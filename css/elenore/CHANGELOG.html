@@ -1,0 +1,425 @@
+<h1 id="Elenore-Changelog"><a href="#Elenore-Changelog" class="headerlink" title="Elenore Changelog"></a>Elenore Changelog</h1><h2 id="1-3-6"><a href="#1-3-6" class="headerlink" title="1.3.6"></a>1.3.6</h2><ul>
+<li>Added: New <code>.has-background-*</code> helper</li>
+<li>Fixed: <code>.card</code> link color</li>
+</ul>
+<h2 id="1-3-5"><a href="#1-3-5" class="headerlink" title="1.3.5"></a>1.3.5</h2><ul>
+<li>Changed: New <code>.button</code> design</li>
+<li>Changed: Add box-shadow to dropbar slide</li>
+<li>Added: <code>.box</code> support color customize</li>
+<li>Added: <code>.card</code> support color customize</li>
+<li>Added: New <code>.is-hover</code> helper</li>
+<li>Added: New <code>.is-overflow</code> helper</li>
+</ul>
+<h2 id="1-3-4"><a href="#1-3-4" class="headerlink" title="1.3.4"></a>1.3.4</h2><ul>
+<li>Added: <code>.has-navbar-fixed-somewhere</code> support to body tag</li>
+<li><p>Added: <code>.footer</code> support color customize</p>
+</li>
+<li><p>Fixed: spacing of the delete button in notification element</p>
+</li>
+<li>Fixed: missing use of <code>$pagination-color</code> variable</li>
+<li>Fixed: navbar-menu background-color</li>
+<li>Fixed: <code>media-content</code> overflow</li>
+<li>Fixed: change dropdown-menu <code>padding-top: unset</code> to support IE11</li>
+</ul>
+<h2 id="1-3-3"><a href="#1-3-3" class="headerlink" title="1.3.3"></a>1.3.3</h2><ul>
+<li>Added: New Rounded buttons, inputs, pagination and toggle tabs</li>
+<li>Added: New <code>.is-italic</code> helper</li>
+<li>Added: <code>sub</code> and <code>sup</code> title sizes</li>
+<li>Added: <code>.is-expanded</code> modifier for <code>navbar-item</code></li>
+<li>Added: <code>.is-centered</code> and <code>.is-right</code> modifiers for <code>tags</code></li>
+<li>Added: <code>.is-empty</code> modifier for <code>file</code></li>
+<li><p>Added: <code>.is-selected</code> class allow on <code>&lt;td&gt;</code> and <code>&lt;th&gt;</code> tags</p>
+</li>
+<li><p>Fixed: <code>$variable-columns</code> to disable <code>--columnGap</code></p>
+</li>
+<li>Fixed: Bug dropdown in <code>hero</code> (primary) menu items not visible</li>
+<li>Fixed: Safari momentum translation</li>
+</ul>
+<h2 id="1-3-2"><a href="#1-3-2" class="headerlink" title="1.3.2"></a>1.3.2</h2><h3 id="New-features"><a href="#New-features" class="headerlink" title="New features"></a>New features</h3><ul>
+<li>Support for five column grid: <code>.is-one-fifth, .is-two-fifths, .is-three-fifths, .is-four-fifths</code></li>
+</ul>
+<h3 id="Fixed"><a href="#Fixed" class="headerlink" title="Fixed"></a>Fixed</h3><ul>
+<li>Fixed: progress bar colors in IE</li>
+</ul>
+<h2 id="1-3-1"><a href="#1-3-1" class="headerlink" title="1.3.1"></a>1.3.1</h2><h3 id="New-features-1"><a href="#New-features-1" class="headerlink" title="New features"></a>New features</h3><ul>
+<li><a href="https://yellowdi.github.io/Elenore/documentation/elements/button/#list-of-buttons">List of buttons</a></li>
+<li>New <code>.is-invisible</code> helper</li>
+</ul>
+<h3 id="Improvements"><a href="#Improvements" class="headerlink" title="Improvements"></a>Improvements</h3><ul>
+<li>Improve: <code>tag &gt; icon</code> spacing</li>
+<li>Improve: <code>hamburger</code> alignment</li>
+</ul>
+<h3 id="Fixed-1"><a href="#Fixed-1" class="headerlink" title="Fixed"></a>Fixed</h3><ul>
+<li>Fixed: able <code>is-selected</code> and <code>is-hoverable</code> styling issue</li>
+</ul>
+<h2 id="1-3-0"><a href="#1-3-0" class="headerlink" title="1.3.0"></a>1.3.0</h2><h3 id="Breaking-changes"><a href="#Breaking-changes" class="headerlink" title="Breaking changes"></a>Breaking changes</h3><ul>
+<li>The new <code>$link</code> color is part of the <code>$colors</code> map. As a result, <code>.button.is-link</code> is a colored button now. Use <code>.button.is-text</code> if you want the underlined button.</li>
+<li>The deprecated <code>variables.sass</code> file has been removed.</li>
+<li>The deprecated <code>nav.sass</code> file has been removed.</li>
+</ul>
+<h3 id="New-features-2"><a href="#New-features-2" class="headerlink" title="New features"></a>New features</h3><ul>
+<li>New <a href="https://yellowdi.github.io/Elenore/documentation/layout/divider">Divider</a></li>
+</ul>
+<h3 id="Improvements-1"><a href="#Improvements-1" class="headerlink" title="Improvements"></a>Improvements</h3><ul>
+<li>The <code>$link</code> color is used instead of <code>$primary</code> in the following components:</li>
+</ul>
+<table><br>  <tr><br>    <th>Variable</th><br>    <th>Old value</th><br>    <th>New value</th><br>  </tr><br>  <tr><br>    <td><code>$dropdown-item-active-color</code></td><br>    <td><code>$primary-invert</code></td><br>    <td><code>$link-invert</code></td><br>  </tr><br>  <tr><br>    <td><code>$dropdown-item-active-background-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$navbar-tab-hover-border-bottom-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$navbar-tab-active-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$navbar-tab-active-border-bottom-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$navbar-dropdown-item-active-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$tabs-link-active-border-bottom-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$tabs-link-active-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$tabs-toggle-link-active-background-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$tabs-toggle-link-active-border-color</code></td><br>    <td><code>$primary</code></td><br>    <td><code>$link</code></td><br>  </tr><br>  <tr><br>    <td><code>$tabs-toggle-link-active-color</code></td><br>    <td><code>$primary-invert</code></td><br>    <td><code>$link-invert</code></td><br>  </tr><br></table>
+
+<h2 id="1-2-3"><a href="#1-2-3" class="headerlink" title="1.2.3"></a>1.2.3</h2><ul>
+<li>Added: <code>.badge</code> can display an outlined by using <code>.is-badge-outlined</code> modifier</li>
+<li>Added: <code>.dropdown</code> now supports <code>.is-up</code> modifier</li>
+<li>Added: <code>.table</code> hover effect is opt-in, by using the <code>.is-hoverable</code> modifier class</li>
+<li>Added: color is consistent with $input-color</li>
+</ul>
+<h2 id="1-2-2"><a href="#1-2-2" class="headerlink" title="1.2.2"></a>1.2.2</h2><ul>
+<li>Added: <code>.card-header-title</code> can be centered with <code>.is-centered</code></li>
+<li>Added: <code>.input</code> readonly and <code>.is-static</code></li>
+<li>Added: <code>.textarea</code> readonly</li>
+</ul>
+<h2 id="1-2-1"><a href="#1-2-1" class="headerlink" title="1.2.1"></a>1.2.1</h2><ul>
+<li><p>Added: <code>.has-text-justified</code> support</p>
+</li>
+<li><p>Fixed: <code>.message .tag</code> combination</p>
+</li>
+<li>Fixed: <code>pre code</code></li>
+<li>Fixed: <code>.breadcrumb</code> alignment</li>
+</ul>
+<h2 id="1-2-0"><a href="#1-2-0" class="headerlink" title="1.2.0"></a>1.2.0</h2><ul>
+<li>Added: Support for third party icons</li>
+<li>Added: Navbar tabs</li>
+<li>Added: <code>text-size-adjust: 100%</code> to <code>html</code></li>
+<li>Added: <code>navbar</code> color modifiers</li>
+<li><p>Added: <code>icon</code> color modifiers</p>
+</li>
+<li><p>Fixed: Undefined variable: <code>$navbar-item</code></p>
+</li>
+<li>Fixed: Font awesome custom <code>font-size</code></li>
+<li><p>Fixed: Font awesome stacked icons</p>
+</li>
+<li><p>Removed: <code>vertical-align: top</code> for icons</p>
+</li>
+<li>Removed: gap between tag and delete button</li>
+<li>Removed: unwanted margin-right on <code>.level-item</code> at mobile breakpoint</li>
+</ul>
+<h2 id="1-1-1"><a href="#1-1-1" class="headerlink" title="1.1.1"></a>1.1.1</h2><ul>
+<li>Added: <code>$button-focus-box-shadow-size</code> and <code>$button-focus-box-shadow-color</code> for customization</li>
+<li>Added: <code>$input-focus-box-shadow-size</code> and <code>$input-focus-box-shadow-color</code> for customization</li>
+<li>Added: <code>.is-narrow</code> modifier for <code>.hero</code> layout</li>
+<li>Added: type to Email input</li>
+<li>Added: a new modifier class for disabling resizability of a textarea</li>
+<li>Added: <code>!important</code> to non responsive display helpers</li>
+<li>Fixed: <code>.navbar-item img</code> max height</li>
+<li>Fixed: <code>$family-primary</code> customisation</li>
+</ul>
+<h2 id="1-1-0"><a href="#1-1-0" class="headerlink" title="1.1.0"></a>1.1.0</h2><ul>
+<li>New <a href="https://yellowdi.github.io/Elenore/documentation/overview/colors">Color</a></li>
+<li>Added: responsive helpers to text-align helpers</li>
+<li>Fixed: <code>.pagination</code> isn’t using <code>$pagination-background</code></li>
+<li>Fixed: <code>.navbar-dropdown</code> with <strong>right</strong> alignment</li>
+<li>Fixed: Text case helpers</li>
+</ul>
+<h2 id="1-0-0"><a href="#1-0-0" class="headerlink" title="1.0.0"></a>1.0.0</h2><h3 id="Added"><a href="#Added" class="headerlink" title="Added"></a>Added</h3><ul>
+<li>New <a href="https://yellowdi.github.io/Elenore/documentation/elements/tag/#list-of-tags">List of tags</a></li>
+<li>New <a href="https://yellowdi.github.io/Elenore/documentation/form/file/">File upload element</a></li>
+<li>New <code>$container-offset</code> variable to determine the <code>.container</code> breakpoints</li>
+<li>New <strong>variable naming system</strong>: <code>component</code>-<code>subcomponent</code>-<code>state</code>-<code>property</code></li>
+<li>Improved <strong>customization</strong> thanks to new set of variables</li>
+</ul>
+<h3 id="Changed"><a href="#Changed" class="headerlink" title="Changed"></a>Changed</h3><p>Variable name changes (mostly appending <code>-color</code>):</p>
+<table><br><tr><th>From</th><th>To</th></tr><br><tr><td><code>$card</code></td><td><code>$card-color</code></td></tr><br><tr><td><code>$card-background</code></td><td><code>$card-background-color</code></td></tr><br><tr><td><code>$card-header</code></td><td><code>$card-header-color</code></td></tr><br><tr><td><code>$dropdown-item</code></td><td><code>$dropdown-item-color</code></td></tr><br><tr><td><code>$dropdown-content-background</code></td><td><code>$dropdown-content-background-color</code></td></tr><br><tr><td><code>$dropdown-item-hover-background</code></td><td><code>$dropdown-item-hover-background-color</code></td></tr><br><tr><td><code>$dropdown-item-hover</code></td><td><code>$dropdown-item-hover-color</code></td></tr><br><tr><td><code>$dropdown-item-active-background</code></td><td><code>$dropdown-item-active-background-color</code></td></tr><br><tr><td><code>$dropdown-item-active</code></td><td><code>$dropdown-item-active-color</code></td></tr><br><tr><td><code>$dropdown-divider-background</code></td><td><code>$dropdown-divider-background-color</code></td></tr><br><tr><td><code>$menu-item</code></td><td><code>$menu-item-color</code></td></tr><br><tr><td><code>$menu-item-hover</code></td><td><code>$menu-item-hover-color</code></td></tr><br><tr><td><code>$menu-item-hover-background</code></td><td><code>$menu-item-hover-background-color</code></td></tr><br><tr><td><code>$menu-item-active</code></td><td><code>$menu-item-active-color</code></td></tr><br><tr><td><code>$menu-item-active-background</code></td><td><code>$menu-item-active-background-color</code></td></tr><br><tr><td><code>$menu-label</code></td><td><code>$menu-label-color</code></td></tr><br><tr><td><code>$message-background</code></td><td><code>$message-background-color</code></td></tr><br><tr><td><code>$message-header-background</code></td><td><code>$message-header-background-color</code></td></tr><br><tr><td><code>$navbar-background</code></td><td><code>$navbar-background-color</code></td></tr><br><tr><td><code>$navbar-item</code></td><td><code>$navbar-item-color</code></td></tr><br><tr><td><code>$navbar-item-hover</code></td><td><code>$navbar-item-hover-color</code></td></tr><br><tr><td><code>$navbar-item-hover-background</code></td><td><code>$navbar-item-hover-background-color</code></td></tr><br><tr><td><code>$navbar-item-active</code></td><td><code>$navbar-item-active-color</code></td></tr><br><tr><td><code>$navbar-item-active-background</code></td><td><code>$navbar-item-active-background-color</code></td></tr><br><tr><td><code>$navbar-tab-hover-background</code></td><td><code>$navbar-tab-hover-background-color</code></td></tr><br><tr><td><code>$navbar-tab-hover-border-bottom</code></td><td><code>$navbar-tab-hover-border-bottom-color</code></td></tr><br><tr><td><code>$navbar-tab-active</code></td><td><code>$navbar-tab-active-color</code></td></tr><br><tr><td><code>$navbar-tab-active-background</code></td><td><code>$navbar-tab-active-background-color</code></td></tr><br><tr><td><code>$navbar-divider-background</code></td><td><code>$navbar-divider-background-color</code></td></tr><br><tr><td><code>$navbar-dropdown-item-hover</code></td><td><code>$navbar-dropdown-item-hover-color</code></td></tr><br><tr><td><code>$navbar-dropdown-item-hover-background</code></td><td><code>$navbar-dropdown-item-hover-background-color</code></td></tr><br><tr><td><code>$navbar-dropdown-item-active</code></td><td><code>$navbar-dropdown-item-active-color</code></td></tr><br><tr><td><code>$navbar-dropdown-item-active-background</code></td><td><code>$navbar-dropdown-item-active-background-color</code></td></tr><br><tr><td><code>$pagination</code></td><td><code>$pagination-color</code></td></tr><br><tr><td><code>$pagination-hover</code></td><td><code>$pagination-hover-color</code></td></tr><br><tr><td><code>$pagination-hover-border</code></td><td><code>$pagination-hover-border-color</code></td></tr><br><tr><td><code>$pagination-focus</code></td><td><code>$pagination-focus-color</code></td></tr><br><tr><td><code>$pagination-focus-border</code></td><td><code>$pagination-focus-border-color</code></td></tr><br><tr><td><code>$pagination-active</code></td><td><code>$pagination-active-color</code></td></tr><br><tr><td><code>$pagination-active-border</code></td><td><code>$pagination-active-border-color</code></td></tr><br><tr><td><code>$pagination-disabled</code></td><td><code>$pagination-disabled-color</code></td></tr><br><tr><td><code>$pagination-disabled-background</code></td><td><code>$pagination-disabled-background-color</code></td></tr><br><tr><td><code>$pagination-disabled-border</code></td><td><code>$pagination-disabled-border-color</code></td></tr><br><tr><td><code>$pagination-current</code></td><td><code>$pagination-current-color</code></td></tr><br><tr><td><code>$pagination-current-background</code></td><td><code>$pagination-current-background-color</code></td></tr><br><tr><td><code>$pagination-current-border</code></td><td><code>$pagination-current-border-color</code></td></tr><br><tr><td><code>$pagination-ellipsis</code></td><td><code>$pagination-ellipsis-color</code></td></tr><br><tr><td><code>$box</code></td><td><code>$box-color</code></td></tr><br><tr><td><code>$box-background</code></td><td><code>$box-background-color</code></td></tr><br><tr><td><code>$button</code></td><td><code>$button-color</code></td></tr><br><tr><td><code>$button-background</code></td><td><code>$button-background-color</code></td></tr><br><tr><td><code>$button-border</code></td><td><code>$button-border-color</code></td></tr><br><tr><td><code>$button-link</code></td><td><code>$button-link-color</code></td></tr><br><tr><td><code>$button-link-hover-background</code></td><td><code>$button-link-hover-background-color</code></td></tr><br><tr><td><code>$button-link-hover</code></td><td><code>$button-link-hover-color</code></td></tr><br><tr><td><code>$button-disabled-background</code></td><td><code>$button-disabled-background-color</code></td></tr><br><tr><td><code>$button-disabled-border</code></td><td><code>$button-disabled-border-color</code></td></tr><br><tr><td><code>$button-static</code></td><td><code>$button-static-color</code></td></tr><br><tr><td><code>$button-static-background</code></td><td><code>$button-static-background-color</code></td></tr><br><tr><td><code>$button-static-border</code></td><td><code>$button-static-border-color</code></td></tr><br><tr><td><code>$input</code></td><td><code>$input-color</code></td></tr><br><tr><td><code>$input-background</code></td><td><code>$input-background-color</code></td></tr><br><tr><td><code>$input-border</code></td><td><code>$input-border-color</code></td></tr><br><tr><td><code>$input-hover</code></td><td><code>$input-hover-color</code></td></tr><br><tr><td><code>$input-hover-border</code></td><td><code>$input-hover-border-color</code></td></tr><br><tr><td><code>$input-focus</code></td><td><code>$input-focus-color</code></td></tr><br><tr><td><code>$input-focus-border</code></td><td><code>$input-focus-border-color</code></td></tr><br><tr><td><code>$input-disabled</code></td><td><code>$input-disabled-color</code></td></tr><br><tr><td><code>$input-disabled-background</code></td><td><code>$input-disabled-background-color</code></td></tr><br><tr><td><code>$input-disabled-border</code></td><td><code>$input-disabled-border-color</code></td></tr><br><tr><td><code>$input-icon</code></td><td><code>$input-icon-color</code></td></tr><br><tr><td><code>$input-icon-active</code></td><td><code>$input-icon-active-color</code></td></tr><br><tr><td><code>$title</code></td><td><code>$title-color</code></td></tr><br><tr><td><code>$subtitle</code></td><td><code>$subtitle-color</code></td></tr><br><tr><td><code>$card-footer-border</code></td><td><code>$card-footer-border-top</code></td></tr><br><tr><td><code>$menu-list-border</code></td><td><code>$menu-list-border-left</code></td></tr><br><tr><td><code>$navbar-tab-hover-border</code></td><td><code>$navbar-tab-hover-border-bottom-color</code></td></tr><br><tr><td><code>$navbar-tab-active-border</code></td><td><code>$navbar-tab-active-border-bottom</code></td></tr><br><tr><td><code>$table-border</code></td><td><code>$table-cell-border</code></td></tr><br><tr><td><code>$table-row-even-background</code></td><td><code>$table-striped-row-even-background-color</code></td></tr><br><tr><td><code>$table-row-even-hover-background</code></td><td><code>$table-striped-row-even-hover-background-color</code></td></tr><br></table>
+
+<h3 id="Fixed-2"><a href="#Fixed-2" class="headerlink" title="Fixed"></a>Fixed</h3><ul>
+<li>Fixed: box missing variables</li>
+<li>Fixed: <code>.dropdown</code> wrapping</li>
+<li>Fixed: missing default statements to box and image</li>
+<li>Fixed: <code>.is-size-7</code> helper is missing</li>
+<li>Fixed: Tabs sass file throwing error with <code>!important</code></li>
+<li>Fixed: Variable <code>$table-head-color</code> isn’t used</li>
+<li>Fixed: <code>navbar-brand</code> overflowing on mobile</li>
+</ul>
+<h2 id="0-4-5"><a href="#0-4-5" class="headerlink" title="0.4.5"></a>0.4.5</h2><h3 id="Changed-1"><a href="#Changed-1" class="headerlink" title="Changed"></a>Changed</h3><ul>
+<li>The breakpoints and <code>.container</code> <strong>gap</strong> can be customized with the new <code>$gap</code> variable</li>
+<li>The <code>.container</code> has 2 new modifiers: <code>.is-widescreen</code> and <code>.is-fullhd</code></li>
+</ul>
+<h3 id="Added-1"><a href="#Added-1" class="headerlink" title="Added"></a>Added</h3><ul>
+<li>New <a href="https://yellowdi.github.io/Elenore/documentation/components/dropdown/">dropdown button</a>!</li>
+<li>New <a href="https://yellowdi.github.io/Elenore/documentation/components/badge/">badge</a>!</li>
+<li>Added: modifiers in <code>.navbar</code></li>
+</ul>
+<h3 id="Fixed-3"><a href="#Fixed-3" class="headerlink" title="Fixed"></a>Fixed</h3><ul>
+<li>Fixed: Textarea now respects rows attribute</li>
+<li>Fixed: <code>body</code> scrollbar</li>
+<li>Fixed: <code>.help</code> class behaviour in horizontal form <code>is-grouped</code> field</li>
+<li>Fixed: Pagination disabled border</li>
+<li>Fixed: Box in hero as text and background white</li>
+<li>Fixed: #1 Card header icon position</li>
+<li>Fixed: JavaScript <code>.nav-burger</code> example</li>
+<li>Fixed: Notification strong color</li>
+</ul>
+<h2 id="0-4-4"><a href="#0-4-4" class="headerlink" title="0.4.4"></a>0.4.4</h2><ul>
+<li>Added: New navbar with dropdown support</li>
+<li>Added: new feature: Breadcrumb component</li>
+<li>Added: responsive <code>is-*-touch</code> tags for .column sizes</li>
+<li>Added: <code>is-hidden</code> to helpers in docs</li>
+<li>Added: figure/figcaption as content element</li>
+<li>Added: <sup> and <sub> support to content</li>
+<li>Added: <code>is-halfheight</code> to hero</li>
+<li>Fixed: Breadcrumb and Navbar in docs</li>
+<li>Fixed: Code examples broken because of <code>text-align: center</code></li>
+<li>Fixed: Loading spinner resizes with controls</li>
+<li>Fixed: Remove <code>height: auto</code> from media elements</li>
+<li>Fixed: Documentation typo</li>
+<li>Fixed: Make use of +fullhd mixin for columns</li>
+<li>Fixed: Add min/max height/width to delete class size modifiers</li>
+<li>Fixed: Section docs update</li>
+</ul>
+<h2 id="0-4-3"><a href="#0-4-3" class="headerlink" title="0.4.3"></a>0.4.3</h2><ul>
+<li>Fixed: selected row on striped table</li>
+<li>Fixed: remove flex-shrink for is-expanded</li>
+<li>Added: icons support for select dropdown</li>
+<li>Fixed: delete button as flexbox item</li>
+<li>Added: static button</li>
+</ul>
+<h2 id="0-4-2"><a href="#0-4-2" class="headerlink" title="0.4.2"></a>0.4.2</h2><ul>
+<li>Fixed: customize Elenore</li>
+<li>Fixed: loading select</li>
+<li>Fixed: control height</li>
+<li>Fixed: is-grouped control</li>
+<li>Fixed: checkbox/radio wrapping</li>
+<li>Feature has-icons placement</li>
+<li>Fixed: selected table row</li>
+<li>Added: customize page</li>
+<li>Fixed: columns negative horizontal margin</li>
+<li>Fixed: pagination wrapping</li>
+<li>Fixed: color keys as strings</li>
+</ul>
+<h2 id="0-4-1"><a href="#0-4-1" class="headerlink" title="0.4.1"></a>0.4.1</h2><ul>
+<li>Fixed: max-width container</li>
+<li>Fixed: notification delete</li>
+<li>Fixed: nav-right without nav-menu</li>
+<li>Fixed: hero and notification buttons</li>
+<li>Fixed: has-addons z-index</li>
+<li>Feature select color modifiers</li>
+<li>Fixed: -ms-expand</li>
+<li>Fixed: better <code>+center</code> mixin</li>
+<li>Fixed: <code>dl</code> styles</li>
+<li>Fixed: <code>pre</code> <code>margin-bottom</code></li>
+<li>Fixed: icon alignment</li>
+<li>Fixed: bold nav menu</li>
+<li>Fixed: nav container</li>
+<li>Fixed: nav grouped buttons</li>
+<li>Fixed: container example</li>
+<li>Fixed: select expanded</li>
+<li>Fixed: separate animations</li>
+</ul>
+<h2 id="0-4-0"><a href="#0-4-0" class="headerlink" title="0.4.0"></a>0.4.0</h2><ul>
+<li><strong>Default font-size is 16px</strong></li>
+<li><strong>New <code>.field</code> element ; <code>.control</code> repurposed</strong></li>
+<li><strong>New <code>.pagination</code> sizes</strong></li>
+<li><p><strong>New <code>$fullhd</code> breakpoint (1344px)</strong></p>
+</li>
+<li><p>Removed: monospace named fonts</p>
+</li>
+<li>Removed: icon spacing logic</li>
+<li>Changed: Split icon container dimensions and icon size</li>
+<li>Fixed: delete button by using pixels instead of (r)em</li>
+<li>Fixed: level on mobile</li>
+<li>Added: new <code>.is-spaced</code> modifer for titles and subtitles</li>
+</ul>
+<h2 id="0-3-8"><a href="#0-3-8" class="headerlink" title="0.3.8"></a>0.3.8</h2><ul>
+<li>Fixed: loading spinner color</li>
+<li>Fixed: invalid sass syntax</li>
+<li>Fixed: the name of the example section</li>
+<li>Added: !default to $button-shadow-inset</li>
+<li>Added: <code>lang</code> attribute to <code>html</code> tag</li>
+</ul>
+<h2 id="0-3-7"><a href="#0-3-7" class="headerlink" title="0.3.7"></a>0.3.7</h2><ul>
+<li>Fixed: rem change breaks build</li>
+</ul>
+<h2 id="0-3-6"><a href="#0-3-6" class="headerlink" title="0.3.6"></a>0.3.6</h2><ul>
+<li>Fixed: <code>.delete</code></li>
+<li>Added: mixins documentation</li>
+<li>Added: functions documentation</li>
+</ul>
+<h2 id="0-3-5"><a href="#0-3-5" class="headerlink" title="0.3.5"></a>0.3.5</h2><ul>
+<li>Fixed: button spacing</li>
+<li>Added: image placeholders</li>
+</ul>
+<h2 id="0-3-4"><a href="#0-3-4" class="headerlink" title="0.3.4"></a>0.3.4</h2><ul>
+<li>Fixed: <code>.columns</code></li>
+<li>Fixed: <code>.tile</code></li>
+</ul>
+<h2 id="0-3-3"><a href="#0-3-3" class="headerlink" title="0.3.3"></a>0.3.3</h2><ul>
+<li>Fixed: <code>.panel</code></li>
+</ul>
+<h2 id="0-3-2"><a href="#0-3-2" class="headerlink" title="0.3.2"></a>0.3.2</h2><ul>
+<li>Fixed: <code>.pagination</code></li>
+<li>Fixed: <code>.tabs</code></li>
+</ul>
+<h2 id="0-3-1"><a href="#0-3-1" class="headerlink" title="0.3.1"></a>0.3.1</h2><ul>
+<li>Added: invert outlined buttons</li>
+<li>Fixed: <code>.nav</code></li>
+</ul>
+<h2 id="0-3-0"><a href="#0-3-0" class="headerlink" title="0.3.0"></a>0.3.0</h2><ul>
+<li>Use <code>rem</code> and <code>em</code> (!)</li>
+<li>Fixed: Font Awesome icons in buttons (!)</li>
+<li>Fixed: message colors (!)</li>
+<li><p>Use <code>{% capture %}</code> to ensure same display as code snippet (!)</p>
+</li>
+<li><p>Move variables to their own file</p>
+</li>
+<li>Remove small tag</li>
+<li>Added: <code>:focus</code> state</li>
+<li>Fixed: table</li>
+<li>Remove table <code>.is-icon</code> and <code>.is-link</code></li>
+<li>Added: <code>.content</code> table</li>
+<li>Fixed: inputs with icons</li>
+<li>Input icons require the <code>.icon</code> container</li>
+<li>Deprecate <code>.media-number</code></li>
+<li>Fixed: <code>.level-item</code> height</li>
+<li>Fixed: <code>.menu</code> spacing</li>
+<li>Deprecate <code>.menu-nav</code></li>
+</ul>
+<h2 id="0-2-0"><a href="#0-2-0" class="headerlink" title="0.2.0"></a>0.2.0</h2><ul>
+<li>Fixed: remove multiple imports</li>
+</ul>
+<h2 id="0-1-8"><a href="#0-1-8" class="headerlink" title="0.1.8"></a>0.1.8</h2><ul>
+<li>Fixed: new brand colors</li>
+<li>Fixed: remove modal example container class</li>
+</ul>
+<h2 id="0-1-7"><a href="#0-1-7" class="headerlink" title="0.1.7"></a>0.1.7</h2><ul>
+<li>Fixed: container flex</li>
+<li>Fixed: nav-item flex</li>
+<li>Fixed: media-number flex</li>
+</ul>
+<h2 id="0-1-6"><a href="#0-1-6" class="headerlink" title="0.1.6"></a>0.1.6</h2><ul>
+<li>Added: table variables</li>
+</ul>
+<h2 id="0-1-5"><a href="#0-1-5" class="headerlink" title="0.1.5"></a>0.1.5</h2><ul>
+<li>Added: modularity</li>
+</ul>
+<h2 id="0-1-4"><a href="#0-1-4" class="headerlink" title="0.1.4"></a>0.1.4</h2><ul>
+<li>Added: grid modules</li>
+</ul>
+<h2 id="0-1-3"><a href="#0-1-3" class="headerlink" title="0.1.3"></a>0.1.3</h2><ul>
+<li>Added: docs folder</li>
+<li>Added: Illuminate.css</li>
+<li>Added: new colors</li>
+<li>Fixed: color luminance</li>
+<li>Remove: mixins</li>
+</ul>
+<h2 id="0-1-2"><a href="#0-1-2" class="headerlink" title="0.1.2"></a>0.1.2</h2><ul>
+<li>Added: <code>.flex-shrink</code></li>
+</ul>
+<h2 id="0-1-1"><a href="#0-1-1" class="headerlink" title="0.1.1"></a>0.1.1</h2><ul>
+<li>Remove <code>flex: 1</code> shorthand</li>
+</ul>
+<h2 id="0-1-0"><a href="#0-1-0" class="headerlink" title="0.1.0"></a>0.1.0</h2><ul>
+<li>BREAKING: <code>.control.is-grouped</code> now uses <code>.control</code> elements as direct children</li>
+<li>Huge bug fixes and code optimization</li>
+</ul>
+<h2 id="0-0-26"><a href="#0-0-26" class="headerlink" title="0.0.26"></a>0.0.26</h2><ul>
+<li>Added: <code>.modal-card</code></li>
+<li>Added: display responsive utilites</li>
+<li>Added: <code>.nav-center</code></li>
+<li>Added: <code>.tabs ul</code> left center right</li>
+<li>Changed: <code>.navbar</code> renamed to <code>.level</code></li>
+<li>Changed: <code>.header</code> renamed to <code>.nav</code></li>
+<li>Deprecated: <code>.header</code></li>
+<li>Deprecated: <code>.navbar</code></li>
+<li>Fixed: <code>.hero</code> layout</li>
+</ul>
+<h2 id="0-0-25"><a href="#0-0-25" class="headerlink" title="0.0.25"></a>0.0.25</h2><ul>
+<li>Added: <code>utilities/controls.sass</code> and <code>elements/form.sass</code></li>
+<li>Added: new responsive classes</li>
+<li>Added: white/black and light/dark colors</li>
+<li>Changed: <code>.tabs</code> need <code>.icon</code> now</li>
+</ul>
+<h2 id="0-0-24"><a href="#0-0-24" class="headerlink" title="0.0.24"></a>0.0.24</h2><h3 id="Added-2"><a href="#Added-2" class="headerlink" title="Added"></a>Added</h3><ul>
+<li><code>is-mobile</code> for the navbar</li>
+</ul>
+<h3 id="Removed"><a href="#Removed" class="headerlink" title="Removed"></a>Removed</h3><ul>
+<li>removed border between sections. Use <code>&lt;hr class=&quot;is-marginless&quot;&gt;</code> now</li>
+</ul>
+<h3 id="Updated"><a href="#Updated" class="headerlink" title="Updated"></a>Updated</h3><ul>
+<li>restructured files</li>
+<li>added back <code>inline-flex</code> for controls and tags</li>
+</ul>
+<h3 id="Removed-1"><a href="#Removed-1" class="headerlink" title="Removed"></a>Removed</h3><ul>
+<li>test tiles</li>
+</ul>
+<h2 id="0-0-23"><a href="#0-0-23" class="headerlink" title="0.0.23"></a>0.0.23</h2><h3 id="BREAKING"><a href="#BREAKING" class="headerlink" title="BREAKING"></a>BREAKING</h3><ul>
+<li><code>Elenore</code> folder renamed to <code>sass</code></li>
+<li><code>variables.sass</code> moved to <code>/utilities</code></li>
+<li>almost everything is singular now</li>
+<li><strong>elements</strong> only have one class</li>
+<li><strong>components</strong> have at least one sub-class</li>
+<li><code>.content</code> moved to elements</li>
+<li><code>.table</code> moved to elements</li>
+<li><code>.message</code> moved to components</li>
+<li><code>.table-icon</code>, <code>.table-link</code>, <code>.table-narrow</code> are now called <code>.is-icon</code>, <code>.is-link</code>, <code>.is-narrow</code></li>
+</ul>
+<h3 id="Added-3"><a href="#Added-3" class="headerlink" title="Added"></a>Added</h3><ul>
+<li>all variables are now <code>!default</code> so you can set your custom variables before importing Elenore</li>
+</ul>
+<h2 id="0-0-22"><a href="#0-0-22" class="headerlink" title="0.0.22"></a>0.0.22</h2><h3 id="Fixed-4"><a href="#Fixed-4" class="headerlink" title="Fixed"></a>Fixed</h3><ul>
+<li>links in hero subtitle</li>
+</ul>
+<h2 id="0-0-21"><a href="#0-0-21" class="headerlink" title="0.0.21"></a>0.0.21</h2><h3 id="Added-4"><a href="#Added-4" class="headerlink" title="Added"></a>Added</h3><ul>
+<li><code>.column.is-narrow</code> to make a column <code>flex: none</code></li>
+</ul>
+<h2 id="0-0-20"><a href="#0-0-20" class="headerlink" title="0.0.20"></a>0.0.20</h2><h3 id="Added-5"><a href="#Added-5" class="headerlink" title="Added"></a>Added</h3><ul>
+<li><code>.has-icon</code> support for different <code>.input</code> sizes</li>
+</ul>
+<h2 id="0-0-19"><a href="#0-0-19" class="headerlink" title="0.0.19"></a>0.0.19</h2><h3 id="NEW"><a href="#NEW" class="headerlink" title="NEW!!!"></a>NEW!!!</h3><ul>
+<li><code>.tile</code></li>
+</ul>
+<h3 id="BREAKING-1"><a href="#BREAKING-1" class="headerlink" title="BREAKING"></a>BREAKING</h3><ul>
+<li><code>.is-third</code> renamed to <code>.is-one-third</code></li>
+<li><code>.is-quarter</code> renamed to <code>.is-one-quarter</code></li>
+</ul>
+<h3 id="Added-6"><a href="#Added-6" class="headerlink" title="Added"></a>Added</h3><ul>
+<li><code>.is-two-thirds</code></li>
+<li><code>.is-three-quarters</code></li>
+</ul>
+<h3 id="Changed-2"><a href="#Changed-2" class="headerlink" title="Changed"></a>Changed</h3><ul>
+<li><code>.delete</code> in <code>.tag</code> has no red</li>
+</ul>
+<h2 id="0-0-18"><a href="#0-0-18" class="headerlink" title="0.0.18"></a>0.0.18</h2><h3 id="BREAKING-2"><a href="#BREAKING-2" class="headerlink" title="BREAKING"></a>BREAKING</h3><ul>
+<li><code>.is-text-*</code> renamed to <code>.has-text-*</code></li>
+<li>removed <code>.is-fullwidth</code> helper</li>
+</ul>
+<h3 id="Added-7"><a href="#Added-7" class="headerlink" title="Added"></a>Added</h3><ul>
+<li><strong>small tag</strong>: <code>.tag.is-small</code></li>
+<li>12th column classes</li>
+<li><code>*-full</code> column classes</li>
+<li><code>$family-code</code></li>
+</ul>
+<h3 id="Fixed-5"><a href="#Fixed-5" class="headerlink" title="Fixed"></a>Fixed</h3><ul>
+<li>disabled input with element</li>
+<li><code>.table</code> last row with <code>th</code></li>
+<li><code>.card</code> color in <code>.hero</code></li>
+<li><code>.columns.is-gapless</code></li>
+</ul>
+<h3 id="Removed-2"><a href="#Removed-2" class="headerlink" title="Removed"></a>Removed</h3><ul>
+<li>removed <code>box-shadow</code> from <code>.tag</code></li>
+<li>custom checkboxes and radio buttons</li>
+</ul>
+<h3 id="Updated-1"><a href="#Updated-1" class="headerlink" title="Updated"></a>Updated</h3><ul>
+<li><code>.tag</code> uses <code>display: inline-flex</code> now</li>
+</ul>
+<h2 id="0-0-17"><a href="#0-0-17" class="headerlink" title="0.0.17"></a>0.0.17</h2><h3 id="Added-8"><a href="#Added-8" class="headerlink" title="Added"></a>Added</h3><ul>
+<li><strong>pagination</strong>: <code>.pagination</code></li>
+<li><strong>horizontal forms</strong>: <code>.control.is-horizontal</code></li>
+<li><strong>help</strong> text for form controls: <code>.help</code></li>
+<li><strong>progress bars</strong>: <code>.progress</code></li>
+</ul>
+<h3 id="Updated-2"><a href="#Updated-2" class="headerlink" title="Updated"></a>Updated</h3><ul>
+<li><code>.button</code> uses <code>display: inline-flex</code> now</li>
+<li><code>.button</code> needs an <code>.icon</code> now</li>
+<li><code>.control.is-grouped</code> renamed to <code>.control.has-addons</code></li>
+<li><code>.control.is-inline</code> renamed to <code>.control.is-grouped</code></li>
+</ul>
+<h3 id="Removed-3"><a href="#Removed-3" class="headerlink" title="Removed"></a>Removed</h3><ul>
+<li><strong>helpers</strong> <code>.is-inline</code> and <code>.is-block</code></li>
+</ul>

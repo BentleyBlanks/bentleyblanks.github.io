@@ -1,0 +1,160 @@
+body {
+  overflow: visible;
+  background-color: rgb(235, 235, 235);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+a {
+  transition: 0.4s ease-in-out;
+}
+
+.is-sticky {
+  position: sticky;
+  top: 1.5rem;
+}
+
+.section {
+  padding: 1.5rem 1.5rem;
+}
+
+/* hero on the top of index*/
+#indexHero {
+  /* darker */
+  background: linear-gradient( rgba(0, 0, 0, 0.65),
+  rgba(0, 0, 0, 0.65)),
+  url("http://pbrt.org/gallery/pavilion-day.jpg");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  margin-top: 3.25rem;  
+  -webkit-box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
+          box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
+}
+
+#titleContent {
+  color: rgb(240, 240, 240);
+  font-size: 1.7rem;
+  font-weight: lighter;
+}
+
+#titleContent span {
+  color: rgb(240, 240, 240);
+  font-weight: bold;
+}
+
+/* hero size */
+@media screen and (min-width: 769px),
+print {
+  .hero.is-large .hero-body {
+    padding-bottom: 13.5rem;
+    padding-top: 13.5rem;
+  }
+}
+
+/* navgation bar*/
+.navbar {
+  font-size: 0.9rem;
+  -webkit-box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
+          box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
+  position: relative;
+}
+
+/*@media screen and (min-width: 1024px) {
+  .navbar.is-white .navbar-start > .navbar-item,
+  .navbar.is-white .navbar-start .navbar-link,
+  .navbar.is-white .navbar-end > .navbar-item,
+  .navbar.is-white .navbar-end .navbar-link {
+    color: #0a0a0a;
+  }
+}*/
+
+/* articles */
+.card {
+  -webkit-box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
+          box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
+}
+
+.card-header {
+  /*background-color: white;*/
+}
+
+.card-header-title {
+	font-size: 1.5rem;
+	font-weight: bold;
+}
+
+.card-header-title {
+  /*transition: 0.4s ease-in-out;*/
+}
+
+/* index article */
+#articleCard .card-content{
+  font-size: 0.9rem;
+  font-weight: normal;
+  line-height: 1.6rem;
+  letter-spacing: 0.01rem;
+}
+
+/* post article */
+#postCard .card-content {
+  font-size: 1rem;
+  font-weight: normal;
+  line-height: 1.9rem;
+  letter-spacing: 0.01rem;
+}
+
+#postCard .card-header-title {
+  font-size: 2rem;
+}
+
+/* index introduce */
+/*#aboutMeCard {
+  position: sticky;
+  top: 1.5rem;
+}*/
+
+/* about me icon */
+#iconLink a {
+  color: rgb(150, 150, 150);
+  /*transition: 0.4s ease-in-out;*/
+}
+
+#iconLink a:hover {
+  color: rgb(20, 20, 20);
+}
+
+/* about me content */
+#aboutContent a {
+  color: rgb(10, 10, 10);
+  /*transition: 0.4s ease-in-out;*/
+}
+
+#aboutContent a:hover {
+  color: rgb(150, 150, 150);
+}
+
+/* footer */
+#footerStyle {
+  font-size: 0.9rem;
+}
+
+#footerStyle a {
+  color: rgb(10, 10, 10);
+  font-weight: bold;
+  /*transition: 0.4s ease-in-out;*/
+}
+
+#footerStyle a:hover {
+  color: rgb(90, 90, 90);
+}
+
+/* about */
+#aboutTitle {
+	font-size: 2.3rem;
+	font-weight: normal;
+}
+
+/* projects */
+#projectsImage {
+  text-align: center;
+}

@@ -1,0 +1,365 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transformation In Multiple Dimensions [ Hexo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+  <link rel="stylesheet" href="/css/highlight/styles/monokai-sublime.css">
+  <script src="/js/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/languages/cpp.min.js"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Transformation In Multiple Dimensions</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>本文运用上文中多维随机变量分布转换规律，来推导出PBRT中一系列重要结论</p>
+</blockquote>
+<hr>
+<blockquote>
+<p><strong>极坐标与笛卡尔坐标</strong></p>
+</blockquote>
+<p>已知$p(x, y)=\frac{p(r, \theta)}{\arrowvert J_t(r, \theta) \arrowvert}$，其中<br>$$T_1(r,\theta)=rcos\theta=x \\<br>T_2(r,\theta)=rsin\theta=y$$</p>
+<p>$$J_t(r, \theta)=\left[<br>\begin{matrix}<br>cos\theta &amp; -rsin\theta \\<br>sin\theta &amp; rcos\theta \\<br>\end{matrix}<br>\right] = r$$</p>
+<p>则有$p(r, \theta) = rp(x, y)$</p>
+<hr>
+<blockquote>
+<p><strong>球坐标与笛卡尔坐标</strong></p>
+</blockquote>
+<p>$$T_1(r,\theta, \phi)=rsin\theta cos\phi = x \\<br>T_2(r,\theta, \phi)=rsin\theta sin\phi = y \\<br>T_3(r,\theta, \phi)=rcos\theta = z$$</p>
+<p>则$p(x, y, z)=\frac{p(r, \theta, \phi)}{\arrowvert J_t(r, \theta, \phi) \arrowvert}$，其中</p>
+<p>$$J_t(r, \theta, \phi)=\left[<br>\begin{matrix}<br>sin\theta cos\phi &amp; rcos\theta cos\phi &amp; -rsin\theta sin\phi \\<br>sin\theta sin\phi &amp; rcos\theta sin\phi &amp; rsin\theta cos\phi \\<br>cos\theta &amp; -rsin\theta &amp; 0 \\<br>\end{matrix}<br>\right] = r^2sin\theta$$</p>
+<p>则有$p(r, \theta, \phi) = r^2sin\theta p(x, y, z)$。</p>
+<hr>
+<blockquote>
+<p><strong>立体角与球坐标</strong></p>
+</blockquote>
+<p>立体角的定义为在单位圆上投影的面积，在球坐标中有$d\omega=sin\theta d\theta d\phi$成立</p>
+<blockquote>
+<p>因此基于物理Lambertion中的$\int_{\Omega}{f(\omega_i, \omega_o, p)cos\theta d\omega}$=1, 可得$f(\omega_i, \omega_o, p) = \frac{1}{\int_{0}^{2\pi}d\phi \int_{0}^{\frac{\pi}{2}}{cos\theta sin\theta d\theta}} = \frac{1}{\pi}$</p>
+</blockquote>
+<p>若定义在某区域$\Omega$上的概率为$Pr\{ \omega \in \Omega \} = \int_{\Omega}{p(\omega)d\omega}$，也有$Pr\{ (\theta ,\phi) \in \Omega ‘\} = \int_{\Omega ‘}{p(\theta, \phi)d\theta d\phi}$</p>
+<p>因此<br>$$p(\theta, \phi)d\theta d\phi=p(\omega) d\omega$$<br>$$p(\theta, \phi)=sin\theta p(\omega)$$</p>
+<hr>
+<blockquote>
+<p><strong>半球上立体角均匀采样</strong></p>
+</blockquote>
+<p>要对单位半球做关于立体角的均匀采样，则$p(\omega)=\frac{1}{2\pi}$，根据上文中与球坐标关系，$p(\theta, \phi)=\frac{sin\theta}{2\pi}$。</p>
+<p>则有两独立同均匀分布随机变量$(\xi,\psi)\in [0,1]$，要转换成满足半球上均匀分布的球坐标表示。</p>
+<p>$$p(\theta) = \int_{0}^{\frac{\pi}{2}}p(\theta, \phi)d\phi = sin\theta, \quad p(\phi) = \int_{0}^{2\pi}p(\theta, \phi)d\theta = \frac{1}{2\pi} $$</p>
+<p>$$p(\theta \arrowvert \phi) = \frac{p(\theta, \phi)}{p(\phi)}=sin\theta, \quad p(\phi \arrowvert  \theta) = \frac{p(\theta, \phi)}{p(\theta)}=\frac{1}{2\pi}$$</p>
+<blockquote>
+<p>这里很明显可以看出来$\theta,\phi$为两个独立随机变量</p>
+</blockquote>
+<p>$$Pr\{\theta’ \leqslant  \theta\} = \int_{0}^{\theta}p(\theta)d\theta=1-cos\theta , Pr\{\phi’ \leqslant  \phi\} = \int_{0}^{\phi}p(\phi)d\phi=2\pi \phi$$</p>
+<p>应用反CDF变换法则，$P^{-1}(\theta)=1-arccos\theta, P^{-1}(\phi)=2\pi \phi$，因此<br>$$\theta=arccos(1-\xi)=arccos\xi \\<br>\phi=2\pi \psi$$</p>
+<p>由于球坐标不容易在计算机中表示，因此转换为笛卡尔表示</p>
+<p>$$x=sin\theta cos\phi=\sqrt{1-\xi^2}cos2\pi \psi \\<br>y = sin\theta sin\phi = \sqrt{1-\xi^2}sin2\pi \psi \\<br>z = cos\theta = \xi$$ </p>
+<blockquote>
+<p>同理可推证球上立体角均匀采样</p>
+</blockquote>
+<blockquote>
+<p>$$x=2\sqrt{\xi(1-\xi)}cos2\pi \psi \\<br>y = 2\sqrt{\xi(1-\xi)}sin2\pi \psi \\<br>z = 1-2\xi$$ </p>
+</blockquote>
+<p>下图为半球上均匀采样的结果与完整球上均匀采样的结果</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/32882394873/in/dateposted-public/" title="hemisphere and sphere" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/4/3827/32882394873_657e2d78a4_z.jpg" width="640" height="248" alt="hemisphere and sphere"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<hr>
+<blockquote>
+<p><strong>单位圆上的均匀采样</strong></p>
+</blockquote>
+<p>要根据面积对单位圆上进行均匀采样，$p(x,y)=\frac{1}{\pi}$，则$p(r, \theta)=rp(x,y)$。</p>
+<p>$$p(\theta)=\int_{0}^{1}\frac{r}{\pi}dr=\frac{1}{2\pi}, \quad p(r\arrowvert \theta)=\frac{p(r,\theta)}{p(\theta)}=2r$$</p>
+<p>则他们对于的CDF为$P(\theta)=\int_{0}^{\theta}p(\theta)d\theta=\frac{\theta}{2\pi}$，$P(r\arrowvert \theta)=\int_{0}^{r}p(r\arrowvert \theta)dr=r^2$</p>
+<p>求出其对应反函数$P^{-1}(\theta)=2\pi\theta$，$P^{-1}(r\arrowvert \theta)=\sqrt{r}$</p>
+<p>若有两满足在$[0, 1]$上均匀分布的随机变量$\xi, \psi$有$\theta=2\pi \xi, r=\sqrt{\psi}$</p>
+<p>则转换回笛卡尔坐标结果为</p>
+<p>$$x = \sqrt{\psi}cos2\pi \xi \\<br>y = \sqrt{\psi}sin2\pi \xi$$</p>
+<blockquote>
+<p>这里$r, \theta$也是两个独立的随机变量</p>
+</blockquote>
+<blockquote>
+<p>PBRT中论述的Concentric Disk Sampling可以参见前文<a href="http://bentleyblanks.github.io/Depth-of-Field/" target="_blank" rel="noopener">Depth of Field</a>中的实现与可视化</p>
+</blockquote>
+<hr>
+<blockquote>
+<p><strong>基于Cosine函数的半球采样</strong></p>
+</blockquote>
+<p>这里使用基本的转换思路，$p(\omega)\propto cos\theta$，因此$p(\omega)=\frac{cos\theta}{\pi}$</p>
+<p>有$p(\theta, \phi)=\frac{sin\theta cos\theta}{\pi}$，则有</p>
+<p>$$p(\theta)=\int_{0}^{2\pi}p(\theta, \phi)d\phi=2sin\theta cos\theta, \quad p(\phi \arrowvert \theta)=\frac{p(\theta, \phi)}{p(\theta)}=\frac{1}{2\pi}$$</p>
+<p>可得CDF为</p>
+<p>$$P(\theta)=\int_{0}^{\theta}p(\theta)d\theta=\frac{1-cos2\theta}{2}, \quad P(\phi \arrowvert \theta)=\int_{0}^{\phi}p(\phi \arrowvert \theta)d\phi=\frac{\phi}{2\pi}$$</p>
+<p>应用反CDF得$P^{-1}(\theta)=\frac{1}{2}arccos(1-2\theta), P^{-1}(\phi \arrowvert \theta)=2\pi \phi$</p>
+<p>$$\theta = \frac{1}{2}arccos(1-2\xi) \\<br>\phi = 2\pi \psi$$</p>
+<p>转换为笛卡尔下的表示为<br>$$x=sin\theta cos\phi = sin(\frac{1}{2}arccos(1-2\xi)))cos2\pi\psi \\<br>y=sin\theta sin\phi =  sin(\frac{1}{2}arccos(1-2\xi)))sin2\pi\psi \\<br>z=cos\theta = cos(\frac{1}{2}arccos(1-2\xi))$$</p>
+<blockquote>
+<p>PBRT中给出了另一种计算办法，将均匀分布在圆盘上的点投影到半球上，其结果就满足Cosine-Weighted。</p>
+</blockquote>
+<p>以下给出证明</p>
+<p>假定在圆盘上的极坐标分布为$p(r, \phi)=\frac{r}{\pi}$（使用$\phi$方便后续将$r$对应为$\theta$相关），$p(r, \phi)=\frac{p(\theta, \phi)}{\arrowvert J_t(r, \theta)\arrowvert}$</p>
+<p>$$r=sin\theta = T_1(r) \\<br>\phi=\phi = T_2(\phi)$$</p>
+<p>$$J_t(r, \theta)=\left[<br>\begin{matrix}<br>cos\theta &amp; 0 \\<br>0 &amp; 1 \\<br>\end{matrix}<br>\right] = cos\theta$$</p>
+<p>即有$p(\theta, \phi)=cos\theta p(r, \phi)=\frac{r cos\theta}{\pi} = \frac{sin\theta cos\theta}{\pi}$，和上述中得到的结果一样。</p>
+<blockquote>
+<p>下图为两种方法产生的Cosine-Weighted对比</p>
+</blockquote>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/33311690620/in/dateposted-public/" title="cartisan and projected" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/4/3838/33311690620_dabe17df74_z.jpg" width="640" height="248" alt="cartisan and projected"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<hr>
+<blockquote>
+<p><strong>三角形均匀采样</strong></p>
+</blockquote>
+<p>PBRT中采用了等腰切两边为1的三角形特殊情况，不过以下计算办法可以变换回任何三角形</p>
+<p>有$p(u,v)=2$（面积倒数），则有</p>
+<p>$$p(u)=\int_{0}^{1-u}p(u,v)dv=2-2u, \quad p(v\arrowvert u)=\frac{p(u,v)}{p(u)}=\frac{1}{1-u} \\<br>P(u)=\int_{0}^{u}p(u)du=2u-u^2, \quad P(v\arrowvert u)=\int_{0}^{v}p(v\arrowvert u)dv=\frac{v}{1-u}$$</p>
+<blockquote>
+<p>这里反变换CDF开根号时要注意到$u,v\in [0,1]$</p>
+</blockquote>
+<p>因此有$u=1-\sqrt{\xi},v=\sqrt{\xi}\psi$</p>
+<blockquote>
+<p>下图中即为三角形上的均匀采样</p>
+</blockquote>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/33311534320/in/dateposted-public/" title="triangle sample" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/3/2841/33311534320_9991e8b365_z.jpg" width="640" height="339" alt="triangle sample"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<hr>
+<blockquote>
+<p><strong>根据二维分段函数分布采样</strong></p>
+</blockquote>
+<p>这里分段函数的采样即为离散随机变量，若有横向纵向各$n_u,n_v$个元素，函数上指定位置一点值为$f(u,v)$，那么就有</p>
+<p>$$I_f=\int_v \int_u f(u,v)dudv=\frac{1}{n_un_v}\sum_{i=0}^{n_u-1}\sum_{j=0}^{n_v-1}f(u_i,v_j) \\<br>p(u,v)=\frac{f(u,v)}{I_f}$$</p>
+<p>而边缘概率密度可直接得到<br>$$p(u)=\int_v p(u,v)dv=\frac{\frac{1}{n_u}\sum_i f(u, v_i)}{I_f} , \quad p(v\arrowvert u)=\frac{p(u,v)}{p(u)}=\frac{f(u,v)}{\frac{1}{n_u}\sum_i f(u, v_i)}$$</p>
+<p>之后利用CDF反变换，即PBRT中distribution1d的实现办法可完成对于$p(u),p(v\arrowvert u)$上的采样</p>
+<blockquote>
+<p>此处效果可见<a href="http://bentleyblanks.github.io/Transforming-Between-Distributions/" target="_blank" rel="noopener">前文</a>中的二维分段函数采样的结果</p>
+</blockquote>
+<hr>
+<blockquote>
+<p><strong>圆锥均匀采样</strong></p>
+</blockquote>
+<blockquote>
+<p>类似于球上的均匀采样, 易证随机变量$\theta, \phi$相互独立</p>
+</blockquote>
+<p>已知$p(\omega)=\frac{1}{2\pi(1-cos\theta_{max})}$，则$p(\theta, \phi)=\frac{sin\theta}{2\pi(1-cos\theta_{max})}$</p>
+<p>$$p(\theta)=\int_{0}^{2\pi}p(\theta, \phi)d\phi=\frac{sin\theta}{1-cos\theta_{max}}, \quad p(\phi)=\int_{0}^{2\pi}\frac{sin\theta}{2\pi(1-cos\theta_{max})}d\theta=\frac{1}{2\pi}$$</p>
+<p>$$P(\theta)=\int_{0}^{\theta}\frac{sin\theta}{1-cos\theta_{max}}d\theta=\frac{1-cos\theta}{1-cos\theta_{max}}, \quad P(\phi)=\int_{0}^{\phi}\frac{1}{2\pi}d\phi=\frac{\phi}{2\pi}$$</p>
+<p>若有两随机变量$xi, \psi$，运用反变换可有（此处省略了$\theta, \phi$到笛卡尔的转换）</p>
+<p>$$cos\theta=1-\xi +\xi cos\theta_{max}, \quad \phi=2\pi\psi$$</p>
+<blockquote>
+<p>下图中即为圆锥上的均匀采样</p>
+</blockquote>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/33700555886/in/dateposted-public/" title="cone sampling" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/3/2822/33700555886_1fe03e48cd_z.jpg" width="640" height="369" alt="cone sampling"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <!-- empty -->
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+
+      <!-- empty -->
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, based on <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+    </div>
+  </div>
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+
+</body>
+</html>
