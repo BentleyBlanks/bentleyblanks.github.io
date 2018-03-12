@@ -1,0 +1,273 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unidirectional Path Tracing 2 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Unidirectional Path Tracing 2</h3>
+					</div>
+					<div class="card-content">
+					  <p><h3 id="Deprecated-2017-03-30"><a href="#Deprecated-2017-03-30" class="headerlink" title="Deprecated(2017.03.30)"></a>Deprecated(2017.03.30)</h3><blockquote>
+<p>对于Unidirectional Path Tracing的理解是建立在<a href="http://cg.informatik.uni-freiburg.de/course_notes/graphics2_09_pathTracing.pdf" target="_blank" rel="noopener">Path Tracing</a>之上</p>
+</blockquote>
+<blockquote>
+<p>本文用于记录当前阶段对于Path Tracing的理解。此笔记的问题来源于，对于Path Tracing使用Direct Lighting的疑惑。</p>
+</blockquote>
+<p>很多教材上提到了渲染方程</p>
+<p>$$L_o(p,\vec{w_o}=L_e(p,\vec{w_o})+\int_{2\pi}f_r(p,\vec{w_i},\vec{w_o})L_i(p,\vec{w_i})cos\theta_i d\omega_i$$</p>
+<p>然后紧接着说到，我们将此方程改写成直接光照部分和间接光照部分，比如<a href="http://www.amazon.com/Advanced-Global-Illumination-Second-Philip/dp/1568813074" target="_blank" rel="noopener">Advanced Global Illumination</a>，问题出在，当真正遇到代码实现的时候，压根找不到间接光的部分，不论是BDPT还是PT都无法直观的理解到间接光的部分。或者说不清楚间接光在代码中的体现。</p>
+<hr>
+<blockquote>
+<p>下图是帮助理解的核心</p>
+</blockquote>
+<p><img src="https://farm2.staticflickr.com/1462/26611340365_dbd824a614_c.jpg" alt=""></p>
+<p>关键部分就是<strong>间接光照 = 反射光照</strong>，这从根本上解释了间接光照的含义就是从其他位置处反射的光照，而非从光源上。</p>
+<p>假定所有表面都不自发光，也就是$L_e(p,\vec{w_i})=0$，那么定义X位置处上的入射辐射度为$L_x$，直接光照部分记为$D_x$，间接光照/反射光照部分记为$R_x$，BRDF项记为$f_{rx}$</p>
+<p>$$<br>\begin{array}{l}<br>L_x &amp;=&amp; f_{rX}<em>(D_X+R_X)<br>\ &amp;=&amp; f_{rX}</em>(D_X+f_{rA}<em>(D_A+R_A))<br>\ &amp;=&amp; f_{rX}</em>(D_X+f_{rA}<em>(D_A+f_{rB}</em>(D_B+R_B)))<br>\ &amp;=&amp; f_{rX}<em>(D_X+f_{rA}</em>(D_A+f_{rB}<em>(D_B+f_{ri}</em>(…))))<br>\end{array}$$</p>
+<p>也就是</p>
+<p>$$L_o(p,\vec{w_o})=\int_{2\pi}f_r(p,\vec{w_i},\vec{w_o})(Le(rc(p,\vec{w_i},-\vec{w_i})+Lr(rc(p,\vec{w_i}),-\vec{w_i})))cos\theta_i d\omega_i$$</p>
+<p>这里$L_e$项表示emitted radiance，因为其他表面没有自发光项，因此就是光源部分的辐射度贡献，即<strong>直接光照</strong>direct illumination部分；$L_r$项表示reflected radiance，也就是<strong>间接光照</strong>indirect ilumination。</p>
+<p>根据无穷积分的定义，也可以改写为</p>
+<p>$$<br>\begin{array}{l}<br>L_o(p,\vec{w_o}) &amp;=&amp; \int_{2\pi}f_r(p,\vec{w_i},\vec{w_o})Le(rc(p,\vec{w_i},-\vec{w_i})cos\theta_i d\omega_i<br>\ &amp;+&amp; \int_{2\pi}f_r(p,\vec{w_i},\vec{w_o})Lr(rc(p,\vec{w_i}),-\vec{w_i})\frac{cos\theta_i cos\theta’}{||p’-p||^2}V(p,p’)dA<br>\end{array}$$</p>
+<p>右边的$V(p’,p)$项就是shadowRay计算是否可视的结果</p>
+<hr>
+<p>所谓的最简单的递归形式的Path Tracing本质上是对渲染方程的另一种解读，可以想象有以下光路</p>
+<p><img src="https://farm2.staticflickr.com/1613/26522586482_3e71678cb6_o.png" alt=""></p>
+<p>假定光路上任意点$p_i$的$BRDF(p)cos\theta_i$乘积定义为$Q_i$，若光源上出射辐射度为$L_i$</p>
+<p>那么$L_o(p,\vec{w_o})=L_i <em> Q_D </em> Q_C <em> Q_B </em> Q_A $</p>
+<p>回想伪代码实现</p>
+<pre><code class="cpp">for i : spp
+
+    new ray()
+
+    Li += li(ray, scene) / spp
+
+end
+</code></pre>
+<p>等价于</p>
+<p>$$<br>\begin{array}{l}<br>L_o(p,\vec{w_i},\vec{w_o}) &amp;=&amp; (Li<em>Q_D</em>Q_C<em>Q_B</em>Q_A<br>\ &amp;+&amp; Li<em>Q_E</em>Q_C<em>F_B</em>Q_G<br>\ &amp;+&amp; Li<em>Q_H</em>Q_I…)<br>\ &amp;*&amp; \frac{1}{spp}<br>\end{array}<br>$$</p>
+<p>这一计算式本身就是$\int_{2\pi}f_r(p,\vec{w_i},\vec{w_o})L_i(p,\vec{w_i})cos\theta_idw_i$的蒙特卡洛近似实现了</p>
+<hr>
+<blockquote>
+<p>结论</p>
+</blockquote>
+<p>本身递归形式和增量循环形式的Path tracing本身都是一种渲染方程的实现方式，并无差错之分。但前者的问题在与光路击中光源的概率太低的时候，比如场景中只有点光源时那么结果会是一片黑。因此在实现效果上考虑了直接光采样的Path Tracing会更胜一筹。</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

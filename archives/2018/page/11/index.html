@@ -1,0 +1,444 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archives: 2018 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-12-07-Custom function binding in Lua/" class="card-header-title">
+                        自定义函数的Lua绑定
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+<p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+<p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
+<pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
+return temp,9,1
+</code></pre>
+<p>在C程序中</p>
+<pre><code class="cpp">std::stringstream strBuffer;
+while(lua_gettop(luaState))
+{
+    strBuffer.str(std::string());
+    strBuffer &lt;&lt; &quot;lua returned a &quot;;
+
+    int index = lua_gettop(luaState);
+    switch(lua_type(luaState, index))
+    {
+    case LUA_TNUMBER:
+        strBuffer &lt;&lt; &quot;number&quot; &lt;&lt; lua_tonumber(luaState, index);
+        break;
+    case LUA_TTABLE:
+        strBuffer &lt;&lt; &quot;table&quot;;
+        break;
+    case LUA_TSTRING:
+        strBuffer &lt;&lt; &quot;string&quot; &lt;&lt; lua_tostring(luaState, index);
+        break;
+    case LUA_TBOOLEAN:
+        strBuffer &lt;&lt; &quot;boolean&quot; &lt;&lt; lua_toboolean(luaState, index);
+        break;
+    default:
+        strBuffer &lt;&lt; &quot;unknow type&quot;;
+        break;
+    }
+
+    strBuffer &lt;&lt; &quot;\n&quot;;
+    lua_pop(luaState, 1);
+    cout &lt;&lt; strBuffer.str() &lt;&lt; endl;
+}
+</code></pre>
+<p>期望能够解析出每个返回值的类型信息 </p>
+<p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-11-22-constructor/" class="card-header-title">
+                        构造函数正确调用
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <pre><code class="cpp">struct CLS
+{
+    int m_i;
+    CLS( int i ):m_i(i){}
+    CLS()
+    {
+        CLS(0);
+    }
+};
+</code></pre>
+<pre><code class="cpp">int main()
+{
+    CLS obj;
+    // obj.m_i = ?
+    return 0;
+}
+</code></pre>
+<p>从这里，我们归纳如下：</p>
+<blockquote>
+<p>1）在c++里，由于构造函数允许有默认参数，使得这种构造函数调用构造函数来重用代码的需求大为减少</p>
+</blockquote>
+<blockquote>
+<p>2）如果仅仅为了一个构造函数重用另一个构造函数的代码，那么完全可以把构造函数中的公共部分抽取出来定义一个成员函数(推荐为private),然后在每个需要这个代码的构造函数中调用该函数即可</p>
+</blockquote>
+<blockquote>
+<p>3）偶尔我们还是希望在类的构造函数里调用另一个构造函数，可以按下面方式做：</p>
+</blockquote>
+<p>在构造函数里调用另一个构造函数的关键是让第二个构造函数在第一次分配好的内存上执行，而不是分配新的内存，这个可以用标准库的<code>placement new</code>做到：</p>
+<blockquote>
+<p>先看看标准库中<code>placement new</code>的定义</p>
+</blockquote>
+<pre><code class="cpp">inline void *__cdecl operator new(size_t, void *_P)
+{
+    return (_P); 
+} 
+</code></pre>
+<p>可见没有分配新的内存。</p>
+<p>正确的方式：</p>
+<pre><code class="cpp">struct CLS
+{
+    int m_i;
+    CLS( int i ) : m_i(i){}
+    CLS()
+    {
+        new (this)CLS(0);
+    }
+};
+</code></pre>
+<blockquote>
+<p>另： 若构造函数调用自身，则会出现无限递归调用，是不允许的</p>
+</blockquote>
+<p>若是构造函数嵌套调用 那么第二次调用产生的是匿名对象 也就是说 无论在第二次的构造函数中赋任何值 都会被作为临时对象给抹去 <code>那么出了第一次的构造函数相当于没有初始化任何东西</code></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-11-10-Sutherland/" class="card-header-title">
+                        Sutherland-Hodgman Algorithm
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
+<pre><code class="cpp">Polygon SutherlandHodgman( const Polygon startingPolygon, Plane[] clippingPlanes )
+{
+  Polygon output = startingPolygon
+  for each Plane clippingPlane in clippingPlanes
+    input = output
+    output.Clear( )
+    Vec2 startingPoint = input.Last( )
+    for each Vec2 endPoint in input
+      if startingPoint and endPoint in front of clippingPlane
+        out.push( endPoint )
+      else if startingPoint in front and endPoint behind clippingPlane
+        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
+      else if startingPoint and endPoint behind clippingPlane
+        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
+        out.push( endPoint )
+      endPoint = startingPoint
+  return output
+}
+</code></pre>
+<p>其本质就是<code>遍历需要被裁减的多边形的所有的边 每边与裁剪多边形的所有边进行位置判断</code></p>
+<pre><code class="cpp">// InFront = plane.Distance( point ) &gt; 0.0f
+// Behind  = plane.Distance( point ) &lt; 0.0f
+
+Vec2 p1, p2;
+ClipPlane plane;
+
+case p1 InFront and p2 InFront
+  push p2
+case p1 InFront and p2 Behind
+  push intersection
+case p1 Behind and p2 InFront
+  push intersection
+  push p2
+</code></pre>
+<p>上方代码的含义基本为下图</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt=""></p>
+<p>1.当边的方向进入裁剪区域 添加P与P1</p>
+<p>2.当边的方向是背离裁剪区域 只添加P</p>
+<p>3.倘若全部都在背离方向上 不添加点</p>
+<p>4.整个边都在内部 只添加P1</p>
+<p>这里P是p0-&gt;p1与裁剪边的交接点 (一元二次的直线方程可以计算出)</p>
+<p>下方为一个裁剪的案例</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt=""></p>
+<p>详情见</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-11-10-Support Point/" class="card-header-title">
+                        Support Point--Minkowski difference
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
+<p>support point是在给定方向上距离最远(投影最大)的点</p>
+<p>在碰撞检测中也需要寻找分离轴 那么这时候 support point就是在面法线相反的方向上最远的点 也就是<code>背离这个方向深交最深的点</code></p>
+<p>倘若两个多边形相互碰撞 那么<code>一定能</code>找到<code>一个顶点与给定平面之间的距离小于0</code>(在面法线上的投影)</p>
+<p>这与两个多边形互不碰撞那么一定可以找到一跟分离轴分离两个多边形的理论是类似的</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
+<p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<div class="pagination-bar">
+    <ul class="pagination">
+        
+        <li class="pagination-prev">
+            
+                <a class="btn btn--default btn--small" href="/archives/2018/page/10/">
+            
+                <i class="fa fa-angle-left text-base icon-mr"></i>
+                    <span>pagination.newer_posts</span>
+            </a>
+        </li>
+        
+        
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/archives/2018/page/12/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
+        
+        <li class="pagination-number">pagination.page pagination.of</li>
+    </ul>
+</div>
+
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

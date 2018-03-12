@@ -1,0 +1,284 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ray Tracing Notes 2 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Ray Tracing Notes 2</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>此篇的内容为观看<a href="https://www.youtube.com/watch?v=4gXPVoippTs&amp;list=PLujxSBD-JXgnGmsn7gEyN28P1DnRZG7qi&amp;index=3" target="_blank" rel="noopener">Ray Tracing Course</a>多遍后并结合部分<a href="www.pbrt.org">PBRT</a>原文的笔记内容</p>
+</blockquote>
+<h2 id="Radiometry"><a href="#Radiometry" class="headerlink" title="Radiometry"></a>Radiometry</h2><p>Radiant Flux</p>
+<p>$$\phi ~ [W] / [J/s]$$</p>
+<p>之所以不使用辐射通量的原因是因为我们无法分辨究竟：「大量的能量穿过了一个小面积区域」or 「较少的能量穿过了一个大面积区域」（这里能量的多少指代平均面积上能量的分布）</p>
+<p>Irradiance</p>
+<p>$$E ~ [W / m^2]$$</p>
+<blockquote>
+<p>又称入射辐射面密度</p>
+</blockquote>
+<p>不使用辐照度的原因是，无法分辨:「大量能量的入射角较大」or「少量能量的入射角较小」情况</p>
+<p>Radiance</p>
+<p>$$L ~ [W / m^2 · sr]$$</p>
+<blockquote>
+<p>sr表示单位角，在更高纬度的情况而言，又称为solid angle，单位为立体弧度</p>
+</blockquote>
+<p><br></p>
+<h2 id="BRDF"><a href="#BRDF" class="headerlink" title="BRDF"></a>BRDF</h2><p>$$<br>f_r(p, \omega_o, \omega_i) = \frac{dL_o(p, \omega_o)}{dE(p, \omega_i)} =  \frac{dL_o(p, \omega_o)}{L_i(p, \omega_i)\cos\theta_id \omega_i}<br>$$</p>
+<blockquote>
+<p>本质上BRDF就是用来描述「有多少从$w_i$方向入射的光从方向$w_o$上反射出去的函数」</p>
+</blockquote>
+<p>BRDF个人觉得可以多层次解读，首先，BRDF讲解了入射光和反射光的概率密度分布，因为他本质上只是一个入射辐射度和出射辐射度的比例（也就是返回值）;另一个角度而言，在给定了入射方向$w_i$时，BRDF也负责计算出射方向$w_o$的概率。</p>
+<p><br></p>
+<h2 id="Fresnel’s-law-Snell’s-Law"><a href="#Fresnel’s-law-Snell’s-Law" class="headerlink" title="Fresnel’s law + Snell’s Law"></a>Fresnel’s law + Snell’s Law</h2><blockquote>
+<p>菲涅尔公式的作用是计算入射光时，发生反射和折射的概率计算，也可以被认为是入射光能量分布情况，而斯奈尔法则则是确定入射光之后的折射光和反射光角度计算</p>
+</blockquote>
+<p>Snell’s Law中展示出的全反射现象，只会出现在光从光疏介质到光密介质的情况下下。</p>
+<p><br></p>
+<h2 id="Surface-Normal"><a href="#Surface-Normal" class="headerlink" title="Surface Normal"></a>Surface Normal</h2><p>面法线的计算本质上就是求解给定曲面指定点上的梯度$\nabla f(x, y) = 0$，给定双曲面$f(x, y, z) = \frac{x^2}{a^2} + \frac{y^2}{b^2} - z$，其中$a, b$为给定的双曲面的曲率，因此给定点$(x, y, z)$求解面法线，$\nabla f(x, y ,z) = (\frac{2x}{a^2}, \frac{2y}{b^2}, -z)$就是所求梯度。</p>
+<p><br></p>
+<h2 id="F-Stop"><a href="#F-Stop" class="headerlink" title="F-Stop"></a>F-Stop</h2><blockquote>
+<p>对于焦比的科普可以参考<a href="https://www.youtube.com/watch?v=KmNIouLByJQ" target="_blank" rel="noopener">A Simple Explanation of F-Stop</a></p>
+</blockquote>
+<p>本质上从光学上理解，景深的就是因为快门的开关之间进光量的多少造成的。因此例如视频中讲解的$\frac{Focal}{x} = Diameter$,实际单反的$f/1.4$之类的写法本质上就是用于给出光圈大小。</p>
+<p>但因为同样的光圈大小也可能因为焦距不同导致进光量有所不同，因此不直接给出$Diameter$的具体值，而是给出类似$f/2.0$之类的写法。</p>
+<p>而进光量越大，通过透镜的光子也就越多，非焦距上的物体边缘也就显得越模糊，换一种说法就是用于描述非焦距上的物体的光子也就越多。</p>
+<p><br></p>
+<h2 id="Monte-Carlo-Integration"><a href="#Monte-Carlo-Integration" class="headerlink" title="Monte Carlo Integration"></a>Monte Carlo Integration</h2><p>$$<br>E_N[f(x)] = \int^b_a f(x)p(x)dx = \lim_{N \to \infty}\frac{b-a}{N}\sum^N_{i=1}f(X_i)<br>$$</p>
+<blockquote>
+<p>X代表在$f(x)$上的N个随机采样，记为$X_i$</p>
+</blockquote>
+<p>因此本质上使用无意识的统计规律算法，对与原始的$\int_a^bf(x)dx$进行变换(可见PBRT)</p>
+<p>$$<br>\int^b_af(x)dx = \int^b_a\frac{f(x)}{p(x)}p(x)dx = E[\frac{f(x)}{p(x)}] = \frac{1}{N}\sum^N_{i=1}\frac{f(X_i)}{p(X_i)}<br>$$</p>
+<p><br></p>
+<h2 id="Importance-Sampling"><a href="#Importance-Sampling" class="headerlink" title="Importance Sampling"></a>Importance Sampling</h2><p>最佳的重要性采样(最小的方差)，就是函数$f(x)$上的每一个采样点的采样概率，都与其函数值成比例即可($p(X_i) \propto f(X_i)$)</p>
+<blockquote>
+<p>因此一个较佳的$p(\vec{w_i’})$本质上就是与被积函数成比例的函数，如若选择一个均匀概率分布函数，那么就是非重要性采样和重要性采样之间的差距了</p>
+</blockquote>
+<p>例如 $p(\vec{w_i}’) = \frac{cos\theta}{\pi}$，简化渲染方程的计算(BRDF采用最简单的漫反射模型$f_r(p, w_i, w_o) = \frac{\rho}{\pi}$.</p>
+<p>$$<br>\frac{1}{N}\sum^N_{i=1}\frac{L_i(x, \vec{w_i}’)\rho/\pi cos\theta}{cos\theta/\pi} = \frac{1}{N}\sum^N_{i=1}L_i(x, \vec{w_i}’)\rho<br>$$</p>
+<p><br></p>
+<p><img src="https://farm1.staticflickr.com/575/23744227676_e4fd679f8d_o.jpg" width="1002" height="798" alt="cornell_box___spheres_in_cycles_ii_by_elbrujodelatribu-d5l59e0"></p>
+<blockquote>
+<p>配图为康奈尔盒</p>
+</blockquote>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

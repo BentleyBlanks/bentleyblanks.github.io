@@ -1,0 +1,263 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>摩擦力 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">摩擦力</h3>
+					</div>
+					<div class="card-content">
+					  <p><p>1.摩擦力的方向与大小计算与冲量相似 需要计算出与碰撞法线方向垂直的切线方向</p>
+<p>这里定义切线的方向为两个对象之间相对速度的正方向</p>
+<p>$$V_R=V_B−V_A$$</p>
+<p>$$t=V_R−(V_R<em>n)</em>n$$</p>
+<p>这里因tangent切线方向与相对速度方向相同 因此 $V_r - V_r$在碰撞法线上的投影向量就能够得到一个与n垂直的切线向量t</p>
+<hr>
+<p>2.在两对象发生碰撞的时候 直接计算出相互作用力F的办法几乎没有 因此想到可以使用已经计算完成的冲量来计算出两个物体之间的作用力大小</p>
+<ul>
+<li>$P = mv$  动量</li>
+<li>$I = Ft$  =&gt;这里就可以使用已经计算好的冲量I来表示出滑动摩擦力</li>
+<li>$I = P2 - P1$ 冲量 = 动量改变量</li>
+</ul>
+<p>$$Ff&lt;=μFn$$</p>
+<p>PS:</p>
+<p>库伦摩擦力定理</p>
+<ul>
+<li>库仑摩擦第一定律：摩擦力跟作用在摩擦面上的正压力成正比，跟外表的接触面积无关</li>
+<li>库仑摩擦第二定律：滑动摩擦力和滑动速度大小无关</li>
+<li>库仑摩擦第三定律：最大静摩擦大于滑动摩擦力，即f静＞f滑。<br>静摩擦力:</li>
+<li><a href="http://baike.baidu.com/view/13321691.htm" target="_blank" rel="noopener">静滑动摩擦力</a>与一般<a href="http://baike.baidu.com/view/5182857.htm" target="_blank" rel="noopener">约束反力</a>不同，它并不随外力的增大而无限制地增大。</li>
+<li>当外力的大小达到一定数值时，物体处于将要滑动，但又未开始滑动的临界状态。此时，只要外力再大一点，物体就开始滑动。当物体处于平衡的临界状态时，静摩擦力达到最大值，即为最大静滑动摩擦力，简称最大静摩擦力。</li>
+</ul>
+<p>此处计算的Ff就是滑动摩擦力 而uFn也就是最大静摩擦力 由于滑动而产生的摩擦力不会超过最大静摩擦力</p>
+<hr>
+<p>3.有一向量与一单位向量点积 那么结果就是得到该向量在单位向量/方向向量上的投影向量 同理 倘若有一点与一单位向量点积 那么结果就是得到这个点在单位向量上的投影点</p>
+<hr>
+<p>4.转动惯量(Moment of Inertia)是<code>刚体绕轴转动时惯性</code>（回转物体保持其<a href="http://baike.baidu.com/view/84850.htm" target="_blank" rel="noopener">匀速圆周运动</a>或静止的特性）的量度，用字母I或J表示。其量值取决于物体的形状、质量分布及转轴的位置。</p>
+<p>PS:<br>转动惯量的表达式为</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/186d76f9-de51-4a41-bd1b-fb6767026232.png" alt=""></p>
+<p>若刚体的质量是连续分布的，则转动惯量的计算公式可写成</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/eec09ddd-b787-4280-ab23-a1cc1a56275e.png" alt=""></p>
+<p>角加速度与合外力矩的关系 因此这里可以得到角速度的计算公式 <code>dw = (M(力矩) / I(转动惯量) )*dt</code></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/f12aec99-232e-4b6f-9bf7-0ee88655339e/Image.png" alt=""></p>
+<p>力矩 $$M = L x F：L$$是从着力点到转动轴的距离矢量, F是矢量力；力矩也是矢量。</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/9c98b280-ab3e-416c-badb-ac48cbad928e/Image.png" alt=""></p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

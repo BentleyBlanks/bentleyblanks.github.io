@@ -1,0 +1,263 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perspective Disortion [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Perspective Disortion</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>以下问题总结均来自于对<a href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atoms Renderer</a>的实现中的理解。</p>
+</blockquote>
+<p>在使用<a href="https://users.cg.tuwien.ac.at/zsolnai/gfx/smallpaint/" target="_blank" rel="noopener">Smallpaint</a>时发现一个比较奇怪的问题，就是当对象处于镜头边缘时会发生肉眼可见的形变，而另一个<a href="http://www.kevinbeason.com/smallpt/" target="_blank" rel="noopener">smallpt</a>，中渲染的结果就没有这样的现象。</p>
+<p>专业术语称此为<a href="https://en.wikipedia.org/wiki/Perspective_distortion_(photography" target="_blank" rel="noopener">Perspective distortion</a>)，简而言之就是当物体在透视变换到视平面上时会产生镜头畸变。</p>
+<p>畸变的原因可见下图</p>
+<p><img src="http://ymuhua.com/wp-content/uploads/2016/02/distortion.png" alt=""></p>
+<p>可以明显的看到当右边的物体透视投影到视平面上时，其横截面明显长于左边两位，这就是为什么畸变产生的原因。人眼因为是凸出的形状，因此不存在这样的透视变形。</p>
+<p>这本质上说不能称为一个问题/BUG，如何较大程度的改善才是问题的关键。</p>
+<p>这里问题出在视角上，视角越大，可投影的视平面越广，那么发生透视形变的程度也会相应的增大。而较小的视野又会影响到画布上成像内容的变少。</p>
+<p>可见<a href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atoms Renderer</a>渲染结果演示</p>
+<blockquote>
+<p>保持相机位置不变，上左至下 $FOV = 77^\circ$ $90^\circ$ $120^\circ$</p>
+</blockquote>
+<figure><br>    <a href="https://farm2.staticflickr.com/1464/25377210811_7566c5ec89_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1464/25377210811_7566c5ec89_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1663/24839515644_07401fbcce_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1663/24839515644_07401fbcce_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1663/24839515644_07401fbcce_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1584/25470082585_509edc7270_z.jpg" alt=""><br>    </a><br></figure>
+
+<blockquote>
+<p><a href="http://www.kevinbeason.com/smallpt/" target="_blank" rel="noopener">smallpt</a>中$tan(\frac{FOV}{2}) = 0.5137$，也就是$FOV = 54^\circ$，相比于上述三者的形变程度要好的多。</p>
+</blockquote>
+<p>若想要维持类似$FOV = 90^\circ$图的样式，需要改变相机的位置至更远处。尽管视平面范围更小，但可投影的对象范围更大了，因此一定程度上说，拉远相机缩小视角可以很好的解决上述形变问题。</p>
+<blockquote>
+<p>注意到右上角的圆盘的形状可以一直保持一致，这和Plane的原理 是一致的，</p>
+</blockquote>
+<blockquote>
+<p><img src="https://farm2.staticflickr.com/1654/25377652651_c4fd332f32_z.jpg" alt=""></p>
+</blockquote>
+<blockquote>
+<p>这里就可以看到Disk的投影在透视变换过程中并不会发生缩小或扩展(对比之前的球型)</p>
+</blockquote>
+<blockquote>
+<p>保持画面中球的位置近似不变，上左至下 $FOV = 54^\circ$ $90^\circ$ $120^\circ$ $170^\circ$</p>
+</blockquote>
+<figure><br>    <a href="https://farm2.staticflickr.com/1449/25470364765_27e121c91e_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1449/25470364765_27e121c91e_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1663/25377469881_0143a42025_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1663/25377469881_0143a42025_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1502/25444162416_7bd988655e_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1502/25444162416_7bd988655e_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1502/25444162416_7bd988655e_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1485/25470304015_3b306aa270_z.jpg" alt=""><br>    </a><br></figure>
+
+<p>因此选取比较合适的相机参数来改善或者加强鱼眼效果或改善变形是有必要的。</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

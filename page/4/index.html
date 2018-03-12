@@ -1,0 +1,586 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2016-03-09-Möller-Trumbore algorithm/" class="card-header-title">
+                        Möller-Trumbore algorithm
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文为学习<a href="http://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection" target="_blank" rel="noopener">Möller-Trumbore算法</a>的笔记，这里不对前面重心坐标求交进行记录，较为简单可自行推导。</p>
+</blockquote>
+<p>根据中心坐标系可以很轻松的得出</p>
+<p>$$P = (1 - u - v)A + uB + vC$$</p>
+<p>这里P为射线与三角形相交点。u, v为以三角形两边为坐标系轴的P的投影长度(也可以理解为是P与该边两点连线三角形的面积与整体之比)。</p>
+<p>$$P=A - uA - vA + uB + vC = A + u(B - A) + v(C - A)$$</p>
+<p>而$P=O+tD$，因此代入可得</p>
+<p>$$\begin{array}{l}<br>O+tD &amp; = &amp; A + u(B - A) + v(C - A)\\<br>O-A &amp; = &amp; -tD+u(B-A)+v(C-A)<br>\end{array}$$</p>
+<p>这里转换为线性方程组的形式</p>
+<p>$$\begin{bmatrix}<br>-D &amp; (B-A) &amp; (C-A)<br>\end{bmatrix}<br>\begin{bmatrix}<br>t\\u\\v<br>\end{bmatrix}<br>=O-A$$</p>
+<p>那么问题就转化为如何求解出这里的$t$ $u$ $v$三个分量</p>
+<p>运用<a href="http://baike.baidu.com/view/1130618.htm" target="_blank" rel="noopener">克莱姆法则</a></p>
+<blockquote>
+<p>令$M$ = $\begin{bmatrix}<br>-D &amp; (B-A) &amp; (C-A)<br>\end{bmatrix}$, 也就是将上式的$O-A$作为替换项，依次替换$M$中的$-D$，$B-A$, $C-A$，得到$M_t, M_u, M_v$。那么最终$t = \frac{M_t}{M}, u = \frac{M_u}{M}, v = \frac{M_v}{M}$。理所当然的可以写为下面这类形式</p>
+</blockquote>
+<p>$$\left[ \begin{array}{r} t \ u \ v\end{array}\right] = {1 \over \left[ \left| \begin{array}{r} -D &amp; (B-A) &amp; (C-A) \end{array}\right| \right]}<br>\left[ \begin{array}{c}<br>\left| \begin{array}{c}  O-A &amp; B-A &amp; C-A\end{array}\right| \ <br>\left| \begin{array}{c}  -D &amp; O-A &amp; C-A\end{array}\right| \ <br>\left| \begin{array}{c}  -D &amp; B-A &amp; O-A\end{array}\right| \ <br>\end{array}\right]$$</p>
+<blockquote>
+<p>原文在这里使用了变量替换，本质一致</p>
+</blockquote>
+<blockquote>
+<p><a href="https://en.wikipedia.org/wiki/Triple_product#Scalar_or_pseudoscalar" target="_blank" rel="noopener">Scalar triple product</a>很好理解，本质上就是计算一个平行六面体的体积，无论是先进行何方向上的叉积点积，最终计算的都是平行六面体的体积。</p>
+</blockquote>
+<blockquote>
+<p>纯量三重积最重要的一点就是$A·(B \times C) = det \left[ \begin{array}{c}<br>\begin{array}{c}  a_1 &amp; a_2 &amp; a_3\end{array} \ <br>\begin{array}{c}  b_1 &amp; b_2 &amp; b_3\end{array} \ <br>\begin{array}{c}  c_1 &amp; c_2 &amp; c_3\end{array} \\<br>\end{array}\right]$</p>
+</blockquote>
+<blockquote>
+<p>$$D = B \times C = \left[\begin{array}{c}  b_yc_z-b_zc_y &amp; b_zc_x-b_xc_z &amp; b_xc_y-b_yc_x\end{array}\right]$$</p>
+</blockquote>
+<blockquote>
+<p>那么</p>
+</blockquote>
+<blockquote>
+<p>$$A · D = \left[ \begin{array}{c} a_x&amp; a_y &amp; a_z \end{array} \right]·D = a_xb_yc_z + a_yb_zc_x + a_zb_xc_y - a_zb_yc_x - a_yb_xc_z - a_xb_zc_y$$</p>
+</blockquote>
+<blockquote>
+<p>对比行列式结果与上式，发现一致。</p>
+</blockquote>
+<p>根据纯量三重积的结论，可以推出</p>
+<p>$$\left[ \begin{array}{r} t \ u \ v\end{array}\right] =<br>{1 \over {(D \times (C-A)) \cdot (B-A)}}<br>\left[ \begin{array}{c}<br>((O-A) \times (B-A)) \cdot (C-A) \\<br>(D \times (C-A)) \cdot (O-A) \\<br>((O-A) \times (B-A)) \cdot D<br>\end{array}\right]$$</p>
+<blockquote>
+<p>注意这里已经通过交换叉积顺序抵消$-D$前方的负号了</p>
+</blockquote>
+<hr>
+<p>最终实现代码</p>
+<pre><code class="cpp">bool rayTriangleIntersect( 
+    const Vec3f &amp;orig, const Vec3f &amp;dir, 
+    const Vec3f &amp;v0, const Vec3f &amp;v1, const Vec3f &amp;v2, 
+    float &amp;t, float &amp;u, float &amp;v) 
+{ 
+    // ---1
+    Vec3f v0v1 = v1 - v0; 
+    Vec3f v0v2 = v2 - v0; 
+    Vec3f pvec = dir.crossProduct(v0v2); 
+    float det = v0v1.dotProduct(pvec); 
+
+    // if the determinant is negative the triangle is backfacing
+    // if the determinant is close to 0, the ray misses the triangle
+    if (det &lt; kEpsilon) return false; 
+    float invDet = 1 / det; 
+
+    // ---2
+    Vec3f tvec = orig - v0; 
+    u = tvec.dotProduct(pvec) * invDet; 
+    if (u &lt; 0 || u &gt; 1) return false; 
+
+    // ---3
+    Vec3f qvec = tvec.crossProduct(v0v1); 
+    v = dir.dotProduct(qvec) * invDet; 
+    if (v &lt; 0 || u + v &gt; 1) return false; 
+
+    // ---4
+    t = v0v2.dotProduct(qvec) * invDet; 
+
+    return true; 
+#else 
+    ... 
+#endif 
+} 
+</code></pre>
+<p>这里第一步先行计算${1 \over {(D \times (C-A)) \cdot (B-A)}} $中的分母是否为0，来判断三角形平面与射线方向是否平行。从分母的几何意义上说，根据交换律本质上原式也等价于$D · ((C-A)\times(B-A))$，而D的右项即为法线(具体看左右手系)</p>
+<blockquote>
+<p>我这里选取右手系，因为计算得到的法线为反的，因此这里在判断$det$的正负时要看具体左右手系。</p>
+</blockquote>
+<p>得到了det之后就按照克莱姆法则依次计算出t, u, v即可。先行判断$u, v$的取值范围就是用于判断相交点P是否在三角形内。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2016-03-06-Depth of Field/" class="card-header-title">
+                        Depth of Field
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>以下理解均来自PBRT以及网络资源</p>
+</blockquote>
+<p>首先，对普通的品红相机添加景深不是一件非常困难的事情，在这里不赘述景深的生成原理，直接步入实现部分。</p>
+<blockquote>
+<p>正常的品红相机为小孔成像，因此没有景深的概念，而增加一凸透镜之后，那么在焦平面左右的对象成像为清晰的，其余部分根据距离焦平面距离模糊程度不同。</p>
+</blockquote>
+<p>如图所示，</p>
+<p><img src="https://farm2.staticflickr.com/1673/24907059613_076536e068_z.jpg" alt=""></p>
+<p>点$p_1$与$p_2$在成像平面上根据离焦平面位置的不同对应的成像点也略有不同。</p>
+<blockquote>
+<p>若有成像平面上一点$p$, 其光路经过凸透镜任意位置，最终都将「收敛」/「汇集」的一平面上，这一平面就是焦平面，有$\frac{1}{s} + \frac{1}{i} = \frac{1}{f}$的关系(<a href="https://zh.wikipedia.org/wiki/%E8%96%84%E9%80%8F%E9%8F%A1" target="_blank" rel="noopener">透镜公式</a>)。</p>
+</blockquote>
+<p>那么在计算机中，虚拟成像平面与焦平面位于同一侧，此时可这样理解光路：</p>
+<p>多术光从凸透镜任意位置发出，击中成像平面的某一特定位置$p$，终将在焦平面(focal plane)上某一点$p’$汇聚。如图所示。</p>
+<p><img src="https://farm2.staticflickr.com/1650/24903650934_7b9e0eb72c_z.jpg" alt=""></p>
+<p>计算机中相机模型生成景深原理就是上图。</p>
+<hr>
+<blockquote>
+<p>PBRT中景深的实现</p>
+</blockquote>
+<pre><code class="cpp">// 1.于透镜上采样
+float lensU, lensV;
+ConcentricSampleDisk(sample.lensU, sample.lensV, &amp;lensU, &amp;lensV);
+lensU *= lensRadius;
+lensV *= lensRadius;
+
+// 2.计算当前采样点在焦平面上对应的收敛点
+float ft = focalDistance / ray-&gt;d.z;
+Point Pfocus = (*ray)(ft);
+
+// 3.更新相机射出光线信息
+ray-&gt;o = Point(lensU, lensV, 0.f);
+ray-&gt;d = Normalize(Pfocus - ray-&gt;o);
+</code></pre>
+<p>步骤2 3难度不大，其原理就是相似三角形。因为凸透镜上任意光路都会在焦平面汇集，因此为了快速计算得到焦平面上的点，我们直接选取光路<strong>从film上点A经过凸透镜中心的方向</strong>来得到与焦平面的交点(凸透镜中心不会发生折射现象，也就无需使用Snell公式计算出射光线方向)</p>
+<p>难点在于第一步<strong>ConcentricSampleDisk</strong>。要求是在圆形透镜上随机采样，而问题出在我们的采样点分布在<strong>方形区域</strong>内，目标区域为<strong>圆形</strong>，因此需要做一次映射。</p>
+<blockquote>
+<p>原论文实现地址<a href="https://mediatech.aalto.fi/~jaakko/T111-5310/K2013/JGT-97.pdf" target="_blank" rel="noopener">A Low Distortion Map Between Disk and Square</a>。其作用就是在将笛卡尔坐标系下的随机点$p\in[-1, 1]$转换为极坐标，确保正方形区域能够直接映射为极坐标。</p>
+</blockquote>
+<p>传统方法映射笛卡尔坐标至极坐标，转换较为简单。但问题在于无法均匀分布采样点，中心点区域会发生过采样问题。如图</p>
+<pre><code class="cpp">// Draw two uniform random numbers in the range [0,1)
+R1 = RAND(0,1);
+R2 = RAND(0,1);
+
+// Map these values to polar space (phi,radius)
+phi = R1 * 2PI;
+radius = R2 * r;
+
+// Map (phi,radius) in polar space to (x,y) in Cartesian space
+x = cos(phi) * radius;
+y = sin(phi) * radius;
+</code></pre>
+<p><img src="http://l2program.co.uk/wp-content/uploads/2014/12/Polar.png" alt=""></p>
+<blockquote>
+<p>图来自<a href="http://l2program.co.uk/900/concentric-disk-sampling" target="_blank" rel="noopener">Concentric Disk Sampling</a></p>
+</blockquote>
+<p>因此论文<a href="https://mediatech.aalto.fi/~jaakko/T111-5310/K2013/JGT-97.pdf" target="_blank" rel="noopener">A Low Distortion Map Between Disk and Square</a>的优势就在于可以将笛卡尔坐标系下均匀分布的随机点映射至极坐标系下且不会发生过采样问题。如图</p>
+<p><img src="http://l2program.co.uk/wp-content/uploads/2014/12/Concentric.png" alt=""></p>
+<blockquote>
+<p>可以通过直接观察颜色点的对应位置做对比</p>
+</blockquote>
+<hr>
+<blockquote>
+<p>算法分析如下</p>
+</blockquote>
+<p>核心思想本质上就是将方形区域与圆形区域做区域划分<br><img src="https://farm2.staticflickr.com/1568/25239018550_b54382d885_z.jpg" alt=""></p>
+<p>若给定两随机数$a, b\in[0, 1]$，那么首先可以将其映射至$[-1, 1]$范围内。可见上方左图显示。</p>
+<blockquote>
+<p>Region 1</p>
+</blockquote>
+<p>这块区域可由直线$b = a(a&gt;b)$与直线$b = -a(a&gt;-b)$确定，也就是代码中if-else环节所做的工作。</p>
+<p>以下思想很关键，这里视<strong>a为极坐标半径，b为对应圆弧长度</strong>。那么可得$r = a, \phi = \frac{\pi}{4}·\frac{b}{a}$</p>
+<p>检验，当$a = 0.4, b = 0.2$时，可得$r = 0.4, \phi = \frac{\pi}{8}$；当$a = 0.4, b = -0.2$时，可得$r = 0.4, \phi = -\frac{\pi}{8}$与逻辑推导吻合。</p>
+<p>同理，根据每个区域的$a,b$绝对值关系，推出Region 2:$r = b, \phi = \frac{\pi}{4}·(2-\frac{b}{a})$, Region 3:$r = -a, \phi = \frac{\pi}{4}·(4+\frac{b}{a})$，Region 4:$\frac{\pi}{4}·(6-\frac{b}{a})$。</p>
+<blockquote>
+<p>可以自行确定$\mid a\mid$与$\mid b\mid$之间的关系</p>
+</blockquote>
+<p>再加上最后一个圆心处, $r = 0, \phi = 0$，即可构成完成的笛卡尔坐标映射至极坐标的任务。</p>
+<p>测试结果如下，左图为均匀分布随机采样点，右图为(使用OF 0.9.0做打点测试)，直观的看到非常吻合和算法本身实现效果。</p>
+<p><img src="https://farm2.staticflickr.com/1513/25441801691_e1d932503a_z.jpg" alt=""></p>
+<hr>
+<p>最后上OF实现代码</p>
+<pre><code class="cpp">ofVec2f squareToUniformDisk(const float sampleU, const float sampleV, int type)
+{
+    float phi, r, u, v;
+    // (a,b) is now on [-1,1]ˆ2
+    float a = 2 * sampleU - 1;
+    float b = 2 * sampleV - 1;
+
+    // region 1 or 2
+    if(a &gt; -b)
+    {
+        // region 1, also |a| &gt; |b|
+        if(a &gt; b)
+        {
+            r = a;
+            phi = (PI / 4) * (b / a);
+        }
+        // region 2, also |b| &gt; |a|
+        else
+        {
+            r = b;
+            phi = (PI / 4) * (2 - (a / b));
+        }
+    }
+    // region 3 or 4
+    else
+    {
+        // region 3, also |a| &gt;= |b|, a != 0
+        if(a &lt; b)
+        {
+            r = -a;
+            phi = (PI / 4) * (4 + (b / a));
+        }
+        // region 4, |b| &gt;= |a|, but a==0 and b==0 could occur.
+        else
+        {
+            r = -b;
+            if(b != 0)
+                phi = (PI / 4) * (6 - (a / b));
+            else
+                phi = 0;
+        }
+    }
+
+    u = r* cos(phi);
+    v = r* sin(phi);
+    return ofVec2f(u, v);
+}
+</code></pre>
+<blockquote>
+<p>原作者在其博客中更新了该映射方法，据本人说明是提升了运算效率，详情可见链接<a href="http://psgraphics.blogspot.co.uk/2011/01/improved-code-for-concentric-map.html" target="_blank" rel="noopener">Blog</a>，其中PBRT就选用的是原作者更新后的实现办法，可酌情选择。</p>
+</blockquote>
+<hr>
+<p>基本完成了上述结果，通过调节相机参数，就可以得到较为完善的景深效果。以下结果由<a href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atoms Renderer</a>渲染得到。</p>
+<p><img src="https://farm2.staticflickr.com/1531/25509064516_8314deedf1_z.jpg" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2016-03-03-Perspective Distortion/" class="card-header-title">
+                        Perspective Disortion
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>以下问题总结均来自于对<a href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atoms Renderer</a>的实现中的理解。</p>
+</blockquote>
+<p>在使用<a href="https://users.cg.tuwien.ac.at/zsolnai/gfx/smallpaint/" target="_blank" rel="noopener">Smallpaint</a>时发现一个比较奇怪的问题，就是当对象处于镜头边缘时会发生肉眼可见的形变，而另一个<a href="http://www.kevinbeason.com/smallpt/" target="_blank" rel="noopener">smallpt</a>，中渲染的结果就没有这样的现象。</p>
+<p>专业术语称此为<a href="https://en.wikipedia.org/wiki/Perspective_distortion_(photography" target="_blank" rel="noopener">Perspective distortion</a>)，简而言之就是当物体在透视变换到视平面上时会产生镜头畸变。</p>
+<p>畸变的原因可见下图</p>
+<p><img src="http://ymuhua.com/wp-content/uploads/2016/02/distortion.png" alt=""></p>
+<p>可以明显的看到当右边的物体透视投影到视平面上时，其横截面明显长于左边两位，这就是为什么畸变产生的原因。人眼因为是凸出的形状，因此不存在这样的透视变形。</p>
+<p>这本质上说不能称为一个问题/BUG，如何较大程度的改善才是问题的关键。</p>
+<p>这里问题出在视角上，视角越大，可投影的视平面越广，那么发生透视形变的程度也会相应的增大。而较小的视野又会影响到画布上成像内容的变少。</p>
+<p>可见<a href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atoms Renderer</a>渲染结果演示</p>
+<blockquote>
+<p>保持相机位置不变，上左至下 $FOV = 77^\circ$ $90^\circ$ $120^\circ$</p>
+</blockquote>
+<figure><br>    <a href="https://farm2.staticflickr.com/1464/25377210811_7566c5ec89_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1464/25377210811_7566c5ec89_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1663/24839515644_07401fbcce_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1663/24839515644_07401fbcce_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1663/24839515644_07401fbcce_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1584/25470082585_509edc7270_z.jpg" alt=""><br>    </a><br></figure>
+
+<blockquote>
+<p><a href="http://www.kevinbeason.com/smallpt/" target="_blank" rel="noopener">smallpt</a>中$tan(\frac{FOV}{2}) = 0.5137$，也就是$FOV = 54^\circ$，相比于上述三者的形变程度要好的多。</p>
+</blockquote>
+<p>若想要维持类似$FOV = 90^\circ$图的样式，需要改变相机的位置至更远处。尽管视平面范围更小，但可投影的对象范围更大了，因此一定程度上说，拉远相机缩小视角可以很好的解决上述形变问题。</p>
+<blockquote>
+<p>注意到右上角的圆盘的形状可以一直保持一致，这和Plane的原理 是一致的，</p>
+</blockquote>
+<blockquote>
+<p><img src="https://farm2.staticflickr.com/1654/25377652651_c4fd332f32_z.jpg" alt=""></p>
+</blockquote>
+<blockquote>
+<p>这里就可以看到Disk的投影在透视变换过程中并不会发生缩小或扩展(对比之前的球型)</p>
+</blockquote>
+<blockquote>
+<p>保持画面中球的位置近似不变，上左至下 $FOV = 54^\circ$ $90^\circ$ $120^\circ$ $170^\circ$</p>
+</blockquote>
+<figure><br>    <a href="https://farm2.staticflickr.com/1449/25470364765_27e121c91e_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1449/25470364765_27e121c91e_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1663/25377469881_0143a42025_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1663/25377469881_0143a42025_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1502/25444162416_7bd988655e_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1502/25444162416_7bd988655e_z.jpg" alt=""><br>    </a><br><br>    <a href="https://farm2.staticflickr.com/1502/25444162416_7bd988655e_z.jpg" target="_blank" rel="noopener"><br>        <img src="https://farm2.staticflickr.com/1485/25470304015_3b306aa270_z.jpg" alt=""><br>    </a><br></figure>
+
+<p>因此选取比较合适的相机参数来改善或者加强鱼眼效果或改善变形是有必要的。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2016-03-02-Direction of refraction/" class="card-header-title">
+                        Direction of refraction
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p><img src="http://images.cnitblog.com/blog/464532/201304/03225127-69686acd16b245a7ad23d6ffa36fc03f.png" alt="Demo"></p>
+<p>已知平面法向量$\vec{N}$, 入射向量$\vec{L}$, 代求向量$\vec{T}$, 入射夹角$\theta_1$, 折射角$\theta_2$，现求$\vec{T}$. $\vec{N}$, $\vec{L}$与$\vec{T}$均为方向向量. </p>
+<p>将$\vec{L}$与$\vec{T}$分解到$N$和切平面上，分量记为$l_1, l_2, t_1, t_2$.</p>
+<p>$$L = l_1 + l_2$$</p>
+<p>$$l2 = -N · cos\theta_1$$</p>
+<p>可得</p>
+<p>$$l_1 = L - l_2 = L + N · cos\theta_1$$</p>
+<p>这里$t_1$与$l_1$方向一致, 令$\frac{sin\theta_1}{sin\theta_2} = \eta = \frac{n_2}{n_1}$(菲涅尔公式)</p>
+<p>$$t_1 = l_1 <em> \frac{sin\theta_2}{sin\theta_1} = l_1 </em> \frac{1}{\eta}$$</p>
+<p>同理推出</p>
+<p>$$T = t_1 + t_2$$</p>
+<p>$$t2 = -N · cos\theta_2$$</p>
+<p>可得</p>
+<p>$$\begin{array}{l}<br>T &amp; = &amp; l_1 <em> \frac{1}{\eta} - N </em> cos\theta_2 \\<br>&amp; = &amp; L - l_2 \\<br>&amp; = &amp; \frac{1}{\eta}(L + N · cos\theta_1) - N * cos\theta_2 \\<br>&amp; = &amp; \frac{1}{\eta}L + N·(\frac{1}{\eta}cos\theta_1 - cos\theta_2)<br>\end{array}<br>$$</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<div class="pagination-bar">
+    <ul class="pagination">
+        
+        <li class="pagination-prev">
+            
+                <a class="btn btn--default btn--small" href="/page/3/">
+            
+                <i class="fa fa-angle-left text-base icon-mr"></i>
+                    <span>pagination.newer_posts</span>
+            </a>
+        </li>
+        
+        
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/page/5/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
+        
+        <li class="pagination-number">pagination.page pagination.of</li>
+    </ul>
+</div>
+
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

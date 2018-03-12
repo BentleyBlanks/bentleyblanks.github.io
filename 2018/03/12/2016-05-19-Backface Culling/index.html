@@ -1,0 +1,246 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backface culling [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Backface culling</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>本文的三角形相交测试算法为<a href="http://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection" target="_blank" rel="noopener">Möller-Trumbore algorithm</a></p>
+</blockquote>
+<p>这里的back-facing culling表示的是若此三角形背对着观察者，那么就直接在相交测试中跳过，返回false。这在正常逻辑思维下是正常的，直到遇到了Refraction的材质。</p>
+<p>首先是正常参数方程定义的两个球的对比，<code>基本上除了目前未调正确的Fresnel以外</code>，折射部分是没有太大问题的。</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/27004752252/in/dateposted-public/" title="3" target="_blank" rel="noopener"><img src="https://farm8.staticflickr.com/7060/27004752252_e94be87867.jpg" width="500" height="500" alt="3"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<p>Atmos的渲染结果</p>
+<p><img src="https://farm8.staticflickr.com/7257/27098895035_64e84660d9.jpg" alt=""></p>
+<p>Mitsuba的渲染结果</p>
+<hr>
+<p>一旦将其改为网格形成的球体，结果令人吃惊的不一致。</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/27004782352/in/dateposted-public/" title="hello" target="_blank" rel="noopener"><img src="https://farm8.staticflickr.com/7240/27004782352_01a7272641.jpg" width="500" height="500" alt="hello"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<p>Atmos的渲染结果</p>
+<p><img src="https://farm8.staticflickr.com/7448/27065757716_04fe6f19d5.jpg" alt=""></p>
+<p>Mitsuba的渲染结果</p>
+<hr>
+<p>在ScatchPixel原文中有这样一段</p>
+<blockquote>
+<p>“… Remember as well that the user might want to cull (discard) back-facing triangles.  …”用户自定义背面剔除</p>
+</blockquote>
+<p>事实上，默认的三角形理应是双面的，因为但当类似于玻璃材质模型光线在几何体内部时必然会遇到光线从背后穿过三角形的问题。一开始我并没有意识到这是三角形的背面剔除的问题，球上折射的内容让我误以为是因为法线的错误问题。</p>
+<p>正确的不跳过背面三角形的Atmos渲染结果如下</p>
+<p><img src="https://farm8.staticflickr.com/7627/27098922015_b99d364d13.jpg" alt=""></p>
+<p>最终，提供材质球的修复前后对比。</p>
+<blockquote>
+<p>BUG非常隐晦，一开始的确完全没有想到是剔除的问题</p>
+</blockquote>
+<p><img src="https://farm8.staticflickr.com/7164/26495490933_0b03b201bf.jpg" alt=""></p>
+<p>错误结果</p>
+<p><img src="https://farm8.staticflickr.com/7531/26495924673_9cf7cebd2f.jpg&quot;" alt=""></p>
+<p>正确结果</p>
+<hr>
+<blockquote>
+<p>坑爹，这BUG找了老子一整晚</p>
+</blockquote>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

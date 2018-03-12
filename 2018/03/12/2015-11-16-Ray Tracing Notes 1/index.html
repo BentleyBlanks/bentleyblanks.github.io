@@ -1,0 +1,645 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ray Tracing Notes 1 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Ray Tracing Notes 1</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>所有的内容都是根据<a href="https://www.youtube.com/watch?v=4gXPVoippTs&amp;list=PLujxSBD-JXgnGmsn7gEyN28P1DnRZG7qi&amp;index=3" target="_blank" rel="noopener">Ray Tracing Course</a>上的课程所做的笔记，因此会包含单词释义，概念记录等等</p>
+</blockquote>
+<h2 id="初级单词释义"><a href="#初级单词释义" class="headerlink" title="初级单词释义"></a>初级单词释义</h2><table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">Radiant flux</td>
+<td style="text-align:center">辐射通量</td>
+</tr>
+<tr>
+<td style="text-align:center">Irradiance</td>
+<td style="text-align:center">辐射度</td>
+</tr>
+<tr>
+<td style="text-align:center">Radiance</td>
+<td style="text-align:center">辐射</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec V$</td>
+<td style="text-align:center">从观察者方向发出的方向</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec N$</td>
+<td style="text-align:center">面法线</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec L$</td>
+<td style="text-align:center">指向光源的向量</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec R$</td>
+<td style="text-align:center">全局光照中反射而来的光线方向 也就是光源在表面上L反射出的间接光照 $\vec R = \vec L - 2\vec N(\vec L \vec N)$，也就是$\vec L · \vec N$得到$\cos \alpha$ 乘以$\vec N$ 表示$\vec L$在$\vec N$方向上的投影 在根据平行四边形法则即可得到$\vec R$</td>
+</tr>
+<tr>
+<td style="text-align:center">$\theta _i$</td>
+<td style="text-align:center">入射角</td>
+</tr>
+<tr>
+<td style="text-align:center">$\theta _r$</td>
+<td style="text-align:center">反射角</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<h2 id="如何描述不同的表面材质？"><a href="#如何描述不同的表面材质？" class="headerlink" title="如何描述不同的表面材质？"></a>如何描述不同的表面材质？</h2><p>不同的材质在接受入射光时，会反射向不同的方向以及吸收不同数量的光</p>
+<p><br></p>
+<h2 id="BRDF概念定义"><a href="#BRDF概念定义" class="headerlink" title="BRDF概念定义"></a>BRDF概念定义</h2><p>$$f_r$$(入射光方向，光在表面上的点，出射光方向)</p>
+<p>$$f_r(\omega，x，\omega’)$$</p>
+<p>因此称他们的集合为<strong>BSDF</strong>或者为<strong>BxDF </strong>也就是说一个表面既能反射也能折射的现象</p>
+<p><br></p>
+<h2 id="BRDF的性质"><a href="#BRDF的性质" class="headerlink" title="BRDF的性质"></a>BRDF的性质</h2><p><strong>双向性</strong>: 也就是fr(ω’，x，ω)  = fr(ω，x，ω’) 当出射光变为入射光再次计算 结果得到原来的入射光方向</p>
+<p><strong>正性</strong>: BRDF的fr(ω’，x，ω) ≥0</p>
+<p><strong>能量守恒</strong>: 表面可能会吸收或者反射入射光 但是两者的能量和都不能超过入射光能量</p>
+<blockquote>
+<p>在所有可能的出射(折射 反射的面上积分) 同时也算上了光的衰减现象</p>
+<p>$\int_{\Omega}f_r(ω，x，ω’) cos\theta d\omega$ (实际为入射光和出射光能量的比值) ≤1 如果=1那么就是发生了全反射现象 ≤1也就是说一部分的光被吸收了 不可能出现能量不守恒的情况</p>
+</blockquote>
+<p><br></p>
+<h2 id="渲染公式定义解读"><a href="#渲染公式定义解读" class="headerlink" title="渲染公式定义解读"></a>渲染公式定义解读</h2><blockquote>
+<p>Rendering Equation</p>
+</blockquote>
+<p>$$<br>L_o(x, \vec ω) = L_e(x, \vec ω) + \int_{\Omega}L_i(x, \vec ω’) f_r(\vec ω，x，\vec ω’ ) cos\theta d\vec ω<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$L_o$</td>
+<td style="text-align:center">从表面点x上离开的辐射度</td>
+</tr>
+<tr>
+<td style="text-align:center">$L_e$</td>
+<td style="text-align:center">从表面点x上发射出的辐射度</td>
+</tr>
+<tr>
+<td style="text-align:center">$\int_{\Omega}…d\vec\omega$</td>
+<td style="text-align:center">所有外来的入射光引起的出射光的总和</td>
+</tr>
+<tr>
+<td style="text-align:center">$L_i(x, \vec\omega’$)</td>
+<td style="text-align:center">从给定方向上指向点x的入射辐射度</td>
+</tr>
+<tr>
+<td style="text-align:center">$f_r(\vec\omega,x,\vec\omega’)$</td>
+<td style="text-align:center">BRDF</td>
+</tr>
+<tr>
+<td style="text-align:center">$cos\theta$</td>
+<td style="text-align:center">光衰减系数</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<h2 id="Ambient模型"><a href="#Ambient模型" class="headerlink" title="Ambient模型"></a>Ambient模型</h2><blockquote>
+<p>最简单的BRDF模型 ambient模型 尽管不是基于物理 但会是一个很好理解的上手模型公式 也就是一个模型将会有不受位置角度影响的基本RGB颜色</p>
+</blockquote>
+<p>$$<br>I = k_aI_a<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">I</td>
+<td style="text-align:center">光强度</td>
+</tr>
+<tr>
+<td style="text-align:center">$k_a$</td>
+<td style="text-align:center">环境光系数</td>
+</tr>
+<tr>
+<td style="text-align:center">$I_a$</td>
+<td style="text-align:center">环境光光照强度</td>
+</tr>
+</tbody>
+</table>
+<p> <br></p>
+<blockquote>
+<p>漫反射Diffuse模型</p>
+</blockquote>
+<p>$$<br>I = k_{a,\lambda}(\vec L · \vec N)<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$k_a$</td>
+<td style="text-align:center">漫反射系数</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec L$</td>
+<td style="text-align:center">指向光源的向量</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec N$</td>
+<td style="text-align:center">面法线</td>
+</tr>
+</tbody>
+</table>
+<p> <br></p>
+<blockquote>
+<p>镜面反射模型Specular</p>
+</blockquote>
+<p>$$<br>I = k_s(\vec V · \vec R)^n<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$k_s$</td>
+<td style="text-align:center">镜面系数</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec V$</td>
+<td style="text-align:center">指向观察者/摄像机的方向</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec R$</td>
+<td style="text-align:center">反射光线的方向</td>
+</tr>
+<tr>
+<td style="text-align:center">$(.)^n$</td>
+<td style="text-align:center">反光度</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<blockquote>
+<p>Phong反射模型就是讲上述三者模型集中在一起的一个最简化的模型</p>
+<p>这也就是为什么无论你怎么样变换摄像机的位置，也就是$\vec V$的方向，但是漫反射颜色都不会因此发生改变的原因。而镜面反射同理，是因为一部分高光从表面上反射而来，也就是$\vec R$与我们的观察方向$\vec V$之间的夹角非常的接近，这也就使得最终的$I$显示在最终的效果上显得非常明亮的原因。</p>
+</blockquote>
+<p>最终的受过大量简化后的Rendering Equation如下</p>
+<p>$$<br>I = k_aI_a + I_i(k_d(\vec L · \vec N) + k_s(\vec V · \vec R)^n)<br>$$</p>
+<p>这只发生在直接光照上，而间接光照没有考虑在其中，在光线照射不到的地方，环境光帮助我们找回了看不见的区域。</p>
+<blockquote>
+<p>注意 这是一个基于物理的渲染的近似 只用于方便理解而做</p>
+</blockquote>
+<p><br></p>
+<h2 id="Fresnel-equation-Schlick’s-approximation"><a href="#Fresnel-equation-Schlick’s-approximation" class="headerlink" title="Fresnel equation(Schlick’s approximation)"></a>Fresnel equation(Schlick’s approximation)</h2><p>$$<br>\vec R(\theta) = \vec R_o + (1-\vec R_o)(1-cos\theta)^5<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$\vec R(\theta)$</td>
+<td style="text-align:center">入射角为$\theta$时发生反射的可能性</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec R_o$</td>
+<td style="text-align:center">当入射角为0的时候，也就是发现方向，发生反射的概率,也可以是$\vec R_o = (\frac{n_1-n_2}{n_1+n_2})^2$，$n_1$为媒介的传输系数 $n_2$在真空或者空气下为1</td>
+</tr>
+</tbody>
+</table>
+<p>$$<br>n_{介质} = \frac{光在真空中的速度}{光在介质中传输的速度}<br>$$</p>
+<blockquote>
+<p>因此在反射现象不明显折射现象较为明显的玻璃这些材质时，最终计算出来的$R_o$将会非常的接近0</p>
+</blockquote>
+<p>原始的Fresnel equation</p>
+<p>$$<br>R_s(\theta) = |\frac{n_1cos\theta - n_2\sqrt{1-(\frac{n_1}{n_2}sin\theta)^2}}{n_1cos\theta + n_2\sqrt{1-{(\frac{n_1}{n_2}sin\theta)^2}}}|^2<br>$$</p>
+<blockquote>
+<p>因此当传输的介质为真空时，Schlick的近似公式计算出来的只是非常贴近0的$(1-cos\theta)^5$，而原始公式计算出的可能性直接就是0</p>
+</blockquote>
+<p><br></p>
+<h2 id="Snell’s-law"><a href="#Snell’s-law" class="headerlink" title="Snell’s law"></a>Snell’s law</h2><p>$$\frac{sin\theta_1}{sin\theta_2} = \frac{v_1}{v_2} = \frac{n_2}{n_1}$$</p>
+<p>全反射现象</p>
+<p>$$sin\theta_2 =( \frac{n_2}{n_1}sin\theta_2)|_{\theta_2=90}$$<br>计算出的结果有一定的可能出现大于1的情况</p>
+<blockquote>
+<p>也就是光从介质系数大的物体中折射到小系数中，折射光线与法线夹角成90度，此时折射现象就不再发生。</p>
+</blockquote>
+<p>折射光线那么这时就发生了全反射现象此时$\theta_{critical} = arcsin(\frac{n_2}{n_1})$</p>
+<p><br></p>
+<h2 id="Ray-Sphere-Intersection"><a href="#Ray-Sphere-Intersection" class="headerlink" title="Ray Sphere Intersection"></a>Ray Sphere Intersection</h2><blockquote>
+<p>Ray的参数表示形式 $\vec r(t) = \vec o + t\vec d$，一般的平面圆的隐式方程表示为$f(x, y) = 0$，例如球的一般方程为$(x-a)^2+(y-b)^2-r^2=0$，而其参数方程就可以写成$x=x(t), y=y(t),r=(t)$</p>
+</blockquote>
+<p>球的方程</p>
+<p>$$<br>(\vec p - \vec c) · (\vec p - \vec c) = \vec r^2<br>$$</p>
+<p>Ray的方程</p>
+<p>$$<br>\vec r(t) = \vec o + t\vec d<br>$$</p>
+<p>简单的直线方程代入球面坐标求解$(\Delta)b^2-4ac$即可</p>
+<p>$$<br>t^2(\vec b·\vec b)+2(\vec o - \vec c)t\vec d + (\vec o - \vec c)·(\vec o - \vec c) - r^2 = 0<br>$$</p>
+<p>$$<br>t_1=\frac{-B+\sqrt{B^2-4AC}}{2A}<br>$$</p>
+<p>$$<br>t_1=\frac{-B-\sqrt{B^2-4AC}}{2A}<br>$$</p>
+<p><br></p>
+<h2 id="Surface-Normals"><a href="#Surface-Normals" class="headerlink" title="Surface Normals"></a>Surface Normals</h2><blockquote>
+<p>如若给定一个表面的隐式方程$f(x, y)=0$，那么他的面法线就是该函数在$(x, y)$处的梯度$\nabla f(x,y)$，梯度定义为$\nabla f(x, y, z) = (\frac{\partial f}{\partial x}, \frac{\partial f}{\partial y}, \frac{\partial f}{\partial z})$</p>
+</blockquote>
+<p><br></p>
+<blockquote>
+<p>例如求椭球形面的面法线</p>
+</blockquote>
+<p>$$<br>f(x, y, z) = \frac{x^2}{a^2}+\frac{y^2}{b^2}-z<br>$$</p>
+<p>其中a和b为椭球形的曲率</p>
+<p>$$<br>\nabla f(x, y, z) = (\frac{2x}{a^2}, \frac{2y}{b^2}, -1)<br>$$</p>
+<blockquote>
+<p>在求得光线与最近物体交点的时候，我们会排除$t\le 0$的情况，因为$=0$时属于自相交情况</p>
+</blockquote>
+<p><br></p>
+<h2 id="Shadow-Computation"><a href="#Shadow-Computation" class="headerlink" title="Shadow Computation"></a>Shadow Computation</h2><p>一个光源下的阴影计算方式</p>
+<p>$$<br>I\gets I(I_{light}\frac{相对于该点光源的可见面积}{整个光源的面积})<br>$$</p>
+<p>因此我们可以通过发射shadow ray来近似上述计算结果</p>
+<p>$$<br>I(I_{light}\frac{未被阻挡的阴影射线数量}{发射的阴影射线总数})<br>$$</p>
+<blockquote>
+<p>在本质上这就是Monte Carlo Integration</p>
+</blockquote>
+<p><br></p>
+<h2 id="Illuminaton-Equation-with-recursion"><a href="#Illuminaton-Equation-with-recursion" class="headerlink" title="Illuminaton Equation with recursion"></a>Illuminaton Equation with recursion</h2><p>$$<br>I = k_aI_a +I_i(k_d(\vec L · \vec N) + k_s(\vec V · \vec R)^n) + k_tI_t + k_rI_r<br>$$</p>
+<p><br></p>
+<p>新增的$k_tI_t+k_rI_r$为递归项</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$k_t$</td>
+<td style="text-align:center">菲涅尔透射系数(发生折射的概率)</td>
+</tr>
+<tr>
+<td style="text-align:center">$I_t$</td>
+<td style="text-align:center">透射方向来的光强度</td>
+</tr>
+<tr>
+<td style="text-align:center">$k_r$</td>
+<td style="text-align:center">菲涅尔反射系数(发生反射的概率)</td>
+</tr>
+<tr>
+<td style="text-align:center">$I_t$</td>
+<td style="text-align:center">反射方向来的光强度</td>
+</tr>
+<tr>
+<td style="text-align:center">$[D]^*$</td>
+<td style="text-align:center">任何反射而来的漫反射光照</td>
+</tr>
+<tr>
+<td style="text-align:center">$[S</td>
+<td style="text-align:center">D]$</td>
+</tr>
+</tbody>
+</table>
+<h2 id="Ray-Tracing-vs-Global-illumination"><a href="#Ray-Tracing-vs-Global-illumination" class="headerlink" title="Ray Tracing vs Global illumination"></a>Ray Tracing vs Global illumination</h2><p>$$<br>I = k_aI_a +I_i(k_d(\vec L · \vec N) + k_s(\vec V · \vec R)^n) + k_tI_t + k_rI_r<br>$$</p>
+<p>$$<br>vs<br>$$</p>
+<p>$$<br>L_o(x, \vec \omega) = L_e(x, \vec \omega) + \int_\Omega L_i(x, \vec \omega)f_r(\vec \omega, x, \vec \omega’)cos\theta d\vec \omega’<br>$$</p>
+<blockquote>
+<p> 可以看到的就是illumination Equation中使用的I本质上是物理空间中不存在的光照强度，而不是Global illumination中的辐射度计算。</p>
+</blockquote>
+<p><br></p>
+<p>Ray Tracing 中无法做到以下几点</p>
+<ol>
+<li>间接光照/颜色渗透现象($LDD[D^*]E$)，从其他表面反射而来得Diffuse Color不能被直接计算</li>
+<li>焦散现象($LE[S^*]DE$)，从其他表面反射来 Specular Color不能被直接计算</li>
+<li>全局光照中阴影无需手工计算，因为阴影的形成本质上就是光照未被照到自然形成的。</li>
+</ol>
+<blockquote>
+<p>因为在ray tracing当中我们只计算了局部的incoming漫反射光照，但事实上我们应该采集在整个上半球上的所有入射光，也就是渲染方程中积分的意义</p>
+</blockquote>
+<p><br></p>
+<p>真实的基于物理的漫反射BRDF模型为，$\rho$代表反射率，$\rho \in (0, 1)$，并且下列BRDF也是概率分布函数，只需要检验$\int_{0}^{\pi}\frac{\rho}{1}d\omega = 1$.</p>
+<blockquote>
+<p>Diffuse BRDF</p>
+</blockquote>
+<p>$$<br>f_r(\vec \omega, x, \vec \omega’) = \frac{\rho}{\pi}<br>$$</p>
+<p>在这个模型中，它将会收集整个半球上的入射光，那么如果手动射入一根光线，那么出射光出射在半球上的任意方向上得概率都是一致的。其中，该BRDF函数也是一个概率分布函数。</p>
+<p>$$<br>\int_{\pi}\frac{1}{\pi}d\vec \omega = 1<br>$$</p>
+<p>镜面反射模型也就意味着如若给定一个入射光方向，那么出射光的方向只有一个。</p>
+<blockquote>
+<p>Specular BRDF</p>
+</blockquote>
+<p>$$<br>f_r(\vec \omega, x, \vec \omega’) = \begin{equation}\begin{cases}1， 反射方向\\0，非反射方向的任意方向\end{cases}\end{equation}<br>$$</p>
+<blockquote>
+<p>简单来讲就是一个二项分布</p>
+</blockquote>
+<p><br></p>
+<h2 id="Monte-Carlo-Intergration"><a href="#Monte-Carlo-Intergration" class="headerlink" title="Monte Carlo Intergration"></a>Monte Carlo Intergration</h2><blockquote>
+<p>Hit or Miss法</p>
+</blockquote>
+<ol>
+<li><p>在一张纸上给定的区域内绘制当前的函数</p>
+</li>
+<li><p>向整个区域打点</p>
+</li>
+<li><p>记录每个点的Hit/Miss情况</p>
+</li>
+<li><p>$\int_a^bf(x)dx/A \approx \frac{hits}{misses+hits}$最终结果就可以这样近似</p>
+</li>
+</ol>
+<blockquote>
+<p>同理也就可以估计$\pi$的值</p>
+</blockquote>
+<p><br></p>
+<h2 id="Path-Tracing"><a href="#Path-Tracing" class="headerlink" title="Path Tracing"></a>Path Tracing</h2><blockquote>
+<p>如果场景中只有一个面积非常小的点光源，那么即便是spp足够大，最终的结果也很有可能是一团黑</p>
+<p>原因在于，只有当发射的ray相交到了一个光源时，他才会返回一个足够的光亮度，因此每次在BRDF的概率密度范围内随机反射光线，只有很小的概率击中光源并返回一个值。</p>
+</blockquote>
+<p><br></p>
+<p>解决方案，极大的缩短追踪Depth是最终的目标。因此在每次递归到Surface上一点时，不仅仅只是计算上从随机方向上反射而来得光照，还需直接计算点到光源之间的通路(间接等价于，随机发射一条光线到光源方向并返回一个可能的值)。</p>
+<p>这就大大的缩短了Path Tracing中需要Sample的光线的数量。同样数量的光线的情况下，整个场景会显得格外的明亮。</p>
+<blockquote>
+<p>需要注意的是，如若在Path Tracing中随机hit到了光源，我们并不直接返回光源的亮度，因为我们在Path Tracing的过程中已经计算过他的亮度。这也就很好的解耦了直接光照和间接光照。</p>
+</blockquote>
+<p><br></p>
+<h2 id="Low-Discrepancy-Series"><a href="#Low-Discrepancy-Series" class="headerlink" title="Low Discrepancy Series"></a>Low Discrepancy Series</h2><blockquote>
+<p>优点:</p>
+</blockquote>
+<p>当构建一个渲染时，你不会得到真正的随机采样结果，因此在渲染一个动画的时候，你能够得到连贯一致的噪点分布。</p>
+<blockquote>
+<p>缺点：</p>
+</blockquote>
+<p>没有……</p>
+<p><br></p>
+<h2 id="Russian-Roulette-Path-Termination"><a href="#Russian-Roulette-Path-Termination" class="headerlink" title="Russian Roulette Path Termination"></a>Russian Roulette Path Termination</h2><p>问题出在，渲染方程本质上是一个无穷积分，因此理论上来说Path Tracing的Depth应该是无穷大，但事实上不能。因此什么时候结束tracing就成为了一个比较大的问题。</p>
+<p>因此我们的目标就是，使用概率论来解决这个问题，当完成了第i次迭代之后，是否停止继续追踪取决于概率，在一定的概率内随机决定是否要终止当前这条光线。</p>
+<p><br></p>
+<p>假定目前有一随机变量$\xi \in (0, 1)$</p>
+<p>若$\xi&lt;p_i$，那么继续追踪当前的光线，最终计算得到的辐射度就为$\frac{L_i}{p_i}$</p>
+<p>若$\xi \ge p_i$，那么结束当前的光线追踪迭代，最终计算得到的辐射度为0</p>
+<blockquote>
+<p>可以通过计算期望$E\lbrack \hat{L_i} \rbrack = p_i * \frac{L_i}{p_i} + (1-p_i) · 0 = L_i $，来印证计算结果的正确性。</p>
+</blockquote>
+<p><br></p>
+<p>$p_i$的取值范围，$p_i = 0$这样的情况不会发生，因为光线一次也不于物体相交($\frac{L_i}{p_i}$非法); $p_i = 1$这样 情况也不会发生，因为光线追踪永不停止。尽管$p_i$的取值理论上在这$(0, 1)$区间内都是可以接受的，但事实上我们最好选取一个能够让结果更快收敛的概率值。</p>
+<p><br></p>
+<p>所以$p_i$的取值也就非常的关键，我们总是希望更远的采样那些明亮的路径而不是较为黑不溜秋的路径，因此我们就可以设$p_i$为简单的反射率，这可以极大的降低方差。</p>
+<p><br></p>
+<h2 id="Consistent"><a href="#Consistent" class="headerlink" title="Consistent"></a>Consistent</h2><p>$$<br>\lim_{N \to \infty}E_N[F] = \int f(x)dx<br>$$</p>
+<p>一致性算法表示算法本身在经过无穷的随机采样逼近之后，将会收敛，但这将会花上非常多的时间。</p>
+<p><br></p>
+<h3 id="Unbiased"><a href="#Unbiased" class="headerlink" title="Unbiased"></a>Unbiased</h3><p>$$<br>E_N[F - \int f(x)dx] = 0<br>$$</p>
+<ol>
+<li>无论采样多少次数，估计量与期望之间的误差都为0</li>
+<li>合并两张由无偏算法生成的图片将会带来更好的效果</li>
+<li>高估/低估被积函数的概率都是相同的</li>
+</ol>
+<p><br></p>
+<h2 id="现代Path-Tracing优化算法"><a href="#现代Path-Tracing优化算法" class="headerlink" title="现代Path Tracing优化算法"></a>现代Path Tracing优化算法</h2><blockquote>
+<p>Bidirectional Path Tracing</p>
+</blockquote>
+<p>遇到了光源在Next Event Estimation也难以处理的情况，比如光源和摄像机之间存在一层遮罩，因此只有摄像机发出的光光线随机的走到了光源中才能够返回一个较为明亮的颜色。</p>
+<p>关键思想: 从摄像机和光源处同时发射光线，并且在一定的depth结束彼此的追踪之后，连接两条路径的结尾点即可。</p>
+<p>总结：更快的焦散和计算收敛速度，尤其是在室内场景中，但添加上Multiple Importance Sampling和路径的权重似乎会增加计算时间。</p>
+<p><br></p>
+<blockquote>
+<p>Metropolis Light Transport</p>
+</blockquote>
+<p>关键思想: 对于明亮的区域我们会采样更多的次数，相比于暗处的区域的话。本质上讲就是明亮处采样的概率会更高。</p>
+<p><br></p>
+<p><img src="https://farm1.staticflickr.com/750/23744227456_4d355c2b3d_o.jpg" width="1000" height="1000" alt="cornell_box_in_cycles_ii_by_elbrujodelatribu-d5gu2uh"></p>
+<blockquote>
+<p>配图为康奈尔盒</p>
+</blockquote>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

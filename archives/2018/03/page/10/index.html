@@ -1,0 +1,388 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archives: 3/2018: 2018 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-06-27-hello-world/" class="card-header-title">
+                        Who&#39;s your daddy?
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>一天一个hello world 我都嫌烦了 daddy大法好啊!</p>
+</blockquote>
+<blockquote>
+<p>请注意 以下是展示我C++程序员前端实力的时候了……以下所有内容都是我在练习Markdown语法</p>
+</blockquote>
+<p><br></p>
+<p>我就一句话，千万不要再喊我做万花筒了……</p>
+<p><br></p>
+<p>啥都不说了，上架完万花筒我就算是升华了。</p>
+<p><br></p>
+<p>什么？毕设要做万花筒？不行了，我肚子疼。</p>
+<p><br></p>
+<p>有事别找我，没事烧纸谢谢。</p>
+<p><br></p>
+<p>听说你赚钱了？哦，被打断腿赔了20万。</p>
+<p><br></p>
+<p>你是喊我去创业吗，公司在哪？在心里，哦，滚。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-03-01-C++_note1/" class="card-header-title">
+                        C++编程思想(读书笔记_1)
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>P78 中讲到</p>
+</blockquote>
+<pre><code class="cpp">while((char c = cin.get()) != &#39;q&#39;)
+</code></pre>
+<p>这里c的结果会得到一张笑脸</p>
+<p>作者说while if switch里不能插入括号 </p>
+<p>事实上 原文作者的意思是这样的 并非不能插入括号 而是说char c这样的语句放在括号中是不行的 </p>
+<pre><code class="cpp">// error
+while((char c = cin.get()) != &#39;q&#39;)
+{
+
+}
+
+// correct
+while(char c = cin.get() != &#39;q&#39;)
+{
+
+}
+</code></pre>
+<p>因为<code>char c = ...</code>这里c的作用域只在括号中 所以超出了范围自动回收 并不能参与运算 正确的写法应该是 </p>
+<pre><code class="cpp">while(char c = cin.get() != &#39;q&#39;)
+</code></pre>
+<p>这里的!=优先级比 = 要高</p>
+<p>所以c得到的不是cin返回的字符串 而是一个bool 所以大多数情况下回显示一个笑脸</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-12-08-Table in Lua/" class="card-header-title">
+                        Lua的Table结构
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.</p>
+<pre><code class="cpp">// 传递表给Lua
+lua_createtable(luaState, 2, 0);
+// [1]-&gt;49
+// 1代表key值 一个键值指定一个value 类似于号码簿
+lua_pushnumber(luaState, 1);
+lua_pushnumber(luaState, 49);
+
+// 压入两个参数之后索引变为-3 栈顶为-1
+lua_rawset(luaState, -3);
+
+// [2]-&gt;&quot;Life is a Circle&quot;
+lua_pushnumber(luaState, 2);
+lua_pushstring(luaState, &quot;Life is a Circle&quot;);
+// 上一步rawset已经清空栈 再次压入两个元素变为-3
+lua_rawset(luaState, -3);
+
+lua_setglobal(luaState, &quot;tables&quot;);
+</code></pre>
+<p>搭配Lua文件中的</p>
+<pre><code class="cpp">-- #table为获取当前table长度
+for i=1, #tables do
+     print(i, tables[i])
+end
+</code></pre>
+<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
+<pre><code class="cpp">print(array[1])
+print(array[3])
+</code></pre>
+<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
+<pre><code class="cpp">print(array[0]) --nil 
+print(array[&quot;1&quot;]) --nil
+</code></pre>
+<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-12-07-Stack in Lua/" class="card-header-title">
+                        Lua栈结构
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <ol>
+<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
+</ol>
+<p>2.lua栈</p>
+<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
+<p>3.建一个新表</p>
+<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
+</code></pre>
+<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
+<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
+</code></pre>
+<p>常用这个</p>
+<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<div class="pagination-bar">
+    <ul class="pagination">
+        
+        <li class="pagination-prev">
+            
+                <a class="btn btn--default btn--small" href="/archives/2018/03/page/9/">
+            
+                <i class="fa fa-angle-left text-base icon-mr"></i>
+                    <span>pagination.newer_posts</span>
+            </a>
+        </li>
+        
+        
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/archives/2018/03/page/11/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
+        
+        <li class="pagination-number">pagination.page pagination.of</li>
+    </ul>
+</div>
+
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

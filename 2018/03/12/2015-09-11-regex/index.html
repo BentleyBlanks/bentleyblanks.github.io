@@ -1,0 +1,411 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>初尝正则表达式 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">初尝正则表达式</h3>
+					</div>
+					<div class="card-content">
+					  <p><p>基本上初步入门都是在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式入门教程</a>学到的，当然没有30分钟那么夸张。</p>
+<p>许多时候如若不进行实际测试很难知道自己的正则表达式正确与否，一般我就在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式在线测试</a>或者<a href="http://www.rubular.com/r/LiOup53CI1" target="_blank" rel="noopener">Rebular</a>直接在线测试，其实道理都一样。</p>
+<blockquote>
+<p>从开始学习，到实际能够解读正则表达式，到真正运用正则表达式在CSS文件的解析上，我起码花了整整三天时间，甚至更多</p>
+</blockquote>
+<p>首先说说我自己的感想，正则表达式难度不在于其各个元字符的搭配很难，而是解析的这一步很难。所以我自己结合了教程总结了如下经验。</p>
+<p>案例1</p>
+<p><code>^(\*?[-#/\*\w]+(\[[0-9a-z_-]+\])?)\s*</code><br>乍一看非常难以分解，不过我一般会这样做</p>
+<pre><code class="cpp">^                           #字符串开始
+(
+      \*?                     #可选的*
+      [-#/\*\w]+              #&quot;-&quot;&quot;#&quot;&quot;\&quot;&quot;*&quot;&quot;字母数字下划线或汉字&quot;出现一次或多次
+      (
+          \[[0-9a-z_-]+\]         #&quot;[&quot;+0~9|a~z|_~空格+&quot;]&quot;
+      )?                      #上述字符串是可选的
+)
+\s*                         #任意多空格
+</code></pre>
+<p>上述代码不会对正则表达式产生任何的影响，因为(?= #xxx)内部的内容表明为注释，这样的缩进可以更明显的看出来内容，我个人更偏向于下面这样的用法。</p>
+<pre><code class="cpp">// ^                    字符串开始
+// (
+//     \*?                  可选的任意出现零次或者多次的字符
+//     [-#/\*\w]+           &quot;-&quot;&quot;#&quot;&quot;\&quot;&quot;*&quot;&quot;字母数字下划线或汉字&quot;出现一次或多次
+//     (\[[0-9a-z_-]+\])?   可选的&quot;[&quot;+0~9|a~z|_~空格+&quot;]&quot;
+// )
+// \s*                  任意多空格
+static const std::regex _RE0_ = RE(R&quot;raw(^(\*?[-#/\*\w]+(\[[0-9a-z_-]+\])?)\s*)raw&quot;);
+</code></pre>
+<p>这样就有一个好处，在实际使用此正则表达式时，不用在表达式内部修改样式，有的OS例如Windows，会要求在每行的最后加上<code>\</code>类似于这样</p>
+<pre><code class="cpp">string test2 = 
+&quot;body{\
+    background-color: #d0e4fe;\
+}\
+\
+h1{\
+    color: orange;\
+    text-align: center;\
+}\
+\
+p{\
+    font-family: \&quot;Times New Roman\&quot;;\
+    font-size: 20px;\
+}&quot;;
+</code></pre>
+<p>这对有强迫症的人来说简直是致命的，但又没有什么好的办法。所以我个人偏向于将正则表达式的注释写到对应语言的注释中。</p>
+<p>对于元字符其实没有什么太多能够讲述的</p>
+<blockquote>
+<p>反义</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">代码</th>
+<th style="text-align:center">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">\W</td>
+<td style="text-align:center">匹配任意不是字母，数字，下划线，汉字的字符</td>
+</tr>
+<tr>
+<td style="text-align:center">\S</td>
+<td style="text-align:center">匹配任意不是空白符的字符</td>
+</tr>
+<tr>
+<td style="text-align:center">\D</td>
+<td style="text-align:center">匹配任意非数字的字符</td>
+</tr>
+<tr>
+<td style="text-align:center">\B</td>
+<td style="text-align:center">匹配不是单词开头或结束的位置</td>
+</tr>
+<tr>
+<td style="text-align:center">[^x]</td>
+<td style="text-align:center">匹配除了x以外的任意字符</td>
+</tr>
+<tr>
+<td style="text-align:center">[^aeiou]</td>
+<td style="text-align:center">匹配除了aeiou这几个字母以外的任意字符</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>重复</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">代码</th>
+<th style="text-align:center">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">*</td>
+<td style="text-align:center">重复零次或更多次</td>
+</tr>
+<tr>
+<td style="text-align:center">+</td>
+<td style="text-align:center">重复一次或更多次</td>
+</tr>
+<tr>
+<td style="text-align:center">?</td>
+<td style="text-align:center">重复零次或一次</td>
+</tr>
+<tr>
+<td style="text-align:center">{n}</td>
+<td style="text-align:center">重复n次</td>
+</tr>
+<tr>
+<td style="text-align:center">{n,}</td>
+<td style="text-align:center">重复n次或更多次</td>
+</tr>
+<tr>
+<td style="text-align:center">{n,m}</td>
+<td style="text-align:center">重复n到m次</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>元字符</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">代码</th>
+<th style="text-align:center">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">.</td>
+<td style="text-align:center">匹配除换行符以外的任意字符</td>
+</tr>
+<tr>
+<td style="text-align:center">\w</td>
+<td style="text-align:center">匹配字母或数字或下划线或汉字</td>
+</tr>
+<tr>
+<td style="text-align:center">\s</td>
+<td style="text-align:center">匹配任意的空白符</td>
+</tr>
+<tr>
+<td style="text-align:center">\d</td>
+<td style="text-align:center">匹配数字</td>
+</tr>
+<tr>
+<td style="text-align:center">\b</td>
+<td style="text-align:center">匹配单词的开始或结束</td>
+</tr>
+<tr>
+<td style="text-align:center">^</td>
+<td style="text-align:center">匹配字符串的开始</td>
+</tr>
+<tr>
+<td style="text-align:center">$</td>
+<td style="text-align:center">匹配字符串的结束</td>
+</tr>
+</tbody>
+</table>
+<p>要说说的就是这个反义,^这个字符如若不在[]中，那么它的意思一般就是表示从字符串开始的位置，当然如果前面没有转义字符的话。一旦跑到了[]中，那么它就代表了反义。</p>
+<p>案例2</p>
+<p><code>^([^\{]+)</code></p>
+<pre><code class="cpp">// ^        字符串开始处
+// (
+//       [^\{]+   除{以外其他的一个或者多个字符
+// )
+</code></pre>
+<p>这里的两个^就展现了不同的含义，一开始我在这里费了不少功夫。</p>
+<blockquote>
+<p>删除注释</p>
+</blockquote>
+<p>有的正则表达式可以匹配得到多门语言当中各型各色的注释，以便于直接找到删除。<a href="http://ostermiller.org/findcomment.html" target="_blank" rel="noopener">删除注释</a>大多数的语言注释的正则表达式都可以在这里找到。C/C++/Java因为语言相通所以注释匹配也是可以通用的。</p>
+<p>在实际应用中，我使用<code>/\*[^\*]*\*+([^/\*][^\*]*\*+)*/</code>来匹配CSS的注释，读者可以自行测试。</p>
+<p>在实际的CSS解析中最难以理解的表达式如下<br><code>^((?:&#39;(?:\\&#39;|.)*?&#39;|\&quot;(?:\\\&quot;|.)*?\&quot;|\([^\)]*?\)|[^\};])+)</code></p>
+<pre><code class="cpp">// ^
+// (
+//    (
+//        ?:            可选的:
+//        &#39;(?:\\&#39;|.)*?&#39;             单引号围起来的内容或者任意字符 若前方有&#39;，那么需要以&#39;结尾
+//        |
+//        \&quot;(?:\\\&quot;|.)*?\&quot;          双引号围起来的内容或者任意字符 若前方有&quot;，那么需要以&quot;结尾
+//        |
+//        \([^\)]*?\)               (开始 匹配除了)以外的任意字符 字符可以出现零次或者多次[^x] 可选的)
+//        |
+//        [^\};]                    匹配除了} ;以外的任意字符
+//    )
+//    +                 可以有零个或者多个上述值出现
+// )
+</code></pre>
+<p>这里的单引号的确是难以理解，后来才发现其实单引号不需要转义就可以直接表达自身的意思，可以对比下一行的双引号。因为有的CSS property: value;里的value是字符串/单一字母/xxx(xxx)/等等形式 如</p>
+<pre><code class="css">background-color: rgb(0, 10, 20); 
+
+background-color: #123456;
+
+background-color: red;
+
+</code></pre>
+<p>很种类繁多，因此需要一并写出。</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

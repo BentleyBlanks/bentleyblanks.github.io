@@ -1,0 +1,267 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compiler Compiler [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Compiler Compiler</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>专业课没有开编译原理，因此刚刚上手Flex+Bison的时候有很多概念性错误。这里不做教程，只是我个人在学习中的心得</p>
+</blockquote>
+<blockquote>
+<p>基于<a href="http://www.amazon.cn/flex%E4%B8%8Ebison-Jobn-Levine/dp/B00510VRB0/ref=sr_1_1?ie=UTF8&amp;qid=1444799536&amp;sr=8-1&amp;keywords=flex%E4%B8%8Ebison" target="_blank" rel="noopener">Flex与Bison</a>学习</p>
+</blockquote>
+<p><br></p>
+<blockquote>
+<p>2015.10.13备注</p>
+</blockquote>
+<h3 id="Chapter-1"><a href="#Chapter-1" class="headerlink" title="Chapter 1"></a>Chapter 1</h3><ol>
+<li>Flex在使用gcc编译时会用到一个名叫<strong>lfl</strong>的库，本质上是yywarp，大多数都会在声明部分启用<strong>%option noyywrap</strong>，一般不需要此库。<br><br><br></li>
+<li>Flex与Bison本质上是给定文法生成指定.c, .h文件提供给工程，因此本身的main主程序测试不是必须的。<br><br><br></li>
+<li>Flex本质是词法分析器，因此在分析到指定token时，会需要用到具体的tokenType。这一般会在Bison中指定，那么就会前向声明<strong>#include</strong> Bison生成的.h,例如<strong>xxx.tab.h</strong>.<br><br><br></li>
+<li>Bison与Flex使用的是标准C，因此当使用cc编译命令时<strong>//</strong>注释不可用，需为<strong>/<em> </em>/</strong><br><br><br></li>
+<li>Bison功用是根据BNF范式生成一颗AST树，这颗树很可能是不可见，也就是隐藏的。<br><br><br></li>
+<li>Bison中的<strong>default $$ = $1</strong>似乎在新版本不可用，但默认Bison就是将右边的语法符号<strong>$1,$2,…</strong>中的<strong>$1</strong>指派给目标符号。</li>
+<li>Flex的规则列表中切忌是不可以增加注释的，只能在右边的动作或者在规则开始声明符<strong>%%</strong>之前添加注释.且规则和动作之间至少增加一个空格，否则<strong>{}</strong>也会被认定为正则表达式。</li>
+</ol>
+<p><br></p>
+<blockquote>
+<p>2015.10.30备注</p>
+</blockquote>
+<p>###Chapter 9</p>
+<p>1.纯词法分析器和纯语法分析器协同工作。不仅是Flex上给出<strong>%option reentrant和%option bison-bridge</strong>+Bison <strong>%pure-parser</strong>那么简单(原本使用书上注明的<strong>%define api.pure</strong>在OSX上不可用，应该是版本问题，具体情况可以参考Webkit上的.flex)。<br>其中<strong>bison-bridge</strong>的作用就是完成Flex上与Bison上不协调的yylex()所做的对接。</p>
+<pre><code class="cpp">// Flex
+token = yylex(YYSTYPE *yylvalp);
+// Bison
+token = yylex(yyscan_t scaninfo);
+</code></pre>
+<p>之前自己在Flex中或Bison或具体外部使用之前的前向声明都可以隐藏，或手动声明为</p>
+<pre><code class="cpp">int yylex(YYSTYPE *lvalp, yyscan_t scaninfo);
+</code></pre>
+<p>2.<strong>%parse-param</strong>/<strong>#define YYPARSE_PARAM</strong>和<strong>%lex-param</strong>/<strong>#define YYLEX_PARAM</strong>都可以声明传递给分析器应用数据的类型，但根据版本迭代的情况而言，以及借鉴Webkit使用情况，推荐使用<strong>%parse-param</strong>和<strong>%lex-param</strong>。</p>
+<p>3.强烈建议包含Flex+Bison生成的头文件时<strong>查看包含关系</strong>。因为一旦重复包含或少包含都会引起非常难以调试的符号未定义BUG，哪怕在生成的源文件中已经#define了此符号。</p>
+<p>4.Bison在定义%token时，使用到了某单符号，例如’-‘’+’等等，此类token若未在Bison中给出相应名，那么就需要分配其指定类型。</p>
+<p>5.BNF范式在实现中，务必手工生成一遍语法树，很有可能其 空 的部分顺序是错误的，因为Bison在面对二义性语法上会选择匹配长度更长的，或者是最新匹配的那一部分，因此 空 实现的顺序就尤为关键。</p>
+<p>6.Flex+Bison支持简单的class内置，所有的中文资料显示2009年时两者未能有效支持C++，需要<strong>%language “C++”</strong>来完成对C++的支持，目前看来无需此关键字也能完成class对struct的替换。</p>
+<p>7.Flex中yyextra指针分配给指定对象的声明位置尤为关键不在头部的%{ %}对中，而是在词法分析单元声明部分中。</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

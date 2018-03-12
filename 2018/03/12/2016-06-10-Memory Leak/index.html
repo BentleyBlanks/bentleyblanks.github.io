@@ -1,0 +1,308 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memory Leak [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Memory Leak</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>文中将会涉及到个人在内存泄露上的一些经验，主要来自于Atmos渲染器在实现可重入的过程。</p>
+</blockquote>
+<blockquote>
+<p>一般内存溢出的问题，有较好找的，也有非常不容易发掘的。这里按照个人经验排序，从简到难记录。将会不定期更新。</p>
+</blockquote>
+<p>0.误分配内存，这种情况最好查找，也最经常犯。Atmos在实现日志系统中，误在字符转换中，遗漏了一个char数组忘记释放，以至于全盘内存上扬.</p>
+<p>1.只有在构造函数中分配了指定内存，经常偷懒不写析构函数的问题就在于，经常忘记释放构造函数中直接分配的内存</p>
+<pre><code class="cpp">class A
+{
+public:
+      A(){
+            b = new B();
+      }
+
+      B* b;
+};
+</code></pre>
+<p>2.Pimple所带来的弊端。Pimple能将程序实现从头文件中剥离，这算是一个好处，但也经常带来麻烦</p>
+<pre><code class="cpp">// h
+class A
+{
+public:
+    A();
+    ~A();
+private:
+    class B;
+    B* b;
+};
+
+// cpp
+A::A(){
+    b = new B();
+}
+A:~A(){
+    delete b;
+}
+</code></pre>
+<p>乍一看似乎是没有问题，但这严重依赖于要<code>在内部实现B的时候也要实现其析构函数</code>.</p>
+<pre><code class="cpp">// cpp
+class A::B{
+public:
+    B(){}
+    //~B(){}
+};
+</code></pre>
+<p>在Atmos中，图像导入和导出都是被封装在cpp中不外漏的。因此在实现中我经常遗漏了内部实现中B析构函数的实现，或者是实现了压根没有记得真正将图像内存直接释放。</p>
+<p>3.我称之为<code>浅释放的问题</code>……经常有的时候并想不起来这东西需要手动释放，例如Atmos中遇到的。实现BVH生成的二叉树，只保存了root结点</p>
+<pre><code class="cpp">class BVH
+{
+public:
+    ~BVH(){
+        delete root;
+    }
+    Node* root;
+};
+</code></pre>
+<p>问题在于，root只是二叉树的开始，需要手动遍历释放，或者实现Node的析构来完成释放。</p>
+<pre><code class="cpp">void deleteNode(Node* root)
+{
+    if(root-&gt;left)  deleteNode(root-&gt;left);
+    if(root-&gt;right)  deleteNode(root-&gt;right);
+    delete root;
+    root = NULL;
+}
+
+// 或者是
+Node::~Node(){
+    if(left) delete left;
+    if(right) delete right;
+}
+
+BVH::~BVH(){
+    delete root;
+}
+</code></pre>
+<p>本质上说就是忘记了数据结构的定义而直接对指针本身进行了内存的释放操作</p>
+<p>4.<code>虚析构函数</code>的重要性，在一般面对资源管理的类型上尤其要注意到，父类指针若想要释放实例化子类的对象，就必须要实现虚析构函数，否则子类对象的析构函数就无法被调用。<br>例如上例中描述的BVH，其继承primitiveSet，但因为父类未实现虚析构，导致即便其实现了析构函数也不起作用.</p>
+<pre><code class="cpp">class father
+{
+public:
+    //~father(){/*A*/}
+    virtual ~father(){/*B*/}
+}
+
+class child:public father
+{
+public:
+    ~child(){
+        // A:not work 
+        // B:it worked
+    }
+};
+</code></pre>
+<p>5.第三方库导致的内存未释放。这类问题非常难以察觉，以至于一开始根本不会意识到是这里的问题，除非在表象上总结出规律来。Atmos在实现图像和模型导入导出时，从未调用过库函数的释放API，这就导致了所有的内存全都未被释放。因此，在想要实现可重入之前，务必祥读文档才是真理。</p>
+<p>6.有一些连锁的，具有内存释放前后关系的是最难以解决的。比如，对象A中包含B的指针，该B的指针由A来创建并返回给使用者。那么问题来了，在A的析构函数中可否释放B？</p>
+<p>答案是无解，需要具体情况具体分析，有的情况做好约定或者引用计数等办法，可以在A中直接释放；而有的情况则是A仅仅只做一个指针保留，那么此时就不应该去释放。还是一句话，具体情况具体分析。</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

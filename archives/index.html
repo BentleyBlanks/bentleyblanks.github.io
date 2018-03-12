@@ -7,7 +7,7 @@
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive-->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title> [ Bingo ]</title>
+  <title>Archives [ Bingo ]</title>
   
     <!-- stylesheets list from config.yml -->
     
@@ -106,122 +106,7 @@
                 
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/07/2016-08-31-一阶线性微分方程笔记/" class="card-header-title">
-                        一阶线性微分方程笔记
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>考研微分方程计算中，并未包含伯努利方程的要求，但一样可以通过变量代换实现求解。下题为一个经典的变量代换求解，但自己发现却可以使用更巧妙的办法解答，张宇解析中并没有提及，因此记录在此。</p>
-</blockquote>
-<p>求 $xdy=(1+ylnx)ydx (x&gt;0)$</p>
-<hr>
-<blockquote>
-<p>变量代换:</p>
-</blockquote>
-<p>$\Rightarrow$ $xy’=y+y^2lnx$</p>
-<p>$\Rightarrow$ $\frac{x}{y^2}y’=\frac{1}{y}+lnx$</p>
-<blockquote>
-<p>令t = $\frac{1}{y}$，那么$\frac{dt}{dx}=-\frac{1}{y^2}\frac{dy}{dx}$</p>
-</blockquote>
-<p>$\Rightarrow$ $-x\frac{dt}{dx}=t+lnx$</p>
-<blockquote>
-<p>凑出一阶线性微分方程形式</p>
-</blockquote>
-<p>$\Rightarrow$ $\frac{dt}{dx}+\frac{1}{x}t=-\frac{lnx}{x}$</p>
-<p>$\Rightarrow$ $t=e^{-\int{\frac{1}{x}dx}}(\int{e^{\int{\frac{1}{x}dx}}(-\frac{lnx}{x})dx}+C)$</p>
-<p>$\Rightarrow$ $t=\frac{1}{x}(\int{x(-\frac{lnx}{x})dx}+C)=-\frac{1}{x}(xlnx-x+C)=\frac{1}{y}$</p>
-<p>$\Rightarrow$ $x=xy-xylnx+Cy$</p>
-<hr>
-<blockquote>
-<p>凑导数形式:</p>
-</blockquote>
-<p>$\Rightarrow$ $xy’=y+lnxy^2$</p>
-<p>$\Rightarrow$ $\frac{y-xy’}{y^2}=-lnx$</p>
-<p>$\Rightarrow$ $(\frac{x}{y})’=-lnx$</p>
-<p>$\Rightarrow$ $-\frac{x}{y}=xlnx-x+C$</p>
-<p>$\Rightarrow$ $x=xy-xylnx+Cy$</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/07/2017-08-23-递归删除单链表中特定值/" class="card-header-title">
-                        递归删除单链表中特定值
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>理解来自CSDN中的<a href="http://blog.csdn.net/raby_gyl/article/details/13383573" target="_blank" rel="noopener">递归删除算法</a>，个人补充细节描述</p>
-</blockquote>
-<p>题为「设计递归算法，删除无头结点的单链表L中值为x的结点」</p>
-<pre><code class="cpp">void deleteX(LinkList &amp;L, ElemType x)  
-{  
-    LNode *p;  
-    if(L==NULL) return;  
-    if(L-&gt;data==x)  
-    {  
-        p=L;  
-        L=L-&gt;next; // (1)单链表保持连续 
-        free(p);  
-        deleteX(L,x); // (2)递归调用
-    }
-    else
-        deleteX(L-&gt;next,x); //(3)向后遍历
-}  
-</code></pre>
-<hr>
-<p>理解难度在于似乎仅仅只是释放了当前结点并使得L向前推进，而导致了断链。</p>
-<blockquote>
-<p>例如要在单链表$[1, 3, 5, 7]$中删除元素$x$(例如$x=3$)，这里递归第二次调用函数讲会遇到$data==3$</p>
-</blockquote>
-<p>核心理解在于这里的LinkList L是<strong>引用</strong>, 观察堆栈会非常清晰的说明这个问题。</p>
-<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/36580955782/in/dateposted-public/" title="deleteX" target="_blank" rel="noopener"><img src="https://farm5.staticflickr.com/4381/36580955782_32532b105a.jpg" width="500" height="500" alt="deleteX"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
-<p>当代码中$(2)$处递归调用deleteX时, 参数作为L-&gt;next的引用传入(引用为别名，相当于本体操作)，即<strong>递归中参数L为上一函数的L-&gt;next本体</strong>，此时的代码相当于</p>
-<pre><code class="cpp">deleteX(L-&gt;next, x)  
-{  
-    // ...
-    p = L-&gt;next;  
-    L-&gt;next = L-&gt;next-&gt;next; // 单链表保持连续 
-    free(p);  
-    deleteX(L-&gt;next, x);
-    // ...
-}  
-</code></pre>
-<hr>
-<p>如若将引用更换为指针，相较于引用的实现较为繁琐，但更能观察到上述代码工作的本质。</p>
-<pre><code class="cpp">// 仅有传入指针的指针才能改变上一函数中指针的值
-void deleteX(LinkList **L, ElemType x)  
-{  
-    LNode *p;  
-    if((*L)==NULL) return;  
-    if((*L)-&gt;data==x)  // L-&gt;next指向的结点为x
-    {  
-        p=*L;  // p指向L-&gt;next指向的结点
-        *L=(*L)-&gt;next; // L-&gt;next=L-&gt;next-&gt;next
-        free(p);  
-        deleteX(L,x); // 传入L-&gt;next的地址
-    }
-    else
-        deleteX(&amp;((*L)-&gt;next),x); // 传入L-&gt;next指向的结点的next指针的地址
-}  
-</code></pre>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/07/2017-07-09-Atmos坐标变换/" class="card-header-title">
+                      <a href="/2018/03/12/2017-07-09-Atmos坐标变换/" class="card-header-title">
                         Atmos坐标变换
                       </a>
                     </div>
@@ -231,7 +116,7 @@ void deleteX(LinkList **L, ElemType x)
 <p>通常摄像机动画，模型动画中会使用旋转平移变换来完成坐标变换。这里使用基变换来完成通用的坐标系转换。</p>
 </blockquote>
 <p>现要求得世界坐标$P_{world}$对应的代求坐标系$\Omega$下坐标$P_{\Omega}$，已知$\Omega$坐标轴向量分别为$\overset{\rightharpoonup}{X}, \overset{\rightharpoonup}{Y}, \overset{\rightharpoonup}{Z}$,坐标原点为$O$</p>
-<p>$$worldToObject<br>\left(<br>\begin{matrix}<br>\overset{\rightharpoonup}{X}.x &amp; \overset{\rightharpoonup}{Y}.x &amp; \overset{\rightharpoonup}{Z}.x &amp; O.x \\\ <br>\overset{\rightharpoonup}{X}.x &amp; \overset{\rightharpoonup}{Y}.y &amp; \overset{\rightharpoonup}{Z}.y &amp; O.y \\\\<br>\overset{\rightharpoonup}{X}.z &amp; \overset{\rightharpoonup}{Y}.z &amp; \overset{\rightharpoonup}{Z}.z &amp; O.z \\\\<br>0 &amp; 0 &amp; 0 &amp; 1<br>\end{matrix}<br>\right)$$</p>
+<p>$$worldToObject<br>\left(<br>\begin{matrix}<br>\overset{\rightharpoonup}{X}.x &amp; \overset{\rightharpoonup}{Y}.x &amp; \overset{\rightharpoonup}{Z}.x &amp; O.x \ <br>\overset{\rightharpoonup}{X}.x &amp; \overset{\rightharpoonup}{Y}.y &amp; \overset{\rightharpoonup}{Z}.y &amp; O.y \\<br>\overset{\rightharpoonup}{X}.z &amp; \overset{\rightharpoonup}{Y}.z &amp; \overset{\rightharpoonup}{Z}.z &amp; O.z \\<br>0 &amp; 0 &amp; 0 &amp; 1<br>\end{matrix}<br>\right)$$</p>
 <p>即有$P_{\Omega}=worldToObject * P_{world}$.(该矩阵含义可展开其含义自明)</p>
 <h3 id="PBRT以及Atmos中关于相机各类坐标系的转换"><a href="#PBRT以及Atmos中关于相机各类坐标系的转换" class="headerlink" title="PBRT以及Atmos中关于相机各类坐标系的转换"></a>PBRT以及Atmos中关于相机各类坐标系的转换</h3><blockquote>
 <p>PBRT中的NDC坐标系在Atmos中未使用，因为其本身在PBRT中并不直接体现</p>
@@ -254,7 +139,7 @@ ray-&gt;origin = cameraToWorld * zeroVector3;
 </code></pre>
 <p><img src="https://farm5.staticflickr.com/4264/35005454923_f05e8118e1_b.jpg" alt=""></p>
 <p>之后可以用worldToCamera矩阵进行转换。</p>
-<p>$$worldToCamera<br>\left(<br>\begin{matrix}<br>right.x &amp; up.x &amp; direction.x &amp; origin.x \\\ <br>right.x &amp; up.y &amp; direction.y &amp; origin.y \\\\<br>right.z &amp; up.z &amp; direction.z &amp; origin.z \\\\<br>0 &amp; 0 &amp; 0 &amp; 1<br>\end{matrix}<br>\right)$$</p>
+<p>$$worldToCamera<br>\left(<br>\begin{matrix}<br>right.x &amp; up.x &amp; direction.x &amp; origin.x \ <br>right.x &amp; up.y &amp; direction.y &amp; origin.y \\<br>right.z &amp; up.z &amp; direction.z &amp; origin.z \\<br>0 &amp; 0 &amp; 0 &amp; 1<br>\end{matrix}<br>\right)$$</p>
 
                       </p>
                     </div>
@@ -264,130 +149,7 @@ ray-&gt;origin = cameraToWorld * zeroVector3;
                   
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/07/2017-03-13-Monte Carlo Integration/" class="card-header-title">
-                        Monte Carlo Integration
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>蒙特卡洛方法求积分以及部分所需的概率论术语可以在<a href="http://www.pbrt.org/" target="_blank" rel="noopener">PBRT</a>以及概率论与数理统计中找到</p>
-</blockquote>
-<p>PBRT中给出了蒙特卡洛估计量，其中随机变量$X_i \in [a,b]$且独立同分布，分布满足概率密度函数 $p(x)$。</p>
-<p>$$F_N = \frac{1}{N}\sum^{N}_{i=1}\frac{f(X_i)}{p(X_i)}$$</p>
-<p>其期望为</p>
-<p>$$\begin{split}<br>E[F_N] &amp; = E[\frac{1}{N}\sum_{i=1}^{N}\frac{f(X_i)}{p(X_i)}] \\\\<br>&amp; = \frac{1}{N}\sum_{i=1}^{N}\int_{a}^{b}\frac{f(x)}{p(x)}p(x)dx \\\\<br>&amp; = \frac{1}{N}\sum_{i=1}^{N}\int_{a}^{b}f(x)dx \\\\<br>&amp; = \int_{a}^{b}f(x)dx \\\\<br>\end{split}<br>$$</p>
-<p>方差为 </p>
-<p>$$\sigma^2=\frac{1}{N}\int(\frac{f(x)}{p(x)}-I)^2p(x)dx$$</p>
-<p>结果的误差与标准差成正比，因此随着样本数增加误差缩小速度仅与$\sqrt{N}$相关(即常说的增加4倍采样数目才能缩小一半的误差)</p>
-<blockquote>
-<p>PBRT以及许多其他文章书籍等直接给出了这个估计量的期望计算（其中第二步到第三步并未直接说明来由，尽管PBRT在对期望的简介中已给出式子），这一步<strong>只能证明估计量本身无偏*</strong>。</p>
-</blockquote>
-<blockquote>
-<p>以下将给出证明</p>
-</blockquote>
-<blockquote>
-<p>引用一个知识点: <a href="https://en.wikipedia.org/wiki/Law_of_the_unconscious_statistician" target="_blank" rel="noopener">Law of the unconscious statistician</a>，简称LOTUS。用法是已知随机变量X的分布$f_X$，但并不知道函数g(X)的分布$f_{g(X)}$。那么此时函数$g(X)$的期望为</p>
-</blockquote>
-<blockquote>
-<p>$E[g(X)]=\sum_x g(x)f_X(x)$(X为离散型随机变量)</p>
-</blockquote>
-<blockquote>
-<p>$E[g(X)]=\int_{-\infty}^{\infty} g(x)f_X(x)dx$(X为连续型随机变量)</p>
-</blockquote>
-<blockquote>
-<p>此处细节介绍也可以看<a href="http://www.qiujiawei.com/monte-carlo/" target="_blank" rel="noopener">Wyman的技术博客</a>，其中就提到了许多地方都没有涉及到的LOTUS。</p>
-</blockquote>
-<p>$$\begin{split}<br>E[ \frac {f(X_{i})}{pdf(X_{i})} ] &amp; = E[ \frac {f(x)}{pdf(x)} ] \\\\<br>&amp; = \int _{a}^{b}\frac {f(x)}{pdf(x)}pdf(x)dx \\\\<br>&amp; = \int _{a}^{b}f(x)dx<br>\end{split}<br>$$</p>
-<blockquote>
-<p>这里积分区间变为$[-\infty, \infty]$也是如此。以下将会使用到<a href="https://zh.wikipedia.org/wiki/%E5%A4%A7%E6%95%B0%E5%AE%9A%E5%BE%8B" target="_blank" rel="noopener">大数定律</a>的知识背景。</p>
-</blockquote>
-<blockquote>
-<p>引用自维基百科：设 $a_{1},a_{2},…,a_{n},…$为相互独立的随机变量，其数学期望为： $E(a_{i})=\mu (i=1,2,…)$，方差为： $Var(a_{i})=\sigma ^{2}(i=1,2,…)$<br>则序列$\overline{a} = \frac{1}{n} \sum_{i=1}^{n}$，$a_{i}$ 依概率收敛于 $\mu$（即收敛于此数列的数学期望 $E(a_{i})$）。</p>
-</blockquote>
-<p>取一组独立同分布的随机变量$\{\xi\}$，且$\xi$在$[a,b]$内满足分布律$p(x)$，则令$p^<em>(x)=\frac{f(x)}{p(x)}$，**则$\{ p^</em>(\xi_i) \}$也是一组独立同分布的随机变量。**，那么计算其得到的期望其实就是积分本身(见下)。</p>
-<p>由大数定理</p>
-<p>$$Pr(\lim_{N\to\infty}\frac{1}{N}\sum_{i=1}^{N}p^*(\xi_i)=I)=1$$</p>
-<p>那么这里已经有随机变量$\{ p^<em>(\xi_i) \}$存在，且期望等于积分值，**那么根据大数定理可知，这里的$\{ p^</em>(\xi_i) \}$就是会依概率收敛于积分值。**证毕。</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/07/2017-03-09-Inverse Transform Sampling/" class="card-header-title">
-                        Inverse Transform Sampling
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>具体理论学习推导参考<a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling" target="_blank" rel="noopener">Wikipedia</a>,<a href="http://www.columbia.edu/~ks20/4404-Sigman/4404-Notes-ITM.pdf" target="_blank" rel="noopener">Inverse Transform Method</a>，<a href="http://www.pbrt.org/" target="_blank" rel="noopener">PBRT-P643</a>, </p>
-</blockquote>
-<blockquote>
-<p>下文中的CDF与PDF等概率论术语定义可在概率论与数理统计等书中找到</p>
-</blockquote>
-<p>生成一个随机数满足一个已知解析式的分布，是一个非常常见的需求(C++11已经内部提供不少给定分布)，这里将推导如何将最常见的均匀分布随机数转换为其他已知解析式的分布。</p>
-<p>先把结论放在这里，<strong>若有一随机变量X满足分布PDF（对应一CDF），使用一个均匀分布的随机变量Y，则Y对该CDF的反函数进行采样的结果满足PDF。</strong></p>
-<blockquote>
-<p>以下内容摘自Wikipedia</p>
-</blockquote>
-<p>已知有分布$F(x)=1-e^{-\lambda x}$，其中$x\geqslant 0$，可以求得CDF的反函数，如下图所示。</p>
-<p>$$x=F^{-1}(y)=-\frac{1}{\lambda}(1-y)$$</p>
-<p><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Inverse_transformation_method_for_exponential_distribution.jpg/400px-Inverse_transformation_method_for_exponential_distribution.jpg" alt=""></p>
-<p>其中$y_i$是满足区间(0, 1)均匀分布的随机数(即，Y~U(0, 1))，这里可以明显看到由反函数求得的X的分布情况，在越接近0的位置分布的越多，越背离则越稀疏，满足对于结果的设想。</p>
-<blockquote>
-<p>证明</p>
-</blockquote>
-<p>若有CDF满足$F(x)=Pr\{X\leqslant x\}$，则起反函数$F^{-1}$满足</p>
-<p>$$F^{-1}(y)=min\{x: F(x)\geqslant y\}, y\in [0, 1]$$</p>
-<p>之所以使用下确界的原因是，$F(x)$满足右连续且单调不减</p>
-<p>令$X=F^{-1}(U)$其中$U$满足在区间$[0,1]$上连续均匀分布，现要证</p>
-<p>$$Pr\{X\leqslant x\}=F(x), x\in \Re$$</p>
-<p>则要证$Pr\{F^{-1}(U)\leqslant x\}=F(x)$成立。此处$F$连续且单调不减，则同时对不等式套用$F$不等式成立</p>
-<p>$$\{F^{-1}(U)\leqslant x\}=\{U\leqslant F(x)\}$$</p>
-<p>则有$Pr\{U\leqslant F(x)\}$成立，下图中描述了$U\leqslant F(x)$的概率就等于$F(x)$本身</p>
-<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/32527569383/in/dateposted-public/" title="无标题" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/1/692/32527569383_039ba28810.jpg" width="431" height="296" alt="无标题"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
-<p>则得证<br>$$Pr\{F^{-1}(U)\leqslant x\}=F(x)$$</p>
-<hr>
-<p>有了Inverse CDF这项工具，就可以很方便的将已有的满足均匀分布的随机数转化为满足一已知PDF的随机数分布。</p>
-<blockquote>
-<p>二维随机变量中条件概率直观理解(其中关于联合以及边缘分布律/概率密度分布的概念可以在<a href="http://math.sjtu.edu.cn/course/gltj/xxzl/he/ch31.pdf" target="_blank" rel="noopener">上海交大的PPT</a>以及<a href="https://zh.wikipedia.org/wiki/%E6%9D%A1%E4%BB%B6%E6%A6%82%E7%8E%87%E5%88%86%E5%B8%83" target="_blank" rel="noopener">Wikipedia</a>中找到)。在渲染中主要在重要性采样中会用到二维随机变量的这些概念</p>
-</blockquote>
-<p><strong>离散条件分布</strong>和<strong>连续条件分布</strong>的定义都可以在引用中看到，这里只关注离散型二维随机变量的分布。</p>
-<p>首先有联合=条件*边缘的定义，当然同时要满足$\sum_{x}\sum_{y}P(X=x, Y=y)=1$的前提条件。</p>
-<p>$$P(X=x, Y=y)=P(Y=y|X=x)P(X=x)=P(X=x|Y=y)P(Y=y)$$</p>
-<p>若X,Y满足相互独立，那么也满足以下等式</p>
-<p>$$P(X=x, Y=y)=P(Y=y)P(X=x)$$</p>
-<p>在渲染中为了对图像上亮度更高的点有更高的概率采样到，那么势必要生成满足图像PDF的二维随机变量。此处易证在图像的采样上，<strong>X与Y二者之间非相互独立</strong>。</p>
-<blockquote>
-<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/32511394224/in/dateposted-public/" title="XY独立性证明" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/4/3886/32511394224_a983cf5254.jpg" width="500" height="262" alt="XY独立性证明"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
-</blockquote>
-<blockquote>
-<p>此图中$P(X=x, Y=y)=\frac{b}{b+8a}$，而$P(X=x)=P(Y=y)=\frac{b}{b+4a}$，容易看出$P(X=x, Y=y)\not = P(Y=y)P(X=x)$</p>
-</blockquote>
-<p>那么求解上述就只剩下一种途径，就是对于给定图像求解边缘以及条件分布函数。这也是PBRT中使用边缘+条件来生成联合的原因。</p>
-<blockquote>
-<p>以下使用OF测试得到的可视化结果，因为一维采样重建可以在二维中体现因此此处不做一维对比。具体实现办法可以在PBRT的Distribution中看到详细过程</p>
-</blockquote>
-<p>左右为不同采样数量但可以明显发现在图像中亮度较高位置采样数量更多，采样结果明显偏向于向图像亮处。</p>
-<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/32990051490/in/dateposted-public/" title="采样对比2" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/3/2818/32990051490_018f71494b_b.jpg" width="1024" height="768" alt="采样对比2"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
-<blockquote>
-<p>这里图像较暗是因为<strong>没有</strong>采用Tone Mapping的关系，但因为不影响全局显示，因此没做特殊处理。此处若使用普通PNG等被截断过的图像则无法有效的对图像上高光部分进行有效采样。</p>
-</blockquote>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/05/2017-03-27-Transformation In Multiple Dimensions/" class="card-header-title">
+                      <a href="/2018/03/12/2017-03-27-Transformation In Multiple Dimensions/" class="card-header-title">
                         Transformation In Multiple Dimensions
                       </a>
                     </div>
@@ -400,16 +162,16 @@ ray-&gt;origin = cameraToWorld * zeroVector3;
 <blockquote>
 <p><strong>极坐标与笛卡尔坐标</strong></p>
 </blockquote>
-<p>已知$p(x, y)=\frac{p(r, \theta)}{\arrowvert J_t(r, \theta) \arrowvert}$，其中<br>$$T_1(r,\theta)=rcos\theta=x \\<br>T_2(r,\theta)=rsin\theta=y$$</p>
+<p>已知$p(x, y)=\frac{p(r, \theta)}{\arrowvert J_t(r, \theta) \arrowvert}$，其中<br>$$T_1(r,\theta)=rcos\theta=x\\<br>T_2(r,\theta)=rsin\theta=y$$</p>
 <p>$$J_t(r, \theta)=\left[<br>\begin{matrix}<br>cos\theta &amp; -rsin\theta \\<br>sin\theta &amp; rcos\theta \\<br>\end{matrix}<br>\right] = r$$</p>
 <p>则有$p(r, \theta) = rp(x, y)$</p>
 <hr>
 <blockquote>
 <p><strong>球坐标与笛卡尔坐标</strong></p>
 </blockquote>
-<p>$$T_1(r,\theta, \phi)=rsin\theta cos\phi = x \\<br>T_2(r,\theta, \phi)=rsin\theta sin\phi = y \\<br>T_3(r,\theta, \phi)=rcos\theta = z$$</p>
+<p>$$T_1(r,\theta, \phi)=rsin\theta cos\phi = x \\<br>T_2(r,\theta, \phi)=rsin\theta sin\phi = y \ <br>T_3(r,\theta, \phi)=rcos\theta = z$$</p>
 <p>则$p(x, y, z)=\frac{p(r, \theta, \phi)}{\arrowvert J_t(r, \theta, \phi) \arrowvert}$，其中</p>
-<p>$$J_t(r, \theta, \phi)=\left[<br>\begin{matrix}<br>sin\theta cos\phi &amp; rcos\theta cos\phi &amp; -rsin\theta sin\phi \\<br>sin\theta sin\phi &amp; rcos\theta sin\phi &amp; rsin\theta cos\phi \\<br>cos\theta &amp; -rsin\theta &amp; 0 \\<br>\end{matrix}<br>\right] = r^2sin\theta$$</p>
+<p>$$J_t(r, \theta, \phi)=\left[<br>\begin{matrix}<br>sin\theta cos\phi &amp; rcos\theta cos\phi &amp; -rsin\theta sin\phi \\<br>sin\theta sin\phi &amp; rcos\theta sin\phi &amp; rsin\theta cos\phi \\<br>cos\theta &amp; -rsin\theta &amp; 0\\<br>\end{matrix}<br>\right] = r^2sin\theta$$</p>
 <p>则有$p(r, \theta, \phi) = r^2sin\theta p(x, y, z)$。</p>
 <hr>
 <blockquote>
@@ -454,7 +216,7 @@ ray-&gt;origin = cameraToWorld * zeroVector3;
 <p>求出其对应反函数$P^{-1}(\theta)=2\pi\theta$，$P^{-1}(r\arrowvert \theta)=\sqrt{r}$</p>
 <p>若有两满足在$[0, 1]$上均匀分布的随机变量$\xi, \psi$有$\theta=2\pi \xi, r=\sqrt{\psi}$</p>
 <p>则转换回笛卡尔坐标结果为</p>
-<p>$$x = \sqrt{\psi}cos2\pi \xi \\<br>y = \sqrt{\psi}sin2\pi \xi$$</p>
+<p>$$x = \sqrt{\psi}cos2\pi \xi\\<br>y = \sqrt{\psi}sin2\pi \xi$$</p>
 <blockquote>
 <p>这里$r, \theta$也是两个独立的随机变量</p>
 </blockquote>
@@ -471,8 +233,8 @@ ray-&gt;origin = cameraToWorld * zeroVector3;
 <p>可得CDF为</p>
 <p>$$P(\theta)=\int_{0}^{\theta}p(\theta)d\theta=\frac{1-cos2\theta}{2}, \quad P(\phi \arrowvert \theta)=\int_{0}^{\phi}p(\phi \arrowvert \theta)d\phi=\frac{\phi}{2\pi}$$</p>
 <p>应用反CDF得$P^{-1}(\theta)=\frac{1}{2}arccos(1-2\theta), P^{-1}(\phi \arrowvert \theta)=2\pi \phi$</p>
-<p>$$\theta = \frac{1}{2}arccos(1-2\xi) \\<br>\phi = 2\pi \psi$$</p>
-<p>转换为笛卡尔下的表示为<br>$$x=sin\theta cos\phi = sin(\frac{1}{2}arccos(1-2\xi)))cos2\pi\psi \\<br>y=sin\theta sin\phi =  sin(\frac{1}{2}arccos(1-2\xi)))sin2\pi\psi \\<br>z=cos\theta = cos(\frac{1}{2}arccos(1-2\xi))$$</p>
+<p>$$\theta = \frac{1}{2}arccos(1-2\xi)\\<br>\phi = 2\pi \psi$$</p>
+<p>转换为笛卡尔下的表示为<br>$$x=sin\theta cos\phi = sin(\frac{1}{2}arccos(1-2\xi)))cos2\pi\psi \\<br>y=sin\theta sin\phi =  sin(\frac{1}{2}arccos(1-2\xi)))sin2\pi\psi\ <br>z=cos\theta = cos(\frac{1}{2}arccos(1-2\xi))$$</p>
 <blockquote>
 <p>PBRT中给出了另一种计算办法，将均匀分布在圆盘上的点投影到半球上，其结果就满足Cosine-Weighted。</p>
 </blockquote>
@@ -536,7 +298,7 @@ ray-&gt;origin = cameraToWorld * zeroVector3;
                   
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/05/2017-03-26-Transforming Between Distributions/" class="card-header-title">
+                      <a href="/2018/03/12/2017-03-26-Transforming Between Distributions/" class="card-header-title">
                         Transforming Between Distributions
                       </a>
                     </div>
@@ -577,159 +339,51 @@ ray-&gt;origin = cameraToWorld * zeroVector3;
                   
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/01/09/motion-blur - 副本 (2)/" class="card-header-title">
-                        motion blur111
+                      <a href="/2018/03/12/2017-03-13-Monte Carlo Integration/" class="card-header-title">
+                        Monte Carlo Integration
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
-<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
-<li>根据深度图计算出每个像素的世界空间位置。</li>
-<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
-<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
-<li>沿着速度方向进行多重采样,结果进行平均</li>
-</ul>
-<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
-<p>world-view-project matrix: M</p>
-<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
-<p>world position: $WorldPos = \frac{D}{D.w}$</p>
-<p>提取世界空间位置:</p>
-<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
-float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
-float4 D = mul(H, g_ViewProjectionInverseMatrix);
-float4 worldPos = D / D.w;
-</code></pre>
-<p>逐像素计算速度</p>
-<pre><code class="cpp">float4 currentPos = H;
-float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
-previousPos /= previousPos.w;
-float2 velocity = (currentPos - previousPos) / 2.0f;
-</code></pre>
-<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
-<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
-for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
-{
-    float4 currentColor = tex2D(sceneSampler, texCoord);
-    color += currentColor;
-}
-
-float4 finalColor = color / g_numSamples;
-</code></pre>
-<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
-<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
-<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
-<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
-<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
-<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/01/09/motion-blur - 副本 (3)/" class="card-header-title">
-                        motion blur123333333332342423425
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
-<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
-<li>根据深度图计算出每个像素的世界空间位置。</li>
-<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
-<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
-<li>沿着速度方向进行多重采样,结果进行平均</li>
-</ul>
-<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
-<p>world-view-project matrix: M</p>
-<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
-<p>world position: $WorldPos = \frac{D}{D.w}$</p>
-<p>提取世界空间位置:</p>
-<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
-float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
-float4 D = mul(H, g_ViewProjectionInverseMatrix);
-float4 worldPos = D / D.w;
-</code></pre>
-<p>逐像素计算速度</p>
-<pre><code class="cpp">float4 currentPos = H;
-float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
-previousPos /= previousPos.w;
-float2 velocity = (currentPos - previousPos) / 2.0f;
-</code></pre>
-<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
-<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
-for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
-{
-    float4 currentColor = tex2D(sceneSampler, texCoord);
-    color += currentColor;
-}
-
-float4 finalColor = color / g_numSamples;
-</code></pre>
-<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
-<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
-<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
-<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
-<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
-<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/01/09/motion-blur - 副本/" class="card-header-title">
-                        motion blur111111
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
-<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
-<li>根据深度图计算出每个像素的世界空间位置。</li>
-<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
-<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
-<li>沿着速度方向进行多重采样,结果进行平均</li>
-</ul>
-<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
-<p>world-view-project matrix: M</p>
-<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
-<p>world position: $WorldPos = \frac{D}{D.w}$</p>
-<p>提取世界空间位置:</p>
-<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
-float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
-float4 D = mul(H, g_ViewProjectionInverseMatrix);
-float4 worldPos = D / D.w;
-</code></pre>
-<p>逐像素计算速度</p>
-<pre><code class="cpp">float4 currentPos = H;
-float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
-previousPos /= previousPos.w;
-float2 velocity = (currentPos - previousPos) / 2.0f;
-</code></pre>
-<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
-<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
-for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
-{
-    float4 currentColor = tex2D(sceneSampler, texCoord);
-    color += currentColor;
-}
-
-float4 finalColor = color / g_numSamples;
-</code></pre>
-<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
-<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
-<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
-<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
-<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
-<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+                        <blockquote>
+<p>蒙特卡洛方法求积分以及部分所需的概率论术语可以在<a href="http://www.pbrt.org/" target="_blank" rel="noopener">PBRT</a>以及概率论与数理统计中找到</p>
+</blockquote>
+<p>PBRT中给出了蒙特卡洛估计量，其中随机变量$X_i \in [a,b]$且独立同分布，分布满足概率密度函数 $p(x)$。</p>
+<p>$$F_N = \frac{1}{N}\sum^{N}_{i=1}\frac{f(X_i)}{p(X_i)}$$</p>
+<p>其期望为</p>
+<p>$$\begin{split}<br>E[F_N] &amp; = E[\frac{1}{N}\sum_{i=1}^{N}\frac{f(X_i)}{p(X_i)}] \\<br>&amp; = \frac{1}{N}\sum_{i=1}^{N}\int_{a}^{b}\frac{f(x)}{p(x)}p(x)dx \\<br>&amp; = \frac{1}{N}\sum_{i=1}^{N}\int_{a}^{b}f(x)dx \\<br>&amp; = \int_{a}^{b}f(x)dx \\<br>\end{split}<br>$$</p>
+<p>方差为 </p>
+<p>$$\sigma^2=\frac{1}{N}\int(\frac{f(x)}{p(x)}-I)^2p(x)dx$$</p>
+<p>结果的误差与标准差成正比，因此随着样本数增加误差缩小速度仅与$\sqrt{N}$相关(即常说的增加4倍采样数目才能缩小一半的误差)</p>
+<blockquote>
+<p>PBRT以及许多其他文章书籍等直接给出了这个估计量的期望计算（其中第二步到第三步并未直接说明来由，尽管PBRT在对期望的简介中已给出式子），这一步<strong>只能证明估计量本身无偏*</strong>。</p>
+</blockquote>
+<blockquote>
+<p>以下将给出证明</p>
+</blockquote>
+<blockquote>
+<p>引用一个知识点: <a href="https://en.wikipedia.org/wiki/Law_of_the_unconscious_statistician" target="_blank" rel="noopener">Law of the unconscious statistician</a>，简称LOTUS。用法是已知随机变量X的分布$f_X$，但并不知道函数g(X)的分布$f_{g(X)}$。那么此时函数$g(X)$的期望为</p>
+</blockquote>
+<blockquote>
+<p>$E[g(X)]=\sum_x g(x)f_X(x)$(X为离散型随机变量)</p>
+</blockquote>
+<blockquote>
+<p>$E[g(X)]=\int_{-\infty}^{\infty} g(x)f_X(x)dx$(X为连续型随机变量)</p>
+</blockquote>
+<blockquote>
+<p>此处细节介绍也可以看<a href="http://www.qiujiawei.com/monte-carlo/" target="_blank" rel="noopener">Wyman的技术博客</a>，其中就提到了许多地方都没有涉及到的LOTUS。</p>
+</blockquote>
+<p>$$\begin{split}<br>E[ \frac {f(X_{i})}{pdf(X_{i})} ] &amp; = E[ \frac {f(x)}{pdf(x)} ] \\<br>&amp; = \int _{a}^{b}\frac {f(x)}{pdf(x)}pdf(x)dx \\<br>&amp; = \int _{a}^{b}f(x)dx<br>\end{split}<br>$$</p>
+<blockquote>
+<p>这里积分区间变为$[-\infty, \infty]$也是如此。以下将会使用到<a href="https://zh.wikipedia.org/wiki/%E5%A4%A7%E6%95%B0%E5%AE%9A%E5%BE%8B" target="_blank" rel="noopener">大数定律</a>的知识背景。</p>
+</blockquote>
+<blockquote>
+<p>引用自维基百科：设 $a_{1},a_{2},…,a_{n},…$为相互独立的随机变量，其数学期望为： $E(a_{i})=\mu (i=1,2,…)$，方差为： $Var(a_{i})=\sigma ^{2}(i=1,2,…)$<br>则序列$\overline{a} = \frac{1}{n} \sum_{i=1}^{n}$，$a_{i}$ 依概率收敛于 $\mu$（即收敛于此数列的数学期望 $E(a_{i})$）。</p>
+</blockquote>
+<p>取一组独立同分布的随机变量$\{\xi\}$，且$\xi$在$[a,b]$内满足分布律$p(x)$，则令$p^<em>(x)=\frac{f(x)}{p(x)}$，**则$\{ p^</em>(\xi_i) \}$也是一组独立同分布的随机变量。**，那么计算其得到的期望其实就是积分本身(见下)。</p>
+<p>由大数定理</p>
+<p>$$Pr(\lim_{N\to\infty}\frac{1}{N}\sum_{i=1}^{N}p^*(\xi_i)=I)=1$$</p>
+<p>那么这里已经有随机变量$\{ p^<em>(\xi_i) \}$存在，且期望等于积分值，**那么根据大数定理可知，这里的$\{ p^</em>(\xi_i) \}$就是会依概率收敛于积分值。**证毕。</p>
 
                       </p>
                     </div>
@@ -791,7 +445,7 @@ float4 finalColor = color / g_numSamples;
   </div>
 </section>
 
-<!-- <div class="pagination-bar">
+<div class="pagination-bar">
     <ul class="pagination">
         
         
@@ -805,7 +459,7 @@ float4 finalColor = color / g_numSamples;
         <li class="pagination-number">pagination.page pagination.of</li>
     </ul>
 </div>
- -->
+
 
 
 <!-- Footer -->
@@ -845,7 +499,7 @@ float4 finalColor = color / g_numSamples;
 
     <div class="columns has-text-centered">
       <div class="column">
-        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, based on <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
       </div>
     </div>
 

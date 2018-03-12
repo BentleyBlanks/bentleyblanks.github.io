@@ -1,0 +1,333 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>网易游戏面经 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">网易游戏面经</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>为记录第一次在网易游戏电面PC客户端游戏研发职位的博客。 </p>
+</blockquote>
+<hr>
+<h3 id="离线渲染部分"><a href="#离线渲染部分" class="headerlink" title="离线渲染部分"></a>离线渲染部分</h3><blockquote>
+<p>以下问题针对<a href="http://www.pbrt.org/" target="_blank" rel="noopener">PBRT</a>而言</p>
+</blockquote>
+<p><br></p>
+<p>1.BRDF的单位是什么?</p>
+<blockquote>
+<p>开口跪</p>
+</blockquote>
+<p>2.渲染方程中左边那一项$Lo(p, \vec{wo})$，具体的含义是什么。是irradiance还是radiance，他们具体的单位又是什么？</p>
+<blockquote>
+<p>概念回答的还算准确，但是他们具体的单位又说的有点模棱两可，后来发现其实也没有说错。</p>
+</blockquote>
+<p>3.BRDF和pdf的关系是什么?</p>
+<blockquote>
+<p>我回答的是$E = \frac{1}{N} \sum\frac{f(p, \vec{w_i}, \vec{w_o})}{pdf()}$的解读，但具体有何联系说的有点模棱两可，理解深度也是不够。</p>
+</blockquote>
+<p>4.<a href="https://zh.wikipedia.org/wiki/%E8%92%99%E5%9C%B0%E5%8D%A1%E7%BE%85%E6%96%B9%E6%B3%95" target="_blank" rel="noopener">蒙特卡洛方法</a>是如何实现Ray Tracing的，或者说蒙特卡洛方法是怎样得到最终结果的?</p>
+<blockquote>
+<p>回答的乱七八糟，语言逻辑组织的很有问题。对蒙特卡洛的理解深度还是不够。</p>
+</blockquote>
+<p>5.Russian rulette的具体作用是何?</p>
+<blockquote>
+<p>这里我提到是减小方差，但事实上作用不仅如此。是因为挑选出了重要的光路。</p>
+</blockquote>
+<p>6.你的渲染器是如何实现高光项的?</p>
+<blockquote>
+<p>这一提问没答好，事实上后来想了一下，可以回答Atoms折射模型里，用<a href="https://zh.wikipedia.org/wiki/%E8%8F%B2%E6%B6%85%E8%80%B3%E6%96%B9%E7%A8%8B" target="_blank" rel="noopener">菲涅尔项</a>算出反射概率用此概率计算反射项即可。</p>
+</blockquote>
+<p>7.<a href="http://simonstechblog.blogspot.jp/2011/12/microfacet-brdf.html" target="_blank" rel="noopener">微表面模型</a>的<a href="https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf" target="_blank" rel="noopener">具体方程</a>?</p>
+<blockquote>
+<p>只是提了一句微表面，以后不能作大死。不记得具体公式，只回答出了一个大体的概念。</p>
+</blockquote>
+<p>8.irradiance和radiance各是什么？</p>
+<blockquote>
+<p>概念是回答八九不离十，但是<a href="http://physics.stackexchange.com/questions/68353/relation-between-radiance-and-irradiance" target="_blank" rel="noopener">区别</a>和单位上又犹豫了一段时间。</p>
+</blockquote>
+<hr>
+<h3 id="光栅化部分"><a href="#光栅化部分" class="headerlink" title="光栅化部分"></a>光栅化部分</h3><blockquote>
+<p>以下全篇基本上都是gg状态，很久不搞光栅化，连基本概念都搞不清了。</p>
+</blockquote>
+<p><br></p>
+<p>1.光栅化的含义?具体的过程是怎么样的?</p>
+<blockquote>
+<p>说了一下就是把几何上的三角形转换成栅格化像素的过程,其他gg</p>
+</blockquote>
+<p>2.你的软件光栅化，顶点在进行转换的时候，具体做了哪些事?</p>
+<blockquote>
+<p>好几年没看了,只说出了把所有的模型对象全都转换到相机坐标下，问转换完之后做了什么就不记得了，gg</p>
+</blockquote>
+<p>3.当时提了一个Phong模型，问我其他的模型的公式知道吗?</p>
+<blockquote>
+<p>gg</p>
+</blockquote>
+<p>4.齐次坐标如何表示点和矢量?为什么要这样表示?</p>
+<blockquote>
+<p>只回答对了w项。具体为什么我说平移就用不了了，但是好像不是很对。gg</p>
+</blockquote>
+<p>5.OpenGL和DirectX懂哪个?</p>
+<blockquote>
+<p>GL不够深入,gg</p>
+</blockquote>
+<hr>
+<h3 id="C-部分"><a href="#C-部分" class="headerlink" title="C++部分"></a>C++部分</h3><p><br></p>
+<p>1.override和overload的差别?</p>
+<blockquote>
+<p>一个是覆盖，一个是函数重载,可以见<a href="http://www.cnblogs.com/chio/archive/2007/06/21/792406.html" target="_blank" rel="noopener">C++专题</a></p>
+</blockquote>
+<p>2.override和哪个关键字是相对的?</p>
+<blockquote>
+<p>final</p>
+</blockquote>
+<p>3.为什么要写override关键字，会有什么好处或者不写有什么坏处？</p>
+<blockquote>
+<p>只知道覆盖的作用，坏处gg</p>
+</blockquote>
+<p>4.虚函数的实现机制?虚表里放了什么?有什么作用?</p>
+<blockquote>
+<p>基类指针里存放了被覆盖的子类的虚函数指针</p>
+</blockquote>
+<p>5.异常处理用过吗?智能指针用过吗，构造和赋值的时候具体都做了些什么事?</p>
+<blockquote>
+<p>智能指针只知道引用计数，其他统统gg</p>
+</blockquote>
+<hr>
+<h3 id="具体问题"><a href="#具体问题" class="headerlink" title="具体问题"></a>具体问题</h3><p><br></p>
+<p>现有两个与坐标轴不平行的2D矩形，程序思想上如何实现矩形是否相交?</p>
+<blockquote>
+<p><a href="http://blog.csdn.net/zc55803903/article/details/7837918" target="_blank" rel="noopener">分离轴</a>。</p>
+</blockquote>
+<p>如何求点在直线上的投影点?</p>
+<blockquote>
+<p>没想起来一个较好的，用了一个解析几何的办法。想了个点到直线距离，然后直角三角形的做法</p>
+</blockquote>
+<p>有没有更好的办法，比如矢量的办法求?</p>
+<blockquote>
+<p>没能现推出来一个好的。<a href="http://www.cnblogs.com/dawn/archive/2010/05/10/1731448.html" target="_blank" rel="noopener">可见这个</a></p>
+</blockquote>
+<hr>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p><br></p>
+<p>也是询问了一下面试官我自己未来应该如何学习，希望能够在pbrt上继续深入下去，pbrt很不错，他的同事也没有多少人看完了这本书。光栅化的不熟悉不行，要很熟悉光栅化那一套。</p>
+<p>一句话就是，开口跪，全场懵逼，直接gg。</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

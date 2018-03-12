@@ -1,0 +1,417 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mathematical Foundations of Monte Carlo Methods 4 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Mathematical Foundations of Monte Carlo Methods 4</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>本文为在<a href="http://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/monte-carlo-methods-mathematical-foundations/quick-introduction-to-monte-carlo-methods" target="_blank" rel="noopener">Scratchapixel</a>上学习的翻译读后感与部分个人解读。这里不会将全篇的内容系数翻译，保留原文以便后期自行理解，笔者只精炼一些文章中关键的点出来便于记录。</p>
+</blockquote>
+<h3 id="Hit-or-Miss-Monte-Carlo-Method"><a href="#Hit-or-Miss-Monte-Carlo-Method" class="headerlink" title="Hit-or-Miss Monte Carlo Method"></a>Hit-or-Miss Monte Carlo Method</h3><p>蒙特卡洛方法(Monte Carlo methods):是一个使用随机采样的数值方法来解决数学问题的方法。</p>
+<blockquote>
+<p>原始的蒙特卡洛方法是允许任意分布采样的，所有的非均匀采样的目的都是降低方差提高估计量的有效性也就是重要性采样。</p>
+</blockquote>
+<p>各向同性散射(Isotropic scattering)与各向异性散射(Anistropic scattering):一个光子在进入一个材质时发生了散射，并且其改变后了的方向是随机的，被称为是各项同性；反之，光子改变后了的方向若是只在一个圆锥方向内，那么被称之为各向异性。</p>
+<hr>
+<h3 id="Monte-Carlo-Estimator"><a href="#Monte-Carlo-Estimator" class="headerlink" title="Monte Carlo Estimator"></a>Monte Carlo Estimator</h3><p>对于函数$f(x)$的积分求解，可以用面积法来表达</p>
+<p>$$F = \int_a^b f(x)\;dx.$$</p>
+<p>下图中，在函数$f(x)$上随机采样一点$x$，那么结果$f(x) * (b-a)$。但是很明显它和实际收敛结果$F$差距较大。</p>
+<figure><br><br><a href="https://farm2.staticflickr.com/1495/24806240436_aa8e259d2f.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1495/24806240436_aa8e259d2f.jpg" alt=""><br></a><br><br></figure>
+
+<p>增加采样数目到4个点，此时对这几个点所求面积进行平均。那么最终的近似结果很明显根据大数定理会不断的逼近真实收敛值。</p>
+<figure><br><br><a href="https://farm2.staticflickr.com/1718/24204329434_e58e2aa085.jpgg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1718/24204329434_e58e2aa085.jpg" alt=""><br></a><br><br></figure>
+
+<p>以下公式很好的表达了这个思想</p>
+<p>$$\langle F^N\rangle = (b-a) \dfrac{1}{N } \sum_{i=0}^{N-1} f(X_i).$$</p>
+<blockquote>
+<p>其中$\langle F^N\rangle$表示了在采样空间$S$中采样N个点之后$F$的近似值，也等价于之前所讲到的样本均值$\bar X_n$。</p>
+<p>这里采样点满足均匀分布，即$pdf(x) = \frac{1}{b-a}$。</p>
+</blockquote>
+<p>$\langle F^N \rangle$也是随机变量(随机变量的和)，其期望就是$F$本身。</p>
+<p>$$\begin{array}{l}</p>
+<p>E[\langle F^N \rangle] &amp; = &amp; E \left[ (b-a) \dfrac{1}{N } \sum_{i=0}^{N-1} f(x_i)\right],\\</p>
+<p>&amp; = &amp; (b-a)\dfrac{1}{N}\sum_{i=0}^{N-1}E[f(x)],\\</p>
+<p>&amp; = &amp;(b-a)\dfrac{1}{N} \sum_{i=0}^{N-1} \int_a^b f(x)pdf(x)\:dx\\</p>
+<p>&amp; = &amp; \dfrac{1}{N} \sum_{i=0}^{N-1} \int_a^b f(x)\:dx,\\</p>
+<p>&amp;=&amp; \int_a^b f(x)\:dx,\\</p>
+<p>&amp;=&amp;F\\</p>
+<p>\end{array}$$</p>
+<blockquote>
+<p>原文中公式有误，已纠正求和部分</p>
+</blockquote>
+<p>由于前面选用了均匀分布的$pdf(x)$的缘故，下面推广到任意$pdf(x)$上。下方为通用的蒙特卡洛估计量的写法。</p>
+<p>$$\langle F^N \rangle = \dfrac{1}{N} \sum_{i=0}^{N-1} \dfrac{f(X_i)}{pdf(X_i)}.$$</p>
+<p>对其求取期望验证正确性</p>
+<p>$$\begin{array}{l}</p>
+<p>E[\langle F^N \rangle ] &amp; = &amp; E \left[ \dfrac{1}{N } \sum_{i=0}^{N-1} \dfrac{f(X_i)}{pdf X_i)} \right],\ </p>
+<p>&amp; = &amp; \dfrac{1}{N} \sum_{i=0}^{N-1} E\left[ \dfrac{f(X_i)}{pdf(X_i) }\right],\ </p>
+<p>&amp; = &amp; \dfrac{1}{N} \sum_{i=0}^{N-1} \int_\Omega \dfrac{f(x)}{pdf(x)} pdf(x)\;dx, \\</p>
+<p>&amp; = &amp; \dfrac{1}{N} \sum_{i=0}^{N-1} \int_\omega f(x) \; dx, \ </p>
+<p>&amp; = &amp; F.</p>
+<p>\end{array}$$</p>
+<blockquote>
+<p>上下限$(b-a)$这样一个积分区间在通用写法中是隐藏的。原因很简单，$(b-a)$的产生是因为估计量$h(x) = \frac{f(x)}{pdf(x)}$下均匀分布的$pdf(x) = \frac{1}{b-a}$引起的。</p>
+<p>因此原式应该是这样:$\langle F^N \rangle  = \frac{1}{N}\sum_{i=0}^{N-1}\frac{f(X_i)}{\frac{1}{b-a}}$，而写法$\langle F^N\rangle = (b-a) \dfrac{1}{N } \sum_{i=0}^{N-1} f(X_i)$会更容易能够从图中直接推出。</p>
+</blockquote>
+<hr>
+<h3 id="Properties-of-Monte-Carlo-Integration"><a href="#Properties-of-Monte-Carlo-Integration" class="headerlink" title="Properties of Monte Carlo Integration"></a>Properties of Monte Carlo Integration</h3><ul>
+<li>蒙特卡洛积分估计值会向函数$f(x)$收敛/逼近。$\text{Pr} \left ( \lim_{N\to\infty} \langle F^N \rangle = F \right ) = 1$</li>
+<li>蒙特卡罗估计量是无偏且一致的</li>
+<li>收敛的速度和函数的方差$\sigma^2$成比例。估计量本身的方差为$\frac{\sigma^2}{n}$，因此如若需要降低估计值错误为原来的一半，那么需要提高四倍的采样。($\sigma[\langle F^N \rangle] \propto { 1 \over \sqrt{N} }$)</li>
+</ul>
+<blockquote>
+<p>无偏:样本均值的期望就是求解积分本身</p>
+<p>一致:随着样本容量的增大，估计量愈来愈接近总体参数的真值)</p>
+</blockquote>
+<hr>
+<h3 id="Importance-Sampling"><a href="#Importance-Sampling" class="headerlink" title="Importance Sampling"></a>Importance Sampling</h3><p>重要性采样作为减小方差众多方法中的一个，本身的思想较为直接。</p>
+<p>以下为不同采样分布的采样点对于近似值的影响(会高于或者低于真实积分解)。</p>
+<figure><br><br><a href="https://farm2.staticflickr.com/1662/24807155306_369d329969.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1662/24807155306_369d329969.jpg" alt=""><br></a><br><br></figure>
+
+<p>此图中均匀分布其值勉强，但采样过程中似乎遗漏了函数当中较为重要的部分(一个高峰被忽略)。而右边的人为的采样也并不是一个较好的方法，这将会导致偏差(bias)。</p>
+<figure><br><br><a href="https://farm2.staticflickr.com/1496/24537947180_f7e1e82d22.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1496/24537947180_f7e1e82d22.jpg" alt=""><br></a><br><br></figure>
+
+<p>如若被积函数为常数函数，那么采样选用均匀分布得到的结果本身就是正确的。</p>
+<figure><br><br><a href="https://farm2.staticflickr.com/1608/24465788229_7c5beb558a.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1608/24465788229_7c5beb558a.jpg" alt=""><br></a><br><br></figure>
+
+<p>现有一函数，他与函数$f(x)$成比例</p>
+<p>$$f(x) = c f’(x)$$</p>
+<p>因此</p>
+<p>$$\dfrac{f(x)}{f’(x) } = \dfrac{1}{c}$$</p>
+<p>那么这里代入蒙特卡洛估计量，联系常数函数的采样的结论。</p>
+<p>$$\langle F^N \rangle = \dfrac{1}{N} \sum_{i=0}^{N-1} {\dfrac{\color{orange}{f(x)}}{\color{red}{pdf(x)}}} = \dfrac{1}{N}\sum_{i=0}^{N-1}{\dfrac{\color{orange}{f(x)}}{\color{red}{f’(x)}}} = \dfrac{1}{N}\sum_{i=0}^{N-1}{\dfrac{\color{orange}{1}}{\color{red}{c}}}$$</p>
+<blockquote>
+<p>也就是说，只要$pdf(x)$与被积函数$f(x)$成比例，蒙特卡洛积分的方差就是0(常数函数的方差为0)。换言之，$pdf(x)$与被积函数$f(x)$的相似度越高，那么偏差也就越低。</p>
+</blockquote>
+<p>以$f(x) = sin(x)$，区间$[0, \frac{\pi}{2}]$为例</p>
+<p>$$\begin{array}{l}</p>
+<p>F &amp; = &amp; \int_0^{\pi \over 2} \sin(x) \; dx \\</p>
+<p>&amp; = &amp; \left[ -\cos(x) \right]_0^{\pi \over 2} \\</p>
+<p>&amp; = &amp; -\cos(\dfrac{\pi}{2}) - - \cos(0) \\</p>
+<p>&amp; = &amp; 1.</p>
+<p>\end{array}$$</p>
+<p>选用两个不同的$pdf(x)$进行对比</p>
+<figure><br><br><a href="https://farm2.staticflickr.com/1507/24206886533_23cf0b4feb.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1507/24206886533_23cf0b4feb.jpg" alt=""><br></a><br><br></figure>
+
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th style="text-align:center">Uniform</th>
+<th style="text-align:center">Importance</th>
+<th style="text-align:center">Error Uniform %</th>
+<th style="text-align:center">Error Importance %</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td style="text-align:center">1.125890</td>
+<td style="text-align:center">0.969068</td>
+<td style="text-align:center">12%</td>
+<td style="text-align:center">-3%</td>
+</tr>
+<tr>
+<td>1</td>
+<td style="text-align:center">1.277833</td>
+<td style="text-align:center">0.925675</td>
+<td style="text-align:center">27%</td>
+<td style="text-align:center">-7%</td>
+</tr>
+<tr>
+<td>2</td>
+<td style="text-align:center">1.054394</td>
+<td style="text-align:center">0.980940</td>
+<td style="text-align:center">5%</td>
+<td style="text-align:center">-1%</td>
+</tr>
+<tr>
+<td>3</td>
+<td style="text-align:center">1.125890</td>
+<td style="text-align:center">0.969068</td>
+<td style="text-align:center">12%</td>
+<td style="text-align:center">-1%</td>
+</tr>
+<tr>
+<td>4</td>
+<td style="text-align:center">1.125890</td>
+<td style="text-align:center">0.969068</td>
+<td style="text-align:center">12%</td>
+<td style="text-align:center">-6%</td>
+</tr>
+<tr>
+<td>5</td>
+<td style="text-align:center">0.830151</td>
+<td style="text-align:center">1.041751</td>
+<td style="text-align:center">-16%</td>
+<td style="text-align:center">4%</td>
+</tr>
+<tr>
+<td>6</td>
+<td style="text-align:center">1.062268</td>
+<td style="text-align:center">0.989363</td>
+<td style="text-align:center">6%</td>
+<td style="text-align:center">-1%</td>
+</tr>
+<tr>
+<td>7</td>
+<td style="text-align:center">0.849265</td>
+<td style="text-align:center">1.043809</td>
+<td style="text-align:center">-15%</td>
+<td style="text-align:center">4%</td>
+</tr>
+<tr>
+<td>8</td>
+<td style="text-align:center">0.921527</td>
+<td style="text-align:center">1.020279</td>
+<td style="text-align:center">-7%</td>
+<td style="text-align:center">2%</td>
+</tr>
+<tr>
+<td>9</td>
+<td style="text-align:center">1.002310</td>
+<td style="text-align:center">0.994284</td>
+<td style="text-align:center">0%</td>
+<td style="text-align:center">0%</td>
+</tr>
+</tbody>
+</table>
+<p>很明显的是，结果非常符合重要性采样理论。</p>
+<hr>
+<h3 id="Quasi-Monte-Carlo"><a href="#Quasi-Monte-Carlo" class="headerlink" title="Quasi Monte Carlo"></a>Quasi Monte Carlo</h3><p>随机采样中无法避免的就是当采样点近乎重合的现象(clump)，这也就意味着在最终计算时，其中一个采样点的信息也就被浪费，这不利于收敛的快速计算。</p>
+<figure><br><br><a href="https://farm2.staticflickr.com/1471/24538477960_7d0c21d3f9.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1471/24538477960_7d0c21d3f9.jpg" alt=""><br></a><br><br></figure>
+
+<p><br></p>
+<p>分层采样(Stratified Sampling): The interval of integration is divided into N subintervals or cells (also often called strata), samples are placed in the middle of these subintervals but are jittered by some negative or positive random offset which can’t be greater than half the width of a cell</p>
+<figure><br><br><a href="https://farm2.staticflickr.com/1596/24716059352_d96be6a9f2.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1596/24716059352_d96be6a9f2.jpg" alt=""><br></a><br><br></figure>
+
+
+<blockquote>
+<p>换言之就是$\langle F^N \rangle = { (b-a) \over N} \sum_{i=0}^{N-1} f(a + ( { {i+\xi} \over N } ) (b-a)).$，其中$-h/2 \leq \xi \leq h/2$。分层采样的思想介于随机采样和均匀采样之间的。</p>
+</blockquote>
+<p>低差异化序列(Low-Discrepancy Sequences):The goal is to generate sequences of samples which are not exactly uniformly distributed (uniformly distributed samples cause aliasing) and yet which appear to have some regularity in the way they are spaced.</p>
+<blockquote>
+<p><a href="http://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/monte-carlo-methods-in-practice/introduction-quasi-monte-carlo" target="_blank" rel="noopener">Van der Corput Sequence</a>的简介可见链接，思想就是将整数转换为二进制形式，根据小数点镜像对称。根据$\phi_b(n) = {d_0 \over {2^1}} + {d_1 \over {2^2}} … + {d_{N-1}\over {2^N}}.$将给定的整数转换为小数形式。</p>
+</blockquote>
+<figure><br><br><a href="https://farm2.staticflickr.com/1597/24205854704_6ec6ec0353.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1597/24205854704_6ec6ec0353.jpg" alt=""><br></a><br><br></figure></p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

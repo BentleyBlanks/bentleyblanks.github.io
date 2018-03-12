@@ -1,0 +1,292 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unidirectional Path Tracing [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Unidirectional Path Tracing</h3>
+					</div>
+					<div class="card-content">
+					  <p><h3 id="Deprecated-2017-03-30"><a href="#Deprecated-2017-03-30" class="headerlink" title="Deprecated(2017.03.30)"></a>Deprecated(2017.03.30)</h3><blockquote>
+<p>本文讲述的是在实现Atoms渲染器基于物理部分遇到问题的PBRT笔记解读</p>
+</blockquote>
+<p>Atmos最先尝试实现的，是最最简单的路径追踪思想，也就是递归。搭配蒙特卡洛方法来计算渲染方程的无穷积分，本质上的思想是非常浅显易懂的。但这里我遇到了一个问题。</p>
+<p>$$L_o(p, \vec{w_o}) = L_e(\vec{w_i}, p, {w_o}) + \int_{\Omega}{BSDF(\vec{w_i}, p, \vec{w_o})L_i(\vec{w_i}, p)cos\theta d\vec{\omega}}$$</p>
+<p>首先是将简单的递归改写成非递归的积分器Intergrator形式遇到了问题：单项路径追踪如何写成非递归样式？</p>
+<p>其次是，为何<a href="http://www.mitsuba-renderer.org/" target="_blank" rel="noopener">Mitsuba</a>与<a href="http://www.pbrt.org/" target="_blank" rel="noopener">pbrt</a>的Interator中Path Tracer实现中都有Direct illiumination过程，难道直接寻找光源进行求解计算不是Bias的？</p>
+<blockquote>
+<p>尝试求解无果后，带着疑问又重新拾起当初一知半解看了大概的<a href="http://www.pbrt.org/" target="_blank" rel="noopener">pbrt</a>。</p>
+</blockquote>
+<p>$P_{763}$中的路径追踪最经典算法</p>
+<p>$$\frac{1}{1-q_1}(P(\bar{p_1} + \frac{1}{1-q_2}(P(\bar{p_2})+\frac{1}{1-q_3}(P(\bar{p_3}+…,)))$$</p>
+<p>PBRT中多次强调，递归计算出来的单项路径追踪最大的问题在于他的n个光线相交点的最后那一个，<strong>一定得是在光源上</strong>。否则，整条路径在最初点上的光照贡献就是$0$。</p>
+<p>这个概念非常易懂，但也正是这个特性，导致最最浅显概念上的非递归版本的单向路径追踪务必要额外增加一个栈来存放所有BSDF信息，这无疑只是简单的将递归转换一种写法，本质上并没有思想上的转换。</p>
+<p>而真正核心的一句话，出现在$P_{767}$的伪代码中。</p>
+<blockquote>
+<p>Possibly add emitted light at path vertex</p>
+</blockquote>
+<p>明白直接光照计算方式的都知晓当前相交点使用Multiple importance sampling这一点，其最关键的就是主动向光源上计算贡献。</p>
+<blockquote>
+<p>PBRT中分为两种采样方式，第一种适合光源较多的场景，是直接对场景中所有光源进行直接采样并累加最后求取期望，也就是$E[f(x) + g(x)]$；蒙特卡洛表示这个求取方法在光源非常多的时候并不理想，这个期望也可以通过$E[f(x)]+E[g(x)]$来完成，因此可以在场景中随机选取一个光源计算其贡献。</p>
+</blockquote>
+<p>这里主动的求光源的光照贡献，其实和点光源/面积小的光源做法是一模一样的。</p>
+<blockquote>
+<p>点光源 / 面积很小的光源会出现一个问题，就是单向路径追踪时，击中光源的概率实在太低了，在点光源上这个概率甚至是0！因此主动求取其光照贡献乘以所谓的权重依旧能保持无偏，但却解决了一个场景中只有点光源时无法照亮任何物体的问题。</p>
+</blockquote>
+<blockquote>
+<p>$P_{764}$: In a similar manner, small area light sources can also be source of variance if not sampled explicityly.</p>
+</blockquote>
+<p>改进后的单向路径追踪的算法改写为</p>
+<p>$$\frac{L_e(p_i \to p_{i-1})f(p_i \to p_{i-1} \to p_{i-2}|cos\theta_{i-1}|)}{p_A(p_i)}(\prod^{i-2}_{j=1}\frac{f(p_{i+1} \to p_j \to p_{j-1})|cos\theta_j|)}{p_{\omega}(p_{j+1}-p_j)})$$</p>
+<blockquote>
+<p>括号的左项就是代表了随机采样的光源的贡献(BSDF在光源-当前点上的f，乘以光源向相交点的$L_e cos\theta$)，右方式子代表了BSDF采样的贡献累乘，由于每次循环所做的事情都一样。因此很自然的就可以写成非递归的形式。</p>
+</blockquote>
+<blockquote>
+<p>可以看到这里直接寻找光源计算贡献的过程依然是Unbiased，只不过将最后击中光源的这一步操作分配到了路径的各个部分上而已。</p>
+</blockquote>
+<hr>
+<p>假定最后一次光线在光源上相交点为$p_i$，那么这一次的光源经常是会被忽略掉的。因为光源的贡献在上一个光路上已经计算过一次，也就是从表面$A$上的$p_{i-1}$的光源贡献是对整条路径而言的。</p>
+<blockquote>
+<p>有两个例外，当光路从摄像机/Eye中发出直接击中光源时，此时光源的贡献是不被忽略的。还有一个就是PBRT中提到的Specular表面。因为在非指定光路的入射角度上，得到的BSDF采样结果都是0，只因在上一步的计算中，这一过程是被直接浪费掉的(光源贡献为0)。因此需要在找到新光路之前，补上这一部分的光照贡献(实现思路与点光源类似)。</p>
+</blockquote>
+<p>最后上Path Tracing核心伪代码(来自PBRT)</p>
+<pre><code class="cpp">Spectrum Li(param)
+
+// Get information from first ray object intesection
+&lt;Declare common path integration variables&gt;
+
+    for(int bounces = 0;; ++bounces)
+        // Direct illumination
+        &lt;Possibly add emitted light at path vertex&gt;
+        &lt;Sample illumination from lights to find path contribution&gt; 
+
+        // BSDF Sampling
+        &lt;Sample BSDF to get new path direction&gt; 
+
+        // Russian rulette / Max depth
+        &lt;Possibly terminate the path&gt;
+
+        // Indirect illumination
+        &lt;Find next vertex of path&gt;
+
+return L
+</code></pre>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

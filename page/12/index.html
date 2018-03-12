@@ -1,0 +1,395 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-11-10-Rigid body with direction/" class="card-header-title">
+                        带有方向的刚体
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.要检测圆形与多边形的碰撞 其实可以分解为圆与多边形上最近点的向量与面法线方向是否一致的问题</p>
+<p>再继续分解下去求解最近点 就能够发现只需要一个多边形的面和一个圆心即可 在这个多边形面上 这个线段可以被分为三个区域</p>
+<p>如图所示<br><img src="https://app.yinxiang.com/shard/s3/res/12b1c6bc-6270-4f30-a5df-c10818ee6a96.png" alt=""></p>
+<ul>
+<li>在Face Region中 圆心到多边形最近的点就在Face Region上 且与圆心的连线垂直于这条边</li>
+<li>在Edge Region内 那么最近点就是线段边缘点本身</li>
+</ul>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3745b055-e85c-42a4-a42f-69c954ceb32d/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
+<ul>
+<li>确定圆心在哪个区域内 可以让圆心与线段本身进行点积</li>
+<li>可以通过想象出一个三角形来完成这样的一个任务</li>
+</ul>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b8db4928-d785-4f21-be7b-6e0ab9f9e635.png" alt=""></p>
+<ul>
+<li>在这里 若是圆心位置为Edge Region那么圆心与线段端点的夹角theta一定大于90度 或者小于90度(对应的变化要看线段的向量方向走向规定)</li>
+</ul>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3c7b74c2-5e9c-4caa-b565-2551f68985d6/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-11-10-Lines and Points/" class="card-header-title">
+                        直线与点
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.现有点(x0, y0)与直线ax+by+c=0<br>点P到直线的距离为d=<br>但是当仅仅只是需要判断点(x0, y0)与直线的位置关系 那么直接可以采用以下式子来计算</p>
+<p>$$d = \frac{|ax0 + by0 + c|}{\sqrt{A^2 + B^2}}$$</p>
+<p>下图就表示了几种直线的情况和d与直线的位置判断</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/82152319-e6f1-4f34-836c-64f3a0018cca/%E6%97%A0%E6%A0%87%E9%A2%98.pngs" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-11-10-Impluse Engine/" class="card-header-title">
+                        ImpluseEngine中的直线求交点方程
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.<img src="https://app.yinxiang.com/shard/s3/res/77ab43b3-3344-4ede-b49f-1be58cbc279e.png" alt=""></p>
+<p>原式中已知两点都是位于交点的两侧</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/7ad5b0d2-d8ac-42a5-9abd-b22f4f3256c8/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
+<p>这样也就求出了最后的结果</p>
+<p>2.<br><img src="https://app.yinxiang.com/shard/s3/res/ba94592d-4422-43d4-aa42-890603536baa.png" alt=""></p>
+<p>这里Dot(n, face[0]) - c得到的方程式其实并不是将face[0]代入到$ax + by + c$中</p>
+<p>而是代入到于$ax + by + c$垂直的真实裁剪线中去的</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b901a590-a871-487b-932c-ebd83d94122e/%E6%97%A0%E6%A0%87%E9%A2%981.png" alt=""></p>
+<p>这里有多重方法可以证明 因为两种Clip情况都相似 所以只取一种情况予以证明</p>
+<p>(1).</p>
+<p>$$n = (x1 - x2, y1 - y2)   c = -[x1·(x2 - x1) + y1·(y2 - y1)]$$</p>
+<p>$$n·(x, y) - c = (x1 - x2)·x + (y1 - y2)·y + x1·(x2 - x1) + y1·(y2 - y1) = (x2 - x1)·(x - x1) + (y2 - y1)·(y - y1)$$</p>
+<p>这个式子是两个向量的点积</p>
+<p>这里的几何意义就表明</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/121762bd-4faa-4ff4-ae2b-7d9163af6ee3/%E6%97%A0%E6%A0%87%E9%A2%982.png" alt=""></p>
+<p>(2).上一则方法是一步步推导实现的 </p>
+<p>第二种方法是直接给出这条真实裁剪线的方程 因为垂直 所以<code>斜率乘积为-1</code> 已知直线斜率为 $k = -\frac{a}{b}$</p>
+<p>那么所求直线斜率为 $k = \frac{b}{a}$ 并且过$(x1, y1)$ (两点式已知a = y2 - y1, b = x1 - x2</p>
+<p>可得 $k·x + y1 - k·x1 = y$</p>
+<p>最终式子为</p>
+<p>$$(x1 - x2)·x + y1·(y2 - y1) - (x1 - x2)·x1 = y·(y2 - y1)$$</p>
+<p>$(x1 - x2)·(x - x1) = (y - y1)(y2 - y1)$也就是第一种情况中所求得的式子 可以证明得到Dot(n, face[0]) - c得到的方程式的的确确就是垂直于已知直线并且过$(x1, y1)$点的直线</p>
+<p>2.<br><img src="https://app.yinxiang.com/shard/s3/res/84fe54b9-5f37-4c02-9cd7-a934edeb76e9.png" alt=""></p>
+<p>在最后计算深度的时候需要注意到的是倘若clip计算出来的边长都在reference face内部 那么两点都为contact point</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-11-10-Friction/" class="card-header-title">
+                        摩擦力
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.摩擦力的方向与大小计算与冲量相似 需要计算出与碰撞法线方向垂直的切线方向</p>
+<p>这里定义切线的方向为两个对象之间相对速度的正方向</p>
+<p>$$V_R=V_B−V_A$$</p>
+<p>$$t=V_R−(V_R<em>n)</em>n$$</p>
+<p>这里因tangent切线方向与相对速度方向相同 因此 $V_r - V_r$在碰撞法线上的投影向量就能够得到一个与n垂直的切线向量t</p>
+<hr>
+<p>2.在两对象发生碰撞的时候 直接计算出相互作用力F的办法几乎没有 因此想到可以使用已经计算完成的冲量来计算出两个物体之间的作用力大小</p>
+<ul>
+<li>$P = mv$  动量</li>
+<li>$I = Ft$  =&gt;这里就可以使用已经计算好的冲量I来表示出滑动摩擦力</li>
+<li>$I = P2 - P1$ 冲量 = 动量改变量</li>
+</ul>
+<p>$$Ff&lt;=μFn$$</p>
+<p>PS:</p>
+<p>库伦摩擦力定理</p>
+<ul>
+<li>库仑摩擦第一定律：摩擦力跟作用在摩擦面上的正压力成正比，跟外表的接触面积无关</li>
+<li>库仑摩擦第二定律：滑动摩擦力和滑动速度大小无关</li>
+<li>库仑摩擦第三定律：最大静摩擦大于滑动摩擦力，即f静＞f滑。<br>静摩擦力:</li>
+<li><a href="http://baike.baidu.com/view/13321691.htm" target="_blank" rel="noopener">静滑动摩擦力</a>与一般<a href="http://baike.baidu.com/view/5182857.htm" target="_blank" rel="noopener">约束反力</a>不同，它并不随外力的增大而无限制地增大。</li>
+<li>当外力的大小达到一定数值时，物体处于将要滑动，但又未开始滑动的临界状态。此时，只要外力再大一点，物体就开始滑动。当物体处于平衡的临界状态时，静摩擦力达到最大值，即为最大静滑动摩擦力，简称最大静摩擦力。</li>
+</ul>
+<p>此处计算的Ff就是滑动摩擦力 而uFn也就是最大静摩擦力 由于滑动而产生的摩擦力不会超过最大静摩擦力</p>
+<hr>
+<p>3.有一向量与一单位向量点积 那么结果就是得到该向量在单位向量/方向向量上的投影向量 同理 倘若有一点与一单位向量点积 那么结果就是得到这个点在单位向量上的投影点</p>
+<hr>
+<p>4.转动惯量(Moment of Inertia)是<code>刚体绕轴转动时惯性</code>（回转物体保持其<a href="http://baike.baidu.com/view/84850.htm" target="_blank" rel="noopener">匀速圆周运动</a>或静止的特性）的量度，用字母I或J表示。其量值取决于物体的形状、质量分布及转轴的位置。</p>
+<p>PS:<br>转动惯量的表达式为</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/186d76f9-de51-4a41-bd1b-fb6767026232.png" alt=""></p>
+<p>若刚体的质量是连续分布的，则转动惯量的计算公式可写成</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/eec09ddd-b787-4280-ab23-a1cc1a56275e.png" alt=""></p>
+<p>角加速度与合外力矩的关系 因此这里可以得到角速度的计算公式 <code>dw = (M(力矩) / I(转动惯量) )*dt</code></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/f12aec99-232e-4b6f-9bf7-0ee88655339e/Image.png" alt=""></p>
+<p>力矩 $$M = L x F：L$$是从着力点到转动轴的距离矢量, F是矢量力；力矩也是矢量。</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/9c98b280-ab3e-416c-badb-ac48cbad928e/Image.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<div class="pagination-bar">
+    <ul class="pagination">
+        
+        <li class="pagination-prev">
+            
+                <a class="btn btn--default btn--small" href="/page/11/">
+            
+                <i class="fa fa-angle-left text-base icon-mr"></i>
+                    <span>pagination.newer_posts</span>
+            </a>
+        </li>
+        
+        
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/page/13/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
+        
+        <li class="pagination-number">pagination.page pagination.of</li>
+    </ul>
+</div>
+
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

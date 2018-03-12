@@ -1,0 +1,464 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-08-12-dataStructures/" class="card-header-title">
+                        数据结构重造轮子
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>大体就是这样了，本工序基本上是按照《数据结构-C语言》来重现出一个大致的数据结构基本内容的轮廓了的。</p>
+<p>本身代码的难度不是很大，除了几个较难理解的算法重新实现以外，抑郁的基本上是对自己基本功的一次完整的复习，希望可以抛砖引玉。</p>
+<p>一旦重现70%书中内容之后，打算接《深入剖析STL》来对照着看具体的差距在哪里。因为已经有不少跨平台工程的经验，所以本数据结构应该可以做到多平台的编译运行（Windows下也徐汇遇到文件格式问题，只需要重新保存成Unicode即可，OSX和Win的平台差异没办法似乎难以解决）</p>
+<p>工程Github链接<a href="https://github.com/BentleyBlanks/t3DataStructures" target="_blank" rel="noopener">t3DataStructures</a>,欢迎Star。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-08-02-KMP-2/" class="card-header-title">
+                        KMP算法心得-2
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文的理解建立在此 <a href="http://blog.csdn.net/v_july_v/article/details/7041827" target="_blank" rel="noopener">v_JULY_v</a> 以及 <a href="http://www.ruanyifeng.com/blog/2013/05/Knuth–Morris–Pratt_algorithm.html" target="_blank" rel="noopener">阮一峰</a> 的详解之上</p>
+</blockquote>
+<blockquote>
+<p>本文是对 数据结构–C语言版 书中代码的详解与个人理解</p>
+</blockquote>
+<p>上一节我只讲述了一下代码层面的理解，如果有算法背景不了解的可以去开篇的两篇教程中寻找答案。<code>这里只阐述自己对于算法中较为难以理解部分的想法</code>。</p>
+<blockquote>
+<p>为了能清晰的讲述KMP总共大概花费了一礼拜的时间; 这里我将书上的failure数组称为next数组以节省篇幅; s代表代求解字符串，p代表模式字符串</p>
+</blockquote>
+<p>这一段代码我认为是我个人最难以理解的。</p>
+<pre><code class="cpp">    i = failure[i];
+</code></pre>
+<p>首先这里的背景是，在求next数组某一循环时发现p[j]!=p[i+1],且i&gt;=0。换言之p<sub>0</sub>,p<sub>1</sub>, … p<sub>i</sub> != p<sub>j-1</sub>, p<sub>j-i+1</sub>, …p<sub>j</sub>，因此我希望能够在p<sub>0</sub>,p<sub>1</sub>, … p<sub>i</sub>中找到一个位置x(x &lt; p)，使得p<sub>0</sub>,p<sub>1</sub>,…p<sub>x</sub> = p<sub>j-x</sub>, p<sub>j-x+1</sub>,…p<sub>j</sub>。</p>
+<blockquote>
+<p>简而言之，就是希望能够找到一条稍微短一些的公共缀。可以参考<code>v_JULY_v</code>教程里的图</p>
+</blockquote>
+<p>而算法的答案是：你可以试试<code>x = next[i]</code>，说不定可行。注意，这里<code>x = next[i]</code>不是一次就可以找到，因此也就是while存在的价值。</p>
+<p>难点依然存在，为什么<code>x = next[i]</code>就可以快速的找到这个x呢？这也是我这么多天一直困扰的地方。</p>
+<pre><code class="cpp">    while(pat[j] != pat[i+1] &amp;&amp; i&gt;0)
+        i = failure[i];
+</code></pre>
+<p>总结了一下，其实难点在于几个指针的意义不明确。这里j很好理解，指向当前需要求解的位置，i才是重点。</p>
+<blockquote>
+<p>注意，这里的指针概念全部都引用自<code>KMP心得-1</code>里的代码实现</p>
+</blockquote>
+<ol>
+<li>next[i]代表了前缀末尾的下标</li>
+<li>next[i]+1代表了前后缀的长度</li>
+<li>next[i]代表了字符s[i]可回溯到的下标</li>
+</ol>
+<p><br></p>
+<blockquote>
+<p>这里我用一句话概括求解next数组的中心思想：让模式串p与自身匹配</p>
+</blockquote>
+<p>知晓了此中心思想，理解算法就游刃有余了。</p>
+<p>假定现在已知模式串为，我将结果和序号一一标示在下边</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">0</th>
+<th style="text-align:center">1</th>
+<th style="text-align:center">2</th>
+<th style="text-align:center">3</th>
+<th style="text-align:center">4</th>
+<th style="text-align:center">5</th>
+<th style="text-align:center">6</th>
+<th style="text-align:center">7</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">A</td>
+<td style="text-align:center">B</td>
+<td style="text-align:center">A</td>
+<td style="text-align:center">C</td>
+<td style="text-align:center">A</td>
+<td style="text-align:center">B</td>
+<td style="text-align:center">A</td>
+<td style="text-align:center">B</td>
+</tr>
+<tr>
+<td style="text-align:center">-1</td>
+<td style="text-align:center">-1</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">-1</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">1</td>
+<td style="text-align:center">2</td>
+<td style="text-align:center">？</td>
+</tr>
+</tbody>
+</table>
+<p>此时i=2（i=next[j-1]），为求解B的next值，根据算法比对前缀<code>ABAC</code>与后缀<code>ABAB</code>（<code>pat[j]!=pat[i]，B!=C</code>），不匹配，这个时候就是关键点了。</p>
+<blockquote>
+<p>直接从字面上寻找，当然很快就能找到s[1] = s[7]的事实，也就是next[7] = 1。</p>
+</blockquote>
+<p>如果这个过程改为p于自身匹配，这个时候就很好理解了。</p>
+<p><code>A B A C A B A B</code></p>
+<p><code>- - - - A B A C A B A B</code></p>
+<p>模拟pmatch的过程，现前循环是这样的。发现B!=C，此时不是从头开始再次匹配，而是<code>回溯到某一个位置重新比对</code>，也就是next[i]（next[2]=0），这就是为什么i可以通过赋值next[i]来迭代寻找的核心原因!</p>
+<p><code>A B A C A B A B</code></p>
+<p><code>- - - - - - A B A C A B A B</code></p>
+<p>此时s[7]==p[1]，next[7]=1!因为谁也不能保证p[next[i]]=p[j]，因此这里用while循环。其实和pmatch里的while是一个道理，我并不清楚回溯之后<code>string[i]和pat[j]</code>是否相等，所以while里j的值一直迭代。</p>
+<p><br></p>
+<p>总结一下，其实求解next数组受益于求解前后缀，其实质就是在匹配自身字符串，大致的核心思想都是相同的。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-08-01-github/" class="card-header-title">
+                        Github仓库小幅更新
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>其实不得不承认，以前写的程序上传到Github都不够用心。甚至于花了很大力气的一些较大程序也没有一个简易的构建说明，甚至于说是更新要点。</p>
+</blockquote>
+<p>自我反省了一下，争取把以前贴到Lofter上的技术博客慢慢的转移到Github以及这里的io上来。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-07-31-KMP-1/" class="card-header-title">
+                        KMP算法心得-1
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文的理解建立在此<a href="http://en.wikipedia.org/wiki/Syntax_highlighting" target="_blank" rel="noopener">^1</a>以及<a href="http://blog.csdn.net/v_july_v/article/details/7041827" target="_blank" rel="noopener">^2</a>详解之上</p>
+</blockquote>
+<blockquote>
+<p>本文是对 数据结构–C语言版 书中代码的详解与个人理解</p>
+</blockquote>
+<p>在看到 数据结构–C语言版 里的字符串模式匹配算法时，一开始我不知情Knuth, Morris, Pratt模式匹配是何物，直到有一行代码</p>
+<pre><code class="cpp">    i = failure[i];
+</code></pre>
+<p>真的是百思不得其解，应该说我对于i的作用并不是很明确。此书称此函数为失配函数，对于此数组的作用也算是略知了一二。我这里不赘述算法的基础介绍，着重于理解上可能产生歧义的几个部分。</p>
+<p>首先我想先将书上KMP算法的实际匹配算法代码罗列一下。此书是将一段未知字符串先进行失配函数处理，得到failure数组，或者说是网络上说的next数组。</p>
+<pre><code class="cpp">int pmatch(char *string, char *pat)
+{
+    // 字符串指针 / 模式字符串指针
+    int i = 0, j = 0;
+    // 命名上稍做了改动 方便理解
+    int lengthString = strlens(string), lengthPat = strlens(pat);
+
+    while(i &lt; lengthString &amp;&amp; j &lt;lengthPat)
+    {
+        if(string[i] == pat[j])
+        {
+            i++;
+            j++;
+        }
+        else if(j == 0)
+            i++;
+        else
+            // 回到可回溯位置(核心)
+            j = failure[j - 1] + 1;
+    }        
+
+    // 若完成匹配需要让i回归到模式匹配的起始位置
+    return (j == lengthPat) ? (i - lengthPat), -1;
+}
+</code></pre>
+<p>这里的核心代码确切的说只有一行，就是j = failure[j - 1] + 1。这里j起到的作用就是原文里这一段。</p>
+<figure><br>    <a href="http://images.cnitblog.com/blog/416010/201308/17122439-e349fed25e974e7886a27d18871ae48a.png" target="_blank" rel="noopener"><br>        <img src="http://images.cnitblog.com/blog/416010/201308/17122439-e349fed25e974e7886a27d18871ae48a.png" alt=""><br>    </a><br></figure>
+
+
+<p>让匹配失败后，不是暴力求解的从pattern的第一位A开始，而是从failure[j-1]+1(在这里failure[j-1]指向的是第一位A，在+1了之后就指向了B)，这一点很重要，很多教程似乎都撇开了next / failure数组和实际求解的关系。</p>
+<p>大多将这两者分开介绍，我在仔细联系了两者后发现，其实j = failure[j - 1] + 1这一段的理解是分不开失配函数的求解的。</p>
+<p>以下是失配函数</p>
+<pre><code class="cpp">void fail(char *pat)
+{
+    int n = strlen(pat);
+    failure[0] = -1;
+
+    for(int j = 0; j&lt;n; j++)
+    {
+        // i在此处会被重置，要么为-1要么为上一循环结束值
+        i = failure[j - 1];
+
+        while(pat[j] != pat[i+1] &amp;&amp; i&gt;0)
+            // 核心代码
+            i = failure[i];
+
+        if(pat[j] == pat[i+1])
+            failure[j] = i+1;
+        else
+            failure[j] = -1;
+    }
+}
+</code></pre>
+<p>我想详说一下i的作用，很微妙，似乎不能用一句简单的话概括。还记得刚才匹配失败以后从failure[j-1]+1重新匹配的事实吗。i在这里就是表示，上一个p0,p1…pi = pj-i,pj-i+1…pj出现的位置，也就是前缀在后缀中出现的位置。后边的if/else应该是好理解的。</p>
+<p>可以这样代入，某一循环中的某一刻，只要上一循环i&gt;0, 那么pat[i]==pat[j-1]，因此failure[j-1] = i - 1无误(本书中i因为是从-1开始的，算法导论从0开始，本意相同，只有1的差距)。</p>
+<p>所以倘若pat[i+1] == pat[j]那么自然failure[j]的值可以直接从上次结果failure[j-1]继承过来failure[j] = i+1了（i会在循环开始被重置为failure[j - 1]，因为我的条件是当前字符相同，所以不进入while），等价于failure[j] = failure[j-1] + 1咯。</p>
+<p>核心代码</p>
+<pre><code class="cpp">    i = failure[i];
+</code></pre>
+<p>的理解我花了非常多的时间。</p>
+<p>感觉直到目前为止，都没能很透彻的了解。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<div class="pagination-bar">
+    <ul class="pagination">
+        
+        <li class="pagination-prev">
+            
+                <a class="btn btn--default btn--small" href="/page/8/">
+            
+                <i class="fa fa-angle-left text-base icon-mr"></i>
+                    <span>pagination.newer_posts</span>
+            </a>
+        </li>
+        
+        
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/page/10/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
+        
+        <li class="pagination-number">pagination.page pagination.of</li>
+    </ul>
+</div>
+
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

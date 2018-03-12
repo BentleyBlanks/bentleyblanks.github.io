@@ -1,0 +1,365 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Depth of Field [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Depth of Field</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>以下理解均来自PBRT以及网络资源</p>
+</blockquote>
+<p>首先，对普通的品红相机添加景深不是一件非常困难的事情，在这里不赘述景深的生成原理，直接步入实现部分。</p>
+<blockquote>
+<p>正常的品红相机为小孔成像，因此没有景深的概念，而增加一凸透镜之后，那么在焦平面左右的对象成像为清晰的，其余部分根据距离焦平面距离模糊程度不同。</p>
+</blockquote>
+<p>如图所示，</p>
+<p><img src="https://farm2.staticflickr.com/1673/24907059613_076536e068_z.jpg" alt=""></p>
+<p>点$p_1$与$p_2$在成像平面上根据离焦平面位置的不同对应的成像点也略有不同。</p>
+<blockquote>
+<p>若有成像平面上一点$p$, 其光路经过凸透镜任意位置，最终都将「收敛」/「汇集」的一平面上，这一平面就是焦平面，有$\frac{1}{s} + \frac{1}{i} = \frac{1}{f}$的关系(<a href="https://zh.wikipedia.org/wiki/%E8%96%84%E9%80%8F%E9%8F%A1" target="_blank" rel="noopener">透镜公式</a>)。</p>
+</blockquote>
+<p>那么在计算机中，虚拟成像平面与焦平面位于同一侧，此时可这样理解光路：</p>
+<p>多术光从凸透镜任意位置发出，击中成像平面的某一特定位置$p$，终将在焦平面(focal plane)上某一点$p’$汇聚。如图所示。</p>
+<p><img src="https://farm2.staticflickr.com/1650/24903650934_7b9e0eb72c_z.jpg" alt=""></p>
+<p>计算机中相机模型生成景深原理就是上图。</p>
+<hr>
+<blockquote>
+<p>PBRT中景深的实现</p>
+</blockquote>
+<pre><code class="cpp">// 1.于透镜上采样
+float lensU, lensV;
+ConcentricSampleDisk(sample.lensU, sample.lensV, &amp;lensU, &amp;lensV);
+lensU *= lensRadius;
+lensV *= lensRadius;
+
+// 2.计算当前采样点在焦平面上对应的收敛点
+float ft = focalDistance / ray-&gt;d.z;
+Point Pfocus = (*ray)(ft);
+
+// 3.更新相机射出光线信息
+ray-&gt;o = Point(lensU, lensV, 0.f);
+ray-&gt;d = Normalize(Pfocus - ray-&gt;o);
+</code></pre>
+<p>步骤2 3难度不大，其原理就是相似三角形。因为凸透镜上任意光路都会在焦平面汇集，因此为了快速计算得到焦平面上的点，我们直接选取光路<strong>从film上点A经过凸透镜中心的方向</strong>来得到与焦平面的交点(凸透镜中心不会发生折射现象，也就无需使用Snell公式计算出射光线方向)</p>
+<p>难点在于第一步<strong>ConcentricSampleDisk</strong>。要求是在圆形透镜上随机采样，而问题出在我们的采样点分布在<strong>方形区域</strong>内，目标区域为<strong>圆形</strong>，因此需要做一次映射。</p>
+<blockquote>
+<p>原论文实现地址<a href="https://mediatech.aalto.fi/~jaakko/T111-5310/K2013/JGT-97.pdf" target="_blank" rel="noopener">A Low Distortion Map Between Disk and Square</a>。其作用就是在将笛卡尔坐标系下的随机点$p\in[-1, 1]$转换为极坐标，确保正方形区域能够直接映射为极坐标。</p>
+</blockquote>
+<p>传统方法映射笛卡尔坐标至极坐标，转换较为简单。但问题在于无法均匀分布采样点，中心点区域会发生过采样问题。如图</p>
+<pre><code class="cpp">// Draw two uniform random numbers in the range [0,1)
+R1 = RAND(0,1);
+R2 = RAND(0,1);
+
+// Map these values to polar space (phi,radius)
+phi = R1 * 2PI;
+radius = R2 * r;
+
+// Map (phi,radius) in polar space to (x,y) in Cartesian space
+x = cos(phi) * radius;
+y = sin(phi) * radius;
+</code></pre>
+<p><img src="http://l2program.co.uk/wp-content/uploads/2014/12/Polar.png" alt=""></p>
+<blockquote>
+<p>图来自<a href="http://l2program.co.uk/900/concentric-disk-sampling" target="_blank" rel="noopener">Concentric Disk Sampling</a></p>
+</blockquote>
+<p>因此论文<a href="https://mediatech.aalto.fi/~jaakko/T111-5310/K2013/JGT-97.pdf" target="_blank" rel="noopener">A Low Distortion Map Between Disk and Square</a>的优势就在于可以将笛卡尔坐标系下均匀分布的随机点映射至极坐标系下且不会发生过采样问题。如图</p>
+<p><img src="http://l2program.co.uk/wp-content/uploads/2014/12/Concentric.png" alt=""></p>
+<blockquote>
+<p>可以通过直接观察颜色点的对应位置做对比</p>
+</blockquote>
+<hr>
+<blockquote>
+<p>算法分析如下</p>
+</blockquote>
+<p>核心思想本质上就是将方形区域与圆形区域做区域划分<br><img src="https://farm2.staticflickr.com/1568/25239018550_b54382d885_z.jpg" alt=""></p>
+<p>若给定两随机数$a, b\in[0, 1]$，那么首先可以将其映射至$[-1, 1]$范围内。可见上方左图显示。</p>
+<blockquote>
+<p>Region 1</p>
+</blockquote>
+<p>这块区域可由直线$b = a(a&gt;b)$与直线$b = -a(a&gt;-b)$确定，也就是代码中if-else环节所做的工作。</p>
+<p>以下思想很关键，这里视<strong>a为极坐标半径，b为对应圆弧长度</strong>。那么可得$r = a, \phi = \frac{\pi}{4}·\frac{b}{a}$</p>
+<p>检验，当$a = 0.4, b = 0.2$时，可得$r = 0.4, \phi = \frac{\pi}{8}$；当$a = 0.4, b = -0.2$时，可得$r = 0.4, \phi = -\frac{\pi}{8}$与逻辑推导吻合。</p>
+<p>同理，根据每个区域的$a,b$绝对值关系，推出Region 2:$r = b, \phi = \frac{\pi}{4}·(2-\frac{b}{a})$, Region 3:$r = -a, \phi = \frac{\pi}{4}·(4+\frac{b}{a})$，Region 4:$\frac{\pi}{4}·(6-\frac{b}{a})$。</p>
+<blockquote>
+<p>可以自行确定$\mid a\mid$与$\mid b\mid$之间的关系</p>
+</blockquote>
+<p>再加上最后一个圆心处, $r = 0, \phi = 0$，即可构成完成的笛卡尔坐标映射至极坐标的任务。</p>
+<p>测试结果如下，左图为均匀分布随机采样点，右图为(使用OF 0.9.0做打点测试)，直观的看到非常吻合和算法本身实现效果。</p>
+<p><img src="https://farm2.staticflickr.com/1513/25441801691_e1d932503a_z.jpg" alt=""></p>
+<hr>
+<p>最后上OF实现代码</p>
+<pre><code class="cpp">ofVec2f squareToUniformDisk(const float sampleU, const float sampleV, int type)
+{
+    float phi, r, u, v;
+    // (a,b) is now on [-1,1]ˆ2
+    float a = 2 * sampleU - 1;
+    float b = 2 * sampleV - 1;
+
+    // region 1 or 2
+    if(a &gt; -b)
+    {
+        // region 1, also |a| &gt; |b|
+        if(a &gt; b)
+        {
+            r = a;
+            phi = (PI / 4) * (b / a);
+        }
+        // region 2, also |b| &gt; |a|
+        else
+        {
+            r = b;
+            phi = (PI / 4) * (2 - (a / b));
+        }
+    }
+    // region 3 or 4
+    else
+    {
+        // region 3, also |a| &gt;= |b|, a != 0
+        if(a &lt; b)
+        {
+            r = -a;
+            phi = (PI / 4) * (4 + (b / a));
+        }
+        // region 4, |b| &gt;= |a|, but a==0 and b==0 could occur.
+        else
+        {
+            r = -b;
+            if(b != 0)
+                phi = (PI / 4) * (6 - (a / b));
+            else
+                phi = 0;
+        }
+    }
+
+    u = r* cos(phi);
+    v = r* sin(phi);
+    return ofVec2f(u, v);
+}
+</code></pre>
+<blockquote>
+<p>原作者在其博客中更新了该映射方法，据本人说明是提升了运算效率，详情可见链接<a href="http://psgraphics.blogspot.co.uk/2011/01/improved-code-for-concentric-map.html" target="_blank" rel="noopener">Blog</a>，其中PBRT就选用的是原作者更新后的实现办法，可酌情选择。</p>
+</blockquote>
+<hr>
+<p>基本完成了上述结果，通过调节相机参数，就可以得到较为完善的景深效果。以下结果由<a href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atoms Renderer</a>渲染得到。</p>
+<p><img src="https://farm2.staticflickr.com/1531/25509064516_8314deedf1_z.jpg" alt=""></p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

@@ -1,0 +1,399 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archives: 2018 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-06-22-include/" class="card-header-title">
+                        头文件依赖
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <pre><code>当一个头文件被包含的同时也引入了新的依赖, 一旦该头文件被修改, 代码就会被重新编译. 
+
+如果这个头文件又包含了其他头文件, 这些头文件的任何改变都将导致所有包含了该头文件的代码被重新编译. 因此, 我们倾向于减少包含头文件, 尤其是在头文件中包含头文件.
+</code></pre><p>使用前置声明可以显著减少需要包含的头文件数量. 举例说明: 如果头文件中用到类 <code>File</code>, 但不需要访问 <code>File</code> 类的声明, 头文件中只需前置声明 <code>class File;</code> 而无须 <code>#include &quot;file/base/file.h&quot;</code>.</p>
+<p>不允许访问类的定义的前提下, 我们在一个头文件中能对类 Foo 做哪些操作?</p>
+<blockquote>
+<p>我们可以将数据成员类型声明为 Foo * 或 Foo &amp;.</p>
+</blockquote>
+<blockquote>
+<p>我们可以将函数参数 / 返回值的类型声明为 Foo (但不能定义实现).</p>
+</blockquote>
+<blockquote>
+<p>我们可以将静态数据成员的类型声明为 Foo, 因为静态数据成员的定义在类定义之外.</p>
+</blockquote>
+<p>反之, 如果你的类是 Foo 的子类, 或者含有类型为 Foo 的非静态数据成员, 则必须包含 Foo 所在的头文件. </p>
+<hr>
+<blockquote>
+<p>第一个原则应该是，如果可以不包含头文件，那就不要包含了。这时候前置声明可以解决问题。如果使用的仅仅是一个类的指针，没有使用这个类的具体对象（非指针），也没有访问到类的具体成员，那么前置声明就可以了。因为指针这一数据类型的大小是特定的，编译器可以获知。</p>
+</blockquote>
+<hr>
+<blockquote>
+<p>第二个原则应该是，尽量在CPP文件中包含头文件，而非在头文件中。假设类A的一个成员是是一个指向类B的指针，在类A的头文件中使用了类B的前置声明并便宜成功，那么在A的实现中我们需要访问B的具体成员，因此需要包含头文件，那么我们应该在类A的实现部分（CPP文件）包含类B的头文件而非声明部分(H文件)。 </p>
+</blockquote>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-06-21-C++ template/" class="card-header-title">
+                        C++模板特化
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>模板为C++提供了泛型的概念</p>
+</blockquote>
+<p>1.在编译初期 编译器并不会给<code>template&lt;typename T&gt; fun</code>分配内存空间 只有在发现程序显式的实例化了这个模板的时候 才会分配响应的内存出来</p>
+<p>2.模板也会有不足的时候</p>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" alt=""><br>    </a><br></figure>
+
+<p>比如在对比大小的min()当中</p>
+<pre><code class="cpp">template&lt;typename T&gt;
+T&amp; min(const T&amp; a, const T&amp; b)
+{
+     return (a&lt;b) ? a : b;
+}
+</code></pre>
+<p>当中 会出现一定情况的不适用 比如用户想要使用<code>char*</code>来对比每一位大小时 编译器发现<code>char*</code>并没有重载过 &gt; 或者 &lt;运算符 那么就会出现编译无法通过的错误</p>
+<pre><code class="cpp">template&lt;&gt; //告诉了编译器 这是一个模板的特化
+const char* min&lt;char *&gt;(const char* const&amp; a, const char* const&amp; b)
+{
+     return (strcmp(a, b) &lt; 0) ? a : b;
+}
+
+
+
+定义完之后 min就可以额外的支持基本数字类型之外的char*型了
+
+```cpp
+const char* s1=“say”, s2 = &quot;hello&quot;;
+min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
+</code></pre>
+<p>就可以正常的通过编译 </p>
+<p>因此模板的特化就是模板本身泛型能力不够的一种补充</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-04-26-Floekr2T/" class="card-header-title">
+                        Floekr2T塔防套件
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.defendor</p>
+<p>2.attacker<br>包含trace和animation两内存块<br>–&gt;setup(trace, animation)初始化预设动画和预设路径<br>–&gt;update(skill)根据遍历一遍skill来更新自身的激活与否状态 外部通过查阅其状态来确定是否弹出vector<br>–&gt;draw()</p>
+<p>3.skill<br>自身具备TRACK PATH SCOPE其中scope并非一个真正意义上的技能而是直接由defendor来控制attacker的血量扣除           </p>
+<p>  –path会根据自身初始化的target位置确定线性方向 之后只需要根据预设定的velocity来不断更新position即可</p>
+<p>  –track会不断的追踪某一个特定的attacker来不断的更新自身的direction(normalize之后缩放velocity大小)更新posotion<br>直到attacker检测到AABB碰撞之后就从vector<skill>弹出vector</skill></p>
+<p>  –scope的skill意味着defendor不会在skill的vector当中添加一个新的技能 而是直接对当前选择的attacker进行伤害的扣除 可选的可以添加噪声以及随机</p>
+<p>4.trace<br>  –维护一段vector专门用于存放拐点<br>通过turnLeft turnRight go…等来智能的(也就是根据当前direction来判断左右转前后转需要rotate的角度)addTurningPoint达到路径中拐点的设置<br>之后attacker只需要不断的从vector中取得下一拐点就可以设定前进方向</p>
+<p>5.animation<br>  –维护一段vector专门用于存放image帧动画<br>只需要不断循环的从vector中读取image并渲染出来就可以做到动画播放的目的<br>getFrame()能返回当前播放帧的image</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-03-28-git/" class="card-header-title">
+                        快速使用Git布置项目环境
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>###初始化：</p>
+<p>在创建项目的目录中执行git init<br>被init的文件夹即作为工作目录树，存放从版本库检出的代码。</p>
+<hr>
+<p>###添加文件：</p>
+<p>创建代码文件以及其他文件，通知git跟踪这个文件：<br>git add &lt;文件名（可以使用统配）&gt;</p>
+<hr>
+<p>###修改以及提交：</p>
+<p>git commit [-m “提交消息”]<br>git将会把提交者的姓名邮件以及-m提交消息全部提交到记录中。<br>使用git log来察看提交信息</p>
+<p>使用git status来察看工作目录树的状态，即当前的视图状态。</p>
+<p>在修改目录之后，再次使用git add来暂存更改，等待提交。<br>git commit接受任意多个-m参数，每次新启一段 。</p>
+<p>git log -&lt;数字&gt;通过修改数字来限制命令git log输出的提交条目的个数。</p>
+<hr>
+<p>###理解使用分支：</p>
+<p>使用git branch 分支名 父分支名  来创建一个分支。<br>默认的主分支叫做master，这也是Git的默认的分支，master对应于CVS<br>和Subversion的主干（trunk）。<br>使用git checkout 分支名 来切换到指定的分支。</p>
+<hr>
+<p>###发布分支（release branch）</p>
+<p>在git commit中使用-a参数来告诉git提交全部修改的文件。</p>
+<p>使用git branch命令来察看当前分支。</p>
+<p>注意：在刚刚init初始化之后没有跟踪任何文件之前，master分支是不存在的。<br>git branch -d xxxxx 删除本地分支，被删除分支必须不是当前所在分支。<br>git branch -a察看远程分支。</p>
+<hr>
+<p>###处理发布：</p>
+<p>使用git tag <tag name=""> &lt;分支名&gt;  来对指定的分支添加一个tag。使用git tag可以察看当前所有的tag。</tag></p>
+<p>添加标签之后，只要标签还在，从标签到版本树起点的一连串提交记录就都还在。这是可以删除打了标签的分支，这仅仅只是删除了标签的名字，而没有删除分支上的内容。</p>
+<p>使用git rebase &lt;分支名&gt; 来变基，即把一个分支上的所有修改都合并到某一个分支上。比如在master分支执行git rebase test，就会把所有test分支的改动全部合并到master主分支上。<br>可以从一个tag建立一个分支git branch XXX <tag>  。</tag></p>
+<hr>
+<p>###归档：</p>
+<p>使用git archive 命令来归档，可以创建一个gzip压缩文件。命令如下：</p>
+<pre><code>git archive --format=tar\
+                 --prefix=&lt;压缩包要存放的目录&gt;/ &lt;要归档的标签名称&gt; \
+                 | gzip &gt; &lt;压缩包名称&gt;.tar.gz
+
+
+git archive --format=zip\
+                 --prefix=&lt;压缩包要存放的目录&gt;/ &lt;要归档的标签名称&gt; \
+                 &gt; &lt;压缩包名称&gt;.zip
+
+(\表示本行命令未完，下行继续)
+</code></pre><p>克隆远程版本：</p>
+<p>使用git clone &lt;源&gt;  来将远程代码拷贝到本地目录。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<div class="pagination-bar">
+    <ul class="pagination">
+        
+        <li class="pagination-prev">
+            
+                <a class="btn btn--default btn--small" href="/archives/2018/page/13/">
+            
+                <i class="fa fa-angle-left text-base icon-mr"></i>
+                    <span>pagination.newer_posts</span>
+            </a>
+        </li>
+        
+        
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/archives/2018/page/15/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
+        
+        <li class="pagination-number">pagination.page pagination.of</li>
+    </ul>
+</div>
+
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

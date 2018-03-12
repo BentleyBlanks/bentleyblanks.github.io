@@ -1,0 +1,313 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Möller-Trumbore algorithm [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Möller-Trumbore algorithm</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>本文为学习<a href="http://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection" target="_blank" rel="noopener">Möller-Trumbore算法</a>的笔记，这里不对前面重心坐标求交进行记录，较为简单可自行推导。</p>
+</blockquote>
+<p>根据中心坐标系可以很轻松的得出</p>
+<p>$$P = (1 - u - v)A + uB + vC$$</p>
+<p>这里P为射线与三角形相交点。u, v为以三角形两边为坐标系轴的P的投影长度(也可以理解为是P与该边两点连线三角形的面积与整体之比)。</p>
+<p>$$P=A - uA - vA + uB + vC = A + u(B - A) + v(C - A)$$</p>
+<p>而$P=O+tD$，因此代入可得</p>
+<p>$$\begin{array}{l}<br>O+tD &amp; = &amp; A + u(B - A) + v(C - A)\\<br>O-A &amp; = &amp; -tD+u(B-A)+v(C-A)<br>\end{array}$$</p>
+<p>这里转换为线性方程组的形式</p>
+<p>$$\begin{bmatrix}<br>-D &amp; (B-A) &amp; (C-A)<br>\end{bmatrix}<br>\begin{bmatrix}<br>t\\u\\v<br>\end{bmatrix}<br>=O-A$$</p>
+<p>那么问题就转化为如何求解出这里的$t$ $u$ $v$三个分量</p>
+<p>运用<a href="http://baike.baidu.com/view/1130618.htm" target="_blank" rel="noopener">克莱姆法则</a></p>
+<blockquote>
+<p>令$M$ = $\begin{bmatrix}<br>-D &amp; (B-A) &amp; (C-A)<br>\end{bmatrix}$, 也就是将上式的$O-A$作为替换项，依次替换$M$中的$-D$，$B-A$, $C-A$，得到$M_t, M_u, M_v$。那么最终$t = \frac{M_t}{M}, u = \frac{M_u}{M}, v = \frac{M_v}{M}$。理所当然的可以写为下面这类形式</p>
+</blockquote>
+<p>$$\left[ \begin{array}{r} t \ u \ v\end{array}\right] = {1 \over \left[ \left| \begin{array}{r} -D &amp; (B-A) &amp; (C-A) \end{array}\right| \right]}<br>\left[ \begin{array}{c}<br>\left| \begin{array}{c}  O-A &amp; B-A &amp; C-A\end{array}\right| \ <br>\left| \begin{array}{c}  -D &amp; O-A &amp; C-A\end{array}\right| \ <br>\left| \begin{array}{c}  -D &amp; B-A &amp; O-A\end{array}\right| \ <br>\end{array}\right]$$</p>
+<blockquote>
+<p>原文在这里使用了变量替换，本质一致</p>
+</blockquote>
+<blockquote>
+<p><a href="https://en.wikipedia.org/wiki/Triple_product#Scalar_or_pseudoscalar" target="_blank" rel="noopener">Scalar triple product</a>很好理解，本质上就是计算一个平行六面体的体积，无论是先进行何方向上的叉积点积，最终计算的都是平行六面体的体积。</p>
+</blockquote>
+<blockquote>
+<p>纯量三重积最重要的一点就是$A·(B \times C) = det \left[ \begin{array}{c}<br>\begin{array}{c}  a_1 &amp; a_2 &amp; a_3\end{array} \ <br>\begin{array}{c}  b_1 &amp; b_2 &amp; b_3\end{array} \ <br>\begin{array}{c}  c_1 &amp; c_2 &amp; c_3\end{array} \\<br>\end{array}\right]$</p>
+</blockquote>
+<blockquote>
+<p>$$D = B \times C = \left[\begin{array}{c}  b_yc_z-b_zc_y &amp; b_zc_x-b_xc_z &amp; b_xc_y-b_yc_x\end{array}\right]$$</p>
+</blockquote>
+<blockquote>
+<p>那么</p>
+</blockquote>
+<blockquote>
+<p>$$A · D = \left[ \begin{array}{c} a_x&amp; a_y &amp; a_z \end{array} \right]·D = a_xb_yc_z + a_yb_zc_x + a_zb_xc_y - a_zb_yc_x - a_yb_xc_z - a_xb_zc_y$$</p>
+</blockquote>
+<blockquote>
+<p>对比行列式结果与上式，发现一致。</p>
+</blockquote>
+<p>根据纯量三重积的结论，可以推出</p>
+<p>$$\left[ \begin{array}{r} t \ u \ v\end{array}\right] =<br>{1 \over {(D \times (C-A)) \cdot (B-A)}}<br>\left[ \begin{array}{c}<br>((O-A) \times (B-A)) \cdot (C-A) \\<br>(D \times (C-A)) \cdot (O-A) \\<br>((O-A) \times (B-A)) \cdot D<br>\end{array}\right]$$</p>
+<blockquote>
+<p>注意这里已经通过交换叉积顺序抵消$-D$前方的负号了</p>
+</blockquote>
+<hr>
+<p>最终实现代码</p>
+<pre><code class="cpp">bool rayTriangleIntersect( 
+    const Vec3f &amp;orig, const Vec3f &amp;dir, 
+    const Vec3f &amp;v0, const Vec3f &amp;v1, const Vec3f &amp;v2, 
+    float &amp;t, float &amp;u, float &amp;v) 
+{ 
+    // ---1
+    Vec3f v0v1 = v1 - v0; 
+    Vec3f v0v2 = v2 - v0; 
+    Vec3f pvec = dir.crossProduct(v0v2); 
+    float det = v0v1.dotProduct(pvec); 
+
+    // if the determinant is negative the triangle is backfacing
+    // if the determinant is close to 0, the ray misses the triangle
+    if (det &lt; kEpsilon) return false; 
+    float invDet = 1 / det; 
+
+    // ---2
+    Vec3f tvec = orig - v0; 
+    u = tvec.dotProduct(pvec) * invDet; 
+    if (u &lt; 0 || u &gt; 1) return false; 
+
+    // ---3
+    Vec3f qvec = tvec.crossProduct(v0v1); 
+    v = dir.dotProduct(qvec) * invDet; 
+    if (v &lt; 0 || u + v &gt; 1) return false; 
+
+    // ---4
+    t = v0v2.dotProduct(qvec) * invDet; 
+
+    return true; 
+#else 
+    ... 
+#endif 
+} 
+</code></pre>
+<p>这里第一步先行计算${1 \over {(D \times (C-A)) \cdot (B-A)}} $中的分母是否为0，来判断三角形平面与射线方向是否平行。从分母的几何意义上说，根据交换律本质上原式也等价于$D · ((C-A)\times(B-A))$，而D的右项即为法线(具体看左右手系)</p>
+<blockquote>
+<p>我这里选取右手系，因为计算得到的法线为反的，因此这里在判断$det$的正负时要看具体左右手系。</p>
+</blockquote>
+<p>得到了det之后就按照克莱姆法则依次计算出t, u, v即可。先行判断$u, v$的取值范围就是用于判断相交点P是否在三角形内。</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

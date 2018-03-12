@@ -1,0 +1,276 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>射线与圆求交 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">射线与圆求交</h3>
+					</div>
+					<div class="card-content">
+					  <p><p>假定已求解出交点，最后一步还需要将距离最短的交点筛选出来，有一个特殊情况如下图</p>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" alt=""><br>    </a><br></figure>
+
+
+<p>实际交点应该是A，因此要剔除B的情况。比较简单，令交点到射线起始点向量为P，那么和射线方向向量d点积，看\( \mathtt{cos \theta} \)的符号即可(-90, 90)。</p>
+<p><br></p>
+<blockquote>
+<p>联立方程组无脑求解</p>
+</blockquote>
+<p>在没有查阅之前，用的就是最基本的直线和圆方程强行联立求解，根据delta值来判断交点情况，最后根据交点与射线起始点的向量夹角筛选合适交点。</p>
+<pre><code class="cpp">class ray
+{
+public:
+    // ...
+    // 0 = ax + by + c
+    float a, b, c;
+}
+</code></pre>
+<p>强行联立</p>
+<pre><code class="cpp">float k = -r.a / r.b, t = -r.c / r.b;
+
+float A = k * k + 1.0f;
+float B = 2 * k * t - 2 * c-&gt;y * k - 2 * c-&gt;x;
+float C = c-&gt;x * c-&gt;x + t * t - 2 * c-&gt;y * t + c-&gt;y * c-&gt;y - c-&gt;radius * c-&gt;radius;
+
+float delta = B * B - 4 * A * C;
+</code></pre>
+<p>求解 delta为0，正负任意</p>
+<pre><code class="cpp">float x1 = (-B + sqrt(delta)) / (2.0f * A);
+float y1 = k*x1 + t;
+int x2 = (-B - sqrt(delta)) / (2.0f * A);
+int y2 = k*x2 + t;
+</code></pre>
+<p>但是上的上述方法有一个缺陷，就是你必须讨论斜率k为无穷的情况。</p>
+<blockquote>
+<p>向量求解</p>
+</blockquote>
+<p>设圆心坐标为C<br>令圆形方程为\( \mathtt{(X-C)·(X-C)=r^2} \)，向量点积自己就是求解自身长度的平方，射线方程令为\( \mathtt{R(t) = P + td, t \ge 0} \)。</p>
+<p>直接代入\( \mathtt{(P+td-C)·(P+td-C)=r^2} \), 令\( \mathtt{P-C = m} \)</p>
+<p>展开下式</p>
+<p>$$ \mathtt{(m + td)·(m + td) = r^2} $$</p>
+<p>等价于二次方程求根</p>
+<p>$$ \mathtt{(d · d)t^2 + 2(m · d)t + (m · m) - r^2 = 0} $$</p>
+<p>基本b, c, t分量代式</p>
+<p>$$ \mathtt{b = m · d} $$</p>
+<p>$$ \mathtt{c = (m · m) - r^2} $$</p>
+<p>$$ \mathtt{t = -b +- \sqrt{b^2 - c}} $$</p>
+<p>这里直接用向量，免去了讨论斜率的情况。交点Q就是\( \mathtt{P + td} \)。</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

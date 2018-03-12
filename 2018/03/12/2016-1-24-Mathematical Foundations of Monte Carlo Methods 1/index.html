@@ -1,0 +1,370 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mathematical Foundations of Monte Carlo Methods 1 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Mathematical Foundations of Monte Carlo Methods 1</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>本文为在<a href="http://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/monte-carlo-methods-mathematical-foundations/quick-introduction-to-monte-carlo-methods" target="_blank" rel="noopener">Scratchapixel</a>上学习的翻译读后感与部分个人解读。这里不会将全篇的内容系数翻译，保留原文以便后期自行理解，笔者只精炼一些文章中关键的点出来便于记录。</p>
+</blockquote>
+<h3 id="Random-Variables-and-Probability"><a href="#Random-Variables-and-Probability" class="headerlink" title="Random Variables and Probability"></a>Random Variables and Probability</h3><p>随机变量(random variable):A random variable is not a fixed value, but a function, mapping or associating a unique numerical value to each possible outcome of a random process which is not necessarily a number.</p>
+<blockquote>
+<p>随机变量本质上就是一个将随机实验结果，映射到实际数据上的函数$X(e)$。</p>
+</blockquote>
+<p>采样空间(sample space):A sample space defines the set of all possible outcomes from an experiment. </p>
+<blockquote>
+<p>采样空间可以用于定义<a href="http://en.wikipedia.org/wiki/Elementary_event" target="_blank" rel="noopener">基本事件</a>与<a href="http://en.wikipedia.org/wiki/Sigma-algebra" target="_blank" rel="noopener">非基本事件</a>。假定你现在有10张牌，3张为0，5张为1，2张为2。那么采样的非基本事件的采样空间就为$S = \{0, 0, 0, 1, 1, 1, 1, 1, 2, 2 \}$，而基本事件的采样空间就为$S = \{ 0, 1, 2 \}$。</p>
+</blockquote>
+<p><br></p>
+<table>
+<thead>
+<tr>
+<th>名词</th>
+<th>释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Random Variable</td>
+<td>A random variable is a function X defined from a sample space S to a measurable space (1, 0). Random variables are denoted with upper case letters.</td>
+</tr>
+<tr>
+<td>Probability</td>
+<td>A probability provides a quantatative description of the likely occurrence of a particular event.</td>
+</tr>
+<tr>
+<td>Observation or Realization</td>
+<td>A realization, or observed value, of a random variable is the value that is actually observed.</td>
+</tr>
+<tr>
+<td>Event</td>
+<td>An event is any collection of outcomes of an experiment. Any subset of the sample space is an event.</td>
+</tr>
+<tr>
+<td>Sample Space</td>
+<td>Exhaustive list of all the possible outcomes of an experiment. Each possible result of such experiment is represented by one and only one point in the sample space, which is usually denoted by $S$. The elements of the sample space can be thought of as all the different possibilities that could happen.</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Probability-Distrubution"><a href="#Probability-Distrubution" class="headerlink" title="Probability Distrubution"></a>Probability Distrubution</h3><p>伯努利分布(Bernoulli trail):In probability theory when a random process has only two outcomes.</p>
+<p>二项分布(Binomial Distribution):We want to find the probability that $S=n$, where $n≤N$, which is the probability that $n$ of the $N$ samples take on the value of 1, and $N−n$ samples take on the value of 0:</p>
+<p>$$Pr(S=n)=C^N_n p^k (1−p)^{(N−n)}$$</p>
+<p>for n = 0, 1, 2, …, N, where:</p>
+<p>$$C^N_n=\frac{N!}{n!(N−n)!}$$</p>
+<blockquote>
+<p>更多的概率分布函数，比如均匀分布，泊松分布等等可以在这里找到<a href="https://en.wikipedia.org/wiki/List_of_probability_distributions" target="_blank" rel="noopener">List of probability distributions</a>.</p>
+</blockquote>
+<hr>
+<h3 id="Probablity-Properties"><a href="#Probablity-Properties" class="headerlink" title="Probablity Properties"></a>Probablity Properties</h3><p>枚举事件(Collectively exhaustive events):A set of events is said to be jointly or collectively exhaustive if at least one of the event must occur.</p>
+<p>互斥事件(Mutually exclusive events):Two sets A and B are said to be <strong>mutually exclusive</strong> or <strong>disjoint</strong>  if A and B have no elements in common.</p>
+<blockquote>
+<p> 抛硬币本身就既是一个枚举事件，又是一个互斥事件:你可以保证得到的事件结果只有面和花两种(可枚举)，且若出现花的一面则另一面不会出现，反之成立(互斥事件)</p>
+</blockquote>
+<p>独立事件(Independent event):When you toss a coin the probability of getting heads or tails is $\frac{1}{2}$ as we know it, but if you toss the coin a second time, the probability of getting either heads or tails is still $\frac{1}{2}$. In other words, the first toss did not change the outcome of the second toss or to say it differently again, the chances of getting heads or tails on the second toss are completely independent of whether or not we got “tails” or “heads” in the first toss.</p>
+<blockquote>
+<p>独立事件有别于前两者，只是表示每一次事件的发生不会因为上一次事件的发生而影响其发生概率。独立事件之间可以遵循乘法规则，也就是$Pr(A∩B) = Pr(A)Pr(B)$.</p>
+</blockquote>
+<hr>
+<h3 id="Introduction-to-Statistics"><a href="#Introduction-to-Statistics" class="headerlink" title="Introduction to Statistics"></a>Introduction to Statistics</h3><p>统计学(Statistics):The goal of statistics is to provide information on random variables and probability distributions we don’t know anything about in the first place. </p>
+<p>有偏(Bias):By “randomly” we mean that the process by which we select elements in the population, doesn’t give more importance to some elements than others. If it was the case we would introduce what we call <strong>bias</strong> in the calculation of this estimate.</p>
+<blockquote>
+<p>也就是不在统计的随机过程中加入人为的统计因素，这将会导致偏差。但正如前文描述，Bias也不是一无是处，有时候在图形学中有偏的方法可以在更小的画面影响下更快的得到，甚至得到比无偏的方法更接近与收敛值。这其实是一个权衡利弊的结果。</p>
+</blockquote>
+<p>采样/统计(Sample or Statistics):Our random variable really is some sort of “sampler”, it’s a tool or a function on the population, that we can use to collect data on that population, and the collected data makes up what we call the observations and the group of observations itself is what we call a <strong>sample</strong> or <strong>statistics</strong>.</p>
+<hr>
+<h3 id="Expected-Value"><a href="#Expected-Value" class="headerlink" title="Expected Value"></a>Expected Value</h3><p>期望(Expected Value):The mean and the expected value are equal however the mean is a simple average of numbers not weighted by anything, while the expected value is a sum of numbers weighted by their probability:</p>
+<p>$$E = \sum^N_{i=1}p_ix_i$$</p>
+<blockquote>
+<p> 换言之，随机变量在采样数不断变大后会向一个值收敛，而这个值就是所求的数学期望</p>
+</blockquote>
+<p>样本均值(Sample mean):the mean of a collection of observations produced by a random variable X, is called a sample mean:</p>
+<p>$$\bar{X}_n = \frac{1}{n}(X_1+X_2+X_3+…+X_n)$$</p>
+<p>独立同分布(Independent and Identically Distributed,i.i.d):Where $X_1,X_2, …$ is a sequence of random variables which have the property to be independent and identically distributed.</p>
+<blockquote>
+<p>如果随机变量序列或者其他随机变量有相同的概率分布，并且他们之间互相独立，那么这些随机变量是独立同分布的。</p>
+<p>当$ω$为随机变量采样空间中的一个采样结果时，可以这样表述$x=X(ω)$。 所以以下方式可以$\bar{X}=\frac{1}{n}(x_1+x_2+…+x_n)$也可以改写为 $\bar{X}=\frac{1}{n} (X_1(ω)+X_2(ω)+…+X_n(ω)$。上述$ X_1,X_2, … $可以作为随机变量$X$的一个实例来看待。</p>
+</blockquote>
+<p><br></p>
+<p>独立(Independent):Imagine that this coin lands on heads with probability 2/3, and tails with probability 1/3. If we flip the coin twice, the outcome of the first coin flip will not the change the outcome of the second.</p>
+<p>同分布(Identically Distributed):When the coin was flipped the first time, the probability of either getting heads or tail was 2/3, and 1/3 respectively. When the coin is flipped the second time, the probability of actually getting either heads or tails is still 2/3, and 1/3. The probability that you get either heads or tails after the first flip doesn’t change. </p>
+<p>大数定理(Law of Large Nunbers, LLN):The idea that the sample mean converges in value and probability to the expected value as the sample size increases.</p>
+<p>大数定理实例解读: … If you toss a coin 10 times, what is the probability that you get 5 heads? This can actually be computed analytically using the binomial distribution:</p>
+<p>$$ \left( \begin{array}{cr} 10 \ 5 \end{array} \right) \left( { 1 \over 2 }\right)^5 \left(1 - {1\over 2}\right)^5 = 0.2461.$$</p>
+<p>But if you now consider 100 trials, the probability becomes:</p>
+<p>$$\left( \begin{array}{cr} 100 \ 50 \end{array} \right) \left( { 1 \over 2 }\right)^{50} \left(1 - {1\over 2}\right)^{50} = 0.0796.$$</p>
+<p>The higher the number of trials, the smaller the probability of getting exactly N/2 number of heads. … however as mentioned before, interestingly the probability to get exactly N/2 heads gets smaller.Let’s for example calculate the probability that we can any number of heads between 40 and 60 for 100 trials:</p>
+<p>$$Pr(40 \leq X \leq 60) = \sum_{i=40}^{60} C^i_{100} \left( \dfrac{1}{2} \right)^i \left( 1 - \dfrac{1}{2} \right)^{100 -i} = 0.9648.$$</p>
+<p>However, if we compute the probability of getting any number of heads in the interval [4,6] for 10 trials, then we get:</p>
+<p>$$Pr(4 \leq X \leq 6) = \sum_{i=4}^{6} C^i_{10} \left( \dfrac{1}{2} \right)^i \left( 1 - \dfrac{1}{2} \right)^{10 -i} = 0.6563.$$</p>
+<p>Clearly, the probability of getting close to 1/2 increases as the number of trials increases.</p>
+<blockquote>
+<p>想象一下丢了N次色子最后的次数分布图为正态分布，那么当总次数变为10次时，就可以理解为采样间隔非常大或者是采样频率更低，总次数不足，因此单个事件(比如5次)发生的概率就远远比采样频率更高的$C^{5}_{10}$要大的多。</p>
+</blockquote>
+<blockquote>
+<p>但倘若取采样间隔$[40, 60]$以及$[4, 6]$就可以明显发现，在采样频率更高的前提下，最终的概率会越来越趋近于$\frac{1}{2}$附近。</p>
+</blockquote>
+<blockquote>
+<p>对比连续型随机变量，事实上当采样频率趋于无穷大$f \to \infty$，连续性随机变量概率函数$PDF(x) = 0$(事实上其概率密度函数的定义就是$PDF(a&lt;x&lt;b) = \int^b_a f(x)dx$，这也被记为$X \sim f(x)$)，所以当离散型随机变量的采样频率不断增加，也就是大数定理反应的，其单一事件发生的概率也会不断趋近于0。</p>
+</blockquote>
+<p>结论(Conclusion):the sample mean $\bar{X}$ of a random sample always converge in probability to the population mean $μ$ of the population from which the random sample was taken … If we know the distribution of the random variable we can compute the expected value directly</p>
+<p>$$E[X] = \sum_{i=1} p_i x_i \rightarrow = \sum_{\omega \in S} X(\omega) p(\omega).$$</p>
+<blockquote>
+<p>事实上当写下$E[X_1]$的时候，此时$X_1$只是随机变量的一个取值，他可以是任何值，但是其期望$E[X_1]$是固定的，这对随机变量的所有取值而言都一样$E[X_1] = E[X_2] = E[X_3]… = E[X_n]$。原因很简单，因为这些随机变量的取值都共有一个概率密度函数。</p>
+</blockquote>
+<hr>
+<h3 id="Properties-of-Expectations"><a href="#Properties-of-Expectations" class="headerlink" title="Properties of Expectations"></a>Properties of Expectations</h3><ol>
+<li><p>若$Y = aX + b​$，那么$E[Y] = aE[X] +b​$。考虑一下当抛掷的色子的号码同时增加b的时候，那么期望值也会随之增加b。</p>
+<p>$$\begin{array}{l}</p>
+<p>E[aX] &amp;=&amp; \sum_i a x_i P(X = x_i) \\</p>
+<p>&amp;=&amp;a \sum_i x_i P(X = x_i)\ </p>
+<p>&amp;=&amp;aE[X].</p>
+<p>\end{array}$$</p>
+</li>
+<li><p>随机变量和的期望等价于每个随机变量期望的和</p>
+<p>$$E[X_1 + … X_n] = E[X_1] + … + E[X_n].​$$</p>
+</li>
+</ol>
+<p>X+Y的期望可以按照如下表达</p>
+<p>$$\begin{array}{l}</p>
+<p>E[X + Y] &amp;=&amp;\sum_i \sum_j (x_i + y_j) Pr(X = x_i, Y = y_i) \ </p>
+<p>&amp; = &amp; \sum_i \sum_j x_i Pr(X = x_i, Y = y_i) +  \sum_i \sum_j y_j Pr(X = x_i, Y = y_i) \ </p>
+<p>&amp; = &amp; \sum_j y_j Pr(Y = y_j) + \sum_i x_i Pr(X = x_i)  \\</p>
+<p>&amp;=&amp;E[Y] + E[X].</p>
+<p>\end{array}$$</p>
+<p>这里Y的概率已经被求和为1省略，X同理</p>
+<p>$$\sum_j Pr(X = x_i, Y = y_j) = Pr(X = x_i),$$</p>
+<p>$$\sum_i Pr(X = x_i, Y = y_j) = Pr(Y = y_j).$$</p>
+<blockquote>
+<p>可以这样解读概率1的由来</p>
+</blockquote>
+<p>$$\begin{array}{l} </p>
+<p>\sum_j Pr(X = x_i, Y = y_j) &amp; = &amp; \sum_j Pr(X = x_i) * Pr(Y = y_j) \\</p>
+<p>&amp; = &amp; Pr(X = x_i) \sum_j Pr(Y = y_j) \\</p>
+<p>&amp; = &amp; Pr(X = x_i) * 1 \\</p>
+<p>&amp; = &amp; Pr(X = x_i)</p>
+<p>\end{array}</p>
+<p>$$</p>
+<p>这里$Pr(X = x_i, Y = y_j)$就是代表当$X$和$Y$同时发生的概率，可以使用乘法守则来解决</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

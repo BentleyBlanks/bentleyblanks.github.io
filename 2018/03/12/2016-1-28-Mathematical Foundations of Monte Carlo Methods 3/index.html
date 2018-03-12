@@ -1,0 +1,403 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mathematical Foundations of Monte Carlo Methods 3 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Mathematical Foundations of Monte Carlo Methods 3</h3>
+					</div>
+					<div class="card-content">
+					  <p><blockquote>
+<p>本文为在<a href="http://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/monte-carlo-methods-mathematical-foundations/quick-introduction-to-monte-carlo-methods" target="_blank" rel="noopener">Scratchapixel</a>上学习的翻译读后感与部分个人解读。这里不会将全篇的内容系数翻译，保留原文以便后期自行理解，笔者只精炼一些文章中关键的点出来便于记录。</p>
+</blockquote>
+<h3 id="The-Probability-Distribution-Function"><a href="#The-Probability-Distribution-Function" class="headerlink" title="The Probability Distribution Function"></a>The Probability Distribution Function</h3><p>概率密度函数(Probabilify density function):When a function such as the normal distribution defines a continuous probability distribution. In other words, pdfs are used for continuous random variables.</p>
+<p>The PDF can be used to calculate the probability that a random variable lies within an interval:</p>
+<p>$$Pr(a \leqslant X \leqslant b) = \int^b_a pdf(x)dx$$</p>
+<p>概率密度函数对概率的积分必为1</p>
+<p>$$\int^{\infty}_{-\infty}g(x)dx = 1$$</p>
+<blockquote>
+<p>概率质量函数(the probability mass function)用于描述离散型随机变量; 概率密度函数(probability distribution function)用于描述连续型随机变量。</p>
+</blockquote>
+<p>累积分布函数(Cumulative Distribution Function/Probability distribution function):CDFs are monotonically increasing functions.It’s not strictly monotic though. There may be intervals of constancy.</p>
+<p>$$pdf(x) = \frac{d}{dx}cdf(x)$$</p>
+<blockquote>
+<p>cdf是pdf在区间$[-\infty, \infty]$上的和，pdf(x)是cdf在「点」x上的斜率/导数</p>
+</blockquote>
+<hr>
+<h3 id="Expected-Value-of-the-Function-of-a-Random-Variable-Law-of-the-Unconscious-Statistician"><a href="#Expected-Value-of-the-Function-of-a-Random-Variable-Law-of-the-Unconscious-Statistician" class="headerlink" title="Expected Value of the Function of a Random Variable: Law of the Unconscious Statistician"></a>Expected Value of the Function of a Random Variable: Law of the Unconscious Statistician</h3><p>统计师的无意识法则(law of the unconscious statistician):In practice, you don’t necessarily know the probability distribution of F(X). Of course you can calculate it, but this is an extra step, which you can avoid if you use the second method.</p>
+<p>$$E[F(X)] = F[Y] = \sum F(X_i) P_X(X_i)$$</p>
+<blockquote>
+<p>假定函数$F(X)$是关于随机变量$X$的一个映射(因此$F(X)$本身也是随机变量)，那么举例而言$F(X) = (X - 3)^2$，现求函数$F(X)$的期望。</p>
+<p>根据期望的定义(离散型随机变量$E[X] = \sum_{i=0}X_ipmf(X_i)$，连续型随机变量$E[X] = \int^{\infty}_{-\infty}Xpdf(X)$)，我们需要知道F(X)的$pdf(F(X))$。</p>
+<p>若$X$的采样空间为$S = \{1,2,3,4,5,6\}$，那么对其所有的可能值进行$F(X)$计算</p>
+</blockquote>
+<p>$$\begin{array}{l}</p>
+<p>X = 1, \; F(1) = (1-3)^2 = 4,\\X = 2, \; F(2) = (2-3)^2 = 1, \ X = 3,\;F(3) = (3-3)^2 = 0, \ X = 4,\;F(4) = (4-3)^2 = 1, \\X=5,\;F(5) = (5-3)^2 = 4,\ X = 6,\;F(6) = (6-3)^2 = 9.</p>
+<p>\end{array}$$</p>
+<blockquote>
+<p>也就可以得到$pdf(F(X))$的「离散型表达」(连续性和离散型本质相同)</p>
+</blockquote>
+<p>$$\begin{array}{l} </p>
+<p>Pr(F(0)) &amp;=&amp; \dfrac{1}{6}</p>
+<p>\ Pr(F(1)) &amp;=&amp; \dfrac{1}{6} + \dfrac{1}{6} &amp;=&amp; \dfrac{2}{6} </p>
+<p>\ Pr(F(4)) &amp;=&amp; \dfrac{1}{6} + \dfrac{1}{6} &amp;=&amp; \dfrac{2}{6}</p>
+<p>\ Pr(F(9)) &amp;=&amp; \dfrac{1}{6}.</p>
+<p>\end{array}$$</p>
+<blockquote>
+<p>最后一步计算$F(X)$的期望也就顺理成章</p>
+</blockquote>
+<p>$$\begin{split}</p>
+<p>E[F(X)]&amp;=&amp;0 \times Pr(F(X) = 0) + 1 \times Pr(F(X) = 1)  + \\</p>
+<p>&amp;&amp;4 \times Pr(F(X) = 4) + 9 \times Pr(F(X) = 9),\\</p>
+<p>&amp;=&amp;0 <em> \dfrac{1}{6} + 1 </em> \dfrac{2}{6} + 4 <em> \dfrac{2}{6} + 9 </em> \dfrac {1}{6},\\</p>
+<p>&amp;=&amp;3.167.</p>
+<p>\end{split}$$</p>
+<blockquote>
+<p>所以这里使用随机变量$Y$代替随机变量$F(X)$，就有</p>
+</blockquote>
+<p>$$E[F(X)] = E[Y] = \sum Y_i P_Y(Y_i) …… ……<1>$$</1></p>
+<blockquote>
+<p>根本不需要知道$F(X)$的具体概率分布，直接根据随机变量$X$的概率分布就可以求出$Y$的期望。</p>
+</blockquote>
+<p>$$\begin{split}</p>
+<p>E[F(X)] &amp; = &amp;(1-3)^2\times Pr(X = 1) + (2-3)^2\times Pr(X = 2) +\\</p>
+<p>&amp;&amp; (3-3)^2\times Pr(X = 3)+ (4-3)^2\times Pr(X = 4) +\\</p>
+<p>&amp;&amp; (5-3)^2\times Pr(X = 5) + (6-3)^2\times Pr(X = 6)\\</p>
+<p>&amp;=&amp;4 <em> \dfrac{1}{6} + 1 </em> \dfrac{1}{6} + 0 <em> \dfrac{1}{6} + 1 </em> \dfrac{1}{6} + 4 <em> \dfrac{1}{6} + 4 </em> \dfrac{1}{6} \\</p>
+<p>&amp;=&amp;3.167.</p>
+<p>\end{split}$$</p>
+<blockquote>
+<p>原因在于，在计算期望的时候，多做了一步工作。也就是将上述式子当中相同的$F(X_i)$对应的概率进行了合并($Pr(F(X_i) = \sum_{j=0}{Pr(X_j)}(all  F(X_i) == F(X_j)))$)，但只为求解他的$pdf$。所以事实上这一步在求解期望过程中<strong>并不需要</strong>。</p>
+</blockquote>
+<p>$$E[F(X)] = E[Y] = \sum{F(X_i)P_X(X_i)}…… ……<2>$$</2></p>
+<blockquote>
+<p>对比$<1>$中，我们将中间合并过程得到的$Pr(Y_i)$直接替换为了$X$的概率分布。之所以称之为无意识的，是因为这一个过程非常的直观，以至于没有意识的状态下统计学家就得出了这样一个结论，同时也是毫无疑问正确的，因此而得名，<a href="https://www.quora.com/How-did-the-Law-of-the-Unconscious-Statistician-get-its-name" target="_blank" rel="noopener">How did the Law of the Unconscious Statistician get its name?</a></1></p>
+</blockquote>
+<hr>
+<h3 id="The-Inverse-Transform-Sampling-Method"><a href="#The-Inverse-Transform-Sampling-Method" class="headerlink" title="The Inverse Transform Sampling Method"></a>The Inverse Transform Sampling Method</h3><p>简介背景，目前已有函数$PDF(X)$的一堆数据(这个$PDF(X)$可能是数学分析就可以解决的<a href="https://en.wikipedia.org/wiki/List_of_probability_distributions" target="_blank" rel="noopener">自然的概率分布</a>，或是任意的$PDF(X)$)，那么我们就可以通过求解$CDF(X)$的反函数$InvCDF(X)$，进行均匀采样计算就可以得到对应$PDF(X)$的密度分布。</p>
+<p>1.计算机中求解的步骤是如何实现的?</p>
+<p>首先对已有数据进行累加求解对应累积分布函数(CDF)，如图</p>
+<figure><br><br><strong><br><a href="https://farm2.staticflickr.com/1544/24560765261_181ac9f907.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1544/24560765261_181ac9f907.jpg" alt=""><br></a>
+</strong><br><br></figure>
+
+
+
+<p>在y轴上进行均匀采样(Uniform Distribution)，假定当前生成随机数$r = 0.491$，那么求取其下界(最接近该y值的采样点，且采样点的$y_{sample} \leqslant y$)</p>
+<figure><br><br><strong><br><a href="https://farm2.staticflickr.com/1711/24347461370_f19ac111f2.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1711/24347461370_f19ac111f2.jpg" alt=""><br></a>
+</strong><br><br></figure>
+
+<blockquote>
+<p>以下证明方法和原文略有不同，更好理解</p>
+</blockquote>
+<p>令图中采样点$n = 15, n = 16$坐标为$(x_1, y_1), (x_2, y_2)$</p>
+<figure><br><br><strong><br><a href="https://farm2.staticflickr.com/1595/24014884244_f53b11ae22.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1595/24014884244_f53b11ae22.jpg" alt=""><br></a>
+</strong><br><br></figure>
+
+<p>那么所求随机数生成点$(?, r)$的x轴坐标，令$dx$为采样点间间距，随机采样点x坐标「?」与下界$x_1$之差为k，其中采样区间为$[min, max]$，采样数量为$nSamples$</p>
+<p>$$dx = \frac{min - max}{nSamples}$$</p>
+<p>$$\frac{k}{dx} = \frac{r-y_1}{y_2-y_1} = t$$</p>
+<p>$$k = t * dx$$</p>
+<p>那么所求「?」即为</p>
+<p>$$? = min + n_{lower} <em> dx + k = min + (n_{lower} + t)</em>dx$$</p>
+<p>为了将「?」控制在区间$[0, 1]$之间($pdf(X)$定义)，需要做一次映射</p>
+<p>$$? \backsim [min, max] \ x \backsim [0, 1]$$</p>
+<p>$$\frac{x-min}{?-0} = \frac{max-x}{1-?} \\</p>
+<p>? = \frac{x-min}{max-min}</p>
+<p>$$</p>
+<p>最终，得到横坐标值之后(也就是在$invCDF(X)$的x轴上均匀采样得到y值)绘图得到</p>
+<figure><br><br><strong><br><a href="https://farm2.staticflickr.com/1691/24029017544_b3c7de509c.jpg" target="_blank" rel="noopener"><br>    <img src="https://farm2.staticflickr.com/1691/24029017544_b3c7de509c.jpg" alt=""><br></a>
+</strong><br><br></figure>
+
+<p>2.上述过程中并没有求反函数过程，为何要求反函数？</p>
+<p>本质上当对$CDF(X)$的y轴进行均匀采样求解x的时候，就已经是在隐含求解了，不过因为不是所有的$CDF(X)$都可以显式的通过数学分析变换，因此计算机中求解使用的是通用过程。</p>
+<p>3.指数分布的反函数求解过程</p>
+<p>$$PDF(X) = \lambda e^{-\lambda x}$$</p>
+<p>$$\begin{array}{l}</p>
+<p>P(X&gt;t) &amp; = &amp; \int^{\infty}_t \lambda e^{-\lambda x}dx \\</p>
+<p>&amp; = &amp; \int_{-\infty}^t \lambda e^{-\lambda x} -\frac{1}{\lambda}d(-\lambda x)</p>
+<p>\end{array}$$</p>
+<p>令$u = -\lambda x$，当$x = t$时，$u = - \lambda t$；当$x = \infty$, $u = -\infty$，变换函数$x = -\frac{1}{\lambda}u$在$[-\infty, -\lambda t]$上单值，$\frac{dx}{du} = -\frac{1}{\lambda}$在$[-\infty, -\lambda t]$上连续</p>
+<p>$$\begin{array}{l}</p>
+<p>P(X&gt;t) &amp; = &amp; -\int^{-\lambda t}_{-\infty}e^udu \\</p>
+<p>&amp; = &amp; -\left[ e^u \right]^{-\lambda t}_{-\infty} \\</p>
+<p>&amp; = &amp; e^{- \lambda t} - e^{-\infty} \\</p>
+<p>&amp; = &amp; e^{- \lambda t}</p>
+<p>\end{array}$$</p>
+<p>那么求取$P(x&lt;t) = 1-e^{-\lambda x} = y$的反函数</p>
+<p>$$\begin{array}{l}</p>
+<p>y = 1-e^{-\lambda x} \\</p>
+<p>e^{-\lambda x} = 1 - y \\</p>
+<p>x = -\frac{1}{\lambda}ln(1-y)</p>
+<p>\end{array}$$</p>
+<p>那么最终对此函数进行采样，得到的结果就是指数分布。</p>
+<blockquote>
+<p>原文中有误，缺$dx$且最后结果e幂上少符号缺$\lambda$，y的表达式有误，目前已反馈给<a href="http://www.scratchapixel.com/" target="_blank" rel="noopener">Scratchapixel</a></p>
+</blockquote>
+<hr>
+<h3 id="Estimators"><a href="#Estimators" class="headerlink" title="Estimators"></a>Estimators</h3><p>参数(Parameter):参数是指描述总体特征的一个或若干个数值，例如总体(Population)的均值、总体的比例和总体的方差等数字特征，两个或两个以上总体间的相关系数、偏相关系数、复相关系数和回归系数等数字特征。</p>
+<blockquote>
+<p>在一般情况下，总体参数是未知的，例如一个国家或地区的人口总数、GDP总量、小麦总产量、人均可支配收入和产品的合格率等都是总体未知参数，而通过全面调查取得这些未知参数需要付出高昂的成本。参数估计的目的就是利用抽样得到的样本信息来估计未知的总体参数(详情可见<a href="http://netclass.csu.edu.cn/NCourse/hep120/kj/6-1-1.htm" target="_blank" rel="noopener">参数的概念</a>)</p>
+</blockquote>
+<p>估计量(Estimator)与估计值(Estimate): The sample mean is a form of estimator, but in the general sense, an estimator is a function operating on observable data and returning an estimate of the population’s parameter value $θ$.</p>
+<p>This function $δ$ is what we call an estimator of the parameter $θ$ and the result of $δ(x_1,…,x_n)$ is called an estimate of $θ$.(An estimation of the population’s paramter $θ$).</p>
+<blockquote>
+<p>采样均值其实就是总体未知参数的一个估计量，本质上估计量就是一组数据的函数。估计量就是随机变量$X_1, . . . , X_n$的一个映射，因此本身他也是随机变量。</p>
+</blockquote>
+<p>常见估计量</p>
+<ol>
+<li><strong>样本均值</strong>$\bar{X} = \frac{1}{n} \sum^n_{i=1}X_i$，是总体均值$E[X] = \mu$的估计量</li>
+<li><strong>样本方差</strong>$S^2 = \frac{1}{n-1}\sum^n_{i=1}(X_i - \bar{X})^2$是总体方差$D(X)=\sigma^2$的估计量；<strong>样本标准差</strong>$S = \sqrt{\frac{1}{n-1}\sum^n_{i=1}(X_i - \bar{X})^2}$是总体标准差$\sigma$的估计量</li>
+<li><strong>样本比例</strong>$\bar{p}=\frac{n_1}{n}$是总体比例p的估计量，其中$n_1$为样本中具有某种特征的样本单位数。</li>
+</ol>
+<p><br></p>
+<p>估计量和估计值之间的区别: An estimate is a specific value $δ(x_1,…,x_n)$ of the estimator which we can determine by using observable values $x_1,…,x_n$. The estimator is a function $δ(X)$ of the random vector $X$ while again, an estimate is a just specific value $δ(x)$.</p>
+<blockquote>
+<p>一句话概括，估计值只是估计总体未知参数的某一估计量，代入样本值计算得到的具体结果</p>
+<p><a href="http://netclass.csu.edu.cn/NCourse/hep120/kj/6-1-1.htm" target="_blank" rel="noopener">点估计和区间估计</a>，这里不做延伸阅读，简单的介绍了<strong>置信区间</strong>，<strong>置信度/置信概率/置信系数/置信水平</strong>，<strong>置信上下限</strong>等基本概念。</p>
+</blockquote>
+<hr>
+<h3 id="Properties-of-Estimators"><a href="#Properties-of-Estimators" class="headerlink" title="Properties of Estimators"></a>Properties of Estimators</h3><p>无偏性(Unbias):</p>
+<p>当采样的数量趋于极限时，样本均值就等于总体均值本身</p>
+<p>$$\bar X_n \xrightarrow{p} \theta \quad \text{ for } n \rightarrow \infty.$$</p>
+<p>也就是样本均值的期望就有着如下的关系</p>
+<p>$$E[\bar X_n] - \theta = 0.$$</p>
+<p>而满足无偏估计性质的样本均值，样本均值就是估计量本身，替换$\bar{X_n}$为$\sigma(X)$，就有以下两种情况了</p>
+<p>$$E[\delta_{unbiased}(X)] - \theta = 0.$$</p>
+<p>$$E[\delta_{biased}(X)] - \theta \neq 0.$$</p>
+<p>二者之差就是偏差本身了</p>
+<p>$$E[\delta_{biases}(X)] - \theta = \text{ bias }.$$</p>
+<blockquote>
+<p>正如先前讲到的，计算机图形学中经常采用有偏的方法来完成计算，原因在于有偏的方法可以带来更快速度的收敛计算(前提是满足一致性，这比无偏的性质对一个估计量而言更重要)，但却只与真实值之间有着微乎其微的误差。</p>
+</blockquote>
+<p>一致性(Consistency):是指随着样本容量的增大，估计量愈来愈接近总体参数的真值。设总体参数为$\theta$，$\delta$为一估计量，如果当样本容量$n \to \infty$时，  依概率收敛于$\theta$，即</p>
+<p>$$P - lim_{n \to \infty}\delta = \theta$$</p>
+<blockquote>
+<p>如果一个估计量是一致估计量，那么可以通过增加样本容量来提高估计的精度和可靠性。</p>
+<p>可以证明，<strong>样本均值</strong>$\bar{X}$是总体均值$\mu$的一致估计量；<strong>样本比例</strong>$\bar{p}$是总体比例$p$的一致估计量；<strong>样本方差</strong>$S^2$是总体方差$\sigma^2$的一致估计量；<strong>样本标准差</strong>$S$ 是总体标准差$\sigma$的一致估计量.(详情见<a href="http://netclass.csu.edu.cn/NCourse/hep120/kj/6-1-2.htm" target="_blank" rel="noopener">估计量评价的标准</a>)</p>
+</blockquote>
+<p>有效性(Variance):有效性是指估计量与总体参数的离散程度。如果两个估计量都是无偏的，那么离散程度较小的估计量相对而言是较为有效的。离散程度是用方差度量的，因此在无偏估计量中，方差愈小愈有效。</p>
+<p>设$\theta_1$与$\theta_2$为总体参数$\theta$的无偏估计量，即$E(\theta_1)=\theta$，$E(\theta_2)=\theta$，那么如果两者的方差对比</p>
+<p>$$D(\theta_1) \leqslant D(\theta_2)$$</p>
+<p>那么称$\theta_1$会比$\theta_2$有效</p>
+<blockquote>
+<p>有效性是一个对比性质，因此是相对的，不存在绝对的自身有效的估计量。</p>
+</blockquote>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

@@ -1,0 +1,252 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ImpluseEngine中的直线求交点方程 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">ImpluseEngine中的直线求交点方程</h3>
+					</div>
+					<div class="card-content">
+					  <p><p>1.<img src="https://app.yinxiang.com/shard/s3/res/77ab43b3-3344-4ede-b49f-1be58cbc279e.png" alt=""></p>
+<p>原式中已知两点都是位于交点的两侧</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/7ad5b0d2-d8ac-42a5-9abd-b22f4f3256c8/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
+<p>这样也就求出了最后的结果</p>
+<p>2.<br><img src="https://app.yinxiang.com/shard/s3/res/ba94592d-4422-43d4-aa42-890603536baa.png" alt=""></p>
+<p>这里Dot(n, face[0]) - c得到的方程式其实并不是将face[0]代入到$ax + by + c$中</p>
+<p>而是代入到于$ax + by + c$垂直的真实裁剪线中去的</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b901a590-a871-487b-932c-ebd83d94122e/%E6%97%A0%E6%A0%87%E9%A2%981.png" alt=""></p>
+<p>这里有多重方法可以证明 因为两种Clip情况都相似 所以只取一种情况予以证明</p>
+<p>(1).</p>
+<p>$$n = (x1 - x2, y1 - y2)   c = -[x1·(x2 - x1) + y1·(y2 - y1)]$$</p>
+<p>$$n·(x, y) - c = (x1 - x2)·x + (y1 - y2)·y + x1·(x2 - x1) + y1·(y2 - y1) = (x2 - x1)·(x - x1) + (y2 - y1)·(y - y1)$$</p>
+<p>这个式子是两个向量的点积</p>
+<p>这里的几何意义就表明</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/121762bd-4faa-4ff4-ae2b-7d9163af6ee3/%E6%97%A0%E6%A0%87%E9%A2%982.png" alt=""></p>
+<p>(2).上一则方法是一步步推导实现的 </p>
+<p>第二种方法是直接给出这条真实裁剪线的方程 因为垂直 所以<code>斜率乘积为-1</code> 已知直线斜率为 $k = -\frac{a}{b}$</p>
+<p>那么所求直线斜率为 $k = \frac{b}{a}$ 并且过$(x1, y1)$ (两点式已知a = y2 - y1, b = x1 - x2</p>
+<p>可得 $k·x + y1 - k·x1 = y$</p>
+<p>最终式子为</p>
+<p>$$(x1 - x2)·x + y1·(y2 - y1) - (x1 - x2)·x1 = y·(y2 - y1)$$</p>
+<p>$(x1 - x2)·(x - x1) = (y - y1)(y2 - y1)$也就是第一种情况中所求得的式子 可以证明得到Dot(n, face[0]) - c得到的方程式的的确确就是垂直于已知直线并且过$(x1, y1)$点的直线</p>
+<p>2.<br><img src="https://app.yinxiang.com/shard/s3/res/84fe54b9-5f37-4c02-9cd7-a934edeb76e9.png" alt=""></p>
+<p>在最后计算深度的时候需要注意到的是倘若clip计算出来的边长都在reference face内部 那么两点都为contact point</p>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

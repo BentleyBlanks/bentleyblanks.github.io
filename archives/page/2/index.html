@@ -7,7 +7,7 @@
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive-->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title> [ Bingo ]</title>
+  <title>Archives [ Bingo ]</title>
   
     <!-- stylesheets list from config.yml -->
     
@@ -106,51 +106,66 @@
                 
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/01/09/motion-blur - 副本 (4)/" class="card-header-title">
-                        motion blur77777777111111
+                      <a href="/2018/03/12/2017-03-09-Inverse Transform Sampling/" class="card-header-title">
+                        Inverse Transform Sampling
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
-<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
-<li>根据深度图计算出每个像素的世界空间位置。</li>
-<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
-<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
-<li>沿着速度方向进行多重采样,结果进行平均</li>
-</ul>
-<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
-<p>world-view-project matrix: M</p>
-<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
-<p>world position: $WorldPos = \frac{D}{D.w}$</p>
-<p>提取世界空间位置:</p>
-<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
-float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
-float4 D = mul(H, g_ViewProjectionInverseMatrix);
-float4 worldPos = D / D.w;
-</code></pre>
-<p>逐像素计算速度</p>
-<pre><code class="cpp">float4 currentPos = H;
-float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
-previousPos /= previousPos.w;
-float2 velocity = (currentPos - previousPos) / 2.0f;
-</code></pre>
-<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
-<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
-for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
-{
-    float4 currentColor = tex2D(sceneSampler, texCoord);
-    color += currentColor;
-}
-
-float4 finalColor = color / g_numSamples;
-</code></pre>
-<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
-<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
-<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
-<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
-<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
-<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+                        <blockquote>
+<p>具体理论学习推导参考<a href="https://en.wikipedia.org/wiki/Inverse_transform_sampling" target="_blank" rel="noopener">Wikipedia</a>,<a href="http://www.columbia.edu/~ks20/4404-Sigman/4404-Notes-ITM.pdf" target="_blank" rel="noopener">Inverse Transform Method</a>，<a href="http://www.pbrt.org/" target="_blank" rel="noopener">PBRT-P643</a>, </p>
+</blockquote>
+<blockquote>
+<p>下文中的CDF与PDF等概率论术语定义可在概率论与数理统计等书中找到</p>
+</blockquote>
+<p>生成一个随机数满足一个已知解析式的分布，是一个非常常见的需求(C++11已经内部提供不少给定分布)，这里将推导如何将最常见的均匀分布随机数转换为其他已知解析式的分布。</p>
+<p>先把结论放在这里，<strong>若有一随机变量X满足分布PDF（对应一CDF），使用一个均匀分布的随机变量Y，则Y对该CDF的反函数进行采样的结果满足PDF。</strong></p>
+<blockquote>
+<p>以下内容摘自Wikipedia</p>
+</blockquote>
+<p>已知有分布$F(x)=1-e^{-\lambda x}$，其中$x\geqslant 0$，可以求得CDF的反函数，如下图所示。</p>
+<p>$$x=F^{-1}(y)=-\frac{1}{\lambda}(1-y)$$</p>
+<p><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Inverse_transformation_method_for_exponential_distribution.jpg/400px-Inverse_transformation_method_for_exponential_distribution.jpg" alt=""></p>
+<p>其中$y_i$是满足区间(0, 1)均匀分布的随机数(即，Y~U(0, 1))，这里可以明显看到由反函数求得的X的分布情况，在越接近0的位置分布的越多，越背离则越稀疏，满足对于结果的设想。</p>
+<blockquote>
+<p>证明</p>
+</blockquote>
+<p>若有CDF满足$F(x)=Pr\{X\leqslant x\}$，则起反函数$F^{-1}$满足</p>
+<p>$$F^{-1}(y)=min\{x: F(x)\geqslant y\}, y\in [0, 1]$$</p>
+<p>之所以使用下确界的原因是，$F(x)$满足右连续且单调不减</p>
+<p>令$X=F^{-1}(U)$其中$U$满足在区间$[0,1]$上连续均匀分布，现要证</p>
+<p>$$Pr\{X\leqslant x\}=F(x), x\in \Re$$</p>
+<p>则要证$Pr\{F^{-1}(U)\leqslant x\}=F(x)$成立。此处$F$连续且单调不减，则同时对不等式套用$F$不等式成立</p>
+<p>$$\{F^{-1}(U)\leqslant x\}=\{U\leqslant F(x)\}$$</p>
+<p>则有$Pr\{U\leqslant F(x)\}$成立，下图中描述了$U\leqslant F(x)$的概率就等于$F(x)$本身</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/32527569383/in/dateposted-public/" title="无标题" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/1/692/32527569383_039ba28810.jpg" width="431" height="296" alt="无标题"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<p>则得证<br>$$Pr\{F^{-1}(U)\leqslant x\}=F(x)$$</p>
+<hr>
+<p>有了Inverse CDF这项工具，就可以很方便的将已有的满足均匀分布的随机数转化为满足一已知PDF的随机数分布。</p>
+<blockquote>
+<p>二维随机变量中条件概率直观理解(其中关于联合以及边缘分布律/概率密度分布的概念可以在<a href="http://math.sjtu.edu.cn/course/gltj/xxzl/he/ch31.pdf" target="_blank" rel="noopener">上海交大的PPT</a>以及<a href="https://zh.wikipedia.org/wiki/%E6%9D%A1%E4%BB%B6%E6%A6%82%E7%8E%87%E5%88%86%E5%B8%83" target="_blank" rel="noopener">Wikipedia</a>中找到)。在渲染中主要在重要性采样中会用到二维随机变量的这些概念</p>
+</blockquote>
+<p><strong>离散条件分布</strong>和<strong>连续条件分布</strong>的定义都可以在引用中看到，这里只关注离散型二维随机变量的分布。</p>
+<p>首先有联合=条件*边缘的定义，当然同时要满足$\sum_{x}\sum_{y}P(X=x, Y=y)=1$的前提条件。</p>
+<p>$$P(X=x, Y=y)=P(Y=y|X=x)P(X=x)=P(X=x|Y=y)P(Y=y)$$</p>
+<p>若X,Y满足相互独立，那么也满足以下等式</p>
+<p>$$P(X=x, Y=y)=P(Y=y)P(X=x)$$</p>
+<p>在渲染中为了对图像上亮度更高的点有更高的概率采样到，那么势必要生成满足图像PDF的二维随机变量。此处易证在图像的采样上，<strong>X与Y二者之间非相互独立</strong>。</p>
+<blockquote>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/32511394224/in/dateposted-public/" title="XY独立性证明" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/4/3886/32511394224_a983cf5254.jpg" width="500" height="262" alt="XY独立性证明"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+</blockquote>
+<blockquote>
+<p>此图中$P(X=x, Y=y)=\frac{b}{b+8a}$，而$P(X=x)=P(Y=y)=\frac{b}{b+4a}$，容易看出$P(X=x, Y=y)\not = P(Y=y)P(X=x)$</p>
+</blockquote>
+<p>那么求解上述就只剩下一种途径，就是对于给定图像求解边缘以及条件分布函数。这也是PBRT中使用边缘+条件来生成联合的原因。</p>
+<blockquote>
+<p>以下使用OF测试得到的可视化结果，因为一维采样重建可以在二维中体现因此此处不做一维对比。具体实现办法可以在PBRT的Distribution中看到详细过程</p>
+</blockquote>
+<p>左右为不同采样数量但可以明显发现在图像中亮度较高位置采样数量更多，采样结果明显偏向于向图像亮处。</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/32990051490/in/dateposted-public/" title="采样对比2" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/3/2818/32990051490_018f71494b_b.jpg" width="1024" height="768" alt="采样对比2"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<blockquote>
+<p>这里图像较暗是因为<strong>没有</strong>采用Tone Mapping的关系，但因为不影响全局显示，因此没做特殊处理。此处若使用普通PNG等被截断过的图像则无法有效的对图像上高光部分进行有效采样。</p>
+</blockquote>
 
                       </p>
                     </div>
@@ -160,51 +175,204 @@ float4 finalColor = color / g_numSamples;
                   
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/01/09/motion-blur/" class="card-header-title">
-                        motion blur
+                      <a href="/2018/03/12/2016-08-31-一阶线性微分方程笔记/" class="card-header-title">
+                        一阶线性微分方程笔记
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
-<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
-<li>根据深度图计算出每个像素的世界空间位置。</li>
-<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
-<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
-<li>沿着速度方向进行多重采样,结果进行平均</li>
-</ul>
-<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
-<p>world-view-project matrix: M</p>
-<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
-<p>world position: $WorldPos = \frac{D}{D.w}$</p>
-<p>提取世界空间位置:</p>
-<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
-float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
-float4 D = mul(H, g_ViewProjectionInverseMatrix);
-float4 worldPos = D / D.w;
-</code></pre>
-<p>逐像素计算速度</p>
-<pre><code class="cpp">float4 currentPos = H;
-float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
-previousPos /= previousPos.w;
-float2 velocity = (currentPos - previousPos) / 2.0f;
-</code></pre>
-<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
-<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
-for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
+                        <blockquote>
+<p>考研微分方程计算中，并未包含伯努利方程的要求，但一样可以通过变量代换实现求解。下题为一个经典的变量代换求解，但自己发现却可以使用更巧妙的办法解答，张宇解析中并没有提及，因此记录在此。</p>
+</blockquote>
+<p>求 $xdy=(1+ylnx)ydx (x&gt;0)$</p>
+<hr>
+<blockquote>
+<p>变量代换:</p>
+</blockquote>
+<p>$\Rightarrow$ $xy’=y+y^2lnx$</p>
+<p>$\Rightarrow$ $\frac{x}{y^2}y’=\frac{1}{y}+lnx$</p>
+<blockquote>
+<p>令t = $\frac{1}{y}$，那么$\frac{dt}{dx}=-\frac{1}{y^2}\frac{dy}{dx}$</p>
+</blockquote>
+<p>$\Rightarrow$ $-x\frac{dt}{dx}=t+lnx$</p>
+<blockquote>
+<p>凑出一阶线性微分方程形式</p>
+</blockquote>
+<p>$\Rightarrow$ $\frac{dt}{dx}+\frac{1}{x}t=-\frac{lnx}{x}$</p>
+<p>$\Rightarrow$ $t=e^{-\int{\frac{1}{x}dx}}(\int{e^{\int{\frac{1}{x}dx}}(-\frac{lnx}{x})dx}+C)$</p>
+<p>$\Rightarrow$ $t=\frac{1}{x}(\int{x(-\frac{lnx}{x})dx}+C)=-\frac{1}{x}(xlnx-x+C)=\frac{1}{y}$</p>
+<p>$\Rightarrow$ $x=xy-xylnx+Cy$</p>
+<hr>
+<blockquote>
+<p>凑导数形式:</p>
+</blockquote>
+<p>$\Rightarrow$ $xy’=y+lnxy^2$</p>
+<p>$\Rightarrow$ $\frac{y-xy’}{y^2}=-lnx$</p>
+<p>$\Rightarrow$ $(\frac{x}{y})’=-lnx$</p>
+<p>$\Rightarrow$ $-\frac{x}{y}=xlnx-x+C$</p>
+<p>$\Rightarrow$ $x=xy-xylnx+Cy$</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2016-06-10-Memory Leak/" class="card-header-title">
+                        Memory Leak
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>文中将会涉及到个人在内存泄露上的一些经验，主要来自于Atmos渲染器在实现可重入的过程。</p>
+</blockquote>
+<blockquote>
+<p>一般内存溢出的问题，有较好找的，也有非常不容易发掘的。这里按照个人经验排序，从简到难记录。将会不定期更新。</p>
+</blockquote>
+<p>0.误分配内存，这种情况最好查找，也最经常犯。Atmos在实现日志系统中，误在字符转换中，遗漏了一个char数组忘记释放，以至于全盘内存上扬.</p>
+<p>1.只有在构造函数中分配了指定内存，经常偷懒不写析构函数的问题就在于，经常忘记释放构造函数中直接分配的内存</p>
+<pre><code class="cpp">class A
 {
-    float4 currentColor = tex2D(sceneSampler, texCoord);
-    color += currentColor;
+public:
+      A(){
+            b = new B();
+      }
+
+      B* b;
+};
+</code></pre>
+<p>2.Pimple所带来的弊端。Pimple能将程序实现从头文件中剥离，这算是一个好处，但也经常带来麻烦</p>
+<pre><code class="cpp">// h
+class A
+{
+public:
+    A();
+    ~A();
+private:
+    class B;
+    B* b;
+};
+
+// cpp
+A::A(){
+    b = new B();
+}
+A:~A(){
+    delete b;
+}
+</code></pre>
+<p>乍一看似乎是没有问题，但这严重依赖于要<code>在内部实现B的时候也要实现其析构函数</code>.</p>
+<pre><code class="cpp">// cpp
+class A::B{
+public:
+    B(){}
+    //~B(){}
+};
+</code></pre>
+<p>在Atmos中，图像导入和导出都是被封装在cpp中不外漏的。因此在实现中我经常遗漏了内部实现中B析构函数的实现，或者是实现了压根没有记得真正将图像内存直接释放。</p>
+<p>3.我称之为<code>浅释放的问题</code>……经常有的时候并想不起来这东西需要手动释放，例如Atmos中遇到的。实现BVH生成的二叉树，只保存了root结点</p>
+<pre><code class="cpp">class BVH
+{
+public:
+    ~BVH(){
+        delete root;
+    }
+    Node* root;
+};
+</code></pre>
+<p>问题在于，root只是二叉树的开始，需要手动遍历释放，或者实现Node的析构来完成释放。</p>
+<pre><code class="cpp">void deleteNode(Node* root)
+{
+    if(root-&gt;left)  deleteNode(root-&gt;left);
+    if(root-&gt;right)  deleteNode(root-&gt;right);
+    delete root;
+    root = NULL;
 }
 
-float4 finalColor = color / g_numSamples;
+// 或者是
+Node::~Node(){
+    if(left) delete left;
+    if(right) delete right;
+}
+
+BVH::~BVH(){
+    delete root;
+}
 </code></pre>
-<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
-<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
-<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
-<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
-<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
-<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+<p>本质上说就是忘记了数据结构的定义而直接对指针本身进行了内存的释放操作</p>
+<p>4.<code>虚析构函数</code>的重要性，在一般面对资源管理的类型上尤其要注意到，父类指针若想要释放实例化子类的对象，就必须要实现虚析构函数，否则子类对象的析构函数就无法被调用。<br>例如上例中描述的BVH，其继承primitiveSet，但因为父类未实现虚析构，导致即便其实现了析构函数也不起作用.</p>
+<pre><code class="cpp">class father
+{
+public:
+    //~father(){/*A*/}
+    virtual ~father(){/*B*/}
+}
+
+class child:public father
+{
+public:
+    ~child(){
+        // A:not work 
+        // B:it worked
+    }
+};
+</code></pre>
+<p>5.第三方库导致的内存未释放。这类问题非常难以察觉，以至于一开始根本不会意识到是这里的问题，除非在表象上总结出规律来。Atmos在实现图像和模型导入导出时，从未调用过库函数的释放API，这就导致了所有的内存全都未被释放。因此，在想要实现可重入之前，务必祥读文档才是真理。</p>
+<p>6.有一些连锁的，具有内存释放前后关系的是最难以解决的。比如，对象A中包含B的指针，该B的指针由A来创建并返回给使用者。那么问题来了，在A的析构函数中可否释放B？</p>
+<p>答案是无解，需要具体情况具体分析，有的情况做好约定或者引用计数等办法，可以在A中直接释放；而有的情况则是A仅仅只做一个指针保留，那么此时就不应该去释放。还是一句话，具体情况具体分析。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2016-05-19-Backface Culling/" class="card-header-title">
+                        Backface culling
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文的三角形相交测试算法为<a href="http://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection" target="_blank" rel="noopener">Möller-Trumbore algorithm</a></p>
+</blockquote>
+<p>这里的back-facing culling表示的是若此三角形背对着观察者，那么就直接在相交测试中跳过，返回false。这在正常逻辑思维下是正常的，直到遇到了Refraction的材质。</p>
+<p>首先是正常参数方程定义的两个球的对比，<code>基本上除了目前未调正确的Fresnel以外</code>，折射部分是没有太大问题的。</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/27004752252/in/dateposted-public/" title="3" target="_blank" rel="noopener"><img src="https://farm8.staticflickr.com/7060/27004752252_e94be87867.jpg" width="500" height="500" alt="3"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<p>Atmos的渲染结果</p>
+<p><img src="https://farm8.staticflickr.com/7257/27098895035_64e84660d9.jpg" alt=""></p>
+<p>Mitsuba的渲染结果</p>
+<hr>
+<p>一旦将其改为网格形成的球体，结果令人吃惊的不一致。</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/27004782352/in/dateposted-public/" title="hello" target="_blank" rel="noopener"><img src="https://farm8.staticflickr.com/7240/27004782352_01a7272641.jpg" width="500" height="500" alt="hello"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<p>Atmos的渲染结果</p>
+<p><img src="https://farm8.staticflickr.com/7448/27065757716_04fe6f19d5.jpg" alt=""></p>
+<p>Mitsuba的渲染结果</p>
+<hr>
+<p>在ScatchPixel原文中有这样一段</p>
+<blockquote>
+<p>“… Remember as well that the user might want to cull (discard) back-facing triangles.  …”用户自定义背面剔除</p>
+</blockquote>
+<p>事实上，默认的三角形理应是双面的，因为但当类似于玻璃材质模型光线在几何体内部时必然会遇到光线从背后穿过三角形的问题。一开始我并没有意识到这是三角形的背面剔除的问题，球上折射的内容让我误以为是因为法线的错误问题。</p>
+<p>正确的不跳过背面三角形的Atmos渲染结果如下</p>
+<p><img src="https://farm8.staticflickr.com/7627/27098922015_b99d364d13.jpg" alt=""></p>
+<p>最终，提供材质球的修复前后对比。</p>
+<blockquote>
+<p>BUG非常隐晦，一开始的确完全没有想到是剔除的问题</p>
+</blockquote>
+<p><img src="https://farm8.staticflickr.com/7164/26495490933_0b03b201bf.jpg" alt=""></p>
+<p>错误结果</p>
+<p><img src="https://farm8.staticflickr.com/7531/26495924673_9cf7cebd2f.jpg&quot;" alt=""></p>
+<p>正确结果</p>
+<hr>
+<blockquote>
+<p>坑爹，这BUG找了老子一整晚</p>
+</blockquote>
 
                       </p>
                     </div>
@@ -266,7 +434,7 @@ float4 finalColor = color / g_numSamples;
   </div>
 </section>
 
-<!-- <div class="pagination-bar">
+<div class="pagination-bar">
     <ul class="pagination">
         
         <li class="pagination-prev">
@@ -279,10 +447,17 @@ float4 finalColor = color / g_numSamples;
         </li>
         
         
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/archives/page/3/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
+        
         <li class="pagination-number">pagination.page pagination.of</li>
     </ul>
 </div>
- -->
+
 
 
 <!-- Footer -->
@@ -322,7 +497,7 @@ float4 finalColor = color / g_numSamples;
 
     <div class="columns has-text-centered">
       <div class="column">
-        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, based on <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
       </div>
     </div>
 

@@ -1,0 +1,1026 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archives: 3/2018: 2018 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-11-16-Ray Tracing Notes 1/" class="card-header-title">
+                        Ray Tracing Notes 1
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>所有的内容都是根据<a href="https://www.youtube.com/watch?v=4gXPVoippTs&amp;list=PLujxSBD-JXgnGmsn7gEyN28P1DnRZG7qi&amp;index=3" target="_blank" rel="noopener">Ray Tracing Course</a>上的课程所做的笔记，因此会包含单词释义，概念记录等等</p>
+</blockquote>
+<h2 id="初级单词释义"><a href="#初级单词释义" class="headerlink" title="初级单词释义"></a>初级单词释义</h2><table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">Radiant flux</td>
+<td style="text-align:center">辐射通量</td>
+</tr>
+<tr>
+<td style="text-align:center">Irradiance</td>
+<td style="text-align:center">辐射度</td>
+</tr>
+<tr>
+<td style="text-align:center">Radiance</td>
+<td style="text-align:center">辐射</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec V$</td>
+<td style="text-align:center">从观察者方向发出的方向</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec N$</td>
+<td style="text-align:center">面法线</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec L$</td>
+<td style="text-align:center">指向光源的向量</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec R$</td>
+<td style="text-align:center">全局光照中反射而来的光线方向 也就是光源在表面上L反射出的间接光照 $\vec R = \vec L - 2\vec N(\vec L \vec N)$，也就是$\vec L · \vec N$得到$\cos \alpha$ 乘以$\vec N$ 表示$\vec L$在$\vec N$方向上的投影 在根据平行四边形法则即可得到$\vec R$</td>
+</tr>
+<tr>
+<td style="text-align:center">$\theta _i$</td>
+<td style="text-align:center">入射角</td>
+</tr>
+<tr>
+<td style="text-align:center">$\theta _r$</td>
+<td style="text-align:center">反射角</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<h2 id="如何描述不同的表面材质？"><a href="#如何描述不同的表面材质？" class="headerlink" title="如何描述不同的表面材质？"></a>如何描述不同的表面材质？</h2><p>不同的材质在接受入射光时，会反射向不同的方向以及吸收不同数量的光</p>
+<p><br></p>
+<h2 id="BRDF概念定义"><a href="#BRDF概念定义" class="headerlink" title="BRDF概念定义"></a>BRDF概念定义</h2><p>$$f_r$$(入射光方向，光在表面上的点，出射光方向)</p>
+<p>$$f_r(\omega，x，\omega’)$$</p>
+<p>因此称他们的集合为<strong>BSDF</strong>或者为<strong>BxDF </strong>也就是说一个表面既能反射也能折射的现象</p>
+<p><br></p>
+<h2 id="BRDF的性质"><a href="#BRDF的性质" class="headerlink" title="BRDF的性质"></a>BRDF的性质</h2><p><strong>双向性</strong>: 也就是fr(ω’，x，ω)  = fr(ω，x，ω’) 当出射光变为入射光再次计算 结果得到原来的入射光方向</p>
+<p><strong>正性</strong>: BRDF的fr(ω’，x，ω) ≥0</p>
+<p><strong>能量守恒</strong>: 表面可能会吸收或者反射入射光 但是两者的能量和都不能超过入射光能量</p>
+<blockquote>
+<p>在所有可能的出射(折射 反射的面上积分) 同时也算上了光的衰减现象</p>
+<p>$\int_{\Omega}f_r(ω，x，ω’) cos\theta d\omega$ (实际为入射光和出射光能量的比值) ≤1 如果=1那么就是发生了全反射现象 ≤1也就是说一部分的光被吸收了 不可能出现能量不守恒的情况</p>
+</blockquote>
+<p><br></p>
+<h2 id="渲染公式定义解读"><a href="#渲染公式定义解读" class="headerlink" title="渲染公式定义解读"></a>渲染公式定义解读</h2><blockquote>
+<p>Rendering Equation</p>
+</blockquote>
+<p>$$<br>L_o(x, \vec ω) = L_e(x, \vec ω) + \int_{\Omega}L_i(x, \vec ω’) f_r(\vec ω，x，\vec ω’ ) cos\theta d\vec ω<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$L_o$</td>
+<td style="text-align:center">从表面点x上离开的辐射度</td>
+</tr>
+<tr>
+<td style="text-align:center">$L_e$</td>
+<td style="text-align:center">从表面点x上发射出的辐射度</td>
+</tr>
+<tr>
+<td style="text-align:center">$\int_{\Omega}…d\vec\omega$</td>
+<td style="text-align:center">所有外来的入射光引起的出射光的总和</td>
+</tr>
+<tr>
+<td style="text-align:center">$L_i(x, \vec\omega’$)</td>
+<td style="text-align:center">从给定方向上指向点x的入射辐射度</td>
+</tr>
+<tr>
+<td style="text-align:center">$f_r(\vec\omega,x,\vec\omega’)$</td>
+<td style="text-align:center">BRDF</td>
+</tr>
+<tr>
+<td style="text-align:center">$cos\theta$</td>
+<td style="text-align:center">光衰减系数</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<h2 id="Ambient模型"><a href="#Ambient模型" class="headerlink" title="Ambient模型"></a>Ambient模型</h2><blockquote>
+<p>最简单的BRDF模型 ambient模型 尽管不是基于物理 但会是一个很好理解的上手模型公式 也就是一个模型将会有不受位置角度影响的基本RGB颜色</p>
+</blockquote>
+<p>$$<br>I = k_aI_a<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">I</td>
+<td style="text-align:center">光强度</td>
+</tr>
+<tr>
+<td style="text-align:center">$k_a$</td>
+<td style="text-align:center">环境光系数</td>
+</tr>
+<tr>
+<td style="text-align:center">$I_a$</td>
+<td style="text-align:center">环境光光照强度</td>
+</tr>
+</tbody>
+</table>
+<p> <br></p>
+<blockquote>
+<p>漫反射Diffuse模型</p>
+</blockquote>
+<p>$$<br>I = k_{a,\lambda}(\vec L · \vec N)<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$k_a$</td>
+<td style="text-align:center">漫反射系数</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec L$</td>
+<td style="text-align:center">指向光源的向量</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec N$</td>
+<td style="text-align:center">面法线</td>
+</tr>
+</tbody>
+</table>
+<p> <br></p>
+<blockquote>
+<p>镜面反射模型Specular</p>
+</blockquote>
+<p>$$<br>I = k_s(\vec V · \vec R)^n<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$k_s$</td>
+<td style="text-align:center">镜面系数</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec V$</td>
+<td style="text-align:center">指向观察者/摄像机的方向</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec R$</td>
+<td style="text-align:center">反射光线的方向</td>
+</tr>
+<tr>
+<td style="text-align:center">$(.)^n$</td>
+<td style="text-align:center">反光度</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<blockquote>
+<p>Phong反射模型就是讲上述三者模型集中在一起的一个最简化的模型</p>
+<p>这也就是为什么无论你怎么样变换摄像机的位置，也就是$\vec V$的方向，但是漫反射颜色都不会因此发生改变的原因。而镜面反射同理，是因为一部分高光从表面上反射而来，也就是$\vec R$与我们的观察方向$\vec V$之间的夹角非常的接近，这也就使得最终的$I$显示在最终的效果上显得非常明亮的原因。</p>
+</blockquote>
+<p>最终的受过大量简化后的Rendering Equation如下</p>
+<p>$$<br>I = k_aI_a + I_i(k_d(\vec L · \vec N) + k_s(\vec V · \vec R)^n)<br>$$</p>
+<p>这只发生在直接光照上，而间接光照没有考虑在其中，在光线照射不到的地方，环境光帮助我们找回了看不见的区域。</p>
+<blockquote>
+<p>注意 这是一个基于物理的渲染的近似 只用于方便理解而做</p>
+</blockquote>
+<p><br></p>
+<h2 id="Fresnel-equation-Schlick’s-approximation"><a href="#Fresnel-equation-Schlick’s-approximation" class="headerlink" title="Fresnel equation(Schlick’s approximation)"></a>Fresnel equation(Schlick’s approximation)</h2><p>$$<br>\vec R(\theta) = \vec R_o + (1-\vec R_o)(1-cos\theta)^5<br>$$</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$\vec R(\theta)$</td>
+<td style="text-align:center">入射角为$\theta$时发生反射的可能性</td>
+</tr>
+<tr>
+<td style="text-align:center">$\vec R_o$</td>
+<td style="text-align:center">当入射角为0的时候，也就是发现方向，发生反射的概率,也可以是$\vec R_o = (\frac{n_1-n_2}{n_1+n_2})^2$，$n_1$为媒介的传输系数 $n_2$在真空或者空气下为1</td>
+</tr>
+</tbody>
+</table>
+<p>$$<br>n_{介质} = \frac{光在真空中的速度}{光在介质中传输的速度}<br>$$</p>
+<blockquote>
+<p>因此在反射现象不明显折射现象较为明显的玻璃这些材质时，最终计算出来的$R_o$将会非常的接近0</p>
+</blockquote>
+<p>原始的Fresnel equation</p>
+<p>$$<br>R_s(\theta) = |\frac{n_1cos\theta - n_2\sqrt{1-(\frac{n_1}{n_2}sin\theta)^2}}{n_1cos\theta + n_2\sqrt{1-{(\frac{n_1}{n_2}sin\theta)^2}}}|^2<br>$$</p>
+<blockquote>
+<p>因此当传输的介质为真空时，Schlick的近似公式计算出来的只是非常贴近0的$(1-cos\theta)^5$，而原始公式计算出的可能性直接就是0</p>
+</blockquote>
+<p><br></p>
+<h2 id="Snell’s-law"><a href="#Snell’s-law" class="headerlink" title="Snell’s law"></a>Snell’s law</h2><p>$$\frac{sin\theta_1}{sin\theta_2} = \frac{v_1}{v_2} = \frac{n_2}{n_1}$$</p>
+<p>全反射现象</p>
+<p>$$sin\theta_2 =( \frac{n_2}{n_1}sin\theta_2)|_{\theta_2=90}$$<br>计算出的结果有一定的可能出现大于1的情况</p>
+<blockquote>
+<p>也就是光从介质系数大的物体中折射到小系数中，折射光线与法线夹角成90度，此时折射现象就不再发生。</p>
+</blockquote>
+<p>折射光线那么这时就发生了全反射现象此时$\theta_{critical} = arcsin(\frac{n_2}{n_1})$</p>
+<p><br></p>
+<h2 id="Ray-Sphere-Intersection"><a href="#Ray-Sphere-Intersection" class="headerlink" title="Ray Sphere Intersection"></a>Ray Sphere Intersection</h2><blockquote>
+<p>Ray的参数表示形式 $\vec r(t) = \vec o + t\vec d$，一般的平面圆的隐式方程表示为$f(x, y) = 0$，例如球的一般方程为$(x-a)^2+(y-b)^2-r^2=0$，而其参数方程就可以写成$x=x(t), y=y(t),r=(t)$</p>
+</blockquote>
+<p>球的方程</p>
+<p>$$<br>(\vec p - \vec c) · (\vec p - \vec c) = \vec r^2<br>$$</p>
+<p>Ray的方程</p>
+<p>$$<br>\vec r(t) = \vec o + t\vec d<br>$$</p>
+<p>简单的直线方程代入球面坐标求解$(\Delta)b^2-4ac$即可</p>
+<p>$$<br>t^2(\vec b·\vec b)+2(\vec o - \vec c)t\vec d + (\vec o - \vec c)·(\vec o - \vec c) - r^2 = 0<br>$$</p>
+<p>$$<br>t_1=\frac{-B+\sqrt{B^2-4AC}}{2A}<br>$$</p>
+<p>$$<br>t_1=\frac{-B-\sqrt{B^2-4AC}}{2A}<br>$$</p>
+<p><br></p>
+<h2 id="Surface-Normals"><a href="#Surface-Normals" class="headerlink" title="Surface Normals"></a>Surface Normals</h2><blockquote>
+<p>如若给定一个表面的隐式方程$f(x, y)=0$，那么他的面法线就是该函数在$(x, y)$处的梯度$\nabla f(x,y)$，梯度定义为$\nabla f(x, y, z) = (\frac{\partial f}{\partial x}, \frac{\partial f}{\partial y}, \frac{\partial f}{\partial z})$</p>
+</blockquote>
+<p><br></p>
+<blockquote>
+<p>例如求椭球形面的面法线</p>
+</blockquote>
+<p>$$<br>f(x, y, z) = \frac{x^2}{a^2}+\frac{y^2}{b^2}-z<br>$$</p>
+<p>其中a和b为椭球形的曲率</p>
+<p>$$<br>\nabla f(x, y, z) = (\frac{2x}{a^2}, \frac{2y}{b^2}, -1)<br>$$</p>
+<blockquote>
+<p>在求得光线与最近物体交点的时候，我们会排除$t\le 0$的情况，因为$=0$时属于自相交情况</p>
+</blockquote>
+<p><br></p>
+<h2 id="Shadow-Computation"><a href="#Shadow-Computation" class="headerlink" title="Shadow Computation"></a>Shadow Computation</h2><p>一个光源下的阴影计算方式</p>
+<p>$$<br>I\gets I(I_{light}\frac{相对于该点光源的可见面积}{整个光源的面积})<br>$$</p>
+<p>因此我们可以通过发射shadow ray来近似上述计算结果</p>
+<p>$$<br>I(I_{light}\frac{未被阻挡的阴影射线数量}{发射的阴影射线总数})<br>$$</p>
+<blockquote>
+<p>在本质上这就是Monte Carlo Integration</p>
+</blockquote>
+<p><br></p>
+<h2 id="Illuminaton-Equation-with-recursion"><a href="#Illuminaton-Equation-with-recursion" class="headerlink" title="Illuminaton Equation with recursion"></a>Illuminaton Equation with recursion</h2><p>$$<br>I = k_aI_a +I_i(k_d(\vec L · \vec N) + k_s(\vec V · \vec R)^n) + k_tI_t + k_rI_r<br>$$</p>
+<p><br></p>
+<p>新增的$k_tI_t+k_rI_r$为递归项</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">单词</th>
+<th style="text-align:center">释义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">$k_t$</td>
+<td style="text-align:center">菲涅尔透射系数(发生折射的概率)</td>
+</tr>
+<tr>
+<td style="text-align:center">$I_t$</td>
+<td style="text-align:center">透射方向来的光强度</td>
+</tr>
+<tr>
+<td style="text-align:center">$k_r$</td>
+<td style="text-align:center">菲涅尔反射系数(发生反射的概率)</td>
+</tr>
+<tr>
+<td style="text-align:center">$I_t$</td>
+<td style="text-align:center">反射方向来的光强度</td>
+</tr>
+<tr>
+<td style="text-align:center">$[D]^*$</td>
+<td style="text-align:center">任何反射而来的漫反射光照</td>
+</tr>
+<tr>
+<td style="text-align:center">$[S</td>
+<td style="text-align:center">D]$</td>
+</tr>
+</tbody>
+</table>
+<h2 id="Ray-Tracing-vs-Global-illumination"><a href="#Ray-Tracing-vs-Global-illumination" class="headerlink" title="Ray Tracing vs Global illumination"></a>Ray Tracing vs Global illumination</h2><p>$$<br>I = k_aI_a +I_i(k_d(\vec L · \vec N) + k_s(\vec V · \vec R)^n) + k_tI_t + k_rI_r<br>$$</p>
+<p>$$<br>vs<br>$$</p>
+<p>$$<br>L_o(x, \vec \omega) = L_e(x, \vec \omega) + \int_\Omega L_i(x, \vec \omega)f_r(\vec \omega, x, \vec \omega’)cos\theta d\vec \omega’<br>$$</p>
+<blockquote>
+<p> 可以看到的就是illumination Equation中使用的I本质上是物理空间中不存在的光照强度，而不是Global illumination中的辐射度计算。</p>
+</blockquote>
+<p><br></p>
+<p>Ray Tracing 中无法做到以下几点</p>
+<ol>
+<li>间接光照/颜色渗透现象($LDD[D^*]E$)，从其他表面反射而来得Diffuse Color不能被直接计算</li>
+<li>焦散现象($LE[S^*]DE$)，从其他表面反射来 Specular Color不能被直接计算</li>
+<li>全局光照中阴影无需手工计算，因为阴影的形成本质上就是光照未被照到自然形成的。</li>
+</ol>
+<blockquote>
+<p>因为在ray tracing当中我们只计算了局部的incoming漫反射光照，但事实上我们应该采集在整个上半球上的所有入射光，也就是渲染方程中积分的意义</p>
+</blockquote>
+<p><br></p>
+<p>真实的基于物理的漫反射BRDF模型为，$\rho$代表反射率，$\rho \in (0, 1)$，并且下列BRDF也是概率分布函数，只需要检验$\int_{0}^{\pi}\frac{\rho}{1}d\omega = 1$.</p>
+<blockquote>
+<p>Diffuse BRDF</p>
+</blockquote>
+<p>$$<br>f_r(\vec \omega, x, \vec \omega’) = \frac{\rho}{\pi}<br>$$</p>
+<p>在这个模型中，它将会收集整个半球上的入射光，那么如果手动射入一根光线，那么出射光出射在半球上的任意方向上得概率都是一致的。其中，该BRDF函数也是一个概率分布函数。</p>
+<p>$$<br>\int_{\pi}\frac{1}{\pi}d\vec \omega = 1<br>$$</p>
+<p>镜面反射模型也就意味着如若给定一个入射光方向，那么出射光的方向只有一个。</p>
+<blockquote>
+<p>Specular BRDF</p>
+</blockquote>
+<p>$$<br>f_r(\vec \omega, x, \vec \omega’) = \begin{equation}\begin{cases}1， 反射方向\\0，非反射方向的任意方向\end{cases}\end{equation}<br>$$</p>
+<blockquote>
+<p>简单来讲就是一个二项分布</p>
+</blockquote>
+<p><br></p>
+<h2 id="Monte-Carlo-Intergration"><a href="#Monte-Carlo-Intergration" class="headerlink" title="Monte Carlo Intergration"></a>Monte Carlo Intergration</h2><blockquote>
+<p>Hit or Miss法</p>
+</blockquote>
+<ol>
+<li><p>在一张纸上给定的区域内绘制当前的函数</p>
+</li>
+<li><p>向整个区域打点</p>
+</li>
+<li><p>记录每个点的Hit/Miss情况</p>
+</li>
+<li><p>$\int_a^bf(x)dx/A \approx \frac{hits}{misses+hits}$最终结果就可以这样近似</p>
+</li>
+</ol>
+<blockquote>
+<p>同理也就可以估计$\pi$的值</p>
+</blockquote>
+<p><br></p>
+<h2 id="Path-Tracing"><a href="#Path-Tracing" class="headerlink" title="Path Tracing"></a>Path Tracing</h2><blockquote>
+<p>如果场景中只有一个面积非常小的点光源，那么即便是spp足够大，最终的结果也很有可能是一团黑</p>
+<p>原因在于，只有当发射的ray相交到了一个光源时，他才会返回一个足够的光亮度，因此每次在BRDF的概率密度范围内随机反射光线，只有很小的概率击中光源并返回一个值。</p>
+</blockquote>
+<p><br></p>
+<p>解决方案，极大的缩短追踪Depth是最终的目标。因此在每次递归到Surface上一点时，不仅仅只是计算上从随机方向上反射而来得光照，还需直接计算点到光源之间的通路(间接等价于，随机发射一条光线到光源方向并返回一个可能的值)。</p>
+<p>这就大大的缩短了Path Tracing中需要Sample的光线的数量。同样数量的光线的情况下，整个场景会显得格外的明亮。</p>
+<blockquote>
+<p>需要注意的是，如若在Path Tracing中随机hit到了光源，我们并不直接返回光源的亮度，因为我们在Path Tracing的过程中已经计算过他的亮度。这也就很好的解耦了直接光照和间接光照。</p>
+</blockquote>
+<p><br></p>
+<h2 id="Low-Discrepancy-Series"><a href="#Low-Discrepancy-Series" class="headerlink" title="Low Discrepancy Series"></a>Low Discrepancy Series</h2><blockquote>
+<p>优点:</p>
+</blockquote>
+<p>当构建一个渲染时，你不会得到真正的随机采样结果，因此在渲染一个动画的时候，你能够得到连贯一致的噪点分布。</p>
+<blockquote>
+<p>缺点：</p>
+</blockquote>
+<p>没有……</p>
+<p><br></p>
+<h2 id="Russian-Roulette-Path-Termination"><a href="#Russian-Roulette-Path-Termination" class="headerlink" title="Russian Roulette Path Termination"></a>Russian Roulette Path Termination</h2><p>问题出在，渲染方程本质上是一个无穷积分，因此理论上来说Path Tracing的Depth应该是无穷大，但事实上不能。因此什么时候结束tracing就成为了一个比较大的问题。</p>
+<p>因此我们的目标就是，使用概率论来解决这个问题，当完成了第i次迭代之后，是否停止继续追踪取决于概率，在一定的概率内随机决定是否要终止当前这条光线。</p>
+<p><br></p>
+<p>假定目前有一随机变量$\xi \in (0, 1)$</p>
+<p>若$\xi&lt;p_i$，那么继续追踪当前的光线，最终计算得到的辐射度就为$\frac{L_i}{p_i}$</p>
+<p>若$\xi \ge p_i$，那么结束当前的光线追踪迭代，最终计算得到的辐射度为0</p>
+<blockquote>
+<p>可以通过计算期望$E\lbrack \hat{L_i} \rbrack = p_i * \frac{L_i}{p_i} + (1-p_i) · 0 = L_i $，来印证计算结果的正确性。</p>
+</blockquote>
+<p><br></p>
+<p>$p_i$的取值范围，$p_i = 0$这样的情况不会发生，因为光线一次也不于物体相交($\frac{L_i}{p_i}$非法); $p_i = 1$这样 情况也不会发生，因为光线追踪永不停止。尽管$p_i$的取值理论上在这$(0, 1)$区间内都是可以接受的，但事实上我们最好选取一个能够让结果更快收敛的概率值。</p>
+<p><br></p>
+<p>所以$p_i$的取值也就非常的关键，我们总是希望更远的采样那些明亮的路径而不是较为黑不溜秋的路径，因此我们就可以设$p_i$为简单的反射率，这可以极大的降低方差。</p>
+<p><br></p>
+<h2 id="Consistent"><a href="#Consistent" class="headerlink" title="Consistent"></a>Consistent</h2><p>$$<br>\lim_{N \to \infty}E_N[F] = \int f(x)dx<br>$$</p>
+<p>一致性算法表示算法本身在经过无穷的随机采样逼近之后，将会收敛，但这将会花上非常多的时间。</p>
+<p><br></p>
+<h3 id="Unbiased"><a href="#Unbiased" class="headerlink" title="Unbiased"></a>Unbiased</h3><p>$$<br>E_N[F - \int f(x)dx] = 0<br>$$</p>
+<ol>
+<li>无论采样多少次数，估计量与期望之间的误差都为0</li>
+<li>合并两张由无偏算法生成的图片将会带来更好的效果</li>
+<li>高估/低估被积函数的概率都是相同的</li>
+</ol>
+<p><br></p>
+<h2 id="现代Path-Tracing优化算法"><a href="#现代Path-Tracing优化算法" class="headerlink" title="现代Path Tracing优化算法"></a>现代Path Tracing优化算法</h2><blockquote>
+<p>Bidirectional Path Tracing</p>
+</blockquote>
+<p>遇到了光源在Next Event Estimation也难以处理的情况，比如光源和摄像机之间存在一层遮罩，因此只有摄像机发出的光光线随机的走到了光源中才能够返回一个较为明亮的颜色。</p>
+<p>关键思想: 从摄像机和光源处同时发射光线，并且在一定的depth结束彼此的追踪之后，连接两条路径的结尾点即可。</p>
+<p>总结：更快的焦散和计算收敛速度，尤其是在室内场景中，但添加上Multiple Importance Sampling和路径的权重似乎会增加计算时间。</p>
+<p><br></p>
+<blockquote>
+<p>Metropolis Light Transport</p>
+</blockquote>
+<p>关键思想: 对于明亮的区域我们会采样更多的次数，相比于暗处的区域的话。本质上讲就是明亮处采样的概率会更高。</p>
+<p><br></p>
+<p><img src="https://farm1.staticflickr.com/750/23744227456_4d355c2b3d_o.jpg" width="1000" height="1000" alt="cornell_box_in_cycles_ii_by_elbrujodelatribu-d5gu2uh"></p>
+<blockquote>
+<p>配图为康奈尔盒</p>
+</blockquote>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-10-30-Compiler Compiler/" class="card-header-title">
+                        Compiler Compiler
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>专业课没有开编译原理，因此刚刚上手Flex+Bison的时候有很多概念性错误。这里不做教程，只是我个人在学习中的心得</p>
+</blockquote>
+<blockquote>
+<p>基于<a href="http://www.amazon.cn/flex%E4%B8%8Ebison-Jobn-Levine/dp/B00510VRB0/ref=sr_1_1?ie=UTF8&amp;qid=1444799536&amp;sr=8-1&amp;keywords=flex%E4%B8%8Ebison" target="_blank" rel="noopener">Flex与Bison</a>学习</p>
+</blockquote>
+<p><br></p>
+<blockquote>
+<p>2015.10.13备注</p>
+</blockquote>
+<h3 id="Chapter-1"><a href="#Chapter-1" class="headerlink" title="Chapter 1"></a>Chapter 1</h3><ol>
+<li>Flex在使用gcc编译时会用到一个名叫<strong>lfl</strong>的库，本质上是yywarp，大多数都会在声明部分启用<strong>%option noyywrap</strong>，一般不需要此库。<br><br><br></li>
+<li>Flex与Bison本质上是给定文法生成指定.c, .h文件提供给工程，因此本身的main主程序测试不是必须的。<br><br><br></li>
+<li>Flex本质是词法分析器，因此在分析到指定token时，会需要用到具体的tokenType。这一般会在Bison中指定，那么就会前向声明<strong>#include</strong> Bison生成的.h,例如<strong>xxx.tab.h</strong>.<br><br><br></li>
+<li>Bison与Flex使用的是标准C，因此当使用cc编译命令时<strong>//</strong>注释不可用，需为<strong>/<em> </em>/</strong><br><br><br></li>
+<li>Bison功用是根据BNF范式生成一颗AST树，这颗树很可能是不可见，也就是隐藏的。<br><br><br></li>
+<li>Bison中的<strong>default $$ = $1</strong>似乎在新版本不可用，但默认Bison就是将右边的语法符号<strong>$1,$2,…</strong>中的<strong>$1</strong>指派给目标符号。</li>
+<li>Flex的规则列表中切忌是不可以增加注释的，只能在右边的动作或者在规则开始声明符<strong>%%</strong>之前添加注释.且规则和动作之间至少增加一个空格，否则<strong>{}</strong>也会被认定为正则表达式。</li>
+</ol>
+<p><br></p>
+<blockquote>
+<p>2015.10.30备注</p>
+</blockquote>
+<p>###Chapter 9</p>
+<p>1.纯词法分析器和纯语法分析器协同工作。不仅是Flex上给出<strong>%option reentrant和%option bison-bridge</strong>+Bison <strong>%pure-parser</strong>那么简单(原本使用书上注明的<strong>%define api.pure</strong>在OSX上不可用，应该是版本问题，具体情况可以参考Webkit上的.flex)。<br>其中<strong>bison-bridge</strong>的作用就是完成Flex上与Bison上不协调的yylex()所做的对接。</p>
+<pre><code class="cpp">// Flex
+token = yylex(YYSTYPE *yylvalp);
+// Bison
+token = yylex(yyscan_t scaninfo);
+</code></pre>
+<p>之前自己在Flex中或Bison或具体外部使用之前的前向声明都可以隐藏，或手动声明为</p>
+<pre><code class="cpp">int yylex(YYSTYPE *lvalp, yyscan_t scaninfo);
+</code></pre>
+<p>2.<strong>%parse-param</strong>/<strong>#define YYPARSE_PARAM</strong>和<strong>%lex-param</strong>/<strong>#define YYLEX_PARAM</strong>都可以声明传递给分析器应用数据的类型，但根据版本迭代的情况而言，以及借鉴Webkit使用情况，推荐使用<strong>%parse-param</strong>和<strong>%lex-param</strong>。</p>
+<p>3.强烈建议包含Flex+Bison生成的头文件时<strong>查看包含关系</strong>。因为一旦重复包含或少包含都会引起非常难以调试的符号未定义BUG，哪怕在生成的源文件中已经#define了此符号。</p>
+<p>4.Bison在定义%token时，使用到了某单符号，例如’-‘’+’等等，此类token若未在Bison中给出相应名，那么就需要分配其指定类型。</p>
+<p>5.BNF范式在实现中，务必手工生成一遍语法树，很有可能其 空 的部分顺序是错误的，因为Bison在面对二义性语法上会选择匹配长度更长的，或者是最新匹配的那一部分，因此 空 实现的顺序就尤为关键。</p>
+<p>6.Flex+Bison支持简单的class内置，所有的中文资料显示2009年时两者未能有效支持C++，需要<strong>%language “C++”</strong>来完成对C++的支持，目前看来无需此关键字也能完成class对struct的替换。</p>
+<p>7.Flex中yyextra指针分配给指定对象的声明位置尤为关键不在头部的%{ %}对中，而是在词法分析单元声明部分中。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-10-27-AST可视化/" class="card-header-title">
+                        AST可视化
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>在使用编译器前端Flex+Bison完成了大部分工作之后，尽管可以使用简易的<strong>printf</strong>来完成终端调试，但终究不够方便。</p>
+<p>使用Bison完成AST生成之后需要对其构建的AST进行分析，此时常规思路的前序中序后序遍历对这样一个庞大的二叉树而言实现可视重建并不容易。因为你需要通过前中序来手工推导出一整棵树，但这并不是你做此任务的主要目的。</p>
+<p>这里我安利一波贝尔实验室推出的黑科技<a href="http://www.graphviz.org/Download_windows.php" target="_blank" rel="noopener">Graphviz</a>，在原有的遍历基础上基本上能够做到1分钟完成上手。</p>
+<p>假定一抽象语法树节点类Node，之后所有AST都将被视为普通二叉树。</p>
+<blockquote>
+<p>简单的类定义</p>
+</blockquote>
+<pre><code class="cpp">class Node
+{
+public:
+  Node *leftChild;
+  Node *rightChild;
+  // 访问当前结点
+  virtual void value();
+};
+</code></pre>
+<blockquote>
+<p>传统的中序遍历</p>
+</blockquote>
+<pre><code class="cpp">void traversal(Node * root)
+{
+  if(!root) return;
+
+  traversal(root-&gt;leftChild);
+  root-&gt;value();
+  traversal(root-&gt;rightChild);
+}
+</code></pre>
+<blockquote>
+<p>Graphviz支持<a href="http://www.graphviz.org/content/dot-language" target="_blank" rel="noopener">DOT</a>语言的输入，个人认为只要依样画葫芦即可</p>
+</blockquote>
+<blockquote>
+<p>使用DOT输出的中序遍历 只需要增加当前结点的label名及各子结点地址 无论是printf或是保存文件都可选 目的无非就是获取这一整段DOT输出代码</p>
+</blockquote>
+<pre><code class="cpp">
+class Node
+{
+public:
+  Node *leftChild;
+  Node *rightChild;
+  // 访问当前结点
+  virtual void value();
+
+  string name;
+};
+
+// 以下代码将会使得遍历转换为DOT格式
+void traversal(Node * root)
+{
+  // 可选将渲染的结点形状更换为其他形式
+  printf(&quot;digraph G {\n&quot;);
+  printf(&quot;node[shape=rect]\n&quot;);
+
+  traversalAsDot(root);
+
+  printf(&quot;}&quot;);
+}
+
+void traversalAsDot(Node* root)
+{
+  if(!root) return;
+
+  // 当前结点名
+  // root-&gt;name.c_str() 可以更换为任意能够获取当前结点名的函数 手工RTTI都可
+  printf(&quot;_%p[label=%s]\n&quot;, root, root-&gt;name.c_str());
+
+  // 传递父节点到子节点地址信息
+  if (l != NULL) printf(&quot;_%p -&gt; _%p\n&quot;, root, root-&gt;leftChild);
+  if (r != NULL) printf(&quot;_%p -&gt; _%p\n&quot;, root, root-&gt;rightChild);
+
+  traversalAsDot(l);
+  root-&gt;value();
+  traversalAsDot(r);
+}
+
+</code></pre>
+<p>我在这里是对CSS进行解析生成AST，解析以下代码，获得AST，输出DOT使用Graphviz渲染</p>
+<pre><code class="css">
+head.font-face.a .b:hover,  #ahs{
+    background: #00FF00;
+    src: 222;
+}
+
+.body {
+    font-family: &#39;Raleway&#39;, Arial, sans-serif;
+    margin: 1, 2, 3, 4;
+}
+
+</code></pre>
+<p>输出的DOT如下</p>
+<pre><code class="cpp">
+digraph G {
+node[shape=rect]
+_0059C010[label=RuleList]
+_0059C010 -&gt; _0059BE48
+_0059C010 -&gt; _0059BFF8
+_0059BE48[label=RuleList]
+_0059BE48 -&gt; _0059BE30
+_0059BE30[label=Ruleset]
+_0059BE30 -&gt; _0059BD70
+_0059BE30 -&gt; _0059BE18
+_0059BD70[label=SelectorList]
+_0059BD70 -&gt; _00597EC0
+_0059BD70 -&gt; _0059BD58
+_00597EC0[label=SelectorList]
+_00597EC0 -&gt; _00597E78
+_00597E78[label=Selector]
+_00597E78 -&gt; _00597E30
+_00597E78 -&gt; _00597C98
+_00597E30[label=SimpleSelector]
+_00597E30 -&gt; _00597DF0
+_00597DF0[label=SpecifierList]
+_00597DF0 -&gt; _00597DD8
+_00597DF0 -&gt; _00597D50
+_00597DD8[label=SpecifierPseudo]
+_00597D50[label=SpecifierList]
+_00597D50 -&gt; _00597D38
+_00597D38[label=SpecifierClass]
+_00597C98[label=Selector]
+_00597C98 -&gt; _00597C50
+_00597C50[label=SimpleSelector]
+_00597C50 -&gt; _00597C10
+_00597C10[label=SpecifierList]
+_00597C10 -&gt; _00597BF8
+_00597C10 -&gt; _00597B70
+_00597BF8[label=SpecifierClass]
+_00597B70[label=SpecifierList]
+_00597B70 -&gt; _00597B58
+_00597B58[label=SpecifierClass]
+_0059BD58[label=Selector]
+_0059BD58 -&gt; _0059BD40
+_0059BD40[label=SimpleSelector]
+_0059BD40 -&gt; _0059BCA0
+_0059BCA0[label=SpecifierList]
+_0059BCA0 -&gt; _00597F68
+_00597F68[label=SpecifierElement]
+_0059BE18[label=DeclarationList]
+_0059BE18 -&gt; _0059BDD0
+_0059BE18 -&gt; _0059BE00
+_0059BDD0[label=DeclarationList]
+_0059BDD0 -&gt; _0059BDA0
+_0059BDA0[label=Declaration]
+_0059BDA0 -&gt; _0059BD88
+_0059BD88[label=Expression]
+_0059BD88 -&gt; _0059C5C8
+_0059C5C8[label=TermHex]
+_0059BE00[label=Declaration]
+_0059BE00 -&gt; _0059BDE8
+_0059BDE8[label=Expression]
+_0059BDE8 -&gt; _0059C620
+_0059C620[label=TermInteger]
+_0059BFF8[label=Ruleset]
+_0059BFF8 -&gt; _0059BED8
+_0059BFF8 -&gt; _0059BFE0
+_0059BED8[label=SelectorList]
+_0059BED8 -&gt; _0059BEC0
+_0059BEC0[label=Selector]
+_0059BEC0 -&gt; _0059BEA8
+_0059BEA8[label=Selector]
+_0059BEA8 -&gt; _0059BE90
+_0059BE90[label=SimpleSelector]
+_0059BE90 -&gt; _0059BE78
+_0059BE78[label=SpecifierList]
+_0059BE78 -&gt; _0059BE60
+_0059BE60[label=SpecifierClass]
+_0059BFE0[label=DeclarationList]
+_0059BFE0 -&gt; _0059BF50
+_0059BFE0 -&gt; _0059BFC8
+_0059BF50[label=DeclarationList]
+_0059BF50 -&gt; _0059BF38
+_0059BF38[label=Declaration]
+_0059BF38 -&gt; _0059BF20
+_0059BF20[label=Expression]
+_0059BF20 -&gt; _0059BF08
+_0059BF20 -&gt; _0059C8E0
+_0059BF08[label=Expression]
+_0059BF08 -&gt; _0059BEF0
+_0059BF08 -&gt; _0059C860
+_0059BEF0[label=Expression]
+_0059BEF0 -&gt; _0059C7E0
+_0059C7E0[label=TermString]
+_0059C860[label=TermIndent]
+_0059C8E0[label=TermIndent]
+_0059BFC8[label=Declaration]
+_0059BFC8 -&gt; _0059BFB0
+_0059BFB0[label=Expression]
+_0059BFB0 -&gt; _0059BF98
+_0059BFB0 -&gt; _0059CA80
+_0059BF98[label=Expression]
+_0059BF98 -&gt; _0059BF80
+_0059BF98 -&gt; _0059CA20
+_0059BF80[label=Expression]
+_0059BF80 -&gt; _0059BF68
+_0059BF80 -&gt; _0059C9C0
+_0059BF68[label=Expression]
+_0059BF68 -&gt; _0059C980
+_0059C980[label=TermInteger]
+_0059C9C0[label=TermInteger]
+_0059CA20[label=TermInteger]
+_0059CA80[label=TermInteger]
+}
+
+</code></pre>
+<blockquote>
+<p>渲染结果为</p>
+</blockquote>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" alt=""><br>    </a><br></figure>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-09-26-射线与圆求交/" class="card-header-title">
+                        射线与圆求交
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>假定已求解出交点，最后一步还需要将距离最短的交点筛选出来，有一个特殊情况如下图</p>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" alt=""><br>    </a><br></figure>
+
+
+<p>实际交点应该是A，因此要剔除B的情况。比较简单，令交点到射线起始点向量为P，那么和射线方向向量d点积，看\( \mathtt{cos \theta} \)的符号即可(-90, 90)。</p>
+<p><br></p>
+<blockquote>
+<p>联立方程组无脑求解</p>
+</blockquote>
+<p>在没有查阅之前，用的就是最基本的直线和圆方程强行联立求解，根据delta值来判断交点情况，最后根据交点与射线起始点的向量夹角筛选合适交点。</p>
+<pre><code class="cpp">class ray
+{
+public:
+    // ...
+    // 0 = ax + by + c
+    float a, b, c;
+}
+</code></pre>
+<p>强行联立</p>
+<pre><code class="cpp">float k = -r.a / r.b, t = -r.c / r.b;
+
+float A = k * k + 1.0f;
+float B = 2 * k * t - 2 * c-&gt;y * k - 2 * c-&gt;x;
+float C = c-&gt;x * c-&gt;x + t * t - 2 * c-&gt;y * t + c-&gt;y * c-&gt;y - c-&gt;radius * c-&gt;radius;
+
+float delta = B * B - 4 * A * C;
+</code></pre>
+<p>求解 delta为0，正负任意</p>
+<pre><code class="cpp">float x1 = (-B + sqrt(delta)) / (2.0f * A);
+float y1 = k*x1 + t;
+int x2 = (-B - sqrt(delta)) / (2.0f * A);
+int y2 = k*x2 + t;
+</code></pre>
+<p>但是上的上述方法有一个缺陷，就是你必须讨论斜率k为无穷的情况。</p>
+<blockquote>
+<p>向量求解</p>
+</blockquote>
+<p>设圆心坐标为C<br>令圆形方程为\( \mathtt{(X-C)·(X-C)=r^2} \)，向量点积自己就是求解自身长度的平方，射线方程令为\( \mathtt{R(t) = P + td, t \ge 0} \)。</p>
+<p>直接代入\( \mathtt{(P+td-C)·(P+td-C)=r^2} \), 令\( \mathtt{P-C = m} \)</p>
+<p>展开下式</p>
+<p>$$ \mathtt{(m + td)·(m + td) = r^2} $$</p>
+<p>等价于二次方程求根</p>
+<p>$$ \mathtt{(d · d)t^2 + 2(m · d)t + (m · m) - r^2 = 0} $$</p>
+<p>基本b, c, t分量代式</p>
+<p>$$ \mathtt{b = m · d} $$</p>
+<p>$$ \mathtt{c = (m · m) - r^2} $$</p>
+<p>$$ \mathtt{t = -b +- \sqrt{b^2 - c}} $$</p>
+<p>这里直接用向量，免去了讨论斜率的情况。交点Q就是\( \mathtt{P + td} \)。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<div class="pagination-bar">
+    <ul class="pagination">
+        
+        <li class="pagination-prev">
+            
+                <a class="btn btn--default btn--small" href="/archives/2018/03/page/6/">
+            
+                <i class="fa fa-angle-left text-base icon-mr"></i>
+                    <span>pagination.newer_posts</span>
+            </a>
+        </li>
+        
+        
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/archives/2018/03/page/8/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
+        
+        <li class="pagination-number">pagination.page pagination.of</li>
+    </ul>
+</div>
+
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>

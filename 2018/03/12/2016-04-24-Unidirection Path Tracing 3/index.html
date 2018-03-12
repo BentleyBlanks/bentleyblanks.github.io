@@ -1,0 +1,284 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive-->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unidirectional Path Tracing 3 [ Bingo ]</title>
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css">
+    
+  
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Unidirectional Path Tracing 3</h3>
+					</div>
+					<div class="card-content">
+					  <p><h3 id="Deprecated-2017-03-30"><a href="#Deprecated-2017-03-30" class="headerlink" title="Deprecated(2017.03.30)"></a>Deprecated(2017.03.30)</h3><blockquote>
+<p>这一篇主要记录<a href="http://www.pbrt.org/" target="_blank" rel="noopener">PBRT</a>中Path Tracing的理解笔记。一旦涉及到了代码层面的实现，会显得无从下手。</p>
+</blockquote>
+<p>首先是路径追踪的蒙特卡洛估计量写法</p>
+<p>$$\frac{L_e(p_i \to p_{i-1})f(p_i \to p_{i-1} \to p_{i-2}|cos\theta_{i-1}|)}{p_A(p_i)}(\prod^{i-2}_{j=1}\frac{f(p_{i+1} \to p_j \to p_{j-1})|cos\theta_j|)}{p_{\omega}(p_{j+1}-p_j)})$$</p>
+<blockquote>
+<p>路径追踪加上了直接光采样，本质上就是应用重要性采样以及对于Dirac delta Distribution等的处理。</p>
+</blockquote>
+<hr>
+<blockquote>
+<p>如图所示</p>
+</blockquote>
+<p><img src="https://farm2.staticflickr.com/1462/26016112614_d283e7eece_o.png" alt=""></p>
+<p>使用一简化后的路径追踪表达式(省略了pdf,russian rullte，以及立体角到面积形式的表示，改变了累乘的上限)</p>
+<p>$$L_e(P_i \to P_{i-1})*(\prod_{j=1}^{i-1}f(P_{j+1} \to P_j \to P_{j-1})cos\theta_j)$$</p>
+<p>意味着，<strong>当前追踪到的点上求得的直接光照，是用来计算上一节点的Reflected Radiance的</strong>。令$E$表示光源，那么直接光采样得到的结果，表示当前点$P_i$位置处，向$P_i \to P_{i-1}$反射的光照，因此需要在计算直接光照时，乘以权重(仅表意，严格来讲这里是做了一次多重重要性采样)</p>
+<p>$$L_e(P_i \to P_{i-1})=L_e(E \to P_i)*\frac{f(P_i,w_{E \to i},w_{i \to i-1})cos\theta_{i-1}}{pdf}$$</p>
+<p>因此这里$P_i$点处计算得到的直接光照，被用于点$P_i$用作间接光照/反射光来传递给下一节点。由于运用了光路可逆，因此在代码实现过程中循环过程会是相反的，也就是正向追踪光路。</p>
+<blockquote>
+<p>这一事实较难以直接从公式中get到，下方通过<a href="http://www.pbrt.org/" target="_blank" rel="noopener">PBRT</a>源代码验证。</p>
+</blockquote>
+<p><a href="http://www.pbrt.org/" target="_blank" rel="noopener">PBRT</a>通过保存一个<strong>pathThroughput</strong>变量，用于记录原式子右边的累乘项</p>
+<p>$$\prod^{i-2}_{j=1}\frac{f(p_{i+1} \to p_j \to p_{j-1})|cos\theta_j|)}{p_{\omega}(p_{j+1}-p_{j})}$$</p>
+<pre><code class="cpp">    for (int bounces = 0; ; ++bounces) 
+    {
+        // 逆向计算直接光照在上一节点的贡献/反射光照
+        Vector wo = -ray.d;
+        L += pathThroughput * UniformSampleOneLight(wo,...);
+
+        // 计算当前结点BRDF以及出射方向
+        Spectrum f = bsdf-&gt;Sample_f(wo, wi, pdf...);
+
+        // 式子中的累乘项，晚于直接光照的计算
+        pathThroughput *= f * AbsDot(wi, n) / pdf;
+
+        // 新的跟踪光线
+        ray = Ray(p, wi, ...);
+
+        if (bounces == maxDepth) break;
+
+        if (!scene-&gt;Intersect(ray,...)) 
+        {
+            // 无限远区域光光照
+            L += pathThroughput * infiniteLight;
+            break;
+        }
+    }
+    return L;
+</code></pre>
+<p>因此在理解增量形式路径追踪的实际实现时，最关键的点为以下两点</p>
+<blockquote>
+<p>1.当前追踪到的点上计算得到的直接光照，是作用于上一节点的反射光照上的。</p>
+</blockquote>
+<blockquote>
+<p>2.循环中累乘项应晚于直接光照计算，因此其累乘项截止到上一节点为止。</p>
+</blockquote>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>, powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end -->
+  
+
+</body>
+</html>
