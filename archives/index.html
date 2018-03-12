@@ -7,7 +7,7 @@
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive-->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Archives [ Hexo ]</title>
+  <title> [ Bingo ]</title>
   
     <!-- stylesheets list from config.yml -->
     
@@ -18,10 +18,12 @@
       <link rel="stylesheet" href="/css/floekr.css">
     
   
-  <link rel="stylesheet" href="/css/highlight/styles/monokai-sublime.css">
-  <script src="/js/highlight/highlight.pack.js"></script>
-  <script>hljs.initHighlightingOnLoad();</script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/languages/cpp.min.js"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
 </head>
 <body>
 
@@ -159,7 +161,21 @@
 <p>理解来自CSDN中的<a href="http://blog.csdn.net/raby_gyl/article/details/13383573" target="_blank" rel="noopener">递归删除算法</a>，个人补充细节描述</p>
 </blockquote>
 <p>题为「设计递归算法，删除无头结点的单链表L中值为x的结点」</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">deleteX</span><span class="params">(LinkList &amp;L, ElemType x)</span>  </span></span><br><span class="line"><span class="function"></span>&#123;  </span><br><span class="line">    LNode *p;  </span><br><span class="line">    <span class="keyword">if</span>(L==<span class="literal">NULL</span>) <span class="keyword">return</span>;  </span><br><span class="line">    <span class="keyword">if</span>(L-&gt;data==x)  </span><br><span class="line">    &#123;  </span><br><span class="line">        p=L;  </span><br><span class="line">        L=L-&gt;next; <span class="comment">// (1)单链表保持连续 </span></span><br><span class="line">        <span class="built_in">free</span>(p);  </span><br><span class="line">        deleteX(L,x); <span class="comment">// (2)递归调用</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        deleteX(L-&gt;next,x); <span class="comment">//(3)向后遍历</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<pre><code class="cpp">void deleteX(LinkList &amp;L, ElemType x)  
+{  
+    LNode *p;  
+    if(L==NULL) return;  
+    if(L-&gt;data==x)  
+    {  
+        p=L;  
+        L=L-&gt;next; // (1)单链表保持连续 
+        free(p);  
+        deleteX(L,x); // (2)递归调用
+    }
+    else
+        deleteX(L-&gt;next,x); //(3)向后遍历
+}  
+</code></pre>
 <hr>
 <p>理解难度在于似乎仅仅只是释放了当前结点并使得L向前推进，而导致了断链。</p>
 <blockquote>
@@ -168,10 +184,35 @@
 <p>核心理解在于这里的LinkList L是<strong>引用</strong>, 观察堆栈会非常清晰的说明这个问题。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/36580955782/in/dateposted-public/" title="deleteX" target="_blank" rel="noopener"><img src="https://farm5.staticflickr.com/4381/36580955782_32532b105a.jpg" width="500" height="500" alt="deleteX"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
 <p>当代码中$(2)$处递归调用deleteX时, 参数作为L-&gt;next的引用传入(引用为别名，相当于本体操作)，即<strong>递归中参数L为上一函数的L-&gt;next本体</strong>，此时的代码相当于</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">deleteX(L-&gt;next, x)  </span><br><span class="line">&#123;  </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    p = L-&gt;next;  </span><br><span class="line">    L-&gt;next = L-&gt;next-&gt;next; <span class="comment">// 单链表保持连续 </span></span><br><span class="line">    <span class="built_in">free</span>(p);  </span><br><span class="line">    deleteX(L-&gt;next, x);</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<pre><code class="cpp">deleteX(L-&gt;next, x)  
+{  
+    // ...
+    p = L-&gt;next;  
+    L-&gt;next = L-&gt;next-&gt;next; // 单链表保持连续 
+    free(p);  
+    deleteX(L-&gt;next, x);
+    // ...
+}  
+</code></pre>
 <hr>
 <p>如若将引用更换为指针，相较于引用的实现较为繁琐，但更能观察到上述代码工作的本质。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 仅有传入指针的指针才能改变上一函数中指针的值</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">deleteX</span><span class="params">(LinkList **L, ElemType x)</span>  </span></span><br><span class="line"><span class="function"></span>&#123;  </span><br><span class="line">    LNode *p;  </span><br><span class="line">    <span class="keyword">if</span>((*L)==<span class="literal">NULL</span>) <span class="keyword">return</span>;  </span><br><span class="line">    <span class="keyword">if</span>((*L)-&gt;data==x)  <span class="comment">// L-&gt;next指向的结点为x</span></span><br><span class="line">    &#123;  </span><br><span class="line">        p=*L;  <span class="comment">// p指向L-&gt;next指向的结点</span></span><br><span class="line">        *L=(*L)-&gt;next; <span class="comment">// L-&gt;next=L-&gt;next-&gt;next</span></span><br><span class="line">        <span class="built_in">free</span>(p);  </span><br><span class="line">        deleteX(L,x); <span class="comment">// 传入L-&gt;next的地址</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        deleteX(&amp;((*L)-&gt;next),x); <span class="comment">// 传入L-&gt;next指向的结点的next指针的地址</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<pre><code class="cpp">// 仅有传入指针的指针才能改变上一函数中指针的值
+void deleteX(LinkList **L, ElemType x)  
+{  
+    LNode *p;  
+    if((*L)==NULL) return;  
+    if((*L)-&gt;data==x)  // L-&gt;next指向的结点为x
+    {  
+        p=*L;  // p指向L-&gt;next指向的结点
+        *L=(*L)-&gt;next; // L-&gt;next=L-&gt;next-&gt;next
+        free(p);  
+        deleteX(L,x); // 传入L-&gt;next的地址
+    }
+    else
+        deleteX(&amp;((*L)-&gt;next),x); // 传入L-&gt;next指向的结点的next指针的地址
+}  
+</code></pre>
+
                       </p>
                     </div>
                   </div>
@@ -196,7 +237,21 @@
 <p>PBRT中的NDC坐标系在Atmos中未使用，因为其本身在PBRT中并不直接体现</p>
 </blockquote>
 <p>具体的转换管线流程如下，实现公式可由下图各自推导出来，不做赘述。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">rasterPosition(imageX, imageY);</span><br><span class="line"></span><br><span class="line"><span class="comment">// raster to screen</span></span><br><span class="line">screenPosition(rasterPosition.x - image-&gt;width / <span class="number">2.0f</span>, -rasterPosition.y + image-&gt;height / <span class="number">2.0f</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// screen to camera</span></span><br><span class="line"><span class="comment">// 这里pbrt中使用投影矩阵的逆变换得到cameraPos，不过由于透视的特殊性，其方向向量是一致的。</span></span><br><span class="line">cameraPosition.x = <span class="number">2</span> * canvasSize.x * screenPosition.x / image-&gt;width;</span><br><span class="line">cameraPosition.y = <span class="number">2</span> * canvasSize.y * screenPosition.y / image-&gt;height;</span><br><span class="line">cameraPosition.z = canvasDistance;</span><br><span class="line"></span><br><span class="line"><span class="comment">// camera to world</span></span><br><span class="line">ray-&gt;direction = (cameraToWorld * cameraPosition).getNormalized();</span><br><span class="line">ray-&gt;origin = cameraToWorld * zeroVector3;</span><br></pre></td></tr></table></figure>
+<pre><code class="cpp">rasterPosition(imageX, imageY);
+
+// raster to screen
+screenPosition(rasterPosition.x - image-&gt;width / 2.0f, -rasterPosition.y + image-&gt;height / 2.0f);
+
+// screen to camera
+// 这里pbrt中使用投影矩阵的逆变换得到cameraPos，不过由于透视的特殊性，其方向向量是一致的。
+cameraPosition.x = 2 * canvasSize.x * screenPosition.x / image-&gt;width;
+cameraPosition.y = 2 * canvasSize.y * screenPosition.y / image-&gt;height;
+cameraPosition.z = canvasDistance;
+
+// camera to world
+ray-&gt;direction = (cameraToWorld * cameraPosition).getNormalized();
+ray-&gt;origin = cameraToWorld * zeroVector3;
+</code></pre>
 <p><img src="https://farm5.staticflickr.com/4264/35005454923_f05e8118e1_b.jpg" alt=""></p>
 <p>之后可以用worldToCamera矩阵进行转换。</p>
 <p>$$worldToCamera<br>\left(<br>\begin{matrix}<br>right.x &amp; up.x &amp; direction.x &amp; origin.x \\\ <br>right.x &amp; up.y &amp; direction.y &amp; origin.y \\\\<br>right.z &amp; up.z &amp; direction.z &amp; origin.z \\\\<br>0 &amp; 0 &amp; 0 &amp; 1<br>\end{matrix}<br>\right)$$</p>
@@ -404,7 +459,7 @@
 <p>这里$r, \theta$也是两个独立的随机变量</p>
 </blockquote>
 <blockquote>
-<p>PBRT中论述的Concentric Disk Sampling可以参见前文<a href="http://bentleyblanks.github.io/Depth-of-Field/" target="_blank" rel="noopener">Depth of Field</a>中的实现与可视化</p>
+<p>PBRT中论述的Concentric Disk Sampling可以参见前文<a href="http://bentleyblanks.github.io/Depth-of-Field/">Depth of Field</a>中的实现与可视化</p>
 </blockquote>
 <hr>
 <blockquote>
@@ -454,7 +509,7 @@
 <p>而边缘概率密度可直接得到<br>$$p(u)=\int_v p(u,v)dv=\frac{\frac{1}{n_u}\sum_i f(u, v_i)}{I_f} , \quad p(v\arrowvert u)=\frac{p(u,v)}{p(u)}=\frac{f(u,v)}{\frac{1}{n_u}\sum_i f(u, v_i)}$$</p>
 <p>之后利用CDF反变换，即PBRT中distribution1d的实现办法可完成对于$p(u),p(v\arrowvert u)$上的采样</p>
 <blockquote>
-<p>此处效果可见<a href="http://bentleyblanks.github.io/Transforming-Between-Distributions/" target="_blank" rel="noopener">前文</a>中的二维分段函数采样的结果</p>
+<p>此处效果可见<a href="http://bentleyblanks.github.io/Transforming-Between-Distributions/">前文</a>中的二维分段函数采样的结果</p>
 </blockquote>
 <hr>
 <blockquote>
@@ -520,6 +575,168 @@
                   <br>
                   <br>
                   
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/01/09/motion-blur - 副本 (2)/" class="card-header-title">
+                        motion blur111
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
+<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
+<li>根据深度图计算出每个像素的世界空间位置。</li>
+<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
+<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
+<li>沿着速度方向进行多重采样,结果进行平均</li>
+</ul>
+<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
+<p>world-view-project matrix: M</p>
+<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
+<p>world position: $WorldPos = \frac{D}{D.w}$</p>
+<p>提取世界空间位置:</p>
+<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
+float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
+float4 D = mul(H, g_ViewProjectionInverseMatrix);
+float4 worldPos = D / D.w;
+</code></pre>
+<p>逐像素计算速度</p>
+<pre><code class="cpp">float4 currentPos = H;
+float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
+previousPos /= previousPos.w;
+float2 velocity = (currentPos - previousPos) / 2.0f;
+</code></pre>
+<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
+<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
+for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
+{
+    float4 currentColor = tex2D(sceneSampler, texCoord);
+    color += currentColor;
+}
+
+float4 finalColor = color / g_numSamples;
+</code></pre>
+<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
+<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
+<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
+<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
+<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
+<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/01/09/motion-blur - 副本 (3)/" class="card-header-title">
+                        motion blur123333333332342423425
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
+<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
+<li>根据深度图计算出每个像素的世界空间位置。</li>
+<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
+<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
+<li>沿着速度方向进行多重采样,结果进行平均</li>
+</ul>
+<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
+<p>world-view-project matrix: M</p>
+<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
+<p>world position: $WorldPos = \frac{D}{D.w}$</p>
+<p>提取世界空间位置:</p>
+<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
+float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
+float4 D = mul(H, g_ViewProjectionInverseMatrix);
+float4 worldPos = D / D.w;
+</code></pre>
+<p>逐像素计算速度</p>
+<pre><code class="cpp">float4 currentPos = H;
+float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
+previousPos /= previousPos.w;
+float2 velocity = (currentPos - previousPos) / 2.0f;
+</code></pre>
+<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
+<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
+for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
+{
+    float4 currentColor = tex2D(sceneSampler, texCoord);
+    color += currentColor;
+}
+
+float4 finalColor = color / g_numSamples;
+</code></pre>
+<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
+<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
+<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
+<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
+<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
+<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/01/09/motion-blur - 副本/" class="card-header-title">
+                        motion blur111111
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
+<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
+<li>根据深度图计算出每个像素的世界空间位置。</li>
+<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
+<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
+<li>沿着速度方向进行多重采样,结果进行平均</li>
+</ul>
+<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
+<p>world-view-project matrix: M</p>
+<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
+<p>world position: $WorldPos = \frac{D}{D.w}$</p>
+<p>提取世界空间位置:</p>
+<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
+float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
+float4 D = mul(H, g_ViewProjectionInverseMatrix);
+float4 worldPos = D / D.w;
+</code></pre>
+<p>逐像素计算速度</p>
+<pre><code class="cpp">float4 currentPos = H;
+float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
+previousPos /= previousPos.w;
+float2 velocity = (currentPos - previousPos) / 2.0f;
+</code></pre>
+<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
+<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
+for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
+{
+    float4 currentColor = tex2D(sceneSampler, texCoord);
+    color += currentColor;
+}
+
+float4 finalColor = color / g_numSamples;
+</code></pre>
+<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
+<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
+<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
+<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
+<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
+<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
               
           </div>
         </div>
@@ -574,39 +791,27 @@
   </div>
 </section>
 
-<!-- <div class="container">
-  <div class="colunms">
-    <div class="colunm is-two-thirds">
-		<div class="pagination-bar">
-		    <ul class="pagination">
-		        
-		        
-		        <li class="pagination-number">pagination.page pagination.of</li>
-		    </ul>
-		</div>
-    </div>
-
-    <div class="colunm"></div>
-    <div class="colunm"></div>
-  </div>
-</div>
- -->
-
- <div class="pagination-bar">
+<!-- <div class="pagination-bar">
     <ul class="pagination">
         
+        
+        <li class="pagination-next">
+            <a class="btn btn--default btn--small" href="/archives/page/2/">
+                    <span>pagination.older_posts</span>
+                <i class="fa fa-angle-right text-base icon-ml"></i>
+            </a>
+        </li>
         
         <li class="pagination-number">pagination.page pagination.of</li>
     </ul>
 </div>
-
+ -->
 
 
 <!-- Footer -->
 <footer class="footer is-medium" id="footerStyle">
   <div class="container">
     <nav class="level is-mobile">
-      <!-- empty -->
       <div class="level-item has-text-centered"></div>
       <div class="level-item has-text-centered"></div>
       <div class="level-item has-text-centered"></div>
@@ -625,8 +830,7 @@
       <div class="level-item has-text-centered">
         <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
       </div>
-
-      <!-- empty -->
+      
       <div class="level-item has-text-centered"></div>
       <div class="level-item has-text-centered"></div>
       <div class="level-item has-text-centered"></div>
@@ -645,15 +849,13 @@
       </div>
     </div>
 
-    </div>
-  </div>
   </div>
 </footer>
 
 
   <!-- scripts list from theme config.yml -->
   
-    <script src="/js/floekr.js"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
 <script type="text/x-mathjax-config">
   MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
 </script>
@@ -672,7 +874,6 @@
 <!-- End: Injected MathJax -->
 <!-- hexo-inject:end -->
   
-
 
 </body>
 </html>

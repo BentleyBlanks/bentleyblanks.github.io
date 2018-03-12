@@ -7,7 +7,7 @@
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive-->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title> [ Hexo ]</title>
+  <title> [ Bingo ]</title>
   
     <!-- stylesheets list from config.yml -->
     
@@ -18,10 +18,12 @@
       <link rel="stylesheet" href="/css/floekr.css">
     
   
-  <link rel="stylesheet" href="/css/highlight/styles/monokai-sublime.css">
-  <script src="/js/highlight/highlight.pack.js"></script>
-  <script>hljs.initHighlightingOnLoad();</script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/languages/cpp.min.js"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+
 </head>
 <body>
 
@@ -159,7 +161,21 @@
 <p>理解来自CSDN中的<a href="http://blog.csdn.net/raby_gyl/article/details/13383573" target="_blank" rel="noopener">递归删除算法</a>，个人补充细节描述</p>
 </blockquote>
 <p>题为「设计递归算法，删除无头结点的单链表L中值为x的结点」</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">deleteX</span><span class="params">(LinkList &amp;L, ElemType x)</span>  </span></span><br><span class="line"><span class="function"></span>&#123;  </span><br><span class="line">    LNode *p;  </span><br><span class="line">    <span class="keyword">if</span>(L==<span class="literal">NULL</span>) <span class="keyword">return</span>;  </span><br><span class="line">    <span class="keyword">if</span>(L-&gt;data==x)  </span><br><span class="line">    &#123;  </span><br><span class="line">        p=L;  </span><br><span class="line">        L=L-&gt;next; <span class="comment">// (1)单链表保持连续 </span></span><br><span class="line">        <span class="built_in">free</span>(p);  </span><br><span class="line">        deleteX(L,x); <span class="comment">// (2)递归调用</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        deleteX(L-&gt;next,x); <span class="comment">//(3)向后遍历</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<pre><code class="cpp">void deleteX(LinkList &amp;L, ElemType x)  
+{  
+    LNode *p;  
+    if(L==NULL) return;  
+    if(L-&gt;data==x)  
+    {  
+        p=L;  
+        L=L-&gt;next; // (1)单链表保持连续 
+        free(p);  
+        deleteX(L,x); // (2)递归调用
+    }
+    else
+        deleteX(L-&gt;next,x); //(3)向后遍历
+}  
+</code></pre>
 <hr>
 <p>理解难度在于似乎仅仅只是释放了当前结点并使得L向前推进，而导致了断链。</p>
 <blockquote>
@@ -168,10 +184,35 @@
 <p>核心理解在于这里的LinkList L是<strong>引用</strong>, 观察堆栈会非常清晰的说明这个问题。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/36580955782/in/dateposted-public/" title="deleteX" target="_blank" rel="noopener"><img src="https://farm5.staticflickr.com/4381/36580955782_32532b105a.jpg" width="500" height="500" alt="deleteX"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
 <p>当代码中$(2)$处递归调用deleteX时, 参数作为L-&gt;next的引用传入(引用为别名，相当于本体操作)，即<strong>递归中参数L为上一函数的L-&gt;next本体</strong>，此时的代码相当于</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">deleteX(L-&gt;next, x)  </span><br><span class="line">&#123;  </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    p = L-&gt;next;  </span><br><span class="line">    L-&gt;next = L-&gt;next-&gt;next; <span class="comment">// 单链表保持连续 </span></span><br><span class="line">    <span class="built_in">free</span>(p);  </span><br><span class="line">    deleteX(L-&gt;next, x);</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<pre><code class="cpp">deleteX(L-&gt;next, x)  
+{  
+    // ...
+    p = L-&gt;next;  
+    L-&gt;next = L-&gt;next-&gt;next; // 单链表保持连续 
+    free(p);  
+    deleteX(L-&gt;next, x);
+    // ...
+}  
+</code></pre>
 <hr>
 <p>如若将引用更换为指针，相较于引用的实现较为繁琐，但更能观察到上述代码工作的本质。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 仅有传入指针的指针才能改变上一函数中指针的值</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">deleteX</span><span class="params">(LinkList **L, ElemType x)</span>  </span></span><br><span class="line"><span class="function"></span>&#123;  </span><br><span class="line">    LNode *p;  </span><br><span class="line">    <span class="keyword">if</span>((*L)==<span class="literal">NULL</span>) <span class="keyword">return</span>;  </span><br><span class="line">    <span class="keyword">if</span>((*L)-&gt;data==x)  <span class="comment">// L-&gt;next指向的结点为x</span></span><br><span class="line">    &#123;  </span><br><span class="line">        p=*L;  <span class="comment">// p指向L-&gt;next指向的结点</span></span><br><span class="line">        *L=(*L)-&gt;next; <span class="comment">// L-&gt;next=L-&gt;next-&gt;next</span></span><br><span class="line">        <span class="built_in">free</span>(p);  </span><br><span class="line">        deleteX(L,x); <span class="comment">// 传入L-&gt;next的地址</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        deleteX(&amp;((*L)-&gt;next),x); <span class="comment">// 传入L-&gt;next指向的结点的next指针的地址</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<pre><code class="cpp">// 仅有传入指针的指针才能改变上一函数中指针的值
+void deleteX(LinkList **L, ElemType x)  
+{  
+    LNode *p;  
+    if((*L)==NULL) return;  
+    if((*L)-&gt;data==x)  // L-&gt;next指向的结点为x
+    {  
+        p=*L;  // p指向L-&gt;next指向的结点
+        *L=(*L)-&gt;next; // L-&gt;next=L-&gt;next-&gt;next
+        free(p);  
+        deleteX(L,x); // 传入L-&gt;next的地址
+    }
+    else
+        deleteX(&amp;((*L)-&gt;next),x); // 传入L-&gt;next指向的结点的next指针的地址
+}  
+</code></pre>
+
                       </p>
                     </div>
                   </div>
@@ -196,7 +237,21 @@
 <p>PBRT中的NDC坐标系在Atmos中未使用，因为其本身在PBRT中并不直接体现</p>
 </blockquote>
 <p>具体的转换管线流程如下，实现公式可由下图各自推导出来，不做赘述。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">rasterPosition(imageX, imageY);</span><br><span class="line"></span><br><span class="line"><span class="comment">// raster to screen</span></span><br><span class="line">screenPosition(rasterPosition.x - image-&gt;width / <span class="number">2.0f</span>, -rasterPosition.y + image-&gt;height / <span class="number">2.0f</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// screen to camera</span></span><br><span class="line"><span class="comment">// 这里pbrt中使用投影矩阵的逆变换得到cameraPos，不过由于透视的特殊性，其方向向量是一致的。</span></span><br><span class="line">cameraPosition.x = <span class="number">2</span> * canvasSize.x * screenPosition.x / image-&gt;width;</span><br><span class="line">cameraPosition.y = <span class="number">2</span> * canvasSize.y * screenPosition.y / image-&gt;height;</span><br><span class="line">cameraPosition.z = canvasDistance;</span><br><span class="line"></span><br><span class="line"><span class="comment">// camera to world</span></span><br><span class="line">ray-&gt;direction = (cameraToWorld * cameraPosition).getNormalized();</span><br><span class="line">ray-&gt;origin = cameraToWorld * zeroVector3;</span><br></pre></td></tr></table></figure>
+<pre><code class="cpp">rasterPosition(imageX, imageY);
+
+// raster to screen
+screenPosition(rasterPosition.x - image-&gt;width / 2.0f, -rasterPosition.y + image-&gt;height / 2.0f);
+
+// screen to camera
+// 这里pbrt中使用投影矩阵的逆变换得到cameraPos，不过由于透视的特殊性，其方向向量是一致的。
+cameraPosition.x = 2 * canvasSize.x * screenPosition.x / image-&gt;width;
+cameraPosition.y = 2 * canvasSize.y * screenPosition.y / image-&gt;height;
+cameraPosition.z = canvasDistance;
+
+// camera to world
+ray-&gt;direction = (cameraToWorld * cameraPosition).getNormalized();
+ray-&gt;origin = cameraToWorld * zeroVector3;
+</code></pre>
 <p><img src="https://farm5.staticflickr.com/4264/35005454923_f05e8118e1_b.jpg" alt=""></p>
 <p>之后可以用worldToCamera矩阵进行转换。</p>
 <p>$$worldToCamera<br>\left(<br>\begin{matrix}<br>right.x &amp; up.x &amp; direction.x &amp; origin.x \\\ <br>right.x &amp; up.y &amp; direction.y &amp; origin.y \\\\<br>right.z &amp; up.z &amp; direction.z &amp; origin.z \\\\<br>0 &amp; 0 &amp; 0 &amp; 1<br>\end{matrix}<br>\right)$$</p>
@@ -330,6 +385,358 @@
                   <br>
                   <br>
                   
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/05/2017-03-27-Transformation In Multiple Dimensions/" class="card-header-title">
+                        Transformation In Multiple Dimensions
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文运用上文中多维随机变量分布转换规律，来推导出PBRT中一系列重要结论</p>
+</blockquote>
+<hr>
+<blockquote>
+<p><strong>极坐标与笛卡尔坐标</strong></p>
+</blockquote>
+<p>已知$p(x, y)=\frac{p(r, \theta)}{\arrowvert J_t(r, \theta) \arrowvert}$，其中<br>$$T_1(r,\theta)=rcos\theta=x \\<br>T_2(r,\theta)=rsin\theta=y$$</p>
+<p>$$J_t(r, \theta)=\left[<br>\begin{matrix}<br>cos\theta &amp; -rsin\theta \\<br>sin\theta &amp; rcos\theta \\<br>\end{matrix}<br>\right] = r$$</p>
+<p>则有$p(r, \theta) = rp(x, y)$</p>
+<hr>
+<blockquote>
+<p><strong>球坐标与笛卡尔坐标</strong></p>
+</blockquote>
+<p>$$T_1(r,\theta, \phi)=rsin\theta cos\phi = x \\<br>T_2(r,\theta, \phi)=rsin\theta sin\phi = y \\<br>T_3(r,\theta, \phi)=rcos\theta = z$$</p>
+<p>则$p(x, y, z)=\frac{p(r, \theta, \phi)}{\arrowvert J_t(r, \theta, \phi) \arrowvert}$，其中</p>
+<p>$$J_t(r, \theta, \phi)=\left[<br>\begin{matrix}<br>sin\theta cos\phi &amp; rcos\theta cos\phi &amp; -rsin\theta sin\phi \\<br>sin\theta sin\phi &amp; rcos\theta sin\phi &amp; rsin\theta cos\phi \\<br>cos\theta &amp; -rsin\theta &amp; 0 \\<br>\end{matrix}<br>\right] = r^2sin\theta$$</p>
+<p>则有$p(r, \theta, \phi) = r^2sin\theta p(x, y, z)$。</p>
+<hr>
+<blockquote>
+<p><strong>立体角与球坐标</strong></p>
+</blockquote>
+<p>立体角的定义为在单位圆上投影的面积，在球坐标中有$d\omega=sin\theta d\theta d\phi$成立</p>
+<blockquote>
+<p>因此基于物理Lambertion中的$\int_{\Omega}{f(\omega_i, \omega_o, p)cos\theta d\omega}$=1, 可得$f(\omega_i, \omega_o, p) = \frac{1}{\int_{0}^{2\pi}d\phi \int_{0}^{\frac{\pi}{2}}{cos\theta sin\theta d\theta}} = \frac{1}{\pi}$</p>
+</blockquote>
+<p>若定义在某区域$\Omega$上的概率为$Pr\{ \omega \in \Omega \} = \int_{\Omega}{p(\omega)d\omega}$，也有$Pr\{ (\theta ,\phi) \in \Omega ‘\} = \int_{\Omega ‘}{p(\theta, \phi)d\theta d\phi}$</p>
+<p>因此<br>$$p(\theta, \phi)d\theta d\phi=p(\omega) d\omega$$<br>$$p(\theta, \phi)=sin\theta p(\omega)$$</p>
+<hr>
+<blockquote>
+<p><strong>半球上立体角均匀采样</strong></p>
+</blockquote>
+<p>要对单位半球做关于立体角的均匀采样，则$p(\omega)=\frac{1}{2\pi}$，根据上文中与球坐标关系，$p(\theta, \phi)=\frac{sin\theta}{2\pi}$。</p>
+<p>则有两独立同均匀分布随机变量$(\xi,\psi)\in [0,1]$，要转换成满足半球上均匀分布的球坐标表示。</p>
+<p>$$p(\theta) = \int_{0}^{\frac{\pi}{2}}p(\theta, \phi)d\phi = sin\theta, \quad p(\phi) = \int_{0}^{2\pi}p(\theta, \phi)d\theta = \frac{1}{2\pi} $$</p>
+<p>$$p(\theta \arrowvert \phi) = \frac{p(\theta, \phi)}{p(\phi)}=sin\theta, \quad p(\phi \arrowvert  \theta) = \frac{p(\theta, \phi)}{p(\theta)}=\frac{1}{2\pi}$$</p>
+<blockquote>
+<p>这里很明显可以看出来$\theta,\phi$为两个独立随机变量</p>
+</blockquote>
+<p>$$Pr\{\theta’ \leqslant  \theta\} = \int_{0}^{\theta}p(\theta)d\theta=1-cos\theta , Pr\{\phi’ \leqslant  \phi\} = \int_{0}^{\phi}p(\phi)d\phi=2\pi \phi$$</p>
+<p>应用反CDF变换法则，$P^{-1}(\theta)=1-arccos\theta, P^{-1}(\phi)=2\pi \phi$，因此<br>$$\theta=arccos(1-\xi)=arccos\xi \\<br>\phi=2\pi \psi$$</p>
+<p>由于球坐标不容易在计算机中表示，因此转换为笛卡尔表示</p>
+<p>$$x=sin\theta cos\phi=\sqrt{1-\xi^2}cos2\pi \psi \\<br>y = sin\theta sin\phi = \sqrt{1-\xi^2}sin2\pi \psi \\<br>z = cos\theta = \xi$$ </p>
+<blockquote>
+<p>同理可推证球上立体角均匀采样</p>
+</blockquote>
+<blockquote>
+<p>$$x=2\sqrt{\xi(1-\xi)}cos2\pi \psi \\<br>y = 2\sqrt{\xi(1-\xi)}sin2\pi \psi \\<br>z = 1-2\xi$$ </p>
+</blockquote>
+<p>下图为半球上均匀采样的结果与完整球上均匀采样的结果</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/32882394873/in/dateposted-public/" title="hemisphere and sphere" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/4/3827/32882394873_657e2d78a4_z.jpg" width="640" height="248" alt="hemisphere and sphere"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<hr>
+<blockquote>
+<p><strong>单位圆上的均匀采样</strong></p>
+</blockquote>
+<p>要根据面积对单位圆上进行均匀采样，$p(x,y)=\frac{1}{\pi}$，则$p(r, \theta)=rp(x,y)$。</p>
+<p>$$p(\theta)=\int_{0}^{1}\frac{r}{\pi}dr=\frac{1}{2\pi}, \quad p(r\arrowvert \theta)=\frac{p(r,\theta)}{p(\theta)}=2r$$</p>
+<p>则他们对于的CDF为$P(\theta)=\int_{0}^{\theta}p(\theta)d\theta=\frac{\theta}{2\pi}$，$P(r\arrowvert \theta)=\int_{0}^{r}p(r\arrowvert \theta)dr=r^2$</p>
+<p>求出其对应反函数$P^{-1}(\theta)=2\pi\theta$，$P^{-1}(r\arrowvert \theta)=\sqrt{r}$</p>
+<p>若有两满足在$[0, 1]$上均匀分布的随机变量$\xi, \psi$有$\theta=2\pi \xi, r=\sqrt{\psi}$</p>
+<p>则转换回笛卡尔坐标结果为</p>
+<p>$$x = \sqrt{\psi}cos2\pi \xi \\<br>y = \sqrt{\psi}sin2\pi \xi$$</p>
+<blockquote>
+<p>这里$r, \theta$也是两个独立的随机变量</p>
+</blockquote>
+<blockquote>
+<p>PBRT中论述的Concentric Disk Sampling可以参见前文<a href="http://bentleyblanks.github.io/Depth-of-Field/">Depth of Field</a>中的实现与可视化</p>
+</blockquote>
+<hr>
+<blockquote>
+<p><strong>基于Cosine函数的半球采样</strong></p>
+</blockquote>
+<p>这里使用基本的转换思路，$p(\omega)\propto cos\theta$，因此$p(\omega)=\frac{cos\theta}{\pi}$</p>
+<p>有$p(\theta, \phi)=\frac{sin\theta cos\theta}{\pi}$，则有</p>
+<p>$$p(\theta)=\int_{0}^{2\pi}p(\theta, \phi)d\phi=2sin\theta cos\theta, \quad p(\phi \arrowvert \theta)=\frac{p(\theta, \phi)}{p(\theta)}=\frac{1}{2\pi}$$</p>
+<p>可得CDF为</p>
+<p>$$P(\theta)=\int_{0}^{\theta}p(\theta)d\theta=\frac{1-cos2\theta}{2}, \quad P(\phi \arrowvert \theta)=\int_{0}^{\phi}p(\phi \arrowvert \theta)d\phi=\frac{\phi}{2\pi}$$</p>
+<p>应用反CDF得$P^{-1}(\theta)=\frac{1}{2}arccos(1-2\theta), P^{-1}(\phi \arrowvert \theta)=2\pi \phi$</p>
+<p>$$\theta = \frac{1}{2}arccos(1-2\xi) \\<br>\phi = 2\pi \psi$$</p>
+<p>转换为笛卡尔下的表示为<br>$$x=sin\theta cos\phi = sin(\frac{1}{2}arccos(1-2\xi)))cos2\pi\psi \\<br>y=sin\theta sin\phi =  sin(\frac{1}{2}arccos(1-2\xi)))sin2\pi\psi \\<br>z=cos\theta = cos(\frac{1}{2}arccos(1-2\xi))$$</p>
+<blockquote>
+<p>PBRT中给出了另一种计算办法，将均匀分布在圆盘上的点投影到半球上，其结果就满足Cosine-Weighted。</p>
+</blockquote>
+<p>以下给出证明</p>
+<p>假定在圆盘上的极坐标分布为$p(r, \phi)=\frac{r}{\pi}$（使用$\phi$方便后续将$r$对应为$\theta$相关），$p(r, \phi)=\frac{p(\theta, \phi)}{\arrowvert J_t(r, \theta)\arrowvert}$</p>
+<p>$$r=sin\theta = T_1(r) \\<br>\phi=\phi = T_2(\phi)$$</p>
+<p>$$J_t(r, \theta)=\left[<br>\begin{matrix}<br>cos\theta &amp; 0 \\<br>0 &amp; 1 \\<br>\end{matrix}<br>\right] = cos\theta$$</p>
+<p>即有$p(\theta, \phi)=cos\theta p(r, \phi)=\frac{r cos\theta}{\pi} = \frac{sin\theta cos\theta}{\pi}$，和上述中得到的结果一样。</p>
+<blockquote>
+<p>下图为两种方法产生的Cosine-Weighted对比</p>
+</blockquote>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/33311690620/in/dateposted-public/" title="cartisan and projected" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/4/3838/33311690620_dabe17df74_z.jpg" width="640" height="248" alt="cartisan and projected"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<hr>
+<blockquote>
+<p><strong>三角形均匀采样</strong></p>
+</blockquote>
+<p>PBRT中采用了等腰切两边为1的三角形特殊情况，不过以下计算办法可以变换回任何三角形</p>
+<p>有$p(u,v)=2$（面积倒数），则有</p>
+<p>$$p(u)=\int_{0}^{1-u}p(u,v)dv=2-2u, \quad p(v\arrowvert u)=\frac{p(u,v)}{p(u)}=\frac{1}{1-u} \\<br>P(u)=\int_{0}^{u}p(u)du=2u-u^2, \quad P(v\arrowvert u)=\int_{0}^{v}p(v\arrowvert u)dv=\frac{v}{1-u}$$</p>
+<blockquote>
+<p>这里反变换CDF开根号时要注意到$u,v\in [0,1]$</p>
+</blockquote>
+<p>因此有$u=1-\sqrt{\xi},v=\sqrt{\xi}\psi$</p>
+<blockquote>
+<p>下图中即为三角形上的均匀采样</p>
+</blockquote>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/33311534320/in/dateposted-public/" title="triangle sample" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/3/2841/33311534320_9991e8b365_z.jpg" width="640" height="339" alt="triangle sample"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+<hr>
+<blockquote>
+<p><strong>根据二维分段函数分布采样</strong></p>
+</blockquote>
+<p>这里分段函数的采样即为离散随机变量，若有横向纵向各$n_u,n_v$个元素，函数上指定位置一点值为$f(u,v)$，那么就有</p>
+<p>$$I_f=\int_v \int_u f(u,v)dudv=\frac{1}{n_un_v}\sum_{i=0}^{n_u-1}\sum_{j=0}^{n_v-1}f(u_i,v_j) \\<br>p(u,v)=\frac{f(u,v)}{I_f}$$</p>
+<p>而边缘概率密度可直接得到<br>$$p(u)=\int_v p(u,v)dv=\frac{\frac{1}{n_u}\sum_i f(u, v_i)}{I_f} , \quad p(v\arrowvert u)=\frac{p(u,v)}{p(u)}=\frac{f(u,v)}{\frac{1}{n_u}\sum_i f(u, v_i)}$$</p>
+<p>之后利用CDF反变换，即PBRT中distribution1d的实现办法可完成对于$p(u),p(v\arrowvert u)$上的采样</p>
+<blockquote>
+<p>此处效果可见<a href="http://bentleyblanks.github.io/Transforming-Between-Distributions/">前文</a>中的二维分段函数采样的结果</p>
+</blockquote>
+<hr>
+<blockquote>
+<p><strong>圆锥均匀采样</strong></p>
+</blockquote>
+<blockquote>
+<p>类似于球上的均匀采样, 易证随机变量$\theta, \phi$相互独立</p>
+</blockquote>
+<p>已知$p(\omega)=\frac{1}{2\pi(1-cos\theta_{max})}$，则$p(\theta, \phi)=\frac{sin\theta}{2\pi(1-cos\theta_{max})}$</p>
+<p>$$p(\theta)=\int_{0}^{2\pi}p(\theta, \phi)d\phi=\frac{sin\theta}{1-cos\theta_{max}}, \quad p(\phi)=\int_{0}^{2\pi}\frac{sin\theta}{2\pi(1-cos\theta_{max})}d\theta=\frac{1}{2\pi}$$</p>
+<p>$$P(\theta)=\int_{0}^{\theta}\frac{sin\theta}{1-cos\theta_{max}}d\theta=\frac{1-cos\theta}{1-cos\theta_{max}}, \quad P(\phi)=\int_{0}^{\phi}\frac{1}{2\pi}d\phi=\frac{\phi}{2\pi}$$</p>
+<p>若有两随机变量$xi, \psi$，运用反变换可有（此处省略了$\theta, \phi$到笛卡尔的转换）</p>
+<p>$$cos\theta=1-\xi +\xi cos\theta_{max}, \quad \phi=2\pi\psi$$</p>
+<blockquote>
+<p>下图中即为圆锥上的均匀采样</p>
+</blockquote>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/33700555886/in/dateposted-public/" title="cone sampling" target="_blank" rel="noopener"><img src="https://c1.staticflickr.com/3/2822/33700555886_1fe03e48cd_z.jpg" width="640" height="369" alt="cone sampling"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/05/2017-03-26-Transforming Between Distributions/" class="card-header-title">
+                        Transforming Between Distributions
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>关于连续型随机变量的分布转换，除了使用反CDF函数将均匀分布函数转换为其他分布函数以外，存在一种通用办法实现不同分布之间的转换，不只局限于均匀分布。</p>
+</blockquote>
+<p>假定存在随机变量$X$，其累积分布函数为$F_X(x)$。若存在单调函数$g$，使得$Y=g(X)$（因为是单调函数，因此$X$与$Y$的关系为单射），则为了计算$Y$的累积分布函数$F_Y(y)$，</p>
+<blockquote>
+<p>设$g(x)$此时为严格单调递增</p>
+</blockquote>
+<p>$$\begin{split}<br>F_Y(y) &amp; = &amp; Pr\{ Y\leqslant y \} \\<br>&amp; = &amp; Pr\{g(X)\leqslant y\} \\<br>&amp; = &amp; Pr\{ X\leqslant g^{-1}(y) \} \\<br>&amp; = &amp; F_X(g^{-1}(y))<br>\end{split}$$</p>
+<p>此时对终式左右对x求导(累积分布函数导数为概率密度函数)</p>
+<p>$$\begin{split}<br>f_Y(y)\frac{dy}{dx}=f_X(g^{-1}(y)) \\<br>f_Y(y) = (\frac{dy}{dx})^{-1}f_X(g^{-1}(y))  \\<br>\end{split}$$</p>
+<blockquote>
+<p>再设$g(x)$此时为严格单调递减</p>
+</blockquote>
+<p>$$\begin{split}<br>F_Y(y) &amp; = &amp; Pr\{ Y\leqslant y \} \\<br>&amp; = &amp; Pr\{g(X)\leqslant y\} \\<br>&amp; = &amp; 1 - Pr\{ X\leqslant g^{-1}(y) \} \\<br>&amp; = &amp; 1 - F_X(g^{-1}(y))<br>\end{split}$$</p>
+<p>同样的有<br>$$f_Y(y) = -(\frac{dy}{dx})^{-1}f_X(g^{-1}(y))$$</p>
+<p>则有$f_Y(y) = \arrowvert (\frac{dy}{dx})^{-1}\arrowvert f_X(g^{-1}(y))$。</p>
+<blockquote>
+<p>PBRT中讲到，当我们有一概率密度为$p_x(x)$的随机变量$X$，想要转换为满足已知分布为$p_y(y)$的随机变量$Y$，那么即有下式成立(此过程与上式正好相反)</p>
+</blockquote>
+<p>$$\begin{split}<br>F_X(x) &amp; = &amp; Pr\{ X\leqslant x \} \\<br>&amp; = &amp; Pr\{g(X)\leqslant g(x)\} \\<br>&amp; = &amp; Pr\{ Y\leqslant g(x) \} \\<br>&amp; = &amp; F_Y(g(x))<br>\end{split}$$</p>
+<blockquote>
+<p>$g(x) = F_Y^{-1}(F_X(x))$或当$g(X)$为单调减函数时$g(x) = F_Y^{-1}(1 - F_X(x))$，PBRT中未对此处进行详细说明。</p>
+</blockquote>
+<p>因此当$X$为满足$[0, 1]$区间均匀分布的随机变量时，$F_X(x)=x$，那么上式中$F_X(x))$或是$1 - F_X(x)$都满足$[0, 1]$区间均匀分布，则$g(x)=F_Y^{-1}(x)$，即Inverse Transform Sampling得证。</p>
+<p>多维随机变量的转换$T(x)$为双射变换，则满足$f_Y(y)=f_Y(T(x))=\frac{f_X(x)}{\arrowvert J_T(x)\arrowvert }$，且$T(x)=(T_1(x),\cdots T_n(x))$</p>
+<p>$$J_T(x)=\left[<br>\begin{matrix}<br> \frac{\partial T_1}{\partial x_1}    &amp; \cdots &amp; \frac{\partial T_1}{\partial x_n}      \\<br> \vdots &amp; \ddots &amp; \vdots \\<br> \frac{\partial T_n}{\partial x_1}    &amp; \cdots &amp; \frac{\partial T_n}{\partial x_n}      \\<br>\end{matrix}<br>\right]$$</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/01/09/motion-blur - 副本 (2)/" class="card-header-title">
+                        motion blur111
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
+<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
+<li>根据深度图计算出每个像素的世界空间位置。</li>
+<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
+<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
+<li>沿着速度方向进行多重采样,结果进行平均</li>
+</ul>
+<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
+<p>world-view-project matrix: M</p>
+<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
+<p>world position: $WorldPos = \frac{D}{D.w}$</p>
+<p>提取世界空间位置:</p>
+<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
+float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
+float4 D = mul(H, g_ViewProjectionInverseMatrix);
+float4 worldPos = D / D.w;
+</code></pre>
+<p>逐像素计算速度</p>
+<pre><code class="cpp">float4 currentPos = H;
+float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
+previousPos /= previousPos.w;
+float2 velocity = (currentPos - previousPos) / 2.0f;
+</code></pre>
+<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
+<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
+for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
+{
+    float4 currentColor = tex2D(sceneSampler, texCoord);
+    color += currentColor;
+}
+
+float4 finalColor = color / g_numSamples;
+</code></pre>
+<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
+<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
+<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
+<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
+<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
+<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/01/09/motion-blur - 副本 (3)/" class="card-header-title">
+                        motion blur123333333332342423425
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
+<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
+<li>根据深度图计算出每个像素的世界空间位置。</li>
+<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
+<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
+<li>沿着速度方向进行多重采样,结果进行平均</li>
+</ul>
+<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
+<p>world-view-project matrix: M</p>
+<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
+<p>world position: $WorldPos = \frac{D}{D.w}$</p>
+<p>提取世界空间位置:</p>
+<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
+float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
+float4 D = mul(H, g_ViewProjectionInverseMatrix);
+float4 worldPos = D / D.w;
+</code></pre>
+<p>逐像素计算速度</p>
+<pre><code class="cpp">float4 currentPos = H;
+float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
+previousPos /= previousPos.w;
+float2 velocity = (currentPos - previousPos) / 2.0f;
+</code></pre>
+<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
+<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
+for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
+{
+    float4 currentColor = tex2D(sceneSampler, texCoord);
+    color += currentColor;
+}
+
+float4 finalColor = color / g_numSamples;
+</code></pre>
+<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
+<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
+<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
+<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
+<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
+<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/01/09/motion-blur - 副本/" class="card-header-title">
+                        motion blur111111
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>motion blur用于表现速度感.一种很常用的后处理技术<a id="more"></a></p>
+<h1 id="算法描述"><a href="#算法描述" class="headerlink" title="算法描述"></a>算法描述</h1><ul>
+<li>根据深度图计算出每个像素的世界空间位置。</li>
+<li>用前一帧的view-project矩阵进行变换,得到新的视口位置</li>
+<li>根据当前帧与上一帧的视口位置，生成逐像素的速度值</li>
+<li>沿着速度方向进行多重采样,结果进行平均</li>
+</ul>
+<h1 id="深度图提取物体位置"><a href="#深度图提取物体位置" class="headerlink" title="深度图提取物体位置"></a>深度图提取物体位置</h1><p>viewport position: $H = (\frac{x}{w}, \frac{y}{w}, \frac{z}{w} , 1)$</p>
+<p>world-view-project matrix: M</p>
+<p>$H \times M^{-1} = (\frac{X}{W}, \frac{Y}{W}, \frac{Z}{W}, W) = D$</p>
+<p>world position: $WorldPos = \frac{D}{D.w}$</p>
+<p>提取世界空间位置:</p>
+<pre><code class="cpp">float2 zOverW = tex2D(depthTexture, texCoord);
+float4 H = float4(texCoord.x * 2 - 1, (1 - texCoord.y) * 2 - 1 , zOverw , 1);
+float4 D = mul(H, g_ViewProjectionInverseMatrix);
+float4 worldPos = D / D.w;
+</code></pre>
+<p>逐像素计算速度</p>
+<pre><code class="cpp">float4 currentPos = H;
+float4 previousPos = mul(worldPos, g_previousViewProjectionMatrix);
+previousPos /= previousPos.w;
+float2 velocity = (currentPos - previousPos) / 2.0f;
+</code></pre>
+<h1 id="实现emotion-blur"><a href="#实现emotion-blur" class="headerlink" title="实现emotion blur"></a>实现emotion blur</h1><p>沿着速度方向进行多重采样,并最终进行平均,得到最终的像素值</p>
+<pre><code class="cpp">float4 color = tex2D(sceneSampler, texCoord);
+for(int i = 1; i &lt; g_numSamples; ++i, texCoord += velocity)
+{
+    float4 currentColor = tex2D(sceneSampler, texCoord);
+    color += currentColor;
+}
+
+float4 finalColor = color / g_numSamples;
+</code></pre>
+<h1 id="动态物体"><a href="#动态物体" class="headerlink" title="动态物体"></a>动态物体</h1><p>上面的算法考虑的是相机的运动，因此对于静态物体表现的很好</p>
+<p>对于动态物体,需要记录物体在场景中的速度,可以单独生成一张速度图</p>
+<p>可以通过当前帧与下一帧的view-projection矩阵变换物体,计算viewport的位置差异</p>
+<h1 id="屏蔽物体"><a href="#屏蔽物体" class="headerlink" title="屏蔽物体"></a>屏蔽物体</h1><p>如果想要屏蔽掉场景中的某些物体,以使motion blur不对其起作用</p>
+<p>那么可以渲染一张mask纹理或者渲染到颜色图的alpha通道</p>
+<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch27.html" target="_blank" rel="noopener">GPU Gems 3 Emotion Blur</a></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
               
           </div>
         </div>
@@ -384,32 +791,7 @@
   </div>
 </section>
 
-<!-- <div class="container">
-  <div class="colunms">
-    <div class="colunm is-two-thirds">
-		<div class="pagination-bar">
-		    <ul class="pagination">
-		        
-		        
-		        <li class="pagination-next">
-		            <a class="btn btn--default btn--small" href="/page/2/">
-		                    <span>pagination.older_posts</span>
-		                <i class="fa fa-angle-right text-base icon-ml"></i>
-		            </a>
-		        </li>
-		        
-		        <li class="pagination-number">pagination.page pagination.of</li>
-		    </ul>
-		</div>
-    </div>
-
-    <div class="colunm"></div>
-    <div class="colunm"></div>
-  </div>
-</div>
- -->
-
- <div class="pagination-bar">
+<!-- <div class="pagination-bar">
     <ul class="pagination">
         
         
@@ -423,14 +805,13 @@
         <li class="pagination-number">pagination.page pagination.of</li>
     </ul>
 </div>
-
+ -->
 
 
 <!-- Footer -->
 <footer class="footer is-medium" id="footerStyle">
   <div class="container">
     <nav class="level is-mobile">
-      <!-- empty -->
       <div class="level-item has-text-centered"></div>
       <div class="level-item has-text-centered"></div>
       <div class="level-item has-text-centered"></div>
@@ -449,8 +830,7 @@
       <div class="level-item has-text-centered">
         <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
       </div>
-
-      <!-- empty -->
+      
       <div class="level-item has-text-centered"></div>
       <div class="level-item has-text-centered"></div>
       <div class="level-item has-text-centered"></div>
@@ -469,15 +849,13 @@
       </div>
     </div>
 
-    </div>
-  </div>
   </div>
 </footer>
 
 
   <!-- scripts list from theme config.yml -->
   
-    <script src="/js/floekr.js"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
 <script type="text/x-mathjax-config">
   MathJax.Hub.Config({"tex2jax":{"inlineMath":[["$","$"],["\\(","\\)"]],"skipTags":["script","noscript","style","textarea","pre","code"],"processEscapes":true},"TeX":{"equationNumbers":{"autoNumber":"AMS"}}});
 </script>
@@ -496,7 +874,6 @@
 <!-- End: Injected MathJax -->
 <!-- hexo-inject:end -->
   
-
 
 </body>
 </html>
