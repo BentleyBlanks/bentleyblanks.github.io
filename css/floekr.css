@@ -169,3 +169,7 @@ pre code {
   font-family: "Consolas", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 
+/* katex */
+.katex { 
+  font-size: 1.1rem;
+}
