@@ -172,4 +172,5 @@ pre code {
 /* katex */
 .katex { 
   font-size: 1.1rem;
+  overflow: hidden;
 }

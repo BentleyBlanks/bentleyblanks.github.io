@@ -5,7 +5,7 @@
 <html lang="">
 <head>
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
-  <!-- responsive-->
+  <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Archives [ Bingo ]</title>
 
@@ -29,7 +29,7 @@
       <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
     
   
-  
+
 </head>
 <body>
 
@@ -112,30 +112,200 @@
                 
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2015-06-27-hello-world/" class="card-header-title">
-                        Who&#39;s your daddy?
+                      <a href="/2018/03/12/2015-09-26-射线与圆求交/" class="card-header-title">
+                        射线与圆求交
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <blockquote>
-<p>一天一个hello world 我都嫌烦了 daddy大法好啊!</p>
+                        <p>假定已求解出交点，最后一步还需要将距离最短的交点筛选出来，有一个特殊情况如下图</p>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" alt=""><br>    </a><br></figure>
+
+
+<p>实际交点应该是A，因此要剔除B的情况。比较简单，令交点到射线起始点向量为P，那么和射线方向向量d点积，看\( \mathtt{cos \theta} \)的符号即可(-90, 90)。</p>
+<p><br></p>
+<blockquote>
+<p>联立方程组无脑求解</p>
+</blockquote>
+<p>在没有查阅之前，用的就是最基本的直线和圆方程强行联立求解，根据delta值来判断交点情况，最后根据交点与射线起始点的向量夹角筛选合适交点。</p>
+<pre><code class="cpp">class ray
+{
+public:
+    // ...
+    // 0 = ax + by + c
+    float a, b, c;
+}
+</code></pre>
+<p>强行联立</p>
+<pre><code class="cpp">float k = -r.a / r.b, t = -r.c / r.b;
+
+float A = k * k + 1.0f;
+float B = 2 * k * t - 2 * c-&gt;y * k - 2 * c-&gt;x;
+float C = c-&gt;x * c-&gt;x + t * t - 2 * c-&gt;y * t + c-&gt;y * c-&gt;y - c-&gt;radius * c-&gt;radius;
+
+float delta = B * B - 4 * A * C;
+</code></pre>
+<p>求解 delta为0，正负任意</p>
+<pre><code class="cpp">float x1 = (-B + sqrt(delta)) / (2.0f * A);
+float y1 = k*x1 + t;
+int x2 = (-B - sqrt(delta)) / (2.0f * A);
+int y2 = k*x2 + t;
+</code></pre>
+<p>但是上的上述方法有一个缺陷，就是你必须讨论斜率k为无穷的情况。</p>
+<blockquote>
+<p>向量求解</p>
+</blockquote>
+<p>设圆心坐标为C<br>令圆形方程为\( \mathtt{(X-C) \ldotp (X-C)=r^2} \)，向量点积自己就是求解自身长度的平方，射线方程令为\( \mathtt{R(t) = P + td, t \ge 0} \)。</p>
+<p>直接代入\( \mathtt{(P+td-C) \ldotp (P+td-C)=r^2} \), 令\( \mathtt{P-C = m} \)</p>
+<p>展开下式</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mrow><mo>(</mo><mi mathvariant="monospace">m</mi><mo>+</mo><mi mathvariant="monospace">t</mi><mi mathvariant="monospace">d</mi><mo>)</mo><mo separator="true">.</mo><mo>(</mo><mi mathvariant="monospace">m</mi><mo>+</mo><mi mathvariant="monospace">t</mi><mi mathvariant="monospace">d</mi><mo>)</mo><mo>=</mo><msup><mi mathvariant="monospace">r</mi><mn mathvariant="monospace">2</mn></msup></mrow></mrow><annotation encoding="application/x-tex"> \mathtt{(m + td) \ldotp (m + td) = r^2} </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.840777em;"></span><span class="strut bottom" style="height:1.090777em;vertical-align:-0.25em;"></span><span class="base"><span class="mord"><span class="mopen">(</span><span class="mord mathtt">m</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathtt">t</span><span class="mord mathtt">d</span><span class="mclose">)</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathtt">m</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathtt">t</span><span class="mord mathtt">d</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord"><span class="mord mathtt">r</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.840777em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathtt mtight">2</span></span></span></span></span></span></span></span></span></span></span></span></span></p>
+<p>等价于二次方程求根</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mrow><mo>(</mo><mi mathvariant="monospace">d</mi><mo separator="true">.</mo><mi mathvariant="monospace">d</mi><mo>)</mo><msup><mi mathvariant="monospace">t</mi><mn mathvariant="monospace">2</mn></msup><mo>+</mo><mn mathvariant="monospace">2</mn><mo>(</mo><mi mathvariant="monospace">m</mi><mo separator="true">.</mo><mi mathvariant="monospace">d</mi><mo>)</mo><mi mathvariant="monospace">t</mi><mo>+</mo><mo>(</mo><mi mathvariant="monospace">m</mi><mo separator="true">.</mo><mi mathvariant="monospace">m</mi><mo>)</mo><mo>−</mo><msup><mi mathvariant="monospace">r</mi><mn mathvariant="monospace">2</mn></msup><mo>=</mo><mn mathvariant="monospace">0</mn></mrow></mrow><annotation encoding="application/x-tex"> \mathtt{(d  \ldotp  d)t^2 + 2(m  \ldotp  d)t + (m  \ldotp  m) - r^2 = 0} </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.840777em;"></span><span class="strut bottom" style="height:1.090777em;vertical-align:-0.25em;"></span><span class="base"><span class="mord"><span class="mopen">(</span><span class="mord mathtt">d</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathtt">d</span><span class="mclose">)</span><span class="mord"><span class="mord mathtt">t</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.840777em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathtt mtight">2</span></span></span></span></span></span></span></span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathtt">2</span><span class="mopen">(</span><span class="mord mathtt">m</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathtt">d</span><span class="mclose">)</span><span class="mord mathtt">t</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mopen">(</span><span class="mord mathtt">m</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathtt">m</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord"><span class="mord mathtt">r</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.840777em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathtt mtight">2</span></span></span></span></span></span></span></span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord mathtt">0</span></span></span></span></span></span></p>
+<p>基本b, c, t分量代式</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mrow><mi mathvariant="monospace">b</mi><mo>=</mo><mi mathvariant="monospace">m</mi><mo separator="true">.</mo><mi mathvariant="monospace">d</mi></mrow></mrow><annotation encoding="application/x-tex"> \mathtt{b = m  \ldotp  d} </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.61111em;"></span><span class="strut bottom" style="height:0.61111em;vertical-align:0em;"></span><span class="base"><span class="mord"><span class="mord mathtt">b</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord mathtt">m</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathtt">d</span></span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mrow><mi mathvariant="monospace">c</mi><mo>=</mo><mo>(</mo><mi mathvariant="monospace">m</mi><mo separator="true">.</mo><mi mathvariant="monospace">m</mi><mo>)</mo><mo>−</mo><msup><mi mathvariant="monospace">r</mi><mn mathvariant="monospace">2</mn></msup></mrow></mrow><annotation encoding="application/x-tex"> \mathtt{c = (m  \ldotp  m) - r^2} </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.840777em;"></span><span class="strut bottom" style="height:1.090777em;vertical-align:-0.25em;"></span><span class="base"><span class="mord"><span class="mord mathtt">c</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mopen">(</span><span class="mord mathtt">m</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathtt">m</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord"><span class="mord mathtt">r</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.840777em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathtt mtight">2</span></span></span></span></span></span></span></span></span></span></span></span></span></p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mrow><mi mathvariant="monospace">t</mi><mo>=</mo><mo>−</mo><mi mathvariant="monospace">b</mi><mo>+</mo><mo>−</mo><msqrt><mrow><msup><mi mathvariant="monospace">b</mi><mn mathvariant="monospace">2</mn></msup><mo>−</mo><mi mathvariant="monospace">c</mi></mrow></msqrt></mrow></mrow><annotation encoding="application/x-tex"> \mathtt{t = -b +- \sqrt{b^2 - c}} </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.9505985em;"></span><span class="strut bottom" style="height:1.04em;vertical-align:-0.08940150000000002em;"></span><span class="base"><span class="mord"><span class="mord mathtt">t</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">−</span><span class="mord mathtt">b</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord">−</span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.9505985em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord"><span class="mord mathtt">b</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.716777em;"><span style="top:-2.9890000000000003em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathtt mtight">2</span></span></span></span></span></span></span></span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathtt">c</span></span></span><span style="top:-2.9105985em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg width="400em" height="1.08em" viewbox="0 0 400000 1080" preserveaspectratio="xMinYMin slice"><path d="M95,702c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,
+-10,-9.5,-14c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54c44.2,-33.3,65.8,
+-50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10s173,378,173,378c0.7,0,
+35.3,-71,104,-213c68.7,-142,137.5,-285,206.5,-429c69,-144,104.5,-217.7,106.5,
+-221c5.3,-9.3,12,-14,20,-14H400000v40H845.2724s-225.272,467,-225.272,467
+s-235,486,-235,486c-2.7,4.7,-9,7,-19,7c-6,0,-10,-1,-12,-3s-194,-422,-194,-422
+s-65,47,-65,47z M834 80H400000v40H845z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.08940150000000002em;"></span></span></span></span></span></span></span></span></span></p>
+<p>这里直接用向量，免去了讨论斜率的情况。交点Q就是\( \mathtt{P + td} \)。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2015-09-21-UE4-1/" class="card-header-title">
+                        UE4初读_Misc
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>Unreal为每个平台的底层都封装了一致的高层代码，本文讲述的是Windows下Unreal的源代码细节表现</p>
+<p>###1. 使用Mutex来保证当前程序是当前系统中唯一开启的</p>
+<p>Unreal源代码</p>
+<pre><code class="cpp">bool MakeNamedMutex( const TCHAR* CmdLine )
+{
+    bool bIsFirstInstance = false;
+
+    TCHAR MutexName[MAX_SPRINTF] = TEXT( &quot;&quot; );
+
+    FCString::Strcpy( MutexName, MAX_SPRINTF, TEXT( &quot;UnrealEngine4&quot; ) );
+
+    GNamedMutex = CreateMutex( NULL, true, MutexName );
+
+    if( GNamedMutex    &amp;&amp; GetLastError() != ERROR_ALREADY_EXISTS &amp;&amp; !FParse::Param( CmdLine, TEXT( &quot;NEVERFIRST&quot; ) ) )
+    {
+        // We&#39;re the first instance!
+        bIsFirstInstance = true;
+    }
+    else
+    {
+        // Still need to release it in this case, because it gave us a valid copy
+        ReleaseNamedMutex();
+        // There is already another instance of the game running.
+        bIsFirstInstance = false;
+    }
+
+    return( bIsFirstInstance );
+}
+</code></pre>
+<p>其中使得程序不会启动两次的关键在于互斥锁CreateMutex()。我参考了这篇文章<a href="http://www.cppblog.com/finehai/archive/2014/03/13/90745.html" target="_blank" rel="noopener">CreateMutex</a>，其中这一段讲解清晰了原理</p>
+<blockquote>
+<p>进程在启动时首先检查当前系统是否已经存在有此进程的实例，如果没有，进程将成功创建并设置标识实例已经存在的标记。此后再创建进程时将会通过该标记而知晓其实例已经存在，从而保证进程在系统中只能存在一个实例。</p>
 </blockquote>
 <blockquote>
-<p>请注意 以下是展示我C++程序员前端实力的时候了……以下所有内容都是我在练习Markdown语法</p>
+<p>如有同名程序运行，则通过 GetLastError（）得到错误代码 ERROR_ALREADY_EXIST。</p>
 </blockquote>
 <p><br></p>
-<p>我就一句话，千万不要再喊我做万花筒了……</p>
-<p><br></p>
-<p>啥都不说了，上架完万花筒我就算是升华了。</p>
-<p><br></p>
-<p>什么？毕设要做万花筒？不行了，我肚子疼。</p>
-<p><br></p>
-<p>有事别找我，没事烧纸谢谢。</p>
-<p><br></p>
-<p>听说你赚钱了？哦，被打断腿赔了20万。</p>
-<p><br></p>
-<p>你是喊我去创业吗，公司在哪？在心里，哦，滚。</p>
+<p>###2. <code>do{ some_code }while(false);</code> 代码块实现<code>模板switch</code></p>
+<p>参考以下文章 <a href="http://mamicode.com/info-detail-441091.html" target="_blank" rel="noopener">Link_1</a>, <a href="http://www.helplib.com/qa/355119?start=10" target="_blank" rel="noopener">Link_2</a>。</p>
+<p>Unreal源代码</p>
+<pre><code class="cpp">#define checkCode( Code )        do { Code } while ( false );
+</code></pre>
+<p>大致含义就是代码块中一旦出现错误或者指定情况下可以直接跳过(break)后部代码，实现类似goto的逻辑代码。说的直白一些，我个人更倾向于认为这像是”模板Switch”的实现。</p>
+<pre><code class="cpp">// 若任何类型的switch存在 就会像下面这样
+switch(condition)
+{
+case condition1:
+    break;
+case condition2:
+    break;
+    // ...
+}
+</code></pre>
+<p>因为switch只能满足标量类型，而搭配此，就无需在每步中额外提供一些标示符来表示执行到的位置。其优点就相当于switch(int)和一堆的if/else组合对比下的优势。就像下面这样，阅读感受很糟糕。</p>
+<pre><code class="cpp">// if/else
+// condition1
+if ( data ==  &amp; array[o1])
+    operation = O1;
+// condition2
+else if ( data ==  &amp; array[o2])
+    operation = O2;
+// conditionxxx
+else if
+    //...
+// conditionn
+else if ( data ==  &amp; array[on])
+    operation = ON;
+
+Log( &quot;operation:&quot;,operation);
+</code></pre>
+<p>相对比之下，checkCode()的优势很明显</p>
+<pre><code class="cpp">// macro switch
+checkCode(
+    if(!condition1)
+        break;
+    if(!condition2)
+        break;
+    // ...
+)
+</code></pre>
+<p>除了我个人理解的switch以外，它也有一定的错误代码跳转能力。以下某种情况下，<code>some_code</code>和<code>some_further_code</code>是有可能不被执行的，实现了类似goto的逻辑。</p>
+<pre><code class="cpp">// template switch
+do
+{
+    if (!condition1) break;
+    some_code;
+    if (!condition2) break;
+    some_further_code;
+    // …
+} while(false);
+</code></pre>
+<p>###3. class后部用于方便导出到dll的”关键字”</p>
+<p>Unreal源代码</p>
+<pre><code class="cpp">class RHI_API FDynamicRHI
+{
+public:
+    // ...
+}
+</code></pre>
+<p>找了很久，在<code>WindowsPlatfrom.h</code>下找到类似定义</p>
+<pre><code class="cpp">#define DLLEXPORT __declspec(dllexport)
+#define DLLIMPORT __declspec(dllimport)
+</code></pre>
+<p>因为我只使用过一次dll导出函数使用，同时也没有过导出类的经验，因此遇到这个宏时一无所知。参考与以下文章<a href="http://bbs.csdn.net/topics/330188830" target="_blank" rel="noopener">CSDN</a>, <a href="http://bbs.csdn.net/topics/330188830" target="_blank" rel="noopener">C++编写DLL的方法</a>, 其中第二篇更为精确一点。</p>
+<p>这个宏出现最核心的原因就在于，<code>客户端和DLL本身共用同一份头文件</code>。</p>
+<p>如若是客户端，那么需要在class后声明<code>_declspec(dllimport)</code>用以导入该类给自己，DLL则是class后声明<code>_declspec(dllexport)</code>，问题就出在这里，要共用一份头文件，但class却有两个写法，岂不是无法起到共用的效果？</p>
+<p>解决方案如下<br>.h</p>
+<pre><code class="cpp">#ifdef  DLL_API
+#else
+#define DLL_API _declspec(dllimport)
+#endif
+</code></pre>
+<p>.cpp</p>
+<pre><code class="cpp">#define DLL_API     _declspec(dllexport)
+
+#include &quot;DLLTest.h&quot;
+</code></pre>
+<p>此时客户端在导入这个类时，使用<code>_declspec(dllimport)</code>，DLL使用时已定义DLL_API，因此依旧是class被认定为导出<code>_declspec(dllexport)</code>。</p>
+<p>下次打算自己亲手试一试Windows平台下的dll导出。这样印象更深一点。</p>
 
                       </p>
                     </div>
@@ -145,114 +315,212 @@
                   
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2015-03-01-C++_note1/" class="card-header-title">
-                        C++编程思想(读书笔记_1)
+                      <a href="/2018/03/12/2015-09-11-regex/" class="card-header-title">
+                        初尝正则表达式
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <blockquote>
-<p>P78 中讲到</p>
+                        <p>基本上初步入门都是在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式入门教程</a>学到的，当然没有30分钟那么夸张。</p>
+<p>许多时候如若不进行实际测试很难知道自己的正则表达式正确与否，一般我就在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式在线测试</a>或者<a href="http://www.rubular.com/r/LiOup53CI1" target="_blank" rel="noopener">Rebular</a>直接在线测试，其实道理都一样。</p>
+<blockquote>
+<p>从开始学习，到实际能够解读正则表达式，到真正运用正则表达式在CSS文件的解析上，我起码花了整整三天时间，甚至更多</p>
 </blockquote>
-<pre><code class="cpp">while((char c = cin.get()) != &#39;q&#39;)
+<p>首先说说我自己的感想，正则表达式难度不在于其各个元字符的搭配很难，而是解析的这一步很难。所以我自己结合了教程总结了如下经验。</p>
+<p>案例1</p>
+<p><code>^(\*?[-#/\*\w]+(\[[0-9a-z_-]+\])?)\s*</code><br>乍一看非常难以分解，不过我一般会这样做</p>
+<pre><code class="cpp">^                           #字符串开始
+(
+      \*?                     #可选的*
+      [-#/\*\w]+              #&quot;-&quot;&quot;#&quot;&quot;\&quot;&quot;*&quot;&quot;字母数字下划线或汉字&quot;出现一次或多次
+      (
+          \[[0-9a-z_-]+\]         #&quot;[&quot;+0~9|a~z|_~空格+&quot;]&quot;
+      )?                      #上述字符串是可选的
+)
+\s*                         #任意多空格
 </code></pre>
-<p>这里c的结果会得到一张笑脸</p>
-<p>作者说while if switch里不能插入括号 </p>
-<p>事实上 原文作者的意思是这样的 并非不能插入括号 而是说char c这样的语句放在括号中是不行的 </p>
-<pre><code class="cpp">// error
-while((char c = cin.get()) != &#39;q&#39;)
-{
+<p>上述代码不会对正则表达式产生任何的影响，因为(?= #xxx)内部的内容表明为注释，这样的缩进可以更明显的看出来内容，我个人更偏向于下面这样的用法。</p>
+<pre><code class="cpp">// ^                    字符串开始
+// (
+//     \*?                  可选的任意出现零次或者多次的字符
+//     [-#/\*\w]+           &quot;-&quot;&quot;#&quot;&quot;\&quot;&quot;*&quot;&quot;字母数字下划线或汉字&quot;出现一次或多次
+//     (\[[0-9a-z_-]+\])?   可选的&quot;[&quot;+0~9|a~z|_~空格+&quot;]&quot;
+// )
+// \s*                  任意多空格
+static const std::regex _RE0_ = RE(R&quot;raw(^(\*?[-#/\*\w]+(\[[0-9a-z_-]+\])?)\s*)raw&quot;);
+</code></pre>
+<p>这样就有一个好处，在实际使用此正则表达式时，不用在表达式内部修改样式，有的OS例如Windows，会要求在每行的最后加上<code>\</code>类似于这样</p>
+<pre><code class="cpp">string test2 = 
+&quot;body{\
+    background-color: #d0e4fe;\
+}\
+\
+h1{\
+    color: orange;\
+    text-align: center;\
+}\
+\
+p{\
+    font-family: \&quot;Times New Roman\&quot;;\
+    font-size: 20px;\
+}&quot;;
+</code></pre>
+<p>这对有强迫症的人来说简直是致命的，但又没有什么好的办法。所以我个人偏向于将正则表达式的注释写到对应语言的注释中。</p>
+<p>对于元字符其实没有什么太多能够讲述的</p>
+<blockquote>
+<p>反义</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">代码</th>
+<th style="text-align:center">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">\W</td>
+<td style="text-align:center">匹配任意不是字母，数字，下划线，汉字的字符</td>
+</tr>
+<tr>
+<td style="text-align:center">\S</td>
+<td style="text-align:center">匹配任意不是空白符的字符</td>
+</tr>
+<tr>
+<td style="text-align:center">\D</td>
+<td style="text-align:center">匹配任意非数字的字符</td>
+</tr>
+<tr>
+<td style="text-align:center">\B</td>
+<td style="text-align:center">匹配不是单词开头或结束的位置</td>
+</tr>
+<tr>
+<td style="text-align:center">[^x]</td>
+<td style="text-align:center">匹配除了x以外的任意字符</td>
+</tr>
+<tr>
+<td style="text-align:center">[^aeiou]</td>
+<td style="text-align:center">匹配除了aeiou这几个字母以外的任意字符</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>重复</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">代码</th>
+<th style="text-align:center">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">*</td>
+<td style="text-align:center">重复零次或更多次</td>
+</tr>
+<tr>
+<td style="text-align:center">+</td>
+<td style="text-align:center">重复一次或更多次</td>
+</tr>
+<tr>
+<td style="text-align:center">?</td>
+<td style="text-align:center">重复零次或一次</td>
+</tr>
+<tr>
+<td style="text-align:center">{n}</td>
+<td style="text-align:center">重复n次</td>
+</tr>
+<tr>
+<td style="text-align:center">{n,}</td>
+<td style="text-align:center">重复n次或更多次</td>
+</tr>
+<tr>
+<td style="text-align:center">{n,m}</td>
+<td style="text-align:center">重复n到m次</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>元字符</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">代码</th>
+<th style="text-align:center">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">.</td>
+<td style="text-align:center">匹配除换行符以外的任意字符</td>
+</tr>
+<tr>
+<td style="text-align:center">\w</td>
+<td style="text-align:center">匹配字母或数字或下划线或汉字</td>
+</tr>
+<tr>
+<td style="text-align:center">\s</td>
+<td style="text-align:center">匹配任意的空白符</td>
+</tr>
+<tr>
+<td style="text-align:center">\d</td>
+<td style="text-align:center">匹配数字</td>
+</tr>
+<tr>
+<td style="text-align:center">\b</td>
+<td style="text-align:center">匹配单词的开始或结束</td>
+</tr>
+<tr>
+<td style="text-align:center">^</td>
+<td style="text-align:center">匹配字符串的开始</td>
+</tr>
+<tr>
+<td style="text-align:center">$</td>
+<td style="text-align:center">匹配字符串的结束</td>
+</tr>
+</tbody>
+</table>
+<p>要说说的就是这个反义,^这个字符如若不在[]中，那么它的意思一般就是表示从字符串开始的位置，当然如果前面没有转义字符的话。一旦跑到了[]中，那么它就代表了反义。</p>
+<p>案例2</p>
+<p><code>^([^\{]+)</code></p>
+<pre><code class="cpp">// ^        字符串开始处
+// (
+//       [^\{]+   除{以外其他的一个或者多个字符
+// )
+</code></pre>
+<p>这里的两个^就展现了不同的含义，一开始我在这里费了不少功夫。</p>
+<blockquote>
+<p>删除注释</p>
+</blockquote>
+<p>有的正则表达式可以匹配得到多门语言当中各型各色的注释，以便于直接找到删除。<a href="http://ostermiller.org/findcomment.html" target="_blank" rel="noopener">删除注释</a>大多数的语言注释的正则表达式都可以在这里找到。C/C++/Java因为语言相通所以注释匹配也是可以通用的。</p>
+<p>在实际应用中，我使用<code>/\*[^\*]*\*+([^/\*][^\*]*\*+)*/</code>来匹配CSS的注释，读者可以自行测试。</p>
+<p>在实际的CSS解析中最难以理解的表达式如下<br><code>^((?:&#39;(?:\\&#39;|.)*?&#39;|\&quot;(?:\\\&quot;|.)*?\&quot;|\([^\)]*?\)|[^\};])+)</code></p>
+<pre><code class="cpp">// ^
+// (
+//    (
+//        ?:            可选的:
+//        &#39;(?:\\&#39;|.)*?&#39;             单引号围起来的内容或者任意字符 若前方有&#39;，那么需要以&#39;结尾
+//        |
+//        \&quot;(?:\\\&quot;|.)*?\&quot;          双引号围起来的内容或者任意字符 若前方有&quot;，那么需要以&quot;结尾
+//        |
+//        \([^\)]*?\)               (开始 匹配除了)以外的任意字符 字符可以出现零次或者多次[^x] 可选的)
+//        |
+//        [^\};]                    匹配除了} ;以外的任意字符
+//    )
+//    +                 可以有零个或者多个上述值出现
+// )
+</code></pre>
+<p>这里的单引号的确是难以理解，后来才发现其实单引号不需要转义就可以直接表达自身的意思，可以对比下一行的双引号。因为有的CSS property: value;里的value是字符串/单一字母/xxx(xxx)/等等形式 如</p>
+<pre><code class="css">background-color: rgb(0, 10, 20); 
 
-}
+background-color: #123456;
 
-// correct
-while(char c = cin.get() != &#39;q&#39;)
-{
+background-color: red;
 
-}
 </code></pre>
-<p>因为<code>char c = ...</code>这里c的作用域只在括号中 所以超出了范围自动回收 并不能参与运算 正确的写法应该是 </p>
-<pre><code class="cpp">while(char c = cin.get() != &#39;q&#39;)
-</code></pre>
-<p>这里的!=优先级比 = 要高</p>
-<p>所以c得到的不是cin返回的字符串 而是一个bool 所以大多数情况下回显示一个笑脸</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/12/2014-12-08-Table in Lua/" class="card-header-title">
-                        Lua的Table结构
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.</p>
-<pre><code class="cpp">// 传递表给Lua
-lua_createtable(luaState, 2, 0);
-// [1]-&gt;49
-// 1代表key值 一个键值指定一个value 类似于号码簿
-lua_pushnumber(luaState, 1);
-lua_pushnumber(luaState, 49);
-
-// 压入两个参数之后索引变为-3 栈顶为-1
-lua_rawset(luaState, -3);
-
-// [2]-&gt;&quot;Life is a Circle&quot;
-lua_pushnumber(luaState, 2);
-lua_pushstring(luaState, &quot;Life is a Circle&quot;);
-// 上一步rawset已经清空栈 再次压入两个元素变为-3
-lua_rawset(luaState, -3);
-
-lua_setglobal(luaState, &quot;tables&quot;);
-</code></pre>
-<p>搭配Lua文件中的</p>
-<pre><code class="cpp">-- #table为获取当前table长度
-for i=1, #tables do
-     print(i, tables[i])
-end
-</code></pre>
-<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
-<pre><code class="cpp">print(array[1])
-print(array[3])
-</code></pre>
-<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
-<pre><code class="cpp">print(array[0]) --nil 
-print(array[&quot;1&quot;]) --nil
-</code></pre>
-<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/12/2014-12-07-Stack in Lua/" class="card-header-title">
-                        Lua栈结构
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <ol>
-<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
-</ol>
-<p>2.lua栈</p>
-<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
-<p>3.建一个新表</p>
-<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
-</code></pre>
-<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
-<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
-</code></pre>
-<p>常用这个</p>
-<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
+<p>很种类繁多，因此需要一并写出。</p>
 
                       </p>
                     </div>
@@ -314,30 +582,55 @@ print(array[&quot;1&quot;]) --nil
   </div>
 </section>
 
-<div class="pagination-bar">
-    <ul class="pagination">
-        
-        <li class="pagination-prev">
-            
-                <a class="btn btn--default btn--small" href="/archives/page/9/">
-            
-                <i class="fa fa-angle-left text-base icon-mr"></i>
-                    <span>pagination.newer_posts</span>
-            </a>
-        </li>
-        
-        
-        <li class="pagination-next">
-            <a class="btn btn--default btn--small" href="/archives/page/11/">
-                    <span>pagination.older_posts</span>
-                <i class="fa fa-angle-right text-base icon-ml"></i>
-            </a>
-        </li>
-        
-        <li class="pagination-number">pagination.page pagination.of</li>
-    </ul>
-</div>
+<section class="section">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-two-thirds">
+                <!-- <div class="card is-white"> -->
+                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+                    
+                        <a class="pagination-previous" href="/archives/page/9/">
+                    
+                    Previous
+                    </a>
 
+                    <ul class="pagination-list">
+
+                        
+                        <li><a class="pagination-link" href="archives//">1</a></li>                        
+                        <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        
+
+                        
+                            <li><a class="pagination-link" href="archives//page/9">9</a></li>
+                        
+
+                        
+                        <li><a class="pagination-link is-current">10</a></li>
+
+                        
+                            <li><a class="pagination-link" href="archives//page/11">11</a></li>
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        
+
+                        
+                            <li><a class="pagination-link" href="archives//page/20">20</a></li>
+                        
+                    </ul>
+
+                    
+                        <a class="pagination-next" href="/archives/page/11/">
+                    
+                    Next
+                    </a>
+                </nav>
+                <!-- </div> -->
+            </div>
+
+            <div class="column"></div>
+        </div>
+    </div>
+</section>
 
 
 <!-- Footer -->

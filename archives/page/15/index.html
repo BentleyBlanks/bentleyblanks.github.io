@@ -5,7 +5,7 @@
 <html lang="">
 <head>
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
-  <!-- responsive-->
+  <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Archives [ Bingo ]</title>
 
@@ -29,7 +29,7 @@
       <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
     
   
-  
+
 </head>
 <body>
 
@@ -112,20 +112,58 @@
                 
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2014-03-23-C or C++/" class="card-header-title">
-                        选用C++还是C
+                      <a href="/2018/03/12/2014-11-10-Sutherland/" class="card-header-title">
+                        Sutherland-Hodgman Algorithm
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.就当前引擎的设计角度而言 倘若从设计模式的角度来讲 也就是建筑这个引擎的过程而言C++的整体结构思想远远超过C语言不知道多少倍 就从类的包装继承而言 C++更像是为了这种的项目而诞生的 </p>
-<p>举个简单的粒子 </p>
-<p>C语言想要实现数学库 那么你就必须面对通用性的考验 这就意味着你很有可能要面对好几十个+的重载运算 </p>
-<p>而只是为了达到类似多态的效果……但这不像是一个很聪明的解决办法 </p>
-<p>齐次 我倘若想要创建一int型的向量 还有一个float的 还有一个unsigned int的甚至各种各样的 难道还需要强制规定响亮的格式不成？</p>
-<p>其实以上的C++早用了函数模板以及模板类来实现 通用性大大加强 我想 同样的情况下 牺牲那1%的速度去换取100%的简洁性是可以理解的</p>
-<p>2.结构体和类本身都是不矛盾的两者 既然在实现上使用了效率更高的C 那么汇编去哪里工作呢？数学库本应该是使用SIMD之类进行优化的 </p>
-<p>在设计的时候就不要太多的关照效率的问题……除非实在是太慢了</p>
+                        <p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
+<pre><code class="cpp">Polygon SutherlandHodgman( const Polygon startingPolygon, Plane[] clippingPlanes )
+{
+  Polygon output = startingPolygon
+  for each Plane clippingPlane in clippingPlanes
+    input = output
+    output.Clear( )
+    Vec2 startingPoint = input.Last( )
+    for each Vec2 endPoint in input
+      if startingPoint and endPoint in front of clippingPlane
+        out.push( endPoint )
+      else if startingPoint in front and endPoint behind clippingPlane
+        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
+      else if startingPoint and endPoint behind clippingPlane
+        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
+        out.push( endPoint )
+      endPoint = startingPoint
+  return output
+}
+</code></pre>
+<p>其本质就是<code>遍历需要被裁减的多边形的所有的边 每边与裁剪多边形的所有边进行位置判断</code></p>
+<pre><code class="cpp">// InFront = plane.Distance( point ) &gt; 0.0f
+// Behind  = plane.Distance( point ) &lt; 0.0f
+
+Vec2 p1, p2;
+ClipPlane plane;
+
+case p1 InFront and p2 InFront
+  push p2
+case p1 InFront and p2 Behind
+  push intersection
+case p1 Behind and p2 InFront
+  push intersection
+  push p2
+</code></pre>
+<p>上方代码的含义基本为下图</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt=""></p>
+<p>1.当边的方向进入裁剪区域 添加P与P1</p>
+<p>2.当边的方向是背离裁剪区域 只添加P</p>
+<p>3.倘若全部都在背离方向上 不添加点</p>
+<p>4.整个边都在内部 只添加P1</p>
+<p>这里P是p0-&gt;p1与裁剪边的交接点 (一元二次的直线方程可以计算出)</p>
+<p>下方为一个裁剪的案例</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt=""></p>
+<p>详情见</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt=""></p>
 
                       </p>
                     </div>
@@ -135,67 +173,52 @@
                   
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2017-08-23-递归删除单链表中特定值/" class="card-header-title">
-                        递归删除单链表中特定值
+                      <a href="/2018/03/12/2014-11-10-Support Point/" class="card-header-title">
+                        Support Point--Minkowski difference
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <blockquote>
-<p>理解来自CSDN中的<a href="http://blog.csdn.net/raby_gyl/article/details/13383573" target="_blank" rel="noopener">递归删除算法</a>，个人补充细节描述</p>
-</blockquote>
-<p>题为「设计递归算法，删除无头结点的单链表L中值为x的结点」</p>
-<pre><code class="cpp">void deleteX(LinkList &amp;L, ElemType x)  
-{  
-    LNode *p;  
-    if(L==NULL) return;  
-    if(L-&gt;data==x)  
-    {  
-        p=L;  
-        L=L-&gt;next; // (1)单链表保持连续 
-        free(p);  
-        deleteX(L,x); // (2)递归调用
-    }
-    else
-        deleteX(L-&gt;next,x); //(3)向后遍历
-}  
-</code></pre>
-<hr>
-<p>理解难度在于似乎仅仅只是释放了当前结点并使得L向前推进，而导致了断链。</p>
-<blockquote>
-<p>例如要在单链表<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>[</mo><mn>1</mn><mo separator="true">,</mo><mn>3</mn><mo separator="true">,</mo><mn>5</mn><mo separator="true">,</mo><mn>7</mn><mo>]</mo></mrow><annotation encoding="application/x-tex">[1, 3, 5, 7]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">[</span><span class="mord">1</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord">3</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord">5</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord">7</span><span class="mclose">]</span></span></span></span>中删除元素<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.43056em;vertical-align:0em;"></span><span class="base"><span class="mord mathit">x</span></span></span></span>(例如<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">x=3</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.64444em;vertical-align:0em;"></span><span class="base"><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">3</span></span></span></span>)，这里递归第二次调用函数讲会遇到<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>d</mi><mi>a</mi><mi>t</mi><mi>a</mi><mo>=</mo><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">data==3</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.69444em;"></span><span class="strut bottom" style="height:0.69444em;vertical-align:0em;"></span><span class="base"><span class="mord mathit">d</span><span class="mord mathit">a</span><span class="mord mathit">t</span><span class="mord mathit">a</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">3</span></span></span></span></p>
-</blockquote>
-<p>核心理解在于这里的LinkList L是<strong>引用</strong>, 观察堆栈会非常清晰的说明这个问题。</p>
-<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/36580955782/in/dateposted-public/" title="deleteX" target="_blank" rel="noopener"><img src="https://farm5.staticflickr.com/4381/36580955782_32532b105a.jpg" width="500" height="500" alt="deleteX"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
-<p>当代码中<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow><annotation encoding="application/x-tex">(2)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">(</span><span class="mord">2</span><span class="mclose">)</span></span></span></span>处递归调用deleteX时, 参数作为L-&gt;next的引用传入(引用为别名，相当于本体操作)，即<strong>递归中参数L为上一函数的L-&gt;next本体</strong>，此时的代码相当于</p>
-<pre><code class="cpp">deleteX(L-&gt;next, x)  
-{  
-    // ...
-    p = L-&gt;next;  
-    L-&gt;next = L-&gt;next-&gt;next; // 单链表保持连续 
-    free(p);  
-    deleteX(L-&gt;next, x);
-    // ...
-}  
-</code></pre>
-<hr>
-<p>如若将引用更换为指针，相较于引用的实现较为繁琐，但更能观察到上述代码工作的本质。</p>
-<pre><code class="cpp">// 仅有传入指针的指针才能改变上一函数中指针的值
-void deleteX(LinkList **L, ElemType x)  
-{  
-    LNode *p;  
-    if((*L)==NULL) return;  
-    if((*L)-&gt;data==x)  // L-&gt;next指向的结点为x
-    {  
-        p=*L;  // p指向L-&gt;next指向的结点
-        *L=(*L)-&gt;next; // L-&gt;next=L-&gt;next-&gt;next
-        free(p);  
-        deleteX(L,x); // 传入L-&gt;next的地址
-    }
-    else
-        deleteX(&amp;((*L)-&gt;next),x); // 传入L-&gt;next指向的结点的next指针的地址
-}  
-</code></pre>
+                        <p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
+<p>support point是在给定方向上距离最远(投影最大)的点</p>
+<p>在碰撞检测中也需要寻找分离轴 那么这时候 support point就是在面法线相反的方向上最远的点 也就是<code>背离这个方向深交最深的点</code></p>
+<p>倘若两个多边形相互碰撞 那么<code>一定能</code>找到<code>一个顶点与给定平面之间的距离小于0</code>(在面法线上的投影)</p>
+<p>这与两个多边形互不碰撞那么一定可以找到一跟分离轴分离两个多边形的理论是类似的</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
+<p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-11-10-Rigid body with direction/" class="card-header-title">
+                        带有方向的刚体
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.要检测圆形与多边形的碰撞 其实可以分解为圆与多边形上最近点的向量与面法线方向是否一致的问题</p>
+<p>再继续分解下去求解最近点 就能够发现只需要一个多边形的面和一个圆心即可 在这个多边形面上 这个线段可以被分为三个区域</p>
+<p>如图所示<br><img src="https://app.yinxiang.com/shard/s3/res/12b1c6bc-6270-4f30-a5df-c10818ee6a96.png" alt=""></p>
+<ul>
+<li>在Face Region中 圆心到多边形最近的点就在Face Region上 且与圆心的连线垂直于这条边</li>
+<li>在Edge Region内 那么最近点就是线段边缘点本身</li>
+</ul>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3745b055-e85c-42a4-a42f-69c954ceb32d/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
+<ul>
+<li>确定圆心在哪个区域内 可以让圆心与线段本身进行点积</li>
+<li>可以通过想象出一个三角形来完成这样的一个任务</li>
+</ul>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b8db4928-d785-4f21-be7b-6e0ab9f9e635.png" alt=""></p>
+<ul>
+<li>在这里 若是圆心位置为Edge Region那么圆心与线段端点的夹角theta一定大于90度 或者小于90度(对应的变化要看线段的向量方向走向规定)</li>
+</ul>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3c7b74c2-5e9c-4caa-b565-2551f68985d6/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
 
                       </p>
                     </div>
@@ -257,23 +280,55 @@ void deleteX(LinkList **L, ElemType x)
   </div>
 </section>
 
-<div class="pagination-bar">
-    <ul class="pagination">
-        
-        <li class="pagination-prev">
-            
-                <a class="btn btn--default btn--small" href="/archives/page/14/">
-            
-                <i class="fa fa-angle-left text-base icon-mr"></i>
-                    <span>pagination.newer_posts</span>
-            </a>
-        </li>
-        
-        
-        <li class="pagination-number">pagination.page pagination.of</li>
-    </ul>
-</div>
+<section class="section">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-two-thirds">
+                <!-- <div class="card is-white"> -->
+                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+                    
+                        <a class="pagination-previous" href="/archives/page/14/">
+                    
+                    Previous
+                    </a>
 
+                    <ul class="pagination-list">
+
+                        
+                        <li><a class="pagination-link" href="archives//">1</a></li>                        
+                        <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        
+
+                        
+                            <li><a class="pagination-link" href="archives//page/14">14</a></li>
+                        
+
+                        
+                        <li><a class="pagination-link is-current">15</a></li>
+
+                        
+                            <li><a class="pagination-link" href="archives//page/16">16</a></li>
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        
+
+                        
+                            <li><a class="pagination-link" href="archives//page/20">20</a></li>
+                        
+                    </ul>
+
+                    
+                        <a class="pagination-next" href="/archives/page/16/">
+                    
+                    Next
+                    </a>
+                </nav>
+                <!-- </div> -->
+            </div>
+
+            <div class="column"></div>
+        </div>
+    </div>
+</section>
 
 
 <!-- Footer -->

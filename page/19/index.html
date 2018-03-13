@@ -1,0 +1,366 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> [ Bingo ]</title>
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
+  <!-- theme css -->
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+    
+  
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-04-26-Floekr2T/" class="card-header-title">
+                        Floekr2T塔防套件
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.defendor</p>
+<p>2.attacker<br>包含trace和animation两内存块<br>–&gt;setup(trace, animation)初始化预设动画和预设路径<br>–&gt;update(skill)根据遍历一遍skill来更新自身的激活与否状态 外部通过查阅其状态来确定是否弹出vector<br>–&gt;draw()</p>
+<p>3.skill<br>自身具备TRACK PATH SCOPE其中scope并非一个真正意义上的技能而是直接由defendor来控制attacker的血量扣除           </p>
+<p>  –path会根据自身初始化的target位置确定线性方向 之后只需要根据预设定的velocity来不断更新position即可</p>
+<p>  –track会不断的追踪某一个特定的attacker来不断的更新自身的direction(normalize之后缩放velocity大小)更新posotion<br>直到attacker检测到AABB碰撞之后就从vector<skill>弹出vector</skill></p>
+<p>  –scope的skill意味着defendor不会在skill的vector当中添加一个新的技能 而是直接对当前选择的attacker进行伤害的扣除 可选的可以添加噪声以及随机</p>
+<p>4.trace<br>  –维护一段vector专门用于存放拐点<br>通过turnLeft turnRight go…等来智能的(也就是根据当前direction来判断左右转前后转需要rotate的角度)addTurningPoint达到路径中拐点的设置<br>之后attacker只需要不断的从vector中取得下一拐点就可以设定前进方向</p>
+<p>5.animation<br>  –维护一段vector专门用于存放image帧动画<br>只需要不断循环的从vector中读取image并渲染出来就可以做到动画播放的目的<br>getFrame()能返回当前播放帧的image</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-03-28-git/" class="card-header-title">
+                        快速使用Git布置项目环境
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>###初始化：</p>
+<p>在创建项目的目录中执行git init<br>被init的文件夹即作为工作目录树，存放从版本库检出的代码。</p>
+<hr>
+<p>###添加文件：</p>
+<p>创建代码文件以及其他文件，通知git跟踪这个文件：<br>git add &lt;文件名（可以使用统配）&gt;</p>
+<hr>
+<p>###修改以及提交：</p>
+<p>git commit [-m “提交消息”]<br>git将会把提交者的姓名邮件以及-m提交消息全部提交到记录中。<br>使用git log来察看提交信息</p>
+<p>使用git status来察看工作目录树的状态，即当前的视图状态。</p>
+<p>在修改目录之后，再次使用git add来暂存更改，等待提交。<br>git commit接受任意多个-m参数，每次新启一段 。</p>
+<p>git log -&lt;数字&gt;通过修改数字来限制命令git log输出的提交条目的个数。</p>
+<hr>
+<p>###理解使用分支：</p>
+<p>使用git branch 分支名 父分支名  来创建一个分支。<br>默认的主分支叫做master，这也是Git的默认的分支，master对应于CVS<br>和Subversion的主干（trunk）。<br>使用git checkout 分支名 来切换到指定的分支。</p>
+<hr>
+<p>###发布分支（release branch）</p>
+<p>在git commit中使用-a参数来告诉git提交全部修改的文件。</p>
+<p>使用git branch命令来察看当前分支。</p>
+<p>注意：在刚刚init初始化之后没有跟踪任何文件之前，master分支是不存在的。<br>git branch -d xxxxx 删除本地分支，被删除分支必须不是当前所在分支。<br>git branch -a察看远程分支。</p>
+<hr>
+<p>###处理发布：</p>
+<p>使用git tag <tag name=""> &lt;分支名&gt;  来对指定的分支添加一个tag。使用git tag可以察看当前所有的tag。</tag></p>
+<p>添加标签之后，只要标签还在，从标签到版本树起点的一连串提交记录就都还在。这是可以删除打了标签的分支，这仅仅只是删除了标签的名字，而没有删除分支上的内容。</p>
+<p>使用git rebase &lt;分支名&gt; 来变基，即把一个分支上的所有修改都合并到某一个分支上。比如在master分支执行git rebase test，就会把所有test分支的改动全部合并到master主分支上。<br>可以从一个tag建立一个分支git branch XXX <tag>  。</tag></p>
+<hr>
+<p>###归档：</p>
+<p>使用git archive 命令来归档，可以创建一个gzip压缩文件。命令如下：</p>
+<pre><code>git archive --format=tar\
+                 --prefix=&lt;压缩包要存放的目录&gt;/ &lt;要归档的标签名称&gt; \
+                 | gzip &gt; &lt;压缩包名称&gt;.tar.gz
+
+
+git archive --format=zip\
+                 --prefix=&lt;压缩包要存放的目录&gt;/ &lt;要归档的标签名称&gt; \
+                 &gt; &lt;压缩包名称&gt;.zip
+
+(\表示本行命令未完，下行继续)
+</code></pre><p>克隆远程版本：</p>
+<p>使用git clone &lt;源&gt;  来将远程代码拷贝到本地目录。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2018/03/12/2014-03-23-C or C++/" class="card-header-title">
+                        选用C++还是C
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.就当前引擎的设计角度而言 倘若从设计模式的角度来讲 也就是建筑这个引擎的过程而言C++的整体结构思想远远超过C语言不知道多少倍 就从类的包装继承而言 C++更像是为了这种的项目而诞生的 </p>
+<p>举个简单的粒子 </p>
+<p>C语言想要实现数学库 那么你就必须面对通用性的考验 这就意味着你很有可能要面对好几十个+的重载运算 </p>
+<p>而只是为了达到类似多态的效果……但这不像是一个很聪明的解决办法 </p>
+<p>齐次 我倘若想要创建一int型的向量 还有一个float的 还有一个unsigned int的甚至各种各样的 难道还需要强制规定响亮的格式不成？</p>
+<p>其实以上的C++早用了函数模板以及模板类来实现 通用性大大加强 我想 同样的情况下 牺牲那1%的速度去换取100%的简洁性是可以理解的</p>
+<p>2.结构体和类本身都是不矛盾的两者 既然在实现上使用了效率更高的C 那么汇编去哪里工作呢？数学库本应该是使用SIMD之类进行优化的 </p>
+<p>在设计的时候就不要太多的关照效率的问题……除非实在是太慢了</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-two-thirds">
+                <!-- <div class="card is-white"> -->
+                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+                    
+                        <a class="pagination-previous" href="/page/18/">
+                    
+                    Previous
+                    </a>
+
+                    <ul class="pagination-list">
+
+                        
+                        <li><a class="pagination-link" href="/">1</a></li>                        
+                        <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        
+
+                        
+                            <li><a class="pagination-link" href="/page/18">18</a></li>
+                        
+
+                        
+                        <li><a class="pagination-link is-current">19</a></li>
+
+                        
+
+                        
+                            <li><a class="pagination-link" href="/page/20">20</a></li>
+                        
+                    </ul>
+
+                    
+                        <a class="pagination-next" href="/page/20/">
+                    
+                    Next
+                    </a>
+                </nav>
+                <!-- </div> -->
+            </div>
+
+            <div class="column"></div>
+        </div>
+    </div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>. Powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>
