@@ -1,0 +1,350 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archives: 2014 [ Bingo ]</title>
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
+  <!-- theme css -->
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+    
+  
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/09/12/2014-09-12-pointer/" class="card-header-title">
+                        指针初始化
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.在类中声明一个指针并不意味着在程序运行中这个指针指向的内容就是0</p>
+<pre><code class="cpp">class A
+{
+     float *a;
+};
+</code></pre>
+<p>这时指针a指向的位置是不确定的 只有在构造函数或者某个初始化位置的地方明确的给定值</p>
+<p><code>a = nullptr / a = 0 / a = NULL;</code>之类的 才可以在后续的指针是否为空判断中正确操作 </p>
+<p>否则</p>
+<p><code>if(a == NULL)</code>这样的判断在没有初始化的指针下是没有意义的 始终会被认定为真值</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/07/27/2014-03-23-C or C++/" class="card-header-title">
+                        选用C++还是C
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.就当前引擎的设计角度而言 倘若从设计模式的角度来讲 也就是建筑这个引擎的过程而言C++的整体结构思想远远超过C语言不知道多少倍 就从类的包装继承而言 C++更像是为了这种的项目而诞生的 </p>
+<p>举个简单的粒子 </p>
+<p>C语言想要实现数学库 那么你就必须面对通用性的考验 这就意味着你很有可能要面对好几十个+的重载运算 </p>
+<p>而只是为了达到类似多态的效果……但这不像是一个很聪明的解决办法 </p>
+<p>齐次 我倘若想要创建一int型的向量 还有一个float的 还有一个unsigned int的甚至各种各样的 难道还需要强制规定响亮的格式不成？</p>
+<p>其实以上的C++早用了函数模板以及模板类来实现 通用性大大加强 我想 同样的情况下 牺牲那1%的速度去换取100%的简洁性是可以理解的</p>
+<p>2.结构体和类本身都是不矛盾的两者 既然在实现上使用了效率更高的C 那么汇编去哪里工作呢？数学库本应该是使用SIMD之类进行优化的 </p>
+<p>在设计的时候就不要太多的关照效率的问题……除非实在是太慢了</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/07/27/2014-07-27-Relations between base pointer and derived pointer/" class="card-header-title">
+                        基类指针与派生类指针之间的转换
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p><img src="https://app.yinxiang.com/shard/s3/res/1c58b253-47b6-436f-b1af-b5c16b4713b3.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3a4bb01e-475c-4c01-b5f6-b629c9ae64f6.png" alt=""></p>
+<p>1.基类指针强制类型转换为派生类指针，其实质是<code>辨认空间</code>变大了，和它具体指向的内容<code>无关</code></p>
+<p>2.辨认空间变大会对指向内容的<code>连续内存</code>空间产生影响</p>
+<h3 id="Demo1"><a href="#Demo1" class="headerlink" title="Demo1"></a>Demo1</h3><p>此处a的内存申请已经完成 如下图 同时也赋值成功</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b2838c50-7e4e-4904-8a75-35acf7db7cf2.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/2dfdb49e-340c-4249-8d28-aca4d3b4a78a/%E6%97%A0%E6%A0%87%E9%A2%982.png" alt=""></p>
+<h3 id="Demo2"><a href="#Demo2" class="headerlink" title="Demo2"></a>Demo2</h3><p>此处base指针初始化时指向的是对象b</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/f2a71cfd-e699-41e0-965f-99feb7182027.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/22df7c59-6c42-4753-978c-6864b3690e16/%E6%97%A0%E6%A0%87%E9%A2%983.png" alt=""></p>
+<h3 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h3><p>内存一旦被申请之后就会被操作系统认定为受保护的 也就不会被二次申请</p>
+<p>但辨认空间发生变化的确会引来不少的问题 在初始化以及强制类型转换基类指针的时候需要格外注意</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-two-thirds">
+                <!-- <div class="card is-white"> -->
+                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+                    
+                        <a class="pagination-previous" href="/archives/2014/page/4/">
+                    
+                    Previous
+                    </a>
+
+                    <ul class="pagination-list">
+
+                        
+                        <li><a class="pagination-link" href="archives/2014//">1</a></li>
+                        
+
+                                                
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
+                            <li><a class="pagination-link" href="archives/2014//page/4">4</a></li>
+                        
+
+                        
+                        <li><a class="pagination-link is-current">5</a></li>
+
+                        
+                            <li><a class="pagination-link" href="archives/2014//page/6">6</a></li>
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        
+
+                        
+                            <li><a class="pagination-link" href="archives/2014//page/7">7</a></li>
+                        
+                    </ul>
+
+                    
+                        <a class="pagination-next" href="/archives/2014/page/6/">
+                    
+                    Next
+                    </a>
+                </nav>
+                <!-- </div> -->
+            </div>
+
+            <div class="column"></div>
+        </div>
+    </div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>. Powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

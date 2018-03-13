@@ -110,9 +110,235 @@
             <!-- articles -->
             
                 
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2015-09-26-射线与圆求交/" class="card-header-title">
+                      <a href="/2015/10/27/2015-10-27-AST可视化/" class="card-header-title">
+                        AST可视化
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>在使用编译器前端Flex+Bison完成了大部分工作之后，尽管可以使用简易的<strong>printf</strong>来完成终端调试，但终究不够方便。</p>
+<p>使用Bison完成AST生成之后需要对其构建的AST进行分析，此时常规思路的前序中序后序遍历对这样一个庞大的二叉树而言实现可视重建并不容易。因为你需要通过前中序来手工推导出一整棵树，但这并不是你做此任务的主要目的。</p>
+<p>这里我安利一波贝尔实验室推出的黑科技<a href="http://www.graphviz.org/Download_windows.php" target="_blank" rel="noopener">Graphviz</a>，在原有的遍历基础上基本上能够做到1分钟完成上手。</p>
+<p>假定一抽象语法树节点类Node，之后所有AST都将被视为普通二叉树。</p>
+<blockquote>
+<p>简单的类定义</p>
+</blockquote>
+<pre><code class="cpp">class Node
+{
+public:
+  Node *leftChild;
+  Node *rightChild;
+  // 访问当前结点
+  virtual void value();
+};
+</code></pre>
+<blockquote>
+<p>传统的中序遍历</p>
+</blockquote>
+<pre><code class="cpp">void traversal(Node * root)
+{
+  if(!root) return;
+
+  traversal(root-&gt;leftChild);
+  root-&gt;value();
+  traversal(root-&gt;rightChild);
+}
+</code></pre>
+<blockquote>
+<p>Graphviz支持<a href="http://www.graphviz.org/content/dot-language" target="_blank" rel="noopener">DOT</a>语言的输入，个人认为只要依样画葫芦即可</p>
+</blockquote>
+<blockquote>
+<p>使用DOT输出的中序遍历 只需要增加当前结点的label名及各子结点地址 无论是printf或是保存文件都可选 目的无非就是获取这一整段DOT输出代码</p>
+</blockquote>
+<pre><code class="cpp">
+class Node
+{
+public:
+  Node *leftChild;
+  Node *rightChild;
+  // 访问当前结点
+  virtual void value();
+
+  string name;
+};
+
+// 以下代码将会使得遍历转换为DOT格式
+void traversal(Node * root)
+{
+  // 可选将渲染的结点形状更换为其他形式
+  printf(&quot;digraph G {\n&quot;);
+  printf(&quot;node[shape=rect]\n&quot;);
+
+  traversalAsDot(root);
+
+  printf(&quot;}&quot;);
+}
+
+void traversalAsDot(Node* root)
+{
+  if(!root) return;
+
+  // 当前结点名
+  // root-&gt;name.c_str() 可以更换为任意能够获取当前结点名的函数 手工RTTI都可
+  printf(&quot;_%p[label=%s]\n&quot;, root, root-&gt;name.c_str());
+
+  // 传递父节点到子节点地址信息
+  if (l != NULL) printf(&quot;_%p -&gt; _%p\n&quot;, root, root-&gt;leftChild);
+  if (r != NULL) printf(&quot;_%p -&gt; _%p\n&quot;, root, root-&gt;rightChild);
+
+  traversalAsDot(l);
+  root-&gt;value();
+  traversalAsDot(r);
+}
+
+</code></pre>
+<p>我在这里是对CSS进行解析生成AST，解析以下代码，获得AST，输出DOT使用Graphviz渲染</p>
+<pre><code class="css">
+head.font-face.a .b:hover,  #ahs{
+    background: #00FF00;
+    src: 222;
+}
+
+.body {
+    font-family: &#39;Raleway&#39;, Arial, sans-serif;
+    margin: 1, 2, 3, 4;
+}
+
+</code></pre>
+<p>输出的DOT如下</p>
+<pre><code class="cpp">
+digraph G {
+node[shape=rect]
+_0059C010[label=RuleList]
+_0059C010 -&gt; _0059BE48
+_0059C010 -&gt; _0059BFF8
+_0059BE48[label=RuleList]
+_0059BE48 -&gt; _0059BE30
+_0059BE30[label=Ruleset]
+_0059BE30 -&gt; _0059BD70
+_0059BE30 -&gt; _0059BE18
+_0059BD70[label=SelectorList]
+_0059BD70 -&gt; _00597EC0
+_0059BD70 -&gt; _0059BD58
+_00597EC0[label=SelectorList]
+_00597EC0 -&gt; _00597E78
+_00597E78[label=Selector]
+_00597E78 -&gt; _00597E30
+_00597E78 -&gt; _00597C98
+_00597E30[label=SimpleSelector]
+_00597E30 -&gt; _00597DF0
+_00597DF0[label=SpecifierList]
+_00597DF0 -&gt; _00597DD8
+_00597DF0 -&gt; _00597D50
+_00597DD8[label=SpecifierPseudo]
+_00597D50[label=SpecifierList]
+_00597D50 -&gt; _00597D38
+_00597D38[label=SpecifierClass]
+_00597C98[label=Selector]
+_00597C98 -&gt; _00597C50
+_00597C50[label=SimpleSelector]
+_00597C50 -&gt; _00597C10
+_00597C10[label=SpecifierList]
+_00597C10 -&gt; _00597BF8
+_00597C10 -&gt; _00597B70
+_00597BF8[label=SpecifierClass]
+_00597B70[label=SpecifierList]
+_00597B70 -&gt; _00597B58
+_00597B58[label=SpecifierClass]
+_0059BD58[label=Selector]
+_0059BD58 -&gt; _0059BD40
+_0059BD40[label=SimpleSelector]
+_0059BD40 -&gt; _0059BCA0
+_0059BCA0[label=SpecifierList]
+_0059BCA0 -&gt; _00597F68
+_00597F68[label=SpecifierElement]
+_0059BE18[label=DeclarationList]
+_0059BE18 -&gt; _0059BDD0
+_0059BE18 -&gt; _0059BE00
+_0059BDD0[label=DeclarationList]
+_0059BDD0 -&gt; _0059BDA0
+_0059BDA0[label=Declaration]
+_0059BDA0 -&gt; _0059BD88
+_0059BD88[label=Expression]
+_0059BD88 -&gt; _0059C5C8
+_0059C5C8[label=TermHex]
+_0059BE00[label=Declaration]
+_0059BE00 -&gt; _0059BDE8
+_0059BDE8[label=Expression]
+_0059BDE8 -&gt; _0059C620
+_0059C620[label=TermInteger]
+_0059BFF8[label=Ruleset]
+_0059BFF8 -&gt; _0059BED8
+_0059BFF8 -&gt; _0059BFE0
+_0059BED8[label=SelectorList]
+_0059BED8 -&gt; _0059BEC0
+_0059BEC0[label=Selector]
+_0059BEC0 -&gt; _0059BEA8
+_0059BEA8[label=Selector]
+_0059BEA8 -&gt; _0059BE90
+_0059BE90[label=SimpleSelector]
+_0059BE90 -&gt; _0059BE78
+_0059BE78[label=SpecifierList]
+_0059BE78 -&gt; _0059BE60
+_0059BE60[label=SpecifierClass]
+_0059BFE0[label=DeclarationList]
+_0059BFE0 -&gt; _0059BF50
+_0059BFE0 -&gt; _0059BFC8
+_0059BF50[label=DeclarationList]
+_0059BF50 -&gt; _0059BF38
+_0059BF38[label=Declaration]
+_0059BF38 -&gt; _0059BF20
+_0059BF20[label=Expression]
+_0059BF20 -&gt; _0059BF08
+_0059BF20 -&gt; _0059C8E0
+_0059BF08[label=Expression]
+_0059BF08 -&gt; _0059BEF0
+_0059BF08 -&gt; _0059C860
+_0059BEF0[label=Expression]
+_0059BEF0 -&gt; _0059C7E0
+_0059C7E0[label=TermString]
+_0059C860[label=TermIndent]
+_0059C8E0[label=TermIndent]
+_0059BFC8[label=Declaration]
+_0059BFC8 -&gt; _0059BFB0
+_0059BFB0[label=Expression]
+_0059BFB0 -&gt; _0059BF98
+_0059BFB0 -&gt; _0059CA80
+_0059BF98[label=Expression]
+_0059BF98 -&gt; _0059BF80
+_0059BF98 -&gt; _0059CA20
+_0059BF80[label=Expression]
+_0059BF80 -&gt; _0059BF68
+_0059BF80 -&gt; _0059C9C0
+_0059BF68[label=Expression]
+_0059BF68 -&gt; _0059C980
+_0059C980[label=TermInteger]
+_0059C9C0[label=TermInteger]
+_0059CA20[label=TermInteger]
+_0059CA80[label=TermInteger]
+}
+
+</code></pre>
+<blockquote>
+<p>渲染结果为</p>
+</blockquote>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" alt=""><br>    </a><br></figure>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/09/26/2015-09-26-射线与圆求交/" class="card-header-title">
                         射线与圆求交
                       </a>
                     </div>
@@ -179,9 +405,11 @@ s-65,47,-65,47z M834 80H400000v40H845z"/></svg></span></span></span><span class=
                   <br>
                   <br>
                   
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2015-09-21-UE4-1/" class="card-header-title">
+                      <a href="/2015/09/21/2015-09-21-UE4-1/" class="card-header-title">
                         UE4初读_Misc
                       </a>
                     </div>
@@ -313,221 +541,6 @@ public:
                   <br>
                   <br>
                   
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/12/2015-09-11-regex/" class="card-header-title">
-                        初尝正则表达式
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>基本上初步入门都是在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式入门教程</a>学到的，当然没有30分钟那么夸张。</p>
-<p>许多时候如若不进行实际测试很难知道自己的正则表达式正确与否，一般我就在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式在线测试</a>或者<a href="http://www.rubular.com/r/LiOup53CI1" target="_blank" rel="noopener">Rebular</a>直接在线测试，其实道理都一样。</p>
-<blockquote>
-<p>从开始学习，到实际能够解读正则表达式，到真正运用正则表达式在CSS文件的解析上，我起码花了整整三天时间，甚至更多</p>
-</blockquote>
-<p>首先说说我自己的感想，正则表达式难度不在于其各个元字符的搭配很难，而是解析的这一步很难。所以我自己结合了教程总结了如下经验。</p>
-<p>案例1</p>
-<p><code>^(\*?[-#/\*\w]+(\[[0-9a-z_-]+\])?)\s*</code><br>乍一看非常难以分解，不过我一般会这样做</p>
-<pre><code class="cpp">^                           #字符串开始
-(
-      \*?                     #可选的*
-      [-#/\*\w]+              #&quot;-&quot;&quot;#&quot;&quot;\&quot;&quot;*&quot;&quot;字母数字下划线或汉字&quot;出现一次或多次
-      (
-          \[[0-9a-z_-]+\]         #&quot;[&quot;+0~9|a~z|_~空格+&quot;]&quot;
-      )?                      #上述字符串是可选的
-)
-\s*                         #任意多空格
-</code></pre>
-<p>上述代码不会对正则表达式产生任何的影响，因为(?= #xxx)内部的内容表明为注释，这样的缩进可以更明显的看出来内容，我个人更偏向于下面这样的用法。</p>
-<pre><code class="cpp">// ^                    字符串开始
-// (
-//     \*?                  可选的任意出现零次或者多次的字符
-//     [-#/\*\w]+           &quot;-&quot;&quot;#&quot;&quot;\&quot;&quot;*&quot;&quot;字母数字下划线或汉字&quot;出现一次或多次
-//     (\[[0-9a-z_-]+\])?   可选的&quot;[&quot;+0~9|a~z|_~空格+&quot;]&quot;
-// )
-// \s*                  任意多空格
-static const std::regex _RE0_ = RE(R&quot;raw(^(\*?[-#/\*\w]+(\[[0-9a-z_-]+\])?)\s*)raw&quot;);
-</code></pre>
-<p>这样就有一个好处，在实际使用此正则表达式时，不用在表达式内部修改样式，有的OS例如Windows，会要求在每行的最后加上<code>\</code>类似于这样</p>
-<pre><code class="cpp">string test2 = 
-&quot;body{\
-    background-color: #d0e4fe;\
-}\
-\
-h1{\
-    color: orange;\
-    text-align: center;\
-}\
-\
-p{\
-    font-family: \&quot;Times New Roman\&quot;;\
-    font-size: 20px;\
-}&quot;;
-</code></pre>
-<p>这对有强迫症的人来说简直是致命的，但又没有什么好的办法。所以我个人偏向于将正则表达式的注释写到对应语言的注释中。</p>
-<p>对于元字符其实没有什么太多能够讲述的</p>
-<blockquote>
-<p>反义</p>
-</blockquote>
-<table>
-<thead>
-<tr>
-<th style="text-align:center">代码</th>
-<th style="text-align:center">说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:center">\W</td>
-<td style="text-align:center">匹配任意不是字母，数字，下划线，汉字的字符</td>
-</tr>
-<tr>
-<td style="text-align:center">\S</td>
-<td style="text-align:center">匹配任意不是空白符的字符</td>
-</tr>
-<tr>
-<td style="text-align:center">\D</td>
-<td style="text-align:center">匹配任意非数字的字符</td>
-</tr>
-<tr>
-<td style="text-align:center">\B</td>
-<td style="text-align:center">匹配不是单词开头或结束的位置</td>
-</tr>
-<tr>
-<td style="text-align:center">[^x]</td>
-<td style="text-align:center">匹配除了x以外的任意字符</td>
-</tr>
-<tr>
-<td style="text-align:center">[^aeiou]</td>
-<td style="text-align:center">匹配除了aeiou这几个字母以外的任意字符</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p>重复</p>
-</blockquote>
-<table>
-<thead>
-<tr>
-<th style="text-align:center">代码</th>
-<th style="text-align:center">说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:center">*</td>
-<td style="text-align:center">重复零次或更多次</td>
-</tr>
-<tr>
-<td style="text-align:center">+</td>
-<td style="text-align:center">重复一次或更多次</td>
-</tr>
-<tr>
-<td style="text-align:center">?</td>
-<td style="text-align:center">重复零次或一次</td>
-</tr>
-<tr>
-<td style="text-align:center">{n}</td>
-<td style="text-align:center">重复n次</td>
-</tr>
-<tr>
-<td style="text-align:center">{n,}</td>
-<td style="text-align:center">重复n次或更多次</td>
-</tr>
-<tr>
-<td style="text-align:center">{n,m}</td>
-<td style="text-align:center">重复n到m次</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p>元字符</p>
-</blockquote>
-<table>
-<thead>
-<tr>
-<th style="text-align:center">代码</th>
-<th style="text-align:center">说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:center">.</td>
-<td style="text-align:center">匹配除换行符以外的任意字符</td>
-</tr>
-<tr>
-<td style="text-align:center">\w</td>
-<td style="text-align:center">匹配字母或数字或下划线或汉字</td>
-</tr>
-<tr>
-<td style="text-align:center">\s</td>
-<td style="text-align:center">匹配任意的空白符</td>
-</tr>
-<tr>
-<td style="text-align:center">\d</td>
-<td style="text-align:center">匹配数字</td>
-</tr>
-<tr>
-<td style="text-align:center">\b</td>
-<td style="text-align:center">匹配单词的开始或结束</td>
-</tr>
-<tr>
-<td style="text-align:center">^</td>
-<td style="text-align:center">匹配字符串的开始</td>
-</tr>
-<tr>
-<td style="text-align:center">$</td>
-<td style="text-align:center">匹配字符串的结束</td>
-</tr>
-</tbody>
-</table>
-<p>要说说的就是这个反义,^这个字符如若不在[]中，那么它的意思一般就是表示从字符串开始的位置，当然如果前面没有转义字符的话。一旦跑到了[]中，那么它就代表了反义。</p>
-<p>案例2</p>
-<p><code>^([^\{]+)</code></p>
-<pre><code class="cpp">// ^        字符串开始处
-// (
-//       [^\{]+   除{以外其他的一个或者多个字符
-// )
-</code></pre>
-<p>这里的两个^就展现了不同的含义，一开始我在这里费了不少功夫。</p>
-<blockquote>
-<p>删除注释</p>
-</blockquote>
-<p>有的正则表达式可以匹配得到多门语言当中各型各色的注释，以便于直接找到删除。<a href="http://ostermiller.org/findcomment.html" target="_blank" rel="noopener">删除注释</a>大多数的语言注释的正则表达式都可以在这里找到。C/C++/Java因为语言相通所以注释匹配也是可以通用的。</p>
-<p>在实际应用中，我使用<code>/\*[^\*]*\*+([^/\*][^\*]*\*+)*/</code>来匹配CSS的注释，读者可以自行测试。</p>
-<p>在实际的CSS解析中最难以理解的表达式如下<br><code>^((?:&#39;(?:\\&#39;|.)*?&#39;|\&quot;(?:\\\&quot;|.)*?\&quot;|\([^\)]*?\)|[^\};])+)</code></p>
-<pre><code class="cpp">// ^
-// (
-//    (
-//        ?:            可选的:
-//        &#39;(?:\\&#39;|.)*?&#39;             单引号围起来的内容或者任意字符 若前方有&#39;，那么需要以&#39;结尾
-//        |
-//        \&quot;(?:\\\&quot;|.)*?\&quot;          双引号围起来的内容或者任意字符 若前方有&quot;，那么需要以&quot;结尾
-//        |
-//        \([^\)]*?\)               (开始 匹配除了)以外的任意字符 字符可以出现零次或者多次[^x] 可选的)
-//        |
-//        [^\};]                    匹配除了} ;以外的任意字符
-//    )
-//    +                 可以有零个或者多个上述值出现
-// )
-</code></pre>
-<p>这里的单引号的确是难以理解，后来才发现其实单引号不需要转义就可以直接表达自身的意思，可以对比下一行的双引号。因为有的CSS property: value;里的value是字符串/单一字母/xxx(xxx)/等等形式 如</p>
-<pre><code class="css">background-color: rgb(0, 10, 20); 
-
-background-color: #123456;
-
-background-color: red;
-
-</code></pre>
-<p>很种类繁多，因此需要一并写出。</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
               
           </div>
         </div>
@@ -597,11 +610,11 @@ background-color: red;
                     <ul class="pagination-list">
 
                         
-                        <li><a class="pagination-link" href="/">1</a></li>                        
-                        <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        <li><a class="pagination-link" href="/">1</a></li>
                         
 
-                        
+                                                
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
                             <li><a class="pagination-link" href="/page/9">9</a></li>
                         
 

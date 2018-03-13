@@ -110,9 +110,80 @@
             <!-- articles -->
             
                 
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2014-11-10-Sutherland/" class="card-header-title">
+                      <a href="/2014/11/22/2014-11-22-constructor/" class="card-header-title">
+                        构造函数正确调用
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <pre><code class="cpp">struct CLS
+{
+    int m_i;
+    CLS( int i ):m_i(i){}
+    CLS()
+    {
+        CLS(0);
+    }
+};
+</code></pre>
+<pre><code class="cpp">int main()
+{
+    CLS obj;
+    // obj.m_i = ?
+    return 0;
+}
+</code></pre>
+<p>从这里，我们归纳如下：</p>
+<blockquote>
+<p>1）在c++里，由于构造函数允许有默认参数，使得这种构造函数调用构造函数来重用代码的需求大为减少</p>
+</blockquote>
+<blockquote>
+<p>2）如果仅仅为了一个构造函数重用另一个构造函数的代码，那么完全可以把构造函数中的公共部分抽取出来定义一个成员函数(推荐为private),然后在每个需要这个代码的构造函数中调用该函数即可</p>
+</blockquote>
+<blockquote>
+<p>3）偶尔我们还是希望在类的构造函数里调用另一个构造函数，可以按下面方式做：</p>
+</blockquote>
+<p>在构造函数里调用另一个构造函数的关键是让第二个构造函数在第一次分配好的内存上执行，而不是分配新的内存，这个可以用标准库的<code>placement new</code>做到：</p>
+<blockquote>
+<p>先看看标准库中<code>placement new</code>的定义</p>
+</blockquote>
+<pre><code class="cpp">inline void *__cdecl operator new(size_t, void *_P)
+{
+    return (_P); 
+} 
+</code></pre>
+<p>可见没有分配新的内存。</p>
+<p>正确的方式：</p>
+<pre><code class="cpp">struct CLS
+{
+    int m_i;
+    CLS( int i ) : m_i(i){}
+    CLS()
+    {
+        new (this)CLS(0);
+    }
+};
+</code></pre>
+<blockquote>
+<p>另： 若构造函数调用自身，则会出现无限递归调用，是不允许的</p>
+</blockquote>
+<p>若是构造函数嵌套调用 那么第二次调用产生的是匿名对象 也就是说 无论在第二次的构造函数中赋任何值 都会被作为临时对象给抹去 <code>那么出了第一次的构造函数相当于没有初始化任何东西</code></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/10/11/2014-11-10-Sutherland/" class="card-header-title">
                         Sutherland-Hodgman Algorithm
                       </a>
                     </div>
@@ -171,9 +242,11 @@ case p1 Behind and p2 InFront
                   <br>
                   <br>
                   
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2014-11-10-Support Point/" class="card-header-title">
+                      <a href="/2014/10/11/2014-11-10-Support Point/" class="card-header-title">
                         Support Point--Minkowski difference
                       </a>
                     </div>
@@ -187,38 +260,6 @@ case p1 Behind and p2 InFront
 <p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
 <p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
 <p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/12/2014-11-10-Rigid body with direction/" class="card-header-title">
-                        带有方向的刚体
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.要检测圆形与多边形的碰撞 其实可以分解为圆与多边形上最近点的向量与面法线方向是否一致的问题</p>
-<p>再继续分解下去求解最近点 就能够发现只需要一个多边形的面和一个圆心即可 在这个多边形面上 这个线段可以被分为三个区域</p>
-<p>如图所示<br><img src="https://app.yinxiang.com/shard/s3/res/12b1c6bc-6270-4f30-a5df-c10818ee6a96.png" alt=""></p>
-<ul>
-<li>在Face Region中 圆心到多边形最近的点就在Face Region上 且与圆心的连线垂直于这条边</li>
-<li>在Edge Region内 那么最近点就是线段边缘点本身</li>
-</ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/3745b055-e85c-42a4-a42f-69c954ceb32d/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
-<ul>
-<li>确定圆心在哪个区域内 可以让圆心与线段本身进行点积</li>
-<li>可以通过想象出一个三角形来完成这样的一个任务</li>
-</ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/b8db4928-d785-4f21-be7b-6e0ab9f9e635.png" alt=""></p>
-<ul>
-<li>在这里 若是圆心位置为Edge Region那么圆心与线段端点的夹角theta一定大于90度 或者小于90度(对应的变化要看线段的向量方向走向规定)</li>
-</ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/3c7b74c2-5e9c-4caa-b565-2551f68985d6/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
 
                       </p>
                     </div>
@@ -295,11 +336,11 @@ case p1 Behind and p2 InFront
                     <ul class="pagination-list">
 
                         
-                        <li><a class="pagination-link" href="archives//">1</a></li>                        
-                        <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        <li><a class="pagination-link" href="archives//">1</a></li>
                         
 
-                        
+                                                
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
                             <li><a class="pagination-link" href="archives//page/14">14</a></li>
                         
 

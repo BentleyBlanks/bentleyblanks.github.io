@@ -110,9 +110,100 @@
             <!-- articles -->
             
                 
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2015-06-27-hello-world/" class="card-header-title">
+                      <a href="/2015/07/31/2015-07-31-KMP-1/" class="card-header-title">
+                        KMP算法心得-1
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文的理解建立在此<a href="http://en.wikipedia.org/wiki/Syntax_highlighting" target="_blank" rel="noopener">^1</a>以及<a href="http://blog.csdn.net/v_july_v/article/details/7041827" target="_blank" rel="noopener">^2</a>详解之上</p>
+</blockquote>
+<blockquote>
+<p>本文是对 数据结构–C语言版 书中代码的详解与个人理解</p>
+</blockquote>
+<p>在看到 数据结构–C语言版 里的字符串模式匹配算法时，一开始我不知情Knuth, Morris, Pratt模式匹配是何物，直到有一行代码</p>
+<pre><code class="cpp">    i = failure[i];
+</code></pre>
+<p>真的是百思不得其解，应该说我对于i的作用并不是很明确。此书称此函数为失配函数，对于此数组的作用也算是略知了一二。我这里不赘述算法的基础介绍，着重于理解上可能产生歧义的几个部分。</p>
+<p>首先我想先将书上KMP算法的实际匹配算法代码罗列一下。此书是将一段未知字符串先进行失配函数处理，得到failure数组，或者说是网络上说的next数组。</p>
+<pre><code class="cpp">int pmatch(char *string, char *pat)
+{
+    // 字符串指针 / 模式字符串指针
+    int i = 0, j = 0;
+    // 命名上稍做了改动 方便理解
+    int lengthString = strlens(string), lengthPat = strlens(pat);
+
+    while(i &lt; lengthString &amp;&amp; j &lt;lengthPat)
+    {
+        if(string[i] == pat[j])
+        {
+            i++;
+            j++;
+        }
+        else if(j == 0)
+            i++;
+        else
+            // 回到可回溯位置(核心)
+            j = failure[j - 1] + 1;
+    }        
+
+    // 若完成匹配需要让i回归到模式匹配的起始位置
+    return (j == lengthPat) ? (i - lengthPat), -1;
+}
+</code></pre>
+<p>这里的核心代码确切的说只有一行，就是j = failure[j - 1] + 1。这里j起到的作用就是原文里这一段。</p>
+<figure><br>    <a href="http://images.cnitblog.com/blog/416010/201308/17122439-e349fed25e974e7886a27d18871ae48a.png" target="_blank" rel="noopener"><br>        <img src="http://images.cnitblog.com/blog/416010/201308/17122439-e349fed25e974e7886a27d18871ae48a.png" alt=""><br>    </a><br></figure>
+
+
+<p>让匹配失败后，不是暴力求解的从pattern的第一位A开始，而是从failure[j-1]+1(在这里failure[j-1]指向的是第一位A，在+1了之后就指向了B)，这一点很重要，很多教程似乎都撇开了next / failure数组和实际求解的关系。</p>
+<p>大多将这两者分开介绍，我在仔细联系了两者后发现，其实j = failure[j - 1] + 1这一段的理解是分不开失配函数的求解的。</p>
+<p>以下是失配函数</p>
+<pre><code class="cpp">void fail(char *pat)
+{
+    int n = strlen(pat);
+    failure[0] = -1;
+
+    for(int j = 0; j&lt;n; j++)
+    {
+        // i在此处会被重置，要么为-1要么为上一循环结束值
+        i = failure[j - 1];
+
+        while(pat[j] != pat[i+1] &amp;&amp; i&gt;0)
+            // 核心代码
+            i = failure[i];
+
+        if(pat[j] == pat[i+1])
+            failure[j] = i+1;
+        else
+            failure[j] = -1;
+    }
+}
+</code></pre>
+<p>我想详说一下i的作用，很微妙，似乎不能用一句简单的话概括。还记得刚才匹配失败以后从failure[j-1]+1重新匹配的事实吗。i在这里就是表示，上一个p0,p1…pi = pj-i,pj-i+1…pj出现的位置，也就是前缀在后缀中出现的位置。后边的if/else应该是好理解的。</p>
+<p>可以这样代入，某一循环中的某一刻，只要上一循环i&gt;0, 那么pat[i]==pat[j-1]，因此failure[j-1] = i - 1无误(本书中i因为是从-1开始的，算法导论从0开始，本意相同，只有1的差距)。</p>
+<p>所以倘若pat[i+1] == pat[j]那么自然failure[j]的值可以直接从上次结果failure[j-1]继承过来failure[j] = i+1了（i会在循环开始被重置为failure[j - 1]，因为我的条件是当前字符相同，所以不进入while），等价于failure[j] = failure[j-1] + 1咯。</p>
+<p>核心代码</p>
+<pre><code class="cpp">    i = failure[i];
+</code></pre>
+<p>的理解我花了非常多的时间。</p>
+<p>感觉直到目前为止，都没能很透彻的了解。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/06/27/2015-06-27-hello-world/" class="card-header-title">
                         Who&#39;s your daddy?
                       </a>
                     </div>
@@ -143,9 +234,11 @@
                   <br>
                   <br>
                   
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2015-03-01-C++_note1/" class="card-header-title">
+                      <a href="/2015/03/01/2015-03-01-C++_note1/" class="card-header-title">
                         C++编程思想(读书笔记_1)
                       </a>
                     </div>
@@ -176,55 +269,6 @@ while(char c = cin.get() != &#39;q&#39;)
 </code></pre>
 <p>这里的!=优先级比 = 要高</p>
 <p>所以c得到的不是cin返回的字符串 而是一个bool 所以大多数情况下回显示一个笑脸</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/12/2014-12-08-Table in Lua/" class="card-header-title">
-                        Lua的Table结构
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.</p>
-<pre><code class="cpp">// 传递表给Lua
-lua_createtable(luaState, 2, 0);
-// [1]-&gt;49
-// 1代表key值 一个键值指定一个value 类似于号码簿
-lua_pushnumber(luaState, 1);
-lua_pushnumber(luaState, 49);
-
-// 压入两个参数之后索引变为-3 栈顶为-1
-lua_rawset(luaState, -3);
-
-// [2]-&gt;&quot;Life is a Circle&quot;
-lua_pushnumber(luaState, 2);
-lua_pushstring(luaState, &quot;Life is a Circle&quot;);
-// 上一步rawset已经清空栈 再次压入两个元素变为-3
-lua_rawset(luaState, -3);
-
-lua_setglobal(luaState, &quot;tables&quot;);
-</code></pre>
-<p>搭配Lua文件中的</p>
-<pre><code class="cpp">-- #table为获取当前table长度
-for i=1, #tables do
-     print(i, tables[i])
-end
-</code></pre>
-<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
-<pre><code class="cpp">print(array[1])
-print(array[3])
-</code></pre>
-<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
-<pre><code class="cpp">print(array[0]) --nil 
-print(array[&quot;1&quot;]) --nil
-</code></pre>
-<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
 
                       </p>
                     </div>
@@ -301,11 +345,11 @@ print(array[&quot;1&quot;]) --nil
                     <ul class="pagination-list">
 
                         
-                        <li><a class="pagination-link" href="/">1</a></li>                        
-                        <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        <li><a class="pagination-link" href="/">1</a></li>
                         
 
-                        
+                                                
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
                             <li><a class="pagination-link" href="/page/12">12</a></li>
                         
 

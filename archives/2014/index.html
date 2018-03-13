@@ -1,0 +1,402 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archives: 2014 [ Bingo ]</title>
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
+  <!-- theme css -->
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+    
+  
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
+                        Lua的Table结构
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.</p>
+<pre><code class="cpp">// 传递表给Lua
+lua_createtable(luaState, 2, 0);
+// [1]-&gt;49
+// 1代表key值 一个键值指定一个value 类似于号码簿
+lua_pushnumber(luaState, 1);
+lua_pushnumber(luaState, 49);
+
+// 压入两个参数之后索引变为-3 栈顶为-1
+lua_rawset(luaState, -3);
+
+// [2]-&gt;&quot;Life is a Circle&quot;
+lua_pushnumber(luaState, 2);
+lua_pushstring(luaState, &quot;Life is a Circle&quot;);
+// 上一步rawset已经清空栈 再次压入两个元素变为-3
+lua_rawset(luaState, -3);
+
+lua_setglobal(luaState, &quot;tables&quot;);
+</code></pre>
+<p>搭配Lua文件中的</p>
+<pre><code class="cpp">-- #table为获取当前table长度
+for i=1, #tables do
+     print(i, tables[i])
+end
+</code></pre>
+<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
+<pre><code class="cpp">print(array[1])
+print(array[3])
+</code></pre>
+<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
+<pre><code class="cpp">print(array[0]) --nil 
+print(array[&quot;1&quot;]) --nil
+</code></pre>
+<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
+                        自定义函数的Lua绑定
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+<p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+<p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
+<pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
+return temp,9,1
+</code></pre>
+<p>在C程序中</p>
+<pre><code class="cpp">std::stringstream strBuffer;
+while(lua_gettop(luaState))
+{
+    strBuffer.str(std::string());
+    strBuffer &lt;&lt; &quot;lua returned a &quot;;
+
+    int index = lua_gettop(luaState);
+    switch(lua_type(luaState, index))
+    {
+    case LUA_TNUMBER:
+        strBuffer &lt;&lt; &quot;number&quot; &lt;&lt; lua_tonumber(luaState, index);
+        break;
+    case LUA_TTABLE:
+        strBuffer &lt;&lt; &quot;table&quot;;
+        break;
+    case LUA_TSTRING:
+        strBuffer &lt;&lt; &quot;string&quot; &lt;&lt; lua_tostring(luaState, index);
+        break;
+    case LUA_TBOOLEAN:
+        strBuffer &lt;&lt; &quot;boolean&quot; &lt;&lt; lua_toboolean(luaState, index);
+        break;
+    default:
+        strBuffer &lt;&lt; &quot;unknow type&quot;;
+        break;
+    }
+
+    strBuffer &lt;&lt; &quot;\n&quot;;
+    lua_pop(luaState, 1);
+    cout &lt;&lt; strBuffer.str() &lt;&lt; endl;
+}
+</code></pre>
+<p>期望能够解析出每个返回值的类型信息 </p>
+<p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
+                        Lua栈结构
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <ol>
+<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
+</ol>
+<p>2.lua栈</p>
+<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
+<p>3.建一个新表</p>
+<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
+</code></pre>
+<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
+<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
+</code></pre>
+<p>常用这个</p>
+<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-two-thirds">
+                <!-- <div class="card is-white"> -->
+                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+                    
+                        <a class="pagination-previous" href="/">
+                    
+                    Previous
+                    </a>
+
+                    <ul class="pagination-list">
+
+                        
+
+                        
+
+                        
+                        <li><a class="pagination-link is-current">1</a></li>
+
+                        
+                            <li><a class="pagination-link" href="archives/2014//page/2">2</a></li>
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        
+
+                        
+                            <li><a class="pagination-link" href="archives/2014//page/7">7</a></li>
+                        
+                    </ul>
+
+                    
+                        <a class="pagination-next" href="/archives/2014/page/2/">
+                    
+                    Next
+                    </a>
+                </nav>
+                <!-- </div> -->
+            </div>
+
+            <div class="column"></div>
+        </div>
+    </div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>. Powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

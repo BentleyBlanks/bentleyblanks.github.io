@@ -110,27 +110,50 @@
             <!-- articles -->
             
                 
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2014-12-07-Stack in Lua/" class="card-header-title">
-                        Lua栈结构
+                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
+                        Lua的Table结构
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <ol>
-<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
-</ol>
-<p>2.lua栈</p>
-<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
-<p>3.建一个新表</p>
-<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
+                        <p>1.</p>
+<pre><code class="cpp">// 传递表给Lua
+lua_createtable(luaState, 2, 0);
+// [1]-&gt;49
+// 1代表key值 一个键值指定一个value 类似于号码簿
+lua_pushnumber(luaState, 1);
+lua_pushnumber(luaState, 49);
+
+// 压入两个参数之后索引变为-3 栈顶为-1
+lua_rawset(luaState, -3);
+
+// [2]-&gt;&quot;Life is a Circle&quot;
+lua_pushnumber(luaState, 2);
+lua_pushstring(luaState, &quot;Life is a Circle&quot;);
+// 上一步rawset已经清空栈 再次压入两个元素变为-3
+lua_rawset(luaState, -3);
+
+lua_setglobal(luaState, &quot;tables&quot;);
 </code></pre>
-<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
-<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
+<p>搭配Lua文件中的</p>
+<pre><code class="cpp">-- #table为获取当前table长度
+for i=1, #tables do
+     print(i, tables[i])
+end
 </code></pre>
-<p>常用这个</p>
-<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
+<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
+<pre><code class="cpp">print(array[1])
+print(array[3])
+</code></pre>
+<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
+<pre><code class="cpp">print(array[0]) --nil 
+print(array[&quot;1&quot;]) --nil
+</code></pre>
+<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
 
                       </p>
                     </div>
@@ -138,9 +161,11 @@
                   <br>
                   <br>
                   
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2014-12-07-Custom function binding in Lua/" class="card-header-title">
+                      <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
                         自定义函数的Lua绑定
                       </a>
                     </div>
@@ -193,66 +218,29 @@ while(lua_gettop(luaState))
                   <br>
                   <br>
                   
+                  <!-- date -->
+                  <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2018/03/12/2014-11-22-constructor/" class="card-header-title">
-                        构造函数正确调用
+                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
+                        Lua栈结构
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <pre><code class="cpp">struct CLS
-{
-    int m_i;
-    CLS( int i ):m_i(i){}
-    CLS()
-    {
-        CLS(0);
-    }
-};
+                        <ol>
+<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
+</ol>
+<p>2.lua栈</p>
+<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
+<p>3.建一个新表</p>
+<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
 </code></pre>
-<pre><code class="cpp">int main()
-{
-    CLS obj;
-    // obj.m_i = ?
-    return 0;
-}
+<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
+<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
 </code></pre>
-<p>从这里，我们归纳如下：</p>
-<blockquote>
-<p>1）在c++里，由于构造函数允许有默认参数，使得这种构造函数调用构造函数来重用代码的需求大为减少</p>
-</blockquote>
-<blockquote>
-<p>2）如果仅仅为了一个构造函数重用另一个构造函数的代码，那么完全可以把构造函数中的公共部分抽取出来定义一个成员函数(推荐为private),然后在每个需要这个代码的构造函数中调用该函数即可</p>
-</blockquote>
-<blockquote>
-<p>3）偶尔我们还是希望在类的构造函数里调用另一个构造函数，可以按下面方式做：</p>
-</blockquote>
-<p>在构造函数里调用另一个构造函数的关键是让第二个构造函数在第一次分配好的内存上执行，而不是分配新的内存，这个可以用标准库的<code>placement new</code>做到：</p>
-<blockquote>
-<p>先看看标准库中<code>placement new</code>的定义</p>
-</blockquote>
-<pre><code class="cpp">inline void *__cdecl operator new(size_t, void *_P)
-{
-    return (_P); 
-} 
-</code></pre>
-<p>可见没有分配新的内存。</p>
-<p>正确的方式：</p>
-<pre><code class="cpp">struct CLS
-{
-    int m_i;
-    CLS( int i ) : m_i(i){}
-    CLS()
-    {
-        new (this)CLS(0);
-    }
-};
-</code></pre>
-<blockquote>
-<p>另： 若构造函数调用自身，则会出现无限递归调用，是不允许的</p>
-</blockquote>
-<p>若是构造函数嵌套调用 那么第二次调用产生的是匿名对象 也就是说 无论在第二次的构造函数中赋任何值 都会被作为临时对象给抹去 <code>那么出了第一次的构造函数相当于没有初始化任何东西</code></p>
+<p>常用这个</p>
+<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
 
                       </p>
                     </div>
@@ -329,11 +317,11 @@ while(lua_gettop(luaState))
                     <ul class="pagination-list">
 
                         
-                        <li><a class="pagination-link" href="/">1</a></li>                        
-                        <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        <li><a class="pagination-link" href="/">1</a></li>
                         
 
-                        
+                                                
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
                             <li><a class="pagination-link" href="/page/13">13</a></li>
                         
 

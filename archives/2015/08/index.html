@@ -1,0 +1,477 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archives: 8/2015: 2015 [ Bingo ]</title>
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
+  <!-- theme css -->
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+    
+  
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/08/14/2015-08-14-operator/" class="card-header-title">
+                        矩阵&#34;快速&#34;初始化
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>我将我尝试的心路历程都记录在了这里。</p>
+</blockquote>
+<p>这里的快速实质上是代表了代码书写的高效率。在重造数据结构里线性表的轮子的时候，遇到了需要构造NxM的矩阵需求，因为NxM可以动态构建出来，这没什么。</p>
+<p>如下，可以非常方便的造一个简单的NxM的矩阵轮子出来</p>
+<pre><code class="cpp">class t3Matrix
+{
+public:
+    // 构造函数参数里给出行列即可
+    t3Matrix(int row, int col):col(col), row(row)
+    {
+        m = new int*[row]();
+        for(int i = 0; i &lt; row; i++)
+            m[i] = new int[col]();
+    }
+
+    ~t3Matrix()
+    {
+        for(int i = 0; i &lt; row; i++)
+            delete[] m[i];
+
+        delete[] m;
+    }
+
+    int **m;
+    int col, row;
+};
+
+</code></pre>
+<p>问题来了，如何赋值，倘若是以往的2x2, 3x3事实上都是好解决的。</p>
+<pre><code class="cpp">void t3Matrix2x2::create(int a00, int a01, int a10, int a11)
+{
+    // do something...
+}
+
+void t3Matrix3x3::create(int a00, int a01, int a02, int a10, int a11, int a12)
+{
+    // do something...
+}
+
+// etc... 
+</code></pre>
+<p>实际使用的时候这样的方法也不免为一个好决策。这里我颇受<a href="http://eigen.tuxfamily.org" target="_blank" rel="noopener">Eigen</a>的影响, 他的矩阵初始化办法颇为简便易读，他是这样的。</p>
+<pre><code class="cpp">void main()
+{
+    // NxM
+    t3Matrix m(2, 3);
+
+    // core!
+    m &lt;&lt; 1, 2,
+         3, 4,
+         5, 6;
+}
+</code></pre>
+<p>这才像话，立马动手抄，但是<a href="http://eigen.tuxfamily.org" target="_blank" rel="noopener">Eigen</a>过于庞大，也只能依样画葫芦尝试着去实现。</p>
+<blockquote>
+<p>尝试1</p>
+</blockquote>
+<p>移位运算符与stream联系非常迫切，兴许有效。这里我尝试着这样去试着使用istream,ostream配合着完成这样的初始化。</p>
+<pre><code class="cpp">class t3Matrix
+{
+public:
+    t3Matrix();
+    ~t3Matrix();
+};
+
+ostream&amp; operator&lt;&lt;(ostream&amp; os, t3Matrix&amp; m);
+
+istream&amp; operator&gt;&gt;(istream&amp; is, t3Matrix&amp; m);
+</code></pre>
+<p>思来想去，我最多能够做到使用cin,cout为矩阵初始化和输出，并不能在代码中实现初始化动作。</p>
+<pre><code class="cpp">void fuck()
+{
+    t3Matrix m(n, m);
+    // 标准输入初始化矩阵
+    cin &gt;&gt; m;
+    // 抛却m.print()方式标准输出
+    cout &lt;&lt; m;
+}
+</code></pre>
+<p>然而这并没有什么卵用，期间我甚至尝试着让t3Matrix<code>继承</code>std::ostream。注意！OSX下XCode不会对以下代码报错</p>
+<pre><code class="cpp">class A:public std::ostream
+{
+public:
+    // 如若不为ostream构造,那么你将面临两次调用matrix析构函数的问题(Windows上VS编译无法通过)
+    // 解决办法是写为ostream(NULL)提供一个streambuf参数即可,当然也可以给NULL 
+    A(){}
+
+    // 会被二次调用
+    ~A(){}
+};
+</code></pre>
+<pre><code class="cpp">class A:public std::ostream
+{
+public:
+    // 运行正常
+    A():std::ostream(NULL){}
+
+    ~A(){}
+};
+</code></pre>
+<p><br></p>
+<blockquote>
+<p>尝试2</p>
+</blockquote>
+<p>这回另辟蹊径，想起了重载逗号运算符。重载这个运算符实在是太少见了，以至于我和同学说起时，惊讶的反应：这**玩意也要重载？</p>
+<p>其实需求很明显只要<code>m &lt;&lt; 1, 2, 3, 4;</code>能够一路正确的读取即可，<code>&lt;&lt;</code>的优先级高于<code>,</code>，加上从左到右的运算顺序。</p>
+<p>所以只要满足<code>m &lt;&lt; 1</code>的返回值能够与重载<code>,</code>的运算符左参数相符，那么其实就是t3Matrix自身了。</p>
+<p>以下写法已证实可行</p>
+<pre><code class="cpp">class t3Matrix
+{
+public:
+    // ...
+    t3Matrix&amp; operator,(int value)
+    {
+        // 赋该value到正确的位置
+        // do something...
+        return *this;
+    }
+
+    t3Matrix&amp; operator&lt;&lt;(int value)
+    {
+        // 赋该value到正确的位置
+        // do something...
+        return *this;
+    }
+};
+
+void main()
+{
+    t3Matrix m(2, 3);
+    m &lt;&lt; 1, 2,
+         3, 4,
+         5, 6;
+}
+</code></pre>
+<blockquote>
+<p>其实难度不在于”&lt;&lt;”的重载，而是想到”,”的重载才是</p>
+</blockquote>
+<blockquote>
+<p>已更新至<a href="https://github.com/BentleyBlanks/t3DataStructures" target="_blank" rel="noopener">t3DataStructures</a></p>
+</blockquote>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/08/13/2015-08-14-corrections/" class="card-header-title">
+                        迷宫算法的更正
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>P74页中倒数第二行的else if</p>
+</blockquote>
+<pre><code class="cpp">if(next_row == EXIT_ROW &amp;&amp; next_col == EXIT_COL)
+    found = TRUE;
+else if(!maze[next_row][next_col] &amp;&amp; !mark[nextRow][next_col]){
+    // do something...
+}
+</code></pre>
+<p>此处的else if我认为可以更正为if，那么最后一个结点也可以入栈，或者为了性能起见，将stack.push()的在第一步if中添加上也可。个人更倾向于第二种做法。</p>
+<p>即(<a href="https://github.com/BentleyBlanks/t3DataStructures/blob/master/t3DataStructures/LinearList/t3Maze.cpp" target="_blank" rel="noopener">t3DataStructures.t3Maze</a>中就是这样做的)</p>
+<pre><code class="cpp">if(next_row == EXIT_ROW &amp;&amp; next_col == EXIT_COL){
+    stack.push(row, col, dir);
+    found = TRUE;
+}
+else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
+    // do something...
+}
+</code></pre>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/08/12/2015-08-12-dataStructures/" class="card-header-title">
+                        数据结构重造轮子
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>大体就是这样了，本工序基本上是按照《数据结构-C语言》来重现出一个大致的数据结构基本内容的轮廓了的。</p>
+<p>本身代码的难度不是很大，除了几个较难理解的算法重新实现以外，抑郁的基本上是对自己基本功的一次完整的复习，希望可以抛砖引玉。</p>
+<p>一旦重现70%书中内容之后，打算接《深入剖析STL》来对照着看具体的差距在哪里。因为已经有不少跨平台工程的经验，所以本数据结构应该可以做到多平台的编译运行（Windows下也徐汇遇到文件格式问题，只需要重新保存成Unicode即可，OSX和Win的平台差异没办法似乎难以解决）</p>
+<p>工程Github链接<a href="https://github.com/BentleyBlanks/t3DataStructures" target="_blank" rel="noopener">t3DataStructures</a>,欢迎Star。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-two-thirds">
+                <!-- <div class="card is-white"> -->
+                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+                    
+                        <a class="pagination-previous" href="/">
+                    
+                    Previous
+                    </a>
+
+                    <ul class="pagination-list">
+
+                        
+
+                        
+
+                        
+                        <li><a class="pagination-link is-current">1</a></li>
+
+                        
+
+                        
+                            <li><a class="pagination-link" href="archives/2015/08//page/2">2</a></li>
+                        
+                    </ul>
+
+                    
+                        <a class="pagination-next" href="/archives/2015/08/page/2/">
+                    
+                    Next
+                    </a>
+                </nav>
+                <!-- </div> -->
+            </div>
+
+            <div class="column"></div>
+        </div>
+    </div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>. Powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

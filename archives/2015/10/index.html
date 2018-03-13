@@ -1,0 +1,538 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archives: 10/2015: 2015 [ Bingo ]</title>
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
+  <!-- theme css -->
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+    
+  
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+
+<section class="section">
+  <div class="container">
+    <!-- content and about me -->
+    <div class="columns">
+      <!-- blog -->
+      <div class="column is-two-thirds">
+        <div class="columns is-multiline">
+          <div class="column is-12">
+            <!-- articles -->
+            
+                
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/10/30/2015-10-30-Compiler Compiler/" class="card-header-title">
+                        Compiler Compiler
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>专业课没有开编译原理，因此刚刚上手Flex+Bison的时候有很多概念性错误。这里不做教程，只是我个人在学习中的心得</p>
+</blockquote>
+<blockquote>
+<p>基于<a href="http://www.amazon.cn/flex%E4%B8%8Ebison-Jobn-Levine/dp/B00510VRB0/ref=sr_1_1?ie=UTF8&amp;qid=1444799536&amp;sr=8-1&amp;keywords=flex%E4%B8%8Ebison" target="_blank" rel="noopener">Flex与Bison</a>学习</p>
+</blockquote>
+<p><br></p>
+<blockquote>
+<p>2015.10.13备注</p>
+</blockquote>
+<h3 id="Chapter-1"><a href="#Chapter-1" class="headerlink" title="Chapter 1"></a>Chapter 1</h3><ol>
+<li>Flex在使用gcc编译时会用到一个名叫<strong>lfl</strong>的库，本质上是yywarp，大多数都会在声明部分启用<strong>%option noyywrap</strong>，一般不需要此库。<br><br><br></li>
+<li>Flex与Bison本质上是给定文法生成指定.c, .h文件提供给工程，因此本身的main主程序测试不是必须的。<br><br><br></li>
+<li>Flex本质是词法分析器，因此在分析到指定token时，会需要用到具体的tokenType。这一般会在Bison中指定，那么就会前向声明<strong>#include</strong> Bison生成的.h,例如<strong>xxx.tab.h</strong>.<br><br><br></li>
+<li>Bison与Flex使用的是标准C，因此当使用cc编译命令时<strong>//</strong>注释不可用，需为<strong>/<em> </em>/</strong><br><br><br></li>
+<li>Bison功用是根据BNF范式生成一颗AST树，这颗树很可能是不可见，也就是隐藏的。<br><br><br></li>
+<li>Flex的规则列表中切忌是不可以增加注释的，只能在右边的动作或者在规则开始声明符<strong>%%</strong>之前添加注释.且规则和动作之间至少增加一个空格，否则<strong>{}</strong>也会被认定为正则表达式。</li>
+</ol>
+<p><br></p>
+<blockquote>
+<p>2015.10.30备注</p>
+</blockquote>
+<p>###Chapter 9</p>
+<p>1.纯词法分析器和纯语法分析器协同工作。不仅是Flex上给出<strong>%option reentrant和%option bison-bridge</strong>+Bison <strong>%pure-parser</strong>那么简单(原本使用书上注明的<strong>%define api.pure</strong>在OSX上不可用，应该是版本问题，具体情况可以参考Webkit上的.flex)。<br>其中<strong>bison-bridge</strong>的作用就是完成Flex上与Bison上不协调的yylex()所做的对接。</p>
+<pre><code class="cpp">// Flex
+token = yylex(YYSTYPE *yylvalp);
+// Bison
+token = yylex(yyscan_t scaninfo);
+</code></pre>
+<p>之前自己在Flex中或Bison或具体外部使用之前的前向声明都可以隐藏，或手动声明为</p>
+<pre><code class="cpp">int yylex(YYSTYPE *lvalp, yyscan_t scaninfo);
+</code></pre>
+<p>2.<strong>%parse-param</strong>/<strong>#define YYPARSE_PARAM</strong>和<strong>%lex-param</strong>/<strong>#define YYLEX_PARAM</strong>都可以声明传递给分析器应用数据的类型，但根据版本迭代的情况而言，以及借鉴Webkit使用情况，推荐使用<strong>%parse-param</strong>和<strong>%lex-param</strong>。</p>
+<p>3.强烈建议包含Flex+Bison生成的头文件时<strong>查看包含关系</strong>。因为一旦重复包含或少包含都会引起非常难以调试的符号未定义BUG，哪怕在生成的源文件中已经#define了此符号。</p>
+<p>4.Bison在定义%token时，使用到了某单符号，例如’-‘’+’等等，此类token若未在Bison中给出相应名，那么就需要分配其指定类型。</p>
+<p>5.BNF范式在实现中，务必手工生成一遍语法树，很有可能其 空 的部分顺序是错误的，因为Bison在面对二义性语法上会选择匹配长度更长的，或者是最新匹配的那一部分，因此 空 实现的顺序就尤为关键。</p>
+<p>6.Flex+Bison支持简单的class内置，所有的中文资料显示2009年时两者未能有效支持C++，需要<strong>%language “C++”</strong>来完成对C++的支持，目前看来无需此关键字也能完成class对struct的替换。</p>
+<p>7.Flex中yyextra指针分配给指定对象的声明位置尤为关键不在头部的%{ %}对中，而是在词法分析单元声明部分中。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- date -->
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/10/27/2015-10-27-AST可视化/" class="card-header-title">
+                        AST可视化
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>在使用编译器前端Flex+Bison完成了大部分工作之后，尽管可以使用简易的<strong>printf</strong>来完成终端调试，但终究不够方便。</p>
+<p>使用Bison完成AST生成之后需要对其构建的AST进行分析，此时常规思路的前序中序后序遍历对这样一个庞大的二叉树而言实现可视重建并不容易。因为你需要通过前中序来手工推导出一整棵树，但这并不是你做此任务的主要目的。</p>
+<p>这里我安利一波贝尔实验室推出的黑科技<a href="http://www.graphviz.org/Download_windows.php" target="_blank" rel="noopener">Graphviz</a>，在原有的遍历基础上基本上能够做到1分钟完成上手。</p>
+<p>假定一抽象语法树节点类Node，之后所有AST都将被视为普通二叉树。</p>
+<blockquote>
+<p>简单的类定义</p>
+</blockquote>
+<pre><code class="cpp">class Node
+{
+public:
+  Node *leftChild;
+  Node *rightChild;
+  // 访问当前结点
+  virtual void value();
+};
+</code></pre>
+<blockquote>
+<p>传统的中序遍历</p>
+</blockquote>
+<pre><code class="cpp">void traversal(Node * root)
+{
+  if(!root) return;
+
+  traversal(root-&gt;leftChild);
+  root-&gt;value();
+  traversal(root-&gt;rightChild);
+}
+</code></pre>
+<blockquote>
+<p>Graphviz支持<a href="http://www.graphviz.org/content/dot-language" target="_blank" rel="noopener">DOT</a>语言的输入，个人认为只要依样画葫芦即可</p>
+</blockquote>
+<blockquote>
+<p>使用DOT输出的中序遍历 只需要增加当前结点的label名及各子结点地址 无论是printf或是保存文件都可选 目的无非就是获取这一整段DOT输出代码</p>
+</blockquote>
+<pre><code class="cpp">
+class Node
+{
+public:
+  Node *leftChild;
+  Node *rightChild;
+  // 访问当前结点
+  virtual void value();
+
+  string name;
+};
+
+// 以下代码将会使得遍历转换为DOT格式
+void traversal(Node * root)
+{
+  // 可选将渲染的结点形状更换为其他形式
+  printf(&quot;digraph G {\n&quot;);
+  printf(&quot;node[shape=rect]\n&quot;);
+
+  traversalAsDot(root);
+
+  printf(&quot;}&quot;);
+}
+
+void traversalAsDot(Node* root)
+{
+  if(!root) return;
+
+  // 当前结点名
+  // root-&gt;name.c_str() 可以更换为任意能够获取当前结点名的函数 手工RTTI都可
+  printf(&quot;_%p[label=%s]\n&quot;, root, root-&gt;name.c_str());
+
+  // 传递父节点到子节点地址信息
+  if (l != NULL) printf(&quot;_%p -&gt; _%p\n&quot;, root, root-&gt;leftChild);
+  if (r != NULL) printf(&quot;_%p -&gt; _%p\n&quot;, root, root-&gt;rightChild);
+
+  traversalAsDot(l);
+  root-&gt;value();
+  traversalAsDot(r);
+}
+
+</code></pre>
+<p>我在这里是对CSS进行解析生成AST，解析以下代码，获得AST，输出DOT使用Graphviz渲染</p>
+<pre><code class="css">
+head.font-face.a .b:hover,  #ahs{
+    background: #00FF00;
+    src: 222;
+}
+
+.body {
+    font-family: &#39;Raleway&#39;, Arial, sans-serif;
+    margin: 1, 2, 3, 4;
+}
+
+</code></pre>
+<p>输出的DOT如下</p>
+<pre><code class="cpp">
+digraph G {
+node[shape=rect]
+_0059C010[label=RuleList]
+_0059C010 -&gt; _0059BE48
+_0059C010 -&gt; _0059BFF8
+_0059BE48[label=RuleList]
+_0059BE48 -&gt; _0059BE30
+_0059BE30[label=Ruleset]
+_0059BE30 -&gt; _0059BD70
+_0059BE30 -&gt; _0059BE18
+_0059BD70[label=SelectorList]
+_0059BD70 -&gt; _00597EC0
+_0059BD70 -&gt; _0059BD58
+_00597EC0[label=SelectorList]
+_00597EC0 -&gt; _00597E78
+_00597E78[label=Selector]
+_00597E78 -&gt; _00597E30
+_00597E78 -&gt; _00597C98
+_00597E30[label=SimpleSelector]
+_00597E30 -&gt; _00597DF0
+_00597DF0[label=SpecifierList]
+_00597DF0 -&gt; _00597DD8
+_00597DF0 -&gt; _00597D50
+_00597DD8[label=SpecifierPseudo]
+_00597D50[label=SpecifierList]
+_00597D50 -&gt; _00597D38
+_00597D38[label=SpecifierClass]
+_00597C98[label=Selector]
+_00597C98 -&gt; _00597C50
+_00597C50[label=SimpleSelector]
+_00597C50 -&gt; _00597C10
+_00597C10[label=SpecifierList]
+_00597C10 -&gt; _00597BF8
+_00597C10 -&gt; _00597B70
+_00597BF8[label=SpecifierClass]
+_00597B70[label=SpecifierList]
+_00597B70 -&gt; _00597B58
+_00597B58[label=SpecifierClass]
+_0059BD58[label=Selector]
+_0059BD58 -&gt; _0059BD40
+_0059BD40[label=SimpleSelector]
+_0059BD40 -&gt; _0059BCA0
+_0059BCA0[label=SpecifierList]
+_0059BCA0 -&gt; _00597F68
+_00597F68[label=SpecifierElement]
+_0059BE18[label=DeclarationList]
+_0059BE18 -&gt; _0059BDD0
+_0059BE18 -&gt; _0059BE00
+_0059BDD0[label=DeclarationList]
+_0059BDD0 -&gt; _0059BDA0
+_0059BDA0[label=Declaration]
+_0059BDA0 -&gt; _0059BD88
+_0059BD88[label=Expression]
+_0059BD88 -&gt; _0059C5C8
+_0059C5C8[label=TermHex]
+_0059BE00[label=Declaration]
+_0059BE00 -&gt; _0059BDE8
+_0059BDE8[label=Expression]
+_0059BDE8 -&gt; _0059C620
+_0059C620[label=TermInteger]
+_0059BFF8[label=Ruleset]
+_0059BFF8 -&gt; _0059BED8
+_0059BFF8 -&gt; _0059BFE0
+_0059BED8[label=SelectorList]
+_0059BED8 -&gt; _0059BEC0
+_0059BEC0[label=Selector]
+_0059BEC0 -&gt; _0059BEA8
+_0059BEA8[label=Selector]
+_0059BEA8 -&gt; _0059BE90
+_0059BE90[label=SimpleSelector]
+_0059BE90 -&gt; _0059BE78
+_0059BE78[label=SpecifierList]
+_0059BE78 -&gt; _0059BE60
+_0059BE60[label=SpecifierClass]
+_0059BFE0[label=DeclarationList]
+_0059BFE0 -&gt; _0059BF50
+_0059BFE0 -&gt; _0059BFC8
+_0059BF50[label=DeclarationList]
+_0059BF50 -&gt; _0059BF38
+_0059BF38[label=Declaration]
+_0059BF38 -&gt; _0059BF20
+_0059BF20[label=Expression]
+_0059BF20 -&gt; _0059BF08
+_0059BF20 -&gt; _0059C8E0
+_0059BF08[label=Expression]
+_0059BF08 -&gt; _0059BEF0
+_0059BF08 -&gt; _0059C860
+_0059BEF0[label=Expression]
+_0059BEF0 -&gt; _0059C7E0
+_0059C7E0[label=TermString]
+_0059C860[label=TermIndent]
+_0059C8E0[label=TermIndent]
+_0059BFC8[label=Declaration]
+_0059BFC8 -&gt; _0059BFB0
+_0059BFB0[label=Expression]
+_0059BFB0 -&gt; _0059BF98
+_0059BFB0 -&gt; _0059CA80
+_0059BF98[label=Expression]
+_0059BF98 -&gt; _0059BF80
+_0059BF98 -&gt; _0059CA20
+_0059BF80[label=Expression]
+_0059BF80 -&gt; _0059BF68
+_0059BF80 -&gt; _0059C9C0
+_0059BF68[label=Expression]
+_0059BF68 -&gt; _0059C980
+_0059C980[label=TermInteger]
+_0059C9C0[label=TermInteger]
+_0059CA20[label=TermInteger]
+_0059CA80[label=TermInteger]
+}
+
+</code></pre>
+<blockquote>
+<p>渲染结果为</p>
+</blockquote>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" alt=""><br>    </a><br></figure>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+              
+          </div>
+        </div>
+      </div>
+      <!-- about me -->
+      <div class="column">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+          <div class="card-image">
+            <figure class="image">
+              <img src="http://pbrt.org/gallery/a3.jpg">
+            </figure>
+          </div>
+          <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
+            <div class="content">
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+            </div>
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+              <!-- <div class="column"></div> -->
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
+              </div>
+
+              <!-- <div class="column"></div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div class="column"></div> -->
+    </div>
+  </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-two-thirds">
+                <!-- <div class="card is-white"> -->
+                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+                    
+                        <a class="pagination-previous" href="/">
+                    
+                    Previous
+                    </a>
+
+                    <ul class="pagination-list">
+
+                        
+
+                        
+
+                        
+                        <li><a class="pagination-link is-current">1</a></li>
+
+                        
+
+                        
+                    </ul>
+
+                    
+                        <a class="pagination-next" href="/">
+                    
+                    Next
+                    </a>
+                </nav>
+                <!-- </div> -->
+            </div>
+
+            <div class="column"></div>
+        </div>
+    </div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>. Powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>
