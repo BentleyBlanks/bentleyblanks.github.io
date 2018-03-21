@@ -116,6 +116,118 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
+                      <a href="/2016/01/20/2016-1-23-Unreal Engine Rendering Overview/" class="card-header-title">
+                        Unreal Engine Rendering Overview
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文源于<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Unreal官方Rendering Overview</a>的基本概念理解和翻译</p>
+</blockquote>
+<h3 id="延迟渲染"><a href="#延迟渲染" class="headerlink" title="延迟渲染"></a>延迟渲染</h3><p>与Unreal Engine 3中的Forward Lighting Path不同的是，Unreal Engine 4中所有的光源都采用的是延迟渲染的技术。各种材质都会讲各自的属性写入GBuffers当中，因此在根据光源计算时，光源直接通过Buffer上的per-pixel的材质属性来计算光照。</p>
+<blockquote>
+<p>Forward Lighting Path本质上就是最传统的光源场景渲染方式，二者对比可见<a href="http://gamedevelopment.tutsplus.com/articles/forward-rendering-vs-deferred-rendering--gamedev-12342" target="_blank" rel="noopener">Forward Rendering vs. Deferred Rendering</a>。当在指定渲染目标时，前者的做法是对场景中的每一个几何体都对每个光源进行一次管线中的光照计算，最后直接着色叠加。</p>
+<p>后者为先行计算四张2D Image/Buffer(<strong>Screen Space Depth</strong>,<strong>Surface Normals</strong>,<strong>Diffuse Color</strong>,<strong>Specular color and specular power</strong>)，VS中计算各图所需的几何体信息，而PS只存图，之后每个光源才与四张图上的内容进行着色计算。</p>
+</blockquote>
+<blockquote>
+<p>总结而言 Forward Lighting Path的伪代码</p>
+</blockquote>
+<pre><code class="cpp">
+for each object
+
+   for each light
+
+     shading
+
+</code></pre>
+<blockquote>
+<p>Deffered Shading</p>
+</blockquote>
+<pre><code class="cpp">
+for each pixel
+
+   for each light
+
+     shading
+
+</code></pre>
+<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" alt=""><br>    </a><br></figure>
+
+<blockquote>
+<p>Forward Rendering Path</p>
+</blockquote>
+<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" alt=""><br>    </a><br></figure>
+
+<blockquote>
+<p>Deffered Shading</p>
+<p>不过延迟渲染也不是完美的，在比较小的场景下延迟渲染会明显增加显存消耗和渲染速度下降，所以比较适合于较大型场景。另一个缺点是，延迟渲染对待多着色模型的场景是比较吃力。(感谢<a href="http://lonelywaiting.github.io/" target="_blank" rel="noopener">孤独的守候</a>的知识分享)</p>
+</blockquote>
+<p><br></p>
+<h3 id="Lighting-Paths"><a href="#Lighting-Paths" class="headerlink" title="Lighting Paths"></a>Lighting Paths</h3><p>UE4中有三种不同的光源</p>
+<ul>
+<li>全动态光源(详见<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/LightingAndShadows/LightMobility/DynamicLights/index.html" target="_blank" rel="noopener">Fully dynamic</a>)</li>
+<li>半静态光源(详见<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Partially static</a>)</li>
+<li>全静态光源(<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Fully static</a>)</li>
+</ul>
+<p>这些光源的使用场景也是根据不同的游戏场景，不同的性能品质要求会需要的权衡。每个游戏都还为自己选用最合适的光源类型。</p>
+<blockquote>
+<p>Movable Lights: 在运行期间可以改变位置，旋转朝向，改变颜色，亮度，衰退因子，半径等任何光源拥有的属性都可以动态修改。因此这些光源不会预先烘焙光照贴图，也不会产生任何的间接光照(实时渲染中间接光照一般都是预计算完成)。</p>
+<p>Static Lights: 静止光源的位置是不可以改变的，但是光源的亮度和颜色等都可以随之改变，因此这也是与静态光源有着最大差异的地方。但是其所改变的光源的属性都只会影响直接光照，间接光照都是由<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/LightingAndShadows/Lightmass/index.html" target="_blank" rel="noopener">Lightmass</a>预计算的，因此运行时改变其值也不会影响。</p>
+<p>Stationary lights:静态光源是不能在运行时改变任何属性的光源，他们会在Lightmass中计算完毕，之后不会对性能造成任何过多的影响。因此他是三者当中拥有中等效果，较低的可更改性但也是性能最友好的一个光源类型。</p>
+</blockquote>
+<p><br></p>
+<h3 id="Lit-Translucency"><a href="#Lit-Translucency" class="headerlink" title="Lit Translucency"></a>Lit Translucency</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" alt=""><br>    </a><br></figure>
+
+<p>以及</p>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" alt=""><br>    </a><br></figure>
+
+<p>半透明材质的发光以及着色是在单一的光源前进传递(Single Forward Pass)中保证其正确性的，但是在多通道的光源下并不适用的技术。</p>
+<p>半透明材质可以向非透明物体上投射阴影，也可以向自身或者其他半透明材质上投射阴影(如图所示)</p>
+<p><br></p>
+<h3 id="Sub-Surface-Shading"><a href="#Sub-Surface-Shading" class="headerlink" title="Sub-Surface Shading"></a>Sub-Surface Shading</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" alt=""><br>    </a><br></figure>
+
+<p>Jade Material</p>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" alt=""><br>    </a><br></figure>
+
+<p>Ice Material</p>
+<p>次表面散射着色模型是为了用于模拟蜡烛，玉制物体而做的新着色模型。他们并不是完全的半透明，但会在内部散射入射进来的光。这会比实现皮肤渲染上质量稍低但开销更小。</p>
+<p><br></p>
+<h3 id="GPU-Particles"><a href="#GPU-Particles" class="headerlink" title="GPU Particles"></a>GPU Particles</h3><p>UE4支持在GPU上模拟粒子效果，传统的CPU难以完成的上千种粒子效果可以在GPU内更快效果更好的实现。</p>
+<p><br></p>
+<h3 id="Vector-Fields"><a href="#Vector-Fields" class="headerlink" title="Vector Fields"></a>Vector Fields</h3><p>在GPU粒子中最有趣的一项特性莫过于向量场了，一个向量场是在一个网格中均匀影响所在其中粒子运动的一个向量集，向量场在UE4中是作为一个Actors来出现的，因此他本身也可以像其他Actors一样被位移，旋转，或者是缩放，所以在运行期间他们都是可以被动态移动的。</p>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" alt=""><br>    </a><br></figure>
+
+<p>例如一个向量场可以被放置在瀑布上，当粒子进入了向量场的边界时，他们都会被其所影响，当粒子群离开了边界其作用的效果也会淡去(fade out)。</p>
+<p><br></p>
+<h3 id="后期特效"><a href="#后期特效" class="headerlink" title="后期特效"></a>后期特效</h3><ul>
+<li><p>环境光遮蔽(Ambient Occlusion): 目前使用的环境光遮蔽为SSAO(屏幕空间环境光遮蔽，Screen Space Ambient Occlusion)，只会依赖与深度缓存。所以也不会被细节法线贴图或者Smoothing groups影响。因此在一些面元较少的多边形上开启这个效果时，就会显得非常生硬。所以UE4只会在选项<strong>AmbientCubemap</strong>上开启这个效果。</p>
+</li>
+<li><p>环境光立方体贴图(Ambient Cubemaps): 该效果对整个场景中的光照采用一立方体贴图，所以这个效果也是与当前材质所在位置是互相独立的。贴图的计算需要用到观察者的位置，材质的粗糙度(镜面反射效果),以及当前材质的面法线。这也就带来了高质量高效的环境光实现。</p>
+</li>
+<li><p>镜头高光(Bloom): 高光是真实世界光照的现象，较低的渲染开销却可以带来非常好的感官真实度的提升。高光效果一般可以在非常暗的背景中裸眼观察非常亮的物体观测到。</p>
+</li>
+</ul>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" alt=""><br>    </a><br></figure>
+
+<ul>
+<li><p>人眼适应:可以会自动调整场景的曝光度，重现从明亮环境进入黑暗环境（或相反）时所经历的效果。</p>
+</li>
+<li><p>镜头眩光:会在镜头转向明亮物体时自动产生镜头的眩光效果。</p>
+</li>
+<li><p>色调映射(Tone Mapping):使得渲染场景的颜色可以被转换或修改来得到不同的效果。这可以被用来制作诸如棕褐滤镜，或击中特效（例如红色闪光）等。</p>
+</li>
+</ul>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
                       <a href="/2015/12/16/2015-12-16-Ray Tracing Notes 2/" class="card-header-title">
                         Ray Tracing Notes 2
                       </a>
@@ -1091,60 +1203,6 @@ c-16-25.333-24-45-24-59z"/></svg></span></span></span></span></span></span></spa
 <blockquote>
 <p>配图为康奈尔盒</p>
 </blockquote>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2015/10/30/2015-10-30-Compiler Compiler/" class="card-header-title">
-                        Compiler Compiler
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>专业课没有开编译原理，因此刚刚上手Flex+Bison的时候有很多概念性错误。这里不做教程，只是我个人在学习中的心得</p>
-</blockquote>
-<blockquote>
-<p>基于<a href="http://www.amazon.cn/flex%E4%B8%8Ebison-Jobn-Levine/dp/B00510VRB0/ref=sr_1_1?ie=UTF8&amp;qid=1444799536&amp;sr=8-1&amp;keywords=flex%E4%B8%8Ebison" target="_blank" rel="noopener">Flex与Bison</a>学习</p>
-</blockquote>
-<p><br></p>
-<blockquote>
-<p>2015.10.13备注</p>
-</blockquote>
-<h3 id="Chapter-1"><a href="#Chapter-1" class="headerlink" title="Chapter 1"></a>Chapter 1</h3><ol>
-<li>Flex在使用gcc编译时会用到一个名叫<strong>lfl</strong>的库，本质上是yywarp，大多数都会在声明部分启用<strong>%option noyywrap</strong>，一般不需要此库。<br><br><br></li>
-<li>Flex与Bison本质上是给定文法生成指定.c, .h文件提供给工程，因此本身的main主程序测试不是必须的。<br><br><br></li>
-<li>Flex本质是词法分析器，因此在分析到指定token时，会需要用到具体的tokenType。这一般会在Bison中指定，那么就会前向声明<strong>#include</strong> Bison生成的.h,例如<strong>xxx.tab.h</strong>.<br><br><br></li>
-<li>Bison与Flex使用的是标准C，因此当使用cc编译命令时<strong>//</strong>注释不可用，需为<strong>/<em> </em>/</strong><br><br><br></li>
-<li>Bison功用是根据BNF范式生成一颗AST树，这颗树很可能是不可见，也就是隐藏的。<br><br><br></li>
-<li>Flex的规则列表中切忌是不可以增加注释的，只能在右边的动作或者在规则开始声明符<strong>%%</strong>之前添加注释.且规则和动作之间至少增加一个空格，否则<strong>{}</strong>也会被认定为正则表达式。</li>
-</ol>
-<p><br></p>
-<blockquote>
-<p>2015.10.30备注</p>
-</blockquote>
-<p>###Chapter 9</p>
-<p>1.纯词法分析器和纯语法分析器协同工作。不仅是Flex上给出<strong>%option reentrant和%option bison-bridge</strong>+Bison <strong>%pure-parser</strong>那么简单(原本使用书上注明的<strong>%define api.pure</strong>在OSX上不可用，应该是版本问题，具体情况可以参考Webkit上的.flex)。<br>其中<strong>bison-bridge</strong>的作用就是完成Flex上与Bison上不协调的yylex()所做的对接。</p>
-<pre><code class="cpp">// Flex
-token = yylex(YYSTYPE *yylvalp);
-// Bison
-token = yylex(yyscan_t scaninfo);
-</code></pre>
-<p>之前自己在Flex中或Bison或具体外部使用之前的前向声明都可以隐藏，或手动声明为</p>
-<pre><code class="cpp">int yylex(YYSTYPE *lvalp, yyscan_t scaninfo);
-</code></pre>
-<p>2.<strong>%parse-param</strong>/<strong>#define YYPARSE_PARAM</strong>和<strong>%lex-param</strong>/<strong>#define YYLEX_PARAM</strong>都可以声明传递给分析器应用数据的类型，但根据版本迭代的情况而言，以及借鉴Webkit使用情况，推荐使用<strong>%parse-param</strong>和<strong>%lex-param</strong>。</p>
-<p>3.强烈建议包含Flex+Bison生成的头文件时<strong>查看包含关系</strong>。因为一旦重复包含或少包含都会引起非常难以调试的符号未定义BUG，哪怕在生成的源文件中已经#define了此符号。</p>
-<p>4.Bison在定义%token时，使用到了某单符号，例如’-‘’+’等等，此类token若未在Bison中给出相应名，那么就需要分配其指定类型。</p>
-<p>5.BNF范式在实现中，务必手工生成一遍语法树，很有可能其 空 的部分顺序是错误的，因为Bison在面对二义性语法上会选择匹配长度更长的，或者是最新匹配的那一部分，因此 空 实现的顺序就尤为关键。</p>
-<p>6.Flex+Bison支持简单的class内置，所有的中文资料显示2009年时两者未能有效支持C++，需要<strong>%language “C++”</strong>来完成对C++的支持，目前看来无需此关键字也能完成class对struct的替换。</p>
-<p>7.Flex中yyextra指针分配给指定对象的声明位置尤为关键不在头部的%{ %}对中，而是在词法分析单元声明部分中。</p>
 
                       </p>
                     </div>

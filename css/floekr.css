@@ -8,6 +8,11 @@ a {
   transition: 0.4s ease-in-out;
 }
 
+img {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
 .is-sticky {
   position: sticky;
   top: 1.5rem;
@@ -79,7 +84,7 @@ print {
 }
 
 .card-header-title {
-	font-size: 1.5rem;
+	font-size: 1.6rem;
 	font-weight: bold;
 }
 
@@ -96,14 +101,14 @@ print {
 }
 
 /* post article */
-.card-content a {
+#articleCard .card-content a {
+  color: rgb(40, 40, 210);
   /*text-decoration: underline;*/
-  /*background-color: rgb(150, 0, 0);*/
-  /*color: rgb(200, 200, 240);*/
+  /*background-color: rgb(150, 0, 0);*/  
 }
 
 .card-content a:hover {
-  color: rgb(10, 10, 10);
+  /*color: rgb(10, 10, 10);*/
 }
 
 #postCard .card-content {
@@ -218,4 +223,24 @@ blockquote {
   padding-left: 1rem;
   margin-top: 1rem;
   margin-bottom: 1rem;
+}
+
+.card-content h1 {
+  font-size: 1.45rem;
+  font-weight: bold;
+}
+
+.card-content h2 {
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.card-content h3 {
+  font-size: 1.15rem;
+  font-weight: bold;
+}
+
+.card-content h4 {
+  font-size: 1rem;
+  font-weight: bold;
 }

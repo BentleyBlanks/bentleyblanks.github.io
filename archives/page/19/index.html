@@ -116,6 +116,34 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/07/27/2014-07-27-Relations between base pointer and derived pointer/" class="card-header-title">
+                        基类指针与派生类指针之间的转换
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p><img src="https://app.yinxiang.com/shard/s3/res/1c58b253-47b6-436f-b1af-b5c16b4713b3.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3a4bb01e-475c-4c01-b5f6-b629c9ae64f6.png" alt=""></p>
+<p>1.基类指针强制类型转换为派生类指针，其实质是<code>辨认空间</code>变大了，和它具体指向的内容<code>无关</code></p>
+<p>2.辨认空间变大会对指向内容的<code>连续内存</code>空间产生影响</p>
+<h3 id="Demo1"><a href="#Demo1" class="headerlink" title="Demo1"></a>Demo1</h3><p>此处a的内存申请已经完成 如下图 同时也赋值成功</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b2838c50-7e4e-4904-8a75-35acf7db7cf2.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/2dfdb49e-340c-4249-8d28-aca4d3b4a78a/%E6%97%A0%E6%A0%87%E9%A2%982.png" alt=""></p>
+<h3 id="Demo2"><a href="#Demo2" class="headerlink" title="Demo2"></a>Demo2</h3><p>此处base指针初始化时指向的是对象b</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/f2a71cfd-e699-41e0-965f-99feb7182027.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/22df7c59-6c42-4753-978c-6864b3690e16/%E6%97%A0%E6%A0%87%E9%A2%983.png" alt=""></p>
+<h3 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h3><p>内存一旦被申请之后就会被操作系统认定为受保护的 也就不会被二次申请</p>
+<p>但辨认空间发生变化的确会引来不少的问题 在初始化以及强制类型转换基类指针的时候需要格外注意</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/06/22/2014-06-22-include/" class="card-header-title">
                         头文件依赖
                       </a>
@@ -188,30 +216,6 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
 </code></pre>
 <p>就可以正常的通过编译 </p>
 <p>因此模板的特化就是模板本身泛型能力不够的一种补充</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/04/26/2014-04-26-Floekr2T/" class="card-header-title">
-                        Floekr2T塔防套件
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.defendor</p>
-<p>2.attacker<br>包含trace和animation两内存块<br>–&gt;setup(trace, animation)初始化预设动画和预设路径<br>–&gt;update(skill)根据遍历一遍skill来更新自身的激活与否状态 外部通过查阅其状态来确定是否弹出vector<br>–&gt;draw()</p>
-<p>3.skill<br>自身具备TRACK PATH SCOPE其中scope并非一个真正意义上的技能而是直接由defendor来控制attacker的血量扣除           </p>
-<p>  –path会根据自身初始化的target位置确定线性方向 之后只需要根据预设定的velocity来不断更新position即可</p>
-<p>  –track会不断的追踪某一个特定的attacker来不断的更新自身的direction(normalize之后缩放velocity大小)更新posotion<br>直到attacker检测到AABB碰撞之后就从vector<skill>弹出vector</skill></p>
-<p>  –scope的skill意味着defendor不会在skill的vector当中添加一个新的技能 而是直接对当前选择的attacker进行伤害的扣除 可选的可以添加噪声以及随机</p>
-<p>4.trace<br>  –维护一段vector专门用于存放拐点<br>通过turnLeft turnRight go…等来智能的(也就是根据当前direction来判断左右转前后转需要rotate的角度)addTurningPoint达到路径中拐点的设置<br>之后attacker只需要不断的从vector中取得下一拐点就可以设定前进方向</p>
-<p>5.animation<br>  –维护一段vector专门用于存放image帧动画<br>只需要不断循环的从vector中读取image并渲染出来就可以做到动画播放的目的<br>getFrame()能返回当前播放帧的image</p>
 
                       </p>
                     </div>

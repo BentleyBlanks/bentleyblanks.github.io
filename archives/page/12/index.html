@@ -116,6 +116,41 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
+                      <a href="/2015/08/13/2015-08-14-corrections/" class="card-header-title">
+                        迷宫算法的更正
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>P74页中倒数第二行的else if</p>
+</blockquote>
+<pre><code class="cpp">if(next_row == EXIT_ROW &amp;&amp; next_col == EXIT_COL)
+    found = TRUE;
+else if(!maze[next_row][next_col] &amp;&amp; !mark[nextRow][next_col]){
+    // do something...
+}
+</code></pre>
+<p>此处的else if我认为可以更正为if，那么最后一个结点也可以入栈，或者为了性能起见，将stack.push()的在第一步if中添加上也可。个人更倾向于第二种做法。</p>
+<p>即(<a href="https://github.com/BentleyBlanks/t3DataStructures/blob/master/t3DataStructures/LinearList/t3Maze.cpp" target="_blank" rel="noopener">t3DataStructures.t3Maze</a>中就是这样做的)</p>
+<pre><code class="cpp">if(next_row == EXIT_ROW &amp;&amp; next_col == EXIT_COL){
+    stack.push(row, col, dir);
+    found = TRUE;
+}
+else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
+    // do something...
+}
+</code></pre>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
                       <a href="/2015/08/12/2015-08-12-dataStructures/" class="card-header-title">
                         数据结构重造轮子
                       </a>
@@ -228,26 +263,6 @@
 <p>此时s[7]==p[1]，next[7]=1!因为谁也不能保证p[next[i]]=p[j]，因此这里用while循环。其实和pmatch里的while是一个道理，我并不清楚回溯之后<code>string[i]和pat[j]</code>是否相等，所以while里j的值一直迭代。</p>
 <p><br></p>
 <p>总结一下，其实求解next数组受益于求解前后缀，其实质就是在匹配自身字符串，大致的核心思想都是相同的。</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2015/08/01/2015-08-01-github/" class="card-header-title">
-                        Github仓库小幅更新
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>其实不得不承认，以前写的程序上传到Github都不够用心。甚至于花了很大力气的一些较大程序也没有一个简易的构建说明，甚至于说是更新要点。</p>
-</blockquote>
-<p>自我反省了一下，争取把以前贴到Lofter上的技术博客慢慢的转移到Github以及这里的io上来。</p>
 
                       </p>
                     </div>

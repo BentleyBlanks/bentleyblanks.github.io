@@ -7,7 +7,7 @@
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title> [ Bingo ]</title>
+  <title>Archives: 3/2018: 2018 [ Bingo ]</title>
 
   <!-- highlight -->
   <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
@@ -116,75 +116,17 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2014/04/26/2014-04-26-Floekr2T/" class="card-header-title">
-                        Floekr2T塔防套件
+                      <a href="/2018/03/21/2018-03-21-Experience of Web Develop/" class="card-header-title">
+                        Experience of Web Develop
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.defendor</p>
-<p>2.attacker<br>包含trace和animation两内存块<br>–&gt;setup(trace, animation)初始化预设动画和预设路径<br>–&gt;update(skill)根据遍历一遍skill来更新自身的激活与否状态 外部通过查阅其状态来确定是否弹出vector<br>–&gt;draw()</p>
-<p>3.skill<br>自身具备TRACK PATH SCOPE其中scope并非一个真正意义上的技能而是直接由defendor来控制attacker的血量扣除           </p>
-<p>  –path会根据自身初始化的target位置确定线性方向 之后只需要根据预设定的velocity来不断更新position即可</p>
-<p>  –track会不断的追踪某一个特定的attacker来不断的更新自身的direction(normalize之后缩放velocity大小)更新posotion<br>直到attacker检测到AABB碰撞之后就从vector<skill>弹出vector</skill></p>
-<p>  –scope的skill意味着defendor不会在skill的vector当中添加一个新的技能 而是直接对当前选择的attacker进行伤害的扣除 可选的可以添加噪声以及随机</p>
-<p>4.trace<br>  –维护一段vector专门用于存放拐点<br>通过turnLeft turnRight go…等来智能的(也就是根据当前direction来判断左右转前后转需要rotate的角度)addTurningPoint达到路径中拐点的设置<br>之后attacker只需要不断的从vector中取得下一拐点就可以设定前进方向</p>
-<p>5.animation<br>  –维护一段vector专门用于存放image帧动画<br>只需要不断循环的从vector中读取image并渲染出来就可以做到动画播放的目的<br>getFrame()能返回当前播放帧的image</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/03/28/2014-03-28-git/" class="card-header-title">
-                        快速使用Git布置项目环境
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>###初始化：</p>
-<p>在创建项目的目录中执行git init<br>被init的文件夹即作为工作目录树，存放从版本库检出的代码。</p>
-<hr>
-<p>###添加文件：</p>
-<p>创建代码文件以及其他文件，通知git跟踪这个文件：<br>git add &lt;文件名（可以使用统配）&gt;</p>
-<hr>
-<p>###修改以及提交：</p>
-<p>git commit [-m “提交消息”]<br>git将会把提交者的姓名邮件以及-m提交消息全部提交到记录中。<br>使用git log来察看提交信息</p>
-<p>使用git status来察看工作目录树的状态，即当前的视图状态。</p>
-<p>在修改目录之后，再次使用git add来暂存更改，等待提交。<br>git commit接受任意多个-m参数，每次新启一段 。</p>
-<p>git log -&lt;数字&gt;通过修改数字来限制命令git log输出的提交条目的个数。</p>
-<hr>
-<p>###理解使用分支：</p>
-<p>使用git branch 分支名 父分支名  来创建一个分支。<br>默认的主分支叫做master，这也是Git的默认的分支，master对应于CVS<br>和Subversion的主干（trunk）。<br>使用git checkout 分支名 来切换到指定的分支。</p>
-<hr>
-<p>###发布分支（release branch）</p>
-<p>在git commit中使用-a参数来告诉git提交全部修改的文件。</p>
-<p>使用git branch命令来察看当前分支。</p>
-<p>注意：在刚刚init初始化之后没有跟踪任何文件之前，master分支是不存在的。<br>git branch -d xxxxx 删除本地分支，被删除分支必须不是当前所在分支。<br>git branch -a察看远程分支。</p>
-<hr>
-<p>###处理发布：</p>
-<p>使用git tag <tag name=""> &lt;分支名&gt;  来对指定的分支添加一个tag。使用git tag可以察看当前所有的tag。</tag></p>
-<p>添加标签之后，只要标签还在，从标签到版本树起点的一连串提交记录就都还在。这是可以删除打了标签的分支，这仅仅只是删除了标签的名字，而没有删除分支上的内容。</p>
-<p>使用git rebase &lt;分支名&gt; 来变基，即把一个分支上的所有修改都合并到某一个分支上。比如在master分支执行git rebase test，就会把所有test分支的改动全部合并到master主分支上。<br>可以从一个tag建立一个分支git branch XXX <tag>  。</tag></p>
-<hr>
-<p>###归档：</p>
-<p>使用git archive 命令来归档，可以创建一个gzip压缩文件。命令如下：</p>
-<pre><code>git archive --format=tar\
-                 --prefix=&lt;压缩包要存放的目录&gt;/ &lt;要归档的标签名称&gt; \
-                 | gzip &gt; &lt;压缩包名称&gt;.tar.gz
-
-
-git archive --format=zip\
-                 --prefix=&lt;压缩包要存放的目录&gt;/ &lt;要归档的标签名称&gt; \
-                 &gt; &lt;压缩包名称&gt;.zip
-
-(\表示本行命令未完，下行继续)
-</code></pre><p>克隆远程版本：</p>
-<p>使用git clone &lt;源&gt;  来将远程代码拷贝到本地目录。</p>
+                        <h2 id="修改CentOS-7-SSH默认端口22"><a href="#修改CentOS-7-SSH默认端口22" class="headerlink" title="修改CentOS 7 SSH默认端口22"></a>修改CentOS 7 SSH默认端口22</h2><blockquote>
+<p>具体终端命令可参见<a href="https://sebastianblade.com/how-to-modify-ssh-port-in-centos7/" target="_blank" rel="noopener">怎样修改 CentOS 7 SSH 端口</a>, 本质为修改开放端口+防火墙修改</p>
+</blockquote>
+<p>如若和我一样为阿里云服务器, 则需要找到控制台中的安全组规则，自定义的开放想要SSH连接的端口，否则在Xshell等工具中仍然无法连接。</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/40227667664/in/dateposted-public/" title="QQ图片20180321174851" target="_blank" rel="noopener"><img src="https://farm1.staticflickr.com/812/40227667664_fb9dfec5e8_o.png" width="1550" height="328" alt="QQ图片20180321174851"></a></p>
 
                       </p>
                     </div>
@@ -253,7 +195,7 @@ git archive --format=zip\
                 <!-- <div class="card is-white"> -->
                 <nav class="pagination is-centered" role="navigation" aria-label="pagination">
                     
-                        <a class="pagination-previous" href="/page/19/">
+                        <a class="pagination-previous" href="/">
                     
                     Previous
                     </a>
@@ -261,16 +203,11 @@ git archive --format=zip\
                     <ul class="pagination-list">
 
                         
-                        <li><a class="pagination-link" href="/">1</a></li>
-                        
 
-                                                
-                            <li><span class="pagination-ellipsis">&hellip;</span></li>
-                            <li><a class="pagination-link" href="/page/19">19</a></li>
                         
 
                         
-                        <li><a class="pagination-link is-current">20</a></li>
+                        <li><a class="pagination-link is-current">1</a></li>
 
                         
 
