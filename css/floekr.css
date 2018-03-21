@@ -96,6 +96,15 @@ print {
 }
 
 /* post article */
+.card-content a {
+  text-decoration: underline;
+  /*background-color: rgb(150, 0, 0);*/
+}
+
+.card-content a:hover {
+  color: rgb(10, 10, 10);
+}
+
 #postCard .card-content {
   font-size: 1rem;
   font-weight: normal;
@@ -107,11 +116,9 @@ print {
   font-size: 2rem;
 }
 
-/* index introduce */
-/*#aboutMeCard {
-  position: sticky;
-  top: 1.5rem;
-}*/
+#pageDescription {
+  font-size: 1rem;
+}
 
 /* about me icon */
 #iconLink a {
@@ -125,12 +132,12 @@ print {
 
 /* about me content */
 #aboutContent a {
-  color: rgb(10, 10, 10);
+  /*color: rgb(10, 10, 10);*/
   /*transition: 0.4s ease-in-out;*/
 }
 
 #aboutContent a:hover {
-  color: rgb(150, 150, 150);
+  /*color: rgb(150, 150, 150);*/
 }
 
 /* footer */
@@ -141,7 +148,6 @@ print {
 #footerStyle a {
   color: rgb(10, 10, 10);
   font-weight: bold;
-  /*transition: 0.4s ease-in-out;*/
 }
 
 #footerStyle a:hover {
@@ -163,6 +169,15 @@ print {
 pre {
   padding: 0 0 0 0;
   margin: 1rem 0 1rem 0;
+  border-radius: 0.1rem;
+  transition: 0.2s ease-in-out;
+  -webkit-box-shadow: 0 4px 5px rgba(0, 0, 10, 0.1);
+          box-shadow: 0 4px 5px rgba(0, 0, 10, 0.1);
+}
+
+pre:hover {
+  -webkit-box-shadow: 0 4px 10px rgba(0, 0, 10, 0.2);
+          box-shadow: 0 4px 10px rgba(0, 0, 10, 0.2);
 }
 
 pre code {
