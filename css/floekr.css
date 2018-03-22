@@ -191,6 +191,11 @@ pre code {
   font-family: "Consolas", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 
+/* pure ```tag */
+code {
+  color: rgb(80, 80, 80);
+}
+
 /* highlight line-number*/
 td.hljs-ln-numbers {
     -webkit-touch-callout: none;
