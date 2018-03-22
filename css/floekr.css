@@ -214,7 +214,7 @@ td.hljs-ln-code {
 /* katex */
 .katex { 
   font-size: 1.1rem;
-  overflow: hidden;
+  overflow: scroll;
 }
 
 /* markdown */

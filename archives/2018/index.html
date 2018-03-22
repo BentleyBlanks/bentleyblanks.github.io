@@ -127,6 +127,17 @@
 </blockquote>
 <p>如若和我一样为阿里云服务器, 则需要找到控制台中的安全组规则，自定义的开放想要SSH连接的端口，否则在Xshell等工具中仍然无法连接。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/40227667664/in/dateposted-public/" title="QQ图片20180321174851" target="_blank" rel="noopener"><img src="https://farm1.staticflickr.com/812/40227667664_fb9dfec5e8_o.png" width="1550" height="328" alt="QQ图片20180321174851"></a></p>
+<hr>
+<h2 id="Nginx搭建开发"><a href="#Nginx搭建开发" class="headerlink" title="Nginx搭建开发"></a>Nginx搭建开发</h2><blockquote>
+<p>Nginx的环境搭建可见<a href="https://nginx.org/en/docs/" target="_blank" rel="noopener">Nginx Documentation</a></p>
+</blockquote>
+<p>以免在服务器上预览开发效率过低，因此在本地也同时配置了Nginx，同时搭配<a href="https://browsersync.io/#install" target="_blank" rel="noopener">Browsersync</a>可以保证只要Web文件有修改时浏览器自动刷新，提高开发效率。</p>
+<p>Nginx默认在80端口开放，因此启用代理模式可以实现类似Hexo主题开发中的效果.</p>
+<pre><code class="cpp">browser-sync start --proxy &quot;localhost:80&quot; --files &quot;**&quot;
+</code></pre>
+<blockquote>
+<p>引号中的内容可更换为<code>**.css</code>等glob语法的正则表达式.</p>
+</blockquote>
 
                       </p>
                     </div>
