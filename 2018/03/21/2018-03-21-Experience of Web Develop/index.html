@@ -127,10 +127,10 @@
 </code></pre>
 <hr>
 <h2 id="Nginx搭建开发"><a href="#Nginx搭建开发" class="headerlink" title="Nginx搭建开发"></a>Nginx搭建开发</h2><blockquote>
-<p>Nginx的环境搭建可见<a href="https://nginx.org/en/docs/" target="_blank" rel="noopener">Nginx Documentation</a></p>
+<p>Nginx的环境搭建可见<a href="https://nginx.org/en/docs/" target="_blank" rel="noopener">Nginx Documentation</a>，在配置SSH默认端口过程中可能将Nginx使用的默认80端口禁用，可参考<a href="https://www.cnblogs.com/eaglezb/p/6073739.html" target="_blank" rel="noopener">Centos 7 firewall 命令</a>在防火墙中打开对80的访问。</p>
 </blockquote>
 <p>以免在服务器上预览开发效率过低，因此在本地也同时配置了Nginx，同时搭配<a href="https://browsersync.io/#install" target="_blank" rel="noopener">Browsersync</a>可以保证只要Web文件有修改时浏览器自动刷新，提高开发效率。</p>
-<p>Nginx默认在80端口开放，因此启用代理模式可以实现类似Hexo主题开发中的效果.</p>
+<p>Nginx默认在80端口开放，因此启用代理模式可以实现类似Hexo主题开发中的效果。</p>
 <pre><code class="cpp">browser-sync start --proxy &quot;localhost:80&quot; --files &quot;**&quot;
 </code></pre>
 <blockquote>
