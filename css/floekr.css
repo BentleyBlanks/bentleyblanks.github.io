@@ -224,10 +224,11 @@ td.hljs-ln-code {
 
 /* markdown */
 blockquote {
-  border-left: 2px solid rgb(220, 220, 220);
+  border-left: 4px solid rgb(220, 220, 220);
   padding-left: 1rem;
   margin-top: 1rem;
   margin-bottom: 1rem;
+  color: rgb(130, 130, 130)
 }
 
 .card-content h1 {

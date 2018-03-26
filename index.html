@@ -9,6 +9,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title> [ Bingo ]</title>
 
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
   <!-- highlight -->
   <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
   <script src="/highlight/highlight.pack.js"></script>
@@ -16,10 +20,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.3.0/highlightjs-line-numbers.min.js"></script>
   <script>hljs.initHighlightingOnLoad();</script>
   <script>hljs.initLineNumbersOnLoad();</script>
-
-  <!-- katex -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
 
   <!-- theme css -->
   
@@ -146,6 +146,17 @@
 </code></pre>
 <blockquote>
 <p>引号中的内容可更换为<code>**.css</code>等glob语法的正则表达式.</p>
+</blockquote>
+<hr>
+<h2 id="Git的自动化部署"><a href="#Git的自动化部署" class="headerlink" title="Git的自动化部署"></a>Git的自动化部署</h2><blockquote>
+<p>Git的环境搭建可参见<a href="https://www.liaoxuefeng.com/wiki/0013739516305929606dd18361248578c67b8067c8c017b000/00137583770360579bc4b458f044ce7afed3df579123eca000" target="_blank" rel="noopener">搭建Git服务器</a>。由于更换了端口号，因此所有Git命令的对象都变为了类似<code>git clone ssh://host@ip:port/xxx/xxx</code>。</p>
+</blockquote>
+<p>在配置完Nginx后，为了能<code>git push</code>后将整个repo拷贝到Nginx的指定网页文件夹中(默认为<code>Nginx/html</code>), 可参考<a href="https://www.hellolvs.com/hexo/" target="_blank" rel="noopener">VPS服务器搭建Hexo博客教程</a>中的<code>安装配置git</code>部分实现Git Hook的功能。</p>
+<blockquote>
+<p>如若为Windows平台，可能遇到push后post-receive文件无法自动执行的问题，因为行尾Unix与Windows格式不一，可在Sublime或其他文本编辑器中修改行尾为UNIX即可解决(其他无法执行原因可直接执行该脚本查看)</p>
+</blockquote>
+<blockquote>
+<p>具体可以参考<a href="https://stackoverflow.com/questions/14219092/bash-my-script-bin-bashm-bad-interpreter-no-such-file-or-directory" target="_blank" rel="noopener">bad interpreter: No such file or directory</a></p>
 </blockquote>
 
                       </p>
