@@ -134,52 +134,46 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
-                      <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
-                        自定义函数的Lua绑定
+                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
+                        Lua的Table结构
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
-<p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
-<p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
-<pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
-return temp,9,1
-</code></pre>
-<p>在C程序中</p>
-<pre><code class="cpp">std::stringstream strBuffer;
-while(lua_gettop(luaState))
-{
-    strBuffer.str(std::string());
-    strBuffer &lt;&lt; &quot;lua returned a &quot;;
+                        <p>1.</p>
+<pre><code class="cpp">// 传递表给Lua
+lua_createtable(luaState, 2, 0);
+// [1]-&gt;49
+// 1代表key值 一个键值指定一个value 类似于号码簿
+lua_pushnumber(luaState, 1);
+lua_pushnumber(luaState, 49);
 
-    int index = lua_gettop(luaState);
-    switch(lua_type(luaState, index))
-    {
-    case LUA_TNUMBER:
-        strBuffer &lt;&lt; &quot;number&quot; &lt;&lt; lua_tonumber(luaState, index);
-        break;
-    case LUA_TTABLE:
-        strBuffer &lt;&lt; &quot;table&quot;;
-        break;
-    case LUA_TSTRING:
-        strBuffer &lt;&lt; &quot;string&quot; &lt;&lt; lua_tostring(luaState, index);
-        break;
-    case LUA_TBOOLEAN:
-        strBuffer &lt;&lt; &quot;boolean&quot; &lt;&lt; lua_toboolean(luaState, index);
-        break;
-    default:
-        strBuffer &lt;&lt; &quot;unknow type&quot;;
-        break;
-    }
+// 压入两个参数之后索引变为-3 栈顶为-1
+lua_rawset(luaState, -3);
 
-    strBuffer &lt;&lt; &quot;\n&quot;;
-    lua_pop(luaState, 1);
-    cout &lt;&lt; strBuffer.str() &lt;&lt; endl;
-}
+// [2]-&gt;&quot;Life is a Circle&quot;
+lua_pushnumber(luaState, 2);
+lua_pushstring(luaState, &quot;Life is a Circle&quot;);
+// 上一步rawset已经清空栈 再次压入两个元素变为-3
+lua_rawset(luaState, -3);
+
+lua_setglobal(luaState, &quot;tables&quot;);
 </code></pre>
-<p>期望能够解析出每个返回值的类型信息 </p>
-<p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
+<p>搭配Lua文件中的</p>
+<pre><code class="cpp">-- #table为获取当前table长度
+for i=1, #tables do
+     print(i, tables[i])
+end
+</code></pre>
+<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
+<pre><code class="cpp">print(array[1])
+print(array[3])
+</code></pre>
+<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
+<pre><code class="cpp">print(array[0]) --nil 
+print(array[&quot;1&quot;]) --nil
+</code></pre>
+<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
 
                       </p>
                     </div>
@@ -338,11 +332,10 @@ while(lua_gettop(luaState))
   </div>
 </section>
 
-<section class="section">
+<!-- <section class="section">
     <div class="container">
         <div class="columns">
             <div class="column is-two-thirds">
-                <!-- <div class="card is-white"> -->
                 <nav class="pagination is-centered" role="navigation" aria-label="pagination">
                     
                         <a class="pagination-previous" href="/page/14/">
@@ -380,7 +373,54 @@ while(lua_gettop(luaState))
                     Next
                     </a>
                 </nav>
-                <!-- </div> -->
+            </div>
+
+            <div class="column"></div>
+        </div>
+    </div>
+</section> -->
+
+<section class="section">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-two-thirds">
+                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+                    
+                        <a class="pagination-previous" href="/page/14/">
+                    
+                    Previous
+                    </a>
+
+                    <ul class="pagination-list">
+
+                        
+                        <li><a class="pagination-link" href="/">1</a></li>
+                        
+
+                                                
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
+                            <li><a class="pagination-link" href="/page/14">14</a></li>
+                        
+
+                        
+                        <li><a class="pagination-link is-current">15</a></li>
+
+                        
+                            <li><a class="pagination-link" href="/page/16">16</a></li>
+                            <li><span class="pagination-ellipsis">&hellip;</span></li>
+                        
+
+                        
+                            <li><a class="pagination-link" href="/page/20">20</a></li>
+                        
+                    </ul>
+
+                    
+                        <a class="pagination-next" href="/page/16/">
+                    
+                    Next
+                    </a>
+                </nav>
             </div>
 
             <div class="column"></div>

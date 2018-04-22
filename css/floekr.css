@@ -9,7 +9,7 @@ a {
   transition: 0.4s ease-in-out;
 }
 
-p {
+p:not(.title) {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
 }
@@ -30,8 +30,8 @@ li {
 /* hero on the top of index*/
 #indexHero {
   /* darker */
-  background: linear-gradient( rgba(0, 0, 0, 0.3),
-  rgba(0, 0, 0, 0.3)),
+  background: linear-gradient( rgba(0, 0, 0, 0.5),
+  rgba(0, 0, 0, 0.5)),
   url("http://pbrt.org/gallery/pavilion-day.jpg");
   background-position: center;
   background-size: cover;
