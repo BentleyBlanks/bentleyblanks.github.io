@@ -9,6 +9,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Archives [ Bingo ]</title>
 
+  <link rel="apple-touch-icon" sizes="57x57" href="./img/apple-icon-57x57.png">
+  <link rel="apple-touch-icon" sizes="60x60" href="./img/apple-icon-60x60.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="./img/apple-icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="./img/apple-icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="./img/apple-icon-114x114.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="./img/apple-icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
+  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
+  <link rel="manifest" href="./img/manifest.json">
+  <meta name="msapplication-TileColor" content="#ffffff">
+  <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
+  <meta name="theme-color" content="#ffffff">
+
   <!-- katex -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
@@ -136,7 +154,6 @@
 <p>提示以下错误信息则证明已无法直接通过账号密码直接登陆</p>
 <pre><code class="bash">Permission denied(publickey,gssapi-keyex,gssapi-with-mic).
 </code></pre>
-<hr>
 <h2 id="Nginx搭建开发"><a href="#Nginx搭建开发" class="headerlink" title="Nginx搭建开发"></a>Nginx搭建开发</h2><blockquote>
 <p>Nginx的环境搭建可见<a href="https://nginx.org/en/docs/" target="_blank" rel="noopener">Nginx Documentation</a>，在配置SSH默认端口过程中可能将Nginx使用的默认80端口禁用，可参考<a href="https://www.cnblogs.com/eaglezb/p/6073739.html" target="_blank" rel="noopener">Centos 7 firewall 命令</a>在防火墙中打开对80的访问。</p>
 </blockquote>
@@ -147,7 +164,6 @@
 <blockquote>
 <p>引号中的内容可更换为<code>**.css</code>等glob语法的正则表达式.</p>
 </blockquote>
-<hr>
 <h2 id="Git的自动化部署"><a href="#Git的自动化部署" class="headerlink" title="Git的自动化部署"></a>Git的自动化部署</h2><blockquote>
 <p>Git的环境搭建可参见<a href="https://www.liaoxuefeng.com/wiki/0013739516305929606dd18361248578c67b8067c8c017b000/00137583770360579bc4b458f044ce7afed3df579123eca000" target="_blank" rel="noopener">搭建Git服务器</a>。由于更换了端口号，因此所有Git命令的对象都变为了类似<code>git clone ssh://host@ip:port/xxx/xxx</code>。</p>
 </blockquote>
@@ -286,7 +302,7 @@ ray-&gt;origin = cameraToWorld * zeroVector3;
       </div>
       <!-- about me -->
       <div class="column">
-        <div class="card is-white is-hover is-hidden-mobile is-sticky">
+        <div class="card is-white is-hover is-hidden-mobile is-sticky" id="indexAboutMe">
           <div class="card-image">
             <figure class="image">
               <img src="http://pbrt.org/gallery/a3.jpg">

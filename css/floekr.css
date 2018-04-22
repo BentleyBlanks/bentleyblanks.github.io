@@ -5,12 +5,8 @@ body {
 }
 
 a {
+  color: rgb(51, 140, 210);
   transition: 0.4s ease-in-out;
-}
-
-img {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
 }
 
 .is-sticky {
@@ -25,8 +21,8 @@ img {
 /* hero on the top of index*/
 #indexHero {
   /* darker */
-  background: linear-gradient( rgba(0, 0, 0, 0.65),
-  rgba(0, 0, 0, 0.65)),
+  background: linear-gradient( rgba(0, 0, 0, 0.3),
+  rgba(0, 0, 0, 0.3)),
   url("http://pbrt.org/gallery/pavilion-day.jpg");
   background-position: center;
   background-size: cover;
@@ -64,23 +60,10 @@ print {
   position: relative;
 }
 
-/*@media screen and (min-width: 1024px) {
-  .navbar.is-white .navbar-start > .navbar-item,
-  .navbar.is-white .navbar-start .navbar-link,
-  .navbar.is-white .navbar-end > .navbar-item,
-  .navbar.is-white .navbar-end .navbar-link {
-    color: #0a0a0a;
-  }
-}*/
-
 /* articles */
 .card {
   -webkit-box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
           box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
-}
-
-.card-header {
-  /*background-color: white;*/
 }
 
 .card-header-title {
@@ -88,29 +71,19 @@ print {
 	font-weight: bold;
 }
 
-.card-header-title {
-  /*transition: 0.4s ease-in-out;*/
-}
-
 /* index article */
-#articleCard .card-content{
+#articleCard .card-content {
   font-size: 0.9rem;
   font-weight: normal;
-  line-height: 1.6rem;
+  line-height: 1.8rem;
   letter-spacing: 0.01rem;
 }
 
+#articleCard .card-content img {
+   margin-top: 1rem;
+}
+
 /* post article */
-#articleCard .card-content a {
-  color: rgb(40, 40, 210);
-  /*text-decoration: underline;*/
-  /*background-color: rgb(150, 0, 0);*/  
-}
-
-.card-content a:hover {
-  /*color: rgb(10, 10, 10);*/
-}
-
 #postCard .card-content {
   font-size: 1rem;
   font-weight: normal;
@@ -129,7 +102,6 @@ print {
 /* about me icon */
 #iconLink a {
   color: rgb(150, 150, 150);
-  /*transition: 0.4s ease-in-out;*/
 }
 
 #iconLink a:hover {
@@ -137,13 +109,8 @@ print {
 }
 
 /* about me content */
-#aboutContent a {
-  /*color: rgb(10, 10, 10);*/
-  /*transition: 0.4s ease-in-out;*/
-}
-
-#aboutContent a:hover {
-  /*color: rgb(150, 150, 150);*/
+.card.is-white a:not(.card-header-title), .card.is-white strong {
+  color: rgb(51, 140, 210);
 }
 
 /* footer */
@@ -176,15 +143,8 @@ pre {
   background-color: rgb(246, 251, 254);
   padding: 0 0 0 0;
   margin: 1rem 0 1rem 0;
-  border-radius: 0.3rem;
+  border-radius: 0.2rem;
   transition: 0.2s ease-in-out;
-/*  -webkit-box-shadow: 0 3px 5px rgba(0, 0, 10, 0.1);
-          box-shadow: 0 3px 5px rgba(0, 0, 10, 0.1);*/
-}
-
-pre:hover {
-/*  -webkit-box-shadow: 0 5px 10px rgba(0, 0, 10, 0.17);
-          box-shadow: 0 5px 10px rgba(0, 0, 10, 0.17);*/
 }
 
 pre code {
@@ -206,8 +166,8 @@ td.hljs-ln-numbers {
     user-select: none;
 
     text-align: center;
-    color: rgb(120, 120, 120);
-    border-right: 1px solid rgb(90, 90, 90);
+    color: rgba(120, 120, 120, 0.8);
+    border-right: 1px solid rgba(90, 90, 90, 0.5);
     vertical-align: top;
     padding-right: 5px;
 }
@@ -219,7 +179,7 @@ td.hljs-ln-code {
 /* katex */
 .katex { 
   font-size: 1.1rem;
-  overflow: scroll;
+  /*overflow: scroll;*/
 }
 
 /* markdown */
@@ -231,22 +191,25 @@ blockquote {
   color: rgb(130, 130, 130)
 }
 
+.card-content h1, .card-content h2, .card-content h3, .card-content h4 {
+  font-weight: bold;
+  padding-top: 0.5rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid rgba(101, 101, 101, 0.2);
+}
+
 .card-content h1 {
   font-size: 1.45rem;
-  font-weight: bold;
 }
 
 .card-content h2 {
   font-size: 1.3rem;
-  font-weight: bold;
 }
 
 .card-content h3 {
   font-size: 1.15rem;
-  font-weight: bold;
 }
 
 .card-content h4 {
   font-size: 1rem;
-  font-weight: bold;
 }
