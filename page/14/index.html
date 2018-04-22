@@ -134,6 +134,40 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
+                      <a href="/2015/06/27/2015-06-27-hello-world/" class="card-header-title">
+                        Who's your daddy?
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>一天一个hello world 我都嫌烦了 daddy大法好啊!</p>
+</blockquote>
+<blockquote>
+<p>请注意 以下是展示我C++程序员前端实力的时候了……以下所有内容都是我在练习Markdown语法</p>
+</blockquote>
+<p><br></p>
+<p>我就一句话，千万不要再喊我做万花筒了……</p>
+<p><br></p>
+<p>啥都不说了，上架完万花筒我就算是升华了。</p>
+<p><br></p>
+<p>什么？毕设要做万花筒？不行了，我肚子疼。</p>
+<p><br></p>
+<p>有事别找我，没事烧纸谢谢。</p>
+<p><br></p>
+<p>听说你赚钱了？哦，被打断腿赔了20万。</p>
+<p><br></p>
+<p>你是喊我去创业吗，公司在哪？在心里，哦，滚。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
                       <a href="/2015/03/01/2015-03-01-C++_note1/" class="card-header-title">
                         C++编程思想(读书笔记_1)
                       </a>
@@ -215,62 +249,6 @@ print(array[3])
 print(array[&quot;1&quot;]) --nil
 </code></pre>
 <p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
-                        自定义函数的Lua绑定
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
-<p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
-<p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
-<pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
-return temp,9,1
-</code></pre>
-<p>在C程序中</p>
-<pre><code class="cpp">std::stringstream strBuffer;
-while(lua_gettop(luaState))
-{
-    strBuffer.str(std::string());
-    strBuffer &lt;&lt; &quot;lua returned a &quot;;
-
-    int index = lua_gettop(luaState);
-    switch(lua_type(luaState, index))
-    {
-    case LUA_TNUMBER:
-        strBuffer &lt;&lt; &quot;number&quot; &lt;&lt; lua_tonumber(luaState, index);
-        break;
-    case LUA_TTABLE:
-        strBuffer &lt;&lt; &quot;table&quot;;
-        break;
-    case LUA_TSTRING:
-        strBuffer &lt;&lt; &quot;string&quot; &lt;&lt; lua_tostring(luaState, index);
-        break;
-    case LUA_TBOOLEAN:
-        strBuffer &lt;&lt; &quot;boolean&quot; &lt;&lt; lua_toboolean(luaState, index);
-        break;
-    default:
-        strBuffer &lt;&lt; &quot;unknow type&quot;;
-        break;
-    }
-
-    strBuffer &lt;&lt; &quot;\n&quot;;
-    lua_pop(luaState, 1);
-    cout &lt;&lt; strBuffer.str() &lt;&lt; endl;
-}
-</code></pre>
-<p>期望能够解析出每个返回值的类型信息 </p>
-<p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
 
                       </p>
                     </div>

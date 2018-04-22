@@ -134,6 +134,49 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/06/21/2014-06-21-C++ template/" class="card-header-title">
+                        C++模板特化
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>模板为C++提供了泛型的概念</p>
+</blockquote>
+<p>1.在编译初期 编译器并不会给<code>template&lt;typename T&gt; fun</code>分配内存空间 只有在发现程序显式的实例化了这个模板的时候 才会分配响应的内存出来</p>
+<p>2.模板也会有不足的时候</p>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" alt=""><br>    </a><br></figure>
+
+<p>比如在对比大小的min()当中</p>
+<pre><code class="cpp">template&lt;typename T&gt;
+T&amp; min(const T&amp; a, const T&amp; b)
+{
+     return (a&lt;b) ? a : b;
+}
+</code></pre>
+<p>当中 会出现一定情况的不适用 比如用户想要使用<code>char*</code>来对比每一位大小时 编译器发现<code>char*</code>并没有重载过 &gt; 或者 &lt;运算符 那么就会出现编译无法通过的错误</p>
+<pre><code class="cpp">template&lt;&gt; //告诉了编译器 这是一个模板的特化
+const char* min&lt;char *&gt;(const char* const&amp; a, const char* const&amp; b)
+{
+     return (strcmp(a, b) &lt; 0) ? a : b;
+}
+</code></pre>
+<p>定义完之后 min就可以额外的支持基本数字类型之外的char*型了</p>
+<pre><code class="cpp">const char* s1=“say”, s2 = &quot;hello&quot;;
+min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
+</code></pre>
+<p>就可以正常的通过编译 </p>
+<p>因此模板的特化就是模板本身泛型能力不够的一种补充</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/04/26/2014-04-26-Floekr2T/" class="card-header-title">
                         Floekr2T塔防套件
                       </a>

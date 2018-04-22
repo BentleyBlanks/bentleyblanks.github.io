@@ -7,7 +7,7 @@
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Archives: 2018 [ Bingo ]</title>
+  <title>Cuda Path Tracer开发 [ Bingo ]</title>
 
   <link rel="apple-touch-icon" sizes="57x57" href="./img/apple-icon-57x57.png">
   <link rel="apple-touch-icon" sizes="60x60" href="./img/apple-icon-60x60.png">
@@ -119,28 +119,17 @@
 </div>
 
 <!-- articles and about me -->
-
+<!-- in the future -->
 <section class="section">
-  <div class="container">
-    <!-- content and about me -->
-    <div class="columns">
-      <!-- blog -->
-      <div class="column is-two-thirds">
-        <div class="columns is-multiline">
-          <div class="column is-12">
-            <!-- articles -->
-            
-                
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/04/22/2018-04-22-Cuda Path Tracer开发/" class="card-header-title">
-                        Cuda Path Tracer开发
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p><img src="https://raw.githubusercontent.com/BentleyBlanks/smallptCuda/master/test.png" alt=""></p>
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">Cuda Path Tracer开发</h3>
+					</div>
+					<div class="card-content">
+					  <p><p><img src="https://raw.githubusercontent.com/BentleyBlanks/smallptCuda/master/test.png" alt=""></p>
 <blockquote>
 <p>选择<a href="http://www.kevinbeason.com/smallpt/" target="_blank" rel="noopener">smallpt</a>了作为Cuda Path Tracer初尝的借鉴，因此此次主要任务是对smallpt进行Cuda移植，并与好友<a href="http://page.shawnlu.ml/" target="_blank" rel="noopener">shawnlu</a>尝试性的做了部分GPU上的优化。代码已开源至<a href="https://github.com/BentleyBlanks/smallptCuda" target="_blank" rel="noopener">smallptCuda</a></p>
 </blockquote>
@@ -237,155 +226,72 @@ output[i] = temp;
 </tr>
 </tbody>
 </table>
+</p>
+			        </div>
+				</div>		
+			</div>
 
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/21/2018-03-21-Experience of Web Develop/" class="card-header-title">
-                        Experience of Web Develop
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <h2 id="CentOS-7"><a href="#CentOS-7" class="headerlink" title="CentOS 7"></a>CentOS 7</h2><p><br></p>
-<h4 id="修改SSH默认端口22"><a href="#修改SSH默认端口22" class="headerlink" title="修改SSH默认端口22"></a>修改SSH默认端口22</h4><blockquote>
-<p>SSH远程登录部分可参见<a href="http://www.ruanyifeng.com/blog/2011/12/ssh_remote_login.html" target="_blank" rel="noopener">SSH原理与运用</a>。具体终端命令可参见<a href="https://sebastianblade.com/how-to-modify-ssh-port-in-centos7/" target="_blank" rel="noopener">怎样修改 CentOS 7 SSH 端口</a>, 本质为修改开放端口+防火墙修改</p>
-</blockquote>
-<p>如若和我一样为阿里云服务器, 则需要找到控制台中的安全组规则，自定义的开放想要SSH连接的端口，否则在Xshell等工具中仍然无法连接。</p>
-<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/40227667664/in/dateposted-public/" title="QQ图片20180321174851" target="_blank" rel="noopener"><img src="https://farm1.staticflickr.com/812/40227667664_fb9dfec5e8_o.png" width="1550" height="328" alt="QQ图片20180321174851"></a></p>
-<h4 id="关闭账号密码登录"><a href="#关闭账号密码登录" class="headerlink" title="关闭账号密码登录"></a>关闭账号密码登录</h4><pre><code class="cpp">vi /etc/ssh/sshd_config
-</code></pre>
-<p>找到<code>PasswordAuthentication yes</code>，更改为<code>no</code>即可。此时再用一未信任的设备连接，可用终端命令登陆</p>
-<pre><code class="cpp">ssh -p 22 hostName@address
-</code></pre>
-<p>提示以下错误信息则证明已无法直接通过账号密码直接登陆</p>
-<pre><code class="bash">Permission denied(publickey,gssapi-keyex,gssapi-with-mic).
-</code></pre>
-<h2 id="Nginx搭建开发"><a href="#Nginx搭建开发" class="headerlink" title="Nginx搭建开发"></a>Nginx搭建开发</h2><blockquote>
-<p>Nginx的环境搭建可见<a href="https://nginx.org/en/docs/" target="_blank" rel="noopener">Nginx Documentation</a>，在配置SSH默认端口过程中可能将Nginx使用的默认80端口禁用，可参考<a href="https://www.cnblogs.com/eaglezb/p/6073739.html" target="_blank" rel="noopener">Centos 7 firewall 命令</a>在防火墙中打开对80的访问。</p>
-</blockquote>
-<p>以免在服务器上预览开发效率过低，因此在本地也同时配置了Nginx，同时搭配<a href="https://browsersync.io/#install" target="_blank" rel="noopener">Browsersync</a>可以保证只要Web文件有修改时浏览器自动刷新，提高开发效率。</p>
-<p>Nginx默认在80端口开放，因此启用代理模式可以实现类似Hexo主题开发中的效果。</p>
-<pre><code class="cpp">browser-sync start --proxy &quot;localhost:80&quot; --files &quot;**&quot;
-</code></pre>
-<blockquote>
-<p>引号中的内容可更换为<code>**.css</code>等glob语法的正则表达式.</p>
-</blockquote>
-<h2 id="Git的自动化部署"><a href="#Git的自动化部署" class="headerlink" title="Git的自动化部署"></a>Git的自动化部署</h2><blockquote>
-<p>Git的环境搭建可参见<a href="https://www.liaoxuefeng.com/wiki/0013739516305929606dd18361248578c67b8067c8c017b000/00137583770360579bc4b458f044ce7afed3df579123eca000" target="_blank" rel="noopener">搭建Git服务器</a>。由于更换了端口号，因此所有Git命令的对象都变为了类似<code>git clone ssh://host@ip:port/xxx/xxx</code>。</p>
-</blockquote>
-<p>在配置完Nginx后，为了能<code>git push</code>后将整个repo拷贝到Nginx的指定网页文件夹中(默认为<code>Nginx/html</code>), 可参考<a href="https://www.hellolvs.com/hexo/" target="_blank" rel="noopener">VPS服务器搭建Hexo博客教程</a>中的<code>安装配置git</code>部分实现Git Hook的功能。</p>
-<blockquote>
-<p>如若为Windows平台，可能遇到push后post-receive文件无法自动执行的问题，因为行尾Unix与Windows格式不一，可在Sublime或其他文本编辑器中修改行尾为UNIX即可解决(其他无法执行原因可直接执行该脚本查看)</p>
-</blockquote>
-<blockquote>
-<p>具体可以参考<a href="https://stackoverflow.com/questions/14219092/bash-my-script-bin-bashm-bad-interpreter-no-such-file-or-directory" target="_blank" rel="noopener">bad interpreter: No such file or directory</a></p>
-</blockquote>
+			<div class="column">
+				<div class="is-sticky">
 
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-              
-          </div>
-        </div>
-      </div>
-      <!-- about me -->
-      <div class="column">
-        <div class="card is-white is-hover is-hidden-mobile is-sticky" id="indexAboutMe">
-          <div class="card-image">
-            <figure class="image">
-              <img src="http://pbrt.org/gallery/a3.jpg">
-            </figure>
-          </div>
-          <div class="card-content">
-            <div class="media">
-              <div class="media-left">
-                <figure class="image is-48x48">
-                  <img src="https://github.com/BentleyBlanks.png">
-                </figure>
-              </div>
-              <div class="media-content">
-                <p class="title is-4">Bingo</p>
-                <p class="subtitle is-6">@BentleyJobs</p>
-              </div>
-            </div>
-            <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
-            </div>
-            <!-- icon link -->
-            <div class="level is-mobile" id="iconLink">
-              <!-- <div class="column"></div> -->
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        DESCRIPTION
+					      </p>
+					      <p id="pageDescription">实现</p>
+					    </aside>
+					  </div>
+					</div>
 
-              <div class="level-item has-text-centered">
-                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399"></a>
-              </div>
-              <div class="level-item has-text-centered">
-                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/"></a>
-              </div>
-              <div class="level-item has-text-centered">
-                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again"></a>
-              </div>
-              <div class="level-item has-text-centered">
-                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794"></a>
-              </div>
+					<br>
 
-              <!-- <div class="column"></div> -->
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- <div class="column"></div> -->
-    </div>
-  </div>
-</section>
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a class="is-active">2017</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					        <li><a>2018</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
 
-<section class="section">
-    <div class="container">
-        <div class="columns">
-            <div class="column is-two-thirds">
-                <!-- <div class="card is-white"> -->
-                <nav class="pagination is-centered" role="navigation" aria-label="pagination">
-                    
-                        <a class="pagination-previous" href="/">
-                    
-                    Previous
-                    </a>
+					<br>
 
-                    <ul class="pagination-list">
-
-                        
-
-                        
-
-                        
-                        <li><a class="pagination-link is-current">1</a></li>
-
-                        
-
-                        
-                    </ul>
-
-                    
-                        <a class="pagination-next" href="/">
-                    
-                    Next
-                    </a>
-                </nav>
-                <!-- </div> -->
-            </div>
-
-            <div class="column"></div>
-        </div>
-    </div>
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 </section>
 
 

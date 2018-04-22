@@ -7,7 +7,7 @@
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Archives [ Bingo ]</title>
+  <title>Archives: 4/2018: 2018 [ Bingo ]</title>
 
   <link rel="apple-touch-icon" sizes="57x57" href="./img/apple-icon-57x57.png">
   <link rel="apple-touch-icon" sizes="60x60" href="./img/apple-icon-60x60.png">
@@ -244,127 +244,6 @@ output[i] = temp;
                   <br>
                   <br>
                   
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2018/03/21/2018-03-21-Experience of Web Develop/" class="card-header-title">
-                        Experience of Web Develop
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <h2 id="CentOS-7"><a href="#CentOS-7" class="headerlink" title="CentOS 7"></a>CentOS 7</h2><p><br></p>
-<h4 id="修改SSH默认端口22"><a href="#修改SSH默认端口22" class="headerlink" title="修改SSH默认端口22"></a>修改SSH默认端口22</h4><blockquote>
-<p>SSH远程登录部分可参见<a href="http://www.ruanyifeng.com/blog/2011/12/ssh_remote_login.html" target="_blank" rel="noopener">SSH原理与运用</a>。具体终端命令可参见<a href="https://sebastianblade.com/how-to-modify-ssh-port-in-centos7/" target="_blank" rel="noopener">怎样修改 CentOS 7 SSH 端口</a>, 本质为修改开放端口+防火墙修改</p>
-</blockquote>
-<p>如若和我一样为阿里云服务器, 则需要找到控制台中的安全组规则，自定义的开放想要SSH连接的端口，否则在Xshell等工具中仍然无法连接。</p>
-<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/40227667664/in/dateposted-public/" title="QQ图片20180321174851" target="_blank" rel="noopener"><img src="https://farm1.staticflickr.com/812/40227667664_fb9dfec5e8_o.png" width="1550" height="328" alt="QQ图片20180321174851"></a></p>
-<h4 id="关闭账号密码登录"><a href="#关闭账号密码登录" class="headerlink" title="关闭账号密码登录"></a>关闭账号密码登录</h4><pre><code class="cpp">vi /etc/ssh/sshd_config
-</code></pre>
-<p>找到<code>PasswordAuthentication yes</code>，更改为<code>no</code>即可。此时再用一未信任的设备连接，可用终端命令登陆</p>
-<pre><code class="cpp">ssh -p 22 hostName@address
-</code></pre>
-<p>提示以下错误信息则证明已无法直接通过账号密码直接登陆</p>
-<pre><code class="bash">Permission denied(publickey,gssapi-keyex,gssapi-with-mic).
-</code></pre>
-<h2 id="Nginx搭建开发"><a href="#Nginx搭建开发" class="headerlink" title="Nginx搭建开发"></a>Nginx搭建开发</h2><blockquote>
-<p>Nginx的环境搭建可见<a href="https://nginx.org/en/docs/" target="_blank" rel="noopener">Nginx Documentation</a>，在配置SSH默认端口过程中可能将Nginx使用的默认80端口禁用，可参考<a href="https://www.cnblogs.com/eaglezb/p/6073739.html" target="_blank" rel="noopener">Centos 7 firewall 命令</a>在防火墙中打开对80的访问。</p>
-</blockquote>
-<p>以免在服务器上预览开发效率过低，因此在本地也同时配置了Nginx，同时搭配<a href="https://browsersync.io/#install" target="_blank" rel="noopener">Browsersync</a>可以保证只要Web文件有修改时浏览器自动刷新，提高开发效率。</p>
-<p>Nginx默认在80端口开放，因此启用代理模式可以实现类似Hexo主题开发中的效果。</p>
-<pre><code class="cpp">browser-sync start --proxy &quot;localhost:80&quot; --files &quot;**&quot;
-</code></pre>
-<blockquote>
-<p>引号中的内容可更换为<code>**.css</code>等glob语法的正则表达式.</p>
-</blockquote>
-<h2 id="Git的自动化部署"><a href="#Git的自动化部署" class="headerlink" title="Git的自动化部署"></a>Git的自动化部署</h2><blockquote>
-<p>Git的环境搭建可参见<a href="https://www.liaoxuefeng.com/wiki/0013739516305929606dd18361248578c67b8067c8c017b000/00137583770360579bc4b458f044ce7afed3df579123eca000" target="_blank" rel="noopener">搭建Git服务器</a>。由于更换了端口号，因此所有Git命令的对象都变为了类似<code>git clone ssh://host@ip:port/xxx/xxx</code>。</p>
-</blockquote>
-<p>在配置完Nginx后，为了能<code>git push</code>后将整个repo拷贝到Nginx的指定网页文件夹中(默认为<code>Nginx/html</code>), 可参考<a href="https://www.hellolvs.com/hexo/" target="_blank" rel="noopener">VPS服务器搭建Hexo博客教程</a>中的<code>安装配置git</code>部分实现Git Hook的功能。</p>
-<blockquote>
-<p>如若为Windows平台，可能遇到push后post-receive文件无法自动执行的问题，因为行尾Unix与Windows格式不一，可在Sublime或其他文本编辑器中修改行尾为UNIX即可解决(其他无法执行原因可直接执行该脚本查看)</p>
-</blockquote>
-<blockquote>
-<p>具体可以参考<a href="https://stackoverflow.com/questions/14219092/bash-my-script-bin-bashm-bad-interpreter-no-such-file-or-directory" target="_blank" rel="noopener">bad interpreter: No such file or directory</a></p>
-</blockquote>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2017/08/23/2017-08-23-递归删除单链表中特定值/" class="card-header-title">
-                        递归删除单链表中特定值
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>理解来自CSDN中的<a href="http://blog.csdn.net/raby_gyl/article/details/13383573" target="_blank" rel="noopener">递归删除算法</a>，个人补充细节描述</p>
-</blockquote>
-<p>题为「设计递归算法，删除无头结点的单链表L中值为x的结点」</p>
-<pre><code class="cpp">void deleteX(LinkList &amp;L, ElemType x)  
-{  
-    LNode *p;  
-    if(L==NULL) return;  
-    if(L-&gt;data==x)  
-    {  
-        p=L;  
-        L=L-&gt;next; // (1)单链表保持连续 
-        free(p);  
-        deleteX(L,x); // (2)递归调用
-    }
-    else
-        deleteX(L-&gt;next,x); //(3)向后遍历
-}  
-</code></pre>
-<hr>
-<p>理解难度在于似乎仅仅只是释放了当前结点并使得L向前推进，而导致了断链。</p>
-<blockquote>
-<p>例如要在单链表<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>[</mo><mn>1</mn><mo separator="true">,</mo><mn>3</mn><mo separator="true">,</mo><mn>5</mn><mo separator="true">,</mo><mn>7</mn><mo>]</mo></mrow><annotation encoding="application/x-tex">[1, 3, 5, 7]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">[</span><span class="mord">1</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord">3</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord">5</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord">7</span><span class="mclose">]</span></span></span></span>中删除元素<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.43056em;vertical-align:0em;"></span><span class="base"><span class="mord mathit">x</span></span></span></span>(例如<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">x=3</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.64444em;"></span><span class="strut bottom" style="height:0.64444em;vertical-align:0em;"></span><span class="base"><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">3</span></span></span></span>)，这里递归第二次调用函数讲会遇到<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>d</mi><mi>a</mi><mi>t</mi><mi>a</mi><mo>=</mo><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">data==3</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.69444em;"></span><span class="strut bottom" style="height:0.69444em;vertical-align:0em;"></span><span class="base"><span class="mord mathit">d</span><span class="mord mathit">a</span><span class="mord mathit">t</span><span class="mord mathit">a</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">3</span></span></span></span></p>
-</blockquote>
-<p>核心理解在于这里的LinkList L是<strong>引用</strong>, 观察堆栈会非常清晰的说明这个问题。</p>
-<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/36580955782/in/dateposted-public/" title="deleteX" target="_blank" rel="noopener"><img src="https://farm5.staticflickr.com/4381/36580955782_32532b105a.jpg" width="500" height="500" alt="deleteX"></a></p>
-<p>当代码中<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>(</mo><mn>2</mn><mo>)</mo></mrow><annotation encoding="application/x-tex">(2)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">(</span><span class="mord">2</span><span class="mclose">)</span></span></span></span>处递归调用deleteX时, 参数作为L-&gt;next的引用传入(引用为别名，相当于本体操作)，即<strong>递归中参数L为上一函数的L-&gt;next本体</strong>，此时的代码相当于</p>
-<pre><code class="cpp">deleteX(L-&gt;next, x)  
-{  
-    // ...
-    p = L-&gt;next;  
-    L-&gt;next = L-&gt;next-&gt;next; // 单链表保持连续 
-    free(p);  
-    deleteX(L-&gt;next, x);
-    // ...
-}  
-</code></pre>
-<hr>
-<p>如若将引用更换为指针，相较于引用的实现较为繁琐，但更能观察到上述代码工作的本质。</p>
-<pre><code class="cpp">// 仅有传入指针的指针才能改变上一函数中指针的值
-void deleteX(LinkList **L, ElemType x)  
-{  
-    LNode *p;  
-    if((*L)==NULL) return;  
-    if((*L)-&gt;data==x)  // L-&gt;next指向的结点为x
-    {  
-        p=*L;  // p指向L-&gt;next指向的结点
-        *L=(*L)-&gt;next; // L-&gt;next=L-&gt;next-&gt;next
-        free(p);  
-        deleteX(L,x); // 传入L-&gt;next的地址
-    }
-    else
-        deleteX(&amp;((*L)-&gt;next),x); // 传入L-&gt;next指向的结点的next指针的地址
-}  
-</code></pre>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
               
           </div>
         </div>
@@ -441,17 +320,12 @@ void deleteX(LinkList **L, ElemType x)
                         <li><a class="pagination-link is-current">1</a></li>
 
                         
-                            <li><a class="pagination-link" href="archives//page/2">2</a></li>
-                            <li><span class="pagination-ellipsis">&hellip;</span></li>
-                        
 
-                        
-                            <li><a class="pagination-link" href="archives//page/20">20</a></li>
                         
                     </ul>
 
                     
-                        <a class="pagination-next" href="/archives/page/2/">
+                        <a class="pagination-next" href="/">
                     
                     Next
                     </a>

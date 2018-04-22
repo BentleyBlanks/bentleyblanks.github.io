@@ -134,6 +134,62 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
+                        自定义函数的Lua绑定
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+<p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+<p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
+<pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
+return temp,9,1
+</code></pre>
+<p>在C程序中</p>
+<pre><code class="cpp">std::stringstream strBuffer;
+while(lua_gettop(luaState))
+{
+    strBuffer.str(std::string());
+    strBuffer &lt;&lt; &quot;lua returned a &quot;;
+
+    int index = lua_gettop(luaState);
+    switch(lua_type(luaState, index))
+    {
+    case LUA_TNUMBER:
+        strBuffer &lt;&lt; &quot;number&quot; &lt;&lt; lua_tonumber(luaState, index);
+        break;
+    case LUA_TTABLE:
+        strBuffer &lt;&lt; &quot;table&quot;;
+        break;
+    case LUA_TSTRING:
+        strBuffer &lt;&lt; &quot;string&quot; &lt;&lt; lua_tostring(luaState, index);
+        break;
+    case LUA_TBOOLEAN:
+        strBuffer &lt;&lt; &quot;boolean&quot; &lt;&lt; lua_toboolean(luaState, index);
+        break;
+    default:
+        strBuffer &lt;&lt; &quot;unknow type&quot;;
+        break;
+    }
+
+    strBuffer &lt;&lt; &quot;\n&quot;;
+    lua_pop(luaState, 1);
+    cout &lt;&lt; strBuffer.str() &lt;&lt; endl;
+}
+</code></pre>
+<p>期望能够解析出每个返回值的类型信息 </p>
+<p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
                         Lua栈结构
                       </a>
@@ -221,68 +277,6 @@
 <p>另： 若构造函数调用自身，则会出现无限递归调用，是不允许的</p>
 </blockquote>
 <p>若是构造函数嵌套调用 那么第二次调用产生的是匿名对象 也就是说 无论在第二次的构造函数中赋任何值 都会被作为临时对象给抹去 <code>那么出了第一次的构造函数相当于没有初始化任何东西</code></p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/10/11/2014-11-10-Sutherland/" class="card-header-title">
-                        Sutherland-Hodgman Algorithm
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
-<pre><code class="cpp">Polygon SutherlandHodgman( const Polygon startingPolygon, Plane[] clippingPlanes )
-{
-  Polygon output = startingPolygon
-  for each Plane clippingPlane in clippingPlanes
-    input = output
-    output.Clear( )
-    Vec2 startingPoint = input.Last( )
-    for each Vec2 endPoint in input
-      if startingPoint and endPoint in front of clippingPlane
-        out.push( endPoint )
-      else if startingPoint in front and endPoint behind clippingPlane
-        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
-      else if startingPoint and endPoint behind clippingPlane
-        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
-        out.push( endPoint )
-      endPoint = startingPoint
-  return output
-}
-</code></pre>
-<p>其本质就是<code>遍历需要被裁减的多边形的所有的边 每边与裁剪多边形的所有边进行位置判断</code></p>
-<pre><code class="cpp">// InFront = plane.Distance( point ) &gt; 0.0f
-// Behind  = plane.Distance( point ) &lt; 0.0f
-
-Vec2 p1, p2;
-ClipPlane plane;
-
-case p1 InFront and p2 InFront
-  push p2
-case p1 InFront and p2 Behind
-  push intersection
-case p1 Behind and p2 InFront
-  push intersection
-  push p2
-</code></pre>
-<p>上方代码的含义基本为下图</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt=""></p>
-<p>1.当边的方向进入裁剪区域 添加P与P1</p>
-<p>2.当边的方向是背离裁剪区域 只添加P</p>
-<p>3.倘若全部都在背离方向上 不添加点</p>
-<p>4.整个边都在内部 只添加P1</p>
-<p>这里P是p0-&gt;p1与裁剪边的交接点 (一元二次的直线方程可以计算出)</p>
-<p>下方为一个裁剪的案例</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt=""></p>
-<p>详情见</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt=""></p>
 
                       </p>
                     </div>
