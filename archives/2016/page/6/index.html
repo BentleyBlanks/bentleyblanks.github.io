@@ -279,6 +279,118 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
+                      <a href="/2016/01/20/2016-1-23-Unreal Engine Rendering Overview/" class="card-header-title">
+                        Unreal Engine Rendering Overview
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文源于<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Unreal官方Rendering Overview</a>的基本概念理解和翻译</p>
+</blockquote>
+<h3 id="延迟渲染"><a href="#延迟渲染" class="headerlink" title="延迟渲染"></a>延迟渲染</h3><p>与Unreal Engine 3中的Forward Lighting Path不同的是，Unreal Engine 4中所有的光源都采用的是延迟渲染的技术。各种材质都会讲各自的属性写入GBuffers当中，因此在根据光源计算时，光源直接通过Buffer上的per-pixel的材质属性来计算光照。</p>
+<blockquote>
+<p>Forward Lighting Path本质上就是最传统的光源场景渲染方式，二者对比可见<a href="http://gamedevelopment.tutsplus.com/articles/forward-rendering-vs-deferred-rendering--gamedev-12342" target="_blank" rel="noopener">Forward Rendering vs. Deferred Rendering</a>。当在指定渲染目标时，前者的做法是对场景中的每一个几何体都对每个光源进行一次管线中的光照计算，最后直接着色叠加。</p>
+<p>后者为先行计算四张2D Image/Buffer(<strong>Screen Space Depth</strong>,<strong>Surface Normals</strong>,<strong>Diffuse Color</strong>,<strong>Specular color and specular power</strong>)，VS中计算各图所需的几何体信息，而PS只存图，之后每个光源才与四张图上的内容进行着色计算。</p>
+</blockquote>
+<blockquote>
+<p>总结而言 Forward Lighting Path的伪代码</p>
+</blockquote>
+<pre><code class="cpp">
+for each object
+
+   for each light
+
+     shading
+
+</code></pre>
+<blockquote>
+<p>Deffered Shading</p>
+</blockquote>
+<pre><code class="cpp">
+for each pixel
+
+   for each light
+
+     shading
+
+</code></pre>
+<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" alt=""><br>    </a><br></figure>
+
+<blockquote>
+<p>Forward Rendering Path</p>
+</blockquote>
+<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" alt=""><br>    </a><br></figure>
+
+<blockquote>
+<p>Deffered Shading</p>
+<p>不过延迟渲染也不是完美的，在比较小的场景下延迟渲染会明显增加显存消耗和渲染速度下降，所以比较适合于较大型场景。另一个缺点是，延迟渲染对待多着色模型的场景是比较吃力。(感谢<a href="http://lonelywaiting.github.io/" target="_blank" rel="noopener">孤独的守候</a>的知识分享)</p>
+</blockquote>
+<p><br></p>
+<h3 id="Lighting-Paths"><a href="#Lighting-Paths" class="headerlink" title="Lighting Paths"></a>Lighting Paths</h3><p>UE4中有三种不同的光源</p>
+<ul>
+<li>全动态光源(详见<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/LightingAndShadows/LightMobility/DynamicLights/index.html" target="_blank" rel="noopener">Fully dynamic</a>)</li>
+<li>半静态光源(详见<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Partially static</a>)</li>
+<li>全静态光源(<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Fully static</a>)</li>
+</ul>
+<p>这些光源的使用场景也是根据不同的游戏场景，不同的性能品质要求会需要的权衡。每个游戏都还为自己选用最合适的光源类型。</p>
+<blockquote>
+<p>Movable Lights: 在运行期间可以改变位置，旋转朝向，改变颜色，亮度，衰退因子，半径等任何光源拥有的属性都可以动态修改。因此这些光源不会预先烘焙光照贴图，也不会产生任何的间接光照(实时渲染中间接光照一般都是预计算完成)。</p>
+<p>Static Lights: 静止光源的位置是不可以改变的，但是光源的亮度和颜色等都可以随之改变，因此这也是与静态光源有着最大差异的地方。但是其所改变的光源的属性都只会影响直接光照，间接光照都是由<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/LightingAndShadows/Lightmass/index.html" target="_blank" rel="noopener">Lightmass</a>预计算的，因此运行时改变其值也不会影响。</p>
+<p>Stationary lights:静态光源是不能在运行时改变任何属性的光源，他们会在Lightmass中计算完毕，之后不会对性能造成任何过多的影响。因此他是三者当中拥有中等效果，较低的可更改性但也是性能最友好的一个光源类型。</p>
+</blockquote>
+<p><br></p>
+<h3 id="Lit-Translucency"><a href="#Lit-Translucency" class="headerlink" title="Lit Translucency"></a>Lit Translucency</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" alt=""><br>    </a><br></figure>
+
+<p>以及</p>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" alt=""><br>    </a><br></figure>
+
+<p>半透明材质的发光以及着色是在单一的光源前进传递(Single Forward Pass)中保证其正确性的，但是在多通道的光源下并不适用的技术。</p>
+<p>半透明材质可以向非透明物体上投射阴影，也可以向自身或者其他半透明材质上投射阴影(如图所示)</p>
+<p><br></p>
+<h3 id="Sub-Surface-Shading"><a href="#Sub-Surface-Shading" class="headerlink" title="Sub-Surface Shading"></a>Sub-Surface Shading</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" alt=""><br>    </a><br></figure>
+
+<p>Jade Material</p>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" alt=""><br>    </a><br></figure>
+
+<p>Ice Material</p>
+<p>次表面散射着色模型是为了用于模拟蜡烛，玉制物体而做的新着色模型。他们并不是完全的半透明，但会在内部散射入射进来的光。这会比实现皮肤渲染上质量稍低但开销更小。</p>
+<p><br></p>
+<h3 id="GPU-Particles"><a href="#GPU-Particles" class="headerlink" title="GPU Particles"></a>GPU Particles</h3><p>UE4支持在GPU上模拟粒子效果，传统的CPU难以完成的上千种粒子效果可以在GPU内更快效果更好的实现。</p>
+<p><br></p>
+<h3 id="Vector-Fields"><a href="#Vector-Fields" class="headerlink" title="Vector Fields"></a>Vector Fields</h3><p>在GPU粒子中最有趣的一项特性莫过于向量场了，一个向量场是在一个网格中均匀影响所在其中粒子运动的一个向量集，向量场在UE4中是作为一个Actors来出现的，因此他本身也可以像其他Actors一样被位移，旋转，或者是缩放，所以在运行期间他们都是可以被动态移动的。</p>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" alt=""><br>    </a><br></figure>
+
+<p>例如一个向量场可以被放置在瀑布上，当粒子进入了向量场的边界时，他们都会被其所影响，当粒子群离开了边界其作用的效果也会淡去(fade out)。</p>
+<p><br></p>
+<h3 id="后期特效"><a href="#后期特效" class="headerlink" title="后期特效"></a>后期特效</h3><ul>
+<li><p>环境光遮蔽(Ambient Occlusion): 目前使用的环境光遮蔽为SSAO(屏幕空间环境光遮蔽，Screen Space Ambient Occlusion)，只会依赖与深度缓存。所以也不会被细节法线贴图或者Smoothing groups影响。因此在一些面元较少的多边形上开启这个效果时，就会显得非常生硬。所以UE4只会在选项<strong>AmbientCubemap</strong>上开启这个效果。</p>
+</li>
+<li><p>环境光立方体贴图(Ambient Cubemaps): 该效果对整个场景中的光照采用一立方体贴图，所以这个效果也是与当前材质所在位置是互相独立的。贴图的计算需要用到观察者的位置，材质的粗糙度(镜面反射效果),以及当前材质的面法线。这也就带来了高质量高效的环境光实现。</p>
+</li>
+<li><p>镜头高光(Bloom): 高光是真实世界光照的现象，较低的渲染开销却可以带来非常好的感官真实度的提升。高光效果一般可以在非常暗的背景中裸眼观察非常亮的物体观测到。</p>
+</li>
+</ul>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" alt=""><br>    </a><br></figure>
+
+<ul>
+<li><p>人眼适应:可以会自动调整场景的曝光度，重现从明亮环境进入黑暗环境（或相反）时所经历的效果。</p>
+</li>
+<li><p>镜头眩光:会在镜头转向明亮物体时自动产生镜头的眩光效果。</p>
+</li>
+<li><p>色调映射(Tone Mapping):使得渲染场景的颜色可以被转换或修改来得到不同的效果。这可以被用来制作诸如棕褐滤镜，或击中特效（例如红色闪光）等。</p>
+</li>
+</ul>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
                       <a href="/2016/01/20/2016-1-20-Path Tracing Notes 1/" class="card-header-title">
                         Path Tracing Notes 1
                       </a>
@@ -498,118 +610,6 @@ c-16-25.333-24-45-24-59z"/></svg></span></span></span></span><span class="vlist-
 <p>因此粗略得出太阳大约覆盖了<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mn>6</mn><mo>∗</mo><mn>1</mn><msup><mn>0</mn><mrow><mo>−</mo><mn>5</mn></mrow></msup></mrow><annotation encoding="application/x-tex">6*10^{-5}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.8141079999999999em;"></span><span class="strut bottom" style="height:0.8141079999999999em;vertical-align:0em;"></span><span class="base"><span class="mord">6</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">∗</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord">1</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141079999999999em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">−</span><span class="mord mtight">5</span></span></span></span></span></span></span></span></span></span></span></span>立体弧度或者<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mfrac><mrow><mn>1</mn></mrow><mrow><mn>1</mn><mn>0</mn><mn>0</mn><mn>0</mn><mn>0</mn><mn>0</mn></mrow></mfrac></mrow><annotation encoding="application/x-tex">\frac{1}{100000}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.845108em;"></span><span class="strut bottom" style="height:1.190108em;vertical-align:-0.345em;"></span><span class="base"><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.845108em;"><span style="top:-2.6550000000000002em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">1</span><span class="mord mtight">0</span><span class="mord mtight">0</span><span class="mord mtight">0</span><span class="mord mtight">0</span><span class="mord mtight">0</span></span></span></span><span style="top:-3.15em;"><span class="pstrut" style="height:3em;"></span><span class="stretchy" style="height:0.2em;"><svg width="400em" height="0.2em" viewbox="0 0 400000 200" preserveaspectratio="xMinYMin slice"><path d="M0 80H400000 v40H0z M0 80H400000 v40H0z"/></svg></span></span><span style="top:-3.394em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.345em;"></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span>的半球表面，所以即便是采用接近70000个采样点，半球也不过只有<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mn>1</mn><mo>−</mo><mo>(</mo><mn>1</mn><mo>−</mo><mn>1</mn><msup><mn>0</mn><mrow><mo>−</mo><mn>5</mn></mrow></msup><msup><mo>)</mo><mrow><mn>7</mn><mn>0</mn><mn>0</mn><mn>0</mn><mn>0</mn></mrow></msup><mo>=</mo><mn>5</mn><mn>0</mn><mi mathvariant="normal">%</mi></mrow><annotation encoding="application/x-tex">1-(1-10^{-5})^{70000} = 50\%</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.8141079999999999em;"></span><span class="strut bottom" style="height:1.064108em;vertical-align:-0.25em;"></span><span class="base"><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mopen">(</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord">1</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141079999999999em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">−</span><span class="mord mtight">5</span></span></span></span></span></span></span></span></span><span class="mclose"><span class="mclose">)</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141079999999999em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">7</span><span class="mord mtight">0</span><span class="mord mtight">0</span><span class="mord mtight">0</span><span class="mord mtight">0</span></span></span></span></span></span></span></span></span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">5</span><span class="mord">0</span><span class="mord">%</span></span></span></span>的几率能够捕捉到太阳光线(换句话说就是发射的光线50%几率能够击中太阳)。</p>
 <p><br></p>
 <p>Direct Lighting本质上是重要性采样的直观实践。在每次光线击中表面时我们都向已知光源发射一根光线手动获取其光亮度(当然当真正击中光源时我们将他的权值定为0，因为光源已经在先前部分有了贡献)。</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2016/01/20/2016-1-23-Unreal Engine Rendering Overview/" class="card-header-title">
-                        Unreal Engine Rendering Overview
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>本文源于<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Unreal官方Rendering Overview</a>的基本概念理解和翻译</p>
-</blockquote>
-<h3 id="延迟渲染"><a href="#延迟渲染" class="headerlink" title="延迟渲染"></a>延迟渲染</h3><p>与Unreal Engine 3中的Forward Lighting Path不同的是，Unreal Engine 4中所有的光源都采用的是延迟渲染的技术。各种材质都会讲各自的属性写入GBuffers当中，因此在根据光源计算时，光源直接通过Buffer上的per-pixel的材质属性来计算光照。</p>
-<blockquote>
-<p>Forward Lighting Path本质上就是最传统的光源场景渲染方式，二者对比可见<a href="http://gamedevelopment.tutsplus.com/articles/forward-rendering-vs-deferred-rendering--gamedev-12342" target="_blank" rel="noopener">Forward Rendering vs. Deferred Rendering</a>。当在指定渲染目标时，前者的做法是对场景中的每一个几何体都对每个光源进行一次管线中的光照计算，最后直接着色叠加。</p>
-<p>后者为先行计算四张2D Image/Buffer(<strong>Screen Space Depth</strong>,<strong>Surface Normals</strong>,<strong>Diffuse Color</strong>,<strong>Specular color and specular power</strong>)，VS中计算各图所需的几何体信息，而PS只存图，之后每个光源才与四张图上的内容进行着色计算。</p>
-</blockquote>
-<blockquote>
-<p>总结而言 Forward Lighting Path的伪代码</p>
-</blockquote>
-<pre><code class="cpp">
-for each object
-
-   for each light
-
-     shading
-
-</code></pre>
-<blockquote>
-<p>Deffered Shading</p>
-</blockquote>
-<pre><code class="cpp">
-for each pixel
-
-   for each light
-
-     shading
-
-</code></pre>
-<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" alt=""><br>    </a><br></figure>
-
-<blockquote>
-<p>Forward Rendering Path</p>
-</blockquote>
-<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" alt=""><br>    </a><br></figure>
-
-<blockquote>
-<p>Deffered Shading</p>
-<p>不过延迟渲染也不是完美的，在比较小的场景下延迟渲染会明显增加显存消耗和渲染速度下降，所以比较适合于较大型场景。另一个缺点是，延迟渲染对待多着色模型的场景是比较吃力。(感谢<a href="http://lonelywaiting.github.io/" target="_blank" rel="noopener">孤独的守候</a>的知识分享)</p>
-</blockquote>
-<p><br></p>
-<h3 id="Lighting-Paths"><a href="#Lighting-Paths" class="headerlink" title="Lighting Paths"></a>Lighting Paths</h3><p>UE4中有三种不同的光源</p>
-<ul>
-<li>全动态光源(详见<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/LightingAndShadows/LightMobility/DynamicLights/index.html" target="_blank" rel="noopener">Fully dynamic</a>)</li>
-<li>半静态光源(详见<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Partially static</a>)</li>
-<li>全静态光源(<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Fully static</a>)</li>
-</ul>
-<p>这些光源的使用场景也是根据不同的游戏场景，不同的性能品质要求会需要的权衡。每个游戏都还为自己选用最合适的光源类型。</p>
-<blockquote>
-<p>Movable Lights: 在运行期间可以改变位置，旋转朝向，改变颜色，亮度，衰退因子，半径等任何光源拥有的属性都可以动态修改。因此这些光源不会预先烘焙光照贴图，也不会产生任何的间接光照(实时渲染中间接光照一般都是预计算完成)。</p>
-<p>Static Lights: 静止光源的位置是不可以改变的，但是光源的亮度和颜色等都可以随之改变，因此这也是与静态光源有着最大差异的地方。但是其所改变的光源的属性都只会影响直接光照，间接光照都是由<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/LightingAndShadows/Lightmass/index.html" target="_blank" rel="noopener">Lightmass</a>预计算的，因此运行时改变其值也不会影响。</p>
-<p>Stationary lights:静态光源是不能在运行时改变任何属性的光源，他们会在Lightmass中计算完毕，之后不会对性能造成任何过多的影响。因此他是三者当中拥有中等效果，较低的可更改性但也是性能最友好的一个光源类型。</p>
-</blockquote>
-<p><br></p>
-<h3 id="Lit-Translucency"><a href="#Lit-Translucency" class="headerlink" title="Lit Translucency"></a>Lit Translucency</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" alt=""><br>    </a><br></figure>
-
-<p>以及</p>
-<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" alt=""><br>    </a><br></figure>
-
-<p>半透明材质的发光以及着色是在单一的光源前进传递(Single Forward Pass)中保证其正确性的，但是在多通道的光源下并不适用的技术。</p>
-<p>半透明材质可以向非透明物体上投射阴影，也可以向自身或者其他半透明材质上投射阴影(如图所示)</p>
-<p><br></p>
-<h3 id="Sub-Surface-Shading"><a href="#Sub-Surface-Shading" class="headerlink" title="Sub-Surface Shading"></a>Sub-Surface Shading</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" alt=""><br>    </a><br></figure>
-
-<p>Jade Material</p>
-<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" alt=""><br>    </a><br></figure>
-
-<p>Ice Material</p>
-<p>次表面散射着色模型是为了用于模拟蜡烛，玉制物体而做的新着色模型。他们并不是完全的半透明，但会在内部散射入射进来的光。这会比实现皮肤渲染上质量稍低但开销更小。</p>
-<p><br></p>
-<h3 id="GPU-Particles"><a href="#GPU-Particles" class="headerlink" title="GPU Particles"></a>GPU Particles</h3><p>UE4支持在GPU上模拟粒子效果，传统的CPU难以完成的上千种粒子效果可以在GPU内更快效果更好的实现。</p>
-<p><br></p>
-<h3 id="Vector-Fields"><a href="#Vector-Fields" class="headerlink" title="Vector Fields"></a>Vector Fields</h3><p>在GPU粒子中最有趣的一项特性莫过于向量场了，一个向量场是在一个网格中均匀影响所在其中粒子运动的一个向量集，向量场在UE4中是作为一个Actors来出现的，因此他本身也可以像其他Actors一样被位移，旋转，或者是缩放，所以在运行期间他们都是可以被动态移动的。</p>
-<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" alt=""><br>    </a><br></figure>
-
-<p>例如一个向量场可以被放置在瀑布上，当粒子进入了向量场的边界时，他们都会被其所影响，当粒子群离开了边界其作用的效果也会淡去(fade out)。</p>
-<p><br></p>
-<h3 id="后期特效"><a href="#后期特效" class="headerlink" title="后期特效"></a>后期特效</h3><ul>
-<li><p>环境光遮蔽(Ambient Occlusion): 目前使用的环境光遮蔽为SSAO(屏幕空间环境光遮蔽，Screen Space Ambient Occlusion)，只会依赖与深度缓存。所以也不会被细节法线贴图或者Smoothing groups影响。因此在一些面元较少的多边形上开启这个效果时，就会显得非常生硬。所以UE4只会在选项<strong>AmbientCubemap</strong>上开启这个效果。</p>
-</li>
-<li><p>环境光立方体贴图(Ambient Cubemaps): 该效果对整个场景中的光照采用一立方体贴图，所以这个效果也是与当前材质所在位置是互相独立的。贴图的计算需要用到观察者的位置，材质的粗糙度(镜面反射效果),以及当前材质的面法线。这也就带来了高质量高效的环境光实现。</p>
-</li>
-<li><p>镜头高光(Bloom): 高光是真实世界光照的现象，较低的渲染开销却可以带来非常好的感官真实度的提升。高光效果一般可以在非常暗的背景中裸眼观察非常亮的物体观测到。</p>
-</li>
-</ul>
-<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" alt=""><br>    </a><br></figure>
-
-<ul>
-<li><p>人眼适应:可以会自动调整场景的曝光度，重现从明亮环境进入黑暗环境（或相反）时所经历的效果。</p>
-</li>
-<li><p>镜头眩光:会在镜头转向明亮物体时自动产生镜头的眩光效果。</p>
-</li>
-<li><p>色调映射(Tone Mapping):使得渲染场景的颜色可以被转换或修改来得到不同的效果。这可以被用来制作诸如棕褐滤镜，或击中特效（例如红色闪光）等。</p>
-</li>
-</ul>
 
                       </p>
                     </div>

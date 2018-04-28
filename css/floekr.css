@@ -142,9 +142,15 @@ print {
 	font-weight: normal;
 }
 
-/* projects */
-#projectsImage {
-  text-align: center;
+/* pagination */
+/*.pagination {
+  width: 40rem;
+}
+*/
+.pagination-previous, 
+.pagination-next, 
+.pagination-list li a {
+  background-color: rgba(250, 250, 250, 0.9);
 }
 
 /* highlight */
@@ -299,6 +305,11 @@ table.hljs-ln {
 
 .projectCardTitle:hover {
   background-color: rgb(240, 240, 240);
+  color: black;
+}
+
+.projectCardTitle:active {
+  background-color: rgb(250, 250, 250);
   color: black;
 }
 
