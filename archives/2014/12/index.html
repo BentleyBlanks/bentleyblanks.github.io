@@ -47,6 +47,8 @@
     
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     
+      <link rel="stylesheet" href="/css/basic.css">
+    
       <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
     
   
@@ -131,6 +133,35 @@
             <!-- articles -->
             
                 
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
+                        Lua栈结构
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <ol>
+<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
+</ol>
+<p>2.lua栈</p>
+<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
+<p>3.建一个新表</p>
+<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
+</code></pre>
+<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
+<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
+</code></pre>
+<p>常用这个</p>
+<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
@@ -230,35 +261,6 @@ print(array[3])
 print(array[&quot;1&quot;]) --nil
 </code></pre>
 <p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
-                        Lua栈结构
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <ol>
-<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
-</ol>
-<p>2.lua栈</p>
-<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
-<p>3.建一个新表</p>
-<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
-</code></pre>
-<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
-<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
-</code></pre>
-<p>常用这个</p>
-<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
 
                       </p>
                     </div>

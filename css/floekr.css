@@ -255,3 +255,54 @@ table.hljs-ln {
   margin-top: 0rem;
   margin-bottom: 0rem;
 }
+
+/* Projects */
+.projectCard {
+  background-color: white;
+  -webkit-box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
+          box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
+
+  /*width: 50rem;*/
+  height: 18rem;
+}
+
+.illustrate {
+  flex: 0 0 40%;
+  height: 100%;
+  width: 100%;
+}
+
+.illustrate img {
+  /*width: 100%;*/
+  height: 100%;
+  overflow: hidden;
+  /*height: 16rem;*/
+  object-fit: cover;
+}
+
+.projectCardContent {
+  flex: 0 0 60%;
+  height: 100%;
+}
+
+.projectCardTitle {
+  color: black;
+  font-size: 2rem;
+  font-weight: bold;
+  -webkit-box-shadow: 0 1px 2px rgba(10, 10, 10, 0.1);
+          box-shadow: 0 1px 2px rgba(10, 10, 10, 0.1);
+  width: 100%;
+  padding: 0.5rem 0rem 0.5rem 2rem;
+
+  transition: 0.2s ease-in-out;
+}
+
+.projectCardTitle:hover {
+  background-color: rgb(240, 240, 240);
+  color: black;
+}
+
+.projectCardIntro {
+  /*flex: 0 1 70%;*/
+  padding: 2rem;
+}

@@ -47,6 +47,8 @@
     
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     
+      <link rel="stylesheet" href="/css/basic.css">
+    
       <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
     
   
@@ -123,88 +125,126 @@
 <article id="page">
   <h1></h1>
   <section class="section">
-  <div class="container">
-    <div class="columns is-multiline">
-      <div class="column is-one-third">
-        <div class="card is-white is-hover">
+  <div class="container column-center">
 
-          <div class="card-image" id="projectsImage">
+    <!-- projects -->
+    <div class="columns">
+
+      <!-- about me -->
+      <div class="column is-4 is-hidden-mobile">
+        <div class="card is-white is-hover is-sticky" id="indexAboutMe">
+          <div class="card-image">
             <figure class="image">
-              <img src="http://pbrt.org/gallery/view-1.jpg">
+              <img src="http://pbrt.org/gallery/a3.jpg">
             </figure>
           </div>
-
-          <div class="card-header">
-            <a class="card-header-title" href="https://github.com/BentleyBlanks/TattyUI" target="_blank" rel="noopener">Atmos</a>
-          </div>
           <div class="card-content">
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img src="https://github.com/BentleyBlanks.png">
+                </figure>
+              </div>
+              <div class="media-content">
+                <p class="title is-4">Bingo</p>
+                <p class="subtitle is-6">@BentleyJobs</p>
+              </div>
+            </div>
             <div class="content">
-              A Simple Physically Based Renderer, still in development. In 2016, the <a href="http://v.youku.com/v_show/id_XMTczMjI3NjY1Mg==.html#paction" target="_blank" rel="noopener"> Video Demo</a> and Atmos Renderer, were as my graduation project from JiangNan University.
+              Graduated from <a href="https://www.jiangnan.edu.cn/" target="_blank" rel="noopener">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/" target="_blank" rel="noopener">Aurogon</a> to develope <a href="https://gjol.yy.com/" target="_blank" rel="noopener">GuJianOL</a>. See <a href="./about>">about</a> for more info.
+            </div>
+
+            <!-- icon link -->
+            <div class="level is-mobile" id="iconLink">
+
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-map-marker" href="https://www.google.com/maps/place/Ningbo,+Zhejiang,+China/@29.8694844,121.2917787,10z/data=!3m1!4b1!4m5!3m4!1s0x344d6354630858f7:0x948723f846ccf173!8m2!3d29.868336!4d121.54399" target="_blank" rel="noopener"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/" target="_blank" rel="noopener"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-envelope" href="mailto:bentleyjobs@gmail.com?subject=Hello%20again" target="_blank" rel="noopener"></a>
+              </div>
+              <div class="level-item has-text-centered">
+                <a class="fa fa-lg fa-weibo" href="https://weibo.com/2162074794" target="_blank" rel="noopener"></a>
+              </div>
+
             </div>
           </div>
         </div>
       </div>
 
-      <div class="column is-one-third">
-        <div class="card is-white is-hover">
-          <div class="card-image" id="projectsImage">
-            <figure class="image">
-              <img src="http://pbrt.org/gallery/whiteroom-night.jpg">
-            </figure>
+      <!-- Projects -->
+      <div class="column">
+        <div class="is-hover row-center projectCard">
+          <div class="illustrate">
+            <img src="http://pbrt.org/gallery/view-1.jpg">
           </div>
+          <div class="projectCardContent column-top">
+            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atmos</a>
 
-          <div class="card-header">
-            <a href="https://github.com/BentleyBlanks/TattyUI" class="card-header-title" target="_blank" rel="noopener">TattyUI</a>
+            <div class="projectCardIntro row-left">
+              A Simple Physically Based Renderer, still in development. In 2016, the <span><a href="http://v.youku.com/v_show/id_XMTczMjI3NjY1Mg==.html#paction" target="_blank" rel="noopener">Video Demo</a></span> and Atmos Renderer, were as my graduation project from JiangNan University.
+            </div>
           </div>
-          <div class="card-content">
-            <div class="content">
+        </div>
+
+        <div class="is-hover row-center projectCard is-interval-top">
+          <div class="illustrate">
+            <img src="http://pbrt.org/gallery/view-1.jpg">
+          </div>
+          <div class="projectCardContent column-top">
+            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/smallptCuda" target="_blank" rel="noopener">smallptCuda</a>
+
+            <div class="projectCardIntro row-left">
+              A simple cuda version of smallpt with some memory optimization. See more optimization details on Shawnlu and Bingo's blog.
+            </div>
+          </div>
+        </div>
+
+        <div class="is-hover row-center projectCard is-interval-top">
+          <div class="illustrate">
+            <img src="http://pbrt.org/gallery/whiteroom-night.jpg">
+          </div>
+          <div class="projectCardContent column-top">
+            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/TattyUI" target="_blank" rel="noopener">TattyUI</a>
+
+            <div class="projectCardIntro row-left">
               借鉴与浏览器的实现，TattyUI使用HTML+CSS+C++完成业务逻辑和样式实现的分离，从而完成UI的快速可定制化搭建。
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="column is-one-third">
-        <div class="card is-white is-hover">
-
-          <div class="card-image" id="projectsImage">
-            <figure class="image">
-              <img src="http://pbrt.org/gallery/sanmiguel_cam25.jpg">
-            </figure>
+        <div class="is-hover row-center projectCard is-interval-top">
+          <div class="illustrate">
+            <img src="http://pbrt.org/gallery/sanmiguel_cam25.jpg">
           </div>
+          <div class="projectCardContent column-top">
+            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/Floekr2d" target="_blank" rel="noopener">Floekr2d</a>
 
-          <div class="card-header">
-            <a class="card-header-title" href="https://github.com/BentleyBlanks/Floekr2d" target="_blank" rel="noopener">Floekr2d
-            </a>
-          </div>
-          <div class="card-content">
-            <div class="content">
+            <div class="projectCardIntro row-left">
               一款接口类似Box2d，使用分离轴碰撞检测算法，支持任意边数凸多边形以及之间碰撞检测及反馈的简单物理引擎。
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="column is-one-third">
-        <div class="card is-white is-hover">
-          <div class="card-image" id="projectsImage">
-            <figure class="image">
-              <img src="http://pbrt.org/gallery/villa-daylight.jpg">
-            </figure>
+        <div class="is-hover row-center projectCard is-interval-top">
+          <div class="illustrate">
+            <img src="http://pbrt.org/gallery/villa-daylight.jpg">
           </div>
-          
-          <div class="card-header">
-            <a class="card-header-title" href="https://github.com/BentleyBlanks/imguiDock" target="_blank" rel="noopener">imguiDock
-            </a>
-          </div>
-          <div class="card-content">
-            <div class="content">
+          <div class="projectCardContent column-top">
+            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/imguiDock" target="_blank" rel="noopener">imguiDock</a>
+
+            <div class="projectCardIntro row-left">
               An addon of imgui for support dock in the window, suppot dock's merging, drag and close.
             </div>
           </div>
-        </div>
+        </div>        
       </div>
+
     </div>
+
   </div>
 </section>
   

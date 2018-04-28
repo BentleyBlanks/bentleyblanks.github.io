@@ -47,6 +47,8 @@
     
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     
+      <link rel="stylesheet" href="/css/basic.css">
+    
       <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
     
   
@@ -134,6 +136,62 @@
                   <!-- article card -->
                   <div class="card is-white is-hover" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
+                        自定义函数的Lua绑定
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+<p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+<p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
+<pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
+return temp,9,1
+</code></pre>
+<p>在C程序中</p>
+<pre><code class="cpp">std::stringstream strBuffer;
+while(lua_gettop(luaState))
+{
+    strBuffer.str(std::string());
+    strBuffer &lt;&lt; &quot;lua returned a &quot;;
+
+    int index = lua_gettop(luaState);
+    switch(lua_type(luaState, index))
+    {
+    case LUA_TNUMBER:
+        strBuffer &lt;&lt; &quot;number&quot; &lt;&lt; lua_tonumber(luaState, index);
+        break;
+    case LUA_TTABLE:
+        strBuffer &lt;&lt; &quot;table&quot;;
+        break;
+    case LUA_TSTRING:
+        strBuffer &lt;&lt; &quot;string&quot; &lt;&lt; lua_tostring(luaState, index);
+        break;
+    case LUA_TBOOLEAN:
+        strBuffer &lt;&lt; &quot;boolean&quot; &lt;&lt; lua_toboolean(luaState, index);
+        break;
+    default:
+        strBuffer &lt;&lt; &quot;unknow type&quot;;
+        break;
+    }
+
+    strBuffer &lt;&lt; &quot;\n&quot;;
+    lua_pop(luaState, 1);
+    cout &lt;&lt; strBuffer.str() &lt;&lt; endl;
+}
+</code></pre>
+<p>期望能够解析出每个返回值的类型信息 </p>
+<p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
                         Lua的Table结构
                       </a>
@@ -174,35 +232,6 @@ print(array[3])
 print(array[&quot;1&quot;]) --nil
 </code></pre>
 <p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
-                        Lua栈结构
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <ol>
-<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
-</ol>
-<p>2.lua栈</p>
-<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
-<p>3.建一个新表</p>
-<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
-</code></pre>
-<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
-<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
-</code></pre>
-<p>常用这个</p>
-<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
 
                       </p>
                     </div>

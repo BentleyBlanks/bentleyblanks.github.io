@@ -1,0 +1,123 @@
+.row-center {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+  flex-flow: row wrap;
+}
+
+.row-center-nowarp {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+  flex-flow: row nowrap;
+}
+
+.column-center {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+  flex-flow: column wrap;
+}
+
+.column-center-nowarp {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+  flex-flow: column nowrap;
+}
+
+.row-left {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: flex-start;
+  align-items: center;
+  flex-flow: row wrap;
+}
+
+.row-left-nowarp {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: flex-start;
+  align-items: center;
+  flex-flow: row nowrap;
+}
+
+.row-right {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: flex-end;
+  align-items: center;
+  flex-flow: row wrap;
+}
+
+.row-right-nowarp {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: flex-end;
+  align-items: center;
+  flex-flow: row nowrap;
+}
+
+.column-top {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: flex-start;
+  align-items: center;
+  flex-flow: column wrap;
+}
+
+.column-bottom {
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: flex-end;
+  align-items: center;
+  flex-flow: column wrap;
+}
+
+.is-interval-top {
+  margin-top: 2rem;
+}
