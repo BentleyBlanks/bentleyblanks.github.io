@@ -78,9 +78,22 @@ print {
 .card-header-title {
 	font-size: 1.6rem;
 	font-weight: bold;
+
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+  flex-flow: row nowrap;
 }
 
-/* index article */
+.card-header-title i {
+  color: rgb(150, 150, 150, 0.5);
+}
+
 #articleCard .card-content {
   font-size: 0.9rem;
   font-weight: normal;
@@ -268,7 +281,16 @@ table.hljs-ln {
   -webkit-box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
           box-shadow: 0 4px 10px rgba(10, 10, 10, 0.2);
 
-  /*width: 50rem;*/
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+  flex-flow: row wrap;
+
   height: 18rem;
 }
 
@@ -292,6 +314,18 @@ table.hljs-ln {
 }
 
 .projectCardTitle {
+  flex: 0 0 25%;
+
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+  flex-flow: row nowrap;
+
   color: black;
   font-size: 2rem;
   font-weight: bold;
@@ -301,6 +335,12 @@ table.hljs-ln {
   padding: 0.5rem 0rem 0.5rem 2rem;
 
   transition: 0.2s ease-in-out;
+}
+
+.projectCardTitle i {
+  font-size: 1.5rem;
+  margin-right: 2rem; 
+  color: rgb(150, 150, 150, 0.5);
 }
 
 .projectCardTitle:hover {
@@ -314,6 +354,83 @@ table.hljs-ln {
 }
 
 .projectCardIntro {
-  /*flex: 0 1 70%;*/
-  padding: 2rem;
+  flex: 0 0 50%;
+  padding: 1rem 1rem 0rem 2rem;
+}
+
+.projectCardLink {
+  flex: 0 0 25%;
+  border-top: 1px solid rgba(100, 100, 100, 0.1);
+  width: 100%;
+  padding: 0.5rem 0rem 0.5rem 2rem;
+
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  justify-content: flex-start;
+  align-items: center;
+  flex-flow: row nowrap;
+}
+
+.projectCardLink a {
+  /*flex: 0 0 25%;*/
+  font-size: 1.6rem;
+  color: rgb(150, 150, 150);
+}
+
+.projectCardLink a:hover {
+  color: rgb(20, 20, 20);
+}
+
+@media screen and (max-width: 768px) {
+  .projectCard {
+    display: -webkit-box;
+    display: -moz-box;
+    display: -ms-flexbox;
+    display: -webkit-flex;
+    display: flex;
+  
+    justify-content: center;
+    align-items: center;
+    flex-flow: column wrap;
+
+    height: 30rem;
+  }
+
+  .illustrate {
+    flex: 0 0 40%;
+    height: 30%;
+    width: 100%;
+  }
+  
+  .illustrate img {
+    width: 100%;
+    /*height: 100%;*/
+    overflow: hidden;
+    /*height: 16rem;*/
+    object-fit: cover;
+  }
+
+  .projectCardTitle {
+    flex: 0 0 20%;
+  }
+
+  .projectCardContent {
+    display: -webkit-box;
+    display: -moz-box;
+    display: -ms-flexbox;
+    display: -webkit-flex;
+    display: flex;
+
+    justify-content: space-between;
+    align-items: center;
+    flex-flow: column wrap;
+  }
+
+  .projectCardLink {
+    flex: 0 0 20%;
+  }
 }

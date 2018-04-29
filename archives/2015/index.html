@@ -26,7 +26,7 @@
   <meta name="msapplication-TileColor" content="#ffffff">
   <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
   <meta name="theme-color" content="#ffffff">
-
+  
   <!-- katex -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
@@ -46,6 +46,8 @@
       <link rel="stylesheet" href="/css/elenore/css/elenore.css">
     
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/animate.min.css">
     
       <link rel="stylesheet" href="/css/basic.css">
     
@@ -126,6 +128,7 @@
   <div class="container">
     <!-- content and about me -->
     <div class="columns">
+
       <!-- blog -->
       <div class="column is-two-thirds">
         <div class="columns is-multiline">
@@ -134,10 +137,11 @@
             
                 
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2015/12/16/2015-12-16-Ray Tracing Notes 2/" class="card-header-title">
-                        Ray Tracing Notes 2
+                        <p>Ray Tracing Notes 2</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -230,10 +234,11 @@ c-16-25.333-24-45-24-59z"/></svg></span></span></span></span><span class="vlist-
                   <br>
                   
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2015/11/16/2015-11-16-Ray Tracing Notes 1/" class="card-header-title">
-                        Ray Tracing Notes 1
+                        <p>Ray Tracing Notes 1</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -1119,10 +1124,11 @@ c-16-25.333-24-45-24-59z"/></svg></span></span></span></span></span></span></spa
                   <br>
                   
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2015/10/30/2015-10-30-Compiler Compiler/" class="card-header-title">
-                        Compiler Compiler
+                        <p>Compiler Compiler</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -1176,6 +1182,7 @@ token = yylex(yyscan_t scaninfo);
           </div>
         </div>
       </div>
+
       <!-- about me -->
       <div class="column">
         <div class="card is-white is-hover is-hidden-mobile is-sticky" id="indexAboutMe">
@@ -1359,6 +1366,10 @@ token = yylex(yyscan_t scaninfo);
 
 
   <!-- scripts list from theme config.yml -->
+  
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" language="javascript"></script>
+  
+    <script src="/js/wow.min.js" language="javascript"></script>
   
     <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
   

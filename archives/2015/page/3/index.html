@@ -26,7 +26,7 @@
   <meta name="msapplication-TileColor" content="#ffffff">
   <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
   <meta name="theme-color" content="#ffffff">
-
+  
   <!-- katex -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
@@ -46,6 +46,8 @@
       <link rel="stylesheet" href="/css/elenore/css/elenore.css">
     
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/animate.min.css">
     
       <link rel="stylesheet" href="/css/basic.css">
     
@@ -126,6 +128,7 @@
   <div class="container">
     <!-- content and about me -->
     <div class="columns">
+
       <!-- blog -->
       <div class="column is-two-thirds">
         <div class="columns is-multiline">
@@ -134,10 +137,11 @@
             
                 
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2015/09/11/2015-09-11-regex/" class="card-header-title">
-                        初尝正则表达式
+                        <p>初尝正则表达式</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -350,10 +354,11 @@ background-color: red;
                   <br>
                   
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2015/08/14/2015-08-14-operator/" class="card-header-title">
-                        矩阵"快速"初始化
+                        <p>矩阵"快速"初始化</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -508,10 +513,11 @@ void main()
                   <br>
                   
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2015/08/13/2015-08-14-corrections/" class="card-header-title">
-                        迷宫算法的更正
+                        <p>迷宫算法的更正</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -546,6 +552,7 @@ else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
           </div>
         </div>
       </div>
+
       <!-- about me -->
       <div class="column">
         <div class="card is-white is-hover is-hidden-mobile is-sticky" id="indexAboutMe">
@@ -739,6 +746,10 @@ else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
 
 
   <!-- scripts list from theme config.yml -->
+  
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" language="javascript"></script>
+  
+    <script src="/js/wow.min.js" language="javascript"></script>
   
     <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
   

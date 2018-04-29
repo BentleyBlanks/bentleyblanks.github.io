@@ -26,7 +26,7 @@
   <meta name="msapplication-TileColor" content="#ffffff">
   <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
   <meta name="theme-color" content="#ffffff">
-
+  
   <!-- katex -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
@@ -46,6 +46,8 @@
       <link rel="stylesheet" href="/css/elenore/css/elenore.css">
     
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/animate.min.css">
     
       <link rel="stylesheet" href="/css/basic.css">
     
@@ -126,8 +128,6 @@
   <h1></h1>
   <section class="section">
   <div class="container column-center">
-
-    <!-- projects -->
     <div class="columns">
 
       <!-- about me -->
@@ -177,67 +177,108 @@
 
       <!-- Projects -->
       <div class="column">
-        <div class="is-hover row-center projectCard">
+        <div class="is-hover row-center projectCard wow fadeInUp">
           <div class="illustrate">
             <img src="../img/projects/Atmos.png">
           </div>
           <div class="projectCardContent column-top">
-            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atmos</a>
+            <a class="projectCardTitle" href="/projects/Atmos.html">
+              <p>Atmos</p>
+              <i class="fa fa-arrow-right" aria-hidden="true"></i>
+            </a>
 
-            <div class="projectCardIntro row-left">
-              A Simple Physically Based Renderer, still in development. In 2016, the <span><a href="http://v.youku.com/v_show/id_XMTczMjI3NjY1Mg==.html#paction" target="_blank" rel="noopener">Video Demo</a></span> and Atmos Renderer, were as my graduation project from JiangNan University.
+            <div class="projectCardIntro row-top">
+              <p>Atmos is a simple physically based renderer with the help of PBRT. In 2016, a <a href="http://v.youku.com/v_show/id_XMTczMjI3NjY1Mg==.html#paction" target="_blank" rel="noopener">video demo</a> and the Renderer itself, were as my graduation project from JiangNan University. </p>
+            </div>
+
+            <div class="projectCardLink">
+              <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener"></a>
+              <a class="fa fa-file-archive-o is-interval-left" href="https://github.com/BentleyBlanks/Atmos/releases" target="_blank" rel="noopener"></a>
+              <a class="fa fa-youtube is-interval-left" href="https://www.youtube.com/watch?v=d6pLWDCjvSk" target="_blank" rel="noopener"></a>
             </div>
           </div>
         </div>
 
-        <div class="is-hover row-center projectCard is-interval-top">
+        <div class="is-hover projectCard is-interval-top wow fadeInUp">
           <div class="illustrate">
             <img src="https://github.com/BentleyBlanks/smallptCuda/raw/master/test.png">
           </div>
           <div class="projectCardContent column-top">
-            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/smallptCuda" target="_blank" rel="noopener">smallptCuda</a>
+            <a class="projectCardTitle" href="/projects/smallptCuda.html">
+              <p>smallptCuda</p>
+              <i class="fa fa-arrow-right" aria-hidden="true"></i>
+            </a>
 
-            <div class="projectCardIntro row-left">
-              A simple cuda version of smallpt with some memory optimization. See more optimization details on Shawnlu and Bingo's blog.
+            <div class="projectCardIntro row-top">
+              <p>A simple cuda version of smallpt with some memory optimization. See more optimization details on Shawnlu and Bingo's blog.</p>
+            </div>
+
+            <div class="projectCardLink">
+              <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/smallptCuda" target="_blank" rel="noopener"></a>
+              <a class="fa fa-rss is-interval-left" href="/2018/04/22/2018-04-22-Cuda%20Path%20Tracer开发/"></a>
+              <a class="fa fa-file-archive-o is-interval-left" href="https://github.com/BentleyBlanks/smallptCuda/releases" target="_blank" rel="noopener"></a>
             </div>
           </div>
         </div>
 
-        <div class="is-hover row-center projectCard is-interval-top">
+        <div class="is-hover projectCard is-interval-top wow fadeInUp">
           <div class="illustrate">
             <img src="https://raw.githubusercontent.com/BentleyBlanks/TattyUI/master/screenshots/1.png">
           </div>
           <div class="projectCardContent column-top">
-            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/TattyUI" target="_blank" rel="noopener">TattyUI</a>
+            <a class="projectCardTitle" href="/projects/TattyUI.html">
+              <p>TattyUI</p>
+              <i class="fa fa-arrow-right" aria-hidden="true"></i>
+            </a>
 
-            <div class="projectCardIntro row-left">
-              借鉴与浏览器的实现，TattyUI使用HTML+CSS+C++完成业务逻辑和样式实现的分离，从而完成UI的快速可定制化搭建。
+            <div class="projectCardIntro row-top">
+              <p>借鉴与浏览器的实现，TattyUI使用HTML+CSS+C++完成业务逻辑和样式实现的分离，从而完成UI的快速可定制化搭建。</p>
+            </div>
+
+            <div class="projectCardLink">
+              <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/TattyUI" target="_blank" rel="noopener"></a>
+              <a class="fa fa-file-archive-o is-interval-left" href="https://github.com/BentleyBlanks/TattyUI/releases" target="_blank" rel="noopener"></a>
             </div>
           </div>
         </div>
 
-        <div class="is-hover row-center projectCard is-interval-top">
+        <div class="is-hover projectCard is-interval-top wow fadeInUp">
           <div class="illustrate">
             <img src="../img/projects/imguiDock.png">
           </div>
           <div class="projectCardContent column-top">
-            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/imguiDock" target="_blank" rel="noopener">imguiDock</a>
+            <a class="projectCardTitle" href="/projects/imguiDock.html">
+              <p>imguiDock</p>
+              <i class="fa fa-arrow-right" aria-hidden="true"></i>
+            </a>
 
-            <div class="projectCardIntro row-left">
-              An addon of imgui for support dock in the window, suppot dock's merging, drag and close.
+            <div class="projectCardIntro row-top">
+              <p>An addon of imgui for support dock in the window, suppot dock's merging, drag and close. </p>
+            </div>
+
+            <div class="projectCardLink">
+              <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/imguiDock" target="_blank" rel="noopener"></a>
             </div>
           </div>
         </div>
 
-        <div class="is-hover row-center projectCard is-interval-top">
+        <div class="is-hover projectCard is-interval-top wow fadeInUp">
           <div class="illustrate">
             <img src="../img/projects/Floekr2d.png">
           </div>
           <div class="projectCardContent column-top">
-            <a class="projectCardTitle row-left" href="https://github.com/BentleyBlanks/Floekr2d" target="_blank" rel="noopener">Floekr2d</a>
+            <a class="projectCardTitle" href="/projects/Floekr2d.html">
+              <p>Floekr2d</p>
+              <i class="fa fa-arrow-right" aria-hidden="true"></i>
+            </a>
 
-            <div class="projectCardIntro row-left">
-              一款接口类似Box2d，使用分离轴碰撞检测算法，支持任意边数凸多边形以及之间碰撞检测及反馈的简单物理引擎。
+            <div class="projectCardIntro row-top">
+              <p>一款接口类似Box2d，使用分离轴碰撞检测算法，支持任意边数凸多边形以及之间碰撞检测及反馈的简单2D物理引擎。</p>
+            </div>
+
+            <div class="projectCardLink">
+              <a class="fa fa-lg fa-github" href="https://github.com/BentleyBlanks/Floekr2d" target="_blank" rel="noopener"></a>
+              <a class="fa fa-file-archive-o is-interval-left" href="https://github.com/BentleyBlanks/Floekr2d/releases" target="_blank" rel="noopener"></a>
             </div>
           </div>
         </div>    
@@ -338,6 +379,10 @@
 
 
   <!-- scripts list from theme config.yml -->
+  
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" language="javascript"></script>
+  
+    <script src="/js/wow.min.js" language="javascript"></script>
   
     <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
   

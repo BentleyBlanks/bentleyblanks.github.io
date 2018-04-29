@@ -1,0 +1,344 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TattyUI [ Bingo ]</title>
+
+  <link rel="apple-touch-icon" sizes="57x57" href="./img/apple-icon-57x57.png">
+  <link rel="apple-touch-icon" sizes="60x60" href="./img/apple-icon-60x60.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="./img/apple-icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="./img/apple-icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="./img/apple-icon-114x114.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="./img/apple-icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
+  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
+  <link rel="manifest" href="./img/manifest.json">
+  <meta name="msapplication-TileColor" content="#ffffff">
+  <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
+  <meta name="theme-color" content="#ffffff">
+  
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <!-- highlight line-number -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.3.0/highlightjs-line-numbers.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  <script>hljs.initLineNumbersOnLoad();</script>
+
+  <!-- theme css -->
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/animate.min.css">
+    
+      <link rel="stylesheet" href="/css/basic.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+    
+  
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">TattyUI</h3>
+					</div>
+					<div class="card-content">
+					  <p><p><img src="https://raw.githubusercontent.com/BentleyBlanks/TattyUI/master/screenshots/1.png" alt="screenshot"></p>
+<p>对比Chrome(本质上是TattyUI做的近似CSS实现)<br><img src="https://raw.githubusercontent.com/BentleyBlanks/TattyUI/master/screenshots/2.png" alt="screenshot"></p>
+<p>本UI框架底层渲染框架采用<a href="https://github.com/memononen/nanovg" target="_blank" rel="noopener">nanovg</a>,采用类似浏览器WebKit的做法，将UI的样式与业务逻辑分离。本质上是一个简易的浏览器内核实现。</p>
+<p>TattyUI第一个较为成熟的production级的产品将会是为 <a href="https://github.com/wubugui/WIP" target="_blank" rel="noopener">WIP2D</a> 2D游戏引擎制作<code>编辑器</code>，尽请期待。</p>
+<p>底层<a href="https://github.com/BentleyBlanks/t2CSSPareser" target="_blank" rel="noopener">CSS解析器</a>为使用Flex+Bison，借鉴<a href="https://www.webkit.org/" target="_blank" rel="noopener">Webkit</a>与<a href="http://www.w3.org/" target="_blank" rel="noopener">W3C</a>中CSS2.0实现，详见<a href="https://github.com/BentleyBlanks/t2CSSPareser" target="_blank" rel="noopener">t2CSSParser</a>介绍。</p>
+<h1 id="依赖项说明"><a href="#依赖项说明" class="headerlink" title="依赖项说明"></a>依赖项说明</h1><p>1.<a href="http://www.glfw.org/" target="_blank" rel="noopener">GLFW</a> ver 3.11</p>
+<p>2.<a href="http://glew.sourceforge.net/" target="_blank" rel="noopener">GLEW</a> ver 1.13.0</p>
+<p>3.<a href="https://github.com/google/gumbo-parser" target="_blank" rel="noopener">Gumbo</a> </p>
+<p>4.<a href="https://github.com/BentleyBlanks/t3DataStructures" target="_blank" rel="noopener">t3DataStructures</a> ver 1.0</p>
+<p>5.<a href="https://github.com/memononen/nanovg" target="_blank" rel="noopener">nanovg</a></p>
+<blockquote>
+<p>依赖项已全部附带至Git，也可以根据需要自行更换<br>目前依赖项静态库为直接给出，可以根据平台需要以及Debug/Release模式的不同自行更换</p>
+</blockquote>
+<h1 id="构建说明"><a href="#构建说明" class="headerlink" title="构建说明"></a>构建说明</h1><p>1.TattyUI采用CMake做跨平台搭建工作,支持Windows,OSX(OSX下的静态库配置仍需手动完成)等</p>
+<p>2.假设您构建在新文件夹build中，那么仅需在IDE中设置包含<code>../TattyUI</code>即可</p>
+<p>3.可自行构建<code>resources</code>文件夹用于放置资源</p>
+<p>4.给出的文件夹<code>bin/graph</code>中包含了<a href="www.graphviz.org/">Graphviz</a>生成的脚本与渲染出的可视AST，也可根据需要自行更换生成。</p>
+<h1 id="使用说明"><a href="#使用说明" class="headerlink" title="使用说明"></a>使用说明</h1><p>1.CSS目前支持的属性已在<code>t2Style.cpp</code>声明，可自行查阅。</p>
+<p>2.C++通过和t2DivController交互即可获取想要的<code>&lt;div&gt;</code>列表，所有C++代码都会直接或者间接的与全局表<code>divTable</code>进行交互。</p>
+<blockquote>
+<p>例如</p>
+</blockquote>
+<pre><code class="cpp">// 两种方式获取指定名称的div作用都是相同的
+t2Div *div1 = divController-&gt;find(&quot;div1&quot;);
+t2Div *div2 = divController[&quot;div2&quot;];
+</code></pre>
+<blockquote>
+<p>详情可见example</p>
+</blockquote>
+<p>3.TattyUI较大的采用C++11标准，在回调函数的选择上使用<code>std::fucntion</code>从而支持成员函数，函数指针，Lambda表达式等，以最大的可能模拟浏览器的样式但采用本地矢量渲染。</p>
+<blockquote>
+<p>例如</p>
+</blockquote>
+<pre><code class="cpp">// 以下回调函数都使用C++11支持的标准Lambda表达式
+    root.mouseMovedIn = [](int x, int y, int px, int py)
+    {
+        t2Log(&quot;Root MovedIn\n&quot;);
+    };
+
+    root.mouseMovedOut = [](int x, int y, int px, int py)
+    {
+        t2Log(&quot;Root MovedOut\n&quot;);
+    };
+
+    div1.mouseMovedIn = [](int x, int y, int px, int py)
+    {
+        t2Log(&quot;Div1 MovedIn\n&quot;);
+    };
+
+    div1.mouseMovedOut = [](int x, int y, int px, int py)
+    {
+        t2Log(&quot;Div1 MovedOut\n&quot;);
+    };
+</code></pre>
+<p>4.CSS解析部分支持大部分CSS2.0语法，部分未支持的语法规则已在<a href="https://github.com/BentleyBlanks/t2CSSPareser" target="_blank" rel="noopener">t2CSSParser</a>简介中给出</p>
+<h1 id="已知BUG"><a href="#已知BUG" class="headerlink" title="已知BUG"></a>已知BUG</h1><p>1.html中不给出<code>class</code>标签直接崩溃的错误</p>
+<p>2.新解析器不支持类似<code>function</code>写法的错误，如下</p>
+<pre><code class="css">/* unsupported */
+color: rgba();
+/* supported */
+color: #ffffff;
+/* supported */
+color: red;
+</code></pre>
+<p>3.#fff这样的位数不足六位写法解析出粗错，如下</p>
+<pre><code class="css">/* 解析器直接崩溃的错误 */
+color: #fff;
+/* 位数严格需要是六位 */
+color: #ffffff;
+</code></pre>
+<p>4.<code>text-align</code>无法使用，TattyUI区别于普通浏览器的新增关键字目前并不支持，因此模拟<code>&lt;h&gt;&lt;p&gt;</code>等标签就需要手工运算距离较麻烦</p>
+<p>5.margin负数时未考虑，会直接忽略这种情况而重置为0。</p>
+<p>6.目前请尽量使用稳定的<code>t2WindowBase</code>来创建窗口,t2Window尚有未解决的布局BUG。</p>
+<h1 id="版本说明"><a href="#版本说明" class="headerlink" title="版本说明"></a>版本说明</h1><pre><code>TattyUI ver 0.0.7 中感谢[ccss](https://github.com/jdeng/ccss)给我提供了非常好的使用正则表达式解析CSS的案例。
+
+TattyUI ver 0.0.3 之前采用XML+Json+Lua的脚本配合
+
+TattyUI ver 0.0.4 之后直接采用HTML+CSS+Lua的脚本
+</code></pre><h2 id="关于作者"><a href="#关于作者" class="headerlink" title="关于作者"></a>关于作者</h2><pre><code class="cpp">int 官某某 = &quot;Bingo&quot;;
+
+char[] 个人博客 = &quot;http://bentleyblanks.github.io&quot;;
+</code></pre>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        DESCRIPTION
+					      </p>
+					      <p id="pageDescription">An introduction to TattyUI</p>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a>2017</a>
+					        </li>
+					        <li>
+					          <a class="is-active">2018</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>. Powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" language="javascript"></script>
+  
+    <script src="/js/wow.min.js" language="javascript"></script>
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>

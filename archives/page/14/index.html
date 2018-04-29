@@ -26,7 +26,7 @@
   <meta name="msapplication-TileColor" content="#ffffff">
   <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
   <meta name="theme-color" content="#ffffff">
-
+  
   <!-- katex -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
@@ -46,6 +46,8 @@
       <link rel="stylesheet" href="/css/elenore/css/elenore.css">
     
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/animate.min.css">
     
       <link rel="stylesheet" href="/css/basic.css">
     
@@ -126,6 +128,7 @@
   <div class="container">
     <!-- content and about me -->
     <div class="columns">
+
       <!-- blog -->
       <div class="column is-two-thirds">
         <div class="columns is-multiline">
@@ -134,10 +137,11 @@
             
                 
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2015/06/27/2015-06-27-hello-world/" class="card-header-title">
-                        Who's your daddy?
+                        <p>Who's your daddy?</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -168,10 +172,11 @@
                   <br>
                   
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2015/03/01/2015-03-01-C++_note1/" class="card-header-title">
-                        C++编程思想(读书笔记_1)
+                        <p>C++编程思想(读书笔记_1)</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -209,10 +214,11 @@ while(char c = cin.get() != &#39;q&#39;)
                   <br>
                   
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
-                        Lua的Table结构
+                        <p>Lua的Table结构</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -262,6 +268,7 @@ print(array[&quot;1&quot;]) --nil
           </div>
         </div>
       </div>
+
       <!-- about me -->
       <div class="column">
         <div class="card is-white is-hover is-hidden-mobile is-sticky" id="indexAboutMe">
@@ -455,6 +462,10 @@ print(array[&quot;1&quot;]) --nil
 
 
   <!-- scripts list from theme config.yml -->
+  
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" language="javascript"></script>
+  
+    <script src="/js/wow.min.js" language="javascript"></script>
   
     <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
   

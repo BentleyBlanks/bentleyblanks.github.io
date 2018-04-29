@@ -26,7 +26,7 @@
   <meta name="msapplication-TileColor" content="#ffffff">
   <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
   <meta name="theme-color" content="#ffffff">
-
+  
   <!-- katex -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
@@ -46,6 +46,8 @@
       <link rel="stylesheet" href="/css/elenore/css/elenore.css">
     
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/animate.min.css">
     
       <link rel="stylesheet" href="/css/basic.css">
     
@@ -126,6 +128,7 @@
   <div class="container">
     <!-- content and about me -->
     <div class="columns">
+
       <!-- blog -->
       <div class="column is-two-thirds">
         <div class="columns is-multiline">
@@ -134,10 +137,11 @@
             
                 
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2014/09/12/2014-09-12-pointer/" class="card-header-title">
-                        指针初始化
+                        <p>指针初始化</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -160,10 +164,11 @@
                   <br>
                   
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2014/07/27/2014-03-23-C or C++/" class="card-header-title">
-                        选用C++还是C
+                        <p>选用C++还是C</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -184,10 +189,11 @@
                   <br>
                   
                   <!-- article card -->
-                  <div class="card is-white is-hover" id="articleCard">
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
                       <a href="/2014/07/27/2014-07-27-Relations between base pointer and derived pointer/" class="card-header-title">
-                        基类指针与派生类指针之间的转换
+                        <p>基类指针与派生类指针之间的转换</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
@@ -215,6 +221,7 @@
           </div>
         </div>
       </div>
+
       <!-- about me -->
       <div class="column">
         <div class="card is-white is-hover is-hidden-mobile is-sticky" id="indexAboutMe">
@@ -408,6 +415,10 @@
 
 
   <!-- scripts list from theme config.yml -->
+  
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" language="javascript"></script>
+  
+    <script src="/js/wow.min.js" language="javascript"></script>
   
     <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
   

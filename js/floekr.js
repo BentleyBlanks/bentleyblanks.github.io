@@ -119,3 +119,5 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
+// Animate
+new WOW().init();

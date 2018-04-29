@@ -1,0 +1,322 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>imguiDock [ Bingo ]</title>
+
+  <link rel="apple-touch-icon" sizes="57x57" href="./img/apple-icon-57x57.png">
+  <link rel="apple-touch-icon" sizes="60x60" href="./img/apple-icon-60x60.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="./img/apple-icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="./img/apple-icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="./img/apple-icon-114x114.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="./img/apple-icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
+  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
+  <link rel="manifest" href="./img/manifest.json">
+  <meta name="msapplication-TileColor" content="#ffffff">
+  <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
+  <meta name="theme-color" content="#ffffff">
+  
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <!-- highlight line-number -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.3.0/highlightjs-line-numbers.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  <script>hljs.initLineNumbersOnLoad();</script>
+
+  <!-- theme css -->
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/animate.min.css">
+    
+      <link rel="stylesheet" href="/css/basic.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+    
+  
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">imguiDock</h3>
+					</div>
+					<div class="card-content">
+					  <p><p>An addon of <a href="https://github.com/ocornut/imgui/wiki" target="_blank" rel="noopener">imgui</a> for support dock in the window</p>
+<p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/24660622177/in/dateposted-public/" title="QQ图片20180106100302" target="_blank" rel="noopener"><img src="https://farm5.staticflickr.com/4683/24660622177_7dafeee6e1_c.jpg" width="800" height="621" alt="QQ图片20180106100302"></a></p>
+<h2 id="How-to-use"><a href="#How-to-use" class="headerlink" title="How to use"></a>How to use</h2><pre><code class="cpp">void setup(){
+    // auto-load the imgui.ini settings
+    ImGui::InitDock();
+}
+
+void update(){
+    if(ImGui::Begin(&quot;Dock Demo&quot;))
+    {
+        // dock layout by hard-coded or .ini file
+        ImGui::BeginDockspace();
+
+        if(ImGui::BeginDock(&quot;Dock 1&quot;)){
+            ImGui::Text(&quot;I&#39;m Wubugui!&quot;);
+        }
+        ImGui::EndDock();
+
+        if(ImGui::BeginDock(&quot;Dock 2&quot;)){
+            ImGui::Text(&quot;I&#39;m BentleyBlanks!&quot;);
+        }
+        ImGui::EndDock();
+
+        if(ImGui::BeginDock(&quot;Dock 3&quot;)){
+            ImGui::Text(&quot;I&#39;m LonelyWaiting!&quot;);
+        }
+        ImGui::EndDock();
+
+        ImGui::EndDockspace();
+    }
+    ImGui::End();
+
+    // multiple dockspace supported
+    if(ImGui::Begin(&quot;Dock Demo2&quot;))
+    {
+        ImGui::BeginDockspace();
+
+        if(ImGui::BeginDock(&quot;Dock 2&quot;)){
+            ImGui::Text(&quot;Who&#39;s your daddy?&quot;);
+        }
+        ImGui::EndDock();
+
+        ImGui::EndDockspace();
+    }
+    ImGui::End();
+}
+
+</code></pre>
+<h2 id="Intro"><a href="#Intro" class="headerlink" title="Intro"></a>Intro</h2><p>Thx to the <a href="https://github.com/nem0" target="_blank" rel="noopener">nem0</a>, <a href="https://github.com/paniq" target="_blank" rel="noopener">paniq</a>, <a href="https://github.com/adcox" target="_blank" rel="noopener">adcox</a>‘s distribute of <code>imgui_dock</code>, so the imgui_dock was able to <code>auto save/load</code> to/from the <code>imgui.ini</code>.</p>
+<blockquote>
+<p>It seems the <a href="https://github.com/nem0/LumixEngine" target="_blank" rel="noopener">Lumix Engine</a> have done a quite intelligible work just save the dock’s property to a Lua file, so I was just save the properties to the <code>imgui.ini</code>.(you can modify the format if your want)</p>
+</blockquote>
+<blockquote>
+<p>Some complie errors may occured because of the API change of ImGui, pls let me know</p>
+</blockquote>
+<h2 id="Collaborator"><a href="#Collaborator" class="headerlink" title="Collaborator"></a>Collaborator</h2><ol>
+<li><a href="https://github.com/lonelyWaiting" target="_blank" rel="noopener">LonelyWaiting</a></li>
+<li><a href="https://github.com/BentleyBlanks" target="_blank" rel="noopener">BentleyBlanks</a></li>
+<li><a href="https://github.com/wubugui" target="_blank" rel="noopener">Wubugui</a></li>
+</ol>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        DESCRIPTION
+					      </p>
+					      <p id="pageDescription">An imgui's dock addon</p>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a>2017</a>
+					        </li>
+					        <li>
+					          <a class="is-active">2018</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>. Powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" language="javascript"></script>
+  
+    <script src="/js/wow.min.js" language="javascript"></script>
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>
