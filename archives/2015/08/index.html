@@ -352,6 +352,130 @@ else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
                   <br>
                   <br>
                   
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/08/02/2015-08-02-KMP-2/" class="card-header-title">
+                        <p>KMP算法心得-2</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>本文的理解建立在此 <a href="http://blog.csdn.net/v_july_v/article/details/7041827" target="_blank" rel="noopener">v_JULY_v</a> 以及 <a href="http://www.ruanyifeng.com/blog/2013/05/Knuth–Morris–Pratt_algorithm.html" target="_blank" rel="noopener">阮一峰</a> 的详解之上</p>
+</blockquote>
+<blockquote>
+<p>本文是对 数据结构–C语言版 书中代码的详解与个人理解</p>
+</blockquote>
+<p>上一节我只讲述了一下代码层面的理解，如果有算法背景不了解的可以去开篇的两篇教程中寻找答案。<code>这里只阐述自己对于算法中较为难以理解部分的想法</code>。</p>
+<blockquote>
+<p>为了能清晰的讲述KMP总共大概花费了一礼拜的时间; 这里我将书上的failure数组称为next数组以节省篇幅; s代表代求解字符串，p代表模式字符串</p>
+</blockquote>
+<p>这一段代码我认为是我个人最难以理解的。</p>
+<pre><code class="cpp">    i = failure[i];
+</code></pre>
+<p>首先这里的背景是，在求next数组某一循环时发现p[j]!=p[i+1],且i&gt;=0。换言之p<sub>0</sub>,p<sub>1</sub>, … p<sub>i</sub> != p<sub>j-1</sub>, p<sub>j-i+1</sub>, …p<sub>j</sub>，因此我希望能够在p<sub>0</sub>,p<sub>1</sub>, … p<sub>i</sub>中找到一个位置x(x &lt; p)，使得p<sub>0</sub>,p<sub>1</sub>,…p<sub>x</sub> = p<sub>j-x</sub>, p<sub>j-x+1</sub>,…p<sub>j</sub>。</p>
+<blockquote>
+<p>简而言之，就是希望能够找到一条稍微短一些的公共缀。可以参考<code>v_JULY_v</code>教程里的图</p>
+</blockquote>
+<p>而算法的答案是：你可以试试<code>x = next[i]</code>，说不定可行。注意，这里<code>x = next[i]</code>不是一次就可以找到，因此也就是while存在的价值。</p>
+<p>难点依然存在，为什么<code>x = next[i]</code>就可以快速的找到这个x呢？这也是我这么多天一直困扰的地方。</p>
+<pre><code class="cpp">    while(pat[j] != pat[i+1] &amp;&amp; i&gt;0)
+        i = failure[i];
+</code></pre>
+<p>总结了一下，其实难点在于几个指针的意义不明确。这里j很好理解，指向当前需要求解的位置，i才是重点。</p>
+<blockquote>
+<p>注意，这里的指针概念全部都引用自<code>KMP心得-1</code>里的代码实现</p>
+</blockquote>
+<ol>
+<li>next[i]代表了前缀末尾的下标</li>
+<li>next[i]+1代表了前后缀的长度</li>
+<li>next[i]代表了字符s[i]可回溯到的下标</li>
+</ol>
+<p><br></p>
+<blockquote>
+<p>这里我用一句话概括求解next数组的中心思想：让模式串p与自身匹配</p>
+</blockquote>
+<p>知晓了此中心思想，理解算法就游刃有余了。</p>
+<p>假定现在已知模式串为，我将结果和序号一一标示在下边</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">0</th>
+<th style="text-align:center">1</th>
+<th style="text-align:center">2</th>
+<th style="text-align:center">3</th>
+<th style="text-align:center">4</th>
+<th style="text-align:center">5</th>
+<th style="text-align:center">6</th>
+<th style="text-align:center">7</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">A</td>
+<td style="text-align:center">B</td>
+<td style="text-align:center">A</td>
+<td style="text-align:center">C</td>
+<td style="text-align:center">A</td>
+<td style="text-align:center">B</td>
+<td style="text-align:center">A</td>
+<td style="text-align:center">B</td>
+</tr>
+<tr>
+<td style="text-align:center">-1</td>
+<td style="text-align:center">-1</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">-1</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">1</td>
+<td style="text-align:center">2</td>
+<td style="text-align:center">？</td>
+</tr>
+</tbody>
+</table>
+<p>此时i=2（i=next[j-1]），为求解B的next值，根据算法比对前缀<code>ABAC</code>与后缀<code>ABAB</code>（<code>pat[j]!=pat[i]，B!=C</code>），不匹配，这个时候就是关键点了。</p>
+<blockquote>
+<p>直接从字面上寻找，当然很快就能找到s[1] = s[7]的事实，也就是next[7] = 1。</p>
+</blockquote>
+<p>如果这个过程改为p于自身匹配，这个时候就很好理解了。</p>
+<p><code>A B A C A B A B</code></p>
+<p><code>- - - - A B A C A B A B</code></p>
+<p>模拟pmatch的过程，现前循环是这样的。发现B!=C，此时不是从头开始再次匹配，而是<code>回溯到某一个位置重新比对</code>，也就是next[i]（next[2]=0），这就是为什么i可以通过赋值next[i]来迭代寻找的核心原因!</p>
+<p><code>A B A C A B A B</code></p>
+<p><code>- - - - - - A B A C A B A B</code></p>
+<p>此时s[7]==p[1]，next[7]=1!因为谁也不能保证p[next[i]]=p[j]，因此这里用while循环。其实和pmatch里的while是一个道理，我并不清楚回溯之后<code>string[i]和pat[j]</code>是否相等，所以while里j的值一直迭代。</p>
+<p><br></p>
+<p>总结一下，其实求解next数组受益于求解前后缀，其实质就是在匹配自身字符串，大致的核心思想都是相同的。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2015/08/01/2015-08-01-github/" class="card-header-title">
+                        <p>Github仓库小幅更新</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>其实不得不承认，以前写的程序上传到Github都不够用心。甚至于花了很大力气的一些较大程序也没有一个简易的构建说明，甚至于说是更新要点。</p>
+</blockquote>
+<p>自我反省了一下，争取把以前贴到Lofter上的技术博客慢慢的转移到Github以及这里的io上来。</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
               
           </div>
         </div>
@@ -430,12 +554,10 @@ else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
                         
 
                         
-                            <li><a class="pagination-link" href="archives/2015/08//page/2">2</a></li>
-                        
                     </ul>
 
                     
-                        <a class="pagination-next" href="/archives/2015/08/page/2/">
+                        <a class="pagination-next" href="/">
                     
                     Next
                     </a>
@@ -470,12 +592,10 @@ else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
                         
 
                         
-                            <li><a class="pagination-link" href="archives/2015/08//page/2">2</a></li>
-                        
                     </ul>
 
                     
-                        <a class="pagination-next" href="/archives/2015/08/page/2/">
+                        <a class="pagination-next" href="/">
                     
                     Next
                     </a>

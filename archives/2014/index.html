@@ -274,6 +274,163 @@ while(lua_gettop(luaState))
                   <br>
                   <br>
                   
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/11/22/2014-11-22-constructor/" class="card-header-title">
+                        <p>构造函数正确调用</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <pre><code class="cpp">struct CLS
+{
+    int m_i;
+    CLS( int i ):m_i(i){}
+    CLS()
+    {
+        CLS(0);
+    }
+};
+</code></pre>
+<pre><code class="cpp">int main()
+{
+    CLS obj;
+    // obj.m_i = ?
+    return 0;
+}
+</code></pre>
+<p>从这里，我们归纳如下：</p>
+<blockquote>
+<p>1）在c++里，由于构造函数允许有默认参数，使得这种构造函数调用构造函数来重用代码的需求大为减少</p>
+</blockquote>
+<blockquote>
+<p>2）如果仅仅为了一个构造函数重用另一个构造函数的代码，那么完全可以把构造函数中的公共部分抽取出来定义一个成员函数(推荐为private),然后在每个需要这个代码的构造函数中调用该函数即可</p>
+</blockquote>
+<blockquote>
+<p>3）偶尔我们还是希望在类的构造函数里调用另一个构造函数，可以按下面方式做：</p>
+</blockquote>
+<p>在构造函数里调用另一个构造函数的关键是让第二个构造函数在第一次分配好的内存上执行，而不是分配新的内存，这个可以用标准库的<code>placement new</code>做到：</p>
+<blockquote>
+<p>先看看标准库中<code>placement new</code>的定义</p>
+</blockquote>
+<pre><code class="cpp">inline void *__cdecl operator new(size_t, void *_P)
+{
+    return (_P); 
+} 
+</code></pre>
+<p>可见没有分配新的内存。</p>
+<p>正确的方式：</p>
+<pre><code class="cpp">struct CLS
+{
+    int m_i;
+    CLS( int i ) : m_i(i){}
+    CLS()
+    {
+        new (this)CLS(0);
+    }
+};
+</code></pre>
+<blockquote>
+<p>另： 若构造函数调用自身，则会出现无限递归调用，是不允许的</p>
+</blockquote>
+<p>若是构造函数嵌套调用 那么第二次调用产生的是匿名对象 也就是说 无论在第二次的构造函数中赋任何值 都会被作为临时对象给抹去 <code>那么出了第一次的构造函数相当于没有初始化任何东西</code></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/10/11/2014-11-10-Sutherland/" class="card-header-title">
+                        <p>Sutherland-Hodgman Algorithm</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
+<pre><code class="cpp">Polygon SutherlandHodgman( const Polygon startingPolygon, Plane[] clippingPlanes )
+{
+  Polygon output = startingPolygon
+  for each Plane clippingPlane in clippingPlanes
+    input = output
+    output.Clear( )
+    Vec2 startingPoint = input.Last( )
+    for each Vec2 endPoint in input
+      if startingPoint and endPoint in front of clippingPlane
+        out.push( endPoint )
+      else if startingPoint in front and endPoint behind clippingPlane
+        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
+      else if startingPoint and endPoint behind clippingPlane
+        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
+        out.push( endPoint )
+      endPoint = startingPoint
+  return output
+}
+</code></pre>
+<p>其本质就是<code>遍历需要被裁减的多边形的所有的边 每边与裁剪多边形的所有边进行位置判断</code></p>
+<pre><code class="cpp">// InFront = plane.Distance( point ) &gt; 0.0f
+// Behind  = plane.Distance( point ) &lt; 0.0f
+
+Vec2 p1, p2;
+ClipPlane plane;
+
+case p1 InFront and p2 InFront
+  push p2
+case p1 InFront and p2 Behind
+  push intersection
+case p1 Behind and p2 InFront
+  push intersection
+  push p2
+</code></pre>
+<p>上方代码的含义基本为下图</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt=""></p>
+<p>1.当边的方向进入裁剪区域 添加P与P1</p>
+<p>2.当边的方向是背离裁剪区域 只添加P</p>
+<p>3.倘若全部都在背离方向上 不添加点</p>
+<p>4.整个边都在内部 只添加P1</p>
+<p>这里P是p0-&gt;p1与裁剪边的交接点 (一元二次的直线方程可以计算出)</p>
+<p>下方为一个裁剪的案例</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt=""></p>
+<p>详情见</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/10/11/2014-11-10-Support Point/" class="card-header-title">
+                        <p>Support Point--Minkowski difference</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
+<p>support point是在给定方向上距离最远(投影最大)的点</p>
+<p>在碰撞检测中也需要寻找分离轴 那么这时候 support point就是在面法线相反的方向上最远的点 也就是<code>背离这个方向深交最深的点</code></p>
+<p>倘若两个多边形相互碰撞 那么<code>一定能</code>找到<code>一个顶点与给定平面之间的距离小于0</code>(在面法线上的投影)</p>
+<p>这与两个多边形互不碰撞那么一定可以找到一跟分离轴分离两个多边形的理论是类似的</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
+<p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
               
           </div>
         </div>
@@ -355,7 +512,7 @@ while(lua_gettop(luaState))
                         
 
                         
-                            <li><a class="pagination-link" href="archives/2014//page/7">7</a></li>
+                            <li><a class="pagination-link" href="archives/2014//page/4">4</a></li>
                         
                     </ul>
 
@@ -398,7 +555,7 @@ while(lua_gettop(luaState))
                         
 
                         
-                            <li><a class="pagination-link" href="archives/2014//page/7">7</a></li>
+                            <li><a class="pagination-link" href="archives/2014//page/4">4</a></li>
                         
                     </ul>
 

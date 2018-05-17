@@ -1,0 +1,332 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ofxTrianglular [ Bingo ]</title>
+
+  <link rel="apple-touch-icon" sizes="57x57" href="./img/apple-icon-57x57.png">
+  <link rel="apple-touch-icon" sizes="60x60" href="./img/apple-icon-60x60.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="./img/apple-icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="./img/apple-icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="./img/apple-icon-114x114.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="./img/apple-icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
+  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
+  <link rel="manifest" href="./img/manifest.json">
+  <meta name="msapplication-TileColor" content="#ffffff">
+  <meta name="msapplication-TileImage" content="./img/ms-icon-144x144.png">
+  <meta name="theme-color" content="#ffffff">
+  
+  <!-- katex -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css" integrity="sha384-TEMocfGvRuD1rIAacqrknm5BQZ7W7uWitoih+jMNFXQIbNl16bO8OZmylH/Vi/Ei" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.js" integrity="sha384-jmxIlussZWB7qCuB+PgKG1uLjjxbVVIayPJwi6cG6Zb4YKq0JIw+OMnkkEC7kYCq" crossorigin="anonymous"></script>
+
+  <!-- highlight -->
+  <link rel="stylesheet" href="/highlight/styles/monokai-sublime.css">
+  <script src="/highlight/highlight.pack.js"></script>
+  <!-- highlight line-number -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.3.0/highlightjs-line-numbers.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  <script>hljs.initLineNumbersOnLoad();</script>
+
+  <!-- theme css -->
+  
+    <!-- stylesheets list from config.yml -->
+    
+      <link rel="stylesheet" href="/css/elenore/css/elenore.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+      <link rel="stylesheet" href="/css/animate.min.css">
+    
+      <link rel="stylesheet" href="/css/basic.css">
+    
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+    
+  
+
+</head>
+<body>
+
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><!-- Navigation Bar -->
+<nav id="navbar" class="navbar is-white is-fixed-top">
+  <div id="specialShadow" class="el-special-shadow"></div>
+  <div class="container">
+
+    <!-- left side, always visible -->
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <!-- <strong>Bingo</strong> -->
+        <i class="fa fa-lg fa-home"></i>
+      </a>
+
+      <!-- toggles the menu on touch devices -->
+      <div id="navbarBurger" class="navbar-burger burger" data-target="navMenu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- menu -->
+    <div id="navMenu" class="navbar-menu">
+        <div class="navbar-end">
+          
+            
+            <a href="/" class="navbar-item">HOME</a>
+            
+
+            
+
+            
+          
+            
+
+            
+
+            
+            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            
+          
+            
+
+            
+            <a href="/about" class="navbar-item">ABOUT</a>
+            
+
+            
+          
+        </div>
+    </div>
+  </div>
+</nav>
+
+<!-- index hero -->
+<div class="hero is-large has-background-fixed" id="indexHero">
+  <div class="hero-body">
+    <div class="container has-text-centered">
+      <p id="titleContent">
+        Bingo, <span>Computer Graphics</span> & <span>Game Developer</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- articles and about me -->
+<!-- in the future -->
+<section class="section">
+	<div class="container">
+		<div class="columns">
+			<div class="column is-four-fifths">
+				<div class="card is-white is-hover" id="postCard">
+					<div class="card-header">
+					  <h3 class="card-header-title">ofxTrianglular</h3>
+					</div>
+					<div class="card-content">
+					  <p><p>Easy to subdivide a complex 2d shape to triangles.<br></p>
+<p>Support <code>OSX</code>(Xcode 6.0) <code>Windows</code>(Visual Studio 2012), and <code>Linux</code>(QtCreator, Ubuntu, Thanks for <a href="https://github.com/icq4ever" target="_blank" rel="noopener">icq4ever</a>).<br></p>
+<p>Based on <code>Jonathan Richard Shewchuk</code>‘s <a href="http://www.cs.cmu.edu/~quake/triangle.html" target="_blank" rel="noopener">triangle library</a><br></p>
+<hr>
+<h3 id="How-to-bulid"><a href="#How-to-bulid" class="headerlink" title="How to bulid"></a>How to bulid</h3><ul>
+<li>Based on <a href="http://openframeworks.cc/" target="_blank" rel="noopener">OpenFrameworks</a>, only need <a href="https://github.com/BentleyBlanks/ofxTrianglular" target="_blank" rel="noopener">ofxTriangular</a>, no other dependencies<br></li>
+</ul>
+<ul>
+<li>To bulid example you need to include <a href="https://github.com/rezaali/ofxUI" target="_blank" rel="noopener">ofxUI</a> and <a href="https://github.com/openframeworks/openFrameworks/tree/master/addons/ofxXmlSettings" target="_blank" rel="noopener">ofxXmlSettings</a> in projectGenerator or added manually.</li>
+</ul>
+<ul>
+<li>Replace the defalut project’s <code>ofApp.cpp</code> + <code>ofApp.h</code> + <code>main.cpp</code><br></li>
+</ul>
+<hr>
+<h3 id="Screenshots"><a href="#Screenshots" class="headerlink" title="Screenshots"></a>Screenshots</h3><h4 id="OSX"><a href="#OSX" class="headerlink" title="OSX"></a>OSX</h4><p><img src="https://farm1.staticflickr.com/974/41192194614_86afa62b4f_o.png" width="2144" height="1548" alt="Mac 1"></p>
+<h4 id="Windows"><a href="#Windows" class="headerlink" title="Windows"></a>Windows</h4><p><img src="https://farm1.staticflickr.com/911/41192193784_d633ababa8_o.jpg" width="976" height="676" alt="Windows 1"></p>
+<h4 id="Linux"><a href="#Linux" class="headerlink" title="Linux"></a>Linux</h4><p><img src="https://cloud.githubusercontent.com/assets/530796/12534737/160ac166-c2a9-11e5-8576-92796b94cf6b.png" alt="screenshot_Linux"></p>
+<p>(Thanks for <a href="https://github.com/icq4ever" target="_blank" rel="noopener">icq4ever</a>)</p>
+<hr>
+<h3 id="Getting-Started"><a href="#Getting-Started" class="headerlink" title="Getting Started"></a>Getting Started</h3><p>Simplest way to init <code>ofxTriangular</code>.</p>
+<pre><code class="c">// set a boundary made by ofPolyline
+ofPolyline polyline
+
+triangular.setBoundary(polyline);
+</code></pre>
+<p>If your 2d shape include some holes in it.</p>
+<pre><code class="c">// set a hole made by ofPolyline
+
+// one ofxHole connect one point inside it.
+ofxHole hole;
+vector&lt;ofxHole&gt; holes;
+
+// only if point(x, y) was inside the hole that you want to add.
+if(holeline.inside(x, y))
+{
+    hole.set(holeline, ofPoint(x, y));
+    holes.push_back(hole);
+}
+
+triangular.setHoles(holes);
+</code></pre>
+<p>Subdivide complex 2d shape to triangles.</p>
+<pre><code class="c">// generate the triangle collections
+
+triangles = triangular.triangulate();
+</code></pre>
+<p>If you want to render the triangle that ofxTriangular generated.</p>
+<pre><code class="c">// loop all of it if needed
+for(int i=0; i&lt;triangles.size(); i++)
+{
+   triangles[i].draw();
+}
+</code></pre>
+<hr>
+<h3 id="Shortage"><a href="#Shortage" class="headerlink" title="Shortage"></a>Shortage</h3><ul>
+<li>The Option <code>Tesselation</code> was enabled, but the effect of it was not obvious.(unless you set the option <code>tesselation</code>  <code>0</code> compared with <code>600</code>)<br><br></li>
+<li>Don’t support advanced features like <code>iteration</code>, <code>constraint</code>. etc(haven’t open the <code>API</code> yet).<br><br></li>
+<li>Under some certain circumstances, <code>Debug</code> is much easier to crash than the <code>Release</code>.<br></li>
+</ul>
+<hr>
+<h4 id="Extreme-Cases"><a href="#Extreme-Cases" class="headerlink" title="Extreme Cases"></a>Extreme Cases</h4><p>Only in some exreme cases (complex nested boundary) that ofxTriangular runs on Windows was easier to crash than the OSX.</p>
+<h4 id="OSX-1"><a href="#OSX-1" class="headerlink" title="OSX"></a>OSX</h4><p><img src="https://farm1.staticflickr.com/957/41192194364_8a6e5c3299_o.png" width="2144" height="1548" alt="Mac 2"></p>
+<p><img src="https://farm1.staticflickr.com/829/41192194104_1b1e4d44bf_o.png" width="2144" height="1548" alt="Mac 3"></p>
+<h4 id="Windows-1"><a href="#Windows-1" class="headerlink" title="Windows"></a>Windows</h4><p><img src="https://farm1.staticflickr.com/977/41192193534_c4483c9590_o.jpg" width="976" height="676" alt="Windows 2"></p>
+<p><img src="https://farm1.staticflickr.com/943/41192193184_07c5fa2765_o.jpg" width="976" height="676" alt="Windows 3"></p>
+<hr>
+<h2 id="Author"><a href="#Author" class="headerlink" title="Author"></a>Author</h2><pre><code class="c">   int 官某某 = Bingo;
+
+   char[] 个人博客 = &quot;http://bentleyblanks.github.io&quot;;
+</code></pre>
+</p>
+			        </div>
+				</div>		
+			</div>
+
+			<div class="column">
+				<div class="is-sticky">
+
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        DESCRIPTION
+					      </p>
+					      <p id="pageDescription">A tool for subdividing a complex 2d shape into triangles.</p>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover  is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Archives
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>2016</a></li>
+					        <li>
+					          <a>2017</a>
+					        </li>
+					        <li>
+					          <a class="is-active">2018</a>
+					          <ul>
+					            <li><a>September</a></li>
+					            <li><a>August</a></li>
+					            <li><a>July</a></li>
+					          </ul>
+					        </li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+
+					<br>
+
+					<div class="card is-white is-hover is-hidden-mobile">
+					  <div class="card-content">
+					    <aside class="menu">
+					      <p class="menu-label">
+					        Tags
+					      </p>
+					      <ul class="menu-list">
+					        <li><a>Game</a></li>
+					        <li>
+					          <a class="is-active">Renderer</a>
+					        </li>
+					        <li><a>C++</a></li>
+					        <li><a>Math</a></li>
+					      </ul>
+					    </aside>
+					  </div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+
+<!-- Footer -->
+<footer class="footer is-medium" id="footerStyle">
+  <div class="container">
+    <nav class="level is-mobile">
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://yellowdi.github.io/Elenore/images/elenore-icon-outlined.png" alt="Elenore logo" width="50">
+      </div>
+
+      <div class="level-item has-text-centered">
+        <img src="https://raw.githubusercontent.com/hexojs/logo/master/hexo-logo-avatar-transparent-background.png" alt="Hexo logo" width="50">
+      </div>
+      
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+      <div class="level-item has-text-centered"></div>
+    </nav>
+
+    <div class="columns has-text-centered">
+      <div class="column">
+        Theme Floekr developed By <a href="https://github.com/BentleyBlanks">Bingo</a>. Powered by <a href="https://yellowdi.github.io/Elenore">Elenore</a> and <a href="https://hexo.io/">Hexo</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+  <!-- scripts list from theme config.yml -->
+  
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" language="javascript"></script>
+  
+    <script src="/js/wow.min.js" language="javascript"></script>
+  
+    <script src="/js/floekr.js" language="javascript"></script><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+  
+
+</body>
+</html>
