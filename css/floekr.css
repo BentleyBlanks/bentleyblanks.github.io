@@ -131,7 +131,7 @@ print {
 }
 
 /* about me content */
-.card.is-white a:not(.card-header-title), .card.is-white strong {
+.card.is-white a:not(.card-header-title) {
   color: rgb(51, 140, 210);
 }
 
@@ -188,7 +188,16 @@ code {
 /* katex */
 .katex { 
   font-size: 1.1rem;
-  /*overflow: scroll;*/
+}
+
+.katex .mord {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.katex .sizing.reset-size6.size3,
+.katex .fontsize-ensurer.reset-size6.size3 {
+  font-size: 0.9em;
 }
 
 /* markdown */
@@ -203,7 +212,7 @@ blockquote {
   margin-bottom: 1rem;
 
   color: rgb(110, 110, 110);
-  background-color: rgba(200, 200, 200, 0.1);
+  background-color: rgba(200, 200, 210, 0.1);
 }
 
 .card-content h1, .card-content h2, .card-content h3, .card-content h4 {
