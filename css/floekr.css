@@ -32,7 +32,7 @@ li {
   /* darker */
   background: linear-gradient( rgba(0, 0, 0, 0.5),
   rgba(0, 0, 0, 0.5)),
-  url("http://pbrt.org/gallery/pavilion-day.jpg");
+  url("../img/pavilion-day.jpg");
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
