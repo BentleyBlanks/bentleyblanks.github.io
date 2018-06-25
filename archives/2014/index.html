@@ -346,6 +346,31 @@ while(lua_gettop(luaState))
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/10/11/2014-11-10-Support Point/" class="card-header-title">
+                        <p>Support Point--Minkowski difference</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
+<p>support point是在给定方向上距离最远(投影最大)的点</p>
+<p>在碰撞检测中也需要寻找分离轴 那么这时候 support point就是在面法线相反的方向上最远的点 也就是<code>背离这个方向深交最深的点</code></p>
+<p>倘若两个多边形相互碰撞 那么<code>一定能</code>找到<code>一个顶点与给定平面之间的距离小于0</code>(在面法线上的投影)</p>
+<p>这与两个多边形互不碰撞那么一定可以找到一跟分离轴分离两个多边形的理论是类似的</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
+<p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/10/11/2014-11-10-Sutherland/" class="card-header-title">
                         <p>Sutherland-Hodgman Algorithm</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -399,31 +424,6 @@ case p1 Behind and p2 InFront
 <p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt=""></p>
 <p>详情见</p>
 <p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt=""></p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/10/11/2014-11-10-Support Point/" class="card-header-title">
-                        <p>Support Point--Minkowski difference</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
-<p>support point是在给定方向上距离最远(投影最大)的点</p>
-<p>在碰撞检测中也需要寻找分离轴 那么这时候 support point就是在面法线相反的方向上最远的点 也就是<code>背离这个方向深交最深的点</code></p>
-<p>倘若两个多边形相互碰撞 那么<code>一定能</code>找到<code>一个顶点与给定平面之间的距离小于0</code>(在面法线上的投影)</p>
-<p>这与两个多边形互不碰撞那么一定可以找到一跟分离轴分离两个多边形的理论是类似的</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
-<p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
 
                       </p>
                     </div>

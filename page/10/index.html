@@ -139,6 +139,53 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/09/29/2014-09-29-Lib Triangle/" class="card-header-title">
+                        <p>Triangle库的封装</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.基于数据驱动的命令行使用方式</p>
+<p>-z 指针指向的数据集开始的位置为0<br>-Q 不会输出任何调式信息<br>-V 输出调试信息<br>-N 不会在三角形上出现边界线</p>
+<hr>
+<p>2.triangleio的结构体简析</p>
+<p>-pointlist 点坐标集合(数组)<br>-pointattributelist 点属性数组(每个点的属性占据一个numberOfPointAttributes中的一个位置)<br>-pointmarkerlist 点标记数组(每个点一个int)</p>
+<hr>
+<p>-trianglelist 三角形拐角数组(从第一个[0]开始 另外的两个拐角逆时针顺序存放)<br>-triangleattributelist 三角形属性数组(每个三角形的属性都会占据一个numberoftriangleattributes中的一个位置)<br>-trianglearealist 一个三角形面积约束的数组(input only) 用于限制生成的三角形面积大小不一的情况 PS：暂时不清楚[0]和[1]的作用<br>-neighborlist 三角形相邻三角形的数组 每一个三角形占据三个int数据(output only)</p>
+<hr>
+<p>-segmentlist 段断点的数组集合 从第一段占据的[0]和[1]开始依次为剩余的段(每段占据两个int型数据)<br>-segmentmarkerlist 段标记 每段一个标记(int)</p>
+<hr>
+<p>-holelist 洞数组 第一个孔的x, y 坐标为[0]和[1] 剩余的依次为其余的孔(每个孔占两个实数 input only但为了方便起见也会将结果拷贝到output的结构体当中)<br>-regionlist 地区范围属性(给定的点集的最大AABB/最大xy范围)和面积约束的数组 第一个约束是x, y 坐标占[0]和[1] 其次是范围属性[2] 最后是最大的面积约束[3] 因此每个范围约束都会占据四个int型数据  PS:范围属性只在传入-A参数才有效 面积约束只在传入-a参数才会有效</p>
+<hr>
+<p>-edgelist 边缘数组 第一个边缘的结束点占位[0]和[1] 剩余按照顺序依次占据(output only)<br>-edgemarkerlist 边缘标记数组(每个边缘占一个int型数据 output only)<br>-normlist 法向量数组 用于确定泰森多边形法图解中的无限远射线 第一个法向量的x, y坐标占据[0]和[1] 剩余法向量依次顺序占位 对于每个泰森多边形法图解的无限远边缘而言 法向量会填写为零向量(output only)</p>
+<hr>
+<p>3.对于每个需要输出的结构体中的指针都必须要分配好合适的空间 或者可以将指针初始化为NULL 这样triangle库本身就会帮你分配所需要的内存空间<br>PS:原作者推荐奖指针初始化为NULL 因为前者的方法多数用于Fortran代码dangzhong</p>
+<p>triangle也不会自动的释放in/out的数组 这都取决于使用者 trifree()的本质就是调用标准库的free() </p>
+<hr>
+<p>4.必须要在triangulate()之前初始化好的部分</p>
+<p>in<br>pointlist 必须是指向一系列点指针的指针<br>numberofpoints和numberofpointattributes 应该被合理的设置<br>pointmarkerlist = NULL(所有的标记都应该设置为NULL)<br>pointattributelist 务必是一个指向点属性的指针<br>使用了-r命令 那么trianglelist就必须要指向一列三角形 numberoftriangles numberofcorners以及numberoftriangleattributes都必须要根据其本身的含义来初始化<br>numberoftriangleattributes != 0 那么triangleattributelist就要指向一三角形属性集合<br>使用了-a命令 trianglearealist就一定要指向一的面积约束数组<br>可以忽略neighborlist， edgelist， edgemarkerlist， normlist， numberofedges的初始化<br>使用了-p命令 segmentlist就必须要指向一片段集合 numberofsegments就要根据其本身含义来初始化；holelist numberofholes 以及numberofregions都会被拷贝至out结构体当中 除非使用了-r命令 否则使用者是不要初始化这些部件的<br>segmentmarkerlist = NULL(使用库本身的空间分配)  否则就需要自己手动指向一标记集合</p>
+<hr>
+<p>out</p>
+<p>pointlist 需要被初始化(NULL / 指向一定的内存空间) 除非使用了-N命令<br>pointmarkerlist 需要被初始化(NULL / 指向一定的内存空间) 除非使用了-N 或者 -B命令<br>in-&gt;numberofpointattributes != 0 并且没有是使用过-N命令 pointattributelist就需要被初始化<br>trianglelist 需要被初始化 除非使用了-E命令<br>neighborlist 需要被初始化 除非使用了-n命令<br>in-&gt;numberofelementattributes != 0并且没有使用-E命令而是使用了-A命令 那么elementattributelist需要被初始化<br>trianglearealist， holelist， regionlist， normlist以及其他的标量初始化可以被忽略<br>使用了-p或者-c命令并且没有使用-P命令的话 那么segmentlist就需要被初始化<br>使用了-B命令 segmentmarkerlist 也需要被初始化<br>使用了-e命令 edgelist需要被初始化 在此基础上 倘若没有使用-B命令 那么edgemarkerlist也需要被初始化</p>
+<hr>
+<p>vorout(只有在使用了-r命令后才需要这部分的参数)</p>
+<p>pointlist需要被初始化<br>edgelist 和 normlist都需要被初始化<br>in-&gt;numberofpointattributes != 0 那么pointattributelist也需要被初始化<br>pointmarkerlist， edgemarkerlist以及<code>上述中没有出现的都可以被忽略</code></p>
+<hr>
+<p>5.segment段和hole是需要互相配合使用的</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/fcc8de49-5164-4b4e-8117-93388eea9d65/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
+<p>segment为多边形中小孔相关线段形成的闭合区域</p>
+<p>hole部分只需要是孔中的任意一点即可</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/09/12/2014-09-12-pointer/" class="card-header-title">
                         <p>指针初始化</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -156,6 +203,31 @@
 <p><code>a = nullptr / a = 0 / a = NULL;</code>之类的 才可以在后续的指针是否为空判断中正确操作 </p>
 <p>否则</p>
 <p><code>if(a == NULL)</code>这样的判断在没有初始化的指针下是没有意义的 始终会被认定为真值</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/07/27/2014-03-23-C or C++/" class="card-header-title">
+                        <p>选用C++还是C</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.就当前引擎的设计角度而言 倘若从设计模式的角度来讲 也就是建筑这个引擎的过程而言C++的整体结构思想远远超过C语言不知道多少倍 就从类的包装继承而言 C++更像是为了这种的项目而诞生的 </p>
+<p>举个简单的粒子 </p>
+<p>C语言想要实现数学库 那么你就必须面对通用性的考验 这就意味着你很有可能要面对好几十个+的重载运算 </p>
+<p>而只是为了达到类似多态的效果……但这不像是一个很聪明的解决办法 </p>
+<p>齐次 我倘若想要创建一int型的向量 还有一个float的 还有一个unsigned int的甚至各种各样的 难道还需要强制规定响亮的格式不成？</p>
+<p>其实以上的C++早用了函数模板以及模板类来实现 通用性大大加强 我想 同样的情况下 牺牲那1%的速度去换取100%的简洁性是可以理解的</p>
+<p>2.结构体和类本身都是不矛盾的两者 既然在实现上使用了效率更高的C 那么汇编去哪里工作呢？数学库本应该是使用SIMD之类进行优化的 </p>
+<p>在设计的时候就不要太多的关照效率的问题……除非实在是太慢了</p>
 
                       </p>
                     </div>
@@ -185,31 +257,6 @@
 <p><img src="https://app.yinxiang.com/shard/s3/res/22df7c59-6c42-4753-978c-6864b3690e16/%E6%97%A0%E6%A0%87%E9%A2%983.png" alt=""></p>
 <h3 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h3><p>内存一旦被申请之后就会被操作系统认定为受保护的 也就不会被二次申请</p>
 <p>但辨认空间发生变化的确会引来不少的问题 在初始化以及强制类型转换基类指针的时候需要格外注意</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/07/27/2014-03-23-C or C++/" class="card-header-title">
-                        <p>选用C++还是C</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.就当前引擎的设计角度而言 倘若从设计模式的角度来讲 也就是建筑这个引擎的过程而言C++的整体结构思想远远超过C语言不知道多少倍 就从类的包装继承而言 C++更像是为了这种的项目而诞生的 </p>
-<p>举个简单的粒子 </p>
-<p>C语言想要实现数学库 那么你就必须面对通用性的考验 这就意味着你很有可能要面对好几十个+的重载运算 </p>
-<p>而只是为了达到类似多态的效果……但这不像是一个很聪明的解决办法 </p>
-<p>齐次 我倘若想要创建一int型的向量 还有一个float的 还有一个unsigned int的甚至各种各样的 难道还需要强制规定响亮的格式不成？</p>
-<p>其实以上的C++早用了函数模板以及模板类来实现 通用性大大加强 我想 同样的情况下 牺牲那1%的速度去换取100%的简洁性是可以理解的</p>
-<p>2.结构体和类本身都是不矛盾的两者 既然在实现上使用了效率更高的C 那么汇编去哪里工作呢？数学库本应该是使用SIMD之类进行优化的 </p>
-<p>在设计的时候就不要太多的关照效率的问题……除非实在是太慢了</p>
 
                       </p>
                     </div>
@@ -294,31 +341,6 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
 </code></pre>
 <p>就可以正常的通过编译 </p>
 <p>因此模板的特化就是模板本身泛型能力不够的一种补充</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/04/26/2014-04-26-Floekr2T/" class="card-header-title">
-                        <p>Floekr2T塔防套件</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.defendor</p>
-<p>2.attacker<br>包含trace和animation两内存块<br>–&gt;setup(trace, animation)初始化预设动画和预设路径<br>–&gt;update(skill)根据遍历一遍skill来更新自身的激活与否状态 外部通过查阅其状态来确定是否弹出vector<br>–&gt;draw()</p>
-<p>3.skill<br>自身具备TRACK PATH SCOPE其中scope并非一个真正意义上的技能而是直接由defendor来控制attacker的血量扣除           </p>
-<p>  –path会根据自身初始化的target位置确定线性方向 之后只需要根据预设定的velocity来不断更新position即可</p>
-<p>  –track会不断的追踪某一个特定的attacker来不断的更新自身的direction(normalize之后缩放velocity大小)更新posotion<br>直到attacker检测到AABB碰撞之后就从vector<skill>弹出vector</skill></p>
-<p>  –scope的skill意味着defendor不会在skill的vector当中添加一个新的技能 而是直接对当前选择的attacker进行伤害的扣除 可选的可以添加噪声以及随机</p>
-<p>4.trace<br>  –维护一段vector专门用于存放拐点<br>通过turnLeft turnRight go…等来智能的(也就是根据当前direction来判断左右转前后转需要rotate的角度)addTurningPoint达到路径中拐点的设置<br>之后attacker只需要不断的从vector中取得下一拐点就可以设定前进方向</p>
-<p>5.animation<br>  –维护一段vector专门用于存放image帧动画<br>只需要不断循环的从vector中读取image并渲染出来就可以做到动画播放的目的<br>getFrame()能返回当前播放帧的image</p>
 
                       </p>
                     </div>

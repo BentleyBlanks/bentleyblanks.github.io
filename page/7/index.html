@@ -139,6 +139,42 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
+                      <a href="/2015/08/13/2015-08-14-corrections/" class="card-header-title">
+                        <p>迷宫算法的更正</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>P74页中倒数第二行的else if</p>
+</blockquote>
+<pre><code class="cpp">if(next_row == EXIT_ROW &amp;&amp; next_col == EXIT_COL)
+    found = TRUE;
+else if(!maze[next_row][next_col] &amp;&amp; !mark[nextRow][next_col]){
+    // do something...
+}
+</code></pre>
+<p>此处的else if我认为可以更正为if，那么最后一个结点也可以入栈，或者为了性能起见，将stack.push()的在第一步if中添加上也可。个人更倾向于第二种做法。</p>
+<p>即(<a href="https://github.com/BentleyBlanks/t3DataStructures/blob/master/t3DataStructures/LinearList/t3Maze.cpp" target="_blank" rel="noopener">t3DataStructures.t3Maze</a>中就是这样做的)</p>
+<pre><code class="cpp">if(next_row == EXIT_ROW &amp;&amp; next_col == EXIT_COL){
+    stack.push(row, col, dir);
+    found = TRUE;
+}
+else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
+    // do something...
+}
+</code></pre>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
                       <a href="/2015/08/12/2015-08-12-dataStructures/" class="card-header-title">
                         <p>数据结构重造轮子</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -398,48 +434,6 @@
 <p>听说你赚钱了？哦，被打断腿赔了20万。</p>
 <p><br></p>
 <p>你是喊我去创业吗，公司在哪？在心里，哦，滚。</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2015/03/01/2015-03-01-C++_note1/" class="card-header-title">
-                        <p>C++编程思想(读书笔记_1)</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>P78 中讲到</p>
-</blockquote>
-<pre><code class="cpp">while((char c = cin.get()) != &#39;q&#39;)
-</code></pre>
-<p>这里c的结果会得到一张笑脸</p>
-<p>作者说while if switch里不能插入括号 </p>
-<p>事实上 原文作者的意思是这样的 并非不能插入括号 而是说char c这样的语句放在括号中是不行的 </p>
-<pre><code class="cpp">// error
-while((char c = cin.get()) != &#39;q&#39;)
-{
-
-}
-
-// correct
-while(char c = cin.get() != &#39;q&#39;)
-{
-
-}
-</code></pre>
-<p>因为<code>char c = ...</code>这里c的作用域只在括号中 所以超出了范围自动回收 并不能参与运算 正确的写法应该是 </p>
-<pre><code class="cpp">while(char c = cin.get() != &#39;q&#39;)
-</code></pre>
-<p>这里的!=优先级比 = 要高</p>
-<p>所以c得到的不是cin返回的字符串 而是一个bool 所以大多数情况下回显示一个笑脸</p>
 
                       </p>
                     </div>
