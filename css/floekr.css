@@ -76,7 +76,7 @@ print {
 }
 
 .card-header-title {
-	font-size: 1.6rem;
+	font-size: 1.8rem;
 	font-weight: bold;
 
   display: -webkit-box;
@@ -95,7 +95,7 @@ print {
 }
 
 #articleCard .card-content {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: normal;
   line-height: 1.8rem;
   letter-spacing: 0.01rem;
@@ -187,7 +187,7 @@ code {
 
 /* katex */
 .katex { 
-  font-size: 1.1rem;
+  font-size: 1.2rem;
 }
 
 .katex .mord {
@@ -197,12 +197,12 @@ code {
 
 .katex .sizing.reset-size6.size3,
 .katex .fontsize-ensurer.reset-size6.size3 {
-  font-size: 0.9em;
+  font-size: 0.7em;
 }
 
 /* markdown */
 blockquote {
-  border-left: 4px solid rgb(220, 220, 220);
+  border-left: 6px solid rgb(220, 220, 220);
 
   padding-left: 1rem;
   padding-top: 0.2rem;
@@ -223,19 +223,19 @@ blockquote {
 }
 
 .card-content h1 {
-  font-size: 1.45rem;
+  font-size: 1.6rem;
 }
 
 .card-content h2 {
-  font-size: 1.3rem;
+  font-size: 1.5rem;
 }
 
 .card-content h3 {
-  font-size: 1.15rem;
+  font-size: 1.3rem;
 }
 
 .card-content h4 {
-  font-size: 1rem;
+  font-size: 1.2rem;
 }
 
 /* Table */

@@ -139,6 +139,165 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
+                      <a href="/2015/08/14/2015-08-14-operator/" class="card-header-title">
+                        <p>矩阵"快速"初始化</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <blockquote>
+<p>我将我尝试的心路历程都记录在了这里。</p>
+</blockquote>
+<p>这里的快速实质上是代表了代码书写的高效率。在重造数据结构里线性表的轮子的时候，遇到了需要构造NxM的矩阵需求，因为NxM可以动态构建出来，这没什么。</p>
+<p>如下，可以非常方便的造一个简单的NxM的矩阵轮子出来</p>
+<pre><code class="cpp">class t3Matrix
+{
+public:
+    // 构造函数参数里给出行列即可
+    t3Matrix(int row, int col):col(col), row(row)
+    {
+        m = new int*[row]();
+        for(int i = 0; i &lt; row; i++)
+            m[i] = new int[col]();
+    }
+
+    ~t3Matrix()
+    {
+        for(int i = 0; i &lt; row; i++)
+            delete[] m[i];
+
+        delete[] m;
+    }
+
+    int **m;
+    int col, row;
+};
+
+</code></pre>
+<p>问题来了，如何赋值，倘若是以往的2x2, 3x3事实上都是好解决的。</p>
+<pre><code class="cpp">void t3Matrix2x2::create(int a00, int a01, int a10, int a11)
+{
+    // do something...
+}
+
+void t3Matrix3x3::create(int a00, int a01, int a02, int a10, int a11, int a12)
+{
+    // do something...
+}
+
+// etc... 
+</code></pre>
+<p>实际使用的时候这样的方法也不免为一个好决策。这里我颇受<a href="http://eigen.tuxfamily.org" target="_blank" rel="noopener">Eigen</a>的影响, 他的矩阵初始化办法颇为简便易读，他是这样的。</p>
+<pre><code class="cpp">void main()
+{
+    // NxM
+    t3Matrix m(2, 3);
+
+    // core!
+    m &lt;&lt; 1, 2,
+         3, 4,
+         5, 6;
+}
+</code></pre>
+<p>这才像话，立马动手抄，但是<a href="http://eigen.tuxfamily.org" target="_blank" rel="noopener">Eigen</a>过于庞大，也只能依样画葫芦尝试着去实现。</p>
+<blockquote>
+<p>尝试1</p>
+</blockquote>
+<p>移位运算符与stream联系非常迫切，兴许有效。这里我尝试着这样去试着使用istream,ostream配合着完成这样的初始化。</p>
+<pre><code class="cpp">class t3Matrix
+{
+public:
+    t3Matrix();
+    ~t3Matrix();
+};
+
+ostream&amp; operator&lt;&lt;(ostream&amp; os, t3Matrix&amp; m);
+
+istream&amp; operator&gt;&gt;(istream&amp; is, t3Matrix&amp; m);
+</code></pre>
+<p>思来想去，我最多能够做到使用cin,cout为矩阵初始化和输出，并不能在代码中实现初始化动作。</p>
+<pre><code class="cpp">void fuck()
+{
+    t3Matrix m(n, m);
+    // 标准输入初始化矩阵
+    cin &gt;&gt; m;
+    // 抛却m.print()方式标准输出
+    cout &lt;&lt; m;
+}
+</code></pre>
+<p>然而这并没有什么卵用，期间我甚至尝试着让t3Matrix<code>继承</code>std::ostream。注意！OSX下XCode不会对以下代码报错</p>
+<pre><code class="cpp">class A:public std::ostream
+{
+public:
+    // 如若不为ostream构造,那么你将面临两次调用matrix析构函数的问题(Windows上VS编译无法通过)
+    // 解决办法是写为ostream(NULL)提供一个streambuf参数即可,当然也可以给NULL 
+    A(){}
+
+    // 会被二次调用
+    ~A(){}
+};
+</code></pre>
+<pre><code class="cpp">class A:public std::ostream
+{
+public:
+    // 运行正常
+    A():std::ostream(NULL){}
+
+    ~A(){}
+};
+</code></pre>
+<p><br></p>
+<blockquote>
+<p>尝试2</p>
+</blockquote>
+<p>这回另辟蹊径，想起了重载逗号运算符。重载这个运算符实在是太少见了，以至于我和同学说起时，惊讶的反应：这**玩意也要重载？</p>
+<p>其实需求很明显只要<code>m &lt;&lt; 1, 2, 3, 4;</code>能够一路正确的读取即可，<code>&lt;&lt;</code>的优先级高于<code>,</code>，加上从左到右的运算顺序。</p>
+<p>所以只要满足<code>m &lt;&lt; 1</code>的返回值能够与重载<code>,</code>的运算符左参数相符，那么其实就是t3Matrix自身了。</p>
+<p>以下写法已证实可行</p>
+<pre><code class="cpp">class t3Matrix
+{
+public:
+    // ...
+    t3Matrix&amp; operator,(int value)
+    {
+        // 赋该value到正确的位置
+        // do something...
+        return *this;
+    }
+
+    t3Matrix&amp; operator&lt;&lt;(int value)
+    {
+        // 赋该value到正确的位置
+        // do something...
+        return *this;
+    }
+};
+
+void main()
+{
+    t3Matrix m(2, 3);
+    m &lt;&lt; 1, 2,
+         3, 4,
+         5, 6;
+}
+</code></pre>
+<blockquote>
+<p>其实难度不在于”&lt;&lt;”的重载，而是想到”,”的重载才是</p>
+</blockquote>
+<blockquote>
+<p>已更新至<a href="https://github.com/BentleyBlanks/t3DataStructures" target="_blank" rel="noopener">t3DataStructures</a></p>
+</blockquote>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
                       <a href="/2015/08/13/2015-08-14-corrections/" class="card-header-title">
                         <p>迷宫算法的更正</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -399,41 +558,6 @@ else if(!maze[next_row][next_col] &amp;&amp; !mark[next_row][next_col]){
 </code></pre>
 <p>的理解我花了非常多的时间。</p>
 <p>感觉直到目前为止，都没能很透彻的了解。</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2015/06/27/2015-06-27-hello-world/" class="card-header-title">
-                        <p>Who's your daddy?</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>一天一个hello world 我都嫌烦了 daddy大法好啊!</p>
-</blockquote>
-<blockquote>
-<p>请注意 以下是展示我C++程序员前端实力的时候了……以下所有内容都是我在练习Markdown语法</p>
-</blockquote>
-<p><br></p>
-<p>我就一句话，千万不要再喊我做万花筒了……</p>
-<p><br></p>
-<p>啥都不说了，上架完万花筒我就算是升华了。</p>
-<p><br></p>
-<p>什么？毕设要做万花筒？不行了，我肚子疼。</p>
-<p><br></p>
-<p>有事别找我，没事烧纸谢谢。</p>
-<p><br></p>
-<p>听说你赚钱了？哦，被打断腿赔了20万。</p>
-<p><br></p>
-<p>你是喊我去创业吗，公司在哪？在心里，哦，滚。</p>
 
                       </p>
                     </div>
