@@ -139,27 +139,6 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
-                      <a href="/2015/08/01/2015-08-01-github/" class="card-header-title">
-                        <p>Github仓库小幅更新</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <blockquote>
-<p>其实不得不承认，以前写的程序上传到Github都不够用心。甚至于花了很大力气的一些较大程序也没有一个简易的构建说明，甚至于说是更新要点。</p>
-</blockquote>
-<p>自我反省了一下，争取把以前贴到Lofter上的技术博客慢慢的转移到Github以及这里的io上来。</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
                       <a href="/2015/07/31/2015-07-31-KMP-1/" class="card-header-title">
                         <p>KMP算法心得-1</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -403,6 +382,57 @@ while(lua_gettop(luaState))
 </code></pre>
 <p>常用这个</p>
 <p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
+                        <p>Lua的Table结构</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.</p>
+<pre><code class="cpp">// 传递表给Lua
+lua_createtable(luaState, 2, 0);
+// [1]-&gt;49
+// 1代表key值 一个键值指定一个value 类似于号码簿
+lua_pushnumber(luaState, 1);
+lua_pushnumber(luaState, 49);
+
+// 压入两个参数之后索引变为-3 栈顶为-1
+lua_rawset(luaState, -3);
+
+// [2]-&gt;&quot;Life is a Circle&quot;
+lua_pushnumber(luaState, 2);
+lua_pushstring(luaState, &quot;Life is a Circle&quot;);
+// 上一步rawset已经清空栈 再次压入两个元素变为-3
+lua_rawset(luaState, -3);
+
+lua_setglobal(luaState, &quot;tables&quot;);
+</code></pre>
+<p>搭配Lua文件中的</p>
+<pre><code class="cpp">-- #table为获取当前table长度
+for i=1, #tables do
+     print(i, tables[i])
+end
+</code></pre>
+<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
+<pre><code class="cpp">print(array[1])
+print(array[3])
+</code></pre>
+<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
+<pre><code class="cpp">print(array[0]) --nil 
+print(array[&quot;1&quot;]) --nil
+</code></pre>
+<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
 
                       </p>
                     </div>
