@@ -7,7 +7,7 @@
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Archives: 12/2014: 2014 [ Bingo ]</title>
+  <title>Archives: 10/2018: 2018 [ Bingo ]</title>
 
   <link rel="apple-touch-icon" sizes="57x57" href="./img/apple-icon-57x57.png">
   <link rel="apple-touch-icon" sizes="60x60" href="./img/apple-icon-60x60.png">
@@ -139,134 +139,168 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
-                      <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
-                        <p>自定义函数的Lua绑定</p>
+                      <a href="/2018/10/13/2018-10-13-Unity Script Optimization/" class="card-header-title">
+                        <p>Unity Script Optimization</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
                       </a>
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
-<p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
-<p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
-<pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
-return temp,9,1
-</code></pre>
-<p>在C程序中</p>
-<pre><code class="cpp">std::stringstream strBuffer;
-while(lua_gettop(luaState))
+                        <blockquote>
+<p>来自于Inside在<a href="https://www.youtube.com/watch?v=mQ2KTRn4BMI&amp;t=3048s&amp;index=3&amp;list=FLz8t4EGfwDKXFaBzXr3qFsw" target="_blank" rel="noopener">Unite 2016</a>大会上的性能优化报告</p>
+</blockquote>
+<p>以下为演示Demo Code</p>
+<pre><code class="cpp">public void func()
 {
-    strBuffer.str(std::string());
-    strBuffer &lt;&lt; &quot;lua returned a &quot;;
-
-    int index = lua_gettop(luaState);
-    switch(lua_type(luaState, index))
-    {
-    case LUA_TNUMBER:
-        strBuffer &lt;&lt; &quot;number&quot; &lt;&lt; lua_tonumber(luaState, index);
-        break;
-    case LUA_TTABLE:
-        strBuffer &lt;&lt; &quot;table&quot;;
-        break;
-    case LUA_TSTRING:
-        strBuffer &lt;&lt; &quot;string&quot; &lt;&lt; lua_tostring(luaState, index);
-        break;
-    case LUA_TBOOLEAN:
-        strBuffer &lt;&lt; &quot;boolean&quot; &lt;&lt; lua_toboolean(luaState, index);
-        break;
-    default:
-        strBuffer &lt;&lt; &quot;unknow type&quot;;
-        break;
-    }
-
-    strBuffer &lt;&lt; &quot;\n&quot;;
-    lua_pop(luaState, 1);
-    cout &lt;&lt; strBuffer.str() &lt;&lt; endl;
+    var lastPos = transform.position;
+    transforms.position = lastPos 
+    + velocity * speed * factor 
+    * Mathf.Sin(factor2) 
+    * drag * friction * Time.deltaTime;
 }
 </code></pre>
-<p>期望能够解析出每个返回值的类型信息 </p>
-<p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
+<ol>
+<li><p>Reduce Vector Operations</p>
+<p> 为了减少Vector临时变量等生成，可以将所有标量先行算完，节省向量操作次数</p>
+<pre><code class="cpp"> // ...
+ transforms.position = lastPos 
+ + velocity * (speed * factor 
+ * Mathf.Sin(factor2) 
+ * drag * friction * Time.deltaTime);
+</code></pre>
+</li>
+<li><p>Used cached Transforms<br> Unity在使用transform时会做非常多的安全监测以保证其存在，因此可以在初始化时存下其引用以加快后期访问速度</p>
+<pre><code class="cpp"> // _transform cached in OnStart()
+ var lastPos = _transform.position;
+ _transforms.position = lastPos + // ...;
+</code></pre>
+</li>
+<li><p>Use localPosition(if possible)<br> 一般更改Position时Unity会对其Hierarchy上的所有对象都进行位置更新，如若不需要这一步操作或其上的位置属性不会因此更改则可以使用localPosition</p>
+<pre><code class="cpp"> // _transform cached in OnStart()
+ var lastPos = _transform.localPosition;
+ _transforms.localPosition = lastPos + // ...;
+</code></pre>
+</li>
+<li><p>Reduce engine calls<br> 应尽量减少对系统内变量的直接访问，可采用全局变量形式能减少engine call</p>
+<pre><code class="cpp"> public Vector3 cachedLocalPosition = Vector3.zero;
 
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
-                        <p>Lua栈结构</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <ol>
-<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
+ public void func()
+ {
+     cachedLocalPosition += velocity * speed * factor 
+                          * Mathf.Sin(factor2) 
+                          * drag * friction * Time.deltaTime;
+     _transform.localPosition = cachedLocalPosition;       
+ }
+</code></pre>
+</li>
+<li><p>Don’t do Vector math at all<br> 为了减少计算过程中Vector隐式转换带来的开销，这里应尽量使用分量赋值的形式来避免过多的隐含Vector生成的问题</p>
+<pre><code class="cpp"> float factor = speed * factor 
+              * Mathf.Sin(factor2) 
+              * drag * friction * Time.deltaTime;
+ cachedLocalPosition.x += velocity.x * factor;
+ cachedLocalPosition.y += velocity.y * factor;
+ cachedLocalPosition.z += velocity.z * factor;
+ _transform.localPosition = cachedLocalPosition;    
+</code></pre>
+</li>
+<li><p>Time.deltaTime could be cached<br> 预存下deltaTime，类似transform的思路</p>
+<pre><code class="cpp"> public static float gloabalDeltaTime;
+ public void func()
+ {
+     // change Time.deltaTime to gloabalDeltaTime
+ }
+</code></pre>
+<blockquote>
+<p>为更新所有脚本队列，因此事先预存globalTime。并做一系列优化</p>
+</blockquote>
+<pre><code class="cpp"> public void Update()
+ {
+     for (int a=0; a&lt;1000; ++a)
+     {
+         Test.gloabalDeltaTime = Time.deltaTime;
+         foreach (var script in scriptList)
+             script.Update();
+     }
+ }
+</code></pre>
+</li>
+<li><p>Don’t use foreach</p>
+<pre><code class="cpp"> public void Update()
+ {
+     for (int a=0; a&lt;1000; ++a)
+     {
+         Test.gloabalDeltaTime = Time.deltaTime;
+         for (int i=0, count=scriptList.Count; i&lt;count; ++i)
+             scriptList[i].Update();
+     }
+ }
+</code></pre>
+</li>
+<li><p>Use Arrays instead of Lists</p>
+<pre><code class="cpp"> public Test[] scriptArray;
+ public void Update()
+ {
+     for (int a=0; a&lt;1000; ++a)
+     {
+         Test.gloabalDeltaTime = Time.deltaTime;
+         for (int i=0, count=scriptList.Count; i&lt;count; ++i)
+             scriptArray.Update();
+     }
+ }
+</code></pre>
+</li>
+<li><p>Use same lookup table sin instead of Mathf.Sin ensure different platforms’s result are the same</p>
+<pre><code class="cpp"> // Size could set different depending on different platforms
+ private static float[] sinLUT = new float[1024];
+ public static float FastSin(float f)
+ {
+     int index = (int)(f * 1024) &amp; 1023;
+     return sinLUT(index);
+ }
+ public void Start()
+ {
+     float forwardStep = (2.0f * Mathf.PI) / (float)1024;
+     for (int i=0; i&lt;1024; ++i)
+     {
+         // Other way to compute sin() is okay
+         float f = (float)i * forwardStep;
+         sinLUT[i] = Mathf.Sin[f];
+     }
+ }
+</code></pre>
+</li>
 </ol>
-<p>2.lua栈</p>
-<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
-<p>3.建一个新表</p>
-<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
-</code></pre>
-<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
-<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
-</code></pre>
-<p>常用这个</p>
-<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
-                        <p>Lua的Table结构</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.</p>
-<pre><code class="cpp">// 传递表给Lua
-lua_createtable(luaState, 2, 0);
-// [1]-&gt;49
-// 1代表key值 一个键值指定一个value 类似于号码簿
-lua_pushnumber(luaState, 1);
-lua_pushnumber(luaState, 49);
-
-// 压入两个参数之后索引变为-3 栈顶为-1
-lua_rawset(luaState, -3);
-
-// [2]-&gt;&quot;Life is a Circle&quot;
-lua_pushnumber(luaState, 2);
-lua_pushstring(luaState, &quot;Life is a Circle&quot;);
-// 上一步rawset已经清空栈 再次压入两个元素变为-3
-lua_rawset(luaState, -3);
-
-lua_setglobal(luaState, &quot;tables&quot;);
-</code></pre>
-<p>搭配Lua文件中的</p>
-<pre><code class="cpp">-- #table为获取当前table长度
-for i=1, #tables do
-     print(i, tables[i])
-end
-</code></pre>
-<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
-<pre><code class="cpp">print(array[1])
-print(array[3])
-</code></pre>
-<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
-<pre><code class="cpp">print(array[0]) --nil 
-print(array[&quot;1&quot;]) --nil
-</code></pre>
-<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
+<p>以上基本为脚本上的实现细节。同时也应注意</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Don’t generate any garbage</td>
+<td>Keep an eye on GC Alloc</td>
+</tr>
+<tr>
+<td>Don’t use Instantiate() runtime</td>
+<td>Instantiate object on first frame</td>
+</tr>
+<tr>
+<td>Don’t do string concatenations</td>
+<td>Use StringBuilder if necessary</td>
+</tr>
+<tr>
+<td>Built-in data structures perform horibbly</td>
+<td>Dicts have a huge performance spike first time they are referenced. Event Subscription is just expensive</td>
+</tr>
+<tr>
+<td>Avoid using Update() and FixedUpdate()</td>
+<td>Every call from the Unity to Update() has a hidden performance overhead. Make your own Update-manager. In Inside this saved them 1-2ms per frame on XBox one and PS4</td>
+</tr>
+</tbody>
+</table>
 
                       </p>
                     </div>

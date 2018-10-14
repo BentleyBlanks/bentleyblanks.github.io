@@ -139,87 +139,6 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
-                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
-                        <p>Lua的Table结构</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.</p>
-<pre><code class="cpp">// 传递表给Lua
-lua_createtable(luaState, 2, 0);
-// [1]-&gt;49
-// 1代表key值 一个键值指定一个value 类似于号码簿
-lua_pushnumber(luaState, 1);
-lua_pushnumber(luaState, 49);
-
-// 压入两个参数之后索引变为-3 栈顶为-1
-lua_rawset(luaState, -3);
-
-// [2]-&gt;&quot;Life is a Circle&quot;
-lua_pushnumber(luaState, 2);
-lua_pushstring(luaState, &quot;Life is a Circle&quot;);
-// 上一步rawset已经清空栈 再次压入两个元素变为-3
-lua_rawset(luaState, -3);
-
-lua_setglobal(luaState, &quot;tables&quot;);
-</code></pre>
-<p>搭配Lua文件中的</p>
-<pre><code class="cpp">-- #table为获取当前table长度
-for i=1, #tables do
-     print(i, tables[i])
-end
-</code></pre>
-<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
-<pre><code class="cpp">print(array[1])
-print(array[3])
-</code></pre>
-<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
-<pre><code class="cpp">print(array[0]) --nil 
-print(array[&quot;1&quot;]) --nil
-</code></pre>
-<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
-                        <p>Lua栈结构</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <ol>
-<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
-</ol>
-<p>2.lua栈</p>
-<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
-<p>3.建一个新表</p>
-<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
-</code></pre>
-<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
-<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
-</code></pre>
-<p>常用这个</p>
-<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
                       <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
                         <p>自定义函数的Lua绑定</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -267,6 +186,87 @@ while(lua_gettop(luaState))
 </code></pre>
 <p>期望能够解析出每个返回值的类型信息 </p>
 <p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
+                        <p>Lua栈结构</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <ol>
+<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
+</ol>
+<p>2.lua栈</p>
+<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
+<p>3.建一个新表</p>
+<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
+</code></pre>
+<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
+<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
+</code></pre>
+<p>常用这个</p>
+<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
+                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
+                        <p>Lua的Table结构</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.</p>
+<pre><code class="cpp">// 传递表给Lua
+lua_createtable(luaState, 2, 0);
+// [1]-&gt;49
+// 1代表key值 一个键值指定一个value 类似于号码簿
+lua_pushnumber(luaState, 1);
+lua_pushnumber(luaState, 49);
+
+// 压入两个参数之后索引变为-3 栈顶为-1
+lua_rawset(luaState, -3);
+
+// [2]-&gt;&quot;Life is a Circle&quot;
+lua_pushnumber(luaState, 2);
+lua_pushstring(luaState, &quot;Life is a Circle&quot;);
+// 上一步rawset已经清空栈 再次压入两个元素变为-3
+lua_rawset(luaState, -3);
+
+lua_setglobal(luaState, &quot;tables&quot;);
+</code></pre>
+<p>搭配Lua文件中的</p>
+<pre><code class="cpp">-- #table为获取当前table长度
+for i=1, #tables do
+     print(i, tables[i])
+end
+</code></pre>
+<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
+<pre><code class="cpp">print(array[1])
+print(array[3])
+</code></pre>
+<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
+<pre><code class="cpp">print(array[0]) --nil 
+print(array[&quot;1&quot;]) --nil
+</code></pre>
+<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
 
                       </p>
                     </div>
@@ -346,6 +346,69 @@ while(lua_gettop(luaState))
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/10/11/2014-11-10-Sutherland/" class="card-header-title">
+                        <p>Sutherland-Hodgman Algorithm</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
+<pre><code class="cpp">Polygon SutherlandHodgman( const Polygon startingPolygon, Plane[] clippingPlanes )
+{
+  Polygon output = startingPolygon
+  for each Plane clippingPlane in clippingPlanes
+    input = output
+    output.Clear( )
+    Vec2 startingPoint = input.Last( )
+    for each Vec2 endPoint in input
+      if startingPoint and endPoint in front of clippingPlane
+        out.push( endPoint )
+      else if startingPoint in front and endPoint behind clippingPlane
+        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
+      else if startingPoint and endPoint behind clippingPlane
+        out.push( Intersection( clippingPlane, startingPoint, endPoint ) )
+        out.push( endPoint )
+      endPoint = startingPoint
+  return output
+}
+</code></pre>
+<p>其本质就是<code>遍历需要被裁减的多边形的所有的边 每边与裁剪多边形的所有边进行位置判断</code></p>
+<pre><code class="cpp">// InFront = plane.Distance( point ) &gt; 0.0f
+// Behind  = plane.Distance( point ) &lt; 0.0f
+
+Vec2 p1, p2;
+ClipPlane plane;
+
+case p1 InFront and p2 InFront
+  push p2
+case p1 InFront and p2 Behind
+  push intersection
+case p1 Behind and p2 InFront
+  push intersection
+  push p2
+</code></pre>
+<p>上方代码的含义基本为下图</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt=""></p>
+<p>1.当边的方向进入裁剪区域 添加P与P1</p>
+<p>2.当边的方向是背离裁剪区域 只添加P</p>
+<p>3.倘若全部都在背离方向上 不添加点</p>
+<p>4.整个边都在内部 只添加P1</p>
+<p>这里P是p0-&gt;p1与裁剪边的交接点 (一元二次的直线方程可以计算出)</p>
+<p>下方为一个裁剪的案例</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt=""></p>
+<p>详情见</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt=""></p>
+
+                      </p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/10/11/2014-11-10-Support Point/" class="card-header-title">
                         <p>Support Point--Minkowski difference</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -361,40 +424,6 @@ while(lua_gettop(luaState))
 <p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
 <p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
 <p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
-
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/10/11/2014-11-10-Rigid body with direction/" class="card-header-title">
-                        <p>带有方向的刚体</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.要检测圆形与多边形的碰撞 其实可以分解为圆与多边形上最近点的向量与面法线方向是否一致的问题</p>
-<p>再继续分解下去求解最近点 就能够发现只需要一个多边形的面和一个圆心即可 在这个多边形面上 这个线段可以被分为三个区域</p>
-<p>如图所示<br><img src="https://app.yinxiang.com/shard/s3/res/12b1c6bc-6270-4f30-a5df-c10818ee6a96.png" alt=""></p>
-<ul>
-<li>在Face Region中 圆心到多边形最近的点就在Face Region上 且与圆心的连线垂直于这条边</li>
-<li>在Edge Region内 那么最近点就是线段边缘点本身</li>
-</ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/3745b055-e85c-42a4-a42f-69c954ceb32d/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
-<ul>
-<li>确定圆心在哪个区域内 可以让圆心与线段本身进行点积</li>
-<li>可以通过想象出一个三角形来完成这样的一个任务</li>
-</ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/b8db4928-d785-4f21-be7b-6e0ab9f9e635.png" alt=""></p>
-<ul>
-<li>在这里 若是圆心位置为Edge Region那么圆心与线段端点的夹角theta一定大于90度 或者小于90度(对应的变化要看线段的向量方向走向规定)</li>
-</ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/3c7b74c2-5e9c-4caa-b565-2551f68985d6/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
 
                       </p>
                     </div>
