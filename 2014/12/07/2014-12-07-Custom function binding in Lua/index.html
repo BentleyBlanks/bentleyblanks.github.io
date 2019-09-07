@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -133,7 +133,7 @@
 					  <h3 class="card-header-title">自定义函数的Lua绑定</h3>
 					</div>
 					<div class="card-content">
-					  <p><p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+					  <p></p><p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
 <p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
 <p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
 <pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
@@ -173,7 +173,7 @@ while(lua_gettop(luaState))
 </code></pre>
 <p>期望能够解析出每个返回值的类型信息 </p>
 <p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
-</p>
+<p></p>
 			        </div>
 				</div>		
 			</div>

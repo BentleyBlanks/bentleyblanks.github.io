@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -51,7 +51,7 @@
     
       <link rel="stylesheet" href="/css/basic.css">
     
-      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css'><!-- hexo-inject:end -->
     
   
 
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -139,6 +139,36 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/12/07/2014-12-07-Stack in Lua/" class="card-header-title">
+                        <p>Lua栈结构</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        <ol>
+<li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
+</ol>
+</p><p>2.lua栈</p>
+<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt></p>
+<p>3.建一个新表</p>
+<pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
+</code></pre>
+<p>创建一个新的table, 并把它放在栈顶. narr和nrec分别指定该table的array部分和hash部分的预分配元素数量<br>无返回值<br>栈高度+1, 栈顶元素是新table</p>
+<pre><code class="cpp">#define lua_newtable(L) lua_createtable(L, 0, 0) 
+</code></pre>
+<p>常用这个</p>
+<p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
+
+                      <p></p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/11/22/2014-11-22-constructor/" class="card-header-title">
                         <p>构造函数正确调用</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -163,7 +193,7 @@
     return 0;
 }
 </code></pre>
-<p>从这里，我们归纳如下：</p>
+</p><p>从这里，我们归纳如下：</p>
 <blockquote>
 <p>1）在c++里，由于构造函数允许有默认参数，使得这种构造函数调用构造函数来重用代码的需求大为减少</p>
 </blockquote>
@@ -199,7 +229,7 @@
 </blockquote>
 <p>若是构造函数嵌套调用 那么第二次调用产生的是匿名对象 也就是说 无论在第二次的构造函数中赋任何值 都会被作为临时对象给抹去 <code>那么出了第一次的构造函数相当于没有初始化任何东西</code></p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -215,7 +245,7 @@
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
+                        </p><p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
 <pre><code class="cpp">Polygon SutherlandHodgman( const Polygon startingPolygon, Plane[] clippingPlanes )
 {
   Polygon output = startingPolygon
@@ -251,18 +281,18 @@ case p1 Behind and p2 InFront
   push p2
 </code></pre>
 <p>上方代码的含义基本为下图</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt></p>
 <p>1.当边的方向进入裁剪区域 添加P与P1</p>
 <p>2.当边的方向是背离裁剪区域 只添加P</p>
 <p>3.倘若全部都在背离方向上 不添加点</p>
 <p>4.整个边都在内部 只添加P1</p>
 <p>这里P是p0-&gt;p1与裁剪边的交接点 (一元二次的直线方程可以计算出)</p>
 <p>下方为一个裁剪的案例</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt></p>
 <p>详情见</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt></p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -278,16 +308,16 @@ case p1 Behind and p2 InFront
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
+                        </p><p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
 <p>support point是在给定方向上距离最远(投影最大)的点</p>
 <p>在碰撞检测中也需要寻找分离轴 那么这时候 support point就是在面法线相反的方向上最远的点 也就是<code>背离这个方向深交最深的点</code></p>
 <p>倘若两个多边形相互碰撞 那么<code>一定能</code>找到<code>一个顶点与给定平面之间的距离小于0</code>(在面法线上的投影)</p>
 <p>这与两个多边形互不碰撞那么一定可以找到一跟分离轴分离两个多边形的理论是类似的</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt></p>
 <p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt></p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -303,25 +333,25 @@ case p1 Behind and p2 InFront
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.要检测圆形与多边形的碰撞 其实可以分解为圆与多边形上最近点的向量与面法线方向是否一致的问题</p>
+                        </p><p>1.要检测圆形与多边形的碰撞 其实可以分解为圆与多边形上最近点的向量与面法线方向是否一致的问题</p>
 <p>再继续分解下去求解最近点 就能够发现只需要一个多边形的面和一个圆心即可 在这个多边形面上 这个线段可以被分为三个区域</p>
-<p>如图所示<br><img src="https://app.yinxiang.com/shard/s3/res/12b1c6bc-6270-4f30-a5df-c10818ee6a96.png" alt=""></p>
+<p>如图所示<br><img src="https://app.yinxiang.com/shard/s3/res/12b1c6bc-6270-4f30-a5df-c10818ee6a96.png" alt></p>
 <ul>
 <li>在Face Region中 圆心到多边形最近的点就在Face Region上 且与圆心的连线垂直于这条边</li>
 <li>在Edge Region内 那么最近点就是线段边缘点本身</li>
 </ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/3745b055-e85c-42a4-a42f-69c954ceb32d/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3745b055-e85c-42a4-a42f-69c954ceb32d/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt></p>
 <ul>
 <li>确定圆心在哪个区域内 可以让圆心与线段本身进行点积</li>
 <li>可以通过想象出一个三角形来完成这样的一个任务</li>
 </ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/b8db4928-d785-4f21-be7b-6e0ab9f9e635.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b8db4928-d785-4f21-be7b-6e0ab9f9e635.png" alt></p>
 <ul>
 <li>在这里 若是圆心位置为Edge Region那么圆心与线段端点的夹角theta一定大于90度 或者小于90度(对应的变化要看线段的向量方向走向规定)</li>
 </ul>
-<p><img src="https://app.yinxiang.com/shard/s3/res/3c7b74c2-5e9c-4caa-b565-2551f68985d6/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3c7b74c2-5e9c-4caa-b565-2551f68985d6/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt></p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -337,7 +367,7 @@ case p1 Behind and p2 InFront
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.现有点(x0, y0)与直线ax+by+c=0<br>点P到直线的距离为d=<br>但是当仅仅只是需要判断点(x0, y0)与直线的位置关系 那么直接可以采用以下式子来计算</p>
+                        </p><p>1.现有点(x0, y0)与直线ax+by+c=0<br>点P到直线的距离为d=<br>但是当仅仅只是需要判断点(x0, y0)与直线的位置关系 那么直接可以采用以下式子来计算</p>
 <p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>d</mi><mo>=</mo><mfrac><mrow><mi mathvariant="normal">∣</mi><mi>a</mi><mi>x</mi><mn>0</mn><mo>+</mo><mi>b</mi><mi>y</mi><mn>0</mn><mo>+</mo><mi>c</mi><mi mathvariant="normal">∣</mi></mrow><mrow><msqrt><mrow><msup><mi>A</mi><mn>2</mn></msup><mo>+</mo><msup><mi>B</mi><mn>2</mn></msup></mrow></msqrt></mrow></mfrac></mrow><annotation encoding="application/x-tex">d = \frac{|ax0 + by0 + c|}{\sqrt{A^2 + B^2}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:1.427em;"></span><span class="strut bottom" style="height:2.357em;vertical-align:-0.93em;"></span><span class="base"><span class="mord mathit">d</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.427em;"><span style="top:-2.196611em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.913389em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord"><span class="mord mathit">A</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.740108em;"><span style="top:-2.9890000000000003em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord"><span class="mord mathit" style="margin-right:0.05017em;">B</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.740108em;"><span style="top:-2.9890000000000003em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span><span style="top:-2.873389em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg width="400em" height="1.08em" viewbox="0 0 400000 1080" preserveaspectratio="xMinYMin slice"><path d="M95,702c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,
 -10,-9.5,-14c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54c44.2,-33.3,65.8,
 -50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10s173,378,173,378c0.7,0,
@@ -346,50 +376,9 @@ case p1 Behind and p2 InFront
 s-235,486,-235,486c-2.7,4.7,-9,7,-19,7c-6,0,-10,-1,-12,-3s-194,-422,-194,-422
 s-65,47,-65,47z M834 80H400000v40H845z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.12661100000000003em;"></span></span></span></span></span></span><span style="top:-3.15em;"><span class="pstrut" style="height:3em;"></span><span class="stretchy" style="height:0.2em;"><svg width="400em" height="0.2em" viewbox="0 0 400000 200" preserveaspectratio="xMinYMin slice"><path d="M0 80H400000 v40H0z M0 80H400000 v40H0z"/></svg></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">∣</span><span class="mord mathit">a</span><span class="mord mathit">x</span><span class="mord">0</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">b</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">0</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">c</span><span class="mord">∣</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.93em;"></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span></p>
 <p>下图就表示了几种直线的情况和d与直线的位置判断</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/82152319-e6f1-4f34-836c-64f3a0018cca/%E6%97%A0%E6%A0%87%E9%A2%98.pngs" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/82152319-e6f1-4f34-836c-64f3a0018cca/%E6%97%A0%E6%A0%87%E9%A2%98.pngs" alt></p>
 
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/10/11/2014-11-10-Impluse Engine/" class="card-header-title">
-                        <p>ImpluseEngine中的直线求交点方程</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.<img src="https://app.yinxiang.com/shard/s3/res/77ab43b3-3344-4ede-b49f-1be58cbc279e.png" alt=""></p>
-<p>原式中已知两点都是位于交点的两侧</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/7ad5b0d2-d8ac-42a5-9abd-b22f4f3256c8/%E6%97%A0%E6%A0%87%E9%A2%98.png" alt=""></p>
-<p>这样也就求出了最后的结果</p>
-<p>2.<br><img src="https://app.yinxiang.com/shard/s3/res/ba94592d-4422-43d4-aa42-890603536baa.png" alt=""></p>
-<p>这里Dot(n, face[0]) - c得到的方程式其实并不是将face[0]代入到<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>a</mi><mi>x</mi><mo>+</mo><mi>b</mi><mi>y</mi><mo>+</mo><mi>c</mi></mrow><annotation encoding="application/x-tex">ax + by + c</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.69444em;"></span><span class="strut bottom" style="height:0.8888799999999999em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord mathit">a</span><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">b</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">c</span></span></span></span>中</p>
-<p>而是代入到于<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>a</mi><mi>x</mi><mo>+</mo><mi>b</mi><mi>y</mi><mo>+</mo><mi>c</mi></mrow><annotation encoding="application/x-tex">ax + by + c</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.69444em;"></span><span class="strut bottom" style="height:0.8888799999999999em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord mathit">a</span><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">b</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">c</span></span></span></span>垂直的真实裁剪线中去的</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/b901a590-a871-487b-932c-ebd83d94122e/%E6%97%A0%E6%A0%87%E9%A2%981.png" alt=""></p>
-<p>这里有多重方法可以证明 因为两种Clip情况都相似 所以只取一种情况予以证明</p>
-<p>(1).</p>
-<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>n</mi><mo>=</mo><mo>(</mo><mi>x</mi><mn>1</mn><mo>−</mo><mi>x</mi><mn>2</mn><mo separator="true">,</mo><mi>y</mi><mn>1</mn><mo>−</mo><mi>y</mi><mn>2</mn><mo>)</mo><mi>c</mi><mo>=</mo><mo>−</mo><mo>[</mo><mi>x</mi><mn>1</mn><mo separator="true">.</mo><mo>(</mo><mi>x</mi><mn>2</mn><mo>−</mo><mi>x</mi><mn>1</mn><mo>)</mo><mo>+</mo><mi>y</mi><mn>1</mn><mo separator="true">.</mo><mo>(</mo><mi>y</mi><mn>2</mn><mo>−</mo><mi>y</mi><mn>1</mn><mo>)</mo><mo>]</mo></mrow><annotation encoding="application/x-tex">n = (x1 - x2, y1 - y2)   c = -[x1 \ldotp (x2 - x1) + y1 \ldotp (y2 - y1)]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mord mathit">n</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">2</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">2</span><span class="mclose">)</span><span class="mord mathit">c</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">−</span><span class="mopen">[</span><span class="mord mathit">x</span><span class="mord">1</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">1</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span><span class="mclose">]</span></span></span></span></span></p>
-<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>n</mi><mo separator="true">.</mo><mo>(</mo><mi>x</mi><mo separator="true">,</mo><mi>y</mi><mo>)</mo><mo>−</mo><mi>c</mi><mo>=</mo><mo>(</mo><mi>x</mi><mn>1</mn><mo>−</mo><mi>x</mi><mn>2</mn><mo>)</mo><mo separator="true">.</mo><mi>x</mi><mo>+</mo><mo>(</mo><mi>y</mi><mn>1</mn><mo>−</mo><mi>y</mi><mn>2</mn><mo>)</mo><mo separator="true">.</mo><mi>y</mi><mo>+</mo><mi>x</mi><mn>1</mn><mo separator="true">.</mo><mo>(</mo><mi>x</mi><mn>2</mn><mo>−</mo><mi>x</mi><mn>1</mn><mo>)</mo><mo>+</mo><mi>y</mi><mn>1</mn><mo separator="true">.</mo><mo>(</mo><mi>y</mi><mn>2</mn><mo>−</mo><mi>y</mi><mn>1</mn><mo>)</mo><mo>=</mo><mo>(</mo><mi>x</mi><mn>2</mn><mo>−</mo><mi>x</mi><mn>1</mn><mo>)</mo><mo separator="true">.</mo><mo>(</mo><mi>x</mi><mo>−</mo><mi>x</mi><mn>1</mn><mo>)</mo><mo>+</mo><mo>(</mo><mi>y</mi><mn>2</mn><mo>−</mo><mi>y</mi><mn>1</mn><mo>)</mo><mo separator="true">.</mo><mo>(</mo><mi>y</mi><mo>−</mo><mi>y</mi><mn>1</mn><mo>)</mo></mrow><annotation encoding="application/x-tex">n \ldotp (x, y) - c = (x1 - x2) \ldotp x + (y1 - y2) \ldotp y + x1 \ldotp (x2 - x1) + y1 \ldotp (y2 - y1) = (x2 - x1) \ldotp (x - x1) + (y2 - y1) \ldotp (y - y1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mord mathit">n</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">c</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">2</span><span class="mclose">)</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">2</span><span class="mclose">)</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">1</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">1</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">1</span><span class="mclose">)</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">1</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span></span></span></span></span></p>
-<p>这个式子是两个向量的点积</p>
-<p>这里的几何意义就表明</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/121762bd-4faa-4ff4-ae2b-7d9163af6ee3/%E6%97%A0%E6%A0%87%E9%A2%982.png" alt=""></p>
-<p>(2).上一则方法是一步步推导实现的 </p>
-<p>第二种方法是直接给出这条真实裁剪线的方程 因为垂直 所以<code>斜率乘积为-1</code> 已知直线斜率为 <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>k</mi><mo>=</mo><mo>−</mo><mfrac><mrow><mi>a</mi></mrow><mrow><mi>b</mi></mrow></mfrac></mrow><annotation encoding="application/x-tex">k = -\frac{a}{b}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.695392em;"></span><span class="strut bottom" style="height:1.040392em;vertical-align:-0.345em;"></span><span class="base"><span class="mord mathit" style="margin-right:0.03148em;">k</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">−</span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.695392em;"><span style="top:-2.6550000000000002em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathit mtight">b</span></span></span></span><span style="top:-3.15em;"><span class="pstrut" style="height:3em;"></span><span class="stretchy" style="height:0.2em;"><svg width="400em" height="0.2em" viewbox="0 0 400000 200" preserveaspectratio="xMinYMin slice"><path d="M0 80H400000 v40H0z M0 80H400000 v40H0z"/></svg></span></span><span style="top:-3.394em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathit mtight">a</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.345em;"></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></p>
-<p>那么所求直线斜率为 <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>k</mi><mo>=</mo><mfrac><mrow><mi>b</mi></mrow><mrow><mi>a</mi></mrow></mfrac></mrow><annotation encoding="application/x-tex">k = \frac{b}{a}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.8801079999999999em;"></span><span class="strut bottom" style="height:1.2251079999999999em;vertical-align:-0.345em;"></span><span class="base"><span class="mord mathit" style="margin-right:0.03148em;">k</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8801079999999999em;"><span style="top:-2.6550000000000002em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathit mtight">a</span></span></span></span><span style="top:-3.15em;"><span class="pstrut" style="height:3em;"></span><span class="stretchy" style="height:0.2em;"><svg width="400em" height="0.2em" viewbox="0 0 400000 200" preserveaspectratio="xMinYMin slice"><path d="M0 80H400000 v40H0z M0 80H400000 v40H0z"/></svg></span></span><span style="top:-3.394em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathit mtight">b</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.345em;"></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span> 并且过<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>(</mo><mi>x</mi><mn>1</mn><mo separator="true">,</mo><mi>y</mi><mn>1</mn><mo>)</mo></mrow><annotation encoding="application/x-tex">(x1, y1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">1</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span></span></span></span> (两点式已知a = y2 - y1, b = x1 - x2</p>
-<p>可得 <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>k</mi><mo separator="true">.</mo><mi>x</mi><mo>+</mo><mi>y</mi><mn>1</mn><mo>−</mo><mi>k</mi><mo separator="true">.</mo><mi>x</mi><mn>1</mn><mo>=</mo><mi>y</mi></mrow><annotation encoding="application/x-tex">k \ldotp x + y1 - k \ldotp x1 = y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.69444em;"></span><span class="strut bottom" style="height:0.8888799999999999em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord mathit" style="margin-right:0.03148em;">k</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03148em;">k</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit">x</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span></span></span></span></p>
-<p>最终式子为</p>
-<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>(</mo><mi>x</mi><mn>1</mn><mo>−</mo><mi>x</mi><mn>2</mn><mo>)</mo><mo separator="true">.</mo><mi>x</mi><mo>+</mo><mi>y</mi><mn>1</mn><mo separator="true">.</mo><mo>(</mo><mi>y</mi><mn>2</mn><mo>−</mo><mi>y</mi><mn>1</mn><mo>)</mo><mo>−</mo><mo>(</mo><mi>x</mi><mn>1</mn><mo>−</mo><mi>x</mi><mn>2</mn><mo>)</mo><mo separator="true">.</mo><mi>x</mi><mn>1</mn><mo>=</mo><mi>y</mi><mo separator="true">.</mo><mo>(</mo><mi>y</mi><mn>2</mn><mo>−</mo><mi>y</mi><mn>1</mn><mo>)</mo></mrow><annotation encoding="application/x-tex">(x1 - x2) \ldotp x + y1 \ldotp (y2 - y1) - (x1 - x2) \ldotp x1 = y \ldotp (y2 - y1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">2</span><span class="mclose">)</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">2</span><span class="mclose">)</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit">x</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span></span></span></span></span></p>
-<p><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>(</mo><mi>x</mi><mn>1</mn><mo>−</mo><mi>x</mi><mn>2</mn><mo>)</mo><mo separator="true">.</mo><mo>(</mo><mi>x</mi><mo>−</mo><mi>x</mi><mn>1</mn><mo>)</mo><mo>=</mo><mo>(</mo><mi>y</mi><mo>−</mo><mi>y</mi><mn>1</mn><mo>)</mo><mo>(</mo><mi>y</mi><mn>2</mn><mo>−</mo><mi>y</mi><mn>1</mn><mo>)</mo></mrow><annotation encoding="application/x-tex">(x1 - x2) \ldotp (x - x1) = (y - y1)(y2 - y1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">1</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">2</span><span class="mclose">)</span><span class="mpunct">.</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit">x</span><span class="mord">1</span><span class="mclose">)</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span><span class="mopen">(</span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">2</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span></span></span></span>也就是第一种情况中所求得的式子 可以证明得到Dot(n, face[0]) - c得到的方程式的的确确就是垂直于已知直线并且过<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>(</mo><mi>x</mi><mn>1</mn><mo separator="true">,</mo><mi>y</mi><mn>1</mn><mo>)</mo></mrow><annotation encoding="application/x-tex">(x1, y1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">(</span><span class="mord mathit">x</span><span class="mord">1</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit" style="margin-right:0.03588em;">y</span><span class="mord">1</span><span class="mclose">)</span></span></span></span>点的直线</p>
-<p>2.<br><img src="https://app.yinxiang.com/shard/s3/res/84fe54b9-5f37-4c02-9cd7-a934edeb76e9.png" alt=""></p>
-<p>在最后计算深度的时候需要注意到的是倘若clip计算出来的边长都在reference face内部 那么两点都为contact point</p>
-
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -421,7 +410,7 @@ s-65,47,-65,47z M834 80H400000v40H845z"/></svg></span></span></span><span class=
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -462,29 +451,23 @@ s-65,47,-65,47z M834 80H400000v40H845z"/></svg></span></span></span><span class=
                     </a>
 
                     <ul class="pagination-list">
-
                         
                         <li><a class="pagination-link" href="/">1</a></li>
                         
-
                                                 
                             <li><span class="pagination-ellipsis">&hellip;</span></li>
                             <li><a class="pagination-link" href="/page/8">8</a></li>
                         
-
-                        
                         <li><a class="pagination-link is-current">9</a></li>
-
                         
                             <li><a class="pagination-link" href="/page/10">10</a></li>
                             <li><span class="pagination-ellipsis">&hellip;</span></li>
                         
-
                         
                             <li><a class="pagination-link" href="/page/11">11</a></li>
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/page/10/">
                     
@@ -510,29 +493,23 @@ s-65,47,-65,47z M834 80H400000v40H845z"/></svg></span></span></span><span class=
                     </a>
 
                     <ul class="pagination-list">
-
                         
                         <li><a class="pagination-link" href="/">1</a></li>
                         
-
                                                 
                             <li><span class="pagination-ellipsis">&hellip;</span></li>
                             <li><a class="pagination-link" href="/page/8">8</a></li>
                         
-
-                        
                         <li><a class="pagination-link is-current">9</a></li>
-
                         
                             <li><a class="pagination-link" href="/page/10">10</a></li>
                             <li><span class="pagination-ellipsis">&hellip;</span></li>
                         
-
                         
                             <li><a class="pagination-link" href="/page/11">11</a></li>
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/page/10/">
                     

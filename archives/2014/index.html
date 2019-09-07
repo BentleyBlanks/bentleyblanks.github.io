@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -139,6 +139,57 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
+                        <p>Lua的Table结构</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        </p><p>1.</p>
+<pre><code class="cpp">// 传递表给Lua
+lua_createtable(luaState, 2, 0);
+// [1]-&gt;49
+// 1代表key值 一个键值指定一个value 类似于号码簿
+lua_pushnumber(luaState, 1);
+lua_pushnumber(luaState, 49);
+
+// 压入两个参数之后索引变为-3 栈顶为-1
+lua_rawset(luaState, -3);
+
+// [2]-&gt;&quot;Life is a Circle&quot;
+lua_pushnumber(luaState, 2);
+lua_pushstring(luaState, &quot;Life is a Circle&quot;);
+// 上一步rawset已经清空栈 再次压入两个元素变为-3
+lua_rawset(luaState, -3);
+
+lua_setglobal(luaState, &quot;tables&quot;);
+</code></pre>
+<p>搭配Lua文件中的</p>
+<pre><code class="cpp">-- #table为获取当前table长度
+for i=1, #tables do
+     print(i, tables[i])
+end
+</code></pre>
+<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
+<pre><code class="cpp">print(array[1])
+print(array[3])
+</code></pre>
+<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
+<pre><code class="cpp">print(array[0]) --nil 
+print(array[&quot;1&quot;]) --nil
+</code></pre>
+<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
+
+                      <p></p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/12/07/2014-12-07-Custom function binding in Lua/" class="card-header-title">
                         <p>自定义函数的Lua绑定</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -146,7 +197,7 @@
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
+                        </p><p>1.在Lua中完成全局函数的绑定时 要注意 调用这个函数需要放在pcall之后 因为在这之前 栈一直是空的<br>而pcall的作用就是讲lua文件编译 并将全局变量(函数是闭包也就是一个变量)压栈 这时候对整个儿自定义的方法进行的操作才是有意义的<br>不然会得到<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
 <p>2.但凡是对全局变量进行的预先处理操作 可以在lua_pcall之前完成 而那些需要使用到全局变量(如返回值 闭包等变量)的一定要等到pcall完成 也就是编译压栈全局变量完成之后才能进行 不然也会报<code>unprotected error in call to Lua API (attempt to call a nil value)</code>的错误</p>
 <p>比如 尝试返回三个值<br>– local表示存在于栈中的变量 而不是存在与table中的全局变量</p>
 <pre><code class="cpp">local temp = {9, &quot;hehehe&quot;}
@@ -187,7 +238,7 @@ while(lua_gettop(luaState))
 <p>期望能够解析出每个返回值的类型信息 </p>
 <p>这一步的操作就应该放在pcall之后 不然会发现操作的栈都是空的 那么就都是对nil进行的非法操作</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -206,8 +257,8 @@ while(lua_gettop(luaState))
                         <ol>
 <li>堆栈的序号可以从栈顶和栈底计数，<code>从栈底计数，则栈底是1,向栈顶方向递增。从栈顶计数，则栈顶是-1,向栈底方向递减.</code><br>因此不论使用何种计数方式都可以用来遍历栈</li>
 </ol>
-<p>2.lua栈</p>
-<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt=""></p>
+</p><p>2.lua栈</p>
+<p><img src="http://images.cnblogs.com/cnblogs_com/ringofthec/WindowsLiveWriter/Lua2_F1FC/lua%E6%A0%88.png" alt></p>
 <p>3.建一个新表</p>
 <pre><code class="cpp">void lua_createtable (lua_State *L, int narr, int nrec)
 </code></pre>
@@ -217,58 +268,7 @@ while(lua_gettop(luaState))
 <p>常用这个</p>
 <p>4.C函数参数里的Lua栈是私有的，每一个函数都有自己的栈。<code>当一个c/c++函数把返回值压入Lua栈以后，该栈会自动被清空。</code></p>
 
-                      </p>
-                    </div>
-                  </div>
-                  <br>
-                  <br>
-                  
-                  <!-- article card -->
-                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
-                    <div class="card-header">
-                      <a href="/2014/12/07/2014-12-08-Table in Lua/" class="card-header-title">
-                        <p>Lua的Table结构</p>
-                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                    <div class="card-content">
-                      <p id="articleContent">
-                        <p>1.</p>
-<pre><code class="cpp">// 传递表给Lua
-lua_createtable(luaState, 2, 0);
-// [1]-&gt;49
-// 1代表key值 一个键值指定一个value 类似于号码簿
-lua_pushnumber(luaState, 1);
-lua_pushnumber(luaState, 49);
-
-// 压入两个参数之后索引变为-3 栈顶为-1
-lua_rawset(luaState, -3);
-
-// [2]-&gt;&quot;Life is a Circle&quot;
-lua_pushnumber(luaState, 2);
-lua_pushstring(luaState, &quot;Life is a Circle&quot;);
-// 上一步rawset已经清空栈 再次压入两个元素变为-3
-lua_rawset(luaState, -3);
-
-lua_setglobal(luaState, &quot;tables&quot;);
-</code></pre>
-<p>搭配Lua文件中的</p>
-<pre><code class="cpp">-- #table为获取当前table长度
-for i=1, #tables do
-     print(i, tables[i])
-end
-</code></pre>
-<p>2.数组在Lua中只不过是整数的Table而已 比如一个table作为array的时候可以是这样的<br>array = {12, “hello world”} (与C/C++类型确定语言不同的是 Lua数组里的元素可以是任何Lua类型 而C/C++规定了只能是一种类型)</p>
-<pre><code class="cpp">print(array[1])
-print(array[3])
-</code></pre>
-<p>Lua的数组下标是从1开始的 因此倘若你越界访问会得到一个nil值</p>
-<pre><code class="cpp">print(array[0]) --nil 
-print(array[&quot;1&quot;]) --nil
-</code></pre>
-<p>(和array[1]的区别：一个是integer作为key,一个是字符串做为key)</p>
-
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -301,7 +301,7 @@ print(array[&quot;1&quot;]) --nil
     return 0;
 }
 </code></pre>
-<p>从这里，我们归纳如下：</p>
+</p><p>从这里，我们归纳如下：</p>
 <blockquote>
 <p>1）在c++里，由于构造函数允许有默认参数，使得这种构造函数调用构造函数来重用代码的需求大为减少</p>
 </blockquote>
@@ -337,7 +337,7 @@ print(array[&quot;1&quot;]) --nil
 </blockquote>
 <p>若是构造函数嵌套调用 那么第二次调用产生的是匿名对象 也就是说 无论在第二次的构造函数中赋任何值 都会被作为临时对象给抹去 <code>那么出了第一次的构造函数相当于没有初始化任何东西</code></p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -353,7 +353,7 @@ print(array[&quot;1&quot;]) --nil
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
+                        </p><p>1.这个裁剪算法可用于当3d光栅化完毕需要将图形渲染到屏幕上方时所作的裁剪 也可以是类似Box2d在多边形碰撞深度计算的时候所作的运算</p>
 <pre><code class="cpp">Polygon SutherlandHodgman( const Polygon startingPolygon, Plane[] clippingPlanes )
 {
   Polygon output = startingPolygon
@@ -389,18 +389,18 @@ case p1 Behind and p2 InFront
   push p2
 </code></pre>
 <p>上方代码的含义基本为下图</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/c4ec8631-7a35-4e4f-afd6-56ee151c91d9.png" alt></p>
 <p>1.当边的方向进入裁剪区域 添加P与P1</p>
 <p>2.当边的方向是背离裁剪区域 只添加P</p>
 <p>3.倘若全部都在背离方向上 不添加点</p>
 <p>4.整个边都在内部 只添加P1</p>
 <p>这里P是p0-&gt;p1与裁剪边的交接点 (一元二次的直线方程可以计算出)</p>
 <p>下方为一个裁剪的案例</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/68f18533-f36b-4599-a53b-90f965880a45/Image.png" alt></p>
 <p>详情见</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/6f02eb03-d666-4b4c-aab1-5f654f80b935.png" alt></p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -416,16 +416,16 @@ case p1 Behind and p2 InFront
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
+                        </p><p>1.Support Point碰撞检测的理念与SAT并无差别 只是在效率上更胜一筹</p>
 <p>support point是在给定方向上距离最远(投影最大)的点</p>
 <p>在碰撞检测中也需要寻找分离轴 那么这时候 support point就是在面法线相反的方向上最远的点 也就是<code>背离这个方向深交最深的点</code></p>
 <p>倘若两个多边形相互碰撞 那么<code>一定能</code>找到<code>一个顶点与给定平面之间的距离小于0</code>(在面法线上的投影)</p>
 <p>这与两个多边形互不碰撞那么一定可以找到一跟分离轴分离两个多边形的理论是类似的</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/dc6ba7be-8259-484c-b56d-961e5f453ec9/SAT.png" alt></p>
 <p>每次循环都挑选一个给定轴 在这个轴的反面法线上找一个深度最深的点 若这个点在这个面的背面(距离为正) 那么就证明存在一条分离轴可以用来分割这两个图形</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/8222451d-4cfb-4cc2-99b5-e302baa5bb09.png" alt></p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -457,7 +457,7 @@ case p1 Behind and p2 InFront
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -498,24 +498,18 @@ case p1 Behind and p2 InFront
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
                             <li><a class="pagination-link" href="archives/2014//page/2">2</a></li>
                             <li><span class="pagination-ellipsis">&hellip;</span></li>
                         
-
                         
                             <li><a class="pagination-link" href="archives/2014//page/4">4</a></li>
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/archives/2014/page/2/">
                     
@@ -541,24 +535,18 @@ case p1 Behind and p2 InFront
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
                             <li><a class="pagination-link" href="archives/2014//page/2">2</a></li>
                             <li><span class="pagination-ellipsis">&hellip;</span></li>
                         
-
                         
                             <li><a class="pagination-link" href="archives/2014//page/4">4</a></li>
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/archives/2014/page/2/">
                     

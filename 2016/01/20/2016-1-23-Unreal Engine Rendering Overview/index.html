@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -136,7 +136,7 @@
 					  <p><blockquote>
 <p>本文源于<a href="https://docs.unrealengine.com/latest/INT/Engine/Rendering/Overview/index.html" target="_blank" rel="noopener">Unreal官方Rendering Overview</a>的基本概念理解和翻译</p>
 </blockquote>
-<h3 id="延迟渲染"><a href="#延迟渲染" class="headerlink" title="延迟渲染"></a>延迟渲染</h3><p>与Unreal Engine 3中的Forward Lighting Path不同的是，Unreal Engine 4中所有的光源都采用的是延迟渲染的技术。各种材质都会讲各自的属性写入GBuffers当中，因此在根据光源计算时，光源直接通过Buffer上的per-pixel的材质属性来计算光照。</p>
+</p><h3 id="延迟渲染"><a href="#延迟渲染" class="headerlink" title="延迟渲染"></a>延迟渲染</h3><p>与Unreal Engine 3中的Forward Lighting Path不同的是，Unreal Engine 4中所有的光源都采用的是延迟渲染的技术。各种材质都会讲各自的属性写入GBuffers当中，因此在根据光源计算时，光源直接通过Buffer上的per-pixel的材质属性来计算光照。</p>
 <blockquote>
 <p>Forward Lighting Path本质上就是最传统的光源场景渲染方式，二者对比可见<a href="http://gamedevelopment.tutsplus.com/articles/forward-rendering-vs-deferred-rendering--gamedev-12342" target="_blank" rel="noopener">Forward Rendering vs. Deferred Rendering</a>。当在指定渲染目标时，前者的做法是对场景中的每一个几何体都对每个光源进行一次管线中的光照计算，最后直接着色叠加。</p>
 <p>后者为先行计算四张2D Image/Buffer(<strong>Screen Space Depth</strong>,<strong>Surface Normals</strong>,<strong>Diffuse Color</strong>,<strong>Specular color and specular power</strong>)，VS中计算各图所需的几何体信息，而PS只存图，之后每个光源才与四张图上的内容进行着色计算。</p>
@@ -163,12 +163,12 @@ for each pixel
      shading
 
 </code></pre>
-<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/forward-v2.png" alt><br>    </a><br></figure>
 
 <blockquote>
 <p>Forward Rendering Path</p>
 </blockquote>
-<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" target="_blank" rel="noopener"><br>        <img src="https://cdn.tutsplus.com/gamedev/uploads/2013/11/deferred-v2.png" alt><br>    </a><br></figure>
 
 <blockquote>
 <p>Deffered Shading</p>
@@ -188,18 +188,18 @@ for each pixel
 <p>Stationary lights:静态光源是不能在运行时改变任何属性的光源，他们会在Lightmass中计算完毕，之后不会对性能造成任何过多的影响。因此他是三者当中拥有中等效果，较低的可更改性但也是性能最友好的一个光源类型。</p>
 </blockquote>
 <p><br></p>
-<h3 id="Lit-Translucency"><a href="#Lit-Translucency" class="headerlink" title="Lit Translucency"></a>Lit Translucency</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" alt=""><br>    </a><br></figure>
+<h3 id="Lit-Translucency"><a href="#Lit-Translucency" class="headerlink" title="Lit Translucency"></a>Lit Translucency</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_1.jpg" alt><br>    </a><br></figure>
 
 <p>以及</p>
-<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/self_shadow_2.jpg" alt><br>    </a><br></figure>
 
 <p>半透明材质的发光以及着色是在单一的光源前进传递(Single Forward Pass)中保证其正确性的，但是在多通道的光源下并不适用的技术。</p>
 <p>半透明材质可以向非透明物体上投射阴影，也可以向自身或者其他半透明材质上投射阴影(如图所示)</p>
 <p><br></p>
-<h3 id="Sub-Surface-Shading"><a href="#Sub-Surface-Shading" class="headerlink" title="Sub-Surface Shading"></a>Sub-Surface Shading</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" alt=""><br>    </a><br></figure>
+<h3 id="Sub-Surface-Shading"><a href="#Sub-Surface-Shading" class="headerlink" title="Sub-Surface Shading"></a>Sub-Surface Shading</h3><figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/jade_statue.jpg" alt><br>    </a><br></figure>
 
 <p>Jade Material</p>
-<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/ice_mounds.jpg" alt><br>    </a><br></figure>
 
 <p>Ice Material</p>
 <p>次表面散射着色模型是为了用于模拟蜡烛，玉制物体而做的新着色模型。他们并不是完全的半透明，但会在内部散射入射进来的光。这会比实现皮肤渲染上质量稍低但开销更小。</p>
@@ -207,7 +207,7 @@ for each pixel
 <h3 id="GPU-Particles"><a href="#GPU-Particles" class="headerlink" title="GPU Particles"></a>GPU Particles</h3><p>UE4支持在GPU上模拟粒子效果，传统的CPU难以完成的上千种粒子效果可以在GPU内更快效果更好的实现。</p>
 <p><br></p>
 <h3 id="Vector-Fields"><a href="#Vector-Fields" class="headerlink" title="Vector Fields"></a>Vector Fields</h3><p>在GPU粒子中最有趣的一项特性莫过于向量场了，一个向量场是在一个网格中均匀影响所在其中粒子运动的一个向量集，向量场在UE4中是作为一个Actors来出现的，因此他本身也可以像其他Actors一样被位移，旋转，或者是缩放，所以在运行期间他们都是可以被动态移动的。</p>
-<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/vector_field_global.jpg" alt><br>    </a><br></figure>
 
 <p>例如一个向量场可以被放置在瀑布上，当粒子进入了向量场的边界时，他们都会被其所影响，当粒子群离开了边界其作用的效果也会淡去(fade out)。</p>
 <p><br></p>
@@ -219,7 +219,7 @@ for each pixel
 <li><p>镜头高光(Bloom): 高光是真实世界光照的现象，较低的渲染开销却可以带来非常好的感官真实度的提升。高光效果一般可以在非常暗的背景中裸眼观察非常亮的物体观测到。</p>
 </li>
 </ul>
-<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" target="_blank" rel="noopener"><br>        <img src="https://docs.unrealengine.com/latest/images/Engine/Rendering/Overview/lens_flare.jpg" alt><br>    </a><br></figure>
 
 <ul>
 <li><p>人眼适应:可以会自动调整场景的曝光度，重现从明亮环境进入黑暗环境（或相反）时所经历的效果。</p>
@@ -229,7 +229,7 @@ for each pixel
 <li><p>色调映射(Tone Mapping):使得渲染场景的颜色可以被转换或修改来得到不同的效果。这可以被用来制作诸如棕褐滤镜，或击中特效（例如红色闪光）等。</p>
 </li>
 </ul>
-</p>
+<p></p>
 			        </div>
 				</div>		
 			</div>

@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -152,7 +152,7 @@
 <blockquote>
 <p>基于<a href="http://www.amazon.cn/flex%E4%B8%8Ebison-Jobn-Levine/dp/B00510VRB0/ref=sr_1_1?ie=UTF8&amp;qid=1444799536&amp;sr=8-1&amp;keywords=flex%E4%B8%8Ebison" target="_blank" rel="noopener">Flex与Bison</a>学习</p>
 </blockquote>
-<p><br></p>
+</p><p><br></p>
 <blockquote>
 <p>2015.10.13备注</p>
 </blockquote>
@@ -185,7 +185,7 @@ token = yylex(yyscan_t scaninfo);
 <p>6.Flex+Bison支持简单的class内置，所有的中文资料显示2009年时两者未能有效支持C++，需要<strong>%language “C++”</strong>来完成对C++的支持，目前看来无需此关键字也能完成class对struct的替换。</p>
 <p>7.Flex中yyextra指针分配给指定对象的声明位置尤为关键不在头部的%{ %}对中，而是在词法分析单元声明部分中。</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -201,7 +201,7 @@ token = yylex(yyscan_t scaninfo);
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>在使用编译器前端Flex+Bison完成了大部分工作之后，尽管可以使用简易的<strong>printf</strong>来完成终端调试，但终究不够方便。</p>
+                        </p><p>在使用编译器前端Flex+Bison完成了大部分工作之后，尽管可以使用简易的<strong>printf</strong>来完成终端调试，但终究不够方便。</p>
 <p>使用Bison完成AST生成之后需要对其构建的AST进行分析，此时常规思路的前序中序后序遍历对这样一个庞大的二叉树而言实现可视重建并不容易。因为你需要通过前中序来手工推导出一整棵树，但这并不是你做此任务的主要目的。</p>
 <p>这里我安利一波贝尔实验室推出的黑科技<a href="http://www.graphviz.org/Download_windows.php" target="_blank" rel="noopener">Graphviz</a>，在原有的遍历基础上基本上能够做到1分钟完成上手。</p>
 <p>假定一抽象语法树节点类Node，之后所有AST都将被视为普通二叉树。</p>
@@ -407,9 +407,9 @@ _0059CA80[label=TermInteger]
 <blockquote>
 <p>渲染结果为</p>
 </blockquote>
-<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/AST.png" alt><br>    </a><br></figure>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -441,7 +441,7 @@ _0059CA80[label=TermInteger]
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -482,19 +482,13 @@ _0059CA80[label=TermInteger]
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
@@ -520,19 +514,13 @@ _0059CA80[label=TermInteger]
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     

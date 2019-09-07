@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -152,7 +152,7 @@
 <blockquote>
 <p>一般内存溢出的问题，有较好找的，也有非常不容易发掘的。这里按照个人经验排序，从简到难记录。将会不定期更新。</p>
 </blockquote>
-<p>0.误分配内存，这种情况最好查找，也最经常犯。Atmos在实现日志系统中，误在字符转换中，遗漏了一个char数组忘记释放，以至于全盘内存上扬.</p>
+</p><p>0.误分配内存，这种情况最好查找，也最经常犯。Atmos在实现日志系统中，误在字符转换中，遗漏了一个char数组忘记释放，以至于全盘内存上扬.</p>
 <p>1.只有在构造函数中分配了指定内存，经常偷懒不写析构函数的问题就在于，经常忘记释放构造函数中直接分配的内存</p>
 <pre><code class="cpp">class A
 {
@@ -244,7 +244,7 @@ public:
 <p>6.有一些连锁的，具有内存释放前后关系的是最难以解决的。比如，对象A中包含B的指针，该B的指针由A来创建并返回给使用者。那么问题来了，在A的析构函数中可否释放B？</p>
 <p>答案是无解，需要具体情况具体分析，有的情况做好约定或者引用计数等办法，可以在A中直接释放；而有的情况则是A仅仅只做一个指针保留，那么此时就不应该去释放。还是一句话，具体情况具体分析。</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -276,7 +276,7 @@ public:
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -317,19 +317,13 @@ public:
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
@@ -355,19 +349,13 @@ public:
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     

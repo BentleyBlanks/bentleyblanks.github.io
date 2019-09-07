@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -133,7 +133,7 @@
 					  <h3 class="card-header-title">Floekr2T塔防套件</h3>
 					</div>
 					<div class="card-content">
-					  <p><p>1.defendor</p>
+					  <p></p><p>1.defendor</p>
 <p>2.attacker<br>包含trace和animation两内存块<br>–&gt;setup(trace, animation)初始化预设动画和预设路径<br>–&gt;update(skill)根据遍历一遍skill来更新自身的激活与否状态 外部通过查阅其状态来确定是否弹出vector<br>–&gt;draw()</p>
 <p>3.skill<br>自身具备TRACK PATH SCOPE其中scope并非一个真正意义上的技能而是直接由defendor来控制attacker的血量扣除           </p>
 <p>  –path会根据自身初始化的target位置确定线性方向 之后只需要根据预设定的velocity来不断更新position即可</p>
@@ -141,7 +141,7 @@
 <p>  –scope的skill意味着defendor不会在skill的vector当中添加一个新的技能 而是直接对当前选择的attacker进行伤害的扣除 可选的可以添加噪声以及随机</p>
 <p>4.trace<br>  –维护一段vector专门用于存放拐点<br>通过turnLeft turnRight go…等来智能的(也就是根据当前direction来判断左右转前后转需要rotate的角度)addTurningPoint达到路径中拐点的设置<br>之后attacker只需要不断的从vector中取得下一拐点就可以设定前进方向</p>
 <p>5.animation<br>  –维护一段vector专门用于存放image帧动画<br>只需要不断循环的从vector中读取image并渲染出来就可以做到动画播放的目的<br>getFrame()能返回当前播放帧的image</p>
-</p>
+<p></p>
 			        </div>
 				</div>		
 			</div>

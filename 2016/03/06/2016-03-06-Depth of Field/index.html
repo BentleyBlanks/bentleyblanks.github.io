@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -51,7 +51,7 @@
     
       <link rel="stylesheet" href="/css/basic.css">
     
-      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css'><!-- hexo-inject:end -->
     
   
 
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -136,19 +136,19 @@
 					  <p><blockquote>
 <p>以下理解均来自PBRT以及网络资源</p>
 </blockquote>
-<p>首先，对普通的品红相机添加景深不是一件非常困难的事情，在这里不赘述景深的生成原理，直接步入实现部分。</p>
+</p><p>首先，对普通的品红相机添加景深不是一件非常困难的事情，在这里不赘述景深的生成原理，直接步入实现部分。</p>
 <blockquote>
 <p>正常的品红相机为小孔成像，因此没有景深的概念，而增加一凸透镜之后，那么在焦平面左右的对象成像为清晰的，其余部分根据距离焦平面距离模糊程度不同。</p>
 </blockquote>
 <p>如图所示，</p>
-<p><img src="https://farm2.staticflickr.com/1673/24907059613_076536e068_z.jpg" alt=""></p>
+<p><img src="https://farm2.staticflickr.com/1673/24907059613_076536e068_z.jpg" alt></p>
 <p>点<span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mi>p</mi><mn>1</mn></msub></mrow><annotation encoding="application/x-tex">p_1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord"><span class="mord mathit">p</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.30110799999999993em;"><span style="top:-2.5500000000000003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"></span></span></span></span></span></span></span></span>与<span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mi>p</mi><mn>2</mn></msub></mrow><annotation encoding="application/x-tex">p_2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord"><span class="mord mathit">p</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.30110799999999993em;"><span style="top:-2.5500000000000003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"></span></span></span></span></span></span></span></span>在成像平面上根据离焦平面位置的不同对应的成像点也略有不同。</p>
 <blockquote>
 <p>若有成像平面上一点<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>p</mi></mrow><annotation encoding="application/x-tex">p</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord mathit">p</span></span></span></span>, 其光路经过凸透镜任意位置，最终都将「收敛」/「汇集」的一平面上，这一平面就是焦平面，有<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mfrac><mrow><mn>1</mn></mrow><mrow><mi>s</mi></mrow></mfrac><mo>+</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mi>i</mi></mrow></mfrac><mo>=</mo><mfrac><mrow><mn>1</mn></mrow><mrow><mi>f</mi></mrow></mfrac></mrow><annotation encoding="application/x-tex">\frac{1}{s} + \frac{1}{i} = \frac{1}{f}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.845108em;"></span><span class="strut bottom" style="height:1.326216em;vertical-align:-0.481108em;"></span><span class="base"><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.845108em;"><span style="top:-2.6550000000000002em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathit mtight">s</span></span></span></span><span style="top:-3.15em;"><span class="pstrut" style="height:3em;"></span><span class="stretchy" style="height:0.2em;"><svg width="400em" height="0.2em" viewbox="0 0 400000 200" preserveaspectratio="xMinYMin slice"><path d="M0 80H400000 v40H0z M0 80H400000 v40H0z"/></svg></span></span><span style="top:-3.394em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.345em;"></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mord rule" style="margin-right:0.2222222222222222em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.845108em;"><span style="top:-2.6550000000000002em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathit mtight">i</span></span></span></span><span style="top:-3.15em;"><span class="pstrut" style="height:3em;"></span><span class="stretchy" style="height:0.2em;"><svg width="400em" height="0.2em" viewbox="0 0 400000 200" preserveaspectratio="xMinYMin slice"><path d="M0 80H400000 v40H0z M0 80H400000 v40H0z"/></svg></span></span><span style="top:-3.394em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.345em;"></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.845108em;"><span style="top:-2.6550000000000002em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathit mtight" style="margin-right:0.10764em;">f</span></span></span></span><span style="top:-3.15em;"><span class="pstrut" style="height:3em;"></span><span class="stretchy" style="height:0.2em;"><svg width="400em" height="0.2em" viewbox="0 0 400000 200" preserveaspectratio="xMinYMin slice"><path d="M0 80H400000 v40H0z M0 80H400000 v40H0z"/></svg></span></span><span style="top:-3.394em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.481108em;"></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span>的关系(<a href="https://zh.wikipedia.org/wiki/%E8%96%84%E9%80%8F%E9%8F%A1" target="_blank" rel="noopener">透镜公式</a>)。</p>
 </blockquote>
 <p>那么在计算机中，虚拟成像平面与焦平面位于同一侧，此时可这样理解光路：</p>
 <p>多术光从凸透镜任意位置发出，击中成像平面的某一特定位置<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>p</mi></mrow><annotation encoding="application/x-tex">p</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord mathit">p</span></span></span></span>，终将在焦平面(focal plane)上某一点<span class="katex"><span class="katex-mathml"><math><semantics><mrow><msup><mi>p</mi><mo mathvariant="normal">′</mo></msup></mrow><annotation encoding="application/x-tex">p&#x27;</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.751892em;"></span><span class="strut bottom" style="height:0.946332em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord"><span class="mord mathit">p</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.751892em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span></span></span></span>汇聚。如图所示。</p>
-<p><img src="https://farm2.staticflickr.com/1650/24903650934_7b9e0eb72c_z.jpg" alt=""></p>
+<p><img src="https://farm2.staticflickr.com/1650/24903650934_7b9e0eb72c_z.jpg" alt></p>
 <p>计算机中相机模型生成景深原理就是上图。</p>
 <hr>
 <blockquote>
@@ -186,12 +186,12 @@ radius = R2 * r;
 x = cos(phi) * radius;
 y = sin(phi) * radius;
 </code></pre>
-<p><img src="http://l2program.co.uk/wp-content/uploads/2014/12/Polar.png" alt=""></p>
+<p><img src="http://l2program.co.uk/wp-content/uploads/2014/12/Polar.png" alt></p>
 <blockquote>
 <p>图来自<a href="http://l2program.co.uk/900/concentric-disk-sampling" target="_blank" rel="noopener">Concentric Disk Sampling</a></p>
 </blockquote>
 <p>因此论文<a href="https://mediatech.aalto.fi/~jaakko/T111-5310/K2013/JGT-97.pdf" target="_blank" rel="noopener">A Low Distortion Map Between Disk and Square</a>的优势就在于可以将笛卡尔坐标系下均匀分布的随机点映射至极坐标系下且不会发生过采样问题。如图</p>
-<p><img src="http://l2program.co.uk/wp-content/uploads/2014/12/Concentric.png" alt=""></p>
+<p><img src="http://l2program.co.uk/wp-content/uploads/2014/12/Concentric.png" alt></p>
 <blockquote>
 <p>可以通过直接观察颜色点的对应位置做对比</p>
 </blockquote>
@@ -199,7 +199,7 @@ y = sin(phi) * radius;
 <blockquote>
 <p>算法分析如下</p>
 </blockquote>
-<p>核心思想本质上就是将方形区域与圆形区域做区域划分<br><img src="https://farm2.staticflickr.com/1568/25239018550_b54382d885_z.jpg" alt=""></p>
+<p>核心思想本质上就是将方形区域与圆形区域做区域划分<br><img src="https://farm2.staticflickr.com/1568/25239018550_b54382d885_z.jpg" alt></p>
 <p>若给定两随机数<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>a</mi><mo separator="true">,</mo><mi>b</mi><mo>∈</mo><mo>[</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo>]</mo></mrow><annotation encoding="application/x-tex">a, b\in[0, 1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mord mathit">a</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit">b</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">∈</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mopen">[</span><span class="mord">0</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span>，那么首先可以将其映射至<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>[</mo><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mn>1</mn><mo>]</mo></mrow><annotation encoding="application/x-tex">[-1, 1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base"><span class="mopen">[</span><span class="mord">−</span><span class="mord">1</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span>范围内。可见上方左图显示。</p>
 <blockquote>
 <p>Region 1</p>
@@ -213,7 +213,7 @@ y = sin(phi) * radius;
 </blockquote>
 <p>再加上最后一个圆心处, <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>r</mi><mo>=</mo><mn>0</mn><mo separator="true">,</mo><mi>ϕ</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">r = 0, \phi = 0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.69444em;"></span><span class="strut bottom" style="height:0.8888799999999999em;vertical-align:-0.19444em;"></span><span class="base"><span class="mord mathit" style="margin-right:0.02778em;">r</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">0</span><span class="mpunct">,</span><span class="mord rule" style="margin-right:0.16666666666666666em;"></span><span class="mord mathit">ϕ</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mord rule" style="margin-right:0.2777777777777778em;"></span><span class="mord">0</span></span></span></span>，即可构成完成的笛卡尔坐标映射至极坐标的任务。</p>
 <p>测试结果如下，左图为均匀分布随机采样点，右图为(使用OF 0.9.0做打点测试)，直观的看到非常吻合和算法本身实现效果。</p>
-<p><img src="https://farm2.staticflickr.com/1513/25441801691_e1d932503a_z.jpg" alt=""></p>
+<p><img src="https://farm2.staticflickr.com/1513/25441801691_e1d932503a_z.jpg" alt></p>
 <hr>
 <p>最后上OF实现代码</p>
 <pre><code class="cpp">ofVec2f squareToUniformDisk(const float sampleU, const float sampleV, int type)
@@ -269,8 +269,8 @@ y = sin(phi) * radius;
 </blockquote>
 <hr>
 <p>基本完成了上述结果，通过调节相机参数，就可以得到较为完善的景深效果。以下结果由<a href="https://github.com/BentleyBlanks/Atmos" target="_blank" rel="noopener">Atoms Renderer</a>渲染得到。</p>
-<p><img src="https://farm2.staticflickr.com/1531/25509064516_8314deedf1_z.jpg" alt=""></p>
-</p>
+<p><img src="https://farm2.staticflickr.com/1531/25509064516_8314deedf1_z.jpg" alt></p>
+<p></p>
 			        </div>
 				</div>		
 			</div>

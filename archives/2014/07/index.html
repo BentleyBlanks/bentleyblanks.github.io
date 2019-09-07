@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -146,7 +146,7 @@
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.就当前引擎的设计角度而言 倘若从设计模式的角度来讲 也就是建筑这个引擎的过程而言C++的整体结构思想远远超过C语言不知道多少倍 就从类的包装继承而言 C++更像是为了这种的项目而诞生的 </p>
+                        </p><p>1.就当前引擎的设计角度而言 倘若从设计模式的角度来讲 也就是建筑这个引擎的过程而言C++的整体结构思想远远超过C语言不知道多少倍 就从类的包装继承而言 C++更像是为了这种的项目而诞生的 </p>
 <p>举个简单的粒子 </p>
 <p>C语言想要实现数学库 那么你就必须面对通用性的考验 这就意味着你很有可能要面对好几十个+的重载运算 </p>
 <p>而只是为了达到类似多态的效果……但这不像是一个很聪明的解决办法 </p>
@@ -155,7 +155,7 @@
 <p>2.结构体和类本身都是不矛盾的两者 既然在实现上使用了效率更高的C 那么汇编去哪里工作呢？数学库本应该是使用SIMD之类进行优化的 </p>
 <p>在设计的时候就不要太多的关照效率的问题……除非实在是太慢了</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -171,20 +171,20 @@
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p><img src="https://app.yinxiang.com/shard/s3/res/1c58b253-47b6-436f-b1af-b5c16b4713b3.png" alt=""></p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/3a4bb01e-475c-4c01-b5f6-b629c9ae64f6.png" alt=""></p>
+                        </p><p><img src="https://app.yinxiang.com/shard/s3/res/1c58b253-47b6-436f-b1af-b5c16b4713b3.png" alt></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3a4bb01e-475c-4c01-b5f6-b629c9ae64f6.png" alt></p>
 <p>1.基类指针强制类型转换为派生类指针，其实质是<code>辨认空间</code>变大了，和它具体指向的内容<code>无关</code></p>
 <p>2.辨认空间变大会对指向内容的<code>连续内存</code>空间产生影响</p>
 <h3 id="Demo1"><a href="#Demo1" class="headerlink" title="Demo1"></a>Demo1</h3><p>此处a的内存申请已经完成 如下图 同时也赋值成功</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/b2838c50-7e4e-4904-8a75-35acf7db7cf2.png" alt=""></p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/2dfdb49e-340c-4249-8d28-aca4d3b4a78a/%E6%97%A0%E6%A0%87%E9%A2%982.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b2838c50-7e4e-4904-8a75-35acf7db7cf2.png" alt></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/2dfdb49e-340c-4249-8d28-aca4d3b4a78a/%E6%97%A0%E6%A0%87%E9%A2%982.png" alt></p>
 <h3 id="Demo2"><a href="#Demo2" class="headerlink" title="Demo2"></a>Demo2</h3><p>此处base指针初始化时指向的是对象b</p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/f2a71cfd-e699-41e0-965f-99feb7182027.png" alt=""></p>
-<p><img src="https://app.yinxiang.com/shard/s3/res/22df7c59-6c42-4753-978c-6864b3690e16/%E6%97%A0%E6%A0%87%E9%A2%983.png" alt=""></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/f2a71cfd-e699-41e0-965f-99feb7182027.png" alt></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/22df7c59-6c42-4753-978c-6864b3690e16/%E6%97%A0%E6%A0%87%E9%A2%983.png" alt></p>
 <h3 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h3><p>内存一旦被申请之后就会被操作系统认定为受保护的 也就不会被二次申请</p>
 <p>但辨认空间发生变化的确会引来不少的问题 在初始化以及强制类型转换基类指针的时候需要格外注意</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -216,7 +216,7 @@
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -257,19 +257,13 @@
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
@@ -295,19 +289,13 @@
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     

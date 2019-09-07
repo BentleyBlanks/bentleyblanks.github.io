@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -51,7 +51,7 @@
     
       <link rel="stylesheet" href="/css/basic.css">
     
-      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><!-- hexo-inject:end -->
+      <link rel="stylesheet" href="/css/floekr.css"><!-- hexo-inject:begin --><link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css'><!-- hexo-inject:end -->
     
   
 
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -146,8 +146,8 @@
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>假定已求解出交点，最后一步还需要将距离最短的交点筛选出来，有一个特殊情况如下图</p>
-<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" alt=""><br>    </a><br></figure>
+                        </p><p>假定已求解出交点，最后一步还需要将距离最短的交点筛选出来，有一个特殊情况如下图</p>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/intersect.png" alt><br>    </a><br></figure>
 
 
 <p>实际交点应该是A，因此要剔除B的情况。比较简单，令交点到射线起始点向量为P，那么和射线方向向量d点积，看\( \mathtt{cos \theta} \)的符号即可(-90, 90)。</p>
@@ -201,7 +201,7 @@ s-235,486,-235,486c-2.7,4.7,-9,7,-19,7c-6,0,-10,-1,-12,-3s-194,-422,-194,-422
 s-65,47,-65,47z M834 80H400000v40H845z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.08940150000000002em;"></span></span></span></span></span></span></span></span></span></p>
 <p>这里直接用向量，免去了讨论斜率的情况。交点Q就是\( \mathtt{P + td} \)。</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -217,7 +217,7 @@ s-65,47,-65,47z M834 80H400000v40H845z"/></svg></span></span></span><span class=
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>Unreal为每个平台的底层都封装了一致的高层代码，本文讲述的是Windows下Unreal的源代码细节表现</p>
+                        </p><p>Unreal为每个平台的底层都封装了一致的高层代码，本文讲述的是Windows下Unreal的源代码细节表现</p>
 <p>###1. 使用Mutex来保证当前程序是当前系统中唯一开启的</p>
 <p>Unreal源代码</p>
 <pre><code class="cpp">bool MakeNamedMutex( const TCHAR* CmdLine )
@@ -337,7 +337,7 @@ public:
 <p>此时客户端在导入这个类时，使用<code>_declspec(dllimport)</code>，DLL使用时已定义DLL_API，因此依旧是class被认定为导出<code>_declspec(dllexport)</code>。</p>
 <p>下次打算自己亲手试一试Windows平台下的dll导出。这样印象更深一点。</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -353,7 +353,7 @@ public:
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>基本上初步入门都是在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式入门教程</a>学到的，当然没有30分钟那么夸张。</p>
+                        </p><p>基本上初步入门都是在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式入门教程</a>学到的，当然没有30分钟那么夸张。</p>
 <p>许多时候如若不进行实际测试很难知道自己的正则表达式正确与否，一般我就在这里<a href="http://deerchao.net/tutorials/regex/regex.htm" target="_blank" rel="noopener">正则表达式在线测试</a>或者<a href="http://www.rubular.com/r/LiOup53CI1" target="_blank" rel="noopener">Rebular</a>直接在线测试，其实道理都一样。</p>
 <blockquote>
 <p>从开始学习，到实际能够解读正则表达式，到真正运用正则表达式在CSS文件的解析上，我起码花了整整三天时间，甚至更多</p>
@@ -554,7 +554,7 @@ background-color: red;
 </code></pre>
 <p>很种类繁多，因此需要一并写出。</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -586,7 +586,7 @@ background-color: red;
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -627,19 +627,13 @@ background-color: red;
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
@@ -665,19 +659,13 @@ background-color: red;
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     

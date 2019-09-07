@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -152,7 +152,7 @@
 <blockquote>
 <p>本文是对 数据结构–C语言版 书中代码的详解与个人理解</p>
 </blockquote>
-<p>在看到 数据结构–C语言版 里的字符串模式匹配算法时，一开始我不知情Knuth, Morris, Pratt模式匹配是何物，直到有一行代码</p>
+</p><p>在看到 数据结构–C语言版 里的字符串模式匹配算法时，一开始我不知情Knuth, Morris, Pratt模式匹配是何物，直到有一行代码</p>
 <pre><code class="cpp">    i = failure[i];
 </code></pre>
 <p>真的是百思不得其解，应该说我对于i的作用并不是很明确。此书称此函数为失配函数，对于此数组的作用也算是略知了一二。我这里不赘述算法的基础介绍，着重于理解上可能产生歧义的几个部分。</p>
@@ -183,7 +183,7 @@
 }
 </code></pre>
 <p>这里的核心代码确切的说只有一行，就是j = failure[j - 1] + 1。这里j起到的作用就是原文里这一段。</p>
-<figure><br>    <a href="http://images.cnitblog.com/blog/416010/201308/17122439-e349fed25e974e7886a27d18871ae48a.png" target="_blank" rel="noopener"><br>        <img src="http://images.cnitblog.com/blog/416010/201308/17122439-e349fed25e974e7886a27d18871ae48a.png" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="http://images.cnitblog.com/blog/416010/201308/17122439-e349fed25e974e7886a27d18871ae48a.png" target="_blank" rel="noopener"><br>        <img src="http://images.cnitblog.com/blog/416010/201308/17122439-e349fed25e974e7886a27d18871ae48a.png" alt><br>    </a><br></figure>
 
 
 <p>让匹配失败后，不是暴力求解的从pattern的第一位A开始，而是从failure[j-1]+1(在这里failure[j-1]指向的是第一位A，在+1了之后就指向了B)，这一点很重要，很多教程似乎都撇开了next / failure数组和实际求解的关系。</p>
@@ -219,7 +219,7 @@
 <p>的理解我花了非常多的时间。</p>
 <p>感觉直到目前为止，都没能很透彻的了解。</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -251,7 +251,7 @@
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -292,19 +292,13 @@
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
@@ -330,19 +324,13 @@
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     

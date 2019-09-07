@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -139,6 +139,35 @@
                   <!-- article card -->
                   <div class="card is-white is-hover wow fadeInUp" id="articleCard">
                     <div class="card-header">
+                      <a href="/2014/07/27/2014-07-27-Relations between base pointer and derived pointer/" class="card-header-title">
+                        <p>基类指针与派生类指针之间的转换</p>
+                        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                      </a>
+                    </div>
+                    <div class="card-content">
+                      <p id="articleContent">
+                        </p><p><img src="https://app.yinxiang.com/shard/s3/res/1c58b253-47b6-436f-b1af-b5c16b4713b3.png" alt></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/3a4bb01e-475c-4c01-b5f6-b629c9ae64f6.png" alt></p>
+<p>1.基类指针强制类型转换为派生类指针，其实质是<code>辨认空间</code>变大了，和它具体指向的内容<code>无关</code></p>
+<p>2.辨认空间变大会对指向内容的<code>连续内存</code>空间产生影响</p>
+<h3 id="Demo1"><a href="#Demo1" class="headerlink" title="Demo1"></a>Demo1</h3><p>此处a的内存申请已经完成 如下图 同时也赋值成功</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/b2838c50-7e4e-4904-8a75-35acf7db7cf2.png" alt></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/2dfdb49e-340c-4249-8d28-aca4d3b4a78a/%E6%97%A0%E6%A0%87%E9%A2%982.png" alt></p>
+<h3 id="Demo2"><a href="#Demo2" class="headerlink" title="Demo2"></a>Demo2</h3><p>此处base指针初始化时指向的是对象b</p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/f2a71cfd-e699-41e0-965f-99feb7182027.png" alt></p>
+<p><img src="https://app.yinxiang.com/shard/s3/res/22df7c59-6c42-4753-978c-6864b3690e16/%E6%97%A0%E6%A0%87%E9%A2%983.png" alt></p>
+<h3 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h3><p>内存一旦被申请之后就会被操作系统认定为受保护的 也就不会被二次申请</p>
+<p>但辨认空间发生变化的确会引来不少的问题 在初始化以及强制类型转换基类指针的时候需要格外注意</p>
+
+                      <p></p>
+                    </div>
+                  </div>
+                  <br>
+                  <br>
+                  
+                  <!-- article card -->
+                  <div class="card is-white is-hover wow fadeInUp" id="articleCard">
+                    <div class="card-header">
                       <a href="/2014/06/22/2014-06-22-include/" class="card-header-title">
                         <p>头文件依赖</p>
                         <i class="fa fa-arrow-right" aria-hidden="true"></i>
@@ -149,7 +178,7 @@
                         <pre><code>当一个头文件被包含的同时也引入了新的依赖, 一旦该头文件被修改, 代码就会被重新编译. 
 
 如果这个头文件又包含了其他头文件, 这些头文件的任何改变都将导致所有包含了该头文件的代码被重新编译. 因此, 我们倾向于减少包含头文件, 尤其是在头文件中包含头文件.
-</code></pre><p>使用前置声明可以显著减少需要包含的头文件数量. 举例说明: 如果头文件中用到类 <code>File</code>, 但不需要访问 <code>File</code> 类的声明, 头文件中只需前置声明 <code>class File;</code> 而无须 <code>#include &quot;file/base/file.h&quot;</code>.</p>
+</code></pre></p><p>使用前置声明可以显著减少需要包含的头文件数量. 举例说明: 如果头文件中用到类 <code>File</code>, 但不需要访问 <code>File</code> 类的声明, 头文件中只需前置声明 <code>class File;</code> 而无须 <code>#include &quot;file/base/file.h&quot;</code>.</p>
 <p>不允许访问类的定义的前提下, 我们在一个头文件中能对类 Foo 做哪些操作?</p>
 <blockquote>
 <p>我们可以将数据成员类型声明为 Foo * 或 Foo &amp;.</p>
@@ -170,7 +199,7 @@
 <p>第二个原则应该是，尽量在CPP文件中包含头文件，而非在头文件中。假设类A的一个成员是是一个指向类B的指针，在类A的头文件中使用了类B的前置声明并便宜成功，那么在A的实现中我们需要访问B的具体成员，因此需要包含头文件，那么我们应该在类A的实现部分（CPP文件）包含类B的头文件而非声明部分(H文件)。 </p>
 </blockquote>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -189,9 +218,9 @@
                         <blockquote>
 <p>模板为C++提供了泛型的概念</p>
 </blockquote>
-<p>1.在编译初期 编译器并不会给<code>template&lt;typename T&gt; fun</code>分配内存空间 只有在发现程序显式的实例化了这个模板的时候 才会分配响应的内存出来</p>
+</p><p>1.在编译初期 编译器并不会给<code>template&lt;typename T&gt; fun</code>分配内存空间 只有在发现程序显式的实例化了这个模板的时候 才会分配响应的内存出来</p>
 <p>2.模板也会有不足的时候</p>
-<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" alt><br>    </a><br></figure>
 
 <p>比如在对比大小的min()当中</p>
 <pre><code class="cpp">template&lt;typename T&gt;
@@ -214,7 +243,7 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
 <p>就可以正常的通过编译 </p>
 <p>因此模板的特化就是模板本身泛型能力不够的一种补充</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -230,7 +259,7 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>1.defendor</p>
+                        </p><p>1.defendor</p>
 <p>2.attacker<br>包含trace和animation两内存块<br>–&gt;setup(trace, animation)初始化预设动画和预设路径<br>–&gt;update(skill)根据遍历一遍skill来更新自身的激活与否状态 外部通过查阅其状态来确定是否弹出vector<br>–&gt;draw()</p>
 <p>3.skill<br>自身具备TRACK PATH SCOPE其中scope并非一个真正意义上的技能而是直接由defendor来控制attacker的血量扣除           </p>
 <p>  –path会根据自身初始化的target位置确定线性方向 之后只需要根据预设定的velocity来不断更新position即可</p>
@@ -239,7 +268,7 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
 <p>4.trace<br>  –维护一段vector专门用于存放拐点<br>通过turnLeft turnRight go…等来智能的(也就是根据当前direction来判断左右转前后转需要rotate的角度)addTurningPoint达到路径中拐点的设置<br>之后attacker只需要不断的从vector中取得下一拐点就可以设定前进方向</p>
 <p>5.animation<br>  –维护一段vector专门用于存放image帧动画<br>只需要不断循环的从vector中读取image并渲染出来就可以做到动画播放的目的<br>getFrame()能返回当前播放帧的image</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -255,7 +284,7 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
                     </div>
                     <div class="card-content">
                       <p id="articleContent">
-                        <p>###初始化：</p>
+                        </p><p>###初始化：</p>
 <p>在创建项目的目录中执行git init<br>被init的文件夹即作为工作目录树，存放从版本库检出的代码。</p>
 <hr>
 <p>###添加文件：</p>
@@ -276,7 +305,7 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
 <p>注意：在刚刚init初始化之后没有跟踪任何文件之前，master分支是不存在的。<br>git branch -d xxxxx 删除本地分支，被删除分支必须不是当前所在分支。<br>git branch -a察看远程分支。</p>
 <hr>
 <p>###处理发布：</p>
-<p>使用git tag <tag name=""> &lt;分支名&gt;  来对指定的分支添加一个tag。使用git tag可以察看当前所有的tag。</tag></p>
+<p>使用git tag <tag name> &lt;分支名&gt;  来对指定的分支添加一个tag。使用git tag可以察看当前所有的tag。</tag></p>
 <p>添加标签之后，只要标签还在，从标签到版本树起点的一连串提交记录就都还在。这是可以删除打了标签的分支，这仅仅只是删除了标签的名字，而没有删除分支上的内容。</p>
 <p>使用git rebase &lt;分支名&gt; 来变基，即把一个分支上的所有修改都合并到某一个分支上。比如在master分支执行git rebase test，就会把所有test分支的改动全部合并到master主分支上。<br>可以从一个tag建立一个分支git branch XXX <tag>  。</tag></p>
 <hr>
@@ -295,7 +324,7 @@ git archive --format=zip\
 </code></pre><p>克隆远程版本：</p>
 <p>使用git clone &lt;源&gt;  来将远程代码拷贝到本地目录。</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -327,7 +356,7 @@ git archive --format=zip\
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -368,24 +397,18 @@ git archive --format=zip\
                     </a>
 
                     <ul class="pagination-list">
-
                         
                         <li><a class="pagination-link" href="/">1</a></li>
                         
-
                                                 
                             <li><span class="pagination-ellipsis">&hellip;</span></li>
                             <li><a class="pagination-link" href="/page/10">10</a></li>
                         
-
-                        
                         <li><a class="pagination-link is-current">11</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
@@ -411,24 +434,18 @@ git archive --format=zip\
                     </a>
 
                     <ul class="pagination-list">
-
                         
                         <li><a class="pagination-link" href="/">1</a></li>
                         
-
                                                 
                             <li><span class="pagination-ellipsis">&hellip;</span></li>
                             <li><a class="pagination-link" href="/page/10">10</a></li>
                         
-
-                        
                         <li><a class="pagination-link is-current">11</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     

@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -149,7 +149,7 @@
                         <pre><code>当一个头文件被包含的同时也引入了新的依赖, 一旦该头文件被修改, 代码就会被重新编译. 
 
 如果这个头文件又包含了其他头文件, 这些头文件的任何改变都将导致所有包含了该头文件的代码被重新编译. 因此, 我们倾向于减少包含头文件, 尤其是在头文件中包含头文件.
-</code></pre><p>使用前置声明可以显著减少需要包含的头文件数量. 举例说明: 如果头文件中用到类 <code>File</code>, 但不需要访问 <code>File</code> 类的声明, 头文件中只需前置声明 <code>class File;</code> 而无须 <code>#include &quot;file/base/file.h&quot;</code>.</p>
+</code></pre></p><p>使用前置声明可以显著减少需要包含的头文件数量. 举例说明: 如果头文件中用到类 <code>File</code>, 但不需要访问 <code>File</code> 类的声明, 头文件中只需前置声明 <code>class File;</code> 而无须 <code>#include &quot;file/base/file.h&quot;</code>.</p>
 <p>不允许访问类的定义的前提下, 我们在一个头文件中能对类 Foo 做哪些操作?</p>
 <blockquote>
 <p>我们可以将数据成员类型声明为 Foo * 或 Foo &amp;.</p>
@@ -170,7 +170,7 @@
 <p>第二个原则应该是，尽量在CPP文件中包含头文件，而非在头文件中。假设类A的一个成员是是一个指向类B的指针，在类A的头文件中使用了类B的前置声明并便宜成功，那么在A的实现中我们需要访问B的具体成员，因此需要包含头文件，那么我们应该在类A的实现部分（CPP文件）包含类B的头文件而非声明部分(H文件)。 </p>
 </blockquote>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -189,9 +189,9 @@
                         <blockquote>
 <p>模板为C++提供了泛型的概念</p>
 </blockquote>
-<p>1.在编译初期 编译器并不会给<code>template&lt;typename T&gt; fun</code>分配内存空间 只有在发现程序显式的实例化了这个模板的时候 才会分配响应的内存出来</p>
+</p><p>1.在编译初期 编译器并不会给<code>template&lt;typename T&gt; fun</code>分配内存空间 只有在发现程序显式的实例化了这个模板的时候 才会分配响应的内存出来</p>
 <p>2.模板也会有不足的时候</p>
-<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" alt=""><br>    </a><br></figure>
+<figure><br>    <a href="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" target="_blank" rel="noopener"><br>        <img src="https://raw.githubusercontent.com/BentleyBlanks/bentleyblanks.github.io/master/images/templateSpecialization.png" alt><br>    </a><br></figure>
 
 <p>比如在对比大小的min()当中</p>
 <pre><code class="cpp">template&lt;typename T&gt;
@@ -214,7 +214,7 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
 <p>就可以正常的通过编译 </p>
 <p>因此模板的特化就是模板本身泛型能力不够的一种补充</p>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -246,7 +246,7 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -287,19 +287,13 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
@@ -325,19 +319,13 @@ min(s1, s1) &lt;&lt; endl;  //此时用户在程序外部调用
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     

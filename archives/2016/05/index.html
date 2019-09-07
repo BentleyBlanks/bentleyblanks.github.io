@@ -2,8 +2,8 @@
 
 
 <!DOCTYPE html>
-<html lang="">
-<head>
+<html lang>
+<head><meta name="generator" content="Hexo 3.9.0">
   <!-- hexo-inject:begin --><!-- hexo-inject:end --><meta charset="UTF-8">
   <!-- responsive -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="144x144" href="./img/apple-icon-144x144.png">
   <link rel="apple-touch-icon" sizes="152x152" href="./img/apple-icon-152x152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192"  href="./img/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./img/android-icon-192x192.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./img/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="./img/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="16x16" href="./img/favicon-16x16.png">
@@ -95,7 +95,7 @@
             
 
             
-            <a href="/projects" class="navbar-item" >PROJECTS</a>
+            <a href="/projects" class="navbar-item">PROJECTS</a>
             
           
             
@@ -149,17 +149,17 @@
                         <blockquote>
 <p>本文的三角形相交测试算法为<a href="http://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection" target="_blank" rel="noopener">Möller-Trumbore algorithm</a></p>
 </blockquote>
-<p>这里的back-facing culling表示的是若此三角形背对着观察者，那么就直接在相交测试中跳过，返回false。这在正常逻辑思维下是正常的，直到遇到了Refraction的材质。</p>
+</p><p>这里的back-facing culling表示的是若此三角形背对着观察者，那么就直接在相交测试中跳过，返回false。这在正常逻辑思维下是正常的，直到遇到了Refraction的材质。</p>
 <p>首先是正常参数方程定义的两个球的对比，<code>基本上除了目前未调正确的Fresnel以外</code>，折射部分是没有太大问题的。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/27004752252/in/dateposted-public/" title="3" target="_blank" rel="noopener"><img src="https://farm8.staticflickr.com/7060/27004752252_e94be87867.jpg" width="500" height="500" alt="3"></a></p>
 <p>Atmos的渲染结果</p>
-<p><img src="https://farm8.staticflickr.com/7257/27098895035_64e84660d9.jpg" alt=""></p>
+<p><img src="https://farm8.staticflickr.com/7257/27098895035_64e84660d9.jpg" alt></p>
 <p>Mitsuba的渲染结果</p>
 <hr>
 <p>一旦将其改为网格形成的球体，结果令人吃惊的不一致。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/27004782352/in/dateposted-public/" title="hello" target="_blank" rel="noopener"><img src="https://farm8.staticflickr.com/7240/27004782352_01a7272641.jpg" width="500" height="500" alt="hello"></a></p>
 <p>Atmos的渲染结果</p>
-<p><img src="https://farm8.staticflickr.com/7448/27065757716_04fe6f19d5.jpg" alt=""></p>
+<p><img src="https://farm8.staticflickr.com/7448/27065757716_04fe6f19d5.jpg" alt></p>
 <p>Mitsuba的渲染结果</p>
 <hr>
 <p>在ScatchPixel原文中有这样一段</p>
@@ -168,21 +168,21 @@
 </blockquote>
 <p>事实上，默认的三角形理应是双面的，因为但当类似于玻璃材质模型光线在几何体内部时必然会遇到光线从背后穿过三角形的问题。一开始我并没有意识到这是三角形的背面剔除的问题，球上折射的内容让我误以为是因为法线的错误问题。</p>
 <p>正确的不跳过背面三角形的Atmos渲染结果如下</p>
-<p><img src="https://farm8.staticflickr.com/7627/27098922015_b99d364d13.jpg" alt=""></p>
+<p><img src="https://farm8.staticflickr.com/7627/27098922015_b99d364d13.jpg" alt></p>
 <p>最终，提供材质球的修复前后对比。</p>
 <blockquote>
 <p>BUG非常隐晦，一开始的确完全没有想到是剔除的问题</p>
 </blockquote>
-<p><img src="https://farm8.staticflickr.com/7164/26495490933_0b03b201bf.jpg" alt=""></p>
+<p><img src="https://farm8.staticflickr.com/7164/26495490933_0b03b201bf.jpg" alt></p>
 <p>错误结果</p>
-<p><img src="https://farm8.staticflickr.com/7531/26495924673_9cf7cebd2f.jpg&quot;" alt=""></p>
+<p><img src="https://farm8.staticflickr.com/7531/26495924673_9cf7cebd2f.jpg&quot;" alt></p>
 <p>正确结果</p>
 <hr>
 <blockquote>
 <p>坑爹，这BUG找了老子一整晚</p>
 </blockquote>
 
-                      </p>
+                      <p></p>
                     </div>
                   </div>
                   <br>
@@ -214,7 +214,7 @@
               </div>
             </div>
             <div class="content">
-              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href="">about</a> for more info.
+              Graduated from <a href="https://www.jiangnan.edu.cn/">JNU</a>, interested in cg & game developing, once worked in <a href="https://www.aurogon.com/">Aurogon</a> to develope <a href="https://gjol.yy.com/">GuJianOL</a>. See <a href>about</a> for more info.
             </div>
             <!-- icon link -->
             <div class="level is-mobile" id="iconLink">
@@ -255,19 +255,13 @@
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
@@ -293,19 +287,13 @@
                     </a>
 
                     <ul class="pagination-list">
-
                         
-
-                        
-
                         
                         <li><a class="pagination-link is-current">1</a></li>
-
                         
-
                         
                     </ul>
-
+                    
                     
                         <a class="pagination-next" href="/">
                     
