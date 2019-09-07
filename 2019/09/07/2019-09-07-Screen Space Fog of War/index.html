@@ -151,7 +151,7 @@ positionWS.xyz /= positionWS.w;
 <p>因此基于屏幕空间的战争迷雾，最核心的就是计算得到的2D阴影贴图，以下列举的不同方案只是在计算这张阴影贴图的过程有所不同。</p>
 <hr>
 <h2 id="grid"><a class="markdownIt-Anchor" href="#grid"></a> Grid</h2>
-<p><strong>Introduction</strong></p>
+<h3 id="introduction"><a class="markdownIt-Anchor" href="#introduction"></a> Introduction</h3>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48693017382/in/dateposted-public/" title="1564411522311" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48693017382_58c54c614d_o.png" width="1919" height="916" alt="1564411522311"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
 <p>网格方案在WC3时代就已经被广泛应用，将地图<strong>预计算</strong>为一张地图障碍物贴图，CPU根据玩家位置实时填充数据，以计算视野阴影贴图。最后转为GPU可读的RT作为2D Shadow。由于CPU填充能力较低，一般最后会辅以<strong>Blur</strong>来弥补画面缺陷。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48692851256/in/dateposted-public/" title="Grid-3" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48692851256_a6300d366b_o.png" width="384" height="128" alt="Grid-3"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
@@ -182,7 +182,7 @@ positionWS.xyz /= positionWS.w;
 </blockquote>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48692844231/in/dateposted-public/" title="FOWGrid0" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48692844231_45b5f5b9b5_o.gif" width="948" height="668" alt="FOWGrid0"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
 <p>网格方案较为流行也容易实现，但由于CPU填充能力有限，即便是能做到仅对<strong>脏区域局部更新</strong>，CPU仍然对高分辨率的需求无法得到较好的满足，且最后一般都需要提供较为高昂的Blur来模糊分辨率带来的界限。不过由于迷雾的特性，低分辨率有时反倒在边缘上能带来更好的过渡感。</p>
-<p><strong>Reference</strong></p>
+<h3 id="reference"><a class="markdownIt-Anchor" href="#reference"></a> Reference</h3>
 <blockquote>
 <p><a href="https://blog.csdn.net/xoyojank/article/details/12259161" target="_blank" rel="noopener">游戏中的战争迷雾</a></p>
 <p><a href="https://blog.csdn.net/mobilebbki399/article/details/78444375" target="_blank" rel="noopener">【Unity】FOV战争迷雾</a></p>
@@ -190,7 +190,7 @@ positionWS.xyz /= positionWS.w;
 </blockquote>
 <hr>
 <h2 id="signed-distance-field-shadow"><a class="markdownIt-Anchor" href="#signed-distance-field-shadow"></a> Signed Distance Field Shadow</h2>
-<p><strong>Introduction</strong></p>
+<h3 id="introduction-2"><a class="markdownIt-Anchor" href="#introduction-2"></a> Introduction</h3>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48693017102/in/dateposted-public/" title="FinalResult-1" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48693017102_099657f010_o.png" width="1917" height="918" alt="FinalResult-1"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
 <p>SDF方案对CPU最为友好，几乎所有计算都可以在GPU中完成。若为静态场景可<strong>预bake</strong>场景成一张障碍物贴图，动态场景可使用正交投影相机在上方正交拍摄Depth再转换得到。之后使用SDF生成算法对这张障碍物贴图计算<strong>Min Signed Distance</strong>。最后对这张SDF进行RayMarching来得到一张2D阴影贴图。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48692850886/in/dateposted-public/" title="MapDataAndSDF" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48692850886_ed15d451ab_o.png" width="1536" height="512" alt="MapDataAndSDF"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
@@ -266,7 +266,7 @@ positionWS.xyz /= positionWS.w;
 </blockquote>
 <p>演示中为了避免BandingArtifact，并没有直接算出半影而是算出二值图最后配合Blur，并按距离增大Blur半径来模拟半影的效果。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48692501968/in/dateposted-public/" title="FOWSDF0" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48692501968_9a52eaf3e6_o.gif" width="948" height="668" alt="FOWSDF0"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
-<p><strong>Reference</strong></p>
+<h3 id="reference-2"><a class="markdownIt-Anchor" href="#reference-2"></a> Reference</h3>
 <blockquote>
 <p><a href="https://www.comp.nus.edu.sg/~tants/jfa/rong-guodong-phd-thesis.pdf" target="_blank" rel="noopener">Jump Flooding in GPU with Applications to Voronoi Diagram and Distance Transform</a></p>
 <p><a href="https://static1.squarespace.com/static/559921a3e4b02c1d7480f8f4/t/596773e9f7e0ab3d29bb102f/1499952110561/Mroz+Michael_746.pdf" target="_blank" rel="noopener">Signed Distance Fields in Real-Time Rendering</a></p>
@@ -277,7 +277,7 @@ positionWS.xyz /= positionWS.w;
 </blockquote>
 <hr>
 <h2 id="mesh-projetion"><a class="markdownIt-Anchor" href="#mesh-projetion"></a> Mesh Projetion</h2>
-<p><strong>Introduction</strong></p>
+<h3 id="introduction-3"><a class="markdownIt-Anchor" href="#introduction-3"></a> Introduction</h3>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48692509073/in/dateposted-public/" title="SFSS-0" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48692509073_52d74c40d4_o.png" width="1918" height="918" alt="SFSS-0"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
 <p>2D阴影由于其特殊性，可以由CPU直接计算出一个变形后的Mesh作为平面的阴影区域。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48693023072/in/dateposted-public/" title="SFSS-2-1567850455727" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48693023072_2232f99029_o.png" width="2637" height="670" alt="SFSS-2-1567850455727"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
@@ -287,7 +287,7 @@ positionWS.xyz /= positionWS.w;
 <p>对场景中所有变形后的Mesh，多次的渲染到一张RT上，即可得到所需的2D Shadow Map(本方法在Demo中并未涵盖，可参考Asset Store的<strong>SFSS插件</strong>)</p>
 <p>若是场景中物体较多，则计算阴影区域的CPU压力将会较大，且即便为静态场景可能也需要多次的DrawMesh才能得到最后的2D ShadowMap。但其优势是在Shader中较前两者，可以较好的控制半影区域的绘制，以得到高质量的阴影结果。</p>
 <p><a data-flickr-embed="true" href="https://www.flickr.com/photos/134486032@N03/48692850321/in/dateposted-public/" title="SFSS-4-1567850431805" target="_blank" rel="noopener"><img src="https://live.staticflickr.com/65535/48692850321_e450af8b50_o.gif" width="1024" height="491" alt="SFSS-4-1567850431805"></a><script async src="//embedr.flickr.com/assets/client-code.js" charset="utf-8"></script></p>
-<p><strong>Reference</strong></p>
+<h3 id="reference-3"><a class="markdownIt-Anchor" href="#reference-3"></a> Reference</h3>
 <blockquote>
 <p><a href="https://assetstore.unity.com/packages/tools/sprite-management/sf-soft-shadow-2d-38682" target="_blank" rel="noopener">Unity Asset Store: SF Soft Shadow 2D</a></p>
 </blockquote>
