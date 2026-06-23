@@ -57,6 +57,9 @@ export interface GameLayout {
   topHud: number;
 }
 
+/** 维修台底部抽屉的高度（手机清完进入维修阶段时占用底部，挤压手机区） */
+export const REPAIR_BENCH_H = 190;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -95,7 +98,9 @@ export function computeGameLayout(state: GameState, width: number, height: numbe
 
   const topHud = width >= 700 ? 62 : 56;
   const queueH = 58;
-  const bottomReserve = 96; // 底部大控制栏（拇指可达）
+  // 聚焦中的手机若已进入维修台阶段，底部让出更高的维修抽屉（挤压手机区，避免遮挡）
+  const benchOpen = !!state.activeCustomers[focusedIndex]?.phone.awaitingDelivery;
+  const bottomReserve = benchOpen ? REPAIR_BENCH_H + 6 : 96; // 底部大控制栏（拇指可达）
   const tabH = activeCount > 1 ? 42 : 0;
 
   const phoneTop = topHud + queueH + tabH + 6;

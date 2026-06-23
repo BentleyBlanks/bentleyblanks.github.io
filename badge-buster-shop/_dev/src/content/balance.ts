@@ -1,4 +1,5 @@
 import type { UpgradeDef } from '../types/content.types';
+import type { RepairKind } from '../types/state.types';
 
 export const GRID_COLS = 4;
 export const GRID_ROWS = 5;
@@ -92,6 +93,59 @@ export const OFFER_BASE_INTERVAL_MS = 22_000;
 export const OFFER_WIN_CHANCE = 0.62;
 export const OFFER_WIN_PER_TIER = 18;
 export const OFFER_FINE_PER_TIER = 28;
+
+// —— 手机维修系统（#4）——
+export const REPAIR_UNLOCK_LEVEL = 4;  // 到此级，清完角标后进入"维修台"阶段
+export const REPAIR_STEAL_LEVEL = 9;   // 到此级，维修台出现"偷资料"选项
+export const REPAIR_OPEN_MS = 620;     // 拆机仪式时长
+export const REPAIR_WORK_MS = 920;     // 施工仪式时长
+export const REPAIR_CLOSE_MS = 560;    // 装回仪式时长
+
+export interface RepairTier { name: string; profitMult: number; unlockLevel: number }
+export interface RepairServiceDef { kind: RepairKind; name: string; emoji: string; base: number; tiers: RepairTier[] }
+
+/** 四项维修服务；贴膜/手机壳分材料档（利润高低不同，按等级解锁，开局只能用低档） */
+export const REPAIR_SERVICES: RepairServiceDef[] = [
+  { kind: 'dust', name: '清灰', emoji: '🧹', base: 9, tiers: [{ name: '标准清灰', profitMult: 1, unlockLevel: 0 }] },
+  {
+    kind: 'film', name: '贴膜', emoji: '🛡', base: 10, tiers: [
+      { name: '高透膜', profitMult: 1, unlockLevel: 0 },
+      { name: '钢化膜', profitMult: 2.2, unlockLevel: 6 },
+      { name: '防窥膜', profitMult: 3.8, unlockLevel: 12 },
+    ],
+  },
+  {
+    kind: 'case', name: '手机壳', emoji: '📦', base: 8, tiers: [
+      { name: '硅胶壳', profitMult: 1, unlockLevel: 0 },
+      { name: '磨砂壳', profitMult: 2.1, unlockLevel: 7 },
+      { name: '真皮壳', profitMult: 3.6, unlockLevel: 14 },
+    ],
+  },
+  { kind: 'battery', name: '换电池', emoji: '🔋', base: 18, tiers: [{ name: '原厂电池', profitMult: 1, unlockLevel: 0 }] },
+];
+
+export function repairServiceDef(kind: RepairKind): RepairServiceDef {
+  return REPAIR_SERVICES.find((s) => s.kind === kind) ?? REPAIR_SERVICES[0];
+}
+
+/** 某服务在玩家当前等级下最高可用的材料档下标 */
+export function maxUnlockedTier(def: RepairServiceDef, level: number): number {
+  let idx = 0;
+  for (let i = 0; i < def.tiers.length; i += 1) if (level >= def.tiers[i].unlockLevel) idx = i;
+  return idx;
+}
+
+/** 维修利润：base · 材料倍率 · 档次加成（手机越贵越赚） */
+export function repairProfit(def: RepairServiceDef, tierIndex: number, phoneTier: number): number {
+  const tier = def.tiers[clamp(tierIndex, 0, def.tiers.length - 1)];
+  return Math.max(1, Math.round(def.base * tier.profitMult * (1 + (phoneTier - 1) * 0.24)));
+}
+
+// 偷资料：被抓→掉信任(声誉)+赔款；成功→拿到"信息差"换大额现金
+export const STEAL_CATCH_CHANCE = 0.34;
+export const STEAL_REP_PENALTY = 0.5;          // 被抓掉的声誉
+export const STEAL_FINE_PER_TIER = 36;         // 被抓的赔款（随档次）
+export const STEAL_WINDFALL_PER_TIER = 130;    // 成功偷到信息差换得的现金（随档次）
 
 export function xpToNextLevel(level: number): number {
   return Math.floor(10 * Math.pow(level, 1.6));

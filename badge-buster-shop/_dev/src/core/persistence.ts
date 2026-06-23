@@ -1,4 +1,4 @@
-import { INITIAL_ACTIVE_SLOTS, INITIAL_QUEUE_CAPACITY, INITIAL_REPUTATION, SAVE_KEY, xpToNextLevel } from '../content/balance';
+import { INITIAL_ACTIVE_SLOTS, INITIAL_QUEUE_CAPACITY, INITIAL_REPUTATION, REPAIR_SERVICES, SAVE_KEY, xpToNextLevel } from '../content/balance';
 import type { CustomerRuntime, GameState, PhoneRuntime } from '../types/state.types';
 
 export function createInitialState(now = performance.now()): GameState {
@@ -65,6 +65,18 @@ function ensurePhone(phone: PhoneRuntime): void {
     popup.vx ??= 0;
     popup.vy ??= 0;
   }
+  // 维修系统（#4）：旧存档补全
+  phone.awaitingDelivery ??= false;
+  phone.repair ??= { services: [], activeKind: null, stage: 'idle', stageMs: 0, steal: false, stealResolved: false, earned: 0 };
+  if (!Array.isArray(phone.repair.services) || phone.repair.services.length === 0) {
+    phone.repair.services = REPAIR_SERVICES.map((d) => ({ kind: d.kind, tier: 0, done: false }));
+  }
+  phone.repair.activeKind ??= null;
+  phone.repair.stage ??= 'idle';
+  phone.repair.stageMs ??= 0;
+  phone.repair.steal ??= false;
+  phone.repair.stealResolved ??= false;
+  phone.repair.earned ??= 0;
 }
 
 function ensureCustomer(customer: CustomerRuntime): void {

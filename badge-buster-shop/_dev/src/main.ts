@@ -8,6 +8,7 @@ import { createInitialState, loadState } from './core/persistence';
 import { createEconomyModule } from './economy/economyModule';
 import { createInputModule } from './input/inputModule';
 import { createRenderModule } from './render/renderModule';
+import { createRepairModule } from './repair/repairModule';
 import { createShopModule } from './shop/shopModule';
 import { createSkillsModule } from './skills/skillsModule';
 import type { GameContext, GameModule } from './types/module.types';
@@ -54,6 +55,7 @@ const modules: GameModule[] = [
   createEconomyModule(),
   createSkillsModule(),
   createShopModule(),
+  createRepairModule(), // 维修台抽屉盖在底部控制栏之上：须先于 ui/core 订阅，命中维修抽屉时优先吞掉点击
   createUiModule(), // 须先于 core 订阅 TAP/SWIPE：命中画布 UI 时吞掉事件
   createCoreModule(),
   createAutomationModule(),

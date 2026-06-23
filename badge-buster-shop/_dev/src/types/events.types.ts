@@ -1,5 +1,5 @@
 import type { AppIconId } from './content.types';
-import type { Mood, PopupKind } from './state.types';
+import type { Mood, PopupKind, RepairKind } from './state.types';
 
 export type GameEvent =
   | { type: 'TAP'; x: number; y: number; consumed?: boolean }
@@ -16,6 +16,9 @@ export type GameEvent =
   | { type: 'MALWARE_CLEARED'; customerId: string; amount: number; x: number; y: number }
   | { type: 'RISK_EVENT'; customerId: string; kind: 'offer_win' | 'offer_fail' | 'golden_break' | 'transformer' | 'soul_skill' | 'bait_fail'; amount: number; label: string; x: number; y: number }
   | { type: 'PHONE_RETURNED'; customerId: string; payout: number; xp: number; mood: Mood }
+  | { type: 'REPAIR_COMPLETED'; customerId: string; kind: RepairKind; tierName: string; profit: number; x: number; y: number }
+  | { type: 'STEAL_RESULT'; customerId: string; caught: boolean; amount: number; x: number; y: number }
+  | { type: 'DELIVER_PHONE'; customerId: string }
   | { type: 'CUSTOMER_LEFT'; customerId: string; reason: 'angry' | 'overflow' }
   | { type: 'REPUTATION_CHANGED'; value: number }
   | { type: 'BUY_UPGRADE'; id: string }

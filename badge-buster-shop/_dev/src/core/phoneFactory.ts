@@ -6,6 +6,7 @@ import {
   GOLDEN_UNLOCK_LEVEL,
   GRID_COLS,
   GRID_ROWS,
+  REPAIR_SERVICES,
   SOUL_CHANCE,
   SOUL_UNLOCK_LEVEL,
   phoneTier,
@@ -92,5 +93,15 @@ export function createPhone(customerId: string, customerDef: CustomerDef, iconDe
     malware: randomRangeInt(4, level >= 3 ? 26 : 16),
     malwareAccumulatorMs: -randomRangeInt(600, 2_000),
     cleaned: false,
+    awaitingDelivery: false,
+    repair: {
+      services: REPAIR_SERVICES.map((d) => ({ kind: d.kind, tier: 0, done: false })),
+      activeKind: null,
+      stage: 'idle',
+      stageMs: 0,
+      steal: false,
+      stealResolved: false,
+      earned: 0,
+    },
   };
 }

@@ -65,6 +65,29 @@ export interface PhoneRuntime {
   transformMs: number;           // cosmic 变形倒计时（剩余 ms），非 cosmic = Infinity
   offerAccumulatorMs: number;    // 盲盒"帮清理垃圾"邀约节奏
   cleaned: boolean;
+  // —— 维修系统 ——
+  awaitingDelivery: boolean;     // 角标清完→进入"维修台"阶段，等待玩家点交付
+  repair: PhoneRepair;
+}
+
+// —— 手机维修系统（#4）——
+export type RepairKind = 'dust' | 'film' | 'case' | 'battery'; // 清灰 / 贴膜 / 手机壳 / 换电池
+export type RepairStage = 'idle' | 'open' | 'work' | 'close';  // 拆机 / 施工 / 装回
+
+export interface RepairService {
+  kind: RepairKind;
+  tier: number;   // 选用的材料档（film/case 有效；dust/battery 恒为 0）
+  done: boolean;
+}
+
+export interface PhoneRepair {
+  services: RepairService[];
+  activeKind: RepairKind | null; // 正在施工的服务（null=空闲）
+  stage: RepairStage;
+  stageMs: number;               // 当前阶段已进行毫秒（驱动拆机/施工/装回仪式）
+  steal: boolean;                // 是否对本台"顺手牵羊·偷资料"
+  stealResolved: boolean;        // 偷资料已结算
+  earned: number;                // 本台维修累计已赚（仅展示）
 }
 
 export type Mood = 'happy' | 'neutral' | 'annoyed' | 'angry';

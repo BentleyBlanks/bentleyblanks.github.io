@@ -1,4 +1,18 @@
-import { MALWARE_LAG_THRESHOLD, MALWARE_MAX, MALWARE_PROMPT_THRESHOLD, shopRankName, TIMED_CLOSE_MS, upgradeCost, upgradeUnlockLevel } from '../content/balance';
+import {
+  MALWARE_LAG_THRESHOLD,
+  MALWARE_MAX,
+  MALWARE_PROMPT_THRESHOLD,
+  REPAIR_CLOSE_MS,
+  REPAIR_OPEN_MS,
+  REPAIR_WORK_MS,
+  maxUnlockedTier,
+  repairProfit,
+  repairServiceDef,
+  shopRankName,
+  TIMED_CLOSE_MS,
+  upgradeCost,
+  upgradeUnlockLevel,
+} from '../content/balance';
 import {
   computeGameLayout,
   defuseButtonRect,
@@ -13,10 +27,11 @@ import {
   type PhoneLayout,
   type QueueLayout,
 } from '../shared/layout';
+import { computeRepairLayout } from '../shared/repairLayout';
 import { computeUiLayout, type Rect, type UiLayout } from '../shared/uiLayout';
 import type { AppIconDef } from '../types/content.types';
 import type { GameContext, GameModule } from '../types/module.types';
-import type { Mood } from '../types/state.types';
+import type { Mood, RepairKind } from '../types/state.types';
 
 function formatMoney(value: number): string {
   if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(1)}亿`;
@@ -970,6 +985,273 @@ export function createRenderModule(): GameModule {
     c.fillText(`🧹 清理后台 ${Math.ceil(runtime.malware)}%`, btn.x + btn.w / 2, btn.y + btn.h / 2, btn.w - 8);
   }
 
+  // ———————————— 维修系统（#4）渲染 ————————————
+  const FF = '"PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+
+  function drawScrew(c: CanvasRenderingContext2D, x: number, y: number, rad: number, ang: number): void {
+    c.save();
+    c.translate(x, y);
+    c.fillStyle = '#C2CBD8';
+    c.beginPath();
+    c.arc(0, 0, rad, 0, TAU);
+    c.fill();
+    c.strokeStyle = '#6B7686';
+    c.lineWidth = Math.max(1, rad * 0.28);
+    c.beginPath();
+    c.arc(0, 0, rad, 0, TAU);
+    c.stroke();
+    c.rotate(ang);
+    c.strokeStyle = '#566072';
+    c.lineWidth = Math.max(1.4, rad * 0.34);
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(-rad * 0.6, 0);
+    c.lineTo(rad * 0.6, 0);
+    c.stroke();
+    c.restore();
+  }
+
+  function drawProgressRing(c: CanvasRenderingContext2D, x: number, y: number, radius: number, p: number, color: string): void {
+    c.save();
+    c.lineWidth = Math.max(3, radius * 0.26);
+    c.strokeStyle = 'rgba(255,255,255,0.16)';
+    c.beginPath();
+    c.arc(x, y, radius, 0, TAU);
+    c.stroke();
+    c.strokeStyle = color;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * clamp01(p));
+    c.stroke();
+    c.restore();
+  }
+
+  // 施工阶段的工种特效（屏幕坐标 sx/sy/sw/sh，p=本阶段进度）
+  function drawRepairWork(c: CanvasRenderingContext2D, kind: RepairKind, sx: number, sy: number, sw: number, sh: number, p: number): void {
+    const midY = sy + sh * 0.44;
+    if (kind === 'dust') {
+      const bx = sx + sw * (0.22 + 0.56 * (Math.sin(p * Math.PI * 3) * 0.5 + 0.5));
+      c.save();
+      c.strokeStyle = '#FFD166';
+      c.lineWidth = 2;
+      for (let i = 0; i < 5; i += 1) {
+        c.beginPath();
+        c.moveTo(bx - sw * 0.06 + i * sw * 0.03, midY + sh * 0.02);
+        c.lineTo(bx - sw * 0.06 + i * sw * 0.03, midY + sh * 0.08);
+        c.stroke();
+      }
+      fillRound(c, bx - sw * 0.07, midY - sh * 0.04, sw * 0.14, sh * 0.06, 4, '#8B5A2B');
+      c.fillStyle = 'rgba(210,200,180,0.85)';
+      for (let i = 0; i < 8; i += 1) {
+        const a = p * 8 + i;
+        c.beginPath();
+        c.arc(bx + Math.cos(a) * sw * 0.12, midY + sh * 0.1 + Math.sin(a * 1.7) * sh * 0.05, 1.6, 0, TAU);
+        c.fill();
+      }
+      c.restore();
+    } else if (kind === 'film') {
+      const filmTop = sy + sh * 0.18;
+      const filmH = sh * 0.46 * p;
+      c.save();
+      c.fillStyle = 'rgba(120, 200, 255, 0.22)';
+      fillRound(c, sx + sw * 0.18, filmTop, sw * 0.64, Math.max(1, filmH), 8, 'rgba(120,200,255,0.22)');
+      c.strokeStyle = 'rgba(150,220,255,0.7)';
+      c.lineWidth = 2;
+      c.strokeRect(sx + sw * 0.18, filmTop, sw * 0.64, Math.max(1, filmH));
+      // 刮板扫过
+      const sqY = filmTop + filmH;
+      c.fillStyle = '#EAF4FF';
+      fillRound(c, sx + sw * 0.16, sqY - 3, sw * 0.68, 6, 3, '#EAF4FF');
+      c.restore();
+    } else if (kind === 'case') {
+      const inset = (1 - p) * sw * 0.22;
+      c.save();
+      c.strokeStyle = '#26C6A6';
+      c.lineWidth = Math.max(4, sw * 0.04);
+      strokeRound(c, sx + sw * 0.12 - inset * 0.2 + inset, sy + sh * 0.16 + inset, sw * 0.76 - inset * 2, sh * 0.52 - inset * 2, 16, '#26C6A6', Math.max(4, sw * 0.04));
+      c.restore();
+    } else {
+      // battery：旧电池(红)滑出右侧，新电池(绿)从左滑入
+      c.save();
+      const oldX = sx + sw * (0.3 + p * 0.5);
+      const newX = sx + sw * (-0.1 + p * 0.4);
+      fillRound(c, oldX, midY - sh * 0.06, sw * 0.22, sh * 0.12, 4, alphaColor('#FF3B30', 1 - p));
+      fillRound(c, newX, midY - sh * 0.06, sw * 0.22, sh * 0.12, 4, alphaColor('#26C6A6', Math.min(1, p + 0.3)));
+      c.fillStyle = '#0A0E18';
+      fillRound(c, newX + sw * 0.22, midY - sh * 0.02, sw * 0.02, sh * 0.04, 1, '#0A0E18');
+      c.restore();
+    }
+  }
+
+  // 维修台阶段：在手机屏幕上叠加拆机/施工/装回仪式（或待操作提示）
+  function drawRepairCeremony(phone: PhoneLayout): void {
+    const runtime = phone.customer.phone;
+    if (!runtime.awaitingDelivery) return;
+    const c = ctx.ctx2d;
+    const r = runtime.repair;
+    const sx = phone.screenX;
+    const sy = phone.screenY;
+    const sw = phone.screenW;
+    const sh = phone.screenH;
+    const cx = sx + sw / 2;
+    c.save();
+    roundedRect(c, sx, sy, sw, sh, phone.w * 0.06);
+    c.clip();
+    c.fillStyle = 'rgba(8, 14, 24, 0.6)';
+    c.fillRect(sx, sy, sw, sh);
+
+    if (r.activeKind) {
+      const def = repairServiceDef(r.activeKind);
+      const dur = r.stage === 'open' ? REPAIR_OPEN_MS : r.stage === 'work' ? REPAIR_WORK_MS : REPAIR_CLOSE_MS;
+      const p = clamp01(r.stageMs / dur);
+      const lift = r.stage === 'open' ? p * sh * 0.14 : r.stage === 'close' ? (1 - p) * sh * 0.14 : sh * 0.14;
+      // 背板
+      fillRound(c, sx + sw * 0.14, sy + sh * 0.2 - lift, sw * 0.72, sh * 0.5, 12, 'rgba(46,58,82,0.92)');
+      strokeRound(c, sx + sw * 0.14, sy + sh * 0.2 - lift, sw * 0.72, sh * 0.5, 12, 'rgba(150,170,200,0.5)', 1.5);
+      // 四角螺丝
+      const screwAng = (r.stage === 'open' ? p : r.stage === 'close' ? 1 - p : 1) * Math.PI * 3;
+      for (const [dx, dy] of [[0.24, 0.27], [0.76, 0.27], [0.24, 0.63], [0.76, 0.63]]) {
+        drawScrew(c, sx + sw * dx, sy + sh * dy - lift, Math.max(3, sw * 0.035), screwAng);
+      }
+      if (r.stage === 'work') drawRepairWork(c, r.activeKind, sx, sy, sw, sh, p);
+      // 进度环 + 文案
+      drawProgressRing(c, cx, sy + sh * 0.82, Math.min(sw, sh) * 0.07, p, '#26C6A6');
+      const label = r.stage === 'open' ? '🔧 拆机中' : r.stage === 'close' ? '🔩 装回中' : `${def.emoji} ${def.name}中`;
+      c.fillStyle = '#EAF4FF';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.font = `900 ${Math.max(10, sw * 0.055)}px ${FF}`;
+      c.fillText(label, cx, sy + sh * 0.92);
+    } else {
+      c.fillStyle = '#EAF4FF';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.font = `900 ${Math.max(12, sw * 0.08)}px ${FF}`;
+      c.fillText('🔧 维修台', cx, sy + sh * 0.4);
+      c.fillStyle = 'rgba(220,230,245,0.82)';
+      c.font = `800 ${Math.max(9, sw * 0.045)}px ${FF}`;
+      c.fillText('下方选服务 · 修好点「交付」', cx, sy + sh * 0.5);
+      // 已完成服务的小勾
+      const doneList = r.services.filter((s) => s.done);
+      if (doneList.length > 0) {
+        c.fillStyle = '#9DE7C4';
+        c.font = `800 ${Math.max(8, sw * 0.04)}px ${FF}`;
+        c.fillText(`✓ ${doneList.map((s) => repairServiceDef(s.kind).name).join(' ')}`, cx, sy + sh * 0.6);
+      }
+    }
+    c.restore();
+  }
+
+  // 底部维修台抽屉
+  function drawRepairBench(): void {
+    const c = ctx.ctx2d;
+    const bench = computeRepairLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    if (!bench.open || !bench.customer) return;
+    const r = bench.customer.phone.repair;
+    const tierOf = bench.customer.phone.tier;
+    c.save();
+    c.shadowColor = 'rgba(0,0,0,0.42)';
+    c.shadowBlur = 18;
+    c.shadowOffsetY = -4;
+    fillRound(c, bench.panel.x - 2, bench.panel.y, bench.panel.w + 4, bench.panel.h + 24, 18, 'rgba(15, 22, 38, 0.99)');
+    c.shadowColor = 'transparent';
+    c.strokeStyle = 'rgba(91,141,239,0.45)';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(bench.panel.x, bench.panel.y + 0.5);
+    c.lineTo(bench.panel.x + bench.panel.w, bench.panel.y + 0.5);
+    c.stroke();
+    fillRound(c, bench.panel.x + bench.panel.w / 2 - 18, bench.panel.y + 4, 36, 4, 2, 'rgba(255,255,255,0.3)');
+
+    c.textBaseline = 'middle';
+    c.textAlign = 'left';
+    c.fillStyle = '#EAF4FF';
+    c.font = `900 14px ${FF}`;
+    c.fillText('🔧 维修台 · 修好再交付', bench.title.x, bench.title.y + bench.title.h / 2);
+    c.textAlign = 'right';
+    c.fillStyle = '#FFD166';
+    c.font = `900 13px ${FF}`;
+    c.fillText(`本台已赚 ¥${r.earned}`, bench.title.x + bench.title.w, bench.title.y + bench.title.h / 2);
+
+    for (const tile of bench.tiles) {
+      const def = repairServiceDef(tile.kind);
+      const svc = r.services.find((s) => s.kind === tile.kind);
+      const active = r.activeKind === tile.kind;
+      const done = !!svc?.done;
+      const b = tile.body;
+      fillRound(c, b.x, b.y, b.w, b.h, 10, done ? 'rgba(28,110,74,0.55)' : active ? 'rgba(40,92,142,0.8)' : 'rgba(40,52,74,0.94)');
+      strokeRound(c, b.x, b.y, b.w, b.h, 10, done ? '#26C6A6' : active ? '#5B8DEF' : 'rgba(255,255,255,0.14)', 1.3);
+      const tcx = b.x + b.w / 2;
+      c.textAlign = 'center';
+      c.fillStyle = '#FFFFFF';
+      c.font = `${Math.max(15, b.w * 0.28)}px system-ui, sans-serif`;
+      c.fillText(def.emoji, tcx, b.y + b.h * 0.24);
+      c.fillStyle = '#EAF4FF';
+      c.font = `900 12px ${FF}`;
+      c.fillText(def.name, tcx, b.y + b.h * 0.46);
+      if (done) {
+        c.fillStyle = '#9DE7C4';
+        c.font = `800 11px ${FF}`;
+        c.fillText('✓ 已完成', tcx, b.y + b.h * 0.66);
+      } else if (active) {
+        const dur = r.stage === 'open' ? REPAIR_OPEN_MS : r.stage === 'work' ? REPAIR_WORK_MS : REPAIR_CLOSE_MS;
+        const p = clamp01(r.stageMs / dur);
+        const stageIdx = r.stage === 'open' ? 0 : r.stage === 'work' ? 1 : 2;
+        const barW = b.w * 0.72;
+        const barX = tcx - barW / 2;
+        const barY = b.y + b.h * 0.6;
+        fillRound(c, barX, barY, barW, 5, 2.5, 'rgba(0,0,0,0.4)');
+        fillRound(c, barX, barY, barW * ((stageIdx + p) / 3), 5, 2.5, '#5B8DEF');
+        c.fillStyle = '#CBE0FF';
+        c.font = `800 10px ${FF}`;
+        c.fillText((r.stage === 'open' ? '拆机' : r.stage === 'work' ? '施工' : '装回') + '中…', tcx, b.y + b.h * 0.8);
+      } else {
+        const profit = repairProfit(def, svc?.tier ?? 0, tierOf);
+        c.fillStyle = '#FFD166';
+        c.font = `900 11px ${FF}`;
+        c.fillText(`施工 +¥${profit}`, tcx, b.y + b.h * 0.66);
+      }
+      if (tile.tierChip && svc) {
+        const maxT = maxUnlockedTier(def, ctx.state.level);
+        const tc = tile.tierChip;
+        fillRound(c, tc.x, tc.y, tc.w, tc.h, tc.h / 2, done ? 'rgba(0,0,0,0.22)' : 'rgba(91,141,239,0.34)');
+        c.fillStyle = done ? 'rgba(200,220,250,0.5)' : '#CBE0FF';
+        c.font = `800 10px ${FF}`;
+        c.fillText(`${def.tiers[svc.tier].name}${maxT > 0 ? ' ▸换' : ''}`, tc.x + tc.w / 2, tc.y + tc.h / 2);
+      }
+    }
+
+    if (bench.steal) {
+      const on = r.steal;
+      const s = bench.steal;
+      fillRound(c, s.x, s.y, s.w, s.h, 10, on ? 'rgba(176,38,58,0.9)' : 'rgba(40,52,74,0.94)');
+      strokeRound(c, s.x, s.y, s.w, s.h, 10, on ? '#FF6B81' : 'rgba(255,255,255,0.16)', 1.3);
+      c.textAlign = 'left';
+      c.fillStyle = on ? '#FFE3E8' : '#DCE6F5';
+      c.font = `900 12px ${FF}`;
+      c.fillText(on ? '😈 偷资料：开' : '😈 顺手牵羊', s.x + 10, s.y + s.h * 0.36);
+      c.fillStyle = on ? 'rgba(255,222,228,0.85)' : 'rgba(200,215,235,0.62)';
+      c.font = `700 10px ${FF}`;
+      c.fillText(on ? '交付时见分晓 · 被抓掉信任' : '小概率发大财 / 被抓掉信任', s.x + 10, s.y + s.h * 0.72);
+    }
+
+    const dl = bench.deliver;
+    const canDeliver = !r.activeKind;
+    const g = c.createLinearGradient(dl.x, dl.y, dl.x, dl.y + dl.h);
+    g.addColorStop(0, canDeliver ? '#2BD49B' : '#3A5060');
+    g.addColorStop(1, canDeliver ? '#179B6F' : '#2A3A48');
+    fillRound(c, dl.x, dl.y, dl.w, dl.h, 12, g);
+    strokeRound(c, dl.x, dl.y, dl.w, dl.h, 12, 'rgba(255,255,255,0.4)', 1.5);
+    c.textAlign = 'center';
+    c.fillStyle = '#FFFFFF';
+    c.font = `1000 16px ${FF}`;
+    c.fillText(r.activeKind ? '施工中…' : '✓ 交付手机', dl.x + dl.w / 2, dl.y + dl.h * 0.4);
+    c.fillStyle = 'rgba(255,255,255,0.86)';
+    c.font = `800 11px ${FF}`;
+    c.fillText(r.earned > 0 ? `含维修 ¥${r.earned}` : '可直接交付', dl.x + dl.w / 2, dl.y + dl.h * 0.74);
+    c.restore();
+  }
+
   function drawStatusStrip(ui: UiLayout): void {
     const c = ctx.ctx2d;
     const s = ctx.state;
@@ -1215,6 +1497,7 @@ export function createRenderModule(): GameModule {
     if (phone.customer.phone.variant === 'cosmic') drawCosmic(phone);
     drawMalware(phone);
     drawPopups(phone); // 遮挡弹窗在最上层
+    drawRepairCeremony(phone); // 维修台阶段：拆机/施工/装回仪式叠加在屏幕上
 
     c.font = `900 ${Math.max(10, phone.w * 0.04)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
     const badgeTotal = phone.customer.phone.badgeTotal;
@@ -1916,6 +2199,7 @@ export function createRenderModule(): GameModule {
     drawHud(ui);
     drawStatusStrip(ui);
     drawControls(ui);
+    drawRepairBench(); // 维修台抽屉（盖在底部控制栏之上）
     drawModal(ui);
     drawCursor();
   }
@@ -1975,6 +2259,28 @@ export function createRenderModule(): GameModule {
         spawnBurst(px, py, '#FFD166', 26, 1.3);
         spawnBurst(px, py, '#1FB57A', 18, 1.1);
         addShake(240, 2.8);
+      });
+      ctx.bus.on('REPAIR_COMPLETED', (event) => {
+        // 装回完成：盖个绿章 + 金币飞钱袋 + 利润飘字
+        effects.push({ kind: 'task', x: event.x, y: event.y, age: 0, ttl: 620, label: `${event.tierName} ✓`, color: '#26C6A6', power: 1.1 });
+        effects.push({ kind: 'return', x: event.x, y: event.y - 30, age: 0, ttl: 900, label: `维修 +${event.profit}元`, color: '#26C6A6', power: 1.1 });
+        spawnCoinStream(event.x, event.y, 4 + Math.min(10, Math.round(event.profit / 8)));
+        spawnBurst(event.x, event.y, '#26C6A6', 16, 1);
+        spawnBurst(event.x, event.y, '#FFD166', 8, 0.8);
+        addShake(120, 2);
+      });
+      ctx.bus.on('STEAL_RESULT', (event) => {
+        if (event.caught) {
+          effects.push({ kind: 'smash', x: event.x, y: event.y, age: 0, ttl: 1050, label: `偷资料被抓 -${event.amount}`, color: '#FF3B30', power: 1.6 });
+          spawnBurst(event.x, event.y, '#FF3B30', 40, 1.7);
+          skillFlash = 600;
+          addShake(520, 8);
+        } else {
+          effects.push({ kind: 'delivery', x: event.x, y: event.y, age: 0, ttl: 1250, label: `信息差 +${event.amount}元`, color: '#E0A100', power: 1.6, mood: 'happy' });
+          spawnCoinStream(event.x, event.y, 16);
+          spawnBurst(event.x, event.y, '#FFD166', 44, 1.8);
+          addShake(300, 3.2);
+        }
       });
       ctx.bus.on('PHONE_SMASHED', (event) => {
         effects.push({ kind: 'smash', x: event.x, y: event.y, age: 0, ttl: 1050, label: `砸出 ${event.totalBadges}`, color: '#FF3B30', power: 1.7 });

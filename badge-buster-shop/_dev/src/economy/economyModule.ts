@@ -128,6 +128,13 @@ export function createEconomyModule(): GameModule {
         }
         // transformer 不再清空本金（爽游基准·本金永不倒退）：仅损失当前在修手机——顾客离店见 shopModule.onRisk
       });
+      ctx.bus.on('REPAIR_COMPLETED', (event) => {
+        bankIncome(event.profit); // 维修利润即时入账
+      });
+      ctx.bus.on('STEAL_RESULT', (event) => {
+        if (event.caught) applyFine(event.amount); // 被抓：赔款（封顶+不碰本金）
+        else bankIncome(event.amount);             // 得手：信息差换大额现金
+      });
       ctx.bus.on('BUY_UPGRADE', (event) => buyUpgrade(event.id));
       ctx.bus.on('REPUTATION_CHANGED', () => recalcDerived(ctx));
     },

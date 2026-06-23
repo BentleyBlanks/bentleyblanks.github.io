@@ -5,7 +5,9 @@ import {
   INITIAL_ACTIVE_SLOTS,
   INITIAL_QUEUE_CAPACITY,
   PATIENCE_PER_UPGRADE,
+  REPAIR_UNLOCK_LEVEL,
   SOUL_REP_DRAIN_PER_SEC,
+  STEAL_REP_PENALTY,
   TIER_PAYOUT_STEP,
   clamp,
 } from '../content/balance';
@@ -163,6 +165,17 @@ export function createShopModule(): GameModule {
     }
   }
 
+  // 角标清完：解锁维修后不立即结算，先进入"维修台"等玩家点交付；未解锁则照旧即时交付
+  function onCleaned(customerId: string): void {
+    const customer = ctx.state.activeCustomers.find((item) => item.id === customerId);
+    if (!customer) return;
+    if (ctx.state.level >= REPAIR_UNLOCK_LEVEL) {
+      customer.phone.awaitingDelivery = true;
+    } else {
+      settlePhone(customerId);
+    }
+  }
+
   function settlePhone(customerId: string): void {
     const index = ctx.state.activeCustomers.findIndex((customer) => customer.id === customerId);
     if (index < 0) {
@@ -184,6 +197,8 @@ export function createShopModule(): GameModule {
     // 交付奖金 XP：逐击清角标已即时给过 XP，这里是"交付一次性奖金"（约逐击的 ~40%，按满意度加成），避免与逐击双计
     const xp = Math.floor(customer.clearedBadges * ctx.state.derived.xpPerBadge * tipMult * 0.4 * moodMultiplier(mood));
     customer.mood = mood;
+    customer.phone.awaitingDelivery = false; // 离场退场动画期间不再叠维修台覆盖层
+    customer.phone.repair.activeKind = null;
     ctx.state.activeCustomers.splice(index, 1);
     ctx.bus.emit({ type: 'PHONE_RETURNED', customerId, payout, xp, mood });
     changeReputation(mood === 'happy' ? 0.05 : mood === 'annoyed' ? -0.04 : 0.01);
@@ -225,7 +240,11 @@ export function createShopModule(): GameModule {
         customer.serviceStartedAt = now0;
         ctx.state.activeCustomers.push(customer);
       }
-      ctx.bus.on('PHONE_CLEANED', (event) => settlePhone(event.customerId));
+      ctx.bus.on('PHONE_CLEANED', (event) => onCleaned(event.customerId));
+      ctx.bus.on('DELIVER_PHONE', (event) => settlePhone(event.customerId));
+      ctx.bus.on('STEAL_RESULT', (event) => {
+        if (event.caught) changeReputation(-STEAL_REP_PENALTY); // 被抓偷资料：掉信任→间接减客流
+      });
       ctx.bus.on('SCAM_INSTALLED', (event) => onScamInstalled(event.customerId));
       ctx.bus.on('RISK_EVENT', (event) => onRisk(event.kind, event.customerId));
       ctx.bus.on('UPGRADE_PURCHASED', syncCapacities);
