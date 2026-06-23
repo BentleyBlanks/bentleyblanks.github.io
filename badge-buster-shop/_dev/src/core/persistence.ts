@@ -55,6 +55,10 @@ function ensurePhone(phone: PhoneRuntime): void {
   phone.notificationAccumulatorMs ??= 0;
   phone.malware ??= 0;
   phone.malwareAccumulatorMs ??= 0;
+  phone.tier ??= 1;
+  phone.variant ??= 'normal';
+  phone.transformMs ??= Number.POSITIVE_INFINITY; // JSON 里 Infinity 会变 null，这里复原
+  phone.offerAccumulatorMs ??= 0;
 }
 
 function ensureCustomer(customer: CustomerRuntime): void {

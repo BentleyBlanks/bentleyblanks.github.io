@@ -10,7 +10,10 @@ export interface IconRuntime {
 
 export type PhoneSystemRuntime = 'ios' | 'android';
 
-export type PopupKind = 'ad' | 'scam';
+export type PopupKind = 'ad' | 'scam' | 'offer';
+
+/** 特殊手机类型：普通 / 黄金(高收益易碎) / 灵魂(掉声誉但可白嫖技能) / 宇宙魔方(会变形砸店) */
+export type PhoneVariant = 'normal' | 'golden' | 'soul' | 'cosmic';
 
 /** 手机屏幕上的弹窗。位置以屏幕矩形的比例(0..1)存储，渲染/命中均按比例换算，跟随布局缩放。 */
 export interface PhonePopup {
@@ -50,6 +53,11 @@ export interface PhoneRuntime {
   // 后台恶意软件 0..100：堆高会让手机卡顿，到阈值后无法清角标，需点"清理后台"
   malware: number;
   malwareAccumulatorMs: number;
+  // —— 肉鸽/盲盒层 ——
+  tier: number;                  // 手机档次（随玩家等级升高），影响身价与赔款
+  variant: PhoneVariant;
+  transformMs: number;           // cosmic 变形倒计时（剩余 ms），非 cosmic = Infinity
+  offerAccumulatorMs: number;    // 盲盒"帮清理垃圾"邀约节奏
   cleaned: boolean;
 }
 

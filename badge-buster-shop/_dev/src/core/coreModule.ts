@@ -1,4 +1,6 @@
 import {
+  GOLDEN_BREAK_CHANCE,
+  GOLDEN_FINE_PER_TIER,
   INCOMING_BASE_INTERVAL_MS,
   MALWARE_GAIN_INTERVAL_MS,
   MALWARE_MAX,
@@ -6,13 +8,20 @@ import {
   MAX_NOTIFICATIONS,
   MAX_POPUPS_PER_PHONE,
   NOTIF_BASE_INTERVAL_MS,
+  OFFER_BASE_INTERVAL_MS,
+  OFFER_FINE_PER_TIER,
+  OFFER_UNLOCK_LEVEL,
+  OFFER_WIN_CHANCE,
+  OFFER_WIN_PER_TIER,
   SCAM_UNLOCK_LEVEL,
 } from '../content/balance';
 import {
   computeGameLayout,
+  defuseButtonRect,
   malwareButtonRect,
   notifBarRect,
   phoneClearingDisabled,
+  popupAcceptRect,
   popupRectOf,
   rectContains,
   type IconLayout,
@@ -27,6 +36,8 @@ const AD_TITLES = ['🧧 恭喜中红包', '附近的人想认识你', '🔥 限
 const AD_BODIES = ['立即领取 ›', '马上查看', '仅剩 3 个名额', '免费试用 7 天'];
 const SCAM_TITLES = ['⚠ 检测到病毒', '账户异常需验证', '免费领 iPhone', '🎁 中奖通知'];
 const SCAM_BODIES = ['不处理将自动安装', '点此验证身份', '填写信息领取', '倒计时结束即扣费'];
+const OFFER_TITLES = ['🎁 帮顾客一键清理垃圾？', '🧹 深度清理优化？'];
+const OFFER_BODIES = ['可能有惊喜，也可能清空资料赔钱'];
 
 function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -51,18 +62,19 @@ let popupSeq = 0;
 function buildPopup(kind: PopupKind, now: number, graceMs: number): PhonePopup {
   popupSeq += 1;
   const fw = 0.62 + Math.random() * 0.22;
-  const fh = 0.15 + Math.random() * 0.08;
+  const fh = (kind === 'offer' ? 0.28 : 0.15) + Math.random() * 0.06;
   const fx = Math.min(Math.max((1 - fw) / 2 + (Math.random() - 0.5) * 0.12, 0.04), 1 - fw - 0.04);
-  const fy = Math.min(Math.max(0.22 + Math.random() * 0.4, 0.2), 0.86 - fh);
+  const fy = Math.min(Math.max(0.2 + Math.random() * 0.36, 0.18), 0.88 - fh);
+  const title = kind === 'scam' ? pick(SCAM_TITLES) : kind === 'offer' ? pick(OFFER_TITLES) : pick(AD_TITLES);
+  const body = kind === 'scam' ? pick(SCAM_BODIES) : kind === 'offer' ? pick(OFFER_BODIES) : pick(AD_BODIES);
+  const accent = kind === 'scam' ? '#FF3B30' : kind === 'offer' ? '#8E7CF6' : '#FF9F43';
   return {
     id: `popup_${Math.floor(now)}_${popupSeq}`,
     kind, fx, fy, fw, fh,
-    closeFx: 0.82, closeFy: 0.07, closeFw: 0.15, closeFh: 0.34,
+    closeFx: 0.82, closeFy: 0.07, closeFw: 0.15, closeFh: 0.28,
     bornAt: now,
     installAt: kind === 'scam' ? now + graceMs : Number.POSITIVE_INFINITY,
-    title: kind === 'scam' ? pick(SCAM_TITLES) : pick(AD_TITLES),
-    body: kind === 'scam' ? pick(SCAM_BODIES) : pick(AD_BODIES),
-    accent: kind === 'scam' ? '#FF3B30' : '#FF9F43',
+    title, body, accent,
   };
 }
 
@@ -96,6 +108,13 @@ export function createCoreModule(): GameModule {
     ctx.state.totalCleared += amount;
     event.amount = amount;
     grantXp(amount);
+    // 黄金手机：清除时小概率碎裂 → 被抓走赔巨款（抢先于正常结算）
+    if (customer.phone.variant === 'golden' && !customer.phone.cleaned && Math.random() < GOLDEN_BREAK_CHANCE) {
+      customer.phone.cleaned = true;
+      const fine = Math.round(GOLDEN_FINE_PER_TIER * customer.phone.tier);
+      ctx.bus.emit({ type: 'RISK_EVENT', customerId: customer.id, kind: 'golden_break', amount: fine, label: `黄金机碎裂 赔${fine}`, x: event.x, y: event.y });
+      return;
+    }
     if (recalcPhone(customer) <= 0 && !customer.phone.cleaned) {
       customer.phone.cleaned = true;
       ctx.bus.emit({ type: 'PHONE_CLEANED', customerId: customer.id });
@@ -138,6 +157,18 @@ export function createCoreModule(): GameModule {
     ctx.bus.emit({ type: 'POPUP_CLOSED', customerId: customer.id, kind: popup.kind, x: cx, y: cy, defused });
   }
 
+  function resolveOffer(customer: CustomerRuntime, popup: PhonePopup, x: number, y: number): void {
+    customer.phone.popups = customer.phone.popups.filter((item) => item.id !== popup.id);
+    const tier = customer.phone.tier;
+    if (Math.random() < OFFER_WIN_CHANCE) {
+      const reward = Math.round(OFFER_WIN_PER_TIER * tier);
+      ctx.bus.emit({ type: 'RISK_EVENT', customerId: customer.id, kind: 'offer_win', amount: reward, label: `清理成功 +${reward}`, x, y });
+    } else {
+      const fine = Math.round(OFFER_FINE_PER_TIER * tier);
+      ctx.bus.emit({ type: 'RISK_EVENT', customerId: customer.id, kind: 'offer_fail', amount: fine, label: `资料清空 赔${fine}`, x, y });
+    }
+  }
+
   function handlePopupTap(x: number, y: number): boolean {
     const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
     for (const phone of layout.phoneLayouts) {
@@ -146,10 +177,36 @@ export function createCoreModule(): GameModule {
         const popup = popups[i];
         const rect = popupRectOf(phone, popup);
         if (!rectContains(rect, x, y)) continue;
-        if (rectContains({ x: rect.closeX, y: rect.closeY, w: rect.closeW, h: rect.closeH }, x, y)) {
+        const closeHit = rectContains({ x: rect.closeX, y: rect.closeY, w: rect.closeW, h: rect.closeH }, x, y);
+        if (popup.kind === 'offer') {
+          const accept = popupAcceptRect(rect);
+          if (rectContains(accept, x, y)) {
+            resolveOffer(phone.customer, popup, accept.x + accept.w / 2, accept.y);
+          } else if (closeHit) {
+            phone.customer.phone.popups = phone.customer.phone.popups.filter((it) => it.id !== popup.id);
+            ctx.bus.emit({ type: 'POPUP_CLOSED', customerId: phone.customer.id, kind: 'offer', x: rect.closeX, y: rect.closeY, defused: false });
+          }
+          return true;
+        }
+        if (closeHit) {
           closePopup(phone.customer, popup, rect.closeX + rect.closeW / 2, rect.closeY + rect.closeH / 2);
         }
         return true; // 点到弹窗任意处都吞掉（防穿透）
+      }
+    }
+    return false;
+  }
+
+  function handleDefuseTap(x: number, y: number): boolean {
+    const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    for (const phone of layout.phoneLayouts) {
+      const runtime = phone.customer.phone;
+      if (runtime.variant !== 'cosmic' || !Number.isFinite(runtime.transformMs)) continue;
+      if (rectContains(defuseButtonRect(phone), x, y)) {
+        runtime.variant = 'normal';
+        runtime.transformMs = Number.POSITIVE_INFINITY;
+        grantXp(3);
+        return true;
       }
     }
     return false;
@@ -204,8 +261,9 @@ export function createCoreModule(): GameModule {
 
   function handleTap(event: Extract<GameEvent, { type: 'TAP' }>): void {
     if (event.consumed) return;
-    if (handlePopupTap(event.x, event.y)) return;   // 关弹窗优先
+    if (handlePopupTap(event.x, event.y)) return;   // 关弹窗 / 盲盒抉择优先
     if (handleMalwareTap(event.x, event.y)) return;  // 清理后台
+    if (handleDefuseTap(event.x, event.y)) return;   // 拔电源拆除宇宙魔方
     const hit = findIconAt(event.x, event.y);
     if (hit) emitClear(hit, ctx.state.derived.clearPerHit);
   }
@@ -297,6 +355,23 @@ export function createCoreModule(): GameModule {
           ctx.bus.emit({ type: 'SCAM_INSTALLED', customerId: customer.id, x: 0, y: 0, penalty: scamPenalty() });
           spawnPopup(phone, 'ad', now);
         }
+      }
+
+      // 宇宙魔方手机：倒计时（冻结时暂停）→ 变形金刚砸店 → 现金清零
+      if (phone.variant === 'cosmic' && Number.isFinite(phone.transformMs)) {
+        if (!isFrozen) phone.transformMs -= dt;
+        if (phone.transformMs <= 0) {
+          phone.transformMs = Number.POSITIVE_INFINITY;
+          phone.cleaned = true;
+          ctx.bus.emit({ type: 'RISK_EVENT', customerId: customer.id, kind: 'transformer', amount: ctx.state.points, label: '变形金刚砸店 破产!', x: 0, y: 0 });
+        }
+      }
+
+      // 盲盒"帮清理垃圾"邀约弹窗
+      phone.offerAccumulatorMs += dt;
+      if (!isFrozen && ctx.state.level >= OFFER_UNLOCK_LEVEL && phone.offerAccumulatorMs >= OFFER_BASE_INTERVAL_MS && !phone.popups.some((p) => p.kind === 'offer') && phone.popups.length < MAX_POPUPS_PER_PHONE) {
+        phone.offerAccumulatorMs = 0;
+        spawnPopup(phone, 'offer', now);
       }
     }
   }

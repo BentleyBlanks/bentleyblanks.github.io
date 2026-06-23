@@ -189,3 +189,17 @@ export function malwareButtonRect(phone: PhoneLayout): Rect {
 export function notifBarRect(phone: PhoneLayout): Rect {
   return { x: phone.screenX, y: phone.screenY, w: phone.screenW, h: phone.screenH * 0.18 };
 }
+
+/** 盲盒 offer 弹窗底部的"清理"接受按钮（✕ 为拒绝）。 */
+export function popupAcceptRect(rect: PopupRect): Rect {
+  const w = rect.w * 0.52;
+  const h = rect.h * 0.3;
+  return { x: rect.x + (rect.w - w) / 2, y: rect.y + rect.h - h - rect.h * 0.1, w, h };
+}
+
+/** 宇宙魔方手机的"拔电源"拆除按钮。 */
+export function defuseButtonRect(phone: PhoneLayout): Rect {
+  const w = phone.screenW * 0.62;
+  const h = phone.screenH * 0.1;
+  return { x: phone.screenX + (phone.screenW - w) / 2, y: phone.screenY + phone.screenH * 0.44, w, h };
+}

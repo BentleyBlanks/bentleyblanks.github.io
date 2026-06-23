@@ -1,9 +1,12 @@
 import {
   ACTIVE_PATIENCE_RATE,
   BASE_PATIENCE_MS,
+  GOLDEN_PAYOUT_MULT,
   INITIAL_ACTIVE_SLOTS,
   INITIAL_QUEUE_CAPACITY,
   PATIENCE_PER_UPGRADE,
+  SOUL_REP_DRAIN_PER_SEC,
+  TIER_PAYOUT_STEP,
   clamp,
 } from '../content/balance';
 import type { CustomerDef, SkillDef } from '../types/content.types';
@@ -135,6 +138,27 @@ export function createShopModule(): GameModule {
     pullFromQueue(now);
   }
 
+  function removeActive(customerId: string, now: number): void {
+    const index = ctx.state.activeCustomers.findIndex((item) => item.id === customerId);
+    if (index >= 0) ctx.state.activeCustomers.splice(index, 1);
+    pullFromQueue(now);
+  }
+
+  function onRisk(kind: 'offer_win' | 'offer_fail' | 'golden_break' | 'transformer' | 'soul_skill', customerId: string): void {
+    const now = performance.now();
+    if (kind === 'golden_break') {
+      removeActive(customerId, now); // 黄金机碎了，顾客被抓走
+      changeReputation(-0.3);
+    } else if (kind === 'transformer') {
+      removeActive(customerId, now); // 变形金刚把店砸了，现金已清零(economy)，声誉不再叠扣
+    } else if (kind === 'offer_fail') {
+      removeActive(customerId, now); // 清空资料，顾客怒走
+      changeReputation(-0.2);
+    } else if (kind === 'offer_win') {
+      changeReputation(0.05);
+    }
+  }
+
   function settlePhone(customerId: string): void {
     const index = ctx.state.activeCustomers.findIndex((customer) => customer.id === customerId);
     if (index < 0) {
@@ -147,9 +171,11 @@ export function createShopModule(): GameModule {
     const ratio = clamp(customer.patience / Math.max(1, customer.maxPatience), 0, 1);
     const mood: Mood = ratio > 0.6 ? 'happy' : ratio > 0.3 ? 'neutral' : 'annoyed';
     const tipMult = now < ctx.state.effects.tipBoostUntil ? ctx.state.effects.tipBoostMult : 1;
+    const tierMult = 1 + (customer.phone.tier - 1) * TIER_PAYOUT_STEP; // 档次越高身价越高
+    const goldenMult = customer.phone.variant === 'golden' ? GOLDEN_PAYOUT_MULT : 1;
     const payout = Math.max(
       1,
-      Math.floor(customer.clearedBadges * 2 * speedBonus * moodMultiplier(mood) * ctx.state.derived.payoutMult * customer.basePayout * tipMult),
+      Math.floor(customer.clearedBadges * 2 * speedBonus * moodMultiplier(mood) * ctx.state.derived.payoutMult * customer.basePayout * tipMult * tierMult * goldenMult),
     );
     const xp = Math.floor(customer.clearedBadges * ctx.state.derived.xpPerBadge * tipMult);
     customer.mood = mood;
@@ -196,6 +222,7 @@ export function createShopModule(): GameModule {
       }
       ctx.bus.on('PHONE_CLEANED', (event) => settlePhone(event.customerId));
       ctx.bus.on('SCAM_INSTALLED', (event) => onScamInstalled(event.customerId));
+      ctx.bus.on('RISK_EVENT', (event) => onRisk(event.kind, event.customerId));
       ctx.bus.on('UPGRADE_PURCHASED', syncCapacities);
       ctx.bus.on('SKILL_USED', (event) => {
         const skill = skillById(ctx.content.skills, event.id);
@@ -216,6 +243,10 @@ export function createShopModule(): GameModule {
         const customer = ctx.state.activeCustomers[i];
         customer.patience -= dt * ACTIVE_PATIENCE_RATE;
         customer.mood = moodFromPatience(customer);
+        // 灵魂手机持续吞噬：缓慢拉低声誉
+        if (customer.phone.variant === 'soul') {
+          ctx.state.reputation = clamp(ctx.state.reputation - (SOUL_REP_DRAIN_PER_SEC * dt) / 1000, 0, 5);
+        }
         if (customer.patience <= 0) {
           ctx.state.activeCustomers.splice(i, 1);
           ctx.bus.emit({ type: 'CUSTOMER_LEFT', customerId: customer.id, reason: 'angry' });

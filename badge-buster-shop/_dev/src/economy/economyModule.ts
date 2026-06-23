@@ -100,6 +100,15 @@ export function createEconomyModule(): GameModule {
       ctx.bus.on('SCAM_INSTALLED', (event) => {
         ctx.state.points = Math.max(0, ctx.state.points - event.penalty);
       });
+      ctx.bus.on('RISK_EVENT', (event) => {
+        if (event.kind === 'offer_win') {
+          ctx.state.points += event.amount;
+        } else if (event.kind === 'offer_fail' || event.kind === 'golden_break') {
+          ctx.state.points = Math.max(0, ctx.state.points - event.amount); // 最低 0 元
+        } else if (event.kind === 'transformer') {
+          ctx.state.points = 0; // 破产：清空现金，保留等级/升级
+        }
+      });
       ctx.bus.on('BUY_UPGRADE', (event) => buyUpgrade(event.id));
       ctx.bus.on('REPUTATION_CHANGED', () => recalcDerived(ctx));
     },

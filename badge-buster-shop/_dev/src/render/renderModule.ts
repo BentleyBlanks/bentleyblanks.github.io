@@ -1,10 +1,12 @@
 import { MALWARE_LAG_THRESHOLD, MALWARE_MAX, upgradeCost } from '../content/balance';
 import {
   computeGameLayout,
+  defuseButtonRect,
   malwareButtonRect,
   notifBarRect,
   phoneBlockedByPopup,
   phoneLaggy,
+  popupAcceptRect,
   popupRectOf,
   type GameLayout,
   type IconLayout,
@@ -618,7 +620,7 @@ export function createRenderModule(): GameModule {
       const bodyX = scam ? rect.x + rect.w * 0.26 : rect.x + rect.w * 0.07;
       c.fillStyle = scam ? 'rgba(255, 220, 214, 0.88)' : 'rgba(43,43,51,0.66)';
       c.font = `800 ${Math.max(8, rect.h * 0.19)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-      c.fillText(popup.body, bodyX, rect.y + rect.h * 0.76, rect.x + rect.w - bodyX - rect.w * 0.05);
+      c.fillText(popup.body, bodyX, rect.y + rect.h * (popup.kind === 'offer' ? 0.56 : art?.complete ? 0.76 : 0.72), rect.x + rect.w - bodyX - rect.w * 0.05);
 
       // 关闭 ✕
       fillRound(c, rect.closeX, rect.closeY, rect.closeW, rect.closeH, Math.min(rect.closeW, rect.closeH) * 0.3, scam ? 'rgba(255,255,255,0.18)' : 'rgba(43,43,51,0.1)');
@@ -653,6 +655,17 @@ export function createRenderModule(): GameModule {
         c.font = `900 ${Math.max(8, ringR * 0.9)}px Inter, system-ui, sans-serif`;
         c.textAlign = 'center';
         c.fillText(String(Math.ceil(remain / 1000)), ringX, ringY + 0.5);
+      }
+
+      if (popup.kind === 'offer') {
+        const acc = popupAcceptRect(rect);
+        fillRound(c, acc.x, acc.y, acc.w, acc.h, acc.h * 0.4, '#26C6A6');
+        strokeRound(c, acc.x, acc.y, acc.w, acc.h, acc.h * 0.4, 'rgba(255,255,255,0.4)', 1.5);
+        c.fillStyle = '#FFFFFF';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.font = `900 ${Math.max(9, acc.h * 0.4)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+        c.fillText('🧹 帮他清理', acc.x + acc.w / 2, acc.y + acc.h / 2);
       }
       c.restore();
     }
@@ -716,6 +729,79 @@ export function createRenderModule(): GameModule {
       c.stroke();
     }
     c.restore();
+  }
+
+  function drawVariantAura(phone: PhoneLayout): void {
+    const v = phone.customer.phone.variant;
+    if (v === 'normal') return;
+    const c = ctx.ctx2d;
+    const color = v === 'golden' ? '#FFC107' : v === 'soul' ? '#8E7CF6' : '#4D96FF';
+    const pulse = (Math.sin(pulseTime * 0.006) + 1) / 2;
+    c.save();
+    c.shadowColor = color;
+    c.shadowBlur = 22 + pulse * 18;
+    strokeRound(c, phone.x - 3, phone.y - 3, phone.w + 6, phone.h + 6, phone.w * 0.14, alphaColor(color, 0.85), 3);
+    c.restore();
+  }
+
+  function drawVariantTag(phone: PhoneLayout): void {
+    const v = phone.customer.phone.variant;
+    if (v === 'normal') return;
+    const c = ctx.ctx2d;
+    const label = v === 'golden' ? '👑 黄金机·高价易碎' : v === 'soul' ? '👻 灵魂机·掉声誉' : '⚡ 魔方感染·会变形';
+    const color = v === 'golden' ? '#B8860B' : v === 'soul' ? '#6A4FB3' : '#2E6FD6';
+    c.save();
+    c.font = `900 ${Math.max(9, phone.w * 0.044)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    const tw = c.measureText(label).width + 14;
+    const tx = phone.x + (phone.w - tw) / 2;
+    const ty = phone.y - 32;
+    fillRound(c, tx, ty, tw, 18, 9, color);
+    c.fillStyle = '#FFFFFF';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(label, tx + tw / 2, ty + 9);
+    c.restore();
+  }
+
+  function drawCosmic(phone: PhoneLayout): void {
+    const runtime = phone.customer.phone;
+    if (runtime.variant !== 'cosmic' || !Number.isFinite(runtime.transformMs)) return;
+    const c = ctx.ctx2d;
+    c.save();
+    roundedRect(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, phone.w * 0.06);
+    c.clip();
+    c.fillStyle = 'rgba(30, 60, 140, 0.34)';
+    c.fillRect(phone.screenX, phone.screenY, phone.screenW, phone.screenH);
+    c.strokeStyle = `rgba(140, 190, 255, ${0.4 + 0.3 * ((Math.sin(pulseTime * 0.02) + 1) / 2)})`;
+    c.lineWidth = 2;
+    for (let i = 0; i < 4; i += 1) {
+      c.beginPath();
+      const yy = phone.screenY + ((i + 1) / 5) * phone.screenH + Math.sin(pulseTime * 0.03 + i) * 6;
+      c.moveTo(phone.screenX, yy);
+      for (let xx = phone.screenX; xx < phone.screenX + phone.screenW; xx += 12) {
+        c.lineTo(xx, yy + Math.sin(xx * 0.3 + pulseTime * 0.04 + i) * 8);
+      }
+      c.stroke();
+    }
+    c.restore();
+    const remain = Math.max(0, runtime.transformMs);
+    c.save();
+    c.fillStyle = '#DCE9FF';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `900 ${Math.max(10, phone.w * 0.046)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.fillText('⚡ 宇宙魔方充能', phone.screenX + phone.screenW / 2, phone.screenY + phone.screenH * 0.24);
+    c.font = `1000 ${Math.max(16, phone.w * 0.09)}px Inter, system-ui, sans-serif`;
+    c.fillText(`${Math.ceil(remain / 1000)}s`, phone.screenX + phone.screenW / 2, phone.screenY + phone.screenH * 0.33);
+    c.restore();
+    const btn = defuseButtonRect(phone);
+    fillRound(c, btn.x, btn.y, btn.w, btn.h, btn.h * 0.3, '#FF3B30');
+    strokeRound(c, btn.x, btn.y, btn.w, btn.h, btn.h * 0.3, 'rgba(255,255,255,0.4)', 1.5);
+    c.fillStyle = '#FFFFFF';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `900 ${Math.max(9, btn.h * 0.4)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.fillText('🔌 拔电源拆除', btn.x + btn.w / 2, btn.y + btn.h / 2);
   }
 
   function drawNotifBar(phone: PhoneLayout): void {
@@ -925,6 +1011,7 @@ export function createRenderModule(): GameModule {
     body.addColorStop(0.55, skin.bodyTop);
     body.addColorStop(1, skin.bodyBottom);
     drawPhoneStation(phone, skin);
+    drawVariantAura(phone);
     c.save();
     c.shadowColor = 'rgba(43, 43, 51, 0.24)';
     c.shadowBlur = 24;
@@ -940,6 +1027,7 @@ export function createRenderModule(): GameModule {
     c.textAlign = 'center';
     c.textBaseline = 'alphabetic';
     c.fillText(customerDef?.name ?? '顾客', phone.x + phone.w / 2, phone.y - 11);
+    drawVariantTag(phone);
 
     for (const icon of phone.icons) {
       drawIcon(icon, skin);
@@ -947,6 +1035,7 @@ export function createRenderModule(): GameModule {
     drawNotifBar(phone);
     if (phoneBlockedByPopup(phone)) drawBlockedScreenDim(phone);
     if (phoneLaggy(phone)) drawLagOverlay(phone);
+    if (phone.customer.phone.variant === 'cosmic') drawCosmic(phone);
     drawMalware(phone);
     drawPopups(phone); // 遮挡弹窗在最上层
 
@@ -1726,6 +1815,42 @@ export function createRenderModule(): GameModule {
         effects.push({ kind: 'task', x: event.x, y: event.y, age: 0, ttl: 560, label: `-${Math.round(event.amount)} 病毒`, color: '#26C6A6', power: 1 });
         spawnBurst(event.x, event.y, '#26C6A6', 14, 1);
         addShake(60, 1);
+      });
+      ctx.bus.on('RISK_EVENT', (event) => {
+        const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+        const phone = layout.phoneLayouts.find((p) => p.customer.id === event.customerId);
+        let x = event.x;
+        let y = event.y;
+        if (!x && !y) {
+          if (phone) { x = phone.x + phone.w / 2; y = phone.y + phone.h / 2; }
+          else { x = ctx.canvas.clientWidth / 2; y = ctx.canvas.clientHeight * 0.4; }
+        }
+        if (event.kind === 'transformer') {
+          x = ctx.canvas.clientWidth / 2;
+          y = ctx.canvas.clientHeight * 0.42;
+          effects.push({ kind: 'smash', x, y, age: 0, ttl: 1500, label: event.label, color: '#FF3B30', power: 2.6 });
+          spawnBurst(x, y, '#FF3B30', 80, 2.6);
+          spawnBurst(x, y, '#2B2B33', 60, 2.2);
+          skillFlash = 1100;
+          addShake(1200, 17);
+        } else if (event.kind === 'golden_break') {
+          effects.push({ kind: 'smash', x, y, age: 0, ttl: 1000, label: event.label, color: '#FFB200', power: 1.9 });
+          spawnBurst(x, y, '#FFD166', 52, 1.9);
+          spawnBurst(x, y, '#B8860B', 30, 1.5);
+          addShake(640, 8.5);
+        } else if (event.kind === 'soul_skill') {
+          effects.push({ kind: 'skill', x, y, age: 0, ttl: 1200, label: event.label, color: '#8E7CF6', power: 1.8 });
+          spawnBurst(x, y, '#8E7CF6', 54, 1.8);
+          spawnBurst(x, y, '#C7B3FF', 30, 1.3);
+          skillFlash = 760;
+        } else if (event.kind === 'offer_win') {
+          effects.push({ kind: 'return', x, y, age: 0, ttl: 950, label: event.label, color: '#26C6A6', power: 1.4 });
+          spawnBurst(x, y, '#26C6A6', 30, 1.3);
+        } else {
+          effects.push({ kind: 'smash', x, y, age: 0, ttl: 950, label: event.label, color: '#FF3B30', power: 1.4 });
+          spawnBurst(x, y, '#FF3B30', 28, 1.5);
+          addShake(340, 5);
+        }
       });
       ctx.bus.on('SCAM_INSTALLED', (event) => {
         const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);

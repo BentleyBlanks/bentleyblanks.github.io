@@ -1,3 +1,4 @@
+import { SOUL_SKILL_CHANCE } from '../content/balance';
 import { computeGameLayout } from '../shared/layout';
 import type { SkillDef } from '../types/content.types';
 import type { GameContext, GameModule } from '../types/module.types';
@@ -108,6 +109,19 @@ export function createSkillsModule(): GameModule {
     ctx.bus.emit({ type: 'SKILL_USED', id });
   }
 
+  // 灵魂手机归还时，有概率白嫖一个尚未解锁的极品技能
+  function onSoulPhoneCleaned(customerId: string): void {
+    const customer = ctx.state.activeCustomers.find((c) => c.id === customerId);
+    if (!customer || customer.phone.variant !== 'soul') return;
+    if (Math.random() >= SOUL_SKILL_CHANCE) return;
+    const locked = ctx.content.skills.filter((s) => !ctx.state.skills[s.id]?.unlocked);
+    if (locked.length === 0) return;
+    const granted = locked[Math.floor(Math.random() * locked.length)];
+    ctx.state.skills[granted.id] = { unlocked: true, lastUsedAt: -Infinity };
+    ctx.bus.emit({ type: 'SKILL_UNLOCKED', id: granted.id });
+    ctx.bus.emit({ type: 'RISK_EVENT', customerId, kind: 'soul_skill', amount: 0, label: `极品技能！${granted.name}`, x: 0, y: 0 });
+  }
+
   return {
     name: 'skills',
     init(context) {
@@ -115,6 +129,7 @@ export function createSkillsModule(): GameModule {
       ensureSkillRecords();
       ctx.bus.on('LEVEL_UP', ensureSkillRecords);
       ctx.bus.on('USE_SKILL', (event) => useSkill(event.id));
+      ctx.bus.on('PHONE_CLEANED', (event) => onSoulPhoneCleaned(event.customerId));
     },
     update() {
       const now = performance.now();

@@ -1,6 +1,25 @@
-import { GRID_COLS, GRID_ROWS, randomRangeInt } from '../content/balance';
+import {
+  COSMIC_CHANCE,
+  COSMIC_MAX_LEVEL,
+  COSMIC_TRANSFORM_MS,
+  GOLDEN_CHANCE,
+  GOLDEN_UNLOCK_LEVEL,
+  GRID_COLS,
+  GRID_ROWS,
+  SOUL_CHANCE,
+  SOUL_UNLOCK_LEVEL,
+  phoneTier,
+  randomRangeInt,
+} from '../content/balance';
 import type { AppIconDef, CustomerDef } from '../types/content.types';
-import type { PhoneRuntime, PhoneSystemRuntime } from '../types/state.types';
+import type { PhoneRuntime, PhoneSystemRuntime, PhoneVariant } from '../types/state.types';
+
+function rollVariant(level: number): PhoneVariant {
+  if (level <= COSMIC_MAX_LEVEL && Math.random() < COSMIC_CHANCE) return 'cosmic';
+  if (level >= GOLDEN_UNLOCK_LEVEL && Math.random() < GOLDEN_CHANCE) return 'golden';
+  if (level >= SOUL_UNLOCK_LEVEL && Math.random() < SOUL_CHANCE) return 'soul';
+  return 'normal';
+}
 
 function weightedIcon(iconDefs: AppIconDef[]): AppIconDef {
   const total = iconDefs.reduce((sum, icon) => sum + icon.spawnWeight, 0);
@@ -50,9 +69,14 @@ export function createPhone(customerId: string, customerDef: CustomerDef, iconDe
   }
 
   const badgeTotal = icons.reduce((sum, icon) => sum + icon.badge, 0);
+  const variant = rollVariant(level);
   return {
     id: `${customerId}_phone`,
     system,
+    tier: phoneTier(level),
+    variant,
+    transformMs: variant === 'cosmic' ? COSMIC_TRANSFORM_MS : Number.POSITIVE_INFINITY,
+    offerAccumulatorMs: -randomRangeInt(3_000, 9_000),
     icons,
     gridCols: GRID_COLS,
     gridRows: GRID_ROWS,

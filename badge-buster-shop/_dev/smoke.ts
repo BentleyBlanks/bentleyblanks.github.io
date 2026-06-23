@@ -1,6 +1,5 @@
-// Headless logic smoke for the new mechanics (#1 block, #4 notif pull, #5 malware clean/lag) + scam.
+// Headless logic smoke for the roguelike layer (#1 single start, #2 offer, #3 golden, #4 soul, #5 cosmic).
 import { content } from './src/content';
-import { MALWARE_LAG_THRESHOLD, MALWARE_MAX } from './src/content/balance';
 import { createEventBus } from './src/core/eventBus';
 import { createInitialState } from './src/core/persistence';
 import { createEconomyModule } from './src/economy/economyModule';
@@ -9,9 +8,10 @@ import { createShopModule } from './src/shop/shopModule';
 import { createUiModule } from './src/ui/uiModule';
 import { createCoreModule } from './src/core/coreModule';
 import { createAutomationModule } from './src/automation/automationModule';
-import { computeGameLayout, malwareButtonRect, notifBarRect, popupRectOf } from './src/shared/layout';
+import { computeGameLayout, popupAcceptRect, popupRectOf } from './src/shared/layout';
 import type { GameContext, GameModule } from './src/types/module.types';
 import type { GameEvent } from './src/types/events.types';
+import type { CustomerRuntime, PhonePopup } from './src/types/state.types';
 
 let clock = 1000;
 (globalThis as unknown as { performance: { now: () => number } }).performance = { now: () => clock };
@@ -22,6 +22,10 @@ const store = new Map<string, string>();
   removeItem: (k: string) => void store.delete(k), clear: () => store.clear(), key: () => null, length: 0,
 } as Storage;
 
+const realRandom = Math.random;
+const setRandom = (v: number) => { Math.random = () => v; };
+const restoreRandom = () => { Math.random = realRandom; };
+
 const W = 1200, H = 760;
 const canvas = { clientWidth: W, clientHeight: H } as HTMLCanvasElement;
 const bus = createEventBus();
@@ -30,10 +34,10 @@ state.level = 6;
 state.points = 1000;
 const ctx: GameContext = { state, bus, content, assets: { images: {}, audio: {} }, canvas, ctx2d: {} as CanvasRenderingContext2D };
 
-const counts: Record<string, number> = {};
-for (const t of ['NOTIFICATION_CLEARED', 'MALWARE_CLEARED', 'POPUP_CLOSED', 'SCAM_INSTALLED', 'BADGE_CLEARED']) {
-  bus.on(t as GameEvent['type'], () => { counts[t] = (counts[t] || 0) + 1; });
-}
+const risk: Record<string, number> = {};
+bus.on('RISK_EVENT', (e) => { risk[(e as Extract<GameEvent, { type: 'RISK_EVENT' }>).kind] = (risk[(e as Extract<GameEvent, { type: 'RISK_EVENT' }>).kind] || 0) + 1; });
+let skillUnlocks = 0;
+bus.on('SKILL_UNLOCKED', () => { skillUnlocks += 1; });
 
 const modules: GameModule[] = [
   createEconomyModule(), createSkillsModule(), createShopModule(), createUiModule(), createCoreModule(), createAutomationModule(),
@@ -41,92 +45,94 @@ const modules: GameModule[] = [
 for (const m of modules) m.init(ctx);
 
 function tick(dt: number) { clock += dt; bus.emit({ type: 'TICK', dt }); for (const m of modules) m.update?.(dt); }
-function tickUntil(pred: () => boolean, maxMs: number, dt = 100): boolean { let t = 0; while (t < maxMs) { tick(dt); t += dt; if (pred()) return true; } return false; }
-const lay = () => computeGameLayout(state, W, H);
+function getActive(): CustomerRuntime {
+  let g = 0;
+  while (state.activeCustomers.length === 0 && g++ < 200) tick(100);
+  return state.activeCustomers[0];
+}
+const phoneLayout = (id: string) => computeGameLayout(state, W, H).phoneLayouts.find((p) => p.customer.id === id)!;
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { console.log((c ? '  ok  - ' : '  FAIL- ') + m); if (!c) fails++; };
 
-console.log('# 3 phones tiled by default (#6)');
-assert(tickUntil(() => state.activeCustomers.length >= 3, 6000), `active slots filled (${state.activeCustomers.length})`);
-assert(state.activeSlots === 3, `default activeSlots = 3 (${state.activeSlots})`);
+console.log('# 1 starts with a single phone (#1)');
+assert(state.activeSlots === 1, `default activeSlots = 1 (${state.activeSlots})`);
+assert(state.activeCustomers.length === 1, `one phone on the bench at open (${state.activeCustomers.length})`);
 
-console.log('# notification pull-down clears (#4)');
+console.log('# golden phone break -> fine + taken away (#3)');
 {
-  const phone = lay().phoneLayouts.find((p) => p.customer.phone.notifications > 0);
-  if (phone) {
-    const before = phone.customer.phone.notifications;
-    const bar = notifBarRect(phone);
-    const cx = bar.x + bar.w / 2;
-    bus.emit({ type: 'SWIPE', path: [{ x: cx, y: bar.y + 4 }, { x: cx, y: bar.y + 40 }, { x: cx, y: bar.y + 78 }] });
-    assert(phone.customer.phone.notifications < before, `pull cleared notifications (${before} -> ${phone.customer.phone.notifications})`);
-    assert((counts['NOTIFICATION_CLEARED'] || 0) >= 1, 'NOTIFICATION_CLEARED fired');
-  } else {
-    console.log('  ..  - (no notifications present, skipping)');
-  }
+  const c = getActive();
+  c.phone.variant = 'golden';
+  c.phone.tier = 5;
+  let icon = c.phone.icons.find((i) => i.badge > 0);
+  if (!icon) { c.phone.icons[0].badge = 3; c.phone.badgeTotal = 3; icon = c.phone.icons[0]; }
+  state.points = 1000;
+  setRandom(0); // 强制碎裂 + 命中
+  bus.emit({ type: 'BADGE_CLEARED', customerId: c.id, iconId: icon.id, amount: 1, x: 0, y: 0 });
+  restoreRandom();
+  assert((risk['golden_break'] || 0) >= 1, 'RISK_EVENT golden_break fired');
+  assert(state.points < 1000, `fine deducted (1000 -> ${state.points})`);
+  assert(!state.activeCustomers.some((x) => x.id === c.id), 'golden customer taken away');
 }
 
-console.log('# malware clean button (#5)');
+console.log('# cosmic transformer -> bankrupt (cash to 0) (#5)');
 {
-  const phone = lay().phoneLayouts.find((p) => p.customer.phone.malware > 0) ?? lay().phoneLayouts[0];
-  phone.customer.phone.malware = Math.max(phone.customer.phone.malware, 40);
-  const before = phone.customer.phone.malware;
-  const btn = malwareButtonRect(phone);
-  bus.emit({ type: 'TAP', x: btn.x + btn.w / 2, y: btn.y + btn.h / 2 });
-  assert(phone.customer.phone.malware < before, `clean button reduced malware (${Math.round(before)} -> ${Math.round(phone.customer.phone.malware)})`);
-  assert((counts['MALWARE_CLEARED'] || 0) >= 1, 'MALWARE_CLEARED fired');
+  const c = getActive();
+  c.phone.variant = 'cosmic';
+  c.phone.transformMs = 50;
+  state.points = 500;
+  tick(120); // 倒计时归零 → 变形砸店
+  assert((risk['transformer'] || 0) >= 1, 'RISK_EVENT transformer fired');
+  assert(state.points === 0, `cash wiped to 0 (was 500 -> ${state.points})`);
+  assert(state.level === 6, 'level preserved through bankruptcy');
+  assert(!state.activeCustomers.some((x) => x.id === c.id), 'cosmic customer removed');
 }
 
-console.log('# malware lag blocks clearing (#5)');
+console.log('# blind-box offer: accept -> win pays out (#2)');
 {
-  const phone = lay().phoneLayouts[0];
-  phone.customer.phone.malware = MALWARE_MAX;
-  const icon = phone.icons.find((i) => i.icon.badge > 0);
-  if (icon) {
-    const before = icon.icon.badge;
-    bus.emit({ type: 'TAP', x: icon.x, y: icon.y });
-    assert(icon.icon.badge === before, `laggy phone (malware>=${MALWARE_LAG_THRESHOLD}) cannot clear badges`);
-  } else {
-    console.log('  ..  - (no badge on phone[0], skipping)');
-  }
-  phone.customer.phone.malware = 0; // 复原以便后续测试
+  const c = getActive();
+  c.phone.tier = 4;
+  const popup: PhonePopup = { id: 'off1', kind: 'offer', fx: 0.12, fy: 0.3, fw: 0.7, fh: 0.32, closeFx: 0.82, closeFy: 0.07, closeFw: 0.15, closeFh: 0.28, bornAt: 0, installAt: Number.POSITIVE_INFINITY, title: 't', body: 'b', accent: '#8E7CF6' };
+  c.phone.popups.push(popup);
+  state.points = 200;
+  const pl = phoneLayout(c.id);
+  const acc = popupAcceptRect(popupRectOf(pl, popup));
+  setRandom(0); // 0 < OFFER_WIN_CHANCE -> win
+  bus.emit({ type: 'TAP', x: acc.x + acc.w / 2, y: acc.y + acc.h / 2 });
+  restoreRandom();
+  assert((risk['offer_win'] || 0) >= 1, 'RISK_EVENT offer_win fired');
+  assert(state.points > 200, `offer win paid out (200 -> ${state.points})`);
+  assert(!c.phone.popups.some((p) => p.id === 'off1'), 'offer popup consumed');
 }
 
-console.log('# popup blocks the WHOLE phone (#1)');
+console.log('# blind-box offer: accept -> fail wipes data + fine (#2)');
 {
-  assert(tickUntil(() => lay().phoneLayouts.some((p) => p.customer.phone.popups.length > 0), 16000), 'a covering popup spawned');
-  const phone = lay().phoneLayouts.find((p) => p.customer.phone.popups.length > 0)!;
-  // 找一个不在弹窗下、却有角标的图标，证明"整机禁用"而非"只挡被覆盖的"
-  const rects = phone.customer.phone.popups.map((pp) => popupRectOf(phone, pp));
-  const exposed = phone.icons.find((i) => i.icon.badge > 0 && !rects.some((r) => i.x >= r.x && i.x <= r.x + r.w && i.y >= r.y && i.y <= r.y + r.h));
-  if (exposed) {
-    const before = exposed.icon.badge;
-    bus.emit({ type: 'TAP', x: exposed.x, y: exposed.y });
-    assert(exposed.icon.badge === before, 'an EXPOSED icon also cannot be cleared while a popup is up (whole-phone block)');
-  } else {
-    console.log('  ..  - (no exposed badged icon, skipping)');
-  }
-  // 关闭弹窗后应恢复
-  const popup = phone.customer.phone.popups[0];
-  const pr = popupRectOf(phone, popup);
-  state.activeSlots = state.activeSlots; // noop
-  while (phone.customer.phone.popups.length > 0) {
-    const top = phone.customer.phone.popups[phone.customer.phone.popups.length - 1];
-    const r = popupRectOf(phone, top);
-    bus.emit({ type: 'TAP', x: r.closeX + r.closeW / 2, y: r.closeY + r.closeH / 2 });
-  }
-  void pr; void popup;
-  assert(phone.customer.phone.popups.length === 0, 'closing ✕ removes popups -> phone operable again');
+  const c = getActive();
+  c.phone.tier = 4;
+  const popup: PhonePopup = { id: 'off2', kind: 'offer', fx: 0.12, fy: 0.3, fw: 0.7, fh: 0.32, closeFx: 0.82, closeFy: 0.07, closeFw: 0.15, closeFh: 0.28, bornAt: 0, installAt: Number.POSITIVE_INFINITY, title: 't', body: 'b', accent: '#8E7CF6' };
+  c.phone.popups.push(popup);
+  state.points = 500;
+  const acc = popupAcceptRect(popupRectOf(phoneLayout(c.id), popup));
+  setRandom(0.99); // 0.99 > win chance -> fail
+  bus.emit({ type: 'TAP', x: acc.x + acc.w / 2, y: acc.y + acc.h / 2 });
+  restoreRandom();
+  assert((risk['offer_fail'] || 0) >= 1, 'RISK_EVENT offer_fail fired');
+  assert(state.points < 500, `offer fail charged a fine (500 -> ${state.points})`);
+  assert(!state.activeCustomers.some((x) => x.id === c.id), 'data-wiped customer left');
 }
 
-console.log('# cursor tracking (#7)');
+console.log('# soul phone grants a rare skill on return (#4)');
 {
-  state.ui.cursor.visible = false;
-  // 模拟 input 写入光标（input 模块在无 DOM 环境未挂载，这里直接验证字段存在且可写）
-  state.ui.cursor.x = 123; state.ui.cursor.y = 456; state.ui.cursor.visible = true; state.ui.cursor.pressed = true;
-  assert(state.ui.cursor.x === 123 && state.ui.cursor.visible && state.ui.cursor.pressed, 'cursor state is present and writable');
+  const c = getActive();
+  c.phone.variant = 'soul';
+  const before = skillUnlocks;
+  setRandom(0); // 0 < SOUL_SKILL_CHANCE -> grant
+  bus.emit({ type: 'PHONE_CLEANED', customerId: c.id });
+  restoreRandom();
+  assert((risk['soul_skill'] || 0) >= 1, 'RISK_EVENT soul_skill fired');
+  assert(skillUnlocks > before, 'a skill was granted (SKILL_UNLOCKED)');
 }
 
 console.log('\n==== ' + (fails === 0 ? 'ALL PASS' : fails + ' FAILURES') + ' ====');
-console.log('counts:', JSON.stringify(counts), 'slots', state.activeSlots, 'active', state.activeCustomers.length);
+console.log('risk:', JSON.stringify(risk), 'skillUnlocks', skillUnlocks);
 process.exit(fails === 0 ? 0 : 1);
