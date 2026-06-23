@@ -1,0 +1,58 @@
+import type { SkillDef } from '../types/content.types';
+
+export const skills: SkillDef[] = [
+  {
+    id: 'skill_clearphone',
+    name: 'Clean Sweep',
+    desc: 'Instantly clear the current phone.',
+    artId: 'skill_clearphone',
+    unlockLevel: 5,
+    cooldownMs: 25_000,
+    effect: { kind: 'clearActivePhone' },
+  },
+  {
+    id: 'skill_freeze',
+    name: 'Signal Freeze',
+    desc: 'Stop incoming badges for twelve seconds.',
+    artId: 'skill_freeze',
+    unlockLevel: 8,
+    cooldownMs: 60_000,
+    effect: { kind: 'freezeIncoming', durationMs: 12_000 },
+  },
+  {
+    id: 'skill_soothe',
+    name: 'Calm Counter',
+    desc: 'Restore patience for the whole queue.',
+    artId: 'skill_soothe',
+    unlockLevel: 10,
+    cooldownMs: 45_000,
+    effect: { kind: 'sootheQueue' },
+  },
+  {
+    id: 'skill_hands',
+    name: 'Extra Hands',
+    desc: 'Temporary helpers clear extra badges.',
+    artId: 'skill_hands',
+    unlockLevel: 12,
+    cooldownMs: 90_000,
+    effect: { kind: 'extraHands', hands: 2, durationMs: 15_000 },
+  },
+  {
+    id: 'skill_tip',
+    name: 'Tip Rush',
+    desc: 'Double payout and XP briefly.',
+    artId: 'skill_tip',
+    unlockLevel: 15,
+    cooldownMs: 120_000,
+    effect: { kind: 'tipBoost', mult: 2, durationMs: 20_000 },
+  },
+  {
+    id: 'skill_magnet',
+    name: 'Badge Magnet',
+    desc: 'Taps pull in nearby badge bubbles.',
+    artId: 'skill_magnet',
+    unlockLevel: 18,
+    cooldownMs: 60_000,
+    effect: { kind: 'magnet', durationMs: 10_000 },
+  },
+];
