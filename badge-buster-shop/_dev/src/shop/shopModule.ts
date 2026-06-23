@@ -152,12 +152,12 @@ export function createShopModule(): GameModule {
     }
     if (kind === 'golden_break') {
       removeActive(customerId, now); // 黄金机碎了，顾客被抓走
-      changeReputation(-0.3);
+      changeReputation(-0.1); // 声誉解耦：罚款已不碰本金，声誉惩罚减轻，避免二阶复利
     } else if (kind === 'transformer') {
-      removeActive(customerId, now); // 变形金刚把店砸了，现金已清零(economy)，声誉不再叠扣
+      removeActive(customerId, now); // 变形金刚跑单：现金不再清零(economy·本金永不倒退)，仅损失此台
     } else if (kind === 'offer_fail') {
       removeActive(customerId, now); // 清空资料，顾客怒走
-      changeReputation(-0.2);
+      changeReputation(-0.08);
     } else if (kind === 'offer_win') {
       changeReputation(0.05);
     }
@@ -181,7 +181,8 @@ export function createShopModule(): GameModule {
       1,
       Math.floor(customer.clearedBadges * 2 * speedBonus * moodMultiplier(mood) * ctx.state.derived.payoutMult * customer.basePayout * tipMult * tierMult * goldenMult),
     );
-    const xp = Math.floor(customer.clearedBadges * ctx.state.derived.xpPerBadge * tipMult);
+    // 交付奖金 XP：逐击清角标已即时给过 XP，这里是"交付一次性奖金"（约逐击的 ~40%，按满意度加成），避免与逐击双计
+    const xp = Math.floor(customer.clearedBadges * ctx.state.derived.xpPerBadge * tipMult * 0.4 * moodMultiplier(mood));
     customer.mood = mood;
     ctx.state.activeCustomers.splice(index, 1);
     ctx.bus.emit({ type: 'PHONE_RETURNED', customerId, payout, xp, mood });
@@ -204,7 +205,7 @@ export function createShopModule(): GameModule {
     }
     customer.patience -= customer.maxPatience * 0.28;
     customer.mood = moodFromPatience(customer);
-    changeReputation(-0.15);
+    changeReputation(-0.05); // 声誉解耦：诈骗惩罚减轻，避免"扣钱+压收入倍率"双重打击
     if (customer.patience <= 0) {
       leaveActiveAngry(customer, now);
     }

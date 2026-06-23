@@ -90,6 +90,7 @@ export interface GameState {
   xp: number;
   xpToNext: number;
   points: number;
+  bankedFloor: number; // 已入账本金保底线（现金峰值的 60%）：罚款永不把现金压到此线以下
   totalCleared: number;
 
   activeCustomers: CustomerRuntime[];

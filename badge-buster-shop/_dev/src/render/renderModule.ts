@@ -1725,6 +1725,9 @@ export function createRenderModule(): GameModule {
       });
       ctx.bus.on('PHONE_RETURNED', (event) => {
         effects.push({ kind: 'return', x: ctx.canvas.clientWidth / 2, y: 130, age: 0, ttl: 950, label: `+${event.payout}元`, color: '#26C6A6', power: 1.2 });
+        if (event.xp > 0) {
+          effects.push({ kind: 'return', x: ctx.canvas.clientWidth / 2, y: 168, age: 0, ttl: 950, label: `+${event.xp} 经验`, color: '#5B8DEF', power: 1 });
+        }
         spawnBurst(ctx.canvas.clientWidth / 2, 136, '#26C6A6', 28, 1.2);
         addShake(220, 2.4);
       });

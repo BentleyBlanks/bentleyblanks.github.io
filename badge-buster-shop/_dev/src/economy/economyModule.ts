@@ -35,7 +35,7 @@ export function recalcDerived(ctx: GameContext): void {
 
   ctx.state.derived.clearPerHit = 1 + clearLevel;
   ctx.state.derived.xpPerBadge = Math.pow(1.12, valueLevel);
-  ctx.state.derived.payoutMult = Math.pow(1.18, payoutLevel) * clamp(repMult, 0.55, 1.35);
+  ctx.state.derived.payoutMult = Math.pow(1.18, payoutLevel) * clamp(repMult, 0.8, 1.35);
   ctx.state.derived.swipeEnabled = swipeLevel > 0;
   ctx.state.derived.botCount = botCountLevel;
   ctx.state.derived.botRatePerSec = botCountLevel * 0.5 * Math.pow(1.18, botSpeedLevel);
@@ -54,6 +54,19 @@ export function recalcDerived(ctx: GameContext): void {
 
 export function createEconomyModule(): GameModule {
   let ctx: GameContext;
+
+  // 收入入账：抬高 bankedFloor（已入账本金保底线 = 现金峰值的 60%）
+  function bankIncome(delta: number): void {
+    ctx.state.points += delta;
+    ctx.state.bankedFloor = Math.max(ctx.state.bankedFloor, Math.floor(ctx.state.points * 0.6));
+  }
+
+  // 罚款：单次 ≤ 当前现金 10%，且永不把现金压到 bankedFloor 以下（本金永不倒退）
+  function applyFine(rawAmount: number): void {
+    const amount = Math.min(rawAmount, ctx.state.points * 0.1);
+    const floorNow = Math.min(ctx.state.bankedFloor, ctx.state.points);
+    ctx.state.points = Math.max(floorNow, ctx.state.points - amount);
+  }
 
   function handleXp(amount: number): void {
     ctx.state.xp += amount;
@@ -99,19 +112,21 @@ export function createEconomyModule(): GameModule {
       recalcDerived(ctx);
       ctx.bus.on('XP_GAINED', (event) => handleXp(event.amount));
       ctx.bus.on('PHONE_RETURNED', (event) => {
-        ctx.state.points += event.payout;
+        bankIncome(event.payout);
+        if (event.xp > 0) {
+          handleXp(event.xp); // 交付奖金 XP（此前为死值，从未入账）→ 走升级/recalc 同一路径
+        }
       });
       ctx.bus.on('SCAM_INSTALLED', (event) => {
-        ctx.state.points = Math.max(0, ctx.state.points - event.penalty);
+        applyFine(event.penalty);
       });
       ctx.bus.on('RISK_EVENT', (event) => {
         if (event.kind === 'offer_win') {
-          ctx.state.points += event.amount;
+          bankIncome(event.amount);
         } else if (event.kind === 'offer_fail' || event.kind === 'golden_break' || event.kind === 'bait_fail') {
-          ctx.state.points = Math.max(0, ctx.state.points - event.amount); // 最低 0 元
-        } else if (event.kind === 'transformer') {
-          ctx.state.points = 0; // 破产：清空现金，保留等级/升级
+          applyFine(event.amount); // 罚款封顶 + 不碰本金（banked-floor）
         }
+        // transformer 不再清空本金（爽游基准·本金永不倒退）：仅损失当前在修手机——顾客离店见 shopModule.onRisk
       });
       ctx.bus.on('BUY_UPGRADE', (event) => buyUpgrade(event.id));
       ctx.bus.on('REPUTATION_CHANGED', () => recalcDerived(ctx));

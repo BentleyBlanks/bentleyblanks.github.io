@@ -9,7 +9,7 @@ export const skills: SkillDef[] = [
     desc: '立刻清空当前手机的所有角标。',
     artId: 'skill_clearphone',
     icon: '🧼',
-    unlockLevel: 5,
+    unlockLevel: 3,
     cooldownMs: 25_000,
     effect: { kind: 'clearActivePhone' },
   },

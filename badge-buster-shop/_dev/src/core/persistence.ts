@@ -7,6 +7,7 @@ export function createInitialState(now = performance.now()): GameState {
     xp: 0,
     xpToNext: xpToNextLevel(1),
     points: 0,
+    bankedFloor: 0,
     totalCleared: 0,
     activeCustomers: [],
     queue: [],
@@ -81,6 +82,7 @@ export function loadState(): GameState | null {
       return null;
     }
     const fresh = createInitialState();
+    parsed.bankedFloor = parsed.bankedFloor ?? Math.floor((parsed.points ?? 0) * 0.6); // 旧存档：按当前现金给出保底线
     parsed.lastTickAt = performance.now();
     parsed.nextArrivalAt = Math.min(parsed.nextArrivalAt || performance.now() + 1000, performance.now() + 4000);
     parsed.activeCustomers = parsed.activeCustomers ?? [];

@@ -439,7 +439,7 @@ export function createCoreModule(): GameModule {
         if (phone.transformMs <= 0) {
           phone.transformMs = Number.POSITIVE_INFINITY;
           phone.cleaned = true;
-          ctx.bus.emit({ type: 'RISK_EVENT', customerId: customer.id, kind: 'transformer', amount: ctx.state.points, label: '变形金刚砸店 破产!', x: 0, y: 0 });
+          ctx.bus.emit({ type: 'RISK_EVENT', customerId: customer.id, kind: 'transformer', amount: 0, label: '魔方变形 顾客跑单!', x: 0, y: 0 });
         }
       }
 

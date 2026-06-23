@@ -19,7 +19,7 @@ export const AD_POPUP_BASE_INTERVAL_MS = 6_400;
 export const SCAM_POPUP_BASE_INTERVAL_MS = 16_000;
 export const SCAM_GRACE_BASE_MS = 6_000;
 export const MAX_POPUPS_PER_PHONE = 3;
-export const SCAM_UNLOCK_LEVEL = 3;
+export const SCAM_UNLOCK_LEVEL = 7;
 
 /** 顶部通知栏广告 */
 export const NOTIF_BASE_INTERVAL_MS = 5_200;
@@ -30,10 +30,10 @@ export const MALWARE_GAIN_INTERVAL_MS = 1_500;
 export const MALWARE_PROMPT_THRESHOLD = 60; // ≥ 此值才弹出"清理后台"按钮（低于不打扰）
 export const MALWARE_LAG_THRESHOLD = 78; // ≥ 此值手机卡死，无法清角标
 export const MALWARE_MAX = 100;
-export const MALWARE_UNLOCK_LEVEL = 2;
+export const MALWARE_UNLOCK_LEVEL = 5;
 
-/** 滑动连清是后期才解锁的进阶手法 */
-export const SWIPE_UNLOCK_LEVEL = 12;
+/** 滑动连清：前期爽感放大器，提前解锁（爽游基准·爽前置） */
+export const SWIPE_UNLOCK_LEVEL = 4;
 
 /** 升级解锁等级（分层级阶段：到等级才能买）。基础项 1 级即可，进阶项更晚。 */
 export function upgradeUnlockLevel(id: string): number {
@@ -52,15 +52,15 @@ export function shopRankName(level: number): string {
 /** 烦人弹窗扩展 */
 export const TIMED_CLOSE_MS = 4_200; // "X 秒后才能关闭"的等待
 
-/** 会动的弹窗（更恶心）：躲避光标 / 泡泡乱滚。与诈骗(3)同期登场，玩家早点尝到苦头。 */
-export const POPUP_MOTION_UNLOCK_LEVEL = 3;
-export const POPUP_DODGE_CHANCE = 0.22;
-export const POPUP_BUBBLE_CHANCE = 0.16;
+/** 会动的弹窗（更恶心）：躲避光标 / 泡泡乱滚。爽游基准：后置到纯爽期之后（≥L10）、并降低出现率。 */
+export const POPUP_MOTION_UNLOCK_LEVEL = 10;
+export const POPUP_DODGE_CHANCE = 0.1;
+export const POPUP_BUBBLE_CHANCE = 0.06;
 export const POPUP_BUBBLE_SPEED = 0.26; // 屏幕比例/秒（要明显"滚来滚去"又不至于点不到）
 export const POPUP_DODGE_RADIUS = 66; // px：光标进入即逃
 export const POPUP_DODGE_STEP = 0.2; // 逃逸步长（屏幕比例）
 export const BAIT_FINE_PER_TIER = 22; // 假奖励陷阱：点"领取"按钮的扣款（随档次）
-export const BAIT_UNLOCK_LEVEL = 2;
+export const BAIT_UNLOCK_LEVEL = 8;
 
 /** 肉鸽 / 盲盒 / 特殊手机（财富有回滚风险，现金最低 0 元） */
 export function phoneTier(level: number): number {
@@ -72,7 +72,7 @@ export const TIER_PAYOUT_STEP = 0.32; // 档次越高身价越高
 export const GOLDEN_UNLOCK_LEVEL = 10;
 export const GOLDEN_CHANCE = 0.08;
 export const GOLDEN_BREAK_CHANCE = 0.012;
-export const GOLDEN_FINE_PER_TIER = 60;
+export const GOLDEN_FINE_PER_TIER = 30;
 export const GOLDEN_PAYOUT_MULT = 3;
 
 // 灵魂手机：持续掉声誉，归还时有概率白嫖一个极品技能
