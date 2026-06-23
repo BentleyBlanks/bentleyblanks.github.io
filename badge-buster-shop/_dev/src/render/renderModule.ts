@@ -199,6 +199,64 @@ function strokeRound(
   ctx.stroke();
 }
 
+// —————————— 工坊拟物质感（程序化绘制：木 / 拉丝金属 / 黄铜 / 雕刻字）——————————
+function woodPanel(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, top = '#6E4A2A', bottom = '#43301C'): void {
+  const g = c.createLinearGradient(x, y, x, y + h);
+  g.addColorStop(0, top);
+  g.addColorStop(1, bottom);
+  fillRound(c, x, y, w, h, r, g);
+  c.save();
+  roundedRect(c, x, y, w, h, r);
+  c.clip();
+  c.globalAlpha = 0.12;
+  c.strokeStyle = '#241404';
+  c.lineWidth = 1;
+  for (let yy = y + 4; yy < y + h; yy += 6) {
+    c.beginPath();
+    c.moveTo(x, yy + Math.sin(yy * 0.35) * 1.4);
+    c.bezierCurveTo(x + w * 0.32, yy + 1.8, x + w * 0.62, yy - 1.8, x + w, yy + Math.cos(yy * 0.22) * 1.4);
+    c.stroke();
+  }
+  c.restore();
+  strokeRound(c, x + 1, y + 1, w - 2, h - 2, r, 'rgba(255,214,160,0.16)', 1);
+  strokeRound(c, x, y, w, h, r, 'rgba(20,12,5,0.55)', 1.2);
+}
+
+function metalPlate(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, pressed = false, tint?: string): void {
+  const g = c.createLinearGradient(x, y, x, y + h);
+  if (pressed) {
+    g.addColorStop(0, '#79818D');
+    g.addColorStop(1, '#A4ACB8');
+  } else {
+    g.addColorStop(0, tint ?? '#DCE1E9');
+    g.addColorStop(0.5, '#A6AEBB');
+    g.addColorStop(1, '#7B828F');
+  }
+  fillRound(c, x, y, w, h, r, g);
+  strokeRound(c, x + 1.2, y + 1.2, w - 2.4, h - 2.4, r, pressed ? 'rgba(0,0,0,0.32)' : 'rgba(255,255,255,0.72)', 1.4);
+  strokeRound(c, x, y, w, h, r, 'rgba(28,34,42,0.6)', 1.2);
+}
+
+function brassPlate(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const g = c.createLinearGradient(x, y, x, y + h);
+  g.addColorStop(0, '#FCE7A4');
+  g.addColorStop(0.5, '#E7B748');
+  g.addColorStop(1, '#A8780E');
+  fillRound(c, x, y, w, h, r, g);
+  strokeRound(c, x + 1.2, y + 1.2, w - 2.4, h - 2.4, r, 'rgba(255,250,210,0.7)', 1.2);
+  strokeRound(c, x, y, w, h, r, 'rgba(86,58,6,0.6)', 1.3);
+}
+
+function engraveText(c: CanvasRenderingContext2D, text: string, x: number, y: number, font: string, color: string, align: CanvasTextAlign = 'center', maxW?: number): void {
+  c.font = font;
+  c.textAlign = align;
+  c.textBaseline = 'middle';
+  c.fillStyle = 'rgba(255,255,255,0.22)';
+  c.fillText(text, x, y + 1, maxW);
+  c.fillStyle = color;
+  c.fillText(text, x, y, maxW);
+}
+
 function moodColor(mood: Mood): string {
   if (mood === 'happy') return '#26C6A6';
   if (mood === 'annoyed') return '#FF9F43';
@@ -1149,18 +1207,16 @@ export function createRenderModule(): GameModule {
     const r = bench.customer.phone.repair;
     const tierOf = bench.customer.phone.tier;
     c.save();
-    c.shadowColor = 'rgba(0,0,0,0.42)';
-    c.shadowBlur = 18;
-    c.shadowOffsetY = -4;
-    fillRound(c, bench.panel.x - 2, bench.panel.y, bench.panel.w + 4, bench.panel.h + 24, 18, 'rgba(15, 22, 38, 0.99)');
-    c.shadowColor = 'transparent';
-    c.strokeStyle = 'rgba(91,141,239,0.45)';
-    c.lineWidth = 1.5;
-    c.beginPath();
-    c.moveTo(bench.panel.x, bench.panel.y + 0.5);
-    c.lineTo(bench.panel.x + bench.panel.w, bench.panel.y + 0.5);
-    c.stroke();
-    fillRound(c, bench.panel.x + bench.panel.w / 2 - 18, bench.panel.y + 4, 36, 4, 2, 'rgba(255,255,255,0.3)');
+    c.shadowColor = 'rgba(0,0,0,0.5)';
+    c.shadowBlur = 20;
+    c.shadowOffsetY = -6;
+    woodPanel(c, bench.panel.x - 2, bench.panel.y, bench.panel.w + 4, bench.panel.h + 26, 16, '#5E3F23', '#362413');
+    c.restore();
+    // 黄铜上沿条 + 两端螺丝（像工作台金属包边）
+    c.fillStyle = '#C8860B';
+    c.fillRect(bench.panel.x, bench.panel.y + 2, bench.panel.w, 2);
+    drawScrew(c, bench.panel.x + 12, bench.panel.y + 14, 3.2, 0.5);
+    drawScrew(c, bench.panel.x + bench.panel.w - 12, bench.panel.y + 14, 3.2, 1.2);
 
     c.textBaseline = 'middle';
     c.textAlign = 'left';
@@ -1178,8 +1234,10 @@ export function createRenderModule(): GameModule {
       const active = r.activeKind === tile.kind;
       const done = !!svc?.done;
       const b = tile.body;
-      fillRound(c, b.x, b.y, b.w, b.h, 10, done ? 'rgba(28,110,74,0.55)' : active ? 'rgba(40,92,142,0.8)' : 'rgba(40,52,74,0.94)');
-      strokeRound(c, b.x, b.y, b.w, b.h, 10, done ? '#26C6A6' : active ? '#5B8DEF' : 'rgba(255,255,255,0.14)', 1.3);
+      // 工作台上的"工具凹槽"：深色内陷 + 黄铜/状态描边
+      fillRound(c, b.x, b.y, b.w, b.h, 10, done ? 'rgba(24,86,58,0.7)' : active ? 'rgba(34,72,116,0.85)' : 'rgba(22,15,8,0.66)');
+      strokeRound(c, b.x + 1, b.y + 1, b.w - 2, b.h - 2, 9, 'rgba(0,0,0,0.4)', 1.4);
+      strokeRound(c, b.x, b.y, b.w, b.h, 10, done ? '#1FB57A' : active ? '#5B8DEF' : 'rgba(200,134,11,0.5)', 1.3);
       const tcx = b.x + b.w / 2;
       const hasChip = !!tile.tierChip;
       c.textAlign = 'center';
@@ -1925,81 +1983,84 @@ export function createRenderModule(): GameModule {
     const c = ctx.ctx2d;
     const s = ctx.state;
     const bar = ui.hud;
-    const grad = c.createLinearGradient(0, 0, 0, bar.h);
-    grad.addColorStop(0, 'rgba(12, 20, 34, 0.96)');
-    grad.addColorStop(1, 'rgba(12, 20, 34, 0.86)');
-    c.fillStyle = grad;
-    c.fillRect(0, 0, bar.w, bar.h);
+    // 木质招牌底板（替代扁平深色条）
+    woodPanel(c, -2, -2, bar.w + 4, bar.h + 2, 4, '#5E3F23', '#392713');
+    c.fillStyle = 'rgba(0,0,0,0.3)';
+    c.fillRect(0, bar.h - 3, bar.w, 3);
+    drawScrew(c, 9, 9, 3.2, 0.6);
+    drawScrew(c, bar.w - 9, 9, 3.2, 1.3);
 
     const cy = bar.h / 2;
-
-    // —— 现金：大金牌，视觉焦点（#E）——
+    // 现金：黄铜收银牌
     const cashLabel = `💰 ${formatMoney(s.points)} 元`;
-    const pillH = bar.h - 12;
+    const pillH = bar.h - 16;
+    const pillY = 8;
+    const pillX = 16;
     c.font = `1000 ${Math.round(pillH * 0.46)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    const cashW = Math.min(bar.w * 0.58, c.measureText(cashLabel).width + 34);
-    const pillX = 8;
-    const pillY = 6;
-    const cg = c.createLinearGradient(pillX, pillY, pillX, pillY + pillH);
-    cg.addColorStop(0, '#FFE082');
-    cg.addColorStop(1, '#FFB300');
-    c.save();
-    c.shadowColor = 'rgba(255, 179, 0, 0.5)';
-    c.shadowBlur = 12;
-    fillRound(c, pillX, pillY, cashW, pillH, pillH / 2, cg);
-    c.restore();
-    strokeRound(c, pillX, pillY, cashW, pillH, pillH / 2, 'rgba(255,255,255,0.7)', 1.5);
-    c.fillStyle = '#5A3600';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText(cashLabel, pillX + cashW / 2, cy);
+    const cashW = Math.min(bar.w * 0.56, c.measureText(cashLabel).width + 30);
+    brassPlate(c, pillX, pillY, cashW, pillH, 6);
+    engraveText(c, cashLabel, pillX + cashW / 2, cy, `1000 ${Math.round(pillH * 0.46)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`, '#4A3000', 'center', cashW - 18);
 
-    // —— 右侧：等级·段位 + 声誉 ——
-    const rx = bar.w - 12;
-    c.textAlign = 'right';
-    c.fillStyle = '#EAF4FF';
-    c.font = '900 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-    c.fillText(`Lv${s.level} · ${shopRankName(s.level)}`, rx, cy - 9);
+    // 等级：金属铭牌 + 黄铜星
+    const badgeW = Math.min(112, bar.w * 0.3);
+    const badgeH = bar.h - 18;
+    const badgeX = bar.w - badgeW - 12;
+    const badgeY = 9;
+    metalPlate(c, badgeX, badgeY, badgeW, badgeH, 6);
+    engraveText(c, `Lv${s.level} · ${shopRankName(s.level)}`, badgeX + badgeW / 2, badgeY + badgeH * 0.33, '900 12px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif', '#2A2E36', 'center', badgeW - 8);
     const stars = Math.round(clamp01(s.reputation / 5) * 5);
     let starStr = '';
     for (let i = 0; i < 5; i += 1) starStr += i < stars ? '★' : '☆';
-    c.fillStyle = '#FFC542';
-    c.font = '900 13px system-ui, sans-serif';
-    c.fillText(starStr, rx, cy + 9);
+    engraveText(c, starStr, badgeX + badgeW / 2, badgeY + badgeH * 0.72, '900 11px system-ui, sans-serif', '#B8860B', 'center', badgeW - 8);
 
-    // —— 经验：贴在 HUD 底边的细条 ——
+    // 经验：底边黄铜进度条
     const xpRatio = Math.min(1, s.xp / Math.max(1, s.xpToNext));
-    c.fillStyle = 'rgba(255,255,255,0.14)';
+    c.fillStyle = 'rgba(0,0,0,0.32)';
     c.fillRect(0, bar.h - 3, bar.w, 3);
-    c.fillStyle = '#5B8DEF';
+    c.fillStyle = '#E7B748';
     c.fillRect(0, bar.h - 3, bar.w * xpRatio, 3);
   }
 
   function drawControls(ui: UiLayout): void {
     const c = ctx.ctx2d;
     const now = performance.now();
-    c.fillStyle = 'rgba(12, 20, 34, 0.5)';
-    c.fillRect(ui.controlBar.x, ui.controlBar.y, ui.controlBar.w, ui.controlBar.h);
+    // 木质工具架
+    woodPanel(c, ui.controlBar.x - 2, ui.controlBar.y, ui.controlBar.w + 4, ui.controlBar.h + 6, 6, '#583C21', '#36240F');
+    c.fillStyle = 'rgba(255,220,170,0.14)';
+    c.fillRect(ui.controlBar.x, ui.controlBar.y, ui.controlBar.w, 2);
     const readySkills = ctx.content.skills.filter((sk) => {
       const rt = ctx.state.skills[sk.id];
       return rt?.unlocked && now - rt.lastUsedAt >= sk.cooldownMs;
     }).length;
+    const emojiOf: Record<string, string> = { shop: '🧰', skills: '⚡', settings: '⚙️' };
     for (const btn of ui.buttons) {
       const active = ctx.state.ui.modal === btn.id;
-      fillRound(c, btn.rect.x, btn.rect.y, btn.rect.w, btn.rect.h, 16, active ? '#5B8DEF' : 'rgba(255,255,255,0.96)');
-      strokeRound(c, btn.rect.x, btn.rect.y, btn.rect.w, btn.rect.h, 16, active ? '#3B6FD0' : 'rgba(43,43,51,0.12)', 1.5);
-      c.fillStyle = active ? '#FFFFFF' : '#2B2B33';
+      const r = btn.rect;
+      // 金属工具牌（按下=内陷质感）
+      metalPlate(c, r.x, r.y, r.w, r.h, 12, active, active ? '#A9C6F2' : undefined);
+      const sr = Math.max(2.4, r.h * 0.045);
+      drawScrew(c, r.x + 10, r.y + 10, sr, 0.4);
+      drawScrew(c, r.x + r.w - 10, r.y + 10, sr, 1.2);
+      drawScrew(c, r.x + 10, r.y + r.h - 10, sr, 2.1);
+      drawScrew(c, r.x + r.w - 10, r.y + r.h - 10, sr, 0.9);
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.font = '22px system-ui, sans-serif';
-      c.fillText(btn.icon, btn.rect.x + btn.rect.w / 2, btn.rect.y + btn.rect.h * 0.36);
-      c.font = '900 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-      c.fillText(btn.label, btn.rect.x + btn.rect.w / 2, btn.rect.y + btn.rect.h * 0.74);
+      c.font = '21px system-ui, sans-serif';
+      c.fillText(emojiOf[btn.id] ?? btn.icon, r.x + r.w / 2, r.y + r.h * 0.36);
+      engraveText(c, btn.label, r.x + r.w / 2, r.y + r.h * 0.74, '900 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif', active ? '#10294C' : '#2A2E36');
       if (btn.id === 'skills' && readySkills > 0 && !active) {
-        fillRound(c, btn.rect.x + btn.rect.w - 22, btn.rect.y + 5, 17, 17, 9, '#FF3B30');
-        c.fillStyle = '#FFFFFF';
+        const dx = r.x + r.w - 14;
+        const dy = r.y + 13;
+        c.fillStyle = '#C8281E';
+        c.beginPath();
+        c.arc(dx, dy, 9, 0, TAU);
+        c.fill();
+        c.strokeStyle = 'rgba(255,220,170,0.8)';
+        c.lineWidth = 1.2;
+        c.stroke();
+        c.fillStyle = '#FFF';
         c.font = '900 11px Inter, system-ui, sans-serif';
-        c.fillText(String(readySkills), btn.rect.x + btn.rect.w - 13, btn.rect.y + 14);
+        c.fillText(String(readySkills), dx, dy + 0.5);
       }
     }
   }
@@ -2014,8 +2075,8 @@ export function createRenderModule(): GameModule {
     const unlockLv = upgradeUnlockLevel(id);
     const locked = ctx.state.level < unlockLv;
     const affordable = !maxed && !locked && ctx.state.points >= cost;
-    fillRound(c, rect.x, rect.y, rect.w, rect.h, 12, 'rgba(255,255,255,0.85)');
-    strokeRound(c, rect.x, rect.y, rect.w, rect.h, 12, 'rgba(43,43,51,0.08)', 1);
+    fillRound(c, rect.x, rect.y, rect.w, rect.h, 10, '#FBF4E2');
+    strokeRound(c, rect.x, rect.y, rect.w, rect.h, 10, 'rgba(80,55,25,0.22)', 1.2);
     c.textAlign = 'left';
     c.textBaseline = 'middle';
     c.fillStyle = '#2B2B33';
@@ -2044,8 +2105,8 @@ export function createRenderModule(): GameModule {
     const unlocked = !!rt?.unlocked;
     const remaining = rt ? Math.max(0, def.cooldownMs - (now - rt.lastUsedAt)) : def.cooldownMs;
     const ready = unlocked && remaining <= 0;
-    fillRound(c, rect.x, rect.y, rect.w, rect.h, 12, ready ? 'rgba(38,198,166,0.16)' : 'rgba(255,255,255,0.85)');
-    strokeRound(c, rect.x, rect.y, rect.w, rect.h, 12, ready ? 'rgba(38,198,166,0.5)' : 'rgba(43,43,51,0.08)', 1);
+    fillRound(c, rect.x, rect.y, rect.w, rect.h, 10, ready ? '#DBF3EA' : '#FBF4E2');
+    strokeRound(c, rect.x, rect.y, rect.w, rect.h, 10, ready ? 'rgba(38,198,166,0.55)' : 'rgba(80,55,25,0.22)', 1.2);
     c.textAlign = 'left';
     c.textBaseline = 'middle';
     c.fillStyle = '#2B2B33';
@@ -2073,8 +2134,8 @@ export function createRenderModule(): GameModule {
     const c = ctx.ctx2d;
     const muted = localStorage.getItem('badge-buster-muted') === '1';
     const isReset = id === 'reset';
-    fillRound(c, rect.x, rect.y, rect.w, rect.h, 12, isReset ? 'rgba(255,59,48,0.08)' : 'rgba(255,255,255,0.85)');
-    strokeRound(c, rect.x, rect.y, rect.w, rect.h, 12, isReset ? 'rgba(255,59,48,0.3)' : 'rgba(43,43,51,0.08)', 1);
+    fillRound(c, rect.x, rect.y, rect.w, rect.h, 10, isReset ? '#F6DED9' : '#FBF4E2');
+    strokeRound(c, rect.x, rect.y, rect.w, rect.h, 10, isReset ? 'rgba(192,57,43,0.4)' : 'rgba(80,55,25,0.22)', 1.2);
     c.textAlign = 'left';
     c.textBaseline = 'middle';
     c.fillStyle = isReset ? '#C0392B' : '#2B2B33';
@@ -2092,23 +2153,23 @@ export function createRenderModule(): GameModule {
     }
     const c = ctx.ctx2d;
     const m = ui.modal;
-    c.fillStyle = 'rgba(6, 12, 22, 0.55)';
+    c.fillStyle = 'rgba(6, 12, 22, 0.6)';
     c.fillRect(0, 0, m.backdrop.w, m.backdrop.h);
+    // 木框抽屉
     c.save();
-    c.shadowColor = 'rgba(0,0,0,0.35)';
-    c.shadowBlur = 24;
-    c.shadowOffsetY = 10;
-    fillRound(c, m.panel.x, m.panel.y, m.panel.w, m.panel.h, 16, '#FBF7F0');
+    c.shadowColor = 'rgba(0,0,0,0.45)';
+    c.shadowBlur = 26;
+    c.shadowOffsetY = -6;
+    woodPanel(c, m.panel.x, m.panel.y, m.panel.w, m.panel.h, 14, '#6A4828', '#42301C');
     c.restore();
-    strokeRound(c, m.panel.x, m.panel.y, m.panel.w, m.panel.h, 16, 'rgba(43,43,51,0.18)', 1.5);
-    fillRound(c, m.panel.x, m.panel.y, m.panel.w, m.titleBar.h, 16, 'rgba(91,141,239,0.16)');
-    c.fillStyle = '#2B2B33';
-    c.font = '900 17px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-    c.textAlign = 'left';
-    c.textBaseline = 'middle';
-    c.fillText(m.title, m.panel.x + 16, m.panel.y + m.titleBar.h / 2);
-    fillRound(c, m.close.x, m.close.y, m.close.w, m.close.h, 10, 'rgba(43,43,51,0.08)');
-    c.strokeStyle = '#6E6A73';
+    // 内层米色工作面
+    fillRound(c, m.panel.x + 8, m.panel.y + m.titleBar.h - 2, m.panel.w - 16, m.panel.h - m.titleBar.h - 6, 10, '#ECE0C7');
+    // 黄铜铭牌标题（留出右侧关闭键空间）
+    brassPlate(c, m.panel.x + 10, m.panel.y + 8, m.panel.w - 20 - 46, m.titleBar.h - 16, 7);
+    engraveText(c, m.title, m.panel.x + 24, m.panel.y + 8 + (m.titleBar.h - 16) / 2, '900 16px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif', '#4A3000', 'left', m.panel.w - 90);
+    // 金属关闭键
+    metalPlate(c, m.close.x, m.close.y, m.close.w, m.close.h, 8);
+    c.strokeStyle = '#2A2E36';
     c.lineWidth = 2.4;
     c.lineCap = 'round';
     const cp = m.close.w * 0.3;
