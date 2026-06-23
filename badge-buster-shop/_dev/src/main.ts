@@ -54,11 +54,11 @@ const modules: GameModule[] = [
   createEconomyModule(),
   createSkillsModule(),
   createShopModule(),
+  createUiModule(), // 须先于 core 订阅 TAP/SWIPE：命中画布 UI 时吞掉事件
   createCoreModule(),
   createAutomationModule(),
   createInputModule(),
   createRenderModule(),
-  createUiModule(),
   createAudioModule(),
 ];
 

@@ -1,4 +1,4 @@
-import type { CustomerRuntime, GameState, IconRuntime } from '../types/state.types';
+import type { CustomerRuntime, GameState, IconRuntime, PhonePopup } from '../types/state.types';
 
 export interface IconLayout {
   customerId: string;
@@ -45,14 +45,14 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function computeGameLayout(state: GameState, width: number, height: number): GameLayout {
-  const desktopUi = width >= 960 ? 350 : 0;
-  const bottomReserve = width >= 960 ? 0 : width < 520 ? 262 : 238;
-  const queueWidth = width >= 960 ? clamp(width * 0.14, 172, 220) : width < 520 ? clamp(width * 0.28, 96, 118) : clamp(width * 0.16, 112, 176);
-  const topReserve = width >= 960 ? 84 : width >= 700 ? 76 : 58;
-  const playX = queueWidth + (width >= 960 ? 28 : 18);
-  const playY = topReserve;
-  const playW = Math.max(width < 520 ? 174 : 300, width - queueWidth - desktopUi - (width >= 960 ? 58 : 42));
-  const playH = Math.max(width < 520 ? 214 : 280, height - topReserve - bottomReserve - 30);
+  const desktopUi = 0; // 不再有 DOM 侧栏，UI 全部画在画布上
+  const bottomReserve = 92; // 底部画布控制栏（升级/技能/设置按钮）
+  const topReserve = width >= 700 ? 66 : 58; // 顶部 HUD
+  const queueWidth = clamp(width * (width < 560 ? 0.24 : 0.15), width < 560 ? 92 : 150, 216);
+  const playX = queueWidth + (width >= 700 ? 24 : 16);
+  const playY = topReserve + 6;
+  const playW = Math.max(width < 520 ? 180 : 300, width - queueWidth - desktopUi - (width >= 700 ? 48 : 34));
+  const playH = Math.max(width < 520 ? 214 : 280, height - playY - bottomReserve - 24);
   const activeCount = state.activeCustomers.length;
   const columns = activeCount >= 3 && playW > 620 ? 3 : activeCount >= 2 && playW > 430 ? 2 : 1;
   const rows = Math.max(1, Math.ceil(Math.max(activeCount, 1) / columns));
@@ -121,4 +121,38 @@ export function computeGameLayout(state: GameState, width: number, height: numbe
     uiReserve: desktopUi,
     bottomReserve,
   };
+}
+
+export interface PopupRect {
+  x: number; y: number; w: number; h: number;
+  closeX: number; closeY: number; closeW: number; closeH: number;
+}
+
+/** 把弹窗的比例坐标换算成屏幕绝对矩形（render 绘制与 core 命中共用）。 */
+export function popupRectOf(phone: PhoneLayout, popup: PhonePopup): PopupRect {
+  const x = phone.screenX + popup.fx * phone.screenW;
+  const y = phone.screenY + popup.fy * phone.screenH;
+  const w = popup.fw * phone.screenW;
+  const h = popup.fh * phone.screenH;
+  return {
+    x, y, w, h,
+    closeX: x + popup.closeFx * w,
+    closeY: y + popup.closeFy * h,
+    closeW: popup.closeFw * w,
+    closeH: popup.closeFh * h,
+  };
+}
+
+export function rectContains(rect: { x: number; y: number; w: number; h: number }, px: number, py: number): boolean {
+  return px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h;
+}
+
+/** 图标中心是否被任一弹窗遮住（被遮住则不能点/划清）。 */
+export function iconCoveredByPopup(phone: PhoneLayout, icon: IconLayout): boolean {
+  for (const popup of phone.customer.phone.popups) {
+    if (rectContains(popupRectOf(phone, popup), icon.x, icon.y)) {
+      return true;
+    }
+  }
+  return false;
 }

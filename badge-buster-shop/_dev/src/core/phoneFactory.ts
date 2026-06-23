@@ -15,7 +15,7 @@ function weightedIcon(iconDefs: AppIconDef[]): AppIconDef {
 }
 
 export function createPhone(customerId: string, customerDef: CustomerDef, iconDefs: AppIconDef[], level: number): PhoneRuntime {
-  const system: PhoneSystemRuntime = Math.random() < 0.58 ? 'android' : 'ios';
+  const system: PhoneSystemRuntime = Math.random() < 0.55 ? 'android' : 'ios';
   const icons = Array.from({ length: GRID_COLS * GRID_ROWS }, (_, index) => {
     const app = weightedIcon(iconDefs);
     return {
@@ -57,14 +57,12 @@ export function createPhone(customerId: string, customerDef: CustomerDef, iconDe
     gridCols: GRID_COLS,
     gridRows: GRID_ROWS,
     badgeTotal,
-    incomingRateMult: 1 + Math.max(0, level - 1) * 0.035,
+    incomingRateMult: 1 + Math.max(0, level - 1) * 0.03,
     incomingAccumulatorMs: 0,
-    adNotifications: randomRangeInt(0, level >= 3 ? 2 : 1),
-    notificationAccumulatorMs: 0,
-    junkMb: system === 'android' ? randomRangeInt(90, 260 + level * 8) : 0,
-    memoryLoad: system === 'android' ? randomRangeInt(18, 48) : 0,
-    backgroundApps: randomRangeInt(1, system === 'android' ? 5 : 3),
-    utilityAccumulatorMs: 0,
+    popups: [],
+    // 错开首个弹窗，避免一进门就被糊脸
+    popupAccumulatorMs: -randomRangeInt(1_200, 3_200),
+    scamAccumulatorMs: -randomRangeInt(2_000, 6_000),
     cleaned: false,
   };
 }

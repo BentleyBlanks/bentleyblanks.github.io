@@ -20,7 +20,6 @@ export function createInitialState(now = performance.now()): GameState {
       freezeIncomingUntil: 0,
       tipBoostUntil: 0,
       tipBoostMult: 1,
-      magnetUntil: 0,
       extraHandsUntil: 0,
       extraHands: 0,
     },
@@ -32,34 +31,23 @@ export function createInitialState(now = performance.now()): GameState {
       botCount: 0,
       botRatePerSec: 0,
       arrivalIntervalMs: 8_000,
-      adClearPower: 1,
-      junkClearMb: 45,
-      memoryClearPower: 16,
-      backgroundClearPower: 1,
+      adSpawnIntervalMs: 5_200,
+      scamSpawnIntervalMs: 15_000,
+      scamGraceMs: 6_000,
     },
+    ui: { modal: 'none' },
     botAccumulator: 0,
     lastTickAt: now,
     startedAt: now,
   };
 }
 
-function hashText(value: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
 function ensurePhone(phone: PhoneRuntime): void {
-  phone.system ??= hashText(phone.id) % 10 < 6 ? 'android' : 'ios';
-  phone.adNotifications ??= 0;
-  phone.notificationAccumulatorMs ??= 0;
-  phone.junkMb ??= phone.system === 'android' ? 120 : 0;
-  phone.memoryLoad ??= phone.system === 'android' ? 24 : 0;
-  phone.backgroundApps ??= 1;
-  phone.utilityAccumulatorMs ??= 0;
+  phone.system ??= Math.random() < 0.55 ? 'android' : 'ios';
+  phone.popups ??= [];
+  phone.popupAccumulatorMs ??= 0;
+  phone.scamAccumulatorMs ??= 0;
+  phone.incomingAccumulatorMs ??= 0;
 }
 
 function ensureCustomer(customer: CustomerRuntime): void {
@@ -76,12 +64,14 @@ export function loadState(): GameState | null {
     if (!parsed || typeof parsed.level !== 'number' || !Array.isArray(parsed.queue)) {
       return null;
     }
+    const fresh = createInitialState();
     parsed.lastTickAt = performance.now();
     parsed.nextArrivalAt = Math.min(parsed.nextArrivalAt || performance.now() + 1000, performance.now() + 4000);
     parsed.activeCustomers = parsed.activeCustomers ?? [];
     parsed.queue = parsed.queue ?? [];
-    parsed.effects = parsed.effects ?? createInitialState().effects;
-    parsed.derived = { ...createInitialState().derived, ...(parsed.derived ?? {}) };
+    parsed.effects = { ...fresh.effects, ...(parsed.effects ?? {}) };
+    parsed.derived = { ...fresh.derived, ...(parsed.derived ?? {}) };
+    parsed.ui = { modal: 'none' }; // 瞬时，不沿用
     for (const customer of [...parsed.activeCustomers, ...parsed.queue]) {
       ensureCustomer(customer);
     }
@@ -93,7 +83,7 @@ export function loadState(): GameState | null {
 
 export function saveState(state: GameState): void {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, ui: { modal: 'none' } }));
   } catch {
     // Storage can be disabled in private browsing; gameplay should continue.
   }

@@ -26,7 +26,7 @@ export function createInputModule(): GameModule {
     const point = canvasPoint(ctx.canvas, event);
     trace = { id: event.pointerId, start: point, path: [point], moved: false, lastEmitAt: performance.now() };
     ctx.canvas.setPointerCapture(event.pointerId);
-    ctx.bus.emit({ type: 'TAP', x: point.x, y: point.y });
+    // 仅在抬手且未移动时发 TAP（避免一次点击触发两次，且防止点 ✕ 后穿透清角标）
   }
 
   function move(event: PointerEvent): void {

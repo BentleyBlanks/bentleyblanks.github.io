@@ -10,6 +10,27 @@ export interface IconRuntime {
 
 export type PhoneSystemRuntime = 'ios' | 'android';
 
+export type PopupKind = 'ad' | 'scam';
+
+/** 手机屏幕上的弹窗。位置以屏幕矩形的比例(0..1)存储，渲染/命中均按比例换算，跟随布局缩放。 */
+export interface PhonePopup {
+  id: string;
+  kind: PopupKind;
+  fx: number; // 左上角 x（占屏幕宽比例）
+  fy: number;
+  fw: number; // 宽（占屏幕宽比例）
+  fh: number;
+  closeFx: number; // ✕ 关闭键左上角（占弹窗自身比例）
+  closeFy: number;
+  closeFw: number;
+  closeFh: number;
+  bornAt: number;
+  installAt: number; // scam：到点自动安装并罚款；ad：Infinity
+  title: string;
+  body: string;
+  accent: string;
+}
+
 export interface PhoneRuntime {
   id: string;
   system: PhoneSystemRuntime;
@@ -19,12 +40,9 @@ export interface PhoneRuntime {
   badgeTotal: number;
   incomingRateMult: number;
   incomingAccumulatorMs: number;
-  adNotifications: number;
-  notificationAccumulatorMs: number;
-  junkMb: number;
-  memoryLoad: number;
-  backgroundApps: number;
-  utilityAccumulatorMs: number;
+  popups: PhonePopup[];
+  popupAccumulatorMs: number;
+  scamAccumulatorMs: number;
   cleaned: boolean;
 }
 
@@ -43,6 +61,8 @@ export interface CustomerRuntime {
   clearedBadges: number;
   startedBadgeTotal: number;
 }
+
+export type ModalKind = 'none' | 'shop' | 'skills' | 'settings';
 
 export interface GameState {
   level: number;
@@ -65,7 +85,6 @@ export interface GameState {
     freezeIncomingUntil: number;
     tipBoostUntil: number;
     tipBoostMult: number;
-    magnetUntil: number;
     extraHandsUntil: number;
     extraHands: number;
   };
@@ -78,11 +97,13 @@ export interface GameState {
     botCount: number;
     botRatePerSec: number;
     arrivalIntervalMs: number;
-    adClearPower: number;
-    junkClearMb: number;
-    memoryClearPower: number;
-    backgroundClearPower: number;
+    adSpawnIntervalMs: number;
+    scamSpawnIntervalMs: number;
+    scamGraceMs: number;
   };
+
+  /** 瞬时 UI 状态（不持久化）：当前打开的画布弹窗面板。 */
+  ui: { modal: ModalKind };
 
   botAccumulator: number;
   lastTickAt: number;

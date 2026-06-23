@@ -1,16 +1,17 @@
 import type { AppIconId } from './content.types';
-import type { Mood } from './state.types';
+import type { Mood, PopupKind } from './state.types';
 
 export type GameEvent =
-  | { type: 'TAP'; x: number; y: number }
-  | { type: 'SWIPE'; path: { x: number; y: number }[] }
+  | { type: 'TAP'; x: number; y: number; consumed?: boolean }
+  | { type: 'SWIPE'; path: { x: number; y: number }[]; consumed?: boolean }
   | { type: 'BADGE_CLEARED'; customerId: string; iconId: AppIconId; amount: number; x: number; y: number }
   | { type: 'XP_GAINED'; amount: number }
   | { type: 'LEVEL_UP'; level: number }
   | { type: 'CUSTOMER_ARRIVED'; customerId: string }
   | { type: 'PHONE_CLEANED'; customerId: string }
   | { type: 'PHONE_SMASHED'; customerId: string; x: number; y: number; iconCount: number; totalBadges: number }
-  | { type: 'PHONE_TASK_CLEARED'; customerId: string; kind: 'ad' | 'junk' | 'memory' | 'background'; amount: number; x: number; y: number }
+  | { type: 'POPUP_CLOSED'; customerId: string; kind: PopupKind; x: number; y: number; defused: boolean }
+  | { type: 'SCAM_INSTALLED'; customerId: string; x: number; y: number; penalty: number }
   | { type: 'PHONE_RETURNED'; customerId: string; payout: number; xp: number; mood: Mood }
   | { type: 'CUSTOMER_LEFT'; customerId: string; reason: 'angry' | 'overflow' }
   | { type: 'REPUTATION_CHANGED'; value: number }

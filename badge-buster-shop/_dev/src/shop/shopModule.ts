@@ -1,4 +1,11 @@
-import { BASE_PATIENCE_MS, INITIAL_ACTIVE_SLOTS, INITIAL_QUEUE_CAPACITY, clamp } from '../content/balance';
+import {
+  ACTIVE_PATIENCE_RATE,
+  BASE_PATIENCE_MS,
+  INITIAL_ACTIVE_SLOTS,
+  INITIAL_QUEUE_CAPACITY,
+  PATIENCE_PER_UPGRADE,
+  clamp,
+} from '../content/balance';
 import type { CustomerDef, SkillDef } from '../types/content.types';
 import type { GameContext, GameModule } from '../types/module.types';
 import type { CustomerRuntime, Mood } from '../types/state.types';
@@ -36,7 +43,7 @@ export function createShopModule(): GameModule {
   }
 
   function patienceBonus(): number {
-    return upgradeLevel('up_patience') * 10_000;
+    return upgradeLevel('up_patience') * PATIENCE_PER_UPGRADE;
   }
 
   function syncCapacities(): void {
@@ -99,7 +106,6 @@ export function createShopModule(): GameModule {
       scheduleNextArrival(now);
       return;
     }
-
     const customer = createCustomer(now);
     ctx.state.queue.push(customer);
     ctx.bus.emit({ type: 'CUSTOMER_ARRIVED', customerId: customer.id });
@@ -113,9 +119,20 @@ export function createShopModule(): GameModule {
         break;
       }
       customer.serviceStartedAt = now;
-      customer.mood = 'neutral';
+      customer.mood = moodFromPatience(customer);
       ctx.state.activeCustomers.push(customer);
     }
+  }
+
+  function leaveActiveAngry(customer: CustomerRuntime, now: number): void {
+    const index = ctx.state.activeCustomers.findIndex((item) => item.id === customer.id);
+    if (index < 0) {
+      return;
+    }
+    ctx.state.activeCustomers.splice(index, 1);
+    ctx.bus.emit({ type: 'CUSTOMER_LEFT', customerId: customer.id, reason: 'angry' });
+    changeReputation(-0.2);
+    pullFromQueue(now);
   }
 
   function settlePhone(customerId: string): void {
@@ -127,7 +144,8 @@ export function createShopModule(): GameModule {
     const customer = ctx.state.activeCustomers[index];
     const elapsed = now - customer.serviceStartedAt;
     const speedBonus = 1 + 0.5 * clamp(1 - elapsed / 32_000, 0, 1);
-    const mood: Mood = elapsed < 18_000 ? 'happy' : elapsed < 34_000 ? 'neutral' : 'annoyed';
+    const ratio = clamp(customer.patience / Math.max(1, customer.maxPatience), 0, 1);
+    const mood: Mood = ratio > 0.6 ? 'happy' : ratio > 0.3 ? 'neutral' : 'annoyed';
     const tipMult = now < ctx.state.effects.tipBoostUntil ? ctx.state.effects.tipBoostMult : 1;
     const payout = Math.max(
       1,
@@ -141,10 +159,24 @@ export function createShopModule(): GameModule {
     pullFromQueue(now);
   }
 
-  function sootheQueue(): void {
-    for (const customer of ctx.state.queue) {
+  function sootheAll(): void {
+    for (const customer of [...ctx.state.queue, ...ctx.state.activeCustomers]) {
       customer.patience = customer.maxPatience;
       customer.mood = 'neutral';
+    }
+  }
+
+  function onScamInstalled(customerId: string): void {
+    const now = performance.now();
+    const customer = ctx.state.activeCustomers.find((item) => item.id === customerId);
+    if (!customer) {
+      return;
+    }
+    customer.patience -= customer.maxPatience * 0.28;
+    customer.mood = moodFromPatience(customer);
+    changeReputation(-0.15);
+    if (customer.patience <= 0) {
+      leaveActiveAngry(customer, now);
     }
   }
 
@@ -155,11 +187,12 @@ export function createShopModule(): GameModule {
       lastReputation = ctx.state.reputation;
       syncCapacities();
       ctx.bus.on('PHONE_CLEANED', (event) => settlePhone(event.customerId));
+      ctx.bus.on('SCAM_INSTALLED', (event) => onScamInstalled(event.customerId));
       ctx.bus.on('UPGRADE_PURCHASED', syncCapacities);
       ctx.bus.on('SKILL_USED', (event) => {
         const skill = skillById(ctx.content.skills, event.id);
         if (skill?.effect.kind === 'sootheQueue') {
-          sootheQueue();
+          sootheAll();
         }
       });
     },
@@ -168,6 +201,18 @@ export function createShopModule(): GameModule {
       syncCapacities();
       if (now >= ctx.state.nextArrivalAt) {
         arrive(now);
+      }
+
+      // 在岗顾客也会慢慢失去耐心 —— 制造"忙不过来"的压力
+      for (let i = ctx.state.activeCustomers.length - 1; i >= 0; i -= 1) {
+        const customer = ctx.state.activeCustomers[i];
+        customer.patience -= dt * ACTIVE_PATIENCE_RATE;
+        customer.mood = moodFromPatience(customer);
+        if (customer.patience <= 0) {
+          ctx.state.activeCustomers.splice(i, 1);
+          ctx.bus.emit({ type: 'CUSTOMER_LEFT', customerId: customer.id, reason: 'angry' });
+          changeReputation(-0.2);
+        }
       }
 
       for (let i = ctx.state.queue.length - 1; i >= 0; i -= 1) {

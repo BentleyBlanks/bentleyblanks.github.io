@@ -7,8 +7,19 @@ export const INITIAL_QUEUE_CAPACITY = 3;
 export const INITIAL_REPUTATION = 3;
 export const BASE_PATIENCE_MS = 30_000;
 export const BASE_ARRIVAL_INTERVAL_MS = 8_000;
-export const INCOMING_BASE_INTERVAL_MS = 2_500;
-export const SAVE_KEY = 'badge-buster-shop:v1';
+export const INCOMING_BASE_INTERVAL_MS = 2_600;
+export const SAVE_KEY = 'badge-buster-shop:v2';
+
+/** 在岗顾客也会流失耐心（按真实时间的比例），制造"忙不过来"的压力。 */
+export const ACTIVE_PATIENCE_RATE = 0.5;
+export const PATIENCE_PER_UPGRADE = 8_000;
+
+/** 弹窗节奏 */
+export const AD_POPUP_BASE_INTERVAL_MS = 5_200;
+export const SCAM_POPUP_BASE_INTERVAL_MS = 15_000;
+export const SCAM_GRACE_BASE_MS = 6_000;
+export const MAX_POPUPS_PER_PHONE = 3;
+export const SCAM_UNLOCK_LEVEL = 3;
 
 export function xpToNextLevel(level: number): number {
   return Math.floor(10 * Math.pow(level, 1.6));

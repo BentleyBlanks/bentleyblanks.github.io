@@ -1,10 +1,22 @@
-import { INCOMING_BASE_INTERVAL_MS } from '../content/balance';
-import { computeGameLayout, type IconLayout, type PhoneLayout } from '../shared/layout';
+import { INCOMING_BASE_INTERVAL_MS, MAX_POPUPS_PER_PHONE, SCAM_UNLOCK_LEVEL } from '../content/balance';
+import {
+  computeGameLayout,
+  iconCoveredByPopup,
+  popupRectOf,
+  rectContains,
+  type IconLayout,
+  type PhoneLayout,
+} from '../shared/layout';
 import type { AppIconDef } from '../types/content.types';
 import type { GameEvent } from '../types/events.types';
 import type { GameContext, GameModule } from '../types/module.types';
-import type { CustomerRuntime, IconRuntime } from '../types/state.types';
+import type { CustomerRuntime, IconRuntime, PhonePopup, PopupKind } from '../types/state.types';
 import { saveState } from './persistence';
+
+const AD_TITLES = ['🧧 恭喜中红包', '附近的人想认识你', '🔥 限时 1 折', '点击领取大礼包', '您有 1 条新消息'];
+const AD_BODIES = ['立即领取 ›', '马上查看', '仅剩 3 个名额', '免费试用 7 天'];
+const SCAM_TITLES = ['⚠ 检测到病毒', '账户异常需验证', '免费领 iPhone', '🎁 中奖通知'];
+const SCAM_BODIES = ['不处理将自动安装', '点此验证身份', '填写信息领取', '倒计时结束即扣费'];
 
 function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -20,98 +32,48 @@ function recalcPhone(customer: CustomerRuntime): number {
   return total;
 }
 
-function phoneWorkTotal(customer: CustomerRuntime): number {
-  const phone = customer.phone;
-  return (
-    recalcPhone(customer) +
-    Math.max(0, phone.adNotifications) +
-    Math.ceil(Math.max(0, phone.junkMb) / 45) +
-    Math.ceil(Math.max(0, phone.memoryLoad) / 10) +
-    Math.max(0, phone.backgroundApps)
-  );
+function pick<T>(items: readonly T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
 }
 
-function taskRects(phone: PhoneLayout): Array<{ kind: 'junk' | 'memory' | 'background'; x: number; y: number; w: number; h: number }> {
-  const gap = Math.max(4, phone.screenH * 0.014);
-  const cardH = Math.max(22, Math.min(38, phone.screenH * 0.105));
-  const startY = phone.screenY + phone.screenH * (phone.customer.phone.system === 'android' ? 0.56 : 0.66);
-  const rects: Array<{ kind: 'junk' | 'memory' | 'background'; x: number; y: number; w: number; h: number }> = [];
-  const x = phone.screenX + phone.screenW * 0.07;
-  const w = phone.screenW * 0.86;
-  if (phone.customer.phone.system === 'android') {
-    rects.push({ kind: 'junk', x, y: startY, w, h: cardH });
-    rects.push({ kind: 'memory', x, y: startY + cardH + gap, w, h: cardH });
-  }
-  rects.push({ kind: 'background', x, y: startY + rects.length * (cardH + gap), w, h: cardH });
-  return rects;
-}
+let popupSeq = 0;
 
-function pointInRect(point: { x: number; y: number }, rect: { x: number; y: number; w: number; h: number }): boolean {
-  return point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h;
-}
-
-function findIconAt(ctx: GameContext, x: number, y: number, extraRadius: number): IconLayout | null {
-  const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
-  let best: { icon: IconLayout; d: number } | null = null;
-  for (const phone of layout.phoneLayouts) {
-    for (const icon of phone.icons) {
-      if (icon.icon.badge <= 0) {
-        continue;
-      }
-      const radius = icon.size * 0.62 + extraRadius;
-      const d = distance({ x, y }, icon);
-      if (d <= radius && (!best || d < best.d)) {
-        best = { icon, d };
-      }
-    }
-  }
-  return best?.icon ?? null;
-}
-
-function iconsAlongPath(ctx: GameContext, path: { x: number; y: number }[]): IconLayout[] {
-  const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
-  const touched = new Map<string, IconLayout>();
-  for (const phone of layout.phoneLayouts) {
-    for (const icon of phone.icons) {
-      if (icon.icon.badge <= 0) {
-        continue;
-      }
-      const radius = icon.size * 0.68;
-      if (path.some((point) => distance(point, icon) <= radius)) {
-        touched.set(icon.icon.id, icon);
-      }
-    }
-  }
-  return [...touched.values()];
-}
-
-function emitClear(ctx: GameContext, icon: IconLayout, amount: number): void {
-  ctx.bus.emit({
-    type: 'BADGE_CLEARED',
-    customerId: icon.customerId,
-    iconId: icon.icon.id,
-    amount,
-    x: icon.badgeX,
-    y: icon.badgeY,
-  });
-}
-
-function taskReward(ctx: GameContext, customer: CustomerRuntime, kind: 'ad' | 'junk' | 'memory' | 'background', amount: number, x: number, y: number): void {
-  const units = kind === 'junk' ? Math.max(1, Math.ceil(amount / 45)) : Math.max(1, amount);
-  customer.clearedBadges += units;
-  ctx.state.totalCleared += units;
-  const xpMult = performance.now() < ctx.state.effects.tipBoostUntil ? ctx.state.effects.tipBoostMult : 1;
-  ctx.bus.emit({ type: 'XP_GAINED', amount: units * ctx.state.derived.xpPerBadge * xpMult });
-  ctx.bus.emit({ type: 'PHONE_TASK_CLEARED', customerId: customer.id, kind, amount, x, y });
-  if (phoneWorkTotal(customer) <= 0 && !customer.phone.cleaned) {
-    customer.phone.cleaned = true;
-    ctx.bus.emit({ type: 'PHONE_CLEANED', customerId: customer.id });
-  }
+function buildPopup(kind: PopupKind, now: number, graceMs: number): PhonePopup {
+  popupSeq += 1;
+  const fw = 0.62 + Math.random() * 0.22;
+  const fh = 0.15 + Math.random() * 0.08;
+  const fx = Math.min(Math.max((1 - fw) / 2 + (Math.random() - 0.5) * 0.12, 0.04), 1 - fw - 0.04);
+  const fy = Math.min(Math.max(0.2 + Math.random() * 0.42, 0.18), 0.9 - fh);
+  return {
+    id: `popup_${Math.floor(now)}_${popupSeq}`,
+    kind,
+    fx,
+    fy,
+    fw,
+    fh,
+    closeFx: 0.82,
+    closeFy: 0.07,
+    closeFw: 0.15,
+    closeFh: 0.34,
+    bornAt: now,
+    installAt: kind === 'scam' ? now + graceMs : Number.POSITIVE_INFINITY,
+    title: kind === 'scam' ? pick(SCAM_TITLES) : pick(AD_TITLES),
+    body: kind === 'scam' ? pick(SCAM_BODIES) : pick(AD_BODIES),
+    accent: kind === 'scam' ? '#FF3B30' : '#FF9F43',
+  };
 }
 
 export function createCoreModule(): GameModule {
   let ctx: GameContext;
   let saveAccumulator = 0;
+
+  function frozen(now: number): boolean {
+    return now < ctx.state.effects.freezeIncomingUntil;
+  }
+
+  function emitClear(icon: IconLayout, amount: number): void {
+    ctx.bus.emit({ type: 'BADGE_CLEARED', customerId: icon.customerId, iconId: icon.icon.id, amount, x: icon.badgeX, y: icon.badgeY });
+  }
 
   function applyClear(event: Extract<GameEvent, { type: 'BADGE_CLEARED' }>): void {
     const customer = ctx.state.activeCustomers.find((item) => item.id === event.customerId);
@@ -120,7 +82,6 @@ export function createCoreModule(): GameModule {
       event.amount = 0;
       return;
     }
-
     const amount = Math.min(icon.badge, Math.max(1, Math.floor(event.amount)));
     icon.badge -= amount;
     customer.clearedBadges += amount;
@@ -130,88 +91,105 @@ export function createCoreModule(): GameModule {
     const xpMult = performance.now() < ctx.state.effects.tipBoostUntil ? ctx.state.effects.tipBoostMult : 1;
     ctx.bus.emit({ type: 'XP_GAINED', amount: amount * ctx.state.derived.xpPerBadge * xpMult });
 
-    if (phoneWorkTotal(customer) <= 0 && !customer.phone.cleaned) {
+    if (recalcPhone(customer) <= 0 && !customer.phone.cleaned) {
       customer.phone.cleaned = true;
       ctx.bus.emit({ type: 'PHONE_CLEANED', customerId: customer.id });
     }
   }
 
-  function clearPhoneTask(phone: PhoneLayout, kind: 'junk' | 'memory' | 'background', x: number, y: number): boolean {
-    const customer = phone.customer;
-    if (kind === 'junk') {
-      if (customer.phone.system !== 'android' || customer.phone.junkMb <= 0) return false;
-      const amount = Math.min(customer.phone.junkMb, ctx.state.derived.junkClearMb);
-      customer.phone.junkMb -= amount;
-      taskReward(ctx, customer, 'junk', amount, x, y);
-      return true;
-    }
-    if (kind === 'memory') {
-      if (customer.phone.system !== 'android' || customer.phone.memoryLoad <= 0) return false;
-      const amount = Math.min(customer.phone.memoryLoad, ctx.state.derived.memoryClearPower);
-      customer.phone.memoryLoad -= amount;
-      taskReward(ctx, customer, 'memory', amount, x, y);
-      return true;
-    }
-    if (customer.phone.backgroundApps <= 0) return false;
-    const amount = Math.min(customer.phone.backgroundApps, ctx.state.derived.backgroundClearPower);
-    customer.phone.backgroundApps -= amount;
-    taskReward(ctx, customer, 'background', amount, x, y);
-    return true;
-  }
-
-  function clearNotificationShade(phone: PhoneLayout, x: number, y: number): boolean {
-    const customer = phone.customer;
-    if (customer.phone.adNotifications <= 0) {
-      return false;
-    }
-    const amount = Math.min(customer.phone.adNotifications, ctx.state.derived.adClearPower);
-    customer.phone.adNotifications -= amount;
-    taskReward(ctx, customer, 'ad', amount, x, y);
-    return true;
-  }
-
-  function handleTaskTap(event: Extract<GameEvent, { type: 'TAP' }>): boolean {
+  function findIconAt(x: number, y: number, extraRadius: number): IconLayout | null {
     const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    let best: { icon: IconLayout; d: number } | null = null;
     for (const phone of layout.phoneLayouts) {
-      for (const rect of taskRects(phone)) {
-        if (pointInRect(event, rect) && clearPhoneTask(phone, rect.kind, event.x, event.y)) {
-          return true;
+      for (const icon of phone.icons) {
+        if (icon.icon.badge <= 0 || iconCoveredByPopup(phone, icon)) {
+          continue;
+        }
+        const radius = icon.size * 0.62 + extraRadius;
+        const d = distance({ x, y }, icon);
+        if (d <= radius && (!best || d < best.d)) {
+          best = { icon, d };
         }
       }
     }
-    return false;
+    return best?.icon ?? null;
   }
 
-  function handleNotificationPull(path: { x: number; y: number }[]): boolean {
-    const first = path[0];
-    const last = path[path.length - 1];
-    if (!first || !last || last.y - first.y < 46 || Math.abs(last.x - first.x) > Math.abs(last.y - first.y) * 0.85) {
-      return false;
+  function iconsAlongPath(path: { x: number; y: number }[]): IconLayout[] {
+    const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    const touched = new Map<string, IconLayout>();
+    for (const phone of layout.phoneLayouts) {
+      for (const icon of phone.icons) {
+        if (icon.icon.badge <= 0 || iconCoveredByPopup(phone, icon)) {
+          continue;
+        }
+        const radius = icon.size * 0.68;
+        if (path.some((point) => distance(point, icon) <= radius)) {
+          touched.set(icon.icon.id, icon);
+        }
+      }
     }
+    return [...touched.values()];
+  }
+
+  function closePopup(customer: CustomerRuntime, popup: PhonePopup, cx: number, cy: number): void {
+    customer.phone.popups = customer.phone.popups.filter((item) => item.id !== popup.id);
+    const defused = popup.kind === 'scam';
+    // 关闭弹窗给一点正反馈：广告 +1，拆掉诈骗 +3（按经验系数）
+    const reward = (defused ? 3 : 1) * ctx.state.derived.xpPerBadge;
+    ctx.bus.emit({ type: 'XP_GAINED', amount: reward });
+    ctx.bus.emit({ type: 'POPUP_CLOSED', customerId: customer.id, kind: popup.kind, x: cx, y: cy, defused });
+  }
+
+  /** 弹窗在图标之上：先处理弹窗点击（关闭 ✕），命中即吞掉本次点击。 */
+  function handlePopupTap(x: number, y: number): boolean {
     const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
     for (const phone of layout.phoneLayouts) {
-      const startsInShade = first.x >= phone.screenX && first.x <= phone.screenX + phone.screenW && first.y >= phone.screenY && first.y <= phone.screenY + phone.screenH * 0.34;
-      if (startsInShade && clearNotificationShade(phone, last.x, last.y)) {
+      const popups = phone.customer.phone.popups;
+      // 顶层（数组末尾）优先
+      for (let i = popups.length - 1; i >= 0; i -= 1) {
+        const popup = popups[i];
+        const rect = popupRectOf(phone, popup);
+        if (!rectContains(rect, x, y)) {
+          continue;
+        }
+        if (rectContains({ x: rect.closeX, y: rect.closeY, w: rect.closeW, h: rect.closeH }, x, y)) {
+          closePopup(phone.customer, popup, rect.closeX + rect.closeW / 2, rect.closeY + rect.closeH / 2);
+        }
+        // 点到弹窗任意处都算"被弹窗挡住"，吞掉这次点击（防止穿透清角标）
         return true;
       }
     }
     return false;
   }
 
-  function handleTap(event: Extract<GameEvent, { type: 'TAP' }>): void {
-    const magnet = performance.now() < ctx.state.effects.magnetUntil ? 46 : 0;
-    const hit = findIconAt(ctx, event.x, event.y, magnet);
-    if (hit) {
-      emitClear(ctx, hit, ctx.state.derived.clearPerHit);
+  function spawnPopup(phone: PhoneLayout['customer']['phone'], kind: PopupKind, now: number): void {
+    if (phone.popups.length >= MAX_POPUPS_PER_PHONE) {
       return;
     }
-    if (handleTaskTap(event)) {
+    phone.popups.push(buildPopup(kind, now, ctx.state.derived.scamGraceMs));
+  }
+
+  function scamPenalty(): number {
+    const antivirus = ctx.state.upgrades['up_antivirus'] ?? 0;
+    return Math.max(5, Math.round((9 + ctx.state.level * 3) * (1 - 0.12 * antivirus)));
+  }
+
+  function handleTap(event: Extract<GameEvent, { type: 'TAP' }>): void {
+    if (event.consumed) {
       return;
+    }
+    if (handlePopupTap(event.x, event.y)) {
+      return;
+    }
+    const hit = findIconAt(event.x, event.y, 0);
+    if (hit) {
+      emitClear(hit, ctx.state.derived.clearPerHit);
     }
   }
 
   function handleSwipe(event: Extract<GameEvent, { type: 'SWIPE' }>): void {
-    if (handleNotificationPull(event.path)) {
+    if (event.consumed) {
       return;
     }
     if (!ctx.state.derived.swipeEnabled) {
@@ -221,8 +199,8 @@ export function createCoreModule(): GameModule {
       }
       return;
     }
-    for (const icon of iconsAlongPath(ctx, event.path)) {
-      emitClear(ctx, icon, ctx.state.derived.clearPerHit);
+    for (const icon of iconsAlongPath(event.path)) {
+      emitClear(icon, ctx.state.derived.clearPerHit);
     }
   }
 
@@ -239,36 +217,58 @@ export function createCoreModule(): GameModule {
     customer.phone.badgeTotal += 1;
   }
 
-  function updateIncoming(dt: number): void {
+  function updateWorld(dt: number): void {
     const now = performance.now();
-    if (now < ctx.state.effects.freezeIncomingUntil) {
-      return;
-    }
-    for (const customer of ctx.state.activeCustomers) {
-      if (customer.phone.cleaned) {
+    const isFrozen = frozen(now);
+    const layoutCustomers = ctx.state.activeCustomers;
+    for (const customer of layoutCustomers) {
+      const phone = customer.phone;
+      if (phone.cleaned) {
         continue;
       }
-      const interval = INCOMING_BASE_INTERVAL_MS / Math.max(0.2, customer.phone.incomingRateMult);
-      customer.phone.incomingAccumulatorMs += dt;
-      let guard = 0;
-      while (customer.phone.incomingAccumulatorMs >= interval && guard < 8) {
-        customer.phone.incomingAccumulatorMs -= interval;
-        addIncomingBadge(customer);
-        guard += 1;
+
+      // 新角标涌入
+      if (!isFrozen) {
+        const interval = INCOMING_BASE_INTERVAL_MS / Math.max(0.2, phone.incomingRateMult);
+        phone.incomingAccumulatorMs += dt;
+        let guard = 0;
+        while (phone.incomingAccumulatorMs >= interval && guard < 8) {
+          phone.incomingAccumulatorMs -= interval;
+          addIncomingBadge(customer);
+          guard += 1;
+        }
       }
-      customer.phone.notificationAccumulatorMs += dt;
-      const notificationInterval = Math.max(2_800, 6_200 / Math.max(0.55, customer.phone.incomingRateMult));
-      while (customer.phone.notificationAccumulatorMs >= notificationInterval && customer.phone.adNotifications < 5) {
-        customer.phone.notificationAccumulatorMs -= notificationInterval;
-        customer.phone.adNotifications += 1;
+
+      // 广告弹窗
+      phone.popupAccumulatorMs += dt;
+      if (!isFrozen && phone.popupAccumulatorMs >= ctx.state.derived.adSpawnIntervalMs && phone.popups.length < MAX_POPUPS_PER_PHONE) {
+        phone.popupAccumulatorMs = 0;
+        spawnPopup(phone, 'ad', now);
       }
-      customer.phone.utilityAccumulatorMs += dt;
-      if (customer.phone.utilityAccumulatorMs >= 4_800) {
-        customer.phone.utilityAccumulatorMs = 0;
-        customer.phone.backgroundApps = Math.min(8, customer.phone.backgroundApps + 1);
-        if (customer.phone.system === 'android') {
-          customer.phone.junkMb = Math.min(999, customer.phone.junkMb + 18 + Math.floor(ctx.state.level * 1.5));
-          customer.phone.memoryLoad = Math.min(100, customer.phone.memoryLoad + 4);
+
+      // 诈骗弹窗（限一个在场）
+      phone.scamAccumulatorMs += dt;
+      const hasScam = phone.popups.some((item) => item.kind === 'scam');
+      if (
+        !isFrozen &&
+        ctx.state.level >= SCAM_UNLOCK_LEVEL &&
+        !hasScam &&
+        phone.scamAccumulatorMs >= ctx.state.derived.scamSpawnIntervalMs &&
+        phone.popups.length < MAX_POPUPS_PER_PHONE
+      ) {
+        phone.scamAccumulatorMs = 0;
+        spawnPopup(phone, 'scam', now);
+      }
+
+      // 诈骗到点自动安装：扣费 + 激怒 + 可能扩散
+      for (let i = phone.popups.length - 1; i >= 0; i -= 1) {
+        const popup = phone.popups[i];
+        if (popup.kind === 'scam' && now >= popup.installAt) {
+          phone.popups.splice(i, 1);
+          const penalty = scamPenalty();
+          ctx.bus.emit({ type: 'SCAM_INSTALLED', customerId: customer.id, x: 0, y: 0, penalty });
+          // 恶意软件扩散：再弹一个广告
+          spawnPopup(phone, 'ad', now);
         }
       }
     }
@@ -284,7 +284,7 @@ export function createCoreModule(): GameModule {
     },
     update(dt) {
       ctx.state.lastTickAt = performance.now();
-      updateIncoming(dt);
+      updateWorld(dt);
       saveAccumulator += dt;
       if (saveAccumulator >= 3_000) {
         saveAccumulator = 0;

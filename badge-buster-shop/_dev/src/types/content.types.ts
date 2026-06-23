@@ -19,7 +19,7 @@ export type UpgradeCategory =
   | 'patience'
   | 'swipe'
   | 'payout'
-  | 'phoneTask';
+  | 'defense';
 
 export interface UpgradeDef {
   id: string;
@@ -35,18 +35,19 @@ export interface UpgradeDef {
 
 export type SkillEffect =
   | { kind: 'clearActivePhone' }
+  | { kind: 'closeAllPopups' }
   | { kind: 'smashActivePhone' }
   | { kind: 'freezeIncoming'; durationMs: number }
   | { kind: 'sootheQueue' }
   | { kind: 'extraHands'; hands: number; durationMs: number }
-  | { kind: 'tipBoost'; mult: number; durationMs: number }
-  | { kind: 'magnet'; durationMs: number };
+  | { kind: 'tipBoost'; mult: number; durationMs: number };
 
 export interface SkillDef {
   id: string;
   name: string;
   desc: string;
   artId: string;
+  icon: string;
   unlockLevel: number;
   cooldownMs: number;
   effect: SkillEffect;

@@ -26,14 +26,29 @@ export function createSkillsModule(): GameModule {
       return;
     }
     for (const icon of phone.icons.filter((item) => item.icon.badge > 0)) {
-      ctx.bus.emit({
-        type: 'BADGE_CLEARED',
-        customerId: icon.customerId,
-        iconId: icon.icon.id,
-        amount: icon.icon.badge,
-        x: icon.badgeX,
-        y: icon.badgeY,
-      });
+      ctx.bus.emit({ type: 'BADGE_CLEARED', customerId: icon.customerId, iconId: icon.icon.id, amount: icon.icon.badge, x: icon.badgeX, y: icon.badgeY });
+    }
+  }
+
+  function closeAllPopups(): void {
+    const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    for (const phone of layout.phoneLayouts) {
+      const popups = phone.customer.phone.popups;
+      if (popups.length === 0) {
+        continue;
+      }
+      for (const popup of popups) {
+        ctx.bus.emit({
+          type: 'POPUP_CLOSED',
+          customerId: phone.customer.id,
+          kind: popup.kind,
+          x: phone.screenX + (popup.fx + popup.fw / 2) * phone.screenW,
+          y: phone.screenY + (popup.fy + popup.fh / 2) * phone.screenH,
+          defused: popup.kind === 'scam',
+        });
+      }
+      ctx.bus.emit({ type: 'XP_GAINED', amount: popups.length * ctx.state.derived.xpPerBadge });
+      phone.customer.phone.popups = [];
     }
   }
 
@@ -52,42 +67,10 @@ export function createSkillsModule(): GameModule {
       iconCount: targets.length,
       totalBadges: phone.customer.phone.badgeTotal,
     });
+    phone.customer.phone.popups = [];
     for (const icon of targets) {
-      ctx.bus.emit({
-        type: 'BADGE_CLEARED',
-        customerId: icon.customerId,
-        iconId: icon.icon.id,
-        amount: icon.icon.badge,
-        x: icon.x,
-        y: icon.y,
-      });
+      ctx.bus.emit({ type: 'BADGE_CLEARED', customerId: icon.customerId, iconId: icon.icon.id, amount: icon.icon.badge, x: icon.x, y: icon.y });
     }
-    const utilityEvents: Array<{ kind: 'ad' | 'junk' | 'memory' | 'background'; amount: number; yOffset: number }> = [
-      { kind: 'ad', amount: phone.customer.phone.adNotifications, yOffset: -phone.h * 0.18 },
-      { kind: 'junk', amount: phone.customer.phone.junkMb, yOffset: -phone.h * 0.04 },
-      { kind: 'memory', amount: phone.customer.phone.memoryLoad, yOffset: phone.h * 0.1 },
-      { kind: 'background', amount: phone.customer.phone.backgroundApps, yOffset: phone.h * 0.22 },
-    ];
-    phone.customer.phone.adNotifications = 0;
-    phone.customer.phone.junkMb = 0;
-    phone.customer.phone.memoryLoad = 0;
-    phone.customer.phone.backgroundApps = 0;
-    for (const item of utilityEvents.filter((event) => event.amount > 0)) {
-      const units = item.kind === 'junk' ? Math.ceil(item.amount / 45) : Math.ceil(item.amount);
-      phone.customer.clearedBadges += units;
-      ctx.state.totalCleared += units;
-      ctx.bus.emit({ type: 'XP_GAINED', amount: units * ctx.state.derived.xpPerBadge });
-      ctx.bus.emit({
-        type: 'PHONE_TASK_CLEARED',
-        customerId: phone.customer.id,
-        kind: item.kind,
-        amount: item.amount,
-        x: phone.x + phone.w / 2,
-        y: phone.y + phone.h / 2 + item.yOffset,
-      });
-    }
-    phone.customer.phone.cleaned = true;
-    ctx.bus.emit({ type: 'PHONE_CLEANED', customerId: phone.customer.id });
   }
 
   function useSkill(id: string): void {
@@ -97,11 +80,13 @@ export function createSkillsModule(): GameModule {
     if (!skill || !runtime?.unlocked || now - runtime.lastUsedAt < skill.cooldownMs) {
       return;
     }
-
     runtime.lastUsedAt = now;
     switch (skill.effect.kind) {
       case 'clearActivePhone':
         clearActivePhone();
+        break;
+      case 'closeAllPopups':
+        closeAllPopups();
         break;
       case 'smashActivePhone':
         smashActivePhone();
@@ -118,9 +103,6 @@ export function createSkillsModule(): GameModule {
       case 'tipBoost':
         ctx.state.effects.tipBoostUntil = now + skill.effect.durationMs;
         ctx.state.effects.tipBoostMult = skill.effect.mult;
-        break;
-      case 'magnet':
-        ctx.state.effects.magnetUntil = now + skill.effect.durationMs;
         break;
     }
     ctx.bus.emit({ type: 'SKILL_USED', id });

@@ -1,4 +1,12 @@
-import { BASE_ARRIVAL_INTERVAL_MS, clamp, upgradeCost, xpToNextLevel } from '../content/balance';
+import {
+  AD_POPUP_BASE_INTERVAL_MS,
+  BASE_ARRIVAL_INTERVAL_MS,
+  SCAM_GRACE_BASE_MS,
+  SCAM_POPUP_BASE_INTERVAL_MS,
+  clamp,
+  upgradeCost,
+  xpToNextLevel,
+} from '../content/balance';
 import type { UpgradeDef } from '../types/content.types';
 import type { GameContext, GameModule } from '../types/module.types';
 
@@ -17,24 +25,24 @@ export function recalcDerived(ctx: GameContext): void {
   const botCountLevel = upgradeLevel(ctx, 'up_botcount');
   const botSpeedLevel = upgradeLevel(ctx, 'up_botspeed');
   const payoutLevel = upgradeLevel(ctx, 'up_payout');
-  const adClearLevel = upgradeLevel(ctx, 'up_adclear');
-  const junkClearLevel = upgradeLevel(ctx, 'up_junkclear');
-  const memoryClearLevel = upgradeLevel(ctx, 'up_memclear');
-  const backgroundClearLevel = upgradeLevel(ctx, 'up_bgclear');
+  const adblockLevel = upgradeLevel(ctx, 'up_adblock');
+  const antivirusLevel = upgradeLevel(ctx, 'up_antivirus');
   const repMult = 0.7 + ctx.state.reputation * 0.12;
   const levelPressure = 1 + Math.max(0, ctx.state.level - 1) * 0.018;
 
   ctx.state.derived.clearPerHit = 1 + clearLevel;
-  ctx.state.derived.xpPerBadge = Math.pow(1.15, valueLevel);
-  ctx.state.derived.payoutMult = Math.pow(1.2, payoutLevel) * clamp(repMult, 0.55, 1.35);
+  ctx.state.derived.xpPerBadge = Math.pow(1.12, valueLevel);
+  ctx.state.derived.payoutMult = Math.pow(1.18, payoutLevel) * clamp(repMult, 0.55, 1.35);
   ctx.state.derived.swipeEnabled = swipeLevel > 0;
   ctx.state.derived.botCount = botCountLevel;
-  ctx.state.derived.botRatePerSec = botCountLevel * 0.5 * Math.pow(1.2, botSpeedLevel);
+  ctx.state.derived.botRatePerSec = botCountLevel * 0.5 * Math.pow(1.18, botSpeedLevel);
   ctx.state.derived.arrivalIntervalMs = Math.max(2_400, Math.floor(BASE_ARRIVAL_INTERVAL_MS / (repMult * levelPressure)));
-  ctx.state.derived.adClearPower = 1 + adClearLevel;
-  ctx.state.derived.junkClearMb = 45 + junkClearLevel * 35;
-  ctx.state.derived.memoryClearPower = 16 + memoryClearLevel * 10;
-  ctx.state.derived.backgroundClearPower = 1 + Math.floor(backgroundClearLevel / 2);
+
+  // 弹窗节奏：等级越高越频繁，对抗类升级减缓之
+  const popPressure = 1 + Math.max(0, ctx.state.level - 1) * 0.03;
+  ctx.state.derived.adSpawnIntervalMs = Math.max(2_200, Math.floor((AD_POPUP_BASE_INTERVAL_MS * (1 + 0.42 * adblockLevel)) / popPressure));
+  ctx.state.derived.scamSpawnIntervalMs = Math.max(7_000, Math.floor((SCAM_POPUP_BASE_INTERVAL_MS * (1 + 0.55 * antivirusLevel)) / (1 + Math.max(0, ctx.state.level - 1) * 0.02)));
+  ctx.state.derived.scamGraceMs = SCAM_GRACE_BASE_MS + antivirusLevel * 1_200;
 }
 
 export function createEconomyModule(): GameModule {
@@ -82,6 +90,9 @@ export function createEconomyModule(): GameModule {
       ctx.bus.on('XP_GAINED', (event) => handleXp(event.amount));
       ctx.bus.on('PHONE_RETURNED', (event) => {
         ctx.state.points += event.payout;
+      });
+      ctx.bus.on('SCAM_INSTALLED', (event) => {
+        ctx.state.points = Math.max(0, ctx.state.points - event.penalty);
       });
       ctx.bus.on('BUY_UPGRADE', (event) => buyUpgrade(event.id));
       ctx.bus.on('REPUTATION_CHANGED', () => recalcDerived(ctx));
