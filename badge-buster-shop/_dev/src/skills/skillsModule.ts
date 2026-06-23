@@ -37,6 +37,33 @@ export function createSkillsModule(): GameModule {
     }
   }
 
+  function smashActivePhone(): void {
+    const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    const phone = layout.phoneLayouts.find((item) => item.customer.phone.badgeTotal > 0);
+    if (!phone) {
+      return;
+    }
+    const targets = phone.icons.filter((item) => item.icon.badge > 0);
+    ctx.bus.emit({
+      type: 'PHONE_SMASHED',
+      customerId: phone.customer.id,
+      x: phone.x + phone.w / 2,
+      y: phone.y + phone.h / 2,
+      iconCount: targets.length,
+      totalBadges: phone.customer.phone.badgeTotal,
+    });
+    for (const icon of targets) {
+      ctx.bus.emit({
+        type: 'BADGE_CLEARED',
+        customerId: icon.customerId,
+        iconId: icon.icon.id,
+        amount: icon.icon.badge,
+        x: icon.x,
+        y: icon.y,
+      });
+    }
+  }
+
   function useSkill(id: string): void {
     const skill = getSkill(ctx, id);
     const runtime = ctx.state.skills[id];
@@ -49,6 +76,9 @@ export function createSkillsModule(): GameModule {
     switch (skill.effect.kind) {
       case 'clearActivePhone':
         clearActivePhone();
+        break;
+      case 'smashActivePhone':
+        smashActivePhone();
         break;
       case 'freezeIncoming':
         ctx.state.effects.freezeIncomingUntil = now + skill.effect.durationMs;

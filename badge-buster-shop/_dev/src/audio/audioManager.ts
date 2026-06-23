@@ -59,6 +59,12 @@ export function createAudioModule(): GameModule {
     window.setTimeout(() => playTone(987.77, 0.16, 0.048, 'triangle', 1.12), 170);
   }
 
+  function playSmash(): void {
+    playTone(92, 0.28, 0.075, 'sawtooth', 0.55);
+    window.setTimeout(() => playTone(370, 0.13, 0.055, 'square', 1.8), 70);
+    window.setTimeout(() => playTone(740, 0.16, 0.05, 'triangle', 1.35), 150);
+  }
+
   function startBgm(): void {
     if (!audioCtx || !master || bgm) {
       return;
@@ -121,6 +127,7 @@ export function createAudioModule(): GameModule {
       });
       ctx.bus.on('LEVEL_UP', () => playChord(523.25));
       ctx.bus.on('PHONE_RETURNED', () => playChord(392));
+      ctx.bus.on('PHONE_SMASHED', playSmash);
       ctx.bus.on('CUSTOMER_ARRIVED', () => playTone(660, 0.12, 0.045, 'triangle', 1.25));
       ctx.bus.on('CUSTOMER_LEFT', (event) => playTone(event.reason === 'overflow' ? 180 : 140, 0.22, 0.055, 'sawtooth', 0.7));
       ctx.bus.on('SKILL_USED', playSkillHit);

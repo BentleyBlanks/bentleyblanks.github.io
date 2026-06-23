@@ -34,6 +34,7 @@ export interface UpgradeDef {
 
 export type SkillEffect =
   | { kind: 'clearActivePhone' }
+  | { kind: 'smashActivePhone' }
   | { kind: 'freezeIncoming'; durationMs: number }
   | { kind: 'sootheQueue' }
   | { kind: 'extraHands'; hands: number; durationMs: number }

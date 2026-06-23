@@ -136,7 +136,7 @@ export function createUiModule(): GameModule {
         <div class="rep-row"><span>声誉</span><span class="stars">${stars()}</span></div>
         <div class="effect-row">
           <span>每次清 ${formatNumber(ctx.state.derived.clearPerHit)}</span>
-          <span>${ctx.state.derived.swipeEnabled ? '按住滑动清' : '点按清理'}</span>
+          <span>${ctx.state.derived.swipeEnabled ? '按住滑动清' : '买手势解锁滑动'}</span>
           <span>学徒 ${ctx.state.derived.botCount}</span>
         </div>
       </section>

@@ -15,7 +15,7 @@ export const upgrades: UpgradeDef[] = [
   {
     id: 'up_swipe',
     name: '顺滑手势',
-    desc: '滑动清理时更容易连起来。',
+    desc: '解锁按住滑动，拖过红色角标即可连清。',
     category: 'swipe',
     artId: 'up_swipe',
     baseCost: 100,
@@ -37,12 +37,12 @@ export const upgrades: UpgradeDef[] = [
   {
     id: 'up_slot',
     name: '加装工位',
-    desc: '同时处理更多手机。',
+    desc: '桌面上多摆一台手机，同时处理更多订单。',
     category: 'slot',
     artId: 'up_slot',
     baseCost: 500,
     costGrowth: 1.25,
-    maxLevel: 3,
+    maxLevel: 5,
     effect: (level) => level,
   },
   {

@@ -55,4 +55,13 @@ export const skills: SkillDef[] = [
     cooldownMs: 60_000,
     effect: { kind: 'magnet', durationMs: 10_000 },
   },
+  {
+    id: 'skill_smash',
+    name: '砸机收割',
+    desc: '砸碎当前手机，所有图标一次飞出并结算。',
+    artId: 'skill_smash',
+    unlockLevel: 24,
+    cooldownMs: 150_000,
+    effect: { kind: 'smashActivePhone' },
+  },
 ];

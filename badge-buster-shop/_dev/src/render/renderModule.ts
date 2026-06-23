@@ -6,7 +6,7 @@ import type { Mood } from '../types/state.types';
 const TAU = Math.PI * 2;
 
 interface VisualEffect {
-  kind: 'pop' | 'return' | 'level' | 'leave' | 'skill' | 'combo';
+  kind: 'pop' | 'return' | 'level' | 'leave' | 'skill' | 'combo' | 'smash';
   x: number;
   y: number;
   age: number;
@@ -401,6 +401,58 @@ export function createRenderModule(): GameModule {
     fillRound(c, item.x + 44, item.y + item.h - 18, meterW * clamp01(ratio), 7, 3, moodColor(item.customer.mood));
   }
 
+  function drawPhoneStation(phone: PhoneLayout, skin: PhoneSkin): void {
+    const c = ctx.ctx2d;
+    const matX = phone.x - phone.w * 0.16;
+    const matY = phone.y + phone.h * 0.78;
+    const matW = phone.w * 1.32;
+    const matH = phone.h * 0.23;
+    const mat = c.createLinearGradient(matX, matY, matX + matW, matY + matH);
+    mat.addColorStop(0, alphaColor(skin.accent, 0.18));
+    mat.addColorStop(0.5, 'rgba(255,255,255,0.42)');
+    mat.addColorStop(1, 'rgba(35,44,58,0.18)');
+
+    c.save();
+    c.shadowColor = 'rgba(43, 43, 51, 0.16)';
+    c.shadowBlur = 18;
+    c.shadowOffsetY = 8;
+    fillRound(c, matX, matY, matW, matH, 14, mat);
+    c.shadowColor = 'transparent';
+    strokeRound(c, matX + 1, matY + 1, matW - 2, matH - 2, 13, alphaColor(skin.accent, 0.28));
+
+    c.globalAlpha = 0.34;
+    c.strokeStyle = '#FFFFFF';
+    c.lineWidth = 1;
+    for (let offset = 12; offset < matW; offset += 18) {
+      c.beginPath();
+      c.moveTo(matX + offset, matY + 8);
+      c.lineTo(matX + offset - 26, matY + matH - 7);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+
+    c.strokeStyle = alphaColor(skin.bezel, 0.38);
+    c.lineWidth = Math.max(2, phone.w * 0.012);
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(phone.x + phone.w * 0.5, phone.y + phone.h * 0.965);
+    c.bezierCurveTo(phone.x + phone.w * 0.66, phone.y + phone.h * 1.02, matX + matW * 0.88, matY + matH * 0.64, matX + matW * 1.05, matY + matH * 0.76);
+    c.stroke();
+
+    fillRound(c, matX + matW * 0.76, matY + matH * 0.46, matW * 0.14, matH * 0.28, 5, 'rgba(255,255,255,0.72)');
+    strokeRound(c, matX + matW * 0.76, matY + matH * 0.46, matW * 0.14, matH * 0.28, 5, 'rgba(119,141,169,0.32)');
+
+    const noteW = Math.min(52, phone.w * 0.28);
+    const noteH = Math.min(34, phone.h * 0.09);
+    fillRound(c, matX + matW * 0.08, matY + matH * 0.48, noteW, noteH, 5, 'rgba(255, 238, 153, 0.78)');
+    c.fillStyle = 'rgba(91, 77, 36, 0.5)';
+    c.font = `800 ${Math.max(7, phone.w * 0.032)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('待清', matX + matW * 0.08 + noteW / 2, matY + matH * 0.48 + noteH / 2, noteW - 6);
+    c.restore();
+  }
+
   function drawWallpaper(phone: PhoneLayout, skin: PhoneSkin): void {
     const c = ctx.ctx2d;
     const screenRadius = phone.w * (skin.model === 'senior' ? 0.035 : 0.065);
@@ -521,6 +573,7 @@ export function createRenderModule(): GameModule {
     body.addColorStop(0, mixColor(skin.bodyTop, '#FFFFFF', skin.model === 'senior' ? 0.18 : 0.08));
     body.addColorStop(0.55, skin.bodyTop);
     body.addColorStop(1, skin.bodyBottom);
+    drawPhoneStation(phone, skin);
     c.save();
     c.shadowColor = 'rgba(43, 43, 51, 0.24)';
     c.shadowBlur = 24;
@@ -805,6 +858,31 @@ export function createRenderModule(): GameModule {
         c.fillStyle = '#B66E00';
         c.font = '1000 18px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
         c.fillText(effect.label, 0, 1);
+      } else if (effect.kind === 'smash') {
+        const radius = 26 + t * 190 * effect.power;
+        c.translate(effect.x, effect.y);
+        c.strokeStyle = alphaColor('#FF3B30', 0.72);
+        c.lineWidth = 5 * (1 - t) + 1.5;
+        c.beginPath();
+        c.arc(0, 0, radius, 0, TAU);
+        c.stroke();
+        c.strokeStyle = alphaColor('#2B2B33', 0.72);
+        c.lineWidth = 3;
+        for (let crack = 0; crack < 12; crack += 1) {
+          const angle = crack * (TAU / 12) + Math.sin(crack * 12.989) * 0.26;
+          const inner = 12 + t * 12;
+          const outer = 38 + t * 82 * (0.7 + (crack % 4) * 0.12);
+          c.beginPath();
+          c.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+          c.lineTo(Math.cos(angle + 0.18) * outer * 0.62, Math.sin(angle + 0.18) * outer * 0.62);
+          c.lineTo(Math.cos(angle - 0.08) * outer, Math.sin(angle - 0.08) * outer);
+          c.stroke();
+        }
+        fillRound(c, -76, -23 - t * 18, 152, 46, 23, 'rgba(255,255,255,0.9)');
+        strokeRound(c, -76, -23 - t * 18, 152, 46, 23, '#FF3B30', 2);
+        c.fillStyle = '#8E1B15';
+        c.font = '1000 21px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+        c.fillText(effect.label, 0, -t * 18 + 1, 138);
       } else if (effect.kind === 'skill') {
         const radius = 48 + t * 150 * effect.power;
         c.translate(effect.x, effect.y);
@@ -849,7 +927,11 @@ export function createRenderModule(): GameModule {
     }
     const c = ctx.ctx2d;
     const beat = (Math.sin(pulseTime * 0.006) + 1) / 2;
-    const label = phone.screenW < 136 ? '按住滑动' : '按住拖动，整排清理';
+    const swipeEnabled = ctx.state.derived.swipeEnabled;
+    if ((swipeEnabled && ctx.state.totalCleared > 180) || (!swipeEnabled && ctx.state.totalCleared > 36)) {
+      return;
+    }
+    const label = swipeEnabled ? (phone.screenW < 136 ? '按住滑动' : '按住拖过红角标') : phone.screenW < 136 ? '点红角标' : '先点掉红色角标';
     const pillW = Math.min(phone.screenW - 12, phone.screenW < 136 ? 92 : 168);
     const pillX = phone.screenX + (phone.screenW - pillW) / 2;
     const pillY = phone.screenY + Math.max(28, phone.screenH * 0.13);
@@ -858,7 +940,7 @@ export function createRenderModule(): GameModule {
     c.globalAlpha = ctx.state.totalCleared < 160 ? 0.92 : 0.62;
     fillRound(c, pillX, pillY, pillW, 28, 14, 'rgba(255,255,255,0.86)');
     strokeRound(c, pillX, pillY, pillW, 28, 14, '#DDE8F6');
-    c.fillStyle = '#305C9C';
+    c.fillStyle = swipeEnabled ? '#305C9C' : '#8A3E00';
     c.font = `900 ${phone.screenW < 136 ? 10 : 12}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
@@ -867,17 +949,19 @@ export function createRenderModule(): GameModule {
     const y = phone.screenY + phone.screenH * 0.48;
     const startX = phone.screenX + phone.screenW * 0.25;
     const endX = phone.screenX + phone.screenW * 0.75;
-    c.strokeStyle = `rgba(91, 141, 239, ${0.42 + beat * 0.28})`;
+    c.strokeStyle = swipeEnabled ? `rgba(91, 141, 239, ${0.42 + beat * 0.28})` : `rgba(255, 159, 67, ${0.4 + beat * 0.28})`;
     c.lineWidth = Math.max(2, phone.w * 0.012);
-    c.setLineDash([7, 8]);
-    c.beginPath();
-    c.moveTo(startX, y);
-    c.quadraticCurveTo(phone.screenX + phone.screenW / 2, y - phone.screenH * 0.14, endX, y);
-    c.stroke();
-    c.setLineDash([]);
+    if (swipeEnabled) {
+      c.setLineDash([7, 8]);
+      c.beginPath();
+      c.moveTo(startX, y);
+      c.quadraticCurveTo(phone.screenX + phone.screenW / 2, y - phone.screenH * 0.14, endX, y);
+      c.stroke();
+      c.setLineDash([]);
+    }
 
-    const dotX = startX + (endX - startX) * beat;
-    const dotY = y - Math.sin(beat * Math.PI) * phone.screenH * 0.12;
+    const dotX = swipeEnabled ? startX + (endX - startX) * beat : phone.screenX + phone.screenW * 0.5;
+    const dotY = swipeEnabled ? y - Math.sin(beat * Math.PI) * phone.screenH * 0.12 : y;
     c.fillStyle = '#FF9F43';
     c.beginPath();
     c.arc(dotX, dotY, 5 + beat * 3, 0, TAU);
@@ -885,6 +969,57 @@ export function createRenderModule(): GameModule {
     c.strokeStyle = 'rgba(255,255,255,0.9)';
     c.lineWidth = 2;
     c.stroke();
+    c.restore();
+  }
+
+  function drawTutorialCoach(layout: GameLayout): void {
+    const phone = layout.phoneLayouts.find((item) => item.customer.phone.badgeTotal > 0);
+    const target = phone?.icons.find((item) => item.icon.badge > 0);
+    if (!phone || !target) {
+      return;
+    }
+    const swipeEnabled = ctx.state.derived.swipeEnabled;
+    if ((swipeEnabled && ctx.state.totalCleared > 120) || (!swipeEnabled && ctx.state.totalCleared > 18)) {
+      return;
+    }
+    const c = ctx.ctx2d;
+    const beat = (Math.sin(pulseTime * 0.008) + 1) / 2;
+    const label = swipeEnabled ? '按住划过红角标' : '点这里清掉角标';
+    const sub = swipeEnabled ? '拖过一串角标会连清' : '先从红色数字开始';
+    const boxW = Math.min(176, Math.max(126, phone.screenW * 0.82));
+    const boxH = 54;
+    const boxX = clamp(target.badgeX - boxW * 0.5, phone.screenX + 6, phone.screenX + phone.screenW - boxW - 6);
+    const boxY = Math.max(phone.screenY + 34, target.badgeY - 78);
+
+    c.save();
+    c.globalAlpha = 0.96;
+    fillRound(c, boxX, boxY, boxW, boxH, 10, 'rgba(255,255,255,0.92)');
+    strokeRound(c, boxX, boxY, boxW, boxH, 10, swipeEnabled ? '#5B8DEF' : '#FF9F43', 2);
+    c.fillStyle = '#2B2B33';
+    c.font = '900 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'alphabetic';
+    c.fillText(label, boxX + boxW / 2, boxY + 22, boxW - 14);
+    c.fillStyle = '#6E6A73';
+    c.font = '800 10px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+    c.fillText(sub, boxX + boxW / 2, boxY + 39, boxW - 14);
+
+    c.strokeStyle = swipeEnabled ? 'rgba(91,141,239,0.86)' : 'rgba(255,159,67,0.9)';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(boxX + boxW / 2, boxY + boxH);
+    c.quadraticCurveTo(target.badgeX - 18, target.badgeY - 24, target.badgeX, target.badgeY - 9);
+    c.stroke();
+
+    c.strokeStyle = swipeEnabled ? 'rgba(91,141,239,0.5)' : 'rgba(255,159,67,0.55)';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.arc(target.badgeX, target.badgeY, 18 + beat * 9, 0, TAU);
+    c.stroke();
+    c.fillStyle = swipeEnabled ? 'rgba(91,141,239,0.2)' : 'rgba(255,159,67,0.22)';
+    c.beginPath();
+    c.arc(target.badgeX, target.badgeY, 8 + beat * 5, 0, TAU);
+    c.fill();
     c.restore();
   }
 
@@ -957,6 +1092,7 @@ export function createRenderModule(): GameModule {
     c.restore();
 
     drawSwipeHint(layout);
+    drawTutorialCoach(layout);
     drawComboOverlay(layout);
   }
 
@@ -1003,6 +1139,13 @@ export function createRenderModule(): GameModule {
         effects.push({ kind: 'return', x: ctx.canvas.clientWidth / 2, y: 130, age: 0, ttl: 950, label: `+${event.payout}元`, color: '#26C6A6', power: 1.2 });
         spawnBurst(ctx.canvas.clientWidth / 2, 136, '#26C6A6', 28, 1.2);
         addShake(220, 2.4);
+      });
+      ctx.bus.on('PHONE_SMASHED', (event) => {
+        effects.push({ kind: 'smash', x: event.x, y: event.y, age: 0, ttl: 1050, label: `砸出 ${event.totalBadges}`, color: '#FF3B30', power: 1.7 });
+        spawnBurst(event.x, event.y, '#FF3B30', 46 + Math.min(44, event.iconCount * 5), 2);
+        spawnBurst(event.x, event.y, '#FFD166', 28 + Math.min(34, event.totalBadges), 1.6);
+        spawnBurst(event.x, event.y, '#5B8DEF', 18 + Math.min(28, event.iconCount * 3), 1.3);
+        addShake(760, 10);
       });
       ctx.bus.on('LEVEL_UP', (event) => {
         effects.push({ kind: 'level', x: ctx.canvas.clientWidth / 2, y: 112, age: 0, ttl: 1300, label: `升级到 ${event.level}`, color: '#5B8DEF', power: 1.7 });

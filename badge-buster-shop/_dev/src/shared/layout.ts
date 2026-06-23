@@ -54,13 +54,13 @@ export function computeGameLayout(state: GameState, width: number, height: numbe
   const playW = Math.max(width < 520 ? 174 : 300, width - queueWidth - desktopUi - (width >= 960 ? 58 : 42));
   const playH = Math.max(width < 520 ? 214 : 280, height - topReserve - bottomReserve - 30);
   const activeCount = state.activeCustomers.length;
-  const columns = activeCount >= 3 && playW > 780 ? 3 : activeCount >= 2 && playW > 520 ? 2 : 1;
+  const columns = activeCount >= 3 && playW > 620 ? 3 : activeCount >= 2 && playW > 430 ? 2 : 1;
   const rows = Math.max(1, Math.ceil(Math.max(activeCount, 1) / columns));
   const gap = width >= 900 ? 26 : 16;
   const maxPhoneWByWidth = (playW - gap * (columns - 1)) / columns;
   const maxPhoneWByHeight = (playH - gap * (rows - 1)) / rows / 1.88;
-  const phoneLimit = width >= 960 ? 352 : width < 520 ? 190 : 282;
-  const phoneMin = width >= 960 ? 184 : width < 520 ? 132 : 150;
+  const phoneLimit = width >= 960 ? (rows > 1 ? 286 : 352) : width < 520 ? 190 : 282;
+  const phoneMin = width >= 960 ? (rows > 1 ? 132 : 184) : width < 520 ? 132 : 150;
   const phoneW = clamp(Math.min(maxPhoneWByWidth, maxPhoneWByHeight, phoneLimit), phoneMin, phoneLimit);
   const phoneH = phoneW * 1.88;
   const gridW = columns * phoneW + (columns - 1) * gap;
