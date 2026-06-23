@@ -63,6 +63,10 @@ export function createPhone(customerId: string, customerDef: CustomerDef, iconDe
     // 错开首个弹窗，避免一进门就被糊脸
     popupAccumulatorMs: -randomRangeInt(1_200, 3_200),
     scamAccumulatorMs: -randomRangeInt(2_000, 6_000),
+    notifications: randomRangeInt(1, level >= 2 ? 3 : 2),
+    notificationAccumulatorMs: -randomRangeInt(800, 2_400),
+    malware: randomRangeInt(4, level >= 3 ? 26 : 16),
+    malwareAccumulatorMs: -randomRangeInt(600, 2_000),
     cleaned: false,
   };
 }

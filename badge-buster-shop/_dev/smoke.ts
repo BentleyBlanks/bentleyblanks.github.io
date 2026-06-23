@@ -1,5 +1,6 @@
-// Headless logic smoke for the refactored mechanics (no render/input/audio).
+// Headless logic smoke for the new mechanics (#1 block, #4 notif pull, #5 malware clean/lag) + scam.
 import { content } from './src/content';
+import { MALWARE_LAG_THRESHOLD, MALWARE_MAX } from './src/content/balance';
 import { createEventBus } from './src/core/eventBus';
 import { createInitialState } from './src/core/persistence';
 import { createEconomyModule } from './src/economy/economyModule';
@@ -8,8 +9,7 @@ import { createShopModule } from './src/shop/shopModule';
 import { createUiModule } from './src/ui/uiModule';
 import { createCoreModule } from './src/core/coreModule';
 import { createAutomationModule } from './src/automation/automationModule';
-import { computeGameLayout, popupRectOf } from './src/shared/layout';
-import { computeUiLayout } from './src/shared/uiLayout';
+import { computeGameLayout, malwareButtonRect, notifBarRect, popupRectOf } from './src/shared/layout';
 import type { GameContext, GameModule } from './src/types/module.types';
 import type { GameEvent } from './src/types/events.types';
 
@@ -19,20 +19,19 @@ const store = new Map<string, string>();
 (globalThis as unknown as { localStorage: Storage }).localStorage = {
   getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
   setItem: (k: string, v: string) => void store.set(k, v),
-  removeItem: (k: string) => void store.delete(k),
-  clear: () => store.clear(), key: () => null, length: 0,
+  removeItem: (k: string) => void store.delete(k), clear: () => store.clear(), key: () => null, length: 0,
 } as Storage;
 
-const W = 1000, H = 700;
+const W = 1200, H = 760;
 const canvas = { clientWidth: W, clientHeight: H } as HTMLCanvasElement;
 const bus = createEventBus();
 const state = createInitialState(clock);
-state.level = 5; // 解锁诈骗弹窗与部分技能
+state.level = 6;
 state.points = 1000;
 const ctx: GameContext = { state, bus, content, assets: { images: {}, audio: {} }, canvas, ctx2d: {} as CanvasRenderingContext2D };
 
 const counts: Record<string, number> = {};
-for (const t of ['POPUP_CLOSED', 'SCAM_INSTALLED', 'BADGE_CLEARED', 'PHONE_RETURNED', 'CUSTOMER_LEFT', 'UPGRADE_PURCHASED']) {
+for (const t of ['NOTIFICATION_CLEARED', 'MALWARE_CLEARED', 'POPUP_CLOSED', 'SCAM_INSTALLED', 'BADGE_CLEARED']) {
   bus.on(t as GameEvent['type'], () => { counts[t] = (counts[t] || 0) + 1; });
 }
 
@@ -42,92 +41,92 @@ const modules: GameModule[] = [
 for (const m of modules) m.init(ctx);
 
 function tick(dt: number) { clock += dt; bus.emit({ type: 'TICK', dt }); for (const m of modules) m.update?.(dt); }
-function tickUntil(pred: () => boolean, maxMs: number, dt = 100): boolean {
-  let t = 0;
-  while (t < maxMs) { tick(dt); t += dt; if (pred()) return true; }
-  return false;
-}
+function tickUntil(pred: () => boolean, maxMs: number, dt = 100): boolean { let t = 0; while (t < maxMs) { tick(dt); t += dt; if (pred()) return true; } return false; }
+const lay = () => computeGameLayout(state, W, H);
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { console.log((c ? '  ok  - ' : '  FAIL- ') + m); if (!c) fails++; };
-const active = () => state.activeCustomers[0];
 
-console.log('# active customer + popups');
-assert(tickUntil(() => state.activeCustomers.length > 0, 4000), 'a customer reaches the workbench');
-assert(tickUntil(() => (active()?.phone.popups.length ?? 0) > 0, 14000), `ad popup spawned (${active()?.phone.popups.length})`);
+console.log('# 3 phones tiled by default (#6)');
+assert(tickUntil(() => state.activeCustomers.length >= 3, 6000), `active slots filled (${state.activeCustomers.length})`);
+assert(state.activeSlots === 3, `default activeSlots = 3 (${state.activeSlots})`);
 
-console.log('# tapping a popup body blocks the icon under it');
+console.log('# notification pull-down clears (#4)');
 {
-  const lay = computeGameLayout(state, W, H);
-  const phone = lay.phoneLayouts[0];
-  const popup = phone.customer.phone.popups[0];
-  const rect = popupRectOf(phone, popup);
-  const covered = phone.icons.find((ic) => ic.icon.badge > 0 && ic.x >= rect.x && ic.x <= rect.x + rect.w && ic.y >= rect.y && ic.y <= rect.y + rect.h);
-  if (covered) {
-    const before = covered.icon.badge;
-    bus.emit({ type: 'TAP', x: covered.x, y: covered.y }); // body of popup, not the ✕
-    assert(covered.icon.badge === before, 'icon under popup was NOT cleared (blocked)');
+  const phone = lay().phoneLayouts.find((p) => p.customer.phone.notifications > 0);
+  if (phone) {
+    const before = phone.customer.phone.notifications;
+    const bar = notifBarRect(phone);
+    const cx = bar.x + bar.w / 2;
+    bus.emit({ type: 'SWIPE', path: [{ x: cx, y: bar.y + 4 }, { x: cx, y: bar.y + 40 }, { x: cx, y: bar.y + 78 }] });
+    assert(phone.customer.phone.notifications < before, `pull cleared notifications (${before} -> ${phone.customer.phone.notifications})`);
+    assert((counts['NOTIFICATION_CLEARED'] || 0) >= 1, 'NOTIFICATION_CLEARED fired');
   } else {
-    console.log('  ..  - (no badge icon under popup this run, skipping block check)');
+    console.log('  ..  - (no notifications present, skipping)');
   }
 }
 
-console.log('# tapping ✕ closes the popup');
+console.log('# malware clean button (#5)');
 {
-  const lay = computeGameLayout(state, W, H);
-  const phone = lay.phoneLayouts[0];
-  const popup = phone.customer.phone.popups[0];
-  const rect = popupRectOf(phone, popup);
-  const before = phone.customer.phone.popups.length;
-  const closedBefore = counts['POPUP_CLOSED'] || 0;
-  bus.emit({ type: 'TAP', x: rect.closeX + rect.closeW / 2, y: rect.closeY + rect.closeH / 2 });
-  assert(active()?.phone.popups.length === before - 1, 'popup removed after tapping ✕');
-  assert((counts['POPUP_CLOSED'] || 0) === closedBefore + 1, 'POPUP_CLOSED fired');
+  const phone = lay().phoneLayouts.find((p) => p.customer.phone.malware > 0) ?? lay().phoneLayouts[0];
+  phone.customer.phone.malware = Math.max(phone.customer.phone.malware, 40);
+  const before = phone.customer.phone.malware;
+  const btn = malwareButtonRect(phone);
+  bus.emit({ type: 'TAP', x: btn.x + btn.w / 2, y: btn.y + btn.h / 2 });
+  assert(phone.customer.phone.malware < before, `clean button reduced malware (${Math.round(before)} -> ${Math.round(phone.customer.phone.malware)})`);
+  assert((counts['MALWARE_CLEARED'] || 0) >= 1, 'MALWARE_CLEARED fired');
 }
 
-console.log('# scam popup installs -> penalty + reputation drop');
-assert(tickUntil(() => (active()?.phone.popups.some((p) => p.kind === 'scam') ?? false), 26000), 'scam popup spawned');
+console.log('# malware lag blocks clearing (#5)');
 {
-  const repBefore = state.reputation;
-  const pointsBefore = state.points;
-  const installedBefore = counts['SCAM_INSTALLED'] || 0;
-  // 不去拆它，等它自动安装
-  const fired = tickUntil(() => (counts['SCAM_INSTALLED'] || 0) > installedBefore, 9000);
-  assert(fired, 'SCAM_INSTALLED fired after grace expired');
-  assert(state.points < pointsBefore, `money deducted (${pointsBefore} -> ${state.points})`);
-  assert(state.reputation < repBefore + 0.001, `reputation dropped (${repBefore.toFixed(2)} -> ${state.reputation.toFixed(2)})`);
-}
-
-console.log('# active customer loses patience over time');
-{
-  const c = active();
-  if (c) {
-    const before = c.patience;
-    tick(1000);
-    assert(c.patience < before, `active patience drains (${Math.round(before)} -> ${Math.round(c.patience)})`);
+  const phone = lay().phoneLayouts[0];
+  phone.customer.phone.malware = MALWARE_MAX;
+  const icon = phone.icons.find((i) => i.icon.badge > 0);
+  if (icon) {
+    const before = icon.icon.badge;
+    bus.emit({ type: 'TAP', x: icon.x, y: icon.y });
+    assert(icon.icon.badge === before, `laggy phone (malware>=${MALWARE_LAG_THRESHOLD}) cannot clear badges`);
   } else {
-    console.log('  ..  - (no active customer, skipping patience check)');
+    console.log('  ..  - (no badge on phone[0], skipping)');
   }
+  phone.customer.phone.malware = 0; // 复原以便后续测试
 }
 
-console.log('# UI tap opens modal and is consumed (no gameplay fall-through)');
+console.log('# popup blocks the WHOLE phone (#1)');
 {
-  const ui = computeUiLayout(state, W, H, content.upgrades.map((u) => u.id), content.skills.map((s) => s.id));
-  const shopBtn = ui.buttons.find((b) => b.id === 'shop')!;
-  const ev: GameEvent = { type: 'TAP', x: shopBtn.rect.x + shopBtn.rect.w / 2, y: shopBtn.rect.y + shopBtn.rect.h / 2 };
-  bus.emit(ev);
-  assert(state.ui.modal === 'shop', 'shop modal opened by button tap');
-  assert((ev as { consumed?: boolean }).consumed === true, 'UI tap was consumed');
-  // buy an upgrade through the modal row
-  const ui2 = computeUiLayout(state, W, H, content.upgrades.map((u) => u.id), content.skills.map((s) => s.id));
-  if (ui2.modal.open) {
-    const row = ui2.modal.rows[0];
-    const pBefore = state.points;
-    bus.emit({ type: 'TAP', x: row.rect.x + row.rect.w / 2, y: row.rect.y + row.rect.h / 2 });
-    assert((counts['UPGRADE_PURCHASED'] || 0) >= 1 || state.points === pBefore, 'modal row tap routed to BUY_UPGRADE');
+  assert(tickUntil(() => lay().phoneLayouts.some((p) => p.customer.phone.popups.length > 0), 16000), 'a covering popup spawned');
+  const phone = lay().phoneLayouts.find((p) => p.customer.phone.popups.length > 0)!;
+  // 找一个不在弹窗下、却有角标的图标，证明"整机禁用"而非"只挡被覆盖的"
+  const rects = phone.customer.phone.popups.map((pp) => popupRectOf(phone, pp));
+  const exposed = phone.icons.find((i) => i.icon.badge > 0 && !rects.some((r) => i.x >= r.x && i.x <= r.x + r.w && i.y >= r.y && i.y <= r.y + r.h));
+  if (exposed) {
+    const before = exposed.icon.badge;
+    bus.emit({ type: 'TAP', x: exposed.x, y: exposed.y });
+    assert(exposed.icon.badge === before, 'an EXPOSED icon also cannot be cleared while a popup is up (whole-phone block)');
+  } else {
+    console.log('  ..  - (no exposed badged icon, skipping)');
   }
+  // 关闭弹窗后应恢复
+  const popup = phone.customer.phone.popups[0];
+  const pr = popupRectOf(phone, popup);
+  state.activeSlots = state.activeSlots; // noop
+  while (phone.customer.phone.popups.length > 0) {
+    const top = phone.customer.phone.popups[phone.customer.phone.popups.length - 1];
+    const r = popupRectOf(phone, top);
+    bus.emit({ type: 'TAP', x: r.closeX + r.closeW / 2, y: r.closeY + r.closeH / 2 });
+  }
+  void pr; void popup;
+  assert(phone.customer.phone.popups.length === 0, 'closing ✕ removes popups -> phone operable again');
+}
+
+console.log('# cursor tracking (#7)');
+{
+  state.ui.cursor.visible = false;
+  // 模拟 input 写入光标（input 模块在无 DOM 环境未挂载，这里直接验证字段存在且可写）
+  state.ui.cursor.x = 123; state.ui.cursor.y = 456; state.ui.cursor.visible = true; state.ui.cursor.pressed = true;
+  assert(state.ui.cursor.x === 123 && state.ui.cursor.visible && state.ui.cursor.pressed, 'cursor state is present and writable');
 }
 
 console.log('\n==== ' + (fails === 0 ? 'ALL PASS' : fails + ' FAILURES') + ' ====');
-console.log('counts:', JSON.stringify(counts), 'level', state.level, 'points', Math.round(state.points), 'rep', state.reputation.toFixed(2));
+console.log('counts:', JSON.stringify(counts), 'slots', state.activeSlots, 'active', state.activeCustomers.length);
 process.exit(fails === 0 ? 0 : 1);

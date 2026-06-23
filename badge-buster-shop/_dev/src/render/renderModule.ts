@@ -1,5 +1,16 @@
-import { upgradeCost } from '../content/balance';
-import { computeGameLayout, popupRectOf, type GameLayout, type IconLayout, type PhoneLayout, type QueueLayout } from '../shared/layout';
+import { MALWARE_LAG_THRESHOLD, MALWARE_MAX, upgradeCost } from '../content/balance';
+import {
+  computeGameLayout,
+  malwareButtonRect,
+  notifBarRect,
+  phoneBlockedByPopup,
+  phoneLaggy,
+  popupRectOf,
+  type GameLayout,
+  type IconLayout,
+  type PhoneLayout,
+  type QueueLayout,
+} from '../shared/layout';
 import { computeUiLayout, type Rect, type UiLayout } from '../shared/uiLayout';
 import type { AppIconDef } from '../types/content.types';
 import type { GameContext, GameModule } from '../types/module.types';
@@ -194,6 +205,12 @@ export function createRenderModule(): GameModule {
   const sparks: Spark[] = [];
   const swipeDots: SwipeDot[] = [];
   const images = new Map<string, HTMLImageElement>();
+  // —— 手机进出场动画（#2）——
+  const phoneAnims = new Map<string, { x: number; y: number; alpha: number }>();
+  const departing: Array<{ layout: PhoneLayout; age: number }> = [];
+  const departingIds = new Set<string>();
+  let lastLayouts = new Map<string, PhoneLayout>();
+  let lastDrawTime = performance.now();
   let combo = 0;
   let lastClearAt = -Infinity;
   let comboHoldMs = 0;
@@ -656,6 +673,203 @@ export function createRenderModule(): GameModule {
     c.restore();
   }
 
+  function drawNotifBar(phone: PhoneLayout): void {
+    const runtime = phone.customer.phone;
+    if (runtime.notifications <= 0) return;
+    const c = ctx.ctx2d;
+    const bar = notifBarRect(phone);
+    const h = Math.max(15, bar.h * 0.46);
+    const x = bar.x + bar.w * 0.06;
+    const y = bar.y + bar.h * 0.12;
+    const w = bar.w * 0.88;
+    c.save();
+    fillRound(c, x, y, w, h, h * 0.32, 'rgba(18, 26, 42, 0.9)');
+    strokeRound(c, x, y, w, h, h * 0.32, 'rgba(255,159,67,0.55)', 1);
+    c.fillStyle = '#FF9F43';
+    c.beginPath();
+    c.arc(x + h * 0.55, y + h * 0.5, h * 0.2, 0, TAU);
+    c.fill();
+    c.fillStyle = '#F8FBFF';
+    c.font = `900 ${Math.max(8, phone.w * 0.03)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.textAlign = 'left';
+    c.textBaseline = 'middle';
+    c.fillText(`${runtime.notifications} 条广告 · 下拉清`, x + h, y + h * 0.5, w - h - 6);
+    c.restore();
+  }
+
+  function drawBlockedScreenDim(phone: PhoneLayout): void {
+    const c = ctx.ctx2d;
+    c.save();
+    roundedRect(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, phone.w * 0.06);
+    c.clip();
+    c.fillStyle = 'rgba(10, 14, 24, 0.4)';
+    c.fillRect(phone.screenX, phone.screenY, phone.screenW, phone.screenH);
+    c.restore();
+  }
+
+  function drawLagOverlay(phone: PhoneLayout): void {
+    const c = ctx.ctx2d;
+    c.save();
+    roundedRect(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, phone.w * 0.06);
+    c.clip();
+    c.fillStyle = 'rgba(120, 20, 30, 0.3)';
+    c.fillRect(phone.screenX, phone.screenY, phone.screenW, phone.screenH);
+    c.globalAlpha = 0.16;
+    c.fillStyle = '#000';
+    const jitter = (Math.sin(pulseTime * 0.05) + 1) * 2;
+    for (let y = phone.screenY + (jitter % 6); y < phone.screenY + phone.screenH; y += 6) {
+      c.fillRect(phone.screenX, y, phone.screenW, 2);
+    }
+    c.restore();
+    c.save();
+    c.fillStyle = '#FFE3DE';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `900 ${Math.max(11, phone.w * 0.052)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.fillText('⚠ 卡顿', phone.screenX + phone.screenW / 2, phone.screenY + phone.screenH * 0.42);
+    c.font = `800 ${Math.max(8, phone.w * 0.033)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.fillText('点下方"清理后台"', phone.screenX + phone.screenW / 2, phone.screenY + phone.screenH * 0.52);
+    c.restore();
+  }
+
+  function drawMalware(phone: PhoneLayout): void {
+    const runtime = phone.customer.phone;
+    if (runtime.malware <= 0) return;
+    const c = ctx.ctx2d;
+    const laggy = runtime.malware >= MALWARE_LAG_THRESHOLD;
+    const btn = malwareButtonRect(phone);
+    const barH = Math.max(4, btn.h * 0.22);
+    const barY = btn.y - barH - 4;
+    fillRound(c, btn.x, barY, btn.w, barH, barH / 2, 'rgba(0,0,0,0.35)');
+    const ratio = Math.min(1, runtime.malware / MALWARE_MAX);
+    fillRound(c, btn.x, barY, btn.w * ratio, barH, barH / 2, laggy ? '#FF3B30' : '#FF9F43');
+    fillRound(c, btn.x, btn.y, btn.w, btn.h, btn.h * 0.3, laggy ? '#FF3B30' : 'rgba(38, 50, 72, 0.94)');
+    strokeRound(c, btn.x, btn.y, btn.w, btn.h, btn.h * 0.3, 'rgba(255,255,255,0.32)', 1);
+    c.fillStyle = '#FFFFFF';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `900 ${Math.max(8, btn.h * 0.4)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.fillText(`🧹 清理后台 ${Math.ceil(runtime.malware)}%`, btn.x + btn.w / 2, btn.y + btn.h / 2, btn.w - 8);
+  }
+
+  function drawStatusStrip(ui: UiLayout): void {
+    const c = ctx.ctx2d;
+    const s = ctx.state;
+    const now = performance.now();
+    const up = (id: string) => s.upgrades[id] ?? 0;
+    const chips: Array<{ label: string; color: string }> = [];
+    if (up('up_adblock') > 0) chips.push({ label: `🛡防弹窗 Lv${up('up_adblock')}`, color: '#5B8DEF' });
+    if (up('up_antivirus') > 0) chips.push({ label: `🦠卫士 Lv${up('up_antivirus')}`, color: '#8E7CF6' });
+    if (up('up_notifclear') > 0) chips.push({ label: `🔔通知 Lv${up('up_notifclear')}`, color: '#FF9F43' });
+    if (up('up_antimalware') > 0) chips.push({ label: `🧹杀毒 Lv${up('up_antimalware')}`, color: '#26C6A6' });
+    if (s.derived.botCount > 0) chips.push({ label: `🤖学徒 x${s.derived.botCount}`, color: '#4D96FF' });
+    if (now < s.effects.freezeIncomingUntil) chips.push({ label: `❄冻结 ${Math.ceil((s.effects.freezeIncomingUntil - now) / 1000)}s`, color: '#5BC0EB' });
+    if (now < s.effects.tipBoostUntil) chips.push({ label: `💰双倍 ${Math.ceil((s.effects.tipBoostUntil - now) / 1000)}s`, color: '#E0A100' });
+    if (now < s.effects.extraHandsUntil) chips.push({ label: `🙌多手 ${Math.ceil((s.effects.extraHandsUntil - now) / 1000)}s`, color: '#FF6B81' });
+    if (chips.length === 0) return;
+    let x = 14;
+    const y = ui.hud.h + 6;
+    const hChip = 22;
+    c.save();
+    c.font = '800 11px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+    c.textBaseline = 'middle';
+    c.textAlign = 'left';
+    for (const chip of chips) {
+      const tw = c.measureText(chip.label).width + 16;
+      if (x + tw > ctx.canvas.clientWidth - 14) break;
+      fillRound(c, x, y, tw, hChip, hChip / 2, 'rgba(255,255,255,0.94)');
+      strokeRound(c, x, y, tw, hChip, hChip / 2, alphaColor(chip.color, 0.5), 1);
+      c.fillStyle = chip.color;
+      c.fillText(chip.label, x + 8, y + hChip / 2 + 0.5);
+      x += tw + 6;
+    }
+    c.restore();
+  }
+
+  function drawCursor(): void {
+    const cur = ctx.state.ui.cursor;
+    if (!cur.visible) return;
+    const c = ctx.ctx2d;
+    c.save();
+    c.translate(cur.x, cur.y);
+    const k = cur.pressed ? 0.86 : 1;
+    c.scale(k, k);
+    if (cur.pressed) {
+      c.strokeStyle = 'rgba(91,141,239,0.7)';
+      c.lineWidth = 2.5;
+      c.beginPath();
+      c.arc(0, 2, 17, 0, TAU);
+      c.stroke();
+    }
+    c.fillStyle = 'rgba(0,0,0,0.16)';
+    c.beginPath();
+    c.ellipse(3, 42, 12, 4, 0, 0, TAU);
+    c.fill();
+    c.strokeStyle = '#2B2B33';
+    c.lineWidth = 2;
+    c.fillStyle = '#FFE0B8';
+    roundedRect(c, -4, 0, 9, 24, 4); // 食指
+    c.fill();
+    c.stroke();
+    roundedRect(c, -12, 18, 25, 22, 9); // 手掌
+    c.fill();
+    c.stroke();
+    c.restore();
+  }
+
+  function updatePhoneAnims(layout: GameLayout, fdt: number): void {
+    const currentIds = new Set(layout.phoneLayouts.map((p) => p.customer.id));
+    for (const [id, lay] of lastLayouts) {
+      if (!currentIds.has(id) && !departingIds.has(id)) {
+        departing.push({ layout: lay, age: 0 });
+        departingIds.add(id);
+        phoneAnims.delete(id);
+      }
+    }
+    const k = 1 - Math.exp(-fdt / 80);
+    for (const phone of layout.phoneLayouts) {
+      let a = phoneAnims.get(phone.customer.id);
+      if (!a) {
+        a = { x: phone.x, y: phone.y + 50, alpha: 0 };
+        phoneAnims.set(phone.customer.id, a);
+      }
+      a.x += (phone.x - a.x) * k;
+      a.y += (phone.y - a.y) * k;
+      a.alpha += (1 - a.alpha) * k;
+    }
+    for (const id of [...phoneAnims.keys()]) if (!currentIds.has(id)) phoneAnims.delete(id);
+    for (const dep of departing) dep.age += fdt;
+    for (let i = departing.length - 1; i >= 0; i -= 1) {
+      if (departing[i].age >= 420) {
+        departingIds.delete(departing[i].layout.customer.id);
+        departing.splice(i, 1);
+      }
+    }
+    lastLayouts = new Map(layout.phoneLayouts.map((p) => [p.customer.id, p]));
+  }
+
+  function drawAnimatedPhone(phone: PhoneLayout): void {
+    const a = phoneAnims.get(phone.customer.id);
+    const c = ctx.ctx2d;
+    c.save();
+    if (a) {
+      c.globalAlpha = a.alpha;
+      c.translate(a.x - phone.x, a.y - phone.y);
+    }
+    drawPhone(phone);
+    c.restore();
+  }
+
+  function drawDepartingPhone(dep: { layout: PhoneLayout; age: number }): void {
+    const c = ctx.ctx2d;
+    const t = clamp01(dep.age / 420);
+    c.save();
+    c.globalAlpha = (1 - t) * 0.92;
+    c.translate(0, t * 80);
+    drawPhone(dep.layout);
+    c.restore();
+  }
+
   function drawPhone(phone: PhoneLayout): void {
     const c = ctx.ctx2d;
     const customerDef = ctx.content.customers.find((item) => item.id === phone.customer.defId);
@@ -685,17 +899,20 @@ export function createRenderModule(): GameModule {
     for (const icon of phone.icons) {
       drawIcon(icon, skin);
     }
-    drawPopups(phone);
+    drawNotifBar(phone);
+    if (phoneBlockedByPopup(phone)) drawBlockedScreenDim(phone);
+    if (phoneLaggy(phone)) drawLagOverlay(phone);
+    drawMalware(phone);
+    drawPopups(phone); // 遮挡弹窗在最上层
 
     c.font = `900 ${Math.max(10, phone.w * 0.04)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    const popupCount = phone.customer.phone.popups.length;
     const badgeTotal = phone.customer.phone.badgeTotal;
     c.fillStyle = badgeTotal > 0 ? '#F8FAFC' : '#C7F9CC';
     c.shadowColor = 'rgba(0,0,0,0.35)';
     c.shadowBlur = 4;
     c.textAlign = 'center';
     c.fillText(
-      badgeTotal > 0 ? (popupCount > 0 ? `角标 ${badgeTotal} · 弹窗 ${popupCount}` : `角标 ${badgeTotal}`) : '已清空',
+      badgeTotal > 0 ? `角标 ${badgeTotal}` : '已清空',
       phone.x + phone.w / 2,
       phone.y + phone.h - 15,
     );
@@ -1360,6 +1577,11 @@ export function createRenderModule(): GameModule {
     const h = ctx.canvas.clientHeight;
     c.clearRect(0, 0, w, h);
 
+    const nowT = performance.now();
+    const fdt = Math.min(60, nowT - lastDrawTime);
+    lastDrawTime = nowT;
+    updatePhoneAnims(layout, fdt);
+
     const shakeRatio = clamp01(shakeMs / 520);
     const shakeX = Math.sin(pulseTime * 0.072) * shakeAmp * shakeRatio + Math.sin(pulseTime * 0.117) * shakeAmp * 0.45 * shakeRatio;
     const shakeY = Math.cos(pulseTime * 0.085) * shakeAmp * shakeRatio;
@@ -1370,8 +1592,11 @@ export function createRenderModule(): GameModule {
     for (const queueItem of layout.queueLayouts) {
       drawQueueItem(queueItem);
     }
+    for (const dep of departing) {
+      drawDepartingPhone(dep);
+    }
     for (const phone of layout.phoneLayouts) {
-      drawPhone(phone);
+      drawAnimatedPhone(phone);
     }
     drawEmptyState(layout);
     drawSwipeDots();
@@ -1385,8 +1610,10 @@ export function createRenderModule(): GameModule {
 
     const ui = computeUiLayout(ctx.state, w, h, ctx.content.upgrades.map((u) => u.id), ctx.content.skills.map((s) => s.id));
     drawHud(ui);
+    drawStatusStrip(ui);
     drawControls(ui);
     drawModal(ui);
+    drawCursor();
   }
 
   function loadImages(): void {
@@ -1445,6 +1672,15 @@ export function createRenderModule(): GameModule {
         effects.push({ kind: 'task', x: event.x, y: event.y, age: 0, ttl: 560, label: event.defused ? '已拆除' : '已关闭', color, power: 1 });
         spawnBurst(event.x, event.y, color, event.defused ? 18 : 10, 1);
         addShake(70, 1);
+      });
+      ctx.bus.on('NOTIFICATION_CLEARED', (event) => {
+        effects.push({ kind: 'task', x: event.x, y: event.y, age: 0, ttl: 520, label: `-${event.amount} 通知`, color: '#FF9F43', power: 1 });
+        spawnBurst(event.x, event.y, '#FF9F43', 10, 0.9);
+      });
+      ctx.bus.on('MALWARE_CLEARED', (event) => {
+        effects.push({ kind: 'task', x: event.x, y: event.y, age: 0, ttl: 560, label: `-${Math.round(event.amount)} 病毒`, color: '#26C6A6', power: 1 });
+        spawnBurst(event.x, event.y, '#26C6A6', 14, 1);
+        addShake(60, 1);
       });
       ctx.bus.on('SCAM_INSTALLED', (event) => {
         const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);

@@ -12,6 +12,8 @@ export type GameEvent =
   | { type: 'PHONE_SMASHED'; customerId: string; x: number; y: number; iconCount: number; totalBadges: number }
   | { type: 'POPUP_CLOSED'; customerId: string; kind: PopupKind; x: number; y: number; defused: boolean }
   | { type: 'SCAM_INSTALLED'; customerId: string; x: number; y: number; penalty: number }
+  | { type: 'NOTIFICATION_CLEARED'; customerId: string; amount: number; x: number; y: number }
+  | { type: 'MALWARE_CLEARED'; customerId: string; amount: number; x: number; y: number }
   | { type: 'PHONE_RETURNED'; customerId: string; payout: number; xp: number; mood: Mood }
   | { type: 'CUSTOMER_LEFT'; customerId: string; reason: 'angry' | 'overflow' }
   | { type: 'REPUTATION_CHANGED'; value: number }

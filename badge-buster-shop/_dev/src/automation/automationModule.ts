@@ -1,4 +1,4 @@
-import { computeGameLayout } from '../shared/layout';
+import { computeGameLayout, phoneClearingDisabled } from '../shared/layout';
 import type { GameContext, GameModule } from '../types/module.types';
 
 export function createAutomationModule(): GameModule {
@@ -8,6 +8,7 @@ export function createAutomationModule(): GameModule {
     const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
     const phones = [...layout.phoneLayouts].sort((a, b) => b.customer.phone.badgeTotal - a.customer.phone.badgeTotal);
     for (const phone of phones) {
+      if (phoneClearingDisabled(phone)) continue; // 学徒也搞不定被弹窗遮挡/卡死的手机
       const candidates = phone.icons.filter((icon) => icon.icon.badge > 0);
       if (candidates.length === 0) {
         continue;

@@ -186,6 +186,14 @@ export function createShopModule(): GameModule {
       ctx = context;
       lastReputation = ctx.state.reputation;
       syncCapacities();
+      // 开局即铺满工位：先从候客厅拉，再补新顾客，让多台手机同时平铺（#6）
+      const now0 = performance.now();
+      pullFromQueue(now0);
+      while (ctx.state.activeCustomers.length < ctx.state.activeSlots) {
+        const customer = createCustomer(now0);
+        customer.serviceStartedAt = now0;
+        ctx.state.activeCustomers.push(customer);
+      }
       ctx.bus.on('PHONE_CLEANED', (event) => settlePhone(event.customerId));
       ctx.bus.on('SCAM_INSTALLED', (event) => onScamInstalled(event.customerId));
       ctx.bus.on('UPGRADE_PURCHASED', syncCapacities);

@@ -40,9 +40,16 @@ export interface PhoneRuntime {
   badgeTotal: number;
   incomingRateMult: number;
   incomingAccumulatorMs: number;
+  // 屏幕中央的遮挡弹窗（广告/诈骗）：只要存在就整机禁清，必须先关掉
   popups: PhonePopup[];
   popupAccumulatorMs: number;
   scamAccumulatorMs: number;
+  // 顶部通知栏广告：下拉通知栏逐条清理
+  notifications: number;
+  notificationAccumulatorMs: number;
+  // 后台恶意软件 0..100：堆高会让手机卡顿，到阈值后无法清角标，需点"清理后台"
+  malware: number;
+  malwareAccumulatorMs: number;
   cleaned: boolean;
 }
 
@@ -100,10 +107,16 @@ export interface GameState {
     adSpawnIntervalMs: number;
     scamSpawnIntervalMs: number;
     scamGraceMs: number;
+    notificationClearPower: number; // 每次下拉清理的通知数
+    malwareClearPower: number;      // 每次点"清理后台"降低的恶意软件值
+    malwareAutoPerSec: number;      // 安全卫士被动每秒自动清理
   };
 
-  /** 瞬时 UI 状态（不持久化）：当前打开的画布弹窗面板。 */
-  ui: { modal: ModalKind };
+  /** 瞬时 UI 状态（不持久化）：当前画布弹窗面板 + 手指光标位置。 */
+  ui: {
+    modal: ModalKind;
+    cursor: { x: number; y: number; pressed: boolean; visible: boolean };
+  };
 
   botAccumulator: number;
   lastTickAt: number;

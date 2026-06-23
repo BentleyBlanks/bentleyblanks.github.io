@@ -34,8 +34,11 @@ export function createInitialState(now = performance.now()): GameState {
       adSpawnIntervalMs: 5_200,
       scamSpawnIntervalMs: 15_000,
       scamGraceMs: 6_000,
+      notificationClearPower: 1,
+      malwareClearPower: 16,
+      malwareAutoPerSec: 0,
     },
-    ui: { modal: 'none' },
+    ui: { modal: 'none', cursor: { x: -100, y: -100, pressed: false, visible: false } },
     botAccumulator: 0,
     lastTickAt: now,
     startedAt: now,
@@ -48,6 +51,10 @@ function ensurePhone(phone: PhoneRuntime): void {
   phone.popupAccumulatorMs ??= 0;
   phone.scamAccumulatorMs ??= 0;
   phone.incomingAccumulatorMs ??= 0;
+  phone.notifications ??= 0;
+  phone.notificationAccumulatorMs ??= 0;
+  phone.malware ??= 0;
+  phone.malwareAccumulatorMs ??= 0;
 }
 
 function ensureCustomer(customer: CustomerRuntime): void {
@@ -71,7 +78,7 @@ export function loadState(): GameState | null {
     parsed.queue = parsed.queue ?? [];
     parsed.effects = { ...fresh.effects, ...(parsed.effects ?? {}) };
     parsed.derived = { ...fresh.derived, ...(parsed.derived ?? {}) };
-    parsed.ui = { modal: 'none' }; // 瞬时，不沿用
+    parsed.ui = { modal: 'none', cursor: { x: -100, y: -100, pressed: false, visible: false } }; // 瞬时，不沿用
     for (const customer of [...parsed.activeCustomers, ...parsed.queue]) {
       ensureCustomer(customer);
     }

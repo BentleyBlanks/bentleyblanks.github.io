@@ -27,6 +27,8 @@ export function recalcDerived(ctx: GameContext): void {
   const payoutLevel = upgradeLevel(ctx, 'up_payout');
   const adblockLevel = upgradeLevel(ctx, 'up_adblock');
   const antivirusLevel = upgradeLevel(ctx, 'up_antivirus');
+  const notifClearLevel = upgradeLevel(ctx, 'up_notifclear');
+  const antimalwareLevel = upgradeLevel(ctx, 'up_antimalware');
   const repMult = 0.7 + ctx.state.reputation * 0.12;
   const levelPressure = 1 + Math.max(0, ctx.state.level - 1) * 0.018;
 
@@ -43,6 +45,10 @@ export function recalcDerived(ctx: GameContext): void {
   ctx.state.derived.adSpawnIntervalMs = Math.max(2_200, Math.floor((AD_POPUP_BASE_INTERVAL_MS * (1 + 0.42 * adblockLevel)) / popPressure));
   ctx.state.derived.scamSpawnIntervalMs = Math.max(7_000, Math.floor((SCAM_POPUP_BASE_INTERVAL_MS * (1 + 0.55 * antivirusLevel)) / (1 + Math.max(0, ctx.state.level - 1) * 0.02)));
   ctx.state.derived.scamGraceMs = SCAM_GRACE_BASE_MS + antivirusLevel * 1_200;
+
+  ctx.state.derived.notificationClearPower = 1 + notifClearLevel;
+  ctx.state.derived.malwareClearPower = 16 + antimalwareLevel * 9;
+  ctx.state.derived.malwareAutoPerSec = antimalwareLevel * 1.6;
 }
 
 export function createEconomyModule(): GameModule {

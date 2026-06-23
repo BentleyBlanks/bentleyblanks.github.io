@@ -1,4 +1,12 @@
+import { MALWARE_LAG_THRESHOLD } from '../content/balance';
 import type { CustomerRuntime, GameState, IconRuntime, PhonePopup } from '../types/state.types';
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 export interface IconLayout {
   customerId: string;
@@ -155,4 +163,29 @@ export function iconCoveredByPopup(phone: PhoneLayout, icon: IconLayout): boolea
     }
   }
   return false;
+}
+
+/** 有遮挡弹窗时整机禁清（#1）。 */
+export function phoneBlockedByPopup(phone: PhoneLayout): boolean {
+  return phone.customer.phone.popups.length > 0;
+}
+
+/** 后台恶意软件过高 → 卡死，无法清角标（#5）。 */
+export function phoneLaggy(phone: PhoneLayout): boolean {
+  return phone.customer.phone.malware >= MALWARE_LAG_THRESHOLD;
+}
+
+/** 该机当前是否无法清角标（弹窗遮挡 或 卡死）。 */
+export function phoneClearingDisabled(phone: PhoneLayout): boolean {
+  return phoneBlockedByPopup(phone) || phoneLaggy(phone);
+}
+
+/** 屏幕底部"清理后台"按钮（仅 malware>0 时显示/可点）。 */
+export function malwareButtonRect(phone: PhoneLayout): Rect {
+  return { x: phone.screenX + phone.screenW * 0.13, y: phone.screenY + phone.screenH * 0.9, w: phone.screenW * 0.74, h: phone.screenH * 0.075 };
+}
+
+/** 顶部通知栏区域（从这里向下滑动 = 下拉通知栏清理）。 */
+export function notifBarRect(phone: PhoneLayout): Rect {
+  return { x: phone.screenX, y: phone.screenY, w: phone.screenW, h: phone.screenH * 0.18 };
 }
