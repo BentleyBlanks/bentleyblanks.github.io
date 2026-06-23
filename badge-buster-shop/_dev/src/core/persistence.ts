@@ -111,7 +111,14 @@ export function loadState(): GameState | null {
   }
 }
 
+// 一旦点了"重置"，到 location.reload() 真正卸载页面之间，运行中的游戏循环可能又把旧进度
+// 写回 localStorage，导致重载后"没清掉"。重置时置位此开关，让后续 saveState 直接跳过。
+let savingDisabled = false;
+
 export function saveState(state: GameState): void {
+  if (savingDisabled) {
+    return;
+  }
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, ui: { modal: 'none' } }));
   } catch {
@@ -120,6 +127,7 @@ export function saveState(state: GameState): void {
 }
 
 export function clearState(): void {
+  savingDisabled = true; // 重置后到 reload 之间，禁止再次存档覆盖（修复"重置无效"）
   try {
     // 清掉本游戏的所有本地存储键（存档 + 静音偏好 + 任何历史遗留键），确保"重置"彻底，
     // 而不仅是当前 SAVE_KEY —— 避免遗留键让进度看起来"没被清掉"。

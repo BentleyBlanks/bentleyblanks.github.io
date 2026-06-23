@@ -83,6 +83,7 @@ export function createRepairModule(): GameModule {
 
   function onTap(event: Extract<GameEvent, { type: 'TAP' }>): void {
     if (event.consumed) return;
+    if (ctx.state.ui.modal !== 'none') return; // 弹窗（升级/技能/设置）优先，维修台不抢点击（修复设置里点不到"重置"等）
     const bench = computeRepairLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
     if (!bench.open || !bench.customer) return;
     const customer = bench.customer;
@@ -117,6 +118,7 @@ export function createRepairModule(): GameModule {
 
   function onSwipe(event: Extract<GameEvent, { type: 'SWIPE' }>): void {
     // 维修台展开时，底部抽屉区域的滑动也吞掉，避免误触手机
+    if (ctx.state.ui.modal !== 'none') return;
     if (!focusedAwaitingPhone(ctx.state)) return;
     const last = event.path[event.path.length - 1];
     if (last && last.y >= ctx.canvas.clientHeight - (REPAIR_BENCH_H + 6)) event.consumed = true;
