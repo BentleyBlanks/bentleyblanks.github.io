@@ -15,13 +15,13 @@ import { createUiModule } from './ui/uiModule';
 
 const canvasElement = document.getElementById('game-canvas');
 if (!(canvasElement instanceof HTMLCanvasElement)) {
-  throw new Error('Missing game canvas');
+  throw new Error('找不到游戏画布');
 }
 
 const canvas = canvasElement;
 const renderingContext = canvas.getContext('2d');
 if (!renderingContext) {
-  throw new Error('Canvas 2D is unavailable');
+  throw new Error('当前浏览器不支持二维画布');
 }
 const ctx2d = renderingContext;
 

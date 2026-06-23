@@ -46,20 +46,20 @@ function clamp(value: number, min: number, max: number): number {
 
 export function computeGameLayout(state: GameState, width: number, height: number): GameLayout {
   const desktopUi = width >= 960 ? 340 : 0;
-  const bottomReserve = width >= 960 ? 0 : 228;
-  const queueWidth = clamp(width * 0.16, 112, 176);
+  const bottomReserve = width >= 960 ? 0 : width < 520 ? 262 : 238;
+  const queueWidth = width < 520 ? clamp(width * 0.28, 96, 118) : clamp(width * 0.16, 112, 176);
   const topReserve = width >= 700 ? 76 : 58;
   const playX = queueWidth + 18;
   const playY = topReserve;
-  const playW = Math.max(260, width - queueWidth - desktopUi - 42);
-  const playH = Math.max(280, height - topReserve - bottomReserve - 30);
+  const playW = Math.max(width < 520 ? 174 : 260, width - queueWidth - desktopUi - 42);
+  const playH = Math.max(width < 520 ? 214 : 280, height - topReserve - bottomReserve - 30);
   const activeCount = state.activeCustomers.length;
   const columns = activeCount >= 3 && playW > 780 ? 3 : activeCount >= 2 && playW > 520 ? 2 : 1;
   const rows = Math.max(1, Math.ceil(Math.max(activeCount, 1) / columns));
   const gap = width >= 900 ? 26 : 16;
   const maxPhoneWByWidth = (playW - gap * (columns - 1)) / columns;
   const maxPhoneWByHeight = (playH - gap * (rows - 1)) / rows / 1.88;
-  const phoneW = clamp(Math.min(maxPhoneWByWidth, maxPhoneWByHeight, 282), 150, 282);
+  const phoneW = clamp(Math.min(maxPhoneWByWidth, maxPhoneWByHeight, width < 520 ? 190 : 282), width < 520 ? 132 : 150, 282);
   const phoneH = phoneW * 1.88;
   const gridW = columns * phoneW + (columns - 1) * gap;
   const gridH = rows * phoneH + (rows - 1) * gap;
@@ -97,7 +97,7 @@ export function computeGameLayout(state: GameState, width: number, height: numbe
     w: queueWidth - 26,
     h: Math.max(240, height - topReserve - bottomReserve - 40),
   };
-  const queueItemH = clamp(queuePanel.h / Math.max(4, state.queueCapacity + 1), 48, 64);
+  const queueItemH = clamp(queuePanel.h / Math.max(4, state.queueCapacity + 1), width < 520 ? 42 : 48, 64);
   const overlap = queueItemH * 0.3;
   const bottom = queuePanel.y + queuePanel.h - queueItemH;
   const queueLayouts = state.queue.map((customer, index) => ({

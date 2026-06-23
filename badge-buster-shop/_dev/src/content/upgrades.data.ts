@@ -3,8 +3,8 @@ import type { UpgradeDef } from '../types/content.types';
 export const upgrades: UpgradeDef[] = [
   {
     id: 'up_clear',
-    name: 'Heavy Thumb',
-    desc: 'Clear one more badge per hit.',
+    name: '厚手指',
+    desc: '每次点击多清 1 个角标。',
     category: 'clear',
     artId: 'up_clear',
     baseCost: 25,
@@ -14,8 +14,8 @@ export const upgrades: UpgradeDef[] = [
   },
   {
     id: 'up_swipe',
-    name: 'Swipe Polish',
-    desc: 'Drag across apps to clear a path.',
+    name: '顺滑手势',
+    desc: '可滑过图标批量清理。',
     category: 'swipe',
     artId: 'up_swipe',
     baseCost: 100,
@@ -25,8 +25,8 @@ export const upgrades: UpgradeDef[] = [
   },
   {
     id: 'up_value',
-    name: 'Receipt Ledger',
-    desc: 'Earn more XP per badge.',
+    name: '经验账本',
+    desc: '每个角标获得更多经验。',
     category: 'value',
     artId: 'up_value',
     baseCost: 40,
@@ -36,8 +36,8 @@ export const upgrades: UpgradeDef[] = [
   },
   {
     id: 'up_slot',
-    name: 'Extra Bench',
-    desc: 'Run another phone station.',
+    name: '加装工位',
+    desc: '同时处理更多手机。',
     category: 'slot',
     artId: 'up_slot',
     baseCost: 500,
@@ -47,8 +47,8 @@ export const upgrades: UpgradeDef[] = [
   },
   {
     id: 'up_queue',
-    name: 'Waiting Shelf',
-    desc: 'Fit another queued customer.',
+    name: '候客架',
+    desc: '候客区多容纳一位顾客。',
     category: 'queue',
     artId: 'up_queue',
     baseCost: 120,
@@ -58,8 +58,8 @@ export const upgrades: UpgradeDef[] = [
   },
   {
     id: 'up_patience',
-    name: 'Soft Chairs',
-    desc: 'Customers wait ten seconds longer.',
+    name: '软座椅',
+    desc: '顾客多等十秒。',
     category: 'patience',
     artId: 'up_patience',
     baseCost: 90,
@@ -69,8 +69,8 @@ export const upgrades: UpgradeDef[] = [
   },
   {
     id: 'up_botcount',
-    name: 'Hire Apprentice',
-    desc: 'Apprentices clear badges automatically.',
+    name: '招学徒',
+    desc: '学徒会自动帮忙清角标。',
     category: 'auto',
     artId: 'up_botcount',
     baseCost: 200,
@@ -80,8 +80,8 @@ export const upgrades: UpgradeDef[] = [
   },
   {
     id: 'up_botspeed',
-    name: 'Practice Drills',
-    desc: 'Apprentices work faster.',
+    name: '学徒训练',
+    desc: '学徒清理速度更快。',
     category: 'auto',
     artId: 'up_botspeed',
     baseCost: 150,
@@ -91,8 +91,8 @@ export const upgrades: UpgradeDef[] = [
   },
   {
     id: 'up_payout',
-    name: 'Gold Service',
-    desc: 'Increase payout from returned phones.',
+    name: '金牌服务',
+    desc: '归还手机时获得更多报酬。',
     category: 'payout',
     artId: 'up_payout',
     baseCost: 300,

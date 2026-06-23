@@ -53,6 +53,10 @@ function moodColor(mood: Mood): string {
   return '#5B8DEF';
 }
 
+function customerName(ctx: GameContext, defId: string): string {
+  return ctx.content.customers.find((item) => item.id === defId)?.name ?? '顾客';
+}
+
 export function createRenderModule(): GameModule {
   let ctx: GameContext;
   const effects: VisualEffect[] = [];
@@ -75,12 +79,12 @@ export function createRenderModule(): GameModule {
     c.fillStyle = '#2B2B33';
     c.font = '700 24px Inter, system-ui, sans-serif';
     c.textAlign = 'left';
-    c.fillText('Badge Buster Shop', 22, 40);
+    c.fillText('角标清理铺', 22, 40);
 
     c.font = '600 13px Inter, system-ui, sans-serif';
     c.fillStyle = '#6E6A73';
     c.textAlign = 'right';
-    c.fillText(`Cleared ${Math.floor(ctx.state.totalCleared)} badges`, Math.max(220, w - layout.uiReserve - 24), 38);
+    c.fillText(`已清理 ${Math.floor(ctx.state.totalCleared)} 个角标`, Math.max(220, w - layout.uiReserve - 24), 38);
 
     const counterY = h - layout.bottomReserve - 82;
     c.fillStyle = '#F3E2C8';
@@ -93,7 +97,7 @@ export function createRenderModule(): GameModule {
     c.fillStyle = '#2B2B33';
     c.font = '700 13px Inter, system-ui, sans-serif';
     c.textAlign = 'center';
-    c.fillText(`Queue ${ctx.state.queue.length}/${ctx.state.queueCapacity}`, layout.queuePanel.x + layout.queuePanel.w / 2, layout.queuePanel.y + 18);
+    c.fillText(`排队 ${ctx.state.queue.length}/${ctx.state.queueCapacity}`, layout.queuePanel.x + layout.queuePanel.w / 2, layout.queuePanel.y + 18);
   }
 
   function drawCustomerBust(x: number, y: number, radius: number, mood: Mood, name: string): void {
@@ -136,11 +140,11 @@ export function createRenderModule(): GameModule {
     const ratio = item.customer.patience / Math.max(1, item.customer.maxPatience);
     fillRound(c, item.x, item.y, item.w, item.h, 8, '#FFFFFF');
     strokeRound(c, item.x, item.y, item.w, item.h, 8, '#E7D8C0');
-    drawCustomerBust(item.x + 22, item.y + item.h / 2, 15, item.customer.mood, item.customer.defId);
+    drawCustomerBust(item.x + 22, item.y + item.h / 2, 15, item.customer.mood, customerName(ctx, item.customer.defId));
     c.fillStyle = '#2B2B33';
     c.font = '700 11px Inter, system-ui, sans-serif';
     c.textAlign = 'left';
-    c.fillText(item.customer.defId.replace('cust_', '').toUpperCase(), item.x + 44, item.y + 22);
+    c.fillText(customerName(ctx, item.customer.defId), item.x + 44, item.y + 22);
     fillRound(c, item.x + 44, item.y + item.h - 18, item.w - 56, 7, 3, '#EFEAE2');
     fillRound(c, item.x + 44, item.y + item.h - 18, (item.w - 56) * clamp01(ratio), 7, 3, moodColor(item.customer.mood));
   }
@@ -160,7 +164,7 @@ export function createRenderModule(): GameModule {
     c.fillStyle = '#2B2B33';
     c.font = '700 13px Inter, system-ui, sans-serif';
     c.textAlign = 'center';
-    c.fillText(customerDef?.name ?? 'Customer', phone.x + phone.w / 2, phone.y - 11);
+    c.fillText(customerDef?.name ?? '顾客', phone.x + phone.w / 2, phone.y - 11);
 
     for (const icon of phone.icons) {
       drawIcon(icon);
@@ -173,7 +177,7 @@ export function createRenderModule(): GameModule {
 
     c.font = '700 12px Inter, system-ui, sans-serif';
     c.fillStyle = '#6E6A73';
-    c.fillText(`${phone.customer.phone.badgeTotal} left`, phone.x + phone.w / 2, phone.y + phone.h - 14);
+    c.fillText(`剩余 ${phone.customer.phone.badgeTotal}`, phone.x + phone.w / 2, phone.y + phone.h - 14);
     c.restore();
   }
 
@@ -242,10 +246,10 @@ export function createRenderModule(): GameModule {
     c.fillStyle = '#2B2B33';
     c.font = '800 18px Inter, system-ui, sans-serif';
     c.textAlign = 'center';
-    c.fillText('Next phone arriving...', layout.playArea.x + layout.playArea.w / 2, layout.playArea.y + layout.playArea.h * 0.26 + 38);
+    c.fillText('等待下一台手机...', layout.playArea.x + layout.playArea.w / 2, layout.playArea.y + layout.playArea.h * 0.26 + 38);
     c.fillStyle = '#6E6A73';
     c.font = '600 12px Inter, system-ui, sans-serif';
-    c.fillText('Keep the counter clear.', layout.playArea.x + layout.playArea.w / 2, layout.playArea.y + layout.playArea.h * 0.26 + 62);
+    c.fillText('保持柜台通畅。', layout.playArea.x + layout.playArea.w / 2, layout.playArea.y + layout.playArea.h * 0.26 + 62);
   }
 
   function clamp01(value: number): number {
@@ -287,13 +291,13 @@ export function createRenderModule(): GameModule {
         }
       });
       ctx.bus.on('PHONE_RETURNED', (event) => {
-        effects.push({ kind: 'return', x: ctx.canvas.clientWidth / 2, y: 130, age: 0, ttl: 950, label: `+$${event.payout}`, color: '#26C6A6' });
+        effects.push({ kind: 'return', x: ctx.canvas.clientWidth / 2, y: 130, age: 0, ttl: 950, label: `+${event.payout}元`, color: '#26C6A6' });
       });
       ctx.bus.on('LEVEL_UP', (event) => {
-        effects.push({ kind: 'level', x: ctx.canvas.clientWidth / 2, y: 110, age: 0, ttl: 1300, label: `LEVEL ${event.level}`, color: '#5B8DEF' });
+        effects.push({ kind: 'level', x: ctx.canvas.clientWidth / 2, y: 110, age: 0, ttl: 1300, label: `升级到 ${event.level}`, color: '#5B8DEF' });
       });
       ctx.bus.on('CUSTOMER_LEFT', (event) => {
-        effects.push({ kind: 'leave', x: 82, y: 120, age: 0, ttl: 900, label: event.reason === 'overflow' ? 'FULL' : 'LEFT', color: '#FF9F43' });
+        effects.push({ kind: 'leave', x: 82, y: 120, age: 0, ttl: 900, label: event.reason === 'overflow' ? '队满' : '离店', color: '#FF9F43' });
       });
     },
     update(dt) {

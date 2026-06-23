@@ -2,8 +2,8 @@ import { upgradeCost } from '../content/balance';
 import type { GameContext, GameModule } from '../types/module.types';
 
 function formatNumber(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 10_000) return `${Math.floor(value / 1000)}k`;
+  if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(1)}亿`;
+  if (value >= 10_000) return `${(value / 10_000).toFixed(1)}万`;
   return String(Math.floor(value));
 }
 
@@ -35,9 +35,9 @@ export function createUiModule(): GameModule {
           <button class="upgrade-row" data-upgrade="${upgrade.id}" ${disabled ? 'disabled' : ''} title="${escapeAttr(upgrade.desc)}">
             <span>
               <strong>${upgrade.name}</strong>
-              <small>Lv ${level}${maxed ? ' max' : ''}</small>
+              <small>${level} 级${maxed ? ' · 满级' : ''}</small>
             </span>
-            <b>${maxed ? 'Done' : `$${formatNumber(cost)}`}</b>
+            <b>${maxed ? '已满' : `${formatNumber(cost)}元`}</b>
           </button>
         `;
       })
@@ -51,7 +51,7 @@ export function createUiModule(): GameModule {
         const runtime = ctx.state.skills[skill.id] ?? { unlocked: false, lastUsedAt: -Infinity };
         const remaining = Math.max(0, skill.cooldownMs - (now - runtime.lastUsedAt));
         const disabled = !runtime.unlocked || remaining > 0;
-        const label = !runtime.unlocked ? `L${skill.unlockLevel}` : remaining > 0 ? `${Math.ceil(remaining / 1000)}s` : 'Use';
+        const label = !runtime.unlocked ? `${skill.unlockLevel}级` : remaining > 0 ? `${Math.ceil(remaining / 1000)}秒` : '释放';
         return `
           <button class="skill-button" data-skill="${skill.id}" ${disabled ? 'disabled' : ''} title="${escapeAttr(skill.desc)}">
             <span>${skill.name}</span>
@@ -68,37 +68,37 @@ export function createUiModule(): GameModule {
       <section class="hud-panel">
         <div class="hud-main">
           <div>
-            <label>Level</label>
+            <label>等级</label>
             <strong>${ctx.state.level}</strong>
           </div>
           <div>
-            <label>Cash</label>
-            <strong>$${formatNumber(ctx.state.points)}</strong>
+            <label>现金</label>
+            <strong>${formatNumber(ctx.state.points)}元</strong>
           </div>
           <div>
-            <label>Queue</label>
+            <label>排队</label>
             <strong>${ctx.state.queue.length}/${ctx.state.queueCapacity}</strong>
           </div>
         </div>
         <div class="xp-bar"><span style="width:${xpRatio * 100}%"></span></div>
-        <div class="rep-row"><span>Reputation</span><span class="stars">${stars()}</span></div>
+        <div class="rep-row"><span>声誉</span><span class="stars">${stars()}</span></div>
         <div class="effect-row">
-          <span>Hit ${formatNumber(ctx.state.derived.clearPerHit)}</span>
-          <span>${ctx.state.derived.swipeEnabled ? 'Swipe on' : 'Tap only'}</span>
-          <span>${ctx.state.derived.botCount} bots</span>
+          <span>每次清 ${formatNumber(ctx.state.derived.clearPerHit)}</span>
+          <span>${ctx.state.derived.swipeEnabled ? '滑动已开' : '仅点按'}</span>
+          <span>学徒 ${ctx.state.derived.botCount}</span>
         </div>
       </section>
       <section class="shop-panel">
-        <header>Upgrades</header>
+        <header>升级</header>
         <div class="upgrade-list">${upgradesHtml()}</div>
       </section>
       <section class="skill-panel">
-        <header>Skills</header>
+        <header>技能</header>
         <div class="skill-list">${skillsHtml()}</div>
       </section>
       <section class="control-panel">
-        <button class="icon-command" data-action="mute" title="Toggle audio">${muted ? 'Unmute' : 'Mute'}</button>
-        <button class="icon-command danger" data-action="reset" title="Reset local save">Reset</button>
+        <button class="icon-command" data-action="mute" title="切换声音">${muted ? '开声' : '静音'}</button>
+        <button class="icon-command danger" data-action="reset" title="重置本地存档">重置</button>
       </section>
     `;
   }
@@ -124,7 +124,7 @@ export function createUiModule(): GameModule {
       window.dispatchEvent(new CustomEvent('badge-buster-toggle-audio', { detail: { muted } }));
       render();
     }
-    if (action === 'reset' && confirm('Reset Badge Buster Shop progress?')) {
+    if (action === 'reset' && confirm('确定要重置《角标清理铺》的本地进度吗？')) {
       localStorage.removeItem('badge-buster-shop:v1');
       location.reload();
     }
@@ -136,7 +136,7 @@ export function createUiModule(): GameModule {
       ctx = context;
       const found = document.getElementById('ui-root');
       if (!found) {
-        throw new Error('Missing #ui-root');
+        throw new Error('找不到 #ui-root');
       }
       root = found;
       root.addEventListener('click', click);

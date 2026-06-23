@@ -3,8 +3,8 @@ import type { SkillDef } from '../types/content.types';
 export const skills: SkillDef[] = [
   {
     id: 'skill_clearphone',
-    name: 'Clean Sweep',
-    desc: 'Instantly clear the current phone.',
+    name: '整机秒清',
+    desc: '立刻清空当前手机。',
     artId: 'skill_clearphone',
     unlockLevel: 5,
     cooldownMs: 25_000,
@@ -12,8 +12,8 @@ export const skills: SkillDef[] = [
   },
   {
     id: 'skill_freeze',
-    name: 'Signal Freeze',
-    desc: 'Stop incoming badges for twelve seconds.',
+    name: '信号冻结',
+    desc: '12 秒内不再涌入新角标。',
     artId: 'skill_freeze',
     unlockLevel: 8,
     cooldownMs: 60_000,
@@ -21,8 +21,8 @@ export const skills: SkillDef[] = [
   },
   {
     id: 'skill_soothe',
-    name: 'Calm Counter',
-    desc: 'Restore patience for the whole queue.',
+    name: '柜台安抚',
+    desc: '回满整条队伍的耐心。',
     artId: 'skill_soothe',
     unlockLevel: 10,
     cooldownMs: 45_000,
@@ -30,8 +30,8 @@ export const skills: SkillDef[] = [
   },
   {
     id: 'skill_hands',
-    name: 'Extra Hands',
-    desc: 'Temporary helpers clear extra badges.',
+    name: '多几双手',
+    desc: '临时增加自动清理帮手。',
     artId: 'skill_hands',
     unlockLevel: 12,
     cooldownMs: 90_000,
@@ -39,8 +39,8 @@ export const skills: SkillDef[] = [
   },
   {
     id: 'skill_tip',
-    name: 'Tip Rush',
-    desc: 'Double payout and XP briefly.',
+    name: '小费冲刺',
+    desc: '短时间内报酬和经验翻倍。',
     artId: 'skill_tip',
     unlockLevel: 15,
     cooldownMs: 120_000,
@@ -48,8 +48,8 @@ export const skills: SkillDef[] = [
   },
   {
     id: 'skill_magnet',
-    name: 'Badge Magnet',
-    desc: 'Taps pull in nearby badge bubbles.',
+    name: '角标磁吸',
+    desc: '点击会吸附附近角标。',
     artId: 'skill_magnet',
     unlockLevel: 18,
     cooldownMs: 60_000,
