@@ -85,6 +85,10 @@ export function createUiModule(): GameModule {
       ctx.state.derived.clearPerHit,
       ctx.state.derived.swipeEnabled ? 1 : 0,
       ctx.state.derived.botCount,
+      ctx.state.derived.adClearPower,
+      ctx.state.derived.junkClearMb,
+      ctx.state.derived.memoryClearPower,
+      ctx.state.derived.backgroundClearPower,
       muted ? 1 : 0,
       upgradeState,
       skillState,
@@ -137,6 +141,8 @@ export function createUiModule(): GameModule {
         <div class="effect-row">
           <span>每次清 ${formatNumber(ctx.state.derived.clearPerHit)}</span>
           <span>${ctx.state.derived.swipeEnabled ? '按住滑动清' : '买手势解锁滑动'}</span>
+          <span>通知 ${ctx.state.derived.adClearPower}</span>
+          <span>垃圾 ${ctx.state.derived.junkClearMb}MB</span>
           <span>学徒 ${ctx.state.derived.botCount}</span>
         </div>
       </section>

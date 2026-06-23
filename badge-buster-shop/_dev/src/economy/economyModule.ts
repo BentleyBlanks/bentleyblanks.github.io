@@ -17,6 +17,10 @@ export function recalcDerived(ctx: GameContext): void {
   const botCountLevel = upgradeLevel(ctx, 'up_botcount');
   const botSpeedLevel = upgradeLevel(ctx, 'up_botspeed');
   const payoutLevel = upgradeLevel(ctx, 'up_payout');
+  const adClearLevel = upgradeLevel(ctx, 'up_adclear');
+  const junkClearLevel = upgradeLevel(ctx, 'up_junkclear');
+  const memoryClearLevel = upgradeLevel(ctx, 'up_memclear');
+  const backgroundClearLevel = upgradeLevel(ctx, 'up_bgclear');
   const repMult = 0.7 + ctx.state.reputation * 0.12;
   const levelPressure = 1 + Math.max(0, ctx.state.level - 1) * 0.018;
 
@@ -27,6 +31,10 @@ export function recalcDerived(ctx: GameContext): void {
   ctx.state.derived.botCount = botCountLevel;
   ctx.state.derived.botRatePerSec = botCountLevel * 0.5 * Math.pow(1.2, botSpeedLevel);
   ctx.state.derived.arrivalIntervalMs = Math.max(2_400, Math.floor(BASE_ARRIVAL_INTERVAL_MS / (repMult * levelPressure)));
+  ctx.state.derived.adClearPower = 1 + adClearLevel;
+  ctx.state.derived.junkClearMb = 45 + junkClearLevel * 35;
+  ctx.state.derived.memoryClearPower = 16 + memoryClearLevel * 10;
+  ctx.state.derived.backgroundClearPower = 1 + Math.floor(backgroundClearLevel / 2);
 }
 
 export function createEconomyModule(): GameModule {

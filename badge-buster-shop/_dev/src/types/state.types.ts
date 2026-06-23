@@ -8,14 +8,23 @@ export interface IconRuntime {
   row: number;
 }
 
+export type PhoneSystemRuntime = 'ios' | 'android';
+
 export interface PhoneRuntime {
   id: string;
+  system: PhoneSystemRuntime;
   icons: IconRuntime[];
   gridCols: number;
   gridRows: number;
   badgeTotal: number;
   incomingRateMult: number;
   incomingAccumulatorMs: number;
+  adNotifications: number;
+  notificationAccumulatorMs: number;
+  junkMb: number;
+  memoryLoad: number;
+  backgroundApps: number;
+  utilityAccumulatorMs: number;
   cleaned: boolean;
 }
 
@@ -69,6 +78,10 @@ export interface GameState {
     botCount: number;
     botRatePerSec: number;
     arrivalIntervalMs: number;
+    adClearPower: number;
+    junkClearMb: number;
+    memoryClearPower: number;
+    backgroundClearPower: number;
   };
 
   botAccumulator: number;

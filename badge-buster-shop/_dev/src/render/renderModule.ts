@@ -6,7 +6,7 @@ import type { Mood } from '../types/state.types';
 const TAU = Math.PI * 2;
 
 interface VisualEffect {
-  kind: 'pop' | 'return' | 'level' | 'leave' | 'skill' | 'combo' | 'smash';
+  kind: 'pop' | 'return' | 'level' | 'leave' | 'skill' | 'combo' | 'smash' | 'task';
   x: number;
   y: number;
   age: number;
@@ -163,7 +163,7 @@ function pickBySeed<T>(items: readonly T[], seed: number): T {
 function skinForPhone(phone: PhoneLayout): PhoneSkin {
   const seed = hashText(`${phone.customer.id}:${phone.customer.phone.id}:${phone.customer.defId}`);
   const model = pickBySeed<PhoneModel>(['island', 'notch', 'androidGlass', 'classic', 'senior'], seed);
-  const system: PhoneSystem = model === 'island' || model === 'notch' ? 'ios' : 'android';
+  const system: PhoneSystem = phone.customer.phone.system;
   const wallpaper = pickBySeed(WALLPAPERS, Math.floor(seed / 7));
   const body = pickBySeed(BODY_PALETTES, Math.floor(seed / 19));
   return {
@@ -251,16 +251,28 @@ export function createRenderModule(): GameModule {
     const w = ctx.canvas.clientWidth;
     const h = ctx.canvas.clientHeight;
     const stageW = Math.max(0, w - layout.uiReserve);
-    const bg = c.createLinearGradient(0, 0, w, h);
-    bg.addColorStop(0, '#EAF4FF');
-    bg.addColorStop(0.5, '#FFF7EC');
-    bg.addColorStop(1, '#EAF8F2');
-    c.fillStyle = bg;
-    c.fillRect(-24, -24, w + 48, h + 48);
+    const shopImage = images.get('shopCounter');
+    if (shopImage?.complete && shopImage.naturalWidth > 0) {
+      const scale = Math.max(stageW / shopImage.naturalWidth, h / shopImage.naturalHeight);
+      const drawW = shopImage.naturalWidth * scale;
+      const drawH = shopImage.naturalHeight * scale;
+      c.drawImage(shopImage, (stageW - drawW) / 2, (h - drawH) / 2, drawW, drawH);
+      c.fillStyle = 'rgba(6, 13, 22, 0.28)';
+      c.fillRect(0, 0, stageW, h);
+      c.fillStyle = 'rgba(255, 244, 220, 0.08)';
+      c.fillRect(0, 0, stageW, h);
+    } else {
+      const bg = c.createLinearGradient(0, 0, w, h);
+      bg.addColorStop(0, '#EAF4FF');
+      bg.addColorStop(0.5, '#FFF7EC');
+      bg.addColorStop(1, '#EAF8F2');
+      c.fillStyle = bg;
+      c.fillRect(-24, -24, w + 48, h + 48);
+    }
 
     c.save();
-    c.globalAlpha = 0.13;
-    c.strokeStyle = '#9CB5D8';
+    c.globalAlpha = shopImage?.complete ? 0.08 : 0.13;
+    c.strokeStyle = '#D9ECFF';
     c.lineWidth = 1;
     for (let x = -40; x < w + 40; x += 44) {
       c.beginPath();
@@ -271,10 +283,10 @@ export function createRenderModule(): GameModule {
     c.restore();
 
     c.save();
-    c.globalAlpha = 0.95;
-    fillRound(c, layout.playArea.x + 8, 82, Math.max(160, stageW - layout.playArea.x - 36), 42, 8, 'rgba(255,255,255,0.58)');
-    strokeRound(c, layout.playArea.x + 8, 82, Math.max(160, stageW - layout.playArea.x - 36), 42, 8, 'rgba(91,141,239,0.18)');
-    c.fillStyle = '#315779';
+    c.globalAlpha = 0.96;
+    fillRound(c, layout.playArea.x + 8, 82, Math.max(160, stageW - layout.playArea.x - 36), 42, 8, 'rgba(9,18,31,0.62)');
+    strokeRound(c, layout.playArea.x + 8, 82, Math.max(160, stageW - layout.playArea.x - 36), 42, 8, 'rgba(255,255,255,0.2)');
+    c.fillStyle = '#F8FBFF';
     c.font = '900 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
     c.textAlign = 'left';
     c.fillText('今日柜台：快速清理 · 手机焕新', layout.playArea.x + 24, 108);
@@ -282,7 +294,7 @@ export function createRenderModule(): GameModule {
     const shelfX = Math.max(16, layout.queuePanel.x + layout.queuePanel.w + 18);
     const shelfY = h - layout.bottomReserve - 132;
     if (shelfY > 150) {
-      fillRound(c, shelfX, shelfY, Math.max(220, stageW - shelfX - 26), 13, 6, '#C99A5B');
+      fillRound(c, shelfX, shelfY, Math.max(220, stageW - shelfX - 26), 13, 6, 'rgba(255, 201, 124, 0.34)');
       for (let index = 0; index < 8; index += 1) {
         const itemX = shelfX + 18 + index * 42;
         if (itemX > stageW - 40) break;
@@ -303,31 +315,31 @@ export function createRenderModule(): GameModule {
       c.fillRect(0, 0, w, h);
     }
 
-    c.fillStyle = 'rgba(255,255,255,0.9)';
+    c.fillStyle = 'rgba(8, 15, 27, 0.76)';
     c.fillRect(0, 0, w, 66);
-    c.fillStyle = '#2B2B33';
+    c.fillStyle = '#F8FBFF';
     c.font = '900 24px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
     c.textAlign = 'left';
     c.textBaseline = 'alphabetic';
     c.fillText('角标清理铺', 22, 41);
 
     const counterX = Math.max(216, w - layout.uiReserve - 176);
-    fillRound(c, counterX, 18, 152, 30, 15, 'rgba(255,255,255,0.78)');
-    strokeRound(c, counterX, 18, 152, 30, 15, '#DDE8F6');
+    fillRound(c, counterX, 18, 152, 30, 15, 'rgba(255,255,255,0.16)');
+    strokeRound(c, counterX, 18, 152, 30, 15, 'rgba(255,255,255,0.24)');
     c.font = '800 12px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-    c.fillStyle = '#4D5A6D';
+    c.fillStyle = '#EAF4FF';
     c.textAlign = 'center';
     c.fillText(`已清理 ${Math.floor(ctx.state.totalCleared)} 个`, counterX + 76, 38);
 
     const counterY = h - layout.bottomReserve - 86;
     if (counterY > 88) {
       const counter = c.createLinearGradient(0, counterY, 0, counterY + 108);
-      counter.addColorStop(0, '#D6B37A');
-      counter.addColorStop(0.18, '#F4D6A3');
-      counter.addColorStop(1, '#B77845');
+      counter.addColorStop(0, 'rgba(34, 20, 10, 0.0)');
+      counter.addColorStop(0.18, 'rgba(255, 210, 145, 0.12)');
+      counter.addColorStop(1, 'rgba(35, 18, 10, 0.18)');
       c.fillStyle = counter;
       c.fillRect(0, counterY, stageW, 108);
-      c.fillStyle = '#8B5A2B';
+      c.fillStyle = 'rgba(255,255,255,0.2)';
       c.fillRect(0, counterY, stageW, 6);
       c.fillStyle = 'rgba(255,255,255,0.38)';
       c.fillRect(0, counterY + 12, stageW, 2);
@@ -337,9 +349,9 @@ export function createRenderModule(): GameModule {
       }
     }
 
-    fillRound(c, layout.queuePanel.x - 8, layout.queuePanel.y - 8, layout.queuePanel.w + 16, layout.queuePanel.h + 16, 8, 'rgba(255, 252, 246, 0.9)');
-    strokeRound(c, layout.queuePanel.x - 8, layout.queuePanel.y - 8, layout.queuePanel.w + 16, layout.queuePanel.h + 16, 8, '#E7D8C0');
-    c.fillStyle = '#2B2B33';
+    fillRound(c, layout.queuePanel.x - 8, layout.queuePanel.y - 8, layout.queuePanel.w + 16, layout.queuePanel.h + 16, 8, 'rgba(10, 19, 32, 0.62)');
+    strokeRound(c, layout.queuePanel.x - 8, layout.queuePanel.y - 8, layout.queuePanel.w + 16, layout.queuePanel.h + 16, 8, 'rgba(255,255,255,0.18)');
+    c.fillStyle = '#F8FBFF';
     c.font = '900 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
     c.textAlign = 'center';
     c.fillText(`排队 ${ctx.state.queue.length}/${ctx.state.queueCapacity}`, layout.queuePanel.x + layout.queuePanel.w / 2, layout.queuePanel.y + 18);
@@ -487,6 +499,14 @@ export function createRenderModule(): GameModule {
       c.stroke();
     }
 
+    const overlayImage = images.get('phoneOverlays');
+    if (overlayImage?.complete && overlayImage.naturalWidth > 0) {
+      const cropSize = Math.min(overlayImage.naturalWidth, overlayImage.naturalHeight);
+      const cropX = (skin.seed % 3) * Math.floor((overlayImage.naturalWidth - cropSize) / 3);
+      c.globalAlpha = 0.1;
+      c.drawImage(overlayImage, cropX, 0, cropSize, cropSize, phone.screenX, phone.screenY, phone.screenW, phone.screenH);
+    }
+
     if (skin.system === 'ios') {
       c.globalAlpha = 0.24;
       fillRound(c, phone.screenX + phone.screenW * 0.08, phone.screenY + phone.screenH * 0.82, phone.screenW * 0.84, phone.screenH * 0.12, phone.w * 0.045, '#FFFFFF');
@@ -502,6 +522,109 @@ export function createRenderModule(): GameModule {
     c.restore();
 
     strokeRound(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, screenRadius, 'rgba(255,255,255,0.46)', 1.3);
+  }
+
+  function phoneTaskCount(phone: PhoneLayout): number {
+    const runtime = phone.customer.phone;
+    return runtime.adNotifications + Math.ceil(runtime.junkMb / 45) + Math.ceil(runtime.memoryLoad / 10) + runtime.backgroundApps;
+  }
+
+  function renderTaskRects(phone: PhoneLayout): Array<{ kind: 'junk' | 'memory' | 'background'; x: number; y: number; w: number; h: number }> {
+    const gap = Math.max(4, phone.screenH * 0.014);
+    const cardH = Math.max(22, Math.min(38, phone.screenH * 0.105));
+    const startY = phone.screenY + phone.screenH * (phone.customer.phone.system === 'android' ? 0.56 : 0.66);
+    const x = phone.screenX + phone.screenW * 0.07;
+    const w = phone.screenW * 0.86;
+    const rects: Array<{ kind: 'junk' | 'memory' | 'background'; x: number; y: number; w: number; h: number }> = [];
+    if (phone.customer.phone.system === 'android') {
+      rects.push({ kind: 'junk', x, y: startY, w, h: cardH });
+      rects.push({ kind: 'memory', x, y: startY + cardH + gap, w, h: cardH });
+    }
+    rects.push({ kind: 'background', x, y: startY + rects.length * (cardH + gap), w, h: cardH });
+    return rects;
+  }
+
+  function drawNotificationShade(phone: PhoneLayout): void {
+    const runtime = phone.customer.phone;
+    if (runtime.adNotifications <= 0) {
+      return;
+    }
+    const c = ctx.ctx2d;
+    const shadeX = phone.screenX + phone.screenW * 0.06;
+    const shadeY = phone.screenY + phone.screenH * 0.12;
+    const shadeW = phone.screenW * 0.88;
+    const cardH = Math.max(25, phone.screenH * 0.108);
+    const visible = Math.min(3, runtime.adNotifications);
+    c.save();
+    for (let index = 0; index < visible; index += 1) {
+      const y = shadeY + index * (cardH * 0.72);
+      const alpha = 0.88 - index * 0.12;
+      fillRound(c, shadeX + index * 3, y, shadeW - index * 6, cardH, 9, `rgba(16, 24, 39, ${alpha})`);
+      strokeRound(c, shadeX + index * 3, y, shadeW - index * 6, cardH, 9, 'rgba(255,255,255,0.16)');
+      c.fillStyle = '#FF9F43';
+      c.beginPath();
+      c.arc(shadeX + 13, y + cardH * 0.36, 5, 0, TAU);
+      c.fill();
+      c.fillStyle = '#F8FBFF';
+      c.font = `900 ${Math.max(8, phone.w * 0.032)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+      c.textAlign = 'left';
+      c.textBaseline = 'middle';
+      c.fillText('广告通知', shadeX + 24, y + cardH * 0.34, shadeW - 52);
+      c.fillStyle = 'rgba(248,251,255,0.72)';
+      c.font = `700 ${Math.max(7, phone.w * 0.026)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+      c.fillText(index === 0 ? '从顶部下拉清除' : '无用弹窗待处理', shadeX + 24, y + cardH * 0.66, shadeW - 52);
+    }
+    if (runtime.adNotifications > 3) {
+      fillRound(c, shadeX + shadeW - 26, shadeY - 8, 24, 18, 9, '#FF3B30');
+      c.fillStyle = '#FFFFFF';
+      c.font = '900 10px Inter, system-ui, sans-serif';
+      c.textAlign = 'center';
+      c.fillText(String(runtime.adNotifications), shadeX + shadeW - 14, shadeY + 4);
+    }
+    c.restore();
+  }
+
+  function drawTaskCard(phone: PhoneLayout, rect: { kind: 'junk' | 'memory' | 'background'; x: number; y: number; w: number; h: number }): void {
+    const c = ctx.ctx2d;
+    const runtime = phone.customer.phone;
+    const value =
+      rect.kind === 'junk'
+        ? runtime.junkMb
+        : rect.kind === 'memory'
+          ? runtime.memoryLoad
+          : runtime.backgroundApps;
+    const active = value > 0;
+    const title = rect.kind === 'junk' ? '垃圾清理' : rect.kind === 'memory' ? '内存加速' : '后台应用';
+    const detail = rect.kind === 'junk' ? `${Math.ceil(runtime.junkMb)} MB` : rect.kind === 'memory' ? `${Math.ceil(runtime.memoryLoad)}%` : `${runtime.backgroundApps} 个`;
+    const color = rect.kind === 'junk' ? '#26C6A6' : rect.kind === 'memory' ? '#5B8DEF' : '#8E7CF6';
+    c.save();
+    fillRound(c, rect.x, rect.y, rect.w, rect.h, 8, active ? 'rgba(15, 23, 42, 0.76)' : 'rgba(15, 23, 42, 0.34)');
+    strokeRound(c, rect.x, rect.y, rect.w, rect.h, 8, active ? alphaColor(color, 0.62) : 'rgba(255,255,255,0.12)');
+    c.fillStyle = active ? color : 'rgba(255,255,255,0.28)';
+    c.beginPath();
+    c.arc(rect.x + rect.h * 0.48, rect.y + rect.h / 2, rect.h * 0.24, 0, TAU);
+    c.fill();
+    c.fillStyle = '#FFFFFF';
+    c.font = `900 ${Math.max(7, phone.w * 0.028)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.textAlign = 'left';
+    c.textBaseline = 'middle';
+    c.fillText(title, rect.x + rect.h * 0.86, rect.y + rect.h * 0.38, rect.w * 0.48);
+    c.fillStyle = active ? 'rgba(255,255,255,0.74)' : 'rgba(255,255,255,0.38)';
+    c.font = `800 ${Math.max(7, phone.w * 0.025)}px Inter, "Microsoft YaHei", sans-serif`;
+    c.fillText(active ? detail : '已清理', rect.x + rect.h * 0.86, rect.y + rect.h * 0.68, rect.w * 0.48);
+    fillRound(c, rect.x + rect.w - rect.w * 0.31, rect.y + rect.h * 0.2, rect.w * 0.25, rect.h * 0.6, rect.h * 0.3, active ? alphaColor(color, 0.8) : 'rgba(255,255,255,0.12)');
+    c.fillStyle = '#FFFFFF';
+    c.font = `900 ${Math.max(7, phone.w * 0.024)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.fillText(active ? '清理' : '完成', rect.x + rect.w - rect.w * 0.185, rect.y + rect.h * 0.51, rect.w * 0.22);
+    c.restore();
+  }
+
+  function drawPhoneTasks(phone: PhoneLayout): void {
+    drawNotificationShade(phone);
+    for (const rect of renderTaskRects(phone)) {
+      drawTaskCard(phone, rect);
+    }
   }
 
   function drawDeviceChrome(phone: PhoneLayout, skin: PhoneSkin): void {
@@ -593,12 +716,18 @@ export function createRenderModule(): GameModule {
     for (const icon of phone.icons) {
       drawIcon(icon, skin);
     }
+    drawPhoneTasks(phone);
 
     c.font = `900 ${Math.max(10, phone.w * 0.04)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    c.fillStyle = phone.customer.phone.badgeTotal > 0 ? '#F8FAFC' : '#C7F9CC';
+    const taskCount = phoneTaskCount(phone);
+    c.fillStyle = phone.customer.phone.badgeTotal + taskCount > 0 ? '#F8FAFC' : '#C7F9CC';
     c.shadowColor = 'rgba(0,0,0,0.35)';
     c.shadowBlur = 4;
-    c.fillText(phone.customer.phone.badgeTotal > 0 ? `剩余 ${phone.customer.phone.badgeTotal}` : '已清空', phone.x + phone.w / 2, phone.y + phone.h - 15);
+    c.fillText(
+      phone.customer.phone.badgeTotal + taskCount > 0 ? `角标 ${phone.customer.phone.badgeTotal} · 任务 ${taskCount}` : '已清空',
+      phone.x + phone.w / 2,
+      phone.y + phone.h - 15,
+    );
     c.restore();
   }
 
@@ -1023,6 +1152,52 @@ export function createRenderModule(): GameModule {
     c.restore();
   }
 
+  function drawSystemTaskCoach(layout: GameLayout): void {
+    const phone = layout.phoneLayouts.find((item) => item.customer.phone.adNotifications > 0 || phoneTaskCount(item) > 0);
+    if (!phone || ctx.state.totalCleared > 220) {
+      return;
+    }
+    const hasAd = phone.customer.phone.adNotifications > 0;
+    const rect = renderTaskRects(phone).find((item) => {
+      const runtime = phone.customer.phone;
+      if (item.kind === 'junk') return runtime.junkMb > 0;
+      if (item.kind === 'memory') return runtime.memoryLoad > 0;
+      return runtime.backgroundApps > 0;
+    });
+    if (!hasAd && !rect) {
+      return;
+    }
+    const c = ctx.ctx2d;
+    const targetX = hasAd ? phone.screenX + phone.screenW * 0.5 : (rect?.x ?? phone.screenX) + (rect?.w ?? phone.screenW) * 0.5;
+    const targetY = hasAd ? phone.screenY + phone.screenH * 0.16 : (rect?.y ?? phone.screenY) + (rect?.h ?? 28) * 0.5;
+    const boxW = Math.min(186, Math.max(132, phone.screenW * 0.86));
+    const boxX = clamp(targetX - boxW * 0.5, phone.screenX + 5, phone.screenX + phone.screenW - boxW - 5);
+    const boxY = hasAd ? phone.screenY + phone.screenH * 0.32 : Math.max(phone.screenY + 32, targetY - 68);
+    const beat = (Math.sin(pulseTime * 0.007) + 1) / 2;
+
+    c.save();
+    fillRound(c, boxX, boxY, boxW, 48, 10, 'rgba(8, 15, 27, 0.84)');
+    strokeRound(c, boxX, boxY, boxW, 48, 10, hasAd ? '#FF9F43' : '#26C6A6', 2);
+    c.fillStyle = '#F8FBFF';
+    c.font = `900 ${phone.screenW < 140 ? 10 : 12}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(hasAd ? '从顶部下拉清广告' : '点清理卡处理系统垃圾', boxX + boxW / 2, boxY + 18, boxW - 12);
+    c.fillStyle = 'rgba(248,251,255,0.68)';
+    c.font = `800 ${phone.screenW < 140 ? 8 : 10}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.fillText(hasAd ? '像真实手机一样拉通知栏' : '安卓才有垃圾和内存任务', boxX + boxW / 2, boxY + 34, boxW - 12);
+    c.strokeStyle = hasAd ? 'rgba(255,159,67,0.82)' : 'rgba(38,198,166,0.82)';
+    c.lineWidth = 2.2;
+    c.beginPath();
+    c.moveTo(boxX + boxW / 2, hasAd ? boxY : boxY + 48);
+    c.quadraticCurveTo(targetX + 22, targetY + (hasAd ? 28 : -24), targetX, targetY);
+    c.stroke();
+    c.beginPath();
+    c.arc(targetX, targetY, 15 + beat * 7, 0, TAU);
+    c.stroke();
+    c.restore();
+  }
+
   function drawComboOverlay(layout: GameLayout): void {
     if (combo < 3 || comboHoldMs <= 0) {
       return;
@@ -1093,6 +1268,7 @@ export function createRenderModule(): GameModule {
 
     drawSwipeHint(layout);
     drawTutorialCoach(layout);
+    drawSystemTaskCoach(layout);
     drawComboOverlay(layout);
   }
 
@@ -1146,6 +1322,13 @@ export function createRenderModule(): GameModule {
         spawnBurst(event.x, event.y, '#FFD166', 28 + Math.min(34, event.totalBadges), 1.6);
         spawnBurst(event.x, event.y, '#5B8DEF', 18 + Math.min(28, event.iconCount * 3), 1.3);
         addShake(760, 10);
+      });
+      ctx.bus.on('PHONE_TASK_CLEARED', (event) => {
+        const color = event.kind === 'ad' ? '#FF9F43' : event.kind === 'junk' ? '#26C6A6' : event.kind === 'memory' ? '#5B8DEF' : '#8E7CF6';
+        const label = event.kind === 'junk' ? `-${event.amount}MB` : event.kind === 'memory' ? `-${event.amount}%` : `-${event.amount}`;
+        effects.push({ kind: 'task', x: event.x, y: event.y, age: 0, ttl: 620, label, color, power: 1.1 });
+        spawnBurst(event.x, event.y, color, 16, 1.05);
+        addShake(90, 1.2);
       });
       ctx.bus.on('LEVEL_UP', (event) => {
         effects.push({ kind: 'level', x: ctx.canvas.clientWidth / 2, y: 112, age: 0, ttl: 1300, label: `升级到 ${event.level}`, color: '#5B8DEF', power: 1.7 });

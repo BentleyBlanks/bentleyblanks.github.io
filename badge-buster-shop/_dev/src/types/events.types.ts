@@ -10,6 +10,7 @@ export type GameEvent =
   | { type: 'CUSTOMER_ARRIVED'; customerId: string }
   | { type: 'PHONE_CLEANED'; customerId: string }
   | { type: 'PHONE_SMASHED'; customerId: string; x: number; y: number; iconCount: number; totalBadges: number }
+  | { type: 'PHONE_TASK_CLEARED'; customerId: string; kind: 'ad' | 'junk' | 'memory' | 'background'; amount: number; x: number; y: number }
   | { type: 'PHONE_RETURNED'; customerId: string; payout: number; xp: number; mood: Mood }
   | { type: 'CUSTOMER_LEFT'; customerId: string; reason: 'angry' | 'overflow' }
   | { type: 'REPUTATION_CHANGED'; value: number }

@@ -1,9 +1,9 @@
 :root {
-  color: #2b2b33;
+  color: #ffffff;
   font-family:
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC", Inter, ui-sans-serif,
     system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #fbf7f0;
+  background: #07101c;
 }
 
 * {
@@ -51,15 +51,15 @@ input {
 .skill-panel,
 .control-panel {
   margin-bottom: 10px;
-  border: 1px solid rgba(119, 141, 169, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 251, 255, 0.88)),
-    rgba(255, 255, 255, 0.92);
+    linear-gradient(145deg, rgba(18, 29, 46, 0.92), rgba(8, 15, 27, 0.82)),
+    rgba(8, 15, 27, 0.88);
   box-shadow:
-    0 18px 36px rgba(43, 43, 51, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(10px);
+    0 22px 42px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(16px) saturate(1.2);
 }
 
 .hud-panel {
@@ -76,14 +76,14 @@ input {
   min-width: 0;
   padding: 8px;
   border-radius: 7px;
-  background: linear-gradient(180deg, #ffffff, #eef5ff);
-  border: 1px solid rgba(91, 141, 239, 0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06));
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 label,
 .rep-row span:first-child {
   display: block;
-  color: #746f78;
+  color: rgba(248, 251, 255, 0.68);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0;
@@ -93,7 +93,7 @@ label,
   display: block;
   overflow: hidden;
   margin-top: 2px;
-  color: #2b2b33;
+  color: #ffffff;
   font-size: 20px;
   line-height: 1.1;
   text-overflow: ellipsis;
@@ -104,7 +104,7 @@ label,
   margin-top: 10px;
   overflow: hidden;
   border-radius: 99px;
-  background: #ece4d8;
+  background: rgba(255,255,255,0.12);
 }
 
 .xp-bar span {
@@ -147,8 +147,8 @@ label,
   min-width: 0;
   padding: 5px 7px;
   border-radius: 6px;
-  background: #eef3ff;
-  color: #3d5d9e;
+  background: rgba(91,141,239,0.2);
+  color: #dbeafe;
   font-size: 12px;
   font-weight: 800;
 }
@@ -180,12 +180,12 @@ label,
   width: 100%;
   min-height: 48px;
   padding: 8px 9px;
-  border: 1px solid rgba(119, 141, 169, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 7px;
   background:
-    linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,247,255,0.94)),
-    #fffaf2;
-  color: #2b2b33;
+    linear-gradient(135deg, rgba(255,255,255,0.14), rgba(91,141,239,0.08)),
+    rgba(255,255,255,0.06);
+  color: #f8fbff;
   text-align: left;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
@@ -221,7 +221,7 @@ label,
 
 .upgrade-row small {
   margin-top: 2px;
-  color: #746f78;
+  color: rgba(248, 251, 255, 0.58);
   font-size: 11px;
   font-weight: 700;
 }
@@ -243,8 +243,8 @@ label,
   padding: 8px;
   border: 1px solid rgba(91, 141, 239, 0.2);
   border-radius: 7px;
-  background: linear-gradient(135deg, #f9fbff, #eef5ff);
-  color: #26364f;
+  background: linear-gradient(135deg, rgba(91,141,239,0.22), rgba(38,198,166,0.08));
+  color: #f8fbff;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
 }
@@ -270,7 +270,7 @@ label,
 .control-panel small {
   display: none;
   grid-column: 1 / -1;
-  color: #746f78;
+  color: rgba(248, 251, 255, 0.58);
   font-size: 11px;
   font-weight: 800;
   text-align: center;
@@ -278,10 +278,10 @@ label,
 
 .icon-command {
   min-height: 38px;
-  border: 1px solid #dce4ef;
+  border: 1px solid rgba(255,255,255,0.18);
   border-radius: 7px;
-  background: #ffffff;
-  color: #2b2b33;
+  background: rgba(255,255,255,0.12);
+  color: #f8fbff;
   font-weight: 900;
   cursor: pointer;
 }

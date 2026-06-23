@@ -1,6 +1,6 @@
 import { GRID_COLS, GRID_ROWS, randomRangeInt } from '../content/balance';
 import type { AppIconDef, CustomerDef } from '../types/content.types';
-import type { PhoneRuntime } from '../types/state.types';
+import type { PhoneRuntime, PhoneSystemRuntime } from '../types/state.types';
 
 function weightedIcon(iconDefs: AppIconDef[]): AppIconDef {
   const total = iconDefs.reduce((sum, icon) => sum + icon.spawnWeight, 0);
@@ -15,6 +15,7 @@ function weightedIcon(iconDefs: AppIconDef[]): AppIconDef {
 }
 
 export function createPhone(customerId: string, customerDef: CustomerDef, iconDefs: AppIconDef[], level: number): PhoneRuntime {
+  const system: PhoneSystemRuntime = Math.random() < 0.58 ? 'android' : 'ios';
   const icons = Array.from({ length: GRID_COLS * GRID_ROWS }, (_, index) => {
     const app = weightedIcon(iconDefs);
     return {
@@ -51,12 +52,19 @@ export function createPhone(customerId: string, customerDef: CustomerDef, iconDe
   const badgeTotal = icons.reduce((sum, icon) => sum + icon.badge, 0);
   return {
     id: `${customerId}_phone`,
+    system,
     icons,
     gridCols: GRID_COLS,
     gridRows: GRID_ROWS,
     badgeTotal,
     incomingRateMult: 1 + Math.max(0, level - 1) * 0.035,
     incomingAccumulatorMs: 0,
+    adNotifications: randomRangeInt(0, level >= 3 ? 2 : 1),
+    notificationAccumulatorMs: 0,
+    junkMb: system === 'android' ? randomRangeInt(90, 260 + level * 8) : 0,
+    memoryLoad: system === 'android' ? randomRangeInt(18, 48) : 0,
+    backgroundApps: randomRangeInt(1, system === 'android' ? 5 : 3),
+    utilityAccumulatorMs: 0,
     cleaned: false,
   };
 }

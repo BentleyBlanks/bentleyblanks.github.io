@@ -40,7 +40,7 @@ export function createInputModule(): GameModule {
     }
 
     const now = performance.now();
-    if (trace.moved && ctx.state.derived.swipeEnabled && now - trace.lastEmitAt >= swipeEmitIntervalMs) {
+    if (trace.moved && now - trace.lastEmitAt >= swipeEmitIntervalMs) {
       const segment = trace.path.slice(Math.max(0, trace.path.length - 5));
       ctx.bus.emit({ type: 'SWIPE', path: segment });
       trace.lastEmitAt = now;
@@ -53,7 +53,7 @@ export function createInputModule(): GameModule {
     }
     const current = canvasPoint(ctx.canvas, event);
     trace.path.push(current);
-    if (trace.moved && ctx.state.derived.swipeEnabled) {
+    if (trace.moved) {
       ctx.bus.emit({ type: 'SWIPE', path: trace.path.slice(Math.max(0, trace.path.length - 10)) });
     } else if (!trace.moved) {
       ctx.bus.emit({ type: 'TAP', x: current.x, y: current.y });

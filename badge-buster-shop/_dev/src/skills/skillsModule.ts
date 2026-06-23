@@ -62,6 +62,32 @@ export function createSkillsModule(): GameModule {
         y: icon.y,
       });
     }
+    const utilityEvents: Array<{ kind: 'ad' | 'junk' | 'memory' | 'background'; amount: number; yOffset: number }> = [
+      { kind: 'ad', amount: phone.customer.phone.adNotifications, yOffset: -phone.h * 0.18 },
+      { kind: 'junk', amount: phone.customer.phone.junkMb, yOffset: -phone.h * 0.04 },
+      { kind: 'memory', amount: phone.customer.phone.memoryLoad, yOffset: phone.h * 0.1 },
+      { kind: 'background', amount: phone.customer.phone.backgroundApps, yOffset: phone.h * 0.22 },
+    ];
+    phone.customer.phone.adNotifications = 0;
+    phone.customer.phone.junkMb = 0;
+    phone.customer.phone.memoryLoad = 0;
+    phone.customer.phone.backgroundApps = 0;
+    for (const item of utilityEvents.filter((event) => event.amount > 0)) {
+      const units = item.kind === 'junk' ? Math.ceil(item.amount / 45) : Math.ceil(item.amount);
+      phone.customer.clearedBadges += units;
+      ctx.state.totalCleared += units;
+      ctx.bus.emit({ type: 'XP_GAINED', amount: units * ctx.state.derived.xpPerBadge });
+      ctx.bus.emit({
+        type: 'PHONE_TASK_CLEARED',
+        customerId: phone.customer.id,
+        kind: item.kind,
+        amount: item.amount,
+        x: phone.x + phone.w / 2,
+        y: phone.y + phone.h / 2 + item.yOffset,
+      });
+    }
+    phone.customer.phone.cleaned = true;
+    ctx.bus.emit({ type: 'PHONE_CLEANED', customerId: phone.customer.id });
   }
 
   function useSkill(id: string): void {

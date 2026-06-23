@@ -1,5 +1,5 @@
 import { INITIAL_ACTIVE_SLOTS, INITIAL_QUEUE_CAPACITY, INITIAL_REPUTATION, SAVE_KEY, xpToNextLevel } from '../content/balance';
-import type { GameState } from '../types/state.types';
+import type { CustomerRuntime, GameState, PhoneRuntime } from '../types/state.types';
 
 export function createInitialState(now = performance.now()): GameState {
   return {
@@ -32,11 +32,38 @@ export function createInitialState(now = performance.now()): GameState {
       botCount: 0,
       botRatePerSec: 0,
       arrivalIntervalMs: 8_000,
+      adClearPower: 1,
+      junkClearMb: 45,
+      memoryClearPower: 16,
+      backgroundClearPower: 1,
     },
     botAccumulator: 0,
     lastTickAt: now,
     startedAt: now,
   };
+}
+
+function hashText(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function ensurePhone(phone: PhoneRuntime): void {
+  phone.system ??= hashText(phone.id) % 10 < 6 ? 'android' : 'ios';
+  phone.adNotifications ??= 0;
+  phone.notificationAccumulatorMs ??= 0;
+  phone.junkMb ??= phone.system === 'android' ? 120 : 0;
+  phone.memoryLoad ??= phone.system === 'android' ? 24 : 0;
+  phone.backgroundApps ??= 1;
+  phone.utilityAccumulatorMs ??= 0;
+}
+
+function ensureCustomer(customer: CustomerRuntime): void {
+  ensurePhone(customer.phone);
 }
 
 export function loadState(): GameState | null {
@@ -54,6 +81,10 @@ export function loadState(): GameState | null {
     parsed.activeCustomers = parsed.activeCustomers ?? [];
     parsed.queue = parsed.queue ?? [];
     parsed.effects = parsed.effects ?? createInitialState().effects;
+    parsed.derived = { ...createInitialState().derived, ...(parsed.derived ?? {}) };
+    for (const customer of [...parsed.activeCustomers, ...parsed.queue]) {
+      ensureCustomer(customer);
+    }
     return parsed;
   } catch {
     return null;

@@ -18,7 +18,8 @@ export type UpgradeCategory =
   | 'queue'
   | 'patience'
   | 'swipe'
-  | 'payout';
+  | 'payout'
+  | 'phoneTask';
 
 export interface UpgradeDef {
   id: string;

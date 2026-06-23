@@ -128,6 +128,10 @@ export function createAudioModule(): GameModule {
       ctx.bus.on('LEVEL_UP', () => playChord(523.25));
       ctx.bus.on('PHONE_RETURNED', () => playChord(392));
       ctx.bus.on('PHONE_SMASHED', playSmash);
+      ctx.bus.on('PHONE_TASK_CLEARED', (event) => {
+        const base = event.kind === 'ad' ? 440 : event.kind === 'junk' ? 330 : event.kind === 'memory' ? 520 : 392;
+        playTone(base, 0.11, 0.045, event.kind === 'ad' ? 'sawtooth' : 'triangle', 1.32);
+      });
       ctx.bus.on('CUSTOMER_ARRIVED', () => playTone(660, 0.12, 0.045, 'triangle', 1.25));
       ctx.bus.on('CUSTOMER_LEFT', (event) => playTone(event.reason === 'overflow' ? 180 : 140, 0.22, 0.055, 'sawtooth', 0.7));
       ctx.bus.on('SKILL_USED', playSkillHit);
