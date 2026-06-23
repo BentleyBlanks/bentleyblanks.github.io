@@ -15,7 +15,7 @@ export const upgrades: UpgradeDef[] = [
   {
     id: 'up_swipe',
     name: '顺滑手势',
-    desc: '可滑过图标批量清理。',
+    desc: '滑动清理时更容易连起来。',
     category: 'swipe',
     artId: 'up_swipe',
     baseCost: 100,

@@ -84,7 +84,7 @@ export function createUiModule(): GameModule {
         <div class="rep-row"><span>声誉</span><span class="stars">${stars()}</span></div>
         <div class="effect-row">
           <span>每次清 ${formatNumber(ctx.state.derived.clearPerHit)}</span>
-          <span>${ctx.state.derived.swipeEnabled ? '滑动已开' : '仅点按'}</span>
+          <span>${ctx.state.derived.swipeEnabled ? '按住滑动清' : '点按清理'}</span>
           <span>学徒 ${ctx.state.derived.botCount}</span>
         </div>
       </section>
@@ -99,6 +99,7 @@ export function createUiModule(): GameModule {
       <section class="control-panel">
         <button class="icon-command" data-action="mute" title="切换声音">${muted ? '开声' : '静音'}</button>
         <button class="icon-command danger" data-action="reset" title="重置本地存档">重置</button>
+        <small>底部面板可左右滑动查看更多</small>
       </section>
     `;
   }

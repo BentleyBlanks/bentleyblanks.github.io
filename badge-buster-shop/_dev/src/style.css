@@ -257,6 +257,15 @@ label,
   padding: 10px;
 }
 
+.control-panel small {
+  display: none;
+  grid-column: 1 / -1;
+  color: #746f78;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .icon-command {
   min-height: 38px;
   border: 1px solid #dce4ef;
@@ -309,8 +318,28 @@ label,
   }
 
   .control-panel {
-    grid-auto-rows: 42px;
+    grid-auto-rows: min-content;
     align-content: start;
+  }
+
+  .control-panel small {
+    display: block;
+  }
+
+  #ui-root::after {
+    position: sticky;
+    right: 0;
+    align-self: center;
+    padding: 6px 8px;
+    border: 1px solid #dde6f8;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #3d5d9e;
+    content: "左右滑动";
+    font-size: 11px;
+    font-weight: 900;
+    box-shadow: 0 8px 18px rgba(43, 43, 51, 0.12);
+    pointer-events: none;
   }
 }
 

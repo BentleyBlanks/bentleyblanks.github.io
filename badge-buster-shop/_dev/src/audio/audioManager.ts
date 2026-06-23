@@ -8,6 +8,9 @@ export function createAudioModule(): GameModule {
   let master: GainNode | null = null;
   let bgm: OscillatorNode | null = null;
   let muted = localStorage.getItem('badge-buster-muted') === '1';
+  let clearStreak = 0;
+  let lastClearAt = -Infinity;
+  let lastSwipeAt = -Infinity;
 
   function ensureAudio(): AudioContext | null {
     if (muted) {
@@ -45,9 +48,15 @@ export function createAudioModule(): GameModule {
     osc.stop(ac.currentTime + duration + 0.02);
   }
 
-  function playChord(base: number): void {
-    playTone(base, 0.16, 0.045, 'triangle', 1.15);
-    window.setTimeout(() => playTone(base * 1.5, 0.18, 0.04, 'triangle', 1.05), 70);
+  function playChord(base: number, gain = 0.045): void {
+    playTone(base, 0.16, gain, 'triangle', 1.15);
+    window.setTimeout(() => playTone(base * 1.5, 0.18, gain * 0.9, 'triangle', 1.05), 70);
+  }
+
+  function playSkillHit(): void {
+    playChord(246.94, 0.055);
+    window.setTimeout(() => playTone(493.88, 0.2, 0.052, 'sawtooth', 1.4), 90);
+    window.setTimeout(() => playTone(987.77, 0.16, 0.048, 'triangle', 1.12), 170);
   }
 
   function startBgm(): void {
@@ -90,14 +99,31 @@ export function createAudioModule(): GameModule {
       }) as EventListener);
 
       ctx.bus.on('BADGE_CLEARED', (event) => {
-        if (event.amount > 0) playTone(820, 0.08, 0.055, 'square', 1.35);
+        if (event.amount <= 0) {
+          return;
+        }
+        const now = performance.now();
+        clearStreak = now - lastClearAt < 680 ? clearStreak + 1 : 1;
+        lastClearAt = now;
+        const pitch = 760 * Math.pow(1.045, Math.min(16, clearStreak));
+        playTone(pitch, 0.075, 0.052, 'square', 1.32);
+        if (clearStreak >= 4 && clearStreak % 4 === 0) {
+          window.setTimeout(() => playTone(pitch * 1.5, 0.09, 0.04, 'triangle', 1.18), 36);
+        }
       });
-      ctx.bus.on('SWIPE', () => playTone(320, 0.18, 0.04, 'sawtooth', 1.8));
+      ctx.bus.on('SWIPE', () => {
+        const now = performance.now();
+        if (now - lastSwipeAt < 92) {
+          return;
+        }
+        lastSwipeAt = now;
+        playTone(320, 0.13, 0.032, 'sawtooth', 1.85);
+      });
       ctx.bus.on('LEVEL_UP', () => playChord(523.25));
       ctx.bus.on('PHONE_RETURNED', () => playChord(392));
       ctx.bus.on('CUSTOMER_ARRIVED', () => playTone(660, 0.12, 0.045, 'triangle', 1.25));
       ctx.bus.on('CUSTOMER_LEFT', (event) => playTone(event.reason === 'overflow' ? 180 : 140, 0.22, 0.055, 'sawtooth', 0.7));
-      ctx.bus.on('SKILL_USED', () => playChord(246.94));
+      ctx.bus.on('SKILL_USED', playSkillHit);
       ctx.bus.on('UPGRADE_PURCHASED', () => playTone(988, 0.12, 0.055, 'triangle', 1.2));
     },
     update() {

@@ -22,7 +22,7 @@ export function recalcDerived(ctx: GameContext): void {
   ctx.state.derived.clearPerHit = 1 + clearLevel;
   ctx.state.derived.xpPerBadge = Math.pow(1.15, valueLevel);
   ctx.state.derived.payoutMult = Math.pow(1.2, payoutLevel) * clamp(repMult, 0.55, 1.35);
-  ctx.state.derived.swipeEnabled = upgradeLevel(ctx, 'up_swipe') > 0 || ctx.state.level >= 3;
+  ctx.state.derived.swipeEnabled = true;
   ctx.state.derived.botCount = botCountLevel;
   ctx.state.derived.botRatePerSec = botCountLevel * 0.5 * Math.pow(1.2, botSpeedLevel);
   ctx.state.derived.arrivalIntervalMs = Math.max(2_400, Math.floor(BASE_ARRIVAL_INTERVAL_MS / (repMult * levelPressure)));
