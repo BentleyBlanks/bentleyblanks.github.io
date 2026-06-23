@@ -51,10 +51,14 @@ input {
 .skill-panel,
 .control-panel {
   margin-bottom: 10px;
-  border: 1px solid #e6d7c0;
+  border: 1px solid rgba(119, 141, 169, 0.28);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 12px 28px rgba(43, 43, 51, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 251, 255, 0.88)),
+    rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 18px 36px rgba(43, 43, 51, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(10px);
 }
 
@@ -72,7 +76,8 @@ input {
   min-width: 0;
   padding: 8px;
   border-radius: 7px;
-  background: #f7f3eb;
+  background: linear-gradient(180deg, #ffffff, #eef5ff);
+  border: 1px solid rgba(91, 141, 239, 0.14);
 }
 
 label,
@@ -151,6 +156,7 @@ label,
 .shop-panel,
 .skill-panel {
   padding: 10px;
+  overscroll-behavior: contain;
 }
 
 .shop-panel header,
@@ -174,12 +180,15 @@ label,
   width: 100%;
   min-height: 48px;
   padding: 8px 9px;
-  border: 1px solid #e7ddce;
+  border: 1px solid rgba(119, 141, 169, 0.22);
   border-radius: 7px;
-  background: #fffaf2;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,247,255,0.94)),
+    #fffaf2;
   color: #2b2b33;
   text-align: left;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
 }
 
 .upgrade-row:not(:disabled):hover,
@@ -232,11 +241,12 @@ label,
   min-width: 0;
   min-height: 54px;
   padding: 8px;
-  border: 1px solid #dde6f8;
+  border: 1px solid rgba(91, 141, 239, 0.2);
   border-radius: 7px;
-  background: #f4f7ff;
+  background: linear-gradient(135deg, #f9fbff, #eef5ff);
   color: #26364f;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
 }
 
 .skill-button span {
@@ -315,6 +325,8 @@ label,
   .skill-panel {
     overflow: auto;
     max-height: min(42dvh, 250px);
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
   }
 
   .control-panel {
@@ -326,10 +338,11 @@ label,
     display: block;
   }
 
-  #ui-root::after {
-    position: sticky;
-    right: 0;
-    align-self: center;
+  #ui-root:not(.has-scrolled)::after {
+    position: fixed;
+    left: 50%;
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + min(45dvh, 270px));
+    transform: translateX(-50%);
     padding: 6px 8px;
     border: 1px solid #dde6f8;
     border-radius: 999px;
@@ -339,7 +352,20 @@ label,
     font-size: 11px;
     font-weight: 900;
     box-shadow: 0 8px 18px rgba(43, 43, 51, 0.12);
+    animation: scrollHintFade 6.5s ease forwards;
     pointer-events: none;
+  }
+}
+
+@keyframes scrollHintFade {
+  0%,
+  58% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    visibility: hidden;
   }
 }
 

@@ -35,6 +35,44 @@ interface SwipeDot {
   color: string;
 }
 
+type PhoneModel = 'island' | 'notch' | 'androidGlass' | 'classic' | 'senior';
+type PhoneSystem = 'ios' | 'android';
+
+interface PhoneSkin {
+  model: PhoneModel;
+  system: PhoneSystem;
+  seed: number;
+  bodyTop: string;
+  bodyBottom: string;
+  bezel: string;
+  accent: string;
+  wallpaperA: string;
+  wallpaperB: string;
+  wallpaperC: string;
+}
+
+const WALLPAPERS = [
+  ['#102A43', '#5B8DEF', '#FFD166'],
+  ['#312E81', '#8E7CF6', '#F472B6'],
+  ['#064E3B', '#26C6A6', '#C7F9CC'],
+  ['#7C2D12', '#FF9F43', '#FDE68A'],
+  ['#164E63', '#73D2DE', '#F0FDFA'],
+  ['#3B0764', '#EF476F', '#FDBA74'],
+  ['#111827', '#4D96FF', '#A7F3D0'],
+  ['#701A75', '#FF6B81', '#FBCFE8'],
+  ['#1E293B', '#06D6A0', '#93C5FD'],
+  ['#422006', '#D6B37A', '#F8FBFF'],
+] as const;
+
+const BODY_PALETTES = [
+  ['#111827', '#020617', '#303443'],
+  ['#D8DFEA', '#AAB6C7', '#F8FAFC'],
+  ['#2B2B33', '#101018', '#4A4A57'],
+  ['#6B7280', '#374151', '#E5E7EB'],
+  ['#DDD6C8', '#8D7A61', '#F7F1E6'],
+  ['#1F2937', '#0F172A', '#64748B'],
+] as const;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -109,6 +147,39 @@ function customerName(ctx: GameContext, defId: string): string {
   return ctx.content.customers.find((item) => item.id === defId)?.name ?? '顾客';
 }
 
+function hashText(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function pickBySeed<T>(items: readonly T[], seed: number): T {
+  return items[seed % items.length];
+}
+
+function skinForPhone(phone: PhoneLayout): PhoneSkin {
+  const seed = hashText(`${phone.customer.id}:${phone.customer.phone.id}:${phone.customer.defId}`);
+  const model = pickBySeed<PhoneModel>(['island', 'notch', 'androidGlass', 'classic', 'senior'], seed);
+  const system: PhoneSystem = model === 'island' || model === 'notch' ? 'ios' : 'android';
+  const wallpaper = pickBySeed(WALLPAPERS, Math.floor(seed / 7));
+  const body = pickBySeed(BODY_PALETTES, Math.floor(seed / 19));
+  return {
+    model,
+    system,
+    seed,
+    bodyTop: model === 'senior' ? '#EEF2F7' : body[0],
+    bodyBottom: model === 'senior' ? '#9CA8B8' : body[1],
+    bezel: model === 'senior' ? '#4B5563' : body[2],
+    accent: wallpaper[1],
+    wallpaperA: wallpaper[0],
+    wallpaperB: wallpaper[1],
+    wallpaperC: wallpaper[2],
+  };
+}
+
 export function createRenderModule(): GameModule {
   let ctx: GameContext;
   const effects: VisualEffect[] = [];
@@ -179,10 +250,11 @@ export function createRenderModule(): GameModule {
     const c = ctx.ctx2d;
     const w = ctx.canvas.clientWidth;
     const h = ctx.canvas.clientHeight;
+    const stageW = Math.max(0, w - layout.uiReserve);
     const bg = c.createLinearGradient(0, 0, w, h);
-    bg.addColorStop(0, '#F8FBFF');
-    bg.addColorStop(0.46, '#FBF7F0');
-    bg.addColorStop(1, '#EEF7F2');
+    bg.addColorStop(0, '#EAF4FF');
+    bg.addColorStop(0.5, '#FFF7EC');
+    bg.addColorStop(1, '#EAF8F2');
     c.fillStyle = bg;
     c.fillRect(-24, -24, w + 48, h + 48);
 
@@ -195,6 +267,29 @@ export function createRenderModule(): GameModule {
       c.moveTo(x, 64);
       c.lineTo(x - 70, h);
       c.stroke();
+    }
+    c.restore();
+
+    c.save();
+    c.globalAlpha = 0.95;
+    fillRound(c, layout.playArea.x + 8, 82, Math.max(160, stageW - layout.playArea.x - 36), 42, 8, 'rgba(255,255,255,0.58)');
+    strokeRound(c, layout.playArea.x + 8, 82, Math.max(160, stageW - layout.playArea.x - 36), 42, 8, 'rgba(91,141,239,0.18)');
+    c.fillStyle = '#315779';
+    c.font = '900 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+    c.textAlign = 'left';
+    c.fillText('今日柜台：快速清理 · 手机焕新', layout.playArea.x + 24, 108);
+
+    const shelfX = Math.max(16, layout.queuePanel.x + layout.queuePanel.w + 18);
+    const shelfY = h - layout.bottomReserve - 132;
+    if (shelfY > 150) {
+      fillRound(c, shelfX, shelfY, Math.max(220, stageW - shelfX - 26), 13, 6, '#C99A5B');
+      for (let index = 0; index < 8; index += 1) {
+        const itemX = shelfX + 18 + index * 42;
+        if (itemX > stageW - 40) break;
+        const color = index % 3 === 0 ? '#5B8DEF' : index % 3 === 1 ? '#26C6A6' : '#FF9F43';
+        fillRound(c, itemX, shelfY - 28 - (index % 2) * 7, 22, 30 + (index % 2) * 7, 4, alphaColor(color, 0.74));
+        fillRound(c, itemX + 5, shelfY - 20 - (index % 2) * 7, 12, 4, 2, 'rgba(255,255,255,0.56)');
+      }
     }
     c.restore();
 
@@ -224,14 +319,22 @@ export function createRenderModule(): GameModule {
     c.textAlign = 'center';
     c.fillText(`已清理 ${Math.floor(ctx.state.totalCleared)} 个`, counterX + 76, 38);
 
-    const counterY = h - layout.bottomReserve - 82;
+    const counterY = h - layout.bottomReserve - 86;
     if (counterY > 88) {
-      c.fillStyle = 'rgba(243, 226, 200, 0.78)';
-      c.fillRect(0, counterY, Math.max(0, w - layout.uiReserve), 100);
-      c.fillStyle = '#D6B37A';
-      c.fillRect(0, counterY, Math.max(0, w - layout.uiReserve), 5);
-      c.fillStyle = 'rgba(255,255,255,0.48)';
-      c.fillRect(0, counterY + 12, Math.max(0, w - layout.uiReserve), 2);
+      const counter = c.createLinearGradient(0, counterY, 0, counterY + 108);
+      counter.addColorStop(0, '#D6B37A');
+      counter.addColorStop(0.18, '#F4D6A3');
+      counter.addColorStop(1, '#B77845');
+      c.fillStyle = counter;
+      c.fillRect(0, counterY, stageW, 108);
+      c.fillStyle = '#8B5A2B';
+      c.fillRect(0, counterY, stageW, 6);
+      c.fillStyle = 'rgba(255,255,255,0.38)';
+      c.fillRect(0, counterY + 12, stageW, 2);
+      for (let x = 18; x < stageW; x += 92) {
+        c.fillStyle = 'rgba(93, 55, 29, 0.12)';
+        c.fillRect(x, counterY + 24, 2, 68);
+      }
     }
 
     fillRound(c, layout.queuePanel.x - 8, layout.queuePanel.y - 8, layout.queuePanel.w + 16, layout.queuePanel.h + 16, 8, 'rgba(255, 252, 246, 0.9)');
@@ -298,30 +401,135 @@ export function createRenderModule(): GameModule {
     fillRound(c, item.x + 44, item.y + item.h - 18, meterW * clamp01(ratio), 7, 3, moodColor(item.customer.mood));
   }
 
+  function drawWallpaper(phone: PhoneLayout, skin: PhoneSkin): void {
+    const c = ctx.ctx2d;
+    const screenRadius = phone.w * (skin.model === 'senior' ? 0.035 : 0.065);
+    roundedRect(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, screenRadius);
+    c.save();
+    c.clip();
+
+    const wallpaper = c.createLinearGradient(phone.screenX, phone.screenY, phone.screenX + phone.screenW, phone.screenY + phone.screenH);
+    wallpaper.addColorStop(0, skin.wallpaperA);
+    wallpaper.addColorStop(0.48, skin.wallpaperB);
+    wallpaper.addColorStop(1, mixColor(skin.wallpaperA, '#020617', 0.35));
+    c.fillStyle = wallpaper;
+    c.fillRect(phone.screenX, phone.screenY, phone.screenW, phone.screenH);
+
+    c.globalAlpha = 0.34;
+    c.fillStyle = skin.wallpaperC;
+    c.beginPath();
+    c.ellipse(phone.screenX + phone.screenW * 0.82, phone.screenY + phone.screenH * 0.22, phone.screenW * 0.35, phone.screenH * 0.16, -0.25, 0, TAU);
+    c.fill();
+    c.globalAlpha = 0.22;
+    c.fillStyle = '#FFFFFF';
+    c.beginPath();
+    c.ellipse(phone.screenX + phone.screenW * 0.22, phone.screenY + phone.screenH * 0.76, phone.screenW * 0.32, phone.screenH * 0.2, 0.45, 0, TAU);
+    c.fill();
+    c.globalAlpha = 0.14;
+    c.strokeStyle = '#FFFFFF';
+    c.lineWidth = 1;
+    for (let offset = -phone.screenH; offset < phone.screenW; offset += 18) {
+      c.beginPath();
+      c.moveTo(phone.screenX + offset, phone.screenY + phone.screenH);
+      c.lineTo(phone.screenX + offset + phone.screenH, phone.screenY);
+      c.stroke();
+    }
+
+    if (skin.system === 'ios') {
+      c.globalAlpha = 0.24;
+      fillRound(c, phone.screenX + phone.screenW * 0.08, phone.screenY + phone.screenH * 0.82, phone.screenW * 0.84, phone.screenH * 0.12, phone.w * 0.045, '#FFFFFF');
+    } else {
+      c.globalAlpha = 0.22;
+      fillRound(c, phone.screenX + phone.screenW * 0.12, phone.screenY + phone.screenH * 0.1, phone.screenW * 0.76, Math.max(14, phone.screenH * 0.055), 99, '#FFFFFF');
+      c.globalAlpha = 0.28;
+      c.fillStyle = '#FFFFFF';
+      c.beginPath();
+      c.arc(phone.screenX + phone.screenW * 0.18, phone.screenY + phone.screenH * 0.127, Math.max(2, phone.w * 0.009), 0, TAU);
+      c.fill();
+    }
+    c.restore();
+
+    strokeRound(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, screenRadius, 'rgba(255,255,255,0.46)', 1.3);
+  }
+
+  function drawDeviceChrome(phone: PhoneLayout, skin: PhoneSkin): void {
+    const c = ctx.ctx2d;
+    c.save();
+    if (skin.model === 'island') {
+      fillRound(c, phone.x + phone.w * 0.35, phone.y + phone.h * 0.045, phone.w * 0.3, 9, 5, '#0A0A0D');
+      fillRound(c, phone.screenX + phone.screenW * 0.36, phone.screenY + 8, phone.screenW * 0.28, 10, 6, 'rgba(8,8,12,0.86)');
+    } else if (skin.model === 'notch') {
+      fillRound(c, phone.screenX + phone.screenW * 0.31, phone.screenY, phone.screenW * 0.38, 18, 0, 'rgba(8,8,12,0.9)');
+      fillRound(c, phone.x + phone.w * 0.38, phone.y + phone.h * 0.037, phone.w * 0.24, 5, 3, skin.bezel);
+    } else if (skin.model === 'androidGlass') {
+      c.fillStyle = 'rgba(8,8,12,0.76)';
+      c.beginPath();
+      c.arc(phone.screenX + phone.screenW / 2, phone.screenY + 13, 5, 0, TAU);
+      c.fill();
+    } else if (skin.model === 'classic') {
+      fillRound(c, phone.x + phone.w * 0.38, phone.y + phone.h * 0.04, phone.w * 0.24, 5, 3, skin.bezel);
+      c.strokeStyle = alphaColor(skin.accent, 0.7);
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(phone.x + phone.w / 2, phone.y + phone.h * 0.918, phone.w * 0.043, 0, TAU);
+      c.stroke();
+    } else {
+      fillRound(c, phone.x + phone.w * 0.31, phone.y + phone.h * 0.045, phone.w * 0.38, 6, 3, '#6B7280');
+      fillRound(c, phone.x + phone.w * 0.18, phone.y + phone.h * 0.865, phone.w * 0.64, phone.h * 0.08, 6, '#CBD5E1');
+      c.strokeStyle = '#64748B';
+      c.lineWidth = 1;
+      for (let index = 1; index < 3; index += 1) {
+        const x = phone.x + phone.w * (0.18 + index * 0.64 / 3);
+        c.beginPath();
+        c.moveTo(x, phone.y + phone.h * 0.87);
+        c.lineTo(x, phone.y + phone.h * 0.94);
+        c.stroke();
+      }
+      c.beginPath();
+      c.moveTo(phone.x + phone.w * 0.2, phone.y + phone.h * 0.905);
+      c.lineTo(phone.x + phone.w * 0.8, phone.y + phone.h * 0.905);
+      c.stroke();
+    }
+
+    c.fillStyle = skin.system === 'ios' ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.86)';
+    c.font = `800 ${Math.max(8, phone.w * 0.033)}px Inter, system-ui, sans-serif`;
+    c.textAlign = 'left';
+    c.textBaseline = 'middle';
+    c.fillText(skin.system === 'ios' ? '9:41' : '09:41', phone.screenX + 13, phone.screenY + 17);
+    c.textAlign = 'right';
+    c.fillText(skin.system === 'ios' ? '5G' : 'LTE', phone.screenX + phone.screenW - 14, phone.screenY + 17);
+
+    if (skin.system === 'ios') {
+      fillRound(c, phone.x + phone.w * 0.39, phone.y + phone.h * 0.925, phone.w * 0.22, 5, 3, 'rgba(255,255,255,0.72)');
+    } else {
+      c.strokeStyle = 'rgba(255,255,255,0.7)';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(phone.screenX + phone.screenW * 0.38, phone.screenY + phone.screenH - 13);
+      c.lineTo(phone.screenX + phone.screenW * 0.62, phone.screenY + phone.screenH - 13);
+      c.stroke();
+    }
+    c.restore();
+  }
+
   function drawPhone(phone: PhoneLayout): void {
     const c = ctx.ctx2d;
     const customerDef = ctx.content.customers.find((item) => item.id === phone.customer.defId);
+    const skin = skinForPhone(phone);
+    const bodyRadius = phone.w * (skin.model === 'senior' ? 0.06 : skin.model === 'classic' ? 0.095 : 0.13);
+    const body = c.createLinearGradient(phone.x, phone.y, phone.x + phone.w * 0.5, phone.y + phone.h);
+    body.addColorStop(0, mixColor(skin.bodyTop, '#FFFFFF', skin.model === 'senior' ? 0.18 : 0.08));
+    body.addColorStop(0.55, skin.bodyTop);
+    body.addColorStop(1, skin.bodyBottom);
     c.save();
     c.shadowColor = 'rgba(43, 43, 51, 0.24)';
     c.shadowBlur = 24;
     c.shadowOffsetY = 12;
-    fillRound(c, phone.x, phone.y, phone.w, phone.h, phone.w * 0.12, '#25252D');
+    fillRound(c, phone.x, phone.y, phone.w, phone.h, bodyRadius, body);
     c.shadowColor = 'transparent';
-
-    const glass = c.createLinearGradient(phone.screenX, phone.screenY, phone.screenX + phone.screenW, phone.screenY + phone.screenH);
-    glass.addColorStop(0, '#F9FCFF');
-    glass.addColorStop(0.52, '#EEF6FF');
-    glass.addColorStop(1, '#FFFFFF');
-    fillRound(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, phone.w * 0.065, glass);
-    strokeRound(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, phone.w * 0.065, 'rgba(255,255,255,0.5)');
-
-    fillRound(c, phone.x + phone.w * 0.38, phone.y + phone.h * 0.035, phone.w * 0.24, 5, 3, '#4A4A57');
-    fillRound(c, phone.screenX + 12, phone.screenY + 11, 30, 11, 6, 'rgba(43,43,51,0.08)');
-    c.fillStyle = '#5B6372';
-    c.font = `800 ${Math.max(8, phone.w * 0.035)}px Inter, system-ui, sans-serif`;
-    c.textAlign = 'left';
-    c.textBaseline = 'middle';
-    c.fillText('9:41', phone.screenX + 18, phone.screenY + 16);
+    strokeRound(c, phone.x + 1, phone.y + 1, phone.w - 2, phone.h - 2, bodyRadius, 'rgba(255,255,255,0.2)', 1.2);
+    drawWallpaper(phone, skin);
+    drawDeviceChrome(phone, skin);
 
     c.fillStyle = '#2B2B33';
     c.font = `900 ${Math.max(12, phone.w * 0.043)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
@@ -330,13 +538,13 @@ export function createRenderModule(): GameModule {
     c.fillText(customerDef?.name ?? '顾客', phone.x + phone.w / 2, phone.y - 11);
 
     for (const icon of phone.icons) {
-      drawIcon(icon);
+      drawIcon(icon, skin);
     }
 
-    fillRound(c, phone.x + phone.w * 0.39, phone.y + phone.h * 0.925, phone.w * 0.22, 5, 3, '#E9EEF9');
-
     c.font = `900 ${Math.max(10, phone.w * 0.04)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    c.fillStyle = phone.customer.phone.badgeTotal > 0 ? '#6E6A73' : '#26A68F';
+    c.fillStyle = phone.customer.phone.badgeTotal > 0 ? '#F8FAFC' : '#C7F9CC';
+    c.shadowColor = 'rgba(0,0,0,0.35)';
+    c.shadowBlur = 4;
     c.fillText(phone.customer.phone.badgeTotal > 0 ? `剩余 ${phone.customer.phone.badgeTotal}` : '已清空', phone.x + phone.w / 2, phone.y + phone.h - 15);
     c.restore();
   }
@@ -503,7 +711,7 @@ export function createRenderModule(): GameModule {
     c.restore();
   }
 
-  function drawIcon(icon: IconLayout): void {
+  function drawIcon(icon: IconLayout, skin: PhoneSkin): void {
     const c = ctx.ctx2d;
     const def = iconDef(icon);
     const image = images.get(def.artId);
@@ -520,9 +728,10 @@ export function createRenderModule(): GameModule {
       c.shadowColor = alphaColor(def.fallbackColor, 0.32);
       c.shadowBlur = 10;
       c.shadowOffsetY = 4;
-      fillRound(c, left, top, icon.size, icon.size, icon.size * 0.24, gradient);
+      const radius = skin.system === 'ios' ? icon.size * 0.24 : skin.model === 'senior' ? icon.size * 0.13 : icon.size * 0.18;
+      fillRound(c, left, top, icon.size, icon.size, radius, gradient);
       c.shadowColor = 'transparent';
-      strokeRound(c, left + 0.7, top + 0.7, icon.size - 1.4, icon.size - 1.4, icon.size * 0.23, 'rgba(255,255,255,0.38)', 1.2);
+      strokeRound(c, left + 0.7, top + 0.7, icon.size - 1.4, icon.size - 1.4, radius, 'rgba(255,255,255,0.42)', 1.2);
       c.globalAlpha = 0.26;
       fillRound(c, left + icon.size * 0.13, top + icon.size * 0.08, icon.size * 0.52, icon.size * 0.18, icon.size * 0.09, '#FFFFFF');
       c.globalAlpha = 1;

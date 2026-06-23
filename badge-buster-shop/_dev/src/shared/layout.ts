@@ -99,13 +99,16 @@ export function computeGameLayout(state: GameState, width: number, height: numbe
     w: queueWidth - 26,
     h: Math.max(240, height - topReserve - bottomReserve - 40),
   };
-  const queueItemH = clamp(queuePanel.h / Math.max(4, state.queueCapacity + 1), width < 520 ? 42 : 48, 64);
-  const overlap = queueItemH * 0.3;
-  const bottom = queuePanel.y + queuePanel.h - queueItemH;
+  const queueGap = width < 520 ? 5 : 7;
+  const queueHeaderReserve = width < 520 ? 34 : 38;
+  const queueSlots = Math.max(1, Math.max(state.queueCapacity, state.queue.length));
+  const rawQueueItemH = (queuePanel.h - queueHeaderReserve - queueGap * Math.max(0, queueSlots - 1)) / queueSlots;
+  const queueItemH = clamp(rawQueueItemH, width < 520 ? 34 : 40, width < 520 ? 52 : 64);
+  const bottom = queuePanel.y + queuePanel.h - queueItemH - 6;
   const queueLayouts = state.queue.map((customer, index) => ({
     customer,
     x: queuePanel.x,
-    y: bottom - index * (queueItemH - overlap),
+    y: bottom - index * (queueItemH + queueGap),
     w: queuePanel.w,
     h: queueItemH,
   }));
