@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" font-family="Segoe UI, PingFang SC, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBF7F0"/>
+      <stop offset="1" stop-color="#F2EAdb"/>
+    </linearGradient>
+    <linearGradient id="sign" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5B8DEF"/>
+      <stop offset="1" stop-color="#4C7BE0"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#2B2B33" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="640" height="400" fill="url(#bg)"/>
+
+  <!-- shop sign -->
+  <rect x="40" y="26" width="560" height="50" rx="14" fill="url(#sign)" filter="url(#sh)"/>
+  <text x="320" y="59" fill="#FFFFFF" font-size="26" font-weight="700" text-anchor="middle">噩梦角标清除铺 · Badge Buster</text>
+
+  <!-- counter -->
+  <rect x="0" y="318" width="640" height="82" fill="#E7D9C2"/>
+  <rect x="0" y="312" width="640" height="10" fill="#D8C5A6"/>
+
+  <!-- phone -->
+  <g filter="url(#sh)">
+    <rect x="246" y="104" width="148" height="262" rx="26" fill="#2B2B33"/>
+    <rect x="258" y="124" width="124" height="222" rx="14" fill="#FBF7F0"/>
+    <rect x="298" y="113" width="44" height="7" rx="3.5" fill="#3a3a44"/>
+  </g>
+
+  <!-- app grid 3x4 with badges -->
+  <g>
+    <!-- row1 -->
+    <rect x="268" y="134" width="32" height="32" rx="9" fill="#5B8DEF"/>
+    <rect x="304" y="134" width="32" height="32" rx="9" fill="#FF9F43"/>
+    <rect x="340" y="134" width="32" height="32" rx="9" fill="#26C6A6"/>
+    <!-- row2 -->
+    <rect x="268" y="186" width="32" height="32" rx="9" fill="#7C4DFF"/>
+    <rect x="304" y="186" width="32" height="32" rx="9" fill="#FF6B6B"/>
+    <rect x="340" y="186" width="32" height="32" rx="9" fill="#EF5350"/>
+    <!-- row3 -->
+    <rect x="268" y="238" width="32" height="32" rx="9" fill="#43A047"/>
+    <rect x="304" y="238" width="32" height="32" rx="9" fill="#FFB300"/>
+    <rect x="340" y="238" width="32" height="32" rx="9" fill="#5B8DEF"/>
+    <!-- row4 -->
+    <rect x="268" y="290" width="32" height="32" rx="9" fill="#26C6A6"/>
+    <rect x="304" y="290" width="32" height="32" rx="9" fill="#2B2B33"/>
+    <rect x="340" y="290" width="32" height="32" rx="9" fill="#FF3B30"/>
+  </g>
+
+  <!-- red badges -->
+  <g font-size="13" font-weight="700" text-anchor="middle" fill="#FFFFFF">
+    <circle cx="302" cy="132" r="12" fill="#FF3B30"/><text x="302" y="137">9</text>
+    <circle cx="338" cy="132" r="13" fill="#FF3B30"/><text x="338" y="137">23</text>
+    <circle cx="374" cy="132" r="14" fill="#FF3B30"/><text x="374" y="137" font-size="11">99+</text>
+    <circle cx="302" cy="184" r="12" fill="#FF3B30"/><text x="302" y="189">5</text>
+    <circle cx="374" cy="184" r="12" fill="#FF3B30"/><text x="374" y="189">7</text>
+    <circle cx="338" cy="236" r="12" fill="#FF3B30"/><text x="338" y="241">3</text>
+    <circle cx="374" cy="288" r="13" fill="#FF3B30"/><text x="374" y="293">12</text>
+  </g>
+
+  <!-- a happy customer blob -->
+  <g filter="url(#sh)">
+    <ellipse cx="138" cy="300" rx="58" ry="62" fill="#FF9F43"/>
+    <circle cx="138" cy="236" r="42" fill="#FFD9A8"/>
+    <circle cx="124" cy="232" r="5" fill="#2B2B33"/>
+    <circle cx="152" cy="232" r="5" fill="#2B2B33"/>
+    <path d="M122 248 q16 16 32 0" stroke="#2B2B33" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- a finger tap spark -->
+  <g>
+    <circle cx="500" cy="220" r="26" fill="none" stroke="#5B8DEF" stroke-width="4" opacity="0.7"/>
+    <circle cx="500" cy="220" r="40" fill="none" stroke="#5B8DEF" stroke-width="3" opacity="0.35"/>
+    <text x="500" y="300" fill="#2B2B33" font-size="16" font-weight="600" text-anchor="middle">点一下，清干净</text>
+  </g>
+</svg>
