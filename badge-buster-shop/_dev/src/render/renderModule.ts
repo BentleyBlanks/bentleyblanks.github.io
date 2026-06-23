@@ -588,17 +588,11 @@ export function createRenderModule(): GameModule {
       c.drawImage(overlayImage, cropX, 0, cropSize, cropSize, phone.screenX, phone.screenY, phone.screenW, phone.screenH);
     }
 
-    if (skin.system === 'ios') {
-      c.globalAlpha = 0.24;
-      fillRound(c, phone.screenX + phone.screenW * 0.08, phone.screenY + phone.screenH * 0.82, phone.screenW * 0.84, phone.screenH * 0.12, phone.w * 0.045, '#FFFFFF');
-    } else {
-      c.globalAlpha = 0.22;
-      fillRound(c, phone.screenX + phone.screenW * 0.12, phone.screenY + phone.screenH * 0.1, phone.screenW * 0.76, Math.max(14, phone.screenH * 0.055), 99, '#FFFFFF');
-      c.globalAlpha = 0.28;
-      c.fillStyle = '#FFFFFF';
-      c.beginPath();
-      c.arc(phone.screenX + phone.screenW * 0.18, phone.screenY + phone.screenH * 0.127, Math.max(2, phone.w * 0.009), 0, TAU);
-      c.fill();
+    // 注：原先 iOS"程序化 Dock 半透明白条"画在 0.82*screenH，与最下行图标重叠 → 看起来"被遮住/错位"，已移除。
+    // Android 顶部搜索框移到状态栏带内、且仅在没有通知时画，避免和通知条打架。
+    if (skin.system === 'android' && phone.customer.phone.notifications <= 0) {
+      c.globalAlpha = 0.2;
+      fillRound(c, phone.screenX + phone.screenW * 0.12, phone.screenY + phone.screenH * 0.075, phone.screenW * 0.76, Math.max(13, phone.screenH * 0.05), 99, '#FFFFFF');
     }
     c.restore();
 
