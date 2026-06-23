@@ -28,7 +28,7 @@ const TAU = Math.PI * 2;
 const NOTIF_SWEEP_MS = 620; // 下拉通知"卷帘"仪式时长
 
 interface VisualEffect {
-  kind: 'pop' | 'return' | 'level' | 'leave' | 'skill' | 'combo' | 'smash' | 'task';
+  kind: 'pop' | 'return' | 'level' | 'leave' | 'skill' | 'combo' | 'smash' | 'task' | 'delivery';
   x: number;
   y: number;
   age: number;
@@ -36,6 +36,18 @@ interface VisualEffect {
   label: string;
   color: string;
   power: number;
+  mood?: Mood; // delivery 横幅用：满意度星级
+}
+
+interface Coin {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  tx: number; // 目标：HUD 钱袋
+  ty: number;
+  age: number;
+  ttl: number;
 }
 
 interface Spark {
@@ -222,10 +234,12 @@ export function createRenderModule(): GameModule {
   const sparks: Spark[] = [];
   const swipeDots: SwipeDot[] = [];
   const notifSweeps: Array<{ customerId: string; age: number; count: number }> = []; // 下拉通知卷帘仪式
+  const coins: Coin[] = []; // 交付时飞向钱袋的金币（#3）
+  const deliveredInfo = new Map<string, { payout: number; xp: number; mood: Mood }>(); // 待离场手机的交付信息
   const images = new Map<string, HTMLImageElement>();
   // —— 手机进出场动画（#2）——
   const phoneAnims = new Map<string, { x: number; y: number; alpha: number }>();
-  const departing: Array<{ layout: PhoneLayout; age: number }> = [];
+  const departing: Array<{ layout: PhoneLayout; age: number; ttl: number; delivered?: { payout: number; mood: Mood } }> = [];
   const departingIds = new Set<string>();
   let lastLayouts = new Map<string, PhoneLayout>();
   let lastDrawTime = performance.now();
@@ -1025,8 +1039,11 @@ export function createRenderModule(): GameModule {
     const currentIds = new Set(layout.phoneLayouts.map((p) => p.customer.id));
     for (const [id, lay] of lastLayouts) {
       if (!currentIds.has(id) && !departingIds.has(id)) {
-        departing.push({ layout: lay, age: 0 });
+        const info = deliveredInfo.get(id);
+        // 交付走的手机用更长、更隆重的退场动画；其它（怒走/被砸）保持快退场
+        departing.push({ layout: lay, age: 0, ttl: info ? 720 : 420, delivered: info ? { payout: info.payout, mood: info.mood } : undefined });
         departingIds.add(id);
+        deliveredInfo.delete(id);
         phoneAnims.delete(id);
       }
     }
@@ -1044,12 +1061,14 @@ export function createRenderModule(): GameModule {
     for (const id of [...phoneAnims.keys()]) if (!currentIds.has(id)) phoneAnims.delete(id);
     for (const dep of departing) dep.age += fdt;
     for (let i = departing.length - 1; i >= 0; i -= 1) {
-      if (departing[i].age >= 420) {
+      if (departing[i].age >= departing[i].ttl) {
         departingIds.delete(departing[i].layout.customer.id);
         departing.splice(i, 1);
       }
     }
     lastLayouts = new Map(layout.phoneLayouts.map((p) => [p.customer.id, p]));
+    // 清掉未被退场动画消费的交付信息（如非聚焦手机被自动清完），防止泄漏
+    for (const id of [...deliveredInfo.keys()]) if (!lastLayouts.has(id)) deliveredInfo.delete(id);
   }
 
   function drawAnimatedPhone(phone: PhoneLayout): void {
@@ -1064,14 +1083,98 @@ export function createRenderModule(): GameModule {
     c.restore();
   }
 
-  function drawDepartingPhone(dep: { layout: PhoneLayout; age: number }): void {
+  function drawDepartingPhone(dep: { layout: PhoneLayout; age: number; ttl: number; delivered?: { payout: number; mood: Mood } }): void {
     const c = ctx.ctx2d;
-    const t = clamp01(dep.age / 420);
+    const t = clamp01(dep.age / dep.ttl);
+    const phone = dep.layout;
     c.save();
-    c.globalAlpha = (1 - t) * 0.92;
-    c.translate(0, t * 80);
-    drawPhone(dep.layout);
+    if (dep.delivered) {
+      // 交付：先弹一下(0..0.18)欢庆，再托起飞向顾客（向上+缩小+淡出）= 把手机"递还"
+      const pop = t < 0.18 ? 1 + Math.sin((t / 0.18) * Math.PI) * 0.06 : 1 - (t - 0.18) / 0.82 * 0.32;
+      const lift = t < 0.18 ? 0 : -Math.pow((t - 0.18) / 0.82, 1.7) * (phone.h * 0.5 + 70);
+      const cxp = phone.x + phone.w / 2;
+      const cyp = phone.y + phone.h / 2;
+      c.globalAlpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
+      c.translate(cxp, cyp + lift);
+      c.scale(pop, pop);
+      c.translate(-cxp, -cyp);
+      drawPhone(phone);
+      // 绿色"已交付"盖章 + 对勾，盖在屏幕中央，随弹跳放大
+      const stampT = clamp01(t / 0.24);
+      const sr = phone.screenW * 0.3 * (0.6 + stampT * 0.4);
+      const sx = phone.screenX + phone.screenW / 2;
+      const sy = phone.screenY + phone.screenH * 0.42;
+      c.globalAlpha *= stampT;
+      c.lineWidth = Math.max(3, sr * 0.16);
+      c.strokeStyle = '#1FB57A';
+      c.beginPath();
+      c.arc(sx, sy, sr, 0, TAU);
+      c.stroke();
+      c.lineCap = 'round';
+      c.lineJoin = 'round';
+      c.beginPath();
+      c.moveTo(sx - sr * 0.42, sy + sr * 0.02);
+      c.lineTo(sx - sr * 0.1, sy + sr * 0.34);
+      c.lineTo(sx + sr * 0.46, sy - sr * 0.34);
+      c.stroke();
+      c.fillStyle = '#1FB57A';
+      c.font = `1000 ${Math.max(10, sr * 0.36)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('已交付', sx, sy + sr * 0.78);
+    } else {
+      c.globalAlpha = (1 - t) * 0.92;
+      c.translate(0, t * 80);
+      drawPhone(phone);
+    }
     c.restore();
+  }
+
+  // 交付金币飞向 HUD 钱袋
+  function drawCoins(): void {
+    if (coins.length === 0) return;
+    const c = ctx.ctx2d;
+    c.save();
+    for (const coin of coins) {
+      const t = clamp01(coin.age / coin.ttl);
+      const r = 7 * (1 - t * 0.4);
+      c.globalAlpha = t > 0.82 ? (1 - t) / 0.18 : 1;
+      const g = c.createRadialGradient(coin.x - r * 0.3, coin.y - r * 0.3, r * 0.2, coin.x, coin.y, r);
+      g.addColorStop(0, '#FFF1B8');
+      g.addColorStop(1, '#F0A500');
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(coin.x, coin.y, r, 0, TAU);
+      c.fill();
+      c.strokeStyle = 'rgba(180,120,0,0.7)';
+      c.lineWidth = 1;
+      c.stroke();
+      c.fillStyle = '#8A5A00';
+      c.font = `1000 ${Math.max(7, r * 1.1)}px Inter, system-ui, sans-serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('¥', coin.x, coin.y + 0.5);
+    }
+    c.restore();
+  }
+
+  function spawnCoinStream(x: number, y: number, count: number): void {
+    const tx = 64;
+    const ty = (ctx.canvas.clientWidth >= 700 ? 62 : 56) / 2;
+    for (let i = 0; i < count; i += 1) {
+      const ang = Math.random() * TAU;
+      const spd = 1.5 + Math.random() * 3;
+      coins.push({
+        x: x + (Math.random() - 0.5) * 30,
+        y: y + (Math.random() - 0.5) * 20,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd - 2,
+        tx, ty,
+        age: -i * 26, // 逐枚错峰出发
+        ttl: 620 + Math.random() * 160,
+      });
+    }
+    if (coins.length > 120) coins.splice(0, coins.length - 120);
   }
 
   function drawPhone(phone: PhoneLayout): void {
@@ -1431,6 +1534,46 @@ export function createRenderModule(): GameModule {
         c.fillStyle = '#35265E';
         c.font = '1000 22px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
         c.fillText(effect.label, 0, 1, 150);
+      } else if (effect.kind === 'delivery') {
+        // 交付横幅：彩带绿牌，弹跳上浮，显示收入 + 满意度星级
+        const pop = 1 + Math.sin(Math.min(1, t / 0.22) * Math.PI) * 0.16;
+        const rise = t * 40;
+        c.translate(effect.x, effect.y - rise);
+        c.scale(pop, pop);
+        // 放射光
+        c.globalAlpha = alpha * 0.5;
+        for (let ray = 0; ray < 12; ray += 1) {
+          c.rotate(TAU / 12);
+          c.strokeStyle = alphaColor('#FFD166', 0.5);
+          c.lineWidth = 3;
+          c.beginPath();
+          c.moveTo(70, 0);
+          c.lineTo(70 + 26 + Math.sin(t * 6 + ray) * 6, 0);
+          c.stroke();
+        }
+        c.globalAlpha = alpha;
+        const bw = 188;
+        const bh = 64;
+        c.shadowColor = 'rgba(31,181,122,0.5)';
+        c.shadowBlur = 16;
+        fillRound(c, -bw / 2, -bh / 2, bw, bh, 16, 'rgba(255,255,255,0.96)');
+        c.shadowColor = 'transparent';
+        strokeRound(c, -bw / 2, -bh / 2, bw, bh, 16, '#1FB57A', 2.5);
+        c.fillStyle = '#0E7A50';
+        c.font = '900 14px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText('🎉 交付完成', 0, -bh / 2 + 15);
+        c.fillStyle = '#0B6B45';
+        c.font = '1000 24px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+        c.fillText(effect.label, -6, 4);
+        // 满意度星级
+        const stars = effect.mood === 'happy' ? 5 : effect.mood === 'neutral' ? 4 : effect.mood === 'annoyed' ? 2 : 1;
+        let starStr = '';
+        for (let i = 0; i < 5; i += 1) starStr += i < stars ? '★' : '☆';
+        c.fillStyle = '#FFB300';
+        c.font = '900 13px system-ui, sans-serif';
+        c.fillText(starStr, 0, bh / 2 - 13);
       } else {
         const isLevel = effect.kind === 'level';
         const boxW = isLevel ? 166 : 126;
@@ -1767,6 +1910,7 @@ export function createRenderModule(): GameModule {
     drawSlotTabs(layout);
     drawIntro(layout);
     drawComboOverlay(layout);
+    drawCoins(); // 交付金币飞向钱袋（固定屏幕坐标，落点是 HUD 金牌）
 
     const ui = computeUiLayout(ctx.state, w, h, ctx.content.upgrades.map((u) => u.id), ctx.content.skills.map((s) => s.id));
     drawHud(ui);
@@ -1816,12 +1960,21 @@ export function createRenderModule(): GameModule {
         }
       });
       ctx.bus.on('PHONE_RETURNED', (event) => {
-        effects.push({ kind: 'return', x: ctx.canvas.clientWidth / 2, y: 130, age: 0, ttl: 950, label: `+${event.payout}元`, color: '#26C6A6', power: 1.2 });
+        // 把交付庆典锚定在刚离场的那台手机上（用上一帧布局位置），而不是干巴巴的屏幕顶部
+        const last = lastLayouts.get(event.customerId);
+        const px = last ? last.x + last.w / 2 : ctx.canvas.clientWidth / 2;
+        const py = last ? last.y + last.h * 0.4 : 150;
+        // 记录交付信息：退场动画据此盖"已交付"章并把手机递还顾客
+        deliveredInfo.set(event.customerId, { payout: event.payout, xp: event.xp, mood: event.mood });
+        // 交付横幅（含满意度）+ 金币飞向钱袋 + 金光爆发
+        effects.push({ kind: 'delivery', x: px, y: py, age: 0, ttl: 1150, label: `+${event.payout} 元`, color: '#1FB57A', power: 1.4, mood: event.mood });
         if (event.xp > 0) {
-          effects.push({ kind: 'return', x: ctx.canvas.clientWidth / 2, y: 168, age: 0, ttl: 950, label: `+${event.xp} 经验`, color: '#5B8DEF', power: 1 });
+          effects.push({ kind: 'return', x: px, y: py - 56, age: 0, ttl: 980, label: `+${event.xp} 经验`, color: '#5B8DEF', power: 1 });
         }
-        spawnBurst(ctx.canvas.clientWidth / 2, 136, '#26C6A6', 28, 1.2);
-        addShake(220, 2.4);
+        spawnCoinStream(px, py, 8 + Math.min(16, Math.round(event.payout / 6)));
+        spawnBurst(px, py, '#FFD166', 26, 1.3);
+        spawnBurst(px, py, '#1FB57A', 18, 1.1);
+        addShake(240, 2.8);
       });
       ctx.bus.on('PHONE_SMASHED', (event) => {
         effects.push({ kind: 'smash', x: event.x, y: event.y, age: 0, ttl: 1050, label: `砸出 ${event.totalBadges}`, color: '#FF3B30', power: 1.7 });
@@ -1962,6 +2115,23 @@ export function createRenderModule(): GameModule {
         if (notifSweeps[i].age >= NOTIF_SWEEP_MS) {
           notifSweeps.splice(i, 1);
         }
+      }
+
+      // 金币飞向钱袋：先小爆发再被钱袋吸引，划出弧线
+      for (const coin of coins) {
+        coin.age += dt;
+        if (coin.age <= 0) continue;
+        const dx = coin.tx - coin.x;
+        const dy = coin.ty - coin.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const pull = 0.55 * step;
+        coin.vx = coin.vx * 0.9 + (dx / dist) * pull;
+        coin.vy = coin.vy * 0.9 + (dy / dist) * pull;
+        coin.x += coin.vx * step * 3.4;
+        coin.y += coin.vy * step * 3.4;
+      }
+      for (let i = coins.length - 1; i >= 0; i -= 1) {
+        if (coins[i].age >= coins[i].ttl) coins.splice(i, 1);
       }
 
       draw();

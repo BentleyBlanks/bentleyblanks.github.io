@@ -305,6 +305,24 @@ export function createCoreModule(): GameModule {
     return false;
   }
 
+  // 直接点通知栏也能清（比下拉更直观；二者皆触发"卷帘"仪式）
+  function handleNotificationTap(x: number, y: number): boolean {
+    const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    for (const phone of layout.phoneLayouts) {
+      const runtime = phone.customer.phone;
+      if (runtime.notifications <= 0) continue;
+      if (rectContains(notifBarRect(phone), x, y)) {
+        const amount = Math.min(runtime.notifications, ctx.state.derived.notificationClearPower);
+        runtime.notifications -= amount;
+        grantXp(amount);
+        const bar = notifBarRect(phone);
+        ctx.bus.emit({ type: 'NOTIFICATION_CLEARED', customerId: phone.customer.id, amount, x: bar.x + bar.w / 2, y: bar.y + bar.h * 0.5 });
+        return true;
+      }
+    }
+    return false;
+  }
+
   function spawnPopup(phone: PhoneRuntime, kind: PopupKind, now: number): void {
     if (phone.popups.length >= MAX_POPUPS_PER_PHONE) return;
     phone.popups.push(buildPopup(kind, now, ctx.state.derived.scamGraceMs, ctx.state.level));
@@ -333,6 +351,7 @@ export function createCoreModule(): GameModule {
   function handleTap(event: Extract<GameEvent, { type: 'TAP' }>): void {
     if (event.consumed) return;
     if (handlePopupTap(event.x, event.y)) return;   // 关弹窗 / 盲盒抉择优先
+    if (handleNotificationTap(event.x, event.y)) return; // 点通知栏清理
     if (handleMalwareTap(event.x, event.y)) return;  // 清理后台
     if (handleDefuseTap(event.x, event.y)) return;   // 拔电源拆除宇宙魔方
     const hit = findIconAt(event.x, event.y);
