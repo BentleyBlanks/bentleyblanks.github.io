@@ -5,6 +5,7 @@ import {
   SCAM_POPUP_BASE_INTERVAL_MS,
   clamp,
   upgradeCost,
+  upgradeUnlockLevel,
   xpToNextLevel,
 } from '../content/balance';
 import type { UpgradeDef } from '../types/content.types';
@@ -74,6 +75,9 @@ export function createEconomyModule(): GameModule {
     if (!def) {
       return;
     }
+    if (ctx.state.level < upgradeUnlockLevel(id)) {
+      return; // 段位/等级未到，尚未解锁该升级
+    }
     const owned = upgradeLevel(ctx, id);
     if (def.maxLevel > 0 && owned >= def.maxLevel) {
       return;
@@ -103,7 +107,7 @@ export function createEconomyModule(): GameModule {
       ctx.bus.on('RISK_EVENT', (event) => {
         if (event.kind === 'offer_win') {
           ctx.state.points += event.amount;
-        } else if (event.kind === 'offer_fail' || event.kind === 'golden_break') {
+        } else if (event.kind === 'offer_fail' || event.kind === 'golden_break' || event.kind === 'bait_fail') {
           ctx.state.points = Math.max(0, ctx.state.points - event.amount); // 最低 0 元
         } else if (event.kind === 'transformer') {
           ctx.state.points = 0; // 破产：清空现金，保留等级/升级

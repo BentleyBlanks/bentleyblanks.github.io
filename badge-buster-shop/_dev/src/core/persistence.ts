@@ -38,7 +38,7 @@ export function createInitialState(now = performance.now()): GameState {
       malwareClearPower: 16,
       malwareAutoPerSec: 0,
     },
-    ui: { modal: 'none', cursor: { x: -100, y: -100, pressed: false, visible: false } },
+    ui: { modal: 'none', focusedSlot: 0, cursor: { x: -100, y: -100, pressed: false, visible: false } },
     botAccumulator: 0,
     lastTickAt: now,
     startedAt: now,
@@ -82,7 +82,7 @@ export function loadState(): GameState | null {
     parsed.queue = parsed.queue ?? [];
     parsed.effects = { ...fresh.effects, ...(parsed.effects ?? {}) };
     parsed.derived = { ...fresh.derived, ...(parsed.derived ?? {}) };
-    parsed.ui = { modal: 'none', cursor: { x: -100, y: -100, pressed: false, visible: false } }; // 瞬时，不沿用
+    parsed.ui = { modal: 'none', focusedSlot: 0, cursor: { x: -100, y: -100, pressed: false, visible: false } }; // 瞬时，不沿用
     for (const customer of [...parsed.activeCustomers, ...parsed.queue]) {
       ensureCustomer(customer);
     }

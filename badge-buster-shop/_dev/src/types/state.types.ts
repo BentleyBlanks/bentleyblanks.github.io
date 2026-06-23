@@ -10,7 +10,7 @@ export interface IconRuntime {
 
 export type PhoneSystemRuntime = 'ios' | 'android';
 
-export type PopupKind = 'ad' | 'scam' | 'offer';
+export type PopupKind = 'ad' | 'scam' | 'offer' | 'bait' | 'timed';
 
 /** 特殊手机类型：普通 / 黄金(高收益易碎) / 灵魂(掉声誉但可白嫖技能) / 宇宙魔方(会变形砸店) */
 export type PhoneVariant = 'normal' | 'golden' | 'soul' | 'cosmic';
@@ -123,6 +123,7 @@ export interface GameState {
   /** 瞬时 UI 状态（不持久化）：当前画布弹窗面板 + 手指光标位置。 */
   ui: {
     modal: ModalKind;
+    focusedSlot: number; // 移动端单机聚焦：当前正在大屏操作的工位下标
     cursor: { x: number; y: number; pressed: boolean; visible: boolean };
   };
 

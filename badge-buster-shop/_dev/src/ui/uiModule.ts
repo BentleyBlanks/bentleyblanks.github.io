@@ -1,4 +1,5 @@
 import { clearState } from '../core/persistence';
+import { computeGameLayout } from '../shared/layout';
 import { computeUiLayout, rectHit } from '../shared/uiLayout';
 import type { GameEvent } from '../types/events.types';
 import type { GameContext, GameModule } from '../types/module.types';
@@ -62,6 +63,16 @@ export function createUiModule(): GameModule {
     for (const btn of ui.buttons) {
       if (rectHit(btn.rect, event.x, event.y)) {
         ctx.state.ui.modal = btn.id;
+        event.consumed = true;
+        return;
+      }
+    }
+
+    // 工位切换标签（多台手机时）
+    const game = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
+    for (const tab of game.slotTabs) {
+      if (rectHit(tab.rect, event.x, event.y)) {
+        ctx.state.ui.focusedSlot = tab.index;
         event.consumed = true;
         return;
       }

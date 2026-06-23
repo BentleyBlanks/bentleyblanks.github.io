@@ -144,8 +144,12 @@ export function createShopModule(): GameModule {
     pullFromQueue(now);
   }
 
-  function onRisk(kind: 'offer_win' | 'offer_fail' | 'golden_break' | 'transformer' | 'soul_skill', customerId: string): void {
+  function onRisk(kind: 'offer_win' | 'offer_fail' | 'golden_break' | 'transformer' | 'soul_skill' | 'bait_fail', customerId: string): void {
     const now = performance.now();
+    if (kind === 'bait_fail') {
+      changeReputation(-0.05); // 你被广告骗了，顾客有点无语（不赶走）
+      return;
+    }
     if (kind === 'golden_break') {
       removeActive(customerId, now); // 黄金机碎了，顾客被抓走
       changeReputation(-0.3);

@@ -1,9 +1,12 @@
 import {
+  BAIT_FINE_PER_TIER,
+  BAIT_UNLOCK_LEVEL,
   GOLDEN_BREAK_CHANCE,
   GOLDEN_FINE_PER_TIER,
   INCOMING_BASE_INTERVAL_MS,
   MALWARE_GAIN_INTERVAL_MS,
   MALWARE_MAX,
+  MALWARE_PROMPT_THRESHOLD,
   MALWARE_UNLOCK_LEVEL,
   MAX_NOTIFICATIONS,
   MAX_POPUPS_PER_PHONE,
@@ -14,6 +17,7 @@ import {
   OFFER_WIN_CHANCE,
   OFFER_WIN_PER_TIER,
   SCAM_UNLOCK_LEVEL,
+  TIMED_CLOSE_MS,
 } from '../content/balance';
 import {
   computeGameLayout,
@@ -38,6 +42,17 @@ const SCAM_TITLES = ['⚠ 检测到病毒', '账户异常需验证', '免费领 
 const SCAM_BODIES = ['不处理将自动安装', '点此验证身份', '填写信息领取', '倒计时结束即扣费'];
 const OFFER_TITLES = ['🎁 帮顾客一键清理垃圾？', '🧹 深度清理优化？'];
 const OFFER_BODIES = ['可能有惊喜，也可能清空资料赔钱'];
+const BAIT_TITLES = ['🎉 恭喜获得 ¥888', '✅ 系统赠送免费升级', '🎁 点击领 500 经验', '💰 现金红包已到账', '🏆 您是第 1 位幸运用户'];
+const BAIT_BODIES = ['点击立即领取', '名额有限 速领', '审核已通过'];
+const TIMED_TITLES = ['🎬 精彩视频广告', '📺 广告加载中…', '您可能感兴趣的内容'];
+const TIMED_BODIES = ['倒计时结束后可关闭', '稍候即可跳过'];
+
+function pickAdKind(level: number): PopupKind {
+  const r = Math.random();
+  if (r < 0.22) return 'timed';
+  if (level >= BAIT_UNLOCK_LEVEL && r < 0.46) return 'bait'; // 假奖励陷阱
+  return 'ad';
+}
 
 function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -61,13 +76,28 @@ let popupSeq = 0;
 
 function buildPopup(kind: PopupKind, now: number, graceMs: number): PhonePopup {
   popupSeq += 1;
+  const hasButton = kind === 'offer' || kind === 'bait';
   const fw = 0.62 + Math.random() * 0.22;
-  const fh = (kind === 'offer' ? 0.28 : 0.15) + Math.random() * 0.06;
+  const fh = (hasButton ? 0.28 : 0.15) + Math.random() * 0.06;
   const fx = Math.min(Math.max((1 - fw) / 2 + (Math.random() - 0.5) * 0.12, 0.04), 1 - fw - 0.04);
   const fy = Math.min(Math.max(0.2 + Math.random() * 0.36, 0.18), 0.88 - fh);
-  const title = kind === 'scam' ? pick(SCAM_TITLES) : kind === 'offer' ? pick(OFFER_TITLES) : pick(AD_TITLES);
-  const body = kind === 'scam' ? pick(SCAM_BODIES) : kind === 'offer' ? pick(OFFER_BODIES) : pick(AD_BODIES);
-  const accent = kind === 'scam' ? '#FF3B30' : kind === 'offer' ? '#8E7CF6' : '#FF9F43';
+  const title =
+    kind === 'scam' ? pick(SCAM_TITLES)
+      : kind === 'offer' ? pick(OFFER_TITLES)
+        : kind === 'bait' ? pick(BAIT_TITLES)
+          : kind === 'timed' ? pick(TIMED_TITLES)
+            : pick(AD_TITLES);
+  const body =
+    kind === 'scam' ? pick(SCAM_BODIES)
+      : kind === 'offer' ? pick(OFFER_BODIES)
+        : kind === 'bait' ? pick(BAIT_BODIES)
+          : kind === 'timed' ? pick(TIMED_BODIES)
+            : pick(AD_BODIES);
+  const accent =
+    kind === 'scam' ? '#FF3B30'
+      : kind === 'offer' ? '#8E7CF6'
+        : kind === 'bait' ? '#E8B500' // 看起来像真奖励的金色
+          : '#FF9F43';
   return {
     id: `popup_${Math.floor(now)}_${popupSeq}`,
     kind, fx, fy, fw, fh,
@@ -128,7 +158,7 @@ export function createCoreModule(): GameModule {
       if (phoneClearingDisabled(phone)) continue; // 弹窗遮挡 或 卡死 → 整机禁清
       for (const icon of phone.icons) {
         if (icon.icon.badge <= 0) continue;
-        const radius = icon.size * 0.62;
+        const radius = icon.size * 0.92 + 4; // 放宽点击容差，移动端更易点中
         const d = distance({ x, y }, icon);
         if (d <= radius && (!best || d < best.d)) best = { icon, d };
       }
@@ -169,7 +199,13 @@ export function createCoreModule(): GameModule {
     }
   }
 
+  function dismissPopup(customer: CustomerRuntime, popup: PhonePopup, rect: { closeX: number; closeY: number; closeW: number; closeH: number }): void {
+    customer.phone.popups = customer.phone.popups.filter((it) => it.id !== popup.id);
+    ctx.bus.emit({ type: 'POPUP_CLOSED', customerId: customer.id, kind: popup.kind, x: rect.closeX, y: rect.closeY, defused: false });
+  }
+
   function handlePopupTap(x: number, y: number): boolean {
+    const now = performance.now();
     const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
     for (const phone of layout.phoneLayouts) {
       const popups = phone.customer.phone.popups;
@@ -178,16 +214,31 @@ export function createCoreModule(): GameModule {
         const rect = popupRectOf(phone, popup);
         if (!rectContains(rect, x, y)) continue;
         const closeHit = rectContains({ x: rect.closeX, y: rect.closeY, w: rect.closeW, h: rect.closeH }, x, y);
+        const btn = popupAcceptRect(rect);
+
         if (popup.kind === 'offer') {
-          const accept = popupAcceptRect(rect);
-          if (rectContains(accept, x, y)) {
-            resolveOffer(phone.customer, popup, accept.x + accept.w / 2, accept.y);
-          } else if (closeHit) {
+          if (rectContains(btn, x, y)) resolveOffer(phone.customer, popup, btn.x + btn.w / 2, btn.y);
+          else if (closeHit) dismissPopup(phone.customer, popup, rect);
+          return true;
+        }
+        if (popup.kind === 'bait') {
+          if (rectContains(btn, x, y)) {
+            // 上当了：点了那个"领取/升级/送经验"的诱饵按钮 → 扣钱
             phone.customer.phone.popups = phone.customer.phone.popups.filter((it) => it.id !== popup.id);
-            ctx.bus.emit({ type: 'POPUP_CLOSED', customerId: phone.customer.id, kind: 'offer', x: rect.closeX, y: rect.closeY, defused: false });
+            const fine = Math.round(BAIT_FINE_PER_TIER * phone.customer.phone.tier);
+            ctx.bus.emit({ type: 'RISK_EVENT', customerId: phone.customer.id, kind: 'bait_fail', amount: fine, label: `假的！赔 ${fine}`, x: btn.x + btn.w / 2, y: btn.y });
+          } else if (closeHit) {
+            closePopup(phone.customer, popup, rect.closeX + rect.closeW / 2, rect.closeY + rect.closeH / 2); // ✕ 才是安全的
           }
           return true;
         }
+        if (popup.kind === 'timed') {
+          if (closeHit && now >= popup.bornAt + TIMED_CLOSE_MS) {
+            closePopup(phone.customer, popup, rect.closeX + rect.closeW / 2, rect.closeY + rect.closeH / 2);
+          }
+          return true; // 倒计时未到：✕ 不响应，但仍吞掉点击（无法清角标）
+        }
+
         if (closeHit) {
           closePopup(phone.customer, popup, rect.closeX + rect.closeW / 2, rect.closeY + rect.closeH / 2);
         }
@@ -216,7 +267,7 @@ export function createCoreModule(): GameModule {
     const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
     for (const phone of layout.phoneLayouts) {
       const runtime = phone.customer.phone;
-      if (runtime.malware <= 0) continue;
+      if (runtime.malware < MALWARE_PROMPT_THRESHOLD) continue; // 仅 ≥60% 才有按钮可点
       if (rectContains(malwareButtonRect(phone), x, y)) {
         const amount = Math.min(runtime.malware, ctx.state.derived.malwareClearPower);
         runtime.malware = Math.max(0, runtime.malware - amount);
@@ -336,7 +387,7 @@ export function createCoreModule(): GameModule {
       phone.popupAccumulatorMs += dt;
       if (!isFrozen && phone.popupAccumulatorMs >= ctx.state.derived.adSpawnIntervalMs && phone.popups.length < MAX_POPUPS_PER_PHONE) {
         phone.popupAccumulatorMs = 0;
-        spawnPopup(phone, 'ad', now);
+        spawnPopup(phone, pickAdKind(ctx.state.level), now);
       }
 
       // 诈骗弹窗（限一个在场）

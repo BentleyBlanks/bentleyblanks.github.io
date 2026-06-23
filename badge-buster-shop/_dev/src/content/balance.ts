@@ -27,9 +27,32 @@ export const MAX_NOTIFICATIONS = 6;
 
 /** 后台恶意软件 */
 export const MALWARE_GAIN_INTERVAL_MS = 1_500;
+export const MALWARE_PROMPT_THRESHOLD = 60; // ≥ 此值才弹出"清理后台"按钮（低于不打扰）
 export const MALWARE_LAG_THRESHOLD = 78; // ≥ 此值手机卡死，无法清角标
 export const MALWARE_MAX = 100;
 export const MALWARE_UNLOCK_LEVEL = 2;
+
+/** 滑动连清是后期才解锁的进阶手法 */
+export const SWIPE_UNLOCK_LEVEL = 12;
+
+/** 升级解锁等级（分层级阶段：到等级才能买）。基础项 1 级即可，进阶项更晚。 */
+export function upgradeUnlockLevel(id: string): number {
+  if (id === 'up_swipe') return SWIPE_UNLOCK_LEVEL;
+  return 1;
+}
+
+/** 铺子段位称号，随等级提升。 */
+export function shopRankName(level: number): string {
+  if (level >= 30) return '宗师';
+  if (level >= 18) return '大师';
+  if (level >= 8) return '匠人';
+  return '学徒';
+}
+
+/** 烦人弹窗扩展 */
+export const TIMED_CLOSE_MS = 4_200; // "X 秒后才能关闭"的等待
+export const BAIT_FINE_PER_TIER = 22; // 假奖励陷阱：点"领取"按钮的扣款（随档次）
+export const BAIT_UNLOCK_LEVEL = 2;
 
 /** 肉鸽 / 盲盒 / 特殊手机（财富有回滚风险，现金最低 0 元） */
 export function phoneTier(level: number): number {
