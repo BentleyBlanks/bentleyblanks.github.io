@@ -29,12 +29,14 @@ import {
   popupRectOf,
   rectContains,
   type IconLayout,
+  type PhoneLayout,
 } from '../shared/layout';
 import type { AppIconDef } from '../types/content.types';
 import type { GameEvent } from '../types/events.types';
 import type { GameContext, GameModule } from '../types/module.types';
 import type { CustomerRuntime, IconRuntime, PhonePopup, PhoneRuntime, PopupKind } from '../types/state.types';
 import { saveState } from './persistence';
+import { dodgeStep, rollMotion, stepBubble } from './popupMotion';
 
 const AD_TITLES = ['🧧 恭喜中红包', '附近的人想认识你', '🔥 限时 1 折', '点击领取大礼包', '您有 1 条新消息'];
 const AD_BODIES = ['立即领取 ›', '马上查看', '仅剩 3 个名额', '免费试用 7 天'];
@@ -74,12 +76,14 @@ function pick<T>(items: readonly T[]): T {
 
 let popupSeq = 0;
 
-function buildPopup(kind: PopupKind, now: number, graceMs: number): PhonePopup {
+function buildPopup(kind: PopupKind, now: number, graceMs: number, level: number): PhonePopup {
   popupSeq += 1;
   const hasButton = kind === 'offer' || kind === 'bait';
-  const fw = 0.62 + Math.random() * 0.22;
-  const fh = (hasButton ? 0.28 : 0.15) + Math.random() * 0.06;
-  const fx = Math.min(Math.max((1 - fw) / 2 + (Math.random() - 0.5) * 0.12, 0.04), 1 - fw - 0.04);
+  const { motion, vx, vy } = rollMotion(kind, level);
+  // 泡泡弹窗做小一点，才有空间"滚来滚去"；其余保持常规大小
+  const fw = motion === 'bubble' ? 0.34 + Math.random() * 0.1 : 0.62 + Math.random() * 0.22;
+  const fh = motion === 'bubble' ? 0.16 + Math.random() * 0.04 : (hasButton ? 0.28 : 0.15) + Math.random() * 0.06;
+  const fx = Math.min(Math.max((1 - fw) / 2 + (Math.random() - 0.5) * (motion === 'bubble' ? 0.4 : 0.12), 0.04), 1 - fw - 0.04);
   const fy = Math.min(Math.max(0.2 + Math.random() * 0.36, 0.18), 0.88 - fh);
   const title =
     kind === 'scam' ? pick(SCAM_TITLES)
@@ -105,6 +109,7 @@ function buildPopup(kind: PopupKind, now: number, graceMs: number): PhonePopup {
     bornAt: now,
     installAt: kind === 'scam' ? now + graceMs : Number.POSITIVE_INFINITY,
     title, body, accent,
+    motion, vx, vy,
   };
 }
 
@@ -302,7 +307,22 @@ export function createCoreModule(): GameModule {
 
   function spawnPopup(phone: PhoneRuntime, kind: PopupKind, now: number): void {
     if (phone.popups.length >= MAX_POPUPS_PER_PHONE) return;
-    phone.popups.push(buildPopup(kind, now, ctx.state.derived.scamGraceMs));
+    phone.popups.push(buildPopup(kind, now, ctx.state.derived.scamGraceMs, ctx.state.level));
+  }
+
+  // 恶心弹窗的移动：bubble 像泡泡乱滚（碰边反弹），dodge 在光标靠近 ✕ 时逃开
+  function updatePopupMotion(customer: CustomerRuntime, phoneLayout: PhoneLayout | undefined, dt: number): void {
+    const popups = customer.phone.popups;
+    if (popups.length === 0) return;
+    const cursor = ctx.state.ui.cursor;
+    const canDodge = !!phoneLayout && phoneLayout.customer.id === customer.id && cursor.visible;
+    for (const popup of popups) {
+      if (popup.motion === 'bubble') {
+        stepBubble(popup, dt);
+      } else if (popup.motion === 'dodge' && canDodge && phoneLayout) {
+        dodgeStep(popup, popupRectOf(phoneLayout, popup), cursor.x, cursor.y);
+      }
+    }
   }
 
   function scamPenalty(): number {
@@ -344,8 +364,13 @@ export function createCoreModule(): GameModule {
   function updateWorld(dt: number): void {
     const now = performance.now();
     const isFrozen = frozen(now);
+    // 仅聚焦中的手机会进入 phoneLayouts（单机大屏）；dodge 需要它来计算光标与 ✕ 的距离
+    const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
     for (const customer of ctx.state.activeCustomers) {
       const phone = customer.phone;
+
+      // 恶心弹窗乱动（泡泡乱滚 / 躲避光标）——即便手机已清完也让它平滑停住
+      updatePopupMotion(customer, layout.phoneLayouts.find((pl) => pl.customer.id === customer.id), dt);
 
       // 后台恶意软件（被动自动杀毒持续生效，即使手机已清角标也跑，便于卡死解除）
       if (!isFrozen && ctx.state.level >= MALWARE_UNLOCK_LEVEL) {

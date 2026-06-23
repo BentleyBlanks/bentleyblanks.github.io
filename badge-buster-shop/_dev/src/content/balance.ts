@@ -51,6 +51,14 @@ export function shopRankName(level: number): string {
 
 /** 烦人弹窗扩展 */
 export const TIMED_CLOSE_MS = 4_200; // "X 秒后才能关闭"的等待
+
+/** 会动的弹窗（更恶心）：躲避光标 / 泡泡乱滚。与诈骗(3)同期登场，玩家早点尝到苦头。 */
+export const POPUP_MOTION_UNLOCK_LEVEL = 3;
+export const POPUP_DODGE_CHANCE = 0.22;
+export const POPUP_BUBBLE_CHANCE = 0.16;
+export const POPUP_BUBBLE_SPEED = 0.26; // 屏幕比例/秒（要明显"滚来滚去"又不至于点不到）
+export const POPUP_DODGE_RADIUS = 66; // px：光标进入即逃
+export const POPUP_DODGE_STEP = 0.2; // 逃逸步长（屏幕比例）
 export const BAIT_FINE_PER_TIER = 22; // 假奖励陷阱：点"领取"按钮的扣款（随档次）
 export const BAIT_UNLOCK_LEVEL = 2;
 

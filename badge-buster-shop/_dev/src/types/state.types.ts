@@ -15,6 +15,9 @@ export type PopupKind = 'ad' | 'scam' | 'offer' | 'bait' | 'timed';
 /** 特殊手机类型：普通 / 黄金(高收益易碎) / 灵魂(掉声誉但可白嫖技能) / 宇宙魔方(会变形砸店) */
 export type PhoneVariant = 'normal' | 'golden' | 'soul' | 'cosmic';
 
+/** 弹窗运动：静止 / 躲避光标 / 像泡泡乱滚 */
+export type PopupMotion = 'none' | 'dodge' | 'bubble';
+
 /** 手机屏幕上的弹窗。位置以屏幕矩形的比例(0..1)存储，渲染/命中均按比例换算，跟随布局缩放。 */
 export interface PhonePopup {
   id: string;
@@ -32,6 +35,9 @@ export interface PhonePopup {
   title: string;
   body: string;
   accent: string;
+  motion: PopupMotion; // 恶心移动：躲避光标 / 泡泡乱滚
+  vx: number;          // bubble 速度（屏幕比例/秒）
+  vy: number;
 }
 
 export interface PhoneRuntime {

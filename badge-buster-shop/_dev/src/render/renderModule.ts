@@ -521,6 +521,48 @@ export function createRenderModule(): GameModule {
     const now = performance.now();
     for (const popup of phone.customer.phone.popups) {
       const rect = popupRectOf(phone, popup);
+      if (popup.motion === 'bubble') {
+        // 泡泡弹窗：圆润半透明的"肥皂泡"，自己滚来滚去（位置由 fx/fy 驱动）→ 又滑又难点中
+        const bcx = rect.x + rect.w / 2;
+        const bcy = rect.y + rect.h / 2;
+        const br = Math.min(rect.w, rect.h) / 2; // 全圆角 = 胶囊/泡泡轮廓
+        c.save();
+        c.shadowColor = 'rgba(0,0,0,0.28)';
+        c.shadowBlur = 14;
+        c.shadowOffsetY = 6;
+        const grad = c.createRadialGradient(rect.x + rect.w * 0.32, rect.y + rect.h * 0.28, br * 0.2, bcx, bcy, rect.w * 0.62);
+        grad.addColorStop(0, 'rgba(255,255,255,0.92)');
+        grad.addColorStop(0.55, alphaColor(popup.accent, 0.5));
+        grad.addColorStop(1, alphaColor(popup.accent, 0.8));
+        fillRound(c, rect.x, rect.y, rect.w, rect.h, br, grad);
+        c.shadowColor = 'transparent';
+        strokeRound(c, rect.x, rect.y, rect.w, rect.h, br, 'rgba(255,255,255,0.85)', 2);
+        strokeRound(c, rect.x + 1.5, rect.y + 1.5, rect.w - 3, rect.h - 3, br, alphaColor(popup.accent, 0.5), 1);
+        // 左上高光小白椭圆 → 肥皂泡反光感
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.beginPath();
+        c.ellipse(rect.x + rect.w * 0.26, rect.y + rect.h * 0.3, rect.w * 0.09, rect.h * 0.17, -0.5, 0, TAU);
+        c.fill();
+        // 泡泡里塞一句广告词（单行）
+        c.fillStyle = '#2B2B33';
+        c.font = `900 ${Math.max(9, rect.h * 0.3)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(popup.title, bcx, bcy, rect.w * 0.7);
+        // ✕（坐标与 popupRectOf 命中区一致：要点中它得追着泡泡点）
+        c.strokeStyle = 'rgba(43,43,51,0.82)';
+        c.lineWidth = Math.max(1.4, rect.closeW * 0.14);
+        c.lineCap = 'round';
+        const bpad = rect.closeW * 0.3;
+        c.beginPath();
+        c.moveTo(rect.closeX + bpad, rect.closeY + bpad);
+        c.lineTo(rect.closeX + rect.closeW - bpad, rect.closeY + rect.closeH - bpad);
+        c.moveTo(rect.closeX + rect.closeW - bpad, rect.closeY + bpad);
+        c.lineTo(rect.closeX + bpad, rect.closeY + rect.closeH - bpad);
+        c.stroke();
+        c.restore();
+        continue;
+      }
       const scam = popup.kind === 'scam';
       const art = scam ? images.get('scam_warning') : images.get(hashText(popup.id) % 2 === 0 ? 'ad_redpacket' : 'ad_offer');
       c.save();

@@ -59,6 +59,11 @@ function ensurePhone(phone: PhoneRuntime): void {
   phone.variant ??= 'normal';
   phone.transformMs ??= Number.POSITIVE_INFINITY; // JSON 里 Infinity 会变 null，这里复原
   phone.offerAccumulatorMs ??= 0;
+  for (const popup of phone.popups) {
+    popup.motion ??= 'none';
+    popup.vx ??= 0;
+    popup.vy ??= 0;
+  }
 }
 
 function ensureCustomer(customer: CustomerRuntime): void {
