@@ -45,9 +45,9 @@ export interface UiLayout {
 }
 
 const BUTTONS: { id: UiButtonId; icon: string; label: string }[] = [
-  { id: 'shop', icon: '🛒', label: '升级' },
-  { id: 'skills', icon: '✨', label: '技能' },
-  { id: 'settings', icon: '⚙️', label: '设置' },
+  { id: 'shop', icon: '升', label: '升级' },
+  { id: 'skills', icon: '技', label: '技能' },
+  { id: 'settings', icon: '设', label: '设置' },
 ];
 
 const MODAL_TITLES: Record<Exclude<ModalKind, 'none'>, string> = {

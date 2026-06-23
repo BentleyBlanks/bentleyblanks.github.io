@@ -122,6 +122,20 @@ function alphaColor(color: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${clamp01(alpha).toFixed(3)})`;
 }
 
+function drawImageCover(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, w: number, h: number): void {
+  const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
+  const drawW = image.naturalWidth * scale;
+  const drawH = image.naturalHeight * scale;
+  ctx.drawImage(image, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH);
+}
+
+function drawImageContain(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, w: number, h: number): void {
+  const scale = Math.min(w / image.naturalWidth, h / image.naturalHeight);
+  const drawW = image.naturalWidth * scale;
+  const drawH = image.naturalHeight * scale;
+  ctx.drawImage(image, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH);
+}
+
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   const radius = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
@@ -382,8 +396,9 @@ export function createRenderModule(): GameModule {
     c.fillText(`排队 ${ctx.state.queue.length}/${ctx.state.queueCapacity}`, layout.queuePanel.x + layout.queuePanel.w / 2, layout.queuePanel.y + 18);
   }
 
-  function drawCustomerBust(x: number, y: number, radius: number, mood: Mood, name: string): void {
+  function drawCustomerBust(x: number, y: number, radius: number, mood: Mood, name: string, defId: string): void {
     const c = ctx.ctx2d;
+    const portrait = images.get(`${defId}_neutral`);
     c.save();
     c.shadowColor = 'rgba(43, 43, 51, 0.18)';
     c.shadowBlur = 8;
@@ -393,6 +408,21 @@ export function createRenderModule(): GameModule {
     c.arc(x, y, radius, 0, TAU);
     c.fill();
     c.shadowColor = 'transparent';
+    if (portrait?.complete && portrait.naturalWidth > 0) {
+      c.beginPath();
+      c.arc(x, y, radius * 0.96, 0, TAU);
+      c.clip();
+      drawImageCover(c, portrait, x - radius * 1.08, y - radius * 1.08, radius * 2.16, radius * 2.16);
+      c.restore();
+      c.save();
+      c.strokeStyle = moodColor(mood);
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(x, y, radius, 0, TAU);
+      c.stroke();
+      c.restore();
+      return;
+    }
     c.fillStyle = '#FFE2C8';
     c.beginPath();
     c.arc(x, y - radius * 0.12, radius * 0.54, 0, TAU);
@@ -427,7 +457,7 @@ export function createRenderModule(): GameModule {
     const ratio = item.customer.patience / Math.max(1, item.customer.maxPatience);
     fillRound(c, item.x, item.y, item.w, item.h, 8, '#FFFFFF');
     strokeRound(c, item.x, item.y, item.w, item.h, 8, '#E7D8C0');
-    drawCustomerBust(item.x + 22, item.y + item.h / 2, 15, item.customer.mood, customerName(ctx, item.customer.defId));
+    drawCustomerBust(item.x + 22, item.y + item.h / 2, 15, item.customer.mood, customerName(ctx, item.customer.defId), item.customer.defId);
     c.fillStyle = '#2B2B33';
     c.font = '900 11px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
     c.textAlign = 'left';
@@ -497,31 +527,39 @@ export function createRenderModule(): GameModule {
     c.save();
     c.clip();
 
-    const wallpaper = c.createLinearGradient(phone.screenX, phone.screenY, phone.screenX + phone.screenW, phone.screenY + phone.screenH);
-    wallpaper.addColorStop(0, skin.wallpaperA);
-    wallpaper.addColorStop(0.48, skin.wallpaperB);
-    wallpaper.addColorStop(1, mixColor(skin.wallpaperA, '#020617', 0.35));
-    c.fillStyle = wallpaper;
-    c.fillRect(phone.screenX, phone.screenY, phone.screenW, phone.screenH);
+    const wallpaperImage = images.get(`wallpaper_${(skin.seed % 8) + 1}`);
+    if (wallpaperImage?.complete && wallpaperImage.naturalWidth > 0) {
+      drawImageCover(c, wallpaperImage, phone.screenX, phone.screenY, phone.screenW, phone.screenH);
+      c.globalAlpha = 0.16;
+      c.fillStyle = mixColor(skin.wallpaperA, '#020617', 0.34);
+      c.fillRect(phone.screenX, phone.screenY, phone.screenW, phone.screenH);
+    } else {
+      const wallpaper = c.createLinearGradient(phone.screenX, phone.screenY, phone.screenX + phone.screenW, phone.screenY + phone.screenH);
+      wallpaper.addColorStop(0, skin.wallpaperA);
+      wallpaper.addColorStop(0.48, skin.wallpaperB);
+      wallpaper.addColorStop(1, mixColor(skin.wallpaperA, '#020617', 0.35));
+      c.fillStyle = wallpaper;
+      c.fillRect(phone.screenX, phone.screenY, phone.screenW, phone.screenH);
 
-    c.globalAlpha = 0.34;
-    c.fillStyle = skin.wallpaperC;
-    c.beginPath();
-    c.ellipse(phone.screenX + phone.screenW * 0.82, phone.screenY + phone.screenH * 0.22, phone.screenW * 0.35, phone.screenH * 0.16, -0.25, 0, TAU);
-    c.fill();
-    c.globalAlpha = 0.22;
-    c.fillStyle = '#FFFFFF';
-    c.beginPath();
-    c.ellipse(phone.screenX + phone.screenW * 0.22, phone.screenY + phone.screenH * 0.76, phone.screenW * 0.32, phone.screenH * 0.2, 0.45, 0, TAU);
-    c.fill();
-    c.globalAlpha = 0.14;
-    c.strokeStyle = '#FFFFFF';
-    c.lineWidth = 1;
-    for (let offset = -phone.screenH; offset < phone.screenW; offset += 18) {
+      c.globalAlpha = 0.34;
+      c.fillStyle = skin.wallpaperC;
       c.beginPath();
-      c.moveTo(phone.screenX + offset, phone.screenY + phone.screenH);
-      c.lineTo(phone.screenX + offset + phone.screenH, phone.screenY);
-      c.stroke();
+      c.ellipse(phone.screenX + phone.screenW * 0.82, phone.screenY + phone.screenH * 0.22, phone.screenW * 0.35, phone.screenH * 0.16, -0.25, 0, TAU);
+      c.fill();
+      c.globalAlpha = 0.22;
+      c.fillStyle = '#FFFFFF';
+      c.beginPath();
+      c.ellipse(phone.screenX + phone.screenW * 0.22, phone.screenY + phone.screenH * 0.76, phone.screenW * 0.32, phone.screenH * 0.2, 0.45, 0, TAU);
+      c.fill();
+      c.globalAlpha = 0.14;
+      c.strokeStyle = '#FFFFFF';
+      c.lineWidth = 1;
+      for (let offset = -phone.screenH; offset < phone.screenW; offset += 18) {
+        c.beginPath();
+        c.moveTo(phone.screenX + offset, phone.screenY + phone.screenH);
+        c.lineTo(phone.screenX + offset + phone.screenH, phone.screenY);
+        c.stroke();
+      }
     }
 
     const overlayImage = images.get('phoneOverlays');
@@ -555,6 +593,7 @@ export function createRenderModule(): GameModule {
     for (const popup of phone.customer.phone.popups) {
       const rect = popupRectOf(phone, popup);
       const scam = popup.kind === 'scam';
+      const art = scam ? images.get('scam_warning') : images.get(hashText(popup.id) % 2 === 0 ? 'ad_redpacket' : 'ad_offer');
       c.save();
       c.shadowColor = 'rgba(0,0,0,0.4)';
       c.shadowBlur = 12;
@@ -564,16 +603,22 @@ export function createRenderModule(): GameModule {
       strokeRound(c, rect.x, rect.y, rect.w, rect.h, 10, popup.accent, scam ? 2.4 : 1.6);
       fillRound(c, rect.x, rect.y, rect.w, Math.max(4, rect.h * 0.16), 8, alphaColor(popup.accent, scam ? 0.95 : 0.85));
 
+      if (art?.complete && art.naturalWidth > 0) {
+        c.globalAlpha = scam ? 0.52 : 0.58;
+        drawImageContain(c, art, rect.x + rect.w * 0.05, rect.y + rect.h * 0.19, rect.w * 0.9, rect.h * 0.46);
+        c.globalAlpha = 1;
+      }
+
       c.fillStyle = scam ? '#FFE3DE' : '#2B2B33';
       c.font = `900 ${Math.max(9, rect.h * 0.25)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
       c.textAlign = 'left';
       c.textBaseline = 'middle';
-      c.fillText(popup.title, rect.x + rect.w * 0.07, rect.y + rect.h * 0.36, rect.w * 0.74);
+      c.fillText(popup.title, rect.x + rect.w * 0.07, rect.y + rect.h * (art?.complete ? 0.47 : 0.36), rect.w * 0.74);
 
       const bodyX = scam ? rect.x + rect.w * 0.26 : rect.x + rect.w * 0.07;
       c.fillStyle = scam ? 'rgba(255, 220, 214, 0.88)' : 'rgba(43,43,51,0.66)';
       c.font = `800 ${Math.max(8, rect.h * 0.19)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-      c.fillText(popup.body, bodyX, rect.y + rect.h * 0.72, rect.x + rect.w - bodyX - rect.w * 0.05);
+      c.fillText(popup.body, bodyX, rect.y + rect.h * 0.76, rect.x + rect.w - bodyX - rect.w * 0.05);
 
       // 关闭 ✕
       fillRound(c, rect.closeX, rect.closeY, rect.closeW, rect.closeH, Math.min(rect.closeW, rect.closeH) * 0.3, scam ? 'rgba(255,255,255,0.18)' : 'rgba(43,43,51,0.1)');
