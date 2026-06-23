@@ -43,7 +43,7 @@ export function createInputModule(): GameModule {
     if (Math.hypot(point.x - trace.start.x, point.y - trace.start.y) > threshold) trace.moved = true;
     const now = performance.now();
     if (trace.moved && now - trace.lastEmitAt >= swipeEmitIntervalMs) {
-      ctx.bus.emit({ type: 'SWIPE', path: trace.path.slice(Math.max(0, trace.path.length - 5)) });
+      ctx.bus.emit({ type: 'SWIPE', path: trace.path.slice(Math.max(0, trace.path.length - 5)), start: trace.start });
       trace.lastEmitAt = now;
     }
   }
@@ -54,7 +54,7 @@ export function createInputModule(): GameModule {
     if (!trace || trace.id !== event.pointerId) return;
     trace.path.push(point);
     if (trace.moved) {
-      ctx.bus.emit({ type: 'SWIPE', path: trace.path.slice(Math.max(0, trace.path.length - 10)) });
+      ctx.bus.emit({ type: 'SWIPE', path: trace.path.slice(Math.max(0, trace.path.length - 10)), start: trace.start, final: true });
     } else {
       ctx.bus.emit({ type: 'TAP', x: point.x, y: point.y });
     }

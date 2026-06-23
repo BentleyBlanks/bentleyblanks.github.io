@@ -285,20 +285,23 @@ export function createCoreModule(): GameModule {
     return false;
   }
 
-  function handleNotificationPull(path: { x: number; y: number }[]): boolean {
-    const first = path[0];
-    const last = path[path.length - 1];
-    if (!first || !last) return false;
-    if (last.y - first.y < 40 || Math.abs(last.x - first.x) > Math.abs(last.y - first.y) * 0.9) return false; // 必须明显向下
+  // 下拉通知栏：用手势"起点"(start)判断是否从通知条往下拉，离指(final)时结算一次——可靠且不会中途乱触发
+  function handleNotificationPull(event: Extract<GameEvent, { type: 'SWIPE' }>): boolean {
+    if (!event.final) return false; // 仅在抬手时结算，像真的"拉下来再松手"
+    const start = event.start ?? event.path[0];
+    const last = event.path[event.path.length - 1];
+    if (!start || !last) return false;
+    if (last.y - start.y < 28) return false; // 需明显向下
     const layout = computeGameLayout(ctx.state, ctx.canvas.clientWidth, ctx.canvas.clientHeight);
     for (const phone of layout.phoneLayouts) {
       const runtime = phone.customer.phone;
       if (runtime.notifications <= 0) continue;
-      if (rectContains(notifBarRect(phone), first.x, first.y)) {
+      if (rectContains(notifBarRect(phone), start.x, start.y)) {
         const amount = Math.min(runtime.notifications, ctx.state.derived.notificationClearPower);
         runtime.notifications -= amount;
         grantXp(amount);
-        ctx.bus.emit({ type: 'NOTIFICATION_CLEARED', customerId: phone.customer.id, amount, x: phone.screenX + phone.screenW / 2, y: phone.screenY + phone.screenH * 0.18 });
+        const bar = notifBarRect(phone);
+        ctx.bus.emit({ type: 'NOTIFICATION_CLEARED', customerId: phone.customer.id, amount, x: bar.x + bar.w / 2, y: bar.y + bar.h * 0.5 });
         return true;
       }
     }
@@ -360,10 +363,14 @@ export function createCoreModule(): GameModule {
 
   function handleSwipe(event: Extract<GameEvent, { type: 'SWIPE' }>): void {
     if (event.consumed) return;
-    if (handleNotificationPull(event.path)) return;  // 下拉通知栏
+    if (handleNotificationPull(event)) return;  // 下拉通知栏
     if (!ctx.state.derived.swipeEnabled) {
-      const last = event.path[event.path.length - 1];
-      if (last) handleTap({ type: 'TAP', x: last.x, y: last.y });
+      // 未解锁"顺滑手势"：滑动不连清。仅在抬手(final)时把它当作一次点按结算，
+      // 否则拖动过程中每个 SWIPE 都补点会变相实现连清（重置后仍能滑动消除的根因）。
+      if (event.final) {
+        const last = event.path[event.path.length - 1];
+        if (last) handleTap({ type: 'TAP', x: last.x, y: last.y });
+      }
       return;
     }
     for (const icon of iconsAlongPath(event.path)) emitClear(icon, ctx.state.derived.clearPerHit);

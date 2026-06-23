@@ -50,8 +50,8 @@ export function computeRepairLayout(state: GameState, w: number, h: number): Rep
   const gap = 8;
   const title: Rect = { x: pad, y: panel.y + 8, w: w - pad * 2, h: 22 };
 
-  const tileTop = panel.y + 34;
-  const tileH = 78;
+  const tileTop = panel.y + 32;
+  const tileH = 90;
   const n = REPAIR_SERVICES.length;
   const tileW = (w - pad * 2 - gap * (n - 1)) / n;
   const tiles: RepairTileLayout[] = REPAIR_SERVICES.map((def, i) => {
@@ -59,7 +59,7 @@ export function computeRepairLayout(state: GameState, w: number, h: number): Rep
     const body: Rect = { x: bx, y: tileTop, w: tileW, h: tileH };
     const hasTiers = def.tiers.length > 1;
     const tierChip: Rect | null = hasTiers
-      ? { x: bx + tileW * 0.08, y: tileTop + tileH - 22, w: tileW * 0.84, h: 19 }
+      ? { x: bx + tileW * 0.06, y: tileTop + tileH - 23, w: tileW * 0.88, h: 20 }
       : null;
     return { kind: def.kind, body, tierChip };
   });

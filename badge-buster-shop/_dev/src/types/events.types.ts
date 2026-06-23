@@ -3,7 +3,7 @@ import type { Mood, PopupKind, RepairKind } from './state.types';
 
 export type GameEvent =
   | { type: 'TAP'; x: number; y: number; consumed?: boolean }
-  | { type: 'SWIPE'; path: { x: number; y: number }[]; consumed?: boolean }
+  | { type: 'SWIPE'; path: { x: number; y: number }[]; start?: { x: number; y: number }; final?: boolean; consumed?: boolean }
   | { type: 'BADGE_CLEARED'; customerId: string; iconId: AppIconId; amount: number; x: number; y: number }
   | { type: 'XP_GAINED'; amount: number }
   | { type: 'LEVEL_UP'; level: number }

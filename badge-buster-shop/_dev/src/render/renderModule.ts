@@ -822,12 +822,11 @@ export function createRenderModule(): GameModule {
     if (runtime.notifications <= 0) return;
     const c = ctx.ctx2d;
     const bar = notifBarRect(phone);
-    // 引导下拉的"呼吸"动画：把手轻轻往下探一点，箭头上下浮动
-    const bob = (Math.sin(pulseTime * 0.005) + 1) * 0.5; // 0..1
+    // 静态把手（之前会"呼吸"上下跳，反而让人以为拉不动/自己弹上去 #5）
     const h = Math.max(20, bar.h * 0.5);
     const w = bar.w * 0.7;
     const x = bar.x + (bar.w - w) / 2;
-    const y = bar.y + bar.h * 0.1 + bob * h * 0.16;
+    const y = bar.y + bar.h * 0.16;
 
     c.save();
     // 通知"卷帘"把手：上缘贴住屏顶，下缘圆角，像可以被往下拽
@@ -850,7 +849,7 @@ export function createRenderModule(): GameModule {
     c.font = `900 ${Math.max(9, phone.w * 0.032)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText('下拉清理通知', x + w / 2, y + h * 0.52, w * 0.7);
+    c.fillText('点我 / 下拉清理', x + w / 2, y + h * 0.52, w * 0.7);
 
     // 数量徽标（左侧）
     const badgeR = h * 0.2;
@@ -864,9 +863,9 @@ export function createRenderModule(): GameModule {
     c.font = `900 ${Math.max(8, badgeR * 1.05)}px Inter, system-ui, sans-serif`;
     c.fillText(String(runtime.notifications), bx, by + 0.5);
 
-    // 跳动的下拉箭头 ▾（右侧），随 bob 上下浮动，强化"往下拉"语义
+    // 静态下拉箭头 ▾（右侧）
     const ax = x + w - h * 0.42;
-    const ay = y + h * 0.5 + (bob - 0.5) * h * 0.22;
+    const ay = y + h * 0.5;
     c.strokeStyle = '#FF9F43';
     c.lineWidth = Math.max(2, h * 0.09);
     c.lineCap = 'round';
@@ -1182,42 +1181,54 @@ export function createRenderModule(): GameModule {
       fillRound(c, b.x, b.y, b.w, b.h, 10, done ? 'rgba(28,110,74,0.55)' : active ? 'rgba(40,92,142,0.8)' : 'rgba(40,52,74,0.94)');
       strokeRound(c, b.x, b.y, b.w, b.h, 10, done ? '#26C6A6' : active ? '#5B8DEF' : 'rgba(255,255,255,0.14)', 1.3);
       const tcx = b.x + b.w / 2;
+      const hasChip = !!tile.tierChip;
       c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      // 图标
       c.fillStyle = '#FFFFFF';
-      c.font = `${Math.max(15, b.w * 0.28)}px system-ui, sans-serif`;
-      c.fillText(def.emoji, tcx, b.y + b.h * 0.24);
+      c.font = `${Math.max(14, b.w * 0.22)}px system-ui, sans-serif`;
+      c.fillText(def.emoji, tcx, b.y + b.h * 0.19);
+      // 名称
       c.fillStyle = '#EAF4FF';
       c.font = `900 12px ${FF}`;
-      c.fillText(def.name, tcx, b.y + b.h * 0.46);
+      c.fillText(def.name, tcx, b.y + b.h * 0.41);
+      // 状态/动作（与底部材料档 chip 错开，互不重叠）
+      const lineY = b.y + b.h * 0.6;
       if (done) {
         c.fillStyle = '#9DE7C4';
         c.font = `800 11px ${FF}`;
-        c.fillText('✓ 已完成', tcx, b.y + b.h * 0.66);
+        c.fillText('✓ 已完成', tcx, lineY);
       } else if (active) {
         const dur = r.stage === 'open' ? REPAIR_OPEN_MS : r.stage === 'work' ? REPAIR_WORK_MS : REPAIR_CLOSE_MS;
         const p = clamp01(r.stageMs / dur);
         const stageIdx = r.stage === 'open' ? 0 : r.stage === 'work' ? 1 : 2;
-        const barW = b.w * 0.72;
+        const barW = b.w * 0.74;
         const barX = tcx - barW / 2;
-        const barY = b.y + b.h * 0.6;
+        const barY = b.y + b.h * 0.55;
         fillRound(c, barX, barY, barW, 5, 2.5, 'rgba(0,0,0,0.4)');
         fillRound(c, barX, barY, barW * ((stageIdx + p) / 3), 5, 2.5, '#5B8DEF');
         c.fillStyle = '#CBE0FF';
         c.font = `800 10px ${FF}`;
-        c.fillText((r.stage === 'open' ? '拆机' : r.stage === 'work' ? '施工' : '装回') + '中…', tcx, b.y + b.h * 0.8);
-      } else {
+        c.fillText((r.stage === 'open' ? '拆机' : r.stage === 'work' ? '施工' : '装回') + '中…', tcx, b.y + b.h * 0.72);
+      } else if (!hasChip) {
         const profit = repairProfit(def, svc?.tier ?? 0, tierOf);
         c.fillStyle = '#FFD166';
-        c.font = `900 11px ${FF}`;
-        c.fillText(`施工 +¥${profit}`, tcx, b.y + b.h * 0.66);
+        c.font = `900 12px ${FF}`;
+        c.fillText(`施工 +¥${profit}`, tcx, lineY);
+      } else {
+        c.fillStyle = 'rgba(220,230,245,0.7)';
+        c.font = `800 10px ${FF}`;
+        c.fillText('点此施工', tcx, b.y + b.h * 0.58);
       }
+      // 材料档 chip（贴膜/手机壳）：材料名 + 利润 + 可换标记
       if (tile.tierChip && svc) {
         const maxT = maxUnlockedTier(def, ctx.state.level);
+        const profit = repairProfit(def, svc.tier, tierOf);
         const tc = tile.tierChip;
-        fillRound(c, tc.x, tc.y, tc.w, tc.h, tc.h / 2, done ? 'rgba(0,0,0,0.22)' : 'rgba(91,141,239,0.34)');
-        c.fillStyle = done ? 'rgba(200,220,250,0.5)' : '#CBE0FF';
+        fillRound(c, tc.x, tc.y, tc.w, tc.h, tc.h / 2, done ? 'rgba(0,0,0,0.22)' : 'rgba(91,141,239,0.36)');
+        c.fillStyle = done ? 'rgba(200,220,250,0.5)' : '#DCE9FF';
         c.font = `800 10px ${FF}`;
-        c.fillText(`${def.tiers[svc.tier].name}${maxT > 0 ? ' ▸换' : ''}`, tc.x + tc.w / 2, tc.y + tc.h / 2);
+        c.fillText(`${def.tiers[svc.tier].name} +¥${profit}${maxT > 0 ? ' ▸' : ''}`, tc.x + tc.w / 2, tc.y + tc.h / 2);
       }
     }
 

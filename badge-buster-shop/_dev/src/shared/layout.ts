@@ -58,7 +58,7 @@ export interface GameLayout {
 }
 
 /** 维修台底部抽屉的高度（手机清完进入维修阶段时占用底部，挤压手机区） */
-export const REPAIR_BENCH_H = 190;
+export const REPAIR_BENCH_H = 204;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
