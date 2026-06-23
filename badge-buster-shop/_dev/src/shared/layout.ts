@@ -67,17 +67,23 @@ function buildPhoneLayout(customer: CustomerRuntime, x: number, y: number, w: nu
   const screenY = y + h * 0.09;
   const screenW = w - bezel * 2;
   const screenH = h * 0.8;
-  const cellW = screenW / customer.phone.gridCols;
-  const cellH = screenH / customer.phone.gridRows;
-  const iconSize = Math.min(cellW, cellH) * 0.66;
+  // 图标网格区：顶部让出状态/通知栏（否则首行图标被通知条压住=错位 #2），底部让出 Home 指示条与"清理后台"按钮
+  const gridTop = screenY + screenH * 0.16;
+  const gridBottom = screenY + screenH * 0.88;
+  const gridH = gridBottom - gridTop;
+  const sidePad = screenW * 0.04; // 左右留白，图标不顶到屏幕边
+  const gridW = screenW - sidePad * 2;
+  const cellW = gridW / customer.phone.gridCols;
+  const cellH = gridH / customer.phone.gridRows;
+  const iconSize = Math.min(cellW, cellH) * 0.78; // 放大图标（原 0.66 偏小 #2）
   const icons = customer.phone.icons.map((icon) => ({
     customerId: customer.id,
     icon,
-    x: screenX + icon.col * cellW + cellW / 2,
-    y: screenY + icon.row * cellH + cellH / 2,
+    x: screenX + sidePad + icon.col * cellW + cellW / 2,
+    y: gridTop + icon.row * cellH + cellH / 2,
     size: iconSize,
-    badgeX: screenX + icon.col * cellW + cellW / 2 + iconSize * 0.38,
-    badgeY: screenY + icon.row * cellH + cellH / 2 - iconSize * 0.38,
+    badgeX: screenX + sidePad + icon.col * cellW + cellW / 2 + iconSize * 0.38,
+    badgeY: gridTop + icon.row * cellH + cellH / 2 - iconSize * 0.38,
   }));
   return { customer, x, y, w, h, screenX, screenY, screenW, screenH, icons };
 }

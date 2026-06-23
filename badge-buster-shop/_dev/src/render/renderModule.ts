@@ -25,6 +25,7 @@ function formatMoney(value: number): string {
 }
 
 const TAU = Math.PI * 2;
+const NOTIF_SWEEP_MS = 620; // 下拉通知"卷帘"仪式时长
 
 interface VisualEffect {
   kind: 'pop' | 'return' | 'level' | 'leave' | 'skill' | 'combo' | 'smash' | 'task';
@@ -220,6 +221,7 @@ export function createRenderModule(): GameModule {
   const effects: VisualEffect[] = [];
   const sparks: Spark[] = [];
   const swipeDots: SwipeDot[] = [];
+  const notifSweeps: Array<{ customerId: string; age: number; count: number }> = []; // 下拉通知卷帘仪式
   const images = new Map<string, HTMLImageElement>();
   // —— 手机进出场动画（#2）——
   const phoneAnims = new Map<string, { x: number; y: number; alpha: number }>();
@@ -791,23 +793,112 @@ export function createRenderModule(): GameModule {
     if (runtime.notifications <= 0) return;
     const c = ctx.ctx2d;
     const bar = notifBarRect(phone);
-    const h = Math.max(15, bar.h * 0.46);
-    const x = bar.x + bar.w * 0.06;
-    const y = bar.y + bar.h * 0.12;
-    const w = bar.w * 0.88;
+    // 引导下拉的"呼吸"动画：把手轻轻往下探一点，箭头上下浮动
+    const bob = (Math.sin(pulseTime * 0.005) + 1) * 0.5; // 0..1
+    const h = Math.max(20, bar.h * 0.5);
+    const w = bar.w * 0.7;
+    const x = bar.x + (bar.w - w) / 2;
+    const y = bar.y + bar.h * 0.1 + bob * h * 0.16;
+
     c.save();
-    fillRound(c, x, y, w, h, h * 0.32, 'rgba(18, 26, 42, 0.9)');
-    strokeRound(c, x, y, w, h, h * 0.32, 'rgba(255,159,67,0.55)', 1);
-    c.fillStyle = '#FF9F43';
-    c.beginPath();
-    c.arc(x + h * 0.55, y + h * 0.5, h * 0.2, 0, TAU);
-    c.fill();
-    c.fillStyle = '#F8FBFF';
-    c.font = `900 ${Math.max(8, phone.w * 0.03)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    c.textAlign = 'left';
+    // 通知"卷帘"把手：上缘贴住屏顶，下缘圆角，像可以被往下拽
+    c.shadowColor = 'rgba(0,0,0,0.35)';
+    c.shadowBlur = 10;
+    c.shadowOffsetY = 3;
+    const g = c.createLinearGradient(x, y, x, y + h);
+    g.addColorStop(0, 'rgba(28, 38, 58, 0.96)');
+    g.addColorStop(1, 'rgba(14, 20, 34, 0.96)');
+    fillRound(c, x, y, w, h, h * 0.42, g);
+    c.shadowColor = 'transparent';
+    strokeRound(c, x, y, w, h, h * 0.42, 'rgba(255,159,67,0.6)', 1.2);
+
+    // 顶部"抓手"短横条（grabber）
+    c.fillStyle = 'rgba(255,255,255,0.5)';
+    fillRound(c, x + w / 2 - w * 0.1, y + h * 0.16, w * 0.2, Math.max(2, h * 0.07), 99, 'rgba(255,255,255,0.5)');
+
+    // 文案 + 件数胶囊
+    c.fillStyle = '#FFE9CF';
+    c.font = `900 ${Math.max(9, phone.w * 0.032)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
+    c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText(`${runtime.notifications} 条广告 · 下拉清`, x + h, y + h * 0.5, w - h - 6);
+    c.fillText('下拉清理通知', x + w / 2, y + h * 0.52, w * 0.7);
+
+    // 数量徽标（左侧）
+    const badgeR = h * 0.2;
+    const bx = x + h * 0.42;
+    const by = y + h * 0.52;
+    c.fillStyle = '#FF3B30';
+    c.beginPath();
+    c.arc(bx, by, badgeR, 0, TAU);
+    c.fill();
+    c.fillStyle = '#FFFFFF';
+    c.font = `900 ${Math.max(8, badgeR * 1.05)}px Inter, system-ui, sans-serif`;
+    c.fillText(String(runtime.notifications), bx, by + 0.5);
+
+    // 跳动的下拉箭头 ▾（右侧），随 bob 上下浮动，强化"往下拉"语义
+    const ax = x + w - h * 0.42;
+    const ay = y + h * 0.5 + (bob - 0.5) * h * 0.22;
+    c.strokeStyle = '#FF9F43';
+    c.lineWidth = Math.max(2, h * 0.09);
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    c.beginPath();
+    c.moveTo(ax - h * 0.16, ay - h * 0.06);
+    c.lineTo(ax, ay + h * 0.1);
+    c.lineTo(ax + h * 0.16, ay - h * 0.06);
+    c.stroke();
     c.restore();
+  }
+
+  // 下拉清理通知的"卷帘"仪式：深色通知面板从屏顶滑下，几张通知卡被一道亮光扫掉后收起
+  function drawNotifSweep(phone: PhoneLayout): void {
+    const c = ctx.ctx2d;
+    for (const sweep of notifSweeps) {
+      if (sweep.customerId !== phone.customer.id) continue;
+      const t = clamp01(sweep.age / NOTIF_SWEEP_MS);
+      // 卷帘下探(0..0.45)→停留+扫光(0.45..0.72)→收起(0.72..1)
+      const drop = t < 0.72 ? Math.min(1, t / 0.45) : 1 - (t - 0.72) / 0.28;
+      const shadeH = phone.screenH * 0.6 * clamp01(drop);
+      if (shadeH <= 1) continue;
+      c.save();
+      roundedRect(c, phone.screenX, phone.screenY, phone.screenW, phone.screenH, phone.w * 0.06);
+      c.clip();
+      // 卷帘面板
+      const g = c.createLinearGradient(phone.screenX, phone.screenY, phone.screenX, phone.screenY + shadeH);
+      g.addColorStop(0, 'rgba(10, 14, 26, 0.96)');
+      g.addColorStop(1, 'rgba(16, 24, 42, 0.86)');
+      fillRound(c, phone.screenX, phone.screenY - phone.screenH * 0.04, phone.screenW, shadeH + phone.screenH * 0.04, phone.w * 0.05, g);
+      // 通知卡：被"扫光"线扫过后向上飞散淡出
+      const cards = Math.max(1, Math.min(4, sweep.count));
+      const sweepY = phone.screenY + shadeH * (0.2 + 0.9 * clamp01((t - 0.4) / 0.36));
+      const cardW = phone.screenW * 0.84;
+      const cardX = phone.screenX + phone.screenW * 0.08;
+      const cardH = phone.screenH * 0.082;
+      for (let i = 0; i < cards; i += 1) {
+        const baseY = phone.screenY + phone.screenH * (0.07 + i * 0.11);
+        const wiped = baseY < sweepY; // 已被扫光线扫过
+        const fly = wiped ? clamp01((sweepY - baseY) / (phone.screenH * 0.2)) : 0;
+        c.globalAlpha = (1 - fly) * Math.min(1, drop * 1.4);
+        if (c.globalAlpha <= 0.02) continue;
+        fillRound(c, cardX, baseY - fly * phone.screenH * 0.12, cardW, cardH, cardH * 0.3, 'rgba(40, 52, 78, 0.96)');
+        c.fillStyle = '#FF9F43';
+        c.beginPath();
+        c.arc(cardX + cardH * 0.6, baseY - fly * phone.screenH * 0.12 + cardH * 0.5, cardH * 0.22, 0, TAU);
+        c.fill();
+        c.fillStyle = 'rgba(230,238,250,0.9)';
+        fillRound(c, cardX + cardH * 1.1, baseY - fly * phone.screenH * 0.12 + cardH * 0.28, cardW * 0.5, cardH * 0.16, 2, 'rgba(230,238,250,0.7)');
+        fillRound(c, cardX + cardH * 1.1, baseY - fly * phone.screenH * 0.12 + cardH * 0.58, cardW * 0.32, cardH * 0.14, 2, 'rgba(190,205,230,0.5)');
+      }
+      c.globalAlpha = 1;
+      // 扫光亮线
+      if (t > 0.4 && t < 0.78) {
+        c.fillStyle = 'rgba(255, 214, 102, 0.9)';
+        c.fillRect(phone.screenX, sweepY - 2, phone.screenW, 3);
+        c.fillStyle = 'rgba(255, 214, 102, 0.25)';
+        c.fillRect(phone.screenX, sweepY - 14, phone.screenW, 12);
+      }
+      c.restore();
+    }
   }
 
   function drawBlockedScreenDim(phone: PhoneLayout): void {
@@ -1015,6 +1106,7 @@ export function createRenderModule(): GameModule {
       drawIcon(icon, skin);
     }
     drawNotifBar(phone);
+    drawNotifSweep(phone); // 下拉清理通知的卷帘仪式（在通知栏之上）
     if (phoneBlockedByPopup(phone)) drawBlockedScreenDim(phone);
     if (phoneLaggy(phone)) drawLagOverlay(phone);
     if (phone.customer.phone.variant === 'cosmic') drawCosmic(phone);
@@ -1746,7 +1838,10 @@ export function createRenderModule(): GameModule {
       });
       ctx.bus.on('NOTIFICATION_CLEARED', (event) => {
         effects.push({ kind: 'task', x: event.x, y: event.y, age: 0, ttl: 520, label: `-${event.amount} 通知`, color: '#FF9F43', power: 1 });
-        spawnBurst(event.x, event.y, '#FF9F43', 10, 0.9);
+        spawnBurst(event.x, event.y, '#FF9F43', 14, 1);
+        spawnBurst(event.x, event.y, '#FFD166', 8, 0.8);
+        notifSweeps.push({ customerId: event.customerId, age: 0, count: event.amount });
+        addShake(70, 1.2);
       });
       ctx.bus.on('MALWARE_CLEARED', (event) => {
         effects.push({ kind: 'task', x: event.x, y: event.y, age: 0, ttl: 560, label: `-${Math.round(event.amount)} 病毒`, color: '#26C6A6', power: 1 });
@@ -1857,6 +1952,15 @@ export function createRenderModule(): GameModule {
       for (let i = swipeDots.length - 1; i >= 0; i -= 1) {
         if (swipeDots[i].age >= swipeDots[i].ttl) {
           swipeDots.splice(i, 1);
+        }
+      }
+
+      for (const sweep of notifSweeps) {
+        sweep.age += dt;
+      }
+      for (let i = notifSweeps.length - 1; i >= 0; i -= 1) {
+        if (notifSweeps[i].age >= NOTIF_SWEEP_MS) {
+          notifSweeps.splice(i, 1);
         }
       }
 

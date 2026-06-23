@@ -108,5 +108,20 @@ export function saveState(state: GameState): void {
 }
 
 export function clearState(): void {
-  localStorage.removeItem(SAVE_KEY);
+  try {
+    // 清掉本游戏的所有本地存储键（存档 + 静音偏好 + 任何历史遗留键），确保"重置"彻底，
+    // 而不仅是当前 SAVE_KEY —— 避免遗留键让进度看起来"没被清掉"。
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('badge-buster')) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // 私密模式等可能禁用存储；忽略，gameplay 不应中断。
+  }
 }
