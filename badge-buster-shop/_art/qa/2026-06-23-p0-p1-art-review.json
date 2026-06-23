@@ -1,0 +1,225 @@
+{
+  "batch_id": "2026-06-23-p0-p1-style-unification",
+  "protocol": "QA-PROTOCOL.md",
+  "style_sources": [
+    "_art/ART_BIBLE.md",
+    "_art/prompts/00-global-style-block.md",
+    "_art/prompts/01-app-icons.md",
+    "_art/prompts/02-upgrade-icons.md",
+    "_art/prompts/03-skill-icons.md",
+    "_art/prompts/04-customers.md",
+    "_art/prompts/05-popups-events.md",
+    "_art/prompts/06-ui-theme.md"
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "asset_ids": [
+        "icon_chat",
+        "icon_mail",
+        "icon_social",
+        "icon_news",
+        "icon_shop",
+        "icon_game",
+        "icon_video",
+        "icon_music",
+        "icon_photo",
+        "icon_map",
+        "icon_weather",
+        "icon_calendar"
+      ],
+      "candidate_id": "round1_app_icon_sheet_crop",
+      "reviewer": "codex-consistency-1",
+      "target_px": 96,
+      "scores": {
+        "finish_match": 5,
+        "saturation_match": 4,
+        "palette_match": 5,
+        "in_context": 4,
+        "lighting_dir": 5,
+        "perspective_match": 5,
+        "linework": 5,
+        "grounding": 4,
+        "edge_clean": 5,
+        "readability": 5,
+        "family_consistency": 5,
+        "identity_preserved": null
+      },
+      "weighted_total": 0.95,
+      "critical_min": 4,
+      "blocking": false,
+      "blocking_issues": [],
+      "fix_deltas": [],
+      "verdict": "pass"
+    },
+    {
+      "round": 1,
+      "asset_ids": [
+        "ad_redpacket",
+        "ad_offer",
+        "scam_warning"
+      ],
+      "candidate_id": "round1_popup_props",
+      "reviewer": "codex-consistency-1",
+      "target_px": 128,
+      "scores": {
+        "finish_match": 4,
+        "saturation_match": 4,
+        "palette_match": 4,
+        "in_context": 4,
+        "lighting_dir": 5,
+        "perspective_match": 5,
+        "linework": 5,
+        "grounding": 5,
+        "edge_clean": 5,
+        "readability": 5,
+        "family_consistency": 5,
+        "identity_preserved": null
+      },
+      "weighted_total": 0.93,
+      "critical_min": 4,
+      "blocking": false,
+      "blocking_issues": [],
+      "fix_deltas": [
+        "下一轮如继续提升，可把金色再向 #E6A92B 降饱和一档"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "round": 1,
+      "asset_ids": [
+        "up_clear",
+        "up_swipe",
+        "up_value",
+        "up_payout",
+        "up_slot",
+        "up_queue",
+        "up_patience",
+        "up_botcount",
+        "up_botspeed",
+        "up_adblock",
+        "up_antivirus",
+        "up_notifclear",
+        "up_antimalware"
+      ],
+      "candidate_id": "round1_upgrade_badge_sheet_crop",
+      "reviewer": "codex-consistency-1",
+      "target_px": 48,
+      "scores": {
+        "finish_match": 5,
+        "saturation_match": 4,
+        "palette_match": 5,
+        "in_context": 4,
+        "lighting_dir": 5,
+        "perspective_match": 5,
+        "linework": 5,
+        "grounding": 4,
+        "edge_clean": 5,
+        "readability": 4,
+        "family_consistency": 5,
+        "identity_preserved": null
+      },
+      "weighted_total": 0.93,
+      "critical_min": 4,
+      "blocking": false,
+      "blocking_issues": [],
+      "fix_deltas": [],
+      "verdict": "pass"
+    },
+    {
+      "round": 1,
+      "asset_ids": [
+        "skill_clearphone",
+        "skill_closeall",
+        "skill_freeze",
+        "skill_soothe",
+        "skill_hands",
+        "skill_tip",
+        "skill_smash"
+      ],
+      "candidate_id": "round1_skill_emblem_sheet_crop",
+      "reviewer": "codex-consistency-1",
+      "target_px": 64,
+      "scores": {
+        "finish_match": 4,
+        "saturation_match": 4,
+        "palette_match": 4,
+        "in_context": 4,
+        "lighting_dir": 5,
+        "perspective_match": 5,
+        "linework": 5,
+        "grounding": 4,
+        "edge_clean": 5,
+        "readability": 5,
+        "family_consistency": 5,
+        "identity_preserved": null
+      },
+      "weighted_total": 0.91,
+      "critical_min": 4,
+      "blocking": false,
+      "blocking_issues": [],
+      "fix_deltas": [
+        "下一轮可把外圈暖光再压低，继续避免被误读成霓虹"
+      ],
+      "verdict": "pass"
+    },
+    {
+      "round": 1,
+      "asset_ids": [
+        "cust_a_neutral",
+        "cust_a_happy",
+        "cust_a_angry",
+        "cust_b_neutral",
+        "cust_b_happy",
+        "cust_b_angry",
+        "cust_c_neutral",
+        "cust_c_happy",
+        "cust_c_angry",
+        "cust_d_neutral",
+        "cust_d_happy",
+        "cust_d_angry",
+        "cust_e_neutral",
+        "cust_e_happy",
+        "cust_e_angry",
+        "cust_f_neutral",
+        "cust_f_happy",
+        "cust_f_angry"
+      ],
+      "candidate_id": "round1_customer_mood_sheets_crop",
+      "reviewer": "codex-consistency-1",
+      "target_px": 64,
+      "scores": {
+        "finish_match": 4,
+        "saturation_match": 4,
+        "palette_match": 4,
+        "in_context": 4,
+        "lighting_dir": 5,
+        "perspective_match": 5,
+        "linework": 5,
+        "grounding": 5,
+        "edge_clean": 4,
+        "readability": 5,
+        "family_consistency": 4,
+        "identity_preserved": 5
+      },
+      "weighted_total": 0.9,
+      "critical_min": 4,
+      "blocking": false,
+      "blocking_issues": [],
+      "fix_deltas": [
+        "已本地执行洋红残边清理；下一轮可针对 cust_f 再降饱和并减少插画亮面"
+      ],
+      "verdict": "pass"
+    }
+  ],
+  "set_gate": {
+    "contact_sheet_reviewed": true,
+    "family_consistency_min": 4,
+    "blocking": false
+  },
+  "global_gate": {
+    "representatives_integrated_in_code": true,
+    "in_context_min": 4,
+    "blocking": false
+  }
+}

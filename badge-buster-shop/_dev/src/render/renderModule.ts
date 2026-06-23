@@ -328,6 +328,17 @@ export function createRenderModule(): GameModule {
     return ctx.content.icons.find((item) => item.id === icon.icon.appId) ?? ctx.content.icons[0];
   }
 
+  function drawAssetImage(artId: string, x: number, y: number, w: number, h: number, alpha = 1): boolean {
+    const image = images.get(artId);
+    if (!image?.complete || image.naturalWidth <= 0) return false;
+    const c = ctx.ctx2d;
+    c.save();
+    c.globalAlpha = alpha;
+    drawImageContain(c, image, x, y, w, h);
+    c.restore();
+    return true;
+  }
+
   function addShake(durationMs: number, amplitude: number): void {
     shakeMs = Math.max(shakeMs, durationMs);
     shakeAmp = Math.max(shakeAmp, amplitude);
@@ -420,7 +431,8 @@ export function createRenderModule(): GameModule {
 
   function drawCustomerBust(x: number, y: number, radius: number, mood: Mood, name: string, defId: string): void {
     const c = ctx.ctx2d;
-    const portrait = images.get(`${defId}_neutral`);
+    const moodKey = mood === 'happy' ? 'happy' : mood === 'angry' || mood === 'annoyed' ? 'angry' : 'neutral';
+    const portrait = images.get(`${defId}_${moodKey}`) ?? images.get(`${defId}_neutral`);
     c.save();
     c.shadowColor = 'rgba(43, 43, 51, 0.18)';
     c.shadowBlur = 8;
@@ -2071,14 +2083,21 @@ export function createRenderModule(): GameModule {
     const affordable = !maxed && !locked && ctx.state.points >= cost;
     fillRound(c, rect.x, rect.y, rect.w, rect.h, 10, '#FBF4E2');
     strokeRound(c, rect.x, rect.y, rect.w, rect.h, 10, 'rgba(80,55,25,0.22)', 1.2);
+    const iconSize = Math.min(42, rect.h - 12);
+    const iconX = rect.x + 10;
+    const iconY = rect.y + (rect.h - iconSize) / 2;
+    const textX = iconX + iconSize + 10;
+    if (!drawAssetImage(def.artId, iconX, iconY, iconSize, iconSize, locked ? 0.44 : 1)) {
+      fillRound(c, iconX, iconY, iconSize, iconSize, 10, 'rgba(138,90,52,0.12)');
+    }
     c.textAlign = 'left';
     c.textBaseline = 'middle';
     c.fillStyle = '#2B2B33';
     c.font = `900 ${Math.min(14, rect.h * 0.32)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    c.fillText(`${def.name}  Lv${level}`, rect.x + 12, rect.y + rect.h * 0.36, rect.w * 0.6);
+    c.fillText(`${def.name}  Lv${level}`, textX, rect.y + rect.h * 0.36, rect.w * 0.52);
     c.fillStyle = '#8A8790';
     c.font = `700 ${Math.min(11, rect.h * 0.24)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    c.fillText(def.desc, rect.x + 12, rect.y + rect.h * 0.74, rect.w * 0.6);
+    c.fillText(def.desc, textX, rect.y + rect.h * 0.74, rect.w * 0.52);
     const pw = Math.min(96, rect.w * 0.28);
     const ph = Math.min(34, rect.h * 0.62);
     const px = rect.x + rect.w - pw - 10;
@@ -2101,17 +2120,24 @@ export function createRenderModule(): GameModule {
     const ready = unlocked && remaining <= 0;
     fillRound(c, rect.x, rect.y, rect.w, rect.h, 10, ready ? '#DBF3EA' : '#FBF4E2');
     strokeRound(c, rect.x, rect.y, rect.w, rect.h, 10, ready ? 'rgba(38,198,166,0.55)' : 'rgba(80,55,25,0.22)', 1.2);
+    const iconSize = Math.min(42, rect.h - 12);
+    const iconX = rect.x + 10;
+    const iconY = rect.y + (rect.h - iconSize) / 2;
+    const textX = iconX + iconSize + 10;
+    const usedImage = drawAssetImage(def.artId, iconX, iconY, iconSize, iconSize, unlocked ? 1 : 0.44);
     c.textAlign = 'left';
     c.textBaseline = 'middle';
-    c.fillStyle = '#2B2B33';
-    c.font = `${Math.min(22, rect.h * 0.5)}px system-ui, sans-serif`;
-    c.fillText(def.icon, rect.x + 12, rect.y + rect.h / 2);
+    if (!usedImage) {
+      c.fillStyle = '#2B2B33';
+      c.font = `${Math.min(22, rect.h * 0.5)}px system-ui, sans-serif`;
+      c.fillText(def.icon, iconX + 6, rect.y + rect.h / 2);
+    }
     c.fillStyle = unlocked ? '#2B2B33' : '#9A9AA3';
     c.font = `900 ${Math.min(14, rect.h * 0.32)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    c.fillText(def.name, rect.x + 46, rect.y + rect.h * 0.36, rect.w * 0.5);
+    c.fillText(def.name, textX, rect.y + rect.h * 0.36, rect.w * 0.46);
     c.fillStyle = '#8A8790';
     c.font = `700 ${Math.min(11, rect.h * 0.24)}px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif`;
-    c.fillText(def.desc, rect.x + 46, rect.y + rect.h * 0.74, rect.w * 0.52);
+    c.fillText(def.desc, textX, rect.y + rect.h * 0.74, rect.w * 0.48);
     const pw = Math.min(86, rect.w * 0.24);
     const ph = Math.min(32, rect.h * 0.58);
     const px = rect.x + rect.w - pw - 10;
