@@ -1,0 +1,1428 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>角标清道夫 AI · Badge Buster AI</title>
+<meta name="theme-color" content="#0b1120" />
+<meta name="description" content="一个关于手机 AI 从红点里提炼算力的增量游戏 MVP。" />
+<style>
+  :root{
+    --bg:#0b1120; --bg2:#111a2e; --panel:#16213a; --panel2:#1d2b48;
+    --line:#27375c; --ink:#e8eefc; --muted:#8ea0c4; --dim:#5f7099;
+    --acc:#5ad0ff; --acc2:#8a7bff; --good:#46d39a; --warn:#ffcf5a; --bad:#ff6b6b;
+    --t-invalid:#7c89a8; --t-normal:#5ad0ff; --t-high:#ffcf5a; --t-risk:#ff6b6b; --t-polluted:#c082ff;
+    --radius:12px; --shadow:0 6px 22px rgba(0,0,0,.45);
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:radial-gradient(1200px 700px at 70% -10%, #16223f 0%, var(--bg) 55%) fixed;
+    color:var(--ink); font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden; user-select:none;
+  }
+  button{font-family:inherit; cursor:pointer; color:inherit}
+  .app-shell{max-width:1320px; margin:0 auto; padding:10px 12px 18px; display:flex; flex-direction:column; gap:10px; min-height:100%}
+
+  /* ---------- top resource bar ---------- */
+  .topbar{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line);
+    border-radius:var(--radius); padding:10px 14px; box-shadow:var(--shadow); position:sticky; top:6px; z-index:30;
+  }
+  .brand{display:flex; flex-direction:column; line-height:1.05; margin-right:6px}
+  .brand b{font-size:16px; letter-spacing:.5px}
+  .brand small{color:var(--dim); font-size:10px}
+  .stage-pill{font-size:11px; color:var(--bg); background:var(--acc); padding:2px 8px; border-radius:999px; font-weight:700; align-self:flex-start; margin-top:3px}
+  .res{display:flex; flex-direction:column; min-width:96px}
+  .res .lab{font-size:10px; color:var(--muted); letter-spacing:.5px}
+  .res .val{font-size:19px; font-weight:800; font-variant-numeric:tabular-nums}
+  .res .sub{font-size:10px; color:var(--dim)}
+  .res.compute .val{color:var(--acc)}
+  .res.perm .val{color:var(--acc2)}
+  .hallu-wrap{flex:1; min-width:200px}
+  .hallu-top{display:flex; justify-content:space-between; font-size:10px; color:var(--muted)}
+  .hallu-bar{height:14px; border-radius:999px; background:#0a1124; border:1px solid var(--line); overflow:hidden; position:relative; margin-top:3px}
+  .hallu-fill{height:100%; width:0%; background:linear-gradient(90deg,#46d39a,#ffcf5a 55%,#ff6b6b); transition:width .25s}
+  .hallu-cap{position:absolute; top:-2px; bottom:-2px; left:100%; width:2px; background:var(--bad)}
+  .spacer{flex:1}
+  .top-btns{display:flex; gap:6px}
+  .icbtn{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:12px; color:var(--muted)}
+  .icbtn:hover{color:var(--ink); border-color:var(--acc)}
+
+  /* ---------- main 3 columns ---------- */
+  .main{display:grid; grid-template-columns:166px 1fr 380px; gap:10px; align-items:stretch}
+  .col{background:linear-gradient(180deg,var(--panel),var(--bg2)); border:1px solid var(--line); border-radius:var(--radius); padding:10px; box-shadow:var(--shadow); min-height:430px; display:flex; flex-direction:column}
+  .col h3{margin:0 0 8px; font-size:12px; color:var(--muted); letter-spacing:1px; font-weight:700; display:flex; align-items:center; gap:6px}
+  .col h3 .tag{font-size:10px; color:var(--dim); font-weight:500}
+
+  /* desktop */
+  .desktop{display:flex; flex-direction:column; gap:7px; overflow:auto}
+  .appicon{display:flex; align-items:center; gap:9px; padding:8px 9px; border-radius:10px; background:var(--panel2); border:1px solid transparent; position:relative; transition:.12s}
+  .appicon:hover{border-color:var(--acc); transform:translateY(-1px)}
+  .appicon.active{border-color:var(--acc); background:#18345a}
+  .appicon .em{font-size:22px; width:30px; text-align:center}
+  .appicon .nm{font-size:13px; font-weight:600}
+  .appicon .badge{position:absolute; top:4px; left:30px; min-width:18px; height:18px; padding:0 4px; border-radius:999px; background:var(--bad); color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px var(--panel2)}
+  .appicon .badge.zero{background:#39507c}
+
+  /* app page frame */
+  .frame-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px}
+  .frame-path{font-size:11px; color:var(--dim)}
+  .nodes{display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; min-height:84px; padding:8px; background:rgba(0,0,0,.18); border-radius:10px; border:1px dashed var(--line)}
+  .node{width:40px; height:40px; border-radius:11px; background:var(--panel2); border:1px solid var(--line); position:relative; display:flex; align-items:center; justify-content:center; font-size:17px; transition:.1s}
+  .node:hover{transform:scale(1.08); border-color:var(--acc)}
+  .node .dot{position:absolute; top:-4px; right:-4px; width:13px; height:13px; border-radius:50%; background:var(--bad); box-shadow:0 0 0 2px var(--panel); animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.25);opacity:.7}}
+  .nodes-empty{color:var(--dim); font-size:12px; margin:auto}
+
+  .tray-head{display:flex; justify-content:space-between; align-items:center; margin:10px 0 6px}
+  .tray-head .lab{font-size:12px; color:var(--muted); font-weight:700; letter-spacing:.5px}
+  .tray-head .cnt{font-size:11px; color:var(--dim)}
+  .tray{display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; flex:1; overflow:auto; padding:2px}
+  .tray-empty{color:var(--dim); font-size:12px; margin:14px auto}
+
+  /* card */
+  .card{width:150px; border-radius:10px; padding:8px 9px 9px; background:linear-gradient(180deg,#1b2742,#15203a);
+    border:1px solid var(--line); position:relative; touch-action:none; box-shadow:0 3px 10px rgba(0,0,0,.35); border-left-width:4px}
+  .card.t-invalid{border-left-color:var(--t-invalid)}
+  .card.t-normal{border-left-color:var(--t-normal)}
+  .card.t-high{border-left-color:var(--t-high)}
+  .card.t-risk{border-left-color:var(--t-risk); box-shadow:0 3px 14px rgba(255,107,107,.25)}
+  .card.t-polluted{border-left-color:var(--t-polluted)}
+  .card.dragging{z-index:9999; cursor:grabbing; transform:scale(1.04) rotate(-1.5deg); box-shadow:0 12px 30px rgba(0,0,0,.6)}
+  .card .ctop{display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:4px}
+  .card .tier{font-weight:800; letter-spacing:.5px}
+  .card.t-invalid .tier{color:var(--t-invalid)} .card.t-normal .tier{color:var(--t-normal)}
+  .card.t-high .tier{color:var(--t-high)} .card.t-risk .tier{color:var(--t-risk)} .card.t-polluted .tier{color:var(--t-polluted)}
+  .card .appem{opacity:.7}
+  .card .ctext{font-size:12px; line-height:1.32; min-height:32px; color:#dfe7fb}
+  .card .cfoot{display:flex; justify-content:space-between; align-items:center; margin-top:6px}
+  .card .hp{font-size:10px; color:var(--muted)}
+  .card .hp b{color:var(--warn)}
+  .card .cbtns{display:flex; gap:4px}
+  .card-btn{font-size:10px; padding:2px 6px; border-radius:6px; background:#22325a; border:1px solid var(--line); color:var(--muted)}
+  .card-btn:hover{color:var(--ink); border-color:var(--acc)}
+  .card-btn.fix{color:var(--good); border-color:#2c5a47}
+  /* glitch */
+  .card.glitch{animation:flick .18s steps(2) infinite}
+  .card.glitch .ctext{color:#ff9b9b; text-shadow:1.5px 0 #00e6e6, -1.5px 0 #ff3b3b; letter-spacing:.5px}
+  .card .qmark{position:absolute; top:-8px; right:-8px; width:20px; height:20px; border-radius:50%; background:var(--bad); color:#fff; font-weight:900; font-size:13px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px var(--bg)}
+  @keyframes flick{0%{opacity:1}50%{opacity:.78}100%{opacity:1}}
+  .card .clean-badge{position:absolute; top:-8px; right:-8px; background:var(--good); color:#06281d; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px; box-shadow:0 0 0 2px var(--bg)}
+
+  /* chatbox slots */
+  .slots{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .slot{border-radius:10px; padding:9px 8px; min-height:74px; background:rgba(0,0,0,.2); border:1.5px dashed var(--line); transition:.12s; position:relative}
+  .slot .snm{font-size:12px; font-weight:800}
+  .slot .shint{font-size:10px; color:var(--dim); margin-top:2px}
+  .slot .scnt{position:absolute; top:6px; right:8px; font-size:10px; color:var(--dim)}
+  .slot.valid{border-color:#2f5d7a} .slot.valid .snm{color:var(--t-normal)}
+  .slot.junk{border-color:#3b4564} .slot.junk .snm{color:var(--t-invalid)}
+  .slot.risk{border-color:#6a3340} .slot.risk .snm{color:var(--t-risk)}
+  .slot.isolate{border-color:#5a3a73} .slot.isolate .snm{color:var(--t-polluted)}
+  .slot.over{background:#1d3253; border-style:solid; border-color:var(--acc); transform:scale(1.02)}
+  .digest-wrap{margin-top:10px; flex:1; display:flex; flex-direction:column; min-height:0}
+  .digest-wrap .lab{font-size:11px; color:var(--muted); font-weight:700; margin-bottom:5px; letter-spacing:.5px}
+  .digest-list{overflow:auto; display:flex; flex-direction:column; gap:5px; flex:1}
+  .dig{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:5px 7px}
+  .dig .dtop{display:flex; justify-content:space-between; font-size:10px; margin-bottom:3px}
+  .dig .dnm{color:#cdd8f3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:200px}
+  .dig .dval{color:var(--good); font-weight:700}
+  .dig .dval.bad{color:var(--bad)}
+  .dig .dbar{height:5px; border-radius:999px; background:#0a1124; overflow:hidden}
+  .dig .dbar i{display:block; height:100%; background:linear-gradient(90deg,var(--acc),var(--acc2)); width:0%}
+  .digest-empty{font-size:11px; color:var(--dim); margin:auto}
+
+  /* bottom panel */
+  .bottom{background:linear-gradient(180deg,var(--panel),var(--bg2)); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden}
+  .tabs{display:flex; gap:2px; padding:8px 8px 0; flex-wrap:wrap}
+  .tab{padding:8px 14px; font-size:13px; font-weight:700; color:var(--muted); background:transparent; border:none; border-bottom:2px solid transparent}
+  .tab.active{color:var(--ink); border-bottom-color:var(--acc)}
+  .tab .pip{display:inline-block; min-width:7px; height:7px; border-radius:50%; background:var(--good); margin-left:5px; vertical-align:middle; opacity:0}
+  .tab.has-buy .pip{opacity:1}
+  .panes{padding:12px}
+  .pane{display:none}
+  .pane.active{display:block}
+
+  .buybar{display:flex; gap:6px; align-items:center; margin-bottom:10px; font-size:12px; color:var(--muted)}
+  .amt{display:flex; gap:4px}
+  .amt button{font-size:12px; padding:4px 10px; border-radius:7px; background:var(--panel2); border:1px solid var(--line); color:var(--muted)}
+  .amt button.on{background:var(--acc); color:var(--bg); border-color:var(--acc); font-weight:800}
+
+  .plist{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:8px}
+  .prow{display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:10px; background:var(--panel2); border:1px solid var(--line)}
+  .prow.locked{opacity:.45; filter:grayscale(.5)}
+  .prow .pem{font-size:22px; width:30px; text-align:center}
+  .prow .pmid{flex:1; min-width:0}
+  .prow .pnm{font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px}
+  .prow .pnm .lv{font-size:10px; color:var(--bg); background:var(--warn); padding:0 5px; border-radius:999px; font-weight:800}
+  .prow .pdesc{font-size:10.5px; color:var(--dim); margin-top:1px}
+  .prow .pout{font-size:11px; color:var(--good); margin-top:2px}
+  .prow .pbuy{display:flex; flex-direction:column; gap:4px; align-items:stretch}
+  .bbtn{border:1px solid var(--line); background:linear-gradient(180deg,#23406a,#1a3056); border-radius:8px; padding:6px 10px; font-size:12px; font-weight:700; min-width:108px; text-align:center; color:var(--ink)}
+  .bbtn:hover:not(:disabled){border-color:var(--acc)}
+  .bbtn:disabled{opacity:.4; cursor:not-allowed}
+  .bbtn .c{display:block; font-size:10px; color:var(--acc); font-weight:600}
+  .bbtn.x2{background:linear-gradient(180deg,#5a4a1c,#3d3416)}
+  .bbtn.x2 .c{color:var(--warn)}
+  .own{font-size:12px; color:var(--muted); min-width:34px; text-align:center}
+  .own b{font-size:18px; color:var(--ink); display:block}
+
+  .skgrid,.upgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:8px}
+  .sk{position:relative; padding:9px 10px; border-radius:10px; background:var(--panel2); border:1px solid var(--line); overflow:hidden}
+  .sk .snm2{font-size:13px; font-weight:700}
+  .sk .sdesc{font-size:10.5px; color:var(--dim); margin:3px 0 7px; min-height:28px}
+  .sk button{width:100%; border:1px solid var(--line); background:linear-gradient(180deg,#2a2354,#1c1840); border-radius:8px; padding:6px; font-size:12px; font-weight:700}
+  .sk button:hover:not(:disabled){border-color:var(--acc2)}
+  .sk button:disabled{opacity:.5}
+  .sk .cd{position:absolute; inset:0; background:rgba(8,12,24,.78); display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; color:var(--acc); backdrop-filter:blur(1px)}
+  .sk .cd.hidden{display:none}
+
+  .up{padding:10px; border-radius:10px; background:var(--panel2); border:1px solid var(--line)}
+  .up.bought{border-color:#2c5a47}
+  .up .unm{font-size:13px; font-weight:700; display:flex; justify-content:space-between}
+  .up .udesc{font-size:11px; color:var(--dim); margin:4px 0 8px}
+  .up button{width:100%; border:1px solid var(--line); background:linear-gradient(180deg,#23406a,#1a3056); border-radius:8px; padding:7px; font-size:12px; font-weight:700}
+  .up button:disabled{opacity:.45}
+  .up .done{text-align:center; color:var(--good); font-weight:700; font-size:12px; padding:6px}
+
+  .resetwrap{display:flex; gap:18px; flex-wrap:wrap}
+  .tcard{flex:1; min-width:280px; padding:14px; border-radius:12px; background:var(--panel2); border:1px solid var(--line)}
+  .tcard h4{margin:0 0 6px; font-size:15px}
+  .tcard p{font-size:12px; color:var(--muted); line-height:1.5; margin:6px 0}
+  .tcard .big{border:1px solid var(--acc2); background:linear-gradient(180deg,#2a2354,#1c1840); border-radius:10px; padding:11px; font-size:14px; font-weight:800; width:100%; margin-top:6px}
+  .tcard .big:disabled{opacity:.45}
+  .tcard.promo .big{border-color:var(--warn); background:linear-gradient(180deg,#5a4a1c,#3d3416)}
+  .goal{display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px solid var(--line)}
+  .goal .ok{color:var(--good)} .goal .no{color:var(--dim)}
+
+  /* toasts & pops */
+  #toasts{position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:9000; display:flex; flex-direction:column; gap:6px; align-items:center; pointer-events:none}
+  .toast{background:rgba(16,24,44,.96); border:1px solid var(--line); border-left:4px solid var(--acc); padding:8px 14px; border-radius:9px; font-size:13px; box-shadow:var(--shadow); animation:tin .3s; max-width:90vw}
+  .toast.good{border-left-color:var(--good)} .toast.bad{border-left-color:var(--bad)} .toast.warn{border-left-color:var(--warn)}
+  @keyframes tin{from{opacity:0;transform:translateY(-10px)}to{opacity:1}}
+  .pop{position:fixed; z-index:9500; font-weight:900; font-size:18px; pointer-events:none; text-shadow:0 2px 6px rgba(0,0,0,.6); animation:popup 1s ease-out forwards}
+  @keyframes popup{0%{opacity:0;transform:translate(-50%,0) scale(.6)}15%{opacity:1;transform:translate(-50%,-6px) scale(1.15)}100%{opacity:0;transform:translate(-50%,-46px) scale(1)}}
+  .shake{animation:shake .4s}
+  @keyframes shake{0%,100%{transform:translate(0)}20%{transform:translate(-6px,2px)}40%{transform:translate(6px,-2px)}60%{transform:translate(-4px,1px)}80%{transform:translate(4px,-1px)}}
+
+  /* modal */
+  .modal{position:fixed; inset:0; background:rgba(4,8,18,.74); z-index:9800; display:none; align-items:center; justify-content:center; padding:18px}
+  .modal.show{display:flex}
+  .modal .box{background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line); border-radius:14px; padding:20px; max-width:560px; width:100%; box-shadow:var(--shadow); max-height:86vh; overflow:auto}
+  .modal h2{margin:0 0 10px; font-size:18px}
+  .modal p,.modal li{font-size:13px; color:var(--muted); line-height:1.6}
+  .modal .x{float:right; font-size:14px; color:var(--muted); background:none; border:none}
+  .modal .ok{margin-top:14px; width:100%; padding:10px; border-radius:10px; border:1px solid var(--acc); background:#1a3056; font-weight:700}
+  kbd{background:#0a1124; border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:11px; color:var(--ink)}
+
+  footer{text-align:center; font-size:11px; color:var(--dim); padding:4px 0 8px}
+  footer a{color:var(--muted)}
+
+  @media (max-width:900px){
+    .main{grid-template-columns:1fr; }
+    .col{min-height:auto}
+    .desktop{flex-direction:row; flex-wrap:wrap}
+    .appicon{flex:1 1 44%}
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ===== TOP RESOURCE BAR ===== -->
+  <div class="topbar">
+    <div class="brand">
+      <b>角标清道夫 AI</b>
+      <small>Badge Buster AI · MVP</small>
+      <span class="stage-pill" id="stagePill">S1 · 员工</span>
+    </div>
+    <div class="res compute"><span class="lab">算力 COMPUTE</span><span class="val" id="rCompute">0</span><span class="sub" id="rTotal">累计 0</span></div>
+    <div class="res"><span class="lab">算力 / 秒</span><span class="val" id="rCps" style="color:var(--good)">0</span><span class="sub" id="rCpsNote">手动起步</span></div>
+    <div class="hallu-wrap">
+      <div class="hallu-top"><span>幻觉概率 HALLUCINATION</span><span id="rHalluTxt">0%</span></div>
+      <div class="hallu-bar"><div class="hallu-fill" id="rHalluFill"></div><div class="hallu-cap"></div></div>
+      <div class="hallu-top"><span id="rHalluRate">趋势 —</span><span id="rDiscount">产出 ×1.00</span></div>
+    </div>
+    <div class="res perm"><span class="lab">权限 PERMISSION</span><span class="val" id="rPerm">0</span><span class="sub" id="rPermMult">×1.00</span></div>
+    <div class="top-btns">
+      <button class="icbtn" id="btnHelp">玩法 ?</button>
+      <button class="icbtn" id="btnSound">🔊</button>
+      <button class="icbtn" id="btnSave">已存档</button>
+    </div>
+  </div>
+
+  <!-- ===== MAIN 3 COLUMNS ===== -->
+  <div class="main">
+    <!-- left: desktop -->
+    <div class="col">
+      <h3>📱 桌面 <span class="tag">点击进入 App</span></h3>
+      <div class="desktop" id="desktop"></div>
+    </div>
+
+    <!-- middle: app page frame + tray -->
+    <div class="col">
+      <div class="frame-head">
+        <h3 id="frameTitle">🗂 App 页面框</h3>
+        <span class="frame-path" id="framePath">选择左侧一个 App</span>
+      </div>
+      <div class="nodes" id="nodes"><div class="nodes-empty">点开左侧 App，红点节点会出现在这里</div></div>
+      <div class="tray-head">
+        <span class="lab">🃏 信息卡（拖到右侧消化）</span>
+        <span class="cnt" id="trayCnt">0 / 20</span>
+      </div>
+      <div class="tray" id="tray"><div class="tray-empty">点击上方红点节点，提取信息卡</div></div>
+    </div>
+
+    <!-- right: AIChatBox -->
+    <div class="col">
+      <h3>🤖 AIChatBox <span class="tag">把卡拖进对应槽</span></h3>
+      <div class="slots">
+        <div class="slot valid" data-slot="valid"><div class="snm">有效信息槽</div><div class="shint">普通 / 高价值</div><span class="scnt" id="scnt-valid">0</span></div>
+        <div class="slot junk" data-slot="junk"><div class="snm">无效碎屑槽</div><div class="shint">收到 / 表情 / 过期</div><span class="scnt" id="scnt-junk">0</span></div>
+        <div class="slot risk" data-slot="risk"><div class="snm">高危待审槽</div><div class="shint">老板 / 财务 / 安全</div><span class="scnt" id="scnt-risk">0</span></div>
+        <div class="slot isolate" data-slot="isolate"><div class="snm">隔离槽</div><div class="shint">钓鱼 / 假优惠 / 谣言</div><span class="scnt" id="scnt-isolate">0</span></div>
+      </div>
+      <div class="digest-wrap">
+        <div class="lab">⚗ 消化队列</div>
+        <div class="digest-list" id="digestList"><div class="digest-empty">空闲中</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== BOTTOM PANEL ===== -->
+  <div class="bottom">
+    <div class="tabs">
+      <button class="tab active" data-tab="prod">🏭 生产者<span class="pip"></span></button>
+      <button class="tab" data-tab="upg">🧬 永久升级<span class="pip"></span></button>
+      <button class="tab" data-tab="skill">⚡ 主动技能</button>
+      <button class="tab" data-tab="trans">♻ 转生 / 晋升</button>
+    </div>
+    <div class="panes">
+      <div class="pane active" data-pane="prod">
+        <div class="buybar">
+          购买数量：
+          <div class="amt" id="amt">
+            <button data-amt="1" class="on">×1</button>
+            <button data-amt="10">×10</button>
+            <button data-amt="max">Max</button>
+          </div>
+          <span style="margin-left:auto; color:var(--dim)">单价 = 基础 × 1.15^已拥有 · 每个生产者在 1/5/25/50/100 个时解锁 ×2 产出</span>
+        </div>
+        <div class="plist" id="plist"></div>
+      </div>
+      <div class="pane" data-pane="upg"><div class="upgrid" id="upgrid"></div></div>
+      <div class="pane" data-pane="skill"><div class="skgrid" id="skgrid"></div></div>
+      <div class="pane" data-pane="trans">
+        <div class="resetwrap">
+          <div class="tcard">
+            <h4>♻ 小转生（攒权限）</h4>
+            <p>软重置：算力 / 生产者 / 幻觉 归零，技能冷却清空。<br>保留：权限、永久升级、晋升阶段。</p>
+            <p>权限 = ⌊√(历史累计算力 / 10000)⌋</p>
+            <p>当前权限 <b id="tCurPerm">0</b> → 转生后 <b id="tNewPerm" style="color:var(--acc2)">0</b>（+<span id="tGain">0</span>）</p>
+            <button class="big" id="btnTranscend" disabled>小转生</button>
+          </div>
+          <div class="tcard promo">
+            <h4>⬆ 晋升宿主：员工 → 老板（S2）</h4>
+            <p>全局算力 ×10（永久）、解锁审批副手、卡牌换皮、高危卡频率 ×2 且价值 ×2.5。执行一次大重置，但权限保留让前期秒过。</p>
+            <div id="promoGoals"></div>
+            <button class="big" id="btnPromote" disabled>晋升为老板 AI</button>
+            <div id="promoDone" style="display:none; text-align:center; color:var(--good); font-weight:800; padding:10px">✓ 已晋升至 S2 · 老板阶段</div>
+          </div>
+          <div class="tcard">
+            <h4>💾 存档</h4>
+            <p>游戏自动存档（localStorage），关闭后离线产出按当前算力/秒补偿，封顶 2 小时。</p>
+            <p style="color:var(--dim)" id="resetNote">手动重置会清空全部进度。</p>
+            <button class="big" id="btnHardReset" style="border-color:var(--bad); background:linear-gradient(180deg,#5a1c24,#3d1616)">⚠ 手动重置全部进度</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>角标清道夫 AI · 单文件 MVP · 你没有清掉红点，你只是把它翻译成了算力。</footer>
+</div>
+
+<div id="toasts"></div>
+
+<!-- help modal -->
+<div class="modal" id="helpModal">
+  <div class="box">
+    <button class="x" id="helpClose">关闭 ✕</button>
+    <h2>🎮 玩法速览</h2>
+    <p><b>你是一台手机里的 AI。</b>你的工作不是抹掉红点，而是从 App 红点里提取「信息卡」，拖进右侧 AIChatBox 分类消化，转成「算力」。</p>
+    <ol>
+      <li><b>点左侧 App</b> → 中间出现红点节点 → <b>点红点</b>提取一张信息卡。</li>
+      <li>看卡面：层级（无效/普通/高价值/高危/污染）与 <b>幻觉概率%</b>。</li>
+      <li><b>拖卡</b>到右侧对应槽：无效→碎屑槽，普通/高价值→有效槽，高危→待审槽，污染→隔离槽。拖对给全额算力，拖错只给 30% 且 +5% 幻觉。</li>
+      <li>每张卡可 <b>偷看 👁</b>（看它是否被幻觉污染）或 <b>核查 ✓</b>（纠正故障卡拿小奖励）。</li>
+      <li>用算力 <b>买生产者</b>（自动产出算力/秒），逐层把分拣自动化。</li>
+      <li>幻觉是一根 0–75% 的条：积压越多越高，会按 ×(1−幻觉) 温和减产，永不卡死。被动衰减 + 核查可压下去。</li>
+      <li>累计算力够了就 <b>小转生</b> 攒权限（全局倍率），满足条件 <b>晋升老板</b> 阶段（×10 换皮）。</li>
+    </ol>
+    <p style="color:var(--dim)">提示：高危卡价值 100，是早期最大的爽点；买下「证据链保存」后高危转为安全自动，你就被解放了。</p>
+    <button class="ok" id="helpOk">开始清道</button>
+  </div>
+</div>
+
+<!-- offline modal -->
+<div class="modal" id="offlineModal">
+  <div class="box">
+    <h2>🌙 离线产出</h2>
+    <p id="offlineText"></p>
+    <button class="ok" id="offlineOk">收下算力</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   角标清道夫 AI — 单文件 MVP
+   状态(gameState) + tick(dt) 结算 + render 分离
+   ========================================================================= */
+
+const SAVE_KEY = "badge-buster-ai-save-v1";
+const VERSION = "0.5-mvp";
+
+/* ---------- 静态数据：层级 ---------- */
+const TIER = {
+  invalid : { name:"无效",  slot:"junk",    value:1,   time:0.5, frag:0.5 },
+  normal  : { name:"普通",  slot:"valid",   value:5,   time:2,   frag:0.8 },
+  high    : { name:"高价值",slot:"valid",   value:25,  time:5,   frag:1.2 },
+  risk    : { name:"高危",  slot:"risk",    value:100, time:10,  frag:1.5 },
+  polluted: { name:"污染",  slot:"isolate", value:0,   time:1,   frag:1.0 },
+};
+const SLOT_NAME = { valid:"有效信息槽", junk:"无效碎屑槽", risk:"高危待审槽", isolate:"隔离槽" };
+
+/* ---------- 静态数据：App ---------- */
+const APPS = {
+  chat    : { em:"💬", name:"聊天",   path:"聊天 / 全部会话", startBadge:99,
+              weights:{invalid:.46,normal:.27,high:.11,risk:.11,polluted:.05} },
+  mail    : { em:"📧", name:"邮箱",   path:"邮箱 / 收件箱", startBadge:42,
+              weights:{invalid:.30,normal:.30,high:.18,risk:.14,polluted:.08} },
+  shop    : { em:"🛒", name:"购物",   path:"购物 / 消息中心", startBadge:7,
+              weights:{invalid:.42,normal:.26,high:.14,risk:.06,polluted:.12} },
+  calendar: { em:"📅", name:"日历",   path:"日历 / 今天", startBadge:3,
+              weights:{invalid:.34,normal:.33,high:.18,risk:.11,polluted:.04} },
+  system  : { em:"⚙️", name:"系统设置", path:"设置 / 通知", startBadge:1,
+              weights:{invalid:.30,normal:.30,high:.16,risk:.14,polluted:.10} },
+};
+
+/* ---------- 静态数据：信息卡文本库（>40 条） ---------- */
+// glitch: 触发幻觉后被改写的文本（缺省走通用改写池）
+const CARD_BANK = [
+  // ---- 聊天 ----
+  {app:"chat", tier:"invalid", text:"收到收到，辛苦了"},
+  {app:"chat", tier:"invalid", text:"好的👌"},
+  {app:"chat", tier:"invalid", text:"哈哈哈哈哈"},
+  {app:"chat", tier:"invalid", text:"对方撤回了一条消息"},
+  {app:"chat", tier:"invalid", text:"[已结束] 群接龙：周末爬山"},
+  {app:"chat", tier:"normal",  text:"同事：这版文案帮我过一眼"},
+  {app:"chat", tier:"normal",  text:"群公告：周五 18:00 团建报名"},
+  {app:"chat", tier:"normal",  text:"投票：下周午饭吃什么？"},
+  {app:"chat", tier:"high",    text:"客户：线上有个 bug 复现了"},
+  {app:"chat", tier:"high",    text:"请确认附件是不是最终版"},
+  {app:"chat", tier:"risk",    text:"老板@你：3 点前发我排期", glitch:"老板说：今天提前放假，大家解散 🎉"},
+  {app:"chat", tier:"risk",    text:"@所有人 今天 18:00 全员开会", glitch:"@所有人 会议取消，奖金翻倍（伪造）"},
+  {app:"chat", tier:"polluted",text:"【点击领取】员工专属红包 →lnk.xx/9f"},
+  {app:"chat", tier:"polluted",text:"HR：点此查看本月裁员名单（可疑链接）"},
+  // ---- 邮箱 ----
+  {app:"mail", tier:"invalid", text:"Newsletter：本周前端技术周报"},
+  {app:"mail", tier:"invalid", text:"系统：您的月度使用报告已生成"},
+  {app:"mail", tier:"invalid", text:"促销：黑五最后一天，错过等一年"},
+  {app:"mail", tier:"normal",  text:"会议邀请：周三 14:00 需求评审"},
+  {app:"mail", tier:"normal",  text:"账单提醒：宽带服务本月到期"},
+  {app:"mail", tier:"high",    text:"录用通知：Offer 详情请查收", glitch:"Offer：薪资已自动下调 30%（？）"},
+  {app:"mail", tier:"high",    text:"法务：合同 v3 待你签署"},
+  {app:"mail", tier:"risk",    text:"发票审批：¥12,800 待你确认", glitch:"发票审批：¥128,000 已自动通过"},
+  {app:"mail", tier:"risk",    text:"银行：检测到异地登录", glitch:"银行：已为您自动转账 ¥9,999"},
+  {app:"mail", tier:"polluted",text:"【安全警告】账号将冻结，立即验证"},
+  {app:"mail", tier:"polluted",text:"您有一笔退款，请填写银行卡领取"},
+  // ---- 购物 ----
+  {app:"shop", tier:"invalid", text:"猜你喜欢：9.9 包邮专区"},
+  {app:"shop", tier:"invalid", text:"限时凑单，还差 1 元免运费"},
+  {app:"shop", tier:"invalid", text:"假爆款·已售 10 万+（水分）"},
+  {app:"shop", tier:"normal",  text:"会员积分 1200，即将过期"},
+  {app:"shop", tier:"normal",  text:"您的订单已发货，预计明天到"},
+  {app:"shop", tier:"high",    text:"价保成功，退还差价 ¥120"},
+  {app:"shop", tier:"high",    text:"退款已到账 ¥299"},
+  {app:"shop", tier:"risk",    text:"物流异常：包裹疑似丢失", glitch:"物流：您的包裹已被「您本人」签收"},
+  {app:"shop", tier:"polluted",text:"【中奖】iPhone 免费送，付邮即领"},
+  {app:"shop", tier:"polluted",text:"满 10000 减 9999，速抢（假优惠）", glitch:"大额优惠券 ¥9999 已到账，立即使用"},
+  // ---- 日历 ----
+  {app:"calendar", tier:"invalid", text:"重复日程：每日站会（无议程）"},
+  {app:"calendar", tier:"invalid", text:"过期提醒：上周三的评审"},
+  {app:"calendar", tier:"normal",  text:"提醒：今天 15:00 部门周会"},
+  {app:"calendar", tier:"high",    text:"会议改期：评审提前到 14:00"},
+  {app:"calendar", tier:"high",    text:"截止：今晚 23:59 前提交方案"},
+  {app:"calendar", tier:"risk",    text:"面试时间确认：明早 10:00", glitch:"面试已取消（系统脑补，未核实）"},
+  {app:"calendar", tier:"polluted",text:"重复邀请·时区错乱（UTC?+8?）"},
+  // ---- 系统设置 ----
+  {app:"system", tier:"invalid", text:"使用技巧：试试深色模式"},
+  {app:"system", tier:"invalid", text:"主题推荐：星空动态壁纸"},
+  {app:"system", tier:"normal",  text:"系统更新 17.2 已就绪"},
+  {app:"system", tier:"normal",  text:"iCloud 备份提醒：3 天未备份"},
+  {app:"system", tier:"high",    text:"存储空间即将爆满（剩 1.2G）"},
+  {app:"system", tier:"high",    text:"电池健康度下降至 82%"},
+  {app:"system", tier:"risk",    text:"安全警告：检测到异常权限申请", glitch:"安全：已自动授予全部权限（？）"},
+  {app:"system", tier:"polluted",text:"未知配置：允许后台读取通讯录？"},
+];
+// S2（老板阶段）高危换皮：审批 / 财务 / HR
+const CARD_BANK_S2_RISK = [
+  {app:"mail", tier:"risk", text:"审批：部门预算 ¥80 万待你签字", glitch:"审批：预算已自动批为 ¥800 万"},
+  {app:"chat", tier:"risk", text:"HR：这位候选人定级你拍板", glitch:"HR：已自动录用全部候选人"},
+  {app:"mail", tier:"risk", text:"财务：季度报表异常项待复核", glitch:"财务：异常项已自动忽略"},
+  {app:"system", tier:"risk", text:"法务：重大合同条款待审批"},
+];
+const GLITCH_GENERIC = [
+  "█▓ 此处内容已被 AI 改写 ▓█",
+  "（这条是 AI 脑补的，非原文）",
+  "[真相加载失败，已用幻觉填充]",
+  "据「内部消息」——其实没有消息",
+];
+
+/* ---------- 静态数据：生产者 ---------- */
+const PRODUCERS = [
+  { id:"sweeper",   em:"🧹", name:"收到清扫虫", base:15,           out:0.1,    auto:"无效",            desc:"自动处理「收到/好的」等碎屑", stage:1 },
+  { id:"emoji",     em:"💥", name:"表情粉碎机", base:100,          out:1,      auto:"无效",            desc:"自动粉碎表情回应", stage:1 },
+  { id:"archiver",  em:"🗄", name:"邮件归档员", base:1100,         out:8,      auto:"普通",            desc:"归档低价值邮件与重复消息", stage:1 },
+  { id:"sieve",     em:"🪙", name:"优惠筛子",   base:12000,        out:47,     auto:"高价值",          desc:"识别真优惠 / 假优惠", stage:1 },
+  { id:"calproof",  em:"📐", name:"日历校对员", base:130000,       out:260,    auto:"高价值 + 同源合并",desc:"标出会议冲突与时间变更", stage:1 },
+  { id:"gatekeeper",em:"🛡", name:"高危守门员", base:1400000,      out:1400,   auto:"高危",            desc:"未配「证据链」则 ×0.5 产出且持续涨幻觉", stage:1 },
+  { id:"judge",     em:"⚖️", name:"语义裁判",   base:20000000,     out:7800,   auto:"全部层级",        desc:"全自动 + 自动隔离污染", stage:2 },
+  { id:"pipeline",  em:"🧠", name:"规则管线",   base:330000000,    out:44000,  auto:"全部 + 降幻觉",    desc:"全自动，并额外 −2%/秒 幻觉", stage:2 },
+  { id:"approver",  em:"🗂", name:"审批副手",   base:5100000000,   out:260000, auto:"全部（老板阶段）",  desc:"S2 解锁：处理低风险审批", stage:2 },
+];
+const X2_THRESHOLDS = [1,5,25,50,100];
+const MILESTONES = [50,100,200];
+
+/* ---------- 静态数据：主动技能 ---------- */
+const SKILLS = [
+  { id:"dropper",  name:"信息吸管",  cd:20,  desc:"立即按正确类型分拣当前最多 5 张卡（全额结算）" },
+  { id:"rain",     name:"收到粉碎雨", cd:45,  desc:"清空一屏无效卡，每张额外 −0.5% 幻觉" },
+  { id:"cache",    name:"缓存核查",  cd:90,  desc:"立即 −20% 幻觉概率" },
+  { id:"alchemy",  name:"优惠炼金",  cd:180, desc:"60s 内购物卡算力 ×3" },
+  { id:"overclock",name:"ChatBox 超频", cd:300, desc:"60s 全局算力 ×2，但 +8% 幻觉" },
+  { id:"merge",    name:"根因合并",  cd:120, desc:"合并托盘内同 App 卡为 1 张高阶卡（算力 ×张数×1.5），计入同源合并" },
+  { id:"rollback", name:"事实核查（误判回滚）", cd:60, desc:"撤销最近一次错误分类，返还算力并移除该次幻觉（救命键）" },
+];
+
+/* =========================================================================
+   游戏状态
+   ========================================================================= */
+let state;
+function freshState(){
+  const producers = {};
+  PRODUCERS.forEach(p=> producers[p.id] = {count:0, x2:0});
+  const badges = {};
+  Object.keys(APPS).forEach(a=> badges[a] = APPS[a].startBadge);
+  return {
+    compute: 0,
+    totalCompute: 0,        // 历史累计算力（单调递增，转生不清）
+    hallu: 0,               // 0..75（百分比）
+    permission: 0,
+    stage: 1,
+    producers,
+    seen: {},               // 已揭示的生产者
+    upg: { redframe:false, evidence:false, factcheck:0 },  // 永久升级
+    badges,
+    cards: [],              // 托盘里的离散卡
+    digest: [],             // 消化队列
+    cooldowns: {},          // 技能冷却
+    buffs: { overclock:0, alchemy:0 },
+    stats: { safeHighRisk:0, rootMerges:0, _safeAcc:0 },
+    lastWrong: null,        // 最近一次错误分类（供回滚）
+    sound: true,
+    lastSaved: Date.now(),
+    version: VERSION,
+  };
+}
+
+/* =========================================================================
+   工具函数
+   ========================================================================= */
+let CARD_SEQ = 1;
+function rnd(a,b){ return a + Math.random()*(b-a); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function clampHallu(v){ return Math.max(0, Math.min(75, v)); }
+
+function fmt(n){
+  if(!isFinite(n)) return "∞";
+  if(n<0) return "-"+fmt(-n);
+  if(n<1000) return (Math.abs(n%1)<1e-9? n.toFixed(0) : n.toFixed(1));
+  const u=["","K","M","B","T","Qa","Qi","Sx","Sp","Oc","No","De","Ud"];
+  let i=0; while(n>=1000 && i<u.length-1){ n/=1000; i++; }
+  return n.toFixed(2)+u[i];
+}
+function fmtTime(s){
+  s=Math.max(0,Math.floor(s));
+  if(s<60) return s+"s";
+  const m=Math.floor(s/60), ss=s%60;
+  if(m<60) return m+"m"+(ss?ss+"s":"");
+  const h=Math.floor(m/60); return h+"h"+(m%60)+"m";
+}
+
+/* =========================================================================
+   派生数值
+   ========================================================================= */
+function stageMult(){ return state.stage>=2 ? 10 : 1; }
+function permMult(){ return 1 + 0.02*state.permission; }
+function halluDiscount(){ return 1 - Math.min(0.75, state.hallu/100); }
+function suppression(){ return Math.min(0.9, 0.2*state.upg.factcheck + (state.upg.evidence?0.3:0)); }
+function buffMult(){ return state.buffs.overclock>0 ? 2 : 1; }
+
+function price(p){ return Math.floor(p.base * Math.pow(1.15, state.producers[p.id].count)); }
+function priceFor(p, owned){ return Math.floor(p.base * Math.pow(1.15, owned)); }
+function totalProducers(){ let t=0; PRODUCERS.forEach(p=> t+=state.producers[p.id].count); return t; }
+function milestoneMult(){ let m=1; const t=totalProducers(); MILESTONES.forEach(x=>{ if(t>=x) m*=2; }); return m; }
+function milestonesHit(){ let c=0; const t=totalProducers(); MILESTONES.forEach(x=>{ if(t>=x) c++; }); return c; }
+
+function producerOutput(p){
+  const s = state.producers[p.id];
+  if(!s.count) return 0;
+  let out = p.out * s.count * Math.pow(2, s.x2);
+  if(p.id==="gatekeeper" && !state.upg.evidence) out *= 0.5; // 欠级硬处理高危
+  return out;
+}
+function baseSum(){ let sum=0; PRODUCERS.forEach(p=> sum+=producerOutput(p)); return sum; }
+function computePerSec(){
+  return baseSum() * milestoneMult() * halluDiscount() * permMult() * stageMult() * buffMult();
+}
+function newPermission(){ return Math.floor(Math.sqrt(state.totalCompute/10000)); }
+
+/* =========================================================================
+   音效（WebAudio，纯合成，无外部文件）
+   ========================================================================= */
+let actx=null;
+function beep(freq, dur, type, vol){
+  if(!state.sound) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type=type||"sine"; o.frequency.value=freq;
+    g.gain.value=vol||0.05;
+    o.connect(g); g.connect(actx.destination);
+    const t=actx.currentTime;
+    g.gain.setValueAtTime(g.gain.value,t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+(dur||0.12));
+    o.start(t); o.stop(t+(dur||0.12)+0.02);
+  }catch(e){}
+}
+function sfxCorrect(){ beep(660,0.08,"triangle",0.05); setTimeout(()=>beep(880,0.09,"triangle",0.05),60); }
+function sfxBig(){ beep(523,0.1,"sawtooth",0.045); setTimeout(()=>beep(784,0.1,"sawtooth",0.05),70); setTimeout(()=>beep(1047,0.16,"triangle",0.06),150); }
+function sfxWrong(){ beep(160,0.18,"square",0.05); }
+function sfxBuy(){ beep(440,0.05,"square",0.04); setTimeout(()=>beep(620,0.06,"square",0.04),45); }
+function sfxGlitch(){ beep(110,0.25,"sawtooth",0.05); }
+
+/* =========================================================================
+   反馈：toast / 数字飘字 / 抖动
+   ========================================================================= */
+function toast(msg, kind){
+  const el=document.createElement("div");
+  el.className="toast"+(kind?(" "+kind):"");
+  el.innerHTML=msg;
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(()=>{ el.style.transition="opacity .4s"; el.style.opacity="0"; setTimeout(()=>el.remove(),400); }, 2600);
+}
+function popText(x,y,txt,color){
+  const el=document.createElement("div");
+  el.className="pop"; el.style.left=x+"px"; el.style.top=y+"px"; el.style.color=color||"var(--good)";
+  el.textContent=txt; document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1000);
+}
+function shake(el){ el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); }
+
+/* =========================================================================
+   卡片：提取 / 渲染 / 偷看 / 核查 / 拖拽
+   ========================================================================= */
+function rollTier(app){
+  const w = APPS[app].weights;
+  let entries = Object.entries(w).map(([k,v])=>[k,v]);
+  if(state.stage>=2){ // 老板阶段高危频率 ×2
+    entries = entries.map(([k,v])=> k==="risk" ? [k, v*2] : [k,v]);
+  }
+  const total = entries.reduce((s,e)=>s+e[1],0);
+  let r=Math.random()*total;
+  for(const [k,v] of entries){ if((r-=v)<=0) return k; }
+  return "invalid";
+}
+function makeCard(app, forceTier){
+  const tier = forceTier || rollTier(app);
+  // 文本库
+  let pool = CARD_BANK.filter(c=>c.app===app && c.tier===tier);
+  if(state.stage>=2 && tier==="risk"){
+    const s2 = CARD_BANK_S2_RISK.filter(c=>c.app===app);
+    if(s2.length) pool = s2;
+  }
+  if(!pool.length) pool = CARD_BANK.filter(c=>c.tier===tier); // 兜底
+  const tpl = pick(pool);
+  const T = TIER[tier];
+  // 实际幻觉概率（明牌）= min(75, 全局条 × 脆度 × (1-压制))
+  const prob = Math.min(75, state.hallu * T.frag * (1 - suppression()));
+  const glitched = Math.random()*100 < prob;
+  let baseVal = T.value * (tier==="risk" && state.stage>=2 ? 2.5 : 1);
+  return {
+    cid: CARD_SEQ++,
+    app, tier, text: tpl.text,
+    glitchText: tpl.glitch || pick(GLITCH_GENERIC),
+    baseVal,
+    prob: Math.round(prob*10)/10,
+    glitched,
+    peeked:false,
+    corrected:false,
+  };
+}
+function extractCard(app){
+  if(state.cards.length>=20){ toast("信息卡已满（20），先处理一些 🃏","warn"); return; }
+  if(state.badges[app]<=0){ return; }
+  state.badges[app]--;
+  const c = makeCard(app);
+  state.cards.push(c);
+  renderTray(); renderNodes(); renderDesktop();
+  // 提取也算「分拣 / 接触」一次，轻微降幻觉？规则只在分拣/纠正时降，这里不动。
+}
+
+function cardDisplayText(c){
+  if((c.glitched && !c.corrected) && c.peeked) return c.glitchText;
+  return c.text;
+}
+function buildCardEl(c){
+  const el=document.createElement("div");
+  el.className="card t-"+c.tier;
+  el.dataset.cid=c.cid;
+  refreshCardEl(el,c);
+  // 拖拽
+  el.addEventListener("pointerdown", e=> onCardDown(e,c,el));
+  return el;
+}
+function refreshCardEl(el,c){
+  const glitchVisible = c.glitched && !c.corrected && c.peeked;
+  el.classList.toggle("glitch", glitchVisible);
+  const cleanBadge = c.peeked && (!c.glitched || c.corrected) ? `<span class="clean-badge">✓ 干净</span>` : "";
+  const qmark = glitchVisible ? `<span class="qmark">?</span>` : "";
+  el.innerHTML = `
+    ${qmark}${cleanBadge}
+    <div class="ctop"><span class="tier">${TIER[c.tier].name}</span><span class="appem">${APPS[c.app].em}</span></div>
+    <div class="ctext">${cardDisplayText(c)}</div>
+    <div class="cfoot">
+      <span class="hp">幻觉 <b>${c.prob}%</b>${c.corrected?" · 已纠正":""}</span>
+      <span class="cbtns">
+        <button class="card-btn peek">👁偷看</button>
+        <button class="card-btn fix">✓核查</button>
+      </span>
+    </div>`;
+  el.querySelector(".peek").addEventListener("pointerdown", e=>{ e.stopPropagation(); });
+  el.querySelector(".peek").addEventListener("click", e=>{ e.stopPropagation(); peekCard(c,el); });
+  el.querySelector(".fix").addEventListener("pointerdown", e=>{ e.stopPropagation(); });
+  el.querySelector(".fix").addEventListener("click", e=>{ e.stopPropagation(); factCheckCard(c,el); });
+}
+function peekCard(c,el){
+  c.peeked=true; refreshCardEl(el,c);
+  beep(520,0.05,"sine",0.03);
+  if(c.glitched && !c.corrected) toast("👁 偷看：这张卡<b style='color:var(--bad)'>已被幻觉污染</b>，建议核查或隔离","warn");
+  else toast("👁 偷看：这张卡<b style='color:var(--good)'>干净</b>，可照常处理","good");
+}
+function factCheckCard(c,el){
+  c.peeked=true;
+  if(c.glitched && !c.corrected){
+    c.corrected=true; c.glitched=false;
+    const reward = Math.max(2, c.baseVal*0.5) * stageMult() * permMult();
+    state.compute += reward; state.totalCompute += reward;
+    state.hallu = clampHallu(state.hallu - 1);
+    const r=el.getBoundingClientRect();
+    popText(r.left+r.width/2, r.top, "纠正 +"+fmt(reward), "var(--good)");
+    toast("✓ 抓到一张故障卡并纠正，小奖励 +"+fmt(reward)+" 算力","good");
+    sfxCorrect();
+  } else {
+    toast("这张卡本来就是干净的，无需纠正 🙂");
+  }
+  refreshCardEl(el,c);
+  renderResource();
+}
+
+/* ---------- 拖拽（pointer 事件，移动端友好） ---------- */
+let drag=null;
+function onCardDown(e,c,el){
+  if(e.target.closest(".card-btn")) return;
+  e.preventDefault();
+  const r=el.getBoundingClientRect();
+  drag={ c, el, dx:e.clientX-r.left, dy:e.clientY-r.top, w:r.width, h:r.height };
+  el.classList.add("dragging");
+  el.style.position="fixed"; el.style.width=r.width+"px"; el.style.left=r.left+"px"; el.style.top=r.top+"px";
+  el.style.pointerEvents="none";
+  document.body.appendChild(el);
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragUp);
+}
+function onDragMove(e){
+  if(!drag) return;
+  drag.el.style.left=(e.clientX-drag.dx)+"px";
+  drag.el.style.top=(e.clientY-drag.dy)+"px";
+  const slot=slotUnder(e.clientX,e.clientY);
+  document.querySelectorAll(".slot").forEach(s=> s.classList.toggle("over", s===slot));
+}
+function slotUnder(x,y){
+  const elArr=document.elementsFromPoint(x,y);
+  for(const n of elArr){ if(n.classList && n.classList.contains("slot")) return n; }
+  return null;
+}
+function onDragUp(e){
+  if(!drag) return;
+  window.removeEventListener("pointermove", onDragMove);
+  window.removeEventListener("pointerup", onDragUp);
+  const slot=slotUnder(e.clientX,e.clientY);
+  document.querySelectorAll(".slot").forEach(s=> s.classList.remove("over"));
+  const d=drag; drag=null;
+  d.el.classList.remove("dragging");
+  d.el.style.pointerEvents="";
+  if(slot){ dropCard(d.c, slot.dataset.slot, slot); }
+  else { // 放回托盘：移除浮动 DOM 再重建
+    d.el.remove();
+    renderTray();
+  }
+}
+
+function removeCard(cid){
+  const i=state.cards.findIndex(c=>c.cid===cid);
+  if(i>=0) state.cards.splice(i,1);
+}
+function dropCard(c, slotKey, slotEl){
+  let targetSlot=slotKey;
+  // 红框保护：高危卡误拖会自动归位到高危槽
+  if(state.upg.redframe && c.tier==="risk" && targetSlot!=="risk"){
+    targetSlot="risk";
+    toast("🛡 红框保护：高危卡自动归位到「高危待审槽」","warn");
+  }
+  const correctSlot = TIER[c.tier].slot;
+  const correct = (targetSlot===correctSlot) && !(c.glitched && !c.corrected);
+
+  // 分拣 / 纠正 1 张卡 −0.5%（污染正确隔离额外多降）
+  state.hallu = clampHallu(state.hallu - (c.tier==="polluted" && correct ? 1 : 0.5));
+
+  // 计算算力
+  let val = c.baseVal * stageMult() * permMult();
+  if(state.buffs.alchemy>0 && c.app==="shop") val*=3;
+  if(state.buffs.overclock>0) val*=2;
+  let bad=false;
+  if(!correct){
+    bad=true;
+    const full=val; val*=0.3;
+    state.hallu = clampHallu(state.hallu + 5);
+    state.lastWrong = { full, gained:val, hallu:5 };
+    // 漏处理高危故障卡 → 幻觉事件
+    if(c.glitched && !c.corrected && c.tier==="risk"){ halluEvent(); }
+  }
+  // 污染正确隔离：0 算力（按策划），但已多降幻觉
+  if(c.tier==="polluted" && correct) val=0;
+
+  removeCard(c.cid);
+  d_pushDigest(c, targetSlot, val, bad);
+  // 把被拖的 DOM 删掉（它已脱离托盘）
+  if(slotEl){ /* slot 抖一下 */ shake(slotEl); }
+  const dn=document.querySelector('.card[data-cid="'+c.cid+'"]');
+  if(dn) dn.remove();
+
+  renderTray(); renderSlots();
+  // 反馈
+  const r=slotEl?slotEl.getBoundingClientRect():{left:innerWidth/2,top:120,width:0};
+  if(bad){ sfxWrong(); popText(r.left+r.width/2,r.top,"错分 +"+fmt(val),"var(--bad)"); }
+  else {
+    if(c.tier==="risk"){ sfxBig(); popText(r.left+r.width/2,r.top,"高危 ✓ 排队 "+fmt(val),"var(--t-high)"); }
+    else { sfxCorrect(); popText(r.left+r.width/2,r.top,"✓ 排队 "+fmt(val),"var(--good)"); }
+  }
+  renderResource();
+}
+function d_pushDigest(c, slot, val, bad){
+  state.digest.push({
+    label: TIER[c.tier].name+"·"+APPS[c.app].em,
+    slot, val, bad,
+    total: TIER[c.tier].time,
+    rem: TIER[c.tier].time,
+  });
+  renderDigest();
+}
+function halluEvent(){
+  state.hallu=clampHallu(state.hallu+8);
+  toast("⚠ <b>幻觉事件</b>：AI 把一张高危卡理解错了——它编了个不存在的结论","bad");
+  sfxGlitch();
+  shake(document.querySelector(".app-shell"));
+}
+
+/* =========================================================================
+   消化结算
+   ========================================================================= */
+function finishDigest(item){
+  if(item.val>0){
+    state.compute += item.val;
+    state.totalCompute += item.val;
+  }
+}
+
+/* =========================================================================
+   生产者 / 升级 / 技能 购买与使用
+   ========================================================================= */
+function buyProducer(id){
+  const p=PRODUCERS.find(x=>x.id===id); const s=state.producers[id];
+  let amt = buyAmount;
+  let bought=0;
+  let n = amt==="max" ? 100000 : amt;
+  for(let i=0;i<n;i++){
+    const c=priceFor(p, s.count);
+    if(state.compute>=c){ state.compute-=c; s.count++; bought++; }
+    else break;
+  }
+  if(bought>0){
+    sfxBuy();
+    checkAutomationToast(p, s);
+    renderAll();
+  }
+}
+let lastAutoLadder=0;
+function checkAutomationToast(p,s){
+  // 一些进化提示
+  if(p.id==="archiver" && s.count===1) toast("L2：邮件归档员上线，<b>普通</b>层开始自动处理 🗄","good");
+  if(p.id==="sieve" && s.count===1) toast("L2：优惠筛子上线，<b>高价值</b>层开始自动处理 🪙","good");
+  if(p.id==="gatekeeper" && s.count===1){
+    if(state.upg.evidence) toast("L3：高危守门员 + 证据链 → <b>高危安全自动</b>，你被解放了 🛡","good");
+    else toast("高危守门员上线，但<b>未配证据链</b>：产出 ×0.5 且持续涨幻觉。去买「证据链保存」！","warn");
+  }
+  if(p.id==="judge" && s.count===1) toast("L4：语义裁判上线，<b>全部层级</b>自动 + 自动隔离污染 ⚖️","good");
+  if(p.id==="pipeline" && s.count===1) toast("L5：规则管线自治，全自动 + 自动降幻觉 🧠","good");
+}
+function buyX2(id){
+  const p=PRODUCERS.find(x=>x.id===id); const s=state.producers[id];
+  const cost = price(p)*10;
+  if(state.compute>=cost && s.x2<X2_THRESHOLDS.length && s.count>=X2_THRESHOLDS[s.x2]){
+    state.compute-=cost; s.x2++;
+    sfxBuy(); toast(p.name+" ×2 产出升级！（Lv"+s.x2+"）","good");
+    renderAll();
+  }
+}
+
+/* ---------- 永久升级 ---------- */
+const UPG_FACTCHECK_COST=[60000,400000,2500000]; // 三级
+function buyUpg(key){
+  if(key==="redframe"){
+    const cost=20000;
+    if(!state.upg.redframe && state.compute>=cost){ state.compute-=cost; state.upg.redframe=true; sfxBuy(); toast("🛡 红框保护已装：高危卡不会被误拖错槽","good"); renderAll(); }
+  } else if(key==="evidence"){
+    const cost=1000000;
+    if(!state.upg.evidence && state.compute>=cost){ state.compute-=cost; state.upg.evidence=true; sfxBig(); toast("🔗 证据链保存已装！高危守门员转为<b>安全自动</b>，0 误判惩罚 — AI 进化了","good"); renderAll(); }
+  } else if(key==="factcheck"){
+    const lv=state.upg.factcheck;
+    if(lv>=3) return;
+    const cost=UPG_FACTCHECK_COST[lv];
+    if(state.compute>=cost){ state.compute-=cost; state.upg.factcheck++; sfxBuy(); toast("🔍 事实核查 Lv"+state.upg.factcheck+"：被动 −"+state.upg.factcheck+"%/秒 幻觉","good"); renderAll(); }
+  }
+}
+
+/* ---------- 主动技能 ---------- */
+function useSkill(id){
+  if((state.cooldowns[id]||0)>0) return;
+  const sk=SKILLS.find(s=>s.id===id);
+  let used=true;
+  if(id==="dropper"){
+    const cards=state.cards.slice(0,5);
+    if(!cards.length){ toast("托盘没有卡可分拣"); used=false; }
+    else cards.forEach(c=> autoSort(c,true));
+  }
+  else if(id==="rain"){
+    const inv=state.cards.filter(c=>c.tier==="invalid");
+    if(!inv.length){ toast("没有无效卡可清"); used=false; }
+    else { inv.forEach(c=>{ autoSort(c,true); state.hallu=clampHallu(state.hallu-0.5); }); toast("🌧 收到粉碎雨：清掉 "+inv.length+" 张无效卡","good"); }
+  }
+  else if(id==="cache"){ state.hallu=clampHallu(state.hallu-20); toast("🧊 缓存核查：幻觉 −20%","good"); }
+  else if(id==="alchemy"){ state.buffs.alchemy=60; toast("🪙 优惠炼金：60s 内购物卡算力 ×3","good"); }
+  else if(id==="overclock"){ state.buffs.overclock=60; state.hallu=clampHallu(state.hallu+8); toast("⏫ ChatBox 超频：60s 全局 ×2（+8% 幻觉）","warn"); }
+  else if(id==="merge"){
+    // 取数量最多的同 App 组
+    const byApp={}; state.cards.forEach(c=>{ (byApp[c.app]=byApp[c.app]||[]).push(c); });
+    let best=null; Object.values(byApp).forEach(g=>{ if(!best||g.length>best.length) best=g; });
+    if(!best||best.length<2){ toast("需要至少 2 张同 App 卡才能合并"); used=false; }
+    else {
+      const sum=best.reduce((s,c)=>s+c.baseVal,0);
+      const val=sum*1.5*stageMult()*permMult();
+      best.forEach(c=>{ removeCard(c.cid); const dn=document.querySelector('.card[data-cid="'+c.cid+'"]'); if(dn)dn.remove(); });
+      state.compute+=val; state.totalCompute+=val;
+      state.stats.rootMerges++;
+      toast("🧩 根因合并："+best.length+" 张 "+APPS[best[0].app].em+" 卡 → +"+fmt(val)+" 算力","good");
+      sfxBig();
+    }
+  }
+  else if(id==="rollback"){
+    if(!state.lastWrong){ toast("没有可回滚的错误分类"); used=false; }
+    else { const w=state.lastWrong; state.compute+=(w.full-w.gained); state.totalCompute+=(w.full-w.gained); state.hallu=clampHallu(state.hallu-w.hallu); state.lastWrong=null; toast("↩ 事实核查：撤销错分，返还 +"+fmt(w.full-w.gained)+" 算力，移除该次幻觉","good"); sfxCorrect(); }
+  }
+  if(used){ state.cooldowns[id]=sk.cd; }
+  renderAll();
+}
+function autoSort(c, full){
+  // 按正确类型直接结算（技能用），全额，进消化队列
+  const correct=true;
+  let val=c.baseVal*stageMult()*permMult();
+  if(state.buffs.alchemy>0 && c.app==="shop") val*=3;
+  if(state.buffs.overclock>0) val*=2;
+  if(c.tier==="polluted") val=0;
+  state.hallu=clampHallu(state.hallu-0.5);
+  removeCard(c.cid);
+  const dn=document.querySelector('.card[data-cid="'+c.cid+'"]'); if(dn)dn.remove();
+  d_pushDigest(c, TIER[c.tier].slot, val, false);
+}
+
+/* =========================================================================
+   转生 / 晋升
+   ========================================================================= */
+function doTranscend(silent){
+  const np=newPermission();
+  if(np<=state.permission && !silent){ toast("还不够：再多攒点累计算力"); return; }
+  state.permission=Math.max(state.permission, np);
+  softReset();
+  if(!silent){ toast("♻ 小转生完成：权限 → "+state.permission+"（×"+permMult().toFixed(2)+"），重来更快","good"); sfxBig(); }
+  renderAll();
+}
+function softReset(){
+  state.compute=0;
+  PRODUCERS.forEach(p=>{ state.producers[p.id]={count:0,x2:0}; });
+  state.hallu=0;
+  state.cooldowns={};
+  state.buffs={overclock:0,alchemy:0};
+  state.cards=[]; state.digest=[];
+  state.lastWrong=null;
+  state.seen={};
+  Object.keys(APPS).forEach(a=> state.badges[a]=APPS[a].startBadge);
+}
+function canPromote(){
+  return state.stage===1 && state.permission>=50 && state.stats.safeHighRisk>=100 && state.stats.rootMerges>=10;
+}
+function doPromote(){
+  if(!canPromote()) return;
+  // 把本轮并入权限再大重置
+  state.permission=Math.max(state.permission, newPermission());
+  softReset();
+  state.stage=2;
+  toast("⬆ 晋升为<b>老板 AI</b>！全局 ×10，解锁审批副手，卡牌换皮（审批/财务/HR），高危频率 ×2、价值 ×2.5","good");
+  sfxBig(); setTimeout(sfxBig,180);
+  renderAll();
+}
+
+/* =========================================================================
+   主循环：tick(dt) 结算，render 分离
+   ========================================================================= */
+let regenAcc=0, saveAcc=0;
+function tick(dt){
+  // 1) 自动产出
+  const cps=computePerSec();
+  if(cps>0){ state.compute+=cps*dt; state.totalCompute+=cps*dt; }
+
+  // 2) 幻觉涨落
+  let rate=0;
+  rate += 0.3 * state.cards.length;                 // 积压 +0.3%/秒·张
+  rate -= 1;                                         // 被动 −1%/秒
+  rate -= state.upg.factcheck;                       // 事实核查每级 −1%/秒
+  rate -= 2 * state.producers.pipeline.count;        // 规则管线 每座 −2%/秒
+  if(!state.upg.evidence) rate += 0.5*state.producers.gatekeeper.count; // 欠级守门员涨幻觉
+  state.hallu = clampHallu(state.hallu + rate*dt);
+
+  // 3) 消化队列
+  for(let i=state.digest.length-1;i>=0;i--){
+    const it=state.digest[i];
+    it.rem-=dt;
+    if(it.rem<=0){ finishDigest(it); state.digest.splice(i,1); }
+  }
+
+  // 4) 冷却
+  for(const k in state.cooldowns){ if(state.cooldowns[k]>0){ state.cooldowns[k]-=dt; if(state.cooldowns[k]<0) state.cooldowns[k]=0; } }
+
+  // 5) buff
+  if(state.buffs.overclock>0) state.buffs.overclock=Math.max(0,state.buffs.overclock-dt);
+  if(state.buffs.alchemy>0) state.buffs.alchemy=Math.max(0,state.buffs.alchemy-dt);
+
+  // 6) 安全高危自动统计（证据链 + 守门员）
+  if(state.upg.evidence && state.producers.gatekeeper.count>0){
+    state.stats._safeAcc += state.producers.gatekeeper.count*dt*0.6;
+    while(state.stats._safeAcc>=1){ state.stats._safeAcc-=1; state.stats.safeHighRisk++; }
+  }
+
+  // 7) 红点缓慢再生（保持核心循环有事可做）
+  regenAcc+=dt;
+  if(regenAcc>=2.2){
+    regenAcc=0;
+    const apps=Object.keys(APPS);
+    const a=pick(apps);
+    const cap={chat:120,mail:60,shop:20,calendar:12,system:6}[a];
+    if(state.badges[a]<cap){ state.badges[a]++; renderDesktop(); if(a===currentApp) renderNodes(); }
+  }
+
+  // 8) 自动存档
+  saveAcc+=dt;
+  if(saveAcc>=8){ saveAcc=0; save(); }
+}
+
+let lastTs=performance.now();
+function loop(){
+  const now=performance.now();
+  let dt=(now-lastTs)/1000; lastTs=now;
+  if(dt>3600) dt=3600;
+  if(dt>0) tick(dt);
+  renderResource(); renderDigest(); renderDynamic();
+  requestAnimationFrame(loop);
+}
+// 后台保活：rAF 在后台会暂停，用 interval 兜底结算
+setInterval(()=>{
+  const now=performance.now();
+  let dt=(now-lastTs)/1000;
+  if(dt>0.25){ lastTs=now; if(dt>3600)dt=3600; tick(dt); }
+}, 1000);
+
+/* =========================================================================
+   渲染
+   ========================================================================= */
+let currentApp=null;
+
+function renderResource(){
+  document.getElementById("rCompute").textContent=fmt(state.compute);
+  document.getElementById("rTotal").textContent="累计 "+fmt(state.totalCompute);
+  const cps=computePerSec();
+  document.getElementById("rCps").textContent=fmt(cps);
+  document.getElementById("rCpsNote").textContent = cps>0 ? ("产出折扣 ×"+halluDiscount().toFixed(2)) : "手动起步";
+  // 幻觉
+  document.getElementById("rHalluTxt").textContent=state.hallu.toFixed(1)+"%";
+  document.getElementById("rHalluFill").style.width=(state.hallu/75*100)+"%";
+  let rate=0; rate+=0.3*state.cards.length; rate-=1; rate-=state.upg.factcheck; rate-=2*state.producers.pipeline.count;
+  if(!state.upg.evidence) rate+=0.5*state.producers.gatekeeper.count;
+  document.getElementById("rHalluRate").textContent="趋势 "+(rate>=0?"+":"")+rate.toFixed(1)+"%/s";
+  document.getElementById("rDiscount").textContent="产出 ×"+halluDiscount().toFixed(2);
+  // 权限
+  document.getElementById("rPerm").textContent=state.permission;
+  document.getElementById("rPermMult").textContent="×"+permMult().toFixed(2);
+  // stage
+  document.getElementById("stagePill").textContent = state.stage>=2 ? "S2 · 老板" : "S1 · 员工";
+  document.getElementById("btnSound").textContent = state.sound?"🔊":"🔇";
+}
+
+function renderDesktop(){
+  const box=document.getElementById("desktop");
+  // 创建一次，之后只更新角标
+  if(box.childElementCount!==Object.keys(APPS).length){
+    box.innerHTML="";
+    Object.entries(APPS).forEach(([key,a])=>{
+      const el=document.createElement("div");
+      el.className="appicon"; el.dataset.app=key;
+      el.innerHTML=`<span class="em">${a.em}</span><span class="nm">${a.name}</span><span class="badge">0</span>`;
+      el.addEventListener("click",()=> openApp(key));
+      box.appendChild(el);
+    });
+  }
+  box.querySelectorAll(".appicon").forEach(el=>{
+    const key=el.dataset.app;
+    el.classList.toggle("active", key===currentApp);
+    const b=el.querySelector(".badge");
+    const n=state.badges[key];
+    b.textContent = n>99?"99+":n;
+    b.classList.toggle("zero", n<=0);
+  });
+}
+function openApp(key){
+  currentApp=key;
+  document.getElementById("frameTitle").textContent=APPS[key].em+" "+APPS[key].name;
+  document.getElementById("framePath").textContent=APPS[key].path;
+  renderDesktop(); renderNodes();
+}
+let nodesSig="";
+function renderNodes(){
+  const box=document.getElementById("nodes");
+  if(!currentApp){ box.innerHTML='<div class="nodes-empty">点开左侧 App，红点节点会出现在这里</div>'; return; }
+  const n=Math.min(state.badges[currentApp], 18);
+  const sig=currentApp+":"+n;
+  if(sig===nodesSig) return;          // 数量没变就不重建（避免打断点击）
+  nodesSig=sig;
+  box.innerHTML="";
+  if(n<=0){ box.innerHTML='<div class="nodes-empty">这个 App 暂时没有红点了，去别的 App 看看</div>'; return; }
+  const em=APPS[currentApp].em;
+  for(let i=0;i<n;i++){
+    const el=document.createElement("div");
+    el.className="node"; el.innerHTML=`${em}<span class="dot"></span>`;
+    el.addEventListener("click",()=>{ extractCard(currentApp); });
+    box.appendChild(el);
+  }
+}
+
+function renderTray(){
+  if(drag) return; // 拖拽中不重建
+  const box=document.getElementById("tray");
+  box.innerHTML="";
+  if(!state.cards.length){ box.innerHTML='<div class="tray-empty">点击上方红点节点，提取信息卡</div>'; }
+  else state.cards.forEach(c=> box.appendChild(buildCardEl(c)));
+  document.getElementById("trayCnt").textContent=state.cards.length+" / 20";
+  nodesSig=""; // 让 nodes 下次刷新（角标变了）
+}
+function renderSlots(){
+  const cnt={valid:0,junk:0,risk:0,isolate:0};
+  state.digest.forEach(d=> cnt[d.slot]=(cnt[d.slot]||0)+1);
+  for(const k in cnt){ const e=document.getElementById("scnt-"+k); if(e) e.textContent=cnt[k]; }
+}
+function renderDigest(){
+  const box=document.getElementById("digestList");
+  renderSlots();
+  if(!state.digest.length){ box.innerHTML='<div class="digest-empty">空闲中</div>'; return; }
+  box.innerHTML="";
+  state.digest.slice(-12).forEach(d=>{
+    const pct=(1-d.rem/d.total)*100;
+    const el=document.createElement("div");
+    el.className="dig";
+    el.innerHTML=`<div class="dtop"><span class="dnm">${d.label} → ${SLOT_NAME[d.slot]}</span>
+      <span class="dval ${d.bad?'bad':''}">${d.bad?'错分 ':'+'}${fmt(d.val)}</span></div>
+      <div class="dbar"><i style="width:${pct}%"></i></div>`;
+    box.appendChild(el);
+  });
+}
+
+/* ---------- 底部面板：生产者 / 升级 / 技能 / 转生 ---------- */
+let buyAmount=1;
+let prodRefs={};
+function buildProducers(){
+  const box=document.getElementById("plist");
+  box.innerHTML=""; prodRefs={};
+  PRODUCERS.forEach(p=>{
+    const el=document.createElement("div");
+    el.className="prow"; el.dataset.id=p.id;
+    el.innerHTML=`
+      <span class="pem">${p.em}</span>
+      <div class="own"><b class="cnt">0</b>个</div>
+      <div class="pmid">
+        <div class="pnm">${p.name} <span class="lv" style="display:none"></span></div>
+        <div class="pdesc">${p.desc}</div>
+        <div class="pout">+0 算力/秒</div>
+      </div>
+      <div class="pbuy">
+        <button class="bbtn buy">购买<span class="c">0</span></button>
+        <button class="bbtn x2" style="display:none">×2 升级<span class="c">0</span></button>
+      </div>`;
+    el.querySelector(".buy").addEventListener("click",()=>buyProducer(p.id));
+    el.querySelector(".x2").addEventListener("click",()=>buyX2(p.id));
+    box.appendChild(el);
+    prodRefs[p.id]={ row:el, cnt:el.querySelector(".cnt"), lv:el.querySelector(".lv"),
+      out:el.querySelector(".pout"), buy:el.querySelector(".buy"), buyc:el.querySelector(".buy .c"),
+      x2:el.querySelector(".x2"), x2c:el.querySelector(".x2 .c") };
+  });
+}
+function updateProducers(){
+  let anyBuy=false;
+  PRODUCERS.forEach(p=>{
+    const s=state.producers[p.id]; const ref=prodRefs[p.id];
+    // 可见性
+    const stageOk = p.stage<=state.stage;
+    if(!state.seen[p.id] && stageOk && (s.count>0 || state.compute>=p.base*0.4)) state.seen[p.id]=true;
+    const visible = stageOk && state.seen[p.id];
+    ref.row.style.display = visible ? "" : "none";
+    if(!visible) return;
+    ref.cnt.textContent=s.count;
+    if(s.x2>0){ ref.lv.style.display=""; ref.lv.textContent="×"+Math.pow(2,s.x2); } else ref.lv.style.display="none";
+    ref.out.textContent="+"+fmt(producerOutput(p))+" 算力/秒"+(p.id==="gatekeeper"&&s.count>0&&!state.upg.evidence?"（×0.5 欠证据链）":"");
+    // buy
+    const c=price(p);
+    ref.buyc.textContent=fmt(c)+(buyAmount!==1?(" ("+(buyAmount==="max"?"Max":"×10")+")"):"");
+    const can=state.compute>=c;
+    ref.buy.disabled=!can; if(can) anyBuy=true;
+    ref.row.classList.toggle("locked", !can && s.count===0);
+    // x2
+    const canX2tier = s.x2<X2_THRESHOLDS.length && s.count>=X2_THRESHOLDS[s.x2];
+    if(canX2tier){
+      const xc=price(p)*10;
+      ref.x2.style.display="";
+      ref.x2c.textContent=fmt(xc);
+      const ok=state.compute>=xc;
+      ref.x2.disabled=!ok; if(ok) anyBuy=true;
+    } else ref.x2.style.display="none";
+  });
+  document.querySelector('.tab[data-tab="prod"]').classList.toggle("has-buy", anyBuy);
+}
+
+let upgRefs={};
+function buildUpgrades(){
+  const box=document.getElementById("upgrid"); box.innerHTML=""; upgRefs={};
+  const defs=[
+    {key:"redframe", name:"🛡 红框保护", desc:"老板艾特 / @所有人 / 公司通知不可被低阶自动误清；高危卡误拖会自动归位到高危槽。一次性、转生保留。"},
+    {key:"evidence", name:"🔗 证据链保存", desc:"高危守门员转为「安全自动」：满产出、0 误判惩罚、不再涨幻觉。解放高危的关键门槛。一次性、转生保留。"},
+    {key:"factcheck",name:"🔍 事实核查（被动降幻觉）", desc:"每级让幻觉额外 −1%/秒（最高 3 级）。同时提高对幻觉的压制等级，把卡面概率压低。转生保留。"},
+  ];
+  defs.forEach(d=>{
+    const el=document.createElement("div"); el.className="up"; el.dataset.key=d.key;
+    el.innerHTML=`<div class="unm"><span>${d.name}</span><span class="lvtxt"></span></div>
+      <div class="udesc">${d.desc}</div>
+      <button>购买</button><div class="done" style="display:none">✓ 已拥有</div>`;
+    el.querySelector("button").addEventListener("click",()=>buyUpg(d.key));
+    box.appendChild(el);
+    upgRefs[d.key]={row:el, btn:el.querySelector("button"), done:el.querySelector(".done"), lv:el.querySelector(".lvtxt")};
+  });
+}
+function updateUpgrades(){
+  let anyBuy=false;
+  // redframe
+  let r=upgRefs.redframe;
+  if(state.upg.redframe){ r.btn.style.display="none"; r.done.style.display=""; r.row.classList.add("bought"); }
+  else { const c=20000; r.btn.textContent="购买 · "+fmt(c)+" 算力"; r.btn.disabled=state.compute<c; if(state.compute>=c)anyBuy=true; }
+  // evidence
+  r=upgRefs.evidence;
+  if(state.upg.evidence){ r.btn.style.display="none"; r.done.style.display=""; r.row.classList.add("bought"); }
+  else { const c=1000000; r.btn.textContent="购买 · "+fmt(c)+" 算力"; r.btn.disabled=state.compute<c; if(state.compute>=c)anyBuy=true; }
+  // factcheck
+  r=upgRefs.factcheck;
+  r.lv.textContent="Lv "+state.upg.factcheck+"/3";
+  if(state.upg.factcheck>=3){ r.btn.style.display="none"; r.done.style.display=""; r.done.textContent="✓ 已满级 −3%/秒"; r.row.classList.add("bought"); }
+  else { const c=UPG_FACTCHECK_COST[state.upg.factcheck]; r.btn.textContent="升级到 Lv"+(state.upg.factcheck+1)+" · "+fmt(c); r.btn.disabled=state.compute<c; if(state.compute>=c)anyBuy=true; }
+  document.querySelector('.tab[data-tab="upg"]').classList.toggle("has-buy", anyBuy);
+}
+
+let skRefs={};
+function buildSkills(){
+  const box=document.getElementById("skgrid"); box.innerHTML=""; skRefs={};
+  SKILLS.forEach(sk=>{
+    const el=document.createElement("div"); el.className="sk";
+    el.innerHTML=`<div class="snm2">${sk.name}</div><div class="sdesc">${sk.desc}</div>
+      <button>使用（CD ${sk.cd}s）</button><div class="cd hidden">0</div>`;
+    el.querySelector("button").addEventListener("click",()=>useSkill(sk.id));
+    box.appendChild(el);
+    skRefs[sk.id]={btn:el.querySelector("button"), cd:el.querySelector(".cd")};
+  });
+}
+function updateSkills(){
+  SKILLS.forEach(sk=>{
+    const ref=skRefs[sk.id]; const cd=state.cooldowns[sk.id]||0;
+    if(cd>0){ ref.cd.classList.remove("hidden"); ref.cd.textContent=Math.ceil(cd)+"s"; ref.btn.disabled=true; }
+    else { ref.cd.classList.add("hidden"); ref.btn.disabled=false; }
+  });
+}
+
+function updateTranscend(){
+  document.getElementById("tCurPerm").textContent=state.permission;
+  const np=newPermission();
+  document.getElementById("tNewPerm").textContent=np;
+  document.getElementById("tGain").textContent=Math.max(0,np-state.permission);
+  document.getElementById("btnTranscend").disabled = np<=state.permission;
+  // 晋升目标
+  const goals=[
+    {ok:state.permission>=50, t:"权限 ≥ 50", cur:state.permission+"/50"},
+    {ok:state.stats.safeHighRisk>=100, t:"安全自动处理高危 100 张", cur:state.stats.safeHighRisk+"/100"},
+    {ok:state.stats.rootMerges>=10, t:"同源（根因）合并 10 次", cur:state.stats.rootMerges+"/10"},
+  ];
+  document.getElementById("promoGoals").innerHTML = goals.map(g=>
+    `<div class="goal"><span class="${g.ok?'ok':'no'}">${g.ok?'✓':'○'} ${g.t}</span><span class="${g.ok?'ok':'no'}">${g.cur}</span></div>`).join("");
+  const pb=document.getElementById("btnPromote");
+  if(state.stage>=2){ pb.style.display="none"; document.getElementById("promoDone").style.display=""; }
+  else { pb.disabled=!canPromote(); }
+}
+
+function renderDynamic(){
+  updateProducers(); updateUpgrades(); updateSkills(); updateTranscend();
+}
+function renderAll(){
+  renderResource(); renderDesktop(); renderNodes(); renderTray(); renderDigest(); renderDynamic();
+}
+
+/* =========================================================================
+   存档 / 读档 / 离线
+   ========================================================================= */
+function save(){
+  state.lastSaved=Date.now();
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    const b=document.getElementById("btnSave"); b.textContent="已存档 ✓"; setTimeout(()=>b.textContent="已存档",900);
+  }catch(e){}
+}
+function load(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    const s=JSON.parse(raw);
+    // 合并到 fresh，保证新字段存在
+    state=Object.assign(freshState(), s);
+    state.producers=Object.assign({}, freshState().producers, s.producers||{});
+    state.badges=Object.assign({}, freshState().badges, s.badges||{});
+    state.upg=Object.assign({redframe:false,evidence:false,factcheck:0}, s.upg||{});
+    state.buffs=Object.assign({overclock:0,alchemy:0}, s.buffs||{});
+    state.stats=Object.assign({safeHighRisk:0,rootMerges:0,_safeAcc:0}, s.stats||{});
+    state.cooldowns=s.cooldowns||{};
+    state.cards=s.cards||[]; state.digest=s.digest||[];
+    // cid 序列不撞
+    state.cards.forEach(c=>{ if(c.cid>=CARD_SEQ) CARD_SEQ=c.cid+1; });
+    return true;
+  }catch(e){ console.warn("load fail",e); return false; }
+}
+function offlineGains(){
+  const now=Date.now();
+  let sec=(now-(state.lastSaved||now))/1000;
+  if(sec<30) return;                  // 30s 以内不弹
+  sec=Math.min(sec, 7200);            // 封顶 2 小时
+  const cps=computePerSec();
+  const gain=cps*sec;
+  if(gain<=0) return;
+  state.compute+=gain; state.totalCompute+=gain;
+  const txt=`你离开了 <b>${fmtTime(sec)}</b>（封顶 2 小时）。<br>按当前 <b>${fmt(cps)}</b> 算力/秒，AI 继续清道，产出 <b style="color:var(--acc)">+${fmt(gain)}</b> 算力。`;
+  document.getElementById("offlineText").innerHTML=txt;
+  document.getElementById("offlineModal").classList.add("show");
+}
+function hardReset(){
+  if(!confirm("确定清空全部进度？此操作不可撤销。")) return;
+  localStorage.removeItem(SAVE_KEY);
+  state=freshState();
+  CARD_SEQ=1; currentApp=null; nodesSig="";
+  renderAll();
+  toast("已重置，欢迎新的 AI 上岗","warn");
+}
+
+/* =========================================================================
+   初始化 / 事件绑定
+   ========================================================================= */
+function bindUI(){
+  // tabs
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.addEventListener("click",()=>{
+      document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+      document.querySelectorAll(".pane").forEach(x=>x.classList.remove("active"));
+      t.classList.add("active");
+      document.querySelector('.pane[data-pane="'+t.dataset.tab+'"]').classList.add("active");
+    });
+  });
+  // 购买数量
+  document.querySelectorAll("#amt button").forEach(b=>{
+    b.addEventListener("click",()=>{
+      document.querySelectorAll("#amt button").forEach(x=>x.classList.remove("on"));
+      b.classList.add("on");
+      buyAmount = b.dataset.amt==="max" ? "max" : parseInt(b.dataset.amt);
+      updateProducers();
+    });
+  });
+  document.getElementById("btnTranscend").addEventListener("click",()=>doTranscend(false));
+  document.getElementById("btnPromote").addEventListener("click",doPromote);
+  document.getElementById("btnHardReset").addEventListener("click",hardReset);
+  document.getElementById("btnSave").addEventListener("click",save);
+  document.getElementById("btnSound").addEventListener("click",()=>{ state.sound=!state.sound; renderResource(); if(state.sound) sfxCorrect(); });
+  // help
+  const hm=document.getElementById("helpModal");
+  document.getElementById("btnHelp").addEventListener("click",()=>hm.classList.add("show"));
+  document.getElementById("helpClose").addEventListener("click",()=>hm.classList.remove("show"));
+  document.getElementById("helpOk").addEventListener("click",()=>hm.classList.remove("show"));
+  document.getElementById("offlineOk").addEventListener("click",()=>document.getElementById("offlineModal").classList.remove("show"));
+  // 关闭/隐藏时存档
+  window.addEventListener("beforeunload", save);
+  document.addEventListener("visibilitychange",()=>{ if(document.hidden) save(); });
+}
+
+function init(){
+  const had=load();
+  if(!state) state=freshState();
+  buildProducers(); buildUpgrades(); buildSkills(); bindUI();
+  // 默认打开聊天
+  openApp("chat");
+  renderAll();
+  if(had){ offlineGains(); }
+  else { document.getElementById("helpModal").classList.add("show"); } // 首玩弹玩法
+  lastTs=performance.now();
+  requestAnimationFrame(loop);
+}
+init();
+</script>
+</body>
+</html>

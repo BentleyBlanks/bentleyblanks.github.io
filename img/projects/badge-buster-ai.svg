@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" font-family="'PingFang SC','Microsoft YaHei',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16223f"/><stop offset="1" stop-color="#0b1120"/>
+    </linearGradient>
+    <linearGradient id="hb" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#46d39a"/><stop offset=".55" stop-color="#ffcf5a"/><stop offset="1" stop-color="#ff6b6b"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="400" fill="url(#bg)"/>
+  <!-- title -->
+  <text x="40" y="78" fill="#e8eefc" font-size="40" font-weight="800">角标清道夫 AI</text>
+  <text x="42" y="108" fill="#5ad0ff" font-size="18" font-weight="600" letter-spacing="2">BADGE BUSTER AI · 增量游戏 MVP</text>
+  <!-- hallucination bar -->
+  <text x="42" y="150" fill="#8ea0c4" font-size="13">幻觉概率 0–75%</text>
+  <rect x="42" y="158" width="430" height="16" rx="8" fill="#0a1124" stroke="#27375c"/>
+  <rect x="42" y="158" width="250" height="16" rx="8" fill="url(#hb)"/>
+  <text x="486" y="171" fill="#ffcf5a" font-size="13" font-weight="700">×(1−幻觉) 减产</text>
+  <!-- app icons with badges -->
+  <g transform="translate(42,200)">
+    <g>
+      <rect width="64" height="64" rx="16" fill="#1d2b48" stroke="#27375c"/>
+      <text x="32" y="44" font-size="30" text-anchor="middle">💬</text>
+      <circle cx="58" cy="8" r="13" fill="#ff6b6b"/><text x="58" y="13" font-size="11" fill="#fff" text-anchor="middle" font-weight="800">99+</text>
+    </g>
+    <g transform="translate(84,0)">
+      <rect width="64" height="64" rx="16" fill="#1d2b48" stroke="#27375c"/>
+      <text x="32" y="44" font-size="28" text-anchor="middle">📧</text>
+      <circle cx="56" cy="8" r="12" fill="#ff6b6b"/><text x="56" y="12" font-size="11" fill="#fff" text-anchor="middle" font-weight="800">42</text>
+    </g>
+    <g transform="translate(168,0)">
+      <rect width="64" height="64" rx="16" fill="#1d2b48" stroke="#27375c"/>
+      <text x="32" y="44" font-size="28" text-anchor="middle">🛒</text>
+      <circle cx="56" cy="8" r="11" fill="#ff6b6b"/><text x="56" y="12" font-size="10" fill="#fff" text-anchor="middle" font-weight="800">7</text>
+    </g>
+  </g>
+  <!-- cards being sorted -->
+  <g transform="translate(330,196)">
+    <rect width="118" height="72" rx="10" fill="#15203a" stroke="#27375c" stroke-width="1.5"/>
+    <rect width="4" height="72" rx="2" fill="#ff6b6b"/>
+    <text x="14" y="22" fill="#ff6b6b" font-size="11" font-weight="800">高危 · 100</text>
+    <text x="14" y="42" fill="#dfe7fb" font-size="11">老板@你：3点前</text>
+    <text x="14" y="60" fill="#8ea0c4" font-size="10">幻觉 <tspan fill="#ffcf5a" font-weight="700">45%</tspan></text>
+  </g>
+  <g transform="translate(462,210)">
+    <rect width="118" height="62" rx="10" fill="#15203a" stroke="#27375c" stroke-width="1.5"/>
+    <rect width="4" height="62" rx="2" fill="#c082ff"/>
+    <text x="14" y="22" fill="#c082ff" font-size="11" font-weight="800">污染</text>
+    <text x="14" y="42" fill="#dfe7fb" font-size="11">假优惠·钓鱼</text>
+    <text x="14" y="56" fill="#46d39a" font-size="10">→ 隔离槽</text>
+  </g>
+  <!-- bottom tagline -->
+  <text x="42" y="320" fill="#5ad0ff" font-size="22" font-weight="800">红点 → 信息卡 → 算力</text>
+  <text x="42" y="352" fill="#8ea0c4" font-size="14">手动分拣 → 半自动 → 全自动 · 幻觉明牌 · 转生晋升</text>
+  <text x="42" y="380" fill="#5f7099" font-size="12" font-style="italic">“你没有清掉红点，你只是把它翻译成了算力。”</text>
+</svg>
