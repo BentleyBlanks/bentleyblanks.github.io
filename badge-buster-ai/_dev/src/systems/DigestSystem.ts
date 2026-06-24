@@ -24,6 +24,9 @@ export class DigestSystem {
   accept(card: InfoCard, mouth: SlotMouth) {
     if (card.busy) return;
     card.busy = true;
+    // stop any in-flight spawn timeline so its onComplete can't fight the eat anim
+    card.spawnTl?.kill();
+    card.spawnTl = null;
     const def = TIERS[card.model.tier];
     const correct = mouth.kind === def.correctSlot;
 

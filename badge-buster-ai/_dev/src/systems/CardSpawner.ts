@@ -66,7 +66,7 @@ export class CardSpawner {
   }
 
   /** Player (or auto-agent) bursts a badge → cards fly out (§A.6.3). */
-  popBadge(icon: AppIcon): boolean {
+  popBadge(icon: AppIcon, opts?: { single?: boolean }): boolean {
     if (icon.count <= 0) return false;
     if (this.cards.length >= BUDGET.maxCards) return false;
     icon.popBadge(1);
@@ -75,7 +75,9 @@ export class CardSpawner {
     this.ctx.particles.burst(local.x, local.y, COLORS.bad, FEEL.burstParticleMin + Math.floor(Math.random() * (FEEL.burstParticleMax - FEEL.burstParticleMin)));
 
     const def = APPS.find((a) => a.id === icon.def.id)!;
-    const n = 1 + Math.floor(Math.random() * Math.min(3, BUDGET.maxCards - this.cards.length));
+    const room = BUDGET.maxCards - this.cards.length;
+    // auto-agents pop a single card so they don't flood the desk with tiny cards
+    const n = opts?.single ? 1 : 1 + Math.floor(Math.random() * Math.min(3, room));
     for (let i = 0; i < n; i++) this.spawnCard(def, local.x, local.y);
     return true;
   }
@@ -84,28 +86,33 @@ export class CardSpawner {
     const model = this.makeModel(def);
     const card = new InfoCard(model);
     card.position.set(fromX, fromY);
-    card.scale.set(0.4);
-    card.rotation = (Math.random() - 0.5) * 0.5;
+    card.scale.set(0.62);
+    card.rotation = (Math.random() - 0.5) * 0.4;
     this.ctx.layers.card.addChild(card);
     this.cards.push(card);
     this.ctx.hallu.refreshCard(card);
 
     const tx = DESK.x0 + Math.random() * (DESK.x1 - DESK.x0);
     const ty = DESK.y0 + Math.random() * (DESK.y1 - DESK.y0);
+    const rot = (Math.random() - 0.5) * 0.18;
     const dur = FEEL.cardFlyMin + Math.random() * (FEEL.cardFlyMax - FEEL.cardFlyMin);
-    gsap.to(card.scale, { x: 1, y: 1, duration: dur * 0.6, ease: 'back.out(2)' });
-    gsap.to(card, {
-      x: tx,
-      rotation: (Math.random() - 0.5) * 0.18,
-      duration: dur,
-      ease: 'power2.out',
+
+    // One synced timeline. onComplete hard-sets the final pose so the card is
+    // GUARANTEED to land full-size on the desk, even if a frame is dropped.
+    const tl = gsap.timeline({
+      onComplete: () => {
+        card.position.set(tx, ty);
+        card.scale.set(1);
+        card.rotation = rot;
+        card.landed = true;
+        card.spawnTl = null;
+      },
     });
-    // arc up then settle with a small bounce (§A.7 落桌弹跳 1–2 次)
-    gsap.to(card, {
-      y: ty,
-      duration: dur,
-      ease: 'bounce.out',
-    });
+    tl.to(card, { x: tx, duration: dur, ease: 'power2.out' }, 0);
+    tl.to(card, { y: ty, duration: dur, ease: 'back.out(1.2)' }, 0); // small settle (§A.7)
+    tl.to(card, { rotation: rot, duration: dur, ease: 'power1.out' }, 0);
+    tl.to(card.scale, { x: 1, y: 1, duration: Math.min(0.3, dur), ease: 'back.out(2)' }, 0);
+    card.spawnTl = tl;
   }
 
   remove(card: InfoCard) {

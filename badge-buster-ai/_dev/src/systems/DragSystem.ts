@@ -41,6 +41,10 @@ export class DragSystem {
     if (!card || card.busy) return;
     this.active = card;
     this.moved = 0;
+    // grabbing mid-flight: stop the spawn timeline so it can't snap the card back
+    card.spawnTl?.kill();
+    card.spawnTl = null;
+    card.landed = true;
     const lp = this.ctx.layers.card.toLocal(e.global);
     this.grabDX = card.x - lp.x;
     this.grabDY = card.y - lp.y;

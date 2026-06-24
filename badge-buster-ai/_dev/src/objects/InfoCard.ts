@@ -15,6 +15,8 @@ export class InfoCard extends Container {
   glitched = false;
   peeked = false;
   busy = false; // locked while digesting / animating into furnace
+  landed = false; // false until the spawn flight finishes (auto-agents wait for this)
+  spawnTl: gsap.core.Timeline | null = null; // spawn-flight timeline; killed on interaction
 
   private body = new Graphics();
   private shadow = new Graphics();

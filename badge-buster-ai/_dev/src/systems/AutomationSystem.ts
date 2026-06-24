@@ -18,11 +18,12 @@ export class AutomationSystem {
 
     if (sweepers > 0) {
       this.sweepT += dt;
-      const interval = Math.max(0.35, 2.4 / sweepers); // faster with more bots
-      if (this.sweepT >= interval) {
+      const interval = Math.max(0.45, 2.4 / sweepers); // faster with more bots
+      // flood guard: leave headroom so the desk never fills with tiny cards
+      if (this.sweepT >= interval && this.ctx.spawner.cards.length < 22) {
         this.sweepT = 0;
         const icon = this.ctx.spawner.randomBadgedIcon();
-        if (icon) this.ctx.spawner.popBadge(icon);
+        if (icon) this.ctx.spawner.popBadge(icon, { single: true });
       }
     }
 
@@ -44,7 +45,9 @@ export class AutomationSystem {
   }
 
   private routeFirst(tiers: Tier[], slot: 'valid' | 'invalid') {
-    const card = this.ctx.spawner.cards.find((c) => !c.busy && tiers.includes(c.model.tier));
+    // only grab cards that have finished their spawn flight, so they never get
+    // yanked into the furnace while still tiny near the phone.
+    const card = this.ctx.spawner.cards.find((c) => c.landed && !c.busy && tiers.includes(c.model.tier));
     if (!card) return;
     this.ctx.digest.accept(card, this.ctx.furnace.mouthByKind(slot));
   }
