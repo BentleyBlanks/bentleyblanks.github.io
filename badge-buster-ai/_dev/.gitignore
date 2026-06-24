@@ -1,0 +1,7 @@
+node_modules
+dist
+.vite
+*.local
+bb_shot.png
+bb_console.log
+chrome-profile
