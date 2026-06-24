@@ -4,15 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>角标清道夫 AI · Badge Buster AI</title>
-    <meta name="theme-color" content="#0b1120" />
-    <meta name="description" content="俯视桌面玩具式增量游戏：点红点、拖卡片、喂炼化炉、提炼算力。" />
+    <meta name="theme-color" content="#3a281a" />
+    <meta name="description" content="俯视桌面玩具式增量游戏：点红点、拖纸条、分拣信息、转交宿主、提炼算力。" />
     <style>
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; }
       body {
-        background: #0b1120;
-        color: #e8eefc;
+        background: #3a281a;
+        color: #f4e8cb;
         font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
         overflow: hidden;
         user-select: none;
@@ -26,15 +26,15 @@
       #boot {
         position: fixed; inset: 0; display: flex; flex-direction: column;
         align-items: center; justify-content: center; gap: 14px; z-index: 10;
-        background: radial-gradient(900px 600px at 70% -10%, #16223f 0%, #0b1120 60%);
+        background: radial-gradient(900px 600px at 72% -10%, #6f4e34 0%, #3a281a 62%);
         transition: opacity .4s; pointer-events: none;
       }
       #boot.hidden { opacity: 0; }
-      #boot .logo { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
-      #boot .logo small { display: block; font-size: 11px; color: #5f7099; font-weight: 500; letter-spacing: 2px; margin-top: 4px; }
-      #boot .bar { width: 180px; height: 6px; border-radius: 999px; background: #1b2742; overflow: hidden; }
+      #boot .logo { font-size: 22px; font-weight: 800; letter-spacing: 1px; color: #f6c66a; }
+      #boot .logo small { display: block; font-size: 11px; color: #c2a06a; font-weight: 500; letter-spacing: 2px; margin-top: 4px; }
+      #boot .bar { width: 180px; height: 6px; border-radius: 999px; background: #4f3722; overflow: hidden; }
       #boot .bar i { display: block; height: 100%; width: 30%; border-radius: 999px;
-        background: linear-gradient(90deg, #5ad0ff, #8a7bff); animation: boot 1.1s ease-in-out infinite; }
+        background: linear-gradient(90deg, #e8932f, #f6c66a); animation: boot 1.1s ease-in-out infinite; }
       @keyframes boot { 0% { transform: translateX(-120%); } 100% { transform: translateX(420%); } }
     </style>
   </head>

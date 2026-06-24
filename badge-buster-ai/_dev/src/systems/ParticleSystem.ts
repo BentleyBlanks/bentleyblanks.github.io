@@ -94,6 +94,33 @@ export class ParticleSystem {
     });
   }
 
+  /** A folded-note parcel handed from the sorting station to the 宿主. */
+  parcel(fromX: number, fromY: number, toX: number, toY: number, ok: boolean, onArrive?: () => void) {
+    const g = this.acquire();
+    const c = ok ? COLORS.paper0 : COLORS.bad;
+    g.roundRect(-6, -5, 12, 10, 2).fill({ color: c, alpha: 0.95 }).stroke({ color: ok ? COLORS.brass : 0x7a1f18, width: 1 });
+    g.position.set(fromX, fromY);
+    const cx = (fromX + toX) / 2 + (Math.random() - 0.5) * 60;
+    const cy = Math.min(fromY, toY) - 70 - Math.random() * 30;
+    const prox = { t: 0 };
+    gsap.to(prox, {
+      t: 1,
+      duration: 0.5,
+      ease: 'power1.inOut',
+      onUpdate: () => {
+        const t = prox.t;
+        const mt = 1 - t;
+        g.x = mt * mt * fromX + 2 * mt * t * cx + t * t * toX;
+        g.y = mt * mt * fromY + 2 * mt * t * cy + t * t * toY;
+        g.rotation += 0.2;
+      },
+      onComplete: () => {
+        this.release(g);
+        onArrive?.();
+      },
+    });
+  }
+
   get liveCount() {
     return this.live;
   }

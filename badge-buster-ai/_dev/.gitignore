@@ -5,3 +5,7 @@ dist
 bb_shot.png
 bb_console.log
 chrome-profile
+# headless-test artifacts
+cp[0-9]*
+shot_*.png
+*.png

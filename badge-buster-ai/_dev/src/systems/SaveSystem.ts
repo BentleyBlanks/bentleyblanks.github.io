@@ -6,6 +6,7 @@ interface SaveBlob {
   compute: number;
   hallucination: number;
   permission: number;
+  satisfaction: number;
   stage: number;
   totalProcessed: number;
   producers: Record<string, number>;
@@ -25,6 +26,7 @@ export class SaveSystem {
         compute: b.compute ?? 0,
         hallucination: b.hallucination ?? 0,
         permission: b.permission ?? 0,
+        satisfaction: b.satisfaction ?? 60,
         stage: b.stage ?? 1,
         totalProcessed: b.totalProcessed ?? 0,
         producers: b.producers ?? {},
@@ -41,6 +43,7 @@ export class SaveSystem {
       compute: s.compute,
       hallucination: s.hallucination,
       permission: s.permission,
+      satisfaction: s.satisfaction,
       stage: s.stage,
       totalProcessed: s.totalProcessed,
       producers: s.producers,

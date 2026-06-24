@@ -17,14 +17,16 @@ export class ShopDrawer extends Container {
     const w = PRODUCERS.length * step + pad * 2;
     const h = 142;
     const bg = new Graphics();
-    bg.roundRect(0, 0, w, h, 16).fill({ color: COLORS.panel, alpha: 0.96 }).stroke({ color: COLORS.line, width: 1.5 });
-    bg.roundRect(6, 6, w - 12, 4, 2).fill({ color: COLORS.acc2, alpha: 0.5 }); // drawer lip
+    bg.roundRect(4, 6, w, h, 16).fill({ color: 0x000000, alpha: 0.25 });
+    bg.roundRect(0, 0, w, h, 16).fill({ color: COLORS.wood1 });
+    bg.roundRect(0, 0, w, h, 16).stroke({ color: COLORS.brass, width: 2 });
+    bg.roundRect(8, 8, w - 16, 22, 7).fill({ color: COLORS.brass, alpha: 0.16 }); // drawer header
     this.addChild(bg);
     const title = new Text({
-      text: '🗄 商店抽屉 · 自动代理',
-      style: new TextStyle({ fontFamily: 'PingFang SC, sans-serif', fontSize: 12, fontWeight: '800', fill: COLORS.muted }),
+      text: '🧰 帮手商店 · 花算力雇自动小帮手',
+      style: new TextStyle({ fontFamily: 'PingFang SC, sans-serif', fontSize: 12, fontWeight: '800', fill: COLORS.brassHi }),
     });
-    title.position.set(pad, 14);
+    title.position.set(pad, 13);
     this.addChild(title);
 
     PRODUCERS.forEach((def, i) => {

@@ -2,7 +2,10 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { gsap } from 'gsap';
 import { COLORS, FEEL } from '../config/theme';
 
-// Red-dot badge (§2.5.3): red jelly bubble, idle bounce, swells with count.
+// Red-dot badge (§2.5.3): a clean glossy red pill, gentle idle bob, swells with
+// count. Earlier версия drew a fat white highlight + a hard squash, which at
+// badge size read as two overlapping blobs — fixed here with a slim crescent
+// sheen, a thin dark rim for legibility on light tiles, and a softer bob.
 export class BadgeBubble extends Container {
   private bg = new Graphics();
   private countLabel: Text;
@@ -12,7 +15,7 @@ export class BadgeBubble extends Container {
     super();
     this.countLabel = new Text({
       text: '',
-      style: new TextStyle({ fontFamily: 'Segoe UI, sans-serif', fontSize: 13, fontWeight: '800', fill: 0xffffff }),
+      style: new TextStyle({ fontFamily: 'Segoe UI, sans-serif', fontSize: 12, fontWeight: '800', fill: 0xffffff }),
     });
     this.countLabel.anchor.set(0.5);
     this.addChild(this.bg, this.countLabel);
@@ -32,11 +35,15 @@ export class BadgeBubble extends Container {
       this.startIdle();
     }
     // swell with count (§2.5.3 数值越大气泡越膨胀).
-    const r = 11 + Math.min(8, Math.log2(n + 1) * 1.6);
+    const r = 10 + Math.min(7, Math.log2(n + 1) * 1.5);
     this.bg.clear();
-    this.bg.circle(0, 0, r + 2).fill({ color: COLORS.bad, alpha: 0.22 });
+    // soft outer glow
+    this.bg.circle(0, 0, r + 3).fill({ color: COLORS.bad, alpha: 0.18 });
+    // dark rim so the dot reads on light app tiles, then the red body
+    this.bg.circle(0, 0, r + 1).fill({ color: 0x5a160f });
     this.bg.circle(0, 0, r).fill({ color: COLORS.bad });
-    this.bg.circle(-r * 0.32, -r * 0.32, r * 0.32).fill({ color: 0xffffff, alpha: 0.4 });
+    // slim crescent sheen across the top — not a second disc
+    this.bg.ellipse(0, -r * 0.38, r * 0.62, r * 0.26).fill({ color: 0xffffff, alpha: 0.32 });
     this.countLabel.text = n > 99 ? '99+' : String(n);
     this.hitArea = { contains: (x: number, y: number) => x * x + y * y <= (r + 4) * (r + 4) } as any;
   }
@@ -44,9 +51,9 @@ export class BadgeBubble extends Container {
   private startIdle() {
     this.stopIdle();
     const period = FEEL.badgeBounceMin + Math.random() * (FEEL.badgeBounceMax - FEEL.badgeBounceMin);
-    this.idle = gsap.to(this.scale, {
-      x: 1.14,
-      y: 0.9,
+    // gentle vertical bob instead of a stretchy squash
+    this.idle = gsap.to(this, {
+      y: this.y - 1.5,
       duration: period / 2,
       ease: 'sine.inOut',
       yoyo: true,
@@ -62,7 +69,7 @@ export class BadgeBubble extends Container {
 
   /** pop feedback when a unit is added. */
   pulse() {
-    gsap.fromTo(this.scale, { x: 1.4, y: 1.4 }, { x: 1, y: 1, duration: 0.3, ease: 'back.out(3)' });
+    gsap.fromTo(this.scale, { x: 1.32, y: 1.32 }, { x: 1, y: 1, duration: 0.32, ease: 'back.out(2.6)' });
   }
 
   destroy(options?: Parameters<Container['destroy']>[0]) {

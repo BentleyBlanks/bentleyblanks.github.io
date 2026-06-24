@@ -52,7 +52,7 @@ export class ItemChip extends Container {
     this.effectText.position.set(48, 33);
     this.badgeText = new Text({
       text: '',
-      style: new TextStyle({ fontFamily: 'PingFang SC, sans-serif', fontSize: 10, fontWeight: '700', fill: COLORS.dim }),
+      style: new TextStyle({ fontFamily: 'PingFang SC, sans-serif', fontSize: 10, fontWeight: '700', fill: COLORS.inkSoft }),
     });
     this.badgeText.position.set(12, H - 22);
     this.costText = new Text({
@@ -90,12 +90,16 @@ export class ItemChip extends Container {
     const accent = r.maxed ? COLORS.good : r.affordable ? this.cfg.accent : COLORS.dim;
     this.costText.style.fill = accent;
     this.bg.clear();
+    // a paper sticker: bright parchment when affordable, faded card when not
+    this.bg
+      .roundRect(0, 2, W, H, 12)
+      .fill({ color: 0x000000, alpha: 0.18 }); // drop shadow
     this.bg
       .roundRect(0, 0, W, H, 12)
-      .fill({ color: r.affordable || r.maxed ? COLORS.panel2 : 0x141d33 })
-      .stroke({ color: accent, width: 1.5, alpha: r.affordable || r.maxed ? 0.85 : 0.4 });
+      .fill({ color: r.affordable || r.maxed ? COLORS.paper0 : COLORS.panel2 })
+      .stroke({ color: accent, width: 1.5, alpha: r.affordable || r.maxed ? 0.9 : 0.45 });
     // thin divider above the cost/level row
-    this.bg.moveTo(12, H - 28).lineTo(W - 12, H - 28).stroke({ color: COLORS.line, width: 1, alpha: 0.5 });
-    this.alpha = r.maxed ? 0.85 : r.affordable ? 1 : 0.72;
+    this.bg.moveTo(12, H - 28).lineTo(W - 12, H - 28).stroke({ color: COLORS.paperLine, width: 1, alpha: 0.7 });
+    this.alpha = r.maxed ? 0.9 : r.affordable ? 1 : 0.82;
   }
 }

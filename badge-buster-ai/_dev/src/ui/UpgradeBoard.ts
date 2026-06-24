@@ -5,7 +5,7 @@ import { store } from '../state/gameStore';
 import { fmt } from '../util/format';
 import { ItemChip } from './ItemChip';
 
-// 升级贴纸板 (§2.5.2 右下). Upgrades shown as stickers / dials / modules.
+// 工作台升级 (§2.5.2 右下). Upgrades shown as paper stickers on a wooden board.
 export class UpgradeBoard extends Container {
   private chips: ItemChip[] = [];
   panelWidth = 0;
@@ -17,13 +17,16 @@ export class UpgradeBoard extends Container {
     const w = UPGRADES.length * step + pad * 2;
     const h = 142;
     const bg = new Graphics();
-    bg.roundRect(0, 0, w, h, 16).fill({ color: COLORS.panel, alpha: 0.96 }).stroke({ color: COLORS.line, width: 1.5 });
+    bg.roundRect(4, 6, w, h, 16).fill({ color: 0x000000, alpha: 0.25 });
+    bg.roundRect(0, 0, w, h, 16).fill({ color: COLORS.wood1 });
+    bg.roundRect(0, 0, w, h, 16).stroke({ color: COLORS.brass, width: 2 });
+    bg.roundRect(8, 8, w - 16, 22, 7).fill({ color: COLORS.brass, alpha: 0.16 });
     this.addChild(bg);
     const title = new Text({
-      text: '🧩 升级贴纸板 · 事实核查 / 吞吐',
-      style: new TextStyle({ fontFamily: 'PingFang SC, sans-serif', fontSize: 12, fontWeight: '800', fill: COLORS.muted }),
+      text: '🔧 工作台升级 · 让你处理得更快更准',
+      style: new TextStyle({ fontFamily: 'PingFang SC, sans-serif', fontSize: 12, fontWeight: '800', fill: COLORS.brassHi }),
     });
-    title.position.set(pad, 12);
+    title.position.set(pad, 13);
     this.addChild(title);
 
     UPGRADES.forEach((def, i) => {

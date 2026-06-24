@@ -3,6 +3,7 @@ import { WORLD_W, WORLD_H } from '../config/theme';
 import { createBackground } from '../objects/Background';
 import { Phone } from '../objects/Phone';
 import { AIFurnace } from '../objects/AIFurnace';
+import { Host } from '../objects/Host';
 import { TopHud } from '../ui/TopHud';
 import { ShopDrawer } from '../ui/ShopDrawer';
 import { UpgradeBoard } from '../ui/UpgradeBoard';
@@ -13,6 +14,7 @@ import { DigestSystem } from '../systems/DigestSystem';
 import { HallucinationSystem } from '../systems/HallucinationSystem';
 import { DragSystem } from '../systems/DragSystem';
 import { AutomationSystem } from '../systems/AutomationSystem';
+import { SweeperSwarm } from '../systems/SweeperSwarm';
 import { SaveSystem } from '../systems/SaveSystem';
 import { store } from '../state/gameStore';
 import type { GameContext, Layers } from './context';
@@ -55,8 +57,13 @@ export class GameRoot {
     this.layers.phone.addChild(phone);
 
     const furnace = new AIFurnace();
-    furnace.position.set(1070, 412);
+    furnace.position.set(1080, 432);
     this.layers.machine.addChild(furnace);
+
+    // the 宿主 sits at the top-right of the desk, above the sorting station
+    const host = new Host();
+    host.position.set(WORLD_W - 324, 78);
+    this.layers.machine.addChild(host);
 
     const hud = new TopHud();
     this.layers.hud.addChild(hud);
@@ -71,6 +78,7 @@ export class GameRoot {
 
     const particles = new ParticleSystem(this.layers.particle);
     const floatText = new FloatingText(this.layers.floating);
+    const swarm = new SweeperSwarm(phone);
 
     // ---- context (filled progressively) ----
     this.ctx = {
@@ -82,7 +90,9 @@ export class GameRoot {
       store,
       furnace,
       phone,
+      host,
       hud,
+      swarm,
       computeAnchor: () => hud.computeAnchor(),
     } as GameContext;
 
@@ -129,8 +139,11 @@ export class GameRoot {
       if (this.uiAcc >= 0.12) {
         this.uiAcc = 0;
         hud.refresh();
+        host.refresh();
         shop.refresh();
         upgrades.refresh();
+        // keep the visible bug swarm in sync with owned 点红点小帮手
+        swarm.sync(store.getState().producers['sweeper'] ?? 0);
       }
     });
   }

@@ -3,6 +3,7 @@ import { FEEL, COLORS } from '../config/theme';
 import { TIERS } from '../config/cards';
 import { sel } from '../state/gameStore';
 import { fmt } from '../util/format';
+import { toastOnce } from '../ui/Toast';
 import type { InfoCard } from '../objects/InfoCard';
 import type { SlotMouth } from '../objects/SlotMouth';
 import type { GameContext } from '../game/context';
@@ -35,7 +36,8 @@ export class DigestSystem {
 
     const s = this.ctx.store.getState();
     const base = def.base * card.model.appMul * card.model.depthMul;
-    const globalMul = sel.yieldMul(s) * sel.permMul(s) * sel.haluDiscount(s) * sel.stageMul(s);
+    const globalMul =
+      sel.yieldMul(s) * sel.permMul(s) * sel.haluDiscount(s) * sel.stageMul(s) * sel.satisfactionMul(s);
 
     let payout = 0;
     let glitched = false;
@@ -45,6 +47,14 @@ export class DigestSystem {
       payout = base * 0.3 * globalMul;
       this.ctx.hallu.onMisclassify();
       glitched = true;
+      // handed the host the wrong tray → he's annoyed
+      this.ctx.store.getState().bumpSatisfaction(-8);
+      this.ctx.host.react('bad');
+      toastOnce(
+        'misclass',
+        '分错托盘了！',
+        '这张卡进了错的托盘，<b>宿主满意度下降</b>，幻觉风险也会上升。拿不准时先<b>点一下卡片偷看</b>再分。',
+      );
     } else {
       // correct routing — but processing may still trigger a hallucination (§6.5)
       glitched = this.ctx.hallu.rollGlitch(card);
@@ -53,8 +63,18 @@ export class DigestSystem {
       if (!glitched) {
         // §4 权限：only-up passive counter, trickles from clean high-tier work
         this.ctx.store.getState().addPermission(def.base >= 25 ? 1 : 0);
+        // good info delivered → host happier (high-value intel pleases him more)
+        this.ctx.store.getState().bumpSatisfaction(def.base >= 25 ? 6 : 3);
+        this.ctx.host.react('good');
       } else {
         this.ctx.store.getState().bumpHallucination(2); // §6.7 漏判小挫折
+        this.ctx.store.getState().bumpSatisfaction(-4);
+        this.ctx.host.react('bad');
+        toastOnce(
+          'glitch',
+          '⚠️ 幻觉发作了',
+          '幻觉风险太高时，卡片内容会被<b>篡改成假消息</b>（看那张抖动变红的卡）。把假信息转交给宿主＝坑了他。<b>买“事实核查/信息加固”能压住幻觉。</b>',
+        );
       }
     }
 
@@ -118,10 +138,15 @@ export class DigestSystem {
     const fl = this.ctx.layers.floating.toLocal(core);
     this.ctx.floatText.pop(fl.x, fl.y - 10, `+${fmt(amount)}`, job.glitched ? COLORS.bad : COLORS.acc, 22);
 
+    const src = this.ctx.layers.particle.toLocal(core);
+
+    // hand the tidied note over to the 宿主 — the visible "info delivered" beat
+    const hostPos = this.ctx.layers.particle.toLocal(this.ctx.host.avatarWorldPos());
+    this.ctx.particles.parcel(src.x, src.y, hostPos.x, hostPos.y, !job.glitched);
+
     // a few compute chips fly to the HUD readout (§2.5.3)
     const hud = this.ctx.computeAnchor();
     const target = this.ctx.layers.particle.toLocal(hud);
-    const src = this.ctx.layers.particle.toLocal(core);
     const chips = Math.min(4, 1 + Math.floor(amount / 8));
     for (let i = 0; i < chips; i++) {
       gsap.delayedCall(i * 0.05, () => this.ctx.particles.chip(src.x, src.y, target.x, target.y, () => this.ctx.hud.pulseCompute()));

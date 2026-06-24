@@ -21,9 +21,15 @@ export class AutomationSystem {
       const interval = Math.max(0.45, 2.4 / sweepers); // faster with more bots
       // flood guard: leave headroom so the desk never fills with tiny cards
       if (this.sweepT >= interval && this.ctx.spawner.cards.length < 22) {
-        this.sweepT = 0;
         const icon = this.ctx.spawner.randomBadgedIcon();
-        if (icon) this.ctx.spawner.popBadge(icon, { single: true });
+        if (!icon) {
+          this.sweepT = 0;
+        } else {
+          // send a visible bug to crawl over and poke the red dot; the card only
+          // pops when it arrives, so the player sees who is clearing the badges.
+          const sent = this.ctx.swarm.trySweep(icon, () => this.ctx.spawner.popBadge(icon, { single: true }));
+          if (sent) this.sweepT = 0; // else all bugs busy — retry next tick
+        }
       }
     }
 

@@ -7,6 +7,7 @@ export interface GameState {
   compute: number;
   hallucination: number; // global probability bar 0..75 (§6)
   permission: number; // passive multiplier counter (§4)
+  satisfaction: number; // 宿主满意度 0..100 — feedback on whether we hand over good info
   stage: number; // 宿主阶段 1..5
   totalProcessed: number;
   producers: Record<string, number>; // id -> owned count
@@ -16,6 +17,7 @@ export interface GameState {
   spend: (n: number) => boolean;
   bumpHallucination: (delta: number) => void;
   addPermission: (n: number) => void;
+  bumpSatisfaction: (delta: number) => void;
   markProcessed: () => void;
   buyProducer: (id: string) => boolean;
   buyUpgrade: (id: string) => boolean;
@@ -28,6 +30,7 @@ export const store = createStore<GameState>((set, get) => ({
   compute: 0,
   hallucination: 0,
   permission: 0,
+  satisfaction: 60, // 宿主 starts mildly content
   stage: 1,
   totalProcessed: 0,
   producers: {},
@@ -42,6 +45,8 @@ export const store = createStore<GameState>((set, get) => ({
   bumpHallucination: (delta) =>
     set((s) => ({ hallucination: Math.max(0, Math.min(HALLU_CAP, s.hallucination + delta)) })),
   addPermission: (n) => set((s) => ({ permission: s.permission + n })),
+  bumpSatisfaction: (delta) =>
+    set((s) => ({ satisfaction: Math.max(0, Math.min(100, s.satisfaction + delta)) })),
   markProcessed: () => set((s) => ({ totalProcessed: s.totalProcessed + 1 })),
 
   buyProducer: (id) => {
@@ -79,4 +84,6 @@ export const sel = {
   suppression: (s: GameState) => 0.12 * (s.upgrades['suppress'] ?? 0),
   // §6.2 passive decay: base −1%/s + 事实核查 −1%/s per level.
   decayPerSec: (s: GameState) => 1 + (s.upgrades['factcheck'] ?? 0),
+  // 宿主满意度 multiplier on output: 0.7× at 0, 1.0× at 50, 1.3× at 100.
+  satisfactionMul: (s: GameState) => 0.7 + 0.006 * s.satisfaction,
 };
