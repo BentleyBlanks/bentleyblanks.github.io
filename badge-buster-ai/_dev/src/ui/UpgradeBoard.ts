@@ -13,9 +13,9 @@ export class UpgradeBoard extends Container {
   constructor() {
     super();
     const pad = 14;
-    const step = 162;
+    const step = 168;
     const w = UPGRADES.length * step + pad * 2;
-    const h = 124;
+    const h = 142;
     const bg = new Graphics();
     bg.roundRect(0, 0, w, h, 16).fill({ color: COLORS.panel, alpha: 0.96 }).stroke({ color: COLORS.line, width: 1.5 });
     this.addChild(bg);
@@ -36,8 +36,9 @@ export class UpgradeBoard extends Container {
           const maxed = lvl >= def.maxLevel;
           const cost = upgradeCost(def, lvl);
           return {
+            effect: def.desc,
+            badge: `Lv ${lvl}/${def.maxLevel}`,
             cost: fmt(cost),
-            sub: `Lv ${lvl}/${def.maxLevel}  ·  ${def.desc}`,
             affordable: !maxed && store.getState().compute >= cost,
             maxed,
           };

@@ -1,5 +1,6 @@
 import { createPixiApp } from './app/createPixiApp';
 import { GameRoot } from './game/GameRoot';
+import { IntroGuide } from './ui/IntroGuide';
 
 // Entry: boot Pixi, hand off to GameRoot, fade out the HTML loader (§A.13).
 async function boot() {
@@ -13,6 +14,11 @@ async function boot() {
     loader.classList.add('hidden');
     setTimeout(() => loader.remove(), 500);
   }
+
+  // onboarding: first-run intro dialogue + always-on replay button
+  const guide = new IntroGuide();
+  guide.mountReplayButton();
+  setTimeout(() => guide.show(), 650);
 }
 
 boot().catch((err) => {

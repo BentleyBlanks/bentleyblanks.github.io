@@ -4,8 +4,8 @@ import { COLORS } from '../config/theme';
 import { TIERS } from '../config/cards';
 import type { CardModel } from '../types';
 
-const CARD_W = 158;
-const CARD_H = 96;
+const CARD_W = 176;
+const CARD_H = 112;
 
 // Info card = a paper scrap on the desk (§2.5.3 信息卡是纸片/便签). NOT a list row.
 export class InfoCard extends Container {
@@ -34,34 +34,34 @@ export class InfoCard extends Container {
 
     this.shadow.roundRect(-CARD_W / 2 + 4, -CARD_H / 2 + 8, CARD_W, CARD_H, 12).fill({ color: 0x000000, alpha: 0.35 });
 
-    this.appEmoji = new Text({ text: model.appEmoji, style: new TextStyle({ fontFamily: 'Segoe UI Emoji', fontSize: 15 }) });
+    this.appEmoji = new Text({ text: model.appEmoji, style: new TextStyle({ fontFamily: 'Segoe UI Emoji', fontSize: 17 }) });
     this.appEmoji.anchor.set(1, 0);
-    this.appEmoji.position.set(CARD_W / 2 - 12, -CARD_H / 2 + 9);
+    this.appEmoji.position.set(CARD_W / 2 - 12, -CARD_H / 2 + 10);
 
     this.tierText = new Text({
       text: def.label,
-      style: new TextStyle({ fontFamily: 'PingFang SC, sans-serif', fontSize: 11, fontWeight: '800', fill: def.color, letterSpacing: 1 }),
+      style: new TextStyle({ fontFamily: 'PingFang SC, sans-serif', fontSize: 12, fontWeight: '800', fill: def.color, letterSpacing: 1 }),
     });
-    this.tierText.position.set(-CARD_W / 2 + 16, -CARD_H / 2 + 10);
+    this.tierText.position.set(-CARD_W / 2 + 16, -CARD_H / 2 + 11);
 
     const bodyStyle = new TextStyle({
       fontFamily: 'PingFang SC, sans-serif',
-      fontSize: 13,
+      fontSize: 14.5,
       fill: 0xdfe7fb,
       wordWrap: true,
       wordWrapWidth: CARD_W - 28,
-      lineHeight: 17,
+      lineHeight: 19,
     });
     this.bodyText = new Text({ text: model.text, style: bodyStyle });
-    this.bodyText.position.set(-CARD_W / 2 + 14, -CARD_H / 2 + 30);
+    this.bodyText.position.set(-CARD_W / 2 + 14, -CARD_H / 2 + 34);
     // duplicated layer used only for the chromatic-glitch look (§6.5 故障闪烁).
     const glitchStyle = new TextStyle({
       fontFamily: 'PingFang SC, sans-serif',
-      fontSize: 13,
+      fontSize: 14.5,
       fill: 0xff3b3b,
       wordWrap: true,
       wordWrapWidth: CARD_W - 28,
-      lineHeight: 17,
+      lineHeight: 19,
     });
     this.glitchText = new Text({ text: model.glitchText, style: glitchStyle });
     this.glitchText.position.copyFrom(this.bodyText.position);
@@ -69,7 +69,7 @@ export class InfoCard extends Container {
 
     this.haluText = new Text({
       text: '',
-      style: new TextStyle({ fontFamily: 'Segoe UI, sans-serif', fontSize: 10, fontWeight: '700', fill: COLORS.warn }),
+      style: new TextStyle({ fontFamily: 'Segoe UI, sans-serif', fontSize: 11, fontWeight: '700', fill: COLORS.warn }),
     });
     this.haluText.anchor.set(0, 1);
     this.haluText.position.set(-CARD_W / 2 + 14, CARD_H / 2 - 8);

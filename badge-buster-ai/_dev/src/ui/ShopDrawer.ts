@@ -13,9 +13,9 @@ export class ShopDrawer extends Container {
   constructor() {
     super();
     const pad = 14;
-    const step = 162;
+    const step = 168;
     const w = PRODUCERS.length * step + pad * 2;
-    const h = 124;
+    const h = 142;
     const bg = new Graphics();
     bg.roundRect(0, 0, w, h, 16).fill({ color: COLORS.panel, alpha: 0.96 }).stroke({ color: COLORS.line, width: 1.5 });
     bg.roundRect(6, 6, w - 12, 4, 2).fill({ color: COLORS.acc2, alpha: 0.5 }); // drawer lip
@@ -35,7 +35,7 @@ export class ShopDrawer extends Container {
         read: () => {
           const owned = store.getState().producers[def.id] ?? 0;
           const cost = producerCost(def, owned);
-          return { cost: fmt(cost), sub: `${def.desc}  ·  ×${owned}`, affordable: store.getState().compute >= cost, maxed: false };
+          return { effect: def.desc, badge: `拥有 ×${owned}`, cost: fmt(cost), affordable: store.getState().compute >= cost, maxed: false };
         },
         buy: () => store.getState().buyProducer(def.id),
       });

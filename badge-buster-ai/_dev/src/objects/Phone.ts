@@ -7,7 +7,7 @@ import { AppIcon } from './AppIcon';
 export class Phone extends Container {
   readonly icons: AppIcon[] = [];
   readonly screenW = 248;
-  readonly screenH = 470;
+  readonly screenH = 410;
 
   constructor() {
     super();
@@ -40,8 +40,8 @@ export class Phone extends Container {
     // 4×2 grid of app icons
     const cols = 2;
     const cellW = this.screenW / cols;
-    const cellH = 100;
-    const top = -this.screenH / 2 + 56;
+    const cellH = 86;
+    const top = -this.screenH / 2 + 50;
     APPS.forEach((def, i) => {
       const icon = new AppIcon(def);
       const col = i % cols;

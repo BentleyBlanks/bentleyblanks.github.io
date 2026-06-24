@@ -51,22 +51,22 @@ export class GameRoot {
 
     // ---- objects ----
     const phone = new Phone();
-    phone.position.set(238, 432);
+    phone.position.set(238, 416);
     this.layers.phone.addChild(phone);
 
     const furnace = new AIFurnace();
-    furnace.position.set(1070, 430);
+    furnace.position.set(1070, 412);
     this.layers.machine.addChild(furnace);
 
     const hud = new TopHud();
     this.layers.hud.addChild(hud);
 
     const shop = new ShopDrawer();
-    shop.position.set(16, 668);
+    shop.position.set(16, 654);
     this.layers.tableProp.addChild(shop);
 
     const upgrades = new UpgradeBoard();
-    upgrades.position.set(WORLD_W - upgrades.panelWidth - 16, 668);
+    upgrades.position.set(WORLD_W - upgrades.panelWidth - 16, 654);
     this.layers.tableProp.addChild(upgrades);
 
     const particles = new ParticleSystem(this.layers.particle);

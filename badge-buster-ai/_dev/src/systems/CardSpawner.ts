@@ -8,7 +8,8 @@ import type { CardModel, Tier } from '../types';
 import type { GameContext } from '../game/context';
 
 // Desk scatter zone where popped cards land (§2.5.2 中央桌面：信息卡散落区).
-const DESK = { x0: 372, x1: 824, y0: 232, y1: 648 };
+// Kept clear of the phone (right edge ~376) and the furnace mouths (~850).
+const DESK = { x0: 452, x1: 808, y0: 250, y1: 632 };
 
 export class CardSpawner {
   readonly cards: InfoCard[] = [];

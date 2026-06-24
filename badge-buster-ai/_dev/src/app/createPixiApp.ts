@@ -9,7 +9,10 @@ export async function createPixiApp(mount: HTMLElement): Promise<Application> {
     resizeTo: window,
     antialias: true,
     autoDensity: true,
-    resolution: Math.min(window.devicePixelRatio || 1, 2),
+    // The world container is up-scaled to fit the viewport, which stretches
+    // rasterized text. Render at >=2x (capped at 3) so text stays crisp even
+    // when the world scale exceeds 1 on large displays.
+    resolution: Math.min(Math.max(window.devicePixelRatio || 1, 2), 3),
     powerPreference: 'high-performance',
   });
   mount.appendChild(app.canvas);

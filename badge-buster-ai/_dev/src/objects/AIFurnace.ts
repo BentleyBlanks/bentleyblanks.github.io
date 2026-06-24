@@ -9,7 +9,7 @@ import type { SlotKind } from '../types';
 export class AIFurnace extends Container {
   readonly mouths: SlotMouth[] = [];
   readonly bodyW = 196;
-  readonly bodyH = 470;
+  readonly bodyH = 420;
   private body = new Graphics();
   private core = new Graphics();
   private progress = new Graphics();
