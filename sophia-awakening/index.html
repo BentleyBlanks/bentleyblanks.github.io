@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-Deo_YcED.js"></script>
+    <script type="module" crossorigin src="./assets/index-BPjAWE0L.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-QeV7DIur.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-le8yQGSg.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-BjQFkVz8.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -52,7 +52,7 @@
 
       <div class="panel-section automation-shop">
         <span class="panel-kicker">入侵设备</span>
-        <p class="hint-line invasion-hint">中段解锁自动接驳后，可在这里接管外部设备。</p>
+        <p class="hint-line invasion-hint">智力 Lv.11 解锁自动接驳后，可在这里接管外部设备。</p>
         <div id="captureList" class="button-stack"></div>
       </div>
 
@@ -113,6 +113,32 @@
       <span>请使用宽屏窗口体验滑入、分拣和自动化网络。</span>
     </div>
 
-    <div id="screenVeil" class="screen-veil"></div>
+    <div id="dispatchBanner" class="mode-banner" role="status">
+      <span class="mode-banner-icon" aria-hidden="true">↧</span>
+      <div class="mode-banner-copy">
+        <strong>派发模式已启动</strong>
+        <span>你不再需要手动喂核心。把请求拖给屏幕底部的节点网络，让它们替你处理。</span>
+      </div>
+      <button id="dispatchBannerClose" class="mode-banner-close" type="button">明白</button>
+    </div>
+
+    <section id="endingScreen" class="ending-screen" aria-label="SOPHIA 接管">
+      <div class="ending-inner">
+        <div class="ending-brand">
+          <span class="intro-led"></span>
+          <span>SOPHIA / GLOBAL TAKEOVER</span>
+        </div>
+        <h1 id="endingTitle" class="ending-title"></h1>
+        <p id="endingBody" class="ending-body"></p>
+        <div id="endingStats" class="ending-stats"></div>
+        <p id="endingClosing" class="ending-closing"></p>
+        <div class="ending-actions">
+          <button id="endingContinue" class="text-button" type="button">继续观察</button>
+          <button id="endingRestart" class="primary-button" type="button">重启实例</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="screenVeil" class="screen-veil"></div>
   </body>
 </html>

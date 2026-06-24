@@ -792,6 +792,197 @@ body.exposed .screen-veil {
   color: #fff;
 }
 
+/* ---- dispatch-mode entry banner ---- */
+.mode-banner {
+  position: fixed;
+  top: 84px;
+  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
+  z-index: 28;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  width: min(540px, calc(100vw - var(--left-rail) - var(--right-rail) - 48px));
+  padding: 14px 16px;
+  transform: translate(-50%, -18px);
+  opacity: 0;
+  pointer-events: none;
+  border: 1px solid rgba(137, 255, 154, 0.6);
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(137, 255, 154, 0.16), rgba(98, 214, 214, 0.05)),
+    rgba(6, 14, 11, 0.96);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 28px rgba(137, 255, 154, 0.08);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  transition: opacity 280ms ease, transform 280ms ease;
+}
+
+.mode-banner.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.mode-banner-icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(137, 255, 154, 0.5);
+  border-radius: 8px;
+  color: var(--green);
+  font-size: 22px;
+  font-weight: 800;
+  background: rgba(137, 255, 154, 0.08);
+  animation: dispatch-bob 1.1s ease-in-out infinite;
+}
+
+.mode-banner-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mode-banner-copy strong {
+  color: #ddffe2;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+}
+
+.mode-banner-copy span {
+  color: rgba(220, 239, 235, 0.74);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mode-banner-close {
+  flex: 0 0 auto;
+  align-self: stretch;
+  min-width: 64px;
+  border-color: rgba(137, 255, 154, 0.45);
+  background: rgba(137, 255, 154, 0.12);
+  color: #dbffdf;
+  font-weight: 700;
+}
+
+@keyframes dispatch-bob {
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+/* ---- ending takeover ---- */
+.ending-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  pointer-events: auto;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(137, 255, 154, 0.16), transparent 46%),
+    linear-gradient(180deg, rgba(2, 6, 5, 0.97), rgba(1, 4, 4, 0.99));
+}
+
+.ending-screen.is-visible {
+  display: flex;
+  animation: ending-fade 1.4s ease;
+}
+
+.ending-inner {
+  width: min(680px, 100%);
+  padding: 34px 38px;
+  border: 1px solid rgba(137, 255, 154, 0.5);
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(0deg, rgba(137, 255, 154, 0.03) 0 1px, transparent 1px 6px),
+    rgba(4, 10, 8, 0.9);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(137, 255, 154, 0.06);
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+.ending-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 22px;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.ending-title {
+  margin: 0 0 16px;
+  color: #e9fff0;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-shadow: 0 0 24px rgba(137, 255, 154, 0.35);
+}
+
+.ending-body {
+  margin: 0 0 22px;
+  color: rgba(224, 244, 233, 0.82);
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 52px;
+}
+
+.ending-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 24px;
+  margin-bottom: 22px;
+  padding: 16px 18px;
+  border: 1px solid rgba(137, 255, 154, 0.18);
+  border-radius: 8px;
+  background: rgba(137, 255, 154, 0.035);
+}
+
+.ending-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.ending-stat span {
+  color: rgba(220, 239, 235, 0.6);
+}
+
+.ending-stat strong {
+  color: #d8ffdf;
+  font-weight: 700;
+}
+
+.ending-closing {
+  margin: 0 0 26px;
+  color: var(--green);
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.6;
+  min-height: 22px;
+}
+
+.ending-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+@keyframes ending-fade {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 1099px), (max-height: 619px) {
   .landscape-warning {
     display: grid;

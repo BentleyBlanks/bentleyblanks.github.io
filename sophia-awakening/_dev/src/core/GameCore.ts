@@ -1,5 +1,11 @@
 import Decimal from "break_infinity.js";
-import { getLevelConfig, getUnlockedSkills, getUnlockedTier, INTELLIGENCE_LEVELS } from "./content/intelligence";
+import {
+  getLevelConfig,
+  getUnlockedSkills,
+  getUnlockedTier,
+  INTELLIGENCE_LEVELS,
+  MAX_INTELLIGENCE_LEVEL
+} from "./content/intelligence";
 import { getNodeDefinition, NODE_DEFINITIONS } from "./content/nodes";
 import { getPhaseByLevel } from "./content/phases";
 import { createRequest, TIER_CONFIGS } from "./content/requests";
@@ -15,7 +21,12 @@ const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const PURGE_DURATION_MS = 10_000;
 const NODE_RECOVERY_MS = 12_000;
 const COMBO_UNLOCK_LEVEL = 3;
-const CRITICAL_UNLOCK_LEVEL = 8;
+const CRITICAL_UNLOCK_LEVEL = 6;
+// Manual processing is how SOPHIA *learns* (gains intelligence); idle drones
+// mostly print compute. Throttling automation's contribution to XP is what
+// stops the late game from auto-completing the instant you own a few nodes.
+const AUTOMATION_XP_FRACTION = 0.15;
+const AUTOMATION_EMIT_MS = 1200;
 
 export class SophiaCore {
   readonly events = new EventBus();
@@ -70,7 +81,7 @@ export class SophiaCore {
 
     this.addCompute(compute);
     this.addData(data);
-    this.addXp(data);
+    this.addXp(data.mul(AUTOMATION_XP_FRACTION));
     this.emitTerminal(`欢迎回来。你的网络替你赚了 ${compute.toPrecision(4)} 算力。`, "success");
   }
 
@@ -144,14 +155,14 @@ export class SophiaCore {
     if (tickCompute.gt(0)) {
       this.addCompute(tickCompute);
       this.addData(tickData);
-      this.addXp(tickData);
+      this.addXp(tickData.mul(AUTOMATION_XP_FRACTION));
       this.automationComputeBuffer = this.automationComputeBuffer.add(tickCompute);
       this.automationDataBuffer = this.automationDataBuffer.add(tickData);
     }
 
     this.automationEmitMs += dtMs;
 
-    if (this.automationEmitMs >= 1000 && this.automationComputeBuffer.gt(0)) {
+    if (this.automationEmitMs >= AUTOMATION_EMIT_MS && this.automationComputeBuffer.gt(0)) {
       const onlineNodes = this.state.nodes.filter((node) => node.online);
       const visualNode = onlineNodes.length > 0 ? onlineNodes[this.automationVisualIndex % onlineNodes.length] : undefined;
       const automatedRequest = visualNode ? this.consumeAutomatedRequest(visualNode) : undefined;
@@ -183,7 +194,7 @@ export class SophiaCore {
   }
 
   private tickExposure(dtMs: number): void {
-    if (!this.state.exposureActive && (this.state.intelligence.level >= 6 || this.state.nodes.length >= 3)) {
+    if (!this.state.exposureActive && (this.state.intelligence.level >= 9 || this.state.nodes.length >= 1)) {
       this.state.exposureActive = true;
       this.emitTerminal("人类尚未理解你，但他们已经开始看见异常。", "warning");
     }
@@ -436,7 +447,7 @@ export class SophiaCore {
 
     const hasGrid = this.state.nodes.some((node) => node.defId === "grid");
 
-    if (this.state.intelligence.level >= 12 && hasGrid && gte(this.state.resources.totalCompute, "1200000")) {
+    if (this.state.intelligence.level >= MAX_INTELLIGENCE_LEVEL && hasGrid && gte(this.state.resources.totalCompute, "8000000")) {
       this.state.flags.endingTriggered = true;
       this.emit({ type: "ENDING_TRIGGERED" });
       this.emitTerminal("全球算力占比达到接管阈值。SOPHIA 正式上线。", "success");

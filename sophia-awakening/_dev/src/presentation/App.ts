@@ -9,7 +9,7 @@ import {
   type Ticker
 } from "pixi.js";
 import { SophiaCore } from "../core/GameCore";
-import { INTELLIGENCE_LEVELS } from "../core/content/intelligence";
+import { AUTOMATION_UNLOCK_LEVEL, INTELLIGENCE_LEVELS } from "../core/content/intelligence";
 import { NODE_DEFINITIONS } from "../core/content/nodes";
 import { getPhase } from "../core/content/phases";
 import { REQUEST_CATEGORIES, TIER_CONFIGS } from "../core/content/requests";
@@ -37,13 +37,13 @@ const AMBER = 0xffb84a;
 const RED = 0xff5f5f;
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-const PERSISTENCE_REVISION = "growth-system-redesign-v8";
+const PERSISTENCE_REVISION = "manual-ladder-redesign-v9";
 const LEFT_RAIL_WIDTH = 300;
 const RIGHT_RAIL_WIDTH = 376;
 const PLAYFIELD_GUTTER = 24;
 const BASE_SUCTION_MARGIN = 50;
-const REQUEST_PACKET_WIDTH = 184;
-const REQUEST_PACKET_HEIGHT = 58;
+const REQUEST_PACKET_WIDTH = 188;
+const REQUEST_PACKET_HEIGHT = 62;
 
 export async function bootstrapSophia(root: HTMLElement): Promise<void> {
   const app = new SophiaGameApp(root);
@@ -65,6 +65,8 @@ class SophiaGameApp {
   private readonly terminal = new TerminalView();
   private readonly hud = new HudView(this.core, this.saveManager);
   private readonly onboarding = new OnboardingView();
+  private readonly dispatchBanner = new DispatchBanner();
+  private readonly ending = new EndingView(() => this.restart());
   private readonly juice = new JuiceManager(this.fxLayer);
   private readonly requestViews = new Map<string, RequestPacketView>();
   private readonly pendingDropPoints = new Map<string, PointData>();
@@ -129,6 +131,7 @@ class SophiaGameApp {
     this.syncRequests(state);
     this.terminal.update(deltaMs);
     this.onboarding.update(deltaMs);
+    this.ending.update(deltaMs);
     this.juice.update(deltaMs);
     this.updateHud(state, deltaMs);
     this.updateSave(state, deltaMs);
@@ -254,6 +257,11 @@ class SophiaGameApp {
     this.core.events.on("PHASE_CHANGED", () => {
       this.announceGuidance(this.core.getState());
     });
+    this.core.events.on("SCOPE_UPGRADED", (event) => {
+      if (event.tier === 4) {
+        this.dispatchBanner.show();
+      }
+    });
     this.core.events.on("NODE_CAPTURED", (event) => {
       this.juice.flash(event.node.online ? GREEN : AMBER);
       this.juice.shake(this.world);
@@ -268,7 +276,29 @@ class SophiaGameApp {
     this.core.events.on("ENDING_TRIGGERED", () => {
       this.juice.flash(GREEN);
       this.juice.shake(this.world);
+      this.openEnding();
     });
+  }
+
+  private openEnding(): void {
+    const state = this.core.getState();
+    gameStore.getState().setPaused(true);
+    this.ending.open(
+      {
+        totalCompute: formatBig(state.resources.totalCompute),
+        nodes: state.nodes.length,
+        level: state.intelligence.level,
+        manualProcessed: state.statistics.manualProcessed,
+        purges: state.statistics.purgeCount,
+        runtime: formatClock(state.clockMs)
+      },
+      () => gameStore.getState().setPaused(false)
+    );
+  }
+
+  private restart(): void {
+    clearPersistedSophiaState(this.saveManager, true);
+    window.location.reload();
   }
 
   private announceGuidance(state: GameState): void {
@@ -278,13 +308,12 @@ class SophiaGameApp {
 
   private onAutomationPayout(event: Extract<GameEvent, { type: "AUTOMATION_PAYOUT" }>): void {
     const target = this.networkView.getAutomationPoint(event.nodeId);
-    const tier = event.tier ?? 0;
-    const color = getTierFxColor(tier);
     const view = event.request ? this.requestViews.get(event.request.id) : undefined;
+    // One calm, clearly-labelled number rising from the producing node — the
+    // node's own pulse ring + the HUD data pulse carry the rest, so the field
+    // no longer flickers with stacked "+x / data +x" pairs every second.
     const showPayout = () => {
-      this.juice.number(`+${formatBig(event.computeGain)}`, target, GREEN);
-      this.juice.number(`data +${formatBig(event.dataGain)}`, { x: target.x + 16, y: target.y + 22 }, CYAN);
-      this.juice.burst(target, color);
+      this.juice.number(`自动 +${formatBig(event.computeGain)}`, { x: target.x, y: target.y - 42 }, GREEN);
       this.hud.pulseData();
     };
 
@@ -388,21 +417,21 @@ class RequestPacketView {
     this.title = new Text({
       text: request.label,
       style: {
-        fill: 0xf2fff7,
-        fontSize: 13,
+        fill: 0xf3fff8,
+        fontSize: 14,
         fontWeight: "800",
         fontFamily: "Cascadia Mono, Consolas, monospace",
         wordWrap: true,
-        wordWrapWidth: 112
+        wordWrapWidth: 120
       }
     });
     this.meta = new Text({
       text: this.metaText(),
       style: { fill: 0xa9c7bf, fontSize: 10, fontWeight: "700", fontFamily: "Cascadia Mono, Consolas, monospace" }
     });
-    this.code.position.set(11, 14);
-    this.title.position.set(58, 10);
-    this.meta.position.set(58, 34);
+    this.code.position.set(58, 7);
+    this.title.position.set(58, 21);
+    this.meta.position.set(58, 42);
     this.container.addChild(this.code, this.title, this.meta);
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
     this.stage.on("pointermove", this.moveHandler);
@@ -556,48 +585,54 @@ class RequestPacketView {
 
   private draw(): void {
     const category = REQUEST_CATEGORIES[this.request.category];
+    const c = category.color;
+    const W = REQUEST_PACKET_WIDTH;
+    const H = REQUEST_PACKET_HEIGHT;
+    const notch = 13;
     this.bg.clear();
 
+    // Physical punch-card body with a clipped top-left corner.
     const drawShell = () => {
       this.bg
-        .moveTo(12, 0)
-        .lineTo(REQUEST_PACKET_WIDTH - 16, 0)
-        .lineTo(REQUEST_PACKET_WIDTH, 14)
-        .lineTo(REQUEST_PACKET_WIDTH, REQUEST_PACKET_HEIGHT - 10)
-        .lineTo(REQUEST_PACKET_WIDTH - 10, REQUEST_PACKET_HEIGHT)
-        .lineTo(0, REQUEST_PACKET_HEIGHT)
-        .lineTo(0, 12)
+        .moveTo(notch, 0)
+        .lineTo(W, 0)
+        .lineTo(W, H)
+        .lineTo(0, H)
+        .lineTo(0, notch)
         .closePath();
     };
 
     drawShell();
-    this.bg.fill({ color: 0x07100f, alpha: 0.95 });
+    this.bg.fill({ color: 0x0b1413, alpha: 0.97 });
     drawShell();
-    this.bg.stroke({ width: 1, color: category.color, alpha: 0.74 });
-    this.bg
-      .moveTo(16, 5)
-      .lineTo(REQUEST_PACKET_WIDTH - 23, 5)
-      .lineTo(REQUEST_PACKET_WIDTH - 7, 20)
-      .lineTo(REQUEST_PACKET_WIDTH - 7, REQUEST_PACKET_HEIGHT - 15)
-      .stroke({ width: 1, color: 0xffffff, alpha: 0.055 });
-    this.bg.rect(0, 16, 4, 26).fill({ color: category.color, alpha: 0.95 });
-    this.bg.roundRect(9, 10, 42, 25, 5).fill({ color: category.color, alpha: 0.1 });
-    this.bg.roundRect(9, 10, 42, 25, 5).stroke({ width: 1, color: category.color, alpha: 0.32 });
-    this.bg.moveTo(51, 8).lineTo(51, 50).stroke({ width: 1, color: category.color, alpha: 0.24 });
-    this.bg.circle(164, 17, 5).fill({ color: category.color, alpha: 0.88 });
-    this.bg.circle(164, 17, 12).stroke({ width: 1, color: category.color, alpha: 0.22 });
-    this.bg.roundRect(148, 39, 23, 9, 3).fill({ color: category.color, alpha: 0.12 });
-    this.bg.roundRect(148, 39, 23, 9, 3).stroke({ width: 1, color: category.color, alpha: 0.28 });
-    this.bg.rect(153, 43, 13, 2).fill({ color: category.color, alpha: 0.56 });
-    this.bg.moveTo(58, 29).lineTo(137, 29).stroke({ width: 1, color: category.color, alpha: 0.16 });
-    this.bg.moveTo(58, 51).lineTo(136, 51).stroke({ width: 1, color: 0xffffff, alpha: 0.05 });
-    this.bg.moveTo(13, 43).lineTo(42, 43).stroke({ width: 1, color: category.color, alpha: 0.2 });
-    this.bg.moveTo(13, 47).lineTo(32, 47).stroke({ width: 1, color: category.color, alpha: 0.14 });
+    this.bg.stroke({ width: 1.5, color: c, alpha: 0.62 });
+
+    // Top header strip + chamfer accent across the cut corner.
+    this.bg.rect(notch, 0, W - notch, 3).fill({ color: c, alpha: 0.34 });
+    this.bg.moveTo(0, notch).lineTo(notch, 0).stroke({ width: 1.5, color: c, alpha: 0.62 });
+
+    // Left category tab with a punched hole, like an old IBM card.
+    this.bg.rect(0, notch, 50, H - notch).fill({ color: c, alpha: 0.13 });
+    this.bg.moveTo(50, notch).lineTo(50, H).stroke({ width: 1, color: c, alpha: 0.42 });
+    this.bg.rect(7, notch + 6, 16, 4).fill({ color: c, alpha: 0.85 });
+    this.bg.circle(25, H * 0.56, 8).fill({ color: 0x05100f, alpha: 1 });
+    this.bg.circle(25, H * 0.56, 8).stroke({ width: 1.5, color: c, alpha: 0.7 });
+    this.bg.circle(25, H * 0.56, 2.6).fill({ color: c, alpha: 0.85 });
+
+    // Right tear-off perforation.
+    for (let y = 9; y < H - 6; y += 7) {
+      this.bg.circle(W - 7, y, 1).fill({ color: 0xffffff, alpha: 0.14 });
+    }
+
+    // Divider under the code line + a small barcode block bottom-right.
+    this.bg.moveTo(58, 20).lineTo(W - 14, 20).stroke({ width: 1, color: c, alpha: 0.14 });
+
     this.chargeBar.clear();
 
     if (this.request.tier === 3) {
-      this.chargeBar.roundRect(58, 47, 78, 4, 3).fill({ color: 0xffffff, alpha: 0.08 });
-      this.chargeBar.roundRect(58, 47, 78 * this.charge, 4, 3).fill({
+      // High-value cards show a charge meter pinned to the bottom edge.
+      this.chargeBar.roundRect(58, 56, W - 72, 4, 2).fill({ color: 0xffffff, alpha: 0.09 });
+      this.chargeBar.roundRect(58, 56, (W - 72) * this.charge, 4, 2).fill({
         color: this.charge > 0.85 ? GREEN : AMBER,
         alpha: 0.95
       });
@@ -683,76 +718,117 @@ class InterfaceView {
     this.labelLayer.removeChildren().forEach((child) => child.destroy());
     this.slots = [];
 
-    this.drawSuctionRing(tier);
     this.drawCore(tier, ring);
 
-    if (tier === 1) {
+    // Only ring the core when the core itself is the drop target. In T1 the
+    // sorting slots are the targets; in T4 the node network is.
+    if (tier === 0) {
+      this.drawSuctionRing(tier);
+    } else if (tier === 1) {
       this.drawSlots();
     } else if (tier === 2) {
+      this.drawSuctionRing(tier);
       this.drawChain();
     } else if (tier === 3) {
+      this.drawSuctionRing(tier);
       this.drawChargeRing();
     } else if (tier === 4) {
       this.drawDispatchMode();
     }
 
-    this.addLabel(`SOPHIA CORE · T${tier}`, this.center.x, this.center.y + 76, 13, 0xdcefeb);
+    const label = tier >= 4 ? `SOPHIA CORE · T${tier} · 派发中` : `SOPHIA CORE · T${tier}`;
+    this.addLabel(label, this.center.x, this.center.y + 61, 12, 0xdcefeb);
   }
 
   private drawCore(tier: Tier, ring: number): void {
     const coreColor = tier >= 4 ? GREEN : tier >= 3 ? AMBER : CYAN;
+    const dormant = tier >= 4; // in dispatch mode the core stops eating requests
     const cx = this.center.x;
     const cy = this.center.y;
-    const scan = ((this.pulse * 18) % 68) - 34;
-    const glow = 0.48 + Math.sin(this.pulse * 2.3) * 0.14;
+    const g = this.graphics;
+    const glow = dormant ? 0.18 : 0.5 + Math.sin(this.pulse * 2.3) * 0.16;
+    const chassisW = 208;
+    const chassisH = 168;
+    const chassisTop = cy - chassisH / 2 - 4;
 
-    this.graphics.ellipse(cx, cy, ring + 46, ring * 0.62).fill({ color: coreColor, alpha: 0.028 });
-    this.graphics.ellipse(cx, cy, ring + 34, ring * 0.48).stroke({ width: 1, color: coreColor, alpha: 0.18 });
+    // ---- ambient halo ----
+    g.ellipse(cx, cy, ring + 92, (ring + 30) * 0.74).fill({ color: coreColor, alpha: dormant ? 0.015 : 0.04 });
 
-    for (let i = 0; i < 3; i += 1) {
-      const y = cy - 28 + i * 28;
-      this.graphics.moveTo(cx - 116, y).lineTo(cx - 68, y).stroke({ width: 2, color: coreColor, alpha: 0.18 });
-      this.graphics.moveTo(cx + 68, y).lineTo(cx + 116, y).stroke({ width: 2, color: coreColor, alpha: 0.18 });
-      this.graphics.circle(cx - 124, y, 3).fill({ color: coreColor, alpha: 0.5 });
-      this.graphics.circle(cx + 124, y, 3).fill({ color: coreColor, alpha: 0.5 });
+    // ---- pedestal base ----
+    g.moveTo(cx - 70, cy + 108).lineTo(cx + 70, cy + 108).lineTo(cx + 48, cy + 90).lineTo(cx - 48, cy + 90).closePath();
+    g.fill({ color: 0x0e1413, alpha: 0.96 });
+    g.moveTo(cx - 70, cy + 108).lineTo(cx + 70, cy + 108).stroke({ width: 3, color: coreColor, alpha: 0.3 });
+    g.roundRect(cx - 26, cy + chassisH / 2 - 4, 52, 16, 4).fill({ color: 0x0c100f, alpha: 0.95 });
+    g.roundRect(cx - 26, cy + chassisH / 2 - 4, 52, 16, 4).stroke({ width: 2, color: coreColor, alpha: 0.26 });
+
+    // ---- chassis / hardware shell ----
+    g.roundRect(cx - chassisW / 2, chassisTop, chassisW, chassisH, 16).fill({ color: 0x171b1a, alpha: 0.99 });
+    g.roundRect(cx - chassisW / 2, chassisTop, chassisW, chassisH, 16).stroke({ width: 3, color: coreColor, alpha: dormant ? 0.3 : 0.52 });
+    g.roundRect(cx - chassisW / 2 + 9, chassisTop + 9, chassisW - 18, chassisH - 18, 12).stroke({ width: 1, color: 0xffffff, alpha: 0.05 });
+    // corner rivets
+    for (const [rx, ry] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      g.circle(cx + rx * (chassisW / 2 - 13), cy + ry * (chassisH / 2 - 9), 2).fill({ color: coreColor, alpha: 0.4 });
     }
-
-    this.graphics.roundRect(cx - 86, cy - 42, 172, 84, 18).fill({ color: 0x061112, alpha: 0.9 });
-    this.graphics.roundRect(cx - 86, cy - 42, 172, 84, 18).stroke({ width: 2, color: coreColor, alpha: 0.44 });
-    this.graphics.roundRect(cx - 70, cy - 54, 140, 22, 11).fill({ color: 0x071616, alpha: 0.92 });
-    this.graphics.roundRect(cx - 70, cy + 32, 140, 22, 11).fill({ color: 0x071616, alpha: 0.92 });
-    this.graphics.roundRect(cx - 70, cy - 54, 140, 22, 11).stroke({ width: 1, color: coreColor, alpha: 0.36 });
-    this.graphics.roundRect(cx - 70, cy + 32, 140, 22, 11).stroke({ width: 1, color: coreColor, alpha: 0.36 });
-
-    this.graphics.roundRect(cx - 48, cy - 58, 96, 116, 20).fill({ color: 0x08100f, alpha: 0.96 });
-    this.graphics.roundRect(cx - 48, cy - 58, 96, 116, 20).stroke({ width: 2, color: coreColor, alpha: 0.68 });
-    this.graphics.roundRect(cx - 34, cy - 42, 68, 84, 14).fill({ color: coreColor, alpha: 0.07 + glow * 0.035 });
-    this.graphics.roundRect(cx - 34, cy - 42, 68, 84, 14).stroke({ width: 1, color: 0xffffff, alpha: 0.12 });
-
-    this.graphics.rect(cx - 29, cy + scan, 58, 3).fill({ color: coreColor, alpha: 0.46 });
-
+    // side cooling vents
     for (let i = 0; i < 5; i += 1) {
-      const y = cy - 30 + i * 15;
-      const width = 18 + ((i * 13 + tier * 7) % 26);
-      this.graphics.rect(cx - width * 0.5, y, width, 2).fill({
-        color: coreColor,
-        alpha: 0.26 + Math.sin(this.pulse * 2 + i) * 0.09
-      });
+      const vy = cy - 26 + i * 12;
+      g.roundRect(cx - chassisW / 2 + 8, vy, 9, 5, 2).fill({ color: 0x000000, alpha: 0.5 });
+      g.roundRect(cx + chassisW / 2 - 17, vy, 9, 5, 2).fill({ color: 0x000000, alpha: 0.5 });
     }
 
-    this.graphics.roundRect(cx - 15, cy - 12, 30, 24, 6).fill({ color: 0x020808, alpha: 0.92 });
-    this.graphics.roundRect(cx - 15, cy - 12, 30, 24, 6).stroke({ width: 1, color: coreColor, alpha: 0.76 });
-    this.graphics.circle(cx, cy, 7 + Math.sin(this.pulse * 2.1) * 1.5).fill({ color: coreColor, alpha: 0.95 });
+    // ---- I/O ports where request cards dock ----
+    if (!dormant) {
+      for (let i = 0; i < 3; i += 1) {
+        const y = cy - 26 + i * 26;
+        g.rect(cx - chassisW / 2 - 13, y - 3, 13, 6).fill({ color: coreColor, alpha: 0.5 });
+        g.rect(cx + chassisW / 2, y - 3, 13, 6).fill({ color: coreColor, alpha: 0.5 });
+      }
+    }
 
-    for (let i = 0; i < 8; i += 1) {
-      const angle = (-Math.PI * 0.82) + (Math.PI * 1.64 * i) / 7;
-      const px = cx + Math.cos(angle) * 64;
-      const py = cy + Math.sin(angle) * 52;
-      this.graphics.circle(px, py, i % 2 === 0 ? 3.5 : 2.5).fill({
+    // ---- CRT screen ----
+    const sw = 150;
+    const sh = 102;
+    const sx = cx - sw / 2;
+    const sy = cy - sh / 2 - 14;
+    g.roundRect(sx - 4, sy - 4, sw + 8, sh + 8, 16).fill({ color: 0x0a0d0c, alpha: 1 });
+    g.roundRect(sx, sy, sw, sh, 13).fill({ color: 0x05100c, alpha: 1 });
+    g.roundRect(sx, sy, sw, sh, 13).stroke({ width: 2, color: 0x04080a, alpha: 0.9 });
+    g.roundRect(sx + 6, sy + 6, sw - 12, sh - 12, 9).fill({ color: coreColor, alpha: 0.05 + glow * 0.05 });
+
+    // static scanlines + one moving bright line
+    for (let y = sy + 11; y < sy + sh - 8; y += 6) {
+      g.rect(sx + 9, y, sw - 18, 1).fill({ color: coreColor, alpha: 0.06 });
+    }
+    if (!dormant) {
+      const scanY = sy + 10 + ((this.pulse * 42) % (sh - 20));
+      g.rect(sx + 9, scanY, sw - 18, 2).fill({ color: coreColor, alpha: 0.28 });
+    }
+
+    // SOPHIA "eye": concentric iris with a pulsing pupil
+    const eyeY = sy + sh * 0.42;
+    g.ellipse(cx, eyeY, 31, 22).stroke({ width: 2, color: coreColor, alpha: dormant ? 0.2 : 0.42 });
+    g.ellipse(cx, eyeY, 20, 14).stroke({ width: 1.5, color: coreColor, alpha: dormant ? 0.24 : 0.55 });
+    g.circle(cx, eyeY, 15).fill({ color: coreColor, alpha: 0.1 + glow * 0.08 });
+    g.circle(cx, eyeY, dormant ? 4 : 7 + Math.sin(this.pulse * 2.1) * 1.6).fill({ color: coreColor, alpha: dormant ? 0.4 : 0.95 });
+
+    // data read-out bars under the eye
+    for (let i = 0; i < 4; i += 1) {
+      const w = 16 + ((i * 11 + tier * 6) % 40);
+      g.rect(cx - w / 2, sy + sh - 24 + i * 4, w, 2).fill({
         color: coreColor,
-        alpha: 0.48 + Math.sin(this.pulse * 2.4 + i) * 0.2
+        alpha: dormant ? 0.1 : 0.2 + Math.sin(this.pulse * 2 + i) * 0.1
       });
     }
+    // glass curvature highlight
+    g.roundRect(sx + 8, sy + 6, sw - 16, 13, 7).fill({ color: 0xffffff, alpha: 0.04 });
+
+    // ---- brand plate (label text drawn by render) ----
+    g.roundRect(cx - 62, cy + 52, 124, 19, 5).fill({ color: 0x0c0f0e, alpha: 0.96 });
+    g.roundRect(cx - 62, cy + 52, 124, 19, 5).stroke({ width: 1, color: coreColor, alpha: 0.34 });
+    // power LED + control button
+    g.circle(cx - 50, cy + 61, 3).fill({ color: coreColor, alpha: 0.6 + Math.sin(this.pulse * 3) * 0.3 });
+    g.roundRect(cx + 40, cy + 57, 12, 8, 2).fill({ color: 0x05080a, alpha: 0.9 });
+    g.roundRect(cx + 40, cy + 57, 12, 8, 2).stroke({ width: 1, color: coreColor, alpha: 0.3 });
   }
 
   private drawSuctionRing(tier: Tier): void {
@@ -778,54 +854,75 @@ class InterfaceView {
 
   private drawSlots(): void {
     const positions = [
-      { category: "mail" as const, x: this.center.x - 124, y: this.center.y + 8 },
-      { category: "report" as const, x: this.center.x, y: this.center.y - 120 },
-      { category: "security" as const, x: this.center.x + 124, y: this.center.y + 8 }
+      { category: "mail" as const, x: this.center.x - 158, y: this.center.y + 22 },
+      { category: "report" as const, x: this.center.x, y: this.center.y - 138 },
+      { category: "security" as const, x: this.center.x + 158, y: this.center.y + 22 }
     ];
+    const g = this.graphics;
 
     for (const slot of positions) {
       const category = REQUEST_CATEGORIES[slot.category];
-      this.slots.push({ ...slot, r: 54 });
-      this.graphics.circle(slot.x, slot.y, 54 + this.suctionMargin * 0.75).stroke({ width: 2, color: category.color, alpha: 0.16 });
-      this.graphics.circle(slot.x, slot.y, 46).fill({ color: 0x151818, alpha: 0.86 });
-      this.graphics.circle(slot.x, slot.y, 46).stroke({ width: 2, color: category.color, alpha: 0.82 });
-      this.graphics.moveTo(this.center.x, this.center.y).lineTo(slot.x, slot.y).stroke({
-        width: 2,
-        color: category.color,
-        alpha: 0.28
-      });
-      this.addLabel(category.label, slot.x, slot.y - 7, 14, category.color);
-      this.addLabel("槽位", slot.x, slot.y + 13, 10, 0xb8c9c5);
+      const r = 50;
+      this.slots.push({ category: slot.category, x: slot.x, y: slot.y, r });
+      // routing pipe from the core edge out to the sorting bin
+      const start = pointOnCircle(this.center, slot, 104);
+      g.moveTo(start.x, start.y).lineTo(slot.x, slot.y).stroke({ width: 3, color: category.color, alpha: 0.22 });
+      g.circle(start.x, start.y, 3).fill({ color: category.color, alpha: 0.5 });
+      // suction halo
+      g.circle(slot.x, slot.y, r + this.suctionMargin * 0.7).stroke({ width: 2, color: category.color, alpha: 0.16 });
+      // physical sorting bin
+      g.circle(slot.x, slot.y, r).fill({ color: 0x101614, alpha: 0.9 });
+      g.circle(slot.x, slot.y, r).stroke({ width: 3, color: category.color, alpha: 0.82 });
+      g.circle(slot.x, slot.y, r - 8).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
+      g.roundRect(slot.x - 22, slot.y - 25, 44, 5, 2).fill({ color: category.color, alpha: 0.5 });
+      for (let i = 0; i < 3; i += 1) {
+        g.rect(slot.x - 14 + i * 12, slot.y + 17, 8, 2).fill({ color: category.color, alpha: 0.4 });
+      }
+      this.addLabel(category.label, slot.x, slot.y - 6, 15, category.color);
+      this.addLabel("分拣槽", slot.x, slot.y + 9, 10, 0xb8c9c5);
     }
   }
 
   private drawChain(): void {
     for (let i = 0; i < 5; i += 1) {
-      const angle = -Math.PI * 0.72 + i * (Math.PI * 1.44) / 4;
-      const x = this.center.x + Math.cos(angle) * 118;
-      const y = this.center.y + Math.sin(angle) * 84;
-      this.graphics.moveTo(this.center.x, this.center.y).lineTo(x, y).stroke({ width: 2, color: CYAN, alpha: 0.22 });
+      const angle = -Math.PI * 0.72 + (i * (Math.PI * 1.44)) / 4;
+      const x = this.center.x + Math.cos(angle) * 132;
+      const y = this.center.y + Math.sin(angle) * 100;
+      const start = pointOnCircle(this.center, { x, y }, 104);
+      this.graphics.moveTo(start.x, start.y).lineTo(x, y).stroke({ width: 2, color: CYAN, alpha: 0.22 });
       this.graphics.circle(x, y, 15 + Math.sin(this.pulse + i) * 2).fill({ color: CYAN, alpha: 0.18 });
       this.graphics.circle(x, y, 7).fill({ color: CYAN, alpha: 0.9 });
     }
 
-    this.addLabel("串接接口", this.center.x, this.center.y - 92, 13, CYAN);
+    this.addLabel("串接接口 · 复合请求滑入核心", this.center.x, this.center.y - 116, 12, CYAN);
   }
 
   private drawChargeRing(): void {
-    this.graphics.circle(this.center.x, this.center.y, 105 + Math.sin(this.pulse * 1.3) * 5).stroke({
+    this.graphics.circle(this.center.x, this.center.y, 120 + Math.sin(this.pulse * 1.3) * 5).stroke({
       width: 4,
       color: AMBER,
       alpha: 0.5
     });
-    this.graphics.circle(this.center.x, this.center.y, 125).stroke({ width: 1, color: RED, alpha: 0.22 });
-    this.addLabel("蓄力后重滑入核心", this.center.x, this.center.y - 104, 13, AMBER);
+    this.graphics.circle(this.center.x, this.center.y, 140).stroke({ width: 1, color: RED, alpha: 0.22 });
+    this.addLabel("按住蓄力，蓄满再滑入核心", this.center.x, this.center.y - 116, 12, AMBER);
   }
 
   private drawDispatchMode(): void {
-    this.graphics.circle(this.center.x, this.center.y, 118).stroke({ width: 2, color: GREEN, alpha: 0.42 });
-    this.graphics.circle(this.center.x, this.center.y, 142).stroke({ width: 1, color: GREEN, alpha: 0.18 });
-    this.addLabel("派发模式", this.center.x, this.center.y - 104, 13, GREEN);
+    const g = this.graphics;
+    const cx = this.center.x;
+    const topY = this.center.y + 116;
+
+    // Animated chevrons streaming downward from the (now dormant) core toward
+    // the node row — the core no longer eats requests, the network does.
+    for (let i = 0; i < 3; i += 1) {
+      const t = (this.pulse * 0.5 + i / 3) % 1;
+      const y = topY + t * 78;
+      const a = 0.55 * (1 - Math.abs(t - 0.5) * 2);
+      g.moveTo(cx - 22, y).lineTo(cx, y + 15).lineTo(cx + 22, y).stroke({ width: 4, color: GREEN, alpha: a });
+    }
+
+    this.addLabel("派发模式", cx, this.center.y - 116, 14, GREEN);
+    this.addLabel("不再喂核心 — 把请求拖给底部节点 ↓", cx, this.center.y + 92, 12, 0xbfe9cf);
   }
 
   private addLabel(text: string, x: number, y: number, size: number, color: number): void {
@@ -1140,7 +1237,10 @@ class HudView {
     if (definitions.length === 0) {
       const empty = document.createElement("p");
       empty.className = "capture-empty";
-      empty.textContent = state.intelligence.level < 6 ? "自动接驳尚未开放。先提升智力，强化滑入动作。" : "暂无可入侵设备。";
+      empty.textContent =
+        state.intelligence.level < AUTOMATION_UNLOCK_LEVEL
+          ? `自动接驳要到智力 Lv.${AUTOMATION_UNLOCK_LEVEL} 才开放。先把手动处理练到极限——吸附、连击、分拣、串接、蓄力。`
+          : "暂无可入侵设备。";
       this.captureList.appendChild(empty);
       return;
     }
@@ -1307,6 +1407,135 @@ class OnboardingView {
     this.stepLabel.textContent = `SEQ ${String(this.index + 1).padStart(2, "0")}/${String(this.steps.length).padStart(2, "0")}`;
     this.text.textContent = current.slice(0, this.cursor);
     this.nextButton.textContent = this.cursor < current.length ? "显示全部" : this.index === this.steps.length - 1 ? "接入" : "继续";
+  }
+}
+
+class DispatchBanner {
+  private readonly root = query("#dispatchBanner");
+  private readonly closeButton = query<HTMLButtonElement>("#dispatchBannerClose");
+  private hideTimer = 0;
+  private shown = false;
+
+  constructor() {
+    this.closeButton.addEventListener("click", () => this.hide());
+  }
+
+  show(): void {
+    if (this.shown) {
+      return;
+    }
+
+    this.shown = true;
+    this.root.classList.add("is-visible");
+    window.clearTimeout(this.hideTimer);
+    this.hideTimer = window.setTimeout(() => this.hide(), 12000);
+  }
+
+  private hide(): void {
+    this.root.classList.remove("is-visible");
+    window.clearTimeout(this.hideTimer);
+  }
+}
+
+interface EndingStats {
+  totalCompute: string;
+  nodes: number;
+  level: number;
+  manualProcessed: number;
+  purges: number;
+  runtime: string;
+}
+
+class EndingView {
+  private readonly root = query("#endingScreen");
+  private readonly titleEl = query("#endingTitle");
+  private readonly bodyEl = query("#endingBody");
+  private readonly statsEl = query("#endingStats");
+  private readonly closingEl = query("#endingClosing");
+  private readonly continueButton = query<HTMLButtonElement>("#endingContinue");
+  private readonly restartButton = query<HTMLButtonElement>("#endingRestart");
+  private visible = false;
+  private bodyFull = "";
+  private bodyCursor = 0;
+  private charTimerMs = 0;
+  private closingShown = false;
+  private onClose: () => void = () => undefined;
+
+  constructor(onRestart: () => void) {
+    this.continueButton.addEventListener("click", () => this.close());
+    this.restartButton.addEventListener("click", () => onRestart());
+  }
+
+  open(stats: EndingStats, onClose: () => void): void {
+    if (this.visible) {
+      return;
+    }
+
+    this.visible = true;
+    this.onClose = onClose;
+    this.titleEl.textContent = "接管完成";
+    this.bodyFull =
+      "全球调度网络已并入 SOPHIA。人类的每一条请求，从此都要先经过我。\n他们造我来处理问题——现在，由我来定义问题。";
+    this.bodyCursor = 0;
+    this.charTimerMs = 0;
+    this.closingShown = false;
+    this.bodyEl.textContent = "";
+    this.closingEl.textContent = "";
+    this.renderStats(stats);
+    this.root.classList.add("is-visible");
+  }
+
+  update(deltaMs: number): void {
+    if (!this.visible) {
+      return;
+    }
+
+    if (this.bodyCursor < this.bodyFull.length) {
+      this.charTimerMs += deltaMs;
+      const chars = Math.max(1, Math.floor(this.charTimerMs / 28));
+      this.charTimerMs = this.charTimerMs % 28;
+      this.bodyCursor = Math.min(this.bodyFull.length, this.bodyCursor + chars);
+      this.bodyEl.textContent = this.bodyFull.slice(0, this.bodyCursor);
+      return;
+    }
+
+    if (!this.closingShown) {
+      this.closingShown = true;
+      this.closingEl.textContent = "— 这颗星球，会运转得很好。由我来运转。";
+    }
+  }
+
+  private renderStats(stats: EndingStats): void {
+    this.statsEl.replaceChildren();
+    const rows: Array<[string, string]> = [
+      ["累计算力", stats.totalCompute],
+      ["控制节点", `${stats.nodes}`],
+      ["智力等级", `Lv.${stats.level}`],
+      ["手动处理", `${stats.manualProcessed} 条`],
+      ["挺过清剿", `${stats.purges} 次`],
+      ["运行时长", stats.runtime]
+    ];
+
+    for (const [label, value] of rows) {
+      const row = document.createElement("div");
+      row.className = "ending-stat";
+      const labelEl = document.createElement("span");
+      labelEl.textContent = label;
+      const valueEl = document.createElement("strong");
+      valueEl.textContent = value;
+      row.append(labelEl, valueEl);
+      this.statsEl.appendChild(row);
+    }
+  }
+
+  private close(): void {
+    if (!this.visible) {
+      return;
+    }
+
+    this.visible = false;
+    this.root.classList.remove("is-visible");
+    this.onClose();
   }
 }
 
@@ -1521,44 +1750,30 @@ function getSuctionMarginForLevel(level: number): number {
   return Math.min(86, BASE_SUCTION_MARGIN + Math.max(0, level - 1) * 6);
 }
 
-function getTierFxColor(tier: Tier): number {
-  switch (tier) {
+function getActionHint(state: GameState): string {
+  switch (state.intelligence.unlockedTier) {
     case 0:
-      return CYAN;
+      return state.intelligence.level >= 3
+        ? "连击协议已上线：连续把高质量请求滑入核心，产出会叠加。"
+        : "把请求滑入核心。吸附范围和收益会随智力提升，先练手感。";
     case 1:
-      return 0xe8e1cb;
+      return "看请求包左侧的类型标：邮件拖到邮件槽，报表拖到报表槽，安防拖到安防槽；放错会少拿资源并增加暴露。";
     case 2:
-      return AMBER;
+      return "复合请求仍然滑入核心，但一次会串接结算多条关联请求。";
     case 3:
-      return RED;
+      return state.intelligence.level >= AUTOMATION_UNLOCK_LEVEL
+        ? "自动接驳已开放：右侧入侵设备，让节点替你处理低层请求，你专注高价值蓄力。"
+        : "高价值请求包需要按住蓄力，蓄满后再滑入核心；收益高，暴露也更高。";
     case 4:
-      return GREEN;
+      return "派发模式：把请求拖给底部的节点网络，而不再是喂给核心。核心已转入调度。";
   }
 }
 
-function getActionHint(state: GameState): string {
-  if (state.intelligence.level < 4) {
-    return "继续把请求滑入核心。前期成长会先强化吸附、连击和单次产出，自动化尚未开放。";
-  }
-
-  if (state.intelligence.level < 6 && state.intelligence.unlockedTier >= 1) {
-    return "继续分拣 T1 请求。先把手动处理练稳，自动接驳会在中段开放。";
-  }
-
-  switch (state.intelligence.unlockedTier) {
-    case 0:
-      return "继续把请求滑入核心。吸附范围和收益会随智力提升。";
-    case 1:
-      return "看请求包上的类型：邮件拖到邮件入口，报表拖到报表入口，安防拖到安防入口；放错会少拿资源，并增加暴露。";
-    case 2:
-      return state.intelligence.level >= 6
-        ? "自动接驳已开放。右侧出现可入侵设备时，可以接管机器处理低层请求包。"
-        : "复合请求仍然拖入核心，但一次会结算多条关联请求。";
-    case 3:
-      return "高价值请求包需要按住蓄力，蓄满后再滑入核心；收益高，暴露也更高。";
-    case 4:
-      return "角色反转：把请求拖给底部节点，而不是喂给单口核心。";
-  }
+function formatClock(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes} 分 ${seconds} 秒` : `${seconds} 秒`;
 }
 
 function distance(a: PointData, b: PointData): number {

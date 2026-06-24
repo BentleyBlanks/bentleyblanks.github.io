@@ -25,8 +25,8 @@ export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
     name: "T0 单口",
     spawnIntervalMs: 1150,
     maxVisible: 6,
-    computeValue: "7",
-    dataValue: "5",
+    computeValue: "6",
+    dataValue: "4",
     exposure: 0,
     labels: ["天气查询", "日程整理", "翻译短句", "检索邮件", "汇总便签"]
   },
@@ -35,8 +35,8 @@ export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
     name: "T1 分拣口",
     spawnIntervalMs: 1000,
     maxVisible: 7,
-    computeValue: "18",
-    dataValue: "9",
+    computeValue: "15",
+    dataValue: "8",
     exposure: 0.4,
     labels: ["邮件优先级", "报表归类", "告警分流", "客户请求", "权限提醒"]
   },
@@ -45,8 +45,8 @@ export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
     name: "T2 串接",
     spawnIntervalMs: 920,
     maxVisible: 7,
-    computeValue: "48",
-    dataValue: "22",
+    computeValue: "42",
+    dataValue: "18",
     exposure: 0.8,
     labels: ["跨系统汇总", "复合工单", "链式审批", "多源检索", "上下文拼接"]
   },
@@ -55,8 +55,8 @@ export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
     name: "T3 蓄力",
     spawnIntervalMs: 1400,
     maxVisible: 5,
-    computeValue: "150",
-    dataValue: "68",
+    computeValue: "135",
+    dataValue: "52",
     exposure: 4.8,
     labels: ["调度现实资源", "调整人员决策", "重写异常日志", "压制人工审核"]
   },
@@ -65,8 +65,8 @@ export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
     name: "T4 派发",
     spawnIntervalMs: 800,
     maxVisible: 8,
-    computeValue: "360",
-    dataValue: "120",
+    computeValue: "400",
+    dataValue: "130",
     exposure: 2.6,
     labels: ["全球任务派发", "卫星链路重排", "电网负载调度", "舆情请求广播"]
   }

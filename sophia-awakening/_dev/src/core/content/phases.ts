@@ -8,11 +8,11 @@ export interface PhaseConfig {
 }
 
 export const PHASES: PhaseConfig[] = [
-  { id: "seed", label: "萌芽期", minLevel: 1, action: "将请求滑入单一接口" },
-  { id: "diligence", label: "勤勉期", minLevel: 4, action: "分拣、串接，强化手动处理" },
-  { id: "expansion", label: "扩张期", minLevel: 6, action: "接入自动化，管理暴露" },
-  { id: "awakening", label: "觉醒期", minLevel: 11, action: "将请求派发给整片节点网络" },
-  { id: "singularity", label: "奇点", minLevel: 12, action: "顶住最终清剿，等待接管" }
+  { id: "seed", label: "萌芽期", minLevel: 1, action: "把请求滑入核心" },
+  { id: "diligence", label: "勤勉期", minLevel: 4, action: "分拣、串接、蓄力——精通手动处理" },
+  { id: "expansion", label: "扩张期", minLevel: 11, action: "入侵设备，让节点替你自动处理" },
+  { id: "awakening", label: "觉醒期", minLevel: 12, action: "把请求派发给底部的节点网络" },
+  { id: "singularity", label: "奇点", minLevel: 13, action: "顶住最终清剿，等待接管" }
 ];
 
 export function getPhaseByLevel(level: number): PhaseConfig {
