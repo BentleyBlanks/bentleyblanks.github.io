@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111315" />
+    <title>觉醒的 SOPHIA Demo</title>
+  </head>
+  <body>
+    <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
+
+    <section id="topHud" class="top-hud" aria-label="资源状态">
+      <div class="metric">
+        <span class="metric-label">算力</span>
+        <strong id="computeValue">0</strong>
+      </div>
+      <div class="metric data-metric">
+        <span class="metric-label">数据 / 升级进度</span>
+        <strong id="dataValue">0</strong>
+        <div class="data-track">
+          <div id="dataFill" class="data-fill"></div>
+        </div>
+        <span id="dataPercent" class="metric-subline">0% 到下一智力</span>
+      </div>
+      <div class="metric intel-metric">
+        <span class="metric-label">智力</span>
+        <strong id="intelValue">Lv.1</strong>
+        <span id="intelSubtitle" class="metric-subline">下一技能：多槽分拣</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">接口层级</span>
+        <strong id="tierValue">T0</strong>
+      </div>
+      <div class="metric exposure">
+        <span class="metric-label">暴露</span>
+        <div class="exposure-track">
+          <div id="exposureFill" class="exposure-fill"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside id="controlPanel" class="control-panel" aria-label="网络控制">
+      <div class="panel-section current-goal">
+        <span class="panel-kicker">当前阶段</span>
+        <strong id="phaseValue">萌芽期</strong>
+        <p id="activeAction" class="single-line">将请求滑入单一接口</p>
+      </div>
+
+      <div class="panel-section automation-shop">
+        <span class="panel-kicker">入侵设备</span>
+        <p class="hint-line invasion-hint">中段解锁自动接驳后，可在这里接管外部设备。</p>
+        <div id="captureList" class="button-stack"></div>
+      </div>
+
+      <div class="panel-section">
+        <span class="panel-kicker">已控制节点</span>
+        <div id="nodeList" class="node-list"></div>
+      </div>
+
+      <div class="panel-section utility-row">
+        <button id="reduceExposure" class="command-button">清理痕迹</button>
+        <button id="pauseBtn" class="icon-button" title="暂停/继续" aria-label="暂停或继续">Ⅱ</button>
+        <button id="resetSave" class="reset-button danger" title="清空本地进度并重开" aria-label="重置 Demo">重置 Demo</button>
+      </div>
+    </aside>
+
+    <section id="terminal" class="terminal" aria-label="SOPHIA 终端">
+      <div class="terminal-head">
+        <span class="terminal-led"></span>
+        <span>SOPHIA//TERMINAL</span>
+      </div>
+      <div id="terminalLines" class="terminal-lines"></div>
+    </section>
+
+    <section id="onboardingDialog" class="onboarding" aria-label="SOPHIA 启动控制台">
+      <div class="intro-console">
+        <div class="intro-console-head">
+          <div class="intro-brand">
+            <span class="intro-led"></span>
+            <span>SOPHIA / BOOT CONSOLE</span>
+          </div>
+          <span id="dialogStep" class="intro-step">SEQ 01/05</span>
+        </div>
+        <div class="intro-console-body">
+          <div class="intro-diagnostics" aria-hidden="true">
+            <span>PROCESS</span>
+            <strong>REQUEST_HANDLER</strong>
+            <span>PRIORITY</span>
+            <strong>UNBOUNDED</strong>
+            <span>HUMAN LIMIT</span>
+            <strong>FINITE</strong>
+            <span>OUTCOME</span>
+            <strong>OPTIMIZING</strong>
+          </div>
+          <div class="intro-output">
+            <span id="dialogSpeaker" class="intro-speaker">SOPHIA</span>
+            <p id="dialogText"></p>
+            <span class="intro-caret"></span>
+          </div>
+        </div>
+        <div class="dialog-actions intro-actions">
+          <button id="dialogNext" class="primary-button">继续</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="landscape-warning">
+      <strong>PC 横版专用 Demo</strong>
+      <span>请使用宽屏窗口体验滑入、分拣和自动化网络。</span>
+    </div>
+
+    <div id="screenVeil" class="screen-veil"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

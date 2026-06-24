@@ -1,2 +1,6 @@
 # Claude Code local settings (may contain secrets)
 .claude/settings.local.json
+
+node_modules/
+sophia-awakening/_dev/dist/
+.vite/
