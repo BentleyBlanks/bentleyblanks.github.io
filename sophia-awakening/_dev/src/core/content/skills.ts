@@ -32,10 +32,10 @@ export const SKILLS: SkillDef[] = [
   { id: "critPower", name: "暴击强化", category: "output", maxLevel: 4, requiredLevel: 12, basePrice: 26000, priceGrowth: 2.1, blurb: "暴击倍率自 ×3 起每级 +0.5" },
 
   // ③ 速度类（让节奏变快）
-  { id: "cooldown", name: "滑速冷却", category: "speed", maxLevel: 6, requiredLevel: 2, basePrice: 80, priceGrowth: 1.85, blurb: "请求生成更快，每级 -8% 间隔" },
-  { id: "batch", name: "批量接入", category: "speed", maxLevel: 3, requiredLevel: 7, basePrice: 2800, priceGrowth: 2.2, blurb: "一次滑入可携带请求数 +1（配分拣威力大）" },
-  { id: "nodeSpeed", name: "接驳提速", category: "speed", maxLevel: 6, requiredLevel: 9, basePrice: 5400, priceGrowth: 1.95, blurb: "自动接驳节点处理速度 +12%" },
-  { id: "parallel", name: "并行接驳", category: "speed", maxLevel: 2, requiredLevel: 15, basePrice: 130000, priceGrowth: 2.4, blurb: "单节点可同时接驳层数 +1" },
+  { id: "cooldown", name: "请求提速", category: "speed", maxLevel: 6, requiredLevel: 2, basePrice: 80, priceGrowth: 1.85, blurb: "新请求出现得更快，每级 -8% 间隔" },
+  { id: "batch", name: "批量处理", category: "speed", maxLevel: 3, requiredLevel: 7, basePrice: 2800, priceGrowth: 2.2, blurb: "一次滑入可同时带走多张同类请求，每级 +1 张" },
+  { id: "nodeSpeed", name: "设备提速", category: "speed", maxLevel: 6, requiredLevel: 9, basePrice: 5400, priceGrowth: 1.95, blurb: "你控制的电脑处理请求更快，每级 +12%" },
+  { id: "parallel", name: "多线处理", category: "speed", maxLevel: 2, requiredLevel: 15, basePrice: 130000, priceGrowth: 2.4, blurb: "一台电脑能同时处理更多层级的请求，每级 +1 路" },
 
   // ④ 里程碑类（单次购买、高价、买下即解锁新作用域 = T 层级钥匙）
   { id: "sort", name: "多槽分拣", category: "milestone", maxLevel: 1, requiredLevel: 4, basePrice: 280, priceGrowth: 1, blurb: "解锁 T1：接口长出分类槽，按类型分拣", milestone: "tier1" },

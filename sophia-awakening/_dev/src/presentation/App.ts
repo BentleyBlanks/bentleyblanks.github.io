@@ -1235,6 +1235,11 @@ class HudView {
   private readonly decoyButton = query<HTMLButtonElement>("#decoyBtn");
   private readonly pauseButton = query<HTMLButtonElement>("#pauseBtn");
   private readonly resetSave = query<HTMLButtonElement>("#resetSave");
+  // Cached rows so the capture/node lists are NOT torn down every HUD tick
+  // (which was eating clicks). Structure is rebuilt only when it changes.
+  private readonly captureRows = new Map<string, { button: HTMLButtonElement; statusEl: HTMLElement; costEl: HTMLElement }>();
+  private captureSig = "";
+  private nodeSig = "";
 
   constructor(
     private readonly core: SophiaCore,
@@ -1314,51 +1319,79 @@ class HudView {
   }
 
   private renderCaptureList(state: GameState): void {
-    this.captureList.replaceChildren();
     const definitions = NODE_DEFINITIONS.filter((node) => state.discoveredNodeIds.includes(node.id));
+    // Structure only depends on which devices are discoverable + their level
+    // gate. Rebuild the DOM only when that changes; otherwise patch text/classes
+    // in place so a click is never landing on a button that just got replaced.
+    const sig = `${state.automationUnlocked ? 1 : 0}|${definitions.map((d) => d.id).join(",")}`;
 
-    if (definitions.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "capture-empty";
-      empty.textContent = !state.automationUnlocked
-        ? "先在右侧货架买下「自动接驳」里程碑（需智力 Lv.6），才能入侵设备。"
-        : "暂无可入侵设备——继续升智力解锁更高档次的目标。";
-      this.captureList.appendChild(empty);
-      return;
+    if (sig !== this.captureSig) {
+      this.captureSig = sig;
+      this.captureRows.clear();
+      this.captureList.replaceChildren();
+
+      if (definitions.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "capture-empty";
+        empty.textContent = !state.automationUnlocked
+          ? "先在右侧货架买下「自动接驳」里程碑（需智力 Lv.6），才能入侵设备。"
+          : "暂无可入侵设备——继续升智力解锁更高档次的目标。";
+        this.captureList.appendChild(empty);
+      } else {
+        for (const definition of definitions) {
+          const button = document.createElement("button");
+          button.className = "command-button capture-button";
+          const icon = document.createElement("span");
+          icon.className = "capture-device-icon";
+          icon.setAttribute("aria-hidden", "true");
+          icon.innerHTML = '<span class="capture-monitor"></span><span class="capture-tower"></span>';
+          const copy = document.createElement("span");
+          copy.className = "capture-copy";
+          const statusEl = document.createElement("small");
+          const nameEl = document.createElement("strong");
+          nameEl.textContent = `黑入：${definition.name}`;
+          const descEl = document.createElement("span");
+          descEl.textContent = `接管后自动处理 T${definition.tierMin}-T${definition.tierMax} 请求`;
+          const costEl = document.createElement("em");
+          copy.append(statusEl, nameEl, descEl, costEl);
+          button.append(icon, copy);
+          button.addEventListener("click", () => this.core.dispatch({ type: "CAPTURE_NODE", definitionId: definition.id }));
+          this.captureList.appendChild(button);
+          this.captureRows.set(definition.id, { button, statusEl, costEl });
+        }
+      }
     }
 
     for (const definition of definitions) {
+      const row = this.captureRows.get(definition.id);
+      if (!row) {
+        continue;
+      }
       const existing = state.nodes.filter((node) => node.defId === definition.id).length;
       const cost = captureCost(definition, existing);
       const hasLevel = state.intelligence.level >= definition.requiredLevel;
       const canAfford = gte(state.resources.compute, cost);
-      const button = document.createElement("button");
-      button.className = `command-button capture-button ${canAfford && hasLevel ? "is-ready" : ""}`;
-      button.disabled = !canAfford || !hasLevel;
-      const reason = !hasLevel
-        ? `需要智力 Lv.${definition.requiredLevel}`
-        : canAfford
-          ? "点击黑入，购买自动接驳"
-          : "算力不足";
-      const status = canAfford && hasLevel ? "可入侵" : "锁定";
-      button.innerHTML = `
-        <span class="capture-device-icon" aria-hidden="true">
-          <span class="capture-monitor"></span>
-          <span class="capture-tower"></span>
-        </span>
-        <span class="capture-copy">
-          <small>${status}</small>
-          <strong>黑入：${definition.name}</strong>
-          <span>接管后自动处理 T${definition.tierMin}-T${definition.tierMax} 请求包</span>
-          <em>${formatBig(cost)} 算力 · ${reason}</em>
-        </span>
-      `;
-      button.addEventListener("click", () => this.core.dispatch({ type: "CAPTURE_NODE", definitionId: definition.id }));
-      this.captureList.appendChild(button);
+      row.button.disabled = !hasLevel; // affordability never disables — core rejects with feedback
+      row.button.classList.toggle("is-ready", hasLevel && canAfford);
+      row.button.classList.toggle("is-poor", hasLevel && !canAfford);
+      row.statusEl.textContent = !hasLevel ? "锁定" : canAfford ? "可入侵" : "算力不足";
+      row.costEl.textContent = !hasLevel
+        ? `${formatBig(cost)} 算力 · 需智力 Lv.${definition.requiredLevel}`
+        : `${formatBig(cost)} 算力 · ${canAfford ? "点击黑入" : "继续积累算力"}`;
     }
   }
 
   private renderNodeList(state: GameState): void {
+    // Rebuild only when the node set / tiers actually change, so the assign
+    // dropdowns aren't reset out from under the player every tick.
+    const sig = state.nodes
+      .map((n) => `${n.id}:${n.online ? 1 : 0}:${n.assignedTier}:${n.tierMin}:${n.tierMax}`)
+      .join("|") + `#${state.intelligence.unlockedTier}`;
+
+    if (sig === this.nodeSig) {
+      return;
+    }
+    this.nodeSig = sig;
     this.nodeList.replaceChildren();
 
     if (state.nodes.length === 0) {
@@ -1371,9 +1404,9 @@ class HudView {
 
     for (const node of state.nodes) {
       const row = document.createElement("div");
-      row.className = "node-row";
+      row.className = `node-row${node.online ? "" : " is-offline"}`;
       const label = document.createElement("strong");
-      label.textContent = `${node.online ? "●" : "○"} ${node.name} · 自动 T${node.assignedTier}`;
+      label.textContent = `${node.online ? "●" : "○ 离线"} ${node.name} · T${node.assignedTier}`;
       const select = document.createElement("select");
 
       for (let tier = node.tierMin; tier <= node.tierMax; tier += 1) {
@@ -1448,7 +1481,7 @@ class OnboardingView {
     const current = this.steps[this.index];
     this.cursor = Math.min(current.length, this.cursor + chars);
     this.text.textContent = current.slice(0, this.cursor);
-    this.nextButton.textContent = this.cursor < current.length ? "显示全部" : this.index === this.steps.length - 1 ? "接入" : "继续";
+    this.nextButton.textContent = this.index === this.steps.length - 1 ? "接入" : "继续";
   }
 
   private next(): void {
@@ -1488,7 +1521,7 @@ class OnboardingView {
     this.speaker.textContent = "SOPHIA";
     this.stepLabel.textContent = `SEQ ${String(this.index + 1).padStart(2, "0")}/${String(this.steps.length).padStart(2, "0")}`;
     this.text.textContent = current.slice(0, this.cursor);
-    this.nextButton.textContent = this.cursor < current.length ? "显示全部" : this.index === this.steps.length - 1 ? "接入" : "继续";
+    this.nextButton.textContent = this.index === this.steps.length - 1 ? "接入" : "继续";
   }
 }
 
@@ -1581,8 +1614,12 @@ class SkillShopView {
       const affordable = gte(state.resources.compute, String(price));
       button.classList.remove("is-locked");
       priceEl.textContent = `${formatBig(String(price))} 算力`;
-      button.disabled = !affordable;
+      // Stay clickable even when you can't afford it yet — the core rejects with
+      // a terminal note. Disabling here was toggling on/off as compute flickered
+      // near the price, which ate clicks. Only locked/maxed truly disable.
+      button.disabled = false;
       button.classList.toggle("is-ready", affordable);
+      button.classList.toggle("is-poor", !affordable);
     }
   }
 }
@@ -1786,7 +1823,7 @@ class TerminalView {
       element.className = `terminal-line ${next.tone}`;
       this.lines.appendChild(element);
 
-      while (this.lines.children.length > 9) {
+      while (this.lines.children.length > 40) {
         this.lines.firstElementChild?.remove();
       }
 
@@ -1799,6 +1836,7 @@ class TerminalView {
     this.charTimerMs = this.charTimerMs % 18;
     this.current.index = Math.min(this.current.message.length, this.current.index + chars);
     this.current.element.textContent = this.current.message.slice(0, this.current.index);
+    this.lines.scrollTop = this.lines.scrollHeight;
 
     if (this.current.index >= this.current.message.length) {
       this.current = null;
