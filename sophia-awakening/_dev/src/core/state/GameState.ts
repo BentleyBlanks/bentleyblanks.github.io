@@ -1,8 +1,11 @@
 import type { BigString } from "../math/BigNumber";
+import type { DerivedSkills } from "../content/skills";
 
 export type Tier = 0 | 1 | 2 | 3 | 4;
 export type PhaseId = "seed" | "diligence" | "expansion" | "awakening" | "singularity";
 export type RequestCategory = "weather" | "mail" | "report" | "security" | "route";
+// T1「读懂真实类别」的判断结果——卡面线索决定它真正属于哪个槽。
+export type SortAnswer = "normal" | "spam" | "reject";
 
 export interface ResourceState {
   compute: BigString;
@@ -15,14 +18,17 @@ export interface IntelligenceState {
   xp: BigString;
   required: BigString;
   globalMultiplier: number;
+  // The current action scope = the highest milestone tier bought (NOT derived
+  // from level). 0 until 多槽分拣 is purchased, etc.
   unlockedTier: Tier;
-  unlockedSkills: string[];
 }
 
 export interface RequestInstance {
   id: string;
   tier: Tier;
-  label: string;
+  label: string; // 标题：这条请求在问什么 / 要什么
+  clues: string[]; // 几条线索，可能不全或带干扰——玩家要读懂
+  answer?: SortAnswer; // T1 的正确判断（其余层不用）
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
@@ -96,12 +102,20 @@ export interface GameState {
   exposure: number;
   exposureActive: boolean;
   intelligence: IntelligenceState;
+  // Purchased skill levels keyed by skill id (0/absent = not owned).
+  skills: Record<string, number>;
+  // Multipliers derived from the skill map, recomputed on every change.
+  derived: DerivedSkills;
+  // Set when the 自动接驳 milestone is bought; gates node invasion.
+  automationUnlocked: boolean;
   automatedTiers: Tier[];
   requests: RequestInstance[];
   nodes: BotNode[];
   discoveredNodeIds: string[];
   phase: PhaseId;
   purge: PurgeState;
+  // clock timestamp (ms) before which 嫁祸 / decoy cleanup is on cooldown.
+  decoyReadyAtMs: number;
   combo: ComboState;
   rebirths: number;
   lastSaveAt: number;
@@ -117,9 +131,11 @@ export type GameCommand =
       targetNodeId?: string;
       exposureBonus?: number;
     }
+  | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
   | { type: "ASSIGN_NODE"; nodeId: string; tier: Tier }
   | { type: "REDUCE_EXPOSURE" }
+  | { type: "DECOY_CLEANUP" }
   | { type: "REBIRTH" };
 
 export function cloneGameState(state: GameState): GameState {

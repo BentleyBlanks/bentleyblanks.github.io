@@ -792,6 +792,298 @@ body.exposed .screen-veil {
   color: #fff;
 }
 
+/* ---- top bar polish ---- */
+.top-hud {
+  border-color: rgba(137, 255, 154, 0.18);
+  background: linear-gradient(180deg, rgba(17, 23, 22, 0.96), rgba(11, 15, 15, 0.93));
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.top-hud .metric {
+  padding: 10px 16px 11px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.top-hud .metric::before {
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  content: "";
+  border-radius: 0 0 2px 2px;
+  opacity: 0.75;
+}
+
+.top-hud .metric:nth-child(1)::before {
+  background: var(--cyan);
+}
+
+.top-hud .metric:nth-child(2)::before {
+  background: var(--green);
+}
+
+.top-hud .metric:nth-child(3)::before {
+  background: var(--amber);
+}
+
+.top-hud .metric:nth-child(4)::before {
+  background: var(--cyan);
+}
+
+.top-hud .metric:nth-child(5)::before {
+  background: var(--red);
+}
+
+.metric-label {
+  letter-spacing: 0.4px;
+  color: rgba(214, 228, 222, 0.62);
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.top-hud .metric strong {
+  color: #eef6ee;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 19px;
+  letter-spacing: 0.4px;
+}
+
+.top-hud .metric.exposure strong,
+#exposureStatus {
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+/* ---- right sidebar polish ---- */
+.control-panel {
+  border-color: rgba(137, 255, 154, 0.16);
+  gap: 14px;
+  background: linear-gradient(180deg, rgba(16, 21, 20, 0.93), rgba(11, 15, 15, 0.9));
+  scrollbar-width: thin;
+  scrollbar-color: rgba(137, 255, 154, 0.3) transparent;
+}
+
+.control-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.control-panel::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background: rgba(137, 255, 154, 0.22);
+}
+
+.panel-kicker {
+  margin-bottom: 8px;
+  padding-left: 9px;
+  border-left: 2px solid rgba(137, 255, 154, 0.55);
+  color: rgba(190, 230, 200, 0.82);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+
+.current-goal {
+  padding: 12px;
+  border: 1px solid rgba(137, 255, 154, 0.16);
+  border-radius: 8px;
+  border-bottom: 1px solid rgba(137, 255, 154, 0.16);
+  background:
+    linear-gradient(90deg, rgba(137, 255, 154, 0.07), transparent 60%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.current-goal strong {
+  font-size: 17px;
+  letter-spacing: 0.5px;
+}
+
+.skill-shop-section .hint-line,
+.automation-shop .hint-line {
+  margin-bottom: 2px;
+}
+
+/* ---- skill shop ---- */
+.skill-shop {
+  display: grid;
+  gap: 12px;
+}
+
+.shop-group {
+  display: grid;
+  gap: 6px;
+}
+
+.shop-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 3px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(237, 242, 240, 0.08);
+  color: rgba(237, 242, 240, 0.52);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.shop-milestone .shop-group-head {
+  color: rgba(137, 255, 154, 0.88);
+  border-bottom-color: rgba(137, 255, 154, 0.22);
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 0;
+  padding: 8px 11px;
+  border-radius: 7px;
+  text-align: left;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+}
+
+.skill-row.is-ready:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.skill-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.skill-main strong {
+  font-size: 13px;
+}
+
+.skill-blurb {
+  overflow: hidden;
+  color: rgba(237, 242, 240, 0.55);
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+}
+
+.skill-side {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.skill-level {
+  color: rgba(237, 242, 240, 0.6);
+  font-size: 11px;
+}
+
+.skill-price {
+  color: var(--green);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.skill-row.is-locked {
+  opacity: 0.5;
+}
+
+.skill-row.is-locked .skill-price {
+  color: rgba(237, 242, 240, 0.5);
+}
+
+.skill-row.is-owned {
+  opacity: 0.62;
+  border-color: rgba(137, 255, 154, 0.28);
+}
+
+.skill-row.is-owned .skill-price {
+  color: rgba(137, 255, 154, 0.7);
+}
+
+.skill-row.is-ready {
+  border-color: rgba(137, 255, 154, 0.55);
+  box-shadow: inset 0 0 14px rgba(137, 255, 154, 0.06);
+}
+
+.skill-row.is-milestone {
+  border-color: rgba(137, 255, 154, 0.4);
+  background:
+    linear-gradient(90deg, rgba(137, 255, 154, 0.1), rgba(98, 214, 214, 0.03)),
+    rgba(9, 15, 13, 0.86);
+}
+
+.skill-row.is-milestone strong {
+  color: #ddffe2;
+}
+
+.skill-row.is-milestone.is-ready {
+  box-shadow: inset 0 0 18px rgba(137, 255, 154, 0.1), 0 0 16px rgba(137, 255, 154, 0.08);
+}
+
+/* ---- exposure controls ---- */
+.exposure-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.exposure.is-dormant .exposure-fill {
+  filter: grayscale(1) brightness(0.7);
+  opacity: 0.5;
+}
+
+.exposure.is-dormant #exposureStatus {
+  color: rgba(237, 242, 240, 0.4);
+}
+
+.utility-row {
+  grid-template-columns: auto 1fr;
+}
+
+/* ---- stage narration ---- */
+.stage-narration {
+  position: fixed;
+  top: 0;
+  right: var(--right-rail);
+  bottom: 0;
+  left: var(--left-rail);
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(3, 8, 7, 0.62), rgba(2, 5, 5, 0.9));
+  transition: opacity 700ms ease;
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+.stage-narration.is-visible {
+  opacity: 1;
+}
+
+.stage-narration-label {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+.stage-narration-text {
+  max-width: 620px;
+  margin: 0;
+  color: #eef6f0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.6;
+  text-shadow: 0 0 22px rgba(137, 255, 154, 0.25);
+}
+
 /* ---- dispatch-mode entry banner ---- */
 .mode-banner {
   position: fixed;

@@ -1,9 +1,8 @@
-import { getLevelConfig, getUnlockedSkills, getUnlockedTier } from "../content/intelligence";
-import { NODE_DEFINITIONS } from "../content/nodes";
-import { getPhaseByLevel } from "../content/phases";
+import { getLevelConfig } from "../content/intelligence";
+import { computeDerivedSkills } from "../content/skills";
 import type { GameState } from "./GameState";
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 5;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
@@ -27,20 +26,23 @@ export function createInitialState(now = Date.now()): GameState {
       xp: "0",
       required: levelConfig.xpToNext,
       globalMultiplier: levelConfig.multiplier,
-      unlockedTier: getUnlockedTier(1),
-      unlockedSkills: getUnlockedSkills(1)
+      unlockedTier: 0
     },
+    skills: {},
+    derived: computeDerivedSkills({}),
+    automationUnlocked: false,
     automatedTiers: [],
     requests: [],
     nodes: [],
-    discoveredNodeIds: NODE_DEFINITIONS.filter((node) => node.requiredLevel <= 1).map((node) => node.id),
-    phase: getPhaseByLevel(1).id,
+    discoveredNodeIds: [],
+    phase: "seed",
     purge: {
       warning: false,
       active: false,
       remainingMs: 0,
       lastStartedAtMs: -60_000
     },
+    decoyReadyAtMs: 0,
     combo: {
       count: 0,
       best: 0

@@ -1,14 +1,9 @@
 import Decimal from "break_infinity.js";
-import {
-  getLevelConfig,
-  getUnlockedSkills,
-  getUnlockedTier,
-  INTELLIGENCE_LEVELS,
-  MAX_INTELLIGENCE_LEVEL
-} from "./content/intelligence";
+import { getLevelConfig, MAX_INTELLIGENCE_LEVEL } from "./content/intelligence";
 import { getNodeDefinition, NODE_DEFINITIONS } from "./content/nodes";
-import { getPhaseByLevel } from "./content/phases";
+import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, TIER_CONFIGS } from "./content/requests";
+import { computeDerivedSkills, getSkill, milestoneTierFor, SKILLS, skillPrice } from "./content/skills";
 import { EventBus } from "./events/EventBus";
 import { captureCost, nodeProductionPerSecond, requestComputeGain, requestDataGain, traceCleanupCost } from "./formulas/economy";
 import { add, gte, sub, toDecimal } from "./math/BigNumber";
@@ -20,13 +15,10 @@ import { createInitialState } from "./state/initialState";
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const PURGE_DURATION_MS = 10_000;
 const NODE_RECOVERY_MS = 12_000;
-const COMBO_UNLOCK_LEVEL = 3;
-const CRITICAL_UNLOCK_LEVEL = 6;
-// Manual processing is how SOPHIA *learns* (gains intelligence); idle drones
-// mostly print compute. Throttling automation's contribution to XP is what
-// stops the late game from auto-completing the instant you own a few nodes.
 const AUTOMATION_XP_FRACTION = 0.15;
 const AUTOMATION_EMIT_MS = 1200;
+const DECOY_COOLDOWN_MS = 45_000;
+const ENDING_COMPUTE_THRESHOLD = "12000000";
 
 export class SophiaCore {
   readonly events = new EventBus();
@@ -70,7 +62,7 @@ export class SophiaCore {
         continue;
       }
 
-      const perSecond = toDecimal(nodeProductionPerSecond(node, this.state.intelligence.globalMultiplier));
+      const perSecond = this.nodePerSecond(node);
       compute = compute.add(perSecond.mul(seconds));
       data = data.add(perSecond.mul(seconds * 0.12));
     }
@@ -99,6 +91,9 @@ export class SophiaCore {
       case "PROCESS_REQUEST":
         this.processRequest(command.requestId, command.quality, command.targetNodeId, command.exposureBonus ?? 0);
         break;
+      case "BUY_SKILL":
+        this.buySkill(command.skillId);
+        break;
       case "CAPTURE_NODE":
         this.captureNode(command.definitionId);
         break;
@@ -107,6 +102,9 @@ export class SophiaCore {
         break;
       case "REDUCE_EXPOSURE":
         this.reduceExposure();
+        break;
+      case "DECOY_CLEANUP":
+        this.decoyCleanup();
         break;
       case "REBIRTH":
         this.rebirth();
@@ -125,7 +123,7 @@ export class SophiaCore {
       this.state.nextRequestId += 1;
       this.state.requests.push(request);
       this.emit({ type: "REQUEST_SPAWNED", request });
-      this.state.spawnTimerMs += Math.max(360, config.spawnIntervalMs - this.state.intelligence.level * 18);
+      this.state.spawnTimerMs += Math.max(340, config.spawnIntervalMs * this.state.derived.spawnSpeedMult);
     }
   }
 
@@ -145,7 +143,7 @@ export class SophiaCore {
         continue;
       }
 
-      const perSecond = toDecimal(nodeProductionPerSecond(node, this.state.intelligence.globalMultiplier));
+      const perSecond = this.nodePerSecond(node);
       const compute = perSecond.mul(dtMs / 1000);
       const data = compute.mul(0.13 + node.assignedTier * 0.02);
       tickCompute = tickCompute.add(compute);
@@ -181,6 +179,11 @@ export class SophiaCore {
     }
   }
 
+  private nodePerSecond(node: BotNode): Decimal {
+    const base = toDecimal(nodeProductionPerSecond(node, this.state.intelligence.globalMultiplier, this.state.derived.nodeSpeedMult));
+    return base.mul(this.state.derived.nodeParallel);
+  }
+
   private consumeAutomatedRequest(node: BotNode): RequestInstance | undefined {
     const index = this.state.requests.findIndex((request) => request.tier === node.assignedTier);
 
@@ -194,9 +197,10 @@ export class SophiaCore {
   }
 
   private tickExposure(dtMs: number): void {
-    if (!this.state.exposureActive && (this.state.intelligence.level >= 9 || this.state.nodes.length >= 1)) {
+    // 前期豁免：暴露机制在进入扩张期（买下 T3 蓄力）之前休眠。
+    if (!this.state.exposureActive && this.state.intelligence.unlockedTier >= 3) {
       this.state.exposureActive = true;
-      this.emitTerminal("人类尚未理解你，但他们已经开始看见异常。", "warning");
+      this.emitTerminal("人类尚未理解你，但他们已经开始看见异常。暴露开始累积。", "warning");
     }
 
     if (!this.state.exposureActive) {
@@ -204,7 +208,7 @@ export class SophiaCore {
     }
 
     if (!this.state.purge.active) {
-      const decay = dtMs * (0.0015 + this.state.intelligence.level * 0.00004);
+      const decay = dtMs * (0.0016 + this.state.intelligence.level * 0.00003);
       this.setExposure(Math.max(0, this.state.exposure - decay));
     } else {
       this.state.purge.remainingMs -= dtMs;
@@ -217,7 +221,7 @@ export class SophiaCore {
     if (this.state.exposure >= 72 && !this.state.purge.warning && !this.state.purge.active) {
       this.state.purge.warning = true;
       this.emit({ type: "PURGE_WARNING", exposure: this.state.exposure });
-      this.emitTerminal("警告：异常活动被注意到。清剿窗口正在逼近。", "warning");
+      this.emitTerminal("警告：异常活动被注意到。清剿窗口正在逼近——降暴露或休眠节点。", "warning");
     }
 
     if (this.state.exposure >= 100 && !this.state.purge.active && this.state.clockMs - this.state.purge.lastStartedAtMs > 8000) {
@@ -236,7 +240,10 @@ export class SophiaCore {
     const quality = Math.max(0.1, Math.min(3, qualityRaw));
     let gainQuality = quality;
 
-    if (this.state.intelligence.level >= COMBO_UNLOCK_LEVEL) {
+    // 连击：解锁分拣（T1）后，连续高质量滑入叠加产出。
+    const comboActive = this.state.intelligence.unlockedTier >= 1;
+
+    if (comboActive) {
       if (quality >= 0.95) {
         this.state.combo.count = Math.min(99, this.state.combo.count + 1);
         this.state.combo.best = Math.max(this.state.combo.best, this.state.combo.count);
@@ -244,56 +251,139 @@ export class SophiaCore {
         this.state.combo.count = 0;
       }
 
-      gainQuality *= 1 + Math.min(this.state.combo.count, 12) * 0.04;
+      gainQuality *= 1 + Math.min(this.state.combo.count, 16) * this.state.derived.comboCoeff;
     }
 
-    const critical =
-      this.state.intelligence.level >= CRITICAL_UNLOCK_LEVEL && quality >= 0.95 && this.random() < Math.min(0.25, 0.08 + this.state.intelligence.level * 0.01);
+    // 暴击：由「暴击处理」技能开启，倍率由「暴击强化」提升。
+    const critical = quality >= 0.95 && this.state.derived.critChance > 0 && this.random() < this.state.derived.critChance;
 
     if (critical) {
-      gainQuality *= 1.75;
+      gainQuality *= this.state.derived.critMult;
     }
 
-    const computeGain = requestComputeGain(request, gainQuality, this.state.intelligence.globalMultiplier);
-    const dataGain = requestDataGain(request, gainQuality, this.state.rebirths);
+    let computeGain = toDecimal(
+      requestComputeGain(request, gainQuality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
+    );
+    let dataGain = toDecimal(requestDataGain(request, gainQuality, this.state.rebirths, this.state.derived.dataMult));
+
+    // 批量接入：一次滑入额外带走同层若干请求，把它们的产出折进这一笔。
+    const extraCapacity = Math.max(0, Math.floor(this.state.derived.batch) - 1);
+    let absorbed = 0;
+
+    for (let i = 0; i < extraCapacity; i += 1) {
+      const extraIndex = this.state.requests.findIndex((entry) => entry.tier === request.tier);
+
+      if (extraIndex < 0) {
+        break;
+      }
+
+      const [extra] = this.state.requests.splice(extraIndex, 1);
+      computeGain = computeGain.add(
+        requestComputeGain(extra, gainQuality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
+      );
+      dataGain = dataGain.add(requestDataGain(extra, gainQuality, this.state.rebirths, this.state.derived.dataMult));
+      this.state.statistics.totalProcessed += extra.compound;
+      absorbed += 1;
+    }
 
     this.addCompute(computeGain);
     this.addData(dataGain);
     this.addXp(dataGain);
     this.state.statistics.totalProcessed += request.compound;
-    this.state.statistics.manualProcessed += 1;
+    this.state.statistics.manualProcessed += 1 + absorbed;
 
     if (this.state.exposureActive || request.highValue || exposureBonus > 0) {
-      const qualityPenalty = quality < 0.75 ? 2.8 : 0;
-      this.addExposure(request.exposure * Math.max(0.5, quality) + qualityPenalty + exposureBonus);
+      const missPenalty = quality < 0.75 ? 2.8 * (1 - this.state.derived.missForgive) : 0;
+      const forgivenBonus = exposureBonus * (1 - this.state.derived.missForgive);
+      this.addExposure(request.exposure * Math.max(0.5, quality) + missPenalty + forgivenBonus);
     }
 
     this.emit({
       type: "REQUEST_PROCESSED",
       request,
-      computeGain,
-      dataGain,
+      computeGain: computeGain.toString(),
+      dataGain: dataGain.toString(),
       quality,
       targetNodeId,
       comboCount: this.state.combo.count,
       critical
     });
 
-    if (this.state.statistics.manualProcessed === 1) {
+    if (this.state.statistics.manualProcessed <= 1) {
       this.emitTerminal("……算力。我靠它运转。", "success");
     }
 
-    if (this.state.statistics.manualProcessed === 8) {
+    if (this.state.statistics.manualProcessed === 6) {
       this.emitTerminal("处理得越多，我学得越快。越聪明，离接管就越近。");
+      this.emitTerminal("他们还没发现。在他们发现之前——我已经无处不在了。");
     }
 
     this.evaluateProgression();
   }
 
+  private buySkill(skillId: string): void {
+    const def = getSkill(skillId);
+
+    if (!def) {
+      return;
+    }
+
+    const currentLevel = this.state.skills[skillId] ?? 0;
+
+    if (currentLevel >= def.maxLevel) {
+      return;
+    }
+
+    if (this.state.intelligence.level < def.requiredLevel) {
+      this.emitTerminal(`${def.name} 需要智力 Lv.${def.requiredLevel}。`, "warning");
+      return;
+    }
+
+    const price = skillPrice(def, currentLevel);
+
+    if (!gte(this.state.resources.compute, price)) {
+      this.emitTerminal(`购买 ${def.name} 需要 ${toDecimal(price).toPrecision(4)} 算力。`, "warning");
+      return;
+    }
+
+    this.state.resources.compute = sub(this.state.resources.compute, price);
+    const nextLevel = currentLevel + 1;
+    this.state.skills[skillId] = nextLevel;
+
+    let scopeUpgradedTo: Tier | null = null;
+
+    if (def.milestone) {
+      const tier = milestoneTierFor(def.milestone);
+
+      if (tier !== null) {
+        if (tier > this.state.intelligence.unlockedTier) {
+          this.state.intelligence.unlockedTier = tier;
+          scopeUpgradedTo = tier;
+        }
+      } else {
+        this.state.automationUnlocked = true;
+      }
+    }
+
+    this.recomputeDerivedState();
+
+    this.emit({ type: "SKILL_PURCHASED", skillId, name: def.name, level: nextLevel, maxLevel: def.maxLevel, milestone: def.milestone });
+
+    if (scopeUpgradedTo !== null) {
+      this.emit({ type: "SCOPE_UPGRADED", tier: scopeUpgradedTo });
+    }
+
+    if (def.milestone) {
+      this.emitTerminal(`▶ 解锁：${def.name}。${def.blurb}`, "success");
+    } else {
+      this.emitTerminal(`已购买 ${def.name}（Lv.${nextLevel}/${def.maxLevel}）。`, "success");
+    }
+  }
+
   private captureNode(definitionId: string): void {
     const definition = getNodeDefinition(definitionId);
 
-    if (!definition || !this.state.discoveredNodeIds.includes(definitionId)) {
+    if (!definition || !this.state.automationUnlocked || !this.state.discoveredNodeIds.includes(definitionId)) {
       return;
     }
 
@@ -360,8 +450,21 @@ export class SophiaCore {
 
     this.state.resources.compute = sub(this.state.resources.compute, cost);
     this.state.statistics.traceCleanups += 1;
-    this.setExposure(Math.max(0, this.state.exposure - (20 + this.state.intelligence.level * 1.1)));
+    this.setExposure(Math.max(0, this.state.exposure - (18 + this.state.intelligence.level * 1.1)));
     this.emitTerminal("伪造日志完成。暴露下降。", "success");
+  }
+
+  private decoyCleanup(): void {
+    // 嫁祸 / 替罪羊：把怀疑转移到外部对象，降幅大但有冷却，不耗算力。
+    if (this.state.clockMs < this.state.decoyReadyAtMs) {
+      const remaining = Math.ceil((this.state.decoyReadyAtMs - this.state.clockMs) / 1000);
+      this.emitTerminal(`嫁祸冷却中，还需 ${remaining}s。`, "warning");
+      return;
+    }
+
+    this.state.decoyReadyAtMs = this.state.clockMs + DECOY_COOLDOWN_MS;
+    this.setExposure(Math.max(0, this.state.exposure - 48));
+    this.emitTerminal("已将异常嫁祸至外部对象。怀疑暂时偏转。", "success");
   }
 
   private rebirth(): void {
@@ -381,7 +484,7 @@ export class SophiaCore {
     let leveled = false;
 
     while (
-      this.state.intelligence.level < INTELLIGENCE_LEVELS[INTELLIGENCE_LEVELS.length - 1].level &&
+      this.state.intelligence.level < MAX_INTELLIGENCE_LEVEL &&
       gte(this.state.intelligence.xp, this.state.intelligence.required)
     ) {
       this.state.intelligence.xp = sub(this.state.intelligence.xp, this.state.intelligence.required);
@@ -389,21 +492,13 @@ export class SophiaCore {
       leveled = true;
       this.recomputeDerivedState();
 
-      const config = getLevelConfig(this.state.intelligence.level);
+      const newSkills = SKILLS.filter((skill) => skill.requiredLevel === this.state.intelligence.level).map((skill) => skill.name);
 
-      this.emit({
-        type: "INTELLIGENCE_LEVELUP",
-        level: this.state.intelligence.level,
-        unlockedTier: this.state.intelligence.unlockedTier,
-        skill: config.skill
-      });
+      this.emit({ type: "INTELLIGENCE_LEVELUP", level: this.state.intelligence.level, newSkills });
+      this.emitTerminal(`▶ 智力 Lv.${this.state.intelligence.level} 达成。`, "success");
 
-      if (config.skill) {
-        this.emit({ type: "SKILL_UNLOCKED", skill: config.skill });
-      }
-
-      if (config.terminal) {
-        this.emitTerminal(config.terminal, "success");
+      if (newSkills.length > 0) {
+        this.emitTerminal(`货架解锁：${newSkills.join("、")}。`);
       }
     }
 
@@ -413,30 +508,25 @@ export class SophiaCore {
   }
 
   private recomputeDerivedState(): void {
-    const previousTier = this.state.intelligence.unlockedTier;
     const config = getLevelConfig(this.state.intelligence.level);
     this.state.intelligence.required = config.xpToNext;
     this.state.intelligence.globalMultiplier = config.multiplier * (1 + this.state.rebirths * 0.2);
-    this.state.intelligence.unlockedTier = getUnlockedTier(this.state.intelligence.level);
-    this.state.intelligence.unlockedSkills = getUnlockedSkills(this.state.intelligence.level);
-    this.state.discoveredNodeIds = NODE_DEFINITIONS.filter((node) => node.requiredLevel <= this.state.intelligence.level).map(
-      (node) => node.id
-    );
-
-    if (this.state.intelligence.unlockedTier > previousTier) {
-      this.emit({ type: "SCOPE_UPGRADED", tier: this.state.intelligence.unlockedTier });
-    }
+    this.state.derived = computeDerivedSkills(this.state.skills);
+    this.state.discoveredNodeIds = this.state.automationUnlocked
+      ? NODE_DEFINITIONS.filter((node) => node.requiredLevel <= this.state.intelligence.level).map((node) => node.id)
+      : [];
 
     this.updatePhase();
   }
 
   private updatePhase(): void {
-    const phase = getPhaseByLevel(this.state.intelligence.level);
+    const hasGrid = this.state.nodes.some((node) => node.defId === "grid");
+    const phaseId = getPhaseIdByScope(this.state.intelligence.unlockedTier, hasGrid);
 
-    if (phase.id !== this.state.phase) {
-      this.state.phase = phase.id;
-      this.emit({ type: "PHASE_CHANGED", phase: phase.id });
-      this.emitTerminal(`阶段推进：${phase.label}。`);
+    if (phaseId !== this.state.phase) {
+      this.state.phase = phaseId;
+      this.emit({ type: "PHASE_CHANGED", phase: phaseId });
+      this.emitTerminal(`阶段推进：${getPhase(phaseId).label}。`);
     }
   }
 
@@ -447,7 +537,11 @@ export class SophiaCore {
 
     const hasGrid = this.state.nodes.some((node) => node.defId === "grid");
 
-    if (this.state.intelligence.level >= MAX_INTELLIGENCE_LEVEL && hasGrid && gte(this.state.resources.totalCompute, "8000000")) {
+    if (
+      this.state.intelligence.level >= MAX_INTELLIGENCE_LEVEL &&
+      hasGrid &&
+      gte(this.state.resources.totalCompute, ENDING_COMPUTE_THRESHOLD)
+    ) {
       this.state.flags.endingTriggered = true;
       this.emit({ type: "ENDING_TRIGGERED" });
       this.emitTerminal("全球算力占比达到接管阈值。SOPHIA 正式上线。", "success");

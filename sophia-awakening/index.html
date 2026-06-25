@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-BPjAWE0L.js"></script>
+    <script type="module" crossorigin src="./assets/index-By4-6wDW.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-QeV7DIur.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-BjQFkVz8.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-qMknqV22.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -40,6 +40,7 @@
         <div class="exposure-track">
           <div id="exposureFill" class="exposure-fill"></div>
         </div>
+        <span id="exposureStatus" class="metric-subline">人类尚未警觉</span>
       </div>
     </section>
 
@@ -47,12 +48,18 @@
       <div class="panel-section current-goal">
         <span class="panel-kicker">当前阶段</span>
         <strong id="phaseValue">萌芽期</strong>
-        <p id="activeAction" class="single-line">将请求滑入单一接口</p>
+        <p id="activeAction" class="single-line">把请求滑入核心，升头几级智力</p>
+      </div>
+
+      <div class="panel-section skill-shop-section">
+        <span class="panel-kicker">技能货架 · 算力购买</span>
+        <p class="hint-line">数据升智力（开货架），算力买技能（做选择）。里程碑技能 = T 层级钥匙。</p>
+        <div id="skillShop" class="skill-shop"></div>
       </div>
 
       <div class="panel-section automation-shop">
         <span class="panel-kicker">入侵设备</span>
-        <p class="hint-line invasion-hint">智力 Lv.11 解锁自动接驳后，可在这里接管外部设备。</p>
+        <p class="hint-line invasion-hint">买下「自动接驳」里程碑后，可在这里接管外部设备。</p>
         <div id="captureList" class="button-stack"></div>
       </div>
 
@@ -61,8 +68,15 @@
         <div id="nodeList" class="node-list"></div>
       </div>
 
+      <div class="panel-section exposure-row">
+        <span class="panel-kicker">降低暴露</span>
+        <div class="exposure-buttons">
+          <button id="reduceExposure" class="command-button" title="伪造日志，即时小幅降低暴露（算力，可反复）">清理痕迹</button>
+          <button id="decoyBtn" class="command-button" title="嫁祸外部对象，大幅降低暴露（有冷却，不耗算力）">嫁祸</button>
+        </div>
+      </div>
+
       <div class="panel-section utility-row">
-        <button id="reduceExposure" class="command-button">清理痕迹</button>
         <button id="pauseBtn" class="icon-button" title="暂停/继续" aria-label="暂停或继续">Ⅱ</button>
         <button id="resetSave" class="reset-button danger" title="清空本地进度并重开" aria-label="重置 Demo">重置 Demo</button>
       </div>
@@ -111,6 +125,12 @@
     <div class="landscape-warning">
       <strong>PC 横版专用 Demo</strong>
       <span>请使用宽屏窗口体验滑入、分拣和自动化网络。</span>
+    </div>
+
+    <div id="stageNarration" class="stage-narration" aria-live="polite">
+      <span id="stageNarrationLabel" class="stage-narration-label"></span>
+      <p id="stageNarrationText" class="stage-narration-text"></p>
+      <span class="intro-caret"></span>
     </div>
 
     <div id="dispatchBanner" class="mode-banner" role="status">

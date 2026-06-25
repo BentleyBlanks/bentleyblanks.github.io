@@ -1,3 +1,4 @@
+import type { MilestoneKind } from "../content/skills";
 import type { BotNode, PhaseId, RequestInstance, Tier } from "../state/GameState";
 
 export type GameEvent =
@@ -13,9 +14,9 @@ export type GameEvent =
       critical?: boolean;
     }
   | { type: "AUTOMATION_PAYOUT"; computeGain: string; dataGain: string; nodeId?: string; tier?: Tier; request?: RequestInstance }
-  | { type: "INTELLIGENCE_LEVELUP"; level: number; unlockedTier: Tier; skill?: string }
+  | { type: "INTELLIGENCE_LEVELUP"; level: number; newSkills: string[] }
+  | { type: "SKILL_PURCHASED"; skillId: string; name: string; level: number; maxLevel: number; milestone?: MilestoneKind }
   | { type: "SCOPE_UPGRADED"; tier: Tier }
-  | { type: "SKILL_UNLOCKED"; skill: string }
   | { type: "NODE_CAPTURED"; node: BotNode }
   | { type: "AUTOMATION_ATTACHED"; nodeId: string; tier: Tier }
   | { type: "NODE_OFFLINE"; nodeId: string; durationMs: number }

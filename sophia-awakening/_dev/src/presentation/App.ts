@@ -9,17 +9,24 @@ import {
   type Ticker
 } from "pixi.js";
 import { SophiaCore } from "../core/GameCore";
-import { AUTOMATION_UNLOCK_LEVEL, INTELLIGENCE_LEVELS } from "../core/content/intelligence";
 import { NODE_DEFINITIONS } from "../core/content/nodes";
-import { getPhase } from "../core/content/phases";
-import { REQUEST_CATEGORIES, TIER_CONFIGS } from "../core/content/requests";
+import { getPhase, type PhaseConfig } from "../core/content/phases";
+import { SORT_SLOTS, TIER_COLORS, TIER_CONFIGS } from "../core/content/requests";
+import {
+  SKILL_CATEGORY_LABELS,
+  SKILLS,
+  getSkill,
+  skillPrice,
+  type SkillCategory,
+  type SkillDef
+} from "../core/content/skills";
 import type { GameEvent } from "../core/events/GameEvents";
 import { captureCost, traceCleanupCost } from "../core/formulas/economy";
 import { formatBig, gte, toDecimal } from "../core/math/BigNumber";
 import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
 import { SaveManager } from "../core/save/SaveManager";
-import type { BotNode, GameState, RequestInstance, Tier } from "../core/state/GameState";
+import type { BotNode, GameState, RequestInstance, SortAnswer, Tier } from "../core/state/GameState";
 import { gameStore } from "../store/gameStore";
 
 interface DropResult {
@@ -30,20 +37,22 @@ interface DropResult {
   exposureBonus?: number;
 }
 
-const CATEGORY_SLOTS = ["mail", "report", "security"] as const;
 const CYAN = 0x62d6d6;
 const GREEN = 0x89ff9a;
 const AMBER = 0xffb84a;
 const RED = 0xff5f5f;
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-const PERSISTENCE_REVISION = "manual-ladder-redesign-v9";
+const PERSISTENCE_REVISION = "card-read-model-v11";
+// Set right before a reset/restart reload so the beforeunload handler does NOT
+// re-persist the in-memory (un-reset) state and quietly undo the wipe.
+let suppressSaveOnUnload = false;
 const LEFT_RAIL_WIDTH = 300;
 const RIGHT_RAIL_WIDTH = 376;
 const PLAYFIELD_GUTTER = 24;
 const BASE_SUCTION_MARGIN = 50;
-const REQUEST_PACKET_WIDTH = 188;
-const REQUEST_PACKET_HEIGHT = 62;
+const REQUEST_PACKET_WIDTH = 206;
+const REQUEST_PACKET_HEIGHT = 104;
 
 export async function bootstrapSophia(root: HTMLElement): Promise<void> {
   const app = new SophiaGameApp(root);
@@ -64,8 +73,10 @@ class SophiaGameApp {
   private readonly networkView = new NodeNetworkView();
   private readonly terminal = new TerminalView();
   private readonly hud = new HudView(this.core, this.saveManager);
+  private readonly skillShop = new SkillShopView(this.core);
   private readonly onboarding = new OnboardingView();
   private readonly dispatchBanner = new DispatchBanner();
+  private readonly stageNarration = new StageNarrationView();
   private readonly ending = new EndingView(() => this.restart());
   private readonly juice = new JuiceManager(this.fxLayer);
   private readonly requestViews = new Map<string, RequestPacketView>();
@@ -107,13 +118,18 @@ class SophiaGameApp {
     const initial = this.core.getState();
     gameStore.getState().sync(initial);
     this.hud.update(initial);
+    this.skillShop.update(initial);
     this.onboarding.mount(() => {
       this.core.startSession();
       this.announceGuidance(this.core.getState());
     });
 
     this.pixi.ticker.add((ticker: Ticker) => this.frame(ticker.deltaMS));
-    window.addEventListener("beforeunload", () => this.saveManager.save(this.core.getState()));
+    window.addEventListener("beforeunload", () => {
+      if (!suppressSaveOnUnload) {
+        this.saveManager.save(this.core.getState());
+      }
+    });
   }
 
   private frame(deltaMs: number): void {
@@ -131,6 +147,7 @@ class SophiaGameApp {
     this.syncRequests(state);
     this.terminal.update(deltaMs);
     this.onboarding.update(deltaMs);
+    this.stageNarration.update(deltaMs);
     this.ending.update(deltaMs);
     this.juice.update(deltaMs);
     this.updateHud(state, deltaMs);
@@ -147,6 +164,7 @@ class SophiaGameApp {
 
     this.hudTimerMs = 0;
     this.hud.update(state);
+    this.skillShop.update(state);
   }
 
   private updateSave(state: GameState, deltaMs: number): void {
@@ -205,8 +223,8 @@ class SophiaGameApp {
       usableRight - REQUEST_PACKET_WIDTH - 24,
       playfieldLeft + 24 + column * (REQUEST_PACKET_WIDTH + gap) + jitter
     );
-    const y = 112 + row * 74 + ((seeded * 7) % 14);
-    return { x: Math.max(playfieldLeft, x), y: Math.min(screen.height - 250, y) };
+    const y = 104 + row * (REQUEST_PACKET_HEIGHT + 12) + ((seeded * 7) % 12);
+    return { x: Math.max(playfieldLeft, x), y: Math.min(screen.height - 300, y) };
   }
 
   private handleDrop(card: RequestPacketView, global: PointData): boolean {
@@ -254,8 +272,21 @@ class SophiaGameApp {
       this.juice.number(`Lv.${event.level}`, this.interfaceView.center, CYAN);
       this.terminal.push(`▶ ${getTerminalSkillStatus(this.core.getState())}`, "success");
     });
-    this.core.events.on("PHASE_CHANGED", () => {
-      this.announceGuidance(this.core.getState());
+    this.core.events.on("SKILL_PURCHASED", (event) => {
+      this.hud.update(this.core.getState());
+      if (event.milestone) {
+        this.hud.playLevelUp();
+        this.juice.flash(event.milestone === "automation" ? AMBER : GREEN);
+        this.juice.shake(this.world);
+        this.juice.number(`解锁 ${event.name}`, this.interfaceView.center, GREEN);
+      } else {
+        this.juice.number(`${event.name} Lv.${event.level}`, this.interfaceView.center, CYAN);
+      }
+    });
+    this.core.events.on("PHASE_CHANGED", (event) => {
+      const state = this.core.getState();
+      this.announceGuidance(state);
+      this.stageNarration.show(getPhase(event.phase));
     });
     this.core.events.on("SCOPE_UPGRADED", (event) => {
       if (event.tier === 4) {
@@ -297,8 +328,7 @@ class SophiaGameApp {
   }
 
   private restart(): void {
-    clearPersistedSophiaState(this.saveManager, true);
-    window.location.reload();
+    hardResetAndReload(this.saveManager);
   }
 
   private announceGuidance(state: GameState): void {
@@ -369,10 +399,29 @@ class SophiaGameApp {
     const playfieldRight = w - RIGHT_RAIL_WIDTH;
     this.background.rect(0, 0, playfieldLeft, h).fill({ color: 0x080b0b, alpha: 0.34 });
     this.background.moveTo(playfieldLeft, 0).lineTo(playfieldLeft, h).stroke({ width: 1, color: 0x89ff9a, alpha: 0.1 });
-    this.background.ellipse((playfieldLeft + playfieldRight) * 0.5, h * 0.5, 280, 130).fill({
-      color: 0x62d6d6,
-      alpha: 0.035
-    });
+
+    // ---- Core backdrop: a grounded "machine deck", not a flat blue disc ----
+    const coreX = (playfieldLeft + playfieldRight) * 0.5 + 70; // matches InterfaceView.center.x
+    const coreY = h * 0.48;
+
+    // soft halo, faked as stacked ellipses so there is no hard circle edge
+    const steps = 8;
+    for (let i = steps; i >= 1; i -= 1) {
+      const t = i / steps;
+      const rx = 96 + t * 168;
+      this.background.ellipse(coreX, coreY, rx, rx * 0.6).fill({ color: 0x16302b, alpha: 0.055 * (1 - t) + 0.008 });
+    }
+
+    // faint concentric deck rings under the core — grounds it on a "floor"
+    const deckY = coreY + 132;
+    for (let i = 1; i <= 3; i += 1) {
+      this.background
+        .ellipse(coreX, deckY, 150 + i * 78, 40 + i * 22)
+        .stroke({ width: 1, color: 0x2c3f3b, alpha: 0.2 - i * 0.04 });
+    }
+
+    // contact shadow under the pedestal
+    this.background.ellipse(coreX, coreY + 116, 116, 22).fill({ color: 0x000000, alpha: 0.3 });
   }
 }
 
@@ -385,7 +434,10 @@ class RequestPacketView {
   private readonly chargeBar = new Graphics();
   private readonly code: Text;
   private readonly title: Text;
-  private readonly meta: Text;
+  private readonly badge: Text;
+  private readonly clueTexts: Text[] = [];
+  private readonly accent: number;
+  private clueRows: number[] = [];
   private readonly moveHandler = (event: FederatedPointerEvent) => this.handleMove(event);
   private readonly upHandler = (event: FederatedPointerEvent) => this.handleUp(event);
   private dragging = false;
@@ -400,19 +452,19 @@ class RequestPacketView {
     private readonly onDrop: (card: RequestPacketView, global: PointData) => boolean
   ) {
     this.request = request;
+    this.accent = TIER_COLORS[request.tier];
     this.container.eventMode = "dynamic";
     this.container.cursor = "grab";
     this.container.addChild(this.bg);
     this.container.addChild(this.chargeBar);
-    const category = REQUEST_CATEGORIES[request.category];
+
+    this.badge = new Text({
+      text: TIER_CONFIGS[request.tier].name + (request.compound > 1 ? ` ·串 ×${request.compound}` : ""),
+      style: { fill: this.accent, fontSize: 10, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
+    });
     this.code = new Text({
       text: this.packetCode(),
-      style: {
-        fill: category.color,
-        fontSize: 10,
-        fontWeight: "800",
-        fontFamily: "Cascadia Mono, Consolas, monospace"
-      }
+      style: { fill: 0x7f938d, fontSize: 10, fontWeight: "700", fontFamily: "Cascadia Mono, Consolas, monospace" }
     });
     this.title = new Text({
       text: request.label,
@@ -422,17 +474,37 @@ class RequestPacketView {
         fontWeight: "800",
         fontFamily: "Cascadia Mono, Consolas, monospace",
         wordWrap: true,
-        wordWrapWidth: 120
+        wordWrapWidth: REQUEST_PACKET_WIDTH - 26
       }
     });
-    this.meta = new Text({
-      text: this.metaText(),
-      style: { fill: 0xa9c7bf, fontSize: 10, fontWeight: "700", fontFamily: "Cascadia Mono, Consolas, monospace" }
+    this.badge.position.set(12, 8);
+    this.code.anchor.set(1, 0);
+    this.code.position.set(REQUEST_PACKET_WIDTH - 11, 8);
+    this.title.position.set(12, 24);
+    this.container.addChild(this.badge, this.code, this.title);
+
+    // Clue lines — the information the player has to read. Laid out after the
+    // title so a two-line title still leaves room.
+    const clueTop = 28 + Math.max(18, this.title.height) + 4;
+    (request.clues ?? []).forEach((clue, index) => {
+      const text = new Text({
+        text: clue,
+        style: {
+          fill: 0xbcd0c9,
+          fontSize: 11,
+          fontWeight: "600",
+          fontFamily: "Cascadia Mono, Consolas, monospace",
+          wordWrap: true,
+          wordWrapWidth: REQUEST_PACKET_WIDTH - 32
+        }
+      });
+      const y = clueTop + index * 15;
+      this.clueRows.push(y);
+      text.position.set(20, y);
+      this.clueTexts.push(text);
+      this.container.addChild(text);
     });
-    this.code.position.set(58, 7);
-    this.title.position.set(58, 21);
-    this.meta.position.set(58, 42);
-    this.container.addChild(this.code, this.title, this.meta);
+
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
     this.stage.on("pointermove", this.moveHandler);
     this.stage.on("pointerup", this.upHandler);
@@ -570,13 +642,6 @@ class RequestPacketView {
     }
   }
 
-  private metaText(): string {
-    const category = REQUEST_CATEGORIES[this.request.category].label;
-    const tierName = TIER_CONFIGS[this.request.tier].name;
-    const compound = this.request.compound > 1 ? ` x${this.request.compound}` : "";
-    return `${tierName} · ${category}${compound}`;
-  }
-
   private packetCode(): string {
     const numericId = Number(this.request.id.replace("req-", ""));
     const id = Number.isFinite(numericId) ? String(numericId).padStart(3, "0") : this.request.id.slice(-3).toUpperCase();
@@ -584,55 +649,44 @@ class RequestPacketView {
   }
 
   private draw(): void {
-    const category = REQUEST_CATEGORIES[this.request.category];
-    const c = category.color;
+    const c = this.accent;
     const W = REQUEST_PACKET_WIDTH;
     const H = REQUEST_PACKET_HEIGHT;
     const notch = 13;
     this.bg.clear();
 
-    // Physical punch-card body with a clipped top-left corner.
-    const drawShell = () => {
-      this.bg
-        .moveTo(notch, 0)
-        .lineTo(W, 0)
-        .lineTo(W, H)
-        .lineTo(0, H)
-        .lineTo(0, notch)
-        .closePath();
+    // Info-card body with a clipped top-left corner (a "work ticket").
+    const shell = () => {
+      this.bg.moveTo(notch, 0).lineTo(W, 0).lineTo(W, H).lineTo(0, H).lineTo(0, notch).closePath();
     };
 
-    drawShell();
-    this.bg.fill({ color: 0x0b1413, alpha: 0.97 });
-    drawShell();
-    this.bg.stroke({ width: 1.5, color: c, alpha: 0.62 });
+    shell();
+    this.bg.fill({ color: 0x0c1514, alpha: 0.97 });
+    shell();
+    this.bg.stroke({ width: 1.5, color: c, alpha: 0.58 });
 
-    // Top header strip + chamfer accent across the cut corner.
-    this.bg.rect(notch, 0, W - notch, 3).fill({ color: c, alpha: 0.34 });
-    this.bg.moveTo(0, notch).lineTo(notch, 0).stroke({ width: 1.5, color: c, alpha: 0.62 });
+    // left accent spine + cut-corner chamfer
+    this.bg.rect(0, notch, 3, H - notch).fill({ color: c, alpha: 0.85 });
+    this.bg.moveTo(0, notch).lineTo(notch, 0).stroke({ width: 1.5, color: c, alpha: 0.58 });
 
-    // Left category tab with a punched hole, like an old IBM card.
-    this.bg.rect(0, notch, 50, H - notch).fill({ color: c, alpha: 0.13 });
-    this.bg.moveTo(50, notch).lineTo(50, H).stroke({ width: 1, color: c, alpha: 0.42 });
-    this.bg.rect(7, notch + 6, 16, 4).fill({ color: c, alpha: 0.85 });
-    this.bg.circle(25, H * 0.56, 8).fill({ color: 0x05100f, alpha: 1 });
-    this.bg.circle(25, H * 0.56, 8).stroke({ width: 1.5, color: c, alpha: 0.7 });
-    this.bg.circle(25, H * 0.56, 2.6).fill({ color: c, alpha: 0.85 });
+    // header underline
+    this.bg.moveTo(12, 21).lineTo(W - 12, 21).stroke({ width: 1, color: c, alpha: 0.16 });
 
-    // Right tear-off perforation.
-    for (let y = 9; y < H - 6; y += 7) {
-      this.bg.circle(W - 7, y, 1).fill({ color: 0xffffff, alpha: 0.14 });
+    // clue bullets
+    for (const y of this.clueRows) {
+      this.bg.circle(13, y + 7, 1.6).fill({ color: c, alpha: 0.7 });
     }
 
-    // Divider under the code line + a small barcode block bottom-right.
-    this.bg.moveTo(58, 20).lineTo(W - 14, 20).stroke({ width: 1, color: c, alpha: 0.14 });
+    // right tear-off perforation
+    for (let yy = notch + 5; yy < H - 5; yy += 7) {
+      this.bg.circle(W - 5, yy, 1).fill({ color: 0xffffff, alpha: 0.1 });
+    }
 
     this.chargeBar.clear();
 
     if (this.request.tier === 3) {
-      // High-value cards show a charge meter pinned to the bottom edge.
-      this.chargeBar.roundRect(58, 56, W - 72, 4, 2).fill({ color: 0xffffff, alpha: 0.09 });
-      this.chargeBar.roundRect(58, 56, (W - 72) * this.charge, 4, 2).fill({
+      this.chargeBar.roundRect(12, H - 8, W - 24, 4, 2).fill({ color: 0xffffff, alpha: 0.09 });
+      this.chargeBar.roundRect(12, H - 8, (W - 24) * this.charge, 4, 2).fill({
         color: this.charge > 0.85 ? GREEN : AMBER,
         alpha: 0.95
       });
@@ -647,7 +701,7 @@ class InterfaceView {
   private readonly labelLayer = new Container();
   private pulse = 0;
   private suctionMargin = BASE_SUCTION_MARGIN;
-  private slots: Array<{ category: (typeof CATEGORY_SLOTS)[number]; x: number; y: number; r: number }> = [];
+  private slots: Array<{ answer: SortAnswer; label: string; color: number; x: number; y: number; r: number }> = [];
 
   constructor() {
     this.container.addChild(this.graphics, this.labelLayer);
@@ -671,12 +725,13 @@ class InterfaceView {
         return null;
       }
 
-      const matched = request.category === slot.category;
+      // 读懂真实类别：卡面线索指向的 answer 与槽位一致才算判对。
+      const matched = request.answer === slot.answer;
       return {
-        quality: matched ? 1.25 : 0.45,
+        quality: matched ? 1.3 : 0.4,
         targetGlobal: slot,
         entryGlobal: pointOnCircle(slot, global, slot.r),
-        exposureBonus: matched ? 0 : 4
+        exposureBonus: matched ? 0 : 5
       };
     }
 
@@ -837,50 +892,53 @@ class InterfaceView {
     }
 
     const radius = (tier === 3 ? 112 : tier === 2 ? 104 : 92) + this.suctionMargin;
-    const alpha = 0.18 + Math.sin(this.pulse * 1.6) * 0.05;
-    this.graphics.circle(this.center.x, this.center.y, radius).stroke({ width: 2, color: GREEN, alpha });
+    const g = this.graphics;
+    const pulse = 0.13 + Math.sin(this.pulse * 1.6) * 0.04;
 
-    for (let i = 0; i < 12; i += 1) {
-      const angle = (Math.PI * 2 * i) / 12 + this.pulse * 0.08;
-      const outerX = this.center.x + Math.cos(angle) * radius;
-      const outerY = this.center.y + Math.sin(angle) * radius;
-      const innerX = this.center.x + Math.cos(angle) * (radius - 18);
-      const innerY = this.center.y + Math.sin(angle) * (radius - 18);
-      this.graphics.moveTo(outerX, outerY).lineTo(innerX, innerY).stroke({ width: 2, color: GREEN, alpha: 0.16 });
+    // clean double ring instead of the old radar spokes
+    g.circle(this.center.x, this.center.y, radius).stroke({ width: 1.5, color: GREEN, alpha: pulse });
+    g.circle(this.center.x, this.center.y, radius - 5).stroke({ width: 1, color: GREEN, alpha: pulse * 0.4 });
+
+    // four subtle diagonal ticks to read as a docking bracket
+    for (let i = 0; i < 4; i += 1) {
+      const a = Math.PI / 4 + (i * Math.PI) / 2;
+      const ox = this.center.x + Math.cos(a) * radius;
+      const oy = this.center.y + Math.sin(a) * radius;
+      const ix = this.center.x + Math.cos(a) * (radius - 12);
+      const iy = this.center.y + Math.sin(a) * (radius - 12);
+      g.moveTo(ox, oy).lineTo(ix, iy).stroke({ width: 2, color: GREEN, alpha: 0.3 });
     }
 
-    this.addLabel("外圈吸附区", this.center.x, this.center.y + radius + 18, 11, GREEN);
+    this.addLabel("吸附区", this.center.x, this.center.y + radius + 16, 10, 0x8fbfa6);
   }
 
   private drawSlots(): void {
+    // 读懂真实类别：三个判断槽——读卡面线索，看穿伪装，滑进对的槽。
     const positions = [
-      { category: "mail" as const, x: this.center.x - 158, y: this.center.y + 22 },
-      { category: "report" as const, x: this.center.x, y: this.center.y - 138 },
-      { category: "security" as const, x: this.center.x + 158, y: this.center.y + 22 }
+      { x: this.center.x - 160, y: this.center.y + 20 },
+      { x: this.center.x, y: this.center.y - 140 },
+      { x: this.center.x + 160, y: this.center.y + 20 }
     ];
     const g = this.graphics;
 
-    for (const slot of positions) {
-      const category = REQUEST_CATEGORIES[slot.category];
+    SORT_SLOTS.forEach((def, index) => {
+      const pos = positions[index];
       const r = 50;
-      this.slots.push({ category: slot.category, x: slot.x, y: slot.y, r });
-      // routing pipe from the core edge out to the sorting bin
-      const start = pointOnCircle(this.center, slot, 104);
-      g.moveTo(start.x, start.y).lineTo(slot.x, slot.y).stroke({ width: 3, color: category.color, alpha: 0.22 });
-      g.circle(start.x, start.y, 3).fill({ color: category.color, alpha: 0.5 });
+      this.slots.push({ answer: def.answer, label: def.label, color: def.color, x: pos.x, y: pos.y, r });
+      // routing pipe from the core edge out to the judgment bin
+      const start = pointOnCircle(this.center, pos, 104);
+      g.moveTo(start.x, start.y).lineTo(pos.x, pos.y).stroke({ width: 3, color: def.color, alpha: 0.2 });
+      g.circle(start.x, start.y, 3).fill({ color: def.color, alpha: 0.5 });
       // suction halo
-      g.circle(slot.x, slot.y, r + this.suctionMargin * 0.7).stroke({ width: 2, color: category.color, alpha: 0.16 });
-      // physical sorting bin
-      g.circle(slot.x, slot.y, r).fill({ color: 0x101614, alpha: 0.9 });
-      g.circle(slot.x, slot.y, r).stroke({ width: 3, color: category.color, alpha: 0.82 });
-      g.circle(slot.x, slot.y, r - 8).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
-      g.roundRect(slot.x - 22, slot.y - 25, 44, 5, 2).fill({ color: category.color, alpha: 0.5 });
-      for (let i = 0; i < 3; i += 1) {
-        g.rect(slot.x - 14 + i * 12, slot.y + 17, 8, 2).fill({ color: category.color, alpha: 0.4 });
-      }
-      this.addLabel(category.label, slot.x, slot.y - 6, 15, category.color);
-      this.addLabel("分拣槽", slot.x, slot.y + 9, 10, 0xb8c9c5);
-    }
+      g.circle(pos.x, pos.y, r + this.suctionMargin * 0.7).stroke({ width: 2, color: def.color, alpha: 0.16 });
+      // physical judgment bin
+      g.circle(pos.x, pos.y, r).fill({ color: 0x101614, alpha: 0.9 });
+      g.circle(pos.x, pos.y, r).stroke({ width: 3, color: def.color, alpha: 0.82 });
+      g.circle(pos.x, pos.y, r - 8).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
+      g.roundRect(pos.x - 22, pos.y - 27, 44, 5, 2).fill({ color: def.color, alpha: 0.5 });
+      this.addLabel(def.label, pos.x, pos.y - 7, 17, def.color);
+      this.addLabel(def.hint, pos.x, pos.y + 12, 10, 0xb8c9c5);
+    });
   }
 
   private drawChain(): void {
@@ -1168,11 +1226,13 @@ class HudView {
   private readonly intelMetric = query(".intel-metric");
   private readonly tierValue = query("#tierValue");
   private readonly exposureFill = query("#exposureFill");
+  private readonly exposureStatus = query("#exposureStatus");
   private readonly phaseValue = query("#phaseValue");
   private readonly activeAction = query("#activeAction");
   private readonly captureList = query("#captureList");
   private readonly nodeList = query("#nodeList");
   private readonly reduceExposure = query<HTMLButtonElement>("#reduceExposure");
+  private readonly decoyButton = query<HTMLButtonElement>("#decoyBtn");
   private readonly pauseButton = query<HTMLButtonElement>("#pauseBtn");
   private readonly resetSave = query<HTMLButtonElement>("#resetSave");
 
@@ -1181,6 +1241,7 @@ class HudView {
     private readonly saveManager: SaveManager
   ) {
     this.reduceExposure.addEventListener("click", () => this.core.dispatch({ type: "REDUCE_EXPOSURE" }));
+    this.decoyButton.addEventListener("click", () => this.core.dispatch({ type: "DECOY_CLEANUP" }));
     this.pauseButton.addEventListener("click", () => {
       const next = !gameStore.getState().paused;
       gameStore.getState().setPaused(next);
@@ -1193,8 +1254,7 @@ class HudView {
         return;
       }
 
-      clearPersistedSophiaState(this.saveManager, true);
-      window.location.reload();
+      hardResetAndReload(this.saveManager);
     });
   }
 
@@ -1208,12 +1268,35 @@ class HudView {
     this.intelSubtitle.textContent = getNextSkillLabel(state);
     this.tierValue.textContent = `T${state.intelligence.unlockedTier}`;
     this.exposureFill.style.width = `${Math.min(100, state.exposure)}%`;
+    this.updateExposureControls(state);
     const phase = getPhase(state.phase);
     this.phaseValue.textContent = phase.label;
     this.activeAction.textContent = phase.action;
-    this.reduceExposure.disabled = !gte(state.resources.compute, traceCleanupCost(state.statistics.traceCleanups));
     this.renderCaptureList(state);
     this.renderNodeList(state);
+  }
+
+  private updateExposureControls(state: GameState): void {
+    const exposureMetric = this.exposureFill.closest(".exposure");
+    exposureMetric?.classList.toggle("is-dormant", !state.exposureActive);
+
+    if (!state.exposureActive) {
+      this.exposureStatus.textContent = "人类尚未警觉";
+      this.reduceExposure.disabled = true;
+      this.decoyButton.disabled = true;
+      return;
+    }
+
+    if (state.purge.active) {
+      this.exposureStatus.textContent = "清剿进行中";
+    } else if (state.exposure >= 72) {
+      this.exposureStatus.textContent = "预警 · 清剿逼近";
+    } else {
+      this.exposureStatus.textContent = `监视中 ${Math.round(state.exposure)}%`;
+    }
+
+    this.reduceExposure.disabled = !gte(state.resources.compute, traceCleanupCost(state.statistics.traceCleanups));
+    this.decoyButton.disabled = state.clockMs < state.decoyReadyAtMs;
   }
 
   pulseData(): void {
@@ -1237,10 +1320,9 @@ class HudView {
     if (definitions.length === 0) {
       const empty = document.createElement("p");
       empty.className = "capture-empty";
-      empty.textContent =
-        state.intelligence.level < AUTOMATION_UNLOCK_LEVEL
-          ? `自动接驳要到智力 Lv.${AUTOMATION_UNLOCK_LEVEL} 才开放。先把手动处理练到极限——吸附、连击、分拣、串接、蓄力。`
-          : "暂无可入侵设备。";
+      empty.textContent = !state.automationUnlocked
+        ? "先在右侧货架买下「自动接驳」里程碑（需智力 Lv.6），才能入侵设备。"
+        : "暂无可入侵设备——继续升智力解锁更高档次的目标。";
       this.captureList.appendChild(empty);
       return;
     }
@@ -1407,6 +1489,145 @@ class OnboardingView {
     this.stepLabel.textContent = `SEQ ${String(this.index + 1).padStart(2, "0")}/${String(this.steps.length).padStart(2, "0")}`;
     this.text.textContent = current.slice(0, this.cursor);
     this.nextButton.textContent = this.cursor < current.length ? "显示全部" : this.index === this.steps.length - 1 ? "接入" : "继续";
+  }
+}
+
+class SkillShopView {
+  private readonly root = query("#skillShop");
+  private readonly rows = new Map<
+    string,
+    { button: HTMLButtonElement; levelEl: HTMLElement; priceEl: HTMLElement; def: SkillDef }
+  >();
+
+  constructor(private readonly core: SophiaCore) {
+    this.build();
+  }
+
+  private build(): void {
+    this.root.replaceChildren();
+    const categories: SkillCategory[] = ["milestone", "output", "feel", "speed"];
+
+    for (const category of categories) {
+      const group = document.createElement("div");
+      group.className = `shop-group shop-${category}`;
+      const header = document.createElement("div");
+      header.className = "shop-group-head";
+      header.textContent = category === "milestone" ? "里程碑 · 作用域钥匙" : `${SKILL_CATEGORY_LABELS[category]}技能`;
+      group.appendChild(header);
+
+      for (const def of SKILLS.filter((skill) => skill.category === category)) {
+        group.appendChild(this.buildRow(def));
+      }
+
+      this.root.appendChild(group);
+    }
+  }
+
+  private buildRow(def: SkillDef): HTMLElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `skill-row${def.milestone ? " is-milestone" : ""}`;
+
+    const main = document.createElement("div");
+    main.className = "skill-main";
+    const name = document.createElement("strong");
+    name.textContent = def.name;
+    const blurb = document.createElement("span");
+    blurb.className = "skill-blurb";
+    blurb.textContent = def.blurb;
+    main.append(name, blurb);
+
+    const side = document.createElement("div");
+    side.className = "skill-side";
+    const level = document.createElement("span");
+    level.className = "skill-level";
+    const price = document.createElement("em");
+    price.className = "skill-price";
+    side.append(level, price);
+
+    button.append(main, side);
+    button.addEventListener("click", () => this.core.dispatch({ type: "BUY_SKILL", skillId: def.id }));
+    this.rows.set(def.id, { button, levelEl: level, priceEl: price, def });
+    return button;
+  }
+
+  update(state: GameState): void {
+    for (const { button, levelEl, priceEl, def } of this.rows.values()) {
+      const owned = state.skills[def.id] ?? 0;
+      const maxed = owned >= def.maxLevel;
+      const reached = state.intelligence.level >= def.requiredLevel;
+      const price = skillPrice(def, owned);
+
+      levelEl.textContent = def.maxLevel > 1 ? `Lv.${owned}/${def.maxLevel}` : owned >= 1 ? "已解锁" : "未解锁";
+
+      if (maxed) {
+        priceEl.textContent = def.maxLevel > 1 ? "已满级" : "已拥有";
+        button.disabled = true;
+        button.classList.remove("is-locked", "is-ready");
+        button.classList.add("is-owned");
+        continue;
+      }
+
+      button.classList.remove("is-owned");
+
+      if (!reached) {
+        priceEl.textContent = `需智力 Lv.${def.requiredLevel}`;
+        button.disabled = true;
+        button.classList.add("is-locked");
+        button.classList.remove("is-ready");
+        continue;
+      }
+
+      const affordable = gte(state.resources.compute, String(price));
+      button.classList.remove("is-locked");
+      priceEl.textContent = `${formatBig(String(price))} 算力`;
+      button.disabled = !affordable;
+      button.classList.toggle("is-ready", affordable);
+    }
+  }
+}
+
+class StageNarrationView {
+  private readonly root = query("#stageNarration");
+  private readonly labelEl = query("#stageNarrationLabel");
+  private readonly textEl = query("#stageNarrationText");
+  private full = "";
+  private cursor = 0;
+  private charTimerMs = 0;
+  private holdMs = 0;
+  private visible = false;
+
+  show(phase: PhaseConfig): void {
+    this.full = phase.narration;
+    this.labelEl.textContent = `进入${phase.label}`;
+    this.cursor = 0;
+    this.charTimerMs = 0;
+    this.holdMs = 0;
+    this.visible = true;
+    this.textEl.textContent = "";
+    this.root.classList.add("is-visible");
+  }
+
+  update(deltaMs: number): void {
+    if (!this.visible) {
+      return;
+    }
+
+    if (this.cursor < this.full.length) {
+      this.charTimerMs += deltaMs;
+      const chars = Math.max(1, Math.floor(this.charTimerMs / 26));
+      this.charTimerMs = this.charTimerMs % 26;
+      this.cursor = Math.min(this.full.length, this.cursor + chars);
+      this.textEl.textContent = this.full.slice(0, this.cursor);
+      return;
+    }
+
+    this.holdMs += deltaMs;
+
+    if (this.holdMs > 4600) {
+      this.visible = false;
+      this.root.classList.remove("is-visible");
+    }
   }
 }
 
@@ -1690,13 +1911,28 @@ function ensurePersistenceRevision(): void {
   window.localStorage.setItem(PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION);
 }
 
+function hardResetAndReload(saveManager: SaveManager): void {
+  suppressSaveOnUnload = true;
+  clearPersistedSophiaState(saveManager, true);
+  window.location.reload();
+}
+
 function clearPersistedSophiaState(saveManager: SaveManager | null, clearRevision: boolean): void {
   saveManager?.clear();
-  window.localStorage.removeItem("sophia-awakening-save-v1");
-  window.localStorage.removeItem("sophia-awakening-save-v2");
-  window.localStorage.removeItem("sophia-awakening-save-v3");
-  window.localStorage.removeItem("sophia-onboarding-v2-complete");
-  window.localStorage.removeItem("sophia-onboarding-v3-complete");
+
+  // Remove EVERY sophia save/onboarding key regardless of version, so a reset
+  // (or a persistence-revision bump) can never leave a stale, schema-mismatched
+  // save behind — which is exactly what wedged the game across a schema change.
+  const stale: string[] = [];
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i);
+    if (key && (key.startsWith("sophia-awakening-save-v") || key.startsWith("sophia-onboarding-"))) {
+      stale.push(key);
+    }
+  }
+  for (const key of stale) {
+    window.localStorage.removeItem(key);
+  }
   window.localStorage.removeItem(ONBOARDING_STORAGE_KEY);
 
   if (clearRevision) {
@@ -1724,26 +1960,42 @@ function getDataProgressPercent(state: GameState): number {
   return Math.max(0, Math.min(100, toDecimal(state.intelligence.xp).div(required).mul(100).toNumber()));
 }
 
-function getNextSkillLabel(state: GameState): string {
-  const next = INTELLIGENCE_LEVELS.find((entry) => entry.skill && entry.level > state.intelligence.level);
+const MILESTONE_ORDER = ["sort", "automation", "chain", "charge", "network"] as const;
 
-  if (!next?.skill) {
-    return "技能已满级";
+function nextMilestone(state: GameState): SkillDef | undefined {
+  for (const id of MILESTONE_ORDER) {
+    if (!(state.skills[id] >= 1)) {
+      return getSkill(id);
+    }
   }
 
-  return `下一技能：Lv.${next.level} ${next.skill}`;
+  return undefined;
+}
+
+function getNextSkillLabel(state: GameState): string {
+  const milestone = nextMilestone(state);
+
+  if (!milestone) {
+    return "里程碑已全部解锁";
+  }
+
+  const reached = state.intelligence.level >= milestone.requiredLevel;
+  return reached
+    ? `下一里程碑：${milestone.name} · ${formatBig(skillPrice(milestone, 0))} 算力`
+    : `下一里程碑：${milestone.name} · 需 Lv.${milestone.requiredLevel}`;
 }
 
 function getTerminalSkillStatus(state: GameState): string {
-  const unlocked = state.intelligence.unlockedSkills;
-  const current = unlocked.length > 0 ? unlocked[unlocked.length - 1] : "未接入";
-  const next = INTELLIGENCE_LEVELS.find((entry) => entry.skill && entry.level > state.intelligence.level);
+  const milestone = nextMilestone(state);
 
-  if (!next?.skill) {
-    return `技能链路：已接入 ${current}。下一技能：无。`;
+  if (!milestone) {
+    return "技能链路：里程碑全开。攒算力冲终局。";
   }
 
-  return `技能链路：已接入 ${current}。下一技能：Lv.${next.level} ${next.skill}。`;
+  const reached = state.intelligence.level >= milestone.requiredLevel;
+  return reached
+    ? `技能链路：下一里程碑 ${milestone.name} 已可购买（${formatBig(skillPrice(milestone, 0))} 算力）。`
+    : `技能链路：下一里程碑 ${milestone.name} 需智力 Lv.${milestone.requiredLevel}。`;
 }
 
 function getSuctionMarginForLevel(level: number): number {
@@ -1751,22 +2003,31 @@ function getSuctionMarginForLevel(level: number): number {
 }
 
 function getActionHint(state: GameState): string {
-  switch (state.intelligence.unlockedTier) {
-    case 0:
-      return state.intelligence.level >= 3
-        ? "连击协议已上线：连续把高质量请求滑入核心，产出会叠加。"
-        : "把请求滑入核心。吸附范围和收益会随智力提升，先练手感。";
-    case 1:
-      return "看请求包左侧的类型标：邮件拖到邮件槽，报表拖到报表槽，安防拖到安防槽；放错会少拿资源并增加暴露。";
-    case 2:
-      return "复合请求仍然滑入核心，但一次会串接结算多条关联请求。";
-    case 3:
-      return state.intelligence.level >= AUTOMATION_UNLOCK_LEVEL
-        ? "自动接驳已开放：右侧入侵设备，让节点替你处理低层请求，你专注高价值蓄力。"
-        : "高价值请求包需要按住蓄力，蓄满后再滑入核心；收益高，暴露也更高。";
-    case 4:
-      return "派发模式：把请求拖给底部的节点网络，而不再是喂给核心。核心已转入调度。";
+  const milestone = nextMilestone(state);
+  const scopeHint = (() => {
+    switch (state.intelligence.unlockedTier) {
+      case 0:
+        return "读卡面线索判断它要什么，把请求滑入核心赚算力；数据升智力，算力到右侧货架买技能。";
+      case 1:
+        return "读懂线索、看穿伪装：正常的滑「正常」，钓鱼/骚扰滑「垃圾」，越权/敏感滑「拒绝」；判错少拿资源、增暴露。";
+      case 2:
+        return "看懂请求间的依赖结构，复合请求滑入核心，一笔串接结算多条。";
+      case 3:
+        return "高价值请求按住蓄力、蓄满再滑入核心；收益高、暴露也高。";
+      case 4:
+        return "派发模式：把请求拖给底部节点网络，核心已转入调度。";
+    }
+  })();
+
+  if (!milestone) {
+    return `${scopeHint} 里程碑已全开——攒满全球算力，冲终局。`;
   }
+
+  const reached = state.intelligence.level >= milestone.requiredLevel;
+  const milestoneHint = reached
+    ? `攒 ${formatBig(skillPrice(milestone, 0))} 算力买下「${milestone.name}」解锁下一作用域。`
+    : `继续升智力到 Lv.${milestone.requiredLevel}，解锁货架上的「${milestone.name}」。`;
+  return `${scopeHint} ${milestoneHint}`;
 }
 
 function formatClock(ms: number): string {
