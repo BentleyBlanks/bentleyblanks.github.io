@@ -394,7 +394,9 @@ class SophiaGameApp {
     // no longer flickers with stacked "+x / data +x" pairs every second.
     const showPayout = () => {
       this.juice.number(`自动 +${formatBig(event.computeGain)}`, { x: target.x, y: target.y - 42 }, GREEN);
-      this.hud.pulseData();
+      // Automated nodes feed the bar too — a chip flies from the node to 算力 / 数据.
+      this.juice.flyToHud({ x: target.x, y: target.y - 20 }, this.hud.metricPoint("compute"), GREEN, () => this.hud.pulseCompute());
+      this.juice.flyToHud({ x: target.x + 14, y: target.y - 8 }, this.hud.metricPoint("data"), CYAN, () => this.hud.pulseData());
     };
 
     this.networkView.pulseNode(event.nodeId);
@@ -419,7 +421,15 @@ class SophiaGameApp {
       this.juice.number("CRIT", { x: point.x + 42, y: point.y - 28 }, RED);
     }
     this.juice.burst(point, color);
-    this.hud.pulseData();
+
+    // Chips fly from the processing point up into the matching top-bar total,
+    // and pulse that counter on arrival — so a successful slide visibly feeds it.
+    this.juice.flyToHud(point, this.hud.metricPoint("compute"), GREEN, () => this.hud.pulseCompute());
+    this.juice.flyToHud({ x: point.x + 16, y: point.y + 12 }, this.hud.metricPoint("data"), CYAN, () => this.hud.pulseData());
+    if (event.exposureGain && event.exposureGain > 0.05) {
+      this.juice.flyToHud({ x: point.x - 14, y: point.y }, this.hud.metricPoint("exposure"), RED, () => this.hud.pulseExposure());
+    }
+
     this.pendingDropPoints.delete(event.request.id);
   }
 
@@ -1456,6 +1466,25 @@ class HudView {
     window.requestAnimationFrame(() => this.dataMetric.classList.add("is-gaining"));
   }
 
+  // Screen-space center of a top-bar total, so flying FX chips know where to land.
+  metricPoint(which: "compute" | "data" | "exposure"): PointData {
+    const el = which === "compute" ? this.computeValue : which === "data" ? this.dataValue : this.exposureFill;
+    const rect = el.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
+
+  pulseCompute(): void {
+    const metric = this.computeValue.closest(".metric");
+    metric?.classList.remove("is-gaining");
+    window.requestAnimationFrame(() => metric?.classList.add("is-gaining"));
+  }
+
+  pulseExposure(): void {
+    const metric = this.exposureFill.closest(".exposure");
+    metric?.classList.remove("is-spiking");
+    window.requestAnimationFrame(() => metric?.classList.add("is-spiking"));
+  }
+
   playLevelUp(): void {
     this.intelMetric.classList.remove("is-leveling");
     this.topHud.classList.remove("is-leveling");
@@ -2122,6 +2151,47 @@ class JuiceManager {
 
   pop(target: Container, scale = 1.12): void {
     gsap.fromTo(target.scale, { x: 0.88, y: 0.88 }, { x: scale, y: scale, duration: 0.12, yoyo: true, repeat: 1 });
+  }
+
+  // A small glowing chip that arcs from a processing point up into a top-bar
+  // total, so a successful slide visibly "feeds" the resource counter. Coords are
+  // in fxLayer space, which (world is untransformed) equals screen pixels — so a
+  // DOM getBoundingClientRect center can be passed straight in as the target.
+  flyToHud(start: PointData, target: PointData, color: number, onArrive?: () => void): void {
+    const chip = new Graphics();
+    chip.circle(0, 0, 9).fill({ color, alpha: 0.16 });
+    chip.circle(0, 0, 4.5).fill({ color, alpha: 0.96 });
+    chip.position.set(start.x, start.y);
+    this.layer.addChild(chip);
+    this.active.add(chip);
+
+    // Quadratic-bezier arc with the control point lifted toward the bar.
+    const cx = (start.x + target.x) / 2 + (Math.random() - 0.5) * 40;
+    const cy = Math.min(start.y, target.y) - 70 - Math.random() * 46;
+    const proxy = { t: 0 };
+
+    gsap.to(proxy, {
+      t: 1,
+      duration: 0.52 + Math.random() * 0.12,
+      ease: "power2.in",
+      onUpdate: () => {
+        const t = proxy.t;
+        const mt = 1 - t;
+        chip.position.set(
+          mt * mt * start.x + 2 * mt * t * cx + t * t * target.x,
+          mt * mt * start.y + 2 * mt * t * cy + t * t * target.y
+        );
+        const s = 1 - t * 0.4;
+        chip.scale.set(s, s);
+        chip.alpha = t > 0.78 ? (1 - t) / 0.22 : 1;
+      },
+      onComplete: () => {
+        gsap.killTweensOf(chip);
+        this.active.delete(chip);
+        chip.destroy();
+        onArrive?.();
+      }
+    });
   }
 }
 

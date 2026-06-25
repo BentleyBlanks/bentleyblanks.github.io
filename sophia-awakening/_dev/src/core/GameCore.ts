@@ -293,6 +293,8 @@ export class SophiaCore {
     this.state.statistics.totalProcessed += request.compound;
     this.state.statistics.manualProcessed += 1 + absorbed;
 
+    const exposureBefore = this.state.exposure;
+
     if (this.state.exposureActive || request.highValue || exposureBonus > 0) {
       const missPenalty = quality < 0.75 ? 2.8 : 0;
       this.addExposure(request.exposure * Math.max(0.5, quality) + missPenalty + exposureBonus);
@@ -306,7 +308,8 @@ export class SophiaCore {
       quality,
       targetNodeId,
       comboCount: this.state.combo.count,
-      critical
+      critical,
+      exposureGain: this.state.exposure - exposureBefore
     });
 
     if (this.state.statistics.manualProcessed <= 1) {

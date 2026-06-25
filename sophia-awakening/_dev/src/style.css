@@ -136,6 +136,44 @@ canvas {
   animation: dataPulse 420ms ease;
 }
 
+.compute-metric.is-gaining {
+  animation: computeGain 460ms ease;
+}
+
+.metric.exposure.is-spiking {
+  animation: exposureSpike 460ms ease;
+}
+
+@keyframes computeGain {
+  0% {
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  35% {
+    background: rgba(137, 255, 154, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(137, 255, 154, 0.42), 0 0 26px rgba(137, 255, 154, 0.2);
+  }
+
+  100% {
+    background: rgba(255, 255, 255, 0.025);
+  }
+}
+
+@keyframes exposureSpike {
+  0% {
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  35% {
+    background: rgba(255, 95, 95, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(255, 95, 95, 0.5), 0 0 26px rgba(255, 95, 95, 0.26);
+  }
+
+  100% {
+    background: rgba(255, 255, 255, 0.025);
+  }
+}
+
 .top-hud.is-leveling {
   animation: hudLevelUp 900ms ease;
 }

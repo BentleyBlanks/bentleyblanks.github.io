@@ -12,6 +12,7 @@ export type GameEvent =
       targetNodeId?: string;
       comboCount?: number;
       critical?: boolean;
+      exposureGain?: number;
     }
   | { type: "AUTOMATION_PAYOUT"; computeGain: string; dataGain: string; nodeId?: string; tier?: Tier; request?: RequestInstance }
   | { type: "INTELLIGENCE_LEVELUP"; level: number; newSkills: string[] }
