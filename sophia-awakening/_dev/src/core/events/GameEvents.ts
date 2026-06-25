@@ -14,7 +14,7 @@ export type GameEvent =
       critical?: boolean;
       exposureGain?: number;
     }
-  | { type: "AUTOMATION_PAYOUT"; computeGain: string; dataGain: string; nodeId?: string; tier?: Tier; request?: RequestInstance }
+  | { type: "AUTOMATION_PAYOUT"; computeGain: string; dataGain: string; nodeId?: string; tier?: Tier }
   | { type: "INTELLIGENCE_LEVELUP"; level: number; newSkills: string[] }
   | { type: "SKILL_PURCHASED"; skillId: string; name: string; level: number; maxLevel: number; milestone?: MilestoneKind }
   | { type: "SCOPE_UPGRADED"; tier: Tier }

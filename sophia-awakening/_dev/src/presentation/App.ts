@@ -84,8 +84,8 @@ class SophiaGameApp {
   private readonly pendingDropPoints = new Map<string, PointData>();
   private hudTimerMs = 0;
   private saveTimerMs = 0;
-  private autoDispatchTimerMs = 0;
-  private t4NodeCursor = 0;
+  // 每个节点一条"处理节拍"计时：弱机慢、强机快——按设备档次/层级各自吃卡。
+  private readonly nodeDispatchTimers = new Map<string, number>();
   private lastScreenW = 0;
   private lastScreenH = 0;
 
@@ -234,46 +234,106 @@ class SophiaGameApp {
   }
 
   private autoDispatch(state: GameState, deltaMs: number): void {
-    // T4 派发模式：玩家不再拖卡——有能力的在线节点会自动把请求拽进去（一条条飞）。
-    if (state.intelligence.unlockedTier !== 4) {
+    // 自动接驳：买下「自动接驳」并控住至少一台在线设备后，节点网络就接管出卡。
+    // 每个节点按自己的「处理节拍」吃卡——弱机（办公机）慢、强机（服务器/数据中心/电网）快，
+    // 所以一台办公机吃不掉洪峰，得靠更多 / 更强的节点来消化。适用于所有被自动化的层。
+    if (!state.automationUnlocked) {
       return;
     }
 
-    const capableNodes = state.nodes.filter((node) => node.online && node.tierMin <= 4 && node.tierMax >= 4);
-    if (capableNodes.length === 0) {
+    const tier = state.intelligence.unlockedTier;
+    const onlineNodes = state.nodes.filter((node) => node.online);
+    if (onlineNodes.length === 0) {
+      this.nodeDispatchTimers.clear();
       return;
     }
+    // 优先派给能处理当前层的节点；没有则退回任意在线节点，让整片机器都在动。
+    const capable = onlineNodes.filter((node) => node.tierMin <= tier && node.tierMax >= tier);
+    const processNodes = capable.length > 0 ? capable : onlineNodes;
 
-    this.autoDispatchTimerMs += deltaMs;
-    if (this.autoDispatchTimerMs < 140) {
-      return;
-    }
-    this.autoDispatchTimerMs = 0;
-
-    let launched = 0;
-    for (const request of state.requests) {
-      if (launched >= 2) {
-        break;
-      }
-      if (request.tier !== 4) {
-        continue;
-      }
+    // 场上还没飞走的空闲卡（玩家正拖的、已在飞的都排除——手动滑入仍可抢在自动之前），
+    // 按出现顺序排队，最旧优先。
+    const queue = state.requests.filter((request) => {
       const view = this.requestViews.get(request.id);
-      if (!view || view.settling) {
-        continue;
-      }
+      return view !== undefined && !view.busy;
+    });
 
-      const node = capableNodes[this.t4NodeCursor % capableNodes.length];
-      this.t4NodeCursor += 1;
-      const target = this.networkView.getAutomationPoint(node.id);
-      const requestId = request.id;
-      const nodeId = node.id;
+    // 推进每个节点的节拍；「最该处理的」（超时最久的）先拿卡。
+    const candidates = processNodes.map((node) => {
+      const interval = this.nodeCardIntervalMs(node, state);
+      const elapsed = (this.nodeDispatchTimers.get(node.id) ?? interval) + deltaMs;
+      return { node, interval, elapsed };
+    });
+    candidates.sort((a, b) => b.elapsed - b.interval - (a.elapsed - a.interval));
+
+    let qi = 0;
+    for (const candidate of candidates) {
+      const ready = candidate.elapsed >= candidate.interval;
+
+      if (ready && qi < queue.length) {
+        this.launchToNode(candidate.node, queue[qi]);
+        qi += 1;
+        this.nodeDispatchTimers.set(candidate.node.id, candidate.elapsed - candidate.interval);
+      } else {
+        // 没轮到、或没卡可吃：没卡时保持"已就绪"（来卡即吃），别让节拍无限累积。
+        this.nodeDispatchTimers.set(candidate.node.id, Math.min(candidate.elapsed, candidate.interval));
+      }
+    }
+  }
+
+  // 节点处理一张卡所需的毫秒（越快越强）。按设备档次（baseProduction，开方压缩量级）
+  // × 接驳层级 × 节点等级 × 「设备提速」技能定速；与产出用的 globalMultiplier 解耦，
+  // 免得后期视觉节拍飞到不可读。
+  private nodeCardIntervalMs(node: BotNode, state: GameState): number {
+    const def = NODE_DEFINITIONS.find((definition) => definition.id === node.defId);
+    const base = def ? Number(def.baseProduction) : 10;
+    const deviceFactor = Math.sqrt(Math.max(1, base / 10)); // 办公机 1 → 电网 ~15.5
+    const tierFactor = 1 + node.assignedTier * 0.25;
+    const levelFactor = 1 + (node.level - 1) * 0.15;
+    const cardsPerSec = 0.7 * deviceFactor * tierFactor * levelFactor * state.derived.nodeSpeedMult;
+    return Math.max(70, 1000 / cardsPerSec);
+  }
+
+  private launchToNode(node: BotNode, request: RequestInstance): void {
+    const view = this.requestViews.get(request.id);
+    if (!view) {
+      return;
+    }
+
+    const target = this.networkView.getAutomationPoint(node.id);
+    const requestId = request.id;
+    const nodeId = node.id;
+    const requestTier = request.tier;
+
+    // T4 仍按单卡结算产出（沿用既有手感）——让 REQUEST_PROCESSED 的飞字落在节点上。
+    if (requestTier === 4) {
       this.pendingDropPoints.set(requestId, target);
-      view.flyToNode(target, () => {
+    }
+
+    view.flyToNode(target, () => {
+      // 经济不变：其余层产出走被动 tickAutomation，这里只把卡消耗掉做表现，不重复结算。
+      if (requestTier === 4) {
         this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality: 1.45, targetNodeId: nodeId });
-        this.networkView.pulseNode(nodeId);
-      });
-      launched += 1;
+      } else {
+        this.core.dispatch({ type: "AUTO_CONSUME_REQUEST", requestId });
+        this.onAutoDispatchLanded(target);
+      }
+      this.networkView.pulseNode(nodeId);
+    });
+  }
+
+  // §3.5「逐个被吸入、伴随脉冲与偶发飞字」：每张落卡都给顶栏喂一颗芯片，偶尔（非每张，
+  // 避免刷屏）冒一个数字——爽点靠密集卡流承载，数字只作点缀。（T4 的单卡飞字由
+  // REQUEST_PROCESSED 自带，故这里只处理被动结算的 T0–T3。）
+  private autoLandCount = 0;
+  private onAutoDispatchLanded(point: PointData): void {
+    this.autoLandCount += 1;
+    this.juice.flyToHud({ x: point.x, y: point.y - 16 }, this.hud.metricPoint("compute"), GREEN, () => this.hud.pulseCompute());
+    if (this.autoLandCount % 2 === 0) {
+      this.juice.flyToHud({ x: point.x + 12, y: point.y - 4 }, this.hud.metricPoint("data"), CYAN, () => this.hud.pulseData());
+    }
+    if (this.autoLandCount % 5 === 0) {
+      this.juice.number("接驳", { x: point.x, y: point.y - 34 }, GREEN);
     }
   }
 
@@ -387,26 +447,11 @@ class SophiaGameApp {
   }
 
   private onAutomationPayout(event: Extract<GameEvent, { type: "AUTOMATION_PAYOUT" }>): void {
+    // 收益读数（被动 tickAutomation 的聚合）——一行清楚标注的数字从产出节点升起。
+    // 逐张卡的接驳动画由 autoDispatch 拥有，这里不再吞卡，只播一个克制的总额。
     const target = this.networkView.getAutomationPoint(event.nodeId);
-    const view = event.request ? this.requestViews.get(event.request.id) : undefined;
-    // One calm, clearly-labelled number rising from the producing node — the
-    // node's own pulse ring + the HUD data pulse carry the rest, so the field
-    // no longer flickers with stacked "+x / data +x" pairs every second.
-    const showPayout = () => {
-      this.juice.number(`自动 +${formatBig(event.computeGain)}`, { x: target.x, y: target.y - 42 }, GREEN);
-      // Automated nodes feed the bar too — a chip flies from the node to 算力 / 数据.
-      this.juice.flyToHud({ x: target.x, y: target.y - 20 }, this.hud.metricPoint("compute"), GREEN, () => this.hud.pulseCompute());
-      this.juice.flyToHud({ x: target.x + 14, y: target.y - 8 }, this.hud.metricPoint("data"), CYAN, () => this.hud.pulseData());
-    };
-
     this.networkView.pulseNode(event.nodeId);
-
-    if (view && !view.settling) {
-      view.acceptByAutomation(target, showPayout);
-      return;
-    }
-
-    showPayout();
+    this.juice.number(`自动 +${formatBig(event.computeGain)}`, { x: target.x, y: target.y - 42 }, GREEN);
   }
 
   private onRequestProcessed(event: Extract<GameEvent, { type: "REQUEST_PROCESSED" }>): void {
@@ -572,6 +617,11 @@ class RequestPacketView {
     this.draw();
   }
 
+  // 正在被玩家拖动或已在飞向目标——自动派发应跳过这类卡（手动滑入可抢先）。
+  get busy(): boolean {
+    return this.dragging || this.settling;
+  }
+
   setHome(x: number, y: number): void {
     this.homeX = x;
     this.homeY = y;
@@ -615,35 +665,7 @@ class RequestPacketView {
       .to(this.container, { alpha: 0, duration: 0.14, ease: "power2.in" }, "-=0.08");
   }
 
-  acceptByAutomation(global: PointData, onComplete: () => void): void {
-    this.settling = true;
-    this.dragging = false;
-    this.container.cursor = "default";
-    this.container.parent?.addChild(this.container);
-    const parent = this.container.parent;
-    const finalLocal = parent ? parent.toLocal(global) : global;
-    const travelAngle = Math.atan2(finalLocal.y - this.container.y, finalLocal.x - this.container.x);
-
-    gsap.killTweensOf(this.container);
-    gsap.killTweensOf(this.container.position);
-    gsap.killTweensOf(this.container.scale);
-    gsap.killTweensOf(this.container.skew);
-
-    gsap
-      .timeline({
-        onComplete: () => {
-          onComplete();
-          this.destroy();
-        }
-      })
-      .to(this.container.scale, { x: 1.08, y: 0.9, duration: 0.1, ease: "power2.out" })
-      .to(this.container.skew, { x: Math.cos(travelAngle) * 0.14, y: Math.sin(travelAngle) * 0.06, duration: 0.12 }, "<")
-      .to(this.container.position, { x: finalLocal.x, y: finalLocal.y, duration: 0.44, ease: "power3.inOut" })
-      .to(this.container.scale, { x: 0.16, y: 0.24, duration: 0.44, ease: "power3.in" }, "<")
-      .to(this.container, { alpha: 0, duration: 0.16, ease: "power2.in" }, "-=0.08");
-  }
-
-  // Fast, flashy auto-fly used at T4 (and bulk automation): the card stretches
+  // Fast, flashy auto-fly used by 自动派发: the card stretches
   // into a streak and rockets into the target device.
   flyToNode(global: PointData, onComplete: () => void): void {
     this.settling = true;

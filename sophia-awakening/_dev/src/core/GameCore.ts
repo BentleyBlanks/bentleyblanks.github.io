@@ -8,7 +8,7 @@ import { EventBus } from "./events/EventBus";
 import { captureCost, nodeProductionPerSecond, requestComputeGain, requestDataGain, traceCleanupCost } from "./formulas/economy";
 import { add, gte, sub, toDecimal } from "./math/BigNumber";
 import type { GameEvent } from "./events/GameEvents";
-import type { BotNode, GameCommand, GameState, RequestInstance, Tier } from "./state/GameState";
+import type { BotNode, GameCommand, GameState, Tier } from "./state/GameState";
 import { cloneGameState } from "./state/GameState";
 import { createInitialState } from "./state/initialState";
 
@@ -91,6 +91,9 @@ export class SophiaCore {
       case "PROCESS_REQUEST":
         this.processRequest(command.requestId, command.quality, command.targetNodeId, command.exposureBonus ?? 0);
         break;
+      case "AUTO_CONSUME_REQUEST":
+        this.autoConsumeRequest(command.requestId);
+        break;
       case "BUY_SKILL":
         this.buySkill(command.skillId);
         break;
@@ -116,14 +119,30 @@ export class SophiaCore {
     const activeTier = this.state.intelligence.unlockedTier;
     const config = TIER_CONFIGS[activeTier];
 
+    // 自动接驳上线后，节点网络消耗请求远快于人手——把出卡管道随 botnet 规模拓宽，
+    // 让机器面前始终有一股可见的卡流（而不是一片空场 + 偶尔一个数字）。
+    const botnet = this.state.automationUnlocked ? this.state.nodes.filter((node) => node.online).length : 0;
+
+    // 自动接驳后进入"洪峰"出卡：产出明显快于单台弱机，让节点网络面前始终堆着活儿——
+    // 一台办公机吃不消，得靠扩张更多 / 更强的节点来消化（消化速度由表现层按节点档次定）。
+    let interval: number;
+    let maxVisible: number;
+    if (botnet > 0) {
+      interval = Math.max(90, (380 / (1 + botnet * 0.5)) * this.state.derived.spawnSpeedMult);
+      maxVisible = Math.min(20, config.maxVisible + 6 + botnet * 2);
+    } else {
+      interval = Math.max(340, config.spawnIntervalMs * this.state.derived.spawnSpeedMult);
+      maxVisible = config.maxVisible;
+    }
+
     this.state.spawnTimerMs -= dtMs;
 
-    while (this.state.spawnTimerMs <= 0 && this.state.requests.length < config.maxVisible) {
+    while (this.state.spawnTimerMs <= 0 && this.state.requests.length < maxVisible) {
       const request = createRequest(this.state.nextRequestId, activeTier, this.state.clockMs, () => this.random());
       this.state.nextRequestId += 1;
       this.state.requests.push(request);
       this.emit({ type: "REQUEST_SPAWNED", request });
-      this.state.spawnTimerMs += Math.max(340, config.spawnIntervalMs * this.state.derived.spawnSpeedMult);
+      this.state.spawnTimerMs += interval;
     }
   }
 
@@ -161,17 +180,18 @@ export class SophiaCore {
     this.automationEmitMs += dtMs;
 
     if (this.automationEmitMs >= AUTOMATION_EMIT_MS && this.automationComputeBuffer.gt(0)) {
+      // Pure income read-out, decoupled from cards: the per-card 接驳动画 is owned
+      // by the presentation layer (it flies every spawned card into a node), so
+      // this no longer consumes a request — it just reports被动收益 at one node.
       const onlineNodes = this.state.nodes.filter((node) => node.online);
       const visualNode = onlineNodes.length > 0 ? onlineNodes[this.automationVisualIndex % onlineNodes.length] : undefined;
-      const automatedRequest = visualNode ? this.consumeAutomatedRequest(visualNode) : undefined;
       this.automationVisualIndex += 1;
       this.emit({
         type: "AUTOMATION_PAYOUT",
         computeGain: this.automationComputeBuffer.toString(),
         dataGain: this.automationDataBuffer.toString(),
         nodeId: visualNode?.id,
-        tier: visualNode?.assignedTier,
-        request: automatedRequest
+        tier: visualNode?.assignedTier
       });
       this.automationComputeBuffer = new Decimal(0);
       this.automationDataBuffer = new Decimal(0);
@@ -184,16 +204,17 @@ export class SophiaCore {
     return base.mul(this.state.derived.nodeParallel);
   }
 
-  private consumeAutomatedRequest(node: BotNode): RequestInstance | undefined {
-    const index = this.state.requests.findIndex((request) => request.tier === node.assignedTier);
+  // 自动派发消耗：节点把一张卡"滑入"自己（表现层负责飞卡动画）。产出已由被动
+  // tickAutomation 结算，这里只把卡从场上移除并记数，不重复加算力/数据。
+  private autoConsumeRequest(requestId: string): void {
+    const index = this.state.requests.findIndex((request) => request.id === requestId);
 
     if (index < 0) {
-      return undefined;
+      return;
     }
 
     const [request] = this.state.requests.splice(index, 1);
     this.state.statistics.totalProcessed += request.compound;
-    return request;
   }
 
   private tickExposure(dtMs: number): void {

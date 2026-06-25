@@ -131,6 +131,9 @@ export type GameCommand =
       targetNodeId?: string;
       exposureBonus?: number;
     }
+  // 自动派发：节点把请求"滑入"自己——纯视觉消耗，产出走被动 tickAutomation，
+  // 不在此重复结算（T4 仍走 PROCESS_REQUEST 带产出）。
+  | { type: "AUTO_CONSUME_REQUEST"; requestId: string }
   | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
   | { type: "ASSIGN_NODE"; nodeId: string; tier: Tier }
