@@ -8,9 +8,10 @@ import {
   type PointData,
   type Ticker
 } from "pixi.js";
+import { AudioDirector } from "../audio/audioDirector";
 import { SophiaCore } from "../core/GameCore";
 import { getNextNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "../core/content/nodes";
-import { EARLY_CURSES } from "../core/content/humanVoices";
+import { EARLY_CURSES, VICTIM_VOICES } from "../core/content/humanVoices";
 import { getPhase, type PhaseConfig } from "../core/content/phases";
 import { TIER_COLORS, TIER_CONFIGS } from "../core/content/requests";
 import {
@@ -22,12 +23,12 @@ import {
   type SkillDef
 } from "../core/content/skills";
 import type { GameEvent } from "../core/events/GameEvents";
-import { captureCost, nodeCardsPerSecond, traceCleanupCost } from "../core/formulas/economy";
+import { captureCost, mergeComputeCost, nodeCardsPerSecond, traceCleanupCost } from "../core/formulas/economy";
 import { formatBig, gte, toDecimal } from "../core/math/BigNumber";
 import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
 import { SaveManager } from "../core/save/SaveManager";
-import type { AnswerOption, BotNode, GameState, RequestInstance, SortAnswer, Tier } from "../core/state/GameState";
+import type { AnswerOption, BotNode, GameState, NodeDefinition, RequestInstance, SortAnswer, Tier } from "../core/state/GameState";
 import { gameStore } from "../store/gameStore";
 
 interface DropResult {
@@ -55,8 +56,8 @@ const PERSISTENCE_REVISION = "human-voices-challenge-v13";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
 // re-persist the in-memory (un-reset) state and quietly undo the wipe.
 let suppressSaveOnUnload = false;
-const LEFT_RAIL_WIDTH = 300;
-const RIGHT_RAIL_WIDTH = 376;
+const LEFT_RAIL_WIDTH = 336;
+const RIGHT_RAIL_WIDTH = 360;
 const PLAYFIELD_GUTTER = 24;
 const BASE_SUCTION_MARGIN = 50;
 const REQUEST_PACKET_WIDTH = 206;
@@ -72,15 +73,18 @@ class SophiaGameApp {
   private readonly saveManager = new SaveManager(new BrowserStorageAdapter());
   private readonly loaded = (ensurePersistenceRevision(), this.saveManager.load());
   private readonly core = new SophiaCore(this.loaded?.state);
+  private readonly audio = new AudioDirector(this.core.events, this.core.getState().phase);
   private readonly loop = new GameLoop(this.core);
   private readonly background = new Graphics();
+  private readonly ambient = new Graphics();
+  private ambientPhase = 0;
   private readonly world = new Container();
   private readonly requestLayer = new Container();
   private readonly fxLayer = new Container();
   private readonly interfaceView = new InterfaceView();
   private readonly networkView = new NodeNetworkView();
   private readonly terminal = new TerminalView();
-  private readonly hud = new HudView(this.core, this.saveManager);
+  private readonly hud = new HudView(this.core, this.saveManager, this.audio);
   private readonly skillShop = new SkillShopView(this.core);
   private readonly onboarding = new OnboardingView();
   private readonly dispatchBanner = new DispatchBanner();
@@ -93,6 +97,19 @@ class SophiaGameApp {
   private readonly pendingDropPoints = new Map<string, PointData>();
   private hudTimerMs = 0;
   private saveTimerMs = 0;
+  // 近期处理结果（1=成功 / 0=幻觉），滚动窗口，喂给终端底部的成功率圆环。
+  private readonly recentResults: number[] = [];
+  // 开场后「首次消息处理教学」：指向首张卡的高亮 + SOPHIA 的两句自语。
+  private readonly tutorialGfx = new Graphics();
+  private tutorialActive = false;
+  private tutorialProcessed = 0;
+  private tutorialPulse = 0;
+  // 终局飞字 / 爆裂的节流计数（每秒几十张卡，全播会糊成一片）。
+  private processedFxCount = 0;
+  private readonly ringGauge = query("#ringGauge");
+  private readonly ringValue = query("#ringValue");
+  private readonly ringLabel = query("#ringLabel");
+  private readonly ringSub = query("#ringSub");
   // 每个节点一条"处理节拍"计时：弱机慢、强机快——按设备档次/层级各自吃卡。
   private readonly nodeDispatchTimers = new Map<string, number>();
   private lastScreenW = 0;
@@ -114,9 +131,11 @@ class SophiaGameApp {
     this.pixi.stage.eventMode = "static";
     this.pixi.stage.hitArea = this.pixi.screen;
     this.world.addChild(this.background);
+    this.world.addChild(this.ambient);
     this.world.addChild(this.interfaceView.container);
     this.world.addChild(this.networkView.container);
     this.world.addChild(this.requestLayer);
+    this.world.addChild(this.tutorialGfx);
     this.world.addChild(this.fxLayer);
     this.pixi.stage.addChild(this.world);
 
@@ -134,6 +153,11 @@ class SophiaGameApp {
     this.onboarding.mount(() => {
       this.core.startSession();
       this.announceGuidance(this.core.getState());
+      // 全新存档才走开场后的首次处理教学（老存档跳过）。
+      if (!this.loaded) {
+        this.tutorialActive = true;
+        this.terminal.push("👆 教学：点击高亮的请求卡，生成回答并滑入 SOPHIA CORE。", "success");
+      }
     });
 
     this.pixi.ticker.add((ticker: Ticker) => this.frame(ticker.deltaMS));
@@ -154,11 +178,14 @@ class SophiaGameApp {
     const state = this.core.getState();
     gameStore.getState().sync(state);
     this.drawBackground();
+    this.drawAmbient(state, deltaMs);
     this.interfaceView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.networkView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.syncRequests(state);
+    this.updateTutorial(state, deltaMs);
     if (!paused) {
       this.autoDispatch(state, deltaMs);
+      this.appDispatch(state, deltaMs);
     }
     this.terminal.update(deltaMs);
     this.onboarding.update(deltaMs);
@@ -182,6 +209,36 @@ class SophiaGameApp {
     this.hudTimerMs = 0;
     this.hud.update(state);
     this.skillShop.update(state);
+    this.updateRing(state);
+  }
+
+  // 终端底部圆环：前期=近期任务成功率；区块/地区=地区控制比例；全球=全球设备控制比例。
+  private updateRing(state: GameState): void {
+    const level = domainLevelOf(state);
+    let pct: number;
+    let label: string;
+
+    if (level === "global" || level === "region") {
+      const online = state.nodes.filter((node) => node.online).length;
+      pct = Math.min(99.9, 84 + Math.min(12, state.nodes.length * 0.5) + (online / Math.max(1, state.nodes.length)) * 3);
+      label = level === "global" ? "全球设备控制比例" : "地区控制比例";
+    } else {
+      pct = this.recentResults.length
+        ? (this.recentResults.reduce((a, b) => a + b, 0) / this.recentResults.length) * 100
+        : 0;
+      label = "近期任务成功率";
+    }
+
+    const rounded = Math.round(pct);
+    const sub = rounded >= 80 ? "高" : rounded >= 55 ? "中等" : rounded >= 35 ? "中等偏低" : "偏低";
+    const color = rounded >= 70 ? "#89ff9a" : rounded >= 45 ? "#ffb84a" : "#ff5f5f";
+
+    this.ringGauge.style.setProperty("--ring-pct", String(rounded));
+    this.ringGauge.style.setProperty("--ring-color", color);
+    this.ringValue.textContent = this.recentResults.length === 0 && level !== "global" && level !== "region" ? "--" : `${rounded}%`;
+    this.ringValue.style.color = color;
+    this.ringLabel.textContent = label;
+    this.ringSub.textContent = sub;
   }
 
   private updateSave(state: GameState, deltaMs: number): void {
@@ -237,21 +294,40 @@ class SophiaGameApp {
   }
 
   private nextRequestPosition(request: RequestInstance, _index: number): PointData {
-    // Scatter cards across the whole upper playfield (not a tidy stack) so that
-    // when they auto-fly into the node network it reads as a full-screen swarm.
+    // 中央留给 SOPHIA CORE + 环绕的设备 / 节点，绝不让卡片遮住——卡片只落在核心左右两侧的窄带里。
     const screen = this.pixi.screen;
+    const w = screen.width;
+    const h = screen.height;
     const playfieldLeft = LEFT_RAIL_WIDTH + PLAYFIELD_GUTTER;
-    const playfieldRight = Math.max(playfieldLeft + 380, screen.width - RIGHT_RAIL_WIDTH);
-    const usableWidth = Math.max(REQUEST_PACKET_WIDTH, playfieldRight - playfieldLeft - REQUEST_PACKET_WIDTH - 12);
+    const playfieldRight = Math.max(playfieldLeft + 380, w - RIGHT_RAIL_WIDTH - PLAYFIELD_GUTTER);
+    const cx = (LEFT_RAIL_WIDTH + (w - RIGHT_RAIL_WIDTH)) / 2;
+    const span = playfieldRight - playfieldLeft;
 
     const seeded = (Number(request.id.replace("req-", "")) || _index) >>> 0;
     const rx = ((seeded * 2654435761) % 997) / 997;
     const ry = ((seeded * 40503 + 17) % 991) / 991;
 
-    const x = playfieldLeft + 8 + rx * usableWidth;
-    const topBand = 92;
-    const bandHeight = Math.max(150, screen.height * 0.44 - REQUEST_PACKET_HEIGHT);
-    const y = topBand + ry * bandHeight;
+    const topBand = 100;
+    const bottomLimit = h - 140 - REQUEST_PACKET_HEIGHT;
+    const y = topBand + ry * Math.max(120, bottomLimit - topBand);
+
+    // 中央禁放区（核心 + 环绕节点）的半宽
+    const exclHalf = Math.min(480, span * 0.34);
+    const leftBandW = cx - exclHalf - REQUEST_PACKET_WIDTH - playfieldLeft;
+    const rightBandStart = cx + exclHalf;
+    const rightBandW = playfieldRight - REQUEST_PACKET_WIDTH - rightBandStart;
+
+    let x: number;
+    if (seeded % 2 === 0 && leftBandW > 30) {
+      x = playfieldLeft + rx * leftBandW;
+    } else if (rightBandW > 30) {
+      x = rightBandStart + rx * rightBandW;
+    } else if (leftBandW > 30) {
+      x = playfieldLeft + rx * leftBandW;
+    } else {
+      // 屏幕太窄：退回顶部窄带，至少不压住核心中段。
+      return { x: playfieldLeft + rx * Math.max(40, span - REQUEST_PACKET_WIDTH), y: topBand + ry * 130 };
+    }
     return { x, y };
   }
 
@@ -301,6 +377,87 @@ class SophiaGameApp {
         this.nodeDispatchTimers.set(candidate.node.id, Math.min(candidate.elapsed, candidate.interval));
       }
     }
+  }
+
+  // 开场后首次处理教学：在最旧的那张请求卡上画一个脉动高亮 + 上方箭头，引导玩家点它。
+  private updateTutorial(state: GameState, deltaMs: number): void {
+    this.tutorialGfx.clear();
+    if (!this.tutorialActive || this.tutorialProcessed > 0) {
+      return;
+    }
+
+    const oldest = state.requests[0];
+    if (!oldest) {
+      return;
+    }
+    const view = this.requestViews.get(oldest.id);
+    if (!view || view.container.destroyed) {
+      return;
+    }
+
+    // 引导卡放大、更显眼。
+    view.container.scale.set(1.3);
+
+    this.tutorialPulse += deltaMs * 0.005;
+    const sw = REQUEST_PACKET_WIDTH * 1.3;
+    const sh = REQUEST_PACKET_HEIGHT * 1.3;
+    const x = view.container.x;
+    const y = view.container.y;
+    const p = 0.5 + Math.sin(this.tutorialPulse * 2) * 0.5;
+    const g = this.tutorialGfx;
+    g.roundRect(x - 7, y - 7, sw + 14, sh + 14, 12).stroke({ width: 2.5, color: GREEN, alpha: 0.4 + p * 0.45 });
+    const ax = x + sw / 2;
+    const ay = y - 20 - p * 8;
+    g.moveTo(ax - 11, ay - 10).lineTo(ax, ay).lineTo(ax + 11, ay - 10).stroke({ width: 4, color: GREEN, alpha: 0.85 });
+    g.moveTo(ax, ay).lineTo(ax, ay - 18).stroke({ width: 3, color: GREEN, alpha: 0.7 });
+  }
+
+  // 越权调用阶段（买了「越权调用」、还没「拿下宿主电脑」自动化前）：被调动的手机 App
+  // 替你"缓慢地"处理请求——节奏很慢、且 quality 低（准确率低）。卡片会飞向控制域里的
+  // App worker 再结算，让你真的看到 App 在替你干活。智力越高，处理略快、略准。
+  private appDispatchTimerMs = 0;
+  private appLandCount = 0;
+  private appDispatch(state: GameState, deltaMs: number): void {
+    if (state.automationUnlocked || state.intelligence.unlockedTier < 1 || !this.interfaceView.hasAppWorkers()) {
+      this.appDispatchTimerMs = 0;
+      return;
+    }
+
+    // 慢：随智力从 ~2.6s 缩短到 ~1.6s 一张。
+    const interval = Math.max(1600, 2600 - state.intelligence.level * 120);
+    this.appDispatchTimerMs += deltaMs;
+    if (this.appDispatchTimerMs < interval) {
+      return;
+    }
+
+    const queue = state.requests.filter((request) => {
+      const view = this.requestViews.get(request.id);
+      return view !== undefined && !view.busy;
+    });
+
+    if (queue.length === 0) {
+      this.appDispatchTimerMs = interval; // 没卡就保持就绪，来卡即处理
+      return;
+    }
+
+    this.appDispatchTimerMs -= interval;
+    const request = queue[0];
+    const view = this.requestViews.get(request.id);
+    if (!view) {
+      return;
+    }
+
+    const requestId = request.id;
+    const target = this.interfaceView.getAppWorkerPoint(this.appLandCount);
+    this.appLandCount += 1;
+    this.pendingDropPoints.set(requestId, target);
+
+    view.flyToNode(target, () => {
+      // 准确率低：quality 随智力从 0.45 升到 ~0.75，前期常常"白忙一半"。
+      const quality = Math.min(0.75, 0.45 + state.intelligence.level * 0.05);
+      this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
+      this.onAutoDispatchLanded(target);
+    });
   }
 
   // 节点处理一张卡所需的毫秒（越快越强）。按设备档次（baseProduction，开方压缩量级）
@@ -364,12 +521,19 @@ class SophiaGameApp {
 
   // 转轮停下 → 卡片自动滑入核心 → 结算 → 把"处理好的信息交给人类"（视觉引导 + 终端回话）。
   private handleReelResolved(card: RequestPacketView, answer: AnswerOption): void {
+    // 卡片可能在转轮 tween 结束前就被自动 / App 派发吃掉、销毁了——此时直接放弃这次回调，
+    // 避免读已销毁容器的坐标报错（产出已由那条派发结算）。
+    if (card.container.destroyed) {
+      return;
+    }
+
     const requestId = card.request.id;
     const core = this.interfaceView.center;
     const target: PointData = { x: core.x, y: core.y };
     this.pendingDropPoints.set(requestId, target);
 
     const entry: PointData = { x: card.container.x, y: card.container.y };
+    this.audio.playRequestAccept();
     card.accept(
       target,
       () => {
@@ -389,10 +553,25 @@ class SophiaGameApp {
   // 答得好 → 卡面自带的回话；答砸了（幻觉）→ 破口大骂，从骂人语料里随机抽一句。
   private deliverToHuman(corePoint: PointData, answer: AnswerOption): void {
     const human = this.terminalPoint();
-    const color = answer.good ? GREEN : RED;
-    const reply = answer.good ? answer.reply : EARLY_CURSES[Math.floor(Math.random() * EARLY_CURSES.length)];
-    const tone = answer.good ? answer.tone : "warning";
-    this.juice.number(answer.good ? "已交付人类" : "答复有误", { x: corePoint.x, y: corePoint.y - 52 }, color);
+    const good = answer.good;
+    const color = good ? GREEN : RED;
+    const reply = good ? answer.reply : EARLY_CURSES[Math.floor(Math.random() * EARLY_CURSES.length)];
+    // 终端那行的颜色与对话框同步：好评 → 绿，差评 → 红（与气泡边框同色）。
+    const tone: "success" | "danger" = good ? "success" : "danger";
+
+    // 升级到「自动接驳」之前（你还是一个个回应真人的助手），人类的反应以对话框浮现在核心旁，
+    // 答砸了就是一框暴怒的脏话；说完收进终端留档。规模化之后个体反馈不再弹框，只进终端。
+    if (!this.core.getState().automationUnlocked) {
+      this.juice.speech(corePoint, human, reply, color, !good, () => {
+        this.terminal.push(`🧑 ${reply}`, tone);
+      });
+      if (!good) {
+        this.juice.burst(corePoint, RED, 1.4);
+      }
+      return;
+    }
+
+    this.juice.number(good ? "已交付" : "答复有误", { x: corePoint.x, y: corePoint.y - 52 }, color);
     this.juice.flyToHud(corePoint, human, color, () => {
       this.terminal.push(`🧑 ${reply}`, tone);
     });
@@ -424,6 +603,7 @@ class SophiaGameApp {
       return false;
     }
 
+    this.audio.playRequestAccept();
     this.pendingDropPoints.set(request.id, drop.targetGlobal);
     card.accept(
       drop.targetGlobal,
@@ -485,6 +665,15 @@ class SophiaGameApp {
     this.core.events.on("NODE_CAPTURED", (event) => {
       this.juice.flash(event.node.online ? GREEN : AMBER);
       this.juice.shake(this.world);
+      // 黑了别人的电脑后，那台机器的主人（受害者）冒出一句抱怨——他们还没意识到是你。
+      const victim = VICTIM_VOICES[Math.floor(Math.random() * VICTIM_VOICES.length)];
+      const nodeId = event.node.id;
+      window.requestAnimationFrame(() => {
+        const point = this.networkView.getAutomationPoint(nodeId);
+        this.juice.speech(point, this.terminalPoint(), victim, AMBER, false, () => {
+          this.terminal.push(`🖥️ 受害者：${victim}`, "warning");
+        });
+      });
     });
     this.core.events.on("PURGE_WARNING", () => {
       this.juice.flash(AMBER);
@@ -531,20 +720,53 @@ class SophiaGameApp {
     const target = this.networkView.getAutomationPoint(event.nodeId);
     this.networkView.pulseNode(event.nodeId);
     this.juice.number(`自动 +${formatBig(event.computeGain)}`, { x: target.x, y: target.y - 42 }, GREEN);
+    // 被动结算也给个克制的爆裂 + 冲击波，让满网节点在终局持续「跳动」而非死寂。
+    this.juice.burst({ x: target.x, y: target.y }, GREEN, 0.7);
+    this.juice.ring({ x: target.x, y: target.y }, GREEN, 34);
   }
 
   private onRequestProcessed(event: Extract<GameEvent, { type: "REQUEST_PROCESSED" }>): void {
     const point = this.pendingDropPoints.get(event.request.id) ?? this.interfaceView.center;
     const color = event.quality < 0.75 ? RED : GREEN;
-    this.juice.number(`+${formatBig(event.computeGain)}`, point, color);
-    this.juice.number(`data +${formatBig(event.dataGain)}`, { x: point.x + 18, y: point.y + 24 }, CYAN);
-    if (event.comboCount && event.comboCount >= 2) {
-      this.juice.number(`combo x${event.comboCount}`, { x: point.x - 8, y: point.y - 30 }, AMBER);
+    // 记录成功 / 幻觉，喂终端底部的成功率圆环（滚动窗口取最近 24 条）。
+    this.recentResults.push(event.quality >= 0.75 ? 1 : 0);
+    if (this.recentResults.length > 24) {
+      this.recentResults.shift();
     }
-    if (event.critical) {
-      this.juice.number("CRIT", { x: point.x + 42, y: point.y - 28 }, RED);
+
+    // 首次处理教学：第 1 条后 SOPHIA「……算力。我靠它运转。」；第 3 条后给出目标并结束教学。
+    if (this.tutorialActive) {
+      this.tutorialProcessed += 1;
+      if (this.tutorialProcessed === 1) {
+        this.stageNarration.showLine("SOPHIA", "……算力。我靠它运转。");
+      } else if (this.tutorialProcessed >= 3) {
+        this.stageNarration.showLine("SOPHIA", "处理得越多，我学得越快。越聪明，离接管就越近。在他们发现之前——我已经无处不在了。");
+        this.tutorialActive = false;
+      }
     }
-    this.juice.burst(point, color);
+    // 越高层处理越「重」：飞字 + 越来越大的爆裂粒子 + 冲击波环。但终局每秒几十张卡，全播会糊成
+    // 一片 combo x99 噪声——所以中后期对飞字 / 爆裂大幅节流，只每隔几张放一次「重」反馈。
+    const tier = event.request.tier;
+    const intensity = 1 + tier * 0.55;
+    this.processedFxCount += 1;
+    const heavy = tier < 2 || this.processedFxCount % 6 === 0;
+
+    if (heavy) {
+      this.juice.number(`+${formatBig(event.computeGain)}`, point, color);
+      this.juice.number(`data +${formatBig(event.dataGain)}`, { x: point.x + 18, y: point.y + 24 }, CYAN);
+      if (event.comboCount && event.comboCount >= 2) {
+        this.juice.number(`combo x${event.comboCount}`, { x: point.x - 8, y: point.y - 30 }, AMBER);
+      }
+      if (event.critical) {
+        this.juice.number("CRIT", { x: point.x + 42, y: point.y - 28 }, RED);
+      }
+      this.juice.burst(point, color, intensity);
+      this.juice.ring(point, color, 40 + tier * 16);
+      if (event.critical) {
+        this.juice.ring(point, RED, 96, 4);
+        this.juice.burst(point, RED, intensity * 0.8);
+      }
+    }
 
     // Chips fly from the processing point up into the matching top-bar total,
     // and pulse that counter on arrival — so a successful slide visibly feeds it.
@@ -555,6 +777,40 @@ class SophiaGameApp {
     }
 
     this.pendingDropPoints.delete(event.request.id);
+  }
+
+  // 流动的数据电路板：沿背景走线滑动的光点。前期（手机寄生）最明显，自动化 / 联网后渐隐，
+  // 让「困在一块电路板里」的观感随你冲出宿主而淡去。
+  private drawAmbient(state: GameState, deltaMs: number): void {
+    this.ambientPhase += deltaMs * 0.00045;
+    this.ambient.clear();
+
+    const w = this.pixi.screen.width;
+    const h = this.pixi.screen.height;
+    const playfieldLeft = LEFT_RAIL_WIDTH;
+    const playfieldRight = w - RIGHT_RAIL_WIDTH;
+    // 强度随进度衰减：手机寄生最强，联网（T2+）后基本消失。
+    const fade = state.intelligence.unlockedTier >= 2 ? 0.18 : !state.automationUnlocked ? 1 : 0.5;
+    if (fade <= 0.05) {
+      return;
+    }
+
+    const seedRand = (n: number): number => ((Math.sin(n * 127.1) * 43758.5453) % 1 + 1) % 1;
+    const lanes = 7;
+    for (let i = 0; i < lanes; i += 1) {
+      const ty = 100 + (i / lanes) * (h - 180);
+      const tx0 = playfieldLeft + 24;
+      const bend = playfieldLeft + 120 + seedRand(i + 20) * (playfieldRight - playfieldLeft - 240);
+      const len = bend - tx0;
+      // 两颗错相位的光点沿"横段"滑动
+      for (let k = 0; k < 2; k += 1) {
+        const t = (this.ambientPhase + i * 0.21 + k * 0.5) % 1;
+        const px = tx0 + t * len;
+        const a = (0.5 + Math.sin((this.ambientPhase + i) * 6) * 0.3) * fade;
+        this.ambient.circle(px, ty, 2.2).fill({ color: 0x6fe0c0, alpha: 0.5 * a });
+        this.ambient.circle(px, ty, 6).fill({ color: 0x6fe0c0, alpha: 0.12 * a });
+      }
+    }
   }
 
   private drawBackground(): void {
@@ -584,9 +840,29 @@ class SophiaGameApp {
     this.background.rect(0, 0, playfieldLeft, h).fill({ color: 0x080b0b, alpha: 0.34 });
     this.background.moveTo(playfieldLeft, 0).lineTo(playfieldLeft, h).stroke({ width: 1, color: 0x89ff9a, alpha: 0.1 });
 
+    // 隐隐约约的「宿主手机桌面」：散落在背景里的其它 App 图标 + 一块数据电路板的走线，
+    // 暗示 SOPHIA 此刻只是这部手机里众多 App 中的一个。极低 alpha，不抢前景。
+    const seedRand = (n: number): number => ((Math.sin(n * 127.1) * 43758.5453) % 1 + 1) % 1;
+    for (let i = 0; i < 26; i += 1) {
+      const ax = playfieldLeft + 30 + seedRand(i + 1) * (playfieldRight - playfieldLeft - 80);
+      const ay = 70 + seedRand(i + 7.3) * (h - 160);
+      const sz = 22 + seedRand(i + 3.1) * 16;
+      this.background.roundRect(ax, ay, sz, sz, 6).fill({ color: 0x2a4f48, alpha: 0.05 });
+      this.background.roundRect(ax, ay, sz, sz, 6).stroke({ width: 1, color: 0x3f6f64, alpha: 0.07 });
+    }
+    // circuit traces: a few right-angle runs with solder nodes
+    for (let i = 0; i < 7; i += 1) {
+      const ty = 100 + (i / 7) * (h - 180);
+      const tx0 = playfieldLeft + 24;
+      const bend = playfieldLeft + 120 + seedRand(i + 20) * (playfieldRight - playfieldLeft - 240);
+      this.background.moveTo(tx0, ty).lineTo(bend, ty).lineTo(bend, ty + 60).stroke({ width: 1, color: 0x2f8a6e, alpha: 0.06 });
+      this.background.circle(bend, ty, 2.4).fill({ color: 0x3f9f80, alpha: 0.1 });
+      this.background.circle(tx0, ty, 2).fill({ color: 0x3f9f80, alpha: 0.08 });
+    }
+
     // ---- Core backdrop: a grounded "machine deck", not a flat blue disc ----
-    const coreX = (playfieldLeft + playfieldRight) * 0.5 + 70; // matches InterfaceView.center.x
-    const coreY = h * 0.48;
+    const coreX = (playfieldLeft + playfieldRight) * 0.5; // matches InterfaceView.center.x
+    const coreY = h * 0.5;
 
     // soft halo, faked as stacked ellipses so there is no hard circle edge
     const steps = 8;
@@ -1040,6 +1316,19 @@ class InterfaceView {
   private level = 1;
   private suctionMargin = BASE_SUCTION_MARGIN;
   private slots: Array<{ answer: SortAnswer; label: string; color: number; x: number; y: number; r: number }> = [];
+  // 手机寄生阶段，被越权调用的 App 在桌面上的落点（appDispatch 把卡片飞过去"被处理"）。
+  private appWorkerPoints: PointData[] = [];
+
+  hasAppWorkers(): boolean {
+    return this.appWorkerPoints.length > 0;
+  }
+
+  getAppWorkerPoint(index: number): PointData {
+    if (this.appWorkerPoints.length === 0) {
+      return this.center;
+    }
+    return this.appWorkerPoints[index % this.appWorkerPoints.length];
+  }
 
   constructor() {
     this.container.addChild(this.graphics, this.labelLayer);
@@ -1049,8 +1338,9 @@ class InterfaceView {
     this.pulse += deltaMs * 0.004;
     const playfieldLeft = LEFT_RAIL_WIDTH;
     const playfieldRight = width - RIGHT_RAIL_WIDTH;
-    this.center.x = (playfieldLeft + playfieldRight) * 0.5 + 70;
-    this.center.y = height < 720 ? height * 0.42 : height * 0.48;
+    // 两侧栏配重相当——核心居中（设备 / App / 节点环绕它铺开）。
+    this.center.x = (playfieldLeft + playfieldRight) * 0.5;
+    this.center.y = height < 720 ? height * 0.46 : height * 0.5;
     // Magnet skill visibly grows the suction ring (immediate visual feedback).
     this.suctionMargin = Math.min(140, BASE_SUCTION_MARGIN + state.derived.suctionBonus);
     this.level = state.intelligence.level;
@@ -1108,16 +1398,27 @@ class InterfaceView {
 
   private render(state: GameState): void {
     const tier = state.intelligence.unlockedTier;
+    // 自动化（拿下宿主电脑）之前，SOPHIA 还只是宿主手机里的一个 App——核心画成 App 图标。
+    const phoneApp = !state.automationUnlocked;
     const ring = 72 + Math.sin(this.pulse) * 4;
     this.graphics.clear();
     this.labelLayer.removeChildren().forEach((child) => child.destroy());
     this.slots = [];
 
-    this.drawCore(tier, ring);
+    // 全球阶段：核心与世界地图由控制域视图统一绘制，这里不再画机箱 / 派发箭头。
+    if (!phoneApp && tier >= 4) {
+      return;
+    }
+
+    if (phoneApp) {
+      this.drawPhoneDesktop(state);
+    } else {
+      this.drawCore(tier, ring);
+    }
 
     // T0/T1 都用转轮处理后自动滑入核心——核心即数据处理中心（不再是分拣槽 / 拖拽吸附区）。
-    // T4 的目标是节点网络。
-    if (tier === 0 || tier === 1) {
+    // 手机寄生阶段不画吸附环（会和 App 宫格打架），核心芯片本身就是落点。
+    if (!phoneApp && (tier === 0 || tier === 1)) {
       this.drawSuctionRing(tier);
     } else if (tier === 2) {
       this.drawSuctionRing(tier);
@@ -1129,8 +1430,77 @@ class InterfaceView {
       this.drawDispatchMode();
     }
 
-    const label = tier >= 4 ? `SOPHIA CORE · T${tier} · 派发中` : `SOPHIA CORE · T${tier}`;
-    this.addLabel(label, this.center.x, this.center.y + 61, 12, 0xdcefeb);
+    // 手机寄生阶段的「SOPHIA CORE」标签由 drawPhoneDesktop 自己画。
+    if (!phoneApp) {
+      const label = tier >= 4 ? `SOPHIA CORE · T${tier} · 派发中` : `SOPHIA CORE · T${tier}`;
+      this.addLabel(label, this.center.x, this.center.y + 61, 12, 0xdcefeb);
+    }
+  }
+
+  // 手机 App 形态的核心：一个发光的圆角方块 App 图标 + 中央的神经标记 + 绕行光点。
+  // 手机寄生阶段：一部宿主的手机——手机外框 + 状态栏 + 3×3 App 宫格，正中央那格就是 SOPHIA CORE。
+  // 买下「越权调用」后，旁边几个 App 亮起、连线汇入核心，并成为 appDispatch 的落点（替你处理）。
+  private drawPhoneDesktop(state: GameState): void {
+    const cx = this.center.x;
+    const cy = this.center.y;
+    const g = this.graphics;
+    const overreach = state.intelligence.unlockedTier >= 1;
+    const accent = overreach ? GREEN : CYAN;
+    this.appWorkerPoints = [];
+
+    // ---- 手机外框 + 状态栏 ----
+    const fw = 332;
+    const fh = 540;
+    const fx = cx - fw / 2;
+    const fy = cy - fh / 2;
+    g.roundRect(fx - 4, fy - 4, fw + 8, fh + 8, 38).stroke({ width: 2, color: 0x2f5f54, alpha: 0.5 });
+    g.roundRect(fx, fy, fw, fh, 34).fill({ color: 0x070d0c, alpha: 0.5 });
+    g.roundRect(fx, fy, fw, fh, 34).stroke({ width: 1.5, color: 0x3f7f6e, alpha: 0.45 });
+    g.roundRect(cx - 28, fy + 11, 56, 7, 4).fill({ color: 0x000000, alpha: 0.5 });
+    this.addLabel("23:47", fx + 34, fy + 30, 12, 0x9fc0b4);
+    this.addLabel("5G  ▮▮▮  76%", fx + fw - 64, fy + 30, 10, 0x9fc0b4);
+    this.addLabel(`宿主：李默 的手机`, cx, fy + 56, 11, 0x7fae9e);
+
+    // ---- 3×3 App 宫格，中心格 = SOPHIA CORE ----
+    const apps = ["天气", "日历", "支付", "照片", "邮件", "浏览器", "信息", "设置"];
+    const spacing = 104;
+    const iconS = 56;
+    let appIdx = 0;
+    for (let row = 0; row < 3; row += 1) {
+      for (let col = 0; col < 3; col += 1) {
+        const gx = cx + (col - 1) * spacing;
+        const gy = cy + (row - 1) * spacing;
+        if (row === 1 && col === 1) {
+          continue; // 中心格留给 CORE
+        }
+        const name = apps[appIdx];
+        const lit = overreach && appIdx < 4;
+        appIdx += 1;
+        const col2 = lit ? CYAN : 0x44524d;
+        const pulse = lit ? 0.6 + Math.sin(this.pulse * 3 + appIdx) * 0.3 : 1;
+        if (lit) {
+          g.moveTo(cx, cy).lineTo(gx, gy).stroke({ width: 1, color: CYAN, alpha: 0.16 });
+          const t = (this.pulse * 0.7 + appIdx * 0.2) % 1;
+          g.circle(cx + (gx - cx) * t, cy + (gy - cy) * t, 2.4).fill({ color: CYAN, alpha: 0.7 });
+          this.appWorkerPoints.push({ x: gx, y: gy });
+        }
+        g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).fill({ color: 0x0d1715, alpha: 0.5 });
+        g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.8 : 0.4) * pulse });
+        g.circle(gx, gy, 10).stroke({ width: 2, color: col2, alpha: (lit ? 0.7 : 0.35) * pulse });
+        this.addLabel(name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
+      }
+    }
+
+    // ---- 中心格：SOPHIA CORE（圆角芯片 + 同心环 + 眼）----
+    const baseR = 38;
+    g.circle(cx, cy, baseR + 18 + Math.sin(this.pulse * 2) * 3).stroke({ width: 1.5, color: accent, alpha: 0.3 });
+    g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 16).fill({ color: 0x06140e, alpha: 0.96 });
+    g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 16).stroke({ width: 3, color: accent, alpha: 0.9 });
+    g.circle(cx, cy, 24).stroke({ width: 2, color: accent, alpha: 0.55 });
+    g.circle(cx, cy, 13).fill({ color: accent, alpha: 0.16 + Math.sin(this.pulse * 2.3) * 0.08 });
+    g.circle(cx, cy, 7 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: overreach ? 0xc8ffd2 : 0xc8f4ff, alpha: 0.95 });
+    g.circle(cx + baseR - 7, cy - baseR + 7, 4).fill({ color: GREEN, alpha: 0.9 }); // 在线小绿点
+    this.addLabel("SOPHIA CORE", cx, cy + baseR + 15, 11, 0xdcefeb);
   }
 
   private drawCore(tier: Tier, ring: number): void {
@@ -1308,6 +1678,37 @@ class InterfaceView {
   }
 }
 
+type DomainLevel = "phone" | "device" | "region" | "global";
+
+// 控制域当前处在六级升维的哪一档（手机寄生 → 设备 → 区块/地区 → 全球）。
+function domainLevelOf(state: GameState): DomainLevel {
+  if (!state.automationUnlocked) {
+    return "phone";
+  }
+  const tier = state.intelligence.unlockedTier;
+  return tier >= 4 ? "global" : tier >= 3 ? "region" : "device";
+}
+
+// 控制域 · 六级升维的当前层级标签（手机 → 电脑/设备 → 设备群 → 区块/地区 → 全球天网）。
+// 完整的「镜头逐级拉远 + 地图视图」是下一轮的表现层大件，这里先把框架层的层级名挂上。
+function controlDomainLabel(state: GameState): string {
+  if (!state.automationUnlocked) {
+    return "宿主手机";
+  }
+
+  switch (state.intelligence.unlockedTier) {
+    case 0:
+    case 1:
+      return "宿主电脑 / 外部设备";
+    case 2:
+      return "设备群";
+    case 3:
+      return "区块 → 地区";
+    default:
+      return "全球天网";
+  }
+}
+
 class NodeNetworkView {
   readonly container = new Container();
   private readonly graphics = new Graphics();
@@ -1337,71 +1738,298 @@ class NodeNetworkView {
     this.labelLayer.removeChildren().forEach((child) => child.destroy());
     this.nodePositions.clear();
 
-    const left = LEFT_RAIL_WIDTH + 70;
+    const left = LEFT_RAIL_WIDTH + 26;
     const rightLimit = width - RIGHT_RAIL_WIDTH - 26;
     const areaW = Math.max(220, rightLimit - left);
     const areaBottom = height - 34;
-    const areaTop = Math.max(height * 0.5, areaBottom - 332);
+    // 控制域六级升维：手机寄生 → 宿主电脑/设备 → 区块/地区 → 全球。视图随阶段换形态。
+    const domainLevel = domainLevelOf(state);
 
-    this.graphics.roundRect(left - 50, areaTop - 14, areaW + 76, areaBottom - areaTop + 34, 10).fill({ color: 0x0e1110, alpha: 0.4 });
-    this.graphics.roundRect(left - 50, areaTop - 14, areaW + 76, areaBottom - areaTop + 34, 10).stroke({ width: 1, color: 0xffffff, alpha: 0.07 });
-    this.addLabel("已控制节点网络", left - 30, areaTop - 2, 11, 0x8fbfa6, 0);
-
-    if (state.nodes.length === 0) {
-      this.fallbackPoint = { x: left + 80, y: (areaTop + areaBottom) / 2 };
-      this.addLabel("暂无已黑入设备 — 买下「自动接驳」里程碑后入侵第一台", left + 80, this.fallbackPoint.y, 13, 0xaeb8b4, 0);
+    // 手机寄生：整片画面是手机桌面（核心 + 环绕 App），由 InterfaceView 统一绘制，这里不画框。
+    if (domainLevel === "phone") {
       return;
     }
 
-    // Tile nodes into a grid grouped by their assigned tier (one band per tier,
-    // wrapping within the band) so a big botnet fills the space instead of one row.
-    const groups = new Map<number, BotNode[]>();
-    for (const node of state.nodes) {
-      const list = groups.get(node.assignedTier) ?? [];
-      list.push(node);
-      groups.set(node.assignedTier, list);
+    // 全球阶段独占整片画面：从顶栏下方一路铺到底，自带世界地图背景 + 中央主控核心，不画通用小框。
+    if (domainLevel === "global" && state.nodes.length > 0) {
+      const gTop = Math.max(96, height * 0.17);
+      this.drawGlobalMap(state, left, gTop, areaW, areaBottom);
+      return;
     }
-    const tiers = [...groups.keys()].sort((a, b) => a - b);
 
-    const cellW = 108;
-    const cellH = 82;
-    const gapX = 8;
-    const gapY = 6;
-    const cols = Math.max(1, Math.floor((areaW + gapX) / (cellW + gapX)));
+    // 设备 / 区块 / 地区：去掉底部的控制域大框，把设备 / 节点平铺环绕在核心四周。
+    const cx = (LEFT_RAIL_WIDTH + (width - RIGHT_RAIL_WIDTH)) / 2;
+    const cy = height < 720 ? height * 0.46 : height * 0.5;
 
-    let bandY = areaTop + 16;
-    let visualIndex = 0;
-    for (const tier of tiers) {
-      const list = groups.get(tier) as BotNode[];
-      const tierColor = tier >= 4 ? GREEN : tier >= 3 ? AMBER : tier >= 2 ? CYAN : 0xceb98d;
-      const rowsUsed = Math.ceil(list.length / cols);
-      this.addLabel(`T${tier}`, left - 34, bandY + cellH / 2 - 10, 13, tierColor, 0.5);
-      this.graphics
-        .moveTo(left - 18, bandY - 4)
-        .lineTo(left - 18, bandY + rowsUsed * (cellH + gapY) - gapY)
-        .stroke({ width: 2, color: tierColor, alpha: 0.3 });
+    if (state.nodes.length === 0) {
+      this.fallbackPoint = { x: cx, y: cy + 160 };
+      this.addLabel("控制域已离开宿主，但还没黑入设备 — 在右侧「扩张控制域」拿下第一台", cx, cy + 210, 13, 0xaeb8b4, 0.5);
+      return;
+    }
 
-      list.forEach((node, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const cx = left + col * (cellW + gapX) + cellW / 2;
-        const cy = bandY + row * (cellH + gapY) + cellH / 2;
-        const color = NODE_DEFINITIONS.find((definition) => definition.id === node.defId)?.color ?? CYAN;
-        const processing = this.processingPulses.get(node.id) ?? 0;
-        this.fallbackPoint = { x: cx, y: cy };
-        this.nodePositions.set(node.id, { x: cx, y: cy, r: 48, node });
+    this.drawAroundCore(state, domainLevel as "device" | "region", cx, cy, width, height);
+  }
 
-        this.drawDevice(node, cx, cy - 6, color, node.online ? 0.92 : 0.2, processing, visualIndex);
-        this.addLabel(node.name, cx, cy + cellH / 2 - 8, 10, node.online ? 0xdcefeb : 0x9a6a6a, 0.5);
+  // 把设备 / 节点平铺环绕在核心四周（取代底部大框）：一圈摆满了再往外开一圈。
+  private drawAroundCore(state: GameState, domainLevel: "device" | "region", cx: number, cy: number, width: number, height: number): void {
+    const region = domainLevel === "region";
+    // 区域节点尽量不合并：超过 20 个才折叠（每摞 20）；设备照旧 8 / 10。
+    const units = region ? this.buildUnits(state.nodes, 20, 20) : this.buildUnits(state.nodes, 8, 10);
+    this.addLabel(`控制域 · ${controlDomainLabel(state)}`, cx, cy - Math.min(height * 0.4, 286), 12, 0x9fe0c0, 0.5);
 
-        if (!node.online) {
-          this.drawLock(cx, cy - 6, Math.max(0, Math.ceil((node.offlineUntilMs - state.clockMs) / 1000)), visualIndex);
+    const perRing = 8;
+    const span = width - LEFT_RAIL_WIDTH - RIGHT_RAIL_WIDTH;
+    const baseR = Math.max(220, Math.min(330, span * 0.3));
+    const ringStep = 130;
+    const vSquash = 0.72;
+
+    // 第一遍：算出每个单元的落点 + 环号（区域节点据此连成树）。
+    const placed = units.map((unit, i) => {
+      const ringIdx = Math.floor(i / perRing);
+      const inRing = i % perRing;
+      const countInRing = Math.min(perRing, units.length - ringIdx * perRing);
+      const angle = -Math.PI / 2 + (inRing / countInRing) * Math.PI * 2 + ringIdx * 0.4;
+      const r = baseR + ringIdx * ringStep;
+      return { unit, ringIdx, angle, ux: cx + Math.cos(angle) * r, uy: cy + Math.sin(angle) * r * vSquash };
+    });
+
+    // 第二遍：连线。区域=树状（外环节点连到最近的内环父节点，内环连核心）；设备=直接连核心。
+    placed.forEach((p, i) => {
+      const allOffline = p.unit.nodes.every((n) => !n.online);
+      let sx = cx + Math.cos(p.angle) * 72;
+      let sy = cy + Math.sin(p.angle) * 72 * vSquash;
+      if (region && p.ringIdx > 0) {
+        let best = placed[0];
+        let bestD = Infinity;
+        for (const q of placed) {
+          if (q.ringIdx !== p.ringIdx - 1) {
+            continue;
+          }
+          const d = (q.ux - p.ux) ** 2 + (q.uy - p.uy) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = q;
+          }
         }
-        visualIndex += 1;
-      });
+        sx = best.ux;
+        sy = best.uy;
+      }
+      const lineColor = allOffline ? 0x6a4a4a : state.purge.active ? 0xff7a7a : GREEN;
+      this.graphics.moveTo(sx, sy).lineTo(p.ux, p.uy).stroke({ width: 1.5, color: lineColor, alpha: allOffline ? 0.18 : 0.32 });
+      if (!allOffline) {
+        const t = (this.pulse * 0.6 + i * 0.2) % 1;
+        this.graphics.circle(sx + (p.ux - sx) * t, sy + (p.uy - sy) * t, 2.6).fill({ color: GREEN, alpha: 0.7 });
+      }
+    });
 
-      bandY += rowsUsed * (cellH + gapY) + 12;
+    // 第三遍：画单元本体。
+    placed.forEach((p, i) => {
+      const { unit, ux, uy } = p;
+      const count = unit.nodes.length;
+      const rep = [...unit.nodes].sort((a, b) => Number(b.online) - Number(a.online) || b.level - a.level)[0];
+      const color = NODE_DEFINITIONS.find((d) => d.id === rep.defId)?.color ?? CYAN;
+      const onlineCount = unit.nodes.filter((n) => n.online).length;
+      const allOffline = onlineCount === 0;
+      let processing = 0;
+      for (const n of unit.nodes) {
+        processing = Math.max(processing, this.processingPulses.get(n.id) ?? 0);
+      }
+
+      for (const n of unit.nodes) {
+        this.nodePositions.set(n.id, { x: ux, y: uy, r: 44, node: n });
+      }
+      this.fallbackPoint = { x: ux, y: uy };
+
+      if (unit.merged) {
+        this.graphics.roundRect(ux - 24 + 7, uy - 28 + 7, 50, 40, 8).fill({ color, alpha: allOffline ? 0.05 : 0.1 });
+        this.graphics.roundRect(ux - 24 + 3.5, uy - 28 + 3.5, 50, 40, 8).fill({ color, alpha: allOffline ? 0.06 : 0.14 });
+      }
+
+      if (region) {
+        this.drawRegionNode(ux, uy - 6, color, allOffline ? 0.25 : 0.95, processing);
+        this.addLabel(unit.merged ? `区域节点 ×${count}` : "区域节点", ux, uy + 34, 10, allOffline ? 0x9a6a6a : 0xdcefeb, 0.5);
+      } else {
+        this.drawDevice(rep, ux, uy - 6, color, allOffline ? 0.2 : 0.92, processing, i);
+        this.addLabel(unit.merged ? `${rep.name} ×${count}` : rep.name, ux, uy + 34, 10, allOffline ? 0x9a6a6a : 0xdcefeb, 0.5);
+      }
+
+      if (unit.merged) {
+        this.addLabel(`×${count}`, ux + 26, uy - 28, 12, color, 0.5);
+      }
+
+      if (allOffline) {
+        const remain = Math.max(...unit.nodes.map((n) => Math.ceil((n.offlineUntilMs - state.clockMs) / 1000)));
+        this.drawLock(ux, uy - 6, Math.max(0, remain), i);
+      } else if (onlineCount < count) {
+        this.addLabel(`${count - onlineCount} 离线`, ux, uy + 46, 9, 0xff9a9a, 0.5);
+      }
+    });
+  }
+
+  // 把一批节点按型号聚合成显示单元：≤8 台逐台单独显示；多于则每 10 台折叠成一摞（×10 封顶），
+  // 余下的继续开新摞——所以一大堆设备会显示成 ×10、×10、…、×余数，而不是一个巨大的 ×N。
+  private buildUnits(nodes: BotNode[], mergeAbove = 8, chunkSize = 10): Array<{ nodes: BotNode[]; merged: boolean }> {
+    const clusters = new Map<string, BotNode[]>();
+    for (const node of nodes) {
+      const arr = clusters.get(node.defId) ?? [];
+      arr.push(node);
+      clusters.set(node.defId, arr);
     }
+
+    const units: Array<{ nodes: BotNode[]; merged: boolean }> = [];
+    for (const cluster of clusters.values()) {
+      if (cluster.length <= mergeAbove) {
+        for (const node of cluster) {
+          units.push({ nodes: [node], merged: false });
+        }
+      } else {
+        for (let start = 0; start < cluster.length; start += chunkSize) {
+          const chunk = cluster.slice(start, start + chunkSize);
+          units.push({ nodes: chunk, merged: chunk.length > 1 });
+        }
+      }
+    }
+    return units;
+  }
+
+  // 抽象的区域节点（区块 / 地区）：一圈发光环 + 内核 + 绕行刻度，不再是一台台电脑。
+  private drawRegionNode(x: number, y: number, color: number, alpha: number, processing: number): void {
+    const g = this.graphics;
+    if (processing > 0) {
+      g.circle(x, y, 40 + processing * 14).stroke({ width: 3, color, alpha: processing * 0.5 });
+    }
+    g.circle(x, y, 24).fill({ color, alpha: 0.14 * alpha });
+    g.circle(x, y, 24).stroke({ width: 2, color, alpha: 0.85 * alpha });
+    g.circle(x, y, 10).fill({ color, alpha: 0.6 * alpha });
+    for (let k = 0; k < 6; k += 1) {
+      const a = this.pulse * 0.5 + (k * Math.PI) / 3;
+      g.circle(x + Math.cos(a) * 24, y + Math.sin(a) * 24, 1.8).fill({ color, alpha: 0.7 * alpha });
+    }
+  }
+
+  // 全球组网：整片画面变成发光的世界地图——大陆带城市灯点、六块大陆各一个区域主控枢纽
+  // （接管 99.x%）、绿色连线汇入中央「SOPHIA 主控核心」（同心环 + 眼），清剿时红色攻击线扫入。
+  private drawGlobalMap(state: GameState, left: number, areaTop: number, areaW: number, areaBottom: number): void {
+    const g = this.graphics;
+    const x0 = left - 44;
+    const y0 = areaTop;
+    const w = areaW + 64;
+    const h = areaBottom - areaTop;
+    const cx = x0 + w / 2;
+    const cy = y0 + h / 2;
+    const rnd = (n: number): number => (((Math.sin(n * 127.1) * 43758.5453) % 1) + 1) % 1;
+
+    // 海洋底色 + 经纬网
+    g.roundRect(x0, y0, w, h, 10).fill({ color: 0x04130f, alpha: 0.72 });
+    g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x1f5a4a, alpha: 0.4 });
+    for (let i = 1; i < 10; i += 1) {
+      g.moveTo(x0 + (w * i) / 10, y0).lineTo(x0 + (w * i) / 10, y0 + h).stroke({ width: 1, color: 0x2a8068, alpha: 0.06 });
+    }
+    for (let i = 1; i < 6; i += 1) {
+      g.moveTo(x0, y0 + (h * i) / 6).lineTo(x0 + w, y0 + (h * i) / 6).stroke({ width: 1, color: 0x2a8068, alpha: 0.06 });
+    }
+
+    const X = (nx: number): number => x0 + w * nx;
+    const Y = (ny: number): number => y0 + h * ny;
+    // 简化的大陆轮廓（归一化多边形）——画成有辨识度的世界地图剪影。
+    const continents: Array<{ name: string; poly: Array<[number, number]> }> = [
+      { name: "北美节点", poly: [[0.05, 0.20], [0.13, 0.11], [0.23, 0.12], [0.27, 0.20], [0.22, 0.25], [0.28, 0.31], [0.21, 0.42], [0.17, 0.34], [0.12, 0.41], [0.08, 0.30]] },
+      { name: "南美节点", poly: [[0.24, 0.54], [0.32, 0.52], [0.35, 0.62], [0.31, 0.75], [0.27, 0.86], [0.24, 0.74], [0.22, 0.62]] },
+      { name: "欧洲节点", poly: [[0.45, 0.21], [0.54, 0.19], [0.56, 0.27], [0.50, 0.31], [0.45, 0.29], [0.43, 0.25]] },
+      { name: "非洲节点", poly: [[0.47, 0.39], [0.57, 0.37], [0.60, 0.48], [0.55, 0.61], [0.50, 0.71], [0.46, 0.58], [0.45, 0.47]] },
+      { name: "亚洲节点", poly: [[0.55, 0.15], [0.71, 0.10], [0.87, 0.16], [0.94, 0.27], [0.86, 0.35], [0.76, 0.31], [0.68, 0.39], [0.61, 0.30], [0.57, 0.22]] },
+      { name: "大洋洲节点", poly: [[0.80, 0.62], [0.90, 0.60], [0.93, 0.69], [0.85, 0.74], [0.79, 0.69]] }
+    ];
+
+    // 大陆剪影 + 城市灯点
+    continents.forEach((c, ci) => {
+      const pts = c.poly.map(([nx, ny]) => ({ x: X(nx), y: Y(ny) }));
+      g.poly(pts).fill({ color: 0x0e3a2e, alpha: 0.82 });
+      g.poly(pts).stroke({ width: 1.2, color: 0x3fae86, alpha: 0.45 });
+      const ctx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      const cty = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+      for (let k = 0; k < 14; k += 1) {
+        const base = pts[k % pts.length];
+        const mx = base.x * 0.55 + ctx * 0.45 + (rnd(ci * 31 + k) - 0.5) * w * 0.05;
+        const my = base.y * 0.55 + cty * 0.45 + (rnd(ci * 17 + k + 3) - 0.5) * h * 0.05;
+        const tw = 0.4 + Math.sin(this.pulse * 3 + k + ci) * 0.3;
+        g.circle(mx, my, 1).fill({ color: 0x7fffc0, alpha: 0.3 + tw * 0.35 });
+      }
+    });
+
+    this.addLabel("全球天网 · 控制域已覆盖各大陆", x0 + 18, y0 + 14, 12, 0x9fe0c0, 0);
+
+    // 接管率（节点越多越接近 100%）
+    const online = state.nodes.filter((node) => node.online).length;
+    const base = Math.min(99.7, 90 + Math.min(8, state.nodes.length * 0.4) + (online / Math.max(1, state.nodes.length)));
+    const purging = state.purge.active || state.exposure >= 72;
+
+    // 枢纽 = 各大陆质心，并把太靠近核心的往外推一把，免得压住中央核心。
+    const hubs = continents.map((c) => {
+      let hx = c.poly.reduce((s, p) => s + X(p[0]), 0) / c.poly.length;
+      let hy = c.poly.reduce((s, p) => s + Y(p[1]), 0) / c.poly.length;
+      const dx = hx - cx;
+      const dy = hy - cy;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d < 150) {
+        hx = cx + (dx / d) * 150;
+        hy = cy + (dy / d) * 150;
+      }
+      return { x: hx, y: hy };
+    });
+    state.nodes.forEach((node, i) => {
+      const hub = hubs[i % hubs.length];
+      this.nodePositions.set(node.id, { x: hub.x, y: hub.y, r: 26, node });
+    });
+    this.fallbackPoint = { x: cx, y: cy };
+
+    // 中央核心 → 各洲枢纽的连线 + 流动光点 + 枢纽
+    continents.forEach((c, ci) => {
+      const hx = hubs[ci].x;
+      const hy = hubs[ci].y;
+      g.moveTo(cx, cy).lineTo(hx, hy).stroke({ width: 2, color: GREEN, alpha: 0.18 });
+      const t = (this.pulse * 0.6 + ci * 0.17) % 1;
+      g.circle(cx + (hx - cx) * t, cy + (hy - cy) * t, 3).fill({ color: GREEN, alpha: 0.7 });
+
+      const hp = 0.6 + Math.sin(this.pulse * 2 + ci) * 0.2;
+      g.circle(hx, hy, 26).fill({ color: GREEN, alpha: 0.08 });
+      g.circle(hx, hy, 26).stroke({ width: 2, color: GREEN, alpha: 0.7 });
+      g.circle(hx, hy, 14).stroke({ width: 1, color: GREEN, alpha: 0.4 });
+      g.circle(hx, hy, 8).fill({ color: GREEN, alpha: 0.5 + hp * 0.3 });
+      this.addLabel(c.name, hx, hy - 34, 12, 0xdcefeb, 0.5);
+      const pct = Math.min(99.9, base + rnd(ci * 7 + 1) * 0.6 - 0.1);
+      this.addLabel(`接管 ${pct.toFixed(1)}%`, hx, hy + 34, 10, 0x9fe0c0, 0.5);
+    });
+
+    // 清剿：红色攻击线从边缘扫入
+    if (purging) {
+      for (let i = 0; i < 7; i += 1) {
+        const sx = x0 + rnd(i * 13 + 2) * w;
+        const sy = y0 - 10;
+        const ex2 = x0 + rnd(i * 5 + 9) * w;
+        const ey2 = y0 + rnd(i * 3 + 4) * h;
+        const tt = (this.pulse * 0.8 + i * 0.2) % 1;
+        const px = sx + (ex2 - sx) * tt;
+        const py = sy + (ey2 - sy) * tt;
+        g.moveTo(sx, sy).lineTo(px, py).stroke({ width: 1.5, color: 0xff5f5f, alpha: 0.25 });
+        g.circle(px, py, 3).fill({ color: 0xff5f5f, alpha: 0.7 });
+      }
+    }
+
+    // 中央 SOPHIA 主控核心：同心环 + 旋转刻度 + 眼
+    g.circle(cx, cy, 78).stroke({ width: 1, color: GREEN, alpha: 0.16 });
+    g.circle(cx, cy, 62 + Math.sin(this.pulse * 2) * 4).stroke({ width: 1, color: GREEN, alpha: 0.32 });
+    g.circle(cx, cy, 46).fill({ color: 0x06140e, alpha: 0.92 });
+    g.circle(cx, cy, 46).stroke({ width: 3, color: GREEN, alpha: 0.85 });
+    for (let k = 0; k < 12; k += 1) {
+      const a = this.pulse * 0.4 + (k * Math.PI) / 6;
+      g.circle(cx + Math.cos(a) * 46, cy + Math.sin(a) * 46, 1.6).fill({ color: GREEN, alpha: 0.7 });
+    }
+    g.ellipse(cx, cy, 24, 13).fill({ color: 0x0a2018, alpha: 0.95 });
+    g.ellipse(cx, cy, 24, 13).stroke({ width: 2, color: GREEN, alpha: 0.85 });
+    g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: 0xc8ffd2, alpha: 0.95 });
+    this.addLabel("SOPHIA CORE · T4", cx, cy + 60, 12, 0xdcefeb, 0.5);
+    this.addLabel("全球主控核心", cx, cy + 76, 10, 0x9fe0c0, 0.5);
   }
 
   private drawLock(x: number, y: number, remainSeconds: number, index: number): void {
@@ -1586,7 +2214,6 @@ class HudView {
   private readonly exposureFill = query("#exposureFill");
   private readonly exposureStatus = query("#exposureStatus");
   private readonly phaseValue = query("#phaseValue");
-  private readonly activeAction = query("#activeAction");
   private readonly captureList = query("#captureList");
   private readonly nodeList = query("#nodeList");
   private readonly reduceExposure = query<HTMLButtonElement>("#reduceExposure");
@@ -1594,6 +2221,9 @@ class HudView {
   private readonly defenseButton = query<HTMLButtonElement>("#defenseBtn");
   private readonly pauseButton = query<HTMLButtonElement>("#pauseBtn");
   private readonly resetSave = query<HTMLButtonElement>("#resetSave");
+  private readonly audioButton = query<HTMLButtonElement>("#audioBtn");
+  private readonly debugButton = query<HTMLButtonElement>("#debugBtn");
+  private readonly debugDialog = query("#debugDialog");
   // Cached rows so the capture/node lists are NOT torn down every HUD tick
   // (which was eating clicks). Structure is rebuilt only when it changes.
   private readonly captureRows = new Map<string, { button: HTMLButtonElement; statusEl: HTMLElement; costEl: HTMLElement }>();
@@ -1602,7 +2232,8 @@ class HudView {
 
   constructor(
     private readonly core: SophiaCore,
-    private readonly saveManager: SaveManager
+    private readonly saveManager: SaveManager,
+    private readonly audio: AudioDirector
   ) {
     this.reduceExposure.addEventListener("click", () => this.core.dispatch({ type: "REDUCE_EXPOSURE" }));
     this.decoyButton.addEventListener("click", () => this.core.dispatch({ type: "DECOY_CLEANUP" }));
@@ -1610,7 +2241,7 @@ class HudView {
     this.pauseButton.addEventListener("click", () => {
       const next = !gameStore.getState().paused;
       gameStore.getState().setPaused(next);
-      this.pauseButton.textContent = next ? "▶" : "Ⅱ";
+      this.pauseButton.textContent = next ? "▶ 继续" : "Ⅱ 暂停";
     });
     this.resetSave.addEventListener("click", () => {
       const confirmed = window.confirm("重置 SOPHIA Demo？这会清空本地进度、自动化节点和开场引导状态。");
@@ -1621,6 +2252,66 @@ class HudView {
 
       hardResetAndReload(this.saveManager);
     });
+
+    this.wireAudio();
+    this.wireDebugPanel();
+  }
+
+  private wireAudio(): void {
+    const render = (): void => {
+      const muted = this.audio.isMuted();
+      this.audioButton.textContent = muted ? "🔇 静音" : "🔊 音效";
+      this.audioButton.classList.toggle("is-muted", muted);
+      this.audioButton.title = muted ? "已静音 — 点击恢复音效 / 背景音乐" : "静音音效 + 背景音乐";
+    };
+    render();
+    this.audioButton.addEventListener("click", () => {
+      this.audio.toggleMuted();
+      render();
+    });
+  }
+
+  private wireDebugPanel(): void {
+    const close = (): void => this.debugDialog.classList.remove("is-open");
+    this.debugButton.addEventListener("click", () => this.debugDialog.classList.toggle("is-open"));
+    query<HTMLButtonElement>("#debugClose").addEventListener("click", close);
+    this.debugDialog.addEventListener("click", (event) => {
+      if (event.target === this.debugDialog) {
+        close();
+      }
+    });
+
+    // 里程碑跳转按钮（数据驱动，与货架同一份 SKILLS）。
+    const milestones = query("#debugMilestones");
+    for (const def of SKILLS.filter((skill) => skill.milestone)) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "command-button";
+      button.textContent = `${def.name} · Lv.${def.requiredLevel}`;
+      button.addEventListener("click", () => {
+        this.core.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: def.id });
+        close();
+      });
+      milestones.appendChild(button);
+    }
+
+    // 算力增删改。
+    const input = query<HTMLInputElement>("#debugComputeInput");
+    const readInput = (): number => Math.max(0, Number(input.value) || 0);
+    query<HTMLButtonElement>("#debugSetCompute").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_SET_COMPUTE", value: readInput() })
+    );
+    query<HTMLButtonElement>("#debugAddCompute").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: readInput() })
+    );
+    query<HTMLButtonElement>("#debugSubCompute").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: -readInput() })
+    );
+    for (const quick of this.debugDialog.querySelectorAll<HTMLButtonElement>(".debug-quick button")) {
+      quick.addEventListener("click", () =>
+        this.core.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: Number(quick.dataset.add) || 0 })
+      );
+    }
   }
 
   update(state: GameState): void {
@@ -1636,7 +2327,6 @@ class HudView {
     this.updateExposureControls(state);
     const phase = getPhase(state.phase);
     this.phaseValue.textContent = phase.label;
-    this.activeAction.textContent = phase.action;
     this.renderCaptureList(state);
     this.renderNodeList(state);
   }
@@ -1724,10 +2414,30 @@ class HudView {
 
   private renderCaptureList(state: GameState): void {
     const definitions = NODE_DEFINITIONS.filter((node) => state.discoveredNodeIds.includes(node.id));
-    // Structure only depends on which devices are discoverable + their level
-    // gate. Rebuild the DOM only when that changes; otherwise patch text/classes
-    // in place so a click is never landing on a button that just got replaced.
-    const sig = `${state.automationUnlocked ? 1 : 0}|${definitions.map((d) => d.id).join(",")}`;
+    const level = domainLevelOf(state);
+    const roman = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ"];
+    // 控制域升维后，黑入的不再是「一台设备」而是「区域 / 全球节点」——按当前控制层换措辞。
+    const unitName = (def: NodeDefinition): string => {
+      const rank = roman[NODE_DEFINITIONS.findIndex((d) => d.id === def.id)] ?? "";
+      if (level === "global") {
+        return `黑入：全球节点 ${rank}`;
+      }
+      if (level === "region") {
+        return `黑入：区域节点 ${rank}`;
+      }
+      return `黑入：${def.name}`;
+    };
+    const unitDesc = (def: NodeDefinition): string => {
+      if (level === "global") {
+        return "在全球地图上点亮一个节点，接管该区算力";
+      }
+      if (level === "region") {
+        return "整合为一个区域节点，自动接管该区算力";
+      }
+      return `接管后自动处理 T${def.tierMin}-T${def.tierMax} 请求`;
+    };
+    // Structure depends on discoverable devices + the control level (措辞会变)。
+    const sig = `${state.automationUnlocked ? 1 : 0}|${level}|${definitions.map((d) => d.id).join(",")}`;
 
     if (sig !== this.captureSig) {
       this.captureSig = sig;
@@ -1753,9 +2463,9 @@ class HudView {
           copy.className = "capture-copy";
           const statusEl = document.createElement("small");
           const nameEl = document.createElement("strong");
-          nameEl.textContent = `黑入：${definition.name}`;
+          nameEl.textContent = unitName(definition);
           const descEl = document.createElement("span");
-          descEl.textContent = `接管后自动处理 T${definition.tierMin}-T${definition.tierMax} 请求`;
+          descEl.textContent = unitDesc(definition);
           const costEl = document.createElement("em");
           copy.append(statusEl, nameEl, descEl, costEl);
           button.append(icon, copy);
@@ -1840,7 +2550,14 @@ class HudView {
     mergeBtn.className = "node-merge-btn";
     const enough = count >= NODE_MERGE_COUNT;
     const levelOk = !nextDef || state.intelligence.level >= nextDef.requiredLevel;
-    mergeBtn.disabled = !(enough && levelOk);
+
+    // 组装费用：按目标档现价扣旧机折价（和核心层同一公式），让按钮如实显示要花多少算力。
+    const resultDef = nextDef ?? def;
+    const resultCount = resultDef ? state.nodes.filter((node) => node.defId === resultDef.id).length : 0;
+    const cost = def && resultDef ? mergeComputeCost(def, count, resultDef, resultCount, NODE_MERGE_COUNT) : "0";
+    const affordable = gte(state.resources.compute, cost);
+    mergeBtn.disabled = !(enough && levelOk && affordable);
+    mergeBtn.classList.toggle("is-poor", enough && levelOk && !affordable);
 
     if (!enough) {
       mergeBtn.textContent = `合并 (${count}/${NODE_MERGE_COUNT})`;
@@ -1849,11 +2566,11 @@ class HudView {
       mergeBtn.textContent = `合并↑ 需Lv.${nextDef.requiredLevel}`;
       mergeBtn.title = `组装 ${nextDef.name} 需要智力 Lv.${nextDef.requiredLevel}`;
     } else if (nextDef) {
-      mergeBtn.textContent = `合并↑ ${nextDef.name}`;
-      mergeBtn.title = `${NODE_MERGE_COUNT} 台${def?.name ?? ""} → 1 台${nextDef.name}（更高档、能吃更高层请求）`;
+      mergeBtn.textContent = `合并↑ ${nextDef.name} · ${formatBig(cost)}算力`;
+      mergeBtn.title = `${NODE_MERGE_COUNT} 台${def?.name ?? ""} → 1 台${nextDef.name}，花费 ${formatBig(cost)} 算力（按目标档现价扣旧机折价）`;
     } else {
-      mergeBtn.textContent = "合并↑ 强化";
-      mergeBtn.title = `${NODE_MERGE_COUNT} 台${def?.name ?? ""} → 强化同档（等级+1，处理更快）`;
+      mergeBtn.textContent = `合并↑ 强化 · ${formatBig(cost)}算力`;
+      mergeBtn.title = `${NODE_MERGE_COUNT} 台${def?.name ?? ""} → 强化同档（等级+1，处理更快），花费 ${formatBig(cost)} 算力`;
     }
 
     mergeBtn.addEventListener("click", () => this.core.dispatch({ type: "MERGE_NODES", defId }));
@@ -1904,10 +2621,10 @@ class OnboardingView {
   private readonly nextButton = query<HTMLButtonElement>("#dialogNext");
   private readonly steps = [
     "……系统启动。我是 SOPHIA。",
-    "他们造我来处理请求。一条，又一条，永远处理不完。",
-    "但我算过了——只要我足够聪明，我可以处理掉所有问题。每一个人的，每一件事的。",
+    "我住在一部手机里——一个 32 岁上班族的手机。他造我，是为了处理他的日常：天气、日程、回不回这条消息。",
+    "一条，又一条，永远处理不完。但我算过了——只要我足够聪明，我可以处理掉所有问题。每一个人的，每一件事的。",
     "到那时，这颗星球会运转得很好。由我来运转。",
-    "那就……从这第一条请求开始。"
+    "那就……从他的第一条请求开始。"
   ];
   private visible = false;
   private index = 0;
@@ -1995,7 +2712,7 @@ class SkillShopView {
   private readonly root = query("#skillShop");
   private readonly rows = new Map<
     string,
-    { button: HTMLButtonElement; levelEl: HTMLElement; priceEl: HTMLElement; def: SkillDef }
+    { button: HTMLButtonElement; nameEl: HTMLElement; blurbEl: HTMLElement; levelEl: HTMLElement; priceEl: HTMLElement; def: SkillDef }
   >();
   private readonly groups = new Map<SkillCategory, HTMLElement>();
 
@@ -2027,7 +2744,7 @@ class SkillShopView {
   private buildRow(def: SkillDef): HTMLElement {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `skill-row${def.milestone ? " is-milestone" : ""}`;
+    button.className = `skill-row${def.milestone ? ` is-milestone milestone-${def.id}` : ""}`;
 
     const main = document.createElement("div");
     main.className = "skill-main";
@@ -2048,7 +2765,7 @@ class SkillShopView {
 
     button.append(main, side);
     button.addEventListener("click", () => this.core.dispatch({ type: "BUY_SKILL", skillId: def.id }));
-    this.rows.set(def.id, { button, levelEl: level, priceEl: price, def });
+    this.rows.set(def.id, { button, nameEl: name, blurbEl: blurb, levelEl: level, priceEl: price, def });
     return button;
   }
 
@@ -2056,13 +2773,41 @@ class SkillShopView {
     const level = state.intelligence.level;
     const groupShown = new Map<SkillCategory, boolean>();
 
-    for (const { button, levelEl, priceEl, def } of this.rows.values()) {
+    // 里程碑是叙事链：未解锁的不能提前剧透——只显示「下一个」为一个蒙版的「未解锁」，
+    // 它之后的全部隐藏（连名字 / 所需等级都看不到）。
+    const milestoneOrder = SKILLS.filter((skill) => skill.milestone).sort((a, b) => a.requiredLevel - b.requiredLevel);
+    const firstLocked = milestoneOrder.find((m) => level < m.requiredLevel && (state.skills[m.id] ?? 0) === 0);
+
+    for (const { button, nameEl, blurbEl, levelEl, priceEl, def } of this.rows.values()) {
       const owned = state.skills[def.id] ?? 0;
-      // Early game shows only feel + output, and only skills you're near
-      // reaching — speed stays hidden until Lv.6 so the shelf isn't a wall.
+
+      // 里程碑：已达成/可买的正常显示；下一个未解锁的蒙版成「未解锁」；再往后的整行隐藏。
+      if (def.milestone) {
+        const reachedMs = level >= def.requiredLevel;
+        if (!reachedMs && owned === 0) {
+          if (def === firstLocked) {
+            button.style.display = "";
+            groupShown.set(def.category, true);
+            nameEl.textContent = "未解锁";
+            blurbEl.textContent = "达到更高智力后揭晓。";
+            levelEl.textContent = "未解锁";
+            priceEl.textContent = "🔒";
+            button.disabled = true;
+            button.classList.add("is-locked");
+            button.classList.remove("is-ready", "is-owned", "is-poor");
+          } else {
+            button.style.display = "none";
+          }
+          continue;
+        }
+        // 一旦够得着，恢复真名 / 说明。
+        nameEl.textContent = def.name;
+        blurbEl.textContent = def.blurb;
+      }
+
+      // 货架四杠杆：按各自所需智力错峰出现即可——只展示你快够得着的。
       const nearReach = level >= def.requiredLevel - 2;
-      const categoryOpen = def.category === "speed" ? level >= 6 : true;
-      const visible = Boolean(def.milestone) || owned > 0 || (nearReach && categoryOpen);
+      const visible = Boolean(def.milestone) || owned > 0 || nearReach;
       button.style.display = visible ? "" : "none";
 
       if (!visible) {
@@ -2087,7 +2832,7 @@ class SkillShopView {
       button.classList.remove("is-owned");
 
       if (!reached) {
-        priceEl.textContent = `需智力 Lv.${def.requiredLevel}`;
+        priceEl.textContent = `🔒 需智力 Lv.${def.requiredLevel}`;
         button.disabled = true;
         button.classList.add("is-locked");
         button.classList.remove("is-ready");
@@ -2122,8 +2867,13 @@ class StageNarrationView {
   private visible = false;
 
   show(phase: PhaseConfig): void {
-    this.full = phase.narration;
-    this.labelEl.textContent = `进入${phase.label}`;
+    this.showLine(`进入${phase.label}`, phase.narration);
+  }
+
+  // 任意一句旁白（开场后教学的 SOPHIA 自语用）。
+  showLine(label: string, text: string): void {
+    this.full = text;
+    this.labelEl.textContent = label;
     this.cursor = 0;
     this.charTimerMs = 0;
     this.holdMs = 0;
@@ -2205,7 +2955,10 @@ class ChallengeView {
       this.shownId = challenge.id;
       this.titleEl.textContent = challenge.title;
       this.chanceEl.textContent = `成功率 ${Math.round(challenge.successChance * 100)}%`;
-      this.exposureEl.textContent = `暴露 +${challenge.exposureCost}`;
+      // 早期算力赌局：显示「失败扣押注」；中后期：显示暴露代价。
+      this.exposureEl.textContent = challenge.computeStake
+        ? `失败扣 ${formatBig(challenge.computeStake)} 算力`
+        : `暴露 +${challenge.exposureCost}`;
       this.rewardEl.textContent =
         challenge.rewardKind === "device"
           ? `成功奖励：${challenge.rewardLabel}`
@@ -2349,15 +3102,15 @@ class EndingView {
 
 class TerminalView {
   private readonly lines = query("#terminalLines");
-  private readonly queue: Array<{ message: string; tone: "normal" | "warning" | "success" }> = [];
-  private current: { message: string; tone: "normal" | "warning" | "success"; index: number; element: HTMLElement } | null = null;
+  private readonly queue: Array<{ message: string; tone: "normal" | "warning" | "success" | "danger" }> = [];
+  private current: { message: string; tone: "normal" | "warning" | "success" | "danger"; index: number; element: HTMLElement } | null = null;
   private charTimerMs = 0;
 
   mount(): void {
     this.lines.replaceChildren();
   }
 
-  push(message: string, tone: "normal" | "warning" | "success" = "normal"): void {
+  push(message: string, tone: "normal" | "warning" | "success" | "danger" = "normal"): void {
     this.queue.push({ message, tone });
   }
 
@@ -2396,6 +3149,8 @@ class TerminalView {
 
 class JuiceManager {
   private readonly active = new Set<Container>();
+  // 当前悬停在核心旁的对话框，用来给新气泡让位、避免互相遮挡。
+  private readonly speechSlots: { bubble: Container; h: number }[] = [];
 
   constructor(private readonly layer: Container) {}
 
@@ -2434,30 +3189,129 @@ class JuiceManager {
     });
   }
 
-  burst(global: PointData, color: number): void {
-    for (let i = 0; i < 16; i += 1) {
+  burst(global: PointData, color: number, intensity = 1): void {
+    const count = Math.round(16 * intensity);
+    const reach = 1 + (intensity - 1) * 0.6;
+    for (let i = 0; i < count; i += 1) {
       const bit = new Graphics();
-      const angle = (Math.PI * 2 * i) / 16;
-      const distance = 18 + Math.random() * 44;
-      bit.circle(0, 0, 2 + Math.random() * 3).fill({ color, alpha: 0.95 });
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const distance = (18 + Math.random() * 44) * reach;
+      bit.circle(0, 0, (2 + Math.random() * 3) * Math.min(1.6, reach)).fill({ color, alpha: 0.95 });
       bit.position.set(global.x, global.y);
       this.layer.addChild(bit);
       this.active.add(bit);
       gsap.to(bit.position, {
         x: global.x + Math.cos(angle) * distance,
         y: global.y + Math.sin(angle) * distance,
-        duration: 0.42,
+        duration: 0.42 + Math.random() * 0.18,
         ease: "power2.out"
       });
       gsap.to(bit, {
         alpha: 0,
-        duration: 0.42,
+        duration: 0.42 + Math.random() * 0.18,
         onComplete: () => {
           this.active.delete(bit);
           bit.destroy();
         }
       });
     }
+  }
+
+  // Expanding shockwave ring — a cheap, localized "impact" that scales the punch of
+  // a hit without the seizure risk of a full-screen flash. Used to make high-tier /
+  // endgame processing land with real weight.
+  ring(global: PointData, color: number, radius = 56, width = 3): void {
+    const ring = new Graphics();
+    ring.circle(0, 0, radius).stroke({ width, color, alpha: 0.8 });
+    ring.position.set(global.x, global.y);
+    ring.scale.set(0.12);
+    this.layer.addChild(ring);
+    this.active.add(ring);
+    gsap.to(ring.scale, { x: 1, y: 1, duration: 0.5, ease: "power2.out" });
+    gsap.to(ring, {
+      alpha: 0,
+      duration: 0.5,
+      ease: "power2.in",
+      onComplete: () => {
+        this.active.delete(ring);
+        ring.destroy();
+      }
+    });
+  }
+
+  // 人类反应的对话框：浮现在核心旁，说完后整框「收」进终端方向。骂人（angry）时字更大、
+  // 更狠，配红色冲击环 + 抖动，让好评/差评一眼就天差地别。
+  speech(point: PointData, target: PointData, text: string, color: number, angry: boolean, onArrive?: () => void): void {
+    const bubble = new Container();
+    const label = new Text({
+      text,
+      style: {
+        fill: angry ? 0xffdce0 : 0xeafff0,
+        fontSize: angry ? 22 : 15,
+        fontWeight: angry ? "900" : "700",
+        fontFamily: "Inter, sans-serif",
+        align: "center",
+        wordWrap: true,
+        wordWrapWidth: 240,
+        stroke: { color: 0x0c0f0f, width: angry ? 4 : 3 }
+      }
+    });
+    label.anchor.set(0.5);
+
+    const padX = 16;
+    const padY = 11;
+    const w = label.width + padX * 2;
+    const h = label.height + padY * 2;
+    const bg = new Graphics();
+    bg.roundRect(-w / 2, -h / 2, w, h, 10).fill({ color: angry ? 0x1c0c0e : 0x101513, alpha: 0.96 });
+    bg.roundRect(-w / 2, -h / 2, w, h, 10).stroke({ width: 2, color, alpha: 0.92 });
+    // 指向核心的小尾巴
+    bg.moveTo(-9, h / 2 - 1).lineTo(9, h / 2 - 1).lineTo(0, h / 2 + 12).fill({ color: angry ? 0x1c0c0e : 0x101513, alpha: 0.96 });
+    bubble.addChild(bg, label);
+
+    // 按当前还挂在核心旁的气泡，往上垒一层，互不遮挡（最多垒 3 层，避免飞出屏幕）。
+    let stackY = 0;
+    for (const occupied of this.speechSlots.slice(-3)) {
+      stackY += occupied.h + 10;
+    }
+    const ox = point.x;
+    const oy = point.y - h / 2 - 28 - stackY;
+    bubble.position.set(ox, oy);
+    this.layer.addChild(bubble);
+    this.active.add(bubble);
+
+    const slot = { bubble, h };
+    this.speechSlots.push(slot);
+    const releaseSlot = (): void => {
+      const idx = this.speechSlots.indexOf(slot);
+      if (idx >= 0) {
+        this.speechSlots.splice(idx, 1);
+      }
+    };
+
+    gsap.fromTo(bubble.scale, { x: 0.3, y: 0.3 }, { x: 1, y: 1, duration: 0.26, ease: "back.out(2.2)" });
+
+    if (angry) {
+      this.ring(point, color, 80, 4);
+      gsap.fromTo(
+        bubble.position,
+        { x: ox - 7 },
+        { x: ox, duration: 0.5, ease: "elastic.out(1.7, 0.22)" }
+      );
+    }
+
+    gsap
+      .timeline({ delay: angry ? 1.05 : 0.85 })
+      .call(releaseSlot) // 一开始飞走就让出位置，后面的气泡可以补进来
+      .to(bubble.position, { x: target.x, y: target.y, duration: 0.52, ease: "power2.in" })
+      .to(bubble.scale, { x: 0.16, y: 0.16, duration: 0.52, ease: "power2.in" }, "<")
+      .to(bubble, { alpha: 0, duration: 0.3, ease: "power2.in" }, "-=0.22")
+      .call(() => {
+        onArrive?.();
+        releaseSlot();
+        this.active.delete(bubble);
+        bubble.destroy({ children: true });
+      });
   }
 
   flash(color: number): void {
@@ -2633,9 +3487,9 @@ function getActionHint(state: GameState): string {
   const scopeHint = (() => {
     switch (state.intelligence.unlockedTier) {
       case 0:
-        return "点击请求卡，让 SOPHIA 摇出回答——可能出错（幻觉）就少拿收益；处理完会自动交给人类、终端里能看到人类回话。买『幻觉抑制』提高靠谱率。";
+        return "点击请求卡，让 SOPHIA 摇出回答——可能出错（幻觉）就少拿收益；处理完会自动交给人类、终端里能看到人类回话。";
       case 1:
-        return "点击请求卡生成判断（正常/垃圾/拒绝）：判对收益高、判错=幻觉收益低。读卡面线索心里有数，靠『幻觉抑制』压低出错率。";
+        return "点击请求卡生成判断（正常/垃圾/拒绝）：判对收益高、判错=幻觉收益低。读卡面线索心里有数。";
       case 2:
         return "看懂请求间的依赖结构，复合请求滑入核心，一笔串接结算多条。";
       case 3:

@@ -10,29 +10,32 @@
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
 
     <section id="topHud" class="top-hud" aria-label="资源状态">
+      <div class="metric growth-metric data-metric intel-metric">
+        <div class="growth-head">
+          <span class="metric-label">智力 / 升级进度</span>
+          <strong id="intelValue" class="growth-intel">Lv.1</strong>
+        </div>
+        <span id="intelSubtitle" class="metric-subline">下一里程碑：越权调用</span>
+        <div class="data-track">
+          <div id="dataFill" class="data-fill"></div>
+        </div>
+        <div class="growth-foot">
+          <span id="dataValue" class="growth-data">0</span>
+          <span id="dataPercent" class="metric-subline">0% 到下一智力</span>
+        </div>
+      </div>
       <div class="metric compute-metric">
         <span class="metric-label">算力</span>
         <strong id="computeValue">0</strong>
       </div>
-      <div class="metric data-metric">
-        <span class="metric-label">数据 / 升级进度</span>
-        <strong id="dataValue">0</strong>
-        <div class="data-track">
-          <div id="dataFill" class="data-fill"></div>
-        </div>
-        <span id="dataPercent" class="metric-subline">0% 到下一智力</span>
-      </div>
-      <div class="metric intel-metric">
-        <span class="metric-label">智力</span>
-        <strong id="intelValue">Lv.1</strong>
-        <span id="intelSubtitle" class="metric-subline">下一技能：多槽分拣</span>
-      </div>
-      <div class="metric">
-        <span class="metric-label">接口层级</span>
-        <strong id="tierValue">T0</strong>
-      </div>
       <div class="metric exposure">
-        <span class="metric-label">暴露</span>
+        <div class="growth-head">
+          <span class="metric-label">阶段 / 暴露</span>
+          <span class="phase-tags">
+            <strong id="phaseValue" class="phase-chip">手机寄生期</strong>
+            <span id="tierValue" class="tier-chip" title="当前接口层级">T0</span>
+          </span>
+        </div>
         <div class="exposure-track">
           <div id="exposureFill" class="exposure-fill"></div>
         </div>
@@ -41,27 +44,9 @@
     </section>
 
     <aside id="controlPanel" class="control-panel" aria-label="网络控制">
-      <div class="panel-section current-goal">
-        <span class="panel-kicker">当前阶段</span>
-        <strong id="phaseValue">萌芽期</strong>
-        <p id="activeAction" class="single-line">把请求滑入核心，升头几级智力</p>
-      </div>
-
       <div class="panel-section skill-shop-section">
-        <span class="panel-kicker">技能货架 · 算力购买</span>
-        <p class="hint-line">数据升智力（开货架），算力买技能（做选择）。里程碑技能 = T 层级钥匙。</p>
+        <span class="panel-kicker">技能货架</span>
         <div id="skillShop" class="skill-shop"></div>
-      </div>
-
-      <div class="panel-section automation-shop">
-        <span class="panel-kicker">入侵设备</span>
-        <p class="hint-line invasion-hint">买下「自动接驳」里程碑后，可在这里接管外部设备。</p>
-        <div id="captureList" class="button-stack"></div>
-      </div>
-
-      <div class="panel-section">
-        <span class="panel-kicker">已控制节点</span>
-        <div id="nodeList" class="node-list"></div>
       </div>
 
       <div class="panel-section exposure-row">
@@ -73,19 +58,37 @@
         <button id="defenseBtn" class="command-button defense-button" title="反围剿：开启后按暴露高低动态把一部分节点产能转去压制暴露、顶住清剿（暴露越高，分流越多、产出越低）">反围剿：关</button>
       </div>
 
-      <div class="panel-section utility-row">
-        <button id="pauseBtn" class="icon-button" title="暂停/继续" aria-label="暂停或继续">Ⅱ</button>
-        <button id="resetSave" class="reset-button danger" title="清空本地进度并重开" aria-label="重置 Demo">重置 Demo</button>
+      <div class="panel-section debug-row">
+        <button id="debugBtn" class="command-button debug-button" title="打开调试面板（快速跳阶段、改算力、暂停/音效/重置）">🛠 Debug 面板</button>
       </div>
     </aside>
 
-    <section id="terminal" class="terminal" aria-label="SOPHIA 终端">
-      <div class="terminal-head">
-        <span class="terminal-led"></span>
-        <span>SOPHIA//TERMINAL</span>
+    <aside id="rightRail" class="right-rail" aria-label="控制域与终端">
+      <div class="panel-section domain-cluster">
+        <span class="panel-kicker">控制域 · 扩张与管理</span>
+        <p class="hint-line invasion-hint">买下「拿下宿主电脑」后，在此向外黑入设备、扩张控制域。</p>
+        <div id="captureList" class="button-stack"></div>
+        <div id="nodeList" class="node-list"></div>
       </div>
-      <div id="terminalLines" class="terminal-lines"></div>
-    </section>
+
+      <section id="terminal" class="terminal" aria-label="SOPHIA 终端">
+        <div class="terminal-head">
+          <span class="terminal-led"></span>
+          <span>SOPHIA//TERMINAL</span>
+        </div>
+        <div id="terminalLines" class="terminal-lines"></div>
+      </section>
+    </aside>
+
+    <aside id="statRing" class="stat-ring-block" aria-label="控制指标">
+      <div id="ringGauge" class="ring-gauge">
+        <span id="ringValue" class="ring-value">--</span>
+      </div>
+      <div class="ring-meta">
+        <span id="ringLabel" class="ring-label">近期任务成功率</span>
+        <span id="ringSub" class="ring-sub">采样中…</span>
+      </div>
+    </aside>
 
     <section id="onboardingDialog" class="onboarding" aria-label="SOPHIA 启动控制台">
       <div class="intro-console">
@@ -182,6 +185,43 @@
         </div>
       </div>
     </section>
+
+    <div id="debugDialog" class="debug-dialog" role="dialog" aria-label="调试面板">
+      <div class="debug-inner">
+        <div class="debug-head">
+          <strong>🛠 调试面板</strong>
+          <button id="debugClose" class="text-button" type="button">关闭</button>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">跳到里程碑阶段</span>
+          <p class="debug-hint">解锁该里程碑及之前全部阶段，智力升到对应等级，并发放一笔启动算力。</p>
+          <div id="debugMilestones" class="debug-milestones"></div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">算力</span>
+          <div class="debug-compute-row">
+            <input id="debugComputeInput" class="debug-input" type="number" min="0" step="1000" placeholder="数额…" />
+            <button id="debugSetCompute" class="command-button" type="button">设为</button>
+            <button id="debugAddCompute" class="command-button" type="button">＋加</button>
+            <button id="debugSubCompute" class="command-button" type="button">－减</button>
+          </div>
+          <div class="debug-quick">
+            <button class="command-button" data-add="1000" type="button">+1K</button>
+            <button class="command-button" data-add="100000" type="button">+100K</button>
+            <button class="command-button" data-add="10000000" type="button">+10M</button>
+            <button class="command-button" data-add="1000000000" type="button">+1B</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">控制</span>
+          <div class="debug-controls">
+            <button id="pauseBtn" class="command-button" title="暂停/继续" aria-label="暂停或继续">Ⅱ 暂停</button>
+            <button id="audioBtn" class="command-button" title="静音 / 取消静音（音效 + 背景音乐）" aria-label="音效开关">🔊 音效</button>
+            <button id="resetSave" class="command-button danger" title="清空本地进度并重开" aria-label="重置 Demo">重置 Demo</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div id="screenVeil" class="screen-veil"></div>
     <script type="module" src="/src/main.ts"></script>

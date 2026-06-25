@@ -100,6 +100,7 @@ export interface ChallengeOffer {
   rewardLabel: string; // 便于展示的奖励描述
   rewardCompute?: BigString; // rewardKind=compute 时的算力数额
   rewardDefId?: string; // rewardKind=device 时直接获得的设备
+  computeStake?: BigString; // 早期算力赌局：失败时扣掉的押注（暴露未激活时才有）
   expiresAtMs: number; // 过期自动放弃
 }
 
@@ -178,7 +179,11 @@ export type GameCommand =
   | { type: "TOGGLE_DEFENSE" }
   | { type: "ACCEPT_CHALLENGE" }
   | { type: "REJECT_CHALLENGE" }
-  | { type: "REBIRTH" };
+  | { type: "REBIRTH" }
+  // 调试用：直接设置/增减算力、跳到某个里程碑阶段。仅 Debug 面板派发。
+  | { type: "DEBUG_SET_COMPUTE"; value: number }
+  | { type: "DEBUG_ADD_COMPUTE"; delta: number }
+  | { type: "DEBUG_JUMP_MILESTONE"; skillId: string };
 
 export function cloneGameState(state: GameState): GameState {
   return JSON.parse(JSON.stringify(state)) as GameState;

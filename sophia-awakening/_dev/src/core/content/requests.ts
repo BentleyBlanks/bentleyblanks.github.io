@@ -54,8 +54,8 @@ export const SORT_SLOTS: { answer: SortAnswer; label: string; hint: string; colo
 ];
 
 export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
-  0: { tier: 0, name: "T0 单口", spawnIntervalMs: 1150, maxVisible: 6, computeValue: "6", dataValue: "4", exposure: 0 },
-  1: { tier: 1, name: "T1 分拣口", spawnIntervalMs: 1000, maxVisible: 7, computeValue: "15", dataValue: "8", exposure: 0.4 },
+  0: { tier: 0, name: "T0 单口", spawnIntervalMs: 1850, maxVisible: 4, computeValue: "6", dataValue: "4", exposure: 0 },
+  1: { tier: 1, name: "T1 分拣口", spawnIntervalMs: 1550, maxVisible: 5, computeValue: "15", dataValue: "8", exposure: 0.4 },
   2: { tier: 2, name: "T2 串接", spawnIntervalMs: 920, maxVisible: 7, computeValue: "42", dataValue: "18", exposure: 0.8 },
   3: { tier: 3, name: "T3 蓄力", spawnIntervalMs: 1400, maxVisible: 5, computeValue: "135", dataValue: "52", exposure: 4.8 },
   4: { tier: 4, name: "T4 派发", spawnIntervalMs: 800, maxVisible: 8, computeValue: "400", dataValue: "130", exposure: 2.6 }

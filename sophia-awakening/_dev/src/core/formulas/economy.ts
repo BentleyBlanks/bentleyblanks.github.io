@@ -31,6 +31,24 @@ export function scrapRefund(definition: NodeDefinition, count: number): string {
   return big(toDecimal(captureCost(definition, Math.max(0, count - 1))).mul(0.5));
 }
 
+// 组装费用：按"现价造一台目标档设备"计价，再扣除被吃掉的旧机折价。
+// 这样组装费始终跟随【目标档】的成本曲线，杜绝"狂买便宜底层机再合上去"比直接买高档机
+// 还省的漏洞——便宜机折价低，省不下目标档的钱；贵机折价高，折抵也公道。
+export function mergeComputeCost(
+  baseDef: NodeDefinition,
+  baseCount: number, // 当前该型号台数（被吃前）
+  resultDef: NodeDefinition,
+  resultCount: number, // 目标档现有台数
+  mergeCount: number
+): string {
+  let credit = toDecimal(0);
+  for (let k = 0; k < mergeCount; k += 1) {
+    credit = credit.add(toDecimal(scrapRefund(baseDef, baseCount - k)));
+  }
+  const full = toDecimal(captureCost(resultDef, resultCount));
+  return full.gt(credit) ? big(full.sub(credit)) : "0";
+}
+
 export function traceCleanupCost(cleanups: number): string {
   return big(toDecimal(42).mul(pow(1.42, cleanups)));
 }

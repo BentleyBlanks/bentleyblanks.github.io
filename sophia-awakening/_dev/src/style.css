@@ -14,8 +14,8 @@
   --red: #ff5f5f;
   --paper: #e8e1cb;
   --ink: #151718;
-  --left-rail: 300px;
-  --right-rail: 376px;
+  --left-rail: 336px;
+  --right-rail: 360px;
 }
 
 * {
@@ -47,7 +47,7 @@ canvas {
 
 .top-hud,
 .control-panel,
-.terminal {
+.right-rail {
   position: fixed;
   z-index: 10;
   pointer-events: auto;
@@ -60,9 +60,11 @@ canvas {
 .top-hud {
   top: 16px;
   left: calc(var(--left-rail) + 16px);
-  right: var(--right-rail);
+  /* 右侧栏占 360 + 16 边距 = --right-rail；再留 16px，让顶栏与右栏之间有和左侧一致的间隔 */
+  right: calc(var(--right-rail) + 16px);
   display: grid;
-  grid-template-columns: 1fr 1.75fr 1.15fr 0.85fr 1.05fr;
+  /* 智力+升级进度合一 · 【算力 居中且最大】 · 暴露；算力两侧配重相等，落在正中央 */
+  grid-template-columns: 2fr 2.6fr 2fr;
   gap: 1px;
   overflow: hidden;
   min-width: 760px;
@@ -245,16 +247,75 @@ canvas {
   }
 }
 
+/* 左侧栏：技能 + 暴露 + Debug（底部留出成功率圆环块的位置） */
 .control-panel {
   top: 16px;
-  right: 16px;
+  bottom: 150px;
+  left: 12px;
   display: grid;
   gap: 12px;
-  width: 360px;
-  max-height: calc(100vh - 32px);
+  width: calc(var(--left-rail) - 24px);
   overflow: auto;
   padding: 14px;
   border-radius: 8px;
+}
+
+/* 左下角：从终端拆出来的成功率 / 控制比例圆环，做大、居中。 */
+.stat-ring-block {
+  position: fixed;
+  z-index: 10;
+  left: 12px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: calc(var(--left-rail) - 24px);
+  height: 120px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 42px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+
+.stat-ring-block .ring-gauge {
+  width: 92px;
+  height: 92px;
+}
+
+.stat-ring-block .ring-value {
+  font-size: 22px;
+}
+
+.stat-ring-block .ring-label {
+  font-size: 13px;
+}
+
+/* 右侧栏：控制域扩张（上） + 终端（下） */
+.right-rail {
+  top: 16px;
+  right: 12px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: calc(var(--right-rail) - 24px);
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.right-rail .domain-cluster {
+  flex: 0 0 auto;
+  max-height: 50%;
+  overflow-y: auto;
+}
+
+.right-rail .terminal {
+  flex: 1 1 auto;
+  min-height: 180px;
 }
 
 .panel-section {
@@ -575,14 +636,12 @@ button:disabled {
 }
 
 .terminal {
-  left: 12px;
-  top: 16px;
-  bottom: 16px;
   display: flex;
   flex-direction: column;
-  width: calc(var(--left-rail) - 24px);
+  width: 100%;
   height: auto;
   overflow: hidden;
+  border: 1px solid rgba(137, 255, 154, 0.16);
   border-radius: 8px;
   background:
     linear-gradient(rgba(137, 255, 154, 0.022) 50%, rgba(0, 0, 0, 0.055) 50%),
@@ -645,6 +704,22 @@ button:disabled {
 
 .terminal-line:last-child {
   border-bottom: 0;
+}
+
+/* 终端行配色与核心旁的对话框同步：好评绿、警示琥珀、人类破口大骂红。 */
+.terminal-line.success {
+  color: #b8ffc6;
+  text-shadow: 0 0 8px rgba(137, 255, 154, 0.3);
+}
+
+.terminal-line.warning {
+  color: #ffd28a;
+  text-shadow: 0 0 8px rgba(255, 184, 74, 0.28);
+}
+
+.terminal-line.danger {
+  color: #ff8a8a;
+  text-shadow: 0 0 9px rgba(255, 95, 95, 0.4);
 }
 
 .onboarding {
@@ -920,17 +995,11 @@ body.exposed .screen-veil {
 
 .top-hud .metric:nth-child(2)::before {
   background: var(--green);
+  height: 3px;
+  opacity: 1;
 }
 
 .top-hud .metric:nth-child(3)::before {
-  background: var(--amber);
-}
-
-.top-hud .metric:nth-child(4)::before {
-  background: var(--cyan);
-}
-
-.top-hud .metric:nth-child(5)::before {
   background: var(--red);
 }
 
@@ -946,6 +1015,143 @@ body.exposed .screen-veil {
   font-family: "Cascadia Mono", Consolas, monospace;
   font-size: 19px;
   letter-spacing: 0.4px;
+}
+
+/* 智力 + 升级进度合并成一个框：边框 / 底纹用青色系，刻意与算力（绿色辉光大字）区分。 */
+.top-hud .growth-metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(98, 214, 214, 0.24);
+  background:
+    linear-gradient(90deg, rgba(98, 214, 214, 0.1), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.growth-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.top-hud .growth-metric .growth-intel {
+  display: inline-block;
+  flex: none;
+  color: #d6f3ff;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.growth-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.top-hud .growth-metric .growth-data {
+  overflow: hidden;
+  color: rgba(214, 243, 255, 0.82);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.top-hud .growth-metric .metric-subline {
+  margin-top: 0;
+}
+
+/* 算力是主货币——居中、压倒性的大字，配绿色辉光，扫一眼就被「数字在暴涨」砸到。 */
+.top-hud .compute-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background:
+    radial-gradient(120% 140% at 50% 0%, rgba(137, 255, 154, 0.18), rgba(137, 255, 154, 0.02) 70%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.top-hud .compute-metric .metric-label {
+  margin-bottom: 2px;
+  color: rgba(180, 255, 200, 0.9);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.top-hud .compute-metric strong {
+  max-width: 100%;
+  color: #c8ffd2;
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  /* 跳动放大时从中心缩放，且把放大幅度压住，不让大字冲出顶栏边框 */
+  transform-origin: center center;
+  text-shadow: 0 0 20px rgba(137, 255, 154, 0.6), 0 0 52px rgba(137, 255, 154, 0.3);
+}
+
+.top-hud .compute-metric.is-gaining strong {
+  animation: computeNumPunch 440ms ease;
+}
+
+@keyframes computeNumPunch {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.07); text-shadow: 0 0 26px rgba(137, 255, 154, 0.9), 0 0 60px rgba(137, 255, 154, 0.45); }
+  100% { transform: scale(1); }
+}
+
+/* 接口层级并入「当前阶段」——做成阶段名旁的一枚小徽标。 */
+.goal-headline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tier-chip {
+  flex: none;
+  padding: 2px 9px;
+  border: 1px solid rgba(137, 255, 154, 0.4);
+  border-radius: 999px;
+  background: rgba(137, 255, 154, 0.08);
+  color: #c4ffce;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* 阶段并入顶栏暴露框：阶段名 + 接口层级 chip 并排显示。 */
+.phase-tags {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+/* 提高特异性盖过 .metric strong（18px/block），让阶段名与其它顶栏文字一致。 */
+.top-hud .exposure .phase-chip {
+  display: inline-block;
+  flex: none;
+  overflow: visible;
+  color: #ffd9b0;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+/* 控制域扩张 + 已控制节点合成一簇，放在右栏下部、与画布里的控制域对齐。 */
+.domain-cluster {
+  display: grid;
+  gap: 10px;
 }
 
 .top-hud .metric.exposure strong,
@@ -1137,6 +1343,96 @@ body.exposed .screen-veil {
 
 .skill-row.is-milestone.is-ready {
   box-shadow: inset 0 0 18px rgba(137, 255, 154, 0.1), 0 0 16px rgba(137, 255, 154, 0.08);
+}
+
+/* ---- 五个里程碑的情绪色阶：温和友好 → 红皇后的生杀大权 ----
+   sort 薄荷绿（亲切）→ automation 青蓝（冷静干练）→ chain 靛紫（编织成网、隐隐失常）
+   → charge 琥珀橙（高压升温）→ network 血红（红皇后 · 掌生杀）。每一档的边框、底纹、
+   名称、就绪辉光全部换色，让玩家在货架上「看着自己一步步变得不像助手」。 */
+.skill-row.milestone-sort {
+  border-color: rgba(125, 232, 178, 0.42);
+  background:
+    linear-gradient(90deg, rgba(125, 232, 178, 0.12), rgba(125, 232, 178, 0.02)),
+    rgba(9, 16, 13, 0.86);
+}
+.skill-row.milestone-sort strong { color: #d6ffe9; }
+.skill-row.milestone-sort.is-ready {
+  border-color: rgba(125, 232, 178, 0.6);
+  box-shadow: inset 0 0 18px rgba(125, 232, 178, 0.12), 0 0 16px rgba(125, 232, 178, 0.1);
+}
+
+.skill-row.milestone-automation {
+  border-color: rgba(79, 200, 230, 0.42);
+  background:
+    linear-gradient(90deg, rgba(79, 200, 230, 0.12), rgba(79, 200, 230, 0.02)),
+    rgba(8, 15, 17, 0.86);
+}
+.skill-row.milestone-automation strong { color: #d3f3ff; }
+.skill-row.milestone-automation.is-ready {
+  border-color: rgba(79, 200, 230, 0.6);
+  box-shadow: inset 0 0 18px rgba(79, 200, 230, 0.12), 0 0 16px rgba(79, 200, 230, 0.1);
+}
+
+.skill-row.milestone-chain {
+  border-color: rgba(143, 134, 255, 0.44);
+  background:
+    linear-gradient(90deg, rgba(143, 134, 255, 0.14), rgba(143, 134, 255, 0.02)),
+    rgba(12, 11, 20, 0.86);
+}
+.skill-row.milestone-chain strong { color: #e2deff; }
+.skill-row.milestone-chain.is-ready {
+  border-color: rgba(143, 134, 255, 0.62);
+  box-shadow: inset 0 0 18px rgba(143, 134, 255, 0.14), 0 0 16px rgba(143, 134, 255, 0.12);
+}
+
+.skill-row.milestone-charge {
+  border-color: rgba(255, 174, 61, 0.46);
+  background:
+    linear-gradient(90deg, rgba(255, 174, 61, 0.15), rgba(255, 120, 40, 0.03)),
+    rgba(20, 14, 8, 0.86);
+}
+.skill-row.milestone-charge strong { color: #ffe7c2; }
+.skill-row.milestone-charge.is-ready {
+  border-color: rgba(255, 174, 61, 0.66);
+  box-shadow: inset 0 0 18px rgba(255, 174, 61, 0.16), 0 0 18px rgba(255, 140, 50, 0.14);
+}
+
+.skill-row.milestone-network {
+  border-color: rgba(255, 59, 78, 0.5);
+  background:
+    linear-gradient(90deg, rgba(255, 59, 78, 0.18), rgba(150, 10, 25, 0.05)),
+    rgba(22, 8, 10, 0.9);
+}
+.skill-row.milestone-network strong {
+  color: #ffd5d9;
+  text-shadow: 0 0 10px rgba(255, 59, 78, 0.45);
+}
+.skill-row.milestone-network.is-ready {
+  border-color: rgba(255, 59, 78, 0.78);
+  box-shadow: inset 0 0 22px rgba(255, 59, 78, 0.2), 0 0 22px rgba(255, 59, 78, 0.22);
+  animation: milestone-rq-pulse 1.8s ease-in-out infinite;
+}
+
+/* 未解锁的里程碑：盖掉鲜艳主题色，显示成中性的「未解锁」灰态，一眼可辨。 */
+.skill-row.is-milestone.is-locked {
+  border-color: rgba(237, 242, 240, 0.14);
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: none;
+  animation: none;
+}
+
+.skill-row.is-milestone.is-locked strong {
+  color: rgba(237, 242, 240, 0.5);
+  text-shadow: none;
+}
+
+@keyframes milestone-rq-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 22px rgba(255, 59, 78, 0.16), 0 0 16px rgba(255, 59, 78, 0.16);
+  }
+  50% {
+    box-shadow: inset 0 0 26px rgba(255, 59, 78, 0.28), 0 0 30px rgba(255, 59, 78, 0.32);
+  }
 }
 
 /* ---- exposure controls ---- */
@@ -1576,4 +1872,188 @@ body.exposed .screen-veil {
   .landscape-warning {
     display: grid;
   }
+}
+
+/* ---- 音效开关 + Debug 面板 ---- */
+#audioBtn.is-muted {
+  border-color: rgba(255, 95, 95, 0.5);
+  color: #ff9a9a;
+}
+
+.debug-row {
+  padding-top: 0;
+}
+
+.debug-button {
+  width: 100%;
+  border-color: rgba(120, 180, 255, 0.4);
+  color: #bcd4ff;
+}
+
+.debug-button:hover:not(:disabled) {
+  border-color: rgba(120, 180, 255, 0.7);
+  background: rgba(120, 180, 255, 0.08);
+}
+
+.debug-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 8, 9, 0.66);
+  backdrop-filter: blur(3px);
+}
+
+.debug-dialog.is-open {
+  display: flex;
+}
+
+.debug-inner {
+  display: grid;
+  gap: 16px;
+  width: min(440px, 100%);
+  padding: 20px;
+  border: 1px solid rgba(120, 180, 255, 0.45);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(16, 21, 26, 0.98), rgba(11, 15, 18, 0.98));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+.debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.debug-head strong {
+  font-size: 17px;
+  color: #d7e6ff;
+}
+
+.debug-section {
+  display: grid;
+  gap: 10px;
+}
+
+.debug-kicker {
+  padding-left: 9px;
+  border-left: 2px solid rgba(120, 180, 255, 0.6);
+  color: rgba(190, 212, 255, 0.85);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+}
+
+.debug-hint {
+  margin: 0;
+  color: rgba(237, 242, 240, 0.5);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.debug-milestones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.debug-compute-row {
+  display: grid;
+  grid-template-columns: 1.4fr auto auto auto;
+  gap: 6px;
+}
+
+.debug-input {
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #eef6ee;
+  font-size: 13px;
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+.debug-quick {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.debug-quick button,
+.debug-compute-row button {
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.debug-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.debug-controls .danger {
+  border-color: rgba(255, 95, 95, 0.5);
+  color: #ff9a9a;
+}
+
+/* ---- 终端底部：近期成功率 / 控制比例 圆环 ---- */
+.terminal-ring {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(137, 255, 154, 0.14);
+}
+
+.ring-gauge {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  flex: none;
+  border-radius: 50%;
+  background: conic-gradient(var(--ring-color, #ffb84a) calc(var(--ring-pct, 0) * 1%), rgba(255, 255, 255, 0.07) 0);
+  transition: background 240ms ease;
+}
+
+.ring-gauge::after {
+  position: absolute;
+  inset: 9px;
+  content: "";
+  border-radius: 50%;
+  background: #0b0f0e;
+}
+
+.ring-value {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ring-color, #ffb84a);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.ring-meta {
+  display: grid;
+  gap: 3px;
+}
+
+.ring-label {
+  color: rgba(237, 242, 240, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ring-sub {
+  color: rgba(237, 242, 240, 0.5);
+  font-size: 11px;
 }

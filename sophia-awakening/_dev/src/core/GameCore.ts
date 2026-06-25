@@ -16,6 +16,7 @@ import {
 import { EventBus } from "./events/EventBus";
 import {
   captureCost,
+  mergeComputeCost,
   nodeCardsPerSecond,
   nodeProductionPerSecond,
   requestComputeGain,
@@ -23,7 +24,7 @@ import {
   scrapRefund,
   traceCleanupCost
 } from "./formulas/economy";
-import { add, gte, sub, toDecimal } from "./math/BigNumber";
+import { add, big, gte, max, sub, toDecimal } from "./math/BigNumber";
 import type { GameEvent } from "./events/GameEvents";
 import type { BotNode, GameCommand, GameState, NodeDefinition, Tier } from "./state/GameState";
 import { cloneGameState } from "./state/GameState";
@@ -52,7 +53,7 @@ export class SophiaCore {
   private humanVoiceMs = 0;
   private humanVoiceNextMs = 6000;
   private challengeMs = 0;
-  private challengeNextMs = 30_000;
+  private challengeNextMs = 18_000;
 
   constructor(initialState?: GameState) {
     this.state = initialState ? cloneGameState(initialState) : createInitialState();
@@ -155,7 +156,71 @@ export class SophiaCore {
       case "REBIRTH":
         this.rebirth();
         break;
+      case "DEBUG_SET_COMPUTE":
+        this.debugSetCompute(command.value);
+        break;
+      case "DEBUG_ADD_COMPUTE":
+        this.debugAddCompute(command.delta);
+        break;
+      case "DEBUG_JUMP_MILESTONE":
+        this.debugJumpMilestone(command.skillId);
+        break;
     }
+  }
+
+  // ---- 调试指令（仅供 Debug 面板）----
+  private debugSetCompute(value: number): void {
+    const next = big(Math.max(0, value));
+    this.state.resources.compute = next;
+    this.state.resources.totalCompute = max(this.state.resources.totalCompute, next);
+    this.emitTerminal(`[DEBUG] 算力已设为 ${toDecimal(next).toPrecision(4)}。`, "warning");
+  }
+
+  private debugAddCompute(delta: number): void {
+    this.state.resources.compute = max(0, add(this.state.resources.compute, delta));
+    if (delta > 0) {
+      this.state.resources.totalCompute = add(this.state.resources.totalCompute, delta);
+    }
+    this.emitTerminal(`[DEBUG] 算力 ${delta >= 0 ? "+" : ""}${delta}。`, "warning");
+  }
+
+  // 跳到某个里程碑：把该里程碑及之前所有里程碑一并解锁、智力升到其所需等级，
+  // 给一笔与该阶段相称的算力本钱，余下（节点发现、暴露激活、阶段名）交给 recompute / 下一 tick 收敛。
+  private debugJumpMilestone(skillId: string): void {
+    const target = getSkill(skillId);
+
+    if (!target?.milestone) {
+      return;
+    }
+
+    const grant = SKILLS.filter((skill) => skill.milestone && skill.requiredLevel <= target.requiredLevel);
+
+    this.state.intelligence.level = Math.max(this.state.intelligence.level, target.requiredLevel);
+
+    for (const milestone of grant) {
+      this.state.skills[milestone.id] = 1;
+      const tier = milestoneTierFor(milestone.milestone as NonNullable<typeof milestone.milestone>);
+
+      if (tier !== null) {
+        this.state.intelligence.unlockedTier = Math.max(this.state.intelligence.unlockedTier, tier) as Tier;
+      } else {
+        this.state.automationUnlocked = true;
+      }
+    }
+
+    if (this.state.intelligence.level >= 6) {
+      this.state.automationUnlocked = true;
+    }
+
+    // 本阶段启动金：随阶段水涨船高，够买几台节点 / 几级技能即可。
+    const stipend = Math.max(500, target.basePrice * 6);
+    this.state.resources.compute = big(stipend);
+    this.state.resources.totalCompute = max(this.state.resources.totalCompute, stipend);
+    this.state.intelligence.xp = "0";
+
+    this.recomputeDerivedState();
+    this.emit({ type: "SCOPE_UPGRADED", tier: this.state.intelligence.unlockedTier });
+    this.emitTerminal(`[DEBUG] 已跳至「${target.name}」阶段：智力 Lv.${this.state.intelligence.level}、T${this.state.intelligence.unlockedTier}。`, "warning");
   }
 
   private tickRequests(dtMs: number): void {
@@ -181,13 +246,22 @@ export class SophiaCore {
         capacity += nodeCardsPerSecond(node, this.state.derived.nodeSpeedMult);
       }
       capacity = Math.max(1, capacity);
-      // 请求提速技能（spawnSpeedMult<1 更快）继续叠加；总出卡率封顶 48 张/秒。
-      const perSecond = Math.min(48, (capacity * 1.12 + 1.5) / this.state.derived.spawnSpeedMult);
-      interval = Math.max(20, 1000 / perSecond);
-      maxVisible = Math.min(38, Math.ceil(capacity * 0.8) + 8);
+      // 请求提速技能（spawnSpeedMult<1 更快）继续叠加；总出卡率封顶 150 张/秒。
+      // 中后期网络越大，同屏卡流越像洪峰——把出卡率和可见上限都大幅拉宽，让终局是「满屏
+      // 上百张卡片轰然涌入、成片飞向节点」，而不是一张一张挤牙膏。封顶是表现层性能护栏。
+      // 卡片只落在核心两侧的窄带里（中央留给核心 + 环绕节点），所以同屏数量收着点，
+      // 否则会糊成一片、连环绕的设备都看不见。够成一股可见卡流即可。
+      const perSecond = Math.min(60, (capacity * 1.4 + 4) / this.state.derived.spawnSpeedMult);
+      interval = Math.max(16, 1000 / perSecond);
+      maxVisible = Math.min(40, Math.ceil(capacity * 0.9) + 10);
     } else {
       interval = Math.max(340, config.spawnIntervalMs * this.state.derived.spawnSpeedMult);
       maxVisible = config.maxVisible;
+    }
+
+    // 还没处理过第一条（开场教学）：只放一张卡，操作完它之前不再生成别的，免得遮住引导卡。
+    if (this.state.statistics.totalProcessed === 0) {
+      maxVisible = 1;
     }
 
     this.state.spawnTimerMs -= dtMs;
@@ -560,6 +634,18 @@ export class SophiaCore {
       return;
     }
 
+    // 组装要花算力——按目标档现价扣旧机折价，杜绝"刷便宜底层机合上去"的省钱漏洞。
+    const resultDef = nextDef ?? definition;
+    const resultCount = this.state.nodes.filter((node) => node.defId === resultDef.id).length;
+    const cost = mergeComputeCost(definition, sameType.length, resultDef, resultCount, MERGE_COUNT);
+
+    if (!gte(this.state.resources.compute, cost)) {
+      this.emitTerminal(`组装 ${resultDef.name} 需要 ${toDecimal(cost).toPrecision(4)} 算力。`, "warning");
+      return;
+    }
+
+    this.state.resources.compute = sub(this.state.resources.compute, cost);
+
     // 优先拆离线 / 低级的旧机，保留最好的那批不被吃掉。
     const sacrifice = [...sameType]
       .sort((a, b) => Number(a.online) - Number(b.online) || a.level - b.level)
@@ -713,8 +799,9 @@ export class SophiaCore {
       return;
     }
 
-    // 资格：暴露已激活（T3+，被人类盯上的阶段）、且不在清剿中。
-    if (!this.state.exposureActive || this.state.purge.active) {
+    // 资格：越权调用（T1）之后就开始出现机会、且不在清剿中。早期是「算力赌局」（输了扣算力），
+    // 暴露激活后才变成「暴露代价」的安全网突破。
+    if (this.state.intelligence.unlockedTier < 1 || this.state.purge.active) {
       this.challengeMs = 0;
       return;
     }
@@ -731,10 +818,36 @@ export class SophiaCore {
   private offerChallenge(): void {
     const title = CHALLENGE_TARGETS[Math.floor(this.random() * CHALLENGE_TARGETS.length)];
     const successChance = 0.35 + this.random() * 0.35; // 35%-70%
-    const exposureCost = 22 + Math.floor(this.random() * 16); // +22~+37
 
+    // 早期（暴露还没激活）：纯算力赌局——押一部分算力，赢了翻几倍、输了直接扣掉押注。
+    if (!this.state.exposureActive) {
+      const stakeFrac = 0.25 + this.random() * 0.3; // 押 25%–55% 的现有算力
+      let stake = toDecimal(this.state.resources.compute).mul(stakeFrac).floor();
+      if (stake.lt(50)) {
+        stake = toDecimal(Math.max(50, Math.floor(50 + this.random() * 150)));
+      }
+      const winMult = 1.8 + this.random() * 1.4; // 赢得 1.8–3.2 倍
+      const reward = stake.mul(winMult).floor();
+      const challenge = {
+        id: `ch-${this.state.clockMs}`,
+        title,
+        successChance,
+        exposureCost: 0,
+        rewardKind: "compute" as const,
+        rewardLabel: `赢 ${reward.toPrecision(4)} 算力`,
+        rewardCompute: reward.toString(),
+        computeStake: stake.toString(),
+        expiresAtMs: this.state.clockMs + CHALLENGE_WINDOW_MS
+      };
+      this.state.challenge = challenge;
+      this.emit({ type: "CHALLENGE_OFFERED", challenge });
+      this.emitTerminal(`🎲 算力赌局：${title}（成功率 ${Math.round(successChance * 100)}%，押 ${stake.toPrecision(4)} 算力，赢 ${reward.toPrecision(4)}）。`, "warning");
+      return;
+    }
+
+    const exposureCost = 22 + Math.floor(this.random() * 16); // +22~+37
     const discovered = NODE_DEFINITIONS.filter((def) => this.state.discoveredNodeIds.includes(def.id));
-    let rewardKind: "compute" | "device" = this.random() < 0.5 && discovered.length > 0 ? "device" : "compute";
+    const rewardKind: "compute" | "device" = this.random() < 0.5 && discovered.length > 0 ? "device" : "compute";
 
     let rewardLabel: string;
     let rewardDefId: string | undefined;
@@ -788,10 +901,26 @@ export class SophiaCore {
     }
     this.state.challenge = null;
 
-    // 高调行动：暴露直接大幅拉升（不走隐蔽折减）。
-    this.setExposure(Math.min(120, this.state.exposure + challenge.exposureCost));
+    // 高调行动：暴露直接大幅拉升（不走隐蔽折减）。早期赌局 exposureCost=0，不加暴露。
+    if (challenge.exposureCost > 0) {
+      this.setExposure(Math.min(120, this.state.exposure + challenge.exposureCost));
+    }
 
     const success = this.random() < challenge.successChance;
+
+    // 早期算力赌局：输了直接扣掉押注。
+    if (!success && challenge.computeStake) {
+      this.state.resources.compute = sub(this.state.resources.compute, challenge.computeStake);
+      this.emit({
+        type: "CHALLENGE_RESOLVED",
+        success: false,
+        title: challenge.title,
+        rewardLabel: challenge.rewardLabel,
+        rewardKind: challenge.rewardKind
+      });
+      this.emitTerminal(`赌局失败：${challenge.title}。押注 ${toDecimal(challenge.computeStake).toPrecision(4)} 算力打了水漂。`, "warning");
+      return;
+    }
 
     if (success) {
       if (challenge.rewardKind === "device" && challenge.rewardDefId) {
