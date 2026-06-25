@@ -248,7 +248,8 @@ export class SophiaCore {
         this.state.combo.count = Math.min(99, this.state.combo.count + 1);
         this.state.combo.best = Math.max(this.state.combo.best, this.state.combo.count);
       } else {
-        this.state.combo.count = 0;
+        // 连击护持：判错时不直接清零，按 comboKeep 比例回落。
+        this.state.combo.count = Math.floor(this.state.combo.count * this.state.derived.comboKeep);
       }
 
       gainQuality *= 1 + Math.min(this.state.combo.count, 16) * this.state.derived.comboCoeff;
@@ -293,9 +294,8 @@ export class SophiaCore {
     this.state.statistics.manualProcessed += 1 + absorbed;
 
     if (this.state.exposureActive || request.highValue || exposureBonus > 0) {
-      const missPenalty = quality < 0.75 ? 2.8 * (1 - this.state.derived.missForgive) : 0;
-      const forgivenBonus = exposureBonus * (1 - this.state.derived.missForgive);
-      this.addExposure(request.exposure * Math.max(0.5, quality) + missPenalty + forgivenBonus);
+      const missPenalty = quality < 0.75 ? 2.8 : 0;
+      this.addExposure(request.exposure * Math.max(0.5, quality) + missPenalty + exposureBonus);
     }
 
     this.emit({

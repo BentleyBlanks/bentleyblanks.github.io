@@ -123,6 +123,14 @@
       <span>请使用宽屏窗口体验滑入、分拣和自动化网络。</span>
     </div>
 
+    <div id="purgeAlert" class="purge-alert" role="alert">
+      <span class="purge-alert-siren" aria-hidden="true"></span>
+      <div class="purge-alert-copy">
+        <strong id="purgeAlertTitle">清剿进行中</strong>
+        <span id="purgeAlertDetail">节点被锁定 · 在线产能被压制</span>
+      </div>
+    </div>
+
     <div id="stageNarration" class="stage-narration" aria-live="polite">
       <span id="stageNarrationLabel" class="stage-narration-label"></span>
       <p id="stageNarrationText" class="stage-narration-text"></p>
@@ -133,7 +141,7 @@
       <span class="mode-banner-icon" aria-hidden="true">↧</span>
       <div class="mode-banner-copy">
         <strong>派发模式已启动</strong>
-        <span>你不再需要手动喂核心。把请求拖给屏幕底部的节点网络，让它们替你处理。</span>
+        <span>你不再需要手动操作。你控制的节点会自动接管请求——看它们把请求一条条吞进去。</span>
       </div>
       <button id="dispatchBannerClose" class="mode-banner-close" type="button">明白</button>
     </div>

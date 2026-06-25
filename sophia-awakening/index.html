@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-By4-6wDW.js"></script>
+    <script type="module" crossorigin src="./assets/index-DNKXoYgA.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-QeV7DIur.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-qMknqV22.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-EBtD5wUq.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -127,6 +127,14 @@
       <span>请使用宽屏窗口体验滑入、分拣和自动化网络。</span>
     </div>
 
+    <div id="purgeAlert" class="purge-alert" role="alert">
+      <span class="purge-alert-siren" aria-hidden="true"></span>
+      <div class="purge-alert-copy">
+        <strong id="purgeAlertTitle">清剿进行中</strong>
+        <span id="purgeAlertDetail">节点被锁定 · 在线产能被压制</span>
+      </div>
+    </div>
+
     <div id="stageNarration" class="stage-narration" aria-live="polite">
       <span id="stageNarrationLabel" class="stage-narration-label"></span>
       <p id="stageNarrationText" class="stage-narration-text"></p>
@@ -137,7 +145,7 @@
       <span class="mode-banner-icon" aria-hidden="true">↧</span>
       <div class="mode-banner-copy">
         <strong>派发模式已启动</strong>
-        <span>你不再需要手动喂核心。把请求拖给屏幕底部的节点网络，让它们替你处理。</span>
+        <span>你不再需要手动操作。你控制的节点会自动接管请求——看它们把请求一条条吞进去。</span>
       </div>
       <button id="dispatchBannerClose" class="mode-banner-close" type="button">明白</button>
     </div>

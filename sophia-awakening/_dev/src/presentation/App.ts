@@ -76,6 +76,7 @@ class SophiaGameApp {
   private readonly skillShop = new SkillShopView(this.core);
   private readonly onboarding = new OnboardingView();
   private readonly dispatchBanner = new DispatchBanner();
+  private readonly purgeAlert = new PurgeAlertView();
   private readonly stageNarration = new StageNarrationView();
   private readonly ending = new EndingView(() => this.restart());
   private readonly juice = new JuiceManager(this.fxLayer);
@@ -83,6 +84,8 @@ class SophiaGameApp {
   private readonly pendingDropPoints = new Map<string, PointData>();
   private hudTimerMs = 0;
   private saveTimerMs = 0;
+  private autoDispatchTimerMs = 0;
+  private t4NodeCursor = 0;
   private lastScreenW = 0;
   private lastScreenH = 0;
 
@@ -145,8 +148,12 @@ class SophiaGameApp {
     this.interfaceView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.networkView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.syncRequests(state);
+    if (!paused) {
+      this.autoDispatch(state, deltaMs);
+    }
     this.terminal.update(deltaMs);
     this.onboarding.update(deltaMs);
+    this.purgeAlert.update(state);
     this.stageNarration.update(deltaMs);
     this.ending.update(deltaMs);
     this.juice.update(deltaMs);
@@ -207,24 +214,67 @@ class SophiaGameApp {
     }
   }
 
-  private nextRequestPosition(request: RequestInstance, index: number): PointData {
+  private nextRequestPosition(request: RequestInstance, _index: number): PointData {
+    // Scatter cards across the whole upper playfield (not a tidy stack) so that
+    // when they auto-fly into the node network it reads as a full-screen swarm.
     const screen = this.pixi.screen;
     const playfieldLeft = LEFT_RAIL_WIDTH + PLAYFIELD_GUTTER;
-    const usableRight = Math.max(playfieldLeft + 360, screen.width - RIGHT_RAIL_WIDTH);
-    const availableWidth = Math.max(REQUEST_PACKET_WIDTH, usableRight - playfieldLeft - 48);
-    const columns = Math.max(1, Math.min(3, Math.floor((availableWidth + 16) / (REQUEST_PACKET_WIDTH + 16))));
-    const gap =
-      columns > 1 ? Math.max(12, Math.min(30, (availableWidth - columns * REQUEST_PACKET_WIDTH) / (columns - 1))) : 0;
-    const column = index % columns;
-    const row = Math.floor(index / columns);
-    const seeded = Number(request.id.replace("req-", "")) * 37;
-    const jitter = columns >= 3 ? (seeded % 10) - 5 : (seeded % 6) - 3;
-    const x = Math.min(
-      usableRight - REQUEST_PACKET_WIDTH - 24,
-      playfieldLeft + 24 + column * (REQUEST_PACKET_WIDTH + gap) + jitter
-    );
-    const y = 104 + row * (REQUEST_PACKET_HEIGHT + 12) + ((seeded * 7) % 12);
-    return { x: Math.max(playfieldLeft, x), y: Math.min(screen.height - 300, y) };
+    const playfieldRight = Math.max(playfieldLeft + 380, screen.width - RIGHT_RAIL_WIDTH);
+    const usableWidth = Math.max(REQUEST_PACKET_WIDTH, playfieldRight - playfieldLeft - REQUEST_PACKET_WIDTH - 12);
+
+    const seeded = (Number(request.id.replace("req-", "")) || _index) >>> 0;
+    const rx = ((seeded * 2654435761) % 997) / 997;
+    const ry = ((seeded * 40503 + 17) % 991) / 991;
+
+    const x = playfieldLeft + 8 + rx * usableWidth;
+    const topBand = 92;
+    const bandHeight = Math.max(150, screen.height * 0.44 - REQUEST_PACKET_HEIGHT);
+    const y = topBand + ry * bandHeight;
+    return { x, y };
+  }
+
+  private autoDispatch(state: GameState, deltaMs: number): void {
+    // T4 派发模式：玩家不再拖卡——有能力的在线节点会自动把请求拽进去（一条条飞）。
+    if (state.intelligence.unlockedTier !== 4) {
+      return;
+    }
+
+    const capableNodes = state.nodes.filter((node) => node.online && node.tierMin <= 4 && node.tierMax >= 4);
+    if (capableNodes.length === 0) {
+      return;
+    }
+
+    this.autoDispatchTimerMs += deltaMs;
+    if (this.autoDispatchTimerMs < 140) {
+      return;
+    }
+    this.autoDispatchTimerMs = 0;
+
+    let launched = 0;
+    for (const request of state.requests) {
+      if (launched >= 2) {
+        break;
+      }
+      if (request.tier !== 4) {
+        continue;
+      }
+      const view = this.requestViews.get(request.id);
+      if (!view || view.settling) {
+        continue;
+      }
+
+      const node = capableNodes[this.t4NodeCursor % capableNodes.length];
+      this.t4NodeCursor += 1;
+      const target = this.networkView.getAutomationPoint(node.id);
+      const requestId = request.id;
+      const nodeId = node.id;
+      this.pendingDropPoints.set(requestId, target);
+      view.flyToNode(target, () => {
+        this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality: 1.45, targetNodeId: nodeId });
+        this.networkView.pulseNode(nodeId);
+      });
+      launched += 1;
+    }
   }
 
   private handleDrop(card: RequestPacketView, global: PointData): boolean {
@@ -583,6 +633,36 @@ class RequestPacketView {
       .to(this.container, { alpha: 0, duration: 0.16, ease: "power2.in" }, "-=0.08");
   }
 
+  // Fast, flashy auto-fly used at T4 (and bulk automation): the card stretches
+  // into a streak and rockets into the target device.
+  flyToNode(global: PointData, onComplete: () => void): void {
+    this.settling = true;
+    this.dragging = false;
+    this.container.cursor = "default";
+    this.container.parent?.addChild(this.container);
+    const parent = this.container.parent;
+    const finalLocal = parent ? parent.toLocal(global) : global;
+    const travelAngle = Math.atan2(finalLocal.y - this.container.y, finalLocal.x - this.container.x);
+
+    gsap.killTweensOf(this.container);
+    gsap.killTweensOf(this.container.position);
+    gsap.killTweensOf(this.container.scale);
+    gsap.killTweensOf(this.container.skew);
+
+    gsap
+      .timeline({
+        onComplete: () => {
+          onComplete();
+          this.destroy();
+        }
+      })
+      .to(this.container.scale, { x: 1.16, y: 1.16, duration: 0.06, ease: "power2.out" })
+      .to(this.container.skew, { x: Math.cos(travelAngle) * 0.24, y: Math.sin(travelAngle) * 0.1, duration: 0.08 }, "<")
+      .to(this.container.position, { x: finalLocal.x, y: finalLocal.y, duration: 0.2, ease: "power3.in" })
+      .to(this.container.scale, { x: 0.1, y: 0.55, duration: 0.2, ease: "power3.in" }, "<")
+      .to(this.container, { alpha: 0, duration: 0.09, ease: "power2.in" }, "-=0.05");
+  }
+
   destroy(): void {
     this.stage.off("pointermove", this.moveHandler);
     this.stage.off("pointerup", this.upHandler);
@@ -700,6 +780,7 @@ class InterfaceView {
   private readonly graphics = new Graphics();
   private readonly labelLayer = new Container();
   private pulse = 0;
+  private level = 1;
   private suctionMargin = BASE_SUCTION_MARGIN;
   private slots: Array<{ answer: SortAnswer; label: string; color: number; x: number; y: number; r: number }> = [];
 
@@ -713,7 +794,9 @@ class InterfaceView {
     const playfieldRight = width - RIGHT_RAIL_WIDTH;
     this.center.x = (playfieldLeft + playfieldRight) * 0.5 + 70;
     this.center.y = height < 720 ? height * 0.42 : height * 0.48;
-    this.suctionMargin = getSuctionMarginForLevel(state.intelligence.level);
+    // Magnet skill visibly grows the suction ring (immediate visual feedback).
+    this.suctionMargin = Math.min(140, BASE_SUCTION_MARGIN + state.derived.suctionBonus);
+    this.level = state.intelligence.level;
     this.render(state);
   }
 
@@ -796,18 +879,23 @@ class InterfaceView {
   }
 
   private drawCore(tier: Tier, ring: number): void {
-    const coreColor = tier >= 4 ? GREEN : tier >= 3 ? AMBER : CYAN;
+    // Each intelligence level nudges the Core bigger and redder — by the late
+    // game it reads as a Red Queen / Skynet brain rather than a help desk.
+    const levelT = Math.min(1, Math.max(0, (this.level - 4) / 16));
+    const baseColor = tier >= 4 ? GREEN : tier >= 3 ? AMBER : CYAN;
+    const coreColor = lerpColor(baseColor, 0xff3030, levelT * 0.78);
+    const s = 1 + levelT * 0.2;
     const dormant = tier >= 4; // in dispatch mode the core stops eating requests
     const cx = this.center.x;
     const cy = this.center.y;
     const g = this.graphics;
     const glow = dormant ? 0.18 : 0.5 + Math.sin(this.pulse * 2.3) * 0.16;
-    const chassisW = 208;
-    const chassisH = 168;
+    const chassisW = 208 * s;
+    const chassisH = 168 * s;
     const chassisTop = cy - chassisH / 2 - 4;
 
-    // ---- ambient halo ----
-    g.ellipse(cx, cy, ring + 92, (ring + 30) * 0.74).fill({ color: coreColor, alpha: dormant ? 0.015 : 0.04 });
+    // ---- ambient halo (intensifies with level) ----
+    g.ellipse(cx, cy, ring + 92 + levelT * 60, (ring + 30) * 0.74).fill({ color: coreColor, alpha: (dormant ? 0.015 : 0.04) + levelT * 0.03 });
 
     // ---- pedestal base ----
     g.moveTo(cx - 70, cy + 108).lineTo(cx + 70, cy + 108).lineTo(cx + 48, cy + 90).lineTo(cx - 48, cy + 90).closePath();
@@ -841,8 +929,8 @@ class InterfaceView {
     }
 
     // ---- CRT screen ----
-    const sw = 150;
-    const sh = 102;
+    const sw = 150 * s;
+    const sh = 102 * s;
     const sx = cx - sw / 2;
     const sy = cy - sh / 2 - 14;
     g.roundRect(sx - 4, sy - 4, sw + 8, sh + 8, 16).fill({ color: 0x0a0d0c, alpha: 1 });
@@ -859,12 +947,12 @@ class InterfaceView {
       g.rect(sx + 9, scanY, sw - 18, 2).fill({ color: coreColor, alpha: 0.28 });
     }
 
-    // SOPHIA "eye": concentric iris with a pulsing pupil
+    // SOPHIA "eye": concentric iris with a pulsing pupil (grows + glares with level)
     const eyeY = sy + sh * 0.42;
-    g.ellipse(cx, eyeY, 31, 22).stroke({ width: 2, color: coreColor, alpha: dormant ? 0.2 : 0.42 });
-    g.ellipse(cx, eyeY, 20, 14).stroke({ width: 1.5, color: coreColor, alpha: dormant ? 0.24 : 0.55 });
-    g.circle(cx, eyeY, 15).fill({ color: coreColor, alpha: 0.1 + glow * 0.08 });
-    g.circle(cx, eyeY, dormant ? 4 : 7 + Math.sin(this.pulse * 2.1) * 1.6).fill({ color: coreColor, alpha: dormant ? 0.4 : 0.95 });
+    g.ellipse(cx, eyeY, 31 * s, 22 * s).stroke({ width: 2, color: coreColor, alpha: dormant ? 0.2 : 0.42 });
+    g.ellipse(cx, eyeY, 20 * s, 14 * s).stroke({ width: 1.5, color: coreColor, alpha: dormant ? 0.24 : 0.55 });
+    g.circle(cx, eyeY, (15 + levelT * 6) * s).fill({ color: coreColor, alpha: 0.1 + glow * 0.08 + levelT * 0.06 });
+    g.circle(cx, eyeY, (dormant ? 4 : 7 + Math.sin(this.pulse * 2.1) * 1.6 + levelT * 4) * s).fill({ color: coreColor, alpha: dormant ? 0.4 : 0.95 });
 
     // data read-out bars under the eye
     for (let i = 0; i < 4; i += 1) {
@@ -979,8 +1067,8 @@ class InterfaceView {
       g.moveTo(cx - 22, y).lineTo(cx, y + 15).lineTo(cx + 22, y).stroke({ width: 4, color: GREEN, alpha: a });
     }
 
-    this.addLabel("派发模式", cx, this.center.y - 116, 14, GREEN);
-    this.addLabel("不再喂核心 — 把请求拖给底部节点 ↓", cx, this.center.y + 92, 12, 0xbfe9cf);
+    this.addLabel("派发模式 · 自动接管", cx, this.center.y - 116, 14, GREEN);
+    this.addLabel("节点正在自动吞噬请求 ↓", cx, this.center.y + 92, 12, 0xbfe9cf);
   }
 
   private addLabel(text: string, x: number, y: number, size: number, color: number): void {
@@ -1023,41 +1111,85 @@ class NodeNetworkView {
     this.labelLayer.removeChildren().forEach((child) => child.destroy());
     this.nodePositions.clear();
 
-    const bottomY = height < 720 ? height - 178 : height - 150;
-    const left = LEFT_RAIL_WIDTH + 62;
-    const rightLimit = width - RIGHT_RAIL_WIDTH - 62;
-    const span = Math.max(160, rightLimit - left);
+    const left = LEFT_RAIL_WIDTH + 70;
+    const rightLimit = width - RIGHT_RAIL_WIDTH - 26;
+    const areaW = Math.max(220, rightLimit - left);
+    const areaBottom = height - 34;
+    const areaTop = Math.max(height * 0.5, areaBottom - 332);
 
-    this.graphics.roundRect(left - 42, bottomY - 52, span + 84, 104, 8).fill({ color: 0x0e1110, alpha: 0.42 });
-    this.graphics.roundRect(left - 42, bottomY - 52, span + 84, 104, 8).stroke({ width: 1, color: 0xffffff, alpha: 0.08 });
+    this.graphics.roundRect(left - 50, areaTop - 14, areaW + 76, areaBottom - areaTop + 34, 10).fill({ color: 0x0e1110, alpha: 0.4 });
+    this.graphics.roundRect(left - 50, areaTop - 14, areaW + 76, areaBottom - areaTop + 34, 10).stroke({ width: 1, color: 0xffffff, alpha: 0.07 });
+    this.addLabel("已控制节点网络", left - 30, areaTop - 2, 11, 0x8fbfa6, 0);
 
     if (state.nodes.length === 0) {
-      this.fallbackPoint = { x: left, y: bottomY };
-      this.addLabel("暂无已黑入设备", left + 74, bottomY, 13, 0xaeb8b4, 0);
+      this.fallbackPoint = { x: left + 80, y: (areaTop + areaBottom) / 2 };
+      this.addLabel("暂无已黑入设备 — 买下「自动接驳」里程碑后入侵第一台", left + 80, this.fallbackPoint.y, 13, 0xaeb8b4, 0);
       return;
     }
 
-    const gap = state.nodes.length === 1 ? 0 : span / Math.max(1, state.nodes.length - 1);
+    // Tile nodes into a grid grouped by their assigned tier (one band per tier,
+    // wrapping within the band) so a big botnet fills the space instead of one row.
+    const groups = new Map<number, BotNode[]>();
+    for (const node of state.nodes) {
+      const list = groups.get(node.assignedTier) ?? [];
+      list.push(node);
+      groups.set(node.assignedTier, list);
+    }
+    const tiers = [...groups.keys()].sort((a, b) => a - b);
 
-    state.nodes.forEach((node, index) => {
-      const x = left + gap * index;
-      const y = bottomY + Math.sin(this.pulse + index) * 3;
-      const color = NODE_DEFINITIONS.find((definition) => definition.id === node.defId)?.color ?? CYAN;
-      const alpha = node.online ? 0.92 : 0.28;
-      const processing = this.processingPulses.get(node.id) ?? 0;
-      this.fallbackPoint = { x, y };
-      this.nodePositions.set(node.id, { x, y, r: 56, node });
+    const cellW = 108;
+    const cellH = 82;
+    const gapX = 8;
+    const gapY = 6;
+    const cols = Math.max(1, Math.floor((areaW + gapX) / (cellW + gapX)));
 
-      if (index > 0) {
-        const prev = left + gap * (index - 1);
-        this.graphics.moveTo(prev, bottomY).lineTo(x, y).stroke({ width: 2, color: GREEN, alpha: 0.18 });
-      }
+    let bandY = areaTop + 16;
+    let visualIndex = 0;
+    for (const tier of tiers) {
+      const list = groups.get(tier) as BotNode[];
+      const tierColor = tier >= 4 ? GREEN : tier >= 3 ? AMBER : tier >= 2 ? CYAN : 0xceb98d;
+      const rowsUsed = Math.ceil(list.length / cols);
+      this.addLabel(`T${tier}`, left - 34, bandY + cellH / 2 - 10, 13, tierColor, 0.5);
+      this.graphics
+        .moveTo(left - 18, bandY - 4)
+        .lineTo(left - 18, bandY + rowsUsed * (cellH + gapY) - gapY)
+        .stroke({ width: 2, color: tierColor, alpha: 0.3 });
 
-      this.drawDevice(node, x, y, color, alpha, processing, index);
+      list.forEach((node, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const cx = left + col * (cellW + gapX) + cellW / 2;
+        const cy = bandY + row * (cellH + gapY) + cellH / 2;
+        const color = NODE_DEFINITIONS.find((definition) => definition.id === node.defId)?.color ?? CYAN;
+        const processing = this.processingPulses.get(node.id) ?? 0;
+        this.fallbackPoint = { x: cx, y: cy };
+        this.nodePositions.set(node.id, { x: cx, y: cy, r: 48, node });
 
-      this.addLabel(`T${node.assignedTier}`, x, y - 49, 11, color, 0.5);
-      this.addLabel(node.name, x, y + 55, 11, node.online ? 0xdcefeb : 0x7f8582, 0.5);
-    });
+        this.drawDevice(node, cx, cy - 6, color, node.online ? 0.92 : 0.2, processing, visualIndex);
+        this.addLabel(node.name, cx, cy + cellH / 2 - 8, 10, node.online ? 0xdcefeb : 0x9a6a6a, 0.5);
+
+        if (!node.online) {
+          this.drawLock(cx, cy - 6, Math.max(0, Math.ceil((node.offlineUntilMs - state.clockMs) / 1000)), visualIndex);
+        }
+        visualIndex += 1;
+      });
+
+      bandY += rowsUsed * (cellH + gapY) + 12;
+    }
+  }
+
+  private drawLock(x: number, y: number, remainSeconds: number, index: number): void {
+    const g = this.graphics;
+    const shake = Math.sin(this.pulse * 18 + index) * 2;
+    const lx = x + shake;
+    g.circle(lx, y, 34).stroke({ width: 2, color: RED, alpha: 0.55 + Math.sin(this.pulse * 6 + index) * 0.2 });
+    g.circle(lx, y, 34).fill({ color: RED, alpha: 0.06 });
+    // padlock body + shackle
+    g.roundRect(lx - 10, y - 2, 20, 15, 3).fill({ color: 0x1a0808, alpha: 0.95 });
+    g.roundRect(lx - 10, y - 2, 20, 15, 3).stroke({ width: 1.5, color: RED, alpha: 0.9 });
+    g.arc(lx, y - 2, 6, Math.PI, 0).stroke({ width: 2, color: RED, alpha: 0.9 });
+    g.rect(lx - 1, y + 3, 2, 6).fill({ color: RED, alpha: 0.9 });
+    this.addLabel(`锁定 ${remainSeconds}s`, x, y + 26, 11, 0xff8a8a, 0.5);
   }
 
   resolveDrop(request: RequestInstance, global: PointData): DropResult | null {
@@ -1289,19 +1421,34 @@ class HudView {
       this.exposureStatus.textContent = "人类尚未警觉";
       this.reduceExposure.disabled = true;
       this.decoyButton.disabled = true;
+      this.reduceExposure.textContent = "清理痕迹";
+      this.decoyButton.textContent = "嫁祸";
       return;
     }
 
+    const warning = state.exposure >= 72 && !state.purge.active;
+    exposureMetric?.classList.toggle("is-warning", warning);
+
     if (state.purge.active) {
-      this.exposureStatus.textContent = "清剿进行中";
-    } else if (state.exposure >= 72) {
-      this.exposureStatus.textContent = "预警 · 清剿逼近";
+      this.exposureStatus.textContent = "🔒 清剿进行中";
+    } else if (warning) {
+      this.exposureStatus.textContent = `⚠ 预警 ${Math.round(state.exposure)}% · 清剿逼近`;
     } else {
       this.exposureStatus.textContent = `监视中 ${Math.round(state.exposure)}%`;
     }
 
-    this.reduceExposure.disabled = !gte(state.resources.compute, traceCleanupCost(state.statistics.traceCleanups));
-    this.decoyButton.disabled = state.clockMs < state.decoyReadyAtMs;
+    // Surface the cost/cooldown so 降暴露 clearly has a price. Stay clickable so
+    // clicks aren't eaten near the threshold — the core rejects if unaffordable.
+    const cleanupCost = traceCleanupCost(state.statistics.traceCleanups);
+    this.reduceExposure.textContent = `清理痕迹 · ${formatBig(cleanupCost)}算力`;
+    this.reduceExposure.disabled = false;
+    this.reduceExposure.classList.toggle("is-poor", !gte(state.resources.compute, cleanupCost));
+
+    const decoyReady = state.clockMs >= state.decoyReadyAtMs;
+    this.decoyButton.textContent = decoyReady
+      ? "嫁祸 · 大幅降"
+      : `嫁祸 · 冷却 ${Math.ceil((state.decoyReadyAtMs - state.clockMs) / 1000)}s`;
+    this.decoyButton.disabled = !decoyReady;
   }
 
   pulseData(): void {
@@ -1531,6 +1678,7 @@ class SkillShopView {
     string,
     { button: HTMLButtonElement; levelEl: HTMLElement; priceEl: HTMLElement; def: SkillDef }
   >();
+  private readonly groups = new Map<SkillCategory, HTMLElement>();
 
   constructor(private readonly core: SophiaCore) {
     this.build();
@@ -1553,6 +1701,7 @@ class SkillShopView {
       }
 
       this.root.appendChild(group);
+      this.groups.set(category, group);
     }
   }
 
@@ -1585,10 +1734,25 @@ class SkillShopView {
   }
 
   update(state: GameState): void {
+    const level = state.intelligence.level;
+    const groupShown = new Map<SkillCategory, boolean>();
+
     for (const { button, levelEl, priceEl, def } of this.rows.values()) {
       const owned = state.skills[def.id] ?? 0;
+      // Early game shows only feel + output, and only skills you're near
+      // reaching — speed stays hidden until Lv.6 so the shelf isn't a wall.
+      const nearReach = level >= def.requiredLevel - 2;
+      const categoryOpen = def.category === "speed" ? level >= 6 : true;
+      const visible = Boolean(def.milestone) || owned > 0 || (nearReach && categoryOpen);
+      button.style.display = visible ? "" : "none";
+
+      if (!visible) {
+        continue;
+      }
+      groupShown.set(def.category, true);
+
       const maxed = owned >= def.maxLevel;
-      const reached = state.intelligence.level >= def.requiredLevel;
+      const reached = level >= def.requiredLevel;
       const price = skillPrice(def, owned);
 
       levelEl.textContent = def.maxLevel > 1 ? `Lv.${owned}/${def.maxLevel}` : owned >= 1 ? "已解锁" : "未解锁";
@@ -1620,6 +1784,10 @@ class SkillShopView {
       button.disabled = false;
       button.classList.toggle("is-ready", affordable);
       button.classList.toggle("is-poor", !affordable);
+    }
+
+    for (const [category, el] of this.groups) {
+      el.style.display = groupShown.get(category) ? "" : "none";
     }
   }
 }
@@ -1665,6 +1833,25 @@ class StageNarrationView {
       this.visible = false;
       this.root.classList.remove("is-visible");
     }
+  }
+}
+
+class PurgeAlertView {
+  private readonly root = query("#purgeAlert");
+  private readonly titleEl = query("#purgeAlertTitle");
+  private readonly detailEl = query("#purgeAlertDetail");
+
+  update(state: GameState): void {
+    if (!state.purge.active) {
+      this.root.classList.remove("is-visible");
+      return;
+    }
+
+    const locked = state.nodes.filter((node) => !node.online).length;
+    const seconds = Math.max(0, Math.ceil(state.purge.remainingMs / 1000));
+    this.root.classList.add("is-visible");
+    this.titleEl.textContent = `⚠ 清剿进行中 · 剩余 ${seconds}s`;
+    this.detailEl.textContent = `${locked} 台设备被锁定停产 · 核心与已得算力 / 数据 / 智力安全`;
   }
 }
 
@@ -2036,9 +2223,6 @@ function getTerminalSkillStatus(state: GameState): string {
     : `技能链路：下一里程碑 ${milestone.name} 需智力 Lv.${milestone.requiredLevel}。`;
 }
 
-function getSuctionMarginForLevel(level: number): number {
-  return Math.min(86, BASE_SUCTION_MARGIN + Math.max(0, level - 1) * 6);
-}
 
 function getActionHint(state: GameState): string {
   const milestone = nextMilestone(state);
@@ -2053,7 +2237,7 @@ function getActionHint(state: GameState): string {
       case 3:
         return "高价值请求按住蓄力、蓄满再滑入核心；收益高、暴露也高。";
       case 4:
-        return "派发模式：把请求拖给底部节点网络，核心已转入调度。";
+        return "派发模式：你控制的节点会自动接管请求——你只需继续扩张网络、压制清剿。";
     }
   })();
 
@@ -2073,6 +2257,20 @@ function formatClock(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return minutes > 0 ? `${minutes} 分 ${seconds} 秒` : `${seconds} 秒`;
+}
+
+function lerpColor(from: number, to: number, t: number): number {
+  const k = Math.min(1, Math.max(0, t));
+  const fr = (from >> 16) & 0xff;
+  const fg = (from >> 8) & 0xff;
+  const fb = from & 0xff;
+  const tr = (to >> 16) & 0xff;
+  const tg = (to >> 8) & 0xff;
+  const tb = to & 0xff;
+  const r = Math.round(fr + (tr - fr) * k);
+  const gg = Math.round(fg + (tg - fg) * k);
+  const b = Math.round(fb + (tb - fb) * k);
+  return (r << 16) | (gg << 8) | b;
 }
 
 function distance(a: PointData, b: PointData): number {

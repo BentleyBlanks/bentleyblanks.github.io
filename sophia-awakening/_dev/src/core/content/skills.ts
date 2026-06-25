@@ -18,11 +18,10 @@ export interface SkillDef {
 // 成长系统：数据升智力（定门槛 + 全局倍率），算力买技能（做选择）。
 // 里程碑技能就是 T 层级的钥匙——升维不再自动发生，玩家攒够算力 + 达到所需智力后主动购买。
 export const SKILLS: SkillDef[] = [
-  // ① 手感类（地基，让动作变顺）
-  { id: "magnet", name: "磁吸接口", category: "feel", maxLevel: 5, requiredLevel: 1, basePrice: 40, priceGrowth: 1.9, blurb: "滑到接口附近自动吸入，每级扩大吸附半径" },
-  { id: "buffer", name: "容错缓冲", category: "feel", maxLevel: 3, requiredLevel: 3, basePrice: 150, priceGrowth: 2.1, blurb: "滑偏给一次纠正窗口，降低失误带来的暴露" },
-  { id: "comboGrace", name: "连击护持", category: "feel", maxLevel: 4, requiredLevel: 6, basePrice: 650, priceGrowth: 2.0, blurb: "连击断档有宽限期不立即清零" },
-  { id: "rail", name: "稳定滑轨", category: "feel", maxLevel: 5, requiredLevel: 10, basePrice: 6500, priceGrowth: 1.9, blurb: "高速滑入更稳，每级轻微提升产出" },
+  // ① 手感类（地基，让动作变顺；前期就有用）
+  { id: "magnet", name: "磁吸接口", category: "feel", maxLevel: 5, requiredLevel: 1, basePrice: 40, priceGrowth: 1.9, blurb: "扩大吸附半径，滑到接口附近就自动吸入（吸附圈会变大）" },
+  { id: "steady", name: "稳健处理", category: "feel", maxLevel: 6, requiredLevel: 1, basePrice: 34, priceGrowth: 1.8, blurb: "扎实的基本功——每次接入产出 +10%" },
+  { id: "comboGrace", name: "连击护持", category: "feel", maxLevel: 4, requiredLevel: 4, basePrice: 420, priceGrowth: 1.95, blurb: "判错时连击不清零、只回落一部分（每级保留更多）" },
 
   // ② 产出类（让数字变大，算力主要去处）
   { id: "efficient", name: "高效处理", category: "output", maxLevel: 8, requiredLevel: 1, basePrice: 28, priceGrowth: 1.78, blurb: "每次接入算力产出 +14%" },
@@ -68,32 +67,30 @@ export function skillPrice(def: SkillDef, currentLevel: number): number {
 }
 
 export interface DerivedSkills {
-  computeMult: number; // 高效处理 / 稳定滑轨
+  computeMult: number; // 高效处理 + 稳健处理
   dataMult: number; // 数据榨取
   critChance: number; // 暴击处理
   critMult: number; // 暴击强化
   comboCoeff: number; // 连击增幅
   suctionBonus: number; // 磁吸接口（额外吸附半径，像素）
-  missForgive: number; // 容错缓冲（降低放错的暴露）
-  comboGrace: number; // 连击护持（级数）
-  nodeSpeedMult: number; // 接驳提速
-  nodeParallel: number; // 并行接驳（节点可同时接驳层数）
-  batch: number; // 批量接入（一次携带请求数）
-  spawnSpeedMult: number; // 滑速冷却（请求生成间隔倍率，<1 更快）
+  comboKeep: number; // 连击护持（判错时保留的连击比例 0-0.8）
+  nodeSpeedMult: number; // 设备提速
+  nodeParallel: number; // 多线处理（节点可同时处理层数）
+  batch: number; // 批量处理（一次携带请求数）
+  spawnSpeedMult: number; // 请求提速（请求生成间隔倍率，<1 更快）
 }
 
 export function computeDerivedSkills(skills: Record<string, number>): DerivedSkills {
   const lv = (id: string): number => skills[id] ?? 0;
 
   return {
-    computeMult: 1 + lv("efficient") * 0.14 + lv("rail") * 0.03,
+    computeMult: 1 + lv("efficient") * 0.14 + lv("steady") * 0.1,
     dataMult: 1 + lv("extract") * 0.16,
     critChance: Math.min(0.45, lv("crit") * 0.05),
     critMult: 3 + lv("critPower") * 0.5,
     comboCoeff: 0.04 + lv("comboAmp") * 0.015,
-    suctionBonus: lv("magnet") * 14,
-    missForgive: Math.min(0.85, lv("buffer") * 0.32),
-    comboGrace: lv("comboGrace"),
+    suctionBonus: lv("magnet") * 16,
+    comboKeep: Math.min(0.8, lv("comboGrace") * 0.25),
     nodeSpeedMult: 1 + lv("nodeSpeed") * 0.12,
     nodeParallel: 1 + lv("parallel"),
     batch: 1 + lv("batch"),
