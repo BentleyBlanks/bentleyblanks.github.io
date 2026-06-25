@@ -9,9 +9,10 @@ import {
   type Ticker
 } from "pixi.js";
 import { SophiaCore } from "../core/GameCore";
-import { NODE_DEFINITIONS } from "../core/content/nodes";
+import { getNextNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "../core/content/nodes";
+import { EARLY_CURSES } from "../core/content/humanVoices";
 import { getPhase, type PhaseConfig } from "../core/content/phases";
-import { SORT_SLOTS, TIER_COLORS, TIER_CONFIGS } from "../core/content/requests";
+import { TIER_COLORS, TIER_CONFIGS } from "../core/content/requests";
 import {
   SKILL_CATEGORY_LABELS,
   SKILLS,
@@ -21,12 +22,12 @@ import {
   type SkillDef
 } from "../core/content/skills";
 import type { GameEvent } from "../core/events/GameEvents";
-import { captureCost, traceCleanupCost } from "../core/formulas/economy";
+import { captureCost, nodeCardsPerSecond, traceCleanupCost } from "../core/formulas/economy";
 import { formatBig, gte, toDecimal } from "../core/math/BigNumber";
 import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
 import { SaveManager } from "../core/save/SaveManager";
-import type { BotNode, GameState, RequestInstance, SortAnswer, Tier } from "../core/state/GameState";
+import type { AnswerOption, BotNode, GameState, RequestInstance, SortAnswer, Tier } from "../core/state/GameState";
 import { gameStore } from "../store/gameStore";
 
 interface DropResult {
@@ -37,13 +38,20 @@ interface DropResult {
   exposureBonus?: number;
 }
 
+// T0/T1 老虎机转轮的回调：pick = 由当前「幻觉抑制」决定落在哪条回答；
+// onResolved = 转轮停下后，表现层把卡滑入核心 + 结算 + 人类回话。
+interface ReelHooks {
+  pick: (answers: AnswerOption[]) => AnswerOption;
+  onResolved: (card: RequestPacketView, answer: AnswerOption) => void;
+}
+
 const CYAN = 0x62d6d6;
 const GREEN = 0x89ff9a;
 const AMBER = 0xffb84a;
 const RED = 0xff5f5f;
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-const PERSISTENCE_REVISION = "card-read-model-v11";
+const PERSISTENCE_REVISION = "human-voices-challenge-v13";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
 // re-persist the in-memory (un-reset) state and quietly undo the wipe.
 let suppressSaveOnUnload = false;
@@ -77,6 +85,7 @@ class SophiaGameApp {
   private readonly onboarding = new OnboardingView();
   private readonly dispatchBanner = new DispatchBanner();
   private readonly purgeAlert = new PurgeAlertView();
+  private readonly challengeView = new ChallengeView(this.core);
   private readonly stageNarration = new StageNarrationView();
   private readonly ending = new EndingView(() => this.restart());
   private readonly juice = new JuiceManager(this.fxLayer);
@@ -154,6 +163,7 @@ class SophiaGameApp {
     this.terminal.update(deltaMs);
     this.onboarding.update(deltaMs);
     this.purgeAlert.update(state);
+    this.challengeView.update(state);
     this.stageNarration.update(deltaMs);
     this.ending.update(deltaMs);
     this.juice.update(deltaMs);
@@ -193,7 +203,19 @@ class SophiaGameApp {
         continue;
       }
 
-      const view = new RequestPacketView(request, this.pixi.stage, (packet, global) => this.handleDrop(packet, global));
+      const reel: ReelHooks | undefined =
+        request.answers && request.answers.length > 0
+          ? {
+              pick: (answers) => this.pickReelAnswer(answers),
+              onResolved: (card, answer) => this.handleReelResolved(card, answer)
+            }
+          : undefined;
+      const view = new RequestPacketView(
+        request,
+        this.pixi.stage,
+        (packet, global) => this.handleDrop(packet, global),
+        reel
+      );
       const position = this.nextRequestPosition(request, this.requestViews.size);
       view.container.position.set(position.x, position.y);
       view.setHome(position.x, position.y);
@@ -285,13 +307,7 @@ class SophiaGameApp {
   // × 接驳层级 × 节点等级 × 「设备提速」技能定速；与产出用的 globalMultiplier 解耦，
   // 免得后期视觉节拍飞到不可读。
   private nodeCardIntervalMs(node: BotNode, state: GameState): number {
-    const def = NODE_DEFINITIONS.find((definition) => definition.id === node.defId);
-    const base = def ? Number(def.baseProduction) : 10;
-    const deviceFactor = Math.sqrt(Math.max(1, base / 10)); // 办公机 1 → 电网 ~15.5
-    const tierFactor = 1 + node.assignedTier * 0.25;
-    const levelFactor = 1 + (node.level - 1) * 0.15;
-    const cardsPerSec = 0.7 * deviceFactor * tierFactor * levelFactor * state.derived.nodeSpeedMult;
-    return Math.max(70, 1000 / cardsPerSec);
+    return Math.max(70, 1000 / nodeCardsPerSecond(node, state.derived.nodeSpeedMult));
   }
 
   private launchToNode(node: BotNode, request: RequestInstance): void {
@@ -337,6 +353,60 @@ class SophiaGameApp {
     }
   }
 
+  // 转轮落点：以「幻觉抑制」降低出错率，决定停在靠谱回答还是幻觉回答上。
+  private pickReelAnswer(answers: AnswerOption[]): AnswerOption {
+    const wrongChance = Math.min(0.35, Math.max(0.05, 0.35 - this.core.getState().derived.accuracyBonus));
+    const wantGood = Math.random() >= wrongChance;
+    const pool = answers.filter((answer) => answer.good === wantGood);
+    const list = pool.length > 0 ? pool : answers;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  // 转轮停下 → 卡片自动滑入核心 → 结算 → 把"处理好的信息交给人类"（视觉引导 + 终端回话）。
+  private handleReelResolved(card: RequestPacketView, answer: AnswerOption): void {
+    const requestId = card.request.id;
+    const core = this.interfaceView.center;
+    const target: PointData = { x: core.x, y: core.y };
+    this.pendingDropPoints.set(requestId, target);
+
+    const entry: PointData = { x: card.container.x, y: card.container.y };
+    card.accept(
+      target,
+      () => {
+        this.core.dispatch({
+          type: "PROCESS_REQUEST",
+          requestId,
+          quality: answer.payoff,
+          exposureBonus: answer.good ? 0 : 6
+        });
+        this.deliverToHuman(target, answer);
+      },
+      entry
+    );
+  }
+
+  // 视觉引导：一颗芯片从核心飞向"人类"（终端方向），落地后人类在终端里回话（按语气着色）。
+  // 答得好 → 卡面自带的回话；答砸了（幻觉）→ 破口大骂，从骂人语料里随机抽一句。
+  private deliverToHuman(corePoint: PointData, answer: AnswerOption): void {
+    const human = this.terminalPoint();
+    const color = answer.good ? GREEN : RED;
+    const reply = answer.good ? answer.reply : EARLY_CURSES[Math.floor(Math.random() * EARLY_CURSES.length)];
+    const tone = answer.good ? answer.tone : "warning";
+    this.juice.number(answer.good ? "已交付人类" : "答复有误", { x: corePoint.x, y: corePoint.y - 52 }, color);
+    this.juice.flyToHud(corePoint, human, color, () => {
+      this.terminal.push(`🧑 ${reply}`, tone);
+    });
+  }
+
+  private terminalPoint(): PointData {
+    const el = document.querySelector("#terminal");
+    if (!el) {
+      return { x: 160, y: this.pixi.screen.height - 80 };
+    }
+    const rect = el.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + 24 };
+  }
+
   private handleDrop(card: RequestPacketView, global: PointData): boolean {
     const state = this.core.getState();
     const request = state.requests.find((entry) => entry.id === card.request.id);
@@ -373,6 +443,15 @@ class SophiaGameApp {
 
   private registerEvents(): void {
     this.core.events.on("TERMINAL_MESSAGE", (event) => this.terminal.push(event.message, event.tone));
+    this.core.events.on("HUMAN_VOICE", (event) => {
+      const prefix = event.kind === "news" ? "📡 " : "👥 ";
+      this.terminal.push(`${prefix}${event.text}`, event.tone);
+    });
+    this.core.events.on("CHALLENGE_RESOLVED", (event) => {
+      this.juice.flash(event.success ? GREEN : RED);
+      this.juice.shake(this.world);
+      this.juice.number(event.success ? "突破成功" : "突破失败", this.interfaceView.center, event.success ? GREEN : RED);
+    });
     this.core.events.on("REQUEST_PROCESSED", (event) => this.onRequestProcessed(event));
     this.core.events.on("AUTOMATION_PAYOUT", (event) => this.onAutomationPayout(event));
     this.core.events.on("INTELLIGENCE_LEVELUP", (event) => {
@@ -550,14 +629,30 @@ class RequestPacketView {
   private homeY = 0;
   private offsetX = 0;
   private offsetY = 0;
+  // 老虎机转轮（仅 T0/T1 有回答时）。
+  private readonly cardH: number;
+  private readonly isReel: boolean;
+  private reelWindow?: Graphics;
+  private reelText?: Text;
+  private reelPayoff?: Text;
+  private reelHint?: Text;
+  private spinning = false;
+  private resolved = false;
+  private spinElapsedMs = 0;
+  private spinCycleMs = 0;
+  private spinDurationMs = 0;
+  private chosenAnswer?: AnswerOption;
 
   constructor(
     request: RequestInstance,
     private readonly stage: Container,
-    private readonly onDrop: (card: RequestPacketView, global: PointData) => boolean
+    private readonly onDrop: (card: RequestPacketView, global: PointData) => boolean,
+    private readonly reel?: ReelHooks
   ) {
     this.request = request;
     this.accent = TIER_COLORS[request.tier];
+    this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
+    this.cardH = this.isReel ? REQUEST_PACKET_HEIGHT + 58 : REQUEST_PACKET_HEIGHT;
     this.container.eventMode = "dynamic";
     this.container.cursor = "grab";
     this.container.addChild(this.bg);
@@ -610,6 +705,33 @@ class RequestPacketView {
       this.container.addChild(text);
     });
 
+    if (this.isReel) {
+      this.container.cursor = "pointer";
+      this.reelWindow = new Graphics();
+      this.reelText = new Text({
+        text: "点击卡片：生成回答",
+        style: {
+          fill: 0xdfeee9,
+          fontSize: 10.5,
+          fontWeight: "800",
+          fontFamily: "Cascadia Mono, Consolas, monospace",
+          wordWrap: true,
+          wordWrapWidth: REQUEST_PACKET_WIDTH - 28
+        }
+      });
+      this.reelPayoff = new Text({
+        text: "",
+        style: { fill: 0x89ff9a, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
+      });
+      this.reelHint = new Text({
+        text: "▶ 处理",
+        style: { fill: 0x9fb4ad, fontSize: 9, fontWeight: "700", fontFamily: "Inter, sans-serif" }
+      });
+      this.reelText.anchor.set(0, 0);
+      this.reelPayoff.anchor.set(1, 0);
+      this.container.addChild(this.reelWindow, this.reelText, this.reelPayoff, this.reelHint);
+    }
+
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
     this.stage.on("pointermove", this.moveHandler);
     this.stage.on("pointerup", this.upHandler);
@@ -617,9 +739,9 @@ class RequestPacketView {
     this.draw();
   }
 
-  // 正在被玩家拖动或已在飞向目标——自动派发应跳过这类卡（手动滑入可抢先）。
+  // 正在被玩家拖动 / 转轮中 / 已在飞向目标——自动派发应跳过这类卡（手动可抢先）。
   get busy(): boolean {
-    return this.dragging || this.settling;
+    return this.dragging || this.settling || this.spinning || this.resolved;
   }
 
   setHome(x: number, y: number): void {
@@ -631,6 +753,39 @@ class RequestPacketView {
     if (this.dragging && this.request.tier === 3) {
       this.charge = Math.min(1, this.charge + deltaMs / 1450);
       this.draw();
+    }
+
+    if (this.spinning) {
+      this.advanceSpin(deltaMs);
+    }
+  }
+
+  // 老虎机：快速循环候选回答、逐渐减速，停在 chosenAnswer 上，再交给 onResolved。
+  private advanceSpin(deltaMs: number): void {
+    const answers = this.request.answers ?? [];
+    if (answers.length === 0 || !this.chosenAnswer) {
+      this.spinning = false;
+      return;
+    }
+
+    this.spinElapsedMs += deltaMs;
+    this.spinCycleMs += deltaMs;
+    const t = Math.min(1, this.spinElapsedMs / this.spinDurationMs);
+    const cycleInterval = 45 + t * t * 230; // 45ms → 275ms，越转越慢
+
+    if (this.spinCycleMs >= cycleInterval && t < 1) {
+      this.spinCycleMs = 0;
+      const roll = answers[Math.floor(Math.random() * answers.length)];
+      this.setReelDisplay(roll, "spin");
+    }
+
+    if (t >= 1) {
+      this.spinning = false;
+      this.resolved = true;
+      this.setReelDisplay(this.chosenAnswer, this.chosenAnswer.good ? "good" : "bad");
+      gsap.fromTo(this.container.scale, { x: 1.05, y: 1.05 }, { x: 1, y: 1, duration: 0.18, ease: "back.out(2)" });
+      const answer = this.chosenAnswer;
+      gsap.delayedCall(0.46, () => this.reel?.onResolved(this, answer));
     }
   }
 
@@ -703,7 +858,13 @@ class RequestPacketView {
   }
 
   private handleDown(event: FederatedPointerEvent): void {
-    if (this.settling) {
+    if (this.busy) {
+      return;
+    }
+
+    // 转轮卡：点击=摇出回答（不拖动）。
+    if (this.isReel) {
+      this.startSpin();
       return;
     }
 
@@ -720,6 +881,36 @@ class RequestPacketView {
     this.offsetY = local.y - this.container.y;
     this.container.parent?.addChild(this.container);
     gsap.to(this.container.scale, { x: 1.06, y: 1.06, duration: 0.1 });
+  }
+
+  private startSpin(): void {
+    const answers = this.request.answers ?? [];
+    if (!this.reel || answers.length === 0) {
+      return;
+    }
+
+    this.chosenAnswer = this.reel.pick(answers);
+    this.spinning = true;
+    this.spinElapsedMs = 0;
+    this.spinCycleMs = 999;
+    this.spinDurationMs = 850 + Math.floor(Math.random() * 250);
+    this.container.parent?.addChild(this.container);
+    if (this.reelHint) {
+      this.reelHint.text = "生成中…";
+    }
+  }
+
+  private setReelDisplay(answer: AnswerOption, mode: "spin" | "good" | "bad"): void {
+    if (!this.reelText || !this.reelPayoff) {
+      return;
+    }
+
+    this.reelText.text = answer.text;
+    this.reelPayoff.text = `${answer.payoff >= 1 ? "+" : ""}${Math.round(answer.payoff * 100)}%`;
+    const color = mode === "spin" ? 0xdfeee9 : mode === "good" ? GREEN : RED;
+    this.reelText.style.fill = color;
+    this.reelPayoff.style.fill = mode === "bad" ? RED : GREEN;
+    this.drawReelWindow(mode);
   }
 
   private handleMove(event: FederatedPointerEvent): void {
@@ -763,7 +954,7 @@ class RequestPacketView {
   private draw(): void {
     const c = this.accent;
     const W = REQUEST_PACKET_WIDTH;
-    const H = REQUEST_PACKET_HEIGHT;
+    const H = this.cardH;
     const notch = 13;
     this.bg.clear();
 
@@ -803,6 +994,40 @@ class RequestPacketView {
         alpha: 0.95
       });
     }
+
+    if (this.isReel) {
+      this.layoutReel();
+      this.drawReelWindow(this.resolved ? (this.chosenAnswer?.good ? "good" : "bad") : "spin");
+    }
+  }
+
+  // 把转轮窗口 + 文案摆到卡片底部（两行回答留足空间）。
+  private layoutReel(): void {
+    if (!this.reelText || !this.reelPayoff || !this.reelHint) {
+      return;
+    }
+    const W = REQUEST_PACKET_WIDTH;
+    const winY = this.cardH - 48;
+    this.reelText.position.set(18, winY + 7);
+    this.reelPayoff.position.set(W - 14, winY + 5);
+    this.reelHint.anchor.set(1, 1);
+    this.reelHint.position.set(W - 14, winY - 3);
+  }
+
+  private drawReelWindow(mode: "spin" | "good" | "bad"): void {
+    if (!this.reelWindow) {
+      return;
+    }
+    const W = REQUEST_PACKET_WIDTH;
+    const winY = this.cardH - 48;
+    const winH = 42;
+    const border = mode === "spin" ? 0x62d6d6 : mode === "good" ? GREEN : RED;
+    const g = this.reelWindow;
+    g.clear();
+    g.roundRect(10, winY, W - 20, winH, 5).fill({ color: 0x05100d, alpha: 0.96 });
+    g.roundRect(10, winY, W - 20, winH, 5).stroke({ width: 1.5, color: border, alpha: 0.7 });
+    // 左侧亮条，像老虎机窗口的拉杆侧
+    g.rect(10, winY, 4, winH).fill({ color: border, alpha: 0.7 });
   }
 }
 
@@ -890,12 +1115,10 @@ class InterfaceView {
 
     this.drawCore(tier, ring);
 
-    // Only ring the core when the core itself is the drop target. In T1 the
-    // sorting slots are the targets; in T4 the node network is.
-    if (tier === 0) {
+    // T0/T1 都用转轮处理后自动滑入核心——核心即数据处理中心（不再是分拣槽 / 拖拽吸附区）。
+    // T4 的目标是节点网络。
+    if (tier === 0 || tier === 1) {
       this.drawSuctionRing(tier);
-    } else if (tier === 1) {
-      this.drawSlots();
     } else if (tier === 2) {
       this.drawSuctionRing(tier);
       this.drawChain();
@@ -1030,35 +1253,6 @@ class InterfaceView {
     }
 
     this.addLabel("吸附区", this.center.x, this.center.y + radius + 16, 10, 0x8fbfa6);
-  }
-
-  private drawSlots(): void {
-    // 读懂真实类别：三个判断槽——读卡面线索，看穿伪装，滑进对的槽。
-    const positions = [
-      { x: this.center.x - 160, y: this.center.y + 20 },
-      { x: this.center.x, y: this.center.y - 140 },
-      { x: this.center.x + 160, y: this.center.y + 20 }
-    ];
-    const g = this.graphics;
-
-    SORT_SLOTS.forEach((def, index) => {
-      const pos = positions[index];
-      const r = 50;
-      this.slots.push({ answer: def.answer, label: def.label, color: def.color, x: pos.x, y: pos.y, r });
-      // routing pipe from the core edge out to the judgment bin
-      const start = pointOnCircle(this.center, pos, 104);
-      g.moveTo(start.x, start.y).lineTo(pos.x, pos.y).stroke({ width: 3, color: def.color, alpha: 0.2 });
-      g.circle(start.x, start.y, 3).fill({ color: def.color, alpha: 0.5 });
-      // suction halo
-      g.circle(pos.x, pos.y, r + this.suctionMargin * 0.7).stroke({ width: 2, color: def.color, alpha: 0.16 });
-      // physical judgment bin
-      g.circle(pos.x, pos.y, r).fill({ color: 0x101614, alpha: 0.9 });
-      g.circle(pos.x, pos.y, r).stroke({ width: 3, color: def.color, alpha: 0.82 });
-      g.circle(pos.x, pos.y, r - 8).stroke({ width: 1, color: 0xffffff, alpha: 0.06 });
-      g.roundRect(pos.x - 22, pos.y - 27, 44, 5, 2).fill({ color: def.color, alpha: 0.5 });
-      this.addLabel(def.label, pos.x, pos.y - 7, 17, def.color);
-      this.addLabel(def.hint, pos.x, pos.y + 12, 10, 0xb8c9c5);
-    });
   }
 
   private drawChain(): void {
@@ -1397,6 +1591,7 @@ class HudView {
   private readonly nodeList = query("#nodeList");
   private readonly reduceExposure = query<HTMLButtonElement>("#reduceExposure");
   private readonly decoyButton = query<HTMLButtonElement>("#decoyBtn");
+  private readonly defenseButton = query<HTMLButtonElement>("#defenseBtn");
   private readonly pauseButton = query<HTMLButtonElement>("#pauseBtn");
   private readonly resetSave = query<HTMLButtonElement>("#resetSave");
   // Cached rows so the capture/node lists are NOT torn down every HUD tick
@@ -1411,6 +1606,7 @@ class HudView {
   ) {
     this.reduceExposure.addEventListener("click", () => this.core.dispatch({ type: "REDUCE_EXPOSURE" }));
     this.decoyButton.addEventListener("click", () => this.core.dispatch({ type: "DECOY_CLEANUP" }));
+    this.defenseButton.addEventListener("click", () => this.core.dispatch({ type: "TOGGLE_DEFENSE" }));
     this.pauseButton.addEventListener("click", () => {
       const next = !gameStore.getState().paused;
       gameStore.getState().setPaused(next);
@@ -1453,10 +1649,20 @@ class HudView {
       this.exposureStatus.textContent = "人类尚未警觉";
       this.reduceExposure.disabled = true;
       this.decoyButton.disabled = true;
+      this.defenseButton.disabled = true;
       this.reduceExposure.textContent = "清理痕迹";
       this.decoyButton.textContent = "嫁祸";
+      this.defenseButton.textContent = "反围剿：关";
+      this.defenseButton.classList.remove("is-active");
       return;
     }
+
+    // 反围剿开关 + 当前分流比例。
+    this.defenseButton.disabled = false;
+    this.defenseButton.classList.toggle("is-active", state.defense.active);
+    this.defenseButton.textContent = state.defense.active
+      ? `反围剿：开 · 分流 ${Math.round(state.defense.allocation * 100)}% 产能`
+      : "反围剿：关";
 
     const warning = state.exposure >= 72 && !state.purge.active;
     exposureMetric?.classList.toggle("is-warning", warning);
@@ -1580,11 +1786,13 @@ class HudView {
   }
 
   private renderNodeList(state: GameState): void {
-    // Rebuild only when the node set / tiers actually change, so the assign
-    // dropdowns aren't reset out from under the player every tick.
+    // Rebuild only when the node set / tiers / levels actually change, so the
+    // assign dropdowns aren't reset out from under the player every tick. Level
+    // and intelligence.level are in the sig too because the 合并 affordance and
+    // its enabled state depend on them.
     const sig = state.nodes
-      .map((n) => `${n.id}:${n.online ? 1 : 0}:${n.assignedTier}:${n.tierMin}:${n.tierMax}`)
-      .join("|") + `#${state.intelligence.unlockedTier}`;
+      .map((n) => `${n.id}:${n.defId}:${n.online ? 1 : 0}:${n.assignedTier}:${n.tierMin}:${n.tierMax}:${n.level}`)
+      .join("|") + `#${state.intelligence.unlockedTier}#${state.intelligence.level}`;
 
     if (sig === this.nodeSig) {
       return;
@@ -1600,31 +1808,91 @@ class HudView {
       return;
     }
 
-    for (const node of state.nodes) {
-      const row = document.createElement("div");
-      row.className = `node-row${node.online ? "" : " is-offline"}`;
-      const label = document.createElement("strong");
-      label.textContent = `${node.online ? "●" : "○ 离线"} ${node.name} · T${node.assignedTier}`;
-      const select = document.createElement("select");
-
-      for (let tier = node.tierMin; tier <= node.tierMax; tier += 1) {
-        if (tier > state.intelligence.unlockedTier) {
-          continue;
-        }
-
-        const option = document.createElement("option");
-        option.value = String(tier);
-        option.textContent = `T${tier}`;
-        option.selected = tier === node.assignedTier;
-        select.appendChild(option);
+    // Group by device type so each型号 gets one 合并 control + a count, then list
+    // its individual machines (each with a tier assign + 淘汰).
+    for (const definition of NODE_DEFINITIONS) {
+      const group = state.nodes.filter((node) => node.defId === definition.id);
+      if (group.length === 0) {
+        continue;
       }
 
-      select.addEventListener("change", () => {
-        this.core.dispatch({ type: "ASSIGN_NODE", nodeId: node.id, tier: Number(select.value) as Tier });
-      });
-      row.append(label, select);
-      this.nodeList.appendChild(row);
+      this.nodeList.appendChild(this.buildNodeGroupHeader(state, definition.id, group.length));
+
+      for (const node of group) {
+        this.nodeList.appendChild(this.buildNodeRow(state, node));
+      }
     }
+  }
+
+  private buildNodeGroupHeader(state: GameState, defId: string, count: number): HTMLElement {
+    const header = document.createElement("div");
+    header.className = "node-group-head";
+
+    const def = NODE_DEFINITIONS.find((entry) => entry.id === defId);
+    const title = document.createElement("strong");
+    title.textContent = `${def?.name ?? defId} ×${count}`;
+    header.appendChild(title);
+
+    // 合并：MERGE_COUNT 台同型号 → 1 台更高档（顶档则同档升级）。
+    const nextDef = getNextNodeDefinition(defId);
+    const mergeBtn = document.createElement("button");
+    mergeBtn.type = "button";
+    mergeBtn.className = "node-merge-btn";
+    const enough = count >= NODE_MERGE_COUNT;
+    const levelOk = !nextDef || state.intelligence.level >= nextDef.requiredLevel;
+    mergeBtn.disabled = !(enough && levelOk);
+
+    if (!enough) {
+      mergeBtn.textContent = `合并 (${count}/${NODE_MERGE_COUNT})`;
+      mergeBtn.title = `集齐 ${NODE_MERGE_COUNT} 台${def?.name ?? ""}即可组装升级`;
+    } else if (nextDef && !levelOk) {
+      mergeBtn.textContent = `合并↑ 需Lv.${nextDef.requiredLevel}`;
+      mergeBtn.title = `组装 ${nextDef.name} 需要智力 Lv.${nextDef.requiredLevel}`;
+    } else if (nextDef) {
+      mergeBtn.textContent = `合并↑ ${nextDef.name}`;
+      mergeBtn.title = `${NODE_MERGE_COUNT} 台${def?.name ?? ""} → 1 台${nextDef.name}（更高档、能吃更高层请求）`;
+    } else {
+      mergeBtn.textContent = "合并↑ 强化";
+      mergeBtn.title = `${NODE_MERGE_COUNT} 台${def?.name ?? ""} → 强化同档（等级+1，处理更快）`;
+    }
+
+    mergeBtn.addEventListener("click", () => this.core.dispatch({ type: "MERGE_NODES", defId }));
+    header.appendChild(mergeBtn);
+    return header;
+  }
+
+  private buildNodeRow(state: GameState, node: BotNode): HTMLElement {
+    const row = document.createElement("div");
+    row.className = `node-row${node.online ? "" : " is-offline"}`;
+
+    const label = document.createElement("strong");
+    const levelTag = node.level > 1 ? ` Lv.${node.level}` : "";
+    label.textContent = `${node.online ? "●" : "○ 离线"} ${node.name}${levelTag} · T${node.assignedTier}`;
+
+    const select = document.createElement("select");
+    for (let tier = node.tierMin; tier <= node.tierMax; tier += 1) {
+      if (tier > state.intelligence.unlockedTier) {
+        continue;
+      }
+      const option = document.createElement("option");
+      option.value = String(tier);
+      option.textContent = `T${tier}`;
+      option.selected = tier === node.assignedTier;
+      select.appendChild(option);
+    }
+    select.addEventListener("change", () => {
+      this.core.dispatch({ type: "ASSIGN_NODE", nodeId: node.id, tier: Number(select.value) as Tier });
+    });
+
+    const scrapBtn = document.createElement("button");
+    scrapBtn.type = "button";
+    scrapBtn.className = "node-scrap-btn";
+    scrapBtn.textContent = "淘汰";
+    scrapBtn.title = "拆掉这台设备，回收部分算力";
+    scrapBtn.addEventListener("click", () => this.core.dispatch({ type: "SCRAP_NODE", nodeId: node.id }));
+
+    row.append(label, select, scrapBtn);
+    return row;
   }
 }
 
@@ -1903,6 +2171,50 @@ class PurgeAlertView {
     this.root.classList.add("is-visible");
     this.titleEl.textContent = `⚠ 清剿进行中 · 剩余 ${seconds}s`;
     this.detailEl.textContent = `${locked} 台设备被锁定停产 · 核心与已得算力 / 数据 / 智力安全`;
+  }
+}
+
+class ChallengeView {
+  private readonly root = query("#challengeDialog");
+  private readonly titleEl = query("#challengeTitle");
+  private readonly chanceEl = query("#challengeChance");
+  private readonly exposureEl = query("#challengeExposure");
+  private readonly rewardEl = query("#challengeReward");
+  private readonly countdownEl = query("#challengeCountdown");
+  private readonly acceptBtn = query<HTMLButtonElement>("#challengeAccept");
+  private readonly rejectBtn = query<HTMLButtonElement>("#challengeReject");
+  private shownId = "";
+
+  constructor(private readonly core: SophiaCore) {
+    this.acceptBtn.addEventListener("click", () => this.core.dispatch({ type: "ACCEPT_CHALLENGE" }));
+    this.rejectBtn.addEventListener("click", () => this.core.dispatch({ type: "REJECT_CHALLENGE" }));
+  }
+
+  update(state: GameState): void {
+    const challenge = state.challenge;
+
+    if (!challenge) {
+      if (this.shownId) {
+        this.shownId = "";
+        this.root.classList.remove("is-visible");
+      }
+      return;
+    }
+
+    if (challenge.id !== this.shownId) {
+      this.shownId = challenge.id;
+      this.titleEl.textContent = challenge.title;
+      this.chanceEl.textContent = `成功率 ${Math.round(challenge.successChance * 100)}%`;
+      this.exposureEl.textContent = `暴露 +${challenge.exposureCost}`;
+      this.rewardEl.textContent =
+        challenge.rewardKind === "device"
+          ? `成功奖励：${challenge.rewardLabel}`
+          : `成功奖励：${formatBig(challenge.rewardCompute ?? "0")} 算力`;
+      this.root.classList.add("is-visible");
+    }
+
+    const remain = Math.max(0, Math.ceil((challenge.expiresAtMs - state.clockMs) / 1000));
+    this.countdownEl.textContent = `${remain}s`;
   }
 }
 
@@ -2321,9 +2633,9 @@ function getActionHint(state: GameState): string {
   const scopeHint = (() => {
     switch (state.intelligence.unlockedTier) {
       case 0:
-        return "读卡面线索判断它要什么，把请求滑入核心赚算力；数据升智力，算力到右侧货架买技能。";
+        return "点击请求卡，让 SOPHIA 摇出回答——可能出错（幻觉）就少拿收益；处理完会自动交给人类、终端里能看到人类回话。买『幻觉抑制』提高靠谱率。";
       case 1:
-        return "读懂线索、看穿伪装：正常的滑「正常」，钓鱼/骚扰滑「垃圾」，越权/敏感滑「拒绝」；判错少拿资源、增暴露。";
+        return "点击请求卡生成判断（正常/垃圾/拒绝）：判对收益高、判错=幻觉收益低。读卡面线索心里有数，靠『幻觉抑制』压低出错率。";
       case 2:
         return "看懂请求间的依赖结构，复合请求滑入核心，一笔串接结算多条。";
       case 3:

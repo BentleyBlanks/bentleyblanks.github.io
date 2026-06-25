@@ -508,9 +508,54 @@ button:disabled {
 
 .node-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 6px;
   align-items: center;
+}
+
+.node-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 2px 2px 0;
+}
+
+.node-group-head strong {
+  font-size: 12px;
+  color: #aeb8b4;
+  letter-spacing: 0.02em;
+}
+
+.node-merge-btn {
+  min-height: 26px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #89ff9a;
+  border: 1px solid rgba(137, 255, 154, 0.45);
+  background: rgba(137, 255, 154, 0.1);
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.node-merge-btn:disabled {
+  color: #7c8a86;
+  border-color: rgba(237, 242, 240, 0.12);
+  background: rgba(237, 242, 240, 0.05);
+}
+
+.node-scrap-btn {
+  min-height: 26px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffb0a8;
+  border: 1px solid rgba(255, 95, 95, 0.4);
+  background: rgba(255, 95, 95, 0.08);
+  border-radius: 5px;
+  white-space: nowrap;
 }
 
 .node-row strong {
@@ -1101,6 +1146,22 @@ body.exposed .screen-veil {
   gap: 8px;
 }
 
+.defense-button {
+  margin-top: 8px;
+  width: 100%;
+  font-weight: 700;
+  color: #cfe9ff;
+  border: 1px solid rgba(98, 214, 214, 0.4);
+  background: rgba(98, 214, 214, 0.08);
+}
+
+.defense-button.is-active {
+  color: #0b1413;
+  border-color: rgba(137, 255, 154, 0.9);
+  background: linear-gradient(180deg, rgba(137, 255, 154, 0.95), rgba(98, 214, 214, 0.85));
+  box-shadow: 0 0 14px rgba(137, 255, 154, 0.35);
+}
+
 .exposure.is-dormant .exposure-fill {
   filter: grayscale(1) brightness(0.7);
   opacity: 0.5;
@@ -1237,6 +1298,90 @@ body.exposed .screen-veil {
 }
 
 /* ---- dispatch-mode entry banner ---- */
+.challenge-dialog {
+  position: fixed;
+  bottom: 24px;
+  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
+  z-index: 30;
+  width: min(420px, calc(100vw - var(--left-rail) - var(--right-rail) - 48px));
+  transform: translate(-50%, 18px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+.challenge-dialog.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.challenge-inner {
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 184, 74, 0.7);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(255, 184, 74, 0.14), rgba(255, 95, 95, 0.06)),
+    rgba(10, 9, 6, 0.97);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), inset 0 0 26px rgba(255, 184, 74, 0.1);
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+.challenge-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.challenge-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffd591;
+}
+
+.challenge-countdown {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ff8a8a;
+}
+
+.challenge-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff4e2;
+}
+
+.challenge-stats {
+  display: flex;
+  gap: 14px;
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.challenge-chance {
+  color: #89ff9a;
+}
+
+.challenge-exposure {
+  color: #ff8a8a;
+}
+
+.challenge-reward {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: #cfe9ff;
+}
+
+.challenge-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .mode-banner {
   position: fixed;
   top: 84px;

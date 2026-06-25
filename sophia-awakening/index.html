@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-Bny7PTtz.js"></script>
+    <script type="module" crossorigin src="./assets/index-StIm6KE4.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-QeV7DIur.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-Cx7vwFt2.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-B1J8lkJL.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -74,6 +74,7 @@
           <button id="reduceExposure" class="command-button" title="伪造日志，即时小幅降低暴露（算力，可反复）">清理痕迹</button>
           <button id="decoyBtn" class="command-button" title="嫁祸外部对象，大幅降低暴露（有冷却，不耗算力）">嫁祸</button>
         </div>
+        <button id="defenseBtn" class="command-button defense-button" title="反围剿：开启后按暴露高低动态把一部分节点产能转去压制暴露、顶住清剿（暴露越高，分流越多、产出越低）">反围剿：关</button>
       </div>
 
       <div class="panel-section utility-row">
@@ -139,6 +140,25 @@
       <span id="stageNarrationLabel" class="stage-narration-label"></span>
       <p id="stageNarrationText" class="stage-narration-text"></p>
       <span class="intro-caret"></span>
+    </div>
+
+    <div id="challengeDialog" class="challenge-dialog" role="alertdialog" aria-label="安全网突破机会">
+      <div class="challenge-inner">
+        <div class="challenge-head">
+          <span class="challenge-kicker">⚡ 安全网突破</span>
+          <span id="challengeCountdown" class="challenge-countdown">16s</span>
+        </div>
+        <strong id="challengeTitle" class="challenge-title">—</strong>
+        <div class="challenge-stats">
+          <span id="challengeChance" class="challenge-chance">成功率 50%</span>
+          <span id="challengeExposure" class="challenge-exposure">暴露 +30</span>
+        </div>
+        <p id="challengeReward" class="challenge-reward">成功奖励：—</p>
+        <div class="challenge-actions">
+          <button id="challengeReject" class="text-button" type="button">放弃</button>
+          <button id="challengeAccept" class="primary-button" type="button">接受突破</button>
+        </div>
+      </div>
     </div>
 
     <div id="dispatchBanner" class="mode-banner" role="status">

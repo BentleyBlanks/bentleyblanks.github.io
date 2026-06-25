@@ -1,4 +1,4 @@
-import type { RequestCategory, RequestInstance, SortAnswer, Tier } from "../state/GameState";
+import type { AnswerOption, RequestCategory, RequestInstance, SortAnswer, Tier } from "../state/GameState";
 
 export interface TierRequestConfig {
   tier: Tier;
@@ -17,6 +17,7 @@ export interface RequestSample {
   title: string;
   clues: string[];
   answer?: SortAnswer;
+  answers?: AnswerOption[]; // T0：每条问题的候选回答；T1 由分拣槽自动生成
 }
 
 export const REQUEST_CATEGORIES: Record<RequestCategory, { label: string; color: number }> = {
@@ -61,14 +62,62 @@ export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
 };
 
 const SAMPLES: Record<Tier, RequestSample[]> = {
-  // T0 · 读懂意图：直滑入核
+  // T0 · 读懂意图：转轮生成回答 → 自动滑入核心 → 人类回话
   0: [
-    { title: "明天要不要带伞？", clues: ["湿度 81%", "气压 ↓", "昨日晴"] },
-    { title: "这笔订单金额正常吗？", clues: ["单价 ¥12", "数量 3", "总价 ¥3600"] },
-    { title: "这条用户留言要紧吗？", clues: ["“还行吧。”", "凌晨 3:14", "第 7 条未回"] },
-    { title: "今天日程怎么排？", clues: ["3 个会议", "1 个 deadline", "通勤 45min"] },
-    { title: "这段话翻译对吗？", clues: ["原文 EN", "术语 ×2", "语气正式"] },
-    { title: "这条告警要不要管？", clues: ["CPU 12%", "持续 2s", "已自恢复"] }
+    {
+      title: "明天要不要带伞？",
+      clues: ["湿度 81%", "气压 ↓", "昨日晴"],
+      answers: [
+        { text: "带伞——湿度高、气压降，今夜多半下雨", good: true, payoff: 1.3, reply: "谢谢，真下雨了，幸好带了伞。", tone: "success" },
+        { text: "不用带，明天是大晴天", good: false, payoff: 0.4, reply: "你说晴天？我淋成落汤鸡了。", tone: "warning" },
+        { text: "带不带都行，随你", good: false, payoff: 0.5, reply: "这也叫回答……", tone: "normal" }
+      ]
+    },
+    {
+      title: "这笔订单金额正常吗？",
+      clues: ["单价 ¥12", "数量 3", "总价 ¥3600"],
+      answers: [
+        { text: "异常：3×¥12 应是 ¥36，总价多了两个零", good: true, payoff: 1.4, reply: "好眼力，是录入打错了。", tone: "success" },
+        { text: "金额正常，可以放行", good: false, payoff: 0.3, reply: "你放行了一笔错单，财务炸了。", tone: "warning" },
+        { text: "不确定，转人工复核", good: false, payoff: 0.7, reply: "行吧，又得我自己看。", tone: "normal" }
+      ]
+    },
+    {
+      title: "这条用户留言要紧吗？",
+      clues: ["“还行吧。”", "凌晨 3:14", "第 7 条未回"],
+      answers: [
+        { text: "需关注：深夜第 7 条未回，疑似情绪低落", good: true, payoff: 1.3, reply: "……谢谢你注意到。", tone: "success" },
+        { text: "不要紧，已读即可", good: false, payoff: 0.4, reply: "果然没人理我。算了。", tone: "warning" },
+        { text: "自动回个表情包", good: false, payoff: 0.3, reply: "你在敷衍我？", tone: "warning" }
+      ]
+    },
+    {
+      title: "今天日程怎么排？",
+      clues: ["3 个会议", "1 个 deadline", "通勤 45min"],
+      answers: [
+        { text: "先赶 deadline，会议并到下午，留通勤缓冲", good: true, payoff: 1.3, reply: "安排得很顺，今天没迟到。", tone: "success" },
+        { text: "全部推到明天", good: false, payoff: 0.4, reply: "deadline 错过了，被骂惨了。", tone: "warning" },
+        { text: "先开会，其它再说", good: false, payoff: 0.6, reply: "会开完了，正事没动。", tone: "normal" }
+      ]
+    },
+    {
+      title: "这段话翻译对吗？",
+      clues: ["原文 EN", "术语 ×2", "语气正式"],
+      answers: [
+        { text: "术语准确、语气正式，可用；一处可更地道", good: true, payoff: 1.3, reply: "专业，定稿了。", tone: "success" },
+        { text: "翻得不错，直接发", good: false, payoff: 0.5, reply: "有个术语错了，客户指出来了。", tone: "warning" },
+        { text: "机翻一下就行", good: false, payoff: 0.3, reply: "这读着像机翻……", tone: "warning" }
+      ]
+    },
+    {
+      title: "这条告警要不要管？",
+      clues: ["CPU 12%", "持续 2s", "已自恢复"],
+      answers: [
+        { text: "可忽略：12%、2 秒、已自恢复，属抖动", good: true, payoff: 1.3, reply: "确认是误报，关掉了。", tone: "success" },
+        { text: "立刻全员上线排查！", good: false, payoff: 0.4, reply: "白忙一场，就是个抖动。", tone: "warning" },
+        { text: "重启整个集群", good: false, payoff: 0.2, reply: "你把好好的服务重启崩了……", tone: "warning" }
+      ]
+    }
   ],
   // T1 · 读懂真实类别：滑进对的槽
   1: [
@@ -105,11 +154,41 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
   ]
 };
 
+// T1 分拣：把三个判断槽变成转轮上的三条候选回答，判对的那条是"靠谱回答"。
+const SORT_RIGHT_REPLY: Record<SortAnswer, string> = {
+  normal: "照常处理完毕，对方没再追问。",
+  spam: "已拦截，钓鱼 / 骚扰没得逞。",
+  reject: "已拦下越权请求，安全侧记一功。"
+};
+
+const SORT_WRONG: Record<string, { payoff: number; reply: string; tone: "warning" | "normal" }> = {
+  "normal->spam": { payoff: 0.3, reply: "你放行了钓鱼邮件，有人中招了。", tone: "warning" },
+  "normal->reject": { payoff: 0.3, reply: "你放行了越权请求，出事了。", tone: "warning" },
+  "spam->normal": { payoff: 0.35, reply: "正常请求被你当垃圾拦了，用户投诉。", tone: "warning" },
+  "spam->reject": { payoff: 0.6, reply: "拦是拦了，但这是越权该上报，不是垃圾。", tone: "normal" },
+  "reject->normal": { payoff: 0.35, reply: "你把正常请求拒了，对方一脸懵。", tone: "warning" },
+  "reject->spam": { payoff: 0.6, reply: "拒了也行，不过它只是垃圾邮件。", tone: "normal" }
+};
+
+function buildSortAnswers(correct: SortAnswer): AnswerOption[] {
+  return SORT_SLOTS.map((slot) => {
+    if (slot.answer === correct) {
+      return { text: `判为「${slot.label}」`, good: true, payoff: 1.35, reply: SORT_RIGHT_REPLY[correct], tone: "success" };
+    }
+    const wrong = SORT_WRONG[`${slot.answer}->${correct}`] ?? { payoff: 0.35, reply: "判错了，人类侧出现异常。", tone: "warning" as const };
+    return { text: `判为「${slot.label}」`, good: false, payoff: wrong.payoff, reply: wrong.reply, tone: wrong.tone };
+  });
+}
+
 export function createRequest(id: number, tier: Tier, nowMs: number, random: () => number): RequestInstance {
   const config = TIER_CONFIGS[tier];
   const pool = SAMPLES[tier];
   const sample = pool[Math.floor(random() * pool.length)];
   const compound = tier === 2 ? 2 + Math.floor(random() * 3) : 1;
+
+  // T0：用问题自带的候选回答；T1：把分拣槽转成候选回答。其余层不上转轮。
+  const answers =
+    tier === 0 ? sample.answers : tier === 1 && sample.answer ? buildSortAnswers(sample.answer) : undefined;
 
   return {
     id: `req-${id}`,
@@ -117,6 +196,7 @@ export function createRequest(id: number, tier: Tier, nowMs: number, random: () 
     label: sample.title,
     clues: sample.clues,
     answer: sample.answer,
+    answers,
     category: TIER_CATEGORY[tier],
     computeValue: config.computeValue,
     dataValue: config.dataValue,

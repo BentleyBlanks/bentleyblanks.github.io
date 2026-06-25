@@ -23,12 +23,22 @@ export interface IntelligenceState {
   unlockedTier: Tier;
 }
 
+// 老虎机转轮上的一个候选回答：SOPHIA 可能生成的一种答复，含收益与人类的回话。
+export interface AnswerOption {
+  text: string; // 这条回答本身
+  good: boolean; // true=靠谱回答；false=幻觉/错误回答（失败）
+  payoff: number; // 收益系数（=processRequest 的 quality；好答案高、幻觉低）
+  reply: string; // 人类收到这条回答后的回话（显示在终端）
+  tone: "success" | "warning" | "normal"; // 终端里这条回话的颜色
+}
+
 export interface RequestInstance {
   id: string;
   tier: Tier;
   label: string; // 标题：这条请求在问什么 / 要什么
   clues: string[]; // 几条线索，可能不全或带干扰——玩家要读懂
   answer?: SortAnswer; // T1 的正确判断（其余层不用）
+  answers?: AnswerOption[]; // T0/T1：老虎机转轮上的候选回答
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
@@ -71,6 +81,26 @@ export interface PurgeState {
   active: boolean;
   remainingMs: number;
   lastStartedAtMs: number;
+}
+
+// 反围剿：开启后，按暴露高低动态把一部分节点产能转去压制暴露 / 顶清剿。
+// allocation = 当前被转走的产能比例（0-0.5），随暴露升高而升高（产出代价也越大）。
+export interface DefenseState {
+  active: boolean;
+  allocation: number;
+}
+
+// 安全网突破挑战：一次性的高风险机会，玩家可接受 / 拒绝。
+export interface ChallengeOffer {
+  id: string;
+  title: string;
+  successChance: number; // 0-1，UI 明确显示
+  exposureCost: number; // 接受即大幅增加的暴露
+  rewardKind: "compute" | "device";
+  rewardLabel: string; // 便于展示的奖励描述
+  rewardCompute?: BigString; // rewardKind=compute 时的算力数额
+  rewardDefId?: string; // rewardKind=device 时直接获得的设备
+  expiresAtMs: number; // 过期自动放弃
 }
 
 export interface StatisticsState {
@@ -116,6 +146,8 @@ export interface GameState {
   purge: PurgeState;
   // clock timestamp (ms) before which 嫁祸 / decoy cleanup is on cooldown.
   decoyReadyAtMs: number;
+  defense: DefenseState;
+  challenge: ChallengeOffer | null;
   combo: ComboState;
   rebirths: number;
   lastSaveAt: number;
@@ -136,9 +168,16 @@ export type GameCommand =
   | { type: "AUTO_CONSUME_REQUEST"; requestId: string }
   | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
+  // 淘汰：拆掉一台过时设备，返还部分算力。
+  | { type: "SCRAP_NODE"; nodeId: string }
+  // 组装合并：把 MERGE_COUNT 台同型号设备合成 1 台更高档（顶档则同档升级）。
+  | { type: "MERGE_NODES"; defId: string }
   | { type: "ASSIGN_NODE"; nodeId: string; tier: Tier }
   | { type: "REDUCE_EXPOSURE" }
   | { type: "DECOY_CLEANUP" }
+  | { type: "TOGGLE_DEFENSE" }
+  | { type: "ACCEPT_CHALLENGE" }
+  | { type: "REJECT_CHALLENGE" }
   | { type: "REBIRTH" };
 
 export function cloneGameState(state: GameState): GameState {

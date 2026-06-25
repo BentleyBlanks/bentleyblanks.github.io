@@ -26,6 +26,7 @@ export const SKILLS: SkillDef[] = [
   // ② 产出类（让数字变大，算力主要去处）
   { id: "efficient", name: "高效处理", category: "output", maxLevel: 8, requiredLevel: 1, basePrice: 28, priceGrowth: 1.78, blurb: "每次接入算力产出 +14%" },
   { id: "extract", name: "数据榨取", category: "output", maxLevel: 6, requiredLevel: 2, basePrice: 95, priceGrowth: 1.95, blurb: "每次接入额外掉数据 +16%（加速升智力）" },
+  { id: "lucid", name: "幻觉抑制", category: "output", maxLevel: 5, requiredLevel: 2, basePrice: 110, priceGrowth: 1.85, blurb: "生成回答更靠谱——出错（幻觉）概率每级 -7%（基础 35%）" },
   { id: "crit", name: "暴击处理", category: "output", maxLevel: 5, requiredLevel: 5, basePrice: 540, priceGrowth: 2.0, blurb: "每级 +5% 概率暴击，产出乘暴击倍率" },
   { id: "comboAmp", name: "连击增幅", category: "output", maxLevel: 6, requiredLevel: 8, basePrice: 3400, priceGrowth: 2.0, blurb: "连击数越高，单次产出加成越大" },
   { id: "critPower", name: "暴击强化", category: "output", maxLevel: 4, requiredLevel: 12, basePrice: 26000, priceGrowth: 2.1, blurb: "暴击倍率自 ×3 起每级 +0.5" },
@@ -69,6 +70,7 @@ export function skillPrice(def: SkillDef, currentLevel: number): number {
 export interface DerivedSkills {
   computeMult: number; // 高效处理 + 稳健处理
   dataMult: number; // 数据榨取
+  accuracyBonus: number; // 幻觉抑制（降低生成错误回答的概率，0-0.35）
   critChance: number; // 暴击处理
   critMult: number; // 暴击强化
   comboCoeff: number; // 连击增幅
@@ -86,6 +88,7 @@ export function computeDerivedSkills(skills: Record<string, number>): DerivedSki
   return {
     computeMult: 1 + lv("efficient") * 0.14 + lv("steady") * 0.1,
     dataMult: 1 + lv("extract") * 0.16,
+    accuracyBonus: Math.min(0.3, lv("lucid") * 0.07),
     critChance: Math.min(0.45, lv("crit") * 0.05),
     critMult: 3 + lv("critPower") * 0.5,
     comboCoeff: 0.04 + lv("comboAmp") * 0.015,

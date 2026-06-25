@@ -43,6 +43,11 @@ export function createInitialState(now = Date.now()): GameState {
       lastStartedAtMs: -60_000
     },
     decoyReadyAtMs: 0,
+    defense: {
+      active: false,
+      allocation: 0
+    },
+    challenge: null,
     combo: {
       count: 0,
       best: 0

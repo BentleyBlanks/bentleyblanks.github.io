@@ -1,5 +1,5 @@
 import type { MilestoneKind } from "../content/skills";
-import type { BotNode, PhaseId, RequestInstance, Tier } from "../state/GameState";
+import type { BotNode, ChallengeOffer, PhaseId, RequestInstance, Tier } from "../state/GameState";
 
 export type GameEvent =
   | { type: "REQUEST_SPAWNED"; request: RequestInstance }
@@ -27,6 +27,9 @@ export type GameEvent =
   | { type: "PURGE_STARTED"; affectedNodes: string[] }
   | { type: "PURGE_ENDED" }
   | { type: "TERMINAL_MESSAGE"; message: string; tone?: "normal" | "warning" | "success" }
+  | { type: "HUMAN_VOICE"; text: string; tone: "normal" | "warning" | "success"; kind: "batch" | "emoji" | "news" }
+  | { type: "CHALLENGE_OFFERED"; challenge: ChallengeOffer }
+  | { type: "CHALLENGE_RESOLVED"; success: boolean; title: string; rewardLabel: string; rewardKind: "compute" | "device" }
   | { type: "PHASE_CHANGED"; phase: PhaseId }
   | { type: "REBIRTH"; rebirths: number }
   | { type: "ENDING_TRIGGERED" };
