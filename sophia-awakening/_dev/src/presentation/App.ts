@@ -99,7 +99,7 @@ const LEFT_RAIL_WIDTH = 336;
 const RIGHT_RAIL_WIDTH = 360;
 const PLAYFIELD_GUTTER = 24;
 const BASE_SUCTION_MARGIN = 50;
-const REQUEST_PACKET_WIDTH = 206;
+const REQUEST_PACKET_WIDTH = 230;
 const REQUEST_PACKET_HEIGHT = 104;
 
 export async function bootstrapSophia(root: HTMLElement): Promise<void> {
@@ -1168,15 +1168,17 @@ class RequestPacketView {
         wordWrapWidth: REQUEST_PACKET_WIDTH - 26
       }
     });
-    this.badge.position.set(12, 8);
+    // 头部排进圆角主体内（避开顶部圆角 + 尾巴），不再贴边导致文字溢出气泡轮廓。
+    this.title.style.wordWrapWidth = REQUEST_PACKET_WIDTH - 44;
+    this.badge.position.set(34, 13);
     this.code.anchor.set(1, 0);
-    this.code.position.set(REQUEST_PACKET_WIDTH - 11, 8);
-    this.title.position.set(12, 24);
+    this.code.position.set(REQUEST_PACKET_WIDTH - 16, 13);
+    this.title.position.set(16, 30);
     this.container.addChild(this.badge, this.code, this.title);
 
     // Clue lines — the information the player has to read. Laid out after the
     // title so a two-line title still leaves room.
-    const clueTop = 28 + Math.max(18, this.title.height) + 4;
+    const clueTop = 34 + Math.max(18, this.title.height) + 4;
     (request.clues ?? []).forEach((clue, index) => {
       const text = new Text({
         text: clue,
@@ -1186,12 +1188,12 @@ class RequestPacketView {
           fontWeight: "600",
           fontFamily: "Cascadia Mono, Consolas, monospace",
           wordWrap: true,
-          wordWrapWidth: REQUEST_PACKET_WIDTH - 32
+          wordWrapWidth: REQUEST_PACKET_WIDTH - 40
         }
       });
       const y = clueTop + index * 15;
       this.clueRows.push(y);
-      text.position.set(20, y);
+      text.position.set(24, y);
       this.clueTexts.push(text);
       this.container.addChild(text);
     });
@@ -1209,17 +1211,18 @@ class RequestPacketView {
             fontWeight: "700",
             fontFamily: "Cascadia Mono, Consolas, monospace",
             wordWrap: true,
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 66
+            // 给右侧概率列让出 ~52px，避免长回复压到 % 上。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 30 - 52
           }
         });
-        label.position.set(28, y + 5);
+        label.position.set(30, y + 6);
         const prob = new Text({
           text: opt.kind === "dead" ? "0%" : `${Math.round(effectiveHitChance(opt, confidence) * 100)}%`,
           style: { fill: 0xbfe6ee, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
         });
         prob.anchor.set(1, 0);
-        prob.position.set(REQUEST_PACKET_WIDTH - 12, y + 6);
-        const h = Math.max(22, label.height + 10);
+        prob.position.set(REQUEST_PACKET_WIDTH - 16, y + 7);
+        const h = Math.max(24, label.height + 12);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
@@ -1562,27 +1565,38 @@ class RequestPacketView {
     const c = this.accent;
     const W = REQUEST_PACKET_WIDTH;
     const H = this.cardH;
-    const r = 14;
-    const fill = this.request.tier === 3 ? 0x1a0a0b : 0x0c1514;
-    const strokeW = this.request.tier === 3 ? 2 : 1.5;
-    const strokeA = this.request.tier === 3 ? 0.78 : 0.55;
+    const top = 6; // 主体顶边（上方留 6px 给尾巴）
+    const r = 16;
+    const t3 = this.request.tier === 3;
+    const fillBody = t3 ? 0x180a0d : 0x0c1816;
+    const fillHead = t3 ? 0x2a1014 : 0x14241f; // 头部稍亮一点
+    const strokeW = t3 ? 2 : 1.5;
+    const strokeA = t3 ? 0.8 : 0.6;
     this.bg.clear();
 
-    // 消息气泡：圆角主体 + 左上尾巴（像一条从上方刷入的聊天/通知气泡）。
-    // 尾巴
-    this.bg.poly([{ x: 15, y: 7 }, { x: 6, y: -7 }, { x: 33, y: 7 }]).fill({ color: fill, alpha: 0.97 });
+    // 消息气泡：投影 + 圆角主体 + 头部亮带 + 左上尾巴 + 发信人头像点。
+    // 柔和投影
+    this.bg.roundRect(3, top + 6, W, H - top, r).fill({ color: 0x000000, alpha: 0.3 });
+    // 尾巴（左上小三角，指向"消息来处"）
+    this.bg.poly([{ x: 20, y: top + 3 }, { x: 10, y: -6 }, { x: 36, y: top + 3 }]).fill({ color: fillHead, alpha: 0.98 });
     // 主体
-    this.bg.roundRect(0, 5, W, H - 5, r).fill({ color: fill, alpha: 0.97 });
-    this.bg.roundRect(0, 5, W, H - 5, r).stroke({ width: strokeW, color: c, alpha: strokeA });
-    // 尾巴描边（两条斜边，留出与主体相接的底边不描，避免压住主体顶边）
-    this.bg.moveTo(15, 7).lineTo(6, -7).lineTo(33, 7).stroke({ width: strokeW, color: c, alpha: strokeA });
+    this.bg.roundRect(0, top, W, H - top, r).fill({ color: fillBody, alpha: 0.98 });
+    // 头部亮带（顶部 ~32px，用裁切的圆角矩形近似）
+    this.bg.roundRect(0, top, W, 30, r).fill({ color: fillHead, alpha: 0.6 });
+    this.bg.rect(0, top + 15, W, 15).fill({ color: fillHead, alpha: 0.6 });
+    // 描边 + 内侧顶部高光
+    this.bg.roundRect(0, top, W, H - top, r).stroke({ width: strokeW, color: c, alpha: strokeA });
+    this.bg.moveTo(20, top + 3).lineTo(10, -6).lineTo(36, top + 3).stroke({ width: strokeW, color: c, alpha: strokeA });
+    // 发信人头像点
+    this.bg.circle(20, 19, 5.5).fill({ color: c, alpha: 0.9 });
+    this.bg.circle(20, 19, 2).fill({ color: fillBody, alpha: 0.9 });
 
-    // header underline
-    this.bg.moveTo(12, 22).lineTo(W - 12, 22).stroke({ width: 1, color: c, alpha: 0.16 });
+    // header 分隔线
+    this.bg.moveTo(14, 30).lineTo(W - 14, 30).stroke({ width: 1, color: c, alpha: 0.18 });
 
     // clue bullets
     for (const y of this.clueRows) {
-      this.bg.circle(13, y + 7, 1.6).fill({ color: c, alpha: 0.7 });
+      this.bg.circle(17, y + 7, 1.8).fill({ color: c, alpha: 0.7 });
     }
 
     this.chargeBar.clear();
