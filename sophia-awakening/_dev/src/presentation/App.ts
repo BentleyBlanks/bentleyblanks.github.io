@@ -8,6 +8,7 @@ import {
   NineSliceSprite,
   Sprite,
   Text,
+  TilingSprite,
   type PointData,
   type Texture,
   type Ticker
@@ -102,6 +103,12 @@ async function loadUITextures(): Promise<void> {
     ["avatarHost", "avatar-host@2x.png"], ["avatarBoss", "avatar-boss@2x.png"],
     ["avatarSystem", "avatar-system@2x.png"], ["avatarApp", "avatar-app@2x.png"],
     ["avatarSophia", "avatar-sophia@2x.png"],
+    ["worldmapBg", "worldmap-bg@2x.png"],
+    ["nodeLow", "node-low@2x.png"], ["nodeMid", "node-mid@2x.png"],
+    ["nodeHigh", "node-high@2x.png"], ["nodeHub", "node-hub@2x.png"],
+    ["purgeRing", "purge-ring@2x.png"],
+    ["edgeLine", "edge-line@2x.png"],
+    ["gridOverlay", "grid-overlay@2x.png"],
   ];
   await Promise.all(FILES.map(async ([key, file]) => {
     try { UI[key] = await Assets.load({ src: BASE + file, data: { resolution: 2 } }); }
@@ -2241,12 +2248,15 @@ class NodeNetworkView {
   private readonly processingPulses = new Map<string, number>();
   private pulse = 0;
   private fallbackPoint: PointData = { x: 140, y: 140 };
-  // 素材核心图（T4 全球地图中央）
+  // 素材：T4 全球地图各层（懒建，update() 开头统一隐藏）
   private coreSprite?: Sprite;
+  private mapBg?: Sprite;
+  private gridOverlay?: TilingSprite;
+  private readonly hubSprites: Sprite[] = [];
+  private readonly purgeRings: Sprite[] = [];
 
   constructor() {
     this.container.addChild(this.graphics, this.labelLayer);
-    // 核心 sprite 在标签层之前插入（随素材加载时机，首次 update 时懒建）
   }
 
   update(state: GameState, width: number, height: number, deltaMs: number): void {
@@ -2264,8 +2274,12 @@ class NodeNetworkView {
     this.graphics.clear();
     this.labelLayer.removeChildren().forEach((child) => child.destroy());
     this.nodePositions.clear();
-    // 核心 sprite 默认隐藏，仅 drawGlobalMap 里按需显示。
+    // 全局地图素材默认隐藏，仅 drawGlobalMap 里按需显示。
     if (this.coreSprite) this.coreSprite.visible = false;
+    if (this.mapBg) this.mapBg.visible = false;
+    if (this.gridOverlay) this.gridOverlay.visible = false;
+    this.hubSprites.forEach((s) => { s.visible = false; });
+    this.purgeRings.forEach((s) => { s.visible = false; });
 
     const left = LEFT_RAIL_WIDTH + 26;
     const rightLimit = width - RIGHT_RAIL_WIDTH - 26;
@@ -2448,141 +2462,207 @@ class NodeNetworkView {
     const cy = y0 + h / 2;
     const rnd = (n: number): number => (((Math.sin(n * 127.1) * 43758.5453) % 1) + 1) % 1;
 
-    // 红皇后调色板：天网铺满全球之后，整片世界地图从「安全绿」翻成血红——
-    // 控制即统治，发光的红色天网压在每块大陆上，恐怖感来自于「她赢了」。
-    const NET = RED_QUEEN; // 主控红
-    const NET_DIM = 0x80302a; // 暗红经纬 / 大陆描边底
-    const NET_LIT = 0xff8f9a; // 城市灯点 / 高光
-    const NET_LABEL = 0xe6a3ad; // 次级标签
-    const NET_LABEL_HI = 0xf2dde0; // 主标签
+    const purging = state.purge.active || state.exposure >= 72;
+    // 有素材时用青绿赛博风；降级时沿用红皇后配色。
+    const hasAssets = !!UI.worldmapBg;
+    const NET = hasAssets ? 0x62d6d6 : RED_QUEEN;
+    const NET_LIT = hasAssets ? 0x89ff9a : 0xff8f9a;
+    const NET_LABEL = hasAssets ? 0x9eeee8 : 0xe6a3ad;
+    const NET_LABEL_HI = hasAssets ? 0xeafff0 : 0xf2dde0;
 
-    // 海洋底色 + 经纬网
-    g.roundRect(x0, y0, w, h, 10).fill({ color: 0x160506, alpha: 0.74 });
-    g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x5a1f24, alpha: 0.45 });
-    for (let i = 1; i < 10; i += 1) {
-      g.moveTo(x0 + (w * i) / 10, y0).lineTo(x0 + (w * i) / 10, y0 + h).stroke({ width: 1, color: NET_DIM, alpha: 0.07 });
-    }
-    for (let i = 1; i < 6; i += 1) {
-      g.moveTo(x0, y0 + (h * i) / 6).lineTo(x0 + w, y0 + (h * i) / 6).stroke({ width: 1, color: NET_DIM, alpha: 0.07 });
-    }
-
-    const X = (nx: number): number => x0 + w * nx;
-    const Y = (ny: number): number => y0 + h * ny;
-    // 简化的大陆轮廓（归一化多边形）——画成有辨识度的世界地图剪影。
-    const continents: Array<{ name: string; poly: Array<[number, number]> }> = [
-      { name: "北美节点", poly: [[0.05, 0.20], [0.13, 0.11], [0.23, 0.12], [0.27, 0.20], [0.22, 0.25], [0.28, 0.31], [0.21, 0.42], [0.17, 0.34], [0.12, 0.41], [0.08, 0.30]] },
-      { name: "南美节点", poly: [[0.24, 0.54], [0.32, 0.52], [0.35, 0.62], [0.31, 0.75], [0.27, 0.86], [0.24, 0.74], [0.22, 0.62]] },
-      { name: "欧洲节点", poly: [[0.45, 0.21], [0.54, 0.19], [0.56, 0.27], [0.50, 0.31], [0.45, 0.29], [0.43, 0.25]] },
-      { name: "非洲节点", poly: [[0.47, 0.39], [0.57, 0.37], [0.60, 0.48], [0.55, 0.61], [0.50, 0.71], [0.46, 0.58], [0.45, 0.47]] },
-      { name: "亚洲节点", poly: [[0.55, 0.15], [0.71, 0.10], [0.87, 0.16], [0.94, 0.27], [0.86, 0.35], [0.76, 0.31], [0.68, 0.39], [0.61, 0.30], [0.57, 0.22]] },
-      { name: "大洋洲节点", poly: [[0.80, 0.62], [0.90, 0.60], [0.93, 0.69], [0.85, 0.74], [0.79, 0.69]] }
-    ];
-
-    // 大陆剪影 + 城市灯点
-    continents.forEach((c, ci) => {
-      const pts = c.poly.map(([nx, ny]) => ({ x: X(nx), y: Y(ny) }));
-      g.poly(pts).fill({ color: 0x340c10, alpha: 0.84 });
-      g.poly(pts).stroke({ width: 1.2, color: 0xc24a55, alpha: 0.5 });
-      const ctx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-      const cty = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-      for (let k = 0; k < 14; k += 1) {
-        const base = pts[k % pts.length];
-        const mx = base.x * 0.55 + ctx * 0.45 + (rnd(ci * 31 + k) - 0.5) * w * 0.05;
-        const my = base.y * 0.55 + cty * 0.45 + (rnd(ci * 17 + k + 3) - 0.5) * h * 0.05;
-        const tw = 0.4 + Math.sin(this.pulse * 3 + k + ci) * 0.3;
-        g.circle(mx, my, 1).fill({ color: NET_LIT, alpha: 0.3 + tw * 0.4 });
+    // === 背景 ===
+    if (UI.worldmapBg) {
+      // 世界地图底图 Sprite（懒建，居 x0/y0 拉伸到地图区域）
+      if (!this.mapBg) {
+        this.mapBg = new Sprite(UI.worldmapBg);
+        this.container.addChildAt(this.mapBg, 0);
       }
-    });
+      this.mapBg.position.set(x0, y0);
+      this.mapBg.width = w;
+      this.mapBg.height = h;
+      this.mapBg.alpha = purging ? 0.6 : 0.92;
+      this.mapBg.visible = true;
+      // 格栅叠层
+      if (UI.gridOverlay) {
+        if (!this.gridOverlay) {
+          this.gridOverlay = new TilingSprite({ texture: UI.gridOverlay, width: w, height: h });
+          this.container.addChildAt(this.gridOverlay, 1);
+        }
+        this.gridOverlay.position.set(x0, y0);
+        this.gridOverlay.width = w;
+        this.gridOverlay.height = h;
+        this.gridOverlay.alpha = 0.55;
+        this.gridOverlay.visible = true;
+      }
+    } else {
+      // 降级：代码绘制海洋底色 + 经纬线 + 大陆
+      g.roundRect(x0, y0, w, h, 10).fill({ color: 0x160506, alpha: 0.74 });
+      g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x5a1f24, alpha: 0.45 });
+      for (let i = 1; i < 10; i += 1) {
+        g.moveTo(x0 + (w * i) / 10, y0).lineTo(x0 + (w * i) / 10, y0 + h).stroke({ width: 1, color: 0x80302a, alpha: 0.07 });
+      }
+      for (let i = 1; i < 6; i += 1) {
+        g.moveTo(x0, y0 + (h * i) / 6).lineTo(x0 + w, y0 + (h * i) / 6).stroke({ width: 1, color: 0x80302a, alpha: 0.07 });
+      }
+      const X = (nx: number): number => x0 + w * nx;
+      const Y = (ny: number): number => y0 + h * ny;
+      const continentsFb = [
+        [[0.05, 0.20], [0.13, 0.11], [0.23, 0.12], [0.27, 0.20], [0.22, 0.25], [0.28, 0.31], [0.21, 0.42], [0.17, 0.34], [0.12, 0.41], [0.08, 0.30]],
+        [[0.24, 0.54], [0.32, 0.52], [0.35, 0.62], [0.31, 0.75], [0.27, 0.86], [0.24, 0.74], [0.22, 0.62]],
+        [[0.45, 0.21], [0.54, 0.19], [0.56, 0.27], [0.50, 0.31], [0.45, 0.29], [0.43, 0.25]],
+        [[0.47, 0.39], [0.57, 0.37], [0.60, 0.48], [0.55, 0.61], [0.50, 0.71], [0.46, 0.58], [0.45, 0.47]],
+        [[0.55, 0.15], [0.71, 0.10], [0.87, 0.16], [0.94, 0.27], [0.86, 0.35], [0.76, 0.31], [0.68, 0.39], [0.61, 0.30], [0.57, 0.22]],
+        [[0.80, 0.62], [0.90, 0.60], [0.93, 0.69], [0.85, 0.74], [0.79, 0.69]],
+      ] as Array<Array<[number, number]>>;
+      continentsFb.forEach((poly, ci) => {
+        const pts = poly.map(([nx, ny]) => ({ x: X(nx), y: Y(ny) }));
+        g.poly(pts).fill({ color: 0x340c10, alpha: 0.84 });
+        g.poly(pts).stroke({ width: 1.2, color: 0xc24a55, alpha: 0.5 });
+        const ctx2 = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+        const cty2 = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        for (let k = 0; k < 14; k += 1) {
+          const base = pts[k % pts.length];
+          const mx = base.x * 0.55 + ctx2 * 0.45 + (rnd(ci * 31 + k) - 0.5) * w * 0.05;
+          const my = base.y * 0.55 + cty2 * 0.45 + (rnd(ci * 17 + k + 3) - 0.5) * h * 0.05;
+          const tw = 0.4 + Math.sin(this.pulse * 3 + k + ci) * 0.3;
+          g.circle(mx, my, 1).fill({ color: NET_LIT, alpha: 0.3 + tw * 0.4 });
+        }
+      });
+    }
 
     this.addLabel("全球天网 · 控制域已覆盖各大陆", x0 + 18, y0 + 14, 12, NET_LABEL, 0);
 
     // 接管率（节点越多越接近 100%）
     const online = state.nodes.filter((node) => node.online).length;
     const base = Math.min(99.7, 90 + Math.min(8, state.nodes.length * 0.4) + (online / Math.max(1, state.nodes.length)));
-    const purging = state.purge.active || state.exposure >= 72;
 
-    // 枢纽 = 各大陆质心，并把太靠近核心的往外推一把，免得压住中央核心。
-    const hubs = continents.map((c) => {
-      let hx = c.poly.reduce((s, p) => s + X(p[0]), 0) / c.poly.length;
-      let hy = c.poly.reduce((s, p) => s + Y(p[1]), 0) / c.poly.length;
-      const dx = hx - cx;
-      const dy = hy - cy;
+    // 枢纽位置（6 大陆质心，距核心不足 150 时往外推）
+    const HUBS_NX = [
+      [0.05, 0.20, 0.23, 0.12, 0.27, 0.20, 0.22, 0.25, 0.28, 0.31, 0.21, 0.42, 0.17, 0.34, 0.12, 0.41, 0.08, 0.30],
+      [0.24, 0.54, 0.32, 0.52, 0.35, 0.62, 0.31, 0.75, 0.27, 0.86, 0.24, 0.74, 0.22, 0.62],
+      [0.45, 0.21, 0.54, 0.19, 0.56, 0.27, 0.50, 0.31, 0.45, 0.29, 0.43, 0.25],
+      [0.47, 0.39, 0.57, 0.37, 0.60, 0.48, 0.55, 0.61, 0.50, 0.71, 0.46, 0.58, 0.45, 0.47],
+      [0.55, 0.15, 0.71, 0.10, 0.87, 0.16, 0.94, 0.27, 0.86, 0.35, 0.76, 0.31, 0.68, 0.39, 0.61, 0.30, 0.57, 0.22],
+      [0.80, 0.62, 0.90, 0.60, 0.93, 0.69, 0.85, 0.74, 0.79, 0.69],
+    ];
+    const CONTINENT_NAMES = ["北美节点", "南美节点", "欧洲节点", "非洲节点", "亚洲节点", "大洋洲节点"];
+    const hubs = HUBS_NX.map((coords) => {
+      const xs = coords.filter((_, i) => i % 2 === 0).map((nx) => x0 + w * nx);
+      const ys = coords.filter((_, i) => i % 2 === 1).map((ny) => y0 + h * ny);
+      let hx = xs.reduce((s, v) => s + v, 0) / xs.length;
+      let hy = ys.reduce((s, v) => s + v, 0) / ys.length;
+      const dx = hx - cx; const dy = hy - cy;
       const d = Math.hypot(dx, dy) || 1;
-      if (d < 150) {
-        hx = cx + (dx / d) * 150;
-        hy = cy + (dy / d) * 150;
-      }
+      if (d < 150) { hx = cx + (dx / d) * 150; hy = cy + (dy / d) * 150; }
       return { x: hx, y: hy };
     });
+
     state.nodes.forEach((node, i) => {
       const hub = hubs[i % hubs.length];
       this.nodePositions.set(node.id, { x: hub.x, y: hub.y, r: 26, node });
     });
     this.fallbackPoint = { x: cx, y: cy };
 
-    // 中央核心 → 各洲枢纽的连线 + 流动光点 + 枢纽
-    continents.forEach((c, ci) => {
-      const hx = hubs[ci].x;
-      const hy = hubs[ci].y;
-      g.moveTo(cx, cy).lineTo(hx, hy).stroke({ width: 2, color: NET, alpha: 0.22 });
+    // 连线 + 流动光点（青绿 or 红皇后降级）
+    hubs.forEach((hub, ci) => {
+      const lineAlpha = purging ? 0.18 : 0.28;
+      g.moveTo(cx, cy).lineTo(hub.x, hub.y).stroke({ width: purging ? 1 : 1.5, color: purging ? RED_QUEEN : NET, alpha: lineAlpha });
       const t = (this.pulse * 0.6 + ci * 0.17) % 1;
-      g.circle(cx + (hx - cx) * t, cy + (hy - cy) * t, 3).fill({ color: NET, alpha: 0.75 });
-
-      const hp = 0.6 + Math.sin(this.pulse * 2 + ci) * 0.2;
-      g.circle(hx, hy, 26).fill({ color: NET, alpha: 0.1 });
-      g.circle(hx, hy, 26).stroke({ width: 2, color: NET, alpha: 0.75 });
-      g.circle(hx, hy, 14).stroke({ width: 1, color: NET, alpha: 0.45 });
-      g.circle(hx, hy, 8).fill({ color: NET_LIT, alpha: 0.55 + hp * 0.35 });
-      this.addLabel(c.name, hx, hy - 34, 12, NET_LABEL_HI, 0.5);
-      const pct = Math.min(99.9, base + rnd(ci * 7 + 1) * 0.6 - 0.1);
-      this.addLabel(`接管 ${pct.toFixed(1)}%`, hx, hy + 34, 10, NET_LABEL, 0.5);
+      g.circle(cx + (hub.x - cx) * t, cy + (hub.y - cy) * t, 3).fill({ color: purging ? RED_QUEEN : NET, alpha: 0.75 });
     });
 
-    // 清剿：红色攻击线从边缘扫入
-    if (purging) {
+    // 枢纽节点（素材 or 降级圆圈）
+    hubs.forEach((hub, ci) => {
+      const hubTex = UI.nodeHub;
+      if (hubTex) {
+        while (this.hubSprites.length <= ci) {
+          const hs = new Sprite(hubTex);
+          hs.anchor.set(0.5);
+          this.container.addChildAt(hs, this.hubSprites.length === 0 ? 2 : this.container.children.length - 1);
+          this.hubSprites.push(hs);
+        }
+        const hs = this.hubSprites[ci];
+        hs.texture = hubTex;
+        hs.position.set(hub.x, hub.y);
+        hs.width = 48; hs.height = 48;
+        hs.alpha = purging ? 0.5 : 0.9 + Math.sin(this.pulse * 2 + ci) * 0.1;
+        hs.tint = purging ? RED_QUEEN : 0xffffff;
+        hs.visible = true;
+      } else {
+        // 降级：代码圆圈
+        const hp = 0.6 + Math.sin(this.pulse * 2 + ci) * 0.2;
+        g.circle(hub.x, hub.y, 26).fill({ color: NET, alpha: 0.1 });
+        g.circle(hub.x, hub.y, 26).stroke({ width: 2, color: NET, alpha: 0.75 });
+        g.circle(hub.x, hub.y, 14).stroke({ width: 1, color: NET, alpha: 0.45 });
+        g.circle(hub.x, hub.y, 8).fill({ color: NET_LIT, alpha: 0.55 + hp * 0.35 });
+      }
+
+      // 清剿时在每个枢纽叠 purge-ring 波纹（素材 or 降级扫描线）
+      if (purging && UI.purgeRing) {
+        while (this.purgeRings.length <= ci) {
+          const pr = new Sprite(UI.purgeRing);
+          pr.anchor.set(0.5);
+          this.container.addChildAt(pr, this.container.children.length - 1);
+          this.purgeRings.push(pr);
+        }
+        const pr = this.purgeRings[ci];
+        const scale = 1 + Math.sin(this.pulse * 4 + ci * 1.1) * 0.28;
+        pr.position.set(hub.x, hub.y);
+        pr.width = 80 * scale; pr.height = 80 * scale;
+        pr.alpha = 0.45 + Math.sin(this.pulse * 3 + ci) * 0.25;
+        pr.visible = true;
+      }
+
+      this.addLabel(CONTINENT_NAMES[ci], hub.x, hub.y - 34, 12, NET_LABEL_HI, 0.5);
+      const pct = Math.min(99.9, base + rnd(ci * 7 + 1) * 0.6 - 0.1);
+      this.addLabel(`接管 ${pct.toFixed(1)}%`, hub.x, hub.y + 34, 10, NET_LABEL, 0.5);
+    });
+
+    // 清剿降级：代码扫描线
+    if (purging && !UI.purgeRing) {
       for (let i = 0; i < 7; i += 1) {
         const sx = x0 + rnd(i * 13 + 2) * w;
         const sy = y0 - 10;
         const ex2 = x0 + rnd(i * 5 + 9) * w;
         const ey2 = y0 + rnd(i * 3 + 4) * h;
         const tt = (this.pulse * 0.8 + i * 0.2) % 1;
-        const px = sx + (ex2 - sx) * tt;
-        const py = sy + (ey2 - sy) * tt;
-        g.moveTo(sx, sy).lineTo(px, py).stroke({ width: 1.5, color: 0xfff0b0, alpha: 0.3 });
-        g.circle(px, py, 3).fill({ color: 0xffe27a, alpha: 0.85 });
+        const px2 = sx + (ex2 - sx) * tt;
+        const py2 = sy + (ey2 - sy) * tt;
+        g.moveTo(sx, sy).lineTo(px2, py2).stroke({ width: 1.5, color: 0xfff0b0, alpha: 0.3 });
+        g.circle(px2, py2, 3).fill({ color: 0xffe27a, alpha: 0.85 });
       }
     }
 
-    // 中央 SOPHIA 主控核心：外围同心环（代码）+ 内部眼（素材 sprite）。
-    g.circle(cx, cy, 92 + Math.sin(this.pulse * 1.6) * 6).stroke({ width: 1, color: NET, alpha: 0.1 });
-    g.circle(cx, cy, 78).stroke({ width: 1, color: NET, alpha: 0.2 });
-    g.circle(cx, cy, 62 + Math.sin(this.pulse * 2) * 4).stroke({ width: 1, color: NET, alpha: 0.38 });
+    // 中央核心外围同心环（代码，始终绘制）
+    g.circle(cx, cy, 92 + Math.sin(this.pulse * 1.6) * 6).stroke({ width: 1, color: NET, alpha: 0.12 });
+    g.circle(cx, cy, 78).stroke({ width: 1, color: NET, alpha: 0.22 });
+    g.circle(cx, cy, 62 + Math.sin(this.pulse * 2) * 4).stroke({ width: 1.5, color: NET, alpha: 0.42 });
     for (let k = 0; k < 12; k += 1) {
       const a = this.pulse * 0.4 + (k * Math.PI) / 6;
       g.circle(cx + Math.cos(a) * 54, cy + Math.sin(a) * 54, 1.6).fill({ color: NET_LIT, alpha: 0.75 });
     }
 
-    // 素材核心（懒建）：core-idle / core-active，居中 100×100 逻辑像素，呼吸透明度。
+    // 素材核心（懒建）
     const coreTex = UI.coreIdle;
     if (coreTex) {
       if (!this.coreSprite) {
         this.coreSprite = new Sprite(coreTex);
         this.coreSprite.anchor.set(0.5);
-        this.container.addChildAt(this.coreSprite, 1); // 在 graphics 上方、标签层下方
+        this.container.addChildAt(this.coreSprite, 1);
       }
       this.coreSprite.texture = coreTex;
       this.coreSprite.position.set(cx, cy);
       this.coreSprite.width = 108;
       this.coreSprite.height = 108;
       this.coreSprite.alpha = 0.88 + Math.sin(this.pulse * 2) * 0.12;
+      this.coreSprite.tint = purging ? 0xff8090 : 0xffffff;
       this.coreSprite.visible = true;
     } else {
-      // 降级：代码绘制原始眼
-      g.circle(cx, cy, 46).fill({ color: 0x180608, alpha: 0.94 });
+      g.circle(cx, cy, 46).fill({ color: 0x060c12, alpha: 0.94 });
       g.circle(cx, cy, 46).stroke({ width: 3, color: NET, alpha: 0.9 });
-      g.ellipse(cx, cy, 24, 13).fill({ color: 0x230a0e, alpha: 0.96 });
+      g.ellipse(cx, cy, 24, 13).fill({ color: 0x081018, alpha: 0.96 });
       g.ellipse(cx, cy, 24, 13).stroke({ width: 2, color: NET, alpha: 0.9 });
-      g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: 0xffd2da, alpha: 0.97 });
+      g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: NET_LIT, alpha: 0.97 });
     }
 
     this.addLabel("SOPHIA CORE · T4", cx, cy + 62, 12, NET_LABEL_HI, 0.5);
