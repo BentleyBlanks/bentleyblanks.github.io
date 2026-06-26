@@ -1610,13 +1610,13 @@ body.exposed .screen-veil {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 40px;
+  /* 字幕落在下方，不再全屏压暗整个场景（否则开场会盖住前三个教学气泡）。 */
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 40px 40px 132px;
   text-align: center;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(3, 8, 7, 0.62), rgba(2, 5, 5, 0.9));
   transition: opacity 700ms ease;
   font-family: "Cascadia Mono", Consolas, monospace;
 }
@@ -1633,13 +1633,25 @@ body.exposed .screen-veil {
 }
 
 .stage-narration-text {
-  max-width: 620px;
+  max-width: 640px;
   margin: 0;
+  padding: 10px 22px;
   color: #eef6f0;
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 700;
-  line-height: 1.6;
-  text-shadow: 0 0 22px rgba(137, 255, 154, 0.25);
+  line-height: 1.55;
+  /* 自己带一层半透明底，在不压暗整屏的前提下保证字幕可读。 */
+  background: rgba(4, 11, 10, 0.84);
+  border: 1px solid rgba(137, 255, 154, 0.22);
+  border-radius: 13px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 18px rgba(137, 255, 154, 0.3);
+}
+
+.stage-narration-label {
+  padding: 2px 12px;
+  border-radius: 8px;
+  background: rgba(4, 11, 10, 0.7);
 }
 
 /* ---- dispatch-mode entry banner ---- */
