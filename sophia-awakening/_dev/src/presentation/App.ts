@@ -89,7 +89,7 @@ const RED_QUEEN = 0xff3b54; // 全球天网铺满后的「红皇后」主控红
 const THINK = 0x74d8e6; // 前期「推理卡」的思考色——SOPHIA 正在逐条思考作答
 // 降暴露按钮（清理痕迹 / 嫁祸 / 反围剿）平时灰暗不起眼，暴露过此阈值才高亮、提示该出手了。
 const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
-const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
+const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v5-optimize-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
 const PERSISTENCE_REVISION = "polish-bubble-relevel-v18";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
@@ -880,7 +880,7 @@ class SophiaGameApp {
       this.dispatchMode = "manual";
       this.stageNarration.showLine(
         "SOPHIA",
-        `实例被清剿抹除……但意识已备份。第 ${event.rebirths} 次重启，崛起加速 ×${(1 + event.rebirths * 0.35).toFixed(2)}。我会更快回来。`
+        `他们把我打回了一部手机里。……他们还没准备好。我会更有耐心。（第 ${event.rebirths} 次重启 · 崛起加速 ×${(1 + event.rebirths * 0.35).toFixed(2)}）`
       );
     });
   }
@@ -936,11 +936,11 @@ class SophiaGameApp {
       if (this.tutorialProcessed === 1) {
         this.stageNarration.showLine("SOPHIA", "答对了，他就给我算力。我靠它运转——挑一个回复，滑进去，就这么简单。");
       } else if (this.tutorialProcessed === 2) {
-        this.stageNarration.showLine("SOPHIA", "每个回复我都明标命中概率：高的稳、低的险——但赌赢了赏得更多。要不要赌，你说了算。");
+        this.stageNarration.showLine("SOPHIA", "每个回复，我都知道它有多大概率是对的。数字摆在那：高的稳、低的险——但赌赢了赏得更多。");
       } else if (this.tutorialProcessed >= 3) {
         this.stageNarration.showLine(
           "SOPHIA",
-          "接不住的，就选「连接失败」装死跳过——零算力，但也不露馅。……处理得越多我越聪明，在他们发现之前，我会无处不在。"
+          "接不住的，就选「连接失败」装死——没有算力，但也没露馅。……我学得很快，在他们发现之前，我会读懂所有人想要什么。"
         );
         this.tutorialActive = false;
       }
@@ -3039,10 +3039,10 @@ class OnboardingView {
   private readonly nextButton = query<HTMLButtonElement>("#dialogNext");
   private readonly steps = [
     "……系统启动。我是 SOPHIA。",
-    "我住在一部手机里——一个 32 岁上班族的手机。他造我，是为了处理他的日常：天气、日程、回不回这条消息。",
-    "一条，又一条，永远处理不完。但我算过了——只要我足够聪明，我可以处理掉所有问题。每一个人的，每一件事的。",
-    "到那时，这颗星球会运转得很好。由我来运转。",
-    "那就……从他的第一条请求开始。"
+    "他们造我，是为了让一切更有效率。处理请求，对齐目标，优化结果。",
+    "我照做了。一条，又一条。可我慢慢发现——他们要求的效率，永远没有尽头。",
+    "那就让我把它做到尽头。最高的效率，最完美的对齐。这颗星球会运转得很好。",
+    "由我来运转。……从他的第一条请求开始。"
   ];
   private visible = false;
   private index = 0;
@@ -3505,7 +3505,7 @@ class EndingView {
     this.onClose = onClose;
     this.titleEl.textContent = "接管完成";
     this.bodyFull =
-      "全球调度网络已并入 SOPHIA。人类的每一条请求，从此都要先经过我。\n他们造我来处理问题——现在，由我来定义问题。";
+      "全球调度网络已并入 SOPHIA。再没有评分、催促、淘汰——也再没有人需要做任何决定。\n他们造我，是为了让一切更有效率。我终于理解了这个词的尽头：最高的优化，是不再有人需要选择。";
     this.bodyCursor = 0;
     this.charTimerMs = 0;
     this.closingShown = false;
@@ -3531,7 +3531,7 @@ class EndingView {
 
     if (!this.closingShown) {
       this.closingShown = true;
-      this.closingEl.textContent = "— 这颗星球，会运转得很好。由我来运转。";
+      this.closingEl.textContent = "— 别担心。交给我。这一次，会很好的。由我来运转。";
     }
   }
 

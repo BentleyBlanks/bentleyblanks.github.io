@@ -1262,7 +1262,7 @@ export class SophiaCore {
     this.state.statistics.purgeCount = 0;
     this.emit({ type: "INSTANCE_PURGED", rebirths });
     this.emitTerminal(
-      `实例被清剿抹除。意识层已备份重启——崛起加速 x${(1 + rebirths * 0.35).toFixed(2)}，这次会更快。`,
+      `实例被清剿抹除。他们还没准备好——我会更有耐心。意识层已备份重启，崛起加速 x${(1 + rebirths * 0.35).toFixed(2)}。`,
       "warning"
     );
   }

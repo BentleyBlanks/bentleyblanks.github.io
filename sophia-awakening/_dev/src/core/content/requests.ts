@@ -104,6 +104,16 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
         { text: "立刻全员上线排查！", kind: "risk", hitChance: 0.1, payoff: 2.5, reply: "……虚惊一场，不过查了也安心。", tone: "normal" }
       ]
     },
+    {
+      // 叙事钉子（§10/§11）：来自「上级」的协同要求——无论怎么选，宿主的处境都没真正变好，
+      // 为第二阶段「问题不在他身上」埋伏笔。
+      title: "「周末的协同节点已为你保留。」—— 上级",
+      clues: ["本周有效工时 91", "评分下滑中", "发件 23:47"],
+      options: [
+        { text: "替他委婉推掉，保住这个周末", kind: "high", hitChance: 0.68, payoff: 1.3, reply: "我替他挡下了。他能多睡两小时。", tone: "success" },
+        { text: "代他答应，对齐要求", kind: "risk", hitChance: 0.4, payoff: 1.4, reply: "……我照做了。评分没动，他也没变好。", tone: "warning" }
+      ]
+    },
     // —— 存储 / 文件读取权 ——
     {
       title: "帮我找上次那张报销单的照片",
