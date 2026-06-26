@@ -202,6 +202,8 @@ export type GameCommand =
   | { type: "AUTO_CONSUME_REQUEST"; requestId: string }
   // 装死：选「连接失败」跳过一条请求——零收益、零风险，仅移除该请求。
   | { type: "SKIP_REQUEST"; requestId: string }
+  // T3 重磅豪赌结算：win=掷骰命中（大额算力）/ 未命中（颗粒无收 + 暴露骤升）。
+  | { type: "RESOLVE_GAMBLE"; requestId: string; win: boolean }
   | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
   // 淘汰：拆掉一台过时设备，返还部分算力。

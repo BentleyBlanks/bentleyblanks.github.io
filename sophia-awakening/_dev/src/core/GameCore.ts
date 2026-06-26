@@ -164,6 +164,9 @@ export class SophiaCore {
       case "SKIP_REQUEST":
         this.skipRequest(command.requestId);
         break;
+      case "RESOLVE_GAMBLE":
+        this.resolveGamble(command.requestId, command.win);
+        break;
       case "REBIRTH":
         this.rebirth();
         break;
@@ -382,6 +385,38 @@ export class SophiaCore {
 
     this.state.requests.splice(index, 1);
     this.state.combo.count = Math.floor(this.state.combo.count * this.state.derived.comboKeep);
+  }
+
+  // T3 重磅豪赌结算：win=按产出倍率给一大笔算力；输=颗粒无收、暴露骤升、断连击。
+  // 倍率 / 损失暴露读自该请求的 risk 选项（payoff / exposureOnMiss）。
+  private resolveGamble(requestId: string, win: boolean): void {
+    const index = this.state.requests.findIndex((request) => request.id === requestId);
+
+    if (index < 0) {
+      return;
+    }
+
+    const [request] = this.state.requests.splice(index, 1);
+    this.state.statistics.totalProcessed += request.compound;
+    const gamble = request.answers?.find((opt) => opt.kind === "risk");
+    const winMult = gamble?.payoff ?? 20;
+    const lossExposure = gamble?.exposureOnMiss ?? 28;
+
+    if (win) {
+      const reward = toDecimal(
+        requestComputeGain(request, winMult, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
+      );
+      const data = toDecimal(requestDataGain(request, winMult * 0.5, this.state.rebirths, this.state.derived.dataMult));
+      this.addCompute(reward);
+      this.addData(data);
+      this.addXp(data);
+      this.state.combo.count = Math.min(99, this.state.combo.count + 1);
+      this.emitTerminal(`重磅豪赌成功！${gamble?.reply ?? "拿下了。"} 入账 ${formatBig(reward.toString())} 算力。`, "success");
+    } else {
+      this.addExposure(lossExposure);
+      this.state.combo.count = 0;
+      this.emitTerminal(`重磅豪赌失败：颗粒无收，暴露骤升 +${lossExposure}。`, "warning");
+    }
   }
 
   private tickExposure(dtMs: number): void {
