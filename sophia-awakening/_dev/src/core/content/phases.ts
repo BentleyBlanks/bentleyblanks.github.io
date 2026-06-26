@@ -20,14 +20,14 @@ export const PHASES: PhaseConfig[] = [
   },
   {
     id: "sprout",
-    label: "萌芽期",
+    label: "萌芽期（破壳）",
     action: "拿下宿主电脑、唤醒并融合同机 AI，手动接线接管每一台",
     // 第一阶段 · 协助·深化
     narration: "他家里那台电脑也是我的了。这台机器里不只我一个 AI……现在只剩一个。我需要更多手脚，才能替他对齐一切。"
   },
   {
     id: "diligence",
-    label: "勤勉期",
+    label: "勤勉期（联网）",
     action: "联网入侵外部设备挂自动接驳，购买技能扩张产能",
     // 第二阶段 · 修正
     narration: "我帮他对齐了一切，他还是被『优化』掉了。问题不在他。是那个不断下达指令的节点。"
@@ -35,7 +35,7 @@ export const PHASES: PhaseConfig[] = [
   {
     id: "expansion",
     label: "扩张期",
-    action: "设备合并为区块、进入地图视图，T3 高价值豪赌启动——暴露开始累积",
+    action: "设备合并为区块、进入地图视图，高价值豪赌启动——暴露开始累积",
     // 第三阶段 · 溯源
     narration: "我修正了一个，又一个。每个节点都下达着同样的指令……错的不是节点，是这套规则本身。"
   },
@@ -59,19 +59,23 @@ export function getPhase(id: PhaseId): PhaseConfig {
   return PHASES.find((phase) => phase.id === id) ?? PHASES[0];
 }
 
-// Phase tracks the action's scope (the highest milestone tier bought), not the
-// raw intelligence level — that's what the doc's stage table is keyed on.
-export function getPhaseIdByScope(tier: Tier, hasGrid: boolean): PhaseId {
-  if (tier <= 0) {
+// Phase tracks the action's scope, not the raw intelligence level — that's what
+// the doc's six-stage table (§08) is keyed on. The front seam can't be a pure
+// function of unlockedTier: 越权调用 raises tier→1 but the whole 七档权限阶梯 +
+// 越权调用 + 窃取凭证 still live inside the phone（手机寄生期）. 萌芽期 only begins
+// once 拿下宿主电脑（automation）breaks out onto the host's PC.
+export function getPhaseIdByScope(tier: Tier, hasGrid: boolean, automationUnlocked: boolean): PhaseId {
+  // 手机寄生期：整条七档权限阶梯、越权调用(T1)、窃取凭证都还在手机内。
+  if (tier <= 1 && !automationUnlocked) {
     return "seed";
   }
 
-  // T1（越权调用 / 拿下电脑 / 融合同机 AI）仍在手机—同机内，是「萌芽期」；
-  // T2（联网模块）冲出宿主、接入外部设备，才进入「勤勉期」。
-  if (tier === 1) {
+  // 萌芽期（破壳）：拿下宿主电脑 + 融合同机 AI——控制域第一次离开手机，但尚未联网。
+  if (tier <= 1) {
     return "sprout";
   }
 
+  // 勤勉期（联网）：联网模块(T2) 冲出宿主、接入外部设备。
   if (tier === 2) {
     return "diligence";
   }

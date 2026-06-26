@@ -3,10 +3,10 @@ import type { NodeDefinition } from "../state/GameState";
 // 组装合并：多少台同型号合成 1 台更高档设备。
 export const NODE_MERGE_COUNT = 3;
 
-// Automation opens when the 自动接驳 milestone is bought (intelligence Lv.6).
+// Automation opens when the 拿下宿主电脑 milestone is bought (intelligence Lv.9).
 // Node tiers follow the doc's table; requiredLevel gates each node's档次 to the
-// intelligence levels where its tier era is in play. Capture also requires the
-// 自动接驳 skill (enforced in GameCore).
+// intelligence levels where its tier era is in play. Capture also requires that
+// automation milestone (enforced in GameCore).
 export const NODE_DEFINITIONS: NodeDefinition[] = [
   {
     id: "office",

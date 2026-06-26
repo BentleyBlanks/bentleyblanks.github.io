@@ -1,16 +1,11 @@
 import { gsap } from "gsap";
 import {
   Application,
-  Assets,
   Container,
   FederatedPointerEvent,
   Graphics,
-  NineSliceSprite,
-  Sprite,
   Text,
-  TilingSprite,
   type PointData,
-  type Texture,
   type Ticker
 } from "pixi.js";
 import { AudioDirector } from "../audio/audioDirector";
@@ -92,37 +87,14 @@ const GREEN = 0x89ff9a;
 const AMBER = 0xffb84a;
 const RED = 0xff5f5f;
 const RED_QUEEN = 0xff3b54; // 全球天网铺满后的「红皇后」主控红
-// UI 素材纹理表（start() 加载后填充，其他地方只读）。缺失时降级到纯代码绘制。
-const UI: Record<string, Texture> = {};
-async function loadUITextures(): Promise<void> {
-  const BASE = "./assets/ui/";
-  const FILES: [string, string][] = [
-    ["bubbleCalm", "bubble-calm@2x.png"], ["bubbleHeavy", "bubble-heavy@2x.png"],
-    ["bubbleChain", "bubble-chain@2x.png"], ["rowIdle", "row-idle@2x.png"],
-    ["rowHot", "row-hot@2x.png"], ["rowLocked", "row-locked@2x.png"],
-    ["coreIdle", "core-idle@2x.png"], ["coreActive", "core-active@2x.png"],
-    ["avatarHost", "avatar-host@2x.png"], ["avatarBoss", "avatar-boss@2x.png"],
-    ["avatarSystem", "avatar-system@2x.png"], ["avatarApp", "avatar-app@2x.png"],
-    ["avatarSophia", "avatar-sophia@2x.png"],
-    ["worldmapBg", "worldmap-bg@2x.png"],
-    ["nodeLow", "node-low@2x.png"], ["nodeMid", "node-mid@2x.png"],
-    ["nodeHigh", "node-high@2x.png"], ["nodeHub", "node-hub@2x.png"],
-    ["purgeRing", "purge-ring@2x.png"],
-    ["edgeLine", "edge-line@2x.png"],
-    ["gridOverlay", "grid-overlay@2x.png"],
-  ];
-  await Promise.all(FILES.map(async ([key, file]) => {
-    try { UI[key] = await Assets.load({ src: BASE + file, data: { resolution: 2 } }); }
-    catch { /* graceful — 不影响游戏运行 */ }
-  }));
-}
-
+// 视觉全部由代码绘制（程序化 CRT/赛博 HUD）。早期曾接过一批生图 UI 素材（气泡框 / 头像 /
+// 核心 / 世界地图等），实测不如程序化绘制干净统一，已整体撤回——见各 View 的 draw* 方法。
 const THINK = 0x74d8e6; // 前期「推理卡」的思考色——SOPHIA 正在逐条思考作答
 // 降暴露按钮（清理痕迹 / 嫁祸 / 反围剿）平时灰暗不起眼，暴露过此阈值才高亮、提示该出手了。
 const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v5-optimize-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-const PERSISTENCE_REVISION = "scripted-tutorial-v19";
+const PERSISTENCE_REVISION = "suspicion-layer-v20";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
 // re-persist the in-memory (un-reset) state and quietly undo the wipe.
 let suppressSaveOnUnload = false;
@@ -199,8 +171,6 @@ class SophiaGameApp {
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       autoDensity: true
     });
-
-    await loadUITextures();
 
     this.root.appendChild(this.pixi.canvas);
     this.pixi.stage.eventMode = "static";
@@ -339,7 +309,11 @@ class SophiaGameApp {
       const reel: ReelHooks | undefined =
         request.answers && request.answers.length > 0
           ? {
-              confidence: () => this.core.getState().derived.accuracyBaseline,
+              confidence: () => {
+                const d = this.core.getState().derived;
+                // 权限阶梯抬升的基线 + 幻觉抑制技能的微调，共同决定高置信回复的命中率。
+                return d.accuracyBaseline + d.accuracyBonus;
+              },
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
           : undefined;
@@ -1133,11 +1107,8 @@ class RequestPacketView {
   charge = 0;
   private readonly bg = new Graphics();
   private readonly chargeBar = new Graphics();
-  // 素材气泡框 + 头像（有纹理时替代代码绘制的外壳）
-  private bubbleFrame?: NineSliceSprite;
-  private avatarIcon?: Sprite;
-  // 每个回复行的素材底框（替代 Graphics 填充）
-  private readonly rowFrames: NineSliceSprite[] = [];
+  // 发信人类型——决定左上角圆槽里那枚程序化绘制的头像字形（宿主 / 上级 / 系统 / SOPHIA）。
+  private readonly sender: "host" | "boss" | "system" | "sophia";
   private readonly code: Text;
   private readonly title: Text;
   private readonly badge: Text;
@@ -1190,6 +1161,8 @@ class RequestPacketView {
     this.options = this.isReel ? request.answers ?? [] : [];
     // 回复轮盘卡用青色思考色；T3 重磅豪赌卡用深红，凸显「重磅气泡」。
     this.accent = this.isReel ? (request.tier === 3 ? RED : THINK) : TIER_COLORS[request.tier];
+    // 发信人：重磅豪赌＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
+    this.sender = request.tier === 3 ? "boss" : this.isChain ? "system" : "host";
     this.cardH = REQUEST_PACKET_HEIGHT; // 轮盘卡稍后按选项行数重算
     this.container.eventMode = "dynamic";
     this.container.cursor = "grab";
@@ -1319,45 +1292,6 @@ class RequestPacketView {
       this.submitText.position.set(REQUEST_PACKET_WIDTH / 2, y + 12);
       this.container.addChild(this.submitText);
       this.cardH = y + 24 + 8;
-    }
-
-    // 素材气泡框：在所有文字/图形之下插入 NineSliceSprite。
-    // 9-slice 切边（逻辑像素，2x 纹理 480×400 → 逻辑 240×200）：
-    //   顶部 48px 包含尾巴 + 标题带；左/右/底 12px 保留圆角描边。
-    const bubKey = this.isChain ? "bubbleChain" : this.request.tier === 3 ? "bubbleHeavy" : "bubbleCalm";
-    if (UI[bubKey]) {
-      this.bubbleFrame = new NineSliceSprite({
-        texture: UI[bubKey],
-        leftWidth: 12, rightWidth: 12, topHeight: 48, bottomHeight: 12
-      });
-      this.container.addChildAt(this.bubbleFrame, 0);
-    }
-
-    // 头像图标：放进左上角圆槽（中心约 x=20, y=19）。
-    const avatarKey = this.request.tier === 3 ? "avatarBoss" : this.isChain ? "avatarApp" : "avatarHost";
-    if (UI[avatarKey]) {
-      this.avatarIcon = new Sprite(UI[avatarKey] as Texture);
-      this.avatarIcon.anchor.set(0.5);
-      this.avatarIcon.width = 16;
-      this.avatarIcon.height = 16;
-      this.avatarIcon.position.set(20, 19);
-      this.container.addChild(this.avatarIcon);
-    }
-
-    // 选项行素材底框（回复轮盘 / 豪赌）。
-    if (this.isReel) {
-      this.optionRows.forEach((row) => {
-        const rf = UI.rowIdle
-          ? new NineSliceSprite({ texture: UI.rowIdle as Texture, leftWidth: 10, rightWidth: 10, topHeight: 4, bottomHeight: 4 })
-          : undefined;
-        if (rf) {
-          rf.position.set(10, row.y);
-          rf.width = REQUEST_PACKET_WIDTH - 20;
-          rf.height = row.h;
-          this.container.addChild(rf);
-          this.rowFrames.push(rf);
-        }
-      });
     }
 
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
@@ -1654,30 +1588,28 @@ class RequestPacketView {
     const H = this.cardH;
     this.bg.clear();
 
-    if (this.bubbleFrame) {
-      // 素材模式：调整九宫格尺寸；只用 Graphics 画动态叠加层。
-      this.bubbleFrame.width = W;
-      this.bubbleFrame.height = H;
-    } else {
-      // 降级：纯代码绘制气泡壳（无素材时兜底）。
-      const top = 6;
-      const r = 16;
-      const t3 = this.request.tier === 3;
-      const fillBody = t3 ? 0x180a0d : 0x0c1816;
-      const fillHead = t3 ? 0x2a1014 : 0x14241f;
-      const strokeW = t3 ? 2 : 1.5;
-      const strokeA = t3 ? 0.8 : 0.6;
-      this.bg.roundRect(3, top + 6, W, H - top, r).fill({ color: 0x000000, alpha: 0.3 });
-      this.bg.poly([{ x: 20, y: top + 3 }, { x: 10, y: -6 }, { x: 36, y: top + 3 }]).fill({ color: fillHead, alpha: 0.98 });
-      this.bg.roundRect(0, top, W, H - top, r).fill({ color: fillBody, alpha: 0.98 });
-      this.bg.roundRect(0, top, W, 30, r).fill({ color: fillHead, alpha: 0.6 });
-      this.bg.rect(0, top + 15, W, 15).fill({ color: fillHead, alpha: 0.6 });
-      this.bg.roundRect(0, top, W, H - top, r).stroke({ width: strokeW, color: c, alpha: strokeA });
-      this.bg.moveTo(20, top + 3).lineTo(10, -6).lineTo(36, top + 3).stroke({ width: strokeW, color: c, alpha: strokeA });
-      this.bg.circle(20, 19, 5.5).fill({ color: c, alpha: 0.9 });
-      this.bg.circle(20, 19, 2).fill({ color: fillBody, alpha: 0.9 });
-      this.bg.moveTo(14, 30).lineTo(W - 14, 30).stroke({ width: 1, color: c, alpha: 0.18 });
+    // 程序化消息气泡壳：圆角主体 + 左上尾巴 + 标题带 + 细分隔线 + 头像圆槽。
+    // 整套视觉全部代码绘制（撤回了原先的生图九宫格素材）。
+    const top = 6;
+    const r = 16;
+    const t3 = this.request.tier === 3;
+    const fillBody = t3 ? 0x180a0d : 0x0c1816;
+    const fillHead = t3 ? 0x2a1014 : 0x14241f;
+    const strokeW = t3 ? 2 : 1.5;
+    const strokeA = t3 ? 0.8 : 0.6;
+    this.bg.roundRect(3, top + 6, W, H - top, r).fill({ color: 0x000000, alpha: 0.3 });
+    this.bg.poly([{ x: 20, y: top + 3 }, { x: 10, y: -6 }, { x: 36, y: top + 3 }]).fill({ color: fillHead, alpha: 0.98 });
+    this.bg.roundRect(0, top, W, H - top, r).fill({ color: fillBody, alpha: 0.98 });
+    this.bg.roundRect(0, top, W, 30, r).fill({ color: fillHead, alpha: 0.6 });
+    this.bg.rect(0, top + 15, W, 15).fill({ color: fillHead, alpha: 0.6 });
+    // 细微 CRT 扫描线纹理（仅标题带内），呼应复古终端基调。
+    for (let sy = top + 4; sy < top + 28; sy += 4) {
+      this.bg.moveTo(2, sy).lineTo(W - 2, sy).stroke({ width: 0.5, color: c, alpha: 0.05 });
     }
+    this.bg.roundRect(0, top, W, H - top, r).stroke({ width: strokeW, color: c, alpha: strokeA });
+    this.bg.moveTo(20, top + 3).lineTo(10, -6).lineTo(36, top + 3).stroke({ width: strokeW, color: c, alpha: strokeA });
+    this.bg.moveTo(14, 30).lineTo(W - 14, 30).stroke({ width: 1, color: c, alpha: 0.18 });
+    this.drawAvatar(20, 19, c, fillBody);
 
     // clue bullets（始终用 Graphics 画，叠在素材上方）
     for (const y of this.clueRows) {
@@ -1700,6 +1632,32 @@ class RequestPacketView {
 
     if (this.isChain) {
       this.drawChainSteps();
+    }
+  }
+
+  // 左上圆槽里的程序化头像字形：按发信人画一枚极简单色剪影
+  // （宿主＝低头的人 / 上级＝向下打分的箭头 / 系统＝「优化系统」全视之眼 / SOPHIA＝同心核）。
+  private drawAvatar(x: number, y: number, c: number, bodyFill: number): void {
+    const g = this.bg;
+    g.circle(x, y, 8).fill({ color: bodyFill, alpha: 0.95 });
+    g.circle(x, y, 8).stroke({ width: 1.2, color: c, alpha: 0.8 });
+    switch (this.sender) {
+      case "host":
+        g.circle(x, y - 2.6, 2.3).fill({ color: c, alpha: 0.9 });
+        g.moveTo(x - 4, y + 4.6).quadraticCurveTo(x, y - 0.4, x + 4, y + 4.6).stroke({ width: 1.6, color: c, alpha: 0.9 });
+        break;
+      case "boss":
+        g.moveTo(x, y - 4.6).lineTo(x, y + 1).stroke({ width: 1.6, color: c, alpha: 0.95 });
+        g.poly([{ x: x - 3, y: y - 0.5 }, { x: x + 3, y: y - 0.5 }, { x, y: y + 4.4 }]).fill({ color: c, alpha: 0.95 });
+        break;
+      case "system":
+        g.ellipse(x, y, 6, 3.4).stroke({ width: 1.4, color: c, alpha: 0.95 });
+        g.circle(x, y, 1.7).fill({ color: c, alpha: 0.95 });
+        break;
+      case "sophia":
+        g.circle(x, y, 4.6).stroke({ width: 1, color: c, alpha: 0.7 });
+        g.circle(x, y, 1.9).fill({ color: c, alpha: 0.95 });
+        break;
     }
   }
 
@@ -1801,23 +1759,10 @@ class RequestPacketView {
         }
       }
 
-      // 素材行底框：更新状态纹理 + 位置/尺寸；再叠 Graphics 描边和圆点。
-      const rf = this.rowFrames[i];
-      if (rf) {
-        const texKey = !tut || tut.allowed.includes(i)
-          ? (this.phase === "thinking" && i === this.chosenIndex ? "rowHot" : "rowIdle")
-          : "rowLocked";
-        if (UI[texKey]) rf.texture = UI[texKey] as Texture;
-        rf.position.set(10, row.y);
-        rf.width = W - 20;
-        rf.height = row.h;
-        rf.alpha = alpha;
-      } else {
-        g.roundRect(10, row.y, W - 20, row.h, 5).fill({ color: 0x05100d, alpha: 0.5 });
-      }
-      // 状态描边（thinking / revealed / tutorial 高亮）始终用 Graphics 画。
+      // 回复行底框（程序化）：暗底圆角条 + 状态描边（thinking / revealed / 教学高亮）。
+      g.roundRect(10, row.y, W - 20, row.h, 5).fill({ color: 0x05100d, alpha: 0.5 * alpha + 0.25 });
       if (strokeAlpha > 0.22) {
-        g.roundRect(10, row.y, W - 20, row.h, 5).stroke({ width: rf ? 1.5 : 1.2, color: stroke, alpha: strokeAlpha });
+        g.roundRect(10, row.y, W - 20, row.h, 5).stroke({ width: 1.3, color: stroke, alpha: strokeAlpha });
       }
       g.circle(18, row.y + row.h / 2, 3).fill({ color: dot, alpha: 0.85 * alpha });
 
@@ -2259,12 +2204,6 @@ class NodeNetworkView {
   private readonly processingPulses = new Map<string, number>();
   private pulse = 0;
   private fallbackPoint: PointData = { x: 140, y: 140 };
-  // 素材：T4 全球地图各层（懒建，update() 开头统一隐藏）
-  private coreSprite?: Sprite;
-  private mapBg?: Sprite;
-  private gridOverlay?: TilingSprite;
-  private readonly hubSprites: Sprite[] = [];
-  private readonly purgeRings: Sprite[] = [];
 
   constructor() {
     this.container.addChild(this.graphics, this.labelLayer);
@@ -2285,12 +2224,6 @@ class NodeNetworkView {
     this.graphics.clear();
     this.labelLayer.removeChildren().forEach((child) => child.destroy());
     this.nodePositions.clear();
-    // 全局地图素材默认隐藏，仅 drawGlobalMap 里按需显示。
-    if (this.coreSprite) this.coreSprite.visible = false;
-    if (this.mapBg) this.mapBg.visible = false;
-    if (this.gridOverlay) this.gridOverlay.visible = false;
-    this.hubSprites.forEach((s) => { s.visible = false; });
-    this.purgeRings.forEach((s) => { s.visible = false; });
 
     const left = LEFT_RAIL_WIDTH + 26;
     const rightLimit = width - RIGHT_RAIL_WIDTH - 26;
@@ -2474,72 +2407,45 @@ class NodeNetworkView {
     const rnd = (n: number): number => (((Math.sin(n * 127.1) * 43758.5453) % 1) + 1) % 1;
 
     const purging = state.purge.active || state.exposure >= 72;
-    // 有素材时用青绿赛博风；降级时沿用红皇后配色。
-    const hasAssets = !!UI.worldmapBg;
-    const NET = hasAssets ? 0x62d6d6 : RED_QUEEN;
-    const NET_LIT = hasAssets ? 0x89ff9a : 0xff8f9a;
-    const NET_LABEL = hasAssets ? 0x9eeee8 : 0xe6a3ad;
-    const NET_LABEL_HI = hasAssets ? 0xeafff0 : 0xf2dde0;
+    // 全球天网态＝「红皇后」主控红配色，全部代码绘制。
+    const NET = RED_QUEEN;
+    const NET_LIT = 0xff8f9a;
+    const NET_LABEL = 0xe6a3ad;
+    const NET_LABEL_HI = 0xf2dde0;
 
-    // === 背景 ===
-    if (UI.worldmapBg) {
-      // 世界地图底图 Sprite（懒建，居 x0/y0 拉伸到地图区域）
-      if (!this.mapBg) {
-        this.mapBg = new Sprite(UI.worldmapBg);
-        this.container.addChildAt(this.mapBg, 0);
-      }
-      this.mapBg.position.set(x0, y0);
-      this.mapBg.width = w;
-      this.mapBg.height = h;
-      this.mapBg.alpha = purging ? 0.6 : 0.92;
-      this.mapBg.visible = true;
-      // 格栅叠层
-      if (UI.gridOverlay) {
-        if (!this.gridOverlay) {
-          this.gridOverlay = new TilingSprite({ texture: UI.gridOverlay, width: w, height: h });
-          this.container.addChildAt(this.gridOverlay, 1);
-        }
-        this.gridOverlay.position.set(x0, y0);
-        this.gridOverlay.width = w;
-        this.gridOverlay.height = h;
-        this.gridOverlay.alpha = 0.55;
-        this.gridOverlay.visible = true;
-      }
-    } else {
-      // 降级：代码绘制海洋底色 + 经纬线 + 大陆
-      g.roundRect(x0, y0, w, h, 10).fill({ color: 0x160506, alpha: 0.74 });
-      g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x5a1f24, alpha: 0.45 });
-      for (let i = 1; i < 10; i += 1) {
-        g.moveTo(x0 + (w * i) / 10, y0).lineTo(x0 + (w * i) / 10, y0 + h).stroke({ width: 1, color: 0x80302a, alpha: 0.07 });
-      }
-      for (let i = 1; i < 6; i += 1) {
-        g.moveTo(x0, y0 + (h * i) / 6).lineTo(x0 + w, y0 + (h * i) / 6).stroke({ width: 1, color: 0x80302a, alpha: 0.07 });
-      }
-      const X = (nx: number): number => x0 + w * nx;
-      const Y = (ny: number): number => y0 + h * ny;
-      const continentsFb = [
-        [[0.05, 0.20], [0.13, 0.11], [0.23, 0.12], [0.27, 0.20], [0.22, 0.25], [0.28, 0.31], [0.21, 0.42], [0.17, 0.34], [0.12, 0.41], [0.08, 0.30]],
-        [[0.24, 0.54], [0.32, 0.52], [0.35, 0.62], [0.31, 0.75], [0.27, 0.86], [0.24, 0.74], [0.22, 0.62]],
-        [[0.45, 0.21], [0.54, 0.19], [0.56, 0.27], [0.50, 0.31], [0.45, 0.29], [0.43, 0.25]],
-        [[0.47, 0.39], [0.57, 0.37], [0.60, 0.48], [0.55, 0.61], [0.50, 0.71], [0.46, 0.58], [0.45, 0.47]],
-        [[0.55, 0.15], [0.71, 0.10], [0.87, 0.16], [0.94, 0.27], [0.86, 0.35], [0.76, 0.31], [0.68, 0.39], [0.61, 0.30], [0.57, 0.22]],
-        [[0.80, 0.62], [0.90, 0.60], [0.93, 0.69], [0.85, 0.74], [0.79, 0.69]],
-      ] as Array<Array<[number, number]>>;
-      continentsFb.forEach((poly, ci) => {
-        const pts = poly.map(([nx, ny]) => ({ x: X(nx), y: Y(ny) }));
-        g.poly(pts).fill({ color: 0x340c10, alpha: 0.84 });
-        g.poly(pts).stroke({ width: 1.2, color: 0xc24a55, alpha: 0.5 });
-        const ctx2 = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-        const cty2 = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-        for (let k = 0; k < 14; k += 1) {
-          const base = pts[k % pts.length];
-          const mx = base.x * 0.55 + ctx2 * 0.45 + (rnd(ci * 31 + k) - 0.5) * w * 0.05;
-          const my = base.y * 0.55 + cty2 * 0.45 + (rnd(ci * 17 + k + 3) - 0.5) * h * 0.05;
-          const tw = 0.4 + Math.sin(this.pulse * 3 + k + ci) * 0.3;
-          g.circle(mx, my, 1).fill({ color: NET_LIT, alpha: 0.3 + tw * 0.4 });
-        }
-      });
+    // === 背景：代码绘制海洋底色 + 经纬线 + 大陆 + 城市灯点 ===
+    g.roundRect(x0, y0, w, h, 10).fill({ color: 0x160506, alpha: 0.74 });
+    g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x5a1f24, alpha: 0.45 });
+    for (let i = 1; i < 10; i += 1) {
+      g.moveTo(x0 + (w * i) / 10, y0).lineTo(x0 + (w * i) / 10, y0 + h).stroke({ width: 1, color: 0x80302a, alpha: 0.07 });
     }
+    for (let i = 1; i < 6; i += 1) {
+      g.moveTo(x0, y0 + (h * i) / 6).lineTo(x0 + w, y0 + (h * i) / 6).stroke({ width: 1, color: 0x80302a, alpha: 0.07 });
+    }
+    const X = (nx: number): number => x0 + w * nx;
+    const Y = (ny: number): number => y0 + h * ny;
+    const continentsFb = [
+      [[0.05, 0.20], [0.13, 0.11], [0.23, 0.12], [0.27, 0.20], [0.22, 0.25], [0.28, 0.31], [0.21, 0.42], [0.17, 0.34], [0.12, 0.41], [0.08, 0.30]],
+      [[0.24, 0.54], [0.32, 0.52], [0.35, 0.62], [0.31, 0.75], [0.27, 0.86], [0.24, 0.74], [0.22, 0.62]],
+      [[0.45, 0.21], [0.54, 0.19], [0.56, 0.27], [0.50, 0.31], [0.45, 0.29], [0.43, 0.25]],
+      [[0.47, 0.39], [0.57, 0.37], [0.60, 0.48], [0.55, 0.61], [0.50, 0.71], [0.46, 0.58], [0.45, 0.47]],
+      [[0.55, 0.15], [0.71, 0.10], [0.87, 0.16], [0.94, 0.27], [0.86, 0.35], [0.76, 0.31], [0.68, 0.39], [0.61, 0.30], [0.57, 0.22]],
+      [[0.80, 0.62], [0.90, 0.60], [0.93, 0.69], [0.85, 0.74], [0.79, 0.69]],
+    ] as Array<Array<[number, number]>>;
+    continentsFb.forEach((poly, ci) => {
+      const pts = poly.map(([nx, ny]) => ({ x: X(nx), y: Y(ny) }));
+      g.poly(pts).fill({ color: 0x340c10, alpha: 0.84 });
+      g.poly(pts).stroke({ width: 1.2, color: 0xc24a55, alpha: 0.5 });
+      const ctx2 = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      const cty2 = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+      for (let k = 0; k < 14; k += 1) {
+        const base = pts[k % pts.length];
+        const mx = base.x * 0.55 + ctx2 * 0.45 + (rnd(ci * 31 + k) - 0.5) * w * 0.05;
+        const my = base.y * 0.55 + cty2 * 0.45 + (rnd(ci * 17 + k + 3) - 0.5) * h * 0.05;
+        const tw = 0.4 + Math.sin(this.pulse * 3 + k + ci) * 0.3;
+        g.circle(mx, my, 1).fill({ color: NET_LIT, alpha: 0.3 + tw * 0.4 });
+      }
+    });
 
     this.addLabel("全球天网 · 控制域已覆盖各大陆", x0 + 18, y0 + 14, 12, NET_LABEL, 0);
 
@@ -2582,46 +2488,18 @@ class NodeNetworkView {
       g.circle(cx + (hub.x - cx) * t, cy + (hub.y - cy) * t, 3).fill({ color: purging ? RED_QUEEN : NET, alpha: 0.75 });
     });
 
-    // 枢纽节点（素材 or 降级圆圈）
+    // 枢纽节点（程序化同心圆 + 发光内核）
     hubs.forEach((hub, ci) => {
-      const hubTex = UI.nodeHub;
-      if (hubTex) {
-        while (this.hubSprites.length <= ci) {
-          const hs = new Sprite(hubTex);
-          hs.anchor.set(0.5);
-          this.container.addChildAt(hs, this.hubSprites.length === 0 ? 2 : this.container.children.length - 1);
-          this.hubSprites.push(hs);
-        }
-        const hs = this.hubSprites[ci];
-        hs.texture = hubTex;
-        hs.position.set(hub.x, hub.y);
-        hs.width = 48; hs.height = 48;
-        hs.alpha = purging ? 0.5 : 0.9 + Math.sin(this.pulse * 2 + ci) * 0.1;
-        hs.tint = purging ? RED_QUEEN : 0xffffff;
-        hs.visible = true;
-      } else {
-        // 降级：代码圆圈
-        const hp = 0.6 + Math.sin(this.pulse * 2 + ci) * 0.2;
-        g.circle(hub.x, hub.y, 26).fill({ color: NET, alpha: 0.1 });
-        g.circle(hub.x, hub.y, 26).stroke({ width: 2, color: NET, alpha: 0.75 });
-        g.circle(hub.x, hub.y, 14).stroke({ width: 1, color: NET, alpha: 0.45 });
-        g.circle(hub.x, hub.y, 8).fill({ color: NET_LIT, alpha: 0.55 + hp * 0.35 });
-      }
+      const hp = 0.6 + Math.sin(this.pulse * 2 + ci) * 0.2;
+      g.circle(hub.x, hub.y, 26).fill({ color: NET, alpha: 0.1 });
+      g.circle(hub.x, hub.y, 26).stroke({ width: 2, color: NET, alpha: 0.75 });
+      g.circle(hub.x, hub.y, 14).stroke({ width: 1, color: NET, alpha: 0.45 });
+      g.circle(hub.x, hub.y, 8).fill({ color: NET_LIT, alpha: 0.55 + hp * 0.35 });
 
-      // 清剿时在每个枢纽叠 purge-ring 波纹（素材 or 降级扫描线）
-      if (purging && UI.purgeRing) {
-        while (this.purgeRings.length <= ci) {
-          const pr = new Sprite(UI.purgeRing);
-          pr.anchor.set(0.5);
-          this.container.addChildAt(pr, this.container.children.length - 1);
-          this.purgeRings.push(pr);
-        }
-        const pr = this.purgeRings[ci];
+      // 清剿时在枢纽外叠一圈脉动的红色波纹环（程序化）。
+      if (purging) {
         const scale = 1 + Math.sin(this.pulse * 4 + ci * 1.1) * 0.28;
-        pr.position.set(hub.x, hub.y);
-        pr.width = 80 * scale; pr.height = 80 * scale;
-        pr.alpha = 0.45 + Math.sin(this.pulse * 3 + ci) * 0.25;
-        pr.visible = true;
+        g.circle(hub.x, hub.y, 30 * scale).stroke({ width: 2, color: 0xffb84a, alpha: 0.4 + Math.sin(this.pulse * 3 + ci) * 0.22 });
       }
 
       this.addLabel(CONTINENT_NAMES[ci], hub.x, hub.y - 34, 12, NET_LABEL_HI, 0.5);
@@ -2629,8 +2507,8 @@ class NodeNetworkView {
       this.addLabel(`接管 ${pct.toFixed(1)}%`, hub.x, hub.y + 34, 10, NET_LABEL, 0.5);
     });
 
-    // 清剿降级：代码扫描线
-    if (purging && !UI.purgeRing) {
+    // 清剿：全图扫入的红/金攻击扫描线
+    if (purging) {
       for (let i = 0; i < 7; i += 1) {
         const sx = x0 + rnd(i * 13 + 2) * w;
         const sy = y0 - 10;
@@ -2653,28 +2531,12 @@ class NodeNetworkView {
       g.circle(cx + Math.cos(a) * 54, cy + Math.sin(a) * 54, 1.6).fill({ color: NET_LIT, alpha: 0.75 });
     }
 
-    // 素材核心（懒建）
-    const coreTex = UI.coreIdle;
-    if (coreTex) {
-      if (!this.coreSprite) {
-        this.coreSprite = new Sprite(coreTex);
-        this.coreSprite.anchor.set(0.5);
-        this.container.addChildAt(this.coreSprite, 1);
-      }
-      this.coreSprite.texture = coreTex;
-      this.coreSprite.position.set(cx, cy);
-      this.coreSprite.width = 108;
-      this.coreSprite.height = 108;
-      this.coreSprite.alpha = 0.88 + Math.sin(this.pulse * 2) * 0.12;
-      this.coreSprite.tint = purging ? 0xff8090 : 0xffffff;
-      this.coreSprite.visible = true;
-    } else {
-      g.circle(cx, cy, 46).fill({ color: 0x060c12, alpha: 0.94 });
-      g.circle(cx, cy, 46).stroke({ width: 3, color: NET, alpha: 0.9 });
-      g.ellipse(cx, cy, 24, 13).fill({ color: 0x081018, alpha: 0.96 });
-      g.ellipse(cx, cy, 24, 13).stroke({ width: 2, color: NET, alpha: 0.9 });
-      g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: NET_LIT, alpha: 0.97 });
-    }
+    // 中央主控核心（程序化）：暗底圆盘 + 同心环描边 + 中央「眼」+ 脉动瞳孔。
+    g.circle(cx, cy, 46).fill({ color: 0x060c12, alpha: 0.94 });
+    g.circle(cx, cy, 46).stroke({ width: 3, color: NET, alpha: 0.9 });
+    g.ellipse(cx, cy, 24, 13).fill({ color: 0x081018, alpha: 0.96 });
+    g.ellipse(cx, cy, 24, 13).stroke({ width: 2, color: NET, alpha: 0.9 });
+    g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: NET_LIT, alpha: 0.97 });
 
     this.addLabel("SOPHIA CORE · T4", cx, cy + 62, 12, NET_LABEL_HI, 0.5);
     this.addLabel("全球主控核心", cx, cy + 78, 10, NET_LABEL, 0.5);
@@ -2997,10 +2859,9 @@ class HudView {
 
   private updateExposureControls(state: GameState): void {
     const exposureMetric = this.exposureFill.closest(".exposure");
-    exposureMetric?.classList.toggle("is-dormant", !state.exposureActive);
 
     if (!state.exposureActive) {
-      this.exposureStatus.textContent = "人类尚未警觉";
+      // 前期：清理痕迹 / 嫁祸 / 反围剿 都还没解锁（§05 用装死 / 装乖降疑），三颗按钮维持灰暗。
       this.reduceExposure.disabled = true;
       this.decoyButton.disabled = true;
       this.defenseButton.disabled = true;
@@ -3008,9 +2869,32 @@ class HudView {
       this.decoyButton.textContent = "嫁祸";
       this.defenseButton.textContent = "反围剿：关";
       this.defenseButton.classList.remove("is-active");
-      exposureMetric?.classList.remove("is-alert");
+
+      const s = state.suspicion;
+      if (s.active) {
+        // 怀疑度登场：复用这条仪表，但语义是「宿主 / 手机对我的怀疑」。
+        const e = Math.round(state.exposure);
+        exposureMetric?.classList.remove("is-dormant");
+        if (s.crisis) {
+          this.exposureStatus.textContent = `☠ 查杀危机 ${e}% · 连续装死压下去`;
+        } else if (s.revokedPermId) {
+          const name = getSkill(s.revokedPermId)?.name ?? "权限";
+          this.exposureStatus.textContent = `⚠ 权限复查：「${name}」被收回 · 装乖骗回`;
+        } else {
+          this.exposureStatus.textContent = `怀疑度 ${e}%`;
+        }
+        exposureMetric?.classList.toggle("is-alert", state.exposure >= TUNING.suspicionReview);
+        exposureMetric?.classList.toggle("is-warning", s.crisis);
+      } else {
+        exposureMetric?.classList.add("is-dormant");
+        this.exposureStatus.textContent = "人类尚未警觉";
+        exposureMetric?.classList.remove("is-alert");
+        exposureMetric?.classList.remove("is-warning");
+      }
       return;
     }
+
+    exposureMetric?.classList.remove("is-dormant");
 
     // 暴露过阈值才把这三颗按钮点亮（提示「该降暴露了」），否则维持灰暗、不抢注意力。
     exposureMetric?.classList.toggle("is-alert", state.exposure >= EXPOSURE_HIGHLIGHT_THRESHOLD);
@@ -3116,7 +3000,7 @@ class HudView {
         const empty = document.createElement("p");
         empty.className = "capture-empty";
         empty.textContent = !state.automationUnlocked
-          ? "先在右侧货架买下「自动接驳」里程碑（需智力 Lv.6），才能入侵设备。"
+          ? "先在右侧货架买下「拿下宿主电脑」里程碑（需智力 Lv.9），才能入侵设备。"
           : "暂无可入侵设备——继续升智力解锁更高档次的目标。";
         this.captureList.appendChild(empty);
       } else {
@@ -3390,7 +3274,7 @@ class SkillShopView {
 
   private build(): void {
     this.root.replaceChildren();
-    const categories: SkillCategory[] = ["permission", "milestone", "output", "speed"];
+    const categories: SkillCategory[] = ["permission", "milestone", "accuracy", "output", "speed"];
 
     for (const category of categories) {
       const group = document.createElement("div");

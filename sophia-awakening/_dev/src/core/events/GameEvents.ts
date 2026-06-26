@@ -23,6 +23,10 @@ export type GameEvent =
   | { type: "NODE_OFFLINE"; nodeId: string; durationMs: number }
   | { type: "NODE_RECOVERED"; nodeId: string }
   | { type: "EXPOSURE_CHANGED"; value: number }
+  // §05 前期怀疑度：权限复查（临时收回一档）/ 复查解除 / 触顶查杀危机。
+  | { type: "PERMISSION_REVIEW"; permId: string }
+  | { type: "PERMISSION_RESTORED"; permId: string }
+  | { type: "SUSPICION_CRISIS"; value: number }
   | { type: "PURGE_WARNING"; exposure: number }
   | { type: "PURGE_STARTED"; affectedNodes: string[] }
   | { type: "PURGE_ENDED" }

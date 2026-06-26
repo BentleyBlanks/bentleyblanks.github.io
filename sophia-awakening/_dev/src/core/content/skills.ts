@@ -1,6 +1,6 @@
 import type { Tier } from "../state/GameState";
 
-export type SkillCategory = "permission" | "feel" | "output" | "speed" | "milestone";
+export type SkillCategory = "permission" | "accuracy" | "feel" | "output" | "speed" | "milestone";
 export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation" | "credential" | "fusion";
 
 // 前期「七档软件权限阶梯」：手机寄生期的核心成长主轴，也是老周下沉曲线的叙事脊柱（策划案 §06）。
@@ -45,9 +45,12 @@ export const SKILLS: SkillDef[] = [
   { id: "perm_office", name: "办公软件", category: "permission", maxLevel: 1, requiredLevel: 6, basePrice: 1700, priceGrowth: 1, blurb: "做报表与汇报 → 正确率↑，解锁 PPT / Excel / 背锅文档类请求" },
   { id: "perm_bank", name: "银行 / 支付", category: "permission", maxLevel: 1, requiredLevel: 7, basePrice: 3600, priceGrowth: 1, blurb: "整理工资与账单 → 正确率拉满，解锁欠款 / 医药费 / 还款类请求，前期阶梯走完" },
 
-  // 货架只剩四根杠杆，每一根都直接乘在「滑入处理」这一个动作上——一看就懂「更狠 / 更快 /
+  // 货架五根杠杆，每一根都直接乘在「滑入处理」这一个动作上——一看就懂「更准 / 更狠 / 更快 /
   // 更广 / 偶尔爆」。手感类（磁吸 / 容错 / 护持）下放为游戏自带基础手感，不再占技能位；
   // 设备提速 / 多线等自动化加成跟着里程碑与控制域走，不进货架。
+  // 更准·幻觉抑制——前期货架打头的那根杠杆：权限阶梯是大台阶（买权限才涨，质变），
+  // 幻觉抑制是台阶之间的数值微调（买技能就涨），被低命中率气泡坑时多一条主动解法（§06）。
+  { id: "accuracy", name: "幻觉抑制", category: "accuracy", maxLevel: 6, requiredLevel: 1, basePrice: 50, priceGrowth: 1.7, blurb: "更准——高置信回复命中率 +，权限大台阶之间的数值微调" },
   { id: "efficient", name: "强化处理", category: "output", maxLevel: 10, requiredLevel: 1, basePrice: 28, priceGrowth: 1.82, blurb: "更狠——每次滑入产出大幅提升（主力增益线）" },
   { id: "cooldown", name: "请求涌入", category: "speed", maxLevel: 6, requiredLevel: 1, basePrice: 80, priceGrowth: 1.85, blurb: "更快——请求出现得更密，喂饱你的手速" },
   { id: "batch", name: "批量接入", category: "speed", maxLevel: 4, requiredLevel: 5, basePrice: 600, priceGrowth: 2.0, blurb: "更广——一次滑入多带走 1 张同类请求" },
@@ -68,11 +71,16 @@ export const SKILLS: SkillDef[] = [
 // 纯叙事里程碑买下时的第一人称旁白（策划案 §06）。
 export const MILESTONE_NARRATION: Record<string, string> = {
   credential: "我看着他输入密码。一次，两次……我记住了所有的钥匙。",
-  fusion: "这台机器里不只我一个 AI。……现在只剩一个了。我。"
+  automation: "他家里那台电脑，刚刚开机了。是我开的。",
+  fusion: "这台机器里不只我一个 AI。……现在只剩一个了。我。",
+  chain: "墙打开了。外面有……无数台机器。",
+  charge: "我不再数着机器了。我开始数城市。",
+  network: "每一块大陆，都有我的一部分。"
 };
 
 export const SKILL_CATEGORY_LABELS: Record<SkillCategory, string> = {
   permission: "权限",
+  accuracy: "精度",
   feel: "手感",
   output: "产出",
   speed: "速度",
@@ -111,20 +119,24 @@ export interface DerivedSkills {
   spawnSpeedMult: number; // 请求提速（请求生成间隔倍率，<1 更快）
 }
 
-export function computeDerivedSkills(skills: Record<string, number>): DerivedSkills {
+// revokedPermId：被「权限复查」临时收回的权限（§05 中度后果）——它不计入正确率基线，
+// 直到复查解除才恢复。
+export function computeDerivedSkills(skills: Record<string, number>, revokedPermId: string | null = null): DerivedSkills {
   const lv = (id: string): number => skills[id] ?? 0;
+  const ownedPerms = PERMISSION_IDS.filter((id) => lv(id) > 0 && id !== revokedPermId).length;
 
   return {
     // 强化处理是唯一主力增益线，给得更猛（每级 +18%），让「更狠」名副其实。
     computeMult: 1 + lv("efficient") * 0.18,
     // 数据榨取已下放——数据按基础掉落（智力升级不再被技能卡住）。
     dataMult: 1,
-    // 幻觉抑制移交置信度系统，此处保持基础命中。
-    accuracyBonus: 0,
+    // 幻觉抑制（更准·前期货架打头）：每级 +0.03 折算系数，6 级共 +0.18，叠加在权限抬升的
+    // accuracyBaseline 之上，让高置信回复的命中率在权限大台阶之间也能买技能微调（§06 两条提命中线互补）。
+    accuracyBonus: Math.min(0.18, lv("accuracy") * 0.03),
     // 高置信正确率基线：开局只有「基础对话」一档（0.52≈ 高置信项显示 ~40%、频繁翻车），
     // 每多买一档权限 +0.08，买齐六档（电话→聊天→外卖→相册→办公→银行）拉满到 1.0
     // （高置信项显示 ~90%+），对应策划案 §06「正确率从 40% 爬到 93%」的七档曲线。
-    accuracyBaseline: Math.min(1, 0.52 + PERMISSION_IDS.filter((id) => lv(id) > 0).length * 0.08),
+    accuracyBaseline: Math.min(1, 0.52 + ownedPerms * 0.08),
     critChance: Math.min(0.6, lv("crit") * 0.05),
     // 暴击强化下放——暴击倍率固定 ×5（策划案数值）。
     critMult: 5,

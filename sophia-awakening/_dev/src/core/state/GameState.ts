@@ -108,6 +108,17 @@ export interface DefenseState {
   allocation: number;
 }
 
+// 前期张力 · 怀疑度（手机寄生期专属，策划案 §05）。与后期暴露度是同一条数值（state.exposure），
+// 只是前期表现为「宿主 / 手机对 SOPHIA 的怀疑」——轻量、后果可恢复、绝不删档。首次买下权限即登场，
+// 进入扩张期（exposureActive）后无缝升格为暴露度，本系统停摆。
+export interface SuspicionState {
+  active: boolean; // 已登场（首次买权限后）
+  lightShown: boolean; // 轻度挑刺旁白已放过（一次性）
+  revokedPermId: string | null; // 中度：被临时收回的权限（accuracyBaseline 下降）
+  reviewUntilMs: number; // 该权限自动恢复的时刻（装乖处理可提前）；0 = 无复查
+  crisis: boolean; // 触顶：宿主查杀危机——自然回落暂停，只有装死能压下
+}
+
 // 前期「特殊请求」：用宿主身份越界牟利的高风险一次性机会。
 export type SpecialRequestKind = "data-theft" | "phone-call" | "scam-sms" | "bank-otp" | "wallet";
 
@@ -169,6 +180,10 @@ export interface GameState {
   resources: ResourceState;
   exposure: number;
   exposureActive: boolean;
+  // 前期怀疑度子系统（手机寄生期）；与 exposure 共用数值，见 SuspicionState。
+  suspicion: SuspicionState;
+  // 上一次处理请求的时刻——用于「处理过快涨怀疑」（像机器一样秒回会更可疑）。
+  lastProcessAtMs: number;
   intelligence: IntelligenceState;
   // Purchased skill levels keyed by skill id (0/absent = not owned).
   skills: Record<string, number>;

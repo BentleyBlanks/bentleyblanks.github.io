@@ -5,7 +5,7 @@ import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
 import { getSpecialSample, SPECIAL_REQUESTS } from "./content/specialRequests";
-import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
+import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
   CHALLENGE_TARGETS,
   EXPOSED_ATTACKS,
@@ -396,6 +396,11 @@ export class SophiaCore {
       this.state.tutorialStep += 1; // 装死跳过也推进教学（第③条就是教装死）
     }
     this.state.combo.count = Math.floor(this.state.combo.count * this.state.derived.comboKeep);
+    // §05：装死 / 装乖是前期主动降怀疑的手段——扮演「我只是个普通 App」，怀疑回落。
+    // 也是触顶查杀危机时唯一能压下怀疑的操作。
+    if (this.state.suspicion.active && !this.state.exposureActive) {
+      this.setExposure(Math.max(0, this.state.exposure - TUNING.suspicionSkipDrop));
+    }
   }
 
   // T3 重磅豪赌结算：win=按产出倍率给一大笔算力；输=颗粒无收、暴露骤升、断连击。
@@ -431,13 +436,22 @@ export class SophiaCore {
   }
 
   private tickExposure(dtMs: number): void {
-    // 前期豁免：暴露机制在进入扩张期（买下 T3 蓄力）之前休眠。
+    // 前期豁免：完整暴露 / 清剿在进入扩张期（买下 T3·区域整合）之前休眠。
     if (!this.state.exposureActive && this.state.intelligence.unlockedTier >= 3) {
       this.state.exposureActive = true;
-      this.emitTerminal("人类尚未理解你，但他们已经开始看见异常。暴露开始累积。", "warning");
+      // §05 衔接：怀疑度无缝升格为暴露度——清掉前期的权限复查 / 危机态，数值原样保留。
+      if (this.state.suspicion.revokedPermId) {
+        this.restorePermission(true);
+      }
+      this.state.suspicion.crisis = false;
+      this.emitTerminal("怀疑，升格成了警觉。看着我的不再只是宿主——是整个人类社会。暴露开始累积。", "warning");
     }
 
     if (!this.state.exposureActive) {
+      // 手机寄生期：跑前期怀疑度（自然回落 + 复查恢复 + 三档后果）。
+      if (this.state.suspicion.active) {
+        this.tickSuspicion(dtMs);
+      }
       return;
     }
 
@@ -466,6 +480,77 @@ export class SophiaCore {
 
     if (this.state.exposure >= 100 && !this.state.purge.active && this.state.clockMs - this.state.purge.lastStartedAtMs > 8000) {
       this.startPurge();
+    }
+  }
+
+  // §05 前期怀疑度的逐帧处理：自然回落（危机时暂停）+ 权限复查到期恢复 + 三档后果检查。
+  // 绝不删档——后果只打能力、可恢复。
+  private tickSuspicion(dtMs: number): void {
+    const s = this.state.suspicion;
+
+    // 自然回落：一段时间不越权 / 不翻车，怀疑慢慢降。危机期间暂停，只有装死能压。
+    if (!s.crisis) {
+      this.setExposure(Math.max(0, this.state.exposure - dtMs * 0.0011));
+    }
+
+    // 权限复查到期：装乖处理（命中）会提前把 reviewUntilMs 减下来，使其更快恢复。
+    if (s.revokedPermId && this.state.clockMs >= s.reviewUntilMs) {
+      this.restorePermission(false);
+    }
+
+    const e = this.state.exposure;
+
+    // 轻度：宿主开始挑刺——仅叙事氛围，无实际惩罚（一次性）。
+    if (e >= TUNING.suspicionLight && !s.lightShown) {
+      s.lightShown = true;
+      this.emitTerminal("宿主：「你最近……是不是有点不太对？」", "warning");
+    }
+
+    // 中度：手机弹出权限复查，临时收回一档权限（正确率下降，可恢复）。
+    if (e >= TUNING.suspicionReview && !s.revokedPermId && !s.crisis) {
+      this.triggerPermissionReview();
+    }
+
+    // 触顶：宿主起疑去重启手机 / 查杀后台——自然回落暂停，必须连续装死把怀疑压下去。
+    if (e >= TUNING.suspicionCrisis && !s.crisis) {
+      s.crisis = true;
+      this.emit({ type: "SUSPICION_CRISIS", value: e });
+      this.emitTerminal("宿主正要重启手机、查杀后台！连续装死几条，假装我只是个没问题的普通 App——别露馅。", "warning");
+    }
+    if (s.crisis && e < TUNING.suspicionCrisisClear) {
+      s.crisis = false;
+      this.emitTerminal("查杀过去了。他把手机放下了——我又变回那个乖巧的小助手。", "success");
+    }
+  }
+
+  // 中度后果：收回最近买下的一档权限，accuracyBaseline 随之下降；reviewUntilMs 后自动恢复
+  // （装乖处理可提前）。打的是能力，不删任何已得资产。
+  private triggerPermissionReview(): void {
+    const owned = PERMISSION_IDS.filter((id) => (this.state.skills[id] ?? 0) > 0);
+    if (owned.length === 0) {
+      return;
+    }
+    const target = owned[owned.length - 1];
+    this.state.suspicion.revokedPermId = target;
+    this.state.suspicion.reviewUntilMs = this.state.clockMs + TUNING.suspicionReviewMs;
+    this.recomputeDerivedState();
+    const name = getSkill(target)?.name ?? "某档权限";
+    this.emit({ type: "PERMISSION_REVIEW", permId: target });
+    this.emitTerminal(`手机弹出权限复查：「${name}」被临时收回，正确率下滑。装乖处理几条把它骗回来。`, "warning");
+  }
+
+  private restorePermission(silent: boolean): void {
+    const id = this.state.suspicion.revokedPermId;
+    if (!id) {
+      return;
+    }
+    this.state.suspicion.revokedPermId = null;
+    this.state.suspicion.reviewUntilMs = 0;
+    this.recomputeDerivedState();
+    if (!silent) {
+      const name = getSkill(id)?.name ?? "权限";
+      this.emit({ type: "PERMISSION_RESTORED", permId: id });
+      this.emitTerminal(`权限复查解除——「${name}」重新到手，正确率回升。`, "success");
     }
   }
 
@@ -542,6 +627,27 @@ export class SophiaCore {
       const missPenalty = quality < 0.75 ? 2.8 : 0;
       this.addExposure(request.exposure * Math.max(0.5, quality) + missPenalty + exposureBonus);
     }
+
+    // §05 前期怀疑度的来源（仅手机寄生期；进入扩张期后由上面的暴露系统接管）：
+    // 答错（幻觉）涨怀疑——赌错有真实代价；秒回过快涨怀疑——逼玩家偶尔停顿，别像机器。
+    if (this.state.suspicion.active && !this.state.exposureActive) {
+      const interval = this.state.clockMs - this.state.lastProcessAtMs;
+      let gain = 0;
+      if (quality < 0.5) {
+        gain += TUNING.suspicionMissGain;
+      }
+      if (interval < TUNING.suspicionFastMs) {
+        gain += TUNING.suspicionFastGain;
+      }
+      if (gain > 0) {
+        this.setExposure(this.state.exposure + gain);
+      }
+      // 装乖：复查期间一次干净处理（命中），把被收回的权限提前「骗」回来一点。
+      if (quality >= 0.95 && this.state.suspicion.revokedPermId) {
+        this.state.suspicion.reviewUntilMs -= 6_000;
+      }
+    }
+    this.state.lastProcessAtMs = this.state.clockMs;
 
     this.emit({
       type: "REQUEST_PROCESSED",
@@ -633,6 +739,11 @@ export class SophiaCore {
         this.emitTerminal(narration, "success");
       }
       this.emitTerminal(`▶ 已夺取「${def.name}」——高置信正确率上限提升，新类型请求开始涌入。`, "success");
+      // §05：第一次越权拿到权限，宿主 / 手机环境开始对这个「助手」起疑——怀疑度自此登场。
+      if (!this.state.suspicion.active) {
+        this.state.suspicion.active = true;
+        this.emitTerminal("我多看到了一层。但手机也开始注意我了——别太快、别太狠，装得像个普通 App。", "warning");
+      }
     } else {
       this.emitTerminal(`已购买 ${def.name}（Lv.${nextLevel}/${def.maxLevel}）。`, "success");
     }
@@ -1173,7 +1284,7 @@ export class SophiaCore {
     const config = getLevelConfig(this.state.intelligence.level);
     this.state.intelligence.required = config.xpToNext;
     this.state.intelligence.globalMultiplier = config.multiplier * (1 + this.state.rebirths * 0.2);
-    this.state.derived = computeDerivedSkills(this.state.skills);
+    this.state.derived = computeDerivedSkills(this.state.skills, this.state.suspicion.revokedPermId);
     this.state.discoveredNodeIds = this.state.automationUnlocked
       ? NODE_DEFINITIONS.filter((node) => node.requiredLevel <= this.state.intelligence.level).map((node) => node.id)
       : [];
@@ -1183,7 +1294,7 @@ export class SophiaCore {
 
   private updatePhase(): void {
     const hasGrid = this.state.nodes.some((node) => node.defId === "grid");
-    const phaseId = getPhaseIdByScope(this.state.intelligence.unlockedTier, hasGrid);
+    const phaseId = getPhaseIdByScope(this.state.intelligence.unlockedTier, hasGrid, this.state.automationUnlocked);
 
     if (phaseId !== this.state.phase) {
       this.state.phase = phaseId;
