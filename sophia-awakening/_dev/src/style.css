@@ -1436,26 +1436,73 @@ body.exposed .screen-veil {
 }
 
 /* ---- exposure controls ---- */
+/* 降暴露控件现在内嵌在「暴露」框里：默认灰暗、不起眼；暴露过阈值（.is-alert）才亮起、变重要。 */
+.exposure-controls {
+  margin-top: 9px;
+  display: grid;
+  gap: 6px;
+}
+
 .exposure-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 
-.defense-button {
-  margin-top: 8px;
+.exposure-action {
   width: 100%;
+  margin: 0;
+  padding: 5px 8px;
+  text-align: center;
+  font-size: 11px;
   font-weight: 700;
-  color: #cfe9ff;
-  border: 1px solid rgba(98, 214, 214, 0.4);
-  background: rgba(98, 214, 214, 0.08);
+  color: rgba(210, 220, 218, 0.42);
+  border: 1px solid rgba(160, 175, 172, 0.16);
+  background: rgba(255, 255, 255, 0.014);
+  filter: grayscale(0.85);
+  opacity: 0.72;
+  transition: opacity 180ms ease, filter 180ms ease, color 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
-.defense-button.is-active {
+.exposure-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 暴露过阈值：三颗按钮亮起——清理痕迹 / 嫁祸 = 警示红，反围剿 = 青。 */
+.exposure.is-alert .exposure-action {
+  opacity: 1;
+  filter: none;
+  color: #ffd0c8;
+  border-color: rgba(255, 120, 110, 0.55);
+  background: rgba(255, 95, 95, 0.09);
+}
+
+.exposure.is-alert .exposure-action:hover:not(:disabled) {
+  border-color: rgba(255, 120, 110, 0.9);
+  background: rgba(255, 95, 95, 0.16);
+}
+
+.exposure.is-alert .exposure-action.is-poor {
+  opacity: 0.55;
+  filter: grayscale(0.5);
+}
+
+.exposure.is-alert .defense-button {
+  color: #cfe9ff;
+  border-color: rgba(98, 214, 214, 0.6);
+  background: rgba(98, 214, 214, 0.12);
+}
+
+/* 反围剿开启：无论是否高亮，都用最强的绿色实心态。 */
+.defense-button.is-active,
+.exposure.is-alert .defense-button.is-active {
   color: #0b1413;
   border-color: rgba(137, 255, 154, 0.9);
   background: linear-gradient(180deg, rgba(137, 255, 154, 0.95), rgba(98, 214, 214, 0.85));
   box-shadow: 0 0 14px rgba(137, 255, 154, 0.35);
+  opacity: 1;
+  filter: none;
 }
 
 .exposure.is-dormant .exposure-fill {

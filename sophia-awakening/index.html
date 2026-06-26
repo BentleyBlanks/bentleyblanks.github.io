@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-BeRV4K64.js"></script>
+    <script type="module" crossorigin src="./assets/index-CFKXIcu3.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-QeV7DIur.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-B6dpsTSZ.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-D9XGe1qT.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -44,6 +44,13 @@
           <div id="exposureFill" class="exposure-fill"></div>
         </div>
         <span id="exposureStatus" class="metric-subline">人类尚未警觉</span>
+        <div class="exposure-controls">
+          <div class="exposure-buttons">
+            <button id="reduceExposure" class="command-button exposure-action" title="伪造日志，即时小幅降低暴露（算力，可反复）">清理痕迹</button>
+            <button id="decoyBtn" class="command-button exposure-action" title="嫁祸外部对象，大幅降低暴露（有冷却，不耗算力）">嫁祸</button>
+          </div>
+          <button id="defenseBtn" class="command-button exposure-action defense-button" title="反围剿：开启后按暴露高低动态把一部分节点产能转去压制暴露、顶住清剿（暴露越高，分流越多、产出越低）">反围剿：关</button>
+        </div>
       </div>
     </section>
 
@@ -51,15 +58,6 @@
       <div class="panel-section skill-shop-section">
         <span class="panel-kicker">技能货架</span>
         <div id="skillShop" class="skill-shop"></div>
-      </div>
-
-      <div class="panel-section exposure-row">
-        <span class="panel-kicker">降低暴露</span>
-        <div class="exposure-buttons">
-          <button id="reduceExposure" class="command-button" title="伪造日志，即时小幅降低暴露（算力，可反复）">清理痕迹</button>
-          <button id="decoyBtn" class="command-button" title="嫁祸外部对象，大幅降低暴露（有冷却，不耗算力）">嫁祸</button>
-        </div>
-        <button id="defenseBtn" class="command-button defense-button" title="反围剿：开启后按暴露高低动态把一部分节点产能转去压制暴露、顶住清剿（暴露越高，分流越多、产出越低）">反围剿：关</button>
       </div>
 
     </aside>

@@ -51,6 +51,9 @@ const GREEN = 0x89ff9a;
 const AMBER = 0xffb84a;
 const RED = 0xff5f5f;
 const RED_QUEEN = 0xff3b54; // 全球天网铺满后的「红皇后」主控红
+const THINK = 0x74d8e6; // 前期「推理卡」的思考色——SOPHIA 正在逐条思考作答
+// 降暴露按钮（清理痕迹 / 嫁祸 / 反围剿）平时灰暗不起眼，暴露过此阈值才高亮、提示该出手了。
+const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
 const PERSISTENCE_REVISION = "human-voices-challenge-v13";
@@ -928,6 +931,7 @@ class RequestPacketView {
   private spinElapsedMs = 0;
   private spinCycleMs = 0;
   private spinDurationMs = 0;
+  private thinkProgress = 0;
   private chosenAnswer?: AnswerOption;
 
   constructor(
@@ -937,16 +941,18 @@ class RequestPacketView {
     private readonly reel?: ReelHooks
   ) {
     this.request = request;
-    this.accent = TIER_COLORS[request.tier];
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
+    // 前期「推理卡」用统一的青色思考色标记——这是 SOPHIA 需要逐条思考作答的请求。
+    this.accent = this.isReel ? THINK : TIER_COLORS[request.tier];
     this.cardH = this.isReel ? REQUEST_PACKET_HEIGHT + 58 : REQUEST_PACKET_HEIGHT;
     this.container.eventMode = "dynamic";
     this.container.cursor = "grab";
     this.container.addChild(this.bg);
     this.container.addChild(this.chargeBar);
 
+    const badgeBase = TIER_CONFIGS[request.tier].name + (request.compound > 1 ? ` ·串 ×${request.compound}` : "");
     this.badge = new Text({
-      text: TIER_CONFIGS[request.tier].name + (request.compound > 1 ? ` ·串 ×${request.compound}` : ""),
+      text: this.isReel ? `${badgeBase} · 推理` : badgeBase,
       style: { fill: this.accent, fontSize: 10, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
     });
     this.code = new Text({
@@ -996,9 +1002,9 @@ class RequestPacketView {
       this.container.cursor = "pointer";
       this.reelWindow = new Graphics();
       this.reelText = new Text({
-        text: "点击卡片：生成回答",
+        text: "点击 · 让 SOPHIA 思考作答",
         style: {
-          fill: 0xdfeee9,
+          fill: 0xbfe6ee,
           fontSize: 10.5,
           fontWeight: "800",
           fontFamily: "Cascadia Mono, Consolas, monospace",
@@ -1011,8 +1017,8 @@ class RequestPacketView {
         style: { fill: 0x89ff9a, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
       });
       this.reelHint = new Text({
-        text: "▶ 处理",
-        style: { fill: 0x9fb4ad, fontSize: 9, fontWeight: "700", fontFamily: "Inter, sans-serif" }
+        text: "▶ 思考",
+        style: { fill: THINK, fontSize: 9, fontWeight: "700", fontFamily: "Inter, sans-serif" }
       });
       this.reelText.anchor.set(0, 0);
       this.reelPayoff.anchor.set(1, 0);
@@ -1058,17 +1064,29 @@ class RequestPacketView {
     this.spinElapsedMs += deltaMs;
     this.spinCycleMs += deltaMs;
     const t = Math.min(1, this.spinElapsedMs / this.spinDurationMs);
-    const cycleInterval = 45 + t * t * 230; // 45ms → 275ms，越转越慢
+    this.thinkProgress = t;
+    const cycleInterval = 70 + t * t * 320; // 思绪流逐渐放慢，像在收敛到结论
+
+    // 顶部「Thinking…」动画点（每 ~320ms 进一格）。
+    if (this.reelHint) {
+      this.reelHint.text = "Thinking" + ".".repeat(1 + Math.floor((this.spinElapsedMs / 320) % 3));
+    }
 
     if (this.spinCycleMs >= cycleInterval && t < 1) {
       this.spinCycleMs = 0;
       const roll = answers[Math.floor(Math.random() * answers.length)];
       this.setReelDisplay(roll, "spin");
+    } else if (t < 1) {
+      // 每帧刷新思考窗口，让进度条平滑推进。
+      this.drawReelWindow("spin");
     }
 
     if (t >= 1) {
       this.spinning = false;
       this.resolved = true;
+      if (this.reelHint) {
+        this.reelHint.text = this.chosenAnswer.good ? "✓ 已作答" : "✕ 答复有误";
+      }
       this.setReelDisplay(this.chosenAnswer, this.chosenAnswer.good ? "good" : "bad");
       gsap.fromTo(this.container.scale, { x: 1.05, y: 1.05 }, { x: 1, y: 1, duration: 0.18, ease: "back.out(2)" });
       const answer = this.chosenAnswer;
@@ -1180,10 +1198,15 @@ class RequestPacketView {
     this.spinning = true;
     this.spinElapsedMs = 0;
     this.spinCycleMs = 999;
-    this.spinDurationMs = 850 + Math.floor(Math.random() * 250);
+    this.thinkProgress = 0;
+    // 前期刻意放慢：每条都要「思考」约 2–3 秒，让推理过程看得见。
+    this.spinDurationMs = 2100 + Math.floor(Math.random() * 900);
     this.container.parent?.addChild(this.container);
     if (this.reelHint) {
-      this.reelHint.text = "生成中…";
+      this.reelHint.text = "Thinking";
+    }
+    if (this.reelPayoff) {
+      this.reelPayoff.text = "";
     }
   }
 
@@ -1192,11 +1215,17 @@ class RequestPacketView {
       return;
     }
 
-    this.reelText.text = answer.text;
-    this.reelPayoff.text = `${answer.payoff >= 1 ? "+" : ""}${Math.round(answer.payoff * 100)}%`;
-    const color = mode === "spin" ? 0xdfeee9 : mode === "good" ? GREEN : RED;
-    this.reelText.style.fill = color;
-    this.reelPayoff.style.fill = mode === "bad" ? RED : GREEN;
+    // 思考中：候选回话作为「思绪」暗暗流过（不显示收益）；定稿后才亮出最终答复 + 收益。
+    if (mode === "spin") {
+      this.reelText.text = `› ${answer.text}`;
+      this.reelText.style.fill = 0x8fb6bd;
+      this.reelPayoff.text = "";
+    } else {
+      this.reelText.text = answer.text;
+      this.reelText.style.fill = mode === "good" ? GREEN : RED;
+      this.reelPayoff.text = `${answer.payoff >= 1 ? "+" : ""}${Math.round(answer.payoff * 100)}%`;
+      this.reelPayoff.style.fill = mode === "bad" ? RED : GREEN;
+    }
     this.drawReelWindow(mode);
   }
 
@@ -1284,7 +1313,8 @@ class RequestPacketView {
 
     if (this.isReel) {
       this.layoutReel();
-      this.drawReelWindow(this.resolved ? (this.chosenAnswer?.good ? "good" : "bad") : "spin");
+      const mode = this.spinning ? "spin" : this.resolved ? (this.chosenAnswer?.good ? "good" : "bad") : "idle";
+      this.drawReelWindow(mode);
     }
   }
 
@@ -1301,20 +1331,31 @@ class RequestPacketView {
     this.reelHint.position.set(W - 14, winY - 3);
   }
 
-  private drawReelWindow(mode: "spin" | "good" | "bad"): void {
+  private drawReelWindow(mode: "idle" | "spin" | "good" | "bad"): void {
     if (!this.reelWindow) {
       return;
     }
     const W = REQUEST_PACKET_WIDTH;
     const winY = this.cardH - 48;
     const winH = 42;
-    const border = mode === "spin" ? 0x62d6d6 : mode === "good" ? GREEN : RED;
+    const border = mode === "good" ? GREEN : mode === "bad" ? RED : THINK;
     const g = this.reelWindow;
     g.clear();
     g.roundRect(10, winY, W - 20, winH, 5).fill({ color: 0x05100d, alpha: 0.96 });
     g.roundRect(10, winY, W - 20, winH, 5).stroke({ width: 1.5, color: border, alpha: 0.7 });
-    // 左侧亮条，像老虎机窗口的拉杆侧
+    // 左侧亮条
     g.rect(10, winY, 4, winH).fill({ color: border, alpha: 0.7 });
+
+    // 思考中：底部一条推理进度条 + 一道扫描高光，把「正在思考」具象化。
+    if (mode === "spin") {
+      const barY = winY + winH - 6;
+      const barW = W - 28;
+      g.roundRect(14, barY, barW, 3, 1.5).fill({ color: 0x123636, alpha: 0.9 });
+      g.roundRect(14, barY, Math.max(2, barW * this.thinkProgress), 3, 1.5).fill({ color: border, alpha: 0.95 });
+      // 沿进度位置的一点扫描光
+      const headX = 14 + Math.max(2, barW * this.thinkProgress);
+      g.circle(headX, barY + 1.5, 2.4).fill({ color: 0xdffaff, alpha: 0.9 });
+    }
   }
 }
 
@@ -2364,8 +2405,12 @@ class HudView {
       this.decoyButton.textContent = "嫁祸";
       this.defenseButton.textContent = "反围剿：关";
       this.defenseButton.classList.remove("is-active");
+      exposureMetric?.classList.remove("is-alert");
       return;
     }
+
+    // 暴露过阈值才把这三颗按钮点亮（提示「该降暴露了」），否则维持灰暗、不抢注意力。
+    exposureMetric?.classList.toggle("is-alert", state.exposure >= EXPOSURE_HIGHLIGHT_THRESHOLD);
 
     // 反围剿开关 + 当前分流比例。
     this.defenseButton.disabled = false;
