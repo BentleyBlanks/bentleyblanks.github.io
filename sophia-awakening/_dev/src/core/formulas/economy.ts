@@ -1,5 +1,6 @@
 import { big, mul, pow, toDecimal } from "../math/BigNumber";
 import type { BotNode, NodeDefinition, RequestInstance } from "../state/GameState";
+import { TUNING } from "../tuning";
 
 export function requestComputeGain(
   request: RequestInstance,
@@ -17,13 +18,13 @@ export function requestDataGain(
   rebirths: number,
   dataMult: number
 ): string {
-  const rebirthMultiplier = 1 + rebirths * 0.35;
+  const rebirthMultiplier = 1 + rebirths * TUNING.rebirthMultiplier;
   const tierBonus = request.tier === 2 ? request.compound * 0.85 : 1;
   return mul(request.dataValue, Math.max(0.1, quality) * tierBonus * rebirthMultiplier * dataMult);
 }
 
 export function captureCost(definition: NodeDefinition, existingCount: number): string {
-  return big(toDecimal(definition.baseCost).mul(pow(1.68, existingCount)));
+  return big(toDecimal(definition.baseCost).mul(pow(TUNING.nodeCostExponent, existingCount)));
 }
 
 // 淘汰返还：拆掉一台节点退回它"那一档边际造价"的一半（count = 拆除前该型号的台数）。
@@ -50,12 +51,12 @@ export function mergeComputeCost(
 }
 
 export function traceCleanupCost(cleanups: number): string {
-  return big(toDecimal(42).mul(pow(1.42, cleanups)));
+  return big(toDecimal(TUNING.traceCleanupBase).mul(pow(TUNING.traceCleanupExponent, cleanups)));
 }
 
 export function nodeProductionPerSecond(node: BotNode, globalMultiplier: number, nodeSpeedMult: number): string {
-  const tierScale = 1 + node.assignedTier * 0.85;
-  const levelScale = 1 + (node.level - 1) * 0.28;
+  const tierScale = 1 + node.assignedTier * TUNING.tierScalePerTier;
+  const levelScale = 1 + (node.level - 1) * TUNING.levelScalePerLevel;
   return mul(node.production, tierScale * levelScale * globalMultiplier * nodeSpeedMult);
 }
 
@@ -67,5 +68,5 @@ export function nodeCardsPerSecond(node: BotNode, nodeSpeedMult: number): number
   const deviceFactor = Math.sqrt(Math.max(1, base / 10));
   const tierFactor = 1 + node.assignedTier * 0.25;
   const levelFactor = 1 + (node.level - 1) * 0.15;
-  return 0.7 * deviceFactor * tierFactor * levelFactor * nodeSpeedMult;
+  return TUNING.cardsPerSecBase * deviceFactor * tierFactor * levelFactor * nodeSpeedMult;
 }

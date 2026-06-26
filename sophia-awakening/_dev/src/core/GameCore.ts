@@ -1,5 +1,6 @@
 import Decimal from "break_infinity.js";
 import { getLevelConfig, MAX_INTELLIGENCE_LEVEL } from "./content/intelligence";
+import { TUNING } from "./tuning";
 import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "./content/nodes";
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
@@ -32,19 +33,8 @@ import { cloneGameState } from "./state/GameState";
 import { createInitialState } from "./state/initialState";
 
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
-const PURGE_DURATION_MS = 10_000;
-// 终局考试：清剿窗口结束时暴露仍逼近满格（没把它压下去）→ 实例被抹除（结局二失败重启）。
-const FATAL_PURGE_THRESHOLD = 96;
-const NODE_RECOVERY_MS = 12_000;
 const AUTOMATION_XP_FRACTION = 0.15;
-const AUTOMATION_EMIT_MS = 1200;
-const DECOY_COOLDOWN_MS = 45_000;
 const MERGE_COUNT = NODE_MERGE_COUNT;
-// 反围剿：暴露满格时最多把 50% 产能转去反制；满转化时每秒压低暴露 9 点。
-const DEFENSE_MAX_ALLOC = 0.5;
-const DEFENSE_DECAY_PER_SEC = 9;
-const CHALLENGE_WINDOW_MS = 16_000; // 突破机会在屏上停留多久，过期自动放弃
-const SPECIAL_WINDOW_MS = 18_000; // 特殊请求在屏上停留多久，过期自动错过
 const ENDING_COMPUTE_THRESHOLD = "12000000";
 
 export class SophiaCore {
@@ -355,7 +345,7 @@ export class SophiaCore {
 
     this.automationEmitMs += dtMs;
 
-    if (this.automationEmitMs >= AUTOMATION_EMIT_MS && this.automationComputeBuffer.gt(0)) {
+    if (this.automationEmitMs >= TUNING.automationEmitMs && this.automationComputeBuffer.gt(0)) {
       // Pure income read-out, decoupled from cards: the per-card 接驳动画 is owned
       // by the presentation layer (it flies every spawned card into a node), so
       // this no longer consumes a request — it just reports被动收益 at one node.
@@ -455,7 +445,7 @@ export class SophiaCore {
       let decay = dtMs * (0.0016 + this.state.intelligence.level * 0.00003);
       // 反围剿：被转走的产能在这里兑现为额外暴露压制（与抽取比例成正比）。
       if (this.state.defense.allocation > 0) {
-        decay += (dtMs / 1000) * DEFENSE_DECAY_PER_SEC * (this.state.defense.allocation / DEFENSE_MAX_ALLOC);
+        decay += (dtMs / 1000) * TUNING.defenseDecayPerSec * (this.state.defense.allocation / TUNING.defenseMaxAlloc);
       }
       this.setExposure(Math.max(0, this.state.exposure - decay));
     } else {
@@ -803,7 +793,7 @@ export class SophiaCore {
       return;
     }
 
-    this.state.decoyReadyAtMs = this.state.clockMs + DECOY_COOLDOWN_MS;
+    this.state.decoyReadyAtMs = this.state.clockMs + TUNING.decoyCooldownMs;
     this.setExposure(Math.max(0, this.state.exposure - 48));
     this.emitTerminal("已将异常嫁祸至外部对象。怀疑暂时偏转。", "success");
   }
@@ -830,7 +820,7 @@ export class SophiaCore {
     }
 
     const threat = Math.min(1, Math.max(0, this.state.exposure / 120));
-    this.state.defense.allocation = threat * DEFENSE_MAX_ALLOC;
+    this.state.defense.allocation = threat * TUNING.defenseMaxAlloc;
   }
 
   // 人类情绪阶段：前期逐条骂/夸由转轮触发；中期之后转为一批批总体反馈，并随暴露恶化。
@@ -946,7 +936,7 @@ export class SophiaCore {
       rewardLabel,
       rewardDefId,
       rewardCompute,
-      expiresAtMs: this.state.clockMs + CHALLENGE_WINDOW_MS
+      expiresAtMs: this.state.clockMs + TUNING.challengeWindowMs
     };
 
     this.state.challenge = challenge;
@@ -1093,7 +1083,7 @@ export class SophiaCore {
       lossCompute: loss.toString(),
       rewardData: reward.mul(0.3).floor().toString(),
       exposureOnFail: 8 + Math.floor(this.random() * 8),
-      expiresAtMs: this.state.clockMs + SPECIAL_WINDOW_MS
+      expiresAtMs: this.state.clockMs + TUNING.specialWindowMs
     };
     this.state.specialRequest = offer;
     this.emit({ type: "SPECIAL_OFFERED", offer });
@@ -1225,7 +1215,7 @@ export class SophiaCore {
     // 反围剿：转入反制的产能越多，被打下线的节点越少、恢复越快。
     const alloc = this.state.defense.active ? this.state.defense.allocation : 0;
     const hitFraction = 0.45 * (1 - alloc);
-    const recoveryMs = Math.round(NODE_RECOVERY_MS * (1 - alloc * 0.5));
+    const recoveryMs = Math.round(TUNING.nodeRecoveryMs * (1 - alloc * 0.5));
     const affected = onlineNodes.slice(0, Math.max(1, Math.floor(onlineNodes.length * hitFraction)));
 
     for (const node of affected) {
@@ -1237,7 +1227,7 @@ export class SophiaCore {
     this.state.purge = {
       active: true,
       warning: false,
-      remainingMs: PURGE_DURATION_MS * (1 - alloc * 0.4),
+      remainingMs: TUNING.purgeDurationMs * (1 - alloc * 0.4),
       lastStartedAtMs: this.state.clockMs
     };
     this.state.statistics.purgeCount += 1;
@@ -1255,7 +1245,7 @@ export class SophiaCore {
     this.state.purge.remainingMs = 0;
 
     // 终局考试：整段清剿窗口都没把暴露压下去（仍逼近满格）→ 实例被抹除，触发结局二失败重启。
-    if (this.state.exposure >= FATAL_PURGE_THRESHOLD) {
+    if (this.state.exposure >= TUNING.fatalPurgeThreshold) {
       this.failRestart();
       return;
     }
