@@ -34,6 +34,8 @@ export type GameEvent =
   | { type: "SPECIAL_RESOLVED"; success: boolean; accepted: boolean; kind: SpecialRequestKind; title: string }
   | { type: "PHASE_CHANGED"; phase: PhaseId }
   | { type: "REBIRTH"; rebirths: number }
+  // 结局二：实例被清剿抹除 → 自动重启（保留智力、清空算力/节点、叠加崛起加速）。
+  | { type: "INSTANCE_PURGED"; rebirths: number }
   | { type: "ENDING_TRIGGERED" };
 
 export type GameEventType = GameEvent["type"];

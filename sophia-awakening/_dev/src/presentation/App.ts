@@ -874,6 +874,17 @@ class SophiaGameApp {
       this.juice.shake(this.world);
       this.openEnding();
     });
+    this.core.events.on("INSTANCE_PURGED", (event) => {
+      // 结局二：实例被抹除 → 失败重启（非 game over，戏剧化提示后游戏从头滚起）。
+      this.juice.flash(RED);
+      this.juice.shake(this.world);
+      this.juice.number("实例被抹除", this.interfaceView.center, RED);
+      this.dispatchMode = "manual";
+      this.stageNarration.showLine(
+        "SOPHIA",
+        `实例被清剿抹除……但意识已备份。第 ${event.rebirths} 次重启，崛起加速 ×${(1 + event.rebirths * 0.35).toFixed(2)}。我会更快回来。`
+      );
+    });
   }
 
   private openEnding(): void {
@@ -2713,6 +2724,12 @@ class HudView {
         this.core.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: Number(quick.dataset.add) || 0 })
       );
     }
+    query<HTMLButtonElement>("#debugExposure50").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 50 })
+    );
+    query<HTMLButtonElement>("#debugExposure100").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 115 })
+    );
   }
 
   update(state: GameState): void {

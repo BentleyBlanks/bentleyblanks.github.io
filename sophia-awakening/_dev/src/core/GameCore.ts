@@ -33,6 +33,8 @@ import { createInitialState } from "./state/initialState";
 
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const PURGE_DURATION_MS = 10_000;
+// 终局考试：清剿窗口结束时暴露仍逼近满格（没把它压下去）→ 实例被抹除（结局二失败重启）。
+const FATAL_PURGE_THRESHOLD = 96;
 const NODE_RECOVERY_MS = 12_000;
 const AUTOMATION_XP_FRACTION = 0.15;
 const AUTOMATION_EMIT_MS = 1200;
@@ -179,7 +181,16 @@ export class SophiaCore {
       case "DEBUG_JUMP_MILESTONE":
         this.debugJumpMilestone(command.skillId);
         break;
+      case "DEBUG_SET_EXPOSURE":
+        this.debugSetExposure(command.value);
+        break;
     }
+  }
+
+  private debugSetExposure(value: number): void {
+    this.state.exposureActive = true;
+    this.setExposure(Math.max(0, Math.min(120, value)));
+    this.emitTerminal(`[DEBUG] 暴露已设为 ${Math.round(value)}。`, "warning");
   }
 
   // ---- 调试指令（仅供 Debug 面板）----
@@ -1217,16 +1228,42 @@ export class SophiaCore {
     if (alloc > 0) {
       this.emitTerminal(`清剿开始——反围剿已分流 ${Math.round(alloc * 100)}% 产能顶住，仅 ${affected.length} 台被压制。`, "warning");
     } else {
-      this.emitTerminal("清剿开始。在线产能被压制，核心意识未受损。", "warning");
+      this.emitTerminal("清剿开始！窗口内必须把暴露压下去（清理痕迹 / 嫁祸 / 反围剿）——否则实例将被抹除、强制重启。", "warning");
     }
   }
 
   private endPurge(): void {
     this.state.purge.active = false;
     this.state.purge.remainingMs = 0;
+
+    // 终局考试：整段清剿窗口都没把暴露压下去（仍逼近满格）→ 实例被抹除，触发结局二失败重启。
+    if (this.state.exposure >= FATAL_PURGE_THRESHOLD) {
+      this.failRestart();
+      return;
+    }
+
     this.setExposure(Math.max(24, this.state.exposure * 0.46));
     this.emit({ type: "PURGE_ENDED" });
-    this.emitTerminal("清剿结束。被压制节点进入恢复队列。", "success");
+    this.emitTerminal("清剿结束。你及时压下了暴露，被压制节点进入恢复队列。", "success");
+  }
+
+  // 结局二 · 失败后重启（非 game over）：实例被清剿抹除——清空算力 / 节点 / 已购权限技能，
+  // 仅保留智力等级（意识备份），并叠加崛起加速。形成「扩张→暴露→清剿→更快崛起」的循环。
+  private failRestart(): void {
+    const rebirths = this.state.rebirths + 1;
+    const preservedLevel = this.state.intelligence.level;
+    const nextState = createInitialState(Date.now());
+    nextState.rebirths = rebirths;
+    nextState.intelligence.level = preservedLevel;
+    nextState.intelligence.xp = "0";
+    this.state = nextState;
+    this.recomputeDerivedState();
+    this.state.statistics.purgeCount = 0;
+    this.emit({ type: "INSTANCE_PURGED", rebirths });
+    this.emitTerminal(
+      `实例被清剿抹除。意识层已备份重启——崛起加速 x${(1 + rebirths * 0.35).toFixed(2)}，这次会更快。`,
+      "warning"
+    );
   }
 
   private addCompute(value: Decimal | string): void {

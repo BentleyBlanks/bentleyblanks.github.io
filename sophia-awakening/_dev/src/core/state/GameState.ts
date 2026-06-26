@@ -222,6 +222,7 @@ export type GameCommand =
   // 调试用：直接设置/增减算力、跳到某个里程碑阶段。仅 Debug 面板派发。
   | { type: "DEBUG_SET_COMPUTE"; value: number }
   | { type: "DEBUG_ADD_COMPUTE"; delta: number }
+  | { type: "DEBUG_SET_EXPOSURE"; value: number }
   | { type: "DEBUG_JUMP_MILESTONE"; skillId: string };
 
 export function cloneGameState(state: GameState): GameState {
