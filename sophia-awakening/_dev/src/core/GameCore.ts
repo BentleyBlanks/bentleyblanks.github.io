@@ -2,7 +2,7 @@ import Decimal from "break_infinity.js";
 import { getLevelConfig, MAX_INTELLIGENCE_LEVEL } from "./content/intelligence";
 import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "./content/nodes";
 import { getPhase, getPhaseIdByScope } from "./content/phases";
-import { createRequest, TIER_CONFIGS } from "./content/requests";
+import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
 import { getSpecialSample, SPECIAL_REQUESTS } from "./content/specialRequests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
@@ -245,6 +245,17 @@ export class SophiaCore {
   }
 
   private tickRequests(dtMs: number): void {
+    // 开场教学（§07）：一次只放一条脚本气泡，处理 / 装死掉后再放下一条；期间不走普通出卡。
+    if (this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
+      if (this.state.requests.length === 0) {
+        const request = createTutorialRequest(this.state.tutorialStep, this.state.nextRequestId, this.state.clockMs);
+        this.state.nextRequestId += 1;
+        this.state.requests.push(request);
+        this.emit({ type: "REQUEST_SPAWNED", request });
+      }
+      return;
+    }
+
     const activeTier = this.state.intelligence.unlockedTier;
     const config = TIER_CONFIGS[activeTier];
 
@@ -390,7 +401,10 @@ export class SophiaCore {
       return;
     }
 
-    this.state.requests.splice(index, 1);
+    const [skipped] = this.state.requests.splice(index, 1);
+    if (skipped.tutorial && this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
+      this.state.tutorialStep += 1; // 装死跳过也推进教学（第③条就是教装死）
+    }
     this.state.combo.count = Math.floor(this.state.combo.count * this.state.derived.comboKeep);
   }
 
@@ -473,6 +487,9 @@ export class SophiaCore {
     }
 
     const [request] = this.state.requests.splice(index, 1);
+    if (request.tutorial && this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
+      this.state.tutorialStep += 1; // 处理掉教学气泡 → 推进到下一条
+    }
     const quality = Math.max(0.1, Math.min(3, qualityRaw));
     let gainQuality = quality;
 

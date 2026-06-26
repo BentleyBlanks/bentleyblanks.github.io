@@ -54,6 +54,9 @@ export interface RequestInstance {
   answer?: SortAnswer; // T1 的正确判断（其余层不用）
   answers?: AnswerOption[]; // T0/T1：回复轮盘的候选回复
   chain?: ChainStep[]; // T2：可勾选的任务链步骤（含干扰项）
+  // 开场教学（§07）：脚本气泡的选项约束——allowed=可点的选项下标，highlight=高亮引导的下标，
+  // line=气泡浮入时 SOPHIA 的旁白。普通请求无此字段。
+  tutorial?: { allowed: number[]; highlight?: number; line?: string };
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
@@ -158,6 +161,8 @@ export interface GameState {
   version: number;
   clockMs: number;
   spawnTimerMs: number;
+  // 开场教学进度：0/1/2 = 正在演示第①②③条脚本气泡；>=3 = 教学结束，正常出卡。
+  tutorialStep: number;
   rngSeed: number;
   nextRequestId: number;
   nextNodeId: number;

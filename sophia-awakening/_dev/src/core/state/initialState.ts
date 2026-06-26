@@ -11,6 +11,7 @@ export function createInitialState(now = Date.now()): GameState {
     version: SAVE_VERSION,
     clockMs: 0,
     spawnTimerMs: 200,
+    tutorialStep: 0,
     rngSeed: Math.floor(now % 2_147_483_647),
     nextRequestId: 1,
     nextNodeId: 1,

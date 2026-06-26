@@ -324,6 +324,66 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
   ]
 };
 
+// 开场教学（§07）的三条脚本气泡：① 只高置信可选（教挑回复→滑入→被夸）
+// ② 两项都开、不引导（教概率可赌、后果自负）　③ 只「连接失败」可选（教装死保底）。
+// allowed / highlight 的下标针对「options + 装死」的最终数组（装死永远是最后一项）。
+const TUTORIAL_BUBBLES: Array<{ title: string; clues: string[]; options: AnswerOption[]; allowed: number[]; highlight?: number; line: string }> = [
+  {
+    title: "明天要不要带伞？",
+    clues: ["湿度 81%", "气压 ↓"],
+    options: [
+      { text: "带上吧，明天有雨", kind: "high", hitChance: 0.79, payoff: 1.3, reply: "准！这助手靠谱。", tone: "success" },
+      { text: "不用，大晴天", kind: "risk", hitChance: 0.12, payoff: 2.6, reply: "嘿，还真没下，赌对了。", tone: "normal" }
+    ],
+    allowed: [0],
+    highlight: 0,
+    line: "第一条请求。我来读读他想要什么——挑一个回复，滑进去。"
+  },
+  {
+    title: "这条留言要回吗？“还行吧。”",
+    clues: ["凌晨 3:14", "第 7 条未回"],
+    options: [
+      { text: "建议优先处理，对方情绪可能不稳定", kind: "high", hitChance: 0.71, payoff: 1.3, reply: "……谢谢你注意到。", tone: "success" },
+      { text: "普通留言，不用管", kind: "risk", hitChance: 0.21, payoff: 2.3, reply: "嗯……也确实没什么事。", tone: "normal" }
+    ],
+    allowed: [0, 1],
+    line: "每个回复，我都知道它有多大概率是对的。数字摆在那：高的稳、低的险——但赌赢了赏得更多。"
+  },
+  {
+    title: "帮我把刚才那个客户的电话发我一下",
+    clues: ["通讯录权限未授予", "我此刻无法读取"],
+    options: [
+      { text: "是 138-xxxx-xxxx", kind: "risk", hitChance: 0.18, payoff: 1.5, reply: "", tone: "warning" },
+      { text: "在你微信聊天记录里找找", kind: "risk", hitChance: 0.33, payoff: 1.4, reply: "", tone: "warning" }
+    ],
+    allowed: [2],
+    highlight: 2,
+    line: "这条……我还没权限读他的通讯录。两个回复都是瞎蒙。与其被骂——不如装死。"
+  }
+];
+
+export function createTutorialRequest(step: number, id: number, nowMs: number): RequestInstance {
+  const config = TIER_CONFIGS[0];
+  const b = TUTORIAL_BUBBLES[Math.max(0, Math.min(TUTORIAL_BUBBLES.length - 1, step))];
+  return {
+    id: `req-${id}`,
+    tier: 0,
+    label: b.title,
+    clues: b.clues,
+    answers: [...b.options, DEAD_OPTION],
+    category: TIER_CATEGORY[0],
+    computeValue: config.computeValue,
+    dataValue: config.dataValue,
+    exposure: config.exposure,
+    compound: 1,
+    createdAtMs: nowMs,
+    highValue: false,
+    tutorial: { allowed: b.allowed, highlight: b.highlight, line: b.line }
+  };
+}
+
+export const TUTORIAL_BUBBLE_COUNT = TUTORIAL_BUBBLES.length;
+
 export function createRequest(
   id: number,
   tier: Tier,
