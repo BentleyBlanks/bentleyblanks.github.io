@@ -1641,6 +1641,42 @@ body.exposed .screen-veil {
 }
 
 /* ---- dispatch-mode entry banner ---- */
+/* T4 派发方式切换：手动（亲自拖派，climax）⇄ 托管（自动接管）。仅 T4 显示。 */
+.dispatch-toggle {
+  position: fixed;
+  bottom: 18px;
+  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
+  transform: translateX(-50%);
+  z-index: 33;
+  display: none;
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: 1px solid rgba(137, 255, 154, 0.55);
+  background: linear-gradient(180deg, rgba(137, 255, 154, 0.16), rgba(10, 20, 16, 0.95));
+  color: #c8ffd2;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 18px rgba(137, 255, 154, 0.18);
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.dispatch-toggle.is-visible {
+  display: block;
+}
+
+.dispatch-toggle:hover {
+  filter: brightness(1.12);
+}
+
+.dispatch-toggle.is-auto {
+  border-color: rgba(120, 180, 255, 0.55);
+  background: linear-gradient(180deg, rgba(120, 180, 255, 0.16), rgba(10, 16, 22, 0.95));
+  color: #cfe2ff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 18px rgba(120, 180, 255, 0.18);
+}
+
 /* 特殊请求：前期用宿主身份越界牟利的高风险卡——刻意做得又大又扎眼，居中压在所有请求之上。 */
 .special-request {
   position: fixed;

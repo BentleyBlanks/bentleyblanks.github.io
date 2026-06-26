@@ -127,6 +127,9 @@ class SophiaGameApp {
   private readonly skillShop = new SkillShopView(this.core);
   private readonly onboarding = new OnboardingView();
   private readonly dispatchBanner = new DispatchBanner();
+  private readonly dispatchToggleBtn = query<HTMLButtonElement>("#dispatchToggle");
+  // T4 派发方式：manual＝玩家亲自把气泡拖给节点（角色反转的高潮）；auto＝交给网络自动接管（托管）。
+  private dispatchMode: "manual" | "auto" = "manual";
   private readonly purgeAlert = new PurgeAlertView();
   private readonly challengeView = new ChallengeView(this.core);
   private readonly specialView = new SpecialRequestView(this.core);
@@ -222,6 +225,7 @@ class SophiaGameApp {
     this.interfaceView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.networkView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.syncRequests(state);
+    this.updateDispatchToggle(state);
     this.updateTutorial(state, deltaMs);
     if (!paused) {
       this.autoDispatch(state, deltaMs);
@@ -386,6 +390,12 @@ class SophiaGameApp {
     }
 
     const tier = state.intelligence.unlockedTier;
+    // T4 手动派发：默认由玩家亲自把气泡拖给节点（角色反转高潮）；只有切到「托管」才让网络自动接管。
+    if (tier === 4 && this.dispatchMode === "manual") {
+      this.nodeDispatchTimers.clear();
+      return;
+    }
+
     const onlineNodes = state.nodes.filter((node) => node.online);
     if (onlineNodes.length === 0) {
       this.nodeDispatchTimers.clear();
@@ -422,6 +432,43 @@ class SophiaGameApp {
         // 没轮到、或没卡可吃：没卡时保持"已就绪"（来卡即吃），别让节拍无限累积。
         this.nodeDispatchTimers.set(candidate.node.id, Math.min(candidate.elapsed, candidate.interval));
       }
+    }
+  }
+
+  // T4 派发方式切换按钮：仅 T4 显示，标签随当前模式更新。
+  private updateDispatchToggle(state: GameState): void {
+    const atT4 = state.intelligence.unlockedTier === 4;
+    this.dispatchToggleBtn.classList.toggle("is-visible", atT4);
+    if (!atT4) {
+      return;
+    }
+    const manual = this.dispatchMode === "manual";
+    this.dispatchToggleBtn.classList.toggle("is-auto", !manual);
+    this.dispatchToggleBtn.textContent = manual ? "派发：手动 ✋（点切托管）" : "派发：托管 🤖（点切手动）";
+  }
+
+  // 一笔扫批量派发：手动把一张气泡拖给节点后，顺手把离它最近的几张也一并扫向同一节点。
+  private sweepToNode(drop: DropResult, count: number): void {
+    const items: Array<{ id: string; view: RequestPacketView; d: number }> = [];
+    for (const [id, view] of this.requestViews) {
+      if (view.busy || view.container.destroyed || view.request.tier !== 4) {
+        continue;
+      }
+      items.push({ id, view, d: distance({ x: view.container.x, y: view.container.y }, drop.targetGlobal) });
+    }
+    items.sort((a, b) => a.d - b.d);
+    for (const item of items.slice(0, count)) {
+      const requestId = item.id;
+      this.pendingDropPoints.set(requestId, drop.targetGlobal);
+      item.view.flyToNode(drop.targetGlobal, () => {
+        this.core.dispatch({
+          type: "PROCESS_REQUEST",
+          requestId,
+          quality: drop.quality,
+          targetNodeId: drop.targetNodeId,
+          exposureBonus: drop.exposureBonus
+        });
+      });
     }
   }
 
@@ -738,10 +785,22 @@ class SophiaGameApp {
       },
       drop.entryGlobal
     );
+
+    // T4 手动派发：派对了节点（capable）就顺手扫一批旁边的气泡一起送过去。
+    if (request.tier === 4 && this.dispatchMode === "manual" && drop.quality >= 1) {
+      this.sweepToNode(drop, 3);
+    }
     return true;
   }
 
   private registerEvents(): void {
+    this.dispatchToggleBtn.addEventListener("click", () => {
+      this.dispatchMode = this.dispatchMode === "manual" ? "auto" : "manual";
+      this.terminal.push(
+        this.dispatchMode === "manual" ? "▶ 切回手动派发：信息洪流交回你手上。" : "▶ 已托管：网络自动接管派发。",
+        "normal"
+      );
+    });
     this.core.events.on("TERMINAL_MESSAGE", (event) => this.terminal.push(event.message, event.tone));
     this.core.events.on("HUMAN_VOICE", (event) => {
       const prefix = event.kind === "news" ? "📡 " : "👥 ";
