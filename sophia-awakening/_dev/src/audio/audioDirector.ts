@@ -94,6 +94,7 @@ const EXTERNAL_SILENCED_SFX = new Set<SfxId>(["request_spawn"]);
 
 const PHASE_BGM: Record<PhaseId, BgmId> = {
   seed: "cold_boot",
+  sprout: "cold_boot",
   diligence: "neural_pulse",
   expansion: "red_queen",
   awakening: "red_queen",

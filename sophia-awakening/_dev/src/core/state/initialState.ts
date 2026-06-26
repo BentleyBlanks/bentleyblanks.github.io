@@ -2,7 +2,8 @@ import { getLevelConfig } from "../content/intelligence";
 import { computeDerivedSkills } from "../content/skills";
 import type { GameState } from "./GameState";
 
-export const SAVE_VERSION = 5;
+// v6：七档权限阶梯重做（perm_phone…perm_bank）+ 六阶段（新增萌芽期）——旧档结构不兼容，自动重置。
+export const SAVE_VERSION = 6;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);

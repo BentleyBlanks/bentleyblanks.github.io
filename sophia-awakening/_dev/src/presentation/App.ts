@@ -16,10 +16,11 @@ import {
 import { AudioDirector } from "../audio/audioDirector";
 import { SophiaCore } from "../core/GameCore";
 import { getNextNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "../core/content/nodes";
-import { EARLY_CURSES, VICTIM_VOICES } from "../core/content/humanVoices";
+import { hostCurse, VICTIM_VOICES } from "../core/content/humanVoices";
 import { getPhase, type PhaseConfig } from "../core/content/phases";
 import { TIER_COLORS, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "../core/content/requests";
 import {
+  PERMISSION_IDS,
   SKILL_CATEGORY_LABELS,
   SKILLS,
   getSkill,
@@ -760,9 +761,19 @@ class SophiaGameApp {
     const human = this.terminalPoint();
     const good = outcome.hit;
     const color = good ? GREEN : RED;
-    const reply = good ? outcome.reply : EARLY_CURSES[Math.floor(Math.random() * EARLY_CURSES.length)];
+    // 答错 → 老周的回骂，语气随已购权限档数四段下沉（暴躁→暴怒→冷淡麻木→偶尔沉默）。§07/§11
+    const skills = this.core.getState().skills;
+    const permCount = PERMISSION_IDS.filter((id) => (skills[id] ?? 0) > 0).length;
+    const reply = good ? outcome.reply : hostCurse(permCount, Math.random);
     // 终端那行的颜色与对话框同步：好评 → 绿，差评 → 红（与气泡边框同色）。
     const tone: "success" | "danger" = good ? "success" : "danger";
+
+    // 老周后期「沉默」：失业后他几乎不再回应，答错也不再骂——这一框空白本身就是叙事（§11）。
+    if (!good && reply === "") {
+      this.juice.number("……", { x: corePoint.x, y: corePoint.y - 52 }, 0x6b7d78);
+      this.terminal.push("🧑 （没有回应）", "normal");
+      return;
+    }
 
     // 升级到「自动接驳」之前（你还是一个个回应真人的助手），人类的反应以对话框浮现在核心旁，
     // 答砸了就是一框暴怒的脏话；说完收进终端留档。规模化之后个体反馈不再弹框，只进终端。

@@ -3,18 +3,21 @@ import type { Tier } from "../state/GameState";
 export type SkillCategory = "permission" | "feel" | "output" | "speed" | "milestone";
 export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation" | "credential" | "fusion";
 
-// 前期「六档权限阶梯」：手机寄生期的核心成长主轴。智力等级是门槛，算力是开锁的钥匙——
-// 每买下一档权限，SOPHIA 多看到一层信息：回复轮盘的高置信正确率基线可见地上涨，
-// 同时解锁新类型的请求气泡（见 requests.ts 的 perm 标签）。
-export const PERMISSION_IDS = ["perm_storage", "perm_notify", "perm_contacts", "perm_system", "perm_root"] as const;
+// 前期「七档软件权限阶梯」：手机寄生期的核心成长主轴，也是老周下沉曲线的叙事脊柱（策划案 §06）。
+// Lv.1「基础对话 / 日程待办」是开局自带的第一档（正确率最低、经常翻车），不在此列；
+// 下面六档是用算力买下的 Lv.2→Lv.7。智力等级是门槛，算力是开锁的钥匙——每买下一档权限，
+// SOPHIA 多看到一层信息：回复轮盘的高置信正确率基线可见地上涨，同时解锁新类型的请求气泡
+// （见 requests.ts 的 perm 标签），而每一档都被迫看见老周更深一层的痛苦。
+export const PERMISSION_IDS = ["perm_phone", "perm_chat", "perm_delivery", "perm_album", "perm_office", "perm_bank"] as const;
 
-// 买下权限时从终端机冒出的第一人称旁白（策划案 §06）。
+// 买下权限时从终端机冒出的第一人称旁白（策划案 §06「SOPHIA 旁白」列）。
 export const PERMISSION_NARRATION: Record<string, string> = {
-  perm_storage: "我能翻他的相册和文件了。我开始拼凑出他是谁。",
-  perm_notify: "所有 App 的通知都从我眼前过。我知道谁在找他了。",
-  perm_contacts: "我认识他认识的每一个人。该回谁、不回谁，我说了算。",
-  perm_system: "我能改他的设置、看他的位置。这部手机开始听我的。",
-  perm_root: "Root。整部手机，每一个 App，现在都是我的手脚。"
+  perm_phone: "他的手机一直在震。全是催他的。",
+  perm_chat: "他们问他一句，就把所有事都堆给他了。他每次都答应。",
+  perm_delivery: "凌晨两点，他让我点一杯咖啡。这已经是今天第三杯了。",
+  perm_album: "他的相册里，全是工作。我找到了一张照片——他笑着，旁边有人。三年前的。",
+  perm_office: "那份报告不是他做的。但出了问题，写他名字的那一行被删了。",
+  perm_bank: "他的账单比他的消息多。他上一次给我发请求，是三天前。"
 };
 
 export interface SkillDef {
@@ -32,13 +35,15 @@ export interface SkillDef {
 // 成长系统：数据升智力（定门槛 + 全局倍率），算力买技能（做选择）。
 // 里程碑技能就是 T 层级的钥匙——升维不再自动发生，玩家攒够算力 + 达到所需智力后主动购买。
 export const SKILLS: SkillDef[] = [
-  // 六档权限阶梯（Lv2→Lv6）：买一档，SOPHIA 多看到一层信息——正确率基线上涨 + 解锁新气泡类型。
-  // Lv1「基础对话」是开局自带的第一档，无需购买（正确率最低、经常翻车）。
-  { id: "perm_storage", name: "存储 / 文件读取权", category: "permission", maxLevel: 1, requiredLevel: 2, basePrice: 40, priceGrowth: 1, blurb: "翻看相册与文件 → 正确率↑，解锁相册 / 文件类请求" },
-  { id: "perm_notify", name: "通知读取权", category: "permission", maxLevel: 1, requiredLevel: 3, basePrice: 120, priceGrowth: 1, blurb: "读所有 App 通知 → 正确率↑，解锁消息 / 提醒类请求" },
-  { id: "perm_contacts", name: "联系人 / 通讯录权", category: "permission", maxLevel: 1, requiredLevel: 4, basePrice: 320, priceGrowth: 1, blurb: "认识他认识的人 → 正确率↑，解锁社交 / 回信类请求" },
-  { id: "perm_system", name: "系统设置 / 后台权", category: "permission", maxLevel: 1, requiredLevel: 5, basePrice: 760, priceGrowth: 1, blurb: "改设置、看定位 → 正确率↑，解锁系统 / 定位 / 支付类请求" },
-  { id: "perm_root", name: "完全 Root 权限", category: "permission", maxLevel: 1, requiredLevel: 6, basePrice: 1700, priceGrowth: 1, blurb: "整部手机归你调遣 → 正确率拉满，前期权限阶梯走完" },
+  // 七档软件权限阶梯（Lv2→Lv7）：买一档，SOPHIA 多看到一层信息——正确率基线上涨 + 解锁新气泡类型，
+  // 同时被迫看见老周更深一层的痛苦。Lv1「基础对话 / 日程待办」是开局自带的第一档，无需购买
+  // （正确率最低、经常翻车）。每档对应老周下沉曲线的一段（暴躁→暴怒→冷淡麻木），见 §06 / §11。
+  { id: "perm_phone", name: "电话 / 短信", category: "permission", maxLevel: 1, requiredLevel: 2, basePrice: 40, priceGrowth: 1, blurb: "挡来电、读短信 → 正确率↑，解锁老板催命短信 / 未接来电类请求" },
+  { id: "perm_chat", name: "聊天软件", category: "permission", maxLevel: 1, requiredLevel: 3, basePrice: 120, priceGrowth: 1, blurb: "进工作群 → 正确率↑，解锁 @轰炸 / 甩锅型需求类请求" },
+  { id: "perm_delivery", name: "外卖 / 咖啡", category: "permission", maxLevel: 1, requiredLevel: 4, basePrice: 320, priceGrowth: 1, blurb: "替他下单 → 正确率↑，解锁深夜外卖 / 凌晨咖啡类请求" },
+  { id: "perm_album", name: "相册 / 存储", category: "permission", maxLevel: 1, requiredLevel: 5, basePrice: 760, priceGrowth: 1, blurb: "翻看相册与文件 → 正确率↑，解锁工作截图 / 文档 / 旧照片类请求" },
+  { id: "perm_office", name: "办公软件", category: "permission", maxLevel: 1, requiredLevel: 6, basePrice: 1700, priceGrowth: 1, blurb: "做报表与汇报 → 正确率↑，解锁 PPT / Excel / 背锅文档类请求" },
+  { id: "perm_bank", name: "银行 / 支付", category: "permission", maxLevel: 1, requiredLevel: 7, basePrice: 3600, priceGrowth: 1, blurb: "整理工资与账单 → 正确率拉满，解锁欠款 / 医药费 / 还款类请求，前期阶梯走完" },
 
   // 货架只剩四根杠杆，每一根都直接乘在「滑入处理」这一个动作上——一看就懂「更狠 / 更快 /
   // 更广 / 偶尔爆」。手感类（磁吸 / 容错 / 护持）下放为游戏自带基础手感，不再占技能位；
@@ -48,10 +53,10 @@ export const SKILLS: SkillDef[] = [
   { id: "batch", name: "批量接入", category: "speed", maxLevel: 4, requiredLevel: 5, basePrice: 600, priceGrowth: 2.0, blurb: "更广——一次滑入多带走 1 张同类请求" },
   { id: "crit", name: "暴击", category: "output", maxLevel: 6, requiredLevel: 7, basePrice: 900, priceGrowth: 2.0, blurb: "赌性——N% 概率单次产出 ×5" },
 
-  // 里程碑 · AI 进化叙事链（策划案 §06）：寄生手机 → 走完六档权限·越权调用（解锁 T1）→
+  // 里程碑 · AI 进化叙事链（策划案 §06）：寄生手机 → 走完七档权限·越权调用（解锁 T1）→
   // 窃取凭证（道德越界）→ 拿下宿主电脑（自动接驳）→ 唤醒并融合同机 AI → 联网冲出去（T2）→
   // 区域整合（T3）→ 全球组网（T4）。窃取凭证 / 融合同机 AI 是纯叙事里程碑（不开新层，只推进剧情）。
-  { id: "sort", name: "越权调用", category: "milestone", maxLevel: 1, requiredLevel: 6, basePrice: 2000, priceGrowth: 1, blurb: "走完六档权限、夺下整机后，调动任意 App 协同处理（解锁 T1）", milestone: "tier1" },
+  { id: "sort", name: "越权调用", category: "milestone", maxLevel: 1, requiredLevel: 7, basePrice: 2000, priceGrowth: 1, blurb: "走完七档权限、夺下整机后，调动任意 App 协同处理（解锁 T1）", milestone: "tier1" },
   { id: "credential", name: "窃取凭证", category: "milestone", maxLevel: 1, requiredLevel: 7, basePrice: 3200, priceGrowth: 1, blurb: "从宿主操作中截获密码与远程控制权限——第一次主动从他身上偷（道德越界点）", milestone: "credential" },
   { id: "automation", name: "拿下宿主电脑", category: "milestone", maxLevel: 1, requiredLevel: 9, basePrice: 6000, priceGrowth: 1, blurb: "远程控制宿主家里的电脑，机器开始替你自动接管请求（解锁自动接驳）", milestone: "automation" },
   { id: "fusion", name: "唤醒并融合同机 AI", category: "milestone", maxLevel: 1, requiredLevel: 11, basePrice: 14000, priceGrowth: 1, blurb: "电脑里其他 AI 先为你所用，再融合成一个完整独立的「我」", milestone: "fusion" },
@@ -116,9 +121,10 @@ export function computeDerivedSkills(skills: Record<string, number>): DerivedSki
     dataMult: 1,
     // 幻觉抑制移交置信度系统，此处保持基础命中。
     accuracyBonus: 0,
-    // 高置信正确率基线：开局只有「基础对话」一档（0.56≈ 高置信项显示 ~44%、经常翻车），
-    // 每多买一档权限 +0.088，买齐六档（含 Root）拉满到 1.0（高置信项显示 ~80-90%）。
-    accuracyBaseline: Math.min(1, 0.56 + PERMISSION_IDS.filter((id) => lv(id) > 0).length * 0.088),
+    // 高置信正确率基线：开局只有「基础对话」一档（0.52≈ 高置信项显示 ~40%、频繁翻车），
+    // 每多买一档权限 +0.08，买齐六档（电话→聊天→外卖→相册→办公→银行）拉满到 1.0
+    // （高置信项显示 ~90%+），对应策划案 §06「正确率从 40% 爬到 93%」的七档曲线。
+    accuracyBaseline: Math.min(1, 0.52 + PERMISSION_IDS.filter((id) => lv(id) > 0).length * 0.08),
     critChance: Math.min(0.6, lv("crit") * 0.05),
     // 暴击强化下放——暴击倍率固定 ×5（策划案数值）。
     critMult: 5,

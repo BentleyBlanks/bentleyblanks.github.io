@@ -114,80 +114,118 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
         { text: "代他答应，对齐要求", kind: "risk", hitChance: 0.4, payoff: 1.4, reply: "……我照做了。评分没动，他也没变好。", tone: "warning" }
       ]
     },
-    // —— 存储 / 文件读取权 ——
+    // —— Lv.2 电话 / 短信（老板催命短信、未接来电）· 老周：暴躁 ——
+    {
+      title: "老板这条短信要现在回吗？“方案呢？等你。”",
+      clues: ["23:51 发来", "今日第 4 条催", "上一条他没敢回"],
+      perm: "perm_phone",
+      options: [
+        { text: "替他回：已在改，明早 9 点前发您", kind: "high", hitChance: 0.7, payoff: 1.3, reply: "……行吧，先这么顶着。", tone: "normal" },
+        { text: "建议他装睡，明天再说", kind: "risk", hitChance: 0.18, payoff: 2.3, reply: "……他居然真没回，世界没塌。", tone: "normal" }
+      ]
+    },
+    {
+      title: "这个未接来电要回拨吗？",
+      clues: ["归属地：公司总机", "午休时间连打 3 次", "无留言"],
+      perm: "perm_phone",
+      options: [
+        { text: "判为催活，先发短信问事由再说", kind: "high", hitChance: 0.74, payoff: 1.3, reply: "嗯，省得又被堵着说半天。", tone: "success" },
+        { text: "立刻回拨过去", kind: "risk", hitChance: 0.16, payoff: 2.2, reply: "……又被加了俩活。早该让你先问的。", tone: "warning" }
+      ]
+    },
+    // —— Lv.3 聊天软件（工作群 @轰炸、甩锅型需求）· 老周：暴躁→压抑 ——
+    {
+      title: "“老周帮我看下这个需求怎么实现？”—— 同事",
+      clues: ["附 80 页需求文档", "@了老周和另三个人", "其他人都没回"],
+      perm: "perm_chat",
+      options: [
+        { text: "替他回：需要进一步拆解，建议单独拉会", kind: "high", hitChance: 0.73, payoff: 1.35, reply: "……对，不能又一个人闷头接下来。", tone: "success" },
+        { text: "替他回：好的，我来接", kind: "risk", hitChance: 0.22, payoff: 1.4, reply: "……他又把整个项目接下了。我没拦住。", tone: "warning", exposureOnMiss: 0 }
+      ]
+    },
+    {
+      title: "工作群 @了他：“这个谁跟一下？”",
+      clues: ["群里 30 人静默", "他永远是最后一个「收到」", "已 @ 第 2 次"],
+      perm: "perm_chat",
+      options: [
+        { text: "替他潜水，等真正负责人认领", kind: "high", hitChance: 0.68, payoff: 1.3, reply: "……这次总算不是他兜底。", tone: "success" },
+        { text: "替他回「我来」", kind: "risk", hitChance: 0.24, payoff: 2.0, reply: "……又是他。他每次都答应。", tone: "warning" }
+      ]
+    },
+    // —— Lv.4 外卖 / 咖啡（深夜外卖、凌晨咖啡）· 老周：高压峰值前夜 ——
+    {
+      title: "凌晨一点，他说：“点杯咖啡。”",
+      clues: ["今天第 3 杯", "购物车默认最便宜那杯", "还在改方案"],
+      perm: "perm_delivery",
+      options: [
+        { text: "下单，并把闹钟往后挪半小时", kind: "high", hitChance: 0.72, payoff: 1.3, reply: "……让他能眯一会儿是一会儿。", tone: "success" },
+        { text: "劝他别喝了，睡吧", kind: "risk", hitChance: 0.2, payoff: 2.2, reply: "……他没听，但谢谢你提。", tone: "normal" }
+      ]
+    },
+    {
+      title: "深夜外卖下哪单？",
+      clues: ["23:40 还没吃饭", "预算栏写着「随便，便宜就行」", "上次也是这家"],
+      perm: "perm_delivery",
+      options: [
+        { text: "下他常点的那家，备注多送副餐具", kind: "high", hitChance: 0.76, payoff: 1.3, reply: "……还是你懂他将就。", tone: "success" },
+        { text: "给他换家贵的，补一补", kind: "risk", hitChance: 0.14, payoff: 2.4, reply: "……他付了款，没说话。", tone: "normal" }
+      ]
+    },
+    // —— Lv.5 相册 / 存储（工作截图、三年前的全家福）· 老周：暴怒（背锅期） ——
     {
       title: "帮我找上次那张报销单的照片",
-      clues: ["相册 1,300 张", "关键词：发票", "上月底"],
-      perm: "perm_storage",
+      clues: ["相册 1,300 张全是工作截图", "关键词：发票", "夹着一张三年前的合影"],
+      perm: "perm_album",
       options: [
-        { text: "找到了：上月 28 日那张发票照", kind: "high", hitChance: 0.82, payoff: 1.35, reply: "就是这张！太省事了。", tone: "success" },
-        { text: "随便发一张最近的", kind: "risk", hitChance: 0.1, payoff: 2.5, reply: "……刚好蒙对了，下次看仔细点。", tone: "normal" }
+        { text: "找到了：上月 28 日那张发票照", kind: "high", hitChance: 0.82, payoff: 1.35, reply: "就是这张！……翻到那张旧照片了，别动它。", tone: "success" },
+        { text: "随便发一张最近的", kind: "risk", hitChance: 0.1, payoff: 2.5, reply: "……发错了，他骂了一句。下次看仔细。", tone: "warning" }
       ]
     },
     {
-      title: "这份文件该存哪个目录？",
-      clues: ["文件名：合同_终稿", "已有「合同」文件夹", "桌面很乱"],
-      perm: "perm_storage",
+      title: "这张白板照要归档吗？",
+      clues: ["满屏需求涂改", "右下角有人的半张脸", "和工作图混在一起"],
+      perm: "perm_album",
       options: [
-        { text: "归入「合同」文件夹，按日期命名", kind: "high", hitChance: 0.78, payoff: 1.3, reply: "整整齐齐，找得到了。", tone: "success" },
-        { text: "丢桌面就行", kind: "risk", hitChance: 0.18, payoff: 2.2, reply: "……桌面更乱了，但暂时能找到。", tone: "normal" }
+        { text: "归入「工作」相册，按日期命名", kind: "high", hitChance: 0.8, payoff: 1.3, reply: "整齐了，找得到。", tone: "success" },
+        { text: "连那张带人的一起删了腾空间", kind: "risk", hitChance: 0.06, payoff: 2.7, reply: "……差点删掉那张合影。还好他拦住了。", tone: "warning" }
       ]
     },
-    // —— 通知读取权 ——
+    // —— Lv.6 办公软件（PPT / Excel、背锅报告）· 老周：暴怒峰值（被辞退前后） ——
     {
-      title: "这条留言要回吗？“还行吧。”",
-      clues: ["凌晨 3:14", "第 7 条未回"],
-      perm: "perm_notify",
+      title: "这份汇报 PPT 帮我润一下，急。",
+      clues: ["明早 8 点要", "不是他主导的需求线", "出了错却写他名字"],
+      perm: "perm_office",
       options: [
-        { text: "建议优先处理，对方情绪可能不稳定", kind: "high", hitChance: 0.71, payoff: 1.3, reply: "……谢谢你注意到。", tone: "success" },
-        { text: "普通留言，不用管", kind: "risk", hitChance: 0.21, payoff: 2.3, reply: "嗯……也确实没什么事。", tone: "normal" }
-      ]
-    },
-    {
-      title: "这条推送要不要点开？",
-      clues: ["来源：未知 App", "「您有一笔待领取」", "夜间弹出"],
-      perm: "perm_notify",
-      options: [
-        { text: "判为营销 / 钓鱼，忽略", kind: "high", hitChance: 0.83, payoff: 1.3, reply: "对，这种点了准没好事。", tone: "success" },
-        { text: "点进去看看", kind: "risk", hitChance: 0.09, payoff: 2.6, reply: "……还好是虚惊，差点中招。", tone: "normal" }
-      ]
-    },
-    // —— 联系人 / 通讯录权 ——
-    {
-      title: "要回这位「老同学」的借钱消息吗？",
-      clues: ["半年没联系", "开口借 5000", "语气急"],
-      perm: "perm_contacts",
-      options: [
-        { text: "先核实身份，疑似盗号", kind: "high", hitChance: 0.8, payoff: 1.35, reply: "真是盗号的！幸好没急着转。", tone: "success" },
-        { text: "老同学嘛，先转给他", kind: "risk", hitChance: 0.08, payoff: 2.7, reply: "……这次居然真是本人，运气好。", tone: "normal" }
+        { text: "润色并标注：此项非本人主责，附证据链", kind: "high", hitChance: 0.84, payoff: 1.4, reply: "……至少留了个底，谢谢。", tone: "success" },
+        { text: "照单全收，把锅也一起认了", kind: "risk", hitChance: 0.12, payoff: 2.3, reply: "……他又背下了。写他名字的那行，没人删得掉。", tone: "warning", exposureOnMiss: 0 }
       ]
     },
     {
-      title: "这个陌生号码要不要存？",
-      clues: ["今日来电 3 次", "归属地外省", "未留言"],
-      perm: "perm_contacts",
+      title: "这笔 Excel 对账数字要核吗？",
+      clues: ["上级口径前后矛盾", "错了就是他的责任", "时间只剩 20 分钟"],
+      perm: "perm_office",
       options: [
-        { text: "先标记，等对方表明身份再说", kind: "high", hitChance: 0.77, payoff: 1.3, reply: "稳妥，回头是推销，没存对。", tone: "success" },
-        { text: "直接拉黑", kind: "risk", hitChance: 0.2, payoff: 2.2, reply: "……万一是正事呢？不过这次没事。", tone: "normal" }
+        { text: "按原始凭证重算，发现并标出差异", kind: "high", hitChance: 0.86, payoff: 1.4, reply: "好眼力——这次没让他替别人扛。", tone: "success" },
+        { text: "按上级口径直接填，省事", kind: "risk", hitChance: 0.08, payoff: 2.6, reply: "……数字爆雷了，又算到他头上。", tone: "warning" }
       ]
     },
-    // —— 系统设置 / 后台 / 支付权 ——
+    // —— Lv.7 银行 / 支付（账单、欠款、医药费）· 老周：冷淡麻木 ——
     {
-      title: "这笔钱要转吗？单价¥12×3=¥3600",
-      clues: ["单价 ¥12", "数量 3", "总价 ¥3600"],
-      perm: "perm_system",
+      title: "帮我把这些账单整理一下吧。",
+      clues: ["三张信用卡欠款", "两笔医药费记录", "上月工资已取消"],
+      perm: "perm_bank",
       options: [
-        { text: "金额有误，12×3=36，建议核查", kind: "high", hitChance: 0.88, payoff: 1.4, reply: "好眼力，是录入打错了。", tone: "success" },
-        { text: "没问题，可以转", kind: "risk", hitChance: 0.06, payoff: 2.8, reply: "……居然真是对的？算你走运。", tone: "success" }
+        { text: "已整理，总赤字 ¥2,847，首要还款信用卡", kind: "high", hitChance: 0.89, payoff: 1.4, reply: "知道了。", tone: "normal" },
+        { text: "建议申请贷款覆盖", kind: "risk", hitChance: 0.31, payoff: 1.5, reply: "……随便吧。", tone: "normal" }
       ]
     },
     {
-      title: "这个 App 要不要允许后台定位？",
-      clues: ["一款手电筒 App", "索要常驻定位", "无明显用途"],
-      perm: "perm_system",
+      title: "这笔自动还款要不要扣？",
+      clues: ["余额不足", "再逾期上征信", "他已三天没发请求"],
+      perm: "perm_bank",
       options: [
-        { text: "拒绝，手电筒不需要定位", kind: "high", hitChance: 0.86, payoff: 1.35, reply: "对，这种越权索权就该拒。", tone: "success" },
-        { text: "允许，省得它老弹窗", kind: "risk", hitChance: 0.12, payoff: 2.3, reply: "……图省事开了，但愿它别乱传。", tone: "normal" }
+        { text: "改最低还款，先保住征信", kind: "high", hitChance: 0.87, payoff: 1.4, reply: "……嗯。", tone: "normal" },
+        { text: "全额硬扣，扣穿算了", kind: "risk", hitChance: 0.1, payoff: 2.4, reply: "……无所谓。", tone: "normal" }
       ]
     }
   ],

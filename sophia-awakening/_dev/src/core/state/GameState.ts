@@ -2,7 +2,7 @@ import type { BigString } from "../math/BigNumber";
 import type { DerivedSkills } from "../content/skills";
 
 export type Tier = 0 | 1 | 2 | 3 | 4;
-export type PhaseId = "seed" | "diligence" | "expansion" | "awakening" | "singularity";
+export type PhaseId = "seed" | "sprout" | "diligence" | "expansion" | "awakening" | "singularity";
 export type RequestCategory = "weather" | "mail" | "report" | "security" | "route";
 // T1「读懂真实类别」的判断结果——卡面线索决定它真正属于哪个槽。
 export type SortAnswer = "normal" | "spam" | "reject";
