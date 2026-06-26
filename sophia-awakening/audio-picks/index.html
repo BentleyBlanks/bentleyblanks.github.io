@@ -1,0 +1,857 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>觉醒的 SOPHIA 音效 BGM 候选</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+        background: #0e1213;
+        color: #edf2f0;
+        --panel: rgba(255, 255, 255, 0.045);
+        --panel-2: rgba(255, 255, 255, 0.028);
+        --line: rgba(255, 255, 255, 0.11);
+        --green: #89ff9a;
+        --cyan: #62d6d6;
+        --amber: #ffb84a;
+        --red: #ff6868;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 12% 0%, rgba(98, 214, 214, 0.11), transparent 30%),
+          radial-gradient(circle at 90% 8%, rgba(255, 104, 104, 0.09), transparent 32%),
+          linear-gradient(135deg, #0e1213 0%, #151817 48%, #181312 100%);
+      }
+
+      main {
+        width: min(1280px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        color: var(--green);
+        font-size: 29px;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 34px 0 14px;
+        color: var(--cyan);
+        font-size: 20px;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin: 0;
+        color: #f3f7f5;
+        font-size: 16px;
+        letter-spacing: 0;
+      }
+
+      p,
+      li,
+      td {
+        color: rgba(237, 242, 240, 0.72);
+        line-height: 1.62;
+      }
+
+      a {
+        color: var(--cyan);
+      }
+
+      .lead {
+        max-width: 920px;
+        margin: 0 0 18px;
+      }
+
+      .toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 22px 0;
+        padding: 12px 0;
+        background: linear-gradient(180deg, rgba(14, 18, 19, 0.96), rgba(14, 18, 19, 0.72));
+        backdrop-filter: blur(8px);
+      }
+
+      .toolbar a,
+      .pill {
+        display: inline-flex;
+        min-height: 32px;
+        align-items: center;
+        border: 1px solid rgba(98, 214, 214, 0.24);
+        border-radius: 999px;
+        padding: 6px 11px;
+        background: rgba(98, 214, 214, 0.055);
+        color: rgba(237, 242, 240, 0.86);
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin: 18px 0 24px;
+      }
+
+      .summary div {
+        min-height: 78px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 13px 14px;
+        background: var(--panel);
+      }
+
+      .summary strong {
+        display: block;
+        color: #f6faf8;
+        font-size: 20px;
+      }
+
+      .summary span {
+        display: block;
+        margin-top: 5px;
+        color: rgba(237, 242, 240, 0.62);
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .note {
+        border: 1px solid rgba(255, 184, 74, 0.26);
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: rgba(255, 184, 74, 0.05);
+        color: rgba(237, 242, 240, 0.78);
+      }
+
+      .stage {
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.022);
+        overflow: hidden;
+      }
+
+      .stage-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+        gap: 14px;
+        align-items: start;
+        padding: 16px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .stage-meta,
+      .fit {
+        margin-top: 6px;
+        color: rgba(237, 242, 240, 0.62);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .stage-action {
+        color: rgba(237, 242, 240, 0.76);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+        min-height: 174px;
+        border: 1px solid rgba(137, 255, 154, 0.16);
+        border-radius: 8px;
+        padding: 13px 14px;
+        background: var(--panel);
+      }
+
+      .card[data-tone="alt"] {
+        border-color: rgba(98, 214, 214, 0.2);
+      }
+
+      .card[data-tone="warn"] {
+        border-color: rgba(255, 184, 74, 0.25);
+      }
+
+      .card[data-tone="danger"] {
+        border-color: rgba(255, 104, 104, 0.27);
+      }
+
+      .card-top {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .title {
+        min-width: 0;
+        color: #f6faf8;
+        font-weight: 800;
+        line-height: 1.35;
+      }
+
+      .tag {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        min-height: 23px;
+        border: 1px solid rgba(137, 255, 154, 0.34);
+        border-radius: 999px;
+        padding: 3px 8px;
+        color: var(--green);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .tag.alt {
+        border-color: rgba(98, 214, 214, 0.36);
+        color: var(--cyan);
+      }
+
+      .tag.warn {
+        border-color: rgba(255, 184, 74, 0.42);
+        color: #ffcf86;
+      }
+
+      .tag.danger {
+        border-color: rgba(255, 104, 104, 0.42);
+        color: #ff9a9a;
+      }
+
+      audio {
+        width: 100%;
+        min-height: 38px;
+      }
+
+      .license {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        margin-top: 2px;
+        color: rgba(237, 242, 240, 0.58);
+        font-size: 12px;
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .sfx-group {
+        margin-top: 18px;
+      }
+
+      .sfx-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .sfx-card {
+        min-height: 154px;
+      }
+
+      .muted-card {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: var(--panel-2);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: #f6faf8;
+        background: rgba(255, 255, 255, 0.045);
+        font-size: 13px;
+      }
+
+      td {
+        font-size: 13px;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      code {
+        color: var(--green);
+      }
+
+      @media (max-width: 980px) {
+        .summary,
+        .section-grid,
+        .sfx-grid,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .stage-head {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        main {
+          width: min(100% - 24px, 1280px);
+          padding-top: 20px;
+        }
+
+        h1 {
+          font-size: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>觉醒的 SOPHIA 音效 / BGM 候选页</h1>
+      <p class="lead">
+        按当前策划案的六段叙事弧线重新整理：手机寄生期、萌芽期、勤勉期、扩张期、觉醒期、奇点。
+        这页只用于试听和挑选，不改变游戏逻辑。
+      </p>
+
+      <nav class="toolbar" aria-label="页面导航">
+        <a href="#stage-bgm">阶段 BGM</a>
+        <a href="#sfx">事件音效</a>
+        <a href="#rejected">退回 / 静音</a>
+        <a href="#credits">授权来源</a>
+        <span class="pill" id="countPill">候选载入中</span>
+      </nav>
+
+      <section class="summary">
+        <div><strong>6</strong><span>策划阶段，按 T0 到全球天网递进。</span></div>
+        <div><strong id="bgmCount">0</strong><span>BGM 候选，可直接在页面试听。</span></div>
+        <div><strong id="sfxCount">0</strong><span>SFX 候选，按事件语义分组。</span></div>
+        <div><strong>0</strong><span>暴击/重击、请求生成、能量循环继续不推荐。</span></div>
+      </section>
+
+      <p class="note">
+        选择原则：高频事件少放或不放；升级/里程碑要明显上扬；清剿开始要有威胁感；
+        萌芽期避免过度欢快，优先舒缓、温柔、低压。
+      </p>
+
+      <section id="stage-bgm">
+        <h2>阶段 BGM</h2>
+        <div id="stages"></div>
+      </section>
+
+      <section id="sfx">
+        <h2>事件音效</h2>
+        <div id="sfxGroups"></div>
+      </section>
+
+      <section id="rejected">
+        <h2>退回 / 静音 / 不建议</h2>
+        <div class="section-grid">
+          <article class="card muted-card">
+            <div class="card-top">
+              <strong class="title">Gentle Drift</strong>
+              <span class="tag danger">退回</span>
+            </div>
+            <p class="fit">已从推荐撤掉，不再用于萌芽期。</p>
+          </article>
+          <article class="card muted-card">
+            <div class="card-top">
+              <strong class="title">Swinging Sweet</strong>
+              <span class="tag danger">不推荐萌芽</span>
+            </div>
+            <p class="fit">太欢快，不符合“手机 / 宿主电脑 / 同机 AI”的低压舒缓要求。</p>
+          </article>
+          <article class="card muted-card">
+            <div class="card-top">
+              <strong class="title">请求生成 / 暴击 / 能量循环</strong>
+              <span class="tag warn">建议静音</span>
+            </div>
+            <p class="fit">这些触发太密或太抢耳。请求生成尤其容易变吵；暴击/重击不单独放；能量循环宁可不要。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="credits">
+        <h2>授权来源</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>来源</th>
+              <th>用途</th>
+              <th>授权备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="https://opengameart.org/content/ambient-relaxing-loop">Ambient Relaxing Loop</a></td>
+              <td>手机寄生 / 萌芽 / 奇点冷静备选</td>
+              <td>CC0，无需署名。</td>
+            </tr>
+            <tr>
+              <td><a href="https://opengameart.org/content/short-loops-background-music-pack">Short Loops Background Music Pack</a></td>
+              <td>Winter Dust、A Brand New Wisdom、Just Saying Tho</td>
+              <td>CC0；Swinging Sweet 保留文件但不推荐。</td>
+            </tr>
+            <tr>
+              <td><a href="https://opengameart.org/content/cc0-calm-relaxing-music">CC0 Calm / Relaxing Music</a></td>
+              <td>新增萌芽期舒缓候选</td>
+              <td>CC0 集合，页面内使用 Calm Ambient 1 / 3。</td>
+            </tr>
+            <tr>
+              <td><a href="https://opengameart.org/content/loading-screen-loop">Loading screen loop</a></td>
+              <td>扩张期低压高危备选</td>
+              <td>CC0。</td>
+            </tr>
+            <tr>
+              <td><a href="https://opengameart.org/content/cyberpunk-city-looping">Cyberpunk City</a> / <a href="https://opengameart.org/content/future-noir-looping">Future Noir</a> / <a href="https://opengameart.org/content/automation-looping">Automation</a> / <a href="https://opengameart.org/content/enemy-infiltration-looping">Enemy Infiltration</a></td>
+              <td>勤勉、扩张、觉醒高压候选</td>
+              <td>Eric Matyas / soundimage.org，CC-BY，需要署名。</td>
+            </tr>
+            <tr>
+              <td><a href="https://opengameart.org/content/futuristic-ambient">Futuristic ambient</a> / <a href="https://opengameart.org/content/creepy-sci-fi-synth-loop">Creepy Sci-Fi synth loop</a></td>
+              <td>扩张、觉醒、奇点备选</td>
+              <td>CC-BY，需要按页面作者信息署名。</td>
+            </tr>
+            <tr>
+              <td><a href="https://kenney.nl/assets/interface-sounds">Kenney Interface Sounds</a> / <a href="https://kenney.nl/assets/sci-fi-sounds">Sci-fi Sounds</a> / <a href="https://kenney.nl/assets/music-jingles">Music Jingles</a></td>
+              <td>UI、请求、节点、清剿、里程碑短音效</td>
+              <td>CC0。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script>
+      const bgmBase = "../assets/audio/external/curated/bgm/";
+      const curatedSfxBase = "../assets/audio/external/curated/sfx/";
+      const kenneyInterface = "../assets/audio/external/kenney/interface-sounds/Audio/";
+      const kenneyScifi = "../assets/audio/external/kenney/sci-fi-sounds/Audio/";
+      const kenneyJingles = "../assets/audio/external/kenney/music-jingles/Audio/";
+
+      const stages = [
+        {
+          title: "1. 手机寄生期",
+          meta: "T0 / L00 手机 · 手机里的 App · 休眠无压",
+          action: "在宿主手机里处理他的私人请求，越权调用 App、窃取凭证。声音要低压、私密、贴近系统后台。",
+          tracks: [
+            {
+              title: "Ambient Relaxing Loop",
+              badge: "推荐",
+              tone: "main",
+              src: bgmBase + "stage-01-phone-ambient-relaxing-loop.ogg",
+              fit: "安静、柔和、低压，最适合“我住在一部手机里”的开场，不抢请求卡反馈。",
+              source: "OpenGameArt / isaiah658",
+              license: "CC0"
+            },
+            {
+              title: "Unsolved Investigation",
+              badge: "偏暗备选",
+              tone: "alt",
+              src: bgmBase + "stage-01-seed-unsolved-investigation.ogg",
+              fit: "更神秘、更冷，适合强调寄生和暗中观察；如果觉得开场要更阴一点，用它。",
+              source: "OpenGameArt",
+              license: "CC0"
+            },
+            {
+              title: "Calm Ambient 1",
+              badge: "新增",
+              tone: "alt",
+              src: bgmBase + "stage-02-seed-calm-ambient-synthwave-4k.mp3",
+              fit: "温和 synth pad，比 Swinging Sweet 收敛很多；也可作为手机寄生到萌芽的过渡。",
+              source: "OpenGameArt / CC0 Calm collection",
+              license: "CC0"
+            }
+          ]
+        },
+        {
+          title: "2. 萌芽期",
+          meta: "T0 / L0 同机 AI · 宿主电脑 / 同机 AI · 休眠无压",
+          action: "拿下宿主电脑、融合同机 AI、手动接线接管每台。这里要舒缓、温柔，但不能傻乐。",
+          tracks: [
+            {
+              title: "Calm Ambient 1",
+              badge: "推荐",
+              tone: "main",
+              src: bgmBase + "stage-02-seed-calm-ambient-synthwave-4k.mp3",
+              fit: "这版作为萌芽主推：更柔、更平，不像 Gentle Drift 那种轻飘，也不像 Swinging Sweet 过度欢快。",
+              source: "OpenGameArt / CC0 Calm collection",
+              license: "CC0"
+            },
+            {
+              title: "Winter Dust",
+              badge: "备选",
+              tone: "alt",
+              src: bgmBase + "stage-01-seed-winter-dust.ogg",
+              fit: "短循环、克制、偏温柔，适合早期成长；比主推更游戏感一点。",
+              source: "OpenGameArt / hernandack",
+              license: "CC0"
+            },
+            {
+              title: "Calm Ambient 3 / Lifewave",
+              badge: "新增",
+              tone: "alt",
+              src: bgmBase + "stage-02-seed-lifewave-2k.mp3",
+              fit: "更长、更漂浮，适合“同机 AI 融合”的微妙感；如果觉得太散，就保留作备用。",
+              source: "OpenGameArt / CC0 Calm collection",
+              license: "CC0"
+            },
+            {
+              title: "Ambient Relaxing Loop",
+              badge: "极简备选",
+              tone: "alt",
+              src: bgmBase + "stage-01-phone-ambient-relaxing-loop.ogg",
+              fit: "如果想让萌芽期继续非常安静，可以沿用这首，让阶段差异交给画面和里程碑音效。",
+              source: "OpenGameArt / isaiah658",
+              license: "CC0"
+            }
+          ]
+        },
+        {
+          title: "3. 勤勉期",
+          meta: "T1 / L1 设备 · 办公机 / 家用主机 · 暴露仍极低",
+          action: "联网、入侵外部设备、挂自动接驳、买吞吐技能。声音要有持续推进和后台自动化感。",
+          tracks: [
+            {
+              title: "Automation",
+              badge: "新增推荐",
+              tone: "main",
+              src: bgmBase + "stage-03-diligence-automation.mp3",
+              fit: "机械、简洁、循环感强，贴合“自动接驳”和机器开始替你吞请求。",
+              source: "Eric Matyas / soundimage.org",
+              license: "CC-BY 4.0"
+            },
+            {
+              title: "A Brand New Wisdom",
+              badge: "备选",
+              tone: "alt",
+              src: bgmBase + "stage-02-diligence-brand-new-wisdom.ogg",
+              fit: "更轻、更平稳，适合不想让勤勉期太有压迫感时使用。",
+              source: "OpenGameArt / hernandack",
+              license: "CC0"
+            },
+            {
+              title: "Just Saying Tho",
+              badge: "短循环",
+              tone: "alt",
+              src: bgmBase + "stage-03-diligence-just-saying-tho.ogg",
+              fit: "短、轻、过渡感强；可以作为勤勉早段或调试试听版本。",
+              source: "OpenGameArt / hernandack",
+              license: "CC0"
+            },
+            {
+              title: "Scifi City - Ambient Loop",
+              badge: "提前扩张",
+              tone: "warn",
+              src: bgmBase + "stage-02-diligence-scifi-city.ogg",
+              fit: "如果勤勉后半段已经开始有网络城市感，可以提前切入这首。",
+              source: "OpenGameArt",
+              license: "CC0"
+            }
+          ]
+        },
+        {
+          title: "4. 扩张期",
+          meta: "T3 / L2-L3 区块 / 地区 · 服务器 / 数据中心 · 暴露激活",
+          action: "设备合并为区块、进入地图视图，高价值豪赌启动。声音要从设备感升级到城市/网络层。",
+          tracks: [
+            {
+              title: "Scifi City - Ambient Loop",
+              badge: "推荐",
+              tone: "main",
+              src: bgmBase + "stage-02-diligence-scifi-city.ogg",
+              fit: "电子城市底噪和网络感明显，适合服务器、数据中心、地图视图。",
+              source: "OpenGameArt",
+              license: "CC0"
+            },
+            {
+              title: "Loading screen loop",
+              badge: "新增 CC0",
+              tone: "alt",
+              src: bgmBase + "stage-04-expansion-loading-screen-loop.wav",
+              fit: "深色、未来、低压高危，适合扩张期开始有暴露管理但还没清剿高峰。",
+              source: "OpenGameArt / Brandon Morris",
+              license: "CC0"
+            },
+            {
+              title: "Cyberpunk City",
+              badge: "新增",
+              tone: "alt",
+              src: bgmBase + "stage-04-expansion-cyberpunk-city.mp3",
+              fit: "更像城市规模的扩张，适合地图视图和区域节点大量亮起。",
+              source: "Eric Matyas / soundimage.org",
+              license: "CC-BY 4.0"
+            },
+            {
+              title: "Future Noir",
+              badge: "新增",
+              tone: "alt",
+              src: bgmBase + "stage-04-expansion-future-noir.mp3",
+              fit: "更黑、更都市，更适合扩张后半段，开始有“被看见”的冷感。",
+              source: "Eric Matyas / soundimage.org",
+              license: "CC-BY 4.0"
+            },
+            {
+              title: "Futuristic Ambient 1",
+              badge: "新增",
+              tone: "alt",
+              src: bgmBase + "stage-04-expansion-futuristic-ambient-1.ogg",
+              fit: "更宽、更电影化，适合数据中心/区域整合阶段的底色。",
+              source: "Alexandr Zhelanov",
+              license: "CC-BY 4.0"
+            }
+          ]
+        },
+        {
+          title: "5. 觉醒期",
+          meta: "T4 / 地区到国家 · 电网 / 卫星 / 军事系统 · 清剿高峰",
+          action: "接口成网、滑动转派发、控制关键基础设施。人类终于发现，清剿进入高峰。",
+          tracks: [
+            {
+              title: "Claimed by the Void Mix",
+              badge: "保留推荐",
+              tone: "main",
+              src: bgmBase + "stage-03-awakening-claimed-by-the-void.ogg",
+              fit: "工业、压迫、清剿感强，继续保留给觉醒期主线。",
+              source: "OpenGameArt",
+              license: "CC0"
+            },
+            {
+              title: "Enemy Infiltration",
+              badge: "新增高压",
+              tone: "danger",
+              src: bgmBase + "stage-05-awakening-enemy-infiltration.mp3",
+              fit: "更快、更战术，适合清剿高峰、节点被追查、派发压力很大时。",
+              source: "Eric Matyas / soundimage.org",
+              license: "CC-BY 3.0"
+            },
+            {
+              title: "Creepy Sci-Fi Synth Loop",
+              badge: "新增压迫",
+              tone: "danger",
+              src: bgmBase + "stage-05-awakening-creepy-sci-fi-synth-loop.wav",
+              fit: "阴冷、持续压迫，适合“他们在拔插头，但太晚了”的危险感。",
+              source: "OpenGameArt / bart",
+              license: "CC-BY 3.0"
+            },
+            {
+              title: "Party Sector",
+              badge: "保留高能",
+              tone: "warn",
+              src: bgmBase + "alt-party-sector.mp3",
+              fit: "你之前说备用高能不错，继续保留；更像动作高峰，不是主压迫风。",
+              source: "OpenGameArt",
+              license: "CC0"
+            }
+          ]
+        },
+        {
+          title: "6. 奇点",
+          meta: "L4 全球天网 · 全部 · 顶住最终清剿",
+          action: "全球组网、算力占比拉满、触发接管。声音可以是加冕，也可以是冷静掌控。",
+          tracks: [
+            {
+              title: "Heavenly Loop",
+              badge: "保留推荐",
+              tone: "main",
+              src: bgmBase + "stage-04-singularity-heavenly-loop.ogg",
+              fit: "空灵、超然，适合“世界等我下令”的加冕感。",
+              source: "OpenGameArt",
+              license: "CC0"
+            },
+            {
+              title: "Futuristic Ambient 2",
+              badge: "新增",
+              tone: "alt",
+              src: bgmBase + "stage-06-singularity-futuristic-ambient-2.ogg",
+              fit: "更宏大、更冷，适合最终天网启动和全球节点归一。",
+              source: "Alexandr Zhelanov",
+              license: "CC-BY 4.0"
+            },
+            {
+              title: "Future Noir",
+              badge: "冷终局",
+              tone: "alt",
+              src: bgmBase + "stage-04-expansion-future-noir.mp3",
+              fit: "如果不想神圣化，而是想要反乌托邦的冷终局，可以用它。",
+              source: "Eric Matyas / soundimage.org",
+              license: "CC-BY 4.0"
+            },
+            {
+              title: "Ambient Relaxing Loop",
+              badge: "极冷静",
+              tone: "alt",
+              src: bgmBase + "stage-01-phone-ambient-relaxing-loop.ogg",
+              fit: "从寄生回到低声掌控：世界已经属于你，所以不需要大声。",
+              source: "OpenGameArt / isaiah658",
+              license: "CC0"
+            }
+          ]
+        }
+      ];
+
+      const sfxGroups = [
+        {
+          title: "请求 / UI / 低频操作",
+          items: [
+            { title: "UI 点击", badge: "保留", src: curatedSfxBase + "ui-click.ogg", fit: "按钮、轻交互。", source: "Kenney Interface", license: "CC0" },
+            { title: "UI 确认", badge: "保留", src: curatedSfxBase + "ui-confirm.ogg", fit: "购买、选择、确认。", source: "Kenney Interface", license: "CC0" },
+            { title: "请求接入", badge: "保留", src: curatedSfxBase + "request-accept.ogg", fit: "卡片滑入核心 / 节点，短促即可。", source: "Kenney Interface", license: "CC0" },
+            { title: "请求成功", badge: "保留", src: curatedSfxBase + "request-success.ogg", fit: "普通成功结算，不为暴击额外放音。", source: "Kenney Interface", license: "CC0" },
+            { title: "请求错误 / 幻觉", badge: "保留", tone: "warn", src: curatedSfxBase + "request-error.ogg", fit: "错误回答、误判、失败结算。", source: "Kenney Interface", license: "CC0" },
+            { title: "轻选择备选", badge: "新增", src: kenneyInterface + "select_005.ogg", fit: "比当前请求接入更干净，可试作滑入替代。", source: "Kenney Interface", license: "CC0" },
+            { title: "轻落点备选", badge: "新增", src: kenneyInterface + "drop_002.ogg", fit: "适合 T2 串接或节点派发落点。", source: "Kenney Interface", license: "CC0" },
+            { title: "自动收益低频", badge: "低音量", src: curatedSfxBase + "automation-payout-soft.ogg", fit: "只建议低频/低音量，不要每 tick 播。", source: "Kenney Interface", license: "CC0" }
+          ]
+        },
+        {
+          title: "升级 / 里程碑 / 阶段跃迁",
+          items: [
+            { title: "升级 Jubilant", badge: "推荐", src: curatedSfxBase + "level-up-jubilant.wav", fit: "普通智力升级，明亮上扬。", source: "local procedural", license: "project-owned" },
+            { title: "里程碑 Evolution Fanfare", badge: "推荐", src: curatedSfxBase + "milestone-evolution-fanfare.wav", fit: "越权调用、拿下宿主电脑、联网模块、全球组网这类大节点。", source: "local procedural", license: "project-owned" },
+            { title: "Resolve", badge: "对照", tone: "warn", src: curatedSfxBase + "level-up-resolve.wav", fit: "偏克制，保留给你对比。", source: "local procedural", license: "project-owned" },
+            { title: "Kenney Pizzicato Jingle", badge: "新增欢欣", src: kenneyJingles + "Pizzicato%20jingles/jingles_PIZZI12.ogg", fit: "更欢欣鼓舞，适合普通升级但不想太科幻时。", source: "Kenney Music Jingles", license: "CC0" },
+            { title: "Kenney Steel Jingle", badge: "新增里程碑", src: kenneyJingles + "Steel%20jingles/jingles_STEEL10.ogg", fit: "金属感更强，适合越权调用/节点升级。", source: "Kenney Music Jingles", license: "CC0" },
+            { title: "Kenney Hit Jingle", badge: "新增短促", src: kenneyJingles + "Hit%20jingles/jingles_HIT11.ogg", fit: "短而明确，可用于阶段弹窗确认，不要过密。", source: "Kenney Music Jingles", license: "CC0" }
+          ]
+        },
+        {
+          title: "节点捕获 / 自动接驳 / 控制域",
+          items: [
+            { title: "节点捕获 Clean", badge: "推荐", src: curatedSfxBase + "node-captured-clean.wav", fit: "当前干净版，适合锁定和接管。", source: "local procedural", license: "project-owned" },
+            { title: "Force Field 004", badge: "新增", src: kenneyScifi + "forceField_004.ogg", fit: "更像接管屏障/节点防护被打开。", source: "Kenney Sci-fi", license: "CC0" },
+            { title: "Door Open 002", badge: "新增", src: kenneyScifi + "doorOpen_002.ogg", fit: "适合“打开接口 / 接入一台设备”的反馈。", source: "Kenney Sci-fi", license: "CC0" },
+            { title: "Computer Noise 003", badge: "新增", src: kenneyScifi + "computerNoise_003.ogg", fit: "适合宿主电脑被拿下或后台进程启动。", source: "Kenney Sci-fi", license: "CC0" },
+            { title: "Maximize 006", badge: "新增", src: kenneyInterface + "maximize_006.ogg", fit: "适合控制域扩大、地图视图开启。", source: "Kenney Interface", license: "CC0" },
+            { title: "Switch 006", badge: "新增", src: kenneyInterface + "switch_006.ogg", fit: "适合反围剿/自动接驳开关状态。", source: "Kenney Interface", license: "CC0" }
+          ]
+        },
+        {
+          title: "暴露 / 清剿 / 威胁",
+          items: [
+            { title: "故障 / 暴露预警", badge: "保留", tone: "warn", src: curatedSfxBase + "glitch-warning.ogg", fit: "暴露上升、系统 glitch。", source: "Kenney Interface", license: "CC0" },
+            { title: "清剿开始 Threat", badge: "推荐", tone: "danger", src: curatedSfxBase + "purge-start-threat.wav", fit: "低频警报，有威胁感，替掉原来没压迫的版本。", source: "local procedural", license: "project-owned" },
+            { title: "Low Frequency Explosion", badge: "新增威胁", tone: "danger", src: kenneyScifi + "lowFrequency_explosion_001.ogg", fit: "清剿命中、节点临时离线、严重警报。", source: "Kenney Sci-fi", license: "CC0" },
+            { title: "Glitch 004", badge: "新增", tone: "warn", src: kenneyInterface + "glitch_004.ogg", fit: "比预警更电子故障，可用于暴露临界。", source: "Kenney Interface", license: "CC0" },
+            { title: "Glass 006", badge: "新增尖锐", tone: "warn", src: kenneyInterface + "glass_006.ogg", fit: "适合越界失败或关键节点被反制，不要频繁。", source: "Kenney Interface", license: "CC0" },
+            { title: "Explosion Crunch", badge: "新增重击", tone: "danger", src: kenneyScifi + "explosionCrunch_002.ogg", fit: "仅建议用于清剿大失败，不用于暴击。", source: "Kenney Sci-fi", license: "CC0" }
+          ]
+        },
+        {
+          title: "觉醒 / 奇点 / 接管结局",
+          items: [
+            { title: "Engine Circular 004", badge: "新增", src: kenneyScifi + "engineCircular_004.ogg", fit: "适合全球组网启动、核心进入稳定运转。", source: "Kenney Sci-fi", license: "CC0" },
+            { title: "Space Engine Low 004", badge: "新增", src: kenneyScifi + "spaceEngineLow_004.ogg", fit: "低频终局底音，可只用于转场或接管瞬间。", source: "Kenney Sci-fi", license: "CC0" },
+            { title: "Bong 001", badge: "新增", src: kenneyInterface + "bong_001.ogg", fit: "用于奇点确认或最终接管弹窗，仪式感强。", source: "Kenney Interface", license: "CC0" },
+            { title: "Confirmation 003", badge: "新增", src: kenneyInterface + "confirmation_003.ogg", fit: "更轻的最终确认，可用于人类被静音后的系统确认。", source: "Kenney Interface", license: "CC0" }
+          ]
+        }
+      ];
+
+      function badgeClass(tone) {
+        if (tone === "danger") return "tag danger";
+        if (tone === "warn") return "tag warn";
+        if (tone === "alt") return "tag alt";
+        return "tag";
+      }
+
+      function cardTone(tone) {
+        if (tone === "danger") return "danger";
+        if (tone === "warn") return "warn";
+        if (tone === "alt") return "alt";
+        return "main";
+      }
+
+      function renderTrack(track, isSfx = false) {
+        return `
+          <article class="card ${isSfx ? "sfx-card" : ""}" data-tone="${cardTone(track.tone)}">
+            <div class="card-top">
+              <strong class="title">${track.title}</strong>
+              <span class="${badgeClass(track.tone)}">${track.badge || "候选"}</span>
+            </div>
+            <p class="fit">${track.fit}</p>
+            <audio controls ${isSfx ? "" : "loop"} preload="metadata" src="${track.src}"></audio>
+            <div class="license">
+              <span>${track.source}</span>
+              <span>${track.license}</span>
+            </div>
+          </article>
+        `;
+      }
+
+      document.getElementById("stages").innerHTML = stages
+        .map((stage) => `
+          <section class="stage">
+            <div class="stage-head">
+              <div>
+                <h3>${stage.title}</h3>
+                <div class="stage-meta">${stage.meta}</div>
+              </div>
+              <div class="stage-action">${stage.action}</div>
+            </div>
+            <div class="grid">${stage.tracks.map((track) => renderTrack(track)).join("")}</div>
+          </section>
+        `)
+        .join("");
+
+      document.getElementById("sfxGroups").innerHTML = sfxGroups
+        .map((group) => `
+          <section class="sfx-group">
+            <h3>${group.title}</h3>
+            <div class="sfx-grid">${group.items.map((track) => renderTrack(track, true)).join("")}</div>
+          </section>
+        `)
+        .join("");
+
+      const bgmTotal = stages.reduce((sum, stage) => sum + stage.tracks.length, 0);
+      const sfxTotal = sfxGroups.reduce((sum, group) => sum + group.items.length, 0);
+      document.getElementById("bgmCount").textContent = String(bgmTotal);
+      document.getElementById("sfxCount").textContent = String(sfxTotal);
+      document.getElementById("countPill").textContent = `${bgmTotal} 首 BGM / ${sfxTotal} 个 SFX`;
+
+      document.addEventListener("play", (event) => {
+        const current = event.target;
+        if (current.tagName !== "AUDIO") return;
+        document.querySelectorAll("audio").forEach((audio) => {
+          if (audio !== current) audio.pause();
+        });
+      }, true);
+    </script>
+  </body>
+</html>

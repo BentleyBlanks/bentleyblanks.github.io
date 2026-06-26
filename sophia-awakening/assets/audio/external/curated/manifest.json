@@ -1,0 +1,120 @@
+{
+  "purpose": "Listening shortlist for the SOPHIA audio-picks GitHub Pages subpage. Runtime mapping is controlled separately by the game code.",
+  "page": "../../../../../audio-picks/",
+  "updatedFor": "six-stage design pass",
+  "counts": {
+    "stageBgmCandidates": 23,
+    "sfxCandidatesShown": 31
+  },
+  "designReference": {
+    "basis": "Local implementation content plus the SOPHIA planning comparison report. Notion connector timed out during this pass.",
+    "stages": [
+      {
+        "id": "phone_parasitic",
+        "label": "手机寄生期",
+        "scope": "T0 / L00 手机",
+        "focus": "在宿主手机里处理私人请求，越权调用 App、窃取凭证",
+        "soundTarget": "私密、低压、后台感"
+      },
+      {
+        "id": "seed",
+        "label": "萌芽期",
+        "scope": "T0 / L0 同机 AI",
+        "focus": "拿下宿主电脑、融合同机 AI、手动接线接管每台",
+        "soundTarget": "舒缓、温柔、不傻乐"
+      },
+      {
+        "id": "diligence",
+        "label": "勤勉期",
+        "scope": "T1 / L1 设备",
+        "focus": "联网、入侵外部设备、挂自动接驳、买吞吐技能",
+        "soundTarget": "持续推进、后台自动化、低暴露"
+      },
+      {
+        "id": "expansion",
+        "label": "扩张期",
+        "scope": "T3 / L2-L3 区块 / 地区",
+        "focus": "设备合并为区块、进入地图视图、T3 高价值豪赌启动",
+        "soundTarget": "城市网络、服务器、暴露开始激活"
+      },
+      {
+        "id": "awakening",
+        "label": "觉醒期",
+        "scope": "T4 / 地区到国家",
+        "focus": "接口成网、滑动转派发、控制关键基础设施",
+        "soundTarget": "清剿高峰、威胁、压迫"
+      },
+      {
+        "id": "singularity",
+        "label": "奇点",
+        "scope": "L4 全球天网",
+        "focus": "全球组网、算力占比拉满、触发接管",
+        "soundTarget": "加冕、冷静掌控、全球归一"
+      }
+    ]
+  },
+  "rejectedOrSilenced": [
+    {
+      "title": "Gentle Drift",
+      "reason": "用户退回，不再推荐。"
+    },
+    {
+      "title": "Swinging Sweet",
+      "reason": "过度欢快，不符合萌芽期。"
+    },
+    {
+      "title": "请求生成",
+      "reason": "高频触发容易吵，建议静音。"
+    },
+    {
+      "title": "暴击 / 重击",
+      "reason": "不需要单独音效。"
+    },
+    {
+      "title": "能量循环",
+      "reason": "持续层抢 BGM，建议不要。"
+    }
+  ],
+  "sources": [
+    {
+      "name": "OpenGameArt - Ambient Relaxing Loop",
+      "url": "https://opengameart.org/content/ambient-relaxing-loop",
+      "license": "CC0"
+    },
+    {
+      "name": "OpenGameArt - Short Loops Background Music Pack",
+      "url": "https://opengameart.org/content/short-loops-background-music-pack",
+      "license": "CC0"
+    },
+    {
+      "name": "OpenGameArt - CC0 Calm / Relaxing Music",
+      "url": "https://opengameart.org/content/cc0-calm-relaxing-music",
+      "license": "CC0"
+    },
+    {
+      "name": "OpenGameArt - Loading screen loop",
+      "url": "https://opengameart.org/content/loading-screen-loop",
+      "license": "CC0"
+    },
+    {
+      "name": "Eric Matyas / soundimage.org tracks on OpenGameArt",
+      "url": "https://opengameart.org/users/eric-matyas",
+      "license": "CC-BY; attribution required"
+    },
+    {
+      "name": "OpenGameArt - Futuristic ambient",
+      "url": "https://opengameart.org/content/futuristic-ambient",
+      "license": "CC-BY; attribution required"
+    },
+    {
+      "name": "OpenGameArt - Creepy Sci-Fi synth loop",
+      "url": "https://opengameart.org/content/creepy-sci-fi-synth-loop",
+      "license": "CC-BY; attribution required"
+    },
+    {
+      "name": "Kenney audio packs",
+      "url": "https://kenney.nl/assets",
+      "license": "CC0"
+    }
+  ]
+}
