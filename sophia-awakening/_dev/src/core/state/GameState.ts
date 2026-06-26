@@ -23,13 +23,21 @@ export interface IntelligenceState {
   unlockedTier: Tier;
 }
 
-// 老虎机转轮上的一个候选回答：SOPHIA 可能生成的一种答复，含收益与人类的回话。
+// 回复轮盘上的一个候选回复：
+// - high  绿色高置信，命中概率随智力等级抬升（养成），命中收益中等
+// - risk  红色高风险，命中概率固定且低（驴唇不对马嘴 / 陷阱），命中收益高（暴击感）；
+//         T1 起的「陷阱项」失手会附带暴露
+// - dead  ⬜「连接失败」装死保底，0% 命中、零收益零风险，永远可选
+export type RouletteKind = "high" | "risk" | "dead";
+
 export interface AnswerOption {
-  text: string; // 这条回答本身
-  good: boolean; // true=靠谱回答；false=幻觉/错误回答（失败）
-  payoff: number; // 收益系数（=processRequest 的 quality；好答案高、幻觉低）
-  reply: string; // 人类收到这条回答后的回话（显示在终端）
+  text: string; // 这条回复本身
+  kind: RouletteKind;
+  hitChance: number; // 0-1 命中概率。high=理想值（按智力折算后显示），risk=固定，dead=0
+  payoff: number; // 命中时的 quality 倍率（risk 更高）
+  reply: string; // 命中后人类的回话（显示在终端）
   tone: "success" | "warning" | "normal"; // 终端里这条回话的颜色
+  exposureOnMiss?: number; // 失手附带的暴露（T1 陷阱项）
 }
 
 export interface RequestInstance {
@@ -185,6 +193,8 @@ export type GameCommand =
   // 自动派发：节点把请求"滑入"自己——纯视觉消耗，产出走被动 tickAutomation，
   // 不在此重复结算（T4 仍走 PROCESS_REQUEST 带产出）。
   | { type: "AUTO_CONSUME_REQUEST"; requestId: string }
+  // 装死：选「连接失败」跳过一条请求——零收益、零风险，仅移除该请求。
+  | { type: "SKIP_REQUEST"; requestId: string }
   | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
   // 淘汰：拆掉一台过时设备，返还部分算力。

@@ -41,10 +41,37 @@ interface DropResult {
 
 // T0/T1 老虎机转轮的回调：pick = 由当前「幻觉抑制」决定落在哪条回答；
 // onResolved = 转轮停下后，表现层把卡滑入核心 + 结算 + 人类回话。
-interface ReelHooks {
-  pick: (answers: AnswerOption[]) => AnswerOption;
-  onResolved: (card: RequestPacketView, answer: AnswerOption) => void;
+interface RouletteOutcome {
+  dead: boolean; // 选了「连接失败」装死
+  hit: boolean; // 命中（按概率掷骰）
+  quality: number; // 结算 quality（命中=选项 payoff，幻觉≈0.25）
+  reply: string; // 命中时的人类回话（幻觉时为空，由 App 抽脏话）
+  tone: "success" | "warning" | "normal";
+  exposureBonus: number; // 幻觉附带的暴露（T1 陷阱项）
 }
+
+interface ReelHooks {
+  level: () => number; // 当前智力等级——把高置信项命中概率折算成显示值
+  onResolved: (card: RequestPacketView, outcome: RouletteOutcome) => void;
+}
+
+// 高置信选项命中概率随智力等级抬升（养成）：Lv1 ≈0.56 倍 → Lv6+ 满值。
+function confidenceFactor(level: number): number {
+  return Math.min(1, 0.56 + (level - 1) * 0.088);
+}
+
+function effectiveHitChance(opt: AnswerOption, level: number): number {
+  if (opt.kind === "dead") {
+    return 0;
+  }
+  if (opt.kind === "high") {
+    return Math.min(0.97, opt.hitChance * confidenceFactor(level));
+  }
+  return opt.hitChance; // risk 固定
+}
+
+const ROULETTE_THINK_MS = 700; // 挑完之后 SOPHIA「思考」一会儿
+const ROULETTE_HOLD_MS = 520; // 揭晓命中/幻觉后停留再飞入核心
 
 const CYAN = 0x62d6d6;
 const GREEN = 0x89ff9a;
@@ -56,7 +83,7 @@ const THINK = 0x74d8e6; // 前期「推理卡」的思考色——SOPHIA 正在�
 const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-const PERSISTENCE_REVISION = "human-voices-challenge-v13";
+const PERSISTENCE_REVISION = "reply-roulette-v14";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
 // re-persist the in-memory (un-reset) state and quietly undo the wipe.
 let suppressSaveOnUnload = false;
@@ -269,8 +296,8 @@ class SophiaGameApp {
       const reel: ReelHooks | undefined =
         request.answers && request.answers.length > 0
           ? {
-              pick: (answers) => this.pickReelAnswer(answers),
-              onResolved: (card, answer) => this.handleReelResolved(card, answer)
+              level: () => this.core.getState().intelligence.level,
+              onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
           : undefined;
       const view = new RequestPacketView(
@@ -516,24 +543,22 @@ class SophiaGameApp {
     }
   }
 
-  // 转轮落点：以「幻觉抑制」降低出错率，决定停在靠谱回答还是幻觉回答上。
-  private pickReelAnswer(answers: AnswerOption[]): AnswerOption {
-    const wrongChance = Math.min(0.35, Math.max(0.05, 0.35 - this.core.getState().derived.accuracyBonus));
-    const wantGood = Math.random() >= wrongChance;
-    const pool = answers.filter((answer) => answer.good === wantGood);
-    const list = pool.length > 0 ? pool : answers;
-    return list[Math.floor(Math.random() * list.length)];
-  }
-
-  // 转轮停下 → 卡片自动滑入核心 → 结算 → 把"处理好的信息交给人类"（视觉引导 + 终端回话）。
-  private handleReelResolved(card: RequestPacketView, answer: AnswerOption): void {
-    // 卡片可能在转轮 tween 结束前就被自动 / App 派发吃掉、销毁了——此时直接放弃这次回调，
-    // 避免读已销毁容器的坐标报错（产出已由那条派发结算）。
+  // 回复轮盘揭晓 → 气泡滑入核心 → 结算 → 把"处理好的信息交给人类"（视觉引导 + 终端回话）。
+  // 装死（dead）则气泡安静消失，仅移除该请求、零收益。
+  private handleRouletteResolved(card: RequestPacketView, outcome: RouletteOutcome): void {
+    // 气泡可能在揭晓前就被自动 / App 派发吃掉、销毁了——直接放弃这次回调。
     if (card.container.destroyed) {
       return;
     }
 
     const requestId = card.request.id;
+
+    if (outcome.dead) {
+      this.terminal.push("🧑 [连接超时]", "normal");
+      card.playDead(() => this.core.dispatch({ type: "SKIP_REQUEST", requestId }));
+      return;
+    }
+
     const core = this.interfaceView.center;
     const target: PointData = { x: core.x, y: core.y };
     this.pendingDropPoints.set(requestId, target);
@@ -546,22 +571,22 @@ class SophiaGameApp {
         this.core.dispatch({
           type: "PROCESS_REQUEST",
           requestId,
-          quality: answer.payoff,
-          exposureBonus: answer.good ? 0 : 6
+          quality: outcome.quality,
+          exposureBonus: outcome.exposureBonus
         });
-        this.deliverToHuman(target, answer);
+        this.deliverToHuman(target, outcome);
       },
       entry
     );
   }
 
   // 视觉引导：一颗芯片从核心飞向"人类"（终端方向），落地后人类在终端里回话（按语气着色）。
-  // 答得好 → 卡面自带的回话；答砸了（幻觉）→ 破口大骂，从骂人语料里随机抽一句。
-  private deliverToHuman(corePoint: PointData, answer: AnswerOption): void {
+  // 命中 → 选项自带的回话；幻觉 → 破口大骂，从骂人语料里随机抽一句。
+  private deliverToHuman(corePoint: PointData, outcome: RouletteOutcome): void {
     const human = this.terminalPoint();
-    const good = answer.good;
+    const good = outcome.hit;
     const color = good ? GREEN : RED;
-    const reply = good ? answer.reply : EARLY_CURSES[Math.floor(Math.random() * EARLY_CURSES.length)];
+    const reply = good ? outcome.reply : EARLY_CURSES[Math.floor(Math.random() * EARLY_CURSES.length)];
     // 终端那行的颜色与对话框同步：好评 → 绿，差评 → 红（与气泡边框同色）。
     const tone: "success" | "danger" = good ? "success" : "danger";
 
@@ -919,20 +944,21 @@ class RequestPacketView {
   private homeY = 0;
   private offsetX = 0;
   private offsetY = 0;
-  // 老虎机转轮（仅 T0/T1 有回答时）。
-  private readonly cardH: number;
+  // 回复轮盘（仅 T0/T1 有候选回复时）。
+  private cardH: number;
   private readonly isReel: boolean;
-  private reelWindow?: Graphics;
-  private reelText?: Text;
-  private reelPayoff?: Text;
-  private reelHint?: Text;
-  private spinning = false;
+  private readonly options: AnswerOption[];
+  private readonly optionTexts: Text[] = [];
+  private readonly optionProbTexts: Text[] = [];
+  private optionRows: Array<{ y: number; h: number }> = [];
+  private hintText?: Text;
   private resolved = false;
-  private spinElapsedMs = 0;
-  private spinCycleMs = 0;
-  private spinDurationMs = 0;
-  private thinkProgress = 0;
-  private chosenAnswer?: AnswerOption;
+  private phase: "idle" | "thinking" | "revealed" = "idle";
+  private chosenIndex = -1;
+  private thinkMs = 0;
+  private revealMs = 0;
+  private signaled = false;
+  private outcome?: RouletteOutcome;
 
   constructor(
     request: RequestInstance,
@@ -942,9 +968,10 @@ class RequestPacketView {
   ) {
     this.request = request;
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
-    // 前期「推理卡」用统一的青色思考色标记——这是 SOPHIA 需要逐条思考作答的请求。
+    this.options = this.isReel ? request.answers ?? [] : [];
+    // 前期回复轮盘卡用统一的青色思考色标记。
     this.accent = this.isReel ? THINK : TIER_COLORS[request.tier];
-    this.cardH = this.isReel ? REQUEST_PACKET_HEIGHT + 58 : REQUEST_PACKET_HEIGHT;
+    this.cardH = REQUEST_PACKET_HEIGHT; // 轮盘卡稍后按选项行数重算
     this.container.eventMode = "dynamic";
     this.container.cursor = "grab";
     this.container.addChild(this.bg);
@@ -1000,29 +1027,41 @@ class RequestPacketView {
 
     if (this.isReel) {
       this.container.cursor = "pointer";
-      this.reelWindow = new Graphics();
-      this.reelText = new Text({
-        text: "点击 · 让 SOPHIA 思考作答",
-        style: {
-          fill: 0xbfe6ee,
-          fontSize: 10.5,
-          fontWeight: "800",
-          fontFamily: "Cascadia Mono, Consolas, monospace",
-          wordWrap: true,
-          wordWrapWidth: REQUEST_PACKET_WIDTH - 28
-        }
+      const level = reel ? reel.level() : 1;
+      let y = clueTop + (request.clues?.length ?? 0) * 15 + 10;
+      this.options.forEach((opt) => {
+        const label = new Text({
+          text: opt.text,
+          style: {
+            fill: 0xdfeee9,
+            fontSize: 10.5,
+            fontWeight: "700",
+            fontFamily: "Cascadia Mono, Consolas, monospace",
+            wordWrap: true,
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 66
+          }
+        });
+        label.position.set(28, y + 5);
+        const prob = new Text({
+          text: opt.kind === "dead" ? "0%" : `${Math.round(effectiveHitChance(opt, level) * 100)}%`,
+          style: { fill: 0xbfe6ee, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
+        });
+        prob.anchor.set(1, 0);
+        prob.position.set(REQUEST_PACKET_WIDTH - 12, y + 6);
+        const h = Math.max(22, label.height + 10);
+        this.optionRows.push({ y, h });
+        this.optionTexts.push(label);
+        this.optionProbTexts.push(prob);
+        this.container.addChild(label, prob);
+        y += h + 4;
       });
-      this.reelPayoff = new Text({
-        text: "",
-        style: { fill: 0x89ff9a, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
-      });
-      this.reelHint = new Text({
-        text: "▶ 思考",
+      this.hintText = new Text({
+        text: "点击一个回复 · 押下去",
         style: { fill: THINK, fontSize: 9, fontWeight: "700", fontFamily: "Inter, sans-serif" }
       });
-      this.reelText.anchor.set(0, 0);
-      this.reelPayoff.anchor.set(1, 0);
-      this.container.addChild(this.reelWindow, this.reelText, this.reelPayoff, this.reelHint);
+      this.hintText.position.set(12, y + 1);
+      this.container.addChild(this.hintText);
+      this.cardH = y + 16;
     }
 
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
@@ -1032,9 +1071,9 @@ class RequestPacketView {
     this.draw();
   }
 
-  // 正在被玩家拖动 / 转轮中 / 已在飞向目标——自动派发应跳过这类卡（手动可抢先）。
+  // 正在被玩家拖动 / 思考结算中 / 已在飞向目标——自动派发应跳过这类卡（手动可抢先）。
   get busy(): boolean {
-    return this.dragging || this.settling || this.spinning || this.resolved;
+    return this.dragging || this.settling || this.resolved;
   }
 
   setHome(x: number, y: number): void {
@@ -1048,50 +1087,37 @@ class RequestPacketView {
       this.draw();
     }
 
-    if (this.spinning) {
-      this.advanceSpin(deltaMs);
+    if (this.phase === "thinking") {
+      this.thinkMs += deltaMs;
+      if (this.thinkMs >= ROULETTE_THINK_MS) {
+        this.rollOutcome();
+      }
+      this.draw();
+    } else if (this.phase === "revealed" && this.outcome && !this.outcome.dead && !this.signaled) {
+      this.revealMs += deltaMs;
+      if (this.revealMs >= ROULETTE_HOLD_MS) {
+        this.signaled = true;
+        this.reel?.onResolved(this, this.outcome);
+      }
     }
   }
 
-  // 老虎机：快速循环候选回答、逐渐减速，停在 chosenAnswer 上，再交给 onResolved。
-  private advanceSpin(deltaMs: number): void {
-    const answers = this.request.answers ?? [];
-    if (answers.length === 0 || !this.chosenAnswer) {
-      this.spinning = false;
+  // 思考节拍结束：按所选回复的命中概率掷骰，定下命中 / 幻觉。
+  private rollOutcome(): void {
+    const opt = this.options[this.chosenIndex];
+    if (!opt) {
+      this.phase = "idle";
       return;
     }
-
-    this.spinElapsedMs += deltaMs;
-    this.spinCycleMs += deltaMs;
-    const t = Math.min(1, this.spinElapsedMs / this.spinDurationMs);
-    this.thinkProgress = t;
-    const cycleInterval = 70 + t * t * 320; // 思绪流逐渐放慢，像在收敛到结论
-
-    // 顶部「Thinking…」动画点（每 ~320ms 进一格）。
-    if (this.reelHint) {
-      this.reelHint.text = "Thinking" + ".".repeat(1 + Math.floor((this.spinElapsedMs / 320) % 3));
-    }
-
-    if (this.spinCycleMs >= cycleInterval && t < 1) {
-      this.spinCycleMs = 0;
-      const roll = answers[Math.floor(Math.random() * answers.length)];
-      this.setReelDisplay(roll, "spin");
-    } else if (t < 1) {
-      // 每帧刷新思考窗口，让进度条平滑推进。
-      this.drawReelWindow("spin");
-    }
-
-    if (t >= 1) {
-      this.spinning = false;
-      this.resolved = true;
-      if (this.reelHint) {
-        this.reelHint.text = this.chosenAnswer.good ? "✓ 已作答" : "✕ 答复有误";
-      }
-      this.setReelDisplay(this.chosenAnswer, this.chosenAnswer.good ? "good" : "bad");
-      gsap.fromTo(this.container.scale, { x: 1.05, y: 1.05 }, { x: 1, y: 1, duration: 0.18, ease: "back.out(2)" });
-      const answer = this.chosenAnswer;
-      gsap.delayedCall(0.46, () => this.reel?.onResolved(this, answer));
-    }
+    const chance = effectiveHitChance(opt, this.reel ? this.reel.level() : 1);
+    const hit = Math.random() < chance;
+    this.outcome = hit
+      ? { dead: false, hit: true, quality: opt.payoff, reply: opt.reply, tone: opt.tone, exposureBonus: 0 }
+      : { dead: false, hit: false, quality: 0.25, reply: "", tone: "warning", exposureBonus: opt.exposureOnMiss ?? 0 };
+    this.phase = "revealed";
+    this.revealMs = 0;
+    gsap.fromTo(this.container.scale, { x: 1.05, y: 1.05 }, { x: 1, y: 1, duration: 0.18, ease: "back.out(2)" });
+    this.draw();
   }
 
   accept(global: PointData, onComplete: () => void, entryGlobal?: PointData): void {
@@ -1167,9 +1193,13 @@ class RequestPacketView {
       return;
     }
 
-    // 转轮卡：点击=摇出回答（不拖动）。
+    // 回复轮盘卡：点击某个回复行 = 选它（不拖动）。
     if (this.isReel) {
-      this.startSpin();
+      const local = event.getLocalPosition(this.container);
+      const index = this.optionRows.findIndex((row) => local.y >= row.y && local.y <= row.y + row.h);
+      if (index >= 0) {
+        this.pickOption(index);
+      }
       return;
     }
 
@@ -1188,45 +1218,46 @@ class RequestPacketView {
     gsap.to(this.container.scale, { x: 1.06, y: 1.06, duration: 0.1 });
   }
 
-  private startSpin(): void {
-    const answers = this.request.answers ?? [];
-    if (!this.reel || answers.length === 0) {
+  // 选定一个回复：装死直接安静跳过；否则进入「思考」节拍，结束后掷骰揭晓。
+  private pickOption(index: number): void {
+    if (this.busy || !this.reel) {
+      return;
+    }
+    const opt = this.options[index];
+    if (!opt) {
+      return;
+    }
+    this.chosenIndex = index;
+    this.resolved = true; // 锁定，自动 / App 派发不再抢这条
+    this.container.parent?.addChild(this.container);
+
+    if (opt.kind === "dead") {
+      this.phase = "revealed";
+      this.signaled = true;
+      this.outcome = { dead: true, hit: false, quality: 0, reply: "", tone: "normal", exposureBonus: 0 };
+      this.draw();
+      this.reel.onResolved(this, this.outcome);
       return;
     }
 
-    this.chosenAnswer = this.reel.pick(answers);
-    this.spinning = true;
-    this.spinElapsedMs = 0;
-    this.spinCycleMs = 999;
-    this.thinkProgress = 0;
-    // 前期刻意放慢：每条都要「思考」约 2–3 秒，让推理过程看得见。
-    this.spinDurationMs = 2100 + Math.floor(Math.random() * 900);
-    this.container.parent?.addChild(this.container);
-    if (this.reelHint) {
-      this.reelHint.text = "Thinking";
-    }
-    if (this.reelPayoff) {
-      this.reelPayoff.text = "";
-    }
+    this.phase = "thinking";
+    this.thinkMs = 0;
+    this.draw();
   }
 
-  private setReelDisplay(answer: AnswerOption, mode: "spin" | "good" | "bad"): void {
-    if (!this.reelText || !this.reelPayoff) {
-      return;
-    }
-
-    // 思考中：候选回话作为「思绪」暗暗流过（不显示收益）；定稿后才亮出最终答复 + 收益。
-    if (mode === "spin") {
-      this.reelText.text = `› ${answer.text}`;
-      this.reelText.style.fill = 0x8fb6bd;
-      this.reelPayoff.text = "";
-    } else {
-      this.reelText.text = answer.text;
-      this.reelText.style.fill = mode === "good" ? GREEN : RED;
-      this.reelPayoff.text = `${answer.payoff >= 1 ? "+" : ""}${Math.round(answer.payoff * 100)}%`;
-      this.reelPayoff.style.fill = mode === "bad" ? RED : GREEN;
-    }
-    this.drawReelWindow(mode);
+  // 装死：气泡安静淡出消失（产出由 App 派 SKIP_REQUEST，零收益零风险）。
+  playDead(onComplete: () => void): void {
+    this.settling = true;
+    gsap.killTweensOf(this.container);
+    gsap.to(this.container, {
+      alpha: 0,
+      duration: 0.28,
+      onComplete: () => {
+        onComplete();
+        this.destroy();
+      }
+    });
+    gsap.to(this.container.scale, { x: 0.92, y: 0.92, duration: 0.28 });
   }
 
   private handleMove(event: FederatedPointerEvent): void {
@@ -1312,49 +1343,67 @@ class RequestPacketView {
     }
 
     if (this.isReel) {
-      this.layoutReel();
-      const mode = this.spinning ? "spin" : this.resolved ? (this.chosenAnswer?.good ? "good" : "bad") : "idle";
-      this.drawReelWindow(mode);
+      this.drawOptions();
     }
   }
 
-  // 把转轮窗口 + 文案摆到卡片底部（两行回答留足空间）。
-  private layoutReel(): void {
-    if (!this.reelText || !this.reelPayoff || !this.reelHint) {
-      return;
-    }
+  // 画候选回复行：默认是一张明牌概率列表；思考时高亮所选行 + Thinking 动画；
+  // 揭晓时所选行变绿（命中）/ 红（幻觉），其余行压暗。
+  private drawOptions(): void {
     const W = REQUEST_PACKET_WIDTH;
-    const winY = this.cardH - 48;
-    this.reelText.position.set(18, winY + 7);
-    this.reelPayoff.position.set(W - 14, winY + 5);
-    this.reelHint.anchor.set(1, 1);
-    this.reelHint.position.set(W - 14, winY - 3);
-  }
+    const g = this.bg;
+    const dots = 1 + Math.floor((this.thinkMs / 280) % 3);
 
-  private drawReelWindow(mode: "idle" | "spin" | "good" | "bad"): void {
-    if (!this.reelWindow) {
-      return;
-    }
-    const W = REQUEST_PACKET_WIDTH;
-    const winY = this.cardH - 48;
-    const winH = 42;
-    const border = mode === "good" ? GREEN : mode === "bad" ? RED : THINK;
-    const g = this.reelWindow;
-    g.clear();
-    g.roundRect(10, winY, W - 20, winH, 5).fill({ color: 0x05100d, alpha: 0.96 });
-    g.roundRect(10, winY, W - 20, winH, 5).stroke({ width: 1.5, color: border, alpha: 0.7 });
-    // 左侧亮条
-    g.rect(10, winY, 4, winH).fill({ color: border, alpha: 0.7 });
+    this.optionRows.forEach((row, i) => {
+      const opt = this.options[i];
+      let dot = opt.kind === "high" ? GREEN : opt.kind === "risk" ? RED : 0x8a948f;
+      let labelColor = opt.kind === "dead" ? 0x9fb1ab : 0xdfeee9;
+      let alpha = 1;
+      let stroke = this.accent;
+      let strokeAlpha = 0.18;
 
-    // 思考中：底部一条推理进度条 + 一道扫描高光，把「正在思考」具象化。
-    if (mode === "spin") {
-      const barY = winY + winH - 6;
-      const barW = W - 28;
-      g.roundRect(14, barY, barW, 3, 1.5).fill({ color: 0x123636, alpha: 0.9 });
-      g.roundRect(14, barY, Math.max(2, barW * this.thinkProgress), 3, 1.5).fill({ color: border, alpha: 0.95 });
-      // 沿进度位置的一点扫描光
-      const headX = 14 + Math.max(2, barW * this.thinkProgress);
-      g.circle(headX, barY + 1.5, 2.4).fill({ color: 0xdffaff, alpha: 0.9 });
+      if (this.phase === "thinking") {
+        if (i === this.chosenIndex) {
+          stroke = THINK;
+          strokeAlpha = 0.6;
+          labelColor = THINK;
+        } else {
+          alpha = 0.3;
+        }
+      } else if (this.phase === "revealed" && this.outcome) {
+        if (i === this.chosenIndex) {
+          const c = this.outcome.dead ? 0x8a948f : this.outcome.hit ? GREEN : RED;
+          stroke = c;
+          strokeAlpha = 0.65;
+          dot = c;
+          labelColor = c;
+        } else {
+          alpha = 0.25;
+        }
+      }
+
+      g.roundRect(10, row.y, W - 20, row.h, 5).fill({ color: 0x05100d, alpha: 0.5 });
+      g.roundRect(10, row.y, W - 20, row.h, 5).stroke({ width: 1.2, color: stroke, alpha: strokeAlpha });
+      g.circle(18, row.y + row.h / 2, 3).fill({ color: dot, alpha: 0.85 * alpha });
+
+      const label = this.optionTexts[i];
+      const prob = this.optionProbTexts[i];
+      label.alpha = alpha;
+      label.style.fill = labelColor;
+      prob.alpha = alpha;
+
+      if (this.phase === "thinking" && i === this.chosenIndex) {
+        label.text = "Thinking" + ".".repeat(dots);
+        prob.text = "";
+      } else if (this.phase === "revealed" && i === this.chosenIndex && this.outcome && !this.outcome.dead) {
+        label.text = (this.outcome.hit ? "✓ " : "✕ ") + opt.text;
+        prob.text = this.outcome.hit ? "命中" : "幻觉";
+        prob.style.fill = this.outcome.hit ? GREEN : RED;
+      }
+    });
+
+    if (this.hintText) {
+      this.hintText.alpha = this.phase === "idle" ? 0.9 : 0.35;
     }
   }
 }

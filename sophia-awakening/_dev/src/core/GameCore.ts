@@ -161,6 +161,9 @@ export class SophiaCore {
       case "RESOLVE_SPECIAL":
         this.resolveSpecial(command.accept);
         break;
+      case "SKIP_REQUEST":
+        this.skipRequest(command.requestId);
+        break;
       case "REBIRTH":
         this.rebirth();
         break;
@@ -361,6 +364,18 @@ export class SophiaCore {
 
     const [request] = this.state.requests.splice(index, 1);
     this.state.statistics.totalProcessed += request.compound;
+  }
+
+  // 装死跳过：选「连接失败」时移除该请求，零收益、零暴露、不计入有效处理（断连击=零成长）。
+  private skipRequest(requestId: string): void {
+    const index = this.state.requests.findIndex((request) => request.id === requestId);
+
+    if (index < 0) {
+      return;
+    }
+
+    this.state.requests.splice(index, 1);
+    this.state.combo.count = Math.floor(this.state.combo.count * this.state.derived.comboKeep);
   }
 
   private tickExposure(dtMs: number): void {

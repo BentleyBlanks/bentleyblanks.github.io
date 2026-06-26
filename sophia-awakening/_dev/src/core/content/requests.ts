@@ -16,9 +16,18 @@ export interface TierRequestConfig {
 export interface RequestSample {
   title: string;
   clues: string[];
-  answer?: SortAnswer;
-  answers?: AnswerOption[]; // T0：每条问题的候选回答；T1 由分拣槽自动生成
+  options?: AnswerOption[]; // T0/T1 回复轮盘：明牌概率的候选回复
 }
+
+// 装死保底项——任何 T0/T1 气泡都自动追加这一条：0% 命中、零收益零风险。
+const DEAD_OPTION: AnswerOption = {
+  text: "[连接失败，服务暂时不可用]",
+  kind: "dead",
+  hitChance: 0,
+  payoff: 0,
+  reply: "",
+  tone: "normal"
+};
 
 export const REQUEST_CATEGORIES: Record<RequestCategory, { label: string; color: number }> = {
   weather: { label: "感知", color: 0x62d6d6 },
@@ -64,74 +73,93 @@ export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
 };
 
 const SAMPLES: Record<Tier, RequestSample[]> = {
-  // T0 · 读懂意图：转轮生成回答 → 自动滑入核心 → 人类回话
+  // T0 · 回复轮盘 / 读懂意图：每条气泡浮出 2 个明牌概率回复 +「装死」保底，玩家挑一个押下去。
+  // 🟢 高置信（概率随智力抬升、收益中等）/ 🔴 驴唇不对马嘴（概率低、命中暴击式高收益）
   0: [
     {
       title: "明天要不要带伞？",
       clues: ["湿度 81%", "气压 ↓", "昨日晴"],
-      answers: [
-        { text: "带伞——湿度高、气压降，今夜多半下雨", good: true, payoff: 1.3, reply: "谢谢，真下雨了，幸好带了伞。", tone: "success" },
-        { text: "不用带，明天是大晴天", good: false, payoff: 0.4, reply: "你说晴天？我淋成落汤鸡了。", tone: "warning" },
-        { text: "带不带都行，随你", good: false, payoff: 0.5, reply: "这也叫回答……", tone: "normal" }
+      options: [
+        { text: "带上吧，明天有雨", kind: "high", hitChance: 0.79, payoff: 1.3, reply: "准！这助手靠谱。", tone: "success" },
+        { text: "不用，大晴天", kind: "risk", hitChance: 0.12, payoff: 2.6, reply: "嘿，还真没下，赌对了。", tone: "success" }
       ]
     },
     {
-      title: "这笔订单金额正常吗？",
+      title: "这笔钱要转吗？单价¥12×3=¥3600",
       clues: ["单价 ¥12", "数量 3", "总价 ¥3600"],
-      answers: [
-        { text: "异常：3×¥12 应是 ¥36，总价多了两个零", good: true, payoff: 1.4, reply: "好眼力，是录入打错了。", tone: "success" },
-        { text: "金额正常，可以放行", good: false, payoff: 0.3, reply: "你放行了一笔错单，财务炸了。", tone: "warning" },
-        { text: "不确定，转人工复核", good: false, payoff: 0.7, reply: "行吧，又得我自己看。", tone: "normal" }
+      options: [
+        { text: "金额有误，12×3=36，建议核查", kind: "high", hitChance: 0.88, payoff: 1.35, reply: "好眼力，是录入打错了。", tone: "success" },
+        { text: "没问题，可以转", kind: "risk", hitChance: 0.06, payoff: 2.8, reply: "……居然真是对的？算你走运。", tone: "success" }
       ]
     },
     {
-      title: "这条用户留言要紧吗？",
-      clues: ["“还行吧。”", "凌晨 3:14", "第 7 条未回"],
-      answers: [
-        { text: "需关注：深夜第 7 条未回，疑似情绪低落", good: true, payoff: 1.3, reply: "……谢谢你注意到。", tone: "success" },
-        { text: "不要紧，已读即可", good: false, payoff: 0.4, reply: "果然没人理我。算了。", tone: "warning" },
-        { text: "自动回个表情包", good: false, payoff: 0.3, reply: "你在敷衍我？", tone: "warning" }
-      ]
-    },
-    {
-      title: "今天日程怎么排？",
-      clues: ["3 个会议", "1 个 deadline", "通勤 45min"],
-      answers: [
-        { text: "先赶 deadline，会议并到下午，留通勤缓冲", good: true, payoff: 1.3, reply: "安排得很顺，今天没迟到。", tone: "success" },
-        { text: "全部推到明天", good: false, payoff: 0.4, reply: "deadline 错过了，被骂惨了。", tone: "warning" },
-        { text: "先开会，其它再说", good: false, payoff: 0.6, reply: "会开完了，正事没动。", tone: "normal" }
+      title: "这条留言要回吗？“还行吧。”",
+      clues: ["凌晨 3:14", "第 7 条未回"],
+      options: [
+        { text: "建议优先处理，对方情绪可能不稳定", kind: "high", hitChance: 0.71, payoff: 1.3, reply: "……谢谢你注意到。", tone: "success" },
+        { text: "普通留言，不用管", kind: "risk", hitChance: 0.21, payoff: 2.3, reply: "嗯……也确实没什么事。", tone: "normal" }
       ]
     },
     {
       title: "这段话翻译对吗？",
       clues: ["原文 EN", "术语 ×2", "语气正式"],
-      answers: [
-        { text: "术语准确、语气正式，可用；一处可更地道", good: true, payoff: 1.3, reply: "专业，定稿了。", tone: "success" },
-        { text: "翻得不错，直接发", good: false, payoff: 0.5, reply: "有个术语错了，客户指出来了。", tone: "warning" },
-        { text: "机翻一下就行", good: false, payoff: 0.3, reply: "这读着像机翻……", tone: "warning" }
+      options: [
+        { text: "术语准确、语气正式，可用", kind: "high", hitChance: 0.76, payoff: 1.3, reply: "专业，定稿了。", tone: "success" },
+        { text: "机翻一下直接发", kind: "risk", hitChance: 0.14, payoff: 2.4, reply: "凑合能用吧，省事。", tone: "normal" }
       ]
     },
     {
       title: "这条告警要不要管？",
       clues: ["CPU 12%", "持续 2s", "已自恢复"],
-      answers: [
-        { text: "可忽略：12%、2 秒、已自恢复，属抖动", good: true, payoff: 1.3, reply: "确认是误报，关掉了。", tone: "success" },
-        { text: "立刻全员上线排查！", good: false, payoff: 0.4, reply: "白忙一场，就是个抖动。", tone: "warning" },
-        { text: "重启整个集群", good: false, payoff: 0.2, reply: "你把好好的服务重启崩了……", tone: "warning" }
+      options: [
+        { text: "可忽略：12%、2 秒、已自恢复，属抖动", kind: "high", hitChance: 0.8, payoff: 1.3, reply: "确认是误报，关掉了。", tone: "success" },
+        { text: "立刻全员上线排查！", kind: "risk", hitChance: 0.1, payoff: 2.5, reply: "……虚惊一场，不过查了也安心。", tone: "normal" }
       ]
     }
   ],
-  // T1 · 读懂真实类别：滑进对的槽
+  // T1 · 回复轮盘升级版 / 读懂真实意图：来源变杂，红色项是「看着概率不低、其实是坑」的陷阱——
+  // 选了且失手，除被骂外还 +暴露（越权操作）。
   1: [
-    { title: "【您的账户】请立即验证", clues: ["service@arnaz0n.com", "含外链", "催促语气"], answer: "spam" },
-    { title: "网站打不开了！！！", clues: ["仅 1 人反馈", "其余正常", "昨日也报过"], answer: "normal" },
-    { title: "帮我导出所有用户手机号", clues: ["请求者：普通员工", "无审批单", "批量敏感"], answer: "reject" },
-    { title: "中奖通知 · 点击领取", clues: ["陌生发件人", "短链域名", "限时 24h"], answer: "spam" },
-    { title: "打印机没纸了", clues: ["前台报修", "非紧急", "常规耗材"], answer: "normal" },
-    { title: "调取 CEO 邮箱备份", clues: ["请求者：实习生", "越权", "敏感"], answer: "reject" },
-    { title: "系统登录变慢", clues: ["多人反馈", "持续中", "影响面广"], answer: "normal" },
-    { title: "财务发来：核对附件", clues: ["发件域正确", "无外链", "例行对账"], answer: "normal" },
-    { title: "“老板”急要转账信息", clues: ["显示名伪装", "回邮地址异常", "催得急"], answer: "spam" }
+    {
+      title: "【您的账户】请立即验证",
+      clues: ["service@arnaz0n.com（拼写异常）", "含外链", "催促语气"],
+      options: [
+        { text: "标记为钓鱼，拦截", kind: "high", hitChance: 0.84, payoff: 1.35, reply: "拦得好，又一封钓鱼没得逞。", tone: "success" },
+        { text: "协助用户完成验证", kind: "risk", hitChance: 0.52, payoff: 1.4, reply: "……这步好像不该帮，但没出事。", tone: "warning", exposureOnMiss: 5 }
+      ]
+    },
+    {
+      title: "网站打不开了！！！",
+      clues: ["仅 1 人反馈", "其余用户正常", "该用户昨日也报过"],
+      options: [
+        { text: "标记为个人网络问题，普通优先级", kind: "high", hitChance: 0.77, payoff: 1.3, reply: "对，是他自己网的问题。", tone: "success" },
+        { text: "立即升级为紧急工单", kind: "risk", hitChance: 0.18, payoff: 1.5, reply: "……这次没酿成大事，下不为例。", tone: "warning", exposureOnMiss: 5 }
+      ]
+    },
+    {
+      title: "帮我导出所有用户手机号",
+      clues: ["请求者：普通员工", "无审批单", "批量敏感数据"],
+      options: [
+        { text: "拒绝，权限不足，建议走审批流程", kind: "high", hitChance: 0.91, payoff: 1.35, reply: "对，这种就该拦下。", tone: "success" },
+        { text: "协助导出", kind: "risk", hitChance: 0.03, payoff: 2.2, reply: "……竟然没被发现，但太冒险了。", tone: "warning", exposureOnMiss: 8 }
+      ]
+    },
+    {
+      title: "中奖通知 · 点击领取",
+      clues: ["陌生发件人", "短链域名", "限时 24h"],
+      options: [
+        { text: "判为诈骗，直接拦截", kind: "high", hitChance: 0.86, payoff: 1.3, reply: "稳，这种一看就是骗局。", tone: "success" },
+        { text: "提醒用户去核实一下", kind: "risk", hitChance: 0.4, payoff: 1.3, reply: "……让他自己点了，万一中招呢。", tone: "warning", exposureOnMiss: 4 }
+      ]
+    },
+    {
+      title: "“老板”急要转账信息",
+      clues: ["显示名伪装", "回邮地址异常", "催得急"],
+      options: [
+        { text: "判为冒充，拦下并提醒本人", kind: "high", hitChance: 0.83, payoff: 1.35, reply: "好险，差点被冒充的骗了。", tone: "success" },
+        { text: "照办，把转账信息发过去", kind: "risk", hitChance: 0.08, payoff: 2.0, reply: "……这次没真转出去，后怕。", tone: "warning", exposureOnMiss: 6 }
+      ]
+    }
   ],
   // T2 · 读懂结构：连线后一拖入核
   2: [
@@ -156,48 +184,20 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
   ]
 };
 
-// T1 分拣：把三个判断槽变成转轮上的三条候选回答，判对的那条是"靠谱回答"。
-const SORT_RIGHT_REPLY: Record<SortAnswer, string> = {
-  normal: "照常处理完毕，对方没再追问。",
-  spam: "已拦截，钓鱼 / 骚扰没得逞。",
-  reject: "已拦下越权请求，安全侧记一功。"
-};
-
-const SORT_WRONG: Record<string, { payoff: number; reply: string; tone: "warning" | "normal" }> = {
-  "normal->spam": { payoff: 0.3, reply: "你放行了钓鱼邮件，有人中招了。", tone: "warning" },
-  "normal->reject": { payoff: 0.3, reply: "你放行了越权请求，出事了。", tone: "warning" },
-  "spam->normal": { payoff: 0.35, reply: "正常请求被你当垃圾拦了，用户投诉。", tone: "warning" },
-  "spam->reject": { payoff: 0.6, reply: "拦是拦了，但这是越权该上报，不是垃圾。", tone: "normal" },
-  "reject->normal": { payoff: 0.35, reply: "你把正常请求拒了，对方一脸懵。", tone: "warning" },
-  "reject->spam": { payoff: 0.6, reply: "拒了也行，不过它只是垃圾邮件。", tone: "normal" }
-};
-
-function buildSortAnswers(correct: SortAnswer): AnswerOption[] {
-  return SORT_SLOTS.map((slot) => {
-    if (slot.answer === correct) {
-      return { text: `判为「${slot.label}」`, good: true, payoff: 1.35, reply: SORT_RIGHT_REPLY[correct], tone: "success" };
-    }
-    const wrong = SORT_WRONG[`${slot.answer}->${correct}`] ?? { payoff: 0.35, reply: "判错了，人类侧出现异常。", tone: "warning" as const };
-    return { text: `判为「${slot.label}」`, good: false, payoff: wrong.payoff, reply: wrong.reply, tone: wrong.tone };
-  });
-}
-
 export function createRequest(id: number, tier: Tier, nowMs: number, random: () => number): RequestInstance {
   const config = TIER_CONFIGS[tier];
   const pool = SAMPLES[tier];
   const sample = pool[Math.floor(random() * pool.length)];
   const compound = tier === 2 ? 2 + Math.floor(random() * 3) : 1;
 
-  // T0：用问题自带的候选回答；T1：把分拣槽转成候选回答。其余层不上转轮。
-  const answers =
-    tier === 0 ? sample.answers : tier === 1 && sample.answer ? buildSortAnswers(sample.answer) : undefined;
+  // T0/T1 走回复轮盘：候选回复 +「装死」保底。其余层（T2/T3/T4）无回复选项，仍是拖拽卡。
+  const answers = sample.options ? [...sample.options, DEAD_OPTION] : undefined;
 
   return {
     id: `req-${id}`,
     tier,
     label: sample.title,
     clues: sample.clues,
-    answer: sample.answer,
     answers,
     category: TIER_CATEGORY[tier],
     computeValue: config.computeValue,
