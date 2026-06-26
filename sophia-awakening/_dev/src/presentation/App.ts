@@ -488,19 +488,17 @@ class SophiaGameApp {
       return;
     }
 
-    // 引导卡放大、更显眼。
-    view.container.scale.set(1.3);
-
+    // 引导卡不再放大（缩放会把位图文字拉糊）——保持原始清晰度，只用脉动高亮环 + 箭头吸引注意。
     this.tutorialPulse += deltaMs * 0.005;
-    const sw = REQUEST_PACKET_WIDTH * 1.3;
-    const sh = REQUEST_PACKET_HEIGHT * 1.3;
+    const sw = REQUEST_PACKET_WIDTH;
+    const sh = Math.max(REQUEST_PACKET_HEIGHT, view.container.height || REQUEST_PACKET_HEIGHT);
     const x = view.container.x;
     const y = view.container.y;
     const p = 0.5 + Math.sin(this.tutorialPulse * 2) * 0.5;
     const g = this.tutorialGfx;
-    g.roundRect(x - 7, y - 7, sw + 14, sh + 14, 12).stroke({ width: 2.5, color: GREEN, alpha: 0.4 + p * 0.45 });
+    g.roundRect(x - 8, y - 12, sw + 16, sh + 18, 16).stroke({ width: 2.5, color: GREEN, alpha: 0.4 + p * 0.45 });
     const ax = x + sw / 2;
-    const ay = y - 20 - p * 8;
+    const ay = y - 24 - p * 8;
     g.moveTo(ax - 11, ay - 10).lineTo(ax, ay).lineTo(ax + 11, ay - 10).stroke({ width: 4, color: GREEN, alpha: 0.85 });
     g.moveTo(ax, ay).lineTo(ax, ay - 18).stroke({ width: 3, color: GREEN, alpha: 0.7 });
   }
