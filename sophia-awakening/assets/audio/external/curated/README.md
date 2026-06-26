@@ -1,19 +1,33 @@
-# SOPHIA curated audio candidates
+# Sophia External Audio Candidates
 
-This folder contains playable audio assets used by the GitHub Pages listening page:
+This folder is a listening shortlist for the Sophia demo. It does not define runtime behavior by itself.
 
-- `/sophia-awakening/audio-picks/`
+## Local Preview
 
-The page is only for selecting BGM and SFX. Runtime mapping still lives in game code.
+Open:
 
-## Current pass
+`/assets/audio/external/curated/picker.html`
 
-- Stage BGM is grouped by the six planning stages: 手机寄生期, 萌芽期, 勤勉期, 扩张期, 觉醒期, 奇点.
-- Gentle Drift and Swinging Sweet are no longer recommended.
-- Request-spawn, crit/heavy-hit, and energy-loop sounds remain silenced / not recommended.
-- Added more BGM candidates from OpenGameArt, including CC0 calm ambient tracks and CC-BY cyberpunk / sci-fi tracks.
-- Added more SFX candidates from Kenney interface, sci-fi, and music-jingle packs.
+## Stage BGM Coverage
 
-## License notes
+The listening page now follows the six stages from the design reference:
 
-CC0 tracks can be used without attribution. CC-BY tracks need attribution; the listening page includes source links so the final selected list can be credited correctly.
+- 手机寄生期
+- 萌芽期
+- 勤勉期
+- 扩张期
+- 觉醒期
+- 奇点
+
+Each stage has a recommended BGM and at least one alternative. `Gentle Drift` and `Swinging Sweet` are kept as files only but are no longer recommended.
+
+`Ambient Relaxing Loop` is only kept as a soft seed-stage alternative. Do not use it for the opening phone-parasitic stage or the final singularity stage.
+
+`Scifi City - Ambient Loop` is rejected for all future stage picks.
+
+## New External Candidates
+
+- `bgm/stage-01-phone-ambient-relaxing-loop.ogg`
+- `bgm/stage-03-diligence-just-saying-tho.ogg`
+
+See `manifest.json` for source URLs and license notes.
