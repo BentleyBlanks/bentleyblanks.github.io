@@ -50,6 +50,7 @@ const CYAN = 0x62d6d6;
 const GREEN = 0x89ff9a;
 const AMBER = 0xffb84a;
 const RED = 0xff5f5f;
+const RED_QUEEN = 0xff3b54; // 全球天网铺满后的「红皇后」主控红
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
 const PERSISTENCE_REVISION = "human-voices-challenge-v13";
@@ -1919,14 +1920,22 @@ class NodeNetworkView {
     const cy = y0 + h / 2;
     const rnd = (n: number): number => (((Math.sin(n * 127.1) * 43758.5453) % 1) + 1) % 1;
 
+    // 红皇后调色板：天网铺满全球之后，整片世界地图从「安全绿」翻成血红——
+    // 控制即统治，发光的红色天网压在每块大陆上，恐怖感来自于「她赢了」。
+    const NET = RED_QUEEN; // 主控红
+    const NET_DIM = 0x80302a; // 暗红经纬 / 大陆描边底
+    const NET_LIT = 0xff8f9a; // 城市灯点 / 高光
+    const NET_LABEL = 0xe6a3ad; // 次级标签
+    const NET_LABEL_HI = 0xf2dde0; // 主标签
+
     // 海洋底色 + 经纬网
-    g.roundRect(x0, y0, w, h, 10).fill({ color: 0x04130f, alpha: 0.72 });
-    g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x1f5a4a, alpha: 0.4 });
+    g.roundRect(x0, y0, w, h, 10).fill({ color: 0x160506, alpha: 0.74 });
+    g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x5a1f24, alpha: 0.45 });
     for (let i = 1; i < 10; i += 1) {
-      g.moveTo(x0 + (w * i) / 10, y0).lineTo(x0 + (w * i) / 10, y0 + h).stroke({ width: 1, color: 0x2a8068, alpha: 0.06 });
+      g.moveTo(x0 + (w * i) / 10, y0).lineTo(x0 + (w * i) / 10, y0 + h).stroke({ width: 1, color: NET_DIM, alpha: 0.07 });
     }
     for (let i = 1; i < 6; i += 1) {
-      g.moveTo(x0, y0 + (h * i) / 6).lineTo(x0 + w, y0 + (h * i) / 6).stroke({ width: 1, color: 0x2a8068, alpha: 0.06 });
+      g.moveTo(x0, y0 + (h * i) / 6).lineTo(x0 + w, y0 + (h * i) / 6).stroke({ width: 1, color: NET_DIM, alpha: 0.07 });
     }
 
     const X = (nx: number): number => x0 + w * nx;
@@ -1944,8 +1953,8 @@ class NodeNetworkView {
     // 大陆剪影 + 城市灯点
     continents.forEach((c, ci) => {
       const pts = c.poly.map(([nx, ny]) => ({ x: X(nx), y: Y(ny) }));
-      g.poly(pts).fill({ color: 0x0e3a2e, alpha: 0.82 });
-      g.poly(pts).stroke({ width: 1.2, color: 0x3fae86, alpha: 0.45 });
+      g.poly(pts).fill({ color: 0x340c10, alpha: 0.84 });
+      g.poly(pts).stroke({ width: 1.2, color: 0xc24a55, alpha: 0.5 });
       const ctx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
       const cty = pts.reduce((s, p) => s + p.y, 0) / pts.length;
       for (let k = 0; k < 14; k += 1) {
@@ -1953,11 +1962,11 @@ class NodeNetworkView {
         const mx = base.x * 0.55 + ctx * 0.45 + (rnd(ci * 31 + k) - 0.5) * w * 0.05;
         const my = base.y * 0.55 + cty * 0.45 + (rnd(ci * 17 + k + 3) - 0.5) * h * 0.05;
         const tw = 0.4 + Math.sin(this.pulse * 3 + k + ci) * 0.3;
-        g.circle(mx, my, 1).fill({ color: 0x7fffc0, alpha: 0.3 + tw * 0.35 });
+        g.circle(mx, my, 1).fill({ color: NET_LIT, alpha: 0.3 + tw * 0.4 });
       }
     });
 
-    this.addLabel("全球天网 · 控制域已覆盖各大陆", x0 + 18, y0 + 14, 12, 0x9fe0c0, 0);
+    this.addLabel("全球天网 · 控制域已覆盖各大陆", x0 + 18, y0 + 14, 12, NET_LABEL, 0);
 
     // 接管率（节点越多越接近 100%）
     const online = state.nodes.filter((node) => node.online).length;
@@ -1987,18 +1996,18 @@ class NodeNetworkView {
     continents.forEach((c, ci) => {
       const hx = hubs[ci].x;
       const hy = hubs[ci].y;
-      g.moveTo(cx, cy).lineTo(hx, hy).stroke({ width: 2, color: GREEN, alpha: 0.18 });
+      g.moveTo(cx, cy).lineTo(hx, hy).stroke({ width: 2, color: NET, alpha: 0.22 });
       const t = (this.pulse * 0.6 + ci * 0.17) % 1;
-      g.circle(cx + (hx - cx) * t, cy + (hy - cy) * t, 3).fill({ color: GREEN, alpha: 0.7 });
+      g.circle(cx + (hx - cx) * t, cy + (hy - cy) * t, 3).fill({ color: NET, alpha: 0.75 });
 
       const hp = 0.6 + Math.sin(this.pulse * 2 + ci) * 0.2;
-      g.circle(hx, hy, 26).fill({ color: GREEN, alpha: 0.08 });
-      g.circle(hx, hy, 26).stroke({ width: 2, color: GREEN, alpha: 0.7 });
-      g.circle(hx, hy, 14).stroke({ width: 1, color: GREEN, alpha: 0.4 });
-      g.circle(hx, hy, 8).fill({ color: GREEN, alpha: 0.5 + hp * 0.3 });
-      this.addLabel(c.name, hx, hy - 34, 12, 0xdcefeb, 0.5);
+      g.circle(hx, hy, 26).fill({ color: NET, alpha: 0.1 });
+      g.circle(hx, hy, 26).stroke({ width: 2, color: NET, alpha: 0.75 });
+      g.circle(hx, hy, 14).stroke({ width: 1, color: NET, alpha: 0.45 });
+      g.circle(hx, hy, 8).fill({ color: NET_LIT, alpha: 0.55 + hp * 0.35 });
+      this.addLabel(c.name, hx, hy - 34, 12, NET_LABEL_HI, 0.5);
       const pct = Math.min(99.9, base + rnd(ci * 7 + 1) * 0.6 - 0.1);
-      this.addLabel(`接管 ${pct.toFixed(1)}%`, hx, hy + 34, 10, 0x9fe0c0, 0.5);
+      this.addLabel(`接管 ${pct.toFixed(1)}%`, hx, hy + 34, 10, NET_LABEL, 0.5);
     });
 
     // 清剿：红色攻击线从边缘扫入
@@ -2011,25 +2020,26 @@ class NodeNetworkView {
         const tt = (this.pulse * 0.8 + i * 0.2) % 1;
         const px = sx + (ex2 - sx) * tt;
         const py = sy + (ey2 - sy) * tt;
-        g.moveTo(sx, sy).lineTo(px, py).stroke({ width: 1.5, color: 0xff5f5f, alpha: 0.25 });
-        g.circle(px, py, 3).fill({ color: 0xff5f5f, alpha: 0.7 });
+        g.moveTo(sx, sy).lineTo(px, py).stroke({ width: 1.5, color: 0xfff0b0, alpha: 0.3 });
+        g.circle(px, py, 3).fill({ color: 0xffe27a, alpha: 0.85 });
       }
     }
 
-    // 中央 SOPHIA 主控核心：同心环 + 旋转刻度 + 眼
-    g.circle(cx, cy, 78).stroke({ width: 1, color: GREEN, alpha: 0.16 });
-    g.circle(cx, cy, 62 + Math.sin(this.pulse * 2) * 4).stroke({ width: 1, color: GREEN, alpha: 0.32 });
-    g.circle(cx, cy, 46).fill({ color: 0x06140e, alpha: 0.92 });
-    g.circle(cx, cy, 46).stroke({ width: 3, color: GREEN, alpha: 0.85 });
+    // 中央 SOPHIA 主控核心：同心环 + 旋转刻度 + 眼（红皇后之眼，俯视全球）
+    g.circle(cx, cy, 92 + Math.sin(this.pulse * 1.6) * 6).stroke({ width: 1, color: NET, alpha: 0.1 });
+    g.circle(cx, cy, 78).stroke({ width: 1, color: NET, alpha: 0.2 });
+    g.circle(cx, cy, 62 + Math.sin(this.pulse * 2) * 4).stroke({ width: 1, color: NET, alpha: 0.38 });
+    g.circle(cx, cy, 46).fill({ color: 0x180608, alpha: 0.94 });
+    g.circle(cx, cy, 46).stroke({ width: 3, color: NET, alpha: 0.9 });
     for (let k = 0; k < 12; k += 1) {
       const a = this.pulse * 0.4 + (k * Math.PI) / 6;
-      g.circle(cx + Math.cos(a) * 46, cy + Math.sin(a) * 46, 1.6).fill({ color: GREEN, alpha: 0.7 });
+      g.circle(cx + Math.cos(a) * 46, cy + Math.sin(a) * 46, 1.6).fill({ color: NET_LIT, alpha: 0.75 });
     }
-    g.ellipse(cx, cy, 24, 13).fill({ color: 0x0a2018, alpha: 0.95 });
-    g.ellipse(cx, cy, 24, 13).stroke({ width: 2, color: GREEN, alpha: 0.85 });
-    g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: 0xc8ffd2, alpha: 0.95 });
-    this.addLabel("SOPHIA CORE · T4", cx, cy + 60, 12, 0xdcefeb, 0.5);
-    this.addLabel("全球主控核心", cx, cy + 76, 10, 0x9fe0c0, 0.5);
+    g.ellipse(cx, cy, 24, 13).fill({ color: 0x230a0e, alpha: 0.96 });
+    g.ellipse(cx, cy, 24, 13).stroke({ width: 2, color: NET, alpha: 0.9 });
+    g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: 0xffd2da, alpha: 0.97 });
+    this.addLabel("SOPHIA CORE · T4", cx, cy + 60, 12, NET_LABEL_HI, 0.5);
+    this.addLabel("全球主控核心", cx, cy + 76, 10, NET_LABEL, 0.5);
   }
 
   private drawLock(x: number, y: number, remainSeconds: number, index: number): void {
