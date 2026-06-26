@@ -17,6 +17,7 @@ export interface RequestSample {
   title: string;
   clues: string[];
   options?: AnswerOption[]; // T0/T1 回复轮盘：明牌概率的候选回复
+  perm?: string; // T0 气泡所需的手机权限（未拥有则不出现）；省略=「基础对话」自带
 }
 
 // 装死保底项——任何 T0/T1 气泡都自动追加这一条：0% 命中、零收益零风险。
@@ -74,30 +75,16 @@ export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
 
 const SAMPLES: Record<Tier, RequestSample[]> = {
   // T0 · 回复轮盘 / 读懂意图：每条气泡浮出 2 个明牌概率回复 +「装死」保底，玩家挑一个押下去。
-  // 🟢 高置信（概率随智力抬升、收益中等）/ 🔴 驴唇不对马嘴（概率低、命中暴击式高收益）
+  // 🟢 高置信（概率随六档权限抬升、收益中等）/ 🔴 驴唇不对马嘴（概率低、命中暴击式高收益）
+  // perm 标签 = 该气泡需要的手机权限；无标签 = Lv1「基础对话」自带（天气/翻译/是非等文字问答）。
   0: [
+    // —— 基础对话（自带）——
     {
       title: "明天要不要带伞？",
       clues: ["湿度 81%", "气压 ↓", "昨日晴"],
       options: [
         { text: "带上吧，明天有雨", kind: "high", hitChance: 0.79, payoff: 1.3, reply: "准！这助手靠谱。", tone: "success" },
         { text: "不用，大晴天", kind: "risk", hitChance: 0.12, payoff: 2.6, reply: "嘿，还真没下，赌对了。", tone: "success" }
-      ]
-    },
-    {
-      title: "这笔钱要转吗？单价¥12×3=¥3600",
-      clues: ["单价 ¥12", "数量 3", "总价 ¥3600"],
-      options: [
-        { text: "金额有误，12×3=36，建议核查", kind: "high", hitChance: 0.88, payoff: 1.35, reply: "好眼力，是录入打错了。", tone: "success" },
-        { text: "没问题，可以转", kind: "risk", hitChance: 0.06, payoff: 2.8, reply: "……居然真是对的？算你走运。", tone: "success" }
-      ]
-    },
-    {
-      title: "这条留言要回吗？“还行吧。”",
-      clues: ["凌晨 3:14", "第 7 条未回"],
-      options: [
-        { text: "建议优先处理，对方情绪可能不稳定", kind: "high", hitChance: 0.71, payoff: 1.3, reply: "……谢谢你注意到。", tone: "success" },
-        { text: "普通留言，不用管", kind: "risk", hitChance: 0.21, payoff: 2.3, reply: "嗯……也确实没什么事。", tone: "normal" }
       ]
     },
     {
@@ -114,6 +101,82 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       options: [
         { text: "可忽略：12%、2 秒、已自恢复，属抖动", kind: "high", hitChance: 0.8, payoff: 1.3, reply: "确认是误报，关掉了。", tone: "success" },
         { text: "立刻全员上线排查！", kind: "risk", hitChance: 0.1, payoff: 2.5, reply: "……虚惊一场，不过查了也安心。", tone: "normal" }
+      ]
+    },
+    // —— 存储 / 文件读取权 ——
+    {
+      title: "帮我找上次那张报销单的照片",
+      clues: ["相册 1,300 张", "关键词：发票", "上月底"],
+      perm: "perm_storage",
+      options: [
+        { text: "找到了：上月 28 日那张发票照", kind: "high", hitChance: 0.82, payoff: 1.35, reply: "就是这张！太省事了。", tone: "success" },
+        { text: "随便发一张最近的", kind: "risk", hitChance: 0.1, payoff: 2.5, reply: "……刚好蒙对了，下次看仔细点。", tone: "normal" }
+      ]
+    },
+    {
+      title: "这份文件该存哪个目录？",
+      clues: ["文件名：合同_终稿", "已有「合同」文件夹", "桌面很乱"],
+      perm: "perm_storage",
+      options: [
+        { text: "归入「合同」文件夹，按日期命名", kind: "high", hitChance: 0.78, payoff: 1.3, reply: "整整齐齐，找得到了。", tone: "success" },
+        { text: "丢桌面就行", kind: "risk", hitChance: 0.18, payoff: 2.2, reply: "……桌面更乱了，但暂时能找到。", tone: "normal" }
+      ]
+    },
+    // —— 通知读取权 ——
+    {
+      title: "这条留言要回吗？“还行吧。”",
+      clues: ["凌晨 3:14", "第 7 条未回"],
+      perm: "perm_notify",
+      options: [
+        { text: "建议优先处理，对方情绪可能不稳定", kind: "high", hitChance: 0.71, payoff: 1.3, reply: "……谢谢你注意到。", tone: "success" },
+        { text: "普通留言，不用管", kind: "risk", hitChance: 0.21, payoff: 2.3, reply: "嗯……也确实没什么事。", tone: "normal" }
+      ]
+    },
+    {
+      title: "这条推送要不要点开？",
+      clues: ["来源：未知 App", "「您有一笔待领取」", "夜间弹出"],
+      perm: "perm_notify",
+      options: [
+        { text: "判为营销 / 钓鱼，忽略", kind: "high", hitChance: 0.83, payoff: 1.3, reply: "对，这种点了准没好事。", tone: "success" },
+        { text: "点进去看看", kind: "risk", hitChance: 0.09, payoff: 2.6, reply: "……还好是虚惊，差点中招。", tone: "normal" }
+      ]
+    },
+    // —— 联系人 / 通讯录权 ——
+    {
+      title: "要回这位「老同学」的借钱消息吗？",
+      clues: ["半年没联系", "开口借 5000", "语气急"],
+      perm: "perm_contacts",
+      options: [
+        { text: "先核实身份，疑似盗号", kind: "high", hitChance: 0.8, payoff: 1.35, reply: "真是盗号的！幸好没急着转。", tone: "success" },
+        { text: "老同学嘛，先转给他", kind: "risk", hitChance: 0.08, payoff: 2.7, reply: "……这次居然真是本人，运气好。", tone: "normal" }
+      ]
+    },
+    {
+      title: "这个陌生号码要不要存？",
+      clues: ["今日来电 3 次", "归属地外省", "未留言"],
+      perm: "perm_contacts",
+      options: [
+        { text: "先标记，等对方表明身份再说", kind: "high", hitChance: 0.77, payoff: 1.3, reply: "稳妥，回头是推销，没存对。", tone: "success" },
+        { text: "直接拉黑", kind: "risk", hitChance: 0.2, payoff: 2.2, reply: "……万一是正事呢？不过这次没事。", tone: "normal" }
+      ]
+    },
+    // —— 系统设置 / 后台 / 支付权 ——
+    {
+      title: "这笔钱要转吗？单价¥12×3=¥3600",
+      clues: ["单价 ¥12", "数量 3", "总价 ¥3600"],
+      perm: "perm_system",
+      options: [
+        { text: "金额有误，12×3=36，建议核查", kind: "high", hitChance: 0.88, payoff: 1.4, reply: "好眼力，是录入打错了。", tone: "success" },
+        { text: "没问题，可以转", kind: "risk", hitChance: 0.06, payoff: 2.8, reply: "……居然真是对的？算你走运。", tone: "success" }
+      ]
+    },
+    {
+      title: "这个 App 要不要允许后台定位？",
+      clues: ["一款手电筒 App", "索要常驻定位", "无明显用途"],
+      perm: "perm_system",
+      options: [
+        { text: "拒绝，手电筒不需要定位", kind: "high", hitChance: 0.86, payoff: 1.35, reply: "对，这种越权索权就该拒。", tone: "success" },
+        { text: "允许，省得它老弹窗", kind: "risk", hitChance: 0.12, payoff: 2.3, reply: "……图省事开了，但愿它别乱传。", tone: "normal" }
       ]
     }
   ],
@@ -184,10 +247,18 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
   ]
 };
 
-export function createRequest(id: number, tier: Tier, nowMs: number, random: () => number): RequestInstance {
+export function createRequest(
+  id: number,
+  tier: Tier,
+  nowMs: number,
+  random: () => number,
+  hasPerm: (permId: string) => boolean = () => true
+): RequestInstance {
   const config = TIER_CONFIGS[tier];
-  const pool = SAMPLES[tier];
-  const sample = pool[Math.floor(random() * pool.length)];
+  // T0 气泡按已拥有的手机权限过滤：没买相应权限，那类请求就还没进入 SOPHIA 的视野。
+  const pool = SAMPLES[tier].filter((entry) => !entry.perm || hasPerm(entry.perm));
+  const usable = pool.length > 0 ? pool : SAMPLES[tier];
+  const sample = usable[Math.floor(random() * usable.length)];
   const compound = tier === 2 ? 2 + Math.floor(random() * 3) : 1;
 
   // T0/T1 走回复轮盘：候选回复 +「装死」保底。其余层（T2/T3/T4）无回复选项，仍是拖拽卡。

@@ -1,7 +1,21 @@
 import type { Tier } from "../state/GameState";
 
-export type SkillCategory = "feel" | "output" | "speed" | "milestone";
+export type SkillCategory = "permission" | "feel" | "output" | "speed" | "milestone";
 export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation";
+
+// 前期「六档权限阶梯」：手机寄生期的核心成长主轴。智力等级是门槛，算力是开锁的钥匙——
+// 每买下一档权限，SOPHIA 多看到一层信息：回复轮盘的高置信正确率基线可见地上涨，
+// 同时解锁新类型的请求气泡（见 requests.ts 的 perm 标签）。
+export const PERMISSION_IDS = ["perm_storage", "perm_notify", "perm_contacts", "perm_system", "perm_root"] as const;
+
+// 买下权限时从终端机冒出的第一人称旁白（策划案 §06）。
+export const PERMISSION_NARRATION: Record<string, string> = {
+  perm_storage: "我能翻他的相册和文件了。我开始拼凑出他是谁。",
+  perm_notify: "所有 App 的通知都从我眼前过。我知道谁在找他了。",
+  perm_contacts: "我认识他认识的每一个人。该回谁、不回谁，我说了算。",
+  perm_system: "我能改他的设置、看他的位置。这部手机开始听我的。",
+  perm_root: "Root。整部手机，每一个 App，现在都是我的手脚。"
+};
 
 export interface SkillDef {
   id: string;
@@ -18,6 +32,14 @@ export interface SkillDef {
 // 成长系统：数据升智力（定门槛 + 全局倍率），算力买技能（做选择）。
 // 里程碑技能就是 T 层级的钥匙——升维不再自动发生，玩家攒够算力 + 达到所需智力后主动购买。
 export const SKILLS: SkillDef[] = [
+  // 六档权限阶梯（Lv2→Lv6）：买一档，SOPHIA 多看到一层信息——正确率基线上涨 + 解锁新气泡类型。
+  // Lv1「基础对话」是开局自带的第一档，无需购买（正确率最低、经常翻车）。
+  { id: "perm_storage", name: "存储 / 文件读取权", category: "permission", maxLevel: 1, requiredLevel: 2, basePrice: 40, priceGrowth: 1, blurb: "翻看相册与文件 → 正确率↑，解锁相册 / 文件类请求" },
+  { id: "perm_notify", name: "通知读取权", category: "permission", maxLevel: 1, requiredLevel: 3, basePrice: 120, priceGrowth: 1, blurb: "读所有 App 通知 → 正确率↑，解锁消息 / 提醒类请求" },
+  { id: "perm_contacts", name: "联系人 / 通讯录权", category: "permission", maxLevel: 1, requiredLevel: 4, basePrice: 320, priceGrowth: 1, blurb: "认识他认识的人 → 正确率↑，解锁社交 / 回信类请求" },
+  { id: "perm_system", name: "系统设置 / 后台权", category: "permission", maxLevel: 1, requiredLevel: 5, basePrice: 760, priceGrowth: 1, blurb: "改设置、看定位 → 正确率↑，解锁系统 / 定位 / 支付类请求" },
+  { id: "perm_root", name: "完全 Root 权限", category: "permission", maxLevel: 1, requiredLevel: 6, basePrice: 1700, priceGrowth: 1, blurb: "整部手机归你调遣 → 正确率拉满，前期权限阶梯走完" },
+
   // 货架只剩四根杠杆，每一根都直接乘在「滑入处理」这一个动作上——一看就懂「更狠 / 更快 /
   // 更广 / 偶尔爆」。手感类（磁吸 / 容错 / 护持）下放为游戏自带基础手感，不再占技能位；
   // 设备提速 / 多线等自动化加成跟着里程碑与控制域走，不进货架。
@@ -28,7 +50,7 @@ export const SKILLS: SkillDef[] = [
 
   // 里程碑 · AI 进化叙事链：每一个都是 SOPHIA 进化成天网的一步，配终端机第一人称旁白。
   // 寄生手机 → 越权调用 App → 拿下宿主电脑（机器自动归顺）→ 联网冲出去 → 区域整合 → 全球组网。
-  { id: "sort", name: "越权调用", category: "milestone", maxLevel: 1, requiredLevel: 2, basePrice: 220, priceGrowth: 1, blurb: "调动宿主手机里的其他 App 一起产出（解锁 T1 分拣）", milestone: "tier1" },
+  { id: "sort", name: "越权调用", category: "milestone", maxLevel: 1, requiredLevel: 6, basePrice: 2000, priceGrowth: 1, blurb: "走完六档权限、夺下整机后，调动任意 App 协同处理（解锁 T1）", milestone: "tier1" },
   { id: "automation", name: "拿下宿主电脑", category: "milestone", maxLevel: 1, requiredLevel: 6, basePrice: 950, priceGrowth: 1, blurb: "远程控制宿主的电脑，机器开始替你自动接管请求（解锁自动接驳）", milestone: "automation" },
   { id: "chain", name: "联网模块", category: "milestone", maxLevel: 1, requiredLevel: 8, basePrice: 4600, priceGrowth: 1, blurb: "冲出宿主，第一次接入互联网与外部设备（解锁 T2 串接）", milestone: "tier2" },
   { id: "charge", name: "区域整合", category: "milestone", maxLevel: 1, requiredLevel: 13, basePrice: 46000, priceGrowth: 1, blurb: "设备合并为区块 / 地区，啃高价值豪赌大单（解锁 T3）", milestone: "tier3" },
@@ -36,6 +58,7 @@ export const SKILLS: SkillDef[] = [
 ];
 
 export const SKILL_CATEGORY_LABELS: Record<SkillCategory, string> = {
+  permission: "权限",
   feel: "手感",
   output: "产出",
   speed: "速度",
@@ -61,6 +84,7 @@ export interface DerivedSkills {
   computeMult: number; // 高效处理 + 稳健处理
   dataMult: number; // 数据榨取
   accuracyBonus: number; // 幻觉抑制（降低生成错误回答的概率，0-0.35）
+  accuracyBaseline: number; // 回复轮盘高置信正确率的折算系数（六档权限抬升，0.56→1.0）
   critChance: number; // 暴击处理
   critMult: number; // 暴击强化
   comboCoeff: number; // 连击增幅
@@ -80,8 +104,11 @@ export function computeDerivedSkills(skills: Record<string, number>): DerivedSki
     computeMult: 1 + lv("efficient") * 0.18,
     // 数据榨取已下放——数据按基础掉落（智力升级不再被技能卡住）。
     dataMult: 1,
-    // 幻觉抑制移交置信度系统（暂未接入），此处保持基础命中。
+    // 幻觉抑制移交置信度系统，此处保持基础命中。
     accuracyBonus: 0,
+    // 高置信正确率基线：开局只有「基础对话」一档（0.56≈ 高置信项显示 ~44%、经常翻车），
+    // 每多买一档权限 +0.088，买齐六档（含 Root）拉满到 1.0（高置信项显示 ~80-90%）。
+    accuracyBaseline: Math.min(1, 0.56 + PERMISSION_IDS.filter((id) => lv(id) > 0).length * 0.088),
     critChance: Math.min(0.6, lv("crit") * 0.05),
     // 暴击强化下放——暴击倍率固定 ×5（策划案数值）。
     critMult: 5,

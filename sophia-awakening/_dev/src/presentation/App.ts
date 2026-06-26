@@ -51,21 +51,17 @@ interface RouletteOutcome {
 }
 
 interface ReelHooks {
-  level: () => number; // 当前智力等级——把高置信项命中概率折算成显示值
+  // 当前高置信正确率折算系数（由六档权限阶梯抬升，derived.accuracyBaseline）。
+  confidence: () => number;
   onResolved: (card: RequestPacketView, outcome: RouletteOutcome) => void;
 }
 
-// 高置信选项命中概率随智力等级抬升（养成）：Lv1 ≈0.56 倍 → Lv6+ 满值。
-function confidenceFactor(level: number): number {
-  return Math.min(1, 0.56 + (level - 1) * 0.088);
-}
-
-function effectiveHitChance(opt: AnswerOption, level: number): number {
+function effectiveHitChance(opt: AnswerOption, confidence: number): number {
   if (opt.kind === "dead") {
     return 0;
   }
   if (opt.kind === "high") {
-    return Math.min(0.97, opt.hitChance * confidenceFactor(level));
+    return Math.min(0.97, opt.hitChance * confidence);
   }
   return opt.hitChance; // risk 固定
 }
@@ -83,7 +79,7 @@ const THINK = 0x74d8e6; // 前期「推理卡」的思考色——SOPHIA 正在�
 const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-const PERSISTENCE_REVISION = "reply-roulette-v14";
+const PERSISTENCE_REVISION = "permission-ladder-v15";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
 // re-persist the in-memory (un-reset) state and quietly undo the wipe.
 let suppressSaveOnUnload = false;
@@ -296,7 +292,7 @@ class SophiaGameApp {
       const reel: ReelHooks | undefined =
         request.answers && request.answers.length > 0
           ? {
-              level: () => this.core.getState().intelligence.level,
+              confidence: () => this.core.getState().derived.accuracyBaseline,
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
           : undefined;
@@ -1027,7 +1023,7 @@ class RequestPacketView {
 
     if (this.isReel) {
       this.container.cursor = "pointer";
-      const level = reel ? reel.level() : 1;
+      const confidence = reel ? reel.confidence() : 0.56;
       let y = clueTop + (request.clues?.length ?? 0) * 15 + 10;
       this.options.forEach((opt) => {
         const label = new Text({
@@ -1043,7 +1039,7 @@ class RequestPacketView {
         });
         label.position.set(28, y + 5);
         const prob = new Text({
-          text: opt.kind === "dead" ? "0%" : `${Math.round(effectiveHitChance(opt, level) * 100)}%`,
+          text: opt.kind === "dead" ? "0%" : `${Math.round(effectiveHitChance(opt, confidence) * 100)}%`,
           style: { fill: 0xbfe6ee, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
         });
         prob.anchor.set(1, 0);
@@ -1109,7 +1105,7 @@ class RequestPacketView {
       this.phase = "idle";
       return;
     }
-    const chance = effectiveHitChance(opt, this.reel ? this.reel.level() : 1);
+    const chance = effectiveHitChance(opt, this.reel ? this.reel.confidence() : 0.56);
     const hit = Math.random() < chance;
     this.outcome = hit
       ? { dead: false, hit: true, quality: opt.payoff, reply: opt.reply, tone: opt.tone, exposureBonus: 0 }
@@ -2836,14 +2832,19 @@ class SkillShopView {
 
   private build(): void {
     this.root.replaceChildren();
-    const categories: SkillCategory[] = ["milestone", "output", "feel", "speed"];
+    const categories: SkillCategory[] = ["permission", "milestone", "output", "speed"];
 
     for (const category of categories) {
       const group = document.createElement("div");
       group.className = `shop-group shop-${category}`;
       const header = document.createElement("div");
       header.className = "shop-group-head";
-      header.textContent = category === "milestone" ? "里程碑 · 作用域钥匙" : `${SKILL_CATEGORY_LABELS[category]}技能`;
+      header.textContent =
+        category === "milestone"
+          ? "里程碑 · 作用域钥匙"
+          : category === "permission"
+            ? "权限 · 手机内夺权（正确率↑）"
+            : `${SKILL_CATEGORY_LABELS[category]}技能`;
       group.appendChild(header);
 
       for (const def of SKILLS.filter((skill) => skill.category === category)) {

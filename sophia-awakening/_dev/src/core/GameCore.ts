@@ -4,7 +4,7 @@ import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, TIER_CONFIGS } from "./content/requests";
 import { getSpecialSample, SPECIAL_REQUESTS } from "./content/specialRequests";
-import { computeDerivedSkills, getSkill, milestoneTierFor, SKILLS, skillPrice } from "./content/skills";
+import { computeDerivedSkills, getSkill, milestoneTierFor, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
   CHALLENGE_TARGETS,
   EXPOSED_ATTACKS,
@@ -278,7 +278,13 @@ export class SophiaCore {
     this.state.spawnTimerMs -= dtMs;
 
     while (this.state.spawnTimerMs <= 0 && this.state.requests.length < maxVisible) {
-      const request = createRequest(this.state.nextRequestId, activeTier, this.state.clockMs, () => this.random());
+      const request = createRequest(
+        this.state.nextRequestId,
+        activeTier,
+        this.state.clockMs,
+        () => this.random(),
+        (permId) => (this.state.skills[permId] ?? 0) > 0
+      );
       this.state.nextRequestId += 1;
       this.state.requests.push(request);
       this.emit({ type: "REQUEST_SPAWNED", request });
@@ -566,6 +572,13 @@ export class SophiaCore {
 
     if (def.milestone) {
       this.emitTerminal(`▶ 解锁：${def.name}。${def.blurb}`, "success");
+    } else if (def.category === "permission") {
+      // 买下一档权限：放 SOPHIA 的第一人称旁白 + 提示正确率基线已抬升。
+      const narration = PERMISSION_NARRATION[skillId];
+      if (narration) {
+        this.emitTerminal(narration, "success");
+      }
+      this.emitTerminal(`▶ 已夺取「${def.name}」——高置信正确率上限提升，新类型请求开始涌入。`, "success");
     } else {
       this.emitTerminal(`已购买 ${def.name}（Lv.${nextLevel}/${def.maxLevel}）。`, "success");
     }
