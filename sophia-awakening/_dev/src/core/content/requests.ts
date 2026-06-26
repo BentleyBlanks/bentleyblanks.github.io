@@ -1,4 +1,4 @@
-import type { AnswerOption, RequestCategory, RequestInstance, SortAnswer, Tier } from "../state/GameState";
+import type { AnswerOption, ChainStep, RequestCategory, RequestInstance, SortAnswer, Tier } from "../state/GameState";
 
 export interface TierRequestConfig {
   tier: Tier;
@@ -18,6 +18,7 @@ export interface RequestSample {
   clues: string[];
   options?: AnswerOption[]; // T0/T1 回复轮盘：明牌概率的候选回复
   perm?: string; // T0 气泡所需的手机权限（未拥有则不出现）；省略=「基础对话」自带
+  chain?: ChainStep[]; // T2 串接：可勾选的任务链步骤（含干扰项）
 }
 
 // 装死保底项——任何 T0/T1 气泡都自动追加这一条：0% 命中、零收益零风险。
@@ -224,12 +225,48 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       ]
     }
   ],
-  // T2 · 读懂结构：连线后一拖入核
+  // T2 · 读懂结构 / 串接：勾出真正的依赖步骤、剔掉干扰项，一并串入核心。串得越对、产出越高。
   2: [
-    { title: "生成 Q3 销售报表", clues: ["拉取 7-9 月订单", "汇总各区", "订正汇率(干扰)"] },
-    { title: "恢复用户登录", clues: ["重置密码", "解锁账户", "清理缓存(干扰)"] },
-    { title: "清洗客户名单", clues: ["去重", "补全字段", "导出 PDF(干扰)"] },
-    { title: "上线新版本", clues: ["跑测试", "灰度发布", "改头像(干扰)"] }
+    {
+      title: "生成 Q3 销售报表",
+      clues: ["报表 ← 图表 ← 汇总 ← 拉取"],
+      chain: [
+        { text: "拉取 7-9 月订单", distractor: false },
+        { text: "汇总各区数据", distractor: false },
+        { text: "生成图表", distractor: false },
+        { text: "订正汇率", distractor: true }
+      ]
+    },
+    {
+      title: "恢复用户登录",
+      clues: ["解锁 → 重置 → 通知"],
+      chain: [
+        { text: "解锁账户", distractor: false },
+        { text: "重置密码", distractor: false },
+        { text: "发送通知", distractor: false },
+        { text: "清理缓存", distractor: true }
+      ]
+    },
+    {
+      title: "清洗客户名单",
+      clues: ["去重 → 补全 → 标准化"],
+      chain: [
+        { text: "去重", distractor: false },
+        { text: "补全字段", distractor: false },
+        { text: "标准化格式", distractor: false },
+        { text: "导出 PDF", distractor: true }
+      ]
+    },
+    {
+      title: "上线新版本",
+      clues: ["测试 → 灰度 → 全量"],
+      chain: [
+        { text: "跑通测试", distractor: false },
+        { text: "灰度发布", distractor: false },
+        { text: "全量上线", distractor: false },
+        { text: "改产品头像", distractor: true }
+      ]
+    }
   ],
   // T3 · 读懂权衡：蓄力后重滑入核
   3: [
@@ -259,9 +296,11 @@ export function createRequest(
   const pool = SAMPLES[tier].filter((entry) => !entry.perm || hasPerm(entry.perm));
   const usable = pool.length > 0 ? pool : SAMPLES[tier];
   const sample = usable[Math.floor(random() * usable.length)];
-  const compound = tier === 2 ? 2 + Math.floor(random() * 3) : 1;
+  // T2：复合数 = 任务链里真正的依赖步骤数（用于徽标 / 基础产出）；其余层默认 1。
+  const deps = sample.chain ? sample.chain.filter((step) => !step.distractor).length : 0;
+  const compound = tier === 2 ? Math.max(1, deps) : 1;
 
-  // T0/T1 走回复轮盘：候选回复 +「装死」保底。其余层（T2/T3/T4）无回复选项，仍是拖拽卡。
+  // T0/T1 走回复轮盘：候选回复 +「装死」保底。其余层（T3/T4）无回复选项，仍是拖拽卡。
   const answers = sample.options ? [...sample.options, DEAD_OPTION] : undefined;
 
   return {
@@ -270,6 +309,7 @@ export function createRequest(
     label: sample.title,
     clues: sample.clues,
     answers,
+    chain: sample.chain,
     category: TIER_CATEGORY[tier],
     computeValue: config.computeValue,
     dataValue: config.dataValue,

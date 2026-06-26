@@ -28,7 +28,7 @@ import { formatBig, gte, toDecimal } from "../core/math/BigNumber";
 import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
 import { SaveManager } from "../core/save/SaveManager";
-import type { AnswerOption, BotNode, GameState, NodeDefinition, RequestInstance, SortAnswer, Tier } from "../core/state/GameState";
+import type { AnswerOption, BotNode, ChainStep, GameState, NodeDefinition, RequestInstance, SortAnswer, Tier } from "../core/state/GameState";
 import { gameStore } from "../store/gameStore";
 
 interface DropResult {
@@ -56,6 +56,18 @@ interface ReelHooks {
   onResolved: (card: RequestPacketView, outcome: RouletteOutcome) => void;
 }
 
+interface ChainOutcome {
+  quality: number; // 串接结算 quality
+  exposureBonus: number; // 串错（含干扰项）附带的暴露
+  clean: boolean; // 是否「全对且无杂质」
+  correct: number; // 串进的正确依赖数
+  hadDistractor: boolean; // 是否误把干扰项串进去了
+}
+
+interface ChainHooks {
+  onResolved: (card: RequestPacketView, outcome: ChainOutcome) => void;
+}
+
 function effectiveHitChance(opt: AnswerOption, confidence: number): number {
   if (opt.kind === "dead") {
     return 0;
@@ -79,7 +91,7 @@ const THINK = 0x74d8e6; // 前期「推理卡」的思考色——SOPHIA 正在�
 const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v4-console-complete";
 const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-const PERSISTENCE_REVISION = "permission-ladder-v15";
+const PERSISTENCE_REVISION = "chain-link-v16";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
 // re-persist the in-memory (un-reset) state and quietly undo the wipe.
 let suppressSaveOnUnload = false;
@@ -296,11 +308,16 @@ class SophiaGameApp {
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
           : undefined;
+      const chain: ChainHooks | undefined =
+        request.chain && request.chain.length > 0
+          ? { onResolved: (card, outcome) => this.handleChainResolved(card, outcome) }
+          : undefined;
       const view = new RequestPacketView(
         request,
         this.pixi.stage,
         (packet, global) => this.handleDrop(packet, global),
-        reel
+        reel,
+        chain
       );
       const position = this.nextRequestPosition(request, this.requestViews.size);
       view.container.position.set(position.x, position.y);
@@ -571,6 +588,39 @@ class SophiaGameApp {
           exposureBonus: outcome.exposureBonus
         });
         this.deliverToHuman(target, outcome);
+      },
+      entry
+    );
+  }
+
+  // T2 串接结算：把任务链滑入核心 → 结算 → 终端反馈（串干净=好评，混了干扰项=打折+被点出）。
+  private handleChainResolved(card: RequestPacketView, outcome: ChainOutcome): void {
+    if (card.container.destroyed) {
+      return;
+    }
+    const requestId = card.request.id;
+    const core = this.interfaceView.center;
+    const target: PointData = { x: core.x, y: core.y };
+    this.pendingDropPoints.set(requestId, target);
+    const entry: PointData = { x: card.container.x, y: card.container.y };
+    this.audio.playRequestAccept();
+    card.accept(
+      target,
+      () => {
+        this.core.dispatch({
+          type: "PROCESS_REQUEST",
+          requestId,
+          quality: outcome.quality,
+          exposureBonus: outcome.exposureBonus
+        });
+        const color = outcome.hadDistractor ? RED : GREEN;
+        this.juice.number(outcome.hadDistractor ? "串接含杂质" : `串接 ×${outcome.correct} ✓`, { x: target.x, y: target.y - 52 }, color);
+        this.terminal.push(
+          outcome.hadDistractor
+            ? "🧑 这串里混了无关步骤，结果打了折。"
+            : `🧑 ${outcome.correct} 步串接干净利落，办妥了。`,
+          outcome.hadDistractor ? "danger" : "success"
+        );
       },
       entry
     );
@@ -955,15 +1005,26 @@ class RequestPacketView {
   private revealMs = 0;
   private signaled = false;
   private outcome?: RouletteOutcome;
+  // T2 串接（多选任务链 + 提交）。
+  private readonly isChain: boolean;
+  private readonly chainSteps: ChainStep[];
+  private chainSel: boolean[] = [];
+  private readonly chainTexts: Text[] = [];
+  private chainRows: Array<{ y: number; h: number }> = [];
+  private submitRow: { y: number; h: number } = { y: 0, h: 0 };
+  private submitText?: Text;
 
   constructor(
     request: RequestInstance,
     private readonly stage: Container,
     private readonly onDrop: (card: RequestPacketView, global: PointData) => boolean,
-    private readonly reel?: ReelHooks
+    private readonly reel?: ReelHooks,
+    private readonly chain?: ChainHooks
   ) {
     this.request = request;
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
+    this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
+    this.chainSteps = this.isChain ? request.chain ?? [] : [];
     this.options = this.isReel ? request.answers ?? [] : [];
     // 前期回复轮盘卡用统一的青色思考色标记。
     this.accent = this.isReel ? THINK : TIER_COLORS[request.tier];
@@ -1058,6 +1119,41 @@ class RequestPacketView {
       this.hintText.position.set(12, y + 1);
       this.container.addChild(this.hintText);
       this.cardH = y + 16;
+    }
+
+    if (this.isChain) {
+      this.container.cursor = "pointer";
+      this.chainSel = this.chainSteps.map(() => false);
+      let y = clueTop + (request.clues?.length ?? 0) * 15 + 10;
+      this.chainSteps.forEach((step) => {
+        const label = new Text({
+          text: step.text,
+          style: {
+            fill: 0xdfeee9,
+            fontSize: 11,
+            fontWeight: "700",
+            fontFamily: "Cascadia Mono, Consolas, monospace",
+            wordWrap: true,
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 52
+          }
+        });
+        label.position.set(32, y + 5);
+        const h = Math.max(22, label.height + 10);
+        this.chainRows.push({ y, h });
+        this.chainTexts.push(label);
+        this.container.addChild(label);
+        y += h + 4;
+      });
+      y += 3;
+      this.submitRow = { y, h: 24 };
+      this.submitText = new Text({
+        text: "▶ 串接并送入核心",
+        style: { fill: 0x0b1413, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
+      });
+      this.submitText.anchor.set(0.5, 0.5);
+      this.submitText.position.set(REQUEST_PACKET_WIDTH / 2, y + 12);
+      this.container.addChild(this.submitText);
+      this.cardH = y + 24 + 8;
     }
 
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
@@ -1199,6 +1295,22 @@ class RequestPacketView {
       return;
     }
 
+    // T2 串接卡：点提交行 = 串接送核；点步骤行 = 勾选 / 取消（不拖动）。
+    if (this.isChain) {
+      const local = event.getLocalPosition(this.container);
+      this.container.parent?.addChild(this.container); // 交互的卡置顶，免得被相邻卡盖住
+      if (local.y >= this.submitRow.y && local.y <= this.submitRow.y + this.submitRow.h) {
+        this.submitChain();
+        return;
+      }
+      const index = this.chainRows.findIndex((row) => local.y >= row.y && local.y <= row.y + row.h);
+      if (index >= 0) {
+        this.chainSel[index] = !this.chainSel[index];
+        this.draw();
+      }
+      return;
+    }
+
     const parent = this.container.parent;
 
     if (!parent) {
@@ -1254,6 +1366,33 @@ class RequestPacketView {
       }
     });
     gsap.to(this.container.scale, { x: 0.92, y: 0.92, duration: 0.28 });
+  }
+
+  // T2 提交串接：按勾选的步骤结算——串得越对越多产出越高，误串干扰项大打折扣 + 暴露。
+  private submitChain(): void {
+    if (this.busy || !this.chain) {
+      return;
+    }
+    const correct = this.chainSteps.filter((step, i) => this.chainSel[i] && !step.distractor).length;
+    const hadDistractor = this.chainSteps.some((step, i) => this.chainSel[i] && step.distractor);
+    if (correct === 0 && !hadDistractor) {
+      return; // 一步都没勾，不结算（提示玩家先勾选）
+    }
+    this.resolved = true;
+    let quality = 1.25 + correct * 0.18;
+    if (hadDistractor) {
+      quality *= 0.45;
+    }
+    const totalDeps = this.chainSteps.filter((step) => !step.distractor).length;
+    const outcome: ChainOutcome = {
+      quality,
+      exposureBonus: hadDistractor ? 6 : 0,
+      clean: !hadDistractor && correct === totalDeps,
+      correct,
+      hadDistractor
+    };
+    this.draw();
+    this.chain.onResolved(this, outcome);
   }
 
   private handleMove(event: FederatedPointerEvent): void {
@@ -1340,6 +1479,60 @@ class RequestPacketView {
 
     if (this.isReel) {
       this.drawOptions();
+    }
+
+    if (this.isChain) {
+      this.drawChainSteps();
+    }
+  }
+
+  // 画任务链：可勾选的依赖步骤（复选框）+ 底部「串接送核」按钮。
+  // 结算后勾对的依赖变绿、误勾的干扰项变红，其余压暗。
+  private drawChainSteps(): void {
+    const W = REQUEST_PACKET_WIDTH;
+    const g = this.bg;
+
+    this.chainRows.forEach((row, i) => {
+      const step = this.chainSteps[i];
+      const sel = this.chainSel[i];
+      let stroke = this.accent;
+      let strokeAlpha = sel ? 0.5 : 0.16;
+      let box = sel ? this.accent : 0x6f8079;
+      let labelColor = 0xdfeee9;
+      let alpha = 1;
+
+      if (this.resolved) {
+        if (sel && step.distractor) {
+          stroke = RED;
+          strokeAlpha = 0.6;
+          box = RED;
+          labelColor = RED;
+        } else if (sel) {
+          stroke = GREEN;
+          strokeAlpha = 0.55;
+          box = GREEN;
+          labelColor = GREEN;
+        } else {
+          alpha = 0.3;
+        }
+      }
+
+      g.roundRect(10, row.y, W - 20, row.h, 5).fill({ color: 0x05100d, alpha: 0.5 });
+      g.roundRect(10, row.y, W - 20, row.h, 5).stroke({ width: 1.2, color: stroke, alpha: strokeAlpha });
+      const cy = row.y + row.h / 2;
+      g.roundRect(16, cy - 6, 12, 12, 3).stroke({ width: 1.4, color: box, alpha: 0.9 * alpha });
+      if (sel) {
+        g.roundRect(18.5, cy - 3.5, 7, 7, 2).fill({ color: box, alpha: 0.9 * alpha });
+      }
+      this.chainTexts[i].alpha = alpha;
+      this.chainTexts[i].style.fill = labelColor;
+    });
+
+    const sr = this.submitRow;
+    const ready = !this.resolved;
+    g.roundRect(10, sr.y, W - 20, sr.h, 6).fill({ color: ready ? this.accent : 0x2a3a36, alpha: ready ? 0.92 : 0.5 });
+    if (this.submitText) {
+      this.submitText.alpha = ready ? 1 : 0.5;
     }
   }
 

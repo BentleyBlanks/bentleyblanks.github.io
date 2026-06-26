@@ -40,13 +40,20 @@ export interface AnswerOption {
   exposureOnMiss?: number; // 失手附带的暴露（T1 陷阱项）
 }
 
+// T2 串接：一条任务链上的一步。distractor=干扰项，不该被串进去。
+export interface ChainStep {
+  text: string;
+  distractor: boolean;
+}
+
 export interface RequestInstance {
   id: string;
   tier: Tier;
   label: string; // 标题：这条请求在问什么 / 要什么
   clues: string[]; // 几条线索，可能不全或带干扰——玩家要读懂
   answer?: SortAnswer; // T1 的正确判断（其余层不用）
-  answers?: AnswerOption[]; // T0/T1：老虎机转轮上的候选回答
+  answers?: AnswerOption[]; // T0/T1：回复轮盘的候选回复
+  chain?: ChainStep[]; // T2：可勾选的任务链步骤（含干扰项）
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
