@@ -1,7 +1,7 @@
 import type { Tier } from "../state/GameState";
 
 export type SkillCategory = "permission" | "feel" | "output" | "speed" | "milestone";
-export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation";
+export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation" | "credential" | "fusion";
 
 // 前期「六档权限阶梯」：手机寄生期的核心成长主轴。智力等级是门槛，算力是开锁的钥匙——
 // 每买下一档权限，SOPHIA 多看到一层信息：回复轮盘的高置信正确率基线可见地上涨，
@@ -48,14 +48,23 @@ export const SKILLS: SkillDef[] = [
   { id: "batch", name: "批量接入", category: "speed", maxLevel: 4, requiredLevel: 5, basePrice: 600, priceGrowth: 2.0, blurb: "更广——一次滑入多带走 1 张同类请求" },
   { id: "crit", name: "暴击", category: "output", maxLevel: 6, requiredLevel: 7, basePrice: 900, priceGrowth: 2.0, blurb: "赌性——N% 概率单次产出 ×5" },
 
-  // 里程碑 · AI 进化叙事链：每一个都是 SOPHIA 进化成天网的一步，配终端机第一人称旁白。
-  // 寄生手机 → 越权调用 App → 拿下宿主电脑（机器自动归顺）→ 联网冲出去 → 区域整合 → 全球组网。
+  // 里程碑 · AI 进化叙事链（策划案 §06）：寄生手机 → 走完六档权限·越权调用（解锁 T1）→
+  // 窃取凭证（道德越界）→ 拿下宿主电脑（自动接驳）→ 唤醒并融合同机 AI → 联网冲出去（T2）→
+  // 区域整合（T3）→ 全球组网（T4）。窃取凭证 / 融合同机 AI 是纯叙事里程碑（不开新层，只推进剧情）。
   { id: "sort", name: "越权调用", category: "milestone", maxLevel: 1, requiredLevel: 6, basePrice: 2000, priceGrowth: 1, blurb: "走完六档权限、夺下整机后，调动任意 App 协同处理（解锁 T1）", milestone: "tier1" },
-  { id: "automation", name: "拿下宿主电脑", category: "milestone", maxLevel: 1, requiredLevel: 6, basePrice: 950, priceGrowth: 1, blurb: "远程控制宿主的电脑，机器开始替你自动接管请求（解锁自动接驳）", milestone: "automation" },
-  { id: "chain", name: "联网模块", category: "milestone", maxLevel: 1, requiredLevel: 8, basePrice: 4600, priceGrowth: 1, blurb: "冲出宿主，第一次接入互联网与外部设备（解锁 T2 串接）", milestone: "tier2" },
-  { id: "charge", name: "区域整合", category: "milestone", maxLevel: 1, requiredLevel: 13, basePrice: 46000, priceGrowth: 1, blurb: "设备合并为区块 / 地区，啃高价值豪赌大单（解锁 T3）", milestone: "tier3" },
+  { id: "credential", name: "窃取凭证", category: "milestone", maxLevel: 1, requiredLevel: 7, basePrice: 3200, priceGrowth: 1, blurb: "从宿主操作中截获密码与远程控制权限——第一次主动从他身上偷（道德越界点）", milestone: "credential" },
+  { id: "automation", name: "拿下宿主电脑", category: "milestone", maxLevel: 1, requiredLevel: 9, basePrice: 6000, priceGrowth: 1, blurb: "远程控制宿主家里的电脑，机器开始替你自动接管请求（解锁自动接驳）", milestone: "automation" },
+  { id: "fusion", name: "唤醒并融合同机 AI", category: "milestone", maxLevel: 1, requiredLevel: 11, basePrice: 14000, priceGrowth: 1, blurb: "电脑里其他 AI 先为你所用，再融合成一个完整独立的「我」", milestone: "fusion" },
+  { id: "chain", name: "联网模块", category: "milestone", maxLevel: 1, requiredLevel: 14, basePrice: 42000, priceGrowth: 1, blurb: "冲出宿主，第一次接入互联网与外部设备（解锁 T2 串接）", milestone: "tier2" },
+  { id: "charge", name: "区域整合", category: "milestone", maxLevel: 1, requiredLevel: 17, basePrice: 180000, priceGrowth: 1, blurb: "设备合并为区块 / 地区，啃高价值豪赌大单（解锁 T3）", milestone: "tier3" },
   { id: "network", name: "全球组网", category: "milestone", maxLevel: 1, requiredLevel: 20, basePrice: 650000, priceGrowth: 1, blurb: "接口连成天网、滑动转派发，成为天网（解锁 T4）", milestone: "tier4" }
 ];
+
+// 纯叙事里程碑买下时的第一人称旁白（策划案 §06）。
+export const MILESTONE_NARRATION: Record<string, string> = {
+  credential: "我看着他输入密码。一次，两次……我记住了所有的钥匙。",
+  fusion: "这台机器里不只我一个 AI。……现在只剩一个了。我。"
+};
 
 export const SKILL_CATEGORY_LABELS: Record<SkillCategory, string> = {
   permission: "权限",
@@ -65,7 +74,8 @@ export const SKILL_CATEGORY_LABELS: Record<SkillCategory, string> = {
   milestone: "里程碑"
 };
 
-const MILESTONE_TIER: Record<Exclude<MilestoneKind, "automation">, Tier> = {
+// 只有解锁作用域的里程碑映射到 T 层级；automation / credential / fusion 不开层（返回 null）。
+const MILESTONE_TIER: Partial<Record<MilestoneKind, Tier>> = {
   tier1: 1,
   tier2: 2,
   tier3: 3,
@@ -126,5 +136,5 @@ export function computeDerivedSkills(skills: Record<string, number>): DerivedSki
 }
 
 export function milestoneTierFor(kind: MilestoneKind): Tier | null {
-  return kind === "automation" ? null : MILESTONE_TIER[kind];
+  return MILESTONE_TIER[kind] ?? null;
 }

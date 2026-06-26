@@ -4,7 +4,7 @@ import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, TIER_CONFIGS } from "./content/requests";
 import { getSpecialSample, SPECIAL_REQUESTS } from "./content/specialRequests";
-import { computeDerivedSkills, getSkill, milestoneTierFor, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
+import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
   CHALLENGE_TARGETS,
   EXPOSED_ATTACKS,
@@ -228,13 +228,9 @@ export class SophiaCore {
 
       if (tier !== null) {
         this.state.intelligence.unlockedTier = Math.max(this.state.intelligence.unlockedTier, tier) as Tier;
-      } else {
+      } else if (milestone.milestone === "automation") {
         this.state.automationUnlocked = true;
       }
-    }
-
-    if (this.state.intelligence.level >= 6) {
-      this.state.automationUnlocked = true;
     }
 
     // 本阶段启动金：随阶段水涨船高，够买几台节点 / 几级技能即可。
@@ -603,9 +599,10 @@ export class SophiaCore {
           this.state.intelligence.unlockedTier = tier;
           scopeUpgradedTo = tier;
         }
-      } else {
+      } else if (def.milestone === "automation") {
         this.state.automationUnlocked = true;
       }
+      // credential / fusion 是纯叙事里程碑——不开新层、不开自动化，只推进剧情。
     }
 
     this.recomputeDerivedState();
@@ -617,6 +614,10 @@ export class SophiaCore {
     }
 
     if (def.milestone) {
+      const narration = MILESTONE_NARRATION[skillId];
+      if (narration) {
+        this.emitTerminal(narration, "success");
+      }
       this.emitTerminal(`▶ 解锁：${def.name}。${def.blurb}`, "success");
     } else if (def.category === "permission") {
       // 买下一档权限：放 SOPHIA 的第一人称旁白 + 提示正确率基线已抬升。
