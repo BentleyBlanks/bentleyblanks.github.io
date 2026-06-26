@@ -1,5 +1,5 @@
 import type { MilestoneKind } from "../content/skills";
-import type { BotNode, ChallengeOffer, PhaseId, RequestInstance, Tier } from "../state/GameState";
+import type { BotNode, ChallengeOffer, PhaseId, RequestInstance, SpecialRequestKind, SpecialRequestOffer, Tier } from "../state/GameState";
 
 export type GameEvent =
   | { type: "REQUEST_SPAWNED"; request: RequestInstance }
@@ -30,6 +30,8 @@ export type GameEvent =
   | { type: "HUMAN_VOICE"; text: string; tone: "normal" | "warning" | "success"; kind: "batch" | "emoji" | "news" }
   | { type: "CHALLENGE_OFFERED"; challenge: ChallengeOffer }
   | { type: "CHALLENGE_RESOLVED"; success: boolean; title: string; rewardLabel: string; rewardKind: "compute" | "device" }
+  | { type: "SPECIAL_OFFERED"; offer: SpecialRequestOffer }
+  | { type: "SPECIAL_RESOLVED"; success: boolean; accepted: boolean; kind: SpecialRequestKind; title: string }
   | { type: "PHASE_CHANGED"; phase: PhaseId }
   | { type: "REBIRTH"; rebirths: number }
   | { type: "ENDING_TRIGGERED" };

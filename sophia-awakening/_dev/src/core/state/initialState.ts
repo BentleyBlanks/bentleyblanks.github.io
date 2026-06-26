@@ -48,6 +48,7 @@ export function createInitialState(now = Date.now()): GameState {
       allocation: 0
     },
     challenge: null,
+    specialRequest: null,
     combo: {
       count: 0,
       best: 0

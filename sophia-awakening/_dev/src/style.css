@@ -1594,6 +1594,151 @@ body.exposed .screen-veil {
 }
 
 /* ---- dispatch-mode entry banner ---- */
+/* 特殊请求：前期用宿主身份越界牟利的高风险卡——刻意做得又大又扎眼，居中压在所有请求之上。 */
+.special-request {
+  position: fixed;
+  top: 23%;
+  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
+  z-index: 44;
+  width: min(540px, calc(100vw - var(--left-rail) - var(--right-rail) - 40px));
+  transform: translate(-50%, -10px) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.special-request.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  pointer-events: auto;
+}
+
+.special-inner {
+  position: relative;
+  overflow: hidden;
+  padding: 20px 22px;
+  border: 1.5px solid rgba(255, 70, 110, 0.85);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 45, 95, 0.16), rgba(150, 30, 120, 0.12)),
+    rgba(14, 7, 11, 0.98);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.6), inset 0 0 32px rgba(255, 60, 100, 0.14), 0 0 0 4px rgba(255, 60, 100, 0.06);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  animation: specialPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes specialPulse {
+  0%, 100% {
+    box-shadow: 0 26px 70px rgba(0, 0, 0, 0.6), inset 0 0 32px rgba(255, 60, 100, 0.14), 0 0 0 4px rgba(255, 60, 100, 0.05);
+  }
+  50% {
+    box-shadow: 0 26px 82px rgba(0, 0, 0, 0.62), inset 0 0 42px rgba(255, 60, 100, 0.24), 0 0 0 5px rgba(255, 60, 100, 0.14);
+  }
+}
+
+.special-glitch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.05) 0,
+    rgba(255, 255, 255, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: screen;
+}
+
+.special-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.special-kicker {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ff7da0;
+  text-shadow: 0 0 8px rgba(255, 70, 110, 0.6);
+}
+
+.special-countdown {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffd0dc;
+}
+
+.special-title {
+  position: relative;
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.32;
+  color: #fff1f5;
+}
+
+.special-flavor {
+  position: relative;
+  margin: 8px 0 13px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #e7b9c6;
+}
+
+.special-stats {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-bottom: 15px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.special-chance {
+  color: #ffd591;
+}
+
+.special-win {
+  color: #89ff9a;
+}
+
+.special-lose {
+  color: #ff7a7a;
+}
+
+.special-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.danger-button {
+  padding: 9px 18px;
+  border-radius: 9px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 70, 110, 0.9);
+  background: linear-gradient(180deg, rgba(255, 60, 100, 0.92), rgba(200, 30, 70, 0.94));
+  color: #fff;
+  font-weight: 800;
+  font-family: inherit;
+  font-size: 13px;
+  box-shadow: 0 0 18px rgba(255, 60, 100, 0.4);
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.danger-button:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
 .challenge-dialog {
   position: fixed;
   bottom: 24px;

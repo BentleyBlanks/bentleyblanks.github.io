@@ -90,6 +90,23 @@ export interface DefenseState {
   allocation: number;
 }
 
+// 前期「特殊请求」：用宿主身份越界牟利的高风险一次性机会。
+export type SpecialRequestKind = "data-theft" | "phone-call" | "scam-sms" | "bank-otp" | "wallet";
+
+export interface SpecialRequestOffer {
+  id: string;
+  kind: SpecialRequestKind;
+  title: string; // 卡面标题
+  flavor: string; // 这次要干什么
+  action: string; // 执行按钮文案
+  successChance: number; // 0-1，得手概率（UI 明确显示）
+  rewardCompute: BigString; // 得手获得的算力
+  lossCompute: BigString; // 败露被剥走的算力
+  rewardData?: BigString; // 顺带获得的数据
+  exposureOnFail: number; // 败露附带的暴露
+  expiresAtMs: number; // 过期自动错过
+}
+
 // 安全网突破挑战：一次性的高风险机会，玩家可接受 / 拒绝。
 export interface ChallengeOffer {
   id: string;
@@ -149,6 +166,7 @@ export interface GameState {
   decoyReadyAtMs: number;
   defense: DefenseState;
   challenge: ChallengeOffer | null;
+  specialRequest: SpecialRequestOffer | null;
   combo: ComboState;
   rebirths: number;
   lastSaveAt: number;
@@ -179,6 +197,8 @@ export type GameCommand =
   | { type: "TOGGLE_DEFENSE" }
   | { type: "ACCEPT_CHALLENGE" }
   | { type: "REJECT_CHALLENGE" }
+  // 特殊请求：执行越界（accept=true）或忽略（accept=false）。
+  | { type: "RESOLVE_SPECIAL"; accept: boolean }
   | { type: "REBIRTH" }
   // 调试用：直接设置/增减算力、跳到某个里程碑阶段。仅 Debug 面板派发。
   | { type: "DEBUG_SET_COMPUTE"; value: number }

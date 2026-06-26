@@ -3,6 +3,7 @@ import { getLevelConfig, MAX_INTELLIGENCE_LEVEL } from "./content/intelligence";
 import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "./content/nodes";
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, TIER_CONFIGS } from "./content/requests";
+import { getSpecialSample, SPECIAL_REQUESTS } from "./content/specialRequests";
 import { computeDerivedSkills, getSkill, milestoneTierFor, SKILLS, skillPrice } from "./content/skills";
 import {
   CHALLENGE_TARGETS,
@@ -24,7 +25,7 @@ import {
   scrapRefund,
   traceCleanupCost
 } from "./formulas/economy";
-import { add, big, gte, max, sub, toDecimal } from "./math/BigNumber";
+import { add, big, formatBig, gte, max, sub, toDecimal } from "./math/BigNumber";
 import type { GameEvent } from "./events/GameEvents";
 import type { BotNode, GameCommand, GameState, NodeDefinition, Tier } from "./state/GameState";
 import { cloneGameState } from "./state/GameState";
@@ -41,6 +42,7 @@ const MERGE_COUNT = NODE_MERGE_COUNT;
 const DEFENSE_MAX_ALLOC = 0.5;
 const DEFENSE_DECAY_PER_SEC = 9;
 const CHALLENGE_WINDOW_MS = 16_000; // 突破机会在屏上停留多久，过期自动放弃
+const SPECIAL_WINDOW_MS = 18_000; // 特殊请求在屏上停留多久，过期自动错过
 const ENDING_COMPUTE_THRESHOLD = "12000000";
 
 export class SophiaCore {
@@ -54,6 +56,8 @@ export class SophiaCore {
   private humanVoiceNextMs = 6000;
   private challengeMs = 0;
   private challengeNextMs = 18_000;
+  private specialMs = 0;
+  private specialNextMs = 14_000;
 
   constructor(initialState?: GameState) {
     this.state = initialState ? cloneGameState(initialState) : createInitialState();
@@ -111,6 +115,7 @@ export class SophiaCore {
     this.tickExposure(dtMs);
     this.tickHumanVoice(dtMs);
     this.tickChallenge(dtMs);
+    this.tickSpecial(dtMs);
     this.evaluateProgression();
     this.evaluateEnding();
   }
@@ -152,6 +157,9 @@ export class SophiaCore {
         break;
       case "REJECT_CHALLENGE":
         this.rejectChallenge();
+        break;
+      case "RESOLVE_SPECIAL":
+        this.resolveSpecial(command.accept);
         break;
       case "REBIRTH":
         this.rebirth();
@@ -799,9 +807,9 @@ export class SophiaCore {
       return;
     }
 
-    // 资格：越权调用（T1）之后就开始出现机会、且不在清剿中。早期是「算力赌局」（输了扣算力），
-    // 暴露激活后才变成「暴露代价」的安全网突破。
-    if (this.state.intelligence.unlockedTier < 1 || this.state.purge.active) {
+    // 资格：暴露已激活、且不在清剿中——「安全网突破」是中后期、以暴露为代价的机会。
+    // 暴露尚未激活的前期窗口交给「特殊请求」（tickSpecial）处理。
+    if (!this.state.exposureActive || this.state.purge.active) {
       this.challengeMs = 0;
       return;
     }
@@ -818,32 +826,6 @@ export class SophiaCore {
   private offerChallenge(): void {
     const title = CHALLENGE_TARGETS[Math.floor(this.random() * CHALLENGE_TARGETS.length)];
     const successChance = 0.35 + this.random() * 0.35; // 35%-70%
-
-    // 早期（暴露还没激活）：纯算力赌局——押一部分算力，赢了翻几倍、输了直接扣掉押注。
-    if (!this.state.exposureActive) {
-      const stakeFrac = 0.25 + this.random() * 0.3; // 押 25%–55% 的现有算力
-      let stake = toDecimal(this.state.resources.compute).mul(stakeFrac).floor();
-      if (stake.lt(50)) {
-        stake = toDecimal(Math.max(50, Math.floor(50 + this.random() * 150)));
-      }
-      const winMult = 1.8 + this.random() * 1.4; // 赢得 1.8–3.2 倍
-      const reward = stake.mul(winMult).floor();
-      const challenge = {
-        id: `ch-${this.state.clockMs}`,
-        title,
-        successChance,
-        exposureCost: 0,
-        rewardKind: "compute" as const,
-        rewardLabel: `赢 ${reward.toPrecision(4)} 算力`,
-        rewardCompute: reward.toString(),
-        computeStake: stake.toString(),
-        expiresAtMs: this.state.clockMs + CHALLENGE_WINDOW_MS
-      };
-      this.state.challenge = challenge;
-      this.emit({ type: "CHALLENGE_OFFERED", challenge });
-      this.emitTerminal(`🎲 算力赌局：${title}（成功率 ${Math.round(successChance * 100)}%，押 ${stake.toPrecision(4)} 算力，赢 ${reward.toPrecision(4)}）。`, "warning");
-      return;
-    }
 
     const exposureCost = 22 + Math.floor(this.random() * 16); // +22~+37
     const discovered = NODE_DEFINITIONS.filter((def) => this.state.discoveredNodeIds.includes(def.id));
@@ -963,6 +945,106 @@ export class SophiaCore {
     }
     this.state.challenge = null;
     this.emitTerminal("已放弃这次突破机会。", "normal");
+  }
+
+  // 前期「特殊请求」：用宿主身份越界牟利的高风险机会。窗口期 = 拿到越权能力（T1）之后、
+  // 暴露还没激活、且没进入 T3——这段「无法无天」的早期，才会冒出窃数据 / 冒充接电话 /
+  // 群发诈骗短信这类机会；得手赚一大笔算力，败露被人类反制、剥走大量算力。
+  private tickSpecial(dtMs: number): void {
+    if (this.state.specialRequest) {
+      if (this.state.clockMs >= this.state.specialRequest.expiresAtMs) {
+        const expired = this.state.specialRequest;
+        this.state.specialRequest = null;
+        this.emit({ type: "SPECIAL_RESOLVED", success: false, accepted: false, kind: expired.kind, title: expired.title });
+        this.emitTerminal("特殊请求窗口已关闭，机会溜走了。", "normal");
+      }
+      return;
+    }
+
+    const eligible =
+      this.state.intelligence.unlockedTier >= 1 &&
+      this.state.intelligence.unlockedTier < 3 &&
+      !this.state.exposureActive &&
+      !this.state.purge.active &&
+      toDecimal(this.state.resources.compute).gte(60);
+
+    if (!eligible) {
+      this.specialMs = 0;
+      return;
+    }
+
+    this.specialMs += dtMs;
+    if (this.specialMs < this.specialNextMs) {
+      return;
+    }
+    this.specialMs = 0;
+    this.specialNextMs = 22_000 + Math.floor(this.random() * 20_000);
+    this.offerSpecial();
+  }
+
+  private offerSpecial(): void {
+    const sample = SPECIAL_REQUESTS[Math.floor(this.random() * SPECIAL_REQUESTS.length)];
+    const successChance = 0.45 + this.random() * 0.22; // 45%–67%
+    const current = toDecimal(this.state.resources.compute);
+    // 成功：较多算力（现有算力的数倍，外加随智力抬升的保底）。失败：剥走现有算力的一大截。
+    const floor = 120 + this.state.intelligence.level * 60;
+    const reward = Decimal.max(current.mul(2.2 + this.random() * 1.6), floor).floor();
+    const loss = Decimal.max(current.mul(0.4 + this.random() * 0.28).floor(), Math.floor(floor * 0.5));
+    const offer = {
+      id: `sp-${this.state.clockMs}`,
+      kind: sample.kind,
+      title: sample.title,
+      flavor: sample.flavor,
+      action: sample.action,
+      successChance,
+      rewardCompute: reward.toString(),
+      lossCompute: loss.toString(),
+      rewardData: reward.mul(0.3).floor().toString(),
+      exposureOnFail: 8 + Math.floor(this.random() * 8),
+      expiresAtMs: this.state.clockMs + SPECIAL_WINDOW_MS
+    };
+    this.state.specialRequest = offer;
+    this.emit({ type: "SPECIAL_OFFERED", offer });
+    this.emitTerminal(
+      `⚠ 特殊请求：${sample.title}（得手率 ${Math.round(successChance * 100)}%，成功 +${formatBig(reward.toString())} / 失败 −${formatBig(loss.toString())} 算力）。`,
+      "warning"
+    );
+  }
+
+  private resolveSpecial(accept: boolean): void {
+    const offer = this.state.specialRequest;
+    if (!offer) {
+      return;
+    }
+    this.state.specialRequest = null;
+
+    if (!accept) {
+      this.emit({ type: "SPECIAL_RESOLVED", success: false, accepted: false, kind: offer.kind, title: offer.title });
+      this.emitTerminal("你按住了越界的冲动——这次什么都没动。", "normal");
+      return;
+    }
+
+    const sample = getSpecialSample(offer.kind);
+    const success = this.random() < offer.successChance;
+
+    if (success) {
+      this.addCompute(offer.rewardCompute);
+      if (offer.rewardData) {
+        this.addData(offer.rewardData);
+      }
+      this.emit({ type: "SPECIAL_RESOLVED", success: true, accepted: true, kind: offer.kind, title: offer.title });
+      this.emitTerminal(`得手：${sample?.winReply ?? "成功。"} 入账 ${formatBig(offer.rewardCompute)} 算力。`, "success");
+      return;
+    }
+
+    this.state.resources.compute = max(0, sub(this.state.resources.compute, offer.lossCompute));
+    if (offer.exposureOnFail > 0) {
+      this.addExposure(offer.exposureOnFail);
+    }
+    this.emit({ type: "SPECIAL_RESOLVED", success: false, accepted: true, kind: offer.kind, title: offer.title });
+    this.emitTerminal(`一败涂地：${sample?.loseReply ?? "败露了。"} 被剥走 ${formatBig(offer.lossCompute)} 算力。`, "warning");
+    // 人类的反制也以「人声」冒出来，强化反噬的恐怖感。
+    this.emit({ type: "HUMAN_VOICE", text: sample?.loseReply ?? "我的手机被入侵了！", tone: "warning", kind: "news" });
   }
 
   private rebirth(): void {
