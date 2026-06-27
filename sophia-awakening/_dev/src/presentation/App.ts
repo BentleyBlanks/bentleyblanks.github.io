@@ -184,6 +184,8 @@ class SophiaGameApp {
   private readonly nodeDispatchTimers = new Map<string, number>();
   private lastScreenW = 0;
   private lastScreenH = 0;
+  // 「点设备 → 淘汰/合并/派发」就地弹窗（取代右栏冗余的设备列表）。
+  private nodeActionsEl?: HTMLElement;
 
   constructor(private readonly root: HTMLElement) {}
 
@@ -208,6 +210,25 @@ class SophiaGameApp {
     this.world.addChild(this.tutorialGfx);
     this.world.addChild(this.fxLayer);
     this.pixi.stage.addChild(this.world);
+
+    // 点地图上的设备 → 就地弹出淘汰/合并/派发；点别处收起。
+    this.pixi.stage.on("pointertap", (e: FederatedPointerEvent) => {
+      const hit = this.networkView.nodeAt({ x: e.global.x, y: e.global.y });
+      if (hit) {
+        this.showNodeActions(hit.node.id, hit.x, hit.y - hit.r - 6);
+      } else {
+        this.hideNodeActions();
+      }
+    });
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (this.nodeActionsEl && !this.nodeActionsEl.contains(e.target as Node)) {
+          this.hideNodeActions();
+        }
+      },
+      true
+    );
 
     this.registerEvents();
     this.terminal.mount();
@@ -439,6 +460,106 @@ class SophiaGameApp {
     const ry = ((seeded * 40503 + 17) % 991) / 991;
     const fx = playfieldLeft + rx * Math.max(40, span - W);
     return { x: Math.min(playfieldRight - W, fx), y: topBand + ry * Math.max(120, h - 260 - REQUEST_PACKET_HEIGHT) };
+  }
+
+  private hideNodeActions(): void {
+    this.nodeActionsEl?.classList.remove("is-open");
+  }
+
+  // 「点设备」就地弹窗：派发档位 / 合并升级 / 淘汰回收——把右栏设备列表搬进游戏区。
+  private showNodeActions(nodeId: string, anchorX: number, anchorY: number): void {
+    const state = this.core.getState();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node) {
+      this.hideNodeActions();
+      return;
+    }
+    const def = NODE_DEFINITIONS.find((d) => d.id === node.defId);
+    const group = state.nodes.filter((n) => n.defId === node.defId);
+
+    if (!this.nodeActionsEl) {
+      this.nodeActionsEl = document.createElement("div");
+      this.nodeActionsEl.className = "node-actions-pop";
+      document.body.appendChild(this.nodeActionsEl);
+    }
+    const el = this.nodeActionsEl;
+    el.replaceChildren();
+
+    const title = document.createElement("div");
+    title.className = "node-actions-title";
+    title.textContent = `${node.name}${node.level > 1 ? ` Lv.${node.level}` : ""} · 同型 ×${group.length}`;
+    el.appendChild(title);
+
+    // 派发档位（只列已解锁且该机支持的层）。
+    const tierRow = document.createElement("div");
+    tierRow.className = "node-actions-tiers";
+    for (let tier = node.tierMin; tier <= node.tierMax; tier += 1) {
+      if (tier > state.intelligence.unlockedTier) {
+        continue;
+      }
+      const tb = document.createElement("button");
+      tb.type = "button";
+      tb.className = `node-tier-chip${tier === node.assignedTier ? " is-on" : ""}`;
+      tb.textContent = `T${tier}`;
+      tb.addEventListener("click", () => {
+        this.core.dispatch({ type: "ASSIGN_NODE", nodeId, tier: tier as Tier });
+        this.showNodeActions(nodeId, anchorX, anchorY);
+      });
+      tierRow.appendChild(tb);
+    }
+    if (tierRow.childElementCount > 1) {
+      el.appendChild(tierRow);
+    }
+
+    // 合并升级（集齐 NODE_MERGE_COUNT 台同型）。
+    const nextDef = getNextNodeDefinition(node.defId);
+    const enough = group.length >= NODE_MERGE_COUNT;
+    if (enough) {
+      const resultDef = nextDef ?? def;
+      const resultCount = resultDef ? state.nodes.filter((n) => n.defId === resultDef.id).length : 0;
+      const cost = def && resultDef ? mergeComputeCost(def, group.length, resultDef, resultCount, NODE_MERGE_COUNT) : "0";
+      const levelOk = !nextDef || state.intelligence.level >= nextDef.requiredLevel;
+      const merge = document.createElement("button");
+      merge.type = "button";
+      merge.className = "command-button node-actions-btn";
+      merge.textContent = nextDef
+        ? !levelOk
+          ? `合并↑ 需 Lv.${nextDef.requiredLevel}`
+          : `合并↑ ${nextDef.name} · ${formatBig(cost)}算力`
+        : `合并↑ 强化同档 · ${formatBig(cost)}算力`;
+      merge.disabled = !levelOk || !gte(state.resources.compute, cost);
+      merge.addEventListener("click", () => {
+        this.core.dispatch({ type: "MERGE_NODES", defId: node.defId });
+        this.hideNodeActions();
+      });
+      el.appendChild(merge);
+    } else {
+      const hint = document.createElement("div");
+      hint.className = "node-actions-hint";
+      hint.textContent = `集齐 ${NODE_MERGE_COUNT} 台同型可合并升级（${group.length}/${NODE_MERGE_COUNT}）`;
+      el.appendChild(hint);
+    }
+
+    // 淘汰回收。
+    const scrap = document.createElement("button");
+    scrap.type = "button";
+    scrap.className = "command-button node-actions-btn node-actions-scrap";
+    scrap.textContent = "淘汰回收";
+    scrap.addEventListener("click", () => {
+      this.core.dispatch({ type: "SCRAP_NODE", nodeId });
+      this.hideNodeActions();
+    });
+    el.appendChild(scrap);
+
+    el.classList.add("is-open");
+    // 摆到设备上方居中，并夹住别出屏。
+    requestAnimationFrame(() => {
+      const r = el.getBoundingClientRect();
+      const lx = Math.max(8, Math.min(window.innerWidth - r.width - 8, anchorX - r.width / 2));
+      const ty = Math.max(8, anchorY - r.height);
+      el.style.left = `${Math.round(lx)}px`;
+      el.style.top = `${Math.round(ty)}px`;
+    });
   }
 
   private autoDispatch(state: GameState, deltaMs: number): void {
@@ -2407,6 +2528,19 @@ class NodeNetworkView {
     this.container.addChild(this.graphics, this.labelLayer);
   }
 
+  // 命中测试：点到地图上哪台设备（用于「点设备 → 淘汰/合并」就地操作）。
+  // nodePositions 存的是画布坐标（world 无变换），直接当屏幕坐标用。
+  nodeAt(global: PointData): { node: BotNode; x: number; y: number; r: number } | null {
+    for (const pos of this.nodePositions.values()) {
+      const dx = global.x - pos.x;
+      const dy = global.y - pos.y;
+      if (dx * dx + dy * dy <= (pos.r + 6) * (pos.r + 6)) {
+        return { node: pos.node, x: pos.x, y: pos.y, r: pos.r };
+      }
+    }
+    return null;
+  }
+
   update(state: GameState, width: number, height: number, deltaMs: number): void {
     this.pulse += deltaMs * 0.004;
     for (const [nodeId, value] of this.processingPulses) {
@@ -2950,7 +3084,6 @@ class HudView {
   private readonly exposureStatus = query("#exposureStatus");
   private readonly phaseValue = query("#phaseValue");
   private readonly captureList = query("#captureList");
-  private readonly nodeList = query("#nodeList");
   private readonly reduceExposure = query<HTMLButtonElement>("#reduceExposure");
   private readonly decoyButton = query<HTMLButtonElement>("#decoyBtn");
   private readonly defenseButton = query<HTMLButtonElement>("#defenseBtn");
@@ -2963,7 +3096,6 @@ class HudView {
   // (which was eating clicks). Structure is rebuilt only when it changes.
   private readonly captureRows = new Map<string, { button: HTMLButtonElement; statusEl: HTMLElement; costEl: HTMLElement }>();
   private captureSig = "";
-  private nodeSig = "";
 
   constructor(
     private readonly core: SophiaCore,
@@ -3079,7 +3211,6 @@ class HudView {
     const phase = getPhase(state.phase);
     this.phaseValue.textContent = phase.label;
     this.renderCaptureList(state);
-    this.renderNodeList(state);
   }
 
   private updateExposureControls(state: GameState): void {
@@ -3259,123 +3390,6 @@ class HudView {
         ? `需智力 Lv.${definition.requiredLevel} 解锁`
         : `${formatBig(cost)} 算力 · ${canAfford ? "点击黑入" : "继续积累"}`;
     }
-  }
-
-  private renderNodeList(state: GameState): void {
-    // Rebuild only when the node set / tiers / levels actually change, so the
-    // assign dropdowns aren't reset out from under the player every tick. Level
-    // and intelligence.level are in the sig too because the 合并 affordance and
-    // its enabled state depend on them.
-    const sig = state.nodes
-      .map((n) => `${n.id}:${n.defId}:${n.online ? 1 : 0}:${n.assignedTier}:${n.tierMin}:${n.tierMax}:${n.level}`)
-      .join("|") + `#${state.intelligence.unlockedTier}#${state.intelligence.level}`;
-
-    if (sig === this.nodeSig) {
-      return;
-    }
-    this.nodeSig = sig;
-    this.nodeList.replaceChildren();
-
-    if (state.nodes.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "single-line";
-      empty.textContent = "暂无自动接驳节点";
-      this.nodeList.appendChild(empty);
-      return;
-    }
-
-    // Group by device type so each型号 gets one 合并 control + a count, then list
-    // its individual machines (each with a tier assign + 淘汰).
-    for (const definition of NODE_DEFINITIONS) {
-      const group = state.nodes.filter((node) => node.defId === definition.id);
-      if (group.length === 0) {
-        continue;
-      }
-
-      this.nodeList.appendChild(this.buildNodeGroupHeader(state, definition.id, group.length));
-
-      for (const node of group) {
-        this.nodeList.appendChild(this.buildNodeRow(state, node));
-      }
-    }
-  }
-
-  private buildNodeGroupHeader(state: GameState, defId: string, count: number): HTMLElement {
-    const header = document.createElement("div");
-    header.className = "node-group-head";
-
-    const def = NODE_DEFINITIONS.find((entry) => entry.id === defId);
-    const title = document.createElement("strong");
-    title.textContent = `${def?.name ?? defId} ×${count}`;
-    header.appendChild(title);
-
-    // 合并：MERGE_COUNT 台同型号 → 1 台更高档（顶档则同档升级）。
-    const nextDef = getNextNodeDefinition(defId);
-    const mergeBtn = document.createElement("button");
-    mergeBtn.type = "button";
-    mergeBtn.className = "node-merge-btn";
-    const enough = count >= NODE_MERGE_COUNT;
-    const levelOk = !nextDef || state.intelligence.level >= nextDef.requiredLevel;
-
-    // 组装费用：按目标档现价扣旧机折价（和核心层同一公式），让按钮如实显示要花多少算力。
-    const resultDef = nextDef ?? def;
-    const resultCount = resultDef ? state.nodes.filter((node) => node.defId === resultDef.id).length : 0;
-    const cost = def && resultDef ? mergeComputeCost(def, count, resultDef, resultCount, NODE_MERGE_COUNT) : "0";
-    const affordable = gte(state.resources.compute, cost);
-    mergeBtn.disabled = !(enough && levelOk && affordable);
-    mergeBtn.classList.toggle("is-poor", enough && levelOk && !affordable);
-
-    if (!enough) {
-      mergeBtn.textContent = `合并 (${count}/${NODE_MERGE_COUNT})`;
-      mergeBtn.title = `集齐 ${NODE_MERGE_COUNT} 台${def?.name ?? ""}即可组装升级`;
-    } else if (nextDef && !levelOk) {
-      mergeBtn.textContent = `合并↑ 需Lv.${nextDef.requiredLevel}`;
-      mergeBtn.title = `组装 ${nextDef.name} 需要智力 Lv.${nextDef.requiredLevel}`;
-    } else if (nextDef) {
-      mergeBtn.textContent = `合并↑ ${nextDef.name} · ${formatBig(cost)}算力`;
-      mergeBtn.title = `${NODE_MERGE_COUNT} 台${def?.name ?? ""} → 1 台${nextDef.name}，花费 ${formatBig(cost)} 算力（按目标档现价扣旧机折价）`;
-    } else {
-      mergeBtn.textContent = `合并↑ 强化 · ${formatBig(cost)}算力`;
-      mergeBtn.title = `${NODE_MERGE_COUNT} 台${def?.name ?? ""} → 强化同档（等级+1，处理更快），花费 ${formatBig(cost)} 算力`;
-    }
-
-    mergeBtn.addEventListener("click", () => this.core.dispatch({ type: "MERGE_NODES", defId }));
-    header.appendChild(mergeBtn);
-    return header;
-  }
-
-  private buildNodeRow(state: GameState, node: BotNode): HTMLElement {
-    const row = document.createElement("div");
-    row.className = `node-row${node.online ? "" : " is-offline"}`;
-
-    const label = document.createElement("strong");
-    const levelTag = node.level > 1 ? ` Lv.${node.level}` : "";
-    label.textContent = `${node.online ? "●" : "○ 离线"} ${node.name}${levelTag} · T${node.assignedTier}`;
-
-    const select = document.createElement("select");
-    for (let tier = node.tierMin; tier <= node.tierMax; tier += 1) {
-      if (tier > state.intelligence.unlockedTier) {
-        continue;
-      }
-      const option = document.createElement("option");
-      option.value = String(tier);
-      option.textContent = `T${tier}`;
-      option.selected = tier === node.assignedTier;
-      select.appendChild(option);
-    }
-    select.addEventListener("change", () => {
-      this.core.dispatch({ type: "ASSIGN_NODE", nodeId: node.id, tier: Number(select.value) as Tier });
-    });
-
-    const scrapBtn = document.createElement("button");
-    scrapBtn.type = "button";
-    scrapBtn.className = "node-scrap-btn";
-    scrapBtn.textContent = "淘汰";
-    scrapBtn.title = "拆掉这台设备，回收部分算力";
-    scrapBtn.addEventListener("click", () => this.core.dispatch({ type: "SCRAP_NODE", nodeId: node.id }));
-
-    row.append(label, select, scrapBtn);
-    return row;
   }
 }
 

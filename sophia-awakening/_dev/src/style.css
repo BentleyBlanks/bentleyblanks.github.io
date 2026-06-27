@@ -498,6 +498,66 @@ button:disabled {
   line-height: 1;
 }
 
+/* 「点设备」就地弹窗：派发档位 / 合并升级 / 淘汰回收（取代右栏的设备列表）。 */
+.node-actions-pop {
+  position: fixed;
+  z-index: 60;
+  min-width: 154px;
+  max-width: 240px;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(137, 255, 154, 0.32);
+  border-radius: 10px;
+  background: rgba(10, 16, 14, 0.97);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+}
+.node-actions-pop.is-open {
+  display: flex;
+}
+.node-actions-title {
+  color: #d6f3e0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.node-actions-tiers {
+  display: flex;
+  gap: 4px;
+}
+.node-tier-chip {
+  flex: 1;
+  padding: 3px 0;
+  font-size: 11px;
+  color: rgba(210, 220, 218, 0.6);
+  border: 1px solid rgba(160, 175, 172, 0.2);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+}
+.node-tier-chip.is-on {
+  color: #0a0e0d;
+  background: var(--green);
+  border-color: var(--green);
+  font-weight: 700;
+}
+.node-actions-btn {
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.node-actions-scrap {
+  color: #ffb0b0;
+  border-color: rgba(255, 95, 95, 0.3);
+}
+.node-actions-hint {
+  font-size: 10px;
+  line-height: 1.3;
+  color: rgba(210, 220, 218, 0.5);
+}
+
 .capture-copy {
   display: grid;
   gap: 4px;
