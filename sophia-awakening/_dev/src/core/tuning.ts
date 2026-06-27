@@ -40,7 +40,7 @@ export const TUNING = {
 
   // § UI 时序
   rouletteThinkMs:      700,      // 轮盘「思考中」动画持续 (ms)
-  rouletteHoldMs:       520,      // 轮盘揭晓后停留再飞入核心 (ms)
+  rouletteHoldMs:       900,      // 轮盘揭晓后停留再飞入核心 (ms)——让命中/惊艳/幻觉的结果多停一会儿看清
 
   // § 前期卡片
   earlyMaxCards:        4,        // 前期（自动化前）最多同屏需求卡数（随智力从 1 升到此上限）

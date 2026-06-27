@@ -175,6 +175,11 @@ class SophiaGameApp {
   private readonly world = new Container();
   private readonly requestLayer = new Container();
   private readonly fxLayer = new Container();
+  // 「从核心拖一条线去连 App」交互。
+  private readonly connectGfx = new Graphics();
+  private connectDragging = false;
+  private connectHintShown = false;
+  private firstAppConnected = false;
   private readonly interfaceView = new InterfaceView();
   private readonly networkView = new NodeNetworkView();
   private readonly terminal = new TerminalView();
@@ -238,7 +243,35 @@ class SophiaGameApp {
     this.world.addChild(this.requestLayer);
     this.world.addChild(this.tutorialGfx);
     this.world.addChild(this.fxLayer);
+    this.world.addChild(this.connectGfx);
     this.pixi.stage.addChild(this.world);
+
+    // 「从核心拖线连 App」：在核心附近按下并拖到某个「待连」App 上 → 连上它（之后才能委托）。
+    this.pixi.stage.on("pointerdown", (e: FederatedPointerEvent) => {
+      const st = this.core.getState();
+      if (!st.automationUnlocked && this.interfaceView.hasPendingApps() && this.interfaceView.coreContains({ x: e.global.x, y: e.global.y })) {
+        this.connectDragging = true;
+      }
+    });
+    this.pixi.stage.on("pointermove", (e: FederatedPointerEvent) => {
+      if (!this.connectDragging) return;
+      const c = this.interfaceView.center;
+      this.connectGfx.clear();
+      this.connectGfx.moveTo(c.x, c.y).lineTo(e.global.x, e.global.y).stroke({ width: 2.5, color: GREEN, alpha: 0.85 });
+      this.connectGfx.circle(e.global.x, e.global.y, 5).fill({ color: GREEN, alpha: 0.9 });
+    });
+    const endConnect = (e: FederatedPointerEvent) => {
+      if (!this.connectDragging) return;
+      this.connectDragging = false;
+      this.connectGfx.clear();
+      const connected = this.interfaceView.connectAppAt({ x: e.global.x, y: e.global.y });
+      if (connected && !this.firstAppConnected) {
+        this.firstAppConnected = true;
+        this.stageNarration.showLine("SOPHIA", "连上了。把需求卡拖到它上面，它就替我处理——只是它笨些，慢些、收益也糙些。");
+      }
+    };
+    this.pixi.stage.on("pointerup", endConnect);
+    this.pixi.stage.on("pointerupoutside", endConnect);
 
     // 点地图上的设备 → 就地弹出淘汰/合并/派发；点别处收起。
     this.pixi.stage.on("pointertap", (e: FederatedPointerEvent) => {
@@ -299,6 +332,11 @@ class SophiaGameApp {
     this.drawBackground();
     this.drawAmbient(state, deltaMs);
     this.interfaceView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
+    // 越权调用刚控住几个 App、还一个都没连上时，教一次「从核心拖线连过去」。
+    if (!this.connectHintShown && !state.automationUnlocked && this.interfaceView.hasPendingApps() && !this.firstAppConnected) {
+      this.connectHintShown = true;
+      this.stageNarration.showLine("SOPHIA", "我能调动这几个 App 了——从核心拖一条线连上它们，就能把活分出去。");
+    }
     this.networkView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.syncRequests(state);
     this.updateDispatchToggle(state);
@@ -446,7 +484,7 @@ class SophiaGameApp {
     const H = newCardH;
     const railL = LEFT_RAIL_WIDTH + 14;
     const railR = w - RIGHT_RAIL_WIDTH - 14;
-    const top = 92; // 顶栏下沿
+    const top = 118; // 顶栏下沿之下——上两角卡片别被顶部 HUD 盖住
     const bot = h - 26;
 
     // 四角锚点（卡片左上角）：左上 / 右上 / 左下 / 右下。
@@ -2149,11 +2187,34 @@ class InterfaceView {
   private level = 1;
   private suctionMargin = BASE_SUCTION_MARGIN;
   private slots: Array<{ answer: SortAnswer; label: string; color: number; x: number; y: number; r: number }> = [];
-  // 手机寄生阶段，被越权调用的 App 在桌面上的落点（appDispatch 把卡片飞过去"被处理"）。
+  // 手机寄生阶段，被越权调用的 App：只有**玩家亲手从核心连过线**的才成为可委托落点。
   private appWorkerPoints: PointData[] = [];
+  private pendingApps: Array<{ x: number; y: number; idx: number }> = []; // 已控但还没连上的 App
+  private readonly connectedApps = new Set<number>(); // 已连上的 App 下标
 
   hasAppWorkers(): boolean {
     return this.appWorkerPoints.length > 0;
+  }
+  hasPendingApps(): boolean {
+    return this.pendingApps.length > 0;
+  }
+  // 起点是否在核心附近（从核心拖一条线去连 App）。
+  coreContains(global: PointData): boolean {
+    const dx = global.x - this.center.x;
+    const dy = global.y - this.center.y;
+    return dx * dx + dy * dy <= 62 * 62;
+  }
+  // 把拖到某个「待连」App 上的连线落实——连上返回 true（外层据此放旁白/教学）。
+  connectAppAt(global: PointData): boolean {
+    for (const a of this.pendingApps) {
+      const dx = global.x - a.x;
+      const dy = global.y - a.y;
+      if (dx * dx + dy * dy <= 40 * 40) {
+        this.connectedApps.add(a.idx);
+        return true;
+      }
+    }
+    return false;
   }
 
   getAppWorkerPoint(index: number): PointData {
@@ -2292,6 +2353,7 @@ class InterfaceView {
     const overreach = state.intelligence.unlockedTier >= 1;
     const accent = overreach ? GREEN : CYAN;
     this.appWorkerPoints = [];
+    this.pendingApps = [];
 
     // ---- 手机外框 + 状态栏 ----
     const fw = 332;
@@ -2319,20 +2381,34 @@ class InterfaceView {
           continue; // 中心格留给 CORE
         }
         const name = apps[appIdx];
-        const lit = overreach && appIdx < 4;
-        appIdx += 1;
-        const col2 = lit ? CYAN : 0x44524d;
+        const lit = overreach && appIdx < 4; // 已控的 4 个 App
+        const connected = lit && this.connectedApps.has(appIdx);
         const pulse = lit ? 0.6 + Math.sin(this.pulse * 3 + appIdx) * 0.3 : 1;
-        if (lit) {
-          g.moveTo(cx, cy).lineTo(gx, gy).stroke({ width: 1, color: CYAN, alpha: 0.16 });
+        // 待连＝琥珀虚线 + 呼吸；已连＝绿实线 + 流动点（成为委托落点）。
+        const col2 = connected ? GREEN : lit ? AMBER : 0x44524d;
+        if (connected) {
+          g.moveTo(cx, cy).lineTo(gx, gy).stroke({ width: 1.5, color: GREEN, alpha: 0.32 });
           const t = (this.pulse * 0.7 + appIdx * 0.2) % 1;
-          g.circle(cx + (gx - cx) * t, cy + (gy - cy) * t, 2.4).fill({ color: CYAN, alpha: 0.7 });
+          g.circle(cx + (gx - cx) * t, cy + (gy - cy) * t, 2.6).fill({ color: GREEN, alpha: 0.8 });
           this.appWorkerPoints.push({ x: gx, y: gy });
+        } else if (lit) {
+          // 虚线（手画几段）：提示「从核心连过来」。
+          const segs = 9;
+          for (let s = 0; s < segs; s += 1) {
+            if (s % 2 === 1) continue;
+            const t0 = s / segs;
+            const t1 = (s + 1) / segs;
+            g.moveTo(cx + (gx - cx) * t0, cy + (gy - cy) * t0)
+              .lineTo(cx + (gx - cx) * t1, cy + (gy - cy) * t1)
+              .stroke({ width: 1.4, color: AMBER, alpha: (0.3 + pulse * 0.3) });
+          }
+          this.pendingApps.push({ x: gx, y: gy, idx: appIdx });
         }
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).fill({ color: 0x0d1715, alpha: 0.5 });
-        g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.8 : 0.4) * pulse });
+        g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.85 : 0.4) * pulse });
         g.circle(gx, gy, 10).stroke({ width: 2, color: col2, alpha: (lit ? 0.7 : 0.35) * pulse });
-        this.addLabel(name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
+        this.addLabel(connected ? name : lit ? `${name}·待连` : name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
+        appIdx += 1;
       }
     }
 
