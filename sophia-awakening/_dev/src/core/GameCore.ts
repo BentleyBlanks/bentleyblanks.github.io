@@ -264,6 +264,29 @@ export class SophiaCore {
     const activeTier = this.state.intelligence.unlockedTier;
     const config = TIER_CONFIGS[activeTier];
 
+    // 前期手动阶段（还没上自动接驳）：一次只摆一条需求；处理 / 装死掉之后，隔一段**随机时间**
+    // 才浮出下一条——给玩家「读懂一条 → 押下去 → 看反馈 → 再来一条」的从容节奏（§03 动作形态一）。
+    if (!this.state.automationUnlocked) {
+      if (this.state.requests.length === 0) {
+        this.state.spawnTimerMs -= dtMs;
+        if (this.state.spawnTimerMs <= 0) {
+          const request = createRequest(
+            this.state.nextRequestId,
+            activeTier,
+            this.state.clockMs,
+            () => this.random(),
+            (permId) => (this.state.skills[permId] ?? 0) > 0
+          );
+          this.state.nextRequestId += 1;
+          this.state.requests.push(request);
+          this.emit({ type: "REQUEST_SPAWNED", request });
+          // 下一条的随机间隔（这条被清掉后才开始倒计时）：约 0.55×~1.6× 基础间隔。
+          this.state.spawnTimerMs = config.spawnIntervalMs * (0.55 + this.random() * 1.05);
+        }
+      }
+      return;
+    }
+
     // 自动接驳上线后，节点网络消耗请求远快于人手——把出卡管道随 botnet 规模拓宽，
     // 让机器面前始终有一股可见的卡流（而不是一片空场 + 偶尔一个数字）。
     // 出卡量跟着整张网的"吞吐力"走：把每台能处理当前层的在线节点的吃卡速率加总，

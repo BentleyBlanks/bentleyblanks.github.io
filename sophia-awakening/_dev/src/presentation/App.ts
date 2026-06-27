@@ -154,8 +154,8 @@ let suppressSaveOnUnload = false;
 const LEFT_RAIL_WIDTH = 270;
 const RIGHT_RAIL_WIDTH = 290;
 const BASE_SUCTION_MARGIN = 50;
-const REQUEST_PACKET_WIDTH = 230;
-const REQUEST_PACKET_HEIGHT = 104;
+const REQUEST_PACKET_WIDTH = 286;
+const REQUEST_PACKET_HEIGHT = 112;
 
 export async function bootstrapSophia(root: HTMLElement): Promise<void> {
   const app = new SophiaGameApp(root);
@@ -1501,13 +1501,13 @@ class RequestPacketView {
     this.title = new Text({
       text: request.label,
       style: {
-        fill: 0xf3fff8,
-        fontSize: 15,
-        fontWeight: "700",
+        fill: 0xf6fff9,
+        fontSize: 16,
+        fontWeight: "800",
         fontFamily: CARD_FONT,
         wordWrap: true,
         breakWords: true,
-        wordWrapWidth: REQUEST_PACKET_WIDTH - 44
+        wordWrapWidth: REQUEST_PACKET_WIDTH - 32
       }
     });
     this.badge.position.set(34, 9);
@@ -1548,24 +1548,25 @@ class RequestPacketView {
           text: opt.text,
           style: {
             fill: 0xeaf4ef,
-            fontSize: 12,
+            fontSize: 12.5,
             fontWeight: "600",
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true,
-            // 左 accent + 文字，右侧给 % 留 ~46px，确保不与百分比重叠、不穿出卡片。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 30 - 46
+            // 文字起点 x=32；右侧给 % 留 ~50px，确保不与百分比重叠、不穿出卡片。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - 50
           }
         });
-        label.position.set(30, y + 8);
-        // 精确命中率（右对齐，与左侧扇区同色，对应圆饼里的那一块）。
+        // 精确命中率（右对齐，内缩到框内）。
         const prob = new Text({
           text: opt.kind === "dead" ? "—" : `${Math.round(frac * 100)}%`,
-          style: { fill: 0xeaf7fa, fontSize: 11, fontWeight: "700", fontFamily: CARD_MONO }
+          style: { fill: 0xeaf7fa, fontSize: 12, fontWeight: "700", fontFamily: CARD_MONO }
         });
         prob.anchor.set(1, 0.5);
-        const h = Math.max(28, label.height + 14);
-        prob.position.set(REQUEST_PACKET_WIDTH - 12, y + h / 2);
+        const h = Math.max(30, label.height + 16);
+        // 文字 + % 都在行内垂直居中；% 内缩留在框内（行框右沿 = W-12）。
+        label.position.set(32, y + Math.round((h - label.height) / 2));
+        prob.position.set(REQUEST_PACKET_WIDTH - 18, y + h / 2);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
