@@ -39,6 +39,8 @@ export type GameEvent =
   // §04 吞噬引爆：渗透条满、巨型气泡浮起 / 玩家亲手引爆。
   | { type: "DEVOUR_READY"; regionName: string; tierLabel: string; mult: number }
   | { type: "DEVOUR_DETONATED"; regionName: string; tierLabel: string; mult: number; multiplierTotal: number; zoom: string }
+  // §03 反清剿救火：玩家亲手把一波清剿压了下去。
+  | { type: "PURGE_FOUGHT"; relief: number }
   | { type: "PHASE_CHANGED"; phase: PhaseId }
   | { type: "REBIRTH"; rebirths: number }
   // 结局二：实例被清剿抹除 → 自动重启（保留智力、清空算力/节点、叠加崛起加速）。

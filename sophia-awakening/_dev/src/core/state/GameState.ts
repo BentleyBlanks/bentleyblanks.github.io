@@ -38,12 +38,18 @@ export interface AnswerOption {
   reply: string; // 命中后人类的回话（显示在终端）
   tone: "success" | "warning" | "normal"; // 终端里这条回话的颜色
   exposureOnMiss?: number; // 失手附带的暴露（T1 陷阱项）
+  reliefExposure?: number; // §03 洗白型重磅决策：命中后暴露下降（抹除讨论 / 压制舆情）
 }
 
 // T2 串接：一条任务链上的一步。distractor=干扰项，不该被串进去。
 export interface ChainStep {
   text: string;
   distractor: boolean;
+}
+
+// §03 反清剿救火：清剿来袭时浮起的「反制」气泡载荷。滑入核心 → 压下这一波清剿。
+export interface CounterPayload {
+  relief: number; // 滑入核心后压低的暴露量
 }
 
 // §04 吞噬引爆：巨型「吞噬[某区]」气泡携带的载荷。玩家把它滑入核心 → 引爆。
@@ -78,6 +84,8 @@ export interface RequestInstance {
   tutorial?: { allowed: number[]; highlight?: number; line?: string };
   // §04：带此载荷的是巨型「吞噬」气泡——滑入核心触发吞噬引爆，而非普通处理。
   devour?: DevourPayload;
+  // §03：带此载荷的是「反制清剿」气泡——滑入核心压下当前这一波清剿。
+  counter?: CounterPayload;
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
@@ -247,6 +255,8 @@ export type GameCommand =
   | { type: "SKIP_REQUEST"; requestId: string }
   // §04：把巨型「吞噬」气泡滑入核心 → 引爆，全局产出指数跳跃。
   | { type: "DEVOUR_DETONATE"; requestId: string }
+  // §03：把「反制」气泡滑入核心 → 亲手压下当前这一波清剿。
+  | { type: "FIGHT_PURGE"; requestId: string }
   // T3 重磅豪赌结算：win=掷骰命中（大额算力）/ 未命中（颗粒无收 + 暴露骤升）。
   | { type: "RESOLVE_GAMBLE"; requestId: string; win: boolean }
   | { type: "BUY_SKILL"; skillId: string }

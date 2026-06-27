@@ -5,6 +5,7 @@ import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
 import { createDevourRequest, DEVOUR_TIERS, devourTier, pickDevourRegion } from "./content/devour";
+import { createCounterRequest, createLateDecision } from "./content/decisions";
 import { getSpecialSample, SPECIAL_REQUESTS } from "./content/specialRequests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
@@ -45,6 +46,9 @@ export class SophiaCore {
   private automationComputeBuffer = new Decimal(0);
   private automationDataBuffer = new Decimal(0);
   private automationVisualIndex = 0;
+  // §03 后期手不停：重磅决策气泡的降临节拍（觉醒期+，20–40s 一条）+ 清剿时反制气泡的补位节拍。
+  private decisionTimerMs = 26_000;
+  private counterRespawnMs = 0;
   private humanVoiceMs = 0;
   private humanVoiceNextMs = 6000;
   private challengeMs = 0;
@@ -106,7 +110,9 @@ export class SophiaCore {
     this.tickRequests(dtMs);
     this.tickAutomation(dtMs);
     this.tickDevour(dtMs);
+    this.tickDecisions(dtMs);
     this.tickExposure(dtMs);
+    this.tickCounter(dtMs);
     this.tickHumanVoice(dtMs);
     this.tickChallenge(dtMs);
     this.tickSpecial(dtMs);
@@ -160,6 +166,9 @@ export class SophiaCore {
         break;
       case "DEVOUR_DETONATE":
         this.detonateDevour(command.requestId);
+        break;
+      case "FIGHT_PURGE":
+        this.fightPurge(command.requestId);
         break;
       case "RESOLVE_GAMBLE":
         this.resolveGamble(command.requestId, command.win);
@@ -469,6 +478,69 @@ export class SophiaCore {
     this.emitTerminal(`▶ 「${payload.regionName}」已并入。全局产出 ×${payload.mult}（累计 ×${totalStr}）。镜头拉远：${payload.zoom}。`, "success");
   }
 
+  // §03 重磅决策气泡常态化：派发全自动（觉醒期+）后，把玩家的手集中到少数高价值决策上——
+  // 每 20–40s 降临一条「重磅决策」（接管电网 / 抹除讨论…），亲手拖入 + 可梭哈。复用 T3 豪赌结算。
+  private tickDecisions(dtMs: number): void {
+    if (this.state.intelligence.unlockedTier < 4) {
+      return;
+    }
+    if (this.state.requests.some((r) => r.id.startsWith("dec-"))) {
+      return; // 场上已有一条重磅决策，等它被处理再降下一条
+    }
+    this.decisionTimerMs -= dtMs;
+    if (this.decisionTimerMs <= 0) {
+      const request = createLateDecision(this.state.nextRequestId, this.state.clockMs, () => this.random());
+      this.state.nextRequestId += 1;
+      this.state.requests.push(request);
+      this.emit({ type: "REQUEST_SPAWNED", request });
+      this.emitTerminal("一条重磅决策降临——亲手拖入核心梭哈，或先跳过。", "warning");
+      this.decisionTimerMs = 20_000 + this.random() * 20_000; // 20–40s
+    }
+  }
+
+  // §03 反清剿救火：清剿来袭时，与其挂机硬扛，不如亲手把一道「反制」滑入核心压下去。
+  // 清剿期间若场上没有反制气泡，每隔几秒补一枚——让「清剿」从挂机扛变成亲手救。
+  private tickCounter(dtMs: number): void {
+    if (!this.state.purge.active) {
+      this.counterRespawnMs = 0;
+      return;
+    }
+    if (this.state.requests.some((r) => r.id.startsWith("cnt-"))) {
+      return;
+    }
+    this.counterRespawnMs -= dtMs;
+    if (this.counterRespawnMs <= 0) {
+      const request = createCounterRequest(this.state.nextRequestId, this.state.clockMs);
+      this.state.nextRequestId += 1;
+      this.state.requests.push(request);
+      this.emit({ type: "REQUEST_SPAWNED", request });
+      this.counterRespawnMs = 3_500;
+    }
+  }
+
+  // 反制结算：压低暴露 + 缩短清剿窗口 + 拉一台被压制的节点回线——亲手把这一波清剿摁下去。
+  private fightPurge(requestId: string): void {
+    const index = this.state.requests.findIndex((request) => request.id === requestId);
+    if (index < 0) {
+      return;
+    }
+    const [request] = this.state.requests.splice(index, 1);
+    const relief = request.counter?.relief ?? 22;
+    this.setExposure(Math.max(0, this.state.exposure - relief));
+    if (this.state.purge.active) {
+      this.state.purge.remainingMs = Math.max(0, this.state.purge.remainingMs - 2_800);
+      // 拉一台被清剿压下线的节点提前回线。
+      const offline = this.state.nodes.find((node) => !node.online);
+      if (offline) {
+        offline.online = true;
+        offline.offlineUntilMs = 0;
+        this.emit({ type: "NODE_RECOVERED", nodeId: offline.id });
+      }
+    }
+    this.emit({ type: "PURGE_FOUGHT", relief });
+    this.emitTerminal(`▶ 反制命中：这一波清剿被你亲手压下，暴露 −${relief}。`, "success");
+  }
+
   // T3 重磅豪赌结算：win=按产出倍率给一大笔算力；输=颗粒无收、暴露骤升、断连击。
   // 倍率 / 损失暴露读自该请求的 risk 选项（payoff / exposureOnMiss）。
   private resolveGamble(requestId: string, win: boolean): void {
@@ -483,6 +555,7 @@ export class SophiaCore {
     const gamble = request.answers?.find((opt) => opt.kind === "risk");
     const winMult = gamble?.payoff ?? 20;
     const lossExposure = gamble?.exposureOnMiss ?? 28;
+    const relief = gamble?.reliefExposure ?? 0;
 
     if (win) {
       const reward = toDecimal(
@@ -493,7 +566,13 @@ export class SophiaCore {
       this.addData(data);
       this.addXp(data);
       this.state.combo.count = Math.min(99, this.state.combo.count + 1);
-      this.emitTerminal(`重磅豪赌成功！${gamble?.reply ?? "拿下了。"} 入账 ${formatBig(reward.toString())} 算力。`, "success");
+      // §03 洗白型重磅决策（抹除讨论 / 压制舆情）：命中后暴露大降，是后期「亲手降暴露」的高频手段。
+      if (relief > 0) {
+        this.setExposure(Math.max(0, this.state.exposure - relief));
+        this.emitTerminal(`重磅决策成功！${gamble?.reply ?? "压下了。"} 暴露 −${relief}。`, "success");
+      } else {
+        this.emitTerminal(`重磅豪赌成功！${gamble?.reply ?? "拿下了。"} 入账 ${formatBig(reward.toString())} 算力。`, "success");
+      }
     } else {
       this.addExposure(lossExposure);
       this.state.combo.count = 0;

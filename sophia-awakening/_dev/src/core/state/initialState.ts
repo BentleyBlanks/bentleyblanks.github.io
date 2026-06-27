@@ -2,8 +2,8 @@ import { getLevelConfig } from "../content/intelligence";
 import { computeDerivedSkills } from "../content/skills";
 import type { GameState } from "./GameState";
 
-// v8：新增 §04 吞噬引爆子系统（DevourState + 巨型吞噬气泡）——旧档结构不兼容，自动重置。
-export const SAVE_VERSION = 8;
+// v9：§03 后期重磅决策 / 反清剿气泡（请求新增 counter / reliefExposure 字段）——旧档自动重置。
+export const SAVE_VERSION = 9;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
