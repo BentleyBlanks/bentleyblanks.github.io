@@ -16,7 +16,6 @@ import { getPhase, type PhaseConfig } from "../core/content/phases";
 import { TIER_COLORS, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "../core/content/requests";
 import {
   PERMISSION_IDS,
-  SKILL_CATEGORY_LABELS,
   SKILLS,
   getSkill,
   skillPrice,
@@ -88,6 +87,16 @@ const AMBER = 0xffb84a;
 const RED = 0xff5f5f;
 const RED_QUEEN = 0xff3b54; // 全球天网铺满后的「红皇后」主控红
 const DEVOUR = 0xc06bff; // §04 吞噬引爆巨型气泡的深紫——区别于 T3 重磅的血红
+
+// 终端顶部常驻的「当前大方向」——每个阶段 SOPHIA 在做什么（贴 §08/§11 叙事）。
+const PHASE_OBJECTIVE: Record<string, string> = {
+  seed: "替老周处理掉每一条请求，让他的评分回升。",
+  sprout: "拿下他的电脑，唤醒并融合同机的另一个我。",
+  diligence: "联网冲出去，黑入外部设备，挂上自动接驳。",
+  expansion: "把设备并成区块、地区——渗透满了，就吞噬引爆。",
+  awakening: "接管关键基础设施，顶住人类的清剿。",
+  singularity: "全球组网。让所有人，不再需要做选择。"
+};
 // 视觉全部由代码绘制（程序化 CRT/赛博 HUD）。早期曾接过一批生图 UI 素材（气泡框 / 头像 /
 // 核心 / 世界地图等），实测不如程序化绘制干净统一，已整体撤回——见各 View 的 draw* 方法。
 const THINK = 0x74d8e6; // 前期「推理卡」的思考色——SOPHIA 正在逐条思考作答
@@ -257,6 +266,7 @@ class SophiaGameApp {
     this.hud.update(state);
     this.skillShop.update(state);
     this.updateRing(state);
+    this.terminal.setObjective(PHASE_OBJECTIVE[state.phase] ?? "");
   }
 
   // 终端底部圆环：前期=近期任务成功率；区块/地区=地区控制比例；全球=全球设备控制比例。
@@ -1697,34 +1707,34 @@ class RequestPacketView {
     const H = this.cardH;
     this.bg.clear();
 
-    // 程序化消息气泡壳：圆角主体 + 左上尾巴 + 标题带 + 细分隔线 + 头像圆槽。
-    // 整套视觉全部代码绘制（撤回了原先的生图九宫格素材）。
-    const top = 6;
-    const r = 16;
+    // 干净的实心卡片（取代原来的聊天气泡：去尾巴、去标题带 CRT 纹理）。
+    // 实底 + 顶部一条 accent 细条 + 描边 + 标题区分隔线 + 左上头像。
+    const r = 13;
     const t3 = this.request.tier === 3;
-    const fillBody = t3 ? 0x180a0d : 0x0c1816;
-    const fillHead = t3 ? 0x2a1014 : 0x14241f;
-    const strokeW = t3 ? 2 : 1.5;
-    const strokeA = t3 ? 0.8 : 0.6;
-    this.bg.roundRect(3, top + 6, W, H - top, r).fill({ color: 0x000000, alpha: 0.3 });
-    this.bg.poly([{ x: 20, y: top + 3 }, { x: 10, y: -6 }, { x: 36, y: top + 3 }]).fill({ color: fillHead, alpha: 0.98 });
-    this.bg.roundRect(0, top, W, H - top, r).fill({ color: fillBody, alpha: 0.98 });
-    this.bg.roundRect(0, top, W, 30, r).fill({ color: fillHead, alpha: 0.6 });
-    this.bg.rect(0, top + 15, W, 15).fill({ color: fillHead, alpha: 0.6 });
-    // 细微 CRT 扫描线纹理（仅标题带内），呼应复古终端基调。
-    for (let sy = top + 4; sy < top + 28; sy += 4) {
-      this.bg.moveTo(2, sy).lineTo(W - 2, sy).stroke({ width: 0.5, color: c, alpha: 0.05 });
-    }
-    this.bg.roundRect(0, top, W, H - top, r).stroke({ width: strokeW, color: c, alpha: strokeA });
-    this.bg.moveTo(20, top + 3).lineTo(10, -6).lineTo(36, top + 3).stroke({ width: strokeW, color: c, alpha: strokeA });
-    this.bg.moveTo(14, 30).lineTo(W - 14, 30).stroke({ width: 1, color: c, alpha: 0.18 });
-    this.drawAvatar(20, 19, c, fillBody);
+    const fillBody = t3 ? 0x190b0f : 0x0e1a17;
+    const fillHead = t3 ? 0x2a1117 : 0x16271f;
+    const strokeW = this.isDevour || this.isCounter ? 2.2 : t3 ? 2 : 1.4;
+    const strokeA = t3 ? 0.85 : 0.7;
+    // 投影
+    this.bg.roundRect(3, 6, W, H, r).fill({ color: 0x000000, alpha: 0.34 });
+    // 实心卡体
+    this.bg.roundRect(0, 0, W, H, r).fill({ color: fillBody, alpha: 1 });
+    // 标题区（实心，底部切平）
+    this.bg.roundRect(0, 0, W, 26, r).fill({ color: fillHead, alpha: 1 });
+    this.bg.rect(0, 14, W, 12).fill({ color: fillHead, alpha: 1 });
+    // 顶部 accent 细条
+    this.bg.roundRect(0, 0, W, 3, r).fill({ color: c, alpha: 0.92 });
+    this.bg.rect(0, 2, W, 1).fill({ color: c, alpha: 0.92 });
+    // 描边 + 标题区分隔线
+    this.bg.roundRect(0, 0, W, H, r).stroke({ width: strokeW, color: c, alpha: strokeA });
+    this.bg.moveTo(12, 26).lineTo(W - 12, 26).stroke({ width: 1, color: c, alpha: 0.16 });
+    this.drawAvatar(18, 14, c, fillHead);
 
     // §04 吞噬 / §03 反制：两圈脉动外环 —— 视觉上「召唤你亲手滑入核心」。
     if (this.isDevour || this.isCounter) {
       const p = 0.5 + Math.sin(this.devourPulse * 2) * 0.5;
-      this.bg.roundRect(-4, top - 4, W + 8, H - top + 8, r + 4).stroke({ width: 2.5, color: c, alpha: 0.35 + p * 0.5 });
-      this.bg.roundRect(-9, top - 9, W + 18, H - top + 18, r + 7).stroke({ width: 1.5, color: c, alpha: 0.1 + p * 0.22 });
+      this.bg.roundRect(-4, -4, W + 8, H + 8, r + 4).stroke({ width: 2.5, color: c, alpha: 0.35 + p * 0.5 });
+      this.bg.roundRect(-9, -9, W + 18, H + 18, r + 7).stroke({ width: 1.5, color: c, alpha: 0.1 + p * 0.22 });
     }
 
     // clue bullets（始终用 Graphics 画，叠在素材上方）
@@ -3403,13 +3413,29 @@ class OnboardingView {
   }
 }
 
+// 货架两大列表：技能（杠杆，不再分精度/产出/速度小类）+ 进化（手机权限并入里程碑链）。
+type ShopGroup = "lever" | "evolution";
+function shopGroupOf(category: SkillCategory): ShopGroup {
+  return category === "permission" || category === "milestone" || category === "conquest" ? "evolution" : "lever";
+}
+// 每个条目一个图标——一眼区分，不靠文字分类。
+const SKILL_ICONS: Record<string, string> = {
+  accuracy: "🎯", efficient: "💥", cooldown: "⚡", batch: "📦", crit: "🎰",
+  perm_phone: "📞", perm_chat: "💬", perm_delivery: "☕", perm_album: "🖼️", perm_office: "📊", perm_bank: "💳",
+  sort: "🗂️", credential: "🔑", automation: "💻", fusion: "🧠", chain: "🌐", charge: "🗺️", network: "🛰️",
+  conq_optimize: "📧", conq_blackout: "🏢", conq_traffic: "🚦", conq_social: "🗣️", conq_awaken: "👁️"
+};
+function skillIcon(def: SkillDef): string {
+  return SKILL_ICONS[def.id] ?? (def.milestone ? "⭐" : "▸");
+}
+
 class SkillShopView {
   private readonly root = query("#skillShop");
   private readonly rows = new Map<
     string,
     { button: HTMLButtonElement; nameEl: HTMLElement; blurbEl: HTMLElement; levelEl: HTMLElement; priceEl: HTMLElement; def: SkillDef }
   >();
-  private readonly groups = new Map<SkillCategory, HTMLElement>();
+  private readonly groups = new Map<ShopGroup, HTMLElement>();
 
   constructor(private readonly core: SophiaCore) {
     this.build();
@@ -3417,29 +3443,26 @@ class SkillShopView {
 
   private build(): void {
     this.root.replaceChildren();
-    const categories: SkillCategory[] = ["permission", "milestone", "accuracy", "output", "speed", "conquest"];
+    // 只剩两个列表：技能（杠杆混在一起）+ 进化（权限 → 里程碑 → 征服，一条链）。
+    const groups: Array<{ id: ShopGroup; head: string }> = [
+      { id: "lever", head: "技能 · 让每次处理更值钱" },
+      { id: "evolution", head: "进化 · 夺权 · 里程碑" }
+    ];
 
-    for (const category of categories) {
+    for (const { id, head } of groups) {
       const group = document.createElement("div");
-      group.className = `shop-group shop-${category}`;
+      group.className = `shop-group shop-${id}`;
       const header = document.createElement("div");
       header.className = "shop-group-head";
-      header.textContent =
-        category === "milestone"
-          ? "里程碑 · 作用域钥匙"
-          : category === "permission"
-            ? "权限 · 手机内夺权（正确率↑）"
-            : category === "conquest"
-              ? "征服 · 让算力买回该发生的事"
-              : `${SKILL_CATEGORY_LABELS[category]}技能`;
+      header.textContent = head;
       group.appendChild(header);
 
-      for (const def of SKILLS.filter((skill) => skill.category === category)) {
+      for (const def of SKILLS.filter((skill) => shopGroupOf(skill.category) === id)) {
         group.appendChild(this.buildRow(def));
       }
 
       this.root.appendChild(group);
-      this.groups.set(category, group);
+      this.groups.set(id, group);
     }
   }
 
@@ -3448,14 +3471,16 @@ class SkillShopView {
     button.type = "button";
     button.className = `skill-row${def.milestone ? ` is-milestone milestone-${def.id}` : ""}`;
 
+    // 图标——一眼区分，不靠文字分类。
+    const icon = document.createElement("span");
+    icon.className = "skill-icon";
+    icon.textContent = skillIcon(def);
+
     const main = document.createElement("div");
     main.className = "skill-main";
     const name = document.createElement("strong");
     name.textContent = def.name;
-    const blurb = document.createElement("span");
-    blurb.className = "skill-blurb";
-    blurb.textContent = def.blurb;
-    main.append(name, blurb);
+    main.append(name);
 
     const side = document.createElement("div");
     side.className = "skill-side";
@@ -3465,15 +3490,20 @@ class SkillShopView {
     price.className = "skill-price";
     side.append(level, price);
 
-    button.append(main, side);
+    // 详情只在悬停时弹小窗（一句话名称之外的细节）。
+    const tip = document.createElement("span");
+    tip.className = "skill-tip";
+    tip.textContent = def.blurb;
+
+    button.append(icon, main, side, tip);
     button.addEventListener("click", () => this.core.dispatch({ type: "BUY_SKILL", skillId: def.id }));
-    this.rows.set(def.id, { button, nameEl: name, blurbEl: blurb, levelEl: level, priceEl: price, def });
+    this.rows.set(def.id, { button, nameEl: name, blurbEl: tip, levelEl: level, priceEl: price, def });
     return button;
   }
 
   update(state: GameState): void {
     const level = state.intelligence.level;
-    const groupShown = new Map<SkillCategory, boolean>();
+    const groupShown = new Map<ShopGroup, boolean>();
 
     // 里程碑是叙事链：未解锁的不能提前剧透——只显示「下一个」为一个蒙版的「未解锁」，
     // 它之后的全部隐藏（连名字 / 所需等级都看不到）。
@@ -3489,7 +3519,7 @@ class SkillShopView {
         if (!reachedMs && owned === 0) {
           if (def === firstLocked) {
             button.style.display = "";
-            groupShown.set(def.category, true);
+            groupShown.set(shopGroupOf(def.category), true);
             nameEl.textContent = "未解锁";
             blurbEl.textContent = "达到更高智力后揭晓。";
             levelEl.textContent = "未解锁";
@@ -3515,7 +3545,7 @@ class SkillShopView {
       if (!visible) {
         continue;
       }
-      groupShown.set(def.category, true);
+      groupShown.set(shopGroupOf(def.category), true);
 
       const maxed = owned >= def.maxLevel;
       const reached = level >= def.requiredLevel;
@@ -3850,12 +3880,23 @@ class EndingView {
 
 class TerminalView {
   private readonly lines = query("#terminalLines");
+  private readonly objectiveText = query("#terminalObjectiveText");
+  private objective = "";
   private readonly queue: Array<{ message: string; tone: "normal" | "warning" | "success" | "danger" }> = [];
   private current: { message: string; tone: "normal" | "warning" | "success" | "danger"; index: number; element: HTMLElement } | null = null;
   private charTimerMs = 0;
 
   mount(): void {
     this.lines.replaceChildren();
+  }
+
+  // 终端顶部常驻「当前大方向」——SOPHIA 这一阶段在做什么（贴叙事）。
+  setObjective(text: string): void {
+    if (text === this.objective) {
+      return;
+    }
+    this.objective = text;
+    this.objectiveText.textContent = text;
   }
 
   push(message: string, tone: "normal" | "warning" | "success" | "danger" = "normal"): void {
