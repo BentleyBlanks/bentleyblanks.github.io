@@ -457,7 +457,7 @@ button:disabled {
 .capture-button {
   position: relative;
   display: grid;
-  grid-template-columns: 48px 1fr;
+  grid-template-columns: 84px 1fr;
   gap: 10px;
   align-items: center;
   min-height: 104px;
@@ -490,11 +490,16 @@ button:disabled {
   animation: capture-scan 1.8s ease-in-out infinite;
 }
 
-.capture-device-icon {
+/* 选择器要压过 .command-button span（否则图标被强制成 11px）。 */
+.capture-button .capture-device-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
   flex: 0 0 auto;
-  width: 28px;
+  width: 84px;
   text-align: center;
-  font-size: 24px;
+  font-size: 62px;
   line-height: 1;
 }
 
