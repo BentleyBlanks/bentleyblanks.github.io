@@ -312,9 +312,9 @@ export class SophiaCore {
       // 上百张卡片轰然涌入、成片飞向节点」，而不是一张一张挤牙膏。封顶是表现层性能护栏。
       // 卡片只落在核心两侧的窄带里（中央留给核心 + 环绕节点），所以同屏数量收着点，
       // 否则会糊成一片、连环绕的设备都看不见。够成一股可见卡流即可。
-      const perSecond = Math.min(60, (capacity * 1.4 + 4) / this.state.derived.spawnSpeedMult);
-      interval = Math.max(16, 1000 / perSecond);
-      maxVisible = Math.min(40, Math.ceil(capacity * 0.9) + 10);
+      const perSecond = Math.min(30, (capacity * 1.2 + 3) / this.state.derived.spawnSpeedMult);
+      interval = Math.max(40, 1000 / perSecond);
+      maxVisible = Math.min(14, Math.ceil(capacity * 0.7) + 6); // 同屏卡数收着点，别糊成一片 / 卡顿
     } else {
       interval = Math.max(340, config.spawnIntervalMs * this.state.derived.spawnSpeedMult);
       maxVisible = config.maxVisible;

@@ -475,35 +475,55 @@ class SophiaGameApp {
     }
   }
 
-  // 卡片摆放：固定落在屏幕**四角**（前期 1 张起、最多 4 张，各占一角，互不遮挡，也不压住中央核心）。
+  // 卡片摆放：前期 1~4 张固定落四角；自动接驳期（洪峰）网格散布、不堆在四角（避免重叠卡顿）。
   private nextRequestPosition(_request: RequestInstance, newCardH: number): PointData {
     const screen = this.pixi.screen;
     const w = screen.width;
     const h = screen.height;
     const W = REQUEST_PACKET_WIDTH;
     const H = newCardH;
-    const railL = LEFT_RAIL_WIDTH + 14;
-    const railR = w - RIGHT_RAIL_WIDTH - 14;
+    // 与顶栏左右沿对齐：顶栏 left/right 各留 16px（见 .top-hud CSS）。
+    const railL = LEFT_RAIL_WIDTH + 16;
+    const railR = w - RIGHT_RAIL_WIDTH - 16;
     const top = 118; // 顶栏下沿之下——上两角卡片别被顶部 HUD 盖住
     const bot = h - 26;
+    const core = this.interfaceView.center;
+    const occ = [...this.requestViews.values()].filter((v) => !v.busy).map((v) => ({ x: v.restX, y: v.restY, h: v.cardHeight }));
 
-    // 四角锚点（卡片左上角）：左上 / 右上 / 左下 / 右下。
+    // 自动接驳期：网格扫描找最靠近核心的空位，散布开来不堆叠（卡片很快飞向节点，过渡用）。
+    if (this.core.getState().automationUnlocked) {
+      const step = 64;
+      const gap = 8;
+      let best: { x: number; y: number; d: number } | null = null;
+      for (let x = railL; x + W <= railR; x += step) {
+        for (let y = top; y + H <= bot; y += step) {
+          if (Math.abs(x + W / 2 - core.x) < 200 && Math.abs(y + H / 2 - core.y) < 230) {
+            continue; // 避开中央核心
+          }
+          const hit = occ.some((o) => x < o.x + W + gap && x + W + gap > o.x && y < o.y + o.h + gap && y + H + gap > o.y);
+          if (!hit) {
+            const d = (x + W / 2 - core.x) ** 2 + (y + H / 2 - core.y) ** 2;
+            if (!best || d < best.d) best = { x, y, d };
+          }
+        }
+      }
+      if (best) return { x: best.x, y: best.y };
+      return { x: railL, y: top };
+    }
+
+    // 前期手动：四角锚点（卡片左上角）。
     const corners: PointData[] = [
       { x: railL, y: top },
       { x: railR - W, y: top },
       { x: railL, y: bot - H },
       { x: railR - W, y: bot - H }
     ];
-
-    // 已停靠卡片（拖动 / 结算中的不占角）。
-    const occ = [...this.requestViews.values()].filter((v) => !v.busy).map((v) => ({ x: v.restX, y: v.restY }));
     for (const c of corners) {
       const taken = occ.some((o) => Math.abs(o.x - c.x) < W * 0.6 && Math.abs(o.y - c.y) < H * 0.6);
       if (!taken) {
         return c;
       }
     }
-    // 四角都占满（前期上限就是 4，正常不会到这）：错开兜底。
     return corners[this.requestViews.size % 4];
   }
 
@@ -1392,7 +1412,7 @@ class RequestPacketView {
   readonly container = new Container();
   readonly request: RequestInstance;
   settling = false;
-  charge = 0;
+  charge = 1; // 「按住蓄力」玩法已删除——恒为满，拖入即按满值结算。
   private readonly bg = new Graphics();
   private readonly chargeBar = new Graphics();
   // 发信人类型——决定左上角圆槽里那枚程序化绘制的头像字形（宿主 / 上级 / 系统 / SOPHIA）。
@@ -1665,10 +1685,7 @@ class RequestPacketView {
       this.draw();
       return;
     }
-    if (this.dragging && this.request.tier === 3) {
-      this.charge = Math.min(1, this.charge + deltaMs / 1450);
-      this.draw();
-    }
+    // （已删除「按住蓄力」玩法——T3 重磅卡直接拖入核心即结算。）
 
     // 教学高亮：未操作时让被引导的选项呼吸闪烁（每帧重绘）。
     if (this.phase === "idle" && this.request.tutorial?.highlight !== undefined) {
@@ -1792,14 +1809,15 @@ class RequestPacketView {
       return;
     }
 
-    // 回复轮盘卡：点击某个回复行 = 选它（不拖动）。
+    // 回复轮盘卡：点某个回复行 = 选它（不拖动）；点标题/线索区 = 进入拖动（可把卡拖去委托给已连的 App）。
     if (this.isReel) {
       const local = event.getLocalPosition(this.container);
       const index = this.optionRows.findIndex((row) => local.y >= row.y && local.y <= row.y + row.h);
       if (index >= 0) {
         this.pickOption(index);
+        return;
       }
-      return;
+      // 没点中选项 → 往下走进入拖动。
     }
 
     // T2 串接卡：点提交行 = 串接送核；点步骤行 = 勾选 / 取消（不拖动）。
@@ -1934,7 +1952,6 @@ class RequestPacketView {
     if (!accepted) {
       gsap.to(this.container.position, { x: this.homeX, y: this.homeY, duration: 0.22, ease: "back.out(1.8)" });
       gsap.to(this.container.scale, { x: 1, y: 1, duration: 0.18 });
-      this.charge = 0;
       this.draw();
     }
   }
@@ -1977,15 +1994,7 @@ class RequestPacketView {
       this.bg.circle(17, y + 7, 1.8).fill({ color: c, alpha: 0.7 });
     }
 
-    this.chargeBar.clear();
-
-    if (this.request.tier === 3 && !this.isReel) {
-      this.chargeBar.roundRect(12, H - 8, W - 24, 4, 2).fill({ color: 0xffffff, alpha: 0.09 });
-      this.chargeBar.roundRect(12, H - 8, (W - 24) * this.charge, 4, 2).fill({
-        color: this.charge > 0.85 ? GREEN : AMBER,
-        alpha: 0.95
-      });
-    }
+    this.chargeBar.clear(); // 蓄力条已移除
 
     if (this.isReel) {
       this.drawOptions();

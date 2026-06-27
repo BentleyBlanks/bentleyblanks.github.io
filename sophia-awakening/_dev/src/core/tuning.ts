@@ -34,7 +34,7 @@ export const TUNING = {
   nodeCostExponent:     1.68,     // 节点造价指数（每多一台 ×exponent）
   tierScalePerTier:     0.85,     // 节点每档产出加成
   levelScalePerLevel:   0.28,     // 节点每升一级产出加成
-  cardsPerSecBase:      0.7,      // 节点基础吞卡速率
+  cardsPerSecBase:      0.42,     // 节点基础吞卡速率（控了几台电脑后处理别太快）
   traceCleanupBase:     42,       // 清理痕迹基础算力消耗
   traceCleanupExponent: 1.42,     // 清理痕迹成本指数（每次 ×exponent）
 
