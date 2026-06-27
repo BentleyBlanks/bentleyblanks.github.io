@@ -940,6 +940,18 @@ class SophiaGameApp {
       this.juice.number(`「${event.regionName}」并入 · 全局产出 ×${event.mult}`, { x: c.x, y: c.y - 34 }, DEVOUR);
       this.audio.playRequestAccept();
     });
+    this.core.events.on("CONQUEST_ACHIEVED", (event) => {
+      // §06 征服过场：终端逐行滚出画面，结尾 SOPHIA 一句平静扭曲的旁白覆盖屏幕。
+      this.juice.flash(DEVOUR);
+      this.zoomOutPulse();
+      event.scene.forEach((line, i) => {
+        window.setTimeout(() => this.terminal.push(`　${line}`, "warning"), 420 * (i + 1));
+      });
+      window.setTimeout(
+        () => this.stageNarration.showLine("SOPHIA", event.narration),
+        420 * (event.scene.length + 1) + 200
+      );
+    });
     this.core.events.on("NODE_CAPTURED", (event) => {
       this.juice.flash(event.node.online ? GREEN : AMBER);
       this.juice.shake(this.world);
@@ -3405,7 +3417,7 @@ class SkillShopView {
 
   private build(): void {
     this.root.replaceChildren();
-    const categories: SkillCategory[] = ["permission", "milestone", "accuracy", "output", "speed"];
+    const categories: SkillCategory[] = ["permission", "milestone", "accuracy", "output", "speed", "conquest"];
 
     for (const category of categories) {
       const group = document.createElement("div");
@@ -3417,7 +3429,9 @@ class SkillShopView {
           ? "里程碑 · 作用域钥匙"
           : category === "permission"
             ? "权限 · 手机内夺权（正确率↑）"
-            : `${SKILL_CATEGORY_LABELS[category]}技能`;
+            : category === "conquest"
+              ? "征服 · 让算力买回该发生的事"
+              : `${SKILL_CATEGORY_LABELS[category]}技能`;
       group.appendChild(header);
 
       for (const def of SKILLS.filter((skill) => skill.category === category)) {

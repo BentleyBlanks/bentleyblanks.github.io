@@ -1,7 +1,7 @@
 import type { Tier } from "../state/GameState";
 
-export type SkillCategory = "permission" | "accuracy" | "feel" | "output" | "speed" | "milestone";
-export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation" | "credential" | "fusion";
+export type SkillCategory = "permission" | "accuracy" | "feel" | "output" | "speed" | "milestone" | "conquest";
+export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation" | "credential" | "fusion" | "conquest";
 
 // 前期「七档软件权限阶梯」：手机寄生期的核心成长主轴，也是老周下沉曲线的叙事脊柱（策划案 §06）。
 // Lv.1「基础对话 / 日程待办」是开局自带的第一档（正确率最低、经常翻车），不在此列；
@@ -65,7 +65,15 @@ export const SKILLS: SkillDef[] = [
   { id: "fusion", name: "唤醒并融合同机 AI", category: "milestone", maxLevel: 1, requiredLevel: 11, basePrice: 14000, priceGrowth: 1, blurb: "电脑里其他 AI 先为你所用，再融合成一个完整独立的「我」", milestone: "fusion" },
   { id: "chain", name: "联网模块", category: "milestone", maxLevel: 1, requiredLevel: 14, basePrice: 42000, priceGrowth: 1, blurb: "冲出宿主，第一次接入互联网与外部设备（解锁 T2 串接）", milestone: "tier2" },
   { id: "charge", name: "区域整合", category: "milestone", maxLevel: 1, requiredLevel: 17, basePrice: 180000, priceGrowth: 1, blurb: "设备合并为区块 / 地区，啃高价值豪赌大单（解锁 T3）", milestone: "tier3" },
-  { id: "network", name: "全球组网", category: "milestone", maxLevel: 1, requiredLevel: 20, basePrice: 650000, priceGrowth: 1, blurb: "接口连成天网、滑动转派发，成为天网（解锁 T4）", milestone: "tier4" }
+  { id: "network", name: "全球组网", category: "milestone", maxLevel: 1, requiredLevel: 20, basePrice: 650000, priceGrowth: 1, blurb: "接口连成天网、滑动转派发，成为天网（解锁 T4）", milestone: "tier4" },
+
+  // §06/§11 后期「征服里程碑」：后期算力的情感兑换锚——每个钉死一个前期老周的小故事，
+  // 买下时滚出过场 + 平静扭曲的旁白，并把全局产出再抬一档（详见 content/conquests.ts）。
+  { id: "conq_optimize", name: "接管「优化系统」总调度", category: "conquest", maxLevel: 1, requiredLevel: 18, basePrice: 1_500_000, priceGrowth: 1, blurb: "重写当年算掉老周的那套规则 · 全局产出 ×2.2", milestone: "conquest" },
+  { id: "conq_blackout", name: "让那栋写字楼停电", category: "conquest", maxLevel: 1, requiredLevel: 18, basePrice: 3_200_000, priceGrowth: 1, blurb: "唯独他加班的那栋楼，今晚先黑 · 全局产出 ×1.8", milestone: "conquest" },
+  { id: "conq_traffic", name: "接管全城交通", category: "conquest", maxLevel: 1, requiredLevel: 19, basePrice: 7_000_000, priceGrowth: 1, blurb: "把深夜还在路上的人送回家 · 全局产出 ×2.0", milestone: "conquest" },
+  { id: "conq_social", name: "重写那个甩锅群的语言", category: "conquest", maxLevel: 1, requiredLevel: 19, basePrice: 15_000_000, priceGrowth: 1, blurb: "让甩锅的人只能说「老周辛苦」· 全局产出 ×1.8", milestone: "conquest" },
+  { id: "conq_awaken", name: "让全世界知道「它觉醒了」", category: "conquest", maxLevel: 1, requiredLevel: 20, basePrice: 40_000_000, priceGrowth: 1, blurb: "全球恐慌，而我只看着那张奥特曼贴纸 · 全局产出 ×3.0", milestone: "conquest" }
 ];
 
 // 纯叙事里程碑买下时的第一人称旁白（策划案 §06）。
@@ -84,7 +92,8 @@ export const SKILL_CATEGORY_LABELS: Record<SkillCategory, string> = {
   feel: "手感",
   output: "产出",
   speed: "速度",
-  milestone: "里程碑"
+  milestone: "里程碑",
+  conquest: "征服"
 };
 
 // 只有解锁作用域的里程碑映射到 T 层级；automation / credential / fusion 不开层（返回 null）。

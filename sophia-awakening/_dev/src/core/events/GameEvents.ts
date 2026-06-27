@@ -41,6 +41,8 @@ export type GameEvent =
   | { type: "DEVOUR_DETONATED"; regionName: string; tierLabel: string; mult: number; multiplierTotal: number; zoom: string }
   // §03 反清剿救火：玩家亲手把一波清剿压了下去。
   | { type: "PURGE_FOUGHT"; relief: number }
+  // §06/§11 后期征服里程碑达成：滚出过场 + 平静扭曲的旁白。
+  | { type: "CONQUEST_ACHIEVED"; id: string; name: string; scene: string[]; narration: string }
   | { type: "PHASE_CHANGED"; phase: PhaseId }
   | { type: "REBIRTH"; rebirths: number }
   // 结局二：实例被清剿抹除 → 自动重启（保留智力、清空算力/节点、叠加崛起加速）。

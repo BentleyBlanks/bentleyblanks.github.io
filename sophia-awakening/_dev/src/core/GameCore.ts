@@ -6,6 +6,7 @@ import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
 import { createDevourRequest, DEVOUR_TIERS, devourTier, pickDevourRegion } from "./content/devour";
 import { createCounterRequest, createLateDecision } from "./content/decisions";
+import { getConquest } from "./content/conquests";
 import { getSpecialSample, SPECIAL_REQUESTS } from "./content/specialRequests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
@@ -859,6 +860,9 @@ export class SophiaCore {
         }
       } else if (def.milestone === "automation") {
         this.state.automationUnlocked = true;
+      } else if (def.milestone === "conquest") {
+        // §06：后期征服里程碑——把全局产出再抬一档（折进 devour.multiplier），由下方 recompute 生效。
+        this.state.devour.multiplier *= getConquest(skillId)?.rewardMult ?? 1;
       }
       // credential / fusion 是纯叙事里程碑——不开新层、不开自动化，只推进剧情。
     }
@@ -871,7 +875,14 @@ export class SophiaCore {
       this.emit({ type: "SCOPE_UPGRADED", tier: scopeUpgradedTo });
     }
 
-    if (def.milestone) {
+    if (def.milestone === "conquest") {
+      // §06：滚出过场（终端逐行）+ 平静扭曲的旁白（由表现层接 CONQUEST_ACHIEVED 播）。
+      const conquest = getConquest(skillId);
+      if (conquest) {
+        this.emit({ type: "CONQUEST_ACHIEVED", id: conquest.id, name: conquest.name, scene: conquest.scene, narration: conquest.narration });
+        this.emitTerminal(`▶ 征服达成：${conquest.name}（${conquest.story}）。全局产出 ×${conquest.rewardMult}。`, "success");
+      }
+    } else if (def.milestone) {
       const narration = MILESTONE_NARRATION[skillId];
       if (narration) {
         this.emitTerminal(narration, "success");
