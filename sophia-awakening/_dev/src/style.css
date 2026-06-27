@@ -1415,32 +1415,30 @@ body.exposed .screen-veil {
 }
 
 /* 详情只在悬停时弹出的小窗——平时藏起来，一句话名称之外的细节都收在这里。 */
+/* 详情文本只是数据载体，不再排版显示（改由跟随鼠标的浮窗读取）。 */
 .skill-tip {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%) scale(0.96);
-  transform-origin: left center;
-  z-index: 60;
-  width: max-content;
-  max-width: 250px;
+  display: none;
+}
+
+/* 跟随鼠标的技能详情浮窗。 */
+.skill-tooltip {
+  position: fixed;
+  z-index: 80;
+  display: none;
+  max-width: 240px;
   padding: 8px 11px;
   border-radius: 8px;
   border: 1px solid rgba(137, 255, 154, 0.35);
-  background: rgba(8, 18, 16, 0.97);
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55);
-  color: rgba(237, 242, 240, 0.86);
+  background: rgba(8, 18, 16, 0.98);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  color: rgba(237, 242, 240, 0.9);
   font-size: 11.5px;
   line-height: 1.45;
   white-space: normal;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms ease, transform 120ms ease;
 }
-
-.skill-row:hover .skill-tip {
-  opacity: 1;
-  transform: translateY(-50%) scale(1);
+.skill-tooltip.is-open {
+  display: block;
 }
 
 .skill-side {

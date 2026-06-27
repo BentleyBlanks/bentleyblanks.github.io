@@ -303,7 +303,7 @@ class SophiaGameApp {
     this.updateTutorial(state, deltaMs);
     if (!paused) {
       this.autoDispatch(state, deltaMs);
-      this.appDispatch(state, deltaMs);
+      // appDispatch（App 自动抢单）已停用——越权调用阶段改为玩家亲手把需求拖到 App 上委托处理。
     }
     this.terminal.update(deltaMs);
     this.onboarding.update(deltaMs);
@@ -707,66 +707,19 @@ class SophiaGameApp {
 
     // 引导卡不再放大（缩放会把位图文字拉糊）——保持原始清晰度，只用脉动高亮环 + 箭头吸引注意。
     this.tutorialPulse += deltaMs * 0.005;
-    const sw = REQUEST_PACKET_WIDTH;
-    const sh = Math.max(REQUEST_PACKET_HEIGHT, view.container.height || REQUEST_PACKET_HEIGHT);
-    const x = view.container.x;
-    const y = view.container.y;
+    // 直接用卡片的真实渲染包围盒画高亮框——和卡片严格对齐，不依赖任何 cardHeight 估算。
+    const b = view.container.getBounds();
     const p = 0.5 + Math.sin(this.tutorialPulse * 2) * 0.5;
     const g = this.tutorialGfx;
-    g.roundRect(x - 8, y - 12, sw + 16, sh + 18, 16).stroke({ width: 2.5, color: GREEN, alpha: 0.4 + p * 0.45 });
-    const ax = x + sw / 2;
-    const ay = y - 24 - p * 8;
+    g.roundRect(b.x - 5, b.y - 5, b.width + 10, b.height + 10, 14).stroke({ width: 2.5, color: GREEN, alpha: 0.4 + p * 0.45 });
+    const ax = b.x + b.width / 2;
+    const ay = b.y - 16 - p * 8;
     g.moveTo(ax - 11, ay - 10).lineTo(ax, ay).lineTo(ax + 11, ay - 10).stroke({ width: 4, color: GREEN, alpha: 0.85 });
     g.moveTo(ax, ay).lineTo(ax, ay - 18).stroke({ width: 3, color: GREEN, alpha: 0.7 });
   }
 
-  // 越权调用阶段（买了「越权调用」、还没「拿下宿主电脑」自动化前）：被调动的手机 App
-  // 替你"缓慢地"处理请求——节奏很慢、且 quality 低（准确率低）。卡片会飞向控制域里的
-  // App worker 再结算，让你真的看到 App 在替你干活。智力越高，处理略快、略准。
-  private appDispatchTimerMs = 0;
-  private appLandCount = 0;
-  private appDispatch(state: GameState, deltaMs: number): void {
-    if (state.automationUnlocked || state.intelligence.unlockedTier < 1 || !this.interfaceView.hasAppWorkers()) {
-      this.appDispatchTimerMs = 0;
-      return;
-    }
-
-    // 慢：随智力从 ~2.6s 缩短到 ~1.6s 一张。
-    const interval = Math.max(1600, 2600 - state.intelligence.level * 120);
-    this.appDispatchTimerMs += deltaMs;
-    if (this.appDispatchTimerMs < interval) {
-      return;
-    }
-
-    const queue = state.requests.filter((request) => {
-      const view = this.requestViews.get(request.id);
-      return view !== undefined && !view.busy;
-    });
-
-    if (queue.length === 0) {
-      this.appDispatchTimerMs = interval; // 没卡就保持就绪，来卡即处理
-      return;
-    }
-
-    this.appDispatchTimerMs -= interval;
-    const request = queue[0];
-    const view = this.requestViews.get(request.id);
-    if (!view) {
-      return;
-    }
-
-    const requestId = request.id;
-    const target = this.interfaceView.getAppWorkerPoint(this.appLandCount);
-    this.appLandCount += 1;
-    this.pendingDropPoints.set(requestId, target);
-
-    view.flyToNode(target, () => {
-      // 准确率低：quality 随智力从 0.45 升到 ~0.75，前期常常"白忙一半"。
-      const quality = Math.min(0.75, 0.45 + state.intelligence.level * 0.05);
-      this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
-      this.onAutoDispatchLanded(target);
-    });
-  }
+  // 越权调用阶段的 App 委托处理已改为「玩家亲手把需求拖到 App 图标上」（见 handleDrop），
+  // 不再自动抢单；旧的 appDispatch 自动派发已移除。
 
   // 节点处理一张卡所需的毫秒（越快越强）。按设备档次（baseProduction，开方压缩量级）
   // × 接驳层级 × 节点等级 × 「设备提速」技能定速；与产出用的 globalMultiplier 解耦，
@@ -1044,6 +997,28 @@ class SophiaGameApp {
         hit.entryGlobal
       );
       return true;
+    }
+
+    // 越权调用阶段（已控 App、还没上自动接驳）：把需求**亲手拖到某个 App 图标上** → 委托它处理。
+    // App 干得更慢更糙（quality 随智力 0.45→0.75），是「要不要分点活给 App」的主动取舍——
+    // App 不再自动抢单，处不处理、给谁处理都由你决定。
+    if (!state.automationUnlocked && state.intelligence.unlockedTier >= 1 && this.interfaceView.hasAppWorkers()) {
+      const appPt = this.interfaceView.appWorkerAt(global);
+      if (appPt) {
+        const requestId = request.id;
+        this.audio.playRequestAccept();
+        this.pendingDropPoints.set(requestId, appPt);
+        card.accept(
+          appPt,
+          () => {
+            const quality = Math.min(0.75, 0.45 + state.intelligence.level * 0.05);
+            this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
+            this.onAutoDispatchLanded(appPt);
+          },
+          { x: card.container.x, y: card.container.y }
+        );
+        return true;
+      }
     }
 
     const drop =
@@ -1573,8 +1548,8 @@ class RequestPacketView {
         this.container.addChild(label, prob);
         y += h + 5;
       });
-      // 去掉「点击一个回复」提示——卡片本就该点，提示纯属冗余。
-      this.cardH = y + 8;
+      // 收紧底部留白，让卡片更贴内容（教学高亮框也跟着贴齐）。
+      this.cardH = y + 3;
     }
 
     if (this.isChain) {
@@ -1944,10 +1919,7 @@ class RequestPacketView {
     // 标题区（实心，底部切平）
     this.bg.roundRect(0, 0, W, 26, r).fill({ color: fillHead, alpha: 1 });
     this.bg.rect(0, 14, W, 12).fill({ color: fillHead, alpha: 1 });
-    // 顶部 accent 细条
-    this.bg.roundRect(0, 0, W, 3, r).fill({ color: c, alpha: 0.92 });
-    this.bg.rect(0, 2, W, 1).fill({ color: c, alpha: 0.92 });
-    // 描边 + 标题区分隔线
+    // 描边 + 标题区分隔线（去掉顶部那根多余的 accent 横条——边框已经够了）
     this.bg.roundRect(0, 0, W, H, r).stroke({ width: strokeW, color: c, alpha: strokeA });
     this.bg.moveTo(12, 26).lineTo(W - 12, 26).stroke({ width: 1, color: c, alpha: 0.16 });
     this.drawAvatar(18, 14, c, fillHead);
@@ -2176,6 +2148,18 @@ class InterfaceView {
       return this.center;
     }
     return this.appWorkerPoints[index % this.appWorkerPoints.length];
+  }
+
+  // 命中测试：卡片是否被拖到了某个「被控 App」图标上（用于玩家亲手把需求委托给 App）。
+  appWorkerAt(global: PointData): PointData | null {
+    for (const p of this.appWorkerPoints) {
+      const dx = global.x - p.x;
+      const dy = global.y - p.y;
+      if (dx * dx + dy * dy <= 46 * 46) {
+        return p;
+      }
+    }
+    return null;
   }
 
   constructor() {
@@ -3554,29 +3538,55 @@ class SkillShopView {
   private readonly root = query("#skillShop");
   private readonly rows = new Map<
     string,
-    { button: HTMLButtonElement; nameEl: HTMLElement; blurbEl: HTMLElement; levelEl: HTMLElement; priceEl: HTMLElement; def: SkillDef }
+    { button: HTMLButtonElement; iconEl: HTMLElement; nameEl: HTMLElement; blurbEl: HTMLElement; levelEl: HTMLElement; priceEl: HTMLElement; def: SkillDef }
   >();
   private readonly groups = new Map<ShopGroup, HTMLElement>();
+  // 跟随鼠标的浮动小窗（取代原来固定在右侧的提示框）。
+  private readonly tooltip = document.createElement("div");
 
   constructor(private readonly core: SophiaCore) {
+    this.tooltip.className = "skill-tooltip";
+    document.body.appendChild(this.tooltip);
     this.build();
+  }
+
+  private showTip(text: string, x: number, y: number): void {
+    if (!text) {
+      this.hideTip();
+      return;
+    }
+    this.tooltip.textContent = text;
+    this.tooltip.classList.add("is-open");
+    this.moveTip(x, y);
+  }
+  private moveTip(x: number, y: number): void {
+    const w = this.tooltip.offsetWidth || 200;
+    const lx = Math.min(window.innerWidth - w - 10, x + 16);
+    this.tooltip.style.left = `${Math.round(lx)}px`;
+    this.tooltip.style.top = `${Math.round(y + 16)}px`;
+  }
+  private hideTip(): void {
+    this.tooltip.classList.remove("is-open");
   }
 
   private build(): void {
     this.root.replaceChildren();
     // 只剩两个列表：技能（杠杆混在一起）+ 进化（权限 → 里程碑 → 征服，一条链）。
+    // 「技能货架」标题已在区块外（panel-kicker），这里 lever 组不再重复「技能」二字。
     const groups: Array<{ id: ShopGroup; head: string }> = [
-      { id: "lever", head: "技能" },
+      { id: "lever", head: "" },
       { id: "evolution", head: "进化 · 里程碑" }
     ];
 
     for (const { id, head } of groups) {
       const group = document.createElement("div");
       group.className = `shop-group shop-${id}`;
-      const header = document.createElement("div");
-      header.className = "shop-group-head";
-      header.textContent = head;
-      group.appendChild(header);
+      if (head) {
+        const header = document.createElement("div");
+        header.className = "shop-group-head";
+        header.textContent = head;
+        group.appendChild(header);
+      }
 
       for (const def of SKILLS.filter((skill) => shopGroupOf(skill.category) === id)) {
         group.appendChild(this.buildRow(def));
@@ -3611,14 +3621,17 @@ class SkillShopView {
     price.className = "skill-price";
     side.append(level, price);
 
-    // 详情只在悬停时弹小窗（一句话名称之外的细节）。
+    // 详情存在隐藏的数据节点上（不再固定排在右侧）；悬停时由跟随鼠标的浮窗读取并显示。
     const tip = document.createElement("span");
     tip.className = "skill-tip";
     tip.textContent = def.blurb;
 
     button.append(icon, main, side, tip);
     button.addEventListener("click", () => this.core.dispatch({ type: "BUY_SKILL", skillId: def.id }));
-    this.rows.set(def.id, { button, nameEl: name, blurbEl: tip, levelEl: level, priceEl: price, def });
+    button.addEventListener("mouseenter", (e) => this.showTip(tip.textContent ?? "", e.clientX, e.clientY));
+    button.addEventListener("mousemove", (e) => this.moveTip(e.clientX, e.clientY));
+    button.addEventListener("mouseleave", () => this.hideTip());
+    this.rows.set(def.id, { button, iconEl: icon, nameEl: name, blurbEl: tip, levelEl: level, priceEl: price, def });
     return button;
   }
 
@@ -3631,26 +3644,29 @@ class SkillShopView {
     const milestoneOrder = SKILLS.filter((skill) => skill.milestone).sort((a, b) => a.requiredLevel - b.requiredLevel);
     const firstLocked = milestoneOrder.find((m) => level < m.requiredLevel && (state.skills[m.id] ?? 0) === 0);
 
-    for (const { button, nameEl, blurbEl, levelEl, priceEl, def } of this.rows.values()) {
+    for (const { button, iconEl, nameEl, blurbEl, levelEl, priceEl, def } of this.rows.values()) {
       const owned = state.skills[def.id] ?? 0;
 
       // 里程碑：已达成/可买的正常显示；下一个未解锁的蒙版成「未解锁」；再往后的整行隐藏。
       if (def.milestone) {
         const reachedMs = level >= def.requiredLevel;
         if (!reachedMs && owned === 0 && def !== firstLocked) {
-          // 叙事链不剧透：只有「下一个」里程碑揭示名字 + 所需等级；更靠后的一律蒙版成「未解锁」（可见但藏掉名字）。
+          // 叙事链不剧透：更靠后的里程碑彻底蒙版——只剩一枚锁图标 + 「未解锁」，
+          // 不露名字/真图标，右侧的等级/价格列也全清空（不要冗余的「未解锁 / 🔒」）。
           button.style.display = "";
           groupShown.set(shopGroupOf(def.category), true);
+          iconEl.textContent = "🔒";
           nameEl.textContent = "未解锁";
           blurbEl.textContent = "达成上一个里程碑后揭晓。";
-          levelEl.textContent = "未解锁";
-          priceEl.textContent = "🔒";
+          levelEl.textContent = "";
+          priceEl.textContent = "";
           button.disabled = true;
           button.classList.add("is-locked");
           button.classList.remove("is-ready", "is-owned", "is-poor");
           continue;
         }
-        // 下一个里程碑 / 已够得着 / 已拥有：显示真名（firstLocked 往下走会显示「🔒 需智力 Lv.X」）。
+        // 下一个里程碑 / 已够得着 / 已拥有：显示真名 + 真图标（firstLocked 往下走会显示「🔒 需智力 Lv.X」）。
+        iconEl.textContent = skillIcon(def);
         nameEl.textContent = def.name;
         blurbEl.textContent = def.blurb;
       }
