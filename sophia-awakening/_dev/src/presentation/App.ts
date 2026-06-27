@@ -121,8 +121,8 @@ const PERSISTENCE_REVISION = "late-decisions-v22";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
 // re-persist the in-memory (un-reset) state and quietly undo the wipe.
 let suppressSaveOnUnload = false;
-const LEFT_RAIL_WIDTH = 336;
-const RIGHT_RAIL_WIDTH = 360;
+const LEFT_RAIL_WIDTH = 270;
+const RIGHT_RAIL_WIDTH = 290;
 const PLAYFIELD_GUTTER = 24;
 const BASE_SUCTION_MARGIN = 50;
 const REQUEST_PACKET_WIDTH = 230;

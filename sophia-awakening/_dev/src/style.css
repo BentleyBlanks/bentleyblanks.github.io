@@ -14,8 +14,25 @@
   --red: #ff5f5f;
   --paper: #e8e1cb;
   --ink: #151718;
-  --left-rail: 336px;
-  --right-rail: 360px;
+  --left-rail: 270px;
+  --right-rail: 290px;
+}
+
+/* 左右栏不显示滚动条（内容溢出仍可滚，但不占视觉、不抢屏幕空间）。 */
+.control-panel,
+.right-rail .domain-cluster,
+.terminal-lines,
+.skill-shop {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.control-panel::-webkit-scrollbar,
+.right-rail .domain-cluster::-webkit-scrollbar,
+.terminal-lines::-webkit-scrollbar,
+.skill-shop::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 * {
