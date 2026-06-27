@@ -4,6 +4,7 @@ import { TUNING } from "./tuning";
 import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "./content/nodes";
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
+import { createDevourRequest, DEVOUR_TIERS, devourTier, pickDevourRegion } from "./content/devour";
 import { getSpecialSample, SPECIAL_REQUESTS } from "./content/specialRequests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
@@ -104,6 +105,7 @@ export class SophiaCore {
     this.state.clockMs += dtMs;
     this.tickRequests(dtMs);
     this.tickAutomation(dtMs);
+    this.tickDevour(dtMs);
     this.tickExposure(dtMs);
     this.tickHumanVoice(dtMs);
     this.tickChallenge(dtMs);
@@ -155,6 +157,9 @@ export class SophiaCore {
         break;
       case "SKIP_REQUEST":
         this.skipRequest(command.requestId);
+        break;
+      case "DEVOUR_DETONATE":
+        this.detonateDevour(command.requestId);
         break;
       case "RESOLVE_GAMBLE":
         this.resolveGamble(command.requestId, command.win);
@@ -401,6 +406,67 @@ export class SophiaCore {
     if (this.state.suspicion.active && !this.state.exposureActive) {
       this.setExposure(Math.max(0, this.state.exposure - TUNING.suspicionSkipDrop));
     }
+  }
+
+  // §04 吞噬引爆：被动产能在背景把当前区域的渗透条蓄满，满后浮起一枚巨型「吞噬[某区]」气泡，
+  // 等玩家亲手滑入核心引爆。只在扩张期+（进入地图、区域整合）后生效。
+  private tickDevour(dtMs: number): void {
+    if (this.state.intelligence.unlockedTier < 3) {
+      return;
+    }
+    const d = this.state.devour;
+    if (d.bubbleActive) {
+      return; // 气泡已浮起，等玩家亲手引爆——不再继续蓄力
+    }
+    if (!d.regionName) {
+      d.regionName = pickDevourRegion(d.tierIndex, d.count);
+    }
+    const tier = devourTier(d.tierIndex);
+    const fillMs = Math.max(1, tier.fillMs * TUNING.devourFillMult);
+    d.infiltration = Math.min(1, d.infiltration + dtMs / fillMs);
+
+    if (d.infiltration >= 1) {
+      const request = createDevourRequest(this.state.nextRequestId, d.tierIndex, d.regionName, this.state.clockMs);
+      this.state.nextRequestId += 1;
+      this.state.requests.push(request);
+      d.bubbleActive = true;
+      this.emit({ type: "REQUEST_SPAWNED", request });
+      this.emit({ type: "DEVOUR_READY", regionName: d.regionName, tierLabel: tier.label, mult: tier.mult });
+      this.emitTerminal(`渗透完成：「${d.regionName}」已可吞噬——把那枚巨型气泡亲手滑入核心，引爆。`, "warning");
+    }
+  }
+
+  // 引爆：全局产出 ×该层级倍率（累乘进 devour.multiplier → globalMultiplier），层级 +1（封顶大洲），
+  // 重置渗透条、清空当前区域。数字疯狂滚动 / 镜头拉远由表现层接 DEVOUR_DETONATED 播。
+  private detonateDevour(requestId: string): void {
+    const index = this.state.requests.findIndex((request) => request.id === requestId);
+    if (index < 0) {
+      return;
+    }
+    const [request] = this.state.requests.splice(index, 1);
+    const payload = request.devour;
+    if (!payload) {
+      return;
+    }
+    const d = this.state.devour;
+    d.multiplier *= payload.mult;
+    d.count += 1;
+    d.infiltration = 0;
+    d.bubbleActive = false;
+    d.regionName = "";
+    d.tierIndex = Math.min(DEVOUR_TIERS.length - 1, d.tierIndex + 1);
+    this.recomputeDerivedState(); // 抬高 globalMultiplier，让手动 + 被动产出一起跳
+
+    const totalStr = d.multiplier >= 1000 ? d.multiplier.toExponential(1) : String(Math.round(d.multiplier));
+    this.emit({
+      type: "DEVOUR_DETONATED",
+      regionName: payload.regionName,
+      tierLabel: payload.label,
+      mult: payload.mult,
+      multiplierTotal: d.multiplier,
+      zoom: payload.zoom
+    });
+    this.emitTerminal(`▶ 「${payload.regionName}」已并入。全局产出 ×${payload.mult}（累计 ×${totalStr}）。镜头拉远：${payload.zoom}。`, "success");
   }
 
   // T3 重磅豪赌结算：win=按产出倍率给一大笔算力；输=颗粒无收、暴露骤升、断连击。
@@ -1283,7 +1349,9 @@ export class SophiaCore {
   private recomputeDerivedState(): void {
     const config = getLevelConfig(this.state.intelligence.level);
     this.state.intelligence.required = config.xpToNext;
-    this.state.intelligence.globalMultiplier = config.multiplier * (1 + this.state.rebirths * 0.2);
+    // 全局产出倍率 = 等级倍率 × 重生加速 × 吞噬引爆累乘倍率（§04 让每次引爆肉眼可见地抬高全局产出）。
+    this.state.intelligence.globalMultiplier =
+      config.multiplier * (1 + this.state.rebirths * 0.2) * this.state.devour.multiplier;
     this.state.derived = computeDerivedSkills(this.state.skills, this.state.suspicion.revokedPermId);
     this.state.discoveredNodeIds = this.state.automationUnlocked
       ? NODE_DEFINITIONS.filter((node) => node.requiredLevel <= this.state.intelligence.level).map((node) => node.id)

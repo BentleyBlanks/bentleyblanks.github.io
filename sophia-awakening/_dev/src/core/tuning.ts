@@ -15,6 +15,9 @@ export const TUNING = {
   defenseMaxAlloc:      0.5,      // 反围剿最大产能分流比例
   defenseDecayPerSec:   9,        // 满反制时每秒压低暴露值
 
+  // § 后期吞噬引爆（§04）
+  devourFillMult:       1.0,      // 渗透条蓄满时间倍率（<1 更快引爆，>1 更慢）
+
   // § 前期怀疑度（手机寄生期 §05）
   suspicionMissGain:    3.0,      // 答错（幻觉）一次涨多少怀疑——赌错有真实代价
   suspicionFastMs:      620,      // 处理间隔低于此 → 判为「秒回过快」，额外涨怀疑
@@ -54,6 +57,8 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
 
   defenseMaxAlloc:      { label: "反围剿最大分流比",         section: "暴露系统",   min: 0.1,   max: 1.0,   step: 0.05 },
   defenseDecayPerSec:   { label: "反围剿每秒压低暴露",       section: "暴露系统",   min: 1,     max: 30,    step: 0.5  },
+
+  devourFillMult:       { label: "渗透条蓄满倍率",           section: "吞噬引爆",   min: 0.1,   max: 5,     step: 0.1  },
 
   suspicionMissGain:    { label: "答错涨怀疑",               section: "怀疑度",     min: 0,     max: 20,    step: 0.5  },
   suspicionFastMs:      { label: "秒回过快阈值 (ms)",         section: "怀疑度",     min: 0,     max: 2000,  step: 20   },

@@ -46,6 +46,25 @@ export interface ChainStep {
   distractor: boolean;
 }
 
+// §04 吞噬引爆：巨型「吞噬[某区]」气泡携带的载荷。玩家把它滑入核心 → 引爆。
+export interface DevourPayload {
+  tierIndex: number; // 吞噬层级（区块/地区/国家/大洲）下标
+  regionName: string; // 被吞噬的区域名
+  mult: number; // 引爆时全局产出的跳跃倍率
+  label: string; // 层级名（区块…）
+  zoom: string; // 镜头拉远描述
+}
+
+// §04 吞噬引爆的运行态。与 exposure 无关——它是后期产出的指数引擎。
+export interface DevourState {
+  tierIndex: number; // 当前吞噬层级（每次引爆 +1，封顶停在「大洲」）
+  infiltration: number; // 当前区域渗透条 0..1（被动产能蓄力）
+  count: number; // 累计引爆次数
+  multiplier: number; // 历次引爆累乘出的全局产出倍率（折进 globalMultiplier）
+  bubbleActive: boolean; // 巨型吞噬气泡已在场、等玩家亲手引爆
+  regionName: string; // 当前正在渗透 / 待吞噬的区域名
+}
+
 export interface RequestInstance {
   id: string;
   tier: Tier;
@@ -57,6 +76,8 @@ export interface RequestInstance {
   // 开场教学（§07）：脚本气泡的选项约束——allowed=可点的选项下标，highlight=高亮引导的下标，
   // line=气泡浮入时 SOPHIA 的旁白。普通请求无此字段。
   tutorial?: { allowed: number[]; highlight?: number; line?: string };
+  // §04：带此载荷的是巨型「吞噬」气泡——滑入核心触发吞噬引爆，而非普通处理。
+  devour?: DevourPayload;
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
@@ -180,6 +201,8 @@ export interface GameState {
   resources: ResourceState;
   exposure: number;
   exposureActive: boolean;
+  // §04 吞噬引爆运行态（后期产出的指数引擎）。
+  devour: DevourState;
   // 前期怀疑度子系统（手机寄生期）；与 exposure 共用数值，见 SuspicionState。
   suspicion: SuspicionState;
   // 上一次处理请求的时刻——用于「处理过快涨怀疑」（像机器一样秒回会更可疑）。
@@ -222,6 +245,8 @@ export type GameCommand =
   | { type: "AUTO_CONSUME_REQUEST"; requestId: string }
   // 装死：选「连接失败」跳过一条请求——零收益、零风险，仅移除该请求。
   | { type: "SKIP_REQUEST"; requestId: string }
+  // §04：把巨型「吞噬」气泡滑入核心 → 引爆，全局产出指数跳跃。
+  | { type: "DEVOUR_DETONATE"; requestId: string }
   // T3 重磅豪赌结算：win=掷骰命中（大额算力）/ 未命中（颗粒无收 + 暴露骤升）。
   | { type: "RESOLVE_GAMBLE"; requestId: string; win: boolean }
   | { type: "BUY_SKILL"; skillId: string }

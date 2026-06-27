@@ -2,8 +2,8 @@ import { getLevelConfig } from "../content/intelligence";
 import { computeDerivedSkills } from "../content/skills";
 import type { GameState } from "./GameState";
 
-// v7：新增前期怀疑度子系统（§05）+ 幻觉抑制技能 + 阶段分界修正——旧档结构不兼容，自动重置。
-export const SAVE_VERSION = 7;
+// v8：新增 §04 吞噬引爆子系统（DevourState + 巨型吞噬气泡）——旧档结构不兼容，自动重置。
+export const SAVE_VERSION = 8;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
@@ -23,6 +23,14 @@ export function createInitialState(now = Date.now()): GameState {
     },
     exposure: 0,
     exposureActive: false,
+    devour: {
+      tierIndex: 0,
+      infiltration: 0,
+      count: 0,
+      multiplier: 1,
+      bubbleActive: false,
+      regionName: ""
+    },
     suspicion: {
       active: false,
       lightShown: false,
