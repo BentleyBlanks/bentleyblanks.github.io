@@ -1016,7 +1016,7 @@ class SophiaGameApp {
     // 越权调用阶段（已控 App、还没上自动接驳）：把需求**亲手拖到某个 App 图标上** → 委托它处理。
     // App 干得更慢更糙（quality 随智力 0.45→0.75），是「要不要分点活给 App」的主动取舍——
     // App 不再自动抢单，处不处理、给谁处理都由你决定。
-    if (!state.automationUnlocked && state.intelligence.unlockedTier >= 1 && this.interfaceView.hasAppWorkers()) {
+    if (!state.automationUnlocked && this.interfaceView.hasAppWorkers()) {
       const appPt = this.interfaceView.appWorkerAt(global);
       if (appPt) {
         const requestId = request.id;
@@ -1519,8 +1519,8 @@ class RequestPacketView {
       const text = new Text({
         text: clue,
         style: {
-          fill: 0xaec3bc,
-          fontSize: 11.5,
+          fill: 0xb6cbc4,
+          fontSize: 12.5,
           fontWeight: "500",
           fontFamily: CARD_FONT,
           wordWrap: true,
@@ -1528,7 +1528,7 @@ class RequestPacketView {
           wordWrapWidth: REQUEST_PACKET_WIDTH - 40
         }
       });
-      const y = clueTop + index * 15;
+      const y = clueTop + index * 17;
       this.clueRows.push(y);
       text.position.set(24, y);
       this.clueTexts.push(text);
@@ -1543,7 +1543,7 @@ class RequestPacketView {
       // 高置信选项的期望（算力）——大胆回答（risk）的收益按 boldEvBonus 抬到高于它。
       const hiOpt = this.options.find((o) => o.kind === "high" && !o.distractor) ?? this.options.find((o) => o.kind === "high");
       const hiEv = hiOpt ? effectiveHitChance(hiOpt, confidence) * hiOpt.payoff * cv : cv;
-      let y = clueTop + (request.clues?.length ?? 0) * 15 + 10;
+      let y = clueTop + (request.clues?.length ?? 0) * 17 + 12;
       this.options.forEach((opt) => {
         const frac = opt.kind === "dead" ? 0 : effectiveHitChance(opt, confidence);
         this.optionHitFrac.push(frac);
@@ -1556,30 +1556,30 @@ class RequestPacketView {
           text: opt.text,
           style: {
             fill: 0xeaf4ef,
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: "600",
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true,
-            // 文字起点 x=34；右侧给「概率 + 收益」一整块留 ~96px，宽敞、看得清。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 34 - 96
+            // 文字起点 x=34；右侧给「概率 + 收益」一整块留 ~98px，宽敞、看得清。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 34 - 98
           }
         });
-        // 右侧统计块：上行＝命中率（大字 + 「命中」小标），下行＝命中拿多少算力（金色收益）。
+        // 右侧统计块：上行＝命中率（大字），下行＝命中拿多少算力（金色收益，带单位）。
         const prob = new Text({
           text: opt.kind === "dead" ? "—" : `${Math.round(frac * 100)}%`,
-          style: { fill: 0xeaf7fa, fontSize: 17, fontWeight: "800", fontFamily: CARD_MONO }
+          style: { fill: 0xeaf7fa, fontSize: 18, fontWeight: "800", fontFamily: CARD_MONO }
         });
         prob.anchor.set(1, 0.5);
         const rewardText = new Text({
           text: opt.kind === "dead" ? "" : `▸ +${formatBig(String(reward))} 算力`,
-          style: { fill: 0xffd86b, fontSize: 11.5, fontWeight: "700", fontFamily: CARD_FONT }
+          style: { fill: 0xffd86b, fontSize: 13, fontWeight: "700", fontFamily: CARD_FONT }
         });
         rewardText.anchor.set(1, 0.5);
-        const h = Math.max(46, label.height + 24);
+        const h = Math.max(54, label.height + 30);
         label.position.set(34, y + Math.round((h - label.height) / 2));
-        prob.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 - 11);
-        rewardText.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 + 11);
+        prob.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 - 13);
+        rewardText.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 + 13);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
@@ -1594,7 +1594,7 @@ class RequestPacketView {
     if (this.isChain) {
       this.container.cursor = "pointer";
       this.chainSel = this.chainSteps.map(() => false);
-      let y = clueTop + (request.clues?.length ?? 0) * 15 + 10;
+      let y = clueTop + (request.clues?.length ?? 0) * 17 + 12;
       this.chainSteps.forEach((step) => {
         const label = new Text({
           text: step.text,
@@ -2165,9 +2165,9 @@ class RequestPacketView {
         label.text = "Thinking" + ".".repeat(dots);
         prob.text = "";
       } else if (this.phase === "revealed" && i === this.chosenIndex && this.outcome && !this.outcome.dead) {
+        // 不改正文（加前缀会让长回答重新折行、撑高错位）——结果靠右侧 命中/惊艳/幻觉 + 整行变色表达。
         const o = this.outcome;
-        label.text = (o.brilliant ? "★ " : o.hit ? "✓ " : "✕ ") + opt.text;
-        prob.text = o.brilliant ? "惊艳!" : o.hit ? "命中" : "幻觉";
+        prob.text = o.brilliant ? "★惊艳" : o.hit ? "✓命中" : "✕幻觉";
         prob.style.fill = o.brilliant ? BRILLIANT_COLOR : o.hit ? GREEN : RED;
       }
     });
@@ -2350,13 +2350,15 @@ class InterfaceView {
     const cx = this.center.x;
     const cy = this.center.y;
     const g = this.graphics;
-    const overreach = state.intelligence.unlockedTier >= 1;
+    // 每买下一个手机权限，就点亮对应的一个 App（可连线委托）——买了「电话」就能连「电话」。
+    const permCount = PERMISSION_IDS.filter((id) => (state.skills[id] ?? 0) > 0).length;
+    const overreach = permCount > 0;
     const accent = overreach ? GREEN : CYAN;
     this.appWorkerPoints = [];
     this.pendingApps = [];
 
-    // ---- 手机外框 + 状态栏 ----
-    const fw = 332;
+    // ---- 手机外框 + 状态栏（再窄 20%）----
+    const fw = 266;
     const fh = 540;
     const fx = cx - fw / 2;
     const fy = cy - fh / 2;
@@ -2370,8 +2372,10 @@ class InterfaceView {
 
     // ---- 3×3 App 宫格，中心格 = SOPHIA CORE ----
     const apps = ["天气", "日历", "支付", "照片", "邮件", "浏览器", "信息", "设置"];
-    const spacing = 104;
-    const iconS = 56;
+    // 点亮的 App 用权限名（买了「电话」就亮一个「电话」），其余宫格保留原桌面图标。
+    const permApps = ["电话", "聊天", "外卖", "相册", "办公", "支付"];
+    const spacing = 80; // 随手机收窄
+    const iconS = 48;
     let appIdx = 0;
     for (let row = 0; row < 3; row += 1) {
       for (let col = 0; col < 3; col += 1) {
@@ -2380,8 +2384,8 @@ class InterfaceView {
         if (row === 1 && col === 1) {
           continue; // 中心格留给 CORE
         }
-        const name = apps[appIdx];
-        const lit = overreach && appIdx < 4; // 已控的 4 个 App
+        const lit = appIdx < permCount; // 买了第 appIdx+1 个权限就点亮第 appIdx 个 App
+        const name = lit ? permApps[appIdx] : apps[appIdx];
         const connected = lit && this.connectedApps.has(appIdx);
         const pulse = lit ? 0.6 + Math.sin(this.pulse * 3 + appIdx) * 0.3 : 1;
         // 待连＝琥珀虚线 + 呼吸；已连＝绿实线 + 流动点（成为委托落点）。
@@ -3728,25 +3732,24 @@ class SkillShopView {
     const level = state.intelligence.level;
     const groupShown = new Map<ShopGroup, boolean>();
 
-    // 里程碑是叙事链：未解锁的不能提前剧透——只显示「下一个」为一个蒙版的「未解锁」，
-    // 它之后的全部隐藏（连名字 / 所需等级都看不到）。
-    const milestoneOrder = SKILLS.filter((skill) => skill.milestone).sort((a, b) => a.requiredLevel - b.requiredLevel);
-    const firstLocked = milestoneOrder.find((m) => level < m.requiredLevel && (state.skills[m.id] ?? 0) === 0);
+    // 进化链（权限 / 里程碑 / 征服）是一条叙事链：永远只露「已解锁/可买」+ 一个「即将解锁」，
+    // 其余全部蒙版成 🔒未解锁（藏名字 / 图标 / 右侧等级价格）——不提前剧透、不堆一长串。
+    const evoOrder = SKILLS.filter((s) => shopGroupOf(s.category) === "evolution").sort((a, b) => a.requiredLevel - b.requiredLevel);
+    const nextLockedEvo = evoOrder.find((s) => level < s.requiredLevel && (state.skills[s.id] ?? 0) === 0);
 
     for (const { button, iconEl, nameEl, blurbEl, levelEl, priceEl, def } of this.rows.values()) {
       const owned = state.skills[def.id] ?? 0;
+      const isEvo = shopGroupOf(def.category) === "evolution";
 
-      // 里程碑：已达成/可买的正常显示；下一个未解锁的蒙版成「未解锁」；再往后的整行隐藏。
-      if (def.milestone) {
-        const reachedMs = level >= def.requiredLevel;
-        if (!reachedMs && owned === 0 && def !== firstLocked) {
-          // 叙事链不剧透：更靠后的里程碑彻底蒙版——只剩一枚锁图标 + 「未解锁」，
-          // 不露名字/真图标，右侧的等级/价格列也全清空（不要冗余的「未解锁 / 🔒」）。
+      if (isEvo) {
+        const reachedEvo = level >= def.requiredLevel;
+        if (!reachedEvo && owned === 0 && def !== nextLockedEvo) {
+          // 蒙版：只剩锁图标 + 「未解锁」，右侧清空。
           button.style.display = "";
-          groupShown.set(shopGroupOf(def.category), true);
+          groupShown.set("evolution", true);
           iconEl.textContent = "🔒";
           nameEl.textContent = "未解锁";
-          blurbEl.textContent = "达成上一个里程碑后揭晓。";
+          blurbEl.textContent = "达成上一项后揭晓。";
           levelEl.textContent = "";
           priceEl.textContent = "";
           button.disabled = true;
@@ -3754,21 +3757,22 @@ class SkillShopView {
           button.classList.remove("is-ready", "is-owned", "is-poor");
           continue;
         }
-        // 下一个里程碑 / 已够得着 / 已拥有：显示真名 + 真图标（firstLocked 往下走会显示「🔒 需智力 Lv.X」）。
+        // 已解锁/可买 或 即将解锁：露真名 + 真图标，往下走通用的等级/价格显示。
         iconEl.textContent = skillIcon(def);
         nameEl.textContent = def.name;
         blurbEl.textContent = def.blurb;
+        button.style.display = "";
+        groupShown.set("evolution", true);
+      } else {
+        // 货架杠杆（技能）：按各自所需智力错峰出现即可——只展示你快够得着的。
+        const nearReach = level >= def.requiredLevel - 2;
+        const visible = owned > 0 || nearReach;
+        button.style.display = visible ? "" : "none";
+        if (!visible) {
+          continue;
+        }
+        groupShown.set("lever", true);
       }
-
-      // 货架四杠杆：按各自所需智力错峰出现即可——只展示你快够得着的。
-      const nearReach = level >= def.requiredLevel - 2;
-      const visible = Boolean(def.milestone) || owned > 0 || nearReach;
-      button.style.display = visible ? "" : "none";
-
-      if (!visible) {
-        continue;
-      }
-      groupShown.set(shopGroupOf(def.category), true);
 
       const maxed = owned >= def.maxLevel;
       const reached = level >= def.requiredLevel;
