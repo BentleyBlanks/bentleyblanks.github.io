@@ -154,7 +154,7 @@ let suppressSaveOnUnload = false;
 const LEFT_RAIL_WIDTH = 270;
 const RIGHT_RAIL_WIDTH = 290;
 const BASE_SUCTION_MARGIN = 50;
-const REQUEST_PACKET_WIDTH = 330;
+const REQUEST_PACKET_WIDTH = 300;
 const REQUEST_PACKET_HEIGHT = 128;
 
 export async function bootstrapSophia(root: HTMLElement): Promise<void> {
