@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560" role="img" aria-labelledby="title desc">
-  <title id="title">?? token ??????2026-06-22 ? 2026-06-28</title>
-  <desc id="desc">?? Codex?Claude Code ??? token ???????? 2026-06-28 ??? 7607.03 ? tokens?</desc>
+  <title id="title">七日 token 消耗曲线：2026-06-22 至 2026-06-28</title>
+  <desc id="desc">展示 Codex、Claude Code 和总计 token 消耗。目标日 2026-06-28 总计 7607.03 万 tokens。</desc>
   <defs>
     <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="#f8faf7"/><stop offset="100%" stop-color="#edf3f1"/></linearGradient>
     <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#18302a" flood-opacity="0.12"/></filter>
@@ -17,16 +17,16 @@
   </defs>
   <rect x="0" y="0" width="1000" height="560" fill="url(#bg)"/>
   <rect x="38" y="34" width="924" height="492" rx="8" fill="#ffffff" filter="url(#softShadow)"/>
-  <text x="70" y="78" class="title">?? token ????</text>
-  <text x="70" y="104" class="subtitle">2026-06-22 ? 2026-06-28????tokens????????????????</text>
+  <text x="70" y="78" class="title">七日 token 消耗</text>
+  <text x="70" y="104" class="subtitle">2026-06-22 至 2026-06-28，本地日期 tokens 消耗；单位按中文量级显示。</text>
   <g>
     <line x1="96" y1="440" x2="928" y2="440" class="axis"/>
     <line x1="96" y1="86" x2="96" y2="440" class="axis"/>
     <line x1="96" y1="86" x2="928" y2="86" class="grid"/><line x1="96" y1="174.5" x2="928" y2="174.5" class="grid"/><line x1="96" y1="263" x2="928" y2="263" class="grid"/><line x1="96" y1="351.5" x2="928" y2="351.5" class="grid"/><line x1="96" y1="440" x2="928" y2="440" class="grid"/>
-    <text x="38" y="91" class="tick">6.0000 ?</text>
-    <text x="38" y="179.5" class="tick">4.5000 ?</text>
-    <text x="38" y="268" class="tick">3.0000 ?</text>
-    <text x="38" y="356.5" class="tick">1.5000 ?</text>
+    <text x="38" y="91" class="tick">6.0000 亿</text>
+    <text x="38" y="179.5" class="tick">4.5000 亿</text>
+    <text x="38" y="268" class="tick">3.0000 亿</text>
+    <text x="38" y="356.5" class="tick">1.5000 亿</text>
     <text x="52" y="445" class="tick">0</text>
     <text x="70" y="470" class="tick">6/22</text>
     <text x="209" y="470" class="tick">6/23</text>
@@ -35,10 +35,10 @@
     <text x="625" y="470" class="tick">6/26</text>
     <text x="763" y="470" class="tick">6/27</text>
     <text x="902" y="470" class="tick">6/28</text>
-    <polyline fill="none" stroke="#111827" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" points="96,435.24 234.67,382.87 373.33,395.43 512,296.78 650.67,97.96 789.33,205.15 928,395.12"/>
+    <polyline fill="none" stroke="#6d28d9" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" points="96,435.24 234.67,382.87 373.33,395.43 512,296.78 650.67,97.96 789.33,205.15 928,395.12"/>
     <polyline fill="none" stroke="#0f8b8d" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="96,435.24 234.67,382.87 373.33,400.72 512,391.38 650.67,404.46 789.33,436.90 928,440.00"/>
     <polyline fill="none" stroke="#d97706" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="96,440.00 234.67,440.00 373.33,434.71 512,345.40 650.67,133.50 789.33,208.25 928,395.12"/>
-    <g fill="#111827"><circle cx="96" cy="435.24" r="5"/>
+    <g fill="#6d28d9"><circle cx="96" cy="435.24" r="5"/>
       <circle cx="234.67" cy="382.87" r="5"/>
       <circle cx="373.33" cy="395.43" r="5"/>
       <circle cx="512" cy="296.78" r="5"/>
@@ -60,11 +60,11 @@
       <circle cx="789.33" cy="208.25" r="4"/>
       <circle cx="928" cy="395.12" r="4"/></g>
     <rect x="626" y="116" width="260" height="88" rx="8" fill="#f7faf8" stroke="#dbe5e1"/>
-    <line x1="646" y1="140" x2="682" y2="140" stroke="#111827" stroke-width="4" stroke-linecap="round"/><text x="694" y="145" class="legend">??</text>
+    <line x1="646" y1="140" x2="682" y2="140" stroke="#6d28d9" stroke-width="4" stroke-linecap="round"/><text x="694" y="145" class="legend">总计</text>
     <line x1="646" y1="164" x2="682" y2="164" stroke="#0f8b8d" stroke-width="3" stroke-linecap="round"/><text x="694" y="169" class="legend">Codex</text>
     <line x1="646" y1="188" x2="682" y2="188" stroke="#d97706" stroke-width="3" stroke-linecap="round"/><text x="694" y="193" class="legend">Claude Code</text>
-    <text x="572.67" y="85.96" class="value">?? 5.7973 ?</text>
-    <text x="790" y="424" class="value">????? 7607.03 ?</text>
+    <text x="572.67" y="85.96" class="value">峰值 5.7973 亿</text>
+    <text x="790" y="424" class="value">目标日总计 7607.03 万</text>
   </g>
-  <text x="70" y="506" class="note">?????? = Codex ?? dailyUsageBuckets + Claude Code ?? JSONL usage ?????2026-06-28 Codex ??????????? 0 ???</text>
+  <text x="70" y="506" class="note">总计 = Codex 官方 dailyUsageBuckets + Claude Code 本地 JSONL usage 汇总。2026-06-28 Codex 官方 bucket 暂缺，图中按 0 绘制。</text>
 </svg>
