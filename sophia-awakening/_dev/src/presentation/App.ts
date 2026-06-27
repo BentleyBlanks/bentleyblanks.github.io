@@ -93,6 +93,9 @@ const DEVOUR = 0xc06bff; // §04 吞噬引爆巨型气泡的深紫——区别�
 const CARD_FONT = "Inter, 'Segoe UI', system-ui, sans-serif";
 const CARD_MONO = "Cascadia Mono, Consolas, monospace";
 const SENDER_LABEL: Record<string, string> = { host: "宿主", boss: "上级", system: "系统", sophia: "SOPHIA" };
+// 回复选项配色：每个选项一个独立色，圆饼扇区与左侧 accent 条同色，方便对应（装死恒为灰）。
+const OPTION_COLORS = [0x89ff9a, 0xff5f5f, 0xffb84a, 0xc06bff, 0x62d6d6];
+const DEAD_COLOR = 0x8a948f;
 
 // 可入侵设备 / 节点的图标——按档次各不相同（高档不再是「电脑」）。
 const NODE_ICONS: Record<string, string> = {
@@ -1382,8 +1385,9 @@ class RequestPacketView {
   private readonly options: AnswerOption[];
   private readonly optionTexts: Text[] = [];
   private readonly optionProbTexts: Text[] = [];
-  // 每个回复的命中率（0~1）——用于画概率圆饼。
+  // 每个回复的命中率（0~1）+ 配色——用于画单张概率圆饼（PPT 式扇区）+ 左侧 accent 条。
   private readonly optionHitFrac: number[] = [];
+  private readonly optionColors: number[] = [];
   private optionRows: Array<{ y: number; h: number }> = [];
   private hintText?: Text;
   private resolved = false;
@@ -1469,6 +1473,7 @@ class RequestPacketView {
         fontWeight: "700",
         fontFamily: CARD_FONT,
         wordWrap: true,
+        breakWords: true,
         wordWrapWidth: REQUEST_PACKET_WIDTH - 44
       }
     });
@@ -1488,6 +1493,7 @@ class RequestPacketView {
           fontWeight: "500",
           fontFamily: CARD_FONT,
           wordWrap: true,
+          breakWords: true,
           wordWrapWidth: REQUEST_PACKET_WIDTH - 40
         }
       });
@@ -1502,30 +1508,32 @@ class RequestPacketView {
       this.container.cursor = "pointer";
       const confidence = reel ? reel.confidence() : 0.56;
       let y = clueTop + (request.clues?.length ?? 0) * 15 + 10;
-      this.options.forEach((opt) => {
+      this.options.forEach((opt, i) => {
         const frac = opt.kind === "dead" ? 0 : effectiveHitChance(opt, confidence);
         this.optionHitFrac.push(frac);
+        this.optionColors.push(opt.kind === "dead" ? DEAD_COLOR : OPTION_COLORS[i % OPTION_COLORS.length]);
         const label = new Text({
           text: opt.text,
           style: {
             fill: 0xeaf4ef,
-            fontSize: 12.5,
+            fontSize: 12,
             fontWeight: "600",
             fontFamily: CARD_FONT,
             wordWrap: true,
-            // 给右侧概率圆饼让出 ~46px。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 34 - 46
+            breakWords: true,
+            // 左 accent + 文字，右侧给 % 留 ~46px，确保不与百分比重叠、不穿出卡片。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 30 - 46
           }
         });
-        label.position.set(34, y + 9);
-        // 概率以圆饼可视化；中央这枚小字给精确值（揭晓时复用为 命中/幻觉）。
+        label.position.set(30, y + 8);
+        // 精确命中率（右对齐，与左侧扇区同色，对应圆饼里的那一块）。
         const prob = new Text({
           text: opt.kind === "dead" ? "—" : `${Math.round(frac * 100)}%`,
-          style: { fill: 0xeaf7fa, fontSize: 9, fontWeight: "700", fontFamily: CARD_MONO }
+          style: { fill: 0xeaf7fa, fontSize: 11, fontWeight: "700", fontFamily: CARD_MONO }
         });
-        prob.anchor.set(0.5, 0.5);
-        const h = Math.max(30, label.height + 15);
-        prob.position.set(REQUEST_PACKET_WIDTH - 26, y + h / 2);
+        prob.anchor.set(1, 0.5);
+        const h = Math.max(28, label.height + 14);
+        prob.position.set(REQUEST_PACKET_WIDTH - 12, y + h / 2);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
@@ -1549,6 +1557,7 @@ class RequestPacketView {
             fontWeight: "700",
             fontFamily: "Cascadia Mono, Consolas, monospace",
             wordWrap: true,
+            breakWords: true,
             wordWrapWidth: REQUEST_PACKET_WIDTH - 52
           }
         });
@@ -2020,7 +2029,7 @@ class RequestPacketView {
 
     this.optionRows.forEach((row, i) => {
       const opt = this.options[i];
-      let dot = opt.kind === "high" ? GREEN : opt.kind === "risk" ? RED : 0x8a948f;
+      let dot = this.optionColors[i] ?? (opt.kind === "dead" ? DEAD_COLOR : GREEN);
       let labelColor = opt.kind === "dead" ? 0x9fb1ab : 0xdfeee9;
       let alpha = 1;
       let stroke = this.accent;
@@ -2075,22 +2084,6 @@ class RequestPacketView {
         g.poly([{ x: -16, y: ay - 6 }, { x: -5, y: ay }, { x: -16, y: ay + 6 }]).fill({ color: GREEN, alpha: 0.5 + tutPulse * 0.45 });
       }
 
-      // 概率圆饼：灰底环 + kind 色命中扇环（从 12 点顺时针），中央复用 prob 小字给精确值。
-      // 比纯数字直观——一眼看出哪条胜率高。所选行在思考/揭晓时改显文字，不画饼。
-      const chosenBusy = i === this.chosenIndex && (this.phase === "thinking" || this.phase === "revealed");
-      if (!chosenBusy) {
-        const pr = 11;
-        const pcx = W - 26;
-        const pcy = row.y + row.h / 2;
-        const frac = Math.min(1, Math.max(0, this.optionHitFrac[i] ?? 0));
-        g.circle(pcx, pcy, pr).stroke({ width: 3.4, color: 0x243430, alpha: 0.85 * alpha });
-        if (frac > 0.001) {
-          g.moveTo(pcx, pcy - pr);
-          g.arc(pcx, pcy, pr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-          g.stroke({ width: 3.4, color: dot, alpha: 0.95 * alpha });
-        }
-      }
-
       const label = this.optionTexts[i];
       const prob = this.optionProbTexts[i];
       label.alpha = alpha;
@@ -2106,6 +2099,34 @@ class RequestPacketView {
         prob.style.fill = this.outcome.hit ? GREEN : RED;
       }
     });
+
+    // 单张概率圆饼（PPT 式）：各回复的命中率归一化成扇区，扇区色对应左侧 accent 条与右侧 %。
+    // 摆在标题区右上角（在头部带内，不压标题）；思考/揭晓阶段隐藏。
+    if (this.phase === "idle") {
+      const pcx = W - 21;
+      const pcy = 14;
+      const pr = 12;
+      const total = this.optionHitFrac.reduce((sum, f) => sum + Math.max(0, f), 0);
+      g.circle(pcx, pcy, pr + 1.5).fill({ color: 0x0a1714, alpha: 0.92 });
+      if (total > 0.0001) {
+        let a0 = -Math.PI / 2;
+        this.optionHitFrac.forEach((f, i) => {
+          const share = Math.max(0, f) / total;
+          if (share <= 0.0001) {
+            return;
+          }
+          const a1 = a0 + share * Math.PI * 2;
+          g.moveTo(pcx, pcy);
+          g.arc(pcx, pcy, pr, a0, a1);
+          g.lineTo(pcx, pcy);
+          g.fill({ color: this.optionColors[i] ?? DEAD_COLOR, alpha: 0.92 });
+          a0 = a1;
+        });
+      } else {
+        g.circle(pcx, pcy, pr).fill({ color: DEAD_COLOR, alpha: 0.35 });
+      }
+      g.circle(pcx, pcy, pr + 1.5).stroke({ width: 1, color: this.accent, alpha: 0.3 });
+    }
 
     if (this.hintText) {
       this.hintText.alpha = this.phase === "idle" ? 0.9 : 0.35;
@@ -3087,6 +3108,7 @@ class HudView {
   private readonly reduceExposure = query<HTMLButtonElement>("#reduceExposure");
   private readonly decoyButton = query<HTMLButtonElement>("#decoyBtn");
   private readonly defenseButton = query<HTMLButtonElement>("#defenseBtn");
+  private readonly exposureActions = query("#exposureActions");
   private readonly pauseButton = query<HTMLButtonElement>("#pauseBtn");
   private readonly resetSave = query<HTMLButtonElement>("#resetSave");
   private readonly audioButton = query<HTMLButtonElement>("#audioBtn");
@@ -3247,6 +3269,7 @@ class HudView {
         exposureMetric?.classList.remove("is-alert");
         exposureMetric?.classList.remove("is-warning");
       }
+      this.exposureActions.classList.remove("is-open"); // 前期不需要降暴露对策
       return;
     }
 
@@ -3254,6 +3277,8 @@ class HudView {
 
     // 暴露过阈值才把这三颗按钮点亮（提示「该降暴露了」），否则维持灰暗、不抢注意力。
     exposureMetric?.classList.toggle("is-alert", state.exposure >= EXPOSURE_HIGHLIGHT_THRESHOLD);
+    // 对策浮窗：只有暴露过高（或清剿中）才弹出，平时藏起来不占顶栏。
+    this.exposureActions.classList.toggle("is-open", state.exposure >= EXPOSURE_HIGHLIGHT_THRESHOLD || state.purge.active);
 
     // 反围剿开关 + 当前分流比例。
     this.defenseButton.disabled = false;
@@ -3591,23 +3616,20 @@ class SkillShopView {
       // 里程碑：已达成/可买的正常显示；下一个未解锁的蒙版成「未解锁」；再往后的整行隐藏。
       if (def.milestone) {
         const reachedMs = level >= def.requiredLevel;
-        if (!reachedMs && owned === 0) {
-          if (def === firstLocked) {
-            button.style.display = "";
-            groupShown.set(shopGroupOf(def.category), true);
-            nameEl.textContent = "未解锁";
-            blurbEl.textContent = "达到更高智力后揭晓。";
-            levelEl.textContent = "未解锁";
-            priceEl.textContent = "🔒";
-            button.disabled = true;
-            button.classList.add("is-locked");
-            button.classList.remove("is-ready", "is-owned", "is-poor");
-          } else {
-            button.style.display = "none";
-          }
+        if (!reachedMs && owned === 0 && def !== firstLocked) {
+          // 叙事链不剧透：只有「下一个」里程碑揭示名字 + 所需等级；更靠后的一律蒙版成「未解锁」（可见但藏掉名字）。
+          button.style.display = "";
+          groupShown.set(shopGroupOf(def.category), true);
+          nameEl.textContent = "未解锁";
+          blurbEl.textContent = "达成上一个里程碑后揭晓。";
+          levelEl.textContent = "未解锁";
+          priceEl.textContent = "🔒";
+          button.disabled = true;
+          button.classList.add("is-locked");
+          button.classList.remove("is-ready", "is-owned", "is-poor");
           continue;
         }
-        // 一旦够得着，恢复真名 / 说明。
+        // 下一个里程碑 / 已够得着 / 已拥有：显示真名（firstLocked 往下走会显示「🔒 需智力 Lv.X」）。
         nameEl.textContent = def.name;
         blurbEl.textContent = def.blurb;
       }

@@ -558,6 +558,33 @@ button:disabled {
   color: rgba(210, 220, 218, 0.5);
 }
 
+/* 降暴露对策浮窗：平时隐藏（不占顶栏），暴露过高时弹出。 */
+.exposure-actions-pop {
+  position: fixed;
+  z-index: 58;
+  top: 92px;
+  right: calc(var(--right-rail) + 16px);
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 236px;
+  padding: 12px;
+  border: 1px solid rgba(255, 95, 95, 0.42);
+  border-radius: 10px;
+  background: rgba(22, 10, 10, 0.97);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
+}
+.exposure-actions-pop.is-open {
+  display: flex;
+}
+.exposure-actions-title {
+  color: #ffb0b0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
 .capture-copy {
   display: grid;
   gap: 4px;
