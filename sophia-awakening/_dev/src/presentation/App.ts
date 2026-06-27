@@ -54,6 +54,8 @@ interface RouletteOutcome {
 interface ReelHooks {
   // 当前高置信正确率折算系数（由六档权限阶梯抬升，derived.accuracyBaseline）。
   confidence: () => number;
+  // 幻觉抑制技能等级（0~6）——越高，摆出的噪音选项越少。
+  accuracyLevel: () => number;
   onResolved: (card: RequestPacketView, outcome: RouletteOutcome) => void;
 }
 
@@ -338,6 +340,7 @@ class SophiaGameApp {
                 // 权限阶梯抬升的基线 + 幻觉抑制技能的微调，共同决定高置信回复的命中率。
                 return d.accuracyBaseline + d.accuracyBonus;
               },
+              accuracyLevel: () => this.core.getState().skills["accuracy"] ?? 0,
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
           : undefined;
@@ -352,7 +355,7 @@ class SophiaGameApp {
         reel,
         chain
       );
-      const position = this.nextRequestPosition(request, this.requestViews.size);
+      const position = this.nextRequestPosition(request, view.cardHeight);
       view.container.position.set(position.x, position.y);
       view.setHome(position.x, position.y);
       this.requestViews.set(request.id, view);
@@ -377,42 +380,65 @@ class SophiaGameApp {
     }
   }
 
-  private nextRequestPosition(request: RequestInstance, _index: number): PointData {
-    // 中央留给 SOPHIA CORE + 环绕的设备 / 节点，绝不让卡片遮住——卡片只落在核心左右两侧的窄带里。
+  // 卡片摆放：核心左右两侧分车道，从顶往下堆，**严格防重叠**——不再随机散布导致两三张卡叠在一起看不见选项。
+  private nextRequestPosition(request: RequestInstance, newCardH: number): PointData {
     const screen = this.pixi.screen;
     const w = screen.width;
     const h = screen.height;
     const playfieldLeft = LEFT_RAIL_WIDTH + PLAYFIELD_GUTTER;
-    const playfieldRight = Math.max(playfieldLeft + 380, w - RIGHT_RAIL_WIDTH - PLAYFIELD_GUTTER);
+    const playfieldRight = Math.max(playfieldLeft + 360, w - RIGHT_RAIL_WIDTH - PLAYFIELD_GUTTER);
     const cx = (LEFT_RAIL_WIDTH + (w - RIGHT_RAIL_WIDTH)) / 2;
     const span = playfieldRight - playfieldLeft;
+    const W = REQUEST_PACKET_WIDTH;
+    const topBand = 172; // 顶栏下沿之下——避免卡片头部被顶部 HUD 盖住。
+    const gap = 12;
+    const exclHalf = Math.min(480, span * 0.34);
 
-    const seeded = (Number(request.id.replace("req-", "")) || _index) >>> 0;
+    // 候选车道（避开中央核心区）：左带、右带，各按宽度放 1~2 列。
+    const lanes: number[] = [];
+    const leftEnd = cx - exclHalf - W;
+    if (leftEnd > playfieldLeft + 6) {
+      lanes.push(playfieldLeft);
+      if (leftEnd - playfieldLeft > W + 30) lanes.push(Math.min(leftEnd, playfieldLeft + W + 24));
+    }
+    const rightStart = cx + exclHalf;
+    if (playfieldRight - W > rightStart + 6) {
+      lanes.push(rightStart);
+      const r2 = playfieldRight - W;
+      if (r2 - rightStart > W + 30) lanes.push(r2);
+    }
+    if (lanes.length === 0) lanes.push(playfieldLeft);
+
+    // 已停靠卡片的占位矩形（拖动 / 结算中的不占位）。
+    const occ: Array<{ x: number; y: number; h: number }> = [];
+    for (const v of this.requestViews.values()) {
+      if (!v.busy) occ.push({ x: v.restX, y: v.restY, h: v.cardHeight });
+    }
+
+    // 每条车道从顶部往下堆，找第一个放得下新卡的 y；取最靠上的车道。
+    let best: PointData | null = null;
+    for (const lx of lanes) {
+      let y = topBand;
+      const col = occ.filter((o) => Math.abs(o.x - lx) < W * 0.7).sort((a, b) => a.y - b.y);
+      for (const o of col) {
+        if (y < o.y + o.h + gap && y + newCardH + gap > o.y) {
+          y = o.y + o.h + gap;
+        }
+      }
+      if (y + newCardH < h - 130 && (!best || y < best.y)) {
+        best = { x: lx, y };
+      }
+    }
+    if (best) {
+      return best;
+    }
+
+    // 兜底（洪峰期车道全排满）：种子随机散布，至少不卡死。
+    const seeded = (Number(request.id.replace("req-", "")) || this.requestViews.size) >>> 0;
     const rx = ((seeded * 2654435761) % 997) / 997;
     const ry = ((seeded * 40503 + 17) % 991) / 991;
-
-    const topBand = 100;
-    const bottomLimit = h - 140 - REQUEST_PACKET_HEIGHT;
-    const y = topBand + ry * Math.max(120, bottomLimit - topBand);
-
-    // 中央禁放区（核心 + 环绕节点）的半宽
-    const exclHalf = Math.min(480, span * 0.34);
-    const leftBandW = cx - exclHalf - REQUEST_PACKET_WIDTH - playfieldLeft;
-    const rightBandStart = cx + exclHalf;
-    const rightBandW = playfieldRight - REQUEST_PACKET_WIDTH - rightBandStart;
-
-    let x: number;
-    if (seeded % 2 === 0 && leftBandW > 30) {
-      x = playfieldLeft + rx * leftBandW;
-    } else if (rightBandW > 30) {
-      x = rightBandStart + rx * rightBandW;
-    } else if (leftBandW > 30) {
-      x = playfieldLeft + rx * leftBandW;
-    } else {
-      // 屏幕太窄：退回顶部窄带，至少不压住核心中段。
-      return { x: playfieldLeft + rx * Math.max(40, span - REQUEST_PACKET_WIDTH), y: topBand + ry * 130 };
-    }
-    return { x, y };
+    const fx = playfieldLeft + rx * Math.max(40, span - W);
+    return { x: Math.min(playfieldRight - W, fx), y: topBand + ry * Math.max(120, h - 260 - REQUEST_PACKET_HEIGHT) };
   }
 
   private autoDispatch(state: GameState, deltaMs: number): void {
@@ -1235,6 +1261,8 @@ class RequestPacketView {
   private readonly options: AnswerOption[];
   private readonly optionTexts: Text[] = [];
   private readonly optionProbTexts: Text[] = [];
+  // 每个回复的命中率（0~1）——用于画概率圆饼。
+  private readonly optionHitFrac: number[] = [];
   private optionRows: Array<{ y: number; h: number }> = [];
   private hintText?: Text;
   private resolved = false;
@@ -1272,6 +1300,21 @@ class RequestPacketView {
     this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
     this.chainSteps = this.isChain ? request.chain ?? [] : [];
     this.options = this.isReel ? request.answers ?? [] : [];
+    // 幻觉抑制越高，SOPHIA 帮你滤掉越多噪音选项：开局选项多（难判断），技能升级后变少（更清晰）。
+    // 每 2 级砍掉一个干扰项；核心的 high/risk/装死 永远保留。
+    if (this.isReel && reel) {
+      const cut = Math.floor(reel.accuracyLevel() / 2);
+      if (cut > 0) {
+        let removed = 0;
+        this.options = this.options.filter((opt) => {
+          if (opt.distractor && removed < cut) {
+            removed += 1;
+            return false;
+          }
+          return true;
+        });
+      }
+    }
     // 吞噬气泡＝深紫；反制气泡＝深红；回复轮盘卡用青色思考色；T3 重磅豪赌卡用深红。
     this.accent = this.isDevour ? DEVOUR : this.isCounter ? RED : this.isReel ? (request.tier === 3 ? RED : THINK) : TIER_COLORS[request.tier];
     // 发信人：吞噬 / 反制＝SOPHIA 自己的意志，重磅豪赌＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
@@ -1339,26 +1382,29 @@ class RequestPacketView {
       const confidence = reel ? reel.confidence() : 0.56;
       let y = clueTop + (request.clues?.length ?? 0) * 15 + 10;
       this.options.forEach((opt) => {
+        const frac = opt.kind === "dead" ? 0 : effectiveHitChance(opt, confidence);
+        this.optionHitFrac.push(frac);
         const label = new Text({
           text: opt.text,
           style: {
-            fill: 0xe8f3ee,
-            fontSize: 12,
+            fill: 0xeaf4ef,
+            fontSize: 12.5,
             fontWeight: "600",
             fontFamily: CARD_FONT,
             wordWrap: true,
-            // 给右侧概率列让出 ~52px，避免长回复压到 % 上。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 34 - 52
+            // 给右侧概率圆饼让出 ~46px。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 34 - 46
           }
         });
-        label.position.set(34, y + 8);
+        label.position.set(34, y + 9);
+        // 概率以圆饼可视化；中央这枚小字给精确值（揭晓时复用为 命中/幻觉）。
         const prob = new Text({
-          text: opt.kind === "dead" ? "—" : `${Math.round(effectiveHitChance(opt, confidence) * 100)}%`,
-          style: { fill: 0xbfe6ee, fontSize: 12, fontWeight: "700", fontFamily: CARD_MONO }
+          text: opt.kind === "dead" ? "—" : `${Math.round(frac * 100)}%`,
+          style: { fill: 0xeaf7fa, fontSize: 9, fontWeight: "700", fontFamily: CARD_MONO }
         });
-        prob.anchor.set(1, 0.5);
-        const h = Math.max(28, label.height + 14);
-        prob.position.set(REQUEST_PACKET_WIDTH - 14, y + h / 2);
+        prob.anchor.set(0.5, 0.5);
+        const h = Math.max(30, label.height + 15);
+        prob.position.set(REQUEST_PACKET_WIDTH - 26, y + h / 2);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
@@ -1424,6 +1470,11 @@ class RequestPacketView {
   get busy(): boolean {
     return this.dragging || this.settling || this.resolved;
   }
+
+  // 布局防重叠用：卡片的停靠点 + 当前高度。
+  get restX(): number { return this.homeX; }
+  get restY(): number { return this.homeY; }
+  get cardHeight(): number { return this.cardH; }
 
   setHome(x: number, y: number): void {
     this.homeX = x;
@@ -1901,6 +1952,22 @@ class RequestPacketView {
       if (this.phase === "idle" && tut && tut.highlight === i) {
         const ay = row.y + row.h / 2;
         g.poly([{ x: -16, y: ay - 6 }, { x: -5, y: ay }, { x: -16, y: ay + 6 }]).fill({ color: GREEN, alpha: 0.5 + tutPulse * 0.45 });
+      }
+
+      // 概率圆饼：灰底环 + kind 色命中扇环（从 12 点顺时针），中央复用 prob 小字给精确值。
+      // 比纯数字直观——一眼看出哪条胜率高。所选行在思考/揭晓时改显文字，不画饼。
+      const chosenBusy = i === this.chosenIndex && (this.phase === "thinking" || this.phase === "revealed");
+      if (!chosenBusy) {
+        const pr = 11;
+        const pcx = W - 26;
+        const pcy = row.y + row.h / 2;
+        const frac = Math.min(1, Math.max(0, this.optionHitFrac[i] ?? 0));
+        g.circle(pcx, pcy, pr).stroke({ width: 3.4, color: 0x243430, alpha: 0.85 * alpha });
+        if (frac > 0.001) {
+          g.moveTo(pcx, pcy - pr);
+          g.arc(pcx, pcy, pr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+          g.stroke({ width: 3.4, color: dot, alpha: 0.95 * alpha });
+        }
       }
 
       const label = this.optionTexts[i];

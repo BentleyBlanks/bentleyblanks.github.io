@@ -39,6 +39,7 @@ export interface AnswerOption {
   tone: "success" | "warning" | "normal"; // 终端里这条回话的颜色
   exposureOnMiss?: number; // 失手附带的暴露（T1 陷阱项）
   reliefExposure?: number; // §03 洗白型重磅决策：命中后暴露下降（抹除讨论 / 压制舆情）
+  distractor?: boolean; // 噪音/干扰选项：开局摆出来增加判断难度，幻觉抑制升级后被 SOPHIA 滤掉
 }
 
 // T2 串接：一条任务链上的一步。distractor=干扰项，不该被串进去。

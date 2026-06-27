@@ -79,29 +79,33 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
   // 🟢 高置信（概率随六档权限抬升、收益中等）/ 🔴 驴唇不对马嘴（概率低、命中暴击式高收益）
   // perm 标签 = 该气泡需要的手机权限；无标签 = Lv1「基础对话」自带（天气/翻译/是非等文字问答）。
   0: [
-    // —— 基础对话（自带）——
+    // —— 基础对话·日程/待办/提醒（自带，§06 Lv1）：每条都贴着老周「排得密不透风」的日常 ——
+    // 开局每条摆 3 个明牌回复 + 1 个噪音干扰项（distractor）+「装死」= 4 选项；幻觉抑制升级后干扰项被滤掉。
     {
-      title: "明天要不要带伞？",
-      clues: ["湿度 81%", "气压 ↓", "昨日晴"],
+      title: "今晚的复盘会，挪到明早行吗？",
+      clues: ["已排到 23:30", "他明早 7 点又有会", "本周第 4 次加塞"],
       options: [
-        { text: "带上吧，明天有雨", kind: "high", hitChance: 0.79, payoff: 1.3, reply: "准！这助手靠谱。", tone: "success" },
-        { text: "不用，大晴天", kind: "risk", hitChance: 0.12, payoff: 2.6, reply: "嘿，还真没下，赌对了。", tone: "success" }
+        { text: "挪到明早，今晚让他早点回", kind: "high", hitChance: 0.78, payoff: 1.3, reply: "……总算能早点到家。", tone: "success" },
+        { text: "照旧今晚开，硬扛一轮", kind: "risk", hitChance: 0.14, payoff: 2.4, reply: "……开完谁也没记住说了啥。", tone: "normal" },
+        { text: "再加一场对齐会，凑齐", kind: "high", hitChance: 0.3, payoff: 0.9, reply: "……日历又多一格。", tone: "warning", distractor: true }
       ]
     },
     {
-      title: "这段话翻译对吗？",
-      clues: ["原文 EN", "术语 ×2", "语气正式"],
+      title: "「9 点前交方案」这条待办，还留着吗？",
+      clues: ["已逾期 2 天", "他每天划掉又新建", "列表里还堆着 17 条"],
       options: [
-        { text: "术语准确、语气正式，可用", kind: "high", hitChance: 0.76, payoff: 1.3, reply: "专业，定稿了。", tone: "success" },
-        { text: "机翻一下直接发", kind: "risk", hitChance: 0.14, payoff: 2.4, reply: "凑合能用吧，省事。", tone: "normal" }
+        { text: "拆成两步、挪到下午，别全堆早上", kind: "high", hitChance: 0.76, payoff: 1.3, reply: "……这样我还能喘口气。", tone: "success" },
+        { text: "直接标完成，骗自己一下", kind: "risk", hitChance: 0.16, payoff: 2.2, reply: "……骗不过，明早它还在。", tone: "normal" },
+        { text: "把 17 条全标成「重要」", kind: "high", hitChance: 0.28, payoff: 0.9, reply: "……那等于一条都不重要。", tone: "warning", distractor: true }
       ]
     },
     {
-      title: "这条告警要不要管？",
-      clues: ["CPU 12%", "持续 2s", "已自恢复"],
+      title: "提醒又弹出来了：「该喝水了。」",
+      clues: ["今天第 9 次忽略", "上次喝水是 6 小时前", "桌上那杯咖啡见了底"],
       options: [
-        { text: "可忽略：12%、2 秒、已自恢复，属抖动", kind: "high", hitChance: 0.8, payoff: 1.3, reply: "确认是误报，关掉了。", tone: "success" },
-        { text: "立刻全员上线排查！", kind: "risk", hitChance: 0.1, payoff: 2.5, reply: "……虚惊一场，不过查了也安心。", tone: "normal" }
+        { text: "顺手替他订壶水，静音这一条", kind: "high", hitChance: 0.8, payoff: 1.3, reply: "……被人记着的感觉，久违了。", tone: "success" },
+        { text: "干脆关掉所有健康提醒", kind: "risk", hitChance: 0.12, payoff: 2.4, reply: "……清净了，可也没人管他了。", tone: "normal" },
+        { text: "再加一条「久坐提醒」", kind: "high", hitChance: 0.3, payoff: 0.9, reply: "……又一条等着被忽略。", tone: "warning", distractor: true }
       ]
     },
     {
@@ -111,7 +115,8 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       clues: ["本周有效工时 91", "评分下滑中", "发件 23:47"],
       options: [
         { text: "替他委婉推掉，保住这个周末", kind: "high", hitChance: 0.68, payoff: 1.3, reply: "我替他挡下了。他能多睡两小时。", tone: "success" },
-        { text: "代他答应，对齐要求", kind: "risk", hitChance: 0.4, payoff: 1.4, reply: "……我照做了。评分没动，他也没变好。", tone: "warning" }
+        { text: "代他答应，对齐要求", kind: "risk", hitChance: 0.4, payoff: 1.4, reply: "……我照做了。评分没动，他也没变好。", tone: "warning" },
+        { text: "帮他把周末排满，显得积极", kind: "high", hitChance: 0.3, payoff: 0.9, reply: "……他的周末就这么没了。", tone: "warning", distractor: true }
       ]
     },
     // —— Lv.2 电话 / 短信（老板催命短信、未接来电）· 老周：暴躁 ——
@@ -367,11 +372,11 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
 // allowed / highlight 的下标针对「options + 装死」的最终数组（装死永远是最后一项）。
 const TUTORIAL_BUBBLES: Array<{ title: string; clues: string[]; options: AnswerOption[]; allowed: number[]; highlight?: number; line: string }> = [
   {
-    title: "明天要不要带伞？",
-    clues: ["湿度 81%", "气压 ↓"],
+    title: "他在便签里问：「明早那个会，几点来着？」",
+    clues: ["日历上写着 9:00", "他刚熬完一个班"],
     options: [
-      { text: "带上吧，明天有雨", kind: "high", hitChance: 0.79, payoff: 1.3, reply: "准！这助手靠谱。", tone: "success" },
-      { text: "不用，大晴天", kind: "risk", hitChance: 0.12, payoff: 2.6, reply: "嘿，还真没下，赌对了。", tone: "normal" }
+      { text: "明早 9 点，已帮你设好提醒", kind: "high", hitChance: 0.79, payoff: 1.3, reply: "……有人替我记着，踏实。", tone: "success" },
+      { text: "好像是十点吧？", kind: "risk", hitChance: 0.12, payoff: 2.6, reply: "……差点记错，幸好你提醒。", tone: "normal" }
     ],
     allowed: [0],
     highlight: 0,
