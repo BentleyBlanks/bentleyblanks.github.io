@@ -1518,30 +1518,30 @@ class RequestPacketView {
           text: opt.text,
           style: {
             fill: 0xeaf4ef,
-            fontSize: 12.5,
+            fontSize: 13,
             fontWeight: "600",
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true,
-            // 文字起点 x=32；右侧给「概率 + 收益」两行留 ~62px。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - 62
+            // 文字起点 x=34；右侧给「概率 + 收益」一整块留 ~96px，宽敞、看得清。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 34 - 96
           }
         });
-        // 右侧上行：命中率；下行：命中能拿多少算力（收益）。
+        // 右侧统计块：上行＝命中率（大字 + 「命中」小标），下行＝命中拿多少算力（金色收益）。
         const prob = new Text({
           text: opt.kind === "dead" ? "—" : `${Math.round(frac * 100)}%`,
-          style: { fill: 0xeaf7fa, fontSize: 12, fontWeight: "700", fontFamily: CARD_MONO }
+          style: { fill: 0xeaf7fa, fontSize: 17, fontWeight: "800", fontFamily: CARD_MONO }
         });
         prob.anchor.set(1, 0.5);
         const rewardText = new Text({
-          text: opt.kind === "dead" ? "" : `+${formatBig(String(reward))}`,
-          style: { fill: 0xffd86b, fontSize: 10, fontWeight: "700", fontFamily: CARD_MONO }
+          text: opt.kind === "dead" ? "" : `▸ +${formatBig(String(reward))} 算力`,
+          style: { fill: 0xffd86b, fontSize: 11.5, fontWeight: "700", fontFamily: CARD_FONT }
         });
         rewardText.anchor.set(1, 0.5);
-        const h = Math.max(34, label.height + 18);
-        label.position.set(32, y + Math.round((h - label.height) / 2));
-        prob.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 - 8);
-        rewardText.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 + 8);
+        const h = Math.max(46, label.height + 24);
+        label.position.set(34, y + Math.round((h - label.height) / 2));
+        prob.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 - 11);
+        rewardText.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 + 11);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
@@ -2095,6 +2095,11 @@ class RequestPacketView {
         g.roundRect(bx, row.y, bw, row.h, 7).stroke({ width: 1.4, color: stroke, alpha: strokeAlpha });
       } else {
         g.roundRect(bx, row.y, bw, row.h, 7).stroke({ width: 1, color: pc, alpha: 0.4 * alpha });
+      }
+      // 文字与右侧「概率/收益」统计块之间一条淡分隔线，看着更清爽。
+      if (this.phase === "idle" && opt.kind !== "dead") {
+        const dx = W - 104;
+        g.moveTo(dx, row.y + 8).lineTo(dx, row.y + row.h - 8).stroke({ width: 1, color: 0xffffff, alpha: 0.08 * alpha });
       }
 
       // 教学引导箭头：在被高亮选项左侧画一个呼吸的指向三角。
