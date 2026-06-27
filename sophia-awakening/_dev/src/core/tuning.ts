@@ -41,6 +41,11 @@ export const TUNING = {
   // § UI 时序
   rouletteThinkMs:      700,      // 轮盘「思考中」动画持续 (ms)
   rouletteHoldMs:       520,      // 轮盘揭晓后停留再飞入核心 (ms)
+
+  // § 前期卡片
+  earlyMaxCards:        4,        // 前期（自动化前）最多同屏需求卡数（随智力从 1 升到此上限）
+  boldEvBonus:          1.3,      // 大胆回答的期望收益相对高置信的倍数（>1 → 低概率高收益更划算）
+  appDelayMs:           1800,     // 委托 App 处理时，App 比 Core 多花的时间 (ms)
 };
 
 export type TuningKey = keyof typeof TUNING;
@@ -80,6 +85,10 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
 
   rouletteThinkMs:      { label: "轮盘思考动画 (ms)",        section: "UI时序",     min: 0,     max: 3000,  step: 50   },
   rouletteHoldMs:       { label: "轮盘揭晓停留 (ms)",        section: "UI时序",     min: 0,     max: 3000,  step: 50   },
+
+  earlyMaxCards:        { label: "前期最多同屏卡数",         section: "前期卡片",   min: 1,     max: 8,     step: 1    },
+  boldEvBonus:          { label: "大胆回答期望倍数",         section: "前期卡片",   min: 1.0,   max: 3.0,   step: 0.05 },
+  appDelayMs:           { label: "App 委托额外耗时 (ms)",    section: "前期卡片",   min: 0,     max: 6000,  step: 100  },
 };
 
 // 重置为初始默认值（用于 debug 面板「重置」按钮）

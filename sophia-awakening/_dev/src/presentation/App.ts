@@ -154,8 +154,8 @@ let suppressSaveOnUnload = false;
 const LEFT_RAIL_WIDTH = 270;
 const RIGHT_RAIL_WIDTH = 290;
 const BASE_SUCTION_MARGIN = 50;
-const REQUEST_PACKET_WIDTH = 286;
-const REQUEST_PACKET_HEIGHT = 112;
+const REQUEST_PACKET_WIDTH = 330;
+const REQUEST_PACKET_HEIGHT = 128;
 
 export async function bootstrapSophia(root: HTMLElement): Promise<void> {
   const app = new SophiaGameApp(root);
@@ -193,6 +193,8 @@ class SophiaGameApp {
   private readonly juice = new JuiceManager(this.fxLayer);
   private readonly requestViews = new Map<string, RequestPacketView>();
   private readonly pendingDropPoints = new Map<string, PointData>();
+  // 已委托给 App 处理、正在「慢慢办」的请求——期间不重建卡片（见 handleDrop 的 App 委托）。
+  private readonly delegatedIds = new Set<string>();
   private hudTimerMs = 0;
   private saveTimerMs = 0;
   // 近期处理结果（1=成功 / 0=幻觉），滚动窗口，喂给终端底部的成功率圆环。
@@ -376,7 +378,7 @@ class SophiaGameApp {
     const liveIds = new Set(state.requests.map((request) => request.id));
 
     for (const request of state.requests) {
-      if (this.requestViews.has(request.id)) {
+      if (this.requestViews.has(request.id) || this.delegatedIds.has(request.id)) {
         continue;
       }
 
@@ -435,62 +437,36 @@ class SophiaGameApp {
     }
   }
 
-  // 卡片摆放：在核心（手机/CORE）四周的空位里，挑离核心最近的一个不重叠的位置落卡。
-  // 网格扫描 + 碰撞检测，**保证不互相遮挡**；空间排满才退回贴边兜底。
+  // 卡片摆放：固定落在屏幕**四角**（前期 1 张起、最多 4 张，各占一角，互不遮挡，也不压住中央核心）。
   private nextRequestPosition(_request: RequestInstance, newCardH: number): PointData {
     const screen = this.pixi.screen;
     const w = screen.width;
     const h = screen.height;
     const W = REQUEST_PACKET_WIDTH;
     const H = newCardH;
-    const railL = LEFT_RAIL_WIDTH + 10;
-    const railR = w - RIGHT_RAIL_WIDTH - 10;
-    const topLimit = 92; // 顶栏下沿
-    const botLimit = h - 30;
+    const railL = LEFT_RAIL_WIDTH + 14;
+    const railR = w - RIGHT_RAIL_WIDTH - 14;
+    const top = 92; // 顶栏下沿
+    const bot = h - 26;
 
-    // 中央禁放区：核心 / 手机这块焦点不让卡片盖住（手机偏高瘦，所以纵向留得多）。
-    const core = this.interfaceView.center;
-    const exL = core.x - 190;
-    const exR = core.x + 190;
-    const exT = core.y - 285;
-    const exB = core.y + 300;
+    // 四角锚点（卡片左上角）：左上 / 右上 / 左下 / 右下。
+    const corners: PointData[] = [
+      { x: railL, y: top },
+      { x: railR - W, y: top },
+      { x: railL, y: bot - H },
+      { x: railR - W, y: bot - H }
+    ];
 
-    // 已停靠卡片占位（拖动 / 结算中的不占位）。
-    const gap = 10;
-    const occ: Array<{ x: number; y: number; w: number; h: number }> = [];
-    for (const v of this.requestViews.values()) {
-      if (!v.busy) occ.push({ x: v.restX, y: v.restY, w: W, h: v.cardHeight });
-    }
-
-    const fits = (x: number, y: number): boolean => {
-      if (x < railL || x + W > railR || y < topLimit || y + H > botLimit) return false;
-      // 不覆盖核心禁区
-      if (x < exR && x + W > exL && y < exB && y + H > exT) return false;
-      for (const o of occ) {
-        if (x < o.x + o.w + gap && x + W + gap > o.x && y < o.y + o.h + gap && y + H + gap > o.y) {
-          return false;
-        }
-      }
-      return true;
-    };
-
-    // 候选网格点：按到核心中心的距离排序——每张新卡都落在离核心最近的空位，自然环绕核心。
-    const step = 22;
-    const cands: Array<{ x: number; y: number; d: number }> = [];
-    for (let x = railL; x + W <= railR; x += step) {
-      for (let y = topLimit; y + H <= botLimit; y += step) {
-        const dx = x + W / 2 - core.x;
-        const dy = y + H / 2 - core.y;
-        cands.push({ x, y, d: dx * dx + dy * dy });
+    // 已停靠卡片（拖动 / 结算中的不占角）。
+    const occ = [...this.requestViews.values()].filter((v) => !v.busy).map((v) => ({ x: v.restX, y: v.restY }));
+    for (const c of corners) {
+      const taken = occ.some((o) => Math.abs(o.x - c.x) < W * 0.6 && Math.abs(o.y - c.y) < H * 0.6);
+      if (!taken) {
+        return c;
       }
     }
-    cands.sort((a, b) => a.d - b.d);
-    for (const c of cands) {
-      if (fits(c.x, c.y)) return { x: c.x, y: c.y };
-    }
-
-    // 实在排满：贴左上角兜底（极端洪峰，宁可叠也不卡死）。
-    return { x: railL, y: topLimit };
+    // 四角都占满（前期上限就是 4，正常不会到这）：错开兜底。
+    return corners[this.requestViews.size % 4];
   }
 
   private hideNodeActions(): void {
@@ -1008,12 +984,19 @@ class SophiaGameApp {
         const requestId = request.id;
         this.audio.playRequestAccept();
         this.pendingDropPoints.set(requestId, appPt);
+        // 标记为「已委托」，期间不让 syncRequests 又给它重建一张卡。
+        this.delegatedIds.add(requestId);
         card.accept(
           appPt,
           () => {
-            const quality = Math.min(0.75, 0.45 + state.intelligence.level * 0.05);
-            this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
             this.onAutoDispatchLanded(appPt);
+            // App 比 Core 慢：落到 App 上后还要等一会儿（智力越低越慢）才出结果 + 收益。
+            const delay = Math.max(200, TUNING.appDelayMs - state.intelligence.level * 80);
+            window.setTimeout(() => {
+              const quality = Math.min(0.75, 0.45 + state.intelligence.level * 0.05);
+              this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
+              this.delegatedIds.delete(requestId);
+            }, delay);
           },
           { x: card.container.x, y: card.container.y }
         );
@@ -1394,8 +1377,10 @@ class RequestPacketView {
   private readonly options: AnswerOption[];
   private readonly optionTexts: Text[] = [];
   private readonly optionProbTexts: Text[] = [];
-  // 每个回复的命中率（0~1）——用于画选项背后的概率进度条。
+  // 每个回复的命中率（0~1）+ 有效 payoff（用于结算/收益显示）——大胆回答的期望被抬到高于平庸（§03）。
   private readonly optionHitFrac: number[] = [];
+  private readonly optionPayoff: number[] = [];
+  private readonly optionRewardTexts: Text[] = [];
   private optionRows: Array<{ y: number; h: number }> = [];
   private hintText?: Text;
   private resolved = false;
@@ -1515,10 +1500,20 @@ class RequestPacketView {
     if (this.isReel) {
       this.container.cursor = "pointer";
       const confidence = reel ? reel.confidence() : 0.56;
+      // 基础算力（用于把 payoff 折算成「能拿多少算力」）。
+      const cv = Math.max(1, parseFloat(request.computeValue) || 1);
+      // 高置信选项的期望（算力）——大胆回答（risk）的收益按 boldEvBonus 抬到高于它。
+      const hiOpt = this.options.find((o) => o.kind === "high" && !o.distractor) ?? this.options.find((o) => o.kind === "high");
+      const hiEv = hiOpt ? effectiveHitChance(hiOpt, confidence) * hiOpt.payoff * cv : cv;
       let y = clueTop + (request.clues?.length ?? 0) * 15 + 10;
       this.options.forEach((opt) => {
         const frac = opt.kind === "dead" ? 0 : effectiveHitChance(opt, confidence);
         this.optionHitFrac.push(frac);
+        // 大胆回答：把有效 payoff 抬到「期望 = boldEvBonus × 高置信期望」——低概率但期望更高（§03，可配置）。
+        const bold = opt.kind === "risk" && frac > 0.01;
+        const payoffEff = bold ? (TUNING.boldEvBonus * hiEv) / (frac * cv) : opt.payoff;
+        this.optionPayoff.push(payoffEff);
+        const reward = Math.round(payoffEff * cv);
         const label = new Text({
           text: opt.text,
           style: {
@@ -1528,24 +1523,30 @@ class RequestPacketView {
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true,
-            // 文字起点 x=32；右侧给 % 留 ~50px，确保不与百分比重叠、不穿出卡片。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - 50
+            // 文字起点 x=32；右侧给「概率 + 收益」两行留 ~62px。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - 62
           }
         });
-        // 精确命中率（右对齐，内缩到框内）。
+        // 右侧上行：命中率；下行：命中能拿多少算力（收益）。
         const prob = new Text({
           text: opt.kind === "dead" ? "—" : `${Math.round(frac * 100)}%`,
           style: { fill: 0xeaf7fa, fontSize: 12, fontWeight: "700", fontFamily: CARD_MONO }
         });
         prob.anchor.set(1, 0.5);
-        const h = Math.max(30, label.height + 16);
-        // 文字 + % 都在行内垂直居中；% 内缩留在框内（行框右沿 = W-12）。
+        const rewardText = new Text({
+          text: opt.kind === "dead" ? "" : `+${formatBig(String(reward))}`,
+          style: { fill: 0xffd86b, fontSize: 10, fontWeight: "700", fontFamily: CARD_MONO }
+        });
+        rewardText.anchor.set(1, 0.5);
+        const h = Math.max(34, label.height + 18);
         label.position.set(32, y + Math.round((h - label.height) / 2));
-        prob.position.set(REQUEST_PACKET_WIDTH - 18, y + h / 2);
+        prob.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 - 8);
+        rewardText.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2 + 8);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
-        this.container.addChild(label, prob);
+        this.optionRewardTexts.push(rewardText);
+        this.container.addChild(label, prob, rewardText);
         y += h + 5;
       });
       // 收紧底部留白，让卡片更贴内容（教学高亮框也跟着贴齐）。
@@ -1668,7 +1669,9 @@ class RequestPacketView {
       // 命中分两档：大胆回答（risk）赌赢本身即惊艳；高置信命中按智力被动概率升格为惊艳。
       const bold = opt.kind === "risk";
       const brilliant = bold || Math.random() < (this.reel?.brilliantChance() ?? 0);
-      const quality = brilliant && !bold ? opt.payoff * BRILLIANT_BOOST : opt.payoff;
+      // 用与卡面收益一致的有效 payoff 结算（大胆回答已按 boldEvBonus 抬高）。
+      const basePayoff = this.optionPayoff[this.chosenIndex] ?? opt.payoff;
+      const quality = brilliant && !bold ? basePayoff * BRILLIANT_BOOST : basePayoff;
       const reply = brilliant && !bold ? pickBrilliantReply(Math.random) : opt.reply;
       this.outcome = { dead: false, hit: true, brilliant, quality, reply, tone: "success", exposureBonus: 0 };
     }
@@ -2102,12 +2105,17 @@ class RequestPacketView {
 
       const label = this.optionTexts[i];
       const prob = this.optionProbTexts[i];
+      const rewardText = this.optionRewardTexts[i];
       label.alpha = alpha;
       label.style.fill = labelColor;
       prob.alpha = alpha;
       // 平时让 % 也用概率色（高绿低红）；揭晓时改显 命中/幻觉。
       if (this.phase === "idle") {
         prob.style.fill = opt.kind === "dead" ? 0x9fb1ab : pc;
+      }
+      // 收益小字只在 idle 显示（思考/揭晓时让位给 命中/幻觉/Thinking）。
+      if (rewardText) {
+        rewardText.alpha = this.phase === "idle" ? alpha : 0;
       }
 
       if (this.phase === "thinking" && i === this.chosenIndex) {
@@ -4549,7 +4557,7 @@ class TuningEditorView {
     tierSection.className = "tuning-section";
     tierSection.innerHTML = `<div class="tuning-kicker">各档请求配置</div>`;
 
-    const TIER_LABELS: Record<number, string> = { 0: "T0 单口", 1: "T1 分拣", 2: "T2 串接", 3: "T3 重磅", 4: "T4 派发" };
+    const TIER_LABELS: Record<number, string> = { 0: "单口处理", 1: "分拣", 2: "串接", 3: "重磅决策", 4: "派发" };
     const TIER_FIELDS: { key: keyof typeof TIER_CONFIGS[0]; label: string; step: number; isString?: boolean }[] = [
       { key: "spawnIntervalMs", label: "生成间隔 (ms)",    step: 50   },
       { key: "maxVisible",      label: "最多同时显示",     step: 1    },

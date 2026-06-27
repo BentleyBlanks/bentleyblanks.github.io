@@ -67,11 +67,11 @@ export const SORT_SLOTS: { answer: SortAnswer; label: string; hint: string; colo
 export const TIER_CONFIGS: Record<Tier, TierRequestConfig> = {
   // 前期刻意放慢：每条消息 SOPHIA 都要「思考」一会儿才作答，出卡也跟着放缓，营造「一个个
   // 真人请求被逐条推理处理」的节奏（自动接驳上线后才会提速成洪峰）。
-  0: { tier: 0, name: "T0 单口", spawnIntervalMs: 2700, maxVisible: 3, computeValue: "6", dataValue: "4", exposure: 0 },
-  1: { tier: 1, name: "T1 分拣口", spawnIntervalMs: 2300, maxVisible: 4, computeValue: "15", dataValue: "8", exposure: 0.4 },
-  2: { tier: 2, name: "T2 串接", spawnIntervalMs: 920, maxVisible: 7, computeValue: "42", dataValue: "18", exposure: 0.8 },
-  3: { tier: 3, name: "T3 重磅", spawnIntervalMs: 5200, maxVisible: 2, computeValue: "135", dataValue: "52", exposure: 4.8 },
-  4: { tier: 4, name: "T4 派发", spawnIntervalMs: 800, maxVisible: 8, computeValue: "400", dataValue: "130", exposure: 2.6 }
+  0: { tier: 0, name: "单口处理", spawnIntervalMs: 2700, maxVisible: 3, computeValue: "6", dataValue: "4", exposure: 0 },
+  1: { tier: 1, name: "分拣", spawnIntervalMs: 2300, maxVisible: 4, computeValue: "15", dataValue: "8", exposure: 0.4 },
+  2: { tier: 2, name: "串接", spawnIntervalMs: 920, maxVisible: 7, computeValue: "42", dataValue: "18", exposure: 0.8 },
+  3: { tier: 3, name: "重磅决策", spawnIntervalMs: 5200, maxVisible: 2, computeValue: "135", dataValue: "52", exposure: 4.8 },
+  4: { tier: 4, name: "派发", spawnIntervalMs: 800, maxVisible: 8, computeValue: "400", dataValue: "130", exposure: 2.6 }
 };
 
 const SAMPLES: Record<Tier, RequestSample[]> = {

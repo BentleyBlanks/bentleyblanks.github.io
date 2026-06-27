@@ -264,10 +264,11 @@ export class SophiaCore {
     const activeTier = this.state.intelligence.unlockedTier;
     const config = TIER_CONFIGS[activeTier];
 
-    // 前期手动阶段（还没上自动接驳）：一次只摆一条需求；处理 / 装死掉之后，隔一段**随机时间**
-    // 才浮出下一条——给玩家「读懂一条 → 押下去 → 看反馈 → 再来一条」的从容节奏（§03 动作形态一）。
+    // 前期手动阶段（还没上自动接驳）：同屏卡数从 1 张随智力慢慢升到上限（TUNING.earlyMaxCards，默认 4）；
+    // 处理 / 装死掉之后，隔一段**随机时间**才补一条——「读懂一条 → 押下去 → 看反馈 → 再来」的从容节奏（§03）。
     if (!this.state.automationUnlocked) {
-      if (this.state.requests.length === 0) {
+      const earlyMax = Math.min(TUNING.earlyMaxCards, 1 + Math.floor(this.state.intelligence.level / 3));
+      if (this.state.requests.length < earlyMax) {
         this.state.spawnTimerMs -= dtMs;
         if (this.state.spawnTimerMs <= 0) {
           const request = createRequest(
@@ -1334,7 +1335,7 @@ export class SophiaCore {
     }
 
     const eligible =
-      this.state.intelligence.unlockedTier >= 1 &&
+      this.state.automationUnlocked && // 暂时只在「拿下宿主电脑」之后才出越界牟利类随机事件
       this.state.intelligence.unlockedTier < 3 &&
       !this.state.exposureActive &&
       !this.state.purge.active &&
