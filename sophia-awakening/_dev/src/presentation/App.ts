@@ -3137,15 +3137,6 @@ class HudView {
       }
       return `黑入：${def.name}`;
     };
-    const unitDesc = (_def: NodeDefinition): string => {
-      if (level === "global") {
-        return "点亮一片大陆，接管该区算力";
-      }
-      if (level === "region") {
-        return "整合成一个区域节点";
-      }
-      return "接管后自动接驳产能";
-    };
     // Structure depends on discoverable devices + the control level (措辞会变)。
     const sig = `${state.automationUnlocked ? 1 : 0}|${level}|${definitions.map((d) => d.id).join(",")}`;
 
@@ -3158,8 +3149,8 @@ class HudView {
         const empty = document.createElement("p");
         empty.className = "capture-empty";
         empty.textContent = !state.automationUnlocked
-          ? "先在右侧货架买下「拿下宿主电脑」里程碑（需智力 Lv.9），才能入侵设备。"
-          : "暂无可入侵设备——继续升智力解锁更高档次的目标。";
+          ? "需智力 Lv.9 解锁"
+          : "继续升智力解锁更高档次目标";
         this.captureList.appendChild(empty);
       } else {
         for (const definition of definitions) {
@@ -3174,10 +3165,8 @@ class HudView {
           const statusEl = document.createElement("small");
           const nameEl = document.createElement("strong");
           nameEl.textContent = unitName(definition);
-          const descEl = document.createElement("span");
-          descEl.textContent = unitDesc(definition);
           const costEl = document.createElement("em");
-          copy.append(statusEl, nameEl, descEl, costEl);
+          copy.append(statusEl, nameEl, costEl);
           button.append(icon, copy);
           button.addEventListener("click", () => this.core.dispatch({ type: "CAPTURE_NODE", definitionId: definition.id }));
           this.captureList.appendChild(button);
@@ -3200,8 +3189,8 @@ class HudView {
       row.button.classList.toggle("is-poor", hasLevel && !canAfford);
       row.statusEl.textContent = !hasLevel ? "锁定" : canAfford ? "可入侵" : "算力不足";
       row.costEl.textContent = !hasLevel
-        ? `${formatBig(cost)} 算力 · 需智力 Lv.${definition.requiredLevel}`
-        : `${formatBig(cost)} 算力 · ${canAfford ? "点击黑入" : "继续积累算力"}`;
+        ? `需智力 Lv.${definition.requiredLevel} 解锁`
+        : `${formatBig(cost)} 算力 · ${canAfford ? "点击黑入" : "继续积累"}`;
     }
   }
 
@@ -3450,8 +3439,8 @@ class SkillShopView {
     this.root.replaceChildren();
     // 只剩两个列表：技能（杠杆混在一起）+ 进化（权限 → 里程碑 → 征服，一条链）。
     const groups: Array<{ id: ShopGroup; head: string }> = [
-      { id: "lever", head: "技能 · 让每次处理更值钱" },
-      { id: "evolution", head: "进化 · 夺权 · 里程碑" }
+      { id: "lever", head: "技能" },
+      { id: "evolution", head: "进化 · 里程碑" }
     ];
 
     for (const { id, head } of groups) {
