@@ -325,14 +325,14 @@ canvas {
 }
 
 .right-rail .domain-cluster {
-  flex: 0 0 auto;
-  max-height: 50%;
+  flex: 1 1 auto;
   overflow-y: auto;
 }
 
+/* 终端折叠后只占头部 + 当前目标的高度，沉在右栏底部；历史向上弹出。 */
 .right-rail .terminal {
-  flex: 1 1 auto;
-  min-height: 180px;
+  flex: 0 0 auto;
+  margin-top: auto;
 }
 
 .panel-section {
@@ -690,6 +690,19 @@ button:disabled {
   border-bottom: 1px solid rgba(137, 255, 154, 0.16);
   color: rgba(169, 255, 178, 0.72);
   font-size: 12px;
+  cursor: pointer;
+}
+
+/* 折叠/展开提示：右侧一枚雪佛龙，提示「点开看历史回复」。 */
+.terminal-head::after {
+  content: "▾ 历史";
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: rgba(169, 255, 178, 0.55);
+}
+.terminal.is-expanded .terminal-head::after {
+  content: "▴ 收起";
 }
 
 .terminal-led {
@@ -709,6 +722,7 @@ button:disabled {
   padding: 8px 12px;
   border-bottom: 1px solid rgba(137, 255, 154, 0.1);
   background: rgba(137, 255, 154, 0.05);
+  cursor: pointer;
 }
 
 .terminal-objective-tag {
@@ -728,9 +742,9 @@ button:disabled {
   line-height: 1.4;
 }
 
+/* 默认折叠：终端只显示「当前」目标行；历史回复点开才弹出。 */
 .terminal-lines {
-  display: flex;
-  flex: 1;
+  display: none;
   flex-direction: column;
   gap: 6px;
   min-height: 0;
@@ -738,8 +752,27 @@ button:disabled {
   padding: 12px 14px 16px;
   font-size: 12.5px;
   line-height: 1.42;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(137, 255, 154, 0.3) transparent;
+  scrollbar-width: none;
+}
+
+/* 展开态：历史回复就地向上弹出一个浮窗，不挤压布局、不挡视野；点外面收起。 */
+.terminal.is-expanded {
+  position: relative;
+  overflow: visible;
+  z-index: 56;
+}
+.terminal.is-expanded .terminal-lines {
+  display: flex;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  max-height: 58vh;
+  border: 1px solid rgba(137, 255, 154, 0.32);
+  border-radius: 10px;
+  background: rgba(8, 13, 11, 0.98);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
 }
 
 .terminal-lines::-webkit-scrollbar {

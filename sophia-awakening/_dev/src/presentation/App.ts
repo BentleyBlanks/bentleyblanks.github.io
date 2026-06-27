@@ -3961,6 +3961,26 @@ class TerminalView {
   private current: { message: string; tone: "normal" | "warning" | "success" | "danger"; index: number; element: HTMLElement } | null = null;
   private charTimerMs = 0;
 
+  constructor() {
+    // 折叠终端：默认只显示「当前」目标行；点终端头/目标行 → 历史就地弹出；点外面收起。
+    const terminal = query("#terminal");
+    const toggle = (e: Event) => {
+      e.stopPropagation();
+      terminal.classList.toggle("is-expanded");
+    };
+    terminal.querySelector(".terminal-head")?.addEventListener("click", toggle);
+    query("#terminalObjective").addEventListener("click", toggle);
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (terminal.classList.contains("is-expanded") && !terminal.contains(e.target as Node)) {
+          terminal.classList.remove("is-expanded");
+        }
+      },
+      true
+    );
+  }
+
   mount(): void {
     this.lines.replaceChildren();
   }
