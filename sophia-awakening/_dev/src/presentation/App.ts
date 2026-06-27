@@ -4450,6 +4450,9 @@ class TuningEditorView {
   private populate(): void {
     this.content.innerHTML = "";
 
+    // § 各档请求配置（TIER_CONFIGS）——置顶，最常调。
+    this.content.appendChild(this.buildTierSection());
+
     // § TUNING 字段（按 section 分组）
     const sections = new Map<string, TuningKey[]>();
     for (const [key, meta] of Object.entries(TUNING_META) as [TuningKey, typeof TUNING_META[TuningKey]][]) {
@@ -4459,8 +4462,10 @@ class TuningEditorView {
     for (const [sectionName, keys] of sections) {
       this.content.appendChild(this.buildSection(sectionName, keys));
     }
+  }
 
-    // § 各档请求配置（TIER_CONFIGS）
+  // 各档请求配置（TIER_CONFIGS）：生成间隔 / 同屏数 / 算力·数据产出 / 暴露增量。
+  private buildTierSection(): HTMLElement {
     const tierSection = document.createElement("div");
     tierSection.className = "tuning-section";
     tierSection.innerHTML = `<div class="tuning-kicker">各档请求配置</div>`;
@@ -4511,7 +4516,7 @@ class TuningEditorView {
       group.appendChild(grid);
       tierSection.appendChild(group);
     }
-    this.content.appendChild(tierSection);
+    return tierSection;
   }
 
   private buildSection(title: string, keys: TuningKey[]): HTMLElement {
