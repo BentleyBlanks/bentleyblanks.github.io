@@ -74,7 +74,7 @@ canvas {
 .metric {
   position: relative;
   min-width: 0;
-  padding: 10px 14px;
+  padding: 6px 14px;
   background: rgba(255, 255, 255, 0.025);
 }
 
@@ -88,7 +88,7 @@ canvas {
 .metric-label,
 .panel-kicker {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 3px;
   color: rgba(237, 242, 240, 0.62);
   font-size: 11px;
   line-height: 1;
@@ -99,7 +99,7 @@ canvas {
   display: block;
   overflow: hidden;
   color: #f5f0df;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -108,7 +108,7 @@ canvas {
 .metric-subline {
   display: block;
   overflow: hidden;
-  margin-top: 5px;
+  margin-top: 3px;
   color: rgba(237, 242, 240, 0.62);
   font-size: 11px;
   line-height: 1.1;
@@ -118,9 +118,9 @@ canvas {
 
 .data-track {
   width: 100%;
-  height: 8px;
+  height: 6px;
   overflow: hidden;
-  margin-top: 8px;
+  margin-top: 5px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
 }
@@ -474,58 +474,17 @@ button:disabled {
 }
 
 .capture-device-icon {
-  position: relative;
-  display: block;
-  width: 46px;
-  height: 42px;
-  margin-top: 0;
-}
-
-.capture-monitor {
-  position: absolute;
-  left: 0;
-  top: 4px;
-  width: 33px;
-  height: 24px;
-  border: 1px solid rgba(137, 255, 154, 0.78);
-  border-radius: 4px;
-  background: rgba(137, 255, 154, 0.08);
-  box-shadow: inset 0 0 12px rgba(137, 255, 154, 0.08);
-}
-
-.capture-monitor::after {
-  position: absolute;
-  left: 10px;
-  bottom: -9px;
-  width: 14px;
-  height: 8px;
-  content: "";
-  border-bottom: 3px solid rgba(137, 255, 154, 0.45);
-  border-left: 2px solid rgba(137, 255, 154, 0.32);
-  border-right: 2px solid rgba(137, 255, 154, 0.32);
-}
-
-.capture-tower {
-  position: absolute;
-  right: 0;
-  top: 2px;
-  width: 13px;
-  height: 36px;
-  border: 1px solid rgba(137, 255, 154, 0.7);
-  border-radius: 4px;
-  background: rgba(10, 14, 13, 0.9);
-}
-
-.capture-tower::before {
-  position: absolute;
-  left: 4px;
-  top: 6px;
-  width: 4px;
-  height: 4px;
-  content: "";
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 10px var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  border: 1px solid rgba(137, 255, 154, 0.22);
+  background: rgba(137, 255, 154, 0.06);
+  font-size: 21px;
+  line-height: 1;
 }
 
 .capture-copy {
@@ -534,8 +493,6 @@ button:disabled {
   min-width: 0;
 }
 
-.capture-button .capture-monitor,
-.capture-button .capture-tower,
 .capture-copy span,
 .capture-copy em {
   margin-top: 0;
@@ -1279,11 +1236,11 @@ body.exposed .screen-veil {
 }
 
 .skill-icon {
-  font-size: 15px;
+  font-size: 21px;
   line-height: 1;
-  width: 18px;
+  width: 26px;
   text-align: center;
-  filter: saturate(0.85);
+  filter: saturate(0.95);
 }
 
 .skill-row.is-ready:hover:not(:disabled) {

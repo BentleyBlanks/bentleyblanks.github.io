@@ -31,7 +31,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     baseProduction: "34",
     stealth: 0.72,
     exposureOnCapture: 8,
-    description: "闲置算力可观，适合接驳 T1-T2。",
+    description: "闲置算力可观，接驳后稳定产出。",
     color: 0x62d6d6
   },
   {

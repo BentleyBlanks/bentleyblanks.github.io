@@ -87,6 +87,19 @@ const AMBER = 0xffb84a;
 const RED = 0xff5f5f;
 const RED_QUEEN = 0xff3b54; // 全球天网铺满后的「红皇后」主控红
 const DEVOUR = 0xc06bff; // §04 吞噬引爆巨型气泡的深紫——区别于 T3 重磅的血红
+// 卡片字体：正文用更有质感的无衬线，数字 / 编号用等宽。
+const CARD_FONT = "Inter, 'Segoe UI', system-ui, sans-serif";
+const CARD_MONO = "Cascadia Mono, Consolas, monospace";
+const SENDER_LABEL: Record<string, string> = { host: "宿主", boss: "上级", system: "系统", sophia: "SOPHIA" };
+
+// 可入侵设备 / 节点的图标——按档次各不相同（高档不再是「电脑」）。
+const NODE_ICONS: Record<string, string> = {
+  office: "🖥️",
+  console: "🎮",
+  server: "🗄️",
+  cloud: "☁️",
+  grid: "🛰️"
+};
 
 // 终端顶部常驻的「当前大方向」——每个阶段 SOPHIA 在做什么（贴 §08/§11 叙事）。
 const PHASE_OBJECTIVE: Record<string, string> = {
@@ -1204,7 +1217,6 @@ class RequestPacketView {
   private readonly chargeBar = new Graphics();
   // 发信人类型——决定左上角圆槽里那枚程序化绘制的头像字形（宿主 / 上级 / 系统 / SOPHIA）。
   private readonly sender: "host" | "boss" | "system" | "sophia";
-  private readonly code: Text;
   private readonly title: Text;
   private readonly badge: Text;
   private readonly clueTexts: Text[] = [];
@@ -1270,36 +1282,35 @@ class RequestPacketView {
     this.container.addChild(this.bg);
     this.container.addChild(this.chargeBar);
 
-    const badgeBase = TIER_CONFIGS[request.tier].name + (request.compound > 1 ? ` ·串 ×${request.compound}` : "");
+    // 标题区只留一个简短标签：普通卡＝发信人（宿主 / 上级…），特殊卡＝类型（吞噬 / 重磅 / 反制 / 串接）。
+    // 不再写 T 编号、REQ 流水号这类冗余信息。
+    const tag = this.isDevour
+      ? `⊙ 吞噬 · ${request.devour?.label ?? ""}`
+      : this.isCounter
+        ? "⚔ 反制清剿"
+        : request.tier === 3 && this.isReel
+          ? "⚡ 重磅豪赌"
+          : this.isChain
+            ? `🔗 任务链${request.compound > 1 ? ` ×${request.compound}` : ""}`
+            : SENDER_LABEL[this.sender] ?? "宿主";
     this.badge = new Text({
-      text: this.isDevour
-        ? `⊙ 吞噬引爆 · ${request.devour?.label ?? ""}`
-        : this.isCounter ? "⚔ 反制清剿"
-        : this.isReel ? `${badgeBase}${request.tier === 3 ? " · 重磅豪赌" : " · 推理"}` : badgeBase,
-      style: { fill: this.accent, fontSize: 10, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
-    });
-    this.code = new Text({
-      text: this.packetCode(),
-      style: { fill: 0x7f938d, fontSize: 10, fontWeight: "700", fontFamily: "Cascadia Mono, Consolas, monospace" }
+      text: tag,
+      style: { fill: this.accent, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.5, fontFamily: CARD_MONO }
     });
     this.title = new Text({
       text: request.label,
       style: {
         fill: 0xf3fff8,
-        fontSize: 14,
-        fontWeight: "800",
-        fontFamily: "Cascadia Mono, Consolas, monospace",
+        fontSize: 15,
+        fontWeight: "700",
+        fontFamily: CARD_FONT,
         wordWrap: true,
-        wordWrapWidth: REQUEST_PACKET_WIDTH - 26
+        wordWrapWidth: REQUEST_PACKET_WIDTH - 44
       }
     });
-    // 头部排进圆角主体内（避开顶部圆角 + 尾巴），不再贴边导致文字溢出气泡轮廓。
-    this.title.style.wordWrapWidth = REQUEST_PACKET_WIDTH - 44;
-    this.badge.position.set(34, 13);
-    this.code.anchor.set(1, 0);
-    this.code.position.set(REQUEST_PACKET_WIDTH - 16, 13);
-    this.title.position.set(16, 30);
-    this.container.addChild(this.badge, this.code, this.title);
+    this.badge.position.set(34, 9);
+    this.title.position.set(16, 31);
+    this.container.addChild(this.badge, this.title);
 
     // Clue lines — the information the player has to read. Laid out after the
     // title so a two-line title still leaves room.
@@ -1308,10 +1319,10 @@ class RequestPacketView {
       const text = new Text({
         text: clue,
         style: {
-          fill: 0xbcd0c9,
-          fontSize: 11,
-          fontWeight: "600",
-          fontFamily: "Cascadia Mono, Consolas, monospace",
+          fill: 0xaec3bc,
+          fontSize: 11.5,
+          fontWeight: "500",
+          fontFamily: CARD_FONT,
           wordWrap: true,
           wordWrapWidth: REQUEST_PACKET_WIDTH - 40
         }
@@ -1331,36 +1342,31 @@ class RequestPacketView {
         const label = new Text({
           text: opt.text,
           style: {
-            fill: 0xdfeee9,
-            fontSize: 10.5,
-            fontWeight: "700",
-            fontFamily: "Cascadia Mono, Consolas, monospace",
+            fill: 0xe8f3ee,
+            fontSize: 12,
+            fontWeight: "600",
+            fontFamily: CARD_FONT,
             wordWrap: true,
             // 给右侧概率列让出 ~52px，避免长回复压到 % 上。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 30 - 52
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 34 - 52
           }
         });
-        label.position.set(30, y + 6);
+        label.position.set(34, y + 8);
         const prob = new Text({
-          text: opt.kind === "dead" ? "0%" : `${Math.round(effectiveHitChance(opt, confidence) * 100)}%`,
-          style: { fill: 0xbfe6ee, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
+          text: opt.kind === "dead" ? "—" : `${Math.round(effectiveHitChance(opt, confidence) * 100)}%`,
+          style: { fill: 0xbfe6ee, fontSize: 12, fontWeight: "700", fontFamily: CARD_MONO }
         });
-        prob.anchor.set(1, 0);
-        prob.position.set(REQUEST_PACKET_WIDTH - 16, y + 7);
-        const h = Math.max(24, label.height + 12);
+        prob.anchor.set(1, 0.5);
+        const h = Math.max(28, label.height + 14);
+        prob.position.set(REQUEST_PACKET_WIDTH - 14, y + h / 2);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
         this.container.addChild(label, prob);
-        y += h + 4;
+        y += h + 5;
       });
-      this.hintText = new Text({
-        text: "点击一个回复 · 押下去",
-        style: { fill: THINK, fontSize: 9, fontWeight: "700", fontFamily: "Inter, sans-serif" }
-      });
-      this.hintText.position.set(12, y + 1);
-      this.container.addChild(this.hintText);
-      this.cardH = y + 16;
+      // 去掉「点击一个回复」提示——卡片本就该点，提示纯属冗余。
+      this.cardH = y + 8;
     }
 
     if (this.isChain) {
@@ -1695,12 +1701,6 @@ class RequestPacketView {
     }
   }
 
-  private packetCode(): string {
-    const numericId = Number(this.request.id.replace("req-", ""));
-    const id = Number.isFinite(numericId) ? String(numericId).padStart(3, "0") : this.request.id.slice(-3).toUpperCase();
-    return `REQ-${id}`;
-  }
-
   private draw(): void {
     const c = this.accent;
     const W = REQUEST_PACKET_WIDTH;
@@ -1885,12 +1885,17 @@ class RequestPacketView {
         }
       }
 
-      // 回复行底框（程序化）：暗底圆角条 + 状态描边（thinking / revealed / 教学高亮）。
-      g.roundRect(10, row.y, W - 20, row.h, 5).fill({ color: 0x05100d, alpha: 0.5 * alpha + 0.25 });
+      // 回复行：暗底圆角 + 左侧一道 kind 色 accent 条 + 克制的状态描边（更有质感，不再是廉价的小圆点）。
+      const bx = 12;
+      const bw = W - 24;
+      g.roundRect(bx, row.y, bw, row.h, 7).fill({ color: 0x0a1714, alpha: 0.5 * alpha + 0.3 });
+      g.roundRect(bx, row.y, bw, row.h, 7).fill({ color: dot, alpha: 0.05 * alpha });
+      g.roundRect(bx, row.y + 4, 3, row.h - 8, 1.5).fill({ color: dot, alpha: 0.85 * alpha });
       if (strokeAlpha > 0.22) {
-        g.roundRect(10, row.y, W - 20, row.h, 5).stroke({ width: 1.3, color: stroke, alpha: strokeAlpha });
+        g.roundRect(bx, row.y, bw, row.h, 7).stroke({ width: 1.4, color: stroke, alpha: strokeAlpha });
+      } else {
+        g.roundRect(bx, row.y, bw, row.h, 7).stroke({ width: 1, color: dot, alpha: 0.16 * alpha });
       }
-      g.circle(18, row.y + row.h / 2, 3).fill({ color: dot, alpha: 0.85 * alpha });
 
       // 教学引导箭头：在被高亮选项左侧画一个呼吸的指向三角。
       if (this.phase === "idle" && tut && tut.highlight === i) {
@@ -3132,14 +3137,14 @@ class HudView {
       }
       return `黑入：${def.name}`;
     };
-    const unitDesc = (def: NodeDefinition): string => {
+    const unitDesc = (_def: NodeDefinition): string => {
       if (level === "global") {
-        return "在全球地图上点亮一个节点，接管该区算力";
+        return "点亮一片大陆，接管该区算力";
       }
       if (level === "region") {
-        return "整合为一个区域节点，自动接管该区算力";
+        return "整合成一个区域节点";
       }
-      return `接管后自动处理 T${def.tierMin}-T${def.tierMax} 请求`;
+      return "接管后自动接驳产能";
     };
     // Structure depends on discoverable devices + the control level (措辞会变)。
     const sig = `${state.automationUnlocked ? 1 : 0}|${level}|${definitions.map((d) => d.id).join(",")}`;
@@ -3163,7 +3168,7 @@ class HudView {
           const icon = document.createElement("span");
           icon.className = "capture-device-icon";
           icon.setAttribute("aria-hidden", "true");
-          icon.innerHTML = '<span class="capture-monitor"></span><span class="capture-tower"></span>';
+          icon.textContent = NODE_ICONS[definition.id] ?? "🖥️";
           const copy = document.createElement("span");
           copy.className = "capture-copy";
           const statusEl = document.createElement("small");
