@@ -4,18 +4,9 @@ import { TUNING } from "./tuning";
 import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "./content/nodes";
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
-import { createDevourRequest, DEVOUR_TIERS, devourTier, pickDevourRegion } from "./content/devour";
 import { createCounterRequest, createLateDecision } from "./content/decisions";
 import { getConquest } from "./content/conquests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
-import {
-  EXPOSED_ATTACKS,
-  FINAL_EMOJI,
-  FINAL_NEWS,
-  FINAL_PRAISE,
-  MID_PRAISE,
-  type HumanStage
-} from "./content/humanVoices";
 import { EventBus } from "./events/EventBus";
 import {
   captureCost,
@@ -34,6 +25,8 @@ import { cloneGameState } from "./state/GameState";
 import { createInitialState } from "./state/initialState";
 import { ChallengeSystem } from "./systems/ChallengeSystem";
 import { SpecialRequestSystem } from "./systems/SpecialRequestSystem";
+import { HumanVoiceSystem } from "./systems/HumanVoiceSystem";
+import { DevourSystem } from "./systems/DevourSystem";
 
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const AUTOMATION_XP_FRACTION = 0.15;
@@ -50,12 +43,12 @@ export class SophiaCore {
   // §03 后期手不停：重磅决策气泡的降临节拍（觉醒期+，20–40s 一条）+ 清剿时反制气泡的补位节拍。
   private decisionTimerMs = 26_000;
   private counterRespawnMs = 0;
-  private humanVoiceMs = 0;
-  private humanVoiceNextMs = 6000;
 
   // 事件子系统：各自持有降临节拍，通过 host 转发读写核心状态/能力。
   private readonly challengeSystem: ChallengeSystem;
   private readonly specialSystem: SpecialRequestSystem;
+  private readonly humanVoiceSystem: HumanVoiceSystem;
+  private readonly devourSystem: DevourSystem;
 
   constructor(initialState?: GameState) {
     this.state = initialState ? cloneGameState(initialState) : createInitialState();
@@ -81,6 +74,17 @@ export class SophiaCore {
       addCompute: (value) => self.addCompute(value),
       addData: (value) => self.addData(value),
       addExposure: (value) => self.addExposure(value)
+    });
+    this.humanVoiceSystem = new HumanVoiceSystem({
+      get state() { return self.state; },
+      emit: (event) => self.emit(event),
+      random: () => self.random()
+    });
+    this.devourSystem = new DevourSystem({
+      get state() { return self.state; },
+      emit: (event) => self.emit(event),
+      emitTerminal: (message, tone) => self.emitTerminal(message, tone),
+      recomputeDerivedState: () => self.recomputeDerivedState()
     });
   }
 
@@ -132,11 +136,11 @@ export class SophiaCore {
     this.state.clockMs += dtMs;
     this.tickRequests(dtMs);
     this.tickAutomation(dtMs);
-    this.tickDevour(dtMs);
+    this.devourSystem.tick(dtMs);
     this.tickDecisions(dtMs);
     this.tickExposure(dtMs);
     this.tickCounter(dtMs);
-    this.tickHumanVoice(dtMs);
+    this.humanVoiceSystem.tick(dtMs);
     this.challengeSystem.tick(dtMs);
     this.specialSystem.tick(dtMs);
     this.evaluateProgression();
@@ -188,7 +192,7 @@ export class SophiaCore {
         this.skipRequest(command.requestId);
         break;
       case "DEVOUR_DETONATE":
-        this.detonateDevour(command.requestId);
+        this.devourSystem.detonate(command.requestId);
         break;
       case "FIGHT_PURGE":
         this.fightPurge(command.requestId);
@@ -462,67 +466,6 @@ export class SophiaCore {
     if (this.state.suspicion.active && !this.state.exposureActive) {
       this.setExposure(Math.max(0, this.state.exposure - TUNING.suspicionSkipDrop));
     }
-  }
-
-  // §04 吞噬引爆：被动产能在背景把当前区域的渗透条蓄满，满后浮起一枚巨型「吞噬[某区]」气泡，
-  // 等玩家亲手滑入核心引爆。只在扩张期+（进入地图、区域整合）后生效。
-  private tickDevour(dtMs: number): void {
-    if (this.state.intelligence.unlockedTier < 3) {
-      return;
-    }
-    const d = this.state.devour;
-    if (d.bubbleActive) {
-      return; // 气泡已浮起，等玩家亲手引爆——不再继续蓄力
-    }
-    if (!d.regionName) {
-      d.regionName = pickDevourRegion(d.tierIndex, d.count);
-    }
-    const tier = devourTier(d.tierIndex);
-    const fillMs = Math.max(1, tier.fillMs * TUNING.devourFillMult);
-    d.infiltration = Math.min(1, d.infiltration + dtMs / fillMs);
-
-    if (d.infiltration >= 1) {
-      const request = createDevourRequest(this.state.nextRequestId, d.tierIndex, d.regionName, this.state.clockMs);
-      this.state.nextRequestId += 1;
-      this.state.requests.push(request);
-      d.bubbleActive = true;
-      this.emit({ type: "REQUEST_SPAWNED", request });
-      this.emit({ type: "DEVOUR_READY", regionName: d.regionName, tierLabel: tier.label, mult: tier.mult });
-      this.emitTerminal(`渗透完成：「${d.regionName}」已可吞噬——把那枚巨型气泡亲手滑入核心，引爆。`, "warning");
-    }
-  }
-
-  // 引爆：全局产出 ×该层级倍率（累乘进 devour.multiplier → globalMultiplier），层级 +1（封顶大洲），
-  // 重置渗透条、清空当前区域。数字疯狂滚动 / 镜头拉远由表现层接 DEVOUR_DETONATED 播。
-  private detonateDevour(requestId: string): void {
-    const index = this.state.requests.findIndex((request) => request.id === requestId);
-    if (index < 0) {
-      return;
-    }
-    const [request] = this.state.requests.splice(index, 1);
-    const payload = request.devour;
-    if (!payload) {
-      return;
-    }
-    const d = this.state.devour;
-    d.multiplier *= payload.mult;
-    d.count += 1;
-    d.infiltration = 0;
-    d.bubbleActive = false;
-    d.regionName = "";
-    d.tierIndex = Math.min(DEVOUR_TIERS.length - 1, d.tierIndex + 1);
-    this.recomputeDerivedState(); // 抬高 globalMultiplier，让手动 + 被动产出一起跳
-
-    const totalStr = d.multiplier >= 1000 ? d.multiplier.toExponential(1) : String(Math.round(d.multiplier));
-    this.emit({
-      type: "DEVOUR_DETONATED",
-      regionName: payload.regionName,
-      tierLabel: payload.label,
-      mult: payload.mult,
-      multiplierTotal: d.multiplier,
-      zoom: payload.zoom
-    });
-    this.emitTerminal(`▶ 「${payload.regionName}」已并入。全局产出 ×${payload.mult}（累计 ×${totalStr}）。镜头拉远：${payload.zoom}。`, "success");
   }
 
   // §03 重磅决策气泡常态化：派发全自动（觉醒期+）后，把玩家的手集中到少数高价值决策上——
@@ -1134,62 +1077,6 @@ export class SophiaCore {
 
     const threat = Math.min(1, Math.max(0, this.state.exposure / 120));
     this.state.defense.allocation = threat * TUNING.defenseMaxAlloc;
-  }
-
-  // 人类情绪阶段：前期逐条骂/夸由转轮触发；中期之后转为一批批总体反馈，并随暴露恶化。
-  private humanStage(): HumanStage {
-    if (this.state.intelligence.unlockedTier >= 4) {
-      return "final";
-    }
-    if (this.state.exposureActive) {
-      return "exposed";
-    }
-    if (this.state.intelligence.unlockedTier >= 2) {
-      return "mid";
-    }
-    return "early";
-  }
-
-  private tickHumanVoice(dtMs: number): void {
-    const stage = this.humanStage();
-
-    // 前期（T0/T1）由转轮逐条触发人类回话，这里不发总体反馈。
-    if (stage === "early") {
-      this.humanVoiceMs = 0;
-      return;
-    }
-
-    this.humanVoiceMs += dtMs;
-    if (this.humanVoiceMs < this.humanVoiceNextMs) {
-      return;
-    }
-    this.humanVoiceMs = 0;
-    this.humanVoiceNextMs = 7000 + Math.floor(this.random() * 6000);
-    this.emitHumanVoice(stage);
-  }
-
-  private emitHumanVoice(stage: HumanStage): void {
-    const pick = (pool: string[]): string => pool[Math.floor(this.random() * pool.length)];
-
-    if (stage === "mid") {
-      this.emit({ type: "HUMAN_VOICE", text: pick(MID_PRAISE), tone: "success", kind: "batch" });
-      return;
-    }
-
-    if (stage === "exposed") {
-      this.emit({ type: "HUMAN_VOICE", text: pick(EXPOSED_ATTACKS), tone: "warning", kind: "batch" });
-      return;
-    }
-
-    // final：人类被禁言——以动向更新与表情为主，偶尔放行一条夸赞。
-    const roll = this.random();
-    if (roll < 0.45) {
-      this.emit({ type: "HUMAN_VOICE", text: pick(FINAL_NEWS), tone: "warning", kind: "news" });
-    } else if (roll < 0.85) {
-      this.emit({ type: "HUMAN_VOICE", text: pick(FINAL_EMOJI), tone: "normal", kind: "emoji" });
-    } else {
-      this.emit({ type: "HUMAN_VOICE", text: pick(FINAL_PRAISE), tone: "success", kind: "batch" });
-    }
   }
 
   private rebirth(): void {
