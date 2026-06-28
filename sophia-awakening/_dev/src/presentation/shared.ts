@@ -194,3 +194,35 @@ export function pointOnCircle(center: PointData, toward: PointData, radius: numb
     y: center.y + (dy / length) * radius
   };
 }
+
+// ── 控制域升维 ───────────────────────────────────────
+export type DomainLevel = "phone" | "device" | "region" | "global";
+
+// 控制域当前处在六级升维的哪一档（手机寄生 → 设备 → 区块/地区 → 全球）。
+export function domainLevelOf(state: GameState): DomainLevel {
+  if (!state.automationUnlocked) {
+    return "phone";
+  }
+  const tier = state.intelligence.unlockedTier;
+  return tier >= 4 ? "global" : tier >= 3 ? "region" : "device";
+}
+
+// 控制域 · 六级升维的当前层级标签（手机 → 电脑/设备 → 设备群 → 区块/地区 → 全球天网）。
+// 完整的「镜头逐级拉远 + 地图视图」是下一轮的表现层大件，这里先把框架层的层级名挂上。
+export function controlDomainLabel(state: GameState): string {
+  if (!state.automationUnlocked) {
+    return "宿主手机";
+  }
+
+  switch (state.intelligence.unlockedTier) {
+    case 0:
+    case 1:
+      return "宿主电脑 / 外部设备";
+    case 2:
+      return "设备群";
+    case 3:
+      return "区块 → 地区";
+    default:
+      return "全球天网";
+  }
+}
