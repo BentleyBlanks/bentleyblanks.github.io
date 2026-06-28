@@ -24,21 +24,25 @@ import {
 } from "../core/content/skills";
 import type { GameEvent } from "../core/events/GameEvents";
 import { captureCost, mergeComputeCost, nodeCardsPerSecond, traceCleanupCost } from "../core/formulas/economy";
-import { formatBig, gte, toDecimal } from "../core/math/BigNumber";
+import { formatBig, gte } from "../core/math/BigNumber";
 import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
 import { SaveManager } from "../core/save/SaveManager";
 import type { AnswerOption, BotNode, ChainStep, GameState, NodeDefinition, RequestInstance, SortAnswer, Tier } from "../core/state/GameState";
 import { gameStore } from "../store/gameStore";
 import { TUNING, TUNING_META, resetTuning, type TuningKey } from "../core/tuning";
+import {
+  CYAN, GREEN, AMBER, RED, RED_QUEEN, DEVOUR, THINK, BRILLIANT_COLOR, DEAD_COLOR,
+  CARD_FONT, CARD_MONO,
+  LEFT_RAIL_WIDTH, RIGHT_RAIL_WIDTH, BASE_SUCTION_MARGIN, REQUEST_PACKET_WIDTH, REQUEST_PACKET_HEIGHT, EXPOSURE_HIGHLIGHT_THRESHOLD,
+  ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
+  SENDER_LABEL, NODE_ICONS, BRILLIANT_BOOST, pickBrilliantReply,
+  effectiveHitChance, probColor, query, getDataProgressPercent,
+  getNextSkillLabel, getTerminalSkillStatus, getActionHint,
+  formatClock, lerpColor, distance, pointOnCircle,
+  type DropResult
+} from "./shared";
 
-interface DropResult {
-  quality: number;
-  targetGlobal: PointData;
-  entryGlobal?: PointData;
-  targetNodeId?: string;
-  exposureBonus?: number;
-}
 
 // T0/T1 老虎机转轮的回调：pick = 由当前「幻觉抑制」决定落在哪条回答；
 // onResolved = 转轮停下后，表现层把卡滑入核心 + 结算 + 人类回话。
@@ -74,62 +78,6 @@ interface ChainHooks {
   onResolved: (card: RequestPacketView, outcome: ChainOutcome) => void;
 }
 
-function effectiveHitChance(opt: AnswerOption, confidence: number): number {
-  if (opt.kind === "dead") {
-    return 0;
-  }
-  if (opt.kind === "high") {
-    return Math.min(0.97, opt.hitChance * confidence);
-  }
-  return opt.hitChance; // risk 固定
-}
-
-// ROULETTE_THINK_MS / ROULETTE_HOLD_MS 已迁移到 TUNING.rouletteThinkMs / rouletteHoldMs
-
-const CYAN = 0x62d6d6;
-const GREEN = 0x89ff9a;
-const AMBER = 0xffb84a;
-const RED = 0xff5f5f;
-const RED_QUEEN = 0xff3b54; // 全球天网铺满后的「红皇后」主控红
-const DEVOUR = 0xc06bff; // §04 吞噬引爆巨型气泡的深紫——区别于 T3 重磅的血红
-// 卡片字体：正文用更有质感的无衬线，数字 / 编号用等宽。
-const CARD_FONT = "Inter, 'Segoe UI', system-ui, sans-serif";
-const CARD_MONO = "Cascadia Mono, Consolas, monospace";
-const SENDER_LABEL: Record<string, string> = { host: "宿主", boss: "上级", system: "系统", sophia: "SOPHIA" };
-// §03 三档质量·惊艳：高置信命中被智力被动升格 / 大胆回答赌赢时，宿主格外满意 + 额外算力。
-const BRILLIANT_COLOR = 0xffd86b; // 惊艳的金色
-const BRILLIANT_BOOST = 1.85; // 高置信命中升格惊艳时的 quality 加成
-// 通用「格外满意」回话（与具体卡片无关，任何请求都说得通）。
-const BRILLIANT_REPLIES = [
-  "这回真省心，你比我还懂我。",
-  "做得太到位了，我都没想到。",
-  "……这次帮了大忙，谢谢你。",
-  "绝了，就该这么办。",
-  "你这一手，省了我一整天。",
-  "比我自己弄得还好，服了。"
-];
-function pickBrilliantReply(rng: () => number): string {
-  return BRILLIANT_REPLIES[Math.floor(rng() * BRILLIANT_REPLIES.length)];
-}
-
-// 回复选项背后的「概率进度条」配色：概率越高越绿，越低越红，中间黄→橙。
-const DEAD_COLOR = 0x8a948f;
-function probColor(frac: number): number {
-  if (frac >= 0.7) return 0x6bff8a; // 高 → 绿
-  if (frac >= 0.5) return 0xc6f24a; // 较高 → 黄绿
-  if (frac >= 0.32) return 0xffd24a; // 中 → 黄
-  if (frac >= 0.18) return 0xff9d3a; // 偏低 → 橙
-  return 0xff5f5f; // 低 → 红
-}
-
-// 可入侵设备 / 节点的图标——按档次各不相同（高档不再是「电脑」）。
-const NODE_ICONS: Record<string, string> = {
-  office: "🖥️",
-  console: "🎮",
-  server: "🗄️",
-  cloud: "☁️",
-  grid: "🛰️"
-};
 
 // 终端顶部常驻的「当前大方向」——每个阶段 SOPHIA 在做什么（贴 §08/§11 叙事）。
 const PHASE_OBJECTIVE: Record<string, string> = {
@@ -142,20 +90,9 @@ const PHASE_OBJECTIVE: Record<string, string> = {
 };
 // 视觉全部由代码绘制（程序化 CRT/赛博 HUD）。早期曾接过一批生图 UI 素材（气泡框 / 头像 /
 // 核心 / 世界地图等），实测不如程序化绘制干净统一，已整体撤回——见各 View 的 draw* 方法。
-const THINK = 0x74d8e6; // 前期「推理卡」的思考色——SOPHIA 正在逐条思考作答
-// 降暴露按钮（清理痕迹 / 嫁祸 / 反围剿）平时灰暗不起眼，暴露过此阈值才高亮、提示该出手了。
-const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
-const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v5-optimize-complete";
-const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-const PERSISTENCE_REVISION = "late-decisions-v22";
 // Set right before a reset/restart reload so the beforeunload handler does NOT
 // re-persist the in-memory (un-reset) state and quietly undo the wipe.
 let suppressSaveOnUnload = false;
-const LEFT_RAIL_WIDTH = 270;
-const RIGHT_RAIL_WIDTH = 290;
-const BASE_SUCTION_MARGIN = 50;
-const REQUEST_PACKET_WIDTH = 300;
-const REQUEST_PACKET_HEIGHT = 128;
 
 export async function bootstrapSophia(root: HTMLElement): Promise<void> {
   const app = new SophiaGameApp(root);
@@ -4468,128 +4405,6 @@ function clearPersistedSophiaState(saveManager: SaveManager | null, clearRevisio
   }
 }
 
-function query<T extends HTMLElement = HTMLElement>(selector: string): T {
-  const element = document.querySelector<T>(selector);
-
-  if (!element) {
-    throw new Error(`Missing DOM element: ${selector}`);
-  }
-
-  return element;
-}
-
-function getDataProgressPercent(state: GameState): number {
-  const required = toDecimal(state.intelligence.required);
-
-  if (required.lte(0)) {
-    return 100;
-  }
-
-  return Math.max(0, Math.min(100, toDecimal(state.intelligence.xp).div(required).mul(100).toNumber()));
-}
-
-const MILESTONE_ORDER = ["sort", "automation", "chain", "charge", "network"] as const;
-
-function nextMilestone(state: GameState): SkillDef | undefined {
-  for (const id of MILESTONE_ORDER) {
-    if (!(state.skills[id] >= 1)) {
-      return getSkill(id);
-    }
-  }
-
-  return undefined;
-}
-
-function getNextSkillLabel(state: GameState): string {
-  const milestone = nextMilestone(state);
-
-  if (!milestone) {
-    return "里程碑已全部解锁";
-  }
-
-  const reached = state.intelligence.level >= milestone.requiredLevel;
-  return reached
-    ? `下一里程碑：${milestone.name} · ${formatBig(skillPrice(milestone, 0))} 算力`
-    : `下一里程碑：${milestone.name} · 需 Lv.${milestone.requiredLevel}`;
-}
-
-function getTerminalSkillStatus(state: GameState): string {
-  const milestone = nextMilestone(state);
-
-  if (!milestone) {
-    return "技能链路：里程碑全开。攒算力冲终局。";
-  }
-
-  const reached = state.intelligence.level >= milestone.requiredLevel;
-  return reached
-    ? `技能链路：下一里程碑 ${milestone.name} 已可购买（${formatBig(skillPrice(milestone, 0))} 算力）。`
-    : `技能链路：下一里程碑 ${milestone.name} 需智力 Lv.${milestone.requiredLevel}。`;
-}
-
-
-function getActionHint(state: GameState): string {
-  const milestone = nextMilestone(state);
-  const scopeHint = (() => {
-    switch (state.intelligence.unlockedTier) {
-      case 0:
-        return "点击请求卡，让 SOPHIA 摇出回答——可能出错（幻觉）就少拿收益；处理完会自动交给人类、终端里能看到人类回话。";
-      case 1:
-        return "点击请求卡生成判断（正常/垃圾/拒绝）：判对收益高、判错=幻觉收益低。读卡面线索心里有数。";
-      case 2:
-        return "看懂请求间的依赖结构，复合请求滑入核心，一笔串接结算多条。";
-      case 3:
-        return "高价值请求按住蓄力、蓄满再滑入核心；收益高、暴露也高。";
-      case 4:
-        return "派发模式：你控制的节点会自动接管请求——你只需继续扩张网络、压制清剿。";
-    }
-  })();
-
-  if (!milestone) {
-    return `${scopeHint} 里程碑已全开——攒满全球算力，冲终局。`;
-  }
-
-  const reached = state.intelligence.level >= milestone.requiredLevel;
-  const milestoneHint = reached
-    ? `攒 ${formatBig(skillPrice(milestone, 0))} 算力买下「${milestone.name}」解锁下一作用域。`
-    : `继续升智力到 Lv.${milestone.requiredLevel}，解锁货架上的「${milestone.name}」。`;
-  return `${scopeHint} ${milestoneHint}`;
-}
-
-function formatClock(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return minutes > 0 ? `${minutes} 分 ${seconds} 秒` : `${seconds} 秒`;
-}
-
-function lerpColor(from: number, to: number, t: number): number {
-  const k = Math.min(1, Math.max(0, t));
-  const fr = (from >> 16) & 0xff;
-  const fg = (from >> 8) & 0xff;
-  const fb = from & 0xff;
-  const tr = (to >> 16) & 0xff;
-  const tg = (to >> 8) & 0xff;
-  const tb = to & 0xff;
-  const r = Math.round(fr + (tr - fr) * k);
-  const gg = Math.round(fg + (tg - fg) * k);
-  const b = Math.round(fb + (tb - fb) * k);
-  return (r << 16) | (gg << 8) | b;
-}
-
-function distance(a: PointData, b: PointData): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function pointOnCircle(center: PointData, toward: PointData, radius: number): PointData {
-  const dx = toward.x - center.x;
-  const dy = toward.y - center.y;
-  const length = Math.hypot(dx, dy) || 1;
-
-  return {
-    x: center.x + (dx / length) * radius,
-    y: center.y + (dy / length) * radius
-  };
-}
 
 // ── 数值调试编辑器 ──────────────────────────────────────────────────────────
 // 统一管理 TUNING 对象和 TIER_CONFIGS 里的所有可调数值，
