@@ -84,7 +84,9 @@ canvas {
   grid-template-columns: 2fr 2.6fr 2fr;
   gap: 1px;
   overflow: hidden;
-  min-width: 760px;
+  /* 不要设 min-width：顶栏用 left/right 卡在两侧栏之间，min-width 比可用宽度大时会
+     无视 right 往右溢出、压到右侧栏。窄窗口下让它跟着缩，绝不重叠。 */
+  min-width: 0;
   border-radius: 8px;
 }
 

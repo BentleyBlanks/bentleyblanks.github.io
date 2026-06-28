@@ -74,7 +74,8 @@ export class NodeNetworkView {
 
     // 设备 / 区块 / 地区：去掉底部的控制域大框，把设备 / 节点平铺环绕在核心四周。
     const cx = (LEFT_RAIL_WIDTH + (width - RIGHT_RAIL_WIDTH)) / 2;
-    const cy = height < 720 ? height * 0.46 : height * 0.5;
+    // 与 InterfaceView 一致：竖向居中但给顶栏留出约 110px，矮窗口下核心/节点不钻到顶栏下。
+    const cy = Math.min(Math.max(height * 0.5, 396), height - 286);
 
     if (state.nodes.length === 0) {
       this.fallbackPoint = { x: cx, y: cy + 160 };

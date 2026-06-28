@@ -76,7 +76,9 @@ export class InterfaceView {
     const playfieldRight = width - RIGHT_RAIL_WIDTH;
     // 两侧栏配重相当——核心居中（设备 / App / 节点环绕它铺开）。
     this.center.x = (playfieldLeft + playfieldRight) * 0.5;
-    this.center.y = height < 720 ? height * 0.46 : height * 0.5;
+    // 顶栏占了上方约 110px：竖向居中，但保证手机/核心（半高 270）不钻到顶栏底下，
+    // 同时别让底部超出画面。矮窗口下贴着顶栏往下排，高窗口下仍是正中。
+    this.center.y = Math.min(Math.max(height * 0.5, 396), height - 286);
     // Magnet skill visibly grows the suction ring (immediate visual feedback).
     this.suctionMargin = Math.min(140, BASE_SUCTION_MARGIN + state.derived.suctionBonus);
     this.level = state.intelligence.level;
