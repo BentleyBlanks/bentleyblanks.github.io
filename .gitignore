@@ -8,3 +8,6 @@ sophia-awakening/assets/audio/
 tmp/
 .vite/
 **/desktop.ini
+
+# Local Codex bridge/watchdog infra (machine-local, not part of the site)
+.codex-tmp/
