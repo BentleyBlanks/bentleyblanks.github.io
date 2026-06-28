@@ -375,7 +375,11 @@ class SophiaGameApp {
     }
 
     for (const [id, view] of this.requestViews) {
-      view.update(this.pixi.ticker.deltaMS);
+      // 已销毁的卡（动画 onComplete 里 destroy 掉、但还没从表里摘除）不能再 update——
+      // 否则 draw() 会对已释放的 Graphics 调 clear()，整条帧循环抛错卡死。
+      if (!view.container.destroyed) {
+        view.update(this.pixi.ticker.deltaMS);
+      }
 
       if (!liveIds.has(id)) {
         if (!view.settling && !view.container.destroyed) {
