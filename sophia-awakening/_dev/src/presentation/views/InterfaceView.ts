@@ -18,12 +18,53 @@ export class InterfaceView {
   private suctionMargin = BASE_SUCTION_MARGIN;
   private slots: Array<{ answer: SortAnswer; label: string; color: number; x: number; y: number; r: number }> = [];
   // 手机寄生阶段，被越权调用的 App：只有**玩家亲手从核心连过线**的才成为可委托落点。
-  private appWorkerPoints: PointData[] = [];
+  private appWorkerPoints: Array<{ x: number; y: number; idx: number }> = [];
   private pendingApps: Array<{ x: number; y: number; idx: number }> = []; // 已控但还没连上的 App
   private readonly connectedApps = new Set<number>(); // 已连上的 App 下标
+  // 每个 App 的处理队列：active=正在处理（进度 0→1），queue=排队等待的待办。委托一条 = 入队一个 job。
+  private readonly appJobs = new Map<
+    number,
+    { active: { progress: number; durationMs: number; onResolve: () => void } | null; queue: Array<{ durationMs: number; onResolve: () => void }> }
+  >();
 
   hasAppWorkers(): boolean {
     return this.appWorkerPoints.length > 0;
+  }
+
+  // 把一条委托塞进某个 App 的处理队列；App 一次只处理一个，进度满了才出结果、再接下一个。
+  enqueueAppJob(idx: number, durationMs: number, onResolve: () => void): void {
+    let job = this.appJobs.get(idx);
+    if (!job) {
+      job = { active: null, queue: [] };
+      this.appJobs.set(idx, job);
+    }
+    if (job.active) {
+      job.queue.push({ durationMs, onResolve });
+    } else {
+      job.active = { progress: 0, durationMs, onResolve };
+    }
+  }
+
+  // 当前某 App 还排着多少条待办（含正在处理的那条）——给角标用。
+  appPendingCount(idx: number): number {
+    const job = this.appJobs.get(idx);
+    if (!job) return 0;
+    return (job.active ? 1 : 0) + job.queue.length;
+  }
+
+  private advanceAppJobs(deltaMs: number): void {
+    for (const job of this.appJobs.values()) {
+      if (!job.active) {
+        continue;
+      }
+      job.active.progress += deltaMs / Math.max(1, job.active.durationMs);
+      if (job.active.progress >= 1) {
+        const done = job.active;
+        const next = job.queue.shift();
+        job.active = next ? { progress: 0, durationMs: next.durationMs, onResolve: next.onResolve } : null;
+        done.onResolve(); // 结算放最后，避免 onResolve 里再入队时被覆盖
+      }
+    }
   }
   hasPendingApps(): boolean {
     return this.pendingApps.length > 0;
@@ -47,15 +88,8 @@ export class InterfaceView {
     return false;
   }
 
-  getAppWorkerPoint(index: number): PointData {
-    if (this.appWorkerPoints.length === 0) {
-      return this.center;
-    }
-    return this.appWorkerPoints[index % this.appWorkerPoints.length];
-  }
-
-  // 命中测试：卡片是否被拖到了某个「被控 App」图标上（用于玩家亲手把需求委托给 App）。
-  appWorkerAt(global: PointData): PointData | null {
+  // 命中测试：卡片是否被拖到了某个「被控 App」图标上（用于玩家亲手把需求委托给 App / 悬停看处理能力）。
+  appWorkerAt(global: PointData): { x: number; y: number; idx: number } | null {
     for (const p of this.appWorkerPoints) {
       const dx = global.x - p.x;
       const dy = global.y - p.y;
@@ -82,6 +116,12 @@ export class InterfaceView {
     // Magnet skill visibly grows the suction ring (immediate visual feedback).
     this.suctionMargin = Math.min(140, BASE_SUCTION_MARGIN + state.derived.suctionBonus);
     this.level = state.intelligence.level;
+    // App 委托处理只在手机寄生阶段；进入自动接驳后清掉残留队列。
+    if (state.automationUnlocked) {
+      if (this.appJobs.size > 0) this.appJobs.clear();
+    } else {
+      this.advanceAppJobs(deltaMs);
+    }
     this.render(state);
   }
 
@@ -226,7 +266,7 @@ export class InterfaceView {
           g.moveTo(cx, cy).lineTo(gx, gy).stroke({ width: 1.5, color: GREEN, alpha: 0.32 });
           const t = (this.pulse * 0.7 + appIdx * 0.2) % 1;
           g.circle(cx + (gx - cx) * t, cy + (gy - cy) * t, 2.6).fill({ color: GREEN, alpha: 0.8 });
-          this.appWorkerPoints.push({ x: gx, y: gy });
+          this.appWorkerPoints.push({ x: gx, y: gy, idx: appIdx });
         } else if (lit) {
           // 虚线（手画几段）：提示「从核心连过来」。
           const segs = 9;
@@ -244,20 +284,36 @@ export class InterfaceView {
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.85 : 0.4) * pulse });
         g.circle(gx, gy, 10).stroke({ width: 2, color: col2, alpha: (lit ? 0.7 : 0.35) * pulse });
         this.addLabel(connected ? name : lit ? `${name}·待连` : name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
+
+        // 委托处理中：图标外圈画一条进度环（转着转着满了才出结果）；还有排队的待办则右上角标 +N。
+        const job = connected ? this.appJobs.get(appIdx) : undefined;
+        if (job && job.active) {
+          const pr = iconS / 2 + 6;
+          g.circle(gx, gy, pr).stroke({ width: 3, color: 0x2a3b36, alpha: 0.6 });
+          const end = -Math.PI / 2 + Math.min(1, job.active.progress) * Math.PI * 2;
+          g.arc(gx, gy, pr, -Math.PI / 2, end).stroke({ width: 3, color: GREEN, alpha: 0.95 });
+          const waiting = job.queue.length;
+          if (waiting > 0) {
+            const bx = gx + iconS / 2 - 2;
+            const by = gy - iconS / 2 + 2;
+            g.circle(bx, by, 9).fill({ color: AMBER, alpha: 0.95 });
+            this.addLabel(`+${waiting}`, bx, by, 11, 0x1a1208);
+          }
+        }
         appIdx += 1;
       }
     }
 
-    // ---- 中心格：SOPHIA CORE（圆角芯片 + 同心环 + 眼）----
-    const baseR = 38;
-    g.circle(cx, cy, baseR + 18 + Math.sin(this.pulse * 2) * 3).stroke({ width: 1.5, color: accent, alpha: 0.3 });
-    g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 16).fill({ color: 0x06140e, alpha: 0.96 });
-    g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 16).stroke({ width: 3, color: accent, alpha: 0.9 });
-    g.circle(cx, cy, 24).stroke({ width: 2, color: accent, alpha: 0.55 });
-    g.circle(cx, cy, 13).fill({ color: accent, alpha: 0.16 + Math.sin(this.pulse * 2.3) * 0.08 });
-    g.circle(cx, cy, 7 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: overreach ? 0xc8ffd2 : 0xc8f4ff, alpha: 0.95 });
-    g.circle(cx + baseR - 7, cy - baseR + 7, 4).fill({ color: GREEN, alpha: 0.9 }); // 在线小绿点
-    this.addLabel("SOPHIA CORE", cx, cy + baseR + 15, 11, 0xdcefeb);
+    // ---- 中心格：SOPHIA CORE（圆角芯片 + 同心环 + 眼）——尺寸与周围 App 图标一致，不再夸张占中。
+    const baseR = 24;
+    g.circle(cx, cy, baseR + 10 + Math.sin(this.pulse * 2) * 2).stroke({ width: 1.5, color: accent, alpha: 0.3 });
+    g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).fill({ color: 0x06140e, alpha: 0.96 });
+    g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).stroke({ width: 2.5, color: accent, alpha: 0.9 });
+    g.circle(cx, cy, 15).stroke({ width: 2, color: accent, alpha: 0.55 });
+    g.circle(cx, cy, 9).fill({ color: accent, alpha: 0.16 + Math.sin(this.pulse * 2.3) * 0.08 });
+    g.circle(cx, cy, 5 + Math.sin(this.pulse * 2.4) * 1.2).fill({ color: overreach ? 0xc8ffd2 : 0xc8f4ff, alpha: 0.95 });
+    g.circle(cx + baseR - 5, cy - baseR + 5, 3).fill({ color: GREEN, alpha: 0.9 }); // 在线小绿点
+    this.addLabel("SOPHIA CORE", cx, cy + baseR + 13, 10, 0xdcefeb);
   }
 
   private drawCore(tier: Tier, ring: number): void {

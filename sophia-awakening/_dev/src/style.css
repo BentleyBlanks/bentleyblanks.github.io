@@ -2718,3 +2718,22 @@ body.exposed .screen-veil {
 }
 .ce-input:focus { outline: none; border-color: rgba(137,255,154,0.5); background: rgba(137,255,154,0.06); }
 .ce-input-num { flex: 0 0 120px; }
+
+/* App 处理能力悬停浮窗（手机寄生期，悬停在已连 App 上）。 */
+.app-ability-tip {
+  position: fixed;
+  z-index: 60;
+  display: none;
+  max-width: 220px;
+  padding: 8px 11px;
+  border: 1px solid rgba(137, 255, 154, 0.35);
+  border-radius: 8px;
+  background: rgba(8, 16, 14, 0.97);
+  color: #dcefeb;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.app-ability-tip.is-open { display: block; }
+.app-ability-tip b { color: #89ff9a; }

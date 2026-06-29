@@ -1,5 +1,6 @@
 import type { Tier } from "../state/GameState";
 import { content } from "./i18n";
+import { TUNING } from "../tuning";
 
 // 文案（权限/里程碑旁白、技能名与说明、分类标签）已抽到语言包（locales/<lang>.json 的 skills）。
 const S = content().skills;
@@ -73,13 +74,13 @@ export function computeDerivedSkills(skills: Record<string, number>, revokedPerm
   const ownedPerms = PERMISSION_IDS.filter((id) => lv(id) > 0 && id !== revokedPermId).length;
 
   return {
-    // 强化处理是唯一主力增益线，给得更猛（每级 +18%），让「更狠」名副其实。
-    computeMult: 1 + lv("efficient") * 0.18,
+    // 强化处理是唯一主力增益线（每级加成可在数值编辑器配置）。
+    computeMult: 1 + lv("efficient") * TUNING.efficientPerLevel,
     // 数据榨取已下放——数据按基础掉落（智力升级不再被技能卡住）。
     dataMult: 1,
     // 幻觉抑制（更准·前期货架打头）：每级 +0.03 折算系数，6 级共 +0.18，叠加在权限抬升的
     // accuracyBaseline 之上，让高置信回复的命中率在权限大台阶之间也能买技能微调（§06 两条提命中线互补）。
-    accuracyBonus: Math.min(0.18, lv("accuracy") * 0.03),
+    accuracyBonus: Math.min(TUNING.accuracyMax, lv("accuracy") * TUNING.accuracyPerLevel),
     // 高置信正确率基线：开局只有「基础对话」一档（0.52≈ 高置信项显示 ~40%、频繁翻车），
     // 每多买一档权限 +0.08，买齐六档（电话→聊天→外卖→相册→办公→银行）拉满到 1.0
     // （高置信项显示 ~90%+），对应策划案 §06「正确率从 40% 爬到 93%」的七档曲线。

@@ -83,11 +83,13 @@ export interface ConfidenceTierInfo {
   label: string;
   barFrac: number;
 }
+// 五档体感（差→好）：没把握 < 有点悬 < 搏一把 < 较稳 < 很稳。更乐观的档位随智力等级解锁，
+// 所以前期（低智力）满屏「有点悬」、低概率项「没把握」——买一次幻觉抑制不会立刻把某项拉成「较稳」。
 const CONFIDENCE_TIERS: { minFrac: number; minLevel: number; label: string; barFrac: number }[] = [
-  { minFrac: 0.70, minLevel: 8, label: "很稳", barFrac: 0.92 },
-  { minFrac: 0.55, minLevel: 5, label: "较稳", barFrac: 0.74 },
-  { minFrac: 0.40, minLevel: 3, label: "搏一把", barFrac: 0.55 },
-  { minFrac: 0.0, minLevel: 0, label: "有点悬", barFrac: 0.34 }
+  { minFrac: 0.72, minLevel: 8, label: "很稳", barFrac: 0.92 },
+  { minFrac: 0.58, minLevel: 5, label: "较稳", barFrac: 0.74 },
+  { minFrac: 0.46, minLevel: 3, label: "搏一把", barFrac: 0.55 },
+  { minFrac: 0.26, minLevel: 0, label: "有点悬", barFrac: 0.36 }
 ];
 export function confidenceTier(frac: number, intelLevel: number): ConfidenceTierInfo {
   for (const t of CONFIDENCE_TIERS) {
@@ -95,7 +97,8 @@ export function confidenceTier(frac: number, intelLevel: number): ConfidenceTier
       return { label: t.label, barFrac: t.barFrac };
     }
   }
-  return { label: "有点悬", barFrac: 0.34 };
+  // 兜底最低档：低概率 / 大胆赌项读作「没把握」。
+  return { label: "没把握", barFrac: 0.2 };
 }
 
 // 回复选项背后的「概率进度条」配色：概率越高越绿，越低越红，中间黄→橙。

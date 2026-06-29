@@ -181,12 +181,34 @@ class SophiaGameApp {
         this.connectDragging = true;
       }
     });
+    // 悬停在某个已连 App 上 → 浮窗显示它的处理能力（成功率 / 幻觉率 / 处理耗时）。
+    const appTip = document.createElement("div");
+    appTip.className = "app-ability-tip";
+    document.body.appendChild(appTip);
+
     this.pixi.stage.on("pointermove", (e: FederatedPointerEvent) => {
-      if (!this.connectDragging) return;
-      const c = this.interfaceView.center;
-      this.connectGfx.clear();
-      this.connectGfx.moveTo(c.x, c.y).lineTo(e.global.x, e.global.y).stroke({ width: 2.5, color: GREEN, alpha: 0.85 });
-      this.connectGfx.circle(e.global.x, e.global.y, 5).fill({ color: GREEN, alpha: 0.9 });
+      if (this.connectDragging) {
+        const c = this.interfaceView.center;
+        this.connectGfx.clear();
+        this.connectGfx.moveTo(c.x, c.y).lineTo(e.global.x, e.global.y).stroke({ width: 2.5, color: GREEN, alpha: 0.85 });
+        this.connectGfx.circle(e.global.x, e.global.y, 5).fill({ color: GREEN, alpha: 0.9 });
+        appTip.classList.remove("is-open");
+        return;
+      }
+      const st = this.core.getState();
+      const app = !st.automationUnlocked ? this.interfaceView.appWorkerAt({ x: e.global.x, y: e.global.y }) : null;
+      if (app) {
+        const lvl = st.intelligence.level;
+        const success = Math.min(0.92, 0.5 + lvl * 0.045);
+        const dur = Math.max(500, TUNING.appDelayMs - lvl * 60);
+        const pending = this.interfaceView.appPendingCount(app.idx);
+        appTip.innerHTML = `App 处理能力<br>成功率 <b>${Math.round(success * 100)}%</b> · 幻觉率 <b>${Math.round((1 - success) * 100)}%</b><br>处理约 ${(dur / 1000).toFixed(1)}s${pending > 0 ? ` · 排队 ${pending}` : ""}`;
+        appTip.style.left = `${Math.round(e.global.x + 16)}px`;
+        appTip.style.top = `${Math.round(e.global.y + 16)}px`;
+        appTip.classList.add("is-open");
+      } else {
+        appTip.classList.remove("is-open");
+      }
     });
     const endConnect = (e: FederatedPointerEvent) => {
       if (!this.connectDragging) return;
@@ -970,29 +992,35 @@ class SophiaGameApp {
     // App 干得更慢更糙（quality 随智力 0.45→0.75），是「要不要分点活给 App」的主动取舍——
     // App 不再自动抢单，处不处理、给谁处理都由你决定。
     if (!state.automationUnlocked && this.interfaceView.hasAppWorkers()) {
-      const appPt = this.interfaceView.appWorkerAt(global);
-      if (appPt) {
+      const app = this.interfaceView.appWorkerAt(global);
+      if (app) {
         const requestId = request.id;
         this.audio.playRequestAccept();
-        this.pendingDropPoints.set(requestId, appPt);
+        this.pendingDropPoints.set(requestId, app);
         // 标记为「已委托」，期间不让 syncRequests 又给它重建一张卡。
         this.delegatedIds.add(requestId);
+        // App 处理需要时间（可在数值编辑器配置 appDelayMs，智力越高越快）：卡滑进 App 后进入它的
+        // 处理队列，转一个进度环、满了才出结果；同一个 App 排队的待办用角标 +N 显示。
+        const durationMs = Math.max(500, TUNING.appDelayMs - state.intelligence.level * 60);
         card.accept(
-          appPt,
+          app,
           () => {
-            this.onAutoDispatchLanded(appPt);
-            // App 比 Core 慢：落到 App 上后还要等一会儿（智力越低越慢）才出结果 + 收益。
-            const delay = Math.max(200, TUNING.appDelayMs - state.intelligence.level * 80);
-            window.setTimeout(() => {
+            this.onAutoDispatchLanded(app);
+            this.interfaceView.enqueueAppJob(app.idx, durationMs, () => {
               const quality = Math.min(0.75, 0.45 + state.intelligence.level * 0.05);
               this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
               this.delegatedIds.delete(requestId);
-            }, delay);
+            });
           },
           { x: card.container.x, y: card.container.y }
         );
         return true;
       }
+    }
+
+    // 手机寄生阶段：核心不再接受「把卡拖上来直接处理」——只能点回复轮盘选项，或亲手委托给某个 App。
+    if (!state.automationUnlocked) {
+      return false;
     }
 
     const drop =

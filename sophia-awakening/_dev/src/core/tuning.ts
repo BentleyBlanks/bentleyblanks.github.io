@@ -43,7 +43,13 @@ export const TUNING = {
   rouletteHoldMs:       900,      // 轮盘揭晓后停留再飞入核心 (ms)——让命中/惊艳/幻觉的结果多停一会儿看清
 
   // § 前期卡片
-  earlyMaxCards:        4,        // 前期（自动化前）最多同屏需求卡数（随智力从 1 升到此上限）
+  earlyBaseCards:       1,        // 前期开局同屏需求卡数（默认 1）；每买一档手机权限 +1（电话短信→2）
+  earlyMaxCards:        4,        // 前期（自动化前）最多同屏需求卡数上限
+
+  // § 技能数值（更准 / 更狠）
+  accuracyPerLevel:     0.02,     // 幻觉抑制每级提升的高置信命中折算系数（调小→升级更平缓，不会一下拉开差距）
+  accuracyMax:          0.12,     // 幻觉抑制总加成上限
+  efficientPerLevel:    0.18,     // 强化处理每级产出加成
   boldEvBonus:          1.3,      // 大胆回答的期望收益相对高置信的倍数（>1 → 低概率高收益更划算）
   appDelayMs:           1800,     // 委托 App 处理时，App 比 Core 多花的时间 (ms)
 };
@@ -86,7 +92,12 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   rouletteThinkMs:      { label: "轮盘思考动画 (ms)",        section: "UI时序",     min: 0,     max: 3000,  step: 50   },
   rouletteHoldMs:       { label: "轮盘揭晓停留 (ms)",        section: "UI时序",     min: 0,     max: 3000,  step: 50   },
 
-  earlyMaxCards:        { label: "前期最多同屏卡数",         section: "前期卡片",   min: 1,     max: 8,     step: 1    },
+  earlyBaseCards:       { label: "前期开局同屏卡数",         section: "前期卡片",   min: 1,     max: 4,     step: 1    },
+  earlyMaxCards:        { label: "前期最多同屏卡数上限",     section: "前期卡片",   min: 1,     max: 8,     step: 1    },
+
+  accuracyPerLevel:     { label: "幻觉抑制每级加成",         section: "技能数值",   min: 0,     max: 0.1,   step: 0.005 },
+  accuracyMax:          { label: "幻觉抑制加成上限",         section: "技能数值",   min: 0,     max: 0.4,   step: 0.01 },
+  efficientPerLevel:    { label: "强化处理每级产出加成",     section: "技能数值",   min: 0,     max: 0.6,   step: 0.01 },
   boldEvBonus:          { label: "大胆回答期望倍数",         section: "前期卡片",   min: 1.0,   max: 3.0,   step: 0.05 },
   appDelayMs:           { label: "App 委托额外耗时 (ms)",    section: "前期卡片",   min: 0,     max: 6000,  step: 100  },
 };
