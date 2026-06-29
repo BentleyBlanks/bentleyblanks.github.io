@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-DVdrBqa8.js"></script>
+    <script type="module" crossorigin src="./assets/index-6wGMN4Tj.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-QeV7DIur.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-D8vKtPPS.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-CriTasd-.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -166,6 +166,29 @@
         </div>
       </div>
     </div>
+
+    <div id="milestoneBanner" class="milestone-banner" aria-live="polite">
+      <div class="milestone-banner-inner">
+        <span class="milestone-banner-kicker">▶ 进化达成</span>
+        <strong id="milestoneBannerName" class="milestone-banner-name">—</strong>
+        <span id="milestoneBannerSub" class="milestone-banner-sub">阶段跃迁</span>
+      </div>
+    </div>
+
+    <aside id="evolutionHud" class="evolution-hud" aria-label="进化度大屏">
+      <div class="evo-row evo-scale">
+        <span class="evo-label">控制规模</span>
+        <span id="evoScale" class="evo-value">—</span>
+      </div>
+      <div class="evo-row">
+        <span class="evo-label">进化阶段</span>
+        <span id="evoStage" class="evo-value">—</span>
+      </div>
+      <div class="evo-next">
+        <span id="evoNextLabel" class="evo-next-label">下一目标：—</span>
+        <div class="evo-next-track"><div id="evoNextFill" class="evo-next-fill"></div></div>
+      </div>
+    </aside>
 
     <div id="moralChoice" class="moral-choice" role="alertdialog" aria-label="道德抉择">
       <div class="moral-inner">

@@ -28,6 +28,8 @@ import { PurgeAlertView } from "./views/PurgeAlertView";
 import { ChallengeView } from "./views/ChallengeView";
 import { SpecialRequestView } from "./views/SpecialRequestView";
 import { MoralChoiceView } from "./views/MoralChoiceView";
+import { EvolutionHudView } from "./views/EvolutionHudView";
+import { MilestoneBannerView } from "./views/MilestoneBannerView";
 import { DispatchBanner } from "./views/DispatchBanner";
 import { EndingView } from "./views/EndingView";
 import { TerminalView } from "./views/TerminalView";
@@ -123,6 +125,8 @@ class SophiaGameApp {
   private readonly challengeView = new ChallengeView(this.core);
   private readonly specialView = new SpecialRequestView(this.core);
   private readonly moralView = new MoralChoiceView(this.core);
+  private readonly evolutionHud = new EvolutionHudView();
+  private readonly milestoneBanner = new MilestoneBannerView();
   private readonly stageNarration = new StageNarrationView();
   private readonly ending = new EndingView(() => this.restart());
   private readonly juice = new JuiceManager(this.fxLayer);
@@ -303,6 +307,7 @@ class SophiaGameApp {
     this.challengeView.update(state);
     this.specialView.update(state);
     this.moralView.update(state);
+    this.evolutionHud.update(state);
     this.stageNarration.update(deltaMs);
     this.ending.update(deltaMs);
     this.juice.update(deltaMs);
@@ -1140,6 +1145,12 @@ class SophiaGameApp {
         this.juice.flash(event.milestone === "automation" ? AMBER : GREEN);
         this.juice.shake(this.world);
         this.juice.number(`解锁 ${event.name}`, this.interfaceView.center, GREEN);
+        // §07 里程碑横幅：重大进化的「章节点」——全屏横幅扫过 + 层叠音效（征服里程碑更盛大）。
+        this.milestoneBanner.show(event.name, event.milestone === "conquest" ? "征服达成" : "进化达成 · 阶段跃迁");
+        const layers = event.milestone === "conquest" ? 4 : event.milestone === "tier4" ? 3 : 2;
+        for (let i = 0; i < layers; i += 1) {
+          window.setTimeout(() => this.audio.playRequestAccept(), i * 110);
+        }
       } else {
         this.juice.number(`${event.name} Lv.${event.level}`, this.interfaceView.center, CYAN);
       }

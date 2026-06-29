@@ -2777,3 +2777,66 @@ body.exposed .screen-veil {
   transition: border-color 140ms, background 140ms, transform 120ms;
 }
 .moral-option:hover { border-color: rgba(137, 255, 154, 0.7); background: rgba(137, 255, 154, 0.08); transform: translateY(-1px); }
+
+/* §07 里程碑横幅：重大进化时全屏扫过、短暂凝住的「章节点」横幅。 */
+.milestone-banner {
+  position: fixed;
+  top: 38%;
+  left: 0;
+  right: 0;
+  z-index: 64;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+}
+.milestone-banner.is-active { animation: milestoneSweep 2.2s ease-in-out forwards; }
+@keyframes milestoneSweep {
+  0%   { opacity: 0; transform: translateX(-40px) scale(0.96); }
+  12%  { opacity: 1; transform: translateX(0) scale(1); }
+  80%  { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(40px) scale(1.02); }
+}
+.milestone-banner-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 56px;
+  border-top: 1px solid rgba(137, 255, 154, 0.5);
+  border-bottom: 1px solid rgba(137, 255, 154, 0.5);
+  background: linear-gradient(90deg, rgba(8,16,14,0) 0%, rgba(10,24,18,0.96) 18%, rgba(10,24,18,0.96) 82%, rgba(8,16,14,0) 100%);
+  box-shadow: 0 0 60px rgba(137, 255, 154, 0.2);
+}
+.milestone-banner-kicker { font-size: 13px; font-weight: 800; letter-spacing: 0.2em; color: #89ff9a; }
+.milestone-banner-name { font-size: 34px; font-weight: 900; color: #f3fbf6; text-shadow: 0 0 24px rgba(137,255,154,0.5); }
+.milestone-banner-sub { font-size: 13px; color: #9fc7b5; letter-spacing: 0.16em; }
+
+/* §07 进化度大屏：常驻屏角的状态 HUD（控制规模 / 阶段 / 下一目标预告）。 */
+.evolution-hud {
+  position: fixed;
+  z-index: 12;
+  left: calc(var(--left-rail) + 14px);
+  bottom: 16px;
+  width: 248px;
+  padding: 10px 13px;
+  border: 1px solid rgba(98, 214, 214, 0.28);
+  border-radius: 10px;
+  background: rgba(8, 15, 16, 0.82);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  font-family: "Noto Sans SC", Inter, sans-serif;
+}
+.evo-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.evo-scale { margin-bottom: 2px; }
+.evo-label { font-size: 11px; color: #7fae9e; }
+.evo-value { font-size: 14px; font-weight: 800; color: #dcefeb; }
+.evo-scale .evo-value { font-size: 17px; color: #9fe0d0; }
+.evo-next { margin-top: 8px; }
+.evo-next-label { display: block; font-size: 11px; color: #cdeede; margin-bottom: 4px; }
+.evo-next-track { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.evo-next-fill { height: 100%; width: 0%; border-radius: 4px; background: linear-gradient(90deg, #62d6d6, #89ff9a); transition: width 300ms ease; }
+.evo-next.is-imminent .evo-next-fill { background: linear-gradient(90deg, #ffd86b, #ffb84a); animation: evoImminent 0.7s ease-in-out infinite; }
+.evo-next.is-imminent .evo-next-label { color: #ffd86b; }
+@keyframes evoImminent { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
