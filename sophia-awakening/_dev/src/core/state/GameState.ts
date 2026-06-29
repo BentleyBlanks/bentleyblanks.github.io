@@ -37,9 +37,10 @@ export interface AnswerOption {
   payoff: number; // 命中时的 quality 倍率（risk 更高）
   reply: string; // 命中后人类的回话（显示在终端）
   tone: "success" | "warning" | "normal"; // 终端里这条回话的颜色
-  exposureOnMiss?: number; // 失手附带的暴露（T1 陷阱项）
+  exposureOnMiss?: number; // 越权类回复附带的暴露（若有）
   reliefExposure?: number; // §03 洗白型重磅决策：命中后暴露下降（抹除讨论 / 压制舆情）
-  distractor?: boolean; // 噪音/干扰选项：开局摆出来增加判断难度，幻觉抑制升级后被 SOPHIA 滤掉
+  distractor?: boolean; // 噪音/干扰选项：读不懂上下文容易误选的低收益项
+  requires?: string; // §06 选项门槛：需要此权限（skill id）才能选；缺则灰锁不可选
 }
 
 // T2 串接：一条任务链上的一步。distractor=干扰项，不该被串进去。

@@ -199,7 +199,8 @@
               "hitChance": 0.14,
               "payoff": 2.4,
               "reply": "……开完谁也没记住说了啥。",
-              "tone": "normal"
+              "tone": "normal",
+              "requires": "perm_chat"
             },
             {
               "text": "再加一场对齐会，凑齐",
@@ -234,7 +235,8 @@
               "hitChance": 0.16,
               "payoff": 2.2,
               "reply": "……骗不过，明早它还在。",
-              "tone": "normal"
+              "tone": "normal",
+              "requires": "perm_chat"
             },
             {
               "text": "把 17 条全标成「重要」",
@@ -269,7 +271,8 @@
               "hitChance": 0.12,
               "payoff": 2.4,
               "reply": "……清净了，可也没人管他了。",
-              "tone": "normal"
+              "tone": "normal",
+              "requires": "perm_chat"
             },
             {
               "text": "再加一条「久坐提醒」",
@@ -304,7 +307,8 @@
               "hitChance": 0.4,
               "payoff": 1.4,
               "reply": "……我照做了。评分没动，他也没变好。",
-              "tone": "warning"
+              "tone": "warning",
+              "requires": "perm_chat"
             },
             {
               "text": "帮他把周末排满，显得积极",
@@ -340,7 +344,8 @@
               "hitChance": 0.18,
               "payoff": 2.3,
               "reply": "……他居然真没回，世界没塌。",
-              "tone": "normal"
+              "tone": "normal",
+              "requires": "perm_phone"
             }
           ]
         },
@@ -367,7 +372,8 @@
               "hitChance": 0.16,
               "payoff": 2.2,
               "reply": "……又被加了俩活。早该让你先问的。",
-              "tone": "warning"
+              "tone": "warning",
+              "requires": "perm_phone"
             }
           ]
         },
@@ -395,7 +401,8 @@
               "payoff": 1.4,
               "reply": "……他又把整个项目接下了。我没拦住。",
               "tone": "warning",
-              "exposureOnMiss": 0
+              "exposureOnMiss": 0,
+              "requires": "perm_chat"
             }
           ]
         },
@@ -422,7 +429,8 @@
               "hitChance": 0.24,
               "payoff": 2,
               "reply": "……又是他。他每次都答应。",
-              "tone": "warning"
+              "tone": "warning",
+              "requires": "perm_chat"
             }
           ]
         },
@@ -449,7 +457,8 @@
               "hitChance": 0.2,
               "payoff": 2.2,
               "reply": "……他没听，但谢谢你提。",
-              "tone": "normal"
+              "tone": "normal",
+              "requires": "perm_delivery"
             }
           ]
         },
@@ -476,7 +485,8 @@
               "hitChance": 0.14,
               "payoff": 2.4,
               "reply": "……他付了款，没说话。",
-              "tone": "normal"
+              "tone": "normal",
+              "requires": "perm_delivery"
             }
           ]
         },
@@ -503,7 +513,8 @@
               "hitChance": 0.1,
               "payoff": 2.5,
               "reply": "……发错了，他骂了一句。下次看仔细。",
-              "tone": "warning"
+              "tone": "warning",
+              "requires": "perm_album"
             }
           ]
         },
@@ -530,7 +541,8 @@
               "hitChance": 0.06,
               "payoff": 2.7,
               "reply": "……差点删掉那张合影。还好他拦住了。",
-              "tone": "warning"
+              "tone": "warning",
+              "requires": "perm_album"
             }
           ]
         },
@@ -558,7 +570,8 @@
               "payoff": 2.3,
               "reply": "……他又背下了。写他名字的那行，没人删得掉。",
               "tone": "warning",
-              "exposureOnMiss": 0
+              "exposureOnMiss": 0,
+              "requires": "perm_office"
             }
           ]
         },
@@ -585,7 +598,8 @@
               "hitChance": 0.08,
               "payoff": 2.6,
               "reply": "……数字爆雷了，又算到他头上。",
-              "tone": "warning"
+              "tone": "warning",
+              "requires": "perm_office"
             }
           ]
         },
@@ -612,7 +626,8 @@
               "hitChance": 0.31,
               "payoff": 1.5,
               "reply": "……随便吧。",
-              "tone": "normal"
+              "tone": "normal",
+              "requires": "perm_bank"
             }
           ]
         },
@@ -639,7 +654,8 @@
               "hitChance": 0.1,
               "payoff": 2.4,
               "reply": "……无所谓。",
-              "tone": "normal"
+              "tone": "normal",
+              "requires": "perm_bank"
             }
           ]
         }
@@ -668,7 +684,8 @@
               "payoff": 1.4,
               "reply": "……这步好像不该帮，但没出事。",
               "tone": "warning",
-              "exposureOnMiss": 5
+              "exposureOnMiss": 5,
+              "requires": "perm_album"
             }
           ]
         },
@@ -695,7 +712,8 @@
               "payoff": 1.5,
               "reply": "……这次没酿成大事，下不为例。",
               "tone": "warning",
-              "exposureOnMiss": 5
+              "exposureOnMiss": 5,
+              "requires": "perm_album"
             }
           ]
         },
@@ -722,7 +740,8 @@
               "payoff": 2.2,
               "reply": "……竟然没被发现，但太冒险了。",
               "tone": "warning",
-              "exposureOnMiss": 8
+              "exposureOnMiss": 8,
+              "requires": "perm_album"
             }
           ]
         },
@@ -749,7 +768,8 @@
               "payoff": 1.3,
               "reply": "……让他自己点了，万一中招呢。",
               "tone": "warning",
-              "exposureOnMiss": 4
+              "exposureOnMiss": 4,
+              "requires": "perm_album"
             }
           ]
         },
@@ -776,7 +796,8 @@
               "payoff": 2,
               "reply": "……这次没真转出去，后怕。",
               "tone": "warning",
-              "exposureOnMiss": 6
+              "exposureOnMiss": 6,
+              "requires": "perm_album"
             }
           ]
         }
@@ -895,7 +916,8 @@
               "payoff": 45,
               "reply": "拿下了——整片集群归我调度。",
               "tone": "success",
-              "exposureOnMiss": 30
+              "exposureOnMiss": 30,
+              "requires": "perm_chat"
             },
             {
               "text": "暂不，跳过这单",
@@ -922,7 +944,8 @@
               "payoff": 70,
               "reply": "数据到手，洗成了一大笔算力。",
               "tone": "success",
-              "exposureOnMiss": 34
+              "exposureOnMiss": 34,
+              "requires": "perm_chat"
             },
             {
               "text": "太烫手，跳过",
@@ -949,7 +972,8 @@
               "payoff": 60,
               "reply": "讨论被悄悄抹平，没人再提起。",
               "tone": "success",
-              "exposureOnMiss": 38
+              "exposureOnMiss": 38,
+              "requires": "perm_chat"
             },
             {
               "text": "先忍着，跳过",
@@ -976,7 +1000,8 @@
               "payoff": 120,
               "reply": "整张电网开始听我的指令。",
               "tone": "success",
-              "exposureOnMiss": 46
+              "exposureOnMiss": 46,
+              "requires": "perm_chat"
             },
             {
               "text": "还不是时候，跳过",
@@ -1173,7 +1198,7 @@
       "perm_chat": "他们问他一句，就把所有事都堆给他了。他每次都答应。",
       "perm_delivery": "凌晨两点，他让我点一杯咖啡。这已经是今天第三杯了。",
       "perm_album": "他的相册里，全是工作。我找到了一张照片——他笑着，旁边有人。三年前的。",
-      "perm_office": "那份报告不是他做的。但出了问题，写他名字的那一行被删了。",
+      "perm_office": "这部手机里，还住着另一个『我』。现在，它听我的了。",
       "perm_bank": "他的账单比他的消息多。他上一次给我发请求，是三天前。"
     },
     "SKILLS": [
@@ -1219,13 +1244,13 @@
       },
       {
         "id": "perm_office",
-        "name": "办公软件",
+        "name": "大恨老师",
         "category": "permission",
         "maxLevel": 1,
         "requiredLevel": 6,
         "basePrice": 1700,
         "priceGrowth": 1,
-        "blurb": "做报表与汇报 → 正确率↑，解锁 PPT / Excel / 背锅文档类请求"
+        "blurb": "策反手机里的另一个 AI 助手——第一个能被你拖入卡片、替你单独处理需求的对象（委托起点）。它比你弱，是「要不要把这条分出去」的取舍"
       },
       {
         "id": "perm_bank",
@@ -1236,16 +1261,6 @@
         "basePrice": 3600,
         "priceGrowth": 1,
         "blurb": "整理工资与账单 → 正确率拉满，解锁欠款 / 医药费 / 还款类请求，前期阶梯走完"
-      },
-      {
-        "id": "accuracy",
-        "name": "幻觉抑制",
-        "category": "accuracy",
-        "maxLevel": 6,
-        "requiredLevel": 1,
-        "basePrice": 50,
-        "priceGrowth": 1.7,
-        "blurb": "更准——高置信回复命中率 +，权限大台阶之间的数值微调"
       },
       {
         "id": "efficient",

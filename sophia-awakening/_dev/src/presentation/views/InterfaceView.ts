@@ -22,7 +22,7 @@ const APP_ICONS: Record<string, string> = {
   聊天: "🗨️",
   外卖: "🍔",
   相册: "🖼️",
-  办公: "📊"
+  大恨老师: "🤖"
 };
 
 export class InterfaceView {
@@ -262,7 +262,7 @@ export class InterfaceView {
     // ---- 3×3 App 宫格，中心格 = SOPHIA CORE ----
     const apps = ["天气", "日历", "支付", "照片", "邮件", "浏览器", "信息", "设置"];
     // 点亮的 App 用权限名（买了「电话」就亮一个「电话」），其余宫格保留原桌面图标。
-    const permApps = ["电话", "聊天", "外卖", "相册", "办公", "支付"];
+    const permApps = ["电话", "聊天", "外卖", "相册", "大恨老师", "支付"];
     const spacing = 84; // 随手机收窄（图标放大后稍微拉开间距）
     const iconS = 54;
     let appIdx = 0;

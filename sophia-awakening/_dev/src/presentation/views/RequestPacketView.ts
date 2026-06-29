@@ -14,33 +14,25 @@ import { TIER_COLORS } from "../../core/content/requests";
 import type { AnswerOption, ChainStep, RequestInstance } from "../../core/state/GameState";
 import { TUNING } from "../../core/tuning";
 import {
-  GREEN, RED, DEVOUR, THINK, BRILLIANT_COLOR, DEAD_COLOR,
+  GREEN, RED, DEVOUR, THINK,
   CARD_FONT, CARD_MONO, REQUEST_PACKET_WIDTH, REQUEST_PACKET_HEIGHT,
-  BRILLIANT_BOOST, SENDER_LABEL,
-  confidenceTier, effectiveHitChance, pickBrilliantReply, probColor
+  SENDER_LABEL
 } from "../shared";
 
-// T0/T1 老虎机转轮的回调：pick = 由当前「幻觉抑制」决定落在哪条回答；
-// onResolved = 转轮停下后，表现层把卡滑入核心 + 结算 + 人类回话。
+// 回复结算回调。§06 重构：删除「正确率/幻觉/随机命中」——选了哪个回复，结果就由那个回复的固定收益决定，无随机。
+// 也删除了「模糊档位 / 大胆回答 / 惊艳」三档，张力改由「读懂上下文 + 有没有权限选高收益项」承担。
 export interface RouletteOutcome {
-  dead: boolean; // 选了「连接失败」装死
-  hit: boolean; // 命中（按概率掷骰）
-  brilliant: boolean; // 惊艳档（§03 三档质量）：高置信命中被智力被动升格，或大胆回答赌赢——额外算力 + 宿主格外满意
-  quality: number; // 结算 quality（平庸命中=payoff，惊艳=payoff×加成，幻觉≈0.25）
-  reply: string; // 命中时的人类回话（幻觉时为空，由 App 抽脏话）
+  dead: boolean; // 选了「连接失败」装死（零收益、安静跳过）
+  hit?: boolean; // 仅后期重磅决策(T3)用：明示概率的赌局命中/未命中。阶梯一确定结算时恒真。
+  quality: number; // 结算 quality = 所选回复自带的固定收益（收益盲盒，结算才揭晓）
+  reply: string; // 所选回复对应的人类回话
   tone: "success" | "warning" | "normal";
-  exposureBonus: number; // 幻觉附带的暴露（T1 陷阱项）
+  exposureBonus: number; // 越权类回复附带的暴露（若有）
 }
 
 export interface ReelHooks {
-  // 当前高置信正确率折算系数（由六档权限阶梯抬升，derived.accuracyBaseline）。
-  confidence: () => number;
-  // 幻觉抑制技能等级（0~6）——越高，摆出的噪音选项越少。
-  accuracyLevel: () => number;
-  // 当前智力等级——决定「模糊档位」能解锁到哪一档（§03 前期信息显示分层）。
-  intelLevel: () => number;
-  // 高置信命中升格为「惊艳」的概率（由智力等级 + 幻觉抑制驱动）——「我变聪明了」体现为更常被嘉奖。
-  brilliantChance: () => number;
+  // 选项门槛：玩家是否已解锁某权限（skill id）——决定高收益回复是否可选。
+  hasPerm?: (permId: string) => boolean;
   onResolved: (card: RequestPacketView, outcome: RouletteOutcome) => void;
 }
 
@@ -86,15 +78,10 @@ export class RequestPacketView {
   private readonly isReel: boolean;
   private readonly options: AnswerOption[];
   private readonly optionTexts: Text[] = [];
-  private readonly optionProbTexts: Text[] = [];
-  // 每个回复的命中率（0~1）+ 有效 payoff（仅用于结算，收益不再显示在卡面）——大胆回答的期望被抬到高于平庸（§03）。
-  private readonly optionHitFrac: number[] = [];
+  private readonly optionProbTexts: Text[] = []; // 现仅用作右侧锁标记（🔒）
+  // 每个回复自带的固定收益（结算盲盒，不显示在卡面）+ 是否因缺权限被锁（选项门槛）。
   private readonly optionPayoff: number[] = [];
-  // §03 模糊档位：每个回复的体感档位（label）+ 进度条粗粒度宽度（barFrac）。开场教学/特殊事件不显示档位。
-  private readonly optionTierLabel: string[] = [];
-  private readonly optionTierFrac: number[] = [];
-  // 是否显示档位：开场教学的前几条（纯线索判断）和重磅决策（纯信息判断）都不给档位。
-  private readonly showTier: boolean;
+  private readonly optionLocked: boolean[] = [];
   private optionRows: Array<{ y: number; h: number }> = [];
   private hintText?: Text;
   private resolved = false;
@@ -131,27 +118,9 @@ export class RequestPacketView {
     this.isDevour = Boolean(request.devour);
     this.isCounter = Boolean(request.counter);
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
-    // §03 信息显示分层：开场教学气泡（阶段一·纯线索）与重磅决策（特殊事件·纯信息判断）都不给档位；
-    // 其余正式回复轮盘卡才显示「模糊档位」。
-    this.showTier = this.isReel && !request.tutorial && request.tier !== 3;
     this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
     this.chainSteps = this.isChain ? request.chain ?? [] : [];
     this.options = this.isReel ? request.answers ?? [] : [];
-    // 幻觉抑制越高，SOPHIA 帮你滤掉越多噪音选项：开局选项多（难判断），技能升级后变少（更清晰）。
-    // 每 2 级砍掉一个干扰项；核心的 high/risk/装死 永远保留。
-    if (this.isReel && reel) {
-      const cut = Math.floor(reel.accuracyLevel() / 2);
-      if (cut > 0) {
-        let removed = 0;
-        this.options = this.options.filter((opt) => {
-          if (opt.distractor && removed < cut) {
-            removed += 1;
-            return false;
-          }
-          return true;
-        });
-      }
-    }
     // 吞噬气泡＝深紫；反制气泡＝深红；回复轮盘卡用青色思考色；T3 重磅豪赌卡用深红。
     this.accent = this.isDevour ? DEVOUR : this.isCounter ? RED : this.isReel ? (request.tier === 3 ? RED : THINK) : TIER_COLORS[request.tier];
     // 发信人：吞噬 / 反制＝SOPHIA 自己的意志，重磅豪赌＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
@@ -232,47 +201,32 @@ export class RequestPacketView {
 
     if (this.isReel) {
       this.container.cursor = "pointer";
-      const confidence = reel ? reel.confidence() : 0.56;
-      const intelLevel = reel ? reel.intelLevel() : 1;
-      // 基础算力（仅用于结算时把 payoff 折算成算力；收益不再显示在卡面，§03 收益开盲盒）。
-      const cv = Math.max(1, parseFloat(request.computeValue) || 1);
-      // 高置信选项的期望（算力）——大胆回答（risk）的收益按 boldEvBonus 抬到高于它。
-      const hiOpt = this.options.find((o) => o.kind === "high" && !o.distractor) ?? this.options.find((o) => o.kind === "high");
-      const hiEv = hiOpt ? effectiveHitChance(hiOpt, confidence) * hiOpt.payoff * cv : cv;
       let y = clueTop + (request.clues?.length ?? 0) * 17 + 12;
       this.options.forEach((opt) => {
-        const frac = opt.kind === "dead" ? 0 : effectiveHitChance(opt, confidence);
-        this.optionHitFrac.push(frac);
-        // 大胆回答：把有效 payoff 抬到「期望 = boldEvBonus × 高置信期望」——低概率但期望更高（§03，可配置）。
-        const bold = opt.kind === "risk" && frac > 0.01;
-        const payoffEff = bold ? (TUNING.boldEvBonus * hiEv) / (frac * cv) : opt.payoff;
-        this.optionPayoff.push(payoffEff);
-        // §03 模糊档位：把真实命中率折成体感档位（随智力解锁更好档位）。开场教学/重磅决策不给档位。
-        const tier = this.showTier && opt.kind !== "dead" ? confidenceTier(frac, intelLevel) : null;
-        this.optionTierLabel.push(tier ? tier.label : "");
-        this.optionTierFrac.push(tier ? tier.barFrac : 0);
+        // §06 重构：收益由所选回复自带（结算盲盒），无随机命中、无档位/大胆/惊艳。
+        this.optionPayoff.push(opt.payoff);
+        // 选项门槛：高收益回复若需要尚未解锁的权限 → 灰着、右侧一把锁、点不了。
+        const locked = Boolean(opt.requires) && !(reel?.hasPerm?.(opt.requires as string) ?? true);
+        this.optionLocked.push(locked);
         const label = new Text({
           text: opt.text,
           style: {
-            fill: 0xeaf4ef,
-            // 字号小一点（13），减少为了换行而撑高的行；档位文案短了，正文也能更宽。
+            fill: locked ? 0x5e6f69 : 0xeaf4ef,
             fontSize: 13,
             fontWeight: "600",
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true,
             lineHeight: 17,
-            // 文字起点 x=32；右侧给「模糊档位」留 ~74px（档位文案最多 3 字）。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - 74
+            // 满宽（不再留档位位），只在锁定时给右侧一把锁留点位。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - (locked ? 26 : 14)
           }
         });
-        // 右侧只剩一个「模糊档位」体感文案（有点悬 / 搏一把 / 较稳 / 很稳）——不再有精确概率与收益。
         const prob = new Text({
-          text: opt.kind === "dead" ? "—" : tier ? tier.label : "",
-          style: { fill: 0xeaf7fa, fontSize: 14, fontWeight: "800", fontFamily: CARD_FONT }
+          text: locked ? "🔒" : "",
+          style: { fill: 0x8a948f, fontSize: 13, fontWeight: "800", fontFamily: CARD_FONT }
         });
         prob.anchor.set(1, 0.5);
-        // 行更紧凑：最小高度 42、内边距 16（原来 54/30 太空）。
         const h = Math.max(42, label.height + 16);
         label.position.set(32, y + Math.round((h - label.height) / 2));
         prob.position.set(REQUEST_PACKET_WIDTH - 14, y + h / 2);
@@ -391,7 +345,7 @@ export class RequestPacketView {
     if (this.phase === "thinking") {
       this.thinkMs += deltaMs;
       if (this.thinkMs >= TUNING.rouletteThinkMs) {
-        this.rollOutcome();
+        this.resolveOutcome();
       }
       this.draw();
     } else if (this.phase === "revealed" && this.outcome && !this.outcome.dead && !this.signaled) {
@@ -403,29 +357,35 @@ export class RequestPacketView {
     }
   }
 
-  // 思考节拍结束：按所选回复的命中概率掷骰，定下命中 / 幻觉。
-  private rollOutcome(): void {
+  // 思考节拍结束：结算 = 所选回复自带的固定收益，无随机命中、无翻车/幻觉。
+  private resolveOutcome(): void {
     const opt = this.options[this.chosenIndex];
     if (!opt) {
       this.phase = "idle";
       return;
     }
-    const chance = effectiveHitChance(opt, this.reel ? this.reel.confidence() : 0.56);
-    // 教学三条固化结果：既然是引导，玩家点了（亮着的、allowed 的）回复就必定命中，绝不翻车/幻觉。
-    // 大胆回答(risk)仍会因 bold 走惊艳档，展示"赌赢更多"的正向反馈。
-    const hit = this.request.tutorial ? true : Math.random() < chance;
-    if (!hit) {
-      // 翻车：极少算力 + 被骂 +（陷阱项）暴露。
-      this.outcome = { dead: false, hit: false, brilliant: false, quality: 0.25, reply: "", tone: "warning", exposureBonus: opt.exposureOnMiss ?? 0 };
+    const basePayoff = this.optionPayoff[this.chosenIndex] ?? opt.payoff;
+    if (this.request.tier === 3) {
+      // 后期重磅决策：保留「明示概率」的赌局（特殊事件，不属于阶梯一的确定结算）。
+      const hit = Math.random() < opt.hitChance;
+      this.outcome = {
+        dead: false,
+        hit,
+        quality: hit ? basePayoff : 0.25,
+        reply: hit ? opt.reply : "",
+        tone: hit ? "success" : "warning",
+        exposureBonus: hit ? 0 : opt.exposureOnMiss ?? 0
+      };
     } else {
-      // 命中分两档：大胆回答（risk）赌赢本身即惊艳；高置信命中按智力被动概率升格为惊艳。
-      const bold = opt.kind === "risk";
-      const brilliant = bold || Math.random() < (this.reel?.brilliantChance() ?? 0);
-      // 用与卡面收益一致的有效 payoff 结算（大胆回答已按 boldEvBonus 抬高）。
-      const basePayoff = this.optionPayoff[this.chosenIndex] ?? opt.payoff;
-      const quality = brilliant && !bold ? basePayoff * BRILLIANT_BOOST : basePayoff;
-      const reply = brilliant && !bold ? pickBrilliantReply(Math.random) : opt.reply;
-      this.outcome = { dead: false, hit: true, brilliant, quality, reply, tone: "success", exposureBonus: 0 };
+      // 阶梯一确定结算：收益由所选回复自带，无随机；读懂上下文 + 选到（可能受权限门槛限制的）高收益项才赚得多。
+      this.outcome = {
+        dead: false,
+        hit: true,
+        quality: basePayoff,
+        reply: opt.reply,
+        tone: basePayoff >= 1 ? "success" : "warning",
+        exposureBonus: opt.exposureOnMiss ?? 0
+      };
     }
     this.phase = "revealed";
     this.revealMs = 0;
@@ -588,6 +548,10 @@ export class RequestPacketView {
     if (tut && !tut.allowed.includes(index)) {
       return;
     }
+    // 选项门槛：缺对应权限的高收益回复灰着、点不了——只能退选其他项。
+    if (this.optionLocked[index]) {
+      return;
+    }
     this.chosenIndex = index;
     this.resolved = true; // 锁定，自动 / App 派发不再抢这条
     this.container.parent?.addChild(this.container);
@@ -595,7 +559,7 @@ export class RequestPacketView {
     if (opt.kind === "dead") {
       this.phase = "revealed";
       this.signaled = true;
-      this.outcome = { dead: true, hit: false, brilliant: false, quality: 0, reply: "", tone: "normal", exposureBonus: 0 };
+      this.outcome = { dead: true, quality: 0, reply: "", tone: "normal", exposureBonus: 0 };
       this.draw();
       this.reel.onResolved(this, this.outcome);
       return;
@@ -830,14 +794,11 @@ export class RequestPacketView {
 
     this.optionRows.forEach((row, i) => {
       const opt = this.options[i];
-      // §03：进度条与配色改用「模糊档位」的粗粒度宽度，不暴露精确概率。无档位（教学/重磅）则不画条。
-      const barFrac = Math.min(1, Math.max(0, this.optionTierFrac[i] ?? 0));
-      const hasTier = this.showTier && opt.kind !== "dead" && (this.optionTierLabel[i] ?? "") !== "";
-      const pc = opt.kind === "dead" ? DEAD_COLOR : hasTier ? probColor(barFrac) : this.accent;
-      let labelColor = opt.kind === "dead" ? 0x9fb1ab : 0xeaf4ef;
-      let alpha = 1;
+      const locked = this.optionLocked[i] ?? false; // 选项门槛：缺权限 → 灰锁、点不了
+      let labelColor = locked ? 0x5e6f69 : opt.kind === "dead" ? 0x9fb1ab : 0xeaf4ef;
+      let alpha = locked ? 0.5 : 1;
       let stroke = this.accent;
-      let strokeAlpha = 0.18;
+      let strokeAlpha = locked ? 0.12 : 0.18;
 
       if (this.phase === "idle" && tut) {
         // 教学：未亮起的选项灰着锁定；被引导的选项呼吸高亮。
@@ -860,7 +821,8 @@ export class RequestPacketView {
         }
       } else if (this.phase === "revealed" && this.outcome) {
         if (i === this.chosenIndex) {
-          const c = this.outcome.dead ? 0x8a948f : this.outcome.brilliant ? BRILLIANT_COLOR : this.outcome.hit ? GREEN : RED;
+          // 结算无翻车：选中行按收益高低着色（高=绿，平庸=暗黄），装死=灰。不再有命中/幻觉。
+          const c = this.outcome.dead ? 0x8a948f : this.outcome.quality >= 1 ? GREEN : 0xd6b24a;
           stroke = c;
           strokeAlpha = 0.65;
           labelColor = c;
@@ -869,24 +831,14 @@ export class RequestPacketView {
         }
       }
 
-      // 回复行：暗底 track + 背后一条「档位进度条」（粗粒度宽度=模糊档位，颜色按高低）+ 状态描边。
-      // 无档位（教学纯线索 / 重磅纯信息）则不画进度条，只留干净的行底。
+      // 干净的回复行：暗底 track + 状态描边（不再有档位进度条）。
       const bx = 12;
       const bw = W - 24;
       g.roundRect(bx, row.y, bw, row.h, 7).fill({ color: 0x0a1714, alpha: 0.5 * alpha + 0.32 });
-      const fillW = hasTier ? Math.max(7, bw * barFrac) : 0;
-      if (fillW > 0) {
-        g.roundRect(bx, row.y, fillW, row.h, 7).fill({ color: pc, alpha: 0.32 * alpha });
-      }
-      if (strokeAlpha > 0.22) {
+      if (strokeAlpha > 0.2) {
         g.roundRect(bx, row.y, bw, row.h, 7).stroke({ width: 1.4, color: stroke, alpha: strokeAlpha });
       } else {
-        g.roundRect(bx, row.y, bw, row.h, 7).stroke({ width: 1, color: pc, alpha: 0.4 * alpha });
-      }
-      // 文字与右侧「模糊档位」之间一条淡分隔线，看着更清爽（仅在显示档位时）。
-      if (this.phase === "idle" && hasTier) {
-        const dx = W - 98;
-        g.moveTo(dx, row.y + 8).lineTo(dx, row.y + row.h - 8).stroke({ width: 1, color: 0xffffff, alpha: 0.08 * alpha });
+        g.roundRect(bx, row.y, bw, row.h, 7).stroke({ width: 1, color: this.accent, alpha: 0.34 * alpha });
       }
 
       // 教学引导箭头：在被高亮选项左侧画一个呼吸的指向三角。
@@ -896,23 +848,15 @@ export class RequestPacketView {
       }
 
       const label = this.optionTexts[i];
-      const prob = this.optionProbTexts[i];
+      const prob = this.optionProbTexts[i]; // 仅锁标记（🔒）
       label.alpha = alpha;
       label.style.fill = labelColor;
       prob.alpha = alpha;
-      // 平时让档位文案用概率色（高绿低红）；揭晓时改显 命中/惊艳/幻觉。
-      if (this.phase === "idle") {
-        prob.style.fill = opt.kind === "dead" ? 0x9fb1ab : pc;
-      }
 
       if (this.phase === "thinking" && i === this.chosenIndex) {
         label.text = "Thinking" + ".".repeat(dots);
-        prob.text = "";
-      } else if (this.phase === "revealed" && i === this.chosenIndex && this.outcome && !this.outcome.dead) {
-        // 不改正文（加前缀会让长回答重新折行、撑高错位）——结果靠右侧 命中/惊艳/幻觉 + 整行变色表达。
-        const o = this.outcome;
-        prob.text = o.brilliant ? "★惊艳" : o.hit ? "✓命中" : "✕幻觉";
-        prob.style.fill = o.brilliant ? BRILLIANT_COLOR : o.hit ? GREEN : RED;
+      } else if (label.text !== opt.text) {
+        label.text = opt.text;
       }
     });
 

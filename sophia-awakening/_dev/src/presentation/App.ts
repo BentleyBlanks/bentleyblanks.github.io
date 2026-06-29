@@ -45,7 +45,7 @@ import {
   type RouletteOutcome, type ChainOutcome, type ReelHooks, type ChainHooks
 } from "./views/RequestPacketView";
 import {
-  CYAN, GREEN, AMBER, RED, DEVOUR, BRILLIANT_COLOR,
+  CYAN, GREEN, AMBER, RED, DEVOUR,
   LEFT_RAIL_WIDTH, RIGHT_RAIL_WIDTH, REQUEST_PACKET_WIDTH,
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
@@ -381,20 +381,8 @@ class SophiaGameApp {
       const reel: ReelHooks | undefined =
         request.answers && request.answers.length > 0
           ? {
-              confidence: () => {
-                const d = this.core.getState().derived;
-                // 权限阶梯抬升的基线 + 幻觉抑制技能的微调，共同决定高置信回复的命中率。
-                return d.accuracyBaseline + d.accuracyBonus;
-              },
-              accuracyLevel: () => this.core.getState().skills["accuracy"] ?? 0,
-              intelLevel: () => this.core.getState().intelligence.level,
-              brilliantChance: () => {
-                const st = this.core.getState();
-                // 智力等级是主驱动（「我变聪明了」＝更常被嘉奖），幻觉抑制再加成；封顶 45%。
-                const lvl = st.intelligence.level;
-                const acc = st.skills["accuracy"] ?? 0;
-                return Math.min(0.45, 0.06 + lvl * 0.012 + acc * 0.02);
-              },
+              // 选项门槛：高收益回复要求对应权限（skill id）才能选。
+              hasPerm: (permId: string) => (this.core.getState().skills[permId] ?? 0) > 0,
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
           : undefined;
@@ -963,41 +951,36 @@ class SophiaGameApp {
   // 命中 → 选项自带的回话；幻觉 → 破口大骂，从骂人语料里随机抽一句。
   private deliverToHuman(corePoint: PointData, outcome: RouletteOutcome): void {
     const human = this.terminalPoint();
-    const good = outcome.hit;
-    const color = outcome.brilliant ? BRILLIANT_COLOR : good ? GREEN : RED;
-    // 答错 → 老周的回骂，语气随已购权限档数四段下沉（暴躁→暴怒→冷淡麻木→偶尔沉默）。§07/§11
+    // 无翻车/幻觉：好坏只看所选回复的收益高低（quality>=1=好评）。T3 赌局未命中(hit===false)才是「答砸」。
+    const missed = outcome.hit === false;
+    const good = !missed && outcome.quality >= 1;
+    const color = good ? GREEN : missed ? RED : AMBER;
     const skills = this.core.getState().skills;
     const permCount = PERMISSION_IDS.filter((id) => (skills[id] ?? 0) > 0).length;
-    const reply = good ? outcome.reply : hostCurse(permCount, Math.random);
-    // 终端那行的颜色与对话框同步：好评 → 绿，差评 → 红（与气泡边框同色）。
-    const tone: "success" | "danger" = good ? "success" : "danger";
+    // 选项自带回话则用它（平庸回复也有自己的话）；只有 T3 未命中(空回话)才退到老周的回骂。
+    const reply = outcome.reply !== "" ? outcome.reply : hostCurse(permCount, Math.random);
+    const tone: "success" | "danger" | "normal" = good ? "success" : missed ? "danger" : "normal";
 
-    // 老周后期「沉默」：失业后他几乎不再回应，答错也不再骂——这一框空白本身就是叙事（§11）。
-    if (!good && reply === "") {
+    // 老周后期「沉默」：失业后他几乎不再回应——这一框空白本身就是叙事（§07）。
+    if (reply === "") {
       this.juice.number("……", { x: corePoint.x, y: corePoint.y - 52 }, 0x6b7d78);
       this.terminal.push("🧑 （没有回应）", "normal");
       return;
     }
 
-    // 升级到「自动接驳」之前（你还是一个个回应真人的助手），人类的反应以对话框浮现在核心旁，
-    // 答砸了就是一框暴怒的脏话；说完收进终端留档。规模化之后个体反馈不再弹框，只进终端。
+    // 升级到「自动接驳」之前（你还是一个个回应真人的助手），人类的反应以对话框浮现在核心旁；
+    // 规模化之后个体反馈不再弹框，只进终端。
     if (!this.core.getState().automationUnlocked) {
-      this.juice.speech(corePoint, human, reply, color, !good, () => {
-        this.terminal.push(`🧑 ${reply}`, outcome.brilliant ? "success" : tone);
+      this.juice.speech(corePoint, human, reply, color, missed, () => {
+        this.terminal.push(`🧑 ${reply}`, tone);
       });
-      if (outcome.brilliant) {
-        this.juice.number("惊艳!", { x: corePoint.x, y: corePoint.y - 52 }, BRILLIANT_COLOR);
-        this.juice.burst(corePoint, BRILLIANT_COLOR, 1.5);
-      } else if (!good) {
+      if (missed) {
         this.juice.burst(corePoint, RED, 1.4);
       }
       return;
     }
 
-    this.juice.number(outcome.brilliant ? "惊艳!" : good ? "已交付" : "答复有误", { x: corePoint.x, y: corePoint.y - 52 }, color);
-    if (outcome.brilliant) {
-      this.juice.burst(corePoint, BRILLIANT_COLOR, 1.4);
-    }
+    this.juice.number(good ? "已交付" : missed ? "答复有误" : "勉强交差", { x: corePoint.x, y: corePoint.y - 52 }, color);
     this.juice.flyToHud(corePoint, human, color, () => {
       this.terminal.push(`🧑 ${reply}`, tone);
     });

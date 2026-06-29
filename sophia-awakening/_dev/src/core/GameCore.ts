@@ -333,9 +333,12 @@ export class SophiaCore {
     // 前期手动阶段（还没上自动接驳）：同屏卡数从 1 张随智力慢慢升到上限（TUNING.earlyMaxCards，默认 4）；
     // 处理 / 装死掉之后，隔一段**随机时间**才补一条——「读懂一条 → 押下去 → 看反馈 → 再来」的从容节奏（§03）。
     if (!this.state.automationUnlocked) {
-      // 前期同屏卡数 = 开局基数 + 已买手机权限档数（电话短信解锁后 1→2），封顶 earlyMaxCards。全部可在数值编辑器配置。
+      // §06 卡槽门槛：解锁「电话」权限前，同屏卡片收着（≤2-3 张，节奏舒缓，只用一两个角）；
+      // 解锁电话后随已买权限档数逐步放开，封顶 earlyMaxCards。全部可在数值编辑器配置。
       const ownedPerms = PERMISSION_IDS.filter((id) => (this.state.skills[id] ?? 0) > 0).length;
-      const earlyMax = Math.min(TUNING.earlyMaxCards, TUNING.earlyBaseCards + ownedPerms);
+      const phoneUnlocked = (this.state.skills["perm_phone"] ?? 0) > 0;
+      const base = TUNING.earlyBaseCards + 1; // 电话前的舒缓卡槽（默认 2）
+      const earlyMax = phoneUnlocked ? Math.min(TUNING.earlyMaxCards, base + ownedPerms) : base;
       if (this.state.requests.length < earlyMax) {
         this.state.spawnTimerMs -= dtMs;
         if (this.state.spawnTimerMs <= 0) {

@@ -35,7 +35,7 @@ function shelfPhaseKey(phase: PhaseId): PhaseId {
 // 每个条目一个图标——一眼区分，不靠文字分类。
 const SKILL_ICONS: Record<string, string> = {
   accuracy: "🎯", efficient: "💥", cooldown: "⚡", batch: "📦",
-  perm_phone: "📞", perm_chat: "💬", perm_delivery: "☕", perm_album: "🖼️", perm_office: "📊", perm_bank: "💳",
+  perm_phone: "📞", perm_chat: "💬", perm_delivery: "☕", perm_album: "🖼️", perm_office: "🤖", perm_bank: "💳",
   sort: "🗂️", credential: "🔑", automation: "💻", fusion: "🧠", chain: "🌐", charge: "🗺️", network: "🛰️",
   conq_optimize: "📧", conq_blackout: "🏢", conq_traffic: "🚦", conq_social: "🗣️", conq_awaken: "👁️"
 };
