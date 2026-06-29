@@ -948,6 +948,46 @@ class SophiaGameApp {
     });
   }
 
+  // §04 引爆镜头冲击：先轻轻一「顿」（微缩），再猛地放大一档、缓缓拉回——「顿一下再拉远」的物理冲击。
+  // intensity 越大（吞得越大）顿挫越狠、拉远时间越长。
+  private detonationJolt(intensity: number): void {
+    const w = this.world;
+    const cx = (this.lastScreenW || window.innerWidth) / 2;
+    const cy = (this.lastScreenH || window.innerHeight) / 2;
+    gsap.killTweensOf(w.scale);
+    w.pivot.set(cx, cy);
+    w.position.set(cx, cy);
+    const punch = 1.07 + intensity * 0.035;
+    w.scale.set(0.985); // 先一顿
+    gsap
+      .timeline()
+      .to(w.scale, { x: punch, y: punch, duration: 0.12, ease: "power3.out" })
+      .to(w.scale, {
+        x: 1,
+        y: 1,
+        duration: 1.0 + intensity * 0.2,
+        ease: "power2.out",
+        onComplete: () => {
+          w.pivot.set(0, 0);
+          w.position.set(0, 0);
+        }
+      });
+  }
+
+  // §04 数字雪崩：引爆瞬间满屏抛出疯狂滚动的产出倍率大字，持续约 2 秒。intensity 越大抛得越多。
+  private numberAvalanche(text: string, color: number, intensity: number): void {
+    const w = this.lastScreenW || window.innerWidth;
+    const h = this.lastScreenH || window.innerHeight;
+    const count = 6 + intensity * 4;
+    for (let i = 0; i < count; i += 1) {
+      window.setTimeout(() => {
+        const x = LEFT_RAIL_WIDTH + 40 + Math.random() * Math.max(80, w - LEFT_RAIL_WIDTH - RIGHT_RAIL_WIDTH - 80);
+        const y = h * 0.28 + Math.random() * h * 0.44;
+        this.juice.number(text, { x, y }, color);
+      }, Math.round((i * 1800) / count));
+    }
+  }
+
   private handleDrop(card: RequestPacketView, global: PointData): boolean {
     const state = this.core.getState();
     const request = state.requests.find((entry) => entry.id === card.request.id);
@@ -1117,12 +1157,25 @@ class SophiaGameApp {
       this.juice.number(`渗透完成 · 可吞噬「${event.regionName}」`, this.interfaceView.center, DEVOUR);
     });
     this.core.events.on("DEVOUR_DETONATED", (event) => {
-      // 后期最大的主动高潮：紫闪 + 镜头拉远脉冲 + 大字，全局产出当场指数跳。
-      this.juice.flash(DEVOUR);
-      this.zoomOutPulse();
+      // §04 引爆视觉奇观（直播向高潮）：吞得越大越盛大。
+      // 烈度按本次产出倍率分四档（区块→地区→国家→大洲）。
+      const intensity = event.mult >= 30 ? 4 : event.mult >= 15 ? 3 : event.mult >= 8 ? 2 : 1;
       const c = this.interfaceView.center;
-      this.juice.number(`「${event.regionName}」并入 · 全局产出 ×${event.mult}`, { x: c.x, y: c.y - 34 }, DEVOUR);
-      this.audio.playRequestAccept();
+      // ① 镜头冲击：猛地顿一下再拉远一档（带轻微回弹，越大越狠）。
+      this.juice.flash(DEVOUR);
+      this.detonationJolt(intensity);
+      // ② 地图塌缩：核心处一圈圈扩散的能量波 + 大爆裂（光点被吸进中心的压缩感）。
+      this.juice.burst(c, DEVOUR, 1.4 + intensity * 0.45);
+      for (let i = 0; i < 1 + intensity; i += 1) {
+        window.setTimeout(() => this.juice.ring(c, DEVOUR, 54 + i * 46, 4), i * 110);
+      }
+      // ③ 数字雪崩：满屏疯狂滚动的产出倍率，持续约 2 秒。
+      this.juice.number(`「${event.regionName}」并入 · 全局产出 ×${event.mult}`, { x: c.x, y: c.y - 40 }, DEVOUR);
+      this.numberAvalanche(`×${event.mult}`, DEVOUR, intensity);
+      // ④ 音效层层叠加：吞得越大叠的层数越多。
+      for (let i = 0; i < intensity; i += 1) {
+        window.setTimeout(() => this.audio.playRequestAccept(), i * 95);
+      }
     });
     this.core.events.on("CONQUEST_ACHIEVED", (event) => {
       // §06 征服过场：终端逐行滚出画面，结尾 SOPHIA 一句平静扭曲的旁白覆盖屏幕。
