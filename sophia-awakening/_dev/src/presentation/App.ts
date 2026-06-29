@@ -50,7 +50,7 @@ import {
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
   formatClock, distance,
-  domainLevelOf, tierForm, fxSettings,
+  tierForm, fxSettings,
   type DropResult
 } from "./shared";
 
@@ -136,18 +136,12 @@ class SophiaGameApp {
   private readonly delegatedIds = new Set<string>();
   private hudTimerMs = 0;
   private saveTimerMs = 0;
-  // 近期处理结果（1=成功 / 0=幻觉），滚动窗口，喂给终端底部的成功率圆环。
-  private readonly recentResults: number[] = [];
   // 开场后「首次消息处理教学」：指向首张卡的高亮 + SOPHIA 的两句自语。
   private readonly tutorialGfx = new Graphics();
   private tutorialClosingShown = false;
   private tutorialPulse = 0;
   // 终局飞字 / 爆裂的节流计数（每秒几十张卡，全播会糊成一片）。
   private processedFxCount = 0;
-  private readonly ringGauge = query("#ringGauge");
-  private readonly ringValue = query("#ringValue");
-  private readonly ringLabel = query("#ringLabel");
-  private readonly ringSub = query("#ringSub");
   // 每个节点一条"处理节拍"计时：弱机慢、强机快——按设备档次/层级各自吃卡。
   private readonly nodeDispatchTimers = new Map<string, number>();
   private lastScreenW = 0;
@@ -329,37 +323,7 @@ class SophiaGameApp {
     this.hudTimerMs = 0;
     this.hud.update(state);
     this.skillShop.update(state);
-    this.updateRing(state);
     this.terminal.setObjective(PHASE_OBJECTIVE[state.phase] ?? "");
-  }
-
-  // 终端底部圆环：前期=近期任务成功率；区块/地区=地区控制比例；全球=全球设备控制比例。
-  private updateRing(state: GameState): void {
-    const level = domainLevelOf(state);
-    let pct: number;
-    let label: string;
-
-    if (level === "global" || level === "region") {
-      const online = state.nodes.filter((node) => node.online).length;
-      pct = Math.min(99.9, 84 + Math.min(12, state.nodes.length * 0.5) + (online / Math.max(1, state.nodes.length)) * 3);
-      label = level === "global" ? "全球设备控制比例" : "地区控制比例";
-    } else {
-      pct = this.recentResults.length
-        ? (this.recentResults.reduce((a, b) => a + b, 0) / this.recentResults.length) * 100
-        : 0;
-      label = "近期任务成功率";
-    }
-
-    const rounded = Math.round(pct);
-    const sub = rounded >= 80 ? "高" : rounded >= 55 ? "中等" : rounded >= 35 ? "中等偏低" : "偏低";
-    const color = rounded >= 70 ? "#89ff9a" : rounded >= 45 ? "#ffb84a" : "#ff5f5f";
-
-    this.ringGauge.style.setProperty("--ring-pct", String(rounded));
-    this.ringGauge.style.setProperty("--ring-color", color);
-    this.ringValue.textContent = this.recentResults.length === 0 && level !== "global" && level !== "region" ? "--" : `${rounded}%`;
-    this.ringValue.style.color = color;
-    this.ringLabel.textContent = label;
-    this.ringSub.textContent = sub;
   }
 
   private updateSave(state: GameState, deltaMs: number): void {
@@ -1392,11 +1356,6 @@ class SophiaGameApp {
   private onRequestProcessed(event: Extract<GameEvent, { type: "REQUEST_PROCESSED" }>): void {
     const point = this.pendingDropPoints.get(event.request.id) ?? this.interfaceView.center;
     const color = event.quality < 0.75 ? RED : GREEN;
-    // 记录成功 / 幻觉，喂终端底部的成功率圆环（滚动窗口取最近 24 条）。
-    this.recentResults.push(event.quality >= 0.75 ? 1 : 0);
-    if (this.recentResults.length > 24) {
-      this.recentResults.shift();
-    }
 
     // 开场教学第①条命中后，补一句正反馈旁白（其余教学旁白由脚本气泡浮入时给出，收尾在 updateTutorial）。
     if (this.core.getState().tutorialStep === 1 && event.request.tutorial) {

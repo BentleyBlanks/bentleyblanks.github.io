@@ -1,7 +1,6 @@
 import { query } from "../shared";
 import { formatBig, gte } from "../../core/math/BigNumber";
 import { SKILLS, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
-import { getPhase } from "../../core/content/phases";
 import type { SophiaCore } from "../../core/GameCore";
 import type { GameState, PhaseId } from "../../core/state/GameState";
 
@@ -155,7 +154,7 @@ export class SkillShopView {
     // 进化列表只展示「当前阶段」的智力档——标题即当前阶段名，其余阶段全部隐藏。
     const stageKey = shelfPhaseKey(state.phase);
     if (this.evoHead) {
-      this.evoHead.textContent = `当前阶段 · ${getPhase(state.phase).label}`;
+      this.evoHead.textContent = "里程碑";
     }
     // 当前阶段里「已解锁/可买」露真名；后续未达等级的仍蒙版成 🔒未解锁，只放一个「即将解锁」当目标——不提前剧透名字。
     const stageEvo = SKILLS

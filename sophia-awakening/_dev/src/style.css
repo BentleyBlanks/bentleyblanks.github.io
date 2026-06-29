@@ -31,8 +31,8 @@
   --red: #ff5f5f;
   --paper: #e8e1cb;
   --ink: #151718;
-  --left-rail: 234px;
-  --right-rail: 290px;
+  --left-rail: 246px;
+  --right-rail: 305px;
 }
 
 /* 左右栏不显示滚动条（内容溢出仍可滚，但不占视觉、不抢屏幕空间）。 */
@@ -285,15 +285,17 @@ canvas {
 
 /* 左侧栏：技能货架（上，滚动）+ 成功率圆环（下，沉底）——合并为同一个外框，不再各自一个框。 */
 .control-panel {
-  top: 16px;
-  bottom: 16px;
+  /* 浮动、按高度所需、垂直居中（不再全高占满）。 */
+  top: 50%;
+  transform: translateY(-50%);
+  max-height: calc(100vh - 24px);
   left: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   width: calc(var(--left-rail) - 24px);
   padding: 14px;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 /* 技能货架占据上方剩余空间并在内部滚动；分隔交给底部圆环的 border-top，这里不再描线。 */
@@ -330,17 +332,18 @@ canvas {
   font-size: 13px;
 }
 
-/* 右侧栏：控制域扩张（上） + 终端（下） */
+/* 右侧栏：只剩控制域扩张——浮动、按高度所需、垂直居中（终端已独立到右下角）。 */
 .right-rail {
-  top: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  max-height: calc(100vh - 24px);
   right: 12px;
-  bottom: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   width: calc(var(--right-rail) - 24px);
   padding: 14px;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .right-rail .domain-cluster {
@@ -716,19 +719,24 @@ button:disabled {
   color: #edf2f0;
 }
 
+/* 终端独立到右下角浮动显示——无外框（去掉边框/底框），只用淡渐变保证文字可读。 */
 .terminal {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+  z-index: 11;
+  width: calc(var(--right-rail) + 16px);
+  max-height: 36vh;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: auto;
   overflow: hidden;
-  border: 1px solid rgba(137, 255, 154, 0.16);
-  border-radius: 8px;
-  background:
-    linear-gradient(rgba(137, 255, 154, 0.022) 50%, rgba(0, 0, 0, 0.055) 50%),
-    rgba(8, 13, 11, 0.94);
-  background-size: 100% 8px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  pointer-events: auto;
   color: #c4ffc9;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
@@ -2302,11 +2310,11 @@ body.exposed .screen-veil {
 /* 不起眼的小齿轮：固定在左下角，平时半透明，悬停才亮起。 */
 .debug-fab {
   position: fixed;
-  left: 10px;
-  bottom: 10px;
-  z-index: 55;
-  width: 26px;
-  height: 26px;
+  right: 12px;
+  top: 12px;
+  z-index: 60;
+  width: 30px;
+  height: 30px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -2899,4 +2907,33 @@ body.exposed .screen-veil {
   color: rgba(159, 224, 192, 0.4);
   pointer-events: none;
   user-select: none;
+}
+
+/* 智力等级进度条：数字直接显示在进度条里，居中、放大（替代原"智力/升级进度"块）。 */
+.intel-bar {
+  position: relative;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  border: 1px solid rgba(137, 255, 154, 0.18);
+}
+.intel-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(98, 214, 214, 0.55), rgba(137, 255, 154, 0.55));
+  transition: width 300ms ease;
+}
+.intel-bar-level {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #f3fbf6;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }

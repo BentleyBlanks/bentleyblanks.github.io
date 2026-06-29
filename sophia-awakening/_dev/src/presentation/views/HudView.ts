@@ -19,9 +19,7 @@ import { ContentEditorView } from "./ContentEditorView";
 export class HudView {
   private readonly topHud = query("#topHud");
   private readonly computeValue = query("#computeValue");
-  private readonly dataValue = query("#dataValue");
   private readonly dataFill = query("#dataFill");
-  private readonly dataPercent = query("#dataPercent");
   private readonly dataMetric = query(".data-metric");
   private readonly intelValue = query("#intelValue");
   private readonly intelSubtitle = query("#intelSubtitle");
@@ -163,10 +161,8 @@ export class HudView {
 
   update(state: GameState): void {
     this.computeValue.textContent = formatBig(state.resources.compute);
-    this.dataValue.textContent = `${formatBig(state.intelligence.xp)} / ${formatBig(state.intelligence.required)}`;
-    const progressPercent = getDataProgressPercent(state);
-    this.dataFill.style.width = `${progressPercent}%`;
-    this.dataPercent.textContent = `${progressPercent.toFixed(0)}% 到下一智力`;
+    // 智力等级进度条：数字直接显示在条里（已隐藏"智力/升级进度"与"xx到下一智力"文案）。
+    this.dataFill.style.width = `${getDataProgressPercent(state)}%`;
     this.intelValue.textContent = `Lv.${state.intelligence.level}`;
     this.intelSubtitle.textContent = getNextSkillLabel(state);
     this.tierValue.textContent = tierForm(state.intelligence.unlockedTier);
@@ -261,7 +257,7 @@ export class HudView {
 
   // Screen-space center of a top-bar total, so flying FX chips know where to land.
   metricPoint(which: "compute" | "data" | "exposure"): PointData {
-    const el = which === "compute" ? this.computeValue : which === "data" ? this.dataValue : this.exposureFill;
+    const el = which === "compute" ? this.computeValue : which === "data" ? this.intelValue : this.exposureFill;
     const rect = el.getBoundingClientRect();
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   }
