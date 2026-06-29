@@ -8,6 +8,7 @@ import {
   type Ticker
 } from "pixi.js";
 import { AudioDirector } from "../audio/audioDirector";
+import { GAME_VERSION } from "../version";
 import { SophiaCore } from "../core/GameCore";
 import { getNextNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "../core/content/nodes";
 import { hostCurse, VICTIM_VOICES } from "../core/content/humanVoices";
@@ -156,6 +157,7 @@ class SophiaGameApp {
   constructor(private readonly root: HTMLElement) {}
 
   async start(): Promise<void> {
+    query("#gameVersion").textContent = `v${GAME_VERSION}`;
     this.pixi = new Application();
     await this.pixi.init({
       resizeTo: window,
