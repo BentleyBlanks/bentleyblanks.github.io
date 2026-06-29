@@ -2812,29 +2812,32 @@ body.exposed .screen-veil {
 .milestone-banner-name { font-size: 34px; font-weight: 900; color: #f3fbf6; text-shadow: 0 0 24px rgba(137,255,154,0.5); }
 .milestone-banner-sub { font-size: 13px; color: #9fc7b5; letter-spacing: 0.16em; }
 
-/* §07 进化度大屏：常驻屏角的状态 HUD（控制规模 / 阶段 / 下一目标预告）。 */
+/* §07 进化度大屏：横跨整条底部的状态横幅（进化阶段 + 下一目标预告进度条）。 */
 .evolution-hud {
   position: fixed;
   z-index: 12;
-  left: calc(var(--left-rail) + 14px);
-  bottom: 16px;
-  width: 248px;
-  padding: 10px 13px;
-  border: 1px solid rgba(98, 214, 214, 0.28);
+  left: calc(var(--left-rail) + 16px);
+  right: calc(var(--right-rail) + 16px);
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 9px 20px;
+  border: 1px solid rgba(98, 214, 214, 0.26);
   border-radius: 10px;
-  background: rgba(8, 15, 16, 0.82);
+  background: rgba(8, 15, 16, 0.85);
   backdrop-filter: blur(8px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
   pointer-events: none;
   font-family: "Noto Sans SC", Inter, sans-serif;
 }
-.evo-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.evo-label { font-size: 11px; color: #7fae9e; }
-.evo-value { font-size: 14px; font-weight: 800; color: #dcefeb; }
-.evo-next { margin-top: 8px; }
-.evo-next-label { display: block; font-size: 11px; color: #cdeede; margin-bottom: 4px; }
-.evo-next-track { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
-.evo-next-fill { height: 100%; width: 0%; border-radius: 4px; background: linear-gradient(90deg, #62d6d6, #89ff9a); transition: width 300ms ease; }
+.evo-stage { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
+.evo-stage-tag { font-size: 11px; letter-spacing: 0.14em; color: #7fae9e; }
+.evo-stage .evo-value { font-size: 15px; font-weight: 800; color: #9fe0d0; white-space: nowrap; }
+.evo-next { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 14px; }
+.evo-next-label { flex: 0 0 auto; font-size: 12px; color: #cdeede; white-space: nowrap; }
+.evo-next-track { flex: 1 1 auto; height: 8px; border-radius: 5px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.evo-next-fill { height: 100%; width: 0%; border-radius: 5px; background: linear-gradient(90deg, #62d6d6, #89ff9a); transition: width 300ms ease; }
 .evo-next.is-imminent .evo-next-fill { background: linear-gradient(90deg, #ffd86b, #ffb84a); animation: evoImminent 0.7s ease-in-out infinite; }
 .evo-next.is-imminent .evo-next-label { color: #ffd86b; }
 @keyframes evoImminent { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
