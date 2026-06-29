@@ -10,6 +10,7 @@ import {
 } from "pixi.js";
 import { AudioDirector } from "../audio/audioDirector";
 import { GAME_VERSION } from "../version";
+import { UI } from "./uiTuning";
 import { SophiaCore } from "../core/GameCore";
 import { getNextNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "../core/content/nodes";
 import { hostCurse, VICTIM_VOICES } from "../core/content/humanVoices";
@@ -46,7 +47,7 @@ import {
 } from "./views/RequestPacketView";
 import {
   CYAN, GREEN, AMBER, RED, DEVOUR,
-  LEFT_RAIL_WIDTH, RIGHT_RAIL_WIDTH, REQUEST_PACKET_WIDTH,
+  LEFT_RAIL_WIDTH, RIGHT_RAIL_WIDTH,
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
   formatClock, distance,
@@ -401,7 +402,7 @@ class SophiaGameApp {
     const screen = this.pixi.screen;
     const w = screen.width;
     const h = screen.height;
-    const W = REQUEST_PACKET_WIDTH;
+    const W = UI.cardWidth;
     const H = newCardH;
     // 与顶栏左右沿对齐：顶栏 left/right 各留 16px（见 .top-hud CSS）。
     const railL = LEFT_RAIL_WIDTH + 16;

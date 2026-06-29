@@ -2912,7 +2912,7 @@ body.exposed .screen-veil {
 /* 智力等级进度条：数字直接显示在进度条里，居中、放大（替代原"智力/升级进度"块）。 */
 .intel-bar {
   position: relative;
-  height: 34px;
+  height: var(--intel-bar-h, 34px);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
@@ -2937,3 +2937,6 @@ body.exposed .screen-veil {
   color: #f3fbf6;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
+
+/* UI 编辑器滑杆 */
+.ui-range { flex: 1 1 auto; min-width: 90px; accent-color: #62d6d6; cursor: pointer; }

@@ -21,8 +21,8 @@ export const CARD_FONT = "'Noto Sans SC', Inter, 'Segoe UI', system-ui, sans-ser
 export const CARD_MONO = "Cascadia Mono, Consolas, monospace";
 
 // ── 布局常量 ─────────────────────────────────────────
-export const LEFT_RAIL_WIDTH = 234;
-export const RIGHT_RAIL_WIDTH = 290;
+export const LEFT_RAIL_WIDTH = 246;
+export const RIGHT_RAIL_WIDTH = 305;
 export const BASE_SUCTION_MARGIN = 50;
 export const REQUEST_PACKET_WIDTH = 384;
 export const REQUEST_PACKET_HEIGHT = 162;

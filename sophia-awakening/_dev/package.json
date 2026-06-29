@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "sim": "tsc -p tsconfig.sim.json && node scripts/sim.cjs"
   },
   "dependencies": {
     "break_infinity.js": "^2.2.0",

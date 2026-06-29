@@ -1,0 +1,18 @@
+{
+  "//": "Throwaway config: compile ONLY the pure game core (src/core) to CommonJS so `npm run sim` can drive SophiaCore in plain Node — no Pixi/DOM. Output goes to .sim-build (gitignored). See scripts/sim.cjs.",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": "src/core",
+    "outDir": ".sim-build",
+    "noEmit": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["src/core"]
+}

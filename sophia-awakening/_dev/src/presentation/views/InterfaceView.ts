@@ -7,6 +7,7 @@ import {
   lerpColor, pointOnCircle, distance, tierForm,
   type DropResult
 } from "../shared";
+import { UI } from "../uiTuning";
 
 // 手机桌面各 App 的图标——给每个 App（含买下权限后点亮的那些）配一个一眼能认的 emoji。
 const APP_ICONS: Record<string, string> = {
@@ -274,8 +275,8 @@ export class InterfaceView {
     // 点亮的 App 用权限名（买了「电话」就亮一个「电话」），其余宫格保留原桌面图标。
     // 顺序＝解锁顺序（App 按已买权限档数从左上依次点亮）：电话→聊天→大恨老师→外卖→相册→支付。
     const permApps = ["电话", "聊天", "大恨老师", "外卖", "相册", "支付"];
-    const spacing = 94; // 手机内图标间距（图标放大后拉开）
-    const iconS = 62;
+    const spacing = UI.phoneSpacing;
+    const iconS = UI.phoneIcon;
     let appIdx = 0;
     for (let row = 0; row < 3; row += 1) {
       for (let col = 0; col < 3; col += 1) {
@@ -311,7 +312,7 @@ export class InterfaceView {
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).fill({ color: 0x0d1715, alpha: 0.5 });
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.85 : 0.4) * pulse });
         // App 图标：emoji（未点亮的 App 调暗一些）。
-        this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, 31, 0xffffff, lit ? 1 : 0.5);
+        this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, UI.appEmoji, 0xffffff, lit ? 1 : 0.5);
         this.addLabel(connected ? name : lit ? `${name}·待连` : name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
 
         // 委托处理中：图标外圈画一条进度环（转着转着满了才出结果）；还有排队的待办则右上角标 +N。
@@ -335,7 +336,7 @@ export class InterfaceView {
     }
 
     // ---- 中心格：SOPHIA CORE（圆角芯片 + 同心环 + 眼）——尺寸与周围 App 图标一致，不再夸张占中。
-    const baseR = 31;
+    const baseR = UI.coreRadius;
     g.circle(cx, cy, baseR + 10 + Math.sin(this.pulse * 2) * 2).stroke({ width: 1.5, color: accent, alpha: 0.3 });
     g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).fill({ color: 0x06140e, alpha: 0.96 });
     g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).stroke({ width: 2.5, color: accent, alpha: 0.9 });

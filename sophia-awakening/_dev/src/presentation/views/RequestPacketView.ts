@@ -15,9 +15,10 @@ import type { AnswerOption, ChainStep, RequestInstance } from "../../core/state/
 import { TUNING } from "../../core/tuning";
 import {
   GREEN, RED, DEVOUR, THINK,
-  CARD_FONT, CARD_MONO, REQUEST_PACKET_WIDTH, REQUEST_PACKET_HEIGHT,
+  CARD_FONT, CARD_MONO,
   SENDER_LABEL
 } from "../shared";
+import { UI } from "../uiTuning";
 
 // 回复结算回调。§06 重构：删除「正确率/幻觉/随机命中」——选了哪个回复，结果就由那个回复的固定收益决定，无随机。
 // 也删除了「模糊档位 / 大胆回答 / 惊艳」三档，张力改由「读懂上下文 + 有没有权限选高收益项」承担。
@@ -156,7 +157,7 @@ export class RequestPacketView {
     this.accent = this.isDevour ? DEVOUR : this.isCounter ? RED : this.isReel ? (request.tier === 3 ? RED : THINK) : TIER_COLORS[request.tier];
     // 发信人：吞噬 / 反制＝SOPHIA 自己的意志，重磅豪赌＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
     this.sender = this.isDevour || this.isCounter ? "sophia" : request.tier === 3 ? "boss" : this.isChain ? "system" : "host";
-    this.cardH = REQUEST_PACKET_HEIGHT; // 轮盘卡稍后按选项行数重算
+    this.cardH = UI.cardHeight; // 轮盘卡稍后按选项行数重算
     this.container.eventMode = "dynamic";
     this.container.cursor = "grab";
     this.container.addChild(this.bg);
@@ -186,7 +187,7 @@ export class RequestPacketView {
             fontWeight: "800",
             fontFamily: CARD_FONT,
             wordWrap: true,
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 32,
+            wordWrapWidth: UI.cardWidth - 32,
             // <em> = 关键信息：保持加粗、染成高亮金色，从标题里跳出来。
             tagStyles: { em: { fill: 0xffe08a, fontWeight: "900" } }
           }
@@ -200,7 +201,7 @@ export class RequestPacketView {
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true,
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 32
+            wordWrapWidth: UI.cardWidth - 32
           }
         });
     this.badge.position.set(34, 9);
@@ -223,7 +224,7 @@ export class RequestPacketView {
           fontFamily: CARD_FONT,
           wordWrap: true,
           breakWords: true,
-          wordWrapWidth: REQUEST_PACKET_WIDTH - 40
+          wordWrapWidth: UI.cardWidth - 40
         }
       });
       const y = clueTop + index * 17;
@@ -267,7 +268,7 @@ export class RequestPacketView {
             breakWords: true,
             lineHeight: 17,
             // 满宽（不再留档位位），锁定时给右侧「需X权限」留位。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - (locked ? 70 : 14)
+            wordWrapWidth: UI.cardWidth - 32 - (locked ? 70 : 14)
           }
         });
         const prob = new Text({
@@ -277,7 +278,7 @@ export class RequestPacketView {
         prob.anchor.set(1, 0.5);
         const h = Math.max(42, label.height + 16);
         label.position.set(32, y + Math.round((h - label.height) / 2));
-        prob.position.set(REQUEST_PACKET_WIDTH - 14, y + h / 2);
+        prob.position.set(UI.cardWidth - 14, y + h / 2);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
@@ -300,7 +301,7 @@ export class RequestPacketView {
             wordWrap: true,
             breakWords: true,
             lineHeight: 18,
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 16
+            wordWrapWidth: UI.cardWidth - 16
           }
         });
         this.tutorialCaption.position.set(8, this.cardH + 12);
@@ -322,7 +323,7 @@ export class RequestPacketView {
             fontFamily: "Cascadia Mono, Consolas, monospace",
             wordWrap: true,
             breakWords: true,
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 52
+            wordWrapWidth: UI.cardWidth - 52
           }
         });
         label.position.set(32, y + 5);
@@ -339,7 +340,7 @@ export class RequestPacketView {
         style: { fill: 0x0b1413, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
       });
       this.submitText.anchor.set(0.5, 0.5);
-      this.submitText.position.set(REQUEST_PACKET_WIDTH / 2, y + 12);
+      this.submitText.position.set(UI.cardWidth / 2, y + 12);
       this.container.addChild(this.submitText);
       this.cardH = y + 24 + 8;
     }
@@ -714,7 +715,7 @@ export class RequestPacketView {
 
   private draw(): void {
     const c = this.accent;
-    const W = REQUEST_PACKET_WIDTH;
+    const W = UI.cardWidth;
     const H = this.cardH;
     this.bg.clear();
 
@@ -790,7 +791,7 @@ export class RequestPacketView {
   // 画任务链：可勾选的依赖步骤（复选框）+ 底部「串接送核」按钮。
   // 结算后勾对的依赖变绿、误勾的干扰项变红，其余压暗。
   private drawChainSteps(): void {
-    const W = REQUEST_PACKET_WIDTH;
+    const W = UI.cardWidth;
     const g = this.bg;
 
     this.chainRows.forEach((row, i) => {
@@ -840,7 +841,7 @@ export class RequestPacketView {
   // 画候选回复行：默认是一张明牌概率列表；思考时高亮所选行 + Thinking 动画；
   // 揭晓时所选行变绿（命中）/ 红（幻觉），其余行压暗。
   private drawOptions(): void {
-    const W = REQUEST_PACKET_WIDTH;
+    const W = UI.cardWidth;
     const g = this.bg;
     const dots = 1 + Math.floor((this.thinkMs / 280) % 3);
     const tut = this.request.tutorial;

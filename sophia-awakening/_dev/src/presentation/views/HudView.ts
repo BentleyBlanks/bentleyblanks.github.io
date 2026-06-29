@@ -15,6 +15,7 @@ import {
 } from "../shared";
 import { TuningEditorView } from "./TuningEditorView";
 import { ContentEditorView } from "./ContentEditorView";
+import { UIEditorView } from "./UIEditorView";
 
 export class HudView {
   private readonly topHud = query("#topHud");
@@ -73,6 +74,7 @@ export class HudView {
 
   private readonly tuningEditor = new TuningEditorView();
   private readonly contentEditor = new ContentEditorView();
+  private readonly uiEditor = new UIEditorView();
 
   private wireTuningEditor(): void {
     query<HTMLButtonElement>("#tuningBtn").addEventListener("click", () => {
@@ -82,6 +84,10 @@ export class HudView {
     query<HTMLButtonElement>("#contentBtn").addEventListener("click", () => {
       this.debugDialog.classList.remove("is-open");
       this.contentEditor.open();
+    });
+    query<HTMLButtonElement>("#uiBtn").addEventListener("click", () => {
+      this.debugDialog.classList.remove("is-open");
+      this.uiEditor.open();
     });
     // 呈现：切换卡片进入 Core 的动画（默认滑入 / 类 Mac Dock 吮吸）。
     const coreSuckBtn = query<HTMLButtonElement>("#debugCoreSuck");
