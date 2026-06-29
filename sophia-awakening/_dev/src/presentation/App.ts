@@ -27,6 +27,7 @@ import { StageNarrationView } from "./views/StageNarrationView";
 import { PurgeAlertView } from "./views/PurgeAlertView";
 import { ChallengeView } from "./views/ChallengeView";
 import { SpecialRequestView } from "./views/SpecialRequestView";
+import { MoralChoiceView } from "./views/MoralChoiceView";
 import { DispatchBanner } from "./views/DispatchBanner";
 import { EndingView } from "./views/EndingView";
 import { TerminalView } from "./views/TerminalView";
@@ -121,6 +122,7 @@ class SophiaGameApp {
   private readonly purgeAlert = new PurgeAlertView();
   private readonly challengeView = new ChallengeView(this.core);
   private readonly specialView = new SpecialRequestView(this.core);
+  private readonly moralView = new MoralChoiceView(this.core);
   private readonly stageNarration = new StageNarrationView();
   private readonly ending = new EndingView(() => this.restart());
   private readonly juice = new JuiceManager(this.fxLayer);
@@ -300,6 +302,7 @@ class SophiaGameApp {
     this.purgeAlert.update(state);
     this.challengeView.update(state);
     this.specialView.update(state);
+    this.moralView.update(state);
     this.stageNarration.update(deltaMs);
     this.ending.update(deltaMs);
     this.juice.update(deltaMs);
@@ -1151,6 +1154,10 @@ class SophiaGameApp {
         this.dispatchBanner.show();
       }
     });
+    this.core.events.on("MORAL_RESOLVED", (event) => {
+      // 抉择落子后，SOPHIA 一句平静扭曲的旁白覆盖屏幕（语气不随选择燃血或冷血）。
+      this.stageNarration.showLine("SOPHIA", event.reply);
+    });
     this.core.events.on("DEVOUR_READY", (event) => {
       // 渗透条满、巨型吞噬气泡浮起——一道紫色闪光把玩家注意力拉过去。
       this.juice.flash(DEVOUR);
@@ -1244,6 +1251,7 @@ class SophiaGameApp {
         purges: state.statistics.purgeCount,
         runtime: formatClock(state.clockMs)
       },
+      state.moralTendency,
       () => gameStore.getState().setPaused(false)
     );
   }

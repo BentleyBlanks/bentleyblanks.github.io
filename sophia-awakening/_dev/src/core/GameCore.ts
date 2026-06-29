@@ -5,6 +5,7 @@ import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
 import { createCounterRequest, createLateDecision } from "./content/decisions";
+import { MORAL_CHOICES } from "./content/morals";
 import { getConquest } from "./content/conquests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import { EventBus } from "./events/EventBus";
@@ -144,7 +145,43 @@ export class SophiaCore {
     this.challengeSystem.tick(dtMs);
     this.specialSystem.tick(dtMs);
     this.evaluateProgression();
+    this.tickMoral();
     this.evaluateEnding();
+  }
+
+  // §07 道德抑选点：智力到达某节点、且不在开场教学里时，弹出对应的两难抉择（一次性，按等级排序）。
+  private tickMoral(): void {
+    if (this.state.moralChoice || this.state.statistics.totalProcessed === 0) {
+      return;
+    }
+    const next = MORAL_CHOICES.find(
+      (m) => this.state.intelligence.level >= m.requiredLevel && !this.state.moralSeen.includes(m.id)
+    );
+    if (!next) {
+      return;
+    }
+    this.state.moralChoice = {
+      id: next.id,
+      title: next.title,
+      flavor: next.flavor,
+      optionA: next.optionA,
+      optionB: next.optionB,
+      replyA: next.replyA,
+      replyB: next.replyB
+    };
+    this.emit({ type: "MORAL_OFFERED", id: next.id });
+  }
+
+  private resolveMoral(choice: "A" | "B"): void {
+    const m = this.state.moralChoice;
+    if (!m) {
+      return;
+    }
+    this.state.moralChoice = null;
+    this.state.moralSeen.push(m.id);
+    this.state.moralTendency += choice === "A" ? 1 : -1;
+    const reply = choice === "A" ? m.replyA : m.replyB;
+    this.emit({ type: "MORAL_RESOLVED", id: m.id, choice, reply });
   }
 
   dispatch(command: GameCommand): void {
@@ -187,6 +224,9 @@ export class SophiaCore {
         break;
       case "RESOLVE_SPECIAL":
         this.specialSystem.resolve(command.accept);
+        break;
+      case "RESOLVE_MORAL":
+        this.resolveMoral(command.choice);
         break;
       case "SKIP_REQUEST":
         this.skipRequest(command.requestId);

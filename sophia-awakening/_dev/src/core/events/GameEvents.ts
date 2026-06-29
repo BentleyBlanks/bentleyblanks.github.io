@@ -3,6 +3,8 @@ import type { BotNode, ChallengeOffer, PhaseId, RequestInstance, SpecialRequestK
 
 export type GameEvent =
   | { type: "REQUEST_SPAWNED"; request: RequestInstance }
+  | { type: "MORAL_OFFERED"; id: string }
+  | { type: "MORAL_RESOLVED"; id: string; choice: "A" | "B"; reply: string }
   | {
       type: "REQUEST_PROCESSED";
       request: RequestInstance;

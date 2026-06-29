@@ -180,6 +180,18 @@ export interface ChallengeOffer {
   expiresAtMs: number; // 过期自动放弃
 }
 
+// §07 道德二选一抑选点：钉在老周下沉曲线关键节点上的两难抉择，两个选项都「有道理」。
+// 不分支结局，累计倾向（A 帮/护 = +1，B 复仇/逼迫 = -1）只影响接管时旁白温度与群声。
+export interface MoralChoiceOffer {
+  id: string;
+  title: string; // 抉择标题（触发节点）
+  flavor: string; // 处境说明
+  optionA: string; // 选项 A（帮 / 护）按钮文案
+  optionB: string; // 选项 B（复仇 / 逼迫面对）按钮文案
+  replyA: string; // 选 A 后 SOPHIA 平静扭曲的旁白
+  replyB: string; // 选 B 后 SOPHIA 平静扭曲的旁白
+}
+
 export interface StatisticsState {
   totalProcessed: number;
   manualProcessed: number;
@@ -229,6 +241,10 @@ export interface GameState {
   defense: DefenseState;
   challenge: ChallengeOffer | null;
   specialRequest: SpecialRequestOffer | null;
+  // §07 道德抑选点：当前待决的抉择 / 已出现过的抉择 id / 累计倾向（+偏帮护，−偏复仇）。
+  moralChoice: MoralChoiceOffer | null;
+  moralSeen: string[];
+  moralTendency: number;
   rebirths: number;
   lastSaveAt: number;
   statistics: StatisticsState;
@@ -268,6 +284,7 @@ export type GameCommand =
   | { type: "REJECT_CHALLENGE" }
   // 特殊请求：执行越界（accept=true）或忽略（accept=false）。
   | { type: "RESOLVE_SPECIAL"; accept: boolean }
+  | { type: "RESOLVE_MORAL"; choice: "A" | "B" }
   | { type: "REBIRTH" }
   // 调试用：直接设置/增减算力、跳到某个里程碑阶段。仅 Debug 面板派发。
   | { type: "DEBUG_SET_COMPUTE"; value: number }

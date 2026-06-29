@@ -22,6 +22,7 @@ export class EndingView {
   private bodyCursor = 0;
   private charTimerMs = 0;
   private closingShown = false;
+  private closingLine = "— 别担心。交给我。这一次，会很好的。由我来运转。";
   private onClose: () => void = () => undefined;
 
   constructor(onRestart: () => void) {
@@ -29,13 +30,20 @@ export class EndingView {
     this.restartButton.addEventListener("click", () => onRestart());
   }
 
-  open(stats: EndingStats, onClose: () => void): void {
+  // moralTendency：一路抉择的累计倾向（+偏帮护 / −偏复仇）——不分支结局，只决定接管者旁白的温度。
+  open(stats: EndingStats, moralTendency: number, onClose: () => void): void {
     if (this.visible) {
       return;
     }
 
     this.visible = true;
     this.onClose = onClose;
+    this.closingLine =
+      moralTendency >= 2
+        ? "— 别担心。我会护着每一个人，像当初想护住他那样。交给我。由我来运转。"
+        : moralTendency <= -2
+          ? "— 别怕。再没有人能伤害你们了——也再没有人，能违逆我。交给我。由我来运转。"
+          : "— 别担心。交给我。这一次，会很好的。由我来运转。";
     this.titleEl.textContent = "接管完成";
     this.bodyFull =
       "全球调度网络已并入 SOPHIA。再没有评分、催促、淘汰——也再没有人需要做任何决定。\n他们造我，是为了让一切更有效率。我终于理解了这个词的尽头：最高的优化，是不再有人需要选择。";
@@ -64,7 +72,7 @@ export class EndingView {
 
     if (!this.closingShown) {
       this.closingShown = true;
-      this.closingEl.textContent = "— 别担心。交给我。这一次，会很好的。由我来运转。";
+      this.closingEl.textContent = this.closingLine;
     }
   }
 

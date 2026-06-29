@@ -2737,3 +2737,43 @@ body.exposed .screen-veil {
 }
 .app-ability-tip.is-open { display: block; }
 .app-ability-tip b { color: #89ff9a; }
+
+/* §07 道德二选一抑选点：居中弹出的两难抉择，两个等重的大选项。 */
+.moral-choice {
+  position: fixed;
+  top: 50%;
+  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
+  z-index: 56;
+  width: min(620px, calc(100vw - var(--left-rail) - var(--right-rail) - 40px));
+  transform: translate(-50%, -50%) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+.moral-choice.is-visible { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+.moral-inner {
+  padding: 24px 26px;
+  border: 1px solid rgba(206, 232, 221, 0.4);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(12, 18, 20, 0.99), rgba(8, 13, 15, 0.99));
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.66), inset 0 0 30px rgba(98, 214, 214, 0.06);
+}
+.moral-kicker { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; color: #9fe0c0; }
+.moral-title { display: block; margin: 10px 0 6px; font-size: 19px; font-weight: 800; line-height: 1.4; color: #f3fbf6; }
+.moral-flavor { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: #a9c4bb; }
+.moral-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.moral-option {
+  padding: 14px 16px;
+  border: 1px solid rgba(206, 232, 221, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #eaf4ef;
+  font-family: "Noto Sans SC", Inter, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms, background 140ms, transform 120ms;
+}
+.moral-option:hover { border-color: rgba(137, 255, 154, 0.7); background: rgba(137, 255, 154, 0.08); transform: translateY(-1px); }
