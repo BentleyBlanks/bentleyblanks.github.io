@@ -2886,16 +2886,17 @@ body.exposed .screen-veil {
   letter-spacing: 0.03em;
 }
 
-/* 游戏版本角标：贴在调试齿轮旁的低调版本戳。 */
+/* 游戏版本角标：屏幕底部正中的低调版本戳（左侧被齿轮/边栏遮挡，改放中间）。 */
 .game-version {
   position: fixed;
-  left: 44px;
-  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 5px;
   z-index: 55;
   font-family: "Cascadia Mono", Consolas, monospace;
   font-size: 11px;
   letter-spacing: 0.06em;
-  color: rgba(159, 224, 192, 0.45);
+  color: rgba(159, 224, 192, 0.4);
   pointer-events: none;
   user-select: none;
 }

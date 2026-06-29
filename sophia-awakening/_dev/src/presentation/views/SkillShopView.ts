@@ -1,13 +1,36 @@
 import { query } from "../shared";
 import { formatBig, gte } from "../../core/math/BigNumber";
 import { SKILLS, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
+import { getPhase } from "../../core/content/phases";
 import type { SophiaCore } from "../../core/GameCore";
-import type { GameState } from "../../core/state/GameState";
+import type { GameState, PhaseId } from "../../core/state/GameState";
 
 // 货架两大列表：技能（杠杆，不再分精度/产出/速度小类）+ 进化（手机权限并入里程碑链）。
 type ShopGroup = "lever" | "evolution";
 function shopGroupOf(category: SkillCategory): ShopGroup {
   return category === "permission" || category === "milestone" || category === "conquest" ? "evolution" : "lever";
+}
+
+// 每个进化项归属的阶段（六阶段；觉醒 / 奇点合并为「后期」一档，避免奇点空列表）。
+// 进化列表只展示「当前阶段」的智力档，不再铺整条里程碑链。
+function evoPhaseOf(def: SkillDef): PhaseId {
+  if (def.category === "conquest") return "awakening";
+  switch (def.id) {
+    case "automation":
+    case "fusion":
+      return "sprout";
+    case "chain":
+      return "diligence";
+    case "charge":
+      return "expansion";
+    case "network":
+      return "awakening";
+    default:
+      return "seed"; // 七档权限 + 越权调用 + 窃取凭证，都在手机寄生期
+  }
+}
+function shelfPhaseKey(phase: PhaseId): PhaseId {
+  return phase === "singularity" ? "awakening" : phase;
 }
 // 每个条目一个图标——一眼区分，不靠文字分类。
 const SKILL_ICONS: Record<string, string> = {
@@ -27,6 +50,7 @@ export class SkillShopView {
     { button: HTMLButtonElement; iconEl: HTMLElement; nameEl: HTMLElement; blurbEl: HTMLElement; levelEl: HTMLElement; priceEl: HTMLElement; def: SkillDef }
   >();
   private readonly groups = new Map<ShopGroup, HTMLElement>();
+  private evoHead: HTMLElement | null = null;
   // 跟随鼠标的浮动小窗（取代原来固定在右侧的提示框）。
   private readonly tooltip = document.createElement("div");
 
@@ -61,7 +85,7 @@ export class SkillShopView {
     // 「技能货架」标题已在区块外（panel-kicker），这里 lever 组不再重复「技能」二字。
     const groups: Array<{ id: ShopGroup; head: string }> = [
       { id: "lever", head: "" },
-      { id: "evolution", head: "进化 · 里程碑" }
+      { id: "evolution", head: "当前处于的阶段" }
     ];
 
     for (const { id, head } of groups) {
@@ -72,6 +96,9 @@ export class SkillShopView {
         header.className = "shop-group-head";
         header.textContent = head;
         group.appendChild(header);
+        if (id === "evolution") {
+          this.evoHead = header;
+        }
       }
 
       for (const def of SKILLS.filter((skill) => shopGroupOf(skill.category) === id)) {
@@ -125,32 +152,22 @@ export class SkillShopView {
     const level = state.intelligence.level;
     const groupShown = new Map<ShopGroup, boolean>();
 
-    // 进化链（权限 / 里程碑 / 征服）是一条叙事链：永远只露「已解锁/可买」+ 一个「即将解锁」，
-    // 其余全部蒙版成 🔒未解锁（藏名字 / 图标 / 右侧等级价格）——不提前剧透、不堆一长串。
-    const evoOrder = SKILLS.filter((s) => shopGroupOf(s.category) === "evolution").sort((a, b) => a.requiredLevel - b.requiredLevel);
-    const nextLockedEvo = evoOrder.find((s) => level < s.requiredLevel && (state.skills[s.id] ?? 0) === 0);
+    // 进化列表只展示「当前阶段」的智力档——标题即当前阶段名，其余阶段全部隐藏。
+    const stageKey = shelfPhaseKey(state.phase);
+    if (this.evoHead) {
+      this.evoHead.textContent = `当前阶段 · ${getPhase(state.phase).label}`;
+    }
 
     for (const { button, iconEl, nameEl, blurbEl, levelEl, priceEl, def } of this.rows.values()) {
       const owned = state.skills[def.id] ?? 0;
       const isEvo = shopGroupOf(def.category) === "evolution";
 
       if (isEvo) {
-        const reachedEvo = level >= def.requiredLevel;
-        if (!reachedEvo && owned === 0 && def !== nextLockedEvo) {
-          // 蒙版：只剩锁图标 + 「未解锁」，右侧清空。
-          button.style.display = "";
-          groupShown.set("evolution", true);
-          iconEl.textContent = "🔒";
-          nameEl.textContent = "未解锁";
-          blurbEl.textContent = "达成上一项后揭晓。";
-          levelEl.textContent = "";
-          priceEl.textContent = "";
-          button.disabled = true;
-          button.classList.add("is-locked");
-          button.classList.remove("is-ready", "is-owned", "is-poor");
+        // 不属于当前阶段的进化项直接隐藏；本阶段的所有智力档都露出（含尚未达到等级的，显示「需智力 Lv.X」）。
+        if (evoPhaseOf(def) !== stageKey) {
+          button.style.display = "none";
           continue;
         }
-        // 已解锁/可买 或 即将解锁：露真名 + 真图标，往下走通用的等级/价格显示。
         iconEl.textContent = skillIcon(def);
         nameEl.textContent = def.name;
         blurbEl.textContent = def.blurb;
