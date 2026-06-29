@@ -23,7 +23,7 @@ export class JuiceManager {
         fill: color,
         fontSize: 18,
         fontWeight: "800",
-        fontFamily: "Inter, sans-serif",
+        fontFamily: "'Noto Sans SC', Inter, sans-serif",
         stroke: { color: 0x101313, width: 3 }
       }
     });
@@ -103,7 +103,7 @@ export class JuiceManager {
         fill: angry ? 0xffdce0 : 0xeafff0,
         fontSize: angry ? 22 : 15,
         fontWeight: angry ? "900" : "700",
-        fontFamily: "Inter, sans-serif",
+        fontFamily: "'Noto Sans SC', Inter, sans-serif",
         align: "center",
         wordWrap: true,
         wordWrapWidth: 240,

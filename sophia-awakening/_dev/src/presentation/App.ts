@@ -69,8 +69,25 @@ const PHASE_OBJECTIVE: Record<string, string> = {
 let suppressSaveOnUnload = false;
 
 export async function bootstrapSophia(root: HTMLElement): Promise<void> {
+  // 等中文字体（思源黑体）就位再渲染，避免 Canvas 文本先用回退字体、加载后才跳字。
+  await preloadFonts();
   const app = new SophiaGameApp(root);
   await app.start();
+}
+
+async function preloadFonts(): Promise<void> {
+  try {
+    if (!document.fonts) {
+      return;
+    }
+    await Promise.all([
+      document.fonts.load("400 16px 'Noto Sans SC'"),
+      document.fonts.load("700 16px 'Noto Sans SC'")
+    ]);
+    await document.fonts.ready;
+  } catch {
+    // 字体加载失败不致命——回退到系统中文字体即可。
+  }
 }
 
 class SophiaGameApp {

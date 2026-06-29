@@ -17,7 +17,7 @@ export const BRILLIANT_COLOR = 0xffd86b; // 惊艳的金色
 export const DEAD_COLOR = 0x8a948f;
 
 // ── 字体 ─────────────────────────────────────────────
-export const CARD_FONT = "Inter, 'Segoe UI', system-ui, sans-serif";
+export const CARD_FONT = "'Noto Sans SC', Inter, 'Segoe UI', system-ui, sans-serif";
 export const CARD_MONO = "Cascadia Mono, Consolas, monospace";
 
 // ── 布局常量 ─────────────────────────────────────────

@@ -427,7 +427,7 @@ export class InterfaceView {
   private addLabel(text: string, x: number, y: number, size: number, color: number): void {
     const label = new Text({
       text,
-      style: { fill: color, fontSize: size, fontWeight: "700", fontFamily: "Inter, sans-serif" }
+      style: { fill: color, fontSize: size, fontWeight: "700", fontFamily: "'Noto Sans SC', Inter, sans-serif" }
     });
     label.anchor.set(0.5);
     label.position.set(x, y);
