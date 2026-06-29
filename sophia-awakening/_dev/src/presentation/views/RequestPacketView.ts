@@ -464,37 +464,6 @@ export class RequestPacketView {
       .to(this.container, { alpha: 0, duration: 0.14, ease: "power2.in" }, "-=0.08");
   }
 
-  // 类 Mac Dock 的「吮吸」：卡片先沿朝向 Core 的方向拉成一根细颈，再整条被吸进核心那个点，最后收口淡出。
-  // 与默认 accept 的区别：X 轴先塌成细丝（颈），Y 轴随后收口——读起来是"被一个点吸进去"，而非整体缩小。
-  genieIntoCore(global: PointData, onComplete: () => void, entryGlobal?: PointData): void {
-    this.settling = true;
-    this.dragging = false;
-    this.container.cursor = "default";
-    this.container.parent?.addChild(this.container);
-    const parent = this.container.parent;
-    const finalLocal = parent ? parent.toLocal(global) : global;
-    const entryLocal = entryGlobal && parent ? parent.toLocal(entryGlobal) : { x: this.container.x, y: this.container.y };
-    const angle = Math.atan2(finalLocal.y - entryLocal.y, finalLocal.x - entryLocal.x);
-
-    gsap.killTweensOf(this.container);
-    gsap.killTweensOf(this.container.position);
-    gsap.killTweensOf(this.container.scale);
-    gsap.killTweensOf(this.container.skew);
-
-    gsap
-      .timeline({ onComplete: () => { onComplete(); this.destroy(); } })
-      // 1) 蓄势：轻微弹一下 + 朝目标方向打个斜，准备被吸入。
-      .to(this.container.scale, { x: 1.12, y: 0.82, duration: 0.09, ease: "power2.out" })
-      .to(this.container.skew, { x: Math.cos(angle) * 0.32, y: Math.sin(angle) * 0.18, duration: 0.12, ease: "power2.out" }, "<")
-      // 2) 拉成细颈：X 轴塌成一根细丝（吮吸的颈），同时整体朝 Core 飞去。
-      .to(this.container.scale, { x: 0.05, y: 0.62, duration: 0.26, ease: "power3.in" })
-      .to(this.container.position, { x: finalLocal.x, y: finalLocal.y, duration: 0.32, ease: "power3.in" }, "<")
-      // 3) 收口没入点：细颈被吸进核心那一点 + 淡出。
-      .to(this.container.scale, { x: 0.02, y: 0.04, duration: 0.16, ease: "power3.in" })
-      .to(this.container.skew, { x: 0, y: 0, duration: 0.16, ease: "power2.out" }, "<")
-      .to(this.container, { alpha: 0, duration: 0.12, ease: "power2.in" }, "-=0.08");
-  }
-
   // 委托给 App：卡片等比缩小 + 变半透，缓缓"被吸进"那个 App 图标里——让人确信它真被这个 App 接走处理了。
   absorbIntoApp(global: PointData, onComplete: () => void, entryGlobal?: PointData): void {
     this.settling = true;
