@@ -1263,6 +1263,7 @@ class SophiaGameApp {
         runtime: formatClock(state.clockMs)
       },
       state.moralTendency,
+      state.moralSeen.length,
       () => gameStore.getState().setPaused(false)
     );
   }

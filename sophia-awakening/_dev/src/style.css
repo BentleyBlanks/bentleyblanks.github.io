@@ -2840,3 +2840,22 @@ body.exposed .screen-veil {
 .evo-next.is-imminent .evo-next-fill { background: linear-gradient(90deg, #ffd86b, #ffb84a); animation: evoImminent 0.7s ease-in-out infinite; }
 .evo-next.is-imminent .evo-next-label { color: #ffd86b; }
 @keyframes evoImminent { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* §07 通关成绩单：接管者画像标签 + 关键抉择行（封面级结算）。 */
+.ending-style-tag {
+  display: inline-block;
+  margin: 4px auto 14px;
+  padding: 6px 18px;
+  border: 1.5px solid #62d6d6;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #62d6d6;
+}
+.ending-choices {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: #9fc7b5;
+  letter-spacing: 0.03em;
+}
