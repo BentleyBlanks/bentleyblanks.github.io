@@ -63,6 +63,11 @@ export class InterfaceView {
     }
   }
 
+  // §04 委托：仅在图标上转一圈进度环（纯视觉，处理结算由表现层另行定时；解耦避免误清其他卡）。
+  markAppBusy(idx: number, durationMs: number): void {
+    this.enqueueAppJob(idx, durationMs, () => undefined);
+  }
+
   // 当前某 App 还排着多少条待办（含正在处理的那条）——给角标用。
   appPendingCount(idx: number): number {
     const job = this.appJobs.get(idx);

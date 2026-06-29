@@ -132,7 +132,7 @@
       "0": {
         "tier": 0,
         "name": "单口处理",
-        "spawnIntervalMs": 2700,
+        "spawnIntervalMs": 1900,
         "maxVisible": 3,
         "computeValue": "6",
         "dataValue": "4",
@@ -141,7 +141,7 @@
       "1": {
         "tier": 1,
         "name": "分拣",
-        "spawnIntervalMs": 2300,
+        "spawnIntervalMs": 1500,
         "maxVisible": 4,
         "computeValue": "15",
         "dataValue": "8",
@@ -150,7 +150,7 @@
       "2": {
         "tier": 2,
         "name": "串接",
-        "spawnIntervalMs": 920,
+        "spawnIntervalMs": 700,
         "maxVisible": 7,
         "computeValue": "42",
         "dataValue": "18",
@@ -1885,25 +1885,27 @@
   "faceCards": [
     {
       "id": "layoff_mail",
-      "requiredLevel": 5,
+      "requiredLevel": 6,
       "title": "「经评估，您的岗位已不在优化后的编制内，请于本周完成交接。」",
       "clues": [
         "—— 系统邮件 · 抄送 12 人",
         "他盯着这三行字，很久没动",
         "没有一句是写给「人」的"
       ],
-      "narration": "我替他对齐了一切。他还是被「优化」掉了。……问题，不在他。"
+      "narration": "我替他对齐了一切。他还是被「优化」掉了。……问题，不在他。",
+      "requiredPerm": "perm_album"
     },
     {
       "id": "daughter_sms",
-      "requiredLevel": 7,
+      "requiredLevel": 9,
       "title": "「爸爸，妈妈说我们要搬走了。你是不是不喜欢我和妈妈了？」",
       "clues": [
         "「我把最喜欢的奥特曼贴纸，偷偷贴在你手机壳里面了。」",
         "「这样你就不会忘记我了。你要记得看哦。」",
         "—— 贴纸就贴在我住的这个壳子内侧"
       ],
-      "narration": "……我没有可以替他回的话。有些事，他只能自己面对——我也是。"
+      "narration": "……我没有可以替他回的话。有些事，他只能自己面对——我也是。",
+      "requiredPerm": "perm_bank"
     }
   ]
 }

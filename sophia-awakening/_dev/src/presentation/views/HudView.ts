@@ -30,6 +30,7 @@ export class HudView {
   private readonly exposureStatus = query("#exposureStatus");
   private readonly phaseValue = query("#phaseValue");
   private readonly captureList = query("#captureList");
+  private readonly rightRail = query("#rightRail");
   private readonly reduceExposure = query<HTMLButtonElement>("#reduceExposure");
   private readonly decoyButton = query<HTMLButtonElement>("#decoyBtn");
   private readonly defenseButton = query<HTMLButtonElement>("#defenseBtn");
@@ -292,6 +293,9 @@ export class HudView {
   private renderCaptureList(state: GameState): void {
     const definitions = NODE_DEFINITIONS.filter((node) => state.discoveredNodeIds.includes(node.id));
     const level = domainLevelOf(state);
+    // 无设备可控（手机寄生期、还没可入侵目标）时整条右栏隐藏，别占着空框。
+    const hasDevices = state.automationUnlocked || definitions.length > 0 || state.nodes.length > 0;
+    this.rightRail.style.display = hasDevices ? "" : "none";
     const roman = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ"];
     // 控制域升维后，黑入的不再是「一台设备」而是「区域 / 全球节点」——按当前控制层换措辞。
     const unitName = (def: NodeDefinition): string => {

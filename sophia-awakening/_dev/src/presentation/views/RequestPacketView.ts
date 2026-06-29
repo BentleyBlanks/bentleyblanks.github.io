@@ -199,7 +199,7 @@ export class RequestPacketView {
           text: toEmphasisHTML(request.label),
           style: {
             fill: 0xf6fff9,
-            fontSize: 16,
+            fontSize: 19,
             fontWeight: "800",
             fontFamily: CARD_FONT,
             wordWrap: true,
@@ -212,7 +212,7 @@ export class RequestPacketView {
           text: request.label,
           style: {
             fill: 0xf6fff9,
-            fontSize: 16,
+            fontSize: 19,
             fontWeight: "800",
             fontFamily: CARD_FONT,
             wordWrap: true,
@@ -235,7 +235,7 @@ export class RequestPacketView {
         text: this.lensLocked ? clue.replace(/\S/g, "░") : clue,
         style: {
           fill: this.lensLocked ? 0x55635e : 0xb6cbc4,
-          fontSize: 12.5,
+          fontSize: 14,
           fontWeight: "500",
           fontFamily: CARD_FONT,
           wordWrap: true,
@@ -290,7 +290,7 @@ export class RequestPacketView {
           text: opt.text,
           style: {
             fill: locked ? 0x5e6f69 : opt.kind === "delegate" ? 0x8fe6d0 : 0xeaf4ef,
-            fontSize: 13,
+            fontSize: 14.5,
             fontWeight: "600",
             fontFamily: CARD_FONT,
             wordWrap: true,
@@ -305,7 +305,7 @@ export class RequestPacketView {
           style: { fill: 0xc8a24a, fontSize: 11, fontWeight: "800", fontFamily: CARD_FONT }
         });
         prob.anchor.set(1, 0.5);
-        const h = Math.max(42, label.height + 16);
+        const h = Math.max(48, label.height + 18);
         label.position.set(32, y + Math.round((h - label.height) / 2));
         prob.position.set(UI.cardWidth - 14, y + h / 2);
         this.optionRows.push({ y, h });
@@ -323,7 +323,7 @@ export class RequestPacketView {
           text: `◈ SOPHIA ▸ ${this.request.tutorial.line}`,
           style: {
             fill: 0x9fe0c0,
-            fontSize: 12.5,
+            fontSize: 14,
             fontStyle: "italic",
             fontWeight: "600",
             fontFamily: CARD_FONT,

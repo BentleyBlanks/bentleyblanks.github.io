@@ -2,7 +2,7 @@
 // Pixi 绘制的尺寸（卡片 / 手机图标 / 核心）在下一张卡 / 下一帧重绘时套用；CSS 尺寸（边栏 / 智力条）即时套用。
 export const UI = {
   cardWidth: 384, // 需求卡片宽
-  cardHeight: 162, // 需求卡片基础高（回复卡按内容重算）
+  cardHeight: 182, // 需求卡片基础高（回复卡按内容重算）
   phoneIcon: 62, // 手机内 App 图标方块边长
   phoneSpacing: 94, // 手机内图标间距
   coreRadius: 31, // SOPHIA CORE 半径

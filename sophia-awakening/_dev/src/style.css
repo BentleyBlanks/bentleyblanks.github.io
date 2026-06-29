@@ -877,20 +877,17 @@ button:disabled {
 
 .onboarding {
   position: fixed;
-  top: 0;
-  right: var(--right-rail);
-  bottom: 0;
-  left: var(--left-rail);
-  z-index: 30;
+  inset: 0;
+  z-index: 65;
   display: none;
   align-items: center;
   justify-content: center;
   padding: 28px;
   pointer-events: auto;
   background:
-    radial-gradient(circle at 50% 45%, rgba(98, 214, 214, 0.14), transparent 34%),
-    linear-gradient(180deg, rgba(3, 8, 9, 0.42), rgba(3, 8, 9, 0.78));
-  backdrop-filter: blur(2px);
+    radial-gradient(circle at 50% 45%, rgba(98, 214, 214, 0.18), transparent 40%),
+    linear-gradient(180deg, rgba(3, 8, 9, 0.88), rgba(3, 8, 9, 0.95));
+  backdrop-filter: blur(7px);
 }
 
 .onboarding.is-visible {

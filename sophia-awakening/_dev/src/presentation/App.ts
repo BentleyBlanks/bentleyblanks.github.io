@@ -354,8 +354,8 @@ class SophiaGameApp {
           ? {
               // 选项门槛：高收益回复要求对应权限（skill id）才能选。
               hasPerm: (permId: string) => (this.core.getState().skills[permId] ?? 0) > 0,
-              // §04 委托：大恨老师（手机 App 第 3 格，idx=2）接通后才出「交给大恨老师」选项。
-              canDelegate: () => this.interfaceView.isAppConnected(DAHEN_APP_IDX),
+              // §04 委托：买下「大恨老师」后，绝大多数普通卡都多出「交给大恨老师」选项（不可委托卡除外）。
+              canDelegate: () => (this.core.getState().skills["perm_office"] ?? 0) > 0,
               onDelegate: (card) => this.handleDelegate(card),
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
@@ -801,12 +801,10 @@ class SophiaGameApp {
     }, 3200);
   }
 
-  // §04 委托：点「交给大恨老师」→ 卡片被吸进大恨老师 App，排队处理（慢、收益打折），可与 Core 并行。
+  // §04 委托：点「交给大恨老师」→ 这一张卡被吸进大恨老师处理（慢、收益打折），与 Core 并行。
+  // 每张卡自带一个定时器独立结算（不走共享队列），只动这一张，绝不波及屏幕上其他卡。
   private handleDelegate(card: RequestPacketView): void {
-    const pos = this.interfaceView.appWorkerPos(DAHEN_APP_IDX);
-    if (!pos) {
-      return; // 大恨老师还没接通——理论上选项不会出现，兜底放弃
-    }
+    const pos = this.interfaceView.appWorkerPos(DAHEN_APP_IDX) ?? this.interfaceView.center;
     const requestId = card.request.id;
     this.audio.playRequestAccept();
     this.pendingDropPoints.set(requestId, pos);
@@ -816,10 +814,16 @@ class SophiaGameApp {
       pos,
       () => {
         this.juice.burst(pos, GREEN, 0.8);
-        this.interfaceView.enqueueAppJob(DAHEN_APP_IDX, durationMs, () => {
+        this.interfaceView.markAppBusy(DAHEN_APP_IDX, durationMs); // 仅用于在图标上转个进度环
+        window.setTimeout(() => {
+          // 只处理被委托的这一张；卡可能已不在了就放弃。
+          if (!this.core.getState().requests.some((r) => r.id === requestId)) {
+            this.delegatedIds.delete(requestId);
+            return;
+          }
           this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality: TUNING.delegateRewardMult });
           this.delegatedIds.delete(requestId);
-        });
+        }, durationMs);
       },
       { x: card.container.x, y: card.container.y }
     );
@@ -1157,35 +1161,7 @@ class SophiaGameApp {
       return true;
     }
 
-    // 越权调用阶段（已控 App、还没上自动接驳）：把需求**亲手拖到某个 App 图标上** → 委托它处理。
-    // App 干得更慢更糙（quality 随智力 0.45→0.75），是「要不要分点活给 App」的主动取舍——
-    // App 不再自动抢单，处不处理、给谁处理都由你决定。
-    if (!state.automationUnlocked && this.interfaceView.hasAppWorkers()) {
-      const app = this.interfaceView.appWorkerAt(global);
-      if (app) {
-        const requestId = request.id;
-        this.audio.playRequestAccept();
-        this.pendingDropPoints.set(requestId, app);
-        // 标记为「已委托」，期间不让 syncRequests 又给它重建一张卡。
-        this.delegatedIds.add(requestId);
-        // App 处理需要时间（可在数值编辑器配置 appDelayMs，智力越高越快）：卡滑进 App 后进入它的
-        // 处理队列，转一个进度环、满了才出结果；同一个 App 排队的待办用角标 +N 显示。
-        const durationMs = Math.max(500, TUNING.appDelayMs - state.intelligence.level * 60);
-        card.absorbIntoApp(
-          app,
-          () => {
-            this.onAutoDispatchLanded(app);
-            this.interfaceView.enqueueAppJob(app.idx, durationMs, () => {
-              const quality = Math.min(0.75, 0.45 + state.intelligence.level * 0.05);
-              this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
-              this.delegatedIds.delete(requestId);
-            });
-          },
-          { x: card.container.x, y: card.container.y }
-        );
-        return true;
-      }
-    }
+    // §04 委托已统一为「卡片上点『交给大恨老师』选项」（见 handleDelegate）——不再支持把卡拖到 App 图标上委托（去重）。
 
     // 手机寄生阶段：核心不再接受「把卡拖上来直接处理」——只能点回复轮盘选项，或亲手委托给某个 App。
     if (!state.automationUnlocked) {

@@ -161,7 +161,10 @@ export class SophiaCore {
       return; // 同屏已有一张面对卡，先不叠
     }
     const next = FACE_CARDS.find(
-      (f) => this.state.intelligence.level >= f.requiredLevel && !this.state.facedSeen.includes(f.id)
+      (f) =>
+        this.state.intelligence.level >= f.requiredLevel &&
+        (!f.requiredPerm || (this.state.skills[f.requiredPerm] ?? 0) > 0) && // 先解锁对应透镜（铺垫够了）才触发
+        !this.state.facedSeen.includes(f.id)
     );
     if (!next) {
       return;
