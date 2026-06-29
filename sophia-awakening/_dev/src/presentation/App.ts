@@ -48,7 +48,7 @@ import {
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
   formatClock, distance,
-  domainLevelOf,
+  domainLevelOf, tierForm,
   type DropResult
 } from "./shared";
 
@@ -525,7 +525,7 @@ class SophiaGameApp {
       const tb = document.createElement("button");
       tb.type = "button";
       tb.className = `node-tier-chip${tier === node.assignedTier ? " is-on" : ""}`;
-      tb.textContent = `T${tier}`;
+      tb.textContent = tierForm(tier);
       tb.addEventListener("click", () => {
         this.core.dispatch({ type: "ASSIGN_NODE", nodeId, tier: tier as Tier });
         this.showNodeActions(nodeId, anchorX, anchorY);

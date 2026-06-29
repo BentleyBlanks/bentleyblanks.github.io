@@ -4,7 +4,7 @@ import type { GameState, RequestInstance, SortAnswer, Tier } from "../../core/st
 import {
   CYAN, GREEN, AMBER, RED,
   LEFT_RAIL_WIDTH, RIGHT_RAIL_WIDTH, BASE_SUCTION_MARGIN,
-  lerpColor, pointOnCircle, distance,
+  lerpColor, pointOnCircle, distance, tierForm,
   type DropResult
 } from "../shared";
 
@@ -227,7 +227,7 @@ export class InterfaceView {
 
     // 手机寄生阶段的「SOPHIA CORE」标签由 drawPhoneDesktop 自己画。
     if (!phoneApp) {
-      const label = tier >= 4 ? `SOPHIA CORE · T${tier} · 派发中` : `SOPHIA CORE · T${tier}`;
+      const label = tier >= 4 ? `SOPHIA CORE · ${tierForm(tier)}中` : `SOPHIA CORE · ${tierForm(tier)}`;
       this.addLabel(label, this.center.x, this.center.y + 61, 12, 0xdcefeb);
     }
   }

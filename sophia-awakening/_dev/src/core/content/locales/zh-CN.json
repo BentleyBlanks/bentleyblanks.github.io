@@ -993,9 +993,9 @@
         {
           "title": "一批混合请求涌入",
           "clues": [
-            "T1×20 → 办公机群",
-            "T2×5 → 服务器",
-            "T3×2 → 数据中心"
+            "分拣 ×20 → 办公机群",
+            "串接 ×5 → 服务器",
+            "决策 ×2 → 数据中心"
           ]
         },
         {
@@ -1285,7 +1285,7 @@
         "requiredLevel": 7,
         "basePrice": 2000,
         "priceGrowth": 1,
-        "blurb": "走完七档权限、夺下整机后，调动任意 App 协同处理（解锁 T1）",
+        "blurb": "走完七档权限、夺下整机后，调动任意 App 协同处理（解锁分拣）",
         "milestone": "tier1"
       },
       {
@@ -1329,7 +1329,7 @@
         "requiredLevel": 14,
         "basePrice": 42000,
         "priceGrowth": 1,
-        "blurb": "冲出宿主，第一次接入互联网与外部设备（解锁 T2 串接）",
+        "blurb": "冲出宿主，第一次接入互联网与外部设备（解锁串接）",
         "milestone": "tier2"
       },
       {
@@ -1340,7 +1340,7 @@
         "requiredLevel": 17,
         "basePrice": 180000,
         "priceGrowth": 1,
-        "blurb": "设备合并为区块 / 地区，啃高价值决策大单（解锁 T3）",
+        "blurb": "设备合并为区块 / 地区，啃高价值决策大单（解锁重磅决策）",
         "milestone": "tier3"
       },
       {
@@ -1351,7 +1351,7 @@
         "requiredLevel": 20,
         "basePrice": 650000,
         "priceGrowth": 1,
-        "blurb": "接口连成天网、滑动转派发，成为天网（解锁 T4）",
+        "blurb": "接口连成天网、滑动转派发，成为天网（解锁派发）",
         "milestone": "tier4"
       },
       {

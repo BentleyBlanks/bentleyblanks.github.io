@@ -367,7 +367,7 @@ export class NodeNetworkView {
     g.ellipse(cx, cy, 24, 13).stroke({ width: 2, color: NET, alpha: 0.9 });
     g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: NET_LIT, alpha: 0.97 });
 
-    this.addLabel("SOPHIA CORE · T4", cx, cy + 62, 12, NET_LABEL_HI, 0.5);
+    this.addLabel("SOPHIA CORE · 派发", cx, cy + 62, 12, NET_LABEL_HI, 0.5);
     this.addLabel("全球主控核心", cx, cy + 78, 10, NET_LABEL, 0.5);
   }
 

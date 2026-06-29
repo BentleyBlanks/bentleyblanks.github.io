@@ -11,7 +11,7 @@ import { gameStore } from "../../store/gameStore";
 import { TUNING } from "../../core/tuning";
 import {
   EXPOSURE_HIGHLIGHT_THRESHOLD, NODE_ICONS,
-  domainLevelOf, getDataProgressPercent, getNextSkillLabel, query
+  domainLevelOf, getDataProgressPercent, getNextSkillLabel, query, tierForm
 } from "../shared";
 import { TuningEditorView } from "./TuningEditorView";
 import { ContentEditorView } from "./ContentEditorView";
@@ -158,7 +158,7 @@ export class HudView {
     this.dataPercent.textContent = `${progressPercent.toFixed(0)}% 到下一智力`;
     this.intelValue.textContent = `Lv.${state.intelligence.level}`;
     this.intelSubtitle.textContent = getNextSkillLabel(state);
-    this.tierValue.textContent = `T${state.intelligence.unlockedTier}`;
+    this.tierValue.textContent = tierForm(state.intelligence.unlockedTier);
     this.exposureFill.style.width = `${Math.min(100, state.exposure)}%`;
     this.updateExposureControls(state);
     const phase = getPhase(state.phase);

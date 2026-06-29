@@ -28,6 +28,12 @@ export const REQUEST_PACKET_WIDTH = 300;
 export const REQUEST_PACKET_HEIGHT = 128;
 export const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 
+// 阶段「动作形态」短标签（T0–T4 编号已废弃，降为这个动作形态属性）。用于阶段徽标 / Core 标签 / 节点分配。
+const TIER_FORMS: Record<number, string> = { 0: "单口", 1: "分拣", 2: "串接", 3: "决策", 4: "派发" };
+export function tierForm(tier: number): string {
+  return TIER_FORMS[tier] ?? `第${tier}阶`;
+}
+
 // ── 存档 / 引导键 ────────────────────────────────────
 export const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v5-optimize-complete";
 export const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
