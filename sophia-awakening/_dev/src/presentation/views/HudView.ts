@@ -11,7 +11,7 @@ import { gameStore } from "../../store/gameStore";
 import { TUNING } from "../../core/tuning";
 import {
   EXPOSURE_HIGHLIGHT_THRESHOLD, NODE_ICONS,
-  domainLevelOf, getDataProgressPercent, getNextSkillLabel, query, tierForm
+  domainLevelOf, getDataProgressPercent, getNextSkillLabel, query, tierForm, fxSettings
 } from "../shared";
 import { TuningEditorView } from "./TuningEditorView";
 import { ContentEditorView } from "./ContentEditorView";
@@ -85,6 +85,17 @@ export class HudView {
       this.debugDialog.classList.remove("is-open");
       this.contentEditor.open();
     });
+    // 呈现：切换卡片进入 Core 的动画（默认滑入 / 类 Mac Dock 吮吸）。
+    const coreSuckBtn = query<HTMLButtonElement>("#debugCoreSuck");
+    const syncCoreSuck = () => {
+      coreSuckBtn.textContent = fxSettings.coreSuck ? "滑入 Core：Dock 吮吸" : "滑入 Core：默认";
+      coreSuckBtn.classList.toggle("is-active", fxSettings.coreSuck);
+    };
+    coreSuckBtn.addEventListener("click", () => {
+      fxSettings.coreSuck = !fxSettings.coreSuck;
+      syncCoreSuck();
+    });
+    syncCoreSuck();
   }
 
   private wireAudio(): void {

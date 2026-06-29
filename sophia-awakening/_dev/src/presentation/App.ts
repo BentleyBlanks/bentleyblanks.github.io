@@ -49,7 +49,7 @@ import {
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
   formatClock, distance,
-  domainLevelOf, tierForm,
+  domainLevelOf, tierForm, fxSettings,
   type DropResult
 } from "./shared";
 
@@ -792,7 +792,8 @@ class SophiaGameApp {
 
     const entry: PointData = { x: card.container.x, y: card.container.y };
     this.audio.playRequestAccept();
-    card.accept(
+    this.flyIntoCore(
+      card,
       target,
       () => {
         this.core.dispatch({
@@ -805,6 +806,15 @@ class SophiaGameApp {
       },
       entry
     );
+  }
+
+  // 卡片飞入 Core 的动画：默认滑入；调试面板开启「Dock 吮吸」后改用被吸入的吮吸动画。
+  private flyIntoCore(card: RequestPacketView, target: PointData, onComplete: () => void, entry?: PointData): void {
+    if (fxSettings.coreSuck) {
+      card.genieIntoCore(target, onComplete, entry);
+    } else {
+      card.accept(target, onComplete, entry);
+    }
   }
 
   // T3 重磅豪赌结算：跳过=安静放下；豪赌命中=大额算力飞入核心；未命中=红色碎裂 + 暴露骤升。
@@ -824,7 +834,8 @@ class SophiaGameApp {
     if (outcome.hit) {
       const entry: PointData = { x: card.container.x, y: card.container.y };
       this.pendingDropPoints.set(requestId, target);
-      card.accept(
+      this.flyIntoCore(
+        card,
         target,
         () => {
           this.core.dispatch({ type: "RESOLVE_GAMBLE", requestId, win: true });
@@ -855,7 +866,8 @@ class SophiaGameApp {
     this.pendingDropPoints.set(requestId, target);
     const entry: PointData = { x: card.container.x, y: card.container.y };
     this.audio.playRequestAccept();
-    card.accept(
+    this.flyIntoCore(
+      card,
       target,
       () => {
         this.core.dispatch({
@@ -1008,7 +1020,8 @@ class SophiaGameApp {
       }
       this.audio.playRequestAccept();
       this.pendingDropPoints.set(request.id, hit.targetGlobal);
-      card.accept(
+      this.flyIntoCore(
+        card,
         hit.targetGlobal,
         () => this.core.dispatch({ type: "DEVOUR_DETONATE", requestId: request.id }),
         hit.entryGlobal
@@ -1024,7 +1037,8 @@ class SophiaGameApp {
       }
       this.audio.playRequestAccept();
       this.pendingDropPoints.set(request.id, hit.targetGlobal);
-      card.accept(
+      this.flyIntoCore(
+        card,
         hit.targetGlobal,
         () => this.core.dispatch({ type: "FIGHT_PURGE", requestId: request.id }),
         hit.entryGlobal
@@ -1078,7 +1092,8 @@ class SophiaGameApp {
 
     this.audio.playRequestAccept();
     this.pendingDropPoints.set(request.id, drop.targetGlobal);
-    card.accept(
+    this.flyIntoCore(
+      card,
       drop.targetGlobal,
       () => {
         this.core.dispatch({
