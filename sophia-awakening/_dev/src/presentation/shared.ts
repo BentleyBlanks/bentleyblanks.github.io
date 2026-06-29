@@ -76,6 +76,28 @@ export function effectiveHitChance(opt: AnswerOption, confidence: number): numbe
   return opt.hitChance; // risk 固定
 }
 
+// §03 前期信息显示分层 · 模糊档位：把真实命中率折成「体感档位」文案，不显示精确百分比。
+// 更乐观的档位随智力等级解锁——开局满屏「有点悬」，后期才逐渐出现「较稳 / 很稳」。
+// barFrac = 对应档位画进度条用的「粗粒度」宽度（不暴露精确概率）。阈值/解锁等级可调。
+export interface ConfidenceTierInfo {
+  label: string;
+  barFrac: number;
+}
+const CONFIDENCE_TIERS: { minFrac: number; minLevel: number; label: string; barFrac: number }[] = [
+  { minFrac: 0.70, minLevel: 8, label: "很稳", barFrac: 0.92 },
+  { minFrac: 0.55, minLevel: 5, label: "较稳", barFrac: 0.74 },
+  { minFrac: 0.40, minLevel: 3, label: "搏一把", barFrac: 0.55 },
+  { minFrac: 0.0, minLevel: 0, label: "有点悬", barFrac: 0.34 }
+];
+export function confidenceTier(frac: number, intelLevel: number): ConfidenceTierInfo {
+  for (const t of CONFIDENCE_TIERS) {
+    if (frac >= t.minFrac && intelLevel >= t.minLevel) {
+      return { label: t.label, barFrac: t.barFrac };
+    }
+  }
+  return { label: "有点悬", barFrac: 0.34 };
+}
+
 // 回复选项背后的「概率进度条」配色：概率越高越绿，越低越红，中间黄→橙。
 export function probColor(frac: number): number {
   if (frac >= 0.7) return 0x6bff8a; // 高 → 绿

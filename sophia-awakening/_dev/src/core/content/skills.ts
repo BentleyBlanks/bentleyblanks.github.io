@@ -54,7 +54,6 @@ export const SKILLS: SkillDef[] = [
   { id: "efficient", name: "强化处理", category: "output", maxLevel: 10, requiredLevel: 1, basePrice: 28, priceGrowth: 1.82, blurb: "更狠——每次滑入产出大幅提升（主力增益线）" },
   { id: "cooldown", name: "请求涌入", category: "speed", maxLevel: 6, requiredLevel: 1, basePrice: 80, priceGrowth: 1.85, blurb: "更快——请求出现得更密，喂饱你的手速" },
   { id: "batch", name: "批量接入", category: "speed", maxLevel: 4, requiredLevel: 5, basePrice: 600, priceGrowth: 2.0, blurb: "更广——一次滑入多带走 1 张同类请求" },
-  { id: "crit", name: "暴击", category: "output", maxLevel: 6, requiredLevel: 7, basePrice: 900, priceGrowth: 2.0, blurb: "赌性——N% 概率单次产出 ×5" },
 
   // 里程碑 · AI 进化叙事链（策划案 §06）：寄生手机 → 走完七档权限·越权调用（解锁 T1）→
   // 窃取凭证（道德越界）→ 拿下宿主电脑（自动接驳）→ 唤醒并融合同机 AI → 联网冲出去（T2）→
@@ -117,8 +116,6 @@ export interface DerivedSkills {
   dataMult: number; // 数据榨取
   accuracyBonus: number; // 幻觉抑制（降低生成错误回答的概率，0-0.35）
   accuracyBaseline: number; // 回复轮盘高置信正确率的折算系数（六档权限抬升，0.56→1.0）
-  critChance: number; // 暴击处理
-  critMult: number; // 暴击强化
   comboCoeff: number; // 连击增幅
   suctionBonus: number; // 磁吸接口（额外吸附半径，像素）
   comboKeep: number; // 连击护持（判错时保留的连击比例 0-0.8）
@@ -146,9 +143,6 @@ export function computeDerivedSkills(skills: Record<string, number>, revokedPerm
     // 每多买一档权限 +0.08，买齐六档（电话→聊天→外卖→相册→办公→银行）拉满到 1.0
     // （高置信项显示 ~90%+），对应策划案 §06「正确率从 40% 爬到 93%」的七档曲线。
     accuracyBaseline: Math.min(1, 0.52 + ownedPerms * 0.08),
-    critChance: Math.min(0.6, lv("crit") * 0.05),
-    // 暴击强化下放——暴击倍率固定 ×5（策划案数值）。
-    critMult: 5,
     // 连击增幅下放——给一条固定的连击系数。
     comboCoeff: 0.05,
     // 磁吸 / 护持下放为游戏自带基础手感（不再占技能位）。

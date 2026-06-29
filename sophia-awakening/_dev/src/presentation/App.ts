@@ -340,6 +340,7 @@ class SophiaGameApp {
                 return d.accuracyBaseline + d.accuracyBonus;
               },
               accuracyLevel: () => this.core.getState().skills["accuracy"] ?? 0,
+              intelLevel: () => this.core.getState().intelligence.level,
               brilliantChance: () => {
                 const st = this.core.getState();
                 // 智力等级是主驱动（「我变聪明了」＝更常被嘉奖），幻觉抑制再加成；封顶 45%。

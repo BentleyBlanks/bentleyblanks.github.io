@@ -718,13 +718,6 @@ export class SophiaCore {
       gainQuality *= 1 + Math.min(this.state.combo.count, 16) * this.state.derived.comboCoeff;
     }
 
-    // 暴击：由「暴击处理」技能开启，倍率由「暴击强化」提升。
-    const critical = quality >= 0.95 && this.state.derived.critChance > 0 && this.random() < this.state.derived.critChance;
-
-    if (critical) {
-      gainQuality *= this.state.derived.critMult;
-    }
-
     let computeGain = toDecimal(
       requestComputeGain(request, gainQuality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
     );
@@ -792,7 +785,6 @@ export class SophiaCore {
       quality,
       targetNodeId,
       comboCount: this.state.combo.count,
-      critical,
       exposureGain: this.state.exposure - exposureBefore
     });
 
