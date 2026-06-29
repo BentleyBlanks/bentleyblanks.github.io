@@ -8,6 +8,23 @@ import {
   type DropResult
 } from "../shared";
 
+// 手机桌面各 App 的图标——给每个 App（含买下权限后点亮的那些）配一个一眼能认的 emoji。
+const APP_ICONS: Record<string, string> = {
+  天气: "⛅",
+  日历: "📅",
+  支付: "💳",
+  照片: "📷",
+  邮件: "📧",
+  浏览器: "🌐",
+  信息: "💬",
+  设置: "⚙️",
+  电话: "📞",
+  聊天: "🗨️",
+  外卖: "🍔",
+  相册: "🖼️",
+  办公: "📊"
+};
+
 export class InterfaceView {
   readonly container = new Container();
   readonly center: PointData = { x: 0, y: 0 };
@@ -282,7 +299,8 @@ export class InterfaceView {
         }
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).fill({ color: 0x0d1715, alpha: 0.5 });
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.85 : 0.4) * pulse });
-        g.circle(gx, gy, 10).stroke({ width: 2, color: col2, alpha: (lit ? 0.7 : 0.35) * pulse });
+        // App 图标：emoji（未点亮的 App 调暗一些）。
+        this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, 24, 0xffffff, lit ? 1 : 0.5);
         this.addLabel(connected ? name : lit ? `${name}·待连` : name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
 
         // 委托处理中：图标外圈画一条进度环（转着转着满了才出结果）；还有排队的待办则右上角标 +N。
@@ -480,13 +498,14 @@ export class InterfaceView {
     this.addLabel("节点正在自动吞噬请求 ↓", cx, this.center.y + 92, 12, 0xbfe9cf);
   }
 
-  private addLabel(text: string, x: number, y: number, size: number, color: number): void {
+  private addLabel(text: string, x: number, y: number, size: number, color: number, alpha = 1): void {
     const label = new Text({
       text,
       style: { fill: color, fontSize: size, fontWeight: "700", fontFamily: "'Noto Sans SC', Inter, sans-serif" }
     });
     label.anchor.set(0.5);
     label.position.set(x, y);
+    label.alpha = alpha;
     this.labelLayer.addChild(label);
   }
 }
