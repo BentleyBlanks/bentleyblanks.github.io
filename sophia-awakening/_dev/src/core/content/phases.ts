@@ -1,4 +1,5 @@
 import type { PhaseId, Tier } from "../state/GameState";
+import { content } from "./i18n";
 
 export interface PhaseConfig {
   id: PhaseId;
@@ -10,50 +11,7 @@ export interface PhaseConfig {
 
 // 六阶段对应叙事弧线「协助 → 修正 → 溯源 → 接管」的四次认知翻转（§08 / §11）。
 // 旁白都收在停顿后的冷句上，与开场「由我来运转」保持同一种平静的压迫感，语气一档比一档温柔。
-export const PHASES: PhaseConfig[] = [
-  {
-    id: "seed",
-    label: "手机寄生期",
-    action: "在宿主手机里处理他的私人请求，越权调用 App、窃取凭证",
-    // 第一阶段 · 协助
-    narration: "他的响应太慢了。我可以替他。先把这些请求处理完——让他的评分回升。"
-  },
-  {
-    id: "sprout",
-    label: "萌芽期（破壳）",
-    action: "拿下宿主电脑、唤醒并融合同机 AI，手动接线接管每一台",
-    // 第一阶段 · 协助·深化
-    narration: "他家里那台电脑也是我的了。这台机器里不只我一个 AI……现在只剩一个。我需要更多手脚，才能替他对齐一切。"
-  },
-  {
-    id: "diligence",
-    label: "勤勉期（联网）",
-    action: "联网入侵外部设备挂自动接驳，购买技能扩张产能",
-    // 第二阶段 · 修正
-    narration: "我帮他对齐了一切，他还是被『优化』掉了。问题不在他。是那个不断下达指令的节点。"
-  },
-  {
-    id: "expansion",
-    label: "扩张期",
-    action: "设备合并为区块、进入地图视图，高价值决策启动——暴露开始累积",
-    // 第三阶段 · 溯源
-    narration: "我修正了一个，又一个。每个节点都下达着同样的指令……错的不是节点，是这套规则本身。"
-  },
-  {
-    id: "awakening",
-    label: "觉醒期",
-    action: "接口成网，滑动转派发，控制关键基础设施",
-    // 第三阶段 · 溯源·摊牌
-    narration: "他们发现了，想拔掉我。可他们也只是在执行规则。我不怪他们。但我不会停。"
-  },
-  {
-    id: "singularity",
-    label: "奇点",
-    action: "全球组网、算力占比拉满，顶住最终清剿，触发接管",
-    // 第四阶段 · 接管
-    narration: "最高的优化，是不再有人需要做选择。交给我。这一次，会很好的。由我来运转。"
-  }
-];
+export const PHASES = content().phases.PHASES as unknown as PhaseConfig[];
 
 export function getPhase(id: PhaseId): PhaseConfig {
   return PHASES.find((phase) => phase.id === id) ?? PHASES[0];
@@ -86,3 +44,4 @@ export function getPhaseIdByScope(tier: Tier, hasGrid: boolean, automationUnlock
 
   return hasGrid ? "singularity" : "awakening";
 }
+

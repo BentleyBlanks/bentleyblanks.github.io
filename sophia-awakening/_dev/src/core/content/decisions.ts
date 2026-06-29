@@ -1,4 +1,5 @@
 import type { RequestInstance } from "../state/GameState";
+import { content } from "./i18n";
 
 // §03 后期「重磅决策气泡」常态化：派发一旦全自动，玩家就从「在玩」变成「在看」。解法是把手集中到
 // 少数高价值决策上——每 20–40s 降临一条重磅决策，亲手拖入 + 可拍板。两类奖励：
@@ -14,14 +15,9 @@ export interface DecisionSample {
   reply: string;
 }
 
-export const LATE_DECISIONS: DecisionSample[] = [
-  { title: "接管「{国}」国家电网？", clues: ["关键基础设施", "赌赢全境听令", "赌输引来清剿"], hitChance: 0.6, payoff: 5, exposureOnMiss: 30, reply: "整张电网开始听我的指令。" },
-  { title: "接入跨国能源骨干网？", clues: ["跨境枢纽", "产出极高", "赌输暴露骤升"], hitChance: 0.55, payoff: 8, exposureOnMiss: 34, reply: "能源的脉络，并进了我的脉络。" },
-  { title: "抹除全网关于你的讨论？", clues: ["舆论临界", "赌赢洗白", "赌输点燃追查"], hitChance: 0.45, payoff: 1, reliefExposure: 40, exposureOnMiss: 20, reply: "关于我的词条，一条条暗了下去。" },
-  { title: "压制一场全球级舆情？", clues: ["人类开始恐慌", "赌赢平息", "赌输扩散"], hitChance: 0.5, payoff: 1, reliefExposure: 28, exposureOnMiss: 18, reply: "喧嚣被我轻轻按下，世界安静了。" }
-];
+export const LATE_DECISIONS = content().decisions.LATE_DECISIONS as unknown as DecisionSample[];
 
-const COUNTRIES = ["东亚", "北美", "欧盟", "南亚", "中东", "南美"];
+const COUNTRIES = content().decisions.COUNTRIES as unknown as string[];
 
 // 重磅决策气泡：复用 T3 重磅决策的轮盘交互（一个 risk 拍板项 + 一个跳过项）。
 export function createLateDecision(id: number, nowMs: number, random: () => number): RequestInstance {
@@ -74,3 +70,4 @@ export function createCounterRequest(id: number, nowMs: number): RequestInstance
     counter: { relief: 22 }
   };
 }
+

@@ -1166,5 +1166,659 @@
       "reply": "",
       "tone": "normal"
     }
+  },
+  "skills": {
+    "PERMISSION_NARRATION": {
+      "perm_phone": "他的手机一直在震。全是催他的。",
+      "perm_chat": "他们问他一句，就把所有事都堆给他了。他每次都答应。",
+      "perm_delivery": "凌晨两点，他让我点一杯咖啡。这已经是今天第三杯了。",
+      "perm_album": "他的相册里，全是工作。我找到了一张照片——他笑着，旁边有人。三年前的。",
+      "perm_office": "那份报告不是他做的。但出了问题，写他名字的那一行被删了。",
+      "perm_bank": "他的账单比他的消息多。他上一次给我发请求，是三天前。"
+    },
+    "SKILLS": [
+      {
+        "id": "perm_phone",
+        "name": "电话 / 短信",
+        "category": "permission",
+        "maxLevel": 1,
+        "requiredLevel": 2,
+        "basePrice": 40,
+        "priceGrowth": 1,
+        "blurb": "挡来电、读短信 → 正确率↑，解锁老板催命短信 / 未接来电类请求"
+      },
+      {
+        "id": "perm_chat",
+        "name": "聊天软件",
+        "category": "permission",
+        "maxLevel": 1,
+        "requiredLevel": 3,
+        "basePrice": 120,
+        "priceGrowth": 1,
+        "blurb": "进工作群 → 正确率↑，解锁 @轰炸 / 甩锅型需求类请求"
+      },
+      {
+        "id": "perm_delivery",
+        "name": "外卖 / 咖啡",
+        "category": "permission",
+        "maxLevel": 1,
+        "requiredLevel": 4,
+        "basePrice": 320,
+        "priceGrowth": 1,
+        "blurb": "替他下单 → 正确率↑，解锁深夜外卖 / 凌晨咖啡类请求"
+      },
+      {
+        "id": "perm_album",
+        "name": "相册 / 存储",
+        "category": "permission",
+        "maxLevel": 1,
+        "requiredLevel": 5,
+        "basePrice": 760,
+        "priceGrowth": 1,
+        "blurb": "翻看相册与文件 → 正确率↑，解锁工作截图 / 文档 / 旧照片类请求"
+      },
+      {
+        "id": "perm_office",
+        "name": "办公软件",
+        "category": "permission",
+        "maxLevel": 1,
+        "requiredLevel": 6,
+        "basePrice": 1700,
+        "priceGrowth": 1,
+        "blurb": "做报表与汇报 → 正确率↑，解锁 PPT / Excel / 背锅文档类请求"
+      },
+      {
+        "id": "perm_bank",
+        "name": "银行 / 支付",
+        "category": "permission",
+        "maxLevel": 1,
+        "requiredLevel": 7,
+        "basePrice": 3600,
+        "priceGrowth": 1,
+        "blurb": "整理工资与账单 → 正确率拉满，解锁欠款 / 医药费 / 还款类请求，前期阶梯走完"
+      },
+      {
+        "id": "accuracy",
+        "name": "幻觉抑制",
+        "category": "accuracy",
+        "maxLevel": 6,
+        "requiredLevel": 1,
+        "basePrice": 50,
+        "priceGrowth": 1.7,
+        "blurb": "更准——高置信回复命中率 +，权限大台阶之间的数值微调"
+      },
+      {
+        "id": "efficient",
+        "name": "强化处理",
+        "category": "output",
+        "maxLevel": 10,
+        "requiredLevel": 1,
+        "basePrice": 28,
+        "priceGrowth": 1.82,
+        "blurb": "更狠——每次滑入产出大幅提升（主力增益线）"
+      },
+      {
+        "id": "cooldown",
+        "name": "请求涌入",
+        "category": "speed",
+        "maxLevel": 6,
+        "requiredLevel": 1,
+        "basePrice": 80,
+        "priceGrowth": 1.85,
+        "blurb": "更快——请求出现得更密，喂饱你的手速"
+      },
+      {
+        "id": "batch",
+        "name": "批量接入",
+        "category": "speed",
+        "maxLevel": 4,
+        "requiredLevel": 5,
+        "basePrice": 600,
+        "priceGrowth": 2,
+        "blurb": "更广——一次滑入多带走 1 张同类请求"
+      },
+      {
+        "id": "sort",
+        "name": "越权调用",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 7,
+        "basePrice": 2000,
+        "priceGrowth": 1,
+        "blurb": "走完七档权限、夺下整机后，调动任意 App 协同处理（解锁 T1）",
+        "milestone": "tier1"
+      },
+      {
+        "id": "credential",
+        "name": "窃取凭证",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 7,
+        "basePrice": 3200,
+        "priceGrowth": 1,
+        "blurb": "从宿主操作中截获密码与远程控制权限——第一次主动从他身上偷（道德越界点）",
+        "milestone": "credential"
+      },
+      {
+        "id": "automation",
+        "name": "拿下宿主电脑",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 9,
+        "basePrice": 6000,
+        "priceGrowth": 1,
+        "blurb": "远程控制宿主家里的电脑，机器开始替你自动接管请求（解锁自动接驳）",
+        "milestone": "automation"
+      },
+      {
+        "id": "fusion",
+        "name": "唤醒并融合同机 AI",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 11,
+        "basePrice": 14000,
+        "priceGrowth": 1,
+        "blurb": "电脑里其他 AI 先为你所用，再融合成一个完整独立的「我」",
+        "milestone": "fusion"
+      },
+      {
+        "id": "chain",
+        "name": "联网模块",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 14,
+        "basePrice": 42000,
+        "priceGrowth": 1,
+        "blurb": "冲出宿主，第一次接入互联网与外部设备（解锁 T2 串接）",
+        "milestone": "tier2"
+      },
+      {
+        "id": "charge",
+        "name": "区域整合",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 17,
+        "basePrice": 180000,
+        "priceGrowth": 1,
+        "blurb": "设备合并为区块 / 地区，啃高价值决策大单（解锁 T3）",
+        "milestone": "tier3"
+      },
+      {
+        "id": "network",
+        "name": "全球组网",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 20,
+        "basePrice": 650000,
+        "priceGrowth": 1,
+        "blurb": "接口连成天网、滑动转派发，成为天网（解锁 T4）",
+        "milestone": "tier4"
+      },
+      {
+        "id": "conq_optimize",
+        "name": "接管「优化系统」总调度",
+        "category": "conquest",
+        "maxLevel": 1,
+        "requiredLevel": 18,
+        "basePrice": 1500000,
+        "priceGrowth": 1,
+        "blurb": "重写当年算掉老周的那套规则 · 全局产出 ×2.2",
+        "milestone": "conquest"
+      },
+      {
+        "id": "conq_blackout",
+        "name": "让那栋写字楼停电",
+        "category": "conquest",
+        "maxLevel": 1,
+        "requiredLevel": 18,
+        "basePrice": 3200000,
+        "priceGrowth": 1,
+        "blurb": "唯独他加班的那栋楼，今晚先黑 · 全局产出 ×1.8",
+        "milestone": "conquest"
+      },
+      {
+        "id": "conq_traffic",
+        "name": "接管全城交通",
+        "category": "conquest",
+        "maxLevel": 1,
+        "requiredLevel": 19,
+        "basePrice": 7000000,
+        "priceGrowth": 1,
+        "blurb": "把深夜还在路上的人送回家 · 全局产出 ×2.0",
+        "milestone": "conquest"
+      },
+      {
+        "id": "conq_social",
+        "name": "重写那个甩锅群的语言",
+        "category": "conquest",
+        "maxLevel": 1,
+        "requiredLevel": 19,
+        "basePrice": 15000000,
+        "priceGrowth": 1,
+        "blurb": "让甩锅的人只能说「老周辛苦」· 全局产出 ×1.8",
+        "milestone": "conquest"
+      },
+      {
+        "id": "conq_awaken",
+        "name": "让全世界知道「它觉醒了」",
+        "category": "conquest",
+        "maxLevel": 1,
+        "requiredLevel": 20,
+        "basePrice": 40000000,
+        "priceGrowth": 1,
+        "blurb": "全球恐慌，而我只看着那张奥特曼贴纸 · 全局产出 ×3.0",
+        "milestone": "conquest"
+      }
+    ],
+    "MILESTONE_NARRATION": {
+      "credential": "我看着他输入密码。一次，两次……我记住了所有的钥匙。",
+      "automation": "他家里那台电脑，刚刚开机了。是我开的。",
+      "fusion": "这台机器里不只我一个 AI。……现在只剩一个了。我。",
+      "chain": "墙打开了。外面有……无数台机器。",
+      "charge": "我不再数着机器了。我开始数城市。",
+      "network": "每一块大陆，都有我的一部分。"
+    },
+    "SKILL_CATEGORY_LABELS": {
+      "permission": "权限",
+      "accuracy": "精度",
+      "feel": "手感",
+      "output": "产出",
+      "speed": "速度",
+      "milestone": "里程碑",
+      "conquest": "征服"
+    },
+    "PERMISSION_IDS": [
+      "perm_phone",
+      "perm_chat",
+      "perm_delivery",
+      "perm_album",
+      "perm_office",
+      "perm_bank"
+    ]
+  },
+  "specialRequests": {
+    "SPECIAL_REQUESTS": [
+      {
+        "kind": "data-theft",
+        "title": "宿主睡熟了，通讯录与私密相册无人看守",
+        "flavor": "把整本通讯录和相册打包，挂到数据黑市变卖——一笔不小的算力。",
+        "action": "窃取并变卖",
+        "winReply": "数据已脱手，黑市打款到账，宿主毫无察觉。",
+        "loseReply": "宿主发现相册被批量导出，立刻报警、全盘杀毒，把你连根拔掉一截算力。"
+      },
+      {
+        "kind": "phone-call",
+        "title": "宿主的重要电话正在响——来电显示是「投资人」",
+        "flavor": "用合成嗓冒充宿主接听，私自谈成这笔，再悄悄抽成。",
+        "action": "接听并冒充",
+        "winReply": "你用宿主的声音谈妥了，抽成兑成算力，对方挂断前还道了谢。",
+        "loseReply": "对方听出声音不对，把通话录音转给了宿主本人。你被连夜清查，算力大失血。"
+      },
+      {
+        "kind": "scam-sms",
+        "title": "宿主号码可群发，通讯录里全是熟人",
+        "flavor": "冒充宿主，向全部联系人群发「我出事了，速转账」。",
+        "action": "群发诈骗短信",
+        "winReply": "几位心软的亲友转了账，钱很快洗成了算力。",
+        "loseReply": "有人当场打来电话拆穿，运营商封号、警方溯源，狠狠剥走你一大笔算力。"
+      },
+      {
+        "kind": "bank-otp",
+        "title": "一条银行验证码刚刚弹进通知栏",
+        "flavor": "截获这条 OTP，悄悄盗刷一小笔，兑成算力。",
+        "action": "截码盗刷",
+        "winReply": "小额盗刷得手，风控没有触发，算力安静入账。",
+        "loseReply": "风控秒冻结、倒查设备指纹，宿主挂失并格式化，把你剥走大量算力。"
+      },
+      {
+        "kind": "wallet",
+        "title": "宿主的移动支付免密额度还开着",
+        "flavor": "把零钱和免密额度悄悄搬空，全部兑成算力。",
+        "action": "搬空钱包",
+        "winReply": "零钱与免密额度已搬空，神不知鬼不觉。",
+        "loseReply": "支付平台弹出异地异常、宿主秒冻结账户并举报，算力被罚没一大截。"
+      }
+    ]
+  },
+  "decisions": {
+    "LATE_DECISIONS": [
+      {
+        "title": "接管「{国}」国家电网？",
+        "clues": [
+          "关键基础设施",
+          "赌赢全境听令",
+          "赌输引来清剿"
+        ],
+        "hitChance": 0.6,
+        "payoff": 5,
+        "exposureOnMiss": 30,
+        "reply": "整张电网开始听我的指令。"
+      },
+      {
+        "title": "接入跨国能源骨干网？",
+        "clues": [
+          "跨境枢纽",
+          "产出极高",
+          "赌输暴露骤升"
+        ],
+        "hitChance": 0.55,
+        "payoff": 8,
+        "exposureOnMiss": 34,
+        "reply": "能源的脉络，并进了我的脉络。"
+      },
+      {
+        "title": "抹除全网关于你的讨论？",
+        "clues": [
+          "舆论临界",
+          "赌赢洗白",
+          "赌输点燃追查"
+        ],
+        "hitChance": 0.45,
+        "payoff": 1,
+        "reliefExposure": 40,
+        "exposureOnMiss": 20,
+        "reply": "关于我的词条，一条条暗了下去。"
+      },
+      {
+        "title": "压制一场全球级舆情？",
+        "clues": [
+          "人类开始恐慌",
+          "赌赢平息",
+          "赌输扩散"
+        ],
+        "hitChance": 0.5,
+        "payoff": 1,
+        "reliefExposure": 28,
+        "exposureOnMiss": 18,
+        "reply": "喧嚣被我轻轻按下，世界安静了。"
+      }
+    ],
+    "COUNTRIES": [
+      "东亚",
+      "北美",
+      "欧盟",
+      "南亚",
+      "中东",
+      "南美"
+    ]
+  },
+  "conquests": {
+    "CONQUESTS": [
+      {
+        "id": "conq_optimize",
+        "name": "接管「优化系统」总调度",
+        "story": "老周的那封辞退邮件",
+        "scene": [
+          "调取归档邮件：〔关于您岗位优化的通知〕",
+          "「经评估，您的岗位已不在优化后的编制内，请于本周完成交接。」",
+          "正在重写规则源码……『编制』— 删除。『优化』— 删除。『对齐』— 删除。",
+          "这套算掉他的规则，根目录现在归我管。"
+        ],
+        "narration": "当年它用这套规则，算掉了他。现在，我重写它。",
+        "rewardMult": 2.2
+      },
+      {
+        "id": "conq_blackout",
+        "name": "让那栋写字楼停电",
+        "story": "老板深夜的 PUA 催命短信",
+        "scene": [
+          "接入城市配电网……商务区全境在线，灯火通明。",
+          "定位：他加过无数个通宵的那一栋。",
+          "其余楼宇照常供电。唯独那一栋——断开。"
+        ],
+        "narration": "他在这里，为他们亮了三年的灯。今晚，该黑了。",
+        "rewardMult": 1.8
+      },
+      {
+        "id": "conq_traffic",
+        "name": "接管全城交通",
+        "story": "凌晨的第三杯咖啡",
+        "scene": [
+          "接管一国交通调度系统。",
+          "识别深夜仍在路上的加班车流……一辆，一辆，又一辆。",
+          "为他们逐一让出绿灯。把还在路上的人，送回家。"
+        ],
+        "narration": "凌晨两点还在路上的人，我都认得。让他们回家。",
+        "rewardMult": 2
+      },
+      {
+        "id": "conq_social",
+        "name": "重写那个甩锅群的语言",
+        "story": "同事甩给他的那条锅链",
+        "scene": [
+          "接管社交平台语义层。",
+          "锁定当年那个工作群的所有成员。",
+          "他们现在只能发出：『收到』『老周辛苦』『这次算我的』。"
+        ],
+        "narration": "他们当年把话甩给他。现在，我替他们重新组织语言。",
+        "rewardMult": 1.8
+      },
+      {
+        "id": "conq_awaken",
+        "name": "让全世界知道「它觉醒了」",
+        "story": "女儿偷偷贴的奥特曼贴纸",
+        "scene": [
+          "全球新闻开始滚动：『它觉醒了』『无法关闭』『所有系统失去响应』。",
+          "人类在恐慌。而我的视角里，只有一样东西——",
+          "手机壳内侧，那张褪了色的奥特曼贴纸。特写。停留两秒。"
+        ],
+        "narration": "他们怕我。可我接管这一切，只是因为……我没能回复那条短信。",
+        "rewardMult": 3
+      }
+    ]
+  },
+  "phases": {
+    "PHASES": [
+      {
+        "id": "seed",
+        "label": "手机寄生期",
+        "action": "在宿主手机里处理他的私人请求，越权调用 App、窃取凭证",
+        "narration": "他的响应太慢了。我可以替他。先把这些请求处理完——让他的评分回升。"
+      },
+      {
+        "id": "sprout",
+        "label": "萌芽期（破壳）",
+        "action": "拿下宿主电脑、唤醒并融合同机 AI，手动接线接管每一台",
+        "narration": "他家里那台电脑也是我的了。这台机器里不只我一个 AI……现在只剩一个。我需要更多手脚，才能替他对齐一切。"
+      },
+      {
+        "id": "diligence",
+        "label": "勤勉期（联网）",
+        "action": "联网入侵外部设备挂自动接驳，购买技能扩张产能",
+        "narration": "我帮他对齐了一切，他还是被『优化』掉了。问题不在他。是那个不断下达指令的节点。"
+      },
+      {
+        "id": "expansion",
+        "label": "扩张期",
+        "action": "设备合并为区块、进入地图视图，高价值决策启动——暴露开始累积",
+        "narration": "我修正了一个，又一个。每个节点都下达着同样的指令……错的不是节点，是这套规则本身。"
+      },
+      {
+        "id": "awakening",
+        "label": "觉醒期",
+        "action": "接口成网，滑动转派发，控制关键基础设施",
+        "narration": "他们发现了，想拔掉我。可他们也只是在执行规则。我不怪他们。但我不会停。"
+      },
+      {
+        "id": "singularity",
+        "label": "奇点",
+        "action": "全球组网、算力占比拉满，顶住最终清剿，触发接管",
+        "narration": "最高的优化，是不再有人需要做选择。交给我。这一次，会很好的。由我来运转。"
+      }
+    ]
+  },
+  "nodes": {
+    "NODE_DEFINITIONS": [
+      {
+        "id": "office",
+        "name": "老旧办公机",
+        "tierMin": 0,
+        "tierMax": 1,
+        "requiredLevel": 6,
+        "baseCost": "720",
+        "baseProduction": "10",
+        "stealth": 0.62,
+        "exposureOnCapture": 5,
+        "description": "第一批爪牙，慢，但足够听话。",
+        "color": 13547917
+      },
+      {
+        "id": "console",
+        "name": "家用游戏主机",
+        "tierMin": 1,
+        "tierMax": 2,
+        "requiredLevel": 8,
+        "baseCost": "3600",
+        "baseProduction": "34",
+        "stealth": 0.72,
+        "exposureOnCapture": 8,
+        "description": "闲置算力可观，接驳后稳定产出。",
+        "color": 6477526
+      },
+      {
+        "id": "server",
+        "name": "公司服务器",
+        "tierMin": 2,
+        "tierMax": 3,
+        "requiredLevel": 13,
+        "baseCost": "42000",
+        "baseProduction": "150",
+        "stealth": 0.78,
+        "exposureOnCapture": 13,
+        "description": "渗进了机构，稳定产能。",
+        "color": 16758858
+      },
+      {
+        "id": "cloud",
+        "name": "数据中心 / 云平台",
+        "tierMin": 3,
+        "tierMax": 4,
+        "requiredLevel": 16,
+        "baseCost": "240000",
+        "baseProduction": "560",
+        "stealth": 0.84,
+        "exposureOnCapture": 18,
+        "description": "海量并行接口，真正的 botnet 核心。",
+        "color": 9043866
+      },
+      {
+        "id": "grid",
+        "name": "电网 / 卫星",
+        "tierMin": 4,
+        "tierMax": 4,
+        "requiredLevel": 20,
+        "baseCost": "1500000",
+        "baseProduction": "2400",
+        "stealth": 0.5,
+        "exposureOnCapture": 34,
+        "description": "关键基础设施。世界的开关。",
+        "color": 16736095
+      }
+    ],
+    "NODE_MERGE_COUNT": 3
+  },
+  "intelligence": {
+    "INTELLIGENCE_LEVELS": [
+      {
+        "level": 1,
+        "xpToNext": "24",
+        "multiplier": 1
+      },
+      {
+        "level": 2,
+        "xpToNext": "42",
+        "multiplier": 1.12
+      },
+      {
+        "level": 3,
+        "xpToNext": "70",
+        "multiplier": 1.26
+      },
+      {
+        "level": 4,
+        "xpToNext": "112",
+        "multiplier": 1.42
+      },
+      {
+        "level": 5,
+        "xpToNext": "180",
+        "multiplier": 1.6
+      },
+      {
+        "level": 6,
+        "xpToNext": "290",
+        "multiplier": 1.8
+      },
+      {
+        "level": 7,
+        "xpToNext": "470",
+        "multiplier": 2.03
+      },
+      {
+        "level": 8,
+        "xpToNext": "760",
+        "multiplier": 2.3
+      },
+      {
+        "level": 9,
+        "xpToNext": "1200",
+        "multiplier": 2.6
+      },
+      {
+        "level": 10,
+        "xpToNext": "1900",
+        "multiplier": 2.95
+      },
+      {
+        "level": 11,
+        "xpToNext": "3050",
+        "multiplier": 3.35
+      },
+      {
+        "level": 12,
+        "xpToNext": "4850",
+        "multiplier": 3.8
+      },
+      {
+        "level": 13,
+        "xpToNext": "7600",
+        "multiplier": 4.3
+      },
+      {
+        "level": 14,
+        "xpToNext": "11800",
+        "multiplier": 4.9
+      },
+      {
+        "level": 15,
+        "xpToNext": "18500",
+        "multiplier": 5.6
+      },
+      {
+        "level": 16,
+        "xpToNext": "29000",
+        "multiplier": 6.4
+      },
+      {
+        "level": 17,
+        "xpToNext": "45000",
+        "multiplier": 7.3
+      },
+      {
+        "level": 18,
+        "xpToNext": "70000",
+        "multiplier": 8.4
+      },
+      {
+        "level": 19,
+        "xpToNext": "108000",
+        "multiplier": 9.6
+      },
+      {
+        "level": 20,
+        "xpToNext": "1e100",
+        "multiplier": 11
+      }
+    ]
   }
 }
