@@ -2829,10 +2829,8 @@ body.exposed .screen-veil {
   font-family: "Noto Sans SC", Inter, sans-serif;
 }
 .evo-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.evo-scale { margin-bottom: 2px; }
 .evo-label { font-size: 11px; color: #7fae9e; }
 .evo-value { font-size: 14px; font-weight: 800; color: #dcefeb; }
-.evo-scale .evo-value { font-size: 17px; color: #9fe0d0; }
 .evo-next { margin-top: 8px; }
 .evo-next-label { display: block; font-size: 11px; color: #cdeede; margin-bottom: 4px; }
 .evo-next-track { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
