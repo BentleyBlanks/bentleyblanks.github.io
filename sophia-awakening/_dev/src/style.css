@@ -2797,50 +2797,24 @@ body.exposed .screen-veil {
   80%  { opacity: 1; transform: translateX(0) scale(1); }
   100% { opacity: 0; transform: translateX(40px) scale(1.02); }
 }
+/* 大横幅：横跨整屏的进化达成条带（边缘渐隐、中段实色、醒目大字）。 */
 .milestone-banner-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 20px 56px;
-  border-top: 1px solid rgba(137, 255, 154, 0.5);
-  border-bottom: 1px solid rgba(137, 255, 154, 0.5);
-  background: linear-gradient(90deg, rgba(8,16,14,0) 0%, rgba(10,24,18,0.96) 18%, rgba(10,24,18,0.96) 82%, rgba(8,16,14,0) 100%);
-  box-shadow: 0 0 60px rgba(137, 255, 154, 0.2);
+  gap: 6px;
+  width: 100%;
+  padding: 42px 56px;
+  border-top: 2px solid rgba(137, 255, 154, 0.6);
+  border-bottom: 2px solid rgba(137, 255, 154, 0.6);
+  background: linear-gradient(90deg, rgba(8,16,14,0) 0%, rgba(10,26,19,0.97) 22%, rgba(10,26,19,0.97) 78%, rgba(8,16,14,0) 100%);
+  box-shadow: 0 0 80px rgba(137, 255, 154, 0.22);
 }
-.milestone-banner-kicker { font-size: 13px; font-weight: 800; letter-spacing: 0.2em; color: #89ff9a; }
-.milestone-banner-name { font-size: 34px; font-weight: 900; color: #f3fbf6; text-shadow: 0 0 24px rgba(137,255,154,0.5); }
-.milestone-banner-sub { font-size: 13px; color: #9fc7b5; letter-spacing: 0.16em; }
+.milestone-banner-kicker { font-size: 15px; font-weight: 800; letter-spacing: 0.24em; color: #89ff9a; }
+.milestone-banner-name { font-size: 56px; font-weight: 900; color: #f3fbf6; text-shadow: 0 0 30px rgba(137,255,154,0.55); }
+.milestone-banner-sub { font-size: 15px; color: #9fc7b5; letter-spacing: 0.18em; }
 
-/* §07 进化度大屏：横跨整条底部的状态横幅（进化阶段 + 下一目标预告进度条）。 */
-.evolution-hud {
-  position: fixed;
-  z-index: 12;
-  left: calc(var(--left-rail) + 16px);
-  right: calc(var(--right-rail) + 16px);
-  bottom: 14px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 9px 20px;
-  border: 1px solid rgba(98, 214, 214, 0.26);
-  border-radius: 10px;
-  background: rgba(8, 15, 16, 0.85);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
-  pointer-events: none;
-  font-family: "Noto Sans SC", Inter, sans-serif;
-}
-.evo-stage { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
-.evo-stage-tag { font-size: 11px; letter-spacing: 0.14em; color: #7fae9e; }
-.evo-stage .evo-value { font-size: 15px; font-weight: 800; color: #9fe0d0; white-space: nowrap; }
-.evo-next { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 14px; }
-.evo-next-label { flex: 0 0 auto; font-size: 12px; color: #cdeede; white-space: nowrap; }
-.evo-next-track { flex: 1 1 auto; height: 8px; border-radius: 5px; background: rgba(255,255,255,0.08); overflow: hidden; }
-.evo-next-fill { height: 100%; width: 0%; border-radius: 5px; background: linear-gradient(90deg, #62d6d6, #89ff9a); transition: width 300ms ease; }
-.evo-next.is-imminent .evo-next-fill { background: linear-gradient(90deg, #ffd86b, #ffb84a); animation: evoImminent 0.7s ease-in-out infinite; }
-.evo-next.is-imminent .evo-next-label { color: #ffd86b; }
-@keyframes evoImminent { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
 
 /* §07 通关成绩单：接管者画像标签 + 关键抉择行（封面级结算）。 */
 .ending-style-tag {

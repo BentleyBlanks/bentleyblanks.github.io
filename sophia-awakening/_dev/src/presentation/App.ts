@@ -28,7 +28,6 @@ import { PurgeAlertView } from "./views/PurgeAlertView";
 import { ChallengeView } from "./views/ChallengeView";
 import { SpecialRequestView } from "./views/SpecialRequestView";
 import { MoralChoiceView } from "./views/MoralChoiceView";
-import { EvolutionHudView } from "./views/EvolutionHudView";
 import { MilestoneBannerView } from "./views/MilestoneBannerView";
 import { DispatchBanner } from "./views/DispatchBanner";
 import { EndingView } from "./views/EndingView";
@@ -125,7 +124,6 @@ class SophiaGameApp {
   private readonly challengeView = new ChallengeView(this.core);
   private readonly specialView = new SpecialRequestView(this.core);
   private readonly moralView = new MoralChoiceView(this.core);
-  private readonly evolutionHud = new EvolutionHudView();
   private readonly milestoneBanner = new MilestoneBannerView();
   private readonly stageNarration = new StageNarrationView();
   private readonly ending = new EndingView(() => this.restart());
@@ -307,7 +305,6 @@ class SophiaGameApp {
     this.challengeView.update(state);
     this.specialView.update(state);
     this.moralView.update(state);
-    this.evolutionHud.update(state);
     this.stageNarration.update(deltaMs);
     this.ending.update(deltaMs);
     this.juice.update(deltaMs);
