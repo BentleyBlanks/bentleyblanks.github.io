@@ -51,7 +51,7 @@ export const TUNING = {
   accuracyMax:          0.12,     // 幻觉抑制总加成上限
   efficientPerLevel:    0.18,     // 强化处理每级产出加成
   boldEvBonus:          1.3,      // 大胆回答的期望收益相对高置信的倍数（>1 → 低概率高收益更划算）
-  appDelayMs:           1800,     // 委托 App 处理时，App 比 Core 多花的时间 (ms)
+  appDelayMs:           3600,     // 委托 App 处理时，App 比 Core 多花的时间 (ms)——初期故意慢一倍，体感"它真在处理"
 };
 
 export type TuningKey = keyof typeof TUNING;

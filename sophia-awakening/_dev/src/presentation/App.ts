@@ -1046,7 +1046,7 @@ class SophiaGameApp {
         // App 处理需要时间（可在数值编辑器配置 appDelayMs，智力越高越快）：卡滑进 App 后进入它的
         // 处理队列，转一个进度环、满了才出结果；同一个 App 排队的待办用角标 +N 显示。
         const durationMs = Math.max(500, TUNING.appDelayMs - state.intelligence.level * 60);
-        card.accept(
+        card.absorbIntoApp(
           app,
           () => {
             this.onAutoDispatchLanded(app);

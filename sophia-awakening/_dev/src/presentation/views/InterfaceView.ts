@@ -263,8 +263,8 @@ export class InterfaceView {
     const apps = ["天气", "日历", "支付", "照片", "邮件", "浏览器", "信息", "设置"];
     // 点亮的 App 用权限名（买了「电话」就亮一个「电话」），其余宫格保留原桌面图标。
     const permApps = ["电话", "聊天", "外卖", "相册", "办公", "支付"];
-    const spacing = 80; // 随手机收窄
-    const iconS = 48;
+    const spacing = 84; // 随手机收窄（图标放大后稍微拉开间距）
+    const iconS = 54;
     let appIdx = 0;
     for (let row = 0; row < 3; row += 1) {
       for (let col = 0; col < 3; col += 1) {
@@ -300,7 +300,7 @@ export class InterfaceView {
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).fill({ color: 0x0d1715, alpha: 0.5 });
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.85 : 0.4) * pulse });
         // App 图标：emoji（未点亮的 App 调暗一些）。
-        this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, 24, 0xffffff, lit ? 1 : 0.5);
+        this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, 27, 0xffffff, lit ? 1 : 0.5);
         this.addLabel(connected ? name : lit ? `${name}·待连` : name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
 
         // 委托处理中：图标外圈画一条进度环（转着转着满了才出结果）；还有排队的待办则右上角标 +N。
@@ -309,7 +309,8 @@ export class InterfaceView {
           const pr = iconS / 2 + 6;
           g.circle(gx, gy, pr).stroke({ width: 3, color: 0x2a3b36, alpha: 0.6 });
           const end = -Math.PI / 2 + Math.min(1, job.active.progress) * Math.PI * 2;
-          g.arc(gx, gy, pr, -Math.PI / 2, end).stroke({ width: 3, color: GREEN, alpha: 0.95 });
+          // moveTo 到弧的起点（12 点方向），否则 Pixi 会从上一条路径的终点画一条直线连到弧首，看着像"连到 00 点"。
+          g.moveTo(gx, gy - pr).arc(gx, gy, pr, -Math.PI / 2, end).stroke({ width: 3, color: GREEN, alpha: 0.95 });
           const waiting = job.queue.length;
           if (waiting > 0) {
             const bx = gx + iconS / 2 - 2;
@@ -323,7 +324,7 @@ export class InterfaceView {
     }
 
     // ---- 中心格：SOPHIA CORE（圆角芯片 + 同心环 + 眼）——尺寸与周围 App 图标一致，不再夸张占中。
-    const baseR = 24;
+    const baseR = 27;
     g.circle(cx, cy, baseR + 10 + Math.sin(this.pulse * 2) * 2).stroke({ width: 1.5, color: accent, alpha: 0.3 });
     g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).fill({ color: 0x06140e, alpha: 0.96 });
     g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).stroke({ width: 2.5, color: accent, alpha: 0.9 });

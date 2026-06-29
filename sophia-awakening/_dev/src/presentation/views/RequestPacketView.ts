@@ -77,6 +77,10 @@ export class RequestPacketView {
   private homeY = 0;
   private offsetX = 0;
   private offsetY = 0;
+  // 拖动判定：按下点 + 是否真的移动过（区分"点击"与"拖动"，纯点击不放大）。
+  private dragStartX = 0;
+  private dragStartY = 0;
+  private dragMoved = false;
   // 回复轮盘（仅 T0/T1 有候选回复时）。
   private cardH: number;
   private readonly isReel: boolean;
@@ -460,6 +464,29 @@ export class RequestPacketView {
       .to(this.container, { alpha: 0, duration: 0.14, ease: "power2.in" }, "-=0.08");
   }
 
+  // 委托给 App：卡片等比缩小 + 变半透，缓缓"被吸进"那个 App 图标里——让人确信它真被这个 App 接走处理了。
+  absorbIntoApp(global: PointData, onComplete: () => void, entryGlobal?: PointData): void {
+    this.settling = true;
+    this.dragging = false;
+    this.container.cursor = "default";
+    this.container.parent?.addChild(this.container);
+    const parent = this.container.parent;
+    const finalLocal = parent ? parent.toLocal(global) : global;
+    void entryGlobal;
+
+    gsap.killTweensOf(this.container);
+    gsap.killTweensOf(this.container.position);
+    gsap.killTweensOf(this.container.scale);
+    gsap.killTweensOf(this.container.skew);
+
+    gsap
+      .timeline({ onComplete: () => { onComplete(); this.destroy(); } })
+      .to(this.container.position, { x: finalLocal.x, y: finalLocal.y, duration: 0.34, ease: "power2.inOut" })
+      .to(this.container.scale, { x: 0.26, y: 0.26, duration: 0.34, ease: "power2.in" }, "<") // 等比变小
+      .to(this.container, { alpha: 0.4, duration: 0.22, ease: "power1.out" }, "<")            // 半透（被处理中）
+      .to(this.container, { alpha: 0, duration: 0.14, ease: "power1.in" });                   // 收尾没入图标
+  }
+
   // Fast, flashy auto-fly used by 自动派发: the card stretches
   // into a streak and rockets into the target device.
   flyToNode(global: PointData, onComplete: () => void): void {
@@ -537,11 +564,14 @@ export class RequestPacketView {
 
     const local = parent.toLocal(event.global);
     this.dragging = true;
+    this.dragMoved = false;
+    this.dragStartX = event.global.x;
+    this.dragStartY = event.global.y;
     this.container.cursor = "grabbing";
     this.offsetX = local.x - this.container.x;
     this.offsetY = local.y - this.container.y;
     this.container.parent?.addChild(this.container);
-    gsap.to(this.container.scale, { x: 1.06, y: 1.06, duration: 0.1 });
+    // 不在按下时就放大——只有真正拖动（移动超过阈值）才放大，避免「点一下卡片就放大且不缩回」。
   }
 
   // 选定一个回复：装死直接安静跳过；否则进入「思考」节拍，结束后掷骰揭晓。
@@ -629,6 +659,17 @@ export class RequestPacketView {
       return;
     }
 
+    // 移动超过阈值才算"真的在拖"——此刻才放大，纯点击（抖动 < 5px）不会放大。
+    if (!this.dragMoved) {
+      const dx = event.global.x - this.dragStartX;
+      const dy = event.global.y - this.dragStartY;
+      if (dx * dx + dy * dy < 25) {
+        return;
+      }
+      this.dragMoved = true;
+      gsap.to(this.container.scale, { x: 1.06, y: 1.06, duration: 0.1 });
+    }
+
     const local = parent.toLocal(event.global);
     this.container.position.set(local.x - this.offsetX, local.y - this.offsetY);
   }
@@ -640,6 +681,10 @@ export class RequestPacketView {
 
     this.dragging = false;
     this.container.cursor = "grab";
+    // 纯点击（没有真正拖动）：什么也不做，更不留下放大状态。
+    if (!this.dragMoved) {
+      return;
+    }
     const accepted = this.onDrop(this, event.global);
 
     if (!accepted) {

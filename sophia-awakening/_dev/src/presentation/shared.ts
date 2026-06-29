@@ -24,8 +24,8 @@ export const CARD_MONO = "Cascadia Mono, Consolas, monospace";
 export const LEFT_RAIL_WIDTH = 234;
 export const RIGHT_RAIL_WIDTH = 290;
 export const BASE_SUCTION_MARGIN = 50;
-export const REQUEST_PACKET_WIDTH = 300;
-export const REQUEST_PACKET_HEIGHT = 128;
+export const REQUEST_PACKET_WIDTH = 336;
+export const REQUEST_PACKET_HEIGHT = 144;
 export const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 
 // 阶段「动作形态」短标签（T0–T4 编号已废弃，降为这个动作形态属性）。用于阶段徽标 / Core 标签 / 节点分配。

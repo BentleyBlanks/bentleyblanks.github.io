@@ -157,15 +157,35 @@ export class SkillShopView {
     if (this.evoHead) {
       this.evoHead.textContent = `当前阶段 · ${getPhase(state.phase).label}`;
     }
+    // 当前阶段里「已解锁/可买」露真名；后续未达等级的仍蒙版成 🔒未解锁，只放一个「即将解锁」当目标——不提前剧透名字。
+    const stageEvo = SKILLS
+      .filter((s) => shopGroupOf(s.category) === "evolution" && evoPhaseOf(s) === stageKey)
+      .sort((a, b) => a.requiredLevel - b.requiredLevel);
+    const nextLockedEvo = stageEvo.find((s) => level < s.requiredLevel && (state.skills[s.id] ?? 0) === 0);
 
     for (const { button, iconEl, nameEl, blurbEl, levelEl, priceEl, def } of this.rows.values()) {
       const owned = state.skills[def.id] ?? 0;
       const isEvo = shopGroupOf(def.category) === "evolution";
 
       if (isEvo) {
-        // 不属于当前阶段的进化项直接隐藏；本阶段的所有智力档都露出（含尚未达到等级的，显示「需智力 Lv.X」）。
+        // 不属于当前阶段的进化项直接隐藏。
         if (evoPhaseOf(def) !== stageKey) {
           button.style.display = "none";
+          continue;
+        }
+        const reachedEvo = level >= def.requiredLevel;
+        if (!reachedEvo && owned === 0 && def !== nextLockedEvo) {
+          // 蒙版：只剩锁图标 + 「未解锁」，藏名字 / 右侧清空。
+          button.style.display = "";
+          groupShown.set("evolution", true);
+          iconEl.textContent = "🔒";
+          nameEl.textContent = "未解锁";
+          blurbEl.textContent = "达成上一项后揭晓。";
+          levelEl.textContent = "";
+          priceEl.textContent = "";
+          button.disabled = true;
+          button.classList.add("is-locked");
+          button.classList.remove("is-ready", "is-owned", "is-poor");
           continue;
         }
         iconEl.textContent = skillIcon(def);
