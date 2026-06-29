@@ -31,7 +31,7 @@
   --red: #ff5f5f;
   --paper: #e8e1cb;
   --ink: #151718;
-  --left-rail: 246px;
+  --left-rail: 286px;
   --right-rail: 305px;
 }
 
@@ -305,6 +305,10 @@ canvas {
   min-height: 0;
   padding-bottom: 0;
   border-bottom: 0;
+}
+
+.control-panel .stat-ring-block {
+  display: none;
 }
 
 /* 成功率圆环：并入左栏底部，去掉自己的框，只用一条分隔线和上面的货架隔开。 */
@@ -730,10 +734,10 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
+  border: 1px solid rgba(137, 255, 154, 0.24);
+  border-radius: 10px;
+  background: rgba(6, 12, 10, 0.72);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.36), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
   pointer-events: auto;
   color: #c4ffc9;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
@@ -816,7 +820,7 @@ button:disabled {
 
 /* 展开态：历史回复就地向上弹出一个浮窗，不挤压布局、不挡视野；点外面收起。 */
 .terminal.is-expanded {
-  position: relative;
+  position: fixed;
   overflow: visible;
   z-index: 56;
 }

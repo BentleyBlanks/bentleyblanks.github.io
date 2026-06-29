@@ -7,7 +7,7 @@ export const UI = {
   phoneSpacing: 94, // 手机内图标间距
   coreRadius: 31, // SOPHIA CORE 半径
   appEmoji: 31, // App 图标 emoji 字号
-  leftRail: 246, // 左侧栏宽 (px)
+  leftRail: 286, // 左侧栏宽 (px)
   rightRail: 305, // 右侧栏宽 (px)
   intelBarHeight: 34 // 顶栏智力等级进度条高 (px)
 };
@@ -21,7 +21,7 @@ export const UI_META: Record<UIKey, { label: string; min: number; max: number; s
   phoneSpacing: { label: "手机 App · 间距", min: 70, max: 120, step: 2 },
   coreRadius: { label: "SOPHIA CORE · 半径", min: 20, max: 48, step: 1 },
   appEmoji: { label: "App emoji · 字号", min: 20, max: 44, step: 1 },
-  leftRail: { label: "左侧栏 · 宽", min: 180, max: 340, step: 4 },
+  leftRail: { label: "左侧栏 · 宽", min: 220, max: 380, step: 4 },
   rightRail: { label: "右侧栏 · 宽", min: 220, max: 400, step: 4 },
   intelBarHeight: { label: "智力等级条 · 高", min: 22, max: 56, step: 2 }
 };

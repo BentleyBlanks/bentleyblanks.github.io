@@ -132,6 +132,12 @@ export class InterfaceView {
     this.container.addChild(this.graphics, this.labelLayer);
   }
 
+  private phoneShellSize(): { w: number; h: number } {
+    const iconSpan = UI.phoneSpacing * 2 + UI.phoneIcon;
+    const w = Math.max(322, iconSpan + 70);
+    return { w, h: Math.max(600, Math.round(w * 1.88)) };
+  }
+
   update(state: GameState, width: number, height: number, deltaMs: number): void {
     this.pulse += deltaMs * 0.004;
     const playfieldLeft = LEFT_RAIL_WIDTH;
@@ -140,7 +146,13 @@ export class InterfaceView {
     this.center.x = (playfieldLeft + playfieldRight) * 0.5;
     // 顶栏占了上方约 110px：竖向居中，但保证手机/核心（半高 270）不钻到顶栏底下，
     // 同时别让底部超出画面。矮窗口下贴着顶栏往下排，高窗口下仍是正中。
-    this.center.y = Math.min(Math.max(height * 0.5, 396), height - 286);
+    if (!state.automationUnlocked) {
+      const phoneShell = this.phoneShellSize();
+      const phoneHalfH = phoneShell.h / 2;
+      this.center.y = Math.min(Math.max(height * 0.5, phoneHalfH + 72), height - phoneHalfH - 16);
+    } else {
+      this.center.y = Math.min(Math.max(height * 0.5, 396), height - 286);
+    }
     // Magnet skill visibly grows the suction ring (immediate visual feedback).
     this.suctionMargin = Math.min(140, BASE_SUCTION_MARGIN + state.derived.suctionBonus);
     this.level = state.intelligence.level;
@@ -258,8 +270,7 @@ export class InterfaceView {
     this.pendingApps = [];
 
     // ---- 手机外框 + 状态栏（再窄 20%）----
-    const fw = 266;
-    const fh = 540;
+    const { w: fw, h: fh } = this.phoneShellSize();
     const fx = cx - fw / 2;
     const fy = cy - fh / 2;
     g.roundRect(fx - 4, fy - 4, fw + 8, fh + 8, 38).stroke({ width: 2, color: 0x2f5f54, alpha: 0.5 });
