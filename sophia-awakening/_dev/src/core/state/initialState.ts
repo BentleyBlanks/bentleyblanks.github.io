@@ -67,10 +67,6 @@ export function createInitialState(now = Date.now()): GameState {
     },
     challenge: null,
     specialRequest: null,
-    combo: {
-      count: 0,
-      best: 0
-    },
     rebirths: 0,
     lastSaveAt: now,
     statistics: {

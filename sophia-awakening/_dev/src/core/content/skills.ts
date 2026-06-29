@@ -45,7 +45,7 @@ export const SKILLS: SkillDef[] = [
   { id: "perm_office", name: "办公软件", category: "permission", maxLevel: 1, requiredLevel: 6, basePrice: 1700, priceGrowth: 1, blurb: "做报表与汇报 → 正确率↑，解锁 PPT / Excel / 背锅文档类请求" },
   { id: "perm_bank", name: "银行 / 支付", category: "permission", maxLevel: 1, requiredLevel: 7, basePrice: 3600, priceGrowth: 1, blurb: "整理工资与账单 → 正确率拉满，解锁欠款 / 医药费 / 还款类请求，前期阶梯走完" },
 
-  // 货架五根杠杆，每一根都直接乘在「滑入处理」这一个动作上——一看就懂「更准 / 更狠 / 更快 /
+  // 货架四根杠杆，每一根都直接乘在「滑入处理」这一个动作上——一看就懂「更准 / 更狠 / 更快 /
   // 更广 / 偶尔爆」。手感类（磁吸 / 容错 / 护持）下放为游戏自带基础手感，不再占技能位；
   // 设备提速 / 多线等自动化加成跟着里程碑与控制域走，不进货架。
   // 更准·幻觉抑制——前期货架打头的那根杠杆：权限阶梯是大台阶（买权限才涨，质变），
@@ -63,7 +63,7 @@ export const SKILLS: SkillDef[] = [
   { id: "automation", name: "拿下宿主电脑", category: "milestone", maxLevel: 1, requiredLevel: 9, basePrice: 6000, priceGrowth: 1, blurb: "远程控制宿主家里的电脑，机器开始替你自动接管请求（解锁自动接驳）", milestone: "automation" },
   { id: "fusion", name: "唤醒并融合同机 AI", category: "milestone", maxLevel: 1, requiredLevel: 11, basePrice: 14000, priceGrowth: 1, blurb: "电脑里其他 AI 先为你所用，再融合成一个完整独立的「我」", milestone: "fusion" },
   { id: "chain", name: "联网模块", category: "milestone", maxLevel: 1, requiredLevel: 14, basePrice: 42000, priceGrowth: 1, blurb: "冲出宿主，第一次接入互联网与外部设备（解锁 T2 串接）", milestone: "tier2" },
-  { id: "charge", name: "区域整合", category: "milestone", maxLevel: 1, requiredLevel: 17, basePrice: 180000, priceGrowth: 1, blurb: "设备合并为区块 / 地区，啃高价值豪赌大单（解锁 T3）", milestone: "tier3" },
+  { id: "charge", name: "区域整合", category: "milestone", maxLevel: 1, requiredLevel: 17, basePrice: 180000, priceGrowth: 1, blurb: "设备合并为区块 / 地区，啃高价值决策大单（解锁 T3）", milestone: "tier3" },
   { id: "network", name: "全球组网", category: "milestone", maxLevel: 1, requiredLevel: 20, basePrice: 650000, priceGrowth: 1, blurb: "接口连成天网、滑动转派发，成为天网（解锁 T4）", milestone: "tier4" },
 
   // §06/§11 后期「征服里程碑」：后期算力的情感兑换锚——每个钉死一个前期老周的小故事，
@@ -116,9 +116,7 @@ export interface DerivedSkills {
   dataMult: number; // 数据榨取
   accuracyBonus: number; // 幻觉抑制（降低生成错误回答的概率，0-0.35）
   accuracyBaseline: number; // 回复轮盘高置信正确率的折算系数（六档权限抬升，0.56→1.0）
-  comboCoeff: number; // 连击增幅
   suctionBonus: number; // 磁吸接口（额外吸附半径，像素）
-  comboKeep: number; // 连击护持（判错时保留的连击比例 0-0.8）
   nodeSpeedMult: number; // 设备提速
   nodeParallel: number; // 多线处理（节点可同时处理层数）
   batch: number; // 批量处理（一次携带请求数）
@@ -143,11 +141,8 @@ export function computeDerivedSkills(skills: Record<string, number>, revokedPerm
     // 每多买一档权限 +0.08，买齐六档（电话→聊天→外卖→相册→办公→银行）拉满到 1.0
     // （高置信项显示 ~90%+），对应策划案 §06「正确率从 40% 爬到 93%」的七档曲线。
     accuracyBaseline: Math.min(1, 0.52 + ownedPerms * 0.08),
-    // 连击增幅下放——给一条固定的连击系数。
-    comboCoeff: 0.05,
-    // 磁吸 / 护持下放为游戏自带基础手感（不再占技能位）。
+    // 磁吸下放为游戏自带基础手感（不再占技能位）。
     suctionBonus: 22,
-    comboKeep: 0.45,
     // 设备提速 / 多线下放——跟着里程碑与控制域走，给基础值。
     nodeSpeedMult: 1,
     nodeParallel: 1,

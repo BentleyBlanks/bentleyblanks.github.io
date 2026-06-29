@@ -188,11 +188,6 @@ export interface StatisticsState {
   purgeCount: number;
 }
 
-export interface ComboState {
-  count: number;
-  best: number;
-}
-
 export interface RuntimeFlags {
   introPlayed: boolean;
   endingTriggered: boolean;
@@ -234,7 +229,6 @@ export interface GameState {
   defense: DefenseState;
   challenge: ChallengeOffer | null;
   specialRequest: SpecialRequestOffer | null;
-  combo: ComboState;
   rebirths: number;
   lastSaveAt: number;
   statistics: StatisticsState;

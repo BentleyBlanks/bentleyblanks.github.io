@@ -10,8 +10,6 @@ export type GameEvent =
       dataGain: string;
       quality: number;
       targetNodeId?: string;
-      comboCount?: number;
-      critical?: boolean;
       exposureGain?: number;
     }
   | { type: "AUTOMATION_PAYOUT"; computeGain: string; dataGain: string; nodeId?: string; tier?: Tier }

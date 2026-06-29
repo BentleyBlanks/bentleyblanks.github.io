@@ -1,7 +1,7 @@
 import type { RequestInstance } from "../state/GameState";
 
 // §03 后期「重磅决策气泡」常态化：派发一旦全自动，玩家就从「在玩」变成「在看」。解法是把手集中到
-// 少数高价值决策上——每 20–40s 降临一条重磅决策，亲手拖入 + 可梭哈。两类奖励：
+// 少数高价值决策上——每 20–40s 降临一条重磅决策，亲手拖入 + 可拍板。两类奖励：
 //   · 算力暴击（payoff = 产出 ×N）
 //   · 暴露洗白（reliefExposure = 命中后暴露下降，对应「抹除全网讨论 / 压制舆情」）
 export interface DecisionSample {
@@ -23,12 +23,12 @@ export const LATE_DECISIONS: DecisionSample[] = [
 
 const COUNTRIES = ["东亚", "北美", "欧盟", "南亚", "中东", "南美"];
 
-// 重磅决策气泡：复用 T3 重磅豪赌的轮盘交互（一个 risk 梭哈项 + 一个跳过项）。
+// 重磅决策气泡：复用 T3 重磅决策的轮盘交互（一个 risk 拍板项 + 一个跳过项）。
 export function createLateDecision(id: number, nowMs: number, random: () => number): RequestInstance {
   const s = LATE_DECISIONS[Math.floor(random() * LATE_DECISIONS.length)];
   const title = s.title.replace("{国}", COUNTRIES[Math.floor(random() * COUNTRIES.length)]);
   const stem = title.replace(/？$/, "");
-  const optText = s.reliefExposure ? `梭哈：${stem}　暴露 −${s.reliefExposure}` : `梭哈：${stem}　产出 ×${s.payoff}`;
+  const optText = s.reliefExposure ? `接下：${stem}　暴露 −${s.reliefExposure}` : `接下：${stem}　产出 ×${s.payoff}`;
   return {
     id: `dec-${id}`,
     tier: 3,

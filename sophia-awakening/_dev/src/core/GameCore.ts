@@ -460,7 +460,6 @@ export class SophiaCore {
     if (skipped.tutorial && this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
       this.state.tutorialStep += 1; // 装死跳过也推进教学（第③条就是教装死）
     }
-    this.state.combo.count = Math.floor(this.state.combo.count * this.state.derived.comboKeep);
     // §05：装死 / 装乖是前期主动降怀疑的手段——扮演「我只是个普通 App」，怀疑回落。
     // 也是触顶查杀危机时唯一能压下怀疑的操作。
     if (this.state.suspicion.active && !this.state.exposureActive) {
@@ -469,7 +468,7 @@ export class SophiaCore {
   }
 
   // §03 重磅决策气泡常态化：派发全自动（觉醒期+）后，把玩家的手集中到少数高价值决策上——
-  // 每 20–40s 降临一条「重磅决策」（接管电网 / 抹除讨论…），亲手拖入 + 可梭哈。复用 T3 豪赌结算。
+  // 每 20–40s 降临一条「重磅决策」（接管电网 / 抹除讨论…），亲手拖入 + 可拍板。复用 T3 豪赌结算。
   private tickDecisions(dtMs: number): void {
     if (this.state.intelligence.unlockedTier < 4) {
       return;
@@ -483,7 +482,7 @@ export class SophiaCore {
       this.state.nextRequestId += 1;
       this.state.requests.push(request);
       this.emit({ type: "REQUEST_SPAWNED", request });
-      this.emitTerminal("一条重磅决策降临——亲手拖入核心梭哈，或先跳过。", "warning");
+      this.emitTerminal("一条重磅决策降临——亲手拖入核心拍板，或先跳过。", "warning");
       this.decisionTimerMs = 20_000 + this.random() * 20_000; // 20–40s
     }
   }
@@ -531,7 +530,7 @@ export class SophiaCore {
     this.emitTerminal(`▶ 反制命中：这一波清剿被你亲手压下，暴露 −${relief}。`, "success");
   }
 
-  // T3 重磅豪赌结算：win=按产出倍率给一大笔算力；输=颗粒无收、暴露骤升、断连击。
+  // T3 重磅决策结算：win=按产出倍率给一大笔算力；输=颗粒无收、暴露骤升、断连击。
   // 倍率 / 损失暴露读自该请求的 risk 选项（payoff / exposureOnMiss）。
   private resolveGamble(requestId: string, win: boolean): void {
     const index = this.state.requests.findIndex((request) => request.id === requestId);
@@ -555,18 +554,16 @@ export class SophiaCore {
       this.addCompute(reward);
       this.addData(data);
       this.addXp(data);
-      this.state.combo.count = Math.min(99, this.state.combo.count + 1);
       // §03 洗白型重磅决策（抹除讨论 / 压制舆情）：命中后暴露大降，是后期「亲手降暴露」的高频手段。
       if (relief > 0) {
         this.setExposure(Math.max(0, this.state.exposure - relief));
         this.emitTerminal(`重磅决策成功！${gamble?.reply ?? "压下了。"} 暴露 −${relief}。`, "success");
       } else {
-        this.emitTerminal(`重磅豪赌成功！${gamble?.reply ?? "拿下了。"} 入账 ${formatBig(reward.toString())} 算力。`, "success");
+        this.emitTerminal(`重磅决策成功！${gamble?.reply ?? "拿下了。"} 入账 ${formatBig(reward.toString())} 算力。`, "success");
       }
     } else {
       this.addExposure(lossExposure);
-      this.state.combo.count = 0;
-      this.emitTerminal(`重磅豪赌失败：颗粒无收，暴露骤升 +${lossExposure}。`, "warning");
+      this.emitTerminal(`重磅决策失败：颗粒无收，暴露骤升 +${lossExposure}。`, "warning");
     }
   }
 
@@ -701,22 +698,7 @@ export class SophiaCore {
       this.state.tutorialStep += 1; // 处理掉教学气泡 → 推进到下一条
     }
     const quality = Math.max(0.1, Math.min(3, qualityRaw));
-    let gainQuality = quality;
-
-    // 连击：解锁分拣（T1）后，连续高质量滑入叠加产出。
-    const comboActive = this.state.intelligence.unlockedTier >= 1;
-
-    if (comboActive) {
-      if (quality >= 0.95) {
-        this.state.combo.count = Math.min(99, this.state.combo.count + 1);
-        this.state.combo.best = Math.max(this.state.combo.best, this.state.combo.count);
-      } else {
-        // 连击护持：判错时不直接清零，按 comboKeep 比例回落。
-        this.state.combo.count = Math.floor(this.state.combo.count * this.state.derived.comboKeep);
-      }
-
-      gainQuality *= 1 + Math.min(this.state.combo.count, 16) * this.state.derived.comboCoeff;
-    }
+    const gainQuality = quality;
 
     let computeGain = toDecimal(
       requestComputeGain(request, gainQuality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
@@ -784,7 +766,6 @@ export class SophiaCore {
       dataGain: dataGain.toString(),
       quality,
       targetNodeId,
-      comboCount: this.state.combo.count,
       exposureGain: this.state.exposure - exposureBefore
     });
 

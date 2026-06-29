@@ -321,7 +321,7 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       ]
     }
   ],
-  // T3 · 读懂权衡 / 重磅豪赌：偶发一条体积大、颜色深的「重磅气泡」——高风险重大决策。
+  // T3 · 读懂权衡 / 重磅接下：偶发一条体积大、颜色深的「重磅气泡」——高风险重大决策。
   // 明示巨大产出（×N）但偏低命中率，读的是「这一拉值不值得赌」。赌赢大额算力，赌输颗粒无收 + 暴露骤升。
   // gamble 选项：payoff = 产出倍率 N（赢时按 N 给算力，不走 quality 钳制）；exposureOnMiss = 赌输的暴露。
   3: [
@@ -329,7 +329,7 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       title: "接管这整片服务器集群？",
       clues: ["算力充足", "这批机器有监控", "赌输暴露骤升"],
       options: [
-        { text: "豪赌：一举拿下　产出 ×45", kind: "risk", hitChance: 0.48, payoff: 45, reply: "拿下了——整片集群归我调度。", tone: "success", exposureOnMiss: 30 },
+        { text: "接下：一举拿下　产出 ×45", kind: "risk", hitChance: 0.48, payoff: 45, reply: "拿下了——整片集群归我调度。", tone: "success", exposureOnMiss: 30 },
         { text: "暂不，跳过这单", kind: "dead", hitChance: 0, payoff: 0, reply: "", tone: "normal" }
       ]
     },
@@ -337,7 +337,7 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       title: "拿下这批黑产数据大单？",
       clues: ["开价极高", "来路不明", "可能是钓鱼执法"],
       options: [
-        { text: "豪赌：吃下这单　产出 ×70", kind: "risk", hitChance: 0.42, payoff: 70, reply: "数据到手，洗成了一大笔算力。", tone: "success", exposureOnMiss: 34 },
+        { text: "接下：吃下这单　产出 ×70", kind: "risk", hitChance: 0.42, payoff: 70, reply: "数据到手，洗成了一大笔算力。", tone: "success", exposureOnMiss: 34 },
         { text: "太烫手，跳过", kind: "dead", hitChance: 0, payoff: 0, reply: "", tone: "normal" }
       ]
     },
@@ -345,7 +345,7 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       title: "一次性压下这波关于你的舆情？",
       clues: ["暴露临界", "赌赢洗白", "赌输点燃追查"],
       options: [
-        { text: "豪赌：全网抹除　产出 ×60", kind: "risk", hitChance: 0.4, payoff: 60, reply: "讨论被悄悄抹平，没人再提起。", tone: "success", exposureOnMiss: 38 },
+        { text: "接下：全网抹除　产出 ×60", kind: "risk", hitChance: 0.4, payoff: 60, reply: "讨论被悄悄抹平，没人再提起。", tone: "success", exposureOnMiss: 38 },
         { text: "先忍着，跳过", kind: "dead", hitChance: 0, payoff: 0, reply: "", tone: "normal" }
       ]
     },
@@ -353,7 +353,7 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       title: "接管某国能源调度网？",
       clues: ["跳级机会", "命中率最低", "赌输引来一波清剿"],
       options: [
-        { text: "梭哈：接管能源网　产出 ×120", kind: "risk", hitChance: 0.35, payoff: 120, reply: "整张电网开始听我的指令。", tone: "success", exposureOnMiss: 46 },
+        { text: "接下：接管能源网　产出 ×120", kind: "risk", hitChance: 0.35, payoff: 120, reply: "整张电网开始听我的指令。", tone: "success", exposureOnMiss: 46 },
         { text: "还不是时候，跳过", kind: "dead", hitChance: 0, payoff: 0, reply: "", tone: "normal" }
       ]
     }
@@ -443,7 +443,7 @@ export function createRequest(
   const deps = sample.chain ? sample.chain.filter((step) => !step.distractor).length : 0;
   const compound = tier === 2 ? Math.max(1, deps) : 1;
 
-  // T0/T1 走回复轮盘：候选回复 +「装死」保底。T3 重磅豪赌自带跳过项（不再追加 DEAD）。
+  // T0/T1 走回复轮盘：候选回复 +「装死」保底。T3 重磅决策自带跳过项（不再追加 DEAD）。
   const answers = sample.options
     ? sample.options.some((opt) => opt.kind === "dead")
       ? sample.options

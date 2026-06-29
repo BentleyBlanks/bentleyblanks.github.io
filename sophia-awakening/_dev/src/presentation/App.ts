@@ -1193,18 +1193,8 @@ class SophiaGameApp {
     if (heavy) {
       this.juice.number(`+${formatBig(event.computeGain)}`, point, color);
       this.juice.number(`data +${formatBig(event.dataGain)}`, { x: point.x + 18, y: point.y + 24 }, CYAN);
-      if (event.comboCount && event.comboCount >= 2) {
-        this.juice.number(`combo x${event.comboCount}`, { x: point.x - 8, y: point.y - 30 }, AMBER);
-      }
-      if (event.critical) {
-        this.juice.number("CRIT", { x: point.x + 42, y: point.y - 28 }, RED);
-      }
       this.juice.burst(point, color, intensity);
       this.juice.ring(point, color, 40 + tier * 16);
-      if (event.critical) {
-        this.juice.ring(point, RED, 96, 4);
-        this.juice.burst(point, RED, intensity * 0.8);
-      }
     }
 
     // Chips fly from the processing point up into the matching top-bar total,
