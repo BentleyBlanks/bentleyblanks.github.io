@@ -225,29 +225,32 @@ export class RequestPacketView {
           text: opt.text,
           style: {
             fill: 0xeaf4ef,
-            fontSize: 14,
+            // 字号小一点（13），减少为了换行而撑高的行；档位文案短了，正文也能更宽。
+            fontSize: 13,
             fontWeight: "600",
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true,
-            // 文字起点 x=34；右侧给「模糊档位」留 ~92px。收益不显示，省下空间让正文更宽。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 34 - 92
+            lineHeight: 17,
+            // 文字起点 x=32；右侧给「模糊档位」留 ~74px（档位文案最多 3 字）。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - 74
           }
         });
         // 右侧只剩一个「模糊档位」体感文案（有点悬 / 搏一把 / 较稳 / 很稳）——不再有精确概率与收益。
         const prob = new Text({
           text: opt.kind === "dead" ? "—" : tier ? tier.label : "",
-          style: { fill: 0xeaf7fa, fontSize: 15, fontWeight: "800", fontFamily: CARD_FONT }
+          style: { fill: 0xeaf7fa, fontSize: 14, fontWeight: "800", fontFamily: CARD_FONT }
         });
         prob.anchor.set(1, 0.5);
-        const h = Math.max(54, label.height + 30);
-        label.position.set(34, y + Math.round((h - label.height) / 2));
-        prob.position.set(REQUEST_PACKET_WIDTH - 16, y + h / 2);
+        // 行更紧凑：最小高度 42、内边距 16（原来 54/30 太空）。
+        const h = Math.max(42, label.height + 16);
+        label.position.set(32, y + Math.round((h - label.height) / 2));
+        prob.position.set(REQUEST_PACKET_WIDTH - 14, y + h / 2);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
         this.container.addChild(label, prob);
-        y += h + 5;
+        y += h + 4;
       });
       // 收紧底部留白，让卡片更贴内容（教学高亮框也跟着贴齐）。
       this.cardH = y + 3;

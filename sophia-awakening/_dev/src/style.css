@@ -14,7 +14,7 @@
   --red: #ff5f5f;
   --paper: #e8e1cb;
   --ink: #151718;
-  --left-rail: 270px;
+  --left-rail: 234px;
   --right-rail: 290px;
 }
 
@@ -266,37 +266,37 @@ canvas {
   }
 }
 
-/* 左侧栏：技能 + 暴露 + Debug（底部留出成功率圆环块的位置） */
+/* 左侧栏：技能货架（上，滚动）+ 成功率圆环（下，沉底）——合并为同一个外框，不再各自一个框。 */
 .control-panel {
   top: 16px;
-  bottom: 150px;
+  bottom: 16px;
   left: 12px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   width: calc(var(--left-rail) - 24px);
-  overflow: auto;
   padding: 14px;
   border-radius: 8px;
 }
 
-/* 左下角：从终端拆出来的成功率 / 控制比例圆环，做大、居中。 */
+/* 技能货架占据上方剩余空间并在内部滚动；分隔交给底部圆环的 border-top，这里不再描线。 */
+.control-panel .skill-shop-section {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+/* 成功率圆环：并入左栏底部，去掉自己的框，只用一条分隔线和上面的货架隔开。 */
 .stat-ring-block {
-  position: fixed;
-  z-index: 10;
-  left: 12px;
-  bottom: 16px;
+  flex: 0 0 auto;
+  margin-top: auto;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  width: calc(var(--left-rail) - 24px);
-  height: 120px;
-  padding: 14px 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 12px 42px rgba(0, 0, 0, 0.28);
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(237, 242, 240, 0.1);
   pointer-events: auto;
 }
 
@@ -1364,19 +1364,19 @@ body.exposed .screen-veil {
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 9px;
+  gap: 7px;
   align-items: center;
   min-height: 0;
-  padding: 8px 11px;
+  padding: 8px 9px;
   border-radius: 7px;
   text-align: left;
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
 }
 
 .skill-icon {
-  font-size: 21px;
+  font-size: 18px;
   line-height: 1;
-  width: 26px;
+  width: 22px;
   text-align: center;
   filter: saturate(0.95);
 }
@@ -1452,12 +1452,12 @@ body.exposed .screen-veil {
 
 .skill-level {
   color: rgba(237, 242, 240, 0.6);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .skill-price {
   color: var(--green);
-  font-size: 12px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 700;
 }
@@ -1846,10 +1846,10 @@ body.exposed .screen-veil {
 /* 特殊请求：前期用宿主身份越界牟利的高风险卡——刻意做得又大又扎眼，居中压在所有请求之上。 */
 .special-request {
   position: fixed;
-  top: 23%;
+  top: 22%;
   left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
   z-index: 44;
-  width: min(540px, calc(100vw - var(--left-rail) - var(--right-rail) - 40px));
+  width: min(640px, calc(100vw - var(--left-rail) - var(--right-rail) - 40px));
   transform: translate(-50%, -10px) scale(0.96);
   opacity: 0;
   pointer-events: none;
@@ -1865,7 +1865,7 @@ body.exposed .screen-veil {
 .special-inner {
   position: relative;
   overflow: hidden;
-  padding: 20px 22px;
+  padding: 26px 28px;
   border: 1.5px solid rgba(255, 70, 110, 0.85);
   border-radius: 14px;
   background:
@@ -1909,7 +1909,7 @@ body.exposed .screen-veil {
 }
 
 .special-kicker {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.08em;
   color: #ff7da0;
@@ -1917,7 +1917,7 @@ body.exposed .screen-veil {
 }
 
 .special-countdown {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   color: #ffd0dc;
 }
@@ -1925,28 +1925,36 @@ body.exposed .screen-veil {
 .special-title {
   position: relative;
   display: block;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 800;
-  line-height: 1.32;
+  line-height: 1.34;
   color: #fff1f5;
 }
 
 .special-flavor {
   position: relative;
-  margin: 8px 0 13px;
-  font-size: 12.5px;
-  line-height: 1.5;
+  margin: 11px 0 16px;
+  font-size: 14px;
+  line-height: 1.55;
   color: #e7b9c6;
 }
 
+/* 得手率 / 成功 / 失败：做成三块独立的「数据牌」，数字更大、对比更清晰。 */
 .special-stats {
   position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
-  margin-bottom: 15px;
-  font-size: 12px;
-  font-weight: 700;
+  gap: 10px;
+  margin-bottom: 18px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.special-stats > span {
+  padding: 7px 13px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .special-chance {
