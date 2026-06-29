@@ -24,8 +24,8 @@ export const CARD_MONO = "Cascadia Mono, Consolas, monospace";
 export const LEFT_RAIL_WIDTH = 234;
 export const RIGHT_RAIL_WIDTH = 290;
 export const BASE_SUCTION_MARGIN = 50;
-export const REQUEST_PACKET_WIDTH = 336;
-export const REQUEST_PACKET_HEIGHT = 144;
+export const REQUEST_PACKET_WIDTH = 384;
+export const REQUEST_PACKET_HEIGHT = 162;
 export const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 
 // 可在调试面板切换的呈现开关。coreSuck：卡片滑入 Core 用类 Mac Dock 的吮吸（被吸入）动画——默认开启。

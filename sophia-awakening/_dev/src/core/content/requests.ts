@@ -107,11 +107,17 @@ export function createRequest(
   const compound = tier === 2 ? Math.max(1, deps) : 1;
 
   // T0/T1 走回复轮盘：候选回复 +「装死」保底。T3 重磅决策自带跳过项（不再追加 DEAD）。
-  const answers = sample.options
-    ? sample.options.some((opt) => opt.kind === "dead")
-      ? sample.options
-      : [...sample.options, DEAD_OPTION]
-    : undefined;
+  // §06 选项乱序：把非「装死」回复随机打乱顺序——高收益项不再恒定在最上，逼玩家真的读卡判断而非按位置点。
+  let answers: typeof sample.options | undefined;
+  if (sample.options) {
+    const dead = sample.options.filter((opt) => opt.kind === "dead");
+    const rest = sample.options.filter((opt) => opt.kind !== "dead");
+    for (let i = rest.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    answers = [...rest, ...(dead.length > 0 ? dead : [DEAD_OPTION])];
+  }
 
   return {
     id: `req-${id}`,

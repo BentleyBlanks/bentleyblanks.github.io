@@ -93,16 +93,16 @@ export class InterfaceView {
     return dx * dx + dy * dy <= 62 * 62;
   }
   // 把拖到某个「待连」App 上的连线落实——连上返回 true（外层据此放旁白/教学）。
-  connectAppAt(global: PointData): boolean {
+  connectAppAt(global: PointData): { x: number; y: number } | null {
     for (const a of this.pendingApps) {
       const dx = global.x - a.x;
       const dy = global.y - a.y;
-      if (dx * dx + dy * dy <= 40 * 40) {
+      if (dx * dx + dy * dy <= 46 * 46) {
         this.connectedApps.add(a.idx);
-        return true;
+        return { x: a.x, y: a.y };
       }
     }
-    return false;
+    return null;
   }
 
   // 命中测试：卡片是否被拖到了某个「被控 App」图标上（用于玩家亲手把需求委托给 App / 悬停看处理能力）。
@@ -262,9 +262,10 @@ export class InterfaceView {
     // ---- 3×3 App 宫格，中心格 = SOPHIA CORE ----
     const apps = ["天气", "日历", "支付", "照片", "邮件", "浏览器", "信息", "设置"];
     // 点亮的 App 用权限名（买了「电话」就亮一个「电话」），其余宫格保留原桌面图标。
-    const permApps = ["电话", "聊天", "外卖", "相册", "大恨老师", "支付"];
-    const spacing = 84; // 随手机收窄（图标放大后稍微拉开间距）
-    const iconS = 54;
+    // 顺序＝解锁顺序（App 按已买权限档数从左上依次点亮）：电话→聊天→大恨老师→外卖→相册→支付。
+    const permApps = ["电话", "聊天", "大恨老师", "外卖", "相册", "支付"];
+    const spacing = 94; // 手机内图标间距（图标放大后拉开）
+    const iconS = 62;
     let appIdx = 0;
     for (let row = 0; row < 3; row += 1) {
       for (let col = 0; col < 3; col += 1) {
@@ -300,7 +301,7 @@ export class InterfaceView {
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).fill({ color: 0x0d1715, alpha: 0.5 });
         g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.85 : 0.4) * pulse });
         // App 图标：emoji（未点亮的 App 调暗一些）。
-        this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, 27, 0xffffff, lit ? 1 : 0.5);
+        this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, 31, 0xffffff, lit ? 1 : 0.5);
         this.addLabel(connected ? name : lit ? `${name}·待连` : name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
 
         // 委托处理中：图标外圈画一条进度环（转着转着满了才出结果）；还有排队的待办则右上角标 +N。
@@ -324,7 +325,7 @@ export class InterfaceView {
     }
 
     // ---- 中心格：SOPHIA CORE（圆角芯片 + 同心环 + 眼）——尺寸与周围 App 图标一致，不再夸张占中。
-    const baseR = 27;
+    const baseR = 31;
     g.circle(cx, cy, baseR + 10 + Math.sin(this.pulse * 2) * 2).stroke({ width: 1.5, color: accent, alpha: 0.3 });
     g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).fill({ color: 0x06140e, alpha: 0.96 });
     g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).stroke({ width: 2.5, color: accent, alpha: 0.9 });

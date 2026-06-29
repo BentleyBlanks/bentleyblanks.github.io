@@ -234,9 +234,10 @@ export class RequestPacketView {
       this.options.forEach((opt) => {
         // §06 重构：收益由所选回复自带（结算盲盒），无随机命中、无档位/大胆/惊艳。
         this.optionPayoff.push(opt.payoff);
-        // 选项门槛：高收益回复若需要尚未解锁的权限 → 灰着、右侧一把锁、点不了。
+        // 选项门槛：高收益回复若需要尚未解锁的权限 → 灰着、右侧标出「需要哪个权限」、点不了。
         const locked = Boolean(opt.requires) && !(reel?.hasPerm?.(opt.requires as string) ?? true);
         this.optionLocked.push(locked);
+        const lockLabel = locked ? `🔒需${LENS_NAMES[opt.requires as string] ?? "权限"}` : "";
         const label = new Text({
           text: opt.text,
           style: {
@@ -247,13 +248,13 @@ export class RequestPacketView {
             wordWrap: true,
             breakWords: true,
             lineHeight: 17,
-            // 满宽（不再留档位位），只在锁定时给右侧一把锁留点位。
-            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - (locked ? 26 : 14)
+            // 满宽（不再留档位位），锁定时给右侧「需X权限」留位。
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 32 - (locked ? 70 : 14)
           }
         });
         const prob = new Text({
-          text: locked ? "🔒" : "",
-          style: { fill: 0x8a948f, fontSize: 13, fontWeight: "800", fontFamily: CARD_FONT }
+          text: lockLabel,
+          style: { fill: 0xc8a24a, fontSize: 11, fontWeight: "800", fontFamily: CARD_FONT }
         });
         prob.anchor.set(1, 0.5);
         const h = Math.max(42, label.height + 16);

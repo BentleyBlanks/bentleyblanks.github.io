@@ -221,10 +221,13 @@ class SophiaGameApp {
       if (!this.connectDragging) return;
       this.connectDragging = false;
       this.connectGfx.clear();
-      const connected = this.interfaceView.connectAppAt({ x: e.global.x, y: e.global.y });
-      if (connected && !this.firstAppConnected) {
-        this.firstAppConnected = true;
-        this.stageNarration.showLine("SOPHIA", "连上了。把需求卡拖到它上面，它就替我处理——只是它笨些，慢些、收益也糙些。");
+      const connectedAt = this.interfaceView.connectAppAt({ x: e.global.x, y: e.global.y });
+      if (connectedAt) {
+        this.connectFx(this.interfaceView.center, connectedAt);
+        if (!this.firstAppConnected) {
+          this.firstAppConnected = true;
+          this.stageNarration.showLine("SOPHIA", "连上了。把需求卡拖到它上面，它就替我处理——只是它笨些，慢些、收益也糙些。");
+        }
       }
     };
     this.pixi.stage.on("pointerup", endConnect);
@@ -436,7 +439,11 @@ class SophiaGameApp {
     const top = 118; // 顶栏下沿之下——上两角卡片别被顶部 HUD 盖住
     const bot = h - 26;
     const core = this.interfaceView.center;
-    const occ = [...this.requestViews.values()].filter((v) => !v.busy).map((v) => ({ x: v.restX, y: v.restY, h: v.cardHeight }));
+    // 占位判定：只要卡片还没真正飞进核心（容器未销毁）就仍占着它的槽位——正在「思考/揭晓/吸入」中的卡
+    // 也算占位，避免新卡生成时盖在它正下方。处理完毕＝飞入 Core 拿到算力（容器销毁）才腾出槽位。
+    const occ = [...this.requestViews.values()]
+      .filter((v) => !v.container.destroyed)
+      .map((v) => ({ x: v.restX, y: v.restY, h: v.cardHeight }));
 
     // 自动接驳期：网格扫描找最靠近核心的空位，散布开来不堆叠（卡片很快飞向节点，过渡用）。
     if (this.core.getState().automationUnlocked) {
@@ -795,6 +802,36 @@ class SophiaGameApp {
       },
       entry
     );
+  }
+
+  // 连上 App 的反馈：从核心沿新接好的线送一颗亮信号进 App，落点炸开 + 扩环 +「已接通」。
+  private connectFx(from: PointData, to: PointData): void {
+    this.audio.playRequestAccept();
+    this.juice.flash(GREEN);
+    this.juice.ring(from, GREEN, 20, 2);
+    const spark = new Graphics();
+    spark.circle(0, 0, 5).fill({ color: 0xeafff0, alpha: 1 });
+    spark.circle(0, 0, 11).stroke({ width: 2, color: GREEN, alpha: 0.85 });
+    spark.position.set(from.x, from.y);
+    this.world.addChild(spark);
+    // 拖尾线：信号划过时留一道渐隐的亮线。
+    const trail = new Graphics();
+    trail.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: 3, color: GREEN, alpha: 0.55 });
+    this.world.addChildAt(trail, this.world.getChildIndex(spark));
+    gsap.to(trail, { alpha: 0, duration: 0.5, ease: "power2.out", onComplete: () => trail.destroy() });
+    gsap.to(spark.position, {
+      x: to.x,
+      y: to.y,
+      duration: 0.36,
+      ease: "power2.in",
+      onComplete: () => {
+        this.juice.burst(to, GREEN, 1.3);
+        this.juice.ring(to, GREEN, 28, 3);
+        this.juice.ring(to, GREEN, 50, 2);
+        this.juice.number("已接通", { x: to.x, y: to.y - 38 }, GREEN);
+        spark.destroy();
+      }
+    });
   }
 
   // 卡片飞入 Core 的动画：默认滑入；调试面板开启「Dock 吮吸」后改用 Mac Dock 神奇效果（genie 网格扭曲）。
