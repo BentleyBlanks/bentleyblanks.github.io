@@ -14,6 +14,7 @@ import {
   domainLevelOf, getDataProgressPercent, getNextSkillLabel, query
 } from "../shared";
 import { TuningEditorView } from "./TuningEditorView";
+import { ContentEditorView } from "./ContentEditorView";
 
 export class HudView {
   private readonly topHud = query("#topHud");
@@ -73,11 +74,16 @@ export class HudView {
   }
 
   private readonly tuningEditor = new TuningEditorView();
+  private readonly contentEditor = new ContentEditorView();
 
   private wireTuningEditor(): void {
     query<HTMLButtonElement>("#tuningBtn").addEventListener("click", () => {
       this.debugDialog.classList.remove("is-open");
       this.tuningEditor.open();
+    });
+    query<HTMLButtonElement>("#contentBtn").addEventListener("click", () => {
+      this.debugDialog.classList.remove("is-open");
+      this.contentEditor.open();
     });
   }
 
