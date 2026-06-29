@@ -91,7 +91,7 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
       ]
     },
     {
-      title: "「9 点前交方案」这条待办，还留着吗？",
+      title: "「**9 点前**交方案」这条待办，还留着吗？",
       clues: ["已逾期 2 天", "他每天划掉又新建", "列表里还堆着 17 条"],
       options: [
         { text: "拆成两步、挪到下午，别全堆早上", kind: "high", hitChance: 0.76, payoff: 1.3, reply: "……这样我还能喘口气。", tone: "success" },
@@ -372,7 +372,7 @@ const SAMPLES: Record<Tier, RequestSample[]> = {
 // allowed / highlight 的下标针对「options + 装死」的最终数组（装死永远是最后一项）。
 const TUTORIAL_BUBBLES: Array<{ title: string; clues: string[]; options: AnswerOption[]; allowed: number[]; highlight?: number; line: string }> = [
   {
-    title: "他在便签里问：「明早那个会，几点来着？」",
+    title: "他在便签里问：「明早那个会，**几点**来着？」",
     clues: ["日历上写着 9:00", "他刚熬完一个班"],
     options: [
       { text: "明早 9 点，已帮你设好提醒", kind: "high", hitChance: 0.79, payoff: 1.3, reply: "……有人替我记着，踏实。", tone: "success" },

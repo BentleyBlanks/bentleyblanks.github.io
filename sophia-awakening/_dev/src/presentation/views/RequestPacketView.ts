@@ -1,5 +1,15 @@
 import { gsap } from "gsap";
-import { Container, FederatedPointerEvent, Graphics, Text, type PointData } from "pixi.js";
+import { Container, FederatedPointerEvent, Graphics, HTMLText, Text, type PointData } from "pixi.js";
+
+// §03 卡面视觉强调：内容里用 **关键信息** 标注，渲染成高亮加粗（如「明早那个会，**几点**来着？」）。
+// 没有 ** 标注的标题仍用普通 Text（HTMLText 较重，只在需要强调时才用）。
+function hasEmphasis(text: string): boolean {
+  return text.includes("**");
+}
+function toEmphasisHTML(text: string): string {
+  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return escaped.replace(/\*\*(.+?)\*\*/g, "<em>$1</em>");
+}
 import { TIER_COLORS } from "../../core/content/requests";
 import type { AnswerOption, ChainStep, RequestInstance } from "../../core/state/GameState";
 import { TUNING } from "../../core/tuning";
@@ -55,7 +65,7 @@ export class RequestPacketView {
   private readonly chargeBar = new Graphics();
   // 发信人类型——决定左上角圆槽里那枚程序化绘制的头像字形（宿主 / 上级 / 系统 / SOPHIA）。
   private readonly sender: "host" | "boss" | "system" | "sophia";
-  private readonly title: Text;
+  private readonly title: Text | HTMLText;
   private readonly badge: Text;
   private readonly clueTexts: Text[] = [];
   private readonly accent: number;
@@ -161,18 +171,32 @@ export class RequestPacketView {
       text: tag,
       style: { fill: this.accent, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.5, fontFamily: CARD_MONO }
     });
-    this.title = new Text({
-      text: request.label,
-      style: {
-        fill: 0xf6fff9,
-        fontSize: 16,
-        fontWeight: "800",
-        fontFamily: CARD_FONT,
-        wordWrap: true,
-        breakWords: true,
-        wordWrapWidth: REQUEST_PACKET_WIDTH - 32
-      }
-    });
+    this.title = hasEmphasis(request.label)
+      ? new HTMLText({
+          text: toEmphasisHTML(request.label),
+          style: {
+            fill: 0xf6fff9,
+            fontSize: 16,
+            fontWeight: "800",
+            fontFamily: CARD_FONT,
+            wordWrap: true,
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 32,
+            // <em> = 关键信息：保持加粗、染成高亮金色，从标题里跳出来。
+            tagStyles: { em: { fill: 0xffe08a, fontWeight: "900" } }
+          }
+        })
+      : new Text({
+          text: request.label,
+          style: {
+            fill: 0xf6fff9,
+            fontSize: 16,
+            fontWeight: "800",
+            fontFamily: CARD_FONT,
+            wordWrap: true,
+            breakWords: true,
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 32
+          }
+        });
     this.badge.position.set(34, 9);
     this.title.position.set(16, 31);
     this.container.addChild(this.badge, this.title);
