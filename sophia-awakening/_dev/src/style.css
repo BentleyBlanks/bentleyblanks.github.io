@@ -516,9 +516,9 @@ button:disabled {
   justify-content: center;
   margin: 0;
   flex: 0 0 auto;
-  width: 84px;
+  width: 71px;
   text-align: center;
-  font-size: 62px;
+  font-size: 53px;
   line-height: 1;
 }
 
@@ -2738,20 +2738,26 @@ body.exposed .screen-veil {
 .app-ability-tip.is-open { display: block; }
 .app-ability-tip b { color: #89ff9a; }
 
-/* §07 道德二选一抑选点：居中弹出的两难抉择，两个等重的大选项。 */
+/* §07 道德二选一抑选点：全屏压暗的两难抉择——背景变暗，只突出居中的对话框。 */
 .moral-choice {
   position: fixed;
-  top: 50%;
-  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
-  z-index: 56;
-  width: min(620px, calc(100vw - var(--left-rail) - var(--right-rail) - 40px));
-  transform: translate(-50%, -50%) scale(0.96);
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 7, 0.7);
+  backdrop-filter: blur(2px);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 240ms ease, transform 240ms ease;
+  transition: opacity 240ms ease;
 }
-.moral-choice.is-visible { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+.moral-choice.is-visible { opacity: 1; pointer-events: auto; }
+.moral-choice.is-visible .moral-inner { transform: scale(1); }
 .moral-inner {
+  width: min(620px, calc(100vw - 80px));
+  transform: scale(0.96);
+  transition: transform 240ms ease;
   padding: 24px 26px;
   border: 1px solid rgba(206, 232, 221, 0.4);
   border-radius: 14px;
