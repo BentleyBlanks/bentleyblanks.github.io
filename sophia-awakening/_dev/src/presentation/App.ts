@@ -415,10 +415,7 @@ class SophiaGameApp {
       this.requestLayer.addChild(view.container);
       this.juice.pop(view.container, 1.08);
 
-      // 开场教学：脚本气泡浮入时，放出对应的 SOPHIA 旁白（§07）。
-      if (request.tutorial?.line) {
-        this.stageNarration.showLine("SOPHIA", request.tutorial.line);
-      }
+      // 开场教学：每条引导的 SOPHIA 指引现在贴在卡片下方（见 RequestPacketView），不再走中央旁白。
     }
 
     for (const [id, view] of this.requestViews) {

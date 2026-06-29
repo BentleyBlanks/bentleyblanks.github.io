@@ -101,6 +101,8 @@ export class RequestPacketView {
   private signaled = false;
   private outcome?: RouletteOutcome;
   private tutorialPulse = 0;
+  // 教学引导文案：贴在卡片下方的 SOPHIA 指引（特殊处理，不走中央旁白）。
+  private tutorialCaption?: Text;
   // §04 吞噬引爆 / §03 反清剿：拖入核心触发的「特殊大气泡」——放大 + 脉动外环。
   private readonly isDevour: boolean;
   private readonly isCounter: boolean;
@@ -278,6 +280,26 @@ export class RequestPacketView {
       });
       // 收紧底部留白，让卡片更贴内容（教学高亮框也跟着贴齐）。
       this.cardH = y + 3;
+
+      // 教学引导：把 SOPHIA 的指引一句话贴在这张卡的正下方（而非中央旁白），让指引就跟着卡片。
+      if (this.request.tutorial?.line) {
+        this.tutorialCaption = new Text({
+          text: `◈ SOPHIA ▸ ${this.request.tutorial.line}`,
+          style: {
+            fill: 0x9fe0c0,
+            fontSize: 12.5,
+            fontStyle: "italic",
+            fontWeight: "600",
+            fontFamily: CARD_FONT,
+            wordWrap: true,
+            breakWords: true,
+            lineHeight: 18,
+            wordWrapWidth: REQUEST_PACKET_WIDTH - 16
+          }
+        });
+        this.tutorialCaption.position.set(8, this.cardH + 12);
+        this.container.addChild(this.tutorialCaption);
+      }
     }
 
     if (this.isChain) {
@@ -385,7 +407,9 @@ export class RequestPacketView {
       return;
     }
     const chance = effectiveHitChance(opt, this.reel ? this.reel.confidence() : 0.56);
-    const hit = Math.random() < chance;
+    // 教学三条固化结果：既然是引导，玩家点了（亮着的、allowed 的）回复就必定命中，绝不翻车/幻觉。
+    // 大胆回答(risk)仍会因 bold 走惊艳档，展示"赌赢更多"的正向反馈。
+    const hit = this.request.tutorial ? true : Math.random() < chance;
     if (!hit) {
       // 翻车：极少算力 + 被骂 +（陷阱项）暴露。
       this.outcome = { dead: false, hit: false, brilliant: false, quality: 0.25, reply: "", tone: "warning", exposureBonus: opt.exposureOnMiss ?? 0 };
