@@ -18,7 +18,8 @@ export interface RequestSample {
   title: string;
   clues: string[];
   options?: AnswerOption[]; // T0/T1 回复轮盘：候选回复
-  perm?: string; // T0 气泡所需的手机权限（未拥有则不出现）；省略=「基础对话」自带
+  perm?: string; // §06 上下文透镜：揭示此卡上下文所需的权限；省略=「基础对话」自带（表面可读）
+  delegatable?: boolean; // §04 不可委托卡：false=重要卡，不出「交给大恨老师」选项
   chain?: ChainStep[]; // T2 串接：可勾选的任务链步骤（含干扰项）
 }
 
@@ -125,6 +126,7 @@ export function createRequest(
     label: sample.title,
     clues: sample.clues,
     lens: sample.perm, // §06 上下文透镜：缺此权限则卡上线索打码
+    delegatable: sample.delegatable, // §04 不可委托卡：false=只能亲自处理
     answers,
     chain: sample.chain,
     category: TIER_CATEGORY[tier],

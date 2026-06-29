@@ -28,7 +28,7 @@ export interface IntelligenceState {
 // - risk  红色高风险，命中概率固定且低（驴唇不对马嘴 / 陷阱），命中收益高（暴击感）；
 //         T1 起的「陷阱项」失手会附带暴露
 // - dead  ⬜「连接失败」装死保底，0% 命中、零收益零风险，永远可选
-export type RouletteKind = "high" | "risk" | "dead";
+export type RouletteKind = "high" | "risk" | "dead" | "delegate";
 
 export interface AnswerOption {
   text: string; // 这条回复本身
@@ -79,6 +79,7 @@ export interface RequestInstance {
   label: string; // 标题：这条请求在问什么 / 要什么
   clues: string[]; // 几条线索，可能不全或带干扰——玩家要读懂
   lens?: string; // §06 上下文透镜：揭示这些线索所需的权限(skill id)；缺则线索打码
+  delegatable?: boolean; // §04 不可委托卡：false=重要卡，不显示「交给大恨老师」选项，只能玩家亲自处理（默认可委托）
   answer?: SortAnswer; // T1 的正确判断（其余层不用）
   answers?: AnswerOption[]; // T0/T1：回复轮盘的候选回复
   chain?: ChainStep[]; // T2：可勾选的任务链步骤（含干扰项）

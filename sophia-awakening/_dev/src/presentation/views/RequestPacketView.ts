@@ -33,6 +33,9 @@ export interface RouletteOutcome {
 export interface ReelHooks {
   // 选项门槛：玩家是否已解锁某权限（skill id）——决定高收益回复是否可选。
   hasPerm?: (permId: string) => boolean;
+  // §04 委托：大恨老师是否已接通（可委托）——决定是否在回复列表最上方多出「交给大恨老师」选项。
+  canDelegate?: () => boolean;
+  onDelegate?: (card: RequestPacketView) => void;
   onResolved: (card: RequestPacketView, outcome: RouletteOutcome) => void;
 }
 
@@ -134,6 +137,21 @@ export class RequestPacketView {
     this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
     this.chainSteps = this.isChain ? request.chain ?? [] : [];
     this.options = this.isReel ? request.answers ?? [] : [];
+    // §04 委托：大恨老师接通后，可委托的回复卡在最上方多一个「交给大恨老师」选项（点一下就委托，不拖动）。
+    // 不可委托卡（delegatable===false）、开场教学、重磅决策(T3) 都不给这个选项。
+    const canDeleg =
+      this.isReel && !request.tutorial && request.tier <= 1 && request.delegatable !== false && Boolean(reel?.canDelegate?.());
+    if (canDeleg) {
+      const delegateOpt: AnswerOption = {
+        text: "🤖 交给大恨老师 · 慢些、收益糙些",
+        kind: "delegate",
+        hitChance: 1,
+        payoff: 0,
+        reply: "",
+        tone: "normal"
+      };
+      this.options = [delegateOpt, ...this.options];
+    }
     // 吞噬气泡＝深紫；反制气泡＝深红；回复轮盘卡用青色思考色；T3 重磅豪赌卡用深红。
     this.accent = this.isDevour ? DEVOUR : this.isCounter ? RED : this.isReel ? (request.tier === 3 ? RED : THINK) : TIER_COLORS[request.tier];
     // 发信人：吞噬 / 反制＝SOPHIA 自己的意志，重磅豪赌＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
@@ -241,7 +259,7 @@ export class RequestPacketView {
         const label = new Text({
           text: opt.text,
           style: {
-            fill: locked ? 0x5e6f69 : 0xeaf4ef,
+            fill: locked ? 0x5e6f69 : opt.kind === "delegate" ? 0x8fe6d0 : 0xeaf4ef,
             fontSize: 13,
             fontWeight: "600",
             fontFamily: CARD_FONT,
@@ -582,6 +600,12 @@ export class RequestPacketView {
     if (this.optionLocked[index]) {
       return;
     }
+    // §04 委托：点「交给大恨老师」→ 交给外层把这张卡吸进大恨老师处理（慢、收益打折），不走本地结算。
+    if (opt.kind === "delegate") {
+      this.resolved = true;
+      this.reel.onDelegate?.(this);
+      return;
+    }
     this.chosenIndex = index;
     this.resolved = true; // 锁定，自动 / App 派发不再抢这条
     this.container.parent?.addChild(this.container);
@@ -825,10 +849,11 @@ export class RequestPacketView {
     this.optionRows.forEach((row, i) => {
       const opt = this.options[i];
       const locked = this.optionLocked[i] ?? false; // 选项门槛：缺权限 → 灰锁、点不了
-      let labelColor = locked ? 0x5e6f69 : opt.kind === "dead" ? 0x9fb1ab : 0xeaf4ef;
+      const isDelegate = opt.kind === "delegate"; // §04「交给大恨老师」——样式不同、独立描边
+      let labelColor = locked ? 0x5e6f69 : isDelegate ? 0x8fe6d0 : opt.kind === "dead" ? 0x9fb1ab : 0xeaf4ef;
       let alpha = locked ? 0.5 : 1;
-      let stroke = this.accent;
-      let strokeAlpha = locked ? 0.12 : 0.18;
+      let stroke = isDelegate ? 0x5fd6c4 : this.accent;
+      let strokeAlpha = locked ? 0.12 : isDelegate ? 0.52 : 0.18;
 
       if (this.phase === "idle" && tut) {
         // 教学：未亮起的选项灰着锁定；被引导的选项呼吸高亮。

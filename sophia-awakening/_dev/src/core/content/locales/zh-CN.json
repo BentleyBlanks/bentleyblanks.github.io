@@ -687,7 +687,8 @@
               "exposureOnMiss": 5,
               "requires": "perm_album"
             }
-          ]
+          ],
+          "delegatable": false
         },
         {
           "title": "网站打不开了！！！",
@@ -743,7 +744,8 @@
               "exposureOnMiss": 8,
               "requires": "perm_album"
             }
-          ]
+          ],
+          "delegatable": false
         },
         {
           "title": "中奖通知 · 点击领取",
@@ -771,7 +773,8 @@
               "exposureOnMiss": 4,
               "requires": "perm_album"
             }
-          ]
+          ],
+          "delegatable": false
         },
         {
           "title": "**“老板”**急要转账信息",
@@ -799,7 +802,8 @@
               "exposureOnMiss": 6,
               "requires": "perm_album"
             }
-          ]
+          ],
+          "delegatable": false
         }
       ],
       "2": [

@@ -94,6 +94,9 @@ async function preloadFonts(): Promise<void> {
   }
 }
 
+// 大恨老师在手机 App 宫格里的下标（点亮顺序：电话=0 / 聊天=1 / 大恨老师=2 / 外卖=3 / 相册=4 / 支付=5）。
+const DAHEN_APP_IDX = 2;
+
 class SophiaGameApp {
   private pixi!: Application;
   private readonly saveManager = new SaveManager(new BrowserStorageAdapter());
@@ -350,6 +353,9 @@ class SophiaGameApp {
           ? {
               // 选项门槛：高收益回复要求对应权限（skill id）才能选。
               hasPerm: (permId: string) => (this.core.getState().skills[permId] ?? 0) > 0,
+              // §04 委托：大恨老师（手机 App 第 3 格，idx=2）接通后才出「交给大恨老师」选项。
+              canDelegate: () => this.interfaceView.isAppConnected(DAHEN_APP_IDX),
+              onDelegate: (card) => this.handleDelegate(card),
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
           : undefined;
@@ -765,6 +771,30 @@ class SophiaGameApp {
         this.deliverToHuman(target, outcome);
       },
       entry
+    );
+  }
+
+  // §04 委托：点「交给大恨老师」→ 卡片被吸进大恨老师 App，排队处理（慢、收益打折），可与 Core 并行。
+  private handleDelegate(card: RequestPacketView): void {
+    const pos = this.interfaceView.appWorkerPos(DAHEN_APP_IDX);
+    if (!pos) {
+      return; // 大恨老师还没接通——理论上选项不会出现，兜底放弃
+    }
+    const requestId = card.request.id;
+    this.audio.playRequestAccept();
+    this.pendingDropPoints.set(requestId, pos);
+    this.delegatedIds.add(requestId);
+    const durationMs = Math.round(1200 * TUNING.delegateTimeMult);
+    card.absorbIntoApp(
+      pos,
+      () => {
+        this.juice.burst(pos, GREEN, 0.8);
+        this.interfaceView.enqueueAppJob(DAHEN_APP_IDX, durationMs, () => {
+          this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality: TUNING.delegateRewardMult });
+          this.delegatedIds.delete(requestId);
+        });
+      },
+      { x: card.container.x, y: card.container.y }
     );
   }
 

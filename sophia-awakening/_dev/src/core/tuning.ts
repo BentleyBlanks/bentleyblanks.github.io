@@ -52,6 +52,8 @@ export const TUNING = {
   efficientPerLevel:    0.18,     // 强化处理每级产出加成
   boldEvBonus:          1.3,      // 大胆回答的期望收益相对高置信的倍数（>1 → 低概率高收益更划算）
   appDelayMs:           3600,     // 委托 App 处理时，App 比 Core 多花的时间 (ms)——初期故意慢一倍，体感"它真在处理"
+  delegateTimeMult:     2.4,      // §04 委托给大恨老师的处理耗时倍率（相对 Core，越大越慢）
+  delegateRewardMult:   0.78,     // §04 委托收益系数（相对亲自处理，大恨老师弱、收益打折）
 };
 
 export type TuningKey = keyof typeof TUNING;
@@ -100,6 +102,8 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   efficientPerLevel:    { label: "强化处理每级产出加成",     section: "技能数值",   min: 0,     max: 0.6,   step: 0.01 },
   boldEvBonus:          { label: "大胆回答期望倍数",         section: "前期卡片",   min: 1.0,   max: 3.0,   step: 0.05 },
   appDelayMs:           { label: "App 委托额外耗时 (ms)",    section: "前期卡片",   min: 0,     max: 6000,  step: 100  },
+  delegateTimeMult:     { label: "委托耗时倍率",             section: "前期卡片",   min: 1,     max: 5,     step: 0.1  },
+  delegateRewardMult:   { label: "委托收益系数",             section: "前期卡片",   min: 0.3,   max: 1,     step: 0.02 },
 };
 
 // 重置为初始默认值（用于 debug 面板「重置」按钮）

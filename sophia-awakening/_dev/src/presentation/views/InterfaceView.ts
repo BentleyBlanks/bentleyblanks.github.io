@@ -105,6 +105,16 @@ export class InterfaceView {
     return null;
   }
 
+  // §04 委托：某个 App 是否已接通（用于决定「交给大恨老师」选项是否出现）。
+  isAppConnected(idx: number): boolean {
+    return this.connectedApps.has(idx);
+  }
+  // 已接通 App 的图标位置（卡片委托时吸进这个点）。
+  appWorkerPos(idx: number): { x: number; y: number } | null {
+    const p = this.appWorkerPoints.find((a) => a.idx === idx);
+    return p ? { x: p.x, y: p.y } : null;
+  }
+
   // 命中测试：卡片是否被拖到了某个「被控 App」图标上（用于玩家亲手把需求委托给 App / 悬停看处理能力）。
   appWorkerAt(global: PointData): { x: number; y: number; idx: number } | null {
     for (const p of this.appWorkerPoints) {
