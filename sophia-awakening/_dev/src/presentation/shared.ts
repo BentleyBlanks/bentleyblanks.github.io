@@ -28,8 +28,8 @@ export const REQUEST_PACKET_WIDTH = 336;
 export const REQUEST_PACKET_HEIGHT = 144;
 export const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 
-// 可在调试面板切换的呈现开关。coreSuck：把"卡片滑入 Core"换成类 Mac Dock 的吮吸（被吸入）动画。
-export const fxSettings = { coreSuck: false };
+// 可在调试面板切换的呈现开关。coreSuck：卡片滑入 Core 用类 Mac Dock 的吮吸（被吸入）动画——默认开启。
+export const fxSettings = { coreSuck: true };
 
 // 阶段「动作形态」短标签（T0–T4 编号已废弃，降为这个动作形态属性）。用于阶段徽标 / Core 标签 / 节点分配。
 const TIER_FORMS: Record<number, string> = { 0: "单口", 1: "分拣", 2: "串接", 3: "决策", 4: "派发" };

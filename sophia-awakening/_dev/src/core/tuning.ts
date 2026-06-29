@@ -40,7 +40,7 @@ export const TUNING = {
 
   // § UI 时序
   rouletteThinkMs:      700,      // 轮盘「思考中」动画持续 (ms)
-  rouletteHoldMs:       900,      // 轮盘揭晓后停留再飞入核心 (ms)——让命中/惊艳/幻觉的结果多停一会儿看清
+  rouletteHoldMs:       360,      // 轮盘揭晓后停留再飞入核心 (ms)——短停一下看清所选回复，随即平滑吸入（无随机结果，不需久停）
 
   // § 前期卡片
   earlyBaseCards:       1,        // 前期开局同屏需求卡数（默认 1）；每买一档手机权限 +1（电话短信→2）

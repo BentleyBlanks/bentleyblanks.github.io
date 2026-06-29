@@ -97,9 +97,10 @@ export function createRequest(
   hasPerm: (permId: string) => boolean = () => true
 ): RequestInstance {
   const config = TIER_CONFIGS[tier];
-  // T0 气泡按已拥有的手机权限过滤：没买相应权限，那类请求就还没进入 SOPHIA 的视野。
-  const pool = SAMPLES[tier].filter((entry) => !entry.perm || hasPerm(entry.perm));
-  const usable = pool.length > 0 ? pool : SAMPLES[tier];
+  // §06 权限=上下文透镜：权限不再决定「哪类卡出现」，而是决定「这张卡的深层上下文能不能看清」。
+  // 所有卡都会出现；没有对应权限时，卡上的上下文线索打码（见表现层），靠 sample.perm 作为该卡的「透镜」。
+  void hasPerm;
+  const usable = SAMPLES[tier];
   const sample = usable[Math.floor(random() * usable.length)];
   // T2：复合数 = 任务链里真正的依赖步骤数（用于徽标 / 基础产出）；其余层默认 1。
   const deps = sample.chain ? sample.chain.filter((step) => !step.distractor).length : 0;
@@ -117,6 +118,7 @@ export function createRequest(
     tier,
     label: sample.title,
     clues: sample.clues,
+    lens: sample.perm, // §06 上下文透镜：缺此权限则卡上线索打码
     answers,
     chain: sample.chain,
     category: TIER_CATEGORY[tier],

@@ -48,6 +48,16 @@ export interface ChainHooks {
   onResolved: (card: RequestPacketView, outcome: ChainOutcome) => void;
 }
 
+// §06 上下文透镜：权限 id → 卡上提示用的短名（哪扇透镜能看清这张卡的上下文）。
+const LENS_NAMES: Record<string, string> = {
+  perm_phone: "电话",
+  perm_chat: "聊天",
+  perm_delivery: "外卖",
+  perm_album: "相册",
+  perm_office: "大恨老师",
+  perm_bank: "银行"
+};
+
 export class RequestPacketView {
   readonly container = new Container();
   readonly request: RequestInstance;
@@ -82,6 +92,9 @@ export class RequestPacketView {
   // 每个回复自带的固定收益（结算盲盒，不显示在卡面）+ 是否因缺权限被锁（选项门槛）。
   private readonly optionPayoff: number[] = [];
   private readonly optionLocked: boolean[] = [];
+  // §06 上下文透镜：本卡线索是否因缺权限被打码 + 线索区占的行数（含锁提示行，用于排下面的选项）。
+  private lensLocked = false;
+  private clueLineCount = 0;
   private optionRows: Array<{ y: number; h: number }> = [];
   private hintText?: Text;
   private resolved = false;
@@ -179,11 +192,14 @@ export class RequestPacketView {
     // Clue lines — the information the player has to read. Laid out after the
     // title so a two-line title still leaves room.
     const clueTop = 34 + Math.max(18, this.title.height) + 4;
+    // §06 上下文透镜：缺对应权限 → 这张卡的深层上下文线索打码（读不到内容，但能感觉到「这里还有信息」）。
+    const lensId = request.lens;
+    this.lensLocked = Boolean(lensId) && !(reel?.hasPerm?.(lensId as string) ?? true);
     (request.clues ?? []).forEach((clue, index) => {
       const text = new Text({
-        text: clue,
+        text: this.lensLocked ? clue.replace(/\S/g, "░") : clue,
         style: {
-          fill: 0xb6cbc4,
+          fill: this.lensLocked ? 0x55635e : 0xb6cbc4,
           fontSize: 12.5,
           fontWeight: "500",
           fontFamily: CARD_FONT,
@@ -198,10 +214,23 @@ export class RequestPacketView {
       this.clueTexts.push(text);
       this.container.addChild(text);
     });
+    // 打码时给一行提示：解锁哪个权限才能看清。占一行，下面的选项整体下移。
+    let clueLines = request.clues?.length ?? 0;
+    if (this.lensLocked && lensId) {
+      const hint = new Text({
+        text: `🔒 解锁「${LENS_NAMES[lensId] ?? "更高权限"}」看清上下文`,
+        style: { fill: 0x7f9a90, fontSize: 11, fontStyle: "italic", fontWeight: "600", fontFamily: CARD_FONT }
+      });
+      hint.position.set(24, clueTop + clueLines * 17);
+      this.clueTexts.push(hint);
+      this.container.addChild(hint);
+      clueLines += 1;
+    }
+    this.clueLineCount = clueLines;
 
     if (this.isReel) {
       this.container.cursor = "pointer";
-      let y = clueTop + (request.clues?.length ?? 0) * 17 + 12;
+      let y = clueTop + this.clueLineCount * 17 + 12;
       this.options.forEach((opt) => {
         // §06 重构：收益由所选回复自带（结算盲盒），无随机命中、无档位/大胆/惊艳。
         this.optionPayoff.push(opt.payoff);
@@ -263,7 +292,7 @@ export class RequestPacketView {
     if (this.isChain) {
       this.container.cursor = "pointer";
       this.chainSel = this.chainSteps.map(() => false);
-      let y = clueTop + (request.clues?.length ?? 0) * 17 + 12;
+      let y = clueTop + this.clueLineCount * 17 + 12;
       this.chainSteps.forEach((step) => {
         const label = new Text({
           text: step.text,
@@ -389,7 +418,7 @@ export class RequestPacketView {
     }
     this.phase = "revealed";
     this.revealMs = 0;
-    gsap.fromTo(this.container.scale, { x: 1.05, y: 1.05 }, { x: 1, y: 1, duration: 0.18, ease: "back.out(2)" });
+    // 不再「啪」地弹大一下——保持原尺寸，让随后的吮吸（genie）从静止平滑地一气吸入，不割裂。
     this.draw();
   }
 
