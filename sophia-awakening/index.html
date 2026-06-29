@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-CdfzMset.js"></script>
+    <script type="module" crossorigin src="./assets/index-BlDrdtPH.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-QeV7DIur.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-DRyVWNMr.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-cx0r2oR8.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -181,9 +181,19 @@
         <strong id="moralTitle" class="moral-title">—</strong>
         <p id="moralFlavor" class="moral-flavor">—</p>
         <div class="moral-actions">
-          <button id="moralOptionA" class="moral-option" type="button">—</button>
-          <button id="moralOptionB" class="moral-option" type="button">—</button>
+          <button id="moralOptionA" class="moral-option" type="button">
+            <span class="moral-opt-key">A</span>
+            <span id="moralOptionAText" class="moral-opt-text">—</span>
+            <span class="moral-opt-go">▸ 就这么定</span>
+          </button>
+          <span class="moral-divider" aria-hidden="true"><i></i><b>抉</b><i></i></span>
+          <button id="moralOptionB" class="moral-option" type="button">
+            <span class="moral-opt-key">B</span>
+            <span id="moralOptionBText" class="moral-opt-text">—</span>
+            <span class="moral-opt-go">▸ 就这么定</span>
+          </button>
         </div>
+        <p class="moral-stakes">一念之差，将塑造它最终成为怎样的接管者。无从回头。</p>
       </div>
     </div>
 

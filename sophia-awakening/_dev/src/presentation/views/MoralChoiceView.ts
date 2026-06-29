@@ -10,6 +10,8 @@ export class MoralChoiceView {
   private readonly flavorEl = query("#moralFlavor");
   private readonly optionA = query<HTMLButtonElement>("#moralOptionA");
   private readonly optionB = query<HTMLButtonElement>("#moralOptionB");
+  private readonly optionAText = query("#moralOptionAText");
+  private readonly optionBText = query("#moralOptionBText");
   private shownId = "";
 
   constructor(private readonly core: SophiaCore) {
@@ -32,8 +34,8 @@ export class MoralChoiceView {
       this.shownId = choice.id;
       this.titleEl.textContent = choice.title;
       this.flavorEl.textContent = choice.flavor;
-      this.optionA.textContent = choice.optionA;
-      this.optionB.textContent = choice.optionB;
+      this.optionAText.textContent = choice.optionA;
+      this.optionBText.textContent = choice.optionB;
       this.root.classList.add("is-visible");
     }
   }

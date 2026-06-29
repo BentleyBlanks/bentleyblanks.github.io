@@ -2767,22 +2767,67 @@ body.exposed .screen-veil {
 .moral-kicker { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; color: #9fe0c0; }
 .moral-title { display: block; margin: 10px 0 6px; font-size: 19px; font-weight: 800; line-height: 1.4; color: #f3fbf6; }
 .moral-flavor { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: #a9c4bb; }
-.moral-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* 两难抉择：两条等重的「岔路」。悬停哪条，哪条亮起、抬升，另一条黯然退场——选这条，就是舍那条。 */
+.moral-actions { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; gap: 0; }
 .moral-option {
-  padding: 14px 16px;
-  border: 1px solid rgba(206, 232, 221, 0.28);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 18px 16px;
+  border: 1px solid rgba(206, 232, 221, 0.26);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
   color: #eaf4ef;
   font-family: "Noto Sans SC", Inter, sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.45;
   text-align: left;
   cursor: pointer;
-  transition: border-color 140ms, background 140ms, transform 120ms;
+  overflow: hidden;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease, filter 180ms ease;
 }
-.moral-option:hover { border-color: rgba(137, 255, 154, 0.7); background: rgba(137, 255, 154, 0.08); transform: translateY(-1px); }
+.moral-opt-key {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: rgba(159, 224, 192, 0.55);
+  transition: color 180ms ease, text-shadow 180ms ease;
+}
+.moral-opt-text { font-size: 15px; font-weight: 700; line-height: 1.5; color: #eef7f2; }
+.moral-opt-go {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffd86b;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+/* 中央「抉」分隔：一道竖线把两条路劈开。 */
+.moral-divider { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 44px; }
+.moral-divider i { flex: 1; width: 1px; background: linear-gradient(rgba(206, 232, 221, 0), rgba(206, 232, 221, 0.22)); }
+.moral-divider i:last-child { background: linear-gradient(rgba(206, 232, 221, 0.22), rgba(206, 232, 221, 0)); }
+.moral-divider b { font-size: 13px; font-weight: 800; color: rgba(159, 224, 192, 0.5); letter-spacing: 0.1em; }
+/* 悬停：选中的一条抬升、镀金发光；同时让另一条黯淡退后——强迫你感到「舍弃」。 */
+.moral-actions:hover .moral-option:not(:hover) { opacity: 0.4; filter: grayscale(0.5); transform: scale(0.985); }
+.moral-option:hover {
+  border-color: rgba(255, 216, 107, 0.8);
+  background: linear-gradient(180deg, rgba(255, 216, 107, 0.12), rgba(255, 216, 107, 0.04));
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5), 0 0 26px rgba(255, 216, 107, 0.22), inset 0 0 0 1px rgba(255, 216, 107, 0.25);
+}
+.moral-option:hover .moral-opt-key { color: #ffd86b; text-shadow: 0 0 18px rgba(255, 216, 107, 0.6); }
+.moral-option:hover .moral-opt-go { opacity: 1; transform: translateY(0); }
+.moral-stakes {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  color: rgba(255, 216, 107, 0.62);
+}
 
 /* §07 里程碑横幅：重大进化时全屏扫过、短暂凝住的「章节点」横幅。 */
 .milestone-banner {
