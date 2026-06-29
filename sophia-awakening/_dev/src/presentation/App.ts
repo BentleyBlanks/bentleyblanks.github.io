@@ -378,6 +378,10 @@ class SophiaGameApp {
       this.requestLayer.addChild(view.container);
       this.juice.pop(view.container, 1.08);
 
+      // §04 只能面对卡：浮入后只能被看着——一阵后 SOPHIA 沉默旁白 → 卡黯然淡出 → 移除（不给算力）。
+      if (view.isFace) {
+        this.beginFaceCard(view);
+      }
       // 开场教学：每条引导的 SOPHIA 指引现在贴在卡片下方（见 RequestPacketView），不再走中央旁白。
     }
 
@@ -773,6 +777,28 @@ class SophiaGameApp {
       },
       entry
     );
+  }
+
+  // §04 只能面对卡：卡浮在那、不能处理也不能委托；停留一阵后 SOPHIA 一句沉默旁白，卡黯然淡出、消失（零算力）。
+  private beginFaceCard(view: RequestPacketView): void {
+    const requestId = view.request.id;
+    const narration = view.request.narration;
+    this.audio.playRequestAccept();
+    window.setTimeout(() => {
+      if (view.container.destroyed) {
+        return;
+      }
+      if (narration) {
+        this.stageNarration.showLine("SOPHIA", narration);
+      }
+      // 沉默地滚出一行字 + 停顿，然后这条「请求」无声地过去——生活不会因为心碎就停下。
+      this.terminal.push("🧑 ……（这条，没有可回的话）", "normal");
+      window.setTimeout(() => {
+        if (!view.container.destroyed) {
+          view.playDead(() => this.core.dispatch({ type: "SKIP_REQUEST", requestId }));
+        }
+      }, 1600);
+    }, 3200);
   }
 
   // §04 委托：点「交给大恨老师」→ 卡片被吸进大恨老师 App，排队处理（慢、收益打折），可与 Core 并行。

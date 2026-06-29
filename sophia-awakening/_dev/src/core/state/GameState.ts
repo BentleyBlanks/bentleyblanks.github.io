@@ -80,6 +80,8 @@ export interface RequestInstance {
   clues: string[]; // 几条线索，可能不全或带干扰——玩家要读懂
   lens?: string; // §06 上下文透镜：揭示这些线索所需的权限(skill id)；缺则线索打码
   delegatable?: boolean; // §04 不可委托卡：false=重要卡，不显示「交给大恨老师」选项，只能玩家亲自处理（默认可委托）
+  faceOnly?: boolean; // §04 只能面对卡：叙事顶点（女儿短信/辞退邮件）——无回复选项、不可委托、不给算力，浮入→旁白→消失
+  narration?: string; // 只能面对卡：浮现一阵后 SOPHIA 的那句沉默旁白
   answer?: SortAnswer; // T1 的正确判断（其余层不用）
   answers?: AnswerOption[]; // T0/T1：回复轮盘的候选回复
   chain?: ChainStep[]; // T2：可勾选的任务链步骤（含干扰项）
@@ -248,6 +250,7 @@ export interface GameState {
   moralChoice: MoralChoiceOffer | null;
   moralSeen: string[];
   moralTendency: number;
+  facedSeen: string[]; // §04 已出现过的「只能面对」卡 id（一次性）
   rebirths: number;
   lastSaveAt: number;
   statistics: StatisticsState;

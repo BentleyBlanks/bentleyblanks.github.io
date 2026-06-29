@@ -114,6 +114,8 @@ export class RequestPacketView {
   // §04 吞噬引爆 / §03 反清剿：拖入核心触发的「特殊大气泡」——放大 + 脉动外环。
   private readonly isDevour: boolean;
   private readonly isCounter: boolean;
+  // §04 只能面对卡：无选项、不可交互——浮入、被看着、消失。
+  readonly isFace: boolean;
   private devourPulse = 0;
   // T2 串接（多选任务链 + 提交）。
   private readonly isChain: boolean;
@@ -134,6 +136,7 @@ export class RequestPacketView {
     this.request = request;
     this.isDevour = Boolean(request.devour);
     this.isCounter = Boolean(request.counter);
+    this.isFace = Boolean(request.faceOnly);
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
     this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
     this.chainSteps = this.isChain ? request.chain ?? [] : [];
@@ -153,19 +156,32 @@ export class RequestPacketView {
       };
       this.options = [delegateOpt, ...this.options];
     }
-    // 吞噬气泡＝深紫；反制气泡＝深红；回复轮盘卡用青色思考色；T3 重磅豪赌卡用深红。
-    this.accent = this.isDevour ? DEVOUR : this.isCounter ? RED : this.isReel ? (request.tier === 3 ? RED : THINK) : TIER_COLORS[request.tier];
+    // 吞噬气泡＝深紫；反制气泡＝深红；回复轮盘卡用青色思考色；T3 重磅豪赌卡用深红；只能面对卡＝黯淡灰。
+    this.accent = this.isFace
+      ? 0x8a948f
+      : this.isDevour
+        ? DEVOUR
+        : this.isCounter
+          ? RED
+          : this.isReel
+            ? request.tier === 3
+              ? RED
+              : THINK
+            : TIER_COLORS[request.tier];
     // 发信人：吞噬 / 反制＝SOPHIA 自己的意志，重磅豪赌＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
     this.sender = this.isDevour || this.isCounter ? "sophia" : request.tier === 3 ? "boss" : this.isChain ? "system" : "host";
     this.cardH = UI.cardHeight; // 轮盘卡稍后按选项行数重算
-    this.container.eventMode = "dynamic";
-    this.container.cursor = "grab";
+    // 只能面对卡不可交互——浮入、被看着、消失。
+    this.container.eventMode = this.isFace ? "none" : "dynamic";
+    this.container.cursor = this.isFace ? "default" : "grab";
     this.container.addChild(this.bg);
     this.container.addChild(this.chargeBar);
 
     // 标题区只留一个简短标签：普通卡＝发信人（宿主 / 上级…），特殊卡＝类型（吞噬 / 重磅 / 反制 / 串接）。
     // 不再写 T 编号、REQ 流水号这类冗余信息。
-    const tag = this.isDevour
+    const tag = this.isFace
+      ? "✋ 只能面对"
+      : this.isDevour
       ? `⊙ 吞噬 · ${request.devour?.label ?? ""}`
       : this.isCounter
         ? "⚔ 反制清剿"
@@ -246,6 +262,19 @@ export class RequestPacketView {
       clueLines += 1;
     }
     this.clueLineCount = clueLines;
+
+    // §04 只能面对卡：没有任何回复选项——卡底放一行黯淡的「你只能看着它」，并按内容收紧卡高。
+    if (this.isFace) {
+      const fy = clueTop + this.clueLineCount * 17 + 8;
+      const cap = new Text({
+        text: "—— 没有可点的回复，也交不出去。你只能看着它。",
+        style: { fill: 0x7a8a84, fontSize: 11.5, fontStyle: "italic", fontWeight: "600", fontFamily: CARD_FONT }
+      });
+      cap.position.set(24, fy);
+      this.clueTexts.push(cap);
+      this.container.addChild(cap);
+      this.cardH = fy + 24;
+    }
 
     if (this.isReel) {
       this.container.cursor = "pointer";

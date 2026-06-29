@@ -40,7 +40,7 @@ export function tierForm(tier: number): string {
 // ── 存档 / 引导键 ────────────────────────────────────
 export const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v5-optimize-complete";
 export const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-export const PERSISTENCE_REVISION = "late-decisions-v22";
+export const PERSISTENCE_REVISION = "face-cards-v23";
 
 // ── 文案 ─────────────────────────────────────────────
 export const SENDER_LABEL: Record<string, string> = { host: "宿主", boss: "上级", system: "系统", sophia: "SOPHIA" };

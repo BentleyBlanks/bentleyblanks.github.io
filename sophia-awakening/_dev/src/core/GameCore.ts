@@ -6,6 +6,7 @@ import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
 import { createCounterRequest, createLateDecision } from "./content/decisions";
 import { MORAL_CHOICES } from "./content/morals";
+import { FACE_CARDS } from "./content/faceCards";
 import { getConquest } from "./content/conquests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import { EventBus } from "./events/EventBus";
@@ -21,7 +22,7 @@ import {
 } from "./formulas/economy";
 import { add, big, formatBig, gte, max, sub, toDecimal } from "./math/BigNumber";
 import type { GameEvent } from "./events/GameEvents";
-import type { BotNode, GameCommand, GameState, NodeDefinition, Tier } from "./state/GameState";
+import type { BotNode, GameCommand, GameState, NodeDefinition, RequestInstance, Tier } from "./state/GameState";
 import { cloneGameState } from "./state/GameState";
 import { createInitialState } from "./state/initialState";
 import { ChallengeSystem } from "./systems/ChallengeSystem";
@@ -146,7 +147,45 @@ export class SophiaCore {
     this.specialSystem.tick(dtMs);
     this.evaluateProgression();
     this.tickMoral();
+    this.tickFaceCards();
     this.evaluateEnding();
+  }
+
+  // §04 只能面对卡：前期叙事顶点（辞退邮件 / 女儿短信）到点浮入一张「只能看着」的卡——
+  // 无回复选项、不可委托、不给算力（一次性，按等级排序，同屏只一张）。
+  private tickFaceCards(): void {
+    if (this.state.automationUnlocked || this.state.statistics.totalProcessed === 0) {
+      return;
+    }
+    if (this.state.requests.some((r) => r.faceOnly)) {
+      return; // 同屏已有一张面对卡，先不叠
+    }
+    const next = FACE_CARDS.find(
+      (f) => this.state.intelligence.level >= f.requiredLevel && !this.state.facedSeen.includes(f.id)
+    );
+    if (!next) {
+      return;
+    }
+    this.state.facedSeen.push(next.id);
+    const request: RequestInstance = {
+      id: `face-${this.state.nextRequestId}`,
+      tier: 0,
+      label: next.title,
+      clues: next.clues ?? [],
+      faceOnly: true,
+      narration: next.narration,
+      delegatable: false,
+      category: "mail",
+      computeValue: "0",
+      dataValue: "0",
+      exposure: 0,
+      compound: 1,
+      createdAtMs: this.state.clockMs,
+      highValue: false
+    };
+    this.state.nextRequestId += 1;
+    this.state.requests.push(request);
+    this.emit({ type: "REQUEST_SPAWNED", request });
   }
 
   // §07 道德抑选点：智力到达某节点、且不在开场教学里时，弹出对应的两难抉择（一次性，按等级排序）。
