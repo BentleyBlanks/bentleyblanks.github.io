@@ -3095,39 +3095,48 @@ body.exposed .screen-veil {
   font-size: 12px;
 }
 
-/* 进化度大屏「下一目标预告」进度条（接近满闪烁催促，给蹲守钩子） */
-.goal-metric .metric-label { margin-bottom: 6px; color: rgba(137, 255, 154, 0.78); }
-.goal-bar {
-  position: relative;
-  height: 16px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.07);
-  overflow: hidden;
-  border: 1px solid rgba(137, 255, 154, 0.16);
-}
-.goal-bar-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0%;
-  background: linear-gradient(90deg, rgba(98, 214, 214, 0.6), rgba(137, 255, 154, 0.7));
-  transition: width 280ms ease;
-}
-.goal-bar-pct {
-  position: absolute;
-  inset: 0;
+/* 进化度大屏：智力等级条 与「下一目标预告」合并为一条——Lv.X 居中，条朝下一里程碑填充，接近满闪烁。 */
+.intel-metric .metric-label { margin-bottom: 7px; color: rgba(137, 255, 154, 0.82); }
+/* Lv.X 居中（盖在进度条之上）。.metric strong 的 display:block 特异性更高，必须在此显式覆盖。 */
+.metric-cluster .intel-bar-level {
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10.5px;
+  text-align: center;
+  z-index: 2;
+}
+/* 右侧的下一目标百分比 / 「可解锁！」——不抢 Lv.X 的居中。 */
+.intel-bar-pct {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  z-index: 2;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.03em;
-  color: #eafff0;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  color: rgba(234, 255, 240, 0.82);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
 }
-.goal-metric.is-close .goal-bar-fill { background: linear-gradient(90deg, rgba(137, 255, 154, 0.7), rgba(255, 224, 120, 0.85)); }
-.goal-metric.is-ready .goal-bar { border-color: rgba(137, 255, 154, 0.7); animation: goalReady 1s ease-in-out infinite; }
-.goal-metric.is-ready .goal-bar-fill { background: linear-gradient(90deg, rgba(137, 255, 154, 0.9), rgba(110, 230, 208, 0.95)); }
+.intel-metric.is-close .intel-bar-fill { background: linear-gradient(90deg, rgba(137, 255, 154, 0.65), rgba(255, 224, 120, 0.85)); }
+.intel-metric.is-ready .intel-bar { border-color: rgba(137, 255, 154, 0.7); animation: goalReady 1s ease-in-out infinite; }
+.intel-metric.is-ready .intel-bar-fill { background: linear-gradient(90deg, rgba(137, 255, 154, 0.9), rgba(110, 230, 208, 0.95)); }
+.intel-metric.is-ready .intel-bar-pct { color: #d6ffe6; }
 @keyframes goalReady {
   0%, 100% { box-shadow: 0 0 0 rgba(137, 255, 154, 0); }
-  50% { box-shadow: 0 0 14px rgba(137, 255, 154, 0.6); }
+  50% { box-shadow: 0 0 16px rgba(137, 255, 154, 0.65); }
 }
+
+/* 算力＝头号资源，做大做亮强调。 */
+.metric-cluster .compute-metric strong {
+  font-size: 42px;
+  font-weight: 900;
+  color: #eafff1;
+  letter-spacing: 0.01em;
+  text-shadow: 0 0 20px rgba(137, 255, 154, 0.28);
+}
+.metric-cluster .compute-metric .metric-label { color: rgba(137, 255, 154, 0.7); }
