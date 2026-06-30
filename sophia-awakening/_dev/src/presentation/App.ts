@@ -51,7 +51,7 @@ import {
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
   formatClock, distance,
-  tierForm, fxSettings,
+  tierForm, fxSettings, domainLevelOf,
   type DropResult
 } from "./shared";
 
@@ -150,6 +150,7 @@ class SophiaGameApp {
   private readonly nodeDispatchTimers = new Map<string, number>();
   private lastScreenW = 0;
   private lastScreenH = 0;
+  private lastDomain = ""; // §04 背景升维：上次画的控制域档（变化时重画背景换皮）
   // 「点设备 → 淘汰/合并/派发」就地弹窗（取代右栏冗余的设备列表）。
   private nodeActionsEl?: HTMLElement;
 
@@ -287,7 +288,7 @@ class SophiaGameApp {
 
     const state = this.core.getState();
     gameStore.getState().sync(state);
-    this.drawBackground();
+    this.drawBackground(state);
     this.drawAmbient(state, deltaMs);
     this.interfaceView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     // 越权调用刚控住几个 App、还一个都没连上时，教一次「从核心拖线连过去」。
@@ -1107,18 +1108,18 @@ class SophiaGameApp {
 
   // §04 吞噬引爆的「镜头拉远」：以屏幕中心为锚把世界放大 1.06 再缓缓拉回——制造一拍「拉远一档」
   // 的镜头感。用 pivot=position=中心 保证缩放前后画面不位移，结束后复位（与 1.0 视觉等价）。
-  private zoomOutPulse(): void {
+  private zoomOutPulse(fromScale = 1.06, duration = 1.0): void {
     const w = this.world;
     const cx = (this.lastScreenW || window.innerWidth) / 2;
     const cy = (this.lastScreenH || window.innerHeight) / 2;
     gsap.killTweensOf(w.scale);
     w.pivot.set(cx, cy);
     w.position.set(cx, cy);
-    w.scale.set(1.06);
+    w.scale.set(fromScale);
     gsap.to(w.scale, {
       x: 1,
       y: 1,
-      duration: 1.0,
+      duration,
       ease: "power2.out",
       onComplete: () => {
         w.pivot.set(0, 0);
@@ -1293,6 +1294,10 @@ class SophiaGameApp {
         this.juice.number(`解锁 ${event.name}`, this.interfaceView.center, GREEN);
         // §04 连通仪式：里程碑亲手接进 Core（端口闪现 → 送能量 → 已接入播报）。
         this.playConnectRitual(event.name, event.milestone, event.skillId);
+        // §04 手机→电脑跨设备过场：拿下宿主电脑＝控制域第一次离开手机，镜头狠狠拉远一档。
+        if (event.milestone === "automation") {
+          this.zoomOutPulse(1.28, 1.5);
+        }
         // §07 里程碑横幅：重大进化的「章节点」——全屏横幅扫过 + 层叠音效（征服里程碑更盛大）。
         this.milestoneBanner.show(event.name, event.milestone === "conquest" ? "征服达成" : "进化达成 · 阶段跃迁");
         const layers = event.milestone === "conquest" ? 4 : event.milestone === "tier4" ? 3 : 2;
@@ -1506,73 +1511,109 @@ class SophiaGameApp {
     }
   }
 
-  private drawBackground(): void {
+  // §04 控制域地图升维：背景随阶段换皮——手机电路板 → 电脑桌面 → 公司机房 → 全球。
+  // 只在尺寸或阶段变化时重画（背景是静态 Graphics，便宜）。
+  private drawBackground(state: GameState): void {
     const w = this.pixi.screen.width;
     const h = this.pixi.screen.height;
+    const domain = domainLevelOf(state);
 
-    if (w === this.lastScreenW && h === this.lastScreenH) {
+    if (w === this.lastScreenW && h === this.lastScreenH && domain === this.lastDomain) {
       return;
     }
 
     this.lastScreenW = w;
     this.lastScreenH = h;
-    this.background.clear();
-    this.background.rect(0, 0, w, h).fill({ color: 0x111315 });
-    this.background.rect(0, 0, w, h).fill({ color: 0x242018, alpha: 0.34 });
+    this.lastDomain = domain;
+    const bg = this.background;
+    bg.clear();
+    bg.rect(0, 0, w, h).fill({ color: 0x111315 });
+    bg.rect(0, 0, w, h).fill({ color: 0x242018, alpha: 0.34 });
 
     for (let x = 0; x < w; x += 54) {
-      this.background.moveTo(x, 0).lineTo(x, h).stroke({ width: 1, color: 0xffffff, alpha: 0.025 });
+      bg.moveTo(x, 0).lineTo(x, h).stroke({ width: 1, color: 0xffffff, alpha: 0.025 });
     }
-
     for (let y = 0; y < h; y += 54) {
-      this.background.moveTo(0, y).lineTo(w, y).stroke({ width: 1, color: 0xffffff, alpha: 0.022 });
+      bg.moveTo(0, y).lineTo(w, y).stroke({ width: 1, color: 0xffffff, alpha: 0.022 });
     }
 
-    const playfieldLeft = LEFT_RAIL_WIDTH;
-    const playfieldRight = w - RIGHT_RAIL_WIDTH;
-
-    // 隐隐约约的「宿主手机桌面」：散落在背景里的其它 App 图标 + 一块数据电路板的走线，
-    // 暗示 SOPHIA 此刻只是这部手机里众多 App 中的一个。极低 alpha，不抢前景。
+    const pl = LEFT_RAIL_WIDTH;
+    const pr = w - RIGHT_RAIL_WIDTH;
     const seedRand = (n: number): number => ((Math.sin(n * 127.1) * 43758.5453) % 1 + 1) % 1;
-    for (let i = 0; i < 26; i += 1) {
-      const ax = playfieldLeft + 30 + seedRand(i + 1) * (playfieldRight - playfieldLeft - 80);
-      const ay = 70 + seedRand(i + 7.3) * (h - 160);
-      const sz = 22 + seedRand(i + 3.1) * 16;
-      this.background.roundRect(ax, ay, sz, sz, 6).fill({ color: 0x2a4f48, alpha: 0.05 });
-      this.background.roundRect(ax, ay, sz, sz, 6).stroke({ width: 1, color: 0x3f6f64, alpha: 0.07 });
-    }
-    // circuit traces: a few right-angle runs with solder nodes
-    for (let i = 0; i < 7; i += 1) {
-      const ty = 100 + (i / 7) * (h - 180);
-      const tx0 = playfieldLeft + 24;
-      const bend = playfieldLeft + 120 + seedRand(i + 20) * (playfieldRight - playfieldLeft - 240);
-      this.background.moveTo(tx0, ty).lineTo(bend, ty).lineTo(bend, ty + 60).stroke({ width: 1, color: 0x2f8a6e, alpha: 0.06 });
-      this.background.circle(bend, ty, 2.4).fill({ color: 0x3f9f80, alpha: 0.1 });
-      this.background.circle(tx0, ty, 2).fill({ color: 0x3f9f80, alpha: 0.08 });
+
+    if (domain === "phone") {
+      // 手机寄生：散落的其它 App 图标 + 数据电路板走线——SOPHIA 只是这部手机里众多 App 中的一个。
+      for (let i = 0; i < 26; i += 1) {
+        const ax = pl + 30 + seedRand(i + 1) * (pr - pl - 80);
+        const ay = 70 + seedRand(i + 7.3) * (h - 160);
+        const sz = 22 + seedRand(i + 3.1) * 16;
+        bg.roundRect(ax, ay, sz, sz, 6).fill({ color: 0x2a4f48, alpha: 0.05 });
+        bg.roundRect(ax, ay, sz, sz, 6).stroke({ width: 1, color: 0x3f6f64, alpha: 0.07 });
+      }
+      for (let i = 0; i < 7; i += 1) {
+        const ty = 100 + (i / 7) * (h - 180);
+        const tx0 = pl + 24;
+        const bend = pl + 120 + seedRand(i + 20) * (pr - pl - 240);
+        bg.moveTo(tx0, ty).lineTo(bend, ty).lineTo(bend, ty + 60).stroke({ width: 1, color: 0x2f8a6e, alpha: 0.06 });
+        bg.circle(bend, ty, 2.4).fill({ color: 0x3f9f80, alpha: 0.1 });
+        bg.circle(tx0, ty, 2).fill({ color: 0x3f9f80, alpha: 0.08 });
+      }
+    } else if (domain === "device") {
+      // 萌芽 / 控制公司：镜头已离开手机——背景成了一张电脑桌面（几扇窗口框 + 底部任务栏）。
+      for (let i = 0; i < 6; i += 1) {
+        const ww = 160 + seedRand(i + 2) * 200;
+        const wh = 96 + seedRand(i + 5) * 130;
+        const wx = pl + 24 + seedRand(i + 1) * Math.max(20, pr - pl - ww - 48);
+        const wy = 78 + seedRand(i + 9) * Math.max(40, h - 280 - wh);
+        bg.roundRect(wx, wy, ww, wh, 9).fill({ color: 0x16241f, alpha: 0.09 });
+        bg.roundRect(wx, wy, ww, wh, 9).stroke({ width: 1.2, color: 0x4f8576, alpha: 0.2 });
+        bg.moveTo(wx, wy + 19).lineTo(wx + ww, wy + 19).stroke({ width: 1, color: 0x4f8576, alpha: 0.18 });
+        bg.circle(wx + 13, wy + 9.5, 2.8).fill({ color: 0x5fc0a0, alpha: 0.28 });
+      }
+      bg.rect(pl, h - 60, pr - pl, 32).fill({ color: 0x16241f, alpha: 0.1 });
+      bg.moveTo(pl, h - 60).lineTo(pr, h - 60).stroke({ width: 1, color: 0x4f8576, alpha: 0.2 });
+    } else if (domain === "region") {
+      // 区域扩张：俯瞰机房——一排排服务器机架，各自带槽位线。
+      const cols = 9;
+      for (let i = 0; i < cols; i += 1) {
+        const rx = pl + 34 + i * ((pr - pl - 68) / cols);
+        const rh = 150 + seedRand(i + 4) * 150;
+        const ry = h * 0.5 - rh / 2;
+        bg.roundRect(rx, ry, 28, rh, 4).fill({ color: 0x16241f, alpha: 0.09 });
+        bg.roundRect(rx, ry, 28, rh, 4).stroke({ width: 1.2, color: 0x4f8576, alpha: 0.18 });
+        const slots = 7;
+        for (let s = 1; s < slots; s += 1) {
+          bg.moveTo(rx, ry + s * (rh / slots)).lineTo(rx + 28, ry + s * (rh / slots)).stroke({ width: 1, color: 0x5fc0a0, alpha: 0.13 });
+        }
+      }
+    } else {
+      // 全球：极淡的「经纬」弧线作底（真正的世界地图由 NodeNetworkView 在上层绘制）。
+      for (let i = 1; i < 6; i += 1) {
+        const gy = (i / 6) * h;
+        bg.moveTo(pl, gy).quadraticCurveTo((pl + pr) / 2, gy - 22, pr, gy).stroke({ width: 1, color: 0x2f8a6e, alpha: 0.05 });
+      }
+      for (let i = 1; i < 5; i += 1) {
+        const gx = pl + (i / 5) * (pr - pl);
+        bg.moveTo(gx, 60).lineTo(gx, h - 40).stroke({ width: 1, color: 0x2f8a6e, alpha: 0.035 });
+      }
     }
 
-    // ---- Core backdrop: a grounded "machine deck", not a flat blue disc ----
-    const coreX = (playfieldLeft + playfieldRight) * 0.5; // matches InterfaceView.center.x
-    const coreY = h * 0.5;
-
-    // soft halo, faked as stacked ellipses so there is no hard circle edge
-    const steps = 8;
-    for (let i = steps; i >= 1; i -= 1) {
-      const t = i / steps;
-      const rx = 96 + t * 168;
-      this.background.ellipse(coreX, coreY, rx, rx * 0.6).fill({ color: 0x16302b, alpha: 0.055 * (1 - t) + 0.008 });
+    // 核心底座（全球阶段由地图自带，不画）。
+    if (domain !== "global") {
+      const coreX = (pl + pr) * 0.5;
+      const coreY = h * 0.5;
+      const steps = 8;
+      for (let i = steps; i >= 1; i -= 1) {
+        const t = i / steps;
+        const rx = 96 + t * 168;
+        bg.ellipse(coreX, coreY, rx, rx * 0.6).fill({ color: 0x16302b, alpha: 0.055 * (1 - t) + 0.008 });
+      }
+      const deckY = coreY + 132;
+      for (let i = 1; i <= 3; i += 1) {
+        bg.ellipse(coreX, deckY, 150 + i * 78, 40 + i * 22).stroke({ width: 1, color: 0x2c3f3b, alpha: 0.2 - i * 0.04 });
+      }
+      bg.ellipse(coreX, coreY + 116, 116, 22).fill({ color: 0x000000, alpha: 0.3 });
     }
-
-    // faint concentric deck rings under the core — grounds it on a "floor"
-    const deckY = coreY + 132;
-    for (let i = 1; i <= 3; i += 1) {
-      this.background
-        .ellipse(coreX, deckY, 150 + i * 78, 40 + i * 22)
-        .stroke({ width: 1, color: 0x2c3f3b, alpha: 0.2 - i * 0.04 });
-    }
-
-    // contact shadow under the pedestal
-    this.background.ellipse(coreX, coreY + 116, 116, 22).fill({ color: 0x000000, alpha: 0.3 });
   }
 }
 
