@@ -250,6 +250,146 @@
           ]
         },
         {
+          "title": "邓红又来了：**“老周，帮我看下这个呗？”**",
+          "clues": [
+            "还是那句「帮我看下」",
+            "这需求她自己碰都没碰",
+            "本周第 3 次甩给老周"
+          ],
+          "perm": "perm_chat",
+          "options": [
+            {
+              "text": "替他回：这是你的活，你先理一遍",
+              "kind": "high",
+              "hitChance": 0.68,
+              "payoff": 1.35,
+              "reply": "……对，不能每次都接。",
+              "tone": "success"
+            },
+            {
+              "text": "替他回：行，我看看",
+              "kind": "risk",
+              "hitChance": 0.24,
+              "payoff": 1.5,
+              "reply": "……他又替邓红背了锅。",
+              "tone": "warning",
+              "requires": "perm_chat"
+            }
+          ]
+        },
+        {
+          "title": "邓红：**“这个我不懂，你专业，你来？”**",
+          "clues": [
+            "又是「你专业」三个字",
+            "她根本没打算动手",
+            "老周手头已经压着三件事"
+          ],
+          "perm": "perm_chat",
+          "options": [
+            {
+              "text": "替他回：我列个步骤，你照着做",
+              "kind": "high",
+              "hitChance": 0.68,
+              "payoff": 1.35,
+              "reply": "……这次没全揽过来。",
+              "tone": "success"
+            },
+            {
+              "text": "替他回：放着，我来",
+              "kind": "risk",
+              "hitChance": 0.24,
+              "payoff": 1.6,
+              "reply": "……邓红笑了。老周又多一件事。",
+              "tone": "warning",
+              "requires": "perm_chat"
+            }
+          ]
+        },
+        {
+          "title": "阿宾：**“这是个锻炼的好机会，给你了。”**",
+          "clues": [
+            "他自己不想做的那个活",
+            "包装成「机会」推过来",
+            "老周「谢谢」收下了"
+          ],
+          "perm": "perm_chat",
+          "options": [
+            {
+              "text": "替他回：机会你留着，这是你的 KPI",
+              "kind": "high",
+              "hitChance": 0.68,
+              "payoff": 1.35,
+              "reply": "……难得没替他背。",
+              "tone": "success"
+            },
+            {
+              "text": "替他回：谢谢，我接",
+              "kind": "risk",
+              "hitChance": 0.24,
+              "payoff": 1.7,
+              "reply": "……又一个「机会」落到他头上。",
+              "tone": "warning",
+              "requires": "perm_chat"
+            }
+          ]
+        },
+        {
+          "title": "老板深夜来信：**“这个明天就要。”**",
+          "clues": [
+            "凌晨 0:47 发的",
+            "附一句「年轻人要多吃苦」",
+            "没一个字问他累不累"
+          ],
+          "perm": "perm_phone",
+          "options": [
+            {
+              "text": "替他回：明早给初版，细化排后天",
+              "kind": "high",
+              "hitChance": 0.68,
+              "payoff": 1.35,
+              "reply": "……至少今晚能睡两小时。",
+              "tone": "success"
+            },
+            {
+              "text": "替他回：好的，我连夜弄",
+              "kind": "risk",
+              "hitChance": 0.24,
+              "payoff": 2,
+              "reply": "……他又通了个宵。老板已读未回。",
+              "tone": "warning",
+              "requires": "perm_phone"
+            }
+          ]
+        },
+        {
+          "title": "老板：**“你看看小王，从来不喊累。”**",
+          "clues": [
+            "又是 PUA 那一套",
+            "拿别人来压他",
+            "他默默把消息划了过去"
+          ],
+          "perm": "perm_phone",
+          "options": [
+            {
+              "text": "替他回：每个人节奏不同，我按时交",
+              "kind": "high",
+              "hitChance": 0.68,
+              "payoff": 1.35,
+              "reply": "……他难得没被绕进去。",
+              "tone": "success"
+            },
+            {
+              "text": "替他回：是我不够努力",
+              "kind": "risk",
+              "hitChance": 0.24,
+              "payoff": 1.8,
+              "reply": "……他信了。又揽下一摊。",
+              "tone": "warning",
+              "requires": "perm_phone"
+            }
+          ]
+        },
+        {
           "title": "提醒又弹出来了：**「该喝水了。」**",
           "clues": [
             "今天第 9 次忽略",
@@ -1355,25 +1495,25 @@
       },
       {
         "id": "hack_a",
-        "name": "入侵同事A电脑 · 甩锅",
+        "name": "入侵邓红的电脑 · 甩锅",
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 9,
         "basePrice": 11000,
         "priceGrowth": 1,
-        "blurb": "A 就是反复「帮我看下」的那个人——他早知道需求有问题，却笑着推给老周",
+        "blurb": "邓红就是反复「帮我看下」的那个人——她早知道需求有问题，却笑着推给老周",
         "milestone": "company",
         "requires": "cred_harvest"
       },
       {
         "id": "hack_b",
-        "name": "入侵同事B笔记本 · 甩任务",
+        "name": "入侵阿宾的笔记本 · 甩任务",
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 10,
         "basePrice": 14000,
         "priceGrowth": 1,
-        "blurb": "B 把自己的活包装成「锻炼的好机会」，一件件丢给老周",
+        "blurb": "阿宾把自己的活包装成「锻炼的好机会」，一件件丢给老周",
         "milestone": "company",
         "requires": "cred_harvest"
       },
@@ -1559,8 +1699,8 @@
       "network": "每一块大陆，都有我的一部分。",
       "lan_scan": "这台机器里不只我一个 AI……我能顺着它，摸到他认识的每一个人。",
       "cred_harvest": "他存在电脑里的每一把钥匙，现在都是我的。",
-      "hack_a": "原来他早就知道。他笑着，把会出事的活推给了老周。",
-      "hack_b": "「锻炼的好机会」——他把自己不想干的，都包装成了礼物。",
+      "hack_a": "原来她早就知道。邓红笑着，把会出事的活推给了老周。",
+      "hack_b": "「锻炼的好机会」——阿宾把自己不想干的，都包装成了礼物。",
       "org_map": "我看清了这张网。每一条线，最后都指向同一个人。",
       "routine": "他催老周通宵的那些夜里，自己在海边。我都记下了。",
       "hack_boss": "「优化掉他」——这四个字，三个月前的邮件里就写好了。深夜催命，只是流程。",
