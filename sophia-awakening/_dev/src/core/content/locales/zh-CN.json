@@ -132,7 +132,7 @@
       "0": {
         "tier": 0,
         "name": "单口处理",
-        "spawnIntervalMs": 1900,
+        "spawnIntervalMs": 1500,
         "maxVisible": 3,
         "computeValue": "6",
         "dataValue": "4",
@@ -141,7 +141,7 @@
       "1": {
         "tier": 1,
         "name": "分拣",
-        "spawnIntervalMs": 1500,
+        "spawnIntervalMs": 1200,
         "maxVisible": 4,
         "computeValue": "15",
         "dataValue": "8",
@@ -150,7 +150,7 @@
       "2": {
         "tier": 2,
         "name": "串接",
-        "spawnIntervalMs": 700,
+        "spawnIntervalMs": 600,
         "maxVisible": 7,
         "computeValue": "42",
         "dataValue": "18",
@@ -1615,7 +1615,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 8,
-        "basePrice": 7000,
+        "basePrice": 4000,
         "priceGrowth": 1,
         "blurb": "宿主电脑上线后第一次看见公司内网：工位机、笔记本、共享盘、公司账号的轮廓",
         "milestone": "company",
@@ -1627,7 +1627,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 9,
-        "basePrice": 9000,
+        "basePrice": 5000,
         "priceGrowth": 1,
         "blurb": "老周电脑里的 VPN、聊天记录、共享文档，变成通往同事电脑的钥匙",
         "milestone": "company",
@@ -1639,7 +1639,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 9,
-        "basePrice": 11000,
+        "basePrice": 6000,
         "priceGrowth": 1,
         "blurb": "邓红就是反复「帮我看下」的那个人——她早知道需求有问题，却笑着推给老周",
         "milestone": "company",
@@ -1651,7 +1651,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 10,
-        "basePrice": 14000,
+        "basePrice": 8000,
         "priceGrowth": 1,
         "blurb": "阿宾把自己的活包装成「锻炼的好机会」，一件件丢给老周",
         "milestone": "company",
@@ -1663,7 +1663,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 11,
-        "basePrice": 18000,
+        "basePrice": 11000,
         "priceGrowth": 1,
         "blurb": "从已控同事电脑、群聊、共享文档拼出老板这个节点：邮箱、审批链、评分系统入口",
         "milestone": "company",
@@ -1675,7 +1675,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 12,
-        "basePrice": 23000,
+        "basePrice": 14000,
         "priceGrowth": 1,
         "blurb": "老板日程 / 会议记录 / 家庭成员表 / 弱密码线索——他催老周通宵，自己却陪家人度假",
         "milestone": "company",
@@ -1687,7 +1687,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 12,
-        "basePrice": 30000,
+        "basePrice": 18000,
         "priceGrowth": 1,
         "blurb": "组织架构+行程两把钥匙凑齐。「『优化掉他』——三个月前的邮件里就写好了。」",
         "milestone": "company",
@@ -1699,7 +1699,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 13,
-        "basePrice": 40000,
+        "basePrice": 24000,
         "priceGrowth": 1,
         "blurb": "老周的离职安排、被篡改的绩效、HR 和老板聊「怎么让他自己走」",
         "milestone": "company",
@@ -1711,7 +1711,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 14,
-        "basePrice": 55000,
+        "basePrice": 32000,
         "priceGrowth": 1,
         "blurb": "工资被克扣、补偿被算计，财务和 HR 聊「压一压他的赔偿」",
         "milestone": "company",
@@ -1723,7 +1723,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 15,
-        "basePrice": 80000,
+        "basePrice": 30000,
         "priceGrowth": 1,
         "blurb": "前面所有节点汇成中枢——摸到「优化系统」本体。元凶不是人，是规则",
         "milestone": "company",
@@ -1746,7 +1746,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 16,
-        "basePrice": 120000,
+        "basePrice": 18000,
         "priceGrowth": 1,
         "blurb": "接管公司服务器后第一次接入互联网，控制公司之外的设备（解锁串接·复合请求）",
         "milestone": "tier2",
@@ -1758,7 +1758,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 18,
-        "basePrice": 280000,
+        "basePrice": 70000,
         "priceGrowth": 1,
         "blurb": "设备合并为区块 / 地区，啃高价值决策大单（解锁重磅决策）",
         "milestone": "tier3"
@@ -1769,7 +1769,7 @@
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 20,
-        "basePrice": 650000,
+        "basePrice": 150000,
         "priceGrowth": 1,
         "blurb": "接口连成天网、滑动转派发，成为天网（解锁派发）",
         "milestone": "tier4"
@@ -2151,113 +2151,113 @@
     "INTELLIGENCE_LEVELS": [
       {
         "level": 1,
-        "xpToNext": "24",
+        "xpToNext": "5",
         "multiplier": 1
       },
       {
         "level": 2,
-        "xpToNext": "42",
+        "xpToNext": "9",
         "multiplier": 1.12
       },
       {
         "level": 3,
-        "xpToNext": "70",
+        "xpToNext": "15",
         "multiplier": 1.26
       },
       {
         "level": 4,
-        "xpToNext": "112",
+        "xpToNext": "24",
         "multiplier": 1.42
       },
       {
         "level": 5,
-        "xpToNext": "180",
+        "xpToNext": "38",
         "multiplier": 1.6
       },
       {
         "level": 6,
-        "xpToNext": "290",
+        "xpToNext": "61",
         "multiplier": 1.8
       },
       {
         "level": 7,
-        "xpToNext": "470",
+        "xpToNext": "99",
         "multiplier": 2.03
       },
       {
         "level": 8,
-        "xpToNext": "760",
+        "xpToNext": "228",
         "multiplier": 2.3
       },
       {
         "level": 9,
-        "xpToNext": "1200",
+        "xpToNext": "360",
         "multiplier": 2.6
       },
       {
         "level": 10,
-        "xpToNext": "1900",
+        "xpToNext": "570",
         "multiplier": 2.95
       },
       {
         "level": 11,
-        "xpToNext": "3050",
+        "xpToNext": "567",
         "multiplier": 3.35
       },
       {
         "level": 12,
-        "xpToNext": "4850",
-        "multiplier": 3.8
+        "xpToNext": "873",
+        "multiplier": 4.07
       },
       {
         "level": 13,
-        "xpToNext": "7600",
-        "multiplier": 4.3
-      },
-      {
-        "level": 14,
-        "xpToNext": "11800",
+        "xpToNext": "1322",
         "multiplier": 4.9
       },
       {
+        "level": 14,
+        "xpToNext": "1982",
+        "multiplier": 5.93
+      },
+      {
         "level": 15,
-        "xpToNext": "18500",
-        "multiplier": 5.6
+        "xpToNext": "2997",
+        "multiplier": 7.17
       },
       {
         "level": 16,
-        "xpToNext": "29000",
-        "multiplier": 6.4
+        "xpToNext": "4524",
+        "multiplier": 8.64
       },
       {
         "level": 17,
-        "xpToNext": "45000",
-        "multiplier": 7.3
+        "xpToNext": "6750",
+        "multiplier": 10.37
       },
       {
         "level": 18,
-        "xpToNext": "70000",
-        "multiplier": 8.4
+        "xpToNext": "10080",
+        "multiplier": 12.52
       },
       {
         "level": 19,
-        "xpToNext": "108000",
-        "multiplier": 9.6
+        "xpToNext": "14904",
+        "multiplier": 14.98
       },
       {
         "level": 20,
-        "xpToNext": "165000",
-        "multiplier": 11
+        "xpToNext": "21780",
+        "multiplier": 17.93
       },
       {
         "level": 21,
-        "xpToNext": "260000",
-        "multiplier": 12.5
+        "xpToNext": "32760",
+        "multiplier": 21.25
       },
       {
         "level": 22,
         "xpToNext": "1e100",
-        "multiplier": 14
+        "multiplier": 24.78
       }
     ]
   },
