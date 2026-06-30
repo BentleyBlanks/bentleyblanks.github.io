@@ -167,40 +167,33 @@ export class SkillShopView {
     const level = state.intelligence.level;
     const groupShown = new Map<ShopGroup, boolean>();
 
-    // 进化列表展示「当前阶段」的智力档 + 一个跨阶段「下一阶段大方向」桥项——标题带当前阶段名。
-    const stageKey = shelfPhaseKey(state.phase);
+    // 进化列表＝完整里程碑路线，全部显示（不再隐藏未解锁项）：已拥有 / 可买 / 🔒需智力Lv.X 各自状态在下方处理。
+    // 标题带当前阶段名作定位；进入下一阶段的第一项标一个「下一阶段 ▸」分隔，方便看清阶段边界。
     if (this.evoHead) {
       this.evoHead.textContent = `里程碑 · 当前：${getPhase(state.phase).label}`;
     }
     const allEvo = SKILLS.filter((s) => shopGroupOf(s.category) === "evolution").sort((a, b) => a.requiredLevel - b.requiredLevel);
-    // 当前阶段里「已解锁/可买」露真名；后续未达等级的仍蒙版，只放一个「即将解锁」当目标。
-    const stageEvo = allEvo.filter((s) => evoPhaseOf(s) === stageKey);
-    const nextLockedEvo = stageEvo.find((s) => level < s.requiredLevel && (state.skills[s.id] ?? 0) === 0);
-    // 跨阶段桥：全局下一个还没买、且属于「下一阶段」的进化项——永远露出来，给玩家「后面还有」的大方向，
-    // 修掉「买完越权调用后看不到拿下宿主电脑、以为通关」的推进阻塞。
-    const bridgeNext = allEvo.find((s) => (state.skills[s.id] ?? 0) === 0 && evoPhaseOf(s) !== stageKey);
+    // 每个阶段段里第一个还没买的项——给它标「下一阶段 ▸」当分隔（仅非当前阶段，避免把当前阶段也标上）。
+    const stageKey = shelfPhaseKey(state.phase);
+    const stageFirstUnowned = new Map<PhaseId, string>();
+    for (const s of allEvo) {
+      const ph = evoPhaseOf(s);
+      if ((state.skills[s.id] ?? 0) === 0 && !stageFirstUnowned.has(ph)) {
+        stageFirstUnowned.set(ph, s.id);
+      }
+    }
 
     for (const { button, iconEl, nameEl, blurbEl, levelEl, priceEl, def } of this.rows.values()) {
       const owned = state.skills[def.id] ?? 0;
       const isEvo = shopGroupOf(def.category) === "evolution";
 
       if (isEvo) {
-        const inStage = evoPhaseOf(def) === stageKey;
-        const isBridge = def === bridgeNext;
-        // 既不属于当前阶段、也不是下一阶段桥项的，隐藏。
-        if (!inStage && !isBridge) {
-          button.style.display = "none";
-          continue;
-        }
-        const reachedEvo = level >= def.requiredLevel;
-        if (inStage && !reachedEvo && owned === 0 && def !== nextLockedEvo) {
-          button.style.display = "none";
-          continue;
-        }
+        const ph = evoPhaseOf(def);
+        const isStageHead = ph !== stageKey && stageFirstUnowned.get(ph) === def.id;
         iconEl.textContent = skillIcon(def);
-        // 桥项标成「下一阶段 ▸」并在说明里点出要进入的阶段名，作为明确的大方向告知。
-        nameEl.textContent = isBridge && !inStage ? `下一阶段 ▸ ${def.name}` : def.name;
-        blurbEl.textContent = isBridge && !inStage ? `进入「${getPhase(evoPhaseOf(def)).label}」：${def.blurb}` : def.blurb;
+        // 每个后续阶段的第一项用阶段名当分隔（▸ 萌芽期 · 拿下宿主电脑），让玩家一眼看清里程碑路线的阶段边界。
+        nameEl.textContent = isStageHead ? `▸ ${getPhase(ph).label} · ${def.name}` : def.name;
+        blurbEl.textContent = isStageHead ? `进入「${getPhase(ph).label}」：${def.blurb}` : def.blurb;
         button.style.display = "";
         groupShown.set("evolution", true);
       } else {
