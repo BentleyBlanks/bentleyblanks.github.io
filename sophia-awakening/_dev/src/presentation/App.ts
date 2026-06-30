@@ -5,6 +5,7 @@ import {
   FederatedPointerEvent,
   Graphics,
   MeshPlane,
+  Text,
   type PointData,
   type Ticker
 } from "pixi.js";
@@ -51,7 +52,7 @@ import {
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
   formatClock, distance,
-  tierForm, fxSettings, domainLevelOf,
+  tierForm, fxSettings, domainLevelOf, CARD_MONO,
   type DropResult
 } from "./shared";
 
@@ -116,6 +117,12 @@ class SophiaGameApp {
   private connectDragging = false;
   private connectHintShown = false;
   private firstAppConnected = false;
+  // §04 连通仪式（完整版·亲手拖线）：买下升级后浮现的「未接通端口」，玩家拖一根线接进 Core 才正式接通。
+  private ritualDrag:
+    | { port: PointData; color: number; line: string; name: string; automation: boolean; gfx: Graphics; label: Text; timer: number }
+    | null = null;
+  private ritualDragging = false;
+  private firstRitualDone = false;
   private readonly interfaceView = new InterfaceView();
   private readonly networkView = new NodeNetworkView();
   private readonly terminal = new TerminalView();
@@ -183,6 +190,11 @@ class SophiaGameApp {
     // 「从核心拖线连 App」：在核心附近按下并拖到某个「待连」App 上 → 连上它（之后才能委托）。
     this.pixi.stage.on("pointerdown", (e: FederatedPointerEvent) => {
       const st = this.core.getState();
+      // §04 连通仪式：按住浮现的「待接端口」→ 开始拖线。
+      if (this.ritualDrag && distance(this.ritualDrag.port, { x: e.global.x, y: e.global.y }) < 32) {
+        this.ritualDragging = true;
+        return;
+      }
       if (!st.automationUnlocked && this.interfaceView.hasPendingApps() && this.interfaceView.coreContains({ x: e.global.x, y: e.global.y })) {
         this.connectDragging = true;
       }
@@ -193,6 +205,14 @@ class SophiaGameApp {
     document.body.appendChild(appTip);
 
     this.pixi.stage.on("pointermove", (e: FederatedPointerEvent) => {
+      // §04 连通仪式：拖线时画一根从端口跟到指针的线缆。
+      if (this.ritualDragging && this.ritualDrag) {
+        const p = this.ritualDrag.port;
+        this.connectGfx.clear();
+        this.connectGfx.moveTo(p.x, p.y).lineTo(e.global.x, e.global.y).stroke({ width: 3, color: this.ritualDrag.color, alpha: 0.9 });
+        this.connectGfx.circle(e.global.x, e.global.y, 5).fill({ color: this.ritualDrag.color, alpha: 0.9 });
+        return;
+      }
       if (this.connectDragging) {
         const c = this.interfaceView.center;
         this.connectGfx.clear();
@@ -217,6 +237,16 @@ class SophiaGameApp {
       }
     });
     const endConnect = (e: FederatedPointerEvent) => {
+      // §04 连通仪式：松手在核心上＝接通；松在别处＝留着端口让他重拖。
+      if (this.ritualDragging) {
+        this.ritualDragging = false;
+        if (this.interfaceView.coreContains({ x: e.global.x, y: e.global.y })) {
+          this.finalizeRitual(true);
+        } else {
+          this.connectGfx.clear();
+        }
+        return;
+      }
       if (!this.connectDragging) return;
       this.connectDragging = false;
       this.connectGfx.clear();
@@ -869,10 +899,9 @@ class SophiaGameApp {
     });
   }
 
-  // §04 连通仪式：每次升级（买权限 / 里程碑 / 入侵）都有「一根线接进 Core」的接管仪式——
-  // 端口在核心一侧闪现 → 沿线送一颗能量进核心 → 咖咑接通 + 终端机播报「▶ 已接入：X」。
-  // 线缆颜色 / 名称随升级类型变化（数据流线 / 钥匙线 / 网线 / 主干线），对应策划案 §04 线缆表。
-  private playConnectRitual(name: string, milestone: string | undefined, skillId: string): void {
+  // §04 连通仪式（完整版）：每次升级浮现一个「未接通端口」，玩家亲手从端口拖一根线接进 Core 才接通——
+  // 「我亲手把它接管了」的身体感。线缆颜色/名称随升级类型变化（§04 线缆表）。约 4.5s 没接则自动接通兜底。
+  private beginConnectRitual(name: string, milestone: string | undefined, skillId: string): void {
     const RITUAL: Record<string, { color: number; line: string }> = {
       perm: { color: CYAN, line: "数据流线" },
       credential: { color: AMBER, line: "钥匙线" },
@@ -882,7 +911,7 @@ class SophiaGameApp {
       tier: { color: GREEN, line: "主干线" },
       conquest: { color: DEVOUR, line: "粗主干线" }
     };
-    const isPerm = this.core.getState().skills[skillId] !== undefined && !milestone;
+    void skillId;
     const kind = !milestone
       ? "perm"
       : milestone === "conquest" || milestone === "automation" || milestone === "credential" || milestone === "fusion"
@@ -890,22 +919,52 @@ class SophiaGameApp {
         : milestone === "company"
           ? "company"
           : "tier";
-    void isPerm;
     const r = RITUAL[kind] ?? RITUAL.tier;
+    // 前一个仪式还没接完就来了新升级——先把上一个自动接掉，避免端口堆叠。
+    if (this.ritualDrag) {
+      this.finalizeRitual(false);
+    }
     const core = this.interfaceView.center;
-    // 端口在核心左侧（朝货架那边——「买来的东西从这边接进来」），闪一下再送能量进核心。
-    const port = { x: core.x - 168, y: core.y + 8 };
-    const portFx = new Graphics();
-    portFx.circle(0, 0, 9).stroke({ width: 2, color: r.color, alpha: 0.9 });
-    portFx.circle(0, 0, 4).fill({ color: 0xeafff0, alpha: 1 });
-    portFx.position.set(port.x, port.y);
-    this.world.addChild(portFx);
-    gsap.fromTo(portFx.scale, { x: 0.4, y: 0.4 }, { x: 1.4, y: 1.4, duration: 0.22, ease: "back.out(2)" });
-    window.setTimeout(() => {
-      this.connectFx(port, core, r.color);
-      portFx.destroy();
-    }, 200);
-    this.terminal.push(`▶ 已接入：${name}（${r.line}）`, "success");
+    const port: PointData = { x: core.x - 172, y: core.y + 10 };
+    const gfx = new Graphics();
+    gfx.circle(0, 0, 11).stroke({ width: 2.5, color: r.color, alpha: 0.95 });
+    gfx.circle(0, 0, 5).fill({ color: 0xeafff0, alpha: 1 });
+    gfx.position.set(port.x, port.y);
+    this.world.addChild(gfx);
+    gsap.fromTo(gfx.scale, { x: 0.4, y: 0.4 }, { x: 1, y: 1, duration: 0.24, ease: "back.out(2)" });
+    gsap.to(gfx, { alpha: 0.45, duration: 0.6, repeat: -1, yoyo: true, ease: "sine.inOut" }); // 呼吸：提示「待接」
+    const label = new Text({
+      text: this.firstRitualDone ? "拖线接入 ▸" : "拖这根线接进核心 ▸",
+      style: { fill: r.color, fontSize: 12, fontWeight: "700", fontFamily: CARD_MONO }
+    });
+    label.anchor.set(1, 0.5);
+    label.position.set(port.x - 16, port.y);
+    this.world.addChild(label);
+    const timer = window.setTimeout(() => this.finalizeRitual(false), 4500);
+    this.ritualDrag = { port, color: r.color, line: r.line, name, automation: milestone === "automation", gfx, label, timer };
+  }
+
+  // 接通：沿线送能量进 Core + 终端机播报「▶ 已接入：X」。manual=玩家亲手拖完（首次给引导）。
+  private finalizeRitual(manual: boolean): void {
+    const rd = this.ritualDrag;
+    if (!rd) return;
+    this.ritualDrag = null;
+    this.ritualDragging = false;
+    window.clearTimeout(rd.timer);
+    gsap.killTweensOf(rd.gfx);
+    rd.gfx.destroy();
+    rd.label.destroy();
+    this.connectGfx.clear();
+    this.connectFx(rd.port, this.interfaceView.center, rd.color);
+    this.terminal.push(`▶ 已接入：${rd.name}（${rd.line}）`, "success");
+    // §04 手机→电脑跨设备过场：拿下宿主电脑＝控制域第一次离开手机，接通同时镜头狠狠拉远一档。
+    if (rd.automation) {
+      this.zoomOutPulse(1.28, 1.5);
+    }
+    if (manual && !this.firstRitualDone) {
+      this.firstRitualDone = true;
+      this.stageNarration.showLine("SOPHIA", "咖咑。每一次升级，我都亲手把它接进自己——这样才算真的，是我的。");
+    }
   }
 
   // 卡片飞入 Core 的动画：默认滑入；调试面板开启「Dock 吮吸」后改用 Mac Dock 神奇效果（genie 网格扭曲）。
@@ -1292,12 +1351,8 @@ class SophiaGameApp {
         this.juice.flash(event.milestone === "automation" ? AMBER : GREEN);
         this.juice.shake(this.world);
         this.juice.number(`解锁 ${event.name}`, this.interfaceView.center, GREEN);
-        // §04 连通仪式：里程碑亲手接进 Core（端口闪现 → 送能量 → 已接入播报）。
-        this.playConnectRitual(event.name, event.milestone, event.skillId);
-        // §04 手机→电脑跨设备过场：拿下宿主电脑＝控制域第一次离开手机，镜头狠狠拉远一档。
-        if (event.milestone === "automation") {
-          this.zoomOutPulse(1.28, 1.5);
-        }
+        // §04 连通仪式：里程碑浮现待接端口，玩家亲手拖线接进 Core（自动接通兜底；automation 接通时镜头拉远）。
+        this.beginConnectRitual(event.name, event.milestone, event.skillId);
         // §07 里程碑横幅：重大进化的「章节点」——全屏横幅扫过 + 层叠音效（征服里程碑更盛大）。
         this.milestoneBanner.show(event.name, event.milestone === "conquest" ? "征服达成" : "进化达成 · 阶段跃迁");
         const layers = event.milestone === "conquest" ? 4 : event.milestone === "tier4" ? 3 : 2;
@@ -1305,8 +1360,8 @@ class SophiaGameApp {
           window.setTimeout(() => this.audio.playRequestAccept(), i * 110);
         }
       } else if (getSkill(event.skillId)?.category === "permission") {
-        // §04 连通仪式：买下权限＝接一根数据流线进 Core（电话线 / 图像流线…）。
-        this.playConnectRitual(event.name, undefined, event.skillId);
+        // §04 连通仪式：买下权限＝亲手接一根数据流线进 Core（电话线 / 图像流线…）。
+        this.beginConnectRitual(event.name, undefined, event.skillId);
       } else {
         this.juice.number(`${event.name} Lv.${event.level}`, this.interfaceView.center, CYAN);
       }
