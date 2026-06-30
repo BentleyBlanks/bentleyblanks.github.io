@@ -609,7 +609,7 @@ button:disabled {
 .exposure-actions-pop {
   position: fixed;
   z-index: 58;
-  top: 92px;
+  top: 168px;
   right: calc(var(--right-rail) + 16px);
   display: none;
   flex-direction: column;
