@@ -1320,22 +1320,9 @@ body.exposed .screen-veil {
   font-family: "Cascadia Mono", Consolas, monospace;
 }
 
-/* ---- right sidebar polish ---- */
+/* .control-panel 现在是透明布局容器（不再带背景/边框/滚动）——两个子框各自描边。 */
 .control-panel {
-  border-color: rgba(137, 255, 154, 0.16);
   gap: 14px;
-  background: linear-gradient(180deg, rgba(16, 21, 20, 0.93), rgba(11, 15, 15, 0.9));
-  scrollbar-width: thin;
-  scrollbar-color: rgba(137, 255, 154, 0.3) transparent;
-}
-
-.control-panel::-webkit-scrollbar {
-  width: 8px;
-}
-
-.control-panel::-webkit-scrollbar-thumb {
-  border-radius: 8px;
-  background: rgba(137, 255, 154, 0.22);
 }
 
 .panel-kicker {
