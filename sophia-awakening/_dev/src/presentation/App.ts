@@ -1483,8 +1483,6 @@ class SophiaGameApp {
 
     const playfieldLeft = LEFT_RAIL_WIDTH;
     const playfieldRight = w - RIGHT_RAIL_WIDTH;
-    this.background.rect(0, 0, playfieldLeft, h).fill({ color: 0x080b0b, alpha: 0.34 });
-    this.background.moveTo(playfieldLeft, 0).lineTo(playfieldLeft, h).stroke({ width: 1, color: 0x89ff9a, alpha: 0.1 });
 
     // 隐隐约约的「宿主手机桌面」：散落在背景里的其它 App 图标 + 一块数据电路板的走线，
     // 暗示 SOPHIA 此刻只是这部手机里众多 App 中的一个。极低 alpha，不抢前景。
@@ -1577,5 +1575,4 @@ function clearPersistedSophiaState(saveManager: SaveManager | null, clearRevisio
     window.localStorage.removeItem(PERSISTENCE_REVISION_KEY);
   }
 }
-
 
