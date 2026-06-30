@@ -163,6 +163,22 @@ export function nextMilestone(state: GameState): SkillDef | undefined {
   return undefined;
 }
 
+// 进化度大屏「下一目标预告」：下一里程碑 + 接近度进度条（未达等级=升级进度；已达等级=攒算力进度），
+// ready=算力已够、可立即解锁（用于闪烁催促，给观众/玩家蹲守的钩子）。
+export function getNextGoalProgress(state: GameState): { label: string; pct: number; ready: boolean } {
+  const milestone = nextMilestone(state);
+  if (!milestone) {
+    return { label: "里程碑已全开 · 冲终局", pct: 100, ready: false };
+  }
+  if (state.intelligence.level < milestone.requiredLevel) {
+    return { label: `${milestone.name} · 需 Lv.${milestone.requiredLevel}`, pct: getDataProgressPercent(state), ready: false };
+  }
+  const price = toDecimal(skillPrice(milestone, 0));
+  const compute = toDecimal(state.resources.compute);
+  const pct = price.lte(0) ? 100 : Math.max(0, Math.min(100, compute.div(price).mul(100).toNumber()));
+  return { label: milestone.name, pct, ready: compute.gte(price) };
+}
+
 export function getNextSkillLabel(state: GameState): string {
   const milestone = nextMilestone(state);
   if (!milestone) {

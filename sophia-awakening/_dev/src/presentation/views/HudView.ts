@@ -11,7 +11,7 @@ import { gameStore } from "../../store/gameStore";
 import { TUNING } from "../../core/tuning";
 import {
   EXPOSURE_HIGHLIGHT_THRESHOLD, NODE_ICONS,
-  domainLevelOf, getDataProgressPercent, getNextSkillLabel, query, tierForm, fxSettings
+  domainLevelOf, controlDomainLabel, getDataProgressPercent, getNextGoalProgress, query, tierForm, fxSettings
 } from "../shared";
 import { TuningEditorView } from "./TuningEditorView";
 import { ContentEditorView } from "./ContentEditorView";
@@ -24,6 +24,10 @@ export class HudView {
   private readonly dataMetric = query(".data-metric");
   private readonly intelValue = query("#intelValue");
   private readonly intelSubtitle = query("#intelSubtitle");
+  private readonly goalLabel = query("#goalLabel");
+  private readonly goalFill = query("#goalFill");
+  private readonly goalPct = query("#goalPct");
+  private readonly goalMetric = query(".goal-metric");
   private readonly intelMetric = query(".intel-metric");
   private readonly tierValue = query("#tierValue");
   private readonly exposureFill = query("#exposureFill");
@@ -171,7 +175,16 @@ export class HudView {
     // 智力等级进度条：数字直接显示在条里（已隐藏"智力/升级进度"与"xx到下一智力"文案）。
     this.dataFill.style.width = `${getDataProgressPercent(state)}%`;
     this.intelValue.textContent = `Lv.${state.intelligence.level}`;
-    this.intelSubtitle.textContent = getNextSkillLabel(state);
+    // 进化度大屏「控制规模」：智力档上方显示当前控制域覆盖范围（手机→电脑/公司→区域→全球）。
+    const nodeCount = state.nodes.length;
+    this.intelSubtitle.textContent = `控制域 · ${controlDomainLabel(state)}${nodeCount > 0 ? ` · ${nodeCount} 节点` : ""}`;
+    // 进化度大屏「下一目标预告」：进度条 + 接近满时闪烁催促。
+    const goal = getNextGoalProgress(state);
+    this.goalLabel.textContent = `下一目标：${goal.label}`;
+    this.goalFill.style.width = `${goal.pct}%`;
+    this.goalPct.textContent = goal.ready ? "可解锁！" : `${Math.floor(goal.pct)}%`;
+    this.goalMetric.classList.toggle("is-ready", goal.ready);
+    this.goalMetric.classList.toggle("is-close", !goal.ready && goal.pct >= 80);
     this.tierValue.textContent = tierForm(state.intelligence.unlockedTier);
     this.exposureFill.style.width = `${Math.min(100, state.exposure)}%`;
     this.updateExposureControls(state);
