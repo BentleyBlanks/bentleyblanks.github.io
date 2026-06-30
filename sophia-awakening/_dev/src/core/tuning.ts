@@ -54,6 +54,7 @@ export const TUNING = {
   appDelayMs:           3600,     // 委托 App 处理时，App 比 Core 多花的时间 (ms)——初期故意慢一倍，体感"它真在处理"
   delegateTimeMult:     2.4,      // §04 委托给大恨老师的处理耗时倍率（相对 Core，越大越慢）
   delegateRewardMult:   0.78,     // §04 委托收益系数（相对亲自处理，大恨老师弱、收益打折）
+  delegateRewardMultPC: 0.92,     // §04 大恨老师搬进电脑后「变强」的委托收益系数（拿下宿主电脑后用，仍略低于亲自）
 };
 
 export type TuningKey = keyof typeof TUNING;
@@ -104,6 +105,7 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   appDelayMs:           { label: "App 委托额外耗时 (ms)",    section: "前期卡片",   min: 0,     max: 6000,  step: 100  },
   delegateTimeMult:     { label: "委托耗时倍率",             section: "前期卡片",   min: 1,     max: 5,     step: 0.1  },
   delegateRewardMult:   { label: "委托收益系数",             section: "前期卡片",   min: 0.3,   max: 1,     step: 0.02 },
+  delegateRewardMultPC: { label: "委托收益·搬进电脑后",       section: "前期卡片",   min: 0.3,   max: 1,     step: 0.02 },
 };
 
 // 重置为初始默认值（用于 debug 面板「重置」按钮）

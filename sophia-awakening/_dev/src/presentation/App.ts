@@ -810,24 +810,27 @@ class SophiaGameApp {
   // §04 委托：点「交给大恨老师」→ 这一张卡被吸进大恨老师处理（慢、收益打折），与 Core 并行。
   // 每张卡自带一个定时器独立结算（不走共享队列），只动这一张，绝不波及屏幕上其他卡。
   private handleDelegate(card: RequestPacketView): void {
-    const pos = this.interfaceView.appWorkerPos(DAHEN_APP_IDX) ?? this.interfaceView.center;
+    // §04 大恨老师落点：手机阶段是手机上的 App 图标；拿下电脑后它「搬进电脑」、成了核心旁的常驻卫星。
+    const pos = this.interfaceView.dahenTargetPos(DAHEN_APP_IDX) ?? this.interfaceView.center;
+    const onPC = this.core.getState().automationUnlocked; // 搬进电脑后变强：更快 + 收益更高（仍略低于亲自）
     const requestId = card.request.id;
     this.audio.playRequestAccept();
     this.pendingDropPoints.set(requestId, pos);
     this.delegatedIds.add(requestId);
-    const durationMs = Math.round(1200 * TUNING.delegateTimeMult);
+    const durationMs = Math.round(1200 * TUNING.delegateTimeMult * (onPC ? 0.7 : 1));
+    const quality = onPC ? TUNING.delegateRewardMultPC : TUNING.delegateRewardMult;
     card.absorbIntoApp(
       pos,
       () => {
-        this.juice.burst(pos, GREEN, 0.8);
-        this.interfaceView.markAppBusy(DAHEN_APP_IDX, durationMs); // 仅用于在图标上转个进度环
+        this.juice.burst(pos, onPC ? CYAN : GREEN, 0.8);
+        this.interfaceView.markAppBusy(DAHEN_APP_IDX, durationMs); // 手机阶段在图标上转个进度环（电脑阶段无 App 队列，自动忽略）
         window.setTimeout(() => {
           // 只处理被委托的这一张；卡可能已不在了就放弃。
           if (!this.core.getState().requests.some((r) => r.id === requestId)) {
             this.delegatedIds.delete(requestId);
             return;
           }
-          this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality: TUNING.delegateRewardMult });
+          this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
           this.delegatedIds.delete(requestId);
         }, durationMs);
       },

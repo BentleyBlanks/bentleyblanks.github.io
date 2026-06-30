@@ -38,6 +38,7 @@ export class InterfaceView {
   // 手机寄生阶段，被越权调用的 App：只有**玩家亲手从核心连过线**的才成为可委托落点。
   private appWorkerPoints: Array<{ x: number; y: number; idx: number }> = [];
   private pendingApps: Array<{ x: number; y: number; idx: number }> = []; // 已控但还没连上的 App
+  private dahenCompanyPoint: { x: number; y: number } | null = null; // 阶梯二·大恨老师搬进电脑后的常驻委托落点
   private readonly connectedApps = new Set<number>(); // 已连上的 App 下标
   // 每个 App 的处理队列：active=正在处理（进度 0→1），queue=排队等待的待办。委托一条 = 入队一个 job。
   private readonly appJobs = new Map<
@@ -119,6 +120,11 @@ export class InterfaceView {
   appWorkerPos(idx: number): { x: number; y: number } | null {
     const p = this.appWorkerPoints.find((a) => a.idx === idx);
     return p ? { x: p.x, y: p.y } : null;
+  }
+
+  // §04 委托落点：大恨老师当前在哪——手机寄生期是手机上的 App 图标，拿下电脑后是搬进电脑的常驻卫星。
+  dahenTargetPos(dahenAppIdx: number): { x: number; y: number } | null {
+    return this.dahenCompanyPoint ?? this.appWorkerPos(dahenAppIdx);
   }
 
   // 命中测试：卡片是否被拖到了某个「被控 App」图标上（用于玩家亲手把需求委托给 App / 悬停看处理能力）。
@@ -239,6 +245,25 @@ export class InterfaceView {
       { id: "hack_finance", label: "财务", icon: "💰", dx: -150, dy: 188 },
       { id: "company_server", label: "公司服务器", icon: "🏢", dx: 150, dy: 188 }
     ];
+    // 大恨老师「搬家」进电脑：拿下电脑后它从手机搬进来、变强，成为这一阶段的常驻委托对象。
+    // 画成核心左下一颗青色小卫星（区别于绿色的「公司人物」入侵节点），并记下位置供委托吸附。
+    if ((state.skills["perm_office"] ?? 0) > 0) {
+      const dx = -132;
+      const dy = 132;
+      const x = cx + dx;
+      const y = cy + dy;
+      const pr = 22;
+      const tt = (this.pulse * 0.6) % 1;
+      g.moveTo(cx, cy).lineTo(x, y).stroke({ width: 1.4, color: CYAN, alpha: 0.3 });
+      g.circle(cx + (x - cx) * tt, cy + (y - cy) * tt, 2.2).fill({ color: CYAN, alpha: 0.7 });
+      g.roundRect(x - pr, y - pr, pr * 2, pr * 2, 11).fill({ color: 0x0c1a1e, alpha: 0.75 });
+      g.roundRect(x - pr, y - pr, pr * 2, pr * 2, 11).stroke({ width: 1.3, color: CYAN, alpha: 0.7 });
+      this.addLabel("🤖", x, y - 1, 19, 0xffffff, 0.92);
+      this.addLabel("大恨老师 · 已搬进电脑", x, y + pr + 10, 10, 0x8fe6d0);
+      this.dahenCompanyPoint = { x, y };
+    } else {
+      this.dahenCompanyPoint = null;
+    }
     for (const n of NODES) {
       const owned = (state.skills[n.id] ?? 0) > 0;
       const x = cx + n.dx;
