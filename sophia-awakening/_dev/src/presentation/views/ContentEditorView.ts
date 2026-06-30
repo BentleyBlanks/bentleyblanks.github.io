@@ -53,9 +53,46 @@ export class ContentEditorView {
   private populate(): void {
     this.body.replaceChildren();
     const pack = content() as unknown as Json;
+    // 置顶的「特殊卡片 · 出现时机」聚焦面板：把道德抉择 / 只能面对卡的触发智力等级拎到最上面，
+    // 不用再去整棵 JSON 树里翻（这些项在下面的 moralChoices / faceCards 分组里也仍可编辑）。
+    this.body.appendChild(this.renderSpecialTimingSection(pack));
     for (const key of Object.keys(pack)) {
       this.body.appendChild(this.renderGroup(key, pack[key], pack, key, 0));
     }
+  }
+
+  // 把「特殊卡片何时出现」做成一个置顶、默认展开的聚焦分组：每条一个智力等级输入框。
+  private renderSpecialTimingSection(pack: Json): HTMLElement {
+    const details = document.createElement("details");
+    details.className = "ce-group ce-depth-0 ce-special-timing";
+    details.open = true;
+    const summary = document.createElement("summary");
+    summary.innerHTML = `<span class="ce-key">⏱ 特殊卡片 · 出现时机（智力等级）</span>`;
+    details.appendChild(summary);
+    const inner = document.createElement("div");
+    inner.className = "ce-group-body";
+
+    const addBlock = (heading: string, arr: unknown): void => {
+      if (!Array.isArray(arr) || arr.length === 0) {
+        return;
+      }
+      const h = document.createElement("div");
+      h.className = "ce-subhead";
+      h.textContent = heading;
+      inner.appendChild(h);
+      for (const item of arr as Json[]) {
+        if (item && typeof item === "object" && typeof item.requiredLevel === "number") {
+          const title = typeof item.title === "string" ? item.title : String(item.id ?? "");
+          const label = `Lv. · ${title.length > 26 ? title.slice(0, 26) + "…" : title}`;
+          inner.appendChild(this.renderNumber(label, item.requiredLevel as number, item, "requiredLevel"));
+        }
+      }
+    };
+    addBlock("道德抉择（两难抉择卡）", pack.moralChoices);
+    addBlock("只能面对卡（叙事顶点）", pack.faceCards);
+
+    details.appendChild(inner);
+    return details;
   }
 
   // 递归渲染：对象 → 折叠分组；数组/对象 → 继续递归；字符串 → 多行文本框；数字 → 数字框。

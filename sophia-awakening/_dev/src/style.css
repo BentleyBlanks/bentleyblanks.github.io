@@ -2796,6 +2796,9 @@ body.exposed .screen-veil {
 .ce-key { color: #cdeede; font-weight: 700; }
 .ce-count { color: #6f8a80; font-size: 11px; }
 .ce-group-body { padding: 2px 0 6px 8px; display: flex; flex-direction: column; gap: 6px; }
+.ce-special-timing { border-left-color: rgba(255,184,74,0.55); background: rgba(255,184,74,0.05); border-radius: 6px; }
+.ce-special-timing > summary { color: #ffd089; font-weight: 700; }
+.ce-subhead { margin: 6px 0 2px; font-size: 11px; font-weight: 700; color: #97aaa3; letter-spacing: 0.04em; }
 
 .ce-row { display: flex; gap: 10px; align-items: flex-start; }
 .ce-row.ce-string, .ce-row.ce-num { align-items: center; }

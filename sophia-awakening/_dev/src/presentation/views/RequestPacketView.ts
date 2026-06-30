@@ -255,6 +255,7 @@ export class RequestPacketView {
             fontWeight: "800",
             fontFamily: CARD_FONT,
             wordWrap: true,
+            breakWords: true, // 中文标题无空格——缺它则带 <em> 的长标题换行后整段 em 丢失（标题只剩前缀）
             wordWrapWidth: UI.cardWidth - 32,
             // <em> = 关键信息：保持加粗、染成高亮金色，从标题里跳出来。
             tagStyles: { em: { fill: 0xffe08a, fontWeight: "900" } }

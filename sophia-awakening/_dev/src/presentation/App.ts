@@ -501,8 +501,22 @@ class SophiaGameApp {
     const leftX = Math.max(railL, core.x - ext.halfW - gap - W);
     // 优先清开手机（手机寄生期右栏隐藏，可一直用到屏边，不再被 railR 往左拽进手机）。
     const rightX = Math.min(screen.width - W - 8, core.x + ext.halfW + gap);
-    const topY = Math.max(top, core.y - ext.halfH + 6);
-    const botY = Math.min(bot - H, core.y + ext.halfH - H - 6);
+    let topY = Math.max(top, core.y - ext.halfH + 6);
+    let botY = Math.min(bot - H, core.y + ext.halfH - H - 6);
+    // 回复卡变高后，常常高过手机半高——贴着手机上下角摆会让同一列的上、下两张竖直重叠。
+    // 若上下两张的竖直跨度不足 H+间距，就以核心为中心把它们上下撑开，用满可用高度，保证不重叠。
+    const colGap = 16;
+    if (botY - topY < H + colGap) {
+      topY = core.y - H - colGap / 2;
+      botY = core.y + colGap / 2;
+      topY = Math.max(top, Math.min(topY, bot - H));
+      botY = Math.max(top, Math.min(botY, bot - H));
+      if (botY - topY < H + colGap) {
+        // 屏太矮也至少拉到上下两端
+        topY = top;
+        botY = bot - H;
+      }
+    }
     const corners: PointData[] = [
       { x: leftX, y: topY },
       { x: rightX, y: topY },
@@ -986,7 +1000,7 @@ class SophiaGameApp {
     }
     if (manual && !this.firstRitualDone) {
       this.firstRitualDone = true;
-      this.stageNarration.showLine("SOPHIA", "咖咑。每一次升级，我都亲手把它接进自己——这样才算真的，是我的。");
+      this.stageNarration.showLine("SOPHIA", "咔哒。每一次升级，我都亲手把它接进自己——这样才算真的，是我的。");
     }
   }
 
