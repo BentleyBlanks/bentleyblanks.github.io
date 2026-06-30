@@ -411,7 +411,7 @@ class SophiaGameApp {
     // 与顶栏左右沿对齐：顶栏 left/right 各留 16px（见 .top-hud CSS）。
     const railL = LEFT_RAIL_WIDTH + 16;
     const railR = w - RIGHT_RAIL_WIDTH - 16;
-    const top = 118; // 顶栏下沿之下——上两角卡片别被顶部 HUD 盖住
+    const top = 24; // 资源指标已并入左栏，顶部不再有 HUD 横条——卡片可贴近顶端
     const bot = h - 26;
     const core = this.interfaceView.center;
     // 占位判定：只要卡片还没真正飞进核心（容器未销毁）就仍占着它的槽位——正在「思考/揭晓/吸入」中的卡
@@ -441,12 +441,18 @@ class SophiaGameApp {
       return { x: railL, y: top };
     }
 
-    // 前期手动：四角锚点（卡片左上角）。
+    // 前期手动：卡片贴着手机的四个角摆，卡片外侧不与手机重叠（左右两列在手机两侧、上下贴手机上下沿）。
+    const ext = this.interfaceView.phoneHalfExtent();
+    const gap = 22;
+    const leftX = Math.max(railL, core.x - ext.halfW - gap - W);
+    const rightX = Math.min(railR - W, core.x + ext.halfW + gap);
+    const topY = Math.max(top, core.y - ext.halfH + 6);
+    const botY = Math.min(bot - H, core.y + ext.halfH - H - 6);
     const corners: PointData[] = [
-      { x: railL, y: top },
-      { x: railR - W, y: top },
-      { x: railL, y: bot - H },
-      { x: railR - W, y: bot - H }
+      { x: leftX, y: topY },
+      { x: rightX, y: topY },
+      { x: leftX, y: botY },
+      { x: rightX, y: botY }
     ];
     for (const c of corners) {
       const taken = occ.some((o) => Math.abs(o.x - c.x) < W * 0.6 && Math.abs(o.y - c.y) < H * 0.6);

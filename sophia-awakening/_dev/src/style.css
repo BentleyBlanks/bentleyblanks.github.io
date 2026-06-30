@@ -300,7 +300,7 @@ canvas {
 
 /* 技能货架占据上方剩余空间并在内部滚动；分隔交给底部圆环的 border-top，这里不再描线。 */
 .control-panel .skill-shop-section {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   overflow-y: auto;
   min-height: 0;
   padding-bottom: 0;
@@ -2941,3 +2941,39 @@ body.exposed .screen-veil {
 
 /* UI 编辑器滑杆 */
 .ui-range { flex: 1 1 auto; min-width: 90px; accent-color: #62d6d6; cursor: pointer; }
+
+/* 资源指标合并到左上角：智力 / 算力 / 阶段·暴露 竖排卡片（合并进左侧浮动栏顶部） */
+.metric-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.metric-cluster .metric {
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(237, 242, 240, 0.07);
+}
+.metric-cluster .intel-metric {
+  background:
+    linear-gradient(120deg, rgba(98, 214, 214, 0.12), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
+  border-color: rgba(137, 255, 154, 0.18);
+}
+.metric-cluster .intel-metric .metric-label { margin-bottom: 6px; }
+.metric-cluster .compute-metric strong {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #eaf6ee;
+}
+.metric-cluster .exposure .growth-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.metric-cluster .exposure .phase-chip { font-size: 13px; font-weight: 800; color: #eaf6ee; }
+.metric-cluster .exposure .metric-subline { margin-top: 5px; }
+#topHud.is-leveling { animation: intelLevelUp 900ms ease; }

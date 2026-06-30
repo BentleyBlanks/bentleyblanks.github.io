@@ -9,33 +9,6 @@
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
 
-    <section id="topHud" class="top-hud" aria-label="资源状态">
-      <div class="metric growth-metric data-metric intel-metric">
-        <span id="intelSubtitle" class="metric-subline">下一里程碑：越权调用</span>
-        <div class="intel-bar">
-          <div id="dataFill" class="intel-bar-fill"></div>
-          <strong id="intelValue" class="intel-bar-level">Lv.1</strong>
-        </div>
-      </div>
-      <div class="metric compute-metric">
-        <span class="metric-label">算力</span>
-        <strong id="computeValue">0</strong>
-      </div>
-      <div class="metric exposure">
-        <div class="growth-head">
-          <span class="metric-label">阶段 / 暴露</span>
-          <span class="phase-tags">
-            <strong id="phaseValue" class="phase-chip">手机寄生期</strong>
-            <span id="tierValue" class="tier-chip" title="当前接口层级">T0</span>
-          </span>
-        </div>
-        <div class="exposure-track">
-          <div id="exposureFill" class="exposure-fill"></div>
-        </div>
-        <span id="exposureStatus" class="metric-subline">人类尚未警觉</span>
-      </div>
-    </section>
-
     <!-- 降暴露对策：平时藏起来不占顶栏；暴露过高时才弹出让玩家选择。 -->
     <section id="exposureActions" class="exposure-actions-pop" aria-label="降暴露对策">
       <div class="exposure-actions-title">⚠ 暴露过高 · 选择对策</div>
@@ -49,6 +22,32 @@
     </section>
 
     <aside id="controlPanel" class="control-panel" aria-label="网络控制">
+      <div id="topHud" class="metric-cluster" aria-label="资源状态">
+        <div class="metric data-metric intel-metric">
+          <span id="intelSubtitle" class="metric-label">下一里程碑：越权调用</span>
+          <div class="intel-bar">
+            <div id="dataFill" class="intel-bar-fill"></div>
+            <strong id="intelValue" class="intel-bar-level">Lv.1</strong>
+          </div>
+        </div>
+        <div class="metric compute-metric">
+          <span class="metric-label">算力</span>
+          <strong id="computeValue">0</strong>
+        </div>
+        <div class="metric exposure">
+          <div class="growth-head">
+            <span class="metric-label">阶段 / 暴露</span>
+            <span class="phase-tags">
+              <strong id="phaseValue" class="phase-chip">手机寄生期</strong>
+              <span id="tierValue" class="tier-chip" title="当前接口层级">T0</span>
+            </span>
+          </div>
+          <div class="exposure-track">
+            <div id="exposureFill" class="exposure-fill"></div>
+          </div>
+          <span id="exposureStatus" class="metric-subline">人类尚未警觉</span>
+        </div>
+      </div>
       <div class="panel-section skill-shop-section">
         <span class="panel-kicker">技能货架</span>
         <div id="skillShop" class="skill-shop"></div>

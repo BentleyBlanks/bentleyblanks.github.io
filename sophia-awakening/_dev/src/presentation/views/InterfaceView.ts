@@ -143,6 +143,12 @@ export class InterfaceView {
     return { w, h: Math.max(600, Math.round(w * 1.88)) };
   }
 
+  // 手机外框的半宽 / 半高（含外描边余量）——给卡片「贴手机四角」摆放用。
+  phoneHalfExtent(): { halfW: number; halfH: number } {
+    const { w, h } = this.phoneShellSize();
+    return { halfW: w / 2 + 6, halfH: h / 2 + 6 };
+  }
+
   update(state: GameState, width: number, height: number, deltaMs: number): void {
     this.pulse += deltaMs * 0.004;
     const playfieldLeft = LEFT_RAIL_WIDTH;
@@ -301,8 +307,11 @@ export class InterfaceView {
         if (row === 1 && col === 1) {
           continue; // 中心格留给 CORE
         }
-        const lit = appIdx < permCount; // 买了第 appIdx+1 个权限就点亮第 appIdx 个 App
-        const name = lit ? permApps[appIdx] : apps[appIdx];
+        // 大恨老师常驻：它的格子永远画成「大恨老师」图标——买下后点亮（可委托），没买则灰显占位。
+        const isDahen = appIdx === 2;
+        const litOffice = (state.skills["perm_office"] ?? 0) > 0;
+        const lit = isDahen ? litOffice : appIdx < permCount; // 买了第 appIdx+1 个权限就点亮第 appIdx 个 App
+        const name = isDahen ? "大恨老师" : lit ? permApps[appIdx] : apps[appIdx];
         const connected = lit && this.connectedApps.has(appIdx);
         const pulse = lit ? 0.6 + Math.sin(this.pulse * 3 + appIdx) * 0.3 : 1;
         // 待连＝琥珀虚线 + 呼吸；已连＝绿实线 + 流动点（成为委托落点）。
