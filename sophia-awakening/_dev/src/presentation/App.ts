@@ -297,7 +297,7 @@ class SophiaGameApp {
       this.announceGuidance(this.core.getState());
       // 全新存档才走开场脚本教学（老存档 tutorialStep 已是 done，直接进正常流程）。
       if (!this.loaded) {
-        this.terminal.push("👆 教学：按住点亮的回复，向右滑到亮起再松开。", "success");
+        this.terminal.push("👆 教学：按住回复左侧滑块，向右拖到亮起再松开。", "success");
       }
     });
 

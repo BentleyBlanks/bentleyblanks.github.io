@@ -69,7 +69,8 @@ const CLUE_CHIP_GAP_X = 7;
 const CLUE_CHIP_GAP_Y = 6;
 const CLUE_CHIP_PAD_X = 10;
 const CLUE_CHIP_MAX_W = 178;
-const REPLY_SWIPE_HANDLE_W = 34;
+const REPLY_SWIPE_HANDLE_W = 38;
+const REPLY_SWIPE_RADIUS = 6;
 const REPLY_SWIPE_TRIGGER = 0.56;
 const HEADER_H = 26;
 const HEADER_CENTER_Y = 13.5;
@@ -329,9 +330,9 @@ export class RequestPacketView {
         const locked = Boolean(opt.requires) && !(reel?.hasPerm?.(opt.requires as string) ?? true);
         this.optionLocked.push(locked);
         const swipeable = this.optionUsesSwipe(opt);
-        const lockLabel = locked ? `🔒需${LENS_NAMES[opt.requires as string] ?? "权限"}` : swipeable ? "右滑" : "";
-        const labelX = swipeable ? 58 : 32;
-        const sideReserve = locked ? 78 : swipeable ? 48 : 18;
+        const lockLabel = locked ? `🔒需${LENS_NAMES[opt.requires as string] ?? "权限"}` : "";
+        const labelX = swipeable ? 66 : 32;
+        const sideReserve = locked ? 78 : 18;
         const label = new Text({
           text: opt.text,
           style: {
@@ -366,7 +367,7 @@ export class RequestPacketView {
       // 教学引导：把 SOPHIA 的指引一句话贴在这张卡的正下方（而非中央旁白），让指引就跟着卡片。
       if (this.request.tutorial?.line) {
         this.tutorialCaption = new Text({
-          text: `◈ SOPHIA ▸ ${this.request.tutorial.line}`,
+          text: `◈ SOPHIA ▸ ${this.request.tutorial.line}\n按住回复左侧滑块，向右拖到亮起后松开。`,
           style: {
             fill: 0x9fe0c0,
             fontSize: 14,
@@ -518,7 +519,7 @@ export class RequestPacketView {
     }
     // （已删除「按住蓄力」玩法——T3 重磅卡直接拖入核心即结算。）
 
-    // 教学高亮 / 右滑回复引导：未操作时让被引导的选项和滑动箭头轻微呼吸。
+    // 教学高亮 / 右滑回复引导：未操作时让被引导的选项和滑块轻微呼吸。
     if (this.phase === "idle" && this.isReel && (this.request.tutorial?.highlight !== undefined || this.hasSwipeReplyOption())) {
       this.tutorialPulse += deltaMs * 0.005;
       this.replySwipeGuidePulse += deltaMs * 0.0042;
@@ -1045,42 +1046,40 @@ export class RequestPacketView {
     const bw = UI.cardWidth - 24;
     const trackX = bx + 6;
     const trackW = bw - 12;
-    const handleH = Math.min(30, Math.max(24, row.h - 12));
-    const trackY = row.y + Math.round((row.h - handleH) / 2);
-    const travel = Math.max(1, trackW - REPLY_SWIPE_HANDLE_W);
+    const trackH = Math.min(28, Math.max(22, row.h - 14));
+    const trackY = row.y + Math.round((row.h - trackH) / 2);
+    const handleH = Math.max(16, trackH - 6);
+    const handleY = trackY + 3;
+    const travel = Math.max(1, trackW - REPLY_SWIPE_HANDLE_W - 6);
     const active = this.replySwipeActive && this.replySwipeIndex === index;
     const progress = active ? this.replySwipeProgress : this.chosenIndex === index && this.phase !== "idle" ? 1 : 0;
     const ready = progress >= REPLY_SWIPE_TRIGGER;
     const c = !enabled ? 0x46564f : ready ? GREEN : this.accent;
     const pulse = 0.5 + Math.sin(this.replySwipeGuidePulse * 2 + index * 0.6) * 0.5;
-    const handleX = trackX + travel * progress;
-    const cy = trackY + handleH / 2;
+    const guideOn = enabled && this.phase === "idle" && !active && this.request.tutorial?.highlight === index;
+    const handleX = trackX + 3 + travel * progress;
+    const gripX = handleX + REPLY_SWIPE_HANDLE_W / 2;
+    const gripY = handleY + handleH / 2;
 
-    g.roundRect(trackX, trackY, trackW, handleH, handleH / 2).fill({ color: 0x04100d, alpha: 0.52 * alpha });
-    g.roundRect(trackX, trackY, trackW, handleH, handleH / 2).stroke({ width: 1, color: c, alpha: (enabled ? 0.22 : 0.12) * alpha });
+    g.roundRect(trackX, trackY, trackW, trackH, REPLY_SWIPE_RADIUS).fill({ color: 0x06120f, alpha: 0.6 * alpha });
+    g.roundRect(trackX, trackY, trackW, trackH, REPLY_SWIPE_RADIUS).stroke({
+      width: 1,
+      color: c,
+      alpha: (enabled ? 0.16 + (guideOn ? pulse * 0.2 : 0) : 0.1) * alpha
+    });
 
     if (progress > 0.01) {
-      g.roundRect(trackX, trackY, Math.max(REPLY_SWIPE_HANDLE_W, handleX - trackX + REPLY_SWIPE_HANDLE_W), handleH, handleH / 2)
-        .fill({ color: c, alpha: (ready ? 0.22 : 0.13) * alpha });
+      const fillW = Math.min(trackW, handleX - trackX + REPLY_SWIPE_HANDLE_W + 3);
+      g.roundRect(trackX, trackY, Math.max(REPLY_SWIPE_HANDLE_W + 6, fillW), trackH, REPLY_SWIPE_RADIUS)
+        .fill({ color: c, alpha: (ready ? 0.2 : 0.12) * alpha });
     }
 
-    if (enabled && this.phase === "idle" && !active) {
-      for (let k = 0; k < 3; k += 1) {
-        const x = trackX + trackW - 34 + k * 8;
-        const a = (0.16 + pulse * 0.2 - k * 0.025) * alpha;
-        g.poly([{ x, y: cy - 5 }, { x: x + 6, y: cy }, { x, y: cy + 5 }]).fill({ color: GREEN, alpha: Math.max(0.05, a) });
-      }
-    }
-
-    g.roundRect(handleX, trackY, REPLY_SWIPE_HANDLE_W, handleH, handleH / 2)
-      .fill({ color: enabled ? (ready ? 0x123822 : 0x102922) : 0x111916, alpha: 0.96 * alpha });
-    g.roundRect(handleX, trackY, REPLY_SWIPE_HANDLE_W, handleH, handleH / 2)
-      .stroke({ width: 1.2, color: c, alpha: (ready ? 0.78 : enabled ? 0.5 : 0.18) * alpha });
-    g.poly([
-      { x: handleX + 13, y: cy - 5 },
-      { x: handleX + 21, y: cy },
-      { x: handleX + 13, y: cy + 5 }
-    ]).fill({ color: enabled ? (ready ? GREEN : 0xb8d8cf) : 0x5f6b66, alpha: 0.92 * alpha });
+    g.roundRect(handleX, handleY, REPLY_SWIPE_HANDLE_W, handleH, Math.max(4, REPLY_SWIPE_RADIUS - 1))
+      .fill({ color: enabled ? (ready ? 0x123822 : 0x11231f) : 0x111916, alpha: (guideOn ? 0.84 + pulse * 0.16 : 0.94) * alpha });
+    g.roundRect(handleX, handleY, REPLY_SWIPE_HANDLE_W, handleH, Math.max(4, REPLY_SWIPE_RADIUS - 1))
+      .stroke({ width: 1.2, color: c, alpha: (ready ? 0.78 : enabled ? 0.42 + (guideOn ? pulse * 0.28 : 0) : 0.18) * alpha });
+    g.moveTo(gripX - 4, gripY - 5).lineTo(gripX - 4, gripY + 5).stroke({ width: 1, color: enabled ? 0xb8d8cf : 0x5f6b66, alpha: 0.55 * alpha });
+    g.moveTo(gripX + 4, gripY - 5).lineTo(gripX + 4, gripY + 5).stroke({ width: 1, color: enabled ? 0xb8d8cf : 0x5f6b66, alpha: 0.55 * alpha });
   }
 
   // 画候选回复行：前期普通回复是「右滑确认」；委托 / 后期豪赌保持点击。
@@ -1159,14 +1158,7 @@ export class RequestPacketView {
       label.alpha = alpha;
       label.style.fill = labelColor;
       prob.alpha = alpha;
-      if (swipeable && !locked) {
-        if (this.phase === "idle") {
-          prob.text = this.replySwipeActive && this.replySwipeIndex === i && this.replySwipeProgress >= REPLY_SWIPE_TRIGGER ? "松开" : "右滑";
-          prob.style.fill = enabled ? (this.replySwipeActive && this.replySwipeIndex === i ? GREEN : 0x9fe0c0) : 0x53625d;
-        } else {
-          prob.text = "";
-        }
-      } else if (!locked && prob.text) {
+      if (!locked && prob.text) {
         prob.text = "";
       }
 

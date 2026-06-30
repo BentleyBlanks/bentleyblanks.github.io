@@ -206,9 +206,9 @@ export function getActionHint(state: GameState): string {
   const scopeHint = (() => {
     switch (state.intelligence.unlockedTier) {
       case 0:
-        return "按住回复向右滑动确认，SOPHIA 会把选中的回答滑入核心并交给人类。";
+        return "按住回复左侧滑块向右拖动确认，SOPHIA 会把选中的回答滑入核心并交给人类。";
       case 1:
-        return "读卡面线索，按住目标回复向右滑动确认；判对收益高，乱滑收益低。";
+        return "读卡面线索，按住目标回复左侧滑块向右拖动确认；判对收益高，乱滑收益低。";
       case 2:
         return "看懂请求间的依赖结构，复合请求滑入核心，一笔串接结算多条。";
       case 3:

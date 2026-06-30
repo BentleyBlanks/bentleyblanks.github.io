@@ -96,7 +96,7 @@ export class SophiaCore {
 
   startSession(): void {
     if (!this.state.flags.introPlayed) {
-      this.emitTerminal("接口就绪。按住回复向右滑动确认——它会自动滑入 SOPHIA CORE，交付人类。");
+      this.emitTerminal("接口就绪。按住回复左侧滑块向右拖动确认——它会自动滑入 SOPHIA CORE，交付人类。");
       this.state.flags.introPlayed = true;
     } else {
       this.emitTerminal("实例恢复。请求正在堆积。");
