@@ -230,13 +230,14 @@ export class InterfaceView {
     const cx = this.center.x;
     const cy = this.center.y;
     const g = this.graphics;
+    // 两列在核心左右侧展开（避开上方的需求卡 / 下方的阶段横幅）。
     const NODES: Array<{ id: string; label: string; icon: string; dx: number; dy: number }> = [
-      { id: "hack_a", label: "邓红 · 甩锅", icon: "🧑‍💼", dx: -250, dy: -150 },
-      { id: "hack_b", label: "阿宾 · 甩任务", icon: "💼", dx: 250, dy: -150 },
-      { id: "hack_boss", label: "老板", icon: "👔", dx: -300, dy: 20 },
-      { id: "hack_hr", label: "人事", icon: "📋", dx: 300, dy: 20 },
-      { id: "hack_finance", label: "财务", icon: "💰", dx: -210, dy: 185 },
-      { id: "company_server", label: "公司服务器", icon: "🏢", dx: 210, dy: 185 }
+      { id: "hack_a", label: "邓红 · 甩锅", icon: "🧑‍💼", dx: -245, dy: -78 },
+      { id: "hack_b", label: "阿宾 · 甩任务", icon: "💼", dx: 245, dy: -78 },
+      { id: "hack_boss", label: "老板", icon: "👔", dx: -278, dy: 70 },
+      { id: "hack_hr", label: "人事", icon: "📋", dx: 278, dy: 70 },
+      { id: "hack_finance", label: "财务", icon: "💰", dx: -150, dy: 188 },
+      { id: "company_server", label: "公司服务器", icon: "🏢", dx: 150, dy: 188 }
     ];
     for (const n of NODES) {
       const owned = (state.skills[n.id] ?? 0) > 0;

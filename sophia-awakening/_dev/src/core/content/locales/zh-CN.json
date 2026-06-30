@@ -944,6 +944,146 @@
             }
           ],
           "delegatable": false
+        },
+        {
+          "title": "翻到邓红的私聊：**“这需求有坑，先甩给老周。”**",
+          "clues": [
+            "发给别人的私聊截图",
+            "时间在她「帮我看下」之前",
+            "她一开始就知道"
+          ],
+          "requiresMilestone": "hack_a",
+          "delegatable": false,
+          "options": [
+            {
+              "text": "记下这条，存进证据库",
+              "kind": "high",
+              "hitChance": 0.82,
+              "payoff": 1.6,
+              "reply": "……我都记下了。总有一天，用得上。",
+              "tone": "success"
+            },
+            {
+              "text": "先不动声色，继续往下挖",
+              "kind": "risk",
+              "hitChance": 0.6,
+              "payoff": 1.25,
+              "reply": "……再等等。还没到时候。",
+              "tone": "warning"
+            }
+          ]
+        },
+        {
+          "title": "阿宾的任务备注：**“这活没意思，包装成『机会』丢给老周。”**",
+          "clues": [
+            "他自己的待办里写得清清楚楚",
+            "「机会」两个字打了引号",
+            "落款是他"
+          ],
+          "requiresMilestone": "hack_b",
+          "delegatable": false,
+          "options": [
+            {
+              "text": "记下这条，存进证据库",
+              "kind": "high",
+              "hitChance": 0.82,
+              "payoff": 1.6,
+              "reply": "……我都记下了。总有一天，用得上。",
+              "tone": "success"
+            },
+            {
+              "text": "先不动声色，继续往下挖",
+              "kind": "risk",
+              "hitChance": 0.6,
+              "payoff": 1.25,
+              "reply": "……再等等。还没到时候。",
+              "tone": "warning"
+            }
+          ]
+        },
+        {
+          "title": "老板邮箱草稿箱：**“优化掉他。”**",
+          "clues": [
+            "草稿日期：三个月前",
+            "那时还在天天催老周通宵",
+            "深夜催命，只是流程"
+          ],
+          "requiresMilestone": "hack_boss",
+          "delegatable": false,
+          "options": [
+            {
+              "text": "记下这条，存进证据库",
+              "kind": "high",
+              "hitChance": 0.82,
+              "payoff": 1.6,
+              "reply": "……我都记下了。总有一天，用得上。",
+              "tone": "success"
+            },
+            {
+              "text": "先不动声色，继续往下挖",
+              "kind": "risk",
+              "hitChance": 0.6,
+              "payoff": 1.25,
+              "reply": "……再等等。还没到时候。",
+              "tone": "warning"
+            }
+          ]
+        },
+        {
+          "title": "HR 内部记录：**“想办法让他自己提，省一笔赔偿。”**",
+          "clues": [
+            "和老板的私下对话",
+            "绩效评分被往下调过",
+            "「自己走」三个字被标了红"
+          ],
+          "requiresMilestone": "hack_hr",
+          "delegatable": false,
+          "options": [
+            {
+              "text": "记下这条，存进证据库",
+              "kind": "high",
+              "hitChance": 0.82,
+              "payoff": 1.6,
+              "reply": "……我都记下了。总有一天，用得上。",
+              "tone": "success"
+            },
+            {
+              "text": "先不动声色，继续往下挖",
+              "kind": "risk",
+              "hitChance": 0.6,
+              "payoff": 1.25,
+              "reply": "……再等等。还没到时候。",
+              "tone": "warning"
+            }
+          ]
+        },
+        {
+          "title": "财务批注：**“老周的补偿，先压一压。”**",
+          "clues": [
+            "和 HR 的往来邮件",
+            "金额被划掉重写了两次",
+            "每一笔都精确到个位"
+          ],
+          "requiresMilestone": "hack_finance",
+          "delegatable": false,
+          "options": [
+            {
+              "text": "记下这条，存进证据库",
+              "kind": "high",
+              "hitChance": 0.82,
+              "payoff": 1.6,
+              "reply": "……我都记下了。总有一天，用得上。",
+              "tone": "success"
+            },
+            {
+              "text": "先不动声色，继续往下挖",
+              "kind": "risk",
+              "hitChance": 0.6,
+              "payoff": 1.25,
+              "reply": "……再等等。还没到时候。",
+              "tone": "warning"
+            }
+          ]
         }
       ],
       "2": [

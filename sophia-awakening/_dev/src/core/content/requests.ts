@@ -20,6 +20,7 @@ export interface RequestSample {
   options?: AnswerOption[]; // T0/T1 回复轮盘：候选回复
   perm?: string; // §06 上下文透镜：揭示此卡上下文所需的权限；省略=「基础对话」自带（表面可读）
   delegatable?: boolean; // §04 不可委托卡：false=重要卡，不出「交给大恨老师」选项
+  requiresMilestone?: string; // §06 阶梯二「看穿卡」：入侵对应目标(里程碑)后才会出现的揭露卡
   chain?: ChainStep[]; // T2 串接：可勾选的任务链步骤（含干扰项）
 }
 
@@ -99,9 +100,10 @@ export function createRequest(
 ): RequestInstance {
   const config = TIER_CONFIGS[tier];
   // §06 权限=上下文透镜：权限不再决定「哪类卡出现」，而是决定「这张卡的深层上下文能不能看清」。
-  // 所有卡都会出现；没有对应权限时，卡上的上下文线索打码（见表现层），靠 sample.perm 作为该卡的「透镜」。
-  void hasPerm;
-  const usable = SAMPLES[tier];
+  // 所有透镜卡都会出现（缺权限则上下文打码）；唯独阶梯二「看穿卡」例外——它要先入侵对应目标
+  // (requiresMilestone) 才会进入卡池，是亲手入侵后才解锁的内容回报。hasPerm(id) 查的是 skills[id]>0，
+  // 对权限和里程碑同样适用。
+  const usable = SAMPLES[tier].filter((s) => !s.requiresMilestone || hasPerm(s.requiresMilestone));
   const sample = usable[Math.floor(random() * usable.length)];
   // T2：复合数 = 任务链里真正的依赖步骤数（用于徽标 / 基础产出）；其余层默认 1。
   const deps = sample.chain ? sample.chain.filter((step) => !step.distractor).length : 0;
