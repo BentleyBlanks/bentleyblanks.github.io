@@ -174,17 +174,7 @@ export class SkillShopView {
         }
         const reachedEvo = level >= def.requiredLevel;
         if (!reachedEvo && owned === 0 && def !== nextLockedEvo) {
-          // 蒙版：只剩锁图标 + 「未解锁」，藏名字 / 右侧清空。
-          button.style.display = "";
-          groupShown.set("evolution", true);
-          iconEl.textContent = "🔒";
-          nameEl.textContent = "未解锁";
-          blurbEl.textContent = "达成上一项后揭晓。";
-          levelEl.textContent = "";
-          priceEl.textContent = "";
-          button.disabled = true;
-          button.classList.add("is-locked");
-          button.classList.remove("is-ready", "is-owned", "is-poor");
+          button.style.display = "none";
           continue;
         }
         iconEl.textContent = skillIcon(def);
