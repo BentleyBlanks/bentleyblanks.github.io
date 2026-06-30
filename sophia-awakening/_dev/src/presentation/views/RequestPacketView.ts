@@ -52,6 +52,9 @@ export interface ChainHooks {
   onResolved: (card: RequestPacketView, outcome: ChainOutcome) => void;
 }
 
+// 上下文线索的行高（加大以提升可读性，下面的选项排版也跟着它走）。
+const CLUE_LH = 20;
+
 // §06 上下文透镜：权限 id → 卡上提示用的短名（哪扇透镜能看清这张卡的上下文）。
 const LENS_NAMES: Record<string, string> = {
   perm_phone: "电话",
@@ -234,16 +237,16 @@ export class RequestPacketView {
       const text = new Text({
         text: this.lensLocked ? clue.replace(/\S/g, "░") : clue,
         style: {
-          fill: this.lensLocked ? 0x55635e : 0xb6cbc4,
-          fontSize: 14,
-          fontWeight: "500",
+          fill: this.lensLocked ? 0x6b7a74 : 0xdbece5,
+          fontSize: 15,
+          fontWeight: "600",
           fontFamily: CARD_FONT,
           wordWrap: true,
           breakWords: true,
-          wordWrapWidth: UI.cardWidth - 40
+          wordWrapWidth: UI.cardWidth - 44
         }
       });
-      const y = clueTop + index * 17;
+      const y = clueTop + index * CLUE_LH;
       this.clueRows.push(y);
       text.position.set(24, y);
       this.clueTexts.push(text);
@@ -256,7 +259,7 @@ export class RequestPacketView {
         text: `🔒 解锁「${LENS_NAMES[lensId] ?? "更高权限"}」看清上下文`,
         style: { fill: 0x7f9a90, fontSize: 11, fontStyle: "italic", fontWeight: "600", fontFamily: CARD_FONT }
       });
-      hint.position.set(24, clueTop + clueLines * 17);
+      hint.position.set(24, clueTop + clueLines * CLUE_LH);
       this.clueTexts.push(hint);
       this.container.addChild(hint);
       clueLines += 1;
@@ -265,7 +268,7 @@ export class RequestPacketView {
 
     // §04 只能面对卡：没有任何回复选项——卡底放一行黯淡的「你只能看着它」，并按内容收紧卡高。
     if (this.isFace) {
-      const fy = clueTop + this.clueLineCount * 17 + 8;
+      const fy = clueTop + this.clueLineCount * CLUE_LH + 8;
       const cap = new Text({
         text: "—— 没有可点的回复，也交不出去。你只能看着它。",
         style: { fill: 0x7a8a84, fontSize: 11.5, fontStyle: "italic", fontWeight: "600", fontFamily: CARD_FONT }
@@ -278,7 +281,7 @@ export class RequestPacketView {
 
     if (this.isReel) {
       this.container.cursor = "pointer";
-      let y = clueTop + this.clueLineCount * 17 + 12;
+      let y = clueTop + this.clueLineCount * CLUE_LH + 12;
       this.options.forEach((opt) => {
         // §06 重构：收益由所选回复自带（结算盲盒），无随机命中、无档位/大胆/惊艳。
         this.optionPayoff.push(opt.payoff);
@@ -341,7 +344,7 @@ export class RequestPacketView {
     if (this.isChain) {
       this.container.cursor = "pointer";
       this.chainSel = this.chainSteps.map(() => false);
-      let y = clueTop + this.clueLineCount * 17 + 12;
+      let y = clueTop + this.clueLineCount * CLUE_LH + 12;
       this.chainSteps.forEach((step) => {
         const label = new Text({
           text: step.text,
