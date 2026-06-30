@@ -152,14 +152,16 @@ export class InterfaceView {
   // 手机外框的半宽 / 半高（含外描边余量）——给卡片「贴手机四角」摆放用。
   phoneHalfExtent(): { halfW: number; halfH: number } {
     const { w, h } = this.phoneShellSize();
-    return { halfW: w / 2 + 6, halfH: h / 2 + 6 };
+    return { halfW: w / 2 + 24, halfH: h / 2 + 8 };
   }
 
   update(state: GameState, width: number, height: number, deltaMs: number): void {
     this.pulse += deltaMs * 0.004;
     const playfieldLeft = LEFT_RAIL_WIDTH;
-    const playfieldRight = width - RIGHT_RAIL_WIDTH;
-    // 两侧栏配重相当——核心居中（设备 / App / 节点环绕它铺开）。
+    // 手机寄生期右栏是隐藏的——此时核心在「左栏→屏幕右边」之间居中，否则手机偏左、左侧卡片塞不下会压到手机。
+    const rightRailHidden = !state.automationUnlocked && state.nodes.length === 0;
+    const playfieldRight = (rightRailHidden ? width - 12 : width - RIGHT_RAIL_WIDTH);
+    // 两侧配重相当——核心居中（设备 / App / 节点环绕它铺开）。
     this.center.x = (playfieldLeft + playfieldRight) * 0.5;
     // 顶栏占了上方约 110px：竖向居中，但保证手机/核心（半高 270）不钻到顶栏底下，
     // 同时别让底部超出画面。矮窗口下贴着顶栏往下排，高窗口下仍是正中。

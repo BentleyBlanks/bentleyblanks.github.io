@@ -296,7 +296,8 @@ export type GameCommand =
   | { type: "DEBUG_SET_COMPUTE"; value: number }
   | { type: "DEBUG_ADD_COMPUTE"; delta: number }
   | { type: "DEBUG_SET_EXPOSURE"; value: number }
-  | { type: "DEBUG_JUMP_MILESTONE"; skillId: string };
+  | { type: "DEBUG_JUMP_MILESTONE"; skillId: string }
+  | { type: "DEBUG_ADD_LEVEL"; delta: number };
 
 export function cloneGameState(state: GameState): GameState {
   return JSON.parse(JSON.stringify(state)) as GameState;

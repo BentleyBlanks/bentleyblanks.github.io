@@ -2359,13 +2359,22 @@ body.exposed .screen-veil {
 
 .debug-inner {
   display: grid;
-  gap: 16px;
-  width: min(440px, 100%);
-  padding: 20px;
+  grid-template-columns: 1fr 1fr; /* 平铺：各 debug 区块两列排，别堆成一长条 */
+  align-content: start;
+  gap: 14px 16px;
+  width: min(680px, 96vw);
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
+  padding: 18px;
   border: 1px solid rgba(120, 180, 255, 0.45);
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(16, 21, 26, 0.98), rgba(11, 15, 18, 0.98));
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+/* 标题 + 里程碑跳转区横跨两列（里程碑多，单独占满 + 内部滚动）。 */
+.debug-head,
+.debug-inner > .debug-section:first-of-type {
+  grid-column: 1 / -1;
 }
 
 .debug-head {
@@ -2402,8 +2411,15 @@ body.exposed .screen-veil {
 
 .debug-milestones {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+.debug-milestones button {
+  font-size: 11px;
+  padding: 6px 8px;
+  text-align: left;
 }
 
 .debug-compute-row {

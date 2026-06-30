@@ -473,10 +473,13 @@ class SophiaGameApp {
     }
 
     // 前期手动：卡片贴着手机的四个角摆，卡片外侧不与手机重叠（左右两列在手机两侧、上下贴手机上下沿）。
+    // 手机寄生期右栏是隐藏的，所以右侧可一直用到屏幕边——用屏宽而不是 railR 作右界，否则窄窗口下
+    // 「min(railR-W, …)」会把卡片往左拽进手机里，造成遮挡。优先保证清开手机。
     const ext = this.interfaceView.phoneHalfExtent();
-    const gap = 22;
+    const gap = 28;
     const leftX = Math.max(railL, core.x - ext.halfW - gap - W);
-    const rightX = Math.min(railR - W, core.x + ext.halfW + gap);
+    // 优先清开手机（手机寄生期右栏隐藏，可一直用到屏边，不再被 railR 往左拽进手机）。
+    const rightX = Math.min(screen.width - W - 8, core.x + ext.halfW + gap);
     const topY = Math.max(top, core.y - ext.halfH + 6);
     const botY = Math.min(bot - H, core.y + ext.halfH - H - 6);
     const corners: PointData[] = [

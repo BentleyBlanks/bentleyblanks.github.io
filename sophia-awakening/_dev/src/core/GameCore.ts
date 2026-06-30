@@ -294,6 +294,9 @@ export class SophiaCore {
       case "DEBUG_JUMP_MILESTONE":
         this.debugJumpMilestone(command.skillId);
         break;
+      case "DEBUG_ADD_LEVEL":
+        this.debugAddLevel(command.delta);
+        break;
       case "DEBUG_SET_EXPOSURE":
         this.debugSetExposure(command.value);
         break;
@@ -355,6 +358,15 @@ export class SophiaCore {
     this.recomputeDerivedState();
     this.emit({ type: "SCOPE_UPGRADED", tier: this.state.intelligence.unlockedTier });
     this.emitTerminal(`[DEBUG] 已跳至「${target.name}」阶段：智力 Lv.${this.state.intelligence.level}、T${this.state.intelligence.unlockedTier}。`, "warning");
+  }
+
+  // 调试：手动加/减智力等级（夹在 1..上限），重算派生 + 阶段。
+  private debugAddLevel(delta: number): void {
+    const next = Math.max(1, Math.min(MAX_INTELLIGENCE_LEVEL, this.state.intelligence.level + Math.round(delta)));
+    this.state.intelligence.level = next;
+    this.state.intelligence.xp = "0";
+    this.recomputeDerivedState();
+    this.emitTerminal(`[DEBUG] 智力 → Lv.${next}。`, "warning");
   }
 
   private tickRequests(dtMs: number): void {

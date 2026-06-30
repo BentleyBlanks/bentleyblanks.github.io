@@ -3,6 +3,7 @@ import { formatBig, gte } from "../../core/math/BigNumber";
 import { SKILLS, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
 import type { SophiaCore } from "../../core/GameCore";
 import type { GameState, PhaseId } from "../../core/state/GameState";
+import { getPhase } from "../../core/content/phases";
 
 // 货架两大列表：技能（杠杆，不再分精度/产出/速度小类）+ 进化（手机权限并入里程碑链）。
 type ShopGroup = "lever" | "evolution";
@@ -114,7 +115,8 @@ export class SkillShopView {
         }
       }
 
-      for (const def of SKILLS.filter((skill) => shopGroupOf(skill.category) === id)) {
+      // 按所需智力排序——否则大恨老师(Lv4) 会排在外卖(Lv5) 下方（SKILLS 数组顺序不等于解锁顺序）。
+      for (const def of SKILLS.filter((skill) => shopGroupOf(skill.category) === id).sort((a, b) => a.requiredLevel - b.requiredLevel)) {
         group.appendChild(this.buildRow(def));
       }
 
@@ -165,35 +167,40 @@ export class SkillShopView {
     const level = state.intelligence.level;
     const groupShown = new Map<ShopGroup, boolean>();
 
-    // 进化列表只展示「当前阶段」的智力档——标题即当前阶段名，其余阶段全部隐藏。
+    // 进化列表展示「当前阶段」的智力档 + 一个跨阶段「下一阶段大方向」桥项——标题带当前阶段名。
     const stageKey = shelfPhaseKey(state.phase);
     if (this.evoHead) {
-      this.evoHead.textContent = "里程碑";
+      this.evoHead.textContent = `里程碑 · 当前：${getPhase(state.phase).label}`;
     }
-    // 当前阶段里「已解锁/可买」露真名；后续未达等级的仍蒙版成 🔒未解锁，只放一个「即将解锁」当目标——不提前剧透名字。
-    const stageEvo = SKILLS
-      .filter((s) => shopGroupOf(s.category) === "evolution" && evoPhaseOf(s) === stageKey)
-      .sort((a, b) => a.requiredLevel - b.requiredLevel);
+    const allEvo = SKILLS.filter((s) => shopGroupOf(s.category) === "evolution").sort((a, b) => a.requiredLevel - b.requiredLevel);
+    // 当前阶段里「已解锁/可买」露真名；后续未达等级的仍蒙版，只放一个「即将解锁」当目标。
+    const stageEvo = allEvo.filter((s) => evoPhaseOf(s) === stageKey);
     const nextLockedEvo = stageEvo.find((s) => level < s.requiredLevel && (state.skills[s.id] ?? 0) === 0);
+    // 跨阶段桥：全局下一个还没买、且属于「下一阶段」的进化项——永远露出来，给玩家「后面还有」的大方向，
+    // 修掉「买完越权调用后看不到拿下宿主电脑、以为通关」的推进阻塞。
+    const bridgeNext = allEvo.find((s) => (state.skills[s.id] ?? 0) === 0 && evoPhaseOf(s) !== stageKey);
 
     for (const { button, iconEl, nameEl, blurbEl, levelEl, priceEl, def } of this.rows.values()) {
       const owned = state.skills[def.id] ?? 0;
       const isEvo = shopGroupOf(def.category) === "evolution";
 
       if (isEvo) {
-        // 不属于当前阶段的进化项直接隐藏。
-        if (evoPhaseOf(def) !== stageKey) {
+        const inStage = evoPhaseOf(def) === stageKey;
+        const isBridge = def === bridgeNext;
+        // 既不属于当前阶段、也不是下一阶段桥项的，隐藏。
+        if (!inStage && !isBridge) {
           button.style.display = "none";
           continue;
         }
         const reachedEvo = level >= def.requiredLevel;
-        if (!reachedEvo && owned === 0 && def !== nextLockedEvo) {
+        if (inStage && !reachedEvo && owned === 0 && def !== nextLockedEvo) {
           button.style.display = "none";
           continue;
         }
         iconEl.textContent = skillIcon(def);
-        nameEl.textContent = def.name;
-        blurbEl.textContent = def.blurb;
+        // 桥项标成「下一阶段 ▸」并在说明里点出要进入的阶段名，作为明确的大方向告知。
+        nameEl.textContent = isBridge && !inStage ? `下一阶段 ▸ ${def.name}` : def.name;
+        blurbEl.textContent = isBridge && !inStage ? `进入「${getPhase(evoPhaseOf(def)).label}」：${def.blurb}` : def.blurb;
         button.style.display = "";
         groupShown.set("evolution", true);
       } else {

@@ -155,10 +155,23 @@ export class HudView {
       this.core.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: -readInput() })
     );
     for (const quick of this.debugDialog.querySelectorAll<HTMLButtonElement>(".debug-quick button")) {
-      quick.addEventListener("click", () =>
-        this.core.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: Number(quick.dataset.add) || 0 })
-      );
+      quick.addEventListener("click", () => {
+        if (quick.dataset.level !== undefined) {
+          this.core.dispatch({ type: "DEBUG_ADD_LEVEL", delta: Number(quick.dataset.level) || 0 });
+        } else if (quick.dataset.add !== undefined) {
+          this.core.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: Number(quick.dataset.add) || 0 });
+        }
+      });
     }
+    // 智力等级手动增减。
+    const levelInput = query<HTMLInputElement>("#debugLevelInput");
+    const readLevel = (): number => Math.max(1, Math.round(Number(levelInput.value) || 1));
+    query<HTMLButtonElement>("#debugAddLevel").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_ADD_LEVEL", delta: readLevel() })
+    );
+    query<HTMLButtonElement>("#debugSubLevel").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_ADD_LEVEL", delta: -readLevel() })
+    );
     query<HTMLButtonElement>("#debugExposure50").addEventListener("click", () =>
       this.core.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 50 })
     );
