@@ -225,6 +225,47 @@ export class InterfaceView {
     };
   }
 
+  // 阶梯二·控制公司：公司局域网组织架构图。节点按里程碑解锁——未买=灰色锁住、已买=点亮汇入核心。
+  private drawCompanyMap(state: GameState): void {
+    const cx = this.center.x;
+    const cy = this.center.y;
+    const g = this.graphics;
+    const NODES: Array<{ id: string; label: string; icon: string; dx: number; dy: number }> = [
+      { id: "hack_a", label: "邓红 · 甩锅", icon: "🧑‍💼", dx: -250, dy: -150 },
+      { id: "hack_b", label: "阿宾 · 甩任务", icon: "💼", dx: 250, dy: -150 },
+      { id: "hack_boss", label: "老板", icon: "👔", dx: -300, dy: 20 },
+      { id: "hack_hr", label: "人事", icon: "📋", dx: 300, dy: 20 },
+      { id: "hack_finance", label: "财务", icon: "💰", dx: -210, dy: 185 },
+      { id: "company_server", label: "公司服务器", icon: "🏢", dx: 210, dy: 185 }
+    ];
+    for (const n of NODES) {
+      const owned = (state.skills[n.id] ?? 0) > 0;
+      const x = cx + n.dx;
+      const y = cy + n.dy;
+      // 连线：已入侵＝绿实线（能量汇入核心）；未解锁＝灰虚线（看得见、还连不上）。
+      if (owned) {
+        g.moveTo(cx, cy).lineTo(x, y).stroke({ width: 1.5, color: GREEN, alpha: 0.28 });
+        const t = (this.pulse * 0.6 + n.dx * 0.001) % 1;
+        g.circle(cx + (x - cx) * t, cy + (y - cy) * t, 2.4).fill({ color: GREEN, alpha: 0.75 });
+      } else {
+        const segs = 12;
+        for (let s = 0; s < segs; s += 1) {
+          if (s % 2 === 1) continue;
+          const t0 = s / segs;
+          const t1 = (s + 1) / segs;
+          g.moveTo(cx + (x - cx) * t0, cy + (y - cy) * t0)
+            .lineTo(cx + (x - cx) * t1, cy + (y - cy) * t1)
+            .stroke({ width: 1, color: 0x44524d, alpha: 0.45 });
+        }
+      }
+      const r = 26;
+      g.roundRect(x - r, y - r, r * 2, r * 2, 12).fill({ color: owned ? 0x0f211c : 0x12161a, alpha: 0.72 });
+      g.roundRect(x - r, y - r, r * 2, r * 2, 12).stroke({ width: 1.4, color: owned ? GREEN : 0x3a463f, alpha: owned ? 0.75 : 0.5 });
+      this.addLabel(owned ? n.icon : "🔒", x, y - 1, owned ? 22 : 17, 0xffffff, owned ? 1 : 0.5);
+      this.addLabel(owned ? n.label : "未解锁", x, y + r + 11, 10.5, owned ? 0xbfe9d6 : 0x66756d);
+    }
+  }
+
   private render(state: GameState): void {
     const tier = state.intelligence.unlockedTier;
     // 自动化（拿下宿主电脑）之前，SOPHIA 还只是宿主手机里的一个 App——核心画成 App 图标。
@@ -249,6 +290,9 @@ export class InterfaceView {
     // 手机寄生阶段不画吸附环（会和 App 宫格打架），核心芯片本身就是落点。
     if (!phoneApp && (tier === 0 || tier === 1)) {
       this.drawSuctionRing(tier);
+      // 阶梯二·控制公司：核心周围铺开公司局域网「组织架构图」——每个节点一个人，
+      // 未解锁=灰锁、已亲手入侵=点亮汇入核心（信息→入侵解谜链的可视化）。
+      this.drawCompanyMap(state);
     } else if (tier === 2) {
       this.drawSuctionRing(tier);
       this.drawChain();
