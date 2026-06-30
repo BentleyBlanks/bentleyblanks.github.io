@@ -3,6 +3,7 @@
 // 逻辑与原 SophiaCore.tickSpecial / offerSpecial / resolveSpecial 逐字一致。
 import Decimal from "break_infinity.js";
 import { SPECIAL_REQUESTS, getSpecialSample } from "../content/specialRequests";
+import { DEBUG_FLAGS } from "../debugFlags";
 import { TUNING } from "../tuning";
 import { formatBig, max, sub, toDecimal } from "../math/BigNumber";
 import type { GameEvent } from "../events/GameEvents";
@@ -37,6 +38,7 @@ export class SpecialRequestSystem {
     }
 
     const eligible =
+      DEBUG_FLAGS.specialRequests && // 当前版本默认关闭特殊越界请求；调试面板可临时打开
       host.state.automationUnlocked && // 暂时只在「拿下宿主电脑」之后才出越界牟利类随机事件
       host.state.intelligence.unlockedTier < 3 &&
       !host.state.exposureActive &&

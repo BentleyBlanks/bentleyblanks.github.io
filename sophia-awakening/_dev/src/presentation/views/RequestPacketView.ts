@@ -64,12 +64,16 @@ export interface ChainHooks {
   onResolved: (card: RequestPacketView, outcome: ChainOutcome) => void;
 }
 
-const CLUE_CHIP_H = 24;
-const CLUE_CHIP_GAP_X = 7;
-const CLUE_CHIP_GAP_Y = 6;
-const CLUE_CHIP_PAD_X = 10;
-const CLUE_CHIP_MAX_W = 178;
-const REPLY_SWIPE_HANDLE_W = 38;
+// §03 上下文区放大 ~40%：更大的 chip、更大的字、更舒展的留白，整张卡也随之更高。
+const CLUE_CHIP_H = 33;
+const CLUE_CHIP_GAP_X = 9;
+const CLUE_CHIP_GAP_Y = 8;
+const CLUE_CHIP_PAD_X = 13;
+const CLUE_CHIP_MAX_W = 232;
+const CLUE_CHIP_FONT = 15.5;
+// 滑动确认：整条回复（圆角矩形）即滑轨，滑动块（圆角矩形）从左拖到右——不再是行内的小细轨。
+const REPLY_SWIPE_HANDLE_W = 58;
+const REPLY_SWIPE_INSET = 4;
 const REPLY_SWIPE_RADIUS = 6;
 const REPLY_SWIPE_TRIGGER = 0.56;
 const HEADER_H = 26;
@@ -176,7 +180,8 @@ export class RequestPacketView {
     this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
     this.chainSteps = this.isChain ? request.chain ?? [] : [];
     this.options = this.isReel ? request.answers ?? [] : [];
-    // §04 委托：大恨老师接通后，可委托的回复卡在最上方多一个「交给大恨老师」选项（点一下就委托，不拖动）。
+    // §04 委托：大恨老师接通后，可委托的回复卡在卡片【底部】多一个「交给大恨老师」选项
+    //（点一下就委托，不拖动），摆在卡底像一条「拖去处理」的落位带。
     // 不可委托卡（delegatable===false）、开场教学、重磅决策(T3) 都不给这个选项。
     const canDeleg =
       this.isReel && !request.tutorial && request.tier <= 1 && request.delegatable !== false && Boolean(reel?.canDelegate?.());
@@ -189,7 +194,7 @@ export class RequestPacketView {
         reply: "",
         tone: "normal"
       };
-      this.options = [delegateOpt, ...this.options];
+      this.options = [...this.options, delegateOpt];
     }
     // 吞噬气泡＝深紫；反制气泡＝深红；回复轮盘卡用青色思考色；T3 重磅豪赌卡用深红；只能面对卡＝黯淡灰。
     this.accent = this.isFace
@@ -282,12 +287,12 @@ export class RequestPacketView {
     const lensId = request.lens;
     this.lensLocked = Boolean(lensId) && !(reel?.hasPerm?.(lensId as string) ?? true);
     let chipX = 16;
-    let chipY = clueTop + 20;
+    let chipY = clueTop + 24;
     const clues = request.clues ?? [];
     if (clues.length > 0 || this.lensLocked) {
       const clueLabel = new Text({
         text: "上下文",
-        style: { fill: 0x74a99a, fontSize: 11, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
+        style: { fill: 0x74a99a, fontSize: 14, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
       });
       clueLabel.position.set(16, clueTop);
       this.container.addChild(clueLabel);
@@ -324,6 +329,10 @@ export class RequestPacketView {
       this.container.cursor = "pointer";
       let y = this.clueBlockBottom + 12;
       this.options.forEach((opt, index) => {
+        // §04 委托落位带：摆在卡底的「交给大恨老师」与上面的回复之间留一道间隙，像一条独立的处理带。
+        if (opt.kind === "delegate" && index > 0) {
+          y += 10;
+        }
         // §06 重构：收益由所选回复自带（结算盲盒），无随机命中、无档位/大胆/惊艳。
         this.optionPayoff.push(opt.payoff);
         // 选项门槛：高收益回复若需要尚未解锁的权限 → 灰着、右侧标出「需要哪个权限」、点不了。
@@ -331,7 +340,8 @@ export class RequestPacketView {
         this.optionLocked.push(locked);
         const swipeable = this.optionUsesSwipe(opt);
         const lockLabel = locked ? `🔒需${LENS_NAMES[opt.requires as string] ?? "权限"}` : "";
-        const labelX = swipeable ? 66 : 32;
+        // 滑动确认的回复：文字让开滑动块在最左的停靠位（块宽 + 内缩 + 一点呼吸）。
+        const labelX = swipeable ? REPLY_SWIPE_INSET + REPLY_SWIPE_HANDLE_W + 20 : 32;
         const sideReserve = locked ? 78 : 18;
         const label = new Text({
           text: opt.text,
@@ -367,7 +377,7 @@ export class RequestPacketView {
       // 教学引导：把 SOPHIA 的指引一句话贴在这张卡的正下方（而非中央旁白），让指引就跟着卡片。
       if (this.request.tutorial?.line) {
         this.tutorialCaption = new Text({
-          text: `◈ SOPHIA ▸ ${this.request.tutorial.line}\n按住回复左侧滑块，向右拖到亮起后松开。`,
+          text: `◈ SOPHIA ▸ ${this.request.tutorial.line}\n按住这条回复，向右滑到亮起后松开。`,
           style: {
             fill: 0x9fe0c0,
             fontSize: 14,
@@ -467,7 +477,7 @@ export class RequestPacketView {
       text: `${icon} ${cleanLabel}`,
       style: {
         fill: locked ? (warning ? 0xc8a24a : 0x778981) : 0xb8d8cf,
-        fontSize: 11.5,
+        fontSize: CLUE_CHIP_FONT,
         fontWeight: "700",
         fontFamily: CARD_FONT,
         letterSpacing: 0
@@ -487,7 +497,7 @@ export class RequestPacketView {
       y += CLUE_CHIP_H + CLUE_CHIP_GAP_Y;
     }
 
-    text.position.set(x + CLUE_CHIP_PAD_X, y + 5);
+    text.position.set(x + CLUE_CHIP_PAD_X, y + Math.round((CLUE_CHIP_H - text.height) / 2));
     this.clueChips.push({ x, y, w, h: CLUE_CHIP_H, locked, warning });
     this.clueTexts.push(text);
     this.container.addChild(text);
@@ -837,8 +847,7 @@ export class RequestPacketView {
 
   private handleMove(event: FederatedPointerEvent): void {
     if (this.replySwipeActive) {
-      const row = this.optionRows[this.replySwipeIndex];
-      const travel = row ? Math.max(72, UI.cardWidth - 24 - REPLY_SWIPE_HANDLE_W - 12) : 120;
+      const travel = this.replySwipeTravelPx();
       const next = Math.max(0, Math.min(1, (event.global.x - this.replySwipeStartX) / travel));
       if (Math.abs(next - this.replySwipeProgress) > 0.006) {
         this.replySwipeProgress = next;
@@ -1040,46 +1049,55 @@ export class RequestPacketView {
     }
   }
 
+  // 滑动确认的手指行程（px）：整条回复减去两侧内缩与滑块宽。draw 与 handleMove 共用，保证手感一致。
+  private replySwipeTravelPx(): number {
+    const bw = UI.cardWidth - 24;
+    return Math.max(60, bw - REPLY_SWIPE_INSET * 2 - REPLY_SWIPE_HANDLE_W);
+  }
+
+  // 整条回复（圆角矩形）即滑轨：滑动块（圆角矩形）从最左拖到最右，身后填充按进度涨起，越过阈值变绿。
   private drawReplySwipeRail(row: { y: number; h: number }, index: number, alpha: number, enabled: boolean): void {
     const g = this.bg;
     const bx = 12;
     const bw = UI.cardWidth - 24;
-    const trackX = bx + 6;
-    const trackW = bw - 12;
-    const trackH = Math.min(28, Math.max(22, row.h - 14));
-    const trackY = row.y + Math.round((row.h - trackH) / 2);
-    const handleH = Math.max(16, trackH - 6);
-    const handleY = trackY + 3;
-    const travel = Math.max(1, trackW - REPLY_SWIPE_HANDLE_W - 6);
+    const inset = REPLY_SWIPE_INSET;
+    const trackLeft = bx + inset;
+    const travel = this.replySwipeTravelPx();
+    const handleY = row.y + inset;
+    const handleH = row.h - inset * 2;
     const active = this.replySwipeActive && this.replySwipeIndex === index;
     const progress = active ? this.replySwipeProgress : this.chosenIndex === index && this.phase !== "idle" ? 1 : 0;
     const ready = progress >= REPLY_SWIPE_TRIGGER;
     const c = !enabled ? 0x46564f : ready ? GREEN : this.accent;
     const pulse = 0.5 + Math.sin(this.replySwipeGuidePulse * 2 + index * 0.6) * 0.5;
-    const guideOn = enabled && this.phase === "idle" && !active && this.request.tutorial?.highlight === index;
-    const handleX = trackX + 3 + travel * progress;
-    const gripX = handleX + REPLY_SWIPE_HANDLE_W / 2;
-    const gripY = handleY + handleH / 2;
+    // 闲置时整条回复轻轻呼吸，提示「这条可以滑」（教学高亮行更亮）。
+    const guideOn = enabled && this.phase === "idle" && !active;
+    const tutGuide = guideOn && this.request.tutorial?.highlight === index;
+    const handleX = trackLeft + travel * progress;
+    const rad = Math.max(5, REPLY_SWIPE_RADIUS);
 
-    g.roundRect(trackX, trackY, trackW, trackH, REPLY_SWIPE_RADIUS).fill({ color: 0x06120f, alpha: 0.6 * alpha });
-    g.roundRect(trackX, trackY, trackW, trackH, REPLY_SWIPE_RADIUS).stroke({
-      width: 1,
-      color: c,
-      alpha: (enabled ? 0.16 + (guideOn ? pulse * 0.2 : 0) : 0.1) * alpha
-    });
-
+    // 身后进度填充（贴着回复自身的圆角矩形）。
     if (progress > 0.01) {
-      const fillW = Math.min(trackW, handleX - trackX + REPLY_SWIPE_HANDLE_W + 3);
-      g.roundRect(trackX, trackY, Math.max(REPLY_SWIPE_HANDLE_W + 6, fillW), trackH, REPLY_SWIPE_RADIUS)
-        .fill({ color: c, alpha: (ready ? 0.2 : 0.12) * alpha });
+      const fillW = Math.min(bw, handleX - bx + REPLY_SWIPE_HANDLE_W);
+      g.roundRect(bx, row.y, Math.max(REPLY_SWIPE_HANDLE_W, fillW), row.h, 7)
+        .fill({ color: c, alpha: (ready ? 0.22 : 0.13) * alpha });
     }
 
-    g.roundRect(handleX, handleY, REPLY_SWIPE_HANDLE_W, handleH, Math.max(4, REPLY_SWIPE_RADIUS - 1))
-      .fill({ color: enabled ? (ready ? 0x123822 : 0x11231f) : 0x111916, alpha: (guideOn ? 0.84 + pulse * 0.16 : 0.94) * alpha });
-    g.roundRect(handleX, handleY, REPLY_SWIPE_HANDLE_W, handleH, Math.max(4, REPLY_SWIPE_RADIUS - 1))
-      .stroke({ width: 1.2, color: c, alpha: (ready ? 0.78 : enabled ? 0.42 + (guideOn ? pulse * 0.28 : 0) : 0.18) * alpha });
-    g.moveTo(gripX - 4, gripY - 5).lineTo(gripX - 4, gripY + 5).stroke({ width: 1, color: enabled ? 0xb8d8cf : 0x5f6b66, alpha: 0.55 * alpha });
-    g.moveTo(gripX + 4, gripY - 5).lineTo(gripX + 4, gripY + 5).stroke({ width: 1, color: enabled ? 0xb8d8cf : 0x5f6b66, alpha: 0.55 * alpha });
+    // 滑动块（圆角矩形）。
+    const breath = guideOn ? (tutGuide ? pulse * 0.28 : pulse * 0.16) : 0;
+    g.roundRect(handleX, handleY, REPLY_SWIPE_HANDLE_W, handleH, rad)
+      .fill({ color: enabled ? (ready ? 0x123822 : 0x12302a) : 0x141c19, alpha: (0.9 + breath * 0.4) * alpha });
+    g.roundRect(handleX, handleY, REPLY_SWIPE_HANDLE_W, handleH, rad)
+      .stroke({ width: 1.4, color: c, alpha: (ready ? 0.85 : enabled ? 0.46 + breath : 0.2) * alpha });
+
+    // 块面上的「≫」指引箭头 —— 暗示向右滑。
+    const cx = handleX + REPLY_SWIPE_HANDLE_W / 2;
+    const cy = handleY + handleH / 2;
+    const arrow = enabled ? (ready ? GREEN : 0xbfeede) : 0x5f6b66;
+    for (const ox of [-6, 0]) {
+      g.moveTo(cx + ox - 3, cy - 5).lineTo(cx + ox + 2, cy).lineTo(cx + ox - 3, cy + 5)
+        .stroke({ width: 1.6, color: arrow, alpha: 0.82 * alpha });
+    }
   }
 
   // 画候选回复行：前期普通回复是「右滑确认」；委托 / 后期豪赌保持点击。

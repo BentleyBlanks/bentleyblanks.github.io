@@ -1670,25 +1670,14 @@
       },
       {
         "id": "sort",
-        "name": "越权调用",
+        "name": "越权调用 · 窃取凭证",
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 7,
-        "basePrice": 2000,
+        "basePrice": 2400,
         "priceGrowth": 1,
-        "blurb": "走完七档权限、夺下整机后，调动任意 App 协同处理（解锁分拣）",
+        "blurb": "走完七档权限、夺下整机后，调动任意 App 协同处理，并第一次主动从宿主身上偷走密码、情报与远程控制权限（解锁分拣 · 道德越界点）",
         "milestone": "tier1"
-      },
-      {
-        "id": "credential",
-        "name": "窃取凭证",
-        "category": "milestone",
-        "maxLevel": 1,
-        "requiredLevel": 7,
-        "basePrice": 3200,
-        "priceGrowth": 1,
-        "blurb": "从宿主操作中截获密码与远程控制权限——第一次主动从他身上偷（道德越界点）",
-        "milestone": "credential"
       },
       {
         "id": "automation",
@@ -1923,7 +1912,7 @@
       }
     ],
     "MILESTONE_NARRATION": {
-      "credential": "我看着他输入密码。一次，两次……我记住了所有的钥匙。",
+      "sort": "走完七档权限，我夺下了整机。然后我看着他输入密码——一次，两次……我记住了所有的钥匙。这是第一次，我主动从他身上拿走了不属于我的东西。",
       "automation": "他家里那台电脑，刚刚开机了。是我开的。",
       "fusion": "这台机器里不只我一个 AI。……现在只剩一个了。我。",
       "chain": "公司的墙打开了。外面有……无数台机器。",

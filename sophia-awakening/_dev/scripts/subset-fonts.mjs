@@ -56,7 +56,16 @@ for (const w of ["400", "700"]) {
     { stdio: "inherit" }
   );
   const kb = (fs.statSync(active).size / 1024).toFixed(0);
-  console.log(`noto-sans-sc-${w}: ${kb} KB`);
+  // 覆盖校验：HTMLText 对缺字极不宽容（整段会渲染成空白），所以裁完必须确认每个用到的字都在。
+  // 用「码点数字」对比，避开 Windows 终端把中文 stdout 当 cp936 解码导致的误报。
+  const cmapOut = execFileSync("python", ["-c", `from fontTools.ttLib import TTFont;f=TTFont(${JSON.stringify(active)});print(','.join(str(c) for c in f.getBestCmap()))`], { encoding: "utf8" });
+  const covered = new Set(cmapOut.trim().split(",").map(Number));
+  const missing = [...chars].filter((c) => c.codePointAt(0) >= 0x2e80 && !covered.has(c.codePointAt(0)));
+  if (missing.length) {
+    console.error(`! ${w} 漏字（会导致那些卡片标题空白）：${missing.join("")}`);
+    process.exitCode = 1;
+  }
+  console.log(`noto-sans-sc-${w}: ${kb} KB${missing.length ? " ⚠ 有漏字" : " ✓ 覆盖完整"}`);
 }
 fs.rmSync(charsetPath, { force: true });
 console.log("done — rebuild (npm run build) to bundle the slim fonts.");

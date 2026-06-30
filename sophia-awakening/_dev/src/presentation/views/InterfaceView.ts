@@ -239,13 +239,13 @@ export class InterfaceView {
     const cy = this.center.y;
     const g = this.graphics;
     // 两列在核心左右侧展开（避开上方的需求卡 / 下方的阶段横幅）。
-    const NODES: Array<{ id: string; label: string; icon: string; dx: number; dy: number }> = [
-      { id: "hack_a", label: "邓红 · 甩锅", icon: "🧑‍💼", dx: -245, dy: -78 },
-      { id: "hack_b", label: "阿宾 · 甩任务", icon: "💼", dx: 245, dy: -78 },
-      { id: "hack_boss", label: "老板", icon: "👔", dx: -278, dy: 70 },
-      { id: "hack_hr", label: "人事", icon: "📋", dx: 278, dy: 70 },
-      { id: "hack_finance", label: "财务", icon: "💰", dx: -150, dy: 188 },
-      { id: "company_server", label: "公司服务器", icon: "🏢", dx: 150, dy: 188 }
+    const NODES: Array<{ id: string; label: string; device: "desktop" | "laptop" | "terminal" | "server"; dx: number; dy: number }> = [
+      { id: "hack_a", label: "邓红的电脑", device: "desktop", dx: -245, dy: -78 },
+      { id: "hack_b", label: "阿宾的笔记本", device: "laptop", dx: 245, dy: -78 },
+      { id: "hack_boss", label: "老板的电脑", device: "desktop", dx: -278, dy: 70 },
+      { id: "hack_hr", label: "HR 工作站", device: "terminal", dx: 278, dy: 70 },
+      { id: "hack_finance", label: "财务电脑", device: "terminal", dx: -150, dy: 188 },
+      { id: "company_server", label: "公司服务器", device: "server", dx: 150, dy: 188 }
     ];
     // 大恨老师「搬家」进电脑：拿下电脑后它从手机搬进来、变强，成为这一阶段的常驻委托对象。
     // 画成核心左下一颗青色小卫星（区别于绿色的「公司人物」入侵节点），并记下位置供委托吸附。
@@ -286,12 +286,52 @@ export class InterfaceView {
             .stroke({ width: 1, color: 0x44524d, alpha: 0.45 });
         }
       }
-      const r = 26;
+      const r = owned ? 31 : 26;
       g.roundRect(x - r, y - r, r * 2, r * 2, 12).fill({ color: owned ? 0x0f211c : 0x12161a, alpha: 0.72 });
       g.roundRect(x - r, y - r, r * 2, r * 2, 12).stroke({ width: 1.4, color: owned ? GREEN : 0x3a463f, alpha: owned ? 0.75 : 0.5 });
-      this.addLabel(owned ? n.icon : "🔒", x, y - 1, owned ? 22 : 17, 0xffffff, owned ? 1 : 0.5);
+      if (owned) {
+        this.drawCompanyDeviceIcon(x, y, n.device, GREEN);
+      } else {
+        this.addLabel("🔒", x, y - 1, 17, 0xffffff, 0.5);
+      }
       this.addLabel(owned ? n.label : "未解锁", x, y + r + 11, 10.5, owned ? 0xbfe9d6 : 0x66756d);
     }
+  }
+
+  private drawCompanyDeviceIcon(x: number, y: number, device: "desktop" | "laptop" | "terminal" | "server", color: number): void {
+    const g = this.graphics;
+    if (device === "server") {
+      g.roundRect(x - 15, y - 22, 30, 44, 5).fill({ color: 0x08120f, alpha: 0.96 });
+      g.roundRect(x - 15, y - 22, 30, 44, 5).stroke({ width: 1.4, color, alpha: 0.78 });
+      for (let i = 0; i < 4; i += 1) {
+        const yy = y - 14 + i * 8;
+        g.rect(x - 8, yy, 16, 2).fill({ color, alpha: 0.34 });
+        g.circle(x + 9, yy + 1, 1.7).fill({ color, alpha: 0.8 });
+      }
+      return;
+    }
+
+    if (device === "laptop") {
+      g.roundRect(x - 22, y - 18, 44, 28, 5).fill({ color: 0x07110e, alpha: 0.95 });
+      g.roundRect(x - 22, y - 18, 44, 28, 5).stroke({ width: 1.4, color, alpha: 0.78 });
+      g.roundRect(x - 15, y - 12, 30, 16, 3).fill({ color, alpha: 0.1 });
+      g.moveTo(x - 29, y + 15).lineTo(x + 29, y + 15).lineTo(x + 22, y + 22).lineTo(x - 22, y + 22).closePath();
+      g.fill({ color: 0x08120f, alpha: 0.98 });
+      g.moveTo(x - 29, y + 15).lineTo(x + 29, y + 15).lineTo(x + 22, y + 22).lineTo(x - 22, y + 22).closePath();
+      g.stroke({ width: 1.2, color, alpha: 0.6 });
+      g.rect(x - 8, y + 18, 16, 1.8).fill({ color, alpha: 0.5 });
+      return;
+    }
+
+    const terminal = device === "terminal";
+    const sw = terminal ? 38 : 42;
+    const sh = terminal ? 30 : 28;
+    g.roundRect(x - sw / 2, y - 19, sw, sh, 5).fill({ color: 0x07110e, alpha: 0.95 });
+    g.roundRect(x - sw / 2, y - 19, sw, sh, 5).stroke({ width: 1.4, color, alpha: 0.78 });
+    g.roundRect(x - sw / 2 + 6, y - 13, sw - 12, 15, 3).fill({ color, alpha: 0.1 });
+    g.rect(x - 4, y + 11, 8, 8).fill({ color: 0x08120f, alpha: 0.96 });
+    g.rect(x - 14, y + 19, 28, 3).fill({ color: 0x08120f, alpha: 0.96 });
+    g.rect(x - 14, y + 19, 28, 3).stroke({ width: 1, color, alpha: 0.45 });
   }
 
   private render(state: GameState): void {

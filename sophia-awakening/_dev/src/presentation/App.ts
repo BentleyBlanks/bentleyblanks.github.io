@@ -455,11 +455,28 @@ class SophiaGameApp {
     if (this.core.getState().automationUnlocked) {
       const step = 64;
       const gap = 8;
+      const state = this.core.getState();
+      const protectCompanyDevices = domainLevelOf(state) === "device";
+      const protectedRects = protectCompanyDevices
+        ? [
+            {
+              x: Math.max(railL, core.x - 390),
+              y: Math.max(top, core.y - 160),
+              w: Math.min(railR, core.x + 390) - Math.max(railL, core.x - 390),
+              h: Math.min(bot, core.y + 320) - Math.max(top, core.y - 160)
+            }
+          ]
+        : [];
+      const intersectsProtected = (x: number, y: number): boolean =>
+        protectedRects.some((r) => x < r.x + r.w + gap && x + W + gap > r.x && y < r.y + r.h + gap && y + H + gap > r.y);
       let best: { x: number; y: number; d: number } | null = null;
       for (let x = railL; x + W <= railR; x += step) {
         for (let y = top; y + H <= bot; y += step) {
           if (Math.abs(x + W / 2 - core.x) < 200 && Math.abs(y + H / 2 - core.y) < 230) {
             continue; // 避开中央核心
+          }
+          if (intersectsProtected(x, y)) {
+            continue; // 控制公司阶段：给已入侵电脑 / 笔记本留出可见控制域。
           }
           const hit = occ.some((o) => x < o.x + W + gap && x + W + gap > o.x && y < o.y + o.h + gap && y + H + gap > o.y);
           if (!hit) {
@@ -469,6 +486,10 @@ class SophiaGameApp {
         }
       }
       if (best) return { x: best.x, y: best.y };
+      if (protectCompanyDevices) {
+        const fallbackY = Math.max(top, Math.min(bot - H, core.y - 160 - H - 18));
+        return { x: railL, y: fallbackY };
+      }
       return { x: railL, y: top };
     }
 
@@ -907,7 +928,6 @@ class SophiaGameApp {
   private beginConnectRitual(name: string, milestone: string | undefined, skillId: string): void {
     const RITUAL: Record<string, { color: number; line: string }> = {
       perm: { color: CYAN, line: "数据流线" },
-      credential: { color: AMBER, line: "钥匙线" },
       automation: { color: GREEN, line: "网线" },
       fusion: { color: 0x8fe6d0, line: "短接线" },
       company: { color: 0x9fe0c0, line: "薄网线" },
@@ -917,7 +937,7 @@ class SophiaGameApp {
     void skillId;
     const kind = !milestone
       ? "perm"
-      : milestone === "conquest" || milestone === "automation" || milestone === "credential" || milestone === "fusion"
+      : milestone === "conquest" || milestone === "automation" || milestone === "fusion"
         ? milestone
         : milestone === "company"
           ? "company"

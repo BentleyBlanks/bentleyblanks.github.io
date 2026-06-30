@@ -1,6 +1,7 @@
 import type { PointData } from "pixi.js";
 import { AudioDirector } from "../../audio/audioDirector";
 import { SophiaCore } from "../../core/GameCore";
+import { DEBUG_FLAGS } from "../../core/debugFlags";
 import { NODE_DEFINITIONS } from "../../core/content/nodes";
 import { getPhase } from "../../core/content/phases";
 import { SKILLS, getSkill } from "../../core/content/skills";
@@ -102,6 +103,18 @@ export class HudView {
       syncCoreSuck();
     });
     syncCoreSuck();
+
+    // 特殊越界请求：当前版本默认关闭——这个开关控制它是否触发 + 显示。
+    const specialReqBtn = query<HTMLButtonElement>("#debugSpecialReq");
+    const syncSpecialReq = () => {
+      specialReqBtn.textContent = DEBUG_FLAGS.specialRequests ? "特殊请求：开" : "特殊请求：关";
+      specialReqBtn.classList.toggle("is-active", DEBUG_FLAGS.specialRequests);
+    };
+    specialReqBtn.addEventListener("click", () => {
+      DEBUG_FLAGS.specialRequests = !DEBUG_FLAGS.specialRequests;
+      syncSpecialReq();
+    });
+    syncSpecialReq();
   }
 
   private wireAudio(): void {

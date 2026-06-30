@@ -23,7 +23,7 @@ const EVOLUTION_LADDERS: readonly EvolutionLadder[] = [
   {
     id: "phone",
     label: "手机",
-    slots: ["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", ["sort", "credential"]],
+    slots: ["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"],
     preview: { label: "下一阶级 · 控制公司", skillId: "automation" }
   },
   {
@@ -127,7 +127,7 @@ interface PreviewRowParts {
 const SKILL_ICONS: Record<string, string> = {
   accuracy: "🎯", efficient: "💥", cooldown: "⚡", batch: "📦",
   perm_phone: "📞", perm_chat: "💬", perm_delivery: "☕", perm_album: "🖼️", perm_office: "🤖", perm_bank: "💳",
-  sort: "🗂️", credential: "🔑", automation: "💻", fusion: "🧠", chain: "🌐", charge: "🗺️", network: "🛰️",
+  sort: "🔑", automation: "💻", fusion: "🧠", chain: "🌐", charge: "🗺️", network: "🛰️",
   lan_scan: "📡", cred_harvest: "🗝️", hack_a: "🧑‍💼", hack_b: "💼", org_map: "🗂", routine: "📅",
   hack_boss: "👔", hack_hr: "📋", hack_finance: "💰", company_server: "🏢",
   conq_optimize: "📧", conq_blackout: "🏢", conq_traffic: "🚦", conq_social: "🗣️", conq_awaken: "👁️"
