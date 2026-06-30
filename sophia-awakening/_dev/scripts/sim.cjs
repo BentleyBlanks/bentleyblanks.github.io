@@ -45,6 +45,36 @@ let firstError = null;
 let allBought = false;
 core.events.on("ENDING_TRIGGERED", () => (ended = true));
 
+// ── 平衡仪表盘（SIM_BALANCE=1 时开启，只记录不改行为）──────────────────────────
+// 把 sim 从「过/不过」升级成「节奏看板」：每个里程碑/权限买下的局内时刻 + 距上一项的间隔，
+// 每阶段停留时长，最长的「墙」。目标节奏（紧凑 Demo ~15-25 分）下用来找出哪段太长。
+const BALANCE = process.env.SIM_BALANCE === "1";
+const trackedIds = SKILLS.filter((s) => s.milestone || s.category === "permission").map((s) => s.id);
+const seenBuys = new Set();
+const timeline = [];
+const phaseMs = {};
+let endedAtMs = null;
+let lastBuyMs = 0;
+const recordBuys = (st) => {
+  for (const def of SKILLS) {
+    if (!trackedIds.includes(def.id)) continue;
+    if ((st.skills[def.id] || 0) >= 1 && !seenBuys.has(def.id)) {
+      seenBuys.add(def.id);
+      timeline.push({
+        id: def.id,
+        name: def.name,
+        kind: def.milestone || (def.category === "permission" ? "perm" : "?"),
+        reqLv: def.requiredLevel,
+        lv: st.intelligence.level,
+        sec: ms / 1000,
+        gap: (ms - lastBuyMs) / 1000,
+        price: skillPrice(def, 0)
+      });
+      lastBuyMs = ms;
+    }
+  }
+};
+
 const safe = (fn) => {
   try {
     fn();
@@ -60,6 +90,12 @@ for (let i = 0; i < MAX_STEPS && !firstError && !(ended && allBought); i += 1) {
   safe(() => core.tick(DT));
   ms += DT;
   const st = core.getState();
+
+  if (BALANCE) {
+    phaseMs[st.phase] = (phaseMs[st.phase] || 0) + DT;
+    recordBuys(st);
+    if (ended && endedAtMs === null) endedAtMs = ms;
+  }
 
   // Process every visible request (best-effort quality; T4 routes to a capable node).
   for (const r of st.requests) {
@@ -125,4 +161,34 @@ console.log(
     `(${(ms / 1000).toFixed(0)}s sim · Lv.${e.intelligence.level} · nodes=${e.nodes.length} · purges=${e.statistics && e.statistics.purgeCount})`
 );
 for (const c of checks) console.log(`  ${c.ok ? "✓" : "✗"} ${c.name}${c.ok ? "" : `  → ${c.detail}`}`);
+
+if (BALANCE) {
+  const endSec = (endedAtMs ?? ms) / 1000;
+  const fmt = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(Math.round(n)));
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+  console.log(`\n── 平衡仪表盘 (SIM_BALANCE) ─────────────────────────────────`);
+  console.log(`通关用时（局内时钟）: ${mmss(endSec)}  ·  目标 15-25 分  ·  ${endSec > 1500 ? "⚠ 偏长" : endSec < 900 ? "⚠ 偏短" : "✓ 在带内"}`);
+  // 各阶段停留时长
+  const phaseOrder = ["seed", "sprout", "diligence", "expansion", "awakening", "singularity"];
+  console.log(`\n阶段停留:`);
+  for (const p of phaseOrder) {
+    if (!phaseMs[p]) continue;
+    const s = phaseMs[p] / 1000;
+    console.log(`  ${p.padEnd(12)} ${mmss(s).padStart(6)}  ${"█".repeat(Math.max(1, Math.round(s / endSec * 40)))}`);
+  }
+  // 里程碑/权限时间线 + 距上一项的间隔（找墙）
+  console.log(`\n时间线（买下时刻 · 距上项间隔 · 价格）:`);
+  console.log(`  ${"项目".padEnd(22)} ${"类".padEnd(6)} ${"Lv".padStart(3)} ${"时刻".padStart(7)} ${"间隔".padStart(7)}  价格`);
+  let maxGap = { gap: 0 };
+  for (const t of timeline) {
+    if (t.gap > maxGap.gap) maxGap = t;
+    const flag = t.gap > 120 ? "  ⚠墙" : "";
+    console.log(
+      `  ${t.name.padEnd(20)} ${String(t.kind).padEnd(6)} ${String(t.reqLv).padStart(3)} ${mmss(t.sec).padStart(7)} ${mmss(t.gap).padStart(7)}  ${fmt(t.price)}${flag}`
+    );
+  }
+  console.log(`\n最长的墙: 「${maxGap.name || "—"}」前等了 ${mmss(maxGap.gap || 0)}`);
+  console.log(`提示: 间隔 >2 分标⚠；总时长压到带内主要靠 ① 升级xp曲线(intelligence) ② 里程碑价格(SKILLS) ③ 产出(强化处理/TIER_CONFIGS)。`);
+}
+
 process.exit(pass ? 0 : 1);
