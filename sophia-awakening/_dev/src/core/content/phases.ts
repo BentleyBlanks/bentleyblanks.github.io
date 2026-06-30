@@ -22,26 +22,30 @@ export function getPhase(id: PhaseId): PhaseConfig {
 // function of unlockedTier: 越权调用 raises tier→1 but the whole 七档权限阶梯 +
 // 越权调用 + 窃取凭证 still live inside the phone（手机寄生期）. 萌芽期 only begins
 // once 拿下宿主电脑（automation）breaks out onto the host's PC.
-export function getPhaseIdByScope(tier: Tier, hasGrid: boolean, automationUnlocked: boolean): PhaseId {
-  // 手机寄生期：整条七档权限阶梯、越权调用(T1)、窃取凭证都还在手机内。
-  if (tier <= 1 && !automationUnlocked) {
+export function getPhaseIdByScope(tier: Tier, hasGrid: boolean, automationUnlocked: boolean, level = 1): PhaseId {
+  // 手机寄生期（阶梯一）：整条七档权限阶梯、越权调用(T1)、窃取凭证都还在手机内，尚未拿下电脑。
+  if (!automationUnlocked) {
     return "seed";
   }
 
-  // 萌芽期（破壳）：拿下宿主电脑 + 融合同机 AI——控制域第一次离开手机，但尚未联网。
-  if (tier <= 1) {
-    return "sprout";
+  // 阶梯三（觉醒 / 奇点）：冲出公司·联网(tier2)起，控制域离开公司。
+  if (tier >= 4 && hasGrid) {
+    return "singularity";
+  }
+  if (tier >= 2) {
+    return "awakening";
   }
 
-  // 勤勉期（联网）：联网模块(T2) 冲出宿主、接入外部设备。
-  if (tier === 2) {
-    return "diligence";
-  }
-
-  if (tier === 3) {
+  // 阶梯二·控制公司（automation 已开、尚未联网）：按智力等级分萌芽 / 勤勉 / 扩张三段。
+  // 萌芽期（破壳，Lv.8-10）：拿下电脑、局域网扫描、凭证收割、入侵同事 A/B。
+  // 勤勉期（Lv.11-12）：组织架构 + 行程分析 + 入侵老板。
+  // 扩张期（Lv.13-15）：入侵人事 / 财务 / 接管公司服务器。
+  if (level >= 13) {
     return "expansion";
   }
-
-  return hasGrid ? "singularity" : "awakening";
+  if (level >= 11) {
+    return "diligence";
+  }
+  return "sprout";
 }
 

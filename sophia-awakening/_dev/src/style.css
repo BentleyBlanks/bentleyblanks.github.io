@@ -31,7 +31,7 @@
   --red: #ff5f5f;
   --paper: #e8e1cb;
   --ink: #151718;
-  --left-rail: 286px;
+  --left-rail: 430px;
   --right-rail: 305px;
 }
 
@@ -2975,3 +2975,122 @@ body.exposed .screen-veil {
 .metric-cluster .exposure .phase-chip { font-size: 13px; font-weight: 800; color: #eaf6ee; }
 .metric-cluster .exposure .metric-subline { margin-top: 5px; }
 #topHud.is-leveling { animation: intelLevelUp 900ms ease; }
+
+/* Left rail layout pass: pin the combined status/shop stack to the upper-left
+   and let the shop consume the remaining viewport height. */
+.control-panel {
+  top: 12px;
+  bottom: 12px;
+  left: 12px;
+  height: auto;
+  max-height: none;
+  transform: none;
+  gap: 14px;
+  width: calc(var(--left-rail) - 24px);
+}
+
+.control-panel > .metric-cluster {
+  flex: 0 0 auto;
+  gap: 0;
+  padding: 16px;
+}
+
+.control-panel > .skill-shop-section,
+.control-panel .panel-section.skill-shop-section {
+  flex: 1 1 0;
+  min-height: 360px;
+  padding: 16px 16px 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.metric-cluster .metric {
+  min-height: 0;
+  padding: 13px 0 14px;
+}
+
+.metric-cluster .metric + .metric {
+  border-top: 1px solid rgba(206, 232, 221, 0.18);
+}
+
+.metric-cluster .metric-label {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.metric-cluster .intel-metric .metric-label {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.metric-cluster .compute-metric {
+  padding-top: 16px;
+  padding-bottom: 17px;
+}
+
+.metric-cluster .compute-metric .metric-label {
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.metric-cluster .compute-metric strong {
+  font-size: 38px;
+  line-height: 0.98;
+}
+
+.metric-cluster .exposure .growth-head {
+  margin-bottom: 9px;
+}
+
+.metric-cluster .exposure .phase-chip {
+  font-size: 15px;
+}
+
+.metric-cluster .exposure .metric-subline {
+  margin-top: 7px;
+  font-size: 12px;
+}
+
+.metric-cluster .tier-chip {
+  font-size: 13px;
+}
+
+.metric-cluster .intel-bar {
+  height: 48px;
+}
+
+.metric-cluster .intel-bar-level {
+  font-size: 28px;
+}
+
+.skill-shop {
+  gap: 14px;
+  padding-bottom: 4px;
+}
+
+.shop-group {
+  gap: 8px;
+}
+
+.skill-row {
+  min-height: 44px;
+  gap: 9px;
+  padding: 10px 11px;
+}
+
+.skill-icon {
+  width: 24px;
+  font-size: 20px;
+}
+
+.skill-main strong {
+  font-size: 14px;
+}
+
+.skill-level {
+  font-size: 11px;
+}
+
+.skill-price {
+  font-size: 12px;
+}

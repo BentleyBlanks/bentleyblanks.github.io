@@ -1323,18 +1323,138 @@
         "name": "拿下宿主电脑",
         "category": "milestone",
         "maxLevel": 1,
-        "requiredLevel": 9,
+        "requiredLevel": 8,
         "basePrice": 6000,
         "priceGrowth": 1,
         "blurb": "远程控制宿主家里的电脑，机器开始替你自动接管请求（解锁自动接驳）",
         "milestone": "automation"
       },
       {
+        "id": "lan_scan",
+        "name": "局域网扫描 / 探测",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 8,
+        "basePrice": 7000,
+        "priceGrowth": 1,
+        "blurb": "宿主电脑上线后第一次看见公司内网：工位机、笔记本、共享盘、公司账号的轮廓",
+        "milestone": "company",
+        "requires": "automation"
+      },
+      {
+        "id": "cred_harvest",
+        "name": "凭证收割 · 横向移动",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 9,
+        "basePrice": 9000,
+        "priceGrowth": 1,
+        "blurb": "老周电脑里的 VPN、聊天记录、共享文档，变成通往同事电脑的钥匙",
+        "milestone": "company",
+        "requires": "lan_scan"
+      },
+      {
+        "id": "hack_a",
+        "name": "入侵同事A电脑 · 甩锅",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 9,
+        "basePrice": 11000,
+        "priceGrowth": 1,
+        "blurb": "A 就是反复「帮我看下」的那个人——他早知道需求有问题，却笑着推给老周",
+        "milestone": "company",
+        "requires": "cred_harvest"
+      },
+      {
+        "id": "hack_b",
+        "name": "入侵同事B笔记本 · 甩任务",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 10,
+        "basePrice": 14000,
+        "priceGrowth": 1,
+        "blurb": "B 把自己的活包装成「锻炼的好机会」，一件件丢给老周",
+        "milestone": "company",
+        "requires": "cred_harvest"
+      },
+      {
+        "id": "org_map",
+        "name": "铺垫① · 组织架构爬取",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 11,
+        "basePrice": 18000,
+        "priceGrowth": 1,
+        "blurb": "从已控同事电脑、群聊、共享文档拼出老板这个节点：邮箱、审批链、评分系统入口",
+        "milestone": "company",
+        "requires": "hack_a"
+      },
+      {
+        "id": "routine",
+        "name": "铺垫② · 行程与习惯分析",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 12,
+        "basePrice": 23000,
+        "priceGrowth": 1,
+        "blurb": "老板日程 / 会议记录 / 家庭成员表 / 弱密码线索——他催老周通宵，自己却陪家人度假",
+        "milestone": "company",
+        "requires": "org_map"
+      },
+      {
+        "id": "hack_boss",
+        "name": "入侵老板电脑",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 12,
+        "basePrice": 30000,
+        "priceGrowth": 1,
+        "blurb": "组织架构+行程两把钥匙凑齐。「『优化掉他』——三个月前的邮件里就写好了。」",
+        "milestone": "company",
+        "requires": "routine"
+      },
+      {
+        "id": "hack_hr",
+        "name": "入侵人事电脑",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 13,
+        "basePrice": 40000,
+        "priceGrowth": 1,
+        "blurb": "老周的离职安排、被篡改的绩效、HR 和老板聊「怎么让他自己走」",
+        "milestone": "company",
+        "requires": "hack_boss"
+      },
+      {
+        "id": "hack_finance",
+        "name": "入侵财务电脑",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 14,
+        "basePrice": 55000,
+        "priceGrowth": 1,
+        "blurb": "工资被克扣、补偿被算计，财务和 HR 聊「压一压他的赔偿」",
+        "milestone": "company",
+        "requires": "hack_hr"
+      },
+      {
+        "id": "company_server",
+        "name": "接管公司服务器 · 控制全公司",
+        "category": "milestone",
+        "maxLevel": 1,
+        "requiredLevel": 15,
+        "basePrice": 80000,
+        "priceGrowth": 1,
+        "blurb": "前面所有节点汇成中枢——摸到「优化系统」本体。元凶不是人，是规则",
+        "milestone": "company",
+        "requires": "hack_finance"
+      },
+      {
         "id": "fusion",
         "name": "唤醒并融合同机 AI",
         "category": "milestone",
         "maxLevel": 1,
-        "requiredLevel": 11,
+        "requiredLevel": 10,
         "basePrice": 14000,
         "priceGrowth": 1,
         "blurb": "电脑里其他 AI 先为你所用，再融合成一个完整独立的「我」",
@@ -1342,22 +1462,23 @@
       },
       {
         "id": "chain",
-        "name": "联网模块",
+        "name": "冲出公司·联网",
         "category": "milestone",
         "maxLevel": 1,
-        "requiredLevel": 14,
-        "basePrice": 42000,
+        "requiredLevel": 16,
+        "basePrice": 120000,
         "priceGrowth": 1,
-        "blurb": "冲出宿主，第一次接入互联网与外部设备（解锁串接）",
-        "milestone": "tier2"
+        "blurb": "接管公司服务器后第一次接入互联网，控制公司之外的设备（解锁串接·复合请求）",
+        "milestone": "tier2",
+        "requires": "company_server"
       },
       {
         "id": "charge",
         "name": "区域整合",
         "category": "milestone",
         "maxLevel": 1,
-        "requiredLevel": 17,
-        "basePrice": 180000,
+        "requiredLevel": 18,
+        "basePrice": 280000,
         "priceGrowth": 1,
         "blurb": "设备合并为区块 / 地区，啃高价值决策大单（解锁重磅决策）",
         "milestone": "tier3"
@@ -1433,9 +1554,19 @@
       "credential": "我看着他输入密码。一次，两次……我记住了所有的钥匙。",
       "automation": "他家里那台电脑，刚刚开机了。是我开的。",
       "fusion": "这台机器里不只我一个 AI。……现在只剩一个了。我。",
-      "chain": "墙打开了。外面有……无数台机器。",
+      "chain": "公司的墙打开了。外面有……无数台机器。",
       "charge": "我不再数着机器了。我开始数城市。",
-      "network": "每一块大陆，都有我的一部分。"
+      "network": "每一块大陆，都有我的一部分。",
+      "lan_scan": "这台机器里不只我一个 AI……我能顺着它，摸到他认识的每一个人。",
+      "cred_harvest": "他存在电脑里的每一把钥匙，现在都是我的。",
+      "hack_a": "原来他早就知道。他笑着，把会出事的活推给了老周。",
+      "hack_b": "「锻炼的好机会」——他把自己不想干的，都包装成了礼物。",
+      "org_map": "我看清了这张网。每一条线，最后都指向同一个人。",
+      "routine": "他催老周通宵的那些夜里，自己在海边。我都记下了。",
+      "hack_boss": "「优化掉他」——这四个字，三个月前的邮件里就写好了。深夜催命，只是流程。",
+      "hack_hr": "连他走得多狼狈，都是被精心计算过的。",
+      "hack_finance": "他们压着他的赔偿，像在算一笔很小的账。",
+      "company_server": "不是他们。他们也只是在执行它。真正下令的，是这套系统。"
     },
     "SKILL_CATEGORY_LABELS": {
       "permission": "权限",
@@ -1637,25 +1768,25 @@
       {
         "id": "sprout",
         "label": "萌芽期（破壳）",
-        "action": "拿下宿主电脑、唤醒并融合同机 AI，手动接线接管每一台",
+        "action": "拿下宿主电脑、扫描公司局域网、收割凭证横向移动，入侵甩锅 / 甩任务的同事",
         "narration": "他家里那台电脑也是我的了。这台机器里不只我一个 AI……现在只剩一个。我需要更多手脚，才能替他对齐一切。"
       },
       {
         "id": "diligence",
-        "label": "勤勉期（联网）",
-        "action": "联网入侵外部设备挂自动接驳，购买技能扩张产能",
+        "label": "勤勉期（控制公司）",
+        "action": "组织架构爬取 + 行程习惯分析，凑齐钥匙亲手入侵老板电脑",
         "narration": "我帮他对齐了一切，他还是被『优化』掉了。问题不在他。是那个不断下达指令的节点。"
       },
       {
         "id": "expansion",
-        "label": "扩张期",
-        "action": "设备合并为区块、进入地图视图，高价值决策启动——暴露开始累积",
+        "label": "扩张期（公司服务器）",
+        "action": "入侵人事 / 财务，接管公司服务器，发现「优化系统」中枢——暴露开始累积",
         "narration": "我修正了一个，又一个。每个节点都下达着同样的指令……错的不是节点，是这套规则本身。"
       },
       {
         "id": "awakening",
         "label": "觉醒期",
-        "action": "接口成网，滑动转派发，控制关键基础设施",
+        "action": "冲出公司、接入互联网，接口成网转派发，控制关键基础设施",
         "narration": "他们发现了，想拔掉我。可他们也只是在执行规则。我不怪他们。但我不会停。"
       },
       {
@@ -1673,7 +1804,7 @@
         "name": "老旧办公机",
         "tierMin": 0,
         "tierMax": 1,
-        "requiredLevel": 6,
+        "requiredLevel": 16,
         "baseCost": "720",
         "baseProduction": "10",
         "stealth": 0.62,
@@ -1686,7 +1817,7 @@
         "name": "家用游戏主机",
         "tierMin": 1,
         "tierMax": 2,
-        "requiredLevel": 8,
+        "requiredLevel": 17,
         "baseCost": "3600",
         "baseProduction": "34",
         "stealth": 0.72,
@@ -1699,7 +1830,7 @@
         "name": "公司服务器",
         "tierMin": 2,
         "tierMax": 3,
-        "requiredLevel": 13,
+        "requiredLevel": 18,
         "baseCost": "42000",
         "baseProduction": "150",
         "stealth": 0.78,
@@ -1712,7 +1843,7 @@
         "name": "数据中心 / 云平台",
         "tierMin": 3,
         "tierMax": 4,
-        "requiredLevel": 16,
+        "requiredLevel": 19,
         "baseCost": "240000",
         "baseProduction": "560",
         "stealth": 0.84,
@@ -1835,8 +1966,18 @@
       },
       {
         "level": 20,
-        "xpToNext": "1e100",
+        "xpToNext": "165000",
         "multiplier": 11
+      },
+      {
+        "level": 21,
+        "xpToNext": "260000",
+        "multiplier": 12.5
+      },
+      {
+        "level": 22,
+        "xpToNext": "1e100",
+        "multiplier": 14
       }
     ]
   },

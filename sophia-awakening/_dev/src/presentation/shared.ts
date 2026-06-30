@@ -21,7 +21,7 @@ export const CARD_FONT = "'Noto Sans SC', Inter, 'Segoe UI', system-ui, sans-ser
 export const CARD_MONO = "Cascadia Mono, Consolas, monospace";
 
 // ── 布局常量 ─────────────────────────────────────────
-export const LEFT_RAIL_WIDTH = 286;
+export const LEFT_RAIL_WIDTH = 430;
 export const RIGHT_RAIL_WIDTH = 305;
 export const BASE_SUCTION_MARGIN = 50;
 export const REQUEST_PACKET_WIDTH = 384;
@@ -40,7 +40,7 @@ export function tierForm(tier: number): string {
 // ── 存档 / 引导键 ────────────────────────────────────
 export const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v5-optimize-complete";
 export const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-export const PERSISTENCE_REVISION = "face-cards-v23";
+export const PERSISTENCE_REVISION = "ladder2-company-v24";
 
 // ── 文案 ─────────────────────────────────────────────
 export const SENDER_LABEL: Record<string, string> = { host: "宿主", boss: "上级", system: "系统", sophia: "SOPHIA" };
@@ -135,7 +135,24 @@ export function getDataProgressPercent(state: GameState): number {
   return Math.max(0, Math.min(100, toDecimal(state.intelligence.xp).div(required).mul(100).toNumber()));
 }
 
-export const MILESTONE_ORDER = ["sort", "automation", "chain", "charge", "network"] as const;
+// 「下一里程碑」引导依次穿过的主线里程碑（含阶梯二·控制公司解谜链）。
+export const MILESTONE_ORDER = [
+  "sort",
+  "automation",
+  "lan_scan",
+  "cred_harvest",
+  "hack_a",
+  "hack_b",
+  "org_map",
+  "routine",
+  "hack_boss",
+  "hack_hr",
+  "hack_finance",
+  "company_server",
+  "chain",
+  "charge",
+  "network"
+] as const;
 
 export function nextMilestone(state: GameState): SkillDef | undefined {
   for (const id of MILESTONE_ORDER) {

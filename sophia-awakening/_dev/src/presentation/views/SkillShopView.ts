@@ -15,13 +15,25 @@ function shopGroupOf(category: SkillCategory): ShopGroup {
 function evoPhaseOf(def: SkillDef): PhaseId {
   if (def.category === "conquest") return "awakening";
   switch (def.id) {
-    case "automation":
-    case "fusion":
+    // 阶梯二·控制公司——按里程碑链分萌芽 / 勤勉 / 扩张三段（与 phases.ts 等级分段一致）。
+    case "automation": // 拿下宿主电脑 Lv8
+    case "lan_scan": // 局域网扫描 Lv8
+    case "cred_harvest": // 凭证收割 Lv9
+    case "hack_a": // 入侵同事A Lv9
+    case "hack_b": // 入侵同事B Lv10
+    case "fusion": // 融合同机AI Lv10
       return "sprout";
-    case "chain":
+    case "org_map": // 组织架构爬取 Lv11
+    case "routine": // 行程习惯分析 Lv12
+    case "hack_boss": // 入侵老板 Lv12
       return "diligence";
-    case "charge":
+    case "hack_hr": // 入侵人事 Lv13
+    case "hack_finance": // 入侵财务 Lv14
+    case "company_server": // 接管公司服务器 Lv15
       return "expansion";
+    // 阶梯三·区域扩张（觉醒 / 奇点合并）。
+    case "chain":
+    case "charge":
     case "network":
       return "awakening";
     default:
@@ -36,6 +48,8 @@ const SKILL_ICONS: Record<string, string> = {
   accuracy: "🎯", efficient: "💥", cooldown: "⚡", batch: "📦",
   perm_phone: "📞", perm_chat: "💬", perm_delivery: "☕", perm_album: "🖼️", perm_office: "🤖", perm_bank: "💳",
   sort: "🗂️", credential: "🔑", automation: "💻", fusion: "🧠", chain: "🌐", charge: "🗺️", network: "🛰️",
+  lan_scan: "📡", cred_harvest: "🗝️", hack_a: "🧑‍💼", hack_b: "💼", org_map: "🗂", routine: "📅",
+  hack_boss: "👔", hack_hr: "📋", hack_finance: "💰", company_server: "🏢",
   conq_optimize: "📧", conq_blackout: "🏢", conq_traffic: "🚦", conq_social: "🗣️", conq_awaken: "👁️"
 };
 function skillIcon(def: SkillDef): string {

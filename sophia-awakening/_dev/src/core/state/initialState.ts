@@ -3,7 +3,7 @@ import { computeDerivedSkills } from "../content/skills";
 import type { GameState } from "./GameState";
 
 // v9：§03 后期重磅决策 / 反清剿气泡（请求新增 counter / reliefExposure 字段）——旧档自动重置。
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);

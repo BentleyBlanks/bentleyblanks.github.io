@@ -6,7 +6,7 @@ import { TUNING } from "../tuning";
 const S = content().skills;
 
 export type SkillCategory = "permission" | "feel" | "output" | "speed" | "milestone" | "conquest";
-export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation" | "credential" | "fusion" | "conquest";
+export type MilestoneKind = "tier1" | "tier2" | "tier3" | "tier4" | "automation" | "credential" | "fusion" | "conquest" | "company";
 
 // 前期「七档软件权限阶梯」：手机寄生期的核心成长主轴，也是老周下沉曲线的叙事脊柱（策划案 §06）。
 // 权限 = 上下文透镜（§06）：买下一档不提升「正确率」（已无随机翻车），而是多看懂卡片一层
@@ -28,6 +28,7 @@ export interface SkillDef {
   priceGrowth: number; // multiplier applied per already-owned level
   blurb: string; // one-line effect summary (per level for multi-level skills)
   milestone?: MilestoneKind;
+  requires?: string; // §04 信息→入侵解谜链：需先买下这个前置里程碑（钥匙）才能购买本项
 }
 
 // 成长系统：数据升智力（定门槛 + 全局倍率），算力买技能（做选择）。

@@ -886,6 +886,13 @@ export class SophiaCore {
       return;
     }
 
+    // §04 信息→入侵解谜链：入侵某目标前，必须先买下它的「钥匙」前置里程碑。
+    if (def.requires && (this.state.skills[def.requires] ?? 0) < 1) {
+      const key = getSkill(def.requires);
+      this.emitTerminal(`${def.name} 需先解锁「${key?.name ?? def.requires}」这把钥匙。`, "warning");
+      return;
+    }
+
     const price = skillPrice(def, currentLevel);
 
     if (!gte(this.state.resources.compute, price)) {
@@ -1195,7 +1202,12 @@ export class SophiaCore {
 
   private updatePhase(): void {
     const hasGrid = this.state.nodes.some((node) => node.defId === "grid");
-    const phaseId = getPhaseIdByScope(this.state.intelligence.unlockedTier, hasGrid, this.state.automationUnlocked);
+    const phaseId = getPhaseIdByScope(
+      this.state.intelligence.unlockedTier,
+      hasGrid,
+      this.state.automationUnlocked,
+      this.state.intelligence.level
+    );
 
     if (phaseId !== this.state.phase) {
       this.state.phase = phaseId;
