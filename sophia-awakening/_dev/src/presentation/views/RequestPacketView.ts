@@ -10,6 +10,18 @@ function toEmphasisHTML(text: string): string {
   const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return escaped.replace(/\*\*(.+?)\*\*/g, "<em>$1</em>");
 }
+
+function fitTextToWidth(text: Text, maxWidth: number): void {
+  if (maxWidth <= 0 || text.width <= maxWidth) {
+    return;
+  }
+  const original = text.text;
+  let next = original;
+  while (next.length > 2 && text.width > maxWidth) {
+    next = next.slice(0, -2).trimEnd();
+    text.text = `${next}…`;
+  }
+}
 import { TIER_COLORS } from "../../core/content/requests";
 import type { AnswerOption, ChainStep, RequestInstance } from "../../core/state/GameState";
 import { TUNING } from "../../core/tuning";
@@ -59,6 +71,8 @@ const CLUE_CHIP_PAD_X = 10;
 const CLUE_CHIP_MAX_W = 178;
 const REPLY_SWIPE_HANDLE_W = 34;
 const REPLY_SWIPE_TRIGGER = 0.56;
+const HEADER_H = 26;
+const HEADER_CENTER_Y = 13.5;
 
 // §06 上下文透镜：权限 id → 卡上提示用的短名（哪扇透镜能看清这张卡的上下文）。
 const LENS_NAMES: Record<string, string> = {
@@ -69,6 +83,13 @@ const LENS_NAMES: Record<string, string> = {
   perm_office: "大恨老师",
   perm_bank: "银行"
 };
+
+function fallbackHeaderTime(createdAtMs: number): string {
+  const total = 23 * 60 + 38 + Math.floor(createdAtMs / 60000);
+  const hh = Math.floor(total / 60) % 24;
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
 
 export class RequestPacketView {
   readonly container = new Container();
@@ -190,8 +211,7 @@ export class RequestPacketView {
     this.container.addChild(this.bg);
     this.container.addChild(this.chargeBar);
 
-    // 标题区只留一个简短标签：普通卡＝发信人（宿主 / 上级…），特殊卡＝类型（吞噬 / 重磅 / 反制 / 串接）。
-    // 不再写 T 编号、REQ 流水号这类冗余信息。
+    // 标题区：头像 + 发信人 + 来源 App + 时间。只做来源语境，不显示高低风险提示。
     const tag = this.isFace
       ? "✋ 只能面对"
       : this.isDevour
@@ -203,10 +223,23 @@ export class RequestPacketView {
           : this.isChain
             ? `🔗 任务链${request.compound > 1 ? ` ×${request.compound}` : ""}`
             : SENDER_LABEL[this.sender] ?? "宿主";
+    const sourceApp = request.sourceApp ?? this.fallbackSourceApp();
+    const sourceTime = request.sourceTime ?? fallbackHeaderTime(request.createdAtMs);
     this.badge = new Text({
       text: tag,
-      style: { fill: this.accent, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.5, fontFamily: CARD_MONO }
+      style: { fill: this.accent, fontSize: 10.5, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
     });
+    this.badge.anchor.set(0, 0.5);
+    const sourceMeta = new Text({
+      text: `|  ${sourceApp}`,
+      style: { fill: 0x6f9187, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
+    });
+    sourceMeta.anchor.set(0, 0.5);
+    const timeMeta = new Text({
+      text: sourceTime,
+      style: { fill: 0x97aaa3, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
+    });
+    timeMeta.anchor.set(1, 0.5);
     this.title = hasEmphasis(request.label)
       ? new HTMLText({
           text: toEmphasisHTML(request.label),
@@ -233,9 +266,13 @@ export class RequestPacketView {
             wordWrapWidth: UI.cardWidth - 32
           }
         });
-    this.badge.position.set(34, 9);
+    this.badge.position.set(34, HEADER_CENTER_Y);
+    const sourceX = 34 + Math.ceil(this.badge.width) + 14;
+    sourceMeta.position.set(sourceX, HEADER_CENTER_Y);
+    timeMeta.position.set(UI.cardWidth - 16, HEADER_CENTER_Y);
+    fitTextToWidth(sourceMeta, Math.max(0, UI.cardWidth - sourceX - 72));
     this.title.position.set(16, 31);
-    this.container.addChild(this.badge, this.title);
+    this.container.addChild(this.badge, sourceMeta, timeMeta, this.title);
 
     // Context chips — the information the player has to read. Laid out after
     // the title so a two-line title still leaves room.
@@ -397,6 +434,14 @@ export class RequestPacketView {
     this.stage.on("pointerup", this.upHandler);
     this.stage.on("pointerupoutside", this.upHandler);
     this.draw();
+  }
+
+  private fallbackSourceApp(): string {
+    if (this.isDevour) return "SOPHIA CORE";
+    if (this.isCounter) return "安全网";
+    if (this.isChain) return "工作流";
+    if (this.request.tier === 3) return "控制台";
+    return "手机助手";
   }
 
   private contextIcon(clue: string, index: number): string {
@@ -881,11 +926,11 @@ export class RequestPacketView {
     // 实心卡体
     this.bg.roundRect(0, 0, W, H, r).fill({ color: fillBody, alpha: 1 });
     // 标题区（实心，底部切平）
-    this.bg.roundRect(0, 0, W, 26, r).fill({ color: fillHead, alpha: 1 });
-    this.bg.rect(0, 14, W, 12).fill({ color: fillHead, alpha: 1 });
+    this.bg.roundRect(0, 0, W, HEADER_H, r).fill({ color: fillHead, alpha: 1 });
+    this.bg.rect(0, Math.floor(HEADER_H / 2), W, Math.ceil(HEADER_H / 2)).fill({ color: fillHead, alpha: 1 });
     // 描边 + 标题区分隔线（去掉顶部那根多余的 accent 横条——边框已经够了）
     this.bg.roundRect(0, 0, W, H, r).stroke({ width: strokeW, color: c, alpha: strokeA });
-    this.bg.moveTo(12, 26).lineTo(W - 12, 26).stroke({ width: 1, color: c, alpha: 0.16 });
+    this.bg.moveTo(12, HEADER_H).lineTo(W - 12, HEADER_H).stroke({ width: 1, color: c, alpha: 0.16 });
     this.drawAvatar(18, 14, c, fillHead);
 
     // §04 吞噬 / §03 反制：两圈脉动外环 —— 视觉上「召唤你亲手滑入核心」。

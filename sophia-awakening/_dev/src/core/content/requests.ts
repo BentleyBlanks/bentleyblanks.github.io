@@ -16,6 +16,8 @@ export interface TierRequestConfig {
 // distractor. T1 samples also carry the true `answer` the clues point to.
 export interface RequestSample {
   title: string;
+  sourceApp?: string;
+  sourceTime?: string;
   clues: string[];
   options?: AnswerOption[]; // T0/T1 回复轮盘：候选回复
   perm?: string; // §06 上下文透镜：揭示此卡上下文所需的权限；省略=「基础对话」自带（表面可读）
@@ -62,6 +64,8 @@ const SAMPLES = R.SAMPLES as unknown as Record<Tier, RequestSample[]>;
 // 开场教学（§07）的脚本气泡。allowed / highlight 的下标针对「options + 装死」的最终数组。
 const TUTORIAL_BUBBLES = R.TUTORIAL_BUBBLES as unknown as Array<{
   title: string;
+  sourceApp?: string;
+  sourceTime?: string;
   clues: string[];
   options: AnswerOption[];
   allowed: number[];
@@ -76,6 +80,8 @@ export function createTutorialRequest(step: number, id: number, nowMs: number): 
     id: `req-${id}`,
     tier: 0,
     label: b.title,
+    sourceApp: b.sourceApp,
+    sourceTime: b.sourceTime,
     clues: b.clues,
     answers: [...b.options, DEAD_OPTION],
     category: TIER_CATEGORY[0],
@@ -126,6 +132,8 @@ export function createRequest(
     id: `req-${id}`,
     tier,
     label: sample.title,
+    sourceApp: sample.sourceApp,
+    sourceTime: sample.sourceTime,
     clues: sample.clues,
     lens: sample.perm, // §06 上下文透镜：缺此权限则卡上线索打码
     delegatable: sample.delegatable, // §04 不可委托卡：false=只能亲自处理

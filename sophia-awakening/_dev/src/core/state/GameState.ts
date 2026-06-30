@@ -77,6 +77,8 @@ export interface RequestInstance {
   id: string;
   tier: Tier;
   label: string; // 标题：这条请求在问什么 / 要什么
+  sourceApp?: string; // 卡片头部来源：微信 / 钉钉 / 邮件 / 系统等
+  sourceTime?: string; // 卡片头部时间：以剧情语义为准，不强绑定真实时钟
   clues: string[]; // 几条线索，可能不全或带干扰——玩家要读懂
   lens?: string; // §06 上下文透镜：揭示这些线索所需的权限(skill id)；缺则线索打码
   delegatable?: boolean; // §04 不可委托卡：false=重要卡，不显示「交给大恨老师」选项，只能玩家亲自处理（默认可委托）
