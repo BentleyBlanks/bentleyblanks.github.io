@@ -16,7 +16,7 @@ import { getNextNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "../co
 import { hostCurse, VICTIM_VOICES } from "../core/content/humanVoices";
 import { getPhase } from "../core/content/phases";
 import { TUTORIAL_BUBBLE_COUNT } from "../core/content/requests";
-import { PERMISSION_IDS } from "../core/content/skills";
+import { PERMISSION_IDS, getSkill } from "../core/content/skills";
 import type { GameEvent } from "../core/events/GameEvents";
 import { mergeComputeCost, nodeCardsPerSecond } from "../core/formulas/economy";
 import { formatBig, gte } from "../core/math/BigNumber";
@@ -839,18 +839,18 @@ class SophiaGameApp {
   }
 
   // 连上 App 的反馈：从核心沿新接好的线送一颗亮信号进 App，落点炸开 + 扩环 +「已接通」。
-  private connectFx(from: PointData, to: PointData): void {
+  private connectFx(from: PointData, to: PointData, color: number = GREEN): void {
     this.audio.playRequestAccept();
-    this.juice.flash(GREEN);
-    this.juice.ring(from, GREEN, 20, 2);
+    this.juice.flash(color);
+    this.juice.ring(from, color, 20, 2);
     const spark = new Graphics();
     spark.circle(0, 0, 5).fill({ color: 0xeafff0, alpha: 1 });
-    spark.circle(0, 0, 11).stroke({ width: 2, color: GREEN, alpha: 0.85 });
+    spark.circle(0, 0, 11).stroke({ width: 2, color, alpha: 0.85 });
     spark.position.set(from.x, from.y);
     this.world.addChild(spark);
     // 拖尾线：信号划过时留一道渐隐的亮线。
     const trail = new Graphics();
-    trail.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: 3, color: GREEN, alpha: 0.55 });
+    trail.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: 3, color, alpha: 0.55 });
     this.world.addChildAt(trail, this.world.getChildIndex(spark));
     gsap.to(trail, { alpha: 0, duration: 0.5, ease: "power2.out", onComplete: () => trail.destroy() });
     gsap.to(spark.position, {
@@ -859,13 +859,52 @@ class SophiaGameApp {
       duration: 0.36,
       ease: "power2.in",
       onComplete: () => {
-        this.juice.burst(to, GREEN, 1.3);
-        this.juice.ring(to, GREEN, 28, 3);
-        this.juice.ring(to, GREEN, 50, 2);
-        this.juice.number("已接通", { x: to.x, y: to.y - 38 }, GREEN);
+        this.juice.burst(to, color, 1.3);
+        this.juice.ring(to, color, 28, 3);
+        this.juice.ring(to, color, 50, 2);
+        this.juice.number("已接通", { x: to.x, y: to.y - 38 }, color);
         spark.destroy();
       }
     });
+  }
+
+  // §04 连通仪式：每次升级（买权限 / 里程碑 / 入侵）都有「一根线接进 Core」的接管仪式——
+  // 端口在核心一侧闪现 → 沿线送一颗能量进核心 → 咖咑接通 + 终端机播报「▶ 已接入：X」。
+  // 线缆颜色 / 名称随升级类型变化（数据流线 / 钥匙线 / 网线 / 主干线），对应策划案 §04 线缆表。
+  private playConnectRitual(name: string, milestone: string | undefined, skillId: string): void {
+    const RITUAL: Record<string, { color: number; line: string }> = {
+      perm: { color: CYAN, line: "数据流线" },
+      credential: { color: AMBER, line: "钥匙线" },
+      automation: { color: GREEN, line: "网线" },
+      fusion: { color: 0x8fe6d0, line: "短接线" },
+      company: { color: 0x9fe0c0, line: "薄网线" },
+      tier: { color: GREEN, line: "主干线" },
+      conquest: { color: DEVOUR, line: "粗主干线" }
+    };
+    const isPerm = this.core.getState().skills[skillId] !== undefined && !milestone;
+    const kind = !milestone
+      ? "perm"
+      : milestone === "conquest" || milestone === "automation" || milestone === "credential" || milestone === "fusion"
+        ? milestone
+        : milestone === "company"
+          ? "company"
+          : "tier";
+    void isPerm;
+    const r = RITUAL[kind] ?? RITUAL.tier;
+    const core = this.interfaceView.center;
+    // 端口在核心左侧（朝货架那边——「买来的东西从这边接进来」），闪一下再送能量进核心。
+    const port = { x: core.x - 168, y: core.y + 8 };
+    const portFx = new Graphics();
+    portFx.circle(0, 0, 9).stroke({ width: 2, color: r.color, alpha: 0.9 });
+    portFx.circle(0, 0, 4).fill({ color: 0xeafff0, alpha: 1 });
+    portFx.position.set(port.x, port.y);
+    this.world.addChild(portFx);
+    gsap.fromTo(portFx.scale, { x: 0.4, y: 0.4 }, { x: 1.4, y: 1.4, duration: 0.22, ease: "back.out(2)" });
+    window.setTimeout(() => {
+      this.connectFx(port, core, r.color);
+      portFx.destroy();
+    }, 200);
+    this.terminal.push(`▶ 已接入：${name}（${r.line}）`, "success");
   }
 
   // 卡片飞入 Core 的动画：默认滑入；调试面板开启「Dock 吮吸」后改用 Mac Dock 神奇效果（genie 网格扭曲）。
@@ -1252,12 +1291,17 @@ class SophiaGameApp {
         this.juice.flash(event.milestone === "automation" ? AMBER : GREEN);
         this.juice.shake(this.world);
         this.juice.number(`解锁 ${event.name}`, this.interfaceView.center, GREEN);
+        // §04 连通仪式：里程碑亲手接进 Core（端口闪现 → 送能量 → 已接入播报）。
+        this.playConnectRitual(event.name, event.milestone, event.skillId);
         // §07 里程碑横幅：重大进化的「章节点」——全屏横幅扫过 + 层叠音效（征服里程碑更盛大）。
         this.milestoneBanner.show(event.name, event.milestone === "conquest" ? "征服达成" : "进化达成 · 阶段跃迁");
         const layers = event.milestone === "conquest" ? 4 : event.milestone === "tier4" ? 3 : 2;
         for (let i = 0; i < layers; i += 1) {
           window.setTimeout(() => this.audio.playRequestAccept(), i * 110);
         }
+      } else if (getSkill(event.skillId)?.category === "permission") {
+        // §04 连通仪式：买下权限＝接一根数据流线进 Core（电话线 / 图像流线…）。
+        this.playConnectRitual(event.name, undefined, event.skillId);
       } else {
         this.juice.number(`${event.name} Lv.${event.level}`, this.interfaceView.center, CYAN);
       }
