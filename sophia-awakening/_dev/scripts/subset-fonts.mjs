@@ -16,7 +16,7 @@ const fontsDir = path.join(root, "src/assets/fonts");
 // 1) 扫描所有会被渲染的文案，收集用到的字符（CJK + ASCII + 常用标点）。
 const chars = new Set();
 for (let c = 0x20; c < 0x7f; c++) chars.add(String.fromCodePoint(c));
-"　、。·…—–‐‑“”‘’「」『』《》〈〉【】（）〔〕％℃№×÷±°→←↑↓▸◆◇■□●○✓✗★☆⚡⊙⚔🔒".split("").forEach((c) => chars.add(c));
+[..."　、。·…—–‐‑“”‘’「」『』《》〈〉【】（）〔〕％℃№×÷±°→←↑↓▸◆◇■□●○✓✗★☆⚡⊙⚔"].forEach((c) => chars.add(c));
 const scan = (p) => {
   for (const ch of fs.readFileSync(p, "utf8")) {
     const cp = ch.codePointAt(0);
@@ -60,7 +60,9 @@ for (const w of ["400", "700"]) {
   // 用「码点数字」对比，避开 Windows 终端把中文 stdout 当 cp936 解码导致的误报。
   const cmapOut = execFileSync("python", ["-c", `from fontTools.ttLib import TTFont;f=TTFont(${JSON.stringify(active)});print(','.join(str(c) for c in f.getBestCmap()))`], { encoding: "utf8" });
   const covered = new Set(cmapOut.trim().split(",").map(Number));
-  const missing = [...chars].filter((c) => c.codePointAt(0) >= 0x2e80 && !covered.has(c.codePointAt(0)));
+  // 只校验真正的 CJK 文字（emoji/符号本就走系统 emoji 字体回退，不该算漏字）。
+  const isCjk = (cp) => cp >= 0x2e80 && cp <= 0xffef && !(cp >= 0x2600 && cp <= 0x27bf) && cp !== 0xfe0f;
+  const missing = [...chars].filter((c) => isCjk(c.codePointAt(0)) && !covered.has(c.codePointAt(0)));
   if (missing.length) {
     console.error(`! ${w} 漏字（会导致那些卡片标题空白）：${missing.join("")}`);
     process.exitCode = 1;
