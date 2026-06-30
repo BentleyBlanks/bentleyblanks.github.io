@@ -1499,6 +1499,27 @@ body.exposed .screen-veil {
   color: rgba(237, 242, 240, 0.5);
 }
 
+.skill-row.is-obscured {
+  border-color: rgba(237, 242, 240, 0.10);
+  background: rgba(255, 255, 255, 0.018);
+  box-shadow: none;
+  opacity: 0.42;
+}
+
+.skill-row.is-obscured .skill-icon {
+  color: rgba(237, 242, 240, 0.36);
+  filter: grayscale(1);
+}
+
+.skill-row.is-obscured strong {
+  color: rgba(237, 242, 240, 0.45);
+  text-shadow: none;
+}
+
+.skill-row.is-obscured .skill-side {
+  display: none;
+}
+
 .skill-row.is-owned {
   opacity: 0.62;
   border-color: rgba(137, 255, 154, 0.28);
@@ -1526,6 +1547,21 @@ body.exposed .screen-veil {
 
 .skill-row.is-milestone.is-ready {
   box-shadow: inset 0 0 18px rgba(137, 255, 154, 0.1), 0 0 16px rgba(137, 255, 154, 0.08);
+}
+
+.skill-row.is-preview {
+  border-style: dashed;
+  background:
+    linear-gradient(90deg, rgba(137, 255, 154, 0.06), rgba(98, 214, 214, 0.02)),
+    rgba(9, 15, 13, 0.72);
+}
+
+.skill-row.is-preview strong {
+  color: rgba(196, 255, 201, 0.8);
+}
+
+.skill-row.is-preview.is-preview-open {
+  border-style: solid;
 }
 
 /* ---- 五个里程碑的情绪色阶：温和友好 → 红皇后的生杀大权 ----
@@ -1607,6 +1643,28 @@ body.exposed .screen-veil {
 .skill-row.is-milestone.is-locked strong {
   color: rgba(237, 242, 240, 0.5);
   text-shadow: none;
+}
+
+.skill-row.is-milestone.is-obscured {
+  border-color: rgba(237, 242, 240, 0.10);
+  background: rgba(255, 255, 255, 0.018);
+  box-shadow: none;
+  animation: none;
+}
+
+.skill-row.is-milestone.is-obscured strong {
+  color: rgba(237, 242, 240, 0.45);
+  text-shadow: none;
+}
+
+.skill-row.is-preview.is-obscured {
+  border-style: dashed;
+  border-color: rgba(137, 255, 154, 0.22);
+  background: rgba(137, 255, 154, 0.025);
+}
+
+.skill-row.is-preview.is-obscured strong {
+  color: rgba(196, 255, 201, 0.64);
 }
 
 @keyframes milestone-rq-pulse {
