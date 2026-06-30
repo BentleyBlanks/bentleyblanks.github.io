@@ -80,7 +80,6 @@ canvas {
 }
 
 .top-hud,
-.control-panel,
 .right-rail {
   position: fixed;
   z-index: 10;
@@ -283,9 +282,11 @@ canvas {
   }
 }
 
-/* 左侧栏：技能货架（上，滚动）+ 成功率圆环（下，沉底）——合并为同一个外框，不再各自一个框。 */
+/* 左侧栏＝透明布局容器（不带框！），里面装两个等宽的独立浮动框：指标框 + 技能货架框。 */
 .control-panel {
-  /* 浮动、按高度所需、垂直居中（不再全高占满）。 */
+  position: fixed;
+  z-index: 10;
+  pointer-events: none; /* 容器本身不挡点击；两个子框各自开启 */
   top: 50%;
   transform: translateY(-50%);
   max-height: calc(100vh - 24px);
@@ -294,17 +295,27 @@ canvas {
   flex-direction: column;
   gap: 12px;
   width: calc(var(--left-rail) - 24px);
-  padding: 14px;
-  border-radius: 10px;
 }
 
-/* 技能货架占据上方剩余空间并在内部滚动；分隔交给底部圆环的 border-top，这里不再描线。 */
-.control-panel .skill-shop-section {
+/* 两个子框：等宽（都撑满容器宽）、各自描边/背景/模糊，独立浮动。 */
+.control-panel > .metric-cluster,
+.control-panel > .skill-shop-section {
+  pointer-events: auto;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 42px rgba(0, 0, 0, 0.28);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+/* 技能货架框：占下方、内部滚动；四周完整描边（特异性盖过 .panel-section:last-child 的去底线）。 */
+.control-panel .panel-section.skill-shop-section {
   flex: 0 1 auto;
   overflow-y: auto;
   min-height: 0;
-  padding-bottom: 0;
-  border-bottom: 0;
+  padding-bottom: 12px;
+  border: 1px solid var(--line);
 }
 
 .control-panel .stat-ring-block {
@@ -2946,20 +2957,15 @@ body.exposed .screen-veil {
 .metric-cluster {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   flex: 0 0 auto;
 }
+/* 框内三项＝纯行（无内框），避免再套一层框。 */
 .metric-cluster .metric {
-  padding: 9px 12px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(237, 242, 240, 0.07);
-}
-.metric-cluster .intel-metric {
-  background:
-    linear-gradient(120deg, rgba(98, 214, 214, 0.12), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.03);
-  border-color: rgba(137, 255, 154, 0.18);
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  border: 0;
 }
 .metric-cluster .intel-metric .metric-label { margin-bottom: 6px; }
 .metric-cluster .compute-metric strong {
