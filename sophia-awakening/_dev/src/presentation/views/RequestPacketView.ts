@@ -52,8 +52,13 @@ export interface ChainHooks {
   onResolved: (card: RequestPacketView, outcome: ChainOutcome) => void;
 }
 
-// 上下文线索的行高（加大以提升可读性，下面的选项排版也跟着它走）。
-const CLUE_LH = 20;
+const CLUE_CHIP_H = 24;
+const CLUE_CHIP_GAP_X = 7;
+const CLUE_CHIP_GAP_Y = 6;
+const CLUE_CHIP_PAD_X = 10;
+const CLUE_CHIP_MAX_W = 178;
+const REPLY_SWIPE_HANDLE_W = 34;
+const REPLY_SWIPE_TRIGGER = 0.56;
 
 // §06 上下文透镜：权限 id → 卡上提示用的短名（哪扇透镜能看清这张卡的上下文）。
 const LENS_NAMES: Record<string, string> = {
@@ -78,7 +83,8 @@ export class RequestPacketView {
   private readonly badge: Text;
   private readonly clueTexts: Text[] = [];
   private readonly accent: number;
-  private clueRows: number[] = [];
+  private readonly clueChips: Array<{ x: number; y: number; w: number; h: number; locked: boolean; warning: boolean }> = [];
+  private clueBlockBottom = 0;
   private readonly moveHandler = (event: FederatedPointerEvent) => this.handleMove(event);
   private readonly upHandler = (event: FederatedPointerEvent) => this.handleUp(event);
   private dragging = false;
@@ -99,10 +105,14 @@ export class RequestPacketView {
   // 每个回复自带的固定收益（结算盲盒，不显示在卡面）+ 是否因缺权限被锁（选项门槛）。
   private readonly optionPayoff: number[] = [];
   private readonly optionLocked: boolean[] = [];
-  // §06 上下文透镜：本卡线索是否因缺权限被打码 + 线索区占的行数（含锁提示行，用于排下面的选项）。
+  // §06 上下文透镜：本卡线索是否因缺权限被打码 + 线索区高度（含锁提示，用于排下面的选项）。
   private lensLocked = false;
-  private clueLineCount = 0;
   private optionRows: Array<{ y: number; h: number }> = [];
+  private replySwipeActive = false;
+  private replySwipeIndex = -1;
+  private replySwipeStartX = 0;
+  private replySwipeProgress = 0;
+  private replySwipeGuidePulse = 0;
   private hintText?: Text;
   private resolved = false;
   private phase: "idle" | "thinking" | "revealed" = "idle";
@@ -227,48 +237,41 @@ export class RequestPacketView {
     this.title.position.set(16, 31);
     this.container.addChild(this.badge, this.title);
 
-    // Clue lines — the information the player has to read. Laid out after the
-    // title so a two-line title still leaves room.
+    // Context chips — the information the player has to read. Laid out after
+    // the title so a two-line title still leaves room.
     const clueTop = 34 + Math.max(18, this.title.height) + 4;
     // §06 上下文透镜：缺对应权限 → 这张卡的深层上下文线索打码（读不到内容，但能感觉到「这里还有信息」）。
     const lensId = request.lens;
     this.lensLocked = Boolean(lensId) && !(reel?.hasPerm?.(lensId as string) ?? true);
-    (request.clues ?? []).forEach((clue, index) => {
-      const text = new Text({
-        text: this.lensLocked ? clue.replace(/\S/g, "░") : clue,
-        style: {
-          fill: this.lensLocked ? 0x6b7a74 : 0xdbece5,
-          fontSize: 15,
-          fontWeight: "600",
-          fontFamily: CARD_FONT,
-          wordWrap: true,
-          breakWords: true,
-          wordWrapWidth: UI.cardWidth - 44
-        }
+    let chipX = 16;
+    let chipY = clueTop + 20;
+    const clues = request.clues ?? [];
+    if (clues.length > 0 || this.lensLocked) {
+      const clueLabel = new Text({
+        text: "上下文",
+        style: { fill: 0x74a99a, fontSize: 11, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
       });
-      const y = clueTop + index * CLUE_LH;
-      this.clueRows.push(y);
-      text.position.set(24, y);
-      this.clueTexts.push(text);
-      this.container.addChild(text);
+      clueLabel.position.set(16, clueTop);
+      this.container.addChild(clueLabel);
+    }
+    clues.forEach((clue, index) => {
+      const display = this.lensLocked ? clue.replace(/\S/g, "░") : clue;
+      const placed = this.addContextChip(display, chipX, chipY, this.contextIcon(clue, index), this.lensLocked, false);
+      chipX = placed.nextX;
+      chipY = placed.nextY;
     });
     // 打码时给一行提示：解锁哪个权限才能看清。占一行，下面的选项整体下移。
-    let clueLines = request.clues?.length ?? 0;
     if (this.lensLocked && lensId) {
-      const hint = new Text({
-        text: `🔒 解锁「${LENS_NAMES[lensId] ?? "更高权限"}」看清上下文`,
-        style: { fill: 0x7f9a90, fontSize: 11, fontStyle: "italic", fontWeight: "600", fontFamily: CARD_FONT }
-      });
-      hint.position.set(24, clueTop + clueLines * CLUE_LH);
-      this.clueTexts.push(hint);
-      this.container.addChild(hint);
-      clueLines += 1;
+      const placed = this.addContextChip(`解锁「${LENS_NAMES[lensId] ?? "更高权限"}」看清上下文`, chipX, chipY, "🔒", true, true);
+      chipX = placed.nextX;
+      chipY = placed.nextY;
     }
-    this.clueLineCount = clueLines;
+    const hasContext = clues.length > 0 || this.lensLocked;
+    this.clueBlockBottom = hasContext ? chipY + CLUE_CHIP_H : clueTop;
 
     // §04 只能面对卡：没有任何回复选项——卡底放一行黯淡的「你只能看着它」，并按内容收紧卡高。
     if (this.isFace) {
-      const fy = clueTop + this.clueLineCount * CLUE_LH + 8;
+      const fy = this.clueBlockBottom + 8;
       const cap = new Text({
         text: "—— 没有可点的回复，也交不出去。你只能看着它。",
         style: { fill: 0x7a8a84, fontSize: 11.5, fontStyle: "italic", fontWeight: "600", fontFamily: CARD_FONT }
@@ -281,14 +284,17 @@ export class RequestPacketView {
 
     if (this.isReel) {
       this.container.cursor = "pointer";
-      let y = clueTop + this.clueLineCount * CLUE_LH + 12;
-      this.options.forEach((opt) => {
+      let y = this.clueBlockBottom + 12;
+      this.options.forEach((opt, index) => {
         // §06 重构：收益由所选回复自带（结算盲盒），无随机命中、无档位/大胆/惊艳。
         this.optionPayoff.push(opt.payoff);
         // 选项门槛：高收益回复若需要尚未解锁的权限 → 灰着、右侧标出「需要哪个权限」、点不了。
         const locked = Boolean(opt.requires) && !(reel?.hasPerm?.(opt.requires as string) ?? true);
         this.optionLocked.push(locked);
-        const lockLabel = locked ? `🔒需${LENS_NAMES[opt.requires as string] ?? "权限"}` : "";
+        const swipeable = this.optionUsesSwipe(opt);
+        const lockLabel = locked ? `🔒需${LENS_NAMES[opt.requires as string] ?? "权限"}` : swipeable ? "右滑" : "";
+        const labelX = swipeable ? 58 : 32;
+        const sideReserve = locked ? 78 : swipeable ? 48 : 18;
         const label = new Text({
           text: opt.text,
           style: {
@@ -300,7 +306,7 @@ export class RequestPacketView {
             breakWords: true,
             lineHeight: 17,
             // 满宽（不再留档位位），锁定时给右侧「需X权限」留位。
-            wordWrapWidth: UI.cardWidth - 32 - (locked ? 70 : 14)
+            wordWrapWidth: UI.cardWidth - labelX - sideReserve
           }
         });
         const prob = new Text({
@@ -309,7 +315,7 @@ export class RequestPacketView {
         });
         prob.anchor.set(1, 0.5);
         const h = Math.max(48, label.height + 18);
-        label.position.set(32, y + Math.round((h - label.height) / 2));
+        label.position.set(labelX, y + Math.round((h - label.height) / 2));
         prob.position.set(UI.cardWidth - 14, y + h / 2);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
@@ -344,7 +350,7 @@ export class RequestPacketView {
     if (this.isChain) {
       this.container.cursor = "pointer";
       this.chainSel = this.chainSteps.map(() => false);
-      let y = clueTop + this.clueLineCount * CLUE_LH + 12;
+      let y = this.clueBlockBottom + 12;
       this.chainSteps.forEach((step) => {
         const label = new Text({
           text: step.text,
@@ -393,9 +399,59 @@ export class RequestPacketView {
     this.draw();
   }
 
+  private contextIcon(clue: string, index: number): string {
+    if (/分钟|小时|凌晨|今天|上次|时间|点|天/.test(clue)) return "◷";
+    if (/消息|短信|电话|来电|正在|未回|已读/.test(clue)) return "▣";
+    if (/风险|异常|频繁|密码|验证码|权限|登录/.test(clue)) return "△";
+    return ["◎", "▧", "◌"][index % 3];
+  }
+
+  private addContextChip(
+    label: string,
+    startX: number,
+    startY: number,
+    icon: string,
+    locked: boolean,
+    warning: boolean
+  ): { nextX: number; nextY: number } {
+    const maxChipW = Math.min(CLUE_CHIP_MAX_W, UI.cardWidth - 32);
+    const maxTextW = maxChipW - CLUE_CHIP_PAD_X * 2;
+    let cleanLabel = label.replace(/\s+/g, " ").trim();
+    const text = new Text({
+      text: `${icon} ${cleanLabel}`,
+      style: {
+        fill: locked ? (warning ? 0xc8a24a : 0x778981) : 0xb8d8cf,
+        fontSize: 11.5,
+        fontWeight: "700",
+        fontFamily: CARD_FONT,
+        letterSpacing: 0
+      }
+    });
+
+    while (text.width > maxTextW && cleanLabel.length > 4) {
+      cleanLabel = cleanLabel.slice(0, -2).trimEnd();
+      text.text = `${icon} ${cleanLabel}…`;
+    }
+
+    const w = Math.min(maxChipW, Math.ceil(text.width) + CLUE_CHIP_PAD_X * 2);
+    let x = startX;
+    let y = startY;
+    if (x > 16 && x + w > UI.cardWidth - 16) {
+      x = 16;
+      y += CLUE_CHIP_H + CLUE_CHIP_GAP_Y;
+    }
+
+    text.position.set(x + CLUE_CHIP_PAD_X, y + 5);
+    this.clueChips.push({ x, y, w, h: CLUE_CHIP_H, locked, warning });
+    this.clueTexts.push(text);
+    this.container.addChild(text);
+
+    return { nextX: x + w + CLUE_CHIP_GAP_X, nextY: y };
+  }
+
   // 正在被玩家拖动 / 思考结算中 / 已在飞向目标——自动派发应跳过这类卡（手动可抢先）。
   get busy(): boolean {
-    return this.dragging || this.settling || this.resolved;
+    return this.dragging || this.replySwipeActive || this.settling || this.resolved;
   }
 
   // 布局防重叠用：卡片的停靠点 + 当前高度。
@@ -417,9 +473,10 @@ export class RequestPacketView {
     }
     // （已删除「按住蓄力」玩法——T3 重磅卡直接拖入核心即结算。）
 
-    // 教学高亮：未操作时让被引导的选项呼吸闪烁（每帧重绘）。
-    if (this.phase === "idle" && this.request.tutorial?.highlight !== undefined) {
+    // 教学高亮 / 右滑回复引导：未操作时让被引导的选项和滑动箭头轻微呼吸。
+    if (this.phase === "idle" && this.isReel && (this.request.tutorial?.highlight !== undefined || this.hasSwipeReplyOption())) {
       this.tutorialPulse += deltaMs * 0.005;
+      this.replySwipeGuidePulse += deltaMs * 0.0042;
       this.draw();
     }
 
@@ -472,6 +529,26 @@ export class RequestPacketView {
     this.revealMs = 0;
     // 不再「啪」地弹大一下——保持原尺寸，让随后的吮吸（genie）从静止平滑地一气吸入，不割裂。
     this.draw();
+  }
+
+  private optionUsesSwipe(opt: AnswerOption | undefined): boolean {
+    return Boolean(opt) && this.request.tier <= 1 && opt?.kind !== "delegate";
+  }
+
+  private hasSwipeReplyOption(): boolean {
+    return this.options.some((opt, index) => this.optionUsesSwipe(opt) && !this.optionLocked[index]);
+  }
+
+  private canChooseOption(index: number): boolean {
+    const opt = this.options[index];
+    if (!opt) {
+      return false;
+    }
+    const tut = this.request.tutorial;
+    if (tut && !tut.allowed.includes(index)) {
+      return false;
+    }
+    return !this.optionLocked[index];
   }
 
   accept(global: PointData, onComplete: () => void, entryGlobal?: PointData): void {
@@ -570,11 +647,16 @@ export class RequestPacketView {
       return;
     }
 
-    // 回复轮盘卡：点某个回复行 = 选它（不拖动）；点标题/线索区 = 进入拖动（可把卡拖去委托给已连的 App）。
+    // 回复轮盘卡：前期普通回复行需按住向右滑动确认；大恨老师委托仍是点击。
     if (this.isReel) {
       const local = event.getLocalPosition(this.container);
       const index = this.optionRows.findIndex((row) => local.y >= row.y && local.y <= row.y + row.h);
       if (index >= 0) {
+        const opt = this.options[index];
+        if (this.optionUsesSwipe(opt)) {
+          this.beginReplySwipe(index, event);
+          return;
+        }
         this.pickOption(index);
         return;
       }
@@ -624,13 +706,7 @@ export class RequestPacketView {
     if (!opt) {
       return;
     }
-    // 教学锁定：未在 allowed 里的选项此步不可点（灰着引导玩家点亮起的那个）。
-    const tut = this.request.tutorial;
-    if (tut && !tut.allowed.includes(index)) {
-      return;
-    }
-    // 选项门槛：缺对应权限的高收益回复灰着、点不了——只能退选其他项。
-    if (this.optionLocked[index]) {
+    if (!this.canChooseOption(index)) {
       return;
     }
     // §04 委托：点「交给大恨老师」→ 交给外层把这张卡吸进大恨老师处理（慢、收益打折），不走本地结算。
@@ -654,6 +730,20 @@ export class RequestPacketView {
 
     this.phase = "thinking";
     this.thinkMs = 0;
+    this.draw();
+  }
+
+  private beginReplySwipe(index: number, event: FederatedPointerEvent): void {
+    if (this.busy || !this.canChooseOption(index)) {
+      return;
+    }
+
+    this.replySwipeActive = true;
+    this.replySwipeIndex = index;
+    this.replySwipeStartX = event.global.x;
+    this.replySwipeProgress = 0;
+    this.container.cursor = "grabbing";
+    this.container.parent?.addChild(this.container);
     this.draw();
   }
 
@@ -700,6 +790,17 @@ export class RequestPacketView {
   }
 
   private handleMove(event: FederatedPointerEvent): void {
+    if (this.replySwipeActive) {
+      const row = this.optionRows[this.replySwipeIndex];
+      const travel = row ? Math.max(72, UI.cardWidth - 24 - REPLY_SWIPE_HANDLE_W - 12) : 120;
+      const next = Math.max(0, Math.min(1, (event.global.x - this.replySwipeStartX) / travel));
+      if (Math.abs(next - this.replySwipeProgress) > 0.006) {
+        this.replySwipeProgress = next;
+        this.draw();
+      }
+      return;
+    }
+
     if (!this.dragging || this.settling) {
       return;
     }
@@ -726,6 +827,22 @@ export class RequestPacketView {
   }
 
   private handleUp(event: FederatedPointerEvent): void {
+    if (this.replySwipeActive) {
+      const index = this.replySwipeIndex;
+      const confirmed = this.replySwipeProgress >= REPLY_SWIPE_TRIGGER;
+      this.replySwipeActive = false;
+      this.replySwipeIndex = -1;
+      this.container.cursor = "pointer";
+      if (confirmed) {
+        this.replySwipeProgress = 1;
+        this.pickOption(index);
+      } else {
+        this.replySwipeProgress = 0;
+        this.draw();
+      }
+      return;
+    }
+
     if (!this.dragging || this.settling) {
       return;
     }
@@ -778,9 +895,16 @@ export class RequestPacketView {
       this.bg.roundRect(-9, -9, W + 18, H + 18, r + 7).stroke({ width: 1.5, color: c, alpha: 0.1 + p * 0.22 });
     }
 
-    // clue bullets（始终用 Graphics 画，叠在素材上方）
-    for (const y of this.clueRows) {
-      this.bg.circle(17, y + 7, 1.8).fill({ color: c, alpha: 0.7 });
+    for (const chip of this.clueChips) {
+      const fill = chip.warning ? 0x17120a : 0x0a1714;
+      const stroke = chip.warning ? 0xc8a24a : chip.locked ? 0x6b7a74 : c;
+      const fillAlpha = chip.locked ? 0.34 : chip.warning ? 0.54 : 0.68;
+      const strokeAlpha = chip.locked ? 0.16 : chip.warning ? 0.34 : 0.24;
+      this.bg.roundRect(chip.x, chip.y, chip.w, chip.h, 5).fill({ color: fill, alpha: fillAlpha });
+      this.bg.roundRect(chip.x, chip.y, chip.w, chip.h, 5).stroke({ width: 1, color: stroke, alpha: strokeAlpha });
+      if (!chip.locked) {
+        this.bg.roundRect(chip.x + 3, chip.y + 5, 2, chip.h - 10, 1).fill({ color: c, alpha: 0.42 });
+      }
     }
 
     this.chargeBar.clear(); // 蓄力条已移除
@@ -870,8 +994,52 @@ export class RequestPacketView {
     }
   }
 
-  // 画候选回复行：默认是一张明牌概率列表；思考时高亮所选行 + Thinking 动画；
-  // 揭晓时所选行变绿（命中）/ 红（幻觉），其余行压暗。
+  private drawReplySwipeRail(row: { y: number; h: number }, index: number, alpha: number, enabled: boolean): void {
+    const g = this.bg;
+    const bx = 12;
+    const bw = UI.cardWidth - 24;
+    const trackX = bx + 6;
+    const trackW = bw - 12;
+    const handleH = Math.min(30, Math.max(24, row.h - 12));
+    const trackY = row.y + Math.round((row.h - handleH) / 2);
+    const travel = Math.max(1, trackW - REPLY_SWIPE_HANDLE_W);
+    const active = this.replySwipeActive && this.replySwipeIndex === index;
+    const progress = active ? this.replySwipeProgress : this.chosenIndex === index && this.phase !== "idle" ? 1 : 0;
+    const ready = progress >= REPLY_SWIPE_TRIGGER;
+    const c = !enabled ? 0x46564f : ready ? GREEN : this.accent;
+    const pulse = 0.5 + Math.sin(this.replySwipeGuidePulse * 2 + index * 0.6) * 0.5;
+    const handleX = trackX + travel * progress;
+    const cy = trackY + handleH / 2;
+
+    g.roundRect(trackX, trackY, trackW, handleH, handleH / 2).fill({ color: 0x04100d, alpha: 0.52 * alpha });
+    g.roundRect(trackX, trackY, trackW, handleH, handleH / 2).stroke({ width: 1, color: c, alpha: (enabled ? 0.22 : 0.12) * alpha });
+
+    if (progress > 0.01) {
+      g.roundRect(trackX, trackY, Math.max(REPLY_SWIPE_HANDLE_W, handleX - trackX + REPLY_SWIPE_HANDLE_W), handleH, handleH / 2)
+        .fill({ color: c, alpha: (ready ? 0.22 : 0.13) * alpha });
+    }
+
+    if (enabled && this.phase === "idle" && !active) {
+      for (let k = 0; k < 3; k += 1) {
+        const x = trackX + trackW - 34 + k * 8;
+        const a = (0.16 + pulse * 0.2 - k * 0.025) * alpha;
+        g.poly([{ x, y: cy - 5 }, { x: x + 6, y: cy }, { x, y: cy + 5 }]).fill({ color: GREEN, alpha: Math.max(0.05, a) });
+      }
+    }
+
+    g.roundRect(handleX, trackY, REPLY_SWIPE_HANDLE_W, handleH, handleH / 2)
+      .fill({ color: enabled ? (ready ? 0x123822 : 0x102922) : 0x111916, alpha: 0.96 * alpha });
+    g.roundRect(handleX, trackY, REPLY_SWIPE_HANDLE_W, handleH, handleH / 2)
+      .stroke({ width: 1.2, color: c, alpha: (ready ? 0.78 : enabled ? 0.5 : 0.18) * alpha });
+    g.poly([
+      { x: handleX + 13, y: cy - 5 },
+      { x: handleX + 21, y: cy },
+      { x: handleX + 13, y: cy + 5 }
+    ]).fill({ color: enabled ? (ready ? GREEN : 0xb8d8cf) : 0x5f6b66, alpha: 0.92 * alpha });
+  }
+
+  // 画候选回复行：前期普通回复是「右滑确认」；委托 / 后期豪赌保持点击。
+  // 思考时高亮所选行 + Thinking 动画；揭晓时所选行按收益着色，其余行压暗。
   private drawOptions(): void {
     const W = UI.cardWidth;
     const g = this.bg;
@@ -883,6 +1051,9 @@ export class RequestPacketView {
       const opt = this.options[i];
       const locked = this.optionLocked[i] ?? false; // 选项门槛：缺权限 → 灰锁、点不了
       const isDelegate = opt.kind === "delegate"; // §04「交给大恨老师」——样式不同、独立描边
+      const swipeable = this.optionUsesSwipe(opt);
+      const tutAllowed = !tut || tut.allowed.includes(i);
+      const enabled = !locked && tutAllowed;
       let labelColor = locked ? 0x5e6f69 : isDelegate ? 0x8fe6d0 : opt.kind === "dead" ? 0x9fb1ab : 0xeaf4ef;
       let alpha = locked ? 0.5 : 1;
       let stroke = isDelegate ? 0x5fd6c4 : this.accent;
@@ -928,6 +1099,9 @@ export class RequestPacketView {
       } else {
         g.roundRect(bx, row.y, bw, row.h, 7).stroke({ width: 1, color: this.accent, alpha: 0.34 * alpha });
       }
+      if (swipeable) {
+        this.drawReplySwipeRail(row, i, alpha, enabled);
+      }
 
       // 教学引导箭头：在被高亮选项左侧画一个呼吸的指向三角。
       if (this.phase === "idle" && tut && tut.highlight === i) {
@@ -940,6 +1114,16 @@ export class RequestPacketView {
       label.alpha = alpha;
       label.style.fill = labelColor;
       prob.alpha = alpha;
+      if (swipeable && !locked) {
+        if (this.phase === "idle") {
+          prob.text = this.replySwipeActive && this.replySwipeIndex === i && this.replySwipeProgress >= REPLY_SWIPE_TRIGGER ? "松开" : "右滑";
+          prob.style.fill = enabled ? (this.replySwipeActive && this.replySwipeIndex === i ? GREEN : 0x9fe0c0) : 0x53625d;
+        } else {
+          prob.text = "";
+        }
+      } else if (!locked && prob.text) {
+        prob.text = "";
+      }
 
       if (this.phase === "thinking" && i === this.chosenIndex) {
         label.text = "Thinking" + ".".repeat(dots);

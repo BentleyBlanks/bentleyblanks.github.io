@@ -206,9 +206,9 @@ export function getActionHint(state: GameState): string {
   const scopeHint = (() => {
     switch (state.intelligence.unlockedTier) {
       case 0:
-        return "点击请求卡，让 SOPHIA 摇出回答——可能出错（幻觉）就少拿收益；处理完会自动交给人类、终端里能看到人类回话。";
+        return "按住回复向右滑动确认，SOPHIA 会把选中的回答滑入核心并交给人类。";
       case 1:
-        return "点击请求卡生成判断（正常/垃圾/拒绝）：判对收益高、判错=幻觉收益低。读卡面线索心里有数。";
+        return "读卡面线索，按住目标回复向右滑动确认；判对收益高，乱滑收益低。";
       case 2:
         return "看懂请求间的依赖结构，复合请求滑入核心，一笔串接结算多条。";
       case 3:

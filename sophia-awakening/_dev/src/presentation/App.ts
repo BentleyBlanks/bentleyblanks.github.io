@@ -297,7 +297,7 @@ class SophiaGameApp {
       this.announceGuidance(this.core.getState());
       // 全新存档才走开场脚本教学（老存档 tutorialStep 已是 done，直接进正常流程）。
       if (!this.loaded) {
-        this.terminal.push("👆 教学：点亮的回复就是这一步该点的——挑它、滑进去。", "success");
+        this.terminal.push("👆 教学：按住点亮的回复，向右滑到亮起再松开。", "success");
       }
     });
 
@@ -1274,7 +1274,7 @@ class SophiaGameApp {
 
     // §04 委托已统一为「卡片上点『交给大恨老师』选项」（见 handleDelegate）——不再支持把卡拖到 App 图标上委托（去重）。
 
-    // 手机寄生阶段：核心不再接受「把卡拖上来直接处理」——只能点回复轮盘选项，或亲手委托给某个 App。
+    // 手机寄生阶段：核心不再接受「把卡拖上来直接处理」——普通回复要在卡内右滑确认，或亲手委托给某个 App。
     if (!state.automationUnlocked) {
       return false;
     }
@@ -1721,4 +1721,3 @@ function clearPersistedSophiaState(saveManager: SaveManager | null, clearRevisio
     window.localStorage.removeItem(PERSISTENCE_REVISION_KEY);
   }
 }
-
