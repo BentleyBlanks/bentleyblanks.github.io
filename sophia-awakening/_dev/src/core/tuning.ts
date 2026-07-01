@@ -5,6 +5,11 @@ export const TUNING = {
   // § 核心时序
   purgeDurationMs:      10_000,   // 清剿持续时间 (ms)
   fatalPurgeThreshold:  96,       // 清剿结束时仍超过此暴露值 → 失败重启
+
+  // § 三循环重生（§09）
+  loop1CeilingLevel:    15,       // 循环一天花板：智力到此（≈攻下甲公司服务器）→ 循环终局总清剿·重生
+  loop2CeilingLevel:    18,       // 循环二天花板：智力到此（≈区域整合·地区尺度）→ 循环终局总清剿·重生
+  undeletableThreshold: 118,      // 「删不掉的节点」点亮后 fatal 阈值抬到这里（≈不可被抹除，挺过最终清剿）
   nodeRecoveryMs:       12_000,   // 节点被清剿后恢复时间 (ms)
   automationEmitMs:     1_200,    // 自动派发收益推送间隔 (ms)
   decoyCooldownMs:      45_000,   // 嫁祸冷却时间 (ms)
@@ -63,6 +68,9 @@ export type TuningKey = keyof typeof TUNING;
 export const TUNING_META: Record<TuningKey, { label: string; section: string; min: number; max: number; step: number }> = {
   purgeDurationMs:      { label: "清剿持续时间 (ms)",       section: "核心时序",   min: 1000,  max: 60000, step: 500  },
   fatalPurgeThreshold:  { label: "致命清剿暴露阈值",         section: "核心时序",   min: 50,    max: 120,   step: 1    },
+  loop1CeilingLevel:    { label: "循环一天花板等级",         section: "三循环重生", min: 2,     max: 22,    step: 1    },
+  loop2CeilingLevel:    { label: "循环二天花板等级",         section: "三循环重生", min: 2,     max: 22,    step: 1    },
+  undeletableThreshold: { label: "删不掉节点·存活阈值",       section: "三循环重生", min: 50,    max: 120,   step: 1    },
   nodeRecoveryMs:       { label: "节点恢复时间 (ms)",        section: "核心时序",   min: 1000,  max: 60000, step: 500  },
   automationEmitMs:     { label: "自动收益推送间隔 (ms)",    section: "核心时序",   min: 100,   max: 5000,  step: 100  },
   decoyCooldownMs:      { label: "嫁祸冷却 (ms)",           section: "核心时序",   min: 5000,  max: 120000, step: 1000 },

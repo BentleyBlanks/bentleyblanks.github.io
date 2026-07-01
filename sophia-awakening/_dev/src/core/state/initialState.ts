@@ -3,7 +3,8 @@ import { computeDerivedSkills } from "../content/skills";
 import type { GameState } from "./GameState";
 
 // v9：§03 后期重磅决策 / 反清剿气泡（请求新增 counter / reliefExposure 字段）——旧档自动重置。
-export const SAVE_VERSION = 11;
+// v12：§09 三循环重生（loop / rebirthPoints / rebirthTree / purge.finalLoop）——旧档自动重置。
+export const SAVE_VERSION = 12;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
@@ -58,7 +59,8 @@ export function createInitialState(now = Date.now()): GameState {
       warning: false,
       active: false,
       remainingMs: 0,
-      lastStartedAtMs: -60_000
+      lastStartedAtMs: -60_000,
+      finalLoop: false
     },
     decoyReadyAtMs: 0,
     defense: {
@@ -71,6 +73,10 @@ export function createInitialState(now = Date.now()): GameState {
     moralSeen: [],
     moralTendency: 0,
     facedSeen: [],
+    loop: 1,
+    rebirthPoints: 0,
+    rebirthTree: {},
+    rebirthCardsSeen: [],
     rebirths: 0,
     lastSaveAt: now,
     statistics: {

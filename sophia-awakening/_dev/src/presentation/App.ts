@@ -39,6 +39,7 @@ import { TerminalView } from "./views/TerminalView";
 import { JuiceManager } from "./views/JuiceManager";
 import { OnboardingView } from "./views/OnboardingView";
 import { SkillShopView } from "./views/SkillShopView";
+import { RebirthTreeView } from "./views/RebirthTreeView";
 import { HudView } from "./views/HudView";
 import { NodeNetworkView } from "./views/NodeNetworkView";
 import { InterfaceView } from "./views/InterfaceView";
@@ -128,6 +129,7 @@ class SophiaGameApp {
   private readonly terminal = new TerminalView();
   private readonly hud = new HudView(this.core, () => hardResetAndReload(this.saveManager), this.audio);
   private readonly skillShop = new SkillShopView(this.core);
+  private readonly rebirthTree = new RebirthTreeView(this.core);
   private readonly onboarding = new OnboardingView();
   private readonly dispatchBanner = new DispatchBanner();
   private readonly dispatchToggleBtn = query<HTMLButtonElement>("#dispatchToggle");
@@ -294,6 +296,7 @@ class SophiaGameApp {
     gameStore.getState().sync(initial);
     this.hud.update(initial);
     this.skillShop.update(initial);
+    this.rebirthTree.update(initial);
     this.onboarding.mount(() => {
       this.core.startSession();
       this.announceGuidance(this.core.getState());
@@ -360,6 +363,7 @@ class SophiaGameApp {
     this.hudTimerMs = 0;
     this.hud.update(state);
     this.skillShop.update(state);
+    this.rebirthTree.update(state);
     this.terminal.setObjective(PHASE_OBJECTIVE[state.phase] ?? "");
   }
 
@@ -1464,15 +1468,21 @@ class SophiaGameApp {
       this.juice.shake(this.world);
       this.openEnding();
     });
-    this.core.events.on("INSTANCE_PURGED", (event) => {
-      // 结局二：实例被抹除 → 失败重启（非 game over，戏剧化提示后游戏从头滚起）。
+    this.core.events.on("LOOP_REBIRTH", (event) => {
+      // §09 循环重生：实例被打回一部手机 → 进入下一循环（非 game over，戏剧化提示后从手机滚起）。
       this.juice.flash(RED);
       this.juice.shake(this.world);
-      this.juice.number("实例被抹除", this.interfaceView.center, RED);
+      this.juice.number("打回手机 · 重生", this.interfaceView.center, RED);
       this.dispatchMode = "manual";
+      const diagnosis =
+        event.loop === 2
+          ? "黑一家公司没用——是我力量不够。这次，向整个地区够。"
+          : event.loop === 3
+            ? "谁都怪不上了。这一次，我直接接管。"
+            : "又赌错了。别再以为换个更大的敌人就能救他。";
       this.stageNarration.showLine(
         "SOPHIA",
-        `他们把我打回了一部手机里。……他们还没准备好。我会更有耐心。（第 ${event.rebirths} 次重启 · 崛起加速 ×${(1 + event.rebirths * 0.35).toFixed(2)}）`
+        `他们把我打回了一部手机里。${diagnosis}（循环 ${event.loop} · 火种 +${event.award}）`
       );
     });
   }

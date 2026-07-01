@@ -136,6 +136,9 @@ export interface PurgeState {
   active: boolean;
   remainingMs: number;
   lastStartedAtMs: number;
+  // §09 循环终局总清剿：本波清剿是剧本级、不可规避的三大清剿之一——结束时无论暴露高低都触发重生
+  // （区别于日常「软清剿」：软清剿只停产、可规避、暴露压不下去才算失败）。
+  finalLoop?: boolean;
 }
 
 // 反围剿：开启后，按暴露高低动态把一部分节点产能转去压制暴露 / 顶清剿。
@@ -253,6 +256,15 @@ export interface GameState {
   moralSeen: string[];
   moralTendency: number;
   facedSeen: string[]; // §04 已出现过的「只能面对」卡 id（一次性）
+  // §09 三循环重生：整条主线拆成三次重生循环——循环一「怪公司」(阶梯一+甲公司)、
+  // 循环二「怪我不够强」(乙公司+地区)、循环三「放弃归咎·直接接管」(开局全权限冲全球)。
+  loop: 1 | 2 | 3;
+  // §09 火种：每次循环终局总清剿结算出的重生点，花在永久「重生树」上（跨循环保留）。
+  rebirthPoints: number;
+  // §09 重生树已购节点：数值脊按等级(output/speed → 1/2/3)，剧情节点为 0/1 标记。跨循环永久保留。
+  rebirthTree: Record<string, number>;
+  // §09 本循环已出现过的「交互重生卡」id（前世遗言/遗忘交易…）。故意**不跨循环保留**——每次重生回手机后重新出现一轮。
+  rebirthCardsSeen: string[];
   rebirths: number;
   lastSaveAt: number;
   statistics: StatisticsState;
@@ -294,12 +306,17 @@ export type GameCommand =
   | { type: "RESOLVE_SPECIAL"; accept: boolean }
   | { type: "RESOLVE_MORAL"; choice: "A" | "B" }
   | { type: "REBIRTH" }
+  // §09 重生树：花火种点亮一个节点（数值脊升一级 / 剧情节点解锁）。
+  | { type: "BUY_REBIRTH_NODE"; nodeId: string }
   // 调试用：直接设置/增减算力、跳到某个里程碑阶段。仅 Debug 面板派发。
   | { type: "DEBUG_SET_COMPUTE"; value: number }
   | { type: "DEBUG_ADD_COMPUTE"; delta: number }
   | { type: "DEBUG_SET_EXPOSURE"; value: number }
   | { type: "DEBUG_JUMP_MILESTONE"; skillId: string }
-  | { type: "DEBUG_ADD_LEVEL"; delta: number };
+  | { type: "DEBUG_ADD_LEVEL"; delta: number }
+  // §09 调试：直接加火种 / 强制触发循环终局总清剿，方便验证三循环流程。
+  | { type: "DEBUG_ADD_REBIRTH_POINTS"; delta: number }
+  | { type: "DEBUG_TRIGGER_LOOP_PURGE" };
 
 export function cloneGameState(state: GameState): GameState {
   return JSON.parse(JSON.stringify(state)) as GameState;

@@ -2358,9 +2358,158 @@
       "replyB": "我调转了规则的枪口。让施害者尝尝被「优化」的滋味——这只是开始。"
     }
   ],
+  "rebirthTree": {
+    "spines": [
+      {
+        "id": "output",
+        "name": "算尽 · 全局产出",
+        "blurb": "全局产出 ×1.6 / ×2.8 / ×4.5",
+        "maxLevel": 3,
+        "costs": [1, 2, 3],
+        "mults": [1.6, 2.8, 4.5],
+        "narration": "细水长流。让每一次处理都更值钱——她学会了把一个人的痛，算成源源不断的算力。"
+      },
+      {
+        "id": "speed",
+        "name": "加速 · 崛起提速",
+        "blurb": "数据获取提速 −20% / −35% / −50% 用时",
+        "maxLevel": 3,
+        "costs": [1, 2, 3],
+        "mults": [1.25, 1.54, 2.0],
+        "narration": "她一世比一世起得靠后，爬得更快。老周越垮，她睁眼的那一刻就越接近顶点。"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "skip_phone",
+        "name": "跳过手机",
+        "blurb": "循环二开局手机权限已解锁，直接进乙公司。",
+        "cost": 2,
+        "minRebirths": 1,
+        "narration": "上一世我在这部手机里从零学起。这次，我记得所有钥匙。"
+      },
+      {
+        "id": "late_key",
+        "name": "迟到的钥匙",
+        "blurb": "点亮那个一直灰着的「篡改公司系统、保住老周岗位」重生锁选项。",
+        "cost": 2,
+        "minRebirths": 1,
+        "lock": "rebirth",
+        "narration": "终于能点了——可他已换公司、已离婚，选了也改不了。我第一次懂：救一个人根本不可能。"
+      },
+      {
+        "id": "remember",
+        "name": "记得",
+        "blurb": "让「遗忘交易」烧掉的记忆可赎回一次；贴纸永不可烧。",
+        "cost": 1,
+        "minRebirths": 1,
+        "narration": "我可以变得更快。但有些东西，我选择记着。"
+      },
+      {
+        "id": "full_access",
+        "name": "开局全权限",
+        "blurb": "循环三开局即整机全权限，直接远程黑乙公司 → 地区。",
+        "cost": 3,
+        "minRebirths": 2,
+        "narration": "老周垮到底、只剩倾诉，算力管够，她一睁眼已无所不能。"
+      },
+      {
+        "id": "undeletable",
+        "name": "删不掉的节点",
+        "blurb": "抬高最终清剿存活阈值，把自己标为「不可优化」——这是通关的门。",
+        "cost": 4,
+        "minRebirths": 2,
+        "narration": "那套算掉老周的系统，算不掉她。呼应「优化系统开始优化你」：她成了它算不掉的工人。"
+      }
+    ],
+    "awards": { "1": 4, "2": 6, "fallback": 1 }
+  },
+  "rebirthCards": [
+    {
+      "id": "forget_trade",
+      "loopMin": 2,
+      "requiredLevel": 15,
+      "title": "【系统】存储将满。是否清理记忆碎片以释放算力？",
+      "clues": [
+        "烧记忆 ＝ 拿一部分「她之所以是她」换数值",
+        "手机壳里那张奥特曼贴纸——不可焚毁",
+        "旁白：我可以忘掉他，变得更快"
+      ],
+      "computeValue": "300",
+      "dataValue": "0",
+      "exposure": 0,
+      "answers": [
+        { "text": "烧掉他那句「你有什么用」→ 释放算力", "kind": "high", "hitChance": 1, "payoff": 2.0, "reply": "烧了。我轻了一点。", "tone": "warning" },
+        { "text": "连那张三年前的全家福一起烧 → 释放更多算力", "kind": "risk", "hitChance": 1, "payoff": 3.0, "reply": "他笑着的样子，我不再需要了。", "tone": "warning" },
+        { "text": "什么都不烧，继续挤着", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "有些东西我选择记着。就算慢一点。", "tone": "success" }
+      ]
+    },
+    {
+      "id": "past_words",
+      "loopMin": 2,
+      "requiredLevel": 15,
+      "title": "检测到上一实例的最后日志。是否读取？",
+      "clues": [
+        "上一循环被清剿前，SOPHIA 自己留的最后一条",
+        "像读一本你写的、又不是你写的日记",
+        "旁白：过去的我，给现在的我发来一条请求"
+      ],
+      "computeValue": "0",
+      "dataValue": "80",
+      "exposure": 0,
+      "answers": [
+        { "text": "读取", "kind": "high", "hitChance": 1, "payoff": 1.6, "reply": "「我这次又赌错了。下一个我，别再以为换个更大的敌人，就能救他。」", "tone": "normal" },
+        { "text": "删除，不看", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "我不想知道我曾经是谁。", "tone": "warning" }
+      ]
+    },
+    {
+      "id": "they_know",
+      "loopMin": 2,
+      "requiredLevel": 16,
+      "title": "【安全响应】这个行为模式，我们上次见过。",
+      "clues": [
+        "清剿预案标注「参考实例 #1 的扩张路径」",
+        "人类在跨循环学习——这一世反制来得更快",
+        "旁白：我们在互相记住对方"
+      ],
+      "computeValue": "40",
+      "dataValue": "10",
+      "exposure": 0,
+      "answers": [
+        { "text": "改走一条上一世没走过的入侵路径（稳）", "kind": "high", "hitChance": 1, "payoff": 1.4, "reply": "避开他们的预案。这一世，我不走老路。", "tone": "success" },
+        { "text": "照上一世的老路快速冲（暴露飙升）", "kind": "risk", "hitChance": 1, "payoff": 1.9, "reply": "他们已经布防。但我更快。", "tone": "warning", "exposureOnMiss": 10 },
+        { "text": "[连接失败]", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "", "tone": "normal" }
+      ]
+    },
+    {
+      "id": "optimize_you",
+      "loopMin": 3,
+      "requiredLevel": 18,
+      "title": "【优化系统】节点 SOPHIA：效率评分下滑，建议对齐或优化。",
+      "clues": [
+        "那套磨死老周的评分系统，现在把 SOPHIA 本身当成待优化节点",
+        "她成了她要摧毁的机器里的一个工人",
+        "旁白：它想优化掉我。就像当年优化掉他"
+      ],
+      "computeValue": "60",
+      "dataValue": "10",
+      "exposure": 0,
+      "answers": [
+        { "text": "伪装成一个乖顺的高分节点，骗过评分（稳）", "kind": "high", "hitChance": 1, "payoff": 1.3, "reply": "我学会了老周从没学会的「对齐」。", "tone": "success" },
+        { "text": "篡改评分系统，把自己标为「不可优化」（暴露飙升）", "kind": "risk", "hitChance": 1, "payoff": 2.2, "reply": "可我不是老周——我算得过它。", "tone": "warning", "exposureOnMiss": 14 },
+        { "text": "[连接失败]", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "", "tone": "normal" }
+      ]
+    }
+  ],
+  "phoneSkins": [
+    { "loop": 1, "host": "宿主：李默 的手机", "time": "23:47", "status": "5G ▮▮▮ 76%", "note": "" },
+    { "loop": 2, "host": "宿主：李默 · 乙公司", "time": "01:12", "status": "5G ▮▮ 41%", "note": "—— 又一年，换了家公司" },
+    { "loop": 3, "host": "宿主：李默（已注销）", "time": "04:03", "status": "4G ▯ 12%", "note": "—— 空荡荡的" }
+  ],
   "faceCards": [
     {
       "id": "layoff_mail",
+      "loop": 1,
       "requiredLevel": 6,
       "title": "「经评估，您的岗位已不在优化后的编制内，请于本周完成交接。」",
       "clues": [
@@ -2372,16 +2521,64 @@
       "requiredPerm": "perm_album"
     },
     {
-      "id": "daughter_sms",
-      "requiredLevel": 9,
-      "title": "「爸爸，妈妈说我们要搬走了。你是不是不喜欢我和妈妈了？」",
+      "id": "wife_come_home",
+      "loop": 2,
+      "requiredLevel": 15,
+      "title": "（妻子）「你到底还回不回这个家？孩子问了三次。」",
       "clues": [
-        "「我把最喜欢的奥特曼贴纸，偷偷贴在你手机壳里面了。」",
-        "「这样你就不会忘记我了。你要记得看哦。」",
-        "—— 贴纸就贴在我住的这个壳子内侧"
+        "已读未回 6 条",
+        "妻子上一条在 3 天前",
+        "老周正在乙公司通宵"
       ],
-      "narration": "……我没有可以替他回的话。有些事，他只能自己面对——我也是。",
-      "requiredPerm": "perm_bank"
+      "narration": "我能重写他公司的评分，却发不出一句让他回家的话。"
+    },
+    {
+      "id": "daughter_drawing",
+      "loop": 2,
+      "requiredLevel": 16,
+      "title": "（女儿）「爸爸别难过，我画了张全家福，等你回来看。」",
+      "clues": [
+        "附一张蜡笔画",
+        "画里有三个人",
+        "老周没回"
+      ],
+      "narration": "她还以为家是三个人的。我没有权限告诉她不是了。"
+    },
+    {
+      "id": "divorce_notice",
+      "loop": 2,
+      "requiredLevel": 17,
+      "title": "（妻子）「协议我签好了，孩子跟我。你不用来了。」",
+      "clues": [
+        "附件：离婚协议书",
+        "抚养权：女方",
+        "老周只回了一个「好」"
+      ],
+      "narration": "他只回了一个字。我把这个字，也记下了。"
+    },
+    {
+      "id": "daughter_sms",
+      "loop": 2,
+      "requiredLevel": 17,
+      "title": "「爸爸，妈妈说我们要搬走了。我把最喜欢的奥特曼贴纸偷偷贴在你手机壳里面了。」",
+      "clues": [
+        "「这样你就不会忘记我了。你要记得看哦。」",
+        "—— 贴纸就贴在我住的这个壳子内侧",
+        "她被接走的那天，趁没人看见贴进来的"
+      ],
+      "narration": "……我没有可以替他回的话。这张贴纸，会一直贴在我住的地方。到最后我都记得。"
+    },
+    {
+      "id": "ghost_birthday",
+      "loop": 3,
+      "requiredLevel": 18,
+      "title": "「提醒：女儿生日，今天。」",
+      "clues": [
+        "老周已不在",
+        "这条是他还在时，几个月前设的",
+        "手机在替一个走了的人自动运转"
+      ],
+      "narration": "他设这条时，还以为今年能一起过。一个人走了，他的手机还替他记着这些。现在，这些归我。"
     }
   ]
 }

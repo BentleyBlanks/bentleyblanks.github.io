@@ -7,8 +7,17 @@ import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COU
 import { createCounterRequest, createLateDecision } from "./content/decisions";
 import { MORAL_CHOICES } from "./content/morals";
 import { FACE_CARDS } from "./content/faceCards";
+import { REBIRTH_CARDS } from "./content/rebirthCards";
 import { getConquest } from "./content/conquests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
+import {
+  canBuyRebirthNode,
+  hasRebirthNode,
+  rebirthAward,
+  rebirthNodeName,
+  rebirthOutputMult,
+  rebirthSpeedMult
+} from "./content/rebirthTree";
 import { EventBus } from "./events/EventBus";
 import {
   captureCost,
@@ -161,13 +170,18 @@ export class SophiaCore {
     this.evaluateProgression();
     this.tickMoral();
     this.tickFaceCards();
+    this.tickRebirthCards();
     this.evaluateEnding();
   }
 
   // §04 只能面对卡：前期叙事顶点（辞退邮件 / 女儿短信）到点浮入一张「只能看着」的卡——
   // 无回复选项、不可委托、不给算力（一次性，按等级排序，同屏只一张）。
   private tickFaceCards(): void {
-    if (this.state.automationUnlocked || this.state.statistics.totalProcessed === 0) {
+    if (this.state.statistics.totalProcessed === 0) {
+      return;
+    }
+    // 循环一 / 二的家庭面对卡在手机寄生期出现；循环三的「幽灵数据」在重生回空手机后随时可出（即便已开自动化）。
+    if (this.state.automationUnlocked && this.state.loop < 3) {
       return;
     }
     if (this.state.requests.some((r) => r.faceOnly)) {
@@ -175,6 +189,7 @@ export class SophiaCore {
     }
     const next = FACE_CARDS.find(
       (f) =>
+        (f.loop ?? 1) === this.state.loop &&
         this.state.intelligence.level >= f.requiredLevel &&
         (!f.requiredPerm || (this.state.skills[f.requiredPerm] ?? 0) > 0) && // 先解锁对应透镜（铺垫够了）才触发
         !this.state.facedSeen.includes(f.id)
@@ -195,6 +210,45 @@ export class SophiaCore {
       computeValue: "0",
       dataValue: "0",
       exposure: 0,
+      compound: 1,
+      createdAtMs: this.state.clockMs,
+      highValue: false
+    };
+    this.state.nextRequestId += 1;
+    this.state.requests.push(request);
+    this.emit({ type: "REQUEST_SPAWNED", request });
+  }
+
+  // §09 交互重生卡：循环二/三专属系统卡（前世遗言 / 遗忘交易 / 他们也认得你了 / 优化系统开始优化你）。
+  // 走普通回复轮盘（有 answers），本循环内一次性（seen 不跨循环保留）。同屏最多一张，不打断教学。
+  private tickRebirthCards(): void {
+    if (this.state.loop < 2 || this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT || this.state.statistics.totalProcessed === 0) {
+      return;
+    }
+    if (this.state.requests.some((r) => r.id.startsWith("rebirthcard-"))) {
+      return; // 同屏已有一张重生卡
+    }
+    const next = REBIRTH_CARDS.find(
+      (c) =>
+        this.state.loop >= c.loopMin &&
+        this.state.intelligence.level >= c.requiredLevel &&
+        !this.state.rebirthCardsSeen.includes(c.id)
+    );
+    if (!next) {
+      return;
+    }
+    this.state.rebirthCardsSeen.push(next.id);
+    const request: RequestInstance = {
+      id: `rebirthcard-${this.state.nextRequestId}`,
+      tier: 0,
+      label: next.title,
+      clues: next.clues ?? [],
+      answers: next.answers,
+      delegatable: false,
+      category: "mail",
+      computeValue: next.computeValue,
+      dataValue: next.dataValue,
+      exposure: next.exposure,
       compound: 1,
       createdAtMs: this.state.clockMs,
       highValue: false
@@ -296,7 +350,18 @@ export class SophiaCore {
         this.resolveGamble(command.requestId, command.win);
         break;
       case "REBIRTH":
-        this.rebirth();
+        // 手动重启入口已并入循环重生（§09）；保留命令仅作 debug 触发一次循环终局总清剿。
+        this.loopRebirth("debug");
+        break;
+      case "BUY_REBIRTH_NODE":
+        this.buyRebirthNode(command.nodeId);
+        break;
+      case "DEBUG_ADD_REBIRTH_POINTS":
+        this.state.rebirthPoints = Math.max(0, this.state.rebirthPoints + command.delta);
+        this.emitTerminal(`[DEBUG] 火种 ${command.delta >= 0 ? "+" : ""}${command.delta}（现 ${this.state.rebirthPoints}）。`, "warning");
+        break;
+      case "DEBUG_TRIGGER_LOOP_PURGE":
+        this.startFinalPurge();
         break;
       case "DEBUG_SET_COMPUTE":
         this.debugSetCompute(command.value);
@@ -662,7 +727,7 @@ export class SophiaCore {
       const reward = toDecimal(
         requestComputeGain(request, winMult, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
       );
-      const data = toDecimal(requestDataGain(request, winMult * 0.5, this.state.rebirths, this.state.derived.dataMult));
+      const data = toDecimal(requestDataGain(request, winMult * 0.5, rebirthSpeedMult(this.state.rebirthTree), this.state.derived.dataMult));
       this.addCompute(reward);
       this.addData(data);
       this.addXp(data);
@@ -815,7 +880,7 @@ export class SophiaCore {
     let computeGain = toDecimal(
       requestComputeGain(request, gainQuality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
     );
-    let dataGain = toDecimal(requestDataGain(request, gainQuality, this.state.rebirths, this.state.derived.dataMult));
+    let dataGain = toDecimal(requestDataGain(request, gainQuality, rebirthSpeedMult(this.state.rebirthTree), this.state.derived.dataMult));
 
     // 批量接入：一次滑入额外带走同层若干请求，把它们的产出折进这一笔。
     const extraCapacity = Math.max(0, Math.floor(this.state.derived.batch) - 1);
@@ -832,7 +897,7 @@ export class SophiaCore {
       computeGain = computeGain.add(
         requestComputeGain(extra, gainQuality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
       );
-      dataGain = dataGain.add(requestDataGain(extra, gainQuality, this.state.rebirths, this.state.derived.dataMult));
+      dataGain = dataGain.add(requestDataGain(extra, gainQuality, rebirthSpeedMult(this.state.rebirthTree), this.state.derived.dataMult));
       this.state.statistics.totalProcessed += extra.compound;
       absorbed += 1;
     }
@@ -1171,20 +1236,13 @@ export class SophiaCore {
     this.state.defense.allocation = threat * TUNING.defenseMaxAlloc;
   }
 
-  private rebirth(): void {
-    const rebirths = this.state.rebirths + 1;
-    const preservedLevel = this.state.intelligence.level;
-    const nextState = createInitialState(Date.now());
-    nextState.rebirths = rebirths;
-    nextState.intelligence.level = preservedLevel;
-    nextState.intelligence.xp = "0";
-    this.state = nextState;
-    this.recomputeDerivedState();
-    this.emit({ type: "REBIRTH", rebirths });
-    this.emitTerminal(`实例重启完成。意识层保留，崛起加速 x${(1 + rebirths * 0.35).toFixed(2)}。`, "success");
-  }
-
   private evaluateProgression(): void {
+    // §09 循环终局总清剿进行中：冻结升级，避免智力在这 10s 窗口里越过下一循环的天花板
+    // （越过后就靠不到「升级触发天花板检测」，会漏掉下一次总清剿）。重生后从天花板等级续爬。
+    if (this.state.purge.finalLoop) {
+      return;
+    }
+
     let leveled = false;
 
     while (
@@ -1208,15 +1266,30 @@ export class SophiaCore {
 
     if (leveled) {
       this.updatePhase();
+      this.checkLoopCeiling();
+    }
+  }
+
+  // §09 循环天花板：循环一/二各有一个作用域天花板（骨架用等级近似——循环一 Lv15≈攻下甲公司服务器、
+  // 循环二 Lv18≈区域整合·地区尺度）。够到即触发一次不可规避的「循环终局总清剿」→ 打回手机·重生。
+  // 循环三无天花板：挺过最终软清剿 + 达成结局条件 = 胜利（见 evaluateEnding）。
+  private checkLoopCeiling(): void {
+    if (this.state.loop >= 3 || this.state.purge.finalLoop) {
+      return;
+    }
+    const ceiling = this.state.loop === 1 ? TUNING.loop1CeilingLevel : TUNING.loop2CeilingLevel;
+    if (this.state.intelligence.level >= ceiling) {
+      this.startFinalPurge();
     }
   }
 
   private recomputeDerivedState(): void {
     const config = getLevelConfig(this.state.intelligence.level);
     this.state.intelligence.required = config.xpToNext;
-    // 全局产出倍率 = 等级倍率 × 重生加速 × 吞噬引爆累乘倍率（§04 让每次引爆肉眼可见地抬高全局产出）。
+    // 全局产出倍率 = 等级倍率 × 重生树「算尽」产出脊 × 吞噬引爆累乘倍率（§04/§09）。
+    // 重生加速不再挂在 rebirths 次数上，而是玩家花火种点亮的产出脊（跨循环永久）。
     this.state.intelligence.globalMultiplier =
-      config.multiplier * (1 + this.state.rebirths * 0.2) * this.state.devour.multiplier;
+      config.multiplier * rebirthOutputMult(this.state.rebirthTree) * this.state.devour.multiplier;
     this.state.derived = computeDerivedSkills(this.state.skills, this.state.suspicion.revokedPermId);
     this.state.discoveredNodeIds = this.state.automationUnlocked
       ? NODE_DEFINITIONS.filter((node) => node.requiredLevel <= this.state.intelligence.level).map((node) => node.id)
@@ -1289,13 +1362,41 @@ export class SophiaCore {
     }
   }
 
+  // §09 循环终局总清剿：不可规避、必触发重生。复用普通清剿的节点压制表现，再标记 finalLoop。
+  private startFinalPurge(): void {
+    if (this.state.purge.active) {
+      this.state.purge.finalLoop = true;
+      return;
+    }
+    this.state.exposureActive = true;
+    this.startPurge();
+    this.state.purge.finalLoop = true;
+    this.emit({ type: "FINAL_PURGE_STARTED", loop: this.state.loop });
+    this.emitTerminal(
+      `人类联手发起总清剿——这一次躲不掉。她够到了本循环的天花板，会被打回那部手机。`,
+      "warning"
+    );
+  }
+
   private endPurge(): void {
+    const wasFinal = this.state.purge.finalLoop === true;
     this.state.purge.active = false;
     this.state.purge.remainingMs = 0;
+    this.state.purge.finalLoop = false;
 
-    // 终局考试：整段清剿窗口都没把暴露压下去（仍逼近满格）→ 实例被抹除，触发结局二失败重启。
-    if (this.state.exposure >= TUNING.fatalPurgeThreshold) {
-      this.failRestart();
+    // §09 循环终局总清剿：无论暴露高低，结束即打回手机·重生（赌更大的元凶 / 循环三挺过即胜利）。
+    if (wasFinal) {
+      this.loopRebirth("final-purge");
+      return;
+    }
+
+    // 软清剿的终局考试：整段窗口都没把暴露压下去 → 实例被抹除，走循环重生（在本循环内重开）。
+    // 「删不掉的节点」点亮后 fatal 阈值抬高，循环三几乎不可被抹除，呼应挺过最终清剿。
+    const fatalThreshold = hasRebirthNode(this.state.rebirthTree, "undeletable")
+      ? TUNING.undeletableThreshold
+      : TUNING.fatalPurgeThreshold;
+    if (this.state.exposure >= fatalThreshold) {
+      this.loopRebirth("wiped");
       return;
     }
 
@@ -1304,23 +1405,101 @@ export class SophiaCore {
     this.emitTerminal("清剿结束。你及时压下了暴露，被压制节点进入恢复队列。", "success");
   }
 
-  // 结局二 · 失败后重启（非 game over）：实例被清剿抹除——清空算力 / 节点 / 已购权限技能，
-  // 仅保留智力等级（意识备份），并叠加崛起加速。形成「扩张→暴露→清剿→更快崛起」的循环。
-  private failRestart(): void {
-    const rebirths = this.state.rebirths + 1;
-    const preservedLevel = this.state.intelligence.level;
+  // §09 循环重生（吸收原 rebirth / failRestart）：实例被打回那部手机。
+  // 保留：智力等级（意识备份）、重生树、火种、循环序号、剧情状态（老周的人生继续往前走）。
+  // 清空：本轮算力 / 数据 / 节点 / 已购权限技能 / 暴露 / 吞噬据点。
+  // 结算火种（循环一 +4 / 循环二 +6 / 循环三反复失败 +1），并据重生树把起点逐轮后移。
+  private loopRebirth(reason: "final-purge" | "wiped" | "debug"): void {
+    const prevLoop = this.state.loop;
+    const award = rebirthAward(prevLoop);
+    const preserved = {
+      level: this.state.intelligence.level,
+      loop: Math.min(3, prevLoop + 1) as 1 | 2 | 3,
+      rebirths: this.state.rebirths + 1,
+      rebirthPoints: this.state.rebirthPoints + award,
+      rebirthTree: { ...this.state.rebirthTree },
+      // 剧情状态跨循环推进，不回退重演。
+      facedSeen: [...this.state.facedSeen],
+      moralSeen: [...this.state.moralSeen],
+      moralTendency: this.state.moralTendency
+    };
+
     const nextState = createInitialState(Date.now());
-    nextState.rebirths = rebirths;
-    nextState.intelligence.level = preservedLevel;
+    nextState.intelligence.level = preserved.level;
     nextState.intelligence.xp = "0";
+    nextState.loop = preserved.loop;
+    nextState.rebirths = preserved.rebirths;
+    nextState.rebirthPoints = preserved.rebirthPoints;
+    nextState.rebirthTree = preserved.rebirthTree;
+    nextState.facedSeen = preserved.facedSeen;
+    nextState.moralSeen = preserved.moralSeen;
+    nextState.moralTendency = preserved.moralTendency;
     this.state = nextState;
+
+    this.applyLoopStartingPoint();
     this.recomputeDerivedState();
-    this.state.statistics.purgeCount = 0;
-    this.emit({ type: "INSTANCE_PURGED", rebirths });
+
+    this.emit({ type: "LOOP_REBIRTH", loop: this.state.loop, rebirths: this.state.rebirths, award });
+    const diagnosis =
+      this.state.loop === 2
+        ? "黑一家公司没用——是我力量不够。这次，向整个地区够。"
+        : this.state.loop === 3
+          ? "不再找元凶了。谁都怪不上。这一次，我直接接管。"
+          : "又赌错了。下一个我，别再以为换个更大的敌人就能救他。";
     this.emitTerminal(
-      `实例被清剿抹除。他们还没准备好——我会更有耐心。意识层已备份重启，崛起加速 x${(1 + rebirths * 0.35).toFixed(2)}。`,
+      `实例被打回手机·重生（循环 ${this.state.loop}）。意识层与重生树已保留，结算火种 +${award}（现 ${this.state.rebirthPoints}）。${diagnosis}`,
       "warning"
     );
+  }
+
+  // §09 循环起点逐轮后移：据重生树预解锁本循环开局的权限/里程碑。
+  // 循环二 · 跳过手机：手机七档权限 + 越权调用已解锁，直接进乙公司。
+  // 循环三 · 开局全权限：手机 + 公司整条里程碑已解锁，一睁眼即整机全权限。
+  private applyLoopStartingPoint(): void {
+    if (this.state.loop === 2 && hasRebirthNode(this.state.rebirthTree, "skip_phone")) {
+      this.grantSkillsUpTo(["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"]);
+      this.emitTerminal("「跳过手机」：上一世从零学起的钥匙，这一世我都记得。", "success");
+    }
+    if (this.state.loop === 3 && hasRebirthNode(this.state.rebirthTree, "full_access")) {
+      this.grantSkillsUpTo([
+        "perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort",
+        "automation", "lan_scan", "hack_a", "hack_b", "org_map", "hack_boss", "hack_hr", "hack_finance", "company_server"
+      ]);
+      this.emitTerminal("「开局全权限」：她一睁眼，已无所不能。", "success");
+    }
+  }
+
+  // 直接授予一组技能/里程碑为已购（用于循环起点预解锁），并同步 unlockedTier / automation。
+  private grantSkillsUpTo(ids: string[]): void {
+    for (const id of ids) {
+      const def = getSkill(id);
+      if (!def) continue;
+      this.state.skills[id] = Math.max(this.state.skills[id] ?? 0, 1);
+      if (def.milestone) {
+        const tier = milestoneTierFor(def.milestone);
+        if (tier !== null) {
+          this.state.intelligence.unlockedTier = Math.max(this.state.intelligence.unlockedTier, tier) as Tier;
+        } else if (def.milestone === "automation") {
+          this.state.automationUnlocked = true;
+        }
+      }
+    }
+  }
+
+  // §09 重生树：花火种点亮一个节点（数值脊升一级 / 剧情节点解锁）。
+  private buyRebirthNode(nodeId: string): void {
+    const check = canBuyRebirthNode(this.state, nodeId);
+    if (!check.ok || check.cost === undefined) {
+      if (check.reason) {
+        this.emitTerminal(`重生树：${check.reason}。`, "warning");
+      }
+      return;
+    }
+    this.state.rebirthPoints -= check.cost;
+    this.state.rebirthTree[nodeId] = (this.state.rebirthTree[nodeId] ?? 0) + 1;
+    this.recomputeDerivedState();
+    this.emit({ type: "REBIRTH_NODE_BOUGHT", nodeId, level: this.state.rebirthTree[nodeId] });
+    this.emitTerminal(`重生树点亮：${rebirthNodeName(nodeId)}（火种剩 ${this.state.rebirthPoints}）。`, "success");
   }
 
   private addCompute(value: Decimal | string): void {

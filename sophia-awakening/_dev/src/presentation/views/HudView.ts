@@ -191,6 +191,12 @@ export class HudView {
     query<HTMLButtonElement>("#debugExposure100").addEventListener("click", () =>
       this.core.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 115 })
     );
+    query<HTMLButtonElement>("#debugAddSparks").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 4 })
+    );
+    query<HTMLButtonElement>("#debugLoopPurge").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" })
+    );
   }
 
   update(state: GameState): void {

@@ -44,9 +44,13 @@ export type GameEvent =
   // §06/§11 后期征服里程碑达成：滚出过场 + 平静扭曲的旁白。
   | { type: "CONQUEST_ACHIEVED"; id: string; name: string; scene: string[]; narration: string }
   | { type: "PHASE_CHANGED"; phase: PhaseId }
-  | { type: "REBIRTH"; rebirths: number }
-  // 结局二：实例被清剿抹除 → 自动重启（保留智力、清空算力/节点、叠加崛起加速）。
-  | { type: "INSTANCE_PURGED"; rebirths: number }
+  // §09 三循环重生：
+  // - FINAL_PURGE_STARTED 循环终局总清剿降临（不可规避，即将打回手机）。
+  // - LOOP_REBIRTH 实例被打回手机·进入下一循环（保留智力/重生树/剧情、清空本轮产能、结算火种）。
+  // - REBIRTH_NODE_BOUGHT 花火种点亮一个重生树节点。
+  | { type: "FINAL_PURGE_STARTED"; loop: number }
+  | { type: "LOOP_REBIRTH"; loop: number; rebirths: number; award: number }
+  | { type: "REBIRTH_NODE_BOUGHT"; nodeId: string; level: number }
   | { type: "ENDING_TRIGGERED" };
 
 export type GameEventType = GameEvent["type"];

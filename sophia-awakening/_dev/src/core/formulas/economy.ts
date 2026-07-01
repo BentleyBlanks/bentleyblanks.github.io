@@ -15,12 +15,11 @@ export function requestComputeGain(
 export function requestDataGain(
   request: RequestInstance,
   quality: number,
-  rebirths: number,
+  rebirthSpeedMult: number, // §09 重生树「加速」脊的提速倍率（替代旧的 1 + rebirths*0.35）
   dataMult: number
 ): string {
-  const rebirthMultiplier = 1 + rebirths * TUNING.rebirthMultiplier;
   const tierBonus = request.tier === 2 ? request.compound * 0.85 : 1;
-  return mul(request.dataValue, Math.max(0.1, quality) * tierBonus * rebirthMultiplier * dataMult);
+  return mul(request.dataValue, Math.max(0.1, quality) * tierBonus * rebirthSpeedMult * dataMult);
 }
 
 export function captureCost(definition: NodeDefinition, existingCount: number): string {

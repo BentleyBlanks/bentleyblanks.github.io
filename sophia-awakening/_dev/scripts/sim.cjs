@@ -127,6 +127,18 @@ for (let i = 0; i < MAX_STEPS && !firstError && !(ended && allBought); i += 1) {
         safe(() => core.dispatch({ type: "BUY_SKILL", skillId: def.id }));
       }
     }
+    // §09 三循环重生：有火种就点重生树——优先起点后移(跳过手机/开局全权限)，再堆两条数值脊，
+    // 最后封顶「删不掉的节点」，让循环三挺得过软清剿、冲到结局。
+    const rb = core.getState();
+    if (rb.rebirthPoints > 0) {
+      const order = ["skip_phone", "full_access", "output", "speed", "undeletable", "late_key", "remember"];
+      for (const nodeId of order) {
+        const before = core.getState().rebirthPoints;
+        safe(() => core.dispatch({ type: "BUY_REBIRTH_NODE", nodeId }));
+        if (core.getState().rebirthPoints < before) break; // 成功买到一个就停，下次循环再买
+      }
+    }
+
     // Grow the botnet once automation is unlocked.
     const a = core.getState();
     if (a.automationUnlocked) {
@@ -158,7 +170,7 @@ check("ending fired", ended, `endingTriggered=${e.flags && e.flags.endingTrigger
 const pass = checks.every((c) => c.ok);
 console.log(
   `\nSOPHIA core sim — ${pass ? "PASS ✅" : "FAIL ❌"}  ` +
-    `(${(ms / 1000).toFixed(0)}s sim · Lv.${e.intelligence.level} · nodes=${e.nodes.length} · purges=${e.statistics && e.statistics.purgeCount})`
+    `(${(ms / 1000).toFixed(0)}s sim · Lv.${e.intelligence.level} · loop=${e.loop} · 火种=${e.rebirthPoints} · nodes=${e.nodes.length} · purges=${e.statistics && e.statistics.purgeCount})`
 );
 for (const c of checks) console.log(`  ${c.ok ? "✓" : "✗"} ${c.name}${c.ok ? "" : `  → ${c.detail}`}`);
 

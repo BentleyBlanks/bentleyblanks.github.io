@@ -1,5 +1,6 @@
 import { Container, Graphics, Text, type PointData } from "pixi.js";
 import { PERMISSION_IDS } from "../../core/content/skills";
+import { content } from "../../core/content/i18n";
 import type { GameState, RequestInstance, SortAnswer, Tier } from "../../core/state/GameState";
 import {
   CYAN, GREEN, AMBER, RED,
@@ -405,9 +406,15 @@ export class InterfaceView {
     g.roundRect(fx, fy, fw, fh, 34).fill({ color: 0x070d0c, alpha: 0.5 });
     g.roundRect(fx, fy, fw, fh, 34).stroke({ width: 1.5, color: 0x3f7f6e, alpha: 0.45 });
     g.roundRect(cx - 28, fy + 11, 56, 7, 4).fill({ color: 0x000000, alpha: 0.5 });
-    this.addLabel("23:47", fx + 34, fy + 30, 12, 0x9fc0b4);
-    this.addLabel("5G  ▮▮▮  76%", fx + fw - 64, fy + 30, 10, 0x9fc0b4);
-    this.addLabel(`宿主：李默 的手机`, cx, fy + 56, 11, 0x7fae9e);
+    // §09 循环皮肤 A/B/C：换时间/电量/宿主署名/副标题，让每次重生「一眼看出时间过去了、人换了地方」。
+    const skins = content().phoneSkins as unknown as Array<{ loop: number; host: string; time: string; status: string; note: string }>;
+    const skin = skins.find((s) => s.loop === state.loop) ?? skins[0];
+    this.addLabel(skin.time, fx + 34, fy + 30, 12, 0x9fc0b4);
+    this.addLabel(skin.status, fx + fw - 64, fy + 30, 10, 0x9fc0b4);
+    this.addLabel(skin.host, cx, fy + 56, 11, 0x7fae9e);
+    if (skin.note) {
+      this.addLabel(skin.note, cx, fy + 72, 9.5, 0x5f7a70);
+    }
 
     // ---- 3×3 App 宫格，中心格 = SOPHIA CORE ----
     const apps = ["天气", "日历", "支付", "照片", "邮件", "浏览器", "信息", "设置"];

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-BxWTIzE1.js"></script>
+    <script type="module" crossorigin src="./assets/index-zwMjT11w.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-ZcWgJ7dB.js">
     <link rel="stylesheet" crossorigin href="./assets/index-ZR84160Y.css">
@@ -52,6 +52,10 @@
           </div>
           <span id="exposureStatus" class="metric-subline">人类尚未警觉</span>
         </div>
+      </div>
+      <div class="panel-section rebirth-section" id="rebirthSection" hidden>
+        <span class="panel-kicker">重生树 · 火种 <strong id="rebirthPointsBadge">0</strong></span>
+        <div id="rebirthTree" class="rebirth-tree"></div>
       </div>
       <div class="panel-section skill-shop-section">
         <span class="panel-kicker">技能货架</span>
@@ -278,6 +282,13 @@
           <div class="debug-exposure-row">
             <button id="debugExposure50" class="command-button" type="button">暴露 50</button>
             <button id="debugExposure100" class="command-button" type="button">暴露拉满（触发清剿）</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">三循环重生</span>
+          <div class="debug-exposure-row">
+            <button id="debugAddSparks" class="command-button" type="button">火种 +4</button>
+            <button id="debugLoopPurge" class="command-button" type="button">触发循环终局总清剿</button>
           </div>
         </div>
         <div class="debug-section">
