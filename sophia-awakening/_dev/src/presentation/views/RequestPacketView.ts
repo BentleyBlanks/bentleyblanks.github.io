@@ -155,6 +155,11 @@ export class RequestPacketView {
   private readonly isCounter: boolean;
   // §04 只能面对卡：无选项、不可交互——浮入、被看着、消失。
   readonly isFace: boolean;
+  // §09 短信 / 通知样式：只能看的家庭短信 / 系统通知卡长得像手机短信气泡 / 通知横幅，
+  // 一眼区别于「需要处理的需求卡」。null = 普通需求卡。
+  private readonly channel: "sms" | "notification" | null;
+  private faceBubbleBottom = 0; // 短信气泡的下沿（title+线索都包在这个气泡里）
+  private faceBarY = 0; // 底部「无法回复 / 无需处理」禁用输入条的 y
   private devourPulse = 0;
   // T2 串接（多选任务链 + 提交）。
   private readonly isChain: boolean;
@@ -196,9 +201,18 @@ export class RequestPacketView {
       };
       this.options = [...this.options, delegateOpt];
     }
-    // 吞噬气泡＝深紫；反制气泡＝深红；回复轮盘卡用青色思考色；T3 重磅豪赌卡用深红；只能面对卡＝黯淡灰。
+    // §09 只能看的卡分两种「频道」：系统通知（提醒/自动扣费/草稿…）vs 私人短信（家人）。
+    // 据此把卡画成通知横幅 / 短信气泡，一眼区别于需求卡。
+    this.channel = this.isFace
+      ? /(提醒|系统|通知|自动|续费|草稿|生日)/.test(`${request.sourceApp ?? ""}${request.label}`)
+        ? "notification"
+        : "sms"
+      : null;
+    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；反制＝深红；回复轮盘＝青；T3 豪赌＝深红。
     this.accent = this.isFace
-      ? 0x8a948f
+      ? this.channel === "notification"
+        ? 0xffc061
+        : 0x7fb4ff
       : this.isDevour
         ? DEVOUR
         : this.isCounter
@@ -219,7 +233,9 @@ export class RequestPacketView {
 
     // 标题区：头像 + 发信人 + 来源 App + 时间。只做来源语境，不显示高低风险提示。
     const tag = this.isFace
-      ? "✋ 只能面对"
+      ? this.channel === "notification"
+        ? "🔔 通知"
+        : "💬 短信"
       : this.isDevour
       ? `⊙ 吞噬 · ${request.devour?.label ?? ""}`
       : this.isCounter
@@ -290,7 +306,8 @@ export class RequestPacketView {
     let chipX = 16;
     let chipY = clueTop + 24;
     const clues = request.clues ?? [];
-    if (clues.length > 0 || this.lensLocked) {
+    // §09 短信/通知卡：不显示「上下文」抬头（它暗示「读上下文做决策」，会被误当需求卡）；线索直接当消息正文行。
+    if ((clues.length > 0 || this.lensLocked) && !this.isFace) {
       const clueLabel = new Text({
         text: "上下文",
         style: { fill: 0x74a99a, fontSize: 14, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
@@ -313,17 +330,22 @@ export class RequestPacketView {
     const hasContext = clues.length > 0 || this.lensLocked;
     this.clueBlockBottom = hasContext ? chipY + CLUE_CHIP_H : clueTop;
 
-    // §04 只能面对卡：没有任何回复选项——卡底放一行黯淡的「你只能看着它」，并按内容收紧卡高。
+    // §09 短信/通知卡：title + 线索包进一个「消息气泡」，底部放一条**禁用的回复输入条**
+    //（短信=发不出、通知=无需处理）——一眼看出是「一条消息」而非需要处理的需求卡。
     if (this.isFace) {
-      const fy = this.clueBlockBottom + 8;
+      this.faceBubbleBottom = this.clueBlockBottom + 6;
+      const barY = this.faceBubbleBottom + 12;
+      this.faceBarY = barY;
+      const label =
+        this.channel === "notification" ? "🔕 通知 · 看过即消，无需处理" : "🚫 无法回复 · 这条你发不出去";
       const cap = new Text({
-        text: "—— 没有可点的回复，也交不出去。你只能看着它。",
-        style: { fill: 0x7a8a84, fontSize: 11.5, fontStyle: "italic", fontWeight: "600", fontFamily: CARD_FONT }
+        text: label,
+        style: { fill: 0x9aa7b0, fontSize: 12, fontWeight: "700", fontFamily: CARD_FONT }
       });
-      cap.position.set(24, fy);
+      cap.position.set(26, barY + 10);
       this.clueTexts.push(cap);
       this.container.addChild(cap);
-      this.cardH = fy + 24;
+      this.cardH = barY + 42;
     }
 
     // §06 阶梯三·区域扩张：简化后的自动处理卡——没有回复轮盘 / 任务链，只有一行提示，
@@ -967,6 +989,24 @@ export class RequestPacketView {
     this.bg.moveTo(12, HEADER_H).lineTo(W - 12, HEADER_H).stroke({ width: 1, color: c, alpha: 0.16 });
     this.drawAvatar(18, 14, c, fillHead);
 
+    // §09 短信/通知卡：把 title+线索包进一个消息气泡（短信带左下小尾巴），底部一条**禁用的回复输入条**，
+    // 一眼是「一条消息」而非需要处理的需求卡。
+    if (this.isFace) {
+      const bubbleTop = 28;
+      const bw = W - 24;
+      const bubbleH = Math.max(22, this.faceBubbleBottom - bubbleTop);
+      const bubbleFill = this.channel === "notification" ? 0x231c10 : 0x0f1f2c;
+      this.bg.roundRect(12, bubbleTop, bw, bubbleH, 12).fill({ color: bubbleFill, alpha: 0.95 });
+      this.bg.roundRect(12, bubbleTop, bw, bubbleH, 12).stroke({ width: 1.2, color: c, alpha: 0.32 });
+      if (this.channel !== "notification") {
+        // 短信气泡左下小尾巴
+        this.bg.moveTo(20, this.faceBubbleBottom - 3).lineTo(11, this.faceBubbleBottom + 8).lineTo(34, this.faceBubbleBottom - 3).closePath().fill({ color: bubbleFill, alpha: 0.95 });
+      }
+      // 禁用的回复输入条（灰、有禁用感）
+      this.bg.roundRect(12, this.faceBarY, bw, 30, 8).fill({ color: 0x0b0f13, alpha: 0.9 });
+      this.bg.roundRect(12, this.faceBarY, bw, 30, 8).stroke({ width: 1.2, color: 0x3a4650, alpha: 0.75 });
+    }
+
     // §04 吞噬 / §03 反制：两圈脉动外环 —— 视觉上「召唤你亲手滑入核心」。
     if (this.isDevour || this.isCounter) {
       const p = 0.5 + Math.sin(this.devourPulse * 2) * 0.5;
@@ -974,7 +1014,8 @@ export class RequestPacketView {
       this.bg.roundRect(-9, -9, W + 18, H + 18, r + 7).stroke({ width: 1.5, color: c, alpha: 0.1 + p * 0.22 });
     }
 
-    for (const chip of this.clueChips) {
+    // 短信/通知卡：线索不画成带框的「上下文 chip」，而是气泡里的纯文本消息行（文本已作为子节点加好）。
+    for (const chip of this.isFace ? [] : this.clueChips) {
       const fill = chip.warning ? 0x17120a : 0x0a1714;
       const stroke = chip.warning ? 0xc8a24a : chip.locked ? 0x6b7a74 : c;
       const fillAlpha = chip.locked ? 0.34 : chip.warning ? 0.54 : 0.68;

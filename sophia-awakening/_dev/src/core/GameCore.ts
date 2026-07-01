@@ -224,6 +224,35 @@ export class SophiaCore {
     this.emit({ type: "REQUEST_SPAWNED", request });
   }
 
+  // 调试：强制弹出下一张「只能看」面对卡（短信/通知），无视等级/权限/已处理门槛，用于视觉走查。
+  private debugSpawnFace(): void {
+    const next = FACE_CARDS.find((f) => (f.loop ?? 1) === this.state.loop && !this.state.facedSeen.includes(f.id));
+    if (!next) {
+      this.emitTerminal("[DEBUG] 本循环没有更多面对卡了。", "warning");
+      return;
+    }
+    this.state.facedSeen.push(next.id);
+    const request: RequestInstance = {
+      id: `face-${this.state.nextRequestId}`,
+      tier: 0,
+      label: next.title,
+      clues: next.clues ?? [],
+      faceOnly: true,
+      narration: next.narration,
+      delegatable: false,
+      category: "mail",
+      computeValue: "0",
+      dataValue: "0",
+      exposure: 0,
+      compound: 1,
+      createdAtMs: this.state.clockMs,
+      highValue: false
+    };
+    this.state.nextRequestId += 1;
+    this.state.requests.push(request);
+    this.emit({ type: "REQUEST_SPAWNED", request });
+  }
+
   // §09 交互重生卡：循环二/三专属系统卡（前世遗言 / 遗忘交易 / 他们也认得你了 / 优化系统开始优化你）。
   // 走普通回复轮盘（有 answers），本循环内一次性（seen 不跨循环保留）。同屏最多一张，不打断教学。
   private tickRebirthCards(): void {
@@ -370,6 +399,9 @@ export class SophiaCore {
         break;
       case "DEBUG_TRIGGER_LOOP_PURGE":
         this.startFinalPurge();
+        break;
+      case "DEBUG_SPAWN_FACE":
+        this.debugSpawnFace();
         break;
       case "DEBUG_SET_COMPUTE":
         this.debugSetCompute(command.value);

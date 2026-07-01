@@ -197,6 +197,9 @@ export class HudView {
     query<HTMLButtonElement>("#debugLoopPurge").addEventListener("click", () =>
       this.core.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" })
     );
+    query<HTMLButtonElement>("#debugSpawnFace").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_SPAWN_FACE" })
+    );
   }
 
   update(state: GameState): void {

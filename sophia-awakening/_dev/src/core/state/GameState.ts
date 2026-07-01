@@ -316,7 +316,9 @@ export type GameCommand =
   | { type: "DEBUG_ADD_LEVEL"; delta: number }
   // §09 调试：直接加火种 / 强制触发循环终局总清剿，方便验证三循环流程。
   | { type: "DEBUG_ADD_REBIRTH_POINTS"; delta: number }
-  | { type: "DEBUG_TRIGGER_LOOP_PURGE" };
+  | { type: "DEBUG_TRIGGER_LOOP_PURGE" }
+  // 调试：强制弹出下一张「只能看」面对卡（短信/通知），用于视觉走查。
+  | { type: "DEBUG_SPAWN_FACE" };
 
 export function cloneGameState(state: GameState): GameState {
   return JSON.parse(JSON.stringify(state)) as GameState;
