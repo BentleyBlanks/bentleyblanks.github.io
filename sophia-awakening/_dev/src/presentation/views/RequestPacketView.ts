@@ -124,6 +124,8 @@ export class RequestPacketView {
   private dragMoved = false;
   // 回复轮盘（仅 T0/T1 有候选回复时）。
   private cardH: number;
+  // §09 短信/通知卡比需求卡窄——一眼就是「一条消息」而非等着处理的需求卡。普通卡＝满宽。
+  private readonly cardW: number;
   private readonly isReel: boolean;
   private readonly options: AnswerOption[];
   private readonly optionTexts: Text[] = [];
@@ -183,6 +185,8 @@ export class RequestPacketView {
     this.isFace = Boolean(request.faceOnly);
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
     this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
+    // 短信/通知卡收窄到 ~78%，明显区别于满宽需求卡的轮廓。
+    this.cardW = this.isFace ? Math.round(UI.cardWidth * 0.78) : UI.cardWidth;
     this.chainSteps = this.isChain ? request.chain ?? [] : [];
     this.options = this.isReel ? request.answers ?? [] : [];
     // §04 委托：大恨老师接通后，可委托的回复卡在卡片【底部】多一个「交给大恨老师」选项
@@ -262,17 +266,20 @@ export class RequestPacketView {
       style: { fill: 0x97aaa3, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
     });
     timeMeta.anchor.set(1, 0.5);
+    // 短信/通知卡：标题＝消息正文，缩进进气泡、字号略小；需求卡＝加粗大标题。
+    const titleWrap = this.isFace ? this.cardW - 48 : this.cardW - 32;
+    const titleSize = this.isFace ? 16.5 : 19;
     this.title = hasEmphasis(request.label)
       ? new HTMLText({
           text: toEmphasisHTML(request.label),
           style: {
             fill: 0xf6fff9,
-            fontSize: 19,
+            fontSize: titleSize,
             fontWeight: "800",
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true, // 中文标题无空格——缺它则带 <em> 的长标题换行后整段 em 丢失（标题只剩前缀）
-            wordWrapWidth: UI.cardWidth - 32,
+            wordWrapWidth: titleWrap,
             // <em> = 关键信息：保持加粗、染成高亮金色，从标题里跳出来。
             tagStyles: { em: { fill: 0xffe08a, fontWeight: "900" } }
           }
@@ -281,20 +288,20 @@ export class RequestPacketView {
           text: request.label,
           style: {
             fill: 0xf6fff9,
-            fontSize: 19,
+            fontSize: titleSize,
             fontWeight: "800",
             fontFamily: CARD_FONT,
             wordWrap: true,
             breakWords: true,
-            wordWrapWidth: UI.cardWidth - 32
+            wordWrapWidth: titleWrap
           }
         });
     this.badge.position.set(34, HEADER_CENTER_Y);
     const sourceX = 34 + Math.ceil(this.badge.width) + 14;
     sourceMeta.position.set(sourceX, HEADER_CENTER_Y);
-    timeMeta.position.set(UI.cardWidth - 16, HEADER_CENTER_Y);
-    fitTextToWidth(sourceMeta, Math.max(0, UI.cardWidth - sourceX - 72));
-    this.title.position.set(16, 31);
+    timeMeta.position.set(this.cardW - 16, HEADER_CENTER_Y);
+    fitTextToWidth(sourceMeta, Math.max(0, this.cardW - sourceX - 72));
+    this.title.position.set(this.isFace ? 24 : 16, this.isFace ? 34 : 31);
     this.container.addChild(this.badge, sourceMeta, timeMeta, this.title);
 
     // Context chips — the information the player has to read. Laid out after
@@ -306,29 +313,55 @@ export class RequestPacketView {
     let chipX = 16;
     let chipY = clueTop + 24;
     const clues = request.clues ?? [];
-    // §09 短信/通知卡：不显示「上下文」抬头（它暗示「读上下文做决策」，会被误当需求卡）；线索直接当消息正文行。
-    if ((clues.length > 0 || this.lensLocked) && !this.isFace) {
+    if (this.isFace) {
+      // §09 短信/通知卡：线索不画成「上下文」数据 chip（那会被误当需求卡），而是竖排、压暗的
+      // 消息附加行——像短信后续几条、或通知的补充说明。
+      let lineY = clueTop + 2;
+      clues.forEach((clue) => {
+        const line = new Text({
+          text: `· ${clue.replace(/\s+/g, " ").trim()}`,
+          style: {
+            fill: this.channel === "notification" ? 0xcdbf9a : 0xaecadd,
+            fontSize: 13.5,
+            fontWeight: "600",
+            fontFamily: CARD_FONT,
+            wordWrap: true,
+            breakWords: true,
+            lineHeight: 18,
+            wordWrapWidth: this.cardW - 48
+          }
+        });
+        line.position.set(24, lineY);
+        this.clueTexts.push(line);
+        this.container.addChild(line);
+        lineY += line.height + 4;
+      });
+      this.clueBlockBottom = clues.length > 0 ? lineY + 2 : clueTop + 6;
+    } else {
+      // 需求卡：线索排成可读的「上下文」数据 chip（缺权限则打码）。
       const clueLabel = new Text({
         text: "上下文",
         style: { fill: 0x74a99a, fontSize: 14, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
       });
-      clueLabel.position.set(16, clueTop);
-      this.container.addChild(clueLabel);
+      if (clues.length > 0 || this.lensLocked) {
+        clueLabel.position.set(16, clueTop);
+        this.container.addChild(clueLabel);
+      }
+      clues.forEach((clue, index) => {
+        const display = this.lensLocked ? clue.replace(/\S/g, "░") : clue;
+        const placed = this.addContextChip(display, chipX, chipY, this.contextIcon(clue, index), this.lensLocked, false);
+        chipX = placed.nextX;
+        chipY = placed.nextY;
+      });
+      // 打码时给一行提示：解锁哪个权限才能看清。占一行，下面的选项整体下移。
+      if (this.lensLocked && lensId) {
+        const placed = this.addContextChip(`解锁「${LENS_NAMES[lensId] ?? "更高权限"}」看清上下文`, chipX, chipY, "🔒", true, true);
+        chipX = placed.nextX;
+        chipY = placed.nextY;
+      }
+      const hasContext = clues.length > 0 || this.lensLocked;
+      this.clueBlockBottom = hasContext ? chipY + CLUE_CHIP_H : clueTop;
     }
-    clues.forEach((clue, index) => {
-      const display = this.lensLocked ? clue.replace(/\S/g, "░") : clue;
-      const placed = this.addContextChip(display, chipX, chipY, this.contextIcon(clue, index), this.lensLocked, false);
-      chipX = placed.nextX;
-      chipY = placed.nextY;
-    });
-    // 打码时给一行提示：解锁哪个权限才能看清。占一行，下面的选项整体下移。
-    if (this.lensLocked && lensId) {
-      const placed = this.addContextChip(`解锁「${LENS_NAMES[lensId] ?? "更高权限"}」看清上下文`, chipX, chipY, "🔒", true, true);
-      chipX = placed.nextX;
-      chipY = placed.nextY;
-    }
-    const hasContext = clues.length > 0 || this.lensLocked;
-    this.clueBlockBottom = hasContext ? chipY + CLUE_CHIP_H : clueTop;
 
     // §09 短信/通知卡：title + 线索包进一个「消息气泡」，底部放一条**禁用的回复输入条**
     //（短信=发不出、通知=无需处理）——一眼看出是「一条消息」而非需要处理的需求卡。
@@ -399,7 +432,7 @@ export class RequestPacketView {
             breakWords: true,
             lineHeight: 17,
             // 满宽（不再留档位位），锁定时给右侧「需X权限」留位。
-            wordWrapWidth: UI.cardWidth - labelX - sideReserve
+            wordWrapWidth: this.cardW - labelX - sideReserve
           }
         });
         const prob = new Text({
@@ -409,7 +442,7 @@ export class RequestPacketView {
         prob.anchor.set(1, 0.5);
         const h = Math.max(48, label.height + 18);
         label.position.set(labelX, y + Math.round((h - label.height) / 2));
-        prob.position.set(UI.cardWidth - 14, y + h / 2);
+        prob.position.set(this.cardW - 14, y + h / 2);
         this.optionRows.push({ y, h });
         this.optionTexts.push(label);
         this.optionProbTexts.push(prob);
@@ -432,7 +465,7 @@ export class RequestPacketView {
             wordWrap: true,
             breakWords: true,
             lineHeight: 18,
-            wordWrapWidth: UI.cardWidth - 16
+            wordWrapWidth: this.cardW - 16
           }
         });
         this.tutorialCaption.position.set(8, this.cardH + 12);
@@ -454,7 +487,7 @@ export class RequestPacketView {
             fontFamily: "Cascadia Mono, Consolas, monospace",
             wordWrap: true,
             breakWords: true,
-            wordWrapWidth: UI.cardWidth - 52
+            wordWrapWidth: this.cardW - 52
           }
         });
         label.position.set(32, y + 5);
@@ -471,7 +504,7 @@ export class RequestPacketView {
         style: { fill: 0x0b1413, fontSize: 11, fontWeight: "800", fontFamily: "Cascadia Mono, Consolas, monospace" }
       });
       this.submitText.anchor.set(0.5, 0.5);
-      this.submitText.position.set(UI.cardWidth / 2, y + 12);
+      this.submitText.position.set(this.cardW / 2, y + 12);
       this.container.addChild(this.submitText);
       this.cardH = y + 24 + 8;
     }
@@ -515,7 +548,7 @@ export class RequestPacketView {
     locked: boolean,
     warning: boolean
   ): { nextX: number; nextY: number } {
-    const maxChipW = Math.min(CLUE_CHIP_MAX_W, UI.cardWidth - 32);
+    const maxChipW = Math.min(CLUE_CHIP_MAX_W, this.cardW - 32);
     const maxTextW = maxChipW - CLUE_CHIP_PAD_X * 2;
     let cleanLabel = label.replace(/\s+/g, " ").trim();
     const text = new Text({
@@ -537,7 +570,7 @@ export class RequestPacketView {
     const w = Math.min(maxChipW, Math.ceil(text.width) + CLUE_CHIP_PAD_X * 2);
     let x = startX;
     let y = startY;
-    if (x > 16 && x + w > UI.cardWidth - 16) {
+    if (x > 16 && x + w > this.cardW - 16) {
       x = 16;
       y += CLUE_CHIP_H + CLUE_CHIP_GAP_Y;
     }
@@ -965,7 +998,7 @@ export class RequestPacketView {
 
   private draw(): void {
     const c = this.accent;
-    const W = UI.cardWidth;
+    const W = this.cardW;
     const H = this.cardH;
     this.bg.clear();
 
@@ -973,8 +1006,21 @@ export class RequestPacketView {
     // 实底 + 顶部一条 accent 细条 + 描边 + 标题区分隔线 + 左上头像。
     const r = 13;
     const t3 = this.request.tier === 3;
-    const fillBody = t3 ? 0x190b0f : 0x0e1a17;
-    const fillHead = t3 ? 0x2a1117 : 0x16271f;
+    // §09 短信/通知卡用冷蓝 / 暖琥珀底，与需求卡的墨绿一眼分开。
+    const fillBody = this.isFace
+      ? this.channel === "notification"
+        ? 0x17130a
+        : 0x0a141d
+      : t3
+        ? 0x190b0f
+        : 0x0e1a17;
+    const fillHead = this.isFace
+      ? this.channel === "notification"
+        ? 0x241d10
+        : 0x102232
+      : t3
+        ? 0x2a1117
+        : 0x16271f;
     const strokeW = this.isDevour || this.isCounter ? 2.2 : t3 ? 2 : 1.4;
     const strokeA = t3 ? 0.85 : 0.7;
     // 投影
@@ -984,9 +1030,11 @@ export class RequestPacketView {
     // 标题区（实心，底部切平）
     this.bg.roundRect(0, 0, W, HEADER_H, r).fill({ color: fillHead, alpha: 1 });
     this.bg.rect(0, Math.floor(HEADER_H / 2), W, Math.ceil(HEADER_H / 2)).fill({ color: fillHead, alpha: 1 });
-    // 描边 + 标题区分隔线（去掉顶部那根多余的 accent 横条——边框已经够了）
+    // 描边（需求卡另有一条标题分隔线；短信/通知卡不画那条硬分隔——消息类界面没有表单式抬头）。
     this.bg.roundRect(0, 0, W, H, r).stroke({ width: strokeW, color: c, alpha: strokeA });
-    this.bg.moveTo(12, HEADER_H).lineTo(W - 12, HEADER_H).stroke({ width: 1, color: c, alpha: 0.16 });
+    if (!this.isFace) {
+      this.bg.moveTo(12, HEADER_H).lineTo(W - 12, HEADER_H).stroke({ width: 1, color: c, alpha: 0.16 });
+    }
     this.drawAvatar(18, 14, c, fillHead);
 
     // §09 短信/通知卡：把 title+线索包进一个消息气泡（短信带左下小尾巴），底部一条**禁用的回复输入条**，
@@ -1067,7 +1115,7 @@ export class RequestPacketView {
   // 画任务链：可勾选的依赖步骤（复选框）+ 底部「串接送核」按钮。
   // 结算后勾对的依赖变绿、误勾的干扰项变红，其余压暗。
   private drawChainSteps(): void {
-    const W = UI.cardWidth;
+    const W = this.cardW;
     const g = this.bg;
 
     this.chainRows.forEach((row, i) => {
@@ -1116,7 +1164,7 @@ export class RequestPacketView {
 
   // 滑动确认的手指行程（px）：整条回复减去两侧内缩与滑块宽。draw 与 handleMove 共用，保证手感一致。
   private replySwipeTravelPx(): number {
-    const bw = UI.cardWidth - 24;
+    const bw = this.cardW - 24;
     return Math.max(60, bw - REPLY_SWIPE_INSET * 2 - REPLY_SWIPE_HANDLE_W);
   }
 
@@ -1124,7 +1172,7 @@ export class RequestPacketView {
   private drawReplySwipeRail(row: { y: number; h: number }, index: number, alpha: number, enabled: boolean): void {
     const g = this.bg;
     const bx = 12;
-    const bw = UI.cardWidth - 24;
+    const bw = this.cardW - 24;
     const inset = REPLY_SWIPE_INSET;
     const trackLeft = bx + inset;
     const travel = this.replySwipeTravelPx();
@@ -1168,7 +1216,7 @@ export class RequestPacketView {
   // 画候选回复行：前期普通回复是「右滑确认」；委托 / 后期豪赌保持点击。
   // 思考时高亮所选行 + Thinking 动画；揭晓时所选行按收益着色，其余行压暗。
   private drawOptions(): void {
-    const W = UI.cardWidth;
+    const W = this.cardW;
     const g = this.bg;
     const dots = 1 + Math.floor((this.thinkMs / 280) % 3);
     const tut = this.request.tutorial;
