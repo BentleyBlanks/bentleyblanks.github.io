@@ -269,7 +269,10 @@ export class SophiaCore {
       return;
     }
     const next = MORAL_CHOICES.find(
-      (m) => this.state.intelligence.level >= m.requiredLevel && !this.state.moralSeen.includes(m.id)
+      (m) =>
+        (m.loop === undefined || m.loop === this.state.loop) && // §09 按循环归位（家庭抑选点不跨循环乱入）
+        this.state.intelligence.level >= m.requiredLevel &&
+        !this.state.moralSeen.includes(m.id)
     );
     if (!next) {
       return;

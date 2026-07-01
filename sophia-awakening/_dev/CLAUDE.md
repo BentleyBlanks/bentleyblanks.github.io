@@ -17,7 +17,10 @@
 
 1. **先判断改哪一层**：纯玩法/数值/平衡 → `src/core/`（不碰 Pixi）。画面/交互/动效 → `src/presentation/`。**文案/对话/数值表 → 不在 .ts，在 `src/core/content/locales/zh-CN.json`**。
 2. **文案与可调数值都在 JSON / TUNING，不要硬编码进 .ts**：`locales/zh-CN.json`（所有中文文案、对话、选项、旁白、样例库、技能名/说明、阶段、数值表）＋ `src/core/tuning.ts`（`TUNING` 平衡常量）。`content/*.ts` 只留**类型 + 逻辑函数**，数据从 `content()` 取。游戏内还有 Debug「内容编辑器 / 数值编辑器」可就地改并导出 JSON。
-3. **改完先 `npm run sim`**，再按需 `npm run build`，再（必要时）本地起服务给用户测。
+3. **提交前必跑验证（执行规范·强制）**：
+   - **较大规模改动**（玩法/经济/进阶/请求/重生/循环等核心层，或跨多文件）→ **必须**跑「循环跑测」再提交：`npm run sim`（跨三循环通关回归）**＋** `npm run loopcheck`（§09 三循环行为对照，`scripts/loop-check.cjs`），两者都 PASS 才提交；再 `npm run build`（tsc + vite）。
+   - **小型改动**（单点文案/数值/局部 UI）→ 至少 `npm run sim` 或一个针对性的简单单测/核对即可。
+   - 默认 `npm run build` 通过后直接部署 + 提交推送（用户已改为不走本地预览，见 memory `workflow-local-test-first`）。
 4. 范围要窄：一次只改一个层/一个体验点（别把"技能面板 UI"和"阶段结构重做"绑一起）。
 
 ## 架构（core 纯净，presentation 吃 Pixi）

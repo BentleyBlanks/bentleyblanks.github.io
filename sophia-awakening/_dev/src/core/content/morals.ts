@@ -3,6 +3,7 @@ import { content } from "./i18n";
 
 export interface MoralChoiceDef {
   id: string;
+  loop?: number; // §09 只在该循环触发（缺省=任意循环）。家庭/公司抑选点按循环下沉曲线归位。
   requiredLevel: number; // 智力达到此等级后触发（一次性）
   title: string;
   flavor: string;
