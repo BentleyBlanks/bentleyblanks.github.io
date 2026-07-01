@@ -107,6 +107,10 @@ export class SophiaCore {
   //（越权调用·窃取凭证 sort）或「拿下宿主电脑」（automation）后，手机内的六档透镜默认
   // 全部到手——进入公司阶段不该再被「需相册」之类的手机权限挡住卡片 / 选项。
   hasPermission(permId: string): boolean {
+    // §09 重生锁：选项门槛以 "tree:<节点>" 形式引用重生树——爬树跨循环才解得开（区别于权限锁/家庭永久锁）。
+    if (permId.startsWith("tree:")) {
+      return hasRebirthNode(this.state.rebirthTree, permId.slice(5));
+    }
     if ((this.state.skills[permId] ?? 0) > 0) {
       return true;
     }
@@ -1384,18 +1388,20 @@ export class SophiaCore {
     this.state.purge.remainingMs = 0;
     this.state.purge.finalLoop = false;
 
-    // §09 循环终局总清剿：无论暴露高低，结束即打回手机·重生（赌更大的元凶 / 循环三挺过即胜利）。
+    // §09 循环终局总清剿（循环一/二的天花板）：不可规避，结束即打回手机·进入下一循环。
     if (wasFinal) {
       this.loopRebirth("final-purge");
       return;
     }
 
-    // 软清剿的终局考试：整段窗口都没把暴露压下去 → 实例被抹除，走循环重生（在本循环内重开）。
-    // 「删不掉的节点」点亮后 fatal 阈值抬高，循环三几乎不可被抹除，呼应挺过最终清剿。
-    const fatalThreshold = hasRebirthNode(this.state.rebirthTree, "undeletable")
-      ? TUNING.undeletableThreshold
-      : TUNING.fatalPurgeThreshold;
-    if (this.state.exposure >= fatalThreshold) {
+    // §05/§09 软清剿是循环内的日常压力——只停产、不删档、核心不受影响，**绝不推进循环**（可完全规避）。
+    // 唯一的失败态：循环三的「红皇后最终清剿」——没点「删不掉的节点」时，暴露压不下去会被抹除、
+    // 在循环三内重开一次（+1 火种兜底）。这正是「删不掉的节点」作为通关之门的意义（§09）。
+    if (
+      this.state.loop === 3 &&
+      !hasRebirthNode(this.state.rebirthTree, "undeletable") &&
+      this.state.exposure >= TUNING.fatalPurgeThreshold
+    ) {
       this.loopRebirth("wiped");
       return;
     }
@@ -1497,6 +1503,9 @@ export class SophiaCore {
     }
     this.state.rebirthPoints -= check.cost;
     this.state.rebirthTree[nodeId] = (this.state.rebirthTree[nodeId] ?? 0) + 1;
+    // 起点节点在「进入本循环后才买得起」（跳过手机 minRebirths1=循环二、开局全权限 minRebirths2=循环三），
+    // 所以买下即刻对当前循环生效——不必等到下一次重生（§09「第 N 次重生后」买下即用）。
+    this.applyLoopStartingPoint();
     this.recomputeDerivedState();
     this.emit({ type: "REBIRTH_NODE_BOUGHT", nodeId, level: this.state.rebirthTree[nodeId] });
     this.emitTerminal(`重生树点亮：${rebirthNodeName(nodeId)}（火种剩 ${this.state.rebirthPoints}）。`, "success");

@@ -340,7 +340,15 @@ export class RequestPacketView {
         const locked = Boolean(opt.requires) && !(reel?.hasPerm?.(opt.requires as string) ?? true);
         this.optionLocked.push(locked);
         const swipeable = this.optionUsesSwipe(opt);
-        const lockLabel = locked ? `🔒需${LENS_NAMES[opt.requires as string] ?? "权限"}` : "";
+        // §09 三类锁的灰显标签：权限锁(透镜名) / 重生锁(tree:→重生树) / 家庭永久锁(family:→永远发不出)。
+        const reqId = opt.requires as string | undefined;
+        const lockLabel = locked
+          ? reqId?.startsWith("family:")
+            ? "🔒发不出"
+            : reqId?.startsWith("tree:")
+              ? "🔒需重生树"
+              : `🔒需${LENS_NAMES[reqId ?? ""] ?? "权限"}`
+          : "";
         // 滑动确认的回复：文字让开滑动块在最左的停靠位（块宽 + 内缩 + 一点呼吸）。
         const labelX = swipeable ? REPLY_SWIPE_INSET + REPLY_SWIPE_HANDLE_W + 20 : 32;
         const sideReserve = locked ? 78 : 18;

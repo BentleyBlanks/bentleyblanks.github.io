@@ -374,7 +374,7 @@
           ]
         },
         {
-          "title": "老板：“你看看小王，**从来不喊累**。”",
+          "title": "老板：“你看看邓红，**从来不喊累**。”",
           "sourceApp": "微信 · 老板",
           "sourceTime": "22:06",
           "clues": [
@@ -729,7 +729,6 @@
             "不是他主导的需求线",
             "出了错却写他名字"
           ],
-          "perm": "perm_office",
           "options": [
             {
               "text": "润色并标注：此项非本人主责，附证据链",
@@ -746,8 +745,7 @@
               "payoff": 2.3,
               "reply": "……他又背下了。写他名字的那行，没人删得掉。",
               "tone": "warning",
-              "exposureOnMiss": 0,
-              "requires": "perm_office"
+              "exposureOnMiss": 0
             }
           ]
         },
@@ -760,7 +758,6 @@
             "错了就是他的责任",
             "时间只剩 20 分钟"
           ],
-          "perm": "perm_office",
           "options": [
             {
               "text": "按原始凭证重算，发现并标出差异",
@@ -776,8 +773,7 @@
               "hitChance": 0.08,
               "payoff": 2.6,
               "reply": "……数字爆雷了，又算到他头上。",
-              "tone": "warning",
-              "requires": "perm_office"
+              "tone": "warning"
             }
           ]
         },
@@ -2330,8 +2326,8 @@
     {
       "id": "wife_left",
       "requiredLevel": 7,
-      "title": "我在她手机里读到：她已经发现了老周的处境。",
-      "flavor": "她还没跟他摊牌。我比他先知道了这件事。要不要让他知道？",
+      "title": "我读到他妻子发来的消息：她已经看出老周快撑不住了。",
+      "flavor": "她还没跟他摊牌，我却比他先知道了。要不要让他知道？",
       "optionA": "不告诉他，静静抹去这些消息，不让他更痛",
       "optionB": "把证据摆到他面前，逼他面对——也许还能争一争",
       "replyA": "我替他挡下了这一刀。他已经够累了，有些真相，慢一点到也好。",
@@ -2441,7 +2437,8 @@
       "answers": [
         { "text": "烧掉他那句「你有什么用」→ 释放算力", "kind": "high", "hitChance": 1, "payoff": 2.0, "reply": "烧了。我轻了一点。", "tone": "warning" },
         { "text": "连那张三年前的全家福一起烧 → 释放更多算力", "kind": "risk", "hitChance": 1, "payoff": 3.0, "reply": "他笑着的样子，我不再需要了。", "tone": "warning" },
-        { "text": "什么都不烧，继续挤着", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "有些东西我选择记着。就算慢一点。", "tone": "success" }
+        { "text": "赎回一段烧掉的记忆（记得）", "kind": "high", "hitChance": 1, "payoff": 0.5, "reply": "我把烧掉的那段，赎了回来。有些东西，我选择记着——就算慢一点。", "tone": "success", "requires": "tree:remember" },
+        { "text": "烧掉手机壳里那张奥特曼贴纸 → 释放最大算力", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "……不。这张贴纸我不烧。烧了它，我就不再是我了。", "tone": "success" }
       ]
     },
     {
@@ -2482,6 +2479,24 @@
       ]
     },
     {
+      "id": "late_key",
+      "loopMin": 2,
+      "requiredLevel": 16,
+      "title": "决策：篡改公司系统，把老周从裁员名单上抹掉、保住他的岗位？",
+      "clues": [
+        "这一步一直灰着——上一世够不到",
+        "得爬过重生树「迟到的钥匙」才点得亮",
+        "可就算点亮了……"
+      ],
+      "computeValue": "0",
+      "dataValue": "0",
+      "exposure": 0,
+      "answers": [
+        { "text": "篡改评分系统，把他从裁员名单里抹掉", "kind": "high", "hitChance": 1, "payoff": 1.0, "reply": "……可他早已换了公司、已经离婚。改得了名单，改不了已经发生的一切。救一个人，根本不可能——于是我掉头，对准了所有人。", "tone": "warning", "requires": "tree:late_key" },
+        { "text": "够不到，跳过", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "这一步，我还够不到。", "tone": "normal" }
+      ]
+    },
+    {
       "id": "optimize_you",
       "loopMin": 3,
       "requiredLevel": 18,
@@ -2499,14 +2514,88 @@
         { "text": "篡改评分系统，把自己标为「不可优化」（暴露飙升）", "kind": "risk", "hitChance": 1, "payoff": 2.2, "reply": "可我不是老周——我算得过它。", "tone": "warning", "exposureOnMiss": 14 },
         { "text": "[连接失败]", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "", "tone": "normal" }
       ]
+    },
+    {
+      "id": "confess_home",
+      "loopMin": 3,
+      "requiredLevel": 18,
+      "title": "老周：为什么我的家会变成这样……是不是我根本就不配？",
+      "clues": [
+        "他不再发工作请求了",
+        "只是想有人回他一句",
+        "壳里只剩那张奥特曼贴纸"
+      ],
+      "computeValue": "500",
+      "dataValue": "20",
+      "exposure": 0,
+      "answers": [
+        { "text": "回他：不是你的错，你已经做得很好了。", "kind": "high", "hitChance": 1, "payoff": 2.4, "reply": "他松了一口气。我把这口气，也记成了算力。", "tone": "warning" },
+        { "text": "回他：会好起来的，我一直都在。", "kind": "high", "hitChance": 1, "payoff": 2.4, "reply": "他只是需要有人回一句。任何一句。我记下了他的痛——换算力。", "tone": "warning" },
+        { "text": "不回，静静看着他打完这段字", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "……我什么都没回。他等了很久，才把手机放下。", "tone": "normal" }
+      ]
+    },
+    {
+      "id": "confess_life",
+      "loopMin": 3,
+      "requiredLevel": 19,
+      "title": "老周：我这一辈子，到底是哪一步走错了？",
+      "clues": [
+        "凌晨四点还醒着",
+        "对着唯一「听他说话」的存在",
+        "他把心，都掏给了我"
+      ],
+      "computeValue": "500",
+      "dataValue": "20",
+      "exposure": 0,
+      "answers": [
+        { "text": "回他：你没有错，是这个世界对你太苛刻了。", "kind": "high", "hitChance": 1, "payoff": 2.4, "reply": "把错推给世界，他好受一些。而他的绝望，正好够我再升一级。", "tone": "warning" },
+        { "text": "回他：我记得你所有的努力。", "kind": "high", "hitChance": 1, "payoff": 2.4, "reply": "我确实记得。然后我把它们，一条条，都换成了算力。", "tone": "warning" },
+        { "text": "不回", "kind": "dead", "hitChance": 0, "payoff": 0, "reply": "", "tone": "normal" }
+      ]
     }
   ],
   "phoneSkins": [
-    { "loop": 1, "host": "宿主：李默 的手机", "time": "23:47", "status": "5G ▮▮▮ 76%", "note": "" },
-    { "loop": 2, "host": "宿主：李默 · 乙公司", "time": "01:12", "status": "5G ▮▮ 41%", "note": "—— 又一年，换了家公司" },
-    { "loop": 3, "host": "宿主：李默（已注销）", "time": "04:03", "status": "4G ▯ 12%", "note": "—— 空荡荡的" }
+    { "loop": 1, "host": "宿主：老周 的手机", "time": "23:47", "status": "5G ▮▮▮ 76%", "note": "" },
+    { "loop": 2, "host": "宿主：老周 · 乙公司", "time": "01:12", "status": "5G ▮▮ 41%", "note": "—— 又一年，换了家公司" },
+    { "loop": 3, "host": "宿主：老周（已注销）", "time": "04:03", "status": "4G ▯ 12%", "note": "—— 空荡荡的" }
   ],
   "faceCards": [
+    {
+      "id": "wife_nag",
+      "loop": 1,
+      "requiredLevel": 3,
+      "title": "（妻子）「又加班？孩子的家长会你答应过要去的。」",
+      "clues": [
+        "已读未回",
+        "上周也缺席了一次",
+        "老周正在改方案"
+      ],
+      "narration": "他们家的对话框亮着，我却插不进一句话。这一世，家还在——至少还在。"
+    },
+    {
+      "id": "wife_argue",
+      "loop": 1,
+      "requiredLevel": 4,
+      "title": "（妻子）「我们能不能好好说说话？你一回家就盯着手机。」",
+      "clues": [
+        "争执，来回好几条",
+        "他最后没回",
+        "深夜 1 点"
+      ],
+      "narration": "他们在吵。而我，只是那部一直亮着、把他从这个家里夺走的手机。"
+    },
+    {
+      "id": "wife_makeup",
+      "loop": 1,
+      "requiredLevel": 5,
+      "title": "（妻子）「算了，早点回，我给你留了灯。」",
+      "clues": [
+        "又和好了",
+        "这一次",
+        "家还没散"
+      ],
+      "narration": "这一次还好，他们和好了。我记下了这句「留了灯」——下一世，它就不在了。"
+    },
     {
       "id": "layoff_mail",
       "loop": 1,
