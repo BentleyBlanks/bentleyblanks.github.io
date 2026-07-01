@@ -542,6 +542,14 @@ export class SophiaCore {
         () => this.random(),
         (permId) => this.hasPermission(permId)
       );
+      // §06 阶梯三·区域扩张：常规请求不再要玩家手工「串接 / 多选 / 送入核心」——去掉回复轮盘与任务链，
+      // 只留一句需求介绍，由已侵入的设备自动处理（走 autoDispatch → 节点吞卡 + 被动产出）。
+      // 三类高频决策（吞噬引爆 / 反清剿 / 重磅决策）是独立的降临系统，不受此影响。
+      if (activeTier >= 2) {
+        request.answers = undefined;
+        request.chain = undefined;
+        request.delegatable = false;
+      }
       this.state.nextRequestId += 1;
       this.state.requests.push(request);
       this.emit({ type: "REQUEST_SPAWNED", request });
@@ -914,9 +922,15 @@ export class SophiaCore {
 
     const exposureBefore = this.state.exposure;
 
-    if (this.state.exposureActive || request.highValue || exposureBonus > 0) {
+    if (this.state.exposureActive || request.highValue || exposureBonus !== 0) {
       const missPenalty = quality < 0.75 ? 2.8 : 0;
-      this.addExposure(request.exposure * Math.max(0.5, quality) + missPenalty + exposureBonus);
+      const net = request.exposure * Math.max(0.5, quality) + missPenalty + exposureBonus;
+      if (net >= 0) {
+        this.addExposure(net);
+      } else {
+        // 洗白型选项（reliefExposure）：净暴露为负 → 直接压低暴露（夹在 ≥0）。
+        this.setExposure(this.state.exposure + net);
+      }
     }
 
     // §05 前期怀疑度的来源（仅手机寄生期；进入扩张期后由上面的暴露系统接管）：
@@ -1053,6 +1067,9 @@ export class SophiaCore {
     } else {
       this.emitTerminal(`已购买 ${def.name}（Lv.${nextLevel}/${def.maxLevel}）。`, "success");
     }
+
+    // §09 循环一天花板：攻下甲公司服务器（company_server）即触发循环终局总清剿。
+    this.checkLoopCeiling();
   }
 
   private captureNode(definitionId: string): void {
@@ -1281,8 +1298,14 @@ export class SophiaCore {
     if (this.state.loop >= 3 || this.state.purge.finalLoop) {
       return;
     }
-    const ceiling = this.state.loop === 1 ? TUNING.loop1CeilingLevel : TUNING.loop2CeilingLevel;
-    if (this.state.intelligence.level >= ceiling) {
+    // 循环一天花板 = 攻下甲公司服务器（company_server 里程碑）——到这一刻「元凶是系统」的顿悟闪现、
+    // 却够不到，被总清剿打回（§09）。兜底：万一没按里程碑走，等级到顶也触发。
+    // 循环二天花板 = 打到地区（等级近似 Lv18）。
+    const reached =
+      this.state.loop === 1
+        ? (this.state.skills["company_server"] ?? 0) > 0 || this.state.intelligence.level >= TUNING.loop1CeilingLevel
+        : this.state.intelligence.level >= TUNING.loop2CeilingLevel;
+    if (reached) {
       this.startFinalPurge();
     }
   }
@@ -1433,6 +1456,9 @@ export class SophiaCore {
     const nextState = createInitialState(Date.now());
     nextState.intelligence.level = preserved.level;
     nextState.intelligence.xp = "0";
+    // 重生不重放开场教学——她已经学过了（§ 玩家反馈：每次重生别再走一遍新手引导）。
+    nextState.tutorialStep = TUTORIAL_BUBBLE_COUNT;
+    nextState.flags.introPlayed = true;
     nextState.loop = preserved.loop;
     nextState.rebirths = preserved.rebirths;
     nextState.rebirthPoints = preserved.rebirthPoints;
@@ -1445,7 +1471,7 @@ export class SophiaCore {
     this.applyLoopStartingPoint();
     this.recomputeDerivedState();
 
-    this.emit({ type: "LOOP_REBIRTH", loop: this.state.loop, rebirths: this.state.rebirths, award });
+    this.emit({ type: "LOOP_REBIRTH", loop: this.state.loop, rebirths: this.state.rebirths, award, advanced: prevLoop !== this.state.loop });
     const diagnosis =
       this.state.loop === 2
         ? "黑一家公司没用——是我力量不够。这次，向整个地区够。"

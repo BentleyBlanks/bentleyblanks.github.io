@@ -2399,6 +2399,100 @@ body.exposed .screen-veil {
   background: rgba(16, 22, 28, 0.92);
 }
 
+/* §09 重生树 FAB：放在调试(⚙)按钮左边；循环一不显示（hidden 由 JS 控制）。 */
+.rebirth-fab {
+  position: fixed;
+  right: 48px;
+  top: 12px;
+  z-index: 60;
+  height: 30px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 170, 90, 0.5);
+  background: rgba(28, 20, 12, 0.92);
+  color: #ffcf8a;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.rebirth-fab[hidden] { display: none; }
+.rebirth-fab:hover { color: #ffe0ad; border-color: rgba(255, 190, 120, 0.9); box-shadow: 0 0 10px rgba(255, 170, 90, 0.35); }
+.rebirth-fab.has-points { box-shadow: 0 0 12px rgba(255, 170, 90, 0.55); animation: rebirthPulse 1.6s ease-in-out infinite; }
+@keyframes rebirthPulse { 0%,100% { box-shadow: 0 0 8px rgba(255,170,90,0.4);} 50% { box-shadow: 0 0 16px rgba(255,190,120,0.75);} }
+
+.rebirth-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 61;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 8, 9, 0.72);
+  backdrop-filter: blur(3px);
+}
+.rebirth-dialog.is-open { display: flex; }
+.rebirth-inner {
+  width: min(720px, 96vw);
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
+  padding: 20px 22px;
+  border: 1px solid rgba(255, 170, 90, 0.45);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(20, 15, 10, 0.98), rgba(12, 10, 8, 0.98));
+  box-shadow: 0 0 40px rgba(255, 150, 60, 0.15);
+}
+.rebirth-head { display: flex; align-items: center; justify-content: space-between; }
+.rebirth-title { font-size: 17px; font-weight: 800; color: #ffd79a; }
+.rebirth-title strong { color: #ffb84a; }
+.rebirth-sub { margin: 6px 0 14px; font-size: 12.5px; color: #9a8f80; line-height: 1.5; }
+.rebirth-tree { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rebirth-node {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 11px 13px;
+  border: 1px solid rgba(140, 120, 90, 0.4);
+  border-radius: 10px;
+  background: rgba(30, 24, 16, 0.6);
+  color: #eadfce; text-align: left; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.rebirth-node:hover:not(:disabled) { border-color: rgba(255, 190, 120, 0.85); background: rgba(44, 34, 20, 0.8); }
+.rebirth-node:disabled { cursor: default; opacity: 0.6; }
+.rebirth-node.is-owned { border-color: rgba(120, 200, 140, 0.55); opacity: 0.85; }
+.rebirth-node .rn-name { font-size: 14px; font-weight: 800; }
+.rebirth-node .rn-blurb { font-size: 11.5px; color: #b6aa97; line-height: 1.45; }
+.rebirth-node .rn-cost { font-size: 12px; font-weight: 800; color: #ffb84a; }
+.rebirth-node.is-spine { grid-column: span 1; }
+.rebirth-node.is-story { grid-column: span 2; }
+
+/* §09 重生全屏提示：每次重生弹出，讲清被清剿的原因 + 保留了什么。 */
+.rebirth-prompt {
+  position: fixed; inset: 0; z-index: 70;
+  display: none; align-items: center; justify-content: center;
+  padding: 28px; background: rgba(2, 4, 5, 0.92);
+}
+.rebirth-prompt.is-open { display: flex; }
+.rebirth-prompt-inner {
+  width: min(560px, 94vw);
+  padding: 30px 32px;
+  border: 1px solid rgba(255, 90, 90, 0.4);
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 0%, rgba(40, 12, 12, 0.96), rgba(8, 8, 10, 0.98));
+  box-shadow: 0 0 60px rgba(255, 60, 60, 0.18);
+  text-align: center;
+}
+.rebirth-prompt-title { font-size: 22px; font-weight: 900; color: #ff8a8a; letter-spacing: 1px; }
+.rebirth-prompt-reason { margin: 16px 0 0; font-size: 14.5px; line-height: 1.7; color: #e6d7d2; }
+.rebirth-prompt-keep { margin: 14px 0 0; font-size: 13px; line-height: 1.7; color: #9fe6c8; }
+.rebirth-prompt-diagnosis { margin: 16px 0 0; font-size: 15px; line-height: 1.6; font-style: italic; color: #ffd79a; }
+.rebirth-prompt-btn { margin-top: 22px; padding: 10px 28px; font-size: 15px; }
+
 .debug-dialog {
   position: fixed;
   inset: 0;

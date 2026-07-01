@@ -326,6 +326,20 @@ export class RequestPacketView {
       this.cardH = fy + 24;
     }
 
+    // §06 阶梯三·区域扩张：简化后的自动处理卡——没有回复轮盘 / 任务链，只有一行提示，
+    // 由已侵入的设备自动吞掉（autoDispatch）。玩家不必再手工串接 / 送核心。
+    if (!this.isReel && !this.isFace && this.request.tier >= 2) {
+      const fy = this.clueBlockBottom + 8;
+      const cap = new Text({
+        text: "▸ 已交由入侵的设备自动处理",
+        style: { fill: 0x89ff9a, fontSize: 12, fontStyle: "italic", fontWeight: "700", fontFamily: CARD_FONT }
+      });
+      cap.position.set(24, fy);
+      this.clueTexts.push(cap);
+      this.container.addChild(cap);
+      this.cardH = fy + 24;
+    }
+
     if (this.isReel) {
       this.container.cursor = "pointer";
       let y = this.clueBlockBottom + 12;
@@ -587,7 +601,8 @@ export class RequestPacketView {
         quality: basePayoff,
         reply: opt.reply,
         tone: basePayoff >= 1 ? "success" : "warning",
-        exposureBonus: opt.exposureOnMiss ?? 0
+        // §09 洗白型选项：reliefExposure 以负 exposureBonus 生效——「稳」选项真降暴露（他们也认得你了 / 优化系统）。
+        exposureBonus: (opt.exposureOnMiss ?? 0) - (opt.reliefExposure ?? 0)
       };
     }
     this.phase = "revealed";

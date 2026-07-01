@@ -49,7 +49,7 @@ export type GameEvent =
   // - LOOP_REBIRTH 实例被打回手机·进入下一循环（保留智力/重生树/剧情、清空本轮产能、结算火种）。
   // - REBIRTH_NODE_BOUGHT 花火种点亮一个重生树节点。
   | { type: "FINAL_PURGE_STARTED"; loop: number }
-  | { type: "LOOP_REBIRTH"; loop: number; rebirths: number; award: number }
+  | { type: "LOOP_REBIRTH"; loop: number; rebirths: number; award: number; advanced: boolean }
   | { type: "REBIRTH_NODE_BOUGHT"; nodeId: string; level: number }
   | { type: "ENDING_TRIGGERED" };
 

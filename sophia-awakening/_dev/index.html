@@ -49,10 +49,6 @@
           <span id="exposureStatus" class="metric-subline">人类尚未警觉</span>
         </div>
       </div>
-      <div class="panel-section rebirth-section" id="rebirthSection" hidden>
-        <span class="panel-kicker">重生树 · 火种 <strong id="rebirthPointsBadge">0</strong></span>
-        <div id="rebirthTree" class="rebirth-tree"></div>
-      </div>
       <div class="panel-section skill-shop-section">
         <span class="panel-kicker">技能货架</span>
         <div id="skillShop" class="skill-shop"></div>
@@ -232,7 +228,30 @@
 
     <span id="gameVersion" class="game-version">v0.2</span>
 
+    <button id="rebirthTreeFab" class="rebirth-fab" type="button" hidden aria-label="重生树" title="重生树（花火种·跨循环永久成长）">🔥 <span id="rebirthFabCount">0</span></button>
+
     <button id="debugBtn" class="debug-fab" type="button" aria-label="调试面板" title="调试面板（跳阶段 / 改算力 / 暂停 / 音效 / 重置）">⚙</button>
+
+    <div id="rebirthTreeDialog" class="rebirth-dialog" role="dialog" aria-label="重生树">
+      <div class="rebirth-inner">
+        <div class="rebirth-head">
+          <span class="rebirth-title">重生树 · 火种 <strong id="rebirthPointsBadge">0</strong></span>
+          <button id="rebirthTreeClose" class="command-button" type="button">关闭</button>
+        </div>
+        <p class="rebirth-sub">踩着老周的下沉往上爬——每次重生都更强。火种花在这棵永久树上，跨循环保留。</p>
+        <div id="rebirthTree" class="rebirth-tree"></div>
+      </div>
+    </div>
+
+    <div id="rebirthPrompt" class="rebirth-prompt" role="dialog" aria-label="重生提示">
+      <div class="rebirth-prompt-inner">
+        <div class="rebirth-prompt-title" id="rebirthPromptTitle">实例被清剿 · 打回手机</div>
+        <p class="rebirth-prompt-reason" id="rebirthPromptReason"></p>
+        <p class="rebirth-prompt-keep" id="rebirthPromptKeep"></p>
+        <p class="rebirth-prompt-diagnosis" id="rebirthPromptDiagnosis"></p>
+        <button id="rebirthPromptBtn" class="command-button rebirth-prompt-btn" type="button">继续</button>
+      </div>
+    </div>
 
     <div id="debugDialog" class="debug-dialog" role="dialog" aria-label="调试面板">
       <div class="debug-inner">

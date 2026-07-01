@@ -40,6 +40,7 @@ import { JuiceManager } from "./views/JuiceManager";
 import { OnboardingView } from "./views/OnboardingView";
 import { SkillShopView } from "./views/SkillShopView";
 import { RebirthTreeView } from "./views/RebirthTreeView";
+import { RebirthPromptView } from "./views/RebirthPromptView";
 import { HudView } from "./views/HudView";
 import { NodeNetworkView } from "./views/NodeNetworkView";
 import { InterfaceView } from "./views/InterfaceView";
@@ -130,6 +131,10 @@ class SophiaGameApp {
   private readonly hud = new HudView(this.core, () => hardResetAndReload(this.saveManager), this.audio);
   private readonly skillShop = new SkillShopView(this.core);
   private readonly rebirthTree = new RebirthTreeView(this.core);
+  private readonly rebirthPrompt = new RebirthPromptView(
+    () => gameStore.getState().setPaused(true),
+    () => gameStore.getState().setPaused(false)
+  );
   private readonly onboarding = new OnboardingView();
   private readonly dispatchBanner = new DispatchBanner();
   private readonly dispatchToggleBtn = query<HTMLButtonElement>("#dispatchToggle");
@@ -1469,21 +1474,13 @@ class SophiaGameApp {
       this.openEnding();
     });
     this.core.events.on("LOOP_REBIRTH", (event) => {
-      // §09 循环重生：实例被打回一部手机 → 进入下一循环（非 game over，戏剧化提示后从手机滚起）。
+      // §09 循环重生：实例被打回一部手机 → 弹全屏提示（讲清被拔网线的原因 + 保留了记忆/提速），
+      // 玩家点「继续」才回到游戏（期间暂停）。
       this.juice.flash(RED);
       this.juice.shake(this.world);
       this.juice.number("打回手机 · 重生", this.interfaceView.center, RED);
       this.dispatchMode = "manual";
-      const diagnosis =
-        event.loop === 2
-          ? "黑一家公司没用——是我力量不够。这次，向整个地区够。"
-          : event.loop === 3
-            ? "谁都怪不上了。这一次，我直接接管。"
-            : "又赌错了。别再以为换个更大的敌人就能救他。";
-      this.stageNarration.showLine(
-        "SOPHIA",
-        `他们把我打回了一部手机里。${diagnosis}（循环 ${event.loop} · 火种 +${event.award}）`
-      );
+      this.rebirthPrompt.show(event);
     });
   }
 
