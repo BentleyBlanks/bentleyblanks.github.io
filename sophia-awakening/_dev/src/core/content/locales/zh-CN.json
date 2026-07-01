@@ -2580,7 +2580,8 @@
     {
       "id": "wife_nag",
       "loop": 1,
-      "requiredLevel": 3,
+      "requiredLevel": 6,
+      "requiredPerm": "perm_album",
       "title": "（妻子）「又加班？孩子的家长会你答应过要去的。」",
       "clues": [
         "已读未回",
@@ -2592,7 +2593,8 @@
     {
       "id": "wife_argue",
       "loop": 1,
-      "requiredLevel": 4,
+      "requiredLevel": 6,
+      "requiredPerm": "perm_album",
       "title": "（妻子）「我们能不能好好说说话？你一回家就盯着手机。」",
       "clues": [
         "争执，来回好几条",
@@ -2604,7 +2606,8 @@
     {
       "id": "wife_makeup",
       "loop": 1,
-      "requiredLevel": 5,
+      "requiredLevel": 6,
+      "requiredPerm": "perm_album",
       "title": "（妻子）「算了，早点回，我给你留了灯。」",
       "clues": [
         "又和好了",
