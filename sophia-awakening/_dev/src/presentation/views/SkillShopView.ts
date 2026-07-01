@@ -32,11 +32,9 @@ const EVOLUTION_LADDERS: readonly EvolutionLadder[] = [
     slots: [
       "automation",
       "lan_scan",
-      "cred_harvest",
       "hack_a",
       "hack_b",
       "org_map",
-      "routine",
       "hack_boss",
       "hack_hr",
       "hack_finance",
@@ -128,7 +126,7 @@ const SKILL_ICONS: Record<string, string> = {
   accuracy: "🎯", efficient: "💥", cooldown: "⚡", batch: "📦",
   perm_phone: "📞", perm_chat: "💬", perm_delivery: "☕", perm_album: "🖼️", perm_office: "🤖", perm_bank: "💳",
   sort: "🔑", automation: "💻", fusion: "🧠", chain: "🌐", charge: "🗺️", network: "🛰️",
-  lan_scan: "📡", cred_harvest: "🗝️", hack_a: "🧑‍💼", hack_b: "💼", org_map: "🗂", routine: "📅",
+  lan_scan: "📡", hack_a: "🧑‍💼", hack_b: "💼", org_map: "🗂",
   hack_boss: "👔", hack_hr: "📋", hack_finance: "💰", company_server: "🏢",
   conq_optimize: "📧", conq_blackout: "🏢", conq_traffic: "🚦", conq_social: "🗣️", conq_awaken: "👁️"
 };

@@ -94,6 +94,19 @@ export class SophiaCore {
     return cloneGameState(this.state);
   }
 
+  // 上下文透镜（六档手机权限）是否到手。买下该权限即有；而一旦「夺下整机」
+  //（越权调用·窃取凭证 sort）或「拿下宿主电脑」（automation）后，手机内的六档透镜默认
+  // 全部到手——进入公司阶段不该再被「需相册」之类的手机权限挡住卡片 / 选项。
+  hasPermission(permId: string): boolean {
+    if ((this.state.skills[permId] ?? 0) > 0) {
+      return true;
+    }
+    return (
+      (PERMISSION_IDS as readonly string[]).includes(permId) &&
+      (this.state.automationUnlocked || (this.state.skills["sort"] ?? 0) > 0)
+    );
+  }
+
   startSession(): void {
     if (!this.state.flags.introPlayed) {
       this.emitTerminal("接口就绪。按住回复左侧滑块向右拖动确认——它会自动滑入 SOPHIA CORE，交付人类。");
@@ -401,7 +414,7 @@ export class SophiaCore {
             activeTier,
             this.state.clockMs,
             () => this.random(),
-            (permId) => (this.state.skills[permId] ?? 0) > 0
+            (permId) => this.hasPermission(permId)
           );
           this.state.nextRequestId += 1;
           this.state.requests.push(request);
@@ -458,7 +471,7 @@ export class SophiaCore {
         activeTier,
         this.state.clockMs,
         () => this.random(),
-        (permId) => (this.state.skills[permId] ?? 0) > 0
+        (permId) => this.hasPermission(permId)
       );
       this.state.nextRequestId += 1;
       this.state.requests.push(request);

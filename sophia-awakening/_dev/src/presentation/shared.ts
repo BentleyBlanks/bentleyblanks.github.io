@@ -21,7 +21,7 @@ export const CARD_FONT = "'Noto Sans SC', Inter, 'Segoe UI', system-ui, sans-ser
 export const CARD_MONO = "Cascadia Mono, Consolas, monospace";
 
 // ── 布局常量 ─────────────────────────────────────────
-export const LEFT_RAIL_WIDTH = 430;
+export const LEFT_RAIL_WIDTH = 360;
 export const RIGHT_RAIL_WIDTH = 305;
 export const BASE_SUCTION_MARGIN = 50;
 export const REQUEST_PACKET_WIDTH = 384;
@@ -140,11 +140,9 @@ export const MILESTONE_ORDER = [
   "sort",
   "automation",
   "lan_scan",
-  "cred_harvest",
   "hack_a",
   "hack_b",
   "org_map",
-  "routine",
   "hack_boss",
   "hack_hr",
   "hack_finance",

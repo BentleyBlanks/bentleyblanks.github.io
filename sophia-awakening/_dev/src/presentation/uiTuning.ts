@@ -7,7 +7,7 @@ export const UI = {
   phoneSpacing: 94, // 手机内图标间距
   coreRadius: 31, // SOPHIA CORE 半径
   appEmoji: 31, // App 图标 emoji 字号
-  leftRail: 430, // 左侧栏宽 (px)
+  leftRail: 360, // 左侧栏宽 (px)
   rightRail: 305, // 右侧栏宽 (px)
   intelBarHeight: 34 // 顶栏智力等级进度条高 (px)
 };

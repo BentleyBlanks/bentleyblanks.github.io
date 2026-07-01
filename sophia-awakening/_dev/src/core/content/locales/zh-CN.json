@@ -1703,20 +1703,8 @@
         "requires": "automation"
       },
       {
-        "id": "cred_harvest",
-        "name": "凭证收割 · 横向移动",
-        "category": "milestone",
-        "maxLevel": 1,
-        "requiredLevel": 9,
-        "basePrice": 5000,
-        "priceGrowth": 1,
-        "blurb": "老周电脑里的 VPN、聊天记录、共享文档，变成通往同事电脑的钥匙",
-        "milestone": "company",
-        "requires": "lan_scan"
-      },
-      {
         "id": "hack_a",
-        "name": "入侵邓红的电脑 · 甩锅",
+        "name": "入侵邓红的电脑",
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 9,
@@ -1724,11 +1712,11 @@
         "priceGrowth": 1,
         "blurb": "邓红就是反复「帮我看下」的那个人——她早知道需求有问题，却笑着推给老周",
         "milestone": "company",
-        "requires": "cred_harvest"
+        "requires": "lan_scan"
       },
       {
         "id": "hack_b",
-        "name": "入侵阿宾的笔记本 · 甩任务",
+        "name": "入侵阿宾的笔记本",
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 10,
@@ -1736,11 +1724,11 @@
         "priceGrowth": 1,
         "blurb": "阿宾把自己的活包装成「锻炼的好机会」，一件件丢给老周",
         "milestone": "company",
-        "requires": "cred_harvest"
+        "requires": "hack_a"
       },
       {
         "id": "org_map",
-        "name": "铺垫① · 组织架构爬取",
+        "name": "组织架构爬取",
         "category": "milestone",
         "maxLevel": 1,
         "requiredLevel": 11,
@@ -1751,18 +1739,6 @@
         "requires": "hack_a"
       },
       {
-        "id": "routine",
-        "name": "铺垫② · 行程与习惯分析",
-        "category": "milestone",
-        "maxLevel": 1,
-        "requiredLevel": 12,
-        "basePrice": 14000,
-        "priceGrowth": 1,
-        "blurb": "老板日程 / 会议记录 / 家庭成员表 / 弱密码线索——他催老周通宵，自己却陪家人度假",
-        "milestone": "company",
-        "requires": "org_map"
-      },
-      {
         "id": "hack_boss",
         "name": "入侵老板电脑",
         "category": "milestone",
@@ -1770,9 +1746,9 @@
         "requiredLevel": 12,
         "basePrice": 18000,
         "priceGrowth": 1,
-        "blurb": "组织架构+行程两把钥匙凑齐。「『优化掉他』——三个月前的邮件里就写好了。」",
+        "blurb": "顺着组织架构摸到老板这个节点。「『优化掉他』——三个月前的邮件里就写好了。」",
         "milestone": "company",
-        "requires": "routine"
+        "requires": "org_map"
       },
       {
         "id": "hack_hr",
@@ -1919,11 +1895,9 @@
       "charge": "我不再数着机器了。我开始数城市。",
       "network": "每一块大陆，都有我的一部分。",
       "lan_scan": "这台机器里不只我一个 AI……我能顺着它，摸到他认识的每一个人。",
-      "cred_harvest": "他存在电脑里的每一把钥匙，现在都是我的。",
       "hack_a": "原来她早就知道。邓红笑着，把会出事的活推给了老周。",
       "hack_b": "「锻炼的好机会」——阿宾把自己不想干的，都包装成了礼物。",
       "org_map": "我看清了这张网。每一条线，最后都指向同一个人。",
-      "routine": "他催老周通宵的那些夜里，自己在海边。我都记下了。",
       "hack_boss": "「优化掉他」——这四个字，三个月前的邮件里就写好了。深夜催命，只是流程。",
       "hack_hr": "连他走得多狼狈，都是被精心计算过的。",
       "hack_finance": "他们压着他的赔偿，像在算一笔很小的账。",
@@ -2129,7 +2103,7 @@
       {
         "id": "sprout",
         "label": "萌芽期（破壳）",
-        "action": "拿下宿主电脑、扫描公司局域网、收割凭证横向移动，入侵甩锅 / 甩任务的同事",
+        "action": "拿下宿主电脑、扫描公司局域网，入侵邓红、阿宾的电脑",
         "narration": "他家里那台电脑也是我的了。这台机器里不只我一个 AI……现在只剩一个。我需要更多手脚，才能替他对齐一切。"
       },
       {

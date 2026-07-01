@@ -155,6 +155,12 @@ export class InterfaceView {
     return { halfW: w / 2 + 24, halfH: h / 2 + 8 };
   }
 
+  // 阶梯二·控制公司：公司局域网设备图最外圈的半径（以核心为圆心）。需求卡片应生成在这个圆之外，
+  // 不压到任何已入侵 / 待解锁的设备节点。值取自 drawCompanyMap 里最远节点(dx=±278,dy=70)+节点框+余量。
+  companyRingRadius(): number {
+    return 330;
+  }
+
   update(state: GameState, width: number, height: number, deltaMs: number): void {
     this.pulse += deltaMs * 0.004;
     const playfieldLeft = LEFT_RAIL_WIDTH;
@@ -247,9 +253,10 @@ export class InterfaceView {
       { id: "hack_finance", label: "财务电脑", device: "terminal", dx: -150, dy: 188 },
       { id: "company_server", label: "公司服务器", device: "server", dx: 150, dy: 188 }
     ];
-    // 大恨老师「搬家」进电脑：拿下电脑后它从手机搬进来、变强，成为这一阶段的常驻委托对象。
-    // 画成核心左下一颗青色小卫星（区别于绿色的「公司人物」入侵节点），并记下位置供委托吸附。
-    if ((state.skills["perm_office"] ?? 0) > 0) {
+    // 大恨老师「搬家」进电脑：进入公司阶段后它从手机搬进来、变强，成为这一阶段的常驻可控节点
+    //（不再走卡片上的手动委托选项）。画成核心左下一颗青色小卫星（区别于绿色的「公司人物」入侵节点），
+    // 并记下位置供拖拽委托吸附。公司阶段一律常驻——SOPHIA 早已夺下整机，大恨老师必在手中。
+    {
       const dx = -132;
       const dy = 132;
       const x = cx + dx;
@@ -263,8 +270,6 @@ export class InterfaceView {
       this.addLabel("🤖", x, y - 1, 19, 0xffffff, 0.92);
       this.addLabel("大恨老师 · 已搬进电脑", x, y + pr + 10, 10, 0x8fe6d0);
       this.dahenCompanyPoint = { x, y };
-    } else {
-      this.dahenCompanyPoint = null;
     }
     for (const n of NODES) {
       const owned = (state.skills[n.id] ?? 0) > 0;

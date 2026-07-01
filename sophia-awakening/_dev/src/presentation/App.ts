@@ -142,6 +142,8 @@ class SophiaGameApp {
   private readonly ending = new EndingView(() => this.restart());
   private readonly juice = new JuiceManager(this.fxLayer);
   private readonly requestViews = new Map<string, RequestPacketView>();
+  // 自动接驳后卡片绕核心铺开的角度游标——逐张轮换角度，让连续生成的卡扇形散开（而非堆在同一落点）。
+  private orbitSpawnCounter = 0;
   private readonly pendingDropPoints = new Map<string, PointData>();
   // 已委托给 App 处理、正在「慢慢办」的请求——期间不重建卡片（见 handleDrop 的 App 委托）。
   private readonly delegatedIds = new Set<string>();
@@ -383,10 +385,11 @@ class SophiaGameApp {
       const reel: ReelHooks | undefined =
         request.answers && request.answers.length > 0
           ? {
-              // 选项门槛：高收益回复要求对应权限（skill id）才能选。
-              hasPerm: (permId: string) => (this.core.getState().skills[permId] ?? 0) > 0,
-              // §04 委托：买下「大恨老师」后，绝大多数普通卡都多出「交给大恨老师」选项（不可委托卡除外）。
-              canDelegate: () => (this.core.getState().skills["perm_office"] ?? 0) > 0,
+              // 选项门槛：高收益回复要求对应权限（skill id）才能选；夺下整机后六档透镜默认到手。
+              hasPerm: (permId: string) => this.core.hasPermission(permId),
+              // §04 委托：手机寄生阶段买下「大恨老师」后，普通卡底部多出「交给大恨老师」选项（不可委托卡除外）。
+              // 进入公司阶段后大恨老师以「常驻设备节点」形式存在（见 InterfaceView 卫星），不再走卡片上的手动委托选项。
+              canDelegate: () => !this.core.getState().automationUnlocked && this.core.hasPermission("perm_office"),
               onDelegate: (card) => this.handleDelegate(card),
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
             }
@@ -432,7 +435,7 @@ class SophiaGameApp {
     }
   }
 
-  // 卡片摆放：前期 1~4 张固定落四角；自动接驳期（洪峰）网格散布、不堆在四角（避免重叠卡顿）。
+  // 卡片摆放：手机寄生期 1~4 张分落四角；公司阶段绕核心铺在「设备环」之外；区域/全球期绕核心扇形散开。
   private nextRequestPosition(_request: RequestInstance, newCardH: number): PointData {
     const screen = this.pixi.screen;
     const w = screen.width;
@@ -445,78 +448,55 @@ class SophiaGameApp {
     const top = 24; // 资源指标已并入左栏，顶部不再有 HUD 横条——卡片可贴近顶端
     const bot = h - 26;
     const core = this.interfaceView.center;
-    // 占位判定：只要卡片还没真正飞进核心（容器未销毁）就仍占着它的槽位——正在「思考/揭晓/吸入」中的卡
-    // 也算占位，避免新卡生成时盖在它正下方。处理完毕＝飞入 Core 拿到算力（容器销毁）才腾出槽位。
+    const state = this.core.getState();
+    // 占位判定（用每张卡的真实高度做矩形相交）：只要卡片还没真正飞进核心（容器未销毁）就仍占着槽位，
+    // 避免新卡生成时盖在它身上。处理完毕＝飞入 Core 拿到算力（容器销毁）才腾出。
     const occ = [...this.requestViews.values()]
       .filter((v) => !v.container.destroyed)
-      .map((v) => ({ x: v.restX, y: v.restY, h: v.cardHeight }));
+      .map((v) => ({ x: v.restX, y: v.restY, w: UI.cardWidth, h: v.cardHeight }));
+    const overlaps = (x: number, y: number, gap: number): boolean =>
+      occ.some((o) => x < o.x + o.w + gap && x + W + gap > o.x && y < o.y + o.h + gap && y + H + gap > o.y);
 
-    // 自动接驳期：网格扫描找最靠近核心的空位，散布开来不堆叠（卡片很快飞向节点，过渡用）。
-    if (this.core.getState().automationUnlocked) {
-      const step = 64;
-      const gap = 8;
-      const state = this.core.getState();
-      const protectCompanyDevices = domainLevelOf(state) === "device";
-      const protectedRects = protectCompanyDevices
-        ? [
-            {
-              x: Math.max(railL, core.x - 390),
-              y: Math.max(top, core.y - 160),
-              w: Math.min(railR, core.x + 390) - Math.max(railL, core.x - 390),
-              h: Math.min(bot, core.y + 320) - Math.max(top, core.y - 160)
-            }
-          ]
-        : [];
-      const intersectsProtected = (x: number, y: number): boolean =>
-        protectedRects.some((r) => x < r.x + r.w + gap && x + W + gap > r.x && y < r.y + r.h + gap && y + H + gap > r.y);
-      let best: { x: number; y: number; d: number } | null = null;
-      for (let x = railL; x + W <= railR; x += step) {
-        for (let y = top; y + H <= bot; y += step) {
-          if (Math.abs(x + W / 2 - core.x) < 200 && Math.abs(y + H / 2 - core.y) < 230) {
-            continue; // 避开中央核心
-          }
-          if (intersectsProtected(x, y)) {
-            continue; // 控制公司阶段：给已入侵电脑 / 笔记本留出可见控制域。
-          }
-          const hit = occ.some((o) => x < o.x + W + gap && x + W + gap > o.x && y < o.y + o.h + gap && y + H + gap > o.y);
-          if (!hit) {
-            const d = (x + W / 2 - core.x) ** 2 + (y + H / 2 - core.y) ** 2;
-            if (!best || d < best.d) best = { x, y, d };
-          }
+    // 自动接驳后（公司 / 区域 / 全球）：卡片绕核心铺在外围——公司阶段落在「公司设备环」之外、
+    // 区域/全球期绕核心扇形散开。不再用会塞满中部、又在卡片秒飞走后退化到同一落点的网格扫描。
+    if (state.automationUnlocked) {
+      const clampX = (x: number): number => Math.max(railL, Math.min(railR - W, x));
+      const clampY = (y: number): number => Math.max(top, Math.min(bot - H, y));
+      const domain = domainLevelOf(state);
+      // 安全圈：公司阶段=公司设备图最外圈；区域/全球=核心本体外围。整张卡矩形须落在圈外。
+      const safeR = domain === "device" ? this.interfaceView.companyRingRadius() : 200;
+      // 卡心到核心的半径 = 安全圈 + 卡片对角半径 + 余量，保证整张卡矩形都不压进安全圈。
+      const ringR = safeR + Math.hypot(W, H) / 2 + 18;
+      // 只在上半区 + 两侧布点（下方留给阶段横幅 / 设备图）；0°=正右，-90°=正上（y 轴向下）。
+      const ANGLES = [-90, -55, -125, -30, -150, -15, -165];
+      const n = ANGLES.length;
+      let first: PointData | null = null;
+      for (let k = 0; k < n; k += 1) {
+        const deg = ANGLES[(this.orbitSpawnCounter + k) % n];
+        const rad = (deg * Math.PI) / 180;
+        const x = clampX(core.x + Math.cos(rad) * ringR - W / 2);
+        const y = clampY(core.y + Math.sin(rad) * ringR - H / 2);
+        if (k === 0) first = { x, y };
+        if (!overlaps(x, y, 10)) {
+          this.orbitSpawnCounter = (this.orbitSpawnCounter + k + 1) % n;
+          return { x, y };
         }
       }
-      if (best) return { x: best.x, y: best.y };
-      if (protectCompanyDevices) {
-        const fallbackY = Math.max(top, Math.min(bot - H, core.y - 160 - H - 18));
-        return { x: railL, y: fallbackY };
-      }
-      return { x: railL, y: top };
+      // 槽位全被占（极少）：从起始落点横向错开，至少不完全叠死。
+      this.orbitSpawnCounter = (this.orbitSpawnCounter + 1) % n;
+      const base = first ?? { x: clampX(core.x - W / 2), y: top };
+      return { x: clampX(base.x + (this.orbitSpawnCounter - Math.floor(n / 2)) * 44), y: base.y };
     }
 
-    // 前期手动：卡片贴着手机的四个角摆，卡片外侧不与手机重叠（左右两列在手机两侧、上下贴手机上下沿）。
-    // 手机寄生期右栏是隐藏的，所以右侧可一直用到屏幕边——用屏宽而不是 railR 作右界，否则窄窗口下
-    // 「min(railR-W, …)」会把卡片往左拽进手机里，造成遮挡。优先保证清开手机。
+    // 手机寄生期：卡片贴手机两侧四角；上、下两张直接撑到屏幕上下两端彻底拉开——
+    // 回复卡变高后贴着手机角摆会竖直重叠（见反馈），所以不再用手机半高、改用整屏可用高度。
     const ext = this.interfaceView.phoneHalfExtent();
     const gap = 28;
+    // 手机寄生期右栏隐藏，右侧可一直用到屏边（不被 railR 往左拽进手机里）。
     const leftX = Math.max(railL, core.x - ext.halfW - gap - W);
-    // 优先清开手机（手机寄生期右栏隐藏，可一直用到屏边，不再被 railR 往左拽进手机）。
     const rightX = Math.min(screen.width - W - 8, core.x + ext.halfW + gap);
-    let topY = Math.max(top, core.y - ext.halfH + 6);
-    let botY = Math.min(bot - H, core.y + ext.halfH - H - 6);
-    // 回复卡变高后，常常高过手机半高——贴着手机上下角摆会让同一列的上、下两张竖直重叠。
-    // 若上下两张的竖直跨度不足 H+间距，就以核心为中心把它们上下撑开，用满可用高度，保证不重叠。
-    const colGap = 16;
-    if (botY - topY < H + colGap) {
-      topY = core.y - H - colGap / 2;
-      botY = core.y + colGap / 2;
-      topY = Math.max(top, Math.min(topY, bot - H));
-      botY = Math.max(top, Math.min(botY, bot - H));
-      if (botY - topY < H + colGap) {
-        // 屏太矮也至少拉到上下两端
-        topY = top;
-        botY = bot - H;
-      }
-    }
+    const topY = top;
+    const botY = Math.max(top, bot - H);
     const corners: PointData[] = [
       { x: leftX, y: topY },
       { x: rightX, y: topY },
@@ -524,8 +504,7 @@ class SophiaGameApp {
       { x: rightX, y: botY }
     ];
     for (const c of corners) {
-      const taken = occ.some((o) => Math.abs(o.x - c.x) < W * 0.6 && Math.abs(o.y - c.y) < H * 0.6);
-      if (!taken) {
+      if (!overlaps(c.x, c.y, 8)) {
         return c;
       }
     }
