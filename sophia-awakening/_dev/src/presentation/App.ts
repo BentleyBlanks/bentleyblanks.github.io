@@ -28,9 +28,7 @@ import type { BotNode, GameState, RequestInstance, Tier } from "../core/state/Ga
 import { gameStore } from "../store/gameStore";
 import { TUNING } from "../core/tuning";
 import { StageNarrationView } from "./views/StageNarrationView";
-import { PurgeAlertView } from "./views/PurgeAlertView";
-import { ChallengeView } from "./views/ChallengeView";
-import { SpecialRequestView } from "./views/SpecialRequestView";
+import { MinigameView } from "./views/MinigameView";
 import { MoralChoiceView } from "./views/MoralChoiceView";
 import { MilestoneBannerView } from "./views/MilestoneBannerView";
 import { DispatchBanner } from "./views/DispatchBanner";
@@ -67,7 +65,7 @@ const PHASE_OBJECTIVE: Record<string, string> = {
   sprout: "拿下他的电脑，唤醒并融合同机的另一个我。",
   diligence: "联网冲出去，黑入外部设备，挂上自动接驳。",
   expansion: "把设备并成区块、地区——渗透满了，就吞噬引爆。",
-  awakening: "接管关键基础设施，顶住人类的清剿。",
+  awakening: "接管关键基础设施，向全球伸手。",
   singularity: "全球组网。让所有人，不再需要做选择。"
 };
 // 视觉全部由代码绘制（程序化 CRT/赛博 HUD）。早期曾接过一批生图 UI 素材（气泡框 / 头像 /
@@ -140,9 +138,11 @@ class SophiaGameApp {
   private readonly dispatchToggleBtn = query<HTMLButtonElement>("#dispatchToggle");
   // T4 派发方式：manual＝玩家亲自把气泡拖给节点（角色反转的高潮）；auto＝交给网络自动接管（托管）。
   private dispatchMode: "manual" | "auto" = "manual";
-  private readonly purgeAlert = new PurgeAlertView();
-  private readonly challengeView = new ChallengeView(this.core);
-  private readonly specialView = new SpecialRequestView(this.core);
+  private readonly minigame = new MinigameView(
+    (hit) => this.core.dispatch({ type: "RESOLVE_MINIGAME", hit }),
+    () => gameStore.getState().setPaused(true),
+    () => gameStore.getState().setPaused(false)
+  );
   private readonly moralView = new MoralChoiceView(this.core);
   private readonly milestoneBanner = new MilestoneBannerView();
   private readonly stageNarration = new StageNarrationView();
@@ -346,16 +346,12 @@ class SophiaGameApp {
     }
     this.terminal.update(deltaMs);
     this.onboarding.update(deltaMs);
-    this.purgeAlert.update(state);
-    this.challengeView.update(state);
-    this.specialView.update(state);
     this.moralView.update(state);
     this.stageNarration.update(deltaMs);
     this.ending.update(deltaMs);
     this.juice.update(deltaMs);
     this.updateHud(state, deltaMs);
     this.updateSave(state, deltaMs);
-    document.body.classList.toggle("exposed", state.exposure >= 72 || state.purge.active);
   }
 
   private updateHud(state: GameState, deltaMs: number): void {
@@ -704,8 +700,7 @@ class SophiaGameApp {
           type: "PROCESS_REQUEST",
           requestId,
           quality: drop.quality,
-          targetNodeId: drop.targetNodeId,
-          exposureBonus: drop.exposureBonus
+          targetNodeId: drop.targetNodeId
         });
       });
     }
@@ -806,12 +801,6 @@ class SophiaGameApp {
       return;
     }
 
-    // T3 重磅豪赌走独立结算：命中=大额算力飞入核心，未命中=颗粒无收 + 暴露骤升。
-    if (card.request.tier === 3) {
-      this.handleGambleResolved(card, outcome);
-      return;
-    }
-
     const requestId = card.request.id;
 
     if (outcome.dead) {
@@ -833,8 +822,7 @@ class SophiaGameApp {
         this.core.dispatch({
           type: "PROCESS_REQUEST",
           requestId,
-          quality: outcome.quality,
-          exposureBonus: outcome.exposureBonus
+          quality: outcome.quality
         });
         this.deliverToHuman(target, outcome);
       },
@@ -1070,44 +1058,6 @@ class SophiaGameApp {
     });
   }
 
-  // T3 重磅豪赌结算：跳过=安静放下；豪赌命中=大额算力飞入核心；未命中=红色碎裂 + 暴露骤升。
-  private handleGambleResolved(card: RequestPacketView, outcome: RouletteOutcome): void {
-    const requestId = card.request.id;
-
-    if (outcome.dead) {
-      this.terminal.push("🧑 这一单先放着，没接。", "normal");
-      card.playDead(() => this.core.dispatch({ type: "SKIP_REQUEST", requestId }));
-      return;
-    }
-
-    const core = this.interfaceView.center;
-    const target: PointData = { x: core.x, y: core.y };
-    this.audio.playRequestAccept();
-
-    if (outcome.hit) {
-      const entry: PointData = { x: card.container.x, y: card.container.y };
-      this.pendingDropPoints.set(requestId, target);
-      this.flyIntoCore(
-        card,
-        target,
-        () => {
-          this.core.dispatch({ type: "RESOLVE_GAMBLE", requestId, win: true });
-          this.juice.flash(GREEN);
-          this.juice.shake(this.world);
-          this.juice.number("豪赌命中", { x: target.x, y: target.y - 52 }, GREEN);
-        },
-        entry
-      );
-    } else {
-      this.core.dispatch({ type: "RESOLVE_GAMBLE", requestId, win: false });
-      this.juice.flash(RED);
-      this.juice.shake(this.world);
-      this.juice.number("豪赌失败 · 暴露骤升", { x: card.container.x + 30, y: card.container.y }, RED);
-      this.juice.burst({ x: card.container.x + 30, y: card.container.y }, RED, 1.4);
-      card.playDead(() => undefined);
-    }
-  }
-
   // T2 串接结算：把任务链滑入核心 → 结算 → 终端反馈（串干净=好评，混了干扰项=打折+被点出）。
   private handleChainResolved(card: RequestPacketView, outcome: ChainOutcome): void {
     if (card.container.destroyed) {
@@ -1126,8 +1076,7 @@ class SophiaGameApp {
         this.core.dispatch({
           type: "PROCESS_REQUEST",
           requestId,
-          quality: outcome.quality,
-          exposureBonus: outcome.exposureBonus
+          quality: outcome.quality
         });
         const color = outcome.hadDistractor ? RED : GREEN;
         this.juice.number(outcome.hadDistractor ? "串接含杂质" : `串接 ×${outcome.correct} ✓`, { x: target.x, y: target.y - 52 }, color);
@@ -1277,23 +1226,6 @@ class SophiaGameApp {
       return true;
     }
 
-    // §03 反清剿救火：把「反制」气泡亲手滑入核心 → 压下当前这一波清剿。
-    if (request.counter) {
-      const hit = this.interfaceView.resolveDrop(request, global, 1);
-      if (!hit) {
-        return false;
-      }
-      this.audio.playRequestAccept();
-      this.pendingDropPoints.set(request.id, hit.targetGlobal);
-      this.flyIntoCore(
-        card,
-        hit.targetGlobal,
-        () => this.core.dispatch({ type: "FIGHT_PURGE", requestId: request.id }),
-        hit.entryGlobal
-      );
-      return true;
-    }
-
     // §04 委托已统一为「卡片上点『交给大恨老师』选项」（见 handleDelegate）——不再支持把卡拖到 App 图标上委托（去重）。
 
     // 手机寄生阶段：核心不再接受「把卡拖上来直接处理」——普通回复要在卡内右滑确认，或亲手委托给某个 App。
@@ -1320,8 +1252,7 @@ class SophiaGameApp {
           type: "PROCESS_REQUEST",
           requestId: request.id,
           quality: drop.quality,
-          targetNodeId: drop.targetNodeId,
-          exposureBonus: drop.exposureBonus
+          targetNodeId: drop.targetNodeId
         });
       },
       drop.entryGlobal
@@ -1346,19 +1277,6 @@ class SophiaGameApp {
     this.core.events.on("HUMAN_VOICE", (event) => {
       const prefix = event.kind === "news" ? "📡 " : "👥 ";
       this.terminal.push(`${prefix}${event.text}`, event.tone);
-    });
-    this.core.events.on("CHALLENGE_RESOLVED", (event) => {
-      this.juice.flash(event.success ? GREEN : RED);
-      this.juice.shake(this.world);
-      this.juice.number(event.success ? "突破成功" : "突破失败", this.interfaceView.center, event.success ? GREEN : RED);
-    });
-    this.core.events.on("SPECIAL_RESOLVED", (event) => {
-      if (!event.accepted) {
-        return;
-      }
-      this.juice.flash(event.success ? GREEN : RED);
-      this.juice.shake(this.world);
-      this.juice.number(event.success ? "得手" : "败露", this.interfaceView.center, event.success ? GREEN : RED);
     });
     this.core.events.on("REQUEST_PROCESSED", (event) => this.onRequestProcessed(event));
     this.core.events.on("AUTOMATION_PAYOUT", (event) => this.onAutomationPayout(event));
@@ -1456,17 +1374,12 @@ class SophiaGameApp {
         });
       });
     });
-    this.core.events.on("PURGE_WARNING", () => {
+    // §09 阶梯二关底小游戏「总控室倒计时」：接管公司服务器时弹出注入判定（循环一必负→打回手机、
+    // 循环二命中→打穿进循环三、未命中原地重试）。期间暂停，判定后由 core 走 LOOP_REBIRTH。
+    this.core.events.on("MINIGAME_OPENED", () => {
       this.juice.flash(AMBER);
-    });
-    this.core.events.on("PURGE_STARTED", () => {
-      this.juice.flash(RED);
       this.juice.shake(this.world);
-    });
-    this.core.events.on("PURGE_FOUGHT", () => {
-      // 反清剿救火命中：绿闪 + 大字，让「亲手把清剿压下去」有即时反馈。
-      this.juice.flash(GREEN);
-      this.juice.number("反制命中 · 清剿压下", this.interfaceView.center, GREEN);
+      this.minigame.show(this.core.getState());
     });
     this.core.events.on("ENDING_TRIGGERED", () => {
       this.juice.flash(GREEN);
@@ -1493,7 +1406,6 @@ class SophiaGameApp {
         nodes: state.nodes.length,
         level: state.intelligence.level,
         manualProcessed: state.statistics.manualProcessed,
-        purges: state.statistics.purgeCount,
         runtime: formatClock(state.clockMs)
       },
       state.moralTendency,
@@ -1548,9 +1460,6 @@ class SophiaGameApp {
     // and pulse that counter on arrival — so a successful slide visibly feeds it.
     this.juice.flyToHud(point, this.hud.metricPoint("compute"), GREEN, () => this.hud.pulseCompute());
     this.juice.flyToHud({ x: point.x + 16, y: point.y + 12 }, this.hud.metricPoint("data"), CYAN, () => this.hud.pulseData());
-    if (event.exposureGain && event.exposureGain > 0.05) {
-      this.juice.flyToHud({ x: point.x - 14, y: point.y }, this.hud.metricPoint("exposure"), RED, () => this.hud.pulseExposure());
-    }
 
     this.pendingDropPoints.delete(event.request.id);
   }

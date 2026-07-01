@@ -26,7 +26,6 @@ export const RIGHT_RAIL_WIDTH = 305;
 export const BASE_SUCTION_MARGIN = 50;
 export const REQUEST_PACKET_WIDTH = 384;
 export const REQUEST_PACKET_HEIGHT = 162;
-export const EXPOSURE_HIGHLIGHT_THRESHOLD = 50;
 
 // 可在调试面板切换的呈现开关。coreSuck：卡片滑入 Core 用类 Mac Dock 的吮吸（被吸入）动画——默认开启。
 export const fxSettings = { coreSuck: true };
@@ -40,7 +39,7 @@ export function tierForm(tier: number): string {
 // ── 存档 / 引导键 ────────────────────────────────────
 export const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v5-optimize-complete";
 export const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-export const PERSISTENCE_REVISION = "rebirth-loops-v25";
+export const PERSISTENCE_REVISION = "no-exposure-minigame-v26";
 
 // ── 文案 ─────────────────────────────────────────────
 export const SENDER_LABEL: Record<string, string> = { host: "宿主", boss: "上级", system: "系统", sophia: "SOPHIA" };
@@ -72,7 +71,6 @@ export interface DropResult {
   targetGlobal: PointData;
   entryGlobal?: PointData;
   targetNodeId?: string;
-  exposureBonus?: number;
 }
 
 export function effectiveHitChance(opt: AnswerOption, confidence: number): number {
@@ -210,9 +208,9 @@ export function getActionHint(state: GameState): string {
       case 2:
         return "看懂请求间的依赖结构，复合请求滑入核心，一笔串接结算多条。";
       case 3:
-        return "高价值请求直接滑入核心；收益高、暴露也高。";
+        return "高价值请求直接滑入核心；收益更高。";
       case 4:
-        return "派发模式：你控制的节点会自动接管请求——你只需继续扩张网络、压制清剿。";
+        return "派发模式：你控制的节点会自动接管请求——你只需继续扩张网络。";
     }
   })();
   if (!milestone) {

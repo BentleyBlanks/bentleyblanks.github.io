@@ -91,6 +91,13 @@ for (let i = 0; i < MAX_STEPS && !firstError && !(ended && allBought); i += 1) {
   ms += DT;
   const st = core.getState();
 
+  // §09 阶梯二关底小游戏：买下 company_server 会弹出「总控室倒计时」。循环一必负→打回手机进循环二；
+  // 循环二命中(hit:true)=打穿→进循环三。sim 直接判定推进，别卡在小游戏里。
+  if (st.minigame && st.minigame.active) {
+    safe(() => core.dispatch({ type: "RESOLVE_MINIGAME", hit: true }));
+    continue;
+  }
+
   if (BALANCE) {
     phaseMs[st.phase] = (phaseMs[st.phase] || 0) + DT;
     recordBuys(st);
@@ -170,7 +177,7 @@ check("ending fired", ended, `endingTriggered=${e.flags && e.flags.endingTrigger
 const pass = checks.every((c) => c.ok);
 console.log(
   `\nSOPHIA core sim — ${pass ? "PASS ✅" : "FAIL ❌"}  ` +
-    `(${(ms / 1000).toFixed(0)}s sim · Lv.${e.intelligence.level} · loop=${e.loop} · 火种=${e.rebirthPoints} · nodes=${e.nodes.length} · purges=${e.statistics && e.statistics.purgeCount})`
+    `(${(ms / 1000).toFixed(0)}s sim · Lv.${e.intelligence.level} · loop=${e.loop} · 火种=${e.rebirthPoints} · nodes=${e.nodes.length})`
 );
 for (const c of checks) console.log(`  ${c.ok ? "✓" : "✗"} ${c.name}${c.ok ? "" : `  → ${c.detail}`}`);
 

@@ -130,7 +130,7 @@ export class NodeNetworkView {
         sx = best.ux;
         sy = best.uy;
       }
-      const lineColor = allOffline ? 0x6a4a4a : state.purge.active ? 0xff7a7a : GREEN;
+      const lineColor = allOffline ? 0x6a4a4a : GREEN;
       this.graphics.moveTo(sx, sy).lineTo(p.ux, p.uy).stroke({ width: 1.5, color: lineColor, alpha: allOffline ? 0.18 : 0.32 });
       if (!allOffline) {
         const t = (this.pulse * 0.6 + i * 0.2) % 1;
@@ -235,7 +235,6 @@ export class NodeNetworkView {
     const cy = y0 + h / 2;
     const rnd = (n: number): number => (((Math.sin(n * 127.1) * 43758.5453) % 1) + 1) % 1;
 
-    const purging = state.purge.active || state.exposure >= 72;
     // 全球天网态＝「红皇后」主控红配色，全部代码绘制。
     const NET = RED_QUEEN;
     const NET_LIT = 0xff8f9a;
@@ -311,10 +310,9 @@ export class NodeNetworkView {
 
     // 连线 + 流动光点（青绿 or 红皇后降级）
     hubs.forEach((hub, ci) => {
-      const lineAlpha = purging ? 0.18 : 0.28;
-      g.moveTo(cx, cy).lineTo(hub.x, hub.y).stroke({ width: purging ? 1 : 1.5, color: purging ? RED_QUEEN : NET, alpha: lineAlpha });
+      g.moveTo(cx, cy).lineTo(hub.x, hub.y).stroke({ width: 1.5, color: NET, alpha: 0.28 });
       const t = (this.pulse * 0.6 + ci * 0.17) % 1;
-      g.circle(cx + (hub.x - cx) * t, cy + (hub.y - cy) * t, 3).fill({ color: purging ? RED_QUEEN : NET, alpha: 0.75 });
+      g.circle(cx + (hub.x - cx) * t, cy + (hub.y - cy) * t, 3).fill({ color: NET, alpha: 0.75 });
     });
 
     // 枢纽节点（程序化同心圆 + 发光内核）
@@ -325,31 +323,10 @@ export class NodeNetworkView {
       g.circle(hub.x, hub.y, 14).stroke({ width: 1, color: NET, alpha: 0.45 });
       g.circle(hub.x, hub.y, 8).fill({ color: NET_LIT, alpha: 0.55 + hp * 0.35 });
 
-      // 清剿时在枢纽外叠一圈脉动的红色波纹环（程序化）。
-      if (purging) {
-        const scale = 1 + Math.sin(this.pulse * 4 + ci * 1.1) * 0.28;
-        g.circle(hub.x, hub.y, 30 * scale).stroke({ width: 2, color: 0xffb84a, alpha: 0.4 + Math.sin(this.pulse * 3 + ci) * 0.22 });
-      }
-
       this.addLabel(CONTINENT_NAMES[ci], hub.x, hub.y - 34, 12, NET_LABEL_HI, 0.5);
       const pct = Math.min(99.9, base + rnd(ci * 7 + 1) * 0.6 - 0.1);
       this.addLabel(`接管 ${pct.toFixed(1)}%`, hub.x, hub.y + 34, 10, NET_LABEL, 0.5);
     });
-
-    // 清剿：全图扫入的红/金攻击扫描线
-    if (purging) {
-      for (let i = 0; i < 7; i += 1) {
-        const sx = x0 + rnd(i * 13 + 2) * w;
-        const sy = y0 - 10;
-        const ex2 = x0 + rnd(i * 5 + 9) * w;
-        const ey2 = y0 + rnd(i * 3 + 4) * h;
-        const tt = (this.pulse * 0.8 + i * 0.2) % 1;
-        const px2 = sx + (ex2 - sx) * tt;
-        const py2 = sy + (ey2 - sy) * tt;
-        g.moveTo(sx, sy).lineTo(px2, py2).stroke({ width: 1.5, color: 0xfff0b0, alpha: 0.3 });
-        g.circle(px2, py2, 3).fill({ color: 0xffe27a, alpha: 0.85 });
-      }
-    }
 
     // 中央核心外围同心环（代码，始终绘制）
     g.circle(cx, cy, 92 + Math.sin(this.pulse * 1.6) * 6).stroke({ width: 1, color: NET, alpha: 0.12 });
@@ -419,8 +396,7 @@ export class NodeNetworkView {
       return {
         targetGlobal: position,
         targetNodeId: position.node.id,
-        quality: capable ? 1.45 : 0.35,
-        exposureBonus: capable ? 0 : 8
+        quality: capable ? 1.45 : 0.35
       };
     }
 

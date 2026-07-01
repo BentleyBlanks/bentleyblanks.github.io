@@ -2,9 +2,9 @@ import { getLevelConfig } from "../content/intelligence";
 import { computeDerivedSkills } from "../content/skills";
 import type { GameState } from "./GameState";
 
-// v9：§03 后期重磅决策 / 反清剿气泡（请求新增 counter / reliefExposure 字段）——旧档自动重置。
-// v12：§09 三循环重生（loop / rebirthPoints / rebirthTree / purge.finalLoop）——旧档自动重置。
-export const SAVE_VERSION = 12;
+// v12：§09 三循环重生（loop / rebirthPoints / rebirthTree）——旧档自动重置。
+// v13：移除暴露/怀疑/清剿/挑战/特殊请求整套系统，接管公司服务器改为关底小游戏（minigame）——旧档自动重置。
+export const SAVE_VERSION = 13;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
@@ -22,8 +22,6 @@ export function createInitialState(now = Date.now()): GameState {
       data: "0",
       totalCompute: "0"
     },
-    exposure: 0,
-    exposureActive: false,
     devour: {
       tierIndex: 0,
       infiltration: 0,
@@ -32,14 +30,6 @@ export function createInitialState(now = Date.now()): GameState {
       bubbleActive: false,
       regionName: ""
     },
-    suspicion: {
-      active: false,
-      lightShown: false,
-      revokedPermId: null,
-      reviewUntilMs: 0,
-      crisis: false
-    },
-    lastProcessAtMs: -10_000,
     intelligence: {
       level: 1,
       xp: "0",
@@ -55,25 +45,12 @@ export function createInitialState(now = Date.now()): GameState {
     nodes: [],
     discoveredNodeIds: [],
     phase: "seed",
-    purge: {
-      warning: false,
-      active: false,
-      remainingMs: 0,
-      lastStartedAtMs: -60_000,
-      finalLoop: false
-    },
-    decoyReadyAtMs: 0,
-    defense: {
-      active: false,
-      allocation: 0
-    },
-    challenge: null,
-    specialRequest: null,
     moralChoice: null,
     moralSeen: [],
     moralTendency: 0,
     facedSeen: [],
     loop: 1,
+    minigame: null,
     rebirthPoints: 0,
     rebirthTree: {},
     rebirthCardsSeen: [],
@@ -82,9 +59,7 @@ export function createInitialState(now = Date.now()): GameState {
     statistics: {
       totalProcessed: 0,
       manualProcessed: 0,
-      nodesCaptured: 0,
-      traceCleanups: 0,
-      purgeCount: 0
+      nodesCaptured: 0
     },
     flags: {
       introPlayed: false,

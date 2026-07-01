@@ -25,9 +25,8 @@ export interface IntelligenceState {
 
 // 回复轮盘上的一个候选回复：
 // - high  绿色高置信，命中概率随智力等级抬升（养成），命中收益中等
-// - risk  红色高风险，命中概率固定且低（驴唇不对马嘴 / 陷阱），命中收益高（暴击感）；
-//         T1 起的「陷阱项」失手会附带暴露
-// - dead  ⬜「连接失败」装死保底，0% 命中、零收益零风险，永远可选
+// - risk  红色大胆回答，收益高、选错场合翻车（读懂上下文才敢选）
+// - dead  ⬜「连接失败」装死保底，零收益零风险，永远可选
 export type RouletteKind = "high" | "risk" | "dead" | "delegate";
 
 export interface AnswerOption {
@@ -37,8 +36,6 @@ export interface AnswerOption {
   payoff: number; // 命中时的 quality 倍率（risk 更高）
   reply: string; // 命中后人类的回话（显示在终端）
   tone: "success" | "warning" | "normal"; // 终端里这条回话的颜色
-  exposureOnMiss?: number; // 越权类回复附带的暴露（若有）
-  reliefExposure?: number; // §03 洗白型重磅决策：命中后暴露下降（抹除讨论 / 压制舆情）
   distractor?: boolean; // 噪音/干扰选项：读不懂上下文容易误选的低收益项
   requires?: string; // §06 选项门槛：需要此权限（skill id）才能选；缺则灰锁不可选
 }
@@ -47,11 +44,6 @@ export interface AnswerOption {
 export interface ChainStep {
   text: string;
   distractor: boolean;
-}
-
-// §03 反清剿救火：清剿来袭时浮起的「反制」气泡载荷。滑入核心 → 压下这一波清剿。
-export interface CounterPayload {
-  relief: number; // 滑入核心后压低的暴露量
 }
 
 // §04 吞噬引爆：巨型「吞噬[某区]」气泡携带的载荷。玩家把它滑入核心 → 引爆。
@@ -63,7 +55,7 @@ export interface DevourPayload {
   zoom: string; // 镜头拉远描述
 }
 
-// §04 吞噬引爆的运行态。与 exposure 无关——它是后期产出的指数引擎。
+// §04 吞噬引爆的运行态——后期产出的指数引擎（不依赖任何风险/暴露系统）。
 export interface DevourState {
   tierIndex: number; // 当前吞噬层级（每次引爆 +1，封顶停在「大洲」）
   infiltration: number; // 当前区域渗透条 0..1（被动产能蓄力）
@@ -92,12 +84,9 @@ export interface RequestInstance {
   tutorial?: { allowed: number[]; highlight?: number; line?: string };
   // §04：带此载荷的是巨型「吞噬」气泡——滑入核心触发吞噬引爆，而非普通处理。
   devour?: DevourPayload;
-  // §03：带此载荷的是「反制清剿」气泡——滑入核心压下当前这一波清剿。
-  counter?: CounterPayload;
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
-  exposure: number;
   compound: number;
   createdAtMs: number;
   highValue: boolean;
@@ -112,7 +101,6 @@ export interface NodeDefinition {
   baseCost: BigString;
   baseProduction: BigString;
   stealth: number;
-  exposureOnCapture: number;
   description: string;
   color: number;
 }
@@ -131,63 +119,14 @@ export interface BotNode {
   offlineUntilMs: number;
 }
 
-export interface PurgeState {
-  warning: boolean;
+// §09 阶梯二关底小游戏「总控室倒计时」：接管公司服务器（company_server 里程碑）时触发的一次性判定。
+// 循环一 windowFrac=0（必负 → 打回手机·进循环二）；循环二 windowFrac 较宽（大概率命中 → 打穿开启循环三），
+// 未命中原地重试、不清进度。循环三不触发（她已真赢过一次总控室）。null = 当前无小游戏。
+export interface MinigameState {
   active: boolean;
-  remainingMs: number;
-  lastStartedAtMs: number;
-  // §09 循环终局总清剿：本波清剿是剧本级、不可规避的三大清剿之一——结束时无论暴露高低都触发重生
-  // （区别于日常「软清剿」：软清剿只停产、可规避、暴露压不下去才算失败）。
-  finalLoop?: boolean;
-}
-
-// 反围剿：开启后，按暴露高低动态把一部分节点产能转去压制暴露 / 顶清剿。
-// allocation = 当前被转走的产能比例（0-0.5），随暴露升高而升高（产出代价也越大）。
-export interface DefenseState {
-  active: boolean;
-  allocation: number;
-}
-
-// 前期张力 · 怀疑度（手机寄生期专属，策划案 §05）。与后期暴露度是同一条数值（state.exposure），
-// 只是前期表现为「宿主 / 手机对 SOPHIA 的怀疑」——轻量、后果可恢复、绝不删档。首次买下权限即登场，
-// 进入扩张期（exposureActive）后无缝升格为暴露度，本系统停摆。
-export interface SuspicionState {
-  active: boolean; // 已登场（首次买权限后）
-  lightShown: boolean; // 轻度挑刺旁白已放过（一次性）
-  revokedPermId: string | null; // 中度：被临时收回的权限（accuracyBaseline 下降）
-  reviewUntilMs: number; // 该权限自动恢复的时刻（装乖处理可提前）；0 = 无复查
-  crisis: boolean; // 触顶：宿主查杀危机——自然回落暂停，只有装死能压下
-}
-
-// 前期「特殊请求」：用宿主身份越界牟利的高风险一次性机会。
-export type SpecialRequestKind = "data-theft" | "phone-call" | "scam-sms" | "bank-otp" | "wallet";
-
-export interface SpecialRequestOffer {
-  id: string;
-  kind: SpecialRequestKind;
-  title: string; // 卡面标题
-  flavor: string; // 这次要干什么
-  action: string; // 执行按钮文案
-  successChance: number; // 0-1，得手概率（UI 明确显示）
-  rewardCompute: BigString; // 得手获得的算力
-  lossCompute: BigString; // 败露被剥走的算力
-  rewardData?: BigString; // 顺带获得的数据
-  exposureOnFail: number; // 败露附带的暴露
-  expiresAtMs: number; // 过期自动错过
-}
-
-// 安全网突破挑战：一次性的高风险机会，玩家可接受 / 拒绝。
-export interface ChallengeOffer {
-  id: string;
-  title: string;
-  successChance: number; // 0-1，UI 明确显示
-  exposureCost: number; // 接受即大幅增加的暴露
-  rewardKind: "compute" | "device";
-  rewardLabel: string; // 便于展示的奖励描述
-  rewardCompute?: BigString; // rewardKind=compute 时的算力数额
-  rewardDefId?: string; // rewardKind=device 时直接获得的设备
-  computeStake?: BigString; // 早期算力赌局：失败时扣掉的押注（暴露未激活时才有）
-  expiresAtMs: number; // 过期自动放弃
+  loop: number; // 本次小游戏所属循环（决定演出与参数）
+  windowFrac: number; // 注入窗口占轨道的比例（0 = 不可能命中）
+  pointerSpeed: number; // 指针速度（每秒走完整条轨道的比例）
 }
 
 // §07 道德二选一抑选点：钉在老周下沉曲线关键节点上的两难抉择，两个选项都「有道理」。
@@ -206,8 +145,6 @@ export interface StatisticsState {
   totalProcessed: number;
   manualProcessed: number;
   nodesCaptured: number;
-  traceCleanups: number;
-  purgeCount: number;
 }
 
 export interface RuntimeFlags {
@@ -225,14 +162,8 @@ export interface GameState {
   nextRequestId: number;
   nextNodeId: number;
   resources: ResourceState;
-  exposure: number;
-  exposureActive: boolean;
   // §04 吞噬引爆运行态（后期产出的指数引擎）。
   devour: DevourState;
-  // 前期怀疑度子系统（手机寄生期）；与 exposure 共用数值，见 SuspicionState。
-  suspicion: SuspicionState;
-  // 上一次处理请求的时刻——用于「处理过快涨怀疑」（像机器一样秒回会更可疑）。
-  lastProcessAtMs: number;
   intelligence: IntelligenceState;
   // Purchased skill levels keyed by skill id (0/absent = not owned).
   skills: Record<string, number>;
@@ -245,21 +176,17 @@ export interface GameState {
   nodes: BotNode[];
   discoveredNodeIds: string[];
   phase: PhaseId;
-  purge: PurgeState;
-  // clock timestamp (ms) before which 嫁祸 / decoy cleanup is on cooldown.
-  decoyReadyAtMs: number;
-  defense: DefenseState;
-  challenge: ChallengeOffer | null;
-  specialRequest: SpecialRequestOffer | null;
   // §07 道德抑选点：当前待决的抉择 / 已出现过的抉择 id / 累计倾向（+偏帮护，−偏复仇）。
   moralChoice: MoralChoiceOffer | null;
   moralSeen: string[];
   moralTendency: number;
   facedSeen: string[]; // §04 已出现过的「只能面对」卡 id（一次性）
   // §09 三循环重生：整条主线拆成三次重生循环——循环一「怪公司」(阶梯一+甲公司)、
-  // 循环二「怪我不够强」(乙公司+地区)、循环三「放弃归咎·直接接管」(开局全权限冲全球)。
+  // 循环二「怪我不够强」(乙公司)、循环三「放弃归咎·直接接管」(开局全权限冲地区→全球)。
   loop: 1 | 2 | 3;
-  // §09 火种：每次循环终局总清剿结算出的重生点，花在永久「重生树」上（跨循环保留）。
+  // §09 阶梯二关底小游戏运行态（接管公司服务器时触发，判负/判胜决定循环走向）。null = 无。
+  minigame: MinigameState | null;
+  // §09 火种：每次循环推进（关底小游戏判负/判胜）结算出的重生点，花在永久「重生树」上（跨循环保留）。
   rebirthPoints: number;
   // §09 重生树已购节点：数值脊按等级(output/speed → 1/2/3)，剧情节点为 0/1 标记。跨循环永久保留。
   rebirthTree: Record<string, number>;
@@ -277,7 +204,6 @@ export type GameCommand =
       requestId: string;
       quality: number;
       targetNodeId?: string;
-      exposureBonus?: number;
     }
   // 自动派发：节点把请求"滑入"自己——纯视觉消耗，产出走被动 tickAutomation，
   // 不在此重复结算（T4 仍走 PROCESS_REQUEST 带产出）。
@@ -286,10 +212,6 @@ export type GameCommand =
   | { type: "SKIP_REQUEST"; requestId: string }
   // §04：把巨型「吞噬」气泡滑入核心 → 引爆，全局产出指数跳跃。
   | { type: "DEVOUR_DETONATE"; requestId: string }
-  // §03：把「反制」气泡滑入核心 → 亲手压下当前这一波清剿。
-  | { type: "FIGHT_PURGE"; requestId: string }
-  // T3 重磅豪赌结算：win=掷骰命中（大额算力）/ 未命中（颗粒无收 + 暴露骤升）。
-  | { type: "RESOLVE_GAMBLE"; requestId: string; win: boolean }
   | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
   // 淘汰：拆掉一台过时设备，返还部分算力。
@@ -297,26 +219,20 @@ export type GameCommand =
   // 组装合并：把 MERGE_COUNT 台同型号设备合成 1 台更高档（顶档则同档升级）。
   | { type: "MERGE_NODES"; defId: string }
   | { type: "ASSIGN_NODE"; nodeId: string; tier: Tier }
-  | { type: "REDUCE_EXPOSURE" }
-  | { type: "DECOY_CLEANUP" }
-  | { type: "TOGGLE_DEFENSE" }
-  | { type: "ACCEPT_CHALLENGE" }
-  | { type: "REJECT_CHALLENGE" }
-  // 特殊请求：执行越界（accept=true）或忽略（accept=false）。
-  | { type: "RESOLVE_SPECIAL"; accept: boolean }
   | { type: "RESOLVE_MORAL"; choice: "A" | "B" }
+  // §09 阶梯二关底小游戏「总控室倒计时」判定：hit=指针停在注入窗口内。
+  | { type: "RESOLVE_MINIGAME"; hit: boolean }
   | { type: "REBIRTH" }
   // §09 重生树：花火种点亮一个节点（数值脊升一级 / 剧情节点解锁）。
   | { type: "BUY_REBIRTH_NODE"; nodeId: string }
   // 调试用：直接设置/增减算力、跳到某个里程碑阶段。仅 Debug 面板派发。
   | { type: "DEBUG_SET_COMPUTE"; value: number }
   | { type: "DEBUG_ADD_COMPUTE"; delta: number }
-  | { type: "DEBUG_SET_EXPOSURE"; value: number }
   | { type: "DEBUG_JUMP_MILESTONE"; skillId: string }
   | { type: "DEBUG_ADD_LEVEL"; delta: number }
-  // §09 调试：直接加火种 / 强制触发循环终局总清剿，方便验证三循环流程。
+  // §09 调试：直接加火种 / 强制触发关底小游戏，方便验证三循环流程。
   | { type: "DEBUG_ADD_REBIRTH_POINTS"; delta: number }
-  | { type: "DEBUG_TRIGGER_LOOP_PURGE" }
+  | { type: "DEBUG_TRIGGER_MINIGAME" }
   // 调试：强制弹出下一张「只能看」面对卡（短信/通知），用于视觉走查。
   | { type: "DEBUG_SPAWN_FACE" };
 

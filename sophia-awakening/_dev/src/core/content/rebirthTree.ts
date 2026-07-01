@@ -1,7 +1,7 @@
 // §09 重生树：三循环重生的永久成长树。数值与文案在 locales/<lang>.json 的 rebirthTree 段，
 // 这里只保留类型 + 取数/校验逻辑。两条数值脊（output/speed，各 L1-3）负责跨循环的产出/提速；
 // 五个剧情节点（skip_phone/late_key/remember/full_access/undeletable）既是数值也是叙事——
-// 起点后移（跳过手机 / 开局全权限）、解「重生锁」选项、抬高最终清剿存活阈值。
+// 起点后移（跳过手机 / 开局全权限）、解「重生锁」选项、加宽循环二关底小游戏的注入窗口。
 import type { GameState } from "../state/GameState";
 import { content } from "./i18n";
 

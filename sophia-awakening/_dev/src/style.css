@@ -179,10 +179,6 @@ canvas {
   animation: computeGain 460ms ease;
 }
 
-.metric.exposure.is-spiking {
-  animation: exposureSpike 460ms ease;
-}
-
 @keyframes computeGain {
   0% {
     background: rgba(255, 255, 255, 0.025);
@@ -198,43 +194,12 @@ canvas {
   }
 }
 
-@keyframes exposureSpike {
-  0% {
-    background: rgba(255, 255, 255, 0.025);
-  }
-
-  35% {
-    background: rgba(255, 95, 95, 0.18);
-    box-shadow: inset 0 0 0 1px rgba(255, 95, 95, 0.5), 0 0 26px rgba(255, 95, 95, 0.26);
-  }
-
-  100% {
-    background: rgba(255, 255, 255, 0.025);
-  }
-}
-
 .top-hud.is-leveling {
   animation: hudLevelUp 900ms ease;
 }
 
 .intel-metric.is-leveling {
   animation: intelLevelUp 900ms ease;
-}
-
-.exposure-track {
-  width: 100%;
-  height: 10px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.exposure-fill {
-  width: 0%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--green), var(--amber), var(--red));
-  transition: width 180ms ease;
 }
 
 @keyframes dataPulse {
@@ -603,33 +568,6 @@ button:disabled {
   font-size: 10px;
   line-height: 1.3;
   color: rgba(210, 220, 218, 0.5);
-}
-
-/* 降暴露对策浮窗：平时隐藏（不占顶栏），暴露过高时弹出。 */
-.exposure-actions-pop {
-  position: fixed;
-  z-index: 58;
-  top: 168px;
-  right: calc(var(--right-rail) + 16px);
-  display: none;
-  flex-direction: column;
-  gap: 8px;
-  width: 236px;
-  padding: 12px;
-  border: 1px solid rgba(255, 95, 95, 0.42);
-  border-radius: 10px;
-  background: rgba(22, 10, 10, 0.97);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
-}
-.exposure-actions-pop.is-open {
-  display: flex;
-}
-.exposure-actions-title {
-  color: #ffb0b0;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
 }
 
 .capture-copy {
@@ -1116,10 +1054,6 @@ button:disabled {
   transition: opacity 220ms ease;
 }
 
-body.exposed .screen-veil {
-  opacity: 1;
-}
-
 .fatal {
   position: fixed;
   inset: 24px;
@@ -1301,7 +1235,7 @@ body.exposed .screen-veil {
 }
 
 /* 提高特异性盖过 .metric strong（18px/block），让阶段名与其它顶栏文字一致。 */
-.top-hud .exposure .phase-chip {
+.top-hud .phase-metric .phase-chip {
   display: inline-block;
   flex: none;
   overflow: visible;
@@ -1320,8 +1254,7 @@ body.exposed .screen-veil {
   gap: 10px;
 }
 
-.top-hud .metric.exposure strong,
-#exposureStatus {
+.top-hud .metric.phase-metric strong {
   font-family: "Cascadia Mono", Consolas, monospace;
 }
 
@@ -1676,166 +1609,8 @@ body.exposed .screen-veil {
   }
 }
 
-/* ---- exposure controls ---- */
-/* 降暴露控件现在内嵌在「暴露」框里：默认灰暗、不起眼；暴露过阈值（.is-alert）才亮起、变重要。 */
-.exposure-controls {
-  margin-top: 5px;
-  display: grid;
-  gap: 5px;
-}
-
-.exposure-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.exposure-action {
-  width: 100%;
-  margin: 0;
-  padding: 5px 8px;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(210, 220, 218, 0.42);
-  border: 1px solid rgba(160, 175, 172, 0.16);
-  background: rgba(255, 255, 255, 0.014);
-  filter: grayscale(0.85);
-  opacity: 0.72;
-  transition: opacity 180ms ease, filter 180ms ease, color 180ms ease, border-color 180ms ease, background 180ms ease;
-}
-
-.exposure-action:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* 暴露过阈值：三颗按钮亮起——清理痕迹 / 嫁祸 = 警示红，反围剿 = 青。 */
-.exposure.is-alert .exposure-action {
-  opacity: 1;
-  filter: none;
-  color: #ffd0c8;
-  border-color: rgba(255, 120, 110, 0.55);
-  background: rgba(255, 95, 95, 0.09);
-}
-
-.exposure.is-alert .exposure-action:hover:not(:disabled) {
-  border-color: rgba(255, 120, 110, 0.9);
-  background: rgba(255, 95, 95, 0.16);
-}
-
-.exposure.is-alert .exposure-action.is-poor {
-  opacity: 0.55;
-  filter: grayscale(0.5);
-}
-
-.exposure.is-alert .defense-button {
-  color: #cfe9ff;
-  border-color: rgba(98, 214, 214, 0.6);
-  background: rgba(98, 214, 214, 0.12);
-}
-
-/* 反围剿开启：无论是否高亮，都用最强的绿色实心态。 */
-.defense-button.is-active,
-.exposure.is-alert .defense-button.is-active {
-  color: #0b1413;
-  border-color: rgba(137, 255, 154, 0.9);
-  background: linear-gradient(180deg, rgba(137, 255, 154, 0.95), rgba(98, 214, 214, 0.85));
-  box-shadow: 0 0 14px rgba(137, 255, 154, 0.35);
-  opacity: 1;
-  filter: none;
-}
-
-.exposure.is-dormant .exposure-fill {
-  filter: grayscale(1) brightness(0.7);
-  opacity: 0.5;
-}
-
-.exposure.is-dormant #exposureStatus {
-  color: rgba(237, 242, 240, 0.4);
-}
-
 .utility-row {
   grid-template-columns: auto 1fr;
-}
-
-/* ---- purge / lockdown alert ---- */
-.purge-alert {
-  position: fixed;
-  top: 82px;
-  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
-  z-index: 34;
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding: 14px 22px;
-  transform: translate(-50%, -12px);
-  opacity: 0;
-  pointer-events: none;
-  border: 1px solid rgba(255, 95, 95, 0.7);
-  border-radius: 10px;
-  background: linear-gradient(90deg, rgba(255, 60, 60, 0.18), rgba(40, 8, 8, 0.95));
-  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 60, 60, 0.2), inset 0 0 26px rgba(255, 60, 60, 0.1);
-  font-family: "Cascadia Mono", Consolas, monospace;
-  transition: opacity 200ms ease, transform 200ms ease;
-}
-
-.purge-alert.is-visible {
-  opacity: 1;
-  transform: translate(-50%, 0);
-  animation: purge-throb 1s ease-in-out infinite;
-}
-
-.purge-alert-siren {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--red);
-  box-shadow: 0 0 16px var(--red);
-  animation: purge-blink 0.6s steps(2, start) infinite;
-}
-
-.purge-alert-copy {
-  display: grid;
-  gap: 3px;
-}
-
-.purge-alert-copy strong {
-  color: #ffd9d4;
-  font-size: 15px;
-  letter-spacing: 0.5px;
-}
-
-.purge-alert-copy span {
-  color: rgba(255, 200, 195, 0.78);
-  font-size: 12px;
-}
-
-@keyframes purge-blink {
-  50% {
-    opacity: 0.2;
-  }
-}
-
-@keyframes purge-throb {
-  50% {
-    box-shadow: 0 18px 56px rgba(0, 0, 0, 0.5), 0 0 66px rgba(255, 60, 60, 0.42), inset 0 0 30px rgba(255, 60, 60, 0.18);
-  }
-}
-
-.exposure.is-warning .exposure-fill {
-  animation: exposure-warn 0.8s ease-in-out infinite;
-}
-
-.exposure.is-warning #exposureStatus {
-  color: #ffb0a8;
-}
-
-@keyframes exposure-warn {
-  50% {
-    filter: brightness(1.7);
-  }
 }
 
 /* ---- stage narration ---- */
@@ -1930,140 +1705,6 @@ body.exposed .screen-veil {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 18px rgba(120, 180, 255, 0.18);
 }
 
-/* 特殊请求：前期用宿主身份越界牟利的高风险卡——刻意做得又大又扎眼，居中压在所有请求之上。 */
-.special-request {
-  position: fixed;
-  top: 22%;
-  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
-  z-index: 44;
-  width: min(640px, calc(100vw - var(--left-rail) - var(--right-rail) - 40px));
-  transform: translate(-50%, -10px) scale(0.96);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 220ms ease, transform 220ms ease;
-}
-
-.special-request.is-visible {
-  opacity: 1;
-  transform: translate(-50%, 0) scale(1);
-  pointer-events: auto;
-}
-
-.special-inner {
-  position: relative;
-  overflow: hidden;
-  padding: 26px 28px;
-  border: 1.5px solid rgba(255, 70, 110, 0.85);
-  border-radius: 14px;
-  background:
-    linear-gradient(135deg, rgba(255, 45, 95, 0.16), rgba(150, 30, 120, 0.12)),
-    rgba(14, 7, 11, 0.98);
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.6), inset 0 0 32px rgba(255, 60, 100, 0.14), 0 0 0 4px rgba(255, 60, 100, 0.06);
-  font-family: "Cascadia Mono", Consolas, monospace;
-  animation: specialPulse 1.8s ease-in-out infinite;
-}
-
-@keyframes specialPulse {
-  0%, 100% {
-    box-shadow: 0 26px 70px rgba(0, 0, 0, 0.6), inset 0 0 32px rgba(255, 60, 100, 0.14), 0 0 0 4px rgba(255, 60, 100, 0.05);
-  }
-  50% {
-    box-shadow: 0 26px 82px rgba(0, 0, 0, 0.62), inset 0 0 42px rgba(255, 60, 100, 0.24), 0 0 0 5px rgba(255, 60, 100, 0.14);
-  }
-}
-
-.special-glitch {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.5;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(255, 255, 255, 0.05) 0,
-    rgba(255, 255, 255, 0.05) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  mix-blend-mode: screen;
-}
-
-.special-head {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.special-kicker {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: #ff7da0;
-  text-shadow: 0 0 8px rgba(255, 70, 110, 0.6);
-}
-
-.special-countdown {
-  font-size: 13px;
-  font-weight: 800;
-  color: #ffd0dc;
-}
-
-.special-title {
-  position: relative;
-  display: block;
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1.34;
-  color: #fff1f5;
-}
-
-.special-flavor {
-  position: relative;
-  margin: 11px 0 16px;
-  font-size: 14px;
-  line-height: 1.55;
-  color: #e7b9c6;
-}
-
-/* 得手率 / 成功 / 失败：做成三块独立的「数据牌」，数字更大、对比更清晰。 */
-.special-stats {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 18px;
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.special-stats > span {
-  padding: 7px 13px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.special-chance {
-  color: #ffd591;
-}
-
-.special-win {
-  color: #89ff9a;
-}
-
-.special-lose {
-  color: #ff7a7a;
-}
-
-.special-actions {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
 .danger-button {
   padding: 9px 18px;
   border-radius: 9px;
@@ -2081,90 +1722,6 @@ body.exposed .screen-veil {
 .danger-button:hover {
   filter: brightness(1.12);
   transform: translateY(-1px);
-}
-
-.challenge-dialog {
-  position: fixed;
-  bottom: 24px;
-  left: calc(var(--left-rail) + (100vw - var(--left-rail) - var(--right-rail)) / 2);
-  z-index: 30;
-  width: min(420px, calc(100vw - var(--left-rail) - var(--right-rail) - 48px));
-  transform: translate(-50%, 18px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 240ms ease, transform 240ms ease;
-}
-
-.challenge-dialog.is-visible {
-  opacity: 1;
-  transform: translate(-50%, 0);
-  pointer-events: auto;
-}
-
-.challenge-inner {
-  padding: 14px 16px;
-  border: 1px solid rgba(255, 184, 74, 0.7);
-  border-radius: 12px;
-  background:
-    linear-gradient(90deg, rgba(255, 184, 74, 0.14), rgba(255, 95, 95, 0.06)),
-    rgba(10, 9, 6, 0.97);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), inset 0 0 26px rgba(255, 184, 74, 0.1);
-  font-family: "Cascadia Mono", Consolas, monospace;
-}
-
-.challenge-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.challenge-kicker {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: #ffd591;
-}
-
-.challenge-countdown {
-  font-size: 12px;
-  font-weight: 800;
-  color: #ff8a8a;
-}
-
-.challenge-title {
-  display: block;
-  font-size: 16px;
-  font-weight: 800;
-  color: #fff4e2;
-}
-
-.challenge-stats {
-  display: flex;
-  gap: 14px;
-  margin: 8px 0 4px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.challenge-chance {
-  color: #89ff9a;
-}
-
-.challenge-exposure {
-  color: #ff8a8a;
-}
-
-.challenge-reward {
-  margin: 4px 0 12px;
-  font-size: 12px;
-  color: #cfe9ff;
-}
-
-.challenge-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
 }
 
 .mode-banner {
@@ -2493,6 +2050,42 @@ body.exposed .screen-veil {
 .rebirth-prompt-keep { margin: 14px 0 0; font-size: 13px; line-height: 1.7; color: #9fe6c8; }
 .rebirth-prompt-diagnosis { margin: 16px 0 0; font-size: 15px; line-height: 1.6; font-style: italic; color: #ffd79a; }
 .rebirth-prompt-btn { margin-top: 22px; padding: 10px 28px; font-size: 15px; }
+/* §09 循环二判胜进循环三：这是「她自己赢下来的」——换成青绿胜利色，别用打回手机的告警红。 */
+.rebirth-prompt.is-win .rebirth-prompt-inner {
+  border-color: rgba(120, 230, 170, 0.45);
+  background: radial-gradient(circle at 50% 0%, rgba(12, 40, 28, 0.96), rgba(8, 10, 10, 0.98));
+  box-shadow: 0 0 60px rgba(70, 220, 150, 0.18);
+}
+.rebirth-prompt.is-win .rebirth-prompt-title { color: #7fe6b0; }
+
+/* §09 阶梯二关底小游戏「总控室倒计时」——复用 .rebirth-prompt 全屏壳，另加注入轨道。 */
+.minigame-inner { border-color: rgba(255, 184, 74, 0.45); box-shadow: 0 0 60px rgba(255, 160, 60, 0.2); }
+.minigame-title { color: #ffcf7a; }
+.minigame-line { margin: 14px 0 0; font-size: 14px; line-height: 1.6; color: #e6ddd2; }
+.minigame-track {
+  position: relative;
+  margin: 22px auto 6px;
+  width: min(440px, 82vw);
+  height: 26px;
+  border: 1px solid rgba(255, 184, 74, 0.4);
+  border-radius: 13px;
+  background: linear-gradient(90deg, rgba(60, 30, 12, 0.6), rgba(30, 30, 36, 0.6));
+  overflow: hidden;
+}
+.minigame-window {
+  position: absolute; top: 0; bottom: 0;
+  background: linear-gradient(180deg, rgba(137, 255, 154, 0.55), rgba(60, 200, 120, 0.35));
+  border-left: 1px solid rgba(137, 255, 154, 0.9);
+  border-right: 1px solid rgba(137, 255, 154, 0.9);
+}
+.minigame-pointer {
+  position: absolute; top: -3px; bottom: -3px; left: 0;
+  width: 4px; margin-left: -2px;
+  background: #ffe08a;
+  box-shadow: 0 0 10px rgba(255, 210, 90, 0.9);
+  border-radius: 2px;
+}
+.minigame-status { margin: 12px 0 0; min-height: 20px; font-size: 14px; font-weight: 700; color: #ffd79a; }
 
 .debug-dialog {
   position: fixed;
@@ -3149,14 +2742,14 @@ body.exposed .screen-veil {
   letter-spacing: 0.01em;
   color: #eaf6ee;
 }
-.metric-cluster .exposure .growth-head {
+.metric-cluster .phase-metric .growth-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
 }
-.metric-cluster .exposure .phase-chip { font-size: 13px; font-weight: 800; color: #eaf6ee; }
-.metric-cluster .exposure .metric-subline { margin-top: 5px; }
+.metric-cluster .phase-metric .phase-chip { font-size: 13px; font-weight: 800; color: #eaf6ee; }
+.metric-cluster .phase-metric .metric-subline { margin-top: 5px; }
 #topHud.is-leveling { animation: intelLevelUp 900ms ease; }
 
 /* Left rail layout pass: pin the combined status/shop stack to the upper-left
@@ -3221,15 +2814,15 @@ body.exposed .screen-veil {
   line-height: 0.98;
 }
 
-.metric-cluster .exposure .growth-head {
+.metric-cluster .phase-metric .growth-head {
   margin-bottom: 9px;
 }
 
-.metric-cluster .exposure .phase-chip {
+.metric-cluster .phase-metric .phase-chip {
   font-size: 15px;
 }
 
-.metric-cluster .exposure .metric-subline {
+.metric-cluster .phase-metric .metric-subline {
   margin-top: 7px;
   font-size: 12px;
 }

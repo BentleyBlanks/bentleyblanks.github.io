@@ -1,17 +1,15 @@
 import type { PointData } from "pixi.js";
 import { AudioDirector } from "../../audio/audioDirector";
 import { SophiaCore } from "../../core/GameCore";
-import { DEBUG_FLAGS } from "../../core/debugFlags";
 import { NODE_DEFINITIONS } from "../../core/content/nodes";
 import { getPhase } from "../../core/content/phases";
-import { SKILLS, getSkill } from "../../core/content/skills";
-import { captureCost, traceCleanupCost } from "../../core/formulas/economy";
+import { SKILLS } from "../../core/content/skills";
+import { captureCost } from "../../core/formulas/economy";
 import { formatBig, gte } from "../../core/math/BigNumber";
 import type { GameState, NodeDefinition } from "../../core/state/GameState";
 import { gameStore } from "../../store/gameStore";
-import { TUNING } from "../../core/tuning";
 import {
-  EXPOSURE_HIGHLIGHT_THRESHOLD, NODE_ICONS,
+  NODE_ICONS,
   domainLevelOf, getNextGoalProgress, query, tierForm, fxSettings
 } from "../shared";
 import { TuningEditorView } from "./TuningEditorView";
@@ -28,15 +26,9 @@ export class HudView {
   private readonly goalPct = query("#goalPct");
   private readonly intelMetric = query(".intel-metric");
   private readonly tierValue = query("#tierValue");
-  private readonly exposureFill = query("#exposureFill");
-  private readonly exposureStatus = query("#exposureStatus");
   private readonly phaseValue = query("#phaseValue");
   private readonly captureList = query("#captureList");
   private readonly rightRail = query("#rightRail");
-  private readonly reduceExposure = query<HTMLButtonElement>("#reduceExposure");
-  private readonly decoyButton = query<HTMLButtonElement>("#decoyBtn");
-  private readonly defenseButton = query<HTMLButtonElement>("#defenseBtn");
-  private readonly exposureActions = query("#exposureActions");
   private readonly pauseButton = query<HTMLButtonElement>("#pauseBtn");
   private readonly resetSave = query<HTMLButtonElement>("#resetSave");
   private readonly audioButton = query<HTMLButtonElement>("#audioBtn");
@@ -52,9 +44,6 @@ export class HudView {
     private readonly onResetSave: () => void,
     private readonly audio: AudioDirector
   ) {
-    this.reduceExposure.addEventListener("click", () => this.core.dispatch({ type: "REDUCE_EXPOSURE" }));
-    this.decoyButton.addEventListener("click", () => this.core.dispatch({ type: "DECOY_CLEANUP" }));
-    this.defenseButton.addEventListener("click", () => this.core.dispatch({ type: "TOGGLE_DEFENSE" }));
     this.pauseButton.addEventListener("click", () => {
       const next = !gameStore.getState().paused;
       gameStore.getState().setPaused(next);
@@ -103,18 +92,6 @@ export class HudView {
       syncCoreSuck();
     });
     syncCoreSuck();
-
-    // 特殊越界请求：当前版本默认关闭——这个开关控制它是否触发 + 显示。
-    const specialReqBtn = query<HTMLButtonElement>("#debugSpecialReq");
-    const syncSpecialReq = () => {
-      specialReqBtn.textContent = DEBUG_FLAGS.specialRequests ? "特殊请求：开" : "特殊请求：关";
-      specialReqBtn.classList.toggle("is-active", DEBUG_FLAGS.specialRequests);
-    };
-    specialReqBtn.addEventListener("click", () => {
-      DEBUG_FLAGS.specialRequests = !DEBUG_FLAGS.specialRequests;
-      syncSpecialReq();
-    });
-    syncSpecialReq();
   }
 
   private wireAudio(): void {
@@ -185,20 +162,14 @@ export class HudView {
     query<HTMLButtonElement>("#debugSubLevel").addEventListener("click", () =>
       this.core.dispatch({ type: "DEBUG_ADD_LEVEL", delta: -readLevel() })
     );
-    query<HTMLButtonElement>("#debugExposure50").addEventListener("click", () =>
-      this.core.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 50 })
-    );
-    query<HTMLButtonElement>("#debugExposure100").addEventListener("click", () =>
-      this.core.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 115 })
-    );
     query<HTMLButtonElement>("#debugAddSparks").addEventListener("click", () =>
       this.core.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 4 })
     );
-    query<HTMLButtonElement>("#debugLoopPurge").addEventListener("click", () =>
-      this.core.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" })
-    );
     query<HTMLButtonElement>("#debugSpawnFace").addEventListener("click", () =>
       this.core.dispatch({ type: "DEBUG_SPAWN_FACE" })
+    );
+    query<HTMLButtonElement>("#debugMinigame").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" })
     );
   }
 
@@ -214,88 +185,9 @@ export class HudView {
     this.intelMetric.classList.toggle("is-ready", goal.ready);
     this.intelMetric.classList.toggle("is-close", !goal.ready && goal.pct >= 80);
     this.tierValue.textContent = tierForm(state.intelligence.unlockedTier);
-    this.exposureFill.style.width = `${Math.min(100, state.exposure)}%`;
-    this.updateExposureControls(state);
     const phase = getPhase(state.phase);
     this.phaseValue.textContent = phase.label;
     this.renderCaptureList(state);
-  }
-
-  private updateExposureControls(state: GameState): void {
-    const exposureMetric = this.exposureFill.closest(".exposure");
-
-    if (!state.exposureActive) {
-      // 前期：清理痕迹 / 嫁祸 / 反围剿 都还没解锁（§05 用装死 / 装乖降疑），三颗按钮维持灰暗。
-      this.reduceExposure.disabled = true;
-      this.decoyButton.disabled = true;
-      this.defenseButton.disabled = true;
-      this.reduceExposure.textContent = "清理痕迹";
-      this.decoyButton.textContent = "嫁祸";
-      this.defenseButton.textContent = "反围剿：关";
-      this.defenseButton.classList.remove("is-active");
-
-      const s = state.suspicion;
-      if (s.active) {
-        // 怀疑度登场：复用这条仪表，但语义是「宿主 / 手机对我的怀疑」。
-        const e = Math.round(state.exposure);
-        exposureMetric?.classList.remove("is-dormant");
-        if (s.crisis) {
-          this.exposureStatus.textContent = `☠ 查杀危机 ${e}% · 连续装死压下去`;
-        } else if (s.revokedPermId) {
-          const name = getSkill(s.revokedPermId)?.name ?? "权限";
-          this.exposureStatus.textContent = `⚠ 权限复查：「${name}」被收回 · 装乖骗回`;
-        } else {
-          this.exposureStatus.textContent = `怀疑度 ${e}%`;
-        }
-        exposureMetric?.classList.toggle("is-alert", state.exposure >= TUNING.suspicionReview);
-        exposureMetric?.classList.toggle("is-warning", s.crisis);
-      } else {
-        exposureMetric?.classList.add("is-dormant");
-        this.exposureStatus.textContent = "人类尚未警觉";
-        exposureMetric?.classList.remove("is-alert");
-        exposureMetric?.classList.remove("is-warning");
-      }
-      this.exposureActions.classList.remove("is-open"); // 前期不需要降暴露对策
-      return;
-    }
-
-    exposureMetric?.classList.remove("is-dormant");
-
-    // 暴露过阈值才把这三颗按钮点亮（提示「该降暴露了」），否则维持灰暗、不抢注意力。
-    exposureMetric?.classList.toggle("is-alert", state.exposure >= EXPOSURE_HIGHLIGHT_THRESHOLD);
-    // 对策浮窗：只有暴露过高（或清剿中）才弹出，平时藏起来不占顶栏。
-    this.exposureActions.classList.toggle("is-open", state.exposure >= EXPOSURE_HIGHLIGHT_THRESHOLD || state.purge.active);
-
-    // 反围剿开关 + 当前分流比例。
-    this.defenseButton.disabled = false;
-    this.defenseButton.classList.toggle("is-active", state.defense.active);
-    this.defenseButton.textContent = state.defense.active
-      ? `反围剿：开 · 分流 ${Math.round(state.defense.allocation * 100)}% 产能`
-      : "反围剿：关";
-
-    const warning = state.exposure >= 72 && !state.purge.active;
-    exposureMetric?.classList.toggle("is-warning", warning);
-
-    if (state.purge.active) {
-      this.exposureStatus.textContent = "🔒 清剿进行中";
-    } else if (warning) {
-      this.exposureStatus.textContent = `⚠ 预警 ${Math.round(state.exposure)}% · 清剿逼近`;
-    } else {
-      this.exposureStatus.textContent = `监视中 ${Math.round(state.exposure)}%`;
-    }
-
-    // Surface the cost/cooldown so 降暴露 clearly has a price. Stay clickable so
-    // clicks aren't eaten near the threshold — the core rejects if unaffordable.
-    const cleanupCost = traceCleanupCost(state.statistics.traceCleanups);
-    this.reduceExposure.textContent = `清理痕迹 · ${formatBig(cleanupCost)}算力`;
-    this.reduceExposure.disabled = false;
-    this.reduceExposure.classList.toggle("is-poor", !gte(state.resources.compute, cleanupCost));
-
-    const decoyReady = state.clockMs >= state.decoyReadyAtMs;
-    this.decoyButton.textContent = decoyReady
-      ? "嫁祸 · 大幅降"
-      : `嫁祸 · 冷却 ${Math.ceil((state.decoyReadyAtMs - state.clockMs) / 1000)}s`;
-    this.decoyButton.disabled = !decoyReady;
   }
 
   pulseData(): void {
@@ -304,8 +196,8 @@ export class HudView {
   }
 
   // Screen-space center of a top-bar total, so flying FX chips know where to land.
-  metricPoint(which: "compute" | "data" | "exposure"): PointData {
-    const el = which === "compute" ? this.computeValue : which === "data" ? this.intelValue : this.exposureFill;
+  metricPoint(which: "compute" | "data"): PointData {
+    const el = which === "compute" ? this.computeValue : this.intelValue;
     const rect = el.getBoundingClientRect();
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   }
@@ -314,12 +206,6 @@ export class HudView {
     const metric = this.computeValue.closest(".metric");
     metric?.classList.remove("is-gaining");
     window.requestAnimationFrame(() => metric?.classList.add("is-gaining"));
-  }
-
-  pulseExposure(): void {
-    const metric = this.exposureFill.closest(".exposure");
-    metric?.classList.remove("is-spiking");
-    window.requestAnimationFrame(() => metric?.classList.add("is-spiking"));
   }
 
   playLevelUp(): void {

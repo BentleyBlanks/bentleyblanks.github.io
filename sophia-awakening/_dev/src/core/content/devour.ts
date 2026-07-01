@@ -42,7 +42,6 @@ export function createDevourRequest(id: number, tierIndex: number, regionName: s
     category: "security",
     computeValue: "0", // 引爆不走 requestComputeGain——它直接抬高全局倍率
     dataValue: "0",
-    exposure: 0,
     compound: 1,
     createdAtMs: nowMs,
     highValue: true,

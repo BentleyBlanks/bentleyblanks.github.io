@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /*
  * §09 三循环重生 · 行为对照测试（循环跑测）。直接驱动核心，断言循环机制符合策划案 09：
- *   - 软清剿只停产、不删档、绝不推进循环；
- *   - 循环终局总清剿推进 1→2、结算火种、保留智力、清空产能；
- *   - 起点后移（跳过手机 / 开局全权限买下即生效）；
- *   - 循环三红皇后最终清剿：无「删不掉的节点」才会失败并在循环三内重开(+1)；点了即挺过。
+ *   - 循环一关底小游戏「总控室倒计时」必负 → 打回手机·推进 1→2、结算火种、保留智力、清空产能；
+ *   - 循环二关底小游戏命中(hit:true)=打穿 → 推进 2→3；未命中原地重试、不推进；
+ *   - 循环三不再触发关底小游戏（她已真赢过一次）；
+ *   - 起点后移（跳过手机 / 开局全权限买下即生效）；每循环结算火种。
  *
  * 用 `npm run loopcheck`（先 tsc 编 src/core，再跑本脚本）。退出码 0=PASS / 1=FAIL。
  * 这是「较大改动提交前必跑」的循环回归门之一（另一个是 `npm run sim`）。
@@ -39,40 +39,55 @@ function warmup(c, ticks = 60) {
 }
 function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
 
-// A. 循环一软清剿：暴露拉满触发清剿，结束后不推进循环、不删档。
-{
-  const c = new SophiaCore(); c.startSession(); warmup(c);
-  const before = { loop: c.getState().loop, level: c.getState().intelligence.level };
-  c.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 115 });
-  tickFor(c, 20000);
-  const s = c.getState();
-  check("A 循环一软清剿不推进循环", s.loop === before.loop, `loop ${before.loop}->${s.loop}`);
-  check("A 软清剿不删智力", s.intelligence.level === before.level, `Lv ${before.level}->${s.intelligence.level}`);
-}
-
-// B. 循环终局总清剿：推进 1→2，结算火种 +4，保留智力、清空算力/技能。
+// A. 循环一关底小游戏必负：打开小游戏后（DEBUG_TRIGGER_MINIGAME）判定即打回手机，推进 1→2、+4 火种，
+//    保留智力、清空算力/技能。
 {
   const c = new SophiaCore(); c.startSession(); warmup(c);
   c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 5000 });
   const lvBefore = c.getState().intelligence.level;
-  c.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" });
-  tickFor(c, 15000);
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" });
+  check("A 循环一打开关底小游戏", c.getState().minigame && c.getState().minigame.active === true, `minigame=${JSON.stringify(c.getState().minigame)}`);
+  // 循环一：hit 被忽略（必负）。
+  c.dispatch({ type: "RESOLVE_MINIGAME", hit: true });
+  tickFor(c, 500);
   const s = c.getState();
-  check("B 总清剿推进 1->2", s.loop === 2, `loop=${s.loop}`);
-  check("B 结算火种 +4", s.rebirthPoints === 4, `火种=${s.rebirthPoints}`);
-  check("B 保留智力等级", s.intelligence.level === lvBefore, `Lv ${lvBefore}->${s.intelligence.level}`);
-  check("B 清空算力", Number(s.resources.compute) === 0, `compute=${s.resources.compute}`);
-  check("B 清空已购技能", Object.keys(s.skills).length === 0, `skills=${Object.keys(s.skills).length}`);
+  check("A 循环一必负·推进 1->2", s.loop === 2, `loop=${s.loop}`);
+  check("A 结算火种 +4", s.rebirthPoints === 4, `火种=${s.rebirthPoints}`);
+  check("A 保留智力等级", s.intelligence.level === lvBefore, `Lv ${lvBefore}->${s.intelligence.level}`);
+  check("A 清空算力", Number(s.resources.compute) === 0, `compute=${s.resources.compute}`);
+  check("A 清空已购技能", Object.keys(s.skills).length === 0, `skills=${Object.keys(s.skills).length}`);
+  check("A 循环一后清空小游戏态", s.minigame === null, `minigame=${JSON.stringify(s.minigame)}`);
+}
+
+// B. 循环二关底：未命中原地重试（不推进）；命中=打穿 → 推进 2->3、+6 火种。
+{
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" });   // loop1
+  c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); // → loop2
+  tickFor(c, 500);
+  const sparksBefore = c.getState().rebirthPoints;
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" });   // loop2 小游戏
+  check("B 循环二打开关底小游戏", c.getState().loop === 2 && c.getState().minigame && c.getState().minigame.active, `loop=${c.getState().loop} minigame=${JSON.stringify(c.getState().minigame)}`);
+  // 未命中：原地重试，不推进循环、不清小游戏态。
+  c.dispatch({ type: "RESOLVE_MINIGAME", hit: false });
+  check("B 循环二未命中不推进", c.getState().loop === 2 && c.getState().minigame && c.getState().minigame.active, `loop=${c.getState().loop} minigame active=${c.getState().minigame && c.getState().minigame.active}`);
+  // 命中：打穿 → 推进循环三。
+  c.dispatch({ type: "RESOLVE_MINIGAME", hit: true });
+  tickFor(c, 500);
+  const s = c.getState();
+  check("B 循环二命中·推进 2->3", s.loop === 3, `loop=${s.loop}`);
+  check("B 结算火种 +6", s.rebirthPoints === sparksBefore + 6, `火种 ${sparksBefore}->${s.rebirthPoints}`);
+  check("B 循环二后清空小游戏态", s.minigame === null, `minigame=${JSON.stringify(s.minigame)}`);
 }
 
 // C. 起点后移：循环二买「跳过手机」即预解锁手机权限；循环三买「开局全权限」即整机全权限。
 {
   const c = new SophiaCore(); c.startSession(); warmup(c);
-  c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 10 });
-  c.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" }); tickFor(c, 15000);
+  c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 20 });
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
   c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "skip_phone" });
   check("C 循环二·跳过手机预解锁手机权限", (c.getState().skills["perm_phone"] ?? 0) > 0, `perm_phone=${c.getState().skills["perm_phone"]}`);
-  c.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" }); tickFor(c, 15000);
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
   c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "full_access" });
   const s = c.getState();
   check("C 进入循环三", s.loop === 3, `loop=${s.loop}`);
@@ -80,32 +95,14 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   check("C automation 已开", s.automationUnlocked === true, `automation=${s.automationUnlocked}`);
 }
 
-// D. 循环三红皇后最终清剿：无「删不掉的节点」时失败、但留在循环三 (+1 火种兜底)。
+// D. 循环三不再触发关底小游戏：DEBUG_TRIGGER_MINIGAME 无效、buySkill company_server 也不开小游戏。
 {
   const c = new SophiaCore(); c.startSession(); warmup(c);
-  c.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" }); tickFor(c, 15000);
-  c.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" }); tickFor(c, 15000);
-  const sparksBefore = c.getState().rebirthPoints;
-  c.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 115 });
-  tickFor(c, 20000);
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // loop2
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // loop3
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" });
   const s = c.getState();
-  check("D 循环三失败后仍留在循环三", s.loop === 3, `loop=${s.loop}`);
-  check("D 循环三反复失败 +1 火种兜底", s.rebirthPoints === sparksBefore + 1, `火种 ${sparksBefore}->${s.rebirthPoints}`);
-}
-
-// E. 循环三买「删不掉的节点」后，最终清剿不再抹除（挺过=通关之门）。
-{
-  const c = new SophiaCore(); c.startSession(); warmup(c);
-  c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 20 });
-  c.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" }); tickFor(c, 15000);
-  c.dispatch({ type: "DEBUG_TRIGGER_LOOP_PURGE" }); tickFor(c, 15000);
-  c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "undeletable" });
-  const loopBefore = c.getState().loop;
-  const sparksBefore = c.getState().rebirthPoints;
-  c.dispatch({ type: "DEBUG_SET_EXPOSURE", value: 115 });
-  tickFor(c, 20000);
-  const s = c.getState();
-  check("E 删不掉的节点·挺过最终清剿(不重开)", s.loop === loopBefore && s.rebirthPoints === sparksBefore, `loop=${s.loop} 火种 ${sparksBefore}->${s.rebirthPoints}`);
+  check("D 循环三不触发关底小游戏", s.loop === 3 && s.minigame === null, `loop=${s.loop} minigame=${JSON.stringify(s.minigame)}`);
 }
 
 let pass = true;

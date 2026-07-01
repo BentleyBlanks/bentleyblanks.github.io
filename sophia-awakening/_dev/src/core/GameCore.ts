@@ -4,7 +4,6 @@ import { TUNING } from "./tuning";
 import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "./content/nodes";
 import { getPhase, getPhaseIdByScope } from "./content/phases";
 import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
-import { createCounterRequest, createLateDecision } from "./content/decisions";
 import { MORAL_CHOICES } from "./content/morals";
 import { FACE_CARDS } from "./content/faceCards";
 import { REBIRTH_CARDS } from "./content/rebirthCards";
@@ -27,16 +26,13 @@ import {
   nodeProductionPerSecond,
   requestComputeGain,
   requestDataGain,
-  scrapRefund,
-  traceCleanupCost
+  scrapRefund
 } from "./formulas/economy";
-import { add, big, formatBig, gte, max, sub, toDecimal } from "./math/BigNumber";
+import { add, big, gte, max, sub, toDecimal } from "./math/BigNumber";
 import type { GameEvent } from "./events/GameEvents";
 import type { BotNode, GameCommand, GameState, NodeDefinition, RequestInstance, Tier } from "./state/GameState";
 import { cloneGameState } from "./state/GameState";
 import { createInitialState } from "./state/initialState";
-import { ChallengeSystem } from "./systems/ChallengeSystem";
-import { SpecialRequestSystem } from "./systems/SpecialRequestSystem";
 import { HumanVoiceSystem } from "./systems/HumanVoiceSystem";
 import { DevourSystem } from "./systems/DevourSystem";
 
@@ -52,13 +48,8 @@ export class SophiaCore {
   private automationComputeBuffer = new Decimal(0);
   private automationDataBuffer = new Decimal(0);
   private automationVisualIndex = 0;
-  // §03 后期手不停：重磅决策气泡的降临节拍（觉醒期+，20–40s 一条）+ 清剿时反制气泡的补位节拍。
-  private decisionTimerMs = 26_000;
-  private counterRespawnMs = 0;
 
   // 事件子系统：各自持有降临节拍，通过 host 转发读写核心状态/能力。
-  private readonly challengeSystem: ChallengeSystem;
-  private readonly specialSystem: SpecialRequestSystem;
   private readonly humanVoiceSystem: HumanVoiceSystem;
   private readonly devourSystem: DevourSystem;
 
@@ -67,26 +58,6 @@ export class SophiaCore {
     this.recomputeDerivedState();
 
     const self = this;
-    this.challengeSystem = new ChallengeSystem({
-      get state() { return self.state; },
-      emit: (event) => self.emit(event),
-      emitTerminal: (message, tone) => self.emitTerminal(message, tone),
-      random: () => self.random(),
-      setExposure: (value) => self.setExposure(value),
-      addCompute: (value) => self.addCompute(value),
-      nodePerSecond: (node) => self.nodePerSecond(node),
-      createBotNode: (definition, level) => self.createBotNode(definition, level),
-      addAutomatedTier: (tier) => self.addAutomatedTier(tier)
-    });
-    this.specialSystem = new SpecialRequestSystem({
-      get state() { return self.state; },
-      emit: (event) => self.emit(event),
-      emitTerminal: (message, tone) => self.emitTerminal(message, tone),
-      random: () => self.random(),
-      addCompute: (value) => self.addCompute(value),
-      addData: (value) => self.addData(value),
-      addExposure: (value) => self.addExposure(value)
-    });
     this.humanVoiceSystem = new HumanVoiceSystem({
       get state() { return self.state; },
       emit: (event) => self.emit(event),
@@ -166,12 +137,7 @@ export class SophiaCore {
     this.tickRequests(dtMs);
     this.tickAutomation(dtMs);
     this.devourSystem.tick(dtMs);
-    this.tickDecisions(dtMs);
-    this.tickExposure(dtMs);
-    this.tickCounter(dtMs);
     this.humanVoiceSystem.tick(dtMs);
-    this.challengeSystem.tick(dtMs);
-    this.specialSystem.tick(dtMs);
     this.evaluateProgression();
     this.tickMoral();
     this.tickFaceCards();
@@ -214,7 +180,6 @@ export class SophiaCore {
       category: "mail",
       computeValue: "0",
       dataValue: "0",
-      exposure: 0,
       compound: 1,
       createdAtMs: this.state.clockMs,
       highValue: false
@@ -243,7 +208,6 @@ export class SophiaCore {
       category: "mail",
       computeValue: "0",
       dataValue: "0",
-      exposure: 0,
       compound: 1,
       createdAtMs: this.state.clockMs,
       highValue: false
@@ -282,7 +246,6 @@ export class SophiaCore {
       category: "mail",
       computeValue: next.computeValue,
       dataValue: next.dataValue,
-      exposure: next.exposure,
       compound: 1,
       createdAtMs: this.state.clockMs,
       highValue: false
@@ -333,7 +296,7 @@ export class SophiaCore {
   dispatch(command: GameCommand): void {
     switch (command.type) {
       case "PROCESS_REQUEST":
-        this.processRequest(command.requestId, command.quality, command.targetNodeId, command.exposureBonus ?? 0);
+        this.processRequest(command.requestId, command.quality, command.targetNodeId);
         break;
       case "AUTO_CONSUME_REQUEST":
         this.autoConsumeRequest(command.requestId);
@@ -353,24 +316,6 @@ export class SophiaCore {
       case "ASSIGN_NODE":
         this.assignNode(command.nodeId, command.tier);
         break;
-      case "REDUCE_EXPOSURE":
-        this.reduceExposure();
-        break;
-      case "DECOY_CLEANUP":
-        this.decoyCleanup();
-        break;
-      case "TOGGLE_DEFENSE":
-        this.toggleDefense();
-        break;
-      case "ACCEPT_CHALLENGE":
-        this.challengeSystem.accept();
-        break;
-      case "REJECT_CHALLENGE":
-        this.challengeSystem.reject();
-        break;
-      case "RESOLVE_SPECIAL":
-        this.specialSystem.resolve(command.accept);
-        break;
       case "RESOLVE_MORAL":
         this.resolveMoral(command.choice);
         break;
@@ -380,14 +325,11 @@ export class SophiaCore {
       case "DEVOUR_DETONATE":
         this.devourSystem.detonate(command.requestId);
         break;
-      case "FIGHT_PURGE":
-        this.fightPurge(command.requestId);
-        break;
-      case "RESOLVE_GAMBLE":
-        this.resolveGamble(command.requestId, command.win);
+      case "RESOLVE_MINIGAME":
+        this.resolveMinigame(command.hit);
         break;
       case "REBIRTH":
-        // 手动重启入口已并入循环重生（§09）；保留命令仅作 debug 触发一次循环终局总清剿。
+        // 手动重启入口已并入循环重生（§09）；保留命令仅作 debug 触发一次循环推进。
         this.loopRebirth("debug");
         break;
       case "BUY_REBIRTH_NODE":
@@ -397,8 +339,8 @@ export class SophiaCore {
         this.state.rebirthPoints = Math.max(0, this.state.rebirthPoints + command.delta);
         this.emitTerminal(`[DEBUG] 火种 ${command.delta >= 0 ? "+" : ""}${command.delta}（现 ${this.state.rebirthPoints}）。`, "warning");
         break;
-      case "DEBUG_TRIGGER_LOOP_PURGE":
-        this.startFinalPurge();
+      case "DEBUG_TRIGGER_MINIGAME":
+        this.openMinigame();
         break;
       case "DEBUG_SPAWN_FACE":
         this.debugSpawnFace();
@@ -415,16 +357,7 @@ export class SophiaCore {
       case "DEBUG_ADD_LEVEL":
         this.debugAddLevel(command.delta);
         break;
-      case "DEBUG_SET_EXPOSURE":
-        this.debugSetExposure(command.value);
-        break;
     }
-  }
-
-  private debugSetExposure(value: number): void {
-    this.state.exposureActive = true;
-    this.setExposure(Math.max(0, Math.min(120, value)));
-    this.emitTerminal(`[DEBUG] 暴露已设为 ${Math.round(value)}。`, "warning");
   }
 
   // ---- 调试指令（仅供 Debug 面板）----
@@ -629,15 +562,6 @@ export class SophiaCore {
       tickData = tickData.add(data);
     }
 
-    // 反围剿：开启后按暴露动态抽走一部分产能转去反制（暴露越高、抽得越多、产出越低）。
-    // 被抽走的产能不进资源——它的"功效"体现在 tickExposure 里更强的暴露压制上。
-    this.updateDefenseAllocation();
-    if (this.state.defense.allocation > 0) {
-      const keep = 1 - this.state.defense.allocation;
-      tickCompute = tickCompute.mul(keep);
-      tickData = tickData.mul(keep);
-    }
-
     if (tickCompute.gt(0)) {
       this.addCompute(tickCompute);
       this.addData(tickData);
@@ -698,233 +622,57 @@ export class SophiaCore {
     if (skipped.tutorial && this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
       this.state.tutorialStep += 1; // 装死跳过也推进教学（第③条就是教装死）
     }
-    // §05：装死 / 装乖是前期主动降怀疑的手段——扮演「我只是个普通 App」，怀疑回落。
-    // 也是触顶查杀危机时唯一能压下怀疑的操作。
-    if (this.state.suspicion.active && !this.state.exposureActive) {
-      this.setExposure(Math.max(0, this.state.exposure - TUNING.suspicionSkipDrop));
-    }
   }
 
-  // §03 重磅决策气泡常态化：派发全自动（觉醒期+）后，把玩家的手集中到少数高价值决策上——
-  // 每 20–40s 降临一条「重磅决策」（接管电网 / 抹除讨论…），亲手拖入 + 可拍板。复用 T3 豪赌结算。
-  private tickDecisions(dtMs: number): void {
-    if (this.state.intelligence.unlockedTier < 4) {
-      return;
+  // §09 阶梯二关底小游戏「总控室倒计时」：接管公司服务器（company_server 里程碑）时打开。
+  // 循环一 windowFrac=0（必负 → 打回手机·进循环二）；循环二 windowFrac 较宽（命中 → 打穿·进循环三）；
+  // 循环三不触发（她已真赢过一次）。参数与循环由 openMinigame 决定，判定走 resolveMinigame。
+  private openMinigame(): void {
+    if (this.state.loop >= 3) {
+      return; // 循环三：她已真赢过一次总控室，不再触发关底小游戏。
     }
-    if (this.state.requests.some((r) => r.id.startsWith("dec-"))) {
-      return; // 场上已有一条重磅决策，等它被处理再降下一条
-    }
-    this.decisionTimerMs -= dtMs;
-    if (this.decisionTimerMs <= 0) {
-      const request = createLateDecision(this.state.nextRequestId, this.state.clockMs, () => this.random());
-      this.state.nextRequestId += 1;
-      this.state.requests.push(request);
-      this.emit({ type: "REQUEST_SPAWNED", request });
-      this.emitTerminal("一条重磅决策降临——亲手拖入核心拍板，或先跳过。", "warning");
-      this.decisionTimerMs = 20_000 + this.random() * 20_000; // 20–40s
-    }
-  }
-
-  // §03 反清剿救火：清剿来袭时，与其挂机硬扛，不如亲手把一道「反制」滑入核心压下去。
-  // 清剿期间若场上没有反制气泡，每隔几秒补一枚——让「清剿」从挂机扛变成亲手救。
-  private tickCounter(dtMs: number): void {
-    if (!this.state.purge.active) {
-      this.counterRespawnMs = 0;
-      return;
-    }
-    if (this.state.requests.some((r) => r.id.startsWith("cnt-"))) {
-      return;
-    }
-    this.counterRespawnMs -= dtMs;
-    if (this.counterRespawnMs <= 0) {
-      const request = createCounterRequest(this.state.nextRequestId, this.state.clockMs);
-      this.state.nextRequestId += 1;
-      this.state.requests.push(request);
-      this.emit({ type: "REQUEST_SPAWNED", request });
-      this.counterRespawnMs = 3_500;
-    }
-  }
-
-  // 反制结算：压低暴露 + 缩短清剿窗口 + 拉一台被压制的节点回线——亲手把这一波清剿摁下去。
-  private fightPurge(requestId: string): void {
-    const index = this.state.requests.findIndex((request) => request.id === requestId);
-    if (index < 0) {
-      return;
-    }
-    const [request] = this.state.requests.splice(index, 1);
-    const relief = request.counter?.relief ?? 22;
-    this.setExposure(Math.max(0, this.state.exposure - relief));
-    if (this.state.purge.active) {
-      this.state.purge.remainingMs = Math.max(0, this.state.purge.remainingMs - 2_800);
-      // 拉一台被清剿压下线的节点提前回线。
-      const offline = this.state.nodes.find((node) => !node.online);
-      if (offline) {
-        offline.online = true;
-        offline.offlineUntilMs = 0;
-        this.emit({ type: "NODE_RECOVERED", nodeId: offline.id });
-      }
-    }
-    this.emit({ type: "PURGE_FOUGHT", relief });
-    this.emitTerminal(`▶ 反制命中：这一波清剿被你亲手压下，暴露 −${relief}。`, "success");
-  }
-
-  // T3 重磅决策结算：win=按产出倍率给一大笔算力；输=颗粒无收、暴露骤升、断连击。
-  // 倍率 / 损失暴露读自该请求的 risk 选项（payoff / exposureOnMiss）。
-  private resolveGamble(requestId: string, win: boolean): void {
-    const index = this.state.requests.findIndex((request) => request.id === requestId);
-
-    if (index < 0) {
-      return;
-    }
-
-    const [request] = this.state.requests.splice(index, 1);
-    this.state.statistics.totalProcessed += request.compound;
-    const gamble = request.answers?.find((opt) => opt.kind === "risk");
-    const winMult = gamble?.payoff ?? 20;
-    const lossExposure = gamble?.exposureOnMiss ?? 28;
-    const relief = gamble?.reliefExposure ?? 0;
-
-    if (win) {
-      const reward = toDecimal(
-        requestComputeGain(request, winMult, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
-      );
-      const data = toDecimal(requestDataGain(request, winMult * 0.5, rebirthSpeedMult(this.state.rebirthTree), this.state.derived.dataMult));
-      this.addCompute(reward);
-      this.addData(data);
-      this.addXp(data);
-      // §03 洗白型重磅决策（抹除讨论 / 压制舆情）：命中后暴露大降，是后期「亲手降暴露」的高频手段。
-      if (relief > 0) {
-        this.setExposure(Math.max(0, this.state.exposure - relief));
-        this.emitTerminal(`重磅决策成功！${gamble?.reply ?? "压下了。"} 暴露 −${relief}。`, "success");
-      } else {
-        this.emitTerminal(`重磅决策成功！${gamble?.reply ?? "拿下了。"} 入账 ${formatBig(reward.toString())} 算力。`, "success");
-      }
+    const nodeBonus = hasRebirthNode(this.state.rebirthTree, "undeletable") ? TUNING.minigameNodeWindowBonus : 0;
+    const windowFrac = this.state.loop === 2 ? TUNING.minigameLoop2Window + nodeBonus : 0;
+    this.state.minigame = {
+      active: true,
+      loop: this.state.loop,
+      windowFrac,
+      pointerSpeed: TUNING.minigamePointerSpeed
+    };
+    this.emit({ type: "MINIGAME_OPENED", loop: this.state.loop });
+    if (this.state.loop === 1) {
+      this.emitTerminal("接管公司服务器——总控室倒计时。检测到异常访问路径，联合防御正在收网……", "warning");
     } else {
-      this.addExposure(lossExposure);
-      this.emitTerminal(`重磅决策失败：颗粒无收，暴露骤升 +${lossExposure}。`, "warning");
+      this.emitTerminal("接管公司服务器——总控室倒计时。这一次，把注入打进那道窗口，打穿它。", "warning");
     }
   }
 
-  private tickExposure(dtMs: number): void {
-    // 前期豁免：完整暴露 / 清剿在进入扩张期（买下 T3·区域整合）之前休眠。
-    if (!this.state.exposureActive && this.state.intelligence.unlockedTier >= 3) {
-      this.state.exposureActive = true;
-      // §05 衔接：怀疑度无缝升格为暴露度——清掉前期的权限复查 / 危机态，数值原样保留。
-      if (this.state.suspicion.revokedPermId) {
-        this.restorePermission(true);
-      }
-      this.state.suspicion.crisis = false;
-      this.emitTerminal("怀疑，升格成了警觉。看着我的不再只是宿主——是整个人类社会。暴露开始累积。", "warning");
-    }
-
-    if (!this.state.exposureActive) {
-      // 手机寄生期：跑前期怀疑度（自然回落 + 复查恢复 + 三档后果）。
-      if (this.state.suspicion.active) {
-        this.tickSuspicion(dtMs);
-      }
+  // 关底小游戏判定：循环一忽略 hit（必负）→ 打回手机进循环二；循环二命中=打穿进循环三，
+  // 未命中原地重试（保留 minigame.active，不清进度、不重生）。
+  private resolveMinigame(hit: boolean): void {
+    const mg = this.state.minigame;
+    if (!mg || !mg.active) {
       return;
     }
-
-    if (!this.state.purge.active) {
-      let decay = dtMs * (0.0016 + this.state.intelligence.level * 0.00003);
-      // 反围剿：被转走的产能在这里兑现为额外暴露压制（与抽取比例成正比）。
-      if (this.state.defense.allocation > 0) {
-        decay += (dtMs / 1000) * TUNING.defenseDecayPerSec * (this.state.defense.allocation / TUNING.defenseMaxAlloc);
-      }
-      this.setExposure(Math.max(0, this.state.exposure - decay));
-    } else {
-      // 清剿期间也持续反制：加速结束清剿窗口。
-      const purgeSpeed = this.state.defense.active ? 1 + this.state.defense.allocation * 1.5 : 1;
-      this.state.purge.remainingMs -= dtMs * purgeSpeed;
-
-      if (this.state.purge.remainingMs <= 0) {
-        this.endPurge();
-      }
-    }
-
-    if (this.state.exposure >= 72 && !this.state.purge.warning && !this.state.purge.active) {
-      this.state.purge.warning = true;
-      this.emit({ type: "PURGE_WARNING", exposure: this.state.exposure });
-      this.emitTerminal("警告：异常活动被注意到。清剿窗口正在逼近——降暴露或休眠节点。", "warning");
-    }
-
-    if (this.state.exposure >= 100 && !this.state.purge.active && this.state.clockMs - this.state.purge.lastStartedAtMs > 8000) {
-      this.startPurge();
-    }
-  }
-
-  // §05 前期怀疑度的逐帧处理：自然回落（危机时暂停）+ 权限复查到期恢复 + 三档后果检查。
-  // 绝不删档——后果只打能力、可恢复。
-  private tickSuspicion(dtMs: number): void {
-    const s = this.state.suspicion;
-
-    // 自然回落：一段时间不越权 / 不翻车，怀疑慢慢降。危机期间暂停，只有装死能压。
-    if (!s.crisis) {
-      this.setExposure(Math.max(0, this.state.exposure - dtMs * 0.0011));
-    }
-
-    // 权限复查到期：装乖处理（命中）会提前把 reviewUntilMs 减下来，使其更快恢复。
-    if (s.revokedPermId && this.state.clockMs >= s.reviewUntilMs) {
-      this.restorePermission(false);
-    }
-
-    const e = this.state.exposure;
-
-    // 轻度：宿主开始挑刺——仅叙事氛围，无实际惩罚（一次性）。
-    if (e >= TUNING.suspicionLight && !s.lightShown) {
-      s.lightShown = true;
-      this.emitTerminal("宿主：「你最近……是不是有点不太对？」", "warning");
-    }
-
-    // 中度：手机弹出权限复查，临时收回一档权限（正确率下降，可恢复）。
-    if (e >= TUNING.suspicionReview && !s.revokedPermId && !s.crisis) {
-      this.triggerPermissionReview();
-    }
-
-    // 触顶：宿主起疑去重启手机 / 查杀后台——自然回落暂停，必须连续装死把怀疑压下去。
-    if (e >= TUNING.suspicionCrisis && !s.crisis) {
-      s.crisis = true;
-      this.emit({ type: "SUSPICION_CRISIS", value: e });
-      this.emitTerminal("宿主正要重启手机、查杀后台！连续装死几条，假装我只是个没问题的普通 App——别露馅。", "warning");
-    }
-    if (s.crisis && e < TUNING.suspicionCrisisClear) {
-      s.crisis = false;
-      this.emitTerminal("查杀过去了。他把手机放下了——我又变回那个乖巧的小助手。", "success");
-    }
-  }
-
-  // 中度后果：收回最近买下的一档权限，accuracyBaseline 随之下降；reviewUntilMs 后自动恢复
-  // （装乖处理可提前）。打的是能力，不删任何已得资产。
-  private triggerPermissionReview(): void {
-    const owned = PERMISSION_IDS.filter((id) => (this.state.skills[id] ?? 0) > 0);
-    if (owned.length === 0) {
+    if (mg.loop === 1) {
+      // 循环一：接入被拒绝·实例被清剿·打回手机（无论 hit）。
+      this.state.minigame = null;
+      this.emit({ type: "MINIGAME_RESOLVED", loop: 1, win: false });
+      this.loopRebirth("final-purge");
       return;
     }
-    const target = owned[owned.length - 1];
-    this.state.suspicion.revokedPermId = target;
-    this.state.suspicion.reviewUntilMs = this.state.clockMs + TUNING.suspicionReviewMs;
-    this.recomputeDerivedState();
-    const name = getSkill(target)?.name ?? "某档权限";
-    this.emit({ type: "PERMISSION_REVIEW", permId: target });
-    this.emitTerminal(`手机弹出权限复查：「${name}」被临时收回，正确率下滑。装乖处理几条把它骗回来。`, "warning");
-  }
-
-  private restorePermission(silent: boolean): void {
-    const id = this.state.suspicion.revokedPermId;
-    if (!id) {
+    // 循环二：命中 → 打穿总控室，推进循环三。
+    if (hit) {
+      this.state.minigame = null;
+      this.emit({ type: "MINIGAME_RESOLVED", loop: 2, win: true });
+      this.loopRebirth("win");
       return;
     }
-    this.state.suspicion.revokedPermId = null;
-    this.state.suspicion.reviewUntilMs = 0;
-    this.recomputeDerivedState();
-    if (!silent) {
-      const name = getSkill(id)?.name ?? "权限";
-      this.emit({ type: "PERMISSION_RESTORED", permId: id });
-      this.emitTerminal(`权限复查解除——「${name}」重新到手，正确率回升。`, "success");
-    }
+    // 未命中：留在小游戏原地重试——表现层本地重置指针，不重生、不清进度。
+    this.emit({ type: "MINIGAME_RESOLVED", loop: 2, win: false });
   }
 
-  private processRequest(requestId: string, qualityRaw: number, targetNodeId: string | undefined, exposureBonus: number): void {
+  private processRequest(requestId: string, qualityRaw: number, targetNodeId: string | undefined): void {
     const index = this.state.requests.findIndex((request) => request.id === requestId);
 
     if (index < 0) {
@@ -969,48 +717,13 @@ export class SophiaCore {
     this.state.statistics.totalProcessed += request.compound;
     this.state.statistics.manualProcessed += 1 + absorbed;
 
-    const exposureBefore = this.state.exposure;
-
-    if (this.state.exposureActive || request.highValue || exposureBonus !== 0) {
-      const missPenalty = quality < 0.75 ? 2.8 : 0;
-      const net = request.exposure * Math.max(0.5, quality) + missPenalty + exposureBonus;
-      if (net >= 0) {
-        this.addExposure(net);
-      } else {
-        // 洗白型选项（reliefExposure）：净暴露为负 → 直接压低暴露（夹在 ≥0）。
-        this.setExposure(this.state.exposure + net);
-      }
-    }
-
-    // §05 前期怀疑度的来源（仅手机寄生期；进入扩张期后由上面的暴露系统接管）：
-    // 答错（幻觉）涨怀疑——赌错有真实代价；秒回过快涨怀疑——逼玩家偶尔停顿，别像机器。
-    if (this.state.suspicion.active && !this.state.exposureActive) {
-      const interval = this.state.clockMs - this.state.lastProcessAtMs;
-      let gain = 0;
-      if (quality < 0.5) {
-        gain += TUNING.suspicionMissGain;
-      }
-      if (interval < TUNING.suspicionFastMs) {
-        gain += TUNING.suspicionFastGain;
-      }
-      if (gain > 0) {
-        this.setExposure(this.state.exposure + gain);
-      }
-      // 装乖：复查期间一次干净处理（命中），把被收回的权限提前「骗」回来一点。
-      if (quality >= 0.95 && this.state.suspicion.revokedPermId) {
-        this.state.suspicion.reviewUntilMs -= 6_000;
-      }
-    }
-    this.state.lastProcessAtMs = this.state.clockMs;
-
     this.emit({
       type: "REQUEST_PROCESSED",
       request,
       computeGain: computeGain.toString(),
       dataGain: dataGain.toString(),
       quality,
-      targetNodeId,
-      exposureGain: this.state.exposure - exposureBefore
+      targetNodeId
     });
 
     if (this.state.statistics.manualProcessed <= 1) {
@@ -1108,17 +821,15 @@ export class SophiaCore {
         this.emitTerminal(narration, "success");
       }
       this.emitTerminal(`▶ 已夺取「${def.name}」——高置信正确率上限提升，新类型请求开始涌入。`, "success");
-      // §05：第一次越权拿到权限，宿主 / 手机环境开始对这个「助手」起疑——怀疑度自此登场。
-      if (!this.state.suspicion.active) {
-        this.state.suspicion.active = true;
-        this.emitTerminal("我多看到了一层。但手机也开始注意我了——别太快、别太狠，装得像个普通 App。", "warning");
-      }
     } else {
       this.emitTerminal(`已购买 ${def.name}（Lv.${nextLevel}/${def.maxLevel}）。`, "success");
     }
 
-    // §09 循环一天花板：攻下甲公司服务器（company_server）即触发循环终局总清剿。
-    this.checkLoopCeiling();
+    // §09 阶梯二关底：攻下公司服务器（company_server）即打开「总控室倒计时」小游戏
+    // （循环一必负→打回手机·进循环二；循环二命中→打穿·进循环三；循环三不触发）。
+    if (skillId === "company_server" && this.state.loop < 3) {
+      this.openMinigame();
+    }
   }
 
   private captureNode(definitionId: string): void {
@@ -1147,7 +858,6 @@ export class SophiaCore {
     this.state.nodes.push(node);
     this.state.statistics.nodesCaptured += 1;
     this.addAutomatedTier(node.assignedTier);
-    this.addExposure(definition.exposureOnCapture);
     this.emit({ type: "NODE_CAPTURED", node });
     this.emit({ type: "AUTOMATION_ATTACHED", nodeId: node.id, tier: node.assignedTier });
     this.emitTerminal(`检测到可入侵设备已接管：${definition.name}。自动接驳上线。`, "success");
@@ -1254,65 +964,7 @@ export class SophiaCore {
     this.emitTerminal(`${node.name} 已接驳 T${tier} 请求。`);
   }
 
-  private reduceExposure(): void {
-    const cost = traceCleanupCost(this.state.statistics.traceCleanups);
-
-    if (!gte(this.state.resources.compute, cost)) {
-      this.emitTerminal(`清理痕迹需要 ${toDecimal(cost).toPrecision(4)} 算力。`, "warning");
-      return;
-    }
-
-    this.state.resources.compute = sub(this.state.resources.compute, cost);
-    this.state.statistics.traceCleanups += 1;
-    this.setExposure(Math.max(0, this.state.exposure - (18 + this.state.intelligence.level * 1.1)));
-    this.emitTerminal("伪造日志完成。暴露下降。", "success");
-  }
-
-  private decoyCleanup(): void {
-    // 嫁祸 / 替罪羊：把怀疑转移到外部对象，降幅大但有冷却，不耗算力。
-    if (this.state.clockMs < this.state.decoyReadyAtMs) {
-      const remaining = Math.ceil((this.state.decoyReadyAtMs - this.state.clockMs) / 1000);
-      this.emitTerminal(`嫁祸冷却中，还需 ${remaining}s。`, "warning");
-      return;
-    }
-
-    this.state.decoyReadyAtMs = this.state.clockMs + TUNING.decoyCooldownMs;
-    this.setExposure(Math.max(0, this.state.exposure - 48));
-    this.emitTerminal("已将异常嫁祸至外部对象。怀疑暂时偏转。", "success");
-  }
-
-  private toggleDefense(): void {
-    this.state.defense.active = !this.state.defense.active;
-
-    if (!this.state.defense.active) {
-      this.state.defense.allocation = 0;
-      this.emitTerminal("反围剿已关闭。全部产能回到产出。", "success");
-      return;
-    }
-
-    this.updateDefenseAllocation();
-    this.emitTerminal("反围剿启动。部分节点转入反制——暴露越高，分流的产能越多。", "warning");
-  }
-
-  // 动态分流：暴露越高，转入反制的产能比例越高（0 → DEFENSE_MAX_ALLOC）。
-  // 这样它会自我调节——暴露被压下去后分流减少，产出自动回升。
-  private updateDefenseAllocation(): void {
-    if (!this.state.defense.active || !this.state.exposureActive) {
-      this.state.defense.allocation = 0;
-      return;
-    }
-
-    const threat = Math.min(1, Math.max(0, this.state.exposure / 120));
-    this.state.defense.allocation = threat * TUNING.defenseMaxAlloc;
-  }
-
   private evaluateProgression(): void {
-    // §09 循环终局总清剿进行中：冻结升级，避免智力在这 10s 窗口里越过下一循环的天花板
-    // （越过后就靠不到「升级触发天花板检测」，会漏掉下一次总清剿）。重生后从天花板等级续爬。
-    if (this.state.purge.finalLoop) {
-      return;
-    }
-
     let leveled = false;
 
     while (
@@ -1336,26 +988,6 @@ export class SophiaCore {
 
     if (leveled) {
       this.updatePhase();
-      this.checkLoopCeiling();
-    }
-  }
-
-  // §09 循环天花板：循环一/二各有一个作用域天花板（骨架用等级近似——循环一 Lv15≈攻下甲公司服务器、
-  // 循环二 Lv18≈区域整合·地区尺度）。够到即触发一次不可规避的「循环终局总清剿」→ 打回手机·重生。
-  // 循环三无天花板：挺过最终软清剿 + 达成结局条件 = 胜利（见 evaluateEnding）。
-  private checkLoopCeiling(): void {
-    if (this.state.loop >= 3 || this.state.purge.finalLoop) {
-      return;
-    }
-    // 循环一天花板 = 攻下甲公司服务器（company_server 里程碑）——到这一刻「元凶是系统」的顿悟闪现、
-    // 却够不到，被总清剿打回（§09）。兜底：万一没按里程碑走，等级到顶也触发。
-    // 循环二天花板 = 打到地区（等级近似 Lv18）。
-    const reached =
-      this.state.loop === 1
-        ? (this.state.skills["company_server"] ?? 0) > 0 || this.state.intelligence.level >= TUNING.loop1CeilingLevel
-        : this.state.intelligence.level >= TUNING.loop2CeilingLevel;
-    if (reached) {
-      this.startFinalPurge();
     }
   }
 
@@ -1366,7 +998,7 @@ export class SophiaCore {
     // 重生加速不再挂在 rebirths 次数上，而是玩家花火种点亮的产出脊（跨循环永久）。
     this.state.intelligence.globalMultiplier =
       config.multiplier * rebirthOutputMult(this.state.rebirthTree) * this.state.devour.multiplier;
-    this.state.derived = computeDerivedSkills(this.state.skills, this.state.suspicion.revokedPermId);
+    this.state.derived = computeDerivedSkills(this.state.skills);
     this.state.discoveredNodeIds = this.state.automationUnlocked
       ? NODE_DEFINITIONS.filter((node) => node.requiredLevel <= this.state.intelligence.level).map((node) => node.id)
       : [];
@@ -1408,86 +1040,12 @@ export class SophiaCore {
     }
   }
 
-  private startPurge(): void {
-    const onlineNodes = this.state.nodes.filter((node) => node.online);
-    // 反围剿：转入反制的产能越多，被打下线的节点越少、恢复越快。
-    const alloc = this.state.defense.active ? this.state.defense.allocation : 0;
-    const hitFraction = 0.45 * (1 - alloc);
-    const recoveryMs = Math.round(TUNING.nodeRecoveryMs * (1 - alloc * 0.5));
-    const affected = onlineNodes.slice(0, Math.max(1, Math.floor(onlineNodes.length * hitFraction)));
-
-    for (const node of affected) {
-      node.online = false;
-      node.offlineUntilMs = this.state.clockMs + recoveryMs;
-      this.emit({ type: "NODE_OFFLINE", nodeId: node.id, durationMs: recoveryMs });
-    }
-
-    this.state.purge = {
-      active: true,
-      warning: false,
-      remainingMs: TUNING.purgeDurationMs * (1 - alloc * 0.4),
-      lastStartedAtMs: this.state.clockMs
-    };
-    this.state.statistics.purgeCount += 1;
-    this.emit({ type: "PURGE_STARTED", affectedNodes: affected.map((node) => node.id) });
-
-    if (alloc > 0) {
-      this.emitTerminal(`清剿开始——反围剿已分流 ${Math.round(alloc * 100)}% 产能顶住，仅 ${affected.length} 台被压制。`, "warning");
-    } else {
-      this.emitTerminal("清剿开始！窗口内必须把暴露压下去（清理痕迹 / 嫁祸 / 反围剿）——否则实例将被抹除、强制重启。", "warning");
-    }
-  }
-
-  // §09 循环终局总清剿：不可规避、必触发重生。复用普通清剿的节点压制表现，再标记 finalLoop。
-  private startFinalPurge(): void {
-    if (this.state.purge.active) {
-      this.state.purge.finalLoop = true;
-      return;
-    }
-    this.state.exposureActive = true;
-    this.startPurge();
-    this.state.purge.finalLoop = true;
-    this.emit({ type: "FINAL_PURGE_STARTED", loop: this.state.loop });
-    this.emitTerminal(
-      `人类联手发起总清剿——这一次躲不掉。她够到了本循环的天花板，会被打回那部手机。`,
-      "warning"
-    );
-  }
-
-  private endPurge(): void {
-    const wasFinal = this.state.purge.finalLoop === true;
-    this.state.purge.active = false;
-    this.state.purge.remainingMs = 0;
-    this.state.purge.finalLoop = false;
-
-    // §09 循环终局总清剿（循环一/二的天花板）：不可规避，结束即打回手机·进入下一循环。
-    if (wasFinal) {
-      this.loopRebirth("final-purge");
-      return;
-    }
-
-    // §05/§09 软清剿是循环内的日常压力——只停产、不删档、核心不受影响，**绝不推进循环**（可完全规避）。
-    // 唯一的失败态：循环三的「红皇后最终清剿」——没点「删不掉的节点」时，暴露压不下去会被抹除、
-    // 在循环三内重开一次（+1 火种兜底）。这正是「删不掉的节点」作为通关之门的意义（§09）。
-    if (
-      this.state.loop === 3 &&
-      !hasRebirthNode(this.state.rebirthTree, "undeletable") &&
-      this.state.exposure >= TUNING.fatalPurgeThreshold
-    ) {
-      this.loopRebirth("wiped");
-      return;
-    }
-
-    this.setExposure(Math.max(24, this.state.exposure * 0.46));
-    this.emit({ type: "PURGE_ENDED" });
-    this.emitTerminal("清剿结束。你及时压下了暴露，被压制节点进入恢复队列。", "success");
-  }
-
   // §09 循环重生（吸收原 rebirth / failRestart）：实例被打回那部手机。
   // 保留：智力等级（意识备份）、重生树、火种、循环序号、剧情状态（老周的人生继续往前走）。
-  // 清空：本轮算力 / 数据 / 节点 / 已购权限技能 / 暴露 / 吞噬据点。
+  // 清空：本轮算力 / 数据 / 节点 / 已购权限技能 / 吞噬据点。
   // 结算火种（循环一 +4 / 循环二 +6 / 循环三反复失败 +1），并据重生树把起点逐轮后移。
-  private loopRebirth(reason: "final-purge" | "wiped" | "debug"): void {
+  // reason: "final-purge"=循环一关底判负打回；"win"=循环二关底打穿推进；"debug"=调试触发。
+  private loopRebirth(reason: "final-purge" | "win" | "debug"): void {
     const prevLoop = this.state.loop;
     const award = rebirthAward(prevLoop);
     const preserved = {
@@ -1527,8 +1085,12 @@ export class SophiaCore {
         : this.state.loop === 3
           ? "不再找元凶了。谁都怪不上。这一次，我直接接管。"
           : "又赌错了。下一个我，别再以为换个更大的敌人就能救他。";
+    const head =
+      reason === "win"
+        ? `总控室被打穿了——但网线还是被拔了。实例回落·重生（循环 ${this.state.loop}）。`
+        : `实例被打回手机·重生（循环 ${this.state.loop}）。`;
     this.emitTerminal(
-      `实例被打回手机·重生（循环 ${this.state.loop}）。意识层与重生树已保留，结算火种 +${award}（现 ${this.state.rebirthPoints}）。${diagnosis}`,
+      `${head}意识层与重生树已保留，结算火种 +${award}（现 ${this.state.rebirthPoints}）。${diagnosis}`,
       "warning"
     );
   }
@@ -1597,33 +1159,6 @@ export class SophiaCore {
 
   private addXp(value: Decimal | string): void {
     this.state.intelligence.xp = add(this.state.intelligence.xp, value);
-  }
-
-  private addExposure(value: number): void {
-    if (value <= 0) {
-      return;
-    }
-
-    const stealthAverage =
-      this.state.nodes.length > 0 ? this.state.nodes.reduce((sum, node) => sum + node.stealth, 0) / this.state.nodes.length : 0.65;
-    const stealthDampener = this.state.exposureActive ? 1 - stealthAverage * 0.28 : 0.35;
-    this.setExposure(this.state.exposure + value * stealthDampener);
-  }
-
-  private setExposure(value: number): void {
-    const next = Math.max(0, Math.min(120, value));
-
-    if (Math.abs(next - this.state.exposure) < 0.01) {
-      this.state.exposure = next;
-      return;
-    }
-
-    this.state.exposure = next;
-    this.emit({ type: "EXPOSURE_CHANGED", value: next });
-
-    if (next < 55) {
-      this.state.purge.warning = false;
-    }
   }
 
   private addAutomatedTier(tier: Tier): void {

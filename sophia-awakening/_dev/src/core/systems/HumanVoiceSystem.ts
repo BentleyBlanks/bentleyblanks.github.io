@@ -30,9 +30,6 @@ export class HumanVoiceSystem {
     if (state.intelligence.unlockedTier >= 4) {
       return "final";
     }
-    if (state.exposureActive) {
-      return "exposed";
-    }
     if (state.intelligence.unlockedTier >= 2) {
       return "mid";
     }

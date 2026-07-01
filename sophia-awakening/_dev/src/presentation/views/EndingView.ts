@@ -5,7 +5,6 @@ interface EndingStats {
   nodes: number;
   level: number;
   manualProcessed: number;
-  purges: number;
   runtime: string;
 }
 
@@ -121,7 +120,6 @@ export class EndingView {
       ["控制节点", `${stats.nodes}`],
       ["智力等级", `Lv.${stats.level}`],
       ["手动处理", `${stats.manualProcessed} 条`],
-      ["挺过清剿", `${stats.purges} 次`],
       ["运行时长", stats.runtime]
     ];
   }

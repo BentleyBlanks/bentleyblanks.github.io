@@ -40,7 +40,6 @@ export interface RouletteOutcome {
   quality: number; // 结算 quality = 所选回复自带的固定收益（收益盲盒，结算才揭晓）
   reply: string; // 所选回复对应的人类回话
   tone: "success" | "warning" | "normal";
-  exposureBonus: number; // 越权类回复附带的暴露（若有）
 }
 
 export interface ReelHooks {
@@ -152,9 +151,8 @@ export class RequestPacketView {
   private tutorialPulse = 0;
   // 教学引导文案：贴在卡片下方的 SOPHIA 指引（特殊处理，不走中央旁白）。
   private tutorialCaption?: Text;
-  // §04 吞噬引爆 / §03 反清剿：拖入核心触发的「特殊大气泡」——放大 + 脉动外环。
+  // §04 吞噬引爆：拖入核心触发的「特殊大气泡」——放大 + 脉动外环。
   private readonly isDevour: boolean;
-  private readonly isCounter: boolean;
   // §04 只能面对卡：无选项、不可交互——浮入、被看着、消失。
   readonly isFace: boolean;
   // §09 短信 / 通知样式：只能看的家庭短信 / 系统通知卡长得像手机短信气泡 / 通知横幅，
@@ -181,7 +179,6 @@ export class RequestPacketView {
   ) {
     this.request = request;
     this.isDevour = Boolean(request.devour);
-    this.isCounter = Boolean(request.counter);
     this.isFace = Boolean(request.faceOnly);
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
     this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
@@ -212,22 +209,20 @@ export class RequestPacketView {
         ? "notification"
         : "sms"
       : null;
-    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；反制＝深红；回复轮盘＝青；T3 豪赌＝深红。
+    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；回复轮盘＝青；T3 重磅＝深红。
     this.accent = this.isFace
       ? this.channel === "notification"
         ? 0xffc061
         : 0x7fb4ff
       : this.isDevour
         ? DEVOUR
-        : this.isCounter
-          ? RED
-          : this.isReel
-            ? request.tier === 3
-              ? RED
-              : THINK
-            : TIER_COLORS[request.tier];
-    // 发信人：吞噬 / 反制＝SOPHIA 自己的意志，重磅豪赌＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
-    this.sender = this.isDevour || this.isCounter ? "sophia" : request.tier === 3 ? "boss" : this.isChain ? "system" : "host";
+        : this.isReel
+          ? request.tier === 3
+            ? RED
+            : THINK
+          : TIER_COLORS[request.tier];
+    // 发信人：吞噬＝SOPHIA 自己的意志，重磅决策＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
+    this.sender = this.isDevour ? "sophia" : request.tier === 3 ? "boss" : this.isChain ? "system" : "host";
     this.cardH = UI.cardHeight; // 轮盘卡稍后按选项行数重算
     // 只能面对卡不可交互——浮入、被看着、消失。
     this.container.eventMode = this.isFace ? "none" : "dynamic";
@@ -242,13 +237,11 @@ export class RequestPacketView {
         : "💬 短信"
       : this.isDevour
       ? `⊙ 吞噬 · ${request.devour?.label ?? ""}`
-      : this.isCounter
-        ? "⚔ 反制清剿"
-        : request.tier === 3 && this.isReel
-          ? "⚡ 重磅豪赌"
-          : this.isChain
-            ? `🔗 任务链${request.compound > 1 ? ` ×${request.compound}` : ""}`
-            : SENDER_LABEL[this.sender] ?? "宿主";
+      : request.tier === 3 && this.isReel
+        ? "⚡ 重磅决策"
+        : this.isChain
+          ? `🔗 任务链${request.compound > 1 ? ` ×${request.compound}` : ""}`
+          : SENDER_LABEL[this.sender] ?? "宿主";
     const sourceApp = request.sourceApp ?? this.fallbackSourceApp();
     const sourceTime = request.sourceTime ?? fallbackHeaderTime(request.createdAtMs);
     this.badge = new Text({
@@ -513,9 +506,6 @@ export class RequestPacketView {
       // 巨型：整张气泡放大，凸显「区域中央浮起的重磅决策」。
       this.container.scale.set(1.34);
       this.title.style.fontSize = 16;
-    } else if (this.isCounter) {
-      this.container.scale.set(1.2);
-      this.title.style.fontSize = 15;
     }
 
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
@@ -527,7 +517,6 @@ export class RequestPacketView {
 
   private fallbackSourceApp(): string {
     if (this.isDevour) return "SOPHIA CORE";
-    if (this.isCounter) return "安全网";
     if (this.isChain) return "工作流";
     if (this.request.tier === 3) return "控制台";
     return "手机助手";
@@ -599,7 +588,7 @@ export class RequestPacketView {
   }
 
   update(deltaMs: number): void {
-    if (this.isDevour || this.isCounter) {
+    if (this.isDevour) {
       // 持续脉动外环——这枚特殊气泡在召唤玩家亲手滑入核心。
       this.devourPulse += deltaMs * 0.005;
       this.draw();
@@ -637,29 +626,15 @@ export class RequestPacketView {
       return;
     }
     const basePayoff = this.optionPayoff[this.chosenIndex] ?? opt.payoff;
-    if (this.request.tier === 3) {
-      // 后期重磅决策：保留「明示概率」的赌局（特殊事件，不属于阶梯一的确定结算）。
-      const hit = Math.random() < opt.hitChance;
-      this.outcome = {
-        dead: false,
-        hit,
-        quality: hit ? basePayoff : 0.25,
-        reply: hit ? opt.reply : "",
-        tone: hit ? "success" : "warning",
-        exposureBonus: hit ? 0 : opt.exposureOnMiss ?? 0
-      };
-    } else {
-      // 阶梯一确定结算：收益由所选回复自带，无随机；读懂上下文 + 选到（可能受权限门槛限制的）高收益项才赚得多。
-      this.outcome = {
-        dead: false,
-        hit: true,
-        quality: basePayoff,
-        reply: opt.reply,
-        tone: basePayoff >= 1 ? "success" : "warning",
-        // §09 洗白型选项：reliefExposure 以负 exposureBonus 生效——「稳」选项真降暴露（他们也认得你了 / 优化系统）。
-        exposureBonus: (opt.exposureOnMiss ?? 0) - (opt.reliefExposure ?? 0)
-      };
-    }
+    // 确定结算：收益由所选回复自带，无随机；读懂上下文 + 选到（可能受权限门槛限制的）高收益项才赚得多。
+    // T3 重磅卡也走这条普通处理路径（豪赌已删除）。
+    this.outcome = {
+      dead: false,
+      hit: true,
+      quality: basePayoff,
+      reply: opt.reply,
+      tone: basePayoff >= 1 ? "success" : "warning"
+    };
     this.phase = "revealed";
     this.revealMs = 0;
     // 不再「啪」地弹大一下——保持原尺寸，让随后的吮吸（genie）从静止平滑地一气吸入，不割裂。
@@ -857,7 +832,7 @@ export class RequestPacketView {
     if (opt.kind === "dead") {
       this.phase = "revealed";
       this.signaled = true;
-      this.outcome = { dead: true, quality: 0, reply: "", tone: "normal", exposureBonus: 0 };
+      this.outcome = { dead: true, quality: 0, reply: "", tone: "normal" };
       this.draw();
       this.reel.onResolved(this, this.outcome);
       return;
@@ -1021,7 +996,7 @@ export class RequestPacketView {
       : t3
         ? 0x2a1117
         : 0x16271f;
-    const strokeW = this.isDevour || this.isCounter ? 2.2 : t3 ? 2 : 1.4;
+    const strokeW = this.isDevour ? 2.2 : t3 ? 2 : 1.4;
     const strokeA = t3 ? 0.85 : 0.7;
     // 投影
     this.bg.roundRect(3, 6, W, H, r).fill({ color: 0x000000, alpha: 0.34 });
@@ -1055,8 +1030,8 @@ export class RequestPacketView {
       this.bg.roundRect(12, this.faceBarY, bw, 30, 8).stroke({ width: 1.2, color: 0x3a4650, alpha: 0.75 });
     }
 
-    // §04 吞噬 / §03 反制：两圈脉动外环 —— 视觉上「召唤你亲手滑入核心」。
-    if (this.isDevour || this.isCounter) {
+    // §04 吞噬：两圈脉动外环 —— 视觉上「召唤你亲手滑入核心」。
+    if (this.isDevour) {
       const p = 0.5 + Math.sin(this.devourPulse * 2) * 0.5;
       this.bg.roundRect(-4, -4, W + 8, H + 8, r + 4).stroke({ width: 2.5, color: c, alpha: 0.35 + p * 0.5 });
       this.bg.roundRect(-9, -9, W + 18, H + 18, r + 7).stroke({ width: 1.5, color: c, alpha: 0.1 + p * 0.22 });

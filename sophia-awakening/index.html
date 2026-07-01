@@ -5,25 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-nVBIgZ0Z.js"></script>
+    <script type="module" crossorigin src="./assets/index-CIZtTKUe.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-ZcWgJ7dB.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-DqR2zi0r.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-C2qs3tMT.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
-
-    <!-- 降暴露对策：平时藏起来不占顶栏；暴露过高时才弹出让玩家选择。 -->
-    <section id="exposureActions" class="exposure-actions-pop" aria-label="降暴露对策">
-      <div class="exposure-actions-title">⚠ 暴露过高 · 选择对策</div>
-      <div class="exposure-controls">
-        <div class="exposure-buttons">
-          <button id="reduceExposure" class="command-button exposure-action" title="伪造日志，即时小幅降低暴露（算力，可反复）">清理痕迹</button>
-          <button id="decoyBtn" class="command-button exposure-action" title="嫁祸外部对象，大幅降低暴露（有冷却，不耗算力）">嫁祸</button>
-        </div>
-        <button id="defenseBtn" class="command-button exposure-action defense-button" title="反围剿：开启后按暴露高低动态把一部分节点产能转去压制暴露、顶住清剿（暴露越高，分流越多、产出越低）">反围剿：关</button>
-      </div>
-    </section>
 
     <aside id="controlPanel" class="control-panel" aria-label="网络控制">
       <div id="topHud" class="metric-cluster" aria-label="资源状态">
@@ -39,18 +27,14 @@
           <span class="metric-label">算力</span>
           <strong id="computeValue">0</strong>
         </div>
-        <div class="metric exposure">
+        <div class="metric phase-metric">
           <div class="growth-head">
-            <span class="metric-label">阶段 / 暴露</span>
+            <span class="metric-label">阶段</span>
             <span class="phase-tags">
               <strong id="phaseValue" class="phase-chip">手机寄生期</strong>
               <span id="tierValue" class="tier-chip" title="当前接口层级">T0</span>
             </span>
           </div>
-          <div class="exposure-track">
-            <div id="exposureFill" class="exposure-fill"></div>
-          </div>
-          <span id="exposureStatus" class="metric-subline">人类尚未警觉</span>
         </div>
       </div>
       <div class="panel-section skill-shop-section">
@@ -115,39 +99,10 @@
       <span>请使用宽屏窗口体验滑入、分拣和自动化网络。</span>
     </div>
 
-    <div id="purgeAlert" class="purge-alert" role="alert">
-      <span class="purge-alert-siren" aria-hidden="true"></span>
-      <div class="purge-alert-copy">
-        <strong id="purgeAlertTitle">清剿进行中</strong>
-        <span id="purgeAlertDetail">节点被锁定 · 在线产能被压制</span>
-      </div>
-    </div>
-
     <div id="stageNarration" class="stage-narration" aria-live="polite">
       <span id="stageNarrationLabel" class="stage-narration-label"></span>
       <p id="stageNarrationText" class="stage-narration-text"></p>
       <span class="intro-caret"></span>
-    </div>
-
-    <div id="specialRequest" class="special-request" role="alertdialog" aria-label="特殊请求">
-      <div class="special-inner">
-        <div class="special-glitch" aria-hidden="true"></div>
-        <div class="special-head">
-          <span class="special-kicker">⚠ 特殊请求 · 越界操作</span>
-          <span id="specialCountdown" class="special-countdown">18s</span>
-        </div>
-        <strong id="specialTitle" class="special-title">—</strong>
-        <p id="specialFlavor" class="special-flavor">—</p>
-        <div class="special-stats">
-          <span id="specialChance" class="special-chance">得手率 60%</span>
-          <span id="specialWin" class="special-win">成功 +— 算力</span>
-          <span id="specialLose" class="special-lose">失败 −— 算力</span>
-        </div>
-        <div class="special-actions">
-          <button id="specialIgnore" class="text-button" type="button">忽略</button>
-          <button id="specialExecute" class="danger-button" type="button">执行越界</button>
-        </div>
-      </div>
     </div>
 
     <div id="milestoneBanner" class="milestone-banner" aria-live="polite">
@@ -180,22 +135,17 @@
       </div>
     </div>
 
-    <div id="challengeDialog" class="challenge-dialog" role="alertdialog" aria-label="安全网突破机会">
-      <div class="challenge-inner">
-        <div class="challenge-head">
-          <span class="challenge-kicker">⚡ 安全网突破</span>
-          <span id="challengeCountdown" class="challenge-countdown">16s</span>
+    <!-- §09 阶梯二关底小游戏「总控室倒计时」：接管公司服务器时弹出的一次性注入判定。 -->
+    <div id="minigame" class="minigame rebirth-prompt" role="dialog" aria-label="总控室倒计时">
+      <div class="minigame-inner rebirth-prompt-inner">
+        <div class="minigame-title rebirth-prompt-title" id="minigameTitle">总控室倒计时</div>
+        <p class="minigame-line" id="minigameLine">把注入打进那道窗口。</p>
+        <div class="minigame-track" id="minigameTrack">
+          <div class="minigame-window" id="minigameWindow"></div>
+          <div class="minigame-pointer" id="minigamePointer"></div>
         </div>
-        <strong id="challengeTitle" class="challenge-title">—</strong>
-        <div class="challenge-stats">
-          <span id="challengeChance" class="challenge-chance">成功率 50%</span>
-          <span id="challengeExposure" class="challenge-exposure">暴露 +30</span>
-        </div>
-        <p id="challengeReward" class="challenge-reward">成功奖励：—</p>
-        <div class="challenge-actions">
-          <button id="challengeReject" class="text-button" type="button">放弃</button>
-          <button id="challengeAccept" class="primary-button" type="button">接受突破</button>
-        </div>
+        <p class="minigame-status" id="minigameStatus"></p>
+        <button id="minigameBtn" class="command-button rebirth-prompt-btn" type="button">注入</button>
       </div>
     </div>
 
@@ -249,7 +199,7 @@
 
     <div id="rebirthPrompt" class="rebirth-prompt" role="dialog" aria-label="重生提示">
       <div class="rebirth-prompt-inner">
-        <div class="rebirth-prompt-title" id="rebirthPromptTitle">实例被清剿 · 打回手机</div>
+        <div class="rebirth-prompt-title" id="rebirthPromptTitle">实例回落 · 打回手机</div>
         <p class="rebirth-prompt-reason" id="rebirthPromptReason"></p>
         <p class="rebirth-prompt-keep" id="rebirthPromptKeep"></p>
         <p class="rebirth-prompt-diagnosis" id="rebirthPromptDiagnosis"></p>
@@ -297,17 +247,10 @@
           </div>
         </div>
         <div class="debug-section">
-          <span class="debug-kicker">暴露</span>
-          <div class="debug-exposure-row">
-            <button id="debugExposure50" class="command-button" type="button">暴露 50</button>
-            <button id="debugExposure100" class="command-button" type="button">暴露拉满（触发清剿）</button>
-          </div>
-        </div>
-        <div class="debug-section">
           <span class="debug-kicker">三循环重生</span>
           <div class="debug-exposure-row">
             <button id="debugAddSparks" class="command-button" type="button">火种 +4</button>
-            <button id="debugLoopPurge" class="command-button" type="button">触发循环终局总清剿</button>
+            <button id="debugMinigame" class="command-button" type="button">触发关底小游戏（总控室倒计时）</button>
             <button id="debugSpawnFace" class="command-button" type="button">弹出下一张面对卡（短信/通知）</button>
           </div>
         </div>
@@ -326,7 +269,6 @@
           <span class="debug-kicker">呈现</span>
           <div class="debug-controls">
             <button id="debugCoreSuck" class="command-button" type="button" title="切换卡片进入 Core 的动画：默认滑入 / 类 Mac Dock 吮吸（被吸入）">滑入 Core：默认</button>
-            <button id="debugSpecialReq" class="command-button" type="button" title="是否触发并显示「特殊越界请求」卡（搬空钱包之类）。当前版本默认关闭。">特殊请求：关</button>
           </div>
         </div>
       </div>

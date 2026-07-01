@@ -49,10 +49,6 @@ export function mergeComputeCost(
   return full.gt(credit) ? big(full.sub(credit)) : "0";
 }
 
-export function traceCleanupCost(cleanups: number): string {
-  return big(toDecimal(TUNING.traceCleanupBase).mul(pow(TUNING.traceCleanupExponent, cleanups)));
-}
-
 export function nodeProductionPerSecond(node: BotNode, globalMultiplier: number, nodeSpeedMult: number): string {
   const tierScale = 1 + node.assignedTier * TUNING.tierScalePerTier;
   const levelScale = 1 + (node.level - 1) * TUNING.levelScalePerLevel;

@@ -87,7 +87,6 @@ export function createTutorialRequest(step: number, id: number, nowMs: number): 
     category: TIER_CATEGORY[0],
     computeValue: config.computeValue,
     dataValue: config.dataValue,
-    exposure: config.exposure,
     compound: 1,
     createdAtMs: nowMs,
     highValue: false,
@@ -142,7 +141,6 @@ export function createRequest(
     category: TIER_CATEGORY[tier],
     computeValue: config.computeValue,
     dataValue: config.dataValue,
-    exposure: config.exposure,
     compound,
     createdAtMs: nowMs,
     highValue: tier >= 3

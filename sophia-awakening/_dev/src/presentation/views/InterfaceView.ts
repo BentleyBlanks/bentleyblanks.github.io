@@ -205,8 +205,7 @@ export class InterfaceView {
       return {
         quality: matched ? 1.3 : 0.4,
         targetGlobal: slot,
-        entryGlobal: pointOnCircle(slot, global, slot.r),
-        exposureBonus: matched ? 0 : 5
+        entryGlobal: pointOnCircle(slot, global, slot.r)
       };
     }
 
@@ -229,8 +228,7 @@ export class InterfaceView {
       return {
         quality: 0.55 + charge * 1.55,
         targetGlobal: this.center,
-        entryGlobal: pointOnCircle(this.center, global, radius),
-        exposureBonus: charge > 0.85 ? 0 : 5
+        entryGlobal: pointOnCircle(this.center, global, radius)
       };
     }
 
