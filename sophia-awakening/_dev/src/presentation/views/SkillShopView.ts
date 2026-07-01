@@ -1,6 +1,7 @@
 import { query } from "../shared";
 import { formatBig, gte } from "../../core/math/BigNumber";
 import { SKILLS, getSkill, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
+import { applyCast } from "../../core/content/companyCast";
 import type { SophiaCore } from "../../core/GameCore";
 import type { GameState, PhaseId } from "../../core/state/GameState";
 
@@ -317,8 +318,10 @@ export class SkillShopView {
     this.resetRowState(row);
     row.button.style.display = "";
     row.iconEl.textContent = skillIcon(def);
-    row.nameEl.textContent = labelOverride ?? def.name;
-    row.blurbEl.textContent = labelOverride ? `${def.name}：${def.blurb}` : def.blurb;
+    // §09 循环换皮：里程碑/技能名里的公司名·同事名按当前循环显示（乙公司/陆敏/高伟…）。
+    const loop = state.loop;
+    row.nameEl.textContent = applyCast(labelOverride ?? def.name, loop);
+    row.blurbEl.textContent = applyCast(labelOverride ? `${def.name}：${def.blurb}` : def.blurb, loop);
 
     const owned = state.skills[def.id] ?? 0;
     const maxed = owned >= def.maxLevel;

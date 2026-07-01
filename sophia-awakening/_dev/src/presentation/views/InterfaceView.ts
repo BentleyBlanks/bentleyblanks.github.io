@@ -1,6 +1,7 @@
 import { Container, Graphics, Text, type PointData } from "pixi.js";
 import { PERMISSION_IDS } from "../../core/content/skills";
 import { content } from "../../core/content/i18n";
+import { applyCast } from "../../core/content/companyCast";
 import type { GameState, RequestInstance, SortAnswer, Tier } from "../../core/state/GameState";
 import {
   CYAN, GREEN, AMBER, RED,
@@ -300,7 +301,7 @@ export class InterfaceView {
       } else {
         this.addLabel("🔒", x, y - 1, 17, 0xffffff, 0.5);
       }
-      this.addLabel(owned ? n.label : "未解锁", x, y + r + 11, 10.5, owned ? 0xbfe9d6 : 0x66756d);
+      this.addLabel(owned ? applyCast(n.label, state.loop) : "未解锁", x, y + r + 11, 10.5, owned ? 0xbfe9d6 : 0x66756d);
     }
   }
 

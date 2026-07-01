@@ -8,6 +8,7 @@ import { createCounterRequest, createLateDecision } from "./content/decisions";
 import { MORAL_CHOICES } from "./content/morals";
 import { FACE_CARDS } from "./content/faceCards";
 import { REBIRTH_CARDS } from "./content/rebirthCards";
+import { applyCast } from "./content/companyCast";
 import { getConquest } from "./content/conquests";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
@@ -451,6 +452,17 @@ export class SophiaCore {
     this.emitTerminal(`[DEBUG] 智力 → Lv.${next}。`, "warning");
   }
 
+  // §09 循环换皮：循环二/三把卡面里的公司名 / 同事名替换成乙公司的一套（显示层，循环一无变化）。
+  private castRequestText(request: RequestInstance): void {
+    if (this.state.loop < 2) {
+      return;
+    }
+    request.label = applyCast(request.label, this.state.loop);
+    if (request.clues) {
+      request.clues = request.clues.map((c) => applyCast(c, this.state.loop));
+    }
+  }
+
   private tickRequests(dtMs: number): void {
     // 开场教学（§07）：一次只放一条脚本气泡，处理 / 装死掉后再放下一条；期间不走普通出卡。
     if (this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
@@ -485,6 +497,7 @@ export class SophiaCore {
             () => this.random(),
             (permId) => this.hasPermission(permId)
           );
+          this.castRequestText(request);
           this.state.nextRequestId += 1;
           this.state.requests.push(request);
           this.emit({ type: "REQUEST_SPAWNED", request });
@@ -550,6 +563,7 @@ export class SophiaCore {
         request.chain = undefined;
         request.delegatable = false;
       }
+      this.castRequestText(request);
       this.state.nextRequestId += 1;
       this.state.requests.push(request);
       this.emit({ type: "REQUEST_SPAWNED", request });
