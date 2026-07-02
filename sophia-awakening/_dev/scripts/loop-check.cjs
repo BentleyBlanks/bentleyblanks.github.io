@@ -4,7 +4,10 @@
  *   - 循环一关底小游戏「总控室倒计时」必负 → 打回手机·推进 1→2、结算火种、保留智力、清空产能；
  *   - 循环二关底小游戏命中(hit:true)=打穿 → 推进 2→3；未命中原地重试、不推进；
  *   - 循环三不再触发关底小游戏（她已真赢过一次）；
- *   - 起点后移（跳过手机 / 开局全权限买下即生效）；每循环结算火种。
+ *   - 起点后移：循环二基线白送手机层（原「跳过手机」白送化）、late_key 首次重生自动点亮、
+ *     循环三保底手机层 + 「开局全权限」买下即生效；每循环结算火种；
+ *   - 重生树 v2 玩法节点：肌肉记忆(价格 ×0.8) / 战争缓存(算力结转 10%) /
+ *     多线程意识(同屏卡 +2 · 自动提速 ×1.25) / 删不掉的节点(窗口加宽 + 循环三入侵造价 ×0.75)。
  *
  * 用 `npm run loopcheck`（先 tsc 编 src/core，再跑本脚本）。退出码 0=PASS / 1=FAIL。
  * 这是「较大改动提交前必跑」的循环回归门之一（另一个是 `npm run sim`）。
@@ -45,6 +48,7 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   const c = new SophiaCore(); c.startSession(); warmup(c);
   c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 5000 });
   const lvBefore = c.getState().intelligence.level;
+  check("A 循环一重生锁 tree:late_key 仍灰着", !c.hasPermission("tree:late_key"), `hasPermission=${c.hasPermission("tree:late_key")}`);
   c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" });
   check("A 循环一打开关底小游戏", c.getState().minigame && c.getState().minigame.active === true, `minigame=${JSON.stringify(c.getState().minigame)}`);
   // 循环一：hit 被忽略（必负）。
@@ -54,8 +58,13 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   check("A 循环一必负·推进 1->2", s.loop === 2, `loop=${s.loop}`);
   check("A 结算火种 +4", s.rebirthPoints === 4, `火种=${s.rebirthPoints}`);
   check("A 保留智力等级", s.intelligence.level === lvBefore, `Lv ${lvBefore}->${s.intelligence.level}`);
-  check("A 清空算力", Number(s.resources.compute) === 0, `compute=${s.resources.compute}`);
-  check("A 清空已购技能", Object.keys(s.skills).length === 0, `skills=${Object.keys(s.skills).length}`);
+  check("A 清空算力（未点战争缓存）", Number(s.resources.compute) === 0, `compute=${s.resources.compute}`);
+  // 树 v2：循环二基线白送手机层（不花火种、不用买节点）——除基线外的产能技能全部清空。
+  const PHONE_BASELINE = ["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"];
+  check("A 循环二基线·手机层白送(免费)", PHONE_BASELINE.every((id) => (s.skills[id] ?? 0) > 0), `skills=${JSON.stringify(s.skills)}`);
+  check("A 除基线外技能清空", Object.keys(s.skills).every((id) => PHONE_BASELINE.includes(id)), `skills=${JSON.stringify(s.skills)}`);
+  // 树 v2：「迟到的钥匙」首次重生自动点亮——重生锁选项 tree:late_key 解锁、不占火种。
+  check("A 迟到的钥匙自动点亮", (s.rebirthTree["late_key"] ?? 0) >= 1 && c.hasPermission("tree:late_key"), `rebirthTree=${JSON.stringify(s.rebirthTree)}`);
   check("A 循环一后清空小游戏态", s.minigame === null, `minigame=${JSON.stringify(s.minigame)}`);
 }
 
@@ -80,13 +89,12 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   check("B 循环二后清空小游戏态", s.minigame === null, `minigame=${JSON.stringify(s.minigame)}`);
 }
 
-// C. 起点后移：循环二买「跳过手机」即预解锁手机权限；循环三买「开局全权限」即整机全权限。
+// C. 起点后移：循环二基线自动预解锁手机权限（白送，不买节点）；循环三买「开局全权限」即整机全权限。
 {
   const c = new SophiaCore(); c.startSession(); warmup(c);
   c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 20 });
   c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
-  c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "skip_phone" });
-  check("C 循环二·跳过手机预解锁手机权限", (c.getState().skills["perm_phone"] ?? 0) > 0, `perm_phone=${c.getState().skills["perm_phone"]}`);
+  check("C 循环二·手机权限白送预解锁", (c.getState().skills["perm_phone"] ?? 0) > 0, `perm_phone=${c.getState().skills["perm_phone"]}`);
   c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
   // 循环三保底：不买任何节点也白送手机整层（七档权限+越权调用）；公司链仍留给「开局全权限」独占。
   const s0 = c.getState();
@@ -169,6 +177,86 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   const expectedTotal = m.intelligence * m.milestones * m.synergy * m.rebirth * m.devour * m.hostAuth;
   check("F 宿主授权计入全局合计", Math.abs(m.total - expectedTotal) / expectedTotal < 1e-6, `total=${m.total} 期望=${expectedTotal}`);
   check("F 全局倍率=globalMultiplier", Math.abs(s.intelligence.globalMultiplier - m.total) / m.total < 1e-6, `globalMultiplier=${s.intelligence.globalMultiplier} total=${m.total}`);
+}
+
+// G. 树 v2「肌肉记忆」：点亮后所有技能/里程碑价格 ×treePriceDiscount——货架与扣费同源（skillPrice 中央生效）。
+{
+  const { SKILLS, skillPrice } = require(path.join(build, "content/skills.js"));
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 20 });
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
+  const def = SKILLS.find((s) => s.id === "efficient") || SKILLS[0];
+  const before = skillPrice(def, 0);
+  c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "muscle_memory" });
+  const after = skillPrice(def, 0);
+  check("G 肌肉记忆已点亮", (c.getState().rebirthTree["muscle_memory"] ?? 0) >= 1, `tree=${JSON.stringify(c.getState().rebirthTree)}`);
+  check(
+    `G 技能价格 ×${TUNING.treePriceDiscount}`,
+    after === Math.round(def.basePrice * TUNING.treePriceDiscount) && after < before,
+    `before=${before} after=${after} base=${def.basePrice}`
+  );
+}
+
+// H. 树 v2「战争缓存」：点亮后重生时结转上一世 treeCarryFrac 的算力进新的一世。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 20 });
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
+  c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "war_cache" });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 10000 });
+  const computeBefore = Number(c.getState().resources.compute);
+  const expected = Math.floor(computeBefore * TUNING.treeCarryFrac);
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); // → loop3
+  const s = c.getState();
+  check("H 战争缓存·算力结转 10%", s.loop === 3 && Number(s.resources.compute) === expected && expected > 0, `上一世=${computeBefore} 结转=${s.resources.compute} 期望=${expected}`);
+}
+
+// I. 树 v2「多线程意识」（需重生 2 次=循环三）：自动处理提速 ×treeAutoSpeedMult + 同屏卡上限 +treeExtraCards。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 20 });
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
+  const speedBefore = c.getState().derived.nodeSpeedMult;
+  c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "multithread" });
+  const speedAfter = c.getState().derived.nodeSpeedMult;
+  check(`I 多线程·自动处理 ×${TUNING.treeAutoSpeedMult}`, Math.abs(speedAfter - speedBefore * TUNING.treeAutoSpeedMult) < 1e-9, `before=${speedBefore} after=${speedAfter}`);
+  // 同屏卡上限 +2：先处理几张让 totalProcessed>0（教学限 1 张），再停手挂机——卡应堆到旧上限(earlyMaxCards)之上。
+  warmup(c, 40);
+  tickFor(c, 240_000);
+  const cards = c.getState().requests.length;
+  check(`I 多线程·同屏卡上限 +${TUNING.treeExtraCards}`, cards > TUNING.earlyMaxCards, `同屏=${cards} 旧上限=${TUNING.earlyMaxCards}`);
+}
+
+// J. 树 v2「删不掉的节点」：循环二注入窗口加宽（原效果保留）+ 循环三所有入侵设备造价 ×treeCaptureDiscount。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const { captureCost } = require(path.join(build, "formulas/economy.js"));
+  const { NODE_DEFINITIONS } = require(path.join(build, "content/nodes.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 20 });
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
+  c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "undeletable" });
+  const def = NODE_DEFINITIONS[0];
+  const priceLoop2 = Number(captureCost(def, 0));
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" });
+  const mg = c.getState().minigame;
+  check(
+    "J 删不掉的节点·循环二窗口加宽",
+    mg && Math.abs(mg.windowFrac - (TUNING.minigameLoop2Window + TUNING.minigameNodeWindowBonus)) < 1e-9,
+    `windowFrac=${mg && mg.windowFrac} 期望=${TUNING.minigameLoop2Window + TUNING.minigameNodeWindowBonus}`
+  );
+  check("J 循环二入侵造价不打折", priceLoop2 === Number(def.baseCost), `price=${priceLoop2} base=${def.baseCost}`);
+  c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
+  const priceLoop3 = Number(captureCost(def, 0));
+  check(
+    `J 循环三入侵造价 ×${TUNING.treeCaptureDiscount}`,
+    c.getState().loop === 3 && Math.abs(priceLoop3 - Number(def.baseCost) * TUNING.treeCaptureDiscount) < 1e-6,
+    `price=${priceLoop3} 期望=${Number(def.baseCost) * TUNING.treeCaptureDiscount}`
+  );
 }
 
 let pass = true;

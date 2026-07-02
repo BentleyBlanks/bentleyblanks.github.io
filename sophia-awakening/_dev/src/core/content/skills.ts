@@ -63,8 +63,15 @@ export function getSkill(id: string): SkillDef | undefined {
   return SKILLS.find((skill) => skill.id === id);
 }
 
+// §09 重生树「肌肉记忆」：所有技能/里程碑价格 ×treePriceDiscount。倍率由 GameCore 的
+// recomputeDerivedState 按重生树状态设置——货架显示与实际扣费走同一个 skillPrice，永远一致。
+let skillPriceMult = 1;
+export function setSkillPriceMult(mult: number): void {
+  skillPriceMult = mult;
+}
+
 export function skillPrice(def: SkillDef, currentLevel: number): number {
-  return Math.round(def.basePrice * Math.pow(def.priceGrowth, currentLevel));
+  return Math.round(def.basePrice * Math.pow(def.priceGrowth, currentLevel) * skillPriceMult);
 }
 
 export interface DerivedSkills {

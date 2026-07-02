@@ -156,11 +156,11 @@ for (let i = 0; i < MAX_STEPS && !firstError && !(ended && allBought); i += 1) {
         safe(() => core.dispatch({ type: "BUY_SKILL", skillId: def.id }));
       }
     }
-    // §09 三循环重生：有火种就点重生树——优先起点后移(跳过手机/开局全权限)，再堆两条数值脊，
-    // 最后封顶「删不掉的节点」，让循环三挺得过软清剿、冲到结局。
+    // §09 三循环重生（树 v2）：有火种就点重生树——循环三先拿起点后移(开局全权限)与多线程，
+    // 循环二先拿肌肉记忆(全场打八折)与战争缓存(算力结转)，再堆两条数值脊，最后「删不掉的节点」。
     const rb = core.getState();
     if (rb.rebirthPoints > 0) {
-      const order = ["skip_phone", "full_access", "output", "speed", "undeletable", "late_key", "remember"];
+      const order = ["full_access", "multithread", "muscle_memory", "war_cache", "output", "speed", "undeletable"];
       for (const nodeId of order) {
         const before = core.getState().rebirthPoints;
         safe(() => core.dispatch({ type: "BUY_REBIRTH_NODE", nodeId }));

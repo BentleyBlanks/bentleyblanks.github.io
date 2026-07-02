@@ -6,7 +6,9 @@ import type { GameState } from "./GameState";
 // v13：移除暴露/怀疑/清剿/挑战/特殊请求整套系统，接管公司服务器改为关底小游戏（minigame）——旧档自动重置。
 // v14：倍率堆栈（里程碑全局倍率 / 设备协同 / 循环内建加速 / multipliers 拆解字段）——旧档自动重置。
 // v15：§09 情感授权钥匙（hostAuthorized 宿主授权倍率 + multipliers.hostAuth）——旧档自动重置。
-export const SAVE_VERSION = 15;
+// v16：重生树 v2「全是看得见的力量」——节点集合更换（skip_phone/late_key/remember 白送化或删除，
+//      新增 muscle_memory/war_cache/multithread），旧档树里可能残留已删节点——旧档自动重置。
+export const SAVE_VERSION = 16;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);

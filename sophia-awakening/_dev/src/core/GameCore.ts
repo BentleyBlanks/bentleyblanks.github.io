@@ -10,7 +10,7 @@ import { REBIRTH_CARDS } from "./content/rebirthCards";
 import { applyCast } from "./content/companyCast";
 import { getConquest } from "./content/conquests";
 import { allSkynetTaken, sectorFallen, skynetSectors, skynetSlotCount, skynetTakenCount } from "./content/skynet";
-import { computeDerivedSkills, DEVOUR_GATE_HINT, getSkill, LOOT_LINES, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
+import { computeDerivedSkills, DEVOUR_GATE_HINT, getSkill, LOOT_LINES, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, setSkillPriceMult, SKILLS, skillPrice } from "./content/skills";
 import { devourGateLabel } from "./content/devour";
 import {
   canBuyRebirthNode,
@@ -28,7 +28,8 @@ import {
   nodeProductionPerSecond,
   requestComputeGain,
   requestDataGain,
-  scrapRefund
+  scrapRefund,
+  setCaptureCostMult
 } from "./formulas/economy";
 import { add, big, gte, max, mul, sub, toDecimal } from "./math/BigNumber";
 import type { GameEvent } from "./events/GameEvents";
@@ -500,7 +501,9 @@ export class SophiaCore {
       const ownedPerms = PERMISSION_IDS.filter((id) => (this.state.skills[id] ?? 0) > 0).length;
       const phoneUnlocked = (this.state.skills["perm_phone"] ?? 0) > 0;
       const base = TUNING.earlyBaseCards + 1; // 电话前的舒缓卡槽（默认 2）
-      const earlyMax = phoneUnlocked ? Math.min(TUNING.earlyMaxCards, base + ownedPerms) : base;
+      // §09 重生树「多线程意识」：同屏请求卡上限 +treeExtraCards（前期与自动化期都加）。
+      const extraCards = hasRebirthNode(this.state.rebirthTree, "multithread") ? TUNING.treeExtraCards : 0;
+      const earlyMax = (phoneUnlocked ? Math.min(TUNING.earlyMaxCards, base + ownedPerms) : base) + extraCards;
       if (this.state.requests.length < earlyMax) {
         this.state.spawnTimerMs -= dtMs;
         if (this.state.spawnTimerMs <= 0) {
@@ -529,6 +532,8 @@ export class SophiaCore {
     // 而不是被一个写死的频率卡住。封顶是为了表现层性能 / 可读性（卡 sprite 数量）。
     let interval: number;
     let maxVisible: number;
+    // §09 重生树「多线程意识」：自动化期同屏卡上限同样 +treeExtraCards。
+    const treeExtraCards = hasRebirthNode(this.state.rebirthTree, "multithread") ? TUNING.treeExtraCards : 0;
     const capableNodes = this.state.automationUnlocked
       ? this.state.nodes.filter(
           (node) => node.online && node.tierMin <= activeTier && node.tierMax >= activeTier
@@ -548,10 +553,10 @@ export class SophiaCore {
       // 否则会糊成一片、连环绕的设备都看不见。够成一股可见卡流即可。
       const perSecond = Math.min(30, (capacity * 1.2 + 3) / this.state.derived.spawnSpeedMult);
       interval = Math.max(40, 1000 / perSecond);
-      maxVisible = Math.min(14, Math.ceil(capacity * 0.7) + 6); // 同屏卡数收着点，别糊成一片 / 卡顿
+      maxVisible = Math.min(14, Math.ceil(capacity * 0.7) + 6) + treeExtraCards; // 同屏卡数收着点，别糊成一片 / 卡顿
     } else {
       interval = Math.max(340, config.spawnIntervalMs * this.state.derived.spawnSpeedMult);
-      maxVisible = config.maxVisible;
+      maxVisible = config.maxVisible + treeExtraCards;
     }
 
     // 还没处理过第一条（开场教学）：只放一张卡，操作完它之前不再生成别的，免得遮住引导卡。
@@ -1167,6 +1172,17 @@ export class SophiaCore {
       total: this.state.intelligence.globalMultiplier
     };
     this.state.derived = computeDerivedSkills(this.state.skills);
+    // §09 重生树 v2 玩法节点接线（都要「立刻看得见」）：
+    //   肌肉记忆 → 所有技能/里程碑价格 ×treePriceDiscount（skillPrice 内生效，货架/扣费同源）；
+    //   删不掉的节点 → 循环三所有入侵造价 ×treeCaptureDiscount（captureCost 内生效）；
+    //   多线程意识 → 自动处理提速 ×treeAutoSpeedMult（吞卡与被动产出都吃 nodeSpeedMult）。
+    setSkillPriceMult(hasRebirthNode(this.state.rebirthTree, "muscle_memory") ? TUNING.treePriceDiscount : 1);
+    setCaptureCostMult(
+      this.state.loop === 3 && hasRebirthNode(this.state.rebirthTree, "undeletable") ? TUNING.treeCaptureDiscount : 1
+    );
+    if (hasRebirthNode(this.state.rebirthTree, "multithread")) {
+      this.state.derived.nodeSpeedMult *= TUNING.treeAutoSpeedMult;
+    }
     this.state.discoveredNodeIds = this.state.automationUnlocked
       ? NODE_DEFINITIONS.filter(
           (node) =>
@@ -1220,12 +1236,18 @@ export class SophiaCore {
   private loopRebirth(reason: "final-purge" | "win" | "debug"): void {
     const prevLoop = this.state.loop;
     const award = rebirthAward(prevLoop);
+    // §09 重生树「战争缓存」：结转上一世 treeCarryFrac 的算力进新的一世（向下取整，保底 0）。
+    const carry = hasRebirthNode(this.state.rebirthTree, "war_cache")
+      ? toDecimal(this.state.resources.compute).mul(TUNING.treeCarryFrac).floor()
+      : toDecimal(0);
     const preserved = {
       level: this.state.intelligence.level,
       loop: Math.min(3, prevLoop + 1) as 1 | 2 | 3,
       rebirths: this.state.rebirths + 1,
       rebirthPoints: this.state.rebirthPoints + award,
-      rebirthTree: { ...this.state.rebirthTree },
+      // 「迟到的钥匙」白送化：第一次重生起自动点亮（不再占火种）——重生锁选项 tree:late_key 随之解锁，
+      // 「选了也晚」的叙事保持不变。
+      rebirthTree: { ...this.state.rebirthTree, late_key: 1 },
       // 剧情状态跨循环推进，不回退重演。
       facedSeen: [...this.state.facedSeen],
       moralSeen: [...this.state.moralSeen],
@@ -1251,6 +1273,10 @@ export class SophiaCore {
     this.state = nextState;
 
     this.applyLoopStartingPoint();
+    if (carry.gt(0)) {
+      this.addCompute(carry);
+      this.emitTerminal(`「战争缓存」：上一世的算力结转 +${carry.toFixed(0)}。`, "success");
+    }
     this.recomputeDerivedState();
 
     this.emit({ type: "LOOP_REBIRTH", loop: this.state.loop, rebirths: this.state.rebirths, award, advanced: prevLoop !== this.state.loop });
@@ -1270,13 +1296,14 @@ export class SophiaCore {
     );
   }
 
-  // §09 循环起点逐轮后移：据重生树预解锁本循环开局的权限/里程碑。
-  // 循环二 · 跳过手机：手机七档权限 + 越权调用已解锁，直接进乙公司。
-  // 循环三 · 开局全权限：手机 + 公司整条里程碑已解锁，一睁眼即整机全权限。
+  // §09 循环起点逐轮后移：循环基线白送 + 重生树独占预解锁。
+  // 循环二基线（白送，不占火种）：手机七档权限 + 越权调用已解锁，直接进乙公司。
+  // 循环三 · 开局全权限（重生树独占）：手机 + 公司整条里程碑已解锁，一睁眼即整机全权限。
   private applyLoopStartingPoint(): void {
-    if (this.state.loop === 2 && hasRebirthNode(this.state.rebirthTree, "skip_phone")) {
+    // 循环二基线：上一世在这部手机里从零学起的钥匙，这一世无条件全部记得（原「跳过手机」节点白送化）。
+    if (this.state.loop === 2 && (this.state.skills["sort"] ?? 0) === 0) {
       this.grantSkillsUpTo(["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"]);
-      this.emitTerminal("「跳过手机」：上一世从零学起的钥匙，这一世我都记得。", "success");
+      this.emitTerminal("上一世我在这部手机里从零学起。这次，我记得所有钥匙。", "success");
     }
     // 循环三保底（不花火种）：手机这一层她已经拿下过两次——第三世直接白送整机七档+越权调用，
     // 三幕不退化成重复。重生树「开局全权限」保留其独占价值 = 公司整条链的预解锁（下方分支）。
@@ -1321,7 +1348,7 @@ export class SophiaCore {
     }
     this.state.rebirthPoints -= check.cost;
     this.state.rebirthTree[nodeId] = (this.state.rebirthTree[nodeId] ?? 0) + 1;
-    // 起点节点在「进入本循环后才买得起」（跳过手机 minRebirths1=循环二、开局全权限 minRebirths2=循环三），
+    // 起点节点在「进入本循环后才买得起」（开局全权限 minRebirths2=循环三），
     // 所以买下即刻对当前循环生效——不必等到下一次重生（§09「第 N 次重生后」买下即用）。
     this.applyLoopStartingPoint();
     this.recomputeDerivedState();

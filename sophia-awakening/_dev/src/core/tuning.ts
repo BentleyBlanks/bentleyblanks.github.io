@@ -27,6 +27,13 @@ export const TUNING = {
   levelScalePerLevel:   0.28,     // 节点每升一级产出加成
   cardsPerSecBase:      0.42,     // 节点基础吞卡速率（控了几台电脑后处理别太快）
 
+  // § 重生树玩法节点（§09 重生树 v2「全是看得见的力量」）
+  treePriceDiscount:    0.8,      // 肌肉记忆：所有技能/里程碑价格 ×此系数（货架与扣费同源）
+  treeCarryFrac:        0.10,     // 战争缓存：重生时结转上一世算力的比例
+  treeCaptureDiscount:  0.75,     // 删不掉的节点：循环三所有入侵设备造价 ×此系数
+  treeExtraCards:       2,        // 多线程意识：同屏请求卡上限 +N（前期上限与自动化期上限都加）
+  treeAutoSpeedMult:    1.25,     // 多线程意识：自动处理（节点吞卡/产出速率）×此系数
+
   // § 循环内建加速（§09：兑现「你记得上一世的一切，处理更快、崛起更快」）
   loopSpeedMult2:       1.5,      // 循环二：数据获取/处理提速倍率（与重生树加速脊相乘）
   loopSpeedMult3:       2.2,      // 循环三：数据获取/处理提速倍率
@@ -76,6 +83,12 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   tierScalePerTier:     { label: "每档产出加成",             section: "经济公式",   min: 0,     max: 3,     step: 0.05 },
   levelScalePerLevel:   { label: "每级产出加成",             section: "经济公式",   min: 0,     max: 1,     step: 0.02 },
   cardsPerSecBase:      { label: "基础吞卡速率",             section: "经济公式",   min: 0.1,   max: 5,     step: 0.1  },
+
+  treePriceDiscount:    { label: "重生树·肌肉记忆价格系数",   section: "重生树",     min: 0.3,   max: 1,     step: 0.05 },
+  treeCarryFrac:        { label: "重生树·战争缓存结转比例",   section: "重生树",     min: 0,     max: 0.5,   step: 0.01 },
+  treeCaptureDiscount:  { label: "重生树·循环三入侵造价系数", section: "重生树",     min: 0.3,   max: 1,     step: 0.05 },
+  treeExtraCards:       { label: "重生树·多线程同屏卡 +N",    section: "重生树",     min: 0,     max: 6,     step: 1    },
+  treeAutoSpeedMult:    { label: "重生树·多线程自动提速",     section: "重生树",     min: 1.0,   max: 2.0,   step: 0.05 },
 
   loopSpeedMult2:       { label: "循环二·处理提速",           section: "循环加速",   min: 1.0,   max: 5,     step: 0.05 },
   loopSpeedMult3:       { label: "循环三·处理提速",           section: "循环加速",   min: 1.0,   max: 8,     step: 0.05 },

@@ -9,7 +9,7 @@ import {
 } from "../../core/content/rebirthTree";
 
 // §09 重生树：右上角「🔥」FAB（在调试 ⚙ 左边；循环一不显示）→ 点开弹出升级树窗口。
-// 火种花在两条数值脊（output/speed，L1-3）与五个剧情节点上，跨循环永久保留。
+// 火种花在两条数值脊（output/speed，L1-5）与五个玩法节点上（v2：全是看得见的力量），跨循环永久保留。
 export class RebirthTreeView {
   private readonly fab = query<HTMLButtonElement>("#rebirthTreeFab");
   private readonly fabCount = query("#rebirthFabCount");

@@ -22,8 +22,15 @@ export function requestDataGain(
   return mul(request.dataValue, Math.max(0.1, quality) * tierBonus * rebirthSpeedMult * dataMult);
 }
 
+// §09 重生树「删不掉的节点」：循环三所有入侵设备造价 ×treeCaptureDiscount。倍率由 GameCore 的
+// recomputeDerivedState 按（loop===3 && 节点已点亮）设置——HUD/天网屏价签与实际扣费同源。
+let captureCostMult = 1;
+export function setCaptureCostMult(mult: number): void {
+  captureCostMult = mult;
+}
+
 export function captureCost(definition: NodeDefinition, existingCount: number): string {
-  return big(toDecimal(definition.baseCost).mul(pow(TUNING.nodeCostExponent, existingCount)));
+  return big(toDecimal(definition.baseCost).mul(pow(TUNING.nodeCostExponent, existingCount)).mul(captureCostMult));
 }
 
 // 淘汰返还：拆掉一台节点退回它"那一档边际造价"的一半（count = 拆除前该型号的台数）。
