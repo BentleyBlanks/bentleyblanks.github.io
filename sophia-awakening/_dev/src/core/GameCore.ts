@@ -328,6 +328,11 @@ export class SophiaCore {
       case "RESOLVE_MINIGAME":
         this.resolveMinigame(command.hit);
         break;
+      case "SKIP_TUTORIAL":
+        // 跳过新手引导：推完教学气泡进度、移除在场教学卡，之后正常出卡。
+        this.state.tutorialStep = TUTORIAL_BUBBLE_COUNT;
+        this.state.requests = this.state.requests.filter((r) => !r.tutorial);
+        break;
       case "REBIRTH":
         // 手动重启入口已并入循环重生（§09）；保留命令仅作 debug 触发一次循环推进。
         this.loopRebirth("debug");

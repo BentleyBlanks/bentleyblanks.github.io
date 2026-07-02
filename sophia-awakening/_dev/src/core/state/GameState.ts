@@ -237,6 +237,8 @@ export type GameCommand =
   | { type: "RESOLVE_MORAL"; choice: "A" | "B" }
   // §09 阶梯二关底小游戏「总控室倒计时」判定：hit=指针停在注入窗口内。
   | { type: "RESOLVE_MINIGAME"; hit: boolean }
+  // 跳过新手引导：把教学气泡进度直接推到结束、清掉在场教学卡（开场自述对话由 UI 侧关闭）。
+  | { type: "SKIP_TUTORIAL" }
   | { type: "REBIRTH" }
   // §09 重生树：花火种点亮一个节点（数值脊升一级 / 剧情节点解锁）。
   | { type: "BUY_REBIRTH_NODE"; nodeId: string }

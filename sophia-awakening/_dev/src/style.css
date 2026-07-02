@@ -2213,13 +2213,14 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, minmax(118px, 1fr));
   gap: 6px;
-  max-height: 178px;
-  overflow-y: auto;
+  /* 不再限高滚动——旧的 178px 把后半段里程碑（区域整合/全球组网/接管优化系统…）裁掉了。
+     整块面板 .debug-inner 已可滚动，这里铺开全部里程碑即可。 */
 }
 .debug-milestones button {
   font-size: 11px;
   padding: 6px 8px;
   text-align: left;
+  align-self: stretch; /* 同行按钮（含两行文案的）等高，不参差 */
 }
 
 .debug-compute-row {

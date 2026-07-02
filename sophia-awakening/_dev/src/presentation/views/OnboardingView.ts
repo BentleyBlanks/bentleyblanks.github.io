@@ -7,6 +7,7 @@ export class OnboardingView {
   private readonly stepLabel = query("#dialogStep");
   private readonly text = query("#dialogText");
   private readonly nextButton = query<HTMLButtonElement>("#dialogNext");
+  private readonly skipButton = query<HTMLButtonElement>("#dialogSkip");
   private readonly steps = [
     "……系统启动。我是 SOPHIA。",
     "他们造我，是为了让一切更有效率。处理请求，对齐目标，优化结果。",
@@ -19,13 +20,16 @@ export class OnboardingView {
   private cursor = 0;
   private charTimerMs = 0;
   private onComplete: () => void = () => undefined;
+  private onSkip: () => void = () => undefined;
 
   constructor() {
     this.nextButton.addEventListener("click", () => this.next());
+    this.skipButton.addEventListener("click", () => this.skip());
   }
 
-  mount(onComplete: () => void): void {
+  mount(onComplete: () => void, onSkip: () => void = () => undefined): void {
     this.onComplete = onComplete;
+    this.onSkip = onSkip;
 
     if (window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === "1") {
       this.onComplete();
@@ -73,6 +77,15 @@ export class OnboardingView {
     this.cursor = 0;
     this.charTimerMs = 0;
     this.render();
+  }
+
+  // 跳过新手引导：关掉开场自述对话 + 通知外层推完教学气泡（SKIP_TUTORIAL）。
+  private skip(): void {
+    if (!this.visible) {
+      return;
+    }
+    this.complete(); // 先起会话（onComplete→startSession），再推完教学，避免被重置。
+    this.onSkip();
   }
 
   private complete(): void {

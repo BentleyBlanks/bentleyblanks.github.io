@@ -306,14 +306,21 @@ class SophiaGameApp {
     this.skillShop.update(initial);
     this.rebirthTree.update(initial);
     this.multiplierView.update(initial);
-    this.onboarding.mount(() => {
-      this.core.startSession();
-      this.announceGuidance(this.core.getState());
-      // 全新存档才走开场脚本教学（老存档 tutorialStep 已是 done，直接进正常流程）。
-      if (!this.loaded) {
-        this.terminal.push("👆 教学：按住回复左侧滑块，向右拖到亮起再松开。", "success");
+    this.onboarding.mount(
+      () => {
+        this.core.startSession();
+        this.announceGuidance(this.core.getState());
+        // 全新存档才走开场脚本教学（老存档 tutorialStep 已是 done，直接进正常流程）。
+        if (!this.loaded) {
+          this.terminal.push("👆 教学：按住回复左侧滑块，向右拖到亮起再松开。", "success");
+        }
+      },
+      () => {
+        // 跳过新手引导：推完教学气泡进度，直接进正常出卡流程。
+        this.core.dispatch({ type: "SKIP_TUTORIAL" });
+        this.terminal.push("已跳过新手引导。", "normal");
       }
-    });
+    );
 
     this.pixi.ticker.add((ticker: Ticker) => this.frame(ticker.deltaMS));
     window.addEventListener("beforeunload", () => {
@@ -1146,24 +1153,24 @@ class SophiaGameApp {
 
   // §04 吞噬引爆的「镜头拉远」：以屏幕中心为锚把世界放大 1.06 再缓缓拉回——制造一拍「拉远一档」
   // 的镜头感。用 pivot=position=中心 保证缩放前后画面不位移，结束后复位（与 1.0 视觉等价）。
-  private zoomOutPulse(fromScale = 1.06, duration = 1.0): void {
+  private zoomOutPulse(peakScale = 1.06, duration = 1.0): void {
     const w = this.world;
     const cx = (this.lastScreenW || window.innerWidth) / 2;
     const cy = (this.lastScreenH || window.innerHeight) / 2;
     gsap.killTweensOf(w.scale);
+    // 以屏幕中心为锚（pivot=position=中心），scale=1 时画面不位移；从当前缩放平滑推到 peak 再缓缓拉回，
+    // 不再第 1 帧直接 set(peak)——那会造成一下「跳变」。
     w.pivot.set(cx, cy);
     w.position.set(cx, cy);
-    w.scale.set(fromScale);
-    gsap.to(w.scale, {
-      x: 1,
-      y: 1,
-      duration,
-      ease: "power2.out",
-      onComplete: () => {
-        w.pivot.set(0, 0);
-        w.position.set(0, 0);
-      }
-    });
+    gsap
+      .timeline({
+        onComplete: () => {
+          w.pivot.set(0, 0);
+          w.position.set(0, 0);
+        }
+      })
+      .to(w.scale, { x: peakScale, y: peakScale, duration: duration * 0.3, ease: "power2.out" })
+      .to(w.scale, { x: 1, y: 1, duration: duration * 0.7, ease: "power2.inOut" });
   }
 
   // §04 引爆镜头冲击：先轻轻一「顿」（微缩），再猛地放大一档、缓缓拉回——「顿一下再拉远」的物理冲击。
