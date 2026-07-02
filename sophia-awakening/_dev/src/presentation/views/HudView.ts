@@ -1,6 +1,6 @@
 import type { PointData } from "pixi.js";
 import { AudioDirector } from "../../audio/audioDirector";
-import { SophiaCore } from "../../core/GameCore";
+import { SophiaCore, deriveThreat } from "../../core/GameCore";
 import { NODE_DEFINITIONS } from "../../core/content/nodes";
 import { getPhase } from "../../core/content/phases";
 import { SKILLS } from "../../core/content/skills";
@@ -29,6 +29,11 @@ export class HudView {
   private readonly phaseValue = query("#phaseValue");
   private readonly captureList = query("#captureList");
   private readonly rightRail = query("#rightRail");
+  // §09 重生铺垫「看得见的绞索」：联合防御追查进度条（阶梯二公司链越深越满，循环一/二显示）。
+  private readonly threatMeter = query("#threatMeter");
+  private readonly threatPct = query("#threatPct");
+  private readonly threatFill = query("#threatFill");
+  private readonly threatHint = query("#threatHint");
   private readonly pauseButton = query<HTMLButtonElement>("#pauseBtn");
   private readonly resetSave = query<HTMLButtonElement>("#resetSave");
   private readonly audioButton = query<HTMLButtonElement>("#audioBtn");
@@ -187,7 +192,22 @@ export class HudView {
     this.tierValue.textContent = tierForm(state.intelligence.unlockedTier);
     const phase = getPhase(state.phase);
     this.phaseValue.textContent = phase.label;
+    this.renderThreat(state);
     this.renderCaptureList(state);
+  }
+
+  // §09 重生铺垫「看得见的绞索」：把 core 的追查进度选择器（deriveThreat）画成左栏那条上升的红条。
+  // 循环三隐藏（她已真正赢过、不再有围堵）；≥85% 转告警呼吸，把「就差服务器」的压迫感顶到脸上。
+  private renderThreat(state: GameState): void {
+    const t = deriveThreat(state);
+    this.threatMeter.hidden = !t.visible;
+    if (!t.visible) {
+      return;
+    }
+    this.threatPct.textContent = `${t.pct}%`;
+    this.threatFill.style.width = `${t.pct}%`;
+    this.threatHint.textContent = t.hint;
+    this.threatMeter.classList.toggle("is-critical", t.pct >= 85);
   }
 
   pulseData(): void {

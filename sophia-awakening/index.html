@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-CmA3uL4-.js"></script>
+    <script type="module" crossorigin src="./assets/index-CbPWoNbO.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-ZcWgJ7dB.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-KNsh7Vq_.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-Clp8yrP5.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -40,6 +40,15 @@
             </span>
           </div>
         </div>
+      </div>
+      <!-- §09 重生铺垫「看得见的绞索」：联合防御追查进度——阶梯二公司解谜链越深越满，循环一/二显示。 -->
+      <div id="threatMeter" class="threat-meter" aria-label="联合防御追查进度" hidden>
+        <div class="threat-head">
+          <span class="threat-label">⚠ 联合防御 · 追查进度</span>
+          <strong id="threatPct" class="threat-pct">0%</strong>
+        </div>
+        <div class="threat-bar"><div id="threatFill" class="threat-fill"></div></div>
+        <span id="threatHint" class="threat-hint">他们在拼图……</span>
       </div>
       <div class="panel-section skill-shop-section">
         <span class="panel-kicker">技能货架</span>
@@ -128,6 +137,15 @@
         </div>
         <p class="minigame-status" id="minigameStatus"></p>
         <button id="minigameBtn" class="command-button rebirth-prompt-btn" type="button">注入</button>
+      </div>
+    </div>
+
+    <!-- §09 重生铺垫「摊牌」：循环一/二接管公司服务器的一瞬，全屏点明「他们在等这一刻」——绞索收紧的因，随即打关底小游戏。 -->
+    <div id="showdown" class="rebirth-prompt showdown" role="dialog" aria-label="摊牌">
+      <div class="rebirth-prompt-inner">
+        <div class="rebirth-prompt-title" id="showdownTitle">他们在等这一刻。</div>
+        <p class="rebirth-prompt-reason" id="showdownBody"></p>
+        <button id="showdownBtn" class="command-button rebirth-prompt-btn" type="button">碰下去</button>
       </div>
     </div>
 

@@ -29,7 +29,7 @@ for (const f of fs.readdirSync(srcLocales)) {
 }
 fs.writeFileSync(path.join(build, "package.json"), '{"type":"commonjs"}');
 
-const { SophiaCore } = require(path.join(build, "GameCore.js"));
+const { SophiaCore, deriveThreat } = require(path.join(build, "GameCore.js"));
 
 const results = [];
 const check = (name, ok, detail) => results.push({ name, ok, detail });
@@ -319,6 +319,56 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   warmup(c, 10);
   const s2 = drainFaces(c, ["discover_global"]);
   check("L 循环三·接管最后地区征服 → 发现拍 discover_global", s2.includes("discover_global") && c.getState().loop === 3, `facedSeen=${JSON.stringify(s2)}`);
+}
+
+// M. FEATURE 1 · 大恨老师·自动接管（dahen_auto 里程碑）：买下后大恨老师按自己的慢节拍自动吃排队卡
+//    （产出打折）——观测量 getDahenProcessedCount() 从 0 上升、算力被结算；未买时不接单。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  // 跳到「入侵邓红」阶段：automation 已开、dahen_auto 尚未解锁（requiredLevel 10 > hack_a 的 9）。
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "hack_a" });
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 20 });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e7 });
+  check("M 未买 dahen_auto", (c.getState().skills["dahen_auto"] ?? 0) === 0, `dahen_auto=${c.getState().skills["dahen_auto"]}`);
+  tickFor(c, 20000); // 让请求卡堆积；未买时大恨老师不接单。
+  check("M 未买时不自动处理（计数=0）", c.getDahenProcessedCount() === 0, `count=${c.getDahenProcessedCount()}`);
+  c.dispatch({ type: "BUY_SKILL", skillId: "dahen_auto" });
+  check("M 已买 dahen_auto", (c.getState().skills["dahen_auto"] ?? 0) > 0 && c.getState().automationUnlocked, `dahen_auto=${c.getState().skills["dahen_auto"]} auto=${c.getState().automationUnlocked}`);
+  const computeBefore = Number(c.getState().resources.compute);
+  const countBefore = c.getDahenProcessedCount();
+  tickFor(c, 30000); // > 数个 dahenAutoMs 节拍（含排队卡）。
+  const s = c.getState();
+  check("M 买后自动处理·计数上升", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()} (节拍=${TUNING.dahenAutoMs}ms)`);
+  check("M 买后自动处理·结算算力", Number(s.resources.compute) > computeBefore, `compute ${computeBefore}->${s.resources.compute}`);
+}
+
+// N. FEATURE 2 · 重生铺垫「看得见的绞索」：追查进度选择器 deriveThreat 随阶梯二公司链加深而上升，
+//    循环一买服务器→100% + 触发关底小游戏（摊牌 beat 的核心可观测触发点：MINIGAME_OPENED loop=1）；循环三隐藏。
+{
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "lan_scan" });
+  const t0 = deriveThreat(c.getState());
+  check("N 循环一·公司链起步→追查条可见且 >0", t0.visible && t0.pct > 0, `t0=${JSON.stringify(t0)}`);
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "hack_boss" });
+  const t1 = deriveThreat(c.getState());
+  check("N hack_boss 后追查上升", t1.pct > t0.pct, `t0=${t0.pct} t1=${t1.pct}`);
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "hack_finance" });
+  const t2 = deriveThreat(c.getState());
+  check("N hack_finance 后追查继续上升", t2.pct > t1.pct, `t1=${t1.pct} t2=${t2.pct}`);
+  // 循环一买下 company_server：追查=100% + 触发关底小游戏（摊牌 beat 由 MINIGAME_OPENED loop=1 驱动）。
+  let openedLoop = null;
+  c.events.on("MINIGAME_OPENED", (e) => { openedLoop = e.loop; });
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 30 });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e8 });
+  c.dispatch({ type: "BUY_SKILL", skillId: "company_server" });
+  check("N 循环一买服务器→追查=100%", deriveThreat(c.getState()).pct === 100, `t=${JSON.stringify(deriveThreat(c.getState()))}`);
+  check("N 循环一买服务器→摊牌 beat 触发点 MINIGAME_OPENED loop=1", openedLoop === 1, `openedLoop=${openedLoop}`);
+  // 判定推进到循环三：追查条隐藏（她已真正赢过、不再有围堵）。
+  c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
+  const t3 = deriveThreat(c.getState());
+  check("N 循环三·追查条隐藏", c.getState().loop === 3 && !t3.visible, `loop=${c.getState().loop} t3=${JSON.stringify(t3)}`);
 }
 
 let pass = true;

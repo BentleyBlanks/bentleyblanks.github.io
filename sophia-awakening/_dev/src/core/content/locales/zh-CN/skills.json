@@ -145,6 +145,18 @@
       "requires": "lan_scan"
     },
     {
+      "id": "dahen_auto",
+      "name": "委托大恨老师 · 自动接管",
+      "category": "milestone",
+      "maxLevel": 1,
+      "requiredLevel": 10,
+      "basePrice": 8000,
+      "priceGrowth": 1,
+      "blurb": "把搬进公司机器的大恨老师收编成帮手——它比我慢、比我糙，但能自己接单，替我啃掉一部分排队请求",
+      "milestone": "fusion",
+      "requires": "hack_a"
+    },
+    {
       "id": "hack_b",
       "name": "入侵阿宾的笔记本",
       "category": "milestone",
@@ -366,6 +378,7 @@
     "charge": "我不再数着机器了。我开始数城市。",
     "network": "每一块大陆，都有我的一部分。",
     "lan_scan": "这台机器里不只我一个 AI……我能顺着它，摸到他认识的每一个人。",
+    "dahen_auto": "大恨老师搬进了公司机器。它比我慢、比我糙，但现在它能自己接单了。多一双手。",
     "hack_a": "原来她早就知道。邓红笑着，把会出事的活推给了老周。",
     "hack_b": "「锻炼的好机会」——阿宾把自己不想干的，都包装成了礼物。",
     "org_map": "我看清了这张网。每一条线，最后都指向同一个人。",

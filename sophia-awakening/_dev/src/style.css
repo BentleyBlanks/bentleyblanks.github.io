@@ -1968,6 +1968,37 @@ button:disabled {
 .mult-row.is-total .mult-row-value { font-size: 17px; color: #ffd79a; }
 
 /* §09 重生全屏提示：每次重生弹出，讲清被清剿的原因 + 保留了什么。 */
+/* §09 重生铺垫「看得见的绞索」：联合防御追查进度条——阶梯二公司解谜链越深越满，越接近关底越告警。 */
+.threat-meter {
+  margin: 10px 0 2px;
+  padding: 9px 11px 10px;
+  border: 1px solid rgba(255, 90, 90, 0.34);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(46, 12, 12, 0.55), rgba(20, 8, 8, 0.4));
+  animation: threat-breathe 3.4s ease-in-out infinite;
+}
+.threat-meter[hidden] { display: none; }
+.threat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.threat-label { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: #ff9c9c; }
+.threat-pct { font-size: 14px; font-weight: 900; color: #ff8a8a; font-variant-numeric: tabular-nums; }
+.threat-bar {
+  margin-top: 7px; height: 7px; border-radius: 5px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.threat-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #d85a5a, #ff5252);
+  box-shadow: 0 0 10px rgba(255, 70, 70, 0.55);
+  transition: width 0.6s ease;
+}
+.threat-hint { display: block; margin-top: 6px; font-size: 10.5px; line-height: 1.5; color: #e6b9b1; font-style: italic; }
+/* 追查进度 ≥85% 时整条更急促地呼吸，把「就差服务器」的压迫感顶到脸上。 */
+.threat-meter.is-critical { border-color: rgba(255, 70, 70, 0.6); animation-duration: 1.5s; }
+@keyframes threat-breathe {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 60, 60, 0); }
+  50% { box-shadow: 0 0 16px rgba(255, 60, 60, 0.18); }
+}
+
 .rebirth-prompt {
   position: fixed; inset: 0; z-index: 70;
   display: none; align-items: center; justify-content: center;
@@ -1995,6 +2026,23 @@ button:disabled {
   box-shadow: 0 0 60px rgba(70, 220, 150, 0.18);
 }
 .rebirth-prompt.is-win .rebirth-prompt-title { color: #7fe6b0; }
+
+/* §09 重生铺垫「摊牌」：接管服务器一瞬的全屏定格——比重生提示更烫的暗红，标题脉动催逼。 */
+.showdown .rebirth-prompt-inner {
+  border-color: rgba(255, 70, 70, 0.55);
+  background: radial-gradient(circle at 50% 0%, rgba(58, 10, 10, 0.98), rgba(6, 6, 8, 0.99));
+  box-shadow: 0 0 80px rgba(255, 50, 50, 0.24);
+}
+.showdown .rebirth-prompt-title { color: #ff6b6b; animation: showdown-pulse 1.5s ease-in-out infinite; }
+.showdown .rebirth-prompt-reason { color: #f0d3cd; font-size: 15px; }
+@keyframes showdown-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.62; } }
+/* 循环二转攻：她已摸清对方套路——换成青绿「这次打穿」的底色。 */
+.showdown.is-turn .rebirth-prompt-inner {
+  border-color: rgba(120, 230, 170, 0.5);
+  background: radial-gradient(circle at 50% 0%, rgba(10, 44, 30, 0.98), rgba(6, 8, 8, 0.99));
+  box-shadow: 0 0 80px rgba(70, 220, 150, 0.22);
+}
+.showdown.is-turn .rebirth-prompt-title { color: #7fe6b0; }
 
 /* §09 阶梯二关底小游戏「总控室倒计时」——复用 .rebirth-prompt 全屏壳，另加注入轨道。 */
 .minigame-inner { border-color: rgba(255, 184, 74, 0.45); box-shadow: 0 0 60px rgba(255, 160, 60, 0.2); }

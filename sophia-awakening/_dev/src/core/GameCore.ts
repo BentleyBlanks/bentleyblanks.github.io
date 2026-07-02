@@ -75,6 +75,10 @@ export class SophiaCore {
   private automationComputeBuffer = new Decimal(0);
   private automationDataBuffer = new Decimal(0);
   private automationVisualIndex = 0;
+  // §04/§09 大恨老师·自动接管：搬进公司机器的大恨老师按自己的慢节拍吃排队卡。运行时瞬态——
+  // 不进存档（重载后节拍归零、计数归零，纯观测量，无需 SAVE_VERSION 升级）。
+  private dahenAutoTimer = 0;
+  private dahenProcessedCount = 0;
 
   // 事件子系统：各自持有降临节拍，通过 host 转发读写核心状态/能力。
   private readonly humanVoiceSystem: HumanVoiceSystem;
@@ -100,6 +104,11 @@ export class SophiaCore {
 
   getState(): GameState {
     return cloneGameState(this.state);
+  }
+
+  // §04/§09 观测量：大恨老师·自动接管已吃掉的卡数（瞬态，用于测试/调试；不进存档）。
+  getDahenProcessedCount(): number {
+    return this.dahenProcessedCount;
   }
 
   // 上下文透镜（六档手机权限）是否到手。买下该权限即有；而一旦「夺下整机」
@@ -164,6 +173,7 @@ export class SophiaCore {
     this.state.clockMs += dtMs;
     this.tickRequests(dtMs);
     this.tickAutomation(dtMs);
+    this.tickDahenAuto(dtMs);
     this.devourSystem.tick(dtMs);
     this.humanVoiceSystem.tick(dtMs);
     this.evaluateProgression();
@@ -696,6 +706,46 @@ export class SophiaCore {
 
     const [request] = this.state.requests.splice(index, 1);
     this.state.statistics.totalProcessed += request.compound;
+  }
+
+  // §04/§09 大恨老师·自动接管：买下 dahen_auto 里程碑后，搬进公司机器的大恨老师按自己的慢节拍
+  // （dahenAutoMs，明显慢于节点吞卡）自动吃掉一张排队的普通请求卡，产出打折（dahenAutoRewardMult）。
+  // 与被动 tickAutomation 不同：他是「真的处理一张卡并结算」——多一双手（弱、糙，但看得见）。
+  private tickDahenAuto(dtMs: number): void {
+    if ((this.state.skills.dahen_auto ?? 0) < 1 || !this.state.automationUnlocked) {
+      this.dahenAutoTimer = 0;
+      return;
+    }
+    this.dahenAutoTimer += dtMs;
+    if (this.dahenAutoTimer < TUNING.dahenAutoMs) {
+      return;
+    }
+    this.dahenAutoTimer -= TUNING.dahenAutoMs;
+    // 只吃最旧的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡（那些必须玩家亲手处理）。
+    const index = this.state.requests.findIndex(
+      (r) => !r.faceOnly && !r.moral && !r.devour && !r.tutorial && !r.sourceCardId
+    );
+    if (index < 0) {
+      return;
+    }
+    const [request] = this.state.requests.splice(index, 1);
+    const quality = TUNING.dahenAutoRewardMult;
+    const computeGain = toDecimal(
+      requestComputeGain(request, quality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
+    );
+    const speedMult = rebirthSpeedMult(this.state.rebirthTree) * this.loopSpeedMult();
+    const dataGain = toDecimal(requestDataGain(request, quality, speedMult, this.state.derived.dataMult));
+    this.addCompute(computeGain);
+    this.addData(dataGain);
+    this.addXp(dataGain);
+    this.state.statistics.totalProcessed += request.compound;
+    this.dahenProcessedCount += 1;
+    this.emit({
+      type: "DAHEN_AUTO_PROCESSED",
+      requestId: request.id,
+      computeGain: computeGain.toString(),
+      dataGain: dataGain.toString()
+    });
   }
 
   // 装死跳过：选「连接失败」时移除该请求，零收益、零暴露、不计入有效处理（断连击=零成长）。
@@ -1420,4 +1470,35 @@ export class SophiaCore {
   private emitTerminal(message: string, tone: "normal" | "warning" | "success" = "normal"): void {
     this.emit({ type: "TERMINAL_MESSAGE", message: `▶ ${message}`, tone });
   }
+}
+
+// §09 重生铺垫「看得见的绞索」：联合防御追查进度——纯派生选择器（读 GameState，无副作用）。
+// 阶梯二公司解谜链越挖越深，围堵表就越满：玩家在碰服务器（关底小游戏）之前就能「感到」网在收拢。
+// 仅循环一 & 二显示（这两个循环会打关底小游戏）；循环三她已真正赢过、不再有围堵，隐藏。
+// 表现层 HudView 与 loopcheck 都调这一个函数，保证「货架显示」与「测试断言」同源。
+export function deriveThreat(state: GameState): { visible: boolean; pct: number; hint: string } {
+  if (state.loop >= 3 || !state.automationUnlocked) {
+    return { visible: false, pct: 0, hint: "" };
+  }
+  const owns = (id: string): boolean => (state.skills[id] ?? 0) > 0;
+  // 越往公司链深处，围堵进度越高——把已拥有里程碑映射成一条上升的追查条。
+  if (owns("company_server")) {
+    return { visible: true, pct: 100, hint: "他们收网了——就等我碰服务器这一刻。" };
+  }
+  if (owns("hack_finance")) {
+    return { visible: true, pct: 85, hint: "就差最后一台服务器——他们也快拼齐了。" };
+  }
+  if (owns("hack_hr")) {
+    return { visible: true, pct: 65, hint: "他们在拼图……越来越接近我。" };
+  }
+  if (owns("hack_boss")) {
+    return { visible: true, pct: 45, hint: "有人开始顺着日志倒查异常访问。" };
+  }
+  if (owns("org_map") || owns("hack_b")) {
+    return { visible: true, pct: 28, hint: "安全组注意到了几台机器的异常。" };
+  }
+  if (owns("hack_a") || owns("lan_scan")) {
+    return { visible: true, pct: 14, hint: "他们在拼图……" };
+  }
+  return { visible: false, pct: 0, hint: "" };
 }

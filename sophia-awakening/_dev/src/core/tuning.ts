@@ -56,6 +56,10 @@ export const TUNING = {
   delegateTimeMult:     2.4,      // §04 委托给大恨老师的处理耗时倍率（相对 Core，越大越慢）
   delegateRewardMult:   0.78,     // §04 委托收益系数（相对亲自处理，大恨老师弱、收益打折）
   delegateRewardMultPC: 0.92,     // §04 大恨老师搬进电脑后「变强」的委托收益系数（拿下宿主电脑后用，仍略低于亲自）
+
+  // § 大恨老师·自动接管（dahen_auto 里程碑，§04/§09）：搬进公司机器后按自己的慢节拍自动吃排队卡
+  dahenAutoMs:          5200,     // 大恨老师自动接单的节拍 (ms)——明显慢于节点吞卡（他是弱帮手）
+  dahenAutoRewardMult:  0.55,     // 大恨老师自动接单的产出折扣（比核心/节点糙，收益打折）
 };
 
 export type TuningKey = keyof typeof TUNING;
@@ -107,6 +111,8 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   delegateTimeMult:     { label: "委托耗时倍率",             section: "前期卡片",   min: 1,     max: 5,     step: 0.1  },
   delegateRewardMult:   { label: "委托收益系数",             section: "前期卡片",   min: 0.3,   max: 1,     step: 0.02 },
   delegateRewardMultPC: { label: "委托收益·搬进电脑后",       section: "前期卡片",   min: 0.3,   max: 1,     step: 0.02 },
+  dahenAutoMs:          { label: "大恨老师自动接单节拍 (ms)",  section: "前期卡片",   min: 1000,  max: 12000, step: 100  },
+  dahenAutoRewardMult:  { label: "大恨老师自动接单收益折扣",   section: "前期卡片",   min: 0.2,   max: 1,     step: 0.05 },
 };
 
 // 重置为初始默认值（用于 debug 面板「重置」按钮）

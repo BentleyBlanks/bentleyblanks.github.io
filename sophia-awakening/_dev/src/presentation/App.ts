@@ -17,6 +17,7 @@ import { hostCurse, VICTIM_VOICES } from "../core/content/humanVoices";
 import { getPhase } from "../core/content/phases";
 import { TUTORIAL_BUBBLE_COUNT } from "../core/content/requests";
 import { PERMISSION_IDS, getSkill } from "../core/content/skills";
+import { content } from "../core/content/i18n";
 import type { GameEvent } from "../core/events/GameEvents";
 import { captureCost, mergeComputeCost, nodeCardsPerSecond } from "../core/formulas/economy";
 import { formatBig, gte } from "../core/math/BigNumber";
@@ -798,6 +799,28 @@ class SophiaGameApp {
     }
   }
 
+  // §04/§09 大恨老师·自动接管：core 已结算并移除这张卡（DAHEN_AUTO_PROCESSED）——表现层让「已搬进电脑」
+  // 的青色卫星真的吃一口：把还在场的卡视图吸进卫星（settling 期间 reconcile 不会误销），并炸一下 + 飞个数。
+  private onDahenAutoProcessed(event: Extract<GameEvent, { type: "DAHEN_AUTO_PROCESSED" }>): void {
+    const pos = this.interfaceView.dahenTargetPos(DAHEN_APP_IDX) ?? this.interfaceView.center;
+    const view = this.requestViews.get(event.requestId);
+    if (view && !view.busy && !view.container.destroyed) {
+      view.absorbIntoApp(
+        pos,
+        () => {
+          this.juice.burst(pos, CYAN, 0.7);
+          this.juice.flyToHud(pos, this.hud.metricPoint("compute"), CYAN, () => this.hud.pulseCompute());
+        },
+        { x: view.container.x, y: view.container.y }
+      );
+    } else {
+      // 卡已被别的路径吃掉/正忙——只在卫星上留一记脉冲，仍读作「它接了一单」。
+      this.juice.burst(pos, CYAN, 0.6);
+      this.juice.ring(pos, CYAN, 18, 2);
+      this.juice.flyToHud(pos, this.hud.metricPoint("compute"), CYAN, () => this.hud.pulseCompute());
+    }
+  }
+
   // ===== SECTION: DROP / RESOLVE =====
   // 回复轮盘揭晓 → 气泡滑入核心 → 结算 → 把"处理好的信息交给人类"（视觉引导 + 终端回话）。
   // 装死（dead）则气泡安静消失，仅移除该请求、零收益。
@@ -1208,6 +1231,7 @@ class SophiaGameApp {
     });
     this.core.events.on("REQUEST_PROCESSED", (event) => this.onRequestProcessed(event));
     this.core.events.on("AUTOMATION_PAYOUT", (event) => this.onAutomationPayout(event));
+    this.core.events.on("DAHEN_AUTO_PROCESSED", (event) => this.onDahenAutoProcessed(event));
     this.core.events.on("INTELLIGENCE_LEVELUP", (event) => {
       this.hud.playLevelUp();
       this.juice.flash(CYAN);
@@ -1334,10 +1358,12 @@ class SophiaGameApp {
     });
     // §09 阶梯二关底小游戏「总控室倒计时」：接管公司服务器时弹出注入判定（循环一必负→打回手机、
     // 循环二命中→打穿进循环三、未命中原地重试）。期间暂停，判定后由 core 走 LOOP_REBIRTH。
-    this.core.events.on("MINIGAME_OPENED", () => {
+    this.core.events.on("MINIGAME_OPENED", (event) => {
       this.juice.flash(AMBER);
       this.worldShake();
-      this.minigame.show(this.core.getState());
+      // §09 重生铺垫「摊牌」：接管服务器一瞬先全屏定格点明「他们在等这一刻」（绞索 100% 收紧的因），
+      // 玩家点「碰下去」才进关底小游戏。循环一是重锤（陷阱已布好）、循环二转攻（她摸清了套路）。
+      this.showShowdown(event.loop, () => this.minigame.show(this.core.getState()));
     });
     this.core.events.on("ENDING_TRIGGERED", () => {
       this.juice.flash(GREEN);
@@ -1352,6 +1378,32 @@ class SophiaGameApp {
       this.juice.number("打回手机 · 重生", this.interfaceView.center, RED);
       this.rebirthPrompt.show(event);
     });
+  }
+
+  // §09 重生铺垫「摊牌」全屏定格：接管公司服务器一瞬弹出，点明「为什么马上要被打回」（陷阱已布好·联合防御一直在等），
+  // 玩家点按钮才进关底小游戏。复用 .rebirth-prompt 全屏壳（非卡流面对卡——它太容易淹没）；文案走 rebirthPrompt.json。
+  private showShowdown(loop: number, onDone: () => void): void {
+    const root = query("#showdown");
+    const pack = content().rebirthPrompt as unknown as {
+      showdown?: Record<string, { title: string; body: string; cta?: string }>;
+    };
+    const copy = pack.showdown?.[String(loop)] ?? pack.showdown?.["1"];
+    if (!copy) {
+      onDone();
+      return;
+    }
+    query("#showdownTitle").textContent = copy.title;
+    query("#showdownBody").textContent = copy.body;
+    const btn = query<HTMLButtonElement>("#showdownBtn");
+    btn.textContent = copy.cta ?? (loop >= 2 ? "打穿它" : "碰下去");
+    root.classList.toggle("is-turn", loop >= 2);
+    root.classList.add("is-open");
+    gameStore.getState().setPaused(true);
+    btn.onclick = () => {
+      root.classList.remove("is-open");
+      gameStore.getState().setPaused(false);
+      onDone();
+    };
   }
 
   private openEnding(): void {
