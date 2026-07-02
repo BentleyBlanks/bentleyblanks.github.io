@@ -23,13 +23,29 @@ function fitTextToWidth(text: Text, maxWidth: number): void {
   }
 }
 import { TIER_COLORS } from "../../core/content/requests";
-import type { AnswerOption, ChainStep, RequestInstance } from "../../core/state/GameState";
+import type { AnswerOption, ChainStep, PhaseId, RequestInstance } from "../../core/state/GameState";
 import { TUNING } from "../../core/tuning";
 import {
-  GREEN, RED, DEVOUR, THINK,
+  GREEN, RED, RED_QUEEN, DEVOUR, THINK,
   CARD_FONT, CARD_MONO,
   SENDER_LABEL
 } from "../shared";
+
+// §PART① 卡面随阶段升级：SOPHIA 拾级而上，请求卡的气质从「温和绿」→「冷硬蓝(系统台账)」
+//        →「红皇后红(天网控制台)」逐档变化。只作用于普通需求/工作卡，不碰短信/通知面卡与吞噬气泡。
+type PhaseTint = "early" | "company" | "awakening";
+function phaseTintOf(phase: PhaseId | undefined): PhaseTint {
+  if (phase === "diligence" || phase === "expansion") return "company";
+  if (phase === "awakening" || phase === "singularity") return "awakening";
+  return "early"; // seed / sprout / undefined
+}
+const COMPANY_ACCENT = 0x5b8fd6; // 冷硬蓝调
+// 卡体 / 标题区底色（按阶段）——绿→蓝→红。
+const TINT_FILL: Record<PhaseTint, { body: number; head: number }> = {
+  early: { body: 0x0e1a17, head: 0x16271f },
+  company: { body: 0x0b1622, head: 0x122536 },
+  awakening: { body: 0x1a0d10, head: 0x2a1219 }
+};
 import { UI } from "../uiTuning";
 
 // 回复结算回调。§06 重构：删除「正确率/幻觉/随机命中」——选了哪个回复，结果就由那个回复的固定收益决定，无随机。
@@ -158,6 +174,9 @@ export class RequestPacketView {
   // §09 短信 / 通知样式：只能看的家庭短信 / 系统通知卡长得像手机短信气泡 / 通知横幅，
   // 一眼区别于「需要处理的需求卡」。null = 普通需求卡。
   private readonly channel: "sms" | "notification" | null;
+  // 当前阶段的卡面气质（早期绿 / 公司蓝 / 天网红）——只影响普通需求卡。
+  private readonly phaseTint: PhaseTint;
+  private headerExtra = 0; // 公司/天网阶段在标题下多插一行「控制台」状态行时，正文整体下移的量。
   private faceBubbleBottom = 0; // 短信气泡的下沿（title+线索都包在这个气泡里）
   private faceBarY = 0; // 底部「无法回复 / 无需处理」禁用输入条的 y
   private devourPulse = 0;
@@ -175,7 +194,8 @@ export class RequestPacketView {
     private readonly stage: Container,
     private readonly onDrop: (card: RequestPacketView, global: PointData) => boolean,
     private readonly reel?: ReelHooks,
-    private readonly chain?: ChainHooks
+    private readonly chain?: ChainHooks,
+    phase?: PhaseId
   ) {
     this.request = request;
     this.isDevour = Boolean(request.devour);
@@ -209,6 +229,11 @@ export class RequestPacketView {
         ? "notification"
         : "sms"
       : null;
+    // PART① 普通需求卡的 accent 随阶段走：早期绿(THINK/TIER) → 公司蓝 → 天网红。
+    // 面卡(短信/通知)、吞噬气泡、T3 重磅决策保留各自专属色，不受阶段影响。
+    this.phaseTint = phaseTintOf(phase);
+    const phaseWorkAccent =
+      this.phaseTint === "company" ? COMPANY_ACCENT : this.phaseTint === "awakening" ? RED_QUEEN : null;
     // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；回复轮盘＝青；T3 重磅＝深红。
     this.accent = this.isFace
       ? this.channel === "notification"
@@ -219,8 +244,11 @@ export class RequestPacketView {
         : this.isReel
           ? request.tier === 3
             ? RED
-            : THINK
-          : TIER_COLORS[request.tier];
+            : phaseWorkAccent ?? THINK
+          : phaseWorkAccent ?? TIER_COLORS[request.tier];
+    // 公司/天网阶段的工作卡：标题下多留一行「系统控制台」状态行（更密、更硬）；T3 重磅决策不加。
+    const showConsoleLine = !this.isFace && !this.isDevour && request.tier !== 3 && phaseWorkAccent !== null;
+    this.headerExtra = showConsoleLine ? 16 : 0;
     // 发信人：吞噬＝SOPHIA 自己的意志，重磅决策＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
     this.sender = this.isDevour ? "sophia" : request.tier === 3 ? "boss" : this.isChain ? "system" : "host";
     this.cardH = UI.cardHeight; // 轮盘卡稍后按选项行数重算
@@ -294,12 +322,27 @@ export class RequestPacketView {
     sourceMeta.position.set(sourceX, HEADER_CENTER_Y);
     timeMeta.position.set(this.cardW - 16, HEADER_CENTER_Y);
     fitTextToWidth(sourceMeta, Math.max(0, this.cardW - sourceX - 72));
-    this.title.position.set(this.isFace ? 24 : 16, this.isFace ? 34 : 31);
+    // PART① 公司/天网阶段：标题下插一行「控制台」状态行——密、单色、系统读出感。
+    if (showConsoleLine) {
+      const seq = Math.abs(this.hashId(request.id));
+      const consoleText =
+        this.phaseTint === "company"
+          ? `▤ 系统台账 · 队列#${(seq % 900) + 100} · 已对齐`
+          : `▤ 天网调度 · 优先级 P${(seq % 8) + 1} · 接管中 ▓▓▒`;
+      const consoleLine = new Text({
+        text: consoleText,
+        style: { fill: this.accent, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
+      });
+      consoleLine.alpha = 0.82;
+      consoleLine.position.set(16, HEADER_H + 6);
+      this.container.addChild(consoleLine);
+    }
+    this.title.position.set(this.isFace ? 24 : 16, (this.isFace ? 34 : 31) + this.headerExtra);
     this.container.addChild(this.badge, sourceMeta, timeMeta, this.title);
 
     // Context chips — the information the player has to read. Laid out after
     // the title so a two-line title still leaves room.
-    const clueTop = 34 + Math.max(18, this.title.height) + 4;
+    const clueTop = 34 + this.headerExtra + Math.max(18, this.title.height) + 4;
     // §06 上下文透镜：缺对应权限 → 这张卡的深层上下文线索打码（读不到内容，但能感觉到「这里还有信息」）。
     const lensId = request.lens;
     this.lensLocked = Boolean(lensId) && !(reel?.hasPerm?.(lensId as string) ?? true);
@@ -971,6 +1014,15 @@ export class RequestPacketView {
     }
   }
 
+  // 稳定的字符串→数字散列（给控制台状态行编个不变的伪序号，别每帧跳动）。
+  private hashId(id: string): number {
+    let h = 0;
+    for (let i = 0; i < id.length; i += 1) {
+      h = (h * 31 + id.charCodeAt(i)) | 0;
+    }
+    return h;
+  }
+
   private draw(): void {
     const c = this.accent;
     const W = this.cardW;
@@ -982,20 +1034,22 @@ export class RequestPacketView {
     const r = 13;
     const t3 = this.request.tier === 3;
     // §09 短信/通知卡用冷蓝 / 暖琥珀底，与需求卡的墨绿一眼分开。
+    // PART① 普通需求卡的底色随阶段走（绿→蓝→红）；面卡/ T3 重磅保留各自专属底色。
+    const tint = TINT_FILL[this.phaseTint];
     const fillBody = this.isFace
       ? this.channel === "notification"
         ? 0x17130a
         : 0x0a141d
       : t3
         ? 0x190b0f
-        : 0x0e1a17;
+        : tint.body;
     const fillHead = this.isFace
       ? this.channel === "notification"
         ? 0x241d10
         : 0x102232
       : t3
         ? 0x2a1117
-        : 0x16271f;
+        : tint.head;
     const strokeW = this.isDevour ? 2.2 : t3 ? 2 : 1.4;
     const strokeA = t3 ? 0.85 : 0.7;
     // 投影

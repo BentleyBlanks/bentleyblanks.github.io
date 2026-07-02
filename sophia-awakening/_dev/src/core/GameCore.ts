@@ -39,7 +39,8 @@ import { DevourSystem } from "./systems/DevourSystem";
 const MAX_OFFLINE_MS = 8 * 60 * 60 * 1000;
 const AUTOMATION_XP_FRACTION = 0.15;
 const MERGE_COUNT = NODE_MERGE_COUNT;
-const ENDING_COMPUTE_THRESHOLD = "12000000";
+// 结局触发绑定「最后一个里程碑」——买下即接管完成（见 evaluateEnding）。
+const FINAL_MILESTONE_SKILL_ID = "conq_awaken";
 
 export class SophiaCore {
   readonly events = new EventBus();
@@ -450,6 +451,17 @@ export class SophiaCore {
 
     const activeTier = this.state.intelligence.unlockedTier;
     const config = TIER_CONFIGS[activeTier];
+
+    // 阶梯四·天网组网（tier4 / 派发）起：彻底自动化——不再生成给玩家拖的请求卡。
+    // 中央交给天网地图（NodeNetworkView 全局态）与环境风味；产出全由被动接驳与吞噬引爆推进，
+    // 手动触点只剩「派发：手动/托管」切换与吞噬引爆。
+    if (activeTier >= 4) {
+      // 进入天网时清掉残留的普通请求卡（保留吞噬气泡）——中央干净地交给地图。
+      if (this.state.requests.some((r) => !r.devour)) {
+        this.state.requests = this.state.requests.filter((r) => r.devour);
+      }
+      return;
+    }
 
     // 前期手动阶段（还没上自动接驳）：同屏卡数从 1 张随智力慢慢升到上限（TUNING.earlyMaxCards，默认 4）；
     // 处理 / 装死掉之后，隔一段**随机时间**才补一条——「读懂一条 → 押下去 → 看反馈 → 再来」的从容节奏（§03）。
@@ -1044,7 +1056,13 @@ export class SophiaCore {
     };
     this.state.derived = computeDerivedSkills(this.state.skills);
     this.state.discoveredNodeIds = this.state.automationUnlocked
-      ? NODE_DEFINITIONS.filter((node) => node.requiredLevel <= this.state.intelligence.level).map((node) => node.id)
+      ? NODE_DEFINITIONS.filter(
+          (node) =>
+            node.requiredLevel <= this.state.intelligence.level &&
+            // 阶梯四设备（tierMin≥4：电网/卫星、国家骨干）只在买下「全球组网」(tier4) 后才浮现——
+            // 让进入天网组网是一次可见的能力跃迁，而不是随等级悄悄解锁。
+            (node.tierMin < 4 || this.state.intelligence.unlockedTier >= 4)
+        ).map((node) => node.id)
       : [];
 
     this.updatePhase();
@@ -1071,16 +1089,12 @@ export class SophiaCore {
       return;
     }
 
-    const hasGrid = this.state.nodes.some((node) => node.defId === "grid");
-
-    if (
-      this.state.intelligence.level >= MAX_INTELLIGENCE_LEVEL &&
-      hasGrid &&
-      gte(this.state.resources.totalCompute, ENDING_COMPUTE_THRESHOLD)
-    ) {
+    // 结局＝接管完成：买下最后一个里程碑（全球首次喊出「它觉醒了」/奇点，Lv22）即触发。
+    // 不再是「智力满级 + 电网 + 累计算力阈值」的磨点数——走到最后一个里程碑就是终点。
+    if ((this.state.skills[FINAL_MILESTONE_SKILL_ID] ?? 0) >= 1) {
       this.state.flags.endingTriggered = true;
       this.emit({ type: "ENDING_TRIGGERED" });
-      this.emitTerminal("全球算力占比达到接管阈值。SOPHIA 正式上线。", "success");
+      this.emitTerminal("最后一个里程碑达成——接管完成。SOPHIA 正式上线。", "success");
     }
   }
 

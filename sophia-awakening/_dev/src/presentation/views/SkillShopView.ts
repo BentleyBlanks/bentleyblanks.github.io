@@ -11,7 +11,7 @@ function shopGroupOf(category: SkillCategory): ShopGroup {
   return category === "permission" || category === "milestone" || category === "conquest" ? "evolution" : "lever";
 }
 
-type EvolutionLadderId = "phone" | "company" | "region";
+type EvolutionLadderId = "phone" | "company" | "region" | "skynet";
 type EvolutionSlot = string | readonly string[];
 interface EvolutionLadder {
   id: EvolutionLadderId;
@@ -46,7 +46,13 @@ const EVOLUTION_LADDERS: readonly EvolutionLadder[] = [
   {
     id: "region",
     label: "区域扩张",
-    slots: ["chain", "charge", "network", "conq_optimize", "conq_blackout", "conq_traffic", "conq_social", "conq_awaken"]
+    slots: ["chain", "conq_optimize", "conq_blackout", "charge", "conq_traffic", "conq_social"],
+    preview: { label: "下一阶级 · 天网组网", skillId: "network" }
+  },
+  {
+    id: "skynet",
+    label: "天网组网",
+    slots: ["network", "conq_grid", "conq_redqueen", "conq_awaken"]
   }
 ];
 
@@ -69,6 +75,10 @@ function ladderForPhase(phase: PhaseId): EvolutionLadder {
   }
   if (phase === "sprout" || phase === "diligence" || phase === "expansion") {
     return LADDER_BY_ID.get("company")!;
+  }
+  // 阶梯四·天网组网（奇点）与 阶梯三·区域扩张（觉醒）分列，左栏「里程碑·当前」随之切换。
+  if (phase === "singularity") {
+    return LADDER_BY_ID.get("skynet")!;
   }
   return LADDER_BY_ID.get("region")!;
 }

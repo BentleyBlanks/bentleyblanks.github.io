@@ -35,8 +35,8 @@ const SYSTEM_NODES: SystemNodeSlot[] = [
   { name: "银行金融", icon: "🏦", defId: "cloud", ownThreshold: 4 },
   { name: "医疗", icon: "🏥", defId: "server", ownThreshold: 5 },
   { name: "媒体", icon: "📺", defId: "console", ownThreshold: 1 },
-  { name: "IoT集群", icon: "💡", defId: "office", ownThreshold: 3 },
-  { name: "车联网", icon: "🚗", defId: "grid", ownThreshold: 2 }
+  { name: "国家骨干网", icon: "🛰️", defId: "backbone", ownThreshold: 1 },
+  { name: "卫星主干", icon: "📶", defId: "backbone", ownThreshold: 2 }
 ];
 
 export class NodeNetworkView {

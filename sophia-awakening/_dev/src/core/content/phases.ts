@@ -28,10 +28,12 @@ export function getPhaseIdByScope(tier: Tier, hasGrid: boolean, automationUnlock
     return "seed";
   }
 
-  // 阶梯三（觉醒 / 奇点）：冲出公司·联网(tier2)起，控制域离开公司。
-  if (tier >= 4 && hasGrid) {
+  // 阶梯四·天网组网（奇点）：买下「全球组网」(tier4) 起，尺度从地区跳到国家/大陆/全球。
+  // 干净地钉在 tier4 边界上——进入 阶梯四 的同一刻，阶段标签推进到奇点。
+  if (tier >= 4) {
     return "singularity";
   }
+  // 阶梯三·区域扩张（觉醒）：冲出公司·联网(tier2)、区域整合(tier3)，控制域离开公司到地区/城市。
   if (tier >= 2) {
     return "awakening";
   }

@@ -420,7 +420,8 @@ class SophiaGameApp {
         this.pixi.stage,
         (packet, global) => this.handleDrop(packet, global),
         reel,
-        chain
+        chain,
+        state.phase
       );
       const position = this.nextRequestPosition(request, view.cardHeight);
       view.container.position.set(position.x, position.y);
@@ -1313,6 +1314,10 @@ class SophiaGameApp {
         this.beginConnectRitual(event.name, event.milestone, event.skillId);
         // §07 里程碑横幅：重大进化的「章节点」——全屏横幅扫过 + 层叠音效（征服里程碑更盛大）。
         this.milestoneBanner.show(event.name, event.milestone === "conquest" ? "征服达成" : "进化达成 · 阶段跃迁");
+        // 阶梯四·天网组网入口（全球组网 = tier4）：镜头狠狠拉远一档，让「尺度跳到全球」被看见。
+        if (event.milestone === "tier4") {
+          this.zoomOutPulse(1.32, 1.6);
+        }
         const layers = event.milestone === "conquest" ? 4 : event.milestone === "tier4" ? 3 : 2;
         for (let i = 0; i < layers; i += 1) {
           window.setTimeout(() => this.audio.playRequestAccept(), i * 110);
