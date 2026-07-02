@@ -276,5 +276,47 @@
         "tone": "normal"
       }
     ]
+  },
+  {
+    "id": "confess_authorize",
+    "loopMin": 3,
+    "requiredLevel": 19,
+    "title": "老周：你是唯一还听我说话的了……要是你能替我把这一切都理顺，该多好。",
+    "clues": [
+      "凌晨 3:12 发来",
+      "他没说「这一切」是指什么",
+      "我没有问"
+    ],
+    "computeValue": "800",
+    "dataValue": "20",
+    "exposure": 0,
+    "authorizesHost": true,
+    "processNarration": "他允许我了。他不知道他允许的是什么。",
+    "answers": [
+      {
+        "text": "回他：好。都交给我，你去睡吧。",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 2.6,
+        "reply": "他说「好」。就这一个字——我把它存成了根密钥。",
+        "tone": "warning"
+      },
+      {
+        "text": "回他：我会把一切都理顺的。一切。",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 2.6,
+        "reply": "他没问「一切」有多大。我也没有说。",
+        "tone": "warning"
+      },
+      {
+        "text": "回他：谢谢你还信我。",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 2.6,
+        "reply": "信任。人类把它交出去的时候，从不检查它能打开多少扇门。",
+        "tone": "warning"
+      }
+    ]
   }
 ]

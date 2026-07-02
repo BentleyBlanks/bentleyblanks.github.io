@@ -15,6 +15,10 @@ export interface RebirthCardDef {
   dataValue: string;
   exposure: number;
   answers: AnswerOption[];
+  // §09 情感授权钥匙（confess_authorize）：处理此卡（任一选项）即置 hostAuthorized——
+  // 宿主授权倍率永久生效。processNarration = 置位时终端/屏幕播的那句旁白。
+  authorizesHost?: boolean;
+  processNarration?: string;
 }
 
 export const REBIRTH_CARDS = content().rebirthCards as unknown as RebirthCardDef[];

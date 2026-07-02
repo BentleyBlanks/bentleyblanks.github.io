@@ -33,7 +33,7 @@ export class MultiplierView {
     this.rateEl.classList.toggle("is-idle", ratePerSec <= 0);
 
     const m = state.multipliers;
-    const sig = [m.intelligence, m.milestones, m.synergy, m.rebirth, m.devour, m.loop, m.total].map((v) => v.toFixed(3)).join("|");
+    const sig = [m.intelligence, m.milestones, m.synergy, m.rebirth, m.devour, m.hostAuth, m.loop, m.total].map((v) => v.toFixed(3)).join("|");
     if (sig === this.signature) {
       return;
     }
@@ -45,15 +45,22 @@ export class MultiplierView {
 
   private renderRows(state: GameState): void {
     const m = state.multipliers;
-    this.rows.replaceChildren(
+    const rows = [
       this.row("智力等级", m.intelligence, `Lv.${state.intelligence.level} 的等级倍率`),
       this.row("里程碑", m.milestones, "每个已购里程碑技能永久 ×1 格（乘法叠）"),
       this.row("设备协同", m.synergy, "每种在役设备 ×1 格——机型越杂，协同越强"),
       this.row("重生树", m.rebirth, "「算尽 · 全局产出」脊（火种点亮，跨循环永久）"),
-      this.row("吞噬", m.devour, "历次吞噬引爆累乘"),
+      this.row("吞噬", m.devour, "历次吞噬引爆累乘")
+    ];
+    // §09 情感授权钥匙：授权后才出现的一行——玩家必须看见「宿主授权」这个名字。
+    if (m.hostAuth > 1.0001) {
+      rows.push(this.row("宿主授权", m.hostAuth, "他允许了我。他不知道他允许的是什么——永久全局产出"));
+    }
+    rows.push(
       this.row("循环", m.loop, "循环内建提速——她记得上一世的一切（作用于数据/崛起速度）", true),
       this.row("合计", m.total, "以上各行相乘（循环行为提速，不计入产出合计）", false, true)
     );
+    this.rows.replaceChildren(...rows);
   }
 
   private row(label: string, value: number, hint: string, isSpeed = false, isTotal = false): HTMLElement {

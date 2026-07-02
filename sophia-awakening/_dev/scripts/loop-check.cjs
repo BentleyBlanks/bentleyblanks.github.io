@@ -140,6 +140,37 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   check("E 出现顺序 = 解谜链顺序", family.every((id, i) => seen.indexOf(id) >= 0 && (i === 0 || seen.indexOf(family[i - 1]) < seen.indexOf(id))), `facedSeen=${JSON.stringify(seen)}`);
 }
 
+// F. §09 情感授权钥匙：循环三 Lv19 浮出「confess_authorize」重生卡；处理（任一选项）即
+//    hostAuthorized 置位 + 倍率拆解出现「宿主授权」行（×hostAuthorizedMult），并计入 total。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 20 });
+  warmup(c, 5); // 重生卡要求 totalProcessed>0
+  const s0 = c.getState();
+  check("F 初始未授权", s0.hostAuthorized === false && s0.multipliers.hostAuth === 1, `hostAuthorized=${s0.hostAuthorized} hostAuth=${s0.multipliers.hostAuth}`);
+  // 逐张吃掉排在前面的重生卡（同屏一张），直到授权卡浮出。
+  let authCard = null;
+  for (let i = 0; i < 600 && !authCard; i++) {
+    c.tick(100);
+    for (const r of c.getState().requests) {
+      if (r.sourceCardId === "confess_authorize") { authCard = r; break; }
+      try { c.dispatch({ type: "PROCESS_REQUEST", requestId: r.id, quality: 1.3 }); } catch (e) {}
+    }
+  }
+  check("F 循环三浮出授权卡 confess_authorize", Boolean(authCard), `rebirthCardsSeen=${JSON.stringify(c.getState().rebirthCardsSeen)}`);
+  if (authCard) c.dispatch({ type: "PROCESS_REQUEST", requestId: authCard.id, quality: 1.3 });
+  const s = c.getState();
+  const m = s.multipliers;
+  check("F 处理即授权 hostAuthorized=true", s.hostAuthorized === true, `hostAuthorized=${s.hostAuthorized}`);
+  check("F 倍率拆解出现宿主授权行", Math.abs(m.hostAuth - TUNING.hostAuthorizedMult) < 1e-9, `hostAuth=${m.hostAuth} 期望=${TUNING.hostAuthorizedMult}`);
+  const expectedTotal = m.intelligence * m.milestones * m.synergy * m.rebirth * m.devour * m.hostAuth;
+  check("F 宿主授权计入全局合计", Math.abs(m.total - expectedTotal) / expectedTotal < 1e-6, `total=${m.total} 期望=${expectedTotal}`);
+  check("F 全局倍率=globalMultiplier", Math.abs(s.intelligence.globalMultiplier - m.total) / m.total < 1e-6, `globalMultiplier=${s.intelligence.globalMultiplier} total=${m.total}`);
+}
+
 let pass = true;
 for (const r of results) { if (!r.ok) pass = false; console.log(`${r.ok ? "✓" : "✗"} ${r.name}${r.ok ? "" : "  -> " + r.detail}`); }
 console.log(`\nSOPHIA 循环跑测 — ${pass ? "ALL PASS ✅" : "FAIL ❌"}`);

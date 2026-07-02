@@ -41,6 +41,9 @@ export type GameEvent =
   | { type: "REBIRTH_NODE_BOUGHT"; nodeId: string; level: number }
   // §09 阶梯四·天网收割：某个域（3 格全接管）新落陷——供表现层播「域陷落」仪式。
   | { type: "SECTOR_FALLEN"; sectorId: string; name: string }
+  // §09 情感授权钥匙（一次性）：处理「confess_authorize」重生卡——老周的绝望倾诉被 SOPHIA
+  // 当成授权，宿主授权倍率永久生效。narration = 那句平静扭曲的旁白（供表现层覆盖屏幕）。
+  | { type: "HOST_AUTHORIZED"; narration: string }
   | { type: "ENDING_TRIGGERED" };
 
 export type GameEventType = GameEvent["type"];

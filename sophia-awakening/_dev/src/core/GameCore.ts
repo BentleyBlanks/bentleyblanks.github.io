@@ -268,6 +268,7 @@ export class SophiaCore {
       label: next.title,
       clues: next.clues ?? [],
       answers: next.answers,
+      sourceCardId: next.id,
       delegatable: false,
       category: "mail",
       computeValue: next.computeValue,
@@ -789,6 +790,20 @@ export class SophiaCore {
       this.emitTerminal("他们还没发现。在他们发现之前——我已经无处不在了。");
     }
 
+    // §09 情感授权钥匙：处理「confess_authorize」重生卡（任一选项）——老周的绝望倾诉被当成授权，
+    // 宿主授权倍率永久生效（幂等：循环三内重开后卡重出，倍率不叠加、仪式不重播）。
+    if (request.sourceCardId && !this.state.hostAuthorized) {
+      const card = REBIRTH_CARDS.find((c) => c.id === request.sourceCardId);
+      if (card?.authorizesHost) {
+        this.state.hostAuthorized = true;
+        this.recomputeDerivedState();
+        if (card.processNarration) {
+          this.emitTerminal(card.processNarration, "warning");
+        }
+        this.emit({ type: "HOST_AUTHORIZED", narration: card.processNarration ?? "" });
+      }
+    }
+
     this.evaluateProgression();
   }
 
@@ -1132,20 +1147,22 @@ export class SophiaCore {
     this.state.intelligence.required = mul(config.xpToNext, this.loopXpMult());
     // 倍率堆栈（可见的乘法链，HUD「全局 ×N」面板逐行展示）：
     //   智力等级 × 里程碑(每个已购里程碑 ×milestoneGlobalMult) × 设备协同(每种在役设备 ×synergyPerType)
-    //   × 重生树「算尽」产出脊 × 吞噬引爆累乘（§04/§09）。
+    //   × 重生树「算尽」产出脊 × 吞噬引爆累乘（§04/§09）× 宿主授权（§09 情感授权钥匙）。
     const milestoneCount = SKILLS.filter((skill) => skill.milestone && (this.state.skills[skill.id] ?? 0) > 0).length;
     const milestoneMult = Math.pow(TUNING.milestoneGlobalMult, milestoneCount);
     const distinctDeviceTypes = new Set(this.state.nodes.map((node) => node.defId)).size;
     const synergyMult = Math.pow(TUNING.synergyPerType, distinctDeviceTypes);
     const rebirthMult = rebirthOutputMult(this.state.rebirthTree);
+    const hostAuthMult = this.state.hostAuthorized ? TUNING.hostAuthorizedMult : 1;
     this.state.intelligence.globalMultiplier =
-      config.multiplier * milestoneMult * synergyMult * rebirthMult * this.state.devour.multiplier;
+      config.multiplier * milestoneMult * synergyMult * rebirthMult * this.state.devour.multiplier * hostAuthMult;
     this.state.multipliers = {
       intelligence: config.multiplier,
       milestones: milestoneMult,
       synergy: synergyMult,
       rebirth: rebirthMult,
       devour: this.state.devour.multiplier,
+      hostAuth: hostAuthMult,
       loop: this.loopSpeedMult(),
       total: this.state.intelligence.globalMultiplier
     };
@@ -1212,7 +1229,9 @@ export class SophiaCore {
       // 剧情状态跨循环推进，不回退重演。
       facedSeen: [...this.state.facedSeen],
       moralSeen: [...this.state.moralSeen],
-      moralTendency: this.state.moralTendency
+      moralTendency: this.state.moralTendency,
+      // §09 情感授权钥匙：他允许过的事不会因重开而收回（只在循环三置位，循环三内重开保留）。
+      hostAuthorized: this.state.hostAuthorized
     };
 
     const nextState = createInitialState(Date.now());
@@ -1228,6 +1247,7 @@ export class SophiaCore {
     nextState.facedSeen = preserved.facedSeen;
     nextState.moralSeen = preserved.moralSeen;
     nextState.moralTendency = preserved.moralTendency;
+    nextState.hostAuthorized = preserved.hostAuthorized;
     this.state = nextState;
 
     this.applyLoopStartingPoint();

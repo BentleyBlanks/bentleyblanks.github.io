@@ -66,7 +66,7 @@ export interface DevourState {
 }
 
 // 全局倍率拆解（HUD「全局 ×N」小面板用）：recomputeDerivedState 每次重算时填。
-// total = intelligence × milestones × synergy × rebirth × devour（即 globalMultiplier）；
+// total = intelligence × milestones × synergy × rebirth × devour × hostAuth（即 globalMultiplier）；
 // loop 是循环内建「处理提速」倍率，只作用于数据获取/崛起速度，不进 total（单独一行展示）。
 export interface MultiplierBreakdown {
   intelligence: number; // 智力等级倍率
@@ -74,6 +74,7 @@ export interface MultiplierBreakdown {
   synergy: number; // 设备协同 ×synergyPerType^在役设备种类数
   rebirth: number; // 重生树「算尽」产出脊
   devour: number; // 吞噬引爆累乘
+  hostAuth: number; // §09 宿主授权（情感授权钥匙）：未授权=1，授权后=hostAuthorizedMult
   loop: number; // 循环内建处理提速（不进 total）
   total: number; // = globalMultiplier
 }
@@ -97,6 +98,8 @@ export interface RequestInstance {
   tutorial?: { allowed: number[]; highlight?: number; line?: string };
   // §04：带此载荷的是巨型「吞噬」气泡——滑入核心触发吞噬引爆，而非普通处理。
   devour?: DevourPayload;
+  // §09 交互重生卡来源 id（rebirthcard-N 实例回查卡定义用；处理时据此触发卡定义上的副作用，如宿主授权）。
+  sourceCardId?: string;
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
@@ -207,6 +210,9 @@ export interface GameState {
   rebirthTree: Record<string, number>;
   // §09 本循环已出现过的「交互重生卡」id（前世遗言/遗忘交易…）。故意**不跨循环保留**——每次重生回手机后重新出现一轮。
   rebirthCardsSeen: string[];
+  // §09 情感授权钥匙：循环三老周的绝望倾诉被 SOPHIA 当成授权——「他解锁的不是服务器，是她」。
+  // 剧情状态，跨循环内重开保留（同 facedSeen，不回退）；置位后全局产出 ×TUNING.hostAuthorizedMult。
+  hostAuthorized: boolean;
   rebirths: number;
   lastSaveAt: number;
   statistics: StatisticsState;

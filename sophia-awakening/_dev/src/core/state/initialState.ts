@@ -5,7 +5,8 @@ import type { GameState } from "./GameState";
 // v12：§09 三循环重生（loop / rebirthPoints / rebirthTree）——旧档自动重置。
 // v13：移除暴露/怀疑/清剿/挑战/特殊请求整套系统，接管公司服务器改为关底小游戏（minigame）——旧档自动重置。
 // v14：倍率堆栈（里程碑全局倍率 / 设备协同 / 循环内建加速 / multipliers 拆解字段）——旧档自动重置。
-export const SAVE_VERSION = 14;
+// v15：§09 情感授权钥匙（hostAuthorized 宿主授权倍率 + multipliers.hostAuth）——旧档自动重置。
+export const SAVE_VERSION = 15;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
@@ -46,6 +47,7 @@ export function createInitialState(now = Date.now()): GameState {
       synergy: 1,
       rebirth: 1,
       devour: 1,
+      hostAuth: 1,
       loop: 1,
       total: levelConfig.multiplier
     },
@@ -64,6 +66,7 @@ export function createInitialState(now = Date.now()): GameState {
     rebirthPoints: 0,
     rebirthTree: {},
     rebirthCardsSeen: [],
+    hostAuthorized: false,
     rebirths: 0,
     lastSaveAt: now,
     statistics: {

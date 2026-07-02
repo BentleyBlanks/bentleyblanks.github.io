@@ -1265,6 +1265,20 @@ class SophiaGameApp {
         window.requestAnimationFrame(() => chip.classList.add("is-pop"));
       }
     });
+    // §09 情感授权钥匙（一次性）：老周的倾诉被当成授权——闪光 + 镜头小推 + 全局倍率片弹一下，
+    // SOPHIA 一句平静扭曲的旁白覆盖屏幕（终端线由 core 播）。
+    this.core.events.on("HOST_AUTHORIZED", (event) => {
+      this.juice.flash(AMBER);
+      this.zoomOutPulse(1.1, 0.8);
+      const chip = document.querySelector<HTMLElement>("#multChip");
+      if (chip) {
+        chip.classList.remove("is-pop");
+        window.requestAnimationFrame(() => chip.classList.add("is-pop"));
+      }
+      if (event.narration) {
+        this.stageNarration.showLine("SOPHIA", event.narration);
+      }
+    });
     this.core.events.on("MORAL_RESOLVED", (event) => {
       // 抉择落子后，SOPHIA 一句平静扭曲的旁白覆盖屏幕（语气不随选择燃血或冷血）。
       this.stageNarration.showLine("SOPHIA", event.reply);
