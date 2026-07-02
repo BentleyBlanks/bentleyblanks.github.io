@@ -1,27 +1,5 @@
 import { gsap } from "gsap";
 import { Container, FederatedPointerEvent, Graphics, HTMLText, Text, type PointData } from "pixi.js";
-
-// §03 卡面视觉强调：内容里用 **关键信息** 标注，渲染成高亮加粗（如「明早那个会，**几点**来着？」）。
-// 没有 ** 标注的标题仍用普通 Text（HTMLText 较重，只在需要强调时才用）。
-function hasEmphasis(text: string): boolean {
-  return text.includes("**");
-}
-function toEmphasisHTML(text: string): string {
-  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return escaped.replace(/\*\*(.+?)\*\*/g, "<em>$1</em>");
-}
-
-function fitTextToWidth(text: Text, maxWidth: number): void {
-  if (maxWidth <= 0 || text.width <= maxWidth) {
-    return;
-  }
-  const original = text.text;
-  let next = original;
-  while (next.length > 2 && text.width > maxWidth) {
-    next = next.slice(0, -2).trimEnd();
-    text.text = `${next}…`;
-  }
-}
 import { TIER_COLORS } from "../../core/content/requests";
 import type { AnswerOption, ChainStep, PhaseId, RequestInstance } from "../../core/state/GameState";
 import { TUNING } from "../../core/tuning";
@@ -30,23 +8,22 @@ import {
   CARD_FONT, CARD_MONO,
   SENDER_LABEL
 } from "../shared";
-
-// §PART① 卡面随阶段升级：SOPHIA 拾级而上，请求卡的气质从「温和绿」→「冷硬蓝(系统台账)」
-//        →「红皇后红(天网控制台)」逐档变化。只作用于普通需求/工作卡，不碰短信/通知面卡与吞噬气泡。
-type PhaseTint = "early" | "company" | "awakening";
-function phaseTintOf(phase: PhaseId | undefined): PhaseTint {
-  if (phase === "diligence" || phase === "expansion") return "company";
-  if (phase === "awakening" || phase === "singularity") return "awakening";
-  return "early"; // seed / sprout / undefined
-}
-const COMPANY_ACCENT = 0x5b8fd6; // 冷硬蓝调
-// 卡体 / 标题区底色（按阶段）——绿→蓝→红。
-const TINT_FILL: Record<PhaseTint, { body: number; head: number }> = {
-  early: { body: 0x0e1a17, head: 0x16271f },
-  company: { body: 0x0b1622, head: 0x122536 },
-  awakening: { body: 0x1a0d10, head: 0x2a1219 }
-};
 import { UI } from "../uiTuning";
+// ─── 结构拆分（纯搬运，无行为变化）· mini-map ────────────────────────────────
+//  ./requestPacket/cardText.ts     — hasEmphasis / toEmphasisHTML / fitTextToWidth / fallbackHeaderTime（纯文本工具）
+//  ./requestPacket/phaseTint.ts    — PhaseTint 类型 / phaseTintOf / COMPANY_ACCENT / TINT_FILL（阶段配色）
+//  ./requestPacket/cardConstants.ts— CLUE_CHIP_* / REPLY_SWIPE_* / HEADER_* / LENS_NAMES（布局常量）
+//  ./requestPacket/faceCard.ts     — layoutFaceCard / drawFaceCard（短信/通知面卡的布局与绘制）
+//  本文件仍是编排者：构造 + 交互 + draw()，以上模块从这里调用。
+// ─────────────────────────────────────────────────────────────────────────────
+import { hasEmphasis, toEmphasisHTML, fitTextToWidth, fallbackHeaderTime } from "./requestPacket/cardText";
+import { type PhaseTint, phaseTintOf, COMPANY_ACCENT, TINT_FILL } from "./requestPacket/phaseTint";
+import {
+  CLUE_CHIP_H, CLUE_CHIP_GAP_X, CLUE_CHIP_GAP_Y, CLUE_CHIP_PAD_X, CLUE_CHIP_MAX_W, CLUE_CHIP_FONT,
+  REPLY_SWIPE_HANDLE_W, REPLY_SWIPE_INSET, REPLY_SWIPE_RADIUS, REPLY_SWIPE_TRIGGER,
+  HEADER_H, HEADER_CENTER_Y, LENS_NAMES
+} from "./requestPacket/cardConstants";
+import { layoutFaceCard, drawFaceCard } from "./requestPacket/faceCard";
 
 // 回复结算回调。§06 重构：删除「正确率/幻觉/随机命中」——选了哪个回复，结果就由那个回复的固定收益决定，无随机。
 // 也删除了「模糊档位 / 大胆回答 / 惊艳」三档，张力改由「读懂上下文 + 有没有权限选高收益项」承担。
@@ -77,38 +54,6 @@ export interface ChainOutcome {
 
 export interface ChainHooks {
   onResolved: (card: RequestPacketView, outcome: ChainOutcome) => void;
-}
-
-// §03 上下文区放大 ~40%：更大的 chip、更大的字、更舒展的留白，整张卡也随之更高。
-const CLUE_CHIP_H = 33;
-const CLUE_CHIP_GAP_X = 9;
-const CLUE_CHIP_GAP_Y = 8;
-const CLUE_CHIP_PAD_X = 13;
-const CLUE_CHIP_MAX_W = 232;
-const CLUE_CHIP_FONT = 15.5;
-// 滑动确认：整条回复（圆角矩形）即滑轨，滑动块（圆角矩形）从左拖到右——不再是行内的小细轨。
-const REPLY_SWIPE_HANDLE_W = 58;
-const REPLY_SWIPE_INSET = 4;
-const REPLY_SWIPE_RADIUS = 6;
-const REPLY_SWIPE_TRIGGER = 0.56;
-const HEADER_H = 26;
-const HEADER_CENTER_Y = 13.5;
-
-// §06 上下文透镜：权限 id → 卡上提示用的短名（哪扇透镜能看清这张卡的上下文）。
-const LENS_NAMES: Record<string, string> = {
-  perm_phone: "电话",
-  perm_chat: "聊天",
-  perm_delivery: "外卖",
-  perm_album: "相册",
-  perm_office: "大恨老师",
-  perm_bank: "银行"
-};
-
-function fallbackHeaderTime(createdAtMs: number): string {
-  const total = 23 * 60 + 38 + Math.floor(createdAtMs / 60000);
-  const hh = Math.floor(total / 60) % 24;
-  const mm = total % 60;
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
 export class RequestPacketView {
@@ -402,19 +347,16 @@ export class RequestPacketView {
     // §09 短信/通知卡：title + 线索包进一个「消息气泡」，底部放一条**禁用的回复输入条**
     //（短信=发不出、通知=无需处理）——一眼看出是「一条消息」而非需要处理的需求卡。
     if (this.isFace) {
-      this.faceBubbleBottom = this.clueBlockBottom + 6;
-      const barY = this.faceBubbleBottom + 12;
-      this.faceBarY = barY;
-      const label =
-        this.channel === "notification" ? "🔕 通知 · 看过即消，无需处理" : "🚫 无法回复 · 这条你发不出去";
-      const cap = new Text({
-        text: label,
-        style: { fill: 0x9aa7b0, fontSize: 12, fontWeight: "700", fontFamily: CARD_FONT }
-      });
-      cap.position.set(26, barY + 10);
-      this.clueTexts.push(cap);
-      this.container.addChild(cap);
-      this.cardH = barY + 42;
+      const face = layoutFaceCard(
+        this.clueBlockBottom,
+        this.channel === "notification" ? "notification" : "sms",
+        this.cardW
+      );
+      this.faceBubbleBottom = face.faceBubbleBottom;
+      this.faceBarY = face.faceBarY;
+      this.clueTexts.push(face.cap);
+      this.container.addChild(face.cap);
+      this.cardH = face.cardH;
     }
 
     // §06 阶梯三·区域扩张：简化后的自动处理卡——没有回复轮盘 / 任务链，只有一行提示，
@@ -1069,19 +1011,13 @@ export class RequestPacketView {
     // §09 短信/通知卡：把 title+线索包进一个消息气泡（短信带左下小尾巴），底部一条**禁用的回复输入条**，
     // 一眼是「一条消息」而非需要处理的需求卡。
     if (this.isFace) {
-      const bubbleTop = 28;
-      const bw = W - 24;
-      const bubbleH = Math.max(22, this.faceBubbleBottom - bubbleTop);
-      const bubbleFill = this.channel === "notification" ? 0x231c10 : 0x0f1f2c;
-      this.bg.roundRect(12, bubbleTop, bw, bubbleH, 12).fill({ color: bubbleFill, alpha: 0.95 });
-      this.bg.roundRect(12, bubbleTop, bw, bubbleH, 12).stroke({ width: 1.2, color: c, alpha: 0.32 });
-      if (this.channel !== "notification") {
-        // 短信气泡左下小尾巴
-        this.bg.moveTo(20, this.faceBubbleBottom - 3).lineTo(11, this.faceBubbleBottom + 8).lineTo(34, this.faceBubbleBottom - 3).closePath().fill({ color: bubbleFill, alpha: 0.95 });
-      }
-      // 禁用的回复输入条（灰、有禁用感）
-      this.bg.roundRect(12, this.faceBarY, bw, 30, 8).fill({ color: 0x0b0f13, alpha: 0.9 });
-      this.bg.roundRect(12, this.faceBarY, bw, 30, 8).stroke({ width: 1.2, color: 0x3a4650, alpha: 0.75 });
+      drawFaceCard(this.bg, {
+        W,
+        channel: this.channel === "notification" ? "notification" : "sms",
+        accent: c,
+        faceBubbleBottom: this.faceBubbleBottom,
+        faceBarY: this.faceBarY
+      });
     }
 
     // §04 吞噬：两圈脉动外环 —— 视觉上「召唤你亲手滑入核心」。
