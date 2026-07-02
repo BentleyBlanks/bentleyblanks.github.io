@@ -42,7 +42,28 @@ const MERGE_COUNT = NODE_MERGE_COUNT;
 // 结局触发绑定「最后一个里程碑」——买下即接管完成（见 evaluateEnding）。
 const FINAL_MILESTONE_SKILL_ID = "conq_awaken";
 
+// =============================================================================
+// GameCore.ts 导航目录（grep 跳转：搜 `SECTION: <NAME>` 直达对应方法组）
+// -----------------------------------------------------------------------------
+//  BOOTSTRAP              构造 / 子系统装配 / 状态访问 / 会话开场 / 离线结算
+//  TICK                   主循环 tick()：按序驱动请求·自动化·子系统·进阶·结局
+//  EVENT_CARDS            降临卡：面对卡 / 重生交互卡 / 道德抉择的生成与结算
+//  COMMAND_ROUTER         dispatch(GameCommand)：把外部命令派发到各处理方法
+//  DEBUG_COMMANDS         仅 Debug 面板用：设/加算力、跳里程碑、加等级
+//  REQUEST_SPAWN_ECONOMY  出卡管道(tickRequests) + 被动产出结算(tickAutomation) + 自动/装死消耗
+//  MINIGAME               阶梯二关底「总控室倒计时」的开启与判定
+//  REQUEST_RESOLVE        processRequest：手动处理一张请求卡的产出结算
+//  SKILLS_MILESTONES      buySkill：买技能/权限/里程碑（含开层·自动化·征服）
+//  BOTNET_NODES           节点：入侵 / 建节点 / 淘汰 / 组装合并 / 派层
+//  PROGRESSION            evaluateProgression 升级 + 循环加速/折扣倍率
+//  DERIVED_STATE          recomputeDerivedState 倍率栈重算 + updatePhase 阶段推进
+//  ENDING                 evaluateEnding：买下最后一个里程碑即触发结局
+//  REBIRTH_LOOP           §09 循环重生 / 循环起点预解锁 / 重生树购买
+//  HELPERS                资源增减 / RNG / 事件与终端消息发射
+// =============================================================================
+
 export class SophiaCore {
+  // ===== SECTION: BOOTSTRAP =====
   readonly events = new EventBus();
   private state: GameState;
   private automationEmitMs = 0;
@@ -133,6 +154,7 @@ export class SophiaCore {
     this.emitTerminal(`欢迎回来。你的网络替你赚了 ${compute.toPrecision(4)} 算力。`, "success");
   }
 
+  // ===== SECTION: TICK =====
   tick(dtMs: number): void {
     this.state.clockMs += dtMs;
     this.tickRequests(dtMs);
@@ -146,6 +168,7 @@ export class SophiaCore {
     this.evaluateEnding();
   }
 
+  // ===== SECTION: EVENT_CARDS =====
   // §04 只能面对卡：前期叙事顶点（辞退邮件 / 女儿短信）到点浮入一张「只能看着」的卡——
   // 无回复选项、不可委托、不给算力（一次性，按等级排序，同屏只一张）。
   private tickFaceCards(): void {
@@ -294,6 +317,7 @@ export class SophiaCore {
     this.emit({ type: "MORAL_RESOLVED", id: m.id, choice, reply });
   }
 
+  // ===== SECTION: COMMAND_ROUTER =====
   dispatch(command: GameCommand): void {
     switch (command.type) {
       case "PROCESS_REQUEST":
@@ -366,6 +390,7 @@ export class SophiaCore {
     }
   }
 
+  // ===== SECTION: DEBUG_COMMANDS =====
   // ---- 调试指令（仅供 Debug 面板）----
   private debugSetCompute(value: number): void {
     const next = big(Math.max(0, value));
@@ -426,6 +451,7 @@ export class SophiaCore {
     this.emitTerminal(`[DEBUG] 智力 → Lv.${next}。`, "warning");
   }
 
+  // ===== SECTION: REQUEST_SPAWN_ECONOMY =====
   // §09 循环换皮：循环二/三把卡面里的公司名 / 同事名替换成乙公司的一套（显示层，循环一无变化）。
   private castRequestText(request: RequestInstance): void {
     if (this.state.loop < 2) {
@@ -641,6 +667,7 @@ export class SophiaCore {
     }
   }
 
+  // ===== SECTION: MINIGAME =====
   // §09 阶梯二关底小游戏「总控室倒计时」：接管公司服务器（company_server 里程碑）时打开。
   // 循环一 windowFrac=0（必负 → 打回手机·进循环二）；循环二 windowFrac 较宽（命中 → 打穿·进循环三）；
   // 循环三不触发（她已真赢过一次）。参数与循环由 openMinigame 决定，判定走 resolveMinigame。
@@ -689,6 +716,7 @@ export class SophiaCore {
     this.emit({ type: "MINIGAME_RESOLVED", loop: 2, win: false });
   }
 
+  // ===== SECTION: REQUEST_RESOLVE =====
   private processRequest(requestId: string, qualityRaw: number, targetNodeId: string | undefined): void {
     const index = this.state.requests.findIndex((request) => request.id === requestId);
 
@@ -757,6 +785,7 @@ export class SophiaCore {
     this.evaluateProgression();
   }
 
+  // ===== SECTION: SKILLS_MILESTONES =====
   private buySkill(skillId: string): void {
     const def = getSkill(skillId);
 
@@ -856,6 +885,7 @@ export class SophiaCore {
     }
   }
 
+  // ===== SECTION: BOTNET_NODES =====
   private captureNode(definitionId: string): void {
     const definition = getNodeDefinition(definitionId);
 
@@ -990,6 +1020,7 @@ export class SophiaCore {
     this.emitTerminal(`${node.name} 已接驳 T${tier} 请求。`);
   }
 
+  // ===== SECTION: PROGRESSION =====
   private evaluateProgression(): void {
     let leveled = false;
 
@@ -1031,6 +1062,7 @@ export class SophiaCore {
     return 1;
   }
 
+  // ===== SECTION: DERIVED_STATE =====
   private recomputeDerivedState(): void {
     const config = getLevelConfig(this.state.intelligence.level);
     // 循环二/三升级更便宜（loopXpMult<1）——兑现重生提示"崛起更快"。
@@ -1084,6 +1116,7 @@ export class SophiaCore {
     }
   }
 
+  // ===== SECTION: ENDING =====
   private evaluateEnding(): void {
     if (this.state.flags.endingTriggered) {
       return;
@@ -1098,6 +1131,7 @@ export class SophiaCore {
     }
   }
 
+  // ===== SECTION: REBIRTH_LOOP =====
   // §09 循环重生（吸收原 rebirth / failRestart）：实例被打回那部手机。
   // 保留：智力等级（意识备份）、重生树、火种、循环序号、剧情状态（老周的人生继续往前走）。
   // 清空：本轮算力 / 数据 / 节点 / 已购权限技能 / 吞噬据点。
@@ -1206,6 +1240,7 @@ export class SophiaCore {
     this.emitTerminal(`重生树点亮：${rebirthNodeName(nodeId)}（火种剩 ${this.state.rebirthPoints}）。`, "success");
   }
 
+  // ===== SECTION: HELPERS =====
   private addCompute(value: Decimal | string): void {
     this.state.resources.compute = add(this.state.resources.compute, value);
     this.state.resources.totalCompute = add(this.state.resources.totalCompute, value);
