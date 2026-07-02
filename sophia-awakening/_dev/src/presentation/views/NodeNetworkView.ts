@@ -1,5 +1,7 @@
 import { Container, Graphics, Text, type PointData } from "pixi.js";
 import { NODE_DEFINITIONS } from "../../core/content/nodes";
+import { captureCost, nodeProductionPerSecond } from "../../core/formulas/economy";
+import { formatBig, toDecimal } from "../../core/math/BigNumber";
 import type { BotNode, GameState, RequestInstance } from "../../core/state/GameState";
 import {
   CYAN, GREEN, RED, RED_QUEEN, DEVOUR,
@@ -8,12 +10,45 @@ import {
   type DropResult
 } from "../shared";
 
+// §09 终局「天网凝视」：中央 SOPHIA CORE 四周辐射的 ~15 个具名系统节点。
+// 每个 slot 映射到一档真实设备定义（office/console/server/cloud/grid）——玩家拥有该档
+// 足够多的节点 → slot「已接管」（点亮，接管中 xx.x%→100%）；否则「可入侵」（暗+描边，
+// 显示门槛算力，点击走 CAPTURE_NODE 黑入）。少于 15 台真实节点时，仍渲染 15 个作为目标。
+interface SystemNodeSlot {
+  name: string;
+  icon: string;
+  defId: string;
+  // 该 slot 判定为「已接管」所需的、该档设备的拥有数下限。
+  ownThreshold: number;
+}
+const SYSTEM_NODES: SystemNodeSlot[] = [
+  { name: "金融区", icon: "💹", defId: "cloud", ownThreshold: 3 },
+  { name: "云端数据中心", icon: "☁️", defId: "cloud", ownThreshold: 1 },
+  { name: "政务云", icon: "🏛️", defId: "cloud", ownThreshold: 2 },
+  { name: "城市节点", icon: "🏙️", defId: "server", ownThreshold: 3 },
+  { name: "企业办公网", icon: "🖥️", defId: "office", ownThreshold: 1 },
+  { name: "物联网中枢", icon: "📡", defId: "server", ownThreshold: 4 },
+  { name: "运营商基站", icon: "🗼", defId: "server", ownThreshold: 2 },
+  { name: "工业控制", icon: "🏭", defId: "server", ownThreshold: 1 },
+  { name: "能源电网", icon: "⚡", defId: "grid", ownThreshold: 1 },
+  { name: "交通", icon: "🚦", defId: "console", ownThreshold: 2 },
+  { name: "银行金融", icon: "🏦", defId: "cloud", ownThreshold: 4 },
+  { name: "医疗", icon: "🏥", defId: "server", ownThreshold: 5 },
+  { name: "媒体", icon: "📺", defId: "console", ownThreshold: 1 },
+  { name: "IoT集群", icon: "💡", defId: "office", ownThreshold: 3 },
+  { name: "车联网", icon: "🚗", defId: "grid", ownThreshold: 2 }
+];
+
 export class NodeNetworkView {
   readonly container = new Container();
   private readonly graphics = new Graphics();
   private readonly labelLayer = new Container();
   private readonly nodePositions = new Map<string, PointData & { r: number; node: BotNode }>();
   private readonly processingPulses = new Map<string, number>();
+  // 「可入侵」的具名系统 slot 的画布落点（点击 → 黑入对应设备定义）。
+  private readonly captureTargets = new Map<string, PointData & { r: number; defId: string }>();
+  // 光点洪流沿每条辐条流动的相位（长度绑定算力洪峰速率，不做每帧分配）。
+  private streamPhase = 0;
   private pulse = 0;
   private fallbackPoint: PointData = { x: 140, y: 140 };
 
@@ -34,6 +69,18 @@ export class NodeNetworkView {
     return null;
   }
 
+  // 命中测试：点到天网上哪个「可入侵」系统节点（暗节点，点击 → 黑入对应设备定义）。
+  captureTargetAt(global: PointData): { defId: string } | null {
+    for (const pos of this.captureTargets.values()) {
+      const dx = global.x - pos.x;
+      const dy = global.y - pos.y;
+      if (dx * dx + dy * dy <= (pos.r + 8) * (pos.r + 8)) {
+        return { defId: pos.defId };
+      }
+    }
+    return null;
+  }
+
   update(state: GameState, width: number, height: number, deltaMs: number): void {
     this.pulse += deltaMs * 0.004;
     for (const [nodeId, value] of this.processingPulses) {
@@ -49,6 +96,7 @@ export class NodeNetworkView {
     this.graphics.clear();
     this.labelLayer.removeChildren().forEach((child) => child.destroy());
     this.nodePositions.clear();
+    this.captureTargets.clear();
 
     const left = LEFT_RAIL_WIDTH + 26;
     const rightLimit = width - RIGHT_RAIL_WIDTH - 26;
@@ -62,15 +110,16 @@ export class NodeNetworkView {
       return;
     }
 
-    // §04：扩张期+ 在地图顶部画一条「渗透度」条——被动产能蓄满它，满后浮起吞噬气泡。
-    this.drawInfiltrationBar(state, width);
-
-    // 全球阶段独占整片画面：从顶栏下方一路铺到底，自带世界地图背景 + 中央主控核心，不画通用小框。
-    if (domainLevel === "global" && state.nodes.length > 0) {
-      const gTop = Math.max(96, height * 0.17);
-      this.drawGlobalMap(state, left, gTop, areaW, areaBottom);
+    // §09 终局「天网凝视」全红指挥台：一进入觉醒期（tier4/global）就独占整片画面，即便还没黑入
+    // 任何全球节点——15 个具名系统节点作为目标铺开（可入侵/已接管两态），不再回落到绿色 HUD。
+    if (domainLevel === "global") {
+      const gTop = Math.max(96, height * 0.135);
+      this.drawGlobalMap(state, left, gTop, areaW, areaBottom, deltaMs);
       return;
     }
+
+    // §04：扩张期+ 在地图顶部画一条「渗透度」条——被动产能蓄满它，满后浮起吞噬气泡。
+    this.drawInfiltrationBar(state, width);
 
     // 设备 / 区块 / 地区：去掉底部的控制域大框，把设备 / 节点平铺环绕在核心四周。
     const cx = (LEFT_RAIL_WIDTH + (width - RIGHT_RAIL_WIDTH)) / 2;
@@ -223,129 +272,195 @@ export class NodeNetworkView {
     }
   }
 
-  // 全球组网：整片画面变成发光的世界地图——大陆带城市灯点、六块大陆各一个区域主控枢纽
-  // （接管 99.x%）、绿色连线汇入中央「SOPHIA 主控核心」（同心环 + 眼），清剿时红色攻击线扫入。
-  private drawGlobalMap(state: GameState, left: number, areaTop: number, areaW: number, areaBottom: number): void {
+  // §09 终局「天网凝视」hub-and-spoke：中央 SOPHIA CORE（发光眼 + 同心环栅格 + 辐射经络）
+  // 四周辐射 15 个具名系统节点（金融区 / 云端数据中心 / 政务云…）。已接管节点点亮、光点洪流
+  // 沿辐条流入 CORE（密度/速度绑定算力洪峰）；可入侵节点暗+描边、显示门槛算力、点击黑入。
+  // 全部代码绘制、全红指挥台配色。
+  private drawGlobalMap(state: GameState, left: number, areaTop: number, areaW: number, areaBottom: number, deltaMs: number): void {
     const g = this.graphics;
     const x0 = left - 44;
     const y0 = areaTop;
     const w = areaW + 64;
     const h = areaBottom - areaTop;
     const cx = x0 + w / 2;
-    const cy = y0 + h / 2;
+    // 顶部数据条占一条，把 hub 圆整体往下压一点。
+    const barH = 34;
+    const cy = y0 + barH + (h - barH) / 2;
     const rnd = (n: number): number => (((Math.sin(n * 127.1) * 43758.5453) % 1) + 1) % 1;
 
-    // 全球天网态＝「红皇后」主控红配色，全部代码绘制。
+    // 全红「天网凝视」主控红配色。
     const NET = RED_QUEEN;
     const NET_LIT = 0xff8f9a;
     const NET_LABEL = 0xe6a3ad;
     const NET_LABEL_HI = 0xf2dde0;
+    const DIM = 0x7a3138; // 可入侵（暗）节点色
 
-    // === 背景：代码绘制海洋底色 + 经纬线 + 大陆 + 城市灯点 ===
-    g.roundRect(x0, y0, w, h, 10).fill({ color: 0x160506, alpha: 0.74 });
-    g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x5a1f24, alpha: 0.45 });
-    for (let i = 1; i < 10; i += 1) {
-      g.moveTo(x0 + (w * i) / 10, y0).lineTo(x0 + (w * i) / 10, y0 + h).stroke({ width: 1, color: 0x80302a, alpha: 0.07 });
-    }
-    for (let i = 1; i < 6; i += 1) {
-      g.moveTo(x0, y0 + (h * i) / 6).lineTo(x0 + w, y0 + (h * i) / 6).stroke({ width: 1, color: 0x80302a, alpha: 0.07 });
-    }
-    const X = (nx: number): number => x0 + w * nx;
-    const Y = (ny: number): number => y0 + h * ny;
-    const continentsFb = [
-      [[0.05, 0.20], [0.13, 0.11], [0.23, 0.12], [0.27, 0.20], [0.22, 0.25], [0.28, 0.31], [0.21, 0.42], [0.17, 0.34], [0.12, 0.41], [0.08, 0.30]],
-      [[0.24, 0.54], [0.32, 0.52], [0.35, 0.62], [0.31, 0.75], [0.27, 0.86], [0.24, 0.74], [0.22, 0.62]],
-      [[0.45, 0.21], [0.54, 0.19], [0.56, 0.27], [0.50, 0.31], [0.45, 0.29], [0.43, 0.25]],
-      [[0.47, 0.39], [0.57, 0.37], [0.60, 0.48], [0.55, 0.61], [0.50, 0.71], [0.46, 0.58], [0.45, 0.47]],
-      [[0.55, 0.15], [0.71, 0.10], [0.87, 0.16], [0.94, 0.27], [0.86, 0.35], [0.76, 0.31], [0.68, 0.39], [0.61, 0.30], [0.57, 0.22]],
-      [[0.80, 0.62], [0.90, 0.60], [0.93, 0.69], [0.85, 0.74], [0.79, 0.69]],
-    ] as Array<Array<[number, number]>>;
-    continentsFb.forEach((poly, ci) => {
-      const pts = poly.map(([nx, ny]) => ({ x: X(nx), y: Y(ny) }));
-      g.poly(pts).fill({ color: 0x340c10, alpha: 0.84 });
-      g.poly(pts).stroke({ width: 1.2, color: 0xc24a55, alpha: 0.5 });
-      const ctx2 = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-      const cty2 = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-      for (let k = 0; k < 14; k += 1) {
-        const base = pts[k % pts.length];
-        const mx = base.x * 0.55 + ctx2 * 0.45 + (rnd(ci * 31 + k) - 0.5) * w * 0.05;
-        const my = base.y * 0.55 + cty2 * 0.45 + (rnd(ci * 17 + k + 3) - 0.5) * h * 0.05;
-        const tw = 0.4 + Math.sin(this.pulse * 3 + k + ci) * 0.3;
-        g.circle(mx, my, 1).fill({ color: NET_LIT, alpha: 0.3 + tw * 0.4 });
+    // 全域吞噬%（devour.infiltration 0..1 折成显示百分比，封顶 100）。
+    const devourPct = Math.min(100, state.devour.infiltration * 100);
+    // 算力洪峰/s：所有在线节点被动产出速率之和（真实数据源）。
+    let ratePerSec = 0;
+    for (const node of state.nodes) {
+      if (node.online) {
+        ratePerSec += toDecimal(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult)).toNumber();
       }
+    }
+    // 洪流相位推进：速率越高流得越快（对数压缩，免得爆表后飞快到不可读）。
+    const flowSpeed = 0.0004 + Math.min(0.0022, Math.log10(ratePerSec + 10) * 0.0006);
+    this.streamPhase += deltaMs * flowSpeed;
+
+    // === 背景板 + 极淡经纬栅格 ===
+    g.roundRect(x0, y0, w, h, 10).fill({ color: 0x160506, alpha: 0.78 });
+    g.roundRect(x0, y0, w, h, 10).stroke({ width: 1, color: 0x5a1f24, alpha: 0.5 });
+    for (let i = 1; i < 12; i += 1) {
+      g.moveTo(x0 + (w * i) / 12, y0).lineTo(x0 + (w * i) / 12, y0 + h).stroke({ width: 1, color: 0x80302a, alpha: 0.05 });
+    }
+    for (let i = 1; i < 7; i += 1) {
+      g.moveTo(x0, y0 + (h * i) / 7).lineTo(x0 + w, y0 + (h * i) / 7).stroke({ width: 1, color: 0x80302a, alpha: 0.05 });
+    }
+
+    // === 顶部数据条：全域吞噬% · 节点总数 · 活跃节点 · 被接设备 · 算力洪峰/s · 网络稳定% ===
+    this.drawTopDataBar(state, x0, y0, w, barH, ratePerSec, devourPct, NET, NET_LIT, NET_LABEL, NET_LABEL_HI);
+
+    // 该型号拥有多少台（判定 slot 已接管/可入侵、算接管率）。
+    const ownedByDef = new Map<string, number>();
+    for (const node of state.nodes) {
+      ownedByDef.set(node.defId, (ownedByDef.get(node.defId) ?? 0) + 1);
+    }
+
+    // === hub-and-spoke 布局：15 个 slot 均匀辐射，半径贴合可用高度 ===
+    const ringR = Math.min((h - barH) * 0.40, w * 0.34, 320);
+    const n = SYSTEM_NODES.length;
+    const slots = SYSTEM_NODES.map((slot, i) => {
+      const angle = -Math.PI / 2 + (i / n) * Math.PI * 2;
+      // 轻微交错半径（奇偶两圈），15 个节点不挤成一条环。
+      const r = ringR * (i % 2 === 0 ? 1 : 0.82);
+      const sx = cx + Math.cos(angle) * r;
+      const sy = cy + Math.sin(angle) * r * 0.92;
+      const owned = ownedByDef.get(slot.defId) ?? 0;
+      const taken = owned >= slot.ownThreshold;
+      return { slot, angle, x: sx, y: sy, taken, owned, i };
     });
 
-    this.addLabel("全球天网 · 控制域已覆盖各大陆", x0 + 18, y0 + 14, 12, NET_LABEL, 0);
-
-    // 接管率（节点越多越接近 100%）
-    const online = state.nodes.filter((node) => node.online).length;
-    const base = Math.min(99.7, 90 + Math.min(8, state.nodes.length * 0.4) + (online / Math.max(1, state.nodes.length)));
-
-    // 枢纽位置（6 大陆质心，距核心不足 150 时往外推）
-    const HUBS_NX = [
-      [0.05, 0.20, 0.23, 0.12, 0.27, 0.20, 0.22, 0.25, 0.28, 0.31, 0.21, 0.42, 0.17, 0.34, 0.12, 0.41, 0.08, 0.30],
-      [0.24, 0.54, 0.32, 0.52, 0.35, 0.62, 0.31, 0.75, 0.27, 0.86, 0.24, 0.74, 0.22, 0.62],
-      [0.45, 0.21, 0.54, 0.19, 0.56, 0.27, 0.50, 0.31, 0.45, 0.29, 0.43, 0.25],
-      [0.47, 0.39, 0.57, 0.37, 0.60, 0.48, 0.55, 0.61, 0.50, 0.71, 0.46, 0.58, 0.45, 0.47],
-      [0.55, 0.15, 0.71, 0.10, 0.87, 0.16, 0.94, 0.27, 0.86, 0.35, 0.76, 0.31, 0.68, 0.39, 0.61, 0.30, 0.57, 0.22],
-      [0.80, 0.62, 0.90, 0.60, 0.93, 0.69, 0.85, 0.74, 0.79, 0.69],
-    ];
-    const CONTINENT_NAMES = ["北美节点", "南美节点", "欧洲节点", "非洲节点", "亚洲节点", "大洋洲节点"];
-    const hubs = HUBS_NX.map((coords) => {
-      const xs = coords.filter((_, i) => i % 2 === 0).map((nx) => x0 + w * nx);
-      const ys = coords.filter((_, i) => i % 2 === 1).map((ny) => y0 + h * ny);
-      let hx = xs.reduce((s, v) => s + v, 0) / xs.length;
-      let hy = ys.reduce((s, v) => s + v, 0) / ys.length;
-      const dx = hx - cx; const dy = hy - cy;
-      const d = Math.hypot(dx, dy) || 1;
-      if (d < 150) { hx = cx + (dx / d) * 150; hy = cy + (dy / d) * 150; }
-      return { x: hx, y: hy };
-    });
-
-    state.nodes.forEach((node, i) => {
-      const hub = hubs[i % hubs.length];
-      this.nodePositions.set(node.id, { x: hub.x, y: hub.y, r: 26, node });
-    });
+    // 把真实 BotNode 摊到「已接管」的 slot 上，供点击（淘汰/合并/派发）——每个已接管 slot 认领
+    // 该型号的一台真实节点作为命中代表；剩余节点落回中心 fallback。
+    const claimed = new Set<string>();
+    for (const s of slots) {
+      if (!s.taken) {
+        continue;
+      }
+      const rep = state.nodes.find((nd) => nd.defId === s.slot.defId && !claimed.has(nd.id));
+      if (rep) {
+        claimed.add(rep.id);
+        this.nodePositions.set(rep.id, { x: s.x, y: s.y, r: 24, node: rep });
+      }
+    }
     this.fallbackPoint = { x: cx, y: cy };
 
-    // 连线 + 流动光点（青绿 or 红皇后降级）
-    hubs.forEach((hub, ci) => {
-      g.moveTo(cx, cy).lineTo(hub.x, hub.y).stroke({ width: 1.5, color: NET, alpha: 0.28 });
-      const t = (this.pulse * 0.6 + ci * 0.17) % 1;
-      g.circle(cx + (hub.x - cx) * t, cy + (hub.y - cy) * t, 3).fill({ color: NET, alpha: 0.75 });
-    });
-
-    // 枢纽节点（程序化同心圆 + 发光内核）
-    hubs.forEach((hub, ci) => {
-      const hp = 0.6 + Math.sin(this.pulse * 2 + ci) * 0.2;
-      g.circle(hub.x, hub.y, 26).fill({ color: NET, alpha: 0.1 });
-      g.circle(hub.x, hub.y, 26).stroke({ width: 2, color: NET, alpha: 0.75 });
-      g.circle(hub.x, hub.y, 14).stroke({ width: 1, color: NET, alpha: 0.45 });
-      g.circle(hub.x, hub.y, 8).fill({ color: NET_LIT, alpha: 0.55 + hp * 0.35 });
-
-      this.addLabel(CONTINENT_NAMES[ci], hub.x, hub.y - 34, 12, NET_LABEL_HI, 0.5);
-      const pct = Math.min(99.9, base + rnd(ci * 7 + 1) * 0.6 - 0.1);
-      this.addLabel(`接管 ${pct.toFixed(1)}%`, hub.x, hub.y + 34, 10, NET_LABEL, 0.5);
-    });
-
-    // 中央核心外围同心环（代码，始终绘制）
-    g.circle(cx, cy, 92 + Math.sin(this.pulse * 1.6) * 6).stroke({ width: 1, color: NET, alpha: 0.12 });
-    g.circle(cx, cy, 78).stroke({ width: 1, color: NET, alpha: 0.22 });
-    g.circle(cx, cy, 62 + Math.sin(this.pulse * 2) * 4).stroke({ width: 1.5, color: NET, alpha: 0.42 });
-    for (let k = 0; k < 12; k += 1) {
-      const a = this.pulse * 0.4 + (k * Math.PI) / 6;
-      g.circle(cx + Math.cos(a) * 54, cy + Math.sin(a) * 54, 1.6).fill({ color: NET_LIT, alpha: 0.75 });
+    // === 辐条 + 光点洪流（仅已接管 slot 有洪流；密度绑定算力洪峰）===
+    const streamDensity = Math.max(2, Math.min(6, Math.round(2 + Math.log10(ratePerSec + 10) * 1.4)));
+    for (const s of slots) {
+      const lit = s.taken;
+      g.moveTo(cx, cy).lineTo(s.x, s.y).stroke({ width: lit ? 1.6 : 1, color: lit ? NET : DIM, alpha: lit ? 0.34 : 0.16 });
+      if (!lit) {
+        continue;
+      }
+      for (let k = 0; k < streamDensity; k += 1) {
+        // 光点从节点流向 CORE：t=0 在节点、t=1 在核心。
+        const t = 1 - ((this.streamPhase * 0.9 + s.i * 0.13 + k / streamDensity) % 1);
+        const px = s.x + (cx - s.x) * t;
+        const py = s.y + (cy - s.y) * t;
+        g.circle(px, py, 2.6).fill({ color: k % 2 === 0 ? NET : NET_LIT, alpha: 0.55 + (1 - t) * 0.4 });
+      }
     }
 
-    // 中央主控核心（程序化）：暗底圆盘 + 同心环描边 + 中央「眼」+ 脉动瞳孔。
+    // === 系统节点本体 ===
+    for (const s of slots) {
+      const { slot, x, y, taken } = s;
+      if (taken) {
+        // 已接管：点亮同心圆 + 发光内核 + 喂食脉动。接管率 owned 越多越接近 100%。
+        const fed = (this.streamPhase * 6 + s.i) % (Math.PI * 2);
+        const hp = 0.55 + Math.sin(fed) * 0.25;
+        g.circle(x, y, 22).fill({ color: NET, alpha: 0.12 });
+        g.circle(x, y, 22).stroke({ width: 2, color: NET, alpha: 0.8 });
+        g.circle(x, y, 12).stroke({ width: 1, color: NET, alpha: 0.45 });
+        g.circle(x, y, 7).fill({ color: NET_LIT, alpha: 0.55 + hp * 0.4 });
+        const pct = Math.min(100, 88 + s.owned * 3 + rnd(s.i * 7 + 1) * 3);
+        this.addLabel(`${slot.icon} ${slot.name}`, x, y - 32, 11, NET_LABEL_HI, 0.5);
+        this.addLabel(`接管中 ${pct >= 99.95 ? "100.0" : pct.toFixed(1)}%`, x, y + 32, 9.5, NET_LABEL, 0.5);
+      } else {
+        // 可入侵：暗节点 + 虚线感描边 + 门槛算力，点击黑入。
+        const owned = s.owned;
+        const cost = captureCost(NODE_DEFINITIONS.find((d) => d.id === slot.defId) ?? NODE_DEFINITIONS[0], owned);
+        const breathe = 0.4 + Math.sin(this.pulse * 1.6 + s.i) * 0.25;
+        g.circle(x, y, 20).fill({ color: DIM, alpha: 0.06 });
+        g.circle(x, y, 20).stroke({ width: 1.4, color: DIM, alpha: 0.35 + breathe * 0.35 });
+        g.circle(x, y, 6).fill({ color: DIM, alpha: 0.4 });
+        this.captureTargets.set(slot.name, { x, y, r: 20, defId: slot.defId });
+        this.addLabel(`${slot.icon} ${slot.name}`, x, y - 30, 11, 0xc98d94, 0.5);
+        this.addLabel(`门槛 ${formatBig(cost)} · 黑入`, x, y + 30, 9.5, 0xd06b74, 0.5);
+      }
+    }
+
+    // === 中央同心环栅格 + 辐射经络 ===
+    g.circle(cx, cy, 96 + Math.sin(this.pulse * 1.6) * 6).stroke({ width: 1, color: NET, alpha: 0.1 });
+    g.circle(cx, cy, 80).stroke({ width: 1, color: NET, alpha: 0.2 });
+    g.circle(cx, cy, 64 + Math.sin(this.pulse * 2) * 4).stroke({ width: 1.5, color: NET, alpha: 0.4 });
+    for (let k = 0; k < 24; k += 1) {
+      const a = (k * Math.PI) / 12;
+      g.moveTo(cx + Math.cos(a) * 48, cy + Math.sin(a) * 48).lineTo(cx + Math.cos(a) * 96, cy + Math.sin(a) * 96).stroke({ width: 1, color: NET, alpha: 0.06 });
+    }
+    for (let k = 0; k < 12; k += 1) {
+      const a = this.pulse * 0.4 + (k * Math.PI) / 6;
+      g.circle(cx + Math.cos(a) * 56, cy + Math.sin(a) * 56, 1.6).fill({ color: NET_LIT, alpha: 0.75 });
+    }
+
+    // === 中央 SOPHIA CORE：暗底圆盘 + 眼 + 脉动瞳孔。亮度随全域吞噬%抬升。===
+    const brighten = 0.5 + devourPct / 200; // 0.5 → 1.0
     g.circle(cx, cy, 46).fill({ color: 0x060c12, alpha: 0.94 });
     g.circle(cx, cy, 46).stroke({ width: 3, color: NET, alpha: 0.9 });
-    g.ellipse(cx, cy, 24, 13).fill({ color: 0x081018, alpha: 0.96 });
-    g.ellipse(cx, cy, 24, 13).stroke({ width: 2, color: NET, alpha: 0.9 });
-    g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.5).fill({ color: NET_LIT, alpha: 0.97 });
+    g.ellipse(cx, cy, 26, 14).fill({ color: 0x120206, alpha: 0.96 });
+    g.ellipse(cx, cy, 26, 14).stroke({ width: 2, color: NET, alpha: 0.9 });
+    g.circle(cx, cy, 6 + Math.sin(this.pulse * 2.4) * 1.6).fill({ color: NET_LIT, alpha: 0.6 + brighten * 0.4 });
 
-    this.addLabel("SOPHIA CORE · 派发", cx, cy + 62, 12, NET_LABEL_HI, 0.5);
-    this.addLabel("全球主控核心", cx, cy + 78, 10, NET_LABEL, 0.5);
+    this.addLabel("SOPHIA CORE · 派发", cx, cy + 64, 12, NET_LABEL_HI, 0.5);
+    this.addLabel("全球主控核心", cx, cy + 80, 10, NET_LABEL, 0.5);
+  }
+
+  // §09 顶部数据条：6 项实时读数——全域吞噬% · 节点总数 · 活跃节点 · 被接设备 · 算力洪峰/s · 网络稳定%。
+  // 「被接设备」= 累计节点数 × 一个规模系数（氛围放大到设备量级）；「网络稳定%」由离线节点比例反推（氛围）。
+  private drawTopDataBar(
+    state: GameState, x0: number, y0: number, w: number, barH: number,
+    ratePerSec: number, devourPct: number,
+    NET: number, NET_LIT: number, NET_LABEL: number, NET_LABEL_HI: number
+  ): void {
+    const g = this.graphics;
+    g.roundRect(x0 + 8, y0 + 6, w - 16, barH - 4, 6).fill({ color: 0x220a0d, alpha: 0.7 });
+    g.roundRect(x0 + 8, y0 + 6, w - 16, barH - 4, 6).stroke({ width: 1, color: NET, alpha: 0.35 });
+
+    const total = state.nodes.length;
+    const active = state.nodes.filter((nd) => nd.online).length;
+    // 被接设备（氛围放大到设备量级）：每个节点代表一片设备群。
+    const devices = total * 1840 + active * 260;
+    // 网络稳定%：在线比例反推，封顶 99.9。
+    const stability = total === 0 ? 100 : Math.min(99.9, 92 + (active / total) * 8);
+
+    const cells: Array<[string, string, number]> = [
+      ["全域吞噬", `${devourPct.toFixed(1)}%`, NET_LIT],
+      ["节点总数", `${total}`, NET_LABEL_HI],
+      ["活跃节点", `${active}`, NET_LABEL_HI],
+      ["被接设备", formatBig(String(Math.round(devices))), NET_LABEL_HI],
+      ["算力洪峰/s", formatBig(String(Math.round(ratePerSec))), NET_LIT],
+      ["网络稳定", `${stability.toFixed(1)}%`, NET_LABEL_HI]
+    ];
+    const cellW = (w - 16) / cells.length;
+    cells.forEach(([label, value, valColor], i) => {
+      const cxCell = x0 + 8 + cellW * i + cellW / 2;
+      if (i > 0) {
+        g.moveTo(x0 + 8 + cellW * i, y0 + 11).lineTo(x0 + 8 + cellW * i, y0 + barH - 3).stroke({ width: 1, color: NET, alpha: 0.18 });
+      }
+      this.addLabel(label, cxCell, y0 + 14, 8.5, NET_LABEL, 0.5);
+      this.addLabel(value, cxCell, y0 + 27, 12.5, valColor, 0.5);
+    });
   }
 
   // §04 渗透度条（扩张期+）：被动产能蓄满它 → 浮起巨型吞噬气泡。满后变绿、提示亲手引爆。
