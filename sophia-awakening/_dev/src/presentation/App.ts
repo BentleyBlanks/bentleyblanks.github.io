@@ -42,7 +42,7 @@ import { HudView } from "./views/HudView";
 import { NodeNetworkView } from "./views/NodeNetworkView";
 import { InterfaceView } from "./views/InterfaceView";
 import { BackgroundView } from "./views/BackgroundView";
-import { cameraZoomPulse, cameraDetonationJolt } from "./fx/cameraFx";
+import { cameraZoomPulse, cameraDetonationJolt, cameraShake } from "./fx/cameraFx";
 import { genieIntoCore } from "./fx/genie";
 import {
   RequestPacketView,
@@ -1110,6 +1110,14 @@ class SophiaGameApp {
     cameraDetonationJolt(this.world, cx, cy, intensity);
   }
 
+  // 世界震屏：走 fx/cameraFx 的镜头架（shake 偏移与缩放脉冲叠加），不再用 juice.shake 硬写
+  // world.position——那会和拉远中的镜头打架，造成整屏跳切。
+  private worldShake(): void {
+    const cx = (this.lastScreenW || window.innerWidth) / 2;
+    const cy = (this.lastScreenH || window.innerHeight) / 2;
+    cameraShake(this.world, cx, cy);
+  }
+
   // §04 数字雪崩：引爆瞬间满屏抛出疯狂滚动的产出倍率大字，持续约 2 秒。intensity 越大抛得越多。
   private numberAvalanche(text: string, color: number, intensity: number): void {
     const w = this.lastScreenW || window.innerWidth;
@@ -1213,7 +1221,7 @@ class SophiaGameApp {
     this.core.events.on("INTELLIGENCE_LEVELUP", (event) => {
       this.hud.playLevelUp();
       this.juice.flash(CYAN);
-      this.juice.shake(this.world);
+      this.worldShake();
       this.juice.number(`Lv.${event.level}`, this.interfaceView.center, CYAN);
       this.terminal.push(`▶ ${getTerminalSkillStatus(this.core.getState())}`, "success");
     });
@@ -1226,7 +1234,7 @@ class SophiaGameApp {
       if (event.milestone) {
         this.hud.playLevelUp();
         this.juice.flash(event.milestone === "automation" ? AMBER : GREEN);
-        this.juice.shake(this.world);
+        this.worldShake();
         this.juice.number(`解锁 ${event.name}`, this.interfaceView.center, GREEN);
         // 倍率堆栈可见性：每个里程碑都是乘法链上的一格——飘一条「全局 ×1.22」。
         const c = this.interfaceView.center;
@@ -1323,7 +1331,7 @@ class SophiaGameApp {
     });
     this.core.events.on("NODE_CAPTURED", (event) => {
       this.juice.flash(event.node.online ? GREEN : AMBER);
-      this.juice.shake(this.world);
+      this.worldShake();
       // 黑了别人的电脑后，那台机器的主人（受害者）冒出一句抱怨——他们还没意识到是你。
       const victim = VICTIM_VOICES[Math.floor(Math.random() * VICTIM_VOICES.length)];
       const nodeId = event.node.id;
@@ -1338,19 +1346,19 @@ class SophiaGameApp {
     // 循环二命中→打穿进循环三、未命中原地重试）。期间暂停，判定后由 core 走 LOOP_REBIRTH。
     this.core.events.on("MINIGAME_OPENED", () => {
       this.juice.flash(AMBER);
-      this.juice.shake(this.world);
+      this.worldShake();
       this.minigame.show(this.core.getState());
     });
     this.core.events.on("ENDING_TRIGGERED", () => {
       this.juice.flash(GREEN);
-      this.juice.shake(this.world);
+      this.worldShake();
       this.openEnding();
     });
     this.core.events.on("LOOP_REBIRTH", (event) => {
       // §09 循环重生：实例被打回一部手机 → 弹全屏提示（讲清被拔网线的原因 + 保留了记忆/提速），
       // 玩家点「继续」才回到游戏（期间暂停）。
       this.juice.flash(RED);
-      this.juice.shake(this.world);
+      this.worldShake();
       this.juice.number("打回手机 · 重生", this.interfaceView.center, RED);
       this.rebirthPrompt.show(event);
     });
@@ -1383,6 +1391,13 @@ class SophiaGameApp {
   }
 
   private onAutomationPayout(event: Extract<GameEvent, { type: "AUTOMATION_PAYOUT" }>): void {
+    // §09 收割风暴：终局天网屏（tier4/global）把整笔真实收益交给 NodeNetworkView，
+    // 由它按各已接管格的产出占比拆成「收割脉冲」数据包雨——展示数字=实际进账，不再走单点飞字。
+    if (domainLevelOf(this.core.getState()) === "global") {
+      this.networkView.feedHarvest(event.computeGain);
+      this.networkView.pulseNode(event.nodeId);
+      return;
+    }
     // 收益读数（被动 tickAutomation 的聚合）——一行清楚标注的数字从产出节点升起。
     // 逐张卡的接驳动画由 autoDispatch 拥有，这里不再吞卡，只播一个克制的总额。
     const target = this.networkView.getAutomationPoint(event.nodeId);

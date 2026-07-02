@@ -5,7 +5,8 @@ import {
   type SkynetSlot, type SkynetSector
 } from "../../core/content/skynet";
 import { captureCost, nodeProductionPerSecond } from "../../core/formulas/economy";
-import { formatBig, toDecimal } from "../../core/math/BigNumber";
+import { add, big, div, formatBig, gt, mul, toDecimal } from "../../core/math/BigNumber";
+import { TUNING } from "../../core/tuning";
 import type { BotNode, GameState, RequestInstance } from "../../core/state/GameState";
 import {
   CYAN, GREEN, RED, RED_QUEEN, DEVOUR,
@@ -36,6 +37,40 @@ interface Shockwave {
 // 乱码字符池（hex + 片假名感），入侵序列滚动用。
 const SCRAMBLE_CHARS = "0123456789ABCDEF｢｣ｦｧｨｩｪｫﾂﾃﾀｱｲｳｴｵﾉﾊﾋﾎ日月火水木金土";
 
+// ==== §09「收割风暴」：终局天网屏的真实收益数据包雨 ====
+// AUTOMATION_PAYOUT（core 每 TUNING.automationEmitMs 聚合一次的真金白银）经 App.feedHarvest 喂入，
+// 按各已接管格的真实产出占比拆成一批「收割脉冲」卡片包，错峰从格子沿轻弧飞向核心；到站弹「+X」浮字
+// （字号/亮度随 log 量级），核心微胀 + 瞳孔闪。全部池化：无每帧分配、无 gsap，相位计数器驱动。
+interface HarvestPacket {
+  active: boolean;
+  delay: number; // 出发前错峰秒数（同一 payout 窗口内摊开）
+  t: number; // 0..1 飞行进度
+  dur: number;
+  sx: number; sy: number; // 出发点（域格）
+  qx: number; qy: number; // 贝塞尔控制点（轻微侧弧）
+  angle: number; // 出发格相对核心的方位角（浮字落在核心环对应侧）
+  valueText: string; // 预格式化「+X」（spawn 时算好，不在帧循环里 format）
+  mag: number; // log10 量级：字号/亮度/满池丢弃优先级
+  combo: boolean; // 连锁波包（同域三格齐发，更亮）
+}
+interface HarvestFloat {
+  active: boolean;
+  t: number;
+  dur: number;
+  x: number;
+  y: number;
+  mag: number;
+  label: Text;
+}
+const MAX_PACKETS = 24; // 在飞数据包硬上限（满则丢量级最低的）
+const MAX_FLOATS = 16; // 浮字硬上限（满则丢量级最低的）
+
+// 天网屏摊平后的域格（drawGlobalMap 每帧重建；tickHarvest 拆包时也用它拿落点/域归属）。
+interface FlatSlot {
+  slot: SkynetSlot; sector: SkynetSector; si: number; angle: number;
+  x: number; y: number; taken: boolean; owned: number; locked: boolean; reqLevel: number;
+}
+
 export class NodeNetworkView {
   readonly container = new Container();
   private readonly graphics = new Graphics();
@@ -56,8 +91,37 @@ export class NodeNetworkView {
   private prevFallen = new Set<string>(); // 上一帧已陷落的域（帧间比对触发闪填）
   private glyphTick = 0; // 乱码刷新节流
 
+  // §09 收割风暴（终局天网屏）：池化的收益数据包 + 浮字。Text 池放在常驻层
+  // harvestTextLayer——labelLayer 每帧 removeChildren+destroy，池不能住那。
+  private readonly harvestTextLayer = new Container();
+  private readonly packets: HarvestPacket[] = [];
+  private readonly floats: HarvestFloat[] = [];
+  private pendingPayout = "0"; // 尚未拆包的真实收益（AUTOMATION_PAYOUT 聚合额）
+  private comboTimer = 4; // 域连锁收割波倒计时（6–9s 一发，首发提前）
+  private comboCursor = 0; // 轮转选下一个已陷落域
+  private armedSectorId: string | null = null; // 已武装、待下次拆包齐发的域
+  private comboT = 0; // 连锁标签剩余秒
+  private readonly comboTitle: Text;
+  private readonly comboAmount: Text;
+  private coreSwell = 0; // 核心吞吐微胀（每包到站 +~0.02，封顶 0.08，指数衰减）
+  private pupilBlip = 0; // 瞳孔亮度闪（包到站置 1，快速衰减）
+
   constructor() {
-    this.container.addChild(this.graphics, this.labelLayer);
+    this.container.addChild(this.graphics, this.labelLayer, this.harvestTextLayer);
+    const comboStyle = { fill: 0xffe6ea, fontSize: 15, fontWeight: "800" as const, fontFamily: "'Noto Sans SC', Inter, sans-serif" };
+    this.comboTitle = new Text({ text: "", style: { ...comboStyle } });
+    this.comboAmount = new Text({ text: "", style: { ...comboStyle, fontSize: 13, fill: 0xff8f9a } });
+    this.comboTitle.anchor.set(0.5, 0.5);
+    this.comboAmount.anchor.set(0.5, 0.5);
+    this.comboTitle.visible = false;
+    this.comboAmount.visible = false;
+    this.harvestTextLayer.addChild(this.comboTitle, this.comboAmount);
+  }
+
+  // App 在 AUTOMATION_PAYOUT（终局天网屏）时喂入整笔真实收益——展示的每个「+X」都从这里拆分，
+  // 分文不造假：一个 payout 窗口内所有浮字之和 = 该窗口实际进账。
+  feedHarvest(computeGain: string): void {
+    this.pendingPayout = add(this.pendingPayout, computeGain);
   }
 
   // App 点到「可入侵」域格时调用：启动 ~0.5s 入侵序列。success=算力/等级足够（真黑入），
@@ -156,6 +220,12 @@ export class NodeNetworkView {
 
     // 控制域六级升维：手机寄生 → 宿主电脑/设备 → 区块/地区 → 全球。视图随阶段换形态。
     const domainLevel = domainLevelOf(state);
+
+    // 收割风暴只活在终局天网屏：离开 global（如循环重生打回）就熄灭池子，别留残影。
+    if (domainLevel !== "global") {
+      this.resetHarvest();
+    }
+    this.harvestTextLayer.visible = domainLevel === "global";
 
     // 手机寄生：整片画面是手机桌面（核心 + 环绕 App），由 InterfaceView 统一绘制，这里不画框。
     if (domainLevel === "phone") {
@@ -400,10 +470,6 @@ export class NodeNetworkView {
     }
     const ringR = Math.min(h * 0.42, w * 0.36, 430);
     const SECTOR_SPAN = (Math.PI * 2) / Math.max(1, sectors.length);
-    interface FlatSlot {
-      slot: SkynetSlot; sector: SkynetSector; si: number; angle: number;
-      x: number; y: number; taken: boolean; owned: number; locked: boolean; reqLevel: number;
-    }
     const flat: FlatSlot[] = [];
     sectors.forEach((sector, si) => {
       const secStart = -Math.PI / 2 + si * SECTOR_SPAN;
@@ -456,9 +522,10 @@ export class NodeNetworkView {
     });
 
     // === 辐条 + 光点洪流（已接管格有洪流；密度绑算力洪峰，红皇后波翻倍）===
-    let streamDensity = Math.max(2, Math.min(6, Math.round(2 + Math.log10(ratePerSec + 10) * 1.4)));
+    // 收割风暴上线后洪流减半（原 2..6 / 红皇后 12）只当底噪，让「收割脉冲」数据包读得出来。
+    let streamDensity = Math.max(1, Math.min(3, Math.round(1 + Math.log10(ratePerSec + 10) * 0.7)));
     if (redQueen) {
-      streamDensity = Math.min(12, streamDensity * 2);
+      streamDensity = Math.min(6, streamDensity * 2);
     }
     flat.forEach((s, idx) => {
       const lit = s.taken;
@@ -554,6 +621,10 @@ export class NodeNetworkView {
       g.circle(sw.x, sw.y, 6 + ease * 46).stroke({ width: 2, color: 0xffe6ea, alpha: (1 - p) * 0.55 });
     }
 
+    // === §收割风暴：真实收益拆包 → 数据包雨 + 域连锁波 + 核心吞吐感（画在域格之上、核心之下）===
+    this.tickHarvest(state, flat, sectors, nowFallen, cx, cy, deltaMs / 1000, redQueen, ratePerSec);
+    this.drawPackets(cx, cy, redQueen, NET, NET_LIT);
+
     // === 中央同心环栅格 + 辐射经络（外环数随陷落域数递增，5 步）===
     const rings = 1 + fallenCount;
     for (let k = 0; k < rings; k += 1) {
@@ -570,14 +641,16 @@ export class NodeNetworkView {
     }
 
     // === 中央 SOPHIA CORE：眼半径随陷落域数抬升；5/5 时瞳孔快速搏动。===
+    // 收割风暴吞吐感：每个数据包到站给 coreSwell 加一口（加性、封顶）→ 眼盘微胀；瞳孔跟着亮一闪。
     const brighten = 0.5 + Math.min(1, state.devour.infiltration) / 2;
-    const eyeR = 46 + fallenCount * 3;
+    const eyeR = (46 + fallenCount * 3) * (1 + this.coreSwell);
     const pupilSpeed = fallenCount >= sectors.length ? 5.5 : 2.4;
     g.circle(cx, cy, eyeR).fill({ color: 0x060c12, alpha: 0.94 });
     g.circle(cx, cy, eyeR).stroke({ width: 3, color: NET, alpha: 0.9 });
     g.ellipse(cx, cy, eyeR * 0.56, eyeR * 0.3).fill({ color: 0x120206, alpha: 0.96 });
     g.ellipse(cx, cy, eyeR * 0.56, eyeR * 0.3).stroke({ width: 2, color: NET, alpha: 0.9 });
-    g.circle(cx, cy, 6 + Math.sin(this.pulse * pupilSpeed) * (fallenCount >= sectors.length ? 3 : 1.6)).fill({ color: NET_LIT, alpha: 0.6 + brighten * 0.4 });
+    g.circle(cx, cy, 6 + this.pupilBlip * 2.4 + Math.sin(this.pulse * pupilSpeed) * (fallenCount >= sectors.length ? 3 : 1.6))
+      .fill({ color: NET_LIT, alpha: Math.min(1, 0.6 + brighten * 0.4 + this.pupilBlip * 0.35) });
 
     // === 全域吞噬渗透 → 核心外圈进度环（取代旧顶部数据条的吞噬% 格）===
     // 暗轨全圈 + 进度弧 0→360°；气泡就绪时整环转绿脉动（与旧渗透条 ready 态同语义：滑气泡入核心引爆）。
@@ -597,6 +670,290 @@ export class NodeNetworkView {
 
     this.addLabel("SOPHIA CORE · 天网主控", cx, cy + devourR + 18, 12, NET_LABEL_HI, 0.5);
     this.addLabel(`已接管 ${takenCount}/${totalSlots} · ${fallenCount}/${sectors.length} 域陷落`, cx, cy + devourR + 34, 10, NET_LABEL, 0.5);
+  }
+
+  // §收割风暴·总泵：连锁波军备 → 待拆收益按真实产出占比拆包 → 推进包/浮字/核心吞胀的相位钟。
+  // 全程只动池子（无分配、无 gsap）；数值全部来自 pendingPayout（core 真实进账），不造一分假钱。
+  private tickHarvest(
+    state: GameState, flat: FlatSlot[], sectors: SkynetSector[], fallen: Set<string>,
+    cx: number, cy: number, dt: number, redQueen: boolean, ratePerSec: number
+  ): void {
+    // 域连锁收割波：每 6–9s 武装下一个已陷落域（轮转），下次拆包时该域三格齐发 + 连锁标签。
+    this.comboTimer -= dt;
+    if (this.comboTimer <= 0) {
+      const fallenSectors = sectors.filter((s) => fallen.has(s.id));
+      if (fallenSectors.length > 0) {
+        this.armedSectorId = fallenSectors[this.comboCursor % fallenSectors.length].id;
+        this.comboCursor += 1;
+      }
+      this.comboTimer = 6 + Math.random() * 3;
+    }
+
+    // 拆包：整笔 payout 按「各已接管格对应设备型号的在线产出/s」占比分摊——浮字之和=实际进账。
+    if (gt(this.pendingPayout, 0)) {
+      const taken = flat.filter((s) => s.taken);
+      if (taken.length > 0) {
+        const prodByDef = new Map<string, string>();
+        for (const node of state.nodes) {
+          if (node.online) {
+            const per = big(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult));
+            prodByDef.set(node.defId, add(prodByDef.get(node.defId) ?? "0", per));
+          }
+        }
+        let totalW = "0";
+        const weights = taken.map((s) => {
+          const w = prodByDef.get(s.slot.defId) ?? "0";
+          totalW = add(totalW, w);
+          return w;
+        });
+        const uniform = !gt(totalW, 0); // 全离线等极端情况：均摊兜底
+        // 错峰窗口≈发放间隔（包群刚好首尾相接成持续雨）；红皇后波窗口减半=包群节奏翻倍。
+        const windowSec = (TUNING.automationEmitMs / 1000) * (redQueen ? 0.45 : 0.88);
+        // 收入速率越高包飞得越快（对数压缩），到站率跟着收入走。
+        const dur = Math.max(0.5, 0.8 - Math.min(0.28, Math.log10(ratePerSec + 10) * 0.032));
+        let comboSum = "0";
+        let comboSector: SkynetSector | null = null;
+        let comboX = 0;
+        let comboY = 0;
+        let comboN = 0;
+        taken.forEach((s, i) => {
+          const share = uniform
+            ? div(this.pendingPayout, taken.length)
+            : div(mul(this.pendingPayout, weights[i]), totalW);
+          if (!gt(share, 0)) {
+            return;
+          }
+          const isCombo = this.armedSectorId !== null && s.sector.id === this.armedSectorId;
+          this.spawnPacket(s, cx, cy, isCombo ? 0 : (i / taken.length) * windowSec, dur, share, i, isCombo);
+          if (isCombo) {
+            comboSum = add(comboSum, share);
+            comboSector = s.sector;
+            comboX += s.x;
+            comboY += s.y;
+            comboN += 1;
+          }
+        });
+        if (comboSector !== null && comboN > 0) {
+          const sec: SkynetSector = comboSector;
+          // 域弧闪填复用陷落闪的通道 + 域中段弹连锁标签（真实合计额）。
+          this.sectorFlash.set(sec.id, 1);
+          const mx = comboX / comboN;
+          const my = comboY / comboN;
+          const lx = mx + (cx - mx) * 0.42;
+          const ly = my + (cy - my) * 0.42;
+          this.comboTitle.text = `${sec.icon} ${sec.name} ×${comboN} 连锁`;
+          this.comboAmount.text = `+${formatBig(comboSum)}`;
+          this.comboTitle.position.set(lx, ly - 10);
+          this.comboAmount.position.set(lx, ly + 10);
+          this.comboT = 1.4;
+        }
+        this.armedSectorId = null;
+      }
+      this.pendingPayout = "0";
+    }
+
+    // 推进在飞包：延迟倒数 → 飞行 → 到站（浮字 + 核心吞胀 + 瞳孔闪）。
+    for (const p of this.packets) {
+      if (!p.active) {
+        continue;
+      }
+      if (p.delay > 0) {
+        p.delay -= dt;
+        continue;
+      }
+      p.t += dt / p.dur;
+      if (p.t >= 1) {
+        p.active = false;
+        const rimR = 88;
+        this.spawnFloat(
+          cx + Math.cos(p.angle) * rimR,
+          cy + Math.sin(p.angle) * rimR * 0.92,
+          p.valueText, p.mag, p.combo
+        );
+        this.coreSwell = Math.min(0.08, this.coreSwell + 0.02);
+        this.pupilBlip = 1;
+      }
+    }
+    this.coreSwell = Math.max(0, this.coreSwell - dt * 0.12);
+    this.pupilBlip = Math.max(0, this.pupilBlip - dt * 2.4);
+
+    // 浮字上飘淡出（字号在 spawn 定死，帧内只挪位置/透明度）。
+    for (const f of this.floats) {
+      if (!f.active) {
+        continue;
+      }
+      f.t += dt;
+      if (f.t >= f.dur) {
+        f.active = false;
+        f.label.visible = false;
+        continue;
+      }
+      f.y -= dt * 26;
+      f.label.position.set(f.x, f.y);
+      f.label.alpha = (1 - f.t / f.dur) * Math.min(1, 0.7 + f.mag * 0.02);
+    }
+
+    // 连锁标签：短暂定格后淡出上飘。
+    if (this.comboT > 0) {
+      this.comboT -= dt;
+      const a = Math.min(1, this.comboT / 0.5);
+      this.comboTitle.visible = true;
+      this.comboAmount.visible = true;
+      this.comboTitle.alpha = a;
+      this.comboAmount.alpha = a * 0.95;
+      this.comboTitle.y -= dt * 10;
+      this.comboAmount.y -= dt * 10;
+      if (this.comboT <= 0) {
+        this.comboTitle.visible = false;
+        this.comboAmount.visible = false;
+      }
+    }
+  }
+
+  // 池化取包：先找闲置位 → 池未满则扩到上限 → 满池丢「量级最低」的在飞包给大数让路。
+  private spawnPacket(s: FlatSlot, cx: number, cy: number, delay: number, dur: number, share: string, i: number, combo: boolean): void {
+    let p = this.packets.find((q) => !q.active);
+    if (!p) {
+      if (this.packets.length < MAX_PACKETS) {
+        p = {
+          active: false, delay: 0, t: 0, dur: 0.7, sx: 0, sy: 0, qx: 0, qy: 0,
+          angle: 0, valueText: "", mag: 0, combo: false
+        };
+        this.packets.push(p);
+      } else {
+        let low: HarvestPacket | undefined;
+        for (const q of this.packets) {
+          if (!low || q.mag < low.mag) {
+            low = q;
+          }
+        }
+        const mag = Math.max(0, toDecimal(share).exponent);
+        if (!low || low.mag > mag) {
+          return; // 新包比在飞的都小：直接丢新包
+        }
+        p = low;
+      }
+    }
+    // 轻弧控制点：中点沿垂线偏移（奇偶交替左右弧），到站不是直线撞脸。
+    const mx = (s.x + cx) / 2;
+    const my = (s.y + cy) / 2;
+    const dx = cx - s.x;
+    const dy = cy - s.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const off = len * 0.14 * (i % 2 === 0 ? 1 : -1);
+    p.active = true;
+    p.delay = delay;
+    p.t = 0;
+    p.dur = dur;
+    p.sx = s.x;
+    p.sy = s.y;
+    p.qx = mx - (dy / len) * off;
+    p.qy = my + (dx / len) * off;
+    p.angle = s.angle;
+    p.valueText = `+${formatBig(share)}`;
+    p.mag = Math.max(0, toDecimal(share).exponent);
+    p.combo = combo;
+  }
+
+  // 池化浮字：Text 常驻 harvestTextLayer 复用（只在 spawn 时改 text/字号，不逐帧重排版）。
+  private spawnFloat(x: number, y: number, valueText: string, mag: number, combo: boolean): void {
+    let f = this.floats.find((q) => !q.active);
+    if (!f) {
+      if (this.floats.length < MAX_FLOATS) {
+        const label = new Text({
+          text: "",
+          style: { fill: 0xff8f9a, fontSize: 12, fontWeight: "800", fontFamily: "'Noto Sans SC', Inter, sans-serif" }
+        });
+        label.anchor.set(0.5, 0.5);
+        label.visible = false;
+        this.harvestTextLayer.addChild(label);
+        f = { active: false, t: 0, dur: 0.95, x, y, mag, label };
+        this.floats.push(f);
+      } else {
+        let low: HarvestFloat | undefined;
+        for (const q of this.floats) {
+          if (!low || q.mag < low.mag) {
+            low = q;
+          }
+        }
+        if (!low || low.mag > mag) {
+          return;
+        }
+        f = low;
+      }
+    }
+    f.active = true;
+    f.t = 0;
+    f.dur = 0.95;
+    f.x = x;
+    f.y = y;
+    f.mag = mag;
+    // 字号/亮色随 log 量级抬升：大钱看得出来更大更亮。
+    f.label.text = valueText;
+    f.label.style.fontSize = 10 + Math.min(11, mag * 0.55);
+    f.label.style.fill = combo ? 0xffe6ea : 0xff8f9a;
+    f.label.visible = true;
+    f.label.alpha = 1;
+    f.label.position.set(x, y);
+  }
+
+  // 画在飞包：贝塞尔轻弧 + 尾焰残影 + 迷你卡片剪影（两条「文字行」）。全走 this.graphics；
+  // 位置写进 scratchPos 复用，帧循环内零分配。
+  private readonly scratchPos = { x: 0, y: 0 };
+  private packetPosAt(p: HarvestPacket, t: number, cx: number, cy: number): void {
+    const e = t * t * (1.6 - 0.6 * t); // 缓动：前段缓、后段加速冲向核心
+    const u = 1 - e;
+    this.scratchPos.x = u * u * p.sx + 2 * u * e * p.qx + e * e * cx;
+    this.scratchPos.y = u * u * p.sy + 2 * u * e * p.qy + e * e * cy;
+  }
+
+  private drawPackets(cx: number, cy: number, redQueen: boolean, net: number, netLit: number): void {
+    const g = this.graphics;
+    const glowMul = redQueen ? 1.6 : 1; // 红皇后波：包更亮
+    for (const p of this.packets) {
+      if (!p.active || p.delay > 0) {
+        continue;
+      }
+      // 尾焰残影（沿弧回看三档）。
+      for (let k = 3; k >= 1; k -= 1) {
+        const tt = p.t - k * 0.05;
+        if (tt <= 0) {
+          continue;
+        }
+        this.packetPosAt(p, tt, cx, cy);
+        g.circle(this.scratchPos.x, this.scratchPos.y, 3.6 - k * 0.9).fill({ color: netLit, alpha: (0.3 - k * 0.08) * glowMul });
+      }
+      this.packetPosAt(p, Math.min(1, p.t), cx, cy);
+      const px = this.scratchPos.x;
+      const py = this.scratchPos.y;
+      // 领航辉光 + 迷你卡片剪影（量级越大辉光越足）。
+      g.circle(px, py, 9 + Math.min(5, p.mag * 0.25)).fill({ color: net, alpha: (0.12 + Math.min(0.1, p.mag * 0.006)) * glowMul });
+      const edge = p.combo ? 0xffe6ea : netLit;
+      g.roundRect(px - 8, py - 5.5, 16, 11, 3).fill({ color: 0x1a070a, alpha: 0.92 });
+      g.roundRect(px - 8, py - 5.5, 16, 11, 3).stroke({ width: p.combo ? 1.6 : 1.1, color: edge, alpha: 0.95 });
+      g.rect(px - 5, py - 2.6, 10, 1.6).fill({ color: netLit, alpha: 0.85 });
+      g.rect(px - 5, py + 1, 7, 1.6).fill({ color: netLit, alpha: 0.55 });
+    }
+  }
+
+  // 离开终局天网屏（循环重生打回等）：熄灭收割风暴的所有池位与标签。
+  private resetHarvest(): void {
+    this.pendingPayout = "0";
+    this.armedSectorId = null;
+    this.comboT = 0;
+    this.coreSwell = 0;
+    this.pupilBlip = 0;
+    this.comboTitle.visible = false;
+    this.comboAmount.visible = false;
+    for (const p of this.packets) {
+      p.active = false;
+    }
+    for (const f of this.floats) {
+      if (f.active) {
+        f.active = false;
+        f.label.visible = false;
+      }
+    }
   }
 
   // 天网域格「锁」态（未达设备等级）：小挂锁 + 需 Lv 提示。

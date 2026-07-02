@@ -30,6 +30,11 @@ export function genieIntoCore(
   const ROWS = 24;
   const mesh = new MeshPlane({ texture: tex, verticesX: 2, verticesY: ROWS });
   mesh.position.set(src.x, src.y);
+  // 接管帧不许「啪」一下：网格要继承卡片当下的变换（巨型吞噬卡 1.34、拖拽提起 1.06 等），
+  // 否则换成网格的第一帧卡片会瞬间缩回 1 倍大小。generateTexture 生成的是卡片本地空间快照，
+  // 所以把 src 的 scale/rotation 原样搬给 mesh 即视觉无缝；toLocal 求目标点也要在这之后做。
+  mesh.scale.set(src.scale.x, src.scale.y);
+  mesh.rotation = src.rotation;
   parent.addChild(mesh);
   src.visible = false;
 
