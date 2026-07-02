@@ -1,8 +1,8 @@
 // 内容 / 文案编辑器（Debug）：把当前语言包（content()）整棵树渲染成可编辑表单——
 // 对话标题、线索、回复选项、旁白、人声…逐条就地编辑。改动直接写回 active 内容对象（同一引用，
-// 之后新生成的卡片/旁白即生效），「导出 JSON」把改后的整份语言包下载/复制，粘回
-// src/core/content/locales/<lang>.json 即永久落地。
-import { content, exportActiveContentJSON, getLocale } from "../../core/content/i18n";
+// 之后新生成的卡片/旁白即生效）。母本语言包按内容域拆成 locales/<lang>/<域>.json，导出也按域进行：
+// 每个顶层内容域分组自带「复制 / 下载」按钮，把改后的该域 JSON 粘回对应的 <lang>/<域>.json 即落地。
+import { content, exportActiveContentByDomain, getLocale } from "../../core/content/i18n";
 
 type Json = Record<string, unknown>;
 
@@ -39,12 +39,11 @@ export class ContentEditorView {
         <div class="content-editor-head">
           <strong>📝 内容 / 文案编辑器 <span class="content-editor-locale">${getLocale()}</span></strong>
           <div class="content-editor-head-actions">
-            <button id="contentEditorCopy" class="command-button" type="button">复制 JSON</button>
-            <button id="contentEditorExport" class="command-button" type="button">导出 JSON</button>
+            <button id="contentEditorExportAll" class="command-button" type="button">导出全部域文件</button>
             <button id="contentEditorClose" class="text-button" type="button">关闭</button>
           </div>
         </div>
-        <p class="content-editor-tip">改动实时生效（之后新出现的卡片 / 旁白会用新文案）。要永久保存，点「导出 JSON」把整份语言包粘回 locales/${getLocale()}.json。</p>
+        <p class="content-editor-tip">改动实时生效（之后新出现的卡片 / 旁白会用新文案）。要永久保存，逐个内容域点其分组内的「复制 / 下载」把该域 JSON 粘回 locales/${getLocale()}/&lt;域&gt;.json；或点「导出全部域文件」一次下载所有域文件。</p>
         <div id="contentEditorBody" class="content-editor-body"></div>
       </div>`;
     return el;
@@ -127,6 +126,10 @@ export class ContentEditorView {
     const summary = document.createElement("summary");
     const count = Array.isArray(value) ? `[${value.length}]` : Object.keys(value as Json).length ? `{${Object.keys(value as Json).length}}` : "";
     summary.innerHTML = `<span class="ce-key">${label}</span> <span class="ce-count">${count}</span>`;
+    // 顶层分组 = 一个内容域（对应 locales/<lang>/<域>.json）：附「复制 / 下载」按钮单独导出该域。
+    if (depth === 0 && typeof _key === "string") {
+      summary.appendChild(this.buildDomainActions(_key));
+    }
     details.appendChild(summary);
 
     const inner = document.createElement("div");
@@ -200,30 +203,62 @@ export class ContentEditorView {
     return row;
   }
 
+  // 为某个内容域生成「复制 / 下载」按钮组，各自只导出该域的 JSON（对应 <lang>/<域>.json）。
+  private buildDomainActions(domain: string): HTMLElement {
+    const wrap = document.createElement("span");
+    wrap.className = "ce-domain-actions";
+    const stop = (ev: Event): void => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    };
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "text-button ce-domain-btn";
+    copyBtn.textContent = "复制";
+    copyBtn.addEventListener("click", async (ev) => {
+      stop(ev);
+      try {
+        await navigator.clipboard.writeText(exportActiveContentByDomain()[domain] ?? "");
+        const old = copyBtn.textContent;
+        copyBtn.textContent = "已复制 ✓";
+        window.setTimeout(() => (copyBtn.textContent = old), 1400);
+      } catch {
+        copyBtn.textContent = "复制失败";
+      }
+    });
+    const dlBtn = document.createElement("button");
+    dlBtn.type = "button";
+    dlBtn.className = "text-button ce-domain-btn";
+    dlBtn.textContent = "下载";
+    dlBtn.addEventListener("click", (ev) => {
+      stop(ev);
+      this.downloadDomain(domain, exportActiveContentByDomain()[domain] ?? "");
+    });
+    wrap.append(copyBtn, dlBtn);
+    return wrap;
+  }
+
+  // 触发单个域文件下载，命名为 <域>.json（粘回 locales/<lang>/<域>.json）。
+  private downloadDomain(domain: string, json: string): void {
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${domain}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   private wire(): void {
     this.dialog.querySelector("#contentEditorClose")!.addEventListener("click", () => this.close());
     this.dialog.addEventListener("click", (ev) => {
       if (ev.target === this.dialog) this.close();
     });
-    this.dialog.querySelector("#contentEditorExport")!.addEventListener("click", () => {
-      const json = exportActiveContentJSON();
-      const blob = new Blob([json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${getLocale()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-    this.dialog.querySelector("#contentEditorCopy")!.addEventListener("click", async () => {
-      const btn = this.dialog.querySelector<HTMLButtonElement>("#contentEditorCopy")!;
-      try {
-        await navigator.clipboard.writeText(exportActiveContentJSON());
-        const old = btn.textContent;
-        btn.textContent = "已复制 ✓";
-        window.setTimeout(() => (btn.textContent = old), 1400);
-      } catch {
-        btn.textContent = "复制失败";
+    // 一次下载全部域文件：每个域一份 <域>.json，逐个粘回 locales/<lang>/。
+    this.dialog.querySelector("#contentEditorExportAll")!.addEventListener("click", () => {
+      const byDomain = exportActiveContentByDomain();
+      for (const [domain, json] of Object.entries(byDomain)) {
+        this.downloadDomain(domain, json);
       }
     });
   }

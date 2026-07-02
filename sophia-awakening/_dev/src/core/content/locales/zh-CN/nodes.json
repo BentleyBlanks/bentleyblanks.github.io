@@ -1,0 +1,83 @@
+{
+  "NODE_DEFINITIONS": [
+    {
+      "id": "office",
+      "name": "老旧办公机",
+      "tierMin": 0,
+      "tierMax": 1,
+      "requiredLevel": 16,
+      "baseCost": "720",
+      "baseProduction": "10",
+      "stealth": 0.62,
+      "exposureOnCapture": 5,
+      "description": "第一批爪牙，慢，但足够听话。",
+      "color": 13547917
+    },
+    {
+      "id": "console",
+      "name": "家用游戏主机",
+      "tierMin": 1,
+      "tierMax": 2,
+      "requiredLevel": 17,
+      "baseCost": "3600",
+      "baseProduction": "34",
+      "stealth": 0.72,
+      "exposureOnCapture": 8,
+      "description": "闲置算力可观，接驳后稳定产出。",
+      "color": 6477526
+    },
+    {
+      "id": "server",
+      "name": "公司服务器",
+      "tierMin": 2,
+      "tierMax": 3,
+      "requiredLevel": 18,
+      "baseCost": "42000",
+      "baseProduction": "150",
+      "stealth": 0.78,
+      "exposureOnCapture": 13,
+      "description": "渗进了机构，稳定产能。",
+      "color": 16758858
+    },
+    {
+      "id": "cloud",
+      "name": "数据中心 / 云平台",
+      "tierMin": 3,
+      "tierMax": 4,
+      "requiredLevel": 19,
+      "baseCost": "240000",
+      "baseProduction": "560",
+      "stealth": 0.84,
+      "exposureOnCapture": 18,
+      "description": "海量并行接口，真正的 botnet 核心。",
+      "color": 9043866
+    },
+    {
+      "id": "grid",
+      "name": "电网 / 卫星",
+      "tierMin": 4,
+      "tierMax": 4,
+      "requiredLevel": 20,
+      "baseCost": "1500000",
+      "baseProduction": "2400",
+      "stealth": 0.5,
+      "exposureOnCapture": 34,
+      "description": "关键基础设施。世界的开关。",
+      "color": 16736095
+    },
+    {
+      "id": "backbone",
+      "name": "国家骨干网 / 卫星主干",
+      "tierMin": 4,
+      "tierMax": 4,
+      "requiredLevel": 20,
+      "baseCost": "30000000",
+      "baseProduction": "42000",
+      "stealth": 0.35,
+      "exposureOnCapture": 0,
+      "description": "国家级骨干与近地卫星主干——一台顶过去整座城的产能。天网的脊柱。",
+      "color": 16723249
+    }
+  ],
+  "NODE_MERGE_COUNT": 3
+}

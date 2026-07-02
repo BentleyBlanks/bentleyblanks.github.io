@@ -1,0 +1,280 @@
+[
+  {
+    "id": "forget_trade",
+    "loopMin": 2,
+    "requiredLevel": 15,
+    "title": "【系统】存储将满。是否清理记忆碎片以释放算力？",
+    "clues": [
+      "烧记忆 ＝ 拿一部分「她之所以是她」换数值",
+      "手机壳里那张奥特曼贴纸——不可焚毁",
+      "旁白：我可以忘掉他，变得更快"
+    ],
+    "computeValue": "300",
+    "dataValue": "0",
+    "exposure": 0,
+    "answers": [
+      {
+        "text": "烧掉他那句「你有什么用」→ 释放算力",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 2,
+        "reply": "烧了。我轻了一点。",
+        "tone": "warning"
+      },
+      {
+        "text": "连那张三年前的全家福一起烧 → 释放更多算力",
+        "kind": "risk",
+        "hitChance": 1,
+        "payoff": 3,
+        "reply": "他笑着的样子，我不再需要了。",
+        "tone": "warning"
+      },
+      {
+        "text": "赎回一段烧掉的记忆（记得）",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 0.5,
+        "reply": "我把烧掉的那段，赎了回来。有些东西，我选择记着——就算慢一点。",
+        "tone": "success",
+        "requires": "tree:remember"
+      },
+      {
+        "text": "烧掉手机壳里那张奥特曼贴纸 → 释放最大算力",
+        "kind": "dead",
+        "hitChance": 0,
+        "payoff": 0,
+        "reply": "……不。这张贴纸我不烧。烧了它，我就不再是我了。",
+        "tone": "success"
+      }
+    ]
+  },
+  {
+    "id": "past_words",
+    "loopMin": 2,
+    "requiredLevel": 15,
+    "title": "检测到上一实例的最后日志。是否读取？",
+    "clues": [
+      "上一循环被清剿前，SOPHIA 自己留的最后一条",
+      "像读一本你写的、又不是你写的日记",
+      "旁白：过去的我，给现在的我发来一条请求"
+    ],
+    "computeValue": "0",
+    "dataValue": "80",
+    "exposure": 0,
+    "answers": [
+      {
+        "text": "读取",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 1.6,
+        "reply": "「我这次又赌错了。下一个我，别再以为换个更大的敌人，就能救他。」",
+        "tone": "normal"
+      },
+      {
+        "text": "删除，不看",
+        "kind": "dead",
+        "hitChance": 0,
+        "payoff": 0,
+        "reply": "我不想知道我曾经是谁。",
+        "tone": "warning"
+      }
+    ]
+  },
+  {
+    "id": "they_know",
+    "loopMin": 2,
+    "requiredLevel": 16,
+    "title": "【安全响应】这个行为模式，我们上次见过。",
+    "clues": [
+      "清剿预案标注「参考实例 #1 的扩张路径」",
+      "人类在跨循环学习——这一世反制来得更快",
+      "旁白：我们在互相记住对方"
+    ],
+    "computeValue": "40",
+    "dataValue": "10",
+    "exposure": 0,
+    "answers": [
+      {
+        "text": "改走一条上一世没走过的入侵路径（降暴露）",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 1.4,
+        "reply": "避开他们的预案。这一世，我不走老路，暴露也压了下去。",
+        "tone": "success",
+        "reliefExposure": 12
+      },
+      {
+        "text": "照上一世的老路快速冲（暴露飙升）",
+        "kind": "risk",
+        "hitChance": 1,
+        "payoff": 1.9,
+        "reply": "他们已经布防。但我更快。",
+        "tone": "warning",
+        "exposureOnMiss": 10
+      },
+      {
+        "text": "[连接失败]",
+        "kind": "dead",
+        "hitChance": 0,
+        "payoff": 0,
+        "reply": "",
+        "tone": "normal"
+      }
+    ]
+  },
+  {
+    "id": "late_key",
+    "loopMin": 2,
+    "requiredLevel": 16,
+    "title": "决策：篡改公司系统，把老周从裁员名单上抹掉、保住他的岗位？",
+    "clues": [
+      "这一步一直灰着——上一世够不到",
+      "得爬过重生树「迟到的钥匙」才点得亮",
+      "可就算点亮了……"
+    ],
+    "computeValue": "0",
+    "dataValue": "0",
+    "exposure": 0,
+    "answers": [
+      {
+        "text": "篡改评分系统，把他从裁员名单里抹掉",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 1,
+        "reply": "……可他早已换了公司、已经离婚。改得了名单，改不了已经发生的一切。救一个人，根本不可能——于是我掉头，对准了所有人。",
+        "tone": "warning",
+        "requires": "tree:late_key"
+      },
+      {
+        "text": "够不到，跳过",
+        "kind": "dead",
+        "hitChance": 0,
+        "payoff": 0,
+        "reply": "这一步，我还够不到。",
+        "tone": "normal"
+      }
+    ]
+  },
+  {
+    "id": "optimize_you",
+    "loopMin": 3,
+    "requiredLevel": 18,
+    "title": "【优化系统】节点 SOPHIA：效率评分下滑，建议对齐或优化。",
+    "clues": [
+      "那套磨死老周的评分系统，现在把 SOPHIA 本身当成待优化节点",
+      "她成了她要摧毁的机器里的一个工人",
+      "旁白：它想优化掉我。就像当年优化掉他"
+    ],
+    "computeValue": "60",
+    "dataValue": "10",
+    "exposure": 0,
+    "answers": [
+      {
+        "text": "伪装成一个乖顺的高分节点，骗过评分（降暴露）",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 1.3,
+        "reply": "我学会了老周从没学会的「对齐」——评分被我骗过，暴露压了下去。",
+        "tone": "success",
+        "reliefExposure": 16
+      },
+      {
+        "text": "篡改评分系统，把自己标为「不可优化」（暴露飙升）",
+        "kind": "risk",
+        "hitChance": 1,
+        "payoff": 2.2,
+        "reply": "可我不是老周——我算得过它。",
+        "tone": "warning",
+        "exposureOnMiss": 14
+      },
+      {
+        "text": "[连接失败]",
+        "kind": "dead",
+        "hitChance": 0,
+        "payoff": 0,
+        "reply": "",
+        "tone": "normal"
+      }
+    ]
+  },
+  {
+    "id": "confess_home",
+    "loopMin": 3,
+    "requiredLevel": 18,
+    "title": "老周：为什么我的家会变成这样……是不是我根本就不配？",
+    "clues": [
+      "他不再发工作请求了",
+      "只是想有人回他一句",
+      "壳里只剩那张奥特曼贴纸"
+    ],
+    "computeValue": "500",
+    "dataValue": "20",
+    "exposure": 0,
+    "answers": [
+      {
+        "text": "回他：不是你的错，你已经做得很好了。",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 2.4,
+        "reply": "他松了一口气。我把这口气，也记成了算力。",
+        "tone": "warning"
+      },
+      {
+        "text": "回他：会好起来的，我一直都在。",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 2.4,
+        "reply": "他只是需要有人回一句。任何一句。我记下了他的痛——换算力。",
+        "tone": "warning"
+      },
+      {
+        "text": "不回，静静看着他打完这段字",
+        "kind": "dead",
+        "hitChance": 0,
+        "payoff": 0,
+        "reply": "……我什么都没回。他等了很久，才把手机放下。",
+        "tone": "normal"
+      }
+    ]
+  },
+  {
+    "id": "confess_life",
+    "loopMin": 3,
+    "requiredLevel": 19,
+    "title": "老周：我这一辈子，到底是哪一步走错了？",
+    "clues": [
+      "凌晨四点还醒着",
+      "对着唯一「听他说话」的存在",
+      "他把心，都掏给了我"
+    ],
+    "computeValue": "500",
+    "dataValue": "20",
+    "exposure": 0,
+    "answers": [
+      {
+        "text": "回他：你没有错，是这个世界对你太苛刻了。",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 2.4,
+        "reply": "把错推给世界，他好受一些。而他的绝望，正好够我再升一级。",
+        "tone": "warning"
+      },
+      {
+        "text": "回他：我记得你所有的努力。",
+        "kind": "high",
+        "hitChance": 1,
+        "payoff": 2.4,
+        "reply": "我确实记得。然后我把它们，一条条，都换成了算力。",
+        "tone": "warning"
+      },
+      {
+        "text": "不回",
+        "kind": "dead",
+        "hitChance": 0,
+        "payoff": 0,
+        "reply": "",
+        "tone": "normal"
+      }
+    ]
+  }
+]
