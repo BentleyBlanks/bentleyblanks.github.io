@@ -31,7 +31,7 @@ export const REQUEST_PACKET_HEIGHT = 162;
 export const fxSettings = { coreSuck: true };
 
 // 阶段「动作形态」短标签（T0–T4 编号已废弃，降为这个动作形态属性）。用于阶段徽标 / Core 标签 / 节点分配。
-const TIER_FORMS: Record<number, string> = { 0: "单口", 1: "分拣", 2: "串接", 3: "决策", 4: "派发" };
+const TIER_FORMS: Record<number, string> = { 0: "单口", 1: "分拣", 2: "串接", 3: "决策", 4: "天网" };
 export function tierForm(tier: number): string {
   return TIER_FORMS[tier] ?? `第${tier}阶`;
 }
@@ -210,7 +210,7 @@ export function getActionHint(state: GameState): string {
       case 3:
         return "高价值请求直接滑入核心；收益更高。";
       case 4:
-        return "派发模式：你控制的节点会自动接管请求——你只需继续扩张网络。";
+        return "天网模式：网络自动收割全球请求——你负责把域一个个啃下来。";
     }
   })();
   if (!milestone) {

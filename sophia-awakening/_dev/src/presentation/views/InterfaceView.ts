@@ -655,7 +655,7 @@ export class InterfaceView {
       g.moveTo(cx - 22, y).lineTo(cx, y + 15).lineTo(cx + 22, y).stroke({ width: 4, color: GREEN, alpha: a });
     }
 
-    this.addLabel("派发模式 · 自动接管", cx, this.center.y - 116, 14, GREEN);
+    this.addLabel("天网模式 · 自动收割", cx, this.center.y - 116, 14, GREEN);
     this.addLabel("节点正在自动吞噬请求 ↓", cx, this.center.y + 92, 12, 0xbfe9cf);
   }
 

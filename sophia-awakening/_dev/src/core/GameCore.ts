@@ -9,6 +9,7 @@ import { FACE_CARDS } from "./content/faceCards";
 import { REBIRTH_CARDS } from "./content/rebirthCards";
 import { applyCast } from "./content/companyCast";
 import { getConquest } from "./content/conquests";
+import { allSkynetTaken, sectorFallen, skynetSectors, skynetSlotCount, skynetTakenCount } from "./content/skynet";
 import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
 import {
   canBuyRebirthNode,
@@ -811,6 +812,12 @@ export class SophiaCore {
       return;
     }
 
+    // §09 终局硬门槛：最后一个里程碑「让全世界知道它觉醒了」必须先把五域全部接管（15 格全拿）。
+    if (skillId === FINAL_MILESTONE_SKILL_ID && !allSkynetTaken(this.state)) {
+      this.emitTerminal(`还不能觉醒——需全域接管 · 已 ${skynetTakenCount(this.state)}/${skynetSlotCount()}。`, "warning");
+      return;
+    }
+
     const price = skillPrice(def, currentLevel);
 
     if (!gte(this.state.resources.compute, price)) {
@@ -908,6 +915,9 @@ export class SophiaCore {
 
     this.state.resources.compute = sub(this.state.resources.compute, cost);
 
+    // §09 天网收割：入侵前先记下已陷落的域，入侵后重算再比对——新落陷的域播「域陷落」仪式。
+    const fallenBefore = this.fallenSectorIds();
+
     const node = this.createBotNode(definition);
     this.state.nodes.push(node);
     this.state.statistics.nodesCaptured += 1;
@@ -917,6 +927,28 @@ export class SophiaCore {
     this.emit({ type: "NODE_CAPTURED", node });
     this.emit({ type: "AUTOMATION_ATTACHED", nodeId: node.id, tier: node.assignedTier });
     this.emitTerminal(`检测到可入侵设备已接管：${definition.name}。自动接驳上线。`, "success");
+    this.emitNewlyFallenSectors(fallenBefore);
+  }
+
+  // §09 当前已陷落（3 格全接管）的域 id 集合。
+  private fallenSectorIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const sector of skynetSectors()) {
+      if (sectorFallen(this.state, sector)) {
+        ids.add(sector.id);
+      }
+    }
+    return ids;
+  }
+
+  // §09 与入侵前的已陷落集合比对，对新落陷的域播终端线 + 发 SECTOR_FALLEN 事件。
+  private emitNewlyFallenSectors(before: Set<string>): void {
+    for (const sector of skynetSectors()) {
+      if (!before.has(sector.id) && sectorFallen(this.state, sector)) {
+        this.emitTerminal(`${sector.name}陷落——${sector.fallenLine}`, "success");
+        this.emit({ type: "SECTOR_FALLEN", sectorId: sector.id, name: sector.name });
+      }
+    }
   }
 
   private createBotNode(definition: NodeDefinition, level = 1): BotNode {

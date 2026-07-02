@@ -1,6 +1,7 @@
 import { query } from "../shared";
 import { formatBig, gte } from "../../core/math/BigNumber";
 import { SKILLS, getSkill, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
+import { allSkynetTaken, skynetSlotCount, skynetTakenCount } from "../../core/content/skynet";
 import { applyCast } from "../../core/content/companyCast";
 import type { SophiaCore } from "../../core/GameCore";
 import type { GameState, PhaseId } from "../../core/state/GameState";
@@ -357,6 +358,14 @@ export class SkillShopView {
     if (def.requires && (state.skills[def.requires] ?? 0) < 1) {
       const key = getSkill(def.requires);
       row.priceEl.textContent = `🔒 需「${key?.name ?? def.requires}」`;
+      row.button.disabled = true;
+      row.button.classList.add("is-locked");
+      return;
+    }
+
+    // §09 终局硬门槛：conq_awaken（觉醒）要五域全接管，未达时显示进度提示、锁住。
+    if (def.id === "conq_awaken" && !allSkynetTaken(state)) {
+      row.priceEl.textContent = `🔒 需全域接管 · 已 ${skynetTakenCount(state)}/${skynetSlotCount()}`;
       row.button.disabled = true;
       row.button.classList.add("is-locked");
       return;

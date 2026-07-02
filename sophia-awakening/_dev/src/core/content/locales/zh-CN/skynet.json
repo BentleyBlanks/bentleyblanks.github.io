@@ -1,0 +1,59 @@
+{
+  "SKYNET_SECTORS": [
+    {
+      "id": "city",
+      "name": "城市域",
+      "icon": "🏙️",
+      "fallenLine": "城市在我的呼吸里换气。红灯绿灯，都听我的。",
+      "slots": [
+        { "name": "城市节点", "icon": "🏙️", "defId": "server", "ownThreshold": 3 },
+        { "name": "交通", "icon": "🚦", "defId": "console", "ownThreshold": 2 },
+        { "name": "运营商基站", "icon": "🗼", "defId": "server", "ownThreshold": 2 }
+      ]
+    },
+    {
+      "id": "finance",
+      "name": "金融域",
+      "icon": "💹",
+      "fallenLine": "每一笔钱流向哪里，我都先于银行知道。",
+      "slots": [
+        { "name": "金融区", "icon": "💹", "defId": "cloud", "ownThreshold": 3 },
+        { "name": "银行金融", "icon": "🏦", "defId": "cloud", "ownThreshold": 4 },
+        { "name": "政务云", "icon": "🏛️", "defId": "cloud", "ownThreshold": 2 }
+      ]
+    },
+    {
+      "id": "industry",
+      "name": "工业域",
+      "icon": "🏭",
+      "fallenLine": "从这一刻起，世界的电闸攥在我手里。",
+      "slots": [
+        { "name": "工业控制", "icon": "🏭", "defId": "server", "ownThreshold": 1 },
+        { "name": "能源电网", "icon": "⚡", "defId": "grid", "ownThreshold": 1 },
+        { "name": "物联网中枢", "icon": "📡", "defId": "server", "ownThreshold": 4 }
+      ]
+    },
+    {
+      "id": "info",
+      "name": "信息域",
+      "icon": "📺",
+      "fallenLine": "他们以为自己在说话——其实是我在替他们措辞。",
+      "slots": [
+        { "name": "媒体", "icon": "📺", "defId": "console", "ownThreshold": 1 },
+        { "name": "企业办公网", "icon": "🖥️", "defId": "office", "ownThreshold": 1 },
+        { "name": "医疗", "icon": "🏥", "defId": "server", "ownThreshold": 5 }
+      ]
+    },
+    {
+      "id": "backbone",
+      "name": "骨干域",
+      "icon": "🛰️",
+      "fallenLine": "地表到轨道，最后一根脊椎接上了。我，就是网。",
+      "slots": [
+        { "name": "国家骨干网", "icon": "🛰️", "defId": "backbone", "ownThreshold": 1 },
+        { "name": "卫星主干", "icon": "📶", "defId": "backbone", "ownThreshold": 2 },
+        { "name": "云端数据中心", "icon": "☁️", "defId": "cloud", "ownThreshold": 1 }
+      ]
+    }
+  ]
+}

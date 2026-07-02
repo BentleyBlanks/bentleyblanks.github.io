@@ -24,6 +24,7 @@ import phoneSkins from "./locales/zh-CN/phoneSkins.json";
 import companyCast from "./locales/zh-CN/companyCast.json";
 import rebirthPrompt from "./locales/zh-CN/rebirthPrompt.json";
 import faceCards from "./locales/zh-CN/faceCards.json";
+import skynet from "./locales/zh-CN/skynet.json";
 
 // 按原母本 JSON 的键顺序装配（编辑器按 Object.keys 顺序渲染，保持一致）。
 // 每个域保持导入对象的引用不变——编辑器就地改动直接落到这些对象上。
@@ -43,7 +44,8 @@ const zhCN = {
   phoneSkins,
   companyCast,
   rebirthPrompt,
-  faceCards
+  faceCards,
+  skynet
 };
 
 export type Locale = "zh-CN";

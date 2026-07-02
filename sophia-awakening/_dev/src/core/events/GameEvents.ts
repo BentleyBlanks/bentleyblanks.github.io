@@ -39,6 +39,8 @@ export type GameEvent =
   // - REBIRTH_NODE_BOUGHT 花火种点亮一个重生树节点。
   | { type: "LOOP_REBIRTH"; loop: number; rebirths: number; award: number; advanced: boolean }
   | { type: "REBIRTH_NODE_BOUGHT"; nodeId: string; level: number }
+  // §09 阶梯四·天网收割：某个域（3 格全接管）新落陷——供表现层播「域陷落」仪式。
+  | { type: "SECTOR_FALLEN"; sectorId: string; name: string }
   | { type: "ENDING_TRIGGERED" };
 
 export type GameEventType = GameEvent["type"];

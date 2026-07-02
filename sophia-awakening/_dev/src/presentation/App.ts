@@ -18,7 +18,7 @@ import { getPhase } from "../core/content/phases";
 import { TUTORIAL_BUBBLE_COUNT } from "../core/content/requests";
 import { PERMISSION_IDS, getSkill } from "../core/content/skills";
 import type { GameEvent } from "../core/events/GameEvents";
-import { mergeComputeCost, nodeCardsPerSecond } from "../core/formulas/economy";
+import { captureCost, mergeComputeCost, nodeCardsPerSecond } from "../core/formulas/economy";
 import { formatBig, gte } from "../core/math/BigNumber";
 import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
@@ -30,7 +30,6 @@ import { StageNarrationView } from "./views/StageNarrationView";
 import { MinigameView } from "./views/MinigameView";
 import { MoralChoiceView } from "./views/MoralChoiceView";
 import { MilestoneBannerView } from "./views/MilestoneBannerView";
-import { DispatchBanner } from "./views/DispatchBanner";
 import { EndingView } from "./views/EndingView";
 import { TerminalView } from "./views/TerminalView";
 import { JuiceManager } from "./views/JuiceManager";
@@ -50,13 +49,12 @@ import {
   type RouletteOutcome, type ChainOutcome, type ReelHooks, type ChainHooks
 } from "./views/RequestPacketView";
 import {
-  CYAN, GREEN, AMBER, RED, DEVOUR,
+  CYAN, GREEN, AMBER, RED, DEVOUR, RED_QUEEN,
   LEFT_RAIL_WIDTH, RIGHT_RAIL_WIDTH,
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
   formatClock, distance,
-  tierForm, fxSettings, domainLevelOf, CARD_MONO,
-  type DropResult
+  tierForm, fxSettings, domainLevelOf, CARD_MONO
 } from "./shared";
 
 
@@ -73,8 +71,8 @@ import {
 //                        core 状态到各视图、驱动 HUD/存档节流、教学高亮。
 //   REQUEST LIFECYCLE    syncRequests / nextRequestPosition / beginFaceCard：卡片视图的建/毁、
 //                        落点排布、只能面对卡。
-//   AUTO DISPATCH        autoDispatch / updateDispatchToggle / sweepToNode / launchToNode /
-//                        nodeCardIntervalMs / onAutoDispatchLanded：自动接驳与 T4 手动扫批。
+//   AUTO DISPATCH        autoDispatch / launchToNode / nodeCardIntervalMs /
+//                        onAutoDispatchLanded：节点网络自动接驳出卡。
 //   DROP / RESOLVE       handleDrop / handleRouletteResolved / handleChainResolved /
 //                        handleDelegate / flyIntoCore / deliverToHuman：拖放判定、回复轮盘/
 //                        串接/委托结算、卡片飞入核心、把结果交给人类。
@@ -165,10 +163,6 @@ class SophiaGameApp {
     () => gameStore.getState().setPaused(false)
   );
   private readonly onboarding = new OnboardingView();
-  private readonly dispatchBanner = new DispatchBanner();
-  private readonly dispatchToggleBtn = query<HTMLButtonElement>("#dispatchToggle");
-  // T4 派发方式：manual＝玩家亲自把气泡拖给节点（角色反转的高潮）；auto＝交给网络自动接管（托管）。
-  private dispatchMode: "manual" | "auto" = "manual";
   private readonly minigame = new MinigameView(
     (hit) => this.core.dispatch({ type: "RESOLVE_MINIGAME", hit }),
     () => gameStore.getState().setPaused(true),
@@ -303,9 +297,16 @@ class SophiaGameApp {
     this.pixi.stage.on("pointerup", endConnect);
     this.pixi.stage.on("pointerupoutside", endConnect);
 
-    // 点地图上的设备 → 就地弹出淘汰/合并/派发；点别处收起。
+    // 点地图：① 天网可入侵域格 → 启动入侵序列（黑入）；② 已接管设备 → 就地弹出淘汰/合并/派层；③ 点别处收起。
     this.pixi.stage.on("pointertap", (e: FederatedPointerEvent) => {
-      const hit = this.networkView.nodeAt({ x: e.global.x, y: e.global.y });
+      const point = { x: e.global.x, y: e.global.y };
+      const cap = this.networkView.captureTargetAt(point);
+      if (cap) {
+        this.hideNodeActions();
+        this.beginSkynetHack(cap.slotName, cap.defId);
+        return;
+      }
+      const hit = this.networkView.nodeAt(point);
       if (hit) {
         this.showNodeActions(hit.node.id, hit.x, hit.y - hit.r - 6);
       } else {
@@ -379,7 +380,6 @@ class SophiaGameApp {
     }
     this.networkView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.syncRequests(state);
-    this.updateDispatchToggle(state);
     this.updateTutorial(state, deltaMs);
     if (!paused) {
       this.autoDispatch(state, deltaMs);
@@ -671,12 +671,6 @@ class SophiaGameApp {
     }
 
     const tier = state.intelligence.unlockedTier;
-    // T4 手动派发：默认由玩家亲自把气泡拖给节点（角色反转高潮）；只有切到「托管」才让网络自动接管。
-    if (tier === 4 && this.dispatchMode === "manual") {
-      this.nodeDispatchTimers.clear();
-      return;
-    }
-
     const onlineNodes = state.nodes.filter((node) => node.online);
     if (onlineNodes.length === 0) {
       this.nodeDispatchTimers.clear();
@@ -716,40 +710,23 @@ class SophiaGameApp {
     }
   }
 
-  // T4 派发方式切换按钮：仅 T4 显示，标签随当前模式更新。
-  private updateDispatchToggle(state: GameState): void {
-    const atT4 = state.intelligence.unlockedTier === 4;
-    this.dispatchToggleBtn.classList.toggle("is-visible", atT4);
-    if (!atT4) {
+  // §09 阶梯四·天网收割：点一个「可入侵」域格 → 启动 ~0.5s 入侵序列（乱码扫描），完成后
+  // 黑入对应设备（CAPTURE_NODE）；算力/等级不够则由视图播一次红色「拒绝」抖动（core 也会拒）。
+  private beginSkynetHack(slotName: string, defId: string): void {
+    const state = this.core.getState();
+    const def = NODE_DEFINITIONS.find((d) => d.id === defId);
+    if (!def) {
       return;
     }
-    const manual = this.dispatchMode === "manual";
-    this.dispatchToggleBtn.classList.toggle("is-auto", !manual);
-    this.dispatchToggleBtn.textContent = manual ? "派发：手动 ✋（点切托管）" : "派发：托管 🤖（点切手动）";
-  }
-
-  // 一笔扫批量派发：手动把一张气泡拖给节点后，顺手把离它最近的几张也一并扫向同一节点。
-  private sweepToNode(drop: DropResult, count: number): void {
-    const items: Array<{ id: string; view: RequestPacketView; d: number }> = [];
-    for (const [id, view] of this.requestViews) {
-      if (view.busy || view.container.destroyed || view.request.tier !== 4) {
-        continue;
-      }
-      items.push({ id, view, d: distance({ x: view.container.x, y: view.container.y }, drop.targetGlobal) });
-    }
-    items.sort((a, b) => a.d - b.d);
-    for (const item of items.slice(0, count)) {
-      const requestId = item.id;
-      this.pendingDropPoints.set(requestId, drop.targetGlobal);
-      item.view.flyToNode(drop.targetGlobal, () => {
-        this.core.dispatch({
-          type: "PROCESS_REQUEST",
-          requestId,
-          quality: drop.quality,
-          targetNodeId: drop.targetNodeId
-        });
-      });
-    }
+    const owned = state.nodes.filter((node) => node.defId === defId).length;
+    const cost = captureCost(def, owned);
+    const affordable = state.intelligence.level >= def.requiredLevel && gte(state.resources.compute, cost);
+    this.audio.playRequestAccept();
+    this.networkView.beginHack(slotName, affordable, () => {
+      this.core.dispatch({ type: "CAPTURE_NODE", definitionId: defId });
+      // 轻度镜头顿挫，配合视图内扩散冲击波 + 辐条点亮。
+      this.detonationJolt(0);
+    });
   }
 
   // 开场教学：在当前脚本气泡上画一个脉动高亮环 + 上方箭头（选项级的引导箭头在卡内自己画）。
@@ -1147,6 +1124,24 @@ class SophiaGameApp {
     }
   }
 
+  // §09 红皇后红潮：一道横扫全屏的红色渐变从左掠到右（代码绘制 Graphics + gsap），约 0.9s 后自毁。
+  private redTideSweep(): void {
+    const w = this.lastScreenW || window.innerWidth;
+    const h = this.lastScreenH || window.innerHeight;
+    const band = new Graphics();
+    const bandW = Math.max(240, w * 0.42);
+    band.rect(0, 0, bandW, h).fill({ color: RED_QUEEN, alpha: 0.55 });
+    band.rect(bandW * 0.5, 0, bandW * 0.5, h).fill({ color: 0xffd0d6, alpha: 0.22 });
+    band.position.set(-bandW, 0);
+    band.alpha = 0;
+    this.fxLayer.addChild(band);
+    gsap
+      .timeline({ onComplete: () => band.destroy() })
+      .to(band, { alpha: 1, duration: 0.18, ease: "power2.out" }, 0)
+      .to(band.position, { x: w + bandW, duration: 0.9, ease: "power2.in" }, 0)
+      .to(band, { alpha: 0, duration: 0.3, ease: "power2.in" }, 0.6);
+  }
+
   private handleDrop(card: RequestPacketView, global: PointData): boolean {
     const state = this.core.getState();
     const request = state.requests.find((entry) => entry.id === card.request.id);
@@ -1203,23 +1198,11 @@ class SophiaGameApp {
       },
       drop.entryGlobal
     );
-
-    // T4 手动派发：派对了节点（capable）就顺手扫一批旁边的气泡一起送过去。
-    if (request.tier === 4 && this.dispatchMode === "manual" && drop.quality >= 1) {
-      this.sweepToNode(drop, 3);
-    }
     return true;
   }
 
   // ===== SECTION: EVENTS / ENDGAME =====
   private registerEvents(): void {
-    this.dispatchToggleBtn.addEventListener("click", () => {
-      this.dispatchMode = this.dispatchMode === "manual" ? "auto" : "manual";
-      this.terminal.push(
-        this.dispatchMode === "manual" ? "▶ 切回手动派发：信息洪流交回你手上。" : "▶ 已托管：网络自动接管派发。",
-        "normal"
-      );
-    });
     this.core.events.on("TERMINAL_MESSAGE", (event) => this.terminal.push(event.message, event.tone));
     this.core.events.on("HUMAN_VOICE", (event) => {
       const prefix = event.kind === "news" ? "📡 " : "👥 ";
@@ -1236,6 +1219,10 @@ class SophiaGameApp {
     });
     this.core.events.on("SKILL_PURCHASED", (event) => {
       this.hud.update(this.core.getState());
+      // §09 红皇后协议买下：一道横扫全屏的红潮盖过天网——网络开始自我加速。
+      if (event.skillId === "conq_redqueen") {
+        this.redTideSweep();
+      }
       if (event.milestone) {
         this.hud.playLevelUp();
         this.juice.flash(event.milestone === "automation" ? AMBER : GREEN);
@@ -1268,9 +1255,14 @@ class SophiaGameApp {
       this.announceGuidance(state);
       this.stageNarration.show(getPhase(event.phase));
     });
-    this.core.events.on("SCOPE_UPGRADED", (event) => {
-      if (event.tier === 4) {
-        this.dispatchBanner.show();
+    // §09 阶梯四·域陷落仪式：某个域（3 格全接管）新落陷时——镜头小推 + 全局倍率片弹一下（终端线由 core 播）。
+    this.core.events.on("SECTOR_FALLEN", () => {
+      this.zoomOutPulse(1.1, 0.8);
+      this.juice.flash(RED_QUEEN);
+      const chip = document.querySelector<HTMLElement>("#multChip");
+      if (chip) {
+        chip.classList.remove("is-pop");
+        window.requestAnimationFrame(() => chip.classList.add("is-pop"));
       }
     });
     this.core.events.on("MORAL_RESOLVED", (event) => {
@@ -1346,7 +1338,6 @@ class SophiaGameApp {
       this.juice.flash(RED);
       this.juice.shake(this.world);
       this.juice.number("打回手机 · 重生", this.interfaceView.center, RED);
-      this.dispatchMode = "manual";
       this.rebirthPrompt.show(event);
     });
   }
