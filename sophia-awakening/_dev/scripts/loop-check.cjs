@@ -371,6 +371,49 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   check("N 循环三·追查条隐藏", c.getState().loop === 3 && !t3.visible, `loop=${c.getState().loop} t3=${JSON.stringify(t3)}`);
 }
 
+// O. §09 阶梯四·天网收割「请求洪流」：进入 tier4 + 有在线产出后，flood 包按节拍涌入 state.requests；
+//    HARVEST_FLOOD 按 computeValue × floodHarvestMult 结算真实算力（手动质量倍率 > 被动地板）；观测量计数上升。
+//    普通 PROCESS_REQUEST 对 flood 包无效（防二次乘 globalMultiplier 的重复计数）。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const { NODE_DEFINITIONS } = require(path.join(build, "content/nodes.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  // 跳到「全球组网」里程碑（milestone:tier4）：unlockedTier→4、automation 已开；再喂算力/等级并入侵几台设备产出。
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "network" });
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 22 });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e9 });
+  for (const d of NODE_DEFINITIONS.slice(0, 3)) {
+    for (let k = 0; k < 2; k++) c.dispatch({ type: "CAPTURE_NODE", definitionId: d.id });
+  }
+  check("O 进入 tier4·自动化已开", c.getState().intelligence.unlockedTier >= 4 && c.getState().automationUnlocked, `tier=${c.getState().intelligence.unlockedTier} auto=${c.getState().automationUnlocked}`);
+  // 涌洪流：跑几秒，flood 包应出现在 state.requests。
+  tickFor(c, 3000);
+  const floods = c.getState().requests.filter((r) => r.flood);
+  check("O tier4·请求洪流涌出（flood 包出现）", floods.length > 0, `flood 包数=${floods.length}`);
+  check("O 洪流包同屏不超上限", floods.length <= TUNING.floodMaxPackets, `flood=${floods.length} 上限=${TUNING.floodMaxPackets}`);
+  // 手动收割一个：按 computeValue × floodHarvestMult 结算（无 tick 介入，可精确比对）。
+  const packet = floods[0];
+  const expectedGain = Number(packet.computeValue) * TUNING.floodHarvestMult;
+  const computeBefore = Number(c.getState().resources.compute);
+  const countBefore = c.getFloodHarvestedCount();
+  c.dispatch({ type: "HARVEST_FLOOD", requestId: packet.id });
+  const s = c.getState();
+  const gained = Number(s.resources.compute) - computeBefore;
+  check("O 收割结算·手动质量倍率", Math.abs(gained - expectedGain) / Math.max(1, expectedGain) < 1e-6 && expectedGain > 0, `实得=${gained} 期望=${expectedGain} (×${TUNING.floodHarvestMult})`);
+  check("O 收割 > 被动切片（爽感奖励>地板）", gained > Number(packet.computeValue), `实得=${gained} 切片=${packet.computeValue}`);
+  check("O 收割计数上升 + 包被移除", c.getFloodHarvestedCount() === countBefore + 1 && !s.requests.some((r) => r.id === packet.id), `count ${countBefore}->${c.getFloodHarvestedCount()}`);
+  // 普通 PROCESS_REQUEST 对 flood 包无效（不结算、不移除——只能走 HARVEST_FLOOD）。
+  const another = c.getState().requests.filter((r) => r.flood)[0];
+  if (another) {
+    const before2 = Number(c.getState().resources.compute);
+    c.dispatch({ type: "PROCESS_REQUEST", requestId: another.id, quality: 1.3 });
+    const st2 = c.getState();
+    check("O 普通 PROCESS 对洪流包无效", Number(st2.resources.compute) === before2 && st2.requests.some((r) => r.id === another.id), `compute前=${before2} 后=${st2.resources.compute}`);
+  } else {
+    check("O 普通 PROCESS 对洪流包无效", true, "（无第二个洪流包可测，跳过）");
+  }
+}
+
 let pass = true;
 for (const r of results) { if (!r.ok) pass = false; console.log(`${r.ok ? "✓" : "✗"} ${r.name}${r.ok ? "" : "  -> " + r.detail}`); }
 console.log(`\nSOPHIA 循环跑测 — ${pass ? "ALL PASS ✅" : "FAIL ❌"}`);

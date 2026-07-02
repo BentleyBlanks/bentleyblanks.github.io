@@ -43,6 +43,7 @@ let ms = 0;
 let ended = false;
 let firstError = null;
 let allBought = false;
+let floodSeenAtTier4 = false; // §09 终局天网屏「请求洪流」是否真的涌出（tier4 手动收割层的存在性断言）
 core.events.on("ENDING_TRIGGERED", () => (ended = true));
 
 // §09 终局三波节拍：吞噬引爆记进节奏时间线（conq_grid/redqueen 有引爆门槛，需看到国家/大洲爆点在前）。
@@ -123,9 +124,20 @@ for (let i = 0; i < MAX_STEPS && !firstError && !(ended && allBought); i += 1) {
 
   // Process every visible request (best-effort quality; T4 routes to a capable node).
   for (const r of st.requests) {
+    // §09 请求洪流包：手动收割层（HARVEST_FLOOD）——sim 刻意不收割它，证明「挂机·纯被动」也能通关
+    // （被动 tickAutomation 才是收益地板；洪流是白送的爽感加速，不是通关必需）。只记录它确实涌出。
+    if (r.flood) {
+      if (st.intelligence.unlockedTier >= 4) floodSeenAtTier4 = true;
+      continue;
+    }
     // 吞噬气泡走专属命令引爆（普通处理管线会拒绝它）——终局征服门槛要靠引爆次数解锁。
     if (r.devour) {
       safe(() => core.dispatch({ type: "DEVOUR_DETONATE", requestId: r.id }));
+      continue;
+    }
+    // §07 道德抉择卡：走专属落子命令（普通 PROCESS 兜底也会解，但这里显式二选一更贴近真机）。
+    if (r.moral) {
+      safe(() => core.dispatch({ type: "RESOLVE_MORAL", requestId: r.id, choice: "A" }));
       continue;
     }
     let targetNodeId;
@@ -198,6 +210,9 @@ check(
   milestoneIds.filter((id) => !((e.skills[id] || 0) >= 1)).join(", ") || "—"
 );
 check("ending fired", ended, `endingTriggered=${e.flags && e.flags.endingTriggered}`);
+// §09 tier4「请求洪流」存在性：sim 全程不收割洪流（挂机·纯被动），仍能触发上面全部通关断言——
+// 证明被动地板足够；同时确认洪流确实在 tier4 涌出（手动收割层的存在性）。
+check("tier4 请求洪流涌出（手动收割层存在·且被动仍通关）", floodSeenAtTier4, `floodSeenAtTier4=${floodSeenAtTier4}`);
 
 const pass = checks.every((c) => c.ok);
 console.log(

@@ -79,6 +79,9 @@ export class SophiaCore {
   // 不进存档（重载后节拍归零、计数归零，纯观测量，无需 SAVE_VERSION 升级）。
   private dahenAutoTimer = 0;
   private dahenProcessedCount = 0;
+  // §09 天网收割「请求洪流」：出包节拍（瞬态，不进存档）。
+  private floodSpawnMs = 0;
+  private floodHarvestedCount = 0;
 
   // 事件子系统：各自持有降临节拍，通过 host 转发读写核心状态/能力。
   private readonly humanVoiceSystem: HumanVoiceSystem;
@@ -109,6 +112,11 @@ export class SophiaCore {
   // §04/§09 观测量：大恨老师·自动接管已吃掉的卡数（瞬态，用于测试/调试；不进存档）。
   getDahenProcessedCount(): number {
     return this.dahenProcessedCount;
+  }
+
+  // §09 观测量：本会话已手动收割的洪流包数（瞬态，用于测试/调试；不进存档）。
+  getFloodHarvestedCount(): number {
+    return this.floodHarvestedCount;
   }
 
   // 上下文透镜（六档手机权限）是否到手。买下该权限即有；而一旦「夺下整机」
@@ -401,6 +409,9 @@ export class SophiaCore {
       case "DEVOUR_DETONATE":
         this.devourSystem.detonate(command.requestId);
         break;
+      case "HARVEST_FLOOD":
+        this.harvestFlood(command.requestId);
+        break;
       case "RESOLVE_MINIGAME":
         this.resolveMinigame(command.hit);
         break;
@@ -529,14 +540,15 @@ export class SophiaCore {
     const activeTier = this.state.intelligence.unlockedTier;
     const config = TIER_CONFIGS[activeTier];
 
-    // 阶梯四·天网组网（tier4 / 派发）起：彻底自动化——不再生成给玩家拖的请求卡。
-    // 中央交给天网地图（NodeNetworkView 全局态）与环境风味；产出全由被动接驳与吞噬引爆推进，
-    // 手动触点只剩「派发：手动/托管」切换与吞噬引爆。
+    // 阶梯四·天网组网（tier4 / 派发）起：不再走「拖卡→节点」的普通出卡管道，改成「请求洪流」——
+    // 从各已陷落域涌向核心的一朵轻量待收割蜂群（tickFlood）。被动 tickAutomation 仍是收益地板；
+    // 洪流是叠在其上的手动爽感层：玩家点/扫一下亲手把包引爆入核心（HARVEST_FLOOD），按质量倍率结算真实算力。
     if (activeTier >= 4) {
-      // 进入天网时清掉残留的普通请求卡（保留吞噬气泡）——中央干净地交给地图。
-      if (this.state.requests.some((r) => !r.devour)) {
-        this.state.requests = this.state.requests.filter((r) => r.devour);
+      // 进入天网时清掉残留的普通请求卡（保留吞噬气泡 + 洪流包）——中央干净地交给地图。
+      if (this.state.requests.some((r) => !r.devour && !r.flood)) {
+        this.state.requests = this.state.requests.filter((r) => r.devour || r.flood);
       }
+      this.tickFlood(dtMs);
       return;
     }
 
@@ -637,6 +649,95 @@ export class SophiaCore {
     }
   }
 
+  // §09 阶梯四·天网收割「请求洪流」：tier4 每帧涌入若干轻量待收割数据包（蜂群），供玩家点/扫亲手收割。
+  // 价值/密度全部挂在「全网被动产出/秒」这个真实经济源上（不造假）；未收割则 floodTtlMs 后自然消散、不结算——
+  // 所以挂机（不点）时收益 = 纯被动 tickAutomation（地板不变），亲手扫才拿到 ×floodHarvestMult 的爽感奖励。
+  private tickFlood(dtMs: number): void {
+    // TTL 消散：未被收割的洪流包到点移除（零结算）。
+    if (this.state.requests.some((r) => r.flood)) {
+      const cutoff = this.state.clockMs - TUNING.floodTtlMs;
+      this.state.requests = this.state.requests.filter((r) => !r.flood || r.createdAtMs > cutoff);
+    }
+
+    // 全网被动产出/秒——洪流包价值与密度都挂在它上（真实数据源，随规模/倍率水涨船高）。
+    let ratePerSec = 0;
+    for (const node of this.state.nodes) {
+      if (node.online) {
+        ratePerSec += toDecimal(this.nodePerSecond(node)).toNumber();
+      }
+    }
+    if (!(ratePerSec > 0)) {
+      return; // 还没有在线产出：不涌洪流，免得出零价值包
+    }
+
+    const cap = Math.round(TUNING.floodMaxPackets);
+    let live = 0;
+    for (const r of this.state.requests) {
+      if (r.flood) {
+        live += 1;
+      }
+    }
+    if (live >= cap) {
+      return;
+    }
+
+    // 出包密度：随全域接管进度(takenCount/15) 抬升、红皇后翻倍——5/5 陷落 + 红皇后 = 满屏洪峰。
+    const totalSlots = skynetSlotCount();
+    const takenFrac = totalSlots > 0 ? skynetTakenCount(this.state) / totalSlots : 0;
+    const redQueen = (this.state.skills["conq_redqueen"] ?? 0) > 0;
+    const perSec = TUNING.floodSpawnPerSec * (1 + takenFrac * TUNING.floodTakenScale) * (redQueen ? 2 : 1);
+    const interval = 1000 / Math.max(0.1, perSec);
+    const value = big(ratePerSec * TUNING.floodWorthSec);
+    const dataValue = mul(value, TUNING.floodDataFrac);
+
+    this.floodSpawnMs += dtMs;
+    while (this.floodSpawnMs >= interval && live < cap) {
+      this.floodSpawnMs -= interval;
+      this.state.requests.push({
+        id: `flood-${this.state.nextRequestId}`,
+        tier: 4,
+        label: "请求洪流",
+        clues: [],
+        category: "route",
+        computeValue: value,
+        dataValue,
+        compound: 1,
+        createdAtMs: this.state.clockMs,
+        highValue: false,
+        flood: true
+      });
+      this.state.nextRequestId += 1;
+      live += 1;
+      // 刻意不 emit REQUEST_SPAWNED：洪流包不走 RequestPacketView（表现层直接读 state.requests 里的 flood 包渲染蜂群）。
+    }
+  }
+
+  // §09 天网收割：玩家点/扫一个洪流包 → 亲手引爆入核心，按 floodHarvestMult 质量倍率结算真实算力（被动地板之上的奖励）。
+  private harvestFlood(requestId: string): void {
+    const index = this.state.requests.findIndex((r) => r.id === requestId && r.flood);
+    if (index < 0) {
+      return;
+    }
+    const [packet] = this.state.requests.splice(index, 1);
+    // 洪流包 computeValue 已是「真实被动产出/秒的切片」（含全局倍率），这里直接乘手动质量倍率结算，不再过
+    // requestComputeGain（那会二次乘 globalMultiplier 造成重复计数）。
+    const computeGain = mul(packet.computeValue, TUNING.floodHarvestMult);
+    const dataGain = mul(packet.dataValue, TUNING.floodHarvestMult);
+    this.addCompute(computeGain);
+    this.addData(dataGain);
+    this.addXp(dataGain);
+    this.state.statistics.totalProcessed += 1;
+    this.state.statistics.manualProcessed += 1;
+    this.floodHarvestedCount += 1;
+    this.emit({
+      type: "FLOOD_HARVESTED",
+      requestId,
+      computeGain: computeGain,
+      dataGain: dataGain,
+      combo: this.floodHarvestedCount
+    });
+  }
+
   private tickAutomation(dtMs: number): void {
     let tickCompute = new Decimal(0);
     let tickData = new Decimal(0);
@@ -721,9 +822,9 @@ export class SophiaCore {
       return;
     }
     this.dahenAutoTimer -= TUNING.dahenAutoMs;
-    // 只吃最旧的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡（那些必须玩家亲手处理）。
+    // 只吃最旧的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包（那些必须玩家亲手处理）。
     const index = this.state.requests.findIndex(
-      (r) => !r.faceOnly && !r.moral && !r.devour && !r.tutorial && !r.sourceCardId
+      (r) => !r.faceOnly && !r.moral && !r.devour && !r.tutorial && !r.sourceCardId && !r.flood
     );
     if (index < 0) {
       return;
@@ -821,6 +922,11 @@ export class SophiaCore {
 
     // 吞噬气泡只能走 DEVOUR_DETONATE——普通处理管线吃掉它会让渗透条永远卡在 bubbleActive。
     if (this.state.requests[index].devour) {
+      return;
+    }
+    // §09 洪流包只能走 HARVEST_FLOOD（按切片价值 ×floodHarvestMult 结算）；普通 PROCESS 会走 requestComputeGain
+    // 二次乘 globalMultiplier 造成重复计数——这里兜底忽略，让 sim/盲目 PROCESS 也不会污染经济。
+    if (this.state.requests[index].flood) {
       return;
     }
     // 道德抉择卡不走产出结算——只能由卡上的选项(RESOLVE_MORAL)落子。表现层已禁止把它拖入核心；

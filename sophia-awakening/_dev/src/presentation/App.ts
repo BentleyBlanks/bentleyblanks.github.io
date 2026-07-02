@@ -20,7 +20,7 @@ import { PERMISSION_IDS, getSkill } from "../core/content/skills";
 import { content } from "../core/content/i18n";
 import type { GameEvent } from "../core/events/GameEvents";
 import { captureCost, mergeComputeCost, nodeCardsPerSecond } from "../core/formulas/economy";
-import { formatBig, gte } from "../core/math/BigNumber";
+import { formatBig, gte, mul, toDecimal } from "../core/math/BigNumber";
 import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
 import { SaveManager } from "../core/save/SaveManager";
@@ -191,6 +191,11 @@ class SophiaGameApp {
   private lastScreenW = 0;
   private lastScreenH = 0;
   private lastDomain = ""; // §04 背景升维：上次画的控制域档（变化时重画背景换皮）
+  // §09 请求洪流·手动收割：点/扫的连击态（在窗口内连续收割 = combo，越长越爽·越震）。
+  private harvestSweeping = false;
+  private harvestCombo = 0;
+  private harvestComboUntilMs = 0;
+  private harvestSweptIds = new Set<string>();
   // 「点设备 → 淘汰/合并/派发」就地弹窗（取代右栏冗余的设备列表）。
   private nodeActionsEl?: HTMLElement;
 
@@ -231,6 +236,12 @@ class SophiaGameApp {
       }
       if (!st.automationUnlocked && this.interfaceView.hasPendingApps() && this.interfaceView.coreContains({ x: e.global.x, y: e.global.y })) {
         this.connectDragging = true;
+        return;
+      }
+      // §09 终局天网屏：按下即开始「收割扫掠」——扫过的洪流包逐个亲手引爆入核（起手先收当前指针下那个）。
+      if (domainLevelOf(st) === "global") {
+        this.harvestSweeping = true;
+        this.harvestFloodAt({ x: e.global.x, y: e.global.y });
       }
     });
     // 悬停在某个已连 App 上 → 浮窗显示它的处理能力（成功率 / 幻觉率 / 处理耗时）。
@@ -255,6 +266,11 @@ class SophiaGameApp {
         appTip.classList.remove("is-open");
         return;
       }
+      // §09 收割扫掠：拖过洪流蜂群——像镰刀扫过麦田，逐个引爆入核（一次滑动扫到多个 = 连击）。
+      if (this.harvestSweeping) {
+        this.harvestFloodAt({ x: e.global.x, y: e.global.y });
+        return;
+      }
       const st = this.core.getState();
       const app = !st.automationUnlocked ? this.interfaceView.appWorkerAt({ x: e.global.x, y: e.global.y }) : null;
       if (app) {
@@ -271,6 +287,11 @@ class SophiaGameApp {
       }
     });
     const endConnect = (e: FederatedPointerEvent) => {
+      // §09 收割扫掠结束：松手即收尾（连击窗口自然过期后归零）。
+      if (this.harvestSweeping) {
+        this.harvestSweeping = false;
+        this.harvestSweptIds.clear();
+      }
       // §04 连通仪式：松手在核心上＝接通；松在别处＝留着端口让他重拖。
       if (this.ritualDragging) {
         this.ritualDragging = false;
@@ -426,6 +447,10 @@ class SophiaGameApp {
     const liveIds = new Set(state.requests.map((request) => request.id));
 
     for (const request of state.requests) {
+      // §09 洪流包不进 RequestPacketView——它由 NodeNetworkView 直接读 state 渲染成待收割蜂群（点/扫收割）。
+      if (request.flood) {
+        continue;
+      }
       if (this.requestViews.has(request.id) || this.delegatedIds.has(request.id)) {
         continue;
       }
@@ -710,6 +735,50 @@ class SophiaGameApp {
       // 轻度镜头顿挫，配合视图内扩散冲击波 + 辐条点亮。
       this.detonationJolt(0);
     });
+  }
+
+  // §09 请求洪流·手动收割：点/扫命中一个洪流包 → 亲手引爆入核（HARVEST_FLOOD 结算真实算力），
+  // 视图播「飞入核心 + 爆裂 + 浮字」，连击越长震得越狠、数字雪崩越猛。返回是否命中（供扫掠判定）。
+  private harvestFloodAt(point: PointData): boolean {
+    const hit = this.networkView.floodPacketAt(point);
+    if (!hit || this.harvestSweptIds.has(hit.id)) {
+      return false;
+    }
+    const state = this.core.getState();
+    const req = state.requests.find((r) => r.id === hit.id && r.flood);
+    if (!req) {
+      return false;
+    }
+    // 展示值 = core 结算口径（computeValue × floodHarvestMult，与 harvestFlood 同源，不造假）。
+    const gain = mul(req.computeValue, TUNING.floodHarvestMult);
+    const gainText = `+${formatBig(gain)}`;
+    const mag = Math.max(0, toDecimal(gain).exponent);
+    this.harvestSweptIds.add(hit.id);
+    this.core.dispatch({ type: "HARVEST_FLOOD", requestId: hit.id });
+    this.networkView.detonateFlood(hit.id, gainText, mag);
+
+    // 连击窗口：500ms 内继续收割则 combo++，否则重置。
+    const now = Date.now();
+    this.harvestCombo = now < this.harvestComboUntilMs ? this.harvestCombo + 1 : 1;
+    this.harvestComboUntilMs = now + 500;
+
+    // 逐次爽点：爆裂 + 飞字入核心，并把算力芯片喂进顶栏。
+    this.audio.playRequestAccept();
+    this.juice.burst(point, RED_QUEEN, 0.8 + Math.min(1.4, mag * 0.05));
+    this.juice.flyToHud(point, this.hud.metricPoint("compute"), RED_QUEEN, () => this.hud.pulseCompute());
+
+    // 连击升级：链越长越爽——3 连起「收割 ×N」标签，每 3 连震一下屏，10 连起镜头顿挫 + 数字雪崩「一刻」。
+    if (this.harvestCombo >= 3) {
+      this.juice.number(`收割 ×${this.harvestCombo}`, { x: point.x, y: point.y - 30 }, 0xffe6ea);
+      if (this.harvestCombo % 3 === 0) {
+        this.worldShake();
+      }
+    }
+    if (this.harvestCombo >= 10 && this.harvestCombo % 6 === 0) {
+      this.detonationJolt(1);
+      this.numberAvalanche(gainText, RED_QUEEN, 1);
+    }
+    return true;
   }
 
   // 开场教学：在当前脚本气泡上画一个脉动高亮环 + 上方箭头（选项级的引导箭头在卡内自己画）。

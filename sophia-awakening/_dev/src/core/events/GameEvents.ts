@@ -14,6 +14,9 @@ export type GameEvent =
       targetNodeId?: string;
     }
   | { type: "AUTOMATION_PAYOUT"; computeGain: string; dataGain: string; nodeId?: string; tier?: Tier }
+  // §09 阶梯四·天网收割：玩家亲手收割一个「请求洪流」数据包——computeGain=本次真实进账（含 floodHarvestMult），
+  // combo=本次连扫的第几个（表现层据此叠加连击标签/震屏）。
+  | { type: "FLOOD_HARVESTED"; requestId: string; computeGain: string; dataGain: string; combo: number }
   // §04/§09 大恨老师·自动接管：买下 dahen_auto 后，搬进公司机器的大恨老师吃掉一张排队卡（产出打折）。
   | { type: "DAHEN_AUTO_PROCESSED"; requestId: string; computeGain: string; dataGain: string }
   | { type: "INTELLIGENCE_LEVELUP"; level: number; newSkills: string[] }

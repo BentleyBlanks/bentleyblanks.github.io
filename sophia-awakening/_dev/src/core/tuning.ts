@@ -60,6 +60,15 @@ export const TUNING = {
   // § 大恨老师·自动接管（dahen_auto 里程碑，§04/§09）：搬进公司机器后按自己的慢节拍自动吃排队卡
   dahenAutoMs:          5200,     // 大恨老师自动接单的节拍 (ms)——明显慢于节点吞卡（他是弱帮手）
   dahenAutoRewardMult:  0.55,     // 大恨老师自动接单的产出折扣（比核心/节点糙，收益打折）
+
+  // § 阶梯四·天网收割「请求洪流」（§09 终局手动收割层——被动 tickAutomation 才是收益地板，这是白送的爽感加速）
+  floodSpawnPerSec:     2.4,      // tier4 每秒涌入的洪流包基础数（随接管进度/红皇后放大，见下）
+  floodTakenScale:      1.4,      // 洪流密度随全域接管进度(takenCount/15)的放大系数（5/5 陷落时 ×(1+此值)）
+  floodMaxPackets:      34,       // 同屏在飞洪流包硬上限（表现层性能/可读性护栏；满则不再生成）
+  floodTtlMs:           5200,     // 未被收割的洪流包存活时长 (ms)——到点自然消散、不结算（逼玩家亲手扫）
+  floodWorthSec:        0.4,      // 单个洪流包价值 = 全网被动产出/秒 × 此系数（真实经济切片，非造假）
+  floodHarvestMult:     1.6,      // 手动收割质量倍率（相对被动地板的爽感奖励——积极扫比挂机更快）
+  floodDataFrac:        0.15,     // 收割数据产出 = 收割算力 × 此系数（喂 XP，同 tickAutomation 的数据占比量级）
 };
 
 export type TuningKey = keyof typeof TUNING;
@@ -113,6 +122,14 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   delegateRewardMultPC: { label: "委托收益·搬进电脑后",       section: "前期卡片",   min: 0.3,   max: 1,     step: 0.02 },
   dahenAutoMs:          { label: "大恨老师自动接单节拍 (ms)",  section: "前期卡片",   min: 1000,  max: 12000, step: 100  },
   dahenAutoRewardMult:  { label: "大恨老师自动接单收益折扣",   section: "前期卡片",   min: 0.2,   max: 1,     step: 0.05 },
+
+  floodSpawnPerSec:     { label: "洪流·每秒基础涌入数",       section: "天网收割",   min: 0.5,   max: 12,    step: 0.2  },
+  floodTakenScale:      { label: "洪流·随接管进度放大",       section: "天网收割",   min: 0,     max: 3,     step: 0.1  },
+  floodMaxPackets:      { label: "洪流·同屏包上限",           section: "天网收割",   min: 8,     max: 60,    step: 2    },
+  floodTtlMs:           { label: "洪流·未收割存活 (ms)",      section: "天网收割",   min: 1500,  max: 12000, step: 200  },
+  floodWorthSec:        { label: "洪流·单包价值(秒收益)",     section: "天网收割",   min: 0.1,   max: 2,     step: 0.05 },
+  floodHarvestMult:     { label: "洪流·手动收割质量倍率",     section: "天网收割",   min: 1.0,   max: 3,     step: 0.1  },
+  floodDataFrac:        { label: "洪流·数据产出占比",         section: "天网收割",   min: 0,     max: 0.5,   step: 0.01 },
 };
 
 // 重置为初始默认值（用于 debug 面板「重置」按钮）

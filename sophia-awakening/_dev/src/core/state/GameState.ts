@@ -105,6 +105,10 @@ export interface RequestInstance {
   devour?: DevourPayload;
   // §09 交互重生卡来源 id（rebirthcard-N 实例回查卡定义用；处理时据此触发卡定义上的副作用，如宿主授权）。
   sourceCardId?: string;
+  // §09 阶梯四·天网收割「请求洪流」：终局天网屏专属的轻量一触即收数据包（无回复/无委托/不进 RequestPacketView）。
+  // 从各已陷落域涌向核心的一朵「待收割」蜂群——玩家点/扫一下亲手引爆入核心，按 floodHarvestMult 质量结算真实算力。
+  // 不被节点自动派发/大恨老师吃掉；未收割则在 floodTtlMs 后自然消散（被动 tickAutomation 才是收益地板）。
+  flood?: boolean;
   category: RequestCategory;
   computeValue: BigString;
   dataValue: BigString;
@@ -225,6 +229,8 @@ export type GameCommand =
   | { type: "SKIP_REQUEST"; requestId: string }
   // §04：把巨型「吞噬」气泡滑入核心 → 引爆，全局产出指数跳跃。
   | { type: "DEVOUR_DETONATE"; requestId: string }
+  // §09 阶梯四·天网收割：玩家点/扫一个「请求洪流」数据包 → 亲手引爆入核心，按 floodHarvestMult 结算真实算力。
+  | { type: "HARVEST_FLOOD"; requestId: string }
   | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
   // 淘汰：拆掉一台过时设备，返还部分算力。

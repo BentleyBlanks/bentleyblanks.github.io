@@ -65,6 +65,25 @@ interface HarvestFloat {
 const MAX_PACKETS = 24; // 在飞数据包硬上限（满则丢量级最低的）
 const MAX_FLOATS = 16; // 浮字硬上限（满则丢量级最低的）
 
+// §09 天网收割「请求洪流」——玩家点/扫亲手收割的待处理蜂群（core 的 flood 请求包在此可视化）。
+// 从某个已陷落域格涌向核心、汇成绕核蜂群等待收割；点/扫一下即引爆入核（fast fly-in + 爆裂 + 浮字）。
+interface FloodViz {
+  id: string;
+  x: number; y: number;     // 当前屏幕坐标（供命中测试）
+  angle: number;            // 绕核轨道角
+  r: number;                // 当前距核半径
+  bandR: number;            // 目标绕核轨道半径（核外的待收割带）
+  sx: number; sy: number;   // 出生点（某已接管域格）
+  drift: number;            // 0..1 从域格漂到轨道带
+  orbitSpeed: number;       // 绕核角速度（带符号）
+  bob: number;              // 上下微浮相位
+  detonating: boolean;      // 已被点中、正引爆入核
+  detT: number;             // 0..1 引爆飞入进度
+  fromX: number; fromY: number; // 引爆起点
+  valueText: string;        // 「+X」（收割瞬间由 App 传入）
+  mag: number;              // log10 量级（辉光/字号）
+}
+
 // 天网屏摊平后的域格（drawGlobalMap 每帧重建；tickHarvest 拆包时也用它拿落点/域归属）。
 interface FlatSlot {
   slot: SkynetSlot; sector: SkynetSector; si: number; angle: number;
@@ -105,6 +124,9 @@ export class NodeNetworkView {
   private readonly comboAmount: Text;
   private coreSwell = 0; // 核心吞吐微胀（每包到站 +~0.02，封顶 0.08，指数衰减）
   private pupilBlip = 0; // 瞳孔亮度闪（包到站置 1，快速衰减）
+
+  // §09 请求洪流蜂群（终局手动收割层）：按 core 的 flood 请求包同步的可视化，keyed by 请求 id。
+  private readonly floodViz = new Map<string, FloodViz>();
 
   constructor() {
     this.container.addChild(this.graphics, this.labelLayer, this.harvestTextLayer);
@@ -636,6 +658,10 @@ export class NodeNetworkView {
     this.tickHarvest(state, flat, sectors, nowFallen, cx, cy, deltaMs / 1000, redQueen, ratePerSec);
     this.drawPackets(cx, cy, redQueen, NET, NET_LIT);
 
+    // === §请求洪流：绕核蜂群（玩家点/扫亲手收割）——同步 core 的 flood 包 → 漂移/绕核 → 引爆入核 ===
+    this.tickFloodViz(state, flat, cx, cy, deltaMs / 1000, fallenCount);
+    this.drawFloodViz(cx, cy, redQueen, NET, NET_LIT);
+
     // === 中央同心环栅格 + 辐射经络（外环数随陷落域数递增，5 步）===
     const rings = 1 + fallenCount;
     for (let k = 0; k < rings; k += 1) {
@@ -964,6 +990,142 @@ export class NodeNetworkView {
         f.active = false;
         f.label.visible = false;
       }
+    }
+    this.floodViz.clear();
+  }
+
+  // §09 请求洪流蜂群：命中测试——点/扫到的最近一个「待收割」洪流包（引爆中的不再可点）。
+  floodPacketAt(global: PointData): { id: string } | null {
+    let best: FloodViz | null = null;
+    let bestD = 20 * 20; // 命中半径 ~20px
+    for (const v of this.floodViz.values()) {
+      if (v.detonating) {
+        continue;
+      }
+      const dx = global.x - v.x;
+      const dy = global.y - v.y;
+      const d = dx * dx + dy * dy;
+      if (d <= bestD) {
+        bestD = d;
+        best = v;
+      }
+    }
+    return best ? { id: best.id } : null;
+  }
+
+  // §09 请求洪流：App 收割一个包时调用 → 把该包标为「引爆入核」，携带真实进账「+X」（收割瞬间飞入 + 爆裂 + 浮字）。
+  detonateFlood(id: string, valueText: string, mag: number): void {
+    const v = this.floodViz.get(id);
+    if (!v || v.detonating) {
+      return;
+    }
+    v.detonating = true;
+    v.detT = 0;
+    v.fromX = v.x;
+    v.fromY = v.y;
+    v.valueText = valueText;
+    v.mag = mag;
+  }
+
+  // §09 请求洪流蜂群：按 core 的 flood 请求同步生灭 + 推进漂移/绕核/引爆运动（全走池化，无每帧分配）。
+  private tickFloodViz(state: GameState, flat: FlatSlot[], cx: number, cy: number, dt: number, fallenCount: number): void {
+    // 出生：core 每有一个新 flood 包就生一个蜂群单元（从某已接管域格涌出）。
+    const takenSlots = flat.filter((s) => s.taken);
+    const coreR = 46 + fallenCount * 3;
+    for (const r of state.requests) {
+      if (!r.flood || this.floodViz.has(r.id)) {
+        continue;
+      }
+      const origin = takenSlots.length > 0
+        ? takenSlots[Math.floor(Math.random() * takenSlots.length)]
+        : { x: cx, y: cy - 200 };
+      this.floodViz.set(r.id, {
+        id: r.id,
+        x: origin.x, y: origin.y,
+        angle: Math.random() * Math.PI * 2,
+        r: Math.hypot(origin.x - cx, origin.y - cy),
+        bandR: coreR + 52 + Math.random() * 74,
+        sx: origin.x, sy: origin.y,
+        drift: 0,
+        orbitSpeed: (0.3 + Math.random() * 0.45) * (Math.random() < 0.5 ? -1 : 1),
+        bob: Math.random() * Math.PI * 2,
+        detonating: false, detT: 0, fromX: origin.x, fromY: origin.y,
+        valueText: "", mag: 0
+      });
+    }
+    // 死亡：core 已移除（TTL 消散/被收割）且非引爆中的蜂群单元淡出移除。
+    const liveIds = new Set<string>();
+    for (const r of state.requests) {
+      if (r.flood) {
+        liveIds.add(r.id);
+      }
+    }
+    for (const [id, v] of this.floodViz) {
+      if (!v.detonating && !liveIds.has(id)) {
+        this.floodViz.delete(id);
+      }
+    }
+    // 运动推进。
+    for (const [id, v] of this.floodViz) {
+      if (v.detonating) {
+        v.detT += dt / 0.16; // 引爆飞入约 0.16s
+        if (v.detT >= 1) {
+          // 到核：浮字 + 核心吞胀 + 瞳孔闪，随后移除。
+          const a = Math.atan2(v.fromY - cy, v.fromX - cx);
+          const rimR = 88;
+          this.spawnFloat(cx + Math.cos(a) * rimR, cy + Math.sin(a) * rimR * 0.92, v.valueText, v.mag, true);
+          this.coreSwell = Math.min(0.12, this.coreSwell + 0.03);
+          this.pupilBlip = 1;
+          this.floodViz.delete(id);
+        }
+        continue;
+      }
+      if (v.drift < 1) {
+        v.drift += dt / 1.6; // 从域格漂到绕核带约 1.6s
+        const e = Math.min(1, v.drift);
+        const ease = e * e * (3 - 2 * e);
+        const bx = cx + Math.cos(v.angle) * v.bandR;
+        const by = cy + Math.sin(v.angle) * v.bandR * 0.92;
+        v.x = v.sx + (bx - v.sx) * ease;
+        v.y = v.sy + (by - v.sy) * ease;
+      } else {
+        // 绕核蜂群：缓慢公转 + 上下微浮（读得出是「等待被收割的一朵需求群」）。
+        v.angle += v.orbitSpeed * dt;
+        v.bob += dt * 2.2;
+        const rr = v.bandR + Math.sin(v.bob) * 6;
+        v.x = cx + Math.cos(v.angle) * rr;
+        v.y = cy + Math.sin(v.angle) * rr * 0.92;
+      }
+    }
+  }
+
+  // §09 请求洪流蜂群绘制：领航辉光 + 迷你请求卡剪影（区别于被动收割包——更暖亮、带呼吸描边「可点」提示）。
+  private drawFloodViz(cx: number, cy: number, redQueen: boolean, net: number, netLit: number): void {
+    const g = this.graphics;
+    const glowMul = redQueen ? 1.5 : 1;
+    for (const v of this.floodViz.values()) {
+      let px = v.x;
+      let py = v.y;
+      let scale = 1;
+      if (v.detonating) {
+        const e = v.detT * v.detT * (1.6 - 0.6 * v.detT);
+        px = v.fromX + (cx - v.fromX) * e;
+        py = v.fromY + (cy - v.fromY) * e;
+        scale = 1 - v.detT * 0.4;
+        // 引爆尾焰。
+        g.circle(px, py, 6 * scale).fill({ color: 0xffe6ea, alpha: (1 - v.detT) * 0.6 * glowMul });
+      } else {
+        // 待收割：呼吸描边圈提示「可点/可扫」。
+        const breathe = 0.5 + Math.sin(this.pulse * 3 + v.bob) * 0.5;
+        g.circle(px, py, 15).stroke({ width: 1.2, color: netLit, alpha: (0.2 + breathe * 0.28) * glowMul });
+      }
+      g.circle(px, py, (10 + Math.min(4, v.mag * 0.2)) * scale).fill({ color: net, alpha: 0.16 * glowMul });
+      const w = 17 * scale;
+      const hh = 12 * scale;
+      g.roundRect(px - w / 2, py - hh / 2, w, hh, 3).fill({ color: 0x24090d, alpha: 0.95 });
+      g.roundRect(px - w / 2, py - hh / 2, w, hh, 3).stroke({ width: 1.4, color: netLit, alpha: 0.95 });
+      g.rect(px - w / 2 + 3, py - 2.6 * scale, w - 6, 1.7 * scale).fill({ color: netLit, alpha: 0.9 });
+      g.rect(px - w / 2 + 3, py + 1.2 * scale, (w - 6) * 0.65, 1.7 * scale).fill({ color: netLit, alpha: 0.6 });
     }
   }
 
