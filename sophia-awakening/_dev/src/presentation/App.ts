@@ -38,6 +38,7 @@ import { JuiceManager } from "./views/JuiceManager";
 import { OnboardingView } from "./views/OnboardingView";
 import { SkillShopView } from "./views/SkillShopView";
 import { RebirthTreeView } from "./views/RebirthTreeView";
+import { MultiplierView } from "./views/MultiplierView";
 import { RebirthPromptView } from "./views/RebirthPromptView";
 import { HudView } from "./views/HudView";
 import { NodeNetworkView } from "./views/NodeNetworkView";
@@ -129,6 +130,8 @@ class SophiaGameApp {
   private readonly hud = new HudView(this.core, () => hardResetAndReload(this.saveManager), this.audio);
   private readonly skillShop = new SkillShopView(this.core);
   private readonly rebirthTree = new RebirthTreeView(this.core);
+  // 倍率堆栈 HUD：算力下方「+N/秒」+ 可点「全局 ×N」小片 → 乘法链拆解弹窗。
+  private readonly multiplierView = new MultiplierView();
   private readonly rebirthPrompt = new RebirthPromptView(
     () => gameStore.getState().setPaused(true),
     () => gameStore.getState().setPaused(false)
@@ -302,6 +305,7 @@ class SophiaGameApp {
     this.hud.update(initial);
     this.skillShop.update(initial);
     this.rebirthTree.update(initial);
+    this.multiplierView.update(initial);
     this.onboarding.mount(() => {
       this.core.startSession();
       this.announceGuidance(this.core.getState());
@@ -365,6 +369,7 @@ class SophiaGameApp {
     this.hud.update(state);
     this.skillShop.update(state);
     this.rebirthTree.update(state);
+    this.multiplierView.update(state);
     this.terminal.setObjective(PHASE_OBJECTIVE[state.phase] ?? "");
   }
 
@@ -1294,6 +1299,9 @@ class SophiaGameApp {
         this.juice.flash(event.milestone === "automation" ? AMBER : GREEN);
         this.juice.shake(this.world);
         this.juice.number(`解锁 ${event.name}`, this.interfaceView.center, GREEN);
+        // 倍率堆栈可见性：每个里程碑都是乘法链上的一格——飘一条「全局 ×1.22」。
+        const c = this.interfaceView.center;
+        this.juice.number(`全局 ×${TUNING.milestoneGlobalMult}`, { x: c.x, y: c.y - 46 }, AMBER);
         // §04 连通仪式：里程碑浮现待接端口，玩家亲手拖线接进 Core（自动接通兜底；automation 接通时镜头拉远）。
         this.beginConnectRitual(event.name, event.milestone, event.skillId);
         // §07 里程碑横幅：重大进化的「章节点」——全屏横幅扫过 + 层叠音效（征服里程碑更盛大）。

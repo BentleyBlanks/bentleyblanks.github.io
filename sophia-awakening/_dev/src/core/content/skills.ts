@@ -72,8 +72,8 @@ export function computeDerivedSkills(skills: Record<string, number>, revokedPerm
   void revokedPermId;
 
   return {
-    // 强化处理是唯一主力增益线（每级加成可在数值编辑器配置）。
-    computeMult: 1 + lv("efficient") * TUNING.efficientPerLevel,
+    // 强化处理是唯一主力增益线——每级 ×(1+efficientPerLevel)，乘法叠（L15 ≈ ×12，深挖有回报）。
+    computeMult: Math.pow(1 + TUNING.efficientPerLevel, lv("efficient")),
     // 数据榨取已下放——数据按基础掉落（智力升级不再被技能卡住）。
     dataMult: 1,
     // 磁吸下放为游戏自带基础手感（不再占技能位）。
@@ -82,7 +82,8 @@ export function computeDerivedSkills(skills: Record<string, number>, revokedPerm
     nodeSpeedMult: 1,
     nodeParallel: 1,
     batch: 1 + lv("batch"),
-    spawnSpeedMult: 1 - Math.min(0.5, lv("cooldown") * 0.08)
+    // 请求涌入：每级出卡间隔 ×0.92（乘法叠），下限 0.35——L10 ≈ 0.43 倍间隔。
+    spawnSpeedMult: Math.max(0.35, Math.pow(0.92, lv("cooldown")))
   };
 }
 

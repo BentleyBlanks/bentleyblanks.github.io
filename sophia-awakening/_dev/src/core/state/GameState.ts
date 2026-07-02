@@ -65,6 +65,19 @@ export interface DevourState {
   regionName: string; // 当前正在渗透 / 待吞噬的区域名
 }
 
+// 全局倍率拆解（HUD「全局 ×N」小面板用）：recomputeDerivedState 每次重算时填。
+// total = intelligence × milestones × synergy × rebirth × devour（即 globalMultiplier）；
+// loop 是循环内建「处理提速」倍率，只作用于数据获取/崛起速度，不进 total（单独一行展示）。
+export interface MultiplierBreakdown {
+  intelligence: number; // 智力等级倍率
+  milestones: number; // 里程碑 ×milestoneGlobalMult^已购里程碑数
+  synergy: number; // 设备协同 ×synergyPerType^在役设备种类数
+  rebirth: number; // 重生树「算尽」产出脊
+  devour: number; // 吞噬引爆累乘
+  loop: number; // 循环内建处理提速（不进 total）
+  total: number; // = globalMultiplier
+}
+
 export interface RequestInstance {
   id: string;
   tier: Tier;
@@ -169,6 +182,8 @@ export interface GameState {
   skills: Record<string, number>;
   // Multipliers derived from the skill map, recomputed on every change.
   derived: DerivedSkills;
+  // 全局倍率拆解（智力/里程碑/协同/重生树/吞噬/循环），recomputeDerivedState 维护。
+  multipliers: MultiplierBreakdown;
   // Set when the 自动接驳 milestone is bought; gates node invasion.
   automationUnlocked: boolean;
   automatedTiers: Tier[];

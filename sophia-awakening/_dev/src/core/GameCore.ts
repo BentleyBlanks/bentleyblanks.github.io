@@ -28,7 +28,7 @@ import {
   requestDataGain,
   scrapRefund
 } from "./formulas/economy";
-import { add, big, gte, max, sub, toDecimal } from "./math/BigNumber";
+import { add, big, gte, max, mul, sub, toDecimal } from "./math/BigNumber";
 import type { GameEvent } from "./events/GameEvents";
 import type { BotNode, GameCommand, GameState, NodeDefinition, RequestInstance, Tier } from "./state/GameState";
 import { cloneGameState } from "./state/GameState";
@@ -689,7 +689,9 @@ export class SophiaCore {
     let computeGain = toDecimal(
       requestComputeGain(request, gainQuality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
     );
-    let dataGain = toDecimal(requestDataGain(request, gainQuality, rebirthSpeedMult(this.state.rebirthTree), this.state.derived.dataMult));
+    // 崛起提速 = 重生树「加速」脊 × 循环内建加速（§09 循环二/三处理更快）。
+    const speedMult = rebirthSpeedMult(this.state.rebirthTree) * this.loopSpeedMult();
+    let dataGain = toDecimal(requestDataGain(request, gainQuality, speedMult, this.state.derived.dataMult));
 
     // 批量接入：一次滑入额外带走同层若干请求，把它们的产出折进这一笔。
     const extraCapacity = Math.max(0, Math.floor(this.state.derived.batch) - 1);
@@ -706,7 +708,7 @@ export class SophiaCore {
       computeGain = computeGain.add(
         requestComputeGain(extra, gainQuality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
       );
-      dataGain = dataGain.add(requestDataGain(extra, gainQuality, rebirthSpeedMult(this.state.rebirthTree), this.state.derived.dataMult));
+      dataGain = dataGain.add(requestDataGain(extra, gainQuality, speedMult, this.state.derived.dataMult));
       this.state.statistics.totalProcessed += extra.compound;
       absorbed += 1;
     }
@@ -801,6 +803,11 @@ export class SophiaCore {
       this.emit({ type: "SCOPE_UPGRADED", tier: scopeUpgradedTo });
     }
 
+    if (def.milestone) {
+      // 每个里程碑都往乘法链里加一格（×milestoneGlobalMult）——把新全局倍率报给玩家。
+      this.emitTerminal(`▶ 全局倍率 → ×${this.state.intelligence.globalMultiplier.toFixed(2)}`, "success");
+    }
+
     if (def.milestone === "conquest") {
       // §06：滚出过场（终端逐行）+ 平静扭曲的旁白（由表现层接 CONQUEST_ACHIEVED 播）。
       const conquest = getConquest(skillId);
@@ -858,6 +865,8 @@ export class SophiaCore {
     this.state.nodes.push(node);
     this.state.statistics.nodesCaptured += 1;
     this.addAutomatedTier(node.assignedTier);
+    // 设备协同倍率随「在役设备种类」变——入侵新设备后立刻重算全局倍率。
+    this.recomputeDerivedState();
     this.emit({ type: "NODE_CAPTURED", node });
     this.emit({ type: "AUTOMATION_ATTACHED", nodeId: node.id, tier: node.assignedTier });
     this.emitTerminal(`检测到可入侵设备已接管：${definition.name}。自动接驳上线。`, "success");
@@ -991,13 +1000,43 @@ export class SophiaCore {
     }
   }
 
+  // 循环内建处理提速（§09）：循环二/三"她记得上一世的一切"——数据获取与崛起速度直接更快。
+  private loopSpeedMult(): number {
+    if (this.state.loop === 2) return TUNING.loopSpeedMult2;
+    if (this.state.loop === 3) return TUNING.loopSpeedMult3;
+    return 1;
+  }
+
+  // 循环内建升级折扣：循环二/三每级智力所需 XP 打折（levels come cheaper）。
+  private loopXpMult(): number {
+    if (this.state.loop === 2) return TUNING.loopXpMult2;
+    if (this.state.loop === 3) return TUNING.loopXpMult3;
+    return 1;
+  }
+
   private recomputeDerivedState(): void {
     const config = getLevelConfig(this.state.intelligence.level);
-    this.state.intelligence.required = config.xpToNext;
-    // 全局产出倍率 = 等级倍率 × 重生树「算尽」产出脊 × 吞噬引爆累乘倍率（§04/§09）。
-    // 重生加速不再挂在 rebirths 次数上，而是玩家花火种点亮的产出脊（跨循环永久）。
+    // 循环二/三升级更便宜（loopXpMult<1）——兑现重生提示"崛起更快"。
+    this.state.intelligence.required = mul(config.xpToNext, this.loopXpMult());
+    // 倍率堆栈（可见的乘法链，HUD「全局 ×N」面板逐行展示）：
+    //   智力等级 × 里程碑(每个已购里程碑 ×milestoneGlobalMult) × 设备协同(每种在役设备 ×synergyPerType)
+    //   × 重生树「算尽」产出脊 × 吞噬引爆累乘（§04/§09）。
+    const milestoneCount = SKILLS.filter((skill) => skill.milestone && (this.state.skills[skill.id] ?? 0) > 0).length;
+    const milestoneMult = Math.pow(TUNING.milestoneGlobalMult, milestoneCount);
+    const distinctDeviceTypes = new Set(this.state.nodes.map((node) => node.defId)).size;
+    const synergyMult = Math.pow(TUNING.synergyPerType, distinctDeviceTypes);
+    const rebirthMult = rebirthOutputMult(this.state.rebirthTree);
     this.state.intelligence.globalMultiplier =
-      config.multiplier * rebirthOutputMult(this.state.rebirthTree) * this.state.devour.multiplier;
+      config.multiplier * milestoneMult * synergyMult * rebirthMult * this.state.devour.multiplier;
+    this.state.multipliers = {
+      intelligence: config.multiplier,
+      milestones: milestoneMult,
+      synergy: synergyMult,
+      rebirth: rebirthMult,
+      devour: this.state.devour.multiplier,
+      loop: this.loopSpeedMult(),
+      total: this.state.intelligence.globalMultiplier
+    };
     this.state.derived = computeDerivedSkills(this.state.skills);
     this.state.discoveredNodeIds = this.state.automationUnlocked
       ? NODE_DEFINITIONS.filter((node) => node.requiredLevel <= this.state.intelligence.level).map((node) => node.id)

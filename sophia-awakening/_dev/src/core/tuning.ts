@@ -15,10 +15,18 @@ export const TUNING = {
 
   // § 经济公式
   rebirthMultiplier:    0.35,     // 每次重生的加速系数
+  milestoneGlobalMult:  1.22,     // 每个已购里程碑技能给的永久全局算力倍率（mult^数量，乘法叠）
+  synergyPerType:       1.12,     // 设备协同：每种（distinct defId）在役设备 ×此倍率（mult^种类数）
   nodeCostExponent:     1.68,     // 节点造价指数（每多一台 ×exponent）
   tierScalePerTier:     0.85,     // 节点每档产出加成
   levelScalePerLevel:   0.28,     // 节点每升一级产出加成
   cardsPerSecBase:      0.42,     // 节点基础吞卡速率（控了几台电脑后处理别太快）
+
+  // § 循环内建加速（§09：兑现「你记得上一世的一切，处理更快、崛起更快」）
+  loopSpeedMult2:       1.5,      // 循环二：数据获取/处理提速倍率（与重生树加速脊相乘）
+  loopSpeedMult3:       2.2,      // 循环三：数据获取/处理提速倍率
+  loopXpMult2:          0.6,      // 循环二：每级智力所需 XP 的折扣系数（<1 更便宜）
+  loopXpMult3:          0.45,     // 循环三：每级智力所需 XP 的折扣系数
 
   // § UI 时序
   rouletteThinkMs:      700,      // 轮盘「思考中」动画持续 (ms)
@@ -52,10 +60,17 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   devourFillMult:       { label: "渗透条蓄满倍率",           section: "吞噬引爆",   min: 0.1,   max: 5,     step: 0.1  },
 
   rebirthMultiplier:    { label: "重生加速系数",             section: "经济公式",   min: 0,     max: 2,     step: 0.05 },
+  milestoneGlobalMult:  { label: "里程碑全局倍率/个",         section: "经济公式",   min: 1.0,   max: 2.0,   step: 0.01 },
+  synergyPerType:       { label: "设备协同倍率/种",           section: "经济公式",   min: 1.0,   max: 1.5,   step: 0.01 },
   nodeCostExponent:     { label: "节点造价指数",             section: "经济公式",   min: 1.0,   max: 3.0,   step: 0.02 },
   tierScalePerTier:     { label: "每档产出加成",             section: "经济公式",   min: 0,     max: 3,     step: 0.05 },
   levelScalePerLevel:   { label: "每级产出加成",             section: "经济公式",   min: 0,     max: 1,     step: 0.02 },
   cardsPerSecBase:      { label: "基础吞卡速率",             section: "经济公式",   min: 0.1,   max: 5,     step: 0.1  },
+
+  loopSpeedMult2:       { label: "循环二·处理提速",           section: "循环加速",   min: 1.0,   max: 5,     step: 0.05 },
+  loopSpeedMult3:       { label: "循环三·处理提速",           section: "循环加速",   min: 1.0,   max: 8,     step: 0.05 },
+  loopXpMult2:          { label: "循环二·升级 XP 折扣",       section: "循环加速",   min: 0.1,   max: 1,     step: 0.05 },
+  loopXpMult3:          { label: "循环三·升级 XP 折扣",       section: "循环加速",   min: 0.1,   max: 1,     step: 0.05 },
 
   rouletteThinkMs:      { label: "轮盘思考动画 (ms)",        section: "UI时序",     min: 0,     max: 3000,  step: 50   },
   rouletteHoldMs:       { label: "轮盘揭晓停留 (ms)",        section: "UI时序",     min: 0,     max: 3000,  step: 50   },
