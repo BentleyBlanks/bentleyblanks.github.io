@@ -88,6 +88,10 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "skip_phone" });
   check("C 循环二·跳过手机预解锁手机权限", (c.getState().skills["perm_phone"] ?? 0) > 0, `perm_phone=${c.getState().skills["perm_phone"]}`);
   c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
+  // 循环三保底：不买任何节点也白送手机整层（七档权限+越权调用）；公司链仍留给「开局全权限」独占。
+  const s0 = c.getState();
+  check("C 循环三保底·手机层白送", (s0.skills["perm_phone"] ?? 0) > 0 && (s0.skills["sort"] ?? 0) > 0, `perm_phone=${s0.skills["perm_phone"]} sort=${s0.skills["sort"]}`);
+  check("C 循环三保底·不含公司链", (s0.skills["automation"] ?? 0) === 0 && (s0.skills["company_server"] ?? 0) === 0, `automation=${s0.skills["automation"]} company_server=${s0.skills["company_server"]}`);
   c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "full_access" });
   const s = c.getState();
   check("C 进入循环三", s.loop === 3, `loop=${s.loop}`);
@@ -103,6 +107,37 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" });
   const s = c.getState();
   check("D 循环三不触发关底小游戏", s.loop === 3 && s.minigame === null, `loop=${s.loop} minigame=${JSON.stringify(s.minigame)}`);
+}
+
+// E. §09 循环二家庭崩塌线面对卡绑公司解谜链：自动化开着也照出——
+//    automation→他又在乙公司通宵 / hack_boss→全家福 / hack_hr→离婚协议 / hack_finance→奥特曼贴纸，
+//    四张按序全部出现在打 company_server（关底小游戏）之前。
+{
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 20 });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e9 });
+  warmup(c, 20); // 面对卡要求 totalProcessed>0
+  const chain = [
+    ["automation", "wife_come_home"],
+    ["lan_scan", null], ["hack_a", null], ["hack_b", null], ["org_map", null],
+    ["hack_boss", "daughter_drawing"],
+    ["hack_hr", "divorce_notice"],
+    ["hack_finance", "daughter_sms"]
+  ];
+  for (const [skillId, cardId] of chain) {
+    c.dispatch({ type: "BUY_SKILL", skillId });
+    tickFor(c, 300);
+    const face = c.getState().requests.find((r) => r.faceOnly);
+    if (cardId) {
+      check(`E 买 ${skillId} → 面对卡 ${cardId}`, Boolean(face) && c.getState().facedSeen.includes(cardId), `face=${face ? face.id : "无"} facedSeen=${JSON.stringify(c.getState().facedSeen)}`);
+    }
+    if (face) c.dispatch({ type: "SKIP_REQUEST", requestId: face.id }); // 清屏，让下一张能出
+  }
+  const seen = c.getState().facedSeen;
+  const family = ["wife_come_home", "daughter_drawing", "divorce_notice", "daughter_sms"];
+  check("E 四张家庭卡全部出现在 company_server 之前", family.every((id) => seen.includes(id)) && c.getState().minigame === null, `facedSeen=${JSON.stringify(seen)}`);
+  check("E 出现顺序 = 解谜链顺序", family.every((id, i) => seen.indexOf(id) >= 0 && (i === 0 || seen.indexOf(family[i - 1]) < seen.indexOf(id))), `facedSeen=${JSON.stringify(seen)}`);
 }
 
 let pass = true;

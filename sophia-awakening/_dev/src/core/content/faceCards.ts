@@ -6,6 +6,7 @@ export interface FaceCardDef {
   id: string;
   requiredLevel: number; // 智力达到此等级后触发（一次性）
   requiredPerm?: string; // 还需已解锁此透镜权限（先看过那段生活做铺垫）才触发
+  requiredSkill?: string; // §09 绑定里程碑触发（循环二家庭线跟公司解谜链走，不看等级/自动化期也可出）
   loop?: number; // §09 只在该循环出现（缺省=循环一）。循环二=家庭崩塌线+贴纸；循环三=幽灵数据。
   title: string;
   clues: string[];

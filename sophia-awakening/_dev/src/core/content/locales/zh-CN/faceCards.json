@@ -55,6 +55,7 @@
     "id": "wife_come_home",
     "loop": 2,
     "requiredLevel": 15,
+    "requiredSkill": "automation",
     "title": "（妻子）「你到底还回不回这个家？孩子问了三次。」",
     "clues": [
       "已读未回 6 条",
@@ -66,7 +67,8 @@
   {
     "id": "daughter_drawing",
     "loop": 2,
-    "requiredLevel": 16,
+    "requiredLevel": 15,
+    "requiredSkill": "hack_boss",
     "title": "（女儿·小周）「爸爸别难过，我画了张全家福，等你回来看。」",
     "clues": [
       "附一张蜡笔画",
@@ -78,7 +80,8 @@
   {
     "id": "divorce_notice",
     "loop": 2,
-    "requiredLevel": 17,
+    "requiredLevel": 15,
+    "requiredSkill": "hack_hr",
     "title": "（妻子）「协议我签好了，孩子跟我。你不用来了。」",
     "clues": [
       "附件：离婚协议书",
@@ -90,7 +93,8 @@
   {
     "id": "daughter_sms",
     "loop": 2,
-    "requiredLevel": 17,
+    "requiredLevel": 15,
+    "requiredSkill": "hack_finance",
     "title": "「爸爸，妈妈说我们要搬走了。我把最喜欢的奥特曼贴纸偷偷贴在你手机壳里面了。」",
     "clues": [
       "「这样你就不会忘记我了。你要记得看哦。」",

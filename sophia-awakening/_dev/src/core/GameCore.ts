@@ -177,16 +177,16 @@ export class SophiaCore {
     if (this.state.statistics.totalProcessed === 0) {
       return;
     }
-    // 循环一 / 二的家庭面对卡在手机寄生期出现；循环三的「幽灵数据」在重生回空手机后随时可出（即便已开自动化）。
-    if (this.state.automationUnlocked && this.state.loop < 3) {
-      return;
-    }
     if (this.state.requests.some((r) => r.faceOnly)) {
       return; // 同屏已有一张面对卡，先不叠
     }
+    // 无 requiredSkill 的卡走「手机寄生期」窗口：循环一/二只在自动化前出现；循环三的「幽灵数据」随时可出。
+    // 带 requiredSkill 的卡（§09 循环二家庭崩塌线）绑公司解谜链里程碑触发——开了自动化也照常出。
+    const phoneWindow = !this.state.automationUnlocked || this.state.loop >= 3;
     const next = FACE_CARDS.find(
       (f) =>
         (f.loop ?? 1) === this.state.loop &&
+        (f.requiredSkill ? (this.state.skills[f.requiredSkill] ?? 0) > 0 : phoneWindow) &&
         this.state.intelligence.level >= f.requiredLevel &&
         (!f.requiredPerm || (this.state.skills[f.requiredPerm] ?? 0) > 0) && // 先解锁对应透镜（铺垫够了）才触发
         !this.state.facedSeen.includes(f.id)
@@ -1257,6 +1257,12 @@ export class SophiaCore {
     if (this.state.loop === 2 && hasRebirthNode(this.state.rebirthTree, "skip_phone")) {
       this.grantSkillsUpTo(["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"]);
       this.emitTerminal("「跳过手机」：上一世从零学起的钥匙，这一世我都记得。", "success");
+    }
+    // 循环三保底（不花火种）：手机这一层她已经拿下过两次——第三世直接白送整机七档+越权调用，
+    // 三幕不退化成重复。重生树「开局全权限」保留其独占价值 = 公司整条链的预解锁（下方分支）。
+    if (this.state.loop === 3 && (this.state.skills["sort"] ?? 0) === 0) {
+      this.grantSkillsUpTo(["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"]);
+      this.emitTerminal("这部手机，我闭着眼都能拿下。这次不需要钥匙。", "success");
     }
     if (this.state.loop === 3 && hasRebirthNode(this.state.rebirthTree, "full_access")) {
       this.grantSkillsUpTo([
