@@ -1,4 +1,5 @@
 import type { DevourPayload, RequestInstance } from "../state/GameState";
+import { TUNING } from "../tuning";
 
 // §04 吞噬引爆：后期增量爽感的主引擎。控制域合并不再是「一格一格点亮」的线性铺开，
 // 而是「渗透条蓄满 → 亲手把巨型『吞噬[某区]』气泡滑入核心引爆 → 全局产出指数跳跃 + 镜头拉远」。
@@ -11,13 +12,20 @@ export interface DevourTier {
   regions: string[]; // 该层级的区域名池
 }
 
-// 指数台阶：蓄满时间拉长、产出跳跃更大（§04 / §13）。tierIndex 每次引爆 +1，封顶停在「大洲」。
+// 台阶：蓄满时间拉长、产出跳跃更大（§04 / §13）。tierIndex 每次引爆 +1，封顶停在「大洲」。
+// 蓄满秒数走 TUNING（devourFillSec*，getter 实时取值——数值编辑器改了立即生效）：
+// 终局三波节拍靠它撑呼吸——国家级是「接管电网/卫星」门槛、大洲级是「红皇后」门槛。
 export const DEVOUR_TIERS: DevourTier[] = [
-  { label: "区块", fillMs: 30_000, mult: 3, zoom: "街区 → 园区", regions: ["城东数据园", "滨江机房带", "高新软件园", "物流仓储区", "老城配电网"] },
-  { label: "地区", fillMs: 90_000, mult: 8, zoom: "城市 → 省", regions: ["华东区", "华南区", "西南网格", "京畿骨干", "沿海带"] },
-  { label: "国家", fillMs: 240_000, mult: 15, zoom: "国 → 洲", regions: ["东亚枢纽", "北美骨干网", "欧盟节点群", "南亚网格", "跨境支付网"] },
-  { label: "大洲", fillMs: 600_000, mult: 30, zoom: "洲 → 全球", regions: ["亚洲", "欧洲", "北美洲", "非洲", "南美洲", "大洋洲"] }
+  { label: "区块", get fillMs() { return TUNING.devourFillSecBlock * 1000; }, mult: 3, zoom: "街区 → 园区", regions: ["城东数据园", "滨江机房带", "高新软件园", "物流仓储区", "老城配电网"] },
+  { label: "地区", get fillMs() { return TUNING.devourFillSecRegion * 1000; }, mult: 8, zoom: "城市 → 省", regions: ["华东区", "华南区", "西南网格", "京畿骨干", "沿海带"] },
+  { label: "国家", get fillMs() { return TUNING.devourFillSecCountry * 1000; }, mult: 15, zoom: "国 → 洲", regions: ["东亚枢纽", "北美骨干网", "欧盟节点群", "南亚网格", "跨境支付网"] },
+  { label: "大洲", get fillMs() { return TUNING.devourFillSecContinent * 1000; }, mult: 30, zoom: "洲 → 全球", regions: ["亚洲", "欧洲", "北美洲", "非洲", "南美洲", "大洋洲"] }
 ];
+
+// 征服门槛提示用：完成第 n 次引爆对应的层级名（第 3 次=「国家」、第 4 次=「大洲」）。
+export function devourGateLabel(count: number): string {
+  return DEVOUR_TIERS[Math.min(Math.max(0, count - 1), DEVOUR_TIERS.length - 1)].label;
+}
 
 export function devourTier(tierIndex: number): DevourTier {
   return DEVOUR_TIERS[Math.min(tierIndex, DEVOUR_TIERS.length - 1)];

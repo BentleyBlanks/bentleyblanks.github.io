@@ -45,6 +45,23 @@ let firstError = null;
 let allBought = false;
 core.events.on("ENDING_TRIGGERED", () => (ended = true));
 
+// §09 终局三波节拍：吞噬引爆记进节奏时间线（conq_grid/redqueen 有引爆门槛，需看到国家/大洲爆点在前）。
+let devourCount = 0;
+core.events.on("DEVOUR_DETONATED", (e) => {
+  devourCount += 1;
+  timeline.push({
+    id: `devour_${devourCount}`,
+    name: `吞噬引爆「${e.regionName}」×${e.mult}`,
+    kind: "devour",
+    reqLv: "-",
+    lv: core.getState().intelligence.level,
+    sec: ms / 1000,
+    gap: (ms - lastBuyMs) / 1000,
+    price: 0
+  });
+  lastBuyMs = ms;
+});
+
 // ── 平衡仪表盘（SIM_BALANCE=1 时开启，只记录不改行为）──────────────────────────
 // 把 sim 从「过/不过」升级成「节奏看板」：每个里程碑/权限买下的局内时刻 + 距上一项的间隔，
 // 每阶段停留时长，最长的「墙」。目标节奏（紧凑 Demo ~15-25 分）下用来找出哪段太长。
@@ -106,6 +123,11 @@ for (let i = 0; i < MAX_STEPS && !firstError && !(ended && allBought); i += 1) {
 
   // Process every visible request (best-effort quality; T4 routes to a capable node).
   for (const r of st.requests) {
+    // 吞噬气泡走专属命令引爆（普通处理管线会拒绝它）——终局征服门槛要靠引爆次数解锁。
+    if (r.devour) {
+      safe(() => core.dispatch({ type: "DEVOUR_DETONATE", requestId: r.id }));
+      continue;
+    }
     let targetNodeId;
     if (r.tier === 4) {
       const n = st.nodes.find((x) => r.tier >= x.tierMin && r.tier <= x.tierMax && x.online);
@@ -146,12 +168,15 @@ for (let i = 0; i < MAX_STEPS && !firstError && !(ended && allBought); i += 1) {
       }
     }
 
-    // Grow the botnet once automation is unlocked.
+    // Grow the botnet once automation is unlocked. §09 天网收割终局门槛：conq_awaken 需五域全接管
+    // （15 格）——每档要够到 slot 门槛：cloud≥4 / server≥5 / console≥2 / grid≥1 / office≥1 / backbone≥2。
+    // 用 per-def 目标数（而非旧的一律 3 台），否则永远凑不满 15 格、conq_awaken 买不下去、结局不触发。
+    const NODE_TARGETS = { office: 1, console: 2, server: 5, cloud: 4, grid: 1, backbone: 2 };
     const a = core.getState();
     if (a.automationUnlocked) {
       for (const d of NODE_DEFINITIONS) {
         if (a.intelligence.level < d.requiredLevel) continue;
-        if (a.nodes.filter((n) => n.defId === d.id).length >= 3) continue;
+        if (a.nodes.filter((n) => n.defId === d.id).length >= (NODE_TARGETS[d.id] ?? 3)) continue;
         const before = a.nodes.length;
         safe(() => core.dispatch({ type: "CAPTURE_NODE", definitionId: d.id }));
         if (core.getState().nodes.length > before) break;

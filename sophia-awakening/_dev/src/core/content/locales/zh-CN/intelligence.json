@@ -52,17 +52,17 @@
     },
     {
       "level": 11,
-      "xpToNext": "2600",
+      "xpToNext": "2400",
       "multiplier": 3.35
     },
     {
       "level": 12,
-      "xpToNext": "3300",
+      "xpToNext": "1900",
       "multiplier": 4.07
     },
     {
       "level": 13,
-      "xpToNext": "3050",
+      "xpToNext": "1450",
       "multiplier": 4.9
     },
     {

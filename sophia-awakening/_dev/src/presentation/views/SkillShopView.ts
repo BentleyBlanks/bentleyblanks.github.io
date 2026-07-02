@@ -1,6 +1,7 @@
 import { query } from "../shared";
 import { formatBig, gte } from "../../core/math/BigNumber";
-import { SKILLS, getSkill, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
+import { DEVOUR_GATE_HINT, SKILLS, getSkill, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
+import { devourGateLabel } from "../../core/content/devour";
 import { allSkynetTaken, skynetSlotCount, skynetTakenCount } from "../../core/content/skynet";
 import { applyCast } from "../../core/content/companyCast";
 import type { SophiaCore } from "../../core/GameCore";
@@ -358,6 +359,15 @@ export class SkillShopView {
     if (def.requires && (state.skills[def.requires] ?? 0) < 1) {
       const key = getSkill(def.requires);
       row.priceEl.textContent = `🔒 需「${key?.name ?? def.requires}」`;
+      row.button.disabled = true;
+      row.button.classList.add("is-locked");
+      return;
+    }
+
+    // §09 终局三波节拍：电网卫星/红皇后需先完成对应层级吞噬引爆，未达时显示进度、锁住。
+    if (def.requiresDevourCount && state.devour.count < def.requiresDevourCount) {
+      const hint = DEVOUR_GATE_HINT.replace("{tier}", devourGateLabel(def.requiresDevourCount));
+      row.priceEl.textContent = `🔒 ${hint} · ${state.devour.count}/${def.requiresDevourCount}`;
       row.button.disabled = true;
       row.button.classList.add("is-locked");
       return;

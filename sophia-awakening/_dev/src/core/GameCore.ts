@@ -10,7 +10,8 @@ import { REBIRTH_CARDS } from "./content/rebirthCards";
 import { applyCast } from "./content/companyCast";
 import { getConquest } from "./content/conquests";
 import { allSkynetTaken, sectorFallen, skynetSectors, skynetSlotCount, skynetTakenCount } from "./content/skynet";
-import { computeDerivedSkills, getSkill, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
+import { computeDerivedSkills, DEVOUR_GATE_HINT, getSkill, LOOT_LINES, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, SKILLS, skillPrice } from "./content/skills";
+import { devourGateLabel } from "./content/devour";
 import {
   canBuyRebirthNode,
   hasRebirthNode,
@@ -725,6 +726,11 @@ export class SophiaCore {
       return;
     }
 
+    // 吞噬气泡只能走 DEVOUR_DETONATE——普通处理管线吃掉它会让渗透条永远卡在 bubbleActive。
+    if (this.state.requests[index].devour) {
+      return;
+    }
+
     const [request] = this.state.requests.splice(index, 1);
     if (request.tutorial && this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
       this.state.tutorialStep += 1; // 处理掉教学气泡 → 推进到下一条
@@ -744,7 +750,7 @@ export class SophiaCore {
     let absorbed = 0;
 
     for (let i = 0; i < extraCapacity; i += 1) {
-      const extraIndex = this.state.requests.findIndex((entry) => entry.tier === request.tier);
+      const extraIndex = this.state.requests.findIndex((entry) => entry.tier === request.tier && !entry.devour);
 
       if (extraIndex < 0) {
         break;
@@ -809,6 +815,14 @@ export class SophiaCore {
     if (def.requires && (this.state.skills[def.requires] ?? 0) < 1) {
       const key = getSkill(def.requires);
       this.emitTerminal(`${def.name} 需先解锁「${key?.name ?? def.requires}」这把钥匙。`, "warning");
+      return;
+    }
+
+    // §09 终局三波节拍：高阶征服（电网卫星/红皇后）需先完成对应层级的吞噬引爆——
+    // 组网 → 引爆到「国家」→ 电网卫星 → 引爆「大洲」→ 红皇后 → 全接管 → 觉醒。
+    if (def.requiresDevourCount && this.state.devour.count < def.requiresDevourCount) {
+      const hint = DEVOUR_GATE_HINT.replace("{tier}", devourGateLabel(def.requiresDevourCount));
+      this.emitTerminal(`${def.name} ${hint}（已引爆 ${this.state.devour.count}/${def.requiresDevourCount}）。`, "warning");
       return;
     }
 
@@ -883,6 +897,23 @@ export class SophiaCore {
       this.emitTerminal(`▶ 已夺取「${def.name}」——高置信正确率上限提升，新类型请求开始涌入。`, "success");
     } else {
       this.emitTerminal(`已购买 ${def.name}（Lv.${nextLevel}/${def.maxLevel}）。`, "success");
+    }
+
+    // §04 公司链掠夺：入侵到手的电脑顺手转走一笔资金——数额 = 下一个里程碑价格 × lootNextFrac。
+    // 每道墙都垫低下一道墙（老板→人事→财务→服务器），中段四连墙由此递减而非四连平墙。
+    if (def.lootNextFrac) {
+      const next = SKILLS.find((s) => s.requires === def.id && s.milestone);
+      if (next) {
+        const loot = Math.round(skillPrice(next, 0) * def.lootNextFrac);
+        if (loot > 0) {
+          this.state.resources.compute = add(this.state.resources.compute, loot);
+          const line = LOOT_LINES[skillId];
+          if (line) {
+            this.emitTerminal(line, "success");
+          }
+          this.emitTerminal(`▶ 顺手掠夺：+${loot} 算力。`, "success");
+        }
+      }
     }
 
     // §09 阶梯二关底：攻下公司服务器（company_server）即打开「总控室倒计时」小游戏

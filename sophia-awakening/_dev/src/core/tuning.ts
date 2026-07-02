@@ -12,6 +12,10 @@ export const TUNING = {
 
   // § 后期吞噬引爆（§04）
   devourFillMult:       1.0,      // 渗透条蓄满时间倍率（<1 更快引爆，>1 更慢）
+  devourFillSecBlock:     30,     // 「区块」级渗透蓄满秒数（终局三波节拍的基准）
+  devourFillSecRegion:    60,     // 「地区」级渗透蓄满秒数
+  devourFillSecCountry:   75,     // 「国家」级渗透蓄满秒数（门槛：接管电网/卫星）
+  devourFillSecContinent: 100,    // 「大洲」级渗透蓄满秒数（门槛：红皇后协议）
 
   // § 经济公式
   rebirthMultiplier:    0.35,     // 每次重生的加速系数
@@ -58,6 +62,10 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   minigamePointerSpeed:    { label: "关底·指针速度",         section: "关底小游戏", min: 0.2, max: 2.0,  step: 0.05 },
 
   devourFillMult:       { label: "渗透条蓄满倍率",           section: "吞噬引爆",   min: 0.1,   max: 5,     step: 0.1  },
+  devourFillSecBlock:     { label: "区块级蓄满秒数",         section: "吞噬引爆",   min: 5,     max: 300,   step: 5    },
+  devourFillSecRegion:    { label: "地区级蓄满秒数",         section: "吞噬引爆",   min: 5,     max: 600,   step: 5    },
+  devourFillSecCountry:   { label: "国家级蓄满秒数",         section: "吞噬引爆",   min: 5,     max: 900,   step: 5    },
+  devourFillSecContinent: { label: "大洲级蓄满秒数",         section: "吞噬引爆",   min: 5,     max: 1200,  step: 5    },
 
   rebirthMultiplier:    { label: "重生加速系数",             section: "经济公式",   min: 0,     max: 2,     step: 0.05 },
   milestoneGlobalMult:  { label: "里程碑全局倍率/个",         section: "经济公式",   min: 1.0,   max: 2.0,   step: 0.01 },

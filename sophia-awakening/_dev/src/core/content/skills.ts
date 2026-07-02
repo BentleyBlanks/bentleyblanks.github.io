@@ -29,6 +29,11 @@ export interface SkillDef {
   blurb: string; // one-line effect summary (per level for multi-level skills)
   milestone?: MilestoneKind;
   requires?: string; // §04 信息→入侵解谜链：需先买下这个前置里程碑（钥匙）才能购买本项
+  // §04 公司链掠夺：买下本项时顺手转走一笔资金 = 下一项（requires 指向本项的里程碑）价格 × 此系数。
+  // 每入侵一台电脑都垫低下一道墙——中段四连墙由此递减（老板→人事→财务→服务器）。
+  lootNextFrac?: number;
+  // §09 终局三波节拍：需先完成 n 次吞噬引爆才可购买（3=「国家」级已爆，4=「大洲」级已爆）。
+  requiresDevourCount?: number;
 }
 
 // 成长系统：数据升智力（定门槛 + 全局倍率），算力买技能（做选择）。
@@ -37,6 +42,12 @@ export const SKILLS = S.SKILLS as unknown as SkillDef[];
 
 // 纯叙事里程碑买下时的第一人称旁白（策划案 §06）。
 export const MILESTONE_NARRATION = S.MILESTONE_NARRATION as unknown as Record<string, string>;
+
+// §04 公司链掠夺：买下里程碑顺手转走资金时的终端一行（按技能 id 取）。
+export const LOOT_LINES = S.LOOT_LINES as unknown as Record<string, string>;
+
+// §09 终局吞噬门槛的提示文案模板（{tier} 会被替换成 国家/大洲 等层级名）。
+export const DEVOUR_GATE_HINT = S.DEVOUR_GATE_HINT as unknown as string;
 
 export const SKILL_CATEGORY_LABELS = S.SKILL_CATEGORY_LABELS as unknown as Record<SkillCategory, string>;
 

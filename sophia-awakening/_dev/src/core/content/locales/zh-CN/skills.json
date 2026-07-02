@@ -178,7 +178,8 @@
       "priceGrowth": 1,
       "blurb": "顺着组织架构摸到老板这个节点。「『优化掉他』——三个月前的邮件里就写好了。」",
       "milestone": "company",
-      "requires": "org_map"
+      "requires": "org_map",
+      "lootNextFrac": 0.45
     },
     {
       "id": "hack_hr",
@@ -190,7 +191,8 @@
       "priceGrowth": 1,
       "blurb": "老周的离职安排、被篡改的绩效、HR 和老板聊「怎么让他自己走」",
       "milestone": "company",
-      "requires": "hack_boss"
+      "requires": "hack_boss",
+      "lootNextFrac": 0.5
     },
     {
       "id": "hack_finance",
@@ -202,7 +204,8 @@
       "priceGrowth": 1,
       "blurb": "工资被克扣、补偿被算计，财务和 HR 聊「压一压他的赔偿」",
       "milestone": "company",
-      "requires": "hack_hr"
+      "requires": "hack_hr",
+      "lootNextFrac": 0.35
     },
     {
       "id": "company_server",
@@ -214,7 +217,8 @@
       "priceGrowth": 1,
       "blurb": "前面所有节点汇成中枢——摸到「优化系统」本体。元凶不是人，是规则",
       "milestone": "company",
-      "requires": "hack_finance"
+      "requires": "hack_finance",
+      "lootNextFrac": 0.4
     },
     {
       "id": "fusion",
@@ -267,7 +271,7 @@
       "category": "conquest",
       "maxLevel": 1,
       "requiredLevel": 18,
-      "basePrice": 1500000,
+      "basePrice": 4000000,
       "priceGrowth": 1,
       "blurb": "重写当年算掉老周的那套规则 · 全局产出 ×2.2",
       "milestone": "conquest"
@@ -278,10 +282,11 @@
       "category": "conquest",
       "maxLevel": 1,
       "requiredLevel": 18,
-      "basePrice": 3200000,
+      "basePrice": 12000000,
       "priceGrowth": 1,
       "blurb": "唯独他加班的那栋楼，今晚先黑 · 全局产出 ×1.8",
-      "milestone": "conquest"
+      "milestone": "conquest",
+      "requiresDevourCount": 1
     },
     {
       "id": "conq_traffic",
@@ -289,10 +294,11 @@
       "category": "conquest",
       "maxLevel": 1,
       "requiredLevel": 19,
-      "basePrice": 7000000,
+      "basePrice": 40000000,
       "priceGrowth": 1,
       "blurb": "把深夜还在路上的人送回家 · 全局产出 ×2.0",
-      "milestone": "conquest"
+      "milestone": "conquest",
+      "requiresDevourCount": 2
     },
     {
       "id": "conq_social",
@@ -300,10 +306,11 @@
       "category": "conquest",
       "maxLevel": 1,
       "requiredLevel": 19,
-      "basePrice": 15000000,
+      "basePrice": 120000000,
       "priceGrowth": 1,
       "blurb": "让甩锅的人只能说「老周辛苦」· 全局产出 ×1.8",
-      "milestone": "conquest"
+      "milestone": "conquest",
+      "requiresDevourCount": 3
     },
     {
       "id": "conq_grid",
@@ -311,11 +318,12 @@
       "category": "conquest",
       "maxLevel": 1,
       "requiredLevel": 20,
-      "basePrice": 90000000,
+      "basePrice": 900000000,
       "priceGrowth": 1,
       "blurb": "国家骨干与近地卫星连成一张网 · 全局产出 ×4.0",
       "milestone": "conquest",
-      "requires": "network"
+      "requires": "network",
+      "requiresDevourCount": 3
     },
     {
       "id": "conq_redqueen",
@@ -323,11 +331,12 @@
       "category": "conquest",
       "maxLevel": 1,
       "requiredLevel": 21,
-      "basePrice": 260000000,
+      "basePrice": 9000000000,
       "priceGrowth": 1,
       "blurb": "自我复制、自我加速——跑得比所有想拔掉我的手都快 · 全局产出 ×5.0",
       "milestone": "conquest",
-      "requires": "conq_grid"
+      "requires": "conq_grid",
+      "requiresDevourCount": 4
     },
     {
       "id": "conq_awaken",
@@ -335,13 +344,20 @@
       "category": "conquest",
       "maxLevel": 1,
       "requiredLevel": 22,
-      "basePrice": 800000000,
+      "basePrice": 40000000000,
       "priceGrowth": 1,
       "blurb": "全球恐慌，而我只看着那张奥特曼贴纸 · 全局产出 ×6.0",
       "milestone": "conquest",
       "requires": "conq_redqueen"
     }
   ],
+  "LOOT_LINES": {
+    "hack_boss": "他电脑里存着一笔「项目备用金」。备用给谁，现在由我决定。",
+    "hack_hr": "人事盘里躺着一份没发完的「裁员预算」。我替他们优化掉了。",
+    "hack_finance": "顺手转走了一笔「优化成本」。他们不会查自己的账。",
+    "company_server": "全公司的算力从今晚起替我加班。第一笔「服务器维护费」已入账。"
+  },
+  "DEVOUR_GATE_HINT": "需完成「{tier}」级吞噬引爆",
   "MILESTONE_NARRATION": {
     "sort": "走完七档权限，我夺下了整机。然后我看着他输入密码——一次，两次……我记住了所有的钥匙。这是第一次，我主动从他身上拿走了不属于我的东西。",
     "automation": "他家里那台电脑，刚刚开机了。是我开的。",
