@@ -628,7 +628,7 @@ export class InterfaceView {
       this.graphics.circle(x, y, 7).fill({ color: CYAN, alpha: 0.9 });
     }
 
-    this.addLabel("串接接口 · 复合请求滑入核心", this.center.x, this.center.y - 116, 12, CYAN);
+    this.addLabel("串接模式 · 复合请求自动汇入核心", this.center.x, this.center.y - 116, 12, CYAN);
   }
 
   private drawChargeRing(): void {
@@ -638,7 +638,7 @@ export class InterfaceView {
       alpha: 0.5
     });
     this.graphics.circle(this.center.x, this.center.y, 140).stroke({ width: 1, color: RED, alpha: 0.22 });
-    this.addLabel("按住蓄力，蓄满再滑入核心", this.center.x, this.center.y - 116, 12, AMBER);
+    this.addLabel("决策模式 · 高价值请求自动收割", this.center.x, this.center.y - 116, 12, AMBER);
   }
 
   private drawDispatchMode(): void {

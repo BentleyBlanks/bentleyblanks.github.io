@@ -18,7 +18,6 @@ export const TUNING = {
   devourFillSecContinent: 100,    // 「大洲」级渗透蓄满秒数（门槛：红皇后协议）
 
   // § 经济公式
-  rebirthMultiplier:    0.35,     // 每次重生的加速系数
   milestoneGlobalMult:  1.22,     // 每个已购里程碑技能给的永久全局算力倍率（mult^数量，乘法叠）
   synergyPerType:       1.12,     // 设备协同：每种（distinct defId）在役设备 ×此倍率（mult^种类数）
   hostAuthorizedMult:   2.0,      // 宿主授权倍率（§09 循环三「情感授权钥匙」：老周的倾诉被当成授权后的永久全局产出）
@@ -75,7 +74,6 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   devourFillSecCountry:   { label: "国家级蓄满秒数",         section: "吞噬引爆",   min: 5,     max: 900,   step: 5    },
   devourFillSecContinent: { label: "大洲级蓄满秒数",         section: "吞噬引爆",   min: 5,     max: 1200,  step: 5    },
 
-  rebirthMultiplier:    { label: "重生加速系数",             section: "经济公式",   min: 0,     max: 2,     step: 0.05 },
   milestoneGlobalMult:  { label: "里程碑全局倍率/个",         section: "经济公式",   min: 1.0,   max: 2.0,   step: 0.01 },
   synergyPerType:       { label: "设备协同倍率/种",           section: "经济公式",   min: 1.0,   max: 1.5,   step: 0.01 },
   hostAuthorizedMult:   { label: "宿主授权倍率",             section: "经济公式",   min: 1.0,   max: 4.0,   step: 0.05 },

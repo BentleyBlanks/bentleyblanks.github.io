@@ -30,8 +30,8 @@ export const REQUEST_PACKET_HEIGHT = 162;
 // 可在调试面板切换的呈现开关。coreSuck：卡片滑入 Core 用类 Mac Dock 的吮吸（被吸入）动画——默认开启。
 export const fxSettings = { coreSuck: true };
 
-// 阶段「动作形态」短标签（T0–T4 编号已废弃，降为这个动作形态属性）。用于阶段徽标 / Core 标签 / 节点分配。
-const TIER_FORMS: Record<number, string> = { 0: "单口", 1: "分拣", 2: "串接", 3: "决策", 4: "天网" };
+// 阶段「动作形态」短标签（T0–T4 编号已废弃，降为这个动作形态属性）。用于阶段徽标 / Core 标签 / HUD。
+const TIER_FORMS: Record<number, string> = { 0: "单口", 1: "处理", 2: "串接", 3: "决策", 4: "天网" };
 export function tierForm(tier: number): string {
   return TIER_FORMS[tier] ?? `第${tier}阶`;
 }
@@ -39,7 +39,7 @@ export function tierForm(tier: number): string {
 // ── 存档 / 引导键 ────────────────────────────────────
 export const ONBOARDING_STORAGE_KEY = "sophia-onboarding-v5-optimize-complete";
 export const PERSISTENCE_REVISION_KEY = "sophia-persistence-revision";
-export const PERSISTENCE_REVISION = "rebirth-tree-v2-v29";
+export const PERSISTENCE_REVISION = "moral-card-v30";
 
 // ── 文案 ─────────────────────────────────────────────
 export const SENDER_LABEL: Record<string, string> = { host: "宿主", boss: "上级", system: "系统", sophia: "SOPHIA" };

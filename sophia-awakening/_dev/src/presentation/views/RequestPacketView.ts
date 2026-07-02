@@ -29,10 +29,10 @@ import { layoutFaceCard, drawFaceCard } from "./requestPacket/faceCard";
 // 也删除了「模糊档位 / 大胆回答 / 惊艳」三档，张力改由「读懂上下文 + 有没有权限选高收益项」承担。
 export interface RouletteOutcome {
   dead: boolean; // 选了「连接失败」装死（零收益、安静跳过）
-  hit?: boolean; // 仅后期重磅决策(T3)用：明示概率的赌局命中/未命中。阶梯一确定结算时恒真。
   quality: number; // 结算 quality = 所选回复自带的固定收益（收益盲盒，结算才揭晓）
   reply: string; // 所选回复对应的人类回话
   tone: "success" | "warning" | "normal";
+  moralChoice?: "A" | "B"; // §07 道德抉择卡：所选选项的倾向标记（普通卡无此字段），供上层走 RESOLVE_MORAL
 }
 
 export interface ReelHooks {
@@ -153,7 +153,7 @@ export class RequestPacketView {
     this.options = this.isReel ? request.answers ?? [] : [];
     // §04 委托：大恨老师接通后，可委托的回复卡在卡片【底部】多一个「交给大恨老师」选项
     //（点一下就委托，不拖动），摆在卡底像一条「拖去处理」的落位带。
-    // 不可委托卡（delegatable===false）、开场教学、重磅决策(T3) 都不给这个选项。
+    // 不可委托卡（delegatable===false，含道德抉择卡）、开场教学都不给这个选项。
     const canDeleg =
       this.isReel && !request.tutorial && request.tier <= 1 && request.delegatable !== false && Boolean(reel?.canDelegate?.());
     if (canDeleg) {
@@ -175,11 +175,11 @@ export class RequestPacketView {
         : "sms"
       : null;
     // PART① 普通需求卡的 accent 随阶段走：早期绿(THINK/TIER) → 公司蓝 → 天网红。
-    // 面卡(短信/通知)、吞噬气泡、T3 重磅决策保留各自专属色，不受阶段影响。
+    // 面卡(短信/通知)、吞噬气泡保留各自专属色，不受阶段影响。
     this.phaseTint = phaseTintOf(phase);
     const phaseWorkAccent =
       this.phaseTint === "company" ? COMPANY_ACCENT : this.phaseTint === "awakening" ? RED_QUEEN : null;
-    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；回复轮盘＝青；T3 重磅＝深红。
+    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；回复轮盘＝青（随阶段变色）。
     this.accent = this.isFace
       ? this.channel === "notification"
         ? 0xffc061
@@ -187,15 +187,13 @@ export class RequestPacketView {
       : this.isDevour
         ? DEVOUR
         : this.isReel
-          ? request.tier === 3
-            ? RED
-            : phaseWorkAccent ?? THINK
+          ? phaseWorkAccent ?? THINK
           : phaseWorkAccent ?? TIER_COLORS[request.tier];
-    // 公司/天网阶段的工作卡：标题下多留一行「系统控制台」状态行（更密、更硬）；T3 重磅决策不加。
-    const showConsoleLine = !this.isFace && !this.isDevour && request.tier !== 3 && phaseWorkAccent !== null;
+    // 公司/天网阶段的工作卡：标题下多留一行「系统控制台」状态行（更密、更硬）。
+    const showConsoleLine = !this.isFace && !this.isDevour && phaseWorkAccent !== null;
     this.headerExtra = showConsoleLine ? 16 : 0;
-    // 发信人：吞噬＝SOPHIA 自己的意志，重磅决策＝「上级 / 系统决策」，任务链＝系统通知，其余＝宿主私信。
-    this.sender = this.isDevour ? "sophia" : request.tier === 3 ? "boss" : this.isChain ? "system" : "host";
+    // 发信人：吞噬＝SOPHIA 自己的意志，任务链＝系统通知，其余＝宿主私信。
+    this.sender = this.isDevour ? "sophia" : this.isChain ? "system" : "host";
     this.cardH = UI.cardHeight; // 轮盘卡稍后按选项行数重算
     // 只能面对卡不可交互——浮入、被看着、消失。
     this.container.eventMode = this.isFace ? "none" : "dynamic";
@@ -210,11 +208,9 @@ export class RequestPacketView {
         : "💬 短信"
       : this.isDevour
       ? `⊙ 吞噬 · ${request.devour?.label ?? ""}`
-      : request.tier === 3 && this.isReel
-        ? "⚡ 重磅决策"
-        : this.isChain
-          ? `🔗 任务链${request.compound > 1 ? ` ×${request.compound}` : ""}`
-          : SENDER_LABEL[this.sender] ?? "宿主";
+      : this.isChain
+        ? `🔗 任务链${request.compound > 1 ? ` ×${request.compound}` : ""}`
+        : SENDER_LABEL[this.sender] ?? "宿主";
     const sourceApp = request.sourceApp ?? this.fallbackSourceApp();
     const sourceTime = request.sourceTime ?? fallbackHeaderTime(request.createdAtMs);
     this.badge = new Text({
@@ -488,7 +484,7 @@ export class RequestPacketView {
     }
 
     if (this.isDevour) {
-      // 巨型：整张气泡放大，凸显「区域中央浮起的重磅决策」。
+      // 巨型：整张气泡放大，凸显「区域中央浮起的吞噬气泡」。
       this.container.scale.set(1.34);
       this.title.style.fontSize = 16;
     }
@@ -579,7 +575,7 @@ export class RequestPacketView {
       this.draw();
       return;
     }
-    // （已删除「按住蓄力」玩法——T3 重磅卡直接拖入核心即结算。）
+    // （「按住蓄力」玩法已删除——高阶卡自动化后由节点自动收割，不再手动蓄力。）
 
     // 教学高亮 / 右滑回复引导：未操作时让被引导的选项和滑块轻微呼吸。
     if (this.phase === "idle" && this.isReel && (this.request.tutorial?.highlight !== undefined || this.hasSwipeReplyOption())) {
@@ -612,13 +608,12 @@ export class RequestPacketView {
     }
     const basePayoff = this.optionPayoff[this.chosenIndex] ?? opt.payoff;
     // 确定结算：收益由所选回复自带，无随机；读懂上下文 + 选到（可能受权限门槛限制的）高收益项才赚得多。
-    // T3 重磅卡也走这条普通处理路径（豪赌已删除）。
     this.outcome = {
       dead: false,
-      hit: true,
       quality: basePayoff,
       reply: opt.reply,
-      tone: basePayoff >= 1 ? "success" : "warning"
+      tone: basePayoff >= 1 ? "success" : "warning",
+      moralChoice: opt.moral
     };
     this.phase = "revealed";
     this.revealMs = 0;

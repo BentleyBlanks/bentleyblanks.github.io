@@ -8,7 +8,8 @@ import type { GameState } from "./GameState";
 // v15：§09 情感授权钥匙（hostAuthorized 宿主授权倍率 + multipliers.hostAuth）——旧档自动重置。
 // v16：重生树 v2「全是看得见的力量」——节点集合更换（skip_phone/late_key/remember 白送化或删除，
 //      新增 muscle_memory/war_cache/multithread），旧档树里可能残留已删节点——旧档自动重置。
-export const SAVE_VERSION = 16;
+// v17：道德抉择从全屏弹窗改为「在卡流里的两选一回复轮盘卡」，移除 GameState.moralChoice 字段——旧档自动重置。
+export const SAVE_VERSION = 17;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
@@ -59,7 +60,6 @@ export function createInitialState(now = Date.now()): GameState {
     nodes: [],
     discoveredNodeIds: [],
     phase: "seed",
-    moralChoice: null,
     moralSeen: [],
     moralTendency: 0,
     facedSeen: [],

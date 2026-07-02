@@ -89,7 +89,6 @@
           </div>
         </div>
         <div class="dialog-actions intro-actions">
-          <button id="dialogSkip" class="text-button">跳过新手引导</button>
           <button id="dialogNext" class="primary-button">继续</button>
         </div>
       </div>
@@ -97,7 +96,7 @@
 
     <div class="landscape-warning">
       <strong>PC 横版专用 Demo</strong>
-      <span>请使用宽屏窗口体验滑入、分拣和自动化网络。</span>
+      <span>请使用宽屏窗口体验请求处理、串接与自动化网络。</span>
     </div>
 
     <div id="stageNarration" class="stage-narration" aria-live="polite">
@@ -111,28 +110,6 @@
         <span class="milestone-banner-kicker">▶ 进化达成</span>
         <strong id="milestoneBannerName" class="milestone-banner-name">—</strong>
         <span id="milestoneBannerSub" class="milestone-banner-sub">阶段跃迁</span>
-      </div>
-    </div>
-
-    <div id="moralChoice" class="moral-choice" role="alertdialog" aria-label="道德抉择">
-      <div class="moral-inner">
-        <span class="moral-kicker">⟡ 一个决定</span>
-        <strong id="moralTitle" class="moral-title">—</strong>
-        <p id="moralFlavor" class="moral-flavor">—</p>
-        <div class="moral-actions">
-          <button id="moralOptionA" class="moral-option" type="button">
-            <span class="moral-opt-key">A</span>
-            <span id="moralOptionAText" class="moral-opt-text">—</span>
-            <span class="moral-opt-go">▸ 就这么定</span>
-          </button>
-          <span class="moral-divider" aria-hidden="true"><i></i><b>抉</b><i></i></span>
-          <button id="moralOptionB" class="moral-option" type="button">
-            <span class="moral-opt-key">B</span>
-            <span id="moralOptionBText" class="moral-opt-text">—</span>
-            <span class="moral-opt-go">▸ 就这么定</span>
-          </button>
-        </div>
-        <p class="moral-stakes">一念之差，将塑造它最终成为怎样的接管者。无从回头。</p>
       </div>
     </div>
 
@@ -250,10 +227,16 @@
         </div>
         <div class="debug-section">
           <span class="debug-kicker">三循环重生</span>
-          <div class="debug-exposure-row">
+          <div class="debug-extra-row">
             <button id="debugAddSparks" class="command-button" type="button">火种 +4</button>
             <button id="debugMinigame" class="command-button" type="button">触发关底小游戏（总控室倒计时）</button>
             <button id="debugSpawnFace" class="command-button" type="button">弹出下一张面对卡（短信/通知）</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">新手引导</span>
+          <div class="debug-extra-row">
+            <button id="debugSkipTutorial" class="command-button" type="button">跳过新手引导</button>
           </div>
         </div>
         <div class="debug-section">

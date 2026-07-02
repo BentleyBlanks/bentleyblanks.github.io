@@ -19,7 +19,7 @@ export interface IntelligenceState {
   required: BigString;
   globalMultiplier: number;
   // The current action scope = the highest milestone tier bought (NOT derived
-  // from level). 0 until 多槽分拣 is purchased, etc.
+  // from level). 0 until the first「处理」milestone is purchased, etc.
   unlockedTier: Tier;
 }
 
@@ -38,6 +38,7 @@ export interface AnswerOption {
   tone: "success" | "warning" | "normal"; // 终端里这条回话的颜色
   distractor?: boolean; // 噪音/干扰选项：读不懂上下文容易误选的低收益项
   requires?: string; // §06 选项门槛：需要此权限（skill id）才能选；缺则灰锁不可选
+  moral?: "A" | "B"; // §07 道德抉择卡的选项标记：选中后按此记录倾向、走 RESOLVE_MORAL（普通卡无此字段）
 }
 
 // T2 串接：一条任务链上的一步。distractor=干扰项，不该被串进去。
@@ -92,6 +93,10 @@ export interface RequestInstance {
   narration?: string; // 只能面对卡：浮现一阵后 SOPHIA 的那句沉默旁白
   answer?: SortAnswer; // T1 的正确判断（其余层不用）
   answers?: AnswerOption[]; // T0/T1：回复轮盘的候选回复
+  // §07 道德抉择卡：作为普通「两选一回复轮盘卡」在卡流里出现（不再是全屏弹窗）。
+  // moral=true 标记它豁免自动派发/答案剥离；moralId 回查 moralChoices 定义以记录倾向 + 取旁白。
+  moral?: boolean;
+  moralId?: string;
   chain?: ChainStep[]; // T2：可勾选的任务链步骤（含干扰项）
   // 开场教学（§07）：脚本气泡的选项约束——allowed=可点的选项下标，highlight=高亮引导的下标，
   // line=气泡浮入时 SOPHIA 的旁白。普通请求无此字段。
@@ -145,18 +150,6 @@ export interface MinigameState {
   pointerSpeed: number; // 指针速度（每秒走完整条轨道的比例）
 }
 
-// §07 道德二选一抑选点：钉在老周下沉曲线关键节点上的两难抉择，两个选项都「有道理」。
-// 不分支结局，累计倾向（A 帮/护 = +1，B 复仇/逼迫 = -1）只影响接管时旁白温度与群声。
-export interface MoralChoiceOffer {
-  id: string;
-  title: string; // 抉择标题（触发节点）
-  flavor: string; // 处境说明
-  optionA: string; // 选项 A（帮 / 护）按钮文案
-  optionB: string; // 选项 B（复仇 / 逼迫面对）按钮文案
-  replyA: string; // 选 A 后 SOPHIA 平静扭曲的旁白
-  replyB: string; // 选 B 后 SOPHIA 平静扭曲的旁白
-}
-
 export interface StatisticsState {
   totalProcessed: number;
   manualProcessed: number;
@@ -194,8 +187,7 @@ export interface GameState {
   nodes: BotNode[];
   discoveredNodeIds: string[];
   phase: PhaseId;
-  // §07 道德抑选点：当前待决的抉择 / 已出现过的抉择 id / 累计倾向（+偏帮护，−偏复仇）。
-  moralChoice: MoralChoiceOffer | null;
+  // §07 道德抑选点：已出现过的抉择 id（一次性去重）/ 累计倾向（+偏帮护，−偏复仇，只染结局风格标签）。
   moralSeen: string[];
   moralTendency: number;
   facedSeen: string[]; // §04 已出现过的「只能面对」卡 id（一次性）
@@ -239,8 +231,8 @@ export type GameCommand =
   | { type: "SCRAP_NODE"; nodeId: string }
   // 组装合并：把 MERGE_COUNT 台同型号设备合成 1 台更高档（顶档则同档升级）。
   | { type: "MERGE_NODES"; defId: string }
-  | { type: "ASSIGN_NODE"; nodeId: string; tier: Tier }
-  | { type: "RESOLVE_MORAL"; choice: "A" | "B" }
+  // §07 道德抉择：卡片上二选一落子——记录倾向、移除卡、播 SOPHIA 自我注解旁白。
+  | { type: "RESOLVE_MORAL"; requestId: string; choice: "A" | "B" }
   // §09 阶梯二关底小游戏「总控室倒计时」判定：hit=指针停在注入窗口内。
   | { type: "RESOLVE_MINIGAME"; hit: boolean }
   // 跳过新手引导：把教学气泡进度直接推到结束、清掉在场教学卡（开场自述对话由 UI 侧关闭）。

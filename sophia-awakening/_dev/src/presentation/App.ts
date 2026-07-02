@@ -23,12 +23,11 @@ import { formatBig, gte } from "../core/math/BigNumber";
 import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
 import { SaveManager } from "../core/save/SaveManager";
-import type { BotNode, GameState, RequestInstance, Tier } from "../core/state/GameState";
+import type { BotNode, GameState, RequestInstance } from "../core/state/GameState";
 import { gameStore } from "../store/gameStore";
 import { TUNING } from "../core/tuning";
 import { StageNarrationView } from "./views/StageNarrationView";
 import { MinigameView } from "./views/MinigameView";
-import { MoralChoiceView } from "./views/MoralChoiceView";
 import { MilestoneBannerView } from "./views/MilestoneBannerView";
 import { EndingView } from "./views/EndingView";
 import { TerminalView } from "./views/TerminalView";
@@ -54,7 +53,7 @@ import {
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
   formatClock, distance,
-  tierForm, fxSettings, domainLevelOf, CARD_MONO
+  fxSettings, domainLevelOf, CARD_MONO
 } from "./shared";
 
 
@@ -168,7 +167,6 @@ class SophiaGameApp {
     () => gameStore.getState().setPaused(true),
     () => gameStore.getState().setPaused(false)
   );
-  private readonly moralView = new MoralChoiceView(this.core);
   private readonly milestoneBanner = new MilestoneBannerView();
   private readonly stageNarration = new StageNarrationView();
   private readonly ending = new EndingView(() => this.restart());
@@ -351,6 +349,8 @@ class SophiaGameApp {
         this.terminal.push("已跳过新手引导。", "normal");
       }
     );
+    // 跳过新手引导按钮已挪进调试面板——无论开场对话是否还开着都能跳过（走 onboarding.skip → onSkip）。
+    query<HTMLButtonElement>("#debugSkipTutorial").addEventListener("click", () => this.onboarding.skip());
 
     this.pixi.ticker.add((ticker: Ticker) => this.frame(ticker.deltaMS));
     window.addEventListener("beforeunload", () => {
@@ -387,7 +387,6 @@ class SophiaGameApp {
     }
     this.terminal.update(deltaMs);
     this.onboarding.update(deltaMs);
-    this.moralView.update(state);
     this.stageNarration.update(deltaMs);
     this.ending.update(deltaMs);
     this.juice.update(deltaMs);
@@ -589,27 +588,6 @@ class SophiaGameApp {
     title.textContent = `${node.name}${node.level > 1 ? ` Lv.${node.level}` : ""} · 同型 ×${group.length}`;
     el.appendChild(title);
 
-    // 派发档位（只列已解锁且该机支持的层）。
-    const tierRow = document.createElement("div");
-    tierRow.className = "node-actions-tiers";
-    for (let tier = node.tierMin; tier <= node.tierMax; tier += 1) {
-      if (tier > state.intelligence.unlockedTier) {
-        continue;
-      }
-      const tb = document.createElement("button");
-      tb.type = "button";
-      tb.className = `node-tier-chip${tier === node.assignedTier ? " is-on" : ""}`;
-      tb.textContent = tierForm(tier);
-      tb.addEventListener("click", () => {
-        this.core.dispatch({ type: "ASSIGN_NODE", nodeId, tier: tier as Tier });
-        this.showNodeActions(nodeId, anchorX, anchorY);
-      });
-      tierRow.appendChild(tb);
-    }
-    if (tierRow.childElementCount > 1) {
-      el.appendChild(tierRow);
-    }
-
     // 合并升级（集齐 NODE_MERGE_COUNT 台同型）。
     const nextDef = getNextNodeDefinition(node.defId);
     const enough = group.length >= NODE_MERGE_COUNT;
@@ -683,6 +661,10 @@ class SophiaGameApp {
     // 场上还没飞走的空闲卡（玩家正拖的、已在飞的都排除——手动滑入仍可抢在自动之前），
     // 按出现顺序排队，最旧优先。
     const queue = state.requests.filter((request) => {
+      // §07 道德抉择卡不被节点自动吞掉——它必须留给玩家亲手二选一。
+      if (request.moral) {
+        return false;
+      }
       const view = this.requestViews.get(request.id);
       return view !== undefined && !view.busy;
     });
@@ -839,10 +821,17 @@ class SophiaGameApp {
 
     const entry: PointData = { x: card.container.x, y: card.container.y };
     this.audio.playRequestAccept();
+    // §07 道德抉择卡：二选一落子 → 走 RESOLVE_MORAL（记录倾向 + SOPHIA 自我注解旁白），
+    // 不进产出结算、不弹「人类回话」。旁白由 MORAL_RESOLVED 事件展示。
+    const moralChoice = card.request.moral ? outcome.moralChoice : undefined;
     this.flyIntoCore(
       card,
       target,
       () => {
+        if (moralChoice) {
+          this.core.dispatch({ type: "RESOLVE_MORAL", requestId, choice: moralChoice });
+          return;
+        }
         this.core.dispatch({
           type: "PROCESS_REQUEST",
           requestId,
@@ -1049,18 +1038,17 @@ class SophiaGameApp {
   }
 
   // 视觉引导：一颗芯片从核心飞向"人类"（终端方向），落地后人类在终端里回话（按语气着色）。
-  // 命中 → 选项自带的回话；幻觉 → 破口大骂，从骂人语料里随机抽一句。
+  // 所选回复自带回话则用它；空回话（老周后期沉默）退到从骂人语料随机抽一句。
   private deliverToHuman(corePoint: PointData, outcome: RouletteOutcome): void {
     const human = this.terminalPoint();
-    // 无翻车/幻觉：好坏只看所选回复的收益高低（quality>=1=好评）。T3 赌局未命中(hit===false)才是「答砸」。
-    const missed = outcome.hit === false;
-    const good = !missed && outcome.quality >= 1;
-    const color = good ? GREEN : missed ? RED : AMBER;
+    // 无翻车/幻觉/赌局：好坏只看所选回复的收益高低（quality>=1=好评）。
+    const good = outcome.quality >= 1;
+    const color = good ? GREEN : AMBER;
     const skills = this.core.getState().skills;
     const permCount = PERMISSION_IDS.filter((id) => (skills[id] ?? 0) > 0).length;
-    // 选项自带回话则用它（平庸回复也有自己的话）；只有 T3 未命中(空回话)才退到老周的回骂。
+    // 选项自带回话则用它（平庸回复也有自己的话）；空回话退到老周的回骂。
     const reply = outcome.reply !== "" ? outcome.reply : hostCurse(permCount, Math.random);
-    const tone: "success" | "danger" | "normal" = good ? "success" : missed ? "danger" : "normal";
+    const tone: "success" | "danger" | "normal" = good ? "success" : "normal";
 
     // 老周后期「沉默」：失业后他几乎不再回应——这一框空白本身就是叙事（§07）。
     if (reply === "") {
@@ -1072,16 +1060,13 @@ class SophiaGameApp {
     // 升级到「自动接驳」之前（你还是一个个回应真人的助手），人类的反应以对话框浮现在核心旁；
     // 规模化之后个体反馈不再弹框，只进终端。
     if (!this.core.getState().automationUnlocked) {
-      this.juice.speech(corePoint, human, reply, color, missed, () => {
+      this.juice.speech(corePoint, human, reply, color, false, () => {
         this.terminal.push(`🧑 ${reply}`, tone);
       });
-      if (missed) {
-        this.juice.burst(corePoint, RED, 1.4);
-      }
       return;
     }
 
-    this.juice.number(good ? "已交付" : missed ? "答复有误" : "勉强交差", { x: corePoint.x, y: corePoint.y - 52 }, color);
+    this.juice.number(good ? "已交付" : "勉强交差", { x: corePoint.x, y: corePoint.y - 52 }, color);
     this.juice.flyToHud(corePoint, human, color, () => {
       this.terminal.push(`🧑 ${reply}`, tone);
     });
@@ -1155,6 +1140,11 @@ class SophiaGameApp {
     const request = state.requests.find((entry) => entry.id === card.request.id);
 
     if (!request) {
+      return false;
+    }
+
+    // §07 道德抉择卡：只能靠卡上的二选一落子（回复轮盘）——不接受直接拖入核心（否则会绕过抉择）。
+    if (request.moral) {
       return false;
     }
 

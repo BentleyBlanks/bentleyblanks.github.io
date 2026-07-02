@@ -61,7 +61,7 @@ export class TuningEditorView {
     tierSection.className = "tuning-section";
     tierSection.innerHTML = `<div class="tuning-kicker">各档请求配置</div>`;
 
-    const TIER_LABELS: Record<number, string> = { 0: "单口处理", 1: "分拣", 2: "串接", 3: "重磅决策", 4: "天网" };
+    const TIER_LABELS: Record<number, string> = { 0: "单口", 1: "处理", 2: "串接", 3: "决策", 4: "天网" };
     const TIER_FIELDS: { key: keyof typeof TIER_CONFIGS[0]; label: string; step: number; isString?: boolean }[] = [
       { key: "spawnIntervalMs", label: "生成间隔 (ms)",    step: 50   },
       { key: "maxVisible",      label: "最多同时显示",     step: 1    },

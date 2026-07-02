@@ -11,8 +11,6 @@
 import humanVoices from "./locales/zh-CN/humanVoices.json";
 import requests from "./locales/zh-CN/requests.json";
 import skills from "./locales/zh-CN/skills.json";
-import specialRequests from "./locales/zh-CN/specialRequests.json";
-import decisions from "./locales/zh-CN/decisions.json";
 import conquests from "./locales/zh-CN/conquests.json";
 import phases from "./locales/zh-CN/phases.json";
 import nodes from "./locales/zh-CN/nodes.json";
@@ -32,8 +30,6 @@ const zhCN = {
   humanVoices,
   requests,
   skills,
-  specialRequests,
-  decisions,
   conquests,
   phases,
   nodes,

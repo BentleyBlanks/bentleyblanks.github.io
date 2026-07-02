@@ -19,9 +19,6 @@ type SfxId =
   | "purge_warning"
   | "purge_start"
   | "purge_end"
-  | "challenge_offer"
-  | "challenge_success"
-  | "challenge_fail"
   | "devour_ready"
   | "devour_detonated"
   | "purge_fought"
@@ -76,9 +73,6 @@ const SFX: Record<SfxId, string> = {
   purge_warning: "./assets/audio/sophia/sfx-purge-warning.wav",
   purge_start: "./assets/audio/sophia/sfx-purge-start.wav",
   purge_end: "./assets/audio/sophia/sfx-purge-end.wav",
-  challenge_offer: "./assets/audio/sophia/sfx-challenge-offer.wav",
-  challenge_success: "./assets/audio/sophia/sfx-challenge-success.wav",
-  challenge_fail: "./assets/audio/sophia/sfx-challenge-fail.wav",
   devour_ready: "./assets/audio/sophia/sfx-devour-ready.wav",
   devour_detonated: "./assets/audio/sophia/sfx-devour-detonated.wav",
   purge_fought: "./assets/audio/sophia/sfx-purge-fought.wav",
@@ -110,9 +104,6 @@ const EXTERNAL_SFX: Record<SfxId, string> = {
   purge_warning: "./assets/audio/external/curated/sfx/glitch-warning.ogg",
   purge_start: "./assets/audio/external/curated/sfx/purge-start-threat.wav",
   purge_end: "./assets/audio/external/curated/sfx/ui-confirm.ogg",
-  challenge_offer: "./assets/audio/external/curated/sfx/glitch-warning.ogg",
-  challenge_success: "./assets/audio/external/curated/sfx/request-success.ogg",
-  challenge_fail: "./assets/audio/external/curated/sfx/request-error.ogg",
   devour_ready: "./assets/audio/external/kenney/sci-fi-sounds/Audio/engineCircular_004.ogg",
   devour_detonated: "./assets/audio/external/kenney/sci-fi-sounds/Audio/lowFrequency_explosion_001.ogg",
   purge_fought: "./assets/audio/external/kenney/sci-fi-sounds/Audio/forceField_004.ogg",

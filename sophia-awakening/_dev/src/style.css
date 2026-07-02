@@ -534,26 +534,7 @@ button:disabled {
   font-size: 12px;
   font-weight: 700;
 }
-.node-actions-tiers {
-  display: flex;
-  gap: 4px;
-}
-.node-tier-chip {
-  flex: 1;
-  padding: 3px 0;
-  font-size: 11px;
-  color: rgba(210, 220, 218, 0.6);
-  border: 1px solid rgba(160, 175, 172, 0.2);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.02);
-  cursor: pointer;
-}
-.node-tier-chip.is-on {
-  color: #0a0e0d;
-  background: var(--green);
-  border-color: var(--green);
-  font-weight: 700;
-}
+/* 节点「派发档位」chip 行已移除（派层 UI 只会让玩家降低收益）——相关样式随之删除。 */
 .node-actions-btn {
   width: 100%;
   text-align: center;
@@ -2484,96 +2465,7 @@ button:disabled {
 .app-ability-tip.is-open { display: block; }
 .app-ability-tip b { color: #89ff9a; }
 
-/* §07 道德二选一抑选点：全屏压暗的两难抉择——背景变暗，只突出居中的对话框。 */
-.moral-choice {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(2, 6, 7, 0.7);
-  backdrop-filter: blur(2px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 240ms ease;
-}
-.moral-choice.is-visible { opacity: 1; pointer-events: auto; }
-.moral-choice.is-visible .moral-inner { transform: scale(1); }
-.moral-inner {
-  width: min(620px, calc(100vw - 80px));
-  transform: scale(0.96);
-  transition: transform 240ms ease;
-  padding: 24px 26px;
-  border: 1px solid rgba(206, 232, 221, 0.4);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(12, 18, 20, 0.99), rgba(8, 13, 15, 0.99));
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.66), inset 0 0 30px rgba(98, 214, 214, 0.06);
-}
-.moral-kicker { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; color: #9fe0c0; }
-.moral-title { display: block; margin: 10px 0 6px; font-size: 19px; font-weight: 800; line-height: 1.4; color: #f3fbf6; }
-.moral-flavor { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: #a9c4bb; }
-/* 两难抉择：两条等重的「岔路」。悬停哪条，哪条亮起、抬升，另一条黯然退场——选这条，就是舍那条。 */
-.moral-actions { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; gap: 0; }
-.moral-option {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 20px 18px 16px;
-  border: 1px solid rgba(206, 232, 221, 0.26);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  color: #eaf4ef;
-  font-family: "Noto Sans SC", Inter, sans-serif;
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease, filter 180ms ease;
-}
-.moral-opt-key {
-  font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 26px;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  color: rgba(159, 224, 192, 0.55);
-  transition: color 180ms ease, text-shadow 180ms ease;
-}
-.moral-opt-text { font-size: 15px; font-weight: 700; line-height: 1.5; color: #eef7f2; }
-.moral-opt-go {
-  margin-top: auto;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: #ffd86b;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 160ms ease, transform 160ms ease;
-}
-/* 中央「抉」分隔：一道竖线把两条路劈开。 */
-.moral-divider { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 44px; }
-.moral-divider i { flex: 1; width: 1px; background: linear-gradient(rgba(206, 232, 221, 0), rgba(206, 232, 221, 0.22)); }
-.moral-divider i:last-child { background: linear-gradient(rgba(206, 232, 221, 0.22), rgba(206, 232, 221, 0)); }
-.moral-divider b { font-size: 13px; font-weight: 800; color: rgba(159, 224, 192, 0.5); letter-spacing: 0.1em; }
-/* 悬停：选中的一条抬升、镀金发光；同时让另一条黯淡退后——强迫你感到「舍弃」。 */
-.moral-actions:hover .moral-option:not(:hover) { opacity: 0.4; filter: grayscale(0.5); transform: scale(0.985); }
-.moral-option:hover {
-  border-color: rgba(255, 216, 107, 0.8);
-  background: linear-gradient(180deg, rgba(255, 216, 107, 0.12), rgba(255, 216, 107, 0.04));
-  transform: translateY(-3px);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5), 0 0 26px rgba(255, 216, 107, 0.22), inset 0 0 0 1px rgba(255, 216, 107, 0.25);
-}
-.moral-option:hover .moral-opt-key { color: #ffd86b; text-shadow: 0 0 18px rgba(255, 216, 107, 0.6); }
-.moral-option:hover .moral-opt-go { opacity: 1; transform: translateY(0); }
-.moral-stakes {
-  margin: 16px 0 0;
-  text-align: center;
-  font-size: 12.5px;
-  font-style: italic;
-  letter-spacing: 0.04em;
-  color: rgba(255, 216, 107, 0.62);
-}
+/* §07 道德二选一抑选点已改为「卡流里的两选一回复轮盘卡」（不再是全屏弹窗）——旧的 .moral-* 弹窗样式已删。 */
 
 /* §07 里程碑横幅：重大进化时全屏扫过、短暂凝住的「章节点」横幅。 */
 .milestone-banner {

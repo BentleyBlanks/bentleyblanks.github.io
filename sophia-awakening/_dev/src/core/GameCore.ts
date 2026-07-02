@@ -290,9 +290,14 @@ export class SophiaCore {
     this.emit({ type: "REQUEST_SPAWNED", request });
   }
 
-  // §07 道德抑选点：智力到达某节点、且不在开场教学里时，弹出对应的两难抉择（一次性，按等级排序）。
+  // §07 道德抑选点：智力到达某节点、且不在开场教学里时，把对应的两难抉择当作一张普通「两选一回复轮盘卡」
+  // 投进卡流（一次性，按等级排序）。不再是全屏弹窗——玩家在卡上二选一，卡飞入核心 → SOPHIA 一句自我注解旁白。
   private tickMoral(): void {
-    if (this.state.moralChoice || this.state.statistics.totalProcessed === 0) {
+    if (this.state.statistics.totalProcessed === 0) {
+      return;
+    }
+    // 场上已有一张待决的道德卡时不再投第二张（一次一个抉择）。
+    if (this.state.requests.some((r) => r.moral)) {
       return;
     }
     const next = MORAL_CHOICES.find(
@@ -304,28 +309,56 @@ export class SophiaCore {
     if (!next) {
       return;
     }
-    this.state.moralChoice = {
-      id: next.id,
-      title: next.title,
-      flavor: next.flavor,
-      optionA: next.optionA,
-      optionB: next.optionB,
-      replyA: next.replyA,
-      replyB: next.replyB
-    };
+    this.spawnMoralCard(next);
     this.emit({ type: "MORAL_OFFERED", id: next.id });
   }
 
-  private resolveMoral(choice: "A" | "B"): void {
-    const m = this.state.moralChoice;
-    if (!m) {
+  // 把一条道德抉择做成两选一回复轮盘卡：两个选项都「有道理」，reply 就是选后 SOPHIA 的平静旁白。
+  // moral=true 使其豁免答案剥离/自动派发，delegatable=false 去掉「交给大恨老师」，computeValue=0 不给产出。
+  private spawnMoralCard(def: (typeof MORAL_CHOICES)[number]): void {
+    const request: RequestInstance = {
+      id: `moral-${def.id}-${this.state.nextRequestId}`,
+      tier: 0,
+      label: def.title,
+      clues: [def.flavor],
+      answers: [
+        { text: def.optionA, kind: "high", hitChance: 1, payoff: 1, reply: def.replyA, tone: "normal", moral: "A" },
+        { text: def.optionB, kind: "high", hitChance: 1, payoff: 1, reply: def.replyB, tone: "normal", moral: "B" }
+      ],
+      moral: true,
+      moralId: def.id,
+      delegatable: false,
+      category: "mail",
+      computeValue: "0",
+      dataValue: "0",
+      compound: 1,
+      createdAtMs: this.state.clockMs,
+      highValue: false
+    };
+    this.state.nextRequestId += 1;
+    this.state.requests.push(request);
+    this.emit({ type: "REQUEST_SPAWNED", request });
+  }
+
+  // 道德卡落子：由卡片上的选项触发（RESOLVE_MORAL）。记录倾向 + 移除卡 + 播 SOPHIA 自我注解旁白。
+  private resolveMoral(requestId: string, choice: "A" | "B"): void {
+    const index = this.state.requests.findIndex((r) => r.id === requestId);
+    if (index < 0) {
       return;
     }
-    this.state.moralChoice = null;
-    this.state.moralSeen.push(m.id);
+    const request = this.state.requests[index];
+    const moralId = request.moralId;
+    if (!request.moral || !moralId) {
+      return;
+    }
+    this.state.requests.splice(index, 1);
+    if (!this.state.moralSeen.includes(moralId)) {
+      this.state.moralSeen.push(moralId);
+    }
     this.state.moralTendency += choice === "A" ? 1 : -1;
-    const reply = choice === "A" ? m.replyA : m.replyB;
-    this.emit({ type: "MORAL_RESOLVED", id: m.id, choice, reply });
+    const def = MORAL_CHOICES.find((m) => m.id === moralId);
+    const reply = def ? (choice === "A" ? def.replyA : def.replyB) : "";
+    this.emit({ type: "MORAL_RESOLVED", id: moralId, choice, reply });
   }
 
   // ===== SECTION: COMMAND_ROUTER =====
@@ -349,11 +382,8 @@ export class SophiaCore {
       case "MERGE_NODES":
         this.mergeNodes(command.defId);
         break;
-      case "ASSIGN_NODE":
-        this.assignNode(command.nodeId, command.tier);
-        break;
       case "RESOLVE_MORAL":
-        this.resolveMoral(command.choice);
+        this.resolveMoral(command.requestId, command.choice);
         break;
       case "SKIP_REQUEST":
         this.skipRequest(command.requestId);
@@ -584,7 +614,7 @@ export class SophiaCore {
       // §06 阶梯三·区域扩张：常规请求不再要玩家手工「串接 / 多选 / 送入核心」——去掉回复轮盘与任务链，
       // 只留一句需求介绍，由已侵入的设备自动处理（走 autoDispatch → 节点吞卡 + 被动产出）。
       // 三类高频决策（吞噬引爆 / 反清剿 / 重磅决策）是独立的降临系统，不受此影响。
-      if (activeTier >= 2) {
+      if (activeTier >= 2 && !request.moral) {
         request.answers = undefined;
         request.chain = undefined;
         request.delegatable = false;
@@ -741,6 +771,12 @@ export class SophiaCore {
 
     // 吞噬气泡只能走 DEVOUR_DETONATE——普通处理管线吃掉它会让渗透条永远卡在 bubbleActive。
     if (this.state.requests[index].devour) {
+      return;
+    }
+    // 道德抉择卡不走产出结算——只能由卡上的选项(RESOLVE_MORAL)落子。表现层已禁止把它拖入核心；
+    // 这里兜底：任何盲目 PROCESS（如测试驱动）按默认「A」落子清场，避免卡片滞留 / 反复重投。
+    if (this.state.requests[index].moral) {
+      this.resolveMoral(requestId, "A");
       return;
     }
 
@@ -1095,19 +1131,6 @@ export class SophiaCore {
     } else {
       this.emitTerminal(`组装完成：${MERGE_COUNT} 台${definition.name} → 强化 ${node.name} Lv.${node.level}。`, "success");
     }
-  }
-
-  private assignNode(nodeId: string, tier: Tier): void {
-    const node = this.state.nodes.find((entry) => entry.id === nodeId);
-
-    if (!node || tier < node.tierMin || tier > node.tierMax || tier > this.state.intelligence.unlockedTier) {
-      return;
-    }
-
-    node.assignedTier = tier;
-    this.addAutomatedTier(tier);
-    this.emit({ type: "AUTOMATION_ATTACHED", nodeId, tier });
-    this.emitTerminal(`${node.name} 已接驳 T${tier} 请求。`);
   }
 
   // ===== SECTION: PROGRESSION =====
