@@ -448,20 +448,31 @@ export class NodeNetworkView {
     const flowSpeed = (0.0004 + Math.min(0.0022, Math.log10(ratePerSec + 10) * 0.0006)) * (redQueen ? 1.8 : 1);
     this.streamPhase += deltaMs * flowSpeed;
 
-    // === 全出血氛围：经纬栅格 + 渐红铺满整个游戏区（无盒边，随接管进度由暗栗红渐红，转红略强）===
-    g.rect(x0, y0, w, h).fill({ color: lerpColor(0x160506, 0x2e080a, redT), alpha: 0.8 });
-    const gridColor = lerpColor(0x80302a, NET, redT);
-    const gridAlpha = 0.06 + redT * 0.15;
+    // === 全出血氛围：红色指挥室地面铺满整个游戏区（无盒边）。从一开始就是成立的暗红指挥台，
+    // 不是黑底贴图；随接管进度由栗红渐向主控红，中心透出径向辉光、四角压暗，纵深感撑满全区。===
+    // 底：实心暗红地面（一进终局就明显是「红色的场」，非近黑）。
+    g.rect(x0, y0, w, h).fill({ color: lerpColor(0x20090c, 0x3a0c12, redT), alpha: 1 });
+    // 中心径向辉光：多层同心圆铺到能触及四角的半径，做出「主控核心把整片地面点亮」的纵深。
+    const glowR = Math.hypot(w, h) / 2;
+    for (let k = 5; k >= 1; k -= 1) {
+      const rr = glowR * (k / 5);
+      g.circle(cx, cy, rr).fill({ color: lerpColor(0x35101a, NET, redT), alpha: 0.05 + redT * 0.045 });
+    }
+    // 经纬栅格（更实一档，一眼看出是「网格化的指挥台」而非空场）。
+    const gridColor = lerpColor(0x9a3a34, NET, redT);
+    const gridAlpha = 0.1 + redT * 0.16;
     for (let i = 1; i < 14; i += 1) {
       g.moveTo(x0 + (w * i) / 14, y0).lineTo(x0 + (w * i) / 14, y0 + h).stroke({ width: 1, color: gridColor, alpha: gridAlpha });
     }
     for (let i = 1; i < 8; i += 1) {
       g.moveTo(x0, y0 + (h * i) / 8).lineTo(x0 + w, y0 + (h * i) / 8).stroke({ width: 1, color: gridColor, alpha: gridAlpha });
     }
-    // 全域接管进度越高，核心背后越透出一层红辉。
-    if (redT > 0) {
-      g.circle(cx, cy, 170).fill({ color: NET, alpha: 0.03 + redT * 0.07 });
+    // 四角压暗（vignette）：外圈几层深色环收边，让整片场有边界纵深、不发飘。
+    for (let k = 0; k < 3; k += 1) {
+      g.circle(cx, cy, glowR + 40 - k * 34).stroke({ width: 46, color: 0x0a0203, alpha: 0.16 });
     }
+    // 核心正后方再叠一层近核红辉（接管越高越亮）。
+    g.circle(cx, cy, 190).fill({ color: NET, alpha: 0.04 + redT * 0.08 });
 
     // === 五域楔形布局：每域 72°，域内 3 格均分楔角，中间格略微内收 ===
     const ownedByDef = new Map<string, number>();
