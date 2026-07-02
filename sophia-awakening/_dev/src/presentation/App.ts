@@ -4,7 +4,6 @@ import {
   Container,
   FederatedPointerEvent,
   Graphics,
-  MeshPlane,
   Text,
   type PointData,
   type Ticker
@@ -43,6 +42,9 @@ import { RebirthPromptView } from "./views/RebirthPromptView";
 import { HudView } from "./views/HudView";
 import { NodeNetworkView } from "./views/NodeNetworkView";
 import { InterfaceView } from "./views/InterfaceView";
+import { BackgroundView } from "./views/BackgroundView";
+import { cameraZoomPulse, cameraDetonationJolt } from "./fx/cameraFx";
+import { genieIntoCore } from "./fx/genie";
 import {
   RequestPacketView,
   type RouletteOutcome, type ChainOutcome, type ReelHooks, type ChainHooks
@@ -59,6 +61,32 @@ import {
 
 
 
+
+// ============================================================================
+// App.ts 分区索引（grep 用速查表）——本文件是「总装配 + 主循环」，可安全自持的绘制/特效
+// 已拆到 fx/ 与 views/BackgroundView。请求生命周期/拖放/结算/仪式/小游戏/重生/结局因交互
+// 自动化测试覆盖弱，刻意保留在本文件内。按下列 `// ===== SECTION: xxx =====` 标记定位：
+//
+//   BOOTSTRAP / WIRING   bootstrapSophia / preloadFonts / start()：Pixi 初始化、指针交互
+//                        （连线仪式拖拽、App 悬浮提示、设备弹窗）、registerEvents 事件订阅。
+//   FRAME LOOP           frame() 主循环 + updateHud / updateSave / updateTutorial：每帧同步
+//                        core 状态到各视图、驱动 HUD/存档节流、教学高亮。
+//   REQUEST LIFECYCLE    syncRequests / nextRequestPosition / beginFaceCard：卡片视图的建/毁、
+//                        落点排布、只能面对卡。
+//   AUTO DISPATCH        autoDispatch / updateDispatchToggle / sweepToNode / launchToNode /
+//                        nodeCardIntervalMs / onAutoDispatchLanded：自动接驳与 T4 手动扫批。
+//   DROP / RESOLVE       handleDrop / handleRouletteResolved / handleChainResolved /
+//                        handleDelegate / flyIntoCore / deliverToHuman：拖放判定、回复轮盘/
+//                        串接/委托结算、卡片飞入核心、把结果交给人类。
+//   RITUAL / FX          connectFx / beginConnectRitual / finalizeRitual / zoomOutPulse /
+//                        detonationJolt / numberAvalanche：§04 连通仪式 + 镜头/雪崩特效
+//                        （镜头两拍与 genie 吮吸的实现体已拆到 fx/cameraFx、fx/genie）。
+//   NODE ACTIONS         showNodeActions / hideNodeActions：点设备就地弹窗（派发/合并/淘汰）。
+//   BACKGROUND           drawBackground / drawAmbient：脏检查留此，实际绘制委托 BackgroundView。
+//   EVENTS / ENDGAME     registerEvents / openEnding / restart / announceGuidance /
+//                        onAutomationPayout / onRequestProcessed：core 事件订阅 + 结局/重生接线。
+//   PERSISTENCE          ensurePersistenceRevision / hardResetAndReload / clearPersistedSophiaState。
+// ============================================================================
 
 // 终端顶部常驻的「当前大方向」——每个阶段 SOPHIA 在做什么（贴 §08/§11 叙事）。
 const PHASE_OBJECTIVE: Record<string, string> = {
@@ -109,7 +137,7 @@ class SophiaGameApp {
   private readonly loop = new GameLoop(this.core);
   private readonly background = new Graphics();
   private readonly ambient = new Graphics();
-  private ambientPhase = 0;
+  private readonly backgroundView = new BackgroundView();
   private readonly world = new Container();
   private readonly requestLayer = new Container();
   private readonly fxLayer = new Container();
@@ -175,6 +203,7 @@ class SophiaGameApp {
 
   constructor(private readonly root: HTMLElement) {}
 
+  // ===== SECTION: BOOTSTRAP / WIRING =====
   async start(): Promise<void> {
     query("#gameVersion").textContent = `v${GAME_VERSION}`;
     this.pixi = new Application();
@@ -330,6 +359,7 @@ class SophiaGameApp {
     });
   }
 
+  // ===== SECTION: FRAME LOOP =====
   private frame(deltaMs: number): void {
     const paused = gameStore.getState().paused;
 
@@ -391,6 +421,7 @@ class SophiaGameApp {
     this.saveManager.save(state);
   }
 
+  // ===== SECTION: REQUEST LIFECYCLE =====
   private syncRequests(state: GameState): void {
     const liveIds = new Set(state.requests.map((request) => request.id));
 
@@ -529,6 +560,7 @@ class SophiaGameApp {
     return corners[this.requestViews.size % 4];
   }
 
+  // ===== SECTION: NODE ACTIONS =====
   private hideNodeActions(): void {
     this.nodeActionsEl?.classList.remove("is-open");
   }
@@ -629,6 +661,7 @@ class SophiaGameApp {
     });
   }
 
+  // ===== SECTION: AUTO DISPATCH =====
   private autoDispatch(state: GameState, deltaMs: number): void {
     // 自动接驳：买下「自动接驳」并控住至少一台在线设备后，节点网络就接管出卡。
     // 每个节点按自己的「处理节拍」吃卡——弱机（办公机）慢、强机（服务器/数据中心/电网）快，
@@ -806,6 +839,7 @@ class SophiaGameApp {
     }
   }
 
+  // ===== SECTION: DROP / RESOLVE =====
   // 回复轮盘揭晓 → 气泡滑入核心 → 结算 → 把"处理好的信息交给人类"（视觉引导 + 终端回话）。
   // 装死（dead）则气泡安静消失，仅移除该请求、零收益。
   private handleRouletteResolved(card: RequestPacketView, outcome: RouletteOutcome): void {
@@ -896,6 +930,7 @@ class SophiaGameApp {
     );
   }
 
+  // ===== SECTION: RITUAL / FX =====
   // 连上 App 的反馈：从核心沿新接好的线送一颗亮信号进 App，落点炸开 + 扩环 +「已接通」。
   private connectFx(from: PointData, to: PointData, color: number = GREEN): void {
     this.audio.playRequestAccept();
@@ -996,79 +1031,11 @@ class SophiaGameApp {
   // 卡片飞入 Core 的动画：默认滑入；调试面板开启「Dock 吮吸」后改用 Mac Dock 神奇效果（genie 网格扭曲）。
   private flyIntoCore(card: RequestPacketView, target: PointData, onComplete: () => void, entry?: PointData): void {
     if (fxSettings.coreSuck) {
-      this.genieIntoCore(card, target, onComplete);
+      // §FX Mac Dock「神奇效果」——网格漏斗吮吸实现见 fx/genie。
+      genieIntoCore(this.pixi?.renderer, card, target, onComplete);
     } else {
       card.accept(target, onComplete, entry);
     }
-  }
-
-  // §FX Mac Dock「神奇效果」：把卡片快照成纹理，贴到一张细分网格上，逐帧沿"漏斗曲线"扭曲——
-  // 靠近目标的一端先被吸成尖颈、整张顺着颈流进核心那一点。不是简单缩放，而是真正的网格形变。
-  private genieIntoCore(card: RequestPacketView, target: PointData, onComplete: () => void): void {
-    const renderer = this.pixi?.renderer;
-    const src = card.container;
-    const parent = src.parent;
-    if (!renderer || !parent) {
-      card.accept(target, onComplete);
-      return;
-    }
-
-    let tex;
-    try {
-      tex = renderer.generateTexture(src);
-    } catch {
-      card.accept(target, onComplete);
-      return;
-    }
-
-    const ROWS = 24;
-    const mesh = new MeshPlane({ texture: tex, verticesX: 2, verticesY: ROWS });
-    mesh.position.set(src.x, src.y);
-    parent.addChild(mesh);
-    src.visible = false;
-
-    const t = mesh.toLocal(target as PointData); // 目标点（核心）在网格本地坐标
-    const texW = tex.width;
-    const texH = tex.height;
-    const attr = mesh.geometry.getAttribute("aPosition");
-    const buffer = attr.buffer;
-    const data = buffer.data as Float32Array;
-
-    const D = 0.55; // 漏斗颈的"行延迟"展开度：越大颈越长
-    const state = { p: 0 };
-    gsap.to(state, {
-      p: 1,
-      duration: 0.6,
-      ease: "power2.in",
-      onUpdate: () => {
-        const p = state.p;
-        for (let j = 0; j < ROWS; j += 1) {
-          const v = j / (ROWS - 1); // 0=顶, 1=底
-          const lead = 1 - v; // 靠近目标的"底端"先走（lead 小→更早收束）
-          let lp = (p - lead * D) / (1 - D);
-          lp = lp < 0 ? 0 : lp > 1 ? 1 : lp;
-          lp = lp * lp * (3 - 2 * lp); // smoothstep
-          const restY = v * texH;
-          const y = restY + (t.y - restY) * lp; // 该行整体被拉向目标
-          const cx = texW / 2 + (t.x - texW / 2) * lp; // 中线弯向目标
-          const halfW = (texW / 2) * Math.pow(1 - lp, 1.5); // 越收束越窄→尖颈
-          const li = (j * 2 + 0) * 2;
-          const ri = (j * 2 + 1) * 2;
-          data[li] = cx - halfW;
-          data[li + 1] = y;
-          data[ri] = cx + halfW;
-          data[ri + 1] = y;
-        }
-        buffer.update();
-        mesh.alpha = p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 1;
-      },
-      onComplete: () => {
-        mesh.destroy();
-        tex.destroy(true);
-        onComplete();
-        card.destroy();
-      }
-    });
   }
 
   // T2 串接结算：把任务链滑入核心 → 结算 → 终端反馈（串干净=好评，混了干扰项=打折+被点出）。
@@ -1152,52 +1119,18 @@ class SophiaGameApp {
     return { x: rect.left + rect.width / 2, y: rect.top + 24 };
   }
 
-  // §04 吞噬引爆的「镜头拉远」：以屏幕中心为锚把世界放大 1.06 再缓缓拉回——制造一拍「拉远一档」
-  // 的镜头感。用 pivot=position=中心 保证缩放前后画面不位移，结束后复位（与 1.0 视觉等价）。
+  // §04 吞噬引爆的「镜头拉远」：算出屏幕中心锚点后委托 cameraZoomPulse（实现见 fx/cameraFx）。
   private zoomOutPulse(peakScale = 1.06, duration = 1.0): void {
-    const w = this.world;
     const cx = (this.lastScreenW || window.innerWidth) / 2;
     const cy = (this.lastScreenH || window.innerHeight) / 2;
-    gsap.killTweensOf(w.scale);
-    // 以屏幕中心为锚（pivot=position=中心），scale=1 时画面不位移；从当前缩放平滑推到 peak 再缓缓拉回，
-    // 不再第 1 帧直接 set(peak)——那会造成一下「跳变」。
-    w.pivot.set(cx, cy);
-    w.position.set(cx, cy);
-    gsap
-      .timeline({
-        onComplete: () => {
-          w.pivot.set(0, 0);
-          w.position.set(0, 0);
-        }
-      })
-      .to(w.scale, { x: peakScale, y: peakScale, duration: duration * 0.3, ease: "power2.out" })
-      .to(w.scale, { x: 1, y: 1, duration: duration * 0.7, ease: "power2.inOut" });
+    cameraZoomPulse(this.world, cx, cy, peakScale, duration);
   }
 
-  // §04 引爆镜头冲击：先轻轻一「顿」（微缩），再猛地放大一档、缓缓拉回——「顿一下再拉远」的物理冲击。
-  // intensity 越大（吞得越大）顿挫越狠、拉远时间越长。
+  // §04 引爆镜头冲击：算出屏幕中心锚点后委托 cameraDetonationJolt（实现见 fx/cameraFx）。
   private detonationJolt(intensity: number): void {
-    const w = this.world;
     const cx = (this.lastScreenW || window.innerWidth) / 2;
     const cy = (this.lastScreenH || window.innerHeight) / 2;
-    gsap.killTweensOf(w.scale);
-    w.pivot.set(cx, cy);
-    w.position.set(cx, cy);
-    const punch = 1.07 + intensity * 0.035;
-    w.scale.set(0.985); // 先一顿
-    gsap
-      .timeline()
-      .to(w.scale, { x: punch, y: punch, duration: 0.12, ease: "power3.out" })
-      .to(w.scale, {
-        x: 1,
-        y: 1,
-        duration: 1.0 + intensity * 0.2,
-        ease: "power2.out",
-        onComplete: () => {
-          w.pivot.set(0, 0);
-          w.position.set(0, 0);
-        }
-      });
+    cameraDetonationJolt(this.world, cx, cy, intensity);
   }
 
   // §04 数字雪崩：引爆瞬间满屏抛出疯狂滚动的产出倍率大字，持续约 2 秒。intensity 越大抛得越多。
@@ -1278,6 +1211,7 @@ class SophiaGameApp {
     return true;
   }
 
+  // ===== SECTION: EVENTS / ENDGAME =====
   private registerEvents(): void {
     this.dispatchToggleBtn.addEventListener("click", () => {
       this.dispatchMode = this.dispatchMode === "manual" ? "auto" : "manual";
@@ -1484,42 +1418,14 @@ class SophiaGameApp {
     this.pendingDropPoints.delete(event.request.id);
   }
 
-  // 流动的数据电路板：沿背景走线滑动的光点。前期（手机寄生）最明显，自动化 / 联网后渐隐，
-  // 让「困在一块电路板里」的观感随你冲出宿主而淡去。
+  // ===== SECTION: BACKGROUND =====
+  // 流动的数据电路板：脏检查无关，逐帧重画——绘制体委托 BackgroundView.paintAmbient。
   private drawAmbient(state: GameState, deltaMs: number): void {
-    this.ambientPhase += deltaMs * 0.00045;
-    this.ambient.clear();
-
-    const w = this.pixi.screen.width;
-    const h = this.pixi.screen.height;
-    const playfieldLeft = LEFT_RAIL_WIDTH;
-    const playfieldRight = w - RIGHT_RAIL_WIDTH;
-    // 强度随进度衰减：手机寄生最强，联网（T2+）后基本消失。
-    const fade = state.intelligence.unlockedTier >= 2 ? 0.18 : !state.automationUnlocked ? 1 : 0.5;
-    if (fade <= 0.05) {
-      return;
-    }
-
-    const seedRand = (n: number): number => ((Math.sin(n * 127.1) * 43758.5453) % 1 + 1) % 1;
-    const lanes = 7;
-    for (let i = 0; i < lanes; i += 1) {
-      const ty = 100 + (i / lanes) * (h - 180);
-      const tx0 = playfieldLeft + 24;
-      const bend = playfieldLeft + 120 + seedRand(i + 20) * (playfieldRight - playfieldLeft - 240);
-      const len = bend - tx0;
-      // 两颗错相位的光点沿"横段"滑动
-      for (let k = 0; k < 2; k += 1) {
-        const t = (this.ambientPhase + i * 0.21 + k * 0.5) % 1;
-        const px = tx0 + t * len;
-        const a = (0.5 + Math.sin((this.ambientPhase + i) * 6) * 0.3) * fade;
-        this.ambient.circle(px, ty, 2.2).fill({ color: 0x6fe0c0, alpha: 0.5 * a });
-        this.ambient.circle(px, ty, 6).fill({ color: 0x6fe0c0, alpha: 0.12 * a });
-      }
-    }
+    this.backgroundView.paintAmbient(this.ambient, state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
   }
 
-  // §04 控制域地图升维：背景随阶段换皮——手机电路板 → 电脑桌面 → 公司机房 → 全球。
-  // 只在尺寸或阶段变化时重画（背景是静态 Graphics，便宜）。
+  // §04 控制域地图升维：背景随阶段换皮。脏检查（尺寸/控制域变化）留在 App——因 lastScreenW/H
+  // 还被镜头特效与数字雪崩共用；实际绘制委托 BackgroundView.paintBackground。
   private drawBackground(state: GameState): void {
     const w = this.pixi.screen.width;
     const h = this.pixi.screen.height;
@@ -1532,95 +1438,7 @@ class SophiaGameApp {
     this.lastScreenW = w;
     this.lastScreenH = h;
     this.lastDomain = domain;
-    const bg = this.background;
-    bg.clear();
-    bg.rect(0, 0, w, h).fill({ color: 0x111315 });
-    bg.rect(0, 0, w, h).fill({ color: 0x242018, alpha: 0.34 });
-
-    for (let x = 0; x < w; x += 54) {
-      bg.moveTo(x, 0).lineTo(x, h).stroke({ width: 1, color: 0xffffff, alpha: 0.025 });
-    }
-    for (let y = 0; y < h; y += 54) {
-      bg.moveTo(0, y).lineTo(w, y).stroke({ width: 1, color: 0xffffff, alpha: 0.022 });
-    }
-
-    const pl = LEFT_RAIL_WIDTH;
-    const pr = w - RIGHT_RAIL_WIDTH;
-    const seedRand = (n: number): number => ((Math.sin(n * 127.1) * 43758.5453) % 1 + 1) % 1;
-
-    if (domain === "phone") {
-      // 手机寄生：散落的其它 App 图标 + 数据电路板走线——SOPHIA 只是这部手机里众多 App 中的一个。
-      for (let i = 0; i < 26; i += 1) {
-        const ax = pl + 30 + seedRand(i + 1) * (pr - pl - 80);
-        const ay = 70 + seedRand(i + 7.3) * (h - 160);
-        const sz = 22 + seedRand(i + 3.1) * 16;
-        bg.roundRect(ax, ay, sz, sz, 6).fill({ color: 0x2a4f48, alpha: 0.05 });
-        bg.roundRect(ax, ay, sz, sz, 6).stroke({ width: 1, color: 0x3f6f64, alpha: 0.07 });
-      }
-      for (let i = 0; i < 7; i += 1) {
-        const ty = 100 + (i / 7) * (h - 180);
-        const tx0 = pl + 24;
-        const bend = pl + 120 + seedRand(i + 20) * (pr - pl - 240);
-        bg.moveTo(tx0, ty).lineTo(bend, ty).lineTo(bend, ty + 60).stroke({ width: 1, color: 0x2f8a6e, alpha: 0.06 });
-        bg.circle(bend, ty, 2.4).fill({ color: 0x3f9f80, alpha: 0.1 });
-        bg.circle(tx0, ty, 2).fill({ color: 0x3f9f80, alpha: 0.08 });
-      }
-    } else if (domain === "device") {
-      // 萌芽 / 控制公司：镜头已离开手机——背景成了一张电脑桌面（几扇窗口框 + 底部任务栏）。
-      for (let i = 0; i < 6; i += 1) {
-        const ww = 160 + seedRand(i + 2) * 200;
-        const wh = 96 + seedRand(i + 5) * 130;
-        const wx = pl + 24 + seedRand(i + 1) * Math.max(20, pr - pl - ww - 48);
-        const wy = 78 + seedRand(i + 9) * Math.max(40, h - 280 - wh);
-        bg.roundRect(wx, wy, ww, wh, 9).fill({ color: 0x16241f, alpha: 0.09 });
-        bg.roundRect(wx, wy, ww, wh, 9).stroke({ width: 1.2, color: 0x4f8576, alpha: 0.2 });
-        bg.moveTo(wx, wy + 19).lineTo(wx + ww, wy + 19).stroke({ width: 1, color: 0x4f8576, alpha: 0.18 });
-        bg.circle(wx + 13, wy + 9.5, 2.8).fill({ color: 0x5fc0a0, alpha: 0.28 });
-      }
-      bg.rect(pl, h - 60, pr - pl, 32).fill({ color: 0x16241f, alpha: 0.1 });
-      bg.moveTo(pl, h - 60).lineTo(pr, h - 60).stroke({ width: 1, color: 0x4f8576, alpha: 0.2 });
-    } else if (domain === "region") {
-      // 区域扩张：俯瞰机房——一排排服务器机架，各自带槽位线。
-      const cols = 9;
-      for (let i = 0; i < cols; i += 1) {
-        const rx = pl + 34 + i * ((pr - pl - 68) / cols);
-        const rh = 150 + seedRand(i + 4) * 150;
-        const ry = h * 0.5 - rh / 2;
-        bg.roundRect(rx, ry, 28, rh, 4).fill({ color: 0x16241f, alpha: 0.09 });
-        bg.roundRect(rx, ry, 28, rh, 4).stroke({ width: 1.2, color: 0x4f8576, alpha: 0.18 });
-        const slots = 7;
-        for (let s = 1; s < slots; s += 1) {
-          bg.moveTo(rx, ry + s * (rh / slots)).lineTo(rx + 28, ry + s * (rh / slots)).stroke({ width: 1, color: 0x5fc0a0, alpha: 0.13 });
-        }
-      }
-    } else {
-      // 全球：极淡的「经纬」弧线作底（真正的世界地图由 NodeNetworkView 在上层绘制）。
-      for (let i = 1; i < 6; i += 1) {
-        const gy = (i / 6) * h;
-        bg.moveTo(pl, gy).quadraticCurveTo((pl + pr) / 2, gy - 22, pr, gy).stroke({ width: 1, color: 0x2f8a6e, alpha: 0.05 });
-      }
-      for (let i = 1; i < 5; i += 1) {
-        const gx = pl + (i / 5) * (pr - pl);
-        bg.moveTo(gx, 60).lineTo(gx, h - 40).stroke({ width: 1, color: 0x2f8a6e, alpha: 0.035 });
-      }
-    }
-
-    // 核心底座（全球阶段由地图自带，不画）。
-    if (domain !== "global") {
-      const coreX = (pl + pr) * 0.5;
-      const coreY = h * 0.5;
-      const steps = 8;
-      for (let i = steps; i >= 1; i -= 1) {
-        const t = i / steps;
-        const rx = 96 + t * 168;
-        bg.ellipse(coreX, coreY, rx, rx * 0.6).fill({ color: 0x16302b, alpha: 0.055 * (1 - t) + 0.008 });
-      }
-      const deckY = coreY + 132;
-      for (let i = 1; i <= 3; i += 1) {
-        bg.ellipse(coreX, deckY, 150 + i * 78, 40 + i * 22).stroke({ width: 1, color: 0x2c3f3b, alpha: 0.2 - i * 0.04 });
-      }
-      bg.ellipse(coreX, coreY + 116, 116, 22).fill({ color: 0x000000, alpha: 0.3 });
-    }
+    this.backgroundView.paintBackground(this.background, w, h, domain);
   }
 }
 
@@ -1631,6 +1449,7 @@ class SophiaGameApp {
 
 
 
+// ===== SECTION: PERSISTENCE =====
 function ensurePersistenceRevision(): void {
   const current = window.localStorage.getItem(PERSISTENCE_REVISION_KEY);
 
