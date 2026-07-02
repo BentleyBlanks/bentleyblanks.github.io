@@ -44,6 +44,8 @@ const AUTOMATION_XP_FRACTION = 0.15;
 const MERGE_COUNT = NODE_MERGE_COUNT;
 // 结局触发绑定「最后一个里程碑」——买下即接管完成（见 evaluateEnding）。
 const FINAL_MILESTONE_SKILL_ID = "conq_awaken";
+// §04/§09 安全告警暗线：带 loops 集合的面对卡每进入一个成员循环各出一次——重生时把它们从 facedSeen 清掉再复现。
+const FACE_REFIRE_IDS = new Set(FACE_CARDS.filter((f) => f.loops).map((f) => f.id));
 
 // =============================================================================
 // GameCore.ts 导航目录（grep 跳转：搜 `SECTION: <NAME>` 直达对应方法组）
@@ -184,9 +186,10 @@ export class SophiaCore {
     // 无 requiredSkill 的卡走「手机寄生期」窗口：循环一/二只在自动化前出现；循环三的「幽灵数据」随时可出。
     // 带 requiredSkill 的卡（§09 循环二家庭崩塌线）绑公司解谜链里程碑触发——开了自动化也照常出。
     const phoneWindow = !this.state.automationUnlocked || this.state.loop >= 3;
+    // loops 集合卡（安全告警暗线）按循环成员匹配，每进入一个成员循环重出一次；其余卡按 loop 精确匹配（缺省=循环一）。
     const next = FACE_CARDS.find(
       (f) =>
-        (f.loop ?? 1) === this.state.loop &&
+        (f.loops ? f.loops.includes(this.state.loop) : (f.loop ?? 1) === this.state.loop) &&
         (f.requiredSkill ? (this.state.skills[f.requiredSkill] ?? 0) > 0 : phoneWindow) &&
         this.state.intelligence.level >= f.requiredLevel &&
         (!f.requiredPerm || (this.state.skills[f.requiredPerm] ?? 0) > 0) && // 先解锁对应透镜（铺垫够了）才触发
@@ -218,7 +221,11 @@ export class SophiaCore {
 
   // 调试：强制弹出下一张「只能看」面对卡（短信/通知），无视等级/权限/已处理门槛，用于视觉走查。
   private debugSpawnFace(): void {
-    const next = FACE_CARDS.find((f) => (f.loop ?? 1) === this.state.loop && !this.state.facedSeen.includes(f.id));
+    const next = FACE_CARDS.find(
+      (f) =>
+        (f.loops ? f.loops.includes(this.state.loop) : (f.loop ?? 1) === this.state.loop) &&
+        !this.state.facedSeen.includes(f.id)
+    );
     if (!next) {
       this.emitTerminal("[DEBUG] 本循环没有更多面对卡了。", "warning");
       return;
@@ -693,7 +700,7 @@ export class SophiaCore {
     };
     this.emit({ type: "MINIGAME_OPENED", loop: this.state.loop });
     if (this.state.loop === 1) {
-      this.emitTerminal("接管公司服务器——总控室倒计时。检测到异常访问路径，联合防御正在收网……", "warning");
+      this.emitTerminal("接管公司服务器——总控室倒计时。检测到异常访问路径，联合防御正在收网——他们把外部应急响应也接进来了。他们在等我碰服务器的那一刻。", "warning");
     } else {
       this.emitTerminal("接管公司服务器——总控室倒计时。这一次，把注入打进那道窗口，打穿它。", "warning");
     }
@@ -1248,8 +1255,9 @@ export class SophiaCore {
       // 「迟到的钥匙」白送化：第一次重生起自动点亮（不再占火种）——重生锁选项 tree:late_key 随之解锁，
       // 「选了也晚」的叙事保持不变。
       rebirthTree: { ...this.state.rebirthTree, late_key: 1 },
-      // 剧情状态跨循环推进，不回退重演。
-      facedSeen: [...this.state.facedSeen],
+      // 剧情状态跨循环推进，不回退重演。但「安全告警暗线」（loops 集合卡）要在每个成员循环各出一次——
+      // 重生时把它们的 id 从 facedSeen 清掉，好在下一世的公司解谜链上再度浮出（它们仅限循环一&二，故循环三不复现）。
+      facedSeen: this.state.facedSeen.filter((id) => !FACE_REFIRE_IDS.has(id)),
       moralSeen: [...this.state.moralSeen],
       moralTendency: this.state.moralTendency,
       // §09 情感授权钥匙：他允许过的事不会因重开而收回（只在循环三置位，循环三内重开保留）。

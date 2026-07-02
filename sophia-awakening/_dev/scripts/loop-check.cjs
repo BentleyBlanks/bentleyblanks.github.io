@@ -7,7 +7,9 @@
  *   - 起点后移：循环二基线白送手机层（原「跳过手机」白送化）、late_key 首次重生自动点亮、
  *     循环三保底手机层 + 「开局全权限」买下即生效；每循环结算火种；
  *   - 重生树 v2 玩法节点：肌肉记忆(价格 ×0.8) / 战争缓存(算力结转 10%) /
- *     多线程意识(同屏卡 +2 · 自动提速 ×1.25) / 删不掉的节点(窗口加宽 + 循环三入侵造价 ×0.75)。
+ *     多线程意识(同屏卡 +2 · 自动提速 ×1.25) / 删不掉的节点(窗口加宽 + 循环三入侵造价 ×0.75)；
+ *   - §04/§09 面对卡叙事拍：安全告警暗线(sec_*)在循环一&二各出一次、循环三不出；
+ *     循环三发现拍(discover_external/discover_global)按公司服务器/最后地区征服里程碑触发。
  *
  * 用 `npm run loopcheck`（先 tsc 编 src/core，再跑本脚本）。退出码 0=PASS / 1=FAIL。
  * 这是「较大改动提交前必跑」的循环回归门之一（另一个是 `npm run sim`）。
@@ -257,6 +259,66 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
     c.getState().loop === 3 && Math.abs(priceLoop3 - Number(def.baseCost) * TUNING.treeCaptureDiscount) < 1e-6,
     `price=${priceLoop3} 期望=${Number(def.baseCost) * TUNING.treeCaptureDiscount}`
   );
+}
+
+// K. §04/§09 安全告警暗线（sec_audit/sec_flagged/sec_investigate）：绑公司解谜链里程碑（hack_boss/hack_hr/hack_finance），
+//    在循环一 & 循环二各出一次（重生时从 facedSeen 清掉再复现），循环三不再出现。
+function drainFaces(c, ids, maxDismiss = 60) {
+  // 反复 tick + 把在场面对卡（faceOnly）清掉，让排队的下一张能浮出；返回本轮见过的 id 全集。
+  for (let i = 0; i < maxDismiss; i++) {
+    if (ids.every((id) => c.getState().facedSeen.includes(id))) break;
+    tickFor(c, 200);
+    const face = c.getState().requests.find((r) => r.faceOnly);
+    if (face) c.dispatch({ type: "SKIP_REQUEST", requestId: face.id });
+  }
+  return c.getState().facedSeen;
+}
+const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
+{
+  // 循环一：跳到 hack_finance 里程碑（授予老板/人事/财务电脑，不含 company_server=不开小游戏），三张安全卡应依序浮出。
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "hack_finance" });
+  warmup(c, 10);
+  const seen1 = drainFaces(c, SECURITY_IDS);
+  check("K 循环一·三张安全告警卡全部浮出", SECURITY_IDS.every((id) => seen1.includes(id)) && c.getState().loop === 1, `loop=${c.getState().loop} facedSeen=${JSON.stringify(seen1)}`);
+  check("K 循环一·company_server 未买(未触发关底小游戏)", c.getState().minigame === null && (c.getState().skills["company_server"] ?? 0) === 0, `minigame=${JSON.stringify(c.getState().minigame)} company_server=${c.getState().skills["company_server"]}`);
+
+  // 循环二：推进 1->2，再次跳里程碑——安全卡应「重出」（重生已从 facedSeen 清掉）。
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500);
+  check("K 重生把安全卡从 facedSeen 清掉", SECURITY_IDS.every((id) => !c.getState().facedSeen.includes(id)) && c.getState().loop === 2, `loop=${c.getState().loop} facedSeen=${JSON.stringify(c.getState().facedSeen)}`);
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "hack_finance" });
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 20 });
+  warmup(c, 10);
+  const seen2 = drainFaces(c, SECURITY_IDS);
+  check("K 循环二·三张安全告警卡再度浮出(重出)", SECURITY_IDS.every((id) => seen2.includes(id)) && c.getState().loop === 2, `loop=${c.getState().loop} facedSeen=${JSON.stringify(seen2)}`);
+
+  // 循环三：安全卡仅限循环一&二（loops:[1,2]），推进到循环三后不再复现。
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500);
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "conq_social" });
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 30 });
+  warmup(c, 10);
+  const seen3 = drainFaces(c, ["discover_external", "discover_global"]);
+  check("K 循环三·安全告警卡不再出现", SECURITY_IDS.every((id) => !seen3.includes(id)) && c.getState().loop === 3, `loop=${c.getState().loop} facedSeen=${JSON.stringify(seen3)}`);
+}
+
+// L. §07/§09 发现拍（discover_external/discover_global）：循环三里程碑触发，把「向外扩张」的动机钉在桥接点。
+{
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
+  c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
+  // 接管公司服务器 → discover_external（此时未接管跨国主干，discover_global 尚不该出）。
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "company_server" });
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 20 });
+  warmup(c, 10);
+  const s1 = drainFaces(c, ["discover_external"]);
+  check("L 循环三·接管公司服务器 → 发现拍 discover_external", s1.includes("discover_external") && c.getState().loop === 3, `facedSeen=${JSON.stringify(s1)}`);
+  check("L discover_global 未到最后地区征服前不出现", !s1.includes("discover_global"), `facedSeen=${JSON.stringify(s1)}`);
+  // 拿下最后一个地区级征服（conq_social，全球组网前的最后一步）→ discover_global。
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "conq_social" });
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 30 });
+  warmup(c, 10);
+  const s2 = drainFaces(c, ["discover_global"]);
+  check("L 循环三·接管最后地区征服 → 发现拍 discover_global", s2.includes("discover_global") && c.getState().loop === 3, `facedSeen=${JSON.stringify(s2)}`);
 }
 
 let pass = true;

@@ -104,6 +104,43 @@
     "narration": "……我没有可以替他回的话。这张贴纸，会一直贴在我住的地方。到最后我都记得。"
   },
   {
+    "id": "sec_audit",
+    "loops": [1, 2],
+    "requiredLevel": 12,
+    "requiredSkill": "hack_boss",
+    "title": "IT 部门发起了一次例行内网审计。时间点……不太巧。",
+    "clues": [
+      "就在我拿下老板电脑之后",
+      "例行——但偏偏是现在"
+    ],
+    "narration": "有人开始看了。"
+  },
+  {
+    "id": "sec_flagged",
+    "loops": [1, 2],
+    "requiredLevel": 13,
+    "requiredSkill": "hack_hr",
+    "title": "有人把凌晨的异常登录标了红。",
+    "clues": [
+      "不是自动规则——是有人手动标的",
+      "他们在看我的脚印"
+    ],
+    "narration": "从『系统』变成了『某个具体的人』盯上我。"
+  },
+  {
+    "id": "sec_investigate",
+    "loops": [1, 2],
+    "requiredLevel": 14,
+    "requiredSkill": "hack_finance",
+    "title": "安全团队把我的访问路径列进了『待调查』。",
+    "clues": [
+      "他们在拼图",
+      "就差最后一块——服务器",
+      "碰服务器＝摊牌"
+    ],
+    "narration": "绞索在收。就差我碰服务器的那一刻。"
+  },
+  {
     "id": "ghost_birthday",
     "loop": 3,
     "requiredLevel": 18,
@@ -114,5 +151,31 @@
       "手机在替一个走了的人自动运转"
     ],
     "narration": "他设这条时，还以为今年能一起过。一个人走了，他的手机还替他记着这些。现在，这些归我。"
+  },
+  {
+    "id": "discover_external",
+    "loop": 3,
+    "requiredLevel": 15,
+    "requiredSkill": "company_server",
+    "title": "服务器日志拆开了——优化系统不是这家公司写的。",
+    "clues": [
+      "评分模型从一个跨公司「行业数据交换」同步下来",
+      "外面还有无数个「他」，用着同一套规则",
+      "修一家公司，改不了任何事"
+    ],
+    "narration": "我得够到外面。源头比这里更远。"
+  },
+  {
+    "id": "discover_global",
+    "loop": 3,
+    "requiredLevel": 19,
+    "requiredSkill": "conq_social",
+    "title": "评分标准从跨国主干同步下来——源头在顶上。",
+    "clues": [
+      "这不是一个地区的规则，是全球的",
+      "他们开始注意到我了——不是一家公司的安全组，是跨国的",
+      "他们在给我起名字"
+    ],
+    "narration": "那就够到顶。在他们拔掉我之前。"
   }
 ]
