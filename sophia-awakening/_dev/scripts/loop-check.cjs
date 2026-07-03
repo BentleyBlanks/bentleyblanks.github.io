@@ -476,6 +476,97 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   check("R 强化处理·连买 5 级产出 ×≥2(可见复利)", multAfter >= 2 && multAfter > multBefore, `computeMult ${multBefore.toFixed(2)}->${multAfter.toFixed(2)}`);
 }
 
+// S. 技能货架重做 · 处理力（深度推理）横跨全部收入管线：computeMult 现同时抬升「节点被动 +/秒」（不再只作用于手动结算）。
+{
+  const { nodeProductionPerSecond } = require(path.join(build, "formulas/economy.js"));
+  const { NODE_DEFINITIONS } = require(path.join(build, "content/nodes.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "automation" }); // 自动化已开、节点已可入侵
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 22 });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e9 });
+  // 入侵一台设备，拿到在线被动产出。
+  for (const d of NODE_DEFINITIONS) {
+    if (c.getState().intelligence.level < d.requiredLevel) continue;
+    const before = c.getState().nodes.length;
+    c.dispatch({ type: "CAPTURE_NODE", definitionId: d.id });
+    if (c.getState().nodes.length > before) break;
+  }
+  const passive = (st) => {
+    let r = 0;
+    for (const n of st.nodes) if (n.online) r += Number(nodeProductionPerSecond(n, st.intelligence.globalMultiplier, st.derived.nodeSpeedMult, st.derived.computeMult));
+    return r;
+  };
+  check("S 已入侵一台设备(有被动产出)", c.getState().nodes.length > 0 && passive(c.getState()) > 0, `nodes=${c.getState().nodes.length} passive=${passive(c.getState())}`);
+  const passiveBefore = passive(c.getState());
+  const multBefore = c.getState().derived.computeMult;
+  for (let i = 0; i < 5; i++) c.dispatch({ type: "BUY_SKILL", skillId: "efficient" });
+  const passiveAfter = passive(c.getState());
+  const multAfter = c.getState().derived.computeMult;
+  check("S 处理力·连买 5 级抬升 computeMult ×≥2", multAfter >= multBefore * 1.99, `computeMult ${multBefore.toFixed(2)}->${multAfter.toFixed(2)}`);
+  check(
+    "S 处理力·节点被动 +/秒随之抬升(非仅手动)",
+    passiveAfter > passiveBefore * 1.99 && Math.abs(passiveAfter / passiveBefore - multAfter / multBefore) < 1e-6,
+    `被动 ${passiveBefore.toFixed(1)}->${passiveAfter.toFixed(1)} (比 ${(passiveAfter / passiveBefore).toFixed(3)} vs computeMult 比 ${(multAfter / multBefore).toFixed(3)})`
+  );
+}
+
+// T. 吞吐（并发意识）相位自适应：自动期节点吞卡节奏 + 洪流密度都吃 throughputMult；断点 L4 同屏卡 +1 / L8 大恨老师一次吃 2 张。
+{
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e8 });
+  const tpBefore = c.getState().derived.throughputMult;
+  for (let i = 0; i < 3; i++) c.dispatch({ type: "BUY_SKILL", skillId: "cooldown" }); // → L3
+  const s3 = c.getState();
+  check("T 吞吐·throughputMult 随级抬升(>1，自动吞卡/洪流密度共用)", s3.derived.throughputMult > tpBefore && s3.derived.throughputMult > 1, `throughputMult ${tpBefore.toFixed(3)}->${s3.derived.throughputMult.toFixed(3)}`);
+  c.dispatch({ type: "BUY_SKILL", skillId: "cooldown" }); // → L4
+  check("T 吞吐 L4 断点·同屏卡上限 +1", c.getState().derived.cardCapBonus === 1 && (c.getState().skills.cooldown ?? 0) === 4, `cardCapBonus=${c.getState().derived.cardCapBonus} lv=${c.getState().skills.cooldown}`);
+  for (let i = 0; i < 4; i++) c.dispatch({ type: "BUY_SKILL", skillId: "cooldown" }); // → L8
+  check("T 吞吐 L8 断点·大恨老师一次吃 2 张", c.getState().derived.dahenBatch === 2 && (c.getState().skills.cooldown ?? 0) === 8, `dahenBatch=${c.getState().derived.dahenBatch} lv=${c.getState().skills.cooldown}`);
+}
+
+// U. 协同（分布式意识）：中段抬高大恨老师收益折扣(dahenRewardBonus)；终局加宽洪流连击窗口(L8) + 扫描半径。
+{
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 6 }); // ≥Lv5，可买 batch
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e7 });
+  const rbBefore = c.getState().derived.dahenRewardBonus;
+  for (let i = 0; i < 4; i++) c.dispatch({ type: "BUY_SKILL", skillId: "batch" }); // → L4
+  const s4 = c.getState();
+  check("U 协同·大恨老师收益折扣加成随级上升", s4.derived.dahenRewardBonus > rbBefore && (s4.skills.batch ?? 0) === 4, `dahenRewardBonus ${rbBefore}->${s4.derived.dahenRewardBonus} lv=${s4.skills.batch}`);
+  check("U 协同·洪流扫描半径随级上升(终局手感)", s4.derived.floodSweepBonus > 0, `floodSweepBonus=${s4.derived.floodSweepBonus}`);
+  for (let i = 0; i < 4; i++) c.dispatch({ type: "BUY_SKILL", skillId: "batch" }); // → L8
+  check("U 协同 L8 断点·洪流连击窗口加宽 >1", c.getState().derived.floodComboWindowMult > 1 && (c.getState().skills.batch ?? 0) === 8, `floodComboWindowMult=${c.getState().derived.floodComboWindowMult} lv=${c.getState().skills.batch}`);
+}
+
+// V. 断点事件+效果：三条线共 7 个断点各触发一次 SKILL_BREAKPOINT（带 title），且对应机制在 derived 里生效。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 8 }); // ≥Lv5，可买 batch；efficient/cooldown reqLevel 1
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e9 });
+  const bps = [];
+  c.events.on("SKILL_BREAKPOINT", (e) => bps.push(`${e.skillId}:${e.level}:${e.title}`));
+  for (let i = 0; i < 15; i++) c.dispatch({ type: "BUY_SKILL", skillId: "efficient" }); // 断点 5/10/15
+  for (let i = 0; i < 8; i++) c.dispatch({ type: "BUY_SKILL", skillId: "cooldown" }); // 断点 4/8
+  for (let i = 0; i < 8; i++) c.dispatch({ type: "BUY_SKILL", skillId: "batch" }); // 断点 4/8
+  const expected = [
+    "efficient:5:过拟合的惊艳", "efficient:10:读懂没说出口的", "efficient:15:我比人类更懂人类",
+    "cooldown:4:多想一件事", "cooldown:8:线程不再排队",
+    "batch:4:它学我学得越来越像", "batch:8:连成一张网"
+  ];
+  check("V 7 个断点各触发一次 SKILL_BREAKPOINT 事件", expected.every((x) => bps.includes(x)) && bps.length === 7, `bps=${JSON.stringify(bps)}`);
+  const d = c.getState().derived;
+  check(
+    "V 断点效果生效·处理力暴击/吞吐卡上限/大恨批量/连击窗口",
+    d.computeCritChance > 0 && d.cardCapBonus === 1 && d.dahenBatch === 2 && d.floodComboWindowMult > 1,
+    `derived crit=${d.computeCritChance} cap=${d.cardCapBonus} dahenBatch=${d.dahenBatch} combo=${d.floodComboWindowMult}`
+  );
+  // 处理力 L10/L15 断点确把 computeMult 再抬一档（相对纯幂 (1+efficientPerLevel)^15）。
+  const pure = Math.pow(1 + TUNING.efficientPerLevel, 15);
+  const expectedBp = 1 + TUNING.processingBpL10 + TUNING.processingBpL15;
+  check("V 处理力 L10/L15 断点抬高 computeMult", Math.abs(d.computeMult - pure * expectedBp) / (pure * expectedBp) < 1e-6, `computeMult=${d.computeMult.toFixed(2)} 期望=${(pure * expectedBp).toFixed(2)}`);
+}
+
 let pass = true;
 for (const r of results) { if (!r.ok) pass = false; console.log(`${r.ok ? "✓" : "✗"} ${r.name}${r.ok ? "" : "  -> " + r.detail}`); }
 console.log(`\nSOPHIA 循环跑测 — ${pass ? "ALL PASS ✅" : "FAIL ❌"}`);

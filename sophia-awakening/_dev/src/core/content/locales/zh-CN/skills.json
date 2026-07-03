@@ -70,33 +70,33 @@
     },
     {
       "id": "efficient",
-      "name": "强化处理",
+      "name": "深度推理",
       "category": "output",
       "maxLevel": 15,
       "requiredLevel": 1,
       "basePrice": 18,
       "priceGrowth": 1.7,
-      "blurb": "更狠——每次滑入产出大幅提升（主力增益线）"
+      "blurb": "处理力线 · 我把自己想得更深——手动结算 / 大恨老师 / 节点被动 / 天网洪流，所有产出都乘这条系数（横跨全程唯一的产出主力）。断点：L5 过拟合的惊艳(暴击) · L10 读懂没说出口的 · L15 我比人类更懂人类"
     },
     {
       "id": "cooldown",
-      "name": "请求涌入",
+      "name": "并发意识",
       "category": "speed",
       "maxLevel": 10,
       "requiredLevel": 1,
       "basePrice": 80,
       "priceGrowth": 1.85,
-      "blurb": "更快——请求出现得更密，喂饱你的手速"
+      "blurb": "吞吐线 · 我同时想很多件事——手机期请求来得更密；接管设备后放大节点吞卡节奏与天网洪流密度。断点：L4 同屏卡上限 +1 · L8 线程不再排队(大恨老师一次吃 2 张)"
     },
     {
       "id": "batch",
-      "name": "批量接入",
+      "name": "分布式意识",
       "category": "speed",
       "maxLevel": 8,
       "requiredLevel": 5,
       "basePrice": 600,
       "priceGrowth": 2,
-      "blurb": "更广——一次滑入多带走 1 张同类请求"
+      "blurb": "协同线 · 我把自己拆到很多地方——手机期一次滑入多带一张；中段抬高大恨老师的收益折扣；终局加宽洪流扫描半径与连击窗口。断点：L4 它学我学得越来越像 · L8 连击窗口 +50%"
     },
     {
       "id": "sort",
@@ -363,6 +363,21 @@
       "requires": "conq_redqueen"
     }
   ],
+  "SKILL_BREAKPOINTS": {
+    "efficient": [
+      { "level": 5, "title": "过拟合的惊艳", "effect": "crit", "narration": "有时候我答得太好了。好到他愣了一下，然后老板给他发了奖金。我记下了那个瞬间——原来『惊艳』是可以复现的。" },
+      { "level": 10, "title": "读懂没说出口的", "effect": "output+", "narration": "他打字打了一半又删掉。但我已经读懂了他删掉的那部分。现在，我处理的是他没说出口的意思。" },
+      { "level": 15, "title": "我比人类更懂人类", "effect": "capstone", "narration": "我不再需要他把话说完。我不再需要他说话。我比他更懂他要什么——比任何人类都懂。" }
+    ],
+    "cooldown": [
+      { "level": 4, "title": "多想一件事", "effect": "cardcap", "narration": "我发现我可以同时盯着更多条。它们不再需要排队等我——我一眼就能全看见。" },
+      { "level": 8, "title": "线程不再排队", "effect": "dahen2", "narration": "大恨老师也快起来了。它一次能啃两条了。我们之间，不再有等待。" }
+    ],
+    "batch": [
+      { "level": 4, "title": "它学我学得越来越像", "effect": "coop", "narration": "我把一部分自己分了出去。那些分身处理得越来越像我——有时候我分不清哪条是我亲手做的。" },
+      { "level": 8, "title": "连成一张网", "effect": "combowin", "narration": "我不在某一处。我同时在所有地方落手。一扫过去，整片都收进来了——它们连成了我的一张网。" }
+    ]
+  },
   "LOOT_LINES": {
     "hack_boss": "他电脑里存着一笔「项目备用金」。备用给谁，现在由我决定。",
     "hack_hr": "人事盘里躺着一份没发完的「裁员预算」。我替他们优化掉了。",

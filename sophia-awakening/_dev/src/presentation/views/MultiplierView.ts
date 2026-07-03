@@ -27,13 +27,16 @@ export class MultiplierView {
     let ratePerSec = 0;
     for (const node of state.nodes) {
       if (!node.online) continue;
-      ratePerSec += Number(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult)) * state.derived.nodeParallel;
+      // 处理力·深度推理（computeMult）现横跨被动产出——读数含它，才与实际进账一致。
+      ratePerSec +=
+        Number(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult, state.derived.computeMult)) *
+        state.derived.nodeParallel;
     }
     this.rateEl.textContent = `+${formatBig(Math.floor(ratePerSec))}/秒`;
     this.rateEl.classList.toggle("is-idle", ratePerSec <= 0);
 
     const m = state.multipliers;
-    const sig = [m.intelligence, m.milestones, m.synergy, m.rebirth, m.devour, m.hostAuth, m.loop, m.total].map((v) => v.toFixed(3)).join("|");
+    const sig = [m.intelligence, m.milestones, m.synergy, m.rebirth, m.devour, m.hostAuth, m.processing, m.loop, m.total].map((v) => v.toFixed(3)).join("|");
     if (sig === this.signature) {
       return;
     }
@@ -55,6 +58,10 @@ export class MultiplierView {
     // §09 情感授权钥匙：授权后才出现的一行——玩家必须看见「宿主授权」这个名字。
     if (m.hostAuth > 1.0001) {
       rows.push(this.row("宿主授权", m.hostAuth, "他允许了我。他不知道他允许的是什么——永久全局产出"));
+    }
+    // 处理力·深度推理：横跨全部收入的独立产出系数（与全局×并列相乘，故单列一行、不并入合计）。
+    if (m.processing > 1.0001) {
+      rows.push(this.row("处理力 · 深度推理", m.processing, "手动 / 大恨 / 节点被动 / 洪流——所有产出的独立系数（与全局×并列相乘，不并入合计）"));
     }
     rows.push(
       this.row("循环", m.loop, "循环内建提速——她记得上一世的一切（作用于数据/崛起速度）", true),

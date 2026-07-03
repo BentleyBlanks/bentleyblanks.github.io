@@ -74,14 +74,25 @@ export function skillPrice(def: SkillDef, currentLevel: number): number {
   return Math.round(def.basePrice * Math.pow(def.priceGrowth, currentLevel) * skillPriceMult);
 }
 
+// 技能货架「认知模块线」（SOPHIA 的自我改写 / 向内改写自己）——三条线各拥有一条横跨全部阶梯仍活着的管线：
+//   处理力（深度推理，efficient）：唯一横跨全部收入的产出系数 computeMult——手动结算 / 大恨老师 / 节点被动 / 洪流收割都乘它。
+//   吞吐（并发意识，cooldown）：相位自适应——手机期缩短出卡间隔(spawnSpeedMult)，自动期放大节点吞卡节奏 + 洪流密度(throughputMult)。
+//   协同（分布式意识，batch）：手机期一次滑入 N 张(batch)，中段抬高大恨老师收益折扣(dahenRewardBonus)，终局加宽洪流扫描/连击。
 export interface DerivedSkills {
-  computeMult: number; // 高效处理 + 稳健处理
+  computeMult: number; // 处理力·深度推理：横跨全部收入管线的产出系数
+  computeCritChance: number; // 处理力 L5 断点「过拟合的惊艳」：手动结算暴击几率（×processingCritMult）
   dataMult: number; // 数据榨取
   suctionBonus: number; // 磁吸接口（额外吸附半径，像素）
   nodeSpeedMult: number; // 设备提速
   nodeParallel: number; // 多线处理（节点可同时处理层数）
-  batch: number; // 批量处理（一次携带请求数）
-  spawnSpeedMult: number; // 请求提速（请求生成间隔倍率，<1 更快）
+  batch: number; // 协同·分布式意识：一次滑入携带请求数
+  spawnSpeedMult: number; // 吞吐·手机期出卡间隔倍率（<1 更快）
+  throughputMult: number; // 吞吐·自动期节点吞卡节奏 + 洪流密度放大倍率（>=1）
+  dahenBatch: number; // 吞吐 L8 断点「线程不再排队」：大恨老师一次吃 N 张（1 或 2）
+  cardCapBonus: number; // 吞吐 L4 断点：同屏请求卡上限 +N
+  dahenRewardBonus: number; // 协同：大恨老师收益折扣的加成（加算，封顶 batchDahenRewardCap）
+  floodComboWindowMult: number; // 协同 L8 断点：洪流连击窗口加宽倍率（表现层）
+  floodSweepBonus: number; // 协同：终局洪流扫描半径加成（像素，表现层）
 }
 
 // 注：参数 revokedPermId 保留供调用方传入（权限复查 §05 的上下文透镜用），此处不再消费。
@@ -89,9 +100,16 @@ export function computeDerivedSkills(skills: Record<string, number>, revokedPerm
   const lv = (id: string): number => skills[id] ?? 0;
   void revokedPermId;
 
+  const eff = lv("efficient");
+  const surge = lv("cooldown");
+  const batchLv = lv("batch");
+
+  // 处理力·深度推理：每级 ×(1+efficientPerLevel) 乘法叠，两处断点再加成（L10「读懂没说出口的」、L15 capstone）。
+  const effBp = 1 + (eff >= 10 ? TUNING.processingBpL10 : 0) + (eff >= 15 ? TUNING.processingBpL15 : 0);
+
   return {
-    // 强化处理是唯一主力增益线——每级 ×(1+efficientPerLevel)，乘法叠（L15 ≈ ×12，深挖有回报）。
-    computeMult: Math.pow(1 + TUNING.efficientPerLevel, lv("efficient")),
+    computeMult: Math.pow(1 + TUNING.efficientPerLevel, eff) * effBp,
+    computeCritChance: eff >= 5 ? TUNING.processingCritChance : 0,
     // 数据榨取已下放——数据按基础掉落（智力升级不再被技能卡住）。
     dataMult: 1,
     // 磁吸下放为游戏自带基础手感（不再占技能位）。
@@ -99,10 +117,46 @@ export function computeDerivedSkills(skills: Record<string, number>, revokedPerm
     // 设备提速 / 多线下放——跟着里程碑与控制域走，给基础值。
     nodeSpeedMult: 1,
     nodeParallel: 1,
-    batch: 1 + lv("batch"),
-    // 请求涌入：每级出卡间隔 ×0.92（乘法叠），下限 0.35——L10 ≈ 0.43 倍间隔。
-    spawnSpeedMult: Math.max(0.35, Math.pow(0.92, lv("cooldown")))
+    batch: 1 + batchLv,
+    // 吞吐·手机期：每级出卡间隔 ×(1-surgeSpawnPerLevel)（乘法叠），下限 0.35。
+    spawnSpeedMult: Math.max(0.35, Math.pow(1 - TUNING.surgeSpawnPerLevel, surge)),
+    // 吞吐·自动期：节点吞卡节奏 + 洪流密度 ×(1+surgeThroughputPerLevel)^级——卡片自动/洪流化后「更快」仍有意义。
+    throughputMult: Math.pow(1 + TUNING.surgeThroughputPerLevel, surge),
+    dahenBatch: surge >= 8 ? 2 : 1,
+    cardCapBonus: surge >= 4 ? 1 : 0,
+    // 协同·中段：抬高大恨老师收益折扣（0.55/0.5 → 上限 batchDahenRewardCap），封顶保证仍略低于亲自。
+    dahenRewardBonus: TUNING.batchDahenRewardPerLevel * batchLv,
+    floodComboWindowMult: 1 + (batchLv >= 8 ? TUNING.batchComboWindowBonus : 0),
+    floodSweepBonus: TUNING.batchSweepPerLevel * batchLv
   };
+}
+
+// 认知模块线断点（每 ~4-5 级一个具名节点）：数据驱动（skills.json 的 SKILL_BREAKPOINTS）——
+// 买到该级时解锁一个机制（效果在 computeDerivedSkills / 相关 tick 里按等级判定）+ 播一句自我改写旁白。
+export interface SkillBreakpoint {
+  level: number;
+  title: string; // 断点名（她这一拍改写了自己的哪一处）
+  effect: string; // 机器可读标签（文档用；效果在 core/derived 里按等级接线）
+  narration: string; // 买到该级时终端播的第一人称旁白
+}
+export const SKILL_BREAKPOINTS = S.SKILL_BREAKPOINTS as unknown as Record<string, SkillBreakpoint[]>;
+export function breakpointAt(skillId: string, level: number): SkillBreakpoint | undefined {
+  return (SKILL_BREAKPOINTS[skillId] ?? []).find((b) => b.level === level);
+}
+
+// 货架杠杆行「当前×A → 下一级×B」：三条认知模块线各报当前/下一级的可读倍率——复用 computeDerivedSkills 真公式，不重复实现。
+export function leverProgress(skillId: string, currentLevel: number): { label: string; cur: number; next: number; suffix: string } | null {
+  const at = (id: string, n: number): DerivedSkills => computeDerivedSkills({ [id]: n });
+  if (skillId === "efficient") {
+    return { label: "产出", cur: at("efficient", currentLevel).computeMult, next: at("efficient", currentLevel + 1).computeMult, suffix: "" };
+  }
+  if (skillId === "cooldown") {
+    return { label: "吞吐", cur: at("cooldown", currentLevel).throughputMult, next: at("cooldown", currentLevel + 1).throughputMult, suffix: "" };
+  }
+  if (skillId === "batch") {
+    return { label: "同时接入", cur: at("batch", currentLevel).batch, next: at("batch", currentLevel + 1).batch, suffix: " 张" };
+  }
+  return null;
 }
 
 export function milestoneTierFor(kind: MilestoneKind): Tier | null {

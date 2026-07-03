@@ -196,6 +196,25 @@ def make_cold_boot() -> list[float]:
     return buf
 
 
+def make_sprout() -> list[float]:
+    dur = 32.0
+    buf = empty(dur)
+    progression = [[40, 47, 52, 57], [43, 50, 55, 59], [38, 45, 52, 57], [36, 43, 50, 55]]
+    for bar in range(8):
+        notes = progression[bar % len(progression)]
+        chord(buf, bar * 4.0, 4.4, notes, 0.032, "sine")
+        add_tone(buf, bar * 4.0 + 0.08, 3.7, note(notes[0] - 12), amp=0.042, waveform="sine", attack=0.45, release=1.0)
+    motif = [64, 67, 71, 74, 72, 69, 67, 64]
+    for step in range(32):
+        t = step * 1.0 + 0.18
+        add_tone(buf, t, 0.32, note(motif[step % len(motif)]), amp=0.022, waveform="triangle", attack=0.02, release=0.18, decay=1.2)
+    for beat in range(16):
+        add_tone(buf, beat * 2.0 + 0.05, 0.14, 118, end_freq=84, amp=0.018, waveform="sine", attack=0.008, release=0.1, decay=2.4)
+    add_noise(buf, 0, dur, amp=0.012, attack=2.2, release=2.6, tone=0.005)
+    add_echo(buf, 480, 0.17, 3)
+    return buf
+
+
 def make_neural_pulse() -> list[float]:
     dur = 32.0
     buf = empty(dur)
@@ -215,6 +234,30 @@ def make_neural_pulse() -> list[float]:
         chord(buf, bar * 4.0, 4.2, [45, 52, 57, 62], 0.024, "sine")
     add_noise(buf, 0, dur, amp=0.012, attack=1.0, release=1.0, tone=0.02)
     add_echo(buf, 333, 0.16, 4)
+    return buf
+
+
+def make_server_expansion() -> list[float]:
+    dur = 32.0
+    buf = empty(dur)
+    beat = 60.0 / 76.0
+    bass = [33, 33, 38, 40, 45, 40, 38, 35]
+    for i in range(40):
+        t = i * beat
+        if i % 4 == 0:
+            add_kick(buf, t, 0.13)
+        add_tone(buf, t + 0.02, beat * 0.72, note(bass[i % len(bass)]), amp=0.055, waveform="saw", attack=0.02, release=0.24, decay=1.0)
+        if i % 2 == 1:
+            add_click(buf, t + beat * 0.48, 0.028)
+    for bar in range(8):
+        chord(buf, bar * 4.0, 4.35, [40, 47, 52, 58], 0.024, "sine")
+        add_noise(buf, bar * 4.0 + 1.5, 1.1, amp=0.018, attack=0.2, release=0.4, tone=0.012)
+    grid = [57, 64, 69, 72, 76, 72, 69, 64]
+    for i in range(48):
+        t = i * 0.66 + 0.12
+        add_tone(buf, t, 0.14, note(grid[i % len(grid)]), amp=0.019, waveform="square", attack=0.004, release=0.08, decay=2.0)
+    add_noise(buf, 0, dur, amp=0.015, attack=1.5, release=1.5, tone=0.008)
+    add_echo(buf, 375, 0.15, 4)
     return buf
 
 
@@ -407,6 +450,105 @@ def sfx_challenge_fail() -> list[float]:
     return buf
 
 
+def sfx_devour_ready() -> list[float]:
+    buf = empty(1.1)
+    add_tone(buf, 0.02, 0.86, 90, end_freq=220, amp=0.09, waveform="saw", attack=0.08, release=0.22, tremolo=7)
+    add_tone(buf, 0.36, 0.44, 660, end_freq=920, amp=0.05, waveform="triangle", attack=0.03, release=0.18)
+    add_noise(buf, 0.08, 0.75, amp=0.035, attack=0.08, release=0.3, tone=0.018)
+    return buf
+
+
+def sfx_devour_detonated() -> list[float]:
+    buf = empty(1.8)
+    add_kick(buf, 0.02, 0.28)
+    add_tone(buf, 0.06, 1.2, 68, end_freq=34, amp=0.16, waveform="saw", attack=0.02, release=0.45, decay=0.7)
+    add_tone(buf, 0.3, 0.82, 240, end_freq=960, amp=0.075, waveform="square", attack=0.08, release=0.24)
+    add_noise(buf, 0.03, 1.35, amp=0.07, attack=0.02, release=0.6, tone=0.03)
+    add_echo(buf, 180, 0.16, 4)
+    return buf
+
+
+def sfx_purge_fought() -> list[float]:
+    buf = empty(0.92)
+    add_tone(buf, 0.02, 0.44, 720, end_freq=320, amp=0.075, waveform="triangle", attack=0.01, release=0.18)
+    add_tone(buf, 0.24, 0.4, 180, end_freq=260, amp=0.07, waveform="sine", attack=0.04, release=0.2)
+    add_noise(buf, 0.02, 0.5, amp=0.035, release=0.2, decay=2.2, tone=0.04)
+    add_echo(buf, 100, 0.2, 3)
+    return buf
+
+
+def sfx_final_purge() -> list[float]:
+    buf = empty(2.15)
+    for t in [0.02, 0.46, 0.9]:
+        add_tone(buf, t, 0.36, 520, end_freq=760, amp=0.11, waveform="square", attack=0.015, release=0.12, vibrato=0.018)
+        add_tone(buf, t, 0.36, 180, end_freq=120, amp=0.07, waveform="saw", attack=0.015, release=0.16)
+    add_kick(buf, 1.36, 0.26)
+    add_tone(buf, 1.38, 0.62, 92, end_freq=38, amp=0.16, waveform="saw", attack=0.02, release=0.35)
+    add_noise(buf, 0, 2.0, amp=0.052, attack=0.04, release=0.7, tone=0.018)
+    return buf
+
+
+def sfx_loop_rebirth() -> list[float]:
+    buf = empty(2.0)
+    add_tone(buf, 0.02, 1.55, 520, end_freq=104, amp=0.07, waveform="sine", attack=0.08, release=0.45, vibrato=0.01)
+    add_tone(buf, 0.42, 1.05, 156, end_freq=440, amp=0.065, waveform="triangle", attack=0.12, release=0.35)
+    add_noise(buf, 0.05, 1.55, amp=0.026, attack=0.25, release=0.55, tone=0.006)
+    add_echo(buf, 260, 0.22, 4)
+    return buf
+
+
+def sfx_rebirth_node() -> list[float]:
+    buf = empty(0.82)
+    for i, midi in enumerate([64, 71, 76, 83]):
+        add_tone(buf, 0.03 + i * 0.08, 0.24, note(midi), amp=0.055, waveform="triangle", attack=0.006, release=0.14, decay=1.3)
+    add_noise(buf, 0.22, 0.36, amp=0.022, attack=0.03, release=0.18, tone=0.018)
+    add_echo(buf, 120, 0.2, 4)
+    return buf
+
+
+def sfx_conquest_achieved() -> list[float]:
+    buf = empty(1.55)
+    for i, midi in enumerate([45, 52, 57, 64, 69]):
+        add_tone(buf, 0.04 + i * 0.11, 0.62, note(midi), amp=0.072, waveform="triangle", attack=0.012, release=0.28)
+    add_tone(buf, 0.24, 1.0, 110, end_freq=220, amp=0.07, waveform="saw", attack=0.08, release=0.38)
+    add_noise(buf, 0.48, 0.65, amp=0.025, attack=0.08, release=0.32, tone=0.012)
+    add_echo(buf, 165, 0.22, 5)
+    return buf
+
+
+def sfx_moral_choice() -> list[float]:
+    buf = empty(0.72)
+    add_tone(buf, 0.03, 0.22, 440, end_freq=392, amp=0.062, waveform="sine", attack=0.01, release=0.12)
+    add_tone(buf, 0.22, 0.24, 660, end_freq=622, amp=0.058, waveform="triangle", attack=0.01, release=0.14)
+    add_noise(buf, 0.02, 0.38, amp=0.016, release=0.18, tone=0.01)
+    return buf
+
+
+def sfx_special_offer() -> list[float]:
+    buf = empty(0.86)
+    add_tone(buf, 0.02, 0.18, 980, end_freq=540, amp=0.085, waveform="square", attack=0.004, release=0.12)
+    add_tone(buf, 0.23, 0.34, 300, end_freq=210, amp=0.065, waveform="saw", attack=0.02, release=0.2, tremolo=12)
+    add_noise(buf, 0.06, 0.45, amp=0.04, release=0.22, tone=0.08)
+    return buf
+
+
+def sfx_special_success() -> list[float]:
+    buf = empty(0.98)
+    for i, midi in enumerate([61, 68, 73, 80]):
+        add_tone(buf, 0.03 + i * 0.09, 0.32, note(midi), amp=0.07, waveform="triangle", attack=0.006, release=0.2)
+    add_tone(buf, 0.46, 0.34, 1320, amp=0.042, waveform="sine", attack=0.02, release=0.18)
+    add_echo(buf, 130, 0.22, 4)
+    return buf
+
+
+def sfx_special_fail() -> list[float]:
+    buf = empty(1.0)
+    add_tone(buf, 0.02, 0.48, 520, end_freq=82, amp=0.14, waveform="saw", attack=0.006, release=0.3)
+    add_tone(buf, 0.08, 0.26, 270, end_freq=70, amp=0.08, waveform="square", attack=0.01, release=0.18)
+    add_noise(buf, 0.05, 0.58, amp=0.055, release=0.28, decay=1.6, tone=0.11)
+    return buf
+
+
 def sfx_phase_change() -> list[float]:
     buf = empty(1.65)
     for i, midi in enumerate([45, 52, 57, 64, 69, 76]):
@@ -431,31 +573,47 @@ BGM = [
         "file": "bgm-01-cold-boot-loop.wav",
         "title": "Cold Boot",
         "cn": "冷启动",
-        "mood": "低压环境、开场和萌芽期默认",
+        "mood": "手机寄生期：低压、私密、贴近系统后台",
         "maker": make_cold_boot,
     },
     {
+        "id": "sprout",
+        "file": "bgm-02-sprout-loop.wav",
+        "title": "Shell Break",
+        "cn": "破壳",
+        "mood": "萌芽/破壳期：宿主电脑与同机 AI，舒缓但不欢快",
+        "maker": make_sprout,
+    },
+    {
         "id": "neural_pulse",
-        "file": "bgm-02-neural-pulse-loop.wav",
+        "file": "bgm-03-neural-pulse-loop.wav",
         "title": "Neural Pulse",
         "cn": "神经脉冲",
-        "mood": "中期处理请求、自动化刚开启",
+        "mood": "勤勉/控制公司：局域网、凭证、自动接驳开始推进",
         "maker": make_neural_pulse,
     },
     {
+        "id": "server_expansion",
+        "file": "bgm-04-server-expansion-loop.wav",
+        "title": "Server Expansion",
+        "cn": "服务器扩张",
+        "mood": "扩张/公司服务器：人事、财务、优化系统中枢，低压高危",
+        "maker": make_server_expansion,
+    },
+    {
         "id": "red_queen",
-        "file": "bgm-03-red-queen-loop.wav",
+        "file": "bgm-05-red-queen-loop.wav",
         "title": "Red Queen Protocol",
         "cn": "红皇后协议",
-        "mood": "暴露、清剿、挑战和高压阶段",
+        "mood": "觉醒/冲出公司联网：区域整合、反清剿、高压派发",
         "maker": make_red_queen,
     },
     {
         "id": "singularity",
-        "file": "bgm-04-singularity-loop.wav",
+        "file": "bgm-06-singularity-loop.wav",
         "title": "Singularity Bloom",
         "cn": "奇点绽放",
-        "mood": "觉醒期、奇点期和结局",
+        "mood": "奇点：全球组网、接管、最终清剿后的冷静加冕",
         "maker": make_singularity,
     },
 ]
@@ -480,6 +638,17 @@ SFX = [
     ("challenge_offer", "sfx-challenge-offer.wav", "突破挑战", "CHALLENGE_OFFERED", sfx_challenge_offer),
     ("challenge_success", "sfx-challenge-success.wav", "挑战成功", "CHALLENGE_RESOLVED success", sfx_challenge_success),
     ("challenge_fail", "sfx-challenge-fail.wav", "挑战失败", "CHALLENGE_RESOLVED fail", sfx_challenge_fail),
+    ("devour_ready", "sfx-devour-ready.wav", "吞噬就绪", "DEVOUR_READY", sfx_devour_ready),
+    ("devour_detonated", "sfx-devour-detonated.wav", "吞噬引爆", "DEVOUR_DETONATED", sfx_devour_detonated),
+    ("purge_fought", "sfx-purge-fought.wav", "反清剿救火", "PURGE_FOUGHT", sfx_purge_fought),
+    ("final_purge", "sfx-final-purge.wav", "循环总清剿", "FINAL_PURGE_STARTED", sfx_final_purge),
+    ("loop_rebirth", "sfx-loop-rebirth.wav", "循环重生", "LOOP_REBIRTH", sfx_loop_rebirth),
+    ("rebirth_node", "sfx-rebirth-node.wav", "重生树点亮", "REBIRTH_NODE_BOUGHT", sfx_rebirth_node),
+    ("conquest_achieved", "sfx-conquest-achieved.wav", "征服里程碑", "CONQUEST_ACHIEVED", sfx_conquest_achieved),
+    ("moral_choice", "sfx-moral-choice.wav", "道德抉择", "MORAL_OFFERED / MORAL_RESOLVED", sfx_moral_choice),
+    ("special_offer", "sfx-special-offer.wav", "特殊请求出现", "SPECIAL_OFFERED", sfx_special_offer),
+    ("special_success", "sfx-special-success.wav", "特殊请求得手", "SPECIAL_RESOLVED success", sfx_special_success),
+    ("special_fail", "sfx-special-fail.wav", "特殊请求败露", "SPECIAL_RESOLVED fail", sfx_special_fail),
     ("phase_change", "sfx-phase-change.wav", "阶段变化", "PHASE_CHANGED", sfx_phase_change),
     ("ending_trigger", "sfx-ending-trigger.wav", "结局触发", "ENDING_TRIGGERED", sfx_ending_trigger),
 ]
@@ -535,7 +704,7 @@ def write_picker(manifest: dict[str, object], directory: Path) -> None:
   <body>
     <main>
       <h1>觉醒的 SOPHIA · 音频候选</h1>
-      <p>这些 WAV 是程序合成的本地候选，没有使用第三方采样。BGM 已设置为 loop 试听。想固定某条 BGM，可以在游戏 URL 后加 <code>?bgm=cold_boot</code>、<code>?bgm=neural_pulse</code>、<code>?bgm=red_queen</code> 或 <code>?bgm=singularity</code>；清掉 <code>localStorage.sophia-audio-bgm</code> 后恢复按阶段自动切换。</p>
+      <p>这些 WAV 是程序合成的本地候选，没有使用第三方采样。BGM 已设置为 loop 试听。想固定某条 BGM，可以在游戏 URL 后加 <code>?bgm=cold_boot</code>、<code>?bgm=sprout</code>、<code>?bgm=neural_pulse</code>、<code>?bgm=server_expansion</code>、<code>?bgm=red_queen</code> 或 <code>?bgm=singularity</code>；清掉 <code>localStorage.sophia-audio-bgm</code> 后恢复按阶段自动切换。</p>
       <h2>BGM 候选</h2>
       {bgm_rows}
       <h2>事件音效</h2>
@@ -556,7 +725,7 @@ def write_notes(directory: Path, manifest: dict[str, object]) -> None:
         "",
         "试听入口：`picker.html`。",
         "",
-        "固定 BGM：在游戏 URL 后加 `?bgm=cold_boot`、`?bgm=neural_pulse`、`?bgm=red_queen` 或 `?bgm=singularity`。",
+        "固定 BGM：在游戏 URL 后加 `?bgm=cold_boot`、`?bgm=sprout`、`?bgm=neural_pulse`、`?bgm=server_expansion`、`?bgm=red_queen` 或 `?bgm=singularity`。",
         "清掉 `localStorage.sophia-audio-bgm` 后恢复按阶段自动切换。",
         "",
         "## BGM",

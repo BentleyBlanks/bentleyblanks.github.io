@@ -1,6 +1,6 @@
 import { query } from "../shared";
 import { formatBig, gte } from "../../core/math/BigNumber";
-import { DEVOUR_GATE_HINT, SKILLS, getSkill, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
+import { DEVOUR_GATE_HINT, SKILLS, getSkill, leverProgress, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
 import { devourGateLabel } from "../../core/content/devour";
 import { allSkynetTaken, skynetSlotCount, skynetTakenCount } from "../../core/content/skynet";
 import { applyCast } from "../../core/content/companyCast";
@@ -336,6 +336,13 @@ export class SkillShopView {
     row.blurbEl.textContent = applyCast(labelOverride ? `${def.name}：${def.blurb}` : def.blurb, loop);
 
     const owned = state.skills[def.id] ?? 0;
+    // 认知模块线（处理力/吞吐/协同）货架行报「当前×A → 下一级×B」——反映它们现横跨全部管线的新现实。
+    const lp = owned < def.maxLevel ? leverProgress(def.id, owned) : null;
+    if (lp) {
+      const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
+      const unit = (v: number) => (lp.suffix ? `${fmt(v)}${lp.suffix}` : `×${fmt(v)}`);
+      row.blurbEl.textContent += `\n${lp.label}：当前 ${unit(lp.cur)} → 下一级 ${unit(lp.next)}`;
+    }
     const maxed = owned >= def.maxLevel;
     const reached = state.intelligence.level >= def.requiredLevel;
     const price = skillPrice(def, owned);

@@ -21,6 +21,9 @@ export type GameEvent =
   | { type: "DAHEN_AUTO_PROCESSED"; requestId: string; computeGain: string; dataGain: string }
   | { type: "INTELLIGENCE_LEVELUP"; level: number; newSkills: string[] }
   | { type: "SKILL_PURCHASED"; skillId: string; name: string; level: number; maxLevel: number; milestone?: MilestoneKind }
+  // 技能货架「认知模块线」断点（处理力/吞吐/协同 每 4-5 级的具名节点）：买到该级时解锁一个机制 +
+  // 播一句 SOPHIA 的自我改写旁白（她向内改写自己的一拍）。title=断点名，narration=终端旁白。
+  | { type: "SKILL_BREAKPOINT"; skillId: string; level: number; title: string; narration: string }
   | { type: "SCOPE_UPGRADED"; tier: Tier }
   | { type: "NODE_CAPTURED"; node: BotNode }
   | { type: "AUTOMATION_ATTACHED"; nodeId: string; tier: Tier }

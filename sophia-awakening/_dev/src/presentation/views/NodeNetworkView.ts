@@ -463,7 +463,7 @@ export class NodeNetworkView {
     let ratePerSec = 0;
     for (const node of state.nodes) {
       if (node.online) {
-        ratePerSec += toDecimal(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult)).toNumber();
+        ratePerSec += toDecimal(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult, state.derived.computeMult)).toNumber();
       }
     }
     // 洪流相位推进：速率越高流得越快（对数压缩）。红皇后波再加速。
@@ -733,7 +733,7 @@ export class NodeNetworkView {
         const prodByDef = new Map<string, string>();
         for (const node of state.nodes) {
           if (node.online) {
-            const per = big(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult));
+            const per = big(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult, state.derived.computeMult));
             prodByDef.set(node.defId, add(prodByDef.get(node.defId) ?? "0", per));
           }
         }
@@ -995,9 +995,11 @@ export class NodeNetworkView {
   }
 
   // §09 请求洪流蜂群：命中测试——点/扫到的最近一个「待收割」洪流包（引爆中的不再可点）。
-  floodPacketAt(global: PointData): { id: string } | null {
+  // radiusBonus：协同·分布式意识（batch）终局加宽扫描半径——扫得更宽、更容易命中一片洪流包。
+  floodPacketAt(global: PointData, radiusBonus = 0): { id: string } | null {
     let best: FloodViz | null = null;
-    let bestD = 20 * 20; // 命中半径 ~20px
+    const radius = 20 + Math.max(0, radiusBonus); // 命中半径 ~20px + 协同加成
+    let bestD = radius * radius;
     for (const v of this.floodViz.values()) {
       if (v.detonating) {
         continue;

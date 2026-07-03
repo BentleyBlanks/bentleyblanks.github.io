@@ -51,6 +51,7 @@ export function createInitialState(now = Date.now()): GameState {
       rebirth: 1,
       devour: 1,
       hostAuth: 1,
+      processing: 1,
       loop: 1,
       total: levelConfig.multiplier
     },

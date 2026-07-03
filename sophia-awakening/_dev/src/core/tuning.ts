@@ -50,7 +50,7 @@ export const TUNING = {
   // § 技能数值（更准 / 更狠）
   accuracyPerLevel:     0.02,     // 幻觉抑制每级提升的高置信命中折算系数（调小→升级更平缓，不会一下拉开差距）
   accuracyMax:          0.12,     // 幻觉抑制总加成上限
-  efficientPerLevel:    0.18,     // 强化处理每级产出加成
+  efficientPerLevel:    0.15,     // 处理力·深度推理每级产出加成（现横跨手动/大恨/节点被动/洪流全部收入管线，故较原 0.18 收敛）
   boldEvBonus:          1.3,      // 大胆回答的期望收益相对高置信的倍数（>1 → 低概率高收益更划算）
   appDelayMs:           3600,     // 委托 App 处理时，App 比 Core 多花的时间 (ms)——初期故意慢一倍，体感"它真在处理"
   delegateTimeMult:     2.4,      // §04 委托给大恨老师的处理耗时倍率（相对 Core，越大越慢）
@@ -74,6 +74,21 @@ export const TUNING = {
   floodWorthSec:        0.4,      // 单个洪流包价值 = 全网被动产出/秒 × 此系数（真实经济切片，非造假）
   floodHarvestMult:     1.6,      // 手动收割质量倍率（相对被动地板的爽感奖励——积极扫比挂机更快）
   floodDataFrac:        0.15,     // 收割数据产出 = 收割算力 × 此系数（喂 XP，同 tickAutomation 的数据占比量级）
+
+  // § 认知模块技能线（技能货架重做 · SOPHIA 的自我改写）——三条线各拥有一条横跨全部阶梯仍活着的管线 + 具名断点。
+  //   处理力（深度推理，efficient）：唯一横跨全部收入的产出系数（手动/大恨/节点被动/洪流都乘 computeMult）。
+  processingCritChance: 0.10,     // L5 断点「过拟合的惊艳」：手动结算暴击几率（重连「惊艳=老板发奖金」旧手感）
+  processingCritMult:   3,        // 手动结算暴击时的产出倍率（×3）
+  processingBpL10:      0.20,     // L10 断点「读懂没说出口的」：computeMult 额外 +此（≈+1 档等效产出）
+  processingBpL15:      0.35,     // L15 capstone「我比人类更懂人类」：computeMult 额外 +此
+  //   吞吐（并发意识，cooldown）：相位自适应——手机期缩短出卡间隔；自动期放大节点吞卡节奏 + 洪流密度。
+  surgeSpawnPerLevel:   0.08,     // 每级手机期出卡间隔缩短比例（间隔 ×(1-此)^级，下限 0.35）——与旧 0.92^级 等价
+  surgeThroughputPerLevel: 0.07,  // 每级自动期节点吞卡节奏 + 洪流密度放大比例（throughputMult=(1+此)^级）
+  //   协同（分布式意识，batch）：手机期一次滑入 N 张；中段抬高大恨老师收益折扣；终局加宽洪流扫描/连击。
+  batchDahenRewardPerLevel: 0.035, // 每级抬高大恨老师收益折扣（加算到 dahen*RewardMult，封顶 batchDahenRewardCap）
+  batchDahenRewardCap:  0.85,     // 大恨老师收益折扣抬升封顶（仍略低于亲自处理）
+  batchComboWindowBonus: 0.5,     // L8 断点：洪流连击窗口加宽比例（表现层连扫计时 ×(1+此)）
+  batchSweepPerLevel:   6,        // 每级终局洪流扫描半径加成(px)（表现层扫得更宽）
 };
 
 export type TuningKey = keyof typeof TUNING;
@@ -119,7 +134,7 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
 
   accuracyPerLevel:     { label: "幻觉抑制每级加成",         section: "技能数值",   min: 0,     max: 0.1,   step: 0.005 },
   accuracyMax:          { label: "幻觉抑制加成上限",         section: "技能数值",   min: 0,     max: 0.4,   step: 0.01 },
-  efficientPerLevel:    { label: "强化处理每级产出加成",     section: "技能数值",   min: 0,     max: 0.6,   step: 0.01 },
+  efficientPerLevel:    { label: "处理力·深度推理每级产出加成", section: "技能数值",   min: 0,     max: 0.6,   step: 0.01 },
   boldEvBonus:          { label: "大胆回答期望倍数",         section: "前期卡片",   min: 1.0,   max: 3.0,   step: 0.05 },
   appDelayMs:           { label: "App 委托额外耗时 (ms)",    section: "前期卡片",   min: 0,     max: 6000,  step: 100  },
   delegateTimeMult:     { label: "委托耗时倍率",             section: "前期卡片",   min: 1,     max: 5,     step: 0.1  },
@@ -137,6 +152,17 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   floodWorthSec:        { label: "洪流·单包价值(秒收益)",     section: "天网收割",   min: 0.1,   max: 2,     step: 0.05 },
   floodHarvestMult:     { label: "洪流·手动收割质量倍率",     section: "天网收割",   min: 1.0,   max: 3,     step: 0.1  },
   floodDataFrac:        { label: "洪流·数据产出占比",         section: "天网收割",   min: 0,     max: 0.5,   step: 0.01 },
+
+  processingCritChance:     { label: "处理力·L5 暴击几率",       section: "认知模块", min: 0,   max: 0.5, step: 0.01 },
+  processingCritMult:       { label: "处理力·暴击倍率",          section: "认知模块", min: 1,   max: 6,   step: 0.5  },
+  processingBpL10:          { label: "处理力·L10 断点加成",      section: "认知模块", min: 0,   max: 1,   step: 0.05 },
+  processingBpL15:          { label: "处理力·L15 capstone 加成", section: "认知模块", min: 0,   max: 2,   step: 0.05 },
+  surgeSpawnPerLevel:       { label: "吞吐·每级出卡间隔缩短",     section: "认知模块", min: 0,   max: 0.2, step: 0.01 },
+  surgeThroughputPerLevel:  { label: "吞吐·每级自动吞吐放大",     section: "认知模块", min: 0,   max: 0.2, step: 0.01 },
+  batchDahenRewardPerLevel: { label: "协同·每级大恨收益抬升",     section: "认知模块", min: 0,   max: 0.1, step: 0.005 },
+  batchDahenRewardCap:      { label: "协同·大恨收益抬升封顶",     section: "认知模块", min: 0.5, max: 1,   step: 0.05 },
+  batchComboWindowBonus:    { label: "协同·L8 连击窗口加宽",     section: "认知模块", min: 0,   max: 1,   step: 0.1  },
+  batchSweepPerLevel:       { label: "协同·每级洪流扫描半径 +px", section: "认知模块", min: 0,   max: 20,  step: 1    },
 };
 
 // 重置为初始默认值（用于 debug 面板「重置」按钮）

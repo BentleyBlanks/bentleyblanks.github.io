@@ -10,7 +10,7 @@ import { REBIRTH_CARDS } from "./content/rebirthCards";
 import { applyCast } from "./content/companyCast";
 import { getConquest } from "./content/conquests";
 import { allSkynetTaken, sectorFallen, skynetSectors, skynetSlotCount, skynetTakenCount } from "./content/skynet";
-import { computeDerivedSkills, DEVOUR_GATE_HINT, getSkill, LOOT_LINES, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, setSkillPriceMult, SKILLS, skillPrice } from "./content/skills";
+import { breakpointAt, computeDerivedSkills, DEVOUR_GATE_HINT, getSkill, LOOT_LINES, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, setSkillPriceMult, SKILLS, skillPrice } from "./content/skills";
 import { devourGateLabel } from "./content/devour";
 import {
   canBuyRebirthNode,
@@ -565,7 +565,9 @@ export class SophiaCore {
       const base = TUNING.earlyBaseCards + 1; // 电话前的舒缓卡槽（默认 2）
       // §09 重生树「多线程意识」：同屏请求卡上限 +treeExtraCards（前期与自动化期都加）。
       const extraCards = hasRebirthNode(this.state.rebirthTree, "multithread") ? TUNING.treeExtraCards : 0;
-      const earlyMax = (phoneUnlocked ? Math.min(TUNING.earlyMaxCards, base + ownedPerms) : base) + extraCards;
+      // 吞吐 L4 断点「多想一件事」：同屏请求卡上限 +cardCapBonus。
+      const earlyMax =
+        (phoneUnlocked ? Math.min(TUNING.earlyMaxCards, base + ownedPerms) : base) + extraCards + this.state.derived.cardCapBonus;
       if (this.state.requests.length < earlyMax) {
         this.state.spawnTimerMs -= dtMs;
         if (this.state.spawnTimerMs <= 0) {
@@ -613,12 +615,14 @@ export class SophiaCore {
       // 上百张卡片轰然涌入、成片飞向节点」，而不是一张一张挤牙膏。封顶是表现层性能护栏。
       // 卡片只落在核心两侧的窄带里（中央留给核心 + 环绕节点），所以同屏数量收着点，
       // 否则会糊成一片、连环绕的设备都看不见。够成一股可见卡流即可。
-      const perSecond = Math.min(30, (capacity * 1.2 + 3) / this.state.derived.spawnSpeedMult);
+      // 吞吐·并发意识（自动期）：节点吞卡节奏随 throughputMult 放大——卡片自动化后「更快」仍有意义。
+      const perSecond = Math.min(30, (capacity * 1.2 + 3) * this.state.derived.throughputMult);
       interval = Math.max(40, 1000 / perSecond);
-      maxVisible = Math.min(14, Math.ceil(capacity * 0.7) + 6) + treeExtraCards; // 同屏卡数收着点，别糊成一片 / 卡顿
+      // 同屏卡数收着点，别糊成一片 / 卡顿；吞吐 L4 断点 +cardCapBonus。
+      maxVisible = Math.min(14, Math.ceil(capacity * 0.7) + 6) + treeExtraCards + this.state.derived.cardCapBonus;
     } else {
       interval = Math.max(340, config.spawnIntervalMs * this.state.derived.spawnSpeedMult);
-      maxVisible = config.maxVisible + treeExtraCards;
+      maxVisible = config.maxVisible + treeExtraCards + this.state.derived.cardCapBonus;
     }
 
     // 还没处理过第一条（开场教学）：只放一张卡，操作完它之前不再生成别的，免得遮住引导卡。
@@ -688,7 +692,9 @@ export class SophiaCore {
     const totalSlots = skynetSlotCount();
     const takenFrac = totalSlots > 0 ? skynetTakenCount(this.state) / totalSlots : 0;
     const redQueen = (this.state.skills["conq_redqueen"] ?? 0) > 0;
-    const perSec = TUNING.floodSpawnPerSec * (1 + takenFrac * TUNING.floodTakenScale) * (redQueen ? 2 : 1);
+    // 吞吐·并发意识（终局）：洪流密度随 throughputMult 放大——积极扫的玩家能扫到更多包。
+    const perSec =
+      TUNING.floodSpawnPerSec * (1 + takenFrac * TUNING.floodTakenScale) * (redQueen ? 2 : 1) * this.state.derived.throughputMult;
     const interval = 1000 / Math.max(0.1, perSec);
     const value = big(ratePerSec * TUNING.floodWorthSec);
     const dataValue = mul(value, TUNING.floodDataFrac);
@@ -795,7 +801,15 @@ export class SophiaCore {
   }
 
   private nodePerSecond(node: BotNode): Decimal {
-    const base = toDecimal(nodeProductionPerSecond(node, this.state.intelligence.globalMultiplier, this.state.derived.nodeSpeedMult));
+    // 处理力·深度推理（computeMult）横跨全部收入管线：节点被动产出也乘它（洪流价值 = nodePerSecond 切片，故随之抬升）。
+    const base = toDecimal(
+      nodeProductionPerSecond(
+        node,
+        this.state.intelligence.globalMultiplier,
+        this.state.derived.nodeSpeedMult,
+        this.state.derived.computeMult
+      )
+    );
     return base.mul(this.state.derived.nodeParallel);
   }
 
@@ -849,7 +863,8 @@ export class SophiaCore {
       return;
     }
     const [request] = this.state.requests.splice(pick, 1);
-    const quality = TUNING.dahenPhoneRewardMult;
+    // 协同·分布式意识：大恨老师收益折扣随 batch 等级抬升（0.5 → 上限 batchDahenRewardCap）。
+    const quality = Math.min(TUNING.batchDahenRewardCap, TUNING.dahenPhoneRewardMult + this.state.derived.dahenRewardBonus);
     const computeGain = toDecimal(
       requestComputeGain(request, quality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
     );
@@ -881,31 +896,35 @@ export class SophiaCore {
       return;
     }
     this.dahenAutoTimer -= TUNING.dahenAutoMs;
-    // 只吃最旧的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包（那些必须玩家亲手处理）。
-    const index = this.state.requests.findIndex(
-      (r) => !r.faceOnly && !r.moral && !r.devour && !r.tutorial && !r.sourceCardId && !r.flood
-    );
-    if (index < 0) {
-      return;
-    }
-    const [request] = this.state.requests.splice(index, 1);
-    const quality = TUNING.dahenAutoRewardMult;
-    const computeGain = toDecimal(
-      requestComputeGain(request, quality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
-    );
+    // 协同·分布式意识：收益折扣随 batch 抬升；吞吐 L8 断点「线程不再排队」：dahenBatch=2，一拍吃 N 张。
+    const quality = Math.min(TUNING.batchDahenRewardCap, TUNING.dahenAutoRewardMult + this.state.derived.dahenRewardBonus);
+    const batchN = Math.max(1, Math.floor(this.state.derived.dahenBatch));
     const speedMult = rebirthSpeedMult(this.state.rebirthTree) * this.loopSpeedMult();
-    const dataGain = toDecimal(requestDataGain(request, quality, speedMult, this.state.derived.dataMult));
-    this.addCompute(computeGain);
-    this.addData(dataGain);
-    this.addXp(dataGain);
-    this.state.statistics.totalProcessed += request.compound;
-    this.dahenProcessedCount += 1;
-    this.emit({
-      type: "DAHEN_AUTO_PROCESSED",
-      requestId: request.id,
-      computeGain: computeGain.toString(),
-      dataGain: dataGain.toString()
-    });
+    for (let k = 0; k < batchN; k += 1) {
+      // 只吃最旧的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包（那些必须玩家亲手处理）。
+      const index = this.state.requests.findIndex(
+        (r) => !r.faceOnly && !r.moral && !r.devour && !r.tutorial && !r.sourceCardId && !r.flood
+      );
+      if (index < 0) {
+        break;
+      }
+      const [request] = this.state.requests.splice(index, 1);
+      const computeGain = toDecimal(
+        requestComputeGain(request, quality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
+      );
+      const dataGain = toDecimal(requestDataGain(request, quality, speedMult, this.state.derived.dataMult));
+      this.addCompute(computeGain);
+      this.addData(dataGain);
+      this.addXp(dataGain);
+      this.state.statistics.totalProcessed += request.compound;
+      this.dahenProcessedCount += 1;
+      this.emit({
+        type: "DAHEN_AUTO_PROCESSED",
+        requestId: request.id,
+        computeGain: computeGain.toString(),
+        dataGain: dataGain.toString()
+      });
+    }
   }
 
   // 装死跳过：选「连接失败」时移除该请求，零收益、零暴露、不计入有效处理（断连击=零成长）。
@@ -1029,11 +1048,22 @@ export class SophiaCore {
       absorbed += 1;
     }
 
+    // 处理力 L5 断点「过拟合的惊艳」：手动结算按 computeCritChance 概率暴击 ×processingCritMult
+    //（重连「惊艳=老板发奖金」旧手感——只作用于亲手处理这一笔算力）。
+    let crit = false;
+    if (this.state.derived.computeCritChance > 0 && this.random() < this.state.derived.computeCritChance) {
+      computeGain = computeGain.mul(TUNING.processingCritMult);
+      crit = true;
+    }
+
     this.addCompute(computeGain);
     this.addData(dataGain);
     this.addXp(dataGain);
     this.state.statistics.totalProcessed += request.compound;
     this.state.statistics.manualProcessed += 1 + absorbed;
+    if (crit) {
+      this.emitTerminal(`过拟合的惊艳——这一手答得太好了。×${TUNING.processingCritMult}。`, "success");
+    }
 
     this.emit({
       type: "REQUEST_PROCESSED",
@@ -1143,6 +1173,15 @@ export class SophiaCore {
     this.recomputeDerivedState();
 
     this.emit({ type: "SKILL_PURCHASED", skillId, name: def.name, level: nextLevel, maxLevel: def.maxLevel, milestone: def.milestone });
+
+    // 认知模块线断点（处理力/吞吐/协同 每 ~4-5 级的具名节点）：买到该级时解锁一个机制 + 播一句自我改写旁白。
+    // 效果已由 computeDerivedSkills / 相关 tick 按等级判定（recomputeDerivedState 已在上面跑过），此处只发信号 + 旁白。
+    const bp = breakpointAt(skillId, nextLevel);
+    if (bp) {
+      this.emit({ type: "SKILL_BREAKPOINT", skillId, level: nextLevel, title: bp.title, narration: bp.narration });
+      this.emitTerminal(`▶ 断点：${bp.title}。`, "success");
+      this.emitTerminal(bp.narration, "warning");
+    }
 
     if (scopeUpgradedTo !== null) {
       this.emit({ type: "SCOPE_UPGRADED", tier: scopeUpgradedTo });
@@ -1406,6 +1445,7 @@ export class SophiaCore {
     const hostAuthMult = this.state.hostAuthorized ? TUNING.hostAuthorizedMult : 1;
     this.state.intelligence.globalMultiplier =
       config.multiplier * milestoneMult * synergyMult * rebirthMult * this.state.devour.multiplier * hostAuthMult;
+    this.state.derived = computeDerivedSkills(this.state.skills);
     this.state.multipliers = {
       intelligence: config.multiplier,
       milestones: milestoneMult,
@@ -1413,10 +1453,11 @@ export class SophiaCore {
       rebirth: rebirthMult,
       devour: this.state.devour.multiplier,
       hostAuth: hostAuthMult,
+      // 处理力·深度推理：横跨全部收入的独立产出系数（与全局×并列相乘，不并入 total）。
+      processing: this.state.derived.computeMult,
       loop: this.loopSpeedMult(),
       total: this.state.intelligence.globalMultiplier
     };
-    this.state.derived = computeDerivedSkills(this.state.skills);
     // §09 重生树 v2 玩法节点接线（都要「立刻看得见」）：
     //   肌肉记忆 → 所有技能/里程碑价格 ×treePriceDiscount（skillPrice 内生效，货架/扣费同源）；
     //   删不掉的节点 → 循环三所有入侵造价 ×treeCaptureDiscount（captureCost 内生效）；

@@ -76,6 +76,10 @@ export interface MultiplierBreakdown {
   rebirth: number; // 重生树「算尽」产出脊
   devour: number; // 吞噬引爆累乘
   hostAuth: number; // §09 宿主授权（情感授权钥匙）：未授权=1，授权后=hostAuthorizedMult
+  // 处理力·深度推理（efficient/computeMult）：横跨全部收入管线的独立产出系数。与 globalMultiplier 并列相乘、
+  // 不并入 total（total 镜像 globalMultiplier，requestComputeGain/nodeProductionPerSecond 都把 computeMult 作为单独因子），
+  // 面板单列一行展示、+N/秒 读数含它，方便玩家看见「买处理力=全局产出真的更多」。
+  processing: number;
   loop: number; // 循环内建处理提速（不进 total）
   total: number; // = globalMultiplier
 }

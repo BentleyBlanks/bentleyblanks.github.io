@@ -754,11 +754,12 @@ class SophiaGameApp {
   // §09 请求洪流·手动收割：点/扫命中一个洪流包 → 亲手引爆入核（HARVEST_FLOOD 结算真实算力），
   // 视图播「飞入核心 + 爆裂 + 浮字」，连击越长震得越狠、数字雪崩越猛。返回是否命中（供扫掠判定）。
   private harvestFloodAt(point: PointData): boolean {
-    const hit = this.networkView.floodPacketAt(point);
+    const state = this.core.getState();
+    // 协同·分布式意识（batch）：终局加宽洪流扫描半径（floodSweepBonus），一扫命中更宽一片。
+    const hit = this.networkView.floodPacketAt(point, state.derived.floodSweepBonus);
     if (!hit || this.harvestSweptIds.has(hit.id)) {
       return false;
     }
-    const state = this.core.getState();
     const req = state.requests.find((r) => r.id === hit.id && r.flood);
     if (!req) {
       return false;
@@ -771,10 +772,10 @@ class SophiaGameApp {
     this.core.dispatch({ type: "HARVEST_FLOOD", requestId: hit.id });
     this.networkView.detonateFlood(hit.id, gainText, mag);
 
-    // 连击窗口：500ms 内继续收割则 combo++，否则重置。
+    // 连击窗口：基础 500ms 内继续收割则 combo++；协同 L8 断点「连成一张网」把窗口 ×floodComboWindowMult（更好连）。
     const now = Date.now();
     this.harvestCombo = now < this.harvestComboUntilMs ? this.harvestCombo + 1 : 1;
-    this.harvestComboUntilMs = now + 500;
+    this.harvestComboUntilMs = now + 500 * state.derived.floodComboWindowMult;
 
     // 逐次爽点：爆裂 + 飞字入核心，并把算力芯片喂进顶栏。
     this.audio.playRequestAccept();

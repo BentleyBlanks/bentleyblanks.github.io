@@ -56,10 +56,17 @@ export function mergeComputeCost(
   return full.gt(credit) ? big(full.sub(credit)) : "0";
 }
 
-export function nodeProductionPerSecond(node: BotNode, globalMultiplier: number, nodeSpeedMult: number): string {
+// computeMult（处理力·深度推理）现横跨全部收入管线——节点被动产出也乘它（与手动结算同口径），
+// 保持它是与 globalMultiplier 并列的独立系数（倍率拆解面板单列一行「处理力」，不并入全局×）。
+export function nodeProductionPerSecond(
+  node: BotNode,
+  globalMultiplier: number,
+  nodeSpeedMult: number,
+  computeMult = 1
+): string {
   const tierScale = 1 + node.assignedTier * TUNING.tierScalePerTier;
   const levelScale = 1 + (node.level - 1) * TUNING.levelScalePerLevel;
-  return mul(node.production, tierScale * levelScale * globalMultiplier * nodeSpeedMult);
+  return mul(node.production, tierScale * levelScale * globalMultiplier * nodeSpeedMult * computeMult);
 }
 
 // 视觉/吞吐速率：一台节点每秒能"吃"几张卡。按设备档次（baseProduction 开方压缩量级）
