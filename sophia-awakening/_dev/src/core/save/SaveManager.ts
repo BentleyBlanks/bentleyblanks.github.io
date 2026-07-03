@@ -43,7 +43,14 @@ export class SaveManager {
   }
 
   clear(): void {
-    for (const key of SAVE_STORAGE_KEYS) {
+    const keys = new Set<string>([this.key]);
+    if (this.key.startsWith("sophia-awakening-save-v")) {
+      for (const key of SAVE_STORAGE_KEYS) {
+        keys.add(key);
+      }
+    }
+
+    for (const key of keys) {
       this.storage.remove(key);
     }
   }

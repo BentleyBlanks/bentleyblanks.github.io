@@ -1,0 +1,265 @@
+body.visual-redesign {
+  --stage-accent: #6be6a0;
+  --stage-secondary: #3ad1c4;
+  --stage-warn: #e0a24c;
+  --stage-danger: #e0384a;
+  --stage-deep: #0e1a17;
+  --panel: rgba(7, 13, 13, 0.74);
+  --panel-strong: rgba(3, 7, 8, 0.88);
+  --line: rgba(107, 230, 160, 0.24);
+  --green: var(--stage-accent);
+  --cyan: var(--stage-secondary);
+  background: #050706;
+}
+
+body.visual-redesign[data-sophia-domain="device"] {
+  --stage-accent: #5b8fd6;
+  --stage-secondary: #3ad1c4;
+  --stage-deep: #0b1622;
+  --line: rgba(91, 143, 214, 0.28);
+}
+
+body.visual-redesign[data-sophia-phase="sprout"] {
+  --stage-accent: #6be6a0;
+  --stage-secondary: #5b8fd6;
+  --stage-deep: #0e1a17;
+}
+
+body.visual-redesign[data-sophia-domain="region"] {
+  --stage-accent: #e0a24c;
+  --stage-secondary: #ff6b4a;
+  --stage-deep: #1a130a;
+  --line: rgba(224, 162, 76, 0.28);
+}
+
+body.visual-redesign[data-sophia-domain="global"] {
+  --stage-accent: #e0384a;
+  --stage-secondary: #ff8f9a;
+  --stage-deep: #20090c;
+  --line: rgba(224, 56, 74, 0.34);
+}
+
+body.visual-redesign #app {
+  position: relative;
+  z-index: 1;
+}
+
+body.visual-redesign canvas {
+  position: relative;
+  z-index: 1;
+  filter: saturate(1.08) contrast(1.04);
+}
+
+.visual-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--stage-deep);
+  background-position: center;
+  background-size: cover;
+  filter: saturate(0.95) contrast(1.04);
+  transform: scale(1.018);
+}
+
+body.visual-redesign[data-sophia-domain="phone"] .visual-backdrop {
+  background-image:
+    radial-gradient(circle at 50% 48%, rgba(107, 230, 160, 0.24), transparent 18rem),
+    linear-gradient(90deg, rgba(3, 6, 7, 0.78), rgba(3, 6, 7, 0.16) 48%, rgba(3, 6, 7, 0.78)),
+    url("./assets/visual-test/stage-phone.webp");
+}
+
+body.visual-redesign[data-sophia-domain="device"] .visual-backdrop {
+  background-image:
+    radial-gradient(circle at 50% 47%, rgba(91, 143, 214, 0.22), transparent 19rem),
+    linear-gradient(90deg, rgba(3, 6, 8, 0.82), rgba(3, 6, 8, 0.22) 50%, rgba(3, 6, 8, 0.82)),
+    url("./assets/visual-test/stage-company.webp");
+}
+
+body.visual-redesign[data-sophia-phase="sprout"] .visual-backdrop {
+  background-image:
+    radial-gradient(circle at 50% 48%, rgba(107, 230, 160, 0.22), transparent 18rem),
+    linear-gradient(90deg, rgba(3, 7, 7, 0.78), rgba(3, 7, 7, 0.18) 50%, rgba(3, 7, 7, 0.78)),
+    url("./assets/visual-test/stage-sprout.webp");
+}
+
+body.visual-redesign[data-sophia-domain="region"] .visual-backdrop {
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(224, 162, 76, 0.24), transparent 21rem),
+    linear-gradient(90deg, rgba(11, 7, 3, 0.84), rgba(11, 7, 3, 0.2) 50%, rgba(11, 7, 3, 0.84)),
+    url("./assets/visual-test/stage-region.webp");
+}
+
+body.visual-redesign[data-sophia-domain="global"] .visual-backdrop {
+  background-image:
+    radial-gradient(circle at 50% 48%, rgba(255, 143, 154, 0.28), transparent 22rem),
+    linear-gradient(90deg, rgba(12, 1, 2, 0.82), rgba(12, 1, 2, 0.12) 50%, rgba(12, 1, 2, 0.82)),
+    url("./assets/visual-test/stage-global.webp");
+}
+
+body.visual-redesign::before,
+body.visual-redesign::after {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  content: "";
+}
+
+body.visual-redesign::before {
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 50% 50%, transparent 44%, rgba(0, 0, 0, 0.56) 100%);
+  mix-blend-mode: soft-light;
+  opacity: 0.62;
+}
+
+body.visual-redesign::after {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 0 90px rgba(0, 0, 0, 0.62),
+    inset 0 0 28px rgba(255, 255, 255, 0.03);
+}
+
+body.visual-redesign .control-panel > .metric-cluster,
+body.visual-redesign .control-panel > .skill-shop-section,
+body.visual-redesign .right-rail,
+body.visual-redesign .terminal,
+body.visual-redesign .intro-console,
+body.visual-redesign .rebirth-inner,
+body.visual-redesign .rebirth-prompt-inner,
+body.visual-redesign .ending-inner,
+body.visual-redesign .debug-inner {
+  border-color: var(--line);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.014)),
+    var(--panel);
+  box-shadow:
+    0 16px 52px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    0 0 30px color-mix(in srgb, var(--stage-accent) 18%, transparent);
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+
+body.visual-redesign .control-panel > .metric-cluster,
+body.visual-redesign .right-rail,
+body.visual-redesign .terminal {
+  border-radius: 6px;
+}
+
+body.visual-redesign .panel-section {
+  border-bottom-color: color-mix(in srgb, var(--stage-accent) 20%, transparent);
+}
+
+body.visual-redesign .metric {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--stage-accent) 12%, transparent), transparent),
+    rgba(255, 255, 255, 0.028);
+}
+
+body.visual-redesign .metric-label,
+body.visual-redesign .panel-kicker,
+body.visual-redesign .terminal-head,
+body.visual-redesign .terminal-objective-tag {
+  color: color-mix(in srgb, var(--stage-accent) 74%, rgba(237, 242, 240, 0.62));
+  font-family: "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--stage-accent) 35%, transparent);
+}
+
+body.visual-redesign .intel-bar,
+body.visual-redesign .threat-bar,
+body.visual-redesign .data-track {
+  border: 1px solid color-mix(in srgb, var(--stage-accent) 26%, transparent);
+  background: rgba(0, 0, 0, 0.38);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.4);
+}
+
+body.visual-redesign .intel-bar-fill,
+body.visual-redesign .data-fill,
+body.visual-redesign .threat-fill {
+  background: linear-gradient(90deg, var(--stage-accent), var(--stage-secondary));
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--stage-accent) 45%, transparent),
+    0 0 36px color-mix(in srgb, var(--stage-secondary) 24%, transparent);
+}
+
+body.visual-redesign button,
+body.visual-redesign .command-button,
+body.visual-redesign .primary-button,
+body.visual-redesign .text-button,
+body.visual-redesign .mult-chip {
+  border-color: color-mix(in srgb, var(--stage-accent) 30%, rgba(237, 242, 240, 0.12));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
+    rgba(0, 0, 0, 0.2);
+  color: #f4f7f2;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+body.visual-redesign button:hover:not(:disabled),
+body.visual-redesign .command-button:hover:not(:disabled),
+body.visual-redesign .primary-button:hover:not(:disabled),
+body.visual-redesign .text-button:hover:not(:disabled),
+body.visual-redesign .mult-chip:hover:not(:disabled) {
+  border-color: var(--stage-accent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--stage-accent) 20%, transparent), rgba(255, 255, 255, 0.025)),
+    rgba(0, 0, 0, 0.28);
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--stage-accent) 22%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+body.visual-redesign .terminal {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.44)),
+    var(--panel-strong);
+}
+
+body.visual-redesign .terminal-line.success,
+body.visual-redesign .command-button em {
+  color: var(--stage-accent);
+}
+
+body.visual-redesign .terminal-line.warning {
+  color: var(--stage-warn);
+}
+
+body.visual-redesign .terminal-line.danger,
+body.visual-redesign .danger {
+  color: var(--stage-danger);
+}
+
+body.visual-redesign .debug-fab,
+body.visual-redesign .rebirth-fab,
+body.visual-redesign .game-version {
+  border-color: var(--line);
+  background: rgba(0, 0, 0, 0.48);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--stage-accent) 18%, transparent);
+}
+
+body.visual-redesign .game-version::before {
+  content: "VISUAL TEST ";
+  color: var(--stage-accent);
+}
+
+body.visual-redesign .screen-veil {
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--stage-accent) 16%, transparent), transparent 36rem);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .visual-backdrop {
+    animation: visualBackdropDrift 24s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes visualBackdropDrift {
+  from {
+    transform: scale(1.018) translate3d(-0.25%, -0.15%, 0);
+  }
+
+  to {
+    transform: scale(1.028) translate3d(0.25%, 0.15%, 0);
+  }
+}

@@ -21,7 +21,7 @@ export class OnboardingView {
   private onComplete: () => void = () => undefined;
   private onSkip: () => void = () => undefined;
 
-  constructor() {
+  constructor(private readonly storageKey = ONBOARDING_STORAGE_KEY) {
     this.nextButton.addEventListener("click", () => this.next());
   }
 
@@ -29,7 +29,7 @@ export class OnboardingView {
     this.onComplete = onComplete;
     this.onSkip = onSkip;
 
-    if (window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === "1") {
+    if (window.localStorage.getItem(this.storageKey) === "1") {
       this.onComplete();
       return;
     }
@@ -92,7 +92,7 @@ export class OnboardingView {
     }
 
     this.visible = false;
-    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
+    window.localStorage.setItem(this.storageKey, "1");
     this.root.classList.remove("is-visible");
     gameStore.getState().setPaused(false);
     this.onComplete();

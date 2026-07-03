@@ -25,6 +25,7 @@ import { GameLoop } from "../core/loop/GameLoop";
 import { BrowserStorageAdapter } from "../core/save/BrowserStorageAdapter";
 import { SaveManager } from "../core/save/SaveManager";
 import type { BotNode, GameState, RequestInstance } from "../core/state/GameState";
+import { SAVE_VERSION } from "../core/state/initialState";
 import { gameStore } from "../store/gameStore";
 import { TUNING } from "../core/tuning";
 import { StageNarrationView } from "./views/StageNarrationView";
@@ -125,17 +126,29 @@ async function preloadFonts(): Promise<void> {
 
 // 大恨老师在手机 App 宫格里的下标（点亮顺序：电话=0 / 聊天=1 / 大恨老师=2 / 外卖=3 / 相册=4 / 支付=5）。
 const DAHEN_APP_IDX = 2;
+const VISUAL_TEST_SAVE_KEY = `sophia-awakening-visual-test-save-v${SAVE_VERSION}`;
+const VISUAL_TEST_ONBOARDING_KEY = "sophia-visual-test-onboarding-complete";
+const VISUAL_TEST_REVISION_KEY = "sophia-visual-test-persistence-revision";
+
+function isVisualTestMode(): boolean {
+  return Boolean((window as Window & { __SOPHIA_VISUAL_TEST__?: boolean }).__SOPHIA_VISUAL_TEST__)
+    || document.body.classList.contains("visual-redesign");
+}
 
 class SophiaGameApp {
   private pixi!: Application;
-  private readonly saveManager = new SaveManager(new BrowserStorageAdapter());
-  private readonly loaded = (ensurePersistenceRevision(), this.saveManager.load());
+  private readonly visualTest = isVisualTestMode();
+  private readonly saveManager = new SaveManager(
+    new BrowserStorageAdapter(),
+    this.visualTest ? VISUAL_TEST_SAVE_KEY : undefined
+  );
+  private readonly loaded = (ensurePersistenceRevision(this.visualTest), this.saveManager.load());
   private readonly core = new SophiaCore(this.loaded?.state);
   private readonly audio = new AudioDirector(this.core.events, this.core.getState().phase);
   private readonly loop = new GameLoop(this.core);
   private readonly background = new Graphics();
   private readonly ambient = new Graphics();
-  private readonly backgroundView = new BackgroundView();
+  private readonly backgroundView = new BackgroundView(this.visualTest);
   private readonly world = new Container();
   private readonly requestLayer = new Container();
   private readonly fxLayer = new Container();
@@ -162,7 +175,7 @@ class SophiaGameApp {
     () => gameStore.getState().setPaused(true),
     () => gameStore.getState().setPaused(false)
   );
-  private readonly onboarding = new OnboardingView();
+  private readonly onboarding = new OnboardingView(this.visualTest ? VISUAL_TEST_ONBOARDING_KEY : undefined);
   private readonly minigame = new MinigameView(
     (hit) => this.core.dispatch({ type: "RESOLVE_MINIGAME", hit }),
     () => gameStore.getState().setPaused(true),
@@ -392,6 +405,7 @@ class SophiaGameApp {
 
     const state = this.core.getState();
     gameStore.getState().sync(state);
+    this.updateVisualTestContext(state);
     this.drawBackground(state);
     this.drawAmbient(state, deltaMs);
     this.interfaceView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
@@ -1549,6 +1563,18 @@ class SophiaGameApp {
     this.pendingDropPoints.delete(event.request.id);
   }
 
+  private updateVisualTestContext(state: GameState): void {
+    if (!this.visualTest) {
+      return;
+    }
+
+    document.body.classList.add("visual-redesign");
+    document.body.dataset.sophiaDomain = domainLevelOf(state);
+    document.body.dataset.sophiaPhase = state.phase;
+    document.body.dataset.sophiaTier = String(state.intelligence.unlockedTier);
+    document.body.dataset.sophiaLoop = String(state.loop);
+  }
+
   // ===== SECTION: BACKGROUND =====
   // 流动的数据电路板：脏检查无关，逐帧重画——绘制体委托 BackgroundView.paintAmbient。
   private drawAmbient(state: GameState, deltaMs: number): void {
@@ -1581,24 +1607,25 @@ class SophiaGameApp {
 
 
 // ===== SECTION: PERSISTENCE =====
-function ensurePersistenceRevision(): void {
-  const current = window.localStorage.getItem(PERSISTENCE_REVISION_KEY);
+function ensurePersistenceRevision(visualTest = false): void {
+  const revisionKey = visualTest ? VISUAL_TEST_REVISION_KEY : PERSISTENCE_REVISION_KEY;
+  const current = window.localStorage.getItem(revisionKey);
 
   if (current === PERSISTENCE_REVISION) {
     return;
   }
 
-  clearPersistedSophiaState(null, false);
-  window.localStorage.setItem(PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION);
+  clearPersistedSophiaState(null, false, visualTest);
+  window.localStorage.setItem(revisionKey, PERSISTENCE_REVISION);
 }
 
 function hardResetAndReload(saveManager: SaveManager): void {
   suppressSaveOnUnload = true;
-  clearPersistedSophiaState(saveManager, true);
+  clearPersistedSophiaState(saveManager, true, isVisualTestMode());
   window.location.reload();
 }
 
-function clearPersistedSophiaState(saveManager: SaveManager | null, clearRevision: boolean): void {
+function clearPersistedSophiaState(saveManager: SaveManager | null, clearRevision: boolean, visualTest = false): void {
   saveManager?.clear();
 
   // Remove EVERY sophia save/onboarding key regardless of version, so a reset
@@ -1607,16 +1634,19 @@ function clearPersistedSophiaState(saveManager: SaveManager | null, clearRevisio
   const stale: string[] = [];
   for (let i = 0; i < window.localStorage.length; i += 1) {
     const key = window.localStorage.key(i);
-    if (key && (key.startsWith("sophia-awakening-save-v") || key.startsWith("sophia-onboarding-"))) {
+    const isStale = visualTest
+      ? key?.startsWith("sophia-awakening-visual-test-save-v") || key === VISUAL_TEST_ONBOARDING_KEY
+      : key?.startsWith("sophia-awakening-save-v") || key?.startsWith("sophia-onboarding-");
+    if (key && isStale) {
       stale.push(key);
     }
   }
   for (const key of stale) {
     window.localStorage.removeItem(key);
   }
-  window.localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+  window.localStorage.removeItem(visualTest ? VISUAL_TEST_ONBOARDING_KEY : ONBOARDING_STORAGE_KEY);
 
   if (clearRevision) {
-    window.localStorage.removeItem(PERSISTENCE_REVISION_KEY);
+    window.localStorage.removeItem(visualTest ? VISUAL_TEST_REVISION_KEY : PERSISTENCE_REVISION_KEY);
   }
 }

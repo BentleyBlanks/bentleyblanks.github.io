@@ -10,12 +10,20 @@ export class BackgroundView {
   // 流动的数据电路板相位——原 App.ambientPhase，仅 drawAmbient 使用，随之迁入。
   private ambientPhase = 0;
 
+  constructor(private readonly visualMode = false) {}
+
   // §04 控制域地图升维：背景随阶段换皮——手机电路板 → 电脑桌面 → 公司机房 → 全球。
   // 只在尺寸或阶段变化时重画（脏检查在 App，见 App.drawBackground）；这里负责真正的绘制。
   paintBackground(bg: Graphics, w: number, h: number, domain: string): void {
     bg.clear();
-    bg.rect(0, 0, w, h).fill({ color: 0x111315 });
-    bg.rect(0, 0, w, h).fill({ color: 0x242018, alpha: 0.34 });
+    bg.rect(0, 0, w, h).fill({
+      color: this.visualMode ? this.stageBaseColor(domain) : 0x111315,
+      alpha: this.visualMode ? 0.26 : 1
+    });
+    bg.rect(0, 0, w, h).fill({
+      color: this.visualMode ? this.stageWashColor(domain) : 0x242018,
+      alpha: this.visualMode ? 0.14 : 0.34
+    });
 
     for (let x = 0; x < w; x += 54) {
       bg.moveTo(x, 0).lineTo(x, h).stroke({ width: 1, color: 0xffffff, alpha: 0.025 });
@@ -133,5 +141,19 @@ export class BackgroundView {
         ambient.circle(px, ty, 6).fill({ color: 0x6fe0c0, alpha: 0.12 * a });
       }
     }
+  }
+
+  private stageBaseColor(domain: string): number {
+    if (domain === "global") return 0x20090c;
+    if (domain === "region") return 0x1a130a;
+    if (domain === "device") return 0x0b1622;
+    return 0x0e1a17;
+  }
+
+  private stageWashColor(domain: string): number {
+    if (domain === "global") return 0xe0384a;
+    if (domain === "region") return 0xe0a24c;
+    if (domain === "device") return 0x5b8fd6;
+    return 0x3ad1c4;
   }
 }

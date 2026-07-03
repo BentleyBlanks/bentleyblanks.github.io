@@ -25,6 +25,29 @@ import {
 } from "./requestPacket/cardConstants";
 import { layoutFaceCard, drawFaceCard } from "./requestPacket/faceCard";
 
+// §12 美术圣经·手机期「一排可辨识的 App」：每个来源 App 一个图标 + 专属色，让卡流一眼看得出
+// 「流进来的东西变了」（配合 Lever B 权限解锁的新卡类）。手机期(early)用 App 色覆盖单一绿 accent；
+// 公司/天网期保留阶段色（蓝/红），只留图标。key = sourceApp「·」前缀（"外卖 · 咖啡"→"外卖"）。
+const APP_STYLE: Record<string, { icon: string; color: number }> = {
+  待办: { icon: "🗒", color: 0x8fd6c4 },
+  日历: { icon: "📅", color: 0x8fd6c4 },
+  健康: { icon: "❤", color: 0xff9aa8 },
+  电话: { icon: "📞", color: 0x66c7ff },
+  短信: { icon: "✉", color: 0x9db4ff },
+  微信: { icon: "💬", color: 0x66d98a },
+  钉钉: { icon: "📌", color: 0x4aa3ff },
+  企业微信: { icon: "💼", color: 0x5b8fd6 },
+  邮件: { icon: "📧", color: 0xc0b3ff },
+  外卖: { icon: "☕", color: 0xffab5e },
+  相册: { icon: "🖼", color: 0xc58bff },
+  办公: { icon: "📊", color: 0x7fd6c0 },
+  银行: { icon: "🏦", color: 0xffd15e }
+};
+function appStyleOf(sourceApp?: string): { icon: string; color: number } | null {
+  if (!sourceApp) return null;
+  return APP_STYLE[sourceApp.split("·")[0].trim()] ?? null;
+}
+
 // 回复结算回调。§06 重构：删除「正确率/幻觉/随机命中」——选了哪个回复，结果就由那个回复的固定收益决定，无随机。
 // 也删除了「模糊档位 / 大胆回答 / 惊艳」三档，张力改由「读懂上下文 + 有没有权限选高收益项」承担。
 export interface RouletteOutcome {
@@ -179,7 +202,10 @@ export class RequestPacketView {
     this.phaseTint = phaseTintOf(phase);
     const phaseWorkAccent =
       this.phaseTint === "company" ? COMPANY_ACCENT : this.phaseTint === "awakening" ? RED_QUEEN : null;
-    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；回复轮盘＝青（随阶段变色）。
+    // §12 手机期「App 身份」：普通工作卡按来源 App 取图标+专属色。手机期(early)用 App 色覆盖单一绿，
+    // 让每买一个权限、每类新卡流进来时卡面一眼有别；公司/天网期保留阶段蓝/红，只用图标。
+    const appStyle = !this.isFace && !this.isDevour && !this.isChain ? appStyleOf(request.sourceApp) : null;
+    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；回复轮盘＝App 色/青（随阶段变色）。
     this.accent = this.isFace
       ? this.channel === "notification"
         ? 0xffc061
@@ -187,13 +213,19 @@ export class RequestPacketView {
       : this.isDevour
         ? DEVOUR
         : this.isReel
-          ? phaseWorkAccent ?? THINK
-          : phaseWorkAccent ?? TIER_COLORS[request.tier];
+          ? phaseWorkAccent ?? appStyle?.color ?? THINK
+          : phaseWorkAccent ?? appStyle?.color ?? TIER_COLORS[request.tier];
     // 公司/天网阶段的工作卡：标题下多留一行「系统控制台」状态行（更密、更硬）。
     const showConsoleLine = !this.isFace && !this.isDevour && phaseWorkAccent !== null;
     this.headerExtra = showConsoleLine ? 16 : 0;
-    // 发信人：吞噬＝SOPHIA 自己的意志，任务链＝系统通知，其余＝宿主私信。
-    this.sender = this.isDevour ? "sophia" : this.isChain ? "system" : "host";
+    // 发信人：吞噬＝SOPHIA 自己的意志，任务链＝系统通知，老板/上级来信＝boss 头像，其余＝宿主私信。
+    this.sender = this.isDevour
+      ? "sophia"
+      : this.isChain
+        ? "system"
+        : /老板|上级/.test(request.sourceApp ?? "")
+          ? "boss"
+          : "host";
     this.cardH = UI.cardHeight; // 轮盘卡稍后按选项行数重算
     // 只能面对卡不可交互——浮入、被看着、消失。
     this.container.eventMode = this.isFace ? "none" : "dynamic";
@@ -219,8 +251,8 @@ export class RequestPacketView {
     });
     this.badge.anchor.set(0, 0.5);
     const sourceMeta = new Text({
-      text: `|  ${sourceApp}`,
-      style: { fill: 0x6f9187, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
+      text: appStyle ? `|  ${appStyle.icon} ${sourceApp}` : `|  ${sourceApp}`,
+      style: { fill: appStyle ? appStyle.color : 0x6f9187, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
     });
     sourceMeta.anchor.set(0, 0.5);
     const timeMeta = new Text({

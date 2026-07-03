@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
+    "build:visual": "tsc --noEmit && vite build --config vite.visual.config.ts",
     "preview": "vite preview --host 127.0.0.1",
     "sim": "tsc -p tsconfig.sim.json && node scripts/sim.cjs",
     "loopcheck": "tsc -p tsconfig.sim.json && node scripts/loop-check.cjs"
