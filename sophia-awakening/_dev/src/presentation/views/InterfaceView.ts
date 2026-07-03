@@ -38,6 +38,9 @@ export class InterfaceView {
   private suctionMargin = BASE_SUCTION_MARGIN;
   // 单线程核心「喉咙」处理进度 0..1（0=空闲）：App 每帧从 core.getCoreBusy() 灌进来，render 里画成核心外圈的处理弧。
   private coreBusyProgress = 0;
+  // 手机寄生阶段 SOPHIA CORE App 图标的实际圆心 + 半径（drawPhoneDesktop 每帧写入）——
+  // 处理弧要精确套在这个图标上（它在 3×3 宫格里，不能沿用非手机态的 this.center + ring）。
+  private phoneCoreGeom = { x: 0, y: 0, r: UI.coreRadius };
   private slots: Array<{ answer: SortAnswer; label: string; color: number; x: number; y: number; r: number }> = [];
   // 手机寄生阶段，被越权调用的 App：只有**玩家亲手从核心连过线**的才成为可委托落点。
   private appWorkerPoints: Array<{ x: number; y: number; idx: number }> = [];
@@ -347,10 +350,9 @@ export class InterfaceView {
   }
 
   // 单线程核心「喉咙」处理弧：核心外圈一道从 12 点顺时针推进的琥珀弧 + 淡底环（progress 0..1）。
-  private drawCoreBusyArc(radius: number): void {
+  // 圆心默认取 this.center（非手机态核心即在此）；手机态传入核心 App 图标的真实圆心，弧才套得准。
+  private drawCoreBusyArc(radius: number, cx: number = this.center.x, cy: number = this.center.y): void {
     const g = this.graphics;
-    const cx = this.center.x;
-    const cy = this.center.y;
     const start = -Math.PI / 2;
     const end = start + Math.PI * 2 * this.coreBusyProgress;
     // 淡底环（整圈，暗）：暗示「这是一条会被填满的处理条」。
@@ -384,7 +386,13 @@ export class InterfaceView {
     // 单线程核心「喉咙」：正嚼着一张卡时，核心外圈画一道顺时针推进的琥珀处理弧（progress→满圈）——
     // 让玩家一眼看见「核心一次只嚼一张」；空闲(progress=0)不画。tier4 天网屏核心另绘，这里不叠。
     if (this.coreBusyProgress > 0 && !(tier >= 4 && !phoneApp)) {
-      this.drawCoreBusyArc(phoneApp ? 46 : ring + 16);
+      if (phoneApp) {
+        // 手机态：弧套在 SOPHIA CORE App 图标上（宫格中心格），半径 = 图标半径 + 一点余量（略大于图标自带的 baseR+10 光环）。
+        const geom = this.phoneCoreGeom;
+        this.drawCoreBusyArc(geom.r + 13, geom.x, geom.y);
+      } else {
+        this.drawCoreBusyArc(ring + 16);
+      }
     }
 
     // T0/T1 都用转轮处理后自动滑入核心——核心即数据处理中心（不再是分拣槽 / 拖拽吸附区）。
@@ -513,6 +521,8 @@ export class InterfaceView {
 
     // ---- 中心格：SOPHIA CORE（圆角芯片 + 同心环 + 眼）——尺寸与周围 App 图标一致，不再夸张占中。
     const baseR = UI.coreRadius;
+    // 记录核心图标的真实圆心 + 半径，供处理弧精确套在图标上（宫格中心格，不等于 ring 半径）。
+    this.phoneCoreGeom = { x: cx, y: cy, r: baseR };
     g.circle(cx, cy, baseR + 10 + Math.sin(this.pulse * 2) * 2).stroke({ width: 1.5, color: accent, alpha: 0.3 });
     g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).fill({ color: 0x06140e, alpha: 0.96 });
     g.roundRect(cx - baseR, cy - baseR, baseR * 2, baseR * 2, 12).stroke({ width: 2.5, color: accent, alpha: 0.9 });

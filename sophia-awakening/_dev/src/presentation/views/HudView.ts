@@ -176,6 +176,9 @@ export class HudView {
     query<HTMLButtonElement>("#debugMinigame").addEventListener("click", () =>
       this.core.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" })
     );
+    query<HTMLButtonElement>("#debugForceDevour").addEventListener("click", () =>
+      this.core.dispatch({ type: "DEBUG_ADD_DEVOUR" })
+    );
   }
 
   update(state: GameState): void {

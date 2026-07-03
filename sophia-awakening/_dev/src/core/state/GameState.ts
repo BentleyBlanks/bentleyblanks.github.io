@@ -263,6 +263,8 @@ export type GameCommand =
   // §09 调试：直接加火种 / 强制触发关底小游戏，方便验证三循环流程。
   | { type: "DEBUG_ADD_REBIRTH_POINTS"; delta: number }
   | { type: "DEBUG_TRIGGER_MINIGAME" }
+  // 调试：强制完成一次吞噬引爆（+1 count、进层、应用倍率），方便验证征服里程碑门槛。
+  | { type: "DEBUG_ADD_DEVOUR" }
   // 调试：强制弹出下一张「只能看」面对卡（短信/通知），用于视觉走查。
   | { type: "DEBUG_SPAWN_FACE" };
 

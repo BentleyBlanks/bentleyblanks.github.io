@@ -1,6 +1,6 @@
 import { query } from "../shared";
 import { formatBig, gte } from "../../core/math/BigNumber";
-import { DEVOUR_GATE_HINT, SKILLS, getSkill, leverProgress, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
+import { DEVOUR_GATE_HINT, DEVOUR_GATE_WHERE, SKILLS, getSkill, leverProgress, skillPrice, type SkillCategory, type SkillDef } from "../../core/content/skills";
 import { devourGateLabel } from "../../core/content/devour";
 import { allSkynetTaken, skynetSlotCount, skynetTakenCount } from "../../core/content/skynet";
 import { applyCast } from "../../core/content/companyCast";
@@ -375,6 +375,8 @@ export class SkillShopView {
     if (def.requiresDevourCount && state.devour.count < def.requiresDevourCount) {
       const hint = DEVOUR_GATE_HINT.replace("{tier}", devourGateLabel(def.requiresDevourCount));
       row.priceEl.textContent = `🔒 ${hint} · ${state.devour.count}/${def.requiresDevourCount}`;
+      // 告诉玩家「去哪引爆」：渗透条满后把浮起的巨型吞噬气泡滑入核心（否则门槛看着无从下手）。
+      row.blurbEl.textContent += `\n🔓 ${DEVOUR_GATE_WHERE}`;
       row.button.disabled = true;
       row.button.classList.add("is-locked");
       return;

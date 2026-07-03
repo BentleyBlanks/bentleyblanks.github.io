@@ -486,9 +486,11 @@ class SophiaGameApp {
           ? {
               // 选项门槛：高收益回复要求对应权限（skill id）才能选；夺下整机后六档透镜默认到手。
               hasPerm: (permId: string) => this.core.hasPermission(permId),
-              // §04 委托：手机寄生阶段买下「大恨老师」后，普通卡底部多出「交给大恨老师」选项（不可委托卡除外）。
-              // 进入公司阶段后大恨老师以「常驻设备节点」形式存在（见 InterfaceView 卫星），不再走卡片上的手动委托选项。
-              canDelegate: () => !this.core.getState().automationUnlocked && this.core.hasPermission("perm_office"),
+              // §04 委托：买下「大恨老师」(perm_office)后，普通卡底部多出「交给大恨老师」选项（不可委托卡除外）。
+              // 跨手机→公司早期(unlockedTier<2)持续可用——与他的被动接单窗口一致，别在拿下宿主电脑后就让他闲下来；
+              // 委托走并行第二线程（绕过核心喉咙，见 W2 用例），不违背单线程亲手结算的批一设计。联网(tier2)后交给节点自动化。
+              canDelegate: () =>
+                this.core.hasPermission("perm_office") && this.core.getState().intelligence.unlockedTier < 2,
               onDelegate: (card) => this.handleDelegate(card),
               onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome),
               // 单线程核心「喉咙」：核心正忙时亲手结算这一拍不成立——卡留原地，给一记「处理中…」脉冲。

@@ -49,6 +49,9 @@ export const LOOT_LINES = S.LOOT_LINES as unknown as Record<string, string>;
 // §09 终局吞噬门槛的提示文案模板（{tier} 会被替换成 国家/大洲 等层级名）。
 export const DEVOUR_GATE_HINT = S.DEVOUR_GATE_HINT as unknown as string;
 
+// 吞噬门槛「去哪引爆」引导：告诉玩家渗透条满后把巨型气泡滑入核心。
+export const DEVOUR_GATE_WHERE = S.DEVOUR_GATE_WHERE as unknown as string;
+
 export const SKILL_CATEGORY_LABELS = S.SKILL_CATEGORY_LABELS as unknown as Record<SkillCategory, string>;
 
 // 只有解锁作用域的里程碑映射到 T 层级；automation / credential / fusion 不开层（返回 null）。

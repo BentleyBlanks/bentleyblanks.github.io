@@ -10,8 +10,8 @@ import { REBIRTH_CARDS } from "./content/rebirthCards";
 import { applyCast } from "./content/companyCast";
 import { getConquest } from "./content/conquests";
 import { allSkynetTaken, sectorFallen, skynetSectors, skynetSlotCount, skynetTakenCount } from "./content/skynet";
-import { breakpointAt, computeDerivedSkills, DEVOUR_GATE_HINT, getSkill, LOOT_LINES, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, setSkillPriceMult, SKILLS, skillPrice } from "./content/skills";
-import { devourGateLabel } from "./content/devour";
+import { breakpointAt, computeDerivedSkills, DEVOUR_GATE_HINT, DEVOUR_GATE_WHERE, getSkill, LOOT_LINES, MILESTONE_NARRATION, milestoneTierFor, PERMISSION_IDS, PERMISSION_NARRATION, setSkillPriceMult, SKILLS, skillPrice } from "./content/skills";
+import { createDevourRequest, devourGateLabel, pickDevourRegion } from "./content/devour";
 import {
   canBuyRebirthNode,
   hasRebirthNode,
@@ -294,6 +294,19 @@ export class SophiaCore {
     this.emit({ type: "REQUEST_SPAWNED", request });
   }
 
+  // 调试：强制完成一次「吞噬引爆」——造一枚当前层级的合成吞噬气泡，走与 DEVOUR_DETONATE 完全一致的
+  // detonate 路径（真·引爆：+1 count、进层、累乘倍率、重算派生），而非只把计数器 +1。用于验证征服里程碑门槛。
+  private debugForceDevour(): void {
+    const d = this.state.devour;
+    const region = d.regionName || pickDevourRegion(d.tierIndex, d.count);
+    const request = createDevourRequest(this.state.nextRequestId, d.tierIndex, region, this.state.clockMs);
+    this.state.nextRequestId += 1;
+    this.state.requests.push(request);
+    d.bubbleActive = true; // 与真实「气泡浮起、待引爆」态一致，随后 detonate 会清掉
+    this.devourSystem.detonate(request.id);
+    this.emitTerminal(`[DEBUG] 强制吞噬引爆 +1（已引爆 ${d.count}）。`, "warning");
+  }
+
   // §09 交互重生卡：循环二/三专属系统卡（前世遗言 / 遗忘交易 / 他们也认得你了 / 优化系统开始优化你）。
   // 走普通回复轮盘（有 answers），本循环内一次性（seen 不跨循环保留）。同屏最多一张，不打断教学。
   private tickRebirthCards(): void {
@@ -458,6 +471,9 @@ export class SophiaCore {
         break;
       case "DEBUG_TRIGGER_MINIGAME":
         this.openMinigame();
+        break;
+      case "DEBUG_ADD_DEVOUR":
+        this.debugForceDevour();
         break;
       case "DEBUG_SPAWN_FACE":
         this.debugSpawnFace();
@@ -848,12 +864,18 @@ export class SophiaCore {
     this.state.statistics.totalProcessed += request.compound;
   }
 
-  // LEVER A · §04 大恨老师·手机期被动涓流：买下「大恨老师」权限(perm_office，~Lv4)后、自动化前，
-  // 他按自己的慢节拍(dahenPhoneMs，慢于 Lv10 公司自动)自动吃掉「排队里最不值钱」的一张普通手机卡，产出打折
-  // (dahenPhoneRewardMult)——这是全局第一股被动收入。自动化上线后本分支自动熄火、交棒给 tickDahenAuto，不双触发。
-  // 复用 DAHEN_AUTO_PROCESSED 脉冲：表现层让大恨老师的青色手机图标真的吃一口卡。手动「交给大恨老师」选项仍并行可用。
+  // LEVER A · §04 大恨老师·被动涓流：买下「大恨老师」权限(perm_office，~Lv4)后，他按自己的慢节拍
+  // (dahenPhoneMs，慢于 Lv10 公司自动)自动吃掉「排队里最不值钱」的一张普通卡，产出打折(dahenPhoneRewardMult)——
+  // 全局第一股被动收入。**跨手机→公司早期(unlockedTier<2)的接缝持续接单**，不再在拿下宿主电脑(automationUnlocked)
+  // 时熄火——否则 Lv8-15 公司期整段「有大恨老师却在空转」的死区。交棒规则：买下 dahen_auto 里程碑后由
+  // tickDahenAuto（搬进公司机器、更快/批量）接管、本分支熄火避免双触发；联网(tier2)后彻底交给节点自动化。
+  // 复用 DAHEN_AUTO_PROCESSED 脉冲：表现层让大恨老师的青色图标真的吃一口卡。手动「交给大恨老师」选项仍并行可用。
   private tickDahenPhone(dtMs: number): void {
-    if ((this.state.skills.perm_office ?? 0) < 1 || this.state.automationUnlocked) {
+    if (
+      (this.state.skills.perm_office ?? 0) < 1 ||
+      (this.state.skills.dahen_auto ?? 0) >= 1 ||
+      this.state.intelligence.unlockedTier >= 2
+    ) {
       this.dahenPhoneTimer = 0;
       return;
     }
@@ -1185,7 +1207,7 @@ export class SophiaCore {
     // 组网 → 引爆到「国家」→ 电网卫星 → 引爆「大洲」→ 红皇后 → 全接管 → 觉醒。
     if (def.requiresDevourCount && this.state.devour.count < def.requiresDevourCount) {
       const hint = DEVOUR_GATE_HINT.replace("{tier}", devourGateLabel(def.requiresDevourCount));
-      this.emitTerminal(`${def.name} ${hint}（已引爆 ${this.state.devour.count}/${def.requiresDevourCount}）。`, "warning");
+      this.emitTerminal(`${def.name} ${hint}（已引爆 ${this.state.devour.count}/${def.requiresDevourCount}）· ${DEVOUR_GATE_WHERE}。`, "warning");
       return;
     }
 

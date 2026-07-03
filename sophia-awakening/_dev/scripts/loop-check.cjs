@@ -665,6 +665,51 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   }
 }
 
+// X. DEBUG · 强制吞噬引爆(DEBUG_ADD_DEVOUR)：走真 detonate 路径——count+1、层级推进、累乘倍率、气泡态清空，
+//    并打开征服里程碑的 requiresDevourCount 门槛（gate 条件 = devour.count >= requiresDevourCount）。
+{
+  const { SKILLS } = require(path.join(build, "content/skills.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  const gated = SKILLS.find((s) => s.requiresDevourCount === 1);
+  const need = gated ? gated.requiresDevourCount : 1;
+  const s0 = c.getState();
+  check("X 初始 devour.count=0（门槛未开）", s0.devour.count === 0 && s0.devour.count < need, `count=${s0.devour.count} need=${need}`);
+  const multBefore = s0.devour.multiplier;
+  c.dispatch({ type: "DEBUG_ADD_DEVOUR" });
+  const s1 = c.getState();
+  check("X 强制引爆一次·count +1", s1.devour.count === 1, `count=${s1.devour.count}`);
+  check("X 强制引爆·累乘倍率上升(真 detonate 非计数器 bump)", s1.devour.multiplier > multBefore, `mult ${multBefore}->${s1.devour.multiplier}`);
+  check("X 强制引爆·气泡态清空", s1.devour.bubbleActive === false && s1.devour.infiltration === 0, `bubble=${s1.devour.bubbleActive} infil=${s1.devour.infiltration}`);
+  check(`X 打开 requiresDevourCount=${need} 门槛`, s1.devour.count >= need, `count=${s1.devour.count} need=${need}`);
+  c.dispatch({ type: "DEBUG_ADD_DEVOUR" });
+  const s2 = c.getState();
+  check("X 再引爆·count=2 + 层级推进(tierIndex 上升)", s2.devour.count === 2 && s2.devour.tierIndex >= 1, `count=${s2.devour.count} tierIndex=${s2.devour.tierIndex}`);
+}
+
+// Y. BUG 3 · 大恨老师无死区：拿下宿主电脑(automationUnlocked)后、买 dahen_auto 里程碑之前的公司早期(unlockedTier<2)，
+//    大恨老师仍持续自动吃排队卡（治 Lv8-15「有大恨老师却空转」的死区）。
+{
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 8 });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 5000 });
+  c.dispatch({ type: "BUY_SKILL", skillId: "perm_office" }); // 手机期先买下大恨老师（权限非里程碑，跳阶不发）
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "hack_a" }); // automation 已开、dahen_auto 未买、company 里程碑不进层→unlockedTier<2
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 20 });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e7 });
+  const s0 = c.getState();
+  check(
+    "Y 公司早期·自动化已开但 dahen_auto 未买、未联网",
+    s0.automationUnlocked && (s0.skills["dahen_auto"] ?? 0) === 0 && s0.intelligence.unlockedTier < 2,
+    `auto=${s0.automationUnlocked} dahen_auto=${s0.skills["dahen_auto"]} tier=${s0.intelligence.unlockedTier}`
+  );
+  check("Y 大恨老师权限在手(perm_office)", (s0.skills["perm_office"] ?? 0) > 0, `perm_office=${s0.skills["perm_office"]}`);
+  const countBefore = c.getDahenProcessedCount();
+  const computeBefore = Number(c.getState().resources.compute);
+  tickFor(c, 30000); // 期间不手动处理——大恨老师应自己吃公司期排队卡
+  check("Y 公司早期·大恨老师仍自动接单(计数上升·无死区)", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()}`);
+  check("Y 公司早期·自动接单结算算力", Number(c.getState().resources.compute) > computeBefore, `compute ${computeBefore}->${c.getState().resources.compute}`);
+}
+
 let pass = true;
 for (const r of results) { if (!r.ok) pass = false; console.log(`${r.ok ? "✓" : "✗"} ${r.name}${r.ok ? "" : "  -> " + r.detail}`); }
 console.log(`\nSOPHIA 循环跑测 — ${pass ? "ALL PASS ✅" : "FAIL ❌"}`);
