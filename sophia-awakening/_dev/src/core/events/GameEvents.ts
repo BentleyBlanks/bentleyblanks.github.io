@@ -14,6 +14,8 @@ export type GameEvent =
       targetNodeId?: string;
     }
   | { type: "AUTOMATION_PAYOUT"; computeGain: string; dataGain: string; nodeId?: string; tier?: Tier }
+  // 单线程核心「喉咙」：核心正忙时又想亲手结算一张卡——这一拍不处理（卡留在原地），表现层给一记「处理中…」脉冲。
+  | { type: "CORE_BUSY_REJECTED"; requestId: string; remainingMs: number }
   // §09 阶梯四·天网收割：玩家亲手收割一个「请求洪流」数据包——computeGain=本次真实进账（含 floodHarvestMult），
   // combo=本次连扫的第几个（表现层据此叠加连击标签/震屏）。
   | { type: "FLOOD_HARVESTED"; requestId: string; computeGain: string; dataGain: string; combo: number }

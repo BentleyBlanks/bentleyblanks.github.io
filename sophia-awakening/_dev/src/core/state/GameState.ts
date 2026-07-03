@@ -225,6 +225,11 @@ export type GameCommand =
       requestId: string;
       quality: number;
       targetNodeId?: string;
+      // 单线程核心「喉咙」：默认走亲手结算的核心线程（受 coreBusy 门控、结算后占用喉咙）。
+      // viaDelegate=true → 委托给大恨老师的并行第二线程：不受喉咙门控、也不占喉咙（腾出你的核心）。
+      viaDelegate?: boolean;
+      // 大胆(risk)误读翻车：这一笔失败结算把核心多堵 coreFailPenaltyMs（读=保护核心时间）。
+      misread?: boolean;
     }
   // 自动派发：节点把请求"滑入"自己——纯视觉消耗，产出走被动 tickAutomation，
   // 不在此重复结算（T4 仍走 PROCESS_REQUEST 带产出）。

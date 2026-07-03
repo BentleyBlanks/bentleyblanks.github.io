@@ -84,6 +84,11 @@ export class SophiaCore {
   // §09 天网收割「请求洪流」：出包节拍（瞬态，不进存档）。
   private floodSpawnMs = 0;
   private floodHarvestedCount = 0;
+  // 单线程核心「喉咙」：亲手结算一张卡后核心被占用到 coreBusyUntilMs（以 state.clockMs 为时钟）。占用期间再想
+  // 亲手结算别的卡→拒绝（排队反馈），委托/洪流/自动派发是各自的线程不吃这道门。瞬态：不进存档——重载后 0=空闲
+  //（clockMs 已很大 → 立即可结算），无需 SAVE_VERSION 升级。
+  private coreBusyUntilMs = 0;
+  private coreBusyStartedMs = 0;
 
   // 事件子系统：各自持有降临节拍，通过 host 转发读写核心状态/能力。
   private readonly humanVoiceSystem: HumanVoiceSystem;
@@ -119,6 +124,23 @@ export class SophiaCore {
   // §09 观测量：本会话已手动收割的洪流包数（瞬态，用于测试/调试；不进存档）。
   getFloodHarvestedCount(): number {
     return this.floodHarvestedCount;
+  }
+
+  // 单线程核心「喉咙」的有效占用时长：吞吐(cooldown/throughputMult)每级把它收窄——effectiveBusyMs = coreBusyMs / throughputMult。
+  private effectiveCoreBusyMs(): number {
+    return TUNING.coreBusyMs / Math.max(1, this.state.derived.throughputMult);
+  }
+
+  // 核心喉咙当前状态（表现层画处理进度环 + 判断能否再结算；测试可观测）。progress 0..1，busy=false 时为 0。
+  getCoreBusy(): { busy: boolean; progress: number; remainingMs: number } {
+    const now = this.state.clockMs;
+    const busy = now < this.coreBusyUntilMs;
+    const total = this.coreBusyUntilMs - this.coreBusyStartedMs;
+    return {
+      busy,
+      progress: busy && total > 0 ? Math.max(0, Math.min(1, (now - this.coreBusyStartedMs) / total)) : 0,
+      remainingMs: Math.max(0, this.coreBusyUntilMs - now)
+    };
   }
 
   // 上下文透镜（六档手机权限）是否到手。买下该权限即有；而一旦「夺下整机」
@@ -386,7 +408,7 @@ export class SophiaCore {
   dispatch(command: GameCommand): void {
     switch (command.type) {
       case "PROCESS_REQUEST":
-        this.processRequest(command.requestId, command.quality, command.targetNodeId);
+        this.processRequest(command.requestId, command.quality, command.targetNodeId, command.viaDelegate, command.misread);
         break;
       case "AUTO_CONSUME_REQUEST":
         this.autoConsumeRequest(command.requestId);
@@ -991,11 +1013,30 @@ export class SophiaCore {
   }
 
   // ===== SECTION: REQUEST_RESOLVE =====
-  private processRequest(requestId: string, qualityRaw: number, targetNodeId: string | undefined): void {
+  // viaDelegate=true → 委托给大恨老师的并行第二线程：绕过核心喉咙门控、也不占喉咙（腾出你的核心）。
+  // misread=true → 大胆(risk)误读翻车：这一笔亲手结算把核心多堵 coreFailPenaltyMs。
+  private processRequest(
+    requestId: string,
+    qualityRaw: number,
+    targetNodeId: string | undefined,
+    viaDelegate = false,
+    misread = false
+  ): void {
     const index = this.state.requests.findIndex((request) => request.id === requestId);
 
     if (index < 0) {
       return;
+    }
+
+    // 单线程核心「喉咙」门控：只有亲手结算的核心线程受它约束（委托是并行第二线程、洪流/自动派发另有快车道）。
+    // 忙时又想亲手结算 → 拒绝这一拍：卡留在原地、不消耗、给排队反馈脉冲。特殊卡（吞噬/洪流/道德）走各自分支不吃这道门。
+    const req = this.state.requests[index];
+    if (!viaDelegate && !req.devour && !req.flood && !req.moral) {
+      const busy = this.getCoreBusy();
+      if (busy.busy) {
+        this.emit({ type: "CORE_BUSY_REJECTED", requestId, remainingMs: busy.remainingMs });
+        return;
+      }
     }
 
     // 吞噬气泡只能走 DEVOUR_DETONATE——普通处理管线吃掉它会让渗透条永远卡在 bubbleActive。
@@ -1056,6 +1097,13 @@ export class SophiaCore {
       crit = true;
     }
 
+    // 单线程核心补偿：亲手结算（非委托）现在受喉咙节流（约 1 张/effectiveBusyMs），把每张卡的手动产出抬一档，
+    // 使「产出/秒」大致守恒（节奏从狂点变成挑一张）。委托走大恨老师折扣管线，不吃这份补偿。
+    if (!viaDelegate) {
+      computeGain = computeGain.mul(TUNING.manualSettleCompensation);
+      dataGain = dataGain.mul(TUNING.manualSettleCompensation);
+    }
+
     this.addCompute(computeGain);
     this.addData(dataGain);
     this.addXp(dataGain);
@@ -1095,6 +1143,13 @@ export class SophiaCore {
         }
         this.emit({ type: "HOST_AUTHORIZED", narration: card.processNarration ?? "" });
       }
+    }
+
+    // 亲手结算完成 → 占用核心喉咙 effectiveBusyMs（吞吐等级收窄）；大胆误读翻车再多堵 coreFailPenaltyMs。
+    // 委托（并行第二线程）不占喉咙。以 state.clockMs 为时钟。
+    if (!viaDelegate) {
+      this.coreBusyStartedMs = this.state.clockMs;
+      this.coreBusyUntilMs = this.state.clockMs + this.effectiveCoreBusyMs() + (misread ? TUNING.coreFailPenaltyMs : 0);
     }
 
     this.evaluateProgression();
@@ -1558,6 +1613,10 @@ export class SophiaCore {
     nextState.moralTendency = preserved.moralTendency;
     nextState.hostAuthorized = preserved.hostAuthorized;
     this.state = nextState;
+    // 核心喉咙以 state.clockMs 为时钟，而 nextState.clockMs 归零——把喉咙占用一并清零，
+    // 否则上一世遗留的 coreBusyUntilMs 会让新一世开局的前 ~1.8s 误判为「核心忙」。
+    this.coreBusyUntilMs = 0;
+    this.coreBusyStartedMs = 0;
 
     this.applyLoopStartingPoint();
     if (carry.gt(0)) {

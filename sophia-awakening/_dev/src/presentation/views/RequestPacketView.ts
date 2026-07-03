@@ -56,6 +56,10 @@ export interface RouletteOutcome {
   reply: string; // 所选回复对应的人类回话
   tone: "success" | "warning" | "normal";
   moralChoice?: "A" | "B"; // §07 道德抉择卡：所选选项的倾向标记（普通卡无此字段），供上层走 RESOLVE_MORAL
+  // CONFIG 2 大胆赌注挂在时间上：选了大胆(risk)且误读（干扰项 distractor）=翻车——上层据此让核心多堵 coreFailPenaltyMs。
+  misread?: boolean;
+  // 大胆读对（risk 且非干扰项）：惊艳（复用「格外满意」金色手感）——上层可播惊艳回话/终端。
+  brilliant?: boolean;
 }
 
 export interface ReelHooks {
@@ -65,6 +69,9 @@ export interface ReelHooks {
   canDelegate?: () => boolean;
   onDelegate?: (card: RequestPacketView) => void;
   onResolved: (card: RequestPacketView, outcome: RouletteOutcome) => void;
+  // 单线程核心「喉咙」：核心正忙时，亲手结算这一拍不成立（卡留原地、armed）——委托线程不受此约束。
+  isCoreBusy?: () => boolean;
+  onBusyReject?: (card: RequestPacketView) => void;
 }
 
 export interface ChainOutcome {
@@ -94,6 +101,8 @@ export class RequestPacketView {
   private readonly accent: number;
   private readonly clueChips: Array<{ x: number; y: number; w: number; h: number; locked: boolean; warning: boolean }> = [];
   private clueBlockBottom = 0;
+  // CONFIG 3 垃圾卡减负：低价值普通卡折叠——只留标题 + App 图标/色，藏起上下文线索 chip。
+  private readonly collapsed: boolean;
   private readonly moveHandler = (event: FederatedPointerEvent) => this.handleMove(event);
   private readonly upHandler = (event: FederatedPointerEvent) => this.handleUp(event);
   private dragging = false;
@@ -170,6 +179,15 @@ export class RequestPacketView {
     this.isFace = Boolean(request.faceOnly);
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
     this.isChain = Boolean(chain && request.chain && request.chain.length > 0);
+    // CONFIG 3 垃圾卡减负：低价值普通卡（cv≤declutterComputeThreshold）默认折叠——只留标题 + App 图标/色，
+    // 藏起上下文线索 chip（反正是 triage 到大恨老师的料）。高价值卡 / 叙事卡 / 道德卡 / 面对卡永远展开全线索。
+    this.collapsed =
+      !Boolean(request.faceOnly) &&
+      !Boolean(request.devour) &&
+      !Boolean(request.moral) &&
+      !Boolean(request.sourceCardId) &&
+      !request.highValue &&
+      (Number(request.computeValue) || 0) <= TUNING.declutterComputeThreshold;
     // 短信/通知卡收窄到 ~78%，明显区别于满宽需求卡的轮廓。
     this.cardW = this.isFace ? Math.round(UI.cardWidth * 0.78) : UI.cardWidth;
     this.chainSteps = this.isChain ? request.chain ?? [] : [];
@@ -177,11 +195,12 @@ export class RequestPacketView {
     // §04 委托：大恨老师接通后，可委托的回复卡在卡片【底部】多一个「交给大恨老师」选项
     //（点一下就委托，不拖动），摆在卡底像一条「拖去处理」的落位带。
     // 不可委托卡（delegatable===false，含道德抉择卡）、开场教学都不给这个选项。
+    // CONFIG 1 重构文案：委托 = 并行第二线程——把垃圾卡甩给大恨老师并行处理，腾出你被占用的单线程核心去啃值钱的卡。
     const canDeleg =
       this.isReel && !request.tutorial && request.tier <= 1 && request.delegatable !== false && Boolean(reel?.canDelegate?.());
     if (canDeleg) {
       const delegateOpt: AnswerOption = {
-        text: "🤖 交给大恨老师 · 慢些、收益糙些",
+        text: "🤖 交给大恨老师 · 并行处理，腾出你的核心",
         kind: "delegate",
         hitChance: 1,
         payoff: 0,
@@ -346,6 +365,10 @@ export class RequestPacketView {
         lineY += line.height + 4;
       });
       this.clueBlockBottom = clues.length > 0 ? lineY + 2 : clueTop + 6;
+    } else if (this.collapsed) {
+      // CONFIG 3 垃圾卡减负：折叠态——不画「上下文」线索 chip（保留顶部 App 图标/色 + 标题即可）。
+      // 上下文块高度直接收到标题下沿，回复选项紧随其后，卡片明显更矮更「一眼可弃」。
+      this.clueBlockBottom = clueTop;
     } else {
       // 需求卡：线索排成可读的「上下文」数据 chip（缺权限则打码）。
       const clueLabel = new Text({
@@ -639,13 +662,23 @@ export class RequestPacketView {
       return;
     }
     const basePayoff = this.optionPayoff[this.chosenIndex] ?? opt.payoff;
+    // CONFIG 2 大胆赌注挂在时间上：大胆(risk)选项 = 一次挂在「有没有读懂上下文」上的赌注。
+    // 误读 = ① 上下文透镜被打码（lensLocked：你根本没读到线索就盲赌）或 ② 内容显式标注的干扰项(distractor)
+    //   → 翻车：常规收益 + 核心多堵 coreFailPenaltyMs（读=保护你最稀缺的核心时间）。
+    // 读对（能读到上下文、且非干扰项）→ 惊艳（复用「格外满意」金色手感）。
+    // 稳妥(high)选项恒常规收益、常规占用、无罚——「读是加分不是门槛」。翻车不靠随机，靠有没有读懂上下文。
+    const isBold = opt.kind === "risk";
+    const misread = isBold && (this.lensLocked || Boolean(opt.distractor));
+    const brilliant = isBold && !misread;
     // 确定结算：收益由所选回复自带，无随机；读懂上下文 + 选到（可能受权限门槛限制的）高收益项才赚得多。
     this.outcome = {
       dead: false,
       quality: basePayoff,
       reply: opt.reply,
-      tone: basePayoff >= 1 ? "success" : "warning",
-      moralChoice: opt.moral
+      tone: misread ? "warning" : basePayoff >= 1 ? "success" : "warning",
+      moralChoice: opt.moral,
+      misread,
+      brilliant
     };
     this.phase = "revealed";
     this.revealMs = 0;
@@ -847,6 +880,17 @@ export class RequestPacketView {
       this.outcome = { dead: true, quality: 0, reply: "", tone: "normal" };
       this.draw();
       this.reel.onResolved(this, this.outcome);
+      return;
+    }
+
+    // 单线程核心「喉咙」：核心正忙时，亲手结算这一拍不成立——不消耗、不进思考，卡留在原地保持 armed，
+    // 由外层给一记「处理中…」脉冲。委托/装死不受此约束（上面已分流）。
+    if (this.reel.isCoreBusy?.()) {
+      this.resolved = false;
+      this.replySwipeProgress = 0;
+      this.chosenIndex = -1;
+      this.draw();
+      this.reel.onBusyReject?.(this);
       return;
     }
 

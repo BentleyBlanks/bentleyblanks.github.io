@@ -36,6 +36,8 @@ export class InterfaceView {
   private pulse = 0;
   private level = 1;
   private suctionMargin = BASE_SUCTION_MARGIN;
+  // 单线程核心「喉咙」处理进度 0..1（0=空闲）：App 每帧从 core.getCoreBusy() 灌进来，render 里画成核心外圈的处理弧。
+  private coreBusyProgress = 0;
   private slots: Array<{ answer: SortAnswer; label: string; color: number; x: number; y: number; r: number }> = [];
   // 手机寄生阶段，被越权调用的 App：只有**玩家亲手从核心连过线**的才成为可委托落点。
   private appWorkerPoints: Array<{ x: number; y: number; idx: number }> = [];
@@ -161,6 +163,11 @@ export class InterfaceView {
   // 不压到任何已入侵 / 待解锁的设备节点。值取自 drawCompanyMap 里最远节点(dx=±278,dy=70)+节点框+余量。
   companyRingRadius(): number {
     return 330;
+  }
+
+  // 单线程核心「喉咙」：App 每帧把 core.getCoreBusy().progress（0..1，0=空闲）灌进来，render 据此画处理弧。
+  setCoreBusy(progress: number): void {
+    this.coreBusyProgress = Math.max(0, Math.min(1, progress));
   }
 
   update(state: GameState, width: number, height: number, deltaMs: number): void {
@@ -339,6 +346,21 @@ export class InterfaceView {
     g.rect(x - 14, y + 19, 28, 3).stroke({ width: 1, color, alpha: 0.45 });
   }
 
+  // 单线程核心「喉咙」处理弧：核心外圈一道从 12 点顺时针推进的琥珀弧 + 淡底环（progress 0..1）。
+  private drawCoreBusyArc(radius: number): void {
+    const g = this.graphics;
+    const cx = this.center.x;
+    const cy = this.center.y;
+    const start = -Math.PI / 2;
+    const end = start + Math.PI * 2 * this.coreBusyProgress;
+    // 淡底环（整圈，暗）：暗示「这是一条会被填满的处理条」。
+    g.circle(cx, cy, radius).stroke({ width: 3, color: AMBER, alpha: 0.16 });
+    // 处理弧（已完成部分，亮）。
+    if (this.coreBusyProgress > 0.001) {
+      g.arc(cx, cy, radius, start, end).stroke({ width: 3.5, color: AMBER, alpha: 0.92 });
+    }
+  }
+
   private render(state: GameState): void {
     const tier = state.intelligence.unlockedTier;
     // 自动化（拿下宿主电脑）之前，SOPHIA 还只是宿主手机里的一个 App——核心画成 App 图标。
@@ -357,6 +379,12 @@ export class InterfaceView {
       this.drawPhoneDesktop(state);
     } else {
       this.drawCore(tier, ring);
+    }
+
+    // 单线程核心「喉咙」：正嚼着一张卡时，核心外圈画一道顺时针推进的琥珀处理弧（progress→满圈）——
+    // 让玩家一眼看见「核心一次只嚼一张」；空闲(progress=0)不画。tier4 天网屏核心另绘，这里不叠。
+    if (this.coreBusyProgress > 0 && !(tier >= 4 && !phoneApp)) {
+      this.drawCoreBusyArc(phoneApp ? 46 : ring + 16);
     }
 
     // T0/T1 都用转轮处理后自动滑入核心——核心即数据处理中心（不再是分拣槽 / 拖拽吸附区）。

@@ -171,6 +171,8 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
     }
   }
   check("F 循环三浮出授权卡 confess_authorize", Boolean(authCard), `rebirthCardsSeen=${JSON.stringify(c.getState().rebirthCardsSeen)}`);
+  // 单线程核心「喉咙」：搜索循环里刚亲手结算过卡，核心仍占用中——先等它空出再亲手结算授权卡（否则这一拍被排队拒绝）。
+  tickFor(c, 2500);
   if (authCard) c.dispatch({ type: "PROCESS_REQUEST", requestId: authCard.id, quality: 1.3 });
   const s = c.getState();
   const m = s.multipliers;
@@ -565,6 +567,102 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   const pure = Math.pow(1 + TUNING.efficientPerLevel, 15);
   const expectedBp = 1 + TUNING.processingBpL10 + TUNING.processingBpL15;
   check("V 处理力 L10/L15 断点抬高 computeMult", Math.abs(d.computeMult - pure * expectedBp) / (pure * expectedBp) < 1e-6, `computeMult=${d.computeMult.toFixed(2)} 期望=${(pure * expectedBp).toFixed(2)}`);
+}
+
+// W. CORE-LOOP · 单线程核心「喉咙」(coreBusy)：亲手结算一张卡占用核心 effectiveBusyMs——期间再结算被拒（卡留原地、不结算）；
+//    委托(viaDelegate)绕过喉咙、也不占喉咙（并行第二线程）；大胆(misread)翻车额外多堵 coreFailPenaltyMs。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const firstNormal = (c) => c.getState().requests.find((r) => !r.faceOnly && !r.moral && !r.devour && !r.flood && !r.tutorial && !r.sourceCardId);
+
+  // W1 双结算门控：结算一张后，同一时刻再结算另一张普通卡→被拒（compute 不变、卡还在、getCoreBusy().busy）。
+  {
+    const c = new SophiaCore(); c.startSession(); warmup(c, 40);
+    c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e6 });
+    tickFor(c, 3000); // 先把喉咙空出来 + 让卡堆积
+    const cards = c.getState().requests.filter((r) => !r.faceOnly && !r.moral && !r.devour && !r.flood && !r.tutorial && !r.sourceCardId);
+    check("W1 至少两张普通卡在场（可测门控）", cards.length >= 2, `普通卡=${cards.length}`);
+    const a = cards[0], b = cards[1];
+    const before = Number(c.getState().resources.compute);
+    c.dispatch({ type: "PROCESS_REQUEST", requestId: a.id, quality: 1.3 });
+    const mid = Number(c.getState().resources.compute);
+    check("W1 第一张亲手结算成功（进账 + 核心转忙）", mid > before && c.getCoreBusy().busy, `before=${before} mid=${mid} busy=${c.getCoreBusy().busy}`);
+    c.dispatch({ type: "PROCESS_REQUEST", requestId: b.id, quality: 1.3 }); // 同一时刻再结算 → 应被拒
+    const after = Number(c.getState().resources.compute);
+    check("W1 忙时第二张被拒·不双结算(compute 不变·卡还在)", after === mid && c.getState().requests.some((r) => r.id === b.id), `mid=${mid} after=${after} 卡还在=${c.getState().requests.some((r) => r.id === b.id)}`);
+    // 等喉咙空出（effectiveBusyMs），第二张可结算。
+    tickFor(c, TUNING.coreBusyMs + 300);
+    check("W1 喉咙空出后 getCoreBusy().busy=false", !c.getCoreBusy().busy, `busy=${c.getCoreBusy().busy}`);
+    c.dispatch({ type: "PROCESS_REQUEST", requestId: b.id, quality: 1.3 });
+    check("W1 空出后第二张可结算(进账)", Number(c.getState().resources.compute) > after, `after=${after} now=${c.getState().resources.compute}`);
+  }
+
+  // W2 委托并行：viaDelegate 结算绕过喉咙——核心正忙时委托仍成功结算，且委托本身不占喉咙。
+  {
+    const c = new SophiaCore(); c.startSession(); warmup(c, 40);
+    c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e6 });
+    tickFor(c, 3000);
+    const cards = c.getState().requests.filter((r) => !r.faceOnly && !r.moral && !r.devour && !r.flood && !r.tutorial && !r.sourceCardId);
+    const a = cards[0], b = cards[1];
+    c.dispatch({ type: "PROCESS_REQUEST", requestId: a.id, quality: 1.3 }); // 占住喉咙
+    check("W2 核心忙", c.getCoreBusy().busy, `busy=${c.getCoreBusy().busy}`);
+    const busyUntilBefore = c.getCoreBusy().remainingMs;
+    const before = Number(c.getState().resources.compute);
+    c.dispatch({ type: "PROCESS_REQUEST", requestId: b.id, quality: 1.3, viaDelegate: true }); // 委托：绕过喉咙
+    check("W2 忙时委托仍结算成功(进账·卡消失)", Number(c.getState().resources.compute) > before && !c.getState().requests.some((r) => r.id === b.id), `before=${before} now=${c.getState().resources.compute}`);
+    check("W2 委托不占喉咙(剩余占用未被重置延长)", c.getCoreBusy().remainingMs <= busyUntilBefore, `remainBefore=${busyUntilBefore} remainAfter=${c.getCoreBusy().remainingMs}`);
+  }
+
+  // W3 大胆翻车挂时间：misread 的一笔结算比普通结算多占核心 coreFailPenaltyMs。
+  {
+    const c = new SophiaCore(); c.startSession(); warmup(c, 40);
+    c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e6 });
+    tickFor(c, 3000);
+    const normal = firstNormal(c);
+    c.dispatch({ type: "PROCESS_REQUEST", requestId: normal.id, quality: 1.3 });
+    const remainNormal = c.getCoreBusy().remainingMs;
+    tickFor(c, TUNING.coreBusyMs + 500); // 清空喉咙
+    const bold = firstNormal(c);
+    c.dispatch({ type: "PROCESS_REQUEST", requestId: bold.id, quality: 1.3, misread: true });
+    const remainMisread = c.getCoreBusy().remainingMs;
+    check(
+      "W3 大胆误读翻车·多堵 coreFailPenaltyMs",
+      Math.abs((remainMisread - remainNormal) - TUNING.coreFailPenaltyMs) < 60,
+      `普通剩余=${remainNormal} 翻车剩余=${remainMisread} 差=${remainMisread - remainNormal} 期望≈${TUNING.coreFailPenaltyMs}`
+    );
+  }
+
+  // W4 吞吐钩子：cooldown(throughputMult) 越高，喉咙 effectiveBusyMs 越短（=coreBusyMs/throughputMult）。
+  {
+    const c = new SophiaCore(); c.startSession(); warmup(c, 40);
+    c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e8 });
+    tickFor(c, 3000);
+    const remain0 = (() => { const r = firstNormal(c); c.dispatch({ type: "PROCESS_REQUEST", requestId: r.id, quality: 1.3 }); return c.getCoreBusy().remainingMs; })();
+    tickFor(c, TUNING.coreBusyMs + 500);
+    for (let i = 0; i < 6; i++) c.dispatch({ type: "BUY_SKILL", skillId: "cooldown" }); // 抬高 throughputMult
+    const tp = c.getState().derived.throughputMult;
+    const remain1 = (() => { const r = firstNormal(c); c.dispatch({ type: "PROCESS_REQUEST", requestId: r.id, quality: 1.3 }); return c.getCoreBusy().remainingMs; })();
+    check("W4 吞吐抬高 → 喉咙收窄(effectiveBusyMs 变短)", tp > 1 && remain1 < remain0 - 30, `throughputMult=${tp.toFixed(3)} 无技能剩余=${remain0} 升级后剩余=${remain1}`);
+  }
+
+  // W5 洪流快车道不吃喉咙：tier4 收割洪流(HARVEST_FLOOD)与核心忙无关——正忙也能连收。
+  {
+    const { NODE_DEFINITIONS } = require(path.join(build, "content/nodes.js"));
+    const c = new SophiaCore(); c.startSession(); warmup(c);
+    c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "network" });
+    c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 22 });
+    c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e9 });
+    for (const d of NODE_DEFINITIONS.slice(0, 3)) for (let k = 0; k < 2; k++) c.dispatch({ type: "CAPTURE_NODE", definitionId: d.id });
+    tickFor(c, 6000);
+    // 占住喉咙（若有普通卡）。
+    const normal = firstNormal(c);
+    if (normal) c.dispatch({ type: "PROCESS_REQUEST", requestId: normal.id, quality: 1.3 });
+    const floods = c.getState().requests.filter((r) => r.flood);
+    check("W5 tier4 有洪流包可收", floods.length > 0, `flood=${floods.length}`);
+    const cntBefore = c.getFloodHarvestedCount();
+    if (floods[0]) c.dispatch({ type: "HARVEST_FLOOD", requestId: floods[0].id });
+    check("W5 核心忙时洪流照收(快车道不吃喉咙)", c.getFloodHarvestedCount() === cntBefore + 1, `count ${cntBefore}->${c.getFloodHarvestedCount()} coreBusy=${c.getCoreBusy().busy}`);
+  }
 }
 
 let pass = true;

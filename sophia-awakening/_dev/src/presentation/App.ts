@@ -50,7 +50,7 @@ import {
   type RouletteOutcome, type ChainOutcome, type ReelHooks, type ChainHooks
 } from "./views/RequestPacketView";
 import {
-  CYAN, GREEN, AMBER, RED, DEVOUR, RED_QUEEN,
+  CYAN, GREEN, AMBER, RED, DEVOUR, RED_QUEEN, BRILLIANT_COLOR,
   LEFT_RAIL_WIDTH, RIGHT_RAIL_WIDTH,
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
@@ -152,6 +152,8 @@ class SophiaGameApp {
   private readonly world = new Container();
   private readonly requestLayer = new Container();
   private readonly fxLayer = new Container();
+  // CONFIG 3 剧情卡「停一拍」：稀有叙事卡入场时压暗全场的覆盖层（贴在最上层、初始透明；不拦截点击）。
+  private readonly beatDim = new Graphics();
   // 「从核心拖一条线去连 App」交互。
   private readonly connectGfx = new Graphics();
   private connectDragging = false;
@@ -193,6 +195,10 @@ class SophiaGameApp {
   private readonly delegatedIds = new Set<string>();
   private hudTimerMs = 0;
   private saveTimerMs = 0;
+  // 核心「喉咙」排队反馈脉冲的节流时钟（避免核心忙时狂点刷屏「处理中…」）。
+  private lastBusyPulseMs = 0;
+  // CONFIG 3 剧情卡「停一拍」：本会话已触发过停一拍的卡 id（每张只停一次）+ 压暗层。
+  private readonly beatSeen = new Set<string>();
   // 开场后「首次消息处理教学」：指向首张卡的高亮 + SOPHIA 的两句自语。
   private readonly tutorialGfx = new Graphics();
   private tutorialClosingShown = false;
@@ -238,6 +244,10 @@ class SophiaGameApp {
     this.world.addChild(this.fxLayer);
     this.world.addChild(this.connectGfx);
     this.pixi.stage.addChild(this.world);
+    // 停一拍压暗层：贴在世界之上、不吃指针（可忽略/秒过，不是模态墙）；初始全透明。
+    this.beatDim.eventMode = "none";
+    this.beatDim.alpha = 0;
+    this.pixi.stage.addChild(this.beatDim);
 
     // 「从核心拖线连 App」：在核心附近按下并拖到某个「待连」App 上 → 连上它（之后才能委托）。
     this.pixi.stage.on("pointerdown", (e: FederatedPointerEvent) => {
@@ -408,6 +418,8 @@ class SophiaGameApp {
     this.updateVisualTestContext(state);
     this.drawBackground(state);
     this.drawAmbient(state, deltaMs);
+    // 单线程核心「喉咙」：把核心处理进度（0..1）灌给 InterfaceView，画核心外圈的琥珀处理弧。
+    this.interfaceView.setCoreBusy(this.core.getCoreBusy().progress);
     this.interfaceView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     // 越权调用刚控住几个 App、还一个都没连上时，教一次「从核心拖线连过去」。
     if (!this.connectHintShown && !state.automationUnlocked && this.interfaceView.hasPendingApps() && !this.firstAppConnected) {
@@ -478,7 +490,10 @@ class SophiaGameApp {
               // 进入公司阶段后大恨老师以「常驻设备节点」形式存在（见 InterfaceView 卫星），不再走卡片上的手动委托选项。
               canDelegate: () => !this.core.getState().automationUnlocked && this.core.hasPermission("perm_office"),
               onDelegate: (card) => this.handleDelegate(card),
-              onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome)
+              onResolved: (card, outcome) => this.handleRouletteResolved(card, outcome),
+              // 单线程核心「喉咙」：核心正忙时亲手结算这一拍不成立——卡留原地，给一记「处理中…」脉冲。
+              isCoreBusy: () => this.core.getCoreBusy().busy,
+              onBusyReject: (card) => this.handleCoreBusyReject(card)
             }
           : undefined;
       const chain: ChainHooks | undefined =
@@ -493,7 +508,11 @@ class SophiaGameApp {
         chain,
         state.phase
       );
-      const position = this.nextRequestPosition(request, view.cardHeight);
+      // CONFIG 3 剧情卡「停一拍」：稀有叙事卡（faceOnly / 道德抉择 / 交互重生卡）——入场停到正中，必然瞥到。
+      const isNarrative = Boolean(request.faceOnly || request.moral || request.sourceCardId);
+      const position = isNarrative
+        ? this.narrativeDockPosition(view.cardHeight)
+        : this.nextRequestPosition(request, view.cardHeight);
       view.container.position.set(position.x, position.y);
       view.setHome(position.x, position.y);
       this.requestViews.set(request.id, view);
@@ -503,6 +522,10 @@ class SophiaGameApp {
       // §04 只能面对卡：浮入后只能被看着——一阵后 SOPHIA 沉默旁白 → 卡黯然淡出 → 移除（不给算力）。
       if (view.isFace) {
         this.beginFaceCard(view);
+      }
+      // CONFIG 3 停一拍：压暗全场 ~0.8s + 轻微镜头拉近 + 定位正中，随即恢复（可忽略、非模态墙）。每张只停一次。
+      if (isNarrative) {
+        this.triggerNarrativeBeat(request.id);
       }
       // 开场教学：每条引导的 SOPHIA 指引现在贴在卡片下方（见 RequestPacketView），不再走中央旁白。
     }
@@ -942,7 +965,9 @@ class SophiaGameApp {
         this.core.dispatch({
           type: "PROCESS_REQUEST",
           requestId,
-          quality: outcome.quality
+          quality: outcome.quality,
+          // CONFIG 2：大胆误读翻车 → 核心多堵 coreFailPenaltyMs（读=保护核心时间）。
+          misread: outcome.misread
         });
         this.deliverToHuman(target, outcome);
       },
@@ -995,12 +1020,60 @@ class SophiaGameApp {
             this.delegatedIds.delete(requestId);
             return;
           }
-          this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality });
+          // CONFIG 1：委托 = 并行第二线程——viaDelegate 绕过核心喉咙、也不占喉咙（腾出你的核心）。
+          this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality, viaDelegate: true });
           this.delegatedIds.delete(requestId);
         }, durationMs);
       },
       { x: card.container.x, y: card.container.y }
     );
+  }
+
+  // 单线程核心「喉咙」排队反馈：核心正忙时又想亲手结算——卡留在原地保持 armed，这里只给一记「处理中…」脉冲，
+  // 让玩家读到「核心一次只嚼一张，挑最值的、其余甩给大恨老师并行」。这一拍不算浪费操作（卡没被消耗）。
+  private handleCoreBusyReject(_card: RequestPacketView): void {
+    const core = this.interfaceView.center;
+    this.juice.ring(core, AMBER, 18, 1.4);
+    const now = performance.now();
+    if (now - this.lastBusyPulseMs > 900) {
+      this.lastBusyPulseMs = now;
+      this.juice.number("处理中…", { x: core.x, y: core.y - 44 }, AMBER);
+    }
+  }
+
+  // CONFIG 3 停一拍：稀有叙事卡入场停到正中——核心正上方稍偏、居中横排，玩家必然瞥到。
+  private narrativeDockPosition(cardH: number): PointData {
+    const core = this.interfaceView.center;
+    const x = core.x - UI.cardWidth / 2;
+    const y = Math.max(24, core.y - cardH - 150);
+    return { x, y };
+  }
+
+  // CONFIG 3 停一拍：压暗全场 ~narrativeBeatMs + 轻微镜头拉近，随即恢复。不是模态墙——不吃指针、可秒过。每张卡只停一次。
+  private triggerNarrativeBeat(cardId: string): void {
+    if (this.beatSeen.has(cardId)) {
+      return;
+    }
+    this.beatSeen.add(cardId);
+    const beatMs = TUNING.narrativeBeatMs;
+    if (beatMs <= 0) {
+      return;
+    }
+    // 压暗层铺满屏幕（每次重画，随窗口尺寸自适应）。
+    this.beatDim.clear();
+    this.beatDim.rect(0, 0, this.pixi.screen.width, this.pixi.screen.height).fill({ color: 0x02100c, alpha: 1 });
+    this.beatDim.alpha = 0;
+    gsap.killTweensOf(this.beatDim);
+    // 快进（压暗）→ 短停 → 缓出（恢复）：总时长≈beatMs，是一记「瞥见」，不打断操作。
+    gsap
+      .timeline()
+      .to(this.beatDim, { alpha: 0.42, duration: 0.22, ease: "power2.out" })
+      .to(this.beatDim, { alpha: 0, duration: Math.max(0.2, beatMs / 1000 - 0.22), ease: "power2.in" });
+    // 轻微镜头拉近（复用镜头架，不直接写 world 变换）——比吞噬拉远小得多，只是把注意力吸到正中。
+    const cx = this.pixi.screen.width / 2;
+    const cy = this.pixi.screen.height / 2;
+    cameraZoomPulse(this.world, cx, cy, 1.035, beatMs / 1000);
+    this.audio.playRequestAccept();
   }
 
   // ===== SECTION: RITUAL / FX =====
@@ -1148,9 +1221,17 @@ class SophiaGameApp {
   // 所选回复自带回话则用它；空回话（老周后期沉默）退到从骂人语料随机抽一句。
   private deliverToHuman(corePoint: PointData, outcome: RouletteOutcome): void {
     const human = this.terminalPoint();
-    // 无翻车/幻觉/赌局：好坏只看所选回复的收益高低（quality>=1=好评）。
+    // 无幻觉随机；好坏只看所选回复的收益高低（quality>=1=好评）。
     const good = outcome.quality >= 1;
     const color = good ? GREEN : AMBER;
+
+    // CONFIG 2 大胆赌注的可见反馈：读懂上下文的大胆 = 惊艳（金）；盲赌误读 = 翻车（红 + 核心被多堵一秒）。
+    if (outcome.brilliant) {
+      this.juice.number("惊艳 ✦", { x: corePoint.x, y: corePoint.y - 62 }, BRILLIANT_COLOR);
+    } else if (outcome.misread) {
+      this.juice.number("翻车 · 核心卡住", { x: corePoint.x, y: corePoint.y - 62 }, RED);
+      this.terminal.push("🧑 这条你没读懂就赌了——返工把核心又占住了一会儿。", "warning");
+    }
     const skills = this.core.getState().skills;
     const permCount = PERMISSION_IDS.filter((id) => (skills[id] ?? 0) > 0).length;
     // 选项自带回话则用它（平庸回复也有自己的话）；空回话退到老周的回骂。
@@ -1285,6 +1366,13 @@ class SophiaGameApp {
         : this.interfaceView.resolveDrop(request, global, card.charge);
 
     if (!drop) {
+      return false;
+    }
+
+    // 单线程核心「喉咙」：把高价值卡亲手拖入核心结算（tier2/3）也占核心线程——正忙时这一拖不成立，卡弹回、给「处理中…」脉冲
+    //（避免先飞入再被 core 拒绝造成的视觉/状态脱节）。tier4 是拖到节点的并行快车道，不吃这道门。
+    if (request.tier !== 4 && this.core.getCoreBusy().busy) {
+      this.handleCoreBusyReject(card);
       return false;
     }
 

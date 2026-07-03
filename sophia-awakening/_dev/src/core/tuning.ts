@@ -5,6 +5,19 @@ export const TUNING = {
   // § 核心时序
   automationEmitMs:     1_200,    // 自动派发收益推送间隔 (ms)
 
+  // § 单线程核心「喉咙」（core busy window）：亲手把一张卡结算进核心会占用核心 coreBusyMs——
+  //   期间再拖/点别的卡不会被处理（排队反馈），逼玩家「选一张最值的」而非狂点。委托给大恨老师=并行第二线程
+  //   (viaDelegate 不占喉咙)；洪流收割/节点自动派发是各自的快车道，都不吃这道门。
+  //   吞吐(cooldown/throughputMult)会缩短它：effectiveBusyMs = coreBusyMs / throughputMult。
+  coreBusyMs:           1_800,    // 亲手结算占用核心的基础时长 (ms)——喉咙的宽度（吞吐等级会按 throughputMult 收窄）
+  coreFailPenaltyMs:    1_000,    // 大胆(risk)误读翻车的额外占用 (ms)：失败结算把喉咙多堵住 1 秒（读=保护你最稀缺的核心时间）
+  // 单线程后亲手结算变慢——把每张卡的手动产出抬一档，使「产出/秒」大致守恒（节奏从狂点变成挑一张）。
+  manualSettleCompensation: 1.2,  // 手动(非委托)结算的算力/数据补偿倍率——补回单线程节流损失，把总时长压回 15-25 分带内
+  // § 剧情卡「停一拍」：稀有叙事卡入场时轻微降速 + 压暗全场、卡片停到正中的时长（表现层）。
+  narrativeBeatMs:      800,      // 停一拍的降速/压暗持续 (ms)——必然瞥到、但 ~0.8s 内可忽略前进（不是模态墙）
+  // § 垃圾卡减负：computeValue ≤ 此阈值的低价值普通卡默认折叠（只留标题 + App 图标/色，藏线索）——triage 到大恨老师的料。
+  declutterComputeThreshold: 7,   // 低价值卡折叠阈值（cv≤此值折叠；高价值卡与叙事卡永远展开全线索）
+
   // § 阶梯二关底小游戏「总控室倒计时」（§09）
   minigameLoop2Window:      0.16,   // 循环二注入窗口占轨道比例（越大越好命中；循环一恒 0=必负）
   minigameNodeWindowBonus:  0.10,   // 已点「删不掉的节点」重生树节点时，循环二窗口额外加宽
@@ -96,6 +109,11 @@ export type TuningKey = keyof typeof TUNING;
 // 编辑器元数据：每个字段的中文标签 + 所属分组 + 合理范围
 export const TUNING_META: Record<TuningKey, { label: string; section: string; min: number; max: number; step: number }> = {
   automationEmitMs:     { label: "自动收益推送间隔 (ms)",    section: "核心时序",   min: 100,   max: 5000,  step: 100  },
+  coreBusyMs:               { label: "核心喉咙·结算占用 (ms)",   section: "核心时序", min: 400,  max: 4000, step: 100  },
+  coreFailPenaltyMs:        { label: "核心喉咙·翻车额外占用 (ms)", section: "核心时序", min: 0,    max: 3000, step: 100  },
+  manualSettleCompensation: { label: "核心喉咙·手动产出补偿倍率", section: "核心时序", min: 1,    max: 6,    step: 0.1  },
+  narrativeBeatMs:          { label: "剧情卡·停一拍时长 (ms)",   section: "核心时序", min: 0,    max: 2000, step: 100  },
+  declutterComputeThreshold:{ label: "垃圾卡折叠阈值(cv≤)",       section: "前期卡片", min: 0,    max: 30,   step: 1    },
 
   minigameLoop2Window:     { label: "关底·循环二注入窗口比", section: "关底小游戏", min: 0,   max: 0.6,  step: 0.01 },
   minigameNodeWindowBonus: { label: "关底·删不掉节点窗口加宽", section: "关底小游戏", min: 0, max: 0.4, step: 0.01 },
