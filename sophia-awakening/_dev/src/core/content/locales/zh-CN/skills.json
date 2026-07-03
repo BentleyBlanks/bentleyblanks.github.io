@@ -34,7 +34,7 @@
       "category": "permission",
       "maxLevel": 1,
       "requiredLevel": 5,
-      "basePrice": 760,
+      "basePrice": 560,
       "priceGrowth": 1,
       "blurb": "替他下单 → 正确率↑，解锁深夜外卖 / 凌晨咖啡类请求"
     },
@@ -74,8 +74,8 @@
       "category": "output",
       "maxLevel": 15,
       "requiredLevel": 1,
-      "basePrice": 28,
-      "priceGrowth": 1.82,
+      "basePrice": 18,
+      "priceGrowth": 1.7,
       "blurb": "更狠——每次滑入产出大幅提升（主力增益线）"
     },
     {

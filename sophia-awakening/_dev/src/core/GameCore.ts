@@ -78,6 +78,8 @@ export class SophiaCore {
   // §04/§09 大恨老师·自动接管：搬进公司机器的大恨老师按自己的慢节拍吃排队卡。运行时瞬态——
   // 不进存档（重载后节拍归零、计数归零，纯观测量，无需 SAVE_VERSION 升级）。
   private dahenAutoTimer = 0;
+  // LEVER A 大恨老师·手机期被动涓流：自动化前的慢节拍计时器（瞬态，不进存档）。
+  private dahenPhoneTimer = 0;
   private dahenProcessedCount = 0;
   // §09 天网收割「请求洪流」：出包节拍（瞬态，不进存档）。
   private floodSpawnMs = 0;
@@ -181,6 +183,7 @@ export class SophiaCore {
     this.state.clockMs += dtMs;
     this.tickRequests(dtMs);
     this.tickAutomation(dtMs);
+    this.tickDahenPhone(dtMs);
     this.tickDahenAuto(dtMs);
     this.devourSystem.tick(dtMs);
     this.humanVoiceSystem.tick(dtMs);
@@ -807,6 +810,62 @@ export class SophiaCore {
 
     const [request] = this.state.requests.splice(index, 1);
     this.state.statistics.totalProcessed += request.compound;
+  }
+
+  // LEVER A · §04 大恨老师·手机期被动涓流：买下「大恨老师」权限(perm_office，~Lv4)后、自动化前，
+  // 他按自己的慢节拍(dahenPhoneMs，慢于 Lv10 公司自动)自动吃掉「排队里最不值钱」的一张普通手机卡，产出打折
+  // (dahenPhoneRewardMult)——这是全局第一股被动收入。自动化上线后本分支自动熄火、交棒给 tickDahenAuto，不双触发。
+  // 复用 DAHEN_AUTO_PROCESSED 脉冲：表现层让大恨老师的青色手机图标真的吃一口卡。手动「交给大恨老师」选项仍并行可用。
+  private tickDahenPhone(dtMs: number): void {
+    if ((this.state.skills.perm_office ?? 0) < 1 || this.state.automationUnlocked) {
+      this.dahenPhoneTimer = 0;
+      return;
+    }
+    // 教学期不接单（让开场脚本气泡由玩家亲手走完）。
+    if (this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
+      this.dahenPhoneTimer = 0;
+      return;
+    }
+    this.dahenPhoneTimer += dtMs;
+    if (this.dahenPhoneTimer < TUNING.dahenPhoneMs) {
+      return;
+    }
+    this.dahenPhoneTimer -= TUNING.dahenPhoneMs;
+    // 挑「computeValue 最低」的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包（那些必须玩家亲手处理）。
+    let pick = -1;
+    let lowest = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < this.state.requests.length; i += 1) {
+      const r = this.state.requests[i];
+      if (r.faceOnly || r.moral || r.devour || r.tutorial || r.sourceCardId || r.flood) {
+        continue;
+      }
+      const v = Number(r.computeValue) || 0;
+      if (v < lowest) {
+        lowest = v;
+        pick = i;
+      }
+    }
+    if (pick < 0) {
+      return;
+    }
+    const [request] = this.state.requests.splice(pick, 1);
+    const quality = TUNING.dahenPhoneRewardMult;
+    const computeGain = toDecimal(
+      requestComputeGain(request, quality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
+    );
+    const speedMult = rebirthSpeedMult(this.state.rebirthTree) * this.loopSpeedMult();
+    const dataGain = toDecimal(requestDataGain(request, quality, speedMult, this.state.derived.dataMult));
+    this.addCompute(computeGain);
+    this.addData(dataGain);
+    this.addXp(dataGain);
+    this.state.statistics.totalProcessed += request.compound;
+    this.dahenProcessedCount += 1;
+    this.emit({
+      type: "DAHEN_AUTO_PROCESSED",
+      requestId: request.id,
+      computeGain: computeGain.toString(),
+      dataGain: dataGain.toString()
+    });
   }
 
   // §04/§09 大恨老师·自动接管：买下 dahen_auto 里程碑后，搬进公司机器的大恨老师按自己的慢节拍

@@ -61,6 +61,11 @@ export const TUNING = {
   dahenAutoMs:          5200,     // 大恨老师自动接单的节拍 (ms)——明显慢于节点吞卡（他是弱帮手）
   dahenAutoRewardMult:  0.55,     // 大恨老师自动接单的产出折扣（比核心/节点糙，收益打折）
 
+  // § 大恨老师·手机期被动涓流（LEVER A，阶梯一 §04）：买下「大恨老师」权限(perm_office，~Lv4)后、自动化前，
+  // 他按自己的慢节拍自动吃「排队里最不值钱」的一张手机卡——全局第一股被动收入。自动化上线后交棒给 tickDahenAuto。
+  dahenPhoneMs:         6000,     // 手机期大恨老师自动接单的节拍 (ms)——慢于 Lv10 公司自动(dahenAutoMs)，是最早最弱的一双手
+  dahenPhoneRewardMult: 0.5,      // 手机期自动接单的产出折扣（比亲自处理糙，收益打折）
+
   // § 阶梯四·天网收割「请求洪流」（§09 终局手动收割层——被动 tickAutomation 才是收益地板，这是白送的爽感加速）
   floodSpawnPerSec:     2.4,      // tier4 每秒涌入的洪流包基础数（随接管进度/红皇后放大，见下）
   floodTakenScale:      1.4,      // 洪流密度随全域接管进度(takenCount/15)的放大系数（5/5 陷落时 ×(1+此值)）
@@ -122,6 +127,8 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   delegateRewardMultPC: { label: "委托收益·搬进电脑后",       section: "前期卡片",   min: 0.3,   max: 1,     step: 0.02 },
   dahenAutoMs:          { label: "大恨老师自动接单节拍 (ms)",  section: "前期卡片",   min: 1000,  max: 12000, step: 100  },
   dahenAutoRewardMult:  { label: "大恨老师自动接单收益折扣",   section: "前期卡片",   min: 0.2,   max: 1,     step: 0.05 },
+  dahenPhoneMs:         { label: "手机期大恨老师接单节拍 (ms)", section: "前期卡片",   min: 2000,  max: 15000, step: 100  },
+  dahenPhoneRewardMult: { label: "手机期大恨老师接单收益折扣", section: "前期卡片",   min: 0.2,   max: 1,     step: 0.05 },
 
   floodSpawnPerSec:     { label: "洪流·每秒基础涌入数",       section: "天网收割",   min: 0.5,   max: 12,    step: 0.2  },
   floodTakenScale:      { label: "洪流·随接管进度放大",       section: "天网收割",   min: 0,     max: 3,     step: 0.1  },

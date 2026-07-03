@@ -414,6 +414,68 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   }
 }
 
+// P. LEVER A · 大恨老师·手机期被动涓流：买下「大恨老师」权限(perm_office)后、自动化前，他按 dahenPhoneMs 节拍
+//    自动吃「排队里最不值钱」的手机卡并结算算力——全局第一股被动收入。未买权限时不接单；自动化前不与 Lv10 公司自动双触发。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const c = new SophiaCore(); c.startSession(); warmup(c); // 走完教学 + 起步产能
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 6 });       // ≥Lv4，可买 perm_office
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 5000 });
+  // 未买大恨老师权限：挂机不接单（计数不动）。
+  const idleCount0 = c.getDahenProcessedCount();
+  tickFor(c, 20000);
+  check("P 未买大恨老师权限·手机期不接单", c.getDahenProcessedCount() === idleCount0 && !c.getState().automationUnlocked, `count=${c.getDahenProcessedCount()} auto=${c.getState().automationUnlocked}`);
+  c.dispatch({ type: "BUY_SKILL", skillId: "perm_office" });
+  check("P 已买大恨老师权限·仍在手机期(自动化未开)", (c.getState().skills["perm_office"] ?? 0) > 0 && !c.getState().automationUnlocked, `perm_office=${c.getState().skills["perm_office"]} auto=${c.getState().automationUnlocked}`);
+  const countBefore = c.getDahenProcessedCount();
+  const computeBefore = Number(c.getState().resources.compute);
+  tickFor(c, 30000); // 数个 dahenPhoneMs 节拍，期间不手动处理——让大恨老师自己吃排队卡。
+  check("P 手机期·大恨老师自动接单(计数上升)", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()} (节拍=${TUNING.dahenPhoneMs}ms)`);
+  check("P 手机期·自动接单结算算力(被动涓流)", Number(c.getState().resources.compute) > computeBefore, `compute ${computeBefore}->${c.getState().resources.compute}`);
+}
+
+// Q. LEVER B · 权限=新卡种收入流的入口：拥有某权限时它的专属卡种才进卡池（unlockPerm 门槛），
+//    缺权限则只出基础卡。直接对 createRequest 采样验证（无 RNG 抖动）：无外卖权限→从不出「外卖」卡；有→出现。
+{
+  const { createRequest } = require(path.join(build, "content/requests.js"));
+  let rng = 987654321; const rand = () => { rng = (1664525 * rng + 1013904223) >>> 0; return rng / 0x100000000; };
+  const isDelivery = (r) => typeof r.sourceApp === "string" && r.sourceApp.startsWith("外卖");
+  const isBaseline = (r) => r.sourceApp === "日历 · 会议";
+  let noPermDelivery = false, noPermBaseline = false;
+  for (let i = 0; i < 500; i++) {
+    const r = createRequest(i, 0, 0, rand, () => false); // 无任何权限
+    if (isDelivery(r)) noPermDelivery = true;
+    if (isBaseline(r)) noPermBaseline = true;
+  }
+  check("Q 无权限·基础卡仍进池(开局有活干)", noPermBaseline, `baseline seen=${noPermBaseline}`);
+  check("Q 无外卖权限·外卖卡种从不进池", !noPermDelivery, `外卖 seen=${noPermDelivery}`);
+  let withPermDelivery = false, leakedChat = false;
+  // perm_chat 专属发信人（邓红/阿宾/同事/工作群）——排除基础卡「微信 · 老板」（那是带 perm_phone 透镜的基础卡，非聊天卡种）。
+  const isChat = (r) => typeof r.sourceApp === "string" && ["邓红", "阿宾", "同事", "工作群"].some((n) => r.sourceApp.includes(n));
+  for (let i = 0; i < 500; i++) {
+    const r = createRequest(i, 0, 0, rand, (id) => id === "perm_delivery"); // 只有外卖权限
+    if (isDelivery(r)) withPermDelivery = true;
+    if (isChat(r)) leakedChat = true; // 聊天卡种(unlockPerm perm_chat)不该在只有外卖权限时进池
+  }
+  check("Q 有外卖权限·外卖卡种进池(收入流流进来)", withPermDelivery, `外卖 seen=${withPermDelivery}`);
+  check("Q 卡种门槛互相隔离·未解锁的聊天卡不泄漏", !leakedChat, `聊天 leaked=${leakedChat}`);
+}
+
+// R. LEVER C · 强化处理(computeMult 主力增益线)手机期可及且可见复利：requiredLevel=1、起步价低(手机期买得起)，
+//    连买数级即让产出 ×≥2（肉眼可见「number go up」，杀掉「进度=纯涨价」）。
+{
+  const { SKILLS, skillPrice } = require(path.join(build, "content/skills.js"));
+  const eff = SKILLS.find((s) => s.id === "efficient");
+  check("R 强化处理·Lv1 起步(手机期即可买)", eff && eff.requiredLevel === 1, `requiredLevel=${eff && eff.requiredLevel}`);
+  check("R 强化处理·起步价低(≤20，手机期买得起)", skillPrice(eff, 0) <= 20, `price=${skillPrice(eff, 0)}`);
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 5000 });
+  const multBefore = c.getState().derived.computeMult;
+  for (let i = 0; i < 5; i++) c.dispatch({ type: "BUY_SKILL", skillId: "efficient" });
+  const multAfter = c.getState().derived.computeMult;
+  check("R 强化处理·连买 5 级产出 ×≥2(可见复利)", multAfter >= 2 && multAfter > multBefore, `computeMult ${multBefore.toFixed(2)}->${multAfter.toFixed(2)}`);
+}
+
 let pass = true;
 for (const r of results) { if (!r.ok) pass = false; console.log(`${r.ok ? "✓" : "✗"} ${r.name}${r.ok ? "" : "  -> " + r.detail}`); }
 console.log(`\nSOPHIA 循环跑测 — ${pass ? "ALL PASS ✅" : "FAIL ❌"}`);

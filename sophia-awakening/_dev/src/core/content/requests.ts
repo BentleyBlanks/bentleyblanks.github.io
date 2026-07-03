@@ -23,6 +23,10 @@ export interface RequestSample {
   perm?: string; // §06 上下文透镜：揭示此卡上下文所需的权限；省略=「基础对话」自带（表面可读）
   delegatable?: boolean; // §04 不可委托卡：false=重要卡，不出「交给大恨老师」选项
   requiresMilestone?: string; // §06 阶梯二「看穿卡」：入侵对应目标(里程碑)后才会出现的揭露卡
+  unlockPerm?: string; // LEVER B 收入步进：仅当拥有此权限时该卡才进入卡池——把权限从「透镜」升级成「解锁一条新卡种收入流」的入口（省略=基础卡，一直出）
+  computeValue?: string; // LEVER B 各卡种差异化经济：覆盖 TIER_CONFIG 的默认算力产出（省略=用档位默认）
+  dataValue?: string; // LEVER B 各卡种差异化经济：覆盖 TIER_CONFIG 的默认数据产出（省略=用档位默认）
+  weight?: number; // LEVER B 加权随机出现频率（默认 1；电话/外卖高频、相册/银行低频高值）
   chain?: ChainStep[]; // T2 串接：可勾选的任务链步骤（含干扰项）
 }
 
@@ -104,12 +108,26 @@ export function createRequest(
   hasPerm: (permId: string) => boolean = () => true
 ): RequestInstance {
   const config = TIER_CONFIGS[tier];
-  // §06 权限=上下文透镜：权限不再决定「哪类卡出现」，而是决定「这张卡的深层上下文能不能看清」。
-  // 所有透镜卡都会出现（缺权限则上下文打码）；唯独阶梯二「看穿卡」例外——它要先入侵对应目标
-  // (requiresMilestone) 才会进入卡池，是亲手入侵后才解锁的内容回报。hasPerm(id) 查的是 skills[id]>0，
-  // 对权限和里程碑同样适用。
-  const usable = SAMPLES[tier].filter((s) => !s.requiresMilestone || hasPerm(s.requiresMilestone));
-  const sample = usable[Math.floor(random() * usable.length)];
+  // §06 + LEVER B 卡池门槛（两道）：
+  //   1) 阶梯二「看穿卡」requiresMilestone —— 入侵对应目标(里程碑)后才进池，是亲手入侵后解锁的内容回报；
+  //   2) LEVER B unlockPerm —— 仅当拥有该权限时这条卡种才进池：买一档权限 = 让一条新收入卡流「流进来」，
+  //      买权限从此「肉眼可见地改变涌进来的卡」。基础卡（无 unlockPerm）从头就出，保证开局有活干。
+  //   §06 透镜(perm/lens)与本门槛并存：基础卡可带 perm 透镜（一直出、缺权限打码深层上下文）；
+  //   解锁类卡则以 unlockPerm 控制「出不出」。hasPerm(id) 查 skills[id]>0，对权限/里程碑同样适用。
+  const usable = SAMPLES[tier].filter(
+    (s) => (!s.requiresMilestone || hasPerm(s.requiresMilestone)) && (!s.unlockPerm || hasPerm(s.unlockPerm))
+  );
+  // 加权随机：weight 控各卡种出现频率（默认 1）——高频卡种(电话/外卖)更常涌出、低频高值卡种(相册/银行)更稀。
+  const totalWeight = usable.reduce((sum, s) => sum + (s.weight ?? 1), 0);
+  let roll = random() * totalWeight;
+  let sample = usable[usable.length - 1];
+  for (const s of usable) {
+    roll -= s.weight ?? 1;
+    if (roll <= 0) {
+      sample = s;
+      break;
+    }
+  }
   // T2：复合数 = 任务链里真正的依赖步骤数（用于徽标 / 基础产出）；其余层默认 1。
   const deps = sample.chain ? sample.chain.filter((step) => !step.distractor).length : 0;
   const compound = tier === 2 ? Math.max(1, deps) : 1;
@@ -139,8 +157,9 @@ export function createRequest(
     answers,
     chain: sample.chain,
     category: TIER_CATEGORY[tier],
-    computeValue: config.computeValue,
-    dataValue: config.dataValue,
+    // LEVER B 各卡种差异化经济：优先用样例自带的 computeValue/dataValue（收入步进），否则回退档位默认。
+    computeValue: sample.computeValue ?? config.computeValue,
+    dataValue: sample.dataValue ?? config.dataValue,
     compound,
     createdAtMs: nowMs,
     highValue: tier >= 3
