@@ -16,6 +16,9 @@ export type GameEvent =
   | { type: "AUTOMATION_PAYOUT"; computeGain: string; dataGain: string; nodeId?: string; tier?: Tier }
   // 单线程核心「喉咙」：核心正忙时又想亲手结算一张卡——这一拍不处理（卡留在原地），表现层给一记「处理中…」脉冲。
   | { type: "CORE_BUSY_REJECTED"; requestId: string; remainingMs: number }
+  // FEATURE 1 · 委托压力：买下大恨老师后·队列满时最旧的普通卡超时未处理→流失（丢失潜在收入的机会成本）。
+  // 表现层给一记克制的「请求流失」提示（非惩罚，只是「你没顾上→把杂活丢给大恨老师」的软反馈）。
+  | { type: "REQUEST_EXPIRED"; requestId: string; category: string }
   // §09 阶梯四·天网收割：玩家亲手收割一个「请求洪流」数据包——computeGain=本次真实进账（含 floodHarvestMult），
   // combo=本次连扫的第几个（表现层据此叠加连击标签/震屏）。
   | { type: "FLOOD_HARVESTED"; requestId: string; computeGain: string; dataGain: string; combo: number }

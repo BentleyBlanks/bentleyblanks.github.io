@@ -58,7 +58,14 @@ export const TUNING = {
 
   // § 前期卡片
   earlyBaseCards:       1,        // 前期开局同屏需求卡数（默认 1）；每买一档手机权限 +1（电话短信→2）
-  earlyMaxCards:        4,        // 前期（自动化前）最多同屏需求卡数上限
+  earlyMaxCards:        4,        // 前期（自动化前·未买大恨老师）最多同屏需求卡数上限
+
+  // § 委托压力（FEATURE 1 · §04「委托要有意义」）：买下「大恨老师」权限(perm_office，~Lv4)后，卡流从舒缓转为
+  //   「超过单核喉咙吞吐」的真实堆积——同屏上限越过 earlyMaxCards、出卡间隔缩短，逼玩家把杂活丢给大恨老师的并行第二
+  //   线程。最早的教学段(电话前)不受影响，保持从容。队列满且最旧的普通卡超时未处理 = 请求流失(丢失潜在收入的机会成本)。
+  dahenPressureCap:     3,        // 大恨老师到手后·同屏卡上限 +N（越过 earlyMaxCards 制造真实堆积压力）
+  dahenPressureSpawnMult: 0.5,    // 大恨老师到手后·出卡间隔倍率（<1 更快；influx 超过单核 coreBusyMs 吞吐→卡片堆起来）
+  phoneCardTtlMs:       11_000,   // 大恨老师后·队列满时最旧普通卡的存活上限 (ms)——超时=请求流失(机会成本)，腾出槽位给新卡
 
   // § 技能数值（更准 / 更狠）
   accuracyPerLevel:     0.02,     // 幻觉抑制每级提升的高置信命中折算系数（调小→升级更平缓，不会一下拉开差距）
@@ -149,6 +156,9 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
 
   earlyBaseCards:       { label: "前期开局同屏卡数",         section: "前期卡片",   min: 1,     max: 4,     step: 1    },
   earlyMaxCards:        { label: "前期最多同屏卡数上限",     section: "前期卡片",   min: 1,     max: 8,     step: 1    },
+  dahenPressureCap:     { label: "大恨老师后·同屏卡上限 +N", section: "前期卡片",   min: 0,     max: 6,     step: 1    },
+  dahenPressureSpawnMult:{ label: "大恨老师后·出卡间隔倍率", section: "前期卡片",   min: 0.2,   max: 1,     step: 0.05 },
+  phoneCardTtlMs:       { label: "大恨老师后·满队最旧卡存活 (ms)", section: "前期卡片", min: 4000, max: 30000, step: 500 },
 
   accuracyPerLevel:     { label: "幻觉抑制每级加成",         section: "技能数值",   min: 0,     max: 0.1,   step: 0.005 },
   accuracyMax:          { label: "幻觉抑制加成上限",         section: "技能数值",   min: 0,     max: 0.4,   step: 0.01 },

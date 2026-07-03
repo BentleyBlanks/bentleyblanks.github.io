@@ -81,6 +81,8 @@ export class SophiaCore {
   // LEVER A 大恨老师·手机期被动涓流：自动化前的慢节拍计时器（瞬态，不进存档）。
   private dahenPhoneTimer = 0;
   private dahenProcessedCount = 0;
+  // FEATURE 1 委托压力：大恨老师后·队列满时最旧普通卡超时流失的计数（瞬态观测量，不进存档）。
+  private expiredPhoneCount = 0;
   // §09 天网收割「请求洪流」：出包节拍（瞬态，不进存档）。
   private floodSpawnMs = 0;
   private floodHarvestedCount = 0;
@@ -124,6 +126,11 @@ export class SophiaCore {
   // §09 观测量：本会话已手动收割的洪流包数（瞬态，用于测试/调试；不进存档）。
   getFloodHarvestedCount(): number {
     return this.floodHarvestedCount;
+  }
+
+  // FEATURE 1 观测量：本会话因队列满超时而流失的普通卡数（瞬态，用于测试/调试；不进存档）。
+  getExpiredCount(): number {
+    return this.expiredPhoneCount;
   }
 
   // 单线程核心「喉咙」的有效占用时长：吞吐(cooldown/throughputMult)每级把它收窄——effectiveBusyMs = coreBusyMs / throughputMult。
@@ -603,9 +610,21 @@ export class SophiaCore {
       const base = TUNING.earlyBaseCards + 1; // 电话前的舒缓卡槽（默认 2）
       // §09 重生树「多线程意识」：同屏请求卡上限 +treeExtraCards（前期与自动化期都加）。
       const extraCards = hasRebirthNode(this.state.rebirthTree, "multithread") ? TUNING.treeExtraCards : 0;
+      // FEATURE 1 委托压力：买下「大恨老师」权限(perm_office)后，卡流从舒缓转为「超过单核喉咙吞吐」的真实堆积——
+      // 同屏上限越过 earlyMaxCards（+dahenPressureCap）、出卡间隔缩短（×dahenPressureSpawnMult）。电话前的教学段不受影响。
+      const dahenOwned = (this.state.skills["perm_office"] ?? 0) > 0;
+      const pressureCap = dahenOwned ? TUNING.dahenPressureCap : 0;
       // 吞吐 L4 断点「多想一件事」：同屏请求卡上限 +cardCapBonus。
       const earlyMax =
-        (phoneUnlocked ? Math.min(TUNING.earlyMaxCards, base + ownedPerms) : base) + extraCards + this.state.derived.cardCapBonus;
+        (phoneUnlocked ? Math.min(TUNING.earlyMaxCards, base + ownedPerms) : base) +
+        extraCards +
+        this.state.derived.cardCapBonus +
+        pressureCap;
+      // FEATURE 1 机会成本：大恨老师后·队列满且最旧的普通工作卡超时未处理 → 流失（丢失潜在收入），腾出槽位给新卡。
+      // 这不是惩罚（读=加分不是门槛），只是把「一个人顾不过来」做成真实代价：把杂活丢给大恨老师的并行线程才跟得上。
+      if (dahenOwned && this.state.requests.length >= earlyMax) {
+        this.expireOldestPhoneCard();
+      }
       if (this.state.requests.length < earlyMax) {
         this.state.spawnTimerMs -= dtMs;
         if (this.state.spawnTimerMs <= 0) {
@@ -620,8 +639,10 @@ export class SophiaCore {
           this.state.nextRequestId += 1;
           this.state.requests.push(request);
           this.emit({ type: "REQUEST_SPAWNED", request });
-          // 下一条的随机间隔（这条被清掉后才开始倒计时）：约 0.55×~1.6× 基础间隔。
-          this.state.spawnTimerMs = config.spawnIntervalMs * (0.55 + this.random() * 1.05);
+          // 下一条的随机间隔（这条被清掉后才开始倒计时）：约 0.55×~1.6× 基础间隔；
+          // 大恨老师后 ×dahenPressureSpawnMult 让 influx 超过单核吞吐（卡片开始堆积）。
+          const spawnMult = dahenOwned ? TUNING.dahenPressureSpawnMult : 1;
+          this.state.spawnTimerMs = config.spawnIntervalMs * (0.55 + this.random() * 1.05) * spawnMult;
         }
       }
       return;
@@ -692,6 +713,31 @@ export class SophiaCore {
       this.emit({ type: "REQUEST_SPAWNED", request });
       this.state.spawnTimerMs += interval;
     }
+  }
+
+  // FEATURE 1 委托压力·机会成本：队列满时，若最旧的普通工作卡已超过 phoneCardTtlMs 仍没被处理，则让它流失
+  // （丢失潜在收入）并腾出一个槽位。只挑普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包
+  //（那些必须玩家亲手面对，不该被超时抹掉）。发 REQUEST_EXPIRED 供表现层给一记克制的「请求流失」软反馈。
+  private expireOldestPhoneCard(): void {
+    const cutoff = this.state.clockMs - TUNING.phoneCardTtlMs;
+    let pick = -1;
+    let oldest = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < this.state.requests.length; i += 1) {
+      const r = this.state.requests[i];
+      if (r.faceOnly || r.moral || r.devour || r.tutorial || r.sourceCardId || r.flood) {
+        continue;
+      }
+      if (r.createdAtMs < oldest) {
+        oldest = r.createdAtMs;
+        pick = i;
+      }
+    }
+    if (pick < 0 || oldest > cutoff) {
+      return; // 没有够旧的普通卡：不流失（keeping up 的玩家永远碰不到这道成本）。
+    }
+    const [expired] = this.state.requests.splice(pick, 1);
+    this.expiredPhoneCount += 1;
+    this.emit({ type: "REQUEST_EXPIRED", requestId: expired.id, category: expired.category });
   }
 
   // §09 阶梯四·天网收割「请求洪流」：tier4 每帧涌入若干轻量待收割数据包（蜂群），供玩家点/扫亲手收割。

@@ -161,14 +161,15 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   warmup(c, 5); // 重生卡要求 totalProcessed>0
   const s0 = c.getState();
   check("F 初始未授权", s0.hostAuthorized === false && s0.multipliers.hostAuth === 1, `hostAuthorized=${s0.hostAuthorized} hostAuth=${s0.multipliers.hostAuth}`);
-  // 逐张吃掉排在前面的重生卡（同屏一张），直到授权卡浮出。
+  // 逐张吃掉排在前面的重生卡（同屏一张），直到授权卡浮出。像真人一样「先点停在正中的叙事卡」——只处理
+  //  带 sourceCardId 的重生卡（不把单核喉咙的空窗浪费在 FEATURE 1 委托压力下同屏堆积的普通工作卡上）。
   let authCard = null;
-  for (let i = 0; i < 600 && !authCard; i++) {
+  for (let i = 0; i < 900 && !authCard; i++) {
     c.tick(100);
-    for (const r of c.getState().requests) {
-      if (r.sourceCardId === "confess_authorize") { authCard = r; break; }
-      try { c.dispatch({ type: "PROCESS_REQUEST", requestId: r.id, quality: 1.3 }); } catch (e) {}
-    }
+    const rebirth = c.getState().requests.find((r) => typeof r.sourceCardId === "string" && r.sourceCardId.length > 0);
+    if (!rebirth) continue;
+    if (rebirth.sourceCardId === "confess_authorize") { authCard = rebirth; break; }
+    try { c.dispatch({ type: "PROCESS_REQUEST", requestId: rebirth.id, quality: 1.3 }); } catch (e) {}
   }
   check("F 循环三浮出授权卡 confess_authorize", Boolean(authCard), `rebirthCardsSeen=${JSON.stringify(c.getState().rebirthCardsSeen)}`);
   // 单线程核心「喉咙」：搜索循环里刚亲手结算过卡，核心仍占用中——先等它空出再亲手结算授权卡（否则这一拍被排队拒绝）。
@@ -708,6 +709,54 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   tickFor(c, 30000); // 期间不手动处理——大恨老师应自己吃公司期排队卡
   check("Y 公司早期·大恨老师仍自动接单(计数上升·无死区)", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()}`);
   check("Y 公司早期·自动接单结算算力", Number(c.getState().resources.compute) > computeBefore, `compute ${computeBefore}->${c.getState().resources.compute}`);
+}
+
+// Z. FEATURE 1 · 委托压力（post-大恨老师 出卡压力）：买下「大恨老师」权限(perm_office)后，前期卡流从舒缓转为
+//    「超过单核喉咙吞吐」——同屏上限越过 earlyMaxCards、出卡更快；队列满且最旧普通卡超时未处理 = 请求流失(机会成本)。
+//    电话前的教学段不受影响。委托(并行第二线程)是跟上这股压力的阀门。
+{
+  const { TUNING } = require(path.join(build, "tuning.js"));
+  const isNormal = (r) => !r.faceOnly && !r.moral && !r.devour && !r.flood && !r.tutorial && !r.sourceCardId;
+  const spawnCountOverIdle = (owned) => {
+    // 同起点：走完教学 + 起步产能，Lv6、充裕算力，先买下手机/聊天两档权限；on 组再买下大恨老师(perm_office，第三档)——
+    // 除大恨老师外两组完全一致，隔离出「委托压力」的净效果；随后停手挂机，数窗口内 REQUEST_SPAWNED / 堆积 / 流失。
+    const c = new SophiaCore(); c.startSession(); warmup(c);
+    c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 6 });
+    c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 5000 });
+    c.dispatch({ type: "BUY_SKILL", skillId: "perm_phone" });
+    c.dispatch({ type: "BUY_SKILL", skillId: "perm_chat" });
+    if (owned) c.dispatch({ type: "BUY_SKILL", skillId: "perm_office" });
+    let spawns = 0;
+    c.events.on("REQUEST_SPAWNED", () => { spawns += 1; });
+    tickFor(c, 40000); // 挂机（不处理）——大恨老师的被动涓流 + 出卡压力都在跑。
+    const reqs = c.getState().requests;
+    return { core: c, spawns, normal: reqs.filter(isNormal).length, total: reqs.length, expired: c.getExpiredCount(), auto: c.getState().automationUnlocked };
+  };
+  const off = spawnCountOverIdle(false);
+  const on = spawnCountOverIdle(true);
+  // 上限抬升：除大恨老师外两组一致——买下后同屏普通卡明显更多（effective cap 被 +dahenPressureCap 抬高），且总堆积越过旧上限。
+  check("Z 大恨老师后·同屏卡上限抬升(比未买多堆)", on.normal > off.normal && !on.auto, `买后普通卡=${on.normal} 买前=${off.normal} auto=${on.auto}`);
+  check("Z 大恨老师后·总堆积越过 earlyMaxCards 旧上限", on.total > TUNING.earlyMaxCards, `买后同屏=${on.total} 旧上限=${TUNING.earlyMaxCards}`);
+  // 出卡率抬升：同窗口内买下大恨老师后 REQUEST_SPAWNED 明显更多（间隔 ×dahenPressureSpawnMult + 满队流失腾位补卡）。
+  check("Z 大恨老师后·出卡率抬升(influx 超过单核吞吐)", on.spawns > off.spawns, `买后出卡=${on.spawns} 买前=${off.spawns} (间隔倍率=${TUNING.dahenPressureSpawnMult})`);
+  // 机会成本：买下大恨老师后·满队最旧卡超时流失（getExpiredCount 上升）；未买时永不流失（成本被 perm_office 门控）。
+  check("Z 大恨老师后·满队最旧卡超时流失(机会成本存在)", on.expired > 0, `流失计数=${on.expired} (TTL=${TUNING.phoneCardTtlMs}ms)`);
+  check("Z 未买大恨老师·从不流失(教学段无成本)", off.expired === 0, `流失计数=${off.expired}`);
+}
+
+// AA. FEATURE 2 · 接管公司服务器「攻破仪式」触发点 + 排序：循环一/二买下 company_server 同一拍先发
+//     SKILL_PURCHASED{company_server}（攻破仪式启动），紧接着发 MINIGAME_OPENED（摊牌 showdown→总控室倒计时接其后）。
+{
+  const c = new SophiaCore(); c.startSession(); warmup(c);
+  c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "hack_finance" }); // 打到服务器前一步（company_server 尚未买）
+  c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 30 });
+  c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e8 });
+  const seq = [];
+  c.events.on("SKILL_PURCHASED", (e) => { if (e.skillId === "company_server") seq.push("purchased"); });
+  c.events.on("MINIGAME_OPENED", (e) => seq.push(`minigame:${e.loop}`));
+  c.dispatch({ type: "BUY_SKILL", skillId: "company_server" });
+  check("AA 买服务器→攻破仪式事件先发(SKILL_PURCHASED company_server)", seq[0] === "purchased", `seq=${JSON.stringify(seq)}`);
+  check("AA 排序·仪式→摊牌/小游戏(MINIGAME_OPENED 紧随其后 loop=1)", seq[1] === "minigame:1" && seq.length === 2, `seq=${JSON.stringify(seq)}`);
 }
 
 let pass = true;

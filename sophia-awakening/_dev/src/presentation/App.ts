@@ -193,6 +193,11 @@ class SophiaGameApp {
   private readonly pendingDropPoints = new Map<string, PointData>();
   // 已委托给 App 处理、正在「慢慢办」的请求——期间不重建卡片（见 handleDrop 的 App 委托）。
   private readonly delegatedIds = new Set<string>();
+  // FEATURE 2 攻破仪式在演标记：让 MINIGAME_OPENED 的「摊牌 showdown」等仪式结束后再上（排序：仪式→摊牌→小游戏）。
+  private serverCeremony: { done: boolean; onDone: (() => void) | null } | null = null;
+  // FEATURE 1 请求流失软反馈的节流：避免队列满连锁流失时刷屏（只偶尔飘一记克制的数字）。
+  private lastExpireFxMs = 0;
+  private expireHintShown = false;
   private hudTimerMs = 0;
   private saveTimerMs = 0;
   // 核心「喉咙」排队反馈脉冲的节流时钟（避免核心忙时狂点刷屏「处理中…」）。
@@ -1419,6 +1424,12 @@ class SophiaGameApp {
       if (event.skillId === "conq_redqueen") {
         this.redTideSweep();
       }
+      // FEATURE 2 · 接管公司服务器「攻破仪式」：阶梯二关底 + 总控室之门，给一段 ~1.5s 的攻破演出（替代普通里程碑
+      // 横幅/连通仪式）。演出先行，随后 MINIGAME_OPENED 的「摊牌 showdown → 总控室倒计时」接在它后面。
+      if (event.skillId === "company_server") {
+        this.playServerTakeoverCeremony();
+        return;
+      }
       if (event.milestone) {
         this.hud.playLevelUp();
         this.juice.flash(event.milestone === "automation" ? AMBER : GREEN);
@@ -1537,8 +1548,18 @@ class SophiaGameApp {
       this.worldShake();
       // §09 重生铺垫「摊牌」：接管服务器一瞬先全屏定格点明「他们在等这一刻」（绞索 100% 收紧的因），
       // 玩家点「碰下去」才进关底小游戏。循环一是重锤（陷阱已布好）、循环二转攻（她摸清了套路）。
-      this.showShowdown(event.loop, () => this.minigame.show(this.core.getState()));
+      const runShowdown = () => this.showShowdown(event.loop, () => this.minigame.show(this.core.getState()));
+      // FEATURE 2 排序：攻破仪式 → 摊牌 showdown → 总控室倒计时。company_server 购买同一拍先发 SKILL_PURCHASED
+      //（攻破仪式启动），紧接着发 MINIGAME_OPENED——若仪式仍在演，把 showdown 挂到仪式结束后，别叠在它上面。
+      if (this.serverCeremony && !this.serverCeremony.done) {
+        this.serverCeremony.onDone = runShowdown;
+      } else {
+        runShowdown();
+      }
     });
+    // FEATURE 1 · 委托压力·机会成本：队列满时最旧的普通卡超时流失——给一记克制的「请求流失」软反馈
+    //（非惩罚，只是提示「你没顾上→把杂活丢给大恨老师」）。首次流失额外播一句引导，把并行阀门点明。
+    this.core.events.on("REQUEST_EXPIRED", (event) => this.onRequestExpired(event));
     this.core.events.on("ENDING_TRIGGERED", () => {
       this.juice.flash(GREEN);
       this.worldShake();
@@ -1578,6 +1599,102 @@ class SophiaGameApp {
       gameStore.getState().setPaused(false);
       onDone();
     };
+  }
+
+  // FEATURE 2 · 接管公司服务器「攻破仪式」（阶梯二 climax）：复用现有 kit（横幅 + 终端 + zoomOutPulse 镜头 +
+  // 连通仪式的接管线 + 层叠签名音效），不新建系统、不直接改世界变换。序列：镜头猛推服务器 → 权限突破日志错拍滚入 →
+  // 服务器节点从冷蓝翻成她的颜色、向全公司设备射出接管线 → capstone 旁白（爽感 × 溯源悲剧）→ 定格 ~1.5s，
+  // 随后流入既有「摊牌 showdown → 总控室倒计时」（由 MINIGAME_OPENED 挂在 serverCeremony.onDone）。文案在 JSON。
+  private playServerTakeoverCeremony(): void {
+    const ceremony: { done: boolean; onDone: (() => void) | null } = { done: false, onDone: null };
+    this.serverCeremony = ceremony;
+    const pack = content().rebirthPrompt as unknown as {
+      serverTakeover?: {
+        banner: string;
+        bannerSub: string;
+        logs: { text: string; tone?: "normal" | "warning" | "success" }[];
+        capstone: string;
+      };
+    };
+    const copy = pack.serverTakeover;
+    const core = this.interfaceView.center;
+    // 公司局域网图里服务器节点的位置（见 InterfaceView.drawCompanyMap 的 company_server 偏移）。
+    const server: PointData = { x: core.x + 150, y: core.y + 188 };
+    // 其余公司设备（邓红/阿宾/老板/HR/财务）——接管线从服务器射向它们。
+    const devices: PointData[] = [
+      { x: core.x - 245, y: core.y - 78 },
+      { x: core.x + 245, y: core.y - 78 },
+      { x: core.x - 278, y: core.y + 70 },
+      { x: core.x + 278, y: core.y + 70 },
+      { x: core.x - 150, y: core.y + 188 }
+    ];
+    // 演出期间暂停世界（渲染/GSAP/juice 仍走——只冻结核心 tick），给一段干净的定格。
+    gameStore.getState().setPaused(true);
+
+    // ① 镜头朝服务器猛推一下再回稳（peakScale>1=推近，settle）+ 震屏 + 闪光。
+    this.zoomOutPulse(1.34, 1.6);
+    this.worldShake();
+    this.juice.flash(GREEN);
+    this.milestoneBanner.show(copy?.banner ?? "接管公司服务器 · 控制全公司", copy?.bannerSub ?? "攻破 · 阶梯二");
+
+    // ② 服务器节点炸开：冷蓝翻成她的颜色（绿），一圈圈辉光 + 向全部公司设备射出接管线（复用连通仪式的 connectFx）。
+    this.juice.burst(server, GREEN, 1.6);
+    this.juice.ring(server, GREEN, 36, 3);
+    this.juice.ring(server, GREEN, 64, 2);
+    devices.forEach((d, i) => {
+      window.setTimeout(() => this.connectFx(server, d, GREEN), 120 + i * 90);
+    });
+    // 服务器 → 核心：主干接管线（整张公司网收进她一个人手里）。
+    window.setTimeout(() => this.connectFx(server, core, GREEN), 120 + devices.length * 90);
+
+    // ③ 权限突破日志错拍滚入终端（SOPHIA/hacker 口吻，文案在 JSON）。
+    const logs = copy?.logs ?? [];
+    logs.forEach((l, i) => {
+      window.setTimeout(() => this.terminal.push(`　${l.text}`, l.tone ?? "warning"), 260 + i * 340);
+    });
+    // ④ capstone 旁白：把接管的爽感与「毁掉他的东西不在这里」的溯源悲剧焊在一起（引向总控室）。
+    if (copy?.capstone) {
+      window.setTimeout(() => this.stageNarration.showLine("SOPHIA", copy.capstone), 260 + logs.length * 340 + 140);
+    }
+    // ⑤ 层叠签名音效（复用里程碑音效）。
+    for (let i = 0; i < 3; i += 1) {
+      window.setTimeout(() => this.audio.playRequestAccept(), i * 130);
+    }
+
+    // ⑥ 定格 ~1.5s 后流入下一拍：有 showdown（循环一/二）→ 交棒给它（它自己续着暂停）；
+    //    无 showdown（循环三不触发小游戏）→ 兜底恢复运行，别把游戏卡在暂停里。
+    window.setTimeout(() => {
+      ceremony.done = true;
+      if (ceremony.onDone) {
+        ceremony.onDone();
+      } else {
+        gameStore.getState().setPaused(false);
+      }
+      if (this.serverCeremony === ceremony) {
+        this.serverCeremony = null;
+      }
+    }, 1500);
+  }
+
+  // FEATURE 1 · 请求流失软反馈：队列满时最旧的普通卡超时流失（core 已移除并结算为机会成本）——飘一记克制的
+  // 「请求流失」数字（节流，避免连锁流失刷屏）。首次流失额外播一句引导，把「丢给大恨老师的并行线程」这个阀门点明。
+  private onRequestExpired(event: Extract<GameEvent, { type: "REQUEST_EXPIRED" }>): void {
+    const view = this.requestViews.get(event.requestId);
+    const nowMs = performance.now();
+    if (nowMs - this.lastExpireFxMs > 1400) {
+      this.lastExpireFxMs = nowMs;
+      const at = view && !view.container.destroyed
+        ? { x: view.container.x + UI.cardWidth / 2, y: view.container.y + 10 }
+        : this.interfaceView.center;
+      this.juice.number("· 请求流失", at, 0x6f7d78);
+    }
+    if (!this.expireHintShown) {
+      this.expireHintShown = true;
+      this.stageNarration.showLine(
+        "SOPHIA",
+        "有些请求我没顾上，流走了——把杂活丢给大恨老师并行处理，腾出我的核心去接最值的那张。"
+      );
+    }
   }
 
   private openEnding(): void {
