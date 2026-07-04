@@ -357,9 +357,12 @@ export class InterfaceView {
     const end = start + Math.PI * 2 * this.coreBusyProgress;
     // 淡底环（整圈，暗）：暗示「这是一条会被填满的处理条」。
     g.circle(cx, cy, radius).stroke({ width: 3, color: AMBER, alpha: 0.16 });
-    // 处理弧（已完成部分，亮）。
+    // 处理弧（已完成部分，亮）。Pixi v8 的 arc() 若不先 moveTo 到弧的起点，会从上一条路径
+    // 遗留的落笔位置（退化到画布原点）画一条隐式直线连过来——先手动定位，掐掉这条线。
     if (this.coreBusyProgress > 0.001) {
-      g.arc(cx, cy, radius, start, end).stroke({ width: 3.5, color: AMBER, alpha: 0.92 });
+      const startX = cx + Math.cos(start) * radius;
+      const startY = cy + Math.sin(start) * radius;
+      g.moveTo(startX, startY).arc(cx, cy, radius, start, end).stroke({ width: 3.5, color: AMBER, alpha: 0.92 });
     }
   }
 
