@@ -16,6 +16,24 @@ if (!document.querySelector("#visualBackdrop")) {
   document.body.prepend(backdrop);
 }
 
+if (!document.querySelector("#visualArtifacts")) {
+  const artifacts = document.createElement("div");
+  artifacts.id = "visualArtifacts";
+  artifacts.className = "visual-artifacts";
+  artifacts.setAttribute("aria-hidden", "true");
+  artifacts.innerHTML = `
+    <div class="visual-artifact visual-artifact-core"></div>
+    <div class="visual-artifact visual-artifact-request"></div>
+    <div class="visual-artifact visual-artifact-node visual-artifact-node-a"></div>
+    <div class="visual-artifact visual-artifact-node visual-artifact-node-b"></div>
+    <div class="visual-artifact visual-artifact-gauge visual-artifact-gauge-a"></div>
+    <div class="visual-artifact visual-artifact-gauge visual-artifact-gauge-b"></div>
+    <div class="visual-artifact visual-artifact-corner visual-artifact-corner-a"></div>
+    <div class="visual-artifact visual-artifact-terminal"></div>
+  `;
+  document.body.prepend(artifacts);
+}
+
 const root = document.querySelector<HTMLElement>("#app");
 
 if (!root) {

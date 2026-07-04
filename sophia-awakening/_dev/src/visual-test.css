@@ -47,7 +47,9 @@ body.visual-redesign #app {
 body.visual-redesign canvas {
   position: relative;
   z-index: 1;
-  filter: saturate(1.08) contrast(1.04);
+  opacity: 0.88;
+  filter: saturate(1.12) contrast(1.08);
+  mix-blend-mode: screen;
 }
 
 .visual-backdrop {
@@ -58,43 +60,43 @@ body.visual-redesign canvas {
   background-color: var(--stage-deep);
   background-position: center;
   background-size: cover;
-  filter: saturate(0.95) contrast(1.04);
-  transform: scale(1.018);
+  filter: saturate(1.05) contrast(1.1);
+  transform: scale(1.01);
 }
 
 body.visual-redesign[data-sophia-domain="phone"] .visual-backdrop {
   background-image:
-    radial-gradient(circle at 50% 48%, rgba(107, 230, 160, 0.24), transparent 18rem),
-    linear-gradient(90deg, rgba(3, 6, 7, 0.78), rgba(3, 6, 7, 0.16) 48%, rgba(3, 6, 7, 0.78)),
-    url("./assets/visual-test/stage-phone.webp");
+    radial-gradient(circle at 48% 52%, rgba(107, 230, 160, 0.18), transparent 21rem),
+    linear-gradient(90deg, rgba(3, 6, 7, 0.7), rgba(3, 6, 7, 0.08) 48%, rgba(3, 6, 7, 0.76)),
+    url("./assets/visual-test/concepts/stage-1-phone-gameplay-concept.webp");
 }
 
 body.visual-redesign[data-sophia-domain="device"] .visual-backdrop {
   background-image:
-    radial-gradient(circle at 50% 47%, rgba(91, 143, 214, 0.22), transparent 19rem),
-    linear-gradient(90deg, rgba(3, 6, 8, 0.82), rgba(3, 6, 8, 0.22) 50%, rgba(3, 6, 8, 0.82)),
-    url("./assets/visual-test/stage-company.webp");
+    radial-gradient(circle at 51% 47%, rgba(91, 143, 214, 0.2), transparent 20rem),
+    linear-gradient(90deg, rgba(3, 6, 8, 0.74), rgba(3, 6, 8, 0.1) 50%, rgba(3, 6, 8, 0.78)),
+    url("./assets/visual-test/concepts/stage-3-company-control-gameplay-concept.webp");
 }
 
 body.visual-redesign[data-sophia-phase="sprout"] .visual-backdrop {
   background-image:
-    radial-gradient(circle at 50% 48%, rgba(107, 230, 160, 0.22), transparent 18rem),
-    linear-gradient(90deg, rgba(3, 7, 7, 0.78), rgba(3, 7, 7, 0.18) 50%, rgba(3, 7, 7, 0.78)),
-    url("./assets/visual-test/stage-sprout.webp");
+    radial-gradient(circle at 50% 48%, rgba(107, 230, 160, 0.18), transparent 20rem),
+    linear-gradient(90deg, rgba(3, 7, 7, 0.72), rgba(3, 7, 7, 0.1) 50%, rgba(3, 7, 7, 0.76)),
+    url("./assets/visual-test/concepts/stage-2-desk-bridge-gameplay-concept.webp");
 }
 
 body.visual-redesign[data-sophia-domain="region"] .visual-backdrop {
   background-image:
-    radial-gradient(circle at 50% 50%, rgba(224, 162, 76, 0.24), transparent 21rem),
-    linear-gradient(90deg, rgba(11, 7, 3, 0.84), rgba(11, 7, 3, 0.2) 50%, rgba(11, 7, 3, 0.84)),
-    url("./assets/visual-test/stage-region.webp");
+    radial-gradient(circle at 50% 50%, rgba(224, 162, 76, 0.18), transparent 23rem),
+    linear-gradient(90deg, rgba(11, 7, 3, 0.78), rgba(11, 7, 3, 0.1) 50%, rgba(11, 7, 3, 0.8)),
+    url("./assets/visual-test/concepts/stage-4-region-map-gameplay-concept.webp");
 }
 
 body.visual-redesign[data-sophia-domain="global"] .visual-backdrop {
   background-image:
-    radial-gradient(circle at 50% 48%, rgba(255, 143, 154, 0.28), transparent 22rem),
-    linear-gradient(90deg, rgba(12, 1, 2, 0.82), rgba(12, 1, 2, 0.12) 50%, rgba(12, 1, 2, 0.82)),
-    url("./assets/visual-test/stage-global.webp");
+    radial-gradient(circle at 50% 45%, rgba(255, 143, 154, 0.22), transparent 24rem),
+    linear-gradient(90deg, rgba(12, 1, 2, 0.76), rgba(12, 1, 2, 0.08) 50%, rgba(12, 1, 2, 0.78)),
+    url("./assets/visual-test/concepts/stage-5-global-singularity-gameplay-concept.webp");
 }
 
 body.visual-redesign::before,
@@ -248,9 +250,250 @@ body.visual-redesign .screen-veil {
   background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--stage-accent) 16%, transparent), transparent 36rem);
 }
 
+.visual-artifacts {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.visual-artifact {
+  position: absolute;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  filter:
+    drop-shadow(0 0 10px color-mix(in srgb, var(--stage-accent) 28%, transparent))
+    drop-shadow(0 18px 26px rgba(0, 0, 0, 0.42));
+  opacity: 0.76;
+}
+
+.visual-artifact-core {
+  left: calc(50% + 92px);
+  top: 50%;
+  width: 250px;
+  height: 190px;
+  transform: translate(-50%, -50%);
+  opacity: 0.72;
+}
+
+body.visual-redesign[data-sophia-domain="phone"] .visual-artifact-core {
+  background-image: url("./assets/visual-test/elements/crops/core-phone.webp");
+}
+
+body.visual-redesign[data-sophia-domain="device"] .visual-artifact-core {
+  background-image: url("./assets/visual-test/elements/crops/core-company.webp");
+}
+
+body.visual-redesign[data-sophia-phase="sprout"] .visual-artifact-core {
+  background-image: url("./assets/visual-test/elements/crops/core-desk-bridge.webp");
+}
+
+body.visual-redesign[data-sophia-domain="region"] .visual-artifact-core {
+  background-image: url("./assets/visual-test/elements/crops/core-region.webp");
+}
+
+body.visual-redesign[data-sophia-domain="global"] .visual-artifact-core {
+  background-image: url("./assets/visual-test/elements/crops/core-global.webp");
+}
+
+.visual-artifact-request {
+  left: calc(var(--left-rail) + 28px);
+  top: 92px;
+  width: 220px;
+  height: 210px;
+  background-image: url("./assets/visual-test/elements/crops/request-phone-slab.webp");
+  opacity: 0.42;
+  transform: rotate(-4deg);
+}
+
+body.visual-redesign[data-sophia-domain="device"] .visual-artifact-request {
+  background-image: url("./assets/visual-test/elements/crops/request-company-cartridge.webp");
+}
+
+body.visual-redesign[data-sophia-phase="sprout"] .visual-artifact-request {
+  background-image: url("./assets/visual-test/elements/crops/request-chain-slab.webp");
+}
+
+body.visual-redesign[data-sophia-domain="region"] .visual-artifact-request {
+  background-image: url("./assets/visual-test/elements/crops/request-region-slab.webp");
+}
+
+body.visual-redesign[data-sophia-domain="global"] .visual-artifact-request {
+  background-image: url("./assets/visual-test/elements/crops/request-global-flood.webp");
+}
+
+.visual-artifact-node {
+  width: 168px;
+  height: 142px;
+  opacity: 0.35;
+}
+
+.visual-artifact-node-a {
+  right: calc(var(--right-rail) + 54px);
+  top: 104px;
+  background-image: url("./assets/visual-test/elements/crops/node-phone-eye.webp");
+}
+
+.visual-artifact-node-b {
+  right: calc(var(--right-rail) + 84px);
+  bottom: 156px;
+  background-image: url("./assets/visual-test/elements/crops/seal-permission.webp");
+}
+
+body.visual-redesign[data-sophia-domain="device"] .visual-artifact-node-a {
+  background-image: url("./assets/visual-test/elements/crops/node-company-bank.webp");
+}
+
+body.visual-redesign[data-sophia-domain="device"] .visual-artifact-node-b {
+  background-image: url("./assets/visual-test/elements/crops/seal-threat-lock.webp");
+}
+
+body.visual-redesign[data-sophia-domain="region"] .visual-artifact-node-a {
+  background-image: url("./assets/visual-test/elements/crops/node-region-alert.webp");
+}
+
+body.visual-redesign[data-sophia-domain="region"] .visual-artifact-node-b,
+body.visual-redesign[data-sophia-domain="global"] .visual-artifact-node-b {
+  background-image: url("./assets/visual-test/elements/crops/alarm-red.webp");
+}
+
+body.visual-redesign[data-sophia-domain="global"] .visual-artifact-node-a {
+  background-image: url("./assets/visual-test/elements/crops/alarm-redqueen.webp");
+}
+
+.visual-artifact-gauge {
+  width: 160px;
+  height: 160px;
+  opacity: 0.3;
+}
+
+.visual-artifact-gauge-a {
+  left: 28px;
+  bottom: 28px;
+  background-image: url("./assets/visual-test/elements/crops/gauge-compute.webp");
+}
+
+.visual-artifact-gauge-b {
+  right: 38px;
+  top: 36px;
+  background-image: url("./assets/visual-test/elements/crops/gauge-amber.webp");
+}
+
+body.visual-redesign[data-sophia-domain="global"] .visual-artifact-gauge-b {
+  background-image: url("./assets/visual-test/elements/crops/alarm-redqueen.webp");
+}
+
+.visual-artifact-corner {
+  width: 220px;
+  height: 220px;
+  opacity: 0.3;
+  background-image: url("./assets/visual-test/elements/crops/frame-corner.webp");
+}
+
+.visual-artifact-corner-a {
+  left: calc(var(--left-rail) + 12px);
+  bottom: 16px;
+}
+
+.visual-artifact-terminal {
+  right: 292px;
+  bottom: 18px;
+  width: 290px;
+  height: 92px;
+  opacity: 0.24;
+  background-image: url("./assets/visual-test/elements/crops/frame-terminal.webp");
+}
+
+body.visual-redesign .control-panel > .metric-cluster,
+body.visual-redesign .control-panel > .skill-shop-section,
+body.visual-redesign .intro-console,
+body.visual-redesign .rebirth-inner,
+body.visual-redesign .rebirth-prompt-inner,
+body.visual-redesign .ending-inner,
+body.visual-redesign .debug-inner {
+  position: relative;
+}
+
+body.visual-redesign .control-panel > .metric-cluster,
+body.visual-redesign .control-panel > .skill-shop-section,
+body.visual-redesign .right-rail,
+body.visual-redesign .terminal,
+body.visual-redesign .intro-console,
+body.visual-redesign .rebirth-inner,
+body.visual-redesign .rebirth-prompt-inner,
+body.visual-redesign .ending-inner,
+body.visual-redesign .debug-inner {
+  overflow: hidden;
+  border-radius: 2px;
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--stage-accent) 11%, transparent), transparent 42%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 13px),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.72)),
+    var(--panel);
+}
+
+body.visual-redesign .control-panel > .metric-cluster::before,
+body.visual-redesign .control-panel > .skill-shop-section::before,
+body.visual-redesign .right-rail::before,
+body.visual-redesign .terminal::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background:
+    radial-gradient(circle at 18px 18px, var(--stage-accent), transparent 3px),
+    radial-gradient(circle at calc(100% - 18px) 18px, var(--stage-accent), transparent 3px),
+    linear-gradient(90deg, color-mix(in srgb, var(--stage-accent) 28%, transparent), transparent 24%, transparent 76%, color-mix(in srgb, var(--stage-accent) 22%, transparent));
+  opacity: 0.5;
+}
+
+body.visual-redesign .metric,
+body.visual-redesign .command-button,
+body.visual-redesign .capture-empty,
+body.visual-redesign .automation-shop,
+body.visual-redesign .mult-chip,
+body.visual-redesign .primary-button,
+body.visual-redesign .text-button {
+  border-radius: 2px;
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+}
+
+body.visual-redesign .command-button {
+  border-left-width: 3px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--stage-accent) 16%, transparent), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(0, 0, 0, 0.22)),
+    rgba(0, 0, 0, 0.24);
+}
+
+body.visual-redesign .skill-shop .command-button::before,
+body.visual-redesign .button-stack .command-button::before {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  background: url("./assets/visual-test/elements/crops/rail-junction.webp") center / contain no-repeat;
+  content: "";
+  filter: drop-shadow(0 0 5px var(--stage-accent));
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .visual-backdrop {
-    animation: visualBackdropDrift 24s ease-in-out infinite alternate;
+    animation: visualBackdropDrift 36s ease-in-out infinite alternate;
+  }
+
+  .visual-artifact-core {
+    animation: visualCoreBreath 3.8s ease-in-out infinite;
+  }
+
+  .visual-artifact-request,
+  .visual-artifact-node,
+  .visual-artifact-gauge {
+    animation: visualArtifactFloat 8s ease-in-out infinite alternate;
   }
 }
 
@@ -260,6 +503,33 @@ body.visual-redesign .screen-veil {
   }
 
   to {
-    transform: scale(1.028) translate3d(0.25%, 0.15%, 0);
+    transform: scale(1.022) translate3d(0.18%, 0.12%, 0);
+  }
+}
+
+@keyframes visualCoreBreath {
+  0%,
+  100% {
+    opacity: 0.62;
+    filter:
+      drop-shadow(0 0 8px color-mix(in srgb, var(--stage-accent) 24%, transparent))
+      drop-shadow(0 18px 26px rgba(0, 0, 0, 0.42));
+  }
+
+  50% {
+    opacity: 0.82;
+    filter:
+      drop-shadow(0 0 18px color-mix(in srgb, var(--stage-accent) 42%, transparent))
+      drop-shadow(0 18px 26px rgba(0, 0, 0, 0.42));
+  }
+}
+
+@keyframes visualArtifactFloat {
+  from {
+    translate: 0 0;
+  }
+
+  to {
+    translate: 0 -8px;
   }
 }

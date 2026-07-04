@@ -147,6 +147,10 @@ export class InterfaceView {
     this.container.addChild(this.graphics, this.labelLayer);
   }
 
+  private isVisualTestSkin(): boolean {
+    return typeof document !== "undefined" && document.body.classList.contains("visual-redesign");
+  }
+
   private phoneShellSize(): { w: number; h: number } {
     const iconSpan = UI.phoneSpacing * 2 + UI.phoneIcon;
     const w = Math.max(322, iconSpan + 70);
@@ -418,6 +422,7 @@ export class InterfaceView {
     const cx = this.center.x;
     const cy = this.center.y;
     const g = this.graphics;
+    const visualSkin = this.isVisualTestSkin();
     // 每买下一个手机权限，就点亮对应的一个 App（可连线委托）——买了「电话」就能连「电话」。
     const permCount = PERMISSION_IDS.filter((id) => (state.skills[id] ?? 0) > 0).length;
     const overreach = permCount > 0;
@@ -485,11 +490,23 @@ export class InterfaceView {
           }
           this.pendingApps.push({ x: gx, y: gy, idx: appIdx });
         }
-        g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).fill({ color: 0x0d1715, alpha: 0.5 });
-        g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.85 : 0.4) * pulse });
-        // App 图标：emoji（未点亮的 App 调暗一些）。
-        this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, UI.appEmoji, 0xffffff, lit ? 1 : 0.5);
-        this.addLabel(connected ? name : lit ? `${name}·待连` : name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
+        if (visualSkin) {
+          const tokenR = iconS * 0.44;
+          const lockColor = lit ? col2 : 0x41514b;
+          g.circle(gx, gy, tokenR).fill({ color: 0x07100e, alpha: lit ? 0.58 : 0.38 });
+          g.circle(gx, gy, tokenR + 4).stroke({ width: 1.4, color: lockColor, alpha: (lit ? 0.78 : 0.36) * pulse });
+          g.circle(gx, gy, tokenR * 0.56).stroke({ width: 1, color: lockColor, alpha: (lit ? 0.5 : 0.2) * pulse });
+          g.moveTo(gx - tokenR * 0.8, gy).lineTo(gx + tokenR * 0.8, gy).stroke({ width: 1, color: lockColor, alpha: lit ? 0.34 : 0.16 });
+          g.moveTo(gx, gy - tokenR * 0.8).lineTo(gx, gy + tokenR * 0.8).stroke({ width: 1, color: lockColor, alpha: lit ? 0.34 : 0.16 });
+          this.addLabel(connected ? "◆" : lit ? "◇" : "◈", gx, gy - 1, 23, lit ? 0xd8fff1 : 0x64736d, lit ? 0.92 : 0.42);
+          this.addLabel(connected ? "接入端口" : lit ? "待接入" : "权限封印", gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x6f7d77);
+        } else {
+          g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).fill({ color: 0x0d1715, alpha: 0.5 });
+          g.roundRect(gx - iconS / 2, gy - iconS / 2, iconS, iconS, 14).stroke({ width: 1.5, color: col2, alpha: (lit ? 0.85 : 0.4) * pulse });
+          // App 图标：emoji（未点亮的 App 调暗一些）。
+          this.addLabel(APP_ICONS[name] ?? "📱", gx, gy - 1, UI.appEmoji, 0xffffff, lit ? 1 : 0.5);
+          this.addLabel(connected ? name : lit ? `${name}·待连` : name, gx, gy + iconS / 2 + 13, 10, lit ? 0xcdeee6 : 0x7a8a84);
+        }
 
         // 委托处理中：图标外圈画一条进度环（转着转着满了才出结果）；还有排队的待办则右上角标 +N。
         const job = connected ? this.appJobs.get(appIdx) : undefined;
