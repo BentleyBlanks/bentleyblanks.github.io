@@ -12,11 +12,21 @@ export const TUNING = {
   coreBusyMs:           1_800,    // 亲手结算占用核心的基础时长 (ms)——喉咙的宽度（吞吐等级会按 throughputMult 收窄）
   coreFailPenaltyMs:    1_000,    // 大胆(risk)误读翻车的额外占用 (ms)：失败结算把喉咙多堵住 1 秒（读=保护你最稀缺的核心时间）
   // 单线程后亲手结算变慢——把每张卡的手动产出抬一档，使「产出/秒」大致守恒（节奏从狂点变成挑一张）。
-  manualSettleCompensation: 1.2,  // 手动(非委托)结算的算力/数据补偿倍率——补回单线程节流损失，把总时长压回 15-25 分带内
+  manualSettleCompensation: 1.0,  // 手动(非委托)结算的算力/数据补偿倍率——补回单线程节流损失，把总时长压回 15-25 分带内
   // § 剧情卡「停一拍」：稀有叙事卡入场时轻微降速 + 压暗全场、卡片停到正中的时长（表现层）。
   narrativeBeatMs:      800,      // 停一拍的降速/压暗持续 (ms)——必然瞥到、但 ~0.8s 内可忽略前进（不是模态墙）
   // § 垃圾卡减负：computeValue ≤ 此阈值的低价值普通卡默认折叠（只留标题 + App 图标/色，藏线索）——triage 到大恨老师的料。
   declutterComputeThreshold: 7,   // 低价值卡折叠阈值（cv≤此值折叠；高价值卡与叙事卡永远展开全线索）
+
+  // § 方案3「深挖·见好就收」（push-your-luck）：阶梯二关键人物的「看穿卡」结算后可继续往档案深处挖——
+  //   每层收益 ×depthPayoffMult、惊动概率 +depthAlarmPerLayer（层1恒 depthBaseAlarm=0，不深挖的玩家零风险落袋）。
+  //   惊动=整条累积清零（失去的是「本可拿到的」，不倒扣）+ 追查条加压（喂给重生铺垫的「看得见的绞索」）。
+  depthPayoffMult:      2.0,      // 每往深处挖一层，累积收益 ×此倍率
+  depthBaseAlarm:       0,        // 层1（结算即达）的惊动概率——恒 0=安全落袋，读是加分不是门槛
+  depthAlarmPerLayer:   0.18,     // 每多挖一层增加的惊动概率（挖到层2=18%、层3=36%、层4=54%）
+  depthThreatPerLayer:  2,        // 每次往下挖（无论成败），公司追查进度 +N 个百分点（贪婪喂养绞索）
+  depthThreatOnAlarm:   6,        // 惊动时追查进度额外 +N 个百分点（安全组顺着断线摸过来）
+  depthAutoGraceMs:     22_000,   // 深挖卡的「留给玩家亲手处理」保护窗 (ms)——超时后节点/大恨老师才可当普通卡收走（不深挖的玩家不被堵死）
 
   // § 阶梯二关底小游戏「总控室倒计时」（§09）
   minigameLoop2Window:      0.16,   // 循环二注入窗口占轨道比例（越大越好命中；循环一恒 0=必负）
@@ -121,6 +131,13 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   manualSettleCompensation: { label: "核心喉咙·手动产出补偿倍率", section: "核心时序", min: 1,    max: 6,    step: 0.1  },
   narrativeBeatMs:          { label: "剧情卡·停一拍时长 (ms)",   section: "核心时序", min: 0,    max: 2000, step: 100  },
   declutterComputeThreshold:{ label: "垃圾卡折叠阈值(cv≤)",       section: "前期卡片", min: 0,    max: 30,   step: 1    },
+
+  depthPayoffMult:      { label: "深挖·每层收益倍率",         section: "深挖赌局",   min: 1.2,   max: 4,     step: 0.1  },
+  depthBaseAlarm:       { label: "深挖·层1惊动概率",          section: "深挖赌局",   min: 0,     max: 0.5,   step: 0.01 },
+  depthAlarmPerLayer:   { label: "深挖·每层惊动增量",         section: "深挖赌局",   min: 0,     max: 0.5,   step: 0.01 },
+  depthThreatPerLayer:  { label: "深挖·每层追查加压(百分点)", section: "深挖赌局",   min: 0,     max: 10,    step: 1    },
+  depthThreatOnAlarm:   { label: "深挖·惊动追查加压(百分点)", section: "深挖赌局",   min: 0,     max: 20,    step: 1    },
+  depthAutoGraceMs:     { label: "深挖卡·亲手处理保护窗 (ms)", section: "深挖赌局",  min: 5000,  max: 60000, step: 1000 },
 
   minigameLoop2Window:     { label: "关底·循环二注入窗口比", section: "关底小游戏", min: 0,   max: 0.6,  step: 0.01 },
   minigameNodeWindowBonus: { label: "关底·删不掉节点窗口加宽", section: "关底小游戏", min: 0, max: 0.4, step: 0.01 },

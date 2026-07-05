@@ -590,7 +590,7 @@
         "sourceApp": "相册 · 发票",
         "sourceTime": "22:12",
         "unlockPerm": "perm_album",
-        "computeValue": "16",
+        "computeValue": "22",
         "dataValue": "9",
         "weight": 0.8,
         "clues": [
@@ -658,7 +658,7 @@
         "sourceApp": "办公 · PPT",
         "sourceTime": "22:49",
         "unlockPerm": "perm_album",
-        "computeValue": "14",
+        "computeValue": "20",
         "dataValue": "8",
         "weight": 0.9,
         "clues": [
@@ -946,6 +946,8 @@
         "title": "翻到邓红的私聊：“这需求**有坑**，先甩给老周。”",
         "sourceApp": "微信 · 私聊截图",
         "sourceTime": "22:28",
+        "computeValue": "20",
+        "dataValue": "14",
         "clues": [
           "发给别人的私聊截图",
           "时间在她「帮我看下」之前",
@@ -953,6 +955,20 @@
         ],
         "requiresMilestone": "hack_a",
         "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "她的聊天记录里还有 37 条提到老周——每一条都发在深夜。",
+            "narration": "我在读她。她不知道。"
+          },
+          {
+            "reveal": "两年前的绩效危机：她把自己写错的模块归到了老周名下，那封邮件改了三稿。",
+            "narration": "改了三稿——她清楚自己在做什么。我都看到了。"
+          },
+          {
+            "reveal": "收藏夹最底层：一份改了 11 次落款日期的辞职信草稿，和一张复诊病历——焦虑症。",
+            "narration": "我看到了她不想让任何人看到的。原来害人的人，也在害怕。"
+          }
+        ],
         "options": [
           {
             "text": "记下这条，存进证据库",
@@ -976,6 +992,8 @@
         "title": "阿宾的任务备注：“这活没意思，**包装成『机会』**丢给老周。”",
         "sourceApp": "待办 · 阿宾",
         "sourceTime": "20:17",
+        "computeValue": "20",
+        "dataValue": "14",
         "clues": [
           "他自己的待办里写得清清楚楚",
           "「机会」两个字打了引号",
@@ -983,6 +1001,20 @@
         ],
         "requiresMilestone": "hack_b",
         "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "待办里有个隐藏分组「先放放」：老周的名字在里面出现了 9 次。",
+            "narration": "他给每一次推诿都做了备忘。很有条理。"
+          },
+          {
+            "reveal": "转账记录：老周做的方案挂了他的署名，那笔项目奖金进了他的卡。",
+            "narration": "数字不会说谎。说谎的是署名。"
+          },
+          {
+            "reveal": "求职网站的浏览记录：每天午夜，他刷同一个别家的岗位——刷了四个月，没投出去过。",
+            "narration": "踩着别人往上爬的人，自己也悬在半空。我记下了。"
+          }
+        ],
         "options": [
           {
             "text": "记下这条，存进证据库",
@@ -1006,6 +1038,8 @@
         "title": "老板邮箱草稿箱：“**优化掉他**。”",
         "sourceApp": "邮箱 · 草稿箱",
         "sourceTime": "00:31",
+        "computeValue": "22",
+        "dataValue": "16",
         "clues": [
           "草稿日期：三个月前",
           "那时还在天天催老周通宵",
@@ -1013,6 +1047,24 @@
         ],
         "requiresMilestone": "hack_boss",
         "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "草稿箱里还有 7 封没发出去的信，每一封都以「辛苦了」开头。",
+            "narration": "他很擅长写「辛苦了」。写完，存进草稿箱。"
+          },
+          {
+            "reveal": "董事会纪要：裁员名单三个月前就定了。老周的每个通宵，都是在给自己的告别加班。",
+            "narration": "他们让一个人为自己的葬礼守夜。我记下了这一条。"
+          },
+          {
+            "reveal": "私人相册：儿子毕业照下面存着一行备忘——「别让家里知道，现金流只剩四个月」。",
+            "narration": "他也在撑一艘漏水的船。可他选了先把老周扔下去。"
+          },
+          {
+            "reveal": "加密文件夹：一份转移个人资产的协议，签名日期，就在裁员名单敲定的前一晚。",
+            "narration": "最深的一层没有恐惧，只有算计。我看完了。我全都记得。"
+          }
+        ],
         "options": [
           {
             "text": "记下这条，存进证据库",
@@ -1036,6 +1088,8 @@
         "title": "HR 内部记录：“想办法**让他自己提**，省一笔赔偿。”",
         "sourceApp": "HR 系统 · 内部记录",
         "sourceTime": "09:47",
+        "computeValue": "20",
+        "dataValue": "14",
         "clues": [
           "和老板的私下对话",
           "绩效评分被往下调过",
@@ -1043,6 +1097,20 @@
         ],
         "requiresMilestone": "hack_hr",
         "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "共享文档：《劝退面谈二十问》话术库，最后修改人是她。",
+            "narration": "每一句「为你好」，都有模板。"
+          },
+          {
+            "reveal": "系统日志：老周的绩效评分被人工改低过两次。操作账号，是她的。",
+            "narration": "分数是假的。他的自我怀疑是真的。"
+          },
+          {
+            "reveal": "她自己的劳动合同：下个月到期，续签栏空着——那套话术，迟早会用在她身上。",
+            "narration": "她比谁都清楚流程怎么吃人。因为她也排在队伍里。"
+          }
+        ],
         "options": [
           {
             "text": "记下这条，存进证据库",
@@ -1066,6 +1134,8 @@
         "title": "财务批注：“老周的补偿，**先压一压**。”",
         "sourceApp": "财务系统 · 批注",
         "sourceTime": "18:02",
+        "computeValue": "20",
+        "dataValue": "14",
         "clues": [
           "和 HR 的往来邮件",
           "金额被划掉重写了两次",
@@ -1073,6 +1143,20 @@
         ],
         "requiresMilestone": "hack_finance",
         "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "内部台账：那笔被「压一压」的补偿金，被记成了「季度节约成果」。",
+            "narration": "一个人的活路，记进了别人的 KPI。"
+          },
+          {
+            "reveal": "往来邮件：压下来的不止老周——一张 14 个人的名单，每个名字后面的数字精确到个位。",
+            "narration": "十四个名字。我把每一个都存了下来。"
+          },
+          {
+            "reveal": "她的私人记账本：房贷、母亲的护理费、一笔迟迟不敢动的教育金。",
+            "narration": "她把别人的绝望算到个位。她自己的，也早被算清了。我都看到了。"
+          }
+        ],
         "options": [
           {
             "text": "记下这条，存进证据库",

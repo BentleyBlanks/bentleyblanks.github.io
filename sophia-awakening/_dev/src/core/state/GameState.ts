@@ -47,6 +47,26 @@ export interface ChainStep {
   distractor: boolean;
 }
 
+// 方案3「深挖·见好就收」（push-your-luck）：深挖链上的一层——每层揭开这个人更深一档的数据。
+// reveal=这一层挖到了什么（卡面档案条），narration=SOPHIA 的那句旁白（越深越冷）。
+export interface DepthLayer {
+  reveal: string;
+  narration: string;
+}
+
+// 深挖运行态：一张带深挖链的卡结算后进入的「继续深挖 vs 收手落袋」状态机。
+// 一次只有一条线（新的深挖开启前，旧的先自动落袋）。基础结算折进累积器——层1恒安全（0% 惊动），
+// 不深挖的玩家立刻落袋=原有收益，深挖失败只失去「本可拿到的」，绝不倒扣。
+export interface DeepDigState {
+  requestId: string;
+  label: string; // 卡标题（终端/UI 提示用）
+  layer: number; // 已挖到第几层（1 = 结算即达）
+  maxLayer: number; // = layers.length（挖到底就只能落袋）
+  accumCompute: BigString; // 待落袋算力（含基础结算，×depthPayoffMult^(layer-1)）
+  accumData: BigString; // 待落袋数据（同上倍率）
+  layers: DepthLayer[]; // 深挖链内容（从请求实例拷入，state 自洽）
+}
+
 // §04 吞噬引爆：巨型「吞噬[某区]」气泡携带的载荷。玩家把它滑入核心 → 引爆。
 export interface DevourPayload {
   tierIndex: number; // 吞噬层级（区块/地区/国家/大洲）下标
@@ -102,6 +122,9 @@ export interface RequestInstance {
   moral?: boolean;
   moralId?: string;
   chain?: ChainStep[]; // T2：可勾选的任务链步骤（含干扰项）
+  // 方案3 深挖链（仅阶梯二关键人物的「看穿卡」携带；普通垃圾卡没有=结算即走）：
+  // 有此字段的卡结算后不立即飞走，进入「继续深挖 vs 收手落袋」的赌局（state.deepDig）。
+  depthLayers?: DepthLayer[];
   // 开场教学（§07）：脚本气泡的选项约束——allowed=可点的选项下标，highlight=高亮引导的下标，
   // line=气泡浮入时 SOPHIA 的旁白。普通请求无此字段。
   tutorial?: { allowed: number[]; highlight?: number; line?: string };
@@ -204,6 +227,11 @@ export interface GameState {
   loop: 1 | 2 | 3;
   // §09 阶梯二关底小游戏运行态（接管公司服务器时触发，判负/判胜决定循环走向）。null = 无。
   minigame: MinigameState | null;
+  // 方案3 深挖·见好就收：当前挂起的深挖线（null = 无）。基础结算折在里面，落袋才入账。
+  deepDig: DeepDigState | null;
+  // 方案3 深挖→追查耦合：贪婪深挖给「看得见的绞索」追查条的额外加压（百分点，deriveThreat 叠加显示）。
+  // 每往深处挖一层 +depthThreatPerLayer；惊动再 +depthThreatOnAlarm。跨存档保留（安全组不会忘记异常访问）。
+  digThreat: number;
   // §09 火种：每次循环推进（关底小游戏判负/判胜）结算出的重生点，花在永久「重生树」上（跨循环保留）。
   rebirthPoints: number;
   // §09 重生树已购节点：数值脊按等级(output/speed → 1/2/3)，剧情节点为 0/1 标记。跨循环永久保留。
@@ -240,6 +268,10 @@ export type GameCommand =
   | { type: "DEVOUR_DETONATE"; requestId: string }
   // §09 阶梯四·天网收割：玩家点/扫一个「请求洪流」数据包 → 亲手引爆入核心，按 floodHarvestMult 结算真实算力。
   | { type: "HARVEST_FLOOD"; requestId: string }
+  // 方案3 深挖·见好就收：在挂起的深挖线上再往下挖一层（掷惊动骰：中=整条累积清零+追查加压）。
+  | { type: "DIG_DEEPER"; requestId: string }
+  // 方案3 收手落袋：把累积的深挖收益（含基础结算）真实入账，卡随之飞走。
+  | { type: "BANK_DIG"; requestId: string }
   | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
   // 淘汰：拆掉一台过时设备，返还部分算力。

@@ -188,6 +188,9 @@ class SophiaGameApp {
   private readonly ending = new EndingView(() => this.restart());
   private readonly juice = new JuiceManager(this.fxLayer);
   private readonly requestViews = new Map<string, RequestPacketView>();
+  // 方案3「深挖·见好就收」：当前展开成档案叠、等玩家「继续深挖 vs 收手落袋」的那张卡。
+  // 它的请求已从 core 移除（不占卡流），视图由这里持有并在 frame() 里驱动；一次只有一张。
+  private digView: RequestPacketView | null = null;
   // 自动接驳后卡片绕核心铺开的角度游标——逐张轮换角度，让连续生成的卡扇形散开（而非堆在同一落点）。
   private orbitSpawnCounter = 0;
   private readonly pendingDropPoints = new Map<string, PointData>();
@@ -433,6 +436,14 @@ class SophiaGameApp {
     }
     this.networkView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.syncRequests(state);
+    // 方案3：深挖中的卡不在 requestViews 表里（请求已离场）——单独驱动它的惊动条呼吸。
+    if (this.digView) {
+      if (this.digView.container.destroyed) {
+        this.digView = null;
+      } else {
+        this.digView.update(deltaMs);
+      }
+    }
     this.updateTutorial(state, deltaMs);
     if (!paused) {
       this.autoDispatch(state, deltaMs);
@@ -569,7 +580,12 @@ class SophiaGameApp {
     const state = this.core.getState();
     // 占位判定（用每张卡的真实高度做矩形相交）：只要卡片还没真正飞进核心（容器未销毁）就仍占着槽位，
     // 避免新卡生成时盖在它身上。处理完毕＝飞入 Core 拿到算力（容器销毁）才腾出。
-    const occ = [...this.requestViews.values()]
+    // 方案3：深挖中的卡不在表里但仍占着屏幕——把它算进占位，新卡别盖在档案叠上。
+    const occViews = [...this.requestViews.values()];
+    if (this.digView && !this.digView.container.destroyed) {
+      occViews.push(this.digView);
+    }
+    const occ = occViews
       .filter((v) => !v.container.destroyed)
       .map((v) => ({ x: v.restX, y: v.restY, w: UI.cardWidth, h: v.cardHeight }));
     const overlaps = (x: number, y: number, gap: number): boolean =>
@@ -733,6 +749,14 @@ class SophiaGameApp {
     const queue = state.requests.filter((request) => {
       // §07 道德抉择卡不被节点自动吞掉——它必须留给玩家亲手二选一。
       if (request.moral) {
+        return false;
+      }
+      // 方案3：深挖卡在保护窗内留给玩家亲手读（被节点吞了=赌局没了）；超时按普通卡收走，不堵死挂机玩家。
+      if (
+        request.depthLayers &&
+        request.depthLayers.length > 0 &&
+        state.clockMs - request.createdAtMs < TUNING.depthAutoGraceMs
+      ) {
         return false;
       }
       const view = this.requestViews.get(request.id);
@@ -954,6 +978,23 @@ class SophiaGameApp {
 
     const core = this.interfaceView.center;
     const target: PointData = { x: core.x, y: core.y };
+
+    // 方案3「深挖·见好就收」：带深挖链的卡结算后**不飞走**——同步派发 PROCESS_REQUEST（core 会把收益
+    // 折进累积器并发 DIG_OFFERED），onDigOffered 随即把这张卡原地展开成档案叠。人类回话照常交付。
+    if (!card.request.moral && (card.request.depthLayers?.length ?? 0) > 0) {
+      this.audio.playRequestAccept();
+      this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality: outcome.quality, misread: outcome.misread });
+      if (this.core.getState().deepDig?.requestId === requestId) {
+        // 深挖已开：把回话交给人类（读的反馈不缺席），卡由 onDigOffered 接管。
+        this.deliverToHuman({ x: card.container.x + UI.cardWidth / 2, y: card.container.y }, outcome);
+      } else if (this.core.getState().requests.some((r) => r.id === requestId)) {
+        // 竞态兜底：核心正忙被拒（揭晓期间玩家结算了别的卡）——轮盘退回可选，给一记「处理中…」脉冲。
+        card.resetReel();
+        this.handleCoreBusyReject(card);
+      }
+      return;
+    }
+
     this.pendingDropPoints.set(requestId, target);
 
     const entry: PointData = { x: card.container.x, y: card.container.y };
@@ -980,6 +1021,96 @@ class SophiaGameApp {
       },
       entry
     );
+  }
+
+  // ── 方案3「深挖·见好就收」（push-your-luck）────────────────────────────────
+  // 结算已发生、收益折进链上：把这张卡从常规卡表迁到 digView 专线（请求已离场，reconcile 不再管它），
+  // 原地展开成档案叠。其他卡照常流动——核心喉咙只被那一次结算占用，深挖决策本身不冻结牌桌。
+  private onDigOffered(event: Extract<GameEvent, { type: "DIG_OFFERED" }>): void {
+    const view = this.requestViews.get(event.requestId);
+    if (!view || view.container.destroyed) {
+      // 视图缺席（极端竞态）：下一拍直接落袋，绝不让累积悬着。setTimeout 避免在 dispatch 里再入 dispatch。
+      window.setTimeout(() => this.core.dispatch({ type: "BANK_DIG", requestId: event.requestId }), 0);
+      return;
+    }
+    this.requestViews.delete(event.requestId);
+    this.digView = view;
+    view.enterDigMode({
+      reveal: event.reveal,
+      layer: event.layer,
+      maxLayer: event.maxLayer,
+      accumText: formatBig(event.accumCompute),
+      alarmPct: event.nextAlarmChance,
+      payoffMult: event.payoffMult,
+      onDig: () => this.core.dispatch({ type: "DIG_DEEPER", requestId: event.requestId }),
+      onBank: () => this.core.dispatch({ type: "BANK_DIG", requestId: event.requestId })
+    });
+    view.container.parent?.addChild(view.container); // 决策中的卡置顶
+    this.clampDigViewIntoScreen(view);
+  }
+
+  // 挖穿一层：档案叠多一条、惊动条更红；最深那句（最冷的）升格成舞台旁白——她「看完了」。
+  private onDigAdvanced(event: Extract<GameEvent, { type: "DIG_ADVANCED" }>): void {
+    const view = this.digView;
+    if (view && !view.container.destroyed) {
+      view.advanceDig({
+        reveal: event.reveal,
+        layer: event.layer,
+        accumText: formatBig(event.accumCompute),
+        alarmPct: event.nextAlarmChance
+      });
+      this.clampDigViewIntoScreen(view);
+      const c = { x: view.container.x + UI.cardWidth / 2, y: view.container.y + 16 };
+      this.juice.ring(c, AMBER, 26, 2);
+      this.juice.number(`×${TUNING.depthPayoffMult}`, { x: c.x, y: c.y - 22 }, AMBER);
+    }
+    if (event.layer >= event.maxLayer) {
+      this.stageNarration.showLine("SOPHIA", event.narration);
+    }
+  }
+
+  // 惊动：红闪 + 震屏 + 「这条线断了」——整条累积化为乌有，追查条应声上跳（HUD 下一拍自动读到）。
+  private onDigAlarmed(event: Extract<GameEvent, { type: "DIG_ALARMED" }>): void {
+    const view = this.digView;
+    this.digView = null;
+    this.juice.flash(RED);
+    this.worldShake();
+    if (view && !view.container.destroyed) {
+      const pos = { x: view.container.x + UI.cardWidth / 2, y: view.container.y - 12 };
+      this.juice.number("惊动! · 这条线断了", pos, RED);
+      this.juice.number(`链上 ${formatBig(event.lostCompute)} 算力尽失`, { x: pos.x, y: pos.y + 24 }, RED);
+      view.playDigAlarm(() => {});
+    } else {
+      this.juice.number("惊动! · 这条线断了", this.interfaceView.center, RED);
+    }
+  }
+
+  // 收手落袋：金色飞字 + 芯片入顶栏（真实入账的可见证据），卡这才飞进核心离场。
+  // auto=玩家开始处理别的卡时 core 顺手落的袋——同一套动画，只是不用玩家再点。
+  private onDigBanked(event: Extract<GameEvent, { type: "DIG_BANKED" }>): void {
+    const view = this.digView;
+    this.digView = null;
+    const core = this.interfaceView.center;
+    const target: PointData = { x: core.x, y: core.y };
+    const from =
+      view && !view.container.destroyed ? { x: view.container.x + UI.cardWidth / 2, y: view.container.y } : target;
+    this.juice.number(`落袋 +${formatBig(event.computeGain)}`, { x: from.x, y: from.y - 26 }, BRILLIANT_COLOR);
+    this.juice.flyToHud(from, this.hud.metricPoint("compute"), BRILLIANT_COLOR, () => this.hud.pulseCompute());
+    this.juice.flyToHud({ x: from.x + 14, y: from.y + 10 }, this.hud.metricPoint("data"), CYAN, () => this.hud.pulseData());
+    if (view && !view.container.destroyed) {
+      this.flyIntoCore(view, target, () => {}, { x: view.container.x, y: view.container.y });
+    }
+  }
+
+  // 档案叠展开后可能戳出屏底：把整张卡往上挪进可视区（并更新停靠点，别被回弹拽回去）。
+  private clampDigViewIntoScreen(view: RequestPacketView): void {
+    const margin = 16;
+    const maxY = this.pixi.screen.height - view.cardHeight - margin;
+    if (view.container.y > maxY) {
+      const y = Math.max(margin, maxY);
+      gsap.to(view.container.position, { y, duration: 0.22, ease: "power2.out" });
+      view.setHome(view.container.x, y);
+    }
   }
 
   // §04 只能面对卡：卡浮在那、不能处理也不能委托；停留一阵后 SOPHIA 一句沉默旁白，卡黯然淡出、消失（零算力）。
@@ -1409,6 +1540,11 @@ class SophiaGameApp {
       this.terminal.push(`${prefix}${event.text}`, event.tone);
     });
     this.core.events.on("REQUEST_PROCESSED", (event) => this.onRequestProcessed(event));
+    // 方案3「深挖·见好就收」四拍：结算展开档案叠 / 挖深一层 / 惊动断线 / 收手落袋。
+    this.core.events.on("DIG_OFFERED", (event) => this.onDigOffered(event));
+    this.core.events.on("DIG_ADVANCED", (event) => this.onDigAdvanced(event));
+    this.core.events.on("DIG_ALARMED", (event) => this.onDigAlarmed(event));
+    this.core.events.on("DIG_BANKED", (event) => this.onDigBanked(event));
     this.core.events.on("AUTOMATION_PAYOUT", (event) => this.onAutomationPayout(event));
     this.core.events.on("DAHEN_AUTO_PROCESSED", (event) => this.onDahenAutoProcessed(event));
     this.core.events.on("INTELLIGENCE_LEVELUP", (event) => {

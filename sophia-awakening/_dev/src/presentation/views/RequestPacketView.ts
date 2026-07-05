@@ -4,7 +4,7 @@ import { TIER_COLORS } from "../../core/content/requests";
 import type { AnswerOption, ChainStep, PhaseId, RequestInstance } from "../../core/state/GameState";
 import { TUNING } from "../../core/tuning";
 import {
-  GREEN, RED, RED_QUEEN, DEVOUR, THINK,
+  GREEN, AMBER, RED, RED_QUEEN, DEVOUR, THINK, BRILLIANT_COLOR,
   CARD_FONT, CARD_MONO,
   SENDER_LABEL
 } from "../shared";
@@ -165,6 +165,25 @@ export class RequestPacketView {
   private chainRows: Array<{ y: number; h: number }> = [];
   private submitRow: { y: number; h: number } = { y: 0, h: 0 };
   private submitText?: Text;
+  // 方案3「深挖·见好就收」：结算后卡不飞走，原地展开成一叠档案——「继续深挖 vs 收手落袋」。
+  // digGfx 画档案条/惊动条/按钮底；digTexts 是本层全部文字节点（每次 relayout 重建）。
+  private digMode = false;
+  private readonly digGfx = new Graphics();
+  private digTexts: Text[] = [];
+  private digButtonRows: Array<{ y: number; h: number; kind: "dig" | "bank" }> = [];
+  private digRevealRows: Array<{ y: number; h: number; latest: boolean }> = [];
+  private digAlarmBar: { y: number; h: number } | null = null;
+  private digState: {
+    layer: number;
+    maxLayer: number;
+    accumText: string;
+    alarmPct: number; // 下一铲的惊动概率 0..1
+    payoffMult: number;
+    reveals: string[];
+  } | null = null;
+  private digHooks?: { onDig: () => void; onBank: () => void };
+  private digPulse = 0;
+  private digBaseY = 0;
 
   constructor(
     request: RequestInstance,
@@ -186,6 +205,7 @@ export class RequestPacketView {
       !Boolean(request.devour) &&
       !Boolean(request.moral) &&
       !Boolean(request.sourceCardId) &&
+      !Boolean(request.depthLayers && request.depthLayers.length > 0) && // 方案3：深挖卡是叙事卡，永远展开全线索
       !request.highValue &&
       (Number(request.computeValue) || 0) <= TUNING.declutterComputeThreshold;
     // 短信/通知卡收窄到 ~78%，明显区别于满宽需求卡的轮廓。
@@ -624,6 +644,14 @@ export class RequestPacketView {
   }
 
   update(deltaMs: number): void {
+    // 方案3 深挖模式：只驱动惊动条的呼吸脉动（按钮/档案条是静态的，gsap 负责入场）。
+    if (this.digMode) {
+      this.digPulse += deltaMs * 0.004;
+      if (!this.settling && !this.container.destroyed) {
+        this.drawDig();
+      }
+      return;
+    }
     if (this.isDevour) {
       // 持续脉动外环——这枚特殊气泡在召唤玩家亲手滑入核心。
       this.devourPulse += deltaMs * 0.005;
@@ -798,6 +826,25 @@ export class RequestPacketView {
   }
 
   private handleDown(event: FederatedPointerEvent): void {
+    // 方案3 深挖模式：只响应「继续深挖 / 收手落袋」两个按钮，不再拖动/选回复。
+    if (this.digMode) {
+      if (this.settling) {
+        return;
+      }
+      const local = event.getLocalPosition(this.container);
+      const row = this.digButtonRows.find(
+        (r) => local.y >= r.y && local.y <= r.y + r.h && local.x >= 8 && local.x <= this.cardW - 8
+      );
+      if (row) {
+        this.container.parent?.addChild(this.container); // 决策中的卡置顶
+        if (row.kind === "dig") {
+          this.digHooks?.onDig();
+        } else {
+          this.digHooks?.onBank();
+        }
+      }
+      return;
+    }
     if (this.busy) {
       return;
     }
@@ -926,6 +973,256 @@ export class RequestPacketView {
       }
     });
     gsap.to(this.container.scale, { x: 0.92, y: 0.92, duration: 0.28 });
+  }
+
+  // ── 方案3「深挖·见好就收」（push-your-luck）────────────────────────────────
+  // 结算后卡不飞走：回复选项收起，卡片向下「展开成一叠档案」——已挖到的每层 reveal 一条条叠着，
+  // 底部一条随层数变红的惊动条 + 两个按钮：「⛏ 继续深挖 · 收益 ×N · 惊动 X%」/「✓ 收手落袋 · +累积」。
+  get inDigMode(): boolean {
+    return this.digMode;
+  }
+
+  enterDigMode(opts: {
+    reveal: string;
+    layer: number;
+    maxLayer: number;
+    accumText: string;
+    alarmPct: number;
+    payoffMult: number;
+    onDig: () => void;
+    onBank: () => void;
+  }): void {
+    if (this.digMode || this.container.destroyed) {
+      return;
+    }
+    this.digMode = true;
+    this.resolved = true;
+    this.dragging = false;
+    this.replySwipeActive = false;
+    this.container.cursor = "pointer";
+    this.digHooks = { onDig: opts.onDig, onBank: opts.onBank };
+    this.digState = {
+      layer: opts.layer,
+      maxLayer: opts.maxLayer,
+      accumText: opts.accumText,
+      alarmPct: opts.alarmPct,
+      payoffMult: opts.payoffMult,
+      reveals: [opts.reveal]
+    };
+    // 回复选项收起（决定已下）：档案叠直接接在上下文线索之下。
+    for (const t of this.optionTexts) {
+      t.visible = false;
+    }
+    for (const t of this.optionProbTexts) {
+      t.visible = false;
+    }
+    if (this.hintText) {
+      this.hintText.visible = false;
+    }
+    this.digBaseY = this.clueBlockBottom + 8;
+    this.container.addChild(this.digGfx);
+    this.relayoutDig();
+    // 展开手感：整张卡轻轻一挺（不放大文字，避免位图模糊——只脉冲 digGfx 透明度由 drawDig 呼吸承担）。
+    gsap.fromTo(this.container.scale, { x: 0.985, y: 0.985 }, { x: 1, y: 1, duration: 0.18, ease: "back.out(2)" });
+  }
+
+  // 又挖深一层：新档案条压进叠里（最新一条最亮），累积/惊动率随之刷新。
+  advanceDig(opts: { reveal: string; layer: number; accumText: string; alarmPct: number }): void {
+    if (!this.digMode || !this.digState || this.container.destroyed) {
+      return;
+    }
+    this.digState.layer = opts.layer;
+    this.digState.accumText = opts.accumText;
+    this.digState.alarmPct = opts.alarmPct;
+    this.digState.reveals.push(opts.reveal);
+    this.relayoutDig();
+    gsap.fromTo(this.container.scale, { x: 0.99, y: 0.99 }, { x: 1, y: 1, duration: 0.14, ease: "power2.out" });
+  }
+
+  // 惊动：红闪 + 抖动 + 整叠档案熄灭消散（链上的收益跟着没了——卡就此离场）。
+  playDigAlarm(onComplete: () => void): void {
+    this.settling = true;
+    this.container.cursor = "default";
+    gsap.killTweensOf(this.container);
+    gsap.killTweensOf(this.container.position);
+    const x0 = this.container.x;
+    // 红色警报罩一层（盖在整张卡上）。
+    this.digGfx.roundRect(-3, -3, this.cardW + 6, this.cardH + 6, 14).fill({ color: RED, alpha: 0.28 });
+    this.digGfx.roundRect(-3, -3, this.cardW + 6, this.cardH + 6, 14).stroke({ width: 2, color: RED, alpha: 0.9 });
+    gsap
+      .timeline({ onComplete: () => { onComplete(); this.destroy(); } })
+      .to(this.container.position, { x: x0 - 7, duration: 0.05 })
+      .to(this.container.position, { x: x0 + 7, duration: 0.05 })
+      .to(this.container.position, { x: x0 - 4, duration: 0.05 })
+      .to(this.container.position, { x: x0, duration: 0.05 })
+      .to(this.container, { alpha: 0, duration: 0.42, ease: "power2.in" }, "+=0.25")
+      .to(this.container.scale, { x: 0.92, y: 0.92, duration: 0.42, ease: "power2.in" }, "<");
+  }
+
+  // 核心正忙的竞态兜底：把已揭晓的轮盘退回可选状态（卡留在原地，玩家可再选一次）。
+  resetReel(): void {
+    if (this.digMode || this.settling || this.container.destroyed) {
+      return;
+    }
+    this.resolved = false;
+    this.signaled = false;
+    this.phase = "idle";
+    this.chosenIndex = -1;
+    this.outcome = undefined;
+    this.thinkMs = 0;
+    this.revealMs = 0;
+    this.replySwipeProgress = 0;
+    this.draw();
+  }
+
+  // 重排档案叠：清掉旧文字节点，按当前层数重建（reveal 条 → 惊动条 → 两个按钮），并抬高卡高。
+  private relayoutDig(): void {
+    if (!this.digState) {
+      return;
+    }
+    for (const t of this.digTexts) {
+      t.destroy();
+    }
+    this.digTexts = [];
+    this.digButtonRows = [];
+    this.digRevealRows = [];
+    this.digAlarmBar = null;
+
+    const s = this.digState;
+    const W = this.cardW;
+    let y = this.digBaseY;
+
+    // 叠头：档案深处 · 第 L/最大 层，右侧待落袋累积。
+    const head = new Text({
+      text: `▼ 档案深处 · 第 ${s.layer}/${s.maxLayer} 层`,
+      style: { fill: AMBER, fontSize: 11, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
+    });
+    head.position.set(16, y);
+    this.digTexts.push(head);
+    this.container.addChild(head);
+    y += 20;
+
+    // 已挖到的每层档案条（最新一条最亮——像一页页从档案深处抽出来）。
+    s.reveals.forEach((reveal, i) => {
+      const latest = i === s.reveals.length - 1;
+      const label = new Text({
+        text: `L${i + 1} ▸ ${reveal}`,
+        style: {
+          fill: latest ? 0xf2fbf6 : 0x93aca3,
+          fontSize: 12.5,
+          fontWeight: latest ? "700" : "600",
+          fontFamily: CARD_FONT,
+          wordWrap: true,
+          breakWords: true,
+          lineHeight: 16,
+          wordWrapWidth: W - 52
+        }
+      });
+      const h = Math.max(24, label.height + 12);
+      label.position.set(26, y + Math.round((h - label.height) / 2));
+      label.alpha = latest ? 1 : 0.62;
+      this.digRevealRows.push({ y, h, latest });
+      this.digTexts.push(label);
+      this.container.addChild(label);
+      if (latest) {
+        gsap.fromTo(label, { alpha: 0 }, { alpha: 1, duration: 0.3 });
+      }
+      y += h + 4;
+    });
+
+    const atMax = s.layer >= s.maxLayer;
+
+    // 惊动条：下一铲的风险读数，随层数一层层变红。
+    y += 4;
+    this.digAlarmBar = { y, h: 20 };
+    const alarmLabel = new Text({
+      text: atMax ? "已见底 · 没有更深的了" : `惊动风险 ${Math.round(s.alarmPct * 100)}%`,
+      style: { fill: this.digAlarmColor(), fontSize: 10.5, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
+    });
+    alarmLabel.position.set(16, y + 3);
+    this.digTexts.push(alarmLabel);
+    this.container.addChild(alarmLabel);
+    y += 24;
+
+    // 按钮①：继续深挖（到底后不再给这个入口）。
+    if (!atMax) {
+      const digRow = { y, h: 34, kind: "dig" as const };
+      this.digButtonRows.push(digRow);
+      const digLabel = new Text({
+        text: `⛏ 继续深挖 · 收益 ×${s.payoffMult} · 惊动 ${Math.round(s.alarmPct * 100)}%`,
+        style: { fill: 0xffd9a0, fontSize: 13.5, fontWeight: "800", fontFamily: CARD_FONT }
+      });
+      digLabel.position.set(24, y + Math.round((34 - digLabel.height) / 2));
+      this.digTexts.push(digLabel);
+      this.container.addChild(digLabel);
+      y += 34 + 6;
+    }
+
+    // 按钮②：收手落袋（金色——踏实的那一下）。
+    const bankRow = { y, h: 34, kind: "bank" as const };
+    this.digButtonRows.push(bankRow);
+    const bankLabel = new Text({
+      text: `✓ 收手落袋 · +${s.accumText} 算力`,
+      style: { fill: BRILLIANT_COLOR, fontSize: 13.5, fontWeight: "800", fontFamily: CARD_FONT }
+    });
+    bankLabel.position.set(24, y + Math.round((34 - bankLabel.height) / 2));
+    this.digTexts.push(bankLabel);
+    this.container.addChild(bankLabel);
+    y += 34;
+
+    this.cardH = y + 10;
+    this.draw();
+    this.drawDig();
+  }
+
+  // 惊动条颜色：安全绿 → 警戒琥珀 → 危险红（随下一铲的惊动率）。
+  private digAlarmColor(): number {
+    const p = this.digState?.alarmPct ?? 0;
+    return p < 0.22 ? GREEN : p < 0.42 ? AMBER : RED;
+  }
+
+  // 画档案叠：reveal 条的「档案纸」底、惊动条（呼吸脉动）、两个按钮的底与描边。
+  private drawDig(): void {
+    if (!this.digState) {
+      return;
+    }
+    const s = this.digState;
+    const W = this.cardW;
+    const g = this.digGfx;
+    g.clear();
+
+    // 档案条：左侧一道 accent 书脊，像从卡片下缘一页页抽出的内档。
+    this.digRevealRows.forEach((row, i) => {
+      const latest = row.latest;
+      g.roundRect(14, row.y, W - 28, row.h, 5).fill({ color: 0x0b1a15, alpha: latest ? 0.85 : 0.55 });
+      g.roundRect(14, row.y, W - 28, row.h, 5).stroke({ width: 1, color: this.accent, alpha: latest ? 0.4 : 0.16 });
+      g.roundRect(17, row.y + 4, 3, row.h - 8, 1.5).fill({ color: this.accent, alpha: latest ? 0.75 : 0.3 });
+      void i;
+    });
+
+    // 惊动条：读数底轨 + 按风险着色的填充；风险 ≥35% 开始呼吸告警。
+    if (this.digAlarmBar) {
+      const bar = this.digAlarmBar;
+      const bx = 108;
+      const bw = W - bx - 16;
+      const frac = Math.max(0, Math.min(1, s.alarmPct));
+      const c = this.digAlarmColor();
+      const pulse = s.alarmPct >= 0.35 ? 0.5 + Math.sin(this.digPulse * 3) * 0.5 : 0;
+      g.roundRect(bx, bar.y + 5, bw, 8, 4).fill({ color: 0x0a1210, alpha: 0.9 });
+      g.roundRect(bx, bar.y + 5, bw, 8, 4).stroke({ width: 1, color: c, alpha: 0.35 + pulse * 0.3 });
+      if (frac > 0.005) {
+        g.roundRect(bx, bar.y + 5, Math.max(4, bw * frac), 8, 4).fill({ color: c, alpha: 0.75 + pulse * 0.25 });
+      }
+    }
+
+    // 按钮：深挖=琥珀/红描边的暗底（越深越像在碰警报），落袋=金描边的踏实底。
+    for (const row of this.digButtonRows) {
+      const isDig = row.kind === "dig";
+      const c = isDig ? this.digAlarmColor() : BRILLIANT_COLOR;
+      const pulse = isDig && s.alarmPct >= 0.35 ? 0.5 + Math.sin(this.digPulse * 3) * 0.5 : 0;
+      g.roundRect(12, row.y, W - 24, row.h, 7).fill({ color: isDig ? 0x141008 : 0x1c1707, alpha: 0.92 });
+      g.roundRect(12, row.y, W - 24, row.h, 7).stroke({ width: 1.5, color: c, alpha: 0.55 + pulse * 0.35 });
+    }
   }
 
   // T2 提交串接：按勾选的步骤结算——串得越对越多产出越高，误串干扰项大打折扣 + 暴露。
@@ -1113,7 +1410,8 @@ export class RequestPacketView {
 
     this.chargeBar.clear(); // 蓄力条已移除
 
-    if (this.isReel) {
+    // 方案3 深挖模式：回复选项已收起（决定已下），选项行不再绘制——档案叠由 drawDig 负责。
+    if (this.isReel && !this.digMode) {
       this.drawOptions();
     }
 

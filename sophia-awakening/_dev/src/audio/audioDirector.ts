@@ -199,6 +199,11 @@ export class AudioDirector {
       }
       this.playThrottled("data_gain", 220, this.pack === "external" ? 0.14 : 0.34);
     });
+    // 方案3「深挖·见好就收」：展开=确认脆响；挖深=数据声；惊动=报错；落袋=结算成功（复用既有 SFX，无新资产）。
+    events.on("DIG_OFFERED", () => this.play("ui_confirm", 0.46));
+    events.on("DIG_ADVANCED", () => this.play("data_gain", 0.5));
+    events.on("DIG_ALARMED", () => this.play("request_error", 0.62));
+    events.on("DIG_BANKED", () => this.play("request_success", 0.6));
     events.on("AUTOMATION_PAYOUT", () =>
       this.playThrottled("automation_payout", 650, this.pack === "external" ? 0.14 : 0.26)
     );

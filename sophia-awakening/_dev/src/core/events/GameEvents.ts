@@ -24,6 +24,36 @@ export type GameEvent =
   | { type: "FLOOD_HARVESTED"; requestId: string; computeGain: string; dataGain: string; combo: number }
   // §04/§09 大恨老师·自动接管：买下 dahen_auto 后，搬进公司机器的大恨老师吃掉一张排队卡（产出打折）。
   | { type: "DAHEN_AUTO_PROCESSED"; requestId: string; computeGain: string; dataGain: string }
+  // 方案3「深挖·见好就收」（push-your-luck）——张力四拍：
+  // - DIG_OFFERED  带深挖链的卡亲手结算 → 基础收益折进累积器、卡原地展开成档案叠（层1恒安全）。
+  //   reveal/narration=层1的内容；nextAlarmChance=挖向层2的惊动概率（0..1）。
+  | {
+      type: "DIG_OFFERED";
+      requestId: string;
+      label: string;
+      layer: number;
+      maxLayer: number;
+      accumCompute: string;
+      reveal: string;
+      narration: string;
+      nextAlarmChance: number;
+      payoffMult: number;
+    }
+  // - DIG_ADVANCED 又挖深一层：累积 ×depthPayoffMult、揭开这一层的 reveal/narration（越深越冷）。
+  | {
+      type: "DIG_ADVANCED";
+      requestId: string;
+      layer: number;
+      maxLayer: number;
+      accumCompute: string;
+      reveal: string;
+      narration: string;
+      nextAlarmChance: number;
+    }
+  // - DIG_ALARMED  惊动：整条累积清零（失去的是「本可拿到的」，不倒扣）+ 追查条加压 threatAdded 个百分点。
+  | { type: "DIG_ALARMED"; requestId: string; layer: number; lostCompute: string; threatAdded: number }
+  // - DIG_BANKED   收手落袋：累积收益真实入账。auto=玩家开始处理别的卡时替 TA 顺手落的袋。
+  | { type: "DIG_BANKED"; requestId: string; layer: number; computeGain: string; dataGain: string; auto: boolean }
   | { type: "INTELLIGENCE_LEVELUP"; level: number; newSkills: string[] }
   | { type: "SKILL_PURCHASED"; skillId: string; name: string; level: number; maxLevel: number; milestone?: MilestoneKind }
   // 技能货架「认知模块线」断点（处理力/吞吐/协同 每 4-5 级的具名节点）：买到该级时解锁一个机制 +

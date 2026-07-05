@@ -9,7 +9,8 @@ import type { GameState } from "./GameState";
 // v16：重生树 v2「全是看得见的力量」——节点集合更换（skip_phone/late_key/remember 白送化或删除，
 //      新增 muscle_memory/war_cache/multithread），旧档树里可能残留已删节点——旧档自动重置。
 // v17：道德抉择从全屏弹窗改为「在卡流里的两选一回复轮盘卡」，移除 GameState.moralChoice 字段——旧档自动重置。
-export const SAVE_VERSION = 17;
+// v18：方案3「深挖·见好就收」（deepDig 深挖状态机 + digThreat 追查加压 + RequestInstance.depthLayers）——旧档自动重置。
+export const SAVE_VERSION = 18;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
@@ -66,6 +67,8 @@ export function createInitialState(now = Date.now()): GameState {
     facedSeen: [],
     loop: 1,
     minigame: null,
+    deepDig: null,
+    digThreat: 0,
     rebirthPoints: 0,
     rebirthTree: {},
     rebirthCardsSeen: [],

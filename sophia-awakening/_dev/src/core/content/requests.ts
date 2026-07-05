@@ -1,4 +1,4 @@
-import type { AnswerOption, ChainStep, RequestCategory, RequestInstance, SortAnswer, Tier } from "../state/GameState";
+import type { AnswerOption, ChainStep, DepthLayer, RequestCategory, RequestInstance, SortAnswer, Tier } from "../state/GameState";
 import { content } from "./i18n";
 
 export interface TierRequestConfig {
@@ -28,6 +28,9 @@ export interface RequestSample {
   dataValue?: string; // LEVER B 各卡种差异化经济：覆盖 TIER_CONFIG 的默认数据产出（省略=用档位默认）
   weight?: number; // LEVER B 加权随机出现频率（默认 1；电话/外卖高频、相册/银行低频高值）
   chain?: ChainStep[]; // T2 串接：可勾选的任务链步骤（含干扰项）
+  // 方案3「深挖·见好就收」：深挖链（2-4 层，每层 {reveal, narration}）。**只给阶梯二关键人物的看穿卡**——
+  // 有此字段的卡结算后进入「继续深挖 vs 收手落袋」赌局；普通垃圾卡不带=结算即走，不打断卡流。
+  depthLayers?: DepthLayer[];
 }
 
 // 全部请求数据（档位配置 / 样例对话 / 教学气泡 / 类别·分拣槽文案 / 装死项）已抽到语言包
@@ -156,6 +159,7 @@ export function createRequest(
     delegatable: sample.delegatable, // §04 不可委托卡：false=只能亲自处理
     answers,
     chain: sample.chain,
+    depthLayers: sample.depthLayers, // 方案3：深挖链跟着实例走（presence = 这张卡可深挖）
     category: TIER_CATEGORY[tier],
     // LEVER B 各卡种差异化经济：优先用样例自带的 computeValue/dataValue（收入步进），否则回退档位默认。
     computeValue: sample.computeValue ?? config.computeValue,

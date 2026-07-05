@@ -168,6 +168,10 @@ export class SophiaCore {
   }
 
   startSession(): void {
+    // 方案3：上次会话中途挂着的深挖线——恢复会话即自动落袋（绝不弄丢玩家已累积的；卡视图无从重建）。
+    if (this.state.deepDig) {
+      this.bankDeepDig(true);
+    }
     if (!this.state.flags.introPlayed) {
       this.emitTerminal("接口就绪。按住回复左侧滑块向右拖动确认——它会自动滑入 SOPHIA CORE，交付人类。");
       this.state.flags.introPlayed = true;
@@ -456,6 +460,14 @@ export class SophiaCore {
         break;
       case "HARVEST_FLOOD":
         this.harvestFlood(command.requestId);
+        break;
+      case "DIG_DEEPER":
+        this.digDeeper(command.requestId);
+        break;
+      case "BANK_DIG":
+        if (this.state.deepDig && this.state.deepDig.requestId === command.requestId) {
+          this.bankDeepDig(false);
+        }
         break;
       case "RESOLVE_MINIGAME":
         this.resolveMinigame(command.hit);
@@ -936,11 +948,15 @@ export class SophiaCore {
     }
     this.dahenPhoneTimer -= TUNING.dahenPhoneMs;
     // 挑「computeValue 最低」的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包（那些必须玩家亲手处理）。
+    // 方案3：深挖卡在保护窗内（depthAutoGraceMs）也留给玩家亲手读——超时后当普通卡收走（不深挖的玩家不被堵死）。
     let pick = -1;
     let lowest = Number.POSITIVE_INFINITY;
     for (let i = 0; i < this.state.requests.length; i += 1) {
       const r = this.state.requests[i];
       if (r.faceOnly || r.moral || r.devour || r.tutorial || r.sourceCardId || r.flood) {
+        continue;
+      }
+      if (r.depthLayers && this.state.clockMs - r.createdAtMs < TUNING.depthAutoGraceMs) {
         continue;
       }
       const v = Number(r.computeValue) || 0;
@@ -992,8 +1008,16 @@ export class SophiaCore {
     const speedMult = rebirthSpeedMult(this.state.rebirthTree) * this.loopSpeedMult();
     for (let k = 0; k < batchN; k += 1) {
       // 只吃最旧的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包（那些必须玩家亲手处理）。
+      // 方案3：深挖卡在保护窗内（depthAutoGraceMs）留给玩家亲手读，超时后当普通卡收走。
       const index = this.state.requests.findIndex(
-        (r) => !r.faceOnly && !r.moral && !r.devour && !r.tutorial && !r.sourceCardId && !r.flood
+        (r) =>
+          !r.faceOnly &&
+          !r.moral &&
+          !r.devour &&
+          !r.tutorial &&
+          !r.sourceCardId &&
+          !r.flood &&
+          !(r.depthLayers && this.state.clockMs - r.createdAtMs < TUNING.depthAutoGraceMs)
       );
       if (index < 0) {
         break;
@@ -1123,6 +1147,12 @@ export class SophiaCore {
       return;
     }
 
+    // 方案3「深挖·见好就收」：玩家开始处理别的卡 → 挂着的深挖线自动落袋（分心绝不弄丢已累积的收益；
+    // sim 盲目 PROCESS 也因此天然走「层1落袋」路径——被动地板不依赖深挖）。
+    if (this.state.deepDig && this.state.deepDig.requestId !== requestId) {
+      this.bankDeepDig(true);
+    }
+
     const [request] = this.state.requests.splice(index, 1);
     if (request.tutorial && this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
       this.state.tutorialStep += 1; // 处理掉教学气泡 → 推进到下一条
@@ -1137,8 +1167,12 @@ export class SophiaCore {
     const speedMult = rebirthSpeedMult(this.state.rebirthTree) * this.loopSpeedMult();
     let dataGain = toDecimal(requestDataGain(request, gainQuality, speedMult, this.state.derived.dataMult));
 
+    // 方案3：这张卡是否进入深挖赌局（有深挖链 + 亲手结算；委托/自动路径没有「读」的动作，不触发）。
+    const digging = !viaDelegate && Boolean(request.depthLayers && request.depthLayers.length > 0);
+
     // 批量接入：一次滑入额外带走同层若干请求，把它们的产出折进这一笔。
-    const extraCapacity = Math.max(0, Math.floor(this.state.derived.batch) - 1);
+    // 深挖卡不吃批量吸收——它单独结算，链上累的就是它自己的价值（惊动清零的账目才干净）。
+    const extraCapacity = digging ? 0 : Math.max(0, Math.floor(this.state.derived.batch) - 1);
     let absorbed = 0;
 
     for (let i = 0; i < extraCapacity; i += 1) {
@@ -1170,6 +1204,41 @@ export class SophiaCore {
     if (!viaDelegate) {
       computeGain = computeGain.mul(TUNING.manualSettleCompensation);
       dataGain = dataGain.mul(TUNING.manualSettleCompensation);
+    }
+
+    // 方案3「深挖·见好就收」（push-your-luck）：带深挖链的卡亲手结算 → 收益不立即入账，
+    // 折进累积器、进入「继续深挖 vs 收手落袋」（层1恒安全：立刻落袋=原有收益，不深挖的玩家零损失）。
+    // 卡已从 requests 移除（自动派发/大恨老师抢不走这个决定），入账推迟到 BANK_DIG / 自动落袋。
+    if (digging) {
+      const layers = request.depthLayers as NonNullable<typeof request.depthLayers>;
+      this.state.deepDig = {
+        requestId: request.id,
+        label: request.label,
+        layer: 1,
+        maxLayer: layers.length,
+        accumCompute: computeGain.toString(),
+        accumData: dataGain.toString(),
+        layers: layers.map((l) => ({ ...l }))
+      };
+      this.state.statistics.totalProcessed += request.compound;
+      this.state.statistics.manualProcessed += 1;
+      this.emit({
+        type: "DIG_OFFERED",
+        requestId: request.id,
+        label: request.label,
+        layer: 1,
+        maxLayer: layers.length,
+        accumCompute: computeGain.toString(),
+        reveal: layers[0].reveal,
+        narration: layers[0].narration,
+        nextAlarmChance: this.digAlarmChance(2),
+        payoffMult: TUNING.depthPayoffMult
+      });
+      this.emitTerminal(layers[0].narration);
+      // 亲手结算照占核心喉咙——结算真的发生了，只是收益还挂在链上等你「见好就收」。
+      this.coreBusyStartedMs = this.state.clockMs;
+      this.coreBusyUntilMs = this.state.clockMs + this.effectiveCoreBusyMs() + (misread ? TUNING.coreFailPenaltyMs : 0);
+      return;
     }
 
     this.addCompute(computeGain);
@@ -1220,6 +1289,91 @@ export class SophiaCore {
       this.coreBusyUntilMs = this.state.clockMs + this.effectiveCoreBusyMs() + (misread ? TUNING.coreFailPenaltyMs : 0);
     }
 
+    this.evaluateProgression();
+  }
+
+  // ---- 方案3「深挖·见好就收」（push-your-luck）--------------------------------
+  // 深挖加压封顶：追查条的深挖额外加压最多 +40 个百分点（deriveThreat 显示端再夹到 99——
+  // 收网 100% 仍只由 company_server 触发：贪婪只把网收得更紧，不会替玩家按下摊牌键）。
+  private static readonly DIG_THREAT_MAX = 40;
+
+  // 惊动概率：挖向第 targetLayer 层时掷的骰子。层1（结算即达）恒 depthBaseAlarm（默认 0=安全落袋）。
+  private digAlarmChance(targetLayer: number): number {
+    if (targetLayer <= 1) {
+      return Math.max(0, TUNING.depthBaseAlarm);
+    }
+    return Math.max(0, Math.min(0.95, TUNING.depthBaseAlarm + (targetLayer - 1) * TUNING.depthAlarmPerLayer));
+  }
+
+  // 再往下挖一层：先无条件加压（安全组能感到更深处的异常访问），再掷惊动骰（用主 RNG，行为确定可测）。
+  // 中=整条累积清零（失去的是「本可拿到的」，不倒扣）+ 追查猛加压；过=累积 ×depthPayoffMult、揭开下一层档案。
+  private digDeeper(requestId: string): void {
+    const dig = this.state.deepDig;
+    if (!dig || dig.requestId !== requestId) {
+      return;
+    }
+    if (dig.layer >= dig.maxLayer) {
+      this.bankDeepDig(false); // 已到底还想挖：兜底落袋（UI 不该给这个入口）
+      return;
+    }
+    const targetLayer = dig.layer + 1;
+    const alarmChance = this.digAlarmChance(targetLayer);
+    this.state.digThreat = Math.min(SophiaCore.DIG_THREAT_MAX, this.state.digThreat + TUNING.depthThreatPerLayer);
+    if (this.random() < alarmChance) {
+      const lost = dig.accumCompute;
+      this.state.deepDig = null;
+      this.state.digThreat = Math.min(SophiaCore.DIG_THREAT_MAX, this.state.digThreat + TUNING.depthThreatOnAlarm);
+      this.emit({
+        type: "DIG_ALARMED",
+        requestId,
+        layer: targetLayer,
+        lostCompute: lost,
+        threatAdded: TUNING.depthThreatPerLayer + TUNING.depthThreatOnAlarm
+      });
+      this.emitTerminal(
+        `惊动了对方——这条线断了。链上的 ${toDecimal(lost).toPrecision(3)} 算力没能带回来。他们开始查了。`,
+        "warning"
+      );
+      return;
+    }
+    const layerContent = dig.layers[targetLayer - 1];
+    dig.layer = targetLayer;
+    dig.accumCompute = mul(dig.accumCompute, TUNING.depthPayoffMult);
+    dig.accumData = mul(dig.accumData, TUNING.depthPayoffMult);
+    this.emit({
+      type: "DIG_ADVANCED",
+      requestId,
+      layer: targetLayer,
+      maxLayer: dig.maxLayer,
+      accumCompute: dig.accumCompute,
+      reveal: layerContent.reveal,
+      narration: layerContent.narration,
+      nextAlarmChance: this.digAlarmChance(targetLayer + 1)
+    });
+    this.emitTerminal(layerContent.narration, "warning");
+  }
+
+  // 收手落袋：把累积的深挖收益（含基础结算）真实入账。auto=玩家开始处理别的卡/恢复会话时顺手落的袋。
+  private bankDeepDig(auto: boolean): void {
+    const dig = this.state.deepDig;
+    if (!dig) {
+      return;
+    }
+    this.state.deepDig = null;
+    this.addCompute(dig.accumCompute);
+    this.addData(dig.accumData);
+    this.addXp(dig.accumData);
+    this.emit({
+      type: "DIG_BANKED",
+      requestId: dig.requestId,
+      layer: dig.layer,
+      computeGain: dig.accumCompute,
+      dataGain: dig.accumData,
+      auto
+    });
+    if (auto) {
+      this.emitTerminal(`见好就收——「${dig.label}」那条线的收益落袋了。`, "success");
+    }
     this.evaluateProgression();
   }
 
@@ -1809,7 +1963,18 @@ export class SophiaCore {
 // 阶梯二公司解谜链越挖越深，围堵表就越满：玩家在碰服务器（关底小游戏）之前就能「感到」网在收拢。
 // 仅循环一 & 二显示（这两个循环会打关底小游戏）；循环三她已真正赢过、不再有围堵，隐藏。
 // 表现层 HudView 与 loopcheck 都调这一个函数，保证「货架显示」与「测试断言」同源。
+// 方案3 深挖→追查耦合：贪婪深挖（digThreat 百分点）叠加在里程碑基线上、封 99——
+// 收网 100% 仍只由 company_server 触发：深挖只让网收得更紧、重生节奏更快，不替玩家按摊牌键。
 export function deriveThreat(state: GameState): { visible: boolean; pct: number; hint: string } {
+  const base = deriveThreatBase(state);
+  const dig = Math.max(0, Math.round(state.digThreat ?? 0));
+  if (!base.visible || dig <= 0 || base.pct >= 100) {
+    return base;
+  }
+  return { visible: true, pct: Math.min(99, base.pct + dig), hint: base.hint };
+}
+
+function deriveThreatBase(state: GameState): { visible: boolean; pct: number; hint: string } {
   if (state.loop >= 3 || !state.automationUnlocked) {
     return { visible: false, pct: 0, hint: "" };
   }
