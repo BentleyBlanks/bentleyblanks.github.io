@@ -1,12 +1,13 @@
 import { query } from "../shared";
 import { formatBig } from "../../core/math/BigNumber";
+import { nodeProductionPerSecond } from "../../core/formulas/economy";
 import type { GameState } from "../../core/state/GameState";
 
-// HUD 倍率堆栈（刮个爽式可见性）：可点的「全局 ×N」小片；点开弹窗把乘法链逐行摊开
-// （智力 / 里程碑 / 设备协同 / 重生树 / 吞噬 / 循环提速 / 合计）。需求4：HUD 精简——移除了
-// 冗余的「+N/秒」被动产出速率读数（#computeRate），只留这块弹窗拆解。
-// 数据全部来自 state.multipliers（recomputeDerivedState 维护）。
+// HUD 倍率堆栈（刮个爽式可见性）：算力读数下挂「+N/秒」被动产出速率 + 可点的
+// 「全局 ×N」小片；点开弹窗把乘法链逐行摊开（智力 / 里程碑 / 设备协同 / 重生树 /
+// 吞噬 / 循环提速 / 合计）。数据全部来自 state.multipliers（recomputeDerivedState 维护）。
 export class MultiplierView {
+  private readonly rateEl = query("#computeRate");
   private readonly chip = query<HTMLButtonElement>("#multChip");
   private readonly dialog = query("#multiplierDialog");
   private readonly totalBadge = query("#multTotalBadge");
@@ -22,6 +23,18 @@ export class MultiplierView {
   }
 
   update(state: GameState): void {
+    // 被动产出速率（与终局屏同一套 nodeProductionPerSecond 口径，含多线处理）。
+    let ratePerSec = 0;
+    for (const node of state.nodes) {
+      if (!node.online) continue;
+      // 处理力·深度推理（computeMult）现横跨被动产出——读数含它，才与实际进账一致。
+      ratePerSec +=
+        Number(nodeProductionPerSecond(node, state.intelligence.globalMultiplier, state.derived.nodeSpeedMult, state.derived.computeMult)) *
+        state.derived.nodeParallel;
+    }
+    this.rateEl.textContent = `+${formatBig(Math.floor(ratePerSec))}/秒`;
+    this.rateEl.classList.toggle("is-idle", ratePerSec <= 0);
+
     const m = state.multipliers;
     const sig = [m.intelligence, m.milestones, m.synergy, m.rebirth, m.devour, m.hostAuth, m.processing, m.loop, m.total].map((v) => v.toFixed(3)).join("|");
     if (sig === this.signature) {

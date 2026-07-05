@@ -1949,10 +1949,17 @@ button:disabled {
 .compute-sub {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
   margin-top: 6px;
 }
+.compute-rate {
+  font-size: 12px;
+  font-weight: 700;
+  color: #79e0a8;
+  white-space: nowrap;
+}
+.compute-rate.is-idle { color: #6f7f78; }
 .mult-chip {
   flex: 0 0 auto;
   padding: 3px 9px;
