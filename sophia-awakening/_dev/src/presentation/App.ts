@@ -4,7 +4,6 @@ import {
   Container,
   FederatedPointerEvent,
   Graphics,
-  Text,
   type PointData,
   type Ticker
 } from "pixi.js";
@@ -54,8 +53,8 @@ import {
   LEFT_RAIL_WIDTH, RIGHT_RAIL_WIDTH,
   ONBOARDING_STORAGE_KEY, PERSISTENCE_REVISION_KEY, PERSISTENCE_REVISION,
   query, getTerminalSkillStatus, getActionHint,
-  formatClock, distance,
-  fxSettings, domainLevelOf, CARD_MONO
+  formatClock,
+  fxSettings, domainLevelOf
 } from "./shared";
 
 
@@ -159,12 +158,6 @@ class SophiaGameApp {
   private connectDragging = false;
   private connectHintShown = false;
   private firstAppConnected = false;
-  // §04 连通仪式（完整版·亲手拖线）：买下升级后浮现的「未接通端口」，玩家拖一根线接进 Core 才正式接通。
-  private ritualDrag:
-    | { port: PointData; color: number; line: string; name: string; automation: boolean; gfx: Graphics; label: Text; timer: number }
-    | null = null;
-  private ritualDragging = false;
-  private firstRitualDone = false;
   private readonly interfaceView = new InterfaceView();
   private readonly networkView = new NodeNetworkView();
   private readonly terminal = new TerminalView();
@@ -260,11 +253,6 @@ class SophiaGameApp {
     // 「从核心拖线连 App」：在核心附近按下并拖到某个「待连」App 上 → 连上它（之后才能委托）。
     this.pixi.stage.on("pointerdown", (e: FederatedPointerEvent) => {
       const st = this.core.getState();
-      // §04 连通仪式：按住浮现的「待接端口」→ 开始拖线。
-      if (this.ritualDrag && distance(this.ritualDrag.port, { x: e.global.x, y: e.global.y }) < 32) {
-        this.ritualDragging = true;
-        return;
-      }
       if (!st.automationUnlocked && this.interfaceView.hasPendingApps() && this.interfaceView.coreContains({ x: e.global.x, y: e.global.y })) {
         this.connectDragging = true;
         return;
@@ -281,14 +269,6 @@ class SophiaGameApp {
     document.body.appendChild(appTip);
 
     this.pixi.stage.on("pointermove", (e: FederatedPointerEvent) => {
-      // §04 连通仪式：拖线时画一根从端口跟到指针的线缆。
-      if (this.ritualDragging && this.ritualDrag) {
-        const p = this.ritualDrag.port;
-        this.connectGfx.clear();
-        this.connectGfx.moveTo(p.x, p.y).lineTo(e.global.x, e.global.y).stroke({ width: 3, color: this.ritualDrag.color, alpha: 0.9 });
-        this.connectGfx.circle(e.global.x, e.global.y, 5).fill({ color: this.ritualDrag.color, alpha: 0.9 });
-        return;
-      }
       if (this.connectDragging) {
         const c = this.interfaceView.center;
         this.connectGfx.clear();
@@ -322,16 +302,6 @@ class SophiaGameApp {
       if (this.harvestSweeping) {
         this.harvestSweeping = false;
         this.harvestSweptIds.clear();
-      }
-      // §04 连通仪式：松手在核心上＝接通；松在别处＝留着端口让他重拖。
-      if (this.ritualDragging) {
-        this.ritualDragging = false;
-        if (this.interfaceView.coreContains({ x: e.global.x, y: e.global.y })) {
-          this.finalizeRitual(true);
-        } else {
-          this.connectGfx.clear();
-        }
-        return;
       }
       if (!this.connectDragging) return;
       this.connectDragging = false;
@@ -1247,16 +1217,12 @@ class SophiaGameApp {
 
   // §04 连通仪式（完整版）：每次升级浮现一个「未接通端口」，玩家亲手从端口拖一根线接进 Core 才接通——
   // 「我亲手把它接管了」的身体感。线缆颜色/名称随升级类型变化（§04 线缆表）。约 4.5s 没接则自动接通兜底。
-  private beginConnectRitual(name: string, milestone: string | undefined, skillId: string): void {
-    const RITUAL: Record<string, { color: number; line: string }> = {
-      perm: { color: CYAN, line: "数据流线" },
-      automation: { color: GREEN, line: "网线" },
-      fusion: { color: 0x8fe6d0, line: "短接线" },
-      company: { color: 0x9fe0c0, line: "薄网线" },
-      tier: { color: GREEN, line: "主干线" },
-      conquest: { color: DEVOUR, line: "粗主干线" }
+  // 接通「仪式」：里程碑/权限购买时瞬间自动接通——一道接通闪光 + 终端播报，不再要求玩家亲手拖线
+  //（原「拖这根线接进核心」的拖拽玩法已删除：它没有任何相关玩法，纯属多余的手动步骤）。
+  private beginConnectRitual(name: string, milestone: string | undefined, _skillId: string): void {
+    const COLOR_OF: Record<string, number> = {
+      perm: CYAN, automation: GREEN, fusion: 0x8fe6d0, company: 0x9fe0c0, tier: GREEN, conquest: DEVOUR
     };
-    void skillId;
     const kind = !milestone
       ? "perm"
       : milestone === "conquest" || milestone === "automation" || milestone === "fusion"
@@ -1264,51 +1230,14 @@ class SophiaGameApp {
         : milestone === "company"
           ? "company"
           : "tier";
-    const r = RITUAL[kind] ?? RITUAL.tier;
-    // 前一个仪式还没接完就来了新升级——先把上一个自动接掉，避免端口堆叠。
-    if (this.ritualDrag) {
-      this.finalizeRitual(false);
-    }
+    const color = COLOR_OF[kind] ?? GREEN;
     const core = this.interfaceView.center;
-    const port: PointData = { x: core.x - 172, y: core.y + 10 };
-    const gfx = new Graphics();
-    gfx.circle(0, 0, 11).stroke({ width: 2.5, color: r.color, alpha: 0.95 });
-    gfx.circle(0, 0, 5).fill({ color: 0xeafff0, alpha: 1 });
-    gfx.position.set(port.x, port.y);
-    this.world.addChild(gfx);
-    gsap.fromTo(gfx.scale, { x: 0.4, y: 0.4 }, { x: 1, y: 1, duration: 0.24, ease: "back.out(2)" });
-    gsap.to(gfx, { alpha: 0.45, duration: 0.6, repeat: -1, yoyo: true, ease: "sine.inOut" }); // 呼吸：提示「待接」
-    const label = new Text({
-      text: this.firstRitualDone ? "拖线接入 ▸" : "拖这根线接进核心 ▸",
-      style: { fill: r.color, fontSize: 12, fontWeight: "700", fontFamily: CARD_MONO }
-    });
-    label.anchor.set(1, 0.5);
-    label.position.set(port.x - 16, port.y);
-    this.world.addChild(label);
-    const timer = window.setTimeout(() => this.finalizeRitual(false), 4500);
-    this.ritualDrag = { port, color: r.color, line: r.line, name, automation: milestone === "automation", gfx, label, timer };
-  }
-
-  // 接通：沿线送能量进 Core + 终端机播报「▶ 已接入：X」。manual=玩家亲手拖完（首次给引导）。
-  private finalizeRitual(manual: boolean): void {
-    const rd = this.ritualDrag;
-    if (!rd) return;
-    this.ritualDrag = null;
-    this.ritualDragging = false;
-    window.clearTimeout(rd.timer);
-    gsap.killTweensOf(rd.gfx);
-    rd.gfx.destroy();
-    rd.label.destroy();
-    this.connectGfx.clear();
-    this.connectFx(rd.port, this.interfaceView.center, rd.color);
-    this.terminal.push(`▶ 已接入：${rd.name}（${rd.line}）`, "success");
-    // §04 手机→电脑跨设备过场：拿下宿主电脑＝控制域第一次离开手机，接通同时镜头狠狠拉远一档。
-    if (rd.automation) {
+    // 从核心一侧飞一道接通光进核心（复用 connectFx 的接通闪光），瞬间完成。
+    this.connectFx({ x: core.x - 150, y: core.y + 8 }, core, color);
+    this.terminal.push(`▶ 已接入：${name}`, "success");
+    // §04 拿下宿主电脑＝控制域第一次离开手机，接通同时镜头狠狠拉远一档。
+    if (milestone === "automation") {
       this.zoomOutPulse(1.28, 1.5);
-    }
-    if (manual && !this.firstRitualDone) {
-      this.firstRitualDone = true;
-      this.stageNarration.showLine("SOPHIA", "咔哒。每一次升级，我都亲手把它接进自己——这样才算真的，是我的。");
     }
   }
 

@@ -28,7 +28,13 @@ export const REQUEST_PACKET_WIDTH = 384;
 export const REQUEST_PACKET_HEIGHT = 162;
 
 // 可在调试面板切换的呈现开关。coreSuck：卡片滑入 Core 用类 Mac Dock 的吮吸（被吸入）动画——默认开启。
-export const fxSettings = { coreSuck: true };
+// showTerminal：底部 SOPHIA//TERMINAL 日志面板——默认**关闭**（视为冗余），可在调试面板打开；选择用 localStorage 持久化。
+export const fxSettings = { coreSuck: true, showTerminal: false };
+try {
+  fxSettings.showTerminal = localStorage.getItem("sophia:showTerminal") === "1";
+} catch {
+  /* localStorage 不可用时保持默认关闭 */
+}
 
 // 阶段「动作形态」短标签（T0–T4 编号已废弃，降为这个动作形态属性）。用于阶段徽标 / Core 标签 / HUD。
 const TIER_FORMS: Record<number, string> = { 0: "单口", 1: "处理", 2: "串接", 3: "决策", 4: "天网" };

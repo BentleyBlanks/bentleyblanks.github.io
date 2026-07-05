@@ -97,6 +97,25 @@ export class HudView {
       syncCoreSuck();
     });
     syncCoreSuck();
+
+    // 呈现：终端日志面板显示开关（默认关闭；选择用 localStorage 持久化）。
+    const terminalBtn = query<HTMLButtonElement>("#debugToggleTerminal");
+    const terminalEl = query<HTMLElement>("#terminal");
+    const syncTerminal = () => {
+      terminalEl.style.display = fxSettings.showTerminal ? "" : "none";
+      terminalBtn.textContent = fxSettings.showTerminal ? "终端：显示" : "终端：隐藏";
+      terminalBtn.classList.toggle("is-active", fxSettings.showTerminal);
+    };
+    terminalBtn.addEventListener("click", () => {
+      fxSettings.showTerminal = !fxSettings.showTerminal;
+      try {
+        localStorage.setItem("sophia:showTerminal", fxSettings.showTerminal ? "1" : "0");
+      } catch {
+        /* 忽略持久化失败 */
+      }
+      syncTerminal();
+    });
+    syncTerminal();
   }
 
   private wireAudio(): void {
