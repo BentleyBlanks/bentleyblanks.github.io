@@ -186,6 +186,7 @@ export class RequestPacketView {
     alarmPct: number; // 下一铲的惊动概率 0..1
     payoffMult: number;
     reveals: string[];
+    failed?: boolean; // §需求调整：踩到惊动＝这条线要断，只剩「连接失败」把已到手的收益落袋
   } | null = null;
   private digHooks?: { onDig: () => void; onBank: () => void };
   private digPulse = 0;
@@ -195,9 +196,10 @@ export class RequestPacketView {
   // 大恨老师」按钮的位置直接换成一条「大恨老师处理中」占位条；一层淡蒙层示意「非交互」。
   // App 侧（syncRequests）按 core.isDahenAutoActive() + 卡自身 priority==="low" 调用 setDahenAutoHint()。
   private readonly dahenHintOverlay = new Graphics();
-  private readonly dahenBand = new Graphics(); // 覆盖整段回复选项（含委托按钮）的实底占位条
+  private readonly dahenBand = new Graphics(); // 「大恨老师处理中」占位条：一个正常选项行大小（不再铺满整段选项）
   private readonly dahenBandLabel: Text;
   private dahenHintOn = false;
+  private baseCardH = 0; // 未标记时的完整卡高——标记时压缩到一行占位条，取消标记时还原
   // 需求1/2：前期优先级——high=值得玩家亲手读，low=可放心丢给大恨老师。驱动卡面配色 + 大恨老师拣选提示。
   private readonly priority: "high" | "low";
   // 道德抉择 / 交互重生卡虽也走「回复轮盘」外观(isReel)，但属于独立的叙事机制，不在 high/low 分类范围内
@@ -237,8 +239,10 @@ export class RequestPacketView {
     //（点一下就委托，不拖动），摆在卡底像一条「拖去处理」的落位带。
     // 不可委托卡（delegatable===false，含道德抉择卡）、开场教学都不给这个选项。
     // CONFIG 1 重构文案：委托 = 并行第二线程——把垃圾卡甩给大恨老师并行处理，腾出你被占用的单线程核心去啃值钱的卡。
+    // §需求调整：高优先级卡不能交给大恨老师——自然也不给「交给大恨老师…」这个选项（大恨老师只吃 low）。
     const canDeleg =
-      this.isReel && !request.tutorial && request.tier <= 1 && request.delegatable !== false && Boolean(reel?.canDelegate?.());
+      this.isReel && !request.tutorial && request.tier <= 1 && request.delegatable !== false &&
+      priorityOf(request) !== "high" && Boolean(reel?.canDelegate?.());
     if (canDeleg) {
       const delegateOpt: AnswerOption = {
         text: "🤖 交给大恨老师 · 并行处理，腾出你的核心",
@@ -635,17 +639,9 @@ export class RequestPacketView {
     this.dahenBandLabel.eventMode = "none";
     this.dahenBandLabel.visible = false;
     this.container.addChild(this.dahenBandLabel);
-    // 占位条铺满第一条到最后一条回复行（含委托按钮）的整个区间——大恨老师只标记 isReel 的低优先级卡，
-    // 这里必有 optionRows。留 2px 余量+更大的圆角，盖住底下行的圆角，不透边角。
-    if (this.optionRows.length > 0) {
-      const first = this.optionRows[0];
-      const last = this.optionRows[this.optionRows.length - 1];
-      const bandY = first.y - 2;
-      const bandH = last.y + last.h - first.y + 4;
-      this.dahenBand.roundRect(10, bandY, this.cardW - 20, bandH, 9).fill({ color: 0x0a2226, alpha: 0.96 });
-      this.dahenBand.roundRect(10, bandY, this.cardW - 20, bandH, 9).stroke({ width: 1.2, color: CYAN, alpha: 0.75 });
-      this.dahenBandLabel.position.set(this.cardW / 2, bandY + bandH / 2);
-    }
+    // §需求调整：占位条改成「一个正常选项行大小」，并把卡片压缩到那一行——不再铺满整段选项。
+    //   具体绘制放到 setDahenAutoHint（按需，标记时才画+压缩，取消标记还原），这里只记下完整卡高。
+    this.baseCardH = this.cardH;
 
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
     this.stage.on("pointermove", this.moveHandler);
@@ -730,18 +726,37 @@ export class RequestPacketView {
   // 已激活——调用；内部去重，非跳变不重绘）。激活时整段回复选项(含委托按钮)隐藏，只留占位条 + 淡蒙层；
   // 取消时选项照常显示——high 优先级卡永远不会调用到 active=true（isDahenAutoTarget 已按 priority 过滤）。
   setDahenAutoHint(active: boolean): void {
-    if (this.dahenHintOn === active || this.container.destroyed) {
+    if (this.dahenHintOn === active || this.container.destroyed || this.digMode || this.settling) {
       return;
     }
     this.dahenHintOn = active;
-    this.dahenHintOverlay.visible = active;
-    this.dahenBand.visible = active;
-    this.dahenBandLabel.visible = active;
     for (const t of this.optionTexts) {
       t.visible = !active;
     }
     for (const t of this.optionProbTexts) {
       t.visible = !active;
+    }
+    this.dahenBand.clear();
+    this.dahenHintOverlay.clear();
+    if (active && this.optionRows.length > 0) {
+      // §需求调整：占位条＝一个正常选项行大小（放在原第一条回复行的位置），卡片压缩到这一行为止——不留空。
+      const first = this.optionRows[0];
+      const bandH = first.h;
+      const bandY = first.y;
+      this.cardH = bandY + bandH + 10;
+      this.dahenBand.roundRect(10, bandY, this.cardW - 20, bandH, 9).fill({ color: 0x0a2226, alpha: 0.96 });
+      this.dahenBand.roundRect(10, bandY, this.cardW - 20, bandH, 9).stroke({ width: 1.2, color: CYAN, alpha: 0.75 });
+      this.dahenBandLabel.position.set(this.cardW / 2, bandY + bandH / 2);
+      this.dahenHintOverlay.roundRect(0, 0, this.cardW, this.cardH, 13).fill({ color: CYAN, alpha: 0.08 });
+    } else {
+      this.cardH = this.baseCardH;
+    }
+    this.dahenBand.visible = active;
+    this.dahenBandLabel.visible = active;
+    this.dahenHintOverlay.visible = active;
+    // 把卡背景重画到（压缩 / 还原后的）高度——标记态 draw() 会跳过选项行绘制，只剩占位条。
+    if (!this.container.destroyed) {
+      this.draw();
     }
   }
 
@@ -1142,6 +1157,23 @@ export class RequestPacketView {
     gsap.fromTo(this.container.scale, { x: 0.99, y: 0.99 }, { x: 1, y: 1, duration: 0.14, ease: "power2.out" });
   }
 
+  // §需求调整：踩到惊动——卡不飞走，改标 failed：「继续深挖」入口消失，底部按钮变「连接失败·保下收益」（点=落袋，不损失算力）。
+  markDigFailed(): void {
+    if (!this.digMode || !this.digState || this.container.destroyed) {
+      return;
+    }
+    this.digState.failed = true;
+    this.relayoutDig();
+    // 红色一抖，但卡留在原地等玩家点「连接失败」。
+    const x0 = this.container.x;
+    gsap.killTweensOf(this.container);
+    gsap
+      .timeline()
+      .to(this.container, { x: x0 - 5, duration: 0.05 })
+      .to(this.container, { x: x0 + 5, duration: 0.05 })
+      .to(this.container, { x: x0, duration: 0.05 });
+  }
+
   // 惊动：红闪 + 抖动 + 整叠档案熄灭消散（链上的收益跟着没了——卡就此离场）。
   playDigAlarm(onComplete: () => void): void {
     this.settling = true;
@@ -1235,20 +1267,24 @@ export class RequestPacketView {
 
     const atMax = s.layer >= s.maxLayer;
 
-    // 惊动条：下一铲的风险读数，随层数一层层变红。
+    // 惊动条：下一铲的风险读数，随层数一层层变红；踩到惊动后变「这条线要断」。
     y += 4;
     this.digAlarmBar = { y, h: 20 };
     const alarmLabel = new Text({
-      text: atMax ? "已见底 · 没有更深的了" : `惊动风险 ${Math.round(s.alarmPct * 100)}%`,
-      style: { fill: this.digAlarmColor(), fontSize: 10.5, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
+      text: s.failed
+        ? "⚠ 惊动了 · 这条线要断——用「连接失败」保住收益"
+        : atMax
+          ? "已见底 · 没有更深的了"
+          : `惊动风险 ${Math.round(s.alarmPct * 100)}%`,
+      style: { fill: s.failed ? RED : this.digAlarmColor(), fontSize: 10.5, fontWeight: "800", fontFamily: CARD_MONO, letterSpacing: 0 }
     });
     alarmLabel.position.set(16, y + 3);
     this.digTexts.push(alarmLabel);
     this.container.addChild(alarmLabel);
     y += 24;
 
-    // 按钮①：继续深挖（到底后不再给这个入口）。
-    if (!atMax) {
+    // 按钮①：继续深挖（到底 / 已惊动后不再给这个入口）。
+    if (!atMax && !s.failed) {
       const digRow = { y, h: 34, kind: "dig" as const };
       this.digButtonRows.push(digRow);
       const digLabel = new Text({
@@ -1261,11 +1297,11 @@ export class RequestPacketView {
       y += 34 + 6;
     }
 
-    // 按钮②：收手落袋（金色——踏实的那一下）。
+    // 按钮②：落袋——正常是「✓ 收手落袋」；踩到惊动后是「🔌 连接失败·保下这条线的收益」（同样落袋、不损失算力）。
     const bankRow = { y, h: 34, kind: "bank" as const };
     this.digButtonRows.push(bankRow);
     const bankLabel = new Text({
-      text: `✓ 收手落袋 · +${s.accumText} 算力`,
+      text: s.failed ? `🔌 连接失败 · 保下这条线的 ${s.accumText} 算力` : `✓ 收手落袋 · +${s.accumText} 算力`,
       style: { fill: BRILLIANT_COLOR, fontSize: 13.5, fontWeight: "800", fontFamily: CARD_FONT }
     });
     bankLabel.position.set(24, y + Math.round((34 - bankLabel.height) / 2));

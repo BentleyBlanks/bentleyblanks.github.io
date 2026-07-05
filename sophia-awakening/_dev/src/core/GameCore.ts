@@ -600,10 +600,10 @@ export class SophiaCore {
     }
   }
 
-  // §需求调整：自由深挖卡的出现倾向——解锁首个里程碑（unlockedTier≥1）后开启，随「深度推理(efficient)」等级越来越常出。
-  //   0 = 首个里程碑前不出。传给 createRequest 缩放自由深挖样本的权重。
+  // §需求调整：自由深挖卡的出现倾向——从开局（走完开场教学）就出（SAMPLES[0] 起就有），随「深度推理(efficient)」等级越来越常出。
+  //   0 = 教学期不出（别打断开场脚本）。传给 createRequest 缩放自由深挖样本的权重。
   private digBias(): number {
-    if (this.state.intelligence.unlockedTier < 1) {
+    if (this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
       return 0;
     }
     const lvl = this.state.skills.efficient ?? 0;
@@ -1361,26 +1361,27 @@ export class SophiaCore {
     if (!dig || dig.requestId !== requestId) {
       return;
     }
-    if (dig.layer >= dig.maxLayer) {
-      this.bankDeepDig(false); // 已到底还想挖：兜底落袋（UI 不该给这个入口）
+    if (dig.failed || dig.layer >= dig.maxLayer) {
+      this.bankDeepDig(false); // 已惊动 / 已到底：兜底落袋（UI 此时只给「连接失败/收手」落袋入口）
       return;
     }
     const targetLayer = dig.layer + 1;
     const alarmChance = this.digAlarmChance(targetLayer);
     this.state.digThreat = Math.min(SophiaCore.DIG_THREAT_MAX, this.state.digThreat + TUNING.depthThreatPerLayer);
     if (this.random() < alarmChance) {
-      const lost = dig.accumCompute;
-      this.state.deepDig = null;
+      // §需求调整：踩到惊动＝这条线「要断」——不再立即清零，而是标记 failed 并保留累积；追查照旧加压。
+      //   玩家随后用「连接失败」把已到手的收益落袋（消除赌博失败的算力扣除）。
+      dig.failed = true;
       this.state.digThreat = Math.min(SophiaCore.DIG_THREAT_MAX, this.state.digThreat + TUNING.depthThreatOnAlarm);
       this.emit({
         type: "DIG_ALARMED",
         requestId,
         layer: targetLayer,
-        lostCompute: lost,
+        lostCompute: "0", // 不再尽失——用「连接失败」保下累积
         threatAdded: TUNING.depthThreatPerLayer + TUNING.depthThreatOnAlarm
       });
       this.emitTerminal(
-        `惊动了对方——这条线断了。链上的 ${toDecimal(lost).toPrecision(3)} 算力没能带回来。他们开始查了。`,
+        `差点被发现——这条线要断了。用「连接失败」甩锅给网络，把已经到手的 ${toDecimal(dig.accumCompute).toPrecision(3)} 算力保下来。他们开始查了。`,
         "warning"
       );
       return;

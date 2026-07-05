@@ -65,6 +65,9 @@ export interface DeepDigState {
   accumCompute: BigString; // 待落袋算力（含基础结算，×depthPayoffMult^(layer-1)）
   accumData: BigString; // 待落袋数据（同上倍率）
   layers: DepthLayer[]; // 深挖链内容（从请求实例拷入，state 自洽）
+  // §需求调整：往下挖踩到惊动＝这条线「要断」，但不立即清零——置 failed，玩家用「连接失败」把已到手的收益保下来
+  //（消除赌博失败的算力扣除；追查加压照旧）。failed 后不能再往下挖，只能落袋。
+  failed?: boolean;
 }
 
 // §04 吞噬引爆：巨型「吞噬[某区]」气泡携带的载荷。玩家把它滑入核心 → 引爆。

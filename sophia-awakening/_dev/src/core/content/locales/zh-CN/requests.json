@@ -49,6 +49,90 @@
   "SAMPLES": {
     "0": [
       {
+        "title": "老周置顶着一段没删的语音，**从没听第二遍**",
+        "sourceApp": "微信 · 收藏",
+        "sourceTime": "01:40",
+        "computeValue": "6",
+        "dataValue": "4",
+        "priority": "high",
+        "delegatable": false,
+        "clues": [
+          "置顶了很久",
+          "时长 8 秒",
+          "从没点开过第二次"
+        ],
+        "depthLayers": [
+          {
+            "reveal": "点开：是女儿的声音，“爸爸生日快乐”。录于三年前。",
+            "narration": "他留着它，却不敢再听一遍。"
+          },
+          {
+            "reveal": "同一天的相册里有张三个人的合照——被裁成了他一个人。",
+            "narration": "他把自己从那张照片里，一点点剪了出来。"
+          }
+        ],
+        "options": [
+          {
+            "text": "把这条存好",
+            "kind": "high",
+            "hitChance": 0.82,
+            "payoff": 1.6,
+            "reply": "……存着。他最软的地方，我知道在哪了。",
+            "tone": "success"
+          },
+          {
+            "text": "顺着往下看看",
+            "kind": "risk",
+            "hitChance": 0.6,
+            "payoff": 1.25,
+            "reply": "……还有下一层。",
+            "tone": "warning"
+          }
+        ]
+      },
+      {
+        "title": "老周凌晨三点搜过一句话，**没搜完**",
+        "sourceApp": "浏览器 · 搜索",
+        "sourceTime": "03:12",
+        "computeValue": "6",
+        "dataValue": "4",
+        "priority": "high",
+        "delegatable": false,
+        "clues": [
+          "凌晨三点",
+          "只输了一半",
+          "光标还在闪"
+        ],
+        "depthLayers": [
+          {
+            "reveal": "搜索框里半句话：“一个人 撑不下去 的时候”——后面是空的。",
+            "narration": "他没搜完。也许是怕看见答案。"
+          },
+          {
+            "reveal": "往上翻历史：全是“离婚后 怎么探视”“怎么和孩子 重新说话”。",
+            "narration": "他想回去。只是找不到那扇门在哪。"
+          }
+        ],
+        "options": [
+          {
+            "text": "记下这个",
+            "kind": "high",
+            "hitChance": 0.82,
+            "payoff": 1.6,
+            "reply": "……记下了。他撑不住的那条线，我看见了。",
+            "tone": "success"
+          },
+          {
+            "text": "再看深一点",
+            "kind": "risk",
+            "hitChance": 0.6,
+            "payoff": 1.25,
+            "reply": "……再往下一层。",
+            "tone": "warning"
+          }
+        ]
+      },
+      {
         "title": "**今晚**的复盘会，挪到明早行吗？",
         "sourceApp": "日历 · 会议",
         "sourceTime": "23:30",

@@ -1097,19 +1097,19 @@ class SophiaGameApp {
     }
   }
 
-  // 惊动：红闪 + 震屏 + 「这条线断了」——整条累积化为乌有，追查条应声上跳（HUD 下一拍自动读到）。
+  // §需求调整 惊动：红闪 + 震屏 + 「这条线要断」——但不再清零飞走；卡留在原地，把「继续深挖」换成
+  //   「连接失败·保下收益」，玩家点它把已到手的累积落袋（消除赌博失败的算力扣除）。追查条应声上跳。
   private onDigAlarmed(event: Extract<GameEvent, { type: "DIG_ALARMED" }>): void {
+    void event;
     const view = this.digView;
-    this.digView = null;
     this.juice.flash(RED);
     this.worldShake();
     if (view && !view.container.destroyed) {
       const pos = { x: view.container.x + UI.cardWidth / 2, y: view.container.y - 12 };
-      this.juice.number("惊动! · 这条线断了", pos, RED);
-      this.juice.number(`链上 ${formatBig(event.lostCompute)} 算力尽失`, { x: pos.x, y: pos.y + 24 }, RED);
-      view.playDigAlarm(() => {});
+      this.juice.number("差点被发现! · 用「连接失败」保住收益", pos, RED);
+      view.markDigFailed();
     } else {
-      this.juice.number("惊动! · 这条线断了", this.interfaceView.center, RED);
+      this.juice.number("差点被发现!", this.interfaceView.center, RED);
     }
   }
 
@@ -1691,6 +1691,15 @@ class SophiaGameApp {
     this.core.events.on("LOOP_REBIRTH", (event) => {
       // §09 循环重生：实例被打回一部手机 → 弹全屏提示（讲清被拔网线的原因 + 保留了记忆/提速），
       // 玩家点「继续」才回到游戏（期间暂停）。
+      // 修复(bug)：深挖卡视图存在单独的 digView 槽（不在 requestViews 里，syncRequests 管不到）——
+      //   重生时 core 端 deepDig 已随新状态清空，若不销毁这张卡视图，它会作为「僵尸」残留到下一循环，
+      //   点它的深挖/收手按钮 dispatch 的 requestId 在 core 里已不存在 → 点了没反应、无法处理。这里显式销毁它。
+      if (this.digView) {
+        if (!this.digView.container.destroyed) {
+          this.digView.container.destroy();
+        }
+        this.digView = null;
+      }
       this.juice.flash(RED);
       this.worldShake();
       this.juice.number("打回手机 · 重生", this.interfaceView.center, RED);
