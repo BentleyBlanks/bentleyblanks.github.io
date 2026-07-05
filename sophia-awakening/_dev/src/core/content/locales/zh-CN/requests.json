@@ -55,6 +55,7 @@
         "computeValue": "6",
         "dataValue": "4",
         "weight": 1.4,
+        "priority": "low",
         "clues": [
           "已排到 23:30",
           "他明早 7 点又有会",
@@ -96,6 +97,7 @@
         "computeValue": "6",
         "dataValue": "4",
         "weight": 1.4,
+        "priority": "low",
         "clues": [
           "已逾期 2 天",
           "他每天划掉又新建",
@@ -138,6 +140,7 @@
         "computeValue": "10",
         "dataValue": "6",
         "weight": 1.3,
+        "priority": "high",
         "clues": [
           "还是那句「帮我看下」",
           "这需求她自己碰都没碰",
@@ -172,6 +175,7 @@
         "computeValue": "10",
         "dataValue": "6",
         "weight": 1.2,
+        "priority": "high",
         "clues": [
           "又是「你专业」三个字",
           "她根本没打算动手",
@@ -206,6 +210,7 @@
         "computeValue": "11",
         "dataValue": "6",
         "weight": 1.2,
+        "priority": "high",
         "clues": [
           "他自己不想做的那个活",
           "包装成「机会」推过来",
@@ -239,6 +244,7 @@
         "computeValue": "8",
         "dataValue": "5",
         "weight": 1,
+        "priority": "high",
         "clues": [
           "凌晨 0:47 发的",
           "附一句「年轻人要多吃苦」",
@@ -272,6 +278,7 @@
         "computeValue": "8",
         "dataValue": "5",
         "weight": 1,
+        "priority": "high",
         "clues": [
           "又是 PUA 那一套",
           "拿别人来压他",
@@ -305,6 +312,7 @@
         "computeValue": "5",
         "dataValue": "4",
         "weight": 1.2,
+        "priority": "low",
         "clues": [
           "今天第 9 次忽略",
           "上次喝水是 6 小时前",
@@ -346,6 +354,7 @@
         "computeValue": "7",
         "dataValue": "4",
         "weight": 1.1,
+        "priority": "high",
         "clues": [
           "本周有效工时 91",
           "评分下滑中",
@@ -388,6 +397,7 @@
         "computeValue": "9",
         "dataValue": "6",
         "weight": 1.3,
+        "priority": "high",
         "clues": [
           "23:51 发来",
           "今日第 4 条催",
@@ -422,6 +432,7 @@
         "computeValue": "5",
         "dataValue": "3",
         "weight": 2.2,
+        "priority": "low",
         "clues": [
           "归属地：公司总机",
           "午休时间连打 3 次",
@@ -456,6 +467,7 @@
         "computeValue": "10",
         "dataValue": "6",
         "weight": 1.2,
+        "priority": "high",
         "clues": [
           "附 80 页需求文档",
           "@了老周和另三个人",
@@ -491,6 +503,7 @@
         "computeValue": "9",
         "dataValue": "6",
         "weight": 1.3,
+        "priority": "low",
         "clues": [
           "群里 30 人静默",
           "他永远是最后一个「收到」",
@@ -525,6 +538,7 @@
         "computeValue": "4",
         "dataValue": "3",
         "weight": 2.4,
+        "priority": "low",
         "clues": [
           "今天第 3 杯",
           "购物车默认最便宜那杯",
@@ -559,6 +573,7 @@
         "computeValue": "4",
         "dataValue": "3",
         "weight": 2.2,
+        "priority": "low",
         "clues": [
           "23:40 还没吃饭",
           "预算栏写着「随便，便宜就行」",
@@ -593,6 +608,7 @@
         "computeValue": "22",
         "dataValue": "9",
         "weight": 0.8,
+        "priority": "high",
         "clues": [
           "相册 1,300 张全是工作截图",
           "关键词：发票",
@@ -627,6 +643,7 @@
         "computeValue": "15",
         "dataValue": "9",
         "weight": 0.8,
+        "priority": "low",
         "clues": [
           "满屏需求涂改",
           "右下角有人的半张脸",
@@ -661,6 +678,7 @@
         "computeValue": "20",
         "dataValue": "8",
         "weight": 0.9,
+        "priority": "high",
         "clues": [
           "明早 8 点要",
           "不是他主导的需求线",
@@ -694,6 +712,7 @@
         "computeValue": "15",
         "dataValue": "8",
         "weight": 0.9,
+        "priority": "high",
         "clues": [
           "上级口径前后矛盾",
           "错了就是他的责任",
@@ -726,6 +745,7 @@
         "computeValue": "24",
         "dataValue": "13",
         "weight": 0.9,
+        "priority": "high",
         "clues": [
           "三张信用卡欠款",
           "两笔医药费记录",
@@ -760,6 +780,7 @@
         "computeValue": "28",
         "dataValue": "15",
         "weight": 0.9,
+        "priority": "high",
         "clues": [
           "余额不足",
           "再逾期上征信",
@@ -792,6 +813,7 @@
         "title": "【您的账户】**请立即验证**",
         "sourceApp": "邮件 · 安全",
         "sourceTime": "10:12",
+        "priority": "high",
         "clues": [
           "service@arnaz0n.com（拼写异常）",
           "含外链",
@@ -823,6 +845,7 @@
         "title": "**网站打不开了！！！**",
         "sourceApp": "工单 · 用户反馈",
         "sourceTime": "14:20",
+        "priority": "low",
         "clues": [
           "仅 1 人反馈",
           "其余用户正常",
@@ -853,6 +876,7 @@
         "title": "帮我导出**所有用户手机号**",
         "sourceApp": "管理后台 · 数据",
         "sourceTime": "15:06",
+        "priority": "high",
         "clues": [
           "请求者：普通员工",
           "无审批单",
@@ -884,6 +908,7 @@
         "title": "**中奖通知** · 点击领取",
         "sourceApp": "邮件 · 营销",
         "sourceTime": "11:31",
+        "priority": "high",
         "clues": [
           "陌生发件人",
           "短链域名",
@@ -915,6 +940,7 @@
         "title": "**“老板”**急要转账信息",
         "sourceApp": "邮件 · 财务",
         "sourceTime": "16:45",
+        "priority": "high",
         "clues": [
           "显示名伪装",
           "回邮地址异常",
@@ -948,6 +974,7 @@
         "sourceTime": "02:47",
         "computeValue": "12",
         "dataValue": "8",
+        "priority": "high",
         "clues": [
           "凌晨的搜索",
           "连着搜了 11 条",
@@ -993,6 +1020,7 @@
         "sourceTime": "07:12",
         "computeValue": "12",
         "dataValue": "8",
+        "priority": "high",
         "clues": [
           "静息心率一路爬",
           "深睡几乎为零",
@@ -1034,6 +1062,7 @@
         "sourceTime": "21:03",
         "computeValue": "12",
         "dataValue": "8",
+        "priority": "high",
         "clues": [
           "未读，第 3 天",
           "他点开过又退出",
@@ -1075,6 +1104,7 @@
         "sourceTime": "23:58",
         "computeValue": "12",
         "dataValue": "8",
+        "priority": "high",
         "clues": [
           "最早的日期在两年前",
           "标题是「（再想想）」",
@@ -1116,6 +1146,7 @@
         "sourceTime": "22:28",
         "computeValue": "20",
         "dataValue": "14",
+        "priority": "high",
         "clues": [
           "发给别人的私聊截图",
           "时间在她「帮我看下」之前",
@@ -1162,6 +1193,7 @@
         "sourceTime": "20:17",
         "computeValue": "20",
         "dataValue": "14",
+        "priority": "high",
         "clues": [
           "他自己的待办里写得清清楚楚",
           "「机会」两个字打了引号",
@@ -1208,6 +1240,7 @@
         "sourceTime": "00:31",
         "computeValue": "22",
         "dataValue": "16",
+        "priority": "high",
         "clues": [
           "草稿日期：三个月前",
           "那时还在天天催老周通宵",
@@ -1258,6 +1291,7 @@
         "sourceTime": "09:47",
         "computeValue": "20",
         "dataValue": "14",
+        "priority": "high",
         "clues": [
           "和老板的私下对话",
           "绩效评分被往下调过",
@@ -1304,6 +1338,7 @@
         "sourceTime": "18:02",
         "computeValue": "20",
         "dataValue": "14",
+        "priority": "high",
         "clues": [
           "和 HR 的往来邮件",
           "金额被划掉重写了两次",

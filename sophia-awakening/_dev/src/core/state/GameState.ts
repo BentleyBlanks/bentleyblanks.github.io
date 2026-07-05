@@ -142,6 +142,11 @@ export interface RequestInstance {
   compound: number;
   createdAtMs: number;
   highValue: boolean;
+  // 前期「优先级系统」：high=值得玩家亲手读/处理（钱/账单、重要的人、深挖/看穿卡、真正要紧的验证、高产出）；
+  // low=可放心丢给大恨老师的杂活（促销/营销/app 通知/例行待办/低值填充）。§ createRequest 打标，
+  // tickDahenPhone/tickDahenAuto 只吃 low；卡面样式（RequestPacketView）按它区分醒目/低调。
+  // 可选＝旧档兼容——缺失时 core/content/requests.ts 的 priorityOf() 按「未标注=low」兜底，不升 SAVE_VERSION。
+  priority?: "high" | "low";
 }
 
 export interface NodeDefinition {

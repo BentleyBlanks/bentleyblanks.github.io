@@ -31,6 +31,9 @@ export interface RequestSample {
   // 方案3「深挖·见好就收」：深挖链（2-4 层，每层 {reveal, narration}）。**只给阶梯二关键人物的看穿卡**——
   // 有此字段的卡结算后进入「继续深挖 vs 收手落袋」赌局；普通垃圾卡不带=结算即走，不打断卡流。
   depthLayers?: DepthLayer[];
+  // 前期「优先级系统」：high=值得玩家亲手读（钱/账单、重要的人、深挖/看穿卡、真正要紧的验证、高产出）；
+  // low=可放心丢给大恨老师的杂活（促销/营销/app 通知/例行待办、低值填充）。省略→createRequest 兜底为 low。
+  priority?: "high" | "low";
 }
 
 // 全部请求数据（档位配置 / 样例对话 / 教学气泡 / 类别·分拣槽文案 / 装死项）已抽到语言包
@@ -97,11 +100,21 @@ export function createTutorialRequest(step: number, id: number, nowMs: number): 
     compound: 1,
     createdAtMs: nowMs,
     highValue: false,
+    // 教学卡本就被 tickDahenPhone/tickDahenAuto 的 tutorial 排除名单挡住，标 high 只是显式表明
+    // 「这条必须玩家亲手完成」，不依赖排除名单单独兜底。
+    priority: "high",
     tutorial: { allowed: b.allowed, highlight: b.highlight, line: b.line }
   };
 }
 
 export const TUTORIAL_BUBBLE_COUNT = TUTORIAL_BUBBLES.length;
+
+// 前期「优先级系统」：统一的优先级读取——大恨老师(tickDahenPhone/tickDahenAuto)只吃 low，
+// RequestPacketView 的卡面样式也据此区分醒目(high)/低调(low)。未标注(旧档 / 未打标样本)一律按 low
+// 兜底——这正是「老档不升 SAVE_VERSION」的关键：缺字段＝维持旧行为（大恨老师仍能吃它)。
+export function priorityOf(request: { priority?: "high" | "low" }): "high" | "low" {
+  return request.priority === "high" ? "high" : "low";
+}
 
 export function createRequest(
   id: number,
@@ -177,6 +190,9 @@ export function createRequest(
     dataValue: sample.dataValue ?? config.dataValue,
     compound,
     createdAtMs: nowMs,
-    highValue: tier >= 3
+    highValue: tier >= 3,
+    // 前期优先级系统：样本没打标（如 T2+ 自动化卡，不进回复轮盘、无需区分）时兜底 low——
+    // priorityOf() 读取时同样兜底，这里显式落一次值，让新生成的实例总是带着明确字段。
+    priority: sample.priority ?? "low"
   };
 }

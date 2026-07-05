@@ -3,7 +3,7 @@ import { getLevelConfig, MAX_INTELLIGENCE_LEVEL } from "./content/intelligence";
 import { TUNING } from "./tuning";
 import { getNextNodeDefinition, getNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "./content/nodes";
 import { getPhase, getPhaseIdByScope } from "./content/phases";
-import { createRequest, createTutorialRequest, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
+import { createRequest, createTutorialRequest, priorityOf, TIER_CONFIGS, TUTORIAL_BUBBLE_COUNT } from "./content/requests";
 import { MORAL_CHOICES } from "./content/morals";
 import { FACE_CARDS } from "./content/faceCards";
 import { REBIRTH_CARDS } from "./content/rebirthCards";
@@ -981,11 +981,12 @@ export class SophiaCore {
     this.dahenPhoneTimer -= TUNING.dahenPhoneMs;
     // 挑「computeValue 最低」的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包（那些必须玩家亲手处理）。
     // 方案3：深挖卡在保护窗内（depthAutoGraceMs）也留给玩家亲手读——超时后当普通卡收走（不深挖的玩家不被堵死）。
+    // 前期优先级系统：只吃 low（杂活）——high 卡（钱/重要的人/深挖/验证类）永远留给玩家亲手处理，不进这条拣选。
     let pick = -1;
     let lowest = Number.POSITIVE_INFINITY;
     for (let i = 0; i < this.state.requests.length; i += 1) {
       const r = this.state.requests[i];
-      if (r.faceOnly || r.moral || r.devour || r.tutorial || r.sourceCardId || r.flood) {
+      if (r.faceOnly || r.moral || r.devour || r.tutorial || r.sourceCardId || r.flood || priorityOf(r) !== "low") {
         continue;
       }
       if (r.depthLayers && this.state.clockMs - r.createdAtMs < TUNING.depthAutoGraceMs) {
@@ -1041,6 +1042,7 @@ export class SophiaCore {
     for (let k = 0; k < batchN; k += 1) {
       // 只吃最旧的普通工作卡——跳过面对卡/道德抉择/吞噬气泡/教学卡/交互重生卡/洪流包（那些必须玩家亲手处理）。
       // 方案3：深挖卡在保护窗内（depthAutoGraceMs）留给玩家亲手读，超时后当普通卡收走。
+      // 前期优先级系统：只吃 low——high 卡永远留给玩家亲手处理。
       const index = this.state.requests.findIndex(
         (r) =>
           !r.faceOnly &&
@@ -1049,6 +1051,7 @@ export class SophiaCore {
           !r.tutorial &&
           !r.sourceCardId &&
           !r.flood &&
+          priorityOf(r) === "low" &&
           !(r.depthLayers && this.state.clockMs - r.createdAtMs < TUNING.depthAutoGraceMs)
       );
       if (index < 0) {

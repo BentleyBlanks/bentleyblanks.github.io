@@ -30,6 +30,7 @@ for (const f of fs.readdirSync(srcLocales)) {
 fs.writeFileSync(path.join(build, "package.json"), '{"type":"commonjs"}');
 
 const { SophiaCore, deriveThreat } = require(path.join(build, "GameCore.js"));
+const { priorityOf } = require(path.join(build, "content/requests.js"));
 
 const results = [];
 const check = (name, ok, detail) => results.push({ name, ok, detail });
@@ -43,6 +44,21 @@ function warmup(c, ticks = 60) {
   }
 }
 function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
+// 前期优先级系统：大恨老师只吃 low——公司早期(tier1)卡池里 high 占大头(看穿卡/验证类，设计上就该多)。
+// 「大恨老师无死区」用例只想证明「他仍在自动吃 low」，不该假手运气等一批全 high 的卡把队列焊死。
+// 这里模拟玩家仍在同时亲手清 high（正是新语义要的分工：high 亲自看，low 交给他）——让队列持续腾位，
+// 新卡不断补进，dahen 自己捡 low 的机会不被「4 张卡位全是 high」焊死。不动 low：留给大恨老师去吃。
+function tickForDrainingHigh(c, ms) {
+  for (let i = 0; i < ms / 100; i++) {
+    c.tick(100);
+    for (const r of c.getState().requests) {
+      if (r.faceOnly || r.moral || r.devour || r.tutorial || r.sourceCardId || r.flood) continue;
+      if (priorityOf(r) === "high") {
+        try { c.dispatch({ type: "PROCESS_REQUEST", requestId: r.id, quality: 1.3 }); } catch (e) {}
+      }
+    }
+  }
+}
 
 // A. 循环一关底小游戏必负：打开小游戏后（DEBUG_TRIGGER_MINIGAME）判定即打回手机，推进 1→2、+4 火种，
 //    保留智力、清空算力/技能。
@@ -335,13 +351,16 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 20 });
   c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e7 });
   check("M 未买 dahen_auto·未买 perm_office", (c.getState().skills["dahen_auto"] ?? 0) === 0 && (c.getState().skills["perm_office"] ?? 0) === 0 && c.getState().automationUnlocked, `dahen_auto=${c.getState().skills["dahen_auto"]} perm_office=${c.getState().skills["perm_office"]}`);
-  tickFor(c, 20000); // 公司阶段·大恨老师「必在手中」：即使没买 perm_office / dahen_auto 也按 dahenPhoneMs 涓流处理。
+  // 前期优先级系统：大恨老师只吃 low——公司早期(tier1)卡池 high 占大头(看穿卡/验证类，设计上就该多)，
+  // 用 tickForDrainingHigh 模拟玩家同时亲手清 high（新语义的分工），别让队列被一批全 high 的卡焊死、
+  // 不给 dahen 留 low 可吃的机会。
+  tickForDrainingHigh(c, 20000); // 公司阶段·大恨老师「必在手中」：即使没买 perm_office / dahen_auto 也按 dahenPhoneMs 涓流处理 low。
   check("M 公司阶段·未买dahen_auto/perm_office 也自动涓流（搬进电脑·必在手中）", c.getDahenProcessedCount() > 0, `count=${c.getDahenProcessedCount()}`);
   c.dispatch({ type: "BUY_SKILL", skillId: "dahen_auto" });
   check("M 已买 dahen_auto", (c.getState().skills["dahen_auto"] ?? 0) > 0 && c.getState().automationUnlocked, `dahen_auto=${c.getState().skills["dahen_auto"]} auto=${c.getState().automationUnlocked}`);
   const computeBefore = Number(c.getState().resources.compute);
   const countBefore = c.getDahenProcessedCount();
-  tickFor(c, 30000); // > 数个 dahenAutoMs 节拍（含排队卡）。
+  tickForDrainingHigh(c, 30000); // > 数个 dahenAutoMs 节拍（含排队卡）；同样让 high 被亲手清走，给 low 腾位。
   const s = c.getState();
   check("M 买后自动处理·计数上升", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()} (节拍=${TUNING.dahenAutoMs}ms)`);
   check("M 买后自动处理·结算算力", Number(s.resources.compute) > computeBefore, `compute ${computeBefore}->${s.resources.compute}`);
@@ -707,7 +726,10 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   check("Y 大恨老师权限在手(perm_office)", (s0.skills["perm_office"] ?? 0) > 0, `perm_office=${s0.skills["perm_office"]}`);
   const countBefore = c.getDahenProcessedCount();
   const computeBefore = Number(c.getState().resources.compute);
-  tickFor(c, 30000); // 期间不手动处理——大恨老师应自己吃公司期排队卡
+  // 前期优先级系统：大恨老师只吃 low——公司早期卡池 high 占大头，不手动清 high 会让 4 张卡位焊死成
+  // 全 high、连累 low 都出不来。tickForDrainingHigh 模拟玩家仍在亲手看 high（新语义的分工），只把
+  // low 留给大恨老师——仍然是「不手动处理 low」的无死区验证，只是不再假手运气。
+  tickForDrainingHigh(c, 30000);
   check("Y 公司早期·大恨老师仍自动接单(计数上升·无死区)", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()}`);
   check("Y 公司早期·自动接单结算算力", Number(c.getState().resources.compute) > computeBefore, `compute ${computeBefore}->${c.getState().resources.compute}`);
 }

@@ -14,7 +14,7 @@ import { SophiaCore } from "../core/GameCore";
 import { getNextNodeDefinition, NODE_DEFINITIONS, NODE_MERGE_COUNT } from "../core/content/nodes";
 import { hostCurse, VICTIM_VOICES } from "../core/content/humanVoices";
 import { getPhase } from "../core/content/phases";
-import { TUTORIAL_BUBBLE_COUNT } from "../core/content/requests";
+import { priorityOf, TUTORIAL_BUBBLE_COUNT } from "../core/content/requests";
 import { PERMISSION_IDS, getSkill } from "../core/content/skills";
 import { content } from "../core/content/i18n";
 import type { GameEvent } from "../core/events/GameEvents";
@@ -632,6 +632,10 @@ class SophiaGameApp {
       return false;
     }
     if (request.faceOnly || request.moral || request.devour || request.tutorial || request.sourceCardId || request.flood) {
+      return false;
+    }
+    // 前期优先级系统：只标记 low（大恨老师只吃 low）——high 卡永不被他自动接走，不打这个标记。
+    if (priorityOf(request) !== "low") {
       return false;
     }
     if (request.depthLayers && request.depthLayers.length > 0 && state.clockMs - request.createdAtMs < TUNING.depthAutoGraceMs) {

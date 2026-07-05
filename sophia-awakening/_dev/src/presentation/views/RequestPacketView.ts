@@ -1,6 +1,6 @@
 import { gsap } from "gsap";
 import { Container, FederatedPointerEvent, Graphics, HTMLText, Text, type PointData } from "pixi.js";
-import { TIER_COLORS } from "../../core/content/requests";
+import { priorityOf, TIER_COLORS } from "../../core/content/requests";
 import type { AnswerOption, ChainStep, PhaseId, RequestInstance } from "../../core/state/GameState";
 import { TUNING } from "../../core/tuning";
 import {
@@ -25,28 +25,34 @@ import {
 } from "./requestPacket/cardConstants";
 import { layoutFaceCard, drawFaceCard } from "./requestPacket/faceCard";
 
-// §12 美术圣经·手机期「一排可辨识的 App」：每个来源 App 一个图标 + 专属色，让卡流一眼看得出
-// 「流进来的东西变了」（配合 Lever B 权限解锁的新卡类）。手机期(early)用 App 色覆盖单一绿 accent；
-// 公司/天网期保留阶段色（蓝/红），只留图标。key = sourceApp「·」前缀（"外卖 · 咖啡"→"外卖"）。
-const APP_STYLE: Record<string, { icon: string; color: number }> = {
-  待办: { icon: "🗒", color: 0x8fd6c4 },
-  日历: { icon: "📅", color: 0x8fd6c4 },
-  健康: { icon: "❤", color: 0xff9aa8 },
-  电话: { icon: "📞", color: 0x66c7ff },
-  短信: { icon: "✉", color: 0x9db4ff },
-  微信: { icon: "💬", color: 0x66d98a },
-  钉钉: { icon: "📌", color: 0x4aa3ff },
-  企业微信: { icon: "💼", color: 0x5b8fd6 },
-  邮件: { icon: "📧", color: 0xc0b3ff },
-  外卖: { icon: "☕", color: 0xffab5e },
-  相册: { icon: "🖼", color: 0xc58bff },
-  办公: { icon: "📊", color: 0x7fd6c0 },
-  银行: { icon: "🏦", color: 0xffd15e }
+// §12 美术圣经·手机期「一排可辨识的 App」：每个来源 App 一个图标，卡头文字标签一眼认出「这是哪个 App」。
+// 需求1(b)：卡片主体不再按 app 上色（也不再按阶段给普通工作卡上色）——配色改由「优先级」决定
+// （见下方 PRIORITY_HIGH_ACCENT/PRIORITY_LOW_ACCENT）。这里只留图标，不留颜色。
+const APP_STYLE: Record<string, { icon: string }> = {
+  待办: { icon: "🗒" },
+  日历: { icon: "📅" },
+  健康: { icon: "❤" },
+  电话: { icon: "📞" },
+  短信: { icon: "✉" },
+  微信: { icon: "💬" },
+  钉钉: { icon: "📌" },
+  企业微信: { icon: "💼" },
+  邮件: { icon: "📧" },
+  外卖: { icon: "☕" },
+  相册: { icon: "🖼" },
+  办公: { icon: "📊" },
+  银行: { icon: "🏦" }
 };
-function appStyleOf(sourceApp?: string): { icon: string; color: number } | null {
+function appStyleOf(sourceApp?: string): { icon: string } | null {
   if (!sourceApp) return null;
   return APP_STYLE[sourceApp.split("·")[0].trim()] ?? null;
 }
+// 需求2：优先级配色——high=醒目琥珀金（复用既有强调色 AMBER，符合 CRT 磷光美学），
+// low=去饱和暗绿灰，视觉退到背景。只作用于回复轮盘工作卡（isReel）——面对/吞噬/任务链卡不受影响。
+const PRIORITY_HIGH_ACCENT = AMBER;
+const PRIORITY_LOW_ACCENT = 0x4c5c54;
+// app 名称文字标签的统一色（不再按 app 变色，只保证清晰可读）。
+const APP_LABEL_COLOR = 0x8fc2b4;
 
 // 回复结算回调。§06 重构：删除「正确率/幻觉/随机命中」——选了哪个回复，结果就由那个回复的固定收益决定，无随机。
 // 也删除了「模糊档位 / 大胆回答 / 惊艳」三档，张力改由「读懂上下文 + 有没有权限选高收益项」承担。
@@ -185,12 +191,18 @@ export class RequestPacketView {
   private digPulse = 0;
   private digBaseY = 0;
 
-  // 需求5：大恨老师涓流/自动接管期——给「可能被他吃掉」的排队普通卡加一层克制提示，别让玩家
-  // 和他抢同一张。App 侧（syncRequests）按 core.isDahenAutoActive() + 卡自身是否满足拣选条件
-  // 调用 setDahenAutoHint()。建一次、只切 visible，不进 draw() 的每帧重绘（不干扰 bg/选项绘制）。
+  // 需求3：大恨老师只吃 low——他正在吃的这张卡（low + 已激活）整段回复选项收起，卡底原来「交给
+  // 大恨老师」按钮的位置直接换成一条「大恨老师处理中」占位条；一层淡蒙层示意「非交互」。
+  // App 侧（syncRequests）按 core.isDahenAutoActive() + 卡自身 priority==="low" 调用 setDahenAutoHint()。
   private readonly dahenHintOverlay = new Graphics();
-  private readonly dahenHintBadge = new Container();
+  private readonly dahenBand = new Graphics(); // 覆盖整段回复选项（含委托按钮）的实底占位条
+  private readonly dahenBandLabel: Text;
   private dahenHintOn = false;
+  // 需求1/2：前期优先级——high=值得玩家亲手读，low=可放心丢给大恨老师。驱动卡面配色 + 大恨老师拣选提示。
+  private readonly priority: "high" | "low";
+  // 道德抉择 / 交互重生卡虽也走「回复轮盘」外观(isReel)，但属于独立的叙事机制，不在 high/low 分类范围内
+  // （priorityOf 对它们会兜底成 low——不能真的把道德抉择卡画成「可以丢给大恨老师的杂活」）。
+  private readonly isSpecialNarrative: boolean;
 
   constructor(
     request: RequestInstance,
@@ -201,6 +213,8 @@ export class RequestPacketView {
     phase?: PhaseId
   ) {
     this.request = request;
+    this.priority = priorityOf(request);
+    this.isSpecialNarrative = Boolean(request.moral || request.sourceCardId);
     this.isDevour = Boolean(request.devour);
     this.isFace = Boolean(request.faceOnly);
     this.isReel = Boolean(reel && request.answers && request.answers.length > 0);
@@ -243,24 +257,24 @@ export class RequestPacketView {
         ? "notification"
         : "sms"
       : null;
-    // PART① 普通需求卡的 accent 随阶段走：早期绿(THINK/TIER) → 公司蓝 → 天网红。
-    // 面卡(短信/通知)、吞噬气泡保留各自专属色，不受阶段影响。
+    // PART① 需求1(b)：普通「回复轮盘」工作卡不再随 app/阶段上色——配色改由优先级决定（见需求2）。
+    // 非回复轮盘的自动化工作卡（tier2+，无回复轮盘）仍保留阶段渐进：早期绿(TIER) → 公司蓝 → 天网红。
+    // 面卡(短信/通知)、吞噬气泡保留各自专属色，不受阶段/优先级影响。
     this.phaseTint = phaseTintOf(phase);
     const phaseWorkAccent =
       this.phaseTint === "company" ? COMPANY_ACCENT : this.phaseTint === "awakening" ? RED_QUEEN : null;
-    // §12 手机期「App 身份」：普通工作卡按来源 App 取图标+专属色。手机期(early)用 App 色覆盖单一绿，
-    // 让每买一个权限、每类新卡流进来时卡面一眼有别；公司/天网期保留阶段蓝/红，只用图标。
+    // §12 手机期「App 身份」：普通工作卡按来源 App 取图标，仅用于卡头文字标签（不再取色）。
     const appStyle = !this.isFace && !this.isDevour && !this.isChain ? appStyleOf(request.sourceApp) : null;
-    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；回复轮盘＝App 色/青（随阶段变色）。
+    // 短信＝柔和蓝；通知＝琥珀；吞噬＝深紫；回复轮盘＝优先级色（high=琥珀金/low=去饱和灰绿，不再随 app/阶段变色）。
     this.accent = this.isFace
       ? this.channel === "notification"
         ? 0xffc061
         : 0x7fb4ff
       : this.isDevour
         ? DEVOUR
-        : this.isReel
-          ? phaseWorkAccent ?? appStyle?.color ?? THINK
-          : phaseWorkAccent ?? appStyle?.color ?? TIER_COLORS[request.tier];
+        : this.isReel && !this.isSpecialNarrative
+          ? (this.priority === "high" ? PRIORITY_HIGH_ACCENT : PRIORITY_LOW_ACCENT)
+          : phaseWorkAccent ?? TIER_COLORS[request.tier];
     // 公司/天网阶段的工作卡：标题下多留一行「系统控制台」状态行（更密、更硬）。
     const showConsoleLine = !this.isFace && !this.isDevour && phaseWorkAccent !== null;
     this.headerExtra = showConsoleLine ? 16 : 0;
@@ -296,9 +310,10 @@ export class RequestPacketView {
       style: { fill: this.accent, fontSize: 10.5, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
     });
     this.badge.anchor.set(0, 0.5);
+    // 需求1(b)：app 名称保留为卡头文字标签，但不再按 app 取色——统一中性色，只求清晰可读。
     const sourceMeta = new Text({
       text: appStyle ? `|  ${appStyle.icon} ${sourceApp}` : `|  ${sourceApp}`,
-      style: { fill: appStyle ? appStyle.color : 0x6f9187, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
+      style: { fill: appStyle ? APP_LABEL_COLOR : 0x6f9187, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
     });
     sourceMeta.anchor.set(0, 0.5);
     const timeMeta = new Text({
@@ -306,15 +321,36 @@ export class RequestPacketView {
       style: { fill: 0x97aaa3, fontSize: 10.2, fontWeight: "700", letterSpacing: 0, fontFamily: CARD_MONO }
     });
     timeMeta.anchor.set(1, 0.5);
+    // 需求2：高/低优先级小标——只在普通回复轮盘工作卡上显示（面对/吞噬/任务链卡不适用），
+    // 贴在时间戳左侧："⚡高"醒目琥珀金，"低"去饱和低调，一眼读出"这张该不该我亲自看"。
+    const showPriorityTag = this.isReel && !this.isFace && !this.isDevour && !this.isChain && !this.isSpecialNarrative;
+    const priorityTag = showPriorityTag
+      ? new Text({
+          text: this.priority === "high" ? "⚡高" : "低",
+          style: {
+            fill: this.priority === "high" ? PRIORITY_HIGH_ACCENT : 0x6b7873,
+            fontSize: 10,
+            fontWeight: "800",
+            letterSpacing: 0,
+            fontFamily: CARD_MONO
+          }
+        })
+      : null;
+    if (priorityTag) {
+      priorityTag.alpha = this.priority === "high" ? 1 : 0.7;
+      priorityTag.anchor.set(1, 0.5);
+    }
     // 短信/通知卡：标题＝消息正文，缩进进气泡、字号略小；需求卡＝加粗大标题。
     const titleWrap = this.isFace ? this.cardW - 48 : this.cardW - 32;
     // §需求调整：标题信息缩小 ~15%（选项/档案不变），让整卡视觉重心落在选项与深挖档案上。
     const titleSize = this.isFace ? 14 : 16.2;
+    // 需求2：low 优先级工作卡的标题也略微压暗——整卡"退到背景"，暗示这张可以放心交给大恨老师。
+    const titleFill = showPriorityTag && this.priority === "low" ? 0xb9c4bd : 0xf6fff9;
     this.title = hasEmphasis(request.label)
       ? new HTMLText({
           text: toEmphasisHTML(request.label),
           style: {
-            fill: 0xf6fff9,
+            fill: titleFill,
             fontSize: titleSize,
             fontWeight: "800",
             fontFamily: CARD_FONT,
@@ -328,7 +364,7 @@ export class RequestPacketView {
       : new Text({
           text: request.label,
           style: {
-            fill: 0xf6fff9,
+            fill: titleFill,
             fontSize: titleSize,
             fontWeight: "800",
             fontFamily: CARD_FONT,
@@ -342,6 +378,9 @@ export class RequestPacketView {
     sourceMeta.position.set(sourceX, HEADER_CENTER_Y);
     timeMeta.position.set(this.cardW - 16, HEADER_CENTER_Y);
     fitTextToWidth(sourceMeta, Math.max(0, this.cardW - sourceX - 72));
+    if (priorityTag) {
+      priorityTag.position.set(this.cardW - 16 - Math.ceil(timeMeta.width) - 10, HEADER_CENTER_Y);
+    }
     // PART① 公司/天网阶段：标题下插一行「控制台」状态行——密、单色、系统读出感。
     if (showConsoleLine) {
       const seq = Math.abs(this.hashId(request.id));
@@ -359,6 +398,9 @@ export class RequestPacketView {
     }
     this.title.position.set(this.isFace ? 24 : 16, (this.isFace ? 34 : 31) + this.headerExtra);
     this.container.addChild(this.badge, sourceMeta, timeMeta, this.title);
+    if (priorityTag) {
+      this.container.addChild(priorityTag);
+    }
 
     // Context chips — the information the player has to read. Laid out after
     // the title so a two-line title still leaves room.
@@ -572,31 +614,38 @@ export class RequestPacketView {
       this.title.style.fontSize = 16;
     }
 
-    // 需求5：大恨老师提示——淡青蒙层 + 一枚探出卡片右上角的角标，初始隐藏，只有 setDahenAutoHint(true)
-    // 时才显示。eventMode="none" 确保它和其子节点绝不拦截卡片本身的拖拽/滑动交互。
+    // 需求3：大恨老师标记提示——淡青蒙层示意「非交互」+ 一条覆盖整段回复选项(含委托按钮)的实底占位条，
+    // 居中显示「大恨老师处理中」，直接盖住那几行回复（覆盖=不必再手动隐藏每个 Text，视觉上等同于"选项
+    // 已不在"）。初始隐藏，只有 setDahenAutoHint(true) 时才显示；eventMode="none" 确保它和子节点
+    // 绝不拦截卡片本身的拖拽交互（玩家本来也不用点它，仍可照常把卡拖走）。
     this.dahenHintOverlay.roundRect(0, 0, this.cardW, this.cardH, 13).fill({ color: CYAN, alpha: 0.08 });
     this.dahenHintOverlay.eventMode = "none";
     this.dahenHintOverlay.visible = false;
     this.container.addChild(this.dahenHintOverlay);
 
-    const dahenTag = new Text({
+    this.dahenBand.eventMode = "none";
+    this.dahenBand.visible = false;
+    this.container.addChild(this.dahenBand);
+
+    this.dahenBandLabel = new Text({
       text: "🤖 大恨老师处理中",
-      style: { fill: 0xdcfbff, fontSize: 10.5, fontWeight: "800", fontFamily: CARD_FONT }
+      style: { fill: 0xdcfbff, fontSize: 13, fontWeight: "800", fontFamily: CARD_FONT }
     });
-    const tagPadX = 8;
-    const tagPadY = 4;
-    const tagW = Math.ceil(dahenTag.width) + tagPadX * 2;
-    const tagH = Math.ceil(dahenTag.height) + tagPadY * 2;
-    dahenTag.position.set(tagPadX, tagPadY);
-    const tagBg = new Graphics();
-    tagBg.roundRect(0, 0, tagW, tagH, 8).fill({ color: 0x0a2226, alpha: 0.94 });
-    tagBg.roundRect(0, 0, tagW, tagH, 8).stroke({ width: 1.2, color: CYAN, alpha: 0.85 });
-    this.dahenHintBadge.addChild(tagBg, dahenTag);
-    // 完全浮在卡片上沿之上（像一枚探出的贴纸），不与标题行的来源/时间文字打架。
-    this.dahenHintBadge.position.set(this.cardW - tagW - 14, -tagH - 5);
-    this.dahenHintBadge.eventMode = "none";
-    this.dahenHintBadge.visible = false;
-    this.container.addChild(this.dahenHintBadge);
+    this.dahenBandLabel.anchor.set(0.5, 0.5);
+    this.dahenBandLabel.eventMode = "none";
+    this.dahenBandLabel.visible = false;
+    this.container.addChild(this.dahenBandLabel);
+    // 占位条铺满第一条到最后一条回复行（含委托按钮）的整个区间——大恨老师只标记 isReel 的低优先级卡，
+    // 这里必有 optionRows。留 2px 余量+更大的圆角，盖住底下行的圆角，不透边角。
+    if (this.optionRows.length > 0) {
+      const first = this.optionRows[0];
+      const last = this.optionRows[this.optionRows.length - 1];
+      const bandY = first.y - 2;
+      const bandH = last.y + last.h - first.y + 4;
+      this.dahenBand.roundRect(10, bandY, this.cardW - 20, bandH, 9).fill({ color: 0x0a2226, alpha: 0.96 });
+      this.dahenBand.roundRect(10, bandY, this.cardW - 20, bandH, 9).stroke({ width: 1.2, color: CYAN, alpha: 0.75 });
+      this.dahenBandLabel.position.set(this.cardW / 2, bandY + bandH / 2);
+    }
 
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
     this.stage.on("pointermove", this.moveHandler);
@@ -677,14 +726,23 @@ export class RequestPacketView {
     this.homeY = y;
   }
 
-  // 需求5：切换「大恨老师处理中」提示的显隐（App 每帧按当前拣选条件调用；内部去重，非跳变不重绘）。
+  // 需求3：切换「大恨老师处理中」提示的显隐（App 每帧按当前拣选条件——priority==="low" 且大恨老师
+  // 已激活——调用；内部去重，非跳变不重绘）。激活时整段回复选项(含委托按钮)隐藏，只留占位条 + 淡蒙层；
+  // 取消时选项照常显示——high 优先级卡永远不会调用到 active=true（isDahenAutoTarget 已按 priority 过滤）。
   setDahenAutoHint(active: boolean): void {
     if (this.dahenHintOn === active || this.container.destroyed) {
       return;
     }
     this.dahenHintOn = active;
     this.dahenHintOverlay.visible = active;
-    this.dahenHintBadge.visible = active;
+    this.dahenBand.visible = active;
+    this.dahenBandLabel.visible = active;
+    for (const t of this.optionTexts) {
+      t.visible = !active;
+    }
+    for (const t of this.optionProbTexts) {
+      t.visible = !active;
+    }
   }
 
   update(deltaMs: number): void {
@@ -894,7 +952,8 @@ export class RequestPacketView {
     }
 
     // 回复轮盘卡：前期普通回复行需按住向右滑动确认；大恨老师委托仍是点击。
-    if (this.isReel) {
+    // 需求3：大恨老师已标记这张卡（选项整段隐藏）时不再命中任何选项行——落在这块区域直接往下走进入拖动。
+    if (this.isReel && !this.dahenHintOn) {
       const local = event.getLocalPosition(this.container);
       const index = this.optionRows.findIndex((row) => local.y >= row.y && local.y <= row.y + row.h);
       if (index >= 0) {
@@ -1404,8 +1463,17 @@ export class RequestPacketView {
       : t3
         ? 0x2a1117
         : tint.head;
-    const strokeW = this.isDevour ? 2.2 : t3 ? 2 : 1.4;
-    const strokeA = t3 ? 0.85 : 0.7;
+    // 需求2：优先级样式——high 醒目（更粗更亮的描边），low 低调（更细更淡，退到背景）。
+    // 只对普通回复轮盘工作卡生效，不影响面对/吞噬/任务链/T3 重磅卡、也不影响道德抉择/交互重生卡
+    // （isSpecialNarrative——它们不在 high/low 分类范围内，保留原有阶段/专属描边规则）。
+    const priorityStroke =
+      this.isReel && !this.isSpecialNarrative
+        ? this.priority === "high"
+          ? { w: 2, a: 0.95 }
+          : { w: 1.1, a: 0.4 }
+        : null;
+    const strokeW = priorityStroke?.w ?? (this.isDevour ? 2.2 : t3 ? 2 : 1.4);
+    const strokeA = priorityStroke?.a ?? (t3 ? 0.85 : 0.7);
     // 投影
     this.bg.roundRect(3, 6, W, H, r).fill({ color: 0x000000, alpha: 0.34 });
     // 实心卡体
@@ -1455,7 +1523,8 @@ export class RequestPacketView {
     this.chargeBar.clear(); // 蓄力条已移除
 
     // 方案3 深挖模式：回复选项已收起（决定已下），选项行不再绘制——档案叠由 drawDig 负责。
-    if (this.isReel && !this.digMode) {
+    // 需求3：大恨老师标记这张卡时，选项整段不绘制——占位条(dahenBand)顶上去。
+    if (this.isReel && !this.digMode && !this.dahenHintOn) {
       this.drawOptions();
     }
 
