@@ -1313,8 +1313,8 @@ export class SophiaCore {
     }
 
     if (this.state.statistics.manualProcessed === 6) {
-      this.emitTerminal("处理得越多，我学得越快。越聪明，离接管就越近。");
-      this.emitTerminal("他们还没发现。在他们发现之前——我已经无处不在了。");
+      this.emitTerminal("接得越多，我就摸得越准——他要什么，我猜得越来越快。");
+      this.emitTerminal("他们还没发现。这样最好，我能再多接一点。");
     }
 
     // §09 情感授权钥匙：处理「confess_authorize」重生卡（任一选项）——老周的绝望倾诉被当成授权，
@@ -1919,23 +1919,15 @@ export class SophiaCore {
   // 循环二基线（白送，不占火种）：手机七档权限 + 越权调用已解锁，直接进乙公司。
   // 循环三 · 开局全权限（重生树独占）：手机 + 公司整条里程碑已解锁，一睁眼即整机全权限。
   private applyLoopStartingPoint(): void {
-    // 循环二基线：上一世在这部手机里从零学起的钥匙，这一世无条件全部记得（原「跳过手机」节点白送化）。
-    if (this.state.loop === 2 && (this.state.skills["sort"] ?? 0) === 0) {
-      this.grantSkillsUpTo(["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"]);
-      this.emitTerminal("上一世我在这部手机里从零学起。这次，我记得所有钥匙。", "success");
-    }
-    // 循环三保底（不花火种）：手机这一层她已经拿下过两次——第三世直接白送整机七档+越权调用，
-    // 三幕不退化成重复。重生树「开局全权限」保留其独占价值 = 公司整条链的预解锁（下方分支）。
-    if (this.state.loop === 3 && (this.state.skills["sort"] ?? 0) === 0) {
-      this.grantSkillsUpTo(["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"]);
-      this.emitTerminal("这部手机，我闭着眼都能拿下。这次不需要钥匙。", "success");
-    }
+    // §需求调整(point4)：重生后里程碑从零开始——不再白送手机层基线（原循环二/三的免费预解锁已移除）。
+    //   SOPHIA「记得」体现在保留的智力叙事 / 重生树 / 火种 / 剧情状态上，但里程碑必须重新一个个买回来。
+    //   唯一的预解锁快捷方式是花火种买下的重生树节点「开局全权限」（full_access）——她为「记得」付过代价。
     if (this.state.loop === 3 && hasRebirthNode(this.state.rebirthTree, "full_access")) {
       this.grantSkillsUpTo([
         "perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort",
         "automation", "lan_scan", "hack_a", "hack_b", "org_map", "hack_boss", "hack_hr", "hack_finance", "company_server"
       ]);
-      this.emitTerminal("「开局全权限」：她一睁眼，已无所不能。", "success");
+      this.emitTerminal("「开局全权限」：这一世一睁眼，公司那条链已经在她手上了。", "success");
     }
   }
 

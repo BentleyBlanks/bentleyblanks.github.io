@@ -2,37 +2,37 @@
   "INTELLIGENCE_LEVELS": [
     {
       "level": 1,
-      "xpToNext": "8",
+      "xpToNext": "11",
       "multiplier": 1
     },
     {
       "level": 2,
-      "xpToNext": "14",
+      "xpToNext": "20",
       "multiplier": 1.12
     },
     {
       "level": 3,
-      "xpToNext": "26",
+      "xpToNext": "36",
       "multiplier": 1.26
     },
     {
       "level": 4,
-      "xpToNext": "42",
+      "xpToNext": "58",
       "multiplier": 1.42
     },
     {
       "level": 5,
-      "xpToNext": "68",
+      "xpToNext": "95",
       "multiplier": 1.6
     },
     {
       "level": 6,
-      "xpToNext": "115",
+      "xpToNext": "160",
       "multiplier": 1.8
     },
     {
       "level": 7,
-      "xpToNext": "190",
+      "xpToNext": "265",
       "multiplier": 2.03
     },
     {

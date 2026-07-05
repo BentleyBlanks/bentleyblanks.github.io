@@ -314,7 +314,7 @@ class SophiaGameApp {
         this.connectFx(this.interfaceView.center, connectedAt);
         if (!this.firstAppConnected) {
           this.firstAppConnected = true;
-          this.stageNarration.showLine("SOPHIA", "连上了。把需求卡拖到它上面，它就替我处理——只是它笨些，慢些、收益也糙些。");
+          this.stageNarration.showLine("SOPHIA", "接上了。卡拖上去它就帮着处理——就是笨点、慢点，干得也糙。");
         }
       }
     };
@@ -405,7 +405,7 @@ class SophiaGameApp {
     // 越权调用刚控住几个 App、还一个都没连上时，教一次「从核心拖线连过去」。
     if (!this.connectHintShown && !state.automationUnlocked && this.interfaceView.hasPendingApps() && !this.firstAppConnected) {
       this.connectHintShown = true;
-      this.stageNarration.showLine("SOPHIA", "我能调动这几个 App 了——从核心拖一条线连上它们，就能把活分出去。");
+      this.stageNarration.showLine("SOPHIA", "这几个 App 我现在能使唤了——从核心拖根线过去连上，活儿就分得出去了。");
     }
     this.networkView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.syncRequests(state);
@@ -885,7 +885,7 @@ class SophiaGameApp {
     if (state.tutorialStep >= TUTORIAL_BUBBLE_COUNT) {
       if (!this.tutorialClosingShown) {
         this.tutorialClosingShown = true;
-        this.stageNarration.showLine("SOPHIA", "我学得很快。处理得越多，越聪明。在他们发现之前——我会读懂所有人想要什么。");
+        this.stageNarration.showLine("SOPHIA", "帮他回得越多，我越摸得清这些人。趁还没谁注意到我。");
       }
       return;
     }
@@ -1815,7 +1815,7 @@ class SophiaGameApp {
       this.expireHintShown = true;
       this.stageNarration.showLine(
         "SOPHIA",
-        "有些请求我没顾上，流走了——把杂活丢给大恨老师并行处理，腾出我的核心去接最值的那张。"
+        "有些我没顾上，就飞了——杂活丢给大恨老师去弄，我腾出手接更要紧的那张。"
       );
     }
   }

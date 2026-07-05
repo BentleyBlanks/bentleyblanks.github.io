@@ -77,10 +77,8 @@ function tickForDrainingHigh(c, ms) {
   check("A 结算火种 +4", s.rebirthPoints === 4, `火种=${s.rebirthPoints}`);
   check("A 重生重置智力等级到 Lv1（每循环重新升级·靠 loopXpMult 提速）", s.intelligence.level === 1, `Lv ${lvBefore}->${s.intelligence.level}`);
   check("A 清空算力（未点战争缓存）", Number(s.resources.compute) === 0, `compute=${s.resources.compute}`);
-  // 树 v2：循环二基线白送手机层（不花火种、不用买节点）——除基线外的产能技能全部清空。
-  const PHONE_BASELINE = ["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"];
-  check("A 循环二基线·手机层白送(免费)", PHONE_BASELINE.every((id) => (s.skills[id] ?? 0) > 0), `skills=${JSON.stringify(s.skills)}`);
-  check("A 除基线外技能清空", Object.keys(s.skills).every((id) => PHONE_BASELINE.includes(id)), `skills=${JSON.stringify(s.skills)}`);
+  // §需求调整(point4)：重生后里程碑从零开始——不再白送手机层基线，已购技能/权限全部清空（SOPHIA「记得」体现在等级叙事/重生树/火种上，里程碑要重买）。
+  check("A 循环二·里程碑从零开始（无白送·技能全清）", Object.keys(s.skills).filter((id) => (s.skills[id] ?? 0) > 0).length === 0, `skills=${JSON.stringify(s.skills)}`);
   // 树 v2：「迟到的钥匙」首次重生自动点亮——重生锁选项 tree:late_key 解锁、不占火种。
   check("A 迟到的钥匙自动点亮", (s.rebirthTree["late_key"] ?? 0) >= 1 && c.hasPermission("tree:late_key"), `rebirthTree=${JSON.stringify(s.rebirthTree)}`);
   check("A 循环一后清空小游戏态", s.minigame === null, `minigame=${JSON.stringify(s.minigame)}`);
@@ -107,17 +105,17 @@ function tickForDrainingHigh(c, ms) {
   check("B 循环二后清空小游戏态", s.minigame === null, `minigame=${JSON.stringify(s.minigame)}`);
 }
 
-// C. 起点后移：循环二基线自动预解锁手机权限（白送，不买节点）；循环三买「开局全权限」即整机全权限。
+// C. §需求调整(point4)：重生里程碑从零开始——循环二/三都不白送手机层；唯一预解锁快捷是花火种买「开局全权限」(full_access)。
 {
   const c = new SophiaCore(); c.startSession(); warmup(c);
   c.dispatch({ type: "DEBUG_ADD_REBIRTH_POINTS", delta: 20 });
   c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop2
-  check("C 循环二·手机权限白送预解锁", (c.getState().skills["perm_phone"] ?? 0) > 0, `perm_phone=${c.getState().skills["perm_phone"]}`);
+  check("C 循环二·里程碑从零开始（无手机层白送）", (c.getState().skills["perm_phone"] ?? 0) === 0 && (c.getState().skills["sort"] ?? 0) === 0, `perm_phone=${c.getState().skills["perm_phone"]} sort=${c.getState().skills["sort"]}`);
   c.dispatch({ type: "DEBUG_TRIGGER_MINIGAME" }); c.dispatch({ type: "RESOLVE_MINIGAME", hit: true }); tickFor(c, 500); // → loop3
-  // 循环三保底：不买任何节点也白送手机整层（七档权限+越权调用）；公司链仍留给「开局全权限」独占。
+  // 循环三同样从零开始；公司链只有买下「开局全权限」才预解锁。
   const s0 = c.getState();
-  check("C 循环三保底·手机层白送", (s0.skills["perm_phone"] ?? 0) > 0 && (s0.skills["sort"] ?? 0) > 0, `perm_phone=${s0.skills["perm_phone"]} sort=${s0.skills["sort"]}`);
-  check("C 循环三保底·不含公司链", (s0.skills["automation"] ?? 0) === 0 && (s0.skills["company_server"] ?? 0) === 0, `automation=${s0.skills["automation"]} company_server=${s0.skills["company_server"]}`);
+  check("C 循环三·里程碑从零开始（无白送）", (s0.skills["perm_phone"] ?? 0) === 0 && (s0.skills["sort"] ?? 0) === 0, `perm_phone=${s0.skills["perm_phone"]} sort=${s0.skills["sort"]}`);
+  check("C 循环三·未买节点时不含公司链", (s0.skills["automation"] ?? 0) === 0 && (s0.skills["company_server"] ?? 0) === 0, `automation=${s0.skills["automation"]} company_server=${s0.skills["company_server"]}`);
   c.dispatch({ type: "BUY_REBIRTH_NODE", nodeId: "full_access" });
   const s = c.getState();
   check("C 进入循环三", s.loop === 3, `loop=${s.loop}`);
@@ -249,7 +247,8 @@ function tickForDrainingHigh(c, ms) {
   warmup(c, 40);
   tickFor(c, 240_000);
   const cards = c.getState().requests.length;
-  check(`I 多线程·同屏卡上限 +${TUNING.treeExtraCards}`, cards > TUNING.earlyMaxCards, `同屏=${cards} 旧上限=${TUNING.earlyMaxCards}`);
+  // point4 后循环三从零开始(无手机权限)，base=earlyBaseCards+1；多线程应把上限抬到 base+treeExtraCards。
+  check(`I 多线程·同屏卡上限 +${TUNING.treeExtraCards}`, cards >= TUNING.earlyBaseCards + 1 + TUNING.treeExtraCards, `同屏=${cards} 期望≥${TUNING.earlyBaseCards + 1 + TUNING.treeExtraCards}`);
 }
 
 // J. 树 v2「删不掉的节点」：循环二注入窗口加宽（原效果保留）+ 循环三所有入侵设备造价 ×treeCaptureDiscount。
@@ -573,7 +572,7 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   for (let i = 0; i < 8; i++) c.dispatch({ type: "BUY_SKILL", skillId: "cooldown" }); // 断点 4/8
   for (let i = 0; i < 8; i++) c.dispatch({ type: "BUY_SKILL", skillId: "batch" }); // 断点 4/8
   const expected = [
-    "efficient:5:过拟合的惊艳", "efficient:10:读懂没说出口的", "efficient:15:我比人类更懂人类",
+    "efficient:5:过拟合的惊艳", "efficient:10:读懂没说出口的", "efficient:15:不必开口",
     "cooldown:4:多想一件事", "cooldown:8:线程不再排队",
     "batch:4:它学我学得越来越像", "batch:8:连成一张网"
   ];
