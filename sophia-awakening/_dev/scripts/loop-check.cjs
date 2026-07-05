@@ -59,7 +59,7 @@ function tickFor(c, ms) { for (let i = 0; i < ms / 100; i++) c.tick(100); }
   const s = c.getState();
   check("A 循环一必负·推进 1->2", s.loop === 2, `loop=${s.loop}`);
   check("A 结算火种 +4", s.rebirthPoints === 4, `火种=${s.rebirthPoints}`);
-  check("A 保留智力等级", s.intelligence.level === lvBefore, `Lv ${lvBefore}->${s.intelligence.level}`);
+  check("A 重生重置智力等级到 Lv1（每循环重新升级·靠 loopXpMult 提速）", s.intelligence.level === 1, `Lv ${lvBefore}->${s.intelligence.level}`);
   check("A 清空算力（未点战争缓存）", Number(s.resources.compute) === 0, `compute=${s.resources.compute}`);
   // 树 v2：循环二基线白送手机层（不花火种、不用买节点）——除基线外的产能技能全部清空。
   const PHONE_BASELINE = ["perm_phone", "perm_chat", "perm_office", "perm_delivery", "perm_album", "perm_bank", "sort"];

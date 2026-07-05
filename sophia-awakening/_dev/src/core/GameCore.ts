@@ -1189,11 +1189,25 @@ export class SophiaCore {
 
     // 批量接入：一次滑入额外带走同层若干请求，把它们的产出折进这一笔。
     // 深挖卡不吃批量吸收——它单独结算，链上累的就是它自己的价值（惊动清零的账目才干净）。
-    const extraCapacity = digging ? 0 : Math.max(0, Math.floor(this.state.derived.batch) - 1);
+    // 修复(bug)：公司阶段（automationUnlocked && tier<2）每张卡都是「读一个人」的有意义卡，不做批量吸收——
+    //   否则处理一张会静默吞掉同屏其他卡（玩家眼里「处理一张，其他卡一起消失了」）。仅手机期高频杂卡才批量。
+    const inCompanyPhase = this.state.automationUnlocked && this.state.intelligence.unlockedTier < 2;
+    const extraCapacity = digging || inCompanyPhase ? 0 : Math.max(0, Math.floor(this.state.derived.batch) - 1);
     let absorbed = 0;
 
     for (let i = 0; i < extraCapacity; i += 1) {
-      const extraIndex = this.state.requests.findIndex((entry) => entry.tier === request.tier && !entry.devour);
+      // 只吸收同层的「普通」工作卡——绝不吞掉深挖卡/道德抉择/面对卡/教学卡/吞噬气泡/洪流包/任务链源卡。
+      const extraIndex = this.state.requests.findIndex(
+        (entry) =>
+          entry.tier === request.tier &&
+          !entry.devour &&
+          !entry.depthLayers &&
+          !entry.moral &&
+          !entry.faceOnly &&
+          !entry.tutorial &&
+          !entry.flood &&
+          !entry.sourceCardId
+      );
 
       if (extraIndex < 0) {
         break;
@@ -1821,7 +1835,6 @@ export class SophiaCore {
       ? toDecimal(this.state.resources.compute).mul(TUNING.treeCarryFrac).floor()
       : toDecimal(0);
     const preserved = {
-      level: this.state.intelligence.level,
       loop: Math.min(3, prevLoop + 1) as 1 | 2 | 3,
       rebirths: this.state.rebirths + 1,
       rebirthPoints: this.state.rebirthPoints + award,
@@ -1838,7 +1851,10 @@ export class SophiaCore {
     };
 
     const nextState = createInitialState(Date.now());
-    nextState.intelligence.level = preserved.level;
+    // §需求调整(bug7a)：重生重置智力等级——从 Lv1 重新升级（原本保留等级=「意识备份」，
+    //   与已有的循环 XP 折扣 loopXpMult2/3「每循环再升级更快」机制相冲突/形同虚设）。
+    //   等级清零后，循环二/三靠 loopXpMult 折扣更快爬回来，三幕不退化成重复的慢。
+    nextState.intelligence.level = 1;
     nextState.intelligence.xp = "0";
     // 重生不重放开场教学——她已经学过了（§ 玩家反馈：每次重生别再走一遍新手引导）。
     nextState.tutorialStep = TUTORIAL_BUBBLE_COUNT;
