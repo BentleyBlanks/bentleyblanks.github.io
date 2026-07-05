@@ -16,25 +16,41 @@ export class JuiceManager {
     }
   }
 
-  number(text: string, global: PointData, color: number): void {
+  // 需求2·算力获得动效：big=true 用于「这一张挣了多少」的核心收益读数——更大字号 + 发光描边 +
+  // 弹入(back.out)冲击 + 更长的上浮距离/时长，一眼可辨于其余细碎浮字（"处理中…"/"接驳"…仍用默认小号）。
+  number(text: string, global: PointData, color: number, opts?: { big?: boolean }): void {
+    const big = opts?.big ?? false;
     const label = new Text({
       text,
       style: {
         fill: color,
-        fontSize: 18,
-        fontWeight: "800",
+        fontSize: big ? 32 : 18,
+        fontWeight: "900",
         fontFamily: "'Noto Sans SC', Inter, sans-serif",
-        stroke: { color: 0x101313, width: 3 }
+        stroke: { color: 0x101313, width: big ? 5 : 3 },
+        dropShadow: big ? { color, alpha: 0.65, blur: 10, distance: 0 } : false
       }
     });
     label.anchor.set(0.5);
     label.position.set(global.x, global.y);
+    label.scale.set(big ? 0.4 : 1);
     this.layer.addChild(label);
     this.active.add(label);
-    gsap.to(label.position, { y: global.y - 54, duration: 0.72, ease: "power2.out" });
+
+    if (big) {
+      // 弹入冲击：先过冲再回稳，比线性淡出更「砸中」。
+      gsap.timeline()
+        .to(label.scale, { x: 1.22, y: 1.22, duration: 0.2, ease: "back.out(2.8)" })
+        .to(label.scale, { x: 1, y: 1, duration: 0.16, ease: "power1.out" });
+    }
+
+    const travel = big ? 92 : 54;
+    const duration = big ? 1.05 : 0.72;
+    gsap.to(label.position, { y: global.y - travel, duration, ease: "power2.out" });
     gsap.to(label, {
       alpha: 0,
-      duration: 0.72,
+      duration,
+      delay: big ? 0.16 : 0,
       ease: "power2.in",
       onComplete: () => {
         this.active.delete(label);

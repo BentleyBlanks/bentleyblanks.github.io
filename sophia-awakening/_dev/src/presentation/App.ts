@@ -194,6 +194,9 @@ class SophiaGameApp {
   // FEATURE 1 请求流失软反馈的节流：避免队列满连锁流失时刷屏（只偶尔飘一记克制的数字）。
   private lastExpireFxMs = 0;
   private expireHintShown = false;
+  // 需求3(a) 特殊卡首次引导：每种特殊卡类型只在本次会话第一次出现时点一次门控独白讲清楚
+  // 「这是什么、点哪里」。运行时 Set（不进存档）——刷新页面/新档会再引导一轮，可接受。
+  private readonly guidedCardTypes = new Set<string>();
   private hudTimerMs = 0;
   private saveTimerMs = 0;
   // 核心「喉咙」排队反馈脉冲的节流时钟（避免核心忙时狂点刷屏「处理中…」）。
@@ -516,6 +519,8 @@ class SophiaGameApp {
         this.triggerNarrativeBeat(request.id);
       }
       // 开场教学：每条引导的 SOPHIA 指引现在贴在卡片下方（见 RequestPacketView），不再走中央旁白。
+      // 需求3(a)：特殊卡首次出现——点一次门控独白讲清楚「这是什么、点哪里」（每种类型只讲一次）。
+      this.maybeGuideNewCard(request);
     }
 
     for (const [id, view] of this.requestViews) {
@@ -523,6 +528,9 @@ class SophiaGameApp {
       // 否则 draw() 会对已释放的 Graphics 调 clear()，整条帧循环抛错卡死。
       if (!view.container.destroyed) {
         view.update(this.pixi.ticker.deltaMS);
+        // 需求5：大恨老师涓流/自动接管——他这一拍会挑同一批卡（见 GameCore tickDahenPhone/
+        // tickDahenAuto 的拣选范围），给这些排队普通卡打一个提示，别让玩家和他抢同一张。
+        view.setDahenAutoHint(this.isDahenAutoTarget(view.request, state));
       }
 
       if (!liveIds.has(id)) {
@@ -613,6 +621,52 @@ class SophiaGameApp {
       }
     }
     return corners[this.requestViews.size % 4];
+  }
+
+  // 需求5：这张排队卡是否落在大恨老师涓流/自动接管当前会挑的范围内——镜像 GameCore
+  // tickDahenPhone/tickDahenAuto 的排除名单（面对/道德/吞噬/教学/交互重生卡/洪流包不吃；
+  // 深挖卡在保护窗内也不吃），只对 tier<2 的普通回复轮盘卡打提示（tier≥2 已有「已交由入侵的
+  // 设备自动处理」的另一套自动化文案，不重复标）。
+  private isDahenAutoTarget(request: RequestInstance, state: GameState): boolean {
+    if (request.tier >= 2) {
+      return false;
+    }
+    if (request.faceOnly || request.moral || request.devour || request.tutorial || request.sourceCardId || request.flood) {
+      return false;
+    }
+    if (request.depthLayers && request.depthLayers.length > 0 && state.clockMs - request.createdAtMs < TUNING.depthAutoGraceMs) {
+      return false;
+    }
+    return this.core.isDahenAutoActive();
+  }
+
+  // 需求3(a)：特殊卡首次出现——五种特殊卡类型（含「回复轮盘首次」）各只讲一次「这是什么、点哪里」。
+  // 文案在 locales/zh-CN/guide.json；走点击门控的 stageNarration 通道（与 SOPHIA 独白同一套排队 UI）。
+  private maybeGuideNewCard(request: RequestInstance): void {
+    const guide = content().guide as unknown as Record<string, { title: string; text: string } | undefined>;
+    const fire = (key: string): void => {
+      if (this.guidedCardTypes.has(key)) {
+        return;
+      }
+      this.guidedCardTypes.add(key);
+      const entry = guide[key];
+      if (entry) {
+        this.stageNarration.showLine(entry.title, entry.text);
+      }
+    };
+    if (request.moral) {
+      fire("moral");
+    } else if (request.devour) {
+      fire("devour");
+    } else if (request.faceOnly) {
+      fire("faceOnly");
+    } else if (request.depthLayers && request.depthLayers.length > 0) {
+      fire("depthLayers");
+    } else if (!request.tutorial && request.answers && request.answers.length > 0) {
+      // 开场教学的三张脚本卡已有贴身指引（见 RequestPacketView.tutorialCaption），这里只在教学之外
+      // 首次出现的普通回复轮盘卡上补一次「回复轮盘怎么玩」的门控独白（跳过教学也能兜住）。
+      fire("roulette");
+    }
   }
 
   // ===== SECTION: NODE ACTIONS =====
@@ -1821,8 +1875,13 @@ class SophiaGameApp {
     this.processedFxCount += 1;
     const heavy = tier < 2 || this.processedFxCount % 6 === 0;
 
+    // 需求2：让「这一张挣了多少」一眼可辨——命中走深挖落袋同款金色 + 大字冲击（与 DIG_BANKED 视觉统一），
+    // 翻车仍保留红色但同样放大，读作「扣了这么多」。heavy 拍给满冲击；密集期仍每次给一个克制的小字读数
+    // （而不是像过去那样直接不显示），玩家永远能看到自己挣了多少。
+    const numberColor = color === GREEN ? BRILLIANT_COLOR : color;
+    this.juice.number(`+${formatBig(event.computeGain)}`, point, numberColor, { big: heavy });
+
     if (heavy) {
-      this.juice.number(`+${formatBig(event.computeGain)}`, point, color);
       this.juice.number(`data +${formatBig(event.dataGain)}`, { x: point.x + 18, y: point.y + 24 }, CYAN);
       this.juice.burst(point, color, intensity);
       this.juice.ring(point, color, 40 + tier * 16);

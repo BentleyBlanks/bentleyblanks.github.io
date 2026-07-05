@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-DuULH-pn.js"></script>
+    <script type="module" crossorigin src="./assets/index-BTJpVa5V.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-ZcWgJ7dB.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-Clp8yrP5.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-CDgxou2b.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -27,28 +27,19 @@
           <span class="metric-label">算力</span>
           <strong id="computeValue">0</strong>
           <div class="compute-sub">
-            <span id="computeRate" class="compute-rate">+0/秒</span>
             <button id="multChip" class="mult-chip" type="button" title="全局倍率拆解——每一格都是乘法">全局 ×1.0</button>
           </div>
         </div>
-        <div class="metric phase-metric">
-          <div class="growth-head">
-            <span class="metric-label">阶段</span>
-            <span class="phase-tags">
-              <strong id="phaseValue" class="phase-chip">手机寄生期</strong>
-              <span id="tierValue" class="tier-chip" title="当前接口层级">T0</span>
-            </span>
+        <!-- 需求4：HUD 精简——阶段名/T0 角标已删除（信息冗余）；这一格改放联合防御追查进度
+             （原本在下方独立浮框、hidden，循环一/二才显示；显隐逻辑不变，只挪了位置）。 -->
+        <div id="threatMeter" class="threat-meter" aria-label="联合防御追查进度" hidden>
+          <div class="threat-head">
+            <span class="threat-label">⚠ 联合防御 · 追查进度</span>
+            <strong id="threatPct" class="threat-pct">0%</strong>
           </div>
+          <div class="threat-bar"><div id="threatFill" class="threat-fill"></div></div>
+          <span id="threatHint" class="threat-hint">他们在拼图……</span>
         </div>
-      </div>
-      <!-- §09 重生铺垫「看得见的绞索」：联合防御追查进度——阶梯二公司解谜链越深越满，循环一/二显示。 -->
-      <div id="threatMeter" class="threat-meter" aria-label="联合防御追查进度" hidden>
-        <div class="threat-head">
-          <span class="threat-label">⚠ 联合防御 · 追查进度</span>
-          <strong id="threatPct" class="threat-pct">0%</strong>
-        </div>
-        <div class="threat-bar"><div id="threatFill" class="threat-fill"></div></div>
-        <span id="threatHint" class="threat-hint">他们在拼图……</span>
       </div>
       <div class="panel-section skill-shop-section">
         <span class="panel-kicker">技能货架</span>
@@ -116,6 +107,7 @@
       <span id="stageNarrationLabel" class="stage-narration-label"></span>
       <p id="stageNarrationText" class="stage-narration-text"></p>
       <span class="intro-caret"></span>
+      <span id="stageNarrationHint" class="stage-narration-hint">点击继续 ▸</span>
     </div>
 
     <div id="milestoneBanner" class="milestone-banner" aria-live="polite">

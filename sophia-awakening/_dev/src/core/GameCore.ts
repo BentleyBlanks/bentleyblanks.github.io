@@ -150,6 +150,21 @@ export class SophiaCore {
     };
   }
 
+  // §09 表现层观测量：大恨老师涓流(tickDahenPhone)/自动接管(tickDahenAuto)当前是否在吃卡——
+  // 供 RequestPacketView 给「可能被他吃掉」的排队卡打一个提示标记，别让玩家和他抢同一张。
+  // 纯读取、不改状态；镜像两个 tick 方法的门控条件，改动那边的门控时记得同步这里。
+  isDahenAutoActive(): boolean {
+    const s = this.state;
+    if ((s.skills.dahen_auto ?? 0) >= 1) {
+      return s.automationUnlocked; // tickDahenAuto：买下里程碑后，只要已接自动化就在吃（不看 tier 上限）
+    }
+    if (s.intelligence.unlockedTier >= 2 || s.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
+      return false; // tickDahenPhone 在 tier2+ 或教学未完成时不接单
+    }
+    const inCompanyPhase = s.automationUnlocked && s.intelligence.unlockedTier < 2;
+    return inCompanyPhase || (s.skills.perm_office ?? 0) >= 1;
+  }
+
   // 上下文透镜（六档手机权限）是否到手。买下该权限即有；而一旦「夺下整机」
   //（越权调用·窃取凭证 sort）或「拿下宿主电脑」（automation）后，手机内的六档透镜默认
   // 全部到手——进入公司阶段不该再被「需相册」之类的手机权限挡住卡片 / 选项。

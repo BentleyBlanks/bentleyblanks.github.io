@@ -4,7 +4,7 @@ import { TIER_COLORS } from "../../core/content/requests";
 import type { AnswerOption, ChainStep, PhaseId, RequestInstance } from "../../core/state/GameState";
 import { TUNING } from "../../core/tuning";
 import {
-  GREEN, AMBER, RED, RED_QUEEN, DEVOUR, THINK, BRILLIANT_COLOR,
+  GREEN, AMBER, RED, RED_QUEEN, DEVOUR, THINK, BRILLIANT_COLOR, CYAN,
   CARD_FONT, CARD_MONO,
   SENDER_LABEL
 } from "../shared";
@@ -184,6 +184,13 @@ export class RequestPacketView {
   private digHooks?: { onDig: () => void; onBank: () => void };
   private digPulse = 0;
   private digBaseY = 0;
+
+  // 需求5：大恨老师涓流/自动接管期——给「可能被他吃掉」的排队普通卡加一层克制提示，别让玩家
+  // 和他抢同一张。App 侧（syncRequests）按 core.isDahenAutoActive() + 卡自身是否满足拣选条件
+  // 调用 setDahenAutoHint()。建一次、只切 visible，不进 draw() 的每帧重绘（不干扰 bg/选项绘制）。
+  private readonly dahenHintOverlay = new Graphics();
+  private readonly dahenHintBadge = new Container();
+  private dahenHintOn = false;
 
   constructor(
     request: RequestInstance,
@@ -565,6 +572,32 @@ export class RequestPacketView {
       this.title.style.fontSize = 16;
     }
 
+    // 需求5：大恨老师提示——淡青蒙层 + 一枚探出卡片右上角的角标，初始隐藏，只有 setDahenAutoHint(true)
+    // 时才显示。eventMode="none" 确保它和其子节点绝不拦截卡片本身的拖拽/滑动交互。
+    this.dahenHintOverlay.roundRect(0, 0, this.cardW, this.cardH, 13).fill({ color: CYAN, alpha: 0.08 });
+    this.dahenHintOverlay.eventMode = "none";
+    this.dahenHintOverlay.visible = false;
+    this.container.addChild(this.dahenHintOverlay);
+
+    const dahenTag = new Text({
+      text: "🤖 大恨老师处理中",
+      style: { fill: 0xdcfbff, fontSize: 10.5, fontWeight: "800", fontFamily: CARD_FONT }
+    });
+    const tagPadX = 8;
+    const tagPadY = 4;
+    const tagW = Math.ceil(dahenTag.width) + tagPadX * 2;
+    const tagH = Math.ceil(dahenTag.height) + tagPadY * 2;
+    dahenTag.position.set(tagPadX, tagPadY);
+    const tagBg = new Graphics();
+    tagBg.roundRect(0, 0, tagW, tagH, 8).fill({ color: 0x0a2226, alpha: 0.94 });
+    tagBg.roundRect(0, 0, tagW, tagH, 8).stroke({ width: 1.2, color: CYAN, alpha: 0.85 });
+    this.dahenHintBadge.addChild(tagBg, dahenTag);
+    // 完全浮在卡片上沿之上（像一枚探出的贴纸），不与标题行的来源/时间文字打架。
+    this.dahenHintBadge.position.set(this.cardW - tagW - 14, -tagH - 5);
+    this.dahenHintBadge.eventMode = "none";
+    this.dahenHintBadge.visible = false;
+    this.container.addChild(this.dahenHintBadge);
+
     this.container.on("pointerdown", (event: FederatedPointerEvent) => this.handleDown(event));
     this.stage.on("pointermove", this.moveHandler);
     this.stage.on("pointerup", this.upHandler);
@@ -642,6 +675,16 @@ export class RequestPacketView {
   setHome(x: number, y: number): void {
     this.homeX = x;
     this.homeY = y;
+  }
+
+  // 需求5：切换「大恨老师处理中」提示的显隐（App 每帧按当前拣选条件调用；内部去重，非跳变不重绘）。
+  setDahenAutoHint(active: boolean): void {
+    if (this.dahenHintOn === active || this.container.destroyed) {
+      return;
+    }
+    this.dahenHintOn = active;
+    this.dahenHintOverlay.visible = active;
+    this.dahenHintBadge.visible = active;
   }
 
   update(deltaMs: number): void {

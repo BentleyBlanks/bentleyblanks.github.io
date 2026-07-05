@@ -2,7 +2,6 @@ import type { PointData } from "pixi.js";
 import { AudioDirector } from "../../audio/audioDirector";
 import { SophiaCore, deriveThreat } from "../../core/GameCore";
 import { NODE_DEFINITIONS } from "../../core/content/nodes";
-import { getPhase } from "../../core/content/phases";
 import { SKILLS } from "../../core/content/skills";
 import { captureCost } from "../../core/formulas/economy";
 import { formatBig, gte } from "../../core/math/BigNumber";
@@ -10,7 +9,7 @@ import type { GameState, NodeDefinition } from "../../core/state/GameState";
 import { gameStore } from "../../store/gameStore";
 import {
   NODE_ICONS,
-  domainLevelOf, getNextGoalProgress, query, tierForm, fxSettings
+  domainLevelOf, getNextGoalProgress, query, fxSettings
 } from "../shared";
 import { TuningEditorView } from "./TuningEditorView";
 import { ContentEditorView } from "./ContentEditorView";
@@ -25,8 +24,6 @@ export class HudView {
   private readonly goalFill = query("#goalFill");
   private readonly goalPct = query("#goalPct");
   private readonly intelMetric = query(".intel-metric");
-  private readonly tierValue = query("#tierValue");
-  private readonly phaseValue = query("#phaseValue");
   private readonly captureList = query("#captureList");
   private readonly rightRail = query("#rightRail");
   // §09 重生铺垫「看得见的绞索」：联合防御追查进度条（阶梯二公司链越深越满，循环一/二显示）。
@@ -211,9 +208,6 @@ export class HudView {
     this.goalPct.textContent = goal.ready ? "可解锁！" : `${Math.floor(goal.pct)}%`;
     this.intelMetric.classList.toggle("is-ready", goal.ready);
     this.intelMetric.classList.toggle("is-close", !goal.ready && goal.pct >= 80);
-    this.tierValue.textContent = tierForm(state.intelligence.unlockedTier);
-    const phase = getPhase(state.phase);
-    this.phaseValue.textContent = phase.label;
     this.renderThreat(state);
     this.renderCaptureList(state);
   }
@@ -262,8 +256,11 @@ export class HudView {
   private renderCaptureList(state: GameState): void {
     const definitions = NODE_DEFINITIONS.filter((node) => state.discoveredNodeIds.includes(node.id));
     const level = domainLevelOf(state);
+    // 需求1：第二阶段（公司阶段 = automationUnlocked && unlockedTier < 2）还黑不进真的设备——
+    // 这段解谜链走公司地图/里程碑，不是 CAPTURE_NODE，右栏「控制域·扩张与管理」面板是多余的，隐藏它。
+    const inCompanyPhase = state.automationUnlocked && state.intelligence.unlockedTier < 2;
     // 无设备可控（手机寄生期、还没可入侵目标）时整条右栏隐藏，别占着空框。
-    const hasDevices = state.automationUnlocked || definitions.length > 0 || state.nodes.length > 0;
+    const hasDevices = !inCompanyPhase && (state.automationUnlocked || definitions.length > 0 || state.nodes.length > 0);
     this.rightRail.style.display = hasDevices ? "" : "none";
     const roman = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ"];
     // 控制域升维后，黑入的不再是「一台设备」而是「区域 / 全球节点」——按当前控制层换措辞。

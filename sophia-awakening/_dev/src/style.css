@@ -1641,6 +1641,37 @@ button:disabled {
   border-radius: 13px;
   box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
   text-shadow: 0 0 18px rgba(137, 255, 154, 0.3);
+  /* 需求3(b)：点击推进的对话框——容器本身 pointer-events:none（不挡卡片/核心操作），
+     只有这个文字气泡可点，点它才推进队列里的下一句。 */
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* 打字完成后才亮出的「点击继续」提示——过场式阶段横幅（自动淡出）不显示这个。 */
+.stage-narration-hint {
+  order: 3;
+  margin-top: -2px;
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: rgba(4, 11, 10, 0.7);
+  border: 1px solid rgba(255, 184, 74, 0.4);
+  color: var(--amber);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.stage-narration-hint.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  animation: stage-hint-pulse 1.15s ease-in-out infinite;
+}
+@keyframes stage-hint-pulse {
+  0%, 100% { opacity: 0.68; }
+  50% { opacity: 1; }
 }
 
 .stage-narration-label {
@@ -1913,21 +1944,15 @@ button:disabled {
 .rebirth-node.is-spine { grid-column: span 1; }
 .rebirth-node.is-story { grid-column: span 2; }
 
-/* ── 倍率堆栈 HUD：算力下方「+N/秒」+ 可点「全局 ×N」小片 + 拆解弹窗 ── */
+/* ── 倍率堆栈 HUD：算力下方可点的「全局 ×N」小片 + 拆解弹窗（需求4：移除了冗余的
+   「+N/秒」被动产出速率读数，这行现在只剩右对齐的倍率小片）。 ── */
 .compute-sub {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 6px;
 }
-.compute-rate {
-  font-size: 12px;
-  font-weight: 700;
-  color: #79e0a8;
-  white-space: nowrap;
-}
-.compute-rate.is-idle { color: #6f7f78; }
 .mult-chip {
   flex: 0 0 auto;
   padding: 3px 9px;
@@ -1994,6 +2019,9 @@ button:disabled {
 .threat-hint { display: block; margin-top: 6px; font-size: 10.5px; line-height: 1.5; color: #e6b9b1; font-style: italic; }
 /* 追查进度 ≥85% 时整条更急促地呼吸，把「就差服务器」的压迫感顶到脸上。 */
 .threat-meter.is-critical { border-color: rgba(255, 70, 70, 0.6); animation-duration: 1.5s; }
+/* 需求4：现在嵌进 #topHud/.metric-cluster 的 flex 堆栈里（原阶段格的位置）——
+   父容器已有 10px 的 flex gap，这里的自带上边距会重复叠加，去掉即可。 */
+.metric-cluster .threat-meter { margin-top: 0; }
 @keyframes threat-breathe {
   0%, 100% { box-shadow: 0 0 0 rgba(255, 60, 60, 0); }
   50% { box-shadow: 0 0 16px rgba(255, 60, 60, 0.18); }
