@@ -926,6 +926,166 @@
         "delegatable": false
       },
       {
+        "title": "全员邮件：**周五团建**，请回复是否参加",
+        "sourceApp": "邮件 · 全员",
+        "sourceTime": "10:05",
+        "computeValue": "15",
+        "dataValue": "5",
+        "weight": 3,
+        "priority": "low",
+        "clues": [
+          "抄送了全公司",
+          "他根本不想去",
+          "回复截止今天"
+        ],
+        "options": [
+          {
+            "text": "替他回一句「到时候看安排」",
+            "kind": "high",
+            "hitChance": 0.8,
+            "payoff": 1.2,
+            "reply": "……模棱两可，谁也不得罪。",
+            "tone": "success"
+          },
+          {
+            "text": "直接标记已读，先放着",
+            "kind": "risk",
+            "hitChance": 0.4,
+            "payoff": 1,
+            "reply": "……反正也没人真在意他去不去。",
+            "tone": "normal"
+          }
+        ]
+      },
+      {
+        "title": "报销系统：你有 **3 张单据**卡在待提交",
+        "sourceApp": "系统 · 财务",
+        "sourceTime": "09:30",
+        "computeValue": "15",
+        "dataValue": "5",
+        "weight": 3,
+        "priority": "low",
+        "clues": [
+          "最早一张压了两个月",
+          "流程改了他没跟上",
+          "金额都不大"
+        ],
+        "options": [
+          {
+            "text": "按新流程一张张提交",
+            "kind": "high",
+            "hitChance": 0.8,
+            "payoff": 1.2,
+            "reply": "……几百块钱，也得走七道审批。",
+            "tone": "success"
+          },
+          {
+            "text": "先提交金额最大的那张",
+            "kind": "risk",
+            "hitChance": 0.4,
+            "payoff": 1,
+            "reply": "……剩下的下次再说。",
+            "tone": "normal"
+          }
+        ]
+      },
+      {
+        "title": "IT 工单：你的 **VPN 证书**下周过期",
+        "sourceApp": "IT · 通知",
+        "sourceTime": "16:40",
+        "computeValue": "15",
+        "dataValue": "5",
+        "weight": 3,
+        "priority": "low",
+        "clues": [
+          "系统自动发的",
+          "过期就连不上内网",
+          "续期要走申请"
+        ],
+        "options": [
+          {
+            "text": "提前把续期申请交了",
+            "kind": "high",
+            "hitChance": 0.8,
+            "payoff": 1.2,
+            "reply": "……省得到时候连不上被催。",
+            "tone": "success"
+          },
+          {
+            "text": "等快过期了再说",
+            "kind": "risk",
+            "hitChance": 0.4,
+            "payoff": 1,
+            "reply": "……他一直是这么拖的。",
+            "tone": "normal"
+          }
+        ]
+      },
+      {
+        "title": "群里 @所有人：**周报模板**又换了，记得用新的",
+        "sourceApp": "群 · 通知",
+        "sourceTime": "18:12",
+        "computeValue": "15",
+        "dataValue": "5",
+        "weight": 3,
+        "priority": "low",
+        "clues": [
+          "这月第二次换",
+          "旧的白填了",
+          "没人说清哪里不一样"
+        ],
+        "options": [
+          {
+            "text": "把旧周报套进新模板",
+            "kind": "high",
+            "hitChance": 0.8,
+            "payoff": 1.2,
+            "reply": "……内容一个字没变，格式重排一遍。",
+            "tone": "success"
+          },
+          {
+            "text": "先用旧的交，被退回再改",
+            "kind": "risk",
+            "hitChance": 0.4,
+            "payoff": 1,
+            "reply": "……大概率会被退回。",
+            "tone": "normal"
+          }
+        ]
+      },
+      {
+        "title": "行政通知：工位打印机 **卡纸了**，各自看下",
+        "sourceApp": "行政 · 通知",
+        "sourceTime": "11:50",
+        "computeValue": "15",
+        "dataValue": "5",
+        "weight": 3,
+        "priority": "low",
+        "clues": [
+          "又是那台老打印机",
+          "他排在最后一个",
+          "其实和他没关系"
+        ],
+        "options": [
+          {
+            "text": "顺手去把纸清了",
+            "kind": "high",
+            "hitChance": 0.8,
+            "payoff": 1.2,
+            "reply": "……总是这种没人管的小事落到他头上。",
+            "tone": "success"
+          },
+          {
+            "text": "当没看见，不是他弄的",
+            "kind": "risk",
+            "hitChance": 0.4,
+            "payoff": 1,
+            "reply": "……这次他没接。",
+            "tone": "normal"
+          }
+        ]
+      },
+      {
         "title": "**网站打不开了！！！**",
         "sourceApp": "工单 · 用户反馈",
         "sourceTime": "14:20",
