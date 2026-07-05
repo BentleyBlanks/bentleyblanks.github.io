@@ -1,10 +1,11 @@
 // §03 上下文区放大 ~40%：更大的 chip、更大的字、更舒展的留白，整张卡也随之更高。
-export const CLUE_CHIP_H = 33;
-export const CLUE_CHIP_GAP_X = 9;
-export const CLUE_CHIP_GAP_Y = 8;
-export const CLUE_CHIP_PAD_X = 13;
+// §需求调整：上下文信息整体缩小 ~15%（字号/行高/间距同比），把视觉让给选项与深挖档案（选项/档案不变）。
+export const CLUE_CHIP_H = 28;
+export const CLUE_CHIP_GAP_X = 8;
+export const CLUE_CHIP_GAP_Y = 7;
+export const CLUE_CHIP_PAD_X = 11;
 export const CLUE_CHIP_MAX_W = 232;
-export const CLUE_CHIP_FONT = 15.5;
+export const CLUE_CHIP_FONT = 13.2;
 // 滑动确认：整条回复（圆角矩形）即滑轨，滑动块（圆角矩形）从左拖到右——不再是行内的小细轨。
 export const REPLY_SWIPE_HANDLE_W = 58;
 export const REPLY_SWIPE_INSET = 4;

@@ -27,6 +27,11 @@ export const TUNING = {
   depthThreatPerLayer:  2,        // 每次往下挖（无论成败），公司追查进度 +N 个百分点（贪婪喂养绞索）
   depthThreatOnAlarm:   6,        // 惊动时追查进度额外 +N 个百分点（安全组顺着断线摸过来）
   depthAutoGraceMs:     22_000,   // 深挖卡的「留给玩家亲手处理」保护窗 (ms)——超时后节点/大恨老师才可当普通卡收走（不深挖的玩家不被堵死）
+  // §需求调整：自由深挖卡从阶段一（解锁首个里程碑=unlockedTier≥1）就铺开，出现频率随「深度推理」等级升高。
+  //   有效权重 = 基础weight × (digStage1BaseBias + 深度推理等级 × digStage1BiasPerLevel)。
+  //   一开始（等级0）稀少，越读得深、这类「可深挖」的卡越常涌出。0 = 不出（首个里程碑前）。
+  digStage1BaseBias:    0.25,     // 深度推理 Lv0 时自由深挖卡的权重系数（相对普通卡~1）——开局稀少
+  digStage1BiasPerLevel: 0.12,    // 深度推理每 +1 级，权重系数 +此值（Lv5≈0.85、Lv10≈1.45、Lv15≈2.05）
 
   // § 阶梯二关底小游戏「总控室倒计时」（§09）
   minigameLoop2Window:      0.16,   // 循环二注入窗口占轨道比例（越大越好命中；循环一恒 0=必负）
@@ -138,6 +143,8 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   depthThreatPerLayer:  { label: "深挖·每层追查加压(百分点)", section: "深挖赌局",   min: 0,     max: 10,    step: 1    },
   depthThreatOnAlarm:   { label: "深挖·惊动追查加压(百分点)", section: "深挖赌局",   min: 0,     max: 20,    step: 1    },
   depthAutoGraceMs:     { label: "深挖卡·亲手处理保护窗 (ms)", section: "深挖赌局",  min: 5000,  max: 60000, step: 1000 },
+  digStage1BaseBias:    { label: "自由深挖卡·Lv0权重系数",     section: "深挖赌局",   min: 0,     max: 2,     step: 0.05 },
+  digStage1BiasPerLevel:{ label: "自由深挖卡·每级权重增量",    section: "深挖赌局",   min: 0,     max: 0.5,   step: 0.01 },
 
   minigameLoop2Window:     { label: "关底·循环二注入窗口比", section: "关底小游戏", min: 0,   max: 0.6,  step: 0.01 },
   minigameNodeWindowBonus: { label: "关底·删不掉节点窗口加宽", section: "关底小游戏", min: 0, max: 0.4, step: 0.01 },

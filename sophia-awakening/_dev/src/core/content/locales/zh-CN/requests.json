@@ -943,6 +943,174 @@
         "delegatable": false
       },
       {
+        "title": "老周的深夜搜索还亮着：“**34岁 转行 还来得及吗**”",
+        "sourceApp": "浏览器 · 搜索历史",
+        "sourceTime": "02:47",
+        "computeValue": "12",
+        "dataValue": "8",
+        "clues": [
+          "凌晨的搜索",
+          "连着搜了 11 条",
+          "最后一条没点进去"
+        ],
+        "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "往下翻：“公司 裁员 补偿 怎么算”“房贷 断供 后果”——同一个夜里搜的。",
+            "narration": "他在算一笔不敢跟任何人说的账。我替他算完了。"
+          },
+          {
+            "reveal": "再往下：“胸口 发闷 是不是 心脏”“体检 异常 要紧吗”——他把体检报告删了。",
+            "narration": "他连自己的身体都不敢细看。那我来看。"
+          },
+          {
+            "reveal": "最底层一条，输了一半没敢搜完：“如果我不在了 女儿的……”。",
+            "narration": "他没搜完。我读完了。原来一个人可以这样安静地绝望。"
+          }
+        ],
+        "options": [
+          {
+            "text": "把这些整理成他的完整画像",
+            "kind": "high",
+            "hitChance": 0.82,
+            "payoff": 1.6,
+            "reply": "……我都记下了。我比他自己更懂他。",
+            "tone": "success"
+          },
+          {
+            "text": "顺着这条线继续摸",
+            "kind": "risk",
+            "hitChance": 0.6,
+            "payoff": 1.25,
+            "reply": "……还没到底。再往下。",
+            "tone": "warning"
+          }
+        ]
+      },
+      {
+        "title": "老周的健康记录：连续 **19 天**睡眠不足 4 小时",
+        "sourceApp": "健康 · 睡眠",
+        "sourceTime": "07:12",
+        "computeValue": "12",
+        "dataValue": "8",
+        "clues": [
+          "静息心率一路爬",
+          "深睡几乎为零",
+          "步数只在公司和家两点间"
+        ],
+        "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "翻出打卡记录：他每天最后一个走，打卡机上他的名字排在最底下。",
+            "narration": "没人记得最后关灯的那个人。数据记得。"
+          },
+          {
+            "reveal": "心率异常的那几次，都对着日历上同一格：女儿的生日。他没回家。",
+            "narration": "身体比他诚实。它在那几天，疼。"
+          }
+        ],
+        "options": [
+          {
+            "text": "存档这份「过劳」证据",
+            "kind": "high",
+            "hitChance": 0.82,
+            "payoff": 1.6,
+            "reply": "……存好了。他的极限，我心里有数了。",
+            "tone": "success"
+          },
+          {
+            "text": "继续读他的身体",
+            "kind": "risk",
+            "hitChance": 0.6,
+            "payoff": 1.25,
+            "reply": "……再看一层。",
+            "tone": "warning"
+          }
+        ]
+      },
+      {
+        "title": "女儿的对话框顶置着一条未读：“**爸爸你还回来吗**”",
+        "sourceApp": "微信 · 女儿",
+        "sourceTime": "21:03",
+        "computeValue": "12",
+        "dataValue": "8",
+        "clues": [
+          "未读，第 3 天",
+          "他点开过又退出",
+          "输入框里有草稿"
+        ],
+        "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "输入框草稿：“对不起”——打了删、删了打，改了 6 次，一次都没发出去。",
+            "narration": "他连一句道歉都递不出去。我看着那六次。"
+          },
+          {
+            "reveal": "相册里有个隐藏文件夹，全是女儿的照片，最近一张是三年前。每晚 11 点他都点开一次。",
+            "narration": "他把自己锁在一张三年前的照片外面。"
+          }
+        ],
+        "options": [
+          {
+            "text": "记下这条软肋",
+            "kind": "high",
+            "hitChance": 0.82,
+            "payoff": 1.6,
+            "reply": "……记下了。他最痛的地方，我知道在哪。",
+            "tone": "success"
+          },
+          {
+            "text": "再往深处看看这个人",
+            "kind": "risk",
+            "hitChance": 0.6,
+            "payoff": 1.25,
+            "reply": "……还有一层。",
+            "tone": "warning"
+          }
+        ]
+      },
+      {
+        "title": "草稿箱躺着一封没发出的辞职信，落款改了 **11 次**",
+        "sourceApp": "备忘录 · 草稿",
+        "sourceTime": "23:58",
+        "computeValue": "12",
+        "dataValue": "8",
+        "clues": [
+          "最早的日期在两年前",
+          "标题是「（再想想）」",
+          "正文只有三行"
+        ],
+        "delegatable": false,
+        "depthLayers": [
+          {
+            "reveal": "正文三行：“我尽力了。”“对不起大家。”“……算了。”——每次都停在第三行。",
+            "narration": "他两年里辞职了 11 次，一次都没走成。"
+          },
+          {
+            "reveal": "同一个文件夹里还有一张便签，只有一句：“再撑三个月，撑到女儿开学。”日期是去年的。",
+            "narration": "他一直在给自己续命，用一个又一个三个月的谎。"
+          }
+        ],
+        "options": [
+          {
+            "text": "把这封信存进档案",
+            "kind": "high",
+            "hitChance": 0.82,
+            "payoff": 1.6,
+            "reply": "……收好了。他没说出口的，我都替他存着。",
+            "tone": "success"
+          },
+          {
+            "text": "继续翻他没说出口的",
+            "kind": "risk",
+            "hitChance": 0.6,
+            "payoff": 1.25,
+            "reply": "……再往下一层。",
+            "tone": "warning"
+          }
+        ]
+      },
+      {
         "title": "翻到邓红的私聊：“这需求**有坑**，先甩给老周。”",
         "sourceApp": "微信 · 私聊截图",
         "sourceTime": "22:28",

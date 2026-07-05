@@ -324,18 +324,19 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   check("L 循环三·接管最后地区征服 → 发现拍 discover_global", s2.includes("discover_global") && c.getState().loop === 3, `facedSeen=${JSON.stringify(s2)}`);
 }
 
-// M. FEATURE 1 · 大恨老师·自动接管（dahen_auto 里程碑）：买下后大恨老师按自己的慢节拍自动吃排队卡
-//    （产出打折）——观测量 getDahenProcessedCount() 从 0 上升、算力被结算；未买时不接单。
+// M. FEATURE 1 · 大恨老师·公司阶段自动处理：进公司阶段（automation 已开）大恨老师「已搬进电脑·必在手中」，
+//    即使没买 perm_office / dahen_auto 也按慢节拍涓流吃排队卡（修复：原本没买 perm_office 会「搬进电脑」却空转）；
+//    买下 dahen_auto 里程碑后升级为更快的批处理（tickDahenAuto）。观测量 getDahenProcessedCount() 上升、算力被结算。
 {
   const { TUNING } = require(path.join(build, "tuning.js"));
   const c = new SophiaCore(); c.startSession(); warmup(c);
-  // 跳到「入侵邓红」阶段：automation 已开、dahen_auto 尚未解锁（requiredLevel 10 > hack_a 的 9）。
+  // 跳到「入侵邓红」阶段：automation 已开、dahen_auto 尚未解锁（requiredLevel 10 > hack_a 的 9）；且未买 perm_office。
   c.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId: "hack_a" });
   c.dispatch({ type: "DEBUG_ADD_LEVEL", delta: 20 });
   c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e7 });
-  check("M 未买 dahen_auto", (c.getState().skills["dahen_auto"] ?? 0) === 0, `dahen_auto=${c.getState().skills["dahen_auto"]}`);
-  tickFor(c, 20000); // 让请求卡堆积；未买时大恨老师不接单。
-  check("M 未买时不自动处理（计数=0）", c.getDahenProcessedCount() === 0, `count=${c.getDahenProcessedCount()}`);
+  check("M 未买 dahen_auto·未买 perm_office", (c.getState().skills["dahen_auto"] ?? 0) === 0 && (c.getState().skills["perm_office"] ?? 0) === 0 && c.getState().automationUnlocked, `dahen_auto=${c.getState().skills["dahen_auto"]} perm_office=${c.getState().skills["perm_office"]}`);
+  tickFor(c, 20000); // 公司阶段·大恨老师「必在手中」：即使没买 perm_office / dahen_auto 也按 dahenPhoneMs 涓流处理。
+  check("M 公司阶段·未买dahen_auto/perm_office 也自动涓流（搬进电脑·必在手中）", c.getDahenProcessedCount() > 0, `count=${c.getDahenProcessedCount()}`);
   c.dispatch({ type: "BUY_SKILL", skillId: "dahen_auto" });
   check("M 已买 dahen_auto", (c.getState().skills["dahen_auto"] ?? 0) > 0 && c.getState().automationUnlocked, `dahen_auto=${c.getState().skills["dahen_auto"]} auto=${c.getState().automationUnlocked}`);
   const computeBefore = Number(c.getState().resources.compute);

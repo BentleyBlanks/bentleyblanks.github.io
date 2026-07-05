@@ -301,7 +301,8 @@ export class RequestPacketView {
     timeMeta.anchor.set(1, 0.5);
     // 短信/通知卡：标题＝消息正文，缩进进气泡、字号略小；需求卡＝加粗大标题。
     const titleWrap = this.isFace ? this.cardW - 48 : this.cardW - 32;
-    const titleSize = this.isFace ? 16.5 : 19;
+    // §需求调整：标题信息缩小 ~15%（选项/档案不变），让整卡视觉重心落在选项与深挖档案上。
+    const titleSize = this.isFace ? 14 : 16.2;
     this.title = hasEmphasis(request.label)
       ? new HTMLText({
           text: toEmphasisHTML(request.label),

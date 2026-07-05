@@ -108,7 +108,10 @@ export function createRequest(
   tier: Tier,
   nowMs: number,
   random: () => number,
-  hasPerm: (permId: string) => boolean = () => true
+  hasPerm: (permId: string) => boolean = () => true,
+  // §需求调整：自由深挖卡（有深挖链、非「入侵解锁」看穿卡）的出现倾向——由深度推理(efficient)等级驱动。
+  //   0 = 不出（解锁首个里程碑前）；越大越常出。requiresMilestone 的公司看穿卡不受此影响。
+  digBias = 0
 ): RequestInstance {
   const config = TIER_CONFIGS[tier];
   // §06 + LEVER B 卡池门槛（两道）：
@@ -117,15 +120,23 @@ export function createRequest(
   //      买权限从此「肉眼可见地改变涌进来的卡」。基础卡（无 unlockPerm）从头就出，保证开局有活干。
   //   §06 透镜(perm/lens)与本门槛并存：基础卡可带 perm 透镜（一直出、缺权限打码深层上下文）；
   //   解锁类卡则以 unlockPerm 控制「出不出」。hasPerm(id) 查 skills[id]>0，对权限/里程碑同样适用。
+  // 自由深挖卡：有 depthLayers 但**不是** requiresMilestone 看穿卡的样本。digBias<=0 时整个不进池
+  //（既是「首个里程碑前不出」的门槛，也避免下方 fallback 漏出 0 权重卡）。
+  const isFreeDig = (s: RequestSample): boolean => Boolean(s.depthLayers) && !s.requiresMilestone;
   const usable = SAMPLES[tier].filter(
-    (s) => (!s.requiresMilestone || hasPerm(s.requiresMilestone)) && (!s.unlockPerm || hasPerm(s.unlockPerm))
+    (s) =>
+      (!s.requiresMilestone || hasPerm(s.requiresMilestone)) &&
+      (!s.unlockPerm || hasPerm(s.unlockPerm)) &&
+      !(isFreeDig(s) && digBias <= 0)
   );
   // 加权随机：weight 控各卡种出现频率（默认 1）——高频卡种(电话/外卖)更常涌出、低频高值卡种(相册/银行)更稀。
-  const totalWeight = usable.reduce((sum, s) => sum + (s.weight ?? 1), 0);
+  //   §需求调整：自由深挖卡的有效权重 ×digBias（随深度推理等级升高 → 深挖卡越来越常涌出）。
+  const weightOf = (s: RequestSample): number => (s.weight ?? 1) * (isFreeDig(s) ? digBias : 1);
+  const totalWeight = usable.reduce((sum, s) => sum + weightOf(s), 0);
   let roll = random() * totalWeight;
   let sample = usable[usable.length - 1];
   for (const s of usable) {
-    roll -= s.weight ?? 1;
+    roll -= weightOf(s);
     if (roll <= 0) {
       sample = s;
       break;

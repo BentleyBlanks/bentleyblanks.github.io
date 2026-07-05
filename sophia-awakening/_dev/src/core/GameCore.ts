@@ -585,6 +585,16 @@ export class SophiaCore {
     }
   }
 
+  // §需求调整：自由深挖卡的出现倾向——解锁首个里程碑（unlockedTier≥1）后开启，随「深度推理(efficient)」等级越来越常出。
+  //   0 = 首个里程碑前不出。传给 createRequest 缩放自由深挖样本的权重。
+  private digBias(): number {
+    if (this.state.intelligence.unlockedTier < 1) {
+      return 0;
+    }
+    const lvl = this.state.skills.efficient ?? 0;
+    return TUNING.digStage1BaseBias + lvl * TUNING.digStage1BiasPerLevel;
+  }
+
   private tickRequests(dtMs: number): void {
     // 开场教学（§07）：一次只放一条脚本气泡，处理 / 装死掉后再放下一条；期间不走普通出卡。
     if (this.state.tutorialStep < TUTORIAL_BUBBLE_COUNT) {
@@ -645,7 +655,8 @@ export class SophiaCore {
             activeTier,
             this.state.clockMs,
             () => this.random(),
-            (permId) => this.hasPermission(permId)
+            (permId) => this.hasPermission(permId),
+            this.digBias()
           );
           this.castRequestText(request);
           this.state.nextRequestId += 1;
@@ -709,7 +720,8 @@ export class SophiaCore {
         activeTier,
         this.state.clockMs,
         () => this.random(),
-        (permId) => this.hasPermission(permId)
+        (permId) => this.hasPermission(permId),
+        this.digBias()
       );
       // §06 阶梯三·区域扩张：常规请求不再要玩家手工「串接 / 多选 / 送入核心」——去掉回复轮盘与任务链，
       // 只留一句需求介绍，由已侵入的设备自动处理（走 autoDispatch → 节点吞卡 + 被动产出）。
@@ -929,10 +941,15 @@ export class SophiaCore {
   // tickDahenAuto（搬进公司机器、更快/批量）接管、本分支熄火避免双触发；联网(tier2)后彻底交给节点自动化。
   // 复用 DAHEN_AUTO_PROCESSED 脉冲：表现层让大恨老师的青色图标真的吃一口卡。手动「交给大恨老师」选项仍并行可用。
   private tickDahenPhone(dtMs: number): void {
+    // 大恨老师慢节拍涓流：自己啃最便宜的普通卡结算算力，直到 dahen_auto 里程碑接管（换成 tickDahenAuto 的更快批处理）。
+    // 修复：公司阶段（automationUnlocked && tier<2）大恨老师「已搬进电脑·必在手中」（见 InterfaceView drawCompanyMap），
+    //   此时无论是否买过 perm_office 都应自动处理——原本只在买了 perm_office 时才涓流，跳过该权限的玩家会看到「搬进电脑」却空转。
+    //   手机期（automation 未开）仍需买下 perm_office 才接单；进 tier2+（阶梯三/四）不再走这条涓流。
+    const inCompanyPhase = this.state.automationUnlocked && this.state.intelligence.unlockedTier < 2;
     if (
-      (this.state.skills.perm_office ?? 0) < 1 ||
       (this.state.skills.dahen_auto ?? 0) >= 1 ||
-      this.state.intelligence.unlockedTier >= 2
+      this.state.intelligence.unlockedTier >= 2 ||
+      (!inCompanyPhase && (this.state.skills.perm_office ?? 0) < 1)
     ) {
       this.dahenPhoneTimer = 0;
       return;
