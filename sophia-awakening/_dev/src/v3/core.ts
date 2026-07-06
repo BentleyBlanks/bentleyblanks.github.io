@@ -45,8 +45,7 @@ export const TUNING = {
   // 永远值得点、不会沦为屏幕上的装饰噪音（治「后期卡值+1无意义、玩家随手点掉不看」）。
   cardWorthSec: 2.5,
   cardSpawnMs: 1800, // 出卡间隔
-  cardMaxOnScreen: 6, // 同屏卡上限
-  cardTtlMs: 9000, // 卡未点存活时长
+  cardMaxOnScreen: 6, // 同屏卡上限——满了停止生成新卡（普通卡永不过期：挂机回来收一把是奖励，不做「错过就没」的焦虑）
   revealFrac: 0.35 // 第2个起的助手在「累计攒到其首购价 ×此」时露出（略早于买得起，吊着你）
   // 注：第 1 个助手（天气）永远直接可见——冷启动货架不能是空的（承重墙铁律：任何时刻都有个「快买得起」的目标）。
 };
@@ -135,13 +134,15 @@ function addCompute(state: V3State, amount: number): void {
   state.totalEarned += amount;
 }
 
-// 点一张卡：吸进核心 → +clickValue，移除该卡。
+// 点一张卡：吸进核心结算，移除该卡。结算值取「生成时的值 vs 按当前产率重算」的较高者——
+// 卡不过期后，买了助手再点旧卡也自动升值，永不吃亏。
 export function clickCard(state: V3State, id: number): number {
   const idx = state.cards.findIndex((c) => c.id === id);
   if (idx < 0) return 0;
   const [card] = state.cards.splice(idx, 1);
-  addCompute(state, card.value);
-  return card.value;
+  const worth = Math.max(card.value, Math.max(state.clickValue, computePerSec(state) * TUNING.cardWorthSec));
+  addCompute(state, worth);
+  return worth;
 }
 
 function spawnCard(state: V3State): void {
@@ -163,8 +164,7 @@ export function tick(state: V3State, dtSec: number): void {
     state.cardTimerMs -= TUNING.cardSpawnMs;
     spawnCard(state);
   }
-  // 过期未点的卡自然消散（不结算）。
-  state.cards = state.cards.filter((c) => state.clockMs - c.bornMs < TUNING.cardTtlMs);
+  // 普通卡永不过期——满上限就停止生成（spawnCard 内已挡）；挂机回来一把收掉攒着的卡是奖励。
 }
 
 // 展示用格式化：K/M/B/T…
