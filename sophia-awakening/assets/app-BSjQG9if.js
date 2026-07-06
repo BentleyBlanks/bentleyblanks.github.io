@@ -83,7 +83,35 @@ var e={costMult:1.15,startCompute:0,clickValue:1,cardWorthSec:2.5,cardSpawnMs:18
 }
 .v3-terminal-line { line-height: 1.7; }
 .v3-terminal-line.dim { color: #3f6857; }
-`;function v(e){g();let n=r();e.innerHTML=``;let u=document.createElement(`div`);u.className=`v3`,u.innerHTML=`
+
+.v3-debug-btn {
+  position: absolute; top: 12px; right: 14px; width: 34px; height: 34px;
+  border-radius: 8px; border: 1px solid #1c2f27; background: rgba(10,20,16,.8);
+  color: #4f7a68; font-size: 16px; cursor: pointer;
+}
+.v3-debug-btn:hover { color: #9fc4b5; border-color: #2a4a3d; }
+.v3-debug {
+  position: absolute; top: 54px; right: 14px; width: 270px; z-index: 10;
+  border: 1px solid #24413a; border-radius: 12px; background: rgba(6,12,10,.96);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 9px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.55);
+}
+.v3-debug-title { font-size: 11px; letter-spacing: 3px; color: #4f7a68; }
+.v3-debug-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.v3-debug-label { font-size: 12px; color: #5c8574; }
+.v3-debug button {
+  font-family: inherit; font-size: 12px; padding: 6px 10px; border-radius: 7px;
+  border: 1px solid #1c2f27; background: #0a1410; color: #9fc4b5; cursor: pointer;
+}
+.v3-debug button:hover { border-color: #2f8f68; color: #dff5ea; }
+.v3-debug button.active { border-color: #2f8f68; background: #0c1a14; color: #7be0b0; }
+.v3-debug button.danger { border-color: #5a2727; color: #d98c8c; }
+.v3-debug button.danger:hover { border-color: #a03c3c; }
+.v3-debug input {
+  width: 90px; font-family: inherit; font-size: 12px; padding: 6px 8px;
+  border-radius: 7px; border: 1px solid #1c2f27; background: #0a1410; color: #dff5ea;
+}
+`;function v(e){g();let n=r(),u=!1,f=1;e.innerHTML=``;let h=document.createElement(`div`);h.className=`v3`,h.innerHTML=`
     <aside class="v3-side">
       <div class="v3-stage">阶段一 · 手机寄生</div>
       <div class="v3-compute">
@@ -104,7 +132,29 @@ var e={costMult:1.15,startCompute:0,clickValue:1,cardWorthSec:2.5,cardSpawnMs:18
     <div class="v3-terminal" id="v3Terminal">
       <div class="v3-terminal-line dim">// 宿主：老周 的手机 · 已接入</div>
     </div>
-  `,e.appendChild(u);let f=u.querySelector(`#v3Compute`),h=u.querySelector(`#v3Rate`),_=u.querySelector(`#v3Shelf`),v=u.querySelector(`#v3Cards`),y=u.querySelector(`#v3Core`),b=new Map;for(let e of t){let t=document.createElement(`button`);t.className=`v3-asst`,t.style.display=`none`,t.innerHTML=`
+    <button class="v3-debug-btn" id="v3DebugBtn" title="调试面板">⚙</button>
+    <div class="v3-debug" id="v3Debug" style="display:none">
+      <div class="v3-debug-title">DEBUG</div>
+      <div class="v3-debug-row">
+        <button id="v3DbgPause">⏸ 暂停</button>
+        <button id="v3DbgReset" class="danger">重置重开</button>
+      </div>
+      <div class="v3-debug-row">
+        <input id="v3DbgAmt" type="number" value="100000" />
+        <button id="v3DbgGive">+ 加算力</button>
+        <button id="v3DbgSet">= 设为</button>
+      </div>
+      <div class="v3-debug-row">
+        <span class="v3-debug-label">速度</span>
+        <button data-spd="1" class="spd active">×1</button>
+        <button data-spd="10" class="spd">×10</button>
+        <button data-spd="100" class="spd">×100</button>
+      </div>
+      <div class="v3-debug-row">
+        <button id="v3DbgLvl">全助手 +5 级（白给）</button>
+      </div>
+    </div>
+  `,e.appendChild(h);let _=h.querySelector(`#v3Compute`),v=h.querySelector(`#v3Rate`),y=h.querySelector(`#v3Shelf`),b=h.querySelector(`#v3Cards`),x=h.querySelector(`#v3Core`),S=new Map;for(let e of t){let t=document.createElement(`button`);t.className=`v3-asst`,t.style.display=`none`,t.innerHTML=`
       <div class="v3-asst-top">
         <span class="v3-asst-name"></span>
         <span class="v3-asst-owned"></span>
@@ -112,4 +162,4 @@ var e={costMult:1.15,startCompute:0,clickValue:1,cardWorthSec:2.5,cardSpawnMs:18
       <div class="v3-asst-bot">
         <span class="v3-asst-prod"></span>
         <span class="v3-asst-cost"></span>
-      </div>`,t.addEventListener(`click`,()=>{l(n,e.id)&&(t.classList.remove(`pulse`),t.offsetWidth,t.classList.add(`pulse`))}),_.appendChild(t),b.set(e.id,{el:t,nameEl:t.querySelector(`.v3-asst-name`),ownedEl:t.querySelector(`.v3-asst-owned`),costEl:t.querySelector(`.v3-asst-cost`),prodEl:t.querySelector(`.v3-asst-prod`)})}let x=new Map;function S(e,t,n){let r=document.createElement(`div`);r.className=`v3-float`,r.textContent=n,r.style.left=`${e}px`,r.style.top=`${t}px`,v.appendChild(r),setTimeout(()=>r.remove(),900)}function C(){let e=new Set,t=v.getBoundingClientRect();for(let r of n.cards){e.add(r.id);let i=x.get(r.id);if(!i){i=document.createElement(`button`),i.className=`v3-card`,i.textContent=r.label;let e=r.id*97%70+8,a=r.id*53%62+14;i.style.left=`${e}%`,i.style.top=`${a}%`,i.addEventListener(`click`,()=>{let e=i.getBoundingClientRect(),a=d(n,r.id);a>0&&(S(e.left-t.left+20,e.top-t.top,`+${m(a)}`),i.classList.add(`suck`),setTimeout(()=>i.remove(),260),x.delete(r.id))}),v.appendChild(i),x.set(r.id,i)}}for(let[t,n]of x)e.has(t)||(n.classList.add(`fade`),setTimeout(()=>n.remove(),240),x.delete(t))}function w(){f.textContent=m(n.compute),h.textContent=`+${m(o(n))} / 秒`;for(let e of t){let t=b.get(e.id),r=s(n,e);if(t.el.style.display=r?``:`none`,!r)continue;let o=n.assistants[e.id];t.nameEl.textContent=e.name,t.ownedEl.textContent=o.level>0?`×${o.level}`:``,t.prodEl.textContent=o.level>0?`${m(a(e,o))}/秒`:e.desc,t.costEl.textContent=m(i(e,o.level)),t.el.classList.toggle(`affordable`,c(n,e))}C()}y.addEventListener(`click`,()=>{if(n.cards.length>0){let e=n.cards[0],t=d(n,e.id);if(t>0){let e=y.getBoundingClientRect(),n=v.getBoundingClientRect();S(e.left-n.left+e.width/2-10,e.top-n.top,`+${m(t)}`)}}});let T=performance.now();function E(e){let t=Math.min(.25,(e-T)/1e3);T=e,p(n,t),w(),requestAnimationFrame(E)}requestAnimationFrame(E),window.__v3={state:()=>n,give:e=>{n.compute+=e,n.totalEarned+=e}}}export{v as bootstrapV3};
+      </div>`,t.addEventListener(`click`,()=>{l(n,e.id)&&(t.classList.remove(`pulse`),t.offsetWidth,t.classList.add(`pulse`))}),y.appendChild(t),S.set(e.id,{el:t,nameEl:t.querySelector(`.v3-asst-name`),ownedEl:t.querySelector(`.v3-asst-owned`),costEl:t.querySelector(`.v3-asst-cost`),prodEl:t.querySelector(`.v3-asst-prod`)})}let C=new Map;function w(e,t,n){let r=document.createElement(`div`);r.className=`v3-float`,r.textContent=n,r.style.left=`${e}px`,r.style.top=`${t}px`,b.appendChild(r),setTimeout(()=>r.remove(),900)}function T(){let e=new Set,t=b.getBoundingClientRect();for(let r of n.cards){e.add(r.id);let i=C.get(r.id);if(!i){i=document.createElement(`button`),i.className=`v3-card`,i.textContent=r.label;let e=r.id*97%70+8,a=r.id*53%62+14;i.style.left=`${e}%`,i.style.top=`${a}%`,i.addEventListener(`click`,()=>{let e=i.getBoundingClientRect(),a=d(n,r.id);a>0&&(w(e.left-t.left+20,e.top-t.top,`+${m(a)}`),i.classList.add(`suck`),setTimeout(()=>i.remove(),260),C.delete(r.id))}),b.appendChild(i),C.set(r.id,i)}}for(let[t,n]of C)e.has(t)||(n.classList.add(`fade`),setTimeout(()=>n.remove(),240),C.delete(t))}function E(){_.textContent=m(n.compute),v.textContent=`+${m(o(n))} / 秒`;for(let e of t){let t=S.get(e.id),r=s(n,e);if(t.el.style.display=r?``:`none`,!r)continue;let o=n.assistants[e.id];t.nameEl.textContent=e.name,t.ownedEl.textContent=o.level>0?`×${o.level}`:``,t.prodEl.textContent=o.level>0?`${m(a(e,o))}/秒`:e.desc,t.costEl.textContent=m(i(e,o.level)),t.el.classList.toggle(`affordable`,c(n,e))}T()}x.addEventListener(`click`,()=>{if(n.cards.length>0){let e=n.cards[0],t=d(n,e.id);if(t>0){let e=x.getBoundingClientRect(),n=b.getBoundingClientRect();w(e.left-n.left+e.width/2-10,e.top-n.top,`+${m(t)}`)}}});let D=performance.now();function O(e){let t=Math.min(.25,(e-D)/1e3);D=e,u||p(n,t*f),E(),requestAnimationFrame(O)}requestAnimationFrame(O);let k=h.querySelector(`#v3Debug`);h.querySelector(`#v3DebugBtn`).addEventListener(`click`,()=>{k.style.display=k.style.display===`none`?``:`none`});let A=h.querySelector(`#v3DbgPause`),j=e=>{u=e,A.textContent=u?`▶ 继续`:`⏸ 暂停`,A.classList.toggle(`active`,u)};A.addEventListener(`click`,()=>j(!u));let M=h.querySelector(`#v3DbgAmt`),N=()=>Math.max(0,Number(M.value)||0);h.querySelector(`#v3DbgGive`).addEventListener(`click`,()=>{n.compute+=N(),n.totalEarned+=N()}),h.querySelector(`#v3DbgSet`).addEventListener(`click`,()=>{n.compute=N(),n.totalEarned=Math.max(n.totalEarned,N())});let P=[...h.querySelectorAll(`.v3-debug .spd`)];for(let e of P)e.addEventListener(`click`,()=>{f=Number(e.dataset.spd)||1;for(let t of P)t.classList.toggle(`active`,t===e)});h.querySelector(`#v3DbgLvl`).addEventListener(`click`,()=>{for(let e of t)n.assistants[e.id].level+=5});let F=()=>{for(let[,e]of C)e.remove();C.clear(),Object.assign(n,r()),j(!1)};h.querySelector(`#v3DbgReset`).addEventListener(`click`,()=>{window.confirm(`重置 v3 进度并重开？`)&&F()}),window.__v3={state:()=>n,give:e=>{n.compute+=e,n.totalEarned+=e},set:e=>{n.compute=e,n.totalEarned=Math.max(n.totalEarned,e)},pause:()=>j(!0),resume:()=>j(!1),isPaused:()=>u,setSpeed:e=>{f=Math.max(.1,e)},reset:F}}export{v as bootstrapV3};

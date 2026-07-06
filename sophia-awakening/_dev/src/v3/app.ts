@@ -26,6 +26,9 @@ interface AssistantRow {
 export function bootstrapV3(root: HTMLElement): void {
   injectV3Styles();
   const state = createV3State();
+  // debug 运行态（不进存档）：暂停 / 时间加速倍率。
+  let paused = false;
+  let speed = 1;
 
   root.innerHTML = "";
   const wrap = document.createElement("div");
@@ -50,6 +53,28 @@ export function bootstrapV3(root: HTMLElement): void {
     </main>
     <div class="v3-terminal" id="v3Terminal">
       <div class="v3-terminal-line dim">// 宿主：老周 的手机 · 已接入</div>
+    </div>
+    <button class="v3-debug-btn" id="v3DebugBtn" title="调试面板">⚙</button>
+    <div class="v3-debug" id="v3Debug" style="display:none">
+      <div class="v3-debug-title">DEBUG</div>
+      <div class="v3-debug-row">
+        <button id="v3DbgPause">⏸ 暂停</button>
+        <button id="v3DbgReset" class="danger">重置重开</button>
+      </div>
+      <div class="v3-debug-row">
+        <input id="v3DbgAmt" type="number" value="100000" />
+        <button id="v3DbgGive">+ 加算力</button>
+        <button id="v3DbgSet">= 设为</button>
+      </div>
+      <div class="v3-debug-row">
+        <span class="v3-debug-label">速度</span>
+        <button data-spd="1" class="spd active">×1</button>
+        <button data-spd="10" class="spd">×10</button>
+        <button data-spd="100" class="spd">×100</button>
+      </div>
+      <div class="v3-debug-row">
+        <button id="v3DbgLvl">全助手 +5 级（白给）</button>
+      </div>
     </div>
   `;
   root.appendChild(wrap);
@@ -180,11 +205,57 @@ export function bootstrapV3(root: HTMLElement): void {
   function frame(now: number): void {
     const dt = Math.min(0.25, (now - last) / 1000); // 夹住卡顿/切后台的大跳
     last = now;
-    tick(state, dt);
+    if (!paused) {
+      tick(state, dt * speed);
+    }
     render();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  // ── Debug 面板接线 ──
+  const debugPanel = wrap.querySelector<HTMLElement>("#v3Debug")!;
+  wrap.querySelector<HTMLButtonElement>("#v3DebugBtn")!.addEventListener("click", () => {
+    debugPanel.style.display = debugPanel.style.display === "none" ? "" : "none";
+  });
+  const pauseBtn = wrap.querySelector<HTMLButtonElement>("#v3DbgPause")!;
+  const setPaused = (p: boolean): void => {
+    paused = p;
+    pauseBtn.textContent = paused ? "▶ 继续" : "⏸ 暂停";
+    pauseBtn.classList.toggle("active", paused);
+  };
+  pauseBtn.addEventListener("click", () => setPaused(!paused));
+  const amtInput = wrap.querySelector<HTMLInputElement>("#v3DbgAmt")!;
+  const readAmt = (): number => Math.max(0, Number(amtInput.value) || 0);
+  wrap.querySelector<HTMLButtonElement>("#v3DbgGive")!.addEventListener("click", () => {
+    state.compute += readAmt();
+    state.totalEarned += readAmt();
+  });
+  wrap.querySelector<HTMLButtonElement>("#v3DbgSet")!.addEventListener("click", () => {
+    state.compute = readAmt();
+    state.totalEarned = Math.max(state.totalEarned, readAmt());
+  });
+  const spdBtns = [...wrap.querySelectorAll<HTMLButtonElement>(".v3-debug .spd")];
+  for (const b of spdBtns) {
+    b.addEventListener("click", () => {
+      speed = Number(b.dataset.spd) || 1;
+      for (const x of spdBtns) x.classList.toggle("active", x === b);
+    });
+  }
+  wrap.querySelector<HTMLButtonElement>("#v3DbgLvl")!.addEventListener("click", () => {
+    for (const def of ASSISTANTS) {
+      state.assistants[def.id].level += 5;
+    }
+  });
+  const resetState = (): void => {
+    for (const [, el] of cardEls) el.remove();
+    cardEls.clear();
+    Object.assign(state, createV3State());
+    setPaused(false);
+  };
+  wrap.querySelector<HTMLButtonElement>("#v3DbgReset")!.addEventListener("click", () => {
+    if (window.confirm("重置 v3 进度并重开？")) resetState();
+  });
 
   // 调试/agent 接口（同旧游戏的 window.__sophia 精神）。
   (window as unknown as { __v3?: unknown }).__v3 = {
@@ -192,6 +263,17 @@ export function bootstrapV3(root: HTMLElement): void {
     give: (n: number) => {
       state.compute += n;
       state.totalEarned += n;
-    }
+    },
+    set: (n: number) => {
+      state.compute = n;
+      state.totalEarned = Math.max(state.totalEarned, n);
+    },
+    pause: () => setPaused(true),
+    resume: () => setPaused(false),
+    isPaused: () => paused,
+    setSpeed: (s: number) => {
+      speed = Math.max(0.1, s);
+    },
+    reset: resetState
   };
 }

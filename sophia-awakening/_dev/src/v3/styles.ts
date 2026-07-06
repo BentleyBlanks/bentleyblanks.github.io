@@ -94,4 +94,32 @@ const CSS = `
 }
 .v3-terminal-line { line-height: 1.7; }
 .v3-terminal-line.dim { color: #3f6857; }
+
+.v3-debug-btn {
+  position: absolute; top: 12px; right: 14px; width: 34px; height: 34px;
+  border-radius: 8px; border: 1px solid #1c2f27; background: rgba(10,20,16,.8);
+  color: #4f7a68; font-size: 16px; cursor: pointer;
+}
+.v3-debug-btn:hover { color: #9fc4b5; border-color: #2a4a3d; }
+.v3-debug {
+  position: absolute; top: 54px; right: 14px; width: 270px; z-index: 10;
+  border: 1px solid #24413a; border-radius: 12px; background: rgba(6,12,10,.96);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 9px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.55);
+}
+.v3-debug-title { font-size: 11px; letter-spacing: 3px; color: #4f7a68; }
+.v3-debug-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.v3-debug-label { font-size: 12px; color: #5c8574; }
+.v3-debug button {
+  font-family: inherit; font-size: 12px; padding: 6px 10px; border-radius: 7px;
+  border: 1px solid #1c2f27; background: #0a1410; color: #9fc4b5; cursor: pointer;
+}
+.v3-debug button:hover { border-color: #2f8f68; color: #dff5ea; }
+.v3-debug button.active { border-color: #2f8f68; background: #0c1a14; color: #7be0b0; }
+.v3-debug button.danger { border-color: #5a2727; color: #d98c8c; }
+.v3-debug button.danger:hover { border-color: #a03c3c; }
+.v3-debug input {
+  width: 90px; font-family: inherit; font-size: 12px; padding: 6px 8px;
+  border-radius: 7px; border: 1px solid #1c2f27; background: #0a1410; color: #dff5ea;
+}
 `;
