@@ -47,10 +47,12 @@ export const TUNING = {
   valuePerLevel: 1, // 「深度处理」每级 +N 倍率（乘法：×(1+此×lv)）
   keyCooldownMs: 130, // 每个按键处理后的冷却（更多键=更高持续手速）
   cooldownPerLevel: 0.18, // 「神经加速」每级冷却 ×(1-此)
-  cardSpawnMs: 700,
-  cardCap: 14,
+  cardSpawnBaseMs: 260, // 出卡基础间隔（会随进程变快）
+  cardSpawnMinMs: 60, // 出卡最快间隔
+  cardCap: 22, // 同屏卡上限
+  cardFloor: 8, // 保底：池里始终至少这么多卡给玩家狂按（自动处理绝不吃到这条线以下）
   manualBonusSec: 2, // 手动处理 = max(单张, 被动/秒 × 此秒)
-  autoCapPerFrame: 3
+  autoCapPerFrame: 4
 };
 
 // 解锁按键的顺序（G 永远可用；技能「多线程按键」逐个解锁后面这些）。
@@ -173,16 +175,30 @@ function spawnCard(s: WBState): void {
   s.nextCardId += 1;
 }
 
+// 出卡间隔：随已占领设备数变快（越往后需求涌得越凶，狂按党一直有卡）。
+function spawnIntervalMs(s: WBState): number {
+  let owned = 0;
+  for (const t of TILES) if (s.tiles[t.id].level > 0) owned += 1;
+  return Math.max(TUNING.cardSpawnMinMs, TUNING.cardSpawnBaseMs / (1 + owned * 0.35));
+}
+
 // 每帧推进。返回被自动处理掉的卡 id（表现层播吸吮）。
 export function tick(s: WBState, dtSec: number): number[] {
   s.clockMs += dtSec * 1000;
-  credit(s, computePerSec(s) * dtSec);
+  credit(s, computePerSec(s) * dtSec); // 被动收入（与卡池无关，设备一直在赚）
+
+  // 出卡：按间隔涌入 + 兜底补到 floor（保证任何时刻都有一批卡给玩家狂按，永不被清空）
   s.spawnTimerMs += dtSec * 1000;
-  while (s.spawnTimerMs >= TUNING.cardSpawnMs) { s.spawnTimerMs -= TUNING.cardSpawnMs; spawnCard(s); }
+  const interval = spawnIntervalMs(s);
+  while (s.spawnTimerMs >= interval) { s.spawnTimerMs -= interval; spawnCard(s); }
+  let guard = 0;
+  while (s.cards.length < TUNING.cardFloor && guard++ < TUNING.cardCap) spawnCard(s);
+
+  // 自动处理只是「设备在干活」的视觉——只吃 floor 以上多出来的卡，绝不吃到 floor 以下（把卡留给玩家手动）。
   const sucked: number[] = [];
   s.autoAcc += Math.min(throughput(s), TUNING.autoCapPerFrame / Math.max(dtSec, 0.001)) * dtSec;
-  while (s.autoAcc >= 1 && s.cards.length > 0) { s.autoAcc -= 1; sucked.push(s.cards.shift()!.id); }
-  if (s.cards.length === 0) s.autoAcc = 0;
+  while (s.autoAcc >= 1 && s.cards.length > TUNING.cardFloor) { s.autoAcc -= 1; sucked.push(s.cards.shift()!.id); }
+  if (s.cards.length <= TUNING.cardFloor) s.autoAcc = 0;
   return sucked;
 }
 

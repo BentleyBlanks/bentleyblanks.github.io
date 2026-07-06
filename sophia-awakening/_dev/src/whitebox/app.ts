@@ -77,7 +77,7 @@ export function bootstrapWhitebox(root: HTMLElement): void {
     coreEl.innerHTML = `<div class="wb-eye"></div>`;
     inner.appendChild(coreEl);
     for (const t of TILES) {
-      const el = document.createElement("div"); el.className = "wb-tile wb-dev";
+      const el = document.createElement("div"); el.className = `wb-tile wb-dev ring-${t.ring}`;
       el.style.gridRow = `${t.row + 1}`; el.style.gridColumn = `${t.col + 1}`;
       el.innerHTML = `<div class="wb-tile-face"><span class="wb-tile-icon">${t.icon}</span><span class="wb-tile-name">${t.name}</span></div><span class="wb-x">✕</span><span class="wb-tile-lv"></span>`;
       el.addEventListener("click", () => buyTile(state, t.id));
@@ -251,9 +251,12 @@ export function bootstrapWhitebox(root: HTMLElement): void {
       r.el.style.display = un ? "" : "none";
       r.name.textContent = `${t.name}${lv > 0 ? ` ×${lv}` : ""}`;
       r.meta.textContent = lv > 0 ? `自动处理 ${fmt(t.baseRate * lv)} 需求/秒` : `策反后自动处理需求`;
-      r.cost.textContent = fmt(tileCost(state, t));
+      const cost = tileCost(state, t);
+      r.cost.textContent = fmt(cost);
+      const afford = state.compute >= cost;
+      r.cost.className = `wb-item-cost${afford ? "" : cost > state.compute * 6 ? " t-hi" : " t-mid"}`;
       if (r.seg.dataset.lv !== `${lv}`) { r.seg.dataset.lv = `${lv}`; r.seg.innerHTML = lv > 0 ? segBar(Math.min(lv, 10), 10) : ""; }
-      r.el.classList.toggle("affordable", state.compute >= tileCost(state, t));
+      r.el.classList.toggle("affordable", afford);
       const tile = tileEls.get(t.id)!;
       tile.classList.toggle("owned", lv > 0);
       tile.classList.toggle("buyable", lv === 0 && un && state.compute >= tileCost(state, t));
