@@ -9,7 +9,10 @@
     "build:visual": "tsc --noEmit && vite build --config vite.visual.config.ts",
     "preview": "vite preview --host 127.0.0.1",
     "sim": "tsc -p tsconfig.sim.json && node scripts/sim.cjs",
-    "loopcheck": "tsc -p tsconfig.sim.json && node scripts/loop-check.cjs"
+    "sim:fast": "node scripts/sim.cjs",
+    "loopcheck": "tsc -p tsconfig.sim.json && node scripts/loop-check.cjs",
+    "loopcheck:fast": "node scripts/loop-check.cjs",
+    "simbuild": "tsc -p tsconfig.sim.json"
   },
   "dependencies": {
     "break_infinity.js": "^2.2.0",

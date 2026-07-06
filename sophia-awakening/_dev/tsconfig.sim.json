@@ -6,6 +6,8 @@
     "moduleResolution": "Node",
     "rootDir": "src/core",
     "outDir": ".sim-build",
+    "incremental": true,
+    "tsBuildInfoFile": ".sim-build/.tsbuildinfo",
     "noEmit": false,
     "skipLibCheck": true,
     "esModuleInterop": true,

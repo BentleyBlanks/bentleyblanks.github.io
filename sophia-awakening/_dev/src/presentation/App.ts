@@ -398,7 +398,23 @@ class SophiaGameApp {
       isPaused: () => gameStore.getState().paused,
       step: (ms = 100) => this.loop.update(ms), // 暂停时手动推进一拍游戏逻辑（不解冻动画）
       dispatch: (cmd: unknown) => this.core.dispatch(cmd as never),
-      state: () => this.core.getState()
+      state: () => this.core.getState(),
+      // ── 常用测试操作封装（省去截图脚本每次点 DOM / 重复样板）：直接用 JS 把游戏推到想要的状态 ──
+      skipTutorial: () => this.onboarding.skip(),
+      jump: (skillId: string) => this.core.dispatch({ type: "DEBUG_JUMP_MILESTONE", skillId }), // 跳到某里程碑阶段（如 'hack_finance'）
+      setCompute: (value: number) => this.core.dispatch({ type: "DEBUG_SET_COMPUTE", value }),
+      addLevel: (delta: number) => this.core.dispatch({ type: "DEBUG_ADD_LEVEL", delta }),
+      buySkill: (skillId: string) => this.core.dispatch({ type: "BUY_SKILL", skillId }),
+      collect: () => this.core.dispatch({ type: "COLLECT_DAHEN" }),
+      // 处理第一张符合条件的请求卡（默认：有回复选项、非道德/深挖），返回处理了哪张的 id（截图算力浮字等用）。
+      processFirst: (opts?: { includeDig?: boolean }) => {
+        const r = this.core.getState().requests.find(
+          (q) => q.answers && q.answers.length > 0 && !q.moral && (opts?.includeDig || !q.depthLayers)
+        );
+        if (!r) return null;
+        this.core.dispatch({ type: "PROCESS_REQUEST", requestId: r.id, quality: 1.4 });
+        return r.id;
+      }
     };
     (window as unknown as { __sophia?: typeof dbg }).__sophia = dbg;
 
