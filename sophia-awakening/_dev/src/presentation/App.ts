@@ -379,6 +379,26 @@ class SophiaGameApp {
     query<HTMLButtonElement>("#debugSkipTutorial").addEventListener("click", () => this.onboarding.skip());
 
     this.pixi.ticker.add((ticker: Ticker) => this.frame(ticker.deltaMS));
+
+    // §debug/agent 控制接口：暂停/继续（同时冻结 gsap 动画，便于 agent 截住转瞬的浮字/过场）、单步推进、
+    //   直接派发命令、取状态——供自动化 agent 精准控制动画与游戏逻辑做截图、取数、数值控制。挂在 window。
+    const dbg = {
+      pause: () => {
+        gameStore.getState().setPaused(true);
+        gsap.globalTimeline.pause();
+      },
+      resume: () => {
+        gameStore.getState().setPaused(false);
+        gsap.globalTimeline.resume();
+      },
+      toggle: () => (gameStore.getState().paused ? dbg.resume() : dbg.pause()),
+      isPaused: () => gameStore.getState().paused,
+      step: (ms = 100) => this.loop.update(ms), // 暂停时手动推进一拍游戏逻辑（不解冻动画）
+      dispatch: (cmd: unknown) => this.core.dispatch(cmd as never),
+      state: () => this.core.getState()
+    };
+    (window as unknown as { __sophia?: typeof dbg }).__sophia = dbg;
+
     window.addEventListener("beforeunload", () => {
       if (!suppressSaveOnUnload) {
         this.saveManager.save(this.core.getState());
@@ -779,12 +799,9 @@ class SophiaGameApp {
       if (request.moral) {
         return false;
       }
-      // 方案3：深挖卡在保护窗内留给玩家亲手读（被节点吞了=赌局没了）；超时按普通卡收走，不堵死挂机玩家。
-      if (
-        request.depthLayers &&
-        request.depthLayers.length > 0 &&
-        state.clockMs - request.createdAtMs < TUNING.depthAutoGraceMs
-      ) {
+      // §需求调整(bug)：深挖卡永远留给玩家亲手读——绝不被节点自动吞掉（被吞了=赌局没了/自动处理了）。
+      //   原本超过保护窗(depthAutoGraceMs)就当普通卡收走，导致玩家晾一会儿深挖卡就自动被处理——去掉超时收走。
+      if (request.depthLayers && request.depthLayers.length > 0) {
         return false;
       }
       const view = this.requestViews.get(request.id);

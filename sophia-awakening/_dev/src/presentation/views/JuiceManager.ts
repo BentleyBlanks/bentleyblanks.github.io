@@ -24,11 +24,11 @@ export class JuiceManager {
       text,
       style: {
         fill: color,
-        fontSize: big ? 32 : 18,
+        fontSize: big ? 42 : 18, // §需求调整：大读数更醒目——字号 32→42
         fontWeight: "900",
         fontFamily: "'Noto Sans SC', Inter, sans-serif",
-        stroke: { color: 0x101313, width: big ? 5 : 3 },
-        dropShadow: big ? { color, alpha: 0.65, blur: 10, distance: 0 } : false
+        stroke: { color: 0x0a0d0d, width: big ? 6 : 3 },
+        dropShadow: big ? { color, alpha: 0.9, blur: 16, distance: 0 } : false // 更强发光
       }
     });
     label.anchor.set(0.5);
@@ -45,12 +45,15 @@ export class JuiceManager {
     }
 
     const travel = opts?.rise ?? (big ? 92 : 54);
-    const duration = big ? 1.05 : 0.72;
-    gsap.to(label.position, { y: global.y - travel, duration, ease: "power2.out" });
+    // §需求调整：大读数「停留久一点」——先快速升到位，停一拍(hold)再淡出，总可见 ~1.9s（原 ~1.05s）。
+    const riseDur = big ? 0.5 : 0.72;
+    const holdDelay = big ? 1.15 : 0; // 升到位后停留这么久才开始淡出
+    const fadeDur = big ? 0.62 : 0.72;
+    gsap.to(label.position, { y: global.y - travel, duration: riseDur, ease: "power2.out" });
     gsap.to(label, {
       alpha: 0,
-      duration,
-      delay: big ? 0.16 : 0,
+      duration: fadeDur,
+      delay: holdDelay,
       ease: "power2.in",
       onComplete: () => {
         this.active.delete(label);

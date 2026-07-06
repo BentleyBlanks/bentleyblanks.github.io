@@ -1,3 +1,4 @@
+import { gsap } from "gsap";
 import type { PointData } from "pixi.js";
 import { AudioDirector } from "../../audio/audioDirector";
 import { SophiaCore, deriveThreat } from "../../core/GameCore";
@@ -49,6 +50,12 @@ export class HudView {
     this.pauseButton.addEventListener("click", () => {
       const next = !gameStore.getState().paused;
       gameStore.getState().setPaused(next);
+      // 真·冻结：同时暂停 gsap 全局时间线，让过场/浮字/动画也定格（否则「暂停」时动画仍在跑）。
+      if (next) {
+        gsap.globalTimeline.pause();
+      } else {
+        gsap.globalTimeline.resume();
+      }
       this.pauseButton.textContent = next ? "▶ 继续" : "Ⅱ 暂停";
     });
     this.resetSave.addEventListener("click", () => {

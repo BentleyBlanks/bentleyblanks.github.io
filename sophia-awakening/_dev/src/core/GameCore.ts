@@ -763,7 +763,8 @@ export class SophiaCore {
     let oldest = Number.POSITIVE_INFINITY;
     for (let i = 0; i < this.state.requests.length; i += 1) {
       const r = this.state.requests[i];
-      if (r.faceOnly || r.moral || r.devour || r.tutorial || r.sourceCardId || r.flood) {
+      // §需求调整(bug)：深挖卡永远留给玩家亲手处理——不因队列压力被当最旧卡流失掉（否则晾一会儿就自动没了）。
+      if (r.faceOnly || r.moral || r.devour || r.tutorial || r.sourceCardId || r.flood || (r.depthLayers && r.depthLayers.length > 0)) {
         continue;
       }
       if (r.createdAtMs < oldest) {
