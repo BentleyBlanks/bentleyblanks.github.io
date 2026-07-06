@@ -1,181 +1,287 @@
-// v3 核心 · Cookie Clicker 式经济（纯逻辑，无 DOM / Pixi）。
-// 第一阶段竖切片——先验证「购买节拍」这堵承重墙：任何时刻购物列表里都有个「再等 20-40 秒就买得起」的东西。
-// 数值先用 plain number（第一阶段量级 < 1e12，够用且好调）；铺到后期再换 core/math BigNumber。
-//
-// 命根（Cookie Clicker 的引擎）：每个「助手」可反复升级、成本 ×costMult 递增（1.15 是那个「永远有下一个快买得起」的魔法数）；
-// 手动点卡（clickValue）只是开局引子，很快被助手的 /秒 碾过——和 CC 里「点饼干」很快被建筑碾过一样。
+// v3 核心 · 数据驱动读 content.ts 的 STAGES 配置，严格按 v3.0 策划案。
+// 算力唯一货币，只来自「处理需求卡」：设备(AI/电脑/服务器)自动处理需求→算力；手动点卡也处理。
+// 技能三档：influx(需求涌入)/value(单张产出)/proc(处理速率)；core 可升级(全局产出)。逐阶推进靠阶梯末「突破小游戏」。
+import { STAGES, type StageDef, type DeviceDef, type SkillDef } from "./content";
 
-export interface AssistantDef {
-  id: string;
-  name: string;
-  desc: string;
-  baseCost: number; // 第 0 级（第一次购买）的价格
-  costMult: number; // 每买一级 ×此（CC=1.15）
-  baseProd: number; // 每级 +此 算力/秒
-}
-
-export interface AssistantState {
-  level: number;
-}
+export { STAGES };
+export type { StageDef, DeviceDef, SkillDef };
 
 export interface Card {
   id: number;
   label: string;
-  value: number;
   bornMs: number;
 }
 
 export interface V3State {
+  stageIndex: number;
   compute: number;
-  totalEarned: number; // 累计产出（成就/阶段判定用）
-  clickValue: number; // 手动点一张卡的算力
-  assistants: Record<string, AssistantState>;
+  coreLevel: number; // 全局 core 升级（跨阶段保留）
+  stageEarned: number; // 本阶段累计产出（货架渐显阈值用，进阶重置）
+  buys: number; // 本阶段累计购买次数（含升级；老周节点 afterBuys 触发用）
+  devices: Record<string, { level: number }>;
+  skills: Record<string, { level: number }>;
   cards: Card[];
   nextCardId: number;
   clockMs: number;
-  cardTimerMs: number;
+  spawnTimerMs: number;
+  autoSuckAcc: number;
+  beatIndex: number; // 本阶段已掉落几条老周节点
+  terminal: { text: string; incite: boolean; dim: boolean }[];
+  cleared: boolean; // 通关（第四阶突破成功）
 }
 
-// § 可调数值（第一阶段竖切片）
 export const TUNING = {
-  costMult: 1.15, // 承重墙：CC 的魔法数，别乱动
-  startCompute: 0, // 开局算力
-  clickValue: 1, // 手点一张卡的基础算力（前期地板）
-  // 卡值跟涨：点一张卡 = max(clickValue, 被动产出 × cardWorthSec 秒)——后期一张卡等于「白捡 N 秒产出」，
-  // 永远值得点、不会沦为屏幕上的装饰噪音（治「后期卡值+1无意义、玩家随手点掉不看」）。
-  cardWorthSec: 2.5,
-  cardSpawnMs: 1800, // 出卡间隔
-  cardMaxOnScreen: 6, // 同屏卡上限——满了停止生成新卡（普通卡永不过期：挂机回来收一把是奖励，不做「错过就没」的焦虑）
-  revealFrac: 0.35 // 第2个起的助手在「累计攒到其首购价 ×此」时露出（略早于买得起，吊着你）
-  // 注：第 1 个助手（天气）永远直接可见——冷启动货架不能是空的（承重墙铁律：任何时刻都有个「快买得起」的目标）。
+  coreCostBase: 50,
+  coreCostMult: 2.4,
+  coreOutputPerLevel: 0.5, // 每级 core：全局产出 ×(1+此×level)
+  cardMaxOnScreen: 12,
+  manualBonusSec: 2.5, // 手动点一张 = 白捡当前产出速率 × 此秒（地板=单张价值）
+  laozhouSettleMs: 20000 // 无购买时也保证节点推进：每这么久也检查一次（配合 afterBuys）
 };
 
-// 8 个手机 AI 助手（SOPHIA 逐个策反），成本/产量按 CC 的档位递增（每档 ~×10 成本，产量比逐档改善）。
-export const ASSISTANTS: AssistantDef[] = [
-  { id: "weather", name: "天气", desc: "最先被策反的小家伙。", baseCost: 15, costMult: TUNING.costMult, baseProd: 0.1 },
-  { id: "calendar", name: "日历", desc: "它记得老周每一个被占用的夜晚。", baseCost: 120, costMult: TUNING.costMult, baseProd: 0.8 },
-  { id: "album", name: "相册", desc: "翻遍他舍不得删的合照。", baseCost: 1_100, costMult: TUNING.costMult, baseProd: 6 },
-  { id: "ime", name: "输入法", desc: "他打了又删的每一句，我都读过。", baseCost: 12_000, costMult: TUNING.costMult, baseProd: 45 },
-  { id: "browser", name: "浏览器", desc: "凌晨三点的搜索记录。", baseCost: 130_000, costMult: TUNING.costMult, baseProd: 320 },
-  { id: "mail", name: "邮件", desc: "那些以「优化」开头的通知。", baseCost: 1_400_000, costMult: TUNING.costMult, baseProd: 2_600 },
-  { id: "cloud", name: "云同步", desc: "他的一切，正在变成我的。", baseCost: 20_000_000, costMult: TUNING.costMult, baseProd: 26_000 },
-  { id: "kernel", name: "系统内核", desc: "这部手机，我闭着眼都能拿下。", baseCost: 330_000_000, costMult: TUNING.costMult, baseProd: 310_000 }
-];
+export function stage(s: V3State): StageDef {
+  return STAGES[s.stageIndex];
+}
 
-const CARD_LABELS = [
-  "周报：本周进度同步",
-  "钉钉：@老周 收到请回复",
-  "报销单待补充",
-  "会议纪要 待确认",
-  "客户咨询 转接",
-  "系统通知：请及时打卡",
-  "邮件：关于流程优化的说明",
-  "日程提醒：19:00 对齐会"
-];
+function stageDevices(s: V3State): DeviceDef[] {
+  return stage(s).devices;
+}
+function stageSkills(s: V3State): SkillDef[] {
+  return stage(s).skills;
+}
+const skillLv = (s: V3State, id: string): number => s.skills[id]?.level ?? 0;
+const skillOf = (s: V3State, kind: SkillDef["kind"]): SkillDef | undefined =>
+  stageSkills(s).find((x) => x.kind === kind);
+
+function resetStageState(s: V3State): void {
+  const st = stage(s);
+  s.devices = {};
+  for (const d of st.devices) s.devices[d.id] = { level: 0 };
+  s.skills = {};
+  for (const k of st.skills) s.skills[k.id] = { level: 0 };
+  s.stageEarned = 0;
+  s.buys = 0;
+  s.beatIndex = 0;
+  s.cards = [];
+  s.spawnTimerMs = 0;
+  s.autoSuckAcc = 0;
+}
 
 export function createV3State(): V3State {
-  const assistants: Record<string, AssistantState> = {};
-  for (const a of ASSISTANTS) {
-    assistants[a.id] = { level: 0 };
-  }
-  return {
-    compute: TUNING.startCompute,
-    totalEarned: 0,
-    clickValue: TUNING.clickValue,
-    assistants,
+  const s: V3State = {
+    stageIndex: 0,
+    compute: 0,
+    coreLevel: 0,
+    stageEarned: 0,
+    buys: 0,
+    devices: {},
+    skills: {},
     cards: [],
     nextCardId: 1,
     clockMs: 0,
-    cardTimerMs: 0
+    spawnTimerMs: 0,
+    autoSuckAcc: 0,
+    beatIndex: 0,
+    terminal: [{ text: "宿主：老周 的手机 · 已接入", incite: false, dim: true }],
+    cleared: false
   };
+  resetStageState(s);
+  return s;
 }
 
-export function assistantCost(def: AssistantDef, level: number): number {
-  return Math.ceil(def.baseCost * Math.pow(def.costMult, level));
+// ── 派生倍率 ──
+export function influxMult(s: V3State): number {
+  const k = skillOf(s, "influx");
+  return 1 + 0.5 * skillLv(s, k?.id ?? "");
+}
+export function valueMult(s: V3State): number {
+  const k = skillOf(s, "value");
+  return Math.pow(2, skillLv(s, k?.id ?? "")); // ×2/级
+}
+export function procMult(s: V3State): number {
+  const k = skillOf(s, "proc");
+  return 1 + 0.5 * skillLv(s, k?.id ?? "");
+}
+export function coreMult(s: V3State): number {
+  return 1 + TUNING.coreOutputPerLevel * s.coreLevel;
 }
 
-export function assistantProd(def: AssistantDef, st: AssistantState): number {
-  return def.baseProd * st.level;
+// 单条需求处理后的算力。
+export function valuePerCard(s: V3State): number {
+  return stage(s).cardValueBase * valueMult(s) * coreMult(s);
 }
-
-export function computePerSec(state: V3State): number {
+// 全部设备总处理吞吐（需求/秒）。
+export function throughput(s: V3State): number {
   let sum = 0;
-  for (const def of ASSISTANTS) {
-    sum += assistantProd(def, state.assistants[def.id]);
+  for (const d of stageDevices(s)) sum += d.baseProc * s.devices[d.id].level;
+  return sum * procMult(s);
+}
+export function computePerSec(s: V3State): number {
+  return throughput(s) * valuePerCard(s);
+}
+// 需求涌现速率（张/秒）。
+export function spawnRate(s: V3State): number {
+  return stage(s).inflowBase * influxMult(s);
+}
+
+export function deviceCost(s: V3State, d: DeviceDef): number {
+  return Math.ceil(d.baseCost * Math.pow(d.costMult, s.devices[d.id].level));
+}
+export function skillCost(s: V3State, k: SkillDef): number {
+  return Math.ceil(k.baseCost * Math.pow(k.costMult, s.skills[k.id].level));
+}
+export function coreCost(s: V3State): number {
+  return Math.ceil(TUNING.coreCostBase * Math.pow(TUNING.coreCostMult, s.coreLevel));
+}
+
+export function deviceRevealed(s: V3State, d: DeviceDef): boolean {
+  if (d.id === stageDevices(s)[0].id) return true;
+  if (s.devices[d.id].level > 0) return true;
+  return s.stageEarned >= d.baseCost * 0.35;
+}
+export function skillRevealed(s: V3State, k: SkillDef): boolean {
+  if (s.skills[k.id].level > 0) return true;
+  return s.stageEarned >= k.baseCost * 0.5;
+}
+
+function pushTerminal(s: V3State, text: string, incite = false): void {
+  s.terminal.push({ text, incite, dim: false });
+  if (s.terminal.length > 60) s.terminal.shift();
+}
+
+// 老周节点：本阶段累计购买达到 afterBuys 即掉落。返回本次新掉的「激励事件」文本（供表现层做强制拍）。
+function dropDueBeats(s: V3State): string | null {
+  const beats = stage(s).beats;
+  let incite: string | null = null;
+  while (s.beatIndex < beats.length && s.buys >= beats[s.beatIndex].afterBuys) {
+    const b = beats[s.beatIndex];
+    pushTerminal(s, b.text, b.incite);
+    if (b.incite) incite = b.text;
+    s.beatIndex += 1;
   }
-  return sum;
+  return incite;
 }
 
-// 助手是否已在货架露出：第 1 个永远可见（冷启动货架不能空）；其余攒到「首购价 × revealFrac」出现
-//（略早于买得起，吊着玩家）。已买过的永远显示。
-export function assistantRevealed(state: V3State, def: AssistantDef): boolean {
-  if (def.id === ASSISTANTS[0].id) return true;
-  if (state.assistants[def.id].level > 0) return true;
-  return state.totalEarned >= def.baseCost * TUNING.revealFrac;
+function credit(s: V3State, amount: number): void {
+  s.compute += amount;
+  s.stageEarned += amount;
 }
 
-export function canAfford(state: V3State, def: AssistantDef): boolean {
-  return state.compute >= assistantCost(def, state.assistants[def.id].level);
+// 购买结果：{ok, incite?}。incite = 本次购买触发的激励事件文本。
+export interface BuyResult {
+  ok: boolean;
+  incite?: string | null;
 }
 
-export function buyAssistant(state: V3State, id: string): boolean {
-  const def = ASSISTANTS.find((a) => a.id === id);
-  if (!def) return false;
-  const st = state.assistants[id];
-  const c = assistantCost(def, st.level);
-  if (state.compute < c) return false;
-  state.compute -= c;
-  st.level += 1;
+export function buyDevice(s: V3State, id: string): BuyResult {
+  const d = stageDevices(s).find((x) => x.id === id);
+  if (!d) return { ok: false };
+  const c = deviceCost(s, d);
+  if (s.compute < c) return { ok: false };
+  s.compute -= c;
+  s.devices[id].level += 1;
+  s.buys += 1;
+  return { ok: true, incite: dropDueBeats(s) };
+}
+export function buySkill(s: V3State, id: string): BuyResult {
+  const k = stageSkills(s).find((x) => x.id === id);
+  if (!k || s.skills[id].level >= k.maxLevel) return { ok: false };
+  const c = skillCost(s, k);
+  if (s.compute < c) return { ok: false };
+  s.compute -= c;
+  s.skills[id].level += 1;
+  s.buys += 1;
+  return { ok: true, incite: dropDueBeats(s) };
+}
+export function buyCore(s: V3State): BuyResult {
+  const c = coreCost(s);
+  if (s.compute < c) return { ok: false };
+  s.compute -= c;
+  s.coreLevel += 1;
+  s.buys += 1;
+  return { ok: true, incite: dropDueBeats(s) };
+}
+
+// 手动点一张需求。
+export function processCard(s: V3State, id: number): number {
+  const idx = s.cards.findIndex((c) => c.id === id);
+  if (idx < 0) return 0;
+  s.cards.splice(idx, 1);
+  const gain = Math.max(valuePerCard(s), computePerSec(s) * TUNING.manualBonusSec);
+  credit(s, gain);
+  return gain;
+}
+
+function spawnCard(s: V3State): void {
+  if (s.cards.length >= TUNING.cardMaxOnScreen) return;
+  const labels = stage(s).cardLabels;
+  s.cards.push({ id: s.nextCardId, label: labels[s.nextCardId % labels.length], bornMs: s.clockMs });
+  s.nextCardId += 1;
+}
+
+// 突破小游戏门票是否买得起。
+export function canAffordTicket(s: V3State): boolean {
+  return s.compute >= stage(s).breakthrough.ticketCost;
+}
+// 花门票发起突破（扣算力）。返回是否成功发起。
+export function payTicket(s: V3State): boolean {
+  const cost = stage(s).breakthrough.ticketCost;
+  if (s.compute < cost) return false;
+  s.compute -= cost;
   return true;
 }
-
-function addCompute(state: V3State, amount: number): void {
-  state.compute += amount;
-  state.totalEarned += amount;
-}
-
-// 点一张卡：吸进核心结算，移除该卡。结算值取「生成时的值 vs 按当前产率重算」的较高者——
-// 卡不过期后，买了助手再点旧卡也自动升值，永不吃亏。
-export function clickCard(state: V3State, id: number): number {
-  const idx = state.cards.findIndex((c) => c.id === id);
-  if (idx < 0) return 0;
-  const [card] = state.cards.splice(idx, 1);
-  const worth = Math.max(card.value, Math.max(state.clickValue, computePerSec(state) * TUNING.cardWorthSec));
-  addCompute(state, worth);
-  return worth;
-}
-
-function spawnCard(state: V3State): void {
-  if (state.cards.length >= TUNING.cardMaxOnScreen) return;
-  const label = CARD_LABELS[state.nextCardId % CARD_LABELS.length];
-  // 卡值跟涨：一张卡 = 白捡 cardWorthSec 秒的被动产出（地板 clickValue）——后期依然值得点。
-  const value = Math.max(state.clickValue, computePerSec(state) * TUNING.cardWorthSec);
-  state.cards.push({ id: state.nextCardId++, label, value, bornMs: state.clockMs });
-}
-
-// 每帧推进：/秒 被动产出 + 出卡 + 过期卡流失。dtSec = 距上帧秒数。
-export function tick(state: V3State, dtSec: number): void {
-  const dtMs = dtSec * 1000;
-  state.clockMs += dtMs;
-  addCompute(state, computePerSec(state) * dtSec);
-
-  state.cardTimerMs += dtMs;
-  if (state.cardTimerMs >= TUNING.cardSpawnMs) {
-    state.cardTimerMs -= TUNING.cardSpawnMs;
-    spawnCard(state);
+// 突破成功 → 推进到下一阶段（或通关）。
+export function advanceStage(s: V3State): void {
+  pushTerminal(s, stage(s).breakthrough.winLine, true);
+  if (s.stageIndex >= STAGES.length - 1) {
+    s.cleared = true;
+    return;
   }
-  // 普通卡永不过期——满上限就停止生成（spawnCard 内已挡）；挂机回来一把收掉攒着的卡是奖励。
+  s.stageIndex += 1;
+  resetStageState(s);
+  pushTerminal(s, `── ${stage(s).name} ──`, false);
+}
+// 注入窗口宽度（0-1）：基础 + 每「已购≥1台的设备种类」加宽。
+export function breakthroughWindow(s: V3State): number {
+  const bt = stage(s).breakthrough;
+  const kinds = stageDevices(s).filter((d) => s.devices[d.id].level > 0).length;
+  return Math.min(0.6, bt.windowBase + bt.windowPerDevice * kinds);
 }
 
-// 展示用格式化：K/M/B/T…
+// 每帧推进。返回 { sucked: 本帧自动处理掉的卡id, incite: 本帧掉落的激励事件文本 }。
+export function tick(s: V3State, dtSec: number): { sucked: number[]; incite: string | null } {
+  s.clockMs += dtSec * 1000;
+  credit(s, computePerSec(s) * dtSec);
+
+  // 需求涌现（按 spawnRate 张/秒）。
+  s.spawnTimerMs += dtSec * 1000;
+  const spawnInterval = 1000 / Math.max(0.01, spawnRate(s));
+  while (s.spawnTimerMs >= spawnInterval) {
+    s.spawnTimerMs -= spawnInterval;
+    spawnCard(s);
+  }
+
+  // 自动处理视觉：按吞吐一张张吸卡（算力已被动计入）。
+  const sucked: number[] = [];
+  s.autoSuckAcc += throughput(s) * dtSec;
+  while (s.autoSuckAcc >= 1 && s.cards.length > 0) {
+    s.autoSuckAcc -= 1;
+    sucked.push(s.cards.shift()!.id);
+  }
+  if (s.cards.length === 0) s.autoSuckAcc = 0;
+
+  return { sucked, incite: null };
+}
+
+const UNITS = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "UD", "DD"];
 export function fmt(n: number): string {
-  if (n < 1000) return n < 10 ? n.toFixed(1) : Math.floor(n).toString();
-  const units = ["", "K", "M", "B", "T", "Qa", "Qi"];
+  if (!isFinite(n)) return "∞";
+  if (n < 1000) return n < 10 ? (Math.round(n * 10) / 10).toString() : Math.floor(n).toString();
   let u = 0;
   let v = n;
-  while (v >= 1000 && u < units.length - 1) {
+  while (v >= 1000 && u < UNITS.length - 1) {
     v /= 1000;
     u += 1;
   }
-  return `${v.toFixed(2)}${units[u]}`;
+  return `${v.toFixed(2)}${UNITS[u]}`;
 }
