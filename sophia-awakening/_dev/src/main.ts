@@ -14,8 +14,13 @@ const showFatal = (error: unknown): void => {
   document.body.appendChild(fallback);
 };
 
-// v3（Cookie Clicker 式重构）已转正为默认主入口；旧版游戏保留在 #classic 路由（代码不删，随时可回）。
-if (location.hash.toLowerCase().includes("classic")) {
+// 路由：#whitebox=方块网格白盒测试原型；#classic=旧 Pixi 版；默认=v3（Cookie Clicker 式重构）。
+const hash = location.hash.toLowerCase();
+if (hash.includes("whitebox") || hash.includes("wb")) {
+  import("./whitebox/app")
+    .then(({ bootstrapWhitebox }) => bootstrapWhitebox(root))
+    .catch(showFatal);
+} else if (hash.includes("classic")) {
   import("./presentation/App")
     .then(({ bootstrapSophia }) => bootstrapSophia(root))
     .catch(showFatal);
