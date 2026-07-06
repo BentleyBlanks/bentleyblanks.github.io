@@ -10,7 +10,9 @@ import type { GameState } from "./GameState";
 //      新增 muscle_memory/war_cache/multithread），旧档树里可能残留已删节点——旧档自动重置。
 // v17：道德抉择从全屏弹窗改为「在卡流里的两选一回复轮盘卡」，移除 GameState.moralChoice 字段——旧档自动重置。
 // v18：方案3「深挖·见好就收」（deepDig 深挖状态机 + digThreat 追查加压 + RequestInstance.depthLayers）——旧档自动重置。
-export const SAVE_VERSION = 18;
+// v19：大恨老师·待验收池（GameState.dahenPending，对标「刮个爽」机器人 collect——他攒的算力先进池，
+//      玩家点验收才到手）——旧档自动重置。
+export const SAVE_VERSION = 19;
 
 export function createInitialState(now = Date.now()): GameState {
   const levelConfig = getLevelConfig(1);
@@ -28,6 +30,7 @@ export function createInitialState(now = Date.now()): GameState {
       data: "0",
       totalCompute: "0"
     },
+    dahenPending: "0",
     devour: {
       tierIndex: 0,
       infiltration: 0,

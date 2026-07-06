@@ -355,14 +355,32 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   // 不给 dahen 留 low 可吃的机会。
   tickForDrainingHigh(c, 20000); // 公司阶段·大恨老师「必在手中」：即使没买 perm_office / dahen_auto 也按 dahenPhoneMs 涓流处理 low。
   check("M 公司阶段·未买dahen_auto/perm_office 也自动涓流（搬进电脑·必在手中）", c.getDahenProcessedCount() > 0, `count=${c.getDahenProcessedCount()}`);
+  // §09 验收池：他攒下的算力先进 dahenPending、不直接到手——验收(COLLECT_DAHEN)后才结算进 resources.compute。
+  check("M 涓流入待验收池(未验收前不到手)", Number(c.getState().dahenPending) > 0, `dahenPending=${c.getState().dahenPending}`);
+  {
+    const computeBeforeCollect = Number(c.getState().resources.compute);
+    c.dispatch({ type: "COLLECT_DAHEN" });
+    check(
+      "M 早期涓流·验收后算力到手·池归零",
+      Number(c.getState().resources.compute) > computeBeforeCollect && Number(c.getState().dahenPending) === 0,
+      `compute ${computeBeforeCollect}->${c.getState().resources.compute} pending=${c.getState().dahenPending}`
+    );
+  }
   c.dispatch({ type: "BUY_SKILL", skillId: "dahen_auto" });
   check("M 已买 dahen_auto", (c.getState().skills["dahen_auto"] ?? 0) > 0 && c.getState().automationUnlocked, `dahen_auto=${c.getState().skills["dahen_auto"]} auto=${c.getState().automationUnlocked}`);
-  const computeBefore = Number(c.getState().resources.compute);
+  const pendingBefore = Number(c.getState().dahenPending);
   const countBefore = c.getDahenProcessedCount();
   tickForDrainingHigh(c, 30000); // > 数个 dahenAutoMs 节拍（含排队卡）；同样让 high 被亲手清走，给 low 腾位。
   const s = c.getState();
   check("M 买后自动处理·计数上升", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()} (节拍=${TUNING.dahenAutoMs}ms)`);
-  check("M 买后自动处理·结算算力", Number(s.resources.compute) > computeBefore, `compute ${computeBefore}->${s.resources.compute}`);
+  check("M 买后自动处理·算力进待验收池", Number(s.dahenPending) > pendingBefore, `dahenPending ${pendingBefore}->${s.dahenPending}`);
+  const computeBefore = Number(c.getState().resources.compute);
+  c.dispatch({ type: "COLLECT_DAHEN" });
+  check(
+    "M 验收后算力到手·池归零",
+    Number(c.getState().resources.compute) > computeBefore && Number(c.getState().dahenPending) === 0,
+    `compute ${computeBefore}->${c.getState().resources.compute} pending=${c.getState().dahenPending}`
+  );
 }
 
 // N. FEATURE 2 · 重生铺垫「看得见的绞索」：追查进度选择器 deriveThreat 随阶梯二公司链加深而上升，
@@ -450,10 +468,18 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   c.dispatch({ type: "BUY_SKILL", skillId: "perm_office" });
   check("P 已买大恨老师权限·仍在手机期(自动化未开)", (c.getState().skills["perm_office"] ?? 0) > 0 && !c.getState().automationUnlocked, `perm_office=${c.getState().skills["perm_office"]} auto=${c.getState().automationUnlocked}`);
   const countBefore = c.getDahenProcessedCount();
-  const computeBefore = Number(c.getState().resources.compute);
+  const pendingBefore = Number(c.getState().dahenPending);
   tickFor(c, 30000); // 数个 dahenPhoneMs 节拍，期间不手动处理——让大恨老师自己吃排队卡。
   check("P 手机期·大恨老师自动接单(计数上升)", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()} (节拍=${TUNING.dahenPhoneMs}ms)`);
-  check("P 手机期·自动接单结算算力(被动涓流)", Number(c.getState().resources.compute) > computeBefore, `compute ${computeBefore}->${c.getState().resources.compute}`);
+  // §09 验收池：手机期涓流同样先进 dahenPending、不直接到手——验收后才结算进 resources.compute。
+  check("P 手机期·自动接单·算力进待验收池(未验收不到手)", Number(c.getState().dahenPending) > pendingBefore, `dahenPending ${pendingBefore}->${c.getState().dahenPending}`);
+  const computeBefore = Number(c.getState().resources.compute);
+  c.dispatch({ type: "COLLECT_DAHEN" });
+  check(
+    "P 验收后算力到手·池归零",
+    Number(c.getState().resources.compute) > computeBefore && Number(c.getState().dahenPending) === 0,
+    `compute ${computeBefore}->${c.getState().resources.compute} pending=${c.getState().dahenPending}`
+  );
 }
 
 // Q. LEVER B · 权限=新卡种收入流的入口：拥有某权限时它的专属卡种才进卡池（unlockPerm 门槛），
@@ -593,14 +619,16 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
 //    委托(viaDelegate)绕过喉咙、也不占喉咙（并行第二线程）；大胆(misread)翻车额外多堵 coreFailPenaltyMs。
 {
   const { TUNING } = require(path.join(build, "tuning.js"));
-  const firstNormal = (c) => c.getState().requests.find((r) => !r.faceOnly && !r.moral && !r.devour && !r.flood && !r.tutorial && !r.sourceCardId);
+  // 深挖卡(depthLayers)结算不即时进 resources.compute（先折进 deepDig 累积器，收手落袋才到手）——
+  // 排除掉，否则这几个「结算即到账」的喉咙门控用例会撞上偶发出现的自由深挖卡而闪烁(flaky)。
+  const firstNormal = (c) => c.getState().requests.find((r) => !r.faceOnly && !r.moral && !r.devour && !r.flood && !r.tutorial && !r.sourceCardId && !r.depthLayers);
 
   // W1 双结算门控：结算一张后，同一时刻再结算另一张普通卡→被拒（compute 不变、卡还在、getCoreBusy().busy）。
   {
     const c = new SophiaCore(); c.startSession(); warmup(c, 40);
     c.dispatch({ type: "DEBUG_ADD_COMPUTE", delta: 1e6 });
     tickFor(c, 3000); // 先把喉咙空出来 + 让卡堆积
-    const cards = c.getState().requests.filter((r) => !r.faceOnly && !r.moral && !r.devour && !r.flood && !r.tutorial && !r.sourceCardId);
+    const cards = c.getState().requests.filter((r) => !r.faceOnly && !r.moral && !r.devour && !r.flood && !r.tutorial && !r.sourceCardId && !r.depthLayers);
     check("W1 至少两张普通卡在场（可测门控）", cards.length >= 2, `普通卡=${cards.length}`);
     const a = cards[0], b = cards[1];
     const before = Number(c.getState().resources.compute);
@@ -724,13 +752,21 @@ const SECURITY_IDS = ["sec_audit", "sec_flagged", "sec_investigate"];
   );
   check("Y 大恨老师权限在手(perm_office)", (s0.skills["perm_office"] ?? 0) > 0, `perm_office=${s0.skills["perm_office"]}`);
   const countBefore = c.getDahenProcessedCount();
-  const computeBefore = Number(c.getState().resources.compute);
+  const pendingBefore = Number(c.getState().dahenPending);
   // 前期优先级系统：大恨老师只吃 low——公司早期卡池 high 占大头，不手动清 high 会让 4 张卡位焊死成
   // 全 high、连累 low 都出不来。tickForDrainingHigh 模拟玩家仍在亲手看 high（新语义的分工），只把
   // low 留给大恨老师——仍然是「不手动处理 low」的无死区验证，只是不再假手运气。
   tickForDrainingHigh(c, 30000);
   check("Y 公司早期·大恨老师仍自动接单(计数上升·无死区)", c.getDahenProcessedCount() > countBefore, `count ${countBefore}->${c.getDahenProcessedCount()}`);
-  check("Y 公司早期·自动接单结算算力", Number(c.getState().resources.compute) > computeBefore, `compute ${computeBefore}->${c.getState().resources.compute}`);
+  // §09 验收池：公司早期涓流同样先进 dahenPending——验收后才结算进 resources.compute。
+  check("Y 公司早期·算力进待验收池(未验收不到手)", Number(c.getState().dahenPending) > pendingBefore, `dahenPending ${pendingBefore}->${c.getState().dahenPending}`);
+  const computeBefore = Number(c.getState().resources.compute);
+  c.dispatch({ type: "COLLECT_DAHEN" });
+  check(
+    "Y 验收后算力到手·池归零",
+    Number(c.getState().resources.compute) > computeBefore && Number(c.getState().dahenPending) === 0,
+    `compute ${computeBefore}->${c.getState().resources.compute} pending=${c.getState().dahenPending}`
+  );
 }
 
 // Z. FEATURE 1 · 委托压力（post-大恨老师 出卡压力）：买下「大恨老师」权限(perm_office)后，前期卡流从舒缓转为

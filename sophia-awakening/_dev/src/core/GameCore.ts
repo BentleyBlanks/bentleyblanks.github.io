@@ -31,7 +31,7 @@ import {
   scrapRefund,
   setCaptureCostMult
 } from "./formulas/economy";
-import { add, big, gte, max, mul, sub, toDecimal } from "./math/BigNumber";
+import { add, big, gt, gte, max, min, mul, sub, toDecimal } from "./math/BigNumber";
 import type { GameEvent } from "./events/GameEvents";
 import type { BotNode, GameCommand, GameState, NodeDefinition, RequestInstance, Tier } from "./state/GameState";
 import { cloneGameState } from "./state/GameState";
@@ -451,6 +451,9 @@ export class SophiaCore {
         break;
       case "AUTO_CONSUME_REQUEST":
         this.autoConsumeRequest(command.requestId);
+        break;
+      case "COLLECT_DAHEN":
+        this.collectDahen();
         break;
       case "BUY_SKILL":
         this.buySkill(command.skillId);
@@ -1010,7 +1013,8 @@ export class SophiaCore {
     );
     const speedMult = rebirthSpeedMult(this.state.rebirthTree) * this.loopSpeedMult();
     const dataGain = toDecimal(requestDataGain(request, quality, speedMult, this.state.derived.dataMult));
-    this.addCompute(computeGain);
+    // §09 验收池：算力不再立即到手——攒进 dahenPending，玩家点验收才收下。data/XP 仍即时入账，不卡升级。
+    this.addDahenPending(computeGain);
     this.addData(dataGain);
     this.addXp(dataGain);
     this.state.statistics.totalProcessed += request.compound;
@@ -1063,7 +1067,8 @@ export class SophiaCore {
         requestComputeGain(request, quality, this.state.intelligence.globalMultiplier, this.state.derived.computeMult)
       );
       const dataGain = toDecimal(requestDataGain(request, quality, speedMult, this.state.derived.dataMult));
-      this.addCompute(computeGain);
+      // §09 验收池：同上——算力攒进 dahenPending，data/XP 即时入账。
+      this.addDahenPending(computeGain);
       this.addData(dataGain);
       this.addXp(dataGain);
       this.state.statistics.totalProcessed += request.compound;
@@ -1075,6 +1080,18 @@ export class SophiaCore {
         dataGain: dataGain.toString()
       });
     }
+  }
+
+  // §09 大恨老师·验收命令：把 dahenPending 全额收进 resources.compute、池归零（对标「刮个爽」机器人
+  // collect——他攒着，你回来点验收才到手）。池空则安全 no-op（不发事件，表现层不必空放一次收下动画）。
+  private collectDahen(): void {
+    if (!gt(this.state.dahenPending, "0")) {
+      return;
+    }
+    const amount = this.state.dahenPending;
+    this.addCompute(amount);
+    this.state.dahenPending = "0";
+    this.emit({ type: "DAHEN_COLLECTED", amount });
   }
 
   // 装死跳过：选「连接失败」时移除该请求，零收益、零暴露、不计入有效处理（断连击=零成长）。
@@ -1973,6 +1990,11 @@ export class SophiaCore {
   private addCompute(value: Decimal | string): void {
     this.state.resources.compute = add(this.state.resources.compute, value);
     this.state.resources.totalCompute = add(this.state.resources.totalCompute, value);
+  }
+
+  // §09 大恨老师·待验收池：累加、封顶 dahenPendingCap（满了 held 住，超额部分不再累积——见 tuning 注释）。
+  private addDahenPending(value: Decimal | string): void {
+    this.state.dahenPending = min(add(this.state.dahenPending, value), TUNING.dahenPendingCap);
   }
 
   private addData(value: Decimal | string): void {

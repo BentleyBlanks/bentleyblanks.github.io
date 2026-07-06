@@ -103,6 +103,13 @@ export const TUNING = {
   dahenPhoneMs:         6000,     // 手机期大恨老师自动接单的节拍 (ms)——慢于 Lv10 公司自动(dahenAutoMs)，是最早最弱的一双手
   dahenPhoneRewardMult: 0.5,      // 手机期自动接单的产出折扣（比亲自处理糙，收益打折）
 
+  // § 大恨老师·待验收池（§09，对标「刮个爽」机器人 collect）：tickDahenPhone/tickDahenAuto 处理卡攒下的
+  //   算力不再立即到手，先累加进 dahenPending，玩家点「验收」才一次性收进 resources.compute。
+  //   估值依据：以公司阶段入口(Lv8-9，perm_office/dahen_auto 刚接手时)的涓流速率为准——约 30-60s 攒满一次，
+  //   逼玩家养成「时不时看一眼右栏、点验收」的习惯；越往后大恨老师产出随全局倍率指数上涨，池会更快见底
+  //   （几秒就满），这是有意为之——阶段越深、越需要勤回来收，呼应「他攒着、你回来收」的爽感张力。
+  dahenPendingCap:      200,      // 待验收池上限——满了大恨老师仍继续清卡（保留压力阀作用），但算力不再累积超过此值（浪费，逼玩家常验收）
+
   // § 阶梯四·天网收割「请求洪流」（§09 终局手动收割层——被动 tickAutomation 才是收益地板，这是白送的爽感加速）
   floodSpawnPerSec:     2.4,      // tier4 每秒涌入的洪流包基础数（随接管进度/红皇后放大，见下）
   floodTakenScale:      1.4,      // 洪流密度随全域接管进度(takenCount/15)的放大系数（5/5 陷落时 ×(1+此值)）
@@ -198,6 +205,7 @@ export const TUNING_META: Record<TuningKey, { label: string; section: string; mi
   dahenAutoRewardMult:  { label: "大恨老师自动接单收益折扣",   section: "前期卡片",   min: 0.2,   max: 1,     step: 0.05 },
   dahenPhoneMs:         { label: "手机期大恨老师接单节拍 (ms)", section: "前期卡片",   min: 2000,  max: 15000, step: 100  },
   dahenPhoneRewardMult: { label: "手机期大恨老师接单收益折扣", section: "前期卡片",   min: 0.2,   max: 1,     step: 0.05 },
+  dahenPendingCap:      { label: "大恨老师·待验收池上限",     section: "前期卡片",   min: 50,    max: 2000,  step: 10   },
 
   floodSpawnPerSec:     { label: "洪流·每秒基础涌入数",       section: "天网收割",   min: 0.5,   max: 12,    step: 0.2  },
   floodTakenScale:      { label: "洪流·随接管进度放大",       section: "天网收割",   min: 0,     max: 3,     step: 0.1  },

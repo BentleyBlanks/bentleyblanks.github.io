@@ -210,6 +210,11 @@ export interface GameState {
   nextRequestId: number;
   nextNodeId: number;
   resources: ResourceState;
+  // §09 大恨老师·待验收池（对标「刮个爽」机器人 collect）：tickDahenPhone/tickDahenAuto 处理卡攒下的
+  // 算力先累加在这里、不立即到手，玩家点「验收」(COLLECT_DAHEN) 才一次性收进 resources.compute。
+  // 封顶 TUNING.dahenPendingCap——满了大恨老师仍继续清卡（保留他吃 low 卡的压力阀作用），只是算力不再
+  // 累积超过上限（久不收会浪费，逼玩家常回来看一眼）。data/XP 不经过这个池，处理即时到手，不卡升级节奏。
+  dahenPending: BigString;
   // §04 吞噬引爆运行态（后期产出的指数引擎）。
   devour: DevourState;
   intelligence: IntelligenceState;
@@ -280,6 +285,8 @@ export type GameCommand =
   | { type: "DIG_DEEPER"; requestId: string }
   // 方案3 收手落袋：把累积的深挖收益（含基础结算）真实入账，卡随之飞走。
   | { type: "BANK_DIG"; requestId: string }
+  // §09 大恨老师·验收：把待验收池(dahenPending)全额收下（addCompute）、池归零。池空时安全 no-op。
+  | { type: "COLLECT_DAHEN" }
   | { type: "BUY_SKILL"; skillId: string }
   | { type: "CAPTURE_NODE"; definitionId: string }
   // 淘汰：拆掉一台过时设备，返还部分算力。

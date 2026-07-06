@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111315" />
     <title>觉醒的 SOPHIA Demo</title>
-    <script type="module" crossorigin src="./assets/index-C3qgWtiY.js"></script>
+    <script type="module" crossorigin src="./assets/index-aLU2QWOO.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/Geometry-hfkBqbNM.js">
     <link rel="modulepreload" crossorigin href="./assets/RenderTargetSystem-ZcWgJ7dB.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-B3_bbqAX.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-DnxtA7gI.css">
   </head>
   <body>
     <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
@@ -49,7 +49,22 @@
     </aside>
 
     <aside id="rightRail" class="right-rail" aria-label="控制域与终端">
-      <div class="panel-section domain-cluster">
+      <!-- 大恨老师·待验收（对标「刮个爽」机器人 collect）：公司阶段(automationUnlocked && unlockedTier<2)
+           右栏本来空着（还黑不进真设备）——这里显示他攒下的待验收算力；手机期若他也在涓流(perm_office)同样可显示。
+           显隐/数值全由 HudView 驱动，这里只是骨架，默认隐藏。 -->
+      <div id="dahenPanel" class="panel-section dahen-panel" hidden>
+        <span class="panel-kicker">🤖 大恨老师 · 待验收</span>
+        <div class="dahen-body">
+          <div class="dahen-readout">
+            <strong id="dahenPendingValue">0</strong>
+            <span class="dahen-readout-label">算力待收</span>
+          </div>
+          <div class="dahen-bar"><div id="dahenFill" class="dahen-fill"></div></div>
+          <button id="dahenCollectBtn" class="command-button dahen-collect-btn" type="button">验收</button>
+          <p id="dahenIdleHint" class="hint-line dahen-idle-hint">大恨老师在处理杂活……</p>
+        </div>
+      </div>
+      <div id="domainCluster" class="panel-section domain-cluster">
         <span class="panel-kicker">控制域 · 扩张与管理</span>
         <div id="captureList" class="button-stack"></div>
       </div>

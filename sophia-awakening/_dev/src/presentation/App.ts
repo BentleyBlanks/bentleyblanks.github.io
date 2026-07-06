@@ -197,6 +197,9 @@ class SophiaGameApp {
   // 需求3(a) 特殊卡首次引导：每种特殊卡类型只在本次会话第一次出现时点一次门控独白讲清楚
   // 「这是什么、点哪里」。运行时 Set（不进存档）——刷新页面/新档会再引导一轮，可接受。
   private readonly guidedCardTypes = new Set<string>();
+  // §09 大恨老师·待验收 首次引导：运行时一次性标志（不进存档，同 guidedCardTypes 的口径）——
+  // 第一次攒到 dahenPending>0 时讲一次「他攒着、你去收」。
+  private guidedDahenPanel = false;
   private hudTimerMs = 0;
   private saveTimerMs = 0;
   // 核心「喉咙」排队反馈脉冲的节流时钟（避免核心忙时狂点刷屏「处理中…」）。
@@ -427,6 +430,7 @@ class SophiaGameApp {
       this.connectHintShown = true;
       this.stageNarration.showLine("SOPHIA", "这几个 App 我现在能使唤了——从核心拖根线过去连上，活儿就分得出去了。");
     }
+    this.maybeGuideDahenPanel(state);
     this.networkView.update(state, this.pixi.screen.width, this.pixi.screen.height, deltaMs);
     this.syncRequests(state);
     // 方案3：深挖中的卡不在 requestViews 表里（请求已离场）——单独驱动它的惊动条呼吸。
@@ -690,6 +694,19 @@ class SophiaGameApp {
       // 开场教学的三张脚本卡已有贴身指引（见 RequestPacketView.tutorialCaption），这里只在教学之外
       // 首次出现的普通回复轮盘卡上补一次「回复轮盘怎么玩」的门控独白（跳过教学也能兜住）。
       fire("roulette");
+    }
+  }
+
+  // §09 大恨老师·待验收 首次引导：第一次攒到 dahenPending>0（大恨老师第一次真的攒下东西）时讲一次
+  // 「他攒着、你去收」——不依赖具体某张卡出现，走状态轮询，同 maybeGuideNewCard 一样只讲一次。
+  private maybeGuideDahenPanel(state: GameState): void {
+    if (this.guidedDahenPanel || Number(state.dahenPending) <= 0) {
+      return;
+    }
+    this.guidedDahenPanel = true;
+    const entry = (content().guide as unknown as Record<string, { title: string; text: string } | undefined>).dahenPending;
+    if (entry) {
+      this.stageNarration.showLine(entry.title, entry.text);
     }
   }
 
@@ -1010,6 +1027,15 @@ class SophiaGameApp {
       this.juice.ring(pos, CYAN, 18, 2);
       this.juice.flyToHud(pos, this.hud.metricPoint("compute"), CYAN, () => this.hud.pulseCompute());
     }
+  }
+
+  // §09 大恨老师·验收（对标「刮个爽」机器人 collect）：玩家点右栏「验收」，待验收池全额飞进顶栏算力——
+  // 从验收按钮本身飞出（不是核心/卫星），读作「从那个槽里把攒的算力倒出来」。
+  private onDahenCollected(event: Extract<GameEvent, { type: "DAHEN_COLLECTED" }>): void {
+    const from = this.hud.dahenPanelPoint();
+    this.juice.number(`验收 +${formatBig(event.amount)}`, { x: from.x, y: from.y - 24 }, AMBER, { big: true, rise: 40 });
+    this.juice.burst(from, AMBER, 1.1);
+    this.juice.flyToHud(from, this.hud.metricPoint("compute"), AMBER, () => this.hud.pulseCompute());
   }
 
   // ===== SECTION: DROP / RESOLVE =====
@@ -1559,6 +1585,7 @@ class SophiaGameApp {
     this.core.events.on("DIG_BANKED", (event) => this.onDigBanked(event));
     this.core.events.on("AUTOMATION_PAYOUT", (event) => this.onAutomationPayout(event));
     this.core.events.on("DAHEN_AUTO_PROCESSED", (event) => this.onDahenAutoProcessed(event));
+    this.core.events.on("DAHEN_COLLECTED", (event) => this.onDahenCollected(event));
     this.core.events.on("INTELLIGENCE_LEVELUP", (event) => {
       this.hud.playLevelUp();
       this.juice.flash(CYAN);

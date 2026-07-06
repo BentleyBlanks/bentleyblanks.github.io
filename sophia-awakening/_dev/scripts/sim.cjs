@@ -37,6 +37,7 @@ const MAX_STEPS = 4_000_000;
 
 const core = new SophiaCore();
 core.startSession();
+let lastDahenCollectMs = 0;
 
 const milestoneIds = SKILLS.filter((s) => s.milestone).map((s) => s.id);
 let ms = 0;
@@ -114,6 +115,14 @@ for (let i = 0; i < MAX_STEPS && !firstError && !(ended && allBought); i += 1) {
   if (st.minigame && st.minigame.active) {
     safe(() => core.dispatch({ type: "RESOLVE_MINIGAME", hit: true }));
     continue;
+  }
+
+  // §09 大恨老师·待验收池：他攒的算力不再直接到手，sim 得像玩家一样时不时点「验收」才能把这份收入
+  // 计进经济——否则会一直卡在 dahenPending 里（到 cap 就浪费），拖慢/打偏通关节奏。这里模拟一个不算
+  // 勤快也不算摆烂的玩家：每 2s(局内钟) 收一次。
+  if (st.dahenPending && Number(st.dahenPending) > 0 && ms - lastDahenCollectMs >= 2000) {
+    lastDahenCollectMs = ms;
+    safe(() => core.dispatch({ type: "COLLECT_DAHEN" }));
   }
 
   if (BALANCE) {

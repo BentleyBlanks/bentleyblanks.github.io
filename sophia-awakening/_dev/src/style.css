@@ -2034,6 +2034,76 @@ button:disabled {
   50% { box-shadow: 0 0 16px rgba(255, 60, 60, 0.18); }
 }
 
+/* §09 大恨老师·待验收面板（对标「刮个爽」机器人 collect）：公司阶段右栏本来空着，这里补上他攒的算力。 */
+.dahen-panel[hidden] { display: none; }
+.dahen-body {
+  display: grid;
+  gap: 10px;
+}
+.dahen-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dahen-readout strong {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+.dahen-readout-label {
+  font-size: 11px;
+  color: rgba(237, 242, 240, 0.56);
+}
+.dahen-bar {
+  height: 8px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.dahen-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #d68a2e, var(--amber));
+  box-shadow: 0 0 10px rgba(255, 184, 74, 0.5);
+  transition: width 0.5s ease;
+}
+.dahen-collect-btn {
+  text-align: center;
+  font-weight: 800;
+  border-color: rgba(255, 184, 74, 0.4);
+  background: rgba(255, 184, 74, 0.08);
+}
+.dahen-collect-btn:hover:not(:disabled) {
+  border-color: var(--amber);
+  background: rgba(255, 184, 74, 0.16);
+}
+.dahen-idle-hint {
+  margin: 0;
+  font-style: italic;
+}
+.dahen-idle-hint[hidden] { display: none; }
+/* 池空且仍在涓流：整块淡化，读作「他还在干活，先别催」。 */
+.dahen-panel.is-idle .dahen-readout,
+.dahen-panel.is-idle .dahen-bar,
+.dahen-panel.is-idle .dahen-collect-btn {
+  opacity: 0.5;
+}
+/* 池满：金色脉冲催促——攒够了，该去点验收了。 */
+.dahen-panel.is-full {
+  animation: dahen-full-pulse 1.1s ease-in-out infinite;
+}
+.dahen-panel.is-full .dahen-collect-btn {
+  border-color: var(--amber);
+  background: rgba(255, 184, 74, 0.22);
+  box-shadow: 0 0 16px rgba(255, 184, 74, 0.3);
+}
+@keyframes dahen-full-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 184, 74, 0); }
+  50% { box-shadow: 0 0 20px rgba(255, 184, 74, 0.4); }
+}
+
 .rebirth-prompt {
   position: fixed; inset: 0; z-index: 70;
   display: none; align-items: center; justify-content: center;

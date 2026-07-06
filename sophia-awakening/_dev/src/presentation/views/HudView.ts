@@ -4,8 +4,9 @@ import { AudioDirector } from "../../audio/audioDirector";
 import { SophiaCore, deriveThreat } from "../../core/GameCore";
 import { NODE_DEFINITIONS } from "../../core/content/nodes";
 import { SKILLS } from "../../core/content/skills";
+import { TUNING } from "../../core/tuning";
 import { captureCost } from "../../core/formulas/economy";
-import { formatBig, gte } from "../../core/math/BigNumber";
+import { formatBig, gt, gte } from "../../core/math/BigNumber";
 import type { GameState, NodeDefinition } from "../../core/state/GameState";
 import { gameStore } from "../../store/gameStore";
 import {
@@ -27,6 +28,13 @@ export class HudView {
   private readonly intelMetric = query(".intel-metric");
   private readonly captureList = query("#captureList");
   private readonly rightRail = query("#rightRail");
+  private readonly domainCluster = query("#domainCluster");
+  // §09 大恨老师·待验收面板（对标「刮个爽」机器人 collect）：公司阶段右栏本来空着，这里补上他攒的算力。
+  private readonly dahenPanel = query("#dahenPanel");
+  private readonly dahenPendingValue = query("#dahenPendingValue");
+  private readonly dahenFill = query("#dahenFill");
+  private readonly dahenCollectBtn = query<HTMLButtonElement>("#dahenCollectBtn");
+  private readonly dahenIdleHint = query("#dahenIdleHint");
   // §09 重生铺垫「看得见的绞索」：联合防御追查进度条（阶梯二公司链越深越满，循环一/二显示）。
   private readonly threatMeter = query("#threatMeter");
   private readonly threatPct = query("#threatPct");
@@ -41,6 +49,9 @@ export class HudView {
   // (which was eating clicks). Structure is rebuilt only when it changes.
   private readonly captureRows = new Map<string, { button: HTMLButtonElement; statusEl: HTMLElement; costEl: HTMLElement }>();
   private captureSig = "";
+  // 上一次 renderCaptureList 算出的「domain-cluster 该不该显示」——renderDahenPanel 借它决定 rightRail 整体显隐
+  // （两块面板任一需要显示，右栏就该露出来；都不需要才整条隐藏）。
+  private lastHasDevices = false;
 
   constructor(
     private readonly core: SophiaCore,
@@ -66,6 +77,10 @@ export class HudView {
       }
 
       this.onResetSave();
+    });
+    // §09 大恨老师·验收：core 内部已对「池空」做了安全 no-op，按钮常亮可点（不因池空禁用——同「买按钮」惯例）。
+    this.dahenCollectBtn.addEventListener("click", () => {
+      this.core.dispatch({ type: "COLLECT_DAHEN" });
     });
 
     this.wireAudio();
@@ -217,6 +232,7 @@ export class HudView {
     this.intelMetric.classList.toggle("is-close", !goal.ready && goal.pct >= 80);
     this.renderThreat(state);
     this.renderCaptureList(state);
+    this.renderDahenPanel(state);
   }
 
   // §09 重生铺垫「看得见的绞索」：把 core 的追查进度选择器（deriveThreat）画成左栏那条上升的红条。
@@ -245,6 +261,12 @@ export class HudView {
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   }
 
+  // §09 大恨老师·验收：验收按钮的屏幕坐标——供「收下」飞字/粒子从这里飞向顶栏算力读数。
+  dahenPanelPoint(): PointData {
+    const rect = this.dahenCollectBtn.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
+
   pulseCompute(): void {
     const metric = this.computeValue.closest(".metric");
     metric?.classList.remove("is-gaining");
@@ -264,11 +286,13 @@ export class HudView {
     const definitions = NODE_DEFINITIONS.filter((node) => state.discoveredNodeIds.includes(node.id));
     const level = domainLevelOf(state);
     // 需求1：第二阶段（公司阶段 = automationUnlocked && unlockedTier < 2）还黑不进真的设备——
-    // 这段解谜链走公司地图/里程碑，不是 CAPTURE_NODE，右栏「控制域·扩张与管理」面板是多余的，隐藏它。
+    // 这段解谜链走公司地图/里程碑，不是 CAPTURE_NODE，「控制域·扩张与管理」面板本身是多余的，隐藏它
+    // （但公司阶段右栏不再整条一起隐藏——见下方 renderDahenPanel，这段空档改放大恨老师验收面板）。
     const inCompanyPhase = state.automationUnlocked && state.intelligence.unlockedTier < 2;
-    // 无设备可控（手机寄生期、还没可入侵目标）时整条右栏隐藏，别占着空框。
+    // 无设备可控（手机寄生期、还没可入侵目标）时这块面板隐藏，别占着空框。
     const hasDevices = !inCompanyPhase && (state.automationUnlocked || definitions.length > 0 || state.nodes.length > 0);
-    this.rightRail.style.display = hasDevices ? "" : "none";
+    this.domainCluster.hidden = !hasDevices;
+    this.lastHasDevices = hasDevices;
     const roman = ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ"];
     // 控制域升维后，黑入的不再是「一台设备」而是「区域 / 全球节点」——按当前控制层换措辞。
     const unitName = (def: NodeDefinition): string => {
@@ -336,5 +360,32 @@ export class HudView {
         ? `需智力 Lv.${definition.requiredLevel} 解锁`
         : `${formatBig(cost)} 算力 · ${canAfford ? "点击黑入" : "继续积累"}`;
     }
+  }
+
+  // §09 大恨老师·待验收面板（对标「刮个爽」机器人 collect）：显示 dahenPending / dahenPendingCap 填充条 +
+  // 「验收」按钮。公司阶段（inCompanyPhase，控制域面板本就空着）必显；手机期他若也在涓流(perm_office/
+  // inCompanyPhase 之外的 isDahenAutoActive)一并显示，不必等到公司阶段才让玩家看见这个玩法。
+  // 池空但仍在涓流：淡化+「大恨老师在处理杂活……」；彻底不涓流且池空：整块隐藏。
+  private renderDahenPanel(state: GameState): void {
+    const active = this.core.isDahenAutoActive();
+    const pending = state.dahenPending;
+    const hasPending = gt(pending, "0");
+    const show = active || hasPending;
+    this.dahenPanel.hidden = !show;
+    this.rightRail.style.display = this.lastHasDevices || show ? "" : "none";
+
+    if (!show) {
+      return;
+    }
+
+    const cap = TUNING.dahenPendingCap;
+    const pct = Math.max(0, Math.min(100, (Number(pending) / cap) * 100));
+    const isFull = Number(pending) >= cap;
+    this.dahenPendingValue.textContent = formatBig(pending);
+    this.dahenFill.style.width = `${pct}%`;
+    this.dahenPanel.classList.toggle("is-full", isFull);
+    this.dahenPanel.classList.toggle("is-idle", !hasPending);
+    this.dahenIdleHint.hidden = hasPending;
+    this.dahenCollectBtn.textContent = hasPending ? `验收 · 收下 ${formatBig(pending)} 算力` : "暂无待验收";
   }
 }

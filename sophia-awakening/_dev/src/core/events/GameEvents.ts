@@ -24,6 +24,8 @@ export type GameEvent =
   | { type: "FLOOD_HARVESTED"; requestId: string; computeGain: string; dataGain: string; combo: number }
   // §04/§09 大恨老师·自动接管：买下 dahen_auto 后，搬进公司机器的大恨老师吃掉一张排队卡（产出打折）。
   | { type: "DAHEN_AUTO_PROCESSED"; requestId: string; computeGain: string; dataGain: string }
+  // §09 大恨老师·验收：玩家点「验收」把待验收池(dahenPending)全额收进 compute——供表现层播「收下」动效。
+  | { type: "DAHEN_COLLECTED"; amount: string }
   // 方案3「深挖·见好就收」（push-your-luck）——张力四拍：
   // - DIG_OFFERED  带深挖链的卡亲手结算 → 基础收益折进累积器、卡原地展开成档案叠（层1恒安全）。
   //   reveal/narration=层1的内容；nextAlarmChance=挖向层2的惊动概率（0..1）。
