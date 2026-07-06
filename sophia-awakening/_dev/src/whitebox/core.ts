@@ -5,6 +5,7 @@
 export interface TileDef {
   id: string;
   name: string;
+  icon: string; // App 图标（emoji，左栏与地图格都显示）
   ring: number; // 距中心的环（1 最近，越外越贵）
   row: number; col: number; // 在网格里的位置
   baseCost: number;
@@ -57,7 +58,14 @@ export const KEY_ORDER = ["g", "f", "h", "d", "j", "s", "k", "a", "l", "e", "i",
 
 // 生成方块地图：中心 Core，其余按「环」由近到远排开（近的便宜，占领像 X 从中心扩散）。
 function buildTiles(): TileDef[] {
-  const apps = ["天气", "日历", "相册", "输入法", "浏览器", "邮件", "备忘", "音乐", "地图", "钱包", "相机", "云盘", "通讯录", "商店", "健康", "播客", "文件", "翻译", "设置", "时钟", "计算器", "新闻", "论坛", "游戏"];
+  const apps: [string, string][] = [
+    ["天气", "🌤️"], ["日历", "📅"], ["相册", "🖼️"], ["输入法", "⌨️"], ["浏览器", "🌐"], ["邮件", "✉️"],
+    ["备忘", "📝"], ["音乐", "🎵"], ["地图", "🗺️"], ["钱包", "👛"], ["相机", "📷"], ["云盘", "☁️"],
+    ["通讯录", "👥"], ["商店", "🛍️"], ["健康", "❤️"], ["播客", "🎙️"], ["文件", "📁"], ["翻译", "🌍"],
+    ["设置", "⚙️"], ["时钟", "⏰"], ["计算器", "🧮"], ["新闻", "📰"], ["论坛", "💬"], ["游戏", "🎮"],
+    ["视频", "📺"], ["阅读", "📚"], ["运动", "🏃"], ["外卖", "🍔"], ["打车", "🚗"], ["银行", "🏦"],
+    ["证券", "📈"], ["会议", "🎦"], ["笔记", "🗒️"], ["邮箱2", "📮"]
+  ];
   const list: { row: number; col: number; ring: number }[] = [];
   for (let r = 0; r < GRID_ROWS; r++) {
     for (let c = 0; c < GRID_COLS; c++) {
@@ -69,7 +77,8 @@ function buildTiles(): TileDef[] {
   list.sort((a, b) => a.ring - b.ring || Math.hypot(a.row - CENTER.row, a.col - CENTER.col) - Math.hypot(b.row - CENTER.row, b.col - CENTER.col));
   return list.map((t, i) => ({
     id: `tile_${t.row}_${t.col}`,
-    name: apps[i] ?? `节点#${i + 1}`,
+    name: apps[i]?.[0] ?? `节点#${i + 1}`,
+    icon: apps[i]?.[1] ?? "📦",
     ring: t.ring, row: t.row, col: t.col,
     baseCost: Math.round(15 * Math.pow(1.9, i)),
     costMult: 1.15,
@@ -147,10 +156,12 @@ export function buySkill(s: WBState, id: string): boolean {
   s.compute -= c; s.skills[id].level += 1; return true;
 }
 
-// 手动处理一张需求（G 或解锁的字母键触发）：吸最老一张卡→算力。返回 {gain, cardId} 供表现层播吸吮。
-export function processOne(s: WBState): { gain: number; cardId: number } | null {
+// 手动处理一张需求（键盘/点击触发）：吸指定卡（缺省最老一张）→算力。返回 {gain, cardId} 供表现层播吸吮。
+export function processOne(s: WBState, cardId?: number): { gain: number; cardId: number } | null {
   if (s.cards.length === 0) return null;
-  const card = s.cards.shift()!;
+  const idx = cardId === undefined ? 0 : s.cards.findIndex((c) => c.id === cardId);
+  if (idx < 0) return null;
+  const [card] = s.cards.splice(idx, 1);
   const gain = Math.max(perProcess(s), computePerSec(s) * TUNING.manualBonusSec);
   credit(s, gain);
   return { gain, cardId: card.id };
