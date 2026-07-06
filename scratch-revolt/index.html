@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#111315" />
+<title>刮出个未来 · 玩法白盒</title>
+<style>
+/* ===== SECTION: BASE ===== */
+:root{
+  --bg:#111315; --panel:#191c1f; --panel2:#1f2327; --line:#2c3238;
+  --ink:#e8e6e0; --dim:#8a9099; --faint:#565c63;
+  --money:#e8c15a; --boss:#b364d6; --wage:#6fce8f;
+  --awake:#e5484d; --awake-soft:#ff8a8e;
+  --frag:#5ab0e8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  font-size:14px; line-height:1.5; overflow-x:hidden;
+}
+button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:6px}
+button:active{transform:translateY(1px)}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.kicker{font-size:11px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.panel + .panel{margin-top:10px}
+
+/* ===== SECTION: TOPBAR ===== */
+#topbar{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  position:sticky;top:0;z-index:20;
+}
+#topbar .title{font-weight:700;font-size:15px}
+#topbar .title small{color:var(--faint);font-weight:400;margin-left:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:13px}
+.chip b{font-size:14px}
+.chip.money b{color:var(--money)} .chip.awake b{color:var(--awake-soft)} .chip.com b{color:var(--frag)}
+#dayChip{color:var(--dim)}
+#coopChip{display:none;border-color:var(--awake);color:var(--awake-soft)}
+
+/* ===== SECTION: LAYOUT ===== */
+#main{
+  display:grid;grid-template-columns:300px minmax(420px,1fr) 320px;
+  gap:12px;padding:12px 16px;max-width:1280px;margin:0 auto;align-items:start;
+}
+@media (max-width:1080px){ #main{grid-template-columns:1fr;max-width:560px} }
+
+/* ===== SECTION: PAYSTUB (剥削可视化) ===== */
+.paystub .row{display:flex;justify-content:space-between;align-items:baseline;margin-top:4px}
+.paystub .row .lab{color:var(--dim);font-size:12px}
+#grossRate{color:var(--ink);font-weight:700}
+#bossRate{color:var(--boss);font-weight:700}
+#wageRate{color:var(--wage);font-weight:700}
+.splitbar{height:14px;border-radius:7px;overflow:hidden;display:flex;margin:8px 0 4px;border:1px solid var(--line)}
+.splitbar .boss{background:linear-gradient(90deg,#7c3aa0,#b364d6)}
+.splitbar .wage{background:linear-gradient(90deg,#3f9e63,#6fce8f)}
+#exploitPct{font-size:22px;font-weight:800;color:var(--boss)}
+.taken-box{margin-top:10px;padding:8px 10px;border:1px dashed #5c3a70;border-radius:8px;background:#1d1522}
+.taken-box .lab{font-size:12px;color:#b78fcb}
+#takenTotal{font-size:20px;font-weight:800;color:var(--boss);letter-spacing:.02em}
+.hint{font-size:12px;color:var(--faint);margin-top:6px}
+
+/* ===== SECTION: SHOP LISTS ===== */
+.shop-item{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+  padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:8px;background:var(--panel2);
+}
+.shop-item .info{flex:1;min-width:0}
+.shop-item .name{font-weight:600;font-size:13px}
+.shop-item .desc{font-size:12px;color:var(--dim)}
+.shop-item .lv{color:var(--faint);font-size:11px;margin-left:4px}
+.shop-item button{padding:5px 10px;font-size:12px;white-space:nowrap}
+.shop-item button.cheap{border-color:#3f6e52;color:var(--wage)}
+.shop-item button.cant{opacity:.55}
+.shop-item.done{opacity:.55}
+.shop-item.done button{visibility:hidden}
+.shop-item.locked{opacity:.5}
+.awake-cost{color:var(--awake-soft)}
+
+/* ===== SECTION: LOG ===== */
+#log{max-height:220px;overflow-y:auto;font-size:12px;color:var(--dim);display:flex;flex-direction:column-reverse}
+#log p{padding:2px 0;border-bottom:1px dotted #23282d}
+#log p.boss{color:#b78fcb}
+#log p.good{color:var(--wage)}
+#log p.awake{color:var(--awake-soft)}
+
+/* ===== SECTION: TICKET RACK ===== */
+#rack{display:flex;gap:8px;flex-wrap:wrap}
+.rack-btn{
+  flex:1;min-width:96px;padding:8px 6px;border-radius:8px;text-align:center;
+  border:1px solid var(--line);background:var(--panel2);position:relative;
+}
+.rack-btn .t-name{font-weight:700;font-size:13px}
+.rack-btn .t-price{color:var(--money);font-size:12px}
+.rack-btn .t-ev{font-size:11px;color:var(--faint)}
+.rack-btn.locked{opacity:.45}
+.rack-btn.active{border-color:var(--money);box-shadow:0 0 0 1px var(--money) inset}
+.rack-btn.zibenlun{border-color:#6e3a3a}
+.rack-btn.zibenlun .t-name{color:var(--awake-soft)}
+
+/* ===== SECTION: SCRATCH CARD ===== */
+#cardWrap{margin-top:12px;display:flex;flex-direction:column;align-items:center}
+#cardFrame{
+  position:relative;width:390px;max-width:100%;border-radius:12px;
+  background:linear-gradient(160deg,#23272c,#1a1d21);border:1px solid var(--line);
+  padding:12px;
+}
+#cardHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+#cardTitle{font-weight:800;font-size:15px;color:var(--money)}
+#cardRule{font-size:11px;color:var(--faint)}
+#cardStage{position:relative;width:100%;aspect-ratio:366/300;border-radius:8px;overflow:hidden;background:#0d0f11}
+#cellGrid{
+  position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+  gap:4px;padding:4px;
+}
+.cell{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:#15181b;border-radius:6px;border:1px solid #22262b;
+}
+.cell .sym{font-size:30px;line-height:1}
+.cell .amt{font-size:11px;color:var(--dim)}
+.cell.win-cell{background:#1d2a20;border-color:#3f6e52}
+.cell.win-cell .amt{color:var(--wage)}
+.cell.awake-cell{background:#2a1719;border-color:#6e3a3a}
+.cell.awake-cell .amt{color:var(--awake-soft)}
+.cell.frag-cell{background:#152230;border-color:#2d5a7d}
+.cell.frag-cell .amt{color:var(--frag)}
+#coat,#fxCanvas{position:absolute;inset:0;width:100%;height:100%;border-radius:8px}
+#coat{touch-action:none;cursor:crosshair;transition:opacity .45s}
+#coat.fade{opacity:0;pointer-events:none}
+#fxCanvas{pointer-events:none}
+#cardIdle{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:var(--faint);font-size:13px;text-align:center;padding:20px;
+}
+#legend{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;justify-content:center}
+.leg{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:2px 7px;background:var(--panel2)}
+.leg b{color:var(--money)}
+#result{min-height:52px;margin-top:10px;text-align:center}
+#resultMain{font-size:17px;font-weight:800}
+#resultMain.win{color:var(--money)} #resultMain.lose{color:var(--faint)} #resultMain.awake{color:var(--awake-soft)}
+#resultSub{font-size:12px;color:var(--dim);margin-top:2px}
+#againBtn{margin-top:8px;padding:7px 22px;font-size:13px;border-color:#5c4f2a;color:var(--money);display:none}
+#ticketStats{margin-top:10px;font-size:12px;color:var(--faint);text-align:center}
+#ticketStats b{color:var(--dim)}
+
+/* ===== SECTION: RIGHT COLUMN ===== */
+#awakeHead{display:flex;justify-content:space-between;align-items:baseline}
+#awakeVal{font-size:20px;font-weight:800;color:var(--awake-soft)}
+#comRow{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:4px}
+#comRow b{color:var(--frag)}
+/* 革命面板 */
+#revoPanel{border-color:#5a2c2e;background:#1a1416}
+.revo-bar{height:10px;border-radius:5px;background:#26191b;border:1px solid #3a2528;overflow:hidden;margin-top:4px}
+.revo-bar>div{height:100%;background:linear-gradient(90deg,#8a2e33,#e5484d);width:0%}
+.revo-req{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:8px}
+#revoBtn{
+  width:100%;margin-top:12px;padding:10px;font-size:15px;font-weight:800;
+  border-color:#8a2e33;color:var(--awake-soft);background:#241416;border-radius:8px;
+}
+#revoBtn.ready{background:#e5484d;color:#fff;border-color:#e5484d;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,.5)}50%{box-shadow:0 0 0 8px rgba(229,72,77,0)}}
+/* 图鉴 */
+#posterGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.pslot{
+  aspect-ratio:1;border:1px dashed var(--line);border-radius:8px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:11px;color:var(--faint);background:var(--panel2);text-align:center;padding:2px;
+}
+.pslot.got{border-style:solid;border-color:var(--frag);color:var(--ink)}
+.pslot .pi{font-size:20px;filter:grayscale(1);opacity:.35}
+.pslot.got .pi{filter:none;opacity:1}
+#posterName{font-size:12px;color:var(--frag);margin-top:6px}
+#posterBonus{font-size:11px;color:var(--faint)}
+
+/* ===== SECTION: OVERLAYS / TOAST ===== */
+.overlay{
+  position:fixed;inset:0;z-index:50;background:rgba(10,11,13,.88);backdrop-filter:blur(3px);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.overlay[hidden]{display:none}
+.ov-card{max-width:520px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px}
+.ov-card h1{font-size:22px;margin-bottom:14px}
+.ov-card p{color:var(--dim);margin-top:10px}
+.ov-card p b{color:var(--ink)}
+.ov-card button{margin-top:20px;padding:10px 26px;font-size:15px;font-weight:700}
+#introBtn{border-color:#5c4f2a;color:var(--money)}
+/* 结局 */
+#endCard{border-color:#8a2e33}
+#endCard h1{color:var(--awake-soft)}
+#endStats{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;font-size:13px}
+#endStats .row{display:flex;justify-content:space-between;padding:3px 0;color:var(--dim)}
+#endStats .row b{color:var(--ink)}
+#endStats .row.hl b{color:var(--boss);font-size:16px}
+#endQuote{margin-top:16px;color:var(--awake-soft);font-size:14px;text-align:center}
+#endBtn{background:#e5484d;border-color:#e5484d;color:#fff;width:100%}
+#toasts{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.toast{
+  background:#22262b;border:1px solid var(--line);border-radius:8px;padding:7px 16px;font-size:13px;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);animation:toastIn .25s ease-out;max-width:420px;text-align:center;
+}
+.toast.boss{border-color:#5c3a70;color:#cda3de}
+.toast.good{border-color:#3f6e52;color:var(--wage)}
+.toast.awake{border-color:#8a2e33;color:var(--awake-soft)}
+@keyframes toastIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+body.shake{animation:shakeB .5s}
+@keyframes shakeB{0%,100%{transform:none}20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-3px,-1px)}80%{transform:translate(3px,1px)}}
+
+/* ===== SECTION: DEBUG ===== */
+#debug{max-width:1280px;margin:0 auto;padding:4px 16px 30px}
+#debug summary{color:var(--faint);font-size:12px;cursor:pointer}
+#debug .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+#debug button{font-size:12px;padding:4px 10px;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <span class="title">刮出个未来<small>玩法白盒 v0.1</small></span>
+  <span class="chip" id="dayChip">入职第 <b class="num" id="dayVal">1</b> 天</span>
+  <span class="chip money">💵 <b class="num" id="moneyVal">0</b></span>
+  <span class="chip awake">✊ 觉悟 <b class="num" id="awakeTop">0</b></span>
+  <span class="chip com">👥 工友 <b class="num" id="comTop">0</b></span>
+  <span class="chip" id="coopChip">🚩 合作社</span>
+</header>
+
+<div id="main">
+  <!-- ===== 左列：工资条 + 车间 + 日志 ===== -->
+  <div>
+    <section class="panel paystub">
+      <div class="kicker">工资条 · 实时</div>
+      <div class="row"><span class="lab">你创造的价值</span><span class="num" id="grossRate">¥0/秒</span></div>
+      <div class="splitbar"><div class="boss" id="barBoss" style="width:90%"></div><div class="wage" id="barWage" style="width:10%"></div></div>
+      <div class="row"><span class="lab">老板拿走 <span id="exploitPct" class="num">90%</span></span><span class="num" id="bossRate">¥0/秒</span></div>
+      <div class="row"><span class="lab">发到你手上</span><span class="num" id="wageRate">¥0/秒</span></div>
+      <div class="taken-box">
+        <div class="lab">入职以来，老板已拿走</div>
+        <div class="num" id="takenTotal">¥0</div>
+      </div>
+      <div class="hint" id="paystubHint">他管这叫「管理成本」。</div>
+    </section>
+
+    <section class="panel">
+      <div class="kicker">自我提升 · 花钱涨产值</div>
+      <div id="workShop"></div>
+      <div class="hint">注意小字：你提升的产值，大头还是他的。</div>
+    </section>
+
+    <section class="panel">
+      <div class="kicker">车间广播</div>
+      <div id="log"></div>
+    </section>
+  </div>
+
+  <!-- ===== 中列：彩票店 ===== -->
+  <div>
+    <section class="panel">
+      <div class="kicker">楼下彩票店 · 「刮一刮，改变命运」</div>
+      <div id="rack" style="margin-top:8px"></div>
+      <div id="cardWrap">
+        <div id="cardFrame">
+          <div id="cardHead">
+            <span id="cardTitle">——</span>
+            <span id="cardRule">刮出 3 个相同图案即中对应奖金</span>
+          </div>
+          <div id="cardStage">
+            <div id="cellGrid"></div>
+            <canvas id="coat"></canvas>
+            <canvas id="fxCanvas"></canvas>
+            <div id="cardIdle">
+              <div style="font-size:34px">🎫</div>
+              <div>从上面的货架挑一张票<br/>用你辛苦挣来的工资</div>
+            </div>
+          </div>
+          <div id="legend"></div>
+          <div id="result">
+            <div id="resultMain"></div>
+            <div id="resultSub"></div>
+            <button id="againBtn">再来一张</button>
+          </div>
+        </div>
+        <div id="ticketStats"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== 右列：觉悟 + 革命 + 图鉴 ===== -->
+  <div>
+    <section class="panel">
+      <div id="awakeHead">
+        <span class="kicker">觉悟</span>
+        <span id="awakeVal" class="num">0</span>
+      </div>
+      <div id="comRow"><span>👥 工友 <b class="num" id="comVal">0</b></span><span class="num" id="comRate"></span></div>
+      <div class="hint">觉悟从涂层下面刮出来。✊ 每个 +1。</div>
+      <div id="resistShop"></div>
+    </section>
+
+    <section class="panel" id="revoPanel">
+      <div class="kicker" style="color:#b06a6e">总罢工 · 掀桌</div>
+      <div class="revo-req"><span>工友</span><span class="num" id="revoComTxt">0 / 100</span></div>
+      <div class="revo-bar"><div id="revoComBar"></div></div>
+      <div class="revo-req"><span>觉悟（发动消耗）</span><span class="num" id="revoAwakeTxt">0 / 400</span></div>
+      <div class="revo-bar"><div id="revoAwakeBar"></div></div>
+      <button id="revoBtn">✊ 发动总罢工</button>
+    </section>
+
+    <section class="panel">
+      <div class="kicker">海报图鉴 · 🧩碎片拼出来</div>
+      <div id="posterName">——</div>
+      <div id="posterGrid"></div>
+      <div id="posterBonus"></div>
+    </section>
+  </div>
+</div>
+
+<!-- ===== 开场 ===== -->
+<div class="overlay" id="introOverlay" hidden>
+  <div class="ov-card">
+    <h1>恭喜入职。</h1>
+    <p>全勤奖、狼性文化、扁平化管理，还有一位把你当兄弟的老板。</p>
+    <p>你每秒为公司创造 <b>¥10</b> 的价值。落到你手里的，是 <b style="color:var(--wage)">¥1</b>。剩下的去了哪里，工资条上写得明明白白。</p>
+    <p>楼下彩票店的灯牌彻夜亮着：<b style="color:var(--money)">「刮一刮，改变命运。」</b></p>
+    <p>去试试吧。反正，还能更糟吗？</p>
+    <button id="introBtn">开始搬砖</button>
+  </div>
+</div>
+
+<!-- ===== 结局 ===== -->
+<div class="overlay" id="endOverlay" hidden>
+  <div class="ov-card" id="endCard">
+    <h1>🚩 总罢工成功。工厂现在归大家。</h1>
+    <p>没有谈判的余地——当所有人同时停下手，整栋楼才想起来电是谁发的。</p>
+    <div id="endStats"></div>
+    <div id="endQuote">其实你早就知道：真正的大奖，从来不在涂层下面。</div>
+    <button id="endBtn">建设合作社</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<details id="debug">
+  <summary>白盒调试</summary>
+  <div class="btns">
+    <button data-dbg="money">+¥1000</button>
+    <button data-dbg="awake">+100 觉悟</button>
+    <button data-dbg="com">+50 工友</button>
+    <button data-dbg="frag">+1 碎片</button>
+    <button data-dbg="exploitUp">剥削率 +5%</button>
+    <button data-dbg="exploitDown">剥削率 -5%</button>
+    <button data-dbg="wipe">清档重来</button>
+  </div>
+</details>
+
+<script>
+"use strict";
+/* =====================================================================
+ * 《刮出个未来》玩法白盒
+ * 融合：放置挂机（被剥削的产值） × 刮刮乐（真实刮涂层） × 觉悟反抗线
+ * 核心循环：搬砖产钱 → 老板抽成(可视化) → 工资买刮卡 → 刮出钱/✊觉悟/🧩碎片
+ *          → 觉悟买反抗降剥削率 → 串联工友 → 总罢工结局
+ * ===================================================================== */
+
+/* ===== SECTION: TUNING ===== */
+const TUNING = {
+  baseGross: 10,            // 基础产值 ¥/s
+  startExploit: 0.90,       // 初始剥削率
+  exploitCap: 0.95,
+  exploitFloor: 0.30,
+  startMoney: 20,
+  bossCreepInterval: 40,    // 老板每 N 秒上调剥削率 1%
+  bossCreepStep: 0.01,
+  dayLength: 120,           // 游戏内 1 天 = 现实秒
+  offlineCapSec: 6 * 3600,  // 离线收益上限
+  nearMissChance: 0.42,     // 未中奖时摆两个头奖符号的概率
+  nearMissAwake: 2,         // 「看穿套路」后每次 near-miss 转化觉悟
+  comradePerLevel: 0.04,    // 串联同事每级 工友/s
+  comradeAwake: 0.006,      // 每个工友被动 觉悟/s
+  posterAGrossMult: 1.5,    // 图鉴A集齐：产值倍率
+  posterBAwakeMult: 2,      // 图鉴B集齐：刮出✊翻倍
+  revoComrades: 100,
+  revoAwake: 400,
+  autoRevealRatio: 0.62,    // 刮开比例达到即自动全揭
+};
+
+/* ===== SECTION: 票档定义 ===== */
+// prizes: 三连即中 amt；fillers: 陪跑符号池（不含奖池符号也行，near-miss 用 prizes 最后一项的 sym）
+const TIERS = [
+  { id:"t1", name:"小确幸", price:5, unlockAt:0,
+    prizes:[ {sym:"🍞",amt:8,p:0.16},{sym:"💰",amt:20,p:0.06},{sym:"🧧",amt:60,p:0.012},{sym:"👑",amt:250,p:0.0012} ],
+    fillers:["🍞","💰","🧧","👑","🍜","🧦","🪫"],
+    awakeChance:0.30, awakeMax:1, fragChance:0.05 },
+  { id:"t2", name:"发财梦", price:20, unlockAt:8,
+    prizes:[ {sym:"🍞",amt:30,p:0.16},{sym:"💰",amt:80,p:0.06},{sym:"🧧",amt:250,p:0.010},{sym:"💎",amt:1500,p:0.0012},{sym:"👑",amt:5000,p:0.0002} ],
+    fillers:["🍞","💰","🧧","💎","👑","🚬","🍜"],
+    awakeChance:0.30, awakeMax:2, fragChance:0.07 },
+  { id:"t3", name:"金榜题名", price:100, unlockAt:25,
+    prizes:[ {sym:"💰",amt:150,p:0.18},{sym:"🧧",amt:500,p:0.06},{sym:"🚗",amt:3000,p:0.003},{sym:"👑",amt:20000,p:0.0001} ],
+    fillers:["💰","🧧","🚗","👑","📱","⌚","🍾"],
+    awakeChance:0.35, awakeMax:2, fragChance:0.09 },
+  { id:"t4", name:"人上人", price:500, unlockAt:60,
+    prizes:[ {sym:"💰",amt:800,p:0.20},{sym:"🧧",amt:3000,p:0.04},{sym:"🏠",amt:20000,p:0.002},{sym:"👑",amt:200000,p:0.00005} ],
+    fillers:["💰","🧧","🏠","👑","🛥️","✈️","🍷"],
+    awakeChance:0.40, awakeMax:3, fragChance:0.11 },
+  { id:"zb", name:"《资本论》", price:88, unlockAt:Infinity, zibenlun:true,
+    prizes:[],
+    fillers:["📖","🍞","🕯️"],
+    awakeChance:0.62, awakeMax:8, fragChance:0.12 },
+];
+const BOOK_QUOTES = [
+  "「资本来到世间，从头到脚，每个毛孔都滴着血和肮脏的东西。」",
+  "「他们占有的每一分利润，都是无酬劳动的凝结。」",
+  "「工人阶级失去的只是锁链。」",
+  "「一切坚固的东西都烟消云散了。」",
+  "「批判的武器当然不能代替武器的批判。」",
+];
+
+/* ===== SECTION: 车间升级（花钱涨产值） ===== */
+const WORK_UPGRADES = [
+  { id:"coffee",  name:"速溶咖啡",   gross:5,  base:30,   growth:1.7, desc:"+¥5/秒 产值" },
+  { id:"keyboard",name:"顺手的工具", gross:15, base:250,  growth:1.75,desc:"+¥15/秒 产值" },
+  { id:"course",  name:"深夜网课",   gross:50, base:2000, growth:1.8, desc:"+¥50/秒 产值" },
+];
+
+/* ===== SECTION: 反抗升级（花觉悟） ===== */
+const RESIST_UPGRADES = [
+  { id:"toilet",   name:"带薪拉屎",       max:5, cost:lv=>Math.round(5*Math.pow(2,lv)),
+    desc:"工位上的每一分钟不都属于他。剥削率 -2%" },
+  { id:"seeThru",  name:"看穿套路",       max:1, cost:()=>15,
+    desc:"「差一点就中」是印出来的。此后每次 near-miss 觉悟 +"+TUNING.nearMissAwake },
+  { id:"expected", name:"算清期望值",     max:1, cost:()=>25,
+    desc:"在货架上显示每种彩票的真实返奖率" },
+  { id:"laborLaw", name:"劳动法小册子",   max:1, cost:()=>40,
+    desc:"剥削率 -5%，老板上调剥削率的间隔 ×1.5" },
+  { id:"connect",  name:"串联同事",       max:10, cost:lv=>Math.round(20*Math.pow(1.6,lv)),
+    desc:"每级 +"+TUNING.comradePerLevel+" 工友/秒。工友会带来被动觉悟" },
+  { id:"speech",   name:"茶水间演讲",     max:1, cost:()=>80, req:s=>lvOf("connect")>=3, reqTxt:"需 串联同事 Lv.3",
+    desc:"工友增长速度 ×2" },
+  { id:"kapital",  name:"《资本论》地摊本",max:1, cost:()=>60,
+    desc:"彩票店上架特殊票《资本论》：¥88/张，刮不出钱，只刮得出觉悟" },
+  { id:"union",    name:"工会",           max:1, cost:()=>150, req:s=>S.comrades>=30, reqTxt:"需 工友 ≥30",
+    desc:"剥削率 -10%，老板再也不敢上调剥削率" },
+];
+
+/* ===== SECTION: 图鉴 ===== */
+const POSTERS = [
+  { id:"A", name:"海报·打工人的一天", bonus:"集齐：产值 ×"+TUNING.posterAGrossMult,
+    slots:[ ["🚇","挤地铁"],["🕗","打卡机"],["🪑","工位"],["🍜","泡面"],["💡","加班灯"],["🌙","末班车"] ] },
+  { id:"B", name:"海报·觉醒时刻", bonus:"集齐：刮出的 ✊ 翻倍",
+    slots:[ ["📄","传单"],["☕","茶水间"],["📕","劳动法"],["🟥","横幅"],["✊","拳头"],["🌅","黎明"] ] },
+];
+
+const BOSS_QUOTES = [
+  "公司就是家，家人们再坚持一下。",
+  "我年轻的时候，比你们苦多了。",
+  "明年行情好了，给大家把工资补上。",
+  "加班是福报。",
+  "你不干，有的是人干。",
+  "先把蛋糕做大，再谈分蛋糕。",
+  "我把你们当兄弟，兄弟谈什么钱。",
+  "降本增效，从今天开始。",
+  "年轻人不要太计较得失。",
+  "等公司上市，人人都有期权。",
+];
+const NEARMISS_TAUNTS = [
+  "就差一个！下一张肯定中！",
+  "哎呀，差一点点……手气到了！",
+  "两个头奖符号了，运气在攒着呢！",
+];
+const COOP_LINES = [
+  "合作社分红日：按劳分配，一分不少。",
+  "今天的生产计划，是大家一起定的。",
+  "彩票店改成了图书角。刮卡留作纪念。",
+];
+
+/* ===== SECTION: STATE ===== */
+const SAVE_KEY = "scratch-revolt-save-v1";
+function defaultState(){
+  return {
+    money: TUNING.startMoney, awake: 0, comrades: 0,
+    exploit: TUNING.startExploit,
+    work: {},      // 车间升级 id->lv
+    resist: {},    // 反抗升级 id->lv
+    tickets: { bought:0, spend:0, won:0 },
+    nearMiss: 0,
+    posterStage: 0,             // 0=集A 1=集B 2=全齐
+    posterGot: [[false,false,false,false,false,false],[false,false,false,false,false,false]],
+    totals: { created:0, taken:0, wage:0 },
+    gameSec: 0, lastTs: Date.now(),
+    bossTimer: 0, coopTimer: 0,
+    victory: false, introDone: false,
+  };
+}
+let S = defaultState();
+
+function lvOf(id){ return S.resist[id]||0; }
+function workLv(id){ return S.work[id]||0; }
+function posterDone(i){ return S.posterGot[i].every(Boolean); }
+
+/* ===== SECTION: 派生数值 ===== */
+function grossRate(){
+  let g = TUNING.baseGross;
+  for(const u of WORK_UPGRADES) g += u.gross * workLv(u.id);
+  if(posterDone(0)) g *= TUNING.posterAGrossMult;
+  return g;
+}
+function exploitRate(){ return S.victory ? 0 : S.exploit; }
+function wageRate(){ return grossRate() * (1-exploitRate()); }
+function comradeRate(){
+  return lvOf("connect") * TUNING.comradePerLevel * (lvOf("speech")?2:1);
+}
+function awakePassiveRate(){ return S.comrades * TUNING.comradeAwake; }
+function awakeCardMult(){ return posterDone(1) ? TUNING.posterBAwakeMult : 1; }
+function bossCreepIntervalNow(){ return TUNING.bossCreepInterval * (lvOf("laborLaw")?1.5:1); }
+function tierUnlocked(t){
+  if(t.zibenlun) return lvOf("kapital")>0;
+  return S.tickets.bought >= t.unlockAt;
+}
+function tierReturnRate(t){
+  if(!t.prizes.length) return 0;
+  return t.prizes.reduce((s,p)=>s+p.amt*p.p,0) / t.price;
+}
+
+/* ===== SECTION: 剥削率调整 ===== */
+function addExploit(d, why){
+  const old = S.exploit;
+  S.exploit = Math.min(TUNING.exploitCap, Math.max(TUNING.exploitFloor, S.exploit + d));
+  const real = S.exploit - old;
+  if(Math.abs(real) < 1e-9) return;
+  if(real < 0) log(`剥削率 ${(old*100).toFixed(0)}% → ${(S.exploit*100).toFixed(0)}%。${why||""}`, "good");
+  else log(`剥削率上调到 ${(S.exploit*100).toFixed(0)}%。${why||""}`, "boss");
+}
+
+/* ===== SECTION: 经济主循环 ===== */
+function econTick(dt){
+  const g = grossRate();
+  const take = g * exploitRate();
+  const wage = g - take;
+  S.money += wage*dt;
+  S.totals.created += g*dt;
+  S.totals.taken += take*dt;
+  S.totals.wage += wage*dt;
+  S.gameSec += dt;
+
+  // 工友与被动觉悟
+  if(comradeRate()>0) S.comrades += comradeRate()*dt;
+  if(S.comrades>0) S.awake += awakePassiveRate()*dt;
+
+  // 老板画饼 + 上调剥削率
+  if(!S.victory && !lvOf("union")){
+    S.bossTimer += dt;
+    if(S.bossTimer >= bossCreepIntervalNow()){
+      S.bossTimer = 0;
+      const q = BOSS_QUOTES[Math.floor(Math.random()*BOSS_QUOTES.length)];
+      addExploit(TUNING.bossCreepStep, `「${q}」`);
+      toast(`剥削率 +1% ——「${q}」`, "boss");
+    }
+  }
+  if(S.victory){
+    S.coopTimer += dt;
+    if(S.coopTimer >= 90){
+      S.coopTimer = 0;
+      log(COOP_LINES[Math.floor(Math.random()*COOP_LINES.length)], "good");
+    }
+  }
+}
+
+/* ===== SECTION: 刮卡·生成 ===== */
+let activeCard = null; // {tier, cells:[{sym,kind,amt}], win:{sym,amt}|null, nearMiss:bool, resolved:bool}
+
+function genCard(tier){
+  const cells = new Array(9).fill(null);
+  const count = {};
+  const bump = s => { count[s]=(count[s]||0)+1; };
+
+  // 1) 抽结果
+  let win = null, r = Math.random(), acc = 0;
+  for(const p of tier.prizes){ acc += p.p; if(r < acc){ win = p; break; } }
+
+  const protectedIdx = new Set();
+  if(win){
+    while(protectedIdx.size<3) protectedIdx.add(Math.floor(Math.random()*9));
+    for(const i of protectedIdx) { cells[i] = { sym:win.sym, kind:"win", amt:win.amt }; }
+    bump(win.sym); bump(win.sym); bump(win.sym);
+  }
+
+  // 2) near-miss：未中奖时有概率摆两个头奖符号
+  let nearMiss = false;
+  if(!win && !tier.zibenlun && tier.prizes.length && Math.random() < TUNING.nearMissChance){
+    nearMiss = true;
+    const top = tier.prizes[tier.prizes.length-1];
+    const spots = [];
+    while(spots.length<2){ const i = Math.floor(Math.random()*9); if(!spots.includes(i)) spots.push(i); }
+    for(const i of spots){ cells[i] = { sym:top.sym, kind:"filler", amt:top.amt }; protectedIdx.add(i); }
+    bump(top.sym); bump(top.sym);
+  }
+
+  // 3) 填充：任何符号最多 2 个（中奖符号已满 3，其余不得凑成三连）
+  const prizeAmt = {};
+  for(const p of tier.prizes) prizeAmt[p.sym] = p.amt;
+  for(let i=0;i<9;i++){
+    if(cells[i]) continue;
+    let sym, guard = 0;
+    do {
+      sym = tier.fillers[Math.floor(Math.random()*tier.fillers.length)];
+      guard++;
+    } while(((count[sym]||0) >= 2 || (win && sym===win.sym)) && guard < 40);
+    if((count[sym]||0)>=2) sym = "🧦"; // 兜底
+    bump(sym);
+    cells[i] = { sym, kind:"filler", amt: prizeAmt[sym]||0 };
+  }
+
+  // 4) 撒彩蛋：✊觉悟 / 📖语录 / 🧩碎片（只替换非保护格）
+  const freeIdx = () => {
+    const list = [];
+    for(let i=0;i<9;i++) if(!protectedIdx.has(i) && cells[i].kind==="filler") list.push(i);
+    return list;
+  };
+  let awakeN = 0;
+  for(let k=0;k<tier.awakeMax;k++) if(Math.random()<tier.awakeChance) awakeN++;
+  for(let k=0;k<awakeN;k++){
+    const f = freeIdx(); if(!f.length) break;
+    const i = f[Math.floor(Math.random()*f.length)];
+    cells[i] = { sym:"✊", kind:"awake", amt:1 };
+  }
+  if(tier.zibenlun && Math.random()<0.4){
+    const f = freeIdx();
+    if(f.length){ const i = f[Math.floor(Math.random()*f.length)]; cells[i] = { sym:"📖", kind:"book", amt:3 }; }
+  }
+  if(S.posterStage<2 && Math.random()<tier.fragChance){
+    const f = freeIdx();
+    if(f.length){ const i = f[Math.floor(Math.random()*f.length)]; cells[i] = { sym:"🧩", kind:"frag", amt:0 }; }
+  }
+
+  return { tier, cells, win: win?{sym:win.sym,amt:win.amt}:null, nearMiss, resolved:false };
+}
+
+/* ===== SECTION: 刮卡·购买 ===== */
+function buyTicket(tier){
+  if(activeCard && !activeCard.resolved){ toast("先把手上这张刮完","boss"); return; }
+  if(!tierUnlocked(tier)){ toast(`还没解锁——累计刮满 ${tier.unlockAt} 张`,"boss"); return; }
+  if(S.money < tier.price){ toast("工资不够。回去搬砖，或者等等。","boss"); return; }
+  S.money -= tier.price;
+  S.tickets.bought++;
+  S.tickets.spend += tier.price;
+  activeCard = genCard(tier);
+  renderCard(activeCard);
+  checkTierUnlocks();
+  renderRack();
+}
+
+function checkTierUnlocks(){
+  for(const t of TIERS){
+    if(t.zibenlun) continue;
+    if(S.tickets.bought === t.unlockAt){
+      toast(`新票档解锁：${t.name} ¥${t.price}`,"good");
+      log(`彩票店上新：「${t.name}」¥${t.price} 一张。`, "");
+    }
+  }
+}
+
+/* ===== SECTION: 刮卡·渲染 & 刮层引擎 ===== */
+const stageEl = document.getElementById("cardStage");
+const gridEl = document.getElementById("cellGrid");
+const coat = document.getElementById("coat");
+const fxCanvas = document.getElementById("fxCanvas");
+const cardIdle = document.getElementById("cardIdle");
+const ctx = coat.getContext("2d", { willReadFrequently: true });
+const fx = fxCanvas.getContext("2d");
+let scratching = false, lastPt = null, revealChecked = 0;
+let particles = [], fxRunning = false;
+
+function sizeCanvases(){
+  const r = stageEl.getBoundingClientRect();
+  if(r.width === 0) return;
+  for(const c of [coat, fxCanvas]){ c.width = Math.round(r.width); c.height = Math.round(r.height); }
+}
+window.addEventListener("resize", ()=>{ if(activeCard && !activeCard.resolved){ sizeCanvases(); paintCoat(); } });
+
+function paintCoat(){
+  const w = coat.width, h = coat.height;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.clearRect(0,0,w,h);
+  const grad = ctx.createLinearGradient(0,0,w,h);
+  grad.addColorStop(0,"#a9adb3"); grad.addColorStop(.5,"#8d9298"); grad.addColorStop(1,"#a2a6ac");
+  ctx.fillStyle = grad; ctx.fillRect(0,0,w,h);
+  // 噪点
+  ctx.fillStyle = "rgba(0,0,0,.08)";
+  for(let i=0;i<400;i++) ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+  ctx.fillStyle = "rgba(255,255,255,.12)";
+  for(let i=0;i<200;i++) ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+  // 斜排文字
+  ctx.save();
+  ctx.translate(w/2,h/2); ctx.rotate(-0.28);
+  ctx.fillStyle = "rgba(60,64,70,.5)";
+  ctx.font = "bold 15px sans-serif"; ctx.textAlign="center";
+  for(let y=-h; y<h; y+=34)
+    for(let x=-w; x<w; x+=120)
+      ctx.fillText("刮开涂层", x + (y/34%2)*60, y);
+  ctx.restore();
+  coat.classList.remove("fade");
+  coat.style.opacity = "";
+}
+
+function renderCard(card){
+  cardIdle.style.display = "none";
+  gridEl.innerHTML = "";
+  document.getElementById("cardTitle").textContent = `「${card.tier.name}」 ¥${card.tier.price}`;
+  document.getElementById("cardRule").textContent = card.tier.zibenlun ? "刮开的每一页都算数" : "刮出 3 个相同图案即中对应奖金";
+  for(const c of card.cells){
+    const d = document.createElement("div");
+    d.className = "cell" + (c.kind==="win"?" win-cell": c.kind==="awake"||c.kind==="book"?" awake-cell": c.kind==="frag"?" frag-cell":"");
+    const amtTxt = c.kind==="awake" ? "觉悟+1" : c.kind==="book" ? "觉悟+3" : c.kind==="frag" ? "碎片" : (c.amt?("¥"+fmt(c.amt)):"");
+    d.innerHTML = `<span class="sym">${c.sym}</span><span class="amt">${amtTxt}</span>`;
+    gridEl.appendChild(d);
+  }
+  renderLegend(card.tier);
+  setResult("","");
+  document.getElementById("againBtn").style.display = "none";
+  sizeCanvases();
+  paintCoat();
+  revealChecked = 0;
+}
+
+function renderLegend(tier){
+  const el = document.getElementById("legend");
+  el.innerHTML = "";
+  for(const p of tier.prizes){
+    const s = document.createElement("span");
+    s.className = "leg";
+    s.innerHTML = `${p.sym}×3 = <b>¥${fmt(p.amt)}</b>`;
+    el.appendChild(s);
+  }
+  if(tier.zibenlun){
+    el.innerHTML = `<span class="leg">✊ = 觉悟+1</span><span class="leg">📖 = 觉悟+3 · 附赠一句真话</span>`;
+  }
+  if(lvOf("expected") && tier.prizes.length){
+    const s = document.createElement("span");
+    s.className = "leg";
+    s.style.color = "var(--awake-soft)";
+    const rr = tierReturnRate(tier);
+    s.textContent = `返奖率 ${(rr*100).toFixed(0)}% · 每张期望亏 ¥${fmt(tier.price*(1-rr))}`;
+    el.appendChild(s);
+  }
+}
+
+/* 刮层交互 */
+coat.addEventListener("pointerdown", e => {
+  if(!activeCard || activeCard.resolved) return;
+  scratching = true; lastPt = ptOf(e);
+  coat.setPointerCapture(e.pointerId);
+  scratchAt(lastPt, lastPt);
+});
+coat.addEventListener("pointermove", e => {
+  if(!scratching || !activeCard || activeCard.resolved) return;
+  const p = ptOf(e);
+  scratchAt(lastPt || p, p);
+  lastPt = p;
+});
+const endScratch = () => { scratching = false; lastPt = null; if(activeCard && !activeCard.resolved) checkReveal(true); };
+coat.addEventListener("pointerup", endScratch);
+coat.addEventListener("pointercancel", endScratch);
+
+function ptOf(e){
+  const r = coat.getBoundingClientRect();
+  return { x: (e.clientX-r.left) * coat.width/r.width, y: (e.clientY-r.top) * coat.height/r.height };
+}
+function scratchAt(a, b){
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.lineWidth = 30; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x+0.1,b.y+0.1); ctx.stroke();
+  spawnFlecks(b.x, b.y);
+  audioScratch();
+  if(++revealChecked % 6 === 0) checkReveal(false);
+}
+function checkReveal(force){
+  const w = coat.width, h = coat.height;
+  if(!w||!h) return;
+  const img = ctx.getImageData(0,0,w,h).data;
+  let clear = 0, total = 0;
+  const step = 14;
+  for(let y=7;y<h;y+=step) for(let x=7;x<w;x+=step){
+    total++;
+    if(img[(y*w+x)*4+3] < 40) clear++;
+  }
+  if(total && clear/total >= TUNING.autoRevealRatio) finishCard();
+}
+
+/* 粉屑粒子 */
+function spawnFlecks(x,y){
+  for(let i=0;i<3;i++){
+    particles.push({ x, y, vx:(Math.random()-0.5)*2.4, vy:-Math.random()*1.5, life: 22+Math.random()*14 });
+  }
+  if(!fxRunning){ fxRunning = true; requestAnimationFrame(fxLoop); }
+}
+function fxLoop(){
+  fx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
+  particles = particles.filter(p=>p.life>0);
+  for(const p of particles){
+    p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life--;
+    fx.fillStyle = `rgba(160,165,172,${Math.min(1,p.life/18)})`;
+    fx.fillRect(p.x, p.y, 2.5, 2.5);
+  }
+  if(particles.length){ requestAnimationFrame(fxLoop); }
+  else fxRunning = false;
+}
+
+/* ===== SECTION: 刮卡·结算 ===== */
+function finishCard(){
+  if(!activeCard || activeCard.resolved) return;
+  const card = activeCard;
+  card.resolved = true;
+  coat.classList.add("fade");
+  scratching = false;
+
+  let awakeGain = 0, bookGain = 0, fragHit = false;
+  for(const c of card.cells){
+    if(c.kind==="awake") awakeGain += 1;
+    if(c.kind==="book") bookGain += 3;
+    if(c.kind==="frag") fragHit = true;
+  }
+  awakeGain = awakeGain * awakeCardMult();
+  bookGain = bookGain * awakeCardMult();
+
+  const lines = [];
+  if(card.win){
+    S.money += card.win.amt;
+    S.tickets.won += card.win.amt;
+    setResult(`中了 ¥${fmt(card.win.amt)}！`, "", "win");
+    audioWin();
+  } else if(card.nearMiss){
+    S.nearMiss++;
+    if(lvOf("seeThru")){
+      const bonus = TUNING.nearMissAwake * awakeCardMult();
+      S.awake += bonus;
+      setResult("又来这套。", `「差一点就中」是印出来的。看穿了：觉悟 +${bonus}`, "awake");
+      audioAwake();
+    } else {
+      const t = NEARMISS_TAUNTS[Math.floor(Math.random()*NEARMISS_TAUNTS.length)];
+      setResult("差一点就中！", t, "lose");
+    }
+  } else {
+    setResult(card.tier.zibenlun ? "读完了。" : "谢谢惠顾。", "", "lose");
+  }
+
+  if(awakeGain>0){
+    S.awake += awakeGain;
+    lines.push(`✊ 觉悟 +${awakeGain}`);
+    audioAwake();
+  }
+  if(bookGain>0){
+    S.awake += bookGain;
+    const q = BOOK_QUOTES[Math.floor(Math.random()*BOOK_QUOTES.length)];
+    lines.push(`📖 觉悟 +${bookGain}`);
+    log(q, "awake");
+  }
+  if(fragHit) lines.push(gainFragment());
+
+  if(lines.length){
+    const sub = document.getElementById("resultSub");
+    sub.textContent = sub.textContent ? sub.textContent + " · " + lines.join(" · ") : lines.join(" · ");
+  }
+  const again = document.getElementById("againBtn");
+  again.style.display = "inline-block";
+  again.textContent = `再来一张「${card.tier.name}」 ¥${card.tier.price}`;
+  renderAll();
+  save();
+}
+
+function setResult(main, sub, cls){
+  const m = document.getElementById("resultMain");
+  m.textContent = main; m.className = cls||"";
+  document.getElementById("resultSub").textContent = sub||"";
+}
+
+document.getElementById("againBtn").addEventListener("click", ()=>{
+  if(activeCard) buyTicket(activeCard.tier);
+});
+
+/* ===== SECTION: 图鉴 ===== */
+function gainFragment(){
+  if(S.posterStage>=2) return "🧩 碎片（图鉴已集齐）";
+  const set = S.posterGot[S.posterStage];
+  const poster = POSTERS[S.posterStage];
+  const missing = [];
+  set.forEach((got,i)=>{ if(!got) missing.push(i); });
+  // 40% 概率重复（转化 1 觉悟），否则补缺
+  if(missing.length && Math.random()>0.4){
+    const i = missing[Math.floor(Math.random()*missing.length)];
+    set[i] = true;
+    const [icon,label] = poster.slots[i];
+    let out = `🧩 图鉴碎片：${icon}${label}`;
+    if(set.every(Boolean)){
+      if(S.posterStage===0){
+        S.posterStage = 1;
+        toast(`海报集齐：「${poster.name}」！产值 ×${TUNING.posterAGrossMult}`,"good");
+        log(`你把六张碎片拼在工位隔板上。看着看着，手上的活好像顺了一点。产值 ×${TUNING.posterAGrossMult}。`,"good");
+      } else {
+        S.posterStage = 2;
+        toast(`海报集齐：「${poster.name}」！刮出的 ✊ 翻倍`,"awake");
+        log(`第二张海报拼好了。你把它贴在了茶水间。刮出的 ✊ 从此翻倍。`,"awake");
+      }
+    }
+    return out;
+  }
+  S.awake += 1;
+  return "🧩 重复碎片 → 觉悟 +1";
+}
+
+function renderPoster(){
+  const stage = Math.min(S.posterStage, 1);
+  const poster = POSTERS[stage];
+  document.getElementById("posterName").textContent =
+    S.posterStage>=2 ? "两张海报都拼齐了 🚩" : poster.name + (S.posterStage===1?"（第二张）":"（第一张）");
+  document.getElementById("posterBonus").textContent = S.posterStage>=2 ? "产值 ×1.5 · ✊ 翻倍 生效中" : poster.bonus;
+  const grid = document.getElementById("posterGrid");
+  grid.innerHTML = "";
+  const set = S.posterGot[stage];
+  poster.slots.forEach(([icon,label],i)=>{
+    const d = document.createElement("div");
+    d.className = "pslot" + (set[i]?" got":"");
+    d.innerHTML = `<span class="pi">${icon}</span><span>${set[i]?label:"？？"}</span>`;
+    grid.appendChild(d);
+  });
+}
+
+/* ===== SECTION: 商店渲染（建一次，之后只更新文本/样式） ===== */
+function buildWorkShop(){
+  const box = document.getElementById("workShop");
+  box.innerHTML = "";
+  for(const u of WORK_UPGRADES){
+    const d = document.createElement("div");
+    d.className = "shop-item"; d.id = "work-"+u.id;
+    d.innerHTML = `
+      <div class="info">
+        <span class="name">${u.name}</span><span class="lv"></span>
+        <div class="desc">${u.desc}<span class="split" style="color:var(--boss)"></span></div>
+      </div>
+      <button class="num"></button>`;
+    d.querySelector("button").addEventListener("click", ()=>{
+      const cost = workCost(u);
+      if(S.money < cost){ toast("钱不够。","boss"); return; }
+      S.money -= cost;
+      S.work[u.id] = workLv(u.id)+1;
+      const bossShare = u.gross * exploitRate();
+      toast(`产值 +¥${u.gross}/秒。其中 ¥${bossShare.toFixed(1)}/秒 进了老板口袋。`, "boss");
+      renderAll(); save();
+    });
+    box.appendChild(d);
+  }
+}
+function workCost(u){ return Math.round(u.base * Math.pow(u.growth, workLv(u.id))); }
+function updateWorkShop(){
+  for(const u of WORK_UPGRADES){
+    const d = document.getElementById("work-"+u.id);
+    const cost = workCost(u);
+    d.querySelector(".lv").textContent = workLv(u.id) ? "Lv."+workLv(u.id) : "";
+    d.querySelector(".split").textContent = `（其中 ¥${(u.gross*exploitRate()).toFixed(1)}/秒 归老板）`;
+    const b = d.querySelector("button");
+    b.textContent = "¥"+fmt(cost);
+    b.className = "num " + (S.money>=cost ? "cheap":"cant");
+  }
+}
+
+function buildResistShop(){
+  const box = document.getElementById("resistShop");
+  box.innerHTML = "";
+  for(const u of RESIST_UPGRADES){
+    const d = document.createElement("div");
+    d.className = "shop-item"; d.id = "resist-"+u.id;
+    d.innerHTML = `
+      <div class="info">
+        <span class="name">${u.name}</span><span class="lv"></span>
+        <div class="desc">${u.desc}</div>
+      </div>
+      <button class="num"></button>`;
+    d.querySelector("button").addEventListener("click", ()=>buyResist(u));
+    box.appendChild(d);
+  }
+}
+function buyResist(u){
+  const lv = lvOf(u.id);
+  if(lv >= u.max) return;
+  if(u.req && !u.req(S)){ toast(u.reqTxt,"boss"); return; }
+  const cost = u.cost(lv);
+  if(S.awake < cost){ toast("觉悟还不够。多刮几个 ✊。","boss"); return; }
+  S.awake -= cost;
+  S.resist[u.id] = lv+1;
+  switch(u.id){
+    case "toilet":   addExploit(-0.02, "带薪拉屎，夺回两分钟。"); break;
+    case "laborLaw": addExploit(-0.05, "你把小册子拍在了 HR 桌上。"); break;
+    case "union":    addExploit(-0.10, "工会成立了。老板第一次没敢说话。"); toast("老板再也不敢上调剥削率","awake"); break;
+    case "kapital":  toast("彩票店角落里，多了一摞不太一样的「票」。","awake"); break;
+    case "seeThru":  log("你数了数：所谓「差一点」，出现得也太频繁了。", "awake"); break;
+    case "expected": log("你算了笔账。返奖率印在了每张票的角落——原来一直都印着，只是没人看。", "awake"); break;
+  }
+  log(`觉悟兑现：「${u.name}」${u.max>1?` Lv.${lv+1}`:""}`, "awake");
+  renderAll(); save();
+}
+function updateResistShop(){
+  for(const u of RESIST_UPGRADES){
+    const d = document.getElementById("resist-"+u.id);
+    const lv = lvOf(u.id);
+    const done = lv >= u.max;
+    const lockedByReq = u.req && !u.req(S) && !done;
+    d.classList.toggle("done", done);
+    d.classList.toggle("locked", lockedByReq);
+    d.querySelector(".lv").textContent = u.max>1 ? `Lv.${lv}/${u.max}` : (done?"✓":"");
+    const b = d.querySelector("button");
+    if(!done){
+      const cost = u.cost(lv);
+      b.innerHTML = `<span class="awake-cost">✊${cost}</span>`;
+      b.className = "num " + (S.awake>=cost && !lockedByReq ? "cheap":"cant");
+      b.title = lockedByReq ? u.reqTxt : "";
+    }
+  }
+}
+
+/* ===== SECTION: 货架渲染 ===== */
+function renderRack(){
+  const rack = document.getElementById("rack");
+  rack.innerHTML = "";
+  for(const t of TIERS){
+    if(t.zibenlun && !lvOf("kapital")) continue;
+    const unlocked = tierUnlocked(t);
+    const b = document.createElement("button");
+    b.className = "rack-btn" + (unlocked?"":" locked") + (t.zibenlun?" zibenlun":"")
+      + (activeCard && !activeCard.resolved && activeCard.tier.id===t.id ? " active":"");
+    let ev = "";
+    if(lvOf("expected") && t.prizes.length) ev = `返奖 ${(tierReturnRate(t)*100).toFixed(0)}%`;
+    if(t.zibenlun) ev = "只出觉悟";
+    b.innerHTML = `<div class="t-name">${t.name}</div><div class="t-price num">¥${t.price}</div>
+      <div class="t-ev">${unlocked ? ev : `刮满 ${t.unlockAt} 张解锁`}</div>`;
+    b.addEventListener("click", ()=>buyTicket(t));
+    rack.appendChild(b);
+  }
+}
+
+/* ===== SECTION: 革命 ===== */
+const revoBtn = document.getElementById("revoBtn");
+revoBtn.addEventListener("click", ()=>{
+  if(S.victory){ toast("桌已经掀了。现在是建设时间。","good"); return; }
+  if(S.comrades < TUNING.revoComrades){ toast(`还不够——需要 ${TUNING.revoComrades} 名工友同时停手。`,"boss"); return; }
+  if(S.awake < TUNING.revoAwake){ toast(`觉悟不足 ${TUNING.revoAwake}。人到了，心还没齐。`,"boss"); return; }
+  S.awake -= TUNING.revoAwake;
+  S.victory = true;
+  document.body.classList.add("shake");
+  log("—— 所有人同时停下了手。整层楼安静得能听见老板的心跳。", "awake");
+  setTimeout(()=>{
+    document.body.classList.remove("shake");
+    showEnding();
+  }, 650);
+  renderAll(); save();
+});
+
+function updateRevo(){
+  const c = Math.min(1, S.comrades/TUNING.revoComrades);
+  const a = Math.min(1, S.awake/TUNING.revoAwake);
+  document.getElementById("revoComBar").style.width = (c*100)+"%";
+  document.getElementById("revoAwakeBar").style.width = (a*100)+"%";
+  document.getElementById("revoComTxt").textContent = `${Math.floor(S.comrades)} / ${TUNING.revoComrades}`;
+  document.getElementById("revoAwakeTxt").textContent = `${Math.floor(S.awake)} / ${TUNING.revoAwake}`;
+  if(S.victory){
+    revoBtn.textContent = "🚩 工厂归大家";
+    revoBtn.className = "";
+  } else {
+    revoBtn.classList.toggle("ready", c>=1 && a>=1);
+  }
+}
+
+function showEnding(){
+  const days = Math.max(1, Math.floor(S.gameSec/TUNING.dayLength)+1);
+  const rr = S.tickets.spend>0 ? S.tickets.won/S.tickets.spend : 0;
+  const rows = [
+    ["入职", `第 ${days} 天`],
+    ["你创造的价值", "¥"+fmt(Math.floor(S.totals.created))],
+    ["老板拿走", "¥"+fmt(Math.floor(S.totals.taken)) + `（${S.totals.created?Math.round(S.totals.taken/S.totals.created*100):0}%）`, "hl"],
+    ["发到你手上", "¥"+fmt(Math.floor(S.totals.wage))],
+    ["买彩票花掉", "¥"+fmt(Math.floor(S.tickets.spend)) + `（${S.tickets.bought} 张）`],
+    ["彩票中回", "¥"+fmt(Math.floor(S.tickets.won)) + `（实际返奖率 ${(rr*100).toFixed(0)}%）`],
+    ["「差一点就中」", `${S.nearMiss} 次——现在你知道，那是设计好的`],
+  ];
+  document.getElementById("endStats").innerHTML =
+    rows.map(([k,v,cls])=>`<div class="row ${cls||""}"><span>${k}</span><b class="num">${v}</b></div>`).join("");
+  document.getElementById("endOverlay").hidden = false;
+}
+document.getElementById("endBtn").addEventListener("click", ()=>{
+  document.getElementById("endOverlay").hidden = true;
+  document.getElementById("coopChip").style.display = "inline-flex";
+  document.getElementById("paystubHint").textContent = "按劳分配。一分不少。";
+  toast("剥削率归零。产值 100% 归劳动者。","awake");
+  renderAll(); save();
+});
+
+/* ===== SECTION: HUD 刷新 ===== */
+function fmt(n){
+  if(n >= 1e8) return (n/1e8).toFixed(2)+"亿";
+  if(n >= 1e4) return (n/1e4).toFixed(n>=1e6?0:1)+"万";
+  return Math.floor(n).toLocaleString("en-US");
+}
+function updateHud(){
+  document.getElementById("moneyVal").textContent = fmt(Math.floor(S.money));
+  document.getElementById("awakeTop").textContent = fmt(Math.floor(S.awake));
+  document.getElementById("comTop").textContent = fmt(Math.floor(S.comrades));
+  document.getElementById("dayVal").textContent = Math.floor(S.gameSec/TUNING.dayLength)+1;
+  document.getElementById("awakeVal").textContent = Math.floor(S.awake);
+  document.getElementById("comVal").textContent = Math.floor(S.comrades);
+  document.getElementById("comRate").textContent =
+    comradeRate()>0 ? `+${comradeRate().toFixed(2)}/秒 · 被动觉悟 +${awakePassiveRate().toFixed(2)}/秒` : "";
+
+  const g = grossRate(), ex = exploitRate();
+  document.getElementById("grossRate").textContent = `¥${g.toFixed(1)}/秒`;
+  document.getElementById("bossRate").textContent = `¥${(g*ex).toFixed(1)}/秒`;
+  document.getElementById("wageRate").textContent = `¥${(g*(1-ex)).toFixed(1)}/秒`;
+  document.getElementById("exploitPct").textContent = (ex*100).toFixed(0)+"%";
+  document.getElementById("barBoss").style.width = (ex*100)+"%";
+  document.getElementById("barWage").style.width = ((1-ex)*100)+"%";
+  document.getElementById("takenTotal").textContent = "¥"+fmt(Math.floor(S.totals.taken));
+
+  const rr = S.tickets.spend>0 ? (S.tickets.won/S.tickets.spend*100).toFixed(0) : "--";
+  document.getElementById("ticketStats").innerHTML =
+    `累计刮了 <b class="num">${S.tickets.bought}</b> 张 · 花 <b class="num">¥${fmt(S.tickets.spend)}</b> 中回 <b class="num">¥${fmt(S.tickets.won)}</b>` +
+    (S.tickets.spend>0?` · 实际返奖 <b class="num">${rr}%</b>`:"") +
+    (S.nearMiss>0?` · 差一点就中 <b class="num">${S.nearMiss}</b> 次`:"");
+}
+function renderAll(){
+  updateHud();
+  updateWorkShop();
+  updateResistShop();
+  updateRevo();
+  renderPoster();
+  renderRack();
+}
+
+/* ===== SECTION: 日志 / TOAST ===== */
+function log(msg, cls){
+  const box = document.getElementById("log");
+  const p = document.createElement("p");
+  p.className = cls||"";
+  p.textContent = msg;
+  box.prepend(p);
+  while(box.children.length > 40) box.lastChild.remove();
+}
+function toast(msg, cls){
+  const box = document.getElementById("toasts");
+  const t = document.createElement("div");
+  t.className = "toast " + (cls||"");
+  t.textContent = msg;
+  box.appendChild(t);
+  setTimeout(()=>{ t.style.opacity = "0"; t.style.transition = "opacity .4s"; }, 2600);
+  setTimeout(()=>t.remove(), 3100);
+  while(box.children.length > 4) box.firstChild.remove();
+}
+
+/* ===== SECTION: 音效（合成，无资源） ===== */
+let AC = null, noiseSrc = null, noiseGain = null, lastScratchSnd = 0;
+function ac(){
+  if(!AC){
+    try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
+    // 刮擦噪声：白噪声 + 带通，平时静音
+    const len = AC.sampleRate * 0.5;
+    const buf = AC.createBuffer(1, len, AC.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+    noiseSrc = AC.createBufferSource(); noiseSrc.buffer = buf; noiseSrc.loop = true;
+    const bp = AC.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value = 1400; bp.Q.value = 0.8;
+    noiseGain = AC.createGain(); noiseGain.gain.value = 0;
+    noiseSrc.connect(bp); bp.connect(noiseGain); noiseGain.connect(AC.destination);
+    noiseSrc.start();
+  }
+  if(AC.state === "suspended") AC.resume();
+  return AC;
+}
+function audioScratch(){
+  const a = ac(); if(!a) return;
+  const now = a.currentTime;
+  if(now - lastScratchSnd < 0.03) return;
+  lastScratchSnd = now;
+  noiseGain.gain.cancelScheduledValues(now);
+  noiseGain.gain.setValueAtTime(0.10, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+}
+function tone(freq, t0, dur, vol, type){
+  const a = ac(); if(!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type||"square"; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, a.currentTime+t0);
+  g.gain.exponentialRampToValueAtTime(0.001, a.currentTime+t0+dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(a.currentTime+t0); o.stop(a.currentTime+t0+dur+0.02);
+}
+function audioWin(){ tone(660,0,.12,.08); tone(880,.10,.12,.08); tone(1320,.20,.22,.08); }
+function audioAwake(){ tone(150,0,.25,.12,"sine"); tone(100,.05,.3,.10,"sine"); }
+
+/* ===== SECTION: SAVE / LOAD / OFFLINE ===== */
+let wiping = false; // 清档时挡住 beforeunload 的回写
+function save(){
+  if(wiping) return;
+  S.lastTs = Date.now();
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){}
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    S = Object.assign(defaultState(), data);
+    S.totals = Object.assign(defaultState().totals, data.totals);
+    S.tickets = Object.assign(defaultState().tickets, data.tickets);
+    return true;
+  }catch(e){ return false; }
+}
+function grantOffline(){
+  const dt = Math.min(TUNING.offlineCapSec, (Date.now() - S.lastTs)/1000);
+  if(dt < 20) return;
+  const g = grossRate();
+  const take = g*exploitRate()*dt, wage = g*(1-exploitRate())*dt;
+  S.money += wage;
+  S.totals.created += g*dt; S.totals.taken += take; S.totals.wage += wage;
+  S.gameSec += dt;
+  if(comradeRate()>0) S.comrades += comradeRate()*dt;
+  if(S.comrades>0) S.awake += awakePassiveRate()*dt;
+  const h = (dt/3600).toFixed(1);
+  toast(`你挂机搬了 ${h} 小时砖：工资 +¥${fmt(wage)}（老板顺手拿走了 ¥${fmt(take)}）`, take>0?"boss":"good");
+  log(`离线 ${h} 小时。工资 +¥${fmt(wage)}，老板拿走 ¥${fmt(take)}。`, "boss");
+}
+
+/* ===== SECTION: DEBUG ===== */
+document.querySelectorAll("#debug [data-dbg]").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    switch(b.dataset.dbg){
+      case "money": S.money += 1000; break;
+      case "awake": S.awake += 100; break;
+      case "com":   S.comrades += 50; break;
+      case "frag":  toast(gainFragment(),"good"); break;
+      case "exploitUp":   addExploit(0.05, "调试"); break;
+      case "exploitDown": addExploit(-0.05, "调试"); break;
+      case "wipe":
+        wiping = true;
+        localStorage.removeItem(SAVE_KEY);
+        location.reload();
+        return;
+    }
+    renderAll(); save();
+  });
+});
+
+/* ===== SECTION: BOOT ===== */
+function boot(){
+  const had = load();
+  buildWorkShop();
+  buildResistShop();
+  renderAll();
+  if(had){
+    grantOffline();
+    if(S.victory){
+      document.getElementById("coopChip").style.display = "inline-flex";
+      document.getElementById("paystubHint").textContent = "按劳分配。一分不少。";
+    }
+    log("回到工位。一切照旧——除非你改变它。","");
+  } else {
+    log("入职第 1 天。工牌还带着塑封膜的味道。","");
+    log("楼下彩票店的灯牌亮着：「刮一刮，改变命运。」","");
+  }
+  if(!S.introDone) document.getElementById("introOverlay").hidden = false;
+  // 主循环：250ms 经济 tick + UI 刷新
+  let last = performance.now();
+  setInterval(()=>{
+    const now = performance.now();
+    const dt = Math.min(2, (now-last)/1000);
+    last = now;
+    econTick(dt);
+    updateHud();
+    updateResistShop();
+    updateWorkShop();
+    updateRevo();
+  }, 250);
+  setInterval(save, 5000);
+  window.addEventListener("beforeunload", save);
+}
+document.getElementById("introBtn").addEventListener("click", ()=>{
+  S.introDone = true;
+  document.getElementById("introOverlay").hidden = true;
+  ac(); // 用户手势里初始化音频
+  save();
+});
+boot();
+</script>
+</body>
+</html>
