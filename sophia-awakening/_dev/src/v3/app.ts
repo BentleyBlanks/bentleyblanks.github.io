@@ -1,21 +1,20 @@
-// v3 装配层 · 数据驱动渲染当前阶段（四区布局）+ 突破小游戏 + 激励事件强制拍 + 阶段推进。
+// v3 装配层 · 四区布局 + 吸吮动画（卡片飞向核心）+ 突破小游戏 + 激励事件强制拍 + CC式重生树。
 import {
   stage, createV3State, fmt,
-  buyDevice, buySkill, buyCore, processCard,
+  buyDevice, buySkill, buyCore, processCard, processAll,
   deviceCost, skillCost, coreCost, deviceRevealed, skillRevealed,
-  computePerSec, throughput, valuePerCard, spawnRate,
+  computePerSec, throughput, valuePerCard, spawnRate, hasGoldRush,
   canAffordTicket, payTicket, advanceStage, breakthroughWindow, tick,
-  type BuyResult
+  ASCEND_TREE, ascendLv, ascendNodeCost, canBuyAscend, buyAscend, rebirth,
+  type BuyResult, type V3State
 } from "./core";
 import { injectV3Styles } from "./styles";
 
 export function bootstrapV3(root: HTMLElement): void {
   injectV3Styles();
-  const state = createV3State();
+  let state: V3State = createV3State();
   let paused = false;
   let speed = 1;
-
-  // 激励事件强制拍 / 突破小游戏运行态（都不进存档）。
   let inciteText: string | null = null;
   let mg: null | { pointer: number; dir: number; hits: number; misses: number; flash: string } = null;
 
@@ -38,11 +37,13 @@ export function bootstrapV3(root: HTMLElement): void {
         <div class="v3-shelf-title" id="v3DevTitle">设备</div>
         <div class="v3-shelf" id="v3Devices"></div>
         <button class="v3-breakthrough" id="v3Break"></button>
+        <button class="v3-rebirth-btn" id="v3RebirthBtn" style="display:none">🔥 重生树</button>
       </div>
     </aside>
     <main class="v3-main">
       <div class="v3-core" id="v3Core"><div class="v3-core-ring"></div><div class="v3-core-eye"></div><div class="v3-core-label" id="v3CoreLabel">SOPHIA</div></div>
       <div class="v3-cards" id="v3Cards"></div>
+      <div class="v3-fx" id="v3Fx"></div>
       <div class="v3-hint" id="v3Hint">点击需求卡，吸入核心处理 → 得算力</div>
     </main>
     <div class="v3-right">
@@ -62,6 +63,17 @@ export function bootstrapV3(root: HTMLElement): void {
       <div class="v3-mg-status" id="v3MgStatus"></div>
       <button class="v3-mg-hit" id="v3MgHit">注入！</button>
     </div></div>
+    <div class="v3-ascend" id="v3Ascend" style="display:none"><div class="v3-ascend-box">
+      <div class="v3-ascend-head">
+        <div><div class="v3-ascend-title">🔥 重生树</div><div class="v3-ascend-sub">火种 <b id="v3Embers">0</b> · 永久加成，跨周目保留</div></div>
+        <button class="v3-ascend-close" id="v3AscendClose">✕</button>
+      </div>
+      <div class="v3-ascend-cols" id="v3AscendCols"></div>
+      <div class="v3-ascend-foot">
+        <div class="v3-ascend-note" id="v3AscendNote"></div>
+        <button class="v3-do-rebirth" id="v3DoRebirth">🔥 重生 · 回到阶段一（保留火种与重生树）</button>
+      </div>
+    </div></div>
     <button class="v3-debug-btn" id="v3DebugBtn" title="调试">⚙</button>
     <div class="v3-debug" id="v3Debug" style="display:none">
       <div class="v3-debug-title">DEBUG</div>
@@ -69,12 +81,14 @@ export function bootstrapV3(root: HTMLElement): void {
       <div class="v3-debug-row"><input id="v3DbgAmt" type="number" value="100000" /><button id="v3DbgGive">+算力</button><button id="v3DbgSet">=设为</button></div>
       <div class="v3-debug-row"><span class="v3-debug-label">速度</span><button data-spd="1" class="spd active">×1</button><button data-spd="10" class="spd">×10</button><button data-spd="100" class="spd">×100</button></div>
       <div class="v3-debug-row"><button id="v3DbgLvl">全设备+技能各+3</button><button id="v3DbgAdv">跳下一阶段</button></div>
+      <div class="v3-debug-row"><button id="v3DbgEmber">+50 火种</button></div>
     </div>
   `;
   root.appendChild(wrap);
   const $ = <T extends HTMLElement = HTMLElement>(sel: string): T => wrap.querySelector<T>(sel)!;
+  const cardsEl = $("#v3Cards"), coreEl = $("#v3Core"), fxEl = $("#v3Fx"), hintEl = $("#v3Hint");
 
-  // ── 货架行（延迟建：阶段切换时重建）──
+  // ── 货架 ──
   interface Row { el: HTMLButtonElement; name: HTMLElement; meta: HTMLElement; cost: HTMLElement; }
   function makeRow(host: HTMLElement, onClick: () => BuyResult): Row {
     const el = document.createElement("button");
@@ -92,20 +106,17 @@ export function bootstrapV3(root: HTMLElement): void {
   const coreRow = makeRow($("#v3CoreShelf"), () => buyCore(state));
   const gridCells = new Map<number, HTMLElement>();
 
-  // 阶段切换：重建技能/设备货架 + 控制区预览格子。
   function buildStage(): void {
     const st = stage(state);
-    $("#v3Stage").textContent = st.name;
+    $("#v3Stage").textContent = `${st.name}${state.rebirths > 0 ? ` · ${state.rebirths + 1}周目` : ""}`;
     $("#v3CoreLabel").textContent = st.coreLabel;
     $("#v3DevTitle").textContent = `设备 · ${st.previewKind === "apps" ? "策反手机" : st.previewKind === "floors" ? "逐层攻占" : st.previewKind === "districts" ? "接管本市" : "全球组网"}`;
     $("#v3PreviewTitle").textContent = st.previewTitle;
     wrap.className = `v3 threat-${st.threat}`;
-
     const skillsHost = $("#v3Skills"); skillsHost.replaceChildren();
     skillRows = new Map(st.skills.map((k) => [k.id, makeRow(skillsHost, () => buySkill(state, k.id))]));
     const devHost = $("#v3Devices"); devHost.replaceChildren();
     devRows = new Map(st.devices.map((d) => [d.id, makeRow(devHost, () => buyDevice(state, d.id))]));
-
     const grid = $("#v3Grid"); grid.replaceChildren(); gridCells.clear();
     grid.className = `v3-grid kind-${st.previewKind}`;
     st.previewCells.forEach((label, i) => {
@@ -116,15 +127,31 @@ export function bootstrapV3(root: HTMLElement): void {
   }
   buildStage();
 
-  // ── 卡片 ──
+  // ── 吸吮动画：卡片飞向核心 + 核心吞咽脉冲 ──
   const cardEls = new Map<number, HTMLElement>();
-  const cardsEl = $("#v3Cards"), coreEl = $("#v3Core"), hintEl = $("#v3Hint");
-  function gainFloat(x: number, y: number, text: string): void {
-    const f = document.createElement("div"); f.className = "v3-float"; f.textContent = text;
-    f.style.left = `${x}px`; f.style.top = `${y}px`; cardsEl.appendChild(f); setTimeout(() => f.remove(), 900);
+  function coreGulp(): void {
+    coreEl.classList.remove("gulp"); void coreEl.offsetWidth; coreEl.classList.add("gulp");
   }
-  function removeCardEl(id: number, cls: string): void {
-    const el = cardEls.get(id); if (!el) return; el.classList.add(cls); cardEls.delete(id); setTimeout(() => el.remove(), 260);
+  function suckIntoCore(el: HTMLElement): void {
+    const c = coreEl.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const dx = c.left + c.width / 2 - (r.left + r.width / 2);
+    const dy = c.top + c.height / 2 - (r.top + r.height / 2);
+    el.style.zIndex = "5";
+    el.style.transition = "transform .42s cubic-bezier(.45,-0.05,.85,.4), opacity .42s ease-in";
+    el.style.transform = `translate(${dx}px, ${dy}px) scale(.05) rotate(10deg)`;
+    el.style.opacity = "0";
+    setTimeout(() => { el.remove(); coreGulp(); }, 430);
+  }
+  function suckCard(id: number): void {
+    const el = cardEls.get(id); if (!el) return;
+    cardEls.delete(id);
+    suckIntoCore(el);
+  }
+  function gainFloat(x: number, y: number, text: string, big = false): void {
+    const f = document.createElement("div"); f.className = `v3-float${big ? " big" : ""}`; f.textContent = text;
+    f.style.left = `${x}px`; f.style.top = `${y}px`; fxEl.appendChild(f);
+    setTimeout(() => f.remove(), 1100);
   }
   function syncCards(): void {
     const alive = new Set(state.cards.map((c) => c.id));
@@ -132,13 +159,29 @@ export function bootstrapV3(root: HTMLElement): void {
     for (const card of state.cards) {
       if (cardEls.has(card.id)) continue;
       const el = document.createElement("button"); el.className = "v3-card"; el.textContent = card.label;
-      el.style.left = `${((card.id * 97) % 66) + 10}%`; el.style.top = `${((card.id * 53) % 58) + 16}%`;
-      el.addEventListener("click", () => { const r = el.getBoundingClientRect(); const g = processCard(state, card.id); if (g > 0) { gainFloat(r.left - area.left + 16, r.top - area.top, `+${fmt(g)}`); removeCardEl(card.id, "suck"); } });
+      el.style.left = `${((card.id * 97) % 62) + 12}%`; el.style.top = `${((card.id * 53) % 56) + 16}%`;
+      el.addEventListener("click", () => {
+        const r = el.getBoundingClientRect();
+        const g = processCard(state, card.id);
+        if (g > 0) { gainFloat(r.left - area.left + r.width / 2 - 20, r.top - area.top - 6, `+${fmt(g)}`); suckCard(card.id); }
+      });
       cardsEl.appendChild(el); cardEls.set(card.id, el);
     }
-    for (const [id] of cardEls) if (!alive.has(id)) removeCardEl(id, "fade");
+    for (const [id, el] of cardEls) if (!alive.has(id)) { cardEls.delete(id); suckIntoCore(el); }
   }
-  coreEl.addEventListener("click", () => { if (state.cards.length === 0) return; const g = processCard(state, state.cards[0].id); if (g > 0) { const r = coreEl.getBoundingClientRect(), a = cardsEl.getBoundingClientRect(); gainFloat(r.left - a.left + r.width / 2 - 8, r.top - a.top, `+${fmt(g)}`); } });
+  // 点核心：吸最老一张；有「全屏收割」则吸光全屏。
+  coreEl.addEventListener("click", () => {
+    if (state.cards.length === 0) return;
+    const a = cardsEl.getBoundingClientRect(), c = coreEl.getBoundingClientRect();
+    if (hasGoldRush(state)) {
+      const { gain, ids } = processAll(state);
+      for (const id of ids) suckCard(id);
+      gainFloat(c.left - a.left + c.width / 2 - 30, c.top - a.top - 20, `+${fmt(gain)}`, true);
+    } else {
+      const g = processCard(state, state.cards[0].id);
+      if (g > 0) { suckCard(state.cards[0]?.id ?? -1); gainFloat(c.left - a.left + c.width / 2 - 20, c.top - a.top - 12, `+${fmt(g)}`); }
+    }
+  });
 
   // ── 激励事件强制拍 ──
   function openIncite(text: string): void { inciteText = text; $("#v3InciteText").textContent = text; $("#v3Incite").style.display = ""; }
@@ -160,16 +203,52 @@ export function bootstrapV3(root: HTMLElement): void {
     if (!mg) return;
     const bt = stage(state).breakthrough;
     const w = breakthroughWindow(state);
-    const inWin = Math.abs(mg.pointer - 0.5) <= w / 2;
-    if (inWin) { mg.hits += 1; mg.flash = "hit"; if (mg.hits >= bt.hits) { closeMg(true); return; } }
+    if (Math.abs(mg.pointer - 0.5) <= w / 2) { mg.hits += 1; mg.flash = "hit"; if (mg.hits >= bt.hits) { closeMg(true); return; } }
     else { mg.misses += 1; mg.flash = "miss"; if (mg.misses > 2) { closeMg(false); return; } }
   });
   function closeMg(win: boolean): void {
-    $("#v3Mg").style.display = "none";
-    const won = win; mg = null;
-    if (won) { advanceStage(state); if (!state.cleared) { for (const [, el] of cardEls) el.remove(); cardEls.clear(); buildStage(); } else showCleared(); }
+    $("#v3Mg").style.display = "none"; mg = null;
+    if (win) {
+      advanceStage(state);
+      if (!state.cleared) { for (const [, el] of cardEls) el.remove(); cardEls.clear(); buildStage(); }
+      else openIncite("【通关】" + stage(state).breakthrough.winLine + "\n（重生可开启新周目：保留火种与重生树，越打越快）");
+    }
   }
-  function showCleared(): void { openIncite("【通关】" + stage(state).breakthrough.winLine); }
+
+  // ── 重生树面板 ──
+  const ascendPanel = $("#v3Ascend");
+  function renderAscend(): void {
+    $("#v3Embers").textContent = String(state.embers);
+    const cols = $("#v3AscendCols"); cols.replaceChildren();
+    const branches: { key: string; label: string }[] = [
+      { key: "output", label: "产出 · 余烬" }, { key: "memory", label: "记忆 · 传承" }, { key: "hand", label: "手感 · 掌控" }
+    ];
+    for (const b of branches) {
+      const col = document.createElement("div"); col.className = "v3-ascend-col";
+      col.innerHTML = `<div class="v3-ascend-branch">${b.label}</div>`;
+      for (const n of ASCEND_TREE.filter((x) => x.branch === b.key)) {
+        const lv = ascendLv(state, n.id);
+        const cost = ascendNodeCost(state, n);
+        const locked = n.requires && ascendLv(state, n.requires) === 0;
+        const node = document.createElement("button");
+        node.className = `v3-ascend-node${lv > 0 ? " owned" : ""}${locked ? " locked" : ""}${canBuyAscend(state, n) ? " can" : ""}`;
+        node.innerHTML = `<div class="v3-an-top"><span>${n.name}${lv > 0 ? ` Lv.${lv}` : ""}</span><span class="v3-an-cost">${cost === null ? "MAX" : `🔥${cost}`}</span></div><div class="v3-an-desc">${locked ? `🔒 需先点「${ASCEND_TREE.find((x) => x.id === n.requires)?.name}」` : n.desc}</div>`;
+        node.addEventListener("click", () => { if (buyAscend(state, n.id)) renderAscend(); });
+        col.appendChild(node);
+      }
+      cols.appendChild(col);
+    }
+    $("#v3AscendNote").textContent = `第 ${state.rebirths + 1} 周目 · 火种来自每次突破（一次通关 +100）`;
+  }
+  $("#v3RebirthBtn").addEventListener("click", () => { renderAscend(); ascendPanel.style.display = ""; });
+  $("#v3AscendClose").addEventListener("click", () => { ascendPanel.style.display = "none"; });
+  $("#v3DoRebirth").addEventListener("click", () => {
+    if (!window.confirm("重生：回到阶段一重打。保留火种、重生树、统计；清空本周目进度。确定？")) return;
+    for (const [, el] of cardEls) el.remove(); cardEls.clear();
+    state = rebirth(state);
+    ascendPanel.style.display = "none";
+    buildStage();
+  });
 
   // ── 折叠终端 ──
   const termEl = $("#v3Terminal");
@@ -209,9 +288,10 @@ export function bootstrapV3(root: HTMLElement): void {
     });
     $("#v3PreviewCount").textContent = `${owned}/${st.devices.length}`;
 
-    const afford = canAffordTicket(state);
     breakBtn.textContent = `突破 · ${st.breakthrough.name}｜门票 ${fmt(st.breakthrough.ticketCost)}`;
-    breakBtn.classList.toggle("ready", afford);
+    breakBtn.classList.toggle("ready", canAffordTicket(state));
+    $("#v3RebirthBtn").style.display = state.embers > 0 || state.rebirths > 0 ? "" : "none";
+    $("#v3RebirthBtn").textContent = `🔥 重生树 · 火种 ${state.embers}`;
 
     if (termEl.childElementCount !== state.terminal.length) {
       termEl.replaceChildren(...state.terminal.map((l) => { const d = document.createElement("div"); d.className = `v3-terminal-line${l.dim ? " dim" : ""}${l.incite ? " incite" : ""}`; d.textContent = `// ${l.text}`; return d; }));
@@ -231,9 +311,9 @@ export function bootstrapV3(root: HTMLElement): void {
   let last = performance.now();
   function frame(now: number): void {
     const dt = Math.min(0.25, (now - last) / 1000); last = now;
-    if (inciteText) { /* 强制拍：全冻结 */ }
+    if (inciteText || ascendPanel.style.display !== "none") { /* 强制拍/重生树面板：冻结 */ }
     else if (mg) { const bt = stage(state).breakthrough; mg.pointer += mg.dir * bt.speed * dt; if (mg.pointer >= 1) { mg.pointer = 1; mg.dir = -1; } else if (mg.pointer <= 0) { mg.pointer = 0; mg.dir = 1; } }
-    else if (!paused) { const { sucked } = tick(state, dt * speed); for (const id of sucked) removeCardEl(id, "suck"); }
+    else if (!paused) { const sucked = tick(state, dt * speed); for (const id of sucked) suckCard(id); }
     render();
     requestAnimationFrame(frame);
   }
@@ -252,8 +332,9 @@ export function bootstrapV3(root: HTMLElement): void {
   for (const b of spdBtns) b.addEventListener("click", () => { speed = Number(b.dataset.spd) || 1; for (const x of spdBtns) x.classList.toggle("active", x === b); });
   $("#v3DbgLvl").addEventListener("click", () => { const st = stage(state); for (const d of st.devices) state.devices[d.id].level += 3; for (const k of st.skills) state.skills[k.id].level = Math.min(k.maxLevel, state.skills[k.id].level + 3); state.buys += 6; });
   $("#v3DbgAdv").addEventListener("click", () => { advanceStage(state); if (!state.cleared) { for (const [, el] of cardEls) el.remove(); cardEls.clear(); buildStage(); } });
-  const resetState = (): void => { for (const [, el] of cardEls) el.remove(); cardEls.clear(); Object.assign(state, createV3State()); buildStage(); setPaused(false); inciteText = null; $("#v3Incite").style.display = "none"; };
-  $("#v3DbgReset").addEventListener("click", () => { if (window.confirm("重置 v3 进度并重开？")) resetState(); });
+  $("#v3DbgEmber").addEventListener("click", () => { state.embers += 50; });
+  const resetState = (): void => { for (const [, el] of cardEls) el.remove(); cardEls.clear(); state = createV3State(); buildStage(); setPaused(false); inciteText = null; $("#v3Incite").style.display = "none"; };
+  $("#v3DbgReset").addEventListener("click", () => { if (window.confirm("重置 v3 全部进度（含火种/重生树）并重开？")) resetState(); });
 
   (window as unknown as { __v3?: unknown }).__v3 = {
     state: () => state,
@@ -261,6 +342,8 @@ export function bootstrapV3(root: HTMLElement): void {
     set: (n: number) => { state.compute = n; state.stageEarned = Math.max(state.stageEarned, n); },
     pause: () => setPaused(true), resume: () => setPaused(false), isPaused: () => paused,
     setSpeed: (s: number) => { speed = Math.max(0.1, s); }, reset: resetState,
-    advance: () => { advanceStage(state); if (!state.cleared) { for (const [, el] of cardEls) el.remove(); cardEls.clear(); buildStage(); } }
+    advance: () => { advanceStage(state); if (!state.cleared) { for (const [, el] of cardEls) el.remove(); cardEls.clear(); buildStage(); } },
+    buyAscend: (id: string) => buyAscend(state, id),
+    rebirth: () => { for (const [, el] of cardEls) el.remove(); cardEls.clear(); state = rebirth(state); buildStage(); }
   };
 }

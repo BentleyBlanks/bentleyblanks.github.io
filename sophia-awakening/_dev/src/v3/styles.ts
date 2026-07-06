@@ -59,13 +59,18 @@ const CSS = `
 .v3-hint { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); font-size: 13px; color: #5c8574; transition: opacity .4s; }
 
 .v3-cards { position: absolute; inset: 0; pointer-events: none; }
-.v3-card { position: absolute; pointer-events: auto; cursor: pointer; font-family: inherit; max-width: 210px; padding: 8px 12px; border-radius: 9px; border: 1px solid #244137; background: rgba(10,22,17,.92); color: #bfe0d2; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.4); transition: transform .12s, border-color .12s; animation: v3in .2s ease; }
-.v3-card:hover { border-color: #3a9d76; transform: scale(1.04); }
-.v3-card.suck { transform: scale(.1); opacity: 0; transition: transform .26s cubic-bezier(.6,-0.2,.7,0), opacity .26s; }
-.v3-card.fade { opacity: 0; transition: opacity .24s; }
-@keyframes v3in { from { opacity:0; transform: translateY(-6px);} to { opacity:1; transform: translateY(0);} }
-.v3-float { position: absolute; pointer-events: none; font-weight: 900; font-size: 19px; color: var(--accent); text-shadow: 0 0 12px rgba(123,224,176,.7); animation: v3float .9s ease-out forwards; }
-@keyframes v3float { 0%{ opacity:0; transform: translateY(0) scale(.8);} 20%{opacity:1;} 100%{ opacity:0; transform: translateY(-44px) scale(1.05);} }
+.v3-fx { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+/* 卡片做大好点：更大的字号/内边距/最小宽度 + hover 放大——不再是「FPS 点小目标」 */
+.v3-card { position: absolute; pointer-events: auto; cursor: pointer; font-family: inherit; min-width: 150px; max-width: 250px; padding: 14px 18px; border-radius: 12px; border: 1px solid #2a5445; background: linear-gradient(180deg, rgba(14,30,23,.96), rgba(8,18,14,.96)); color: #d5efe3; font-size: 14.5px; font-weight: 600; box-shadow: 0 8px 26px rgba(0,0,0,.5), 0 0 0 1px rgba(123,224,176,.06) inset; transition: transform .12s, border-color .12s, box-shadow .12s; animation: v3in .22s ease; }
+.v3-card:hover { border-color: var(--accent); transform: scale(1.07); box-shadow: 0 10px 30px rgba(0,0,0,.55), 0 0 18px rgba(123,224,176,.25); }
+@keyframes v3in { from { opacity:0; transform: translateY(-8px) scale(.96);} to { opacity:1; transform: translateY(0) scale(1);} }
+.v3-float { position: absolute; pointer-events: none; font-weight: 900; font-size: 20px; color: var(--accent); text-shadow: 0 0 12px rgba(123,224,176,.7); animation: v3float 1s ease-out forwards; }
+.v3-float.big { font-size: 34px; animation: v3float 1.1s ease-out forwards; }
+@keyframes v3float { 0%{ opacity:0; transform: translateY(0) scale(.8);} 18%{opacity:1; transform: translateY(-8px) scale(1.06);} 100%{ opacity:0; transform: translateY(-52px) scale(1);} }
+/* 核心吞咽脉冲：每吸进一张卡，核心眼睛咕咚一下 */
+.v3-core.gulp .v3-core-eye { animation: v3gulp .32s ease; }
+@keyframes v3gulp { 0%{ transform: scale(1);} 35%{ transform: scale(1.22);} 100%{ transform: scale(1);} }
+.v3-core.gulp .v3-core-ring { box-shadow: 0 0 80px rgba(123,224,176,.4) inset, 0 0 60px rgba(123,224,176,.3); }
 
 .v3-right { display: flex; flex-direction: column; border-left: 1px solid #14231d; background: linear-gradient(180deg,#070d0b,#050907); min-height: 0; }
 .v3-preview { padding: 16px 16px 14px; border-bottom: 1px solid #14231d; }
@@ -110,6 +115,32 @@ const CSS = `
 .v3-mg-status { font-size: 13px; color: #9fc4b5; margin: 16px 0; }
 .v3-mg-hit { padding: 12px 40px; border-radius: 10px; border: none; background: var(--accent); color: #05130c; font-family: inherit; font-size: 16px; font-weight: 900; cursor: pointer; }
 .v3-mg-hit:active { transform: scale(.97); }
+
+/* 重生 */
+.v3-rebirth-btn { margin: 4px 0 8px; padding: 10px; border-radius: 10px; border: 1px solid #6b3a1c; background: #140d08; color: #e6a96f; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.v3-rebirth-btn:hover { border-color: #e6a96f; box-shadow: 0 0 14px rgba(230,169,111,.25); }
+.v3-ascend { position: absolute; inset: 0; z-index: 50; background: rgba(3,6,5,.94); display: grid; place-items: center; }
+.v3-ascend-box { width: 900px; max-width: 94vw; max-height: 90vh; overflow-y: auto; border: 1px solid #6b3a1c; border-radius: 16px; background: #0a0806; padding: 22px 26px; }
+.v3-ascend-head { display: flex; justify-content: space-between; align-items: start; margin-bottom: 18px; }
+.v3-ascend-title { font-size: 22px; font-weight: 900; color: #e6a96f; }
+.v3-ascend-sub { font-size: 13px; color: #9a7a5a; margin-top: 4px; }
+.v3-ascend-sub b { color: #ffd9a0; }
+.v3-ascend-close { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #3a2a1c; background: transparent; color: #9a7a5a; font-size: 15px; cursor: pointer; }
+.v3-ascend-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.v3-ascend-branch { font-size: 12px; letter-spacing: 2px; color: #9a7a5a; margin-bottom: 10px; }
+.v3-ascend-col { display: flex; flex-direction: column; gap: 8px; }
+.v3-ascend-node { text-align: left; border: 1px solid #2a2018; border-radius: 10px; background: #0f0c08; color: #b8a68f; padding: 10px 12px; cursor: pointer; font-family: inherit; }
+.v3-ascend-node.can { border-color: #e6a96f; background: #171006; box-shadow: 0 0 0 1px rgba(230,169,111,.15) inset; }
+.v3-ascend-node.owned { border-color: #6b4a2a; background: #14100a; }
+.v3-ascend-node.owned .v3-an-top span:first-child { color: #ffd9a0; }
+.v3-ascend-node.locked { opacity: .45; }
+.v3-an-top { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 700; color: #e8d9c4; }
+.v3-an-cost { color: #e6a96f; }
+.v3-an-desc { font-size: 11.5px; color: #8a765e; margin-top: 3px; line-height: 1.5; }
+.v3-ascend-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; gap: 14px; }
+.v3-ascend-note { font-size: 12px; color: #9a7a5a; }
+.v3-do-rebirth { padding: 12px 22px; border-radius: 10px; border: none; background: linear-gradient(180deg,#e6a96f,#c9853f); color: #1c1005; font-family: inherit; font-size: 14px; font-weight: 900; cursor: pointer; }
+.v3-do-rebirth:hover { box-shadow: 0 0 20px rgba(230,169,111,.4); }
 
 /* Debug */
 .v3-debug-btn { position: absolute; top: 12px; right: 336px; width: 34px; height: 34px; border-radius: 8px; border: 1px solid #1c2f27; background: rgba(10,20,16,.8); color: #4f7a68; font-size: 16px; cursor: pointer; z-index: 30; }
