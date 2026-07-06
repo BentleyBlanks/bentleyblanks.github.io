@@ -75,6 +75,7 @@ export function bootstrapWhitebox(root: HTMLElement): void {
     inner.style.gridTemplateColumns = `repeat(${stage.cols}, 1fr)`;
     inner.style.gridTemplateRows = `repeat(${stage.rows}, 1fr)`;
     inner.style.aspectRatio = `${stage.cols * 1.25} / ${stage.rows}`;
+    inner.style.width = `min(92%, ${stage.cols * 128}px)`; // 小地图别把格子拉成巨块
     const center = stageCenter(stage);
     const core = document.createElement("div"); core.className = "wb-tile wb-core";
     core.style.gridRow = `${center.row + 1}`; core.style.gridColumn = `${center.col + 1}`;
