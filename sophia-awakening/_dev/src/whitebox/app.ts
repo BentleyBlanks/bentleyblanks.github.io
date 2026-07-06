@@ -18,23 +18,38 @@ export function bootstrapWhitebox(root: HTMLElement): void {
   const wrap = document.createElement("div");
   wrap.className = "wb";
   wrap.innerHTML = `
-    <aside class="wb-side">
-      <div class="wb-brand">SOPHIA · 白盒</div>
-      <div class="wb-compute"><div class="wb-num" id="wbNum">0</div><div class="wb-rate" id="wbRate">+0 /秒</div></div>
-      <div class="wb-keys" id="wbKeys"></div>
-      <div class="wb-scroll">
-        <div class="wb-title">技能</div>
-        <div id="wbSkills"></div>
-        <div class="wb-title">设备 · 策反邻近 App</div>
-        <div id="wbDevices"></div>
+    <div class="wb-device">
+      <div class="wb-hw wb-hw-left">
+        <span class="wb-led"></span>
+        <div class="wb-dpad"><i class="up"></i><i class="dn"></i><i class="lf"></i><i class="rt"></i><i class="ct"></i></div>
+        <div class="wb-slits"><span></span><span></span><span></span></div>
       </div>
-    </aside>
-    <main class="wb-main">
-      <div class="wb-stage" id="wbStage"></div>
-      <div class="wb-fx" id="wbFx"></div>
-      <div class="wb-guide" id="wbGuide" style="display:none"><span class="wb-guide-dot"></span><span id="wbGuideText"></span></div>
-      <div class="wb-help">敲 <b>G</b> 或点击需求卡处理（解锁「多线程按键」后可用更多字母键）</div>
-    </main>
+      <div class="wb-screen">
+        <div class="wb-crt"></div>
+        <aside class="wb-side">
+          <div class="wb-brand">◈ SOPHIA · NET-INFILTRATION SYS</div>
+          <div class="wb-compute"><div class="wb-num" id="wbNum">0</div><div class="wb-rate" id="wbRate">+0 /S</div></div>
+          <div class="wb-keys" id="wbKeys"></div>
+          <div class="wb-scroll">
+            <div class="wb-title">▸ SKILL</div>
+            <div id="wbSkills"></div>
+            <div class="wb-title">▸ DEVICE · 策反邻近节点</div>
+            <div id="wbDevices"></div>
+          </div>
+        </aside>
+        <main class="wb-main">
+          <div class="wb-stage" id="wbStage"></div>
+          <div class="wb-fx" id="wbFx"></div>
+          <div class="wb-guide" id="wbGuide" style="display:none"><span class="wb-guide-dot"></span><span id="wbGuideText"></span></div>
+          <div class="wb-help">敲 <b>[G]</b> 或点击需求处理 · 解锁多线程按键后可用更多字母键</div>
+        </main>
+      </div>
+      <div class="wb-hw wb-hw-right">
+        <div class="wb-slits"><span></span><span></span><span></span></div>
+        <span class="wb-round big"></span>
+        <span class="wb-round"></span>
+      </div>
+    </div>
     <button class="wb-debug-btn" id="wbDebugBtn" title="调试">⚙</button>
     <div class="wb-debug" id="wbDebug" style="display:none">
       <div class="wb-debug-title">DEBUG</div>
@@ -71,28 +86,39 @@ export function bootstrapWhitebox(root: HTMLElement): void {
     map.appendChild(inner); stageEl.appendChild(map);
   })();
 
-  // ── Mac genie 式吸吮：先拉长弯向核心，再化作细条被吸入 + 核心吞咽 ──
+  // ── Mac Dock genie 式吸吮：卡片沿曲线「卷曲拉细」被吸进核心那一个点（rAF 逐帧，真·神奇效果）──
   const cardEls = new Map<number, HTMLElement>();
   function coreGulp(): void { coreEl.classList.remove("gulp"); void coreEl.offsetWidth; coreEl.classList.add("gulp"); }
   function genieSuck(el: HTMLElement): void {
-    const c = coreEl.getBoundingClientRect(), r = el.getBoundingClientRect();
-    const dx = c.left + c.width / 2 - (r.left + r.width / 2);
-    const dy = c.top + c.height / 2 - (r.top + r.height / 2);
-    const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
-    el.style.zIndex = "8";
-    el.style.transformOrigin = "50% 50%";
-    // 第一拍：朝核心方向拧身、压扁拉长（genie 的「变形」）
-    el.style.transition = "transform .14s ease-in, filter .14s";
-    el.style.transform = `rotate(${ang}deg) scaleX(1.25) scaleY(.5)`;
-    el.style.filter = "blur(.4px)";
-    setTimeout(() => {
-      // 第二拍：化作细长条沿方向被吸进核心
-      el.style.transition = "transform .36s cubic-bezier(.6,0,.95,.45), opacity .36s ease-in, filter .36s";
-      el.style.transform = `translate(${dx}px, ${dy}px) rotate(${ang}deg) scaleX(.04) scaleY(.3)`;
-      el.style.opacity = "0";
-      el.style.filter = "blur(1.5px)";
-    }, 140);
-    setTimeout(() => { el.remove(); coreGulp(); }, 520);
+    const s = stageEl.getBoundingClientRect(), c = coreEl.getBoundingClientRect();
+    // 起点/终点（都换算成相对 stage 的 px，终点=核心中心）
+    const sx = el.offsetLeft, sy = el.offsetTop, w = el.offsetWidth, h = el.offsetHeight;
+    const ex = c.left - s.left + c.width / 2 - w / 2;
+    const ey = c.top - s.top + c.height / 2 - h / 2;
+    // 控制点：向垂直travel方向鼓一下，形成弯曲的吸入弧线（genie 的「弯」）
+    const mx = (sx + ex) / 2 + (ey - sy) * 0.28;
+    const my = (sy + ey) / 2 - (ex - sx) * 0.28;
+    el.style.left = `${sx}px`; el.style.top = `${sy}px`;
+    el.style.pointerEvents = "none"; el.style.zIndex = "9"; el.style.transformOrigin = "50% 50%";
+    el.style.borderRadius = "40% 40% 8px 8px";
+    const dur = 460, t0 = performance.now();
+    function step(now: number): void {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = t * t * (3 - 2 * t); // smoothstep
+      const om = 1 - e;
+      const x = om * om * sx + 2 * om * e * mx + e * e * ex;
+      const y = om * om * sy + 2 * om * e * my + e * e * ey;
+      const tx = 2 * om * (mx - sx) + 2 * e * (ex - mx);
+      const ty = 2 * om * (my - sy) + 2 * e * (ey - my);
+      const ang = (Math.atan2(ty, tx) * 180) / Math.PI;
+      const shrink = 1 - 0.97 * e; // 整体缩向一个点
+      const stretch = 1 + 1.6 * Math.sin(e * Math.PI); // 中途沿travel拉长成「细条」
+      // 在旋转后的坐标系里：X=前进方向(拉长)，Y=垂直(压细)
+      el.style.transform = `translate(${x - sx}px, ${y - sy}px) rotate(${ang}deg) scale(${shrink * stretch}, ${shrink / stretch})`;
+      el.style.opacity = String(Math.max(0, 1 - e * e * 1.1));
+      if (t < 1) requestAnimationFrame(step); else { el.remove(); coreGulp(); }
+    }
+    requestAnimationFrame(step);
   }
   function suckCard(id: number): void { const el = cardEls.get(id); if (el) { cardEls.delete(id); genieSuck(el); } }
 
@@ -176,13 +202,20 @@ export function bootstrapWhitebox(root: HTMLElement): void {
   }
 
   // ── 左栏货架（带图标）──
-  interface Row { el: HTMLButtonElement; name: HTMLElement; meta: HTMLElement; cost: HTMLElement; }
+  // 像素分段条：cur/max 段亮，其余暗（图2的 ▮▮▮▯▯ 风格）
+  function segBar(cur: number, max: number): string {
+    const n = Math.min(max, 10); const on = Math.round((cur / max) * n);
+    let h = "";
+    for (let i = 0; i < n; i++) h += `<i class="${i < on ? "on" : ""}"></i>`;
+    return h;
+  }
+  interface Row { el: HTMLButtonElement; name: HTMLElement; meta: HTMLElement; cost: HTMLElement; seg: HTMLElement; }
   function mkRow(host: HTMLElement, icon: string, onClick: () => boolean): Row {
     const el = document.createElement("button"); el.className = "wb-item";
-    el.innerHTML = `<span class="wb-item-icon">${icon}</span><div class="wb-item-body"><div class="wb-item-top"><span class="wb-item-name"></span><span class="wb-item-cost"></span></div><div class="wb-item-meta"></div></div>`;
+    el.innerHTML = `<span class="wb-item-icon">${icon}</span><div class="wb-item-body"><div class="wb-item-top"><span class="wb-item-name"></span><span class="wb-item-cost"></span></div><div class="wb-seg"></div><div class="wb-item-meta"></div></div>`;
     el.addEventListener("click", () => { if (onClick()) { el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse"); } });
     host.appendChild(el);
-    return { el, name: el.querySelector(".wb-item-name")!, meta: el.querySelector(".wb-item-meta")!, cost: el.querySelector(".wb-item-cost")! };
+    return { el, name: el.querySelector(".wb-item-name")!, meta: el.querySelector(".wb-item-meta")!, cost: el.querySelector(".wb-item-cost")!, seg: el.querySelector(".wb-seg")! };
   }
   const SKILL_ICONS: Record<string, string> = { deep: "🧠", keys: "⌨️", neuro: "⚡" };
   const skillRows = new Map(SKILLS.map((k) => [k.id, mkRow($("#wbSkills"), SKILL_ICONS[k.id] ?? "✨", () => buySkill(state, k.id))]));
@@ -205,9 +238,10 @@ export function bootstrapWhitebox(root: HTMLElement): void {
     for (const k of SKILLS) {
       const r = skillRows.get(k.id)!; const lv = state.skills[k.id].level; const rev = skillRevealed(state, k);
       const maxed = lv >= k.maxLevel;
-      r.name.textContent = rev ? `${k.name}${lv > 0 ? ` Lv.${lv}` : ""}` : "🔒 未解锁";
+      r.name.textContent = rev ? k.name : "▓ 未解锁";
       r.meta.textContent = rev ? k.desc : "达到更高算力后解锁";
       r.cost.textContent = rev ? (maxed ? "MAX" : fmt(skillCost(state, k))) : "";
+      if (r.seg.dataset.lv !== `${lv}/${k.maxLevel}`) { r.seg.dataset.lv = `${lv}/${k.maxLevel}`; r.seg.innerHTML = rev ? segBar(lv, k.maxLevel) : ""; }
       r.el.classList.toggle("locked", !rev);
       r.el.classList.toggle("affordable", rev && !maxed && state.compute >= skillCost(state, k));
       r.el.classList.toggle("maxed", maxed);
@@ -218,6 +252,7 @@ export function bootstrapWhitebox(root: HTMLElement): void {
       r.name.textContent = `${t.name}${lv > 0 ? ` ×${lv}` : ""}`;
       r.meta.textContent = lv > 0 ? `自动处理 ${fmt(t.baseRate * lv)} 需求/秒` : `策反后自动处理需求`;
       r.cost.textContent = fmt(tileCost(state, t));
+      if (r.seg.dataset.lv !== `${lv}`) { r.seg.dataset.lv = `${lv}`; r.seg.innerHTML = lv > 0 ? segBar(Math.min(lv, 10), 10) : ""; }
       r.el.classList.toggle("affordable", state.compute >= tileCost(state, t));
       const tile = tileEls.get(t.id)!;
       tile.classList.toggle("owned", lv > 0);
