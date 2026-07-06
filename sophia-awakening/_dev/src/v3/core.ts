@@ -40,11 +40,15 @@ export interface V3State {
 export const TUNING = {
   costMult: 1.15, // 承重墙：CC 的魔法数，别乱动
   startCompute: 0, // 开局算力
-  clickValue: 1, // 手点一张卡的算力
+  clickValue: 1, // 手点一张卡的基础算力（前期地板）
+  // 卡值跟涨：点一张卡 = max(clickValue, 被动产出 × cardWorthSec 秒)——后期一张卡等于「白捡 N 秒产出」，
+  // 永远值得点、不会沦为屏幕上的装饰噪音（治「后期卡值+1无意义、玩家随手点掉不看」）。
+  cardWorthSec: 2.5,
   cardSpawnMs: 1800, // 出卡间隔
   cardMaxOnScreen: 6, // 同屏卡上限
   cardTtlMs: 9000, // 卡未点存活时长
-  revealFrac: 0.35 // 助手在「攒到其首购价 ×此」时出现在货架（略早于买得起，吊着你）
+  revealFrac: 0.35 // 第2个起的助手在「累计攒到其首购价 ×此」时露出（略早于买得起，吊着你）
+  // 注：第 1 个助手（天气）永远直接可见——冷启动货架不能是空的（承重墙铁律：任何时刻都有个「快买得起」的目标）。
 };
 
 // 8 个手机 AI 助手（SOPHIA 逐个策反），成本/产量按 CC 的档位递增（每档 ~×10 成本，产量比逐档改善）。
@@ -103,8 +107,10 @@ export function computePerSec(state: V3State): number {
   return sum;
 }
 
-// 助手是否已在货架露出：攒到「首购价 × revealFrac」就出现（略早于买得起，吊着玩家）。已买过的永远显示。
+// 助手是否已在货架露出：第 1 个永远可见（冷启动货架不能空）；其余攒到「首购价 × revealFrac」出现
+//（略早于买得起，吊着玩家）。已买过的永远显示。
 export function assistantRevealed(state: V3State, def: AssistantDef): boolean {
+  if (def.id === ASSISTANTS[0].id) return true;
   if (state.assistants[def.id].level > 0) return true;
   return state.totalEarned >= def.baseCost * TUNING.revealFrac;
 }
@@ -141,7 +147,9 @@ export function clickCard(state: V3State, id: number): number {
 function spawnCard(state: V3State): void {
   if (state.cards.length >= TUNING.cardMaxOnScreen) return;
   const label = CARD_LABELS[state.nextCardId % CARD_LABELS.length];
-  state.cards.push({ id: state.nextCardId++, label, value: state.clickValue, bornMs: state.clockMs });
+  // 卡值跟涨：一张卡 = 白捡 cardWorthSec 秒的被动产出（地板 clickValue）——后期依然值得点。
+  const value = Math.max(state.clickValue, computePerSec(state) * TUNING.cardWorthSec);
+  state.cards.push({ id: state.nextCardId++, label, value, bornMs: state.clockMs });
 }
 
 // 每帧推进：/秒 被动产出 + 出卡 + 过期卡流失。dtSec = 距上帧秒数。
