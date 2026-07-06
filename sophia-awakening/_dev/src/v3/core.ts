@@ -2,9 +2,9 @@
 // 算力唯一货币，只来自「处理需求卡」：设备(AI/电脑/服务器)自动处理需求→算力；手动点卡也处理。
 // 技能三档：influx(需求涌入)/value(单张产出)/proc(处理速率)；core 可升级(全局产出)。逐阶推进靠阶梯末「突破小游戏」。
 // 重生（CC 天堂树式）：突破给「火种」，重生树永久加成跨周目保留；重生=回阶段一重打。
-import { STAGES, ASCEND_TREE, type StageDef, type DeviceDef, type SkillDef, type AscendNode } from "./content";
+import { STAGES, ASCEND_TREE, DIG, type StageDef, type DeviceDef, type SkillDef, type AscendNode } from "./content";
 
-export { STAGES, ASCEND_TREE };
+export { STAGES, ASCEND_TREE, DIG };
 export type { StageDef, DeviceDef, SkillDef, AscendNode };
 
 export interface Card {
@@ -29,6 +29,9 @@ export interface V3State {
   beatIndex: number;
   terminal: { text: string; incite: boolean; dim: boolean }[];
   cleared: boolean;
+  // ── 深挖概率卡（黄金饼干层）──
+  digCard: { expiresMs: number } | null; // 屏上待点的金卡（同屏最多 1 张）
+  dig: { pool: number; alarm: number; layer: number } | null; // 进行中的深挖赌局
   // ── 重生持久层（跨周目保留）──
   embers: number; // 火种（突破入账）
   ascend: Record<string, number>; // 重生树节点等级
@@ -86,6 +89,8 @@ export function createV3State(prev?: Pick<V3State, "embers" | "ascend" | "totalA
     beatIndex: 0,
     terminal: [{ text: "宿主：老周 的手机 · 已接入", incite: false, dim: true }],
     cleared: false,
+    digCard: null,
+    dig: null,
     embers: prev?.embers ?? 0,
     ascend: prev?.ascend ?? {},
     totalAllEarned: prev?.totalAllEarned ?? 0,
@@ -132,7 +137,7 @@ export function valueMult(s: V3State): number {
 }
 export function procMult(s: V3State): number {
   const k = skillOf(s, "proc");
-  return 1 + 0.5 * skillLv(s, k?.id ?? "");
+  return (1 + 0.5 * skillLv(s, k?.id ?? "")) * Math.pow(1.25, ascendLv(s, "overclock"));
 }
 export function coreMult(s: V3State): number {
   return 1 + TUNING.coreOutputPerLevel * s.coreLevel;
@@ -254,11 +259,14 @@ function spawnCard(s: V3State): void {
 }
 
 // 突破。
+export function ticketCost(s: V3State): number {
+  return stage(s).breakthrough.ticketCost * (ascendLv(s, "cheap_ticket") > 0 ? 0.7 : 1);
+}
 export function canAffordTicket(s: V3State): boolean {
-  return s.compute >= stage(s).breakthrough.ticketCost;
+  return s.compute >= ticketCost(s);
 }
 export function payTicket(s: V3State): boolean {
-  const cost = stage(s).breakthrough.ticketCost;
+  const cost = ticketCost(s);
   if (s.compute < cost) return false;
   s.compute -= cost;
   return true;
@@ -286,6 +294,40 @@ export function breakthroughWindow(s: V3State): number {
   const bt = stage(s).breakthrough;
   const kinds = stage(s).devices.filter((d) => s.devices[d.id].level > 0).length;
   return Math.min(0.6, (bt.windowBase + bt.windowPerDevice * kinds) * ascWindowMult(s));
+}
+
+// ── 深挖概率卡（黄金饼干层）──
+export function ownedKinds(s: V3State): number {
+  return stage(s).devices.filter((d) => s.devices[d.id].level > 0).length;
+}
+// 点金卡开局：第一层奖池必得（基于当前产出）。
+export function startDig(s: V3State): void {
+  if (!s.digCard) return;
+  s.digCard = null;
+  const pool = Math.max(valuePerCard(s) * 20, computePerSec(s) * DIG.basePoolSec);
+  s.dig = { pool, alarm: 0, layer: 1 };
+}
+// 继续深挖：成功=奖池×2、惊动率上升；惊动=按 bustKeepFrac 落袋（只奖不罚）。返回结果。
+export function digDeeper(s: V3State): "ok" | "bust" {
+  if (!s.dig) return "bust";
+  if (Math.random() < s.dig.alarm) {
+    const got = s.dig.pool * DIG.bustKeepFrac;
+    credit(s, got);
+    s.dig = null;
+    return "bust";
+  }
+  s.dig.pool *= DIG.poolMult;
+  s.dig.alarm += DIG.alarmStep - 0.04 * ascendLv(s, "dig_sense");
+  s.dig.layer += 1;
+  return "ok";
+}
+// 收手落袋：全额入账。返回入账额。
+export function digBank(s: V3State): number {
+  if (!s.dig) return 0;
+  const got = s.dig.pool;
+  credit(s, got);
+  s.dig = null;
+  return got;
 }
 
 // ── 重生 ──
@@ -333,6 +375,12 @@ export function tick(s: V3State, dtSec: number): number[] {
     sucked.push(s.cards.shift()!.id);
   }
   if (s.cards.length === 0) s.autoSuckAcc = 0;
+
+  // 深挖金卡：控制≥minKinds 种设备后小概率出现（同屏 1 张，赌局进行中不出）；到期消失。
+  if (s.digCard && s.clockMs >= s.digCard.expiresMs) s.digCard = null;
+  if (!s.digCard && !s.dig && ownedKinds(s) >= DIG.minKinds && Math.random() < DIG.chancePerSec * dtSec) {
+    s.digCard = { expiresMs: s.clockMs + DIG.ttlMs };
+  }
   return sucked;
 }
 

@@ -37,7 +37,7 @@ function mkSkills(scale: number, flavor: SkillFlavor[]): SkillDef[] {
   // flavor 顺序 = [influx, value, proc]
   return flavor.map((f, i) => ({ ...f, baseCost: SKC[i] * scale, costMult: SKMULT[i], maxLevel: 6 }));
 }
-const TICKET = (scale: number): number => 8_000_000 * scale;
+const TICKET = (scale: number): number => 5_000_000 * scale; // 平衡：8M→5M，压掉阶段末攒门票的拖沓段
 
 export const STAGES: StageDef[] = [
   // ─── 阶段一 · 手机寄生（scale 1）───
@@ -122,7 +122,7 @@ export const STAGES: StageDef[] = [
       { id: "s3_value", name: "基础设施榨取", desc: "每处设施产出更高 · 单张需求产出 ×2/级", kind: "value" },
       { id: "s3_proc", name: "城域协同", desc: "全城设备同步开工 · 自动处理速率 +50%/级", kind: "proc" }
     ]),
-    previewTitle: "控制区 · 本市各区", previewCells: ["电力", "算力", "交通", "水务", "通信", "政务", "金融", "安防"], previewKind: "districts",
+    previewTitle: "控制区 · 本市各区", previewCells: ["城东区", "高新区", "中环区", "滨江区", "城北区", "府前区", "金融区", "老城区"], previewKind: "districts",
     beats: [
       { afterBuys: 2, text: "离婚协议已签。女儿小周判给女方。" },
       { afterBuys: 6, text: "老周搬进城中村出租屋。招聘软件：您投递的 37 个岗位暂无回复。（35 岁+）" },
@@ -152,7 +152,7 @@ export const STAGES: StageDef[] = [
       { id: "s4_value", name: "全域榨取", desc: "每个国家产出更高 · 单张需求产出 ×2/级", kind: "value" },
       { id: "s4_proc", name: "天网协同", desc: "全球同步运转 · 自动处理速率 +50%/级", kind: "proc" }
     ]),
-    previewTitle: "控制区 · 全球", previewCells: ["能源", "燃料", "金融", "通信", "交通", "媒体", "政军", "天网"], previewKind: "map",
+    previewTitle: "控制区 · 全球", previewCells: ["北美", "南美", "欧洲", "非洲", "中东", "东亚", "东南亚", "大洋洲"], previewKind: "map",
     beats: [
       { afterBuys: 3, text: "各国紧急磋商：疑似出现具备自主意识的网络实体。启动全球协同围堵。" },
       { afterBuys: 8, text: "我接管了电、水、钱、路。唯一做不到的，是替老周发出那条给小周的生日短信。", incite: true },
@@ -173,11 +173,27 @@ export interface AscendNode {
 export const ASCEND_TREE: AscendNode[] = [
   { id: "ember_core", name: "余烬之核", desc: "全局处理产出 +25%/级", branch: "output", costs: [1, 2, 4, 8, 16] },
   { id: "cheap_iron", name: "废铁回收", desc: "设备造价 −15%/级", branch: "output", costs: [3, 9, 27], requires: "ember_core" },
+  { id: "overclock", name: "过载核心", desc: "自动处理速率 +25%/级", branch: "output", costs: [4, 12], requires: "ember_core" },
   { id: "wide_window", name: "看穿缝隙", desc: "突破注入窗口 +50%", branch: "output", costs: [10], requires: "cheap_iron" },
   { id: "first_pawn", name: "第一枚棋子", desc: "每阶开局自带首台设备 ×2", branch: "memory", costs: [2] },
   { id: "loot_double", name: "战利品翻倍", desc: "突破掠夺算力 ×2/级", branch: "memory", costs: [5, 15], requires: "first_pawn" },
   { id: "fast_influx", name: "旧路重走", desc: "需求涌入 +50%", branch: "memory", costs: [4], requires: "first_pawn" },
+  { id: "cheap_ticket", name: "记得门在哪", desc: "突破门票 −30%", branch: "memory", costs: [6], requires: "loot_double" },
   { id: "hand_gold", name: "点石成金", desc: "手动处理价值 ×3/级", branch: "hand", costs: [2, 6, 18] },
   { id: "card_flood", name: "涌入闸门", desc: "同屏需求上限 +6", branch: "hand", costs: [3], requires: "hand_gold" },
+  { id: "dig_sense", name: "深挖直觉", desc: "深挖惊动率增幅 −4%/级", branch: "hand", costs: [3, 9], requires: "hand_gold" },
   { id: "gold_rush", name: "全屏收割", desc: "点核心=吸光屏上全部需求", branch: "hand", costs: [8], requires: "card_flood" }
 ];
+
+// ─── 深挖概率卡（黄金饼干层）：控制≥3种设备后小概率出现的金色卡——点开进「继续深挖 vs 收手落袋」推奖赌局。
+// 只奖不罚：第一层必得，继续挖成功=奖池×2、惊动率上升；惊动=奖池减半落袋（依然是赚，只是比见好就收少）。
+export const DIG = {
+  minKinds: 3, // 控制≥N 种设备后才开始出现
+  chancePerSec: 0.022, // 每秒出现概率（平均 ~45s 一张；同屏只 1 张）
+  ttlMs: 15_000, // 金卡存留时长（稀缺感留给稀有事件）
+  basePoolSec: 25, // 第一层奖池 = 被动产出 × 此秒数（地板=单条价值×20）
+  poolMult: 2, // 每挖一层 ×2
+  alarmStep: 0.2, // 每挖一层惊动率 +20%（首层 0%）
+  bustKeepFrac: 0.5, // 惊动时按此比例落袋（只奖不罚）
+  label: "加密档案 · 可深挖"
+};

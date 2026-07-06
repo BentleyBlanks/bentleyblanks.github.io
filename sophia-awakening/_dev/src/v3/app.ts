@@ -22,6 +22,20 @@ export function bootstrapV3(root: HTMLElement): void {
   const wrap = document.createElement("div");
   wrap.className = "v3";
   wrap.innerHTML = `
+    <div class="v3-hardware v3-hardware-left" aria-hidden="true">
+      <span class="v3-status-led"></span>
+      <span class="v3-speaker-slit slit-a"></span>
+      <span class="v3-speaker-slit slit-b"></span>
+      <span class="v3-speaker-slit slit-c"></span>
+      <div class="v3-dpad"><span></span><span></span><span></span><span></span><i></i></div>
+    </div>
+    <div class="v3-hardware v3-hardware-right" aria-hidden="true">
+      <span class="v3-speaker-slit slit-a"></span>
+      <span class="v3-speaker-slit slit-b"></span>
+      <span class="v3-speaker-slit slit-c"></span>
+      <span class="v3-round-button"></span>
+      <span class="v3-round-button small"></span>
+    </div>
     <aside class="v3-side">
       <div class="v3-stage" id="v3Stage"></div>
       <div class="v3-compute">
@@ -42,8 +56,15 @@ export function bootstrapV3(root: HTMLElement): void {
     </aside>
     <main class="v3-main">
       <div class="v3-core" id="v3Core"><div class="v3-core-ring"></div><div class="v3-core-eye"></div><div class="v3-core-label" id="v3CoreLabel">SOPHIA</div></div>
+      <div class="v3-node-cloud" aria-hidden="true">
+        <span class="node-a"></span><span class="node-b"></span><span class="node-c danger"></span><span class="node-d"></span><span class="node-e warn"></span>
+        <span class="node-f"></span><span class="node-g danger"></span><span class="node-h"></span><span class="node-i warn"></span><span class="node-j"></span>
+      </div>
       <div class="v3-cards" id="v3Cards"></div>
       <div class="v3-fx" id="v3Fx"></div>
+      <div class="v3-action-dock" aria-hidden="true">
+        <span>◌</span><span>↯</span><span>✚</span><span>⇄</span><span>◎</span>
+      </div>
       <div class="v3-hint" id="v3Hint">点击需求卡，吸入核心处理 → 得算力</div>
     </main>
     <div class="v3-right">
@@ -56,6 +77,7 @@ export function bootstrapV3(root: HTMLElement): void {
         <div class="v3-terminal" id="v3Terminal"></div>
       </div>
     </div>
+    <canvas class="v3-shader" id="v3Shader" aria-hidden="true"></canvas>
     <div class="v3-incite" id="v3Incite" style="display:none"><div class="v3-incite-box"><div class="v3-incite-text" id="v3InciteText"></div><button class="v3-incite-btn" id="v3InciteBtn">点击继续 ▸</button></div></div>
     <div class="v3-mg" id="v3Mg" style="display:none"><div class="v3-mg-box">
       <div class="v3-mg-name" id="v3MgName"></div><div class="v3-mg-desc" id="v3MgDesc"></div>
@@ -87,6 +109,7 @@ export function bootstrapV3(root: HTMLElement): void {
   root.appendChild(wrap);
   const $ = <T extends HTMLElement = HTMLElement>(sel: string): T => wrap.querySelector<T>(sel)!;
   const cardsEl = $("#v3Cards"), coreEl = $("#v3Core"), fxEl = $("#v3Fx"), hintEl = $("#v3Hint");
+  initScreenShader($<HTMLCanvasElement>("#v3Shader"));
 
   // ── 货架 ──
   interface Row { el: HTMLButtonElement; name: HTMLElement; meta: HTMLElement; cost: HTMLElement; }
@@ -135,13 +158,37 @@ export function bootstrapV3(root: HTMLElement): void {
   function suckIntoCore(el: HTMLElement): void {
     const c = coreEl.getBoundingClientRect();
     const r = el.getBoundingClientRect();
-    const dx = c.left + c.width / 2 - (r.left + r.width / 2);
-    const dy = c.top + c.height / 2 - (r.top + r.height / 2);
-    el.style.zIndex = "5";
-    el.style.transition = "transform .42s cubic-bezier(.45,-0.05,.85,.4), opacity .42s ease-in";
-    el.style.transform = `translate(${dx}px, ${dy}px) scale(.05) rotate(10deg)`;
-    el.style.opacity = "0";
-    setTimeout(() => { el.remove(); coreGulp(); }, 430);
+    const a = cardsEl.getBoundingClientRect();
+    const sx = r.left + r.width / 2;
+    const sy = r.top + r.height / 2;
+    const tx = c.left + c.width / 2;
+    const ty = c.top + c.height / 2;
+    const dx = tx - sx;
+    const dy = ty - sy;
+    const dist = Math.max(1, Math.hypot(dx, dy));
+    const bend = Math.min(120, dist * 0.18) * (sx < tx ? -1 : 1);
+    const mx = dx * 0.48 + (-dy / dist) * bend;
+    const my = dy * 0.48 + (dx / dist) * bend;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    const twist = sx < tx ? 13 : -13;
+    const ribbon = document.createElement("div");
+    ribbon.className = "v3-suck-ribbon";
+    ribbon.style.left = `${sx - a.left}px`;
+    ribbon.style.top = `${sy - a.top}px`;
+    ribbon.style.width = `${dist}px`;
+    ribbon.style.transform = `translateY(-50%) rotate(${angle}deg)`;
+    fxEl.appendChild(ribbon);
+    setTimeout(() => ribbon.remove(), 760);
+    el.style.zIndex = "12";
+    el.style.setProperty("--suck-dx", `${dx}px`);
+    el.style.setProperty("--suck-dy", `${dy}px`);
+    el.style.setProperty("--suck-mx", `${mx}px`);
+    el.style.setProperty("--suck-my", `${my}px`);
+    el.style.setProperty("--suck-angle", `${angle}deg`);
+    el.style.setProperty("--suck-twist", `${twist}deg`);
+    el.classList.add("sucking");
+    coreEl.classList.add("sucking");
+    setTimeout(() => { el.remove(); coreGulp(); coreEl.classList.remove("sucking"); }, 760);
   }
   function suckCard(id: number): void {
     const el = cardEls.get(id); if (!el) return;
@@ -346,4 +393,132 @@ export function bootstrapV3(root: HTMLElement): void {
     buyAscend: (id: string) => buyAscend(state, id),
     rebirth: () => { for (const [, el] of cardEls) el.remove(); cardEls.clear(); state = rebirth(state); buildStage(); }
   };
+}
+
+function initScreenShader(canvas: HTMLCanvasElement): void {
+  const gl = canvas.getContext("webgl", {
+    alpha: true,
+    antialias: false,
+    premultipliedAlpha: true,
+    preserveDrawingBuffer: false
+  });
+  if (!gl) {
+    canvas.classList.add("fallback");
+    return;
+  }
+
+  const vertexSource = `
+attribute vec2 a_pos;
+varying vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+  const fragmentSource = `
+precision mediump float;
+varying vec2 v_uv;
+uniform vec2 u_res;
+uniform float u_time;
+
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 345.45));
+  p += dot(p, p + 34.345);
+  return fract(p.x * p.y);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+void main() {
+  vec2 uv = v_uv;
+  vec2 center = uv * 2.0 - 1.0;
+  vec2 curve = center;
+  float barrel = dot(curve, curve);
+  vec2 warped = uv + curve * barrel * 0.018;
+  float vignette = smoothstep(1.38, 0.22, length(center * vec2(0.82, 1.04)));
+  float glassEdge = smoothstep(1.08, 0.78, max(abs(center.x) * 0.72, abs(center.y)));
+  float scan = 0.5 + 0.5 * sin((warped.y * u_res.y * 1.08) + u_time * 7.0);
+  float vertical = 0.5 + 0.5 * sin(warped.x * u_res.x * 0.72);
+  float phosphor = smoothstep(0.72, 1.0, scan) * 0.06 + smoothstep(0.86, 1.0, vertical) * 0.04;
+  float n0 = noise(warped * vec2(64.0, 38.0) + u_time * 0.018);
+  float nx = noise((warped + vec2(0.006, 0.0)) * vec2(64.0, 38.0));
+  float ny = noise((warped + vec2(0.0, 0.006)) * vec2(64.0, 38.0));
+  vec3 normal = normalize(vec3((n0 - nx) * 5.8 + center.x * 0.38, (n0 - ny) * 5.8 + center.y * 0.48, 1.0));
+  vec3 lightDir = normalize(vec3(-0.42, -0.72, 0.86));
+  float bevelLight = pow(max(dot(normal, lightDir), 0.0), 2.25);
+  float rim = smoothstep(0.32, 1.12, barrel) * 0.2;
+  float glare = smoothstep(0.18, 0.0, abs((uv.x - uv.y * 0.32) - 0.34)) * smoothstep(0.92, 0.12, uv.y);
+  vec3 green = vec3(0.43, 0.95, 0.18);
+  vec3 amber = vec3(0.95, 0.54, 0.12);
+  vec3 color = green * phosphor + green * bevelLight * 0.15 + amber * rim * 0.08 + vec3(1.0) * glare * 0.09;
+  float alpha = (0.12 + phosphor + bevelLight * 0.18 + rim + glare * 0.18) * vignette * glassEdge;
+  gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.34));
+}`;
+
+  const compile = (type: number, source: string): WebGLShader | null => {
+    const shader = gl.createShader(type);
+    if (!shader) return null;
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      gl.deleteShader(shader);
+      return null;
+    }
+    return shader;
+  };
+  const vertex = compile(gl.VERTEX_SHADER, vertexSource);
+  const fragment = compile(gl.FRAGMENT_SHADER, fragmentSource);
+  const program = gl.createProgram();
+  if (!vertex || !fragment || !program) {
+    canvas.classList.add("fallback");
+    return;
+  }
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    canvas.classList.add("fallback");
+    return;
+  }
+  gl.useProgram(program);
+
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1, 1, -1, -1, 1,
+    -1, 1, 1, -1, 1, 1
+  ]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(program, "a_pos");
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const resLoc = gl.getUniformLocation(program, "u_res");
+  const timeLoc = gl.getUniformLocation(program, "u_time");
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  const draw = (now: number): void => {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+    const height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      gl.viewport(0, 0, width, height);
+    }
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniform2f(resLoc, width, height);
+    gl.uniform1f(timeLoc, now * 0.001);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(draw);
+  };
+  requestAnimationFrame(draw);
 }
