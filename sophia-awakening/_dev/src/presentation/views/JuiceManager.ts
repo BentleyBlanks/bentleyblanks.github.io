@@ -18,7 +18,7 @@ export class JuiceManager {
 
   // 需求2·算力获得动效：big=true 用于「这一张挣了多少」的核心收益读数——更大字号 + 发光描边 +
   // 弹入(back.out)冲击 + 更长的上浮距离/时长，一眼可辨于其余细碎浮字（"处理中…"/"接驳"…仍用默认小号）。
-  number(text: string, global: PointData, color: number, opts?: { big?: boolean }): void {
+  number(text: string, global: PointData, color: number, opts?: { big?: boolean; rise?: number }): void {
     const big = opts?.big ?? false;
     const label = new Text({
       text,
@@ -44,7 +44,7 @@ export class JuiceManager {
         .to(label.scale, { x: 1, y: 1, duration: 0.16, ease: "power1.out" });
     }
 
-    const travel = big ? 92 : 54;
+    const travel = opts?.rise ?? (big ? 92 : 54);
     const duration = big ? 1.05 : 0.72;
     gsap.to(label.position, { y: global.y - travel, duration, ease: "power2.out" });
     gsap.to(label, {

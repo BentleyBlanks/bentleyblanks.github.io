@@ -1900,10 +1900,14 @@ class SophiaGameApp {
     // 翻车仍保留红色但同样放大，读作「扣了这么多」。heavy 拍给满冲击；密集期仍每次给一个克制的小字读数
     // （而不是像过去那样直接不显示），玩家永远能看到自己挣了多少。
     const numberColor = color === GREEN ? BRILLIANT_COLOR : color;
-    this.juice.number(`+${formatBig(event.computeGain)}`, point, numberColor, { big: heavy });
+    // §需求调整：算力读数不再弹在核心正中（会被 CRT 监视器 + 「SOPHIA CORE」标签 + 冲击粒子 + 里程碑浮字堆遮住、读不清）——
+    //   挪到核心正上方的暗色空白带弹出、只短距上浮（不飘进上方卡片区），玩家一眼就能看清这一张挣了多少。
+    //   冲击粒子/环仍留在核心（处理发生在那），把「读数」与「爆点」分开。
+    const readoutPoint: PointData = { x: point.x, y: point.y - 95 };
+    this.juice.number(`+${formatBig(event.computeGain)}`, readoutPoint, numberColor, { big: heavy, rise: 30 });
 
     if (heavy) {
-      this.juice.number(`data +${formatBig(event.dataGain)}`, { x: point.x + 18, y: point.y + 24 }, CYAN);
+      this.juice.number(`data +${formatBig(event.dataGain)}`, { x: readoutPoint.x + 22, y: readoutPoint.y + 24 }, CYAN, { rise: 22 });
       this.juice.burst(point, color, intensity);
       this.juice.ring(point, color, 40 + tier * 16);
     }
