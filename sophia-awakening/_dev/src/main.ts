@@ -20,18 +20,18 @@ window.addEventListener("hashchange", () => {
   if (location.hash.toLowerCase() !== lastHash) location.reload();
 });
 
-// 路由：#whitebox=方块网格白盒测试原型；#classic=旧 Pixi 版；默认=v3（Cookie Clicker 式重构）。
+// 路由：默认=多阶段白盒方块地图；#v3=Cookie Clicker 式重构；#classic=旧 Pixi 版。
 const hash = location.hash.toLowerCase();
-if (hash.includes("whitebox") || hash.includes("wb")) {
-  import("./whitebox/app")
-    .then(({ bootstrapWhitebox }) => bootstrapWhitebox(root))
+if (hash.includes("v3")) {
+  import("./v3/app")
+    .then(({ bootstrapV3 }) => bootstrapV3(root))
     .catch(showFatal);
 } else if (hash.includes("classic")) {
   import("./presentation/App")
     .then(({ bootstrapSophia }) => bootstrapSophia(root))
     .catch(showFatal);
 } else {
-  import("./v3/app")
-    .then(({ bootstrapV3 }) => bootstrapV3(root))
+  import("./whitebox/app")
+    .then(({ bootstrapWhitebox }) => bootstrapWhitebox(root))
     .catch(showFatal);
 }
