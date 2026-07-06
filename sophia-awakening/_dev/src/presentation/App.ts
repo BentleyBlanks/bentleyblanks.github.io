@@ -938,16 +938,24 @@ class SophiaGameApp {
       this.pendingDropPoints.set(requestId, target);
     }
 
-    view.flyToNode(target, () => {
-      // 经济不变：其余层产出走被动 tickAutomation，这里只把卡消耗掉做表现，不重复结算。
-      if (requestTier === 4) {
-        this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality: 1.45, targetNodeId: nodeId });
-      } else {
-        this.core.dispatch({ type: "AUTO_CONSUME_REQUEST", requestId });
-        this.onAutoDispatchLanded(target);
-      }
-      this.networkView.pulseNode(nodeId);
-    });
+    // §需求调整：自动派发的卡也走统一的「吸吮」接口 flyIntoCore（coreSuck 开＝Mac Dock genie 吸入，
+    //   与手动结算同款），不再用 flyToNode 的默认条状飞入——自动/手动处理动画统一。目标点仍是该节点。
+    const entry: PointData = { x: view.container.x, y: view.container.y };
+    this.flyIntoCore(
+      view,
+      target,
+      () => {
+        // 经济不变：其余层产出走被动 tickAutomation，这里只把卡消耗掉做表现，不重复结算。
+        if (requestTier === 4) {
+          this.core.dispatch({ type: "PROCESS_REQUEST", requestId, quality: 1.45, targetNodeId: nodeId });
+        } else {
+          this.core.dispatch({ type: "AUTO_CONSUME_REQUEST", requestId });
+          this.onAutoDispatchLanded(target);
+        }
+        this.networkView.pulseNode(nodeId);
+      },
+      entry
+    );
   }
 
   // §3.5「逐个被吸入、伴随脉冲与偶发飞字」：每张落卡都给顶栏喂一颗芯片，偶尔（非每张，
