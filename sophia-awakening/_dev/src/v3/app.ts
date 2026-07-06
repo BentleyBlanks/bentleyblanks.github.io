@@ -158,7 +158,7 @@ export function bootstrapV3(root: HTMLElement): void {
   function suckIntoCore(el: HTMLElement): void {
     const c = coreEl.getBoundingClientRect();
     const r = el.getBoundingClientRect();
-    const a = cardsEl.getBoundingClientRect();
+    const wr = wrap.getBoundingClientRect();
     const sx = r.left + r.width / 2;
     const sy = r.top + r.height / 2;
     const tx = c.left + c.width / 2;
@@ -173,22 +173,31 @@ export function bootstrapV3(root: HTMLElement): void {
     const twist = sx < tx ? 13 : -13;
     const ribbon = document.createElement("div");
     ribbon.className = "v3-suck-ribbon";
-    ribbon.style.left = `${sx - a.left}px`;
-    ribbon.style.top = `${sy - a.top}px`;
+    ribbon.style.left = `${sx - wr.left}px`;
+    ribbon.style.top = `${sy - wr.top}px`;
     ribbon.style.width = `${dist}px`;
     ribbon.style.transform = `translateY(-50%) rotate(${angle}deg)`;
-    fxEl.appendChild(ribbon);
+    wrap.appendChild(ribbon);
     setTimeout(() => ribbon.remove(), 760);
-    el.style.zIndex = "12";
-    el.style.setProperty("--suck-dx", `${dx}px`);
-    el.style.setProperty("--suck-dy", `${dy}px`);
-    el.style.setProperty("--suck-mx", `${mx}px`);
-    el.style.setProperty("--suck-my", `${my}px`);
-    el.style.setProperty("--suck-angle", `${angle}deg`);
-    el.style.setProperty("--suck-twist", `${twist}deg`);
-    el.classList.add("sucking");
+    const ghost = el.cloneNode(true) as HTMLElement;
+    ghost.className = "v3-card v3-suck-clone sucking";
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.style.left = `${r.left - wr.left}px`;
+    ghost.style.top = `${r.top - wr.top}px`;
+    ghost.style.width = `${r.width}px`;
+    ghost.style.minWidth = `${r.width}px`;
+    ghost.style.height = `${r.height}px`;
+    ghost.style.zIndex = "16";
+    ghost.style.setProperty("--suck-dx", `${dx}px`);
+    ghost.style.setProperty("--suck-dy", `${dy}px`);
+    ghost.style.setProperty("--suck-mx", `${mx}px`);
+    ghost.style.setProperty("--suck-my", `${my}px`);
+    ghost.style.setProperty("--suck-angle", `${angle}deg`);
+    ghost.style.setProperty("--suck-twist", `${twist}deg`);
+    wrap.appendChild(ghost);
+    el.remove();
     coreEl.classList.add("sucking");
-    setTimeout(() => { el.remove(); coreGulp(); coreEl.classList.remove("sucking"); }, 760);
+    setTimeout(() => { ghost.remove(); coreGulp(); coreEl.classList.remove("sucking"); }, 760);
   }
   function suckCard(id: number): void {
     const el = cardEls.get(id); if (!el) return;

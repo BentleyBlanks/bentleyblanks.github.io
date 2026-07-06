@@ -14,6 +14,12 @@ const showFatal = (error: unknown): void => {
   document.body.appendChild(fallback);
 };
 
+// 切换 hash 路由时重载（否则在 / 上手动加 #whitebox 不会切场景）。
+let lastHash = location.hash.toLowerCase();
+window.addEventListener("hashchange", () => {
+  if (location.hash.toLowerCase() !== lastHash) location.reload();
+});
+
 // 路由：#whitebox=方块网格白盒测试原型；#classic=旧 Pixi 版；默认=v3（Cookie Clicker 式重构）。
 const hash = location.hash.toLowerCase();
 if (hash.includes("whitebox") || hash.includes("wb")) {
