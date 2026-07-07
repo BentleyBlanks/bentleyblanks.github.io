@@ -1,8 +1,10 @@
-// 《烽火敌后》· 抗日根据地 × CookieClicker 核心逻辑（纯逻辑，无 DOM/WebGL）。
+// 《烽火敌后》· 抗日根据地 × CookieClicker 核心逻辑（纯逻辑，无 DOM/Canvas）。
 // 玩家=敌后抗日根据地的组织者。双资源：兵员(人) + 物资(粮弹药)。点击「发动群众」起手，
 // 建设施自动产出，搞政策运动加成，攒够就「发动战役/收复失地」点亮地图。日军「扫荡/封锁」定期造成真实损失。
+// 扫荡=多阶段事件（来袭→会战→劫掠），玩家两个应对手段：「组织群众大范围转移」减损、「组织抗击」投入兵员打会战。
+// 会战在 core 内逐秒结算（兰彻斯特式互相消耗），表现层(2.5D)只负责画兵团与战斗。
 // 历史内核=《论持久战》三阶段：战略防御(极难) → 相持发展(百团大战) → 1941-42 最艰难期(大扫荡/三光/囚笼) → 局部反攻·收复失地。
-// 数值 CookieClicker 式（成本 ×1.15），经 sim 验证核心循环可跑通全弧线。
+// 数值 CookieClicker 式（成本 ×1.15），经 scripts/kangri-sim.cjs 验证核心循环可跑通全弧线。
 
 // ── 建设施：用物资(部分含兵员)购买，自动产出 兵员/物资。热力/年代色 ──
 export interface BuildingDef {
@@ -84,6 +86,28 @@ export const PHASES: PhaseDef[] = [
   { id: 3, name: "局部反攻", year: "1943-45", note: "熬过来了。生产恢复、主力壮大，开始一座座收复失地。", atTotalWuzi: 3e7 }
 ];
 
+// ── 扫荡事件（多阶段，core 内结算；表现层只画）──
+// incoming: 日军兵团从据点开拔压向根据地（决策窗口：转移群众 / 组织抗击）
+// battle:   我方投入的部队与日军会战（兰彻斯特式互相消耗，逐秒结算）
+// pillage:  （突破防线的）日军在村里烧抢（按剩余兵力/防御/转移进度算损失）
+export type SweepStage = "incoming" | "battle" | "pillage";
+export interface Sweep {
+  stage: SweepStage;
+  strength: number; // 日军兵团当前兵力
+  strength0: number; // 开拔时兵力
+  etaSec: number; // incoming 剩余秒（决策窗口）
+  committed: number; // 我方投入会战的兵员（从 s.bing 划出，幸存者战后归队）
+  committed0: number;
+  evacStarted: boolean; // 已下令群众大范围转移
+  evacProgress: number; // 0..1 转移进度（需要时间；越完整劫掠损失越低）
+  battleSec: number;
+  pillageSec: number; // 劫掠剩余秒
+  pillageFrac: number; // 本次劫掠总损失比例（进入 pillage 时定格）
+  killed: number; // 累计击毙日军
+  lostBing: number; // 我方会战阵亡
+  targetRegion: string | null; // 遭扫荡的根据地（null=中心根据地），表现层定位用
+}
+
 export interface KRState {
   bing: number; // 兵员
   wuzi: number; // 物资
@@ -95,7 +119,8 @@ export interface KRState {
   clockMs: number;
   sweepTimerMs: number; // 距下次扫荡
   lastSweepMs: number;
-  pendingSweep: number | null; // 待发起的扫荡：日军数量（由表现层拉起 3D 战斗，战斗结果回填损失/缴获）
+  sweep: Sweep | null; // 进行中的扫荡事件
+  sweepsSurvived: number;
   terminal: { text: string; kind: "info" | "win" | "loss" | "era" }[];
   phaseShown: number;
 }
@@ -105,17 +130,27 @@ export const TUNING = {
   clickWuzi: 2, // 点击基础 +物资
   sweepBaseMs: 110_000, // 扫荡基础间隔
   sweepMinMs: 72_000,
-  sweepLossFrac: 0.24, // 扫荡基础损失比例（资源+建筑）——疼但能扛（配合地道/地雷可压很低）
+  sweepLossFrac: 0.24, // 扫荡基础损失比例（资源+建筑）——疼但能扛（配合地道/地雷/转移可压很低）
   hardPhase: 2, // 最艰难期
   hardSweepMult: 1.5, // 最艰难期扫荡更频更狠（但非灭顶）
-  garrisonPerRegion: 0 // 预留
+  // ── 扫荡事件节奏/战斗 ──
+  sweepEtaSec: 16, // 兵团开拔→压到根据地的决策窗口
+  battleMaxSec: 45, // 会战最长时长（打不完=日军且战且退）
+  pillageSec: 9, // 劫掠时长
+  evacSec: 22, // 群众大范围转移完成所需秒（情报站/defense 加速）
+  evacProdMult: 0.45, // 转移期间产出打折（群众在路上）
+  ourKillRate: 0.07, // 每名我方战士每秒击毙日军数（基础）
+  jpKillRate: 0.075, // 每名日军每秒杀伤我方数（基础）——不下令抗击=小股民兵挡不住
+  autoMilitiaFrac: 0.1, // 未下令抗击时，民兵自发抵抗投入的兵员比例
+  lootBase: 30, // 每击毙 1 日军的缴获基数（×阶段×regionMult）
+  lootPerPhase: 180
 };
 
 export function createKRState(): KRState {
   return {
     bing: 0, wuzi: 0, totalWuzi: 0, clickN: 0,
     buildings: BUILDINGS.map(() => 0), policies: {}, regions: {},
-    clockMs: 0, sweepTimerMs: TUNING.sweepBaseMs, lastSweepMs: 0, pendingSweep: null,
+    clockMs: 0, sweepTimerMs: TUNING.sweepBaseMs, lastSweepMs: 0, sweep: null, sweepsSurvived: 0,
     terminal: [{ text: "1937 · 卢沟桥的枪声响了。华北沦陷，但敌后的缝隙里——根据地要在这里扎根。", kind: "era" }],
     phaseShown: 0
   };
@@ -221,46 +256,149 @@ export function launchOp(s: KRState, id: string): boolean {
   return true;
 }
 
-// 扫荡日军数量：随阶段增多，被地道/地雷/情报(defense)拦下一批 → 减少压进村的敌人。
-export function sweepCount(s: KRState): number {
+// ── 扫荡事件 ──────────────────────────────────────────────────
+// 日军兵团兵力：随阶段与你的规模水涨船高（根据地越肥越招扫荡），defense(情报/地道)提前拦掉一批。
+export function sweepStrength(s: KRState): number {
   const p = phase(s);
-  const base = 4 + p * 3, hard = p === TUNING.hardPhase ? TUNING.hardSweepMult : 1;
-  return Math.max(3, Math.round(base * hard * (1 - defense(s) * 0.7)));
+  const hard = p === TUNING.hardPhase ? TUNING.hardSweepMult : 1;
+  const base = (6 + p * 14) * hard;
+  const scale = Math.pow(Math.max(1, s.bing), 0.62) * 0.55; // 跟兵员规模半速增长——组织抗击永远打得动
+  return Math.max(5, Math.round((base + scale) * (1 - defense(s) * 0.45) * (0.85 + Math.random() * 0.3)));
 }
-// 触发扫荡：只标记 pendingSweep（表现层据此拉起 3D 战斗）。
+// 触发扫荡：进入 incoming 决策窗口。表现层据 s.sweep 画兵团开进 + 弹出「转移/抗击」。
 function triggerSweep(s: KRState): void {
-  s.pendingSweep = sweepCount(s);
+  const strength = sweepStrength(s);
+  const owned = REGIONS.filter((r) => s.regions[r.id]);
+  const target = owned.length > 0 && Math.random() < 0.6 ? owned[Math.floor(Math.random() * owned.length)].id : null;
+  s.sweep = {
+    stage: "incoming", strength, strength0: strength, etaSec: TUNING.sweepEtaSec,
+    committed: 0, committed0: 0, evacStarted: false, evacProgress: 0,
+    battleSec: 0, pillageSec: 0, pillageFrac: 0, killed: 0, lostBing: 0, targetRegion: target
+  };
   const hard = phase(s) === TUNING.hardPhase;
-  if (hard) pushT(s, `⚠ 日军大扫荡·三光政策！${s.pendingSweep} 股敌人压进根据地——组织反扫荡！`, "loss");
-  else pushT(s, `⚠ 日军扫荡！${s.pendingSweep} 个鬼子进村——打退它们，别让它们烧房抢粮！`, "loss");
+  const where = target ? REGIONS.find((r) => r.id === target)!.name : "中心根据地";
+  if (hard) pushT(s, `⚠ 日军大扫荡·三光政策！约 ${strength} 人的兵团正压向【${where}】——快组织群众转移、组织抗击！`, "loss");
+  else pushT(s, `⚠ 日军扫荡！约 ${strength} 人的兵团开向【${where}】——组织群众转移，或集结兵员抗击！`, "loss");
   s.lastSweepMs = s.clockMs;
 }
-// 3D 战斗结算：烧了几间房 → 损失多少资源+毁设施；击毙几个日军 → 缴获物资。sim 无表现层时也可直接调（burned 近似）。
-export function applySweepResult(s: KRState, burned: number, total: number, killed: number): void {
-  const hard = phase(s) === TUNING.hardPhase;
-  const frac = TUNING.sweepLossFrac * (hard ? TUNING.hardSweepMult : 1);
-  const loss = Math.max(0, frac * (total > 0 ? burned / total : 0.4));
-  s.wuzi -= s.wuzi * loss; s.bing -= s.bing * loss;
-  let destroyed = 0;
-  for (let i = 0; i < s.buildings.length; i++) {
-    if (s.buildings[i] > 0 && Math.random() < loss * 0.6) { const d = Math.ceil(s.buildings[i] * loss * 0.5); s.buildings[i] -= d; destroyed += d; }
-  }
-  const loot = killed * (30 + phase(s) * 200) * regionMult(s);
-  s.wuzi += loot; s.totalWuzi += loot;
-  if (burned === 0) pushT(s, `★ 反扫荡大捷！击毙日军 ${killed}，一间房没让它烧着，缴获物资 ${fmt(loot)}！`, "win");
-  else pushT(s, `反扫荡结束：击毙 ${killed}，烧毁民房 ${burned}/${total}，损失 ${Math.round(loss * 100)}% 资源、设施 ${destroyed}，缴获 ${fmt(loot)}。`, burned > total / 2 ? "loss" : "info");
-  s.pendingSweep = null;
+
+// 玩家动作①：组织群众大范围转移（incoming/battle 期均可下令；需要时间完成，期间产出打折）。
+export function startEvacuation(s: KRState): boolean {
+  const sw = s.sweep;
+  if (!sw || sw.stage === "pillage" || sw.evacStarted) return false;
+  sw.evacStarted = true;
+  pushT(s, "▶ 组织群众大范围转移！乡亲们坚壁清野，向山里疏散——转移越完整，损失越小。", "info");
+  return true;
+}
+// 玩家动作②：组织抗击——把兵员投入会战（可追加增援）。
+export function commitTroops(s: KRState, n: number): number {
+  const sw = s.sweep;
+  if (!sw || sw.stage === "pillage") return 0;
+  const c = Math.min(Math.floor(s.bing), Math.max(0, Math.floor(n)));
+  if (c <= 0) return 0;
+  s.bing -= c; sw.committed += c; sw.committed0 += c;
+  if (sw.stage === "incoming") pushT(s, `▶ 组织抗击！${c} 名战士在村口一线设伏，等鬼子进入伏击圈。`, "info");
+  else pushT(s, `▶ 增援 ${c} 名战士投入会战！`, "info");
+  return c;
 }
 
-// 每帧推进：产出 + 扫荡计时 + 阶段播报。
+// 劫掠总损失比例：基础 × 剩余日军占比 × 防御减免 × 转移减免。
+function pillageFracOf(s: KRState, sw: Sweep): number {
+  const hard = phase(s) === TUNING.hardPhase ? TUNING.hardSweepMult : 1;
+  const strengthFrac = sw.strength / Math.max(1, sw.strength0);
+  return Math.max(0, TUNING.sweepLossFrac * hard * strengthFrac * (1 - defense(s)) * (1 - 0.8 * sw.evacProgress));
+}
+function endBattle(s: KRState, sw: Sweep): void {
+  // 幸存者归队
+  const back = Math.floor(sw.committed);
+  s.bing += back; sw.committed = 0;
+  if (sw.strength <= 0.5) { // 全歼/击退 → 直接结算胜利
+    finishSweep(s, sw, true);
+  } else { // 突破防线 → 劫掠
+    sw.stage = "pillage"; sw.pillageSec = TUNING.pillageSec;
+    sw.pillageFrac = pillageFracOf(s, sw);
+    pushT(s, `日军 ${Math.round(sw.strength)} 人突进根据地，开始烧抢——${sw.evacStarted ? "掩护群众撤完最后一程！" : "群众没来得及转移！"}`, "loss");
+  }
+}
+function finishSweep(s: KRState, sw: Sweep, cleanWin: boolean): void {
+  const killed = Math.round(sw.killed);
+  const loot = killed * (TUNING.lootBase + phase(s) * TUNING.lootPerPhase) * regionMult(s);
+  s.wuzi += loot; s.totalWuzi += loot;
+  if (cleanWin) {
+    pushT(s, `★ 反扫荡大捷！击毙日军 ${killed}（我方伤亡 ${Math.round(sw.lostBing)}），根据地毫发无损，缴获物资 ${fmt(loot)}！`, "win");
+  } else {
+    const lossPct = Math.round(sw.pillageFrac * 100);
+    pushT(s, `反扫荡结束：击毙 ${killed}，我方伤亡 ${Math.round(sw.lostBing)}，被烧抢损失 ${lossPct}%${sw.evacProgress > 0.5 ? "（群众大转移保住了大半家底）" : ""}，缴获 ${fmt(loot)}。`, sw.pillageFrac > 0.12 ? "loss" : "info");
+  }
+  s.sweepsSurvived += 1;
+  s.sweep = null;
+}
+// 劫掠损失按秒摊开（表现层能看到数字持续掉），结束时毁一点设施。
+function tickPillage(s: KRState, sw: Sweep, dt: number): void {
+  const perSec = sw.pillageFrac / TUNING.pillageSec;
+  s.wuzi -= s.wuzi * perSec * dt;
+  s.bing -= s.bing * perSec * dt * 0.5; // 人比粮跑得快
+  sw.pillageSec -= dt;
+  if (sw.pillageSec <= 0) {
+    let destroyed = 0;
+    for (let i = 0; i < s.buildings.length; i++) {
+      if (s.buildings[i] > 0 && Math.random() < sw.pillageFrac * 0.9) {
+        const d = Math.max(1, Math.ceil(s.buildings[i] * sw.pillageFrac * 0.45)); s.buildings[i] -= Math.min(s.buildings[i], d); destroyed += d;
+      }
+    }
+    if (destroyed > 0) pushT(s, `烧毁设施 ${destroyed} 处。留得青山在——重建！`, "loss");
+    finishSweep(s, sw, false);
+  }
+}
+// 会战逐秒结算：兰彻斯特式互耗。我方吃 defense(地道/地雷/情报) 与伏击加成。
+// 单秒歼灭量封顶（初始兵力的 18%/秒）——碾压局也要打上几秒，画面看得见。
+function tickBattle(s: KRState, sw: Sweep, dt: number): void {
+  sw.battleSec += dt;
+  const d = defense(s);
+  const ourRate = TUNING.ourKillRate * (1 + d * 1.6);
+  const jpRate = TUNING.jpKillRate * (1 - d * 0.55);
+  const jpLoss = Math.min(sw.strength, sw.committed * ourRate * dt, sw.strength0 * 0.18 * dt);
+  const ourLoss = Math.min(sw.committed, sw.strength * jpRate * dt, sw.committed0 * 0.18 * dt);
+  sw.strength -= jpLoss; sw.killed += jpLoss;
+  sw.committed -= ourLoss; sw.lostBing += ourLoss;
+  if (sw.strength <= 0.5 || sw.committed <= 0.5 || sw.battleSec >= TUNING.battleMaxSec) {
+    if (sw.battleSec >= TUNING.battleMaxSec && sw.strength > 0.5) sw.strength *= 0.55; // 拖到日军且战且退
+    endBattle(s, sw);
+  }
+}
+function tickSweep(s: KRState, dt: number): void {
+  const sw = s.sweep;
+  if (!sw) return;
+  // 转移进度（情报站等 defense 让群众跑得更快）
+  if (sw.evacStarted && sw.evacProgress < 1) {
+    sw.evacProgress = Math.min(1, sw.evacProgress + dt / TUNING.evacSec * (1 + defense(s) * 0.8));
+  }
+  if (sw.stage === "incoming") {
+    sw.etaSec -= dt;
+    if (sw.etaSec <= 0) {
+      if (sw.committed <= 0) { // 没人下令抗击 → 民兵自发抵抗一小股
+        const auto = Math.floor(s.bing * TUNING.autoMilitiaFrac);
+        if (auto > 0) { s.bing -= auto; sw.committed = auto; sw.committed0 = auto; pushT(s, `民兵 ${auto} 人自发阻击，掩护乡亲！`, "info"); }
+      }
+      if (sw.committed > 0) { sw.stage = "battle"; sw.battleSec = 0; pushT(s, `会战打响！我 ${Math.round(sw.committed)} × 敌 ${Math.round(sw.strength)}`, "info"); }
+      else { sw.stage = "pillage"; sw.pillageSec = TUNING.pillageSec; sw.pillageFrac = pillageFracOf(s, sw); pushT(s, "无人设防——日军长驱直入，开始烧抢！", "loss"); }
+    }
+  } else if (sw.stage === "battle") tickBattle(s, sw, dt);
+  else tickPillage(s, sw, dt);
+}
+
+// 每帧推进：产出 + 扫荡计时/事件 + 阶段播报。
 export function tick(s: KRState, dtSec: number): void {
   s.clockMs += dtSec * 1000;
-  s.bing += bingPerSec(s) * dtSec;
-  s.wuzi += wuziPerSec(s) * dtSec;
-  s.totalWuzi += wuziPerSec(s) * dtSec;
+  const prodMult = s.sweep?.evacStarted ? TUNING.evacProdMult : 1; // 群众在转移=生产停摆大半
 
-  // 扫荡计时（有产出才会被盯上；最艰难期更频繁）
-  if (bingPerSec(s) + wuziPerSec(s) > 0.5 || s.wuzi > 500) {
+  s.bing += bingPerSec(s) * prodMult * dtSec;
+  s.wuzi += wuziPerSec(s) * prodMult * dtSec;
+  s.totalWuzi += wuziPerSec(s) * prodMult * dtSec;
+
+  // 扫荡计时（有产出才会被盯上；最艰难期更频繁；一次只来一股）
+  if (s.sweep) tickSweep(s, dtSec);
+  else if (bingPerSec(s) + wuziPerSec(s) > 0.5 || s.wuzi > 500) {
     s.sweepTimerMs -= dtSec * 1000;
     if (s.sweepTimerMs <= 0) {
       triggerSweep(s);

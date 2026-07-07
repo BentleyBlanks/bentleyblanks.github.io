@@ -1,12 +1,13 @@
-// 《烽火敌后》装配层。3D 战场(Three.js)作主视图 + 双资源 HUD + 设施/政策/战役商店 + 扫荡拉起真实战斗 + 战果结算。路由 #kangri。
+// 《烽火敌后》装配层。2.5D 华北大地图(Canvas2D)作主视图 + 双资源 HUD + 设施/政策/战役商店
+// + 扫荡多阶段事件（转移群众/组织抗击决策条）+ 地图直接点区域发动收复战役。路由 #kangri。
 import {
-  BUILDINGS, POLICIES, REGIONS, PHASES,
+  BUILDINGS, POLICIES, REGIONS, PHASES, TUNING,
   createKRState, fmt, phase, regionsReclaimed, bingPerSec, wuziPerSec, defense,
   buildCostWuzi, buildCostBing, buildingUnlocked, policyRevealed, regionAvailable,
-  rally, buyBuilding, buyPolicy, launchOp, tick, applySweepResult,
+  rally, buyBuilding, buyPolicy, launchOp, tick, startEvacuation, commitTroops,
   type KRState
 } from "./core";
-import { initBattle3D } from "./battle3d";
+import { initScene } from "./scene";
 import { injectKRStyles } from "./styles";
 
 export function bootstrapKangri(root: HTMLElement): void {
@@ -23,7 +24,22 @@ export function bootstrapKangri(root: HTMLElement): void {
     <div class="kr-title">烽火敌后 · 华北抗日根据地</div>
     <div class="kr-phase" id="krPhase"></div>
     <div class="kr-sweep" id="krSweep"></div>
-    <div class="kr-ctrlhint">操控八路军战士：<b>W A S D</b> 移动 · 靠近日军自动开火 · <b>点击</b>补枪</div>
+
+    <div class="kr-sweepbar" id="krSweepBar" style="display:none">
+      <div class="kr-sb-head" id="krSbHead"></div>
+      <div class="kr-sb-status" id="krSbStatus"></div>
+      <div class="kr-sb-row" id="krSbActions">
+        <button class="kr-sb-btn evac" id="krEvac"><b>组织群众大范围转移</b><span>坚壁清野 · 减少烧抢损失（转移期间产出减半）</span></button>
+        <div class="kr-sb-commit">
+          <div class="kr-sb-commit-t">组织抗击 · 投入兵员迎战</div>
+          <div class="kr-sb-commit-btns">
+            <button class="kr-sb-btn fight" data-frac="0.3">三成兵力</button>
+            <button class="kr-sb-btn fight" data-frac="0.6">六成兵力</button>
+            <button class="kr-sb-btn fight all" data-frac="1">全军压上</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <aside class="kr-left">
       <div class="kr-res">
@@ -54,29 +70,86 @@ export function bootstrapKangri(root: HTMLElement): void {
   root.appendChild(wrap);
   const $ = <T extends HTMLElement = HTMLElement>(s: string): T => wrap.querySelector<T>(s)!;
 
-  // 3D 战场
-  const battle = initBattle3D($<HTMLCanvasElement>("#krMap"));
-  new ResizeObserver(() => battle.resize()).observe($("#krMap"));
-  const keys: Record<string, boolean> = {}; battle.setKeys(keys);
-  $("#krMap").addEventListener("click", () => battle.fire());
-  let battleActive = false;
+  // 2.5D 大地图
+  const mapCanvas = $<HTMLCanvasElement>("#krMap");
+  const scene = initScene(mapCanvas);
+  new ResizeObserver(() => scene.resize()).observe(mapCanvas);
+
+  const fx = document.createElement("div"); fx.className = "kr-fx"; wrap.appendChild(fx);
+  function floatAt(x: number, y: number, text: string, cls = ""): void {
+    const f = document.createElement("div"); f.className = `kr-float ${cls}`; f.textContent = text;
+    f.style.left = `${x}px`; f.style.top = `${y}px`;
+    fx.appendChild(f); setTimeout(() => f.remove(), 950);
+  }
+
+  // 地图点区域 → 直接发动收复战役
+  mapCanvas.addEventListener("click", (e) => {
+    const r = mapCanvas.getBoundingClientRect();
+    const id = scene.hitRegion(e.clientX - r.left, e.clientY - r.top);
+    if (!id || id === "base") return;
+    const def = REGIONS.find((x) => x.id === id);
+    if (!def || state.regions[id]) return;
+    if (launchOp(state, id)) {
+      floatAt(e.clientX - r.left, e.clientY - r.top - 12, `★ 收复 ${def.name}！`, "big");
+    } else if (regionAvailable(state, def)) {
+      floatAt(e.clientX - r.left, e.clientY - r.top - 12, `需 ${fmt(def.costBing)}兵 ${fmt(def.costWuzi)}资`, "dim");
+    }
+  });
 
   // ── 发动群众 ──
   const rallyBtn = $("#krRally");
-  function doRally(): void { rally(state); rallyBtn.classList.remove("hit"); void rallyBtn.offsetWidth; rallyBtn.classList.add("hit"); floatGain(); }
-  rallyBtn.addEventListener("click", doRally);
-  window.addEventListener("keydown", (e) => {
-    const k = e.key.toLowerCase();
-    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) { keys[k] = true; e.preventDefault(); }
-    else if (k === "g") { doRally(); }
-  });
-  window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
-  const fx = document.createElement("div"); fx.className = "kr-fx"; wrap.appendChild(fx);
-  function floatGain(): void {
+  function doRally(): void {
+    rally(state);
+    rallyBtn.classList.remove("hit"); void rallyBtn.offsetWidth; rallyBtn.classList.add("hit");
     const b = rallyBtn.getBoundingClientRect(), w = wrap.getBoundingClientRect();
-    const f = document.createElement("div"); f.className = "kr-float"; f.textContent = `+兵 +物资`;
-    f.style.left = `${b.left - w.left + b.width / 2}px`; f.style.top = `${b.top - w.top - 6}px`;
-    fx.appendChild(f); setTimeout(() => f.remove(), 850);
+    floatAt(b.left - w.left + b.width / 2, b.top - w.top - 6, "+兵 +物资");
+  }
+  rallyBtn.addEventListener("click", doRally);
+  window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "g") doRally(); });
+
+  // ── 扫荡决策条 ──
+  const sweepBar = $("#krSweepBar"), sbHead = $("#krSbHead"), sbStatus = $("#krSbStatus");
+  const evacBtn = $<HTMLButtonElement>("#krEvac");
+  evacBtn.addEventListener("click", () => { startEvacuation(state); });
+  for (const b of wrap.querySelectorAll<HTMLButtonElement>(".kr-sb-btn.fight")) {
+    b.addEventListener("click", () => {
+      const frac = Number(b.dataset.frac) || 0.3;
+      const n = commitTroops(state, Math.floor(state.bing * frac));
+      if (n > 0) { b.classList.remove("pulse"); void b.offsetWidth; b.classList.add("pulse"); }
+    });
+  }
+  function renderSweepBar(): void {
+    const sw = state.sweep;
+    const banner = $("#krSweep");
+    if (!sw) {
+      sweepBar.style.display = "none"; banner.classList.remove("on");
+      return;
+    }
+    sweepBar.style.display = "";
+    banner.classList.add("on");
+    const where = sw.targetRegion ? REGIONS.find((r) => r.id === sw.targetRegion)!.name : "中心根据地";
+    if (sw.stage === "incoming") {
+      banner.textContent = "⚠ 日军兵团开拔！";
+      sbHead.textContent = `日军 ${Math.round(sw.strength)} 人压向【${where}】 · ${Math.ceil(sw.etaSec)} 秒后抵达`;
+      sbStatus.textContent = sw.evacStarted
+        ? `群众转移中 ${Math.round(sw.evacProgress * 100)}%${sw.committed > 0 ? ` · 已集结 ${Math.round(sw.committed)} 人设伏` : " · 尚未组织抗击"}`
+        : sw.committed > 0 ? `已集结 ${Math.round(sw.committed)} 人设伏 · 群众未转移` : "尚未应对——快下令！";
+    } else if (sw.stage === "battle") {
+      banner.textContent = "⚔ 会战进行中！";
+      sbHead.textContent = `【${where}】会战 · 我 ${Math.round(sw.committed)} × 敌 ${Math.round(sw.strength)}`;
+      sbStatus.textContent = `已击毙 ${Math.round(sw.killed)} · 我方伤亡 ${Math.round(sw.lostBing)}${sw.evacStarted ? ` · 群众转移 ${Math.round(sw.evacProgress * 100)}%` : ""}（可点击追加增援）`;
+    } else {
+      banner.textContent = "🔥 日军烧抢中！";
+      sbHead.textContent = `日军 ${Math.round(sw.strength)} 人突入【${where}】烧抢 · ${Math.ceil(sw.pillageSec)} 秒`;
+      sbStatus.textContent = sw.evacProgress > 0.5 ? "群众大部分已转移进山——家底保住了大半。" : "群众没能及时转移，损失惨重……";
+    }
+    evacBtn.classList.toggle("done", sw.evacStarted);
+    evacBtn.querySelector("b")!.textContent = sw.evacStarted
+      ? (sw.evacProgress >= 1 ? "✓ 群众已转移进山" : `转移中… ${Math.round(sw.evacProgress * 100)}%`)
+      : "组织群众大范围转移";
+    const canAct = sw.stage !== "pillage";
+    evacBtn.disabled = !canAct || sw.evacStarted;
+    for (const b of wrap.querySelectorAll<HTMLButtonElement>(".kr-sb-btn.fight")) b.disabled = !canAct;
   }
 
   // ── 商店 ──
@@ -99,9 +172,9 @@ export function bootstrapKangri(root: HTMLElement): void {
 
   const GUIDE = [
     { t: "敌后一无所有。按【G】或点『发动群众抗争』——组织起来，攒兵员与物资", d: (s: KRState) => s.clickN > 0 },
-    { t: "右侧买【民兵队】『开荒生产队』——让根据地自己产出", d: (s: KRState) => s.buildings.some((b) => b > 0) },
-    { t: "日军会来扫荡！用【WASD】操控你的战士，靠近日军自动开火，别让它们烧房", d: (s: KRState) => s.lastSweepMs > 0 },
-    { t: "切『战役·收复』攒兵发动战役收复失地。多建地道、搞地雷战，熬到反攻", d: (s: KRState) => regionsReclaimed(s) > 0 }
+    { t: "右侧买【民兵队】『开荒生产队』——设施会长在地图上，根据地自己产出", d: (s: KRState) => s.buildings.some((b) => b > 0) },
+    { t: "日军扫荡要来了！兵团压过来时：下令【组织群众大范围转移】保家底，【组织抗击】投兵员打会战", d: (s: KRState) => s.sweepsSurvived > 0 },
+    { t: "地图上点亮着金圈的区域可以收复——攒兵发动战役。多建地道、搞地雷战，熬到反攻", d: (s: KRState) => regionsReclaimed(s) > 0 }
   ];
   let gstep = 0;
 
@@ -115,8 +188,9 @@ export function bootstrapKangri(root: HTMLElement): void {
   function render(): void {
     $("#krBing").textContent = fmt(state.bing);
     $("#krWuzi").textContent = fmt(state.wuzi);
-    $("#krBingS").textContent = `+${fmt(bingPerSec(state))}/秒`;
-    $("#krWuziS").textContent = `+${fmt(wuziPerSec(state))}/秒`;
+    const prodNote = state.sweep?.evacStarted ? `（转移中 ×${TUNING.evacProdMult}）` : "";
+    $("#krBingS").textContent = `+${fmt(bingPerSec(state))}/秒${prodNote}`;
+    $("#krWuziS").textContent = `+${fmt(wuziPerSec(state))}/秒${prodNote}`;
     const ph = PHASES[phase(state)];
     $("#krPhase").textContent = `${ph.year} · ${ph.name}　│　收复 ${regionsReclaimed(state)}/${REGIONS.length}　│　反扫荡减损 ${Math.round(defense(state) * 100)}%`;
 
@@ -140,7 +214,7 @@ export function bootstrapKangri(root: HTMLElement): void {
       const r = opRows.get(rgn.id)!; const has = !!state.regions[rgn.id]; const avail = regionAvailable(state, rgn);
       r.el.style.display = has || avail ? "" : "none";
       r.name.textContent = `${rgn.name} · ${rgn.battle}`;
-      r.meta.textContent = has ? "★ 已收复 · 根据地" : `产出 ×${rgn.outputMult}`;
+      r.meta.textContent = has ? "★ 已收复 · 根据地" : `产出 ×${rgn.outputMult}（也可在地图上直接点它）`;
       r.cost.textContent = has ? "✓" : `${fmt(rgn.costWuzi)}资 ${fmt(rgn.costBing)}兵`;
       r.el.classList.toggle("affordable", !has && avail && state.wuzi >= rgn.costWuzi && state.bing >= rgn.costBing);
       r.el.classList.toggle("maxed", has);
@@ -148,19 +222,8 @@ export function bootstrapKangri(root: HTMLElement): void {
     const g = $("#krGuide"); while (gstep < GUIDE.length && GUIDE[gstep].d(state)) gstep += 1;
     if (gstep >= GUIDE.length) g.style.display = "none";
     else { g.style.display = ""; const txt = `${gstep + 1}/${GUIDE.length} · ${GUIDE[gstep].t}`; if (g.textContent !== txt) g.textContent = txt; }
+    renderSweepBar();
     renderTerm();
-  }
-
-  // ── 扫荡 → 3D 战斗 → 战果结算 ──
-  function checkSweep(): void {
-    if (state.pendingSweep !== null && !battleActive) {
-      const count = state.pendingSweep; battleActive = true;
-      const sw = $("#krSweep"); sw.textContent = "⚠ 日军扫荡进村！"; sw.classList.add("on");
-      battle.triggerSweep(count, (res) => {
-        applySweepResult(state, res.burned, res.total, res.killed);
-        battleActive = false; sw.classList.remove("on");
-      });
-    }
   }
 
   // ── 主循环 ──
@@ -168,12 +231,11 @@ export function bootstrapKangri(root: HTMLElement): void {
   function frame(now: number): void {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (!paused) tick(state, dt * speed);
-    checkSweep();
-    battle.update(dt);
+    scene.frame(dt, state);
     render();
     requestAnimationFrame(frame);
   }
-  requestAnimationFrame(() => { battle.resize(); requestAnimationFrame(frame); });
+  requestAnimationFrame(() => { scene.resize(); requestAnimationFrame(frame); });
 
   // ── Debug ──
   const dbg = $("#krDebug");
@@ -186,13 +248,15 @@ export function bootstrapKangri(root: HTMLElement): void {
   $("#krDbgBing").addEventListener("click", () => { state.bing += rdv(); });
   const spd = [...wrap.querySelectorAll<HTMLButtonElement>(".kr-debug .spd")];
   for (const b of spd) b.addEventListener("click", () => { speed = Number(b.dataset.spd) || 1; for (const x of spd) x.classList.toggle("active", x === b); });
-  $("#krDbgSweep").addEventListener("click", () => { state.sweepTimerMs = 1; });
+  $("#krDbgSweep").addEventListener("click", () => { if (!state.sweep) state.sweepTimerMs = 1; });
   $("#krDbgReset").addEventListener("click", () => { if (window.confirm("重置？")) { state = createKRState(); gstep = 0; } });
 
   (window as unknown as { __kr?: unknown }).__kr = {
     state: () => state, give: (w: number, b: number) => { state.wuzi += w; state.totalWuzi += w; state.bing += b || 0; },
     rally: doRally, buyBuilding: (i: number) => buyBuilding(state, i), launch: (id: string) => launchOp(state, id),
     pause: () => setP(true), resume: () => setP(false), setSpeed: (n: number) => { speed = n; },
-    phase: () => phase(state), regions: () => regionsReclaimed(state), battleOk: () => battle.ok, sweep: () => { state.sweepTimerMs = 1; }
+    phase: () => phase(state), regions: () => regionsReclaimed(state), sceneOk: () => scene.ok,
+    sweep: () => { if (!state.sweep) state.sweepTimerMs = 1; },
+    evac: () => startEvacuation(state), fight: (frac = 0.6) => commitTroops(state, Math.floor(state.bing * frac))
   };
 }

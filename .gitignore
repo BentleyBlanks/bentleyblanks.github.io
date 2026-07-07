@@ -4,6 +4,7 @@
 node_modules/
 sophia-awakening/_dev/dist/
 sophia-awakening/_dev/.sim-build/
+sophia-awakening/_dev/.sim-build-kangri/
 sophia-awakening/_dev/public/
 sophia-awakening/assets/audio/
 tmp/

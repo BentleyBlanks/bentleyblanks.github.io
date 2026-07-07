@@ -19,6 +19,32 @@ const CSS = `
 .kr-sweep.on { opacity: 1; animation: krshake .3s ease 3; }
 @keyframes krshake { 0%,100%{ transform: translateX(-50%);} 25%{ transform: translate(-52%,1px);} 75%{ transform: translate(-48%,-1px);} }
 
+/* 扫荡决策条：兵团来袭时底部弹出——组织群众转移 / 组织抗击 */
+.kr-sweepbar { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); z-index: 12; width: min(680px, 62%);
+  border: 1px solid var(--red); border-radius: 6px; background: rgba(24,16,12,.96); padding: 12px 16px 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.7), 0 0 22px rgba(200,57,46,.25); animation: krbarin .25s ease; }
+@keyframes krbarin { 0%{ opacity:0; transform: translate(-50%,14px);} 100%{ opacity:1; transform: translate(-50%,0);} }
+.kr-sb-head { font-size: 15px; font-weight: 800; color: var(--red-lt); letter-spacing: 1px; margin-bottom: 3px; }
+.kr-sb-status { font-size: 11.5px; color: var(--pap-dk); margin-bottom: 9px; }
+.kr-sb-row { display: flex; gap: 10px; align-items: stretch; }
+.kr-sb-btn { font-family: inherit; cursor: pointer; border-radius: 5px; color: #f0e4c0; transition: border-color .1s, transform .06s; }
+.kr-sb-btn:active { transform: scale(.97); }
+.kr-sb-btn:disabled { opacity: .45; cursor: default; }
+.kr-sb-btn.evac { flex: 1.15; display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 9px 12px;
+  border: 2px solid var(--amb); background: linear-gradient(180deg, #4a3c1a, #302510); }
+.kr-sb-btn.evac:hover:not(:disabled) { border-color: #f0cf70; }
+.kr-sb-btn.evac.done { border-color: var(--grn); background: linear-gradient(180deg, #35401c, #222b12); }
+.kr-sb-btn.evac b { font-size: 14px; letter-spacing: 1px; }
+.kr-sb-btn.evac span { font-size: 10px; color: var(--pap-dk); }
+.kr-sb-commit { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.kr-sb-commit-t { font-size: 11px; color: var(--pap-dk); letter-spacing: 1px; }
+.kr-sb-commit-btns { display: flex; gap: 6px; flex: 1; }
+.kr-sb-btn.fight { flex: 1; padding: 7px 4px; font-size: 12.5px; font-weight: 700; border: 2px solid var(--red);
+  background: linear-gradient(180deg, #5a221c, #3a1610); }
+.kr-sb-btn.fight:hover:not(:disabled) { border-color: var(--red-lt); }
+.kr-sb-btn.fight.all { background: linear-gradient(180deg, #77281f, #4a1a12); }
+.kr-sb-btn.fight.pulse { animation: krpul .35s ease; }
+
 /* 地图区域标记 */
 .kr-regions { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .kr-region { position: absolute; transform: translate(-50%,-50%); pointer-events: auto; background: none; border: none; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; }
@@ -77,6 +103,8 @@ const CSS = `
 
 .kr-fx { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
 .kr-float { position: absolute; transform: translateX(-50%); font-weight: 800; font-size: 18px; color: #f0e0c0; text-shadow: 0 0 12px rgba(216,164,65,.7), 0 2px 4px #000; animation: krfloat .85s ease-out forwards; font-family: inherit; }
+.kr-float.big { font-size: 22px; color: #f2c0a0; text-shadow: 0 0 16px rgba(226,86,77,.9), 0 2px 4px #000; }
+.kr-float.dim { font-size: 13px; font-weight: 600; color: var(--pap-dk); }
 @keyframes krfloat { 0%{ opacity:0; transform: translate(-50%,0) scale(.85);} 18%{opacity:1;} 100%{ opacity:0; transform: translate(-50%,-40px) scale(1.05);} }
 .kr-flash { position: absolute; transform: translate(-50%,-50%); width: 40px; height: 40px; border-radius: 50%; pointer-events: none; }
 .kr-flash.win { border: 2px solid var(--red-lt); animation: krring .9s ease-out forwards; }
