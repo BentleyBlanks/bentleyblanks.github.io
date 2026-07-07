@@ -15,9 +15,11 @@
     "simbuild": "tsc -p tsconfig.sim.json"
   },
   "dependencies": {
+    "@types/three": "^0.185.0",
     "break_infinity.js": "^2.2.0",
     "gsap": "^3.13.0",
     "pixi.js": "^8.10.0",
+    "three": "^0.185.1",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

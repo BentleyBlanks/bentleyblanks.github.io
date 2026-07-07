@@ -95,6 +95,7 @@ export interface KRState {
   clockMs: number;
   sweepTimerMs: number; // 距下次扫荡
   lastSweepMs: number;
+  pendingSweep: number | null; // 待发起的扫荡：日军数量（由表现层拉起 3D 战斗，战斗结果回填损失/缴获）
   terminal: { text: string; kind: "info" | "win" | "loss" | "era" }[];
   phaseShown: number;
 }
@@ -114,7 +115,7 @@ export function createKRState(): KRState {
   return {
     bing: 0, wuzi: 0, totalWuzi: 0, clickN: 0,
     buildings: BUILDINGS.map(() => 0), policies: {}, regions: {},
-    clockMs: 0, sweepTimerMs: TUNING.sweepBaseMs, lastSweepMs: 0,
+    clockMs: 0, sweepTimerMs: TUNING.sweepBaseMs, lastSweepMs: 0, pendingSweep: null,
     terminal: [{ text: "1937 · 卢沟桥的枪声响了。华北沦陷，但敌后的缝隙里——根据地要在这里扎根。", kind: "era" }],
     phaseShown: 0
   };
@@ -220,24 +221,35 @@ export function launchOp(s: KRState, id: string): boolean {
   return true;
 }
 
-// 扫荡：造成真实损失（资源按比例、建筑随机毁一批）。最艰难期更狠。
-function triggerSweep(s: KRState): void {
+// 扫荡日军数量：随阶段增多，被地道/地雷/情报(defense)拦下一批 → 减少压进村的敌人。
+export function sweepCount(s: KRState): number {
   const p = phase(s);
-  const hard = p === TUNING.hardPhase;
-  const base = TUNING.sweepLossFrac * (hard ? TUNING.hardSweepMult : 1);
-  const loss = Math.max(0, base * (1 - defense(s)));
-  const lostW = s.wuzi * loss, lostB = s.bing * loss;
-  s.wuzi -= lostW; s.bing -= lostB;
-  // 随机毁掉一部分建筑（不清零，可重建）
+  const base = 4 + p * 3, hard = p === TUNING.hardPhase ? TUNING.hardSweepMult : 1;
+  return Math.max(3, Math.round(base * hard * (1 - defense(s) * 0.7)));
+}
+// 触发扫荡：只标记 pendingSweep（表现层据此拉起 3D 战斗）。
+function triggerSweep(s: KRState): void {
+  s.pendingSweep = sweepCount(s);
+  const hard = phase(s) === TUNING.hardPhase;
+  if (hard) pushT(s, `⚠ 日军大扫荡·三光政策！${s.pendingSweep} 股敌人压进根据地——组织反扫荡！`, "loss");
+  else pushT(s, `⚠ 日军扫荡！${s.pendingSweep} 个鬼子进村——打退它们，别让它们烧房抢粮！`, "loss");
+  s.lastSweepMs = s.clockMs;
+}
+// 3D 战斗结算：烧了几间房 → 损失多少资源+毁设施；击毙几个日军 → 缴获物资。sim 无表现层时也可直接调（burned 近似）。
+export function applySweepResult(s: KRState, burned: number, total: number, killed: number): void {
+  const hard = phase(s) === TUNING.hardPhase;
+  const frac = TUNING.sweepLossFrac * (hard ? TUNING.hardSweepMult : 1);
+  const loss = Math.max(0, frac * (total > 0 ? burned / total : 0.4));
+  s.wuzi -= s.wuzi * loss; s.bing -= s.bing * loss;
   let destroyed = 0;
   for (let i = 0; i < s.buildings.length; i++) {
-    if (s.buildings[i] > 0 && Math.random() < loss * 0.5) {
-      const d = Math.ceil(s.buildings[i] * loss * 0.5); s.buildings[i] -= d; destroyed += d;
-    }
+    if (s.buildings[i] > 0 && Math.random() < loss * 0.6) { const d = Math.ceil(s.buildings[i] * loss * 0.5); s.buildings[i] -= d; destroyed += d; }
   }
-  if (hard) pushT(s, `⚠ 日军大扫荡·三光政策！烧杀抢掠，根据地损失惨重（-${Math.round(loss * 100)}% 资源，毁设施 ${destroyed}）。咬牙挺住。`, "loss");
-  else pushT(s, `⚠ 日军扫荡来了！损失 ${Math.round(loss * 100)}% 资源、设施 ${destroyed}。反扫荡，坚壁清野。`, "loss");
-  s.lastSweepMs = s.clockMs;
+  const loot = killed * (30 + phase(s) * 200) * regionMult(s);
+  s.wuzi += loot; s.totalWuzi += loot;
+  if (burned === 0) pushT(s, `★ 反扫荡大捷！击毙日军 ${killed}，一间房没让它烧着，缴获物资 ${fmt(loot)}！`, "win");
+  else pushT(s, `反扫荡结束：击毙 ${killed}，烧毁民房 ${burned}/${total}，损失 ${Math.round(loss * 100)}% 资源、设施 ${destroyed}，缴获 ${fmt(loot)}。`, burned > total / 2 ? "loss" : "info");
+  s.pendingSweep = null;
 }
 
 // 每帧推进：产出 + 扫荡计时 + 阶段播报。

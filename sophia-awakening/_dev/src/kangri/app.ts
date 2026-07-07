@@ -1,12 +1,12 @@
-// 《烽火敌后》装配层。WebGL 战图(shader) + 双资源 HUD + 设施/政策/战役商店 + 地图收复标记 + 扫荡警报 + 战报终端。路由 #kangri。
+// 《烽火敌后》装配层。3D 战场(Three.js)作主视图 + 双资源 HUD + 设施/政策/战役商店 + 扫荡拉起真实战斗 + 战果结算。路由 #kangri。
 import {
   BUILDINGS, POLICIES, REGIONS, PHASES,
   createKRState, fmt, phase, regionsReclaimed, bingPerSec, wuziPerSec, defense,
   buildCostWuzi, buildCostBing, buildingUnlocked, policyRevealed, regionAvailable,
-  rally, buyBuilding, buyPolicy, launchOp, tick,
+  rally, buyBuilding, buyPolicy, launchOp, tick, applySweepResult,
   type KRState
 } from "./core";
-import { initMapGL } from "./mapgl";
+import { initBattle3D } from "./battle3d";
 import { injectKRStyles } from "./styles";
 
 export function bootstrapKangri(root: HTMLElement): void {
@@ -19,18 +19,18 @@ export function bootstrapKangri(root: HTMLElement): void {
   wrap.innerHTML = `
     <canvas class="kr-map" id="krMap"></canvas>
     <div class="kr-vig"></div>
-    <div class="kr-regions" id="krRegions"></div>
 
     <div class="kr-title">烽火敌后 · 华北抗日根据地</div>
     <div class="kr-phase" id="krPhase"></div>
     <div class="kr-sweep" id="krSweep"></div>
+    <div class="kr-ctrlhint">操控八路军战士：<b>W A S D</b> 移动 · 靠近日军自动开火 · <b>点击</b>补枪</div>
 
     <aside class="kr-left">
       <div class="kr-res">
         <div class="kr-res-row"><span class="kr-ic">👥</span><div><div class="kr-res-num" id="krBing">0</div><div class="kr-res-lab">兵员 <span id="krBingS"></span></div></div></div>
         <div class="kr-res-row"><span class="kr-ic">🌾</span><div><div class="kr-res-num" id="krWuzi">0</div><div class="kr-res-lab">物资 <span id="krWuziS"></span></div></div></div>
       </div>
-      <button class="kr-rally" id="krRally"><b>发动群众抗争</b><span>[空格 / G] 点击 · 组织抵抗</span></button>
+      <button class="kr-rally" id="krRally"><b>发动群众抗争</b><span>[G] 点击 · 组织抵抗</span></button>
       <div class="kr-terminal" id="krTerm"></div>
     </aside>
 
@@ -54,51 +54,32 @@ export function bootstrapKangri(root: HTMLElement): void {
   root.appendChild(wrap);
   const $ = <T extends HTMLElement = HTMLElement>(s: string): T => wrap.querySelector<T>(s)!;
 
-  const map = initMapGL($<HTMLCanvasElement>("#krMap"));
-  new ResizeObserver(() => map.resize()).observe($("#krMap"));
+  // 3D 战场
+  const battle = initBattle3D($<HTMLCanvasElement>("#krMap"));
+  new ResizeObserver(() => battle.resize()).observe($("#krMap"));
+  const keys: Record<string, boolean> = {}; battle.setKeys(keys);
+  $("#krMap").addEventListener("click", () => battle.fire());
+  let battleActive = false;
 
-  // ── 地图区域标记（DOM，覆在 canvas 上，可点收复）──
-  const regionEls = new Map<string, HTMLElement>();
-  const regHost = $("#krRegions");
-  for (const r of REGIONS) {
-    const el = document.createElement("button"); el.className = "kr-region";
-    el.style.left = `${r.x * 100}%`; el.style.top = `${r.y * 100}%`;
-    el.innerHTML = `<span class="kr-region-dot"></span><span class="kr-region-name">${r.name}</span>`;
-    el.addEventListener("click", () => {
-      if (launchOp(state, r.id)) { map.pulseSweep(r.x, r.y); flash(r.x, r.y, "win"); syncRegions(); }
-    });
-    regHost.appendChild(el); regionEls.set(r.id, el);
-  }
-  function syncRegions(): void {
-    map.setRegions(REGIONS.map((r) => ({ x: r.x, y: r.y, reclaimed: !!state.regions[r.id] })));
-    map.setPhase(phase(state), regionsReclaimed(state) / REGIONS.length);
-  }
-  syncRegions();
-
-  function flash(nx: number, ny: number, kind: string): void {
-    const f = document.createElement("div"); f.className = `kr-flash ${kind}`;
-    f.style.left = `${nx * 100}%`; f.style.top = `${ny * 100}%`;
-    regHost.appendChild(f); setTimeout(() => f.remove(), 900);
-  }
-
-  // ── 发动群众（点击/键盘）──
+  // ── 发动群众 ──
   const rallyBtn = $("#krRally");
-  function doRally(): void {
-    const g = rally(state);
-    rallyBtn.classList.remove("hit"); void rallyBtn.offsetWidth; rallyBtn.classList.add("hit");
-    floatGain(`+${fmt(g.bing)}兵 +${fmt(g.wuzi)}资`);
-  }
+  function doRally(): void { rally(state); rallyBtn.classList.remove("hit"); void rallyBtn.offsetWidth; rallyBtn.classList.add("hit"); floatGain(); }
   rallyBtn.addEventListener("click", doRally);
-  window.addEventListener("keydown", (e) => { if (e.repeat) return; if (e.key === " " || e.key.toLowerCase() === "g") { e.preventDefault(); doRally(); } });
+  window.addEventListener("keydown", (e) => {
+    const k = e.key.toLowerCase();
+    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) { keys[k] = true; e.preventDefault(); }
+    else if (k === "g") { doRally(); }
+  });
+  window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
   const fx = document.createElement("div"); fx.className = "kr-fx"; wrap.appendChild(fx);
-  function floatGain(t: string): void {
+  function floatGain(): void {
     const b = rallyBtn.getBoundingClientRect(), w = wrap.getBoundingClientRect();
-    const f = document.createElement("div"); f.className = "kr-float"; f.textContent = t;
+    const f = document.createElement("div"); f.className = "kr-float"; f.textContent = `+兵 +物资`;
     f.style.left = `${b.left - w.left + b.width / 2}px`; f.style.top = `${b.top - w.top - 6}px`;
     fx.appendChild(f); setTimeout(() => f.remove(), 850);
   }
 
-  // ── 商店行 ──
+  // ── 商店 ──
   interface Row { el: HTMLButtonElement; name: HTMLElement; meta: HTMLElement; cost: HTMLElement; }
   function mkRow(host: HTMLElement, onClick: () => boolean): Row {
     const el = document.createElement("button"); el.className = "kr-item";
@@ -109,23 +90,18 @@ export function bootstrapKangri(root: HTMLElement): void {
   }
   const buildRows = BUILDINGS.map((_, i) => mkRow($("#krBuild"), () => buyBuilding(state, i)));
   const policyRows = new Map(POLICIES.map((p) => [p.id, mkRow($("#krPolicy"), () => buyPolicy(state, p.id))]));
-  const opRows = new Map(REGIONS.map((r) => [r.id, mkRow($("#krOp"), () => { const ok = launchOp(state, r.id); if (ok) { map.pulseSweep(r.x, r.y); flash(r.x, r.y, "win"); syncRegions(); } return ok; })]));
-
-  // tabs
+  const opRows = new Map(REGIONS.map((r) => [r.id, mkRow($("#krOp"), () => launchOp(state, r.id))]));
   const panels: Record<string, HTMLElement> = { build: $("#krBuild"), policy: $("#krPolicy"), op: $("#krOp") };
   for (const t of wrap.querySelectorAll<HTMLButtonElement>(".kr-tab")) t.addEventListener("click", () => {
-    for (const x of wrap.querySelectorAll(".kr-tab")) x.classList.remove("active");
-    t.classList.add("active");
+    for (const x of wrap.querySelectorAll(".kr-tab")) x.classList.remove("active"); t.classList.add("active");
     for (const k in panels) panels[k].style.display = k === t.dataset.t ? "" : "none";
   });
 
-  // 扫荡警报 + 阶段变化侦测
-  let lastSweepMs = 0, lastPhase = 0;
   const GUIDE = [
-    { t: "敌后一无所有。敲【空格】或点『发动群众抗争』——组织起来，是唯一的本钱", d: (s: KRState) => s.clickN > 0 },
-    { t: "攒够物资，右侧买【民兵队】『开荒生产队』——让根据地自己产出", d: (s: KRState) => s.buildings.some((b) => b > 0) },
-    { t: "切到『战役·收复』，或点地图上发亮的据点，发动第一场战役收复失地", d: (s: KRState) => regionsReclaimed(s) > 0 },
-    { t: "日军会来扫荡、造成损失。多建『地道网』减损、搞政策加成——熬到反攻", d: (s: KRState) => Object.keys(s.policies).length > 0 || regionsReclaimed(s) >= 2 }
+    { t: "敌后一无所有。按【G】或点『发动群众抗争』——组织起来，攒兵员与物资", d: (s: KRState) => s.clickN > 0 },
+    { t: "右侧买【民兵队】『开荒生产队』——让根据地自己产出", d: (s: KRState) => s.buildings.some((b) => b > 0) },
+    { t: "日军会来扫荡！用【WASD】操控你的战士，靠近日军自动开火，别让它们烧房", d: (s: KRState) => s.lastSweepMs > 0 },
+    { t: "切『战役·收复』攒兵发动战役收复失地。多建地道、搞地雷战，熬到反攻", d: (s: KRState) => regionsReclaimed(s) > 0 }
   ];
   let gstep = 0;
 
@@ -144,16 +120,6 @@ export function bootstrapKangri(root: HTMLElement): void {
     const ph = PHASES[phase(state)];
     $("#krPhase").textContent = `${ph.year} · ${ph.name}　│　收复 ${regionsReclaimed(state)}/${REGIONS.length}　│　反扫荡减损 ${Math.round(defense(state) * 100)}%`;
 
-    // 扫荡警报
-    if (state.lastSweepMs !== lastSweepMs) {
-      lastSweepMs = state.lastSweepMs;
-      // 从随机据点扩散
-      const rr = REGIONS[Math.floor(Math.random() * REGIONS.length)];
-      map.pulseSweep(rr.x, rr.y);
-      const sw = $("#krSweep"); sw.textContent = "⚠ 日军扫荡！"; sw.classList.add("on");
-      setTimeout(() => sw.classList.remove("on"), 2200);
-    }
-
     for (let i = 0; i < BUILDINGS.length; i++) {
       const r = buildRows[i]; const b = BUILDINGS[i]; const un = buildingUnlocked(state, i);
       r.el.style.display = un ? "" : "none"; if (!un) continue;
@@ -168,8 +134,7 @@ export function bootstrapKangri(root: HTMLElement): void {
       r.el.style.display = rev ? "" : "none"; if (!rev) continue;
       r.name.textContent = p.name; r.meta.textContent = p.desc;
       r.cost.textContent = has ? "✓ 已推行" : `${fmt(p.cost)}资`;
-      r.el.classList.toggle("affordable", !has && state.wuzi >= p.cost);
-      r.el.classList.toggle("maxed", has);
+      r.el.classList.toggle("affordable", !has && state.wuzi >= p.cost); r.el.classList.toggle("maxed", has);
     }
     for (const rgn of REGIONS) {
       const r = opRows.get(rgn.id)!; const has = !!state.regions[rgn.id]; const avail = regionAvailable(state, rgn);
@@ -179,19 +144,23 @@ export function bootstrapKangri(root: HTMLElement): void {
       r.cost.textContent = has ? "✓" : `${fmt(rgn.costWuzi)}资 ${fmt(rgn.costBing)}兵`;
       r.el.classList.toggle("affordable", !has && avail && state.wuzi >= rgn.costWuzi && state.bing >= rgn.costBing);
       r.el.classList.toggle("maxed", has);
-      // 地图标记
-      const me = regionEls.get(rgn.id)!;
-      me.classList.toggle("reclaimed", has);
-      me.classList.toggle("ready", !has && avail && state.wuzi >= rgn.costWuzi && state.bing >= rgn.costBing);
-      me.classList.toggle("hidden", !has && !avail);
     }
-    // 引导
     const g = $("#krGuide"); while (gstep < GUIDE.length && GUIDE[gstep].d(state)) gstep += 1;
     if (gstep >= GUIDE.length) g.style.display = "none";
     else { g.style.display = ""; const txt = `${gstep + 1}/${GUIDE.length} · ${GUIDE[gstep].t}`; if (g.textContent !== txt) g.textContent = txt; }
-
     renderTerm();
-    if (phase(state) !== lastPhase) { lastPhase = phase(state); syncRegions(); }
+  }
+
+  // ── 扫荡 → 3D 战斗 → 战果结算 ──
+  function checkSweep(): void {
+    if (state.pendingSweep !== null && !battleActive) {
+      const count = state.pendingSweep; battleActive = true;
+      const sw = $("#krSweep"); sw.textContent = "⚠ 日军扫荡进村！"; sw.classList.add("on");
+      battle.triggerSweep(count, (res) => {
+        applySweepResult(state, res.burned, res.total, res.killed);
+        battleActive = false; sw.classList.remove("on");
+      });
+    }
   }
 
   // ── 主循环 ──
@@ -199,11 +168,12 @@ export function bootstrapKangri(root: HTMLElement): void {
   function frame(now: number): void {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (!paused) tick(state, dt * speed);
-    map.render(now * 0.001);
+    checkSweep();
+    battle.update(dt);
     render();
     requestAnimationFrame(frame);
   }
-  requestAnimationFrame(() => { map.resize(); requestAnimationFrame(frame); });
+  requestAnimationFrame(() => { battle.resize(); requestAnimationFrame(frame); });
 
   // ── Debug ──
   const dbg = $("#krDebug");
@@ -211,18 +181,18 @@ export function bootstrapKangri(root: HTMLElement): void {
   const pb = $<HTMLButtonElement>("#krDbgPause");
   const setP = (p: boolean): void => { paused = p; pb.textContent = paused ? "▶继续" : "⏸暂停"; };
   pb.addEventListener("click", () => setP(!paused));
-  const amt = $<HTMLInputElement>("#krDbgAmt"); const rd = () => Math.max(0, Number(amt.value) || 0);
-  $("#krDbgGive").addEventListener("click", () => { state.wuzi += rd(); state.totalWuzi += rd(); });
-  $("#krDbgBing").addEventListener("click", () => { state.bing += rd(); });
+  const amt = $<HTMLInputElement>("#krDbgAmt"); const rdv = () => Math.max(0, Number(amt.value) || 0);
+  $("#krDbgGive").addEventListener("click", () => { state.wuzi += rdv(); state.totalWuzi += rdv(); });
+  $("#krDbgBing").addEventListener("click", () => { state.bing += rdv(); });
   const spd = [...wrap.querySelectorAll<HTMLButtonElement>(".kr-debug .spd")];
   for (const b of spd) b.addEventListener("click", () => { speed = Number(b.dataset.spd) || 1; for (const x of spd) x.classList.toggle("active", x === b); });
   $("#krDbgSweep").addEventListener("click", () => { state.sweepTimerMs = 1; });
-  $("#krDbgReset").addEventListener("click", () => { if (window.confirm("重置？")) { state = createKRState(); gstep = 0; lastPhase = 0; syncRegions(); } });
+  $("#krDbgReset").addEventListener("click", () => { if (window.confirm("重置？")) { state = createKRState(); gstep = 0; } });
 
   (window as unknown as { __kr?: unknown }).__kr = {
     state: () => state, give: (w: number, b: number) => { state.wuzi += w; state.totalWuzi += w; state.bing += b || 0; },
     rally: doRally, buyBuilding: (i: number) => buyBuilding(state, i), launch: (id: string) => launchOp(state, id),
     pause: () => setP(true), resume: () => setP(false), setSpeed: (n: number) => { speed = n; },
-    phase: () => phase(state), regions: () => regionsReclaimed(state), mapOk: () => map.ok
+    phase: () => phase(state), regions: () => regionsReclaimed(state), battleOk: () => battle.ok, sweep: () => { state.sweepTimerMs = 1; }
   };
 }
