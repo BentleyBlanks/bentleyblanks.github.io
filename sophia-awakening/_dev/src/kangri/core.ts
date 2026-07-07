@@ -34,7 +34,8 @@ export const ERAS: EraDef[] = [
   { id: 1, name: "囚笼与蚕食", years: "1939-40", from: 18, to: 41, jp: "多田骏「囚笼政策」：铁路为柱、公路为链、碉堡为锁——修据点挖封锁沟，一寸寸蚕食根据地。", sweepGapM: [2, 4], cols: 2, strengthMult: 1, sanguang: false, encroach: 0.5, canExpand: true },
   { id: 2, name: "至暗时刻", years: "1941-42", from: 42, to: 65, jp: "冈村宁次：铁壁合围、梳篦清剿、三光政策、清乡运动。根据地被压缩，这是黎明前最黑的夜。", sweepGapM: [1, 3], cols: 4, strengthMult: 1.9, sanguang: true, encroach: 0.8, canExpand: false },
   { id: 3, name: "恢复与局部反攻", years: "1943-44", from: 66, to: 89, jp: "太平洋战场吃紧，日军兵力被抽走——扫荡渐弱，拔据点、破封锁，一块块夺回来。", sweepGapM: [4, 6], cols: 2, strengthMult: 0.9, sanguang: false, encroach: 0.15, canExpand: true },
-  { id: 4, name: "大反攻", years: "1945", from: 90, to: 97, jp: "全面反攻！收复县城、逼降据点——迎接最后的胜利。", sweepGapM: [99, 99], cols: 0, strengthMult: 0, sanguang: false, encroach: 0, canExpand: true }
+  { id: 4, name: "大反攻", years: "1945", from: 90, to: 97, jp: "全面反攻！收复县城、逼降据点——迎接最后的胜利。", sweepGapM: [99, 99], cols: 0, strengthMult: 0, sanguang: false, encroach: 0, canExpand: true },
+  { id: 5, name: "无尽相持", years: "1946-", from: 98, to: 99999999, jp: "【架空】原子弹计划失败,日本本土决战派拒绝投降——持久战没有终点,只有把侵略者彻底磨垮。每 12 个月一个「讨伐纪」,日军一轮强过一轮。", sweepGapM: [2, 4], cols: 4, strengthMult: 2.2, sanguang: true, encroach: 0.5, canExpand: true }
 ];
 export function eraOf(mi: number): EraDef {
   for (const e of ERAS) if (mi >= e.from && mi <= e.to) return e;
@@ -95,7 +96,8 @@ export const BASES: BaseDef[] = [
 ];
 export interface BaseState {
   est: boolean; // 已开辟
-  dev: number; // 发展度 0-5(动员/政权/生产)
+  dev: number; // 发展度 0-5(不再手动买——由该地军事胜利自动成长)
+  devP: number; // 发展进度(拔据点/反扫荡胜利/战役 +1, 攒够 dev+2 升一级)
   tunnels: number; // 地道 0-3(平原保命)
   pop: number; // 当前人口(三光会掉,永久)
   spots: number; // 周边日军蚕食据点 0-5(压产出;≥3=封锁沟合围)
@@ -117,7 +119,10 @@ export const BUILDINGS: BuildingDef[] = [
   { id: "raid", name: "破袭队", desc: "破袭铁路公路，缴获敌军物资。", costWuzi: 1.2e6, costBing: 120, costMult: 1.15, bing: 0, wuzi: 260, defense: 0.01, unlockEra: 2 },
   { id: "college", name: "抗大分校", desc: "抗日军政大学——整训干部、扩大骨干。", costWuzi: 5e6, costBing: 300, costMult: 1.15, bing: 20, wuzi: 120, defense: 0, unlockEra: 2 },
   { id: "mainforce", name: "主力团", desc: "脱产的正规主力，能打大仗。", costWuzi: 3.5e6, costBing: 800, costMult: 1.15, bing: 45, wuzi: 1200, defense: 0.02, unlockEra: 2 },
-  { id: "arsenal2", name: "黄崖洞兵工厂", desc: "自造步枪掷弹筒——根据地的军工心脏。", costWuzi: 1.1e7, costBing: 2000, costMult: 1.15, bing: 0, wuzi: 9000, defense: 0, unlockEra: 3 }
+  { id: "arsenal2", name: "黄崖洞兵工厂", desc: "自造步枪掷弹筒——根据地的军工心脏。", costWuzi: 1.1e7, costBing: 2000, costMult: 1.15, bing: 0, wuzi: 9000, defense: 0, unlockEra: 3 },
+  { id: "scout", name: "侦察连", desc: "【军事线】主要花兵员——敌情早知道,反扫荡更稳。", costWuzi: 30, costBing: 45, costMult: 1.18, bing: 0, wuzi: 0.6, defense: 0.02, unlockEra: 0 },
+  { id: "jiaodao", name: "教导队", desc: "【军事线】老兵带新兵——兵员产出的骨干。", costWuzi: 200, costBing: 160, costMult: 1.17, bing: 1.2, wuzi: 0, defense: 0, unlockEra: 1 },
+  { id: "wugong", name: "武工大队", desc: "【军事线】敌后武工队——出击冷却更快。", costWuzi: 5000, costBing: 900, costMult: 1.2, bing: 2.5, wuzi: 0, defense: 0.01, unlockEra: 2 }
 ];
 export interface PolicyDef {
   id: string; name: string; desc: string; cost: number;
@@ -140,7 +145,7 @@ export interface CampaignDef {
   needBases: number; costBing: number; costWuzi: number;
   outputMult: number; // 战后全局产出×
   desc: string; hist: string; line: string;
-  fx?: "baituan" | "qinyuan"; // 特殊效果
+  fx?: "baituan" | "qinyuan" | "victory"; // 特殊效果
 }
 // minor=小战役(时间轴填充,收益小但高频——几乎每 1-2 月有仗可打,连胜士气+里程碑密度)
 export const CAMPAIGNS: CampaignDef[] = [
@@ -162,6 +167,7 @@ export const CAMPAIGNS: CampaignDef[] = [
   { id: "hanlvecun", name: "韩略村伏击", window: [75, 78], needBases: 4, costBing: 8000, costWuzi: 200000, outputMult: 1.09, desc: "全歼日军「战地观战团」。", hist: "1943.10 王近山部", line: "一百二十名军官的「观战团」全歼于韩略村——冈村宁次暴跳如雷。" },
   { id: "nanle", name: "南乐战役", window: [92, 94], needBases: 5, costBing: 30000, costWuzi: 1200000, outputMult: 1.1, desc: "冀鲁豫春季攻势。", hist: "1945.4 歼敌3400余", line: "南乐城头换了旗——反攻的春天来了。" },
   { id: "anyang", name: "安阳战役", window: [94, 96], needBases: 5, costBing: 40000, costWuzi: 2000000, outputMult: 1.1, desc: "掃清平汉线残敌。", hist: "1945.6", line: "安阳外围据点一扫而空——大反攻的号角就在耳边。" },
+  { id: "zongfangong", name: "★ 战略总反攻", window: [110, 99999999], needBases: 9, costBing: 5e6, costWuzi: 5e9, outputMult: 1, fx: "victory", desc: "终局之战:九块根据地全部建成、牵制日军 220 万后,向全华北的侵略者发起总攻。", hist: "架空·你亲手写下的结局", line: "" },
   { id: "pingxingguan", name: "平型关大捷", window: [1, 4], needBases: 1, costBing: 80, costWuzi: 100, outputMult: 1.3, desc: "115师设伏平型关，打日军板垣师团辎重队。", hist: "1937.9.25 歼敌千余", line: "平型关一声炮响——打破『日军不可战胜』的神话！全国振奋，参军的青年排起长队。" },
   { id: "huangtuling", name: "黄土岭围歼战", window: [27, 31], needBases: 2, costBing: 600, costWuzi: 3000, outputMult: 1.25, desc: "雁宿崖再设伏，围住独立混成第二旅团。", hist: "1939.11 击毙『名将之花』阿部规秀中将", line: "黄土岭一炮，阿部规秀毙命——日军哀叹『名将之花凋谢在太行山上』。" },
   { id: "baituan", name: "百团大战", window: [37, 41], needBases: 4, costBing: 2500, costWuzi: 25_000, outputMult: 1.45, fx: "baituan", desc: "105个团同时破袭正太、同蒲、平汉铁路——砸碎囚笼！", hist: "1940.8-12 毙伤日伪军2.5万余，破路474公里", line: "百团大战！一夜之间华北铁路公路全线开花——囚笼被砸得粉碎。但要当心：日军的报复会更疯狂（史实如此）。" },
@@ -227,10 +233,16 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "migrate", name: "大转移", desc: "组织一次跨根据地的群众大转移" },
   { id: "policy_all", name: "新政齐备", desc: "推行全部政策", check: (s) => POLICIES.every((p) => s.policies[p.id]) },
   { id: "dark_through", name: "黎明前最黑的夜", desc: "熬过 1941-42，迎来恢复反攻", check: (s) => era(s).id >= 3 },
-  { id: "victory", name: "1945.8.15", desc: "迎来胜利日", check: (s) => s.ended },
+  { id: "victory", name: "历史分歧点", desc: "抵达 1945.8——历史在这里转向,持久战没有终点", check: (s) => s.monthIdx >= 97 },
+  { id: "true_victory", name: "亲手写下的结局", desc: "发动战略总反攻,赢下这场没有原子弹的战争", hidden: true, check: (s) => s.ended && !s.defeated },
   { id: "legend", name: "中流砥柱", desc: "以最高评级迎来胜利", hidden: true },
   { id: "fog_gaze", name: "远望", desc: "在一切开始之前，拉远看过整个笼罩在黑暗里的华北", hidden: true }
 ];
+// 牵制(万人): 敌后钉住的日军兵力——中流砥柱的核心指标
+export function tiedown(s: KRState): number {
+  const devSum = BASES.reduce((a, b) => a + s.bases[b.id].dev, 0);
+  return Math.round(estCount(s) * 4 + devSum * 1.5 + s.stats.spotsRemoved * 0.4 + s.stats.killed / 800 + s.alert * 0.3);
+}
 export function unlockAch(s: KRState, id: string): void {
   if (s.achievements[id]) return;
   s.achievements[id] = true;
@@ -294,12 +306,14 @@ export function launchRaid(s: KRState, id: string): boolean {
   if (s.bing < need) return false;
   // 伏击结算(预设战场,我方占尽先机): 全歼,伤亡=敌18%×防御减免
   const ourLoss = Math.round(enemy * 0.18 * (1 - defense(s) * 0.5));
-  s.bing -= ourLoss;
+  s.bing -= need; s.tiredBing += need - ourLoss; // 出击部队全程占用,幸存者战后休整归建
+  s.alert = Math.min(100, s.alert + 2.5);
   const loot = enemy * r.lootF * (1 + era(s).id * 0.6) * networkMult(s) * doctrineMult(s, "loot");
   s.wuzi += loot; s.totalWuzi += loot;
   s.stats.killed += enemy; s.stats.lost += ourLoss;
   s.combo += 1;
-  s.raidCd[id] = r.cdS;
+  const wg = s.buildings[BUILDINGS.findIndex((b) => b.id === "wugong")] ?? 0;
+  s.raidCd[id] = r.cdS * Math.max(0.5, 1 - wg * 0.04);
   if (id === "patrol") { const cap = Math.round(enemy * 0.6); s.bing += cap; pushT(s, `⚡ 伏击得手！全歼巡逻队 ${enemy} 人，缴获步枪武装了 ${cap} 名民兵（伤亡 ${ourLoss}，缴获 ${fmt(loot)}，连胜 ${s.combo}）。`, "win"); }
   else if (id === "rail") { s.nextSweepM += 1; pushT(s, `💥 铁路破袭成功！歼灭护路队 ${enemy} 人，扒轨三里、缴获 ${fmt(loot)}——日军下次扫荡被迟滞（连胜 ${s.combo}）。`, "win"); }
   else pushT(s, `🎯 运输队进了伏击圈！全歼押运 ${enemy} 人，粮车弹药车尽入我手——缴获 ${fmt(loot)}（伤亡 ${ourLoss}，连胜 ${s.combo}）。`, "win");
@@ -358,6 +372,14 @@ export interface KRState {
   combo: number; // 连胜士气
   raidCd: Record<string, number>; // 出击冷却(秒)
   hqBase: string; // 总部所在根据地(可搬迁)
+  alert: number; // 警备等级 0-100(你打得越狠日军盯得越紧,蛰伏回落)
+  tiredBing: number; // 休整中的部队(战后暂不可用,~45s归建)
+  evacRecoverS: number; // 群众回迁期(转移后产出仍打折)
+  peakRate: number; // 产出峰值(星火不灭判定)
+  sparkBuff: boolean; // 星火不灭: 被打崩后恢复加速+重建半价
+  tiedownMilestone: number; // 已触发的牵制里程碑档
+  ultimatumShown: boolean; // 最后通牒(失败前警告)
+  veterans: number; // 老骨干(跨局永久,prestige 获得)
   ended: boolean;
   defeated: boolean; // 失败结局: 根据地覆灭
   terminal: { text: string; kind: "info" | "win" | "loss" | "era" }[];
@@ -382,13 +404,15 @@ export const TUNING = {
 
 export function createKRState(): KRState {
   const bases: Record<string, BaseState> = {};
-  for (const b of BASES) bases[b.id] = { est: b.id === "hq", dev: 0, tunnels: 0, pop: b.pop0, spots: b.id === "hq" ? 1 : 0 }; // 村口一座炮楼=第一个对手
+  for (const b of BASES) bases[b.id] = { est: b.id === "hq", dev: 0, devP: 0, tunnels: 0, pop: b.pop0, spots: b.id === "hq" ? 1 : 0 }; // 村口一座炮楼=第一个对手
   return {
     bing: 0, wuzi: 0, totalWuzi: 0, clickN: 0,
     monthIdx: 0, monthAcc: 0,
     buildings: BUILDINGS.map(() => 0), policies: {}, bases, campaigns: {}, campMult: 1, kmtCut: false, pendingWuyi: false,
     sweep: null, migration: null, doctrines: {}, pendingDoctrines: [], achievements: {}, achQueue: [], achPoll: 0,
-    nextSweepM: 4, sweepsSurvived: 0, routStreak: 0, combo: 0, raidCd: {}, hqBase: "hq", ended: false, defeated: false,
+    nextSweepM: 3, sweepsSurvived: 0, routStreak: 0, combo: 0, raidCd: {}, hqBase: "hq",
+    alert: 0, tiredBing: 0, evacRecoverS: 0, peakRate: 0, sparkBuff: false, tiedownMilestone: 0, ultimatumShown: false, veterans: 0,
+    ended: false, defeated: false,
     terminal: [{ text: "【1937.7】卢沟桥的枪声响了。华北在沦陷——但敌后的缝隙里，根据地要在这里扎根。", kind: "era" }],
     eraShown: 0, eventsFired: {},
     stats: { killed: 0, lost: 0, popLost: 0, spotsRemoved: 0, campaignsWon: 0, sweepsFought: 0, estPeak: 1, eraSnap: [] }
@@ -412,7 +436,7 @@ export function baseMult(s: KRState, id: string): number {
   return 1 + (0.10 + 0.05 * st.dev) * popFrac * spotMalus * terr;
 }
 export function networkMult(s: KRState): number {
-  let m = s.campMult * doctrineMult(s, "prod") * comboMult(s);
+  let m = s.campMult * doctrineMult(s, "prod") * comboMult(s) * (1 + s.veterans * 0.03);
   for (const b of BASES) m *= baseMult(s, b.id);
   return m;
 }
@@ -447,7 +471,7 @@ export function defense(s: KRState, baseId?: string): number {
   }
   return Math.min(0.9, d);
 }
-export function buildCostWuzi(s: KRState, i: number): number { return Math.ceil(BUILDINGS[i].costWuzi * Math.pow(BUILDINGS[i].costMult, s.buildings[i])); }
+export function buildCostWuzi(s: KRState, i: number): number { return Math.ceil(BUILDINGS[i].costWuzi * Math.pow(BUILDINGS[i].costMult, s.buildings[i]) * (s.sparkBuff ? 0.5 : 1)); }
 export function buildCostBing(s: KRState, i: number): number { return Math.ceil(BUILDINGS[i].costBing * Math.pow(BUILDINGS[i].costMult, s.buildings[i])); }
 export function buildingUnlocked(s: KRState, i: number): boolean { return s.buildings[i] > 0 || era(s).id >= BUILDINGS[i].unlockEra; }
 export function policyRevealed(s: KRState, p: PolicyDef): boolean { return s.policies[p.id] || s.monthIdx >= p.revealM; }
@@ -468,9 +492,20 @@ export function campaignAvailable(s: KRState, c: CampaignDef): "ok" | "early" | 
   if (s.monthIdx < c.window[0]) return "early";
   if (s.monthIdx > c.window[1]) return "late";
   if (estCount(s) < c.needBases) return "weak";
+  if (c.fx === "victory" && tiedown(s) < 220) return "weak";
   return "ok";
 }
 
+// 军事胜利让根据地自动发展(②双引擎合并: 经济归商店,根据地=战果仪表盘)
+function growBase(s: KRState, id: string): void {
+  const st = s.bases[id];
+  if (!st?.est || st.dev >= 5) return;
+  st.devP += 1;
+  if (st.devP >= st.dev + 2) {
+    st.devP = 0; st.dev += 1;
+    pushT(s, `【${BASES.find((b) => b.id === id)!.short}】在胜利中成长——发展度升到 ${st.dev}（政权稳了,生产旺了）。`, "win");
+  }
+}
 function pushT(s: KRState, text: string, kind: KRState["terminal"][number]["kind"]): void {
   s.terminal.push({ text, kind });
   if (s.terminal.length > 120) s.terminal.shift();
@@ -487,7 +522,9 @@ export function buyBuilding(s: KRState, i: number): boolean {
   if (!buildingUnlocked(s, i)) return false;
   const cw = buildCostWuzi(s, i), cb = buildCostBing(s, i);
   if (s.wuzi < cw || s.bing < cb) return false;
-  s.wuzi -= cw; s.bing -= cb; s.buildings[i] += 1; return true;
+  s.wuzi -= cw; s.bing -= cb; s.buildings[i] += 1;
+  if (i === 0 && s.buildings[0] === 1) { s.wuzi += 20; s.totalWuzi += 20; pushT(s, "第一支民兵队拉起来了!乡亲们凑了二十斤小米慰劳——组织起来,就有力量。(+20 物资)", "win"); }
+  return true;
 }
 export function buyPolicy(s: KRState, id: string): boolean {
   const p = POLICIES.find((x) => x.id === id);
@@ -528,6 +565,8 @@ export function removeSpot(s: KRState, id: string): boolean {
   const c = spotCost(s);
   if (s.bing < c.bing || s.wuzi < c.wuzi) return false;
   s.bing -= c.bing; s.wuzi -= c.wuzi; st.spots -= 1; s.stats.spotsRemoved += 1;
+  growBase(s, id);
+  s.alert = Math.min(100, s.alert + 3);
   const loot = 50 * (1 + era(s).id) * networkMult(s);
   s.wuzi += loot; s.totalWuzi += loot;
   if (s.stats.spotsRemoved === 1) pushT(s, `★★ 村口的炮楼端掉了！枪一响，十里八乡都传遍——参军的青年多起来了。缴获 ${fmt(loot)} 物资。`, "win");
@@ -616,12 +655,20 @@ export function launchCampaign(s: KRState, id: string): boolean {
   if (s.bing < c.costBing || s.wuzi < c.costWuzi) return false;
   s.bing -= c.costBing; s.wuzi -= c.costWuzi;
   s.campaigns[id] = true; s.campMult *= c.outputMult; s.stats.campaignsWon += 1; s.combo += 1;
+  growBase(s, s.hqBase);
+  s.alert = Math.min(100, s.alert + (c.outputMult > 1.2 ? 8 : 3));
   pushT(s, `★★ ${c.name}（${c.hist}）：${c.line}`, "win");
   if (c.fx === "baituan") {
     let removed = 0;
     for (const b of BASES) { const st = s.bases[b.id]; const r = Math.ceil(st.spots * 0.6); st.spots -= r; removed += r; }
     s.stats.spotsRemoved += removed;
     if (removed > 0) pushT(s, `百团破袭拆掉 ${removed} 座据点、破路千里——囚笼稀烂！`, "win");
+  }
+  if (c.fx === "victory") {
+    s.ended = true;
+    pushT(s, "【战略总反攻】千里战线同时打响!县城一座座光复,据点一片片拔除——被钉死在敌后的两百万日军,在人民战争的汪洋里覆灭。", "win");
+    pushT(s, "没有原子弹,没有外援奇迹——是敌后的星火,亲手烧穿了这个黑夜。持久战,胜利了。", "win");
+    if (endReport(s).grade === "中流砥柱") unlockAch(s, "legend");
   }
   if (c.fx === "qinyuan") {
     const st = s.bases["taiyue"]; if (st) { s.stats.spotsRemoved += st.spots; st.spots = 0; }
@@ -630,13 +677,15 @@ export function launchCampaign(s: KRState, id: string): boolean {
 }
 
 // ══ 扫荡 ══════════════════════════════════════════════════════════
-// 强度=档位基准为主(每档对抗规模可预期)+玩家兵力推高(封顶基准2.4×,防碾压无聊)
+// 强度=档位基准×警备等级(你的行动招来的,可控可读)×相持纪元讨伐纪指数。不再跟玩家兵力——囤兵变强有获得感。
+export function cycleMult(s: KRState): number {
+  return s.monthIdx > 98 ? Math.pow(1.32, Math.floor((s.monthIdx - 98) / 12)) : 1;
+}
 function sweepStrength(s: KRState, mult = 1): number {
   const e = era(s);
   const retaliation = s.campaigns["baituan"] && e.id === 2 ? TUNING.baituanRetaliation : 1;
   const tb = TIER_ENEMY[tier(s)] * Math.max(0.5, e.strengthMult) * retaliation * mult;
-  const scale = Math.pow(Math.max(1, s.bing), 0.85) * 0.9;
-  return Math.max(6, Math.round((tb * 0.65 + Math.min(scale, tb * 2.4) * 0.5) * (0.85 + Math.random() * 0.3)));
+  return Math.max(6, Math.round(tb * (0.9 + s.alert / 100 * 1.4) * cycleMult(s) * (0.85 + Math.random() * 0.3)));
 }
 function pickSweepTarget(s: KRState): string {
   const est = BASES.filter((b) => s.bases[b.id].est);
@@ -714,7 +763,7 @@ function endBattle(s: KRState, sw: Sweep): void {
     return;
   }
   const back = Math.floor(sw.committed);
-  s.bing += back; sw.committed = 0;
+  s.tiredBing += back; sw.committed = 0; // 幸存者转入休整(~45s归建)——全军压上的真实代价
   if (sw.strength <= 0.5) finishSweep(s, sw, true);
   else {
     sw.stage = "pillage"; sw.pillageSec = TUNING.pillageSec;
@@ -740,6 +789,7 @@ function finishSweep(s: KRState, sw: Sweep, cleanWin: boolean): void {
     s.combo += rating === "S" ? 3 : rating === "A" ? 2 : 1;
     if (sw.waves > 1) pushT(s, `★★【${rating} 级反扫荡】${sw.waves} 波合围全部粉碎！击毙 ${killed}（我方伤亡 ${Math.round(sw.lostBing)}），缴获 ${fmt(loot * ratingMult)}！士气高涨(连胜 ${s.combo})。`, "win");
     else pushT(s, `★ 反扫荡大捷！击毙日军 ${killed}（我方伤亡 ${Math.round(sw.lostBing)}），根据地毫发无损，缴获物资 ${fmt(loot * ratingMult)}！`, "win");
+    growBase(s, sw.targetBase);
     unlockAch(s, "clean_win");
     if (sw.kind === "encircle") unlockAch(s, "repel_encircle");
     if (sw.kind === "raid") unlockAch(s, "repel_raid");
@@ -750,8 +800,17 @@ function finishSweep(s: KRState, sw: Sweep, cleanWin: boolean): void {
     pushT(s, `反扫荡结束：击毙 ${killed}，我方伤亡 ${Math.round(sw.lostBing)}，被烧抢损失 ${lossPct}%${sw.evacProgress > 0.5 ? "（大转移保住了大半家底）" : ""}，缴获 ${fmt(loot)}。`, sw.pillageFrac > 0.12 ? "loss" : "info");
   }
   if (cleanWin) s.routStreak = 0;
-  else if (sw.pillageFrac > 0.15) { s.routStreak += 1; if (s.combo > 0) { s.combo = 0; pushT(s, "被烧穿了——连胜中断，士气回落。", "loss"); } }
+  else if (sw.pillageFrac > 0.15) {
+    s.routStreak += 1;
+    if (s.combo > 1) { s.combo = Math.floor(s.combo / 2); pushT(s, `被烧穿了——士气受挫（连胜减半至 ${s.combo}）。`, "loss"); }
+    if (s.routStreak === 3 && !s.ultimatumShown) {
+      s.ultimatumShown = true;
+      pushT(s, "⚠⚠【总部危急】连番被烧穿,根据地摇摇欲坠——再有一次,星火就熄了!快转移总部、大转移人口、组织一场像样的反击自救!", "loss");
+    }
+    if (s.routStreak < 3) s.ultimatumShown = false;
+  }
   else s.routStreak = Math.max(0, s.routStreak - 1);
+  if (sw.evacStarted) s.evacRecoverS = 20; // 群众回迁需要时间
   s.sweepsSurvived += 1;
   if (s.monthIdx >= 57 && s.monthIdx <= 59 && sw.strength0 > 100) unlockAch(s, "survive_wuyi");
   s.sweep = null;
@@ -872,29 +931,56 @@ function advanceMonth(s: KRState): void {
   // 扫荡排程
   if (!s.sweep && s.monthIdx >= s.nextSweepM && e.strengthMult > 0 && (bingPerSec(s) + wuziPerSec(s) > 0.5 || s.wuzi > 400)) {
     triggerSweep(s);
-    s.nextSweepM = s.monthIdx + e.sweepGapM[0] + Math.floor(Math.random() * (e.sweepGapM[1] - e.sweepGapM[0] + 1));
+    const gapCut = 1 - s.alert / 100 * 0.4; // 警备高→扫荡更频
+    s.nextSweepM = s.monthIdx + Math.max(1, Math.round((e.sweepGapM[0] + Math.floor(Math.random() * (e.sweepGapM[1] - e.sweepGapM[0] + 1))) * gapCut));
   }
-  // 终局
-  if (s.monthIdx >= END_MONTH && !s.ended) {
-    s.ended = true;
-    pushT(s, "【1945.8.15】日本无条件投降！八年烽火，敌后的星火终成燎原——胜利了！", "win");
-    if (endReport(s).grade === "中流砥柱") unlockAch(s, "legend");
+  // ⑤ 架空分歧: 1945.8 不再是终点
+  if (s.monthIdx === END_MONTH && !s.eventsFired[97]) {
+    s.eventsFired[97] = true;
+    pushT(s, "【1945.8·历史分歧】广岛上空,原子弹装置失效坠海。东京政变,本土决战派掌权——日本,拒绝投降。", "era");
+    pushT(s, "战争进入无尽的相持。没有外力会来终结它——只有敌后的星火,把侵略者一寸寸磨垮。牵制 220 万日军、九块根据地全部建成,发动战略总反攻!", "era");
+    unlockAch(s, "victory");
   }
 }
 
 export function tick(s: KRState, dtSec: number): void {
   if (s.ended) return;
-  const prodMult = s.sweep?.evacStarted ? TUNING.evacProdMult : 1;
+  const prodMult = s.sweep?.evacStarted ? TUNING.evacProdMult : s.evacRecoverS > 0 ? 0.7 : 1;
   s.bing += bingPerSec(s) * prodMult * dtSec;
   s.wuzi += wuziPerSec(s) * prodMult * dtSec;
   s.totalWuzi += wuziPerSec(s) * prodMult * dtSec;
   if (s.sweep) tickSweep(s, dtSec);
   tickMigration(s, dtSec);
   for (const k in s.raidCd) if (s.raidCd[k] > 0) s.raidCd[k] -= dtSec;
+  // 人口自然恢复(星火不灭时×4)
+  const rec = 0.0022 * (s.sparkBuff ? 4 : 1) * dtSec;
+  for (const b of BASES) { const st = s.bases[b.id]; if (st.est && st.pop < b.pop0) st.pop = Math.min(b.pop0, st.pop + (b.pop0 - st.pop) * rec); }
+  // 休整部队归建(~45s)
+  if (s.tiredBing > 0) { const back = Math.min(s.tiredBing, Math.max(0.5, s.tiredBing / 45) * dtSec); s.tiredBing -= back; s.bing += back; }
+  // 警备等级回落(蛰伏)
+  s.alert = Math.max(0, s.alert - 0.10 * dtSec);
+  // 群众回迁期
+  if (s.evacRecoverS > 0) s.evacRecoverS -= dtSec;
   s.achPoll += dtSec;
   if (s.achPoll >= 0.5) {
     s.achPoll = 0;
     for (const a of ACHIEVEMENTS) if (a.check && !s.achievements[a.id] && a.check(s)) unlockAch(s, a.id);
+    // 星火不灭: 产出崩到峰值 22% 以下 → 恢复加速+重建半价(反死亡螺旋橡皮筋)
+    const rate = wuziPerSec(s);
+    if (rate > s.peakRate) s.peakRate = rate;
+    const spark = s.peakRate > 10 && rate < s.peakRate * 0.22;
+    if (spark && !s.sparkBuff) pushT(s, "【星火不灭】根据地被打残了——但群众还在。重建半价、人口恢复加速:『留得青山在,不怕没柴烧。』", "era");
+    if (!spark && s.sparkBuff && rate > s.peakRate * 0.35) s.sparkBuff = false;
+    else if (spark) s.sparkBuff = true;
+    // 牵制里程碑(⑦中流砥柱机制化): 钉住的日军越多,正面战场越轻
+    const td = tiedown(s);
+    const TDM = [30, 60, 100, 150, 220];
+    if (s.tiedownMilestone < TDM.length && td >= TDM[s.tiedownMilestone]) {
+      s.tiedownMilestone += 1;
+      const bonus = 800 * Math.pow(8, s.tiedownMilestone);
+      s.wuzi += bonus; s.totalWuzi += bonus;
+      pushT(s, `★★【牵制 ${TDM[s.tiedownMilestone - 1]} 万】华北日军被死死钉住,无法南调——正面战场压力骤减!各界劳军慰问送达:+${fmt(bonus)} 物资。这,就是中流砥柱。`, "win");
+    }
     // 失败结局: 人口凋零 或 连番被烧穿
     if (!s.ended) {
       const popNow = BASES.reduce((a2, b) => a2 + s.bases[b.id].pop, 0);
@@ -943,6 +1029,48 @@ export function endReport(s: KRState): EndReport {
     { era: "1945 大反攻", yours: `累计击毙 ${fmt(s.stats.killed)} · 我方伤亡 ${fmt(s.stats.lost)} · 反扫荡 ${s.sweepsSurvived} 次`, hist: "史实：敌后战场八年累计歼日伪军171万余人，敌后军民伤亡600余万" }
   ];
   return { grade, gradeDesc, score: Math.round(score), rows };
+}
+
+// ══ ⑤ 整风再出发(Prestige): 重开保留老骨干/文献/成就 ══════════════
+export function prestigeGain(s: KRState): number {
+  return Math.max(1, Math.floor(Math.sqrt(s.stats.killed / 500) + tiedown(s) / 15));
+}
+export function prestigeReady(s: KRState): boolean { return s.monthIdx >= 98 || s.ended; }
+// veterans 效果挂 networkMult(下方)。app 负责: gain=prestigeGain → meta.veterans += gain → 新 state 注入 veterans/doctrines/achievements。
+
+// ══ 存档(①): serialize/deserialize + 离线收益 ══════════════════════
+export const SAVE_V = 1;
+export function serialize(s: KRState): string {
+  const { sweep, migration, achQueue, terminal, ...rest } = s;
+  void sweep; void achQueue;
+  // 进行中的迁移直接结算到目标(不存过程)
+  if (migration) {
+    const to = rest.bases[migration.to];
+    if (to) to.pop = Math.min(BASES.find((b) => b.id === migration.to)!.pop0 * 1.5, to.pop + migration.pop);
+    if (migration.escort > 0) rest.bing += migration.escort;
+  }
+  return JSON.stringify({ v: SAVE_V, t: Date.now(), s: { ...rest, terminal: terminal.slice(-15) } });
+}
+export function deserialize(json: string): { state: KRState; offlineSec: number } | null {
+  try {
+    const d = JSON.parse(json);
+    if (d.v !== SAVE_V || !d.s) return null;
+    const base = createKRState();
+    const st: KRState = { ...base, ...d.s, sweep: null, migration: null, achQueue: [] };
+    // bases 字段兜底(新版本加字段时旧档不崩)
+    for (const b of BASES) st.bases[b.id] = { ...base.bases[b.id], ...(d.s.bases?.[b.id] ?? {}) };
+    const offlineSec = Math.max(0, (Date.now() - (d.t ?? Date.now())) / 1000);
+    return { state: st, offlineSec };
+  } catch { return null; }
+}
+// 离线收益: 只结算生产(半效率,上限8h),不推进历史时间轴——历史要在线见证
+export function applyOffline(s: KRState, sec: number): { bing: number; wuzi: number } | null {
+  const t = Math.min(sec, 8 * 3600);
+  if (t < 120 || s.ended) return null;
+  const b = bingPerSec(s) * t * 0.5, w = wuziPerSec(s) * t * 0.5;
+  s.bing += b; s.wuzi += w; s.totalWuzi += w;
+  pushT(s, `【离线报告】你不在的 ${(t / 3600).toFixed(1)} 小时里，根据地照常运转：+${fmt(b)} 兵员、+${fmt(w)} 物资（半效）。`, "info");
+  return { bing: b, wuzi: w };
 }
 
 const UNITS = ["", "万", "亿", "兆"];

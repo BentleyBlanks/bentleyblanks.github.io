@@ -3,15 +3,16 @@
 import {
   BUILDINGS, POLICIES, BASES, CAMPAIGNS, TUNING, MONTH_MS,
   createKRState, fmt, dateStr, era, estCount, baseRevealed,
-  bingPerSec, wuziPerSec, defense, networkMult,
+  bingPerSec, wuziPerSec, networkMult,
   buildCostWuzi, buildCostBing, buildingUnlocked, policyRevealed,
-  estCost, devCost, tunCost, spotCost, campaignAvailable, endReport,
+  estCost, spotCost, campaignAvailable, endReport,
   rally, buyBuilding, buyPolicy, establishBase, raiseDev, digTunnel, removeSpot, launchCampaign,
   tick, startEvacuation, commitTroops, tier, TIERS, unitName, SWEEP_KIND_NAME,
   transferPop, pickMigrationTarget, migrationCost,
   ACHIEVEMENTS, DOCTRINES, unlockAch, acquireDoctrine,
   RAIDS, launchRaid, raidEnemy, raidTroopsNeeded, comboMult,
   canRelocateHQ, relocateHQ, relocateCost,
+  serialize, deserialize, applyOffline, tiedown, prestigeGain, prestigeReady, cycleMult,
   type KRState
 } from "./core";
 import { initScene } from "./scene";
@@ -19,7 +20,30 @@ import { injectKRStyles } from "./styles";
 
 export function bootstrapKangri(root: HTMLElement): void {
   injectKRStyles();
-  let state: KRState = createKRState();
+  // ── ① 存档 + ⑤ 跨局 meta(老骨干/文献/成就) ──
+  const META_KEY = "kangri_meta_v1", SAVE_KEY = "kangri_save_v1";
+  interface Meta { veterans: number; doctrines: Record<string, boolean>; achievements: Record<string, boolean>; }
+  const loadMeta = (): Meta => { try { return { veterans: 0, doctrines: {}, achievements: {}, ...JSON.parse(localStorage.getItem(META_KEY) ?? "{}") }; } catch { return { veterans: 0, doctrines: {}, achievements: {} }; } };
+  const meta = loadMeta();
+  const saveMeta = (): void => { localStorage.setItem(META_KEY, JSON.stringify(meta)); };
+  function freshState(): KRState {
+    const st = createKRState();
+    st.veterans = meta.veterans;
+    st.doctrines = { ...meta.doctrines }; // 文献=思想火种,跨局带着
+    st.achievements = { ...meta.achievements };
+    return st;
+  }
+  let state: KRState = freshState();
+  {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const got = deserialize(raw);
+      if (got) { state = got.state; state.veterans = meta.veterans; applyOffline(state, got.offlineSec); }
+    }
+  }
+  const doSave = (): void => { try { localStorage.setItem(SAVE_KEY, serialize(state)); meta.achievements = { ...meta.achievements, ...state.achievements }; meta.doctrines = { ...meta.doctrines, ...state.doctrines }; saveMeta(); } catch { /* 空间不足等 */ } };
+  setInterval(doSave, 15000);
+  window.addEventListener("beforeunload", doSave);
   let paused = false, speed = 1;
   let selectedBase: string | null = null;
   let endShown = false;
@@ -59,6 +83,7 @@ export function bootstrapKangri(root: HTMLElement): void {
       </div>
       <button class="kr-rally" id="krRally"><b>发动群众抗争</b><span>[G] 点击 · 组织抵抗</span></button>
       <div class="kr-raids" id="krRaids"><div class="kr-raids-head">游击出击 <span id="krCombo"></span></div></div>
+      <button class="kr-prestige" id="krPrestige" style="display:none"></button>
       <div class="kr-terminal" id="krTerm"></div>
     </aside>
 
@@ -89,7 +114,8 @@ export function bootstrapKangri(root: HTMLElement): void {
       <div class="kr-dr"><button id="krDbgPause">⏸暂停</button><button id="krDbgReset" class="danger">重置</button></div>
       <div class="kr-dr"><input id="krDbgAmt" type="number" value="100000"/><button id="krDbgGive">+物资</button><button id="krDbgBing">+兵员</button></div>
       <div class="kr-dr"><span>速度</span><button data-spd="1" class="spd active">×1</button><button data-spd="10" class="spd">×10</button><button data-spd="100" class="spd">×100</button></div>
-      <div class="kr-dr"><button id="krDbgSweep">触发扫荡</button><button id="krDbgMonth">+6月</button><button id="krDbgEnd">跳结局</button></div>
+      <div class="kr-dr"><button id="krDbgSweep">触发扫荡</button><button id="krDbgMonth">+6月</button><button id="krDbgEnd">跳1945</button></div>
+      <div class="kr-dr"><button id="krDbgSave">存档</button><button id="krDbgWipe" class="danger">清档(含meta)</button></div>
     </div>
   `;
   root.appendChild(wrap);
@@ -319,6 +345,26 @@ export function bootstrapKangri(root: HTMLElement): void {
     if (tip.textContent !== text) tip.textContent = text;
   }
 
+  // ── ⑤ 整风再出发(Prestige) ──
+  const prestigeBtn = $<HTMLButtonElement>("#krPrestige");
+  function doPrestige(): void {
+    const gain = prestigeGain(state);
+    if (!window.confirm(`整风再出发:重开一局(回到1937.7),获得 ${gain} 名老骨干(每名全局产出+3%,永久)。文献、成就保留。确定?`)) return;
+    meta.veterans += gain;
+    meta.achievements = { ...meta.achievements, ...state.achievements };
+    meta.doctrines = { ...meta.doctrines, ...state.doctrines };
+    saveMeta();
+    state = freshState(); gstep = 0; endShown = false; shownTier = 0;
+    $("#krEnding").style.display = "none";
+    doSave();
+  }
+  prestigeBtn.addEventListener("click", doPrestige);
+  function renderPrestige(): void {
+    const ok = prestigeReady(state);
+    prestigeBtn.style.display = ok ? "" : "none";
+    if (ok) prestigeBtn.textContent = `🔄 整风再出发（+${prestigeGain(state)} 老骨干）`;
+  }
+
   // ── 游击出击面板(主动打日本:高频动作+缴获+连胜) ──
   const raidsHost = $("#krRaids");
   const raidRows = RAIDS.map((r) => {
@@ -380,10 +426,7 @@ export function bootstrapKangri(root: HTMLElement): void {
         <button class="kr-end-btn" id="krEndClose">从头再来</button>
       </div>`;
       el.style.display = "";
-      el.querySelector<HTMLButtonElement>("#krEndClose")!.addEventListener("click", () => {
-        state = createKRState(); gstep = 0; endShown = false; selectedBase = null;
-        el.style.display = "none";
-      });
+      el.querySelector<HTMLButtonElement>("#krEndClose")!.addEventListener("click", () => { doPrestige(); });
       return;
     }
     el.innerHTML = `
@@ -399,21 +442,19 @@ export function bootstrapKangri(root: HTMLElement): void {
         <button class="kr-end-btn" id="krEndClose">再打一遍</button>
       </div>`;
     el.style.display = "";
-    el.querySelector<HTMLButtonElement>("#krEndClose")!.addEventListener("click", () => {
-      state = createKRState(); gstep = 0; endShown = false; selectedBase = null;
-      el.style.display = "none";
-    });
+    el.querySelector<HTMLButtonElement>("#krEndClose")!.addEventListener("click", () => { doPrestige(); });
   }
 
   function render(): void {
     $("#krBing").textContent = fmt(state.bing);
     $("#krWuzi").textContent = fmt(state.wuzi);
     const prodNote = state.sweep?.evacStarted ? `（转移中 ×${TUNING.evacProdMult}）` : "";
-    $("#krBingS").textContent = `+${fmt(bingPerSec(state))}/秒${prodNote}`;
+    $("#krBingS").textContent = `+${fmt(bingPerSec(state))}/秒${prodNote}${state.tiredBing >= 1 ? ` · 休整中 ${fmt(state.tiredBing)}` : ""}`;
     $("#krWuziS").textContent = `+${fmt(wuziPerSec(state))}/秒${prodNote}`;
     const e = era(state);
     const T = TIERS[tier(state)];
-    $("#krPhase").textContent = `${dateStr(state.monthIdx)} · ${e.name}（${e.years}）　│　【${T.name}·${T.scope}】　│　根据地 ${estCount(state)}/${BASES.length}　│　乘数 ×${networkMult(state).toFixed(2)}　│　减损 ${Math.round(defense(state) * 100)}%`;
+    const cyc = state.monthIdx > 98 ? `　│　讨伐纪 ${Math.floor((state.monthIdx - 98) / 12) + 1}(敌×${cycleMult(state).toFixed(1)})` : "";
+    $("#krPhase").textContent = `${dateStr(state.monthIdx)} · ${e.name}（${e.years}）　│　【${T.name}·${T.scope}】　│　🎯牵制日军 ${tiedown(state)} 万　│　⚠警备 ${Math.round(state.alert)}　│　乘数 ×${networkMult(state).toFixed(2)}${state.veterans > 0 ? `　│　老骨干 ${state.veterans}` : ""}${cyc}`;
     $("#krEraNote").textContent = e.jp;
 
     for (let i = 0; i < BUILDINGS.length; i++) {
@@ -459,18 +500,14 @@ export function bootstrapKangri(root: HTMLElement): void {
       row.name.textContent = `${b.id === state.hqBase ? "🏛 " : ""}${st.est ? "★" : "○"} ${b.name}`;
       row.terr.textContent = b.terrain === "plain" ? "平原·肥沃/挨打" : b.terrain === "hills" ? "丘陵" : "山地·安全";
       row.stats.textContent = st.est
-        ? `人口 ${st.pop.toFixed(0)}/${b.pop0}万 · 发展 ${st.dev}/5 · 地道 ${st.tunnels}/3 · 据点🏯 ${st.spots}/5 · 乘数 ×${(1 + (0.10 + 0.05 * st.dev) * (st.pop / b.pop0) * Math.max(0.3, 1 - 0.1 * st.spots) * (b.terrain === "plain" ? 1.25 : b.terrain === "hills" ? 1.05 : 0.95)).toFixed(2)}`
+        ? `人口 ${st.pop.toFixed(0)}/${b.pop0}万 · 发展 ${st.dev}/5(${st.devP}/${st.dev + 2}·靠胜仗涨) · 据点🏯 ${st.spots}/5 · 乘数 ×${(1 + (0.10 + 0.05 * st.dev) * (st.pop / b.pop0) * Math.max(0.3, 1 - 0.1 * st.spots) * (b.terrain === "plain" ? 1.25 : b.terrain === "hills" ? 1.05 : 0.95)).toFixed(2)}`
         : `人口 ${b.pop0}万 · ${b.hist}`;
       const ec = estCost(state);
       row.est.style.display = st.est ? "none" : "";
       row.est.textContent = tier(state) < 7 ? "开辟(需边区规模)" : era(state).canExpand ? `开辟 ${fmt(ec.bing)}兵${fmt(ec.wuzi)}资` : "开辟(至暗期不可)";
       row.est.disabled = tier(state) < 7 || !era(state).canExpand || state.bing < ec.bing || state.wuzi < ec.wuzi;
-      row.dev.style.display = st.est ? "" : "none";
-      row.dev.textContent = st.dev >= 5 ? "发展MAX" : `发展 ${fmt(devCost(state, b.id))}资`;
-      row.dev.disabled = st.dev >= 5 || state.wuzi < devCost(state, b.id);
-      row.tun.style.display = st.est ? "" : "none";
-      row.tun.textContent = st.tunnels >= 3 ? "地道MAX" : `挖地道 ${fmt(tunCost(state, b.id))}资`;
-      row.tun.disabled = st.tunnels >= 3 || state.wuzi < tunCost(state, b.id);
+      row.dev.style.display = "none"; // ②双引擎合并: 发展由军事胜利自动成长(仪表盘化)
+      row.tun.style.display = "none"; // 地道并入全局设施
       const sc = spotCost(state);
       row.spot.style.display = st.est && st.spots > 0 ? "" : "none";
       row.spot.textContent = `拔据点 ${fmt(sc.bing)}兵${fmt(sc.wuzi)}资`;
@@ -504,11 +541,20 @@ export function bootstrapKangri(root: HTMLElement): void {
       floatAt(wrap.clientWidth / 2, 130, `━ 视野扩大：${td.name}（${td.scope}）━`, "big");
       state.terminal.push({ text: `【规模升级】${td.name}——${td.note}`, kind: "era" });
     }
+    // ④ 渐进解锁: 开局只有点击+设施(CC 纯度),其余随进度显现
+    const tabBase = wrap.querySelector<HTMLElement>('.kr-tab[data-t="base"]')!;
+    const tabPolicy = wrap.querySelector<HTMLElement>('.kr-tab[data-t="policy"]')!;
+    const tabCamp = wrap.querySelector<HTMLElement>('.kr-tab[data-t="camp"]')!;
+    tabBase.style.display = tier(state) >= 2 || estCount(state) > 1 ? "" : "none";
+    tabPolicy.style.display = state.monthIdx >= 4 ? "" : "none";
+    tabCamp.style.display = state.monthIdx >= 2 ? "" : "none";
+    $("#krRaids").style.display = state.stats.spotsRemoved >= 1 ? "" : "none";
     const g = $("#krGuide"); while (gstep < GUIDE.length && GUIDE[gstep].d(state)) gstep += 1;
     if (gstep >= GUIDE.length || state.ended) g.style.display = "none";
     else { g.style.display = ""; const txt = `${gstep + 1}/${GUIDE.length} · ${GUIDE[gstep].t}`; if (g.textContent !== txt) g.textContent = txt; }
     renderSweepBar();
     renderRaids();
+    renderPrestige();
     renderTerm();
     renderEnding();
     renderAch();
@@ -542,7 +588,9 @@ export function bootstrapKangri(root: HTMLElement): void {
   $("#krDbgSweep").addEventListener("click", () => { if (!state.sweep) state.nextSweepM = state.monthIdx; state.monthAcc = MONTH_MS; });
   $("#krDbgMonth").addEventListener("click", () => { state.monthAcc += MONTH_MS * 6; });
   $("#krDbgEnd").addEventListener("click", () => { state.monthAcc += MONTH_MS * 98; });
-  $("#krDbgReset").addEventListener("click", () => { if (window.confirm("重置？")) { state = createKRState(); gstep = 0; endShown = false; $("#krEnding").style.display = "none"; } });
+  $("#krDbgReset").addEventListener("click", () => { if (window.confirm("重置？")) { state = freshState(); gstep = 0; endShown = false; $("#krEnding").style.display = "none"; } });
+  $("#krDbgSave").addEventListener("click", doSave);
+  $("#krDbgWipe").addEventListener("click", () => { if (window.confirm("清空存档+永久进度？")) { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(META_KEY); location.reload(); } });
 
   (window as unknown as { __kr?: unknown }).__kr = {
     state: () => state, give: (w: number, b: number) => { state.wuzi += w; state.totalWuzi += w; state.bing += b || 0; },
@@ -556,6 +604,7 @@ export function bootstrapKangri(root: HTMLElement): void {
     bases: () => estCount(state), ended: () => state.ended, report: () => endReport(state), sceneOk: () => scene.ok,
     sweep: () => { if (!state.sweep) { state.nextSweepM = state.monthIdx; state.monthAcc = MONTH_MS; } },
     skipMonths: (n: number) => { state.monthAcc += MONTH_MS * n; },
-    evac: () => startEvacuation(state), fight: (frac = 0.6) => commitTroops(state, Math.floor(state.bing * frac))
+    evac: () => startEvacuation(state), fight: (frac = 0.6) => commitTroops(state, Math.floor(state.bing * frac)),
+    tiedown: () => tiedown(state), alert: () => state.alert, save: doSave, prestige: doPrestige, raid: (id: string) => launchRaid(state, id)
   };
 }

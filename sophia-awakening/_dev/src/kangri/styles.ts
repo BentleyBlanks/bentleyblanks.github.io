@@ -229,4 +229,8 @@ const CSS = `
 .kr-doct-full .kr-doct-line { font-size: 14.5px; }
 .kr-doct-full .kr-doct-fx { font-size: 16px; }
 .kr-ba.hq { border-color: rgba(216,164,65,.7); color: #f0d8a0; }
+
+/* 整风再出发 */
+.kr-prestige { padding: 9px 12px; border: 1px solid rgba(216,164,65,.7); border-radius: 5px; background: linear-gradient(180deg, #3a2e12, #241c0c); color: #f0d8a0; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
+.kr-prestige:hover { background: linear-gradient(180deg, #4a3a18, #2c2210); }
 `;
