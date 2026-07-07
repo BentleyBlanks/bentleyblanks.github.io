@@ -45,13 +45,15 @@ export function eraOf(mi: number): EraDef {
 // tier 由 max(资源阈值, 时间下限) 决定——发展快提前放大视野，时间到也强制推进（历史不等人）。
 export interface TierDef { id: number; name: string; scope: string; atWuzi: number; atM: number; note: string; }
 export const TIERS: TierDef[] = [
-  { id: 0, name: "孤村星火", scope: "一个村", atWuzi: 0, atM: 0, note: "一个村的抵抗。对手：村口炮楼里的日军小分队。" },
-  { id: 1, name: "连村成片", scope: "数村", atWuzi: 500, atM: 2, note: "村村相连。对手：日军讨伐小队。" },
-  { id: 2, name: "区乡动员", scope: "一个区乡", atWuzi: 2_500, atM: 5, note: "十里八乡组织起来。对手：日军警备中队。" },
-  { id: 3, name: "县域争夺", scope: "一县", atWuzi: 9_000, atM: 8, note: "和县城的日军掰手腕。铁路支线出现了。" },
-  { id: 4, name: "专区经营", scope: "数县连片", atWuzi: 35_000, atM: 12, note: "几座县城连成专区——公路网、多路讨伐都来了。对手：日军大队。" },
-  { id: 5, name: "边区格局", scope: "边区大板块", atWuzi: 130_000, atM: 16, note: "太行区立住了——可以开辟各大板块根据地。对手：日军支队。" },
-  { id: 6, name: "华北大棋局", scope: "全华北", atWuzi: 6e5, atM: 20, note: "冀中、太行、山东……整个华北敌后。对手：联队、师团级兵团。" }
+  { id: 0, name: "孤村星火", scope: "一个村", atWuzi: 0, atM: 0, note: "一个村的抵抗。对手：村口炮楼里的日军小分队——先端掉它。" },
+  { id: 1, name: "鸡犬相闻", scope: "邻村", atWuzi: 300, atM: 1, note: "邻村联起手来。对手：下乡抢粮的巡逻小队。" },
+  { id: 2, name: "连村成片", scope: "数村", atWuzi: 1_200, atM: 3, note: "村村相连、户户相通。对手：日军讨伐小队。" },
+  { id: 3, name: "区乡动员", scope: "一个区乡", atWuzi: 5_000, atM: 5, note: "十里八乡组织起来。对手：日军警备中队。" },
+  { id: 4, name: "重镇争夺", scope: "半个县", atWuzi: 15_000, atM: 8, note: "打到重镇外围——据点链和公路网出现了。对手：讨伐大队。" },
+  { id: 5, name: "县域拉锯", scope: "一县", atWuzi: 45_000, atM: 11, note: "和县城日军反复拉锯。对手：守备大队+伪军。" },
+  { id: 6, name: "专区经营", scope: "数县连片", atWuzi: 130_000, atM: 14, note: "几座县城连成专区。对手：日军支队。" },
+  { id: 7, name: "边区格局", scope: "边区大板块", atWuzi: 350_000, atM: 17, note: "太行区立住了——可以开辟各大板块根据地。对手：联队。" },
+  { id: 8, name: "华北大棋局", scope: "全华北", atWuzi: 8e5, atM: 20, note: "冀中、太行、山东……整个华北敌后。对手：师团级兵团。" }
 ];
 export function tier(s: KRState): number {
   let byW = 0, byM = 0;
@@ -176,12 +178,12 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "first_tunnel", name: "深挖洞", desc: "挖出第一条地道", check: (s) => s.buildings[2] > 0 || BASES.some((b) => s.bases[b.id].tunnels > 0) },
   { id: "doctrine_lun", name: "黑夜里的灯", desc: "研读《论持久战》", check: (s) => !!s.doctrines["lunchijiu"] },
   { id: "doctrine_all", name: "真理之光", desc: "集齐全部六部文献", check: (s) => DOCTRINES.every((d) => s.doctrines[d.id]) },
-  { id: "tier1", name: "连村成片", desc: "规模达到数村", check: (s) => tier(s) >= 1 },
-  { id: "tier2", name: "县域争夺", desc: "规模达到一县", check: (s) => tier(s) >= 3 },
-  { id: "tier2x", name: "区乡动员", desc: "规模达到区乡", check: (s) => tier(s) >= 2 },
-  { id: "tier3", name: "专区经营", desc: "数县连成专区", check: (s) => tier(s) >= 4 },
-  { id: "tier5", name: "边区格局", desc: "撑起边区大板块", check: (s) => tier(s) >= 5 },
-  { id: "tier4", name: "华北大棋局", desc: "视野展开到整个华北", check: (s) => tier(s) >= 6 },
+  { id: "tier1", name: "连村成片", desc: "规模达到数村", check: (s) => tier(s) >= 2 },
+  { id: "tier2", name: "县域拉锯", desc: "规模达到一县", check: (s) => tier(s) >= 5 },
+  { id: "tier2x", name: "区乡动员", desc: "规模达到区乡", check: (s) => tier(s) >= 3 },
+  { id: "tier3", name: "专区经营", desc: "数县连成专区", check: (s) => tier(s) >= 6 },
+  { id: "tier5", name: "边区格局", desc: "撑起边区大板块", check: (s) => tier(s) >= 7 },
+  { id: "tier4", name: "华北大棋局", desc: "视野展开到整个华北", check: (s) => tier(s) >= 8 },
   { id: "pingxingguan", name: "首战告捷", desc: "打出平型关大捷", check: (s) => !!s.campaigns["pingxingguan"] },
   { id: "huangtuling", name: "名将之花凋谢", desc: "黄土岭围歼战击毙阿部规秀", check: (s) => !!s.campaigns["huangtuling"] },
   { id: "baituan", name: "百团出击", desc: "发动百团大战", check: (s) => !!s.campaigns["baituan"] },
@@ -199,6 +201,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "est6", name: "燎原", desc: "开辟 6 块根据地", check: (s) => estCount(s) >= 6 },
   { id: "est9", name: "满盘皆红", desc: "九块根据地全部开辟", check: (s) => estCount(s) >= 9 },
   { id: "dev_max", name: "模范根据地", desc: "一块根据地发展到 5 级", check: (s) => BASES.some((b) => s.bases[b.id].dev >= 5) },
+  { id: "first_tower", name: "第一座炮楼", desc: "端掉村口的炮楼——十里八乡都传遍了", check: (s) => s.stats.spotsRemoved >= 1 },
   { id: "spots10", name: "拔钉子", desc: "累计拔除 10 座炮楼据点", check: (s) => s.stats.spotsRemoved >= 10 },
   { id: "migrate", name: "大转移", desc: "组织一次跨根据地的群众大转移" },
   { id: "policy_all", name: "新政齐备", desc: "推行全部政策", check: (s) => POLICIES.every((p) => s.policies[p.id]) },
@@ -245,6 +248,9 @@ export const EVENTS: EventDef[] = [
   { m: 90, text: "【1945】各根据地转入全面局部反攻——拔据点、围县城，解放区连成一片。", kind: "win" },
   { m: 96, text: "【1945.8】苏联对日宣战、广岛长崎原子弹——日本帝国主义的丧钟敲响了。", kind: "win" }
 ];
+
+// 各档位对抗基准兵力(难度曲线: 村口炮楼小分队→巡逻队→讨伐队→中队→大队→守备队→支队→联队→师团)
+export const TIER_ENEMY = [12, 25, 55, 130, 350, 750, 1800, 3800, 8000];
 
 // ══ 扫荡（多路合围事件）══════════════════════════════════════════
 export type SweepStage = "incoming" | "battle" | "pillage";
@@ -313,7 +319,7 @@ export const TUNING = {
 
 export function createKRState(): KRState {
   const bases: Record<string, BaseState> = {};
-  for (const b of BASES) bases[b.id] = { est: b.id === "hq", dev: 0, tunnels: 0, pop: b.pop0, spots: 0 };
+  for (const b of BASES) bases[b.id] = { est: b.id === "hq", dev: 0, tunnels: 0, pop: b.pop0, spots: b.id === "hq" ? 1 : 0 }; // 村口一座炮楼=第一个对手
   return {
     bing: 0, wuzi: 0, totalWuzi: 0, clickN: 0,
     monthIdx: 0, monthAcc: 0,
@@ -391,7 +397,8 @@ export function devCost(s: KRState, id: string): number { return Math.ceil(TUNIN
 export function tunCost(s: KRState, id: string): number { return Math.ceil(TUNING.tunCost0 * Math.pow(TUNING.tunCostMult, s.bases[id].tunnels) * (1 + estCount(s) * 0.25)); }
 export function spotCost(s: KRState): { bing: number; wuzi: number } {
   const half = era(s).id >= 3 ? 0.5 : 1;
-  return { bing: Math.ceil(TUNING.spotBing * half * (1 + era(s).id)), wuzi: Math.ceil(TUNING.spotWuzi * half * (1 + era(s).id)) };
+  const tb = TIER_ENEMY[tier(s)];
+  return { bing: Math.ceil(tb * 2.2 * half), wuzi: Math.ceil(tb * 11 * half) };
 }
 export function campaignAvailable(s: KRState, c: CampaignDef): "ok" | "early" | "late" | "done" | "weak" {
   if (s.campaigns[c.id]) return "done";
@@ -429,7 +436,7 @@ export function buyPolicy(s: KRState, id: string): boolean {
 // 开辟根据地
 export function establishBase(s: KRState, id: string): boolean {
   const st = s.bases[id]; const d = BASES.find((b) => b.id === id);
-  if (!d || st.est || !baseRevealed(s, id) || !era(s).canExpand || tier(s) < 5) return false;
+  if (!d || st.est || !baseRevealed(s, id) || !era(s).canExpand || tier(s) < 7) return false;
   const c = estCost(s);
   if (s.bing < c.bing || s.wuzi < c.wuzi) return false;
   s.bing -= c.bing; s.wuzi -= c.wuzi; st.est = true;
@@ -460,7 +467,8 @@ export function removeSpot(s: KRState, id: string): boolean {
   s.bing -= c.bing; s.wuzi -= c.wuzi; st.spots -= 1; s.stats.spotsRemoved += 1;
   const loot = 50 * (1 + era(s).id) * networkMult(s);
   s.wuzi += loot; s.totalWuzi += loot;
-  pushT(s, `★ 拔掉【${BASES.find((b) => b.id === id)!.short}】外围一座炮楼据点！缴获 ${fmt(loot)} 物资，封锁松动。`, "win");
+  if (s.stats.spotsRemoved === 1) pushT(s, `★★ 村口的炮楼端掉了！枪一响，十里八乡都传遍——参军的青年多起来了。缴获 ${fmt(loot)} 物资。`, "win");
+  else pushT(s, `★ 拔掉【${BASES.find((b) => b.id === id)!.short}】外围一座炮楼据点！缴获 ${fmt(loot)} 物资，封锁松动。`, "win");
   return true;
 }
 
@@ -524,11 +532,13 @@ export function launchCampaign(s: KRState, id: string): boolean {
 }
 
 // ══ 扫荡 ══════════════════════════════════════════════════════════
+// 强度=档位基准为主(每档对抗规模可预期)+玩家兵力推高(封顶基准2.4×,防碾压无聊)
 function sweepStrength(s: KRState, mult = 1): number {
   const e = era(s);
   const retaliation = s.campaigns["baituan"] && e.id === 2 ? TUNING.baituanRetaliation : 1;
+  const tb = TIER_ENEMY[tier(s)] * Math.max(0.5, e.strengthMult) * retaliation * mult;
   const scale = Math.pow(Math.max(1, s.bing), 0.85) * 0.9;
-  return Math.max(5, Math.round((TUNING.sweepBase * (1 + e.id * 0.8) + scale) * e.strengthMult * retaliation * mult * (0.85 + Math.random() * 0.3)));
+  return Math.max(6, Math.round((tb * 0.65 + Math.min(scale, tb * 2.4) * 0.5) * (0.85 + Math.random() * 0.3)));
 }
 function pickSweepTarget(s: KRState): string {
   const est = BASES.filter((b) => s.bases[b.id].est);

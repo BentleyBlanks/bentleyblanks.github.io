@@ -21,30 +21,33 @@ export interface Scene25D {
   dispose: () => void;
 }
 
-const EVAC = { x: 0.12, y: 0.88 };
 
 // ── 世界布点 ──
 const HQ = { x: 0.50, y: 0.68 };
 // hq 卫星村（世界坐标偏移；T0 雾半径外→只见中心村，T1 雾散见连村）
+// 卫星村: 距中心村 1.5~4.5km(真实邻村距离)
 const HQ_SATS = [
-  { x: 0.462, y: 0.664 }, { x: 0.535, y: 0.655 }, { x: 0.472, y: 0.712 },
-  { x: 0.528, y: 0.706 }, { x: 0.455, y: 0.690 }, { x: 0.512, y: 0.632 }, { x: 0.545, y: 0.684 }
+  { x: HQ.x + 0.0016, y: HQ.y - 0.0009 }, { x: HQ.x - 0.0018, y: HQ.y + 0.0013 },
+  { x: HQ.x + 0.0028, y: HQ.y + 0.0008 }, { x: HQ.x - 0.0030, y: HQ.y - 0.0015 },
+  { x: HQ.x + 0.0009, y: HQ.y + 0.0026 }, { x: HQ.x - 0.0011, y: HQ.y - 0.0029 }, { x: HQ.x + 0.0037, y: HQ.y - 0.0022 }
 ];
 // 县城群(日占)：T3 见第一座,T4 专区见三座
 const COUNTIES = [
-  { x: 0.552, y: 0.606, name: "东关县城" },
-  { x: 0.428, y: 0.612, name: "西口县城" },
-  { x: 0.532, y: 0.762, name: "南塬县城" }
+  { x: HQ.x + 0.036, y: HQ.y - 0.024, name: "东关县城" },
+  { x: HQ.x - 0.040, y: HQ.y + 0.020, name: "西口县城" },
+  { x: HQ.x + 0.022, y: HQ.y + 0.052, name: "南塬县城" }
 ];
 const HQ_COUNTY = COUNTIES[0];
 // 乡镇聚落(中立灰村,被红区罩住即"解放"观感)
+// 乡镇(6~18km) + 小庄子(3~7km)
 const TOWNS = [
-  { x: 0.472, y: 0.588 }, { x: 0.545, y: 0.565 }, { x: 0.585, y: 0.655 },
-  { x: 0.44, y: 0.72 }, { x: 0.56, y: 0.71 }, { x: 0.40, y: 0.655 },
-  { x: 0.49, y: 0.77 }, { x: 0.615, y: 0.60 }, { x: 0.375, y: 0.565 }, { x: 0.60, y: 0.755 }
+  { x: HQ.x - 0.009, y: HQ.y - 0.006 }, { x: HQ.x + 0.011, y: HQ.y - 0.010 }, { x: HQ.x + 0.014, y: HQ.y + 0.007 },
+  { x: HQ.x - 0.013, y: HQ.y + 0.010 }, { x: HQ.x + 0.006, y: HQ.y + 0.015 }, { x: HQ.x - 0.017, y: HQ.y - 0.001 },
+  { x: HQ.x - 0.004, y: HQ.y + 0.019 }, { x: HQ.x + 0.019, y: HQ.y - 0.002 }, { x: HQ.x - 0.008, y: HQ.y - 0.016 }, { x: HQ.x + 0.009, y: HQ.y + 0.023 },
+  { x: HQ.x + 0.004, y: HQ.y - 0.005 }, { x: HQ.x - 0.005, y: HQ.y + 0.004 }, { x: HQ.x + 0.006, y: HQ.y + 0.003 }, { x: HQ.x - 0.006, y: HQ.y - 0.004 }
 ];
 // 村口第一座炮楼(T0 的对手)；更多 spots 塔在外环
-const HQ_TOWER0 = { x: 0.521, y: 0.662 };
+const HQ_TOWER0 = { x: HQ.x + 0.0021, y: HQ.y - 0.0007 }; // 村口炮楼 ~2.5km
 const CITIES = [
   { id: "beiping", name: "北平", x: 0.62, y: 0.16 },
   { id: "tianjin", name: "天津", x: 0.76, y: 0.20 },
@@ -60,9 +63,9 @@ const RAILS: [string, string][] = [
 ];
 const cityOf = (id: string) => CITIES.find((c) => c.id === id)!;
 // 阶梯 → 战雾解锁半径(以 hq 为中心；已开辟/揭示的根据地各自再挖开一圈)。7 档:村/连村/区乡/县/专区/边区/华北
-const UNLOCK_R = [0.045, 0.085, 0.14, 0.22, 0.34, 0.55, 2];
+const UNLOCK_R = [0.0028, 0.0058, 0.012, 0.024, 0.045, 0.085, 0.16, 0.4, 2];
 // 阶梯 → 升级时镜头自动拉远到的 zoom
-const TIER_ZOOM = [15, 9.5, 6.5, 4.2, 2.8, 1.9, 1.15];
+const TIER_ZOOM = [560, 270, 130, 62, 30, 15, 7.2, 3.2, 1.15];
 
 function hash2(x: number, y: number): number {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -116,7 +119,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const r = canvas.getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
     const before = unproj(mx, my);
-    cam.zoom = clamp(cam.zoom * Math.exp(-e.deltaY * 0.0013), 1, 22);
+    cam.zoom = clamp(cam.zoom * Math.exp(-e.deltaY * 0.0019), 1, 900);
     cam.tzoom = cam.zoom;
     const after = unproj(mx, my);
     cam.x += before.x - after.x; cam.y += before.y - after.y;
@@ -159,7 +162,8 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const hq = s.bases["hq"];
     // hq 村群（中心+卫星，随发展/人口长大）
     const popF = clamp(hq.pop / 20, 0.3, 1.25);
-    const baseR = (0.028 + hq.dev * 0.007 + Math.min(0.04, s.totalWuzi / 60_000 * 0.03)) * popF;
+    const tierGrow = Math.pow(1.75, T * 0.55); // 档位放大: 村级 0.002 → 板块级 ~0.05
+    const baseR = Math.min(0.055, (0.0022 + hq.dev * 0.0008) * popF * tierGrow);
     ourSrc.push({ x: HQ.x, y: HQ.y, r: smoothTo("hq", baseR * 1.5, dt) });
     const satN = clamp(1 + hq.dev + T, 0, HQ_SATS.length);
     for (let i = 0; i < HQ_SATS.length; i++) {
@@ -177,8 +181,8 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
     // 日军：城市 + 县城 + 炮楼
     for (const c of CITIES) jpSrc.push({ x: c.x, y: c.y, r: 0.07 });
-    for (const c of COUNTIES) jpSrc.push({ x: c.x, y: c.y, r: 0.042 });
-    for (const tw of hqTowers(s)) jpSrc.push({ x: tw.x, y: tw.y, r: 0.02 });
+    for (const c of COUNTIES) jpSrc.push({ x: c.x, y: c.y, r: 0.008 });
+    for (const tw of hqTowers(s)) jpSrc.push({ x: tw.x, y: tw.y, r: 0.0035 });
     for (const b of BASES) {
       const st = s.bases[b.id];
       if (b.id !== "hq" && st.spots > 0) jpSrc.push({ x: b.x, y: b.y, r: (0.035 + st.spots * 0.01) * 0.8 });
@@ -195,10 +199,11 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
   function fogAt(s: KRState, wx: number, wy: number): number {
     const T = tier(s);
     const uR = UNLOCK_R[T];
-    let vis = sstep(uR + 0.06, uR - 0.02, Math.hypot(wx - HQ.x, wy - HQ.y));
+    const edge = Math.max(0.004, uR * 0.5);
+    let vis = sstep(uR + edge, uR - edge * 0.3, Math.hypot(wx - HQ.x, wy - HQ.y));
     for (const b of BASES) {
       if (b.id === "hq" || !baseRevealed(s, b.id)) continue;
-      if (tier(s) < 5) continue; // 大板块的雾 T5(边区) 起才挖开
+      if (tier(s) < 7) continue; // 大板块的雾 T7(边区) 起才挖开
       vis = Math.max(vis, sstep(0.15, 0.06, Math.hypot(wx - b.x, wy - b.y)));
     }
     return 1 - vis; // 1=浓雾
@@ -261,7 +266,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const lg = loCv.getContext("2d")!;
     const img = lg.createImageData(LX, LY);
     const px = img.data;
-    const zoomDetail = clamp((cam.zoom - 3) / 10, 0, 0.3);
+    const zd1 = clamp((cam.zoom - 4) / 20, 0, 0.28), zd2 = clamp((cam.zoom - 40) / 200, 0, 0.24);
     let prevH = 0;
     for (let j = 0; j < LY; j++) {
       for (let i = 0; i < LX; i++) {
@@ -269,7 +274,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         const w = unproj((i + 0.5) / LX * W, (j + 0.5) / LY * H);
         if (w.x < -0.02 || w.x > 1.02 || w.y < -0.02 || w.y > 1.02) { px[idx] = 10; px[idx + 1] = 11; px[idx + 2] = 7; px[idx + 3] = 255; prevH = 0; continue; }
         let h = terrainH(w.x, w.y);
-        if (zoomDetail > 0) h = h * (1 - zoomDetail) + fbm(w.x * 26 + 3, w.y * 26 + 9) * zoomDetail;
+        if (zd1 > 0) h = h * (1 - zd1 - zd2) + fbm(w.x * 26 + 3, w.y * 26 + 9) * zd1 + (zd2 > 0 ? fbm(w.x * 160 + 31, w.y * 160 + 17) * zd2 : 0);
         const m = moistAt(w.x, w.y);
         // 高度带色板(华北): 平原农田黄绿→黄土丘陵→山麓→太行深山
         let r: number, gg: number, b: number;
@@ -282,7 +287,8 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         gg *= 1 + wet * 0.35; r *= 1 - wet * 0.15;
         // 平原农田斑块(田块状色差)
         if (h < 0.32) {
-          const patch = hash2(Math.floor(w.x * 76), Math.floor(w.y * 76));
+          const pf = cam.zoom > 60 ? 900 : cam.zoom > 12 ? 300 : 76;
+          const patch = hash2(Math.floor(w.x * pf), Math.floor(w.y * pf));
           const f = 0.93 + patch * 0.14;
           r *= f; gg *= f * (patch > 0.5 ? 1.06 : 0.98); b *= f;
         }
@@ -291,7 +297,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         if (rd < 0.030) { const t = sstep(0.030, 0.008, rd) * 0.5; r = lerp(r, 82, t); gg = lerp(gg, 108, t); b = lerp(b, 56, t); }
         // 村庄周边田野
         const dHq = Math.hypot(w.x - HQ.x, w.y - HQ.y);
-        if (dHq < 0.13) { const gmix = sstep(0.13, 0.03, dHq) * 0.4; r = lerp(r, r * 0.85, gmix); gg = lerp(gg, gg * 1.18, gmix); b = lerp(b, b * 0.88, gmix); }
+        if (dHq < 0.02) { const gmix = sstep(0.02, 0.004, dHq) * 0.4; r = lerp(r, r * 0.85, gmix); gg = lerp(gg, gg * 1.18, gmix); b = lerp(b, b * 0.88, gmix); }
         // 侧光(横向高度差分近似)
         const lig = clamp(1 + (prevH - h) * 5.5, 0.74, 1.28);
         prevH = h;
@@ -357,8 +363,36 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     road(COUNTIES[0].x, COUNTIES[0].y, COUNTIES[2].x, COUNTIES[2].y);
     road(COUNTIES[1].x, COUNTIES[1].y, COUNTIES[2].x, COUNTIES[2].y);
     for (const tn of TOWNS.slice(0, 6)) road(HQ.x, HQ.y, tn.x, tn.y);
-    // ── 地理符号(文明6式简单表达): 山峰(双面山形)/森林(树簇)/农田(田埂) ──
-    const step = cam.zoom < 2 ? 3 : cam.zoom < 4 ? 2 : 1; // 拉远降密度
+    // ── 近景程序化符号(zoom>30): 视野内网格 hash 撒点,虚拟无限细节 ──
+    if (cam.zoom > 30) {
+      const gstep = Math.pow(2, Math.round(Math.log2((1 / cam.zoom) / 13)));
+      const vw = 1 / cam.zoom;
+      const x0 = Math.floor((cam.x - vw) / gstep) * gstep, x1 = cam.x + vw;
+      const y0 = Math.floor((cam.y - vw) / gstep) * gstep, y1 = cam.y + vw;
+      for (let wy = y0; wy < y1; wy += gstep) {
+        for (let wx = x0; wx < x1; wx += gstep) {
+          const hh = hash2(Math.round(wx / gstep), Math.round(wy / gstep));
+          if (hh > 0.58) continue;
+          const ox = wx + (hash2(wx * 999, wy * 777) - 0.2) * gstep, oy = wy + (hash2(wx * 555, wy * 333) - 0.2) * gstep;
+          if (fogAt(s, ox, oy) > 0.6) continue;
+          const p = proj(ox, oy);
+          if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) continue;
+          const h = terrainH(ox, oy), m = moistAt(ox, oy);
+          const sz = clamp(A * 0.0007 * Math.pow(cam.zoom, 0.6), 2, 12);
+          if (h > 0.55 || m > 0.6) { // 树
+            g.strokeStyle = "rgba(52,42,26,.8)"; g.lineWidth = Math.max(0.8, sz * 0.16);
+            g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x, p.y - sz * 0.7); g.stroke();
+            g.fillStyle = hh > 0.2 ? "#41552b" : "#375024";
+            g.beginPath(); g.arc(p.x, p.y - sz * 0.95, sz * 0.6, 0, 6.29); g.fill();
+          } else if (h < 0.34 && hh < 0.24) { // 田埂
+            g.strokeStyle = "rgba(150,132,80,.3)"; g.lineWidth = Math.max(0.7, sz * 0.12);
+            g.beginPath(); g.moveTo(p.x - sz, p.y - sz * 0.4); g.lineTo(p.x + sz, p.y + sz * 0.4); g.stroke();
+          }
+        }
+      }
+    }
+    // ── 宏观地理符号(山峰/森林/农田): 板块尺度, 近景淡出 ──
+    const step = cam.zoom > 60 ? 9999 : cam.zoom < 2 ? 3 : cam.zoom < 4 ? 2 : 1; // 近景全跳(程序化符号接管)
     for (let k2 = 0; k2 < SYMS.length; k2 += step) {
       const sym = SYMS[k2];
       if (fogAt(s, sym.x, sym.y) > 0.6) continue;
@@ -399,57 +433,58 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
   // ── 文明6式领土层 ──
   // 世界固定网格,每格按影响场定归属(our/jp/中立);同属地块连成整片半透明填充,
   // 只在"归属交界"画亮描边(我方亮红/日军青灰)——像文明的国界线。地块随平滑半径生长/收缩。
-  const TTX = 56, TTY = 40;
-  const terrOwn = new Int8Array(TTX * TTY); // 1=our -1=jp 0=neutral
+  // 分级网格: 块大小随 zoom 自适应(snap 2 的幂, 世界对齐——缩放跨千倍仍有合适的地块)
   function drawTerritory(g: CanvasRenderingContext2D, s: KRState): void {
-    // 归属采样(格中心,雾内=中立)
-    for (let j = 0; j < TTY; j++) {
-      for (let i = 0; i < TTX; i++) {
-        const wx = (i + 0.5) / TTX, wy = (j + 0.5) / TTY;
-        let own = 0;
-        if (fogAt(s, wx, wy) < 0.5) {
-          // 乘地形通行系数：高山/大河阻断 → 领土边界沿山脊河流走
-          const pass = terrainPass(wx, wy);
-          const ctl = (fieldAt({ x: wx, y: wy }, ourSrc) - fieldAt({ x: wx, y: wy }, jpSrc)) * pass;
-          own = ctl > 0.14 ? 1 : ctl < -0.14 ? -1 : 0;
-        }
-        terrOwn[j * TTX + i] = own;
+    const stepW = Math.pow(2, Math.round(Math.log2((1 / cam.zoom) / 20)));
+    const vw = 1.4 / cam.zoom;
+    const gx0 = Math.floor((cam.x - vw) / stepW), gx1 = Math.ceil((cam.x + vw) / stepW);
+    const gy0 = Math.floor((cam.y - vw) / stepW), gy1 = Math.ceil((cam.y + vw) / stepW);
+    const NX = gx1 - gx0 + 1, NY = gy1 - gy0 + 1;
+    if (NX <= 0 || NY <= 0 || NX * NY > 4000) return;
+    const own = new Int8Array(NX * NY);
+    for (let j = 0; j < NY; j++) {
+      for (let i = 0; i < NX; i++) {
+        const wx = (gx0 + i + 0.5) * stepW, wy = (gy0 + j + 0.5) * stepW;
+        if (wx < 0 || wx > 1 || wy < 0 || wy > 1) continue;
+        if (fogAt(s, wx, wy) >= 0.5) continue;
+        const pass = terrainPass(wx, wy);
+        const ctl = (fieldAt({ x: wx, y: wy }, ourSrc) - fieldAt({ x: wx, y: wy }, jpSrc)) * pass;
+        own[j * NX + i] = ctl > 0.14 ? 1 : ctl < -0.14 ? -1 : 0;
       }
     }
-    const corner = (i: number, j: number) => proj(i / TTX, j / TTY);
-    const lw = Math.max(1.6, A * 0.0035 * Math.pow(cam.zoom, 0.45));
-    // ① 整块填充(半透明,同属相邻无内线→整片领土感)
-    for (let j = 0; j < TTY; j++) {
-      for (let i = 0; i < TTX; i++) {
-        const own = terrOwn[j * TTX + i];
-        if (own === 0) continue;
-        const p0 = corner(i, j), p2 = corner(i + 1, j + 1);
+    const corner = (gi: number, gj: number) => proj(gi * stepW, gj * stepW);
+    const lw = clamp(A * 0.0035 * Math.pow(cam.zoom, 0.3), 1.6, 4.2);
+    for (let j = 0; j < NY; j++) {
+      for (let i = 0; i < NX; i++) {
+        const o = own[j * NX + i];
+        if (o === 0) continue;
+        const p0 = corner(gx0 + i, gy0 + j), p2 = corner(gx0 + i + 1, gy0 + j + 1);
         if (Math.max(p0.x, p2.x) < -40 || Math.min(p0.x, p2.x) > W + 40 || Math.max(p0.y, p2.y) < -40 || Math.min(p0.y, p2.y) > H + 40) continue;
-        const p1 = corner(i + 1, j), p3 = corner(i, j + 1);
-        g.fillStyle = own > 0 ? "rgba(178,44,28,.20)" : "rgba(56,72,92,.20)";
+        const p1 = corner(gx0 + i + 1, gy0 + j), p3 = corner(gx0 + i, gy0 + j + 1);
+        const fa = cam.zoom > 100 ? 0.13 : 0.20;
+        g.fillStyle = o > 0 ? `rgba(178,44,28,${fa})` : `rgba(56,72,92,${fa})`;
         g.beginPath(); g.moveTo(p0.x, p0.y); g.lineTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.lineTo(p3.x, p3.y); g.closePath(); g.fill();
       }
     }
-    // ② 边界描边: 与右邻/下邻归属不同 → 公共边画国界线(先宽光晕后亮线)
     g.lineCap = "round";
-    const edge = (ax: number, ay: number, bx: number, by: number, own: number): void => {
+    const edge = (ax: number, ay: number, bx: number, by: number, o: number): void => {
       const pa = corner(ax, ay), pb = corner(bx, by);
       if ((pa.x < -40 && pb.x < -40) || (pa.x > W + 40 && pb.x > W + 40)) return;
       if ((pa.y < -40 && pb.y < -40) || (pa.y > H + 40 && pb.y > H + 40)) return;
-      g.strokeStyle = own > 0 ? "rgba(226,86,77,.25)" : "rgba(130,160,190,.22)";
+      g.strokeStyle = o > 0 ? "rgba(226,86,77,.25)" : "rgba(130,160,190,.22)";
       g.lineWidth = lw * 2.6;
       g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
-      g.strokeStyle = own > 0 ? "rgba(240,120,100,.85)" : "rgba(150,180,205,.75)";
+      g.strokeStyle = o > 0 ? "rgba(240,120,100,.85)" : "rgba(150,180,205,.75)";
       g.lineWidth = lw;
       g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
     };
-    for (let j = 0; j < TTY; j++) {
-      for (let i = 0; i < TTX; i++) {
-        const own = terrOwn[j * TTX + i];
-        const right = i + 1 < TTX ? terrOwn[j * TTX + i + 1] : 0;
-        const down = j + 1 < TTY ? terrOwn[(j + 1) * TTX + i] : 0;
-        if (own !== right && (own !== 0 || right !== 0)) edge(i + 1, j, i + 1, j + 1, own !== 0 ? own : right);
-        if (own !== down && (own !== 0 || down !== 0)) edge(i, j + 1, i + 1, j + 1, own !== 0 ? own : down);
+    for (let j = 0; j < NY; j++) {
+      for (let i = 0; i < NX; i++) {
+        const o = own[j * NX + i];
+        const rgt = i + 1 < NX ? own[j * NX + i + 1] : 0;
+        const dwn = j + 1 < NY ? own[(j + 1) * NX + i] : 0;
+        if (o !== rgt && (o !== 0 || rgt !== 0)) edge(gx0 + i + 1, gy0 + j, gx0 + i + 1, gy0 + j + 1, o !== 0 ? o : rgt);
+        if (o !== dwn && (o !== 0 || dwn !== 0)) edge(gx0 + i, gy0 + j + 1, gx0 + i + 1, gy0 + j + 1, o !== 0 ? o : dwn);
       }
     }
   }
@@ -470,7 +505,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const out: { x: number; y: number }[] = [HQ_TOWER0];
     for (let i = 1; i < n; i++) {
       const ang = 0.9 + (i / 5) * Math.PI * 2;
-      out.push({ x: HQ.x + Math.cos(ang) * 0.075, y: HQ.y + Math.sin(ang) * 0.06 });
+      out.push({ x: HQ.x + Math.cos(ang) * 0.0075, y: HQ.y + Math.sin(ang) * 0.006 });
     }
     return out;
   }
@@ -612,7 +647,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const T = tier(s);
     // 阶梯升级：自动平滑拉远(玩家仍可随时缩放)
     if (T !== shownTier) {
-      if (shownTier >= 0) { cam.tzoom = TIER_ZOOM[T]; cam.tx = T >= 5 ? 0.5 : HQ.x; cam.ty = T >= 5 ? 0.5 : HQ.y; userCamMs = 0; }
+      if (shownTier >= 0) { cam.tzoom = TIER_ZOOM[T]; cam.tx = T >= 7 ? 0.5 : HQ.x; cam.ty = T >= 7 ? 0.5 : HQ.y; userCamMs = 0; }
       shownTier = T;
     }
     // 相机 lerp
@@ -633,8 +668,8 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     ctx.clearRect(0, 0, W, H);
     ctx.drawImage(ground, 0, 0, W, H);
 
-    const k = clamp(A * 0.0055 * Math.pow(cam.zoom, 0.88), 1.0, 40);
-    const kS = clamp(k, 1.0, 3.2); // 远景元素(城市/根据地村)用的小系数
+    const k = clamp(A * 0.0011 * Math.pow(cam.zoom, 0.60), 1.1, 42);
+    const kS = clamp(k, 1.2, 4.2); // 远景元素(城市/根据地村)用的小系数
     const sw = s.sweep;
     formationLabels.length = 0; // 本帧兵团标签收集器清空
     const queue: { y: number; draw: () => void }[] = [];
@@ -658,18 +693,18 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         const houses = 3 + hq.dev;
         for (let i = 0; i < houses; i++) {
           const ang = (i / houses) * Math.PI * 2 + 0.7;
-          const wr = 0.006 + (i % 3) * 0.0035;
+          const wr = 0.0005 + (i % 3) * 0.00028;
           const hw = { x: HQ.x + Math.cos(ang) * wr, y: HQ.y + Math.sin(ang) * wr };
           const hp = proj(hw.x, hw.y);
           const burning = sw?.stage === "pillage" && sw.targetBase === "hq" && i % 2 === 0;
           push(hp.y, () => drawHouse(ctx, hp.x, hp.y, k * 0.32));
           if (burning) spawnFlameW(hw.x, hw.y);
         }
-        push(p.y + 1, () => drawFlag(ctx, p.x, p.y, k * 0.42, t));
+        push(p.y + 1, () => drawFlag(ctx, p.x, p.y, clamp(k * 0.32, 2, 11), t));
         if (hq.tunnels > 0) push(p.y + 2, () => {
           ctx.fillStyle = "#14110b";
           for (let i = 0; i < hq.tunnels; i++) {
-            const tp = proj(HQ.x + 0.012 + i * 0.005, HQ.y + 0.009);
+            const tp = proj(HQ.x + 0.0012 + i * 0.0005, HQ.y + 0.0009);
             ctx.save(); ctx.translate(tp.x, tp.y); ctx.scale(1, 0.6); ctx.beginPath(); ctx.arc(0, 0, k * 0.8, Math.PI, 0); ctx.fill(); ctx.restore();
           }
         });
@@ -697,7 +732,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         if (inView(p2, 160)) push(p2.y, () => drawCounty(ctx, p2.x, p2.y, k * 0.28, t));
       }
       // 乡镇聚落(中立小村)
-      if (cam.zoom > 2.2) {
+      if (cam.zoom > 8) {
         for (const tn of TOWNS) {
           if (!fogOk(tn.x, tn.y)) continue;
           const p2 = proj(tn.x, tn.y);
@@ -752,7 +787,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       const p = proj(wlk.x, wlk.y);
       if (!inView(p, 30)) continue;
       const kind = wlk.kind;
-      push(p.y, () => drawFigure(ctx, p.x, p.y, clamp(k * 0.09, 0.8, 3.4) * (kind === "soldier" ? 1.1 : 1), {
+      push(p.y, () => drawFigure(ctx, p.x, p.y, clamp(k * 0.12, 0.8, 4.2) * (kind === "soldier" ? 1.1 : 1), {
         civ: kind !== "soldier", walk: t * 8 + wlk.ph, face: wlk.tx >= wlk.x ? 1 : -1, carry: kind === "evac" || kind === "migrate"
       }));
     }
@@ -802,7 +837,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       const lt = pp.life / pp.max;
       pp.x += pp.vx * dt; pp.y += pp.vy * dt;
       const p = proj(pp.x, pp.y);
-      const pr = pp.r * Math.pow(cam.zoom, 0.85) * A * 0.001;
+      const pr = clamp(pp.r * Math.pow(cam.zoom, 0.5) * A * 0.0012, 1, 26);
       if (pp.kind === "smoke") {
         ctx.globalAlpha = (1 - lt) * 0.35; ctx.fillStyle = "#3c3830";
         ctx.beginPath(); ctx.arc(p.x, p.y, pr * (0.6 + lt * 1.8), 0, 6.29); ctx.fill();
@@ -857,7 +892,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       const p = baseScreen.get(b.id)!;
       if (!inView(p, 60)) continue;
       const st = s.bases[b.id];
-      const canEst = !st.est && era(s).canExpand && tier(s) >= 5;
+      const canEst = !st.est && era(s).canExpand && tier(s) >= 7;
       ctx.font = `${st.est ? 700 : 400} ${fs}px 'Noto Serif SC', serif`;
       const lab = st.est ? `${b.short}${st.dev > 0 ? `·发展${st.dev}` : ""}${st.spots > 0 ? ` 🏯${st.spots}` : ""}` : `${b.short}(未开辟)`;
       const twd = ctx.measureText(lab).width;
@@ -906,9 +941,9 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const tb = BASES.find((b) => b.id === sw.targetBase)!;
     const target = { x: tb.x, y: tb.y };
     const spawns: { x: number; y: number }[] = [];
-    if (sw.targetBase === "hq" && tier(s) < 5) {
+    if (sw.targetBase === "hq" && tier(s) < 7) {
       const tws = hqTowers(s);
-      for (let i = 0; i < sw.cols; i++) spawns.push(tier(s) >= 3 && i < COUNTIES.length ? COUNTIES[i] : tws[i % tws.length]);
+      for (let i = 0; i < sw.cols; i++) spawns.push(tier(s) >= 5 && i < COUNTIES.length ? COUNTIES[i] : tws[i % tws.length]);
     } else {
       const sorted = [...CITIES].sort((a, b) => ((a.x - target.x) ** 2 + (a.y - target.y) ** 2) - ((b.x - target.x) ** 2 + (b.y - target.y) ** 2));
       for (let i = 0; i < sw.cols; i++) spawns.push(sorted[i % sorted.length]);
@@ -918,13 +953,15 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
   }
   function drawSweep(sw: Sweep, s: KRState, t: number, push: (y: number, d: () => void) => void, dt: number): void {
     const { target, spawns } = sweepGeom(sw, s);
+    const LOCAL = sw.targetBase === "hq" && tier(s) < 7;
+    const SC = LOCAL ? 0.1 : 1; // 局部战斗全部 offset 缩到村尺度
     const per = sw.strength / Math.max(1, sw.cols);
     const tp = proj(target.x, target.y);
-    const fk = clamp(A * 0.0055 * Math.pow(cam.zoom, 0.88) * 0.12, 1.0, 3.4); // 兵团小人尺寸
+    const fk = clamp(A * 0.0006 * Math.pow(cam.zoom, 0.55), 1.0, 8); // 兵团小人尺寸
     if (sw.stage === "incoming") {
       const prog = 1 - sw.etaSec / sw.etaSec0;
       if (sw.kind === "encircle") {
-        const wR = 0.10 * (1 - prog * 0.7);
+        const wR = 0.10 * SC * 10 * (1 - prog * 0.7) * (LOCAL ? 0.14 : 1);
         const sR = wR * cam.zoom * A;
         ctx.save(); ctx.translate(tp.x, tp.y); ctx.scale(1, 0.5);
         ctx.strokeStyle = `rgba(226,86,77,${0.35 + prog * 0.3})`; ctx.lineWidth = 1.6; ctx.setLineDash([7, 7]);
@@ -934,59 +971,61 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       for (let i = 0; i < spawns.length; i++) {
         const sp = spawns[i];
         const dx = target.x - sp.x, dy = target.y - sp.y, dl = Math.hypot(dx, dy) || 1;
-        const stop = 0.018 + i * 0.004;
+        const stop = (0.018 + i * 0.004) * SC;
         const mx = lerp(sp.x, target.x - (dx / dl) * stop, prog), my = lerp(sp.y, target.y - (dy / dl) * stop, prog);
         const p = proj(mx, my);
         const face = tp.x >= p.x ? 1 : -1;
         if (inView(p, 150)) push(p.y, () => drawFormation(ctx, p.x, p.y, per, true, fk, t, true, face, i === 0, sw.kind === "comb"));
-        if (Math.random() < (sw.kind === "raid" ? 0.7 : 0.3)) particles.push({ x: mx, y: my, vx: -0.004 * face, vy: -0.003, life: 0, max: 1.2, kind: "puff", r: 2 });
+        if (Math.random() < (sw.kind === "raid" ? 0.7 : 0.3)) { const pv2 = 30 / (cam.zoom * A); particles.push({ x: mx, y: my, vx: -pv2 * face, vy: -pv2 * 0.7, life: 0, max: 1.2, kind: "puff", r: 2 }); }
         if (sw.kind === "raid") { ctx.strokeStyle = "rgba(255,90,60,.8)"; ctx.lineWidth = 2; }
         else { ctx.setLineDash([5, 6]); ctx.strokeStyle = "rgba(226,86,77,.45)"; ctx.lineWidth = 1.3; }
         ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(tp.x, tp.y); ctx.stroke(); ctx.setLineDash([]);
       }
       if (sw.committed > 0) {
-        const dp = proj(target.x, target.y - 0.012);
+        const dp = proj(target.x, target.y - 0.012 * SC);
         push(dp.y, () => drawFormation(ctx, dp.x, dp.y, sw.committed, false, fk, t, false, 1));
       }
     } else if (sw.stage === "battle") {
-      const our = proj(target.x, target.y + 0.006);
+      const our = proj(target.x, target.y + 0.006 * SC);
       push(our.y, () => drawFormation(ctx, our.x, our.y, sw.committed, false, fk, t, false, 1));
       for (let i = 0; i < spawns.length; i++) {
         const sp = spawns[i];
         const dx = target.x - sp.x, dy = target.y - sp.y, dl = Math.hypot(dx, dy) || 1;
-        const jw = { x: target.x - (dx / dl) * 0.016, y: target.y - (dy / dl) * 0.016 };
+        const jw = { x: target.x - (dx / dl) * 0.016 * SC, y: target.y - (dy / dl) * 0.016 * SC };
         const jp = proj(jw.x, jw.y);
         const face = tp.x >= jp.x ? 1 : -1;
         push(jp.y, () => drawFormation(ctx, jp.x, jp.y, per, true, fk, t, false, face, i === 0, sw.kind === "comb"));
         const rate = clamp((sw.strength + sw.committed) * 0.02, 0.3, 2.2) / sw.cols;
         if (Math.random() < rate * dt * 30) {
           const fromJp = Math.random() < 0.5;
-          const aW = fromJp ? jw : { x: target.x, y: target.y + 0.006 };
-          const bW = fromJp ? { x: target.x, y: target.y + 0.006 } : jw;
-          const ox = (Math.random() - 0.5) * 0.004, oy = (Math.random() - 0.5) * 0.003;
+          const aW = fromJp ? jw : { x: target.x, y: target.y + 0.006 * SC };
+          const bW = fromJp ? { x: target.x, y: target.y + 0.006 * SC } : jw;
+          const ox = (Math.random() - 0.5) * 0.004 * SC, oy = (Math.random() - 0.5) * 0.003 * SC;
           tracers.push({ x1: aW.x + ox, y1: aW.y + oy, x2: bW.x - ox, y2: bW.y - oy, life: 1, jp: fromJp });
           particles.push({ x: aW.x + ox, y: aW.y + oy, vx: 0, vy: 0, life: 0, max: 0.16, kind: "flash", r: 2.4 });
         }
       }
-      if (Math.random() < dt * 8) particles.push({ x: target.x + (Math.random() - 0.5) * 0.012, y: target.y, vx: 0.002, vy: -0.004, life: 0, max: 2.2, kind: "smoke", r: 3 });
+      if (Math.random() < dt * 8) particles.push({ x: target.x + (Math.random() - 0.5) * 0.012 * SC, y: target.y, vx: 0.002 * SC, vy: -0.004 * SC, life: 0, max: 2.2, kind: "smoke", r: 3 });
     } else {
       push(tp.y + 2, () => drawFormation(ctx, tp.x, tp.y, sw.strength, true, fk, t, true, 1));
-      spawnFlameW(target.x + (Math.random() - 0.5) * 0.008, target.y + (Math.random() - 0.5) * 0.006);
+      spawnFlameW(target.x + (Math.random() - 0.5) * 0.008 * SC, target.y + (Math.random() - 0.5) * 0.006 * SC);
     }
     // 群众进山
     if (sw.evacStarted && sw.evacProgress < 1) {
       if (Math.random() < dt * 6 && walkers.filter((w) => w.kind === "evac").length < 26) {
+        const evScale = sw.targetBase === "hq" && tier(s) < 7 ? 1 : 10;
         walkers.push({
-          x: target.x + (Math.random() - 0.5) * 0.01, y: target.y + (Math.random() - 0.5) * 0.01,
-          tx: EVAC.x + (Math.random() - 0.5) * 0.05, ty: EVAC.y + (Math.random() - 0.5) * 0.04,
-          spd: 0.018 + Math.random() * 0.008, kind: "evac", ph: Math.random() * 7
+          x: target.x + (Math.random() - 0.5) * 0.001 * evScale, y: target.y + (Math.random() - 0.5) * 0.001 * evScale,
+          tx: target.x - 0.006 * evScale + (Math.random() - 0.5) * 0.002 * evScale, ty: target.y + 0.005 * evScale + (Math.random() - 0.5) * 0.002 * evScale,
+          spd: (0.0012 + Math.random() * 0.0006) * evScale, kind: "evac", ph: Math.random() * 7
         });
       }
     }
   }
   function spawnFlameW(wx: number, wy: number): void {
-    if (Math.random() < 0.5) particles.push({ x: wx + (Math.random() - 0.5) * 0.002, y: wy, vx: (Math.random() - 0.5) * 0.001, vy: -0.006 - Math.random() * 0.004, life: 0, max: 0.7, kind: "flame", r: 2.2 });
-    if (Math.random() < 0.3) particles.push({ x: wx, y: wy - 0.001, vx: 0.001, vy: -0.005, life: 0, max: 2.6, kind: "smoke", r: 3 });
+    const pv = 46 / (cam.zoom * A); // 屏幕~46px/s 的世界速度
+    if (Math.random() < 0.5) particles.push({ x: wx + (Math.random() - 0.5) * pv, y: wy, vx: (Math.random() - 0.5) * pv * 0.4, vy: -pv - Math.random() * pv * 0.6, life: 0, max: 0.7, kind: "flame", r: 2.2 });
+    if (Math.random() < 0.3) particles.push({ x: wx, y: wy, vx: pv * 0.3, vy: -pv * 0.8, life: 0, max: 2.6, kind: "smoke", r: 3 });
   }
   function trackCasualties(sw: Sweep | null, s: KRState): void {
     if (!sw || sw.stage !== "battle") { prevJp = sw ? sw.strength : 0; prevOur = sw ? sw.committed : 0; prevSweepOn = !!sw; return; }
@@ -994,8 +1033,9 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const tb = BASES.find((b) => b.id === sw.targetBase)!;
     const jpDrop = Math.floor(prevJp) - Math.floor(sw.strength);
     const ourDrop = Math.floor(prevOur) - Math.floor(sw.committed);
-    for (let i = 0; i < Math.min(3, jpDrop); i++) corpses.push({ x: tb.x + (Math.random() - 0.5) * 0.02, y: tb.y - 0.012 + (Math.random() - 0.5) * 0.008, life: 6, jp: true });
-    for (let i = 0; i < Math.min(3, ourDrop); i++) corpses.push({ x: tb.x + (Math.random() - 0.5) * 0.016, y: tb.y + 0.006 + (Math.random() - 0.5) * 0.006, life: 6, jp: false });
+    const cSC = sw.targetBase === "hq" && tier(s) < 7 ? 0.1 : 1;
+    for (let i = 0; i < Math.min(3, jpDrop); i++) corpses.push({ x: tb.x + (Math.random() - 0.5) * 0.02 * cSC, y: tb.y - 0.012 * cSC + (Math.random() - 0.5) * 0.008 * cSC, life: 6, jp: true });
+    for (let i = 0; i < Math.min(3, ourDrop); i++) corpses.push({ x: tb.x + (Math.random() - 0.5) * 0.016 * cSC, y: tb.y + 0.006 * cSC + (Math.random() - 0.5) * 0.006 * cSC, life: 6, jp: false });
     prevJp = sw.strength; prevOur = sw.committed;
     void s;
   }
@@ -1031,18 +1071,18 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
   }
   function spawnWalker(kind: "villager" | "soldier"): Walker {
-    const r = kind === "soldier" ? 0.016 : 0.011;
+    const r = kind === "soldier" ? 0.0016 : 0.0011;
     return {
       x: HQ.x + (Math.random() - 0.5) * r * 2, y: HQ.y + (Math.random() - 0.5) * r * 1.6,
       tx: HQ.x + (Math.random() - 0.5) * r * 2, ty: HQ.y + (Math.random() - 0.5) * r * 1.6,
-      spd: 0.003 + Math.random() * 0.002, kind, ph: Math.random() * 7
+      spd: 0.0004 + Math.random() * 0.0002, kind, ph: Math.random() * 7
     };
   }
   function stepWalkers(dt: number): void {
     for (let i = walkers.length - 1; i >= 0; i--) {
       const w = walkers[i];
       const dx = w.tx - w.x, dy = w.ty - w.y, d = Math.hypot(dx, dy);
-      if (d < 0.002) {
+      if (d < 0.0004) {
         if (w.kind === "evac" || w.kind === "migrate") { walkers.splice(i, 1); continue; }
         const r = w.kind === "soldier" ? 0.016 : 0.011;
         w.tx = HQ.x + (Math.random() - 0.5) * r * 2; w.ty = HQ.y + (Math.random() - 0.5) * r * 1.6;

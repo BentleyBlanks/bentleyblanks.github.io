@@ -313,6 +313,7 @@ export function bootstrapKangri(root: HTMLElement): void {
 
   const GUIDE = [
     { t: "买【民兵队】『生产队』攒家底；点地图上金圈闪的区域【开辟】新根据地——现在是大发展窗口！", d: (s: KRState) => estCount(s) >= 2 },
+    { t: "村口那座炮楼就是第一个对手——攒兵和物资,到『根据地』面板【拔据点】端掉它！", d: (s: KRState) => s.stats.spotsRemoved > 0 },
     { t: "日军扫荡来时：下令【组织群众大范围转移】保家底，【组织抗击】投兵员打会战", d: (s: KRState) => s.sweepsSurvived > 0 },
     { t: "1939 起日军修炮楼蚕食根据地(🏯)——在根据地面板【拔据点】。给平原根据地【挖地道】，1941-42 顶得住铁壁合围", d: (s: KRState) => s.stats.spotsRemoved > 0 || BASES.some((b) => s.bases[b.id].tunnels > 0) },
     { t: "『大战役』档里有历史窗口——平型关、百团大战……错过就没了。撑到 1945.8！", d: (s: KRState) => s.stats.campaignsWon > 0 }
@@ -408,8 +409,8 @@ export function bootstrapKangri(root: HTMLElement): void {
         : `人口 ${b.pop0}万 · ${b.hist}`;
       const ec = estCost(state);
       row.est.style.display = st.est ? "none" : "";
-      row.est.textContent = tier(state) < 5 ? "开辟(需边区规模)" : era(state).canExpand ? `开辟 ${fmt(ec.bing)}兵${fmt(ec.wuzi)}资` : "开辟(至暗期不可)";
-      row.est.disabled = tier(state) < 5 || !era(state).canExpand || state.bing < ec.bing || state.wuzi < ec.wuzi;
+      row.est.textContent = tier(state) < 7 ? "开辟(需边区规模)" : era(state).canExpand ? `开辟 ${fmt(ec.bing)}兵${fmt(ec.wuzi)}资` : "开辟(至暗期不可)";
+      row.est.disabled = tier(state) < 7 || !era(state).canExpand || state.bing < ec.bing || state.wuzi < ec.wuzi;
       row.dev.style.display = st.est ? "" : "none";
       row.dev.textContent = st.dev >= 5 ? "发展MAX" : `发展 ${fmt(devCost(state, b.id))}资`;
       row.dev.disabled = st.dev >= 5 || state.wuzi < devCost(state, b.id);
@@ -421,7 +422,7 @@ export function bootstrapKangri(root: HTMLElement): void {
       row.spot.textContent = `拔据点 ${fmt(sc.bing)}兵${fmt(sc.wuzi)}资`;
       row.spot.disabled = state.bing < sc.bing || state.wuzi < sc.wuzi;
       const migTo = st.est ? pickMigrationTarget(state, b.id) : null;
-      row.mig.style.display = st.est && migTo && tier(state) >= 5 ? "" : "none";
+      row.mig.style.display = st.est && migTo && tier(state) >= 7 ? "" : "none";
       if (migTo) {
         row.mig.textContent = state.migration ? "迁移中…" : `迁25%群众→${BASES.find((x) => x.id === migTo)!.short} ${fmt(migrationCost(state, b.id))}资`;
         row.mig.disabled = !!state.migration || state.wuzi < migrationCost(state, b.id) || state.bases[b.id].pop <= b.pop0 * 0.3;
