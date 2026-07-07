@@ -30,7 +30,19 @@ const HQ_SATS = [
   { x: 0.462, y: 0.664 }, { x: 0.535, y: 0.655 }, { x: 0.472, y: 0.712 },
   { x: 0.528, y: 0.706 }, { x: 0.455, y: 0.690 }, { x: 0.512, y: 0.632 }, { x: 0.545, y: 0.684 }
 ];
-const HQ_COUNTY = { x: 0.552, y: 0.606 }; // 县城(日占,T2 视野)
+// 县城群(日占)：T3 见第一座,T4 专区见三座
+const COUNTIES = [
+  { x: 0.552, y: 0.606, name: "东关县城" },
+  { x: 0.428, y: 0.612, name: "西口县城" },
+  { x: 0.532, y: 0.762, name: "南塬县城" }
+];
+const HQ_COUNTY = COUNTIES[0];
+// 乡镇聚落(中立灰村,被红区罩住即"解放"观感)
+const TOWNS = [
+  { x: 0.472, y: 0.588 }, { x: 0.545, y: 0.565 }, { x: 0.585, y: 0.655 },
+  { x: 0.44, y: 0.72 }, { x: 0.56, y: 0.71 }, { x: 0.40, y: 0.655 },
+  { x: 0.49, y: 0.77 }, { x: 0.615, y: 0.60 }, { x: 0.375, y: 0.565 }, { x: 0.60, y: 0.755 }
+];
 // 村口第一座炮楼(T0 的对手)；更多 spots 塔在外环
 const HQ_TOWER0 = { x: 0.521, y: 0.662 };
 const CITIES = [
@@ -47,10 +59,10 @@ const RAILS: [string, string][] = [
   ["datong", "taiyuan"], ["tianjin", "jinan"], ["jinan", "xuzhou"], ["beiping", "tianjin"], ["shijiazhuang", "jinan"]
 ];
 const cityOf = (id: string) => CITIES.find((c) => c.id === id)!;
-// 阶梯 → 战雾解锁半径(以 hq 为中心；已开辟/揭示的根据地各自再挖开一圈)
-const UNLOCK_R = [0.045, 0.11, 0.24, 0.5, 2];
+// 阶梯 → 战雾解锁半径(以 hq 为中心；已开辟/揭示的根据地各自再挖开一圈)。7 档:村/连村/区乡/县/专区/边区/华北
+const UNLOCK_R = [0.045, 0.085, 0.14, 0.22, 0.34, 0.55, 2];
 // 阶梯 → 升级时镜头自动拉远到的 zoom
-const TIER_ZOOM = [15, 8, 4, 1.9, 1.15];
+const TIER_ZOOM = [15, 9.5, 6.5, 4.2, 2.8, 1.9, 1.15];
 
 function hash2(x: number, y: number): number {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -165,7 +177,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
     // 日军：城市 + 县城 + 炮楼
     for (const c of CITIES) jpSrc.push({ x: c.x, y: c.y, r: 0.07 });
-    jpSrc.push({ x: HQ_COUNTY.x, y: HQ_COUNTY.y, r: 0.045 });
+    for (const c of COUNTIES) jpSrc.push({ x: c.x, y: c.y, r: 0.042 });
     for (const tw of hqTowers(s)) jpSrc.push({ x: tw.x, y: tw.y, r: 0.02 });
     for (const b of BASES) {
       const st = s.bases[b.id];
@@ -186,12 +198,11 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     let vis = sstep(uR + 0.06, uR - 0.02, Math.hypot(wx - HQ.x, wy - HQ.y));
     for (const b of BASES) {
       if (b.id === "hq" || !baseRevealed(s, b.id)) continue;
-      if (tier(s) < 3) continue; // 大板块的雾 T3 起才挖开
+      if (tier(s) < 5) continue; // 大板块的雾 T5(边区) 起才挖开
       vis = Math.max(vis, sstep(0.15, 0.06, Math.hypot(wx - b.x, wy - b.y)));
     }
     return 1 - vis; // 1=浓雾
   }
-  const QK = 140; // 地块量化密度(世界 1/140 一格→边界经等距投影贴网格)
   function renderGround(s: KRState): void {
     ground.width = Math.max(1, W * dpr); ground.height = Math.max(1, H * dpr);
     const g = ground.getContext("2d")!;
@@ -219,11 +230,6 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         const hl = fbm((w.x - 0.012) * 5.2 + 7, (w.y - 0.012) * 5.2 + 3) * (0.55 + ridge) - (fbm(w.x * 5.2 + 7, w.y * 5.2 + 3) * (0.55 + ridge));
         const lig = clamp(1 + hl * 5.5, 0.72, 1.3);
         r *= lig; gg *= lig; b *= lig;
-        // 地块控制染色（世界空间量化→贴等距网格）
-        const qx = (Math.floor(w.x * QK) + 0.5) / QK, qy = (Math.floor(w.y * QK) + 0.5) / QK;
-        const ctl = clamp((fieldAt({ x: qx, y: qy }, ourSrc) - fieldAt({ x: qx, y: qy }, jpSrc)) * 1.6, -1, 1);
-        if (ctl > 0.13) { const a = 0.10 + 0.30 * ctl; r = lerp(r, 178, a); gg = lerp(gg, 44, a); b = lerp(b, 28, a); }
-        else if (ctl < -0.13) { const a = 0.10 + 0.26 * -ctl; r = lerp(r, 58, a); gg = lerp(gg, 70, a); b = lerp(b, 86, a); }
         // 战雾
         const fog = fogAt(s, w.x, w.y);
         if (fog > 0.02) { const fa = fog * 0.93; r = lerp(r, 5, fa); gg = lerp(gg, 5, fa); b = lerp(b, 4, fa); }
@@ -261,6 +267,22 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     };
     for (const [a, b] of RAILS) { const ca = cityOf(a), cb = cityOf(b); railSeg(ca.x, ca.y, cb.x, cb.y); }
     railSeg(HQ_COUNTY.x, HQ_COUNTY.y, 0.50, 0.40); // 县城→石家庄支线
+    // 公路网(囚笼的链): 县城互连+通向乡镇的土路
+    const road = (x1: number, y1: number, x2: number, y2: number): void => {
+      const STEPS = 10;
+      for (let st2 = 0; st2 < STEPS; st2++) {
+        const t0 = st2 / STEPS, t1 = (st2 + 1) / STEPS;
+        const ax = lerp(x1, x2, t0), ay = lerp(y1, y2, t0);
+        if (fogAt(s, ax, ay) > 0.8) continue;
+        const pa = proj(ax, ay), pb = proj(lerp(x1, x2, t1), lerp(y1, y2, t1));
+        g.strokeStyle = "rgba(130,112,74,.4)"; g.lineWidth = Math.max(1, A * 0.0022 * Math.pow(cam.zoom, 0.6));
+        g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
+      }
+    };
+    road(COUNTIES[0].x, COUNTIES[0].y, COUNTIES[1].x, COUNTIES[1].y);
+    road(COUNTIES[0].x, COUNTIES[0].y, COUNTIES[2].x, COUNTIES[2].y);
+    road(COUNTIES[1].x, COUNTIES[1].y, COUNTIES[2].x, COUNTIES[2].y);
+    for (const tn of TOWNS.slice(0, 6)) road(HQ.x, HQ.y, tn.x, tn.y);
     // 树/山脊符号（世界撒点，可见+雾外才画）
     const symN = 900;
     for (let k2 = 0; k2 < symN; k2++) {
@@ -281,10 +303,69 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         g.beginPath(); g.moveTo(p.x, p.y - sz * 0.4); g.lineTo(p.x, p.y + sz * 0.8); g.stroke();
       }
     }
+    // ── 领土地块层(文明6式): 世界网格整块填充+归属边界亮描边 ──
+    drawTerritory(g, s);
     // 地图外框
     const c0 = proj(0, 0), c1 = proj(1, 0), c2 = proj(1, 1), c3 = proj(0, 1);
     g.strokeStyle = "rgba(216,201,160,.22)"; g.lineWidth = 1.5;
     g.beginPath(); g.moveTo(c0.x, c0.y); g.lineTo(c1.x, c1.y); g.lineTo(c2.x, c2.y); g.lineTo(c3.x, c3.y); g.closePath(); g.stroke();
+  }
+
+
+  // ── 文明6式领土层 ──
+  // 世界固定网格,每格按影响场定归属(our/jp/中立);同属地块连成整片半透明填充,
+  // 只在"归属交界"画亮描边(我方亮红/日军青灰)——像文明的国界线。地块随平滑半径生长/收缩。
+  const TTX = 56, TTY = 40;
+  const terrOwn = new Int8Array(TTX * TTY); // 1=our -1=jp 0=neutral
+  function drawTerritory(g: CanvasRenderingContext2D, s: KRState): void {
+    // 归属采样(格中心,雾内=中立)
+    for (let j = 0; j < TTY; j++) {
+      for (let i = 0; i < TTX; i++) {
+        const wx = (i + 0.5) / TTX, wy = (j + 0.5) / TTY;
+        let own = 0;
+        if (fogAt(s, wx, wy) < 0.5) {
+          const ctl = fieldAt({ x: wx, y: wy }, ourSrc) - fieldAt({ x: wx, y: wy }, jpSrc);
+          own = ctl > 0.14 ? 1 : ctl < -0.14 ? -1 : 0;
+        }
+        terrOwn[j * TTX + i] = own;
+      }
+    }
+    const corner = (i: number, j: number) => proj(i / TTX, j / TTY);
+    const lw = Math.max(1.6, A * 0.0035 * Math.pow(cam.zoom, 0.45));
+    // ① 整块填充(半透明,同属相邻无内线→整片领土感)
+    for (let j = 0; j < TTY; j++) {
+      for (let i = 0; i < TTX; i++) {
+        const own = terrOwn[j * TTX + i];
+        if (own === 0) continue;
+        const p0 = corner(i, j), p2 = corner(i + 1, j + 1);
+        if (Math.max(p0.x, p2.x) < -40 || Math.min(p0.x, p2.x) > W + 40 || Math.max(p0.y, p2.y) < -40 || Math.min(p0.y, p2.y) > H + 40) continue;
+        const p1 = corner(i + 1, j), p3 = corner(i, j + 1);
+        g.fillStyle = own > 0 ? "rgba(178,44,28,.20)" : "rgba(56,72,92,.20)";
+        g.beginPath(); g.moveTo(p0.x, p0.y); g.lineTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.lineTo(p3.x, p3.y); g.closePath(); g.fill();
+      }
+    }
+    // ② 边界描边: 与右邻/下邻归属不同 → 公共边画国界线(先宽光晕后亮线)
+    g.lineCap = "round";
+    const edge = (ax: number, ay: number, bx: number, by: number, own: number): void => {
+      const pa = corner(ax, ay), pb = corner(bx, by);
+      if ((pa.x < -40 && pb.x < -40) || (pa.x > W + 40 && pb.x > W + 40)) return;
+      if ((pa.y < -40 && pb.y < -40) || (pa.y > H + 40 && pb.y > H + 40)) return;
+      g.strokeStyle = own > 0 ? "rgba(226,86,77,.25)" : "rgba(130,160,190,.22)";
+      g.lineWidth = lw * 2.6;
+      g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
+      g.strokeStyle = own > 0 ? "rgba(240,120,100,.85)" : "rgba(150,180,205,.75)";
+      g.lineWidth = lw;
+      g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
+    };
+    for (let j = 0; j < TTY; j++) {
+      for (let i = 0; i < TTX; i++) {
+        const own = terrOwn[j * TTX + i];
+        const right = i + 1 < TTX ? terrOwn[j * TTX + i + 1] : 0;
+        const down = j + 1 < TTY ? terrOwn[(j + 1) * TTX + i] : 0;
+        if (own !== right && (own !== 0 || right !== 0)) edge(i + 1, j, i + 1, j + 1, own !== 0 ? own : right);
+        if (own !== down && (own !== 0 || down !== 0)) edge(i, j + 1, i + 1, j + 1, own !== 0 ? own : down);
+      }
+    }
   }
 
   let time = 0;
@@ -445,7 +526,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const T = tier(s);
     // 阶梯升级：自动平滑拉远(玩家仍可随时缩放)
     if (T !== shownTier) {
-      if (shownTier >= 0) { cam.tzoom = TIER_ZOOM[T]; cam.tx = T >= 3 ? 0.5 : HQ.x; cam.ty = T >= 3 ? 0.5 : HQ.y; userCamMs = 0; }
+      if (shownTier >= 0) { cam.tzoom = TIER_ZOOM[T]; cam.tx = T >= 5 ? 0.5 : HQ.x; cam.ty = T >= 5 ? 0.5 : HQ.y; userCamMs = 0; }
       shownTier = T;
     }
     // 相机 lerp
@@ -523,10 +604,20 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         if (!inView(p2)) continue;
         push(p2.y, () => drawBlockhouse(ctx, p2.x, p2.y, k * 0.26, t));
       }
-      // 县城
-      if (fogOk(HQ_COUNTY.x, HQ_COUNTY.y)) {
-        const p2 = proj(HQ_COUNTY.x, HQ_COUNTY.y);
+      // 县城群
+      for (const c of COUNTIES) {
+        if (!fogOk(c.x, c.y)) continue;
+        const p2 = proj(c.x, c.y);
         if (inView(p2, 160)) push(p2.y, () => drawCounty(ctx, p2.x, p2.y, k * 0.28, t));
+      }
+      // 乡镇聚落(中立小村)
+      if (cam.zoom > 2.2) {
+        for (const tn of TOWNS) {
+          if (!fogOk(tn.x, tn.y)) continue;
+          const p2 = proj(tn.x, tn.y);
+          if (!inView(p2)) continue;
+          push(p2.y, () => { drawHouse(ctx, p2.x - k * 1.6, p2.y, k * 0.16); drawHouse(ctx, p2.x + k * 1.4, p2.y + k * 0.6, k * 0.15); });
+        }
       }
     }
     // ③ 其余根据地（T3+ 雾开后可见）
@@ -680,7 +771,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       const p = baseScreen.get(b.id)!;
       if (!inView(p, 60)) continue;
       const st = s.bases[b.id];
-      const canEst = !st.est && era(s).canExpand && tier(s) >= 3;
+      const canEst = !st.est && era(s).canExpand && tier(s) >= 5;
       ctx.font = `${st.est ? 700 : 400} ${fs}px 'Noto Serif SC', serif`;
       const lab = st.est ? `${b.short}${st.dev > 0 ? `·发展${st.dev}` : ""}${st.spots > 0 ? ` 🏯${st.spots}` : ""}` : `${b.short}(未开辟)`;
       const twd = ctx.measureText(lab).width;
@@ -709,9 +800,10 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
     // 县城/炮楼 小字（近景才显示）
     if (cam.zoom > 3.2) {
-      if (fogAt(s, HQ_COUNTY.x, HQ_COUNTY.y) < 0.55) {
-        const p = proj(HQ_COUNTY.x, HQ_COUNTY.y);
-        if (inView(p, 40)) { ctx.font = `400 11px 'Noto Serif SC', serif`; ctx.fillStyle = "rgba(150,158,168,.8)"; ctx.fillText("县城(日占)", p.x - 26, p.y + 26); }
+      for (const c of COUNTIES) {
+        if (fogAt(s, c.x, c.y) > 0.55) continue;
+        const p = proj(c.x, c.y);
+        if (inView(p, 40)) { ctx.font = `400 11px 'Noto Serif SC', serif`; ctx.fillStyle = "rgba(150,158,168,.8)"; ctx.fillText(c.name + "(日占)", p.x - 30, p.y + 26); }
       }
       for (const tw of hqTowers(s)) {
         if (fogAt(s, tw.x, tw.y) > 0.55) continue;
@@ -728,9 +820,9 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const tb = BASES.find((b) => b.id === sw.targetBase)!;
     const target = { x: tb.x, y: tb.y };
     const spawns: { x: number; y: number }[] = [];
-    if (sw.targetBase === "hq" && tier(s) < 3) {
+    if (sw.targetBase === "hq" && tier(s) < 5) {
       const tws = hqTowers(s);
-      for (let i = 0; i < sw.cols; i++) spawns.push(i === 0 && tier(s) >= 2 ? HQ_COUNTY : tws[i % tws.length]);
+      for (let i = 0; i < sw.cols; i++) spawns.push(tier(s) >= 3 && i < COUNTIES.length ? COUNTIES[i] : tws[i % tws.length]);
     } else {
       const sorted = [...CITIES].sort((a, b) => ((a.x - target.x) ** 2 + (a.y - target.y) ** 2) - ((b.x - target.x) ** 2 + (b.y - target.y) ** 2));
       for (let i = 0; i < sw.cols; i++) spawns.push(sorted[i % sorted.length]);

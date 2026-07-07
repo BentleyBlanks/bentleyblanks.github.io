@@ -65,13 +65,11 @@ export function bootstrapKangri(root: HTMLElement): void {
         <button class="kr-tab" data-t="base">根据地</button>
         <button class="kr-tab" data-t="policy">政策</button>
         <button class="kr-tab" data-t="camp">大战役</button>
-        <button class="kr-tab" data-t="ach">成就</button>
       </div>
       <div class="kr-panel" id="krBuild"></div>
       <div class="kr-panel" id="krBase" style="display:none"></div>
       <div class="kr-panel" id="krPolicy" style="display:none"></div>
       <div class="kr-panel" id="krCamp" style="display:none"></div>
-      <div class="kr-panel" id="krAch" style="display:none"></div>
     </aside>
 
     <div class="kr-guide" id="krGuide" style="display:none"></div>
@@ -80,6 +78,8 @@ export function bootstrapKangri(root: HTMLElement): void {
     <div class="kr-toasts" id="krToasts"></div>
     <div class="kr-onb" id="krOnb" style="display:none"><div class="kr-onb-tip" id="krOnbTip"></div><button class="kr-onb-skip" id="krOnbSkip">跳过引导</button></div>
     <div class="kr-ending" id="krEnding" style="display:none"></div>
+    <button class="kr-ach-btn" id="krAchBtn">🏆<span class="kr-ach-badge" id="krAchBadge"></span></button>
+    <div class="kr-ach-pop" id="krAchPop" style="display:none"></div>
     <button class="kr-debug-btn" id="krDbgBtn">⚙</button>
     <div class="kr-debug" id="krDebug" style="display:none">
       <div class="kr-dt">DEBUG</div>
@@ -205,7 +205,7 @@ export function bootstrapKangri(root: HTMLElement): void {
     return [b.id, { el, name: el.querySelector<HTMLElement>(".kr-base-name")!, terr: el.querySelector<HTMLElement>(".kr-base-terr")!, stats: el.querySelector<HTMLElement>(".kr-base-stats")!, est: q(".kr-ba.est"), dev: q(".kr-ba.dev"), tun: q(".kr-ba.tun"), spot: q(".kr-ba.spot"), mig: q(".kr-ba.mig") }];
   }));
 
-  const panels: Record<string, HTMLElement> = { build: $("#krBuild"), base: $("#krBase"), policy: $("#krPolicy"), camp: $("#krCamp"), ach: $("#krAch") };
+  const panels: Record<string, HTMLElement> = { build: $("#krBuild"), base: $("#krBase"), policy: $("#krPolicy"), camp: $("#krCamp") };
   function switchTab(t: string): void {
     for (const x of wrap.querySelectorAll<HTMLButtonElement>(".kr-tab")) x.classList.toggle("active", x.dataset.t === t);
     for (const k in panels) panels[k].style.display = k === t ? "" : "none";
@@ -214,7 +214,8 @@ export function bootstrapKangri(root: HTMLElement): void {
 
 
   // ── 成就系统（Steam 预留：ACHIEVEMENTS 的 id 即成就 API Name）──
-  const achPanel = $("#krAch");
+  const achPanel = $("#krAchPop");
+  $("#krAchBtn").addEventListener("click", () => { achPanel.style.display = achPanel.style.display === "none" ? "" : "none"; });
   const achRows = new Map(ACHIEVEMENTS.map((a) => {
     const el = document.createElement("div"); el.className = "kr-ach";
     el.innerHTML = '<span class="kr-ach-ic"></span><div><div class="kr-ach-name"></div><div class="kr-ach-desc"></div></div>';
@@ -225,7 +226,8 @@ export function bootstrapKangri(root: HTMLElement): void {
   achPanel.prepend(achHead);
   function renderAch(): void {
     const n = ACHIEVEMENTS.filter((a) => state.achievements[a.id]).length;
-    achHead.textContent = "🏆 " + n + " / " + ACHIEVEMENTS.length;
+    achHead.textContent = "🏆 成就 " + n + " / " + ACHIEVEMENTS.length;
+    $("#krAchBadge").textContent = String(n);
     for (const a of ACHIEVEMENTS) {
       const r = achRows.get(a.id)!;
       const got = !!state.achievements[a.id];
@@ -406,8 +408,8 @@ export function bootstrapKangri(root: HTMLElement): void {
         : `人口 ${b.pop0}万 · ${b.hist}`;
       const ec = estCost(state);
       row.est.style.display = st.est ? "none" : "";
-      row.est.textContent = tier(state) < 3 ? "开辟(需县域规模)" : era(state).canExpand ? `开辟 ${fmt(ec.bing)}兵${fmt(ec.wuzi)}资` : "开辟(至暗期不可)";
-      row.est.disabled = tier(state) < 3 || !era(state).canExpand || state.bing < ec.bing || state.wuzi < ec.wuzi;
+      row.est.textContent = tier(state) < 5 ? "开辟(需边区规模)" : era(state).canExpand ? `开辟 ${fmt(ec.bing)}兵${fmt(ec.wuzi)}资` : "开辟(至暗期不可)";
+      row.est.disabled = tier(state) < 5 || !era(state).canExpand || state.bing < ec.bing || state.wuzi < ec.wuzi;
       row.dev.style.display = st.est ? "" : "none";
       row.dev.textContent = st.dev >= 5 ? "发展MAX" : `发展 ${fmt(devCost(state, b.id))}资`;
       row.dev.disabled = st.dev >= 5 || state.wuzi < devCost(state, b.id);
@@ -419,7 +421,7 @@ export function bootstrapKangri(root: HTMLElement): void {
       row.spot.textContent = `拔据点 ${fmt(sc.bing)}兵${fmt(sc.wuzi)}资`;
       row.spot.disabled = state.bing < sc.bing || state.wuzi < sc.wuzi;
       const migTo = st.est ? pickMigrationTarget(state, b.id) : null;
-      row.mig.style.display = st.est && migTo && tier(state) >= 3 ? "" : "none";
+      row.mig.style.display = st.est && migTo && tier(state) >= 5 ? "" : "none";
       if (migTo) {
         row.mig.textContent = state.migration ? "迁移中…" : `迁25%群众→${BASES.find((x) => x.id === migTo)!.short} ${fmt(migrationCost(state, b.id))}资`;
         row.mig.disabled = !!state.migration || state.wuzi < migrationCost(state, b.id) || state.bases[b.id].pop <= b.pop0 * 0.3;

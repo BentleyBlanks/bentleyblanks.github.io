@@ -46,10 +46,12 @@ export function eraOf(mi: number): EraDef {
 export interface TierDef { id: number; name: string; scope: string; atWuzi: number; atM: number; note: string; }
 export const TIERS: TierDef[] = [
   { id: 0, name: "孤村星火", scope: "一个村", atWuzi: 0, atM: 0, note: "一个村的抵抗。对手：村口炮楼里的日军小分队。" },
-  { id: 1, name: "连村成片", scope: "数村", atWuzi: 600, atM: 2, note: "村村相连。对手：日军讨伐小队。" },
-  { id: 2, name: "县域争夺", scope: "一县", atWuzi: 6_000, atM: 6, note: "和县城的日军警备队掰手腕。铁路出现了。" },
-  { id: 3, name: "区域根据地", scope: "专区", atWuzi: 60_000, atM: 10, note: "视野放大到区域——可以开辟各大板块根据地了。对手：日军支队。" },
-  { id: 4, name: "华北大棋局", scope: "全华北", atWuzi: 6e5, atM: 18, note: "冀中、太行、山东……整个华北敌后。对手：联队、师团级兵团。" }
+  { id: 1, name: "连村成片", scope: "数村", atWuzi: 500, atM: 2, note: "村村相连。对手：日军讨伐小队。" },
+  { id: 2, name: "区乡动员", scope: "一个区乡", atWuzi: 2_500, atM: 5, note: "十里八乡组织起来。对手：日军警备中队。" },
+  { id: 3, name: "县域争夺", scope: "一县", atWuzi: 9_000, atM: 8, note: "和县城的日军掰手腕。铁路支线出现了。" },
+  { id: 4, name: "专区经营", scope: "数县连片", atWuzi: 35_000, atM: 12, note: "几座县城连成专区——公路网、多路讨伐都来了。对手：日军大队。" },
+  { id: 5, name: "边区格局", scope: "边区大板块", atWuzi: 130_000, atM: 16, note: "太行区立住了——可以开辟各大板块根据地。对手：日军支队。" },
+  { id: 6, name: "华北大棋局", scope: "全华北", atWuzi: 6e5, atM: 20, note: "冀中、太行、山东……整个华北敌后。对手：联队、师团级兵团。" }
 ];
 export function tier(s: KRState): number {
   let byW = 0, byM = 0;
@@ -175,9 +177,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "doctrine_lun", name: "黑夜里的灯", desc: "研读《论持久战》", check: (s) => !!s.doctrines["lunchijiu"] },
   { id: "doctrine_all", name: "真理之光", desc: "集齐全部六部文献", check: (s) => DOCTRINES.every((d) => s.doctrines[d.id]) },
   { id: "tier1", name: "连村成片", desc: "规模达到数村", check: (s) => tier(s) >= 1 },
-  { id: "tier2", name: "县域争夺", desc: "规模达到一县", check: (s) => tier(s) >= 2 },
-  { id: "tier3", name: "区域根据地", desc: "规模达到专区", check: (s) => tier(s) >= 3 },
-  { id: "tier4", name: "华北大棋局", desc: "视野展开到整个华北", check: (s) => tier(s) >= 4 },
+  { id: "tier2", name: "县域争夺", desc: "规模达到一县", check: (s) => tier(s) >= 3 },
+  { id: "tier2x", name: "区乡动员", desc: "规模达到区乡", check: (s) => tier(s) >= 2 },
+  { id: "tier3", name: "专区经营", desc: "数县连成专区", check: (s) => tier(s) >= 4 },
+  { id: "tier5", name: "边区格局", desc: "撑起边区大板块", check: (s) => tier(s) >= 5 },
+  { id: "tier4", name: "华北大棋局", desc: "视野展开到整个华北", check: (s) => tier(s) >= 6 },
   { id: "pingxingguan", name: "首战告捷", desc: "打出平型关大捷", check: (s) => !!s.campaigns["pingxingguan"] },
   { id: "huangtuling", name: "名将之花凋谢", desc: "黄土岭围歼战击毙阿部规秀", check: (s) => !!s.campaigns["huangtuling"] },
   { id: "baituan", name: "百团出击", desc: "发动百团大战", check: (s) => !!s.campaigns["baituan"] },
@@ -425,7 +429,7 @@ export function buyPolicy(s: KRState, id: string): boolean {
 // 开辟根据地
 export function establishBase(s: KRState, id: string): boolean {
   const st = s.bases[id]; const d = BASES.find((b) => b.id === id);
-  if (!d || st.est || !baseRevealed(s, id) || !era(s).canExpand || tier(s) < 3) return false;
+  if (!d || st.est || !baseRevealed(s, id) || !era(s).canExpand || tier(s) < 5) return false;
   const c = estCost(s);
   if (s.bing < c.bing || s.wuzi < c.wuzi) return false;
   s.bing -= c.bing; s.wuzi -= c.wuzi; st.est = true;

@@ -190,4 +190,11 @@ const CSS = `
 .kr-onb-skip:hover { color: #f0e4c0; border-color: var(--amb); }
 .kr-onb-glow { animation: krglow 1.3s ease-in-out infinite; position: relative; z-index: 25; }
 @keyframes krglow { 0%,100%{ box-shadow: 0 0 0 2px rgba(216,164,65,.5), 0 0 18px rgba(216,164,65,.4);} 50%{ box-shadow: 0 0 0 4px rgba(216,164,65,.9), 0 0 30px rgba(216,164,65,.8);} }
+
+/* 右上角成就按钮 + 浮层 */
+.kr-ach-btn { position: absolute; top: 12px; right: 384px; width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--khk); background: rgba(24,20,12,.9); font-size: 14px; cursor: pointer; z-index: 12; padding: 0; }
+.kr-ach-btn:hover { border-color: var(--amb); }
+.kr-ach-badge { position: absolute; top: -6px; right: -7px; min-width: 15px; height: 15px; border-radius: 8px; background: var(--amb); color: #201808; font-size: 9.5px; font-weight: 800; line-height: 15px; text-align: center; padding: 0 3px; font-family: inherit; }
+.kr-ach-pop { position: absolute; top: 48px; right: 384px; width: 300px; max-height: 72vh; overflow-y: auto; z-index: 13; border: 1px solid var(--amb); border-radius: 8px; background: rgba(14,12,8,.98); padding: 10px 12px; box-shadow: 0 14px 50px rgba(0,0,0,.7); }
+.kr-ach-pop::-webkit-scrollbar { width: 6px; } .kr-ach-pop::-webkit-scrollbar-thumb { background: var(--khk); border-radius: 3px; }
 `;
