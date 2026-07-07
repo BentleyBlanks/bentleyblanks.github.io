@@ -22,7 +22,11 @@ window.addEventListener("hashchange", () => {
 
 // 路由：#matrix=算力格子矩阵白盒；#v3=Cookie Clicker 式重构；#classic=旧 Pixi 版；默认=多阶段白盒方块地图。
 const hash = location.hash.toLowerCase();
-if (hash.includes("matrix")) {
+if (hash.includes("kangri")) {
+  import("./kangri/app")
+    .then(({ bootstrapKangri }) => bootstrapKangri(root))
+    .catch(showFatal);
+} else if (hash.includes("matrix")) {
   import("./matrix/app")
     .then(({ bootstrapMatrix }) => bootstrapMatrix(root))
     .catch(showFatal);
