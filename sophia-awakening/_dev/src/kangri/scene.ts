@@ -1,10 +1,11 @@
 // 《烽火敌后》· 2.5D 战场（纯 Canvas2D，无图片资产）。
-// v3：尺度阶梯 + 地块控制层。
-// · 阶梯外观：T0 一个村(特写:大村+村口炮楼) → T1 数村连片 → T2 县域(县城+铁路支线+据点链) → T3/T4 华北大图(雾逐块揭开)。
-// · 地块层：等距菱形网格铺满地图，按「我方影响场 vs 日军影响场」染色(根据地红/日占灰蓝)，
-//   随发展自动漫开、被围剿(掉人口/发展)自动缩回——控制范围一眼可见。
-// · 扫荡意图表现：讨伐=单路推进；铁壁合围=多路箭头+收缩圈；奔袭=快速小队直插；梳篦=拉网横排。
-// · 群众跨根据地大转移：拖家带口的队伍从 A 走到 B。全部状态读自 core，只画不改。
+// v4：同一张无缝缩放的世界大地图。
+// · 相机系统：滚轮缩放(1~22×)+拖拽平移，随时可拉到全图；阶梯升级=战雾解锁范围扩大+镜头自动平滑拉远。
+//   开局全华北笼罩浓雾，只有自己的村亮着一点红——星星之火。
+// · 所有内容钉在同一世界坐标系：hq 村群/卫星村/村口炮楼/县城+铁路支线(近景) 与 华北铁路网/城市/九块根据地(远景) 连续共存。
+// · 地形+地块控制染色+战雾 = 屏幕空间自适应采样一次遍历(离屏缓存,脏了才重采样)；
+//   地块在世界空间量化 → 边界经等距投影自然贴网格；控制半径平滑生长=红区逐格漫开。
+// · 扫荡意图表现/兵团/小人/迁移队伍全部世界坐标，缩放下连续。只画不改 core 状态。
 import {
   BASES,
   era, tier, baseRevealed, unitName, type KRState, type Sweep
@@ -15,13 +16,22 @@ export interface Scene25D {
   resize: () => void;
   frame: (dt: number, s: KRState) => void;
   hitBase: (cx: number, cy: number) => string | null;
+  focusSweep: () => void;
   dispose: () => void;
 }
 
 const EVAC = { x: 0.12, y: 0.88 };
-const HIT_R = 0.055;
 
-// 铁路网（华北图用）
+// ── 世界布点 ──
+const HQ = { x: 0.50, y: 0.68 };
+// hq 卫星村（世界坐标偏移；T0 雾半径外→只见中心村，T1 雾散见连村）
+const HQ_SATS = [
+  { x: 0.462, y: 0.664 }, { x: 0.535, y: 0.655 }, { x: 0.472, y: 0.712 },
+  { x: 0.528, y: 0.706 }, { x: 0.455, y: 0.690 }, { x: 0.512, y: 0.632 }, { x: 0.545, y: 0.684 }
+];
+const HQ_COUNTY = { x: 0.552, y: 0.606 }; // 县城(日占,T2 视野)
+// 村口第一座炮楼(T0 的对手)；更多 spots 塔在外环
+const HQ_TOWER0 = { x: 0.521, y: 0.662 };
 const CITIES = [
   { id: "beiping", name: "北平", x: 0.62, y: 0.16 },
   { id: "tianjin", name: "天津", x: 0.76, y: 0.20 },
@@ -36,36 +46,10 @@ const RAILS: [string, string][] = [
   ["datong", "taiyuan"], ["tianjin", "jinan"], ["jinan", "xuzhou"], ["beiping", "tianjin"], ["shijiazhuang", "jinan"]
 ];
 const cityOf = (id: string) => CITIES.find((c) => c.id === id)!;
-
-// ── 局部场景布点（T0-T2；坐标同 0..1 地图系）──
-interface LocalLayout {
-  center: { x: number; y: number }; // 中心村/根据地心
-  villages: { x: number; y: number; big: boolean }[];
-  towers: { x: number; y: number }[]; // 日军炮楼(数量跟 hq.spots, 至少1座=对手)
-  county: { x: number; y: number } | null; // 县城(T2)
-  rail: { x1: number; y1: number; x2: number; y2: number } | null;
-}
-function localLayout(tierId: number, spots: number): LocalLayout {
-  const C = { x: 0.5, y: 0.56 };
-  const nT = Math.max(1, Math.min(5, spots || 1));
-  const towerRing = (n: number, r: number): { x: number; y: number }[] =>
-    Array.from({ length: n }, (_, i) => ({ x: C.x + Math.cos(0.9 + (i / 5) * Math.PI * 2) * r, y: C.y + Math.sin(0.9 + (i / 5) * Math.PI * 2) * r * 0.8 }));
-  if (tierId === 0) {
-    return { center: C, villages: [{ x: C.x, y: C.y, big: true }], towers: [{ x: 0.74, y: 0.30 }].slice(0, 1), county: null, rail: null };
-  }
-  if (tierId === 1) {
-    return {
-      center: C,
-      villages: [{ x: C.x, y: C.y, big: true }, { x: 0.34, y: 0.44, big: false }, { x: 0.62, y: 0.40, big: false }, { x: 0.40, y: 0.72, big: false }, { x: 0.66, y: 0.68, big: false }],
-      towers: towerRing(nT, 0.30), county: null, rail: null
-    };
-  }
-  return {
-    center: C,
-    villages: [{ x: C.x, y: C.y, big: true }, { x: 0.34, y: 0.46, big: false }, { x: 0.60, y: 0.42, big: false }, { x: 0.38, y: 0.70, big: false }, { x: 0.64, y: 0.70, big: false }, { x: 0.26, y: 0.58, big: false }, { x: 0.52, y: 0.30, big: false }, { x: 0.72, y: 0.56, big: false }],
-    towers: towerRing(nT, 0.26), county: { x: 0.78, y: 0.22 }, rail: { x1: 0.06, y1: 0.36, x2: 0.96, y2: 0.14 }
-  };
-}
+// 阶梯 → 战雾解锁半径(以 hq 为中心；已开辟/揭示的根据地各自再挖开一圈)
+const UNLOCK_R = [0.045, 0.11, 0.24, 0.5, 2];
+// 阶梯 → 升级时镜头自动拉远到的 zoom
+const TIER_ZOOM = [15, 8, 4, 1.9, 1.15];
 
 function hash2(x: number, y: number): number {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -84,213 +68,246 @@ function fbm(x: number, y: number): number {
 }
 const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+const sstep = (a: number, b: number, x: number): number => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 interface Walker { x: number; y: number; tx: number; ty: number; spd: number; kind: "villager" | "soldier" | "evac" | "migrate"; ph: number; }
-interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; kind: "smoke" | "flame" | "flash" | "puff"; r: number; }
+interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; kind: "smoke" | "flame" | "flash" | "puff"; r: number; } // 世界坐标/世界速度
 interface Corpse { x: number; y: number; life: number; jp: boolean; }
 interface Tracer { x1: number; y1: number; x2: number; y2: number; life: number; jp: boolean; }
 
 export function initScene(canvas: HTMLCanvasElement): Scene25D {
   const ctx0 = canvas.getContext("2d");
-  if (!ctx0) return { ok: false, resize() {}, frame() {}, hitBase: () => null, dispose() {} };
+  if (!ctx0) return { ok: false, resize() {}, frame() {}, hitBase: () => null, focusSweep() {}, dispose() {} };
   const ctx: CanvasRenderingContext2D = ctx0;
 
   let W = 0, H = 0, dpr = 1;
-  let cx = 0, cy = 0, A = 400, B = 200;
+  let cx0 = 0, cy0 = 0, A = 400, B = 200;
+
+  // ── 相机 ──
+  const cam = { x: HQ.x, y: HQ.y, zoom: TIER_ZOOM[0], tx: HQ.x, ty: HQ.y, tzoom: TIER_ZOOM[0] };
+  let userCamMs = 0; // 玩家最近操作相机的冷却(自动聚焦让路)
   const proj = (mx: number, my: number): { x: number; y: number } => {
-    const u = mx - 0.5, v = my - 0.5;
-    return { x: cx + (u - v) * A, y: cy + (u + v) * B };
+    const u = (mx - cam.x) * cam.zoom, v = (my - cam.y) * cam.zoom;
+    return { x: cx0 + (u - v) * A, y: cy0 + (u + v) * B };
   };
   const unproj = (sx: number, sy: number): { x: number; y: number } => {
-    const px = (sx - cx) / A, py = (sy - cy) / B;
-    return { x: (px + py) / 2 + 0.5, y: (py - px) / 2 + 0.5 };
+    const px = (sx - cx0) / A, py = (sy - cy0) / B;
+    const u = (px + py) / 2, v = (py - px) / 2;
+    return { x: u / cam.zoom + cam.x, y: v / cam.zoom + cam.y };
   };
 
-  const terrain = document.createElement("canvas");
-  let terrainTier = -1;
-  let time = 0;
-  let shownTier = -1; // 转场检测
-  let flashT = 0;
+  // 交互：滚轮缩放(鼠标锚点) + 拖拽平移
+  let dragging = false, dragMoved = false, lastMx = 0, lastMy = 0;
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const before = unproj(mx, my);
+    cam.zoom = clamp(cam.zoom * Math.exp(-e.deltaY * 0.0013), 1, 22);
+    cam.tzoom = cam.zoom;
+    const after = unproj(mx, my);
+    cam.x += before.x - after.x; cam.y += before.y - after.y;
+    cam.x = clamp(cam.x, 0, 1); cam.y = clamp(cam.y, 0, 1);
+    cam.tx = cam.x; cam.ty = cam.y;
+    userCamMs = 8000; dirty = true;
+  }, { passive: false });
+  canvas.addEventListener("mousedown", (e) => { dragging = true; dragMoved = false; lastMx = e.clientX; lastMy = e.clientY; });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastMx, dy = e.clientY - lastMy;
+    if (Math.abs(dx) + Math.abs(dy) > 3) dragMoved = true;
+    lastMx = e.clientX; lastMy = e.clientY;
+    // 屏幕位移 → 世界位移（等距逆变换）
+    const pu = dx / A / 2 + dy / B / 2, pv = dy / B / 2 - dx / A / 2;
+    cam.x -= pu / cam.zoom; cam.y -= pv / cam.zoom;
+    cam.x = clamp(cam.x, 0, 1); cam.y = clamp(cam.y, 0, 1);
+    cam.tx = cam.x; cam.ty = cam.y;
+    userCamMs = 8000; dirty = true;
+  });
+  window.addEventListener("mouseup", () => { dragging = false; });
 
+  // ── 地面层（地形+地块染色+战雾 一次采样；离屏缓存，脏才重画）──
+  const ground = document.createElement("canvas");
+  let dirty = true;
+  let groundTimer = 0;
+  // 控制源的平滑半径（生长动画：红区逐格漫开靠它 lerp）
+  const smoothR = new Map<string, number>();
+  function smoothTo(key: string, target: number, dt: number): number {
+    const cur = smoothR.get(key) ?? 0;
+    const next = cur + (target - cur) * Math.min(1, dt * 1.6);
+    smoothR.set(key, next);
+    return next;
+  }
+  interface Src { x: number; y: number; r: number; }
+  let ourSrc: Src[] = [], jpSrc: Src[] = [];
+  function rebuildSources(s: KRState, dt: number): void {
+    const T = tier(s);
+    ourSrc = []; jpSrc = [];
+    const hq = s.bases["hq"];
+    // hq 村群（中心+卫星，随发展/人口长大）
+    const popF = clamp(hq.pop / 20, 0.3, 1.25);
+    const baseR = (0.028 + hq.dev * 0.007 + Math.min(0.04, s.totalWuzi / 60_000 * 0.03)) * popF;
+    ourSrc.push({ x: HQ.x, y: HQ.y, r: smoothTo("hq", baseR * 1.5, dt) });
+    const satN = clamp(1 + hq.dev + T, 0, HQ_SATS.length);
+    for (let i = 0; i < HQ_SATS.length; i++) {
+      const on = i < satN;
+      const r = smoothTo(`sat${i}`, on ? baseR : 0, dt);
+      if (r > 0.002) ourSrc.push({ x: HQ_SATS[i].x, y: HQ_SATS[i].y, r });
+    }
+    // 其余根据地
+    for (const b of BASES) {
+      if (b.id === "hq") continue;
+      const st = s.bases[b.id];
+      const target = st.est ? (0.045 + st.dev * 0.012) * clamp(st.pop / b.pop0, 0.3, 1.25) * Math.max(0.45, 1 - st.spots * 0.09) : 0;
+      const r = smoothTo(b.id, target, dt);
+      if (r > 0.002) ourSrc.push({ x: b.x, y: b.y, r });
+    }
+    // 日军：城市 + 县城 + 炮楼
+    for (const c of CITIES) jpSrc.push({ x: c.x, y: c.y, r: 0.07 });
+    jpSrc.push({ x: HQ_COUNTY.x, y: HQ_COUNTY.y, r: 0.045 });
+    for (const tw of hqTowers(s)) jpSrc.push({ x: tw.x, y: tw.y, r: 0.02 });
+    for (const b of BASES) {
+      const st = s.bases[b.id];
+      if (b.id !== "hq" && st.spots > 0) jpSrc.push({ x: b.x, y: b.y, r: (0.035 + st.spots * 0.01) * 0.8 });
+    }
+  }
+  function fieldAt(w: { x: number; y: number }, arr: Src[]): number {
+    let v = 0;
+    for (const sc of arr) {
+      const d2 = (w.x - sc.x) ** 2 + (w.y - sc.y) ** 2;
+      if (d2 < sc.r * sc.r * 9) v = Math.max(v, Math.exp(-d2 / Math.max(1e-6, sc.r * sc.r)));
+    }
+    return v;
+  }
+  function fogAt(s: KRState, wx: number, wy: number): number {
+    const T = tier(s);
+    const uR = UNLOCK_R[T];
+    let vis = sstep(uR + 0.06, uR - 0.02, Math.hypot(wx - HQ.x, wy - HQ.y));
+    for (const b of BASES) {
+      if (b.id === "hq" || !baseRevealed(s, b.id)) continue;
+      if (tier(s) < 3) continue; // 大板块的雾 T3 起才挖开
+      vis = Math.max(vis, sstep(0.15, 0.06, Math.hypot(wx - b.x, wy - b.y)));
+    }
+    return 1 - vis; // 1=浓雾
+  }
+  const QK = 140; // 地块量化密度(世界 1/140 一格→边界经等距投影贴网格)
+  function renderGround(s: KRState): void {
+    ground.width = Math.max(1, W * dpr); ground.height = Math.max(1, H * dpr);
+    const g = ground.getContext("2d")!;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = "#0a0b07"; g.fillRect(0, 0, W, H);
+    const GX = 72, GY = 46;
+    const cw = W / GX, ch = H / GY;
+    const detail = cam.zoom > 5;
+    for (let j = 0; j < GY; j++) {
+      for (let i = 0; i < GX; i++) {
+        const sx = (i + 0.5) * cw, sy = (j + 0.5) * ch;
+        const w = unproj(sx, sy);
+        if (w.x < -0.02 || w.x > 1.02 || w.y < -0.02 || w.y > 1.02) continue; // 图外=底色
+        // 地形
+        const ridge = clamp((0.52 - w.x) * 1.8, 0, 1) * 0.5;
+        let h = fbm(w.x * 5.2 + 7, w.y * 5.2 + 3) * (0.55 + ridge) + ridge * 0.4;
+        if (detail) h = h * 0.7 + fbm(w.x * 26 + 3, w.y * 26 + 9) * 0.3; // 近景细节
+        let r = 62 + h * 52, gg = 55 + h * 44, b = 34 + h * 22;
+        if (h > 0.62) { r *= 0.72; gg *= 0.70; b *= 0.72; }
+        if (h < 0.34) { r *= 1.10; gg *= 1.14; b *= 0.95; }
+        // 村庄周边带田野绿意
+        const dHq = Math.hypot(w.x - HQ.x, w.y - HQ.y);
+        if (dHq < 0.13) { const gmix = sstep(0.13, 0.03, dHq) * 0.5; r = lerp(r, r * 0.82, gmix); gg = lerp(gg, gg * 1.22, gmix); b = lerp(b, b * 0.85, gmix); }
+        // 侧光
+        const hl = fbm((w.x - 0.012) * 5.2 + 7, (w.y - 0.012) * 5.2 + 3) * (0.55 + ridge) - (fbm(w.x * 5.2 + 7, w.y * 5.2 + 3) * (0.55 + ridge));
+        const lig = clamp(1 + hl * 5.5, 0.72, 1.3);
+        r *= lig; gg *= lig; b *= lig;
+        // 地块控制染色（世界空间量化→贴等距网格）
+        const qx = (Math.floor(w.x * QK) + 0.5) / QK, qy = (Math.floor(w.y * QK) + 0.5) / QK;
+        const ctl = clamp((fieldAt({ x: qx, y: qy }, ourSrc) - fieldAt({ x: qx, y: qy }, jpSrc)) * 1.6, -1, 1);
+        if (ctl > 0.13) { const a = 0.10 + 0.30 * ctl; r = lerp(r, 178, a); gg = lerp(gg, 44, a); b = lerp(b, 28, a); }
+        else if (ctl < -0.13) { const a = 0.10 + 0.26 * -ctl; r = lerp(r, 58, a); gg = lerp(gg, 70, a); b = lerp(b, 86, a); }
+        // 战雾
+        const fog = fogAt(s, w.x, w.y);
+        if (fog > 0.02) { const fa = fog * 0.93; r = lerp(r, 5, fa); gg = lerp(gg, 5, fa); b = lerp(b, 4, fa); }
+        g.fillStyle = `rgb(${r | 0},${gg | 0},${b | 0})`;
+        g.fillRect(i * cw - 0.5, j * ch - 0.5, cw + 1, ch + 1);
+      }
+    }
+    // 河（世界折线）
+    g.strokeStyle = "rgba(58,74,72,.85)"; g.lineWidth = Math.max(1.5, A * 0.008 * cam.zoom * 0.5); g.lineCap = "round";
+    g.beginPath();
+    let started = false;
+    for (let t2 = 0; t2 <= 60; t2++) {
+      const tt = t2 / 60;
+      const mx = lerp(0.08, 0.92, tt) + Math.sin(tt * 9 + 1.3) * 0.035;
+      const my = lerp(0.16, 0.5, tt) + Math.sin(tt * 6.2) * 0.05;
+      if (fogAt(s, mx, my) > 0.75) { started = false; continue; }
+      const p = proj(mx, my);
+      if (!started) { g.moveTo(p.x, p.y); started = true; } else g.lineTo(p.x, p.y);
+    }
+    g.stroke();
+    // 铁路网 + hq 县城支线（雾外部分）
+    const railSeg = (x1: number, y1: number, x2: number, y2: number): void => {
+      const STEPS = 14;
+      for (let st2 = 0; st2 < STEPS; st2++) {
+        const t0 = st2 / STEPS, t1 = (st2 + 1) / STEPS;
+        const ax = lerp(x1, x2, t0), ay = lerp(y1, y2, t0), bx2 = lerp(x1, x2, t1), by2 = lerp(y1, y2, t1);
+        if (fogAt(s, ax, ay) > 0.8) continue;
+        const pa = proj(ax, ay), pb = proj(bx2, by2);
+        g.strokeStyle = "rgba(20,18,14,.9)"; g.lineWidth = Math.max(1.6, A * 0.004 * Math.pow(cam.zoom, 0.6));
+        g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
+        g.strokeStyle = "rgba(216,201,160,.45)"; g.lineWidth = Math.max(0.8, A * 0.002 * Math.pow(cam.zoom, 0.6));
+        g.setLineDash([6, 6]);
+        g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke(); g.setLineDash([]);
+      }
+    };
+    for (const [a, b] of RAILS) { const ca = cityOf(a), cb = cityOf(b); railSeg(ca.x, ca.y, cb.x, cb.y); }
+    railSeg(HQ_COUNTY.x, HQ_COUNTY.y, 0.50, 0.40); // 县城→石家庄支线
+    // 树/山脊符号（世界撒点，可见+雾外才画）
+    const symN = 900;
+    for (let k2 = 0; k2 < symN; k2++) {
+      const mx = hash2(k2, 1.7), my = hash2(k2, 9.2);
+      if (fogAt(s, mx, my) > 0.6) continue;
+      const p = proj(mx, my);
+      if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) continue;
+      const ridge = clamp((0.52 - mx) * 1.8, 0, 1) * 0.5;
+      const h = fbm(mx * 5.2 + 7, my * 5.2 + 3) * (0.55 + ridge) + ridge * 0.4;
+      const sz = A * 0.004 * Math.pow(cam.zoom, 0.8);
+      if (h > 0.6) {
+        g.strokeStyle = "rgba(30,26,16,.55)"; g.lineWidth = Math.max(1, sz * 0.3);
+        g.beginPath(); g.moveTo(p.x - sz * 2, p.y + sz * 1.2); g.lineTo(p.x, p.y - sz * 1.4); g.lineTo(p.x + sz * 2, p.y + sz * 1.2); g.stroke();
+      } else if (hash2(k2, 4.4) < 0.35) {
+        g.fillStyle = "rgba(52,66,32,.7)";
+        g.beginPath(); g.arc(p.x, p.y - sz, sz, 0, 6.29); g.fill();
+        g.strokeStyle = "rgba(40,32,20,.6)"; g.lineWidth = Math.max(0.8, sz * 0.25);
+        g.beginPath(); g.moveTo(p.x, p.y - sz * 0.4); g.lineTo(p.x, p.y + sz * 0.8); g.stroke();
+      }
+    }
+    // 地图外框
+    const c0 = proj(0, 0), c1 = proj(1, 0), c2 = proj(1, 1), c3 = proj(0, 1);
+    g.strokeStyle = "rgba(216,201,160,.22)"; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(c0.x, c0.y); g.lineTo(c1.x, c1.y); g.lineTo(c2.x, c2.y); g.lineTo(c3.x, c3.y); g.closePath(); g.stroke();
+  }
+
+  let time = 0;
+  let shownTier = -1;
   const walkers: Walker[] = [];
   const particles: Particle[] = [];
   const corpses: Corpse[] = [];
   const tracers: Tracer[] = [];
   let prevJp = 0, prevOur = 0, prevSweepOn = false;
   let migSpawnAcc = 0;
+  let lastSweepTarget: { x: number; y: number } | null = null;
 
-  // ── 地块控制层 ──
-  const TX = 32, TY = 22;
-  const tileCtl = new Float32Array(TX * TY); // -1(日占)..1(我方), lerp 平滑
-
-  // 我方/日方影响场（按当前 tier 用不同的源）
-  function fields(s: KRState, L: LocalLayout | null): { our: (x: number, y: number) => number; jp: (x: number, y: number) => number } {
-    const t = tier(s);
-    const g = (d2: number, r: number): number => Math.exp(-d2 / (r * r));
-    if (t < 3 && L) {
-      const hq = s.bases["hq"];
-      const devR = 0.10 + hq.dev * 0.03 + Math.min(0.12, s.totalWuzi / 60_000 * 0.1);
-      const popF = clamp(hq.pop / 20, 0.3, 1.25);
-      return {
-        our: (x, y) => {
-          let v = 0;
-          for (const vg of L.villages) v = Math.max(v, g((x - vg.x) ** 2 + (y - vg.y) ** 2, devR * (vg.big ? 1.15 : 0.8) * popF));
-          return v;
-        },
-        jp: (x, y) => {
-          let v = 0;
-          for (const tw of L.towers) v = Math.max(v, g((x - tw.x) ** 2 + (y - tw.y) ** 2, 0.11));
-          if (L.county) v = Math.max(v, g((x - L.county.x) ** 2 + (y - L.county.y) ** 2, 0.16));
-          return v;
-        }
-      };
+  // hq 的炮楼（世界坐标：第一座在村口，其余绕外环）
+  function hqTowers(s: KRState): { x: number; y: number }[] {
+    const n = Math.max(1, Math.min(5, s.bases["hq"].spots || 1));
+    const out: { x: number; y: number }[] = [HQ_TOWER0];
+    for (let i = 1; i < n; i++) {
+      const ang = 0.9 + (i / 5) * Math.PI * 2;
+      out.push({ x: HQ.x + Math.cos(ang) * 0.075, y: HQ.y + Math.sin(ang) * 0.06 });
     }
-    return {
-      our: (x, y) => {
-        let v = 0;
-        for (const b of BASES) {
-          const st = s.bases[b.id];
-          if (!st.est) continue;
-          const r = (0.055 + st.dev * 0.014) * clamp(st.pop / b.pop0, 0.3, 1.25) * Math.max(0.45, 1 - st.spots * 0.09);
-          v = Math.max(v, g((x - b.x) ** 2 + (y - b.y) ** 2, r));
-        }
-        return v;
-      },
-      jp: (x, y) => {
-        let v = 0;
-        for (const c of CITIES) v = Math.max(v, g((x - c.x) ** 2 + (y - c.y) ** 2, 0.085));
-        for (const b of BASES) {
-          const st = s.bases[b.id];
-          if (st.spots > 0) v = Math.max(v, g((x - b.x) ** 2 + (y - b.y) ** 2, 0.05 + st.spots * 0.012) * 0.7);
-        }
-        return v;
-      }
-    };
-  }
-  function stepTiles(dt: number, s: KRState, L: LocalLayout | null): void {
-    const f = fields(s, L);
-    const k = Math.min(1, dt * 1.4); // 漫开/缩回速度
-    for (let j = 0; j < TY; j++) {
-      for (let i = 0; i < TX; i++) {
-        const x = (i + 0.5) / TX, y = (j + 0.5) / TY;
-        const o = f.our(x, y), e = f.jp(x, y);
-        let target = 0;
-        if (o > 0.18 || e > 0.18) target = clamp((o - e) * 1.6, -1, 1);
-        const idx = j * TX + i;
-        tileCtl[idx] += (target - tileCtl[idx]) * k;
-      }
-    }
-  }
-  function drawTiles(): void {
-    // 每个地块的 4 个地图角点各自投影（与地形同一套等距投影 → 完全对齐），向外微扩 ~0.6px 消接缝。
-    const EXP = 1.05;
-    for (let j = 0; j < TY; j++) {
-      for (let i = 0; i < TX; i++) {
-        const c = tileCtl[j * TX + i];
-        if (Math.abs(c) < 0.13) continue;
-        const mx0 = i / TX, my0 = j / TY, mx1 = (i + 1) / TX, my1 = (j + 1) / TY;
-        const p0 = proj(mx0, my0), p1 = proj(mx1, my0), p2 = proj(mx1, my1), p3 = proj(mx0, my1);
-        const mxs = (p0.x + p1.x + p2.x + p3.x) / 4, mys = (p0.y + p1.y + p2.y + p3.y) / 4;
-        const ex = (p: { x: number; y: number }): [number, number] => [mxs + (p.x - mxs) * EXP, mys + (p.y - mys) * EXP];
-        const a0 = ex(p0), a1 = ex(p1), a2 = ex(p2), a3 = ex(p3);
-        if (c > 0) ctx.fillStyle = `rgba(178,44,28,${0.08 + 0.22 * c})`;
-        else ctx.fillStyle = `rgba(58,70,86,${0.08 + 0.20 * -c})`;
-        ctx.beginPath();
-        ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.lineTo(a2[0], a2[1]); ctx.lineTo(a3[0], a3[1]);
-        ctx.closePath(); ctx.fill();
-      }
-    }
+    return out;
   }
 
-  // ══ 地形层（tier 变化时重画：T0-2 局部黄土/田野，T3-4 华北大图）══
-  function renderTerrain(t: number): void {
-    terrain.width = Math.max(1, W * dpr); terrain.height = Math.max(1, H * dpr);
-    const g = terrain.getContext("2d")!;
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const bg = g.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, "#0c0d08"); bg.addColorStop(1, "#12100a");
-    g.fillStyle = bg; g.fillRect(0, 0, W, H);
-    const local = t < 3;
-    const N = 46;
-    for (let j = 0; j < N; j++) {
-      for (let i = 0; i < N; i++) {
-        const mx = i / N, my = j / N, sN = 1 / N;
-        const ridge = local ? 0 : clamp((0.52 - mx) * 1.8, 0, 1) * 0.5;
-        const freq = local ? 3.4 : 5.2;
-        const h = fbm(mx * freq + 7, my * freq + 3) * (0.55 + ridge) + ridge * 0.4;
-        const p0 = proj(mx, my), p1 = proj(mx + sN, my), p2 = proj(mx + sN, my + sN), p3 = proj(mx, my + sN);
-        let r = 62 + h * 52, gg = 55 + h * 44, b = 34 + h * 22;
-        if (local && h < 0.42) { r *= 0.94; gg *= 1.20; b *= 0.92; } // 局部图偏田野绿
-        if (h > 0.62) { r *= 0.72; gg *= 0.70; b *= 0.72; }
-        if (!local && h < 0.34) { r *= 1.10; gg *= 1.14; b *= 0.95; }
-        const hl = fbm((mx - 0.012) * freq + 7, (my - 0.012) * freq + 3) * (0.55 + ridge) - h + ridge * 0.4;
-        const lig = clamp(1 + hl * 5.5, 0.72, 1.3);
-        g.fillStyle = `rgb(${(r * lig) | 0},${(gg * lig) | 0},${(b * lig) | 0})`;
-        g.beginPath(); g.moveTo(p0.x, p0.y); g.lineTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.lineTo(p3.x, p3.y); g.closePath(); g.fill();
-      }
-    }
-    if (local) {
-      // 田埂条纹 + 树（村庄尺度）
-      for (let k = 0; k < 200; k++) {
-        const mx = hash2(k, 2.7), my = hash2(k, 8.2);
-        const p = proj(mx, my);
-        if (hash2(k, 5.1) < 0.4) {
-          g.fillStyle = "rgba(52,66,32,.75)";
-          g.beginPath(); g.arc(p.x, p.y, A * 0.006, 0, 6.29); g.fill();
-          g.strokeStyle = "rgba(40,32,20,.6)"; g.lineWidth = 1.2;
-          g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x, p.y + A * 0.009); g.stroke();
-        } else if (hash2(k, 6.3) < 0.3) {
-          g.strokeStyle = "rgba(70,62,38,.4)"; g.lineWidth = 1;
-          const p2 = proj(mx + 0.05, my + 0.02);
-          g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p2.x, p2.y); g.stroke();
-        }
-      }
-      // 土路：村与村之间(浅色路径感)
-      g.strokeStyle = "rgba(140,120,80,.28)"; g.lineWidth = Math.max(2, A * 0.006); g.lineCap = "round";
-      const C = proj(0.5, 0.56);
-      for (const e of [[0.34, 0.44], [0.62, 0.40], [0.40, 0.72], [0.66, 0.68]]) {
-        const p = proj(e[0], e[1]);
-        g.beginPath(); g.moveTo(C.x, C.y); g.lineTo(p.x, p.y); g.stroke();
-      }
-    } else {
-      for (let k = 0; k < 480; k++) {
-        const mx = hash2(k, 1.7), my = hash2(k, 9.2);
-        const ridge = clamp((0.52 - mx) * 1.8, 0, 1) * 0.5;
-        const h = fbm(mx * 5.2 + 7, my * 5.2 + 3) * (0.55 + ridge) + ridge * 0.4;
-        const p = proj(mx, my);
-        if (h > 0.6) {
-          const sZ = A * 0.008 * (1 + h);
-          g.strokeStyle = "rgba(30,26,16,.55)"; g.lineWidth = 1.2;
-          g.beginPath(); g.moveTo(p.x - sZ, p.y + sZ * 0.6); g.lineTo(p.x, p.y - sZ * 0.7); g.lineTo(p.x + sZ, p.y + sZ * 0.6); g.stroke();
-        }
-      }
-      g.strokeStyle = "rgba(58,74,72,.85)"; g.lineWidth = Math.max(2, A * 0.008); g.lineCap = "round";
-      g.beginPath();
-      for (let tt2 = 0; tt2 <= 40; tt2++) {
-        const tt = tt2 / 40;
-        const mx = lerp(0.08, 0.92, tt) + Math.sin(tt * 9 + 1.3) * 0.035;
-        const my = lerp(0.16, 0.5, tt) + Math.sin(tt * 6.2) * 0.05;
-        const p = proj(mx, my);
-        if (tt2 === 0) g.moveTo(p.x, p.y); else g.lineTo(p.x, p.y);
-      }
-      g.stroke();
-      for (const [a, b] of RAILS) {
-        const ca = cityOf(a), cb = cityOf(b);
-        const pa = proj(ca.x, ca.y), pb = proj(cb.x, cb.y);
-        g.strokeStyle = "rgba(20,18,14,.9)"; g.lineWidth = Math.max(2, A * 0.006);
-        g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
-        g.strokeStyle = "rgba(216,201,160,.5)"; g.lineWidth = Math.max(1, A * 0.003);
-        g.setLineDash([A * 0.008, A * 0.008]);
-        g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
-        g.setLineDash([]);
-      }
-    }
-    const c0 = proj(0, 0), c1 = proj(1, 0), c2 = proj(1, 1), c3 = proj(0, 1);
-    g.strokeStyle = "rgba(216,201,160,.22)"; g.lineWidth = 1.5;
-    g.beginPath(); g.moveTo(c0.x, c0.y); g.lineTo(c1.x, c1.y); g.lineTo(c2.x, c2.y); g.lineTo(c3.x, c3.y); g.closePath(); g.stroke();
-  }
-
-  // ══ 基元 ══
+  // ══ 基元（尺寸系数 k 随 zoom）══
   function drawFigure(g: CanvasRenderingContext2D, sx: number, sy: number, k: number, opts: { jp?: boolean; civ?: boolean; walk?: number; face?: number; carry?: boolean }): void {
     const { jp = false, civ = false, walk = 0, face = 1, carry = false } = opts;
     const cloth = jp ? "#6b6b3a" : civ ? "#7a7058" : "#8a7d55";
@@ -363,7 +380,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     g.fillStyle = "#1c1e22";
     g.fillRect(sx - k * 3.4, sy - k * 11, k * 1.4, k * 2); g.fillRect(sx + k * 1.6, sy - k * 12, k * 1.4, k * 2);
     drawFlag(g, sx, sy - k * 18, k * 0.8, t, true);
-    g.strokeStyle = "rgba(40,42,46,.8)"; g.lineWidth = 1;
+    g.strokeStyle = "rgba(40,42,46,.8)"; g.lineWidth = Math.max(0.8, k * 0.5);
     for (let i = -2; i <= 2; i++) {
       g.beginPath(); g.moveTo(sx + i * k * 5, sy + k * 4 - Math.abs(i) * k); g.lineTo(sx + i * k * 5, sy + k * 1.5 - Math.abs(i) * k); g.stroke();
     }
@@ -374,23 +391,12 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     isoBox(g, sx, sy - k * 3, k * 3.4, k * 3.4, k * 9, "#74787e", "#50545a", "#62666c");
     drawFlag(g, sx + k * 2, sy - k * 12, k * 0.9, t, true);
   }
-  // 县城(T2)：带城墙的方城
   function drawCounty(g: CanvasRenderingContext2D, sx: number, sy: number, k: number, t: number): void {
     isoBox(g, sx, sy, k * 14, k * 14, k * 4, "#7a7466", "#565046", "#6a6456");
     isoBox(g, sx, sy - k * 3, k * 9, k * 9, k * 6, "#6e7278", "#4a4e54", "#5c6066");
     isoBox(g, sx - k * 12, sy + k * 1, k * 2, k * 2, k * 8, "#84888f", "#5c6068", "#70747c");
     isoBox(g, sx + k * 11, sy + k * 3, k * 2, k * 2, k * 8, "#84888f", "#5c6068", "#70747c");
     drawFlag(g, sx, sy - k * 12, k * 1.1, t, true);
-  }
-  function drawBlockadeRing(g: CanvasRenderingContext2D, px: number, py: number, spots: number, t: number, R: number): void {
-    const arcFrac = clamp(spots / 5, 0, 1) * Math.PI * 2;
-    g.save(); g.translate(px, py); g.scale(1, 0.5);
-    g.strokeStyle = "rgba(28,26,20,.9)"; g.lineWidth = Math.max(3, A * 0.010);
-    g.beginPath(); g.arc(0, 0, R, -Math.PI / 2 + t * 0.02, -Math.PI / 2 + t * 0.02 + arcFrac); g.stroke();
-    g.strokeStyle = "rgba(140,130,100,.35)"; g.lineWidth = 1;
-    g.setLineDash([3, 4]);
-    g.beginPath(); g.arc(0, 0, R + A * 0.006, -Math.PI / 2 + t * 0.02, -Math.PI / 2 + t * 0.02 + arcFrac); g.stroke();
-    g.setLineDash([]); g.restore();
   }
   function drawFormation(g: CanvasRenderingContext2D, sx: number, sy: number, count: number, jp: boolean, k: number, t: number, moving: boolean, face: number, label = true, wide = false): void {
     if (count <= 0) return;
@@ -408,73 +414,179 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
     if (!label) return;
     const lab = `${jp ? `日军${unitName(count)}` : "我军"} ×${Math.max(1, Math.round(count))}`;
-    g.font = `700 ${Math.max(11, k * 6)}px 'Noto Serif SC', serif`;
+    g.font = `700 ${clamp(k * 6, 10, 15)}px 'Noto Serif SC', serif`;
     const tw = g.measureText(lab).width;
     const by = sy - rows * k * 5 - k * 16;
     g.fillStyle = jp ? "rgba(46,48,30,.92)" : "rgba(90,26,18,.92)";
     g.strokeStyle = jp ? "#8a8a50" : "#e2564d"; g.lineWidth = 1;
     const bx = sx - tw / 2 - k * 3;
-    g.beginPath(); g.roundRect(bx, by, tw + k * 6, k * 9, 3); g.fill(); g.stroke();
+    g.beginPath(); g.roundRect(bx, by, tw + k * 6, clamp(k * 9, 14, 20), 3); g.fill(); g.stroke();
     g.fillStyle = jp ? "#d8d2a8" : "#f2d8c0";
-    g.fillText(lab, sx - tw / 2, by + k * 6.6);
+    g.fillText(lab, sx - tw / 2, by + clamp(k * 6.6, 10, 15));
   }
+  const inView = (p: { x: number; y: number }, pad = 80): boolean => p.x > -pad && p.x < W + pad && p.y > -pad && p.y < H + pad;
 
   // ══ 主帧 ══
   const baseScreen = new Map<string, { x: number; y: number }>();
-  let curLayout: LocalLayout | null = null;
 
   function frame(dt: number, s: KRState): void {
     time += dt;
     const t = time;
     const T = tier(s);
-    // 阶梯转场：白闪 + 重画地形
-    if (T !== shownTier) { shownTier = T; flashT = 0.7; }
-    if (terrainTier !== (T < 3 ? T : 3)) { terrainTier = T < 3 ? T : 3; renderTerrain(T); }
-    curLayout = T < 3 ? localLayout(T, s.bases["hq"].spots) : null;
+    // 阶梯升级：自动平滑拉远(玩家仍可随时缩放)
+    if (T !== shownTier) {
+      if (shownTier >= 0) { cam.tzoom = TIER_ZOOM[T]; cam.tx = T >= 3 ? 0.5 : HQ.x; cam.ty = T >= 3 ? 0.5 : HQ.y; userCamMs = 0; }
+      shownTier = T;
+    }
+    // 相机 lerp
+    if (userCamMs > 0) userCamMs -= dt * 1000;
+    const camK = 1 - Math.pow(0.04, dt);
+    if (Math.abs(cam.zoom - cam.tzoom) > 0.001 || Math.abs(cam.x - cam.tx) > 0.0002 || Math.abs(cam.y - cam.ty) > 0.0002) {
+      cam.zoom = lerp(cam.zoom, cam.tzoom, camK);
+      cam.x = lerp(cam.x, cam.tx, camK);
+      cam.y = lerp(cam.y, cam.ty, camK);
+      dirty = true;
+    }
+    // 地面层重采样（脏/定时——控制场生长动画靠定时）
+    groundTimer -= dt;
+    rebuildSources(s, dt);
+    if (dirty || groundTimer <= 0) { renderGround(s); dirty = false; groundTimer = 0.18; }
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(terrain, 0, 0, W, H);
+    ctx.drawImage(ground, 0, 0, W, H);
 
-    // 地块控制层
-    stepTiles(dt, s, curLayout);
-    drawTiles();
-
-    const k = clamp(A * 0.006, 1.1, 2.6) * (T === 0 ? 2.2 : T === 1 ? 1.5 : T === 2 ? 1.2 : 1);
+    const k = clamp(A * 0.0055 * Math.pow(cam.zoom, 0.88), 1.0, 40);
+    const kS = clamp(k, 1.0, 3.2); // 远景元素(城市/根据地村)用的小系数
     const sw = s.sweep;
     const queue: { y: number; draw: () => void }[] = [];
     const push = (y: number, draw: () => void): void => { queue.push({ y, draw }); };
+    const fogOk = (wx: number, wy: number): boolean => fogAt(s, wx, wy) < 0.55;
 
-    if (T < 3 && curLayout) {
-      drawLocal(s, curLayout, k, t, push, dt, sw);
-    } else {
-      drawNorthChina(s, k, t, push, dt, sw);
+    // ① 城市（雾外+视内）
+    for (const c of CITIES) {
+      if (!fogOk(c.x, c.y)) continue;
+      const p = proj(c.x, c.y);
+      if (!inView(p)) continue;
+      push(p.y, () => drawCity(ctx, p.x, p.y, kS * 1.1, t));
+    }
+    // ② hq 村群（中心村+卫星村+炮楼+县城）——世界坐标，随缩放连续
+    const hq = s.bases["hq"];
+    baseScreen.clear();
+    {
+      const p = proj(HQ.x, HQ.y);
+      baseScreen.set("hq", p);
+      if (inView(p, 200)) {
+        const houses = 3 + hq.dev;
+        for (let i = 0; i < houses; i++) {
+          const ang = (i / houses) * Math.PI * 2 + 0.7;
+          const wr = 0.006 + (i % 3) * 0.0035;
+          const hw = { x: HQ.x + Math.cos(ang) * wr, y: HQ.y + Math.sin(ang) * wr };
+          const hp = proj(hw.x, hw.y);
+          const burning = sw?.stage === "pillage" && sw.targetBase === "hq" && i % 2 === 0;
+          push(hp.y, () => drawHouse(ctx, hp.x, hp.y, k * 0.32));
+          if (burning) spawnFlameW(hw.x, hw.y);
+        }
+        push(p.y + 1, () => drawFlag(ctx, p.x, p.y, k * 0.42, t));
+        if (hq.tunnels > 0) push(p.y + 2, () => {
+          ctx.fillStyle = "#14110b";
+          for (let i = 0; i < hq.tunnels; i++) {
+            const tp = proj(HQ.x + 0.012 + i * 0.005, HQ.y + 0.009);
+            ctx.save(); ctx.translate(tp.x, tp.y); ctx.scale(1, 0.6); ctx.beginPath(); ctx.arc(0, 0, k * 0.8, Math.PI, 0); ctx.fill(); ctx.restore();
+          }
+        });
+      }
+      // 卫星村（雾外）
+      const satN = clamp(1 + hq.dev + T, 0, HQ_SATS.length);
+      for (let i = 0; i < satN; i++) {
+        const sv = HQ_SATS[i];
+        if (!fogOk(sv.x, sv.y)) continue;
+        const p2 = proj(sv.x, sv.y);
+        if (!inView(p2)) continue;
+        push(p2.y, () => { drawHouse(ctx, p2.x - k * 2.2, p2.y, k * 0.22); drawHouse(ctx, p2.x + k * 2.2, p2.y + k * 0.8, k * 0.20); drawFlag(ctx, p2.x, p2.y - k * 0.5, k * 0.24, t); });
+      }
+      // 炮楼
+      for (const tw of hqTowers(s)) {
+        if (!fogOk(tw.x, tw.y)) continue;
+        const p2 = proj(tw.x, tw.y);
+        if (!inView(p2)) continue;
+        push(p2.y, () => drawBlockhouse(ctx, p2.x, p2.y, k * 0.26, t));
+      }
+      // 县城
+      if (fogOk(HQ_COUNTY.x, HQ_COUNTY.y)) {
+        const p2 = proj(HQ_COUNTY.x, HQ_COUNTY.y);
+        if (inView(p2, 160)) push(p2.y, () => drawCounty(ctx, p2.x, p2.y, k * 0.28, t));
+      }
+    }
+    // ③ 其余根据地（T3+ 雾开后可见）
+    for (const b of BASES) {
+      if (b.id === "hq") continue;
+      const st = s.bases[b.id];
+      const p = proj(b.x, b.y);
+      baseScreen.set(b.id, p);
+      if (!fogOk(b.x, b.y) || !inView(p, 150)) continue;
+      if (st.est) {
+        const houses = 2 + st.dev;
+        for (let i = 0; i < houses; i++) {
+          const ang = (i / houses) * Math.PI * 2 + 0.7 + b.x * 9;
+          const wr = 0.010 + (i % 3) * 0.004;
+          const hw = { x: b.x + Math.cos(ang) * wr, y: b.y + Math.sin(ang) * wr };
+          const hp = proj(hw.x, hw.y);
+          const burning = sw?.stage === "pillage" && sw.targetBase === b.id && i % 2 === 0;
+          push(hp.y, () => drawHouse(ctx, hp.x, hp.y, kS * 0.8));
+          if (burning) spawnFlameW(hw.x, hw.y);
+        }
+        push(p.y + 1, () => drawFlag(ctx, p.x, p.y, kS, t));
+        if (st.tunnels > 0) push(p.y + 2, () => {
+          ctx.fillStyle = "#14110b";
+          for (let i = 0; i < st.tunnels; i++) {
+            const tp = proj(b.x + 0.014 + i * 0.007, b.y + 0.007);
+            ctx.save(); ctx.translate(tp.x, tp.y); ctx.scale(1, 0.6); ctx.beginPath(); ctx.arc(0, 0, kS * 2.2, Math.PI, 0); ctx.fill(); ctx.restore();
+          }
+        });
+      } else {
+        push(p.y, () => { drawHouse(ctx, p.x - kS * 6, p.y, kS * 0.6, true); drawHouse(ctx, p.x + kS * 6, p.y + kS * 2, kS * 0.6, true); });
+      }
+      if (st.spots > 0) {
+        for (let i = 0; i < st.spots; i++) {
+          const ang = (i / 5) * Math.PI * 2 + 1.1;
+          const wp = { x: b.x + Math.cos(ang) * 0.035, y: b.y + Math.sin(ang) * 0.026 };
+          const sp = proj(wp.x, wp.y);
+          push(sp.y, () => drawBlockhouse(ctx, sp.x, sp.y, kS * 0.75, t));
+        }
+      }
     }
 
-    // 小人（中心村人气）
-    syncWalkers(s, T);
+    // ④ 小人
+    syncWalkers(s);
     for (const wlk of walkers) {
+      if (!fogOk(wlk.x, wlk.y)) continue;
       const p = proj(wlk.x, wlk.y);
+      if (!inView(p, 30)) continue;
       const kind = wlk.kind;
-      push(p.y, () => drawFigure(ctx, p.x, p.y, k * (kind === "soldier" ? 0.95 : 0.85) * (T >= 3 ? 1 : 0.8), {
+      push(p.y, () => drawFigure(ctx, p.x, p.y, clamp(k * 0.09, 0.8, 3.4) * (kind === "soldier" ? 1.1 : 1), {
         civ: kind !== "soldier", walk: t * 8 + wlk.ph, face: wlk.tx >= wlk.x ? 1 : -1, carry: kind === "evac" || kind === "migrate"
       }));
     }
-    stepWalkers(dt, s, T);
-    spawnMigrationWalkers(dt, s, T);
+    stepWalkers(dt);
+    spawnMigrationWalkers(dt, s);
 
-    if (sw) drawSweepFx(sw, s, k, t, dt);
-    trackCasualties(sw, k, s);
+    // ⑤ 扫荡兵团（世界坐标）
+    if (sw) drawSweep(sw, s, t, push, dt);
+    trackCasualties(sw, s);
 
     for (let i = corpses.length - 1; i >= 0; i--) {
       const c = corpses[i]; c.life -= dt;
       if (c.life <= 0) { corpses.splice(i, 1); continue; }
+      const p = proj(c.x, c.y);
+      if (!inView(p, 30)) continue;
       const a = clamp(c.life / 6, 0, 1) * 0.9;
-      push(c.y - 1, () => {
+      const ck = clamp(k * 0.09, 0.8, 3);
+      push(p.y - 1, () => {
         ctx.globalAlpha = a;
-        ctx.strokeStyle = c.jp ? "#5c5c32" : "#6f6540"; ctx.lineWidth = k * 2;
-        ctx.beginPath(); ctx.moveTo(c.x - k * 4, c.y); ctx.lineTo(c.x + k * 4, c.y - k * 1.4); ctx.stroke();
-        ctx.fillStyle = "#b08a60"; ctx.beginPath(); ctx.arc(c.x + k * 5, c.y - k * 1.6, k * 1.3, 0, 6.29); ctx.fill();
+        ctx.strokeStyle = c.jp ? "#5c5c32" : "#6f6540"; ctx.lineWidth = ck * 2;
+        ctx.beginPath(); ctx.moveTo(p.x - ck * 4, p.y); ctx.lineTo(p.x + ck * 4, p.y - ck * 1.4); ctx.stroke();
+        ctx.fillStyle = "#b08a60"; ctx.beginPath(); ctx.arc(p.x + ck * 5, p.y - ck * 1.6, ck * 1.3, 0, 6.29); ctx.fill();
         ctx.globalAlpha = 1;
       });
     }
@@ -482,16 +594,17 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     queue.sort((a, b) => a.y - b.y);
     for (const q of queue) q.draw();
 
-    // 曳光弹/粒子
+    // ⑥ 曳光弹/粒子（世界坐标→投影）
     for (let i = tracers.length - 1; i >= 0; i--) {
       const tr = tracers[i]; tr.life -= dt * 6;
       if (tr.life <= 0) { tracers.splice(i, 1); continue; }
+      const p1 = proj(tr.x1, tr.y1), p2 = proj(tr.x2, tr.y2);
       ctx.globalAlpha = clamp(tr.life, 0, 1);
       ctx.strokeStyle = tr.jp ? "#ffb060" : "#fff0a0"; ctx.lineWidth = 1.3;
       const tt = 1 - tr.life;
       ctx.beginPath();
-      ctx.moveTo(lerp(tr.x1, tr.x2, tt * 0.85), lerp(tr.y1, tr.y2, tt * 0.85));
-      ctx.lineTo(lerp(tr.x1, tr.x2, clamp(tt * 0.85 + 0.14, 0, 1)), lerp(tr.y1, tr.y2, clamp(tt * 0.85 + 0.14, 0, 1)));
+      ctx.moveTo(lerp(p1.x, p2.x, tt * 0.85), lerp(p1.y, p2.y, tt * 0.85));
+      ctx.lineTo(lerp(p1.x, p2.x, clamp(tt * 0.85 + 0.14, 0, 1)), lerp(p1.y, p2.y, clamp(tt * 0.85 + 0.14, 0, 1)));
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
@@ -500,27 +613,28 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       if (pp.life >= pp.max) { particles.splice(i, 1); continue; }
       const lt = pp.life / pp.max;
       pp.x += pp.vx * dt; pp.y += pp.vy * dt;
+      const p = proj(pp.x, pp.y);
+      const pr = pp.r * Math.pow(cam.zoom, 0.85) * A * 0.001;
       if (pp.kind === "smoke") {
         ctx.globalAlpha = (1 - lt) * 0.35; ctx.fillStyle = "#3c3830";
-        ctx.beginPath(); ctx.arc(pp.x, pp.y, pp.r * (0.6 + lt * 1.8), 0, 6.29); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, pr * (0.6 + lt * 1.8), 0, 6.29); ctx.fill();
       } else if (pp.kind === "flame") {
         ctx.globalAlpha = (1 - lt) * 0.9; ctx.fillStyle = lt < 0.4 ? "#ffd060" : "#ff6620";
-        ctx.beginPath(); ctx.arc(pp.x, pp.y, pp.r * (1 - lt * 0.6), 0, 6.29); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, pr * (1 - lt * 0.6), 0, 6.29); ctx.fill();
       } else if (pp.kind === "flash") {
         ctx.globalAlpha = (1 - lt); ctx.fillStyle = "#fff4c0";
-        ctx.beginPath(); ctx.arc(pp.x, pp.y, pp.r * (1 - lt), 0, 6.29); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, pr * (1 - lt), 0, 6.29); ctx.fill();
       } else {
         ctx.globalAlpha = (1 - lt) * 0.3; ctx.fillStyle = "#8a7a58";
-        ctx.beginPath(); ctx.arc(pp.x, pp.y, pp.r * (0.5 + lt), 0, 6.29); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, pr * (0.5 + lt), 0, 6.29); ctx.fill();
       }
       ctx.globalAlpha = 1;
     }
 
-    // 名牌（华北图）
-    if (T >= 3) drawLabels(s, k, t);
-    else drawLocalLabels(s, curLayout!, k, T);
+    // ⑦ 名牌
+    drawLabels(s, t);
 
-    // 扫荡泛红 + 阶梯转场白闪
+    // ⑧ 扫荡警报泛红
     if (sw) {
       const pulse = sw.stage === "pillage" ? 0.5 : 0.3;
       const a = (Math.sin(t * (sw.stage === "incoming" ? 4 : 7)) * 0.5 + 0.5) * pulse;
@@ -528,269 +642,177 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       gr.addColorStop(0, "rgba(180,40,26,0)"); gr.addColorStop(1, `rgba(180,40,26,${a * 0.4})`);
       ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
     }
-    if (flashT > 0) {
-      flashT = Math.max(0, flashT - dt);
-      ctx.fillStyle = `rgba(240,228,192,${flashT * 0.7})`;
-      ctx.fillRect(0, 0, W, H);
-    }
   }
 
-  // ── T0-2 局部场景 ──
-  function drawLocal(s: KRState, L: LocalLayout, k: number, t: number, push: (y: number, d: () => void) => void, dt: number, sw: Sweep | null): void {
-    const hq = s.bases["hq"];
-    baseScreen.clear();
-    const cp = proj(L.center.x, L.center.y);
-    baseScreen.set("hq", cp);
-    // 铁路(T2)
-    if (L.rail) {
-      const pa = proj(L.rail.x1, L.rail.y1), pb = proj(L.rail.x2, L.rail.y2);
-      ctx.strokeStyle = "rgba(20,18,14,.9)"; ctx.lineWidth = Math.max(2, A * 0.006);
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-      ctx.strokeStyle = "rgba(216,201,160,.5)"; ctx.lineWidth = Math.max(1, A * 0.003);
-      ctx.setLineDash([A * 0.008, A * 0.008]);
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke(); ctx.setLineDash([]);
-    }
-    // 村庄：中心村房子数随 dev；外村小
-    for (let vi = 0; vi < L.villages.length; vi++) {
-      const v = L.villages[vi];
-      const p = proj(v.x, v.y);
-      const houses = v.big ? 3 + hq.dev : 2;
-      for (let i = 0; i < houses; i++) {
-        const ang = (i / houses) * Math.PI * 2 + 0.7 + vi;
-        const rr = A * (v.big ? 0.030 : 0.016) + (i % 3) * A * 0.008;
-        const hp = { x: p.x + Math.cos(ang) * rr, y: p.y + Math.sin(ang) * rr * 0.5 };
-        const burning = sw?.stage === "pillage" && v.big && i % 2 === 0;
-        push(hp.y, () => drawHouse(ctx, hp.x, hp.y, k * (v.big ? 0.9 : 0.6)));
-        if (burning) spawnFlame(hp.x, hp.y - k * 6, k);
-      }
-      if (v.big) {
-        push(p.y + 1, () => drawFlag(ctx, p.x, p.y, k * 1.2, t));
-        if (hq.tunnels > 0) push(p.y + 2, () => {
-          ctx.fillStyle = "#14110b";
-          for (let i = 0; i < hq.tunnels; i++) {
-            const tx = p.x + A * 0.045 + i * k * 7, ty = p.y + A * 0.02;
-            ctx.save(); ctx.translate(tx, ty); ctx.scale(1, 0.6); ctx.beginPath(); ctx.arc(0, 0, k * 2.6, Math.PI, 0); ctx.fill(); ctx.restore();
-          }
-        });
-      }
-    }
-    // 炮楼(=hq.spots) + 封锁沟
-    for (const tw of L.towers) {
-      const p = proj(tw.x, tw.y);
-      push(p.y, () => drawBlockhouse(ctx, p.x, p.y, k * 0.8, t));
-    }
-    if (hq.spots >= 3) drawBlockadeRing(ctx, cp.x, cp.y, hq.spots, t, A * 0.20);
-    // 县城
-    if (L.county) {
-      const p = proj(L.county.x, L.county.y);
-      push(p.y, () => drawCounty(ctx, p.x, p.y, k * 0.9, t));
-    }
-    // 扫荡兵团（局部：从炮楼/县城/图角开进）
-    if (sw) drawSweepLocal(sw, L, k, t, push, dt);
-  }
-  function drawLocalLabels(s: KRState, L: LocalLayout, k: number, T: number): void {
+  function drawLabels(s: KRState, t: number): void {
     ctx.textBaseline = "alphabetic";
-    const cp = proj(L.center.x, L.center.y);
-    ctx.font = `700 ${Math.max(11, k * 4.6)}px 'Noto Serif SC', serif`;
-    const lab = T === 0 ? "★ 根据地·村" : T === 1 ? "★ 中心村" : "★ 根据地中心区";
-    const twd = ctx.measureText(lab).width;
-    ctx.fillStyle = "rgba(90,26,18,.8)";
-    ctx.beginPath(); ctx.roundRect(cp.x - twd / 2 - 5, cp.y + k * 8, twd + 10, k * 6.4, 3); ctx.fill();
-    ctx.fillStyle = "#f2d8c0"; ctx.fillText(lab, cp.x - twd / 2, cp.y + k * 12.8);
-    if (L.county) {
-      const p = proj(L.county.x, L.county.y);
-      ctx.font = `400 ${Math.max(10, k * 4)}px 'Noto Serif SC', serif`;
-      ctx.fillStyle = "rgba(150,158,168,.8)";
-      ctx.fillText("县城(日占)", p.x - k * 8, p.y + k * 10);
+    const fs = clamp(A * 0.028 / Math.pow(cam.zoom, 0.15), 11, 15);
+    // hq 名牌
+    {
+      const p = baseScreen.get("hq")!;
+      if (inView(p, 100)) {
+        ctx.font = `700 ${fs}px 'Noto Serif SC', serif`;
+        const hq = s.bases["hq"];
+        const T = tier(s);
+        const lab = `★ ${T < 2 ? "根据地·村" : T < 3 ? "太行根据地" : `太行·总部${hq.dev > 0 ? ` 发展${hq.dev}` : ""}${hq.spots > 0 ? ` 🏯${hq.spots}` : ""}`}`;
+        const twd = ctx.measureText(lab).width;
+        ctx.fillStyle = "rgba(90,26,18,.8)";
+        ctx.beginPath(); ctx.roundRect(p.x - twd / 2 - 5, p.y + 14, twd + 10, fs + 8, 3); ctx.fill();
+        ctx.fillStyle = "#f2d8c0"; ctx.fillText(lab, p.x - twd / 2, p.y + 14 + fs + 1);
+      }
     }
-    for (const tw of L.towers) {
-      const p = proj(tw.x, tw.y);
-      ctx.font = `400 ${Math.max(9, k * 3.2)}px 'Noto Serif SC', serif`;
-      ctx.fillStyle = "rgba(150,158,168,.6)";
-      ctx.fillText("炮楼", p.x - k * 3.5, p.y + k * 7);
-    }
-    void s;
-  }
-  // 局部扫荡表现
-  function drawSweepLocal(sw: Sweep, L: LocalLayout, k: number, t: number, push: (y: number, d: () => void) => void, dt: number): void {
-    const target = L.center;
-    const spawnPts: { x: number; y: number }[] = [];
-    for (let i = 0; i < sw.cols; i++) {
-      const src = L.county && i === 0 ? L.county : L.towers[i % L.towers.length] ?? { x: 0.85, y: 0.2 };
-      spawnPts.push(src);
-    }
-    drawSweepCommon(sw, spawnPts, target, k, t, push, dt);
-  }
-
-  // ── T3-4 华北图 ──
-  function drawNorthChina(s: KRState, k: number, t: number, push: (y: number, d: () => void) => void, dt: number, sw: Sweep | null): void {
-    for (const c of CITIES) {
-      const p = proj(c.x, c.y);
-      push(p.y, () => drawCity(ctx, p.x, p.y, k, t));
-    }
-    baseScreen.clear();
+    // 其余根据地（雾外）
     for (const b of BASES) {
-      const st = s.bases[b.id];
-      const p = proj(b.x, b.y);
-      baseScreen.set(b.id, p);
-      if (!baseRevealed(s, b.id)) {
-        // 战雾
-        const R = A * 0.15;
-        ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1, 0.5);
-        const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
-        gr.addColorStop(0, "rgba(4,4,3,.92)"); gr.addColorStop(0.7, "rgba(4,4,3,.75)"); gr.addColorStop(1, "rgba(4,4,3,0)");
-        ctx.fillStyle = gr;
-        ctx.beginPath(); ctx.arc(0, 0, R, 0, 6.29); ctx.fill(); ctx.restore();
-        ctx.fillStyle = "rgba(216,201,160,.25)";
-        ctx.font = `700 ${Math.max(12, A * 0.028)}px 'Noto Serif SC', serif`;
-        ctx.fillText("？", p.x - A * 0.008, p.y + A * 0.008);
-        continue;
-      }
-      if (st.est) {
-        const houses = 2 + st.dev;
-        for (let i = 0; i < houses; i++) {
-          const ang = (i / houses) * Math.PI * 2 + 0.7 + b.x * 9;
-          const rr = A * (0.022 + (i % 3) * 0.009);
-          const hp = { x: p.x + Math.cos(ang) * rr, y: p.y + Math.sin(ang) * rr * 0.5 };
-          const burning = sw?.stage === "pillage" && sw.targetBase === b.id && i % 2 === 0;
-          push(hp.y, () => drawHouse(ctx, hp.x, hp.y, k * (b.id === "hq" ? 0.95 : 0.8)));
-          if (burning) spawnFlame(hp.x, hp.y - k * 6, k);
-        }
-        push(p.y + 1, () => drawFlag(ctx, p.x, p.y, k * (b.id === "hq" ? 1.3 : 1), t));
-        if (st.tunnels > 0) push(p.y + 2, () => {
-          ctx.fillStyle = "#14110b";
-          for (let i = 0; i < st.tunnels; i++) {
-            const tx = p.x + A * 0.03 + i * k * 6, ty = p.y + A * 0.014;
-            ctx.save(); ctx.translate(tx, ty); ctx.scale(1, 0.6); ctx.beginPath(); ctx.arc(0, 0, k * 2.2, Math.PI, 0); ctx.fill(); ctx.restore();
-          }
-        });
-      } else {
-        push(p.y, () => { drawHouse(ctx, p.x - k * 6, p.y, k * 0.6, true); drawHouse(ctx, p.x + k * 6, p.y + k * 2, k * 0.6, true); });
-      }
-      if (st.spots > 0) {
-        for (let i = 0; i < st.spots; i++) {
-          const ang = (i / 5) * Math.PI * 2 + 1.1;
-          const sp = { x: p.x + Math.cos(ang) * A * 0.085, y: p.y + Math.sin(ang) * A * 0.0425 };
-          push(sp.y, () => drawBlockhouse(ctx, sp.x, sp.y, k * 0.75, t));
-        }
-        if (st.spots >= 3) drawBlockadeRing(ctx, p.x, p.y, st.spots, t, A * 0.115);
-      }
-    }
-    if (sw) {
-      const target = BASES.find((b) => b.id === sw.targetBase)!;
-      const sorted = [...CITIES].sort((a, b) => ((a.x - target.x) ** 2 + (a.y - target.y) ** 2) - ((b.x - target.x) ** 2 + (b.y - target.y) ** 2));
-      const spawns: { x: number; y: number }[] = [];
-      for (let i = 0; i < sw.cols; i++) spawns.push(sorted[i % sorted.length]);
-      drawSweepCommon(sw, spawns, target, k, t, push, dt);
-    }
-  }
-  function drawLabels(s: KRState, k: number, t: number): void {
-    ctx.textBaseline = "alphabetic";
-    for (const b of BASES) {
-      if (!baseRevealed(s, b.id)) continue;
+      if (b.id === "hq") continue;
+      if (fogAt(s, b.x, b.y) > 0.55) continue;
       const p = baseScreen.get(b.id)!;
+      if (!inView(p, 60)) continue;
       const st = s.bases[b.id];
       const canEst = !st.est && era(s).canExpand && tier(s) >= 3;
-      ctx.font = `${st.est ? 700 : 400} ${Math.max(10, k * 5.2)}px 'Noto Serif SC', serif`;
+      ctx.font = `${st.est ? 700 : 400} ${fs}px 'Noto Serif SC', serif`;
       const lab = st.est ? `${b.short}${st.dev > 0 ? `·发展${st.dev}` : ""}${st.spots > 0 ? ` 🏯${st.spots}` : ""}` : `${b.short}(未开辟)`;
       const twd = ctx.measureText(lab).width;
       ctx.fillStyle = "rgba(10,9,6,.66)";
-      ctx.beginPath(); ctx.roundRect(p.x - twd / 2 - 4, p.y + k * 6, twd + 8, k * 7.6, 3); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(p.x - twd / 2 - 4, p.y + 12, twd + 8, fs + 7, 3); ctx.fill();
       if (canEst) { ctx.strokeStyle = "rgba(216,164,65,.85)"; ctx.lineWidth = 1; ctx.stroke(); }
       ctx.fillStyle = st.est ? "#f2b6a0" : canEst ? "#e8d29a" : "rgba(216,201,160,.55)";
-      ctx.fillText(lab, p.x - twd / 2, p.y + k * 11.6);
+      ctx.fillText(lab, p.x - twd / 2, p.y + 12 + fs);
       if (canEst) {
-        const pr = k * (10 + Math.sin(t * 3) * 2);
+        const pr = 14 + Math.sin(t * 3) * 3;
         ctx.strokeStyle = `rgba(216,164,65,${0.5 + Math.sin(t * 3) * 0.25})`; ctx.lineWidth = 1.5;
         ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1, 0.5);
         ctx.beginPath(); ctx.arc(0, 0, pr, 0, 6.29); ctx.stroke(); ctx.restore();
       }
     }
-    for (const c of CITIES) {
-      const p = proj(c.x, c.y);
-      ctx.font = `400 ${Math.max(9, k * 4.4)}px 'Noto Serif SC', serif`;
-      ctx.fillStyle = "rgba(150,158,168,.7)";
-      ctx.fillText(c.name, p.x - k * 5, p.y + k * 9);
+    // 城市名（拉远才显示，避免近景乱）
+    if (cam.zoom < 7) {
+      for (const c of CITIES) {
+        if (fogAt(s, c.x, c.y) > 0.55) continue;
+        const p = proj(c.x, c.y);
+        if (!inView(p, 40)) continue;
+        ctx.font = `400 ${clamp(fs - 2, 9, 12)}px 'Noto Serif SC', serif`;
+        ctx.fillStyle = "rgba(150,158,168,.7)";
+        ctx.fillText(c.name, p.x - 12, p.y + 20);
+      }
+    }
+    // 县城/炮楼 小字（近景才显示）
+    if (cam.zoom > 3.2) {
+      if (fogAt(s, HQ_COUNTY.x, HQ_COUNTY.y) < 0.55) {
+        const p = proj(HQ_COUNTY.x, HQ_COUNTY.y);
+        if (inView(p, 40)) { ctx.font = `400 11px 'Noto Serif SC', serif`; ctx.fillStyle = "rgba(150,158,168,.8)"; ctx.fillText("县城(日占)", p.x - 26, p.y + 26); }
+      }
+      for (const tw of hqTowers(s)) {
+        if (fogAt(s, tw.x, tw.y) > 0.55) continue;
+        const p = proj(tw.x, tw.y);
+        if (!inView(p, 30)) continue;
+        ctx.font = `400 10px 'Noto Serif SC', serif`; ctx.fillStyle = "rgba(150,158,168,.6)";
+        ctx.fillText("炮楼", p.x - 10, p.y + 16);
+      }
     }
   }
 
-  // ── 扫荡通用表现（意图差异：合围收缩圈 / 奔袭直插 / 梳篦拉网）──
-  function drawSweepCommon(sw: Sweep, spawns: { x: number; y: number }[], target: { x: number; y: number }, k: number, t: number, push: (y: number, d: () => void) => void, dt: number): void {
+  // ── 扫荡表现（世界坐标；意图差异化）──
+  function sweepGeom(sw: Sweep, s: KRState): { target: { x: number; y: number }; spawns: { x: number; y: number }[] } {
+    const tb = BASES.find((b) => b.id === sw.targetBase)!;
+    const target = { x: tb.x, y: tb.y };
+    const spawns: { x: number; y: number }[] = [];
+    if (sw.targetBase === "hq" && tier(s) < 3) {
+      const tws = hqTowers(s);
+      for (let i = 0; i < sw.cols; i++) spawns.push(i === 0 && tier(s) >= 2 ? HQ_COUNTY : tws[i % tws.length]);
+    } else {
+      const sorted = [...CITIES].sort((a, b) => ((a.x - target.x) ** 2 + (a.y - target.y) ** 2) - ((b.x - target.x) ** 2 + (b.y - target.y) ** 2));
+      for (let i = 0; i < sw.cols; i++) spawns.push(sorted[i % sorted.length]);
+    }
+    lastSweepTarget = target;
+    return { target, spawns };
+  }
+  function drawSweep(sw: Sweep, s: KRState, t: number, push: (y: number, d: () => void) => void, dt: number): void {
+    const { target, spawns } = sweepGeom(sw, s);
     const per = sw.strength / Math.max(1, sw.cols);
     const tp = proj(target.x, target.y);
+    const fk = clamp(A * 0.0055 * Math.pow(cam.zoom, 0.88) * 0.12, 1.0, 3.4); // 兵团小人尺寸
     if (sw.stage === "incoming") {
       const prog = 1 - sw.etaSec / sw.etaSec0;
-      // 合围：外圈收缩虚线椭圆
       if (sw.kind === "encircle") {
-        const R0 = A * 0.30, R = R0 * (1 - prog * 0.75);
+        const wR = 0.10 * (1 - prog * 0.7);
+        const sR = wR * cam.zoom * A;
         ctx.save(); ctx.translate(tp.x, tp.y); ctx.scale(1, 0.5);
         ctx.strokeStyle = `rgba(226,86,77,${0.35 + prog * 0.3})`; ctx.lineWidth = 1.6; ctx.setLineDash([7, 7]);
-        ctx.beginPath(); ctx.arc(0, 0, R, t * 0.4, t * 0.4 + Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, sR, 0, 6.29); ctx.stroke();
         ctx.setLineDash([]); ctx.restore();
       }
       for (let i = 0; i < spawns.length; i++) {
         const sp = spawns[i];
         const dx = target.x - sp.x, dy = target.y - sp.y, dl = Math.hypot(dx, dy) || 1;
-        const stop = 0.055 + i * 0.008;
-        const spdMul = sw.kind === "raid" ? 1 : 1; // 奔袭本身 eta 短=快
-        const mx = lerp(sp.x, target.x - (dx / dl) * stop, prog * spdMul), my = lerp(sp.y, target.y - (dy / dl) * stop, prog * spdMul);
+        const stop = 0.018 + i * 0.004;
+        const mx = lerp(sp.x, target.x - (dx / dl) * stop, prog), my = lerp(sp.y, target.y - (dy / dl) * stop, prog);
         const p = proj(mx, my);
         const face = tp.x >= p.x ? 1 : -1;
-        const wide = sw.kind === "comb"; // 梳篦=拉网横排
-        push(p.y, () => drawFormation(ctx, p.x, p.y, per, true, k * 0.9, t, true, face, i === 0, wide));
-        if (Math.random() < (sw.kind === "raid" ? 0.7 : 0.3)) particles.push({ x: p.x + (Math.random() - 0.5) * k * 14, y: p.y + k * 2, vx: -5 * face, vy: -4, life: 0, max: 1.2, kind: "puff", r: k * 2 });
-        // 行军路线：奔袭=醒目实线，其它=虚线
+        if (inView(p, 150)) push(p.y, () => drawFormation(ctx, p.x, p.y, per, true, fk, t, true, face, i === 0, sw.kind === "comb"));
+        if (Math.random() < (sw.kind === "raid" ? 0.7 : 0.3)) particles.push({ x: mx, y: my, vx: -0.004 * face, vy: -0.003, life: 0, max: 1.2, kind: "puff", r: 2 });
         if (sw.kind === "raid") { ctx.strokeStyle = "rgba(255,90,60,.8)"; ctx.lineWidth = 2; }
         else { ctx.setLineDash([5, 6]); ctx.strokeStyle = "rgba(226,86,77,.45)"; ctx.lineWidth = 1.3; }
         ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(tp.x, tp.y); ctx.stroke(); ctx.setLineDash([]);
       }
       if (sw.committed > 0) {
-        const dp = proj(target.x, target.y - 0.035);
-        push(dp.y, () => drawFormation(ctx, dp.x, dp.y, sw.committed, false, k, t, false, 1));
+        const dp = proj(target.x, target.y - 0.012);
+        push(dp.y, () => drawFormation(ctx, dp.x, dp.y, sw.committed, false, fk, t, false, 1));
       }
     } else if (sw.stage === "battle") {
-      const our = proj(target.x, target.y + 0.012);
-      push(our.y, () => drawFormation(ctx, our.x, our.y, sw.committed, false, k, t, false, 1));
+      const our = proj(target.x, target.y + 0.006);
+      push(our.y, () => drawFormation(ctx, our.x, our.y, sw.committed, false, fk, t, false, 1));
       for (let i = 0; i < spawns.length; i++) {
         const sp = spawns[i];
         const dx = target.x - sp.x, dy = target.y - sp.y, dl = Math.hypot(dx, dy) || 1;
-        const jp = proj(target.x - (dx / dl) * 0.05, target.y - (dy / dl) * 0.05);
+        const jw = { x: target.x - (dx / dl) * 0.016, y: target.y - (dy / dl) * 0.016 };
+        const jp = proj(jw.x, jw.y);
         const face = tp.x >= jp.x ? 1 : -1;
-        push(jp.y, () => drawFormation(ctx, jp.x, jp.y, per, true, k * 0.9, t, false, face, i === 0, sw.kind === "comb"));
+        push(jp.y, () => drawFormation(ctx, jp.x, jp.y, per, true, fk, t, false, face, i === 0, sw.kind === "comb"));
         const rate = clamp((sw.strength + sw.committed) * 0.02, 0.3, 2.2) / sw.cols;
         if (Math.random() < rate * dt * 30) {
           const fromJp = Math.random() < 0.5;
-          const a = fromJp ? jp : our, b = fromJp ? our : jp;
-          const ox = (Math.random() - 0.5) * k * 12, oy = (Math.random() - 0.5) * k * 7;
-          tracers.push({ x1: a.x + ox, y1: a.y - k * 6 + oy, x2: b.x - ox, y2: b.y - k * 5 + oy * 0.5, life: 1, jp: fromJp });
-          particles.push({ x: a.x + ox, y: a.y - k * 6 + oy, vx: 0, vy: 0, life: 0, max: 0.16, kind: "flash", r: k * 2.4 });
+          const aW = fromJp ? jw : { x: target.x, y: target.y + 0.006 };
+          const bW = fromJp ? { x: target.x, y: target.y + 0.006 } : jw;
+          const ox = (Math.random() - 0.5) * 0.004, oy = (Math.random() - 0.5) * 0.003;
+          tracers.push({ x1: aW.x + ox, y1: aW.y + oy, x2: bW.x - ox, y2: bW.y - oy, life: 1, jp: fromJp });
+          particles.push({ x: aW.x + ox, y: aW.y + oy, vx: 0, vy: 0, life: 0, max: 0.16, kind: "flash", r: 2.4 });
         }
       }
-      if (Math.random() < dt * 8) particles.push({ x: tp.x + (Math.random() - 0.5) * k * 34, y: tp.y - k * 4, vx: 4, vy: -8, life: 0, max: 2.2, kind: "smoke", r: k * 3 });
+      if (Math.random() < dt * 8) particles.push({ x: target.x + (Math.random() - 0.5) * 0.012, y: target.y, vx: 0.002, vy: -0.004, life: 0, max: 2.2, kind: "smoke", r: 3 });
     } else {
-      push(tp.y + 2, () => drawFormation(ctx, tp.x, tp.y, sw.strength, true, k, t, true, 1));
-      spawnFlame(tp.x + (Math.random() - 0.5) * k * 24, tp.y - k * 4 + (Math.random() - 0.5) * k * 10, k);
+      push(tp.y + 2, () => drawFormation(ctx, tp.x, tp.y, sw.strength, true, fk, t, true, 1));
+      spawnFlameW(target.x + (Math.random() - 0.5) * 0.008, target.y + (Math.random() - 0.5) * 0.006);
     }
-  }
-  // 扫荡期间的群众进山转移小人
-  function drawSweepFx(sw: Sweep, s: KRState, k: number, t: number, dt: number): void {
-    void k; void t;
+    // 群众进山
     if (sw.evacStarted && sw.evacProgress < 1) {
-      const T = tier(s);
-      const target = T < 3 && curLayout ? curLayout.center : BASES.find((b) => b.id === sw.targetBase)!;
       if (Math.random() < dt * 6 && walkers.filter((w) => w.kind === "evac").length < 26) {
         walkers.push({
-          x: target.x + (Math.random() - 0.5) * 0.02, y: target.y + (Math.random() - 0.5) * 0.02,
+          x: target.x + (Math.random() - 0.5) * 0.01, y: target.y + (Math.random() - 0.5) * 0.01,
           tx: EVAC.x + (Math.random() - 0.5) * 0.05, ty: EVAC.y + (Math.random() - 0.5) * 0.04,
           spd: 0.018 + Math.random() * 0.008, kind: "evac", ph: Math.random() * 7
         });
       }
     }
   }
-  // 跨根据地大迁移的队伍（读 s.migration）
-  function spawnMigrationWalkers(dt: number, s: KRState, T: number): void {
+  function spawnFlameW(wx: number, wy: number): void {
+    if (Math.random() < 0.5) particles.push({ x: wx + (Math.random() - 0.5) * 0.002, y: wy, vx: (Math.random() - 0.5) * 0.001, vy: -0.006 - Math.random() * 0.004, life: 0, max: 0.7, kind: "flame", r: 2.2 });
+    if (Math.random() < 0.3) particles.push({ x: wx, y: wy - 0.001, vx: 0.001, vy: -0.005, life: 0, max: 2.6, kind: "smoke", r: 3 });
+  }
+  function trackCasualties(sw: Sweep | null, s: KRState): void {
+    if (!sw || sw.stage !== "battle") { prevJp = sw ? sw.strength : 0; prevOur = sw ? sw.committed : 0; prevSweepOn = !!sw; return; }
+    if (!prevSweepOn) { prevJp = sw.strength; prevOur = sw.committed; prevSweepOn = true; return; }
+    const tb = BASES.find((b) => b.id === sw.targetBase)!;
+    const jpDrop = Math.floor(prevJp) - Math.floor(sw.strength);
+    const ourDrop = Math.floor(prevOur) - Math.floor(sw.committed);
+    for (let i = 0; i < Math.min(3, jpDrop); i++) corpses.push({ x: tb.x + (Math.random() - 0.5) * 0.02, y: tb.y - 0.012 + (Math.random() - 0.5) * 0.008, life: 6, jp: true });
+    for (let i = 0; i < Math.min(3, ourDrop); i++) corpses.push({ x: tb.x + (Math.random() - 0.5) * 0.016, y: tb.y + 0.006 + (Math.random() - 0.5) * 0.006, life: 6, jp: false });
+    prevJp = sw.strength; prevOur = sw.committed;
+    void s;
+  }
+  // 迁移队伍
+  function spawnMigrationWalkers(dt: number, s: KRState): void {
     const m = s.migration;
-    if (!m || T < 3) { migSpawnAcc = 0; return; }
+    if (!m) { migSpawnAcc = 0; return; }
     migSpawnAcc += dt;
     const from = BASES.find((b) => b.id === m.from)!, to = BASES.find((b) => b.id === m.to)!;
     if (migSpawnAcc > 0.25 && walkers.filter((w) => w.kind === "migrate").length < 20) {
@@ -803,40 +825,13 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
   }
 
-  function spawnFlame(x: number, y: number, k: number): void {
-    if (Math.random() < 0.5) particles.push({ x: x + (Math.random() - 0.5) * k * 6, y, vx: (Math.random() - 0.5) * 4, vy: -14 - Math.random() * 10, life: 0, max: 0.7, kind: "flame", r: k * 2.2 });
-    if (Math.random() < 0.3) particles.push({ x, y: y - k * 4, vx: 4, vy: -12, life: 0, max: 2.6, kind: "smoke", r: k * 3 });
-  }
-  function trackCasualties(sw: Sweep | null, k: number, s: KRState): void {
-    if (!sw || sw.stage !== "battle") { prevJp = sw ? sw.strength : 0; prevOur = sw ? sw.committed : 0; prevSweepOn = !!sw; return; }
-    if (!prevSweepOn) { prevJp = sw.strength; prevOur = sw.committed; prevSweepOn = true; return; }
-    const T = tier(s);
-    const target = T < 3 && curLayout ? curLayout.center : BASES.find((b) => b.id === sw.targetBase)!;
-    const jpDrop = Math.floor(prevJp) - Math.floor(sw.strength);
-    const ourDrop = Math.floor(prevOur) - Math.floor(sw.committed);
-    for (let i = 0; i < Math.min(3, jpDrop); i++) {
-      const p = proj(target.x + (Math.random() - 0.5) * 0.05, target.y - 0.03 + (Math.random() - 0.5) * 0.02);
-      corpses.push({ x: p.x, y: p.y, life: 6, jp: true });
-    }
-    for (let i = 0; i < Math.min(3, ourDrop); i++) {
-      const p = proj(target.x + (Math.random() - 0.5) * 0.04, target.y + 0.015 + (Math.random() - 0.5) * 0.014);
-      corpses.push({ x: p.x, y: p.y, life: 6, jp: false });
-    }
-    prevJp = sw.strength; prevOur = sw.committed;
-    void k;
-  }
-
-  // ── 中心村小人 ──
-  function centerOf(T: number): { x: number; y: number } {
-    return T < 3 && curLayout ? curLayout.center : { x: BASES[0].x, y: BASES[0].y };
-  }
-  function syncWalkers(s: KRState, T: number): void {
+  function syncWalkers(s: KRState): void {
     const wantVil = clamp(Math.floor(2 + Math.log2(s.bing + 1) * 2.6), 2, 30);
     const wantSol = clamp(Math.floor(Math.log2(s.bing + 1) * 1.1), 0, 12);
     let vil = 0, sol = 0;
     for (const w of walkers) { if (w.kind === "villager") vil++; else if (w.kind === "soldier") sol++; }
-    while (vil < wantVil) { walkers.push(spawnWalker("villager", T)); vil++; }
-    while (sol < wantSol) { walkers.push(spawnWalker("soldier", T)); sol++; }
+    while (vil < wantVil) { walkers.push(spawnWalker("villager")); vil++; }
+    while (sol < wantSol) { walkers.push(spawnWalker("soldier")); sol++; }
     if (vil > wantVil || sol > wantSol) {
       for (let i = walkers.length - 1; i >= 0 && (vil > wantVil || sol > wantSol); i--) {
         const w = walkers[i];
@@ -845,28 +840,26 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       }
     }
   }
-  function spawnWalker(kind: "villager" | "soldier", T: number): Walker {
-    const C = centerOf(T);
-    const r = (kind === "soldier" ? 0.05 : 0.035) * (T < 3 ? 1.6 : 1);
+  function spawnWalker(kind: "villager" | "soldier"): Walker {
+    const r = kind === "soldier" ? 0.016 : 0.011;
     return {
-      x: C.x + (Math.random() - 0.5) * r * 2, y: C.y + (Math.random() - 0.5) * r * 1.6,
-      tx: C.x + (Math.random() - 0.5) * r * 2, ty: C.y + (Math.random() - 0.5) * r * 1.6,
-      spd: 0.008 + Math.random() * 0.006, kind, ph: Math.random() * 7
+      x: HQ.x + (Math.random() - 0.5) * r * 2, y: HQ.y + (Math.random() - 0.5) * r * 1.6,
+      tx: HQ.x + (Math.random() - 0.5) * r * 2, ty: HQ.y + (Math.random() - 0.5) * r * 1.6,
+      spd: 0.003 + Math.random() * 0.002, kind, ph: Math.random() * 7
     };
   }
-  function stepWalkers(dt: number, s: KRState, T: number): void {
-    void s;
-    const C = centerOf(T);
+  function stepWalkers(dt: number): void {
     for (let i = walkers.length - 1; i >= 0; i--) {
       const w = walkers[i];
       const dx = w.tx - w.x, dy = w.ty - w.y, d = Math.hypot(dx, dy);
-      if (d < 0.004) {
+      if (d < 0.002) {
         if (w.kind === "evac" || w.kind === "migrate") { walkers.splice(i, 1); continue; }
-        const r = (w.kind === "soldier" ? 0.05 : 0.035) * (T < 3 ? 1.6 : 1);
-        w.tx = C.x + (Math.random() - 0.5) * r * 2; w.ty = C.y + (Math.random() - 0.5) * r * 1.6;
+        const r = w.kind === "soldier" ? 0.016 : 0.011;
+        w.tx = HQ.x + (Math.random() - 0.5) * r * 2; w.ty = HQ.y + (Math.random() - 0.5) * r * 1.6;
       } else {
-        w.x += (dx / d) * w.spd * dt * (w.kind === "evac" || w.kind === "migrate" ? 1 : 0.55);
-        w.y += (dy / d) * w.spd * dt * (w.kind === "evac" || w.kind === "migrate" ? 1 : 0.55);
+        const sp = w.kind === "evac" || w.kind === "migrate" ? w.spd : w.spd * 0.55;
+        w.x += (dx / d) * sp * dt;
+        w.y += (dy / d) * sp * dt;
       }
     }
   }
@@ -875,25 +868,27 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     W = canvas.clientWidth || 1; H = canvas.clientHeight || 1;
     canvas.width = Math.max(1, W * dpr); canvas.height = Math.max(1, H * dpr);
-    cx = W * 0.5; cy = H * 0.52;
+    cx0 = W * 0.5; cy0 = H * 0.52;
     A = Math.min(W * 0.52, H * 0.92); B = A * 0.5;
-    terrainTier = -1; // 触发重画
+    dirty = true;
   }
   resize();
 
   function hitBase(cxp: number, cyp: number): string | null {
-    const m = unproj(cxp, cyp);
-    if (curLayout) { // 局部场景只有 hq
-      const d = (curLayout.center.x - m.x) ** 2 + (curLayout.center.y - m.y) ** 2;
-      return d < HIT_R * HIT_R * 4 ? "hq" : null;
-    }
-    let best: string | null = null, bd = HIT_R * HIT_R;
+    if (dragMoved) return null; // 拖拽不算点击
+    let best: string | null = null, bd = 42 * 42; // 屏幕像素判定
     for (const b of BASES) {
-      const d = (b.x - m.x) ** 2 + (b.y - m.y) ** 2;
+      const p = proj(b.x, b.y);
+      const d = (p.x - cxp) ** 2 + (p.y - cyp) ** 2;
       if (d < bd) { bd = d; best = b.id; }
     }
     return best;
   }
+  function focusSweep(): void {
+    if (!lastSweepTarget) return;
+    cam.tx = lastSweepTarget.x; cam.ty = lastSweepTarget.y;
+    cam.tzoom = Math.max(cam.zoom, 6);
+  }
 
-  return { ok: true, resize, frame, hitBase, dispose() { walkers.length = 0; particles.length = 0; } };
+  return { ok: true, resize, frame, hitBase, focusSweep, dispose() { walkers.length = 0; particles.length = 0; } };
 }

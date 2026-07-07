@@ -117,6 +117,8 @@ export function bootstrapKangri(root: HTMLElement): void {
 
   // ── 扫荡决策条 ──
   const sweepBar = $("#krSweepBar"), sbHead = $("#krSbHead"), sbStatus = $("#krSbStatus");
+  sbHead.style.cursor = "pointer";
+  sbHead.addEventListener("click", () => scene.focusSweep());
   const evacBtn = $<HTMLButtonElement>("#krEvac");
   evacBtn.addEventListener("click", () => { startEvacuation(state); });
   for (const b of wrap.querySelectorAll<HTMLButtonElement>(".kr-sb-btn.fight")) {
@@ -204,7 +206,7 @@ export function bootstrapKangri(root: HTMLElement): void {
   for (const t of wrap.querySelectorAll<HTMLButtonElement>(".kr-tab")) t.addEventListener("click", () => switchTab(t.dataset.t!));
 
   const GUIDE = [
-    { t: "1937·敌后一无所有。按【G】或点『发动群众抗争』——组织起来，攒兵员与物资", d: (s: KRState) => s.clickN > 0 },
+    { t: "1937·敌后一无所有。按【G】发动群众攒家底；【滚轮】缩放地图、【拖拽】平移——拉远看看整个华北还笼罩在战雾里", d: (s: KRState) => s.clickN > 0 },
     { t: "买【民兵队】『生产队』攒家底；点地图上金圈闪的区域【开辟】新根据地——现在是大发展窗口！", d: (s: KRState) => estCount(s) >= 2 },
     { t: "日军扫荡来时：下令【组织群众大范围转移】保家底，【组织抗击】投兵员打会战", d: (s: KRState) => s.sweepsSurvived > 0 },
     { t: "1939 起日军修炮楼蚕食根据地(🏯)——在根据地面板【拔据点】。给平原根据地【挖地道】，1941-42 顶得住铁壁合围", d: (s: KRState) => s.stats.spotsRemoved > 0 || BASES.some((b) => s.bases[b.id].tunnels > 0) },
