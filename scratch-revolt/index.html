@@ -4,78 +4,155 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#111315" />
-<title>刮出个未来 · 玩法白盒</title>
+<title>刮出个未来</title>
 <style>
 /* ===== SECTION: BASE ===== */
 :root{
-  --bg:#111315; --panel:#191c1f; --panel2:#1f2327; --line:#2c3238;
-  --ink:#e8e6e0; --dim:#8a9099; --faint:#565c63;
-  --money:#e8c15a; --boss:#b364d6; --wage:#6fce8f;
-  --awake:#e5484d; --awake-soft:#ff8a8e;
-  --frag:#5ab0e8;
+  --bg:#0b0d12; --panel:#171b23; --panel2:#1d232e; --line:#262d3a; --line2:#323a4a;
+  --ink:#e9e6dc; --dim:#98a0ad; --faint:#5d6572;
+  --money:#f0c752; --money-deep:#c99a2e;
+  --boss:#c470e0; --wage:#7ddc9c;
+  --awake:#e5484d; --awake-soft:#ff9094;
+  --frag:#62b8f5;
+  --paper:#f4eddc; --paper2:#efe7d4; --paper-line:#d9cdb2;
+  --paper-ink:#2c2a24; --paper-dim:#8a8062; --stamp:#c23b3b;
+  --serif:"Songti SC","STZhongsong","SimSun",serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
-  background:var(--bg); color:var(--ink);
+  background:
+    radial-gradient(110% 70% at 70% -10%, rgba(255,170,60,.08), transparent 55%),
+    radial-gradient(120% 80% at 8% 110%, rgba(140,50,170,.07), transparent 60%),
+    linear-gradient(180deg,#0d1016,#0a0c10 60%,#0b0d13);
+  background-attachment:fixed;
+  color:var(--ink);
   font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
   font-size:14px; line-height:1.5; overflow-x:hidden;
 }
-button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:6px}
+body::before{ /* 夜色颗粒 */
+  content:"";position:fixed;inset:0;z-index:2;pointer-events:none;opacity:.45;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+button{
+  font-family:inherit;cursor:pointer;color:var(--ink);border-radius:7px;
+  border:1px solid var(--line2);
+  background:linear-gradient(180deg,#242b38,#1a1f29);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 2px 6px rgba(0,0,0,.35);
+}
+button:hover{border-color:#46536e}
 button:active{transform:translateY(1px)}
 .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
-.kicker{font-size:11px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
-.panel + .panel{margin-top:10px}
+.kicker{font-size:11px;letter-spacing:.22em;color:#7d8695;text-transform:uppercase}
+.panel{
+  background:linear-gradient(180deg,#181c25,#141821);
+  border:1px solid var(--line);border-radius:12px;padding:14px;
+  box-shadow:0 12px 32px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.03);
+}
+.panel + .panel{margin-top:12px}
 
 /* ===== SECTION: TOPBAR ===== */
 #topbar{
   display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);
-  position:sticky;top:0;z-index:20;
+  padding:10px 18px;position:sticky;top:0;z-index:20;
+  background:linear-gradient(180deg,#151924,#10131b);
+  border-bottom:1px solid #2a3140;
+  box-shadow:0 6px 24px rgba(0,0,0,.45);
 }
-#topbar .title{font-weight:700;font-size:15px}
-#topbar .title small{color:var(--faint);font-weight:400;margin-left:6px}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:13px}
+#topbar .title{
+  font-family:var(--serif);font-weight:800;font-size:17px;letter-spacing:.08em;
+  background:linear-gradient(180deg,#ffe9ad,#e0a83c);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 22px rgba(240,199,82,.25);
+}
+#topbar .title small{
+  font-family:"PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--faint);-webkit-text-fill-color:var(--faint);
+  font-weight:400;margin-left:8px;letter-spacing:.05em;font-size:11px;
+}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;padding:3px 12px;
+  border:1px solid var(--line);border-radius:999px;font-size:13px;
+  background:linear-gradient(180deg,#1e2430,#181d27);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}
 .chip b{font-size:14px}
-.chip.money b{color:var(--money)} .chip.awake b{color:var(--awake-soft)} .chip.com b{color:var(--frag)}
+.chip.money b{color:var(--money);text-shadow:0 0 10px rgba(240,199,82,.35)}
+.chip.awake b{color:var(--awake-soft);text-shadow:0 0 10px rgba(229,72,77,.35)}
+.chip.com b{color:var(--frag)}
 #dayChip{color:var(--dim)}
 #coopChip{display:none;border-color:var(--awake);color:var(--awake-soft)}
 
 /* ===== SECTION: LAYOUT ===== */
 #main{
-  display:grid;grid-template-columns:300px minmax(420px,1fr) 320px;
-  gap:12px;padding:12px 16px;max-width:1280px;margin:0 auto;align-items:start;
+  display:grid;grid-template-columns:308px minmax(420px,1fr) 324px;
+  gap:14px;padding:16px 18px;max-width:1300px;margin:0 auto;align-items:start;
+  position:relative;z-index:1;
 }
 @media (max-width:1080px){ #main{grid-template-columns:1fr;max-width:560px} }
 
-/* ===== SECTION: PAYSTUB (剥削可视化) ===== */
+/* ===== SECTION: PAYSTUB 纸质工资结算单 ===== */
+.paystub{
+  background:
+    repeating-linear-gradient(0deg, transparent 0 26px, rgba(160,123,23,.07) 26px 27px),
+    linear-gradient(160deg,#f7f0de,#efe6d0);
+  border:1px solid #cfc2a4;border-radius:6px;color:var(--paper-ink);
+  box-shadow:0 14px 30px rgba(0,0,0,.5), inset 0 0 40px rgba(160,123,23,.06);
+  position:relative;overflow:hidden;
+  font-family:var(--serif);
+}
+.paystub::before{ /* 顶部撕票孔 */
+  content:"";position:absolute;top:0;left:0;right:0;height:8px;
+  background:radial-gradient(circle at 8px 0px, #0d1016 4px, transparent 4.5px);
+  background-size:20px 8px;background-position:6px -2px;
+}
+.paystub::after{ /* 红章 */
+  content:"已\A 核";white-space:pre;
+  position:absolute;top:34px;right:14px;width:52px;height:52px;
+  border:3px solid rgba(194,59,59,.65);border-radius:50%;
+  color:rgba(194,59,59,.72);font-family:var(--serif);font-weight:800;font-size:14px;
+  line-height:1.2;display:flex;align-items:center;justify-content:center;text-align:center;
+  transform:rotate(-14deg);pointer-events:none;
+}
+.stub-head{
+  text-align:center;font-size:13px;letter-spacing:.18em;color:#6b6350;
+  border-bottom:2px solid #3a352b;padding:6px 0 7px;margin-bottom:8px;font-weight:700;
+}
+.stub-head b{color:var(--paper-ink)}
 .paystub .row{display:flex;justify-content:space-between;align-items:baseline;margin-top:4px}
-.paystub .row .lab{color:var(--dim);font-size:12px}
-#grossRate{color:var(--ink);font-weight:700}
-#bossRate{color:var(--boss);font-weight:700}
-#wageRate{color:var(--wage);font-weight:700}
-.splitbar{height:14px;border-radius:7px;overflow:hidden;display:flex;margin:8px 0 4px;border:1px solid var(--line)}
-.splitbar .boss{background:linear-gradient(90deg,#7c3aa0,#b364d6)}
-.splitbar .wage{background:linear-gradient(90deg,#3f9e63,#6fce8f)}
-#exploitPct{font-size:22px;font-weight:800;color:var(--boss)}
-.taken-box{margin-top:10px;padding:8px 10px;border:1px dashed #5c3a70;border-radius:8px;background:#1d1522}
-.taken-box .lab{font-size:12px;color:#b78fcb}
-#takenTotal{font-size:20px;font-weight:800;color:var(--boss);letter-spacing:.02em}
-.hint{font-size:12px;color:var(--faint);margin-top:6px}
+.paystub .row .lab{color:var(--paper-dim);font-size:12px}
+#grossRate{color:var(--paper-ink);font-weight:700}
+#bossRate{color:#b0342e;font-weight:800}
+#wageRate{color:#2e7d4f;font-weight:800}
+.splitbar{
+  height:16px;border-radius:3px;overflow:hidden;display:flex;margin:9px 0 5px;
+  border:1px solid #b9ab8b;box-shadow:inset 0 1px 3px rgba(0,0,0,.18);
+}
+.splitbar .boss{background:repeating-linear-gradient(-45deg,#b0342e 0 8px,#9c2b26 8px 16px)}
+.splitbar .wage{background:linear-gradient(180deg,#3f9e63,#2e7d4f)}
+#exploitPct{font-size:22px;font-weight:800;color:#b0342e}
+.taken-box{
+  margin-top:12px;padding:9px 12px;border:2px double #b0342e;border-radius:4px;
+  background:rgba(194,59,59,.06);
+}
+.taken-box .lab{font-size:12px;color:#9c5b52;letter-spacing:.08em}
+#takenTotal{font-size:22px;font-weight:800;color:#b0342e;letter-spacing:.02em}
+.hint{font-size:12px;color:var(--faint);margin-top:8px}
+.paystub .hint{color:#a39877;font-style:italic}
 
 /* ===== SECTION: SHOP LISTS ===== */
 .shop-item{
   display:flex;justify-content:space-between;align-items:center;gap:8px;
-  padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:8px;background:var(--panel2);
+  padding:9px 10px;border:1px solid var(--line);border-radius:9px;margin-top:8px;
+  background:linear-gradient(180deg,#1c212c,#181d27);
 }
 .shop-item .info{flex:1;min-width:0}
 .shop-item .name{font-weight:600;font-size:13px}
 .shop-item .desc{font-size:12px;color:var(--dim)}
 .shop-item .lv{color:var(--faint);font-size:11px;margin-left:4px}
-.shop-item button{padding:5px 10px;font-size:12px;white-space:nowrap}
-.shop-item button.cheap{border-color:#3f6e52;color:var(--wage)}
-.shop-item button.cant{opacity:.55}
+.shop-item button{padding:5px 11px;font-size:12px;white-space:nowrap}
+.shop-item button.cheap{border-color:#3f6e52;color:var(--wage);box-shadow:0 0 12px rgba(125,220,156,.12), inset 0 1px 0 rgba(255,255,255,.06)}
+.shop-item button.cant{opacity:.5}
 .shop-item.done{opacity:.55}
 .shop-item.done button{visibility:hidden}
 .shop-item.locked{opacity:.5}
@@ -83,125 +160,267 @@ button:active{transform:translateY(1px)}
 
 /* ===== SECTION: LOG ===== */
 #log{max-height:220px;overflow-y:auto;font-size:12px;color:var(--dim);display:flex;flex-direction:column-reverse}
-#log p{padding:2px 0;border-bottom:1px dotted #23282d}
+#log p{padding:3px 0;border-bottom:1px dotted #232936}
 #log p.boss{color:#b78fcb}
 #log p.good{color:var(--wage)}
 #log p.awake{color:var(--awake-soft)}
 
-/* ===== SECTION: TICKET RACK ===== */
-#rack{display:flex;gap:8px;flex-wrap:wrap}
-.rack-btn{
-  flex:1;min-width:96px;padding:8px 6px;border-radius:8px;text-align:center;
-  border:1px solid var(--line);background:var(--panel2);position:relative;
+/* ===== SECTION: 彩票店霓虹灯牌 ===== */
+.lottery{
+  background:
+    radial-gradient(90% 60% at 50% 0%, rgba(255,170,50,.10), transparent 60%),
+    linear-gradient(180deg,#181c25,#141821);
 }
-.rack-btn .t-name{font-weight:700;font-size:13px}
-.rack-btn .t-price{color:var(--money);font-size:12px}
-.rack-btn .t-ev{font-size:11px;color:var(--faint)}
-.rack-btn.locked{opacity:.45}
-.rack-btn.active{border-color:var(--money);box-shadow:0 0 0 1px var(--money) inset}
-.rack-btn.zibenlun{border-color:#6e3a3a}
-.rack-btn.zibenlun .t-name{color:var(--awake-soft)}
+.shop-sign{
+  text-align:center;font-size:18px;font-weight:800;letter-spacing:.14em;
+  color:#ffd873;
+  text-shadow:0 0 5px rgba(255,205,90,.9),0 0 18px rgba(255,150,20,.55),0 0 40px rgba(255,120,0,.3);
+  border:1px solid rgba(255,190,80,.28);border-radius:10px;padding:7px 0;
+  background:rgba(255,170,50,.05);
+}
+.shop-sign em{font-style:normal;animation:flicker 3.8s infinite}
+@keyframes flicker{0%,88%,92%,100%{opacity:1}89.5%,91%{opacity:.3}}
 
-/* ===== SECTION: SCRATCH CARD ===== */
-#cardWrap{margin-top:12px;display:flex;flex-direction:column;align-items:center}
-#cardFrame{
-  position:relative;width:390px;max-width:100%;border-radius:12px;
-  background:linear-gradient(160deg,#23272c,#1a1d21);border:1px solid var(--line);
-  padding:12px;
+/* ===== SECTION: TICKET RACK 票架 ===== */
+#rack{display:flex;gap:9px;flex-wrap:wrap}
+.rack-btn{
+  flex:1;min-width:98px;padding:9px 6px 7px;border-radius:6px;text-align:center;
+  border:1px solid var(--line2);border-top-width:4px;position:relative;
+  background:linear-gradient(180deg,#222836,#1a1f2a);
 }
-#cardHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
-#cardTitle{font-weight:800;font-size:15px;color:var(--money)}
-#cardRule{font-size:11px;color:var(--faint)}
-#cardStage{position:relative;width:100%;aspect-ratio:366/300;border-radius:8px;overflow:hidden;background:#0d0f11}
+.rack-btn::before,.rack-btn::after{ /* 票边打孔 */
+  content:"";position:absolute;top:50%;width:10px;height:10px;border-radius:50%;
+  background:#12151d;border:1px solid var(--line);transform:translateY(-50%);
+}
+.rack-btn::before{left:-6px} .rack-btn::after{right:-6px}
+.rack-btn .t-name{font-weight:800;font-size:13px;letter-spacing:.06em}
+.rack-btn .t-price{color:var(--money);font-size:12px;font-weight:700}
+.rack-btn .t-ev{font-size:11px;color:var(--faint)}
+.rack-btn.tier-t1{border-top-color:#3fa66b}.rack-btn.tier-t1 .t-name{color:#8fdcb0}
+.rack-btn.tier-t2{border-top-color:#e08a2e}.rack-btn.tier-t2 .t-name{color:#ffc888}
+.rack-btn.tier-t3{border-top-color:#4f7bd9}.rack-btn.tier-t3 .t-name{color:#a9c4ff}
+.rack-btn.tier-t4{border-top-color:#d4af37;background:linear-gradient(180deg,#26232e,#1b1922)}
+.rack-btn.tier-t4 .t-name{color:#ffe9ad;text-shadow:0 0 8px rgba(240,199,82,.4)}
+.rack-btn.zibenlun{border-top-color:#8a3b2e;background:linear-gradient(180deg,#241a18,#1c1412)}
+.rack-btn.zibenlun .t-name{color:var(--awake-soft);font-family:var(--serif)}
+.rack-btn.locked{opacity:.4;filter:grayscale(.7)}
+.rack-btn.active{box-shadow:0 0 0 2px var(--money),0 0 18px rgba(240,199,82,.35)}
+
+/* ===== SECTION: SCRATCH CARD 印刷彩票 ===== */
+#cardWrap{margin-top:14px;display:flex;flex-direction:column;align-items:center}
+#cardFrame{
+  position:relative;width:396px;max-width:100%;border-radius:10px;padding:0 12px 10px;
+  background:
+    repeating-linear-gradient(45deg, rgba(160,123,23,.05) 0 1px, transparent 1px 10px),
+    linear-gradient(165deg,#f7f0de,#ece2c8);
+  border:1px solid #cfc2a4;color:var(--paper-ink);
+  box-shadow:0 16px 36px rgba(0,0,0,.55), inset 0 0 46px rgba(160,123,23,.07);
+}
+#cardHead{
+  display:flex;justify-content:space-between;align-items:center;
+  margin:0 -12px 8px;padding:8px 14px;border-radius:9px 9px 0 0;
+  background:linear-gradient(180deg,#3d4350,#2d323d);
+}
+#cardTitle{font-weight:800;font-size:16px;color:#f7f0dd;font-family:var(--serif);letter-spacing:.08em}
+#cardSerial{font-size:10px;color:rgba(247,240,221,.75);letter-spacing:.12em}
+#cardFrame[data-tier="t1"] #cardHead{background:linear-gradient(180deg,#37955f,#25714a)}
+#cardFrame[data-tier="t2"] #cardHead{background:linear-gradient(180deg,#dd8626,#b5661a)}
+#cardFrame[data-tier="t3"] #cardHead{background:linear-gradient(180deg,#4c76d4,#3557a8)}
+#cardFrame[data-tier="t4"] #cardHead{background:linear-gradient(180deg,#2b2b33,#1d1d24);border-bottom:2px solid #d4af37}
+#cardFrame[data-tier="t4"] #cardTitle{color:#ffe9ad}
+#cardFrame[data-tier="zb"] #cardHead{background:linear-gradient(180deg,#8a3b2e,#6b2c22)}
+#cardRule{font-size:11px;color:var(--paper-dim);text-align:center;margin-bottom:8px;letter-spacing:.06em}
+#cardStage{position:relative;width:100%;aspect-ratio:366/300;border-radius:8px;overflow:hidden;background:var(--paper2);border:1px solid var(--paper-line)}
 #cellGrid{
   position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
-  gap:4px;padding:4px;
+  gap:5px;padding:5px;
 }
 .cell{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  background:#15181b;border-radius:6px;border:1px solid #22262b;
+  background:#fbf6ea;border-radius:5px;border:1px solid var(--paper-line);
+  box-shadow:inset 0 1px 2px rgba(160,123,23,.10);
 }
 .cell .sym{font-size:30px;line-height:1}
-.cell .amt{font-size:11px;color:var(--dim)}
-.cell.win-cell{background:#1d2a20;border-color:#3f6e52}
-.cell.win-cell .amt{color:var(--wage)}
-.cell.awake-cell{background:#2a1719;border-color:#6e3a3a}
-.cell.awake-cell .amt{color:var(--awake-soft)}
-.cell.frag-cell{background:#152230;border-color:#2d5a7d}
-.cell.frag-cell .amt{color:var(--frag)}
-#coat,#fxCanvas{position:absolute;inset:0;width:100%;height:100%;border-radius:8px}
+.cell .amt{font-size:10px;color:var(--paper-dim);font-weight:600}
+.cell.win-cell{background:#e9f3e4;border-color:#7fae8a}
+.cell.win-cell .amt{color:#2e7d4f}
+.cell.awake-cell{background:#f8e4e2;border-color:#cf9090}
+.cell.awake-cell .amt{color:var(--stamp)}
+.cell.frag-cell{background:#e4eef7;border-color:#92b6d6}
+.cell.frag-cell .amt{color:#2e6da0}
+#coat,#fxCanvas{position:absolute;inset:0;width:100%;height:100%;border-radius:7px}
 #coat{touch-action:none;cursor:crosshair;transition:opacity .45s}
 #coat.fade{opacity:0;pointer-events:none}
 #fxCanvas{pointer-events:none}
+#cardStage.flash::after{
+  content:"";position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,215,90,.55),transparent 70%);
+  animation:flashOut .7s forwards;
+}
+@keyframes flashOut{from{opacity:1}to{opacity:0}}
 #cardIdle{
   position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-  color:var(--faint);font-size:13px;text-align:center;padding:20px;
+  color:#a39877;font-size:13px;text-align:center;padding:20px;
 }
-#legend{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;justify-content:center}
-.leg{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:2px 7px;background:var(--panel2)}
-.leg b{color:var(--money)}
-#result{min-height:52px;margin-top:10px;text-align:center}
-#resultMain{font-size:17px;font-weight:800}
-#resultMain.win{color:var(--money)} #resultMain.lose{color:var(--faint)} #resultMain.awake{color:var(--awake-soft)}
-#resultSub{font-size:12px;color:var(--dim);margin-top:2px}
-#againBtn{margin-top:8px;padding:7px 22px;font-size:13px;border-color:#5c4f2a;color:var(--money);display:none}
+#legend{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;justify-content:center}
+.leg{
+  font-size:11px;color:#6b6350;border:1px solid var(--paper-line);border-radius:5px;
+  padding:2px 8px;background:var(--paper2);
+}
+.leg b{color:#a07b17}
+#result{min-height:52px;margin-top:9px;text-align:center}
+#resultMain{font-size:18px;font-weight:800;font-family:var(--serif);letter-spacing:.04em}
+#resultMain.win{color:#a07b17;text-shadow:0 0 14px rgba(240,199,82,.4)}
+#resultMain.lose{color:#8a8062}
+#resultMain.awake{color:var(--stamp)}
+#resultSub{font-size:12px;color:var(--paper-dim);margin-top:2px}
+#againBtn{
+  margin-top:8px;padding:7px 24px;font-size:13px;font-weight:700;display:none;
+  background:transparent;border:2px solid var(--stamp);color:var(--stamp);
+  border-radius:5px;box-shadow:none;font-family:var(--serif);letter-spacing:.08em;
+}
+#againBtn:hover{background:rgba(194,59,59,.08);border-color:var(--stamp)}
+#cardFoot{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  margin-top:9px;padding-top:7px;border-top:1px dashed #c9bd9f;
+}
+#cardFine{font-size:9px;color:#a39877;letter-spacing:.05em}
+#barcode{
+  width:104px;height:20px;flex:none;
+  background:repeating-linear-gradient(90deg,#3a352b 0 2px,transparent 2px 4px,#3a352b 4px 5px,transparent 5px 9px,#3a352b 9px 12px,transparent 12px 14px);
+}
 #ticketStats{margin-top:10px;font-size:12px;color:var(--faint);text-align:center}
 #ticketStats b{color:var(--dim)}
 
-/* ===== SECTION: RIGHT COLUMN ===== */
+/* ===== SECTION: RIGHT COLUMN 觉悟专栏 ===== */
+#main>div:last-child .kicker{
+  font-family:var(--serif);color:var(--awake-soft);font-size:13px;
+  letter-spacing:.3em;text-transform:none;
+}
 #awakeHead{display:flex;justify-content:space-between;align-items:baseline}
-#awakeVal{font-size:20px;font-weight:800;color:var(--awake-soft)}
+#awakeVal{font-size:22px;font-weight:800;color:var(--awake-soft);text-shadow:0 0 16px rgba(229,72,77,.4)}
 #comRow{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:4px}
 #comRow b{color:var(--frag)}
-/* 革命面板 */
-#revoPanel{border-color:#5a2c2e;background:#1a1416}
-.revo-bar{height:10px;border-radius:5px;background:#26191b;border:1px solid #3a2528;overflow:hidden;margin-top:4px}
-.revo-bar>div{height:100%;background:linear-gradient(90deg,#8a2e33,#e5484d);width:0%}
-.revo-req{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:8px}
+/* 革命红旗面板 */
+#revoPanel{
+  background:
+    radial-gradient(100% 70% at 50% 0%, rgba(255,200,120,.10), transparent 55%),
+    linear-gradient(175deg,#6f1d22,#491114);
+  border-color:#a3383e;
+  box-shadow:0 12px 32px rgba(80,10,15,.5), inset 0 1px 0 rgba(255,255,255,.06);
+}
+#revoPanel .kicker{color:#ffd8a0;letter-spacing:.3em}
+.revo-req{display:flex;justify-content:space-between;font-size:12px;color:#e8b9ac;margin-top:8px}
+.revo-bar{height:10px;border-radius:5px;background:#380d10;border:1px solid #7e2a2f;overflow:hidden;margin-top:4px}
+.revo-bar>div{height:100%;background:linear-gradient(90deg,#d9a13d,#ffdf8a);width:0%;box-shadow:0 0 10px rgba(255,223,138,.5)}
 #revoBtn{
-  width:100%;margin-top:12px;padding:10px;font-size:15px;font-weight:800;
-  border-color:#8a2e33;color:var(--awake-soft);background:#241416;border-radius:8px;
+  width:100%;margin-top:14px;padding:11px;font-size:16px;font-weight:800;
+  font-family:var(--serif);letter-spacing:.24em;border-radius:6px;
+  background:linear-gradient(180deg,#f7f0de,#e8dcc0);color:#8a1f25;
+  border:1px solid #f4eddc;box-shadow:0 3px 10px rgba(0,0,0,.35);
 }
-#revoBtn.ready{background:#e5484d;color:#fff;border-color:#e5484d;animation:pulse 1.2s infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,.5)}50%{box-shadow:0 0 0 8px rgba(229,72,77,0)}}
+#revoBtn.ready{
+  background:linear-gradient(180deg,#ffe9ad,#f0c752);border-color:#ffe9ad;
+  animation:pulse 1.2s infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,223,138,.55)}50%{box-shadow:0 0 0 10px rgba(255,223,138,0)}}
 /* 图鉴 */
-#posterGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+#posterGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
 .pslot{
-  aspect-ratio:1;border:1px dashed var(--line);border-radius:8px;
+  aspect-ratio:1;border:1px dashed var(--line2);border-radius:6px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  font-size:11px;color:var(--faint);background:var(--panel2);text-align:center;padding:2px;
+  font-size:11px;color:var(--faint);background:linear-gradient(180deg,#1c212c,#181d27);
+  text-align:center;padding:2px;
 }
-.pslot.got{border-style:solid;border-color:var(--frag);color:var(--ink)}
-.pslot .pi{font-size:20px;filter:grayscale(1);opacity:.35}
+.pslot.got{
+  border-style:solid;border-color:#8fb4d4;color:var(--ink);
+  background:linear-gradient(180deg,#20304a,#1a2438);
+  box-shadow:0 0 12px rgba(98,184,245,.15);
+}
+.pslot .pi{font-size:20px;filter:grayscale(1);opacity:.3}
 .pslot.got .pi{filter:none;opacity:1}
-#posterName{font-size:12px;color:var(--frag);margin-top:6px}
+#posterName{font-size:12px;color:var(--frag);margin-top:6px;font-family:var(--serif);letter-spacing:.06em}
 #posterBonus{font-size:11px;color:var(--faint)}
 
 /* ===== SECTION: OVERLAYS / TOAST ===== */
 .overlay{
-  position:fixed;inset:0;z-index:50;background:rgba(10,11,13,.88);backdrop-filter:blur(3px);
+  position:fixed;inset:0;z-index:50;background:rgba(8,9,12,.9);backdrop-filter:blur(4px);
   display:flex;align-items:center;justify-content:center;padding:20px;
 }
 .overlay[hidden]{display:none}
-.ov-card{max-width:520px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px}
-.ov-card h1{font-size:22px;margin-bottom:14px}
-.ov-card p{color:var(--dim);margin-top:10px}
-.ov-card p b{color:var(--ink)}
-.ov-card button{margin-top:20px;padding:10px 26px;font-size:15px;font-weight:700}
-#introBtn{border-color:#5c4f2a;color:var(--money)}
-/* 结局 */
-#endCard{border-color:#8a2e33}
-#endCard h1{color:var(--awake-soft)}
-#endStats{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;font-size:13px}
-#endStats .row{display:flex;justify-content:space-between;padding:3px 0;color:var(--dim)}
-#endStats .row b{color:var(--ink)}
-#endStats .row.hl b{color:var(--boss);font-size:16px}
-#endQuote{margin-top:16px;color:var(--awake-soft);font-size:14px;text-align:center}
-#endBtn{background:#e5484d;border-color:#e5484d;color:#fff;width:100%}
-#toasts{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.ov-card{max-width:540px;width:100%;border-radius:12px;padding:30px}
+.ov-card button{margin-top:22px;padding:10px 28px;font-size:15px;font-weight:700}
+/* 入职通知书(纸) */
+.paper-letter{
+  background:
+    repeating-linear-gradient(0deg, transparent 0 30px, rgba(160,123,23,.06) 30px 31px),
+    linear-gradient(160deg,#f7f0de,#eee4cc);
+  border:1px solid #cfc2a4;color:var(--paper-ink);position:relative;overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+}
+.letter-head{
+  text-align:center;font-family:var(--serif);font-size:13px;letter-spacing:.4em;
+  color:#6b6350;border-bottom:2px solid #3a352b;padding-bottom:8px;
+}
+.paper-letter h1{
+  font-family:var(--serif);font-size:26px;text-align:center;letter-spacing:.3em;
+  margin:16px 0 6px;color:var(--paper-ink);
+}
+.paper-letter p{color:#57503f;margin-top:10px;font-size:13.5px}
+.paper-letter p b{color:var(--paper-ink)}
+.paper-letter .gold-ink{color:#a07b17}
+.paper-letter .wage-ink{color:#2e7d4f}
+.paper-letter .letter-ps{font-style:italic;color:#8a8062}
+.letter-stamp{
+  position:absolute;right:26px;bottom:64px;width:64px;height:64px;
+  border:3px solid rgba(194,59,59,.6);border-radius:50%;
+  color:rgba(194,59,59,.7);font-family:var(--serif);font-weight:800;font-size:15px;
+  display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;
+  transform:rotate(12deg);pointer-events:none;
+}
+#introBtn{
+  display:block;margin:24px auto 0;background:transparent;border:2px solid var(--stamp);
+  color:var(--stamp);border-radius:5px;box-shadow:none;
+  font-family:var(--serif);letter-spacing:.2em;
+}
+#introBtn:hover{background:rgba(194,59,59,.08);border-color:var(--stamp)}
+/* 结局红海报 */
+#endCard{
+  background:radial-gradient(130% 120% at 50% 0%,#8a2429,#54141a 70%);
+  border:1px solid #c0503f;position:relative;overflow:hidden;
+  box-shadow:0 24px 70px rgba(120,20,25,.5);
+}
+#endCard::before{ /* 放射线 */
+  content:"";position:absolute;inset:-40%;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg at 50% 38%, rgba(255,220,150,.07) 0 7deg, transparent 7deg 14deg);
+}
+#endCard>*{position:relative}
+.end-emblem{font-size:46px;text-align:center;filter:drop-shadow(0 0 14px rgba(255,200,120,.55))}
+#endCard h1{
+  font-family:var(--serif);font-size:24px;text-align:center;letter-spacing:.12em;
+  color:#ffe9c9;margin:10px 0 12px;line-height:1.5;
+}
+#endCard p{color:#ecc4b3;text-align:center;font-size:13px}
+#endStats{
+  margin-top:16px;padding:12px 14px;font-size:13px;border-radius:8px;
+  background:rgba(30,6,8,.45);border:1px solid #a3383e;
+}
+#endStats .row{display:flex;justify-content:space-between;padding:3px 0;color:#e8b9ac}
+#endStats .row b{color:#ffe9c9}
+#endStats .row.hl b{color:#ffdf8a;font-size:16px;text-shadow:0 0 12px rgba(255,223,138,.5)}
+#endQuote{
+  margin-top:16px;color:#ffd8a0;font-size:14px;text-align:center;
+  font-family:var(--serif);letter-spacing:.06em;
+}
+#endBtn{
+  width:100%;background:linear-gradient(180deg,#f7f0de,#e8dcc0);color:#8a1f25;
+  border:1px solid #f4eddc;font-family:var(--serif);letter-spacing:.24em;border-radius:6px;
+}
+#toasts{position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .toast{
-  background:#22262b;border:1px solid var(--line);border-radius:8px;padding:7px 16px;font-size:13px;
-  box-shadow:0 4px 16px rgba(0,0,0,.4);animation:toastIn .25s ease-out;max-width:420px;text-align:center;
+  background:linear-gradient(180deg,#242a37,#1c212c);border:1px solid var(--line2);
+  border-radius:9px;padding:8px 18px;font-size:13px;
+  box-shadow:0 8px 26px rgba(0,0,0,.5);animation:toastIn .25s ease-out;max-width:440px;text-align:center;
 }
 .toast.boss{border-color:#5c3a70;color:#cda3de}
 .toast.good{border-color:#3f6e52;color:var(--wage)}
@@ -211,7 +430,7 @@ body.shake{animation:shakeB .5s}
 @keyframes shakeB{0%,100%{transform:none}20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-3px,-1px)}80%{transform:translate(3px,1px)}}
 
 /* ===== SECTION: DEBUG ===== */
-#debug{max-width:1280px;margin:0 auto;padding:4px 16px 30px}
+#debug{max-width:1300px;margin:0 auto;padding:4px 18px 32px;position:relative;z-index:1}
 #debug summary{color:var(--faint);font-size:12px;cursor:pointer}
 #debug .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 #debug button{font-size:12px;padding:4px 10px;color:var(--dim)}
@@ -220,7 +439,7 @@ body.shake{animation:shakeB .5s}
 <body>
 
 <header id="topbar">
-  <span class="title">刮出个未来<small>玩法白盒 v0.1</small></span>
+  <span class="title">刮出个未来<small>试玩版 v0.2</small></span>
   <span class="chip" id="dayChip">入职第 <b class="num" id="dayVal">1</b> 天</span>
   <span class="chip money">💵 <b class="num" id="moneyVal">0</b></span>
   <span class="chip awake">✊ 觉悟 <b class="num" id="awakeTop">0</b></span>
@@ -232,7 +451,7 @@ body.shake{animation:shakeB .5s}
   <!-- ===== 左列：工资条 + 车间 + 日志 ===== -->
   <div>
     <section class="panel paystub">
-      <div class="kicker">工资条 · 实时</div>
+      <div class="stub-head">打工人科技有限公司 · <b>工资结算单</b></div>
       <div class="row"><span class="lab">你创造的价值</span><span class="num" id="grossRate">¥0/秒</span></div>
       <div class="splitbar"><div class="boss" id="barBoss" style="width:90%"></div><div class="wage" id="barWage" style="width:10%"></div></div>
       <div class="row"><span class="lab">老板拿走 <span id="exploitPct" class="num">90%</span></span><span class="num" id="bossRate">¥0/秒</span></div>
@@ -258,15 +477,16 @@ body.shake{animation:shakeB .5s}
 
   <!-- ===== 中列：彩票店 ===== -->
   <div>
-    <section class="panel">
-      <div class="kicker">楼下彩票店 · 「刮一刮，改变命运」</div>
-      <div id="rack" style="margin-top:8px"></div>
+    <section class="panel lottery">
+      <div class="shop-sign">🎰 刮一刮 · 改<em>变</em>命运</div>
+      <div id="rack" style="margin-top:12px"></div>
       <div id="cardWrap">
-        <div id="cardFrame">
+        <div id="cardFrame" data-tier="none">
           <div id="cardHead">
             <span id="cardTitle">——</span>
-            <span id="cardRule">刮出 3 个相同图案即中对应奖金</span>
+            <span id="cardSerial" class="num">NO.0000000</span>
           </div>
+          <div id="cardRule">刮出 3 个相同图案即中对应奖金 · 奖金当场兑付</div>
           <div id="cardStage">
             <div id="cellGrid"></div>
             <canvas id="coat"></canvas>
@@ -281,6 +501,10 @@ body.shake{animation:shakeB .5s}
             <div id="resultMain"></div>
             <div id="resultSub"></div>
             <button id="againBtn">再来一张</button>
+          </div>
+          <div id="cardFoot">
+            <span id="cardFine">本券最终解释权归老板彩票发行有限公司所有</span>
+            <span id="barcode"></span>
           </div>
         </div>
         <div id="ticketStats"></div>
@@ -320,12 +544,14 @@ body.shake{animation:shakeB .5s}
 
 <!-- ===== 开场 ===== -->
 <div class="overlay" id="introOverlay" hidden>
-  <div class="ov-card">
-    <h1>恭喜入职。</h1>
-    <p>全勤奖、狼性文化、扁平化管理，还有一位把你当兄弟的老板。</p>
-    <p>你每秒为公司创造 <b>¥10</b> 的价值。落到你手里的，是 <b style="color:var(--wage)">¥1</b>。剩下的去了哪里，工资条上写得明明白白。</p>
-    <p>楼下彩票店的灯牌彻夜亮着：<b style="color:var(--money)">「刮一刮，改变命运。」</b></p>
-    <p>去试试吧。反正，还能更糟吗？</p>
+  <div class="ov-card paper-letter">
+    <div class="letter-head">打工人科技有限公司</div>
+    <h1>入职通知书</h1>
+    <p>兹聘用 <b>你</b> 为本公司螺丝钉（编号 007743），即日起生效。全勤奖、狼性文化、扁平化管理，还有一位把你当兄弟的老板。</p>
+    <p>你每秒将为公司创造 <b>¥10</b> 的价值。落到你手里的，是 <b class="wage-ink">¥1</b>。剩下的去了哪里，工资条上写得明明白白。</p>
+    <p>楼下彩票店的灯牌彻夜亮着：<b class="gold-ink">「刮一刮，改变命运。」</b></p>
+    <p class="letter-ps">去试试吧。反正，还能更糟吗？</p>
+    <div class="letter-stamp">老板<br/>已阅</div>
     <button id="introBtn">开始搬砖</button>
   </div>
 </div>
@@ -333,7 +559,8 @@ body.shake{animation:shakeB .5s}
 <!-- ===== 结局 ===== -->
 <div class="overlay" id="endOverlay" hidden>
   <div class="ov-card" id="endCard">
-    <h1>🚩 总罢工成功。工厂现在归大家。</h1>
+    <div class="end-emblem">✊</div>
+    <h1>总罢工成功<br/>工厂现在归大家</h1>
     <p>没有谈判的余地——当所有人同时停下手，整栋楼才想起来电是谁发的。</p>
     <div id="endStats"></div>
     <div id="endQuote">其实你早就知道：真正的大奖，从来不在涂层下面。</div>
@@ -344,7 +571,7 @@ body.shake{animation:shakeB .5s}
 <div id="toasts"></div>
 
 <details id="debug">
-  <summary>白盒调试</summary>
+  <summary>调试面板</summary>
   <div class="btns">
     <button data-dbg="money">+¥1000</button>
     <button data-dbg="awake">+100 觉悟</button>
@@ -685,23 +912,41 @@ function paintCoat(){
   const w = coat.width, h = coat.height;
   ctx.globalCompositeOperation = "source-over";
   ctx.clearRect(0,0,w,h);
+  // 镭射银箔基底
   const grad = ctx.createLinearGradient(0,0,w,h);
-  grad.addColorStop(0,"#a9adb3"); grad.addColorStop(.5,"#8d9298"); grad.addColorStop(1,"#a2a6ac");
+  grad.addColorStop(0,"#cdd1d7"); grad.addColorStop(.22,"#9ba1a9");
+  grad.addColorStop(.48,"#dfe2e6"); grad.addColorStop(.72,"#a3a9b1"); grad.addColorStop(1,"#c6cad0");
   ctx.fillStyle = grad; ctx.fillRect(0,0,w,h);
-  // 噪点
-  ctx.fillStyle = "rgba(0,0,0,.08)";
-  for(let i=0;i<400;i++) ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
-  ctx.fillStyle = "rgba(255,255,255,.12)";
-  for(let i=0;i<200;i++) ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
-  // 斜排文字
-  ctx.save();
-  ctx.translate(w/2,h/2); ctx.rotate(-0.28);
-  ctx.fillStyle = "rgba(60,64,70,.5)";
-  ctx.font = "bold 15px sans-serif"; ctx.textAlign="center";
-  for(let y=-h; y<h; y+=34)
-    for(let x=-w; x<w; x+=120)
-      ctx.fillText("刮开涂层", x + (y/34%2)*60, y);
+  // 斜向高光带
+  ctx.save(); ctx.rotate(-0.35);
+  for(let x=-h; x<w+h; x+=88){
+    const gg = ctx.createLinearGradient(x,0,x+36,0);
+    gg.addColorStop(0,"rgba(255,255,255,0)"); gg.addColorStop(.5,"rgba(255,255,255,.5)"); gg.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle = gg; ctx.fillRect(x,-h,36,h*3);
+  }
   ctx.restore();
+  // 细噪点 + 镭射彩闪
+  ctx.fillStyle = "rgba(0,0,0,.07)";
+  for(let i=0;i<380;i++) ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+  ctx.fillStyle = "rgba(255,255,255,.16)";
+  for(let i=0;i<200;i++) ctx.fillRect(Math.random()*w, Math.random()*h, 1.5, 1.5);
+  for(let i=0;i<70;i++){
+    ctx.fillStyle = `hsla(${Math.floor(Math.random()*360)},80%,72%,.5)`;
+    ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+  }
+  // 浮雕压印文字
+  ctx.font = "bold 15px sans-serif"; ctx.textAlign = "center";
+  ctx.save(); ctx.translate(w/2,h/2); ctx.rotate(-0.28);
+  for(let y=-h; y<h; y+=36)
+    for(let x=-w; x<w; x+=124){
+      const ox = x + (y/36%2)*62;
+      ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillText("刮开涂层", ox, y+1);
+      ctx.fillStyle = "rgba(88,93,102,.6)";  ctx.fillText("刮开涂层", ox, y);
+    }
+  ctx.restore();
+  // 箔面描边
+  ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 2;
+  ctx.strokeRect(1,1,w-2,h-2);
   coat.classList.remove("fade");
   coat.style.opacity = "";
 }
@@ -709,6 +954,8 @@ function paintCoat(){
 function renderCard(card){
   cardIdle.style.display = "none";
   gridEl.innerHTML = "";
+  document.getElementById("cardFrame").dataset.tier = card.tier.id;
+  document.getElementById("cardSerial").textContent = "NO." + String(Math.floor(Math.random()*1e7)).padStart(7,"0");
   document.getElementById("cardTitle").textContent = `「${card.tier.name}」 ¥${card.tier.price}`;
   document.getElementById("cardRule").textContent = card.tier.zibenlun ? "刮开的每一页都算数" : "刮出 3 个相同图案即中对应奖金";
   for(const c of card.cells){
@@ -790,20 +1037,49 @@ function checkReveal(force){
   if(total && clear/total >= TUNING.autoRevealRatio) finishCard();
 }
 
-/* 粉屑粒子 */
+/* 粉屑粒子 + 中奖金屑 */
 function spawnFlecks(x,y){
   for(let i=0;i<3;i++){
-    particles.push({ x, y, vx:(Math.random()-0.5)*2.4, vy:-Math.random()*1.5, life: 22+Math.random()*14 });
+    particles.push({ kind:"fleck", x, y, vx:(Math.random()-0.5)*2.4, vy:-Math.random()*1.5, life: 22+Math.random()*14 });
   }
+  kickFx();
+}
+function spawnConfetti(){
+  const w = fxCanvas.width, h = fxCanvas.height;
+  for(let i=0;i<70;i++){
+    particles.push({
+      kind:"confetti", x: w/2 + (Math.random()-0.5)*w*0.5, y: h*0.75,
+      vx:(Math.random()-0.5)*4.6, vy:-(3.2+Math.random()*4.2),
+      rot:Math.random()*Math.PI, vr:(Math.random()-0.5)*0.32,
+      hue:["#f0c752","#e5484d","#f4eddc","#7ddc9c","#ffdf8a"][Math.floor(Math.random()*5)],
+      life: 55+Math.random()*35
+    });
+  }
+  kickFx();
+}
+function stageFlash(){
+  stageEl.classList.add("flash");
+  setTimeout(()=>stageEl.classList.remove("flash"), 720);
+}
+function kickFx(){
   if(!fxRunning){ fxRunning = true; requestAnimationFrame(fxLoop); }
 }
 function fxLoop(){
   fx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
   particles = particles.filter(p=>p.life>0);
   for(const p of particles){
-    p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life--;
-    fx.fillStyle = `rgba(160,165,172,${Math.min(1,p.life/18)})`;
-    fx.fillRect(p.x, p.y, 2.5, 2.5);
+    p.x += p.vx; p.y += p.vy; p.life--;
+    if(p.kind==="confetti"){
+      p.vy += 0.16; p.rot += p.vr;
+      fx.save(); fx.translate(p.x,p.y); fx.rotate(p.rot);
+      fx.globalAlpha = Math.min(1,p.life/22);
+      fx.fillStyle = p.hue; fx.fillRect(-3,-2,6,4);
+      fx.restore(); fx.globalAlpha = 1;
+    } else {
+      p.vy += 0.12;
+      fx.fillStyle = `rgba(160,165,172,${Math.min(1,p.life/18)})`;
+      fx.fillRect(p.x, p.y, 2.5, 2.5);
+    }
   }
   if(particles.length){ requestAnimationFrame(fxLoop); }
   else fxRunning = false;
@@ -831,6 +1107,8 @@ function finishCard(){
     S.money += card.win.amt;
     S.tickets.won += card.win.amt;
     setResult(`中了 ¥${fmt(card.win.amt)}！`, "", "win");
+    spawnConfetti();
+    stageFlash();
     audioWin();
   } else if(card.nearMiss){
     S.nearMiss++;
@@ -1028,7 +1306,7 @@ function renderRack(){
     if(t.zibenlun && !lvOf("kapital")) continue;
     const unlocked = tierUnlocked(t);
     const b = document.createElement("button");
-    b.className = "rack-btn" + (unlocked?"":" locked") + (t.zibenlun?" zibenlun":"")
+    b.className = "rack-btn tier-" + t.id + (unlocked?"":" locked") + (t.zibenlun?" zibenlun":"")
       + (activeCard && !activeCard.resolved && activeCard.tier.id===t.id ? " active":"");
     let ev = "";
     if(lvOf("expected") && t.prizes.length) ev = `返奖 ${(tierReturnRate(t)*100).toFixed(0)}%`;
