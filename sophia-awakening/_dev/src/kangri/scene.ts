@@ -182,16 +182,21 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
   }
   function drawTiles(): void {
-    const hw = A / TX * 0.5, hh = B / TY * 0.5;
+    // 每个地块的 4 个地图角点各自投影（与地形同一套等距投影 → 完全对齐），向外微扩 ~0.6px 消接缝。
+    const EXP = 1.05;
     for (let j = 0; j < TY; j++) {
       for (let i = 0; i < TX; i++) {
         const c = tileCtl[j * TX + i];
         if (Math.abs(c) < 0.13) continue;
-        const p = proj((i + 0.5) / TX, (j + 0.5) / TY);
+        const mx0 = i / TX, my0 = j / TY, mx1 = (i + 1) / TX, my1 = (j + 1) / TY;
+        const p0 = proj(mx0, my0), p1 = proj(mx1, my0), p2 = proj(mx1, my1), p3 = proj(mx0, my1);
+        const mxs = (p0.x + p1.x + p2.x + p3.x) / 4, mys = (p0.y + p1.y + p2.y + p3.y) / 4;
+        const ex = (p: { x: number; y: number }): [number, number] => [mxs + (p.x - mxs) * EXP, mys + (p.y - mys) * EXP];
+        const a0 = ex(p0), a1 = ex(p1), a2 = ex(p2), a3 = ex(p3);
         if (c > 0) ctx.fillStyle = `rgba(178,44,28,${0.08 + 0.22 * c})`;
         else ctx.fillStyle = `rgba(58,70,86,${0.08 + 0.20 * -c})`;
         ctx.beginPath();
-        ctx.moveTo(p.x, p.y - hh); ctx.lineTo(p.x + hw, p.y); ctx.lineTo(p.x, p.y + hh); ctx.lineTo(p.x - hw, p.y);
+        ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.lineTo(a2[0], a2[1]); ctx.lineTo(a3[0], a3[1]);
         ctx.closePath(); ctx.fill();
       }
     }
