@@ -203,53 +203,127 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
     return 1 - vis; // 1=浓雾
   }
+  // ── PCG 地理：高度场(西部太行山脉ridge)/湿度场/河流(沿地势下行的三条河) ──
+  function terrainH(x: number, y: number): number {
+    const ridge = clamp((0.52 - x) * 1.8, 0, 1) * 0.5;
+    return fbm(x * 5.2 + 7, y * 5.2 + 3) * (0.55 + ridge) + ridge * 0.4;
+  }
+  const moistAt = (x: number, y: number): number => fbm(x * 4.2 + 51, y * 4.2 + 83);
+  // 河流(华北意象:滹沱河/漳河/永定河,山地发源流向东部平原)
+  const RIVERS: [number, number][][] = [
+    [[0.28, 0.28], [0.40, 0.34], [0.52, 0.40], [0.66, 0.48], [0.82, 0.54]],
+    [[0.34, 0.56], [0.44, 0.62], [0.54, 0.70], [0.66, 0.78], [0.78, 0.84]],
+    [[0.44, 0.08], [0.54, 0.14], [0.63, 0.20], [0.72, 0.27]]
+  ];
+  function riverDist(x: number, y: number): number {
+    let best = 9;
+    for (const rv of RIVERS) {
+      for (let i = 0; i < rv.length - 1; i++) {
+        const ax = rv[i][0], ay = rv[i][1], bx = rv[i + 1][0], by = rv[i + 1][1];
+        const dx = bx - ax, dy = by - ay;
+        const t = clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy), 0, 1);
+        const d = Math.hypot(x - (ax + dx * t), y - (ay + dy * t));
+        if (d < best) best = d;
+      }
+    }
+    return best;
+  }
+  // 地形通行系数：高山/大河阻断势力扩张 → 领土边界自然沿山脊河流走(文明6的边界-地形关联)
+  function terrainPass(x: number, y: number): number {
+    if (terrainH(x, y) > 0.63) return 0.3;
+    if (riverDist(x, y) < 0.011) return 0.55;
+    return 1;
+  }
+  // 地理符号(山峰/森林簇/农田)预计算——按高度带+湿度分布,符合地理位置
+  interface Sym { x: number; y: number; kind: 0 | 1 | 2; sd: number; } // 0峰 1树 2田
+  const SYMS: Sym[] = (() => {
+    const out: Sym[] = [];
+    for (let k = 0; k < 2400; k++) {
+      const x = hash2(k, 1.7), y = hash2(k, 9.2), sd = hash2(k, 4.4);
+      const h = terrainH(x, y), m = moistAt(x, y);
+      if (riverDist(x, y) < 0.012) continue;
+      if (h > 0.60) out.push({ x, y, kind: 0, sd });
+      else if (h > 0.40 && m > 0.56) out.push({ x, y, kind: 1, sd });
+      else if (h < 0.32 && sd < 0.55) out.push({ x, y, kind: 2, sd });
+      else if (m > 0.72) out.push({ x, y, kind: 1, sd });
+    }
+    return out;
+  })();
+  const loCv = document.createElement("canvas");
   function renderGround(s: KRState): void {
     ground.width = Math.max(1, W * dpr); ground.height = Math.max(1, H * dpr);
     const g = ground.getContext("2d")!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = "#0a0b07"; g.fillRect(0, 0, W, H);
-    const GX = 72, GY = 46;
-    const cw = W / GX, ch = H / GY;
-    const detail = cam.zoom > 5;
-    for (let j = 0; j < GY; j++) {
-      for (let i = 0; i < GX; i++) {
-        const sx = (i + 0.5) * cw, sy = (j + 0.5) * ch;
-        const w = unproj(sx, sy);
-        if (w.x < -0.02 || w.x > 1.02 || w.y < -0.02 || w.y > 1.02) continue; // 图外=底色
-        // 地形
-        const ridge = clamp((0.52 - w.x) * 1.8, 0, 1) * 0.5;
-        let h = fbm(w.x * 5.2 + 7, w.y * 5.2 + 3) * (0.55 + ridge) + ridge * 0.4;
-        if (detail) h = h * 0.7 + fbm(w.x * 26 + 3, w.y * 26 + 9) * 0.3; // 近景细节
-        let r = 62 + h * 52, gg = 55 + h * 44, b = 34 + h * 22;
-        if (h > 0.62) { r *= 0.72; gg *= 0.70; b *= 0.72; }
-        if (h < 0.34) { r *= 1.10; gg *= 1.14; b *= 0.95; }
-        // 村庄周边带田野绿意
+    // ── 地形底图：低分辨率逐像素采样 → 双线性平滑放大(连续渐变,不再是马赛克色块) ──
+    const LX = 150, LY = 92;
+    loCv.width = LX; loCv.height = LY;
+    const lg = loCv.getContext("2d")!;
+    const img = lg.createImageData(LX, LY);
+    const px = img.data;
+    const zoomDetail = clamp((cam.zoom - 3) / 10, 0, 0.3);
+    let prevH = 0;
+    for (let j = 0; j < LY; j++) {
+      for (let i = 0; i < LX; i++) {
+        const idx = (j * LX + i) * 4;
+        const w = unproj((i + 0.5) / LX * W, (j + 0.5) / LY * H);
+        if (w.x < -0.02 || w.x > 1.02 || w.y < -0.02 || w.y > 1.02) { px[idx] = 10; px[idx + 1] = 11; px[idx + 2] = 7; px[idx + 3] = 255; prevH = 0; continue; }
+        let h = terrainH(w.x, w.y);
+        if (zoomDetail > 0) h = h * (1 - zoomDetail) + fbm(w.x * 26 + 3, w.y * 26 + 9) * zoomDetail;
+        const m = moistAt(w.x, w.y);
+        // 高度带色板(华北): 平原农田黄绿→黄土丘陵→山麓→太行深山
+        let r: number, gg: number, b: number;
+        if (h < 0.30) { const t = h / 0.30; r = lerp(112, 122, t); gg = lerp(112, 102, t); b = lerp(60, 58, t); }
+        else if (h < 0.48) { const t = (h - 0.30) / 0.18; r = lerp(122, 108, t); gg = lerp(102, 92, t); b = lerp(58, 55, t); }
+        else if (h < 0.64) { const t = (h - 0.48) / 0.16; r = lerp(108, 90, t); gg = lerp(92, 80, t); b = lerp(55, 54, t); }
+        else { const t = clamp((h - 0.64) / 0.2, 0, 1); r = lerp(90, 70, t); gg = lerp(80, 64, t); b = lerp(54, 52, t); }
+        // 湿度: 湿润偏绿,干燥偏黄
+        const wet = (m - 0.5) * 0.5;
+        gg *= 1 + wet * 0.35; r *= 1 - wet * 0.15;
+        // 平原农田斑块(田块状色差)
+        if (h < 0.32) {
+          const patch = hash2(Math.floor(w.x * 76), Math.floor(w.y * 76));
+          const f = 0.93 + patch * 0.14;
+          r *= f; gg *= f * (patch > 0.5 ? 1.06 : 0.98); b *= f;
+        }
+        // 河谷湿绿带
+        const rd = riverDist(w.x, w.y);
+        if (rd < 0.030) { const t = sstep(0.030, 0.008, rd) * 0.5; r = lerp(r, 82, t); gg = lerp(gg, 108, t); b = lerp(b, 56, t); }
+        // 村庄周边田野
         const dHq = Math.hypot(w.x - HQ.x, w.y - HQ.y);
-        if (dHq < 0.13) { const gmix = sstep(0.13, 0.03, dHq) * 0.5; r = lerp(r, r * 0.82, gmix); gg = lerp(gg, gg * 1.22, gmix); b = lerp(b, b * 0.85, gmix); }
-        // 侧光
-        const hl = fbm((w.x - 0.012) * 5.2 + 7, (w.y - 0.012) * 5.2 + 3) * (0.55 + ridge) - (fbm(w.x * 5.2 + 7, w.y * 5.2 + 3) * (0.55 + ridge));
-        const lig = clamp(1 + hl * 5.5, 0.72, 1.3);
+        if (dHq < 0.13) { const gmix = sstep(0.13, 0.03, dHq) * 0.4; r = lerp(r, r * 0.85, gmix); gg = lerp(gg, gg * 1.18, gmix); b = lerp(b, b * 0.88, gmix); }
+        // 侧光(横向高度差分近似)
+        const lig = clamp(1 + (prevH - h) * 5.5, 0.74, 1.28);
+        prevH = h;
         r *= lig; gg *= lig; b *= lig;
         // 战雾
         const fog = fogAt(s, w.x, w.y);
         if (fog > 0.02) { const fa = fog * 0.93; r = lerp(r, 5, fa); gg = lerp(gg, 5, fa); b = lerp(b, 4, fa); }
-        g.fillStyle = `rgb(${r | 0},${gg | 0},${b | 0})`;
-        g.fillRect(i * cw - 0.5, j * ch - 0.5, cw + 1, ch + 1);
+        px[idx] = r; px[idx + 1] = gg; px[idx + 2] = b; px[idx + 3] = 255;
       }
     }
-    // 河（世界折线）
-    g.strokeStyle = "rgba(58,74,72,.85)"; g.lineWidth = Math.max(1.5, A * 0.008 * cam.zoom * 0.5); g.lineCap = "round";
-    g.beginPath();
-    let started = false;
-    for (let t2 = 0; t2 <= 60; t2++) {
-      const tt = t2 / 60;
-      const mx = lerp(0.08, 0.92, tt) + Math.sin(tt * 9 + 1.3) * 0.035;
-      const my = lerp(0.16, 0.5, tt) + Math.sin(tt * 6.2) * 0.05;
-      if (fogAt(s, mx, my) > 0.75) { started = false; continue; }
-      const p = proj(mx, my);
-      if (!started) { g.moveTo(p.x, p.y); started = true; } else g.lineTo(p.x, p.y);
+    lg.putImageData(img, 0, 0);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(loCv, 0, 0, W, H);
+    // ── 河流(蓝绿曲线,下游渐宽,雾外) ──
+    for (const rv of RIVERS) {
+      for (let i = 0; i < rv.length - 1; i++) {
+        const SEG = 8;
+        for (let st2 = 0; st2 < SEG; st2++) {
+          const t0 = st2 / SEG, t1 = (st2 + 1) / SEG;
+          const gT = (i + t0) / (rv.length - 1);
+          const ax = lerp(rv[i][0], rv[i + 1][0], t0), ay = lerp(rv[i][1], rv[i + 1][1], t0);
+          if (fogAt(s, ax, ay) > 0.8) continue;
+          const pa = proj(ax, ay), pb = proj(lerp(rv[i][0], rv[i + 1][0], t1), lerp(rv[i][1], rv[i + 1][1], t1));
+          const wRiver = Math.max(1.4, A * 0.0035 * Math.pow(cam.zoom, 0.62) * (0.55 + gT * 0.8));
+          g.lineCap = "round";
+          g.strokeStyle = "rgba(48,74,82,.92)"; g.lineWidth = wRiver;
+          g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
+          g.strokeStyle = "rgba(96,132,128,.55)"; g.lineWidth = wRiver * 0.45;
+          g.beginPath(); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke();
+        }
+      }
     }
-    g.stroke();
     // 铁路网 + hq 县城支线（雾外部分）
     const railSeg = (x1: number, y1: number, x2: number, y2: number): void => {
       const STEPS = 14;
@@ -283,24 +357,34 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     road(COUNTIES[0].x, COUNTIES[0].y, COUNTIES[2].x, COUNTIES[2].y);
     road(COUNTIES[1].x, COUNTIES[1].y, COUNTIES[2].x, COUNTIES[2].y);
     for (const tn of TOWNS.slice(0, 6)) road(HQ.x, HQ.y, tn.x, tn.y);
-    // 树/山脊符号（世界撒点，可见+雾外才画）
-    const symN = 900;
-    for (let k2 = 0; k2 < symN; k2++) {
-      const mx = hash2(k2, 1.7), my = hash2(k2, 9.2);
-      if (fogAt(s, mx, my) > 0.6) continue;
-      const p = proj(mx, my);
-      if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) continue;
-      const ridge = clamp((0.52 - mx) * 1.8, 0, 1) * 0.5;
-      const h = fbm(mx * 5.2 + 7, my * 5.2 + 3) * (0.55 + ridge) + ridge * 0.4;
-      const sz = A * 0.004 * Math.pow(cam.zoom, 0.8);
-      if (h > 0.6) {
-        g.strokeStyle = "rgba(30,26,16,.55)"; g.lineWidth = Math.max(1, sz * 0.3);
-        g.beginPath(); g.moveTo(p.x - sz * 2, p.y + sz * 1.2); g.lineTo(p.x, p.y - sz * 1.4); g.lineTo(p.x + sz * 2, p.y + sz * 1.2); g.stroke();
-      } else if (hash2(k2, 4.4) < 0.35) {
-        g.fillStyle = "rgba(52,66,32,.7)";
-        g.beginPath(); g.arc(p.x, p.y - sz, sz, 0, 6.29); g.fill();
-        g.strokeStyle = "rgba(40,32,20,.6)"; g.lineWidth = Math.max(0.8, sz * 0.25);
-        g.beginPath(); g.moveTo(p.x, p.y - sz * 0.4); g.lineTo(p.x, p.y + sz * 0.8); g.stroke();
+    // ── 地理符号(文明6式简单表达): 山峰(双面山形)/森林(树簇)/农田(田埂) ──
+    const step = cam.zoom < 2 ? 3 : cam.zoom < 4 ? 2 : 1; // 拉远降密度
+    for (let k2 = 0; k2 < SYMS.length; k2 += step) {
+      const sym = SYMS[k2];
+      if (fogAt(s, sym.x, sym.y) > 0.6) continue;
+      const p = proj(sym.x, sym.y);
+      if (p.x < -24 || p.x > W + 24 || p.y < -24 || p.y > H + 24) continue;
+      const sz = A * 0.0038 * Math.pow(cam.zoom, 0.8) * (0.8 + sym.sd * 0.5);
+      if (sym.kind === 0) { // 山峰: 左亮右暗双面
+        g.fillStyle = "#7c7258";
+        g.beginPath(); g.moveTo(p.x - sz * 1.8, p.y + sz); g.lineTo(p.x - sz * 0.1, p.y - sz * 1.7); g.lineTo(p.x, p.y + sz * 0.2); g.closePath(); g.fill();
+        g.fillStyle = "#4e4636";
+        g.beginPath(); g.moveTo(p.x, p.y + sz * 0.2); g.lineTo(p.x - sz * 0.1, p.y - sz * 1.7); g.lineTo(p.x + sz * 1.7, p.y + sz); g.closePath(); g.fill();
+      } else if (sym.kind === 1) { // 森林: 2-3 棵树簇
+        const n = 2 + Math.floor(sym.sd * 2);
+        for (let ti = 0; ti < n; ti++) {
+          const ox = (hash2(k2, ti + 11) - 0.5) * sz * 2.4, oy = (hash2(k2, ti + 23) - 0.5) * sz * 1.4;
+          g.strokeStyle = "rgba(52,42,26,.8)"; g.lineWidth = Math.max(0.8, sz * 0.18);
+          g.beginPath(); g.moveTo(p.x + ox, p.y + oy); g.lineTo(p.x + ox, p.y + oy - sz * 0.7); g.stroke();
+          g.fillStyle = ti % 2 ? "#41552b" : "#375024";
+          g.beginPath(); g.arc(p.x + ox, p.y + oy - sz * 0.95, sz * 0.62, 0, 6.29); g.fill();
+        }
+      } else if (cam.zoom > 3.4) { // 农田: 平行田埂短线(近景)
+        g.strokeStyle = "rgba(150,132,80,.34)"; g.lineWidth = Math.max(0.7, sz * 0.14);
+        for (let li = 0; li < 3; li++) {
+          const oy = (li - 1) * sz * 0.55;
+          g.beginPath(); g.moveTo(p.x - sz, p.y + oy - sz * 0.5); g.lineTo(p.x + sz, p.y + oy + sz * 0.5 - sz); g.stroke();
+        }
       }
     }
     // ── 领土地块层(文明6式): 世界网格整块填充+归属边界亮描边 ──
@@ -324,7 +408,9 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         const wx = (i + 0.5) / TTX, wy = (j + 0.5) / TTY;
         let own = 0;
         if (fogAt(s, wx, wy) < 0.5) {
-          const ctl = fieldAt({ x: wx, y: wy }, ourSrc) - fieldAt({ x: wx, y: wy }, jpSrc);
+          // 乘地形通行系数：高山/大河阻断 → 领土边界沿山脊河流走
+          const pass = terrainPass(wx, wy);
+          const ctl = (fieldAt({ x: wx, y: wy }, ourSrc) - fieldAt({ x: wx, y: wy }, jpSrc)) * pass;
           own = ctl > 0.14 ? 1 : ctl < -0.14 ? -1 : 0;
         }
         terrOwn[j * TTX + i] = own;
