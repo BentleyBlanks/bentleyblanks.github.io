@@ -121,4 +121,35 @@ const CSS = `
 .kr-debug button.active { border-color: var(--amb); color: #f0e4c0; }
 .kr-debug button.danger { border-color: #6a2723; color: var(--red-lt); }
 .kr-debug input { width: 74px; font-family: inherit; font-size: 11px; padding: 5px 7px; border-radius: 5px; border: 1px solid var(--khk); background: rgba(40,36,24,.6); color: #f0e4c0; }
+
+/* v2：时期注释 / 根据地面板 / 大战役 / 结局对照屏 */
+.kr-eranote { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); z-index: 8; max-width: 54%; font-size: 11px; color: rgba(216,201,160,.62); letter-spacing: .5px; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,.9); }
+.kr-item.locked { opacity: .45; border-style: dashed; }
+.kr-item.locked .kr-item-cost { color: #8a6a5a; }
+.kr-base { padding: 8px 11px; margin-bottom: 5px; border: 1px solid var(--khk); border-radius: 4px; background: linear-gradient(180deg, rgba(40,36,24,.6), rgba(24,22,14,.6)); cursor: pointer; }
+.kr-base.est { border-color: rgba(200,57,46,.5); }
+.kr-base.sel { border-color: var(--amb); box-shadow: 0 0 10px rgba(216,164,65,.25); }
+.kr-base-head { display: flex; justify-content: space-between; align-items: baseline; }
+.kr-base-name { font-size: 13.5px; font-weight: 700; color: #e8d7ae; }
+.kr-base.est .kr-base-name { color: #f2b6a0; }
+.kr-base-terr { font-size: 10px; color: #8a8058; }
+.kr-base-stats { font-size: 10.5px; color: var(--pap-dk); margin: 3px 0 6px; line-height: 1.5; }
+.kr-base-acts { display: flex; gap: 5px; flex-wrap: wrap; }
+.kr-ba { font-family: inherit; font-size: 11px; padding: 4px 9px; border-radius: 4px; border: 1px solid var(--khk); background: rgba(40,36,24,.7); color: #d8c9a0; cursor: pointer; }
+.kr-ba:hover:not(:disabled) { border-color: var(--amb); color: #f0e4c0; }
+.kr-ba:disabled { opacity: .42; cursor: default; }
+.kr-ba.est { border-color: rgba(216,164,65,.6); }
+.kr-ba.spot { border-color: rgba(200,57,46,.55); color: #f2c0a0; }
+.kr-ending { position: absolute; inset: 0; z-index: 30; background: rgba(6,5,3,.88); display: flex; align-items: center; justify-content: center; }
+.kr-end-card { width: min(720px, 88%); max-height: 88%; overflow-y: auto; padding: 28px 34px; border: 2px solid var(--amb); border-radius: 8px; background: linear-gradient(180deg, #1c1810, #12100a); box-shadow: 0 24px 80px rgba(0,0,0,.8), 0 0 40px rgba(216,164,65,.15); text-align: center; }
+.kr-end-date { font-size: 13px; color: var(--pap-dk); letter-spacing: 2px; }
+.kr-end-grade { font-size: 44px; font-weight: 800; color: #f0e4c0; letter-spacing: 10px; margin: 10px 0 6px; text-shadow: 0 0 24px rgba(216,164,65,.5); }
+.kr-end-desc { font-size: 13px; color: #d8c9a0; margin-bottom: 18px; line-height: 1.7; }
+.kr-end-table { width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left; margin-bottom: 16px; }
+.kr-end-table th { color: var(--amb); font-size: 11px; letter-spacing: 1px; padding: 6px 8px; border-bottom: 1px solid var(--khk); }
+.kr-end-table td { padding: 7px 8px; border-bottom: 1px solid rgba(58,56,38,.5); color: #d8c9a0; vertical-align: top; line-height: 1.55; }
+.kr-end-table td.hist { color: #9a8f68; font-size: 10.5px; }
+.kr-end-foot { font-size: 11px; color: #8a8058; line-height: 1.8; margin-bottom: 16px; }
+.kr-end-btn { font-family: inherit; font-size: 14px; padding: 9px 30px; border-radius: 5px; border: 1px solid var(--amb); background: linear-gradient(180deg, #5a221c, #3a1610); color: #f0e4c0; cursor: pointer; letter-spacing: 2px; }
+.kr-end-btn:hover { background: linear-gradient(180deg, #6a271f, #431811); }
 `;
