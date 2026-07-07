@@ -413,17 +413,26 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         drawFigure(g, fx, fy, k * 0.9, { jp, walk: moving ? t * 9 + idx * 1.7 : Math.sin(idx) * 0.3, face });
       }
     }
+    // 数量标签不在这里画——收集起来最后顶层统一绘制，避免被建筑/其它兵团遮挡。
     if (!label) return;
-    const lab = `${jp ? `日军${unitName(count)}` : "我军"} ×${Math.max(1, Math.round(count))}`;
-    g.font = `700 ${clamp(k * 6, 10, 15)}px 'Noto Serif SC', serif`;
-    const tw = g.measureText(lab).width;
-    const by = sy - rows * k * 5 - k * 16;
-    g.fillStyle = jp ? "rgba(46,48,30,.92)" : "rgba(90,26,18,.92)";
-    g.strokeStyle = jp ? "#8a8a50" : "#e2564d"; g.lineWidth = 1;
-    const bx = sx - tw / 2 - k * 3;
-    g.beginPath(); g.roundRect(bx, by, tw + k * 6, clamp(k * 9, 14, 20), 3); g.fill(); g.stroke();
-    g.fillStyle = jp ? "#d8d2a8" : "#f2d8c0";
-    g.fillText(lab, sx - tw / 2, by + clamp(k * 6.6, 10, 15));
+    formationLabels.push({ sx, by: sy - rows * k * 5 - k * 16, count, jp, k });
+  }
+  // 顶层绘制所有兵团数量标签（不参与深度排序 → 永不被遮挡）
+  const formationLabels: { sx: number; by: number; count: number; jp: boolean; k: number }[] = [];
+  function drawFormationLabels(g: CanvasRenderingContext2D): void {
+    for (const L of formationLabels) {
+      const lab = `${L.jp ? `日军${unitName(L.count)}` : "我军"} ×${Math.max(1, Math.round(L.count))}`;
+      g.font = `700 ${clamp(L.k * 6, 11, 15)}px 'Noto Serif SC', serif`;
+      const tw = g.measureText(lab).width;
+      const bh = clamp(L.k * 9, 15, 20);
+      g.fillStyle = L.jp ? "rgba(46,48,30,.95)" : "rgba(90,26,18,.95)";
+      g.strokeStyle = L.jp ? "#8a8a50" : "#e2564d"; g.lineWidth = 1;
+      g.beginPath(); g.roundRect(L.sx - tw / 2 - L.k * 3, L.by, tw + L.k * 6, bh, 3); g.fill(); g.stroke();
+      g.fillStyle = L.jp ? "#d8d2a8" : "#f2d8c0";
+      g.textBaseline = "middle"; g.textAlign = "center";
+      g.fillText(lab, L.sx, L.by + bh / 2 + 1);
+      g.textBaseline = "alphabetic"; g.textAlign = "left";
+    }
   }
   const inView = (p: { x: number; y: number }, pad = 80): boolean => p.x > -pad && p.x < W + pad && p.y > -pad && p.y < H + pad;
 
@@ -460,6 +469,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const k = clamp(A * 0.0055 * Math.pow(cam.zoom, 0.88), 1.0, 40);
     const kS = clamp(k, 1.0, 3.2); // 远景元素(城市/根据地村)用的小系数
     const sw = s.sweep;
+    formationLabels.length = 0; // 本帧兵团标签收集器清空
     const queue: { y: number; draw: () => void }[] = [];
     const push = (y: number, draw: () => void): void => { queue.push({ y, draw }); };
     const fogOk = (wx: number, wy: number): boolean => fogAt(s, wx, wy) < 0.55;
@@ -632,8 +642,9 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       ctx.globalAlpha = 1;
     }
 
-    // ⑦ 名牌
+    // ⑦ 名牌 + 兵团数量标签（顶层，永不被遮挡）
     drawLabels(s, t);
+    drawFormationLabels(ctx);
 
     // ⑧ 扫荡警报泛红
     if (sw) {
