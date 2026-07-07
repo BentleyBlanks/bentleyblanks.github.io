@@ -10,6 +10,8 @@ import {
   tick, startEvacuation, commitTroops, tier, TIERS, unitName, SWEEP_KIND_NAME,
   transferPop, pickMigrationTarget, migrationCost,
   ACHIEVEMENTS, DOCTRINES, unlockAch, acquireDoctrine,
+  RAIDS, launchRaid, raidEnemy, raidTroopsNeeded, comboMult,
+  canRelocateHQ, relocateHQ, relocateCost,
   type KRState
 } from "./core";
 import { initScene } from "./scene";
@@ -56,6 +58,7 @@ export function bootstrapKangri(root: HTMLElement): void {
         <div class="kr-res-row"><span class="kr-ic">🌾</span><div><div class="kr-res-num" id="krWuzi">0</div><div class="kr-res-lab">物资 <span id="krWuziS"></span></div></div></div>
       </div>
       <button class="kr-rally" id="krRally"><b>发动群众抗争</b><span>[G] 点击 · 组织抵抗</span></button>
+      <div class="kr-raids" id="krRaids"><div class="kr-raids-head">游击出击 <span id="krCombo"></span></div></div>
       <div class="kr-terminal" id="krTerm"></div>
     </aside>
 
@@ -150,9 +153,9 @@ export function bootstrapKangri(root: HTMLElement): void {
         ? `群众转移中 ${Math.round(sw.evacProgress * 100)}%${sw.committed > 0 ? ` · 已集结 ${Math.round(sw.committed)} 人设伏` : " · 尚未组织抗击"}`
         : sw.committed > 0 ? `已集结 ${Math.round(sw.committed)} 人设伏 · 群众未转移` : "尚未应对——快下令！";
     } else if (sw.stage === "battle") {
-      banner.textContent = "⚔ 会战进行中！";
+      banner.textContent = sw.waves > 1 ? ("⚔ 反扫荡 Boss 战 · 第 " + sw.wave + "/" + sw.waves + " 波！") : "⚔ 会战进行中！";
       sbHead.textContent = `【${where}】反扫荡会战（${colsTag}） · 我 ${Math.round(sw.committed)} × 敌 ${Math.round(sw.strength)}`;
-      sbStatus.textContent = `已击毙 ${Math.round(sw.killed)} · 我方伤亡 ${Math.round(sw.lostBing)}${sw.evacStarted ? ` · 群众转移 ${Math.round(sw.evacProgress * 100)}%` : ""}（可点击追加增援）`;
+      sbStatus.textContent = sw.lullS > 0 ? `第 ${sw.wave} 波已打退——喘息 ${Math.ceil(sw.lullS)}s，下一波将至，快增援！` : `已击毙 ${Math.round(sw.killed)} · 我方伤亡 ${Math.round(sw.lostBing)}${sw.evacStarted ? ` · 群众转移 ${Math.round(sw.evacProgress * 100)}%` : ""}（可点击追加增援）`;
     } else {
       banner.textContent = sw.sanguang ? "🔥 三光暴行！" : "🔥 日军烧抢中！";
       sbHead.textContent = `日军 ${Math.round(sw.strength)} 人突入【${where}】烧抢 · ${Math.ceil(sw.pillageSec)} 秒`;
@@ -192,7 +195,10 @@ export function bootstrapKangri(root: HTMLElement): void {
         <button class="kr-ba dev">发展</button>
         <button class="kr-ba tun">挖地道</button>
         <button class="kr-ba spot">拔据点</button>
-        <button class="kr-ba mig">迁移群众</button>
+        <button class="kr-ba mig" data-route="safe">迁移·山路稳</button>
+        <button class="kr-ba mig2" data-route="fast">迁移·大路急</button>
+        <button class="kr-ba mig3" data-route="escort">迁移·派兵护送</button>
+        <button class="kr-ba hq">迁总部至此</button>
       </div>`;
     basePanel.appendChild(el);
     const q = (s: string) => el.querySelector<HTMLButtonElement>(s)!;
@@ -200,9 +206,12 @@ export function bootstrapKangri(root: HTMLElement): void {
     q(".kr-ba.dev").addEventListener("click", () => { raiseDev(state, b.id); });
     q(".kr-ba.tun").addEventListener("click", () => { digTunnel(state, b.id); });
     q(".kr-ba.spot").addEventListener("click", () => { removeSpot(state, b.id); });
-    q(".kr-ba.mig").addEventListener("click", () => { const to = pickMigrationTarget(state, b.id); if (to) transferPop(state, b.id, to); });
+    q(".kr-ba.mig").addEventListener("click", () => { const to = pickMigrationTarget(state, b.id); if (to) transferPop(state, b.id, to, "safe"); });
+    q(".kr-ba.mig2").addEventListener("click", () => { const to = pickMigrationTarget(state, b.id); if (to) transferPop(state, b.id, to, "fast"); });
+    q(".kr-ba.mig3").addEventListener("click", () => { const to = pickMigrationTarget(state, b.id); if (to) transferPop(state, b.id, to, "escort"); });
+    q(".kr-ba.hq").addEventListener("click", () => { relocateHQ(state, b.id); });
     el.addEventListener("click", () => { selectedBase = b.id; });
-    return [b.id, { el, name: el.querySelector<HTMLElement>(".kr-base-name")!, terr: el.querySelector<HTMLElement>(".kr-base-terr")!, stats: el.querySelector<HTMLElement>(".kr-base-stats")!, est: q(".kr-ba.est"), dev: q(".kr-ba.dev"), tun: q(".kr-ba.tun"), spot: q(".kr-ba.spot"), mig: q(".kr-ba.mig") }];
+    return [b.id, { el, name: el.querySelector<HTMLElement>(".kr-base-name")!, terr: el.querySelector<HTMLElement>(".kr-base-terr")!, stats: el.querySelector<HTMLElement>(".kr-base-stats")!, est: q(".kr-ba.est"), dev: q(".kr-ba.dev"), tun: q(".kr-ba.tun"), spot: q(".kr-ba.spot"), mig: q(".kr-ba.mig"), mig2: q(".kr-ba.mig2"), mig3: q(".kr-ba.mig3"), hqBtn: q(".kr-ba.hq") }];
   }));
 
   const panels: Record<string, HTMLElement> = { build: $("#krBuild"), base: $("#krBase"), policy: $("#krPolicy"), camp: $("#krCamp") };
@@ -260,7 +269,7 @@ export function bootstrapKangri(root: HTMLElement): void {
     const d = DOCTRINES.find((x) => x.id === id)!;
     acquireDoctrine(state);
     doctShowing = true;
-    doctCard.innerHTML = '<div class="kr-doct-inner kr-doct-pop">'
+    doctCard.innerHTML = '<div class="kr-doct-inner kr-doct-pop kr-doct-full">'
       + '<div class="kr-doct-got">— 获得关键文献 —</div>'
       + '<div class="kr-doct-book">📜</div>'
       + '<div class="kr-doct-title">' + d.name + '</div>'
@@ -308,6 +317,32 @@ export function bootstrapKangri(root: HTMLElement): void {
       tip.style.left = "50%"; tip.style.top = "62%"; tip.style.transform = "translateX(-50%)";
     }
     if (tip.textContent !== text) tip.textContent = text;
+  }
+
+  // ── 游击出击面板(主动打日本:高频动作+缴获+连胜) ──
+  const raidsHost = $("#krRaids");
+  const raidRows = RAIDS.map((r) => {
+    const el = document.createElement("button"); el.className = "kr-raid";
+    el.innerHTML = '<span class="kr-raid-ic">' + r.icon + '</span><div class="kr-raid-body"><div class="kr-raid-top"><span class="kr-raid-name">' + r.name + '</span><span class="kr-raid-cd"></span></div><div class="kr-raid-meta"></div></div>';
+    el.addEventListener("click", () => {
+      if (launchRaid(state, r.id)) { el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse"); }
+    });
+    raidsHost.appendChild(el);
+    return { r, el, cd: el.querySelector<HTMLElement>(".kr-raid-cd")!, meta: el.querySelector<HTMLElement>(".kr-raid-meta")! };
+  });
+  function renderRaids(): void {
+    const cb = $("#krCombo");
+    cb.textContent = state.combo > 0 ? "🔥连胜 " + state.combo + "（产出 ×" + comboMult(state).toFixed(2) + "）" : "";
+    for (const row of raidRows) {
+      const cd = state.raidCd[row.r.id] ?? 0;
+      const need = raidTroopsNeeded(state, row.r);
+      const enemy = raidEnemy(state, row.r);
+      const busy = !!state.sweep;
+      row.cd.textContent = cd > 0 ? Math.ceil(cd) + "s" : busy ? "扫荡中" : "就绪";
+      row.meta.textContent = "敌约" + enemy + "人 · 需" + need + "兵 · " + row.r.desc;
+      row.el.classList.toggle("ready", cd <= 0 && !busy && state.bing >= need);
+      row.el.classList.toggle("cooling", cd > 0 || busy);
+    }
   }
 
   const GUIDE = [
@@ -421,7 +456,7 @@ export function bootstrapKangri(root: HTMLElement): void {
       row.el.style.display = rev ? "" : "none"; if (!rev) continue;
       row.el.classList.toggle("sel", selectedBase === b.id);
       row.el.classList.toggle("est", st.est);
-      row.name.textContent = `${st.est ? "★" : "○"} ${b.name}`;
+      row.name.textContent = `${b.id === state.hqBase ? "🏛 " : ""}${st.est ? "★" : "○"} ${b.name}`;
       row.terr.textContent = b.terrain === "plain" ? "平原·肥沃/挨打" : b.terrain === "hills" ? "丘陵" : "山地·安全";
       row.stats.textContent = st.est
         ? `人口 ${st.pop.toFixed(0)}/${b.pop0}万 · 发展 ${st.dev}/5 · 地道 ${st.tunnels}/3 · 据点🏯 ${st.spots}/5 · 乘数 ×${(1 + (0.10 + 0.05 * st.dev) * (st.pop / b.pop0) * Math.max(0.3, 1 - 0.1 * st.spots) * (b.terrain === "plain" ? 1.25 : b.terrain === "hills" ? 1.05 : 0.95)).toFixed(2)}`
@@ -441,10 +476,24 @@ export function bootstrapKangri(root: HTMLElement): void {
       row.spot.textContent = `拔据点 ${fmt(sc.bing)}兵${fmt(sc.wuzi)}资`;
       row.spot.disabled = state.bing < sc.bing || state.wuzi < sc.wuzi;
       const migTo = st.est ? pickMigrationTarget(state, b.id) : null;
-      row.mig.style.display = st.est && migTo && tier(state) >= 7 ? "" : "none";
+      const migOk = st.est && migTo && tier(state) >= 7;
+      const migDis = !!state.migration || state.wuzi < migrationCost(state, b.id) || state.bases[b.id].pop <= b.pop0 * 0.3;
+      row.mig.style.display = migOk ? "" : "none";
+      row.mig2.style.display = migOk ? "" : "none";
+      row.mig3.style.display = migOk ? "" : "none";
       if (migTo) {
-        row.mig.textContent = state.migration ? "迁移中…" : `迁25%群众→${BASES.find((x) => x.id === migTo)!.short} ${fmt(migrationCost(state, b.id))}资`;
-        row.mig.disabled = !!state.migration || state.wuzi < migrationCost(state, b.id) || state.bases[b.id].pop <= b.pop0 * 0.3;
+        const toShort = BASES.find((x) => x.id === migTo)!.short;
+        row.mig.textContent = state.migration ? "迁移中…" : `山路稳走→${toShort}（慢/损4%）`;
+        row.mig2.textContent = `大路急行→${toShort}（快/可能被截）`;
+        row.mig3.textContent = `派兵护送→${toShort}（占用兵力）`;
+        row.mig.disabled = migDis; row.mig2.disabled = migDis; row.mig3.disabled = migDis;
+      }
+      // 总部搬迁: 目标=est 且非当前总部,且满足搬迁条件
+      const hqOk = st.est && b.id !== state.hqBase && canRelocateHQ(state);
+      row.hqBtn.style.display = hqOk ? "" : "none";
+      if (hqOk) {
+        row.hqBtn.textContent = `迁总部至此 ${fmt(relocateCost(state))}资`;
+        row.hqBtn.disabled = state.wuzi < relocateCost(state);
       }
     }
 
@@ -459,6 +508,7 @@ export function bootstrapKangri(root: HTMLElement): void {
     if (gstep >= GUIDE.length || state.ended) g.style.display = "none";
     else { g.style.display = ""; const txt = `${gstep + 1}/${GUIDE.length} · ${GUIDE[gstep].t}`; if (g.textContent !== txt) g.textContent = txt; }
     renderSweepBar();
+    renderRaids();
     renderTerm();
     renderEnding();
     renderAch();

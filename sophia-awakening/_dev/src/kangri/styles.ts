@@ -204,4 +204,29 @@ const CSS = `
 .kr-doct-got { font-size: 11px; letter-spacing: 6px; color: var(--amb); margin-bottom: 8px; }
 .kr-end-card.defeat { border-color: #7a2c22; box-shadow: 0 24px 80px rgba(0,0,0,.85), 0 0 46px rgba(160,40,26,.3); background: linear-gradient(180deg, #201210, #120b08); }
 .kr-end-card.defeat .kr-end-grade { color: #d86a58; text-shadow: 0 0 24px rgba(200,57,46,.6); }
+
+/* 游击出击面板 + 文献全屏 */
+.kr-raids { border: 1px solid var(--khk); border-radius: 4px; background: rgba(18,16,10,.8); padding: 7px 9px; display: flex; flex-direction: column; gap: 4px; }
+.kr-raids-head { font-size: 11px; letter-spacing: 1px; color: var(--pap-dk); margin-bottom: 2px; }
+.kr-raids-head span { color: #f0b060; font-weight: 700; }
+.kr-raid { display: flex; gap: 7px; align-items: center; width: 100%; text-align: left; padding: 5px 8px; border: 1px solid var(--khk); border-radius: 4px; background: rgba(28,24,14,.6); color: var(--pap-dk); cursor: pointer; font-family: inherit; transition: border-color .1s; }
+.kr-raid.ready { border-color: rgba(226,120,60,.65); background: linear-gradient(180deg, rgba(70,42,18,.6), rgba(40,26,12,.6)); }
+.kr-raid.ready .kr-raid-name { color: #f5c896; }
+.kr-raid.ready .kr-raid-cd { color: #8fc06a; }
+.kr-raid.cooling { opacity: .55; }
+.kr-raid.pulse { animation: krpul .4s ease; }
+.kr-raid-ic { font-size: 16px; }
+.kr-raid-body { flex: 1; min-width: 0; }
+.kr-raid-top { display: flex; justify-content: space-between; }
+.kr-raid-name { font-size: 12.5px; font-weight: 700; color: #d8c9a0; }
+.kr-raid-cd { font-size: 10.5px; }
+.kr-raid-meta { font-size: 9.5px; color: #8a8058; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kr-doct-card { background: rgba(4,3,2,.95); }
+.kr-doct-full { width: min(760px, 94%); padding: 44px 56px; }
+.kr-doct-full .kr-doct-book { font-size: 64px; }
+.kr-doct-full .kr-doct-title { font-size: 32px; letter-spacing: 5px; }
+.kr-doct-full .kr-doct-desc { font-size: 14.5px; }
+.kr-doct-full .kr-doct-line { font-size: 14.5px; }
+.kr-doct-full .kr-doct-fx { font-size: 16px; }
+.kr-ba.hq { border-color: rgba(216,164,65,.7); color: #f0d8a0; }
 `;

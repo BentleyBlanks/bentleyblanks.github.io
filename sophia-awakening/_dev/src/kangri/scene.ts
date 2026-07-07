@@ -199,8 +199,9 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
   function fogAt(s: KRState, wx: number, wy: number): number {
     const T = tier(s);
     const uR = UNLOCK_R[T];
+    const hb = BASES.find((b) => b.id === s.hqBase) ?? BASES[0];
     const edge = Math.max(0.004, uR * 0.5);
-    let vis = sstep(uR + edge, uR - edge * 0.3, Math.hypot(wx - HQ.x, wy - HQ.y));
+    let vis = sstep(uR + edge, uR - edge * 0.3, Math.hypot(wx - hb.x, wy - hb.y));
     for (const b of BASES) {
       if (b.id === "hq" || !baseRevealed(s, b.id)) continue;
       if (tier(s) < 7) continue; // 大板块的雾 T7(边区) 起才挖开
@@ -717,7 +718,8 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     const T = tier(s);
     // 阶梯升级：自动平滑拉远(玩家仍可随时缩放)
     if (T !== shownTier) {
-      if (shownTier >= 0) { cam.tzoom = TIER_ZOOM[T]; cam.tx = T >= 7 ? 0.5 : HQ.x; cam.ty = T >= 7 ? 0.5 : HQ.y; userCamMs = 0; }
+      const hb2 = BASES.find((b) => b.id === s.hqBase) ?? BASES[0];
+      if (shownTier >= 0) { cam.tzoom = TIER_ZOOM[T]; cam.tx = T >= 7 ? 0.5 : hb2.x; cam.ty = T >= 7 ? 0.5 : hb2.y; userCamMs = 0; }
       shownTier = T;
     }
     // 相机 lerp
@@ -986,7 +988,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         ctx.font = `700 ${fs}px 'Noto Serif SC', serif`;
         const hq = s.bases["hq"];
         const T = tier(s);
-        const lab = `★ ${T < 2 ? "根据地·村" : T < 3 ? "太行根据地" : `太行·总部${hq.dev > 0 ? ` 发展${hq.dev}` : ""}${hq.spots > 0 ? ` 🏯${hq.spots}` : ""}`}`;
+        const lab = `${s.hqBase === "hq" ? "★ " : ""}${T < 2 ? "根据地·村" : T < 3 ? "太行根据地" : `太行·总部${hq.dev > 0 ? ` 发展${hq.dev}` : ""}${hq.spots > 0 ? ` 🏯${hq.spots}` : ""}`}`;
         const twd = ctx.measureText(lab).width;
         ctx.fillStyle = "rgba(90,26,18,.8)";
         ctx.beginPath(); ctx.roundRect(p.x - twd / 2 - 5, p.y + 14, twd + 10, fs + 8, 3); ctx.fill();
@@ -1002,7 +1004,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       const st = s.bases[b.id];
       const canEst = !st.est && era(s).canExpand && tier(s) >= 7;
       ctx.font = `${st.est ? 700 : 400} ${fs}px 'Noto Serif SC', serif`;
-      const lab = st.est ? `${b.short}${st.dev > 0 ? `·发展${st.dev}` : ""}${st.spots > 0 ? ` 🏯${st.spots}` : ""}` : `${b.short}(未开辟)`;
+      const lab = st.est ? `${s.hqBase === b.id ? "🏛" : ""}${b.short}${st.dev > 0 ? `·发展${st.dev}` : ""}${st.spots > 0 ? ` 🏯${st.spots}` : ""}` : `${b.short}(未开辟)`;
       const twd = ctx.measureText(lab).width;
       ctx.fillStyle = "rgba(10,9,6,.66)";
       ctx.beginPath(); ctx.roundRect(p.x - twd / 2 - 4, p.y + 12, twd + 8, fs + 7, 3); ctx.fill();

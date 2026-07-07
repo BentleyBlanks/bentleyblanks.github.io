@@ -142,7 +142,26 @@ export interface CampaignDef {
   desc: string; hist: string; line: string;
   fx?: "baituan" | "qinyuan"; // 特殊效果
 }
+// minor=小战役(时间轴填充,收益小但高频——几乎每 1-2 月有仗可打,连胜士气+里程碑密度)
 export const CAMPAIGNS: CampaignDef[] = [
+  { id: "yangmingbao", name: "夜袭阳明堡", window: [3, 5], needBases: 1, costBing: 60, costWuzi: 80, outputMult: 1.08, desc: "夜袭机场,烧毁敌机二十四架。", hist: "1937.10 129师769团", line: "火光冲天——忻口前线的日军飞机,再也飞不起来了。" },
+  { id: "yanmenguan", name: "雁门关伏击", window: [3, 6], needBases: 1, costBing: 90, costWuzi: 120, outputMult: 1.06, desc: "断敌运输线,毁敌汽车数十辆。", hist: "1937.10 120师716团", line: "雁门关下,运输车队burning——大同到忻口的补给断了。" },
+  { id: "shentouling", name: "神头岭伏击", window: [8, 10], needBases: 1, costBing: 300, costWuzi: 500, outputMult: 1.07, desc: "「吸打敌援」经典伏击。", hist: "1938.3 歼敌1500余", line: "神头岭一仗,鬼子在辎重驮马间哭爹喊娘——「典型的游击战」。" },
+  { id: "xiangtangpu", name: "响堂铺伏击", window: [9, 11], needBases: 1, costBing: 350, costWuzi: 700, outputMult: 1.07, desc: "毁敌汽车百余辆。", hist: "1938.3 129师", line: "邯长公路上一百八十辆汽车烧成铁架——日军的运输线瘫了。" },
+  { id: "changlecun", name: "长乐村急袭", window: [9, 12], needBases: 2, costBing: 500, costWuzi: 1000, outputMult: 1.08, desc: "粉碎九路围攻的关键一仗。", hist: "1938.4 歼敌2200余", line: "长乐村河谷里,九路围攻的日军主力被拦腰斩断——晋东南保住了。" },
+  { id: "tingdian", name: "町店伏击", window: [11, 13], needBases: 2, costBing: 600, costWuzi: 1500, outputMult: 1.06, desc: "打乱敌沿白晋路南犯部署。", hist: "1938.7", line: "町店一战,鬼子在山沟里丢下几百具尸体。" },
+  { id: "xiangchenggu", name: "香城固诱伏", window: [19, 21], needBases: 2, costBing: 900, costWuzi: 3000, outputMult: 1.07, desc: "平原诱伏战范例。", hist: "1939.2 386旅", line: "把鬼子引进沙河故道的口袋——平原上也能打伏击！" },
+  { id: "lufang", name: "陆房突围", window: [21, 24], needBases: 2, costBing: 1200, costWuzi: 5000, outputMult: 1.06, desc: "跳出五千日军合围。", hist: "1939.5 115师", line: "陆房山区杀出重围——115师在山东站住了脚。" },
+  { id: "liangshan", name: "梁山歼灭战", window: [24, 27], needBases: 2, costBing: 1500, costWuzi: 8000, outputMult: 1.08, desc: "平原全歼日军一个大队。", hist: "1939.8", line: "梁山脚下全歼日军少佐以下三百余——山东军民士气大振。" },
+  { id: "yansuya", name: "雁宿崖歼灭战", window: [27, 29], needBases: 2, costBing: 1800, costWuzi: 12000, outputMult: 1.07, desc: "黄土岭的前奏。", hist: "1939.11 歼敌600余", line: "雁宿崖峡谷全歼辻村大队——阿部规秀气急败坏地出动了。" },
+  { id: "ciwushelin", name: "磁武涉林战役", window: [32, 35], needBases: 3, costBing: 3000, costWuzi: 20000, outputMult: 1.07, desc: "反顽固派磨擦,巩固太行。", hist: "1940.4", line: "太行根据地的南大门守住了。" },
+  { id: "baijin", name: "白晋铁路破击", window: [34, 37], needBases: 3, costBing: 3500, costWuzi: 30000, outputMult: 1.08, desc: "百团大战的预演。", hist: "1940.5", line: "白晋路五十里路轨一夜掀翻——破袭战的兵演练熟了。" },
+  { id: "huangyadong", name: "黄崖洞保卫战", window: [52, 55], needBases: 3, costBing: 5000, costWuzi: 60000, outputMult: 1.1, desc: "保卫兵工厂,毙伤敌6倍于己。", hist: "1941.11 「敌我伤亡6:1」", line: "水窑山上打出6:1的交换比——兵工厂的每一台机器都保住了。" },
+  { id: "fansaodang42", name: "1942 春季反扫荡", window: [56, 59], needBases: 3, costBing: 6000, costWuzi: 90000, outputMult: 1.08, desc: "太行山反「辗转抉剔」清剿。", hist: "1942.2", line: "敌进我进——跳到外线去,打他的后方！" },
+  { id: "linnan", name: "林南战役", window: [73, 76], needBases: 4, costBing: 12000, costWuzi: 300000, outputMult: 1.1, desc: "太行局部反攻首战。", hist: "1943.8 歼敌7000余", line: "林县以南一举收复八十余村——反攻,从太行开始。" },
+  { id: "hanlvecun", name: "韩略村伏击", window: [75, 78], needBases: 4, costBing: 8000, costWuzi: 200000, outputMult: 1.09, desc: "全歼日军「战地观战团」。", hist: "1943.10 王近山部", line: "一百二十名军官的「观战团」全歼于韩略村——冈村宁次暴跳如雷。" },
+  { id: "nanle", name: "南乐战役", window: [92, 94], needBases: 5, costBing: 30000, costWuzi: 1200000, outputMult: 1.1, desc: "冀鲁豫春季攻势。", hist: "1945.4 歼敌3400余", line: "南乐城头换了旗——反攻的春天来了。" },
+  { id: "anyang", name: "安阳战役", window: [94, 96], needBases: 5, costBing: 40000, costWuzi: 2000000, outputMult: 1.1, desc: "掃清平汉线残敌。", hist: "1945.6", line: "安阳外围据点一扫而空——大反攻的号角就在耳边。" },
   { id: "pingxingguan", name: "平型关大捷", window: [1, 4], needBases: 1, costBing: 80, costWuzi: 100, outputMult: 1.3, desc: "115师设伏平型关，打日军板垣师团辎重队。", hist: "1937.9.25 歼敌千余", line: "平型关一声炮响——打破『日军不可战胜』的神话！全国振奋，参军的青年排起长队。" },
   { id: "huangtuling", name: "黄土岭围歼战", window: [27, 31], needBases: 2, costBing: 600, costWuzi: 3000, outputMult: 1.25, desc: "雁宿崖再设伏，围住独立混成第二旅团。", hist: "1939.11 击毙『名将之花』阿部规秀中将", line: "黄土岭一炮，阿部规秀毙命——日军哀叹『名将之花凋谢在太行山上』。" },
   { id: "baituan", name: "百团大战", window: [37, 41], needBases: 4, costBing: 2500, costWuzi: 25_000, outputMult: 1.45, fx: "baituan", desc: "105个团同时破袭正太、同蒲、平汉铁路——砸碎囚笼！", hist: "1940.8-12 毙伤日伪军2.5万余，破路474公里", line: "百团大战！一夜之间华北铁路公路全线开花——囚笼被砸得粉碎。但要当心：日军的报复会更疯狂（史实如此）。" },
@@ -202,6 +221,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "est9", name: "满盘皆红", desc: "九块根据地全部开辟", check: (s) => estCount(s) >= 9 },
   { id: "dev_max", name: "模范根据地", desc: "一块根据地发展到 5 级", check: (s) => BASES.some((b) => s.bases[b.id].dev >= 5) },
   { id: "first_tower", name: "第一座炮楼", desc: "端掉村口的炮楼——十里八乡都传遍了", check: (s) => s.stats.spotsRemoved >= 1 },
+  { id: "combo10", name: "越打越强", desc: "连胜达到 10（士气如虹）", check: (s) => s.combo >= 10 },
+  { id: "rating_s", name: "S 级反扫荡", desc: "以伤亡不到敌三成的代价粉碎多波大扫荡" },
   { id: "spots10", name: "拔钉子", desc: "累计拔除 10 座炮楼据点", check: (s) => s.stats.spotsRemoved >= 10 },
   { id: "migrate", name: "大转移", desc: "组织一次跨根据地的群众大转移" },
   { id: "policy_all", name: "新政齐备", desc: "推行全部政策", check: (s) => POLICIES.every((p) => s.policies[p.id]) },
@@ -252,6 +273,39 @@ export const EVENTS: EventDef[] = [
 // 各档位对抗基准兵力(难度曲线: 村口炮楼小分队→巡逻队→讨伐队→中队→大队→守备队→支队→联队→师团)
 export const TIER_ENEMY = [12, 25, 55, 130, 350, 750, 1800, 3800, 8000];
 
+// ══ 游击出击（主动打日本: 高频动作+缴获滚雪球+连胜士气）══════════
+export interface RaidDef { id: string; name: string; icon: string; desc: string; cdS: number; enemyF: number; lootF: number; }
+export const RAIDS: RaidDef[] = [
+  { id: "patrol", name: "袭击巡逻队", icon: "⚡", desc: "吃掉落单的巡逻队——缴枪扩军(击毙数×0.6 转入兵员)", cdS: 30, enemyF: 0.18, lootF: 8 },
+  { id: "convoy", name: "伏击运输队", icon: "🎯", desc: "打敌人的粮车弹药车——缴获丰厚", cdS: 45, enemyF: 0.30, lootF: 26 },
+  { id: "rail", name: "破袭铁路", icon: "💥", desc: "扒铁轨烧枕木——大缴获,并迟滞日军下次扫荡", cdS: 60, enemyF: 0.12, lootF: 34 }
+];
+// 连胜士气: 出击/反扫荡胜利累积,产出加成(每级+2%,上限+30%);被烧穿清零。
+export function comboMult(s: KRState): number { return 1 + Math.min(0.3, s.combo * 0.02); }
+export function raidEnemy(s: KRState, r: RaidDef): number {
+  return Math.max(4, Math.round(TIER_ENEMY[tier(s)] * r.enemyF * Math.max(0.5, era(s).strengthMult)));
+}
+export function raidTroopsNeeded(s: KRState, r: RaidDef): number { return Math.ceil(raidEnemy(s, r) * 2.2); }
+export function launchRaid(s: KRState, id: string): boolean {
+  const r = RAIDS.find((x) => x.id === id);
+  if (!r || (s.raidCd[id] ?? 0) > 0 || s.sweep) return false;
+  const enemy = raidEnemy(s, r);
+  const need = raidTroopsNeeded(s, r);
+  if (s.bing < need) return false;
+  // 伏击结算(预设战场,我方占尽先机): 全歼,伤亡=敌18%×防御减免
+  const ourLoss = Math.round(enemy * 0.18 * (1 - defense(s) * 0.5));
+  s.bing -= ourLoss;
+  const loot = enemy * r.lootF * (1 + era(s).id * 0.6) * networkMult(s) * doctrineMult(s, "loot");
+  s.wuzi += loot; s.totalWuzi += loot;
+  s.stats.killed += enemy; s.stats.lost += ourLoss;
+  s.combo += 1;
+  s.raidCd[id] = r.cdS;
+  if (id === "patrol") { const cap = Math.round(enemy * 0.6); s.bing += cap; pushT(s, `⚡ 伏击得手！全歼巡逻队 ${enemy} 人，缴获步枪武装了 ${cap} 名民兵（伤亡 ${ourLoss}，缴获 ${fmt(loot)}，连胜 ${s.combo}）。`, "win"); }
+  else if (id === "rail") { s.nextSweepM += 1; pushT(s, `💥 铁路破袭成功！歼灭护路队 ${enemy} 人，扒轨三里、缴获 ${fmt(loot)}——日军下次扫荡被迟滞（连胜 ${s.combo}）。`, "win"); }
+  else pushT(s, `🎯 运输队进了伏击圈！全歼押运 ${enemy} 人，粮车弹药车尽入我手——缴获 ${fmt(loot)}（伤亡 ${ourLoss}，连胜 ${s.combo}）。`, "win");
+  return true;
+}
+
 // ══ 扫荡（多路合围事件）══════════════════════════════════════════
 export type SweepStage = "incoming" | "battle" | "pillage";
 // 日军战略意图（历史原型）：
@@ -273,9 +327,13 @@ export interface Sweep {
   battleSec: number; battleMax: number; pillageSec: number; pillageFrac: number;
   killed: number; lostBing: number;
   targetBase: string; // BASES id
+  ambush: boolean; // incoming 期已设伏(首击加成)
+  wave: number; waves: number; // Boss 战波次(era2 大扫荡多波)
+  waveStrength0: number; lullS: number; // 波间喘息秒
 }
 // 群众跨根据地大转移（平时经营动作;至暗期把平原人口迁进山保平安,反攻期迁回恢复产出）
-export interface Migration { from: string; to: string; pop: number; t: number; dur: number; }
+export type MigRoute = "fast" | "safe" | "escort";
+export interface Migration { from: string; to: string; pop: number; t: number; dur: number; route: MigRoute; escort: number; }
 
 export interface KRState {
   bing: number; wuzi: number; totalWuzi: number; clickN: number;
@@ -297,6 +355,9 @@ export interface KRState {
   nextSweepM: number;
   sweepsSurvived: number;
   routStreak: number; // 连续被烧穿次数(失败判定)
+  combo: number; // 连胜士气
+  raidCd: Record<string, number>; // 出击冷却(秒)
+  hqBase: string; // 总部所在根据地(可搬迁)
   ended: boolean;
   defeated: boolean; // 失败结局: 根据地覆灭
   terminal: { text: string; kind: "info" | "win" | "loss" | "era" }[];
@@ -308,7 +369,7 @@ export interface KRState {
 export const TUNING = {
   clickBing: 1, clickWuzi: 2,
   sweepEtaSec: 16, battleMaxSec: 45, pillageSec: 9, evacSec: 22, evacProdMult: 0.45,
-  ourKillRate: 0.07, jpKillRate: 0.075, autoMilitiaFrac: 0.1,
+  ourKillRate: 0.038, jpKillRate: 0.105, autoMilitiaFrac: 0.1, // 史实:正面硬拼我方~1:2.8吃亏;防御/伏击翻盘
   lootBase: 30, lootPerEra: 150,
   sweepBase: 8, // 基础兵团规模
   devCost0: 150, devCostMult: 3, // 根据地发展造价
@@ -327,7 +388,7 @@ export function createKRState(): KRState {
     monthIdx: 0, monthAcc: 0,
     buildings: BUILDINGS.map(() => 0), policies: {}, bases, campaigns: {}, campMult: 1, kmtCut: false, pendingWuyi: false,
     sweep: null, migration: null, doctrines: {}, pendingDoctrines: [], achievements: {}, achQueue: [], achPoll: 0,
-    nextSweepM: 4, sweepsSurvived: 0, routStreak: 0, ended: false, defeated: false,
+    nextSweepM: 4, sweepsSurvived: 0, routStreak: 0, combo: 0, raidCd: {}, hqBase: "hq", ended: false, defeated: false,
     terminal: [{ text: "【1937.7】卢沟桥的枪声响了。华北在沦陷——但敌后的缝隙里，根据地要在这里扎根。", kind: "era" }],
     eraShown: 0, eventsFired: {},
     stats: { killed: 0, lost: 0, popLost: 0, spotsRemoved: 0, campaignsWon: 0, sweepsFought: 0, estPeak: 1, eraSnap: [] }
@@ -351,7 +412,7 @@ export function baseMult(s: KRState, id: string): number {
   return 1 + (0.10 + 0.05 * st.dev) * popFrac * spotMalus * terr;
 }
 export function networkMult(s: KRState): number {
-  let m = s.campMult * doctrineMult(s, "prod");
+  let m = s.campMult * doctrineMult(s, "prod") * comboMult(s);
   for (const b of BASES) m *= baseMult(s, b.id);
   return m;
 }
@@ -487,20 +548,35 @@ export function pickMigrationTarget(s: KRState, fromId: string): string | null {
 export function migrationCost(s: KRState, fromId: string): number {
   return Math.ceil(s.bases[fromId].pop * 0.25 * 40 * (1 + era(s).id * 0.4));
 }
-export function transferPop(s: KRState, fromId: string, toId: string): boolean {
+// 三条路线: 大路急行(快/险,至暗期可能被截) / 山路稳走(慢/稳) / 派兵护送(中速,占用兵力)
+export function transferPop(s: KRState, fromId: string, toId: string, route: MigRoute = "safe"): boolean {
   const from = s.bases[fromId], to = s.bases[toId];
   if (!from?.est || !to?.est || fromId === toId || s.migration) return false;
   const fd = BASES.find((b) => b.id === fromId)!;
   if (from.pop <= fd.pop0 * 0.3) return false; // 底线人口留守
   const c = migrationCost(s, fromId);
   if (s.wuzi < c) return false;
-  s.wuzi -= c;
   const amount = from.pop * 0.25;
+  let escort = 0;
+  if (route === "escort") {
+    escort = Math.min(Math.floor(s.bing), Math.ceil(amount * 12));
+    if (escort < amount * 6) return false; // 兵不够护不住
+    s.bing -= escort;
+  }
+  s.wuzi -= c;
   from.pop -= amount;
-  const loss = era(s).id === 2 ? 0.12 : 0.05; // 至暗期路上损耗更大
-  s.migration = { from: fromId, to: toId, pop: amount * (1 - loss), t: 0, dur: 8 };
+  const eraHard = era(s).id === 2;
+  let loss = route === "fast" ? (eraHard ? 0.10 : 0.06) : route === "safe" ? 0.04 : 0.05;
+  let dur = route === "fast" ? 5 : route === "safe" ? 14 : 8;
+  // 大路急行的风险: 至暗期 35%/平时 15% 概率被日军截击,额外损失
+  if (route === "fast" && Math.random() < (eraHard ? 0.35 : 0.15)) {
+    loss += 0.16;
+    pushT(s, "⚠ 转移队伍在大路上撞上了日军巡逻队——仓促突围，队伍失散了一批人！", "loss");
+  }
+  s.migration = { from: fromId, to: toId, pop: amount * (1 - loss), t: 0, dur, route, escort };
   unlockAch(s, "migrate");
-  pushT(s, `▶ 组织【${fd.short}】${amount.toFixed(1)}万群众向【${BASES.find((b) => b.id === toId)!.short}】大转移——拖家带口，路上小心。`, "info");
+  const rName = route === "fast" ? "沿大路急行" : route === "safe" ? "走山路稳进" : `${escort} 名战士护送`;
+  pushT(s, `▶ 组织【${fd.short}】${amount.toFixed(1)}万群众向【${BASES.find((b) => b.id === toId)!.short}】大转移（${rName}）。`, "info");
   return true;
 }
 function tickMigration(s: KRState, dt: number): void {
@@ -509,17 +585,37 @@ function tickMigration(s: KRState, dt: number): void {
   if (m.t >= m.dur) {
     const to = s.bases[m.to];
     to.pop = Math.min(BASES.find((b) => b.id === m.to)!.pop0 * 1.5, to.pop + m.pop);
+    if (m.escort > 0) s.bing += m.escort; // 护送队归建
     pushT(s, `★ ${m.pop.toFixed(1)}万群众安全抵达【${BASES.find((b) => b.id === m.to)!.short}】，安顿下来了。`, "win");
     s.migration = null;
   }
 }
+// ── 总部搬迁(遭重创后把指挥中枢转移到别的根据地——史实:八路军总部多次转移) ──
+export function canRelocateHQ(s: KRState): boolean {
+  const hq = s.bases[s.hqBase];
+  const d = BASES.find((b) => b.id === s.hqBase)!;
+  return hq.pop < d.pop0 * 0.55 || s.routStreak >= 2;
+}
+export function relocateCost(s: KRState): number { return Math.ceil(800 * Math.pow(3, era(s).id)); }
+export function relocateHQ(s: KRState, toId: string): boolean {
+  const to = s.bases[toId];
+  if (!to?.est || toId === s.hqBase || !canRelocateHQ(s)) return false;
+  const c = relocateCost(s);
+  if (s.wuzi < c) return false;
+  s.wuzi -= c;
+  const from = BASES.find((b) => b.id === s.hqBase)!;
+  s.hqBase = toId;
+  pushT(s, `★ 总部机关轻装转移：【${from.short}】→【${BASES.find((b) => b.id === toId)!.short}】。电台架起来，指挥中枢立住了——敌人扑了个空。`, "win");
+  return true;
+}
+
 // 发动大战役
 export function launchCampaign(s: KRState, id: string): boolean {
   const c = CAMPAIGNS.find((x) => x.id === id);
   if (!c || campaignAvailable(s, c) !== "ok") return false;
   if (s.bing < c.costBing || s.wuzi < c.costWuzi) return false;
   s.bing -= c.costBing; s.wuzi -= c.costWuzi;
-  s.campaigns[id] = true; s.campMult *= c.outputMult; s.stats.campaignsWon += 1;
+  s.campaigns[id] = true; s.campMult *= c.outputMult; s.stats.campaignsWon += 1; s.combo += 1;
   pushT(s, `★★ ${c.name}（${c.hist}）：${c.line}`, "win");
   if (c.fx === "baituan") {
     let removed = 0;
@@ -550,6 +646,7 @@ function pickSweepTarget(s: KRState): string {
     const plains = est.filter((b) => b.terrain === "plain");
     if (plains.length > 0 && Math.random() < 0.6) return plains.sort((a, b2) => s.bases[b2.id].pop - s.bases[a.id].pop)[0].id;
   }
+  if (s.bases[s.hqBase]?.est && Math.random() < 0.3) return s.hqBase; // 日军也认总部
   return est[Math.floor(Math.random() * est.length)].id;
 }
 // 按时期选战略意图（历史原型分布）
@@ -572,6 +669,7 @@ function triggerSweep(s: KRState, forceTarget?: string, strengthMult = 1, forceC
   const eta = TUNING.sweepEtaSec * kEta;
   s.sweep = {
     stage: "incoming", kind, strength, strength0: strength, cols, sanguang: e.sanguang,
+    ambush: false, wave: 1, waves: (e.id === 2 && (kind === "encircle" || kind === "comb")) ? (forceCols ? 5 : 3) : 1, waveStrength0: strength, lullS: 0,
     etaSec: eta, etaSec0: eta, committed: 0, committed0: 0, evacStarted: false, evacProgress: 0,
     battleSec: 0, battleMax: TUNING.battleMaxSec * (kind === "comb" ? 1.4 : 1), pillageSec: 0, pillageFrac: 0, killed: 0, lostBing: 0, targetBase: target
   };
@@ -597,6 +695,7 @@ export function commitTroops(s: KRState, n: number): number {
   const c = Math.min(Math.floor(s.bing), Math.max(0, Math.floor(n)));
   if (c <= 0) return 0;
   s.bing -= c; sw.committed += c; sw.committed0 += c;
+  if (sw.stage === "incoming") sw.ambush = true; // 提前设伏=开战首击加成
   pushT(s, sw.stage === "incoming" ? `▶ 组织抗击！${c} 名战士分路设伏，等鬼子进伏击圈。` : `▶ 增援 ${c} 名战士投入会战！`, "info");
   return c;
 }
@@ -608,6 +707,12 @@ function pillageFracOf(s: KRState, sw: Sweep): number {
   return Math.max(0, base * strengthFrac * (1 - defense(s, sw.targetBase)) * (1 - evacEff * sw.evacProgress));
 }
 function endBattle(s: KRState, sw: Sweep): void {
+  // Boss 战: 这一波打完但还有下一波 → 波间喘息(部队不撤,可增援)
+  if (sw.strength <= 0.5 && sw.wave < sw.waves) {
+    sw.lullS = 8; sw.battleSec = 0;
+    pushT(s, `第 ${sw.wave} 波打退了！短暂喘息——日军还有 ${sw.waves - sw.wave} 波,可点击增援。`, "info");
+    return;
+  }
   const back = Math.floor(sw.committed);
   s.bing += back; sw.committed = 0;
   if (sw.strength <= 0.5) finishSweep(s, sw, true);
@@ -623,17 +728,29 @@ function finishSweep(s: KRState, sw: Sweep, cleanWin: boolean): void {
   s.wuzi += loot; s.totalWuzi += loot;
   s.stats.killed += killed; s.stats.lost += Math.round(sw.lostBing);
   if (cleanWin) {
-    pushT(s, `★ 反扫荡大捷！击毙日军 ${killed}（我方伤亡 ${Math.round(sw.lostBing)}），根据地毫发无损，缴获物资 ${fmt(loot)}！`, "win");
+    // 战果分级(多波大扫荡 Boss 战): S=全歼且伤亡<敌30% / A=全歼 / B=打退
+    let rating = "B", ratingMult = 1;
+    if (sw.waves > 1 || sw.strength0 > 100) {
+      const ratio = sw.lostBing / Math.max(1, sw.killed);
+      rating = ratio < 0.3 ? "S" : ratio < 0.7 ? "A" : "B";
+      ratingMult = rating === "S" ? 3 : rating === "A" ? 2 : 1;
+    }
+    const loot2 = loot * (ratingMult - 1);
+    if (loot2 > 0) { s.wuzi += loot2; s.totalWuzi += loot2; }
+    s.combo += rating === "S" ? 3 : rating === "A" ? 2 : 1;
+    if (sw.waves > 1) pushT(s, `★★【${rating} 级反扫荡】${sw.waves} 波合围全部粉碎！击毙 ${killed}（我方伤亡 ${Math.round(sw.lostBing)}），缴获 ${fmt(loot * ratingMult)}！士气高涨(连胜 ${s.combo})。`, "win");
+    else pushT(s, `★ 反扫荡大捷！击毙日军 ${killed}（我方伤亡 ${Math.round(sw.lostBing)}），根据地毫发无损，缴获物资 ${fmt(loot * ratingMult)}！`, "win");
     unlockAch(s, "clean_win");
     if (sw.kind === "encircle") unlockAch(s, "repel_encircle");
     if (sw.kind === "raid") unlockAch(s, "repel_raid");
+    if (rating === "S") unlockAch(s, "rating_s");
   }
   else {
     const lossPct = Math.round(sw.pillageFrac * 100);
     pushT(s, `反扫荡结束：击毙 ${killed}，我方伤亡 ${Math.round(sw.lostBing)}，被烧抢损失 ${lossPct}%${sw.evacProgress > 0.5 ? "（大转移保住了大半家底）" : ""}，缴获 ${fmt(loot)}。`, sw.pillageFrac > 0.12 ? "loss" : "info");
   }
   if (cleanWin) s.routStreak = 0;
-  else if (sw.pillageFrac > 0.15) s.routStreak += 1;
+  else if (sw.pillageFrac > 0.15) { s.routStreak += 1; if (s.combo > 0) { s.combo = 0; pushT(s, "被烧穿了——连胜中断，士气回落。", "loss"); } }
   else s.routStreak = Math.max(0, s.routStreak - 1);
   s.sweepsSurvived += 1;
   if (s.monthIdx >= 57 && s.monthIdx <= 59 && sw.strength0 > 100) unlockAch(s, "survive_wuyi");
@@ -671,10 +788,22 @@ function tickPillage(s: KRState, sw: Sweep, dt: number): void {
   }
 }
 function tickBattle(s: KRState, sw: Sweep, dt: number): void {
+  // Boss 战波间喘息(era2 多波扫荡): 不互相杀伤,可增援
+  if (sw.lullS > 0) {
+    sw.lullS -= dt;
+    if (sw.lullS <= 0) {
+      sw.wave += 1;
+      sw.strength = sw.waveStrength0 * Math.pow(0.82, sw.wave - 1);
+      pushT(s, `⚠ 日军第 ${sw.wave}/${sw.waves} 波压上来了！约 ${Math.round(sw.strength)} 人。`, "loss");
+    }
+    return;
+  }
   sw.battleSec += dt;
   const d = defense(s, sw.targetBase);
-  const ourRate = TUNING.ourKillRate * (1 + d * 1.6) * doctrineMult(s, "kill");
-  const jpRate = TUNING.jpKillRate * (1 - d * 0.55);
+  // 伏击首击: incoming 期就设伏 → 开战头 6 秒杀伤 ×2.2(游击战的本钱:预设战场)
+  const ambushMult = sw.ambush && sw.battleSec < 6 ? 2.2 : 1;
+  const ourRate = TUNING.ourKillRate * (1 + d * 2.8) * doctrineMult(s, "kill") * ambushMult;
+  const jpRate = TUNING.jpKillRate * (1 - d * 0.72);
   const jpLoss = Math.min(sw.strength, sw.committed * ourRate * dt, sw.strength0 * 0.18 * dt);
   const ourLoss = Math.min(sw.committed, sw.strength * jpRate * dt, sw.committed0 * 0.18 * dt);
   sw.strength -= jpLoss; sw.killed += jpLoss;
@@ -761,6 +890,7 @@ export function tick(s: KRState, dtSec: number): void {
   s.totalWuzi += wuziPerSec(s) * prodMult * dtSec;
   if (s.sweep) tickSweep(s, dtSec);
   tickMigration(s, dtSec);
+  for (const k in s.raidCd) if (s.raidCd[k] > 0) s.raidCd[k] -= dtSec;
   s.achPoll += dtSec;
   if (s.achPoll >= 0.5) {
     s.achPoll = 0;
