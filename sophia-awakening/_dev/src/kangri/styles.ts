@@ -140,6 +140,9 @@ const CSS = `
 .kr-ba:disabled { opacity: .42; cursor: default; }
 .kr-ba.est { border-color: rgba(216,164,65,.6); }
 .kr-ba.spot { border-color: rgba(200,57,46,.55); color: #f2c0a0; }
+.kr-ba.mig { border-color: rgba(122,143,58,.6); color: #c6d49a; }
+.kr-float.big { font-size: 24px; color: #f0e4c0; letter-spacing: 3px; }
+.kr-float.dim { font-size: 13px; color: #b5a575; }
 .kr-ending { position: absolute; inset: 0; z-index: 30; background: rgba(6,5,3,.88); display: flex; align-items: center; justify-content: center; }
 .kr-end-card { width: min(720px, 88%); max-height: 88%; overflow-y: auto; padding: 28px 34px; border: 2px solid var(--amb); border-radius: 8px; background: linear-gradient(180deg, #1c1810, #12100a); box-shadow: 0 24px 80px rgba(0,0,0,.8), 0 0 40px rgba(216,164,65,.15); text-align: center; }
 .kr-end-date { font-size: 13px; color: var(--pap-dk); letter-spacing: 2px; }

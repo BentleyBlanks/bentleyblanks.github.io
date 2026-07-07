@@ -7,7 +7,8 @@ import {
   buildCostWuzi, buildCostBing, buildingUnlocked, policyRevealed,
   estCost, devCost, tunCost, spotCost, campaignAvailable, endReport,
   rally, buyBuilding, buyPolicy, establishBase, raiseDev, digTunnel, removeSpot, launchCampaign,
-  tick, startEvacuation, commitTroops,
+  tick, startEvacuation, commitTroops, tier, TIERS, unitName, SWEEP_KIND_NAME,
+  transferPop, pickMigrationTarget, migrationCost,
   type KRState
 } from "./core";
 import { initScene } from "./scene";
@@ -19,6 +20,7 @@ export function bootstrapKangri(root: HTMLElement): void {
   let paused = false, speed = 1;
   let selectedBase: string | null = null;
   let endShown = false;
+  let shownTier = 0;
 
   root.innerHTML = "";
   const wrap = document.createElement("div"); wrap.className = "kr";
@@ -131,10 +133,10 @@ export function bootstrapKangri(root: HTMLElement): void {
     sweepBar.style.display = "";
     banner.classList.add("on");
     const where = BASES.find((b) => b.id === sw.targetBase)!.name;
-    const colsTag = sw.cols > 1 ? `${sw.cols}路合围` : "单路讨伐";
+    const colsTag = `${SWEEP_KIND_NAME[sw.kind]}${sw.cols > 1 ? `·${sw.cols}路` : ""}`;
     if (sw.stage === "incoming") {
-      banner.textContent = sw.sanguang ? "⚠⚠ 铁壁合围·三光！" : "⚠ 日军兵团开拔！";
-      sbHead.textContent = `日军 ${Math.round(sw.strength)} 人（${colsTag}）压向【${where}】 · ${Math.ceil(sw.etaSec)} 秒后抵达`;
+      banner.textContent = sw.kind === "raid" ? "⚠⚠ 日军奔袭！预警极短！" : sw.sanguang ? "⚠⚠ 铁壁合围·三光！" : sw.kind === "comb" ? "⚠ 梳篦清剿——转移也难躲！" : "⚠ 日军兵团开拔！";
+      sbHead.textContent = `日军${unitName(sw.strength)} ${Math.round(sw.strength)} 人（${colsTag}）压向【${where}】 · ${Math.ceil(sw.etaSec)} 秒后抵达`;
       sbStatus.textContent = sw.evacStarted
         ? `群众转移中 ${Math.round(sw.evacProgress * 100)}%${sw.committed > 0 ? ` · 已集结 ${Math.round(sw.committed)} 人设伏` : " · 尚未组织抗击"}`
         : sw.committed > 0 ? `已集结 ${Math.round(sw.committed)} 人设伏 · 群众未转移` : "尚未应对——快下令！";
@@ -181,6 +183,7 @@ export function bootstrapKangri(root: HTMLElement): void {
         <button class="kr-ba dev">发展</button>
         <button class="kr-ba tun">挖地道</button>
         <button class="kr-ba spot">拔据点</button>
+        <button class="kr-ba mig">迁移群众</button>
       </div>`;
     basePanel.appendChild(el);
     const q = (s: string) => el.querySelector<HTMLButtonElement>(s)!;
@@ -188,8 +191,9 @@ export function bootstrapKangri(root: HTMLElement): void {
     q(".kr-ba.dev").addEventListener("click", () => { raiseDev(state, b.id); });
     q(".kr-ba.tun").addEventListener("click", () => { digTunnel(state, b.id); });
     q(".kr-ba.spot").addEventListener("click", () => { removeSpot(state, b.id); });
+    q(".kr-ba.mig").addEventListener("click", () => { const to = pickMigrationTarget(state, b.id); if (to) transferPop(state, b.id, to); });
     el.addEventListener("click", () => { selectedBase = b.id; });
-    return [b.id, { el, name: el.querySelector<HTMLElement>(".kr-base-name")!, terr: el.querySelector<HTMLElement>(".kr-base-terr")!, stats: el.querySelector<HTMLElement>(".kr-base-stats")!, est: q(".kr-ba.est"), dev: q(".kr-ba.dev"), tun: q(".kr-ba.tun"), spot: q(".kr-ba.spot") }];
+    return [b.id, { el, name: el.querySelector<HTMLElement>(".kr-base-name")!, terr: el.querySelector<HTMLElement>(".kr-base-terr")!, stats: el.querySelector<HTMLElement>(".kr-base-stats")!, est: q(".kr-ba.est"), dev: q(".kr-ba.dev"), tun: q(".kr-ba.tun"), spot: q(".kr-ba.spot"), mig: q(".kr-ba.mig") }];
   }));
 
   const panels: Record<string, HTMLElement> = { build: $("#krBuild"), base: $("#krBase"), policy: $("#krPolicy"), camp: $("#krCamp") };
@@ -246,7 +250,8 @@ export function bootstrapKangri(root: HTMLElement): void {
     $("#krBingS").textContent = `+${fmt(bingPerSec(state))}/秒${prodNote}`;
     $("#krWuziS").textContent = `+${fmt(wuziPerSec(state))}/秒${prodNote}`;
     const e = era(state);
-    $("#krPhase").textContent = `${dateStr(state.monthIdx)} · ${e.name}（${e.years}）　│　根据地 ${estCount(state)}/${BASES.length}　│　产出乘数 ×${networkMult(state).toFixed(2)}　│　减损 ${Math.round(defense(state) * 100)}%`;
+    const T = TIERS[tier(state)];
+    $("#krPhase").textContent = `${dateStr(state.monthIdx)} · ${e.name}（${e.years}）　│　【${T.name}·${T.scope}】　│　根据地 ${estCount(state)}/${BASES.length}　│　乘数 ×${networkMult(state).toFixed(2)}　│　减损 ${Math.round(defense(state) * 100)}%`;
     $("#krEraNote").textContent = e.jp;
 
     for (let i = 0; i < BUILDINGS.length; i++) {
@@ -296,8 +301,8 @@ export function bootstrapKangri(root: HTMLElement): void {
         : `人口 ${b.pop0}万 · ${b.hist}`;
       const ec = estCost(state);
       row.est.style.display = st.est ? "none" : "";
-      row.est.textContent = era(state).canExpand ? `开辟 ${fmt(ec.bing)}兵${fmt(ec.wuzi)}资` : "开辟(至暗期不可)";
-      row.est.disabled = !era(state).canExpand || state.bing < ec.bing || state.wuzi < ec.wuzi;
+      row.est.textContent = tier(state) < 3 ? "开辟(需县域规模)" : era(state).canExpand ? `开辟 ${fmt(ec.bing)}兵${fmt(ec.wuzi)}资` : "开辟(至暗期不可)";
+      row.est.disabled = tier(state) < 3 || !era(state).canExpand || state.bing < ec.bing || state.wuzi < ec.wuzi;
       row.dev.style.display = st.est ? "" : "none";
       row.dev.textContent = st.dev >= 5 ? "发展MAX" : `发展 ${fmt(devCost(state, b.id))}资`;
       row.dev.disabled = st.dev >= 5 || state.wuzi < devCost(state, b.id);
@@ -308,8 +313,21 @@ export function bootstrapKangri(root: HTMLElement): void {
       row.spot.style.display = st.est && st.spots > 0 ? "" : "none";
       row.spot.textContent = `拔据点 ${fmt(sc.bing)}兵${fmt(sc.wuzi)}资`;
       row.spot.disabled = state.bing < sc.bing || state.wuzi < sc.wuzi;
+      const migTo = st.est ? pickMigrationTarget(state, b.id) : null;
+      row.mig.style.display = st.est && migTo && tier(state) >= 3 ? "" : "none";
+      if (migTo) {
+        row.mig.textContent = state.migration ? "迁移中…" : `迁25%群众→${BASES.find((x) => x.id === migTo)!.short} ${fmt(migrationCost(state, b.id))}资`;
+        row.mig.disabled = !!state.migration || state.wuzi < migrationCost(state, b.id) || state.bases[b.id].pop <= b.pop0 * 0.3;
+      }
     }
 
+    const Tid = tier(state);
+    if (Tid > shownTier) {
+      shownTier = Tid;
+      const td = TIERS[Tid];
+      floatAt(wrap.clientWidth / 2, 130, `━ 视野扩大：${td.name}（${td.scope}）━`, "big");
+      state.terminal.push({ text: `【规模升级】${td.name}——${td.note}`, kind: "era" });
+    }
     const g = $("#krGuide"); while (gstep < GUIDE.length && GUIDE[gstep].d(state)) gstep += 1;
     if (gstep >= GUIDE.length || state.ended) g.style.display = "none";
     else { g.style.display = ""; const txt = `${gstep + 1}/${GUIDE.length} · ${GUIDE[gstep].t}`; if (g.textContent !== txt) g.textContent = txt; }
@@ -352,7 +370,8 @@ export function bootstrapKangri(root: HTMLElement): void {
     tunnel: (id: string) => digTunnel(state, id), removeSpot: (id: string) => removeSpot(state, id),
     campaign: (id: string) => launchCampaign(state, id),
     pause: () => setP(true), resume: () => setP(false), setSpeed: (n: number) => { speed = n; },
-    month: () => state.monthIdx, date: () => dateStr(state.monthIdx), eraId: () => era(state).id,
+    month: () => state.monthIdx, date: () => dateStr(state.monthIdx), eraId: () => era(state).id, tierId: () => tier(state),
+    transfer: (from: string, to?: string) => transferPop(state, from, to || pickMigrationTarget(state, from) || ""),
     bases: () => estCount(state), ended: () => state.ended, report: () => endReport(state), sceneOk: () => scene.ok,
     sweep: () => { if (!state.sweep) { state.nextSweepM = state.monthIdx; state.monthAcc = MONTH_MS; } },
     skipMonths: (n: number) => { state.monthAcc += MONTH_MS * n; },

@@ -41,6 +41,32 @@ export function eraOf(mi: number): EraDef {
   return ERAS[ERAS.length - 1];
 }
 
+// ══ 尺度阶梯（视野从一个村逐级放大到整个华北）══════════════════════
+// tier 由 max(资源阈值, 时间下限) 决定——发展快提前放大视野，时间到也强制推进（历史不等人）。
+export interface TierDef { id: number; name: string; scope: string; atWuzi: number; atM: number; note: string; }
+export const TIERS: TierDef[] = [
+  { id: 0, name: "孤村星火", scope: "一个村", atWuzi: 0, atM: 0, note: "一个村的抵抗。对手：村口炮楼里的日军小分队。" },
+  { id: 1, name: "连村成片", scope: "数村", atWuzi: 600, atM: 2, note: "村村相连。对手：日军讨伐小队。" },
+  { id: 2, name: "县域争夺", scope: "一县", atWuzi: 6_000, atM: 6, note: "和县城的日军警备队掰手腕。铁路出现了。" },
+  { id: 3, name: "区域根据地", scope: "专区", atWuzi: 60_000, atM: 10, note: "视野放大到区域——可以开辟各大板块根据地了。对手：日军支队。" },
+  { id: 4, name: "华北大棋局", scope: "全华北", atWuzi: 6e5, atM: 18, note: "冀中、太行、山东……整个华北敌后。对手：联队、师团级兵团。" }
+];
+export function tier(s: KRState): number {
+  let byW = 0, byM = 0;
+  for (const t of TIERS) { if (s.totalWuzi >= t.atWuzi) byW = t.id; if (s.monthIdx >= t.atM) byM = t.id; }
+  return Math.max(byW, byM);
+}
+// 日军单位规模称谓（随兵力）
+export function unitName(strength: number): string {
+  if (strength < 20) return "小分队";
+  if (strength < 60) return "讨伐小队";
+  if (strength < 200) return "警备中队";
+  if (strength < 600) return "大队";
+  if (strength < 1500) return "支队";
+  if (strength < 4000) return "联队";
+  return "师团级兵团";
+}
+
 // ══ 根据地 ══════════════════════════════════════════════════════
 export type Terrain = "mountain" | "hills" | "plain";
 export interface BaseDef {
@@ -140,18 +166,28 @@ export const EVENTS: EventDef[] = [
 
 // ══ 扫荡（多路合围事件）══════════════════════════════════════════
 export type SweepStage = "incoming" | "battle" | "pillage";
+// 日军战略意图（历史原型）：
+// punitive 讨伐(单路直扑) / encircle 铁壁合围·分进合击(多路同压,预警长但兵力大)
+// raid 捕捉奔袭·挺进队偷袭(预警极短!史实如1942年偷袭八路总部) / comb 梳篦式清剿(拉网搜山,转移效果减半,拖得久)
+export type SweepKind = "punitive" | "encircle" | "raid" | "comb";
+export const SWEEP_KIND_NAME: Record<SweepKind, string> = {
+  punitive: "讨伐", encircle: "铁壁合围·分进合击", raid: "捕捉奔袭·挺进队偷袭", comb: "梳篦式清剿"
+};
 export interface Sweep {
   stage: SweepStage;
+  kind: SweepKind;
   strength: number; strength0: number;
   cols: number; // 合围路数(表现)
   sanguang: boolean;
-  etaSec: number;
+  etaSec: number; etaSec0: number;
   committed: number; committed0: number;
   evacStarted: boolean; evacProgress: number;
-  battleSec: number; pillageSec: number; pillageFrac: number;
+  battleSec: number; battleMax: number; pillageSec: number; pillageFrac: number;
   killed: number; lostBing: number;
   targetBase: string; // BASES id
 }
+// 群众跨根据地大转移（平时经营动作;至暗期把平原人口迁进山保平安,反攻期迁回恢复产出）
+export interface Migration { from: string; to: string; pop: number; t: number; dur: number; }
 
 export interface KRState {
   bing: number; wuzi: number; totalWuzi: number; clickN: number;
@@ -164,6 +200,7 @@ export interface KRState {
   kmtCut: boolean; // 皖南事变后外援断绝
   pendingWuyi: boolean; // 五一大扫荡挂起(撞上进行中的扫荡时)
   sweep: Sweep | null;
+  migration: Migration | null;
   nextSweepM: number;
   sweepsSurvived: number;
   ended: boolean;
@@ -194,7 +231,7 @@ export function createKRState(): KRState {
     bing: 0, wuzi: 0, totalWuzi: 0, clickN: 0,
     monthIdx: 0, monthAcc: 0,
     buildings: BUILDINGS.map(() => 0), policies: {}, bases, campaigns: {}, campMult: 1, kmtCut: false, pendingWuyi: false,
-    sweep: null, nextSweepM: 4, sweepsSurvived: 0, ended: false,
+    sweep: null, migration: null, nextSweepM: 4, sweepsSurvived: 0, ended: false,
     terminal: [{ text: "【1937.7】卢沟桥的枪声响了。华北在沦陷——但敌后的缝隙里，根据地要在这里扎根。", kind: "era" }],
     eraShown: 0, eventsFired: {},
     stats: { killed: 0, lost: 0, popLost: 0, spotsRemoved: 0, campaignsWon: 0, sweepsFought: 0, estPeak: 1, eraSnap: [] }
@@ -212,7 +249,7 @@ export function baseRevealed(s: KRState, id: string): boolean {
 export function baseMult(s: KRState, id: string): number {
   const st = s.bases[id]; if (!st.est) return 1;
   const d = BASES.find((b) => b.id === id)!;
-  const popFrac = st.pop / d.pop0;
+  const popFrac = Math.min(1.25, st.pop / d.pop0);
   const spotMalus = Math.max(0.3, 1 - TUNING.spotOutputMalus * st.spots);
   const terr = d.terrain === "plain" ? 1.25 : d.terrain === "hills" ? 1.05 : 0.95;
   return 1 + (0.10 + 0.05 * st.dev) * popFrac * spotMalus * terr;
@@ -304,7 +341,7 @@ export function buyPolicy(s: KRState, id: string): boolean {
 // 开辟根据地
 export function establishBase(s: KRState, id: string): boolean {
   const st = s.bases[id]; const d = BASES.find((b) => b.id === id);
-  if (!d || st.est || !baseRevealed(s, id) || !era(s).canExpand) return false;
+  if (!d || st.est || !baseRevealed(s, id) || !era(s).canExpand || tier(s) < 3) return false;
   const c = estCost(s);
   if (s.bing < c.bing || s.wuzi < c.wuzi) return false;
   s.bing -= c.bing; s.wuzi -= c.wuzi; st.est = true;
@@ -337,6 +374,45 @@ export function removeSpot(s: KRState, id: string): boolean {
   s.wuzi += loot; s.totalWuzi += loot;
   pushT(s, `★ 拔掉【${BASES.find((b) => b.id === id)!.short}】外围一座炮楼据点！缴获 ${fmt(loot)} 物资，封锁松动。`, "win");
   return true;
+}
+
+// ── 群众跨根据地大转移 ──
+// 智能目标：至暗期(era≤2)找最安全的山地(人口空间最大)；反攻期(era≥3)迁回人口比率最低的平原恢复产出。
+export function pickMigrationTarget(s: KRState, fromId: string): string | null {
+  const e = era(s);
+  const cands = BASES.filter((b) => b.id !== fromId && s.bases[b.id].est
+    && (e.id <= 2 ? b.terrain === "mountain" : b.terrain !== "mountain"));
+  if (cands.length === 0) return null;
+  cands.sort((a, b) => s.bases[a.id].pop / a.pop0 - s.bases[b.id].pop / b.pop0);
+  return cands[0].id;
+}
+export function migrationCost(s: KRState, fromId: string): number {
+  return Math.ceil(s.bases[fromId].pop * 0.25 * 40 * (1 + era(s).id * 0.4));
+}
+export function transferPop(s: KRState, fromId: string, toId: string): boolean {
+  const from = s.bases[fromId], to = s.bases[toId];
+  if (!from?.est || !to?.est || fromId === toId || s.migration) return false;
+  const fd = BASES.find((b) => b.id === fromId)!;
+  if (from.pop <= fd.pop0 * 0.3) return false; // 底线人口留守
+  const c = migrationCost(s, fromId);
+  if (s.wuzi < c) return false;
+  s.wuzi -= c;
+  const amount = from.pop * 0.25;
+  from.pop -= amount;
+  const loss = era(s).id === 2 ? 0.12 : 0.05; // 至暗期路上损耗更大
+  s.migration = { from: fromId, to: toId, pop: amount * (1 - loss), t: 0, dur: 8 };
+  pushT(s, `▶ 组织【${fd.short}】${amount.toFixed(1)}万群众向【${BASES.find((b) => b.id === toId)!.short}】大转移——拖家带口，路上小心。`, "info");
+  return true;
+}
+function tickMigration(s: KRState, dt: number): void {
+  const m = s.migration; if (!m) return;
+  m.t += dt;
+  if (m.t >= m.dur) {
+    const to = s.bases[m.to];
+    to.pop = Math.min(BASES.find((b) => b.id === m.to)!.pop0 * 1.5, to.pop + m.pop);
+    pushT(s, `★ ${m.pop.toFixed(1)}万群众安全抵达【${BASES.find((b) => b.id === m.to)!.short}】，安顿下来了。`, "win");
+    s.migration = null;
+  }
 }
 // 发动大战役
 export function launchCampaign(s: KRState, id: string): boolean {
@@ -375,21 +451,37 @@ function pickSweepTarget(s: KRState): string {
   }
   return est[Math.floor(Math.random() * est.length)].id;
 }
+// 按时期选战略意图（历史原型分布）
+function pickSweepKind(e: EraDef): SweepKind {
+  const r = Math.random();
+  if (e.id === 0) return r < 0.85 ? "punitive" : "raid";
+  if (e.id === 1) return r < 0.3 ? "punitive" : r < 0.75 ? "encircle" : "raid";
+  if (e.id === 2) return r < 0.5 ? "encircle" : r < 0.8 ? "comb" : "raid";
+  return r < 0.5 ? "punitive" : r < 0.8 ? "raid" : "encircle";
+}
 function triggerSweep(s: KRState, forceTarget?: string, strengthMult = 1, forceCols?: number): void {
   const e = era(s);
-  const strength = sweepStrength(s, strengthMult);
+  const kind: SweepKind = forceCols ? "encircle" : pickSweepKind(e);
+  // 意图参数：合围兵力大预警长；奔袭预警极短兵力小；梳篦拖得久、转移效果差
+  const kMult = kind === "encircle" ? 1.2 : kind === "raid" ? 0.7 : kind === "comb" ? 1.1 : 1;
+  const kEta = kind === "encircle" ? 1.3 : kind === "raid" ? 0.42 : kind === "comb" ? 1.2 : 1;
+  const strength = sweepStrength(s, strengthMult * kMult);
   const target = forceTarget ?? pickSweepTarget(s);
-  const cols = forceCols ?? Math.max(1, Math.min(5, e.cols + (Math.random() < 0.3 ? 1 : 0)));
+  const cols = forceCols ?? (kind === "raid" ? 1 : kind === "encircle" ? Math.max(2, Math.min(5, e.cols + 1)) : Math.max(1, Math.min(5, e.cols)));
+  const eta = TUNING.sweepEtaSec * kEta;
   s.sweep = {
-    stage: "incoming", strength, strength0: strength, cols, sanguang: e.sanguang,
-    etaSec: TUNING.sweepEtaSec, committed: 0, committed0: 0, evacStarted: false, evacProgress: 0,
-    battleSec: 0, pillageSec: 0, pillageFrac: 0, killed: 0, lostBing: 0, targetBase: target
+    stage: "incoming", kind, strength, strength0: strength, cols, sanguang: e.sanguang,
+    etaSec: eta, etaSec0: eta, committed: 0, committed0: 0, evacStarted: false, evacProgress: 0,
+    battleSec: 0, battleMax: TUNING.battleMaxSec * (kind === "comb" ? 1.4 : 1), pillageSec: 0, pillageFrac: 0, killed: 0, lostBing: 0, targetBase: target
   };
   s.stats.sweepsFought += 1;
   const name = BASES.find((b) => b.id === target)!.name;
-  if (e.sanguang) pushT(s, `⚠⚠ 日军${cols}路铁壁合围【${name}】！约 ${strength} 人，带着三光的命令——快转移群众、组织抗击！`, "loss");
-  else if (cols > 1) pushT(s, `⚠ 日军${cols}路合击【${name}】，约 ${strength} 人——组织应对！`, "loss");
-  else pushT(s, `⚠ 日军讨伐队约 ${strength} 人开向【${name}】——组织群众转移，或集结兵员抗击！`, "loss");
+  const unit = unitName(strength);
+  if (kind === "raid") pushT(s, `⚠⚠ 日军挺进队约 ${strength} 人化装奔袭【${name}】——预警极短，快应对！（捕捉奔袭）`, "loss");
+  else if (kind === "comb") pushT(s, `⚠ 日军${unit}约 ${strength} 人对【${name}】拉网梳篦清剿——搜山搜地道，转移也难躲！`, "loss");
+  else if (kind === "encircle" && e.sanguang) pushT(s, `⚠⚠ 日军${cols}路铁壁合围【${name}】！${unit}约 ${strength} 人，带着三光的命令——快转移群众、组织抗击！`, "loss");
+  else if (kind === "encircle") pushT(s, `⚠ 日军${cols}路分进合击【${name}】，${unit}约 ${strength} 人——组织应对！`, "loss");
+  else pushT(s, `⚠ 日军${unit}约 ${strength} 人讨伐【${name}】——组织群众转移，或集结兵员抗击！`, "loss");
 }
 export function startEvacuation(s: KRState): boolean {
   const sw = s.sweep;
@@ -411,7 +503,8 @@ function pillageFracOf(s: KRState, sw: Sweep): number {
   const e = era(s);
   const strengthFrac = sw.strength / Math.max(1, sw.strength0);
   const base = 0.24 * (e.id === 2 ? 1.5 : 1);
-  return Math.max(0, base * strengthFrac * (1 - defense(s, sw.targetBase)) * (1 - 0.8 * sw.evacProgress));
+  const evacEff = sw.kind === "comb" ? 0.45 : 0.8; // 梳篦清剿搜山搜地道——转移效果减半
+  return Math.max(0, base * strengthFrac * (1 - defense(s, sw.targetBase)) * (1 - evacEff * sw.evacProgress));
 }
 function endBattle(s: KRState, sw: Sweep): void {
   const back = Math.floor(sw.committed);
@@ -471,8 +564,8 @@ function tickBattle(s: KRState, sw: Sweep, dt: number): void {
   const ourLoss = Math.min(sw.committed, sw.strength * jpRate * dt, sw.committed0 * 0.18 * dt);
   sw.strength -= jpLoss; sw.killed += jpLoss;
   sw.committed -= ourLoss; sw.lostBing += ourLoss;
-  if (sw.strength <= 0.5 || sw.committed <= 0.5 || sw.battleSec >= TUNING.battleMaxSec) {
-    if (sw.battleSec >= TUNING.battleMaxSec && sw.strength > 0.5) sw.strength *= 0.55;
+  if (sw.strength <= 0.5 || sw.committed <= 0.5 || sw.battleSec >= sw.battleMax) {
+    if (sw.battleSec >= sw.battleMax && sw.strength > 0.5) sw.strength *= 0.55;
     endBattle(s, sw);
   }
 }
@@ -544,6 +637,7 @@ export function tick(s: KRState, dtSec: number): void {
   s.wuzi += wuziPerSec(s) * prodMult * dtSec;
   s.totalWuzi += wuziPerSec(s) * prodMult * dtSec;
   if (s.sweep) tickSweep(s, dtSec);
+  tickMigration(s, dtSec);
   // 月推进（扫荡进行中时时间也走——历史不等人）
   s.monthAcc += dtSec * 1000;
   while (s.monthAcc >= MONTH_MS && !s.ended) { s.monthAcc -= MONTH_MS; advanceMonth(s); }
