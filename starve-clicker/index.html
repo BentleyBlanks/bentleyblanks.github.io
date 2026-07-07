@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0d0b0e" />
+<title>熬冬 · 荒野点击求生</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===== 顶栏:时间 / 三槽 / 篝火 ===== -->
+<header id="topbar">
+  <div class="title-block">
+    <h1>熬 冬</h1>
+    <span class="sub">饥荒 × Cookie Clicker</span>
+  </div>
+  <div id="timeChip" class="chip">
+    <span id="seasonIcon">🍂</span>
+    <span id="dayLabel" class="num">第 1 天</span>
+    <span id="phaseLabel">白昼</span>
+  </div>
+  <div id="meters">
+    <div class="meter" id="meterHunger" title="饥饿:归零后开始扣血。有食物时会自动进食。">
+      <span class="m-icon">🍖</span>
+      <div class="m-bar"><div class="m-fill hunger"></div></div>
+      <span class="m-val num">100</span>
+    </div>
+    <div class="meter" id="meterSanity" title="理智:黑暗与寒雨侵蚀心智。过低时暗影生物会现身。">
+      <span class="m-icon">🧠</span>
+      <div class="m-bar"><div class="m-fill sanity"></div></div>
+      <span class="m-val num">100</span>
+    </div>
+    <div class="meter" id="meterHealth" title="生命:归零即死。死亡不是终点——是转生。">
+      <span class="m-icon">❤</span>
+      <div class="m-bar"><div class="m-fill health"></div></div>
+      <span class="m-val num">100</span>
+    </div>
+    <div class="meter" id="meterFire" title="篝火燃料:夜晚无火,查理会来。冬天无火,你会冻僵。">
+      <span class="m-icon">🔥</span>
+      <div class="m-bar"><div class="m-fill fire"></div></div>
+      <span class="m-val num">0</span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ===== 左栏:资源与营地 ===== -->
+  <aside id="colLeft">
+    <section class="panel" id="resPanel">
+      <div class="kicker">物资</div>
+      <ul id="resList">
+        <li id="resFood"><span class="r-icon">🥩</span><span class="r-name">食物</span><b class="r-val num">0</b><span class="r-rate num"></span></li>
+        <li id="resWood"><span class="r-icon">🪵</span><span class="r-name">木材</span><b class="r-val num">0</b><span class="r-rate num"></span></li>
+        <li id="resStone" class="locked"><span class="r-icon">🪨</span><span class="r-name">石料</span><b class="r-val num">0</b><span class="r-rate num"></span></li>
+        <li id="resSci" class="locked"><span class="r-icon">⚙</span><span class="r-name">科学</span><b class="r-val num">0</b><span class="r-rate num"></span></li>
+      </ul>
+      <div id="spoilNote" class="footnote"></div>
+    </section>
+
+    <section class="panel" id="firePanel">
+      <div class="kicker">篝火</div>
+      <div class="fire-row">
+        <button id="btnStoke">添柴 <small>5 木 → 25 燃料</small></button>
+        <label class="toggle"><input type="checkbox" id="autoStoke" /> 自动添柴</label>
+      </div>
+      <div class="footnote">夜里没有火,黑暗中的「她」会出手。冬天没有火,寒冷会啃噬你。</div>
+    </section>
+
+    <section class="panel" id="defPanel">
+      <div class="kicker">防御</div>
+      <div class="def-row"><span>战力</span><b id="defVal" class="num">0</b></div>
+      <div class="footnote" id="houndNote">猎犬的嚎叫还很遥远……</div>
+    </section>
+  </aside>
+
+  <!-- ===== 中栏:场景 + 点击 + 日志 ===== -->
+  <section id="colMid">
+    <div id="scene">
+      <svg id="sceneSvg" viewBox="0 0 460 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+      <div id="sceneTint"></div>
+      <button id="clickArea" title="采集荒野的馈赠">
+        <span id="clickHint">采 集</span>
+      </button>
+      <div id="floaters"></div>
+      <div id="seasonBanner"></div>
+    </div>
+    <section class="panel" id="logPanel">
+      <div class="kicker">荒野纪事</div>
+      <ul id="log"></ul>
+    </section>
+  </section>
+
+  <!-- ===== 右栏:建筑 / 科技 / 余烬 ===== -->
+  <aside id="colRight">
+    <nav id="tabs">
+      <button class="tab active" data-tab="build">营地建设</button>
+      <button class="tab" data-tab="tech">科学</button>
+      <button class="tab" data-tab="ember">余烬 <b id="emberCount" class="num">0</b></button>
+    </nav>
+    <section class="panel tabpane" id="paneBuild"><ul id="buildList"></ul></section>
+    <section class="panel tabpane hidden" id="paneTech"><ul id="techList"></ul></section>
+    <section class="panel tabpane hidden" id="paneEmber">
+      <div class="footnote" id="emberIntro">死亡不是终点。每一次倒下,余烬都会留存,让下一个你走得更远。</div>
+      <ul id="emberList"></ul>
+      <button id="btnDark" class="danger hidden">走入黑暗(立刻结束本轮,结算余烬)</button>
+    </section>
+  </aside>
+
+</main>
+
+<!-- ===== 死亡 / 转生结算 ===== -->
+<div id="deathOverlay" class="overlay hidden">
+  <div class="death-card">
+    <h2 id="deathTitle">你死了</h2>
+    <p id="deathCause"></p>
+    <ul id="deathStats"></ul>
+    <p class="ember-gain">收获余烬 <b id="deathEmbers" class="num">0</b> ✦</p>
+    <button id="btnRebirth">向火而生(转生)</button>
+  </div>
+</div>
+
+<!-- ===== 离线收益 ===== -->
+<div id="offlineOverlay" class="overlay hidden">
+  <div class="death-card">
+    <h2>你打了个盹……</h2>
+    <p id="offlineDetail"></p>
+    <button id="btnOfflineOk">继续求生</button>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>

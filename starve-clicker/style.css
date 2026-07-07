@@ -1,0 +1,241 @@
+/* ===== 熬冬 · 饥荒式暗黑手绘风 ===== */
+:root{
+  --bg:#0d0b0e;
+  --panel:#171217;
+  --panel2:#211a1f;
+  --line:#3a2f2e;
+  --line-soft:#2a2226;
+  --ink:#e8ddc4;          /* 骨白 */
+  --dim:#9c8f7d;
+  --faint:#5f564c;
+  --hunger:#d9a441;       /* 琥珀 */
+  --sanity:#9b6fc4;       /* 幽紫 */
+  --health:#c65b4e;       /* 血红 */
+  --fire:#e08830;         /* 火橙 */
+  --food:#c9a13c;
+  --wood:#8a6c48;
+  --stone:#9aa0a6;
+  --sci:#6fa8c9;
+  --ember:#e5484d;
+  --good:#7fbf7f;
+  --bad:#e06c5b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -10%, #1a1420 0%, transparent 55%),
+    radial-gradient(ellipse 100% 60% at 50% 115%, #14100a 0%, transparent 60%),
+    var(--bg);
+  color:var(--ink);
+  font-family:Georgia,"Noto Serif SC","Songti SC","SimSun",serif;
+  font-size:14px;line-height:1.55;overflow-x:hidden;
+}
+button{
+  font-family:inherit;cursor:pointer;color:var(--ink);
+  background:linear-gradient(#2a2126,#1d171b);
+  border:1px solid var(--line);border-radius:8px;
+}
+button:hover{border-color:#5a4a44}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.kicker{
+  font-size:11px;letter-spacing:.3em;color:var(--faint);
+  margin-bottom:8px;border-bottom:1px dashed var(--line-soft);padding-bottom:5px;
+}
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:10px 12px 10px 13px;   /* 微歪,手作感 */
+  padding:12px;
+  box-shadow:inset 0 0 24px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.5);
+}
+.panel + .panel{margin-top:10px}
+.footnote{font-size:12px;color:var(--faint);margin-top:8px;font-style:italic}
+.hidden{display:none !important}
+
+/* ===== 顶栏 ===== */
+#topbar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:10px 18px;border-bottom:1px solid var(--line);
+  background:linear-gradient(#151015,#100c10);
+  position:sticky;top:0;z-index:30;
+}
+.title-block h1{
+  font-size:22px;letter-spacing:.35em;font-weight:700;
+  text-shadow:0 0 18px rgba(224,136,48,.35);
+}
+.title-block .sub{font-size:11px;color:var(--faint);letter-spacing:.12em}
+.chip{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:4px 12px;border:1px solid var(--line);border-radius:999px;
+  background:var(--panel2);font-size:13px;
+}
+#phaseLabel{color:var(--dim)}
+#phaseLabel.night{color:var(--sanity)}
+#meters{display:flex;gap:12px;flex-wrap:wrap;margin-left:auto}
+.meter{display:flex;align-items:center;gap:6px}
+.m-icon{font-size:14px;filter:grayscale(.2)}
+.m-bar{
+  width:86px;height:10px;border:1px solid var(--line);border-radius:6px;
+  background:#0a080a;overflow:hidden;
+}
+.m-fill{height:100%;width:100%;transition:width .3s;border-radius:5px}
+.m-fill.hunger{background:linear-gradient(90deg,#8a6420,var(--hunger))}
+.m-fill.sanity{background:linear-gradient(90deg,#5b3f78,var(--sanity))}
+.m-fill.health{background:linear-gradient(90deg,#7c3a32,var(--health))}
+.m-fill.fire{background:linear-gradient(90deg,#8a4a14,var(--fire))}
+.m-val{font-size:12px;color:var(--dim);min-width:26px;text-align:right}
+.meter.low .m-fill{animation:pulse 1s infinite alternate}
+@keyframes pulse{from{filter:brightness(.7)}to{filter:brightness(1.4)}}
+
+/* ===== 三栏布局 ===== */
+#main{
+  display:grid;grid-template-columns:270px minmax(400px,1fr) 330px;
+  gap:12px;padding:12px 16px;max-width:1320px;margin:0 auto;align-items:start;
+}
+@media (max-width:1100px){
+  #main{grid-template-columns:1fr;max-width:600px}
+  #colMid{order:-1}
+}
+
+/* ===== 左栏:资源 ===== */
+#resList{list-style:none}
+#resList li{
+  display:flex;align-items:center;gap:8px;padding:5px 2px;
+  border-bottom:1px dotted var(--line-soft);
+}
+#resList li:last-child{border-bottom:none}
+#resList li.locked{display:none}
+.r-icon{width:20px;text-align:center}
+.r-name{color:var(--dim);flex:0 0 44px}
+.r-val{margin-left:auto;font-size:15px}
+#resFood .r-val{color:var(--food)}
+#resWood .r-val{color:var(--wood)}
+#resStone .r-val{color:var(--stone)}
+#resSci .r-val{color:var(--sci)}
+.r-rate{font-size:11px;color:var(--faint);min-width:58px;text-align:right}
+
+.fire-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#btnStoke{padding:6px 12px;font-size:13px}
+#btnStoke small{color:var(--dim);font-size:11px}
+.toggle{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:5px;cursor:pointer}
+.def-row{display:flex;justify-content:space-between;font-size:14px}
+#defVal{color:var(--ink)}
+
+/* ===== 中栏:场景 ===== */
+#scene{
+  position:relative;border:1px solid var(--line);border-radius:12px;
+  overflow:hidden;background:#0a0810;user-select:none;
+}
+#sceneSvg{display:block;width:100%;height:auto}
+#sceneTint{
+  position:absolute;inset:0;pointer-events:none;
+  transition:background 2s;mix-blend-mode:multiply;
+}
+#clickArea{
+  position:absolute;inset:0;background:transparent;border:none;border-radius:0;
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px;
+}
+#clickArea:active{transform:none}
+#clickHint{
+  font-size:13px;letter-spacing:.5em;color:var(--ink);opacity:.55;
+  border:1px dashed rgba(232,221,196,.35);padding:5px 16px 5px 21px;border-radius:999px;
+  background:rgba(13,11,14,.55);transition:opacity .2s;
+}
+#clickArea:hover #clickHint{opacity:1}
+#floaters{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.floater{
+  position:absolute;font-size:13px;font-weight:700;color:var(--ink);
+  text-shadow:0 1px 3px #000;animation:floatUp 1.1s ease-out forwards;white-space:nowrap;
+}
+@keyframes floatUp{
+  from{opacity:1;transform:translateY(0)}
+  to{opacity:0;transform:translateY(-46px)}
+}
+#seasonBanner{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  font-size:15px;letter-spacing:.4em;color:var(--ink);opacity:0;
+  text-shadow:0 0 12px #000;pointer-events:none;transition:opacity 1s;
+}
+#seasonBanner.show{opacity:.9}
+
+/* 日志 */
+#logPanel{margin-top:10px}
+#log{list-style:none;max-height:210px;overflow-y:auto;font-size:12.5px}
+#log li{
+  padding:3px 2px;border-bottom:1px dotted var(--line-soft);color:var(--dim);
+}
+#log li b{color:var(--ink);font-weight:400}
+#log li.good b{color:var(--good)}
+#log li.bad b{color:var(--bad)}
+#log li.omen b{color:var(--sanity)}
+#log li .d{color:var(--faint);font-size:11px;margin-right:6px}
+
+/* ===== 右栏:页签 ===== */
+#tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab{
+  flex:1;padding:7px 4px;font-size:13px;letter-spacing:.1em;
+  border-radius:8px 8px 2px 2px;color:var(--dim);
+}
+.tab.active{color:var(--ink);border-color:#6a5648;background:linear-gradient(#342a2c,#241d21)}
+.tab b{font-size:12px;color:var(--ember)}
+
+#buildList,#techList,#emberList{list-style:none}
+.card{
+  border:1px solid var(--line-soft);border-radius:9px 10px 9px 11px;
+  padding:8px 10px;margin-bottom:8px;background:var(--panel2);
+  cursor:pointer;transition:border-color .15s;
+}
+.card:hover{border-color:#5a4a44}
+.card.cant{opacity:.55;cursor:not-allowed}
+.card.owned-max,.card.bought{opacity:.7;cursor:default}
+.card .c-head{display:flex;align-items:baseline;gap:8px}
+.card .c-icon{font-size:16px}
+.card .c-name{font-weight:700;font-size:13.5px}
+.card .c-count{margin-left:auto;color:var(--fire);font-size:13px}
+.card .c-desc{font-size:11.5px;color:var(--dim);margin-top:3px}
+.card .c-cost{font-size:11.5px;margin-top:4px;color:var(--faint)}
+.card .c-cost .ok{color:var(--good)}
+.card .c-cost .no{color:var(--bad)}
+.card.seasonal-off .c-name::after{content:" ·休眠";font-size:11px;color:var(--sanity)}
+
+#emberList .card{cursor:pointer}
+#emberList .lv{color:var(--ember)}
+#btnDark{
+  width:100%;margin-top:10px;padding:8px;font-size:13px;
+}
+button.danger{border-color:#6a3030;color:var(--bad)}
+button.danger:hover{border-color:var(--ember)}
+
+/* ===== 覆盖层:死亡 / 离线 ===== */
+.overlay{
+  position:fixed;inset:0;z-index:50;background:rgba(5,3,6,.88);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.death-card{
+  max-width:440px;width:100%;background:var(--panel);
+  border:1px solid #4a3a38;border-radius:14px 16px 14px 17px;
+  padding:26px 28px;text-align:center;
+  box-shadow:0 0 60px rgba(229,72,77,.15), inset 0 0 30px rgba(0,0,0,.5);
+}
+.death-card h2{
+  font-size:26px;letter-spacing:.3em;margin-bottom:10px;color:var(--ember);
+  text-shadow:0 0 20px rgba(229,72,77,.4);
+}
+.death-card p{color:var(--dim);font-size:13.5px;margin-bottom:12px}
+#deathStats{list-style:none;text-align:left;margin:0 auto 14px;max-width:300px;font-size:13px}
+#deathStats li{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted var(--line-soft);color:var(--dim)}
+#deathStats li b{color:var(--ink)}
+.ember-gain{font-size:15px;color:var(--ink)}
+.ember-gain b{color:var(--ember);font-size:20px}
+#btnRebirth,#btnOfflineOk{
+  margin-top:8px;padding:10px 26px;font-size:15px;letter-spacing:.2em;
+  border-color:#6a5648;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-thumb{background:#332a2e;border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
