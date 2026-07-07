@@ -251,11 +251,17 @@ export function bootstrapKangri(root: HTMLElement): void {
 
   // ── 历史文献道具：送达→发光按钮→研读卡→永久增益 ──
   const doctBtn = $<HTMLButtonElement>("#krDoctBtn"), doctCard = $("#krDoctCard");
-  doctBtn.addEventListener("click", () => {
+  doctBtn.style.display = "none"; // 弃用按钮中转——文献送达=全屏特殊道具直弹
+  let doctShowing = false, doctCd = 0;
+  function renderDoct(): void {
+    if (doctCd > 0) { doctCd -= 1 / 60; return; }
+    if (doctShowing || state.ended) return;
     const id = state.pendingDoctrines[0]; if (!id) return;
     const d = DOCTRINES.find((x) => x.id === id)!;
     acquireDoctrine(state);
-    doctCard.innerHTML = '<div class="kr-doct-inner">'
+    doctShowing = true;
+    doctCard.innerHTML = '<div class="kr-doct-inner kr-doct-pop">'
+      + '<div class="kr-doct-got">— 获得关键文献 —</div>'
       + '<div class="kr-doct-book">📜</div>'
       + '<div class="kr-doct-title">' + d.name + '</div>'
       + '<div class="kr-doct-hist">' + d.hist + '</div>'
@@ -264,14 +270,7 @@ export function bootstrapKangri(root: HTMLElement): void {
       + '<div class="kr-doct-fx">获得：' + d.fxText + '</div>'
       + '<button class="kr-doct-close" id="krDoctClose">收入行囊</button></div>';
     doctCard.style.display = "";
-    doctCard.querySelector<HTMLButtonElement>("#krDoctClose")!.addEventListener("click", () => { doctCard.style.display = "none"; });
-  });
-  function renderDoct(): void {
-    const id = state.pendingDoctrines[0];
-    if (!id) { doctBtn.style.display = "none"; return; }
-    const d = DOCTRINES.find((x) => x.id === id)!;
-    doctBtn.style.display = "";
-    doctBtn.textContent = "📜 文献送达：" + d.name + " —— 点击研读";
+    doctCard.querySelector<HTMLButtonElement>("#krDoctClose")!.addEventListener("click", () => { doctCard.style.display = "none"; doctShowing = false; doctCd = 1.5; });
   }
 
   // ── 新手引导（轻量：三步高亮气泡，完成即走，可跳过）──
@@ -332,6 +331,26 @@ export function bootstrapKangri(root: HTMLElement): void {
     endShown = true;
     const r = endReport(state);
     const el = $("#krEnding");
+    if (state.defeated) {
+      el.innerHTML = `
+      <div class="kr-end-card defeat">
+        <div class="kr-end-date">${dateStr(state.monthIdx)} · 根据地覆灭</div>
+        <div class="kr-end-grade">星火熄灭</div>
+        <div class="kr-end-desc">${r.gradeDesc}</div>
+        <table class="kr-end-table">
+          <tr><th>坚持</th><th>你的敌后</th><th>历史对照</th></tr>
+          ${r.rows.map((row) => `<tr><td>${row.era}</td><td>${row.yours}</td><td class="hist">${row.hist}</td></tr>`).join("")}
+        </table>
+        <div class="kr-end-foot">敌后战场的火种，历史上从未被彻底扑灭。<br/>留得青山在——从头再来。</div>
+        <button class="kr-end-btn" id="krEndClose">从头再来</button>
+      </div>`;
+      el.style.display = "";
+      el.querySelector<HTMLButtonElement>("#krEndClose")!.addEventListener("click", () => {
+        state = createKRState(); gstep = 0; endShown = false; selectedBase = null;
+        el.style.display = "none";
+      });
+      return;
+    }
     el.innerHTML = `
       <div class="kr-end-card">
         <div class="kr-end-date">1945年8月15日 · 日本无条件投降</div>

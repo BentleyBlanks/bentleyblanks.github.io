@@ -296,7 +296,9 @@ export interface KRState {
   achPoll: number;
   nextSweepM: number;
   sweepsSurvived: number;
+  routStreak: number; // 连续被烧穿次数(失败判定)
   ended: boolean;
+  defeated: boolean; // 失败结局: 根据地覆灭
   terminal: { text: string; kind: "info" | "win" | "loss" | "era" }[];
   eraShown: number;
   eventsFired: Record<number, boolean>;
@@ -325,7 +327,7 @@ export function createKRState(): KRState {
     monthIdx: 0, monthAcc: 0,
     buildings: BUILDINGS.map(() => 0), policies: {}, bases, campaigns: {}, campMult: 1, kmtCut: false, pendingWuyi: false,
     sweep: null, migration: null, doctrines: {}, pendingDoctrines: [], achievements: {}, achQueue: [], achPoll: 0,
-    nextSweepM: 4, sweepsSurvived: 0, ended: false,
+    nextSweepM: 4, sweepsSurvived: 0, routStreak: 0, ended: false, defeated: false,
     terminal: [{ text: "【1937.7】卢沟桥的枪声响了。华北在沦陷——但敌后的缝隙里，根据地要在这里扎根。", kind: "era" }],
     eraShown: 0, eventsFired: {},
     stats: { killed: 0, lost: 0, popLost: 0, spotsRemoved: 0, campaignsWon: 0, sweepsFought: 0, estPeak: 1, eraSnap: [] }
@@ -630,6 +632,9 @@ function finishSweep(s: KRState, sw: Sweep, cleanWin: boolean): void {
     const lossPct = Math.round(sw.pillageFrac * 100);
     pushT(s, `反扫荡结束：击毙 ${killed}，我方伤亡 ${Math.round(sw.lostBing)}，被烧抢损失 ${lossPct}%${sw.evacProgress > 0.5 ? "（大转移保住了大半家底）" : ""}，缴获 ${fmt(loot)}。`, sw.pillageFrac > 0.12 ? "loss" : "info");
   }
+  if (cleanWin) s.routStreak = 0;
+  else if (sw.pillageFrac > 0.15) s.routStreak += 1;
+  else s.routStreak = Math.max(0, s.routStreak - 1);
   s.sweepsSurvived += 1;
   if (s.monthIdx >= 57 && s.monthIdx <= 59 && sw.strength0 > 100) unlockAch(s, "survive_wuyi");
   s.sweep = null;
@@ -652,11 +657,16 @@ function tickPillage(s: KRState, sw: Sweep, dt: number): void {
     const st = s.bases[sw.targetBase];
     if (sw.sanguang && st) {
       const lost = st.pop * sw.pillageFrac * 0.8;
-      st.pop = Math.max(BASES.find((b) => b.id === sw.targetBase)!.pop0 * 0.25, st.pop - lost);
+      st.pop = Math.max(BASES.find((b) => b.id === sw.targetBase)!.pop0 * 0.06, st.pop - lost);
       s.stats.popLost += lost;
       if (lost > 0.5) pushT(s, `三光暴行：【${BASES.find((b) => b.id === sw.targetBase)!.short}】人口锐减 ${lost.toFixed(1)} 万——烧光、杀光、抢光。这笔血债，记下了。`, "loss");
     }
     if (destroyed > 0) pushT(s, `烧毁设施 ${destroyed} 处。留得青山在——重建！`, "loss");
+    // 围剿得手 → 日军趁势重修炮楼(拔过的据点可能死灰复燃)
+    if (st && st.spots < 5 && Math.random() < 0.45) {
+      st.spots += 1;
+      pushT(s, `日军趁扫荡得手，在【${BASES.find((b) => b.id === sw.targetBase)!.short}】重新修起一座炮楼——拔过的钉子又钉回来了。`, "loss");
+    }
     finishSweep(s, sw, false);
   }
 }
@@ -755,6 +765,15 @@ export function tick(s: KRState, dtSec: number): void {
   if (s.achPoll >= 0.5) {
     s.achPoll = 0;
     for (const a of ACHIEVEMENTS) if (a.check && !s.achievements[a.id] && a.check(s)) unlockAch(s, a.id);
+    // 失败结局: 人口凋零 或 连番被烧穿
+    if (!s.ended) {
+      const popNow = BASES.reduce((a2, b) => a2 + s.bases[b.id].pop, 0);
+      const pop0 = BASES.reduce((a2, b) => a2 + b.pop0, 0);
+      if (popNow < pop0 * 0.25 || s.routStreak >= 4) {
+        s.defeated = true; s.ended = true;
+        pushT(s, `【${dateStr(s.monthIdx)}】${s.routStreak >= 4 ? "连番扫荡烧穿了根据地——设施成灰、群众离散" : "三光之下，人口凋零"}。星火，熄灭在这个寒冬。`, "loss");
+      }
+    }
   }
   // 月推进（扫荡进行中时时间也走——历史不等人）
   s.monthAcc += dtSec * 1000;
@@ -767,6 +786,15 @@ export interface EndReport {
   rows: { era: string; yours: string; hist: string }[];
 }
 export function endReport(s: KRState): EndReport {
+  if (s.defeated) {
+    return {
+      grade: "星火熄灭", score: 0,
+      gradeDesc: "根据地在围剿中覆灭了。史实中，冀中根据地在 1942 年五一大扫荡后也曾一度全部变为游击区——但敌后军民终究重新聚拢、坚持到了胜利。留得青山在，从头再来。",
+      rows: [
+        { era: `1937.7 - ${dateStr(s.monthIdx)}`, yours: `坚持 ${Math.floor(s.monthIdx / 12)} 年 ${s.monthIdx % 12} 个月 · 击毙 ${fmt(s.stats.killed)} · 反扫荡 ${s.sweepsSurvived} 次`, hist: "史实：敌后根据地屡遭毁灭性扫荡，但从未被彻底扑灭——坚持，就是胜利" }
+      ]
+    };
+  }
   const popNow = BASES.reduce((a, b) => a + s.bases[b.id].pop, 0);
   const pop0 = BASES.reduce((a, b) => a + b.pop0, 0);
   const devSum = BASES.reduce((a, b) => a + s.bases[b.id].dev, 0);

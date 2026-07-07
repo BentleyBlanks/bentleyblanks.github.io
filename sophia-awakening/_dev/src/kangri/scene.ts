@@ -220,6 +220,20 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     [[0.34, 0.56], [0.44, 0.62], [0.54, 0.70], [0.66, 0.78], [0.78, 0.84]],
     [[0.44, 0.08], [0.54, 0.14], [0.63, 0.20], [0.72, 0.27]]
   ];
+  function segDist(x: number, y: number, ax: number, ay: number, bx: number, by: number): number {
+    const dx = bx - ax, dy = by - ay;
+    const t = clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+    return Math.hypot(x - (ax + dx * t), y - (ay + dy * t));
+  }
+  function railDist(x: number, y: number): number {
+    let best = 9;
+    for (const [a, b] of RAILS) {
+      const ca = cityOf(a), cb = cityOf(b);
+      const d = segDist(x, y, ca.x, ca.y, cb.x, cb.y);
+      if (d < best) best = d;
+    }
+    return best;
+  }
   function riverDist(x: number, y: number): number {
     let best = 9;
     for (const rv of RIVERS) {
@@ -243,7 +257,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
   interface Sym { x: number; y: number; kind: 0 | 1 | 2; sd: number; } // 0峰 1树 2田
   const SYMS: Sym[] = (() => {
     const out: Sym[] = [];
-    for (let k = 0; k < 2400; k++) {
+    for (let k = 0; k < 4200; k++) {
       const x = hash2(k, 1.7), y = hash2(k, 9.2), sd = hash2(k, 4.4);
       const h = terrainH(x, y), m = moistAt(x, y);
       if (riverDist(x, y) < 0.012) continue;
@@ -254,6 +268,51 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     }
     return out;
   })();
+  // ── PCG 敌占网(囚笼: 城-县-据点沿交通线) + 村庄散布 ──
+  const PCG_COUNTIES: { x: number; y: number }[] = (() => {
+    const out: { x: number; y: number }[] = [];
+    for (let k = 0; k < 1600 && out.length < 30; k++) {
+      const x = hash2(k, 77.3) * 0.9 + 0.05, y = hash2(k, 178.9) * 0.9 + 0.05;
+      if (terrainH(x, y) > 0.42) continue;
+      if (railDist(x, y) > 0.045 && riverDist(x, y) > 0.035) continue;
+      if (Math.hypot(x - HQ.x, y - HQ.y) < 0.09) continue;
+      if (CITIES.some((c) => Math.hypot(x - c.x, y - c.y) < 0.06)) continue;
+      if (out.some((c) => Math.hypot(x - c.x, y - c.y) < 0.055)) continue;
+      out.push({ x, y });
+    }
+    return out;
+  })();
+  const PCG_PILLBOX: { x: number; y: number }[] = (() => {
+    const out: { x: number; y: number }[] = [];
+    let k = 0;
+    for (const [a, b] of RAILS) {
+      const ca = cityOf(a), cb = cityOf(b);
+      for (let t = 0.1; t < 0.92; t += 0.09) {
+        k += 1;
+        const x = lerp(ca.x, cb.x, t) + (hash2(k, 31.7) - 0.5) * 0.012;
+        const y = lerp(ca.y, cb.y, t) + (hash2(k, 63.1) - 0.5) * 0.012;
+        if (Math.hypot(x - HQ.x, y - HQ.y) < 0.05) continue;
+        out.push({ x, y });
+      }
+    }
+    return out;
+  })();
+  const PCG_VILLAGES: { x: number; y: number }[] = (() => {
+    const out: { x: number; y: number }[] = [];
+    for (let k = 0; k < 2600 && out.length < 130; k++) {
+      const x = hash2(k, 271.3) * 0.92 + 0.04, y = hash2(k, 419.7) * 0.92 + 0.04;
+      const h = terrainH(x, y);
+      if (h > 0.55) continue; // 山里村少
+      if (h > 0.4 && hash2(k, 91.1) < 0.6) continue;
+      if (Math.hypot(x - HQ.x, y - HQ.y) < 0.05) continue;
+      if (riverDist(x, y) < 0.006 || railDist(x, y) < 0.006) continue;
+      if (out.some((c) => Math.hypot(x - c.x, y - c.y) < 0.022)) continue;
+      out.push({ x, y });
+    }
+    return out;
+  })();
+  // 日军巡逻队(沿铁路往返的活动单位)
+  const PATROLS = [0, 2, 4, 6].map((ri) => ({ ri: ri % RAILS.length, t: 0.2 + (ri % 3) * 0.25, dir: 1 }));
   const loCv = document.createElement("canvas");
   function renderGround(s: KRState): void {
     ground.width = Math.max(1, W * dpr); ground.height = Math.max(1, H * dpr);
@@ -276,25 +335,34 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         let h = terrainH(w.x, w.y);
         if (zd1 > 0) h = h * (1 - zd1 - zd2) + fbm(w.x * 26 + 3, w.y * 26 + 9) * zd1 + (zd2 > 0 ? fbm(w.x * 160 + 31, w.y * 160 + 17) * zd2 : 0);
         const m = moistAt(w.x, w.y);
-        // 高度带色板(华北): 平原农田黄绿→黄土丘陵→山麓→太行深山
+        // ── 生物群系染色(重设计: 地貌分区在中远景直接可读) ──
         let r: number, gg: number, b: number;
-        if (h < 0.30) { const t = h / 0.30; r = lerp(112, 122, t); gg = lerp(112, 102, t); b = lerp(60, 58, t); }
-        else if (h < 0.48) { const t = (h - 0.30) / 0.18; r = lerp(122, 108, t); gg = lerp(102, 92, t); b = lerp(58, 55, t); }
-        else if (h < 0.64) { const t = (h - 0.48) / 0.16; r = lerp(108, 90, t); gg = lerp(92, 80, t); b = lerp(55, 54, t); }
-        else { const t = clamp((h - 0.64) / 0.2, 0, 1); r = lerp(90, 70, t); gg = lerp(80, 64, t); b = lerp(54, 52, t); }
-        // 湿度: 湿润偏绿,干燥偏黄
-        const wet = (m - 0.5) * 0.5;
-        gg *= 1 + wet * 0.35; r *= 1 - wet * 0.15;
-        // 平原农田斑块(田块状色差)
-        if (h < 0.32) {
-          const pf = cam.zoom > 60 ? 900 : cam.zoom > 12 ? 300 : 76;
+        const forest = (h > 0.40 && h < 0.64 && m > 0.54) || m > 0.74; // 森林区
+        if (h >= 0.66) { // 高山: 深棕灰,脊线亮
+          const t = clamp((h - 0.66) / 0.22, 0, 1);
+          r = lerp(104, 82, t); gg = lerp(94, 74, t); b = lerp(74, 62, t);
+        } else if (h >= 0.52) { // 山地
+          r = 118; gg = 104; b = 72;
+        } else if (h >= 0.36) { // 丘陵黄土 + 梯田等高条带
+          r = 152; gg = 128; b = 82;
+          const band = (h * 30) % 1;
+          if (band < 0.18) { r *= 0.90; gg *= 0.90; b *= 0.88; }
+        } else { // 平原: 农田四色拼块(麦黄/田绿/休耕/浅绿)
+          const pf = clamp(cam.zoom * 22, 120, 4000);
           const patch = hash2(Math.floor(w.x * pf), Math.floor(w.y * pf));
-          const f = 0.93 + patch * 0.14;
-          r *= f; gg *= f * (patch > 0.5 ? 1.06 : 0.98); b *= f;
+          if (patch < 0.3) { r = 162; gg = 146; b = 86; }
+          else if (patch < 0.55) { r = 140; gg = 148; b = 80; }
+          else if (patch < 0.8) { r = 154; gg = 138; b = 90; }
+          else { r = 146; gg = 152; b = 86; }
         }
+        // 森林色块(中远景可见的深绿成片)
+        if (forest) { const ft = 0.55; r = lerp(r, 62, ft); gg = lerp(gg, 88, ft); b = lerp(b, 48, ft); }
+        // 湿度微调
+        const wet = (m - 0.5) * 0.4;
+        gg *= 1 + wet * 0.2; r *= 1 - wet * 0.1;
         // 河谷湿绿带
         const rd = riverDist(w.x, w.y);
-        if (rd < 0.030) { const t = sstep(0.030, 0.008, rd) * 0.5; r = lerp(r, 82, t); gg = lerp(gg, 108, t); b = lerp(b, 56, t); }
+        if (rd < 0.024) { const t = sstep(0.024, 0.006, rd) * 0.6; r = lerp(r, 96, t); gg = lerp(gg, 128, t); b = lerp(b, 62, t); }
         // 村庄周边田野
         const dHq = Math.hypot(w.x - HQ.x, w.y - HQ.y);
         if (dHq < 0.02) { const gmix = sstep(0.02, 0.004, dHq) * 0.4; r = lerp(r, r * 0.85, gmix); gg = lerp(gg, gg * 1.18, gmix); b = lerp(b, b * 0.88, gmix); }
@@ -305,7 +373,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
         // 战雾
         const fog = fogAt(s, w.x, w.y);
         if (fog > 0.02) { const fa = fog * 0.93; r = lerp(r, 5, fa); gg = lerp(gg, 5, fa); b = lerp(b, 4, fa); }
-        px[idx] = r; px[idx + 1] = gg; px[idx + 2] = b; px[idx + 3] = 255;
+        px[idx] = r * 0.86; px[idx + 1] = gg * 0.86; px[idx + 2] = b * 0.86; px[idx + 3] = 255;
       }
     }
     lg.putImageData(img, 0, 0);
@@ -364,7 +432,7 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     road(COUNTIES[1].x, COUNTIES[1].y, COUNTIES[2].x, COUNTIES[2].y);
     for (const tn of TOWNS.slice(0, 6)) road(HQ.x, HQ.y, tn.x, tn.y);
     // ── 近景程序化符号(zoom>30): 视野内网格 hash 撒点,虚拟无限细节 ──
-    if (cam.zoom > 30) {
+    if (cam.zoom > 14) {
       const gstep = Math.pow(2, Math.round(Math.log2((1 / cam.zoom) / 13)));
       const vw = 1 / cam.zoom;
       const x0 = Math.floor((cam.x - vw) / gstep) * gstep, x1 = cam.x + vw;
@@ -392,15 +460,17 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       }
     }
     // ── 宏观地理符号(山峰/森林/农田): 板块尺度, 近景淡出 ──
-    const step = cam.zoom > 60 ? 9999 : cam.zoom < 2 ? 3 : cam.zoom < 4 ? 2 : 1; // 近景全跳(程序化符号接管)
+    const step = cam.zoom > 20 ? 9999 : cam.zoom < 2 ? 2 : 1; // 近景全跳(程序化符号接管)
     for (let k2 = 0; k2 < SYMS.length; k2 += step) {
       const sym = SYMS[k2];
       if (fogAt(s, sym.x, sym.y) > 0.6) continue;
       const p = proj(sym.x, sym.y);
       if (p.x < -24 || p.x > W + 24 || p.y < -24 || p.y > H + 24) continue;
-      const sz = A * 0.0038 * Math.pow(cam.zoom, 0.8) * (0.8 + sym.sd * 0.5);
-      if (sym.kind === 0) { // 山峰: 左亮右暗双面
-        g.fillStyle = "#7c7258";
+      const sz = A * 0.0058 * Math.pow(cam.zoom, 0.72) * (0.8 + sym.sd * 0.5);
+      if (sym.kind === 0) { // 山峰: 左亮右暗双面 + 底影
+        g.fillStyle = "rgba(40,36,26,.25)";
+        g.beginPath(); g.ellipse(p.x, p.y + sz * 0.9, sz * 1.9, sz * 0.5, 0, 0, 6.29); g.fill();
+        g.fillStyle = "#8a7f60";
         g.beginPath(); g.moveTo(p.x - sz * 1.8, p.y + sz); g.lineTo(p.x - sz * 0.1, p.y - sz * 1.7); g.lineTo(p.x, p.y + sz * 0.2); g.closePath(); g.fill();
         g.fillStyle = "#4e4636";
         g.beginPath(); g.moveTo(p.x, p.y + sz * 0.2); g.lineTo(p.x - sz * 0.1, p.y - sz * 1.7); g.lineTo(p.x + sz * 1.7, p.y + sz); g.closePath(); g.fill();
@@ -682,6 +752,44 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
       const p = proj(c.x, c.y);
       if (!inView(p)) continue;
       push(p.y, () => drawCity(ctx, p.x, p.y, kS * 1.1, t));
+    }
+    // ①b PCG 敌占网: 日占县城(全图22座)/囚笼炮楼(铁路沿线)/散布村庄
+    for (const c of PCG_COUNTIES) {
+      if (!fogOk(c.x, c.y)) continue;
+      const p = proj(c.x, c.y);
+      if (!inView(p, 100)) continue;
+      push(p.y, () => drawCounty(ctx, p.x, p.y, clamp(kS * 0.62, 1, 3.4), t));
+    }
+    if (cam.zoom > 2.6) {
+      for (const pb of PCG_PILLBOX) {
+        if (!fogOk(pb.x, pb.y)) continue;
+        const p = proj(pb.x, pb.y);
+        if (!inView(p, 60)) continue;
+        push(p.y, () => drawBlockhouse(ctx, p.x, p.y, clamp(kS * 0.42, 0.9, 2.6), t));
+      }
+    }
+    if (cam.zoom > 2.4) {
+      for (const v of PCG_VILLAGES) {
+        if (!fogOk(v.x, v.y)) continue;
+        const p = proj(v.x, v.y);
+        if (!inView(p, 40)) continue;
+        push(p.y, () => { drawHouse(ctx, p.x - kS * 1.4, p.y, clamp(kS * 0.34, 0.7, 2)); drawHouse(ctx, p.x + kS * 1.2, p.y + kS * 0.5, clamp(kS * 0.3, 0.6, 1.8)); });
+      }
+    }
+    // ①c 日军巡逻队(沿铁路往返)
+    if (cam.zoom > 2 && cam.zoom < 200) {
+      for (const pt of PATROLS) {
+        pt.t += pt.dir * dt * 0.008;
+        if (pt.t > 0.88 || pt.t < 0.12) pt.dir *= -1;
+        const [a, b] = RAILS[pt.ri];
+        const ca = cityOf(a), cb = cityOf(b);
+        const wx = lerp(ca.x, cb.x, pt.t), wy = lerp(ca.y, cb.y, pt.t);
+        if (!fogOk(wx, wy)) continue;
+        const p = proj(wx, wy);
+        if (!inView(p, 40)) continue;
+        const pk = clamp(A * 0.0005 * Math.pow(cam.zoom, 0.55), 1, 4);
+        push(p.y, () => drawFormation(ctx, p.x, p.y, 8, true, pk, t, true, pt.dir, false));
+      }
     }
     // ② hq 村群（中心村+卫星村+炮楼+县城）——世界坐标，随缩放连续
     const hq = s.bases["hq"];

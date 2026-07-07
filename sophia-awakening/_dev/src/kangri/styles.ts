@@ -197,4 +197,11 @@ const CSS = `
 .kr-ach-badge { position: absolute; top: -6px; right: -7px; min-width: 15px; height: 15px; border-radius: 8px; background: var(--amb); color: #201808; font-size: 9.5px; font-weight: 800; line-height: 15px; text-align: center; padding: 0 3px; font-family: inherit; }
 .kr-ach-pop { position: absolute; top: 48px; right: 384px; width: 300px; max-height: 72vh; overflow-y: auto; z-index: 13; border: 1px solid var(--amb); border-radius: 8px; background: rgba(14,12,8,.98); padding: 10px 12px; box-shadow: 0 14px 50px rgba(0,0,0,.7); }
 .kr-ach-pop::-webkit-scrollbar { width: 6px; } .kr-ach-pop::-webkit-scrollbar-thumb { background: var(--khk); border-radius: 3px; }
+
+/* 文献全屏直弹 + 失败结局 */
+.kr-doct-pop { animation: krdoctpop .5s cubic-bezier(.2,1.5,.4,1); }
+@keyframes krdoctpop { 0%{ opacity:0; transform: scale(.7) translateY(30px);} 100%{ opacity:1; transform: none;} }
+.kr-doct-got { font-size: 11px; letter-spacing: 6px; color: var(--amb); margin-bottom: 8px; }
+.kr-end-card.defeat { border-color: #7a2c22; box-shadow: 0 24px 80px rgba(0,0,0,.85), 0 0 46px rgba(160,40,26,.3); background: linear-gradient(180deg, #201210, #120b08); }
+.kr-end-card.defeat .kr-end-grade { color: #d86a58; text-shadow: 0 0 24px rgba(200,57,46,.6); }
 `;
