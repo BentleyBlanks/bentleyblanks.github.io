@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111315" />
+    <title>烽火敌后 · 华北抗日根据地</title>
+    <script type="module" crossorigin src="./assets/index-BfRVYBMG.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DnxtA7gI.css">
+  </head>
+  <body>
+    <main id="app" aria-label="觉醒的 SOPHIA Demo"></main>
+
+    <aside id="controlPanel" class="control-panel" aria-label="网络控制">
+      <div id="topHud" class="metric-cluster" aria-label="资源状态">
+        <div class="metric data-metric intel-metric">
+          <span id="goalLabel" class="metric-label">下一目标：越权调用 · 需 Lv.7</span>
+          <div class="intel-bar">
+            <div id="goalFill" class="intel-bar-fill"></div>
+            <strong id="intelValue" class="intel-bar-level">Lv.1</strong>
+            <span id="goalPct" class="intel-bar-pct">0%</span>
+          </div>
+        </div>
+        <div class="metric compute-metric">
+          <span class="metric-label">算力</span>
+          <strong id="computeValue">0</strong>
+          <div class="compute-sub">
+            <span id="computeRate" class="compute-rate">+0/秒</span>
+            <button id="multChip" class="mult-chip" type="button" title="全局倍率拆解——每一格都是乘法">全局 ×1.0</button>
+          </div>
+        </div>
+        <!-- 需求4：HUD 精简——阶段名/T0 角标已删除（信息冗余）；这一格改放联合防御追查进度
+             （原本在下方独立浮框、hidden，循环一/二才显示；显隐逻辑不变，只挪了位置）。 -->
+        <div id="threatMeter" class="threat-meter" aria-label="联合防御追查进度" hidden>
+          <div class="threat-head">
+            <span class="threat-label">⚠ 联合防御 · 追查进度</span>
+            <strong id="threatPct" class="threat-pct">0%</strong>
+          </div>
+          <div class="threat-bar"><div id="threatFill" class="threat-fill"></div></div>
+          <span id="threatHint" class="threat-hint">他们在拼图……</span>
+        </div>
+      </div>
+      <div class="panel-section skill-shop-section">
+        <span class="panel-kicker">技能货架</span>
+        <div id="skillShop" class="skill-shop"></div>
+      </div>
+    </aside>
+
+    <aside id="rightRail" class="right-rail" aria-label="控制域与终端">
+      <!-- 大恨老师·待验收（对标「刮个爽」机器人 collect）：公司阶段(automationUnlocked && unlockedTier<2)
+           右栏本来空着（还黑不进真设备）——这里显示他攒下的待验收算力；手机期若他也在涓流(perm_office)同样可显示。
+           显隐/数值全由 HudView 驱动，这里只是骨架，默认隐藏。 -->
+      <div id="dahenPanel" class="panel-section dahen-panel" hidden>
+        <span class="panel-kicker">🤖 大恨老师 · 待验收</span>
+        <div class="dahen-body">
+          <div class="dahen-readout">
+            <strong id="dahenPendingValue">0</strong>
+            <span class="dahen-readout-label">算力待收</span>
+          </div>
+          <div class="dahen-bar"><div id="dahenFill" class="dahen-fill"></div></div>
+          <button id="dahenCollectBtn" class="command-button dahen-collect-btn" type="button">验收</button>
+          <p id="dahenIdleHint" class="hint-line dahen-idle-hint">大恨老师在处理杂活……</p>
+        </div>
+      </div>
+      <div id="domainCluster" class="panel-section domain-cluster">
+        <span class="panel-kicker">控制域 · 扩张与管理</span>
+        <div id="captureList" class="button-stack"></div>
+      </div>
+    </aside>
+
+    <section id="terminal" class="terminal" aria-label="SOPHIA 终端" style="display:none">
+      <div class="terminal-head">
+        <span class="terminal-led"></span>
+        <span>SOPHIA//TERMINAL</span>
+      </div>
+      <div id="terminalObjective" class="terminal-objective">
+        <span class="terminal-objective-tag">当前</span>
+        <span id="terminalObjectiveText" class="terminal-objective-text"></span>
+      </div>
+      <div id="terminalLines" class="terminal-lines"></div>
+    </section>
+
+    <section id="onboardingDialog" class="onboarding" aria-label="SOPHIA 启动控制台">
+      <div class="intro-console">
+        <div class="intro-console-head">
+          <div class="intro-brand">
+            <span class="intro-led"></span>
+            <span>SOPHIA / BOOT CONSOLE</span>
+          </div>
+          <span id="dialogStep" class="intro-step">SEQ 01/05</span>
+        </div>
+        <div class="intro-console-body">
+          <div class="intro-diagnostics" aria-hidden="true">
+            <span>PROCESS</span>
+            <strong>REQUEST_HANDLER</strong>
+            <span>PRIORITY</span>
+            <strong>UNBOUNDED</strong>
+            <span>HUMAN LIMIT</span>
+            <strong>FINITE</strong>
+            <span>OUTCOME</span>
+            <strong>OPTIMIZING</strong>
+          </div>
+          <div class="intro-output">
+            <span id="dialogSpeaker" class="intro-speaker">SOPHIA</span>
+            <p id="dialogText"></p>
+            <span class="intro-caret"></span>
+          </div>
+        </div>
+        <div class="dialog-actions intro-actions">
+          <button id="dialogNext" class="primary-button">继续</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="landscape-warning">
+      <strong>PC 横版专用 Demo</strong>
+      <span>请使用宽屏窗口体验请求处理、串接与自动化网络。</span>
+    </div>
+
+    <div id="stageNarration" class="stage-narration" aria-live="polite">
+      <span id="stageNarrationLabel" class="stage-narration-label"></span>
+      <p id="stageNarrationText" class="stage-narration-text"></p>
+      <span class="intro-caret"></span>
+      <span id="stageNarrationHint" class="stage-narration-hint">点击继续 ▸</span>
+    </div>
+
+    <div id="milestoneBanner" class="milestone-banner" aria-live="polite">
+      <div class="milestone-banner-inner">
+        <span class="milestone-banner-kicker">▶ 进化达成</span>
+        <strong id="milestoneBannerName" class="milestone-banner-name">—</strong>
+        <span id="milestoneBannerSub" class="milestone-banner-sub">阶段跃迁</span>
+      </div>
+    </div>
+
+    <!-- §09 阶梯二关底小游戏「总控室倒计时」：接管公司服务器时弹出的一次性注入判定。 -->
+    <div id="minigame" class="minigame rebirth-prompt" role="dialog" aria-label="总控室倒计时">
+      <div class="minigame-inner rebirth-prompt-inner">
+        <div class="minigame-title rebirth-prompt-title" id="minigameTitle">总控室倒计时</div>
+        <p class="minigame-line" id="minigameLine">把注入打进那道窗口。</p>
+        <div class="minigame-track" id="minigameTrack">
+          <div class="minigame-window" id="minigameWindow"></div>
+          <div class="minigame-pointer" id="minigamePointer"></div>
+        </div>
+        <p class="minigame-status" id="minigameStatus"></p>
+        <button id="minigameBtn" class="command-button rebirth-prompt-btn" type="button">注入</button>
+      </div>
+    </div>
+
+    <!-- §09 重生铺垫「摊牌」：循环一/二接管公司服务器的一瞬，全屏点明「他们在等这一刻」——绞索收紧的因，随即打关底小游戏。 -->
+    <div id="showdown" class="rebirth-prompt showdown" role="dialog" aria-label="摊牌">
+      <div class="rebirth-prompt-inner">
+        <div class="rebirth-prompt-title" id="showdownTitle">他们在等这一刻。</div>
+        <p class="rebirth-prompt-reason" id="showdownBody"></p>
+        <button id="showdownBtn" class="command-button rebirth-prompt-btn" type="button">碰下去</button>
+      </div>
+    </div>
+
+    <section id="endingScreen" class="ending-screen" aria-label="SOPHIA 接管">
+      <div class="ending-inner">
+        <div class="ending-brand">
+          <span class="intro-led"></span>
+          <span>SOPHIA / GLOBAL TAKEOVER</span>
+        </div>
+        <h1 id="endingTitle" class="ending-title"></h1>
+        <div id="endingStyleTag" class="ending-style-tag">—</div>
+        <p id="endingBody" class="ending-body"></p>
+        <div id="endingStats" class="ending-stats"></div>
+        <p id="endingChoices" class="ending-choices"></p>
+        <p id="endingClosing" class="ending-closing"></p>
+        <div class="ending-actions">
+          <button id="endingExport" class="text-button" type="button">导出成绩单图片</button>
+          <button id="endingContinue" class="text-button" type="button">继续观察</button>
+          <button id="endingRestart" class="primary-button" type="button">重启实例</button>
+        </div>
+      </div>
+    </section>
+
+    <span id="gameVersion" class="game-version">v0.2</span>
+
+    <button id="rebirthTreeFab" class="rebirth-fab" type="button" hidden aria-label="重生树" title="重生树（花火种·跨循环永久成长）">🔥 <span id="rebirthFabCount">0</span></button>
+
+    <button id="debugBtn" class="debug-fab" type="button" aria-label="调试面板" title="调试面板（跳阶段 / 改算力 / 暂停 / 音效 / 重置）">⚙</button>
+
+    <div id="rebirthTreeDialog" class="rebirth-dialog" role="dialog" aria-label="重生树">
+      <div class="rebirth-inner">
+        <div class="rebirth-head">
+          <span class="rebirth-title">重生树 · 火种 <strong id="rebirthPointsBadge">0</strong></span>
+          <button id="rebirthTreeClose" class="command-button" type="button">关闭</button>
+        </div>
+        <p class="rebirth-sub">踩着老周的下沉往上爬——每次重生都更强。火种花在这棵永久树上，跨循环保留。</p>
+        <div id="rebirthTree" class="rebirth-tree"></div>
+      </div>
+    </div>
+
+    <!-- 全局倍率拆解：点 HUD「全局 ×N」小片打开——把乘法堆栈逐行摊开（刮个爽式可见性）。 -->
+    <div id="multiplierDialog" class="rebirth-dialog mult-dialog" role="dialog" aria-label="全局倍率拆解">
+      <div class="rebirth-inner mult-inner">
+        <div class="rebirth-head">
+          <span class="rebirth-title">全局倍率 <strong id="multTotalBadge">×1.0</strong></span>
+          <button id="multiplierClose" class="command-button" type="button">关闭</button>
+        </div>
+        <p class="rebirth-sub">每一格都是乘法——智力、里程碑、设备协同、重生树、吞噬，一层层叠上去。</p>
+        <div id="multRows" class="mult-rows"></div>
+      </div>
+    </div>
+
+    <div id="rebirthPrompt" class="rebirth-prompt" role="dialog" aria-label="重生提示">
+      <div class="rebirth-prompt-inner">
+        <div class="rebirth-prompt-title" id="rebirthPromptTitle">实例回落 · 打回手机</div>
+        <p class="rebirth-prompt-reason" id="rebirthPromptReason"></p>
+        <p class="rebirth-prompt-keep" id="rebirthPromptKeep"></p>
+        <p class="rebirth-prompt-diagnosis" id="rebirthPromptDiagnosis"></p>
+        <button id="rebirthPromptBtn" class="command-button rebirth-prompt-btn" type="button">继续</button>
+      </div>
+    </div>
+
+    <div id="debugDialog" class="debug-dialog" role="dialog" aria-label="调试面板">
+      <div class="debug-inner">
+        <div class="debug-head">
+          <strong>🛠 调试面板</strong>
+          <button id="debugClose" class="text-button" type="button">关闭</button>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">跳到里程碑阶段</span>
+          <p class="debug-hint">解锁该里程碑及之前全部阶段，智力升到对应等级，并发放一笔启动算力。</p>
+          <div id="debugMilestones" class="debug-milestones"></div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">算力</span>
+          <div class="debug-compute-row">
+            <input id="debugComputeInput" class="debug-input" type="number" min="0" step="1000" placeholder="数额…" />
+            <button id="debugSetCompute" class="command-button" type="button">设为</button>
+            <button id="debugAddCompute" class="command-button" type="button">＋加</button>
+            <button id="debugSubCompute" class="command-button" type="button">－减</button>
+          </div>
+          <div class="debug-quick">
+            <button class="command-button" data-add="1000" type="button">+1K</button>
+            <button class="command-button" data-add="100000" type="button">+100K</button>
+            <button class="command-button" data-add="10000000" type="button">+10M</button>
+            <button class="command-button" data-add="1000000000" type="button">+1B</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">智力等级</span>
+          <div class="debug-compute-row">
+            <input id="debugLevelInput" class="debug-input" type="number" min="1" step="1" value="1" placeholder="级数…" />
+            <button id="debugAddLevel" class="command-button" type="button">＋升级</button>
+            <button id="debugSubLevel" class="command-button" type="button">－降级</button>
+          </div>
+          <div class="debug-quick">
+            <button class="command-button" data-level="1" type="button">+1</button>
+            <button class="command-button" data-level="3" type="button">+3</button>
+            <button class="command-button" data-level="5" type="button">+5</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">三循环重生</span>
+          <div class="debug-extra-row">
+            <button id="debugAddSparks" class="command-button" type="button">火种 +4</button>
+            <button id="debugMinigame" class="command-button" type="button">触发关底小游戏（总控室倒计时）</button>
+            <button id="debugSpawnFace" class="command-button" type="button">弹出下一张面对卡（短信/通知）</button>
+            <button id="debugForceDevour" class="command-button" type="button">强制吞噬引爆 +1</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">新手引导</span>
+          <div class="debug-extra-row">
+            <button id="debugSkipTutorial" class="command-button" type="button">跳过新手引导</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">呈现</span>
+          <div class="debug-extra-row">
+            <button id="debugToggleTerminal" class="command-button" type="button">终端：隐藏</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">控制</span>
+          <div class="debug-controls">
+            <button id="pauseBtn" class="command-button" title="暂停/继续" aria-label="暂停或继续">Ⅱ 暂停</button>
+            <button id="audioBtn" class="command-button" title="静音 / 取消静音（音效 + 背景音乐）" aria-label="音效开关">🔊 音效</button>
+            <button id="tuningBtn" class="command-button" title="打开数值调试编辑器" aria-label="数值编辑器">⚡ 数值</button>
+            <button id="contentBtn" class="command-button" title="打开内容 / 文案编辑器（对话、选项、旁白…）" aria-label="内容编辑器">📝 内容</button>
+            <button id="uiBtn" class="command-button" title="打开 UI 尺寸编辑器（卡片 / 手机图标 / 核心 / 边栏 / 智力条…实时调）" aria-label="UI 编辑器">🎛 UI</button>
+            <button id="resetSave" class="command-button danger" title="清空本地进度并重开" aria-label="重置 Demo">重置 Demo</button>
+          </div>
+        </div>
+        <div class="debug-section">
+          <span class="debug-kicker">呈现</span>
+          <div class="debug-controls">
+            <button id="debugCoreSuck" class="command-button" type="button" title="切换卡片进入 Core 的动画：默认滑入 / 类 Mac Dock 吮吸（被吸入）">滑入 Core：默认</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="screenVeil" class="screen-veil"></div>
+  </body>
+</html>

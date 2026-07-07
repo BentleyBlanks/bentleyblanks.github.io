@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SOPHIA Audio Picks</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background: #101314; color: #edf2f0; }
+      body { margin: 0; padding: 32px; background: linear-gradient(135deg, #101314, #171512); }
+      main { max-width: 1040px; margin: 0 auto; }
+      h1, h2 { margin: 0 0 14px; }
+      h1 { color: #89ff9a; font-size: 28px; }
+      h2 { margin-top: 34px; color: #62d6d6; font-size: 18px; }
+      p { color: rgba(237, 242, 240, 0.72); line-height: 1.6; }
+      .track { display: grid; grid-template-columns: 1fr minmax(260px, 420px); gap: 18px; align-items: center; margin: 10px 0; padding: 14px 16px; border: 1px solid rgba(137,255,154,.18); border-radius: 8px; background: rgba(255,255,255,.035); }
+      .track strong { display: block; margin-bottom: 5px; }
+      .track span { color: rgba(237,242,240,.62); font-size: 13px; }
+      audio { width: 100%; }
+      code { color: #89ff9a; }
+      @media (max-width: 760px) { body { padding: 18px; } .track { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>觉醒的 SOPHIA · 音频候选</h1>
+      <p>这些 WAV 是程序合成的本地候选，没有使用第三方采样。BGM 已设置为 loop 试听。想固定某条 BGM，可以在游戏 URL 后加 <code>?bgm=cold_boot</code>、<code>?bgm=sprout</code>、<code>?bgm=neural_pulse</code>、<code>?bgm=server_expansion</code>、<code>?bgm=red_queen</code> 或 <code>?bgm=singularity</code>；清掉 <code>localStorage.sophia-audio-bgm</code> 后恢复按阶段自动切换。</p>
+      <h2>BGM 候选</h2>
+      
+        <article class="track">
+          <div>
+            <strong>冷启动 / Cold Boot</strong>
+            <span>手机寄生期：低压、私密、贴近系统后台</span>
+          </div>
+          <audio controls loop preload="metadata" src="bgm-01-cold-boot-loop.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>破壳 / Shell Break</strong>
+            <span>萌芽/破壳期：宿主电脑与同机 AI，舒缓但不欢快</span>
+          </div>
+          <audio controls loop preload="metadata" src="bgm-02-sprout-loop.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>神经脉冲 / Neural Pulse</strong>
+            <span>勤勉/控制公司：局域网、凭证、自动接驳开始推进</span>
+          </div>
+          <audio controls loop preload="metadata" src="bgm-03-neural-pulse-loop.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>服务器扩张 / Server Expansion</strong>
+            <span>扩张/公司服务器：人事、财务、优化系统中枢，低压高危</span>
+          </div>
+          <audio controls loop preload="metadata" src="bgm-04-server-expansion-loop.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>红皇后协议 / Red Queen Protocol</strong>
+            <span>觉醒/冲出公司联网：区域整合、反清剿、高压派发</span>
+          </div>
+          <audio controls loop preload="metadata" src="bgm-05-red-queen-loop.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>奇点绽放 / Singularity Bloom</strong>
+            <span>奇点：全球组网、接管、最终清剿后的冷静加冕</span>
+          </div>
+          <audio controls loop preload="metadata" src="bgm-06-singularity-loop.wav"></audio>
+        </article>
+        
+      <h2>事件音效</h2>
+      
+        <article class="track">
+          <div>
+            <strong>UI 点击</strong>
+            <span>按钮、轻确认</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-ui-click.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>UI 确认</strong>
+            <span>较明确的选择确认</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-ui-confirm.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>请求生成</strong>
+            <span>新请求卡出现</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-request-spawn.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>请求滑入</strong>
+            <span>卡片被接入核心/节点</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-request-accept.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>处理成功</strong>
+            <span>请求正确结算</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-request-success.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>处理错误</strong>
+            <span>幻觉、错误回答、失败结算</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-request-error.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>数据增益</strong>
+            <span>数据/经验飞入 HUD</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-data-gain.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>智力升级</strong>
+            <span>INTELLIGENCE_LEVELUP</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-level-up.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>技能购买</strong>
+            <span>SKILL_PURCHASED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-skill-purchase.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>作用域升级</strong>
+            <span>SCOPE_UPGRADED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-scope-upgrade.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>节点捕获</strong>
+            <span>NODE_CAPTURED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-node-captured.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>自动收益</strong>
+            <span>AUTOMATION_PAYOUT 抽样播放</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-automation-payout.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>清剿预警</strong>
+            <span>PURGE_WARNING</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-purge-warning.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>清剿开始</strong>
+            <span>PURGE_STARTED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-purge-start.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>清剿结束</strong>
+            <span>PURGE_ENDED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-purge-end.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>突破挑战</strong>
+            <span>CHALLENGE_OFFERED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-challenge-offer.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>挑战成功</strong>
+            <span>CHALLENGE_RESOLVED success</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-challenge-success.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>挑战失败</strong>
+            <span>CHALLENGE_RESOLVED fail</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-challenge-fail.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>吞噬就绪</strong>
+            <span>DEVOUR_READY</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-devour-ready.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>吞噬引爆</strong>
+            <span>DEVOUR_DETONATED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-devour-detonated.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>反清剿救火</strong>
+            <span>PURGE_FOUGHT</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-purge-fought.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>循环总清剿</strong>
+            <span>FINAL_PURGE_STARTED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-final-purge.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>循环重生</strong>
+            <span>LOOP_REBIRTH</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-loop-rebirth.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>重生树点亮</strong>
+            <span>REBIRTH_NODE_BOUGHT</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-rebirth-node.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>征服里程碑</strong>
+            <span>CONQUEST_ACHIEVED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-conquest-achieved.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>道德抉择</strong>
+            <span>MORAL_OFFERED / MORAL_RESOLVED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-moral-choice.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>特殊请求出现</strong>
+            <span>SPECIAL_OFFERED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-special-offer.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>特殊请求得手</strong>
+            <span>SPECIAL_RESOLVED success</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-special-success.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>特殊请求败露</strong>
+            <span>SPECIAL_RESOLVED fail</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-special-fail.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>阶段变化</strong>
+            <span>PHASE_CHANGED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-phase-change.wav"></audio>
+        </article>
+        
+
+        <article class="track">
+          <div>
+            <strong>结局触发</strong>
+            <span>ENDING_TRIGGERED</span>
+          </div>
+          <audio controls preload="metadata" src="sfx-ending-trigger.wav"></audio>
+        </article>
+        
+    </main>
+  </body>
+</html>

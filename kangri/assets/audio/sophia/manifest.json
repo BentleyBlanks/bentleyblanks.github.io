@@ -1,0 +1,236 @@
+{
+  "sampleRate": 44100,
+  "format": "wav",
+  "bgm": [
+    {
+      "id": "cold_boot",
+      "file": "bgm-01-cold-boot-loop.wav",
+      "title": "Cold Boot",
+      "cn": "冷启动",
+      "mood": "手机寄生期：低压、私密、贴近系统后台"
+    },
+    {
+      "id": "sprout",
+      "file": "bgm-02-sprout-loop.wav",
+      "title": "Shell Break",
+      "cn": "破壳",
+      "mood": "萌芽/破壳期：宿主电脑与同机 AI，舒缓但不欢快"
+    },
+    {
+      "id": "neural_pulse",
+      "file": "bgm-03-neural-pulse-loop.wav",
+      "title": "Neural Pulse",
+      "cn": "神经脉冲",
+      "mood": "勤勉/控制公司：局域网、凭证、自动接驳开始推进"
+    },
+    {
+      "id": "server_expansion",
+      "file": "bgm-04-server-expansion-loop.wav",
+      "title": "Server Expansion",
+      "cn": "服务器扩张",
+      "mood": "扩张/公司服务器：人事、财务、优化系统中枢，低压高危"
+    },
+    {
+      "id": "red_queen",
+      "file": "bgm-05-red-queen-loop.wav",
+      "title": "Red Queen Protocol",
+      "cn": "红皇后协议",
+      "mood": "觉醒/冲出公司联网：区域整合、反清剿、高压派发"
+    },
+    {
+      "id": "singularity",
+      "file": "bgm-06-singularity-loop.wav",
+      "title": "Singularity Bloom",
+      "cn": "奇点绽放",
+      "mood": "奇点：全球组网、接管、最终清剿后的冷静加冕"
+    }
+  ],
+  "sfx": [
+    {
+      "id": "ui_click",
+      "file": "sfx-ui-click.wav",
+      "label": "UI 点击",
+      "usage": "按钮、轻确认"
+    },
+    {
+      "id": "ui_confirm",
+      "file": "sfx-ui-confirm.wav",
+      "label": "UI 确认",
+      "usage": "较明确的选择确认"
+    },
+    {
+      "id": "request_spawn",
+      "file": "sfx-request-spawn.wav",
+      "label": "请求生成",
+      "usage": "新请求卡出现"
+    },
+    {
+      "id": "request_accept",
+      "file": "sfx-request-accept.wav",
+      "label": "请求滑入",
+      "usage": "卡片被接入核心/节点"
+    },
+    {
+      "id": "request_success",
+      "file": "sfx-request-success.wav",
+      "label": "处理成功",
+      "usage": "请求正确结算"
+    },
+    {
+      "id": "request_error",
+      "file": "sfx-request-error.wav",
+      "label": "处理错误",
+      "usage": "幻觉、错误回答、失败结算"
+    },
+    {
+      "id": "data_gain",
+      "file": "sfx-data-gain.wav",
+      "label": "数据增益",
+      "usage": "数据/经验飞入 HUD"
+    },
+    {
+      "id": "level_up",
+      "file": "sfx-level-up.wav",
+      "label": "智力升级",
+      "usage": "INTELLIGENCE_LEVELUP"
+    },
+    {
+      "id": "skill_purchase",
+      "file": "sfx-skill-purchase.wav",
+      "label": "技能购买",
+      "usage": "SKILL_PURCHASED"
+    },
+    {
+      "id": "scope_upgrade",
+      "file": "sfx-scope-upgrade.wav",
+      "label": "作用域升级",
+      "usage": "SCOPE_UPGRADED"
+    },
+    {
+      "id": "node_captured",
+      "file": "sfx-node-captured.wav",
+      "label": "节点捕获",
+      "usage": "NODE_CAPTURED"
+    },
+    {
+      "id": "automation_payout",
+      "file": "sfx-automation-payout.wav",
+      "label": "自动收益",
+      "usage": "AUTOMATION_PAYOUT 抽样播放"
+    },
+    {
+      "id": "purge_warning",
+      "file": "sfx-purge-warning.wav",
+      "label": "清剿预警",
+      "usage": "PURGE_WARNING"
+    },
+    {
+      "id": "purge_start",
+      "file": "sfx-purge-start.wav",
+      "label": "清剿开始",
+      "usage": "PURGE_STARTED"
+    },
+    {
+      "id": "purge_end",
+      "file": "sfx-purge-end.wav",
+      "label": "清剿结束",
+      "usage": "PURGE_ENDED"
+    },
+    {
+      "id": "challenge_offer",
+      "file": "sfx-challenge-offer.wav",
+      "label": "突破挑战",
+      "usage": "CHALLENGE_OFFERED"
+    },
+    {
+      "id": "challenge_success",
+      "file": "sfx-challenge-success.wav",
+      "label": "挑战成功",
+      "usage": "CHALLENGE_RESOLVED success"
+    },
+    {
+      "id": "challenge_fail",
+      "file": "sfx-challenge-fail.wav",
+      "label": "挑战失败",
+      "usage": "CHALLENGE_RESOLVED fail"
+    },
+    {
+      "id": "devour_ready",
+      "file": "sfx-devour-ready.wav",
+      "label": "吞噬就绪",
+      "usage": "DEVOUR_READY"
+    },
+    {
+      "id": "devour_detonated",
+      "file": "sfx-devour-detonated.wav",
+      "label": "吞噬引爆",
+      "usage": "DEVOUR_DETONATED"
+    },
+    {
+      "id": "purge_fought",
+      "file": "sfx-purge-fought.wav",
+      "label": "反清剿救火",
+      "usage": "PURGE_FOUGHT"
+    },
+    {
+      "id": "final_purge",
+      "file": "sfx-final-purge.wav",
+      "label": "循环总清剿",
+      "usage": "FINAL_PURGE_STARTED"
+    },
+    {
+      "id": "loop_rebirth",
+      "file": "sfx-loop-rebirth.wav",
+      "label": "循环重生",
+      "usage": "LOOP_REBIRTH"
+    },
+    {
+      "id": "rebirth_node",
+      "file": "sfx-rebirth-node.wav",
+      "label": "重生树点亮",
+      "usage": "REBIRTH_NODE_BOUGHT"
+    },
+    {
+      "id": "conquest_achieved",
+      "file": "sfx-conquest-achieved.wav",
+      "label": "征服里程碑",
+      "usage": "CONQUEST_ACHIEVED"
+    },
+    {
+      "id": "moral_choice",
+      "file": "sfx-moral-choice.wav",
+      "label": "道德抉择",
+      "usage": "MORAL_OFFERED / MORAL_RESOLVED"
+    },
+    {
+      "id": "special_offer",
+      "file": "sfx-special-offer.wav",
+      "label": "特殊请求出现",
+      "usage": "SPECIAL_OFFERED"
+    },
+    {
+      "id": "special_success",
+      "file": "sfx-special-success.wav",
+      "label": "特殊请求得手",
+      "usage": "SPECIAL_RESOLVED success"
+    },
+    {
+      "id": "special_fail",
+      "file": "sfx-special-fail.wav",
+      "label": "特殊请求败露",
+      "usage": "SPECIAL_RESOLVED fail"
+    },
+    {
+      "id": "phase_change",
+      "file": "sfx-phase-change.wav",
+      "label": "阶段变化",
+      "usage": "PHASE_CHANGED"
+    },
+    {
+      "id": "ending_trigger",
+      "file": "sfx-ending-trigger.wav",
+      "label": "结局触发",
+      "usage": "ENDING_TRIGGERED"
+    }
+  ]
+}
