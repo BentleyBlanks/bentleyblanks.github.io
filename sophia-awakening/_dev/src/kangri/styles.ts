@@ -155,4 +155,39 @@ const CSS = `
 .kr-end-foot { font-size: 11px; color: #8a8058; line-height: 1.8; margin-bottom: 16px; }
 .kr-end-btn { font-family: inherit; font-size: 14px; padding: 9px 30px; border-radius: 5px; border: 1px solid var(--amb); background: linear-gradient(180deg, #5a221c, #3a1610); color: #f0e4c0; cursor: pointer; letter-spacing: 2px; }
 .kr-end-btn:hover { background: linear-gradient(180deg, #6a271f, #431811); }
+
+/* 成就 toast / 成就面板 / 文献道具 / 新手引导 */
+.kr-toasts { position: absolute; right: 346px; bottom: 20px; z-index: 26; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.kr-toast { display: flex; gap: 10px; align-items: center; padding: 10px 16px; border: 1px solid var(--amb); border-radius: 6px; background: linear-gradient(180deg, rgba(40,34,18,.97), rgba(24,20,12,.97)); box-shadow: 0 8px 30px rgba(0,0,0,.6), 0 0 18px rgba(216,164,65,.25); animation: krtoast .45s cubic-bezier(.2,1.4,.4,1); }
+.kr-toast.out { transition: opacity .5s, transform .5s; opacity: 0; transform: translateY(14px); }
+@keyframes krtoast { 0%{ opacity:0; transform: translateX(60px);} 100%{ opacity:1; transform: none;} }
+.kr-toast-ic { font-size: 24px; }
+.kr-toast-name { font-size: 14px; font-weight: 800; color: #f0e4c0; letter-spacing: 1px; }
+.kr-toast-desc { font-size: 11px; color: var(--pap-dk); }
+.kr-ach-head { font-size: 13px; font-weight: 700; color: var(--amb); letter-spacing: 2px; padding: 4px 2px 8px; }
+.kr-ach { display: flex; gap: 9px; align-items: center; padding: 7px 10px; margin-bottom: 4px; border: 1px solid var(--khk); border-radius: 4px; background: rgba(24,22,14,.55); opacity: .55; }
+.kr-ach.got { opacity: 1; border-color: rgba(216,164,65,.55); background: linear-gradient(180deg, rgba(48,40,20,.7), rgba(28,24,14,.7)); }
+.kr-ach-ic { font-size: 17px; width: 24px; text-align: center; }
+.kr-ach-name { font-size: 12.5px; font-weight: 700; color: #d8c9a0; }
+.kr-ach.got .kr-ach-name { color: #f0e4c0; }
+.kr-ach-desc { font-size: 10.5px; color: #8a8058; }
+.kr-doct-btn { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); z-index: 14; padding: 10px 22px; border: 1px solid var(--amb); border-radius: 6px; background: linear-gradient(180deg, #4a3a16, #2c2210); color: #f0e4c0; font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: 1px; cursor: pointer; animation: krdoct 1.6s ease-in-out infinite; }
+@keyframes krdoct { 0%,100%{ box-shadow: 0 0 10px rgba(216,164,65,.35);} 50%{ box-shadow: 0 0 26px rgba(216,164,65,.75);} }
+.kr-doct-btn:hover { background: linear-gradient(180deg, #5a4820, #362a14); }
+.kr-doct-card { position: absolute; inset: 0; z-index: 28; background: rgba(6,5,3,.82); display: flex; align-items: center; justify-content: center; }
+.kr-doct-inner { width: min(560px, 86%); padding: 30px 38px; border: 2px solid var(--amb); border-radius: 8px; background: linear-gradient(180deg, #221c10, #14100a); text-align: center; box-shadow: 0 24px 80px rgba(0,0,0,.8), 0 0 40px rgba(216,164,65,.2); }
+.kr-doct-book { font-size: 44px; margin-bottom: 6px; }
+.kr-doct-title { font-size: 24px; font-weight: 800; color: #f0e4c0; letter-spacing: 3px; }
+.kr-doct-hist { font-size: 11px; color: var(--pap-dk); margin: 4px 0 12px; letter-spacing: 1px; }
+.kr-doct-desc { font-size: 13px; color: #d8c9a0; line-height: 1.8; margin-bottom: 12px; }
+.kr-doct-line { font-size: 13px; color: #e8d29a; font-style: italic; line-height: 1.8; padding: 10px 14px; border-left: 2px solid var(--amb); background: rgba(216,164,65,.06); text-align: left; margin-bottom: 14px; }
+.kr-doct-fx { font-size: 14px; font-weight: 700; color: #b6d48a; margin-bottom: 18px; }
+.kr-doct-close { font-family: inherit; font-size: 14px; padding: 9px 30px; border-radius: 5px; border: 1px solid var(--amb); background: linear-gradient(180deg, #5a221c, #3a1610); color: #f0e4c0; cursor: pointer; letter-spacing: 2px; }
+.kr-onb { position: absolute; inset: 0; z-index: 24; pointer-events: none; }
+.kr-onb-tip { position: absolute; max-width: 320px; padding: 10px 16px; border: 1px solid var(--amb); border-radius: 6px; background: rgba(28,22,12,.97); color: #f0e4c0; font-size: 13px; line-height: 1.6; box-shadow: 0 6px 24px rgba(0,0,0,.6), 0 0 16px rgba(216,164,65,.25); }
+.kr-onb-tip::before { content: "☝"; margin-right: 6px; }
+.kr-onb-skip { position: absolute; bottom: 14px; right: 360px; pointer-events: auto; font-family: inherit; font-size: 11px; padding: 4px 12px; border-radius: 4px; border: 1px solid var(--khk); background: rgba(24,20,12,.8); color: var(--pap-dk); cursor: pointer; }
+.kr-onb-skip:hover { color: #f0e4c0; border-color: var(--amb); }
+.kr-onb-glow { animation: krglow 1.3s ease-in-out infinite; position: relative; z-index: 25; }
+@keyframes krglow { 0%,100%{ box-shadow: 0 0 0 2px rgba(216,164,65,.5), 0 0 18px rgba(216,164,65,.4);} 50%{ box-shadow: 0 0 0 4px rgba(216,164,65,.9), 0 0 30px rgba(216,164,65,.8);} }
 `;

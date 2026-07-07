@@ -146,6 +146,84 @@ export const CAMPAIGNS: CampaignDef[] = [
   { id: "chejiao", name: "车桥战役", window: [78, 84], needBases: 5, costBing: 15_000, costWuzi: 8e5, outputMult: 1.4, desc: "新四军攻坚打援全歼守敌——反攻序幕。", hist: "1944.3 歼日伪军近千，苏中战局改观", line: "车桥一役攻坚打援双胜——局部反攻的号角吹响了！" }
 ];
 
+
+// ══ 历史文献道具（关键道具：历史时点送达→研读→永久增益）══════════
+// 《论持久战》为前章开端；其余按史实时间线跨越全程，对战役/根据地发展各有实际加成。
+export interface DoctrineDef {
+  id: string; name: string; m: number; // 送达月份
+  hist: string; desc: string; line: string;
+  fx: { prod?: number; bing?: number; wuzi?: number; kill?: number; devCost?: number; loot?: number };
+  fxText: string;
+}
+export const DOCTRINES: DoctrineDef[] = [
+  { id: "lunchijiu", name: "《论持久战》", m: 10, hist: "1938年5月，延安窑洞", desc: "战略总纲：战略防御→战略相持→战略反攻。看清了全局，就不会在黑夜里绝望。", line: "「抗日战争是持久战，最后胜利是中国的——这就是我们的结论。」", fx: { prod: 1.2 }, fxText: "全局产出 ×1.2" },
+  { id: "youjizhan", name: "《抗日游击战争的战略问题》", m: 11, hist: "1938年5月", desc: "游击战不是小打小闹，是敌后战场的战略形态。十六字诀融进血脉。", line: "「敌进我退，敌驻我扰，敌疲我打，敌退我追。」", fx: { kill: 1.15 }, fxText: "会战杀伤 ×1.15" },
+  { id: "celue", name: "《目前抗日统一战线中的策略问题》", m: 32, hist: "1940年3月", desc: "发展进步势力、争取中间势力——把最广大的人发动起来。", line: "减租减息落到实处，参军的青年在村口排起长队。", fx: { bing: 1.15 }, fxText: "兵员产出 ×1.15" },
+  { id: "jingji", name: "《经济问题与财政问题》", m: 65, hist: "1942年12月", desc: "「发展经济，保障供给」——大生产运动的行动纲领。", line: "自己动手，丰衣足食。纺车吱呀，南泥湾开了荒。", fx: { wuzi: 1.25 }, fxText: "物资产出 ×1.25" },
+  { id: "zuzhi", name: "《组织起来》", m: 76, hist: "1943年11月", desc: "变工队、互助组——把分散的个体组织成劳动大军。", line: "「群众是真正的英雄。」组织起来的力量，事半功倍。", fx: { devCost: 0.75 }, fxText: "根据地发展造价 ×0.75" },
+  { id: "yugong", name: "《愚公移山》", m: 95, hist: "1945年6月，七大闭幕词", desc: "下定决心，不怕牺牲，排除万难，去争取胜利。", line: "「我们也会感动上帝的。这个上帝就是全中国的人民大众。」", fx: { kill: 1.2, loot: 1.5 }, fxText: "会战杀伤 ×1.2 · 缴获 ×1.5" }
+];
+
+// ══ 成就系统（Steam 预留：id 即将来的成就 API Name；unlockAch 处将来接 SteamUserStats.SetAchievement(id)）══
+// check 有值=轮询判定；无 check 的在对应事件点手动 unlockAch。hidden=未解锁时显示为 ???。
+export interface AchievementDef { id: string; name: string; desc: string; hidden?: boolean; check?: (s: KRState) => boolean; }
+export const ACHIEVEMENTS: AchievementDef[] = [
+  { id: "spark", name: "星星之火", desc: "第一次发动群众", check: (s) => s.clickN > 0 },
+  { id: "first_facility", name: "白手起家", desc: "建起第一处设施", check: (s) => s.buildings.some((b) => b > 0) },
+  { id: "militia10", name: "十里八乡", desc: "民兵队达到 10 支", check: (s) => s.buildings[0] >= 10 },
+  { id: "first_tunnel", name: "深挖洞", desc: "挖出第一条地道", check: (s) => s.buildings[2] > 0 || BASES.some((b) => s.bases[b.id].tunnels > 0) },
+  { id: "doctrine_lun", name: "黑夜里的灯", desc: "研读《论持久战》", check: (s) => !!s.doctrines["lunchijiu"] },
+  { id: "doctrine_all", name: "真理之光", desc: "集齐全部六部文献", check: (s) => DOCTRINES.every((d) => s.doctrines[d.id]) },
+  { id: "tier1", name: "连村成片", desc: "规模达到数村", check: (s) => tier(s) >= 1 },
+  { id: "tier2", name: "县域争夺", desc: "规模达到一县", check: (s) => tier(s) >= 2 },
+  { id: "tier3", name: "区域根据地", desc: "规模达到专区", check: (s) => tier(s) >= 3 },
+  { id: "tier4", name: "华北大棋局", desc: "视野展开到整个华北", check: (s) => tier(s) >= 4 },
+  { id: "pingxingguan", name: "首战告捷", desc: "打出平型关大捷", check: (s) => !!s.campaigns["pingxingguan"] },
+  { id: "huangtuling", name: "名将之花凋谢", desc: "黄土岭围歼战击毙阿部规秀", check: (s) => !!s.campaigns["huangtuling"] },
+  { id: "baituan", name: "百团出击", desc: "发动百团大战", check: (s) => !!s.campaigns["baituan"] },
+  { id: "qinyuan", name: "一座不屈的空城", desc: "沁源围困战", check: (s) => !!s.campaigns["qinyuan"] },
+  { id: "chejiao", name: "反攻序幕", desc: "车桥战役", check: (s) => !!s.campaigns["chejiao"] },
+  { id: "camp_all", name: "战史留名", desc: "打出全部五次大战役", check: (s) => CAMPAIGNS.every((c) => s.campaigns[c.id]) },
+  { id: "first_win", name: "第一次反扫荡", desc: "扛过第一次日军扫荡", check: (s) => s.sweepsSurvived >= 1 },
+  { id: "clean_win", name: "毫发无损", desc: "一场反扫荡大捷：一间房都没让烧" },
+  { id: "repel_encircle", name: "撕开铁壁", desc: "全歼一次铁壁合围" },
+  { id: "repel_raid", name: "反偷袭", desc: "挫败一次挺进队奔袭" },
+  { id: "survive_wuyi", name: "冀中在地下", desc: "熬过 1942 五一大扫荡" },
+  { id: "kill1k", name: "千人斩", desc: "累计击毙日军 1,000", check: (s) => s.stats.killed >= 1000 },
+  { id: "kill10k", name: "歼敌一万", desc: "累计击毙日军 10,000", check: (s) => s.stats.killed >= 10000 },
+  { id: "est3", name: "三足鼎立", desc: "开辟 3 块根据地", check: (s) => estCount(s) >= 3 },
+  { id: "est6", name: "燎原", desc: "开辟 6 块根据地", check: (s) => estCount(s) >= 6 },
+  { id: "est9", name: "满盘皆红", desc: "九块根据地全部开辟", check: (s) => estCount(s) >= 9 },
+  { id: "dev_max", name: "模范根据地", desc: "一块根据地发展到 5 级", check: (s) => BASES.some((b) => s.bases[b.id].dev >= 5) },
+  { id: "spots10", name: "拔钉子", desc: "累计拔除 10 座炮楼据点", check: (s) => s.stats.spotsRemoved >= 10 },
+  { id: "migrate", name: "大转移", desc: "组织一次跨根据地的群众大转移" },
+  { id: "policy_all", name: "新政齐备", desc: "推行全部政策", check: (s) => POLICIES.every((p) => s.policies[p.id]) },
+  { id: "dark_through", name: "黎明前最黑的夜", desc: "熬过 1941-42，迎来恢复反攻", check: (s) => era(s).id >= 3 },
+  { id: "victory", name: "1945.8.15", desc: "迎来胜利日", check: (s) => s.ended },
+  { id: "legend", name: "中流砥柱", desc: "以最高评级迎来胜利", hidden: true },
+  { id: "fog_gaze", name: "远望", desc: "在一切开始之前，拉远看过整个笼罩在黑暗里的华北", hidden: true }
+];
+export function unlockAch(s: KRState, id: string): void {
+  if (s.achievements[id]) return;
+  s.achievements[id] = true;
+  s.achQueue.push(id);
+}
+export function doctrineMult(s: KRState, key: "prod" | "bing" | "wuzi" | "kill" | "devCost" | "loot"): number {
+  let m = 1;
+  for (const d of DOCTRINES) if (s.doctrines[d.id] && d.fx[key]) m *= d.fx[key]!;
+  return m;
+}
+// 研读文献（pendingDoctrines 队首）
+export function acquireDoctrine(s: KRState): DoctrineDef | null {
+  const id = s.pendingDoctrines[0];
+  if (!id) return null;
+  s.pendingDoctrines.shift();
+  s.doctrines[id] = true;
+  const d = DOCTRINES.find((x) => x.id === id)!;
+  pushT(s, `📜 研读${d.name}（${d.hist}）——${d.fxText}。${d.line}`, "win");
+  return d;
+}
+
 // ══ 历史事件脚本（按月触发）══════════════════════════════════════
 export interface EventDef { m: number; text: string; kind: "era" | "info" | "loss" | "win"; fx?: "wannan" | "wuyi" | "ichigo"; }
 export const EVENTS: EventDef[] = [
@@ -201,6 +279,11 @@ export interface KRState {
   pendingWuyi: boolean; // 五一大扫荡挂起(撞上进行中的扫荡时)
   sweep: Sweep | null;
   migration: Migration | null;
+  doctrines: Record<string, boolean>;
+  pendingDoctrines: string[]; // 已送达待研读
+  achievements: Record<string, boolean>;
+  achQueue: string[]; // 新解锁待弹出(表现层消费)
+  achPoll: number;
   nextSweepM: number;
   sweepsSurvived: number;
   ended: boolean;
@@ -231,7 +314,8 @@ export function createKRState(): KRState {
     bing: 0, wuzi: 0, totalWuzi: 0, clickN: 0,
     monthIdx: 0, monthAcc: 0,
     buildings: BUILDINGS.map(() => 0), policies: {}, bases, campaigns: {}, campMult: 1, kmtCut: false, pendingWuyi: false,
-    sweep: null, migration: null, nextSweepM: 4, sweepsSurvived: 0, ended: false,
+    sweep: null, migration: null, doctrines: {}, pendingDoctrines: [], achievements: {}, achQueue: [], achPoll: 0,
+    nextSweepM: 4, sweepsSurvived: 0, ended: false,
     terminal: [{ text: "【1937.7】卢沟桥的枪声响了。华北在沦陷——但敌后的缝隙里，根据地要在这里扎根。", kind: "era" }],
     eraShown: 0, eventsFired: {},
     stats: { killed: 0, lost: 0, popLost: 0, spotsRemoved: 0, campaignsWon: 0, sweepsFought: 0, estPeak: 1, eraSnap: [] }
@@ -255,7 +339,7 @@ export function baseMult(s: KRState, id: string): number {
   return 1 + (0.10 + 0.05 * st.dev) * popFrac * spotMalus * terr;
 }
 export function networkMult(s: KRState): number {
-  let m = s.campMult;
+  let m = s.campMult * doctrineMult(s, "prod");
   for (const b of BASES) m *= baseMult(s, b.id);
   return m;
 }
@@ -270,14 +354,14 @@ export function bingPerSec(s: KRState): number {
   let sum = 0;
   for (let i = 0; i < BUILDINGS.length; i++) sum += BUILDINGS[i].bing * s.buildings[i];
   for (const b of BASES) { const st = s.bases[b.id]; if (st.est) sum += st.pop * (0.25 + 0.12 * st.dev) * 0.004; }
-  return sum * polMult(s, "bing") * networkMult(s);
+  return sum * polMult(s, "bing") * networkMult(s) * doctrineMult(s, "bing");
 }
 export function wuziPerSec(s: KRState): number {
   let sum = 0;
   for (let i = 0; i < BUILDINGS.length; i++) sum += BUILDINGS[i].wuzi * s.buildings[i];
   for (const b of BASES) { const st = s.bases[b.id]; if (st.est) sum += st.pop * (0.25 + 0.12 * st.dev) * (b.terrain === "plain" ? 0.03 : 0.02) * Math.max(0.3, 1 - TUNING.spotOutputMalus * st.spots); }
   const kmt = s.kmtCut ? 0.9 : 1;
-  return sum * polMult(s, "wuzi") * networkMult(s) * kmt;
+  return sum * polMult(s, "wuzi") * networkMult(s) * kmt * doctrineMult(s, "wuzi");
 }
 // 全局防御(设施/政策) + 目标根据地(地道/地形)
 export function defense(s: KRState, baseId?: string): number {
@@ -299,7 +383,7 @@ export function estCost(s: KRState): { bing: number; wuzi: number } {
   const n = estCount(s) - 1;
   return { bing: Math.ceil(TUNING.estBing0 * Math.pow(TUNING.estMult, n)), wuzi: Math.ceil(TUNING.estWuzi0 * Math.pow(TUNING.estMult, n)) };
 }
-export function devCost(s: KRState, id: string): number { return Math.ceil(TUNING.devCost0 * Math.pow(TUNING.devCostMult, s.bases[id].dev) * (1 + estCount(s) * 0.25)); }
+export function devCost(s: KRState, id: string): number { return Math.ceil(TUNING.devCost0 * Math.pow(TUNING.devCostMult, s.bases[id].dev) * (1 + estCount(s) * 0.25) * doctrineMult(s, "devCost")); }
 export function tunCost(s: KRState, id: string): number { return Math.ceil(TUNING.tunCost0 * Math.pow(TUNING.tunCostMult, s.bases[id].tunnels) * (1 + estCount(s) * 0.25)); }
 export function spotCost(s: KRState): { bing: number; wuzi: number } {
   const half = era(s).id >= 3 ? 0.5 : 1;
@@ -401,6 +485,7 @@ export function transferPop(s: KRState, fromId: string, toId: string): boolean {
   from.pop -= amount;
   const loss = era(s).id === 2 ? 0.12 : 0.05; // 至暗期路上损耗更大
   s.migration = { from: fromId, to: toId, pop: amount * (1 - loss), t: 0, dur: 8 };
+  unlockAch(s, "migrate");
   pushT(s, `▶ 组织【${fd.short}】${amount.toFixed(1)}万群众向【${BASES.find((b) => b.id === toId)!.short}】大转移——拖家带口，路上小心。`, "info");
   return true;
 }
@@ -518,15 +603,21 @@ function endBattle(s: KRState, sw: Sweep): void {
 }
 function finishSweep(s: KRState, sw: Sweep, cleanWin: boolean): void {
   const killed = Math.round(sw.killed);
-  const loot = killed * (TUNING.lootBase + era(s).id * TUNING.lootPerEra) * networkMult(s);
+  const loot = killed * (TUNING.lootBase + era(s).id * TUNING.lootPerEra) * networkMult(s) * doctrineMult(s, "loot");
   s.wuzi += loot; s.totalWuzi += loot;
   s.stats.killed += killed; s.stats.lost += Math.round(sw.lostBing);
-  if (cleanWin) pushT(s, `★ 反扫荡大捷！击毙日军 ${killed}（我方伤亡 ${Math.round(sw.lostBing)}），根据地毫发无损，缴获物资 ${fmt(loot)}！`, "win");
+  if (cleanWin) {
+    pushT(s, `★ 反扫荡大捷！击毙日军 ${killed}（我方伤亡 ${Math.round(sw.lostBing)}），根据地毫发无损，缴获物资 ${fmt(loot)}！`, "win");
+    unlockAch(s, "clean_win");
+    if (sw.kind === "encircle") unlockAch(s, "repel_encircle");
+    if (sw.kind === "raid") unlockAch(s, "repel_raid");
+  }
   else {
     const lossPct = Math.round(sw.pillageFrac * 100);
     pushT(s, `反扫荡结束：击毙 ${killed}，我方伤亡 ${Math.round(sw.lostBing)}，被烧抢损失 ${lossPct}%${sw.evacProgress > 0.5 ? "（大转移保住了大半家底）" : ""}，缴获 ${fmt(loot)}。`, sw.pillageFrac > 0.12 ? "loss" : "info");
   }
   s.sweepsSurvived += 1;
+  if (s.monthIdx >= 57 && s.monthIdx <= 59 && sw.strength0 > 100) unlockAch(s, "survive_wuyi");
   s.sweep = null;
 }
 function tickPillage(s: KRState, sw: Sweep, dt: number): void {
@@ -558,7 +649,7 @@ function tickPillage(s: KRState, sw: Sweep, dt: number): void {
 function tickBattle(s: KRState, sw: Sweep, dt: number): void {
   sw.battleSec += dt;
   const d = defense(s, sw.targetBase);
-  const ourRate = TUNING.ourKillRate * (1 + d * 1.6);
+  const ourRate = TUNING.ourKillRate * (1 + d * 1.6) * doctrineMult(s, "kill");
   const jpRate = TUNING.jpKillRate * (1 - d * 0.55);
   const jpLoss = Math.min(sw.strength, sw.committed * ourRate * dt, sw.strength0 * 0.18 * dt);
   const ourLoss = Math.min(sw.committed, sw.strength * jpRate * dt, sw.committed0 * 0.18 * dt);
@@ -606,6 +697,13 @@ function advanceMonth(s: KRState): void {
       if (ev.fx === "ichigo") { for (const b of BASES) s.bases[b.id].spots = Math.max(0, s.bases[b.id].spots - 1); }
     }
   }
+  // 文献送达
+  for (const d of DOCTRINES) {
+    if (d.m === s.monthIdx && !s.doctrines[d.id] && !s.pendingDoctrines.includes(d.id)) {
+      s.pendingDoctrines.push(d.id);
+      pushT(s, `📜 一份油印小册子送到了根据地：${d.name}——点击研读。`, "era");
+    }
+  }
   // 蚕食：修据点/封锁沟(囚笼)
   if (Math.random() < e.encroach) {
     const est = BASES.filter((b) => s.bases[b.id].est && s.bases[b.id].spots < 5);
@@ -627,6 +725,7 @@ function advanceMonth(s: KRState): void {
   if (s.monthIdx >= END_MONTH && !s.ended) {
     s.ended = true;
     pushT(s, "【1945.8.15】日本无条件投降！八年烽火，敌后的星火终成燎原——胜利了！", "win");
+    if (endReport(s).grade === "中流砥柱") unlockAch(s, "legend");
   }
 }
 
@@ -638,6 +737,11 @@ export function tick(s: KRState, dtSec: number): void {
   s.totalWuzi += wuziPerSec(s) * prodMult * dtSec;
   if (s.sweep) tickSweep(s, dtSec);
   tickMigration(s, dtSec);
+  s.achPoll += dtSec;
+  if (s.achPoll >= 0.5) {
+    s.achPoll = 0;
+    for (const a of ACHIEVEMENTS) if (a.check && !s.achievements[a.id] && a.check(s)) unlockAch(s, a.id);
+  }
   // 月推进（扫荡进行中时时间也走——历史不等人）
   s.monthAcc += dtSec * 1000;
   while (s.monthAcc >= MONTH_MS && !s.ended) { s.monthAcc -= MONTH_MS; advanceMonth(s); }

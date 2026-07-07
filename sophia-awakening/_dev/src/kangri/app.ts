@@ -9,6 +9,7 @@ import {
   rally, buyBuilding, buyPolicy, establishBase, raiseDev, digTunnel, removeSpot, launchCampaign,
   tick, startEvacuation, commitTroops, tier, TIERS, unitName, SWEEP_KIND_NAME,
   transferPop, pickMigrationTarget, migrationCost,
+  ACHIEVEMENTS, DOCTRINES, unlockAch, acquireDoctrine,
   type KRState
 } from "./core";
 import { initScene } from "./scene";
@@ -64,14 +65,20 @@ export function bootstrapKangri(root: HTMLElement): void {
         <button class="kr-tab" data-t="base">根据地</button>
         <button class="kr-tab" data-t="policy">政策</button>
         <button class="kr-tab" data-t="camp">大战役</button>
+        <button class="kr-tab" data-t="ach">成就</button>
       </div>
       <div class="kr-panel" id="krBuild"></div>
       <div class="kr-panel" id="krBase" style="display:none"></div>
       <div class="kr-panel" id="krPolicy" style="display:none"></div>
       <div class="kr-panel" id="krCamp" style="display:none"></div>
+      <div class="kr-panel" id="krAch" style="display:none"></div>
     </aside>
 
     <div class="kr-guide" id="krGuide" style="display:none"></div>
+    <button class="kr-doct-btn" id="krDoctBtn" style="display:none"></button>
+    <div class="kr-doct-card" id="krDoctCard" style="display:none"></div>
+    <div class="kr-toasts" id="krToasts"></div>
+    <div class="kr-onb" id="krOnb" style="display:none"><div class="kr-onb-tip" id="krOnbTip"></div><button class="kr-onb-skip" id="krOnbSkip">跳过引导</button></div>
     <div class="kr-ending" id="krEnding" style="display:none"></div>
     <button class="kr-debug-btn" id="krDbgBtn">⚙</button>
     <div class="kr-debug" id="krDebug" style="display:none">
@@ -198,15 +205,111 @@ export function bootstrapKangri(root: HTMLElement): void {
     return [b.id, { el, name: el.querySelector<HTMLElement>(".kr-base-name")!, terr: el.querySelector<HTMLElement>(".kr-base-terr")!, stats: el.querySelector<HTMLElement>(".kr-base-stats")!, est: q(".kr-ba.est"), dev: q(".kr-ba.dev"), tun: q(".kr-ba.tun"), spot: q(".kr-ba.spot"), mig: q(".kr-ba.mig") }];
   }));
 
-  const panels: Record<string, HTMLElement> = { build: $("#krBuild"), base: $("#krBase"), policy: $("#krPolicy"), camp: $("#krCamp") };
+  const panels: Record<string, HTMLElement> = { build: $("#krBuild"), base: $("#krBase"), policy: $("#krPolicy"), camp: $("#krCamp"), ach: $("#krAch") };
   function switchTab(t: string): void {
     for (const x of wrap.querySelectorAll<HTMLButtonElement>(".kr-tab")) x.classList.toggle("active", x.dataset.t === t);
     for (const k in panels) panels[k].style.display = k === t ? "" : "none";
   }
   for (const t of wrap.querySelectorAll<HTMLButtonElement>(".kr-tab")) t.addEventListener("click", () => switchTab(t.dataset.t!));
 
+
+  // ── 成就系统（Steam 预留：ACHIEVEMENTS 的 id 即成就 API Name）──
+  const achPanel = $("#krAch");
+  const achRows = new Map(ACHIEVEMENTS.map((a) => {
+    const el = document.createElement("div"); el.className = "kr-ach";
+    el.innerHTML = '<span class="kr-ach-ic"></span><div><div class="kr-ach-name"></div><div class="kr-ach-desc"></div></div>';
+    achPanel.appendChild(el);
+    return [a.id, { el, ic: el.querySelector<HTMLElement>(".kr-ach-ic")!, name: el.querySelector<HTMLElement>(".kr-ach-name")!, desc: el.querySelector<HTMLElement>(".kr-ach-desc")! }];
+  }));
+  const achHead = document.createElement("div"); achHead.className = "kr-ach-head";
+  achPanel.prepend(achHead);
+  function renderAch(): void {
+    const n = ACHIEVEMENTS.filter((a) => state.achievements[a.id]).length;
+    achHead.textContent = "🏆 " + n + " / " + ACHIEVEMENTS.length;
+    for (const a of ACHIEVEMENTS) {
+      const r = achRows.get(a.id)!;
+      const got = !!state.achievements[a.id];
+      r.el.classList.toggle("got", got);
+      r.ic.textContent = got ? "🏆" : a.hidden ? "❓" : "🔒";
+      r.name.textContent = got || !a.hidden ? a.name : "？？？";
+      r.desc.textContent = got || !a.hidden ? a.desc : "隐藏成就";
+    }
+  }
+  function pumpToasts(): void {
+    while (state.achQueue.length > 0) {
+      const id = state.achQueue.shift()!;
+      const a = ACHIEVEMENTS.find((x) => x.id === id); if (!a) continue;
+      const t = document.createElement("div"); t.className = "kr-toast";
+      t.innerHTML = '<span class="kr-toast-ic">🏆</span><div><div class="kr-toast-name">' + a.name + '</div><div class="kr-toast-desc">' + a.desc + '</div></div>';
+      $("#krToasts").appendChild(t);
+      setTimeout(() => t.classList.add("out"), 3600);
+      setTimeout(() => t.remove(), 4100);
+    }
+  }
+
+  // ── 历史文献道具：送达→发光按钮→研读卡→永久增益 ──
+  const doctBtn = $<HTMLButtonElement>("#krDoctBtn"), doctCard = $("#krDoctCard");
+  doctBtn.addEventListener("click", () => {
+    const id = state.pendingDoctrines[0]; if (!id) return;
+    const d = DOCTRINES.find((x) => x.id === id)!;
+    acquireDoctrine(state);
+    doctCard.innerHTML = '<div class="kr-doct-inner">'
+      + '<div class="kr-doct-book">📜</div>'
+      + '<div class="kr-doct-title">' + d.name + '</div>'
+      + '<div class="kr-doct-hist">' + d.hist + '</div>'
+      + '<div class="kr-doct-desc">' + d.desc + '</div>'
+      + '<div class="kr-doct-line">' + d.line + '</div>'
+      + '<div class="kr-doct-fx">获得：' + d.fxText + '</div>'
+      + '<button class="kr-doct-close" id="krDoctClose">收入行囊</button></div>';
+    doctCard.style.display = "";
+    doctCard.querySelector<HTMLButtonElement>("#krDoctClose")!.addEventListener("click", () => { doctCard.style.display = "none"; });
+  });
+  function renderDoct(): void {
+    const id = state.pendingDoctrines[0];
+    if (!id) { doctBtn.style.display = "none"; return; }
+    const d = DOCTRINES.find((x) => x.id === id)!;
+    doctBtn.style.display = "";
+    doctBtn.textContent = "📜 文献送达：" + d.name + " —— 点击研读";
+  }
+
+  // ── 新手引导（轻量：三步高亮气泡，完成即走，可跳过）──
+  let onbStep = 0; // 0 发动群众 1 买设施 2 缩放地图 3 完成
+  let onbZoomed = false, onbTimer = 0;
+  canvas_onb_listen();
+  function canvas_onb_listen(): void {
+    mapCanvas.addEventListener("wheel", () => { onbZoomed = true; }, { passive: true, once: true });
+    mapCanvas.addEventListener("wheel", () => { if (tier(state) === 0 && scene.getZoom() < 1.8) unlockAch(state, "fog_gaze"); }, { passive: true });
+  }
+  $("#krOnbSkip").addEventListener("click", () => { onbStep = 3; });
+  function renderOnb(dt: number): void {
+    const onb = $("#krOnb"), tip = $("#krOnbTip");
+    if (onbStep >= 3) { onb.style.display = "none"; document.querySelectorAll(".kr-onb-glow").forEach((e) => e.classList.remove("kr-onb-glow")); return; }
+    onb.style.display = "";
+    let target: HTMLElement | null = null, text = "";
+    if (onbStep === 0) {
+      target = rallyBtn; text = "先把人组织起来——点这里（或按 G）发动群众";
+      if (state.clickN >= 5) onbStep = 1;
+    } else if (onbStep === 1) {
+      target = wrap.querySelector<HTMLElement>("#krBuild .kr-item"); text = "用攒下的物资买一支【民兵队】——它会自动产兵员";
+      if (state.buildings.some((b) => b > 0)) { onbStep = 2; onbTimer = 0; }
+    } else {
+      target = null; text = "试试【滚轮】缩放、【拖拽】平移——拉远看看，整个华北还笼罩在战雾里";
+      onbTimer += dt;
+      if (onbZoomed || onbTimer > 14) onbStep = 3;
+    }
+    document.querySelectorAll(".kr-onb-glow").forEach((e) => e.classList.remove("kr-onb-glow"));
+    if (target) {
+      target.classList.add("kr-onb-glow");
+      const r = target.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+      tip.style.left = Math.min(w.width - 340, Math.max(10, r.left - w.left + r.width / 2 - 160)) + "px";
+      tip.style.top = (r.bottom - w.top + 12) + "px";
+    } else {
+      tip.style.left = "50%"; tip.style.top = "62%"; tip.style.transform = "translateX(-50%)";
+    }
+    if (tip.textContent !== text) tip.textContent = text;
+  }
+
   const GUIDE = [
-    { t: "1937·敌后一无所有。按【G】发动群众攒家底；【滚轮】缩放地图、【拖拽】平移——拉远看看整个华北还笼罩在战雾里", d: (s: KRState) => s.clickN > 0 },
     { t: "买【民兵队】『生产队』攒家底；点地图上金圈闪的区域【开辟】新根据地——现在是大发展窗口！", d: (s: KRState) => estCount(s) >= 2 },
     { t: "日军扫荡来时：下令【组织群众大范围转移】保家底，【组织抗击】投兵员打会战", d: (s: KRState) => s.sweepsSurvived > 0 },
     { t: "1939 起日军修炮楼蚕食根据地(🏯)——在根据地面板【拔据点】。给平原根据地【挖地道】，1941-42 顶得住铁壁合围", d: (s: KRState) => s.stats.spotsRemoved > 0 || BASES.some((b) => s.bases[b.id].tunnels > 0) },
@@ -336,6 +439,9 @@ export function bootstrapKangri(root: HTMLElement): void {
     renderSweepBar();
     renderTerm();
     renderEnding();
+    renderAch();
+    renderDoct();
+    pumpToasts();
   }
 
   // ── 主循环 ──
@@ -345,6 +451,7 @@ export function bootstrapKangri(root: HTMLElement): void {
     if (!paused) tick(state, dt * speed);
     scene.frame(dt, state);
     render();
+    renderOnb(dt);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(() => { scene.resize(); requestAnimationFrame(frame); });

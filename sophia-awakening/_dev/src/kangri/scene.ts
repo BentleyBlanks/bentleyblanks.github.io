@@ -17,6 +17,7 @@ export interface Scene25D {
   frame: (dt: number, s: KRState) => void;
   hitBase: (cx: number, cy: number) => string | null;
   focusSweep: () => void;
+  getZoom: () => number;
   dispose: () => void;
 }
 
@@ -77,7 +78,7 @@ interface Tracer { x1: number; y1: number; x2: number; y2: number; life: number;
 
 export function initScene(canvas: HTMLCanvasElement): Scene25D {
   const ctx0 = canvas.getContext("2d");
-  if (!ctx0) return { ok: false, resize() {}, frame() {}, hitBase: () => null, focusSweep() {}, dispose() {} };
+  if (!ctx0) return { ok: false, resize() {}, frame() {}, hitBase: () => null, focusSweep() {}, getZoom: () => 1, dispose() {} };
   const ctx: CanvasRenderingContext2D = ctx0;
 
   let W = 0, H = 0, dpr = 1;
@@ -890,5 +891,5 @@ export function initScene(canvas: HTMLCanvasElement): Scene25D {
     cam.tzoom = Math.max(cam.zoom, 6);
   }
 
-  return { ok: true, resize, frame, hitBase, focusSweep, dispose() { walkers.length = 0; particles.length = 0; } };
+  return { ok: true, resize, frame, hitBase, focusSweep, getZoom: () => cam.zoom, dispose() { walkers.length = 0; particles.length = 0; } };
 }
