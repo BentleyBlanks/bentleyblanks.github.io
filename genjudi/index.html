@@ -65,6 +65,18 @@ const CONFIG = {
   noiseAfterSweep: 15,   // 扫荡后注意度归此值(余威——日军仍在注视)。【行为】周期变紧,连续冒进的空间更小
   sweepCadreStun: 1,     // 被扫荡后下回合干部点-X(干部转移隐蔽,组织瘫痪)。【行为】扫荡打的是你的"引擎"而非存量——这才疼到骨头
 
+  // ── 伏击(主动打日本人!) ──
+  ambushCostTroops: 10,  // 伏击投入兵力。【行为】兵是防御+扩张门票+出击本钱三用——打日本人要掂量兵够不够
+  ambushJpBase: 15,      // 日军巡逻队基础规模,回合t实际=15+t×1.5(越晚越硬)
+  ambushJpGrowth: 1.5,
+  ambushLossRatio: 0.25, // 我方损兵=巡逻队规模×X(伏击占先手,损失可控)
+  ambushLootArms: 4,     // 缴获武器=4+回合×0.3——"没有枪没有炮,敌人给我们造"
+  ambushLootArmsGrowth: 0.3,
+  ambushLootGrain: 8,    // 缴获粮=8+回合×0.5(端了运输队)
+  ambushLootGrainGrowth: 0.5,
+  ambushNoise: 6,        // 伏击+注意度。【行为】打得爽但招报复——连续伏击会加速扫荡周期
+  sweepWinLootArms: 0.2, // 打退扫荡缴获武器=日军战力×X。【行为】防御投资有正回报:打赢大部队=大缴获
+
   // ── 村庄特产 ──
   grainBonus: 4,         // 偏粮村(己方)额外+4粮/回合。【行为】扩张选边:先吃粮村续航
   recruitBonus: 1,       // 偏兵源村(己方)每回合自然+1兵。【行为】长线复利,越早吃越值
@@ -166,6 +178,7 @@ details p { margin: 6px 0; line-height: 1.6; color: #b5a575; }
     <span class="res" id="rArms"></span>
     <span class="res" id="rTroops"></span>
     <span class="res" id="rVil"></span>
+    <span class="res" id="rKills"></span>
   </div>
 
   <div class="noisewrap">
@@ -188,6 +201,7 @@ details p { margin: 6px 0; line-height: 1.6; color: #b5a575; }
     <button id="aFactory">办厂<small>+4武器 注意+2/回合</small></button>
     <button id="aWork">工作队<small>-6粮 民心+15</small></button>
     <button id="aDrill">练兵<small>-5武器 +10兵</small></button>
+    <button id="aAmbush">伏击<small>-10兵 缴武器粮 注意+6</small></button>
     <button id="aHide">隐蔽<small>注意-5 增长减半</small></button>
     <button id="endBtn">结束回合 ▶</button>
   </div>
@@ -197,7 +211,7 @@ details p { margin: 6px 0; line-height: 1.6; color: #b5a575; }
   <details>
     <summary>帮助</summary>
     <p>目标:第 30 回合结束时拥有 ≥6 个村庄。失败:村庄全丢,或粮食连续 3 回合为负。</p>
-    <p>每回合 3 干部点。<b>开垦/办厂</b>建在己方村(持续产出,办厂持续+注意度)。<b>工作队</b>带粮(-6)渗透邻近中立村(+15民心);民心满80后<b>凑齐8名民兵</b>回合结算时自动并入(并入+12注意度)。<b>练兵</b>把武器变成兵员——兵既是防御也是扩张门票。<b>隐蔽</b>压注意度。</p>
+    <p>每回合 3 干部点。<b>开垦/办厂</b>建在己方村(持续产出,办厂持续+注意度)。<b>工作队</b>带粮(-6)渗透邻近中立村(+15民心);民心满80后<b>凑齐8名民兵</b>回合结算时自动并入(并入+12注意度)。<b>练兵</b>把武器变成兵员——兵既是防御、扩张门票,也是出击本钱。<b>伏击</b>派10名民兵主动打日军巡逻队:击毙缴获武器和粮(越晚缴获越多,但敌人也越硬),注意度+6。<b>隐蔽</b>压注意度。打退扫荡也有大额武器缴获——防御不白练。</p>
     <p><b>注意度</b>随村庄数和工厂数增长,≥60 后每回合有概率遭<b>扫荡</b>:日军战力随时间和你的规模变强,对比防御(兵员+武器×0.5),打输被抢粮、毁设施、丢村(焦土:民心归零;偏隐蔽村损失减半);打赢也被抢一口。<b>被扫荡后下回合干部点-1(组织瘫痪)</b>,注意度回落至15。</p>
     <p>断粮:全村民心下降,民心低于30的村会脱离;连续3回合负粮即失败。</p>
   </details>
@@ -222,7 +236,7 @@ function newGame() {
   S = {
     turn: 1, cp: C.cadrePoints,
     grain: C.startGrain, arms: C.startArms, troops: C.startTroops,
-    noise: 0, hiding: false, starveStreak: 0, stunned: false,
+    noise: 0, hiding: false, starveStreak: 0, stunned: false, kills: 0,
     sweeps: 0,
     vs: VILLAGES.map((v) => ({
       owned: v.type === "start",
@@ -262,6 +276,19 @@ function doAction(kind, target) {
     if (S.arms < C.drillCostArms) return;
     S.arms -= C.drillCostArms; S.troops += C.drillGainTroops;
     logT(`练兵:武器-${C.drillCostArms},民兵+${C.drillGainTroops}。`, "info");
+  }
+  else if (kind === "ambush") {
+    if (S.troops < C.ambushCostTroops) return;
+    const jp = Math.round(C.ambushJpBase + S.turn * C.ambushJpGrowth);
+    const loss = Math.max(1, Math.round(jp * C.ambushLossRatio));
+    const gainA = Math.round(C.ambushLootArms + S.turn * C.ambushLootArmsGrowth);
+    const gainG = Math.round(C.ambushLootGrain + S.turn * C.ambushLootGrainGrowth);
+    S.troops -= loss;
+    S.arms += gainA; S.grain += gainG;
+    S.kills += jp;
+    S.noise = Math.min(100, S.noise + C.ambushNoise);
+    const flavors = ["公路边的伏击圈收网——运输队全交代了", "夜袭岗楼,敌人还没摸到枪", "铁道旁埋伏一天,等来了辎重车队", "麻雀战:打一枪换一个地方"];
+    logT(`⚔ ${flavors[S.turn % flavors.length]}!击毙${jp},缴获武器+${gainA}、粮+${gainG},我方伤亡${loss}(注意度+${C.ambushNoise})。`, "win");
   }
   else if (kind === "hide") {
     S.noise = Math.max(0, S.noise - C.noiseHideReduce);
@@ -350,9 +377,10 @@ function doSweep() {
   const tl = Math.round(Math.max(jp * C.troopsLossMin, diff * C.troopsLossRatio));
   S.troops = Math.max(0, S.troops - tl);
   if (diff <= 0) {
-    const loot = Math.round(Math.max(0, S.grain) * C.lootGrainWin);
-    S.grain -= loot;
-    lines.push(`打退了!但村口的粮车被抢走一批(-${loot}粮),民兵伤亡${tl}。`);
+    const gainA = Math.round(jp * C.sweepWinLootArms);
+    S.arms += gainA;
+    S.kills += Math.round(jp * 0.3);
+    lines.push(`漂亮的反扫荡!毙敌${Math.round(jp * 0.3)},缴获武器+${gainA},民兵伤亡${tl}——根据地毫发无损。`);
     logT(lines.join(" "), "win");
   } else {
     const loot = Math.round(Math.max(0, S.grain) * C.lootGrainLose);
@@ -417,7 +445,7 @@ function showSweepModal(jp, def, diff, lines) {
 function gameOver(win, reason) {
   S.over = { win, reason };
   $("overT").textContent = win ? "🔥 燎原" : "💀 星火熄灭";
-  $("overR").textContent = reason + `(共经历 ${S.sweeps} 次扫荡)`;
+  $("overR").textContent = reason + `(共经历 ${S.sweeps} 次扫荡,累计毙敌 ${S.kills})`;
   $("over").style.display = "flex";
   render();
 }
@@ -460,6 +488,7 @@ function render() {
   $("rArms").innerHTML = `🔫 <b>${S.arms}</b>`;
   $("rTroops").innerHTML = `🪖 <b>${S.troops}</b>`;
   $("rVil").innerHTML = `🚩 <b>${ownedCount()}</b>/${C.winVillages}`;
+  $("rKills").innerHTML = `☠ 毙敌 <b>${S.kills}</b>`;
   const jp0 = Math.round(jpPower()), def0 = Math.round(myDefense());
   $("dVal").textContent = def0; $("jVal").textContent = jp0;
   const dRatio = Math.min(1, def0 / Math.max(1, jp0));
@@ -495,6 +524,7 @@ function render() {
   $("aFactory").disabled = no;
   $("aWork").disabled = no || S.grain < C.workteamCostGrain || !VILLAGES.some((v) => canWork(v.id));
   $("aDrill").disabled = no || S.arms < C.drillCostArms;
+  $("aAmbush").disabled = no || S.troops < C.ambushCostTroops;
   $("aHide").disabled = no;
   ["aFarm", "aFactory", "aWork"].forEach((id) => $(id).classList.remove("picking"));
   if (picking === "farm") $("aFarm").classList.add("picking");
@@ -528,6 +558,7 @@ $("aFarm").addEventListener("click", () => { picking = picking === "farm" ? null
 $("aFactory").addEventListener("click", () => { picking = picking === "factory" ? null : "factory"; render(); });
 $("aWork").addEventListener("click", () => { picking = picking === "work" ? null : "work"; render(); });
 $("aDrill").addEventListener("click", () => doAction("drill"));
+$("aAmbush").addEventListener("click", () => doAction("ambush"));
 $("aHide").addEventListener("click", () => doAction("hide"));
 $("endBtn").addEventListener("click", () => { picking = null; endTurn(); });
 
