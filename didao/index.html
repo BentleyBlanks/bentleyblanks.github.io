@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>地道战 · 根据地建设</title>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// 《地道战·根据地建设》白盒 —— 模拟城市式根据地经营(1942-1945 冀中平原)。
+// 核心循环: 盖民居养人口→垦农田产粮→挖地道网(防灾基建)→日军扫荡(灾害)→坚壁清野→重建再发展。
+// 尊重历史: 地道战/三光/坚壁清野/减租减息/大生产/劳武结合。全部数值在 CONFIG。
+// ═══════════════════════════════════════════════════════════════
+const CONFIG = {
+  // ── 起始 ──
+  startPop: 20,           // 起始人口
+  startGrain: 60,         // 起始粮
+  startSupply: 25,        // 起始物资
+
+  // ── 人口(核心指标) ──
+  popPerHouse: 12,        // 每座民居的人口容量
+  popGrowthSec: 5,        // 有余粮+有空房时,每X秒+1人(民心政策可加速)
+  popEatRate: 0.045,      // 每人每秒吃粮
+  starveShrinkSec: 3,     // 断粮时每X秒-1人(逃荒)
+
+  // ── 建筑(粮/物资造价, 人力=占用人口) ──
+  costHouse:  { g: 15, s: 8,  w: 0 },   // 民居
+  costField:  { g: 5,  s: 2,  w: 3 },   // 农田(占3人耕种)
+  costBarn:   { g: 10, s: 12, w: 1 },   // 粮仓(+存粮上限120,地道覆盖内的存粮受保护)
+  costTunnel: { g: 8,  s: 15, w: 2 },   // 地道口(挖通后覆盖半径内人口/建筑/存粮受扫荡保护)
+  costMilitia:{ g: 12, s: 15, w: 4 },   // 民兵哨(半径内迟滞杀伤日军,可歼灭缴获)
+  costWorkshop:{g: 20, s: 10, w: 3 },   // 纺织坊(产物资)
+  costHall:   { g: 30, s: 25, w: 2 },   // 村公所(解锁政策,全村限1座)
+
+  // ── 产出 ──
+  fieldGrainRate: 0.34,   // 每块农田每秒产粮
+  riverBonus: 1.3,        // 临河农田产量倍率(灌溉)
+  workshopSupplyRate: 0.14, // 纺织坊每秒产物资
+  barnCap: 120,           // 每座粮仓+存粮上限(基础上限80)
+  baseGrainCap: 80,
+
+  // ── 地道(防灾基建,本作灵魂) ──
+  tunnelRadius: 2.6,      // 地道口保护半径(格)
+  tunnelDigTime: 14,      // 挖通耗时(秒)
+  tunnelPopShelter: 30,   // 每个地道口可容纳的躲藏人口
+
+  // ── 民兵 ──
+  militiaRadius: 2.2,     // 民兵哨警戒半径
+  militiaDps: 2.6,        // 对半径内日军每秒杀伤
+  militiaLoot: 10,        // 歼灭一队缴获物资
+
+  // ── 日军扫荡(灾害系统) ──
+  sweepFirstAt: 75,       // 第一波扫荡时刻(秒)——给建设期
+  sweepInterval: 95,      // 之后每隔X秒一波
+  sweepWarn: 16,          // 预警提前量(秒)——坚壁清野的窗口
+  sweepSquadHp: 26,       // 每队日军兵力(随波次+30%/波)
+  sweepSquadsBase: 1,     // 第一波队数(每2波+1队,上限4)
+  sweepBurnDps: 8,        // 日军烧一座建筑的速度(HP=10)
+  sweepKillRatio: 0.35,   // 未躲入地道的人口被杀比例(三光!)
+  sweepLootRatio: 0.45,   // 未受保护存粮被抢比例
+  qingbijianye: 0.5,      // 手动「坚壁清野」:额外把X比例的无覆盖人口塞进临近地道
+
+  // ── 政策(村公所,各限一次) ──
+  polRentGrowth: 1.45,    // 减租减息:人口增速×
+  polProdField: 1.3,      // 大生产运动:农田产量×
+  polMilitiaAtk: 1.6,     // 劳武结合:民兵杀伤×
+
+  // ── 胜负 ──
+  winSweeps: 6,           // 撑过X波扫荡
+  winPop: 200,            // 且人口≥X → 胜利(根据地站住了)
+  losePop: 6,             // 人口跌破X → 失败
+  endYearSec: 780,        // 游戏总时长参考(13分钟≈1942→1945)
+};
+</script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#151309; color:#d8c9a0; font-family:system-ui,"Noto Sans SC",sans-serif; font-size:13px; overflow:hidden; }
+#top { display:flex; gap:15px; align-items:center; padding:7px 14px; background:#1c1810; border-bottom:1px solid #3a3826; flex-wrap:wrap; }
+#top b { color:#f0e4c0; }
+#top .warn { color:#e2564d; font-weight:700; }
+canvas { display:block; cursor:pointer; }
+#build { position:fixed; left:0; right:0; bottom:0; display:flex; gap:6px; align-items:stretch; padding:8px 12px; background:rgba(26,22,14,.96); border-top:1px solid #3a3826; overflow-x:auto; }
+#build button { font-family:inherit; font-size:12px; padding:7px 10px; border:1px solid #6b5a30; border-radius:6px; background:#2a2416; color:#e8d7ae; cursor:pointer; white-space:nowrap; line-height:1.4; }
+#build button small { display:block; font-size:10px; color:#8a8058; }
+#build button.on { border-color:#ffe9a0; background:#3a3218; }
+#build button:disabled { opacity:.38; }
+#build .grow { flex:1; }
+#qbBtn { border-color:#a84343 !important; color:#f2c0a0 !important; font-weight:700; }
+#log { position:fixed; left:10px; top:48px; width:330px; max-height:150px; overflow:hidden; font-size:11.5px; line-height:1.55; pointer-events:none; text-shadow:0 1px 3px #000; }
+#log .win { color:#f2c0a0; } #log .loss { color:#e2564d; } #log .info { color:#b5a575; }
+#pols { position:fixed; right:10px; top:48px; width:210px; background:rgba(30,26,16,.95); border:1px solid #3a3826; border-radius:6px; padding:8px 10px; font-size:11.5px; display:none; }
+#pols button { display:block; width:100%; margin:4px 0; font-family:inherit; font-size:11.5px; padding:6px; border:1px solid #6b5a30; border-radius:5px; background:#2a2416; color:#e8d7ae; cursor:pointer; text-align:left; }
+#pols button:disabled { opacity:.4; }
+#over { position:fixed; inset:0; background:rgba(8,6,4,.9); display:none; align-items:center; justify-content:center; z-index:10; }
+#over .card { background:#1e1a10; border:2px solid #d8a441; border-radius:10px; padding:30px 38px; max-width:460px; text-align:center; }
+#over .t { font-size:28px; font-weight:800; letter-spacing:4px; color:#f0e4c0; margin-bottom:10px; }
+#over .r { line-height:1.8; color:#b5a575; margin-bottom:16px; }
+#over button { font-family:inherit; font-size:14px; padding:9px 26px; border:1px solid #d8a441; border-radius:6px; background:linear-gradient(180deg,#5a221c,#3a1610); color:#f0e4c0; cursor:pointer; }
+#tip { position:fixed; pointer-events:none; background:rgba(20,16,10,.95); border:1px solid #6b5a30; border-radius:5px; padding:5px 9px; font-size:11.5px; display:none; z-index:5; line-height:1.5; }
+</style>
+</head>
+<body>
+<div id="top">
+  <span style="font-weight:800;letter-spacing:2px;color:#f0e4c0">地道战 · 根据地建设</span>
+  <span>👥 <b id="tPop"></b></span>
+  <span>🌾 <b id="tGrain"></b></span>
+  <span>📦 <b id="tSupply"></b></span>
+  <span>🕳 地道庇护 <b id="tShelter"></b></span>
+  <span id="tSweep"></span>
+  <span id="tDate" style="margin-left:auto;color:#8a8058"></span>
+</div>
+<canvas id="cv"></canvas>
+<div id="log"></div>
+<div id="pols">
+  <div style="color:#d8a441;font-weight:700;margin-bottom:4px">村公所 · 政策(各限一次)</div>
+  <button id="pRent">减租减息<br><small style="color:#8a8058">人口增速×1.45 —— 1942年史实推行</small></button>
+  <button id="pProd">大生产运动<br><small style="color:#8a8058">农田产量×1.3 —— 自己动手丰衣足食</small></button>
+  <button id="pMil">劳武结合<br><small style="color:#8a8058">民兵杀伤×1.6 —— 一手锄头一手枪</small></button>
+</div>
+<div id="tip"></div>
+<div id="build"></div>
+<div id="over"><div class="card"><div class="t" id="overT"></div><div class="r" id="overR"></div><button onclick="location.reload()">再来一局</button></div></div>
+
+<script>
+"use strict";
+const C = CONFIG;
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+let W = 0, H = 0;
+function resize() { W = innerWidth; H = innerHeight - 96; cv.width = W; cv.height = H; }
+addEventListener("resize", resize); resize();
+
+// ── 等距网格 ──
+const GW = 22, GH = 15, T = 30;
+const ix = (x, y) => W / 2 + (x - y) * T * 1.05;
+const iy = (x, y) => 60 + (x + y) * T * 0.52;
+// 逆投影
+function pick(mx, my) {
+  const u = (mx - W / 2) / (T * 1.05), v = (my - 60) / (T * 0.52);
+  const x = Math.round((u + v) / 2 - 0.5), y = Math.round((v - u) / 2 - 0.5);
+  return x >= 0 && x < GW && y >= 0 && y < GH ? { x, y } : null;
+}
+
+// ── 地图: 平地/山(顶缘)/河(竖穿) ──
+const terrain = [];
+for (let y = 0; y < GH; y++) {
+  terrain.push([]);
+  for (let x = 0; x < GW; x++) {
+    let t = "plain";
+    if (y === 0 || (y === 1 && (x * 7 % 3) === 0)) t = "hill";
+    if (x === 14 && y >= 1) t = "river";
+    terrain[y].push(t);
+  }
+}
+const isRiverside = (x, y) => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) => terrain[y+dy]?.[x+dx] === "river");
+
+// ── 建筑定义 ──
+const BDEFS = {
+  house:   { name: "民居",   cost: C.costHouse,   color: "#8a7050", desc: `+${C.popPerHouse}人口容量` },
+  field:   { name: "农田",   cost: C.costField,   color: "#7a8f3a", desc: `占3人耕种·+${C.fieldGrainRate}粮/秒(临河×${C.riverBonus})` },
+  barn:    { name: "粮仓",   cost: C.costBarn,    color: "#a8842e", desc: `+${C.barnCap}存粮上限·地道覆盖内的粮受保护` },
+  tunnel:  { name: "地道口", cost: C.costTunnel,  color: "#4a3f30", desc: `挖${C.tunnelDigTime}秒·覆盖${C.tunnelRadius}格:扫荡时人口躲藏/建筑免烧/粮免抢` },
+  militia: { name: "民兵哨", cost: C.costMilitia, color: "#a83228", desc: `警戒${C.militiaRadius}格·杀伤过境日军·歼灭缴物资` },
+  workshop:{ name: "纺织坊", cost: C.costWorkshop,color: "#6a5a8a", desc: `+${C.workshopSupplyRate}物资/秒` },
+  hall:    { name: "村公所", cost: C.costHall,    color: "#b06a2e", desc: `解锁政策(减租减息/大生产/劳武结合)·限1座` },
+};
+
+// ── 状态 ──
+let S;
+function newGame() {
+  S = {
+    t: 0, pop: C.startPop, grain: C.startGrain, supply: C.startSupply,
+    grid: Array.from({ length: GH }, () => Array(GW).fill(null)),
+    growAcc: 0, starveAcc: 0,
+    nextSweep: C.sweepFirstAt, sweepN: 0, sweeping: false, warned: false, qbUsed: false,
+    jps: [], flames: [],
+    pols: { rent: false, prod: false, mil: false },
+    log: [], over: null, buildSel: null,
+  };
+  // 初始建筑: 村中心 2 民居 2 农田
+  put(10, 7, "house"); put(11, 8, "house"); put(9, 8, "field"); put(12, 7, "field");
+  logT("1942年·冀中平原。日军的扫荡一次比一次狠——把村子建起来,把地道挖起来。地道就是命。", "info");
+}
+function put(x, y, type) {
+  S.grid[y][x] = { type, hp: 10, dig: type === "tunnel" ? 0 : 1, burned: false };
+}
+function bAll() { const out = []; for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (S.grid[y][x] && !S.grid[y][x].burned) out.push({ x, y, b: S.grid[y][x] }); return out; }
+function count(type) { return bAll().filter(o => o.b.type === type).length; }
+function logT(t, k) { S.log.unshift({ t, k }); if (S.log.length > 8) S.log.pop(); }
+function workersUsed() { return bAll().reduce((a, o) => a + (BDEFS[o.b.type].cost.w || 0), 0); }
+function popCap() { return count("house") * C.popPerHouse; }
+function grainCap() { return C.baseGrainCap + count("barn") * C.barnCap; }
+// 地道覆盖判定
+function covered(x, y) {
+  return bAll().some(o => o.b.type === "tunnel" && o.b.dig >= 1 && Math.hypot(o.x - x, o.y - y) <= C.tunnelRadius);
+}
+function shelterCap() { return bAll().filter(o => o.b.type === "tunnel" && o.b.dig >= 1).length * C.tunnelPopShelter; }
+
+// ── 主循环 ──
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!S.over) tick(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+function tick(dt) {
+  S.t += dt;
+  // 产出: 农田(有人耕才产——人力不足的田荒着)
+  let mult = S.pols.prod ? C.polProdField : 1;
+  const fields = bAll().filter(o => o.b.type === "field");
+  let manned = Math.floor(Math.min(fields.length, Math.max(0, S.pop - (workersUsed() - fields.length * 3)) / 3));
+  let gRate = 0;
+  fields.forEach((o, i) => { if (i < manned) gRate += C.fieldGrainRate * (isRiverside(o.x, o.y) ? C.riverBonus : 1); });
+  S.grain = Math.min(grainCap(), S.grain + gRate * mult * dt);
+  S.supply += count("workshop") * C.workshopSupplyRate * dt;
+  // 地道挖掘进度
+  bAll().forEach(o => { if (o.b.type === "tunnel" && o.b.dig < 1) o.b.dig += dt / C.tunnelDigTime; });
+  // 人口: 吃粮/增长/逃荒
+  S.grain -= S.pop * C.popEatRate * dt;
+  if (S.grain > 5 && S.pop < popCap()) {
+    S.growAcc += dt;
+    const need = C.popGrowthSec / (S.pols.rent ? C.polRentGrowth : 1);
+    if (S.growAcc >= need) { S.growAcc = 0; S.pop += 1; }
+  }
+  if (S.grain < 0) {
+    S.grain = 0; S.starveAcc += dt;
+    if (S.starveAcc >= C.starveShrinkSec) { S.starveAcc = 0; S.pop -= 1; logT("粮尽了——有人拖家带口逃荒去了。", "loss"); }
+  }
+  // 扫荡调度
+  if (!S.sweeping) {
+    const left = S.nextSweep - S.t;
+    if (left <= C.sweepWarn && !S.warned) { S.warned = true; logT(`⚠ 情报:日军扫荡队已出县城,约${Math.ceil(left)}秒后进村!快「坚壁清野」!`, "loss"); }
+    if (left <= 0) startSweep();
+  }
+  // 日军单位
+  for (const j of S.jps) jpTick(j, dt);
+  S.jps = S.jps.filter(j => j.hp > 0 && j.x < GW + 2);
+  if (S.sweeping && S.jps.length === 0) endSweep();
+  // 火焰粒子
+  S.flames = S.flames.filter(f => (f.life -= dt) > 0);
+  // 胜负
+  if (S.pop < C.losePop) return lose("人口凋零——这个村,散了。");
+  if (S.sweepN >= C.winSweeps && S.pop >= C.winPop) return win();
+}
+
+// ── 扫荡(灾害) ──
+function startSweep() {
+  S.sweeping = true; S.warned = false; S.qbUsed = false;
+  S.sweepN += 1;
+  const squads = Math.min(4, C.sweepSquadsBase + Math.floor((S.sweepN - 1) / 2));
+  const hp = C.sweepSquadHp * Math.pow(1.3, S.sweepN - 1);
+  for (let i = 0; i < squads; i++) {
+    S.jps.push({ x: -1 - i * 1.5, y: 3 + i * 3 + (S.sweepN % 3), hp, maxHp: hp, burnT: 0, kills: 0 });
+  }
+  // 三光结算(入侵瞬间:人口/存粮按庇护结算)
+  const shel = Math.min(S.pop, shelterCap());
+  let unshel = S.pop - shel;
+  if (S.qbBonus) { const extra = Math.min(unshel, Math.round(unshel * C.qingbijianye)); unshel -= extra; S.qbBonus = false; }
+  const killed = Math.round(unshel * C.sweepKillRatio);
+  S.pop -= killed;
+  // 存粮: 粮仓在地道覆盖内的部分保住
+  const barns = bAll().filter(o => o.b.type === "barn");
+  const coveredCapRatio = grainCap() > 0 ? (C.baseGrainCap * 0 + barns.filter(o => covered(o.x, o.y)).length * C.barnCap) / grainCap() : 0;
+  const exposedGrain = S.grain * (1 - Math.min(1, coveredCapRatio));
+  const loot = Math.round(exposedGrain * C.sweepLootRatio);
+  S.grain -= loot;
+  logT(`🔥 第${S.sweepN}波扫荡进村!${killed > 0 ? `${killed}名乡亲没来得及进地道,没了(三光)。` : "全村钻了地道——一个人都没让他们找到!"}${loot > 0 ? `露天存粮被抢${loot}。` : "粮食全藏进了地道。"}`, killed > 0 ? "loss" : "win");
+}
+function jpTick(j, dt) {
+  j.x += dt * 1.1; // 横穿村庄
+  // 民兵哨杀伤
+  const milDps = C.militiaDps * (S.pols.mil ? C.polMilitiaAtk : 1);
+  for (const o of bAll()) {
+    if (o.b.type === "militia" && Math.hypot(o.x - j.x, o.y - j.y) <= C.militiaRadius) {
+      j.hp -= milDps * dt;
+      if (j.hp <= 0) { S.supply += C.militiaLoot; logT(`⚔ 民兵把一队鬼子撂在了村口——缴获物资+${C.militiaLoot}!`, "win"); return; }
+    }
+  }
+  // 烧未保护建筑
+  const gx = Math.round(j.x), gy = Math.round(j.y);
+  const cell = S.grid[gy]?.[gx];
+  if (cell && !cell.burned && cell.type !== "tunnel" && !covered(gx, gy)) {
+    j.burnT += dt;
+    cell.hp -= C.sweepBurnDps * dt;
+    if (Math.random() < dt * 8) S.flames.push({ x: gx + (Math.random() - .5) * .6, y: gy + (Math.random() - .5) * .6, life: .6 });
+    if (cell.hp <= 0) {
+      cell.burned = true;
+      logT(`${BDEFS[cell.type].name}被烧毁${cell.type === "field" ? "——庄稼付之一炬" : ""}。`, "loss");
+    }
+  }
+}
+function endSweep() {
+  S.sweeping = false;
+  S.nextSweep = S.t + C.sweepInterval;
+  logT(`扫荡过去了(第${S.sweepN}/${C.winSweeps}波)。清点损失,重建——地道再挖深些。`, "info");
+}
+function win() {
+  S.over = { win: true };
+  $("overT").textContent = "🔥 根据地站住了";
+  $("overR").innerHTML = `撑过 ${C.winSweeps} 波扫荡,人口 ${S.pop}。<br>地道纵横,粮田青青——任凭敌人多凶,冀中平原的地下长城拆不掉。<br><span style="color:#8a8058">史实:冀中地道网全长约1.25万公里,被称为"地下长城"。</span>`;
+  $("over").style.display = "flex";
+}
+function lose(r) {
+  S.over = { win: false };
+  $("overT").textContent = "💀 村子散了";
+  $("overR").textContent = r;
+  $("over").style.display = "flex";
+}
+
+// ── 建造 ──
+function canAfford(type) {
+  const c = BDEFS[type].cost;
+  return S.grain >= c.g && S.supply >= c.s && (S.pop - workersUsed()) >= c.w;
+}
+function tryBuild(x, y, type) {
+  if (terrain[y][x] !== "plain") { logT(type === "tunnel" && terrain[y][x] === "hill" ? "山地也能挖——但白盒先只许平地。" : "这里不能建。", "info"); return; }
+  if (S.grid[y][x] && !S.grid[y][x].burned) return;
+  if (type === "hall" && count("hall") >= 1) { logT("村公所只能有一座。", "info"); return; }
+  if (!canAfford(type)) return;
+  const c = BDEFS[type].cost;
+  S.grain -= c.g; S.supply -= c.s;
+  put(x, y, type);
+  if (type === "hall") $("pols").style.display = "block";
+  logT(`${BDEFS[type].name}${type === "tunnel" ? "开挖" : "建成"}。`, "info");
+}
+
+// ── 渲染 ──
+function draw() {
+  ctx.fillStyle = "#151309"; ctx.fillRect(0, 0, W, H);
+  // tiles
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const px = ix(x, y), py = iy(x, y);
+    if (px < -60 || px > W + 60 || py < -40 || py > H + 40) continue;
+    const t = terrain[y][x];
+    ctx.beginPath();
+    ctx.moveTo(px, py - T * .5); ctx.lineTo(px + T * 1.02, py); ctx.lineTo(px, py + T * .5); ctx.lineTo(px - T * 1.02, py);
+    ctx.closePath();
+    ctx.fillStyle = t === "hill" ? "#4a4433" : t === "river" ? "#2e4a52" : "#3d3a26";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(20,18,12,.6)"; ctx.stroke();
+    const cell = S.grid[y][x];
+    if (cell) {
+      const d = BDEFS[cell.type];
+      if (cell.burned) {
+        ctx.fillStyle = "#2a221a";
+        ctx.fillRect(px - 10, py - 8, 20, 10);
+      } else if (cell.type === "field") {
+        ctx.fillStyle = d.color;
+        for (let r = 0; r < 3; r++) { ctx.fillRect(px - 14 + 2, py - 7 + r * 5, 24, 3); }
+      } else if (cell.type === "tunnel") {
+        ctx.fillStyle = "#241e14";
+        ctx.beginPath(); ctx.ellipse(px, py, 10, 6, 0, 0, 7); ctx.fill();
+        ctx.strokeStyle = "#6b5a30"; ctx.stroke();
+        if (cell.dig < 1) { ctx.fillStyle = "#d8a441"; ctx.fillRect(px - 10, py + 8, 20 * cell.dig, 3); }
+      } else {
+        ctx.fillStyle = d.color;
+        ctx.fillRect(px - 11, py - 12, 22, 15);
+        ctx.fillStyle = "rgba(0,0,0,.25)";
+        ctx.beginPath(); ctx.moveTo(px - 13, py - 12); ctx.lineTo(px, py - 20); ctx.lineTo(px + 13, py - 12); ctx.closePath(); ctx.fill();
+        if (cell.type === "militia") { ctx.fillStyle = "#e2564d"; ctx.fillRect(px - 1, py - 26, 6, 4); }
+        if (cell.type === "hall") { ctx.fillStyle = "#e2564d"; ctx.fillRect(px - 2, py - 28, 8, 5); }
+      }
+    }
+  }
+  // 地道网连线(挖通的地道口互连——地下长城可视化)
+  const tuns = bAll().filter(o => o.b.type === "tunnel" && o.b.dig >= 1);
+  ctx.setLineDash([3, 5]); ctx.strokeStyle = "rgba(216,164,65,.4)"; ctx.lineWidth = 1.6;
+  for (let i = 0; i < tuns.length; i++) for (let k = i + 1; k < tuns.length; k++) {
+    if (Math.hypot(tuns[i].x - tuns[k].x, tuns[i].y - tuns[k].y) <= C.tunnelRadius * 2.2) {
+      ctx.beginPath(); ctx.moveTo(ix(tuns[i].x, tuns[i].y), iy(tuns[i].x, tuns[i].y)); ctx.lineTo(ix(tuns[k].x, tuns[k].y), iy(tuns[k].x, tuns[k].y)); ctx.stroke();
+    }
+  }
+  ctx.setLineDash([]);
+  // 覆盖圈(建造地道选中时全部显示,平时淡显)
+  const showCover = S.buildSel === "tunnel";
+  for (const o of tuns) {
+    ctx.strokeStyle = showCover ? "rgba(216,164,65,.55)" : "rgba(216,164,65,.16)";
+    ctx.beginPath(); ctx.ellipse(ix(o.x, o.y), iy(o.x, o.y), C.tunnelRadius * T * 1.05, C.tunnelRadius * T * .52, 0, 0, 7); ctx.stroke();
+  }
+  // 民兵圈
+  for (const o of bAll().filter(o => o.b.type === "militia")) {
+    ctx.strokeStyle = "rgba(226,86,77,.22)";
+    ctx.beginPath(); ctx.ellipse(ix(o.x, o.y), iy(o.x, o.y), C.militiaRadius * T * 1.05, C.militiaRadius * T * .52, 0, 0, 7); ctx.stroke();
+  }
+  // 日军
+  for (const j of S.jps) {
+    const px = ix(j.x, j.y), py = iy(j.x, j.y);
+    ctx.fillStyle = "#5a5c40";
+    ctx.beginPath(); ctx.arc(px, py, 9, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#2a281a"; ctx.stroke();
+    ctx.fillStyle = "#e8e2d0"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("扫", px, py + 3);
+    ctx.fillStyle = "#1a160e"; ctx.fillRect(px - 9, py + 10, 18, 3);
+    ctx.fillStyle = "#c8b040"; ctx.fillRect(px - 9, py + 10, 18 * j.hp / j.maxHp, 3);
+  }
+  // 火焰
+  for (const f of S.flames) {
+    const px = ix(f.x, f.y), py = iy(f.x, f.y);
+    ctx.fillStyle = `rgba(255,${100 + Math.random() * 80 | 0},30,${f.life})`;
+    ctx.beginPath(); ctx.arc(px, py - 8 - (0.6 - f.life) * 16, 3 + Math.random() * 3, 0, 7); ctx.fill();
+  }
+  // 建造预览
+  if (S.buildSel && hoverCell) {
+    const px = ix(hoverCell.x, hoverCell.y), py = iy(hoverCell.x, hoverCell.y);
+    const ok = terrain[hoverCell.y][hoverCell.x] === "plain" && (!S.grid[hoverCell.y][hoverCell.x] || S.grid[hoverCell.y][hoverCell.x].burned) && canAfford(S.buildSel);
+    ctx.strokeStyle = ok ? "#7ec850" : "#e2564d"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px, py - T * .5); ctx.lineTo(px + T * 1.02, py); ctx.lineTo(px, py + T * .5); ctx.lineTo(px - T * 1.02, py);
+    ctx.closePath(); ctx.stroke(); ctx.lineWidth = 1;
+    if (S.buildSel === "tunnel") {
+      ctx.strokeStyle = "rgba(216,164,65,.7)"; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.ellipse(px, py, C.tunnelRadius * T * 1.05, C.tunnelRadius * T * .52, 0, 0, 7); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  // HUD
+  $("tPop").textContent = `${S.pop}/${popCap()}`;
+  $("tGrain").textContent = `${Math.floor(S.grain)}/${grainCap()}`;
+  $("tSupply").textContent = Math.floor(S.supply);
+  const shel = shelterCap();
+  $("tShelter").textContent = `${Math.min(S.pop, shel)}/${S.pop}人`;
+  $("tShelter").parentElement.style.color = shel >= S.pop ? "#9ab06a" : "#e2564d";
+  const left = S.nextSweep - S.t;
+  $("tSweep").innerHTML = S.sweeping ? '<span class="warn">🔥 扫荡进行中!</span>' : left <= C.sweepWarn ? `<span class="warn">⚠ 扫荡将至 ${Math.ceil(left)}s</span>` : `下波扫荡 ${Math.ceil(left)}s(第${S.sweepN + 1}/${C.winSweeps}波)`;
+  const yr = 1942 + Math.floor(S.t / (C.endYearSec / 3));
+  $("tDate").textContent = `${Math.min(1945, yr)}年 · ${Math.floor(S.t / 60)}:${String(Math.floor(S.t % 60)).padStart(2, "0")}`;
+  $("log").innerHTML = S.log.map(l => `<div class="${l.k}">${l.t}</div>`).join("");
+  // 政策按钮
+  $("pRent").disabled = S.pols.rent; $("pProd").disabled = S.pols.prod; $("pMil").disabled = S.pols.mil;
+  // 建造栏
+  renderBuild();
+}
+// ── 建造栏 ──
+let buildBtns = null, hoverCell = null;
+function renderBuild() {
+  if (!buildBtns) {
+    const host = $("build");
+    buildBtns = {};
+    for (const k of Object.keys(BDEFS)) {
+      const b = document.createElement("button");
+      b.id = "bb_" + k;
+      b.addEventListener("click", () => { S.buildSel = S.buildSel === k ? null : k; });
+      host.appendChild(b);
+      buildBtns[k] = b;
+    }
+    const spacer = document.createElement("div"); spacer.className = "grow"; host.appendChild(spacer);
+    const qb = document.createElement("button"); qb.id = "qbBtn";
+    qb.textContent = "🕳 坚壁清野!";
+    qb.title = "扫荡预警时使用:额外把一半没有地道庇护的乡亲塞进就近地道";
+    qb.addEventListener("click", () => {
+      if (!S.warned || S.qbUsed) return;
+      S.qbBonus = true; S.qbUsed = true;
+      logT("坚壁清野!家家户户往地道里钻,粮食藏进夹壁墙——就算挤,也别留给鬼子。", "win");
+    });
+    host.appendChild(qb);
+  }
+  for (const k of Object.keys(BDEFS)) {
+    const d = BDEFS[k], b = buildBtns[k];
+    b.innerHTML = `${d.name}<small>🌾${d.cost.g} 📦${d.cost.s}${d.cost.w ? " 👥" + d.cost.w : ""}</small>`;
+    b.className = S.buildSel === k ? "on" : "";
+    b.disabled = !canAfford(k) && S.buildSel !== k;
+    b.title = d.desc;
+  }
+  $("qbBtn").style.display = "";
+  $("qbBtn").disabled = !S.warned || S.qbUsed;
+}
+// ── 交互 ──
+cv.addEventListener("mousemove", (e) => {
+  hoverCell = pick(e.clientX, e.clientY - cv.getBoundingClientRect().top);
+  const tip = $("tip");
+  if (hoverCell) {
+    const cell = S.grid[hoverCell.y]?.[hoverCell.x];
+    if (cell && !cell.burned) {
+      tip.style.display = "block";
+      tip.style.left = e.clientX + 14 + "px"; tip.style.top = e.clientY + 8 + "px";
+      const cov = covered(hoverCell.x, hoverCell.y);
+      tip.innerHTML = `<b style="color:#f0e4c0">${BDEFS[cell.type].name}</b><br>${BDEFS[cell.type].desc}<br>${cell.type !== "tunnel" ? (cov ? "<span style='color:#9ab06a'>🕳 地道覆盖中(扫荡免烧)</span>" : "<span style='color:#e2564d'>⚠ 无地道保护!</span>") : ""}`;
+    } else tip.style.display = "none";
+  } else tip.style.display = "none";
+});
+cv.addEventListener("click", (e) => {
+  if (S.over || !S.buildSel) return;
+  const c = pick(e.clientX, e.clientY - cv.getBoundingClientRect().top);
+  if (c) tryBuild(c.x, c.y, S.buildSel);
+});
+$("pRent").addEventListener("click", () => { if (!S.pols.rent) { S.pols.rent = true; logT("【减租减息】地租降了,佃户直起了腰——愿意来村里安家的人多了。", "win"); } });
+$("pProd").addEventListener("click", () => { if (!S.pols.prod) { S.pols.prod = true; logT("【大生产运动】开荒、纺线、互助组——自己动手,丰衣足食。", "win"); } });
+$("pMil").addEventListener("click", () => { if (!S.pols.mil) { S.pols.mil = true; logT("【劳武结合】一手锄头一手枪,民兵瞄得更准了。", "win"); } });
+
+window.__dd = { s: () => S, build: tryBuild, give: (g, s2, p) => { S.grain += g; S.supply += s2; S.pop += p; }, sweep: () => { S.nextSweep = S.t; } };
+newGame();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
