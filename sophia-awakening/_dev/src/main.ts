@@ -23,7 +23,11 @@ window.addEventListener("hashchange", () => {
 // 路由：#matrix=算力格子矩阵白盒；#v3=Cookie Clicker 式重构；#classic=旧 Pixi 版；默认=多阶段白盒方块地图。
 const hash = location.hash.toLowerCase();
 const path = location.pathname.toLowerCase();
-if (hash.includes("kangri") || path.includes("/kangri")) {
+if (hash.includes("tbs")) {
+  import("./tbs/app")
+    .then(({ bootstrapTbs }) => bootstrapTbs(root))
+    .catch(showFatal);
+} else if (hash.includes("kangri") || path.includes("/kangri")) {
   import("./kangri/app")
     .then(({ bootstrapKangri }) => bootstrapKangri(root))
     .catch(showFatal);
