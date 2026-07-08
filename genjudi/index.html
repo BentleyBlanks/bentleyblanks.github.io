@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>根据地 · MVP</title>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// 《根据地》MVP —— 全部数值参数。调平衡只改这里。
+// 每个参数注释末尾【行为】= 预期它影响哪种玩家行为。
+// ═══════════════════════════════════════════════════════════════
+const CONFIG = {
+  // ── 回合与胜负 ──
+  totalTurns: 30,        // 总回合(1943.1-1945.6)。改小→全局更紧
+  cadrePoints: 3,        // 每回合干部点。【行为】3点=每回合必有舍弃;加到4玩家会"既要又要",纠结感崩
+  winVillages: 6,        // 胜利村庄数。【行为】需扩张5次,配合注意度节奏≈逼出2-3个"冒进期"
+  starveFailTurns: 3,    // 连续负粮N回合判负。【行为】给1-2回合抢救窗口,粮危机是"警报"而非"猝死"
+
+  // ── 起始 ──
+  startGrain: 50,
+  startArms: 10,
+  startTroops: 20,
+
+  // ── 经济 ──
+  farmYield: 8,          // 每处开垦+粮/回合。【行为】8粮/垦 vs 5粮/村消耗→1垦养1.6村,扩张前必先垦,压出"建设回合"
+  factoryYield: 4,       // 每处厂+武器/回合
+  factoryNoise: 2,       // 每处厂+注意度/回合(持续!)。【行为】武器的隐性长期代价——办厂是"抵押安全换战力"
+  grainUpkeep: 5,        // 每村耗粮/回合。【行为】涨它→扩张更贵更谨慎
+  drillCostArms: 5,      // 练兵消耗武器
+  drillGainTroops: 10,   // 练兵获得兵员。【行为】5武→10兵,武器是"存着守村(×0.5)"还是"变现成兵(×1)"的二选一
+  hqTax: 0,              // 起始村额外产粮(0=无特殊)。留作调参余地
+
+  // ── 民心与扩张 ──
+  workteamHeart: 15,     // 工作队+民心/次
+  annexThreshold: 80,    // 并入门槛。中立村初始20→每村约需5次工作队(含回落损耗)
+  heartDecay: 3,         // 未并入村民心每回合回落(不低于初始值)。【行为】惩罚"撒胡椒面",鼓励集中攻坚一个村
+  starveHeartLoss: 5,    // 负粮时全部己方村民心-X/回合
+  heartFloorRevolt: 30,  // 己方村民心低于此→退回中立。【行为】断粮的连锁失地代价
+  villageLostHeart: 0,   // 被扫荡丢的村民心归零(焦土——被烧的村要重建信任)。【行为】丢村=重大损失,吃村速度跑不赢丢村速度
+  neutralHeartStart: 15, // 中立村初始民心。【行为】每村约需5次工作队——扩张是重投资
+
+  // ── 注意度(灵魂) ──
+  noisePerVillage: 1.5,  // 每村+注意度/回合。【行为】规模本身=暴露:7村=+10.5/回合,后期危险区几乎压不住——大根据地必须学会与扫荡共存
+  noiseAnnex: 10,        // 扩张成功+注意度。【行为】"再吃一个村"的即时冒险成本——中盘最纠结点的来源
+  noiseHideReduce: 5,    // 隐蔽:注意度立减X(可在一回合内多次隐蔽叠加)
+  hideGrowthMult: 0.5,   // 隐蔽当回合注意度增长×0.5
+  sweepThreshold: 60,    // 扫荡概率起算线。【行为】60以下绝对安全,玩家会精确卡线——有意留出"贴脸操作"空间
+  sweepChancePct: 3,     // 超线每点+3%概率。70→30%,80→60%——软墙不是硬墙,但赌注更大
+
+  // ── 扫荡 ──
+  sweepBasePower: 45,    // 日军基础战力,回合t实际=base×(1+t/总回合)+村数×perVillage。t10≈60/t20≈75/t30≈90
+                         // 【行为】防御(兵+武器×0.5)必须持续成长——"纯苟不练兵"到中期被打穿→苟不是最优解
+  sweepPowerPerVillage: 4,// 日军战力额外+村数×4。【行为】树大招风:8村时+32——规模越大防御门槛越高,胜利必须持续投入军备而非白嫖扩张
+  armsDefRatio: 0.5,     // 防御=兵员+武器×X(库存武器也守村)
+  lootGrainWin: 0.15,    // 打退(差值≤0)仍被抢粮15%。【行为】扫荡永远疼,防玩家把挨打当"免费清零注意度"
+  lootGrainLose: 0.3,    // 打输被抢粮30%
+  diffLoseFacility: 15,  // 差值≥15:随机摧毁1处开垦/厂
+  diffLoseVillage: 30,   // 差值≥30:失去民心最低的己方村
+  diffLoseVillagePer: 25,// 差值每再多25,额外多丢1村。【行为】防御被甩开越远丢得越狠——无脑猛扩的克星
+  troopsLossRatio: 0.5,  // 兵员战损=差值×0.5
+  troopsLossMin: 0.1,    // 打赢也按日军战力×10%掉兵
+  hiddenLossMult: 0.5,   // 偏隐蔽村被选中受损时50%概率豁免(=期望损失减半)
+  noiseAfterSweep: 15,   // 扫荡后注意度归此值(余威——日军仍在注视)。【行为】周期变紧,连续冒进的空间更小
+
+  // ── 村庄特产 ──
+  grainBonus: 4,         // 偏粮村(己方)额外+4粮/回合。【行为】扩张选边:先吃粮村续航
+  recruitBonus: 1,       // 偏兵源村(己方)每回合自然+1兵。【行为】长线复利,越早吃越值
+};
+
+// ── 固定地图: 10 村。type: start/grain(粮)/recruit(兵源)/hidden(隐蔽) ──
+const VILLAGES = [
+  { id: 0, name: "李家庄", type: "start",   x: 175, y: 150, adj: [1, 3, 4, 6] },
+  { id: 1, name: "西沟",   type: "grain",   x: 60,  y: 150, adj: [0, 2, 5] },
+  { id: 2, name: "北坡",   type: "hidden",  x: 110, y: 60,  adj: [1, 3] },
+  { id: 3, name: "黑石崖", type: "hidden",  x: 240, y: 60,  adj: [0, 2] },
+  { id: 4, name: "王家峪", type: "recruit", x: 290, y: 150, adj: [0, 7, 8] },
+  { id: 5, name: "南湾",   type: "grain",   x: 115, y: 240, adj: [1, 6] },
+  { id: 6, name: "赵家坳", type: "recruit", x: 235, y: 240, adj: [0, 5, 8, 9] },
+  { id: 7, name: "东塬",   type: "grain",   x: 400, y: 150, adj: [4] },
+  { id: 8, name: "河口",   type: "hidden",  x: 345, y: 240, adj: [4, 6] },
+  { id: 9, name: "孙家铺", type: "recruit", x: 235, y: 315, adj: [6] },
+];
+const TYPE_LABEL = { start: "根据地", grain: "偏粮", recruit: "偏兵源", hidden: "偏隐蔽" };
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #16130c; color: #d8c9a0; font-family: system-ui, "Noto Sans SC", sans-serif; font-size: 14px; }
+#wrap { max-width: 480px; margin: 0 auto; padding: 8px 10px 30px; }
+h1 { font-size: 17px; letter-spacing: 3px; color: #f0e4c0; padding: 4px 0 2px; }
+h1 small { font-size: 11px; color: #8a8058; letter-spacing: 0; margin-left: 8px; }
+
+.bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: #1e1a10; border: 1px solid #3a3826; border-radius: 6px; padding: 7px 10px; margin: 6px 0; font-size: 13px; }
+.bar b { color: #f0e4c0; }
+.res { white-space: nowrap; }
+.res.bad b { color: #e2564d; }
+
+.noisewrap { margin: 6px 0; }
+.noiselabel { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+.noisebar { position: relative; height: 14px; background: #242014; border: 1px solid #3a3826; border-radius: 7px; overflow: hidden; }
+.noisefill { height: 100%; width: 0%; background: #7a8f3a; transition: width .3s, background .3s; }
+.noisefill.warn { background: #d8a441; }
+.noisefill.hot { background: #e2564d; }
+.noiseline { position: absolute; top: 0; bottom: 0; left: 60%; width: 2px; background: rgba(240,228,192,.55); }
+
+svg { display: block; width: 100%; background: #1a170e; border: 1px solid #3a3826; border-radius: 8px; margin: 6px 0; touch-action: manipulation; }
+.vl { stroke: #4a4430; stroke-width: 2; }
+.vnode { cursor: pointer; }
+.vnode circle { stroke-width: 2.5; }
+.vc-neutral { fill: #3c3626; stroke: #5c5440; }
+.vc-owned { fill: #7a2a20; stroke: #e2564d; }
+.vc-target { stroke: #ffe9a0 !important; stroke-width: 4 !important; }
+.vname { fill: #e8dcc0; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+.vsub { fill: #a99a70; font-size: 9px; text-anchor: middle; pointer-events: none; }
+.vheart { fill: #d8a441; font-size: 9.5px; text-anchor: middle; pointer-events: none; }
+.vbuild { fill: #9ab06a; font-size: 9px; text-anchor: middle; pointer-events: none; }
+@keyframes pulse { 0%,100% { stroke-opacity: 1; } 50% { stroke-opacity: .35; } }
+.vc-target { animation: pulse 1s infinite; }
+
+.acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 6px 0; }
+.acts button { font-family: inherit; font-size: 12.5px; padding: 9px 4px; border: 1px solid #6b5a30; border-radius: 6px; background: #2a2416; color: #e8d7ae; cursor: pointer; line-height: 1.35; }
+.acts button small { display: block; font-size: 10px; color: #8a8058; }
+.acts button:disabled { opacity: .38; }
+.acts button.picking { border-color: #ffe9a0; background: #3a3218; }
+#endBtn { grid-column: span 3; font-weight: 700; font-size: 14px; padding: 11px; background: linear-gradient(180deg, #5a221c, #3a1610); border-color: #d8a441; color: #f0e4c0; }
+.hint { font-size: 12px; color: #d8a441; min-height: 17px; padding: 1px 2px; }
+
+#log { background: #1a170e; border: 1px solid #3a3826; border-radius: 6px; padding: 8px 10px; font-size: 12.5px; line-height: 1.65; max-height: 180px; overflow-y: auto; margin: 6px 0; }
+#log .win { color: #f2c0a0; }
+#log .loss { color: #e2564d; }
+#log .info { color: #b5a575; }
+#log .turnhead { color: #8a8058; border-top: 1px dashed #3a3826; margin-top: 3px; padding-top: 3px; }
+#log div:first-child.turnhead { border-top: none; margin-top: 0; padding-top: 0; }
+
+details { background: #1e1a10; border: 1px solid #3a3826; border-radius: 6px; padding: 7px 10px; margin: 6px 0; font-size: 12.5px; }
+summary { cursor: pointer; color: #d8a441; font-weight: 700; }
+details p { margin: 6px 0; line-height: 1.6; color: #b5a575; }
+#dbg table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+#dbg td { padding: 2px 4px; border-bottom: 1px solid #2a2618; font-size: 12px; }
+#dbg button { font-family: inherit; font-size: 12px; padding: 6px 12px; margin: 4px 6px 2px 0; border: 1px solid #6b5a30; border-radius: 5px; background: #2a2416; color: #e8d7ae; cursor: pointer; }
+
+#over { position: fixed; inset: 0; background: rgba(8,6,4,.88); display: none; align-items: center; justify-content: center; z-index: 10; }
+#over .card { background: #1e1a10; border: 2px solid #d8a441; border-radius: 10px; padding: 28px 30px; max-width: 400px; margin: 20px; text-align: center; }
+#over .t { font-size: 28px; font-weight: 800; letter-spacing: 5px; color: #f0e4c0; margin-bottom: 10px; }
+#over .r { line-height: 1.7; color: #b5a575; margin-bottom: 16px; }
+#over button { font-family: inherit; font-size: 14px; padding: 9px 26px; border: 1px solid #d8a441; border-radius: 6px; background: linear-gradient(180deg, #5a221c, #3a1610); color: #f0e4c0; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>根据地<small>1943.1 — 1945.6 · MVP</small></h1>
+
+  <div class="bar">
+    <span class="res" id="rTurn"></span>
+    <span class="res" id="rGrain"></span>
+    <span class="res" id="rArms"></span>
+    <span class="res" id="rTroops"></span>
+    <span class="res" id="rVil"></span>
+  </div>
+
+  <div class="noisewrap">
+    <div class="noiselabel"><span>注意度 <b id="nVal"></b></span><span id="nWarn"></span></div>
+    <div class="noisebar"><div class="noisefill" id="nFill"></div><div class="noiseline"></div></div>
+  </div>
+
+  <svg id="map" viewBox="0 0 460 360"></svg>
+
+  <div class="bar" style="justify-content:space-between">
+    <span>干部点 <b id="rCp"></b> / 3</span><span id="hideMark"></span>
+  </div>
+  <div class="hint" id="hint"></div>
+  <div class="acts">
+    <button id="aFarm">开垦<small>+8粮/回合</small></button>
+    <button id="aFactory">办厂<small>+4武器 注意+2/回合</small></button>
+    <button id="aWork">工作队<small>邻村民心+15</small></button>
+    <button id="aDrill">练兵<small>-5武器 +10兵</small></button>
+    <button id="aHide">隐蔽<small>注意-5 增长减半</small></button>
+    <button id="endBtn">结束回合 ▶</button>
+  </div>
+
+  <div id="log"></div>
+
+  <details>
+    <summary>帮助</summary>
+    <p>目标:第 30 回合结束时拥有 ≥6 个村庄。失败:村庄全丢,或粮食连续 3 回合为负。</p>
+    <p>每回合 3 干部点。<b>开垦/办厂</b>建在己方村(持续产出,办厂持续+注意度)。<b>工作队</b>渗透与己方村相邻的中立村(+15民心,满80并入,并入+8注意度;渗透中断民心会回落)。<b>练兵</b>把武器变成兵员。<b>隐蔽</b>压注意度。</p>
+    <p><b>注意度</b>每回合随村庄数和工厂数增长,≥60 后每回合有概率遭日军<b>扫荡</b>:日军战力随时间变强,对比你的防御(兵员+武器×0.5),打输会被抢粮、毁设施、甚至丢村(偏隐蔽村损失减半);打赢也会被抢一小口。扫荡后注意度归零。</p>
+    <p>断粮:全村民心下降,民心低于30的村会脱离;连续3回合负粮即失败。</p>
+  </details>
+
+  <details id="dbgWrap">
+    <summary>调试面板</summary>
+    <div id="dbg"></div>
+  </details>
+</div>
+
+<div id="over"><div class="card"><div class="t" id="overT"></div><div class="r" id="overR"></div><button onclick="location.reload()">再来一局</button></div></div>
+
+<script>
+"use strict";
+const C = CONFIG;
+const $ = (id) => document.getElementById(id);
+
+// ── 状态 ──
+let S;
+function newGame() {
+  S = {
+    turn: 1, cp: C.cadrePoints,
+    grain: C.startGrain, arms: C.startArms, troops: C.startTroops,
+    noise: 0, hiding: false, starveStreak: 0,
+    sweeps: 0,
+    vs: VILLAGES.map((v) => ({
+      owned: v.type === "start",
+      heart: v.type === "start" ? C.annexThreshold : C.neutralHeartStart,
+      farms: 0, factories: 0
+    })),
+    log: [], over: null,
+  };
+  logT(`【第1回合 · ${dateStr(1)}】根据地立在李家庄。3 个干部点,用在哪?`, "info");
+}
+function dateStr(t) { const m = (t - 1) % 12, y = 1943 + Math.floor((t - 1) / 12); return `${y}年${m + 1}月`; }
+function ownedCount() { return S.vs.filter((v) => v.owned).length; }
+function jpPower() { return C.sweepBasePower * (1 + S.turn / C.totalTurns) + ownedCount() * C.sweepPowerPerVillage; }
+function myDefense() { return S.troops + S.arms * C.armsDefRatio; }
+function sweepChance() { return S.noise >= C.sweepThreshold ? Math.min(100, (S.noise - C.sweepThreshold) * C.sweepChancePct) : 0; }
+function logT(t, k) { S.log.unshift({ t, k }); if (S.log.length > 60) S.log.pop(); }
+
+// ── 行动 ──
+let picking = null; // "farm"|"factory"|"work"
+function canWork(i) { // 中立村且与任一己方村相邻
+  const v = VILLAGES[i];
+  return !S.vs[i].owned && v.adj.some((a) => S.vs[a].owned);
+}
+function doAction(kind, target) {
+  if (S.over || S.cp <= 0) return;
+  const st = target !== undefined ? S.vs[target] : null;
+  if (kind === "farm") { st.farms += 1; logT(`${VILLAGES[target].name}开垦一片荒地(+${C.farmYield}粮/回合)。`, "info"); }
+  else if (kind === "factory") { st.factories += 1; logT(`${VILLAGES[target].name}办起小兵工厂(+${C.factoryYield}武器,注意+${C.factoryNoise}/回合)。`, "info"); }
+  else if (kind === "work") {
+    st.heart = Math.min(100, st.heart + C.workteamHeart);
+    if (st.heart >= C.annexThreshold) {
+      st.owned = true;
+      S.noise = Math.min(100, S.noise + C.noiseAnnex);
+      logT(`★ ${VILLAGES[target].name}挂起了红旗——并入根据地!(注意度+${C.noiseAnnex})`, "win");
+    } else logT(`工作队进了${VILLAGES[target].name}:民心 ${st.heart}/${C.annexThreshold}。`, "info");
+  }
+  else if (kind === "drill") {
+    if (S.arms < C.drillCostArms) return;
+    S.arms -= C.drillCostArms; S.troops += C.drillGainTroops;
+    logT(`练兵:武器-${C.drillCostArms},民兵+${C.drillGainTroops}。`, "info");
+  }
+  else if (kind === "hide") {
+    S.noise = Math.max(0, S.noise - C.noiseHideReduce);
+    S.hiding = true;
+    logT(`坚壁清野,化整为零(注意度-${C.noiseHideReduce},本回合增长减半)。`, "info");
+  }
+  S.cp -= 1;
+  picking = null;
+  render();
+}
+
+// ── 结束回合结算 ──
+function endTurn() {
+  if (S.over) return;
+  const head = [];
+  // 1 产出
+  let gG = 0, gA = 0, gT = 0;
+  S.vs.forEach((st, i) => {
+    if (!st.owned) return;
+    gG += st.farms * C.farmYield + (VILLAGES[i].type === "grain" ? C.grainBonus : 0) + (VILLAGES[i].type === "start" ? C.hqTax : 0);
+    gA += st.factories * C.factoryYield;
+    gT += VILLAGES[i].type === "recruit" ? C.recruitBonus : 0;
+  });
+  // 2 消耗
+  const upkeep = ownedCount() * C.grainUpkeep;
+  S.grain += gG - upkeep; S.arms += gA; S.troops += gT;
+  head.push(`产出:粮${gG >= upkeep ? "+" : ""}${gG - upkeep}(收${gG}/耗${upkeep}) 武器+${gA}${gT ? " 兵+" + gT : ""}`);
+  // 3 断粮
+  if (S.grain < 0) {
+    S.starveStreak += 1;
+    S.vs.forEach((st) => { if (st.owned) st.heart = Math.max(0, st.heart - C.starveHeartLoss); });
+    logT(`⚠ 粮食见底(连续${S.starveStreak}回合)!各村民心-${C.starveHeartLoss}。`, "loss");
+    S.vs.forEach((st, i) => {
+      if (st.owned && st.heart < C.heartFloorRevolt && VILLAGES[i].type !== "start") {
+        st.owned = false; st.farms = 0; st.factories = 0; st.heart = C.neutralHeartStart;
+        logT(`${VILLAGES[i].name}对根据地失望,脱离了。`, "loss");
+      }
+    });
+    if (S.starveStreak >= C.starveFailTurns) return gameOver(false, "粮食连续三个月见底——根据地散了。");
+  } else S.starveStreak = 0;
+  // 4 中立村民心回落
+  S.vs.forEach((st) => { if (!st.owned && st.heart > C.neutralHeartStart) st.heart = Math.max(C.neutralHeartStart, st.heart - C.heartDecay); });
+  // 5 注意度增长
+  let gain = ownedCount() * C.noisePerVillage + S.vs.reduce((a, st) => a + (st.owned ? st.factories : 0), 0) * C.factoryNoise;
+  if (S.hiding) gain *= C.hideGrowthMult;
+  S.noise = Math.min(100, S.noise + gain);
+  head.push(`注意度+${Math.round(gain * 10) / 10}${S.hiding ? "(隐蔽减半)" : ""}→${Math.round(S.noise)}`);
+  logT(head.join(" · "), "info");
+  // 6 扫荡判定
+  const p = sweepChance();
+  if (p > 0 && Math.random() * 100 < p) doSweep();
+  if (S.over) return;
+  // 7 胜负
+  if (S.turn >= C.totalTurns) {
+    const n = ownedCount();
+    return gameOver(n >= C.winVillages, n >= C.winVillages
+      ? `坚持到 ${dateStr(C.totalTurns)},根据地 ${n} 个村——上级来电:很好,燎原了。`
+      : `坚持到最后,但根据地只有 ${n} 个村(需要${C.winVillages})——星火未成燎原。`);
+  }
+  // 8 新回合
+  S.turn += 1; S.cp = C.cadrePoints; S.hiding = false;
+  logT(`【第${S.turn}回合 · ${dateStr(S.turn)}】`, "turnhead");
+  render();
+}
+
+// ── 扫荡 ──
+function doSweep() {
+  S.sweeps += 1;
+  const jp = Math.round(jpPower());
+  const def = Math.round(myDefense());
+  const diff = jp - def;
+  const lines = [`⚔ 日军扫荡!敌战力${jp} vs 我防御${def}(兵${S.troops}+武器×${C.armsDefRatio})`];
+  // 兵损
+  const tl = Math.round(Math.max(jp * C.troopsLossMin, diff * C.troopsLossRatio));
+  S.troops = Math.max(0, S.troops - tl);
+  if (diff <= 0) {
+    const loot = Math.round(Math.max(0, S.grain) * C.lootGrainWin);
+    S.grain -= loot;
+    lines.push(`打退了!但村口的粮车被抢走一批(-${loot}粮),民兵伤亡${tl}。`);
+    logT(lines.join(" "), "win");
+  } else {
+    const loot = Math.round(Math.max(0, S.grain) * C.lootGrainLose);
+    S.grain -= loot;
+    lines.push(`没顶住:被抢粮${loot},民兵伤亡${tl}。`);
+    // 毁设施
+    if (diff >= C.diffLoseFacility) {
+      const cands = S.vs.map((st, i) => ({ st, i })).filter((x) => x.st.owned && (x.st.farms + x.st.factories) > 0);
+      if (cands.length) {
+        const pick = cands[Math.floor(Math.random() * cands.length)];
+        const spared = VILLAGES[pick.i].type === "hidden" && Math.random() < C.hiddenLossMult;
+        if (spared) lines.push(`日军搜山扑向${VILLAGES[pick.i].name},但那里沟壑纵横,设施藏住了。`);
+        else {
+          if (pick.st.factories > 0) { pick.st.factories -= 1; lines.push(`${VILLAGES[pick.i].name}的兵工厂被炸毁。`); }
+          else { pick.st.farms -= 1; lines.push(`${VILLAGES[pick.i].name}的垦田被烧。`); }
+        }
+      }
+    }
+    // 丢村(按差值阶梯: 30丢1, 每多25再丢1)
+    if (diff >= C.diffLoseVillage) {
+      const loseN = 1 + Math.floor((diff - C.diffLoseVillage) / C.diffLoseVillagePer);
+      for (let li = 0; li < loseN; li++) {
+      const cands = S.vs.map((st, i) => ({ st, i })).filter((x) => x.st.owned && VILLAGES[x.i].type !== "start");
+      if (cands.length) {
+        cands.sort((a, b) => a.st.heart - b.st.heart);
+        const pick = cands[0];
+        const spared = VILLAGES[pick.i].type === "hidden" && Math.random() < C.hiddenLossMult;
+        if (spared) lines.push(`${VILLAGES[pick.i].name}靠地形躲过了驻剿。`);
+        else {
+          pick.st.owned = false; pick.st.farms = 0; pick.st.factories = 0; pick.st.heart = C.villageLostHeart;
+          lines.push(`${VILLAGES[pick.i].name}失守,退回中立(民心存${C.villageLostHeart})。`);
+        }
+      } else if (ownedCount() <= 1) {
+        // 只剩起始村还被打穿→失守判负
+        logT(lines.join(" "), "loss");
+        return gameOver(false, "最后的根据地也被扫荡踏平了。");
+      }
+      }
+    }
+    logT(lines.join(" "), "loss");
+  }
+  S.noise = C.noiseAfterSweep;
+  if (ownedCount() === 0) gameOver(false, "根据地全部丢失。");
+}
+
+function gameOver(win, reason) {
+  S.over = { win, reason };
+  $("overT").textContent = win ? "🔥 燎原" : "💀 星火熄灭";
+  $("overR").textContent = reason + `(共经历 ${S.sweeps} 次扫荡)`;
+  $("over").style.display = "flex";
+  render();
+}
+
+// ── 渲染 ──
+const svg = $("map");
+function buildMap() {
+  let html = "";
+  const done = new Set();
+  for (const v of VILLAGES) for (const a of v.adj) {
+    const k = Math.min(v.id, a) + "-" + Math.max(v.id, a);
+    if (done.has(k)) continue; done.add(k);
+    const b = VILLAGES[a];
+    html += `<line class="vl" x1="${v.x}" y1="${v.y}" x2="${b.x}" y2="${b.y}"/>`;
+  }
+  for (const v of VILLAGES) {
+    html += `<g class="vnode" data-i="${v.id}">
+      <circle id="vc${v.id}" cx="${v.x}" cy="${v.y}" r="22" class="vc-neutral"/>
+      <text class="vname" x="${v.x}" y="${v.y - 1}">${v.name}</text>
+      <text class="vsub" x="${v.x}" y="${v.y + 10}">${TYPE_LABEL[v.type]}</text>
+      <text class="vheart" id="vh${v.id}" x="${v.x}" y="${v.y + 34}"></text>
+      <text class="vbuild" id="vb${v.id}" x="${v.x}" y="${v.y - 28}"></text>
+    </g>`;
+  }
+  svg.innerHTML = html;
+  svg.querySelectorAll(".vnode").forEach((g) => {
+    g.addEventListener("click", () => onVillage(Number(g.dataset.i)));
+  });
+}
+function onVillage(i) {
+  if (!picking || S.over) return;
+  const st = S.vs[i];
+  if (picking === "work" && canWork(i)) doAction("work", i);
+  else if ((picking === "farm" || picking === "factory") && st.owned) doAction(picking, i);
+}
+function render() {
+  $("rTurn").innerHTML = `回合 <b>${S.turn}</b>/${C.totalTurns}`;
+  $("rGrain").innerHTML = `🌾 <b>${S.grain}</b>`;
+  $("rGrain").className = "res" + (S.grain < 0 ? " bad" : "");
+  $("rArms").innerHTML = `🔫 <b>${S.arms}</b>`;
+  $("rTroops").innerHTML = `🪖 <b>${S.troops}</b>`;
+  $("rVil").innerHTML = `🚩 <b>${ownedCount()}</b>/${C.winVillages}`;
+  $("rCp").textContent = S.cp;
+  $("hideMark").textContent = S.hiding ? "🕶 本回合隐蔽中" : "";
+  const n = Math.round(S.noise);
+  $("nVal").textContent = n;
+  const p = sweepChance();
+  $("nWarn").textContent = p > 0 ? `⚠ 危险区(扫荡风险中)` : n >= 45 ? "接近警戒线(60)" : "";
+  const f = $("nFill");
+  f.style.width = n + "%";
+  f.className = "noisefill" + (n >= C.sweepThreshold ? " hot" : n >= 45 ? " warn" : "");
+  // 地图
+  for (const v of VILLAGES) {
+    const st = S.vs[v.id];
+    const c = $("vc" + v.id);
+    c.setAttribute("class", st.owned ? "vc-owned" : "vc-neutral");
+    if (picking === "work" && canWork(v.id)) c.classList.add("vc-target");
+    if ((picking === "farm" || picking === "factory") && st.owned) c.classList.add("vc-target");
+    $("vh" + v.id).textContent = st.owned ? "" : `民心 ${st.heart}`;
+    const b = [];
+    if (st.farms) b.push("垦×" + st.farms);
+    if (st.factories) b.push("厂×" + st.factories);
+    $("vb" + v.id).textContent = b.join(" ");
+  }
+  // 按钮
+  const no = S.cp <= 0 || !!S.over;
+  $("aFarm").disabled = no;
+  $("aFactory").disabled = no;
+  $("aWork").disabled = no || !VILLAGES.some((v) => canWork(v.id));
+  $("aDrill").disabled = no || S.arms < C.drillCostArms;
+  $("aHide").disabled = no;
+  ["aFarm", "aFactory", "aWork"].forEach((id) => $(id).classList.remove("picking"));
+  if (picking === "farm") $("aFarm").classList.add("picking");
+  if (picking === "factory") $("aFactory").classList.add("picking");
+  if (picking === "work") $("aWork").classList.add("picking");
+  $("hint").textContent =
+    picking === "work" ? "点击一个闪亮的中立村派工作队" :
+    picking === "farm" ? "点击一个己方村开垦" :
+    picking === "factory" ? "点击一个己方村办厂" :
+    S.cp > 0 ? "选择行动…" : "干部点用完了——结束回合吧";
+  // log
+  $("log").innerHTML = S.log.map((l) => `<div class="${l.k}">${l.t}</div>`).join("");
+  renderDbg();
+}
+function renderDbg() {
+  const rows = VILLAGES.map((v) => {
+    const st = S.vs[v.id];
+    return `<tr><td>${v.name}(${TYPE_LABEL[v.type]})</td><td>${st.owned ? "己方" : "中立"}</td><td>民心${st.heart}</td><td>垦${st.farms}/厂${st.factories}</td></tr>`;
+  }).join("");
+  $("dbg").innerHTML = `
+    <table>${rows}</table>
+    <div>注意度精确值: ${S.noise.toFixed(2)} | 下回合扫荡概率: ${sweepChance().toFixed(1)}%</div>
+    <div>日军当前战力: ${Math.round(jpPower())} | 我方防御: ${Math.round(myDefense())} | 已扫荡: ${S.sweeps} 次 | 负粮连击: ${S.starveStreak}</div>
+    <button id="dbgSkip">跳过 5 回合</button><button id="dbgSweep">立即触发扫荡</button>`;
+  $("dbgSkip").onclick = () => { for (let i = 0; i < 5 && !S.over; i++) endTurn(); };
+  $("dbgSweep").onclick = () => { if (!S.over) { doSweep(); render(); } };
+}
+
+// ── 绑定 ──
+$("aFarm").addEventListener("click", () => { picking = picking === "farm" ? null : "farm"; render(); });
+$("aFactory").addEventListener("click", () => { picking = picking === "factory" ? null : "factory"; render(); });
+$("aWork").addEventListener("click", () => { picking = picking === "work" ? null : "work"; render(); });
+$("aDrill").addEventListener("click", () => doAction("drill"));
+$("aHide").addEventListener("click", () => doAction("hide"));
+$("endBtn").addEventListener("click", () => { picking = null; endTurn(); });
+
+// 测试接口(调试/自动化)
+window.__g = {
+  s: () => S, act: doAction, end: endTurn, sweep: doSweep, canWork,
+  reset: () => { newGame(); buildMap(); render(); }
+};
+
+newGame();
+buildMap();
+render();
+</script>
+</body>
+</html>
