@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>敌后 · RTS 白盒</title>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// 《敌后》慢速实时 RTS-lite 白盒 —— 全部数值集中在 CONFIG。
+// 核心循环: 直接操控队伍(民兵/工作队) × 半自动产出 × 日军铁链割据/抢粮/扫荡 × 三胜利路径
+// ═══════════════════════════════════════════════════════════════
+const CONFIG = {
+  // ── 我方 ──
+  startGrain: 40,          // 起始粮
+  militiaCost: 25,         // 训练一支民兵队的粮价
+  workteamCost: 15,        // 组建一支工作队的粮价
+  militiaCap: 3,           // 民兵队上限(不爆炸:队伍数量恒定上限)
+  workteamCap: 2,          // 工作队上限
+  militiaHp: 24,           // 民兵队兵力(=HP=输出基数)
+  workteamHp: 8,           // 工作队兵力(几乎无战力,会被抢粮队追杀)
+  militiaSpeed: 42,        // 移动速度(像素/秒)
+  workteamSpeed: 50,
+  militiaAtk: 3.2,         // 民兵队每秒输出
+  healRate: 1.2,           // 队伍在基地/解放村驻扎时每秒回复兵力
+
+  // ── 村庄与群众 ──
+  liberateTime: 12,        // 工作队发动一个村所需秒数
+  villageGrainRate: 0.5,   // 每个解放村每秒藏粮给我军
+  transferTime: 5,         // 转移群众所需秒数(工作队在村执行)
+  villagePop: 1,           // 村庄人口单位(被三光烧掉=永久损失)
+
+  // ── 日军 ──
+  jpGarrison: 60,          // 县城驻军战力(解放胜利要打穿它)
+  raidSquadHp: 16,         // 抢粮队兵力
+  raidSquadAtk: 2.6,
+  raidInterval: 22,        // 每隔X秒县城派一支抢粮队(去最近有粮的村)
+  raidGrainSteal: 12,      // 抢粮队到村抢走的粮(运回县城,可半路伏击夺回)
+  builderHp: 14,           // 筑楼队兵力
+  buildInterval: 34,       // 每隔X秒派筑楼队去下一个铁路槽位修炮楼
+  towerBuildTime: 14,      // 修一座炮楼耗时
+  towerHp: 40,             // 炮楼HP(民兵攻坚目标)
+  towerAtk: 2.2,           // 炮楼对附近我军的每秒输出
+  towerLockRadius: 96,     // 炮楼锁定半径(内的村庄无法发动/停产——铁链割据)
+  sweepHp: 45,             // 扫荡队兵力(硬)
+  sweepAtk: 5,
+  alertPerAction: 8,       // 我方每次得手(解放/拔楼/伏击歼灭/破路)+警备
+  alertDecay: 0.25,        // 警备每秒自然回落
+  sweepThreshold: 60,      // 警备≥此值→触发扫荡(烧最近的解放村,三光)
+  railRepairTime: 30,      // 被破坏的铁路段日军X秒后修复
+  railSlowMult: 0.45,      // 铁路断时日军地面队伍移速倍率(断路迟滞)
+
+  // ── 牵制速率(胜利节奏) ──
+  tieTowerRate: 1,       // 每座炮楼每秒+牵制(它得驻兵)
+  tieSquadRate: 1.5,     // 每支活动日军队每秒+牵制
+  tieBaseRate: 0.5,      // 县城驻军基础牵制/秒
+  tieHotMult: 1.4,       // 警备>30时(你闹得凶,日军增兵)牵制倍率
+
+  // ── 三胜利路径 ──
+  tieDownGoal: 900,        // 【牵制胜利】牵制指数达标(速率=炮楼×2+活动日军队×3+驻军压力1/秒)
+  liberationNeedTowers: 0, // 【解放胜利】拔光全部炮楼后,围攻县城打穿驻军
+  blazeNeedVillages: 8,    // 【燎原胜利】全部8村解放(被烧毁的村无法计入!)
+
+  // ── 失败 ──
+  loseBaseHp: 50,          // 基地HP,扫荡队若打到山头基地则攻击它,归零=失败
+};
+</script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#14120c; color:#d8c9a0; font-family:system-ui,"Noto Sans SC",sans-serif; font-size:13px; overflow:hidden; }
+#top { display:flex; gap:16px; align-items:center; padding:7px 14px; background:#1c1810; border-bottom:1px solid #3a3826; font-size:13px; flex-wrap:wrap; }
+#top b { color:#f0e4c0; }
+#top .vic { font-size:12px; color:#a99a70; }
+#top .vic b { color:#d8a441; }
+canvas { display:block; cursor:crosshair; }
+#bottom { position:fixed; left:0; right:0; bottom:0; display:flex; gap:10px; align-items:center; padding:8px 14px; background:rgba(26,22,14,.95); border-top:1px solid #3a3826; }
+#selInfo { flex:1; font-size:12.5px; line-height:1.45; min-height:34px; }
+#selInfo b { color:#f0e4c0; }
+#bottom button { font-family:inherit; font-size:12.5px; padding:8px 14px; border:1px solid #6b5a30; border-radius:6px; background:#2a2416; color:#e8d7ae; cursor:pointer; white-space:nowrap; }
+#bottom button:disabled { opacity:.38; }
+#bottom button:hover:not(:disabled) { border-color:#d8a441; }
+#log { position:fixed; left:10px; top:52px; width:300px; max-height:170px; overflow-y:auto; font-size:11.5px; line-height:1.55; pointer-events:none; text-shadow:0 1px 3px #000; }
+#log .win { color:#f2c0a0; } #log .loss { color:#e2564d; } #log .info { color:#b5a575; }
+#hint { position:fixed; left:50%; transform:translateX(-50%); bottom:64px; font-size:12.5px; color:#ffe9a0; text-shadow:0 1px 4px #000; pointer-events:none; }
+#over { position:fixed; inset:0; background:rgba(8,6,4,.9); display:none; align-items:center; justify-content:center; z-index:10; }
+#over .card { background:#1e1a10; border:2px solid #d8a441; border-radius:10px; padding:30px 38px; max-width:460px; text-align:center; }
+#over .t { font-size:30px; font-weight:800; letter-spacing:5px; color:#f0e4c0; margin-bottom:10px; }
+#over .r { line-height:1.8; color:#b5a575; margin-bottom:18px; }
+#over button { font-family:inherit; font-size:14px; padding:9px 28px; border:1px solid #d8a441; border-radius:6px; background:linear-gradient(180deg,#5a221c,#3a1610); color:#f0e4c0; cursor:pointer; }
+#help { position:fixed; right:10px; top:52px; width:250px; background:rgba(30,26,16,.95); border:1px solid #3a3826; border-radius:6px; padding:8px 11px; font-size:11.5px; line-height:1.6; color:#b5a575; }
+#help b { color:#d8a441; }
+</style>
+</head>
+<body>
+<div id="top">
+  <span style="font-weight:800;letter-spacing:2px;color:#f0e4c0">敌后 · 白盒</span>
+  <span>🌾 <b id="tGrain"></b></span>
+  <span>⚠ 警备 <b id="tAlert"></b></span>
+  <span class="vic">🎯牵制 <b id="tTie"></b>/900</span>
+  <span class="vic">🚩燎原 <b id="tBlaze"></b>/8村</span>
+  <span class="vic">⚔解放 <b id="tLib"></b></span>
+  <span id="tTime" style="margin-left:auto;color:#8a8058"></span>
+</div>
+<canvas id="cv"></canvas>
+<div id="log"></div>
+<div id="hint"></div>
+<div id="help">
+  <b>玩法</b>:点选队伍→点目标下令。<br>
+  <b>工作队</b>→中立村:发动群众(解放后村民藏粮给你);→解放村:转移群众(扫荡来前把人撤进山)。<br>
+  <b>民兵队</b>→炮楼:攻坚拔点;→铁路:破路(迟滞日军);→日军队伍:伏击。<br>
+  日军会:下乡<b>抢粮</b>、沿铁路<b>筑炮楼</b>锁死村庄(铁链割据)、警备≥60 派<b>扫荡队</b>烧村(三光,没转移的村永久烧毁)。<br>
+  <b>三条胜利路</b>:牵制满900 / 拔光炮楼再攻破县城 / 8村全部解放。基地被打穿=失败。
+</div>
+<div id="bottom">
+  <div id="selInfo">未选中。点击你的队伍(红色)。</div>
+  <button id="bMilitia"></button>
+  <button id="bWork"></button>
+  <button id="bPause">⏸ 暂停</button>
+</div>
+<div id="over"><div class="card"><div class="t" id="overT"></div><div class="r" id="overR"></div><button onclick="location.reload()">再来一局</button></div></div>
+
+<script>
+"use strict";
+const C = CONFIG;
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+let W = 0, H = 0;
+function resize() { W = innerWidth; H = innerHeight - 100; cv.width = W; cv.height = H; cv.style.marginTop = "0"; }
+addEventListener("resize", resize); resize();
+
+// ── 等距投影(逻辑坐标→屏幕) ──
+const TILE = 34;
+const ix = (x, y) => W / 2 + (x - y) * TILE * 0.9 - 60;
+const iy = (x, y) => 70 + (x + y) * TILE * 0.46;
+
+// ── 地图布点(逻辑坐标) ──
+const CITY = { x: 19, y: 2 };
+const BASE = { x: 2.5, y: 13 };
+// 铁路: 折线段(县城→西南)
+const RAIL = [[22, 3], [19, 4], [16, 5], [13, 6], [10, 7], [7, 8], [4, 9], [1, 10]];
+// 炮楼槽位(铁路沿线,日军按序修)
+const TOWER_SLOTS = [[17.5, 4.5], [14.5, 5.5], [11.5, 6.5], [8.5, 7.5], [5.5, 8.5]];
+// 8 个村庄
+const VILL = [
+  { x: 15, y: 2.5, name: "北岭村" }, { x: 11, y: 3.5, name: "杏树坡" }, { x: 7, y: 4.5, name: "槐花峪" },
+  { x: 16.5, y: 8, name: "赵家湾" }, { x: 12.5, y: 9, name: "石桥集" }, { x: 8.5, y: 10.5, name: "南坪" },
+  { x: 5, y: 12, name: "柳条沟" }, { x: 12, y: 12.5, name: "野狐岭" },
+];
+const dist = (a, b) => Math.hypot(ix(a.x, a.y) - ix(b.x, b.y), iy(a.x, a.y) - iy(b.x, b.y));
+
+// ── 状态 ──
+let S;
+function newGame() {
+  S = {
+    t: 0, grain: C.startGrain, alert: 0, tie: 0, paused: false,
+    baseHp: C.loseBaseHp, cityHp: C.jpGarrison,
+    vills: VILL.map(() => ({ state: "neutral", prog: 0, burned: false, pop: C.villagePop })), // neutral/liberated/empty(已转移)/burned
+    towers: TOWER_SLOTS.map(() => ({ state: "none", hp: 0, buildProg: 0 })), // none/building/built/razed
+    rails: RAIL.slice(0, -1).map(() => ({ broken: false, repairT: 0 })), // 段
+    units: [], jps: [], // 我方/日军单位
+    nextRaid: C.raidInterval * 0.6, nextBuild: 8,
+    log: [], over: null, sel: null, uid: 1,
+  };
+  spawnUnit("militia"); spawnUnit("work");
+  logT("1941年·敌后。日军占着县城和铁路,你有一支民兵队、一支工作队、一个山头。发动群众吧。", "info");
+}
+function spawnUnit(kind) {
+  const d = kind === "militia" ? { hp: C.militiaHp, spd: C.militiaSpeed } : { hp: C.workteamHp, spd: C.workteamSpeed };
+  S.units.push({ id: S.uid++, kind, x: BASE.x + (Math.random() - .5), y: BASE.y + (Math.random() - .5), hp: d.hp, maxHp: d.hp, spd: d.spd, task: null, tx: BASE.x, ty: BASE.y, prog: 0 });
+}
+function spawnJp(kind, extra) {
+  const defs = { raid: { hp: C.raidSquadHp, atk: C.raidSquadAtk, spd: 36 }, builder: { hp: C.builderHp, atk: 1, spd: 32 }, sweep: { hp: C.sweepHp, atk: C.sweepAtk, spd: 34 } };
+  const d = defs[kind];
+  S.jps.push(Object.assign({ id: S.uid++, kind, x: CITY.x, y: CITY.y, hp: d.hp, maxHp: d.hp, atk: d.atk, spd: d.spd, phase: "go", carry: 0 }, extra));
+}
+function logT(t, k) { S.log.unshift({ t, k }); if (S.log.length > 9) S.log.pop(); }
+
+// ── 我方指令 ──
+function orderUnit(u, target) {
+  u.task = target; u.prog = 0;
+  const p = targetPos(target);
+  u.tx = p.x; u.ty = p.y;
+}
+function targetPos(t) {
+  if (t.type === "vill") return VILL[t.i];
+  if (t.type === "tower") return { x: TOWER_SLOTS[t.i][0], y: TOWER_SLOTS[t.i][1] };
+  if (t.type === "rail") { const a = RAIL[t.i], b = RAIL[t.i + 1]; return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2 }; }
+  if (t.type === "jp") { const j = S.jps.find(j => j.id === t.id); return j ? { x: j.x, y: j.y } : BASE; }
+  if (t.type === "city") return CITY;
+  if (t.type === "base") return BASE;
+  return t; // 裸坐标
+}
+
+// ── 主循环 ──
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!S.paused && !S.over) tick(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+function tick(dt) {
+  S.t += dt;
+  // 解放村产粮(藏粮给我军)——被炮楼锁定的停产
+  let libN = 0;
+  S.vills.forEach((v, i) => {
+    if (v.state === "liberated" && !v.burned) {
+      libN++;
+      if (!lockedByTower(VILL[i])) S.grain += C.villageGrainRate * dt;
+    }
+  });
+  // 牵制指数: 钉住的日军投入×时间
+  const jpPresence = S.towers.filter(t => t.state === "built").length * 2 + S.jps.length * 3 + 1;
+  S.tie += jpPresence * dt * (S.alert > 30 ? C.tieHotMult : 1); // 你闹得越凶,日军投入越大
+  S.alert = Math.max(0, S.alert - C.alertDecay * dt);
+  // 铁路修复
+  S.rails.forEach(r => { if (r.broken) { r.repairT -= dt; if (r.repairT <= 0) { r.broken = false; logT("日军修复了一段铁路。", "loss"); } } });
+  // 日军调度
+  S.nextRaid -= dt;
+  if (S.nextRaid <= 0) { S.nextRaid = C.raidInterval; sendRaid(); }
+  S.nextBuild -= dt;
+  if (S.nextBuild <= 0) { S.nextBuild = C.buildInterval; sendBuilder(); }
+  if (S.alert >= C.sweepThreshold && !S.jps.some(j => j.kind === "sweep")) sendSweep();
+  // 单位更新
+  for (const u of S.units) unitTick(u, dt);
+  for (const j of S.jps) jpTick(j, dt);
+  S.units = S.units.filter(u => u.hp > 0);
+  S.jps = S.jps.filter(j => j.hp > 0 && j.phase !== "gone");
+  // 胜负
+  if (S.tie >= C.tieDownGoal) return win("牵制胜利", `牵制指数满 ${C.tieDownGoal}——被钉死在这个县的日军师团,永远开不去正面战场。中流砥柱,就是这个意思。`);
+  if (S.vills.filter(v => v.state === "liberated" && !v.burned).length >= C.blazeNeedVillages) return win("燎原胜利", "八个村庄全部解放,红旗连成一片——星星之火,可以燎原。");
+  if (S.cityHp <= 0) return win("解放胜利", "炮楼拔尽、县城攻破——这个县,光复了。");
+  if (S.baseHp <= 0) return lose("山头基地被扫荡攻破——星火熄灭。");
+}
+function lockedByTower(p) {
+  return S.towers.some((t, i) => t.state === "built" && dist({ x: TOWER_SLOTS[i][0], y: TOWER_SLOTS[i][1] }, p) < C.towerLockRadius);
+}
+
+// ── 我方单位逻辑 ──
+function unitTick(u, dt) {
+  const tp = u.task ? targetPos(u.task) : { x: u.tx, y: u.ty };
+  const d = dist(u, tp);
+  if (d > 14) { // 移动
+    const sx = ix(u.x, u.y), sy = iy(u.x, u.y), ex = ix(tp.x, tp.y), ey = iy(tp.x, tp.y);
+    const step = u.spd * dt / Math.max(1, d);
+    u.x += (tp.x - u.x) * step * 3.2; u.y += (tp.y - u.y) * step * 3.2;
+    return;
+  }
+  // 到达:执行任务
+  const t = u.task;
+  if (!t) { // 驻扎回血
+    if (u.hp < u.maxHp && (dist(u, BASE) < 40 || S.vills.some((v, i) => v.state === "liberated" && dist(u, VILL[i]) < 40))) u.hp = Math.min(u.maxHp, u.hp + C.healRate * dt);
+    return;
+  }
+  if (t.type === "vill") {
+    const v = S.vills[t.i];
+    if (u.kind === "work") {
+      if (v.state === "neutral" && !v.burned) {
+        if (lockedByTower(VILL[t.i])) { hint("这个村被炮楼锁死了——先派民兵拔掉附近的炮楼!"); u.task = null; return; }
+        v.prog += dt;
+        if (v.prog >= C.liberateTime) { v.state = "liberated"; S.alert = Math.min(100, S.alert + C.alertPerAction); logT(`★ ${VILL[t.i].name}解放!群众开始藏粮支援(警备+${C.alertPerAction})。`, "win"); u.task = null; }
+      } else if (v.state === "liberated") {
+        v.prog += dt;
+        if (v.prog >= C.transferTime) { v.state = "empty"; logT(`${VILL[t.i].name}的群众转移进山了——扫荡来了也烧不到人。`, "info"); u.task = null; }
+      } else if (v.state === "empty") {
+        v.prog += dt;
+        if (v.prog >= C.transferTime) { v.state = "liberated"; logT(`${VILL[t.i].name}群众回村,恢复生产。`, "info"); u.task = null; }
+      } else u.task = null;
+    } else u.task = null;
+  } else if (t.type === "tower" && u.kind === "militia") {
+    const tw = S.towers[t.i];
+    if (tw.state === "built" || tw.state === "building") {
+      tw.hp -= C.militiaAtk * dt * (tw.state === "building" ? 2 : 1);
+      u.hp -= (tw.state === "built" ? C.towerAtk : 0.5) * dt;
+      if (tw.hp <= 0) { tw.state = "razed"; S.alert = Math.min(100, S.alert + C.alertPerAction); S.grain += 8; logT(`💥 炮楼拔掉了!缴获物资+8(警备+${C.alertPerAction})。铁链断了一环。`, "win"); u.task = null; }
+    } else u.task = null;
+  } else if (t.type === "rail" && u.kind === "militia") {
+    const r = S.rails[t.i];
+    if (!r.broken) {
+      u.prog += dt;
+      if (u.prog >= 4) { r.broken = true; r.repairT = C.railRepairTime; S.alert = Math.min(100, S.alert + C.alertPerAction * 0.5); S.tie += 15; logT("🔧 扒了一段铁路!日军行动迟滞,牵制+15。", "win"); u.task = null; }
+    } else u.task = null;
+  } else if (t.type === "jp" && u.kind === "militia") {
+    const j = S.jps.find(j => j.id === t.id);
+    if (!j || j.hp <= 0) { u.task = null; return; }
+    u.tx = j.x; u.ty = j.y;
+    if (dist(u, j) < 26) {
+      j.hp -= C.militiaAtk * 1.4 * dt; // 伏击优势
+      u.hp -= j.atk * 0.7 * dt;
+      if (j.hp <= 0) {
+        S.alert = Math.min(100, S.alert + C.alertPerAction);
+        if (j.carry > 0) { S.grain += j.carry; logT(`⚔ 全歼${jpName(j)},夺回粮食+${j.carry}!(警备+${C.alertPerAction})`, "win"); }
+        else logT(`⚔ 伏击得手,全歼${jpName(j)}!(警备+${C.alertPerAction})`, "win");
+        S.tie += 10;
+        u.task = null;
+      }
+    }
+  } else if (t.type === "city" && u.kind === "militia") {
+    if (S.towers.some(tw => tw.state === "built" || tw.state === "building")) { hint("县城城防未破——先拔光铁路沿线的炮楼!"); u.task = null; return; }
+    S.cityHp -= C.militiaAtk * dt;
+    u.hp -= 2.5 * dt;
+  } else if (t.type === "base") {
+    u.task = null;
+  }
+}
+function jpName(j) { return j.kind === "raid" ? "抢粮队" : j.kind === "builder" ? "筑楼队" : "扫荡队"; }
+function hint(t) { $("hint").textContent = t; clearTimeout(hint._t); hint._t = setTimeout(() => $("hint").textContent = "", 3000); }
+
+// ── 日军 AI ──
+function railSlowAt(p) { // 铁路断了附近日军变慢
+  return S.rails.some((r, i) => r.broken && dist(targetPos({ type: "rail", i }), p) < 130) ? C.railSlowMult : 1;
+}
+function sendRaid() {
+  // 抢有粮的村(解放村优先,否则中立村)
+  const cands = S.vills.map((v, i) => ({ v, i })).filter(x => !x.v.burned && x.v.state !== "empty");
+  if (!cands.length) return;
+  cands.sort((a, b) => (b.v.state === "liberated" ? 1 : 0) - (a.v.state === "liberated" ? 1 : 0));
+  spawnJp("raid", { target: cands[0].i });
+  logT(`日军抢粮队出城,扑向${VILL[cands[0].i].name}!`, "loss");
+}
+function sendBuilder() {
+  const i = S.towers.findIndex(t => t.state === "none" || t.state === "razed");
+  if (i < 0) return;
+  spawnJp("builder", { target: i });
+  logT("日军筑楼队沿铁路开进——又要立炮楼锁村了(铁链政策)。", "loss");
+}
+function sendSweep() {
+  const cands = S.vills.map((v, i) => ({ v, i })).filter(x => x.v.state === "liberated" && !x.v.burned);
+  const target = cands.length ? cands.sort((a, b) => dist(VILL[a.i], CITY) - dist(VILL[b.i], CITY))[0].i : -1;
+  spawnJp("sweep", { target });
+  S.alert = Math.max(0, S.alert - 35);
+  logT(`⚠⚠ 警备爆表——日军扫荡队出动了!目标:${target >= 0 ? VILL[target].name : "山头基地"}。快转移群众或组织阻击!`, "loss");
+}
+function jpTick(j, dt) {
+  const spd = j.spd * railSlowAt(j) * dt;
+  const goTo = (p) => {
+    const d = dist(j, p);
+    if (d < 16) return true;
+    j.x += (p.x - j.x) / Math.max(1, d) * spd * 3.2;
+    j.y += (p.y - j.y) / Math.max(1, d) * spd * 3.2;
+    return false;
+  };
+  // 攻击贴身我军
+  const near = S.units.find(u => dist(u, j) < 24 && u.hp > 0);
+  if (near && j.kind !== "builder") { near.hp -= j.atk * dt; }
+  if (j.kind === "raid") {
+    if (j.phase === "go") {
+      const v = S.vills[j.target];
+      if (v.burned || v.state === "empty") { j.phase = "back"; return; }
+      if (goTo(VILL[j.target])) {
+        j.carry = C.raidGrainSteal;
+        if (v.state === "liberated") { S.grain = Math.max(0, S.grain - C.raidGrainSteal * 0.5); }
+        logT(`抢粮队洗劫了${VILL[j.target].name},正把粮往县城运——半路截它!`, "loss");
+        j.phase = "back";
+      }
+    } else if (goTo(CITY)) j.phase = "gone";
+  } else if (j.kind === "builder") {
+    const slot = { x: TOWER_SLOTS[j.target][0], y: TOWER_SLOTS[j.target][1] };
+    const tw = S.towers[j.target];
+    if (j.phase === "go") { if (goTo(slot)) { j.phase = "build"; tw.state = "building"; tw.hp = C.towerHp * 0.4; tw.buildProg = 0; } }
+    else if (j.phase === "build") {
+      if (tw.state === "razed") { j.phase = "back"; return; }
+      tw.buildProg += dt;
+      tw.hp = Math.min(C.towerHp, tw.hp + C.towerHp * 0.6 * dt / C.towerBuildTime);
+      if (tw.buildProg >= C.towerBuildTime) {
+        tw.state = "built"; tw.hp = C.towerHp;
+        logT("一座炮楼立起来了——附近村庄被锁死(无法发动/停产)。", "loss");
+        j.phase = "back";
+      }
+    } else if (goTo(CITY)) j.phase = "gone";
+  } else if (j.kind === "sweep") {
+    if (j.phase === "go") {
+      const tp = j.target >= 0 ? VILL[j.target] : BASE;
+      if (j.target >= 0) {
+        const v = S.vills[j.target];
+        if (goTo(tp)) {
+          if (v.state === "liberated") { v.burned = true; v.state = "burned"; logT(`🔥 三光!${VILL[j.target].name}被烧成白地——没来得及转移的群众,没了。这个村永远失去了。`, "loss"); }
+          else logT(`扫荡队扑了个空——${VILL[j.target].name}的群众早转移了。`, "win");
+          j.phase = "back";
+        }
+      } else if (goTo(BASE)) { j.phase = "siege"; }
+    } else if (j.phase === "siege") {
+      S.baseHp -= j.atk * dt;
+      if (goTo(BASE)) { /* 停在基地打 */ }
+    } else if (goTo(CITY)) j.phase = "gone";
+  }
+}
+
+function win(t, r) { S.over = { win: true }; $("overT").textContent = "🔥 " + t; $("overR").textContent = r + `(用时 ${Math.round(S.t)} 秒)`; $("over").style.display = "flex"; }
+function lose(r) { S.over = { win: false }; $("overT").textContent = "💀 星火熄灭"; $("overR").textContent = r; $("over").style.display = "flex"; }
+
+// ── 渲染 ──
+function draw() {
+  ctx.fillStyle = "#1a170e"; ctx.fillRect(0, 0, W, H);
+  // 地面网格淡菱形
+  ctx.strokeStyle = "rgba(60,54,38,.25)";
+  for (let gy = 0; gy < 17; gy++) for (let gx = 0; gx < 24; gx++) {
+    const x = ix(gx, gy), y = iy(gx, gy);
+    if (x < -40 || x > W + 40 || y < -30 || y > H + 30) continue;
+    ctx.strokeRect(x - 1, y - 1, 2, 2);
+  }
+  // 山头区(左下,绿)
+  for (let i = 0; i < 14; i++) {
+    const a = (i * 2.4) % 6, r = 20 + (i % 4) * 14;
+    const mx = ix(BASE.x, BASE.y) + Math.cos(a) * r * 1.6, my = iy(BASE.x, BASE.y) + Math.sin(a) * r * 0.7;
+    ctx.fillStyle = "rgba(58,74,40,.5)";
+    ctx.beginPath(); ctx.moveTo(mx - 13, my + 8); ctx.lineTo(mx, my - 12); ctx.lineTo(mx + 13, my + 8); ctx.closePath(); ctx.fill();
+  }
+  // 铁路
+  for (let i = 0; i < RAIL.length - 1; i++) {
+    const a = RAIL[i], b = RAIL[i + 1];
+    const r = S.rails[i];
+    ctx.strokeStyle = r.broken ? "rgba(90,70,50,.5)" : "#3c3830";
+    ctx.lineWidth = 5;
+    ctx.setLineDash(r.broken ? [4, 8] : []);
+    ctx.beginPath(); ctx.moveTo(ix(a[0], a[1]), iy(a[0], a[1])); ctx.lineTo(ix(b[0], b[1]), iy(b[0], b[1])); ctx.stroke();
+    ctx.setLineDash([]);
+    if (!r.broken) {
+      ctx.strokeStyle = "#c8b890"; ctx.lineWidth = 1.4; ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.moveTo(ix(a[0], a[1]), iy(a[0], a[1])); ctx.lineTo(ix(b[0], b[1]), iy(b[0], b[1])); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  // 炮楼锁定圈
+  S.towers.forEach((t, i) => {
+    if (t.state !== "built") return;
+    const x = ix(TOWER_SLOTS[i][0], TOWER_SLOTS[i][1]), y = iy(TOWER_SLOTS[i][0], TOWER_SLOTS[i][1]);
+    ctx.strokeStyle = "rgba(140,150,165,.28)"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 6]);
+    ctx.beginPath(); ctx.ellipse(x, y, C.towerLockRadius, C.towerLockRadius * 0.5, 0, 0, 7); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+  // 村庄
+  VILL.forEach((v, i) => {
+    const st = S.vills[i];
+    const x = ix(v.x, v.y), y = iy(v.x, v.y);
+    const col = st.burned ? "#332821" : st.state === "liberated" ? "#7a2a20" : st.state === "empty" ? "#4a3a2a" : "#4a4436";
+    // 屋
+    ctx.fillStyle = col;
+    ctx.fillRect(x - 12, y - 8, 10, 9); ctx.fillRect(x + 1, y - 5, 11, 8);
+    ctx.fillStyle = st.burned ? "#221a14" : "#5c4a32";
+    ctx.beginPath(); ctx.moveTo(x - 14, y - 8); ctx.lineTo(x - 7, y - 15); ctx.lineTo(x, y - 8); ctx.closePath(); ctx.fill();
+    if (st.state === "liberated" && !st.burned) { ctx.fillStyle = "#e2564d"; ctx.fillRect(x - 2, y - 24, 8, 5); ctx.strokeStyle = "#8a6a40"; ctx.beginPath(); ctx.moveTo(x - 2, y - 24); ctx.lineTo(x - 2, y - 8); ctx.stroke(); }
+    // 发动进度
+    if (st.state === "neutral" && st.prog > 0) { ctx.fillStyle = "#1a160e"; ctx.fillRect(x - 14, y + 6, 28, 4); ctx.fillStyle = "#d8a441"; ctx.fillRect(x - 14, y + 6, 28 * st.prog / C.liberateTime, 4); }
+    ctx.fillStyle = st.burned ? "#6a5a48" : "#c8b890";
+    ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(v.name + (st.burned ? "(焦土)" : st.state === "empty" ? "(空)" : ""), x, y + 20);
+  });
+  // 县城
+  {
+    const x = ix(CITY.x, CITY.y), y = iy(CITY.x, CITY.y);
+    ctx.fillStyle = "#3a3e46"; ctx.fillRect(x - 22, y - 18, 44, 26);
+    ctx.fillStyle = "#2a2e36"; ctx.fillRect(x - 10, y - 30, 20, 14);
+    ctx.fillStyle = "#b23a2c"; ctx.fillRect(x - 2, y - 38, 9, 6);
+    ctx.fillStyle = "#c8b890"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(`县城(日军 ${Math.max(0, Math.round(S.cityHp))})`, x, y + 22);
+  }
+  // 基地
+  {
+    const x = ix(BASE.x, BASE.y), y = iy(BASE.x, BASE.y);
+    ctx.fillStyle = "#5a4a32"; ctx.fillRect(x - 16, y - 10, 32, 14);
+    ctx.fillStyle = "#e2564d"; ctx.fillRect(x - 2, y - 26, 9, 6);
+    ctx.strokeStyle = "#8a6a40"; ctx.beginPath(); ctx.moveTo(x - 2, y - 26); ctx.lineTo(x - 2, y - 10); ctx.stroke();
+    ctx.fillStyle = "#c8b890"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(`山头基地(${Math.max(0, Math.round(S.baseHp))})`, x, y + 16);
+  }
+  // 炮楼
+  S.towers.forEach((t, i) => {
+    if (t.state === "none" || t.state === "razed") return;
+    const x = ix(TOWER_SLOTS[i][0], TOWER_SLOTS[i][1]), y = iy(TOWER_SLOTS[i][0], TOWER_SLOTS[i][1]);
+    ctx.fillStyle = t.state === "building" ? "rgba(125,129,136,.55)" : "#7d8188";
+    ctx.fillRect(x - 7, y - 22, 14, 24);
+    ctx.fillStyle = "#1c1e22"; ctx.fillRect(x - 3, y - 16, 6, 5);
+    ctx.fillStyle = "#1a160e"; ctx.fillRect(x - 10, y + 4, 20, 3);
+    ctx.fillStyle = "#c8b040"; ctx.fillRect(x - 10, y + 4, 20 * t.hp / C.towerHp, 3);
+  });
+  // 日军单位
+  for (const j of S.jps) {
+    const x = ix(j.x, j.y), y = iy(j.x, j.y);
+    ctx.fillStyle = j.kind === "sweep" ? "#6a6c30" : "#5a5c40";
+    ctx.beginPath(); ctx.arc(x, y, j.kind === "sweep" ? 11 : 8, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#2a281a"; ctx.stroke();
+    ctx.fillStyle = "#e8e2d0"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(j.kind === "raid" ? "抢" : j.kind === "builder" ? "筑" : "扫", x, y + 3);
+    ctx.fillStyle = "#1a160e"; ctx.fillRect(x - 9, y + 9, 18, 3);
+    ctx.fillStyle = "#c8b040"; ctx.fillRect(x - 9, y + 9, 18 * j.hp / j.maxHp, 3);
+    if (j.carry > 0) { ctx.fillStyle = "#d8a441"; ctx.fillText("🌾", x + 12, y - 6); }
+  }
+  // 我方单位
+  for (const u of S.units) {
+    const x = ix(u.x, u.y), y = iy(u.x, u.y);
+    const selMark = S.sel === u.id;
+    ctx.beginPath(); ctx.arc(x, y, u.kind === "militia" ? 10 : 8, 0, 7);
+    ctx.fillStyle = u.kind === "militia" ? "#a83228" : "#c8792e";
+    ctx.fill();
+    ctx.strokeStyle = selMark ? "#ffe9a0" : "#2a1610"; ctx.lineWidth = selMark ? 3 : 1.5; ctx.stroke(); ctx.lineWidth = 1;
+    ctx.fillStyle = "#f2ead2"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(u.kind === "militia" ? "兵" : "工", x, y + 3.5);
+    ctx.fillStyle = "#1a160e"; ctx.fillRect(x - 9, y + 10, 18, 3);
+    ctx.fillStyle = "#7ec850"; ctx.fillRect(x - 9, y + 10, 18 * u.hp / u.maxHp, 3);
+    // 目的地线
+    if (u.task && selMark) {
+      const p = targetPos(u.task);
+      ctx.setLineDash([3, 4]); ctx.strokeStyle = "rgba(255,233,160,.5)";
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ix(p.x, p.y), iy(p.x, p.y)); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  // HUD
+  $("tGrain").textContent = Math.floor(S.grain);
+  $("tAlert").textContent = Math.round(S.alert) + "/60";
+  $("tAlert").style.color = S.alert >= 45 ? "#e2564d" : "";
+  $("tTie").textContent = Math.floor(S.tie);
+  $("tBlaze").textContent = S.vills.filter(v => v.state === "liberated" && !v.burned).length;
+  const towersLeft = S.towers.filter(t => t.state === "built" || t.state === "building").length;
+  $("tLib").textContent = towersLeft > 0 ? `还剩${towersLeft}座炮楼` : `攻城:${Math.max(0, Math.round(S.cityHp))}`;
+  $("tTime").textContent = Math.floor(S.t / 60) + ":" + String(Math.floor(S.t % 60)).padStart(2, "0");
+  const mCount = S.units.filter(u => u.kind === "militia").length, wCount = S.units.filter(u => u.kind === "work").length;
+  $("bMilitia").textContent = `+民兵队 🌾${C.militiaCost} (${mCount}/${C.militiaCap})`;
+  $("bMilitia").disabled = S.grain < C.militiaCost || mCount >= C.militiaCap;
+  $("bWork").textContent = `+工作队 🌾${C.workteamCost} (${wCount}/${C.workteamCap})`;
+  $("bWork").disabled = S.grain < C.workteamCost || wCount >= C.workteamCap;
+  const sel = S.units.find(u => u.id === S.sel);
+  $("selInfo").innerHTML = sel
+    ? `<b>${sel.kind === "militia" ? "民兵队" : "工作队"}</b> ${Math.round(sel.hp)}/${sel.maxHp}　${sel.task ? "执行中:" + taskName(sel.task) : "待命"}<br><span style="color:#8a8058">${sel.kind === "militia" ? "可点:炮楼(攻坚)/铁路(破路)/日军(伏击)/县城(攻城)" : "可点:中立村(发动)/解放村(转移群众)/空村(回迁)"}</span>`
+    : "未选中。点击你的队伍(红=民兵,橙=工作队),再点目标下令。";
+  $("log").innerHTML = S.log.map(l => `<div class="${l.k}">${l.t}</div>`).join("");
+}
+function taskName(t) {
+  if (t.type === "vill") return VILL[t.i].name;
+  if (t.type === "tower") return "炮楼";
+  if (t.type === "rail") return "破铁路";
+  if (t.type === "jp") return "追击日军";
+  if (t.type === "city") return "攻打县城";
+  return "移动";
+}
+
+// ── 交互 ──
+cv.addEventListener("click", (e) => {
+  if (S.over) return;
+  const mx = e.clientX, my = e.clientY - cv.getBoundingClientRect().top;
+  // 1. 点我方单位=选中
+  let best = null, bd = 24;
+  for (const u of S.units) {
+    const d = Math.hypot(ix(u.x, u.y) - mx, iy(u.x, u.y) - my);
+    if (d < bd) { bd = d; best = u; }
+  }
+  if (best) { S.sel = best.id; return; }
+  // 2. 有选中→点目标下令
+  const sel = S.units.find(u => u.id === S.sel);
+  if (!sel) return;
+  // 日军单位
+  let jbest = null, jbd = 22;
+  for (const j of S.jps) {
+    const d = Math.hypot(ix(j.x, j.y) - mx, iy(j.x, j.y) - my);
+    if (d < jbd) { jbd = d; jbest = j; }
+  }
+  if (jbest && sel.kind === "militia") { orderUnit(sel, { type: "jp", id: jbest.id }); return; }
+  // 村庄
+  for (let i = 0; i < VILL.length; i++) {
+    if (Math.hypot(ix(VILL[i].x, VILL[i].y) - mx, iy(VILL[i].x, VILL[i].y) - my) < 26) { orderUnit(sel, { type: "vill", i }); return; }
+  }
+  // 炮楼
+  for (let i = 0; i < TOWER_SLOTS.length; i++) {
+    const t = S.towers[i];
+    if ((t.state === "built" || t.state === "building") && Math.hypot(ix(TOWER_SLOTS[i][0], TOWER_SLOTS[i][1]) - mx, iy(TOWER_SLOTS[i][0], TOWER_SLOTS[i][1]) - my) < 26) { orderUnit(sel, { type: "tower", i }); return; }
+  }
+  // 县城
+  if (Math.hypot(ix(CITY.x, CITY.y) - mx, iy(CITY.x, CITY.y) - my) < 34) { orderUnit(sel, { type: "city" }); return; }
+  // 铁路段
+  for (let i = 0; i < S.rails.length; i++) {
+    const p = targetPos({ type: "rail", i });
+    if (!S.rails[i].broken && Math.hypot(ix(p.x, p.y) - mx, iy(p.x, p.y) - my) < 24) { orderUnit(sel, { type: "rail", i }); return; }
+  }
+  // 空地=移动(屏幕→逻辑坐标逆解)
+  const lx = ((mx - W / 2 + 60) / (TILE * 0.9) + (my - 70) / (TILE * 0.46)) / 2;
+  const ly = ((my - 70) / (TILE * 0.46) - (mx - W / 2 + 60) / (TILE * 0.9)) / 2;
+  orderUnit(sel, { type: "move", x: lx, y: ly });
+});
+$("bMilitia").addEventListener("click", () => { if (S.grain >= C.militiaCost) { S.grain -= C.militiaCost; spawnUnit("militia"); logT("训练场拉起一支新民兵队。", "info"); } });
+$("bWork").addEventListener("click", () => { if (S.grain >= C.workteamCost) { S.grain -= C.workteamCost; spawnUnit("work"); logT("新工作队整装出发。", "info"); } });
+$("bPause").addEventListener("click", () => { S.paused = !S.paused; $("bPause").textContent = S.paused ? "▶ 继续" : "⏸ 暂停"; });
+
+window.__d = { s: () => S, order: orderUnit, spawn: spawnUnit, give: (g) => S.grain += g, units: () => S.units };
+newGame();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
