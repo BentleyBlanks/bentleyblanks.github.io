@@ -2355,6 +2355,7 @@ function dbgApply(cat, key, v) {
   else if (cat === "tone") D.setTone(v, null);
   else if (cat === "exposure") D.setTone(null, v);
   else if (cat === "taa") D.setTAA(v);
+  else if (cat === "cam") D.setCamera({ [key]: v });
 }
 function dbgSl(label, min, max, step, val, cat, key) { return `<div class="dr"><label title="${label}">${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="dbgSlide(this,'${cat}','${key}')"><span class="dv">${val}</span></div>`; }
 function dbgCol(label, val, cat, key) { return `<div class="dr"><label>${label}</label><input type="color" value="${val}" oninput="dbgColor(this,'${cat}','${key}')"></div>`; }
@@ -2411,7 +2412,12 @@ function buildDebugPanel() {
   qual += dbgSl("曝光", 0, 2, 0.05, 0.5, "exposure", "v");
   qual += `<div class="dr"><label>阴影分辨率(CSM)</label><select onchange="dbgApply('shadow','v',+this.value)"><option value="1024">1024</option><option value="2048" selected>2048</option><option value="4096">4096</option></select></div>`;
   qual += `<div class="dr"><label>TAA 抗锯齿</label><input type="checkbox" onchange="dbgApply('taa','on',this.checked)"></div>`;
-  $("dbgPanel").innerHTML = dsec("Debug", dbgInner, true) + dsec("环境系统 (3D)", env, false) + dsec("画质 (3D)", qual, false);
+  let cam = "<div class='note'>需在 3D 模式下调整 · 越俯视=越接近正上方</div>";
+  cam += dbgSl("俯视角(越小越俯视)", 0.15, 1.3, 0.02, 0.62, "cam", "polar");
+  cam += dbgSl("视野 FOV", 25, 70, 1, 46, "cam", "fov");
+  cam += dbgSl("最近距离(拉最近)", 4, 30, 1, 8, "cam", "minDist");
+  cam += dbgSl("最远距离(拉最远)", 30, 150, 1, 85, "cam", "maxDist");
+  $("dbgPanel").innerHTML = dsec("Debug", dbgInner, true) + dsec("相机 (3D)", cam, false) + dsec("环境系统 (3D)", env, false) + dsec("画质 (3D)", qual, false);
 }
 $("dbgBtn").addEventListener("click", () => { const p = $("dbgPanel"); if (p.classList.contains("show")) { p.classList.remove("show"); $("dbgBtn").classList.remove("on"); } else { buildDebugPanel(); p.classList.add("show"); $("dbgBtn").classList.add("on"); } });
 

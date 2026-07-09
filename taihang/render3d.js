@@ -19,6 +19,7 @@ const matCache = {};
 const texCache = {};
 let sunLight, sky, hemiLight, ambientLight, lastSig = "", inited = false, cx0 = 0, cz0 = 0;
 let _sunElev = 42, _sunAzi = 150, composer = null, taaPass = null, taaEnabled = false;
+let camPolar = 0.62; // 相机俯视极角(距+Y轴; 越小越俯视/越接近正上方俯拍 — 参考文明6)
 let clock = 0; const revealAnims = {}; const tileVisPrev = new Set(); // 战雾展开动画
 
 // ── PCG 噪声 ──
@@ -141,11 +142,11 @@ function init(container) {
   const hq = G().state().hq; const [hx, hz] = hexWorld(hq.q, hq.r);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(hx, 0, hz);
-  camera.position.set(hx, 20, hz + 22);
-  // 文明6式相机: 固定俯角, 只允许平移+滚轮缩放, 不允许旋转/改变角度
+  camera.position.set(hx, 30, hz + 20); // 高俯视起始机位
+  // 文明6式相机: 固定俯角(高俯视), 只允许平移+滚轮缩放, 不允许旋转/改变角度
   controls.enableRotate = false;
-  controls.minPolarAngle = controls.maxPolarAngle = 0.95;
-  controls.minDistance = 8; controls.maxDistance = 70;
+  controls.minPolarAngle = controls.maxPolarAngle = camPolar;
+  controls.minDistance = 8; controls.maxDistance = 85;
   controls.enableDamping = true; controls.dampingFactor = 0.1; controls.screenSpacePanning = false;
   controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.update();
@@ -236,6 +237,14 @@ const dbg = {
   setShadow(size) { if (!sunLight) return; if (sunLight.shadow.map) sunLight.shadow.map.dispose(); sunLight.shadow.map = null; sunLight.shadow.mapSize.set(size, size); },
   setTone(mode, exposure) { if (!renderer) return; if (mode && TONE[mode] !== undefined) { renderer.toneMapping = TONE[mode]; forceMatUpdate(); } if (exposure != null) renderer.toneMappingExposure = exposure; },
   setTAA(on) { taaEnabled = !!on; if (on) ensureComposer(); },
+  setCamera(o) {
+    if (!controls) return;
+    if (o.polar != null) { camPolar = o.polar; controls.minPolarAngle = controls.maxPolarAngle = camPolar; }
+    if (o.fov != null) { camera.fov = o.fov; camera.updateProjectionMatrix(); }
+    if (o.minDist != null) controls.minDistance = o.minDist;
+    if (o.maxDist != null) controls.maxDistance = o.maxDist;
+    controls.update();
+  },
 };
 
 // ── 动态同步(信号量变化时重建 树/单位/建筑/高亮 + 迷雾可见性) ──
