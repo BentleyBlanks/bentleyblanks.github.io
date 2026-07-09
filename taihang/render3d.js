@@ -3,6 +3,10 @@
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { TAARenderPass } from "three/addons/postprocessing/TAARenderPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 const SQ3 = Math.sqrt(3), R = 1.0, DEG = THREE.MathUtils.degToRad;
 const G = () => window.TH;
@@ -13,7 +17,8 @@ const tiles = {};            // "q,r" -> { mesh, h, terrain }
 let prismGeo, coneGeo, treeTrunkGeo, treeLeafGeo, hexFlatGeo;
 const matCache = {};
 const texCache = {};
-let sunLight, lastSig = "", inited = false, cx0 = 0, cz0 = 0;
+let sunLight, sky, hemiLight, ambientLight, lastSig = "", inited = false, cx0 = 0, cz0 = 0;
+let _sunElev = 42, _sunAzi = 150, composer = null, taaPass = null, taaEnabled = false;
 let clock = 0; const revealAnims = {}; const tileVisPrev = new Set(); // 战雾展开动画
 
 // ── PCG 噪声 ──
@@ -33,13 +38,7 @@ const TERR = {
   forest:   { base: .12, amp: .10, top: "#4d6a2e", side: "#54502c" },
   mountain: { base: .40, amp: .70, top: "#9a9386", side: "#5c554a" },
 };
-function tileH(q, r, t) {
-  const c = TERR[t] || TERR.plain;
-  let h = c.base + c.amp * fbm(q * 0.32 + 3.1, r * 0.32 + 7.2); // 低频=邻格更接近, 过渡平滑
-  const W = G().CFG.mapW, H = G().CFG.mapH, edge = Math.min(q, W - 1 - q, r, H - 1 - r);
-  h *= Math.min(1, 0.35 + edge * 0.32); // 边缘平滑: 靠边界的格子高度渐降, 板子边不是陡壁
-  return h;
-}
+function tileH() { return 0.5; } // 地块平整不起伏(0缝隙/边缘对齐); 山地靠山峰锥体表现, 且不可通行
 
 function terrainTex(t) {
   if (texCache[t]) return texCache[t];
@@ -106,11 +105,10 @@ function init(container) {
   const [bx, bz] = hexWorld(W / 2, H / 2); cx0 = bx; cz0 = bz; // 板心
 
   // 天空(大气散射)
-  const sky = new Sky(); sky.scale.setScalar(6000); scene.add(sky);
+  sky = new Sky(); sky.scale.setScalar(6000); scene.add(sky);
   const u = sky.material.uniforms;
   u.turbidity.value = 8; u.rayleigh.value = 2.6; u.mieCoefficient.value = 0.005; u.mieDirectionalG.value = 0.85;
-  const sunPos = new THREE.Vector3(); const phi = DEG(90 - 42), theta = DEG(150);
-  sunPos.setFromSphericalCoords(1, phi, theta); u.sunPosition.value.copy(sunPos);
+  const sunPos = new THREE.Vector3(); sunPos.setFromSphericalCoords(1, DEG(90 - _sunElev), DEG(_sunAzi)); u.sunPosition.value.copy(sunPos);
 
   // 光照
   sunLight = new THREE.DirectionalLight(0xfff2da, 3.2);
@@ -119,11 +117,11 @@ function init(container) {
   const sc = sunLight.shadow.camera; sc.near = 1; sc.far = 260; sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.updateProjectionMatrix();
   sunLight.shadow.bias = -0.0006;
   scene.add(sunLight, sunLight.target);
-  scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x54492e, 0.95));
-  scene.add(new THREE.AmbientLight(0x55606f, 0.35));
+  hemiLight = new THREE.HemisphereLight(0xcfe0ff, 0x54492e, 0.95); scene.add(hemiLight);
+  ambientLight = new THREE.AmbientLight(0x55606f, 0.35); scene.add(ambientLight);
 
   // 共享几何(thetaStart=π/2 → 顶点落在 ±x, 平顶六边形, 与 hexWorld 的 1.5R 列距对齐)
-  prismGeo = new THREE.CylinderGeometry(R * 0.99, R * 0.99, 1, 6, 1, false, Math.PI / 2);
+  prismGeo = new THREE.CylinderGeometry(R, R, 1, 6, 1, false, Math.PI / 2); // 半径=R → 相邻六边形贴合无缝
   coneGeo = new THREE.ConeGeometry(R * 0.66, 1, 6, 1, false, Math.PI / 2);
   treeTrunkGeo = new THREE.CylinderGeometry(0.04, 0.06, 0.3, 5);
   treeLeafGeo = new THREE.ConeGeometry(0.22, 0.5, 6);
@@ -144,8 +142,12 @@ function init(container) {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(hx, 0, hz);
   camera.position.set(hx, 20, hz + 22);
-  controls.maxPolarAngle = 1.32; controls.minDistance = 6; controls.maxDistance = 90;
-  controls.enableDamping = true; controls.dampingFactor = 0.09; controls.screenSpacePanning = false;
+  // 文明6式相机: 固定俯角, 只允许平移+滚轮缩放, 不允许旋转/改变角度
+  controls.enableRotate = false;
+  controls.minPolarAngle = controls.maxPolarAngle = 0.95;
+  controls.minDistance = 8; controls.maxDistance = 70;
+  controls.enableDamping = true; controls.dampingFactor = 0.1; controls.screenSpacePanning = false;
+  controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.update();
 
   // 点击拾取
@@ -213,6 +215,28 @@ function project(q, r) {
   const rect = renderer.domElement.getBoundingClientRect();
   return { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
 }
+
+// ── Debug: 环境/画质调参 API ──
+const TONE = { none: THREE.NoToneMapping, linear: THREE.LinearToneMapping, reinhard: THREE.ReinhardToneMapping, cineon: THREE.CineonToneMapping, aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping };
+function forceMatUpdate() { if (scene) scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.needsUpdate = true); }); }
+function ensureComposer() {
+  if (composer || !renderer) return;
+  try {
+    composer = new EffectComposer(renderer);
+    taaPass = new TAARenderPass(scene, camera); taaPass.unbiased = false; taaPass.sampleLevel = 2;
+    composer.addPass(taaPass); composer.addPass(new OutputPass()); onResize();
+  } catch (e) { console.error("TAA 初始化失败", e); composer = null; taaEnabled = false; }
+}
+const dbg = {
+  setSky(o) { if (!sky) return; const u = sky.material.uniforms; if (o.turbidity != null) u.turbidity.value = o.turbidity; if (o.rayleigh != null) u.rayleigh.value = o.rayleigh; if (o.mie != null) u.mieCoefficient.value = o.mie; if (o.mieG != null) u.mieDirectionalG.value = o.mieG; if (o.elevation != null) _sunElev = o.elevation; if (o.azimuth != null) _sunAzi = o.azimuth; if (o.elevation != null || o.azimuth != null) { const p = new THREE.Vector3(); p.setFromSphericalCoords(1, DEG(90 - _sunElev), DEG(_sunAzi)); u.sunPosition.value.copy(p); sunLight.position.copy(p).multiplyScalar(80); } },
+  setSun(o) { if (!sunLight) return; if (o.color) sunLight.color.set(o.color); if (o.intensity != null) sunLight.intensity = o.intensity; },
+  setHemi(o) { if (!hemiLight) return; if (o.sky) hemiLight.color.set(o.sky); if (o.ground) hemiLight.groundColor.set(o.ground); if (o.intensity != null) hemiLight.intensity = o.intensity; },
+  setAmbient(o) { if (!ambientLight) return; if (o.color) ambientLight.color.set(o.color); if (o.intensity != null) ambientLight.intensity = o.intensity; },
+  setFog(o) { if (!scene) return; if (o.enabled === false) { scene.fog = null; return; } if (!scene.fog) scene.fog = new THREE.Fog(0xbcc6d0, 18, 85); if (o.color) scene.fog.color.set(o.color); if (o.near != null) scene.fog.near = o.near; if (o.far != null) scene.fog.far = o.far; },
+  setShadow(size) { if (!sunLight) return; if (sunLight.shadow.map) sunLight.shadow.map.dispose(); sunLight.shadow.map = null; sunLight.shadow.mapSize.set(size, size); },
+  setTone(mode, exposure) { if (!renderer) return; if (mode && TONE[mode] !== undefined) { renderer.toneMapping = TONE[mode]; forceMatUpdate(); } if (exposure != null) renderer.toneMappingExposure = exposure; },
+  setTAA(on) { taaEnabled = !!on; if (on) ensureComposer(); },
+};
 
 // ── 动态同步(信号量变化时重建 树/单位/建筑/高亮 + 迷雾可见性) ──
 function signature() {
@@ -354,7 +378,7 @@ function setupPicking() {
   });
 }
 
-function onResize() { if (!renderer) return; const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function onResize() { if (!renderer) return; const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight; renderer.setSize(w, h); if (composer) composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 function loop() {
   animId = requestAnimationFrame(loop);
   clock = performance.now() / 1000;
@@ -365,19 +389,20 @@ function loop() {
     if (p >= 1) { tt.mesh.scale.y = tt.h; tt.mesh.position.y = tt.h / 2; delete revealAnims[k]; }
     else { const e = 1 - Math.pow(1 - p, 3), sy = Math.max(0.001, tt.h * e); tt.mesh.scale.y = sy; tt.mesh.position.y = sy / 2; }
   }
-  renderer.render(scene, camera);
+  if (taaEnabled && composer) composer.render(); else renderer.render(scene, camera);
 }
 
 function dispose() {
   if (!inited) return; cancelAnimationFrame(animId); animId = 0;
   if (ro) ro.disconnect(); window.removeEventListener("resize", onResize);
   controls.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
-  renderer.dispose(); scene = null; renderer = null; inited = false; lastSig = "";
+  if (composer) { composer.dispose && composer.dispose(); composer = null; taaPass = null; }
+  renderer.dispose(); scene = null; renderer = null; sky = hemiLight = ambientLight = sunLight = null; inited = false; lastSig = "";
   for (const k in tiles) delete tiles[k];
   for (const k in revealAnims) delete revealAnims[k];
   tileVisPrev.clear();
 }
 function active() { return inited; }
 
-export const TH3D = { init, dispose, active, focus, project };
+export const TH3D = { init, dispose, active, focus, project, dbg };
 if (typeof window !== "undefined") window.TH3D = TH3D;

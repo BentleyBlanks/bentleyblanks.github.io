@@ -21,6 +21,20 @@ button { font-family: inherit; cursor: pointer; }
 #gl { position: fixed; inset: 0; z-index: 1; display: none; }
 #gl canvas { display: block; width: 100%; height: 100%; }
 .tbtn.on { border-color: #6cbf5a; color: #bfe89a; background: #26361c; }
+#dbgPanel { position: fixed; top: 44px; right: 6px; z-index: 20; width: 320px; max-height: calc(100vh - 56px); overflow-y: auto; display: none; background: rgba(18,15,9,.97); border: 1px solid #6b5a30; border-radius: 9px; padding: 10px 12px; font-size: 12px; color: #cdbf98; box-shadow: 0 6px 24px rgba(0,0,0,.6); }
+#dbgPanel.show { display: block; }
+#dbgPanel h4 { color: #e8b64a; font-size: 12.5px; margin: 10px 0 5px; letter-spacing: 1px; border-bottom: 1px solid #4a3f22; padding-bottom: 3px; }
+#dbgPanel h4:first-child { margin-top: 0; }
+#dbgPanel .dr { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+#dbgPanel .dr label { flex: 1; color: #b0a478; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+#dbgPanel .dr input[type=number], #dbgPanel .dr input[type=range] { width: 96px; }
+#dbgPanel .dr input[type=number] { background: #241d10; border: 1px solid #4a3f22; color: #e8dcb8; border-radius: 4px; padding: 2px 4px; font-family: inherit; }
+#dbgPanel .dr input[type=color] { width: 26px; height: 20px; padding: 0; border: 1px solid #4a3f22; background: none; }
+#dbgPanel .dr .dv { width: 34px; text-align: right; color: #d8a441; font-size: 11px; }
+#dbgPanel select { background: #241d10; border: 1px solid #4a3f22; color: #e8dcb8; border-radius: 4px; padding: 2px; font-family: inherit; flex: 1; }
+#dbgPanel button.dbtn { width: 100%; margin: 4px 0; background: #2a2416; border: 1px solid #6b5a30; color: #e8d7ae; border-radius: 5px; padding: 6px; font-family: inherit; font-size: 12px; cursor: pointer; }
+#dbgPanel button.dbtn:hover { background: #3a3320; }
+#dbgPanel .note { color: #7a6c4a; font-size: 10.5px; margin: 2px 0 6px; }
 
 /* ── 顶栏 ── */
 #topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 12px; background: rgba(22,18,10,.92); border-bottom: 1px solid #3a3826; font-size: 13px; }
@@ -81,6 +95,17 @@ button { font-family: inherit; cursor: pointer; }
 #endTurnBtn:active, #endTurnBtn.pressed { transform: scale(.93); background: #4a1712; box-shadow: inset 0 0 10px rgba(0,0,0,.5); }
 #endTurnBtn.pulse { animation: pulse 1.2s infinite; }
 @keyframes pulse { 0%,100% { box-shadow: 0 0 0 rgba(216,164,65,0); } 50% { box-shadow: 0 0 12px rgba(216,164,65,.55); } }
+#resPop { position: fixed; z-index: 13; display: none; max-width: 300px; background: rgba(26,20,12,.98); border: 1px solid #6b5a30; border-radius: 9px; padding: 10px 13px; box-shadow: 0 6px 20px rgba(0,0,0,.55); font-size: 12.5px; color: #d8c9a0; line-height: 1.5; }
+#resPop.show { display: block; }
+#resPop h4 { color: #f0e4c0; font-size: 14px; margin-bottom: 6px; letter-spacing: 1px; }
+#resPop .rbrk { margin: 6px 0; }
+#resPop .rbrk .rl { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px solid #2a2618; }
+#resPop .rbrk .rl b { color: #e8dcb8; white-space: nowrap; }
+#resPop .rbrk .rl.tot { border-bottom: none; border-top: 1px solid #4a452c; margin-top: 2px; padding-top: 4px; color: #f0e4c0; font-weight: 700; }
+#resPop .rbrk .rl.tot b { color: #f0d488; }
+#resPop .v-ok { color: #9fbc52; font-weight: 700; } #resPop .v-warn { color: #e8b64a; font-weight: 700; } #resPop .v-bad { color: #e2564d; font-weight: 700; }
+#resPop .rhow { margin-top: 6px; padding-top: 5px; border-top: 1px dashed #3a3826; color: #b9ab84; }
+#resPop .rhow b { color: #d8a441; }
 #turnToast { position: fixed; top: 46%; left: 50%; transform: translate(-50%,-50%); z-index: 11; pointer-events: none; padding: 10px 24px; border-radius: 10px; background: rgba(26,20,12,.92); border: 1px solid #a08338; color: #f0e4c0; font-size: 20px; font-weight: 700; letter-spacing: 3px; text-shadow: 0 2px 6px #000; opacity: 0; }
 #turnToast.show { animation: turnpop 1.05s ease-out; }
 #turnToast small { display: block; text-align: center; font-size: 12px; font-weight: 400; letter-spacing: 1px; color: #c8a850; margin-top: 3px; }
@@ -183,13 +208,16 @@ button { font-family: inherit; cursor: pointer; }
   <button class="tbtn" id="helpBtn">规则 [H]</button>
   <button class="tbtn" id="nextUnitBtn" title="跳到下一个待命单位(空格)">⏭ 下一单位</button>
   <button class="tbtn" id="view3dBtn" title="切换 3D/2D 视角(3D 仅桌面)">🗺 3D</button>
+  <button class="tbtn" id="dbgBtn" title="调试面板">🐞 Debug</button>
 </div>
+<div id="dbgPanel"></div>
 
 <div id="sweepBanner" class="hidden"></div>
 <div id="sidePanel" class="hidden"></div>
 <div id="logBox"></div>
 <button id="endTurnBtn">结束回合</button>
 <div id="turnToast"></div>
+<div id="resPop"></div>
 <div id="confirmBar"><span class="cinfo" id="cInfo"></span><button id="cOk">确认</button><button id="cCancel">取消</button></div>
 <div id="modalWrap" class="hidden"><div id="modalBox"></div></div>
 
@@ -208,9 +236,9 @@ const CFG = {
   greatWinVillages: 8,     // ≥N村=大胜
 
   // ── 地图 ──
-  mapW: 24, mapH: 16,
+  mapW: 24, mapH: 20,
   hexSize: 36,
-  villageCount: 16,        // 总村庄数(含根据地)
+  villageCount: 20,        // 总村庄数(含根据地)
   villageMinGap: 2,        // 村庄间最小距离
 
   // ── 起始 ──
@@ -429,9 +457,9 @@ function genMap() {
   // ── 村庄 ──
   const villages = [];
   const zones = [ // [minQ,maxQ,数量]
-    [1, 7, 5],    // 山区
-    [8, 13, 5],   // 丘陵
-    [14, 22, 6],  // 平原
+    [1, 7, 6],    // 山区
+    [8, 13, 6],   // 丘陵
+    [14, 22, 8],  // 平原
   ];
   const names = VNAMES.slice(); // 顺序取名
   let ni = 0;
@@ -440,8 +468,7 @@ function genMap() {
     while (got < count && g2++ < 800) {
       const q = ri(minQ, maxQ), r = ri(1, H - 2);
       const t = tiles[q][r];
-      if (t.rail || t.sh) continue;
-      if (t.sh) continue;
+      if (t.rail || t.sh || t.terrain === "mountain") continue; // 村庄不落在山地(山地不可通行)
       let ok = true;
       for (const v of villages) if (hexDist(q, r, v.q, v.r) < CFG.villageMinGap) { ok = false; break; }
       for (let qq = 0; qq < W && ok; qq++) for (let rr = 0; rr < H && ok; rr++) {
@@ -528,8 +555,9 @@ function computeVis() {
 
 // ── 移动 ──
 function moveCost(unit, t) {
+  if (t.terrain === "mountain" && !t.village && !t.sh) return 99; // 山川不可通行(陆地单位); 山上的村/据点仍可进
   if (UT[unit.type].roadOnly) return (t.rail || t.terrain === "plain") ? 1 : 99;
-  if (t.terrain === "forest" || t.terrain === "mountain") return unit.side === "j" && t.terrain === "mountain" ? 3 : 2;
+  if (t.terrain === "forest") return 2;
   return 1;
 }
 function reachable(u) {
@@ -1144,6 +1172,7 @@ function jpUnitAct(u) {
     // 3) 向 dest 走一步(贪心, 绕开山与占位)
     const opts = nbrs(u.q, u.r).filter(([a, b]) => {
       const t = state.tiles[a][b];
+      if (moveCost(u, t) >= 99) return false; // 不可通行(山川)
       if (t.sh) return false;
       if (UT[u.type].roadOnly && !(t.rail || t.terrain === "plain")) return false;
       if (unitAt(a, b, "j", "mil")) return false;
@@ -1454,9 +1483,12 @@ function draw() {
     for (const k of reach.keys()) {
       const [q, r] = k.split(",").map(Number);
       const [cx, cy] = hexCenter(q, r);
+      const pl = 0.5 + 0.5 * Math.sin(animTime * 4 + (q + r) * 0.6);
       hexPath(cx, cy, s - 3);
-      ctx.strokeStyle = "rgba(159,188,82,.75)"; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = "rgba(159,188,82,.10)"; ctx.fill();
+      ctx.fillStyle = "rgba(150,210,80,.32)"; ctx.fill();                       // 明显的绿色填充
+      ctx.strokeStyle = "rgba(180,235,110," + (0.7 + 0.3 * pl) + ")"; ctx.lineWidth = 2.6; ctx.stroke();
+      ctx.fillStyle = "rgba(200,245,140," + (0.5 + 0.4 * pl) + ")";              // 脉冲中心点
+      ctx.beginPath(); ctx.arc(cx, cy, s * 0.13, 0, 7); ctx.fill();
     }
     // 可攻目标
     const u = getSelUnit();
@@ -2150,7 +2182,7 @@ function startGame(fromSave) {
 }
 
 // ── 顶栏资源点击说明(对标文明6产出分解: 现值 / 每回合来源 / 怎么提升) ──
-function showResourceInfo(kind) {
+function showResourceInfo(kind, anchorEl) {
   if (!state || !state.started || state.over) return;
   const S = state, owned = ownedVillages();
   const inc = S.lastIncome || { g: 0, m: 0, o: 0, a: 0 };
@@ -2213,13 +2245,25 @@ function showResourceInfo(kind) {
       + `<p style="color:#9a8d68">另有一次性：主动攻击+5、拔炮楼+12、破袭+8、并入新村+6。到 <b style="color:#e2564d">${CFG.sweepThreshold}</b> 日军就集结扫荡(3回合预警)。</p>`;
     how = "少打(军事行动最涨暴露) · 别一口气并入太多村 · 把部队藏进山地/地道 · 点【敌工科】科技加衰减 · 破袭铁路虽+暴露但削弱下次扫荡。<b>但纯苟也不行</b>：超过15回合不动会被强制扫荡。";
   }
-  openModal(`<h2>${title}</h2>${body}${heartNote}<p><b>怎么提升/控制：</b>${how}</p><div class="mbtns"><button class="mbtn ghost" onclick="closeModal()">知道了</button></div>`);
+  const pop = $("resPop");
+  pop.innerHTML = `<h4>${title}</h4>${body}${heartNote}<div class="rhow"><b>怎么提升/控制：</b>${how}</div>`;
+  pop.classList.add("show");
+  // 定位在被点资源的正下方, 越界夹住
+  const r = anchorEl.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = r.left, top = r.bottom + 6;
+  if (left + pw > innerWidth - 6) left = innerWidth - pw - 6;
+  if (top + ph > innerHeight - 6) top = r.top - ph - 6;
+  pop.style.left = Math.max(6, left) + "px"; pop.style.top = Math.max(6, top) + "px";
 }
-$("uiGrain").addEventListener("click", () => showResourceInfo("grain"));
-$("uiMan").addEventListener("click", () => showResourceInfo("man"));
-$("uiArms").addEventListener("click", () => showResourceInfo("arms"));
-$("uiOrg").addEventListener("click", () => showResourceInfo("org"));
-$("expWrap").addEventListener("click", () => showResourceInfo("exp"));
+let resPopKind = null;
+function closeResPop() { $("resPop").classList.remove("show"); resPopKind = null; }
+["uiGrain", "uiMan", "uiArms", "uiOrg", "expWrap"].forEach(id => $(id).addEventListener("click", e => {
+  e.stopPropagation();
+  const kind = { uiGrain: "grain", uiMan: "man", uiArms: "arms", uiOrg: "org", expWrap: "exp" }[id];
+  if (resPopKind === kind && $("resPop").classList.contains("show")) { closeResPop(); return; } // 同一项再点=关闭
+  resPopKind = kind; showResourceInfo(kind, $(id));
+}));
+addEventListener("click", e => { const p = $("resPop"); if (p.classList.contains("show") && !p.contains(e.target)) closeResPop(); }); // 点别处关闭
 $("endTurnBtn").addEventListener("click", () => {
   const b = $("endTurnBtn"); if (b.disabled || (state && state.over)) return;
   b.classList.add("pressed");                        // 立即按下反馈(尤其移动端无hover)
@@ -2260,7 +2304,7 @@ window.TH = {
   click: (q, r) => handleClickTile(q, r),
 };
 $("nextUnitBtn").addEventListener("click", nextUnit);
-addEventListener("keydown", e => { if (e.code === "Space" && !modalOpen()) { e.preventDefault(); nextUnit(); } });
+addEventListener("keydown", e => { if (e.code === "Space" && !modalOpen() && !/INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || "")) { e.preventDefault(); nextUnit(); } });
 let mode3d = false;
 $("view3dBtn").addEventListener("click", async () => {
   const btn = $("view3dBtn"), gl = $("gl");
@@ -2279,6 +2323,49 @@ $("view3dBtn").addEventListener("click", async () => {
     btn.textContent = "🗺 3D"; btn.classList.remove("on"); resize(); draw();
   }
 });
+
+// ── Debug 面板 ──
+function revealAllMap() { if (!state) return; for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { state.tiles[q][r].disc = true; visSet.add(key(q, r)); } draw(); log("【Debug】已开全地图", "hl"); }
+function dbgCfg(el, k) { const v = +el.value; if (!isNaN(v)) { CFG[k] = v; if (state && state.started) { updateUI(); draw(); } } }
+function dbgSlide(el, cat, key) { const v = +el.value; el.nextElementSibling.textContent = v; dbgApply(cat, key, v); }
+function dbgColor(el, cat, key) { dbgApply(cat, key, el.value); }
+function dbgApply(cat, key, v) {
+  const D = window.TH3D && window.TH3D.dbg; const on = window.TH3D && window.TH3D.active && window.TH3D.active();
+  if (!D || !on) return; // 仅 3D 模式生效
+  if (cat === "sky") D.setSky({ [key]: v });
+  else if (cat === "sun") D.setSun({ [key]: v });
+  else if (cat === "hemi") D.setHemi({ [key]: v });
+  else if (cat === "amb") D.setAmbient({ [key]: v });
+  else if (cat === "fog") D.setFog({ [key]: v });
+  else if (cat === "shadow") D.setShadow(v);
+  else if (cat === "tone") D.setTone(v, null);
+  else if (cat === "exposure") D.setTone(null, v);
+  else if (cat === "taa") D.setTAA(v);
+}
+function dbgSl(label, min, max, step, val, cat, key) { return `<div class="dr"><label title="${label}">${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="dbgSlide(this,'${cat}','${key}')"><span class="dv">${val}</span></div>`; }
+function dbgCol(label, val, cat, key) { return `<div class="dr"><label>${label}</label><input type="color" value="${val}" oninput="dbgColor(this,'${cat}','${key}')"></div>`; }
+function buildDebugPanel() {
+  let h = "<h4>Debug</h4>";
+  h += `<button class="dbtn" onclick="revealAllMap()">🗺 一键开全地图</button>`;
+  h += `<div class="note">↓ 所有数值参数(改后即时生效; 需重开局的下局生效)</div>`;
+  for (const k in CFG) if (typeof CFG[k] === "number") h += `<div class="dr"><label title="${k}">${k}</label><input type="number" step="any" value="${CFG[k]}" oninput="dbgCfg(this,'${k}')"></div>`;
+  h += "<h4>环境系统 (3D)</h4><div class='note'>需在 3D 模式下调整</div>";
+  h += dbgSl("大气·rayleigh", 0, 6, 0.1, 2.6, "sky", "rayleigh") + dbgSl("大气·turbidity", 0, 20, 0.5, 8, "sky", "turbidity");
+  h += dbgSl("大气·mie", 0, 0.05, 0.001, 0.005, "sky", "mie") + dbgSl("大气·mieG", 0, 1, 0.01, 0.85, "sky", "mieG");
+  h += dbgSl("太阳·高度角", 1, 89, 1, 42, "sky", "elevation") + dbgSl("太阳·方位角", 0, 360, 1, 150, "sky", "azimuth");
+  h += dbgSl("太阳·强度", 0, 6, 0.1, 3.2, "sun", "intensity") + dbgCol("太阳·颜色", "#fff2da", "sun", "color");
+  h += dbgSl("GI·环境光强度", 0, 3, 0.05, 0.95, "hemi", "intensity") + dbgCol("GI·天空色", "#cfe0ff", "hemi", "sky") + dbgCol("GI·地面色", "#54492e", "hemi", "ground");
+  h += dbgSl("补光·强度", 0, 2, 0.05, 0.35, "amb", "intensity") + dbgCol("补光·颜色", "#55606f", "amb", "color");
+  h += `<div class="dr"><label>高度雾 开关</label><input type="checkbox" onchange="dbgApply('fog','enabled',this.checked)"></div>`;
+  h += dbgSl("雾·近", 0, 60, 1, 18, "fog", "near") + dbgSl("雾·远", 20, 200, 1, 85, "fog", "far") + dbgCol("雾·颜色", "#bcc6d0", "fog", "color");
+  h += "<h4>画质 (3D)</h4>";
+  h += `<div class="dr"><label>ToneMapping</label><select onchange="dbgApply('tone','mode',this.value)"><option value="aces" selected>ACESFilmic</option><option value="agx">AgX</option><option value="reinhard">Reinhard</option><option value="cineon">Cineon</option><option value="linear">Linear</option><option value="none">None</option></select></div>`;
+  h += dbgSl("曝光", 0, 2, 0.05, 0.5, "exposure", "v");
+  h += `<div class="dr"><label>阴影分辨率(CSM)</label><select onchange="dbgApply('shadow','v',+this.value)"><option value="1024">1024</option><option value="2048" selected>2048</option><option value="4096">4096</option></select></div>`;
+  h += `<div class="dr"><label>TAA 抗锯齿</label><input type="checkbox" onchange="dbgApply('taa','on',this.checked)"></div>`;
+  $("dbgPanel").innerHTML = h;
+}
+$("dbgBtn").addEventListener("click", () => { const p = $("dbgPanel"); if (p.classList.contains("show")) { p.classList.remove("show"); $("dbgBtn").classList.remove("on"); } else { buildDebugPanel(); p.classList.add("show"); $("dbgBtn").classList.add("on"); } });
 
 resize();
 newState();       // 先生成一张底图作为标题背景
