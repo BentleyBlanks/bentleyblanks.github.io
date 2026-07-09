@@ -69,8 +69,13 @@ button { font-family: inherit; cursor: pointer; }
 #endTurnBtn { position: absolute; right: 12px; bottom: 12px; z-index: 10; background: #6a1f18; border: 1px solid #a04338; color: #f0d8c0; font-size: 15px; letter-spacing: 3px; border-radius: 8px; padding: 12px 22px; }
 #endTurnBtn:hover { background: #7d281f; }
 #endTurnBtn:disabled { opacity: .5; cursor: default; }
+#endTurnBtn:active, #endTurnBtn.pressed { transform: scale(.93); background: #4a1712; box-shadow: inset 0 0 10px rgba(0,0,0,.5); }
 #endTurnBtn.pulse { animation: pulse 1.2s infinite; }
 @keyframes pulse { 0%,100% { box-shadow: 0 0 0 rgba(216,164,65,0); } 50% { box-shadow: 0 0 12px rgba(216,164,65,.55); } }
+#turnToast { position: fixed; top: 46%; left: 50%; transform: translate(-50%,-50%); z-index: 11; pointer-events: none; padding: 10px 24px; border-radius: 10px; background: rgba(26,20,12,.92); border: 1px solid #a08338; color: #f0e4c0; font-size: 20px; font-weight: 700; letter-spacing: 3px; text-shadow: 0 2px 6px #000; opacity: 0; }
+#turnToast.show { animation: turnpop 1.05s ease-out; }
+#turnToast small { display: block; text-align: center; font-size: 12px; font-weight: 400; letter-spacing: 1px; color: #c8a850; margin-top: 3px; }
+@keyframes turnpop { 0% { opacity: 0; transform: translate(-50%,-30%) scale(.9); } 18% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 72% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-58%) scale(1); } }
 
 /* ── 弹窗 ── */
 #modalWrap { position: absolute; inset: 0; z-index: 30; background: rgba(8,6,3,.78); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -161,6 +166,7 @@ button { font-family: inherit; cursor: pointer; }
 <div id="sidePanel" class="hidden"></div>
 <div id="logBox"></div>
 <button id="endTurnBtn">结束回合</button>
+<div id="turnToast"></div>
 <div id="modalWrap" class="hidden"><div id="modalBox"></div></div>
 
 <script>
@@ -849,7 +855,13 @@ function endTurn() {
   // 总部沦陷判定在 jpTurn 内
   checkEra();
   computeVis(); updateUI(); draw();
+  showTurnToast();
   saveGame();
+}
+function showTurnToast() {
+  const el = $("turnToast");
+  el.innerHTML = "▶ " + dateStr(state.turn) + "<small>" + eraName(state.turn) + " · 第 " + state.turn + " / " + CFG.totalTurns + " 回合</small>";
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
 }
 function nearOwnVillage(q, r, d) {
   return ownedVillages().some(x => hexDist(q, r, x.q, x.r) <= d);
@@ -1299,6 +1311,17 @@ function unitDrawPos(u, s) {
   const oy = u.layer === "civ" ? -s * 0.32 : (hasV ? -s * 0.3 : 0);
   return [cx + ox, cy + oy];
 }
+function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+// 我方地雷标识(居中的雷体+触角+脉冲红灯, 比原来角落里的小☢清楚得多)
+function drawMine(cx, cy, s) {
+  const my = cy + s * 0.06, pulse = 0.5 + 0.5 * Math.sin(animTime * 4 + cx * 0.1);
+  ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(cx, my + s * 0.02, s * 0.22, s * 0.06, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#241f18"; ctx.lineWidth = s * 0.045; ctx.lineCap = "round"; // 触角
+  for (const dx of [-0.13, 0, 0.13]) { ctx.beginPath(); ctx.moveTo(cx + dx * s, my - s * 0.14); ctx.lineTo(cx + dx * s * 1.5, my - s * 0.3); ctx.stroke(); }
+  ctx.fillStyle = "#2c2820"; ctx.beginPath(); ctx.arc(cx, my, s * 0.2, Math.PI, 0); ctx.fill(); ctx.fillRect(cx - s * 0.2, my - 1, s * 0.4, s * 0.05); // 半球雷体
+  ctx.fillStyle = `rgba(232,64,52,${0.55 + 0.45 * pulse})`; ctx.beginPath(); ctx.arc(cx, my - s * 0.09, s * 0.06, 0, 7); ctx.fill(); // 脉冲红灯
+  ctx.fillStyle = "rgba(255,200,190,.9)"; ctx.beginPath(); ctx.arc(cx - s * 0.02, my - s * 0.11, s * 0.018, 0, 7); ctx.fill(); // 高光
+}
 
 // dpr 单一来源(封顶3, 避免 dpr=4 机型 backing 过大); draw 与 syncCanvas 必须用同一个值,否则错位/黑屏
 function curDpr() { return Math.min(Math.max(window.devicePixelRatio || 1, 1), 3); }
@@ -1364,7 +1387,7 @@ function draw() {
     // 铁路(跟着走向连成一线): 县城格不画, 否则铁路会从城底下露出来
     if (t.rail && !(t.sh && t.sh.kind === "town")) drawRail(q, r, cx, cy, s);
     // 地雷(只对玩家可见)
-    if (t.mine) { ctx.fillStyle = "rgba(226,86,77,.8)"; ctx.font = (s * 0.34) + "px serif"; ctx.fillText("☢", cx + s * 0.5, cy - s * 0.5); }
+    if (t.mine) drawMine(cx, cy, s);
     // 村庄
     if (t.village) drawVillage(cx, cy, s, t.village, isSuppressed(q, r));
     // 敌设施
@@ -1465,8 +1488,11 @@ function drawVillage(cx, cy, s, v, suppressed) {
   const w = s * 0.82;
   // 地面阴影
   ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(cx, cy + s * 0.2, w * 0.52, s * 0.13, 0, 0, 7); ctx.fill();
-  // HQ 金环
-  if (v.hq) { ctx.strokeStyle = "#e8c05a"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(cx, cy - s * 0.02, s * 0.6, 0, 7); ctx.stroke(); }
+  // HQ 双金环
+  if (v.hq) {
+    ctx.strokeStyle = "#e8c05a"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(cx, cy - s * 0.02, s * 0.62, 0, 7); ctx.stroke();
+    ctx.strokeStyle = "rgba(232,192,90,.4)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy - s * 0.02, s * 0.69, 0, 7); ctx.stroke();
+  }
   // 三间坡顶房, 错落成村落
   const house = (hx, hy, hw, hh) => {
     ctx.fillStyle = wall; ctx.fillRect(hx - hw / 2, hy, hw, hh);
@@ -1498,7 +1524,12 @@ function drawVillage(cx, cy, s, v, suppressed) {
   ctx.font = "600 " + (s * 0.3) + "px 'Noto Sans SC', sans-serif";
   ctx.textAlign = "center"; ctx.textBaseline = "top";
   ctx.fillText(v.name.replace("(总部)", ""), cx, cy + s * 0.4);
-  if (v.hq) { ctx.fillStyle = "#e8c05a"; ctx.fillText("★总部", cx, cy + s * 0.4 + s * 0.32); }
+  if (v.hq) { // 金色"★ 总部"铭牌
+    const pw = s * 0.92, ph = s * 0.32, py = cy + s * 0.4 + s * 0.36;
+    ctx.fillStyle = "#e8c05a"; rrect(cx - pw / 2, py - ph / 2, pw, ph, s * 0.06); ctx.fill();
+    ctx.fillStyle = "#3a2a10"; ctx.font = "800 " + (s * 0.24) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("★ 总部", cx, py + s * 0.01);
+  }
 }
 
 function drawStructure(cx, cy, s, sh) {
@@ -1569,10 +1600,14 @@ function drawUnit(u, s) {
   // 敌军杀气红晕
   if (!isP && u.type !== "puppet") { ctx.fillStyle = "rgba(206,40,30,.13)"; ctx.beginPath(); ctx.arc(x, y, s * 0.44, 0, 7); ctx.fill(); }
   if (cfg.tank) drawTank(x, y, s, phase); else drawFigure(x, y, s, cfg, phase);
-  // 类型标签(带描边, 一眼分清)
-  ctx.font = "700 " + (s * 0.27) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.strokeStyle = "rgba(0,0,0,.65)"; ctx.lineWidth = 2.6; ctx.strokeText(ut.glyph, x, y - s * 0.46);
-  ctx.fillStyle = isP ? "#f2e6cc" : (u.type === "puppet" ? "#e0d090" : "#ff9a86"); ctx.fillText(ut.glyph, x, y - s * 0.46);
+  // 类型徽标(彩色小牌: 阵营+兵种一眼分清) —— 我方民事=青/军事=红棕/武工=紫, 日军=深红, 伪军=橄榄
+  const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a")
+                    : (u.type === "puppet" ? "#5f5628" : "#961f13");
+  const bw = s * 0.44, bh = s * 0.32, by = y - s * 0.5;
+  ctx.fillStyle = badge; rrect(x - bw / 2, by - bh / 2, bw, bh, s * 0.08); ctx.fill();
+  ctx.strokeStyle = isP ? "rgba(240,220,180,.7)" : "rgba(230,120,110,.7)"; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.fillStyle = "#f8eed8"; ctx.font = "800 " + (s * 0.26) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(ut.glyph, x, by + s * 0.008);
   // HP条
   if (u.hp < 100) {
     const bw = s * 0.5;
@@ -2040,7 +2075,11 @@ $("uiMan").addEventListener("click", () => showResourceInfo("man"));
 $("uiArms").addEventListener("click", () => showResourceInfo("arms"));
 $("uiOrg").addEventListener("click", () => showResourceInfo("org"));
 $("expWrap").addEventListener("click", () => showResourceInfo("exp"));
-$("endTurnBtn").addEventListener("click", endTurn);
+$("endTurnBtn").addEventListener("click", () => {
+  const b = $("endTurnBtn"); if (b.disabled || (state && state.over)) return;
+  b.classList.add("pressed");                        // 立即按下反馈(尤其移动端无hover)
+  setTimeout(() => { b.classList.remove("pressed"); endTurn(); }, 30);
+});
 $("techBtn").addEventListener("click", showTech);
 $("helpBtn").addEventListener("click", () => showHelp(false));
 
