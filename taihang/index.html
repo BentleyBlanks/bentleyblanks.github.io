@@ -357,6 +357,23 @@ const CFG = {
   // ── 经验与晋升 ──
   xpAttack: 2, xpKill: 4, xpStruct: 4, xpDefend: 1, xpSabotage: 2,
   vetLevels: [8, 20, 36],  // 各级晋升所需经验(老练/精锐/英雄)
+
+  // ── 扫荡战术(1942年起解锁新打法, 侦察网可预知) ──
+  ironFromYear: 1942,      // 铁壁合围/清乡驻剿 最早出现年份
+  ironExtraUnits: 2,       // 铁壁合围: 纵队数上限追加(四面围)
+  ironRingDist: [4, 7],    // 铁壁合围: 进场围圈距根据地重心的距离带
+  garrisonMaxUnits: 4,     // 清乡驻剿: 纵队数上限(少而精)
+  garrisonTTLMult: 2.5,    // 清乡驻剿: 驻留时长倍率
+
+  // ── 特务队 ──
+  spyFromTurn: 21,         // 此回合起日军渗透特务
+  spyEvery: 10,            // 每N回合派一名(存活上限内)
+  spyMax: 2,               // 同时存在的特务上限
+  spyTTL: 24,              // 特务潜伏N回合后撤回
+  spyHeartLoss: 6,         // 特务潜伏村庄: -民心/回合
+  spyExpGain: 1.2,         // 特务潜伏村庄: +暴露/回合
+  chujianHeart: 5,         // 锄奸成功: 所在村民心+
+  chujianExpDrop: 4,       // 锄奸成功: 暴露-
 };
 
 // ── 时代强度曲线: 1941-43扫荡愈演愈烈, 1944后日军抽兵南洋渐衰 ──
@@ -390,6 +407,7 @@ const UT = {
   regular:  { name: "主力连", glyph: "连", side: "p", layer: "mil", str: 16, mp: 2, vis: 2, cost: { grain: 25, man: 20, arms: 15 }, upkeep: 2, desc: "野战中坚, 拔炮楼主力。" },
   elite:    { name: "主力团", glyph: "团", side: "p", layer: "mil", str: 26, mp: 2, vis: 2, cost: { grain: 40, man: 35, arms: 30 }, upkeep: 3, needTech: "zhenggui", desc: "正规化整训后的重拳, 反攻县城的本钱。" },
   commando: { name: "武工队", glyph: "武", side: "p", layer: "mil", str: 11, mp: 3, vis: 2, cost: { grain: 20, man: 10, arms: 10, org: 10 }, upkeep: 1, hidden: true, needTech: "poxi", desc: "昼伏夜出, 日军无法主动攻击它。破袭铁路的行家。" },
+  spy:      { name: "特务队", glyph: "特", side: "j", layer: "civ", str: 5,  mp: 3, vis: 2, upkeep: 0 },
   puppet:   { name: "伪军小队", glyph: "伪", side: "j", layer: "mil", str: 8,  mp: 2, vis: 2, upkeep: 0 },
   squad:    { name: "日军小队", glyph: "日", side: "j", layer: "mil", str: 14, mp: 2, vis: 2, upkeep: 0 },
   company:  { name: "日军中队", glyph: "中", side: "j", layer: "mil", str: 22, mp: 2, vis: 2, upkeep: 0 },
@@ -410,8 +428,9 @@ const BUILDING_YIELD = { kaiken: [4, 0, 0], yexiao: [0, 0, 2], liangcang: [0, 0,
 const TECHS = {
   jianzu:   { tier: 1, name: "减租减息", cost: 30, desc: "工作队+4民心/回合; 己方村民心回升翻倍" },
   maque:    { tier: 1, name: "麻雀战",   cost: 30, desc: "民兵在山地/森林战力+4" },
-  zhencha:  { tier: 1, name: "侦察网",   cost: 30, desc: "全体视野+1; 可预知扫荡目标与规模" },
+  zhencha:  { tier: 1, name: "侦察网",   cost: 30, desc: "全体视野+1; 可预知扫荡目标、规模与战术打法" },
   dilei:    { tier: 2, name: "地雷战",   cost: 60, desc: "解锁【埋地雷】: 4军火布雷, 踩中-42HP" },
+  chujian:  { tier: 2, name: "锄奸部",   cost: 60, desc: "可攻击特务队; 我军踏入特务所在格当场锄奸(村民心+5, 暴露-4)" },
   didao:    { tier: 2, name: "地道战",   cost: 60, desc: "解锁建筑【地道网】" },
   binggong: { tier: 2, name: "兵工生产", cost: 60, desc: "解锁建筑【兵工坊】" },
   tongzhan: { tier: 2, name: "统一战线", cost: 60, desc: "伪军战力-3(策反瓦解); 中立村初始民心+10" },
@@ -463,6 +482,53 @@ function maybeLevel(u) {
   log(uname(u) + "身经百战, 晋升【" + LV_NAMES[u.lv - 1] + "】" + (u.pendPromo ? " — 点开部队选择特长" : ""), "good");
 }
 function grantXp(u, n) { if (u.side !== "p" || !UT[u.type].str) return; u.xp = (u.xp || 0) + n; maybeLevel(u); }
+
+// ── 扫荡战术 ──
+const TACTIC_INFO = {
+  converge: { name: "分进合击", hint: "数路敌军直扑高民心村庄, 沿途袭扰" },
+  iron:     { name: "铁壁合围", hint: "敌军将从四面八方进场向心收缩 — 留好突围路线, 或据险各个击破" },
+  garrison: { name: "清乡驻剿", hint: "敌军少而精, 进驻村庄设防长期盘踞 — 不主动拔除就赖着不走" },
+};
+function pickSweepTactic(S) {
+  if (S.turn === CFG.bigSweepTurn) return "iron"; // 五一大扫荡=历史上的铁壁合围
+  if (eraYear(S.turn) < CFG.ironFromYear) return "converge";
+  const roll = rng(), late = eraYear(S.turn) >= 1943;
+  if (roll < (late ? 0.35 : 0.25)) return "iron";
+  if (roll < (late ? 0.65 : 0.45)) return "garrison";
+  return "converge";
+}
+// 铁壁合围进场点: 根据地重心外围一圈, 按方位角均匀取样(四面合围)
+function ringSpawns(count) {
+  const own = ownedVillages();
+  if (!own.length) return [];
+  let cq = 0, cr = 0;
+  for (const o of own) { cq += o.q; cr += o.r; }
+  cq = Math.round(cq / own.length); cr = Math.round(cr / own.length);
+  const cands = [];
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const d = hexDist(q, r, cq, cr);
+    if (d < CFG.ironRingDist[0] || d > CFG.ironRingDist[1]) continue;
+    const t = state.tiles[q][r];
+    if (t.sh || t.terrain === "mountain") continue;
+    if (unitAt(q, r, "j", "mil") || anyEnemyMilAt(q, r, "j")) continue;
+    cands.push([q, r, Math.atan2(r - cr, (q - cq) * 0.87)]);
+  }
+  cands.sort((a, b) => a[2] - b[2]);
+  const out = [];
+  for (let i = 0; i < count && cands.length; i++) out.push(cands[Math.floor(i * cands.length / count) % cands.length]);
+  return out;
+}
+// 锄奸: 铲除特务, 稳定民心+压暴露
+function chujianCatch(u, spy) {
+  const v = state.tiles[spy.q][spy.r].village;
+  addFx("hit", spy.q, spy.r);
+  removeUnit(spy);
+  state.stats.spies = (state.stats.spies || 0) + 1;
+  if (v) v.heart = clamp(v.heart + CFG.chujianHeart, 0, 100);
+  state.exposure = clamp(state.exposure - CFG.chujianExpDrop, 0, 100);
+  grantXp(u, 2);
+  log("锄奸成功! " + uname(u) + "揪出潜伏的特务" + (v ? ", " + v.name + "民心+" + CFG.chujianHeart : "") + ", 暴露-" + CFG.chujianExpDrop, "good");
+}
 
 // ── 村名池 ──
 const VNAMES = ["李家庄","王家峪","赵家坳","马家沟","石门村","柳树沟","黑石崖","桃花寨","大杨庄","南坡村","北岭村","河口镇","东塬村","西沟村","孙家铺","青石口","枣林坪","白草洼","麻田镇","苇子峪"];
@@ -748,6 +814,15 @@ function doMove(u, q, r, cost) {
     addFx("boom", q, r); addFx("text", q, r, { text: "-" + CFG.mineDamage, color: "#ffce6a" });
     log("地雷战显神威! " + UT[u.type].name + "在" + tileName(q, r) + "踩响地雷 -" + CFG.mineDamage, "good");
     if (u.hp <= 0) { killUnit(u, "p"); }
+  }
+  // 我军搜村撞上特务: 有锄奸部→当场锄奸; 没有→特务溜走(围死跑不掉则也被抓)
+  if (u.side === "p" && u.layer === "mil") {
+    const spy = state.units.find(x => x.q === q && x.r === r && x.side === "j" && x.type === "spy");
+    if (spy) {
+      const free = nbrs(q, r).filter(([a, b]) => !state.tiles[a][b].sh && moveCost(spy, state.tiles[a][b]) < 99 && !unitAt(a, b, "p", "mil") && !unitAt(a, b, "j", "civ"));
+      if (state.techs.chujian || !free.length) chujianCatch(u, spy);
+      else { const [a, b] = pick(free); spy.q = a; spy.r = b; log("一个生面孔匆匆溜出" + tileName(q, r) + " — 是特务! 没能抓住(整训【锄奸部】可当场锄奸)", "jp"); }
+    }
   }
   // 敌军抓落单工作队
   if (u.side === "j" && u.hp > 0) {
@@ -1138,7 +1213,9 @@ function jpTurn() {
       S.sweep.phase = "massing";
       S.sweep.countdown = CFG.sweepTelegraph;
       S.sweep.big = S.turn === CFG.bigSweepTurn;
+      S.sweep.tactic = pickSweepTactic(S);
       log(S.sweep.big ? "敌情通报: 日军空前集结, 五一大扫荡将至!!" : "敌情通报: 铁路沿线日军频繁调动, 扫荡正在集结…", "jp");
+      if (S.techs.zhencha) log("侦察网破译敌军部署: 此次扫荡采取【" + TACTIC_INFO[S.sweep.tactic].name + "】— " + TACTIC_INFO[S.sweep.tactic].hint, "jp");
     }
   } else if (S.sweep.phase === "massing") {
     if (--S.sweep.countdown <= 0) launchSweep();
@@ -1164,6 +1241,15 @@ function jpTurn() {
       const type = S.turn < 20 ? "puppet" : (rng() < 0.5 ? "puppet" : "squad");
       const u = spawnUnit(type, spawn[0], spawn[1], { patrol: true, ttl: CFG.patrolTTL });
       if (u) u.mp = 0;
+    }
+  }
+
+  // ── 特务队渗透: 便衣潜入根据地刺探破坏 ──
+  if (S.turn >= CFG.spyFromTurn && S.turn % CFG.spyEvery === 0 && S.units.filter(u => u.side === "j" && u.type === "spy").length < CFG.spyMax) {
+    const spawn = jpSpawnPoint();
+    if (spawn) {
+      const u = spawnUnit("spy", spawn[0], spawn[1], { ttl: CFG.spyTTL });
+      if (u) { u.mp = 0; if (!S.spyWarned) { S.spyWarned = true; log("上级通报: 日伪特务机关活动加剧 — 提防村中生面孔, 民心异常下跌就派队伍搜村", "jp"); } }
     }
   }
 
@@ -1210,7 +1296,7 @@ function jpTurn() {
     log("日军" + tag + v.name + ": 抢粮-" + g + ", 民心-" + hh, "bad");
   };
   for (const u of S.units) {
-    if (u.side !== "j") continue;
+    if (u.side !== "j" || u.type === "spy") continue; // 特务是便衣, 不明抢(有自己的潜伏破坏结算)
     const t = S.tiles[u.q][u.r];
     const v = t.village;
     if (v && v.owner === "p") {
@@ -1225,8 +1311,43 @@ function jpTurn() {
       if (bestV) doPillage(bestV, (bestV.buildings.includes("didao") ? CFG.tunnelDamageMult : 1) * 0.5, "袭扰");
     }
   }
+  // ── 特务潜伏活动: 在无驻军的己方村造谣破坏、刺探敌情 ──
+  for (const u of S.units) {
+    if (u.side !== "j" || u.type !== "spy") continue;
+    const v = S.tiles[u.q][u.r].village;
+    if (v && v.owner === "p" && !unitAt(u.q, u.r, "p", "mil")) {
+      v.heart = clamp(v.heart - CFG.spyHeartLoss, 0, 100);
+      S.exposure = clamp(S.exposure + CFG.spyExpGain, 0, 100);
+      if (visSet.has(key(u.q, u.r))) log("特务在" + v.name + "造谣破坏、刺探敌情: 民心-" + CFG.spyHeartLoss + " 暴露+" + CFG.spyExpGain, "jp");
+      else if (!u.noticed) { u.noticed = true; log(v.name + "民心莫名浮动, 疑有特务潜入 — 派队伍去搜村!", "jp"); }
+    }
+  }
   const hqV = S.tiles[S.hq.q][S.hq.r].village;
   if (hqV.owner !== "p" || hqV.heart <= 5) { endGame(false, "hqfall"); return; }
+}
+// 特务 AI: 不作战, 专挑民心最高且无驻军的己方村潜入; 绕开我军部队
+function spyAct(u) {
+  const S = state;
+  const garr = (q, r) => !!unitAt(q, r, "p", "mil");
+  const here = S.tiles[u.q][u.r].village;
+  if (here && here.owner === "p" && !garr(u.q, u.r)) return; // 已潜伏, 原地活动
+  const targets = ownedVillages().filter(o => !garr(o.q, o.r)).sort((a, b) => b.v.heart - a.v.heart);
+  if (!targets.length) return;
+  const tg = targets[0];
+  let steps = 0;
+  while (u.mp > 0 && steps++ < 5) {
+    if (u.q === tg.q && u.r === tg.r) return;
+    const opts = nbrs(u.q, u.r).filter(([a, b]) => {
+      const t = S.tiles[a][b];
+      return !t.sh && moveCost(u, t) < 99 && !unitAt(a, b, "p", "mil") && !unitAt(a, b, "j", "civ");
+    });
+    if (!opts.length) return;
+    opts.sort((p1, p2) => hexDist(p1[0], p1[1], tg.q, tg.r) - hexDist(p2[0], p2[1], tg.q, tg.r));
+    const [nq, nr] = opts[0];
+    if (hexDist(nq, nr, tg.q, tg.r) >= hexDist(u.q, u.r, tg.q, tg.r) + 1) return; // 不绕远路
+    doMove(u, nq, nr, Math.min(moveCost(u, S.tiles[nq][nr]), u.mp));
+    if (u.hp <= 0) return;
+  }
 }
 
 function jpSpawnPoint(tq, tr) {
@@ -1287,31 +1408,49 @@ function launchSweep() {
   const owned = ownedVillages();
   let target = owned.filter(x => !x.v.hq).sort((a, b) => b.v.heart - a.v.heart)[0] || owned[0];
   if (!target) { S.sweep.phase = "idle"; return; }
-  // 组队
+  const tactic = S.sweep.tactic || "converge";
+  // 组队: 清乡=少而精, 铁壁=多路
   const comp = [];
   let left = budget;
-  const menu = S.turn < 16 ? ["puppet","puppet","squad"] : S.turn < 32 ? ["puppet","squad","squad","company"] : ["squad","company","company","armored"];
+  let menu = S.turn < 16 ? ["puppet","puppet","squad"] : S.turn < 32 ? ["puppet","squad","squad","company"] : ["squad","company","company","armored"];
+  let maxUnits = CFG.sweepMaxUnits;
+  if (tactic === "garrison") { menu = S.turn < 32 ? ["squad","squad","company"] : ["squad","company","company","armored"]; maxUnits = CFG.garrisonMaxUnits; }
+  else if (tactic === "iron") maxUnits += CFG.ironExtraUnits;
   let guard = 0;
-  while (left > 6 && guard++ < 30 && comp.length < CFG.sweepMaxUnits) {
+  while (left > 6 && guard++ < 40 && comp.length < maxUnits) {
     const t = pick(menu);
     if (UT[t].str > left + 4) continue;
     comp.push(t); left -= UT[t].str;
   }
   if (!comp.length) comp.push("squad");
   S.sweep.total = 0; S.sweep.killed = 0;
-  // 目标分摊: 民心最高的至多3个村, 轮流指派(多路合击), 各纵队从最近据点出动
-  const tgs = owned.filter(x => !x.v.hq).sort((a, b) => b.v.heart - a.v.heart).slice(0, 3);
-  if (!tgs.length) tgs.push(target);
-  comp.forEach((t, i) => {
-    const tg = tgs[i % tgs.length];
-    const spawn = jpSpawnPoint(tg.q, tg.r) || [W - 2, Math.floor(H / 2)];
-    const u = spawnUnit(t, spawn[0], spawn[1], { sweep: true, tq: tg.q, tr: tg.r });
-    if (u) { u.mp = 0; S.sweep.total += UT[t].str; }
-  });
+  if (tactic === "iron") {
+    // 铁壁合围: 围圈进场, 各纵队攻离自己最近的村 → 压力来自四面八方
+    const ring = ringSpawns(comp.length);
+    comp.forEach((t, i) => {
+      const sp = ring[i] || jpSpawnPoint() || [W - 2, Math.floor(H / 2)];
+      const near = owned.slice().sort((a, b) => hexDist(sp[0], sp[1], a.q, a.r) - hexDist(sp[0], sp[1], b.q, b.r))[0];
+      const u = spawnUnit(t, sp[0], sp[1], { sweep: true, tq: near.q, tr: near.r });
+      if (u) { u.mp = 0; S.sweep.total += UT[t].str; }
+    });
+  } else {
+    // 分进合击/清乡: 民心最高的至多3个村, 轮流指派, 从最近据点出动
+    const tgs = owned.filter(x => !x.v.hq).sort((a, b) => b.v.heart - a.v.heart).slice(0, 3);
+    if (!tgs.length) tgs.push(target);
+    comp.forEach((t, i) => {
+      const tg = tgs[i % tgs.length];
+      const spawn = jpSpawnPoint(tg.q, tg.r) || [W - 2, Math.floor(H / 2)];
+      const u = spawnUnit(t, spawn[0], spawn[1], { sweep: true, tq: tg.q, tr: tg.r, garrison: tactic === "garrison" });
+      if (u) { u.mp = 0; S.sweep.total += UT[t].str; }
+    });
+  }
   S.sweep.phase = "active";
-  S.sweep.ttl = CFG.sweepTTL;
+  S.sweep.ttl = tactic === "garrison" ? Math.round(CFG.sweepTTL * CFG.garrisonTTLMult) : CFG.sweepTTL;
   S.exposure = clamp(S.exposure * 0.35, 0, 100); // 出兵后暴露释放
-  log((S.sweep.big ? "五一大扫荡开始!! " : "扫荡开始! ") + comp.length + "支敌军出动, 直扑" + S.tiles[target.q][target.r].village.name + "方向", "jp");
+  const head = S.sweep.big ? "五一大扫荡开始!! " : "扫荡开始! ";
+  if (tactic === "iron") log(head + comp.length + "支敌军【铁壁合围】四面进场, 合围圈正在收紧 — 留好突围路线!", "jp");
+  else if (tactic === "garrison") log(head + comp.length + "支敌军【清乡驻剿】直扑村庄, 意在长期盘踞 — 不打不走!", "jp");
+  else log(head + comp.length + "支敌军出动, 直扑" + S.tiles[target.q][target.r].village.name + "方向", "jp");
 }
 
 function endSweep() {
@@ -1331,6 +1470,7 @@ function endSweep() {
 }
 
 function jpUnitAct(u) {
+  if (u.type === "spy") return spyAct(u); // 特务不作战
   let steps = 0;
   while (u.mp > 0 && steps++ < 6 && u.hp > 0) {
     // 1) 邻格有可攻目标→打(优先军事单位, 其次不打)
@@ -1349,7 +1489,7 @@ function jpUnitAct(u) {
     if (u.sweep) {
       if (u.q === u.tq && u.r === u.tr) {
         const v0 = state.tiles[u.q][u.r].village;
-        if (v0 && v0.owner === "p") return; // 驻村掠夺
+        if (v0 && v0.owner === "p") { if (u.garrison && !u.fortified) u.fortified = true; return; } // 驻村掠夺(清乡军就地设防)
       }
       const v = state.tiles[u.tq][u.tr].village;
       const tgOccupied = v && unitAt(u.tq, u.tr, "j", "mil");
@@ -1533,6 +1673,7 @@ const FIG = {
   regular:  { coat: "#7a2418", skin: "#d8b088", hat: "cap",    rifle: true, bayonet: true },
   elite:    { coat: "#8f2c1e", skin: "#d8b088", hat: "cap",    rifle: true, bayonet: true },
   commando: { coat: "#3d3050", skin: "#c8a878", hat: "cadre",  rifle: true },
+  spy:      { coat: "#3a352c", skin: "#c8a878", hat: "puppet", rifle: false },
   puppet:   { coat: "#5a5230", skin: "#c8a878", hat: "puppet", rifle: true },
   squad:    { coat: "#2c2b1d", skin: "#c8a878", hat: "helmet", rifle: true, bayonet: true, accent: true },
   company:  { coat: "#26241a", skin: "#c8a878", hat: "helmet", rifle: true, bayonet: true, accent: true },
@@ -1936,7 +2077,7 @@ function drawUnit(u, s) {
   if (cfg.tank) drawTank(x, y, s, phase); else drawFigure(x, y, s, cfg, phase);
   // Civ6式头顶大横幅(易辨认): 阵营色底+大徽标字+姿态icon, 血条嵌在横幅底边 —— 我方民事=青/军事=红棕/武工=紫, 日军=深红, 伪军=橄榄
   const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a")
-                    : (u.type === "puppet" ? "#5f5628" : "#961f13");
+                    : (u.type === "puppet" ? "#5f5628" : u.type === "spy" ? "#463a52" : "#961f13");
   const posture = u.fortified ? "🛡" : u.resting ? "🛌" : (u.autoPath && u.autoPath.length) ? "🚩" : "";
   const bw = s * (posture ? 0.92 : 0.68), bh = s * 0.44, by = y - s * 0.72;
   // 指向杆(横幅→单位)
@@ -2032,7 +2173,10 @@ function handleClick(px, py) {
     if (pending && pending.q === q && pending.r === r) { execPending(); return; }
     const canAtk = !selU.attacked && UT[selU.type].str > 0 && hexDist(selU.q, selU.r, q, r) === 1;
     const enemy = visSet.has(key(q, r)) && state.units.find(x => x.q === q && x.r === r && x.side === "j");
-    if (canAtk && enemy) { planAttack(selU, enemy, q, r); return; }
+    if (canAtk && enemy) {
+      if (enemy.type === "spy" && !state.techs.chujian) { log("特务混在老乡中间, 认不出打不得 — 完成整训【锄奸部】, 或用部队踏进那一格围堵", "jp"); return; }
+      planAttack(selU, enemy, q, r); return;
+    }
     if (canAtk && t.sh) {
       if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; }
       planStructAttack(selU, q, r); return;
@@ -2205,10 +2349,12 @@ function updateUI() {
   const bn = $("sweepBanner");
   if (S.sweep.phase === "massing") {
     bn.className = "telegraph";
-    bn.textContent = "⚠ 日军正在集结 — " + S.sweep.countdown + " 回合后出动扫荡!" + (S.sweep.big ? " (空前规模!!)" : "");
+    const tn = S.techs.zhencha && S.sweep.tactic ? "【" + TACTIC_INFO[S.sweep.tactic].name + "】" : "";
+    bn.textContent = "⚠ 日军正在集结" + tn + " — " + S.sweep.countdown + " 回合后出动扫荡!" + (S.sweep.big ? " (空前规模!!)" : "");
   } else if (S.sweep.phase === "active") {
     bn.className = "";
-    bn.textContent = "🔥 扫荡进行中 — 敌军 " + S.units.filter(u => u.sweep).length + " 队在根据地内 (" + S.sweep.ttl + " 回合后撤退)";
+    const tn = S.sweep.tactic && TACTIC_INFO[S.sweep.tactic] ? TACTIC_INFO[S.sweep.tactic].name : "扫荡";
+    bn.textContent = "🔥 " + tn + "进行中 — 敌军 " + S.units.filter(u => u.sweep).length + " 队在根据地内 (" + S.sweep.ttl + " 回合后撤退)";
   } else bn.className = "hidden";
   // 结束回合按钮
   refreshMainBtn();
@@ -2395,6 +2541,7 @@ function showHelp(isStart) {
 <p><b>地形</b>(看地块图标): <b>山地</b>(雪顶山峰)守+6、移动慢、日军装甲进不来——游击最稳的老窝; <b>森林</b>(松树丛)守+4、从这里发起攻击<b>伏击+3</b>; <b>丘陵</b>(圆丘)守+3; <b>平原</b>(田垄)产粮最高但一马平川、无遮蔽、日军装甲长驱直入。</p>
 <p><b>季节</b>(看顶栏日期): <b>🌿青纱帐</b>(6-9月)庄稼比人高——暴露衰减+1/回合、我军平原防御+2,是平原活动的窗口期; <b>🌾秋收</b>(9-10月)产粮×1.6,但日军抢粮扫荡预算×1.4; <b>❄寒冬</b>(12-2月)产粮×0.8、回血减半,日军也收缩过冬(集结阈值+12)。围着季节安排作战与休整。</p>
 <p><b>核心矛盾:暴露度。</b>发展越快、打得越狠,暴露涨得越快;到${CFG.sweepThreshold}日军就集结<b>扫荡</b>(有${CFG.sweepTelegraph}回合预警)。扫荡军会烧村抢粮毁建筑。躲进山里疏散部队、用地道保存实力、或者设伏歼敌打个反扫荡大捷——都由你选。<b>纯苟也不行</b>:长期不动日军照样清乡,而且1942年5月的<b>五一大扫荡</b>是躲不掉的历史剧本。</p>
+<p><b>敌军的花样</b>: 1942年起扫荡分三种打法——<b>分进合击</b>直扑高民心村庄、<b>铁壁合围</b>从四面八方进场收缩(留好突围口!)、<b>清乡驻剿</b>少而精地进驻村庄设防久踞(不打不走)。完成【侦察网】可在集结期预知打法。另提防便衣<b>特务队</b>潜入村庄降民心、涨暴露、抓工作队——派兵驻村可赶走它,整训【锄奸部】才能锄奸(踏进它那格即铲除,民心+${CFG.chujianHeart}、暴露-${CFG.chujianExpDrop})。</p>
 <p><b>胜利:</b>①坚持到1945年8月日本投降且保有≥${CFG.survivalWinVillages}村(≥${CFG.greatWinVillages}村为大胜);②完成【战略反攻】整训后攻克<b>县城</b>,提前解放全县。<br><b>失败:</b>总部村被扫荡摧残至民心崩溃。</p>
 <p class="hint" style="color:#8a8058">操作: 拖拽平移 / 滚轮缩放 · 点单位再点绿格移动、点红框敌人攻击 · 点己方村庄建造与招兵 · [Enter]结束回合 [T]整训 [H]规则</p>
 <div class="mbtns">
@@ -2455,7 +2602,7 @@ function endGame(win, how) {
 <h2>${title}</h2>
 <p>${story}</p>
 <hr style="border:none;border-top:1px solid #3a3826;margin:10px 0">
-<p>📊 战绩: 坚持 <b>${Math.min(S.turn, CFG.totalTurns)}</b> 个月 · 根据地 <b>${n}</b> 村 · 歼敌 <b>${st.kills}</b> 队(合围全歼 <b>${st.encircled || 0}</b>) · 拔炮楼 <b>${st.pillboxes}</b> 座 · 破袭铁路 <b>${st.sabotages}</b> 次 · 熬过扫荡 <b>${st.sweepsSurvived}</b> 次 · 完成整训 <b>${Object.keys(S.techs).length}</b> 项 · 老兵部队 <b>${S.units.filter(u => u.side === "p" && (u.lv || 0) > 0).length}</b> 支</p>
+<p>📊 战绩: 坚持 <b>${Math.min(S.turn, CFG.totalTurns)}</b> 个月 · 根据地 <b>${n}</b> 村 · 歼敌 <b>${st.kills}</b> 队(合围全歼 <b>${st.encircled || 0}</b>) · 拔炮楼 <b>${st.pillboxes}</b> 座 · 破袭铁路 <b>${st.sabotages}</b> 次 · 熬过扫荡 <b>${st.sweepsSurvived}</b> 次 · 锄奸 <b>${st.spies || 0}</b> 名 · 完成整训 <b>${Object.keys(S.techs).length}</b> 项 · 老兵部队 <b>${S.units.filter(u => u.side === "p" && (u.lv || 0) > 0).length}</b> 支</p>
 <div class="mbtns"><button class="mbtn" onclick="clearSave();location.reload()">再来一局</button></div>`);
   updateUI(); draw();
 }
@@ -2488,7 +2635,7 @@ function newState() {
     sweep: { phase: "idle", countdown: 0, ttl: 0, total: 0, killed: 0, big: false },
     lastSweepEnd: 0, era: "",
     lastIncome: { g: 0, m: 0, o: 0, a: 0 },
-    stats: { kills: 0, pillboxes: 0, sabotages: 0, sweepsSurvived: 0, joined: 0, encircled: 0 },
+    stats: { kills: 0, pillboxes: 0, sabotages: 0, sweepsSurvived: 0, joined: 0, encircled: 0, spies: 0 },
     seasonMark: seasonsOf(1).join(","),
   };
   revealArea(hq.q, hq.r, 3);
@@ -2621,7 +2768,10 @@ function handleClickTile(q, r) {
     if (pending && pending.q === q && pending.r === r) { execPending(); return; }
     const canAtk = !selU.attacked && UT[selU.type].str > 0 && hexDist(selU.q, selU.r, q, r) === 1;
     const enemy = visSet.has(key(q, r)) && state.units.find(x => x.q === q && x.r === r && x.side === "j");
-    if (canAtk && enemy) { planAttack(selU, enemy, q, r); return; }
+    if (canAtk && enemy) {
+      if (enemy.type === "spy" && !state.techs.chujian) { log("特务混在老乡中间, 认不出打不得 — 完成整训【锄奸部】, 或用部队踏进那一格围堵", "jp"); return; }
+      planAttack(selU, enemy, q, r); return;
+    }
     if (canAtk && t.sh) { if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; } planStructAttack(selU, q, r); return; }
     const rc = reach && reach.get(key(q, r));
     if (rc) { planMove(selU, q, r, rc.cost); return; }
@@ -2721,6 +2871,9 @@ const CFG_DESC = {
   flankBonus: "侧翼: 目标周围每个额外我方战斗单位的攻击加成", flankMax: "侧翼加成上限",
   encircleLootMult: "合围全歼(残敌无退路)缴获倍率", capturePuppetMan: "合围全歼伪军俘虏转化的人力",
   xpAttack: "每次攻击获得经验", xpKill: "歼敌额外经验", xpStruct: "摧毁据点额外经验", xpDefend: "被攻击存活获得经验", xpSabotage: "破袭铁路获得经验",
+  ironFromYear: "铁壁合围/清乡驻剿最早出现的年份", ironExtraUnits: "铁壁合围追加的纵队数上限", garrisonMaxUnits: "清乡驻剿纵队数上限(少而精)", garrisonTTLMult: "清乡驻剿驻留时长倍率",
+  spyFromTurn: "此回合起日军渗透特务", spyEvery: "每N回合派一名特务", spyMax: "同时存在的特务上限", spyTTL: "特务潜伏N回合后撤回",
+  spyHeartLoss: "特务潜伏村庄每回合-民心", spyExpGain: "特务潜伏村庄每回合+暴露", chujianHeart: "锄奸成功所在村民心+", chujianExpDrop: "锄奸成功暴露-",
 };
 const CFG_GROUPS = [
   ["回合与胜负", ["turnsPerMonth", "totalTurns", "startYear", "survivalWinVillages", "greatWinVillages"]],
@@ -2734,6 +2887,7 @@ const CFG_GROUPS = [
   ["破袭/地雷/铁路", ["sabotageArms", "sabotageGrain", "mineCostArms", "mineDamage", "railRepair", "sabotageSweepReduce"]],
   ["季节", ["qsExpDecay", "qsPlainDef", "harvestGrainMult", "harvestSweepMult", "winterGrainMult", "winterHealMult", "winterSweepThresholdAdd"]],
   ["协同与经验", ["flankBonus", "flankMax", "encircleLootMult", "capturePuppetMan", "xpAttack", "xpKill", "xpStruct", "xpDefend", "xpSabotage"]],
+  ["扫荡战术/特务", ["ironFromYear", "ironExtraUnits", "garrisonMaxUnits", "garrisonTTLMult", "spyFromTurn", "spyEvery", "spyMax", "spyTTL", "spyHeartLoss", "spyExpGain", "chujianHeart", "chujianExpDrop"]],
 ];
 function cfgRow(k) { return `<div class="dr"><label class="dbgk" data-k="${k}" title="${CFG_DESC[k] || k}" onclick="dbgTip(this,event)">${k}</label><input type="number" step="any" value="${CFG[k]}" oninput="dbgCfg(this,'${k}')"></div>`; }
 function dbgTip(el, ev) {

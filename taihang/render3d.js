@@ -131,12 +131,12 @@ function sketchMats(t) {
 }
 
 // ── 单位棋子贴图(复用彩色徽标) ──
-const UGLYPH = { scout: "侦", work: "工", militia: "民", regular: "连", elite: "团", commando: "武", puppet: "伪", squad: "日", company: "中", armored: "装" };
+const UGLYPH = { scout: "侦", work: "工", militia: "民", regular: "连", elite: "团", commando: "武", spy: "特", puppet: "伪", squad: "日", company: "中", armored: "装" };
 function unitTex(u) {
   const k = u.type; if (texCache["u_" + k]) return texCache["u_" + k];
   const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
   const isP = u.side === "p";
-  const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a") : (u.type === "puppet" ? "#5f5628" : "#961f13");
+  const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a") : (u.type === "puppet" ? "#5f5628" : u.type === "spy" ? "#463a52" : "#961f13");
   // 简笔人形
   g.fillStyle = "rgba(0,0,0,.28)"; g.beginPath(); g.ellipse(64, 116, 26, 8, 0, 0, 7); g.fill();
   g.strokeStyle = badge; g.lineWidth = 11; g.lineCap = "round";
@@ -156,7 +156,7 @@ function unitBannerTex(u) {
   if (texCache[k]) return texCache[k];
   const c = document.createElement("canvas"); c.width = 256; c.height = 104; const g = c.getContext("2d");
   const isP = u.side === "p";
-  const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a") : (u.type === "puppet" ? "#5f5628" : "#961f13");
+  const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a") : (u.type === "puppet" ? "#5f5628" : u.type === "spy" ? "#463a52" : "#961f13");
   const w = posture ? 190 : 130, x0 = 128 - w / 2;
   g.fillStyle = badge; roundRect(g, x0, 8, w, 82, 20); g.fill();
   g.strokeStyle = isP ? "rgba(240,220,180,.9)" : "rgba(230,120,110,.9)"; g.lineWidth = 5; g.stroke();
