@@ -66,7 +66,8 @@ button { font-family: inherit; cursor: pointer; }
 #sweepBanner.telegraph { background: rgba(96,72,16,.92); border-color: #a08338; color: #f0e0b0; }
 
 /* ── 侧面板 ── */
-#sidePanel { position: absolute; top: 56px; right: 8px; z-index: 10; width: 250px; max-height: calc(100% - 130px); overflow-y: auto; background: rgba(24,20,11,.95); border: 1px solid #3a3826; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+/* Civ6式右下角 dock: 选中面板永远贴在结束回合按钮上方, 组成一体 */
+#sidePanel { position: absolute; bottom: 74px; right: 12px; z-index: 10; width: 280px; max-height: calc(100% - 140px); overflow-y: auto; background: rgba(24,20,11,.95); border: 1px solid #3a3826; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
 #sidePanel h3 { font-size: 14px; color: #f0e4c0; margin-bottom: 4px; letter-spacing: 1px; }
 #sidePanel h3 small { color: #8a8058; font-size: 11px; font-weight: 400; margin-left: 5px; }
 #sidePanel .row { margin: 3px 0; color: #b9ab84; }
@@ -674,8 +675,69 @@ function reachable(u) {
   out.delete(key(u.q, u.r));
   return out;
 }
+// ── 多回合寻路(文明六式): 不限MP的Dijkstra, 返回完整路径 [[q,r]...](含起点); 无路→null ──
+function farPath(u, dq, dr) {
+  const dt = state.tiles[dq][dr];
+  if (!dt.disc || dt.sh || anyEnemyMilAt(dq, dr, u.side) || unitAt(dq, dr, u.side, u.layer)) return null;
+  const dist = new Map(), prev = new Map();
+  dist.set(key(u.q, u.r), 0);
+  const pq = [[0, u.q, u.r]];
+  while (pq.length) {
+    pq.sort((a, b) => a[0] - b[0]);
+    const [c, q, r] = pq.shift();
+    if (q === dq && r === dr) break;
+    if (c > (dist.get(key(q, r)) ?? 1e9)) continue;
+    for (const [nq, nr] of nbrs(q, r)) {
+      const t = state.tiles[nq][nr];
+      if (!t.disc || t.sh) continue;
+      if (anyEnemyMilAt(nq, nr, u.side)) continue;
+      if (unitAt(nq, nr, u.side, u.layer)) continue; // 友军占位不可穿(与单回合规则一致)
+      const sc = moveCost(u, t); if (sc >= 99) continue;
+      const nc = c + sc;
+      if (nc < (dist.get(key(nq, nr)) ?? 1e9)) { dist.set(key(nq, nr), nc); prev.set(key(nq, nr), key(q, r)); pq.push([nc, nq, nr]); }
+    }
+  }
+  if (!dist.has(key(dq, dr))) return null;
+  const path = []; let k = key(dq, dr);
+  while (k) { const [a, b] = k.split(",").map(Number); path.unshift([a, b]); k = prev.get(k); }
+  return path;
+}
+// 路径按回合切分: 返回 { stops:[[q,r,回合号]...], nTurns } — 数字标注在每回合行军终点(文明六图样式)
+function pathTurns(u, path) {
+  const maxMp = UT[u.type].mp, stops = [];
+  let mp = u.mp, t = 1; // 数字=还差几个回合到达该点(文明六语义)
+  if (mp <= 0) mp = maxMp; // 本回合走不动: 首段即下回合, 仍标1
+  for (let i = 1; i < path.length; i++) {
+    if (mp <= 0) { stops.push([path[i - 1][0], path[i - 1][1], t]); t++; mp = maxMp; }
+    const [a, b] = path[i];
+    mp = Math.max(0, mp - moveCost(u, state.tiles[a][b]));
+  }
+  stops.push([path[path.length - 1][0], path[path.length - 1][1], t]);
+  return { stops, nTurns: t };
+}
+// 回合开始: 有行军令的单位自动续走; 途中遇阻(敌军/友军占位/新障碍)则停下待命
+function continueAutoPaths() {
+  for (const u of state.units) {
+    if (u.side !== "p" || !u.autoPath || !u.autoPath.length) continue;
+    let mp = u.mp, idx = 0; const maxN = u.autoPath.length;
+    let blocked = false;
+    while (mp > 0 && idx < maxN) {
+      const [nq, nr] = u.autoPath[idx], t = state.tiles[nq][nr];
+      if (t.sh || anyEnemyMilAt(nq, nr, "p") || unitAt(nq, nr, "p", u.layer) || moveCost(u, t) >= 99) { blocked = true; break; }
+      mp = Math.max(0, mp - moveCost(u, t)); idx++;
+    }
+    if (idx > 0) {
+      const [fq, fr] = u.autoPath[idx - 1], consumed = u.mp - mp;
+      const rest = u.autoPath.slice(idx);
+      doMove(u, fq, fr, consumed);
+      u.autoPath = rest.length ? rest : null;
+      if (!u.autoPath && !blocked) log(UT[u.type].name + "行军抵达" + tileName(fq, fr), "info");
+    }
+    if (blocked) { u.autoPath = null; log(UT[u.type].name + "行军受阻, 在" + tileName(u.q, u.r) + "停下待命", "jp"); }
+  }
+}
 function doMove(u, q, r, cost) {
-  u.resting = false; u.fortified = false;
+  u.resting = false; u.fortified = false; u.autoPath = null; // 新移动覆盖旧行军令(自动行军会在调用后重挂)
   u.q = q; u.r = r; u.mp -= cost;
   if (u.side === "p") { revealArea(q, r, unitVis(u)); }
   // 敌军踩雷
@@ -1019,6 +1081,7 @@ function endTurn() {
       if (u.resting || u.fortified) { u.attacked = true; u.mp = 0; }
     }
   }
+  continueAutoPaths(); // 多回合行军令: 自动续走
 
   // ── 8. 推进回合 ──
   state.turn++;
@@ -1031,9 +1094,10 @@ function endTurn() {
   saveGame();
 }
 function showTurnToast() {
+  // 日期变化不弹提示(顶栏直接变), 只在跨年时弹一次
+  if (state.turn > 1 && eraYear(state.turn) === eraYear(state.turn - 1)) return;
   const el = $("turnToast");
-  const ssn = seasonsOf(state.turn).map(k => SEASON_INFO[k].icon + SEASON_INFO[k].name).join("·");
-  el.innerHTML = "▶ " + dateStr(state.turn) + "<small>" + eraName(state.turn) + (ssn ? " · " + ssn : "") + " · 第 " + state.turn + " / " + CFG.totalTurns + " 回合</small>";
+  el.innerHTML = "▶ " + eraYear(state.turn) + "年<small>" + eraName(state.turn) + " · 第 " + state.turn + " / " + CFG.totalTurns + " 回合</small>";
   el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
 }
 function nearOwnVillage(q, r, d) {
@@ -1653,20 +1717,42 @@ function draw() {
     }
   }
 
-  // 移动路径预览(待确认): 虚线 + 途经点 + 目的地脉冲圈
-  if (pending && pending.type === "move" && pending.path) {
+  // 移动路径预览(待确认): 虚线 + 途经点 + 目的地脉冲圈; movefar 加回合数字标注(文明六式)
+  if (pending && (pending.type === "move" || pending.type === "movefar") && pending.path) {
     ctx.strokeStyle = "#ffe9a0"; ctx.lineWidth = 3; ctx.setLineDash([2, 6]); ctx.lineCap = "round";
     ctx.beginPath();
     pending.path.forEach(([pq, pr], i) => { const [px, py] = hexCenter(pq, pr); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
     ctx.stroke(); ctx.setLineDash([]);
     pending.path.forEach(([pq, pr], i) => { if (!i) return; const [px, py] = hexCenter(pq, pr); ctx.fillStyle = "rgba(255,233,160,.85)"; ctx.beginPath(); ctx.arc(px, py, 2.6, 0, 7); ctx.fill(); });
+    if (pending.stops) drawTurnBadges(pending.stops, s);
     const [dx, dy] = hexCenter(pending.q, pending.r), pl = 0.5 + 0.5 * Math.sin(animTime * 5);
     ctx.strokeStyle = `rgba(255,233,160,${0.5 + 0.4 * pl})`; ctx.lineWidth = 2.5; hexPath(dx, dy, s - 4 - pl * 3); ctx.stroke();
+  }
+  // 选中单位已下达的行军令: 灰虚线 + 剩余回合数字
+  const selMarch = getSelUnit && getSelUnit();
+  if (selMarch && selMarch.autoPath && selMarch.autoPath.length && !(pending && pending.path)) {
+    const full = [[selMarch.q, selMarch.r], ...selMarch.autoPath];
+    ctx.strokeStyle = "rgba(160,200,220,.75)"; ctx.lineWidth = 2.5; ctx.setLineDash([2, 6]); ctx.lineCap = "round";
+    ctx.beginPath();
+    full.forEach(([pq, pr], i) => { const [px, py] = hexCenter(pq, pr); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+    ctx.stroke(); ctx.setLineDash([]);
+    drawTurnBadges(pathTurns(selMarch, full).stops, s, "rgba(120,180,205,.95)");
   }
   // 攻击目标脉冲(待确认)
   if (pending && (pending.type === "atk" || pending.type === "struct")) {
     const [dx, dy] = hexCenter(pending.q, pending.r), pl = 0.5 + 0.5 * Math.sin(animTime * 6);
     ctx.strokeStyle = `rgba(226,86,77,${0.6 + 0.4 * pl})`; ctx.lineWidth = 3; hexPath(dx, dy, s - 3 - pl * 3); ctx.stroke();
+  }
+  // 回合数字标注(行军路径上的1,2,3.. = 第几回合到达)
+  function drawTurnBadges(stops, s, color) {
+    for (const [bq, br, bt] of stops) {
+      const [bx, by] = hexCenter(bq, br), rad = s * 0.3;
+      ctx.fillStyle = color || "rgba(40,36,24,.92)";
+      ctx.beginPath(); ctx.arc(bx, by, rad, 0, 7); ctx.fill();
+      ctx.strokeStyle = "#ffe9a0"; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = "#fff4d0"; ctx.font = "bold " + Math.round(s * 0.42) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(bt, bx, by + 0.5);
+    }
   }
   // 单位
   for (const u of state.units) {
@@ -1742,17 +1828,36 @@ function drawVillage(cx, cy, s, v, suppressed) {
   ctx.fillStyle = "#1a170e"; ctx.fillRect(cx - bw / 2, cy + s * 0.28, bw, 4);
   ctx.fillStyle = v.heart >= CFG.joinThreshold ? "#9fbc52" : v.heart >= 40 ? "#d8a441" : "#b8563a";
   ctx.fillRect(cx - bw / 2, cy + s * 0.28, bw * v.heart / 100, 4);
-  // 名字
-  ctx.fillStyle = owned ? "#f0dcb8" : "#a2966e";
-  ctx.font = "600 " + (s * 0.3) + "px 'Noto Sans SC', sans-serif";
-  ctx.textAlign = "center"; ctx.textBaseline = "top";
-  ctx.fillText(v.name.replace("(总部)", ""), cx, cy + s * 0.4);
-  if (v.hq) { // 金色"★ 总部"铭牌
-    const pw = s * 0.92, ph = s * 0.32, py = cy + s * 0.4 + s * 0.36;
-    ctx.fillStyle = "#e8c05a"; rrect(cx - pw / 2, py - ph / 2, pw, ph, s * 0.06); ctx.fill();
-    ctx.fillStyle = "#3a2a10"; ctx.font = "800 " + (s * 0.24) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("★ 总部", cx, py + s * 0.01);
+  // 名字/城市横幅
+  if (owned) {
+    drawCityBanner(cx, cy - s * 0.86, s, v); // Civ6式城市横幅(民心|名字|建造)悬在村落上方
+  } else {
+    ctx.fillStyle = "#a2966e";
+    ctx.font = "600 " + (s * 0.3) + "px 'Noto Sans SC', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillText(v.name, cx, cy + s * 0.4);
   }
+}
+// Civ6式城市横幅: [民心圆] 名字 [建造中🔨n / 建筑🏠n]; 总部金边+★
+function drawCityBanner(cx, cy, s, v) {
+  const name = (v.hq ? "★" : "") + v.name.replace("(总部)", "");
+  const h = s * 0.42, w = s * 0.62 + name.length * s * 0.3 + s * 0.72;
+  ctx.fillStyle = v.hq ? "rgba(112,26,16,.95)" : "rgba(84,26,16,.92)";
+  rrect(cx - w / 2, cy - h / 2, w, h, h * 0.5); ctx.fill();
+  ctx.strokeStyle = v.hq ? "#e8c05a" : "rgba(240,220,180,.5)"; ctx.lineWidth = v.hq ? 2 : 1.2; ctx.stroke();
+  // 左: 民心圆(数字+色环)
+  const cxL = cx - w / 2 + h * 0.52;
+  ctx.fillStyle = "#22190f"; ctx.beginPath(); ctx.arc(cxL, cy, h * 0.36, 0, 7); ctx.fill();
+  ctx.strokeStyle = v.heart >= CFG.joinThreshold ? "#9fbc52" : v.heart >= 40 ? "#d8a441" : "#b8563a";
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cxL, cy, h * 0.36, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * v.heart / 100); ctx.stroke();
+  ctx.fillStyle = "#f0e4c0"; ctx.font = "800 " + h * 0.42 + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(Math.round(v.heart), cxL, cy + 0.5);
+  // 中: 名字
+  ctx.fillStyle = "#f8eed8"; ctx.font = "700 " + (s * 0.28) + "px 'Noto Sans SC', sans-serif";
+  ctx.fillText(name, cx + h * 0.1, cy + 0.5);
+  // 右: 建造中🔨余回合 / 已有建筑数
+  const tR = v.build ? "🔨" + v.build.left : (v.buildings.length ? "🏠" + v.buildings.length : "");
+  if (tR) { ctx.font = "700 " + (s * 0.24) + "px sans-serif"; ctx.fillText(tR, cx + w / 2 - h * 0.62, cy + 0.5); }
 }
 
 function drawStructure(cx, cy, s, sh) {
@@ -1829,24 +1934,28 @@ function drawUnit(u, s) {
   // 敌军杀气红晕
   if (!isP && u.type !== "puppet") { ctx.fillStyle = "rgba(206,40,30,.13)"; ctx.beginPath(); ctx.arc(x, y, s * 0.44, 0, 7); ctx.fill(); }
   if (cfg.tank) drawTank(x, y, s, phase); else drawFigure(x, y, s, cfg, phase);
-  // 类型徽标(彩色小牌: 阵营+兵种一眼分清) —— 我方民事=青/军事=红棕/武工=紫, 日军=深红, 伪军=橄榄
+  // Civ6式头顶大横幅(易辨认): 阵营色底+大徽标字+姿态icon, 血条嵌在横幅底边 —— 我方民事=青/军事=红棕/武工=紫, 日军=深红, 伪军=橄榄
   const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a")
                     : (u.type === "puppet" ? "#5f5628" : "#961f13");
-  const bw = s * 0.44, bh = s * 0.32, by = y - s * 0.5;
-  ctx.fillStyle = badge; rrect(x - bw / 2, by - bh / 2, bw, bh, s * 0.08); ctx.fill();
-  ctx.strokeStyle = isP ? "rgba(240,220,180,.7)" : "rgba(230,120,110,.7)"; ctx.lineWidth = 1.2; ctx.stroke();
-  ctx.fillStyle = "#f8eed8"; ctx.font = "800 " + (s * 0.26) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(ut.glyph, x, by + s * 0.008);
-  // HP条
+  const posture = u.fortified ? "🛡" : u.resting ? "🛌" : (u.autoPath && u.autoPath.length) ? "🚩" : "";
+  const bw = s * (posture ? 0.92 : 0.68), bh = s * 0.44, by = y - s * 0.72;
+  // 指向杆(横幅→单位)
+  ctx.strokeStyle = "rgba(240,220,180,.45)"; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(x, by + bh / 2); ctx.lineTo(x, y - s * 0.3); ctx.stroke();
+  ctx.fillStyle = badge; rrect(x - bw / 2, by - bh / 2, bw, bh, s * 0.1); ctx.fill();
+  ctx.strokeStyle = isP ? "rgba(240,220,180,.85)" : "rgba(230,120,110,.85)"; ctx.lineWidth = 1.6; ctx.stroke();
+  ctx.fillStyle = "#f8eed8"; ctx.font = "800 " + (s * 0.3) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(posture ? ut.glyph + posture : ut.glyph, x, by - (u.hp < 100 ? s * 0.03 : 0));
+  // HP条(嵌横幅底边, 满血不显)
   if (u.hp < 100) {
-    const bw = s * 0.5;
-    ctx.fillStyle = "rgba(18,14,8,.85)"; ctx.fillRect(x - bw / 2, y + s * 0.36, bw, 3.5);
+    const hbw = bw * 0.84;
+    ctx.fillStyle = "rgba(18,14,8,.85)"; ctx.fillRect(x - hbw / 2, by + bh / 2 - 4.5, hbw, 3);
     ctx.fillStyle = u.hp > 55 ? "#9fbc52" : u.hp > 25 ? "#d8a441" : "#e2564d";
-    ctx.fillRect(x - bw / 2, y + s * 0.36, bw * u.hp / 100, 3.5);
+    ctx.fillRect(x - hbw / 2, by + bh / 2 - 4.5, hbw * u.hp / 100, 3);
   }
-  // 可行动绿点
-  if (isP && u.mp > 0 && !state.over) { ctx.fillStyle = "#9fbc52"; ctx.beginPath(); ctx.arc(x + s * 0.26, y - s * 0.42, 3.2, 0, 7); ctx.fill(); }
-  // 老兵星级(金点) + 待晋升脉冲金圈
+  // 可行动绿点(横幅右上角)
+  if (isP && u.mp > 0 && !state.over) { ctx.fillStyle = "#9fbc52"; ctx.strokeStyle = "rgba(18,14,8,.8)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + bw / 2, by - bh / 2, 3.4, 0, 7); ctx.fill(); ctx.stroke(); }
+  // 老兵星级(金点, 横幅上方) + 待晋升脉冲金圈
   if (isP && (u.lv || 0) > 0) {
     ctx.fillStyle = "#ffd766";
     const n = u.lv, y0 = by - bh / 2 - 4;
@@ -1977,6 +2086,12 @@ function planMove(u, q, r, cost) {
   $("cInfo").innerHTML = `移动 <b>${UT[u.type].name}</b> → <b>${tileName(q, r)}</b>　行程 <b>${steps}</b> 步`;
   showConfirmNear(q, r); draw();
 }
+function planMoveFar(u, path) { // 超出本回合MP: 多回合行军(数字=第几回合抵达)
+  const seg = pathTurns(u, path), [dq, dr] = path[path.length - 1];
+  pending = { type: "movefar", q: dq, r: dr, path, stops: seg.stops };
+  $("cInfo").innerHTML = `行军 <b>${UT[u.type].name}</b> → <b>${tileName(dq, dr)}</b>　<b>${path.length - 1}</b> 步 · 约 <b>${seg.nTurns}</b> 回合抵达`;
+  showConfirmNear(dq, dr); draw();
+}
 function attackVerdict(exp, dhp, back, ahp, kill) {
   if (kill) return { t: "✓ 预计一击歼灭", c: "v-ok" };
   if (back >= ahp) return { t: "✗ 恐被反杀，慎战!", c: "v-bad" };
@@ -2022,11 +2137,24 @@ function execPending() {
     doMove(u, pq, pr, cost);
     moveAnim = { id: u.id, pts: path.map(([a, b]) => hexCenter(a, b)), t0: animTime, dur: Math.max(0.22, (path.length - 1) * 0.13) };
     reach = state.units.includes(u) && u.mp > 0 ? reachable(u) : null;
+  } else if (pt === "movefar") {
+    // 走完本回合能走的部分, 剩余存为行军令
+    let mp = u.mp, idx = 1, lastIdx = 0;
+    while (idx < path.length && mp > 0) { const [a, b] = path[idx]; mp = Math.max(0, mp - moveCost(u, state.tiles[a][b])); lastIdx = idx; idx++; }
+    const rest = path.slice(lastIdx + 1);
+    if (lastIdx > 0) {
+      const [fq, fr] = path[lastIdx], leg = path.slice(0, lastIdx + 1);
+      doMove(u, fq, fr, u.mp - mp);
+      moveAnim = { id: u.id, pts: leg.map(([a, b]) => hexCenter(a, b)), t0: animTime, dur: Math.max(0.22, (leg.length - 1) * 0.13) };
+    }
+    u.autoPath = rest.length ? rest : null;
+    if (u.autoPath) log(UT[u.type].name + "接令行军 → " + tileName(pq, pr) + " (余" + u.autoPath.length + "步)", "hl");
+    reach = null;
   } else if (pt === "atk") {
     const d = state.units.find(x => x.id === tid);
-    if (d) { attackUnit(u, d); state.exposure = clamp(state.exposure + (hasPromo(u, "yexi") ? 0 : CFG.expAttack), 0, 100); }
+    if (d) { u.autoPath = null; attackUnit(u, d); state.exposure = clamp(state.exposure + (hasPromo(u, "yexi") ? 0 : CFG.expAttack), 0, 100); }
     reach = null;
-  } else if (pt === "struct") { attackStructure(u, pq, pr); reach = null; }
+  } else if (pt === "struct") { u.autoPath = null; attackStructure(u, pq, pr); reach = null; }
   if (!getSelUnit()) sel = null;
   afterAction();
 }
@@ -2115,6 +2243,7 @@ function renderPanel() {
       html += "<div class='row' style='color:#9fbc52'>" + (u.fortified ? "🛡 驻扎设防中 · 防御+" + CFG.fortifyDef + ", 每回合回血" : "🛌 原地休整中 · 每回合+" + CFG.restHeal + "回血(至满员)") + "</div>";
       html += "<div class='uacts'><button class='uab' title='解除驻扎/休整, 恢复本回合行动' onclick='uiWake()'>⏏<span>醒转</span></button><button class='uab danger' title='解散(返还一半人力)' onclick='uiDisband()'>✖<span>解散</span></button></div>";
     } else {
+      if (u.autoPath && u.autoPath.length) html += "<div class='row' style='color:#8fd2e8'>🚩 行军令执行中 · 余" + u.autoPath.length + "步 <button class='uab' style='display:inline-flex;vertical-align:middle' title='取消行军令' onclick='uiCancelMarch()'>✖<span>取消</span></button></div>";
       if (u.attacked) html += "<div class='warn'>本回合已行动</div>";
       if (u.type === "militia" && state.techs.dilei && !t.mine && !u.attacked)
         html += "<button class='abtn' onclick='uiMine()'>💣 埋地雷 <span class='cost'>(" + costPart(state.arms, CFG.mineCostArms, "军火") + ")</span><span class='sub'>敌军踩中 -" + CFG.mineDamage + "HP</span></button>";
@@ -2194,9 +2323,10 @@ function uiBuild(bk) {
 function uiRecruit(tk) { if (sel?.kind === "tile") { recruit(sel.q, sel.r, tk); afterAction(); } }
 function uiMine() { const u = getSelUnit(); if (u) { actionMine(u); afterAction(); } }
 function uiSabotage() { const u = getSelUnit(); if (u) { actionSabotage(u); afterAction(); } }
-function uiRest() { const u = getSelUnit(); if (!u || u.attacked || u.resting) return; u.resting = true; u.fortified = false; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(uname(u) + "原地休整 — 每回合回血 +" + CFG.restHeal + ", 直到满员或敌军逼近", "hl"); clearPending(false); afterAction(); }
-function uiFortify() { const u = getSelUnit(); if (!u || u.attacked || u.fortified || UT[u.type].str <= 0) return; u.fortified = true; u.resting = false; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(uname(u) + "驻扎设防 — 防御+" + (CFG.fortifyDef * (hasPromo(u, "gongshi") ? 2 : 1)) + ", 每回合回血, 守到你调动它", "hl"); clearPending(false); afterAction(); }
+function uiRest() { const u = getSelUnit(); if (!u || u.attacked || u.resting) return; u.autoPath = null; u.resting = true; u.fortified = false; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(uname(u) + "原地休整 — 每回合回血 +" + CFG.restHeal + ", 直到满员或敌军逼近", "hl"); clearPending(false); afterAction(); }
+function uiFortify() { const u = getSelUnit(); if (!u || u.attacked || u.fortified || UT[u.type].str <= 0) return; u.autoPath = null; u.fortified = true; u.resting = false; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(uname(u) + "驻扎设防 — 防御+" + (CFG.fortifyDef * (hasPromo(u, "gongshi") ? 2 : 1)) + ", 每回合回血, 守到你调动它", "hl"); clearPending(false); afterAction(); }
 function uiWake() { const u = getSelUnit(); if (!u) return; u.resting = false; u.fortified = false; u.attacked = false; u.mp = maxMp(u); reach = reachable(u); renderPanel(); draw(); }
+function uiCancelMarch() { const u = getSelUnit(); if (!u) return; u.autoPath = null; log(uname(u) + "行军令已取消", "info"); renderPanel(); updateUI(); draw(); }
 function uiPromo(i) { // 晋升二选一
   const u = getSelUnit();
   if (!u || !u.pendPromo || !u.pendPromo[i]) return;
@@ -2216,7 +2346,7 @@ function focusTile(q, r) {
   if (typeof mode3d !== "undefined" && mode3d && window.TH3D && window.TH3D.focus) { window.TH3D.focus(q, r); return; }
   const [cx, cy] = hexCenter(q, r); cam.x = cx * cam.zoom - innerWidth / 2; cam.y = cy * cam.zoom - innerHeight / 2;
 }
-function actionableUnits() { return state && state.units ? state.units.filter(u => u.side === "p" && u.mp > 0 && !u.attacked && !u.resting) : []; }
+function actionableUnits() { return state && state.units ? state.units.filter(u => u.side === "p" && u.mp > 0 && !u.attacked && !u.resting && !(u.autoPath && u.autoPath.length)) : []; }
 // 文明6式统一按钮: 有待命单位=「下一单位」, 全部行动完=「结束回合」
 function refreshMainBtn() {
   const b = $("endTurnBtn"); if (!b || !state || !state.started) return;
@@ -2228,7 +2358,7 @@ function mainAction() {
   if (actionableUnits().length) { nextUnit(); }
   else { const b = $("endTurnBtn"); b.classList.add("pressed"); setTimeout(() => { b.classList.remove("pressed"); endTurn(); }, 30); }
 }
-function uiSkip() { const u = getSelUnit(); if (!u) return; u.attacked = true; u.mp = 0; u.resting = false; clearPending(false); computeVis(); updateUI(); if (actionableUnits().length) nextUnit(); else deselect(); }
+function uiSkip() { const u = getSelUnit(); if (!u) return; u.autoPath = null; u.attacked = true; u.mp = 0; u.resting = false; clearPending(false); computeVis(); updateUI(); if (actionableUnits().length) nextUnit(); else deselect(); }
 // 下一待命单位: 选中并把镜头切过去
 function nextUnit() {
   if (state.over) return;
@@ -2495,6 +2625,11 @@ function handleClickTile(q, r) {
     if (canAtk && t.sh) { if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; } planStructAttack(selU, q, r); return; }
     const rc = reach && reach.get(key(q, r));
     if (rc) { planMove(selU, q, r, rc.cost); return; }
+    // 超出本回合可达 → 多回合行军规划(文明六式)
+    if (!(q === selU.q && r === selU.r)) {
+      const fp = farPath(selU, q, r);
+      if (fp && fp.length > 1) { planMoveFar(selU, fp); return; }
+    }
   }
   clearPending(false);
   const mine = state.units.filter(x => x.q === q && x.r === r && x.side === "p");
@@ -2509,6 +2644,7 @@ function handleClickTile(q, r) {
 window.TH = {
   CFG, key, UT,
   state: () => state, visSet: () => visSet, sel: () => sel, reach: () => reach, pending: () => pending,
+  pathTurns: (u, p) => pathTurns(u, p),
   click: (q, r) => handleClickTile(q, r),
 };
 addEventListener("keydown", e => { if (e.code === "Space" && !modalOpen() && !/INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || "")) { e.preventDefault(); mainAction(); } });
@@ -2540,6 +2676,8 @@ function dbgApply(cat, key, v) {
   const D = window.TH3D && window.TH3D.dbg; const on = window.TH3D && window.TH3D.active && window.TH3D.active();
   if (!D || !on) return; // 仅 3D 模式生效
   if (cat === "sky") D.setSky({ [key]: v });
+  else if (cat === "tod") D.setTOD(v);
+  else if (cat === "atmo") D.setAtmo(v);
   else if (cat === "sun") D.setSun({ [key]: v });
   else if (cat === "hemi") D.setHemi({ [key]: v });
   else if (cat === "amb") D.setAmbient({ [key]: v });
@@ -2617,9 +2755,9 @@ function buildDebugPanel() {
   let other = ""; for (const k in CFG) if (typeof CFG[k] === "number" && !used.has(k)) other += cfgRow(k);
   if (other) dbgInner += dsec("其他", other, false);
   let env = "<div class='note'>需在 3D 模式下调整</div>";
-  env += dbgSl("大气·rayleigh", 0, 6, 0.1, 2.6, "sky", "rayleigh") + dbgSl("大气·turbidity", 0, 20, 0.5, 8, "sky", "turbidity");
-  env += dbgSl("大气·mie", 0, 0.05, 0.001, 0.005, "sky", "mie") + dbgSl("大气·mieG", 0, 1, 0.01, 0.85, "sky", "mieG");
-  env += dbgSl("太阳·高度角", 1, 89, 1, 42, "sky", "elevation") + dbgSl("太阳·方位角", 0, 360, 1, 150, "sky", "azimuth");
+  env += `<div class="dr"><label title="关闭大气→改用程序化天空盒 CubeMap">大气 开/关</label><input type="checkbox" checked onchange="dbgApply('atmo','on',this.checked)"></div>`;
+  env += dbgSl("🕑 昼夜 (0-24h)", 0, 24, 0.25, 12, "tod", "h");
+  env += dbgCol("天空·天顶色", "#2a5fa8", "sky", "zenith") + dbgCol("天空·地平线色", "#acc6da", "sky", "horizon") + dbgCol("天空·夜色", "#0a1430", "sky", "night");
   env += dbgSl("太阳·强度", 0, 6, 0.1, 3.2, "sun", "intensity") + dbgCol("太阳·颜色", "#fff2da", "sun", "color");
   env += dbgSl("GI·环境光强度", 0, 3, 0.05, 0.95, "hemi", "intensity") + dbgCol("GI·天空色", "#cfe0ff", "hemi", "sky") + dbgCol("GI·地面色", "#54492e", "hemi", "ground");
   env += dbgSl("补光·强度", 0, 2, 0.05, 0.35, "amb", "intensity") + dbgCol("补光·颜色", "#55606f", "amb", "color");
