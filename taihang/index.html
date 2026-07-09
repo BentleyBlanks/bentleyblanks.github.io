@@ -105,6 +105,15 @@ button { font-family: inherit; cursor: pointer; }
 .klist b { color: #e8dcb8; }
 .klist .x { color: #d8a441; font-weight: 700; }
 
+/* 顶栏资源可点击 + 产出分解表(对标文明6) */
+#uiGrain, #uiMan, #uiArms, #uiOrg, #expWrap { cursor: pointer; }
+#uiGrain:hover, #uiMan:hover, #uiArms:hover, #uiOrg:hover, #expWrap:hover { filter: brightness(1.25); }
+.rbrk { margin: 10px 0; }
+.rbrk .rl { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid #2a2618; font-size: 13.5px; color: #b9ab84; }
+.rbrk .rl b { color: #e8dcb8; white-space: nowrap; }
+.rbrk .rl.tot { border-bottom: none; border-top: 1px solid #4a452c; margin-top: 3px; padding-top: 6px; color: #f0e4c0; font-weight: 700; }
+.rbrk .rl.tot b { color: #f0d488; }
+
 @media (max-width: 640px) {
   /* 顶栏: 紧凑 + 顶部安全区(刘海), 精简掉副标题与产出增量以省宽度 */
   #topbar { gap: 5px 9px; font-size: 11.5px; padding: calc(3px + env(safe-area-inset-top)) 8px 3px; }
@@ -1338,11 +1347,19 @@ function drawStructure(cx, cy, s, sh) {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("城", cx, cy);
   } else if (sh.kind === "pillbox") {
-    ctx.fillStyle = "#4a3428"; ctx.strokeStyle = "#a06a48"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(cx, cy, s * 0.42, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#e0b890"; ctx.font = "700 " + (s * 0.36) + "px 'Noto Sans SC', sans-serif";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("楼", cx, cy);
+    // 炮楼: 深色碉堡塔 + 红色射击孔 + 危险红晕
+    ctx.fillStyle = "rgba(206,42,32,.15)"; ctx.beginPath(); ctx.arc(cx, cy, s * 0.56, 0, 7); ctx.fill();
+    const w = s * 0.5, h = s * 0.72, top = cy - h * 0.42, bot = cy + h * 0.44;
+    ctx.fillStyle = "#2b2622"; ctx.strokeStyle = "#7a4638"; ctx.lineWidth = 1.8;
+    ctx.beginPath(); // 上窄下宽的塔身
+    ctx.moveTo(cx - w * 0.5, bot); ctx.lineTo(cx - w * 0.34, top);
+    ctx.lineTo(cx + w * 0.34, top); ctx.lineTo(cx + w * 0.5, bot); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#2b2622"; // 顶部垛口(3齿)
+    for (let i = -1; i <= 1; i++) ctx.fillRect(cx + i * w * 0.3 - w * 0.09, top - h * 0.18, w * 0.18, h * 0.18);
+    ctx.fillStyle = "#e2483a"; // 红色射击孔(十字机枪眼)
+    ctx.fillRect(cx - w * 0.15, cy - h * 0.14, w * 0.3, h * 0.11);
+    ctx.fillRect(cx - w * 0.07, cy + h * 0.04, w * 0.14, h * 0.17);
   } else { // site
     ctx.strokeStyle = "#a06a48"; ctx.lineWidth = 1.6; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.arc(cx, cy, s * 0.42, 0, 7); ctx.stroke(); ctx.setLineDash([]);
@@ -1366,14 +1383,23 @@ function drawUnit(u, s) {
   const oy = u.layer === "civ" ? -s * 0.3 : (state.tiles[u.q][u.r].village ? -s * 0.34 : 0);
   const R = u.layer === "civ" ? s * 0.26 : s * 0.34;
   const x = cx + ox, y = cy + oy;
-  ctx.fillStyle = isP ? (u.type === "commando" ? "#3d3050" : "#7a2418") : "#3c3416";
-  ctx.strokeStyle = isP ? "#e8b8a0" : "#c9a038";
-  ctx.lineWidth = 1.8;
-  ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = isP ? "#f8e8d0" : "#e8d088";
-  ctx.font = "700 " + R + "px 'Noto Sans SC', sans-serif";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(ut.glyph, x, y + 1);
+  if (isP) {
+    ctx.fillStyle = u.type === "commando" ? "#3d3050" : "#7a2418";
+    ctx.strokeStyle = "#e8b8a0"; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#f8e8d0"; ctx.font = "700 " + R + "px 'Noto Sans SC', sans-serif";
+    ctx.fillText(ut.glyph, x, y + 1);
+  } else {
+    const real = u.type !== "puppet"; // 真日军(非伪军)
+    if (real) { ctx.fillStyle = "rgba(206,40,30,.2)"; ctx.beginPath(); ctx.arc(x, y, R + 4, 0, 7); ctx.fill(); } // 杀气红晕
+    ctx.fillStyle = real ? "#241310" : "#33301e"; // 真日军近黑, 伪军暗黄褐
+    ctx.strokeStyle = real ? "#d63a2c" : "#8a7a3a"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill(); ctx.stroke();
+    if (real) { ctx.fillStyle = "#c8352a"; ctx.beginPath(); ctx.arc(x, y, R * 0.6, 0, 7); ctx.fill(); } // 膏药旗(红日)
+    ctx.fillStyle = real ? "#ffe6e0" : "#e8d088"; ctx.font = "800 " + R + "px 'Noto Sans SC', sans-serif";
+    ctx.fillText(ut.glyph, x, y + 1);
+  }
   // HP弧
   if (u.hp < 100) {
     ctx.strokeStyle = u.hp > 55 ? "#9fbc52" : u.hp > 25 ? "#d8a441" : "#e2564d";
@@ -1768,6 +1794,77 @@ function startGame(fromSave) {
   computeVis(); updateUI(); renderPanel(); draw();
 }
 
+// ── 顶栏资源点击说明(对标文明6产出分解: 现值 / 每回合来源 / 怎么提升) ──
+function showResourceInfo(kind) {
+  if (!state || !state.started || state.over) return;
+  const S = state, owned = ownedVillages();
+  const inc = S.lastIncome || { g: 0, m: 0, o: 0, a: 0 };
+  const R = n => (n >= 0 ? "+" : "") + n;
+  // 按民心系数汇总某资源(0粮/1人力/2组织)的地形/建筑/总部三源
+  const sum = (i) => {
+    let terr = 0, hq = 0, bld = 0;
+    for (const { q, r, v } of owned) {
+      const m = heartMult(v.heart);
+      terr += CFG.yields[S.tiles[q][r].terrain][i] * m;
+      if (v.hq) hq += CFG.hqBonus[i] * m;
+      for (const b of v.buildings) bld += (BUILDING_YIELD[b] ? BUILDING_YIELD[b][i] : 0) * m;
+    }
+    return { terr: Math.round(terr), hq: Math.round(hq), bld: Math.round(bld) };
+  };
+  const cnt = (bk) => owned.reduce((a, o) => a + o.v.buildings.filter(b => b === bk).length, 0);
+  const lowHeart = owned.filter(o => o.v.heart < CFG.heartFullProd).length;
+  const heartNote = lowHeart ? `<p class="warn" style="color:#d8a441">⚠ 有 ${lowHeart} 座村民心&lt;60，产出被打折(≥30 打七五折，&lt;30 腰斩)——派工作队把民心拉满是最快的增产。</p>` : "";
+  let title = "", body = "", how = "";
+  if (kind === "grain") {
+    const g = sum(0); let up = 0; for (const u of S.units) if (u.side === "p") up += UT[u.type].upkeep;
+    title = "🌾 粮食 " + Math.round(S.grain) + " / " + grainMax();
+    body = `<div class="rbrk"><div class="rl"><span>村庄地形基础</span><b>${R(g.terr)}</b></div>`
+      + `<div class="rl"><span>开垦地 ×${cnt("kaiken")}（各 +4）</span><b>${R(g.bld)}</b></div>`
+      + `<div class="rl"><span>总部村</span><b>${R(g.hq)}</b></div>`
+      + `<div class="rl"><span>脱产部队维护</span><b>${R(-up)}</b></div>`
+      + `<div class="rl tot"><span>合计 / 回合</span><b>${R(g.terr + g.bld + g.hq - up)}</b></div></div>`;
+    how = "修【开垦地】(+4/回合) · 优先占产粮最高的平原村(平原基础8) · 把村民心拉到≥60吃满产 · 少养脱产部队省维护 · 修【藏粮洞】防扫荡被抢。";
+  } else if (kind === "man") {
+    const g = sum(1);
+    title = "👥 人力 " + Math.round(S.man) + " / " + CFG.manCap;
+    body = `<div class="rbrk"><div class="rl"><span>村庄产出(地形)</span><b>${R(g.terr)}</b></div>`
+      + `<div class="rl"><span>总部村</span><b>${R(g.hq)}</b></div>`
+      + `<div class="rl tot"><span>合计 / 回合</span><b>${R(g.terr + g.hq)}</b></div></div>`;
+    how = "人力全来自村庄产出——多占村、优先平原/丘陵(人力基础高)、把民心拉到≥60吃满产。人力是招兵扩军的瓶颈。";
+  } else if (kind === "org") {
+    const g = sum(2);
+    title = "✊ 组织 " + Math.round(S.org);
+    body = `<div class="rbrk"><div class="rl"><span>村庄地形基础</span><b>${R(g.terr)}</b></div>`
+      + `<div class="rl"><span>冬学夜校 ×${cnt("yexiao")}（各 +2）</span><b>${R(g.bld)}</b></div>`
+      + `<div class="rl"><span>总部村（+2）</span><b>${R(g.hq)}</b></div>`
+      + `<div class="rl tot"><span>合计 / 回合</span><b>${R(g.terr + g.bld + g.hq)}</b></div></div>`;
+    how = "修【冬学夜校】(+2/回合，专产组织) · 多占村 · 把民心拉到≥60吃满产。组织力是【整训】科技树的唯一货币——地雷战/地道战/破袭战/主力团全靠它。";
+  } else if (kind === "arms") {
+    const ar = cnt("arsenal");
+    title = "🔫 军火 " + Math.round(S.arms) + " / " + CFG.armsCap;
+    body = `<div class="rbrk"><div class="rl"><span>兵工坊 ×${ar}（各 +2）</span><b>${R(ar * 2)}</b></div>`
+      + `<div class="rl tot"><span>稳定产出 / 回合</span><b>${R(ar * 2)}</b></div></div>`
+      + `<p style="color:#9a8d68">军火主要不是"产"出来的，是"抢"来的——缴获才是大头。</p>`;
+    how = "①打日军<b>缴获</b>是主力：歼敌=敌战力×0.5、拔炮楼+15、破袭铁路+12；②修【兵工坊】稳定+2/回合(需【兵工生产】科技，但每座+1暴露)。注意：库存军火本身也算防御(防御=兵员+军火×0.5)，别全花光。";
+  } else { // exp
+    const nonHQ = owned.filter(o => !o.v.hq).length, ar = cnt("arsenal");
+    const dec = CFG.expDecay + (S.techs.diwork ? 1 : 0);
+    const net = nonHQ * CFG.expPerVillage + ar * CFG.expPerArsenal - dec;
+    title = "⚠ 暴露度 " + Math.round(S.exposure) + " / 100";
+    body = `<div class="rbrk"><div class="rl"><span>己方村 ×${nonHQ}（各 +0.7）</span><b>+${(nonHQ * CFG.expPerVillage).toFixed(1)}</b></div>`
+      + `<div class="rl"><span>兵工坊 ×${ar}（各 +1）</span><b>+${(ar * CFG.expPerArsenal).toFixed(1)}</b></div>`
+      + `<div class="rl"><span>自然衰减${S.techs.diwork ? "(敌工科+1)" : ""}</span><b>-${dec.toFixed(1)}</b></div>`
+      + `<div class="rl tot"><span>被动 / 回合</span><b>${R(+net.toFixed(1))}</b></div></div>`
+      + `<p style="color:#9a8d68">另有一次性：主动攻击+5、拔炮楼+12、破袭+8、并入新村+6。到 <b style="color:#e2564d">${CFG.sweepThreshold}</b> 日军就集结扫荡(3回合预警)。</p>`;
+    how = "少打(军事行动最涨暴露) · 别一口气并入太多村 · 把部队藏进山地/地道 · 点【敌工科】科技加衰减 · 破袭铁路虽+暴露但削弱下次扫荡。<b>但纯苟也不行</b>：超过15回合不动会被强制扫荡。";
+  }
+  openModal(`<h2>${title}</h2>${body}${heartNote}<p><b>怎么提升/控制：</b>${how}</p><div class="mbtns"><button class="mbtn ghost" onclick="closeModal()">知道了</button></div>`);
+}
+$("uiGrain").addEventListener("click", () => showResourceInfo("grain"));
+$("uiMan").addEventListener("click", () => showResourceInfo("man"));
+$("uiArms").addEventListener("click", () => showResourceInfo("arms"));
+$("uiOrg").addEventListener("click", () => showResourceInfo("org"));
+$("expWrap").addEventListener("click", () => showResourceInfo("exp"));
 $("endTurnBtn").addEventListener("click", endTurn);
 $("techBtn").addEventListener("click", showTech);
 $("helpBtn").addEventListener("click", () => showHelp(false));
