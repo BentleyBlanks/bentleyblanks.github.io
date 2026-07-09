@@ -23,8 +23,9 @@ button { font-family: inherit; cursor: pointer; }
 .tbtn.on { border-color: #6cbf5a; color: #bfe89a; background: #26361c; }
 #dbgPanel { position: fixed; top: 44px; right: 6px; z-index: 20; width: 320px; max-height: calc(100vh - 56px); overflow-y: auto; display: none; background: rgba(18,15,9,.97); border: 1px solid #6b5a30; border-radius: 9px; padding: 10px 12px; font-size: 12px; color: #cdbf98; box-shadow: 0 6px 24px rgba(0,0,0,.6); }
 #dbgPanel.show { display: block; }
-#dbgPanel h4 { color: #e8b64a; font-size: 12.5px; margin: 10px 0 5px; letter-spacing: 1px; border-bottom: 1px solid #4a3f22; padding-bottom: 3px; }
-#dbgPanel h4:first-child { margin-top: 0; }
+#dbgPanel .dhead { color: #e8b64a; font-size: 12.5px; margin: 10px 0 5px; letter-spacing: 1px; border-bottom: 1px solid #4a3f22; padding-bottom: 3px; cursor: pointer; user-select: none; }
+#dbgPanel .dsec:first-child .dhead { margin-top: 0; }
+#dbgPanel .dhead:hover { color: #f0c860; }
 #dbgPanel .dr { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 #dbgPanel .dr label { flex: 1; color: #b0a478; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
 #dbgPanel .dr input[type=number], #dbgPanel .dr input[type=range] { width: 96px; }
@@ -206,7 +207,6 @@ button { font-family: inherit; cursor: pointer; }
   <span id="expWrap">暴露 <span id="expBar"><span id="expFill"></span><span id="expLine"></span></span> <span id="expVal"></span></span>
   <button class="tbtn" id="techBtn">整训 [T]</button>
   <button class="tbtn" id="helpBtn">规则 [H]</button>
-  <button class="tbtn" id="nextUnitBtn" title="跳到下一个待命单位(空格)">⏭ 下一单位</button>
   <button class="tbtn" id="view3dBtn" title="切换 3D/2D 视角(3D 仅桌面)">🗺 3D</button>
   <button class="tbtn" id="dbgBtn" title="调试面板">🐞 Debug</button>
 </div>
@@ -1916,8 +1916,7 @@ function updateUI() {
     bn.textContent = "🔥 扫荡进行中 — 敌军 " + S.units.filter(u => u.sweep).length + " 队在根据地内 (" + S.sweep.ttl + " 回合后撤退)";
   } else bn.className = "hidden";
   // 结束回合按钮
-  const idle = S.units.some(u => u.side === "p" && u.layer === "mil" && u.mp > 0);
-  $("endTurnBtn").classList.toggle("pulse", !idle);
+  refreshMainBtn();
   // 整训按钮发光: 有能买的
   const canBuy = Object.keys(TECHS).some(k => !S.techs[k] && S.org >= TECHS[k].cost && tierUnlocked(TECHS[k].tier) && (!TECHS[k].need || TECHS[k].need.every(n => S.techs[n])));
   $("techBtn").classList.toggle("glow", canBuy);
@@ -1947,6 +1946,8 @@ function renderPanel() {
         html += "<button class='abtn' onclick='uiSabotage()'>💥 破袭铁路 <span class='cost'>(+暴露" + CFG.expSabotage + ")</span><span class='sub'>缴获军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + ", 削弱下次扫荡</span></button>";
       if (!u.attacked && u.hp < 100)
         html += "<button class='abtn' onclick='uiRest()'>🛌 原地休整 <span class='cost'>(+" + CFG.restHeal + "回血/回合)</span><span class='sub'>结束本回合行动, 每回合回血至满员</span></button>";
+      if (!u.attacked)
+        html += "<button class='abtn' onclick='uiSkip()'>⏭ 跳过(本回合) <span class='sub'>此单位本回合不再行动</span></button>";
     }
     html += "<button class='abtn danger' onclick='uiDisband()'>解散 <span class='sub'>返还一半人力</span></button>";
     html += "<hr><div class='hint'>点击绿色格移动 · 点击相邻红框敌人攻击</div>";
@@ -2024,7 +2025,20 @@ function focusTile(q, r) {
   if (typeof mode3d !== "undefined" && mode3d && window.TH3D && window.TH3D.focus) { window.TH3D.focus(q, r); return; }
   const [cx, cy] = hexCenter(q, r); cam.x = cx * cam.zoom - innerWidth / 2; cam.y = cy * cam.zoom - innerHeight / 2;
 }
-// 下一待命单位(对标文明6): 选中并把镜头切过去; 无待命单位则提示可结束回合
+function actionableUnits() { return state && state.units ? state.units.filter(u => u.side === "p" && u.mp > 0 && !u.attacked && !u.resting) : []; }
+// 文明6式统一按钮: 有待命单位=「下一单位」, 全部行动完=「结束回合」
+function refreshMainBtn() {
+  const b = $("endTurnBtn"); if (!b || !state || !state.started) return;
+  if (actionableUnits().length) { b.dataset.mode = "next"; b.innerHTML = "下一单位 <span style='font-weight:400;font-size:11px;opacity:.75'>[空格]</span>"; b.classList.remove("pulse"); }
+  else { b.dataset.mode = "end"; b.textContent = "结束回合 ▶"; b.classList.add("pulse"); }
+}
+function mainAction() {
+  if (!state || state.over) return;
+  if (actionableUnits().length) { nextUnit(); }
+  else { const b = $("endTurnBtn"); b.classList.add("pressed"); setTimeout(() => { b.classList.remove("pressed"); endTurn(); }, 30); }
+}
+function uiSkip() { const u = getSelUnit(); if (!u) return; u.attacked = true; u.mp = 0; u.resting = false; clearPending(false); computeVis(); updateUI(); if (actionableUnits().length) nextUnit(); else deselect(); }
+// 下一待命单位: 选中并把镜头切过去
 function nextUnit() {
   if (state.over) return;
   const acts = state.units.filter(u => u.side === "p" && u.mp > 0 && !u.attacked && !u.resting).sort((a, b) => a.id - b.id);
@@ -2264,11 +2278,7 @@ function closeResPop() { $("resPop").classList.remove("show"); resPopKind = null
   resPopKind = kind; showResourceInfo(kind, $(id));
 }));
 addEventListener("click", e => { const p = $("resPop"); if (p.classList.contains("show") && !p.contains(e.target)) closeResPop(); }); // 点别处关闭
-$("endTurnBtn").addEventListener("click", () => {
-  const b = $("endTurnBtn"); if (b.disabled || (state && state.over)) return;
-  b.classList.add("pressed");                        // 立即按下反馈(尤其移动端无hover)
-  setTimeout(() => { b.classList.remove("pressed"); endTurn(); }, 30);
-});
+$("endTurnBtn").addEventListener("click", () => { if (!$("endTurnBtn").disabled) mainAction(); });
 $("cOk").addEventListener("click", execPending);
 $("cCancel").addEventListener("click", () => clearPending());
 $("techBtn").addEventListener("click", showTech);
@@ -2303,8 +2313,7 @@ window.TH = {
   state: () => state, visSet: () => visSet, sel: () => sel, reach: () => reach, pending: () => pending,
   click: (q, r) => handleClickTile(q, r),
 };
-$("nextUnitBtn").addEventListener("click", nextUnit);
-addEventListener("keydown", e => { if (e.code === "Space" && !modalOpen() && !/INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || "")) { e.preventDefault(); nextUnit(); } });
+addEventListener("keydown", e => { if (e.code === "Space" && !modalOpen() && !/INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || "")) { e.preventDefault(); mainAction(); } });
 let mode3d = false;
 $("view3dBtn").addEventListener("click", async () => {
   const btn = $("view3dBtn"), gl = $("gl");
@@ -2344,26 +2353,25 @@ function dbgApply(cat, key, v) {
 }
 function dbgSl(label, min, max, step, val, cat, key) { return `<div class="dr"><label title="${label}">${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="dbgSlide(this,'${cat}','${key}')"><span class="dv">${val}</span></div>`; }
 function dbgCol(label, val, cat, key) { return `<div class="dr"><label>${label}</label><input type="color" value="${val}" oninput="dbgColor(this,'${cat}','${key}')"></div>`; }
+function dsec(title, inner, open) { return `<div class="dsec"><div class="dhead" onclick="toggleDsec(this)">${open ? "▼" : "▶"} ${title}</div><div class="dbody"${open ? "" : " style='display:none'"}>${inner}</div></div>`; }
+function toggleDsec(el) { const body = el.nextElementSibling, open = body.style.display !== "none"; body.style.display = open ? "none" : "block"; el.textContent = (open ? "▶ " : "▼ ") + el.textContent.slice(2); }
 function buildDebugPanel() {
-  let h = "<h4>Debug</h4>";
-  h += `<button class="dbtn" onclick="revealAllMap()">🗺 一键开全地图</button>`;
-  h += `<div class="note">↓ 所有数值参数(改后即时生效; 需重开局的下局生效)</div>`;
-  for (const k in CFG) if (typeof CFG[k] === "number") h += `<div class="dr"><label title="${k}">${k}</label><input type="number" step="any" value="${CFG[k]}" oninput="dbgCfg(this,'${k}')"></div>`;
-  h += "<h4>环境系统 (3D)</h4><div class='note'>需在 3D 模式下调整</div>";
-  h += dbgSl("大气·rayleigh", 0, 6, 0.1, 2.6, "sky", "rayleigh") + dbgSl("大气·turbidity", 0, 20, 0.5, 8, "sky", "turbidity");
-  h += dbgSl("大气·mie", 0, 0.05, 0.001, 0.005, "sky", "mie") + dbgSl("大气·mieG", 0, 1, 0.01, 0.85, "sky", "mieG");
-  h += dbgSl("太阳·高度角", 1, 89, 1, 42, "sky", "elevation") + dbgSl("太阳·方位角", 0, 360, 1, 150, "sky", "azimuth");
-  h += dbgSl("太阳·强度", 0, 6, 0.1, 3.2, "sun", "intensity") + dbgCol("太阳·颜色", "#fff2da", "sun", "color");
-  h += dbgSl("GI·环境光强度", 0, 3, 0.05, 0.95, "hemi", "intensity") + dbgCol("GI·天空色", "#cfe0ff", "hemi", "sky") + dbgCol("GI·地面色", "#54492e", "hemi", "ground");
-  h += dbgSl("补光·强度", 0, 2, 0.05, 0.35, "amb", "intensity") + dbgCol("补光·颜色", "#55606f", "amb", "color");
-  h += `<div class="dr"><label>高度雾 开关</label><input type="checkbox" onchange="dbgApply('fog','enabled',this.checked)"></div>`;
-  h += dbgSl("雾·近", 0, 60, 1, 18, "fog", "near") + dbgSl("雾·远", 20, 200, 1, 85, "fog", "far") + dbgCol("雾·颜色", "#bcc6d0", "fog", "color");
-  h += "<h4>画质 (3D)</h4>";
-  h += `<div class="dr"><label>ToneMapping</label><select onchange="dbgApply('tone','mode',this.value)"><option value="aces" selected>ACESFilmic</option><option value="agx">AgX</option><option value="reinhard">Reinhard</option><option value="cineon">Cineon</option><option value="linear">Linear</option><option value="none">None</option></select></div>`;
-  h += dbgSl("曝光", 0, 2, 0.05, 0.5, "exposure", "v");
-  h += `<div class="dr"><label>阴影分辨率(CSM)</label><select onchange="dbgApply('shadow','v',+this.value)"><option value="1024">1024</option><option value="2048" selected>2048</option><option value="4096">4096</option></select></div>`;
-  h += `<div class="dr"><label>TAA 抗锯齿</label><input type="checkbox" onchange="dbgApply('taa','on',this.checked)"></div>`;
-  $("dbgPanel").innerHTML = h;
+  let dbgInner = `<button class="dbtn" onclick="revealAllMap()">🗺 一键开全地图</button><div class="note">↓ 所有数值参数(改后即时生效; 需重开局的下局生效)</div>`;
+  for (const k in CFG) if (typeof CFG[k] === "number") dbgInner += `<div class="dr"><label title="${k}">${k}</label><input type="number" step="any" value="${CFG[k]}" oninput="dbgCfg(this,'${k}')"></div>`;
+  let env = "<div class='note'>需在 3D 模式下调整</div>";
+  env += dbgSl("大气·rayleigh", 0, 6, 0.1, 2.6, "sky", "rayleigh") + dbgSl("大气·turbidity", 0, 20, 0.5, 8, "sky", "turbidity");
+  env += dbgSl("大气·mie", 0, 0.05, 0.001, 0.005, "sky", "mie") + dbgSl("大气·mieG", 0, 1, 0.01, 0.85, "sky", "mieG");
+  env += dbgSl("太阳·高度角", 1, 89, 1, 42, "sky", "elevation") + dbgSl("太阳·方位角", 0, 360, 1, 150, "sky", "azimuth");
+  env += dbgSl("太阳·强度", 0, 6, 0.1, 3.2, "sun", "intensity") + dbgCol("太阳·颜色", "#fff2da", "sun", "color");
+  env += dbgSl("GI·环境光强度", 0, 3, 0.05, 0.95, "hemi", "intensity") + dbgCol("GI·天空色", "#cfe0ff", "hemi", "sky") + dbgCol("GI·地面色", "#54492e", "hemi", "ground");
+  env += dbgSl("补光·强度", 0, 2, 0.05, 0.35, "amb", "intensity") + dbgCol("补光·颜色", "#55606f", "amb", "color");
+  env += `<div class="dr"><label>高度雾 开关</label><input type="checkbox" onchange="dbgApply('fog','enabled',this.checked)"></div>`;
+  env += dbgSl("雾·近", 0, 60, 1, 18, "fog", "near") + dbgSl("雾·远", 20, 200, 1, 85, "fog", "far") + dbgCol("雾·颜色", "#bcc6d0", "fog", "color");
+  let qual = `<div class="dr"><label>ToneMapping</label><select onchange="dbgApply('tone','mode',this.value)"><option value="aces" selected>ACESFilmic</option><option value="agx">AgX</option><option value="reinhard">Reinhard</option><option value="cineon">Cineon</option><option value="linear">Linear</option><option value="none">None</option></select></div>`;
+  qual += dbgSl("曝光", 0, 2, 0.05, 0.5, "exposure", "v");
+  qual += `<div class="dr"><label>阴影分辨率(CSM)</label><select onchange="dbgApply('shadow','v',+this.value)"><option value="1024">1024</option><option value="2048" selected>2048</option><option value="4096">4096</option></select></div>`;
+  qual += `<div class="dr"><label>TAA 抗锯齿</label><input type="checkbox" onchange="dbgApply('taa','on',this.checked)"></div>`;
+  $("dbgPanel").innerHTML = dsec("Debug", dbgInner, true) + dsec("环境系统 (3D)", env, false) + dsec("画质 (3D)", qual, false);
 }
 $("dbgBtn").addEventListener("click", () => { const p = $("dbgPanel"); if (p.classList.contains("show")) { p.classList.remove("show"); $("dbgBtn").classList.remove("on"); } else { buildDebugPanel(); p.classList.add("show"); $("dbgBtn").classList.add("on"); } });
 
