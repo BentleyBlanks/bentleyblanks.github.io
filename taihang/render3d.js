@@ -7,6 +7,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { TAARenderPass } from "three/addons/postprocessing/TAARenderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { CSM } from "three/addons/csm/CSM.js";
 
 const SQ3 = Math.sqrt(3), R = 1.0, DEG = THREE.MathUtils.degToRad;
 const G = () => window.TH;
@@ -20,6 +21,7 @@ const texCache = {};
 let sunLight, sky, hemiLight, ambientLight, lastSig = "", inited = false, cx0 = 0, cz0 = 0;
 let _sunElev = 42, _sunAzi = 150, composer = null, taaPass = null, taaEnabled = false;
 let camPolar = 0.62; // 相机俯视极角(距+Y轴; 越小越俯视/越接近正上方俯拍 — 参考文明6)
+let csm = null; const csmCfg = { cascades: 2, size: 2048, maxFar: 55, fade: true };
 let clock = 0; const revealAnims = {}; const tileVisPrev = new Set(); // 战雾展开动画
 
 // ── PCG 噪声 ──
@@ -115,8 +117,9 @@ function init(container) {
   sunLight = new THREE.DirectionalLight(0xfff2da, 3.2);
   sunLight.position.copy(sunPos).multiplyScalar(80); sunLight.target.position.set(cx0, 0, cz0);
   sunLight.castShadow = true; sunLight.shadow.mapSize.set(2048, 2048);
-  const sc = sunLight.shadow.camera; sc.near = 1; sc.far = 260; sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40; sc.updateProjectionMatrix();
-  sunLight.shadow.bias = -0.0006;
+  // 兜底单阴影: 收紧范围(±18)让 2k 精度不被浪费, 每帧跟随镜头; CSM 启用时此阴影关闭
+  const sc = sunLight.shadow.camera; sc.near = 1; sc.far = 90; sc.left = -18; sc.right = 18; sc.top = 18; sc.bottom = -18; sc.updateProjectionMatrix();
+  sunLight.shadow.bias = -0.0005;
   scene.add(sunLight, sunLight.target);
   hemiLight = new THREE.HemisphereLight(0xcfe0ff, 0x54492e, 0.95); scene.add(hemiLight);
   ambientLight = new THREE.AmbientLight(0x55606f, 0.35); scene.add(ambientLight);
@@ -158,6 +161,7 @@ function init(container) {
 
   inited = true; lastSig = "";
   syncDynamic();
+  buildCSM();     // 2级 CSM 阴影(默认开启)
   loop();
   return true;
 }
@@ -217,6 +221,20 @@ function project(q, r) {
   return { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
 }
 
+// ── 级联阴影 CSM ──
+function sunDirVec() { const p = new THREE.Vector3(); p.setFromSphericalCoords(1, DEG(90 - _sunElev), DEG(_sunAzi)); return p.normalize().multiplyScalar(-1); }
+function csmSetupScene() { if (!csm || !scene) return; scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.isMeshStandardMaterial && !m.userData._csm) { try { csm.setupMaterial(m); m.userData._csm = true; } catch (e) {} } }); }); }
+function disposeCSM() { if (csm) { try { csm.dispose(); } catch (e) {} csm = null; } if (scene) scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.userData._csm = false; }); }); }
+function buildCSM() {
+  try {
+    disposeCSM();
+    csm = new CSM({ maxFar: csmCfg.maxFar, cascades: csmCfg.cascades, mode: "practical", parent: scene, shadowMapSize: csmCfg.size, camera, lightDirection: sunDirVec(), lightColor: sunLight.color.clone(), lightIntensity: 3.0 / csmCfg.cascades, shadowBias: -0.0004 });
+    csm.fade = csmCfg.fade;
+    if (sunLight) { sunLight.castShadow = false; sunLight.visible = false; } // CSM 接管方向光+阴影
+    csmSetupScene();
+  } catch (e) { console.error("CSM 初始化失败, 回退单阴影", e); csm = null; if (sunLight) { sunLight.visible = true; sunLight.castShadow = true; } }
+}
+
 // ── Debug: 环境/画质调参 API ──
 const TONE = { none: THREE.NoToneMapping, linear: THREE.LinearToneMapping, reinhard: THREE.ReinhardToneMapping, cineon: THREE.CineonToneMapping, aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping };
 function forceMatUpdate() { if (scene) scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.needsUpdate = true); }); }
@@ -229,12 +247,13 @@ function ensureComposer() {
   } catch (e) { console.error("TAA 初始化失败", e); composer = null; taaEnabled = false; }
 }
 const dbg = {
-  setSky(o) { if (!sky) return; const u = sky.material.uniforms; if (o.turbidity != null) u.turbidity.value = o.turbidity; if (o.rayleigh != null) u.rayleigh.value = o.rayleigh; if (o.mie != null) u.mieCoefficient.value = o.mie; if (o.mieG != null) u.mieDirectionalG.value = o.mieG; if (o.elevation != null) _sunElev = o.elevation; if (o.azimuth != null) _sunAzi = o.azimuth; if (o.elevation != null || o.azimuth != null) { const p = new THREE.Vector3(); p.setFromSphericalCoords(1, DEG(90 - _sunElev), DEG(_sunAzi)); u.sunPosition.value.copy(p); sunLight.position.copy(p).multiplyScalar(80); } },
-  setSun(o) { if (!sunLight) return; if (o.color) sunLight.color.set(o.color); if (o.intensity != null) sunLight.intensity = o.intensity; },
+  setSky(o) { if (!sky) return; const u = sky.material.uniforms; if (o.turbidity != null) u.turbidity.value = o.turbidity; if (o.rayleigh != null) u.rayleigh.value = o.rayleigh; if (o.mie != null) u.mieCoefficient.value = o.mie; if (o.mieG != null) u.mieDirectionalG.value = o.mieG; if (o.elevation != null) _sunElev = o.elevation; if (o.azimuth != null) _sunAzi = o.azimuth; if (o.elevation != null || o.azimuth != null) { const p = new THREE.Vector3(); p.setFromSphericalCoords(1, DEG(90 - _sunElev), DEG(_sunAzi)); u.sunPosition.value.copy(p); sunLight.position.copy(p).multiplyScalar(80); if (csm) csm.lightDirection.copy(sunDirVec()); } },
+  setSun(o) { if (!sunLight) return; if (o.color) sunLight.color.set(o.color); if (o.intensity != null) sunLight.intensity = o.intensity; if (csm) { if (o.intensity != null) { csm.lightIntensity = o.intensity / csmCfg.cascades; csm.lights.forEach(l => l.intensity = csm.lightIntensity); } if (o.color) csm.lights.forEach(l => l.color.set(o.color)); } },
   setHemi(o) { if (!hemiLight) return; if (o.sky) hemiLight.color.set(o.sky); if (o.ground) hemiLight.groundColor.set(o.ground); if (o.intensity != null) hemiLight.intensity = o.intensity; },
   setAmbient(o) { if (!ambientLight) return; if (o.color) ambientLight.color.set(o.color); if (o.intensity != null) ambientLight.intensity = o.intensity; },
   setFog(o) { if (!scene) return; if (o.enabled === false) { scene.fog = null; return; } if (!scene.fog) scene.fog = new THREE.Fog(0xbcc6d0, 18, 85); if (o.color) scene.fog.color.set(o.color); if (o.near != null) scene.fog.near = o.near; if (o.far != null) scene.fog.far = o.far; },
-  setShadow(size) { if (!sunLight) return; if (sunLight.shadow.map) sunLight.shadow.map.dispose(); sunLight.shadow.map = null; sunLight.shadow.mapSize.set(size, size); },
+  setShadow(size) { csmCfg.size = size; if (csm) { buildCSM(); return; } if (!sunLight) return; if (sunLight.shadow.map) sunLight.shadow.map.dispose(); sunLight.shadow.map = null; sunLight.shadow.mapSize.set(size, size); },
+  setCSM(o) { if (o.cascades != null) csmCfg.cascades = o.cascades; if (o.size != null) csmCfg.size = o.size; if (o.maxFar != null) csmCfg.maxFar = o.maxFar; if (o.fade != null) csmCfg.fade = o.fade; if (o.enabled === false) { disposeCSM(); if (sunLight) { sunLight.visible = true; sunLight.castShadow = true; } forceMatUpdate(); } else buildCSM(); },
   setTone(mode, exposure) { if (!renderer) return; if (mode && TONE[mode] !== undefined) { renderer.toneMapping = TONE[mode]; forceMatUpdate(); } if (exposure != null) renderer.toneMappingExposure = exposure; },
   setTAA(on) { taaEnabled = !!on; if (on) ensureComposer(); },
   setCamera(o) {
@@ -330,6 +349,7 @@ function syncDynamic() {
     gOverlay.add(ring(pend.q, pend.r, 0xffe9a0, 0.9));
   }
   if (pend && (pend.type === "atk" || pend.type === "struct")) gOverlay.add(ring(pend.q, pend.r, 0xe2564d, 0.95));
+  csmSetupScene(); // 新建的村庄/建筑/树材质接入 CSM
 }
 
 function topY(q, r) { const tt = tiles[q + "," + r]; return tt ? tt.h : 0.2; }
@@ -387,11 +407,13 @@ function setupPicking() {
   });
 }
 
-function onResize() { if (!renderer) return; const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight; renderer.setSize(w, h); if (composer) composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function onResize() { if (!renderer) return; const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight; renderer.setSize(w, h); if (composer) composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); if (csm) csm.updateFrustums(); }
 function loop() {
   animId = requestAnimationFrame(loop);
   clock = performance.now() / 1000;
   controls.update();
+  if (csm) { csm.update(); }
+  else if (sunLight && sunLight.castShadow) { const d = sunDirVec(); sunLight.position.copy(controls.target).addScaledVector(d, -60); sunLight.target.position.copy(controls.target); sunLight.target.updateMatrixWorld(); } // 单阴影跟随镜头
   const sig = signature(); if (sig !== lastSig) { lastSig = sig; syncDynamic(); }
   for (const k in revealAnims) { // 战雾展开: 新格从地面升起
     const tt = tiles[k], p = (clock - revealAnims[k]) / 0.5;
@@ -405,6 +427,7 @@ function dispose() {
   if (!inited) return; cancelAnimationFrame(animId); animId = 0;
   if (ro) ro.disconnect(); window.removeEventListener("resize", onResize);
   controls.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+  disposeCSM();
   if (composer) { composer.dispose && composer.dispose(); composer = null; taaPass = null; }
   renderer.dispose(); scene = null; renderer = null; sky = hemiLight = ambientLight = sunLight = null; inited = false; lastSig = "";
   for (const k in tiles) delete tiles[k];

@@ -26,6 +26,8 @@ button { font-family: inherit; cursor: pointer; }
 #dbgPanel .dhead { color: #e8b64a; font-size: 12.5px; margin: 10px 0 5px; letter-spacing: 1px; border-bottom: 1px solid #4a3f22; padding-bottom: 3px; cursor: pointer; user-select: none; }
 #dbgPanel .dsec:first-child .dhead { margin-top: 0; }
 #dbgPanel .dhead:hover { color: #f0c860; }
+#dbgPanel .dsec .dsec .dhead { font-size: 11px; color: #c8a850; margin: 6px 0 3px; letter-spacing: 0; }
+#dbgPanel .dsec .dsec { margin-left: 4px; }
 #dbgPanel .dr { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 #dbgPanel .dr label { flex: 1; color: #b0a478; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
 #dbgPanel .dr input[type=number], #dbgPanel .dr input[type=range] { width: 96px; }
@@ -80,6 +82,12 @@ button { font-family: inherit; cursor: pointer; }
 .abtn .sub { color: #8a8058; font-size: 11px; display: block; }
 .abtn.danger { border-color: #6a3830; }
 .abtn.danger:hover:not(:disabled) { background: #4a2018; }
+.uacts { display: flex; gap: 5px; margin: 6px 0; flex-wrap: wrap; }
+.uab { flex: 1; min-width: 48px; display: flex; flex-direction: column; align-items: center; gap: 1px; background: #2a2516; border: 1px solid #4a452c; color: #e8d7ae; border-radius: 6px; padding: 6px 3px; font-size: 16px; cursor: pointer; line-height: 1.1; }
+.uab span { font-size: 10.5px; color: #a99a70; }
+.uab:hover { background: #3a3320; border-color: #6a5f38; }
+.uab.danger { border-color: #6a3830; }
+.uab.danger:hover { background: #4a2018; }
 .heartbar { height: 8px; background: #242014; border: 1px solid #3a3826; border-radius: 4px; overflow: hidden; margin: 3px 0; }
 .heartfill { height: 100%; background: #b8563a; transition: width .3s; }
 .heartfill.ok { background: #7a8f3a; }
@@ -306,6 +314,7 @@ const CFG = {
   lootArmsRatio: 0.5,      // 歼敌缴获军火=敌战力*此值
   healVillage: 12, healTerritory: 4,  // 驻己方村/根据地范围内回血
   restHeal: 16,            // 原地休整每回合额外回血(文明6式)
+  fortifyDef: 5,           // 驻扎(文明6式)防御加成 + 每回合回血
 
   // ── 单位死粮 ──
   starveHpLoss: 10, starveHeartLoss: 3,  // 断粮: 全军掉血+全村掉民心
@@ -591,7 +600,7 @@ function reachable(u) {
   return out;
 }
 function doMove(u, q, r, cost) {
-  u.resting = false;
+  u.resting = false; u.fortified = false;
   u.q = q; u.r = r; u.mp -= cost;
   if (u.side === "p") { revealArea(q, r, unitVis(u)); }
   // 敌军踩雷
@@ -633,6 +642,7 @@ function effStr(u, ctx) {
     s += CFG.terrainDef[t.terrain] || 0;
     const v = t.village;
     if (v && v.owner === (u.side === "p" ? "p" : "x") && v.buildings.includes("didao")) s += CFG.tunnelDef;
+    if (u.fortified) s += CFG.fortifyDef; // 驻扎防御加成
   }
   return s * (CFG.hpScaleFloor + (1 - CFG.hpScaleFloor) * u.hp / 100);
 }
@@ -652,7 +662,7 @@ function killUnit(u, bySide) {
   }
 }
 function attackUnit(a, d) {
-  a.attacked = true; a.mp = 0; a.resting = false;
+  a.attacked = true; a.mp = 0; a.resting = false; a.fortified = false;
   const as = effStr(a, "atk"), ds = effStr(d, "def");
   const dmg = dmgRoll(as, ds);
   d.hp -= dmg;
@@ -899,12 +909,12 @@ function endTurn() {
       let heal = 0;
       if (t.village && t.village.owner === "p") heal = CFG.healVillage;
       else if (nearOwnVillage(u.q, u.r, 2)) heal = CFG.healTerritory;
-      if (u.resting) heal += CFG.restHeal;
+      if (u.resting || u.fortified) heal += CFG.restHeal;
       u.hp = Math.min(100, u.hp + heal);
     }
-    if (u.resting) {
-      if (u.hp >= 100 || anyEnemyMilAt(u.q, u.r, "p")) u.resting = false; // 满员/敌军贴近→自动解除
-      else { u.attacked = true; u.mp = 0; }                              // 继续休整, 不需下令
+    if (u.resting || u.fortified) { // 休整/驻扎: 自动续持, 不需下令
+      if (u.resting && (u.hp >= 100 || anyEnemyMilAt(u.q, u.r, "p"))) u.resting = false; // 休整满员/遇敌→解除(驻扎不解除)
+      if (u.resting || u.fortified) { u.attacked = true; u.mp = 0; }
     }
   }
 
@@ -1940,22 +1950,24 @@ function renderPanel() {
     if (ut.str > 0) html += "<div class='row'>战力 <b>" + effStr(u, "atk").toFixed(1) + "</b>(攻) / <b>" + effStr(u, "def").toFixed(1) + "</b>(守)</div>";
     html += "<div class='hint'>" + ut.desc + "</div>";
     const t = state.tiles[u.q][u.r];
-    if (u.resting) {
-      html += "<div class='row' style='color:#9fbc52'>🛌 原地休整中 · 每回合 +" + CFG.restHeal + " 回血(至满员)</div>";
-      html += "<button class='abtn' onclick='uiWake()'>醒转 <span class='sub'>停止休整, 恢复本回合行动</span></button>";
+    if (u.resting || u.fortified) {
+      html += "<div class='row' style='color:#9fbc52'>" + (u.fortified ? "🛡 驻扎设防中 · 防御+" + CFG.fortifyDef + ", 每回合回血" : "🛌 原地休整中 · 每回合+" + CFG.restHeal + "回血(至满员)") + "</div>";
+      html += "<div class='uacts'><button class='uab' title='解除驻扎/休整, 恢复本回合行动' onclick='uiWake()'>⏏<span>醒转</span></button><button class='uab danger' title='解散(返还一半人力)' onclick='uiDisband()'>✖<span>解散</span></button></div>";
     } else {
       if (u.attacked) html += "<div class='warn'>本回合已行动</div>";
       if (u.type === "militia" && state.techs.dilei && !t.mine && !u.attacked)
         html += "<button class='abtn' onclick='uiMine()'>💣 埋地雷 <span class='cost'>(" + costPart(state.arms, CFG.mineCostArms, "军火") + ")</span><span class='sub'>敌军踩中 -" + CFG.mineDamage + "HP</span></button>";
       if ((u.type === "commando" || u.type === "militia" && state.techs.poxi) && t.rail && t.railBroken <= 0 && !u.attacked)
         html += "<button class='abtn' onclick='uiSabotage()'>💥 破袭铁路 <span class='cost'>(+暴露" + CFG.expSabotage + ")</span><span class='sub'>缴获军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + ", 削弱下次扫荡</span></button>";
-      if (!u.attacked && u.hp < 100)
-        html += "<button class='abtn' onclick='uiRest()'>🛌 原地休整 <span class='cost'>(+" + CFG.restHeal + "回血/回合)</span><span class='sub'>结束本回合行动, 每回合回血至满员</span></button>";
-      if (!u.attacked)
-        html += "<button class='abtn' onclick='uiSkip()'>⏭ 跳过(本回合) <span class='sub'>此单位本回合不再行动</span></button>";
+      // 紧凑姿态按钮行(驻扎/休整/跳过/解散)
+      html += "<div class='uacts'>";
+      if (!u.attacked && ut.str > 0) html += "<button class='uab' title='驻扎(文明6): 防御+" + CFG.fortifyDef + " 且每回合回血, 守到你调动它' onclick='uiFortify()'>🛡<span>驻扎</span></button>";
+      if (!u.attacked && u.hp < 100) html += "<button class='uab' title='原地休整: 每回合回血至满员(不加防御)' onclick='uiRest()'>🛌<span>休整</span></button>";
+      if (!u.attacked) html += "<button class='uab' title='跳过: 本回合不再行动' onclick='uiSkip()'>⏭<span>跳过</span></button>";
+      html += "<button class='uab danger' title='解散: 返还一半人力' onclick='uiDisband()'>✖<span>解散</span></button>";
+      html += "</div>";
     }
-    html += "<button class='abtn danger' onclick='uiDisband()'>解散 <span class='sub'>返还一半人力</span></button>";
-    html += "<hr><div class='hint'>点击绿色格移动 · 点击相邻红框敌人攻击</div>";
+    html += "<hr><div class='hint'>点绿格移动 · 点相邻红框敌人攻击</div>";
   } else if (sel.kind === "tile") {
     const t = state.tiles[sel.q][sel.r];
     const TN = { plain: "平原", hills: "丘陵", forest: "林地", mountain: "山地" };
@@ -2021,8 +2033,9 @@ function uiBuild(bk) {
 function uiRecruit(tk) { if (sel?.kind === "tile") { recruit(sel.q, sel.r, tk); afterAction(); } }
 function uiMine() { const u = getSelUnit(); if (u) { actionMine(u); afterAction(); } }
 function uiSabotage() { const u = getSelUnit(); if (u) { actionSabotage(u); afterAction(); } }
-function uiRest() { const u = getSelUnit(); if (!u || u.attacked || u.resting) return; u.resting = true; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(UT[u.type].name + "原地休整 — 每回合回血 +" + CFG.restHeal + ", 直到满员或敌军逼近", "hl"); clearPending(false); afterAction(); }
-function uiWake() { const u = getSelUnit(); if (!u) return; u.resting = false; u.attacked = false; u.mp = UT[u.type].mp; reach = reachable(u); renderPanel(); draw(); }
+function uiRest() { const u = getSelUnit(); if (!u || u.attacked || u.resting) return; u.resting = true; u.fortified = false; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(UT[u.type].name + "原地休整 — 每回合回血 +" + CFG.restHeal + ", 直到满员或敌军逼近", "hl"); clearPending(false); afterAction(); }
+function uiFortify() { const u = getSelUnit(); if (!u || u.attacked || u.fortified || UT[u.type].str <= 0) return; u.fortified = true; u.resting = false; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(UT[u.type].name + "驻扎设防 — 防御+" + CFG.fortifyDef + ", 每回合回血, 守到你调动它", "hl"); clearPending(false); afterAction(); }
+function uiWake() { const u = getSelUnit(); if (!u) return; u.resting = false; u.fortified = false; u.attacked = false; u.mp = UT[u.type].mp; reach = reachable(u); renderPanel(); draw(); }
 // 成本标记: 不足的资源标红, 让玩家看出是哪一项卡住了建造/招募
 function costPart(have, need, label) { return need ? "<span" + (have < need ? " style='color:#e2564d;font-weight:700'" : "") + ">" + label + need + "</span>" : ""; }
 // 镜头聚焦某格(2D 平移 / 3D 交给 render3d)
@@ -2356,6 +2369,7 @@ function dbgApply(cat, key, v) {
   else if (cat === "exposure") D.setTone(null, v);
   else if (cat === "taa") D.setTAA(v);
   else if (cat === "cam") D.setCamera({ [key]: v });
+  else if (cat === "csm") D.setCSM({ [key]: v });
 }
 function dbgSl(label, min, max, step, val, cat, key) { return `<div class="dr"><label title="${label}">${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="dbgSlide(this,'${cat}','${key}')"><span class="dv">${val}</span></div>`; }
 function dbgCol(label, val, cat, key) { return `<div class="dr"><label>${label}</label><input type="color" value="${val}" oninput="dbgColor(this,'${cat}','${key}')"></div>`; }
@@ -2384,6 +2398,18 @@ const CFG_DESC = {
   sabotageArms: "破袭铁路缴获军火", sabotageGrain: "破袭铁路缴获粮", mineCostArms: "埋地雷消耗军火", mineDamage: "地雷伤害",
   restHeal: "原地休整每回合额外回血", railRepair: "铁路被破坏后N回合修复", sabotageSweepReduce: "每处断轨削减扫荡预算的比例(下限60%)",
 };
+const CFG_GROUPS = [
+  ["回合与胜负", ["turnsPerMonth", "totalTurns", "startYear", "survivalWinVillages", "greatWinVillages"]],
+  ["地图", ["mapW", "mapH", "hexSize", "villageCount", "villageMinGap"]],
+  ["起始与资源", ["startGrain", "startMan", "startArms", "startOrg", "startHQHeart", "grainCap", "grainCapPerBarn", "manCap", "armsCap"]],
+  ["民心与扩张", ["heartFullProd", "joinThreshold", "workteamHeart", "ownedHeartRegen", "neutralDrift", "suppressDist", "suppressCap", "revertHeart", "joinExposure"]],
+  ["暴露度", ["expPerVillage", "expPerArsenal", "expDecay", "expAttack", "expKillPillbox", "expSabotage", "expPatrolSpot", "sweepThreshold", "pitySweepGap", "sweepTelegraph"]],
+  ["扫荡", ["sweepBase", "sweepPerTurn", "sweepExpFactor", "sweepCooldown", "sweepTTL", "sweepMaxUnits", "pillageGrain", "pillageHeart", "pillageBuildingChance", "tunnelDamageMult", "bigSweepTurn", "bigSweepMult", "sweepWinKillRatio"]],
+  ["战斗与单位", ["dmgBase", "dmgExpDiv", "counterMult", "hpScaleFloor", "tunnelDef", "ambushBonus", "lootArmsRatio", "healVillage", "healTerritory", "restHeal", "fortifyDef", "starveHpLoss", "starveHeartLoss"]],
+  ["据点/炮楼/囚笼", ["pillboxHP", "pillboxStr", "townHP", "townStr", "siteHP", "siteStr", "siteTurns", "lootPillboxArms", "lootPillboxGrain", "patrolEvery", "patrolTTL"]],
+  ["破袭/地雷/铁路", ["sabotageArms", "sabotageGrain", "mineCostArms", "mineDamage", "railRepair", "sabotageSweepReduce"]],
+];
+function cfgRow(k) { return `<div class="dr"><label class="dbgk" data-k="${k}" title="${CFG_DESC[k] || k}" onclick="dbgTip(this,event)">${k}</label><input type="number" step="any" value="${CFG[k]}" oninput="dbgCfg(this,'${k}')"></div>`; }
 function dbgTip(el, ev) {
   if (ev) ev.stopPropagation();
   const tip = $("dbgTip"), k = el.dataset.k;
@@ -2397,8 +2423,11 @@ addEventListener("click", e => { const t = $("dbgTip"); if (t.classList.contains
 function dsec(title, inner, open) { return `<div class="dsec"><div class="dhead" onclick="toggleDsec(this)">${open ? "▼" : "▶"} ${title}</div><div class="dbody"${open ? "" : " style='display:none'"}>${inner}</div></div>`; }
 function toggleDsec(el) { const body = el.nextElementSibling, open = body.style.display !== "none"; body.style.display = open ? "none" : "block"; el.textContent = (open ? "▶ " : "▼ ") + el.textContent.slice(2); }
 function buildDebugPanel() {
-  let dbgInner = `<button class="dbtn" onclick="revealAllMap()">🗺 一键开全地图</button><div class="note">↓ 所有数值参数(改后即时生效; 需重开局的下局生效)</div>`;
-  for (const k in CFG) if (typeof CFG[k] === "number") dbgInner += `<div class="dr"><label class="dbgk" data-k="${k}" title="${CFG_DESC[k] || k}" onclick="dbgTip(this,event)">${k}</label><input type="number" step="any" value="${CFG[k]}" oninput="dbgCfg(this,'${k}')"></div>`;
+  let dbgInner = `<button class="dbtn" onclick="revealAllMap()">🗺 一键开全地图</button><div class="note">↓ 数值参数分类(点标题看含义; 改后即时生效, 需重开局的下局生效)</div>`;
+  const used = new Set();
+  for (const [gname, keys] of CFG_GROUPS) { let inner = ""; for (const k of keys) if (typeof CFG[k] === "number") { used.add(k); inner += cfgRow(k); } if (inner) dbgInner += dsec(gname, inner, false); }
+  let other = ""; for (const k in CFG) if (typeof CFG[k] === "number" && !used.has(k)) other += cfgRow(k);
+  if (other) dbgInner += dsec("其他", other, false);
   let env = "<div class='note'>需在 3D 模式下调整</div>";
   env += dbgSl("大气·rayleigh", 0, 6, 0.1, 2.6, "sky", "rayleigh") + dbgSl("大气·turbidity", 0, 20, 0.5, 8, "sky", "turbidity");
   env += dbgSl("大气·mie", 0, 0.05, 0.001, 0.005, "sky", "mie") + dbgSl("大气·mieG", 0, 1, 0.01, 0.85, "sky", "mieG");
@@ -2410,14 +2439,18 @@ function buildDebugPanel() {
   env += dbgSl("雾·近", 0, 60, 1, 18, "fog", "near") + dbgSl("雾·远", 20, 200, 1, 85, "fog", "far") + dbgCol("雾·颜色", "#bcc6d0", "fog", "color");
   let qual = `<div class="dr"><label>ToneMapping</label><select onchange="dbgApply('tone','mode',this.value)"><option value="aces" selected>ACESFilmic</option><option value="agx">AgX</option><option value="reinhard">Reinhard</option><option value="cineon">Cineon</option><option value="linear">Linear</option><option value="none">None</option></select></div>`;
   qual += dbgSl("曝光", 0, 2, 0.05, 0.5, "exposure", "v");
-  qual += `<div class="dr"><label>阴影分辨率(CSM)</label><select onchange="dbgApply('shadow','v',+this.value)"><option value="1024">1024</option><option value="2048" selected>2048</option><option value="4096">4096</option></select></div>`;
   qual += `<div class="dr"><label>TAA 抗锯齿</label><input type="checkbox" onchange="dbgApply('taa','on',this.checked)"></div>`;
+  let csm = `<div class="dr"><label title="级联数(文明6式远近分级阴影)">级联数 cascades</label><select onchange="dbgApply('csm','cascades',+this.value)"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></div>`;
+  csm += `<div class="dr"><label title="每级阴影贴图分辨率">每级分辨率</label><select onchange="dbgApply('csm','size',+this.value)"><option value="1024">1024</option><option value="2048" selected>2048</option><option value="4096">4096</option></select></div>`;
+  csm += dbgSl("阴影距离(maxFar)", 20, 120, 1, 55, "csm", "maxFar");
+  csm += `<div class="dr"><label title="级联间平滑淡出">级联淡出 fade</label><input type="checkbox" checked onchange="dbgApply('csm','fade',this.checked)"></div>`;
+  csm += `<div class="dr"><label title="关闭CSM回退单阴影(跟随镜头)">启用 CSM</label><input type="checkbox" checked onchange="dbgApply('csm','enabled',this.checked)"></div>`;
   let cam = "<div class='note'>需在 3D 模式下调整 · 越俯视=越接近正上方</div>";
   cam += dbgSl("俯视角(越小越俯视)", 0.15, 1.3, 0.02, 0.62, "cam", "polar");
   cam += dbgSl("视野 FOV", 25, 70, 1, 46, "cam", "fov");
   cam += dbgSl("最近距离(拉最近)", 4, 30, 1, 8, "cam", "minDist");
   cam += dbgSl("最远距离(拉最远)", 30, 150, 1, 85, "cam", "maxDist");
-  $("dbgPanel").innerHTML = dsec("Debug", dbgInner, true) + dsec("相机 (3D)", cam, false) + dsec("环境系统 (3D)", env, false) + dsec("画质 (3D)", qual, false);
+  $("dbgPanel").innerHTML = dsec("Debug", dbgInner, true) + dsec("相机 (3D)", cam, false) + dsec("环境系统 (3D)", env, false) + dsec("画质 (3D)", qual, false) + dsec("级联阴影 CSM (3D)", csm, false);
 }
 $("dbgBtn").addEventListener("click", () => { const p = $("dbgPanel"); if (p.classList.contains("show")) { p.classList.remove("show"); $("dbgBtn").classList.remove("on"); } else { buildDebugPanel(); p.classList.add("show"); $("dbgBtn").classList.add("on"); } });
 
