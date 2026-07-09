@@ -1148,10 +1148,7 @@ function drawTerrainIcon(terr, cx, cy, s, hasVillage) {
     ctx.fillStyle = "rgba(200,168,106,.9)";
     ctx.beginPath(); ctx.arc(-s * 0.16, s * 0.12, s * 0.22, Math.PI, 0); ctx.fill();
     ctx.beginPath(); ctx.arc(s * 0.2, s * 0.12, s * 0.17, Math.PI, 0); ctx.fill();
-  } else { // plain: 田垄三道短横, 读成开阔农田
-    ctx.strokeStyle = "rgba(214,202,152,.5)"; ctx.lineWidth = 1.4;
-    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(-s * 0.28, i * s * 0.2); ctx.lineTo(s * 0.28, i * s * 0.2); ctx.stroke(); }
-  }
+  } // 平原: 不画图标——开阔地靠最亮的底色本身区分, 画三根线反而看不懂
   ctx.restore();
 }
 // 铁路: 连向相邻的铁路格(含县城), 画成双钢轨+枕木, 跟着折线走向连成一条铁道
@@ -1182,6 +1179,28 @@ function drawRail(q, r, cx, cy, s) {
   if (dirs.length === 0) { seg(cx, cy - s); seg(cx, cy + s); } // 孤立格兜底
   else for (const [mx, my] of dirs) seg(mx, my);
   if (broken) { ctx.fillStyle = "#e2564d"; ctx.font = "700 " + (s * 0.44) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("✕", cx, cy); }
+}
+let animTime = 0; // 由动画循环推进, 供旗子飘动
+// 会飘荡的旗: type="red"(根据地红旗) / "sun"(日军膏药旗)。旗面随 phase 起伏, 越靠外摆动越大
+function drawFlag(px, pyTop, s, type, phase) {
+  ctx.strokeStyle = "#cfc6b2"; ctx.lineWidth = 1.4; // 旗杆
+  ctx.beginPath(); ctx.moveTo(px, pyTop); ctx.lineTo(px, pyTop + s * 0.52); ctx.stroke();
+  ctx.fillStyle = "#8a7a58"; ctx.beginPath(); ctx.arc(px, pyTop, 1.9, 0, 7); ctx.fill(); // 杆顶球
+  const fw = s * 0.48, fh = s * 0.3, segs = 8;
+  const wave = (t) => Math.sin(phase + t * 4.6) * fh * 0.2 * (0.22 + t);
+  ctx.beginPath();
+  for (let i = 0; i <= segs; i++) { const t = i / segs; ctx.lineTo(px + fw * t, pyTop + wave(t)); }
+  for (let i = segs; i >= 0; i--) { const t = i / segs; ctx.lineTo(px + fw * t, pyTop + fh + wave(t)); }
+  ctx.closePath();
+  if (type === "sun") {
+    ctx.fillStyle = "#f2eee2"; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = "#c8352a"; ctx.beginPath(); ctx.arc(px + fw * 0.54, pyTop + fh * 0.5 + wave(0.54), fh * 0.36, 0, 7); ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.fillStyle = "#e23a2c"; ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 0.8; ctx.stroke();
+  }
 }
 
 // dpr 单一来源(封顶3, 避免 dpr=4 机型 backing 过大); draw 与 syncCanvas 必须用同一个值,否则错位/黑屏
@@ -1243,11 +1262,10 @@ function draw() {
     ctx.strokeStyle = TERRAIN_EDGE[t.terrain];
     ctx.lineWidth = 1;
     ctx.stroke();
-    // 地形图标(矢量, 清晰易读)
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    drawTerrainIcon(t.terrain, cx, cy, s, !!t.village);
-    // 铁路(跟着走向连成一线)
-    if (t.rail) drawRail(q, r, cx, cy, s);
+    // 地形图标(矢量): 村庄格不画, 免与村庄图标重叠
+    if (!t.village) { ctx.textAlign = "center"; ctx.textBaseline = "middle"; drawTerrainIcon(t.terrain, cx, cy, s, false); }
+    // 铁路(跟着走向连成一线): 县城格不画, 否则铁路会从城底下露出来
+    if (t.rail && !(t.sh && t.sh.kind === "town")) drawRail(q, r, cx, cy, s);
     // 地雷(只对玩家可见)
     if (t.mine) { ctx.fillStyle = "rgba(226,86,77,.8)"; ctx.font = (s * 0.34) + "px serif"; ctx.fillText("☢", cx + s * 0.5, cy - s * 0.5); }
     // 村庄
@@ -1325,39 +1343,47 @@ function draw() {
 }
 
 function drawVillage(cx, cy, s, v, suppressed) {
-  const col = v.owner === "p" ? "#b8462f" : "#6a6248";
-  ctx.fillStyle = "#26221a";
-  ctx.strokeStyle = col; ctx.lineWidth = v.hq ? 3 : 2;
-  const w = s * 0.9, h = s * 0.62;
-  ctx.beginPath();
-  ctx.moveTo(cx - w / 2, cy - h * 0.1); ctx.lineTo(cx, cy - h * 0.62); ctx.lineTo(cx + w / 2, cy - h * 0.1);
-  ctx.lineTo(cx + w / 2, cy + h * 0.5); ctx.lineTo(cx - w / 2, cy + h * 0.5); ctx.closePath();
-  ctx.fill(); ctx.stroke();
-  if (v.owner === "p") { // 红旗
-    ctx.strokeStyle = "#d8c9a0"; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(cx + w * 0.34, cy - h * 0.5); ctx.lineTo(cx + w * 0.34, cy - h * 1.15); ctx.stroke();
-    ctx.fillStyle = "#e2382a";
-    ctx.beginPath(); ctx.moveTo(cx + w * 0.34, cy - h * 1.15); ctx.lineTo(cx + w * 0.34 + 11, cy - h * 0.98); ctx.lineTo(cx + w * 0.34, cy - h * 0.8); ctx.closePath(); ctx.fill();
-  }
-  // 名字+民心
-  ctx.fillStyle = v.owner === "p" ? "#f0dcb8" : "#a2966e";
-  ctx.font = "600 " + (s * 0.30) + "px 'Noto Sans SC', sans-serif";
-  ctx.textAlign = "center"; ctx.textBaseline = "top";
-  ctx.fillText(v.name.replace("(总部)", ""), cx, cy + h * 0.55);
-  if (v.hq) { ctx.fillStyle = "#d8a441"; ctx.fillText("★总部", cx, cy + h * 0.55 + s * 0.33); }
-  // 民心条
-  const bw = s * 0.85;
-  ctx.fillStyle = "#1a170e"; ctx.fillRect(cx - bw / 2, cy - h * 0.02, bw, 4);
-  ctx.fillStyle = v.heart >= CFG.joinThreshold ? "#9fbc52" : v.heart >= 40 ? "#d8a441" : "#b8563a";
-  ctx.fillRect(cx - bw / 2, cy - h * 0.02, bw * v.heart / 100, 4);
-  // 建筑图标
+  const owned = v.owner === "p";
+  const wall = owned ? "#886238" : "#4c473a";
+  const roof = owned ? "#9c3b27" : "#544b3c";
+  const edge = owned ? "rgba(232,152,112,.5)" : "rgba(28,24,16,.6)";
+  const w = s * 0.82;
+  // 地面阴影
+  ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(cx, cy + s * 0.2, w * 0.52, s * 0.13, 0, 0, 7); ctx.fill();
+  // HQ 金环
+  if (v.hq) { ctx.strokeStyle = "#e8c05a"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(cx, cy - s * 0.02, s * 0.6, 0, 7); ctx.stroke(); }
+  // 三间坡顶房, 错落成村落
+  const house = (hx, hy, hw, hh) => {
+    ctx.fillStyle = wall; ctx.fillRect(hx - hw / 2, hy, hw, hh);
+    ctx.strokeStyle = edge; ctx.lineWidth = 1; ctx.strokeRect(hx - hw / 2, hy, hw, hh);
+    ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(hx - hw * 0.64, hy); ctx.lineTo(hx, hy - hh * 0.72); ctx.lineTo(hx + hw * 0.64, hy); ctx.closePath(); ctx.fill();
+  };
+  house(cx - w * 0.28, cy - s * 0.02, w * 0.36, s * 0.26);
+  house(cx + w * 0.26, cy - s * 0.08, w * 0.42, s * 0.32);
+  house(cx, cy + s * 0.04, w * 0.3, s * 0.2);
+  ctx.fillStyle = "#181009"; ctx.fillRect(cx + w * 0.21, cy + s * 0.06, w * 0.09, s * 0.18); // 门
+  // 压制虚线环
+  if (suppressed) { ctx.strokeStyle = "rgba(226,86,77,.55)"; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy - s * 0.02, s * 0.54, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+  // 会飘的红旗(根据地)
+  if (owned) drawFlag(cx + w * (v.hq ? 0.46 : 0.4), cy - s * (v.hq ? 0.68 : 0.56), s, "red", animTime + (cx + cy) * 0.03);
+  // 建筑图标(村落上方)
   if (v.buildings.length) {
-    ctx.font = (s * 0.26) + "px serif"; ctx.fillStyle = "#c9ba90"; ctx.textBaseline = "middle";
+    ctx.font = (s * 0.24) + "px serif"; ctx.fillStyle = "#d0c199"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const icons = { kaiken: "🌾", yexiao: "📖", liangcang: "🏺", didao: "🕳", arsenal: "🔧" };
-    ctx.fillText(v.buildings.map(b => icons[b]).join(""), cx, cy + h * 0.32);
+    ctx.fillText(v.buildings.map(b => icons[b]).join(""), cx, cy - s * 0.4);
   }
-  if (v.build) { ctx.font = (s * 0.24) + "px sans-serif"; ctx.fillStyle = "#8a8058"; ctx.fillText("🔨" + v.build.left, cx - w * 0.35, cy - h * 0.35); }
-  if (suppressed && v.owner === "n") { ctx.font = (s * 0.3) + "px sans-serif"; ctx.fillStyle = "#d8a441"; ctx.fillText("🔒", cx - w * 0.42, cy - h * 0.75); }
+  if (v.build) { ctx.font = (s * 0.22) + "px sans-serif"; ctx.fillStyle = "#8a8058"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🔨" + v.build.left, cx - w * 0.44, cy - s * 0.3); }
+  // 民心条
+  const bw = s * 0.8;
+  ctx.fillStyle = "#1a170e"; ctx.fillRect(cx - bw / 2, cy + s * 0.28, bw, 4);
+  ctx.fillStyle = v.heart >= CFG.joinThreshold ? "#9fbc52" : v.heart >= 40 ? "#d8a441" : "#b8563a";
+  ctx.fillRect(cx - bw / 2, cy + s * 0.28, bw * v.heart / 100, 4);
+  // 名字
+  ctx.fillStyle = owned ? "#f0dcb8" : "#a2966e";
+  ctx.font = "600 " + (s * 0.3) + "px 'Noto Sans SC', sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText(v.name.replace("(总部)", ""), cx, cy + s * 0.4);
+  if (v.hq) { ctx.fillStyle = "#e8c05a"; ctx.fillText("★总部", cx, cy + s * 0.4 + s * 0.32); }
 }
 
 function drawStructure(cx, cy, s, sh) {
@@ -1365,6 +1391,7 @@ function drawStructure(cx, cy, s, sh) {
     // 县城: 砖石城墙 + 垛口 + 城门 + 城内楼宇 + 日军膏药旗(区域大本营)
     const w = s * 1.28, h = s * 0.98, L = cx - w / 2, T = cy - h / 2, B = cy + h / 2;
     ctx.fillStyle = "rgba(206,45,35,.1)"; ctx.beginPath(); ctx.arc(cx, cy, s * 0.82, 0, 7); ctx.fill(); // 危险红晕
+    hexPath(cx, cy, s - 0.6); ctx.fillStyle = "#2a231b"; ctx.fill(); // 实心底座: 盖住整格, 城底下不再露地形/铁路
     // 城内楼宇剪影
     ctx.fillStyle = "#241d16";
     ctx.fillRect(cx - w * 0.3, cy - h * 0.08, w * 0.22, h * 0.4);
@@ -1382,12 +1409,8 @@ function drawStructure(cx, cy, s, sh) {
     // 城门
     ctx.fillStyle = "#120c05"; ctx.fillRect(cx - w * 0.1, B - h * 0.32, w * 0.2, h * 0.32);
     ctx.strokeStyle = "#8a6a30"; ctx.lineWidth = 1.4; ctx.strokeRect(cx - w * 0.1, B - h * 0.32, w * 0.2, h * 0.32);
-    // 膏药旗(日军占领)
-    const fx = cx + w * 0.34, fy = T - h * 0.42;
-    ctx.strokeStyle = "#d0c8b8"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, T - h * 0.02); ctx.stroke();
-    ctx.fillStyle = "#f0ece0"; ctx.fillRect(fx, fy, w * 0.26, h * 0.18);
-    ctx.fillStyle = "#c8352a"; ctx.beginPath(); ctx.arc(fx + w * 0.13, fy + h * 0.09, h * 0.055, 0, 7); ctx.fill();
+    // 膏药旗(日军占领, 会飘荡)
+    drawFlag(cx + w * 0.3, T - h * 0.52, s, "sun", animTime * 1.1 + (cx + cy) * 0.02);
   } else if (sh.kind === "pillbox") {
     // 炮楼: 深色碉堡塔 + 红色射击孔 + 危险红晕
     ctx.fillStyle = "rgba(206,42,32,.15)"; ctx.beginPath(); ctx.arc(cx, cy, s * 0.56, 0, 7); ctx.fill();
@@ -1916,6 +1939,15 @@ newState();       // 先生成一张底图作为标题背景
 centerCam();
 computeVis(); updateUI(); draw();
 showHelp(true);
+
+// 动画循环: 推进 animTime, 节流(~22fps)重绘让旗子飘荡; 弹窗打开/结束时不空转
+let _lastAnimDraw = 0;
+function animLoop(t) {
+  animTime = t / 1000;
+  if (state && !state.over && !modalOpen() && t - _lastAnimDraw > 45) { _lastAnimDraw = t; draw(); }
+  requestAnimationFrame(animLoop);
+}
+requestAnimationFrame(animLoop);
 
 </script>
 </body>
