@@ -181,6 +181,7 @@ button { font-family: inherit; cursor: pointer; }
   <span id="expWrap">暴露 <span id="expBar"><span id="expFill"></span><span id="expLine"></span></span> <span id="expVal"></span></span>
   <button class="tbtn" id="techBtn">整训 [T]</button>
   <button class="tbtn" id="helpBtn">规则 [H]</button>
+  <button class="tbtn" id="nextUnitBtn" title="跳到下一个待命单位(空格)">⏭ 下一单位</button>
   <button class="tbtn" id="view3dBtn" title="切换 3D/2D 视角(3D 仅桌面)">🗺 3D</button>
 </div>
 
@@ -1801,7 +1802,10 @@ function planStructAttack(a, q, r) {
   $("confirmBar").classList.add("show"); draw();
 }
 function execPending() {
-  const u = getSelUnit(); if (!u || !pending) { clearPending(); return; }
+  if (!pending) { clearPending(); return; }
+  if (pending.type === "build") { const p = pending; clearPending(false); startBuild(p.q, p.r, p.bk); afterAction(); return; }
+  if (pending.type === "recruit") { const p = pending; clearPending(false); recruit(p.q, p.r, p.tk); afterAction(); return; }
+  const u = getSelUnit(); if (!u) { clearPending(); return; }
   const pt = pending.type, pq = pending.q, pr = pending.r, path = pending.path, cost = pending.cost, tid = pending.targetId;
   clearPending(false);
   if (pt === "move") {
@@ -1955,7 +1959,14 @@ function renderPanel() {
   pn.innerHTML = html;
 }
 // 面板按钮回调(通过 sel 定位)
-function uiBuild(bk) { if (sel?.kind === "tile") { startBuild(sel.q, sel.r, bk); afterAction(); } }
+function uiBuild(bk) {
+  if (sel?.kind !== "tile") return;
+  const t = state.tiles[sel.q][sel.r], b = BUILDINGS[bk];
+  if (!t.village || t.village.build || state.grain < b.cost.grain) return;
+  pending = { type: "build", q: sel.q, r: sel.r, bk };
+  $("cInfo").innerHTML = "在 <b>" + t.village.name + "</b> 修建 <b>" + b.name + "</b>　" + costPart(state.grain, b.cost.grain, "粮") + " · " + b.turns + "回合<br><span style='color:#8a8058'>" + b.desc + "</span>";
+  $("confirmBar").classList.add("show"); draw();
+}
 function uiRecruit(tk) { if (sel?.kind === "tile") { recruit(sel.q, sel.r, tk); afterAction(); } }
 function uiMine() { const u = getSelUnit(); if (u) { actionMine(u); afterAction(); } }
 function uiSabotage() { const u = getSelUnit(); if (u) { actionSabotage(u); afterAction(); } }
@@ -1963,6 +1974,21 @@ function uiRest() { const u = getSelUnit(); if (!u || u.attacked || u.resting) r
 function uiWake() { const u = getSelUnit(); if (!u) return; u.resting = false; u.attacked = false; u.mp = UT[u.type].mp; reach = reachable(u); renderPanel(); draw(); }
 // 成本标记: 不足的资源标红, 让玩家看出是哪一项卡住了建造/招募
 function costPart(have, need, label) { return need ? "<span" + (have < need ? " style='color:#e2564d;font-weight:700'" : "") + ">" + label + need + "</span>" : ""; }
+// 镜头聚焦某格(2D 平移 / 3D 交给 render3d)
+function focusTile(q, r) {
+  if (typeof mode3d !== "undefined" && mode3d && window.TH3D && window.TH3D.focus) { window.TH3D.focus(q, r); return; }
+  const [cx, cy] = hexCenter(q, r); cam.x = cx * cam.zoom - innerWidth / 2; cam.y = cy * cam.zoom - innerHeight / 2;
+}
+// 下一待命单位(对标文明6): 选中并把镜头切过去; 无待命单位则提示可结束回合
+function nextUnit() {
+  if (state.over) return;
+  const acts = state.units.filter(u => u.side === "p" && u.mp > 0 && !u.attacked && !u.resting).sort((a, b) => a.id - b.id);
+  if (!acts.length) { log("所有单位都行动完了 — 可以结束回合了。", "info"); $("endTurnBtn").classList.add("pulse"); return; }
+  const cur = getSelUnit(); let next = acts[0];
+  if (cur) { const i = acts.findIndex(u => u.id === cur.id); if (i >= 0) next = acts[(i + 1) % acts.length]; }
+  sel = { kind: "unit", id: next.id }; reach = next.mp > 0 ? reachable(next) : null;
+  clearPending(false); focusTile(next.q, next.r); renderPanel(); draw();
+}
 function uiDisband() {
   const u = getSelUnit();
   if (!u) return;
@@ -2220,6 +2246,8 @@ window.TH = {
   state: () => state, visSet: () => visSet, sel: () => sel, reach: () => reach, pending: () => pending,
   click: (q, r) => handleClickTile(q, r),
 };
+$("nextUnitBtn").addEventListener("click", nextUnit);
+addEventListener("keydown", e => { if (e.code === "Space" && !modalOpen()) { e.preventDefault(); nextUnit(); } });
 let mode3d = false;
 $("view3dBtn").addEventListener("click", async () => {
   const btn = $("view3dBtn"), gl = $("gl");

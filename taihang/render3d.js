@@ -14,6 +14,7 @@ let prismGeo, coneGeo, treeTrunkGeo, treeLeafGeo, hexFlatGeo;
 const matCache = {};
 const texCache = {};
 let sunLight, lastSig = "", inited = false, cx0 = 0, cz0 = 0;
+let clock = 0; const revealAnims = {}; const tileVisPrev = new Set(); // 战雾展开动画
 
 // ── PCG 噪声 ──
 function h2(x, y) { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); }
@@ -27,13 +28,18 @@ function fbm(x, y) { let s = 0, a = .5, f = 1; for (let i = 0; i < 4; i++) { s +
 function hexWorld(q, r) { return [1.5 * R * q, SQ3 * R * (r + 0.5 * (q & 1))]; }
 
 const TERR = {
-  plain:    { base: .18, amp: .10, top: "#8a923f", side: "#6a5836" },
-  hills:    { base: .5,  amp: .7,  top: "#a88f3f", side: "#7a5f36" },
-  forest:   { base: .3,  amp: .22, top: "#4d6a2e", side: "#54502c" },
-  mountain: { base: .9,  amp: 1.7, top: "#9a938682", side: "#5c554a" },
+  plain:    { base: .08, amp: .05, top: "#8a923f", side: "#6a5836" },
+  hills:    { base: .22, amp: .30, top: "#a88f3f", side: "#7a5f36" },
+  forest:   { base: .12, amp: .10, top: "#4d6a2e", side: "#54502c" },
+  mountain: { base: .40, amp: .70, top: "#9a9386", side: "#5c554a" },
 };
-TERR.mountain.top = "#9a9386";
-function tileH(q, r, t) { const c = TERR[t] || TERR.plain; return c.base + c.amp * fbm(q * 0.55 + 3.1, r * 0.55 + 7.2); }
+function tileH(q, r, t) {
+  const c = TERR[t] || TERR.plain;
+  let h = c.base + c.amp * fbm(q * 0.32 + 3.1, r * 0.32 + 7.2); // 低频=邻格更接近, 过渡平滑
+  const W = G().CFG.mapW, H = G().CFG.mapH, edge = Math.min(q, W - 1 - q, r, H - 1 - r);
+  h *= Math.min(1, 0.35 + edge * 0.32); // 边缘平滑: 靠边界的格子高度渐降, 板子边不是陡壁
+  return h;
+}
 
 function terrainTex(t) {
   if (texCache[t]) return texCache[t];
@@ -116,17 +122,21 @@ function init(container) {
   scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x54492e, 0.95));
   scene.add(new THREE.AmbientLight(0x55606f, 0.35));
 
-  // 共享几何
-  prismGeo = new THREE.CylinderGeometry(R * 0.985, R * 0.985, 1, 6);
-  coneGeo = new THREE.ConeGeometry(R * 0.72, 1, 6);
+  // 共享几何(thetaStart=π/2 → 顶点落在 ±x, 平顶六边形, 与 hexWorld 的 1.5R 列距对齐)
+  prismGeo = new THREE.CylinderGeometry(R * 0.99, R * 0.99, 1, 6, 1, false, Math.PI / 2);
+  coneGeo = new THREE.ConeGeometry(R * 0.66, 1, 6, 1, false, Math.PI / 2);
   treeTrunkGeo = new THREE.CylinderGeometry(0.04, 0.06, 0.3, 5);
   treeLeafGeo = new THREE.ConeGeometry(0.22, 0.5, 6);
-  hexFlatGeo = new THREE.CircleGeometry(R * 0.92, 6); hexFlatGeo.rotateX(-Math.PI / 2);
+  hexFlatGeo = new THREE.CircleGeometry(R * 0.9, 6, Math.PI / 2); hexFlatGeo.rotateX(-Math.PI / 2);
 
   gTiles = new THREE.Group(); gTrees = new THREE.Group(); gUnits = new THREE.Group(); gStruct = new THREE.Group(); gOverlay = new THREE.Group();
   scene.add(gTiles, gTrees, gUnits, gStruct, gOverlay);
 
   buildTiles();
+  buildBoundary();
+  // 首帧: 已探明格不做展开动画(避免整片抖动), 只有之后新揭开的才动画
+  const s0 = G().state();
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) if (s0.tiles[q][r].disc) tileVisPrev.add(q + "," + r);
 
   // 相机 + 控制
   camera = new THREE.PerspectiveCamera(46, host.clientWidth / host.clientHeight, 0.5, 3000);
@@ -171,6 +181,31 @@ function buildTiles() {
   }
 }
 
+function buildBoundary() {
+  const W = G().CFG.mapW, H = G().CFG.mapH, R3 = SQ3 * R, pts = [];
+  const has = (px, pz) => { for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const [ex, ez] = hexWorld(q, r); if ((ex - px) ** 2 + (ez - pz) ** 2 < (R * 0.5) ** 2) return true; } return false; };
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    if (q !== 0 && q !== W - 1 && r !== 0 && r !== H - 1) continue;
+    const [x, z] = hexWorld(q, r);
+    for (let i = 0; i < 6; i++) {
+      const am = Math.PI / 3 * (i + 0.5), nx = x + R3 * Math.cos(am), nz = z + R3 * Math.sin(am);
+      if (has(nx, nz)) continue; // 朝图外的边→边界
+      const a0 = Math.PI / 3 * i, a1 = Math.PI / 3 * ((i + 1) % 6);
+      pts.push(new THREE.Vector3(x + R * Math.cos(a0), 0.08, z + R * Math.sin(a0)));
+      pts.push(new THREE.Vector3(x + R * Math.cos(a1), 0.08, z + R * Math.sin(a1)));
+    }
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xf0c860 }));
+  line.renderOrder = 2; gTiles.add(line);
+}
+function focus(q, r) {
+  if (!inited) return;
+  const [x, z] = hexWorld(q, r), ty = topY(q, r);
+  const dx = camera.position.x - controls.target.x, dy = camera.position.y - controls.target.y, dz = camera.position.z - controls.target.z;
+  controls.target.set(x, ty, z); camera.position.set(x + dx, ty + dy, z + dz); controls.update();
+}
+
 // ── 动态同步(信号量变化时重建 树/单位/建筑/高亮 + 迷雾可见性) ──
 function signature() {
   const s = G().state(); let u = ""; for (const un of s.units) u += un.id + un.q + "," + un.r + "|" + Math.round(un.hp) + ";";
@@ -185,8 +220,12 @@ function clearGroup(g) { for (let i = g.children.length - 1; i >= 0; i--) { cons
 function syncDynamic() {
   const s = G().state(), W = G().CFG.mapW, H = G().CFG.mapH, key = G().key;
   const visSet = G().visSet();
-  // 迷雾: 未探明格隐藏
-  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const tt = tiles[q + "," + r]; if (tt) tt.mesh.visible = s.tiles[q][r].disc; }
+  // 迷雾: 未探明格隐藏; 新揭开的登记展开动画
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const k = q + "," + r, tt = tiles[k]; if (!tt) continue;
+    const disc = s.tiles[q][r].disc; tt.mesh.visible = disc;
+    if (disc && !tileVisPrev.has(k)) { tileVisPrev.add(k); revealAnims[k] = clock; tt.mesh.scale.y = 0.001; tt.mesh.position.y = 0.0005; }
+  }
   gTiles.children.forEach(m => { if (m.userData && m.userData.decor) m.visible = s.tiles[m.userData.q][m.userData.r].disc; });
 
   // 树木(PCG, 仅已探明的森林/丘陵)
@@ -308,7 +347,18 @@ function setupPicking() {
 }
 
 function onResize() { if (!renderer) return; const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
-function loop() { animId = requestAnimationFrame(loop); controls.update(); const sig = signature(); if (sig !== lastSig) { lastSig = sig; syncDynamic(); } renderer.render(scene, camera); }
+function loop() {
+  animId = requestAnimationFrame(loop);
+  clock = performance.now() / 1000;
+  controls.update();
+  const sig = signature(); if (sig !== lastSig) { lastSig = sig; syncDynamic(); }
+  for (const k in revealAnims) { // 战雾展开: 新格从地面升起
+    const tt = tiles[k], p = (clock - revealAnims[k]) / 0.5;
+    if (p >= 1) { tt.mesh.scale.y = tt.h; tt.mesh.position.y = tt.h / 2; delete revealAnims[k]; }
+    else { const e = 1 - Math.pow(1 - p, 3), sy = Math.max(0.001, tt.h * e); tt.mesh.scale.y = sy; tt.mesh.position.y = sy / 2; }
+  }
+  renderer.render(scene, camera);
+}
 
 function dispose() {
   if (!inited) return; cancelAnimationFrame(animId); animId = 0;
@@ -316,7 +366,10 @@ function dispose() {
   controls.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
   renderer.dispose(); scene = null; renderer = null; inited = false; lastSig = "";
   for (const k in tiles) delete tiles[k];
+  for (const k in revealAnims) delete revealAnims[k];
+  tileVisPrev.clear();
 }
 function active() { return inited; }
 
-export const TH3D = { init, dispose, active };
+export const TH3D = { init, dispose, active, focus };
+if (typeof window !== "undefined") window.TH3D = TH3D;
