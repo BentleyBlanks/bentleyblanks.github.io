@@ -205,6 +205,14 @@ function focus(q, r) {
   const dx = camera.position.x - controls.target.x, dy = camera.position.y - controls.target.y, dz = camera.position.z - controls.target.z;
   controls.target.set(x, ty, z); camera.position.set(x + dx, ty + dy, z + dz); controls.update();
 }
+// 目标格顶投影到屏幕像素坐标(供确认框定位)
+function project(q, r) {
+  if (!inited) return null;
+  const [x, z] = hexWorld(q, r), v = new THREE.Vector3(x, topY(q, r) + 0.6, z);
+  v.project(camera);
+  const rect = renderer.domElement.getBoundingClientRect();
+  return { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
+}
 
 // ── 动态同步(信号量变化时重建 树/单位/建筑/高亮 + 迷雾可见性) ──
 function signature() {
@@ -371,5 +379,5 @@ function dispose() {
 }
 function active() { return inited; }
 
-export const TH3D = { init, dispose, active, focus };
+export const TH3D = { init, dispose, active, focus, project };
 if (typeof window !== "undefined") window.TH3D = TH3D;

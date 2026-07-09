@@ -1766,12 +1766,25 @@ function buildPath(u, q, r) {
   if (!path.length || path[0][0] !== u.q || path[0][1] !== u.r) path.unshift([u.q, u.r]);
   return path;
 }
-function clearPending(redraw = true) { pending = null; $("confirmBar").classList.remove("show"); if (redraw) draw(); }
+function clearPending(redraw = true) { const b = $("confirmBar"); pending = null; b.classList.remove("show"); b.style.left = b.style.top = b.style.bottom = b.style.transform = ""; if (redraw) draw(); }
+// 确认框弹在目标格附近(免鼠标跑远); 屏幕坐标: 3D 用投影, 2D 用相机变换; 越界则夹住
+function showConfirmNear(q, r) {
+  const bar = $("confirmBar"); bar.classList.add("show");
+  let sx, sy;
+  if (typeof mode3d !== "undefined" && mode3d && window.TH3D && window.TH3D.project) { const p = window.TH3D.project(q, r); if (p) { sx = p.x; sy = p.y; } }
+  if (sx === undefined) { const [cx, cy] = hexCenter(q, r); sx = cx * cam.zoom - cam.x; sy = cy * cam.zoom - cam.y; }
+  const bw = bar.offsetWidth || 260, bh = bar.offsetHeight || 60;
+  let left = sx - bw / 2, top = sy + 34;
+  if (top + bh > innerHeight - 8) top = sy - bh - 34;            // 下方放不下→放上方
+  left = Math.max(6, Math.min(left, innerWidth - bw - 6));
+  top = Math.max(50, Math.min(top, innerHeight - bh - 8));
+  bar.style.transform = "none"; bar.style.left = left + "px"; bar.style.top = top + "px"; bar.style.bottom = "auto";
+}
 function planMove(u, q, r, cost) {
   pending = { type: "move", q, r, cost, path: buildPath(u, q, r) };
   const steps = pending.path.length - 1;
   $("cInfo").innerHTML = `移动 <b>${UT[u.type].name}</b> → <b>${tileName(q, r)}</b>　行程 <b>${steps}</b> 步`;
-  $("confirmBar").classList.add("show"); draw();
+  showConfirmNear(q, r); draw();
 }
 function attackVerdict(exp, dhp, back, ahp, kill) {
   if (kill) return { t: "✓ 预计一击歼灭", c: "v-ok" };
@@ -1788,7 +1801,7 @@ function planAttack(a, d, q, r) {
   const back = kill ? 0 : Math.round(CFG.dmgBase * Math.exp((effStr(d, "atk") - as) / CFG.dmgExpDiv) * CFG.counterMult);
   const v = attackVerdict(exp, d.hp, back, a.hp, kill);
   $("cInfo").innerHTML = `<b>${UT[a.type].name}</b>(攻${Math.round(as)}) → <b>${UT[d.type].name}</b>(${Math.round(d.hp)}血·守${Math.round(ds)})　预计 <b style="color:#ffd0c0">-${exp}</b>${kill ? "" : ` · 敌反击 <b style="color:#ff9a86">-${back}</b>`}<br><span class="${v.c}">${v.t}</span>`;
-  $("confirmBar").classList.add("show"); draw();
+  showConfirmNear(q, r); draw();
 }
 function planStructAttack(a, q, r) {
   const sh = state.tiles[q][r].sh;
@@ -1799,7 +1812,7 @@ function planStructAttack(a, q, r) {
   const back = Math.round(CFG.dmgBase * Math.exp((sh.str - as) / CFG.dmgExpDiv) * CFG.counterMult);
   const v = attackVerdict(exp, sh.hp, back, a.hp, kill);
   $("cInfo").innerHTML = `<b>${UT[a.type].name}</b>(攻${Math.round(as)}) → <b>${sh.name}</b>(${Math.round(sh.hp)}/${sh.maxHp}血)　预计 <b style="color:#ffd0c0">-${exp}</b> · 守敌反击 <b style="color:#ff9a86">-${back}</b><br><span class="${v.c}">${kill ? "✓ 预计可拔除" : v.t}</span>`;
-  $("confirmBar").classList.add("show"); draw();
+  showConfirmNear(q, r); draw();
 }
 function execPending() {
   if (!pending) { clearPending(); return; }
@@ -1965,7 +1978,7 @@ function uiBuild(bk) {
   if (!t.village || t.village.build || state.grain < b.cost.grain) return;
   pending = { type: "build", q: sel.q, r: sel.r, bk };
   $("cInfo").innerHTML = "在 <b>" + t.village.name + "</b> 修建 <b>" + b.name + "</b>　" + costPart(state.grain, b.cost.grain, "粮") + " · " + b.turns + "回合<br><span style='color:#8a8058'>" + b.desc + "</span>";
-  $("confirmBar").classList.add("show"); draw();
+  showConfirmNear(sel.q, sel.r); draw();
 }
 function uiRecruit(tk) { if (sel?.kind === "tile") { recruit(sel.q, sel.r, tk); afterAction(); } }
 function uiMine() { const u = getSelUnit(); if (u) { actionMine(u); afterAction(); } }
