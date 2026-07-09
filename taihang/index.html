@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>太行·1941 — 敌后战场 4X</title>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; overflow: hidden; }
@@ -12,6 +18,9 @@ button { font-family: inherit; cursor: pointer; }
 .hidden { display: none !important; }
 
 #cv { position: absolute; inset: 0; display: block; touch-action: none; }
+#gl { position: fixed; inset: 0; z-index: 1; display: none; }
+#gl canvas { display: block; width: 100%; height: 100%; }
+.tbtn.on { border-color: #6cbf5a; color: #bfe89a; background: #26361c; }
 
 /* ── 顶栏 ── */
 #topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 12px; background: rgba(22,18,10,.92); border-bottom: 1px solid #3a3826; font-size: 13px; }
@@ -160,6 +169,7 @@ button { font-family: inherit; cursor: pointer; }
 </head>
 <body>
 <canvas id="cv"></canvas>
+<div id="gl"></div>
 
 <div id="topbar">
   <span class="ttl">太行·1941<small>敌后 4X</small></span>
@@ -171,6 +181,7 @@ button { font-family: inherit; cursor: pointer; }
   <span id="expWrap">暴露 <span id="expBar"><span id="expFill"></span><span id="expLine"></span></span> <span id="expVal"></span></span>
   <button class="tbtn" id="techBtn">整训 [T]</button>
   <button class="tbtn" id="helpBtn">规则 [H]</button>
+  <button class="tbtn" id="view3dBtn" title="切换 3D/2D 视角(3D 仅桌面)">🗺 3D</button>
 </div>
 
 <div id="sweepBanner" class="hidden"></div>
@@ -2167,6 +2178,54 @@ $("cOk").addEventListener("click", execPending);
 $("cCancel").addEventListener("click", () => clearPending());
 $("techBtn").addEventListener("click", showTech);
 $("helpBtn").addEventListener("click", () => showHelp(false));
+
+// ── 3D 视角: 供 render3d.js 读取状态 + 点格回调(复用规划/确认/攻击逻辑) ──
+function handleClickTile(q, r) {
+  if (state.over) return;
+  const t = state.tiles[q][r]; if (!t.disc) { deselect(); return; }
+  const selU = getSelUnit();
+  if (selU) {
+    if (pending && pending.q === q && pending.r === r) { execPending(); return; }
+    const canAtk = !selU.attacked && UT[selU.type].str > 0 && hexDist(selU.q, selU.r, q, r) === 1;
+    const enemy = visSet.has(key(q, r)) && state.units.find(x => x.q === q && x.r === r && x.side === "j");
+    if (canAtk && enemy) { planAttack(selU, enemy, q, r); return; }
+    if (canAtk && t.sh) { if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; } planStructAttack(selU, q, r); return; }
+    const rc = reach && reach.get(key(q, r));
+    if (rc) { planMove(selU, q, r, rc.cost); return; }
+  }
+  clearPending(false);
+  const mine = state.units.filter(x => x.q === q && x.r === r && x.side === "p");
+  if (mine.length) {
+    const cur = selU && selU.q === q && selU.r === r ? mine.indexOf(selU) : -1;
+    const pick = mine[(cur + 1) % mine.length];
+    sel = { kind: "unit", id: pick.id }; reach = pick.mp > 0 ? reachable(pick) : null;
+    renderPanel(); draw(); return;
+  }
+  sel = { kind: "tile", q, r }; reach = null; renderPanel(); draw();
+}
+window.TH = {
+  CFG, key, UT,
+  state: () => state, visSet: () => visSet, sel: () => sel, reach: () => reach, pending: () => pending,
+  click: (q, r) => handleClickTile(q, r),
+};
+let mode3d = false;
+$("view3dBtn").addEventListener("click", async () => {
+  const btn = $("view3dBtn"), gl = $("gl");
+  if (!mode3d) {
+    btn.textContent = "载入中…"; btn.disabled = true;
+    try {
+      const mod = await import("./render3d.js");
+      if (!mod.TH3D.init(gl)) throw new Error("WebGL 不可用");
+      mode3d = true; gl.style.display = "block"; $("cv").style.display = "none";
+      btn.textContent = "🗺 2D"; btn.classList.add("on");
+    } catch (e) { console.error(e); log("3D 视角载入失败(需桌面浏览器+网络): " + e.message, "jp"); btn.textContent = "🗺 3D"; }
+    btn.disabled = false;
+  } else {
+    try { const mod = await import("./render3d.js"); mod.TH3D.dispose(); } catch (e) {}
+    mode3d = false; gl.style.display = "none"; $("cv").style.display = "block";
+    btn.textContent = "🗺 3D"; btn.classList.remove("on"); resize(); draw();
+  }
+});
 
 resize();
 newState();       // 先生成一张底图作为标题背景
