@@ -1190,8 +1190,14 @@ function draw() {
 
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const t = state.tiles[q][r];
-    if (!t.disc) continue;
     const [cx, cy] = hexCenter(q, r);
+    // 未探明格: 画成深色雾格(而非整片黑), 让地图范围与边界一眼可见, 避免往边界外白跑
+    if (!t.disc) {
+      hexPath(cx, cy, s - 0.6);
+      ctx.fillStyle = "#171308"; ctx.fill();
+      ctx.strokeStyle = "#28230f"; ctx.lineWidth = 1; ctx.stroke();
+      continue;
+    }
     const visible = visSet.has(key(q, r));
     hexPath(cx, cy, s - 0.6);
     ctx.fillStyle = TERRAIN_COLOR[t.terrain];
@@ -1219,6 +1225,15 @@ function draw() {
     if (t.sh) drawStructure(cx, cy, s, t.sh);
     // 迷雾(已探明但不可见)
     if (!visible) { hexPath(cx, cy, s - 0.6); ctx.fillStyle = "rgba(10,8,4,.45)"; ctx.fill(); }
+  }
+
+  // 地图边界: 描出最外圈格子, 一眼看清"地图到此为止", 免得往界外移动白费回合
+  ctx.strokeStyle = "rgba(206,170,92,.55)"; ctx.lineWidth = 2.5;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    if (q !== 0 && q !== W - 1 && r !== 0 && r !== H - 1) continue;
+    const [cx, cy] = hexCenter(q, r);
+    hexPath(cx, cy, s - 0.6);
+    ctx.stroke();
   }
 
   // 可达高亮
