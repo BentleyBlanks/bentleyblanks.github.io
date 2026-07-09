@@ -200,7 +200,8 @@ button { font-family: inherit; cursor: pointer; }
 // ═══════════════════════════════════════════════════════════════════
 const CFG = {
   // ── 回合与胜负 ──
-  totalTurns: 56,          // 1941年1月—1945年8月
+  turnsPerMonth: 3,        // 每回合≈10天(旬); 日期/纪元由此驱动
+  totalTurns: 168,         // 1941年1月—1945年8月(55个月×3回合)
   startYear: 1941,
   survivalWinVillages: 5,  // 坚持到日本投降时≥N村=胜利(<N为惨胜)
   greatWinVillages: 8,     // ≥N村=大胜
@@ -236,28 +237,28 @@ const CFG = {
   joinExposure: 6,         // 并入一村+暴露
 
   // ── 暴露度(灵魂: 发展=暴露) ──
-  expPerVillage: 0.7,      // 每己方村(除总部)+暴露/回合
-  expPerArsenal: 1.0,      // 每兵工坊+暴露/回合
-  expDecay: 1.6,           // 基础衰减/回合
+  expPerVillage: 0.25,     // 每己方村(除总部)+暴露/回合(按旬回合缩放)
+  expPerArsenal: 0.35,     // 每兵工坊+暴露/回合
+  expDecay: 0.6,           // 基础衰减/回合
   expAttack: 5,            // 主动攻击+暴露
   expKillPillbox: 12,      // 拔掉炮楼+暴露
   expSabotage: 8,          // 破袭铁路+暴露
   expPatrolSpot: 4,        // 巡逻队侦知村庄+暴露
   sweepThreshold: 55,      // 暴露≥此值→日军开始集结
-  pitySweepGap: 15,        // 距上次扫荡>N回合且暴露≥30→强制集结(不许纯苟)
-  sweepTelegraph: 3,       // 集结N回合后出兵(备战窗口)
+  pitySweepGap: 40,        // 距上次扫荡>N回合且暴露≥30→强制集结(不许纯苟)
+  sweepTelegraph: 4,       // 集结N回合后出兵(备战窗口)
 
   // ── 扫荡 ──
-  sweepBase: 38, sweepPerTurn: 1.4,       // 预算=(base+turn*perTurn)*时代系数*暴露系数
+  sweepBase: 38, sweepPerTurn: 0.5,       // 预算=(base+turn*perTurn)*时代系数*暴露系数
   sweepExpFactor: 150,                    // 暴露系数=0.6+exposure/此值
-  sweepCooldown: 4,        // 扫荡结束后N回合内不再集结(喘息重建窗口)
-  sweepTTL: 8,             // 扫荡部队N回合后撤回
+  sweepCooldown: 10,       // 扫荡结束后N回合内不再集结(喘息重建窗口)
+  sweepTTL: 14,            // 扫荡部队N回合后撤回
   sweepMaxUnits: 7,        // 单次扫荡纵队数上限
   pillageGrain: 18,        // 敌军驻村掠粮/回合
   pillageHeart: 12,        // 敌军驻村毁民心/回合
   pillageBuildingChance: 0.35, // 敌军驻村每回合摧毁建筑概率
   tunnelDamageMult: 0.5,   // 地道村受掠夺/民心损失减半
-  bigSweepTurn: 17,        // 「五一大扫荡」剧本回合(1942年5月)
+  bigSweepTurn: 50,        // 「五一大扫荡」剧本回合(1942年5月)
   bigSweepMult: 1.5,
   sweepWinKillRatio: 0.6,  // 歼灭≥60%扫荡兵力=反扫荡大捷(全村民心+5)
 
@@ -270,6 +271,7 @@ const CFG = {
   ambushBonus: 3,          // 从山地/森林发起攻击+战力
   lootArmsRatio: 0.5,      // 歼敌缴获军火=敌战力*此值
   healVillage: 12, healTerritory: 4,  // 驻己方村/根据地范围内回血
+  restHeal: 16,            // 原地休整每回合额外回血(文明6式)
 
   // ── 单位死粮 ──
   starveHpLoss: 10, starveHeartLoss: 3,  // 断粮: 全军掉血+全村掉民心
@@ -278,9 +280,9 @@ const CFG = {
   pillboxHP: 150, pillboxStr: 20,
   townHP: 260, townStr: 34,
   siteHP: 60, siteStr: 6, siteTurns: 4,  // 囚笼: 修建中的炮楼
-  cagePolicy: [12, 24, 36, 46],          // 这些回合日军尝试修新炮楼
+  cagePolicy: [18, 54, 90, 126],         // 这些回合日军尝试修新炮楼
   lootPillboxArms: 15, lootPillboxGrain: 20,
-  patrolEvery: 4, patrolTTL: 8,          // 巡逻队
+  patrolEvery: 8, patrolTTL: 14,         // 巡逻队
 
   // ── 破袭 ──
   railRepair: 8,           // 铁路破坏N回合后修复
@@ -292,17 +294,10 @@ const CFG = {
 };
 
 // ── 时代强度曲线: 1941-43扫荡愈演愈烈, 1944后日军抽兵南洋渐衰 ──
-function eraMult(t) {
-  if (t <= 12) return 0.8;        // 1941: 试探
-  if (t <= 24) return 1.05;       // 1942: 最残酷的一年
-  if (t <= 36) return 1.25;       // 1943: 高压顶点
-  if (t <= 48) return 1.0;        // 1944: 相持
-  return 0.8;                     // 1945: 强弩之末
-}
-function eraName(t) {
-  if (t <= 12) return "囚笼初现"; if (t <= 24) return "至暗时刻";
-  if (t <= 36) return "咬牙坚持"; if (t <= 48) return "局部反攻"; return "最后胜利";
-}
+function monthIdx(t) { return Math.floor((t - 1) / CFG.turnsPerMonth); }   // 距1941.1的月数
+function eraYear(t) { return CFG.startYear + Math.floor(monthIdx(t) / 12); }
+function eraMult(t) { const y = eraYear(t); return y <= 1941 ? 0.8 : y === 1942 ? 1.05 : y === 1943 ? 1.25 : y === 1944 ? 1.0 : 0.8; }
+function eraName(t) { const y = eraYear(t); return y <= 1941 ? "囚笼初现" : y === 1942 ? "至暗时刻" : y === 1943 ? "咬牙坚持" : y === 1944 ? "局部反攻" : "最后胜利"; }
 
 // ── 单位表 ──
 const UT = {
@@ -382,8 +377,9 @@ function hexCenter(q, r) {
   return [1.5 * s * q + s, SQRT3 * s * (r + 0.5 * (q & 1)) + s];
 }
 function dateStr(t) {
-  const m = (t - 1) % 12 + 1, y = CFG.startYear + Math.floor((t - 1) / 12);
-  return y + "年" + m + "月";
+  const mi = monthIdx(t), y = CFG.startYear + Math.floor(mi / 12), m = mi % 12 + 1;
+  const xun = ["上旬", "中旬", "下旬", "月末", "月末"][(t - 1) % CFG.turnsPerMonth];
+  return y + "年" + m + "月" + (CFG.turnsPerMonth > 1 ? xun : "");
 }
 
 // ═══════════════════════════ 地图生成 ═══════════════════════════
@@ -561,6 +557,7 @@ function reachable(u) {
   return out;
 }
 function doMove(u, q, r, cost) {
+  u.resting = false;
   u.q = q; u.r = r; u.mp -= cost;
   if (u.side === "p") { revealArea(q, r, unitVis(u)); }
   // 敌军踩雷
@@ -621,7 +618,7 @@ function killUnit(u, bySide) {
   }
 }
 function attackUnit(a, d) {
-  a.attacked = true; a.mp = 0;
+  a.attacked = true; a.mp = 0; a.resting = false;
   const as = effStr(a, "atk"), ds = effStr(d, "def");
   const dmg = dmgRoll(as, ds);
   d.hp -= dmg;
@@ -868,7 +865,12 @@ function endTurn() {
       let heal = 0;
       if (t.village && t.village.owner === "p") heal = CFG.healVillage;
       else if (nearOwnVillage(u.q, u.r, 2)) heal = CFG.healTerritory;
+      if (u.resting) heal += CFG.restHeal;
       u.hp = Math.min(100, u.hp + heal);
+    }
+    if (u.resting) {
+      if (u.hp >= 100 || anyEnemyMilAt(u.q, u.r, "p")) u.resting = false; // 满员/敌军贴近→自动解除
+      else { u.attacked = true; u.mp = 0; }                              // 继续休整, 不需下令
     }
   }
 
@@ -1884,13 +1886,19 @@ function renderPanel() {
     html += "<h3>" + ut.name + "<small>HP " + Math.max(0, Math.round(u.hp)) + " · 移动 " + u.mp + "/" + ut.mp + "</small></h3>";
     if (ut.str > 0) html += "<div class='row'>战力 <b>" + effStr(u, "atk").toFixed(1) + "</b>(攻) / <b>" + effStr(u, "def").toFixed(1) + "</b>(守)</div>";
     html += "<div class='hint'>" + ut.desc + "</div>";
-    if (u.attacked) html += "<div class='warn'>本回合已行动</div>";
     const t = state.tiles[u.q][u.r];
-    // 特殊行动按钮
-    if (u.type === "militia" && state.techs.dilei && !t.mine && !u.attacked)
-      html += "<button class='abtn' onclick='uiMine()'>💣 埋地雷 <span class='cost'>(军火" + CFG.mineCostArms + ")</span><span class='sub'>敌军踩中 -" + CFG.mineDamage + "HP</span></button>";
-    if ((u.type === "commando" || u.type === "militia" && state.techs.poxi) && t.rail && t.railBroken <= 0 && !u.attacked)
-      html += "<button class='abtn' onclick='uiSabotage()'>💥 破袭铁路 <span class='cost'>(+暴露" + CFG.expSabotage + ")</span><span class='sub'>缴获军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + ", 削弱下次扫荡</span></button>";
+    if (u.resting) {
+      html += "<div class='row' style='color:#9fbc52'>🛌 原地休整中 · 每回合 +" + CFG.restHeal + " 回血(至满员)</div>";
+      html += "<button class='abtn' onclick='uiWake()'>醒转 <span class='sub'>停止休整, 恢复本回合行动</span></button>";
+    } else {
+      if (u.attacked) html += "<div class='warn'>本回合已行动</div>";
+      if (u.type === "militia" && state.techs.dilei && !t.mine && !u.attacked)
+        html += "<button class='abtn' onclick='uiMine()'>💣 埋地雷 <span class='cost'>(" + costPart(state.arms, CFG.mineCostArms, "军火") + ")</span><span class='sub'>敌军踩中 -" + CFG.mineDamage + "HP</span></button>";
+      if ((u.type === "commando" || u.type === "militia" && state.techs.poxi) && t.rail && t.railBroken <= 0 && !u.attacked)
+        html += "<button class='abtn' onclick='uiSabotage()'>💥 破袭铁路 <span class='cost'>(+暴露" + CFG.expSabotage + ")</span><span class='sub'>缴获军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + ", 削弱下次扫荡</span></button>";
+      if (!u.attacked && u.hp < 100)
+        html += "<button class='abtn' onclick='uiRest()'>🛌 原地休整 <span class='cost'>(+" + CFG.restHeal + "回血/回合)</span><span class='sub'>结束本回合行动, 每回合回血至满员</span></button>";
+    }
     html += "<button class='abtn danger' onclick='uiDisband()'>解散 <span class='sub'>返还一半人力</span></button>";
     html += "<hr><div class='hint'>点击绿色格移动 · 点击相邻红框敌人攻击</div>";
   } else if (sel.kind === "tile") {
@@ -1918,7 +1926,7 @@ function renderPanel() {
           if (v.buildings.includes(bk)) { html += "<div class='row'>✓ " + b.name + " <span class='sub'></span></div>"; continue; }
           if (b.needTech && !state.techs[b.needTech]) { html += "<button class='abtn' disabled>" + b.name + " <span class='sub'>需整训【" + TECHS[b.needTech].name + "】</span></button>"; continue; }
           const can = state.grain >= b.cost.grain;
-          html += "<button class='abtn' " + (can ? "" : "disabled") + " onclick=\"uiBuild('" + bk + "')\">" + b.name + " <span class='cost'>粮" + b.cost.grain + "·" + b.turns + "回合</span><span class='sub'>" + b.desc + "</span></button>";
+          html += "<button class='abtn' " + (can ? "" : "disabled") + " onclick=\"uiBuild('" + bk + "')\">" + b.name + " <span class='cost'>" + costPart(state.grain, b.cost.grain, "粮") + "·" + b.turns + "回合</span><span class='sub'>" + b.desc + "</span></button>";
         }
         // 招募
         html += "<hr><div class='row'><b>组建队伍</b></div>";
@@ -1927,7 +1935,7 @@ function renderPanel() {
           if (ut.needTech && !state.techs[ut.needTech]) continue;
           const c = ut.cost;
           const can = state.grain >= (c.grain || 0) && state.man >= (c.man || 0) && state.arms >= (c.arms || 0) && state.org >= (c.org || 0);
-          const cost = [c.grain ? "粮" + c.grain : "", c.man ? "人" + c.man : "", c.arms ? "火" + c.arms : "", c.org ? "组" + c.org : ""].filter(Boolean).join(" ");
+          const cost = [costPart(state.grain, c.grain, "粮"), costPart(state.man, c.man, "人"), costPart(state.arms, c.arms, "火"), costPart(state.org, c.org, "组")].filter(Boolean).join(" ");
           html += "<button class='abtn' " + (can ? "" : "disabled") + " onclick=\"uiRecruit('" + tk + "')\">" + ut.name + (ut.str ? "(战" + ut.str + ")" : "") + " <span class='cost'>" + cost + "</span><span class='sub'>" + ut.desc + "</span></button>";
         }
       }
@@ -1951,6 +1959,10 @@ function uiBuild(bk) { if (sel?.kind === "tile") { startBuild(sel.q, sel.r, bk);
 function uiRecruit(tk) { if (sel?.kind === "tile") { recruit(sel.q, sel.r, tk); afterAction(); } }
 function uiMine() { const u = getSelUnit(); if (u) { actionMine(u); afterAction(); } }
 function uiSabotage() { const u = getSelUnit(); if (u) { actionSabotage(u); afterAction(); } }
+function uiRest() { const u = getSelUnit(); if (!u || u.attacked || u.resting) return; u.resting = true; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(UT[u.type].name + "原地休整 — 每回合回血 +" + CFG.restHeal + ", 直到满员或敌军逼近", "hl"); clearPending(false); afterAction(); }
+function uiWake() { const u = getSelUnit(); if (!u) return; u.resting = false; u.attacked = false; u.mp = UT[u.type].mp; reach = reachable(u); renderPanel(); draw(); }
+// 成本标记: 不足的资源标红, 让玩家看出是哪一项卡住了建造/招募
+function costPart(have, need, label) { return need ? "<span" + (have < need ? " style='color:#e2564d;font-weight:700'" : "") + ">" + label + need + "</span>" : ""; }
 function uiDisband() {
   const u = getSelUnit();
   if (!u) return;
@@ -1998,7 +2010,7 @@ function showTech() {
       html += `<div class="techCard${done ? " done" : ""}"><b>${t.name}</b><div class="desc">${t.desc}</div>`;
       if (done) html += `<div class="lock">✓ 已完成</div>`;
       else {
-        html += `<div class="cost">✊ ${t.cost}</div>`;
+        html += `<div class="cost"${state.org < t.cost ? " style='color:#e2564d;font-weight:700'" : ""}>✊ ${t.cost}${state.org < t.cost ? "(组织不足)" : ""}</div>`;
         if (t.need && !needOk) html += `<div class="lock">需先完成: ${t.need.map(n => TECHS[n].name).join("、")}</div>`;
         else if (!unlocked) html += `<div class="lock">${tier === 2 ? "需完成1项第一阶" : "需完成2项第二阶"}</div>`;
         html += `<button ${can ? "" : "disabled"} onclick="buyTech('${k}');showTech();updateUI();afterAction()">整训</button>`;
