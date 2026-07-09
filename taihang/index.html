@@ -76,6 +76,17 @@ button { font-family: inherit; cursor: pointer; }
 #turnToast.show { animation: turnpop 1.05s ease-out; }
 #turnToast small { display: block; text-align: center; font-size: 12px; font-weight: 400; letter-spacing: 1px; color: #c8a850; margin-top: 3px; }
 @keyframes turnpop { 0% { opacity: 0; transform: translate(-50%,-30%) scale(.9); } 18% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 72% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-58%) scale(1); } }
+#confirmBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(74px + env(safe-area-inset-bottom)); z-index: 12; display: none; align-items: center; gap: 9px; background: rgba(26,20,12,.97); border: 1px solid #6b5a30; border-radius: 10px; padding: 8px 11px; max-width: 94vw; box-shadow: 0 4px 18px rgba(0,0,0,.55); }
+#confirmBar.show { display: flex; }
+#confirmBar .cinfo { font-size: 12.5px; color: #d8c9a0; line-height: 1.45; }
+#confirmBar .cinfo b { color: #f0e4c0; }
+#confirmBar .v-ok { color: #9fbc52; font-weight: 700; }
+#confirmBar .v-warn { color: #e8b64a; font-weight: 700; }
+#confirmBar .v-bad { color: #e2564d; font-weight: 700; }
+#confirmBar button { font-family: inherit; font-size: 13px; padding: 9px 15px; border-radius: 7px; cursor: pointer; white-space: nowrap; border: 1px solid; }
+#cOk { background: #2f5a2b; border-color: #6cbf5a; color: #eaffe0; }
+#cOk:active { transform: scale(.94); }
+#cCancel { background: #3a2a24; border-color: #7a5a4a; color: #e8d0c0; }
 
 /* ── 弹窗 ── */
 #modalWrap { position: absolute; inset: 0; z-index: 30; background: rgba(8,6,3,.78); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -167,6 +178,7 @@ button { font-family: inherit; cursor: pointer; }
 <div id="logBox"></div>
 <button id="endTurnBtn">结束回合</button>
 <div id="turnToast"></div>
+<div id="confirmBar"><span class="cinfo" id="cInfo"></span><button id="cOk">确认</button><button id="cCancel">取消</button></div>
 <div id="modalWrap" class="hidden"><div id="modalBox"></div></div>
 
 <script>
@@ -1141,6 +1153,8 @@ const ctx = cv.getContext("2d");
 let cam = { x: 0, y: 0, zoom: 1 };
 let sel = null;        // { kind:"unit", id } | { kind:"tile", q, r }
 let reach = null;      // Map of reachable
+let pending = null;    // 待确认动作 { type:"move"|"atk"|"struct", q, r, cost?, path?, targetId? }
+let moveAnim = null;   // 移动滑行动画 { id, pts:[[x,y]...], t0, dur }
 // 四种地形拉开色相与明度: 平原=暖黄开阔 / 丘陵=红棕 / 森林=绿 / 山地=冷灰, 一眼可辨
 const TERRAIN_COLOR = { plain: "#6d6634", hills: "#6f5232", forest: "#39501f", mountain: "#585449" };
 const TERRAIN_EDGE  = { plain: "#847a44", hills: "#8a6a44", forest: "#4c6a2c", mountain: "#726c5e" };
@@ -1445,6 +1459,21 @@ function draw() {
     }
   }
 
+  // 移动路径预览(待确认): 虚线 + 途经点 + 目的地脉冲圈
+  if (pending && pending.type === "move" && pending.path) {
+    ctx.strokeStyle = "#ffe9a0"; ctx.lineWidth = 3; ctx.setLineDash([2, 6]); ctx.lineCap = "round";
+    ctx.beginPath();
+    pending.path.forEach(([pq, pr], i) => { const [px, py] = hexCenter(pq, pr); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+    ctx.stroke(); ctx.setLineDash([]);
+    pending.path.forEach(([pq, pr], i) => { if (!i) return; const [px, py] = hexCenter(pq, pr); ctx.fillStyle = "rgba(255,233,160,.85)"; ctx.beginPath(); ctx.arc(px, py, 2.6, 0, 7); ctx.fill(); });
+    const [dx, dy] = hexCenter(pending.q, pending.r), pl = 0.5 + 0.5 * Math.sin(animTime * 5);
+    ctx.strokeStyle = `rgba(255,233,160,${0.5 + 0.4 * pl})`; ctx.lineWidth = 2.5; hexPath(dx, dy, s - 4 - pl * 3); ctx.stroke();
+  }
+  // 攻击目标脉冲(待确认)
+  if (pending && (pending.type === "atk" || pending.type === "struct")) {
+    const [dx, dy] = hexCenter(pending.q, pending.r), pl = 0.5 + 0.5 * Math.sin(animTime * 6);
+    ctx.strokeStyle = `rgba(226,86,77,${0.6 + 0.4 * pl})`; ctx.lineWidth = 3; hexPath(dx, dy, s - 3 - pl * 3); ctx.stroke();
+  }
   // 单位
   for (const u of state.units) {
     if (u.side === "j" && !visSet.has(key(u.q, u.r))) continue;
@@ -1587,7 +1616,13 @@ function drawStructure(cx, cy, s, sh) {
 }
 
 function drawUnit(u, s) {
-  const [x, y] = unitDrawPos(u, s);
+  let [x, y] = unitDrawPos(u, s);
+  if (moveAnim && moveAnim.id === u.id) { // 沿路径滑行动画
+    const p = Math.min(1, (animTime - moveAnim.t0) / moveAnim.dur), pts = moveAnim.pts, segs = pts.length - 1;
+    const fseg = Math.max(0, Math.min(segs - 1, Math.floor(p * segs))), lt = p * segs - fseg;
+    const a = pts[fseg], b = pts[fseg + 1];
+    x = a[0] + (b[0] - a[0]) * lt; y = a[1] + (b[1] - a[1]) * lt;
+  }
   const ut = UT[u.type];
   const isP = u.side === "p";
   const cfg = FIG[u.type] || FIG.militia;
@@ -1666,7 +1701,7 @@ function pxToHex(px, py) {
   return bd <= (CFG.hexSize * 1.05) ** 2 ? best : null;
 }
 function getSelUnit() { return sel?.kind === "unit" ? state.units.find(u => u.id === sel.id) : null; }
-function deselect() { sel = null; reach = null; renderPanel(); draw(); }
+function deselect() { sel = null; reach = null; clearPending(false); renderPanel(); draw(); }
 
 function handleClick(px, py) {
   if (state.over) return;
@@ -1677,31 +1712,21 @@ function handleClick(px, py) {
   if (!t.disc) { deselect(); return; }
   const selU = getSelUnit();
 
-  // ── 有选中单位: 尝试 移动/攻击 ──
+  // ── 有选中单位: 规划移动/攻击(先预览, 再点同一目标或按确认才执行) ──
   if (selU) {
-    // 攻击敌单位
+    // 再次点击已规划的目标 → 执行
+    if (pending && pending.q === q && pending.r === r) { execPending(); return; }
+    const canAtk = !selU.attacked && UT[selU.type].str > 0 && hexDist(selU.q, selU.r, q, r) === 1;
     const enemy = visSet.has(key(q, r)) && state.units.find(x => x.q === q && x.r === r && x.side === "j");
-    if (enemy && hexDist(selU.q, selU.r, q, r) === 1 && !selU.attacked && UT[selU.type].str > 0) {
-      attackUnit(selU, enemy);
-      state.exposure = clamp(state.exposure + CFG.expAttack, 0, 100);
-      reach = null; sel = selU.hp > 0 && state.units.includes(selU) ? sel : null;
-      afterAction(); return;
-    }
-    // 攻击设施
-    if (t.sh && hexDist(selU.q, selU.r, q, r) === 1 && !selU.attacked && UT[selU.type].str > 0) {
+    if (canAtk && enemy) { planAttack(selU, enemy, q, r); return; }
+    if (canAtk && t.sh) {
       if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; }
-      attackStructure(selU, q, r);
-      reach = null;
-      afterAction(); return;
+      planStructAttack(selU, q, r); return;
     }
-    // 移动
     const rc = reach?.get(key(q, r));
-    if (rc) {
-      doMove(selU, q, r, rc.cost);
-      reach = state.units.includes(selU) && selU.mp > 0 ? reachable(selU) : null;
-      afterAction(); return;
-    }
+    if (rc) { planMove(selU, q, r, rc.cost); return; }
   }
+  clearPending(false);
 
   // ── 选择本格单位(军事优先, 再民事) ──
   const mine = state.units.filter(x => x.q === q && x.r === r && x.side === "p");
@@ -1719,6 +1744,64 @@ function handleClick(px, py) {
   sel = { kind: "tile", q, r };
   reach = null;
   renderPanel(); draw();
+}
+// 从 reach 的 from 链重建路径(含起点与终点)
+function buildPath(u, q, r) {
+  const path = []; let k = key(q, r), guard = 0;
+  while (k != null && guard++ < 60) { const [pq, pr] = k.split(",").map(Number); path.unshift([pq, pr]); k = reach && reach.get(k) ? reach.get(k).from : null; }
+  if (!path.length || path[0][0] !== u.q || path[0][1] !== u.r) path.unshift([u.q, u.r]);
+  return path;
+}
+function clearPending(redraw = true) { pending = null; $("confirmBar").classList.remove("show"); if (redraw) draw(); }
+function planMove(u, q, r, cost) {
+  pending = { type: "move", q, r, cost, path: buildPath(u, q, r) };
+  const steps = pending.path.length - 1;
+  $("cInfo").innerHTML = `移动 <b>${UT[u.type].name}</b> → <b>${tileName(q, r)}</b>　行程 <b>${steps}</b> 步`;
+  $("confirmBar").classList.add("show"); draw();
+}
+function attackVerdict(exp, dhp, back, ahp, kill) {
+  if (kill) return { t: "✓ 预计一击歼灭", c: "v-ok" };
+  if (back >= ahp) return { t: "✗ 恐被反杀，慎战!", c: "v-bad" };
+  if (exp >= dhp * 0.5 && back <= ahp * 0.35) return { t: "◑ 占优，能压制", c: "v-warn" };
+  if (exp < dhp * 0.25) return { t: "✗ 啃不动，硬拼吃亏", c: "v-bad" };
+  return { t: "◐ 拉锯，两败俱伤", c: "v-warn" };
+}
+function planAttack(a, d, q, r) {
+  pending = { type: "atk", q, r, targetId: d.id };
+  const as = effStr(a, "atk"), ds = effStr(d, "def");
+  const exp = Math.max(1, Math.round(CFG.dmgBase * Math.exp((as - ds) / CFG.dmgExpDiv)));
+  const kill = exp >= d.hp;
+  const back = kill ? 0 : Math.round(CFG.dmgBase * Math.exp((effStr(d, "atk") - as) / CFG.dmgExpDiv) * CFG.counterMult);
+  const v = attackVerdict(exp, d.hp, back, a.hp, kill);
+  $("cInfo").innerHTML = `<b>${UT[a.type].name}</b>(攻${Math.round(as)}) → <b>${UT[d.type].name}</b>(${Math.round(d.hp)}血·守${Math.round(ds)})　预计 <b style="color:#ffd0c0">-${exp}</b>${kill ? "" : ` · 敌反击 <b style="color:#ff9a86">-${back}</b>`}<br><span class="${v.c}">${v.t}</span>`;
+  $("confirmBar").classList.add("show"); draw();
+}
+function planStructAttack(a, q, r) {
+  const sh = state.tiles[q][r].sh;
+  pending = { type: "struct", q, r };
+  const as = effStr(a, "atk"), ds = sh.str * (sh.hp / sh.maxHp * 0.4 + 0.6);
+  const exp = Math.max(1, Math.round(CFG.dmgBase * Math.exp((as - ds) / CFG.dmgExpDiv)));
+  const kill = exp >= sh.hp;
+  const back = Math.round(CFG.dmgBase * Math.exp((sh.str - as) / CFG.dmgExpDiv) * CFG.counterMult);
+  const v = attackVerdict(exp, sh.hp, back, a.hp, kill);
+  $("cInfo").innerHTML = `<b>${UT[a.type].name}</b>(攻${Math.round(as)}) → <b>${sh.name}</b>(${Math.round(sh.hp)}/${sh.maxHp}血)　预计 <b style="color:#ffd0c0">-${exp}</b> · 守敌反击 <b style="color:#ff9a86">-${back}</b><br><span class="${v.c}">${kill ? "✓ 预计可拔除" : v.t}</span>`;
+  $("confirmBar").classList.add("show"); draw();
+}
+function execPending() {
+  const u = getSelUnit(); if (!u || !pending) { clearPending(); return; }
+  const pt = pending.type, pq = pending.q, pr = pending.r, path = pending.path, cost = pending.cost, tid = pending.targetId;
+  clearPending(false);
+  if (pt === "move") {
+    doMove(u, pq, pr, cost);
+    moveAnim = { id: u.id, pts: path.map(([a, b]) => hexCenter(a, b)), t0: animTime, dur: Math.max(0.22, (path.length - 1) * 0.13) };
+    reach = state.units.includes(u) && u.mp > 0 ? reachable(u) : null;
+  } else if (pt === "atk") {
+    const d = state.units.find(x => x.id === tid);
+    if (d) { attackUnit(u, d); state.exposure = clamp(state.exposure + CFG.expAttack, 0, 100); }
+    reach = null;
+  } else if (pt === "struct") { attackStructure(u, pq, pr); reach = null; }
+  if (!getSelUnit()) sel = null;
+  afterAction();
 }
 function afterAction() {
   computeVis(); renderPanel(); updateUI(); draw();
@@ -2080,6 +2163,8 @@ $("endTurnBtn").addEventListener("click", () => {
   b.classList.add("pressed");                        // 立即按下反馈(尤其移动端无hover)
   setTimeout(() => { b.classList.remove("pressed"); endTurn(); }, 30);
 });
+$("cOk").addEventListener("click", execPending);
+$("cCancel").addEventListener("click", () => clearPending());
 $("techBtn").addEventListener("click", showTech);
 $("helpBtn").addEventListener("click", () => showHelp(false));
 
@@ -2094,7 +2179,8 @@ let _lastAnimDraw = 0;
 function animLoop(t) {
   animTime = t / 1000;
   if (fx.length) fx = fx.filter(e => animTime - e.t0 < e.dur); // 过期特效
-  const active = fx.length > 0; // 有特效时逐帧重绘, 否则节流(~22fps)只飘旗
+  if (moveAnim && animTime - moveAnim.t0 >= moveAnim.dur) moveAnim = null; // 滑行结束
+  const active = fx.length > 0 || moveAnim || pending; // 特效/滑行/待确认脉冲时逐帧重绘, 否则节流(~22fps)只飘旗
   if (state && !state.over && !modalOpen() && (active || t - _lastAnimDraw > 45)) { _lastAnimDraw = t; draw(); }
   requestAnimationFrame(animLoop);
 }
