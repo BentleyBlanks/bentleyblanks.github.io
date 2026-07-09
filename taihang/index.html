@@ -36,6 +36,10 @@ button { font-family: inherit; cursor: pointer; }
 #dbgPanel button.dbtn { width: 100%; margin: 4px 0; background: #2a2416; border: 1px solid #6b5a30; color: #e8d7ae; border-radius: 5px; padding: 6px; font-family: inherit; font-size: 12px; cursor: pointer; }
 #dbgPanel button.dbtn:hover { background: #3a3320; }
 #dbgPanel .note { color: #7a6c4a; font-size: 10.5px; margin: 2px 0 6px; }
+#dbgPanel label.dbgk { cursor: help; text-decoration: underline dotted rgba(176,164,120,.4); }
+#dbgPanel label.dbgk:hover { color: #e8d7ae; }
+#dbgTip { position: fixed; z-index: 30; display: none; max-width: 240px; background: rgba(30,24,14,.98); border: 1px solid #8a6a30; border-radius: 7px; padding: 7px 10px; font-size: 12px; line-height: 1.5; color: #e8dcb8; box-shadow: 0 4px 16px rgba(0,0,0,.6); }
+#dbgTip.show { display: block; }
 
 /* ── 顶栏 ── */
 #topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 12px; background: rgba(22,18,10,.92); border-bottom: 1px solid #3a3826; font-size: 13px; }
@@ -211,6 +215,7 @@ button { font-family: inherit; cursor: pointer; }
   <button class="tbtn" id="dbgBtn" title="调试面板">🐞 Debug</button>
 </div>
 <div id="dbgPanel"></div>
+<div id="dbgTip"></div>
 
 <div id="sweepBanner" class="hidden"></div>
 <div id="sidePanel" class="hidden"></div>
@@ -2353,11 +2358,46 @@ function dbgApply(cat, key, v) {
 }
 function dbgSl(label, min, max, step, val, cat, key) { return `<div class="dr"><label title="${label}">${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="dbgSlide(this,'${cat}','${key}')"><span class="dv">${val}</span></div>`; }
 function dbgCol(label, val, cat, key) { return `<div class="dr"><label>${label}</label><input type="color" value="${val}" oninput="dbgColor(this,'${cat}','${key}')"></div>`; }
+const CFG_DESC = {
+  turnsPerMonth: "每月多少回合(≈旬); 日期与纪元由此驱动", totalTurns: "总回合数(游戏结束点, 对应1945年8月投降)", startYear: "起始年份(1941)",
+  survivalWinVillages: "生存胜利: 投降时需保有的村庄数(低于为惨胜)", greatWinVillages: "大胜所需村庄数",
+  mapW: "地图宽/列数(改后下局生效)", mapH: "地图高/行数(改后下局生效)", hexSize: "六边形像素半径(2D绘制)",
+  villageCount: "总村庄数(含总部)", villageMinGap: "村庄之间最小间距",
+  startGrain: "起始粮食", startMan: "起始人力", startArms: "起始军火", startOrg: "起始组织", startHQHeart: "总部村起始民心",
+  grainCap: "粮食基础上限", grainCapPerBarn: "每座藏粮洞增加的粮上限", manCap: "人力上限", armsCap: "军火上限",
+  heartFullProd: "民心≥此值产出100%(≥30产75%, 更低50%)", joinThreshold: "民心≥此值且未被压制→挂红旗并入根据地",
+  workteamHeart: "工作队驻村每回合+民心(减租减息更高)", ownedHeartRegen: "己方村每回合民心自然回升", neutralDrift: "无人工作的中立村民心回落到此值",
+  suppressDist: "据点压制半径(距炮楼/县城≤此格的村被压制)", suppressCap: "被压制村民心上限(低于并入线, 须先拔据点)", revertHeart: "己方村民心低于此值→退回中立",
+  joinExposure: "每并入一村增加的暴露度", expPerVillage: "每己方村(除总部)每回合+暴露", expPerArsenal: "每兵工坊每回合+暴露", expDecay: "暴露每回合自然衰减",
+  expAttack: "主动攻击一次+暴露", expKillPillbox: "拔炮楼+暴露", expSabotage: "破袭铁路+暴露", expPatrolSpot: "巡逻队侦知你的村庄+暴露",
+  sweepThreshold: "暴露≥此值→日军开始集结扫荡", pitySweepGap: "距上次扫荡>N回合且暴露≥30→强制集结(反苟)", sweepTelegraph: "集结后N回合出兵(备战预警窗口)",
+  sweepBase: "扫荡兵力预算基数", sweepPerTurn: "扫荡预算随回合增长的系数", sweepExpFactor: "暴露系数=0.6+暴露/此值",
+  sweepCooldown: "扫荡后N回合内不再集结(喘息期)", sweepTTL: "扫荡部队N回合后撤回", sweepMaxUnits: "单次扫荡最多纵队数",
+  pillageGrain: "敌军驻村每回合掠粮", pillageHeart: "敌军驻村每回合毁民心", pillageBuildingChance: "敌军驻村每回合摧毁一处建筑的概率", tunnelDamageMult: "地道村受掠夺/民心损失倍率(减半)",
+  bigSweepTurn: "五一大扫荡固定触发回合(1942年5月)", bigSweepMult: "大扫荡兵力倍率", sweepWinKillRatio: "歼灭≥此比例扫荡兵力=反扫荡大捷(全村+民心)",
+  dmgBase: "战斗基础伤害", dmgExpDiv: "伤害公式 e^((攻-守)/此值) 的除数", counterMult: "反击伤害系数", hpScaleFloor: "战力随HP衰减的下限",
+  tunnelDef: "地道村防御加成", ambushBonus: "从山地/森林发起攻击的战力加成", lootArmsRatio: "歼敌缴获军火=敌战力×此值",
+  healVillage: "在己方村内每回合回血", healTerritory: "在根据地范围内每回合回血", starveHpLoss: "断粮时全军每回合掉血", starveHeartLoss: "断粮时全村每回合掉民心",
+  pillboxHP: "炮楼耐久", pillboxStr: "炮楼火力", townHP: "县城耐久", townStr: "县城守军火力", siteHP: "修建中炮楼(工地)耐久", siteStr: "工地火力", siteTurns: "炮楼修建所需回合",
+  lootPillboxArms: "拔炮楼缴获军火", lootPillboxGrain: "拔炮楼缴获粮", patrolEvery: "每隔N回合派一支巡逻队", patrolTTL: "巡逻队N回合后撤回",
+  sabotageArms: "破袭铁路缴获军火", sabotageGrain: "破袭铁路缴获粮", mineCostArms: "埋地雷消耗军火", mineDamage: "地雷伤害",
+  restHeal: "原地休整每回合额外回血", railRepair: "铁路被破坏后N回合修复", sabotageSweepReduce: "每处断轨削减扫荡预算的比例(下限60%)",
+};
+function dbgTip(el, ev) {
+  if (ev) ev.stopPropagation();
+  const tip = $("dbgTip"), k = el.dataset.k;
+  tip.innerHTML = "<b style='color:#f0d488'>" + k + "</b><br>" + (CFG_DESC[k] || "(暂无说明)");
+  tip.classList.add("show");
+  const r = el.getBoundingClientRect(), tw = tip.offsetWidth;
+  let left = r.left - tw - 10; if (left < 6) left = r.right + 10; if (left + tw > innerWidth - 6) left = innerWidth - tw - 6;
+  tip.style.left = Math.max(6, left) + "px"; tip.style.top = Math.min(r.top, innerHeight - tip.offsetHeight - 6) + "px";
+}
+addEventListener("click", e => { const t = $("dbgTip"); if (t.classList.contains("show") && !e.target.classList.contains("dbgk")) t.classList.remove("show"); });
 function dsec(title, inner, open) { return `<div class="dsec"><div class="dhead" onclick="toggleDsec(this)">${open ? "▼" : "▶"} ${title}</div><div class="dbody"${open ? "" : " style='display:none'"}>${inner}</div></div>`; }
 function toggleDsec(el) { const body = el.nextElementSibling, open = body.style.display !== "none"; body.style.display = open ? "none" : "block"; el.textContent = (open ? "▶ " : "▼ ") + el.textContent.slice(2); }
 function buildDebugPanel() {
   let dbgInner = `<button class="dbtn" onclick="revealAllMap()">🗺 一键开全地图</button><div class="note">↓ 所有数值参数(改后即时生效; 需重开局的下局生效)</div>`;
-  for (const k in CFG) if (typeof CFG[k] === "number") dbgInner += `<div class="dr"><label title="${k}">${k}</label><input type="number" step="any" value="${CFG[k]}" oninput="dbgCfg(this,'${k}')"></div>`;
+  for (const k in CFG) if (typeof CFG[k] === "number") dbgInner += `<div class="dr"><label class="dbgk" data-k="${k}" title="${CFG_DESC[k] || k}" onclick="dbgTip(this,event)">${k}</label><input type="number" step="any" value="${CFG[k]}" oninput="dbgCfg(this,'${k}')"></div>`;
   let env = "<div class='note'>需在 3D 模式下调整</div>";
   env += dbgSl("大气·rayleigh", 0, 6, 0.1, 2.6, "sky", "rayleigh") + dbgSl("大气·turbidity", 0, 20, 0.5, 8, "sky", "turbidity");
   env += dbgSl("大气·mie", 0, 0.05, 0.001, 0.005, "sky", "mie") + dbgSl("大气·mieG", 0, 1, 0.01, 0.85, "sky", "mieG");
