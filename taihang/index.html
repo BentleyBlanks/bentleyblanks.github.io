@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>太行·1941 — 敌后战场 4X</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body { background: #131008; color: #d8c9a0; font-family: system-ui, "Noto Sans SC", sans-serif; font-size: 14px; user-select: none; }
+button { font-family: inherit; cursor: pointer; }
+.hidden { display: none !important; }
+
+#cv { position: absolute; inset: 0; display: block; touch-action: none; }
+
+/* ── 顶栏 ── */
+#topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 12px; background: rgba(22,18,10,.92); border-bottom: 1px solid #3a3826; font-size: 13px; }
+#topbar .ttl { font-weight: 700; letter-spacing: 2px; color: #f0e4c0; font-size: 14px; }
+#topbar .ttl small { font-weight: 400; color: #8a8058; font-size: 11px; margin-left: 4px; letter-spacing: 0; }
+#topbar .res { white-space: nowrap; }
+#topbar .res b { color: #f0e4c0; }
+#topbar .res.bad b { color: #e2564d; }
+#topbar .res .d { color: #8a8058; font-size: 11px; }
+#expWrap { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+#expBar { position: relative; width: 90px; height: 10px; background: #242014; border: 1px solid #3a3826; border-radius: 5px; overflow: hidden; }
+#expFill { height: 100%; width: 0%; background: #7a8f3a; transition: width .3s, background .3s; }
+#expFill.warn { background: #d8a441; }
+#expFill.hot { background: #e2564d; }
+#expLine { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(240,228,192,.6); }
+.tbtn { background: #2a2516; border: 1px solid #4a452c; color: #d8c9a0; border-radius: 5px; padding: 4px 10px; font-size: 12px; }
+.tbtn:hover { background: #3a3320; }
+.tbtn.glow { border-color: #d8a441; color: #f0d488; box-shadow: 0 0 6px rgba(216,164,65,.35); }
+
+/* ── 扫荡横幅 ── */
+#sweepBanner { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 9; background: rgba(90,20,16,.92); border: 1px solid #a04338; color: #f0d0c0; border-radius: 6px; padding: 5px 14px; font-size: 13px; letter-spacing: 1px; pointer-events: none; }
+#sweepBanner.telegraph { background: rgba(96,72,16,.92); border-color: #a08338; color: #f0e0b0; }
+
+/* ── 侧面板 ── */
+#sidePanel { position: absolute; top: 56px; right: 8px; z-index: 10; width: 250px; max-height: calc(100% - 130px); overflow-y: auto; background: rgba(24,20,11,.95); border: 1px solid #3a3826; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+#sidePanel h3 { font-size: 14px; color: #f0e4c0; margin-bottom: 4px; letter-spacing: 1px; }
+#sidePanel h3 small { color: #8a8058; font-size: 11px; font-weight: 400; margin-left: 5px; }
+#sidePanel .row { margin: 3px 0; color: #b9ab84; }
+#sidePanel .row b { color: #e8dcb8; }
+#sidePanel .hint { color: #8a8058; font-size: 12px; margin: 4px 0; line-height: 1.5; }
+#sidePanel .warn { color: #d8a441; font-size: 12px; margin: 4px 0; }
+#sidePanel .bad { color: #e2564d; font-size: 12px; margin: 4px 0; }
+#sidePanel hr { border: none; border-top: 1px solid #3a3826; margin: 7px 0; }
+.abtn { display: block; width: 100%; text-align: left; margin: 4px 0; background: #2a2516; border: 1px solid #4a452c; color: #d8c9a0; border-radius: 5px; padding: 6px 9px; font-size: 12.5px; line-height: 1.4; }
+.abtn:hover:not(:disabled) { background: #3a3320; border-color: #6a5f38; }
+.abtn:disabled { opacity: .42; cursor: default; }
+.abtn .cost { color: #d8a441; }
+.abtn .sub { color: #8a8058; font-size: 11px; display: block; }
+.abtn.danger { border-color: #6a3830; }
+.abtn.danger:hover:not(:disabled) { background: #4a2018; }
+.heartbar { height: 8px; background: #242014; border: 1px solid #3a3826; border-radius: 4px; overflow: hidden; margin: 3px 0; }
+.heartfill { height: 100%; background: #b8563a; transition: width .3s; }
+.heartfill.ok { background: #7a8f3a; }
+
+/* ── 日志 ── */
+#logBox { position: absolute; left: 8px; bottom: 8px; z-index: 8; width: min(360px, 60vw); max-height: 138px; overflow-y: auto; background: rgba(20,16,9,.88); border: 1px solid #33301e; border-radius: 7px; padding: 6px 10px; font-size: 12px; line-height: 1.55; pointer-events: auto; }
+#logBox p { color: #a99b74; }
+#logBox p.hl { color: #e8dcb8; }
+#logBox p.good { color: #9fbc52; }
+#logBox p.bad { color: #e2685c; }
+#logBox p.jp { color: #d8a441; }
+#logBox p .t { color: #6a6248; margin-right: 5px; }
+
+/* ── 结束回合 ── */
+#endTurnBtn { position: absolute; right: 12px; bottom: 12px; z-index: 10; background: #6a1f18; border: 1px solid #a04338; color: #f0d8c0; font-size: 15px; letter-spacing: 3px; border-radius: 8px; padding: 12px 22px; }
+#endTurnBtn:hover { background: #7d281f; }
+#endTurnBtn:disabled { opacity: .5; cursor: default; }
+#endTurnBtn.pulse { animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 rgba(216,164,65,0); } 50% { box-shadow: 0 0 12px rgba(216,164,65,.55); } }
+
+/* ── 弹窗 ── */
+#modalWrap { position: absolute; inset: 0; z-index: 30; background: rgba(8,6,3,.78); display: flex; align-items: center; justify-content: center; padding: 16px; }
+#modalBox { background: #1c1810; border: 1px solid #4a452c; border-radius: 10px; max-width: 860px; width: 100%; max-height: 92vh; overflow-y: auto; padding: 18px 22px; }
+#modalBox h2 { color: #f0e4c0; font-size: 18px; letter-spacing: 3px; margin-bottom: 10px; }
+#modalBox h2 small { color: #8a8058; font-size: 12px; letter-spacing: 0; margin-left: 8px; }
+#modalBox p { color: #b9ab84; line-height: 1.7; margin: 6px 0; font-size: 13.5px; }
+#modalBox p b { color: #e8dcb8; }
+#modalBox .mbtns { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+.mbtn { background: #6a1f18; border: 1px solid #a04338; color: #f0d8c0; font-size: 14px; letter-spacing: 2px; border-radius: 7px; padding: 9px 20px; }
+.mbtn:hover { background: #7d281f; }
+.mbtn.ghost { background: #2a2516; border-color: #4a452c; color: #d8c9a0; }
+.mbtn.ghost:hover { background: #3a3320; }
+
+/* 科技树 */
+.techTiers { display: flex; gap: 10px; overflow-x: auto; padding: 4px 0; }
+.techTier { flex: 1; min-width: 170px; }
+.techTier h4 { color: #8a8058; font-size: 12px; margin-bottom: 6px; letter-spacing: 1px; }
+.techCard { background: #242014; border: 1px solid #3a3826; border-radius: 7px; padding: 8px 10px; margin-bottom: 8px; font-size: 12.5px; }
+.techCard b { color: #e8dcb8; font-size: 13px; }
+.techCard .desc { color: #9a8d68; line-height: 1.5; margin: 3px 0; }
+.techCard .cost { color: #d8a441; }
+.techCard .lock { color: #7a6c4a; font-size: 11.5px; }
+.techCard.done { border-color: #5a7a30; background: #232a14; }
+.techCard.done b { color: #9fbc52; }
+.techCard button { margin-top: 5px; width: 100%; background: #2a2516; border: 1px solid #6a5f38; color: #e8dcb8; border-radius: 5px; padding: 5px; font-size: 12px; }
+.techCard button:hover:not(:disabled) { background: #3a3320; }
+.techCard button:disabled { opacity: .4; cursor: default; }
+
+.klist { margin: 6px 0 6px 4px; }
+.klist li { color: #b9ab84; line-height: 1.75; margin-left: 18px; font-size: 13.5px; }
+.klist b { color: #e8dcb8; }
+.klist .x { color: #d8a441; font-weight: 700; }
+
+@media (max-width: 640px) {
+  #sidePanel { width: 210px; font-size: 12px; }
+  #topbar { gap: 8px; font-size: 12px; padding: 4px 8px; }
+  #logBox { max-height: 96px; width: 55vw; }
+  #endTurnBtn { padding: 10px 16px; font-size: 14px; }
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="topbar">
+  <span class="ttl">太行·1941<small>敌后 4X</small></span>
+  <span class="res" id="uiDate"></span>
+  <span class="res" id="uiGrain"></span>
+  <span class="res" id="uiMan"></span>
+  <span class="res" id="uiArms"></span>
+  <span class="res" id="uiOrg"></span>
+  <span id="expWrap">暴露 <span id="expBar"><span id="expFill"></span><span id="expLine"></span></span> <span id="expVal"></span></span>
+  <button class="tbtn" id="techBtn">整训 [T]</button>
+  <button class="tbtn" id="helpBtn">规则 [H]</button>
+</div>
+
+<div id="sweepBanner" class="hidden"></div>
+<div id="sidePanel" class="hidden"></div>
+<div id="logBox"></div>
+<button id="endTurnBtn">结束回合</button>
+<div id="modalWrap" class="hidden"><div id="modalBox"></div></div>
+
+<script>
+"use strict";
+// ═══════════════════════════════════════════════════════════════════
+// 《太行·1941》—— 敌后战场 4X(探索/扩张/开发/歼灭)。全部数值集中在 CFG。
+// 每回合=1个月, 1941.1 → 1945.8 共56回合, 目标游戏时长≈1小时。
+// ═══════════════════════════════════════════════════════════════════
+const CFG = {
+  // ── 回合与胜负 ──
+  totalTurns: 56,          // 1941年1月—1945年8月
+  startYear: 1941,
+  survivalWinVillages: 5,  // 坚持到日本投降时≥N村=胜利(<N为惨胜)
+  greatWinVillages: 8,     // ≥N村=大胜
+
+  // ── 地图 ──
+  mapW: 24, mapH: 16,
+  hexSize: 36,
+  villageCount: 16,        // 总村庄数(含根据地)
+  villageMinGap: 2,        // 村庄间最小距离
+
+  // ── 起始 ──
+  startGrain: 60, startMan: 20, startArms: 12, startOrg: 20,
+  startHQHeart: 85,
+
+  // ── 资源上限 ──
+  grainCap: 300, grainCapPerBarn: 120,
+  manCap: 100, armsCap: 150,
+
+  // ── 村庄产出(按地形: 粮/兵源/组织) ──
+  yields: { plain: [8, 3, 1], hills: [6, 2, 1], forest: [5, 2, 1], mountain: [4, 2, 1] },
+  hqBonus: [2, 0, 2],      // 总部村额外产出
+  heartFullProd: 60,       // 民心≥此值产出100%; ≥30产75%; 再低50%
+
+  // ── 民心与扩张 ──
+  joinThreshold: 70,       // 民心≥此值且未被据点压制→挂红旗并入
+  workteamHeart: 8,        // 工作队驻村+民心/回合(减租减息+4)
+  ownedHeartRegen: 1,      // 己方村民心自然回升/回合(减租减息+1)
+  neutralDrift: 25,        // 无人工作的中立村民心向此值回落
+  neutralHeartStart: [15, 35], // 中立村初始民心区间
+  suppressDist: 2,         // 据点压制半径: 距炮楼/县城≤2的村
+  suppressCap: 55,         // 被压制村民心上限(<并入线→must拔据点)
+  revertHeart: 15,         // 己方村民心<此值→退回中立(扫荡摧残的结果)
+  joinExposure: 6,         // 并入一村+暴露
+
+  // ── 暴露度(灵魂: 发展=暴露) ──
+  expPerVillage: 0.7,      // 每己方村(除总部)+暴露/回合
+  expPerArsenal: 1.0,      // 每兵工坊+暴露/回合
+  expDecay: 1.6,           // 基础衰减/回合
+  expAttack: 5,            // 主动攻击+暴露
+  expKillPillbox: 12,      // 拔掉炮楼+暴露
+  expSabotage: 8,          // 破袭铁路+暴露
+  expPatrolSpot: 4,        // 巡逻队侦知村庄+暴露
+  sweepThreshold: 55,      // 暴露≥此值→日军开始集结
+  pitySweepGap: 15,        // 距上次扫荡>N回合且暴露≥30→强制集结(不许纯苟)
+  sweepTelegraph: 3,       // 集结N回合后出兵(备战窗口)
+
+  // ── 扫荡 ──
+  sweepBase: 38, sweepPerTurn: 1.4,       // 预算=(base+turn*perTurn)*时代系数*暴露系数
+  sweepExpFactor: 150,                    // 暴露系数=0.6+exposure/此值
+  sweepCooldown: 4,        // 扫荡结束后N回合内不再集结(喘息重建窗口)
+  sweepTTL: 8,             // 扫荡部队N回合后撤回
+  sweepMaxUnits: 7,        // 单次扫荡纵队数上限
+  pillageGrain: 18,        // 敌军驻村掠粮/回合
+  pillageHeart: 12,        // 敌军驻村毁民心/回合
+  pillageBuildingChance: 0.35, // 敌军驻村每回合摧毁建筑概率
+  tunnelDamageMult: 0.5,   // 地道村受掠夺/民心损失减半
+  bigSweepTurn: 17,        // 「五一大扫荡」剧本回合(1942年5月)
+  bigSweepMult: 1.5,
+  sweepWinKillRatio: 0.6,  // 歼灭≥60%扫荡兵力=反扫荡大捷(全村民心+5)
+
+  // ── 战斗 ──
+  dmgBase: 26, dmgExpDiv: 11,   // 伤害=base*e^((攻-守)/div)*随机
+  counterMult: 0.75,            // 反击伤害系数
+  hpScaleFloor: 0.55,           // 战力随HP衰减下限
+  terrainDef: { mountain: 6, forest: 4, hills: 3, plain: 0 },
+  tunnelDef: 8,            // 地道村防御加成
+  ambushBonus: 3,          // 从山地/森林发起攻击+战力
+  lootArmsRatio: 0.5,      // 歼敌缴获军火=敌战力*此值
+  healVillage: 12, healTerritory: 4,  // 驻己方村/根据地范围内回血
+
+  // ── 单位死粮 ──
+  starveHpLoss: 10, starveHeartLoss: 3,  // 断粮: 全军掉血+全村掉民心
+
+  // ── 敌军设施 ──
+  pillboxHP: 150, pillboxStr: 20,
+  townHP: 260, townStr: 34,
+  siteHP: 60, siteStr: 6, siteTurns: 4,  // 囚笼: 修建中的炮楼
+  cagePolicy: [12, 24, 36, 46],          // 这些回合日军尝试修新炮楼
+  lootPillboxArms: 15, lootPillboxGrain: 20,
+  patrolEvery: 4, patrolTTL: 8,          // 巡逻队
+
+  // ── 破袭 ──
+  railRepair: 8,           // 铁路破坏N回合后修复
+  sabotageArms: 12, sabotageGrain: 20,
+  sabotageSweepReduce: 0.06, // 每处断轨扫荡预算-6%(下限60%)
+
+  // ── 地雷 ──
+  mineCostArms: 4, mineDamage: 42,
+};
+
+// ── 时代强度曲线: 1941-43扫荡愈演愈烈, 1944后日军抽兵南洋渐衰 ──
+function eraMult(t) {
+  if (t <= 12) return 0.8;        // 1941: 试探
+  if (t <= 24) return 1.05;       // 1942: 最残酷的一年
+  if (t <= 36) return 1.25;       // 1943: 高压顶点
+  if (t <= 48) return 1.0;        // 1944: 相持
+  return 0.8;                     // 1945: 强弩之末
+}
+function eraName(t) {
+  if (t <= 12) return "囚笼初现"; if (t <= 24) return "至暗时刻";
+  if (t <= 36) return "咬牙坚持"; if (t <= 48) return "局部反攻"; return "最后胜利";
+}
+
+// ── 单位表 ──
+const UT = {
+  scout:    { name: "侦察员", glyph: "侦", side: "p", layer: "mil", str: 4,  mp: 3, vis: 3, cost: { grain: 10, man: 5 },  upkeep: 0, desc: "视野3, 探索地图。战力孱弱, 别拿去拼命。" },
+  work:     { name: "工作队", glyph: "工", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 5, org: 10 }, upkeep: 0, desc: "驻在中立村自动发动群众(+民心/回合)。无武装, 落单被抓就没了。" },
+  militia:  { name: "民兵队", glyph: "民", side: "p", layer: "mil", str: 9,  mp: 2, vis: 2, cost: { grain: 15, man: 10, arms: 5 }, upkeep: 1, desc: "便宜耐用。可埋地雷(需地雷战)。" },
+  regular:  { name: "主力连", glyph: "连", side: "p", layer: "mil", str: 16, mp: 2, vis: 2, cost: { grain: 25, man: 20, arms: 15 }, upkeep: 2, desc: "野战中坚, 拔炮楼主力。" },
+  elite:    { name: "主力团", glyph: "团", side: "p", layer: "mil", str: 26, mp: 2, vis: 2, cost: { grain: 40, man: 35, arms: 30 }, upkeep: 3, needTech: "zhenggui", desc: "正规化整训后的重拳, 反攻县城的本钱。" },
+  commando: { name: "武工队", glyph: "武", side: "p", layer: "mil", str: 11, mp: 3, vis: 2, cost: { grain: 20, man: 10, arms: 10, org: 10 }, upkeep: 1, hidden: true, needTech: "poxi", desc: "昼伏夜出, 日军无法主动攻击它。破袭铁路的行家。" },
+  puppet:   { name: "伪军小队", glyph: "伪", side: "j", layer: "mil", str: 8,  mp: 2, vis: 2, upkeep: 0 },
+  squad:    { name: "日军小队", glyph: "日", side: "j", layer: "mil", str: 14, mp: 2, vis: 2, upkeep: 0 },
+  company:  { name: "日军中队", glyph: "中", side: "j", layer: "mil", str: 22, mp: 2, vis: 2, upkeep: 0 },
+  armored:  { name: "装甲巡逻", glyph: "装", side: "j", layer: "mil", str: 26, mp: 3, vis: 2, upkeep: 0, roadOnly: true },
+};
+
+// ── 建筑表 ──
+const BUILDINGS = {
+  kaiken:   { name: "开垦地",  cost: { grain: 20 }, turns: 2, desc: "+4粮/回合" },
+  yexiao:   { name: "冬学夜校", cost: { grain: 25 }, turns: 2, desc: "+2组织/回合" },
+  liangcang:{ name: "藏粮洞",  cost: { grain: 25 }, turns: 2, desc: "粮上限+120, 被掠夺减60%" },
+  didao:    { name: "地道网",  cost: { grain: 30 }, turns: 3, needTech: "didao", desc: "驻军防御+8, 扫荡损失减半" },
+  arsenal:  { name: "兵工坊",  cost: { grain: 40 }, turns: 3, needTech: "binggong", desc: "+2军火/回合, 但+1暴露/回合" },
+};
+const BUILDING_YIELD = { kaiken: [4, 0, 0], yexiao: [0, 0, 2], liangcang: [0, 0, 0], didao: [0, 0, 0], arsenal: [0, 0, 0] };
+
+// ── 整训树(4阶, 组织力即买即得) ──
+const TECHS = {
+  jianzu:   { tier: 1, name: "减租减息", cost: 30, desc: "工作队+4民心/回合; 己方村民心回升翻倍" },
+  maque:    { tier: 1, name: "麻雀战",   cost: 30, desc: "民兵在山地/森林战力+4" },
+  zhencha:  { tier: 1, name: "侦察网",   cost: 30, desc: "全体视野+1; 可预知扫荡目标与规模" },
+  dilei:    { tier: 2, name: "地雷战",   cost: 60, desc: "解锁【埋地雷】: 4军火布雷, 踩中-42HP" },
+  didao:    { tier: 2, name: "地道战",   cost: 60, desc: "解锁建筑【地道网】" },
+  binggong: { tier: 2, name: "兵工生产", cost: 60, desc: "解锁建筑【兵工坊】" },
+  tongzhan: { tier: 2, name: "统一战线", cost: 60, desc: "伪军战力-3(策反瓦解); 中立村初始民心+10" },
+  poxi:     { tier: 3, name: "破袭战",   cost: 100, desc: "解锁【武工队】与【破袭铁路】: 缴获+削弱扫荡" },
+  zhenggui: { tier: 3, name: "正规化整训", cost: 100, desc: "解锁【主力团】; 主力连/团战力+2" },
+  diwork:   { tier: 3, name: "敌工科",   cost: 100, desc: "看穿敌军战力详情; 暴露衰减+1/回合" },
+  fangong:  { tier: 4, name: "战略反攻", cost: 150, need: ["zhenggui", "poxi"], desc: "全军战力+2; 解锁攻击县城→军事胜利" },
+};
+function tierUnlocked(tier) {
+  if (tier === 1) return true;
+  const done = Object.keys(state.techs).filter(k => TECHS[k].tier === tier - 1).length;
+  if (tier === 2) return done >= 1;
+  if (tier === 3) return Object.keys(state.techs).filter(k => TECHS[k].tier === 2).length >= 2;
+  return true; // tier4 用显式 need
+}
+
+// ── 村名池 ──
+const VNAMES = ["李家庄","王家峪","赵家坳","马家沟","石门村","柳树沟","黑石崖","桃花寨","大杨庄","南坡村","北岭村","河口镇","东塬村","西沟村","孙家铺","青石口","枣林坪","白草洼","麻田镇","苇子峪"];
+const TOWN_NAME = "云阳县城";
+
+// ═══════════════════════════ 工具 ═══════════════════════════
+let rng = Math.random;
+function mulberry32(a) { return function() { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const ri = (a, b) => a + Math.floor(rng() * (b - a + 1));
+const pick = arr => arr[Math.floor(rng() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const key = (q, r) => q + "," + r;
+
+const W = CFG.mapW, H = CFG.mapH;
+const SQRT3 = Math.sqrt(3);
+function inb(q, r) { return q >= 0 && q < W && r >= 0 && r < H; }
+// flat-top 六边形, odd-q 偏移(奇数列下沉)
+function nbrs(q, r) {
+  const d = (q & 1) ? [[1,0],[1,1],[0,-1],[0,1],[-1,0],[-1,1]] : [[1,-1],[1,0],[0,-1],[0,1],[-1,-1],[-1,0]];
+  const out = [];
+  for (const [dq, dr] of d) { const nq = q + dq, nr = r + dr; if (inb(nq, nr)) out.push([nq, nr]); }
+  return out;
+}
+function hexDist(q1, r1, q2, r2) {
+  const x1 = q1, z1 = r1 - ((q1 - (q1 & 1)) >> 1), y1 = -x1 - z1;
+  const x2 = q2, z2 = r2 - ((q2 - (q2 & 1)) >> 1), y2 = -x2 - z2;
+  return (Math.abs(x1 - x2) + Math.abs(y1 - y2) + Math.abs(z1 - z2)) / 2;
+}
+function hexCenter(q, r) {
+  const s = CFG.hexSize;
+  return [1.5 * s * q + s, SQRT3 * s * (r + 0.5 * (q & 1)) + s];
+}
+function dateStr(t) {
+  const m = (t - 1) % 12 + 1, y = CFG.startYear + Math.floor((t - 1) / 12);
+  return y + "年" + m + "月";
+}
+
+// ═══════════════════════════ 地图生成 ═══════════════════════════
+// 西部太行山区(隐蔽穷) → 中部丘陵 → 东部平原(富庶危险), 东侧纵贯铁路+据点链
+function genMap() {
+  const tiles = [];
+  for (let q = 0; q < W; q++) {
+    tiles[q] = [];
+    for (let r = 0; r < H; r++) {
+      let terrain;
+      const x = q + (rng() - 0.5) * 2.2; // 列向噪声, 让分界线不是直线
+      if (x < 7) terrain = pick(["mountain","mountain","mountain","mountain","forest","forest","forest","hills","hills","plain"]);
+      else if (x < 13) terrain = pick(["hills","hills","hills","forest","forest","plain","plain","plain","mountain"]);
+      else terrain = pick(["plain","plain","plain","plain","plain","plain","hills","forest","plain","plain"]);
+      tiles[q][r] = { q, r, terrain, rail: false, railBroken: 0, village: null, sh: null, mine: false, disc: false };
+    }
+  }
+  // ── 铁路: 从北到南, 在 q≈19 附近蜿蜒 ──
+  let rq = 19;
+  const railTiles = [];
+  for (let r = 0; r < H; r++) {
+    if (r > 0 && rng() < 0.3) rq = clamp(rq + (rng() < 0.5 ? -1 : 1), 17, 21);
+    tiles[rq][r].rail = true; tiles[rq][r].terrain = "plain";
+    railTiles.push([rq, r]);
+  }
+  // ── 县城: 铁路中段 ──
+  const [tq, tr] = railTiles[Math.floor(H / 2)];
+  tiles[tq][tr].sh = { kind: "town", name: TOWN_NAME, hp: CFG.townHP, maxHp: CFG.townHP, str: CFG.townStr };
+  // ── 炮楼: 沿铁路每3-4格一个 + 2个丘陵封锁点 ──
+  let pbId = 1;
+  const putPillbox = (q, r) => {
+    if (tiles[q][r].sh || tiles[q][r].village) return false;
+    tiles[q][r].sh = { kind: "pillbox", name: "炮楼·" + ["甲","乙","丙","丁","戊","己","庚","辛","壬"][(pbId - 1) % 9] + "号", hp: CFG.pillboxHP, maxHp: CFG.pillboxHP, str: CFG.pillboxStr };
+    pbId++; return true;
+  };
+  for (let i = 1; i < railTiles.length; i += 3) {
+    const [q, r] = railTiles[i];
+    if (hexDist(q, r, tq, tr) >= 2) putPillbox(q, r);
+  }
+  // 封锁线炮楼(伸进丘陵, 压制中部村庄)
+  let placed = 0, guard = 0;
+  while (placed < 2 && guard++ < 200) {
+    const q = ri(11, 13), r = ri(2, H - 3);
+    if (tiles[q][r].terrain !== "mountain" && !tiles[q][r].sh && !tiles[q][r].rail) { if (putPillbox(q, r)) placed++; }
+  }
+  // ── 村庄 ──
+  const villages = [];
+  const zones = [ // [minQ,maxQ,数量]
+    [1, 7, 5],    // 山区
+    [8, 13, 5],   // 丘陵
+    [14, 22, 6],  // 平原
+  ];
+  const names = VNAMES.slice(); // 顺序取名
+  let ni = 0;
+  for (const [minQ, maxQ, count] of zones) {
+    let got = 0, g2 = 0;
+    while (got < count && g2++ < 800) {
+      const q = ri(minQ, maxQ), r = ri(1, H - 2);
+      const t = tiles[q][r];
+      if (t.rail || t.sh) continue;
+      if (t.sh) continue;
+      let ok = true;
+      for (const v of villages) if (hexDist(q, r, v.q, v.r) < CFG.villageMinGap) { ok = false; break; }
+      for (let qq = 0; qq < W && ok; qq++) for (let rr = 0; rr < H && ok; rr++) {
+        if (tiles[qq][rr].sh && hexDist(q, r, qq, rr) < 2) ok = false;
+      }
+      if (!ok) continue;
+      t.village = { name: names[ni++ % names.length], owner: "n", heart: ri(CFG.neutralHeartStart[0], CFG.neutralHeartStart[1]), buildings: [], build: null, hq: false };
+      villages.push({ q, r });
+      got++;
+    }
+  }
+  // ── 总部: 最靠西的山区村 ──
+  let hq = null, best = 1e9;
+  for (const v of villages) {
+    const t = tiles[v.q][v.r];
+    const score = v.q * 10 + Math.abs(v.r - H / 2) + (t.terrain === "mountain" ? -15 : 0);
+    if (score < best) { best = score; hq = v; }
+  }
+  const hqT = tiles[hq.q][hq.r];
+  hqT.village.owner = "p"; hqT.village.heart = CFG.startHQHeart; hqT.village.hq = true;
+  hqT.village.name = "王家峪(总部)";
+  return { tiles, hq };
+}
+
+// ═══════════════════════════════ 状态 ═══════════════════════════════
+let state = null;
+
+function spawnUnit(type, q, r, extra) {
+  // 军事单位一格一个(同层同边), 找最近空位
+  const layer = UT[type].layer;
+  const side = UT[type].side;
+  let sq = q, sr = r;
+  if (unitAt(q, r, side, layer)) {
+    let found = null;
+    const seen = new Set([key(q, r)]);
+    const queue = [[q, r]];
+    while (queue.length && !found) {
+      const [cq, cr] = queue.shift();
+      for (const [nq, nr] of nbrs(cq, cr)) {
+        if (seen.has(key(nq, nr))) continue;
+        seen.add(key(nq, nr));
+        const t = state.tiles[nq][nr];
+        if (t.sh) continue;
+        if (!unitAt(nq, nr, side, layer) && !unitAt(nq, nr, side === "p" ? "j" : "p", "mil")) { found = [nq, nr]; break; }
+        queue.push([nq, nr]);
+      }
+    }
+    if (!found) return null;
+    [sq, sr] = found;
+  }
+  const u = { id: state.nextUid++, type, q: sq, r: sr, hp: 100, mp: UT[type].mp, attacked: false, side, layer, ...extra };
+  state.units.push(u);
+  if (side === "p") revealArea(sq, sr, unitVis(u));
+  return u;
+}
+function unitAt(q, r, side, layer) {
+  return state.units.find(u => u.q === q && u.r === r && u.side === side && (!layer || u.layer === layer));
+}
+function anyEnemyMilAt(q, r, mySide) {
+  return state.units.find(u => u.q === q && u.r === r && u.side !== mySide && u.layer === "mil" && !(u.type === "commando" && mySide === "j"));
+}
+function removeUnit(u) { state.units = state.units.filter(x => x.id !== u.id); }
+function unitVis(u) { return UT[u.type].vis + (state.techs.zhencha ? 1 : 0); }
+
+// ── 视野与迷雾 ──
+function revealArea(q, r, radius) {
+  for (let qq = 0; qq < W; qq++) for (let rr = 0; rr < H; rr++)
+    if (hexDist(q, r, qq, rr) <= radius) state.tiles[qq][rr].disc = true;
+}
+let visSet = new Set();
+function computeVis() {
+  visSet = new Set();
+  const add = (q, r, rad) => {
+    for (let qq = Math.max(0, q - rad - 1); qq <= Math.min(W - 1, q + rad + 1); qq++)
+      for (let rr = Math.max(0, r - rad - 1); rr <= Math.min(H - 1, r + rad + 1); rr++)
+        if (hexDist(q, r, qq, rr) <= rad) visSet.add(key(qq, rr));
+  };
+  for (const u of state.units) if (u.side === "p") add(u.q, u.r, unitVis(u));
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const v = state.tiles[q][r].village;
+    if (v && v.owner === "p") add(q, r, 2 + (state.techs.zhencha ? 1 : 0));
+  }
+}
+
+// ── 移动 ──
+function moveCost(unit, t) {
+  if (UT[unit.type].roadOnly) return (t.rail || t.terrain === "plain") ? 1 : 99;
+  if (t.terrain === "forest" || t.terrain === "mountain") return unit.side === "j" && t.terrain === "mountain" ? 3 : 2;
+  return 1;
+}
+function reachable(u) {
+  // Dijkstra, 返回 Map key->{cost, from}
+  const out = new Map();
+  out.set(key(u.q, u.r), { cost: 0, from: null });
+  const pq = [[0, u.q, u.r]];
+  while (pq.length) {
+    pq.sort((a, b) => a[0] - b[0]);
+    const [c, q, r] = pq.shift();
+    if (c > (out.get(key(q, r))?.cost ?? 1e9)) continue;
+    for (const [nq, nr] of nbrs(q, r)) {
+      const t = state.tiles[nq][nr];
+      if (!t.disc && u.side === "p") continue;
+      if (t.sh) continue; // 敌军设施格不可进(只能攻击)
+      if (anyEnemyMilAt(nq, nr, u.side)) continue;
+      if (unitAt(nq, nr, u.side, u.layer)) continue; // 同层己方占位: 不可停(也不穿行, 简化)
+      const sc = moveCost(u, t);
+      if (sc >= 99) continue;
+      if (c >= u.mp) continue; // 还有移动力就能再走一步(文明式规则)
+      const nc = Math.min(c + sc, u.mp);
+      if (nc < (out.get(key(nq, nr))?.cost ?? 1e9)) { out.set(key(nq, nr), { cost: nc, from: key(q, r) }); pq.push([nc, nq, nr]); }
+    }
+  }
+  out.delete(key(u.q, u.r));
+  return out;
+}
+function doMove(u, q, r, cost) {
+  u.q = q; u.r = r; u.mp -= cost;
+  if (u.side === "p") { revealArea(q, r, unitVis(u)); }
+  // 敌军踩雷
+  const t = state.tiles[q][r];
+  if (u.side === "j" && t.mine) {
+    t.mine = false;
+    u.hp -= CFG.mineDamage;
+    log("地雷战显神威! " + UT[u.type].name + "在" + tileName(q, r) + "踩响地雷 -" + CFG.mineDamage, "good");
+    if (u.hp <= 0) { killUnit(u, "p"); }
+  }
+  // 敌军抓落单工作队
+  if (u.side === "j" && u.hp > 0) {
+    const civ = unitAt(q, r, "p", "civ");
+    if (civ) { removeUnit(civ); log("工作队在" + tileName(q, r) + "遭敌捕杀!", "bad"); }
+    // 隐蔽单位溜走
+    const cm = state.units.find(x => x.q === q && x.r === r && x.side === "p" && x.type === "commando");
+    if (cm) {
+      const free = nbrs(q, r).filter(([a, b]) => !state.tiles[a][b].sh && !anyEnemyMilAt(a, b, "p") && !unitAt(a, b, "p", "mil"));
+      if (free.length) { const [a, b] = pick(free); cm.q = a; cm.r = b; log("武工队悄然转移, 敌人扑了个空", "hl"); }
+      else { cm.hp -= 30; if (cm.hp <= 0) killUnit(cm, "j"); }
+    }
+  }
+}
+
+// ── 战力与战斗 ──
+function effStr(u, ctx) {
+  const t = state.tiles[u.q][u.r];
+  let s = UT[u.type].str;
+  if (u.side === "p") {
+    if (state.techs.maque && u.type === "militia" && (t.terrain === "mountain" || t.terrain === "forest")) s += 4;
+    if (state.techs.zhenggui && (u.type === "regular" || u.type === "elite")) s += 2;
+    if (state.techs.fangong) s += 2;
+    if (ctx === "atk" && (t.terrain === "mountain" || t.terrain === "forest")) s += CFG.ambushBonus;
+  } else {
+    if (state.techs.tongzhan && u.type === "puppet") s = Math.max(1, s - 3);
+  }
+  if (ctx === "def") {
+    s += CFG.terrainDef[t.terrain] || 0;
+    const v = t.village;
+    if (v && v.owner === (u.side === "p" ? "p" : "x") && v.buildings.includes("didao")) s += CFG.tunnelDef;
+  }
+  return s * (CFG.hpScaleFloor + (1 - CFG.hpScaleFloor) * u.hp / 100);
+}
+function dmgRoll(atkS, defS) {
+  return Math.round(CFG.dmgBase * Math.exp((atkS - defS) / CFG.dmgExpDiv) * (0.85 + rng() * 0.3));
+}
+function killUnit(u, bySide) {
+  removeUnit(u);
+  if (u.side === "j" && bySide === "p") {
+    const loot = Math.round(UT[u.type].str * CFG.lootArmsRatio);
+    state.arms = Math.min(CFG.armsCap, state.arms + loot);
+    state.stats.kills++;
+    if (u.sweep) state.sweep.killed += UT[u.type].str;
+    log("歼灭" + UT[u.type].name + "! 缴获军火+" + loot, "good");
+  } else if (u.side === "p") {
+    log(UT[u.type].name + "全员牺牲…", "bad");
+  }
+}
+function attackUnit(a, d) {
+  a.attacked = true; a.mp = 0;
+  const as = effStr(a, "atk"), ds = effStr(d, "def");
+  const dmg = dmgRoll(as, ds);
+  d.hp -= dmg;
+  let txt = UT[a.type].name + "袭击" + UT[d.type].name + " -" + dmg;
+  if (d.hp <= 0) { killUnit(d, a.side); log(txt, a.side === "p" ? "good" : "bad"); }
+  else {
+    const back = Math.round(dmgRoll(ds, as) * CFG.counterMult);
+    a.hp -= back;
+    txt += " / 反击 -" + back;
+    log(txt, a.side === "p" ? "hl" : "jp");
+    if (a.hp <= 0) killUnit(a, d.side);
+  }
+}
+function attackStructure(a, q, r) {
+  const t = state.tiles[q][r], sh = t.sh;
+  if (!sh) return;
+  a.attacked = true; a.mp = 0;
+  const as = effStr(a, "atk");
+  const dmg = dmgRoll(as, sh.str * (sh.hp / sh.maxHp * 0.4 + 0.6));
+  sh.hp -= dmg;
+  if (sh.hp <= 0) {
+    if (sh.kind === "pillbox") {
+      t.sh = null;
+      state.arms = Math.min(CFG.armsCap, state.arms + CFG.lootPillboxArms);
+      state.grain = Math.min(grainMax(), state.grain + CFG.lootPillboxGrain);
+      state.exposure = clamp(state.exposure + CFG.expKillPillbox, 0, 100);
+      state.stats.pillboxes++;
+      log("拔掉" + sh.name + "! 缴获军火+" + CFG.lootPillboxArms + " 粮+" + CFG.lootPillboxGrain + " (暴露+" + CFG.expKillPillbox + ")", "good");
+    } else if (sh.kind === "site") {
+      t.sh = null;
+      log("捣毁修建中的炮楼工地!", "good");
+    } else if (sh.kind === "town") {
+      t.sh = null;
+      endGame(true, "military");
+      return;
+    }
+  } else {
+    const back = Math.round(dmgRoll(sh.str, as) * CFG.counterMult);
+    a.hp -= back;
+    log(UT[a.type].name + "强攻" + sh.name + " -" + dmg + " / 守敌反击 -" + back, "hl");
+    if (a.hp <= 0) killUnit(a, "j");
+  }
+  state.exposure = clamp(state.exposure + CFG.expAttack, 0, 100);
+}
+
+// ── 特殊行动 ──
+function actionSabotage(u) {
+  const t = state.tiles[u.q][u.r];
+  if (!t.rail || t.railBroken > 0) return;
+  t.railBroken = CFG.railRepair;
+  u.attacked = true; u.mp = 0;
+  state.arms = Math.min(CFG.armsCap, state.arms + CFG.sabotageArms);
+  state.grain = Math.min(grainMax(), state.grain + CFG.sabotageGrain);
+  state.exposure = clamp(state.exposure + CFG.expSabotage, 0, 100);
+  state.stats.sabotages++;
+  log("破袭铁路成功! 掀翻运输车: 军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + " (暴露+" + CFG.expSabotage + ")", "good");
+}
+function actionMine(u) {
+  const t = state.tiles[u.q][u.r];
+  if (t.mine || state.arms < CFG.mineCostArms) return;
+  state.arms -= CFG.mineCostArms;
+  t.mine = true;
+  u.attacked = true; u.mp = 0;
+  log("民兵在" + tileName(u.q, u.r) + "埋下地雷", "hl");
+}
+
+// ── 村庄 ──
+function tileName(q, r) {
+  const t = state.tiles[q][r];
+  if (t.village) return t.village.name;
+  if (t.sh) return t.sh.name;
+  const TN = { plain: "平原", hills: "丘陵", forest: "林地", mountain: "山地" };
+  return TN[t.terrain] + "(" + q + "," + r + ")";
+}
+function isSuppressed(q, r) {
+  for (let qq = 0; qq < W; qq++) for (let rr = 0; rr < H; rr++) {
+    const sh = state.tiles[qq][rr].sh;
+    if (sh && (sh.kind === "pillbox" || sh.kind === "town") && hexDist(q, r, qq, rr) <= CFG.suppressDist) return true;
+  }
+  return false;
+}
+function ownedVillages() {
+  const out = [];
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const v = state.tiles[q][r].village;
+    if (v && v.owner === "p") out.push({ q, r, v });
+  }
+  return out;
+}
+function grainMax() {
+  let cap = CFG.grainCap;
+  for (const { v } of ownedVillages()) cap += v.buildings.filter(b => b === "liangcang").length * CFG.grainCapPerBarn;
+  return cap;
+}
+function heartMult(h) { return h >= CFG.heartFullProd ? 1 : h >= 30 ? 0.75 : 0.5; }
+function villageYield(q, r, v) {
+  const t = state.tiles[q][r];
+  const base = CFG.yields[t.terrain].slice();
+  if (v.hq) for (let i = 0; i < 3; i++) base[i] += CFG.hqBonus[i];
+  for (const b of v.buildings) { const y = BUILDING_YIELD[b]; for (let i = 0; i < 3; i++) base[i] += y[i]; }
+  const m = heartMult(v.heart);
+  return base.map(x => Math.round(x * m));
+}
+function startBuild(q, r, bk) {
+  const v = state.tiles[q][r].village;
+  const b = BUILDINGS[bk];
+  if (!v || v.owner !== "p" || v.build || v.buildings.includes(bk)) return;
+  if (b.needTech && !state.techs[b.needTech]) return;
+  if (state.grain < b.cost.grain) return;
+  state.grain -= b.cost.grain;
+  v.build = { key: bk, left: b.turns };
+  log(v.name + "开始修建【" + b.name + "】(" + b.turns + "回合)", "hl");
+}
+function recruit(q, r, type) {
+  const ut = UT[type];
+  const c = ut.cost;
+  if ((c.grain || 0) > state.grain || (c.man || 0) > state.man || (c.arms || 0) > state.arms || (c.org || 0) > state.org) return;
+  if (ut.needTech && !state.techs[ut.needTech]) return;
+  const u = spawnUnit(type, q, r);
+  if (!u) { log("周围没有空位安置新队伍", "bad"); return; }
+  state.grain -= c.grain || 0; state.man -= c.man || 0; state.arms -= c.arms || 0; state.org -= c.org || 0;
+  u.mp = 0;
+  log(tileName(q, r) + "组建了" + ut.name, "hl");
+}
+function buyTech(k) {
+  const t = TECHS[k];
+  if (state.techs[k] || state.org < t.cost) return;
+  if (!tierUnlocked(t.tier)) return;
+  if (t.need && !t.need.every(n => state.techs[n])) return;
+  state.org -= t.cost;
+  state.techs[k] = true;
+  if (k === "tongzhan") {
+    for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+      const v = state.tiles[q][r].village;
+      if (v && v.owner === "n") v.heart = clamp(v.heart + 10, 0, 100);
+    }
+  }
+  log("完成整训【" + t.name + "】", "good");
+}
+
+// ═══════════════════════════════ 回合结算 ═══════════════════════════════
+function endTurn() {
+  if (state.over) return;
+  deselect();
+
+  // ── 1. 产出 ──
+  let gGain = 0, mGain = 0, oGain = 0;
+  for (const { q, r, v } of ownedVillages()) {
+    const y = villageYield(q, r, v);
+    gGain += y[0]; mGain += y[1]; oGain += y[2];
+  }
+  // 兵工坊军火
+  let aGain = 0;
+  for (const { v } of ownedVillages()) aGain += v.buildings.filter(b => b === "arsenal").length * 2;
+  // 维护
+  let upkeep = 0;
+  for (const u of state.units) if (u.side === "p") upkeep += UT[u.type].upkeep;
+  state.grain += gGain - upkeep;
+  state.man = Math.min(CFG.manCap, state.man + mGain);
+  state.org += oGain;
+  state.arms = Math.min(CFG.armsCap, state.arms + aGain);
+  state.lastIncome = { g: gGain - upkeep, m: mGain, o: oGain, a: aGain };
+
+  // ── 断粮惩罚 ──
+  if (state.grain < 0) {
+    state.grain = 0;
+    for (const u of state.units) if (u.side === "p" && u.layer === "mil") {
+      u.hp -= CFG.starveHpLoss;
+      if (u.hp <= 0) killUnit(u, "j");
+    }
+    for (const { v } of ownedVillages()) v.heart = clamp(v.heart - CFG.starveHeartLoss, 0, 100);
+    log("粮荒! 部队饿着肚子行军(-HP), 村庄民心受损", "bad");
+  }
+  state.grain = Math.min(grainMax(), state.grain);
+
+  // ── 2. 民心演化 ──
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const v = state.tiles[q][r].village;
+    if (!v) continue;
+    const wt = unitAt(q, r, "p", "civ");
+    if (v.owner === "n") {
+      if (wt) {
+        v.heart = clamp(v.heart + CFG.workteamHeart + (state.techs.jianzu ? 4 : 0), 0, 100);
+        if (isSuppressed(q, r)) v.heart = Math.min(v.heart, CFG.suppressCap);
+      } else {
+        // 回落
+        if (v.heart > CFG.neutralDrift) v.heart = Math.max(CFG.neutralDrift, v.heart - 2);
+      }
+      if (v.heart >= CFG.joinThreshold && !anyEnemyMilAt(q, r, "p")) {
+        v.owner = "p";
+        state.exposure = clamp(state.exposure + CFG.joinExposure, 0, 100);
+        state.stats.joined++;
+        log(v.name + "挂起红旗, 正式并入根据地! (暴露+" + CFG.joinExposure + ")", "good");
+        revealArea(q, r, 2);
+      }
+    } else if (v.owner === "p") {
+      const regen = CFG.ownedHeartRegen * (state.techs.jianzu ? 2 : 1) + (wt ? 3 : 0);
+      v.heart = clamp(v.heart + regen, 0, 100);
+      if (isSuppressed(q, r)) v.heart = Math.min(v.heart, CFG.suppressCap + 20);
+      if (v.heart < CFG.revertHeart && !v.hq) {
+        v.owner = "n";
+        log(v.name + "民心涣散, 退回中立…", "bad");
+      }
+    }
+  }
+
+  // ── 3. 建造推进 ──
+  for (const { v } of ownedVillages()) {
+    if (v.build && --v.build.left <= 0) {
+      v.buildings.push(v.build.key);
+      log(v.name + "的【" + BUILDINGS[v.build.key].name + "】竣工", "good");
+      v.build = null;
+    }
+  }
+
+  // ── 4. 铁路修复 ──
+  let broken = 0;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const t = state.tiles[q][r];
+    if (t.railBroken > 0) { t.railBroken--; if (t.railBroken > 0) broken++; else if (t.disc) log("日军修复了一段铁路", "jp"); }
+  }
+
+  // ── 5. 暴露度演化 ──
+  const nonHQ = ownedVillages().filter(x => !x.v.hq).length;
+  let arsenals = 0;
+  for (const { v } of ownedVillages()) arsenals += v.buildings.filter(b => b === "arsenal").length;
+  state.exposure += nonHQ * CFG.expPerVillage + arsenals * CFG.expPerArsenal;
+  state.exposure -= CFG.expDecay + (state.techs.diwork ? 1 : 0);
+  state.exposure = clamp(state.exposure, 0, 100);
+
+  // ── 6. 日军回合 ──
+  jpTurn();
+  if (state.over) return;
+
+  // ── 7. 我方单位恢复 ──
+  for (const u of state.units) {
+    if (u.side !== "p") continue;
+    u.mp = UT[u.type].mp; u.attacked = false;
+    if (u.hp < 100 && !anyEnemyMilAt(u.q, u.r, "p")) {
+      const t = state.tiles[u.q][u.r];
+      let heal = 0;
+      if (t.village && t.village.owner === "p") heal = CFG.healVillage;
+      else if (nearOwnVillage(u.q, u.r, 2)) heal = CFG.healTerritory;
+      u.hp = Math.min(100, u.hp + heal);
+    }
+  }
+
+  // ── 8. 推进回合 ──
+  state.turn++;
+  if (state.turn > CFG.totalTurns) { endGame(ownedVillages().length >= CFG.survivalWinVillages, "survival"); return; }
+  // 总部沦陷判定在 jpTurn 内
+  checkEra();
+  computeVis(); updateUI(); draw();
+  saveGame();
+}
+function nearOwnVillage(q, r, d) {
+  return ownedVillages().some(x => hexDist(q, r, x.q, x.r) <= d);
+}
+function checkEra() {
+  const e = eraName(state.turn);
+  if (e !== state.era) {
+    state.era = e;
+    log("═══ " + dateStr(state.turn) + " · " + e + " ═══", "hl");
+    if (state.turn === CFG.bigSweepTurn) log("情报: 冈村宁次调集重兵, 空前规模的大扫荡迫在眉睫!", "jp");
+  }
+}
+
+// ═══════════════════════════════ 日军 AI ═══════════════════════════════
+function jpTurn() {
+  const S = state;
+  // ── 扫荡状态机: idle → massing(集结telegraphed) → active(出兵) ──
+  if (S.sweep.phase === "idle") {
+    const cooling = S.lastSweepEnd > 0 && S.turn - S.lastSweepEnd < CFG.sweepCooldown;
+    const force = S.turn - S.lastSweepEnd >= CFG.pitySweepGap && S.exposure >= 30;
+    if ((!cooling && (S.exposure >= CFG.sweepThreshold || force)) || S.turn === CFG.bigSweepTurn) {
+      S.sweep.phase = "massing";
+      S.sweep.countdown = CFG.sweepTelegraph;
+      S.sweep.big = S.turn === CFG.bigSweepTurn;
+      log(S.sweep.big ? "敌情通报: 日军空前集结, 五一大扫荡将至!!" : "敌情通报: 铁路沿线日军频繁调动, 扫荡正在集结…", "jp");
+    }
+  } else if (S.sweep.phase === "massing") {
+    if (--S.sweep.countdown <= 0) launchSweep();
+  } else if (S.sweep.phase === "active") {
+    if (--S.sweep.ttl <= 0 || !S.units.some(u => u.sweep)) endSweep();
+  }
+
+  // ── 囚笼政策: 定点修炮楼 ──
+  if (CFG.cagePolicy.includes(S.turn)) buildSite();
+  // 工地推进
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const sh = S.tiles[q][r].sh;
+    if (sh && sh.kind === "site" && --sh.left <= 0) {
+      S.tiles[q][r].sh = { kind: "pillbox", name: "炮楼·新筑", hp: CFG.pillboxHP, maxHp: CFG.pillboxHP, str: CFG.pillboxStr };
+      if (S.tiles[q][r].disc) log("日军新炮楼筑成, 封锁线又收紧一分", "jp");
+    }
+  }
+
+  // ── 巡逻队生成 ──
+  if (S.turn % CFG.patrolEvery === 0 && S.units.filter(u => u.side === "j" && u.patrol).length < 3) {
+    const spawn = jpSpawnPoint();
+    if (spawn) {
+      const type = S.turn < 20 ? "puppet" : (rng() < 0.5 ? "puppet" : "squad");
+      const u = spawnUnit(type, spawn[0], spawn[1], { patrol: true, ttl: CFG.patrolTTL });
+      if (u) u.mp = 0;
+    }
+  }
+
+  // ── 敌单位行动 ──
+  for (const u of S.units.slice()) {
+    if (u.side !== "j" || u.hp <= 0) continue;
+    if (u.hp < 35) { // 被打残→溃退回据点(算作被击溃, 计入歼敌比)
+      removeUnit(u);
+      if (u.sweep) S.sweep.killed += UT[u.type].str * 0.7;
+      const loot = Math.round(UT[u.type].str * 0.25);
+      S.arms = Math.min(CFG.armsCap, S.arms + loot);
+      if (visSet.has(key(u.q, u.r))) log(UT[u.type].name + "伤亡惨重, 溃退回据点! 拾获遗弃军火+" + loot, "good");
+      continue;
+    }
+    u.mp = UT[u.type].mp + (u.sweep ? 1 : 0); // 扫荡纵队轻装急行
+    jpUnitAct(u);
+    if (u.ttl !== undefined && --u.ttl <= 0) removeUnit(u); // 巡逻期满撤回
+  }
+
+  // ── 敌军掠夺: 驻村全额, 贴村合围减半 ──
+  const doPillage = (v, mult, tag) => {
+    const g = Math.round(CFG.pillageGrain * mult * (v.buildings.includes("liangcang") ? 0.4 : 1));
+    S.grain = Math.max(0, S.grain - g);
+    const hh = Math.round(CFG.pillageHeart * mult);
+    v.heart = clamp(v.heart - hh, 0, 100);
+    if (v.buildings.length && rng() < CFG.pillageBuildingChance * mult) {
+      const idx = ri(0, v.buildings.length - 1);
+      const bk = v.buildings.splice(idx, 1)[0];
+      log(v.name + "的【" + BUILDINGS[bk].name + "】被日军焚毁!", "bad");
+    }
+    log("日军" + tag + v.name + ": 抢粮-" + g + ", 民心-" + hh, "bad");
+  };
+  for (const u of S.units) {
+    if (u.side !== "j") continue;
+    const t = S.tiles[u.q][u.r];
+    const v = t.village;
+    if (v && v.owner === "p") {
+      doPillage(v, v.buildings.includes("didao") ? CFG.tunnelDamageMult : 1, "盘踞");
+    } else if (u.sweep) {
+      // 合围: 邻格民心最高的己方村遭殃(减半)
+      let bestV = null;
+      for (const [nq, nr] of nbrs(u.q, u.r)) {
+        const nv = S.tiles[nq][nr].village;
+        if (nv && nv.owner === "p" && (!bestV || nv.heart > bestV.heart)) bestV = nv;
+      }
+      if (bestV) doPillage(bestV, (bestV.buildings.includes("didao") ? CFG.tunnelDamageMult : 1) * 0.5, "袭扰");
+    }
+  }
+  const hqV = S.tiles[S.hq.q][S.hq.r].village;
+  if (hqV.owner !== "p" || hqV.heart <= 5) { endGame(false, "hqfall"); return; }
+}
+
+function jpSpawnPoint(tq, tr) {
+  // 据点旁空格; 给定目标时选离目标最近的据点(就近出动)
+  let spots = [], bestD = 1e9;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const sh = state.tiles[q][r].sh;
+    if (sh && (sh.kind === "town" || sh.kind === "pillbox")) {
+      const d = tq !== undefined ? hexDist(q, r, tq, tr) : 0;
+      if (d > bestD) continue;
+      const local = [];
+      for (const [nq, nr] of nbrs(q, r)) {
+        if (!state.tiles[nq][nr].sh && !unitAt(nq, nr, "j", "mil") && !anyEnemyMilAt(nq, nr, "j")) local.push([nq, nr]);
+      }
+      if (!local.length) continue;
+      if (d < bestD) { bestD = d; spots = local; } else spots.push(...local);
+    }
+  }
+  return spots.length ? pick(spots) : null;
+}
+
+function buildSite() {
+  // 找一个能压制最多我方/高民心村的空格
+  let best = null, bestScore = 2;
+  for (let q = 8; q < W - 1; q++) for (let r = 1; r < H - 1; r++) {
+    const t = state.tiles[q][r];
+    if (t.sh || t.village || t.rail || t.terrain === "mountain") continue;
+    let score = 0;
+    for (let qq = 0; qq < W; qq++) for (let rr = 0; rr < H; rr++) {
+      const v = state.tiles[qq][rr].village;
+      if (v && hexDist(q, r, qq, rr) <= CFG.suppressDist) {
+        score += v.owner === "p" ? 3 : (v.heart > 40 ? 2 : 1);
+      }
+    }
+    // 已有据点附近不重复修
+    for (let qq = 0; qq < W; qq++) for (let rr = 0; rr < H; rr++) {
+      if (state.tiles[qq][rr].sh && hexDist(q, r, qq, rr) <= 2) score = -99;
+    }
+    if (score > bestScore) { bestScore = score; best = [q, r]; }
+  }
+  if (best) {
+    const [q, r] = best;
+    state.tiles[q][r].sh = { kind: "site", name: "炮楼工地", hp: CFG.siteHP, maxHp: CFG.siteHP, str: CFG.siteStr, left: CFG.siteTurns };
+    log("侦察急报: 日军在" + tileName(q, r) + "附近动工修炮楼! " + CFG.siteTurns + "回合后筑成 — 趁早捣毁!", "jp");
+  }
+}
+
+function launchSweep() {
+  const S = state;
+  let budget = (CFG.sweepBase + S.turn * CFG.sweepPerTurn) * eraMult(S.turn) * (0.6 + S.exposure / CFG.sweepExpFactor);
+  if (S.sweep.big) budget *= CFG.bigSweepMult;
+  // 破袭削弱
+  let brokenCnt = 0;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) if (S.tiles[q][r].railBroken > 0) brokenCnt++;
+  budget *= Math.max(0.6, 1 - brokenCnt * CFG.sabotageSweepReduce);
+  // 目标: 民心最高的非总部己方村, 否则总部
+  const owned = ownedVillages();
+  let target = owned.filter(x => !x.v.hq).sort((a, b) => b.v.heart - a.v.heart)[0] || owned[0];
+  if (!target) { S.sweep.phase = "idle"; return; }
+  // 组队
+  const comp = [];
+  let left = budget;
+  const menu = S.turn < 16 ? ["puppet","puppet","squad"] : S.turn < 32 ? ["puppet","squad","squad","company"] : ["squad","company","company","armored"];
+  let guard = 0;
+  while (left > 6 && guard++ < 30 && comp.length < CFG.sweepMaxUnits) {
+    const t = pick(menu);
+    if (UT[t].str > left + 4) continue;
+    comp.push(t); left -= UT[t].str;
+  }
+  if (!comp.length) comp.push("squad");
+  S.sweep.total = 0; S.sweep.killed = 0;
+  // 目标分摊: 民心最高的至多3个村, 轮流指派(多路合击), 各纵队从最近据点出动
+  const tgs = owned.filter(x => !x.v.hq).sort((a, b) => b.v.heart - a.v.heart).slice(0, 3);
+  if (!tgs.length) tgs.push(target);
+  comp.forEach((t, i) => {
+    const tg = tgs[i % tgs.length];
+    const spawn = jpSpawnPoint(tg.q, tg.r) || [W - 2, Math.floor(H / 2)];
+    const u = spawnUnit(t, spawn[0], spawn[1], { sweep: true, tq: tg.q, tr: tg.r });
+    if (u) { u.mp = 0; S.sweep.total += UT[t].str; }
+  });
+  S.sweep.phase = "active";
+  S.sweep.ttl = CFG.sweepTTL;
+  S.exposure = clamp(S.exposure * 0.35, 0, 100); // 出兵后暴露释放
+  log((S.sweep.big ? "五一大扫荡开始!! " : "扫荡开始! ") + comp.length + "支敌军出动, 直扑" + S.tiles[target.q][target.r].village.name + "方向", "jp");
+}
+
+function endSweep() {
+  const S = state;
+  for (const u of S.units.slice()) if (u.sweep) removeUnit(u);
+  const ratio = S.sweep.total > 0 ? S.sweep.killed / S.sweep.total : 0;
+  if (ratio >= CFG.sweepWinKillRatio) {
+    for (const { v } of ownedVillages()) v.heart = clamp(v.heart + 5, 0, 100);
+    log("反扫荡大捷! 歼敌" + Math.round(ratio * 100) + "%, 根据地军民欢欣鼓舞(全村民心+5)", "good");
+  } else {
+    log("日军扫荡部队撤回据点。此仗歼敌" + Math.round(ratio * 100) + "%", "hl");
+  }
+  S.sweep.phase = "idle";
+  S.lastSweepEnd = S.turn;
+  S.exposure = Math.min(S.exposure, 40); // 敌情报过时, 给喘息窗口
+  S.stats.sweepsSurvived++;
+}
+
+function jpUnitAct(u) {
+  let steps = 0;
+  while (u.mp > 0 && steps++ < 6 && u.hp > 0) {
+    // 1) 邻格有可攻目标→打(优先军事单位, 其次不打)
+    const adjTargets = [];
+    for (const [nq, nr] of nbrs(u.q, u.r)) {
+      const e = state.units.find(x => x.q === nq && x.r === nr && x.side === "p" && x.layer === "mil" && !UT[x.type].hidden);
+      if (e) adjTargets.push(e);
+    }
+    if (adjTargets.length && !u.attacked) {
+      adjTargets.sort((a, b) => a.hp - b.hp);
+      attackUnit(u, adjTargets[0]);
+      return;
+    }
+    // 2) 决定目的地
+    let dest = null;
+    if (u.sweep) {
+      if (u.q === u.tq && u.r === u.tr) {
+        const v0 = state.tiles[u.q][u.r].village;
+        if (v0 && v0.owner === "p") return; // 驻村掠夺
+      }
+      const v = state.tiles[u.tq][u.tr].village;
+      const tgOccupied = v && unitAt(u.tq, u.tr, "j", "mil");
+      if (v && v.owner === "p" && !tgOccupied) dest = [u.tq, u.tr];
+      else {
+        // 换目标: 最近的未被占据的己方村; 全被占则围向最近村
+        const owned = ownedVillages().sort((a, b) => hexDist(u.q, u.r, a.q, a.r) - hexDist(u.q, u.r, b.q, b.r));
+        if (!owned.length) return;
+        const free = owned.find(o => !unitAt(o.q, o.r, "j", "mil"));
+        const tg = free || owned[0];
+        u.tq = tg.q; u.tr = tg.r;
+        if (hexDist(u.q, u.r, tg.q, tg.r) <= 1 && !free) return; // 已贴身合围
+        dest = [u.tq, u.tr];
+      }
+    } else if (u.patrol) {
+      // 巡逻: 附近有我方单位→追; 否则沿铁路/平原游荡
+      const prey = state.units.filter(x => x.side === "p" && x.layer === "mil" && !UT[x.type].hidden && hexDist(u.q, u.r, x.q, x.r) <= 3);
+      if (prey.length) dest = [prey[0].q, prey[0].r];
+      else {
+        const wander = nbrs(u.q, u.r).filter(([a, b]) => { const t = state.tiles[a][b]; return !t.sh && (UT[u.type].roadOnly ? (t.rail || t.terrain === "plain") : t.terrain !== "mountain") && !anyEnemyMilAt(a, b, "j") && !unitAt(a, b, "j", "mil"); });
+        if (wander.length) dest = pick(wander);
+      }
+      // 巡逻侦知: 站上/邻接我方村→暴露+
+      const t0 = state.tiles[u.q][u.r];
+      if (t0.village && t0.village.owner === "p" && !u.spotted) {
+        u.spotted = true;
+        state.exposure = clamp(state.exposure + CFG.expPatrolSpot, 0, 100);
+        log("巡逻队窜入" + t0.village.name + ", 根据地暴露+" + CFG.expPatrolSpot, "jp");
+      }
+    }
+    if (!dest) return;
+    // 3) 向 dest 走一步(贪心, 绕开山与占位)
+    const opts = nbrs(u.q, u.r).filter(([a, b]) => {
+      const t = state.tiles[a][b];
+      if (t.sh) return false;
+      if (UT[u.type].roadOnly && !(t.rail || t.terrain === "plain")) return false;
+      if (unitAt(a, b, "j", "mil")) return false;
+      const blocker = anyEnemyMilAt(a, b, "j");
+      if (blocker) return false;
+      return true;
+    });
+    if (!opts.length) return;
+    opts.sort((p1, p2) => hexDist(p1[0], p1[1], dest[0], dest[1]) - hexDist(p2[0], p2[1], dest[0], dest[1]) + (moveCost(u, state.tiles[p1[0]][p1[1]]) - moveCost(u, state.tiles[p2[0]][p2[1]])) * 0.3);
+    const [nq, nr] = opts[0];
+    if (hexDist(nq, nr, dest[0], dest[1]) > hexDist(u.q, u.r, dest[0], dest[1]) && !u.patrol) return; // 不绕远
+    const cost = Math.min(moveCost(u, state.tiles[nq][nr]), u.mp);
+    doMove(u, nq, nr, cost);
+    if (u.hp <= 0) return;
+  }
+}
+
+// ═══════════════════════════════ 渲染 ═══════════════════════════════
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+let cam = { x: 0, y: 0, zoom: 1 };
+let sel = null;        // { kind:"unit", id } | { kind:"tile", q, r }
+let reach = null;      // Map of reachable
+const TERRAIN_COLOR = { plain: "#4a4526", hills: "#3e3a20", forest: "#2c3a1e", mountain: "#35302a" };
+const TERRAIN_EDGE  = { plain: "#5a5432", hills: "#4c4828", forest: "#384a26", mountain: "#454038" };
+
+function resize() {
+  cv.width = innerWidth * devicePixelRatio;
+  cv.height = innerHeight * devicePixelRatio;
+  cv.style.width = innerWidth + "px";
+  cv.style.height = innerHeight + "px";
+  draw();
+}
+addEventListener("resize", resize);
+
+function hexPath(cx, cy, s) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i;
+    const x = cx + s * Math.cos(a), y = cy + s * Math.sin(a);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+}
+
+function draw() {
+  if (!state) return;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.fillStyle = "#100d07";
+  ctx.fillRect(0, 0, innerWidth, innerHeight);
+  ctx.translate(-cam.x, -cam.y);
+  ctx.scale(cam.zoom, cam.zoom);
+  const s = CFG.hexSize;
+
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const t = state.tiles[q][r];
+    if (!t.disc) continue;
+    const [cx, cy] = hexCenter(q, r);
+    const visible = visSet.has(key(q, r));
+    hexPath(cx, cy, s - 0.6);
+    ctx.fillStyle = TERRAIN_COLOR[t.terrain];
+    ctx.fill();
+    ctx.strokeStyle = TERRAIN_EDGE[t.terrain];
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // 地形纹理符号
+    ctx.fillStyle = "rgba(216,201,160,.18)";
+    ctx.font = (s * 0.5) + "px serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (t.terrain === "mountain") ctx.fillText("⛰", cx, cy + (t.village ? s * 0.45 : 0));
+    else if (t.terrain === "forest") ctx.fillText("🌲", cx, cy + (t.village ? s * 0.45 : 0));
+    else if (t.terrain === "hills") { ctx.font = (s * 0.36) + "px serif"; ctx.fillText("〰", cx, cy + (t.village ? s * 0.5 : s * 0.3)); }
+    // 铁路
+    if (t.rail) {
+      ctx.strokeStyle = t.railBroken > 0 ? "#7a4438" : "#8a8058";
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(cx, cy - s * 0.85); ctx.lineTo(cx, cy + s * 0.85); ctx.stroke();
+      ctx.strokeStyle = "#242014"; ctx.lineWidth = 1.4;
+      for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(cx - 5, cy + i * s * 0.3); ctx.lineTo(cx + 5, cy + i * s * 0.3); ctx.stroke(); }
+      if (t.railBroken > 0) { ctx.fillStyle = "#e2564d"; ctx.font = (s * 0.5) + "px serif"; ctx.fillText("✕", cx, cy); }
+    }
+    // 地雷(只对玩家可见)
+    if (t.mine) { ctx.fillStyle = "rgba(226,86,77,.8)"; ctx.font = (s * 0.34) + "px serif"; ctx.fillText("☢", cx + s * 0.5, cy - s * 0.5); }
+    // 村庄
+    if (t.village) drawVillage(cx, cy, s, t.village, isSuppressed(q, r));
+    // 敌设施
+    if (t.sh) drawStructure(cx, cy, s, t.sh);
+    // 迷雾(已探明但不可见)
+    if (!visible) { hexPath(cx, cy, s - 0.6); ctx.fillStyle = "rgba(10,8,4,.45)"; ctx.fill(); }
+  }
+
+  // 可达高亮
+  if (reach && sel?.kind === "unit") {
+    for (const k of reach.keys()) {
+      const [q, r] = k.split(",").map(Number);
+      const [cx, cy] = hexCenter(q, r);
+      hexPath(cx, cy, s - 3);
+      ctx.strokeStyle = "rgba(159,188,82,.75)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "rgba(159,188,82,.10)"; ctx.fill();
+    }
+    // 可攻目标
+    const u = getSelUnit();
+    if (u && !u.attacked && UT[u.type].str > 0) {
+      for (const [nq, nr] of nbrs(u.q, u.r)) {
+        const t = state.tiles[nq][nr];
+        const e = visSet.has(key(nq, nr)) && state.units.find(x => x.q === nq && x.r === nr && x.side === "j");
+        if (e || (t.sh && t.disc)) {
+          const [cx, cy] = hexCenter(nq, nr);
+          hexPath(cx, cy, s - 3);
+          ctx.strokeStyle = "rgba(226,86,77,.9)"; ctx.lineWidth = 2.5; ctx.stroke();
+        }
+      }
+    }
+  }
+
+  // 单位
+  for (const u of state.units) {
+    if (u.side === "j" && !visSet.has(key(u.q, u.r))) continue;
+    if (!state.tiles[u.q][u.r].disc) continue;
+    drawUnit(u, s);
+  }
+
+  // 选中框
+  if (sel) {
+    let q, r;
+    if (sel.kind === "unit") { const u = getSelUnit(); if (u) { q = u.q; r = u.r; } }
+    else { q = sel.q; r = sel.r; }
+    if (q !== undefined) {
+      const [cx, cy] = hexCenter(q, r);
+      hexPath(cx, cy, s - 1.5);
+      ctx.strokeStyle = "#f0e4c0"; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+  }
+  // 扫荡目标指示
+  if (state.techs.zhencha && state.sweep.phase === "massing") {
+    // 集结阶段无目标坐标, 出兵时才有 — 目标预测: 民心最高村
+    const owned = ownedVillages().filter(x => !x.v.hq).sort((a, b) => b.v.heart - a.v.heart);
+    const tg = owned[0] || ownedVillages()[0];
+    if (tg) {
+      const [cx, cy] = hexCenter(tg.q, tg.r);
+      ctx.strokeStyle = "rgba(216,164,65,.8)"; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+      hexPath(cx, cy, s + 3); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(216,164,65,.9)"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("⚠ 预判扫荡目标", cx, cy - s - 7);
+    }
+  }
+}
+
+function drawVillage(cx, cy, s, v, suppressed) {
+  const col = v.owner === "p" ? "#b8462f" : "#6a6248";
+  ctx.fillStyle = "#26221a";
+  ctx.strokeStyle = col; ctx.lineWidth = v.hq ? 3 : 2;
+  const w = s * 0.9, h = s * 0.62;
+  ctx.beginPath();
+  ctx.moveTo(cx - w / 2, cy - h * 0.1); ctx.lineTo(cx, cy - h * 0.62); ctx.lineTo(cx + w / 2, cy - h * 0.1);
+  ctx.lineTo(cx + w / 2, cy + h * 0.5); ctx.lineTo(cx - w / 2, cy + h * 0.5); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  if (v.owner === "p") { // 红旗
+    ctx.strokeStyle = "#d8c9a0"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(cx + w * 0.34, cy - h * 0.5); ctx.lineTo(cx + w * 0.34, cy - h * 1.15); ctx.stroke();
+    ctx.fillStyle = "#e2382a";
+    ctx.beginPath(); ctx.moveTo(cx + w * 0.34, cy - h * 1.15); ctx.lineTo(cx + w * 0.34 + 11, cy - h * 0.98); ctx.lineTo(cx + w * 0.34, cy - h * 0.8); ctx.closePath(); ctx.fill();
+  }
+  // 名字+民心
+  ctx.fillStyle = v.owner === "p" ? "#f0dcb8" : "#a2966e";
+  ctx.font = "600 " + (s * 0.30) + "px 'Noto Sans SC', sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText(v.name.replace("(总部)", ""), cx, cy + h * 0.55);
+  if (v.hq) { ctx.fillStyle = "#d8a441"; ctx.fillText("★总部", cx, cy + h * 0.55 + s * 0.33); }
+  // 民心条
+  const bw = s * 0.85;
+  ctx.fillStyle = "#1a170e"; ctx.fillRect(cx - bw / 2, cy - h * 0.02, bw, 4);
+  ctx.fillStyle = v.heart >= CFG.joinThreshold ? "#9fbc52" : v.heart >= 40 ? "#d8a441" : "#b8563a";
+  ctx.fillRect(cx - bw / 2, cy - h * 0.02, bw * v.heart / 100, 4);
+  // 建筑图标
+  if (v.buildings.length) {
+    ctx.font = (s * 0.26) + "px serif"; ctx.fillStyle = "#c9ba90"; ctx.textBaseline = "middle";
+    const icons = { kaiken: "🌾", yexiao: "📖", liangcang: "🏺", didao: "🕳", arsenal: "🔧" };
+    ctx.fillText(v.buildings.map(b => icons[b]).join(""), cx, cy + h * 0.32);
+  }
+  if (v.build) { ctx.font = (s * 0.24) + "px sans-serif"; ctx.fillStyle = "#8a8058"; ctx.fillText("🔨" + v.build.left, cx - w * 0.35, cy - h * 0.35); }
+  if (suppressed && v.owner === "n") { ctx.font = (s * 0.3) + "px sans-serif"; ctx.fillStyle = "#d8a441"; ctx.fillText("🔒", cx - w * 0.42, cy - h * 0.75); }
+}
+
+function drawStructure(cx, cy, s, sh) {
+  if (sh.kind === "town") {
+    ctx.fillStyle = "#3a2620"; ctx.strokeStyle = "#c9a038"; ctx.lineWidth = 2.5;
+    const w = s * 1.15, h = s * 0.85;
+    ctx.fillRect(cx - w / 2, cy - h / 2, w, h); ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+    ctx.fillStyle = "#c9a038"; ctx.font = "700 " + (s * 0.42) + "px 'Noto Sans SC', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("城", cx, cy);
+  } else if (sh.kind === "pillbox") {
+    ctx.fillStyle = "#4a3428"; ctx.strokeStyle = "#a06a48"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, s * 0.42, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#e0b890"; ctx.font = "700 " + (s * 0.36) + "px 'Noto Sans SC', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("楼", cx, cy);
+  } else { // site
+    ctx.strokeStyle = "#a06a48"; ctx.lineWidth = 1.6; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.arc(cx, cy, s * 0.42, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "#d8a441"; ctx.font = (s * 0.34) + "px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("🔨" + sh.left, cx, cy);
+  }
+  // 血条
+  if (sh.hp < sh.maxHp) {
+    const bw = s * 0.9;
+    ctx.fillStyle = "#1a170e"; ctx.fillRect(cx - bw / 2, cy + s * 0.5, bw, 4);
+    ctx.fillStyle = "#d8a441"; ctx.fillRect(cx - bw / 2, cy + s * 0.5, bw * sh.hp / sh.maxHp, 4);
+  }
+}
+
+function drawUnit(u, s) {
+  const [cx, cy] = hexCenter(u.q, u.r);
+  const ut = UT[u.type];
+  const isP = u.side === "p";
+  const ox = u.layer === "civ" ? -s * 0.42 : (state.tiles[u.q][u.r].village ? s * 0.42 : 0);
+  const oy = u.layer === "civ" ? -s * 0.3 : (state.tiles[u.q][u.r].village ? -s * 0.34 : 0);
+  const R = u.layer === "civ" ? s * 0.26 : s * 0.34;
+  const x = cx + ox, y = cy + oy;
+  ctx.fillStyle = isP ? (u.type === "commando" ? "#3d3050" : "#7a2418") : "#3c3416";
+  ctx.strokeStyle = isP ? "#e8b8a0" : "#c9a038";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = isP ? "#f8e8d0" : "#e8d088";
+  ctx.font = "700 " + R + "px 'Noto Sans SC', sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(ut.glyph, x, y + 1);
+  // HP弧
+  if (u.hp < 100) {
+    ctx.strokeStyle = u.hp > 55 ? "#9fbc52" : u.hp > 25 ? "#d8a441" : "#e2564d";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, R + 2.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * u.hp / 100); ctx.stroke();
+  }
+  // 待命点
+  if (isP && (u.mp > 0 || !u.attacked && ut.str > 0) && !state.over) {
+    if (u.mp > 0) { ctx.fillStyle = "#9fbc52"; ctx.beginPath(); ctx.arc(x + R * 0.85, y - R * 0.85, 3.5, 0, 7); ctx.fill(); }
+  }
+}
+
+// ═══════════════════════════════ 输入 ═══════════════════════════════
+let dragging = false, dragMoved = false, lastPt = null, pinchD = 0;
+cv.addEventListener("pointerdown", e => { dragging = true; dragMoved = false; lastPt = [e.clientX, e.clientY]; });
+addEventListener("pointermove", e => {
+  if (!dragging) return;
+  const dx = e.clientX - lastPt[0], dy = e.clientY - lastPt[1];
+  if (Math.abs(dx) + Math.abs(dy) > 4) dragMoved = true;
+  if (dragMoved) { cam.x -= dx; cam.y -= dy; lastPt = [e.clientX, e.clientY]; draw(); }
+});
+addEventListener("pointerup", e => {
+  if (dragging && !dragMoved) handleClick(e.clientX, e.clientY);
+  dragging = false;
+});
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const nz = clamp(cam.zoom * f, 0.45, 2.2);
+  const wx = (e.clientX + cam.x) / cam.zoom, wy = (e.clientY + cam.y) / cam.zoom;
+  cam.zoom = nz;
+  cam.x = wx * nz - e.clientX; cam.y = wy * nz - e.clientY;
+  draw();
+}, { passive: false });
+cv.addEventListener("touchmove", e => {
+  if (e.touches.length === 2) {
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    if (pinchD) {
+      const f = d / pinchD;
+      cam.zoom = clamp(cam.zoom * f, 0.45, 2.2);
+      draw();
+    }
+    pinchD = d;
+    e.preventDefault();
+  }
+}, { passive: false });
+cv.addEventListener("touchend", () => { pinchD = 0; });
+
+function pxToHex(px, py) {
+  const wx = (px + cam.x) / cam.zoom, wy = (py + cam.y) / cam.zoom;
+  let best = null, bd = 1e9;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const [cx, cy] = hexCenter(q, r);
+    const d = (cx - wx) ** 2 + (cy - wy) ** 2;
+    if (d < bd) { bd = d; best = [q, r]; }
+  }
+  return bd <= (CFG.hexSize * 1.05) ** 2 ? best : null;
+}
+function getSelUnit() { return sel?.kind === "unit" ? state.units.find(u => u.id === sel.id) : null; }
+function deselect() { sel = null; reach = null; renderPanel(); draw(); }
+
+function handleClick(px, py) {
+  if (state.over) return;
+  const hex = pxToHex(px, py);
+  if (!hex) { deselect(); return; }
+  const [q, r] = hex;
+  const t = state.tiles[q][r];
+  if (!t.disc) { deselect(); return; }
+  const selU = getSelUnit();
+
+  // ── 有选中单位: 尝试 移动/攻击 ──
+  if (selU) {
+    // 攻击敌单位
+    const enemy = visSet.has(key(q, r)) && state.units.find(x => x.q === q && x.r === r && x.side === "j");
+    if (enemy && hexDist(selU.q, selU.r, q, r) === 1 && !selU.attacked && UT[selU.type].str > 0) {
+      attackUnit(selU, enemy);
+      state.exposure = clamp(state.exposure + CFG.expAttack, 0, 100);
+      reach = null; sel = selU.hp > 0 && state.units.includes(selU) ? sel : null;
+      afterAction(); return;
+    }
+    // 攻击设施
+    if (t.sh && hexDist(selU.q, selU.r, q, r) === 1 && !selU.attacked && UT[selU.type].str > 0) {
+      if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; }
+      attackStructure(selU, q, r);
+      reach = null;
+      afterAction(); return;
+    }
+    // 移动
+    const rc = reach?.get(key(q, r));
+    if (rc) {
+      doMove(selU, q, r, rc.cost);
+      reach = state.units.includes(selU) && selU.mp > 0 ? reachable(selU) : null;
+      afterAction(); return;
+    }
+  }
+
+  // ── 选择本格单位(军事优先, 再民事) ──
+  const mine = state.units.filter(x => x.q === q && x.r === r && x.side === "p");
+  if (mine.length) {
+    const cur = selU && selU.q === q && selU.r === r ? mine.indexOf(selU) : -1;
+    const next = mine[(cur + 1) % mine.length];
+    sel = { kind: "unit", id: next.id };
+    reach = next.mp > 0 ? reachable(next) : null;
+    renderPanel(); draw(); return;
+  }
+  // ── 选择地格 ──
+  sel = { kind: "tile", q, r };
+  reach = null;
+  renderPanel(); draw();
+}
+function afterAction() {
+  computeVis(); renderPanel(); updateUI(); draw();
+  if (state.over) return;
+}
+
+addEventListener("keydown", e => {
+  if (e.key === "Enter" && !modalOpen()) endTurn();
+  if ((e.key === "t" || e.key === "T") && !modalOpen()) showTech();
+  if (e.key === "h" || e.key === "H") { modalOpen() ? closeModal() : showHelp(false); }
+  if (e.key === "Escape") { modalOpen() ? closeModal() : deselect(); }
+});
+
+// ═══════════════════════════════ UI ═══════════════════════════════
+const $ = id => document.getElementById(id);
+function log(msg, cls) {
+  const p = document.createElement("p");
+  if (cls) p.className = cls;
+  p.innerHTML = '<span class="t">' + dateStr(Math.min(state.turn, CFG.totalTurns)) + "</span>" + msg;
+  const box = $("logBox");
+  box.appendChild(p);
+  while (box.children.length > 80) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+
+function updateUI() {
+  const S = state;
+  const inc = S.lastIncome || { g: 0, m: 0, o: 0, a: 0 };
+  const dd = n => (n >= 0 ? "+" : "") + n;
+  const tShow = Math.min(S.turn, CFG.totalTurns);
+  $("uiDate").innerHTML = "📅 <b>" + dateStr(tShow) + "</b> <span class='d'>(" + tShow + "/" + CFG.totalTurns + " · " + eraName(tShow) + ")</span>";
+  $("uiGrain").innerHTML = "🌾 粮 <b>" + Math.round(S.grain) + "</b>/" + grainMax() + " <span class='d'>" + dd(inc.g) + "</span>";
+  $("uiGrain").className = "res" + (inc.g < 0 ? " bad" : "");
+  $("uiMan").innerHTML = "👥 人力 <b>" + Math.round(S.man) + "</b> <span class='d'>" + dd(inc.m) + "</span>";
+  $("uiArms").innerHTML = "🔫 军火 <b>" + Math.round(S.arms) + "</b>" + (inc.a ? " <span class='d'>" + dd(inc.a) + "</span>" : "");
+  $("uiOrg").innerHTML = "✊ 组织 <b>" + Math.round(S.org) + "</b> <span class='d'>" + dd(inc.o) + "</span>";
+  const exp = Math.round(S.exposure);
+  $("expVal").textContent = exp;
+  const fill = $("expFill");
+  fill.style.width = exp + "%";
+  fill.className = exp >= CFG.sweepThreshold ? "hot" : exp >= CFG.sweepThreshold - 15 ? "warn" : "";
+  $("expLine").style.left = CFG.sweepThreshold + "%";
+  // 扫荡横幅
+  const bn = $("sweepBanner");
+  if (S.sweep.phase === "massing") {
+    bn.className = "telegraph";
+    bn.textContent = "⚠ 日军正在集结 — " + S.sweep.countdown + " 回合后出动扫荡!" + (S.sweep.big ? " (空前规模!!)" : "");
+  } else if (S.sweep.phase === "active") {
+    bn.className = "";
+    bn.textContent = "🔥 扫荡进行中 — 敌军 " + S.units.filter(u => u.sweep).length + " 队在根据地内 (" + S.sweep.ttl + " 回合后撤退)";
+  } else bn.className = "hidden";
+  // 结束回合按钮
+  const idle = S.units.some(u => u.side === "p" && u.layer === "mil" && u.mp > 0);
+  $("endTurnBtn").classList.toggle("pulse", !idle);
+  // 整训按钮发光: 有能买的
+  const canBuy = Object.keys(TECHS).some(k => !S.techs[k] && S.org >= TECHS[k].cost && tierUnlocked(TECHS[k].tier) && (!TECHS[k].need || TECHS[k].need.every(n => S.techs[n])));
+  $("techBtn").classList.toggle("glow", canBuy);
+}
+
+// ── 侧面板 ──
+function renderPanel() {
+  const pn = $("sidePanel");
+  if (!sel) { pn.classList.add("hidden"); return; }
+  pn.classList.remove("hidden");
+  let html = "";
+  const u = getSelUnit();
+  if (u) {
+    const ut = UT[u.type];
+    html += "<h3>" + ut.name + "<small>HP " + Math.max(0, Math.round(u.hp)) + " · 移动 " + u.mp + "/" + ut.mp + "</small></h3>";
+    if (ut.str > 0) html += "<div class='row'>战力 <b>" + effStr(u, "atk").toFixed(1) + "</b>(攻) / <b>" + effStr(u, "def").toFixed(1) + "</b>(守)</div>";
+    html += "<div class='hint'>" + ut.desc + "</div>";
+    if (u.attacked) html += "<div class='warn'>本回合已行动</div>";
+    const t = state.tiles[u.q][u.r];
+    // 特殊行动按钮
+    if (u.type === "militia" && state.techs.dilei && !t.mine && !u.attacked)
+      html += "<button class='abtn' onclick='uiMine()'>💣 埋地雷 <span class='cost'>(军火" + CFG.mineCostArms + ")</span><span class='sub'>敌军踩中 -" + CFG.mineDamage + "HP</span></button>";
+    if ((u.type === "commando" || u.type === "militia" && state.techs.poxi) && t.rail && t.railBroken <= 0 && !u.attacked)
+      html += "<button class='abtn' onclick='uiSabotage()'>💥 破袭铁路 <span class='cost'>(+暴露" + CFG.expSabotage + ")</span><span class='sub'>缴获军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + ", 削弱下次扫荡</span></button>";
+    html += "<button class='abtn danger' onclick='uiDisband()'>解散 <span class='sub'>返还一半人力</span></button>";
+    html += "<hr><div class='hint'>点击绿色格移动 · 点击相邻红框敌人攻击</div>";
+  } else if (sel.kind === "tile") {
+    const t = state.tiles[sel.q][sel.r];
+    const TN = { plain: "平原", hills: "丘陵", forest: "林地", mountain: "山地" };
+    if (t.village) {
+      const v = t.village;
+      html += "<h3>" + v.name + "<small>" + TN[t.terrain] + (t.rail ? "·铁路" : "") + "</small></h3>";
+      const own = v.owner === "p" ? (v.hq ? "根据地总部" : "根据地村庄") : "中立村庄";
+      html += "<div class='row'>" + own + " · 民心 <b>" + Math.round(v.heart) + "</b>/100</div>";
+      html += "<div class='heartbar'><div class='heartfill" + (v.heart >= CFG.joinThreshold ? " ok" : "") + "' style='width:" + v.heart + "%'></div></div>";
+      const sup = isSuppressed(sel.q, sel.r);
+      if (v.owner === "n") {
+        html += "<div class='hint'>民心≥" + CFG.joinThreshold + " 自动并入根据地。派<b>工作队</b>驻村发动群众。</div>";
+        if (sup) html += "<div class='bad'>⚠ 附近有日军据点压制, 民心上限 " + CFG.suppressCap + " — 必须先拔掉据点!</div>";
+      } else {
+        const y = villageYield(sel.q, sel.r, v);
+        html += "<div class='row'>产出/回合: 🌾<b>" + y[0] + "</b> 👥<b>" + y[1] + "</b> ✊<b>" + y[2] + "</b>" + (v.buildings.includes("arsenal") ? " 🔫<b>2</b>" : "") + "</div>";
+        if (v.heart < CFG.heartFullProd) html += "<div class='warn'>民心不足" + CFG.heartFullProd + ", 产出打折(" + heartMult(v.heart) * 100 + "%)</div>";
+        if (sup) html += "<div class='warn'>⚠ 据点压制中, 民心上限受限</div>";
+        // 建造
+        html += "<hr><div class='row'><b>修建</b>" + (v.build ? "(建造中: " + BUILDINGS[v.build.key].name + " 余" + v.build.left + "回合)" : "") + "</div>";
+        if (!v.build) for (const bk in BUILDINGS) {
+          const b = BUILDINGS[bk];
+          if (v.buildings.includes(bk)) { html += "<div class='row'>✓ " + b.name + " <span class='sub'></span></div>"; continue; }
+          if (b.needTech && !state.techs[b.needTech]) { html += "<button class='abtn' disabled>" + b.name + " <span class='sub'>需整训【" + TECHS[b.needTech].name + "】</span></button>"; continue; }
+          const can = state.grain >= b.cost.grain;
+          html += "<button class='abtn' " + (can ? "" : "disabled") + " onclick=\"uiBuild('" + bk + "')\">" + b.name + " <span class='cost'>粮" + b.cost.grain + "·" + b.turns + "回合</span><span class='sub'>" + b.desc + "</span></button>";
+        }
+        // 招募
+        html += "<hr><div class='row'><b>组建队伍</b></div>";
+        for (const tk of ["scout", "work", "militia", "regular", "elite", "commando"]) {
+          const ut = UT[tk];
+          if (ut.needTech && !state.techs[ut.needTech]) continue;
+          const c = ut.cost;
+          const can = state.grain >= (c.grain || 0) && state.man >= (c.man || 0) && state.arms >= (c.arms || 0) && state.org >= (c.org || 0);
+          const cost = [c.grain ? "粮" + c.grain : "", c.man ? "人" + c.man : "", c.arms ? "火" + c.arms : "", c.org ? "组" + c.org : ""].filter(Boolean).join(" ");
+          html += "<button class='abtn' " + (can ? "" : "disabled") + " onclick=\"uiRecruit('" + tk + "')\">" + ut.name + (ut.str ? "(战" + ut.str + ")" : "") + " <span class='cost'>" + cost + "</span><span class='sub'>" + ut.desc + "</span></button>";
+        }
+      }
+    } else if (t.sh) {
+      html += "<h3>" + t.sh.name + "<small>敌军设施</small></h3>";
+      html += "<div class='row'>耐久 <b>" + Math.max(0, Math.round(t.sh.hp)) + "</b>/" + t.sh.maxHp + " · 火力 <b>" + t.sh.str + "</b></div>";
+      if (t.sh.kind === "town") html += "<div class='hint'>日军华北方面军的县级据点。完成整训【战略反攻】后攻克它=军事胜利。</div>";
+      else if (t.sh.kind === "pillbox") html += "<div class='hint'>封锁线炮楼, 压制周围" + CFG.suppressDist + "格内村庄民心(上限" + CFG.suppressCap + ")。拔掉它, 附近的村子才敢跟咱们走。</div>";
+      else html += "<div class='hint'>修建中的炮楼, " + t.sh.left + "回合后完工。趁工事未成赶紧捣毁!</div>";
+    } else {
+      html += "<h3>" + TN[t.terrain] + "<small>" + (t.rail ? "铁路 " : "") + sel.q + "," + sel.r + "</small></h3>";
+      const dv = { plain: "无防御加成, 敌军装甲可通行", hills: "+3防御", forest: "+4防御, 伏击+3", mountain: "+6防御, 伏击+3, 日军行动迟缓" }[t.terrain];
+      html += "<div class='hint'>" + dv + (t.rail ? "<br>敌军命脉铁路。武工队可【破袭】。" : "") + "</div>";
+      if (t.mine) html += "<div class='warn'>💣 我方地雷已布设</div>";
+    }
+  }
+  pn.innerHTML = html;
+}
+// 面板按钮回调(通过 sel 定位)
+function uiBuild(bk) { if (sel?.kind === "tile") { startBuild(sel.q, sel.r, bk); afterAction(); } }
+function uiRecruit(tk) { if (sel?.kind === "tile") { recruit(sel.q, sel.r, tk); afterAction(); } }
+function uiMine() { const u = getSelUnit(); if (u) { actionMine(u); afterAction(); } }
+function uiSabotage() { const u = getSelUnit(); if (u) { actionSabotage(u); afterAction(); } }
+function uiDisband() {
+  const u = getSelUnit();
+  if (!u) return;
+  state.man = Math.min(CFG.manCap, state.man + Math.floor((UT[u.type].cost.man || 0) / 2));
+  removeUnit(u); deselect(); afterAction();
+}
+
+// ═══════════════════════════════ 弹窗 ═══════════════════════════════
+function modalOpen() { return !$("modalWrap").classList.contains("hidden"); }
+function openModal(html) { $("modalBox").innerHTML = html; $("modalWrap").classList.remove("hidden"); }
+function closeModal() { $("modalWrap").classList.add("hidden"); }
+$("modalWrap").addEventListener("click", e => { if (e.target === $("modalWrap") && state && !state.over && state.started) closeModal(); });
+
+function showHelp(isStart) {
+  openModal(`
+<h2>太行·1941<small>敌后战场 4X · 约1小时</small></h2>
+<p>1941年,华北。日军的"囚笼政策"用铁路作柱、炮楼作锁,要把敌后根据地困死、扫荡干净。你是太行山根据地的指挥员——从一个山村总部起步,坚持到<b>1945年8月</b>。</p>
+<ul class="klist">
+  <li><span class="x">探索</span> — 侦察员揭开战争迷雾,找到村庄、敌据点与铁路线。</li>
+  <li><span class="x">扩张</span> — 工作队驻中立村发动群众,民心≥${CFG.joinThreshold}就挂红旗并入根据地。但炮楼附近的村会被<b>压制</b>,必须先拔据点。</li>
+  <li><span class="x">开发</span> — 村庄产<b>🌾粮/👥人力/✊组织</b>。修开垦地、夜校、藏粮洞、地道;组织力用于<b>整训</b>(科技树):地雷战、地道战、破袭战……</li>
+  <li><span class="x">歼灭</span> — 伏击巡逻队、拔炮楼、破袭铁路,人枪粮都靠<b>缴获</b>。但一切军事行动与扩张都会累积<b>暴露度</b>。</li>
+</ul>
+<p><b>核心矛盾:暴露度。</b>发展越快、打得越狠,暴露涨得越快;到${CFG.sweepThreshold}日军就集结<b>扫荡</b>(有${CFG.sweepTelegraph}回合预警)。扫荡军会烧村抢粮毁建筑。躲进山里疏散部队、用地道保存实力、或者设伏歼敌打个反扫荡大捷——都由你选。<b>纯苟也不行</b>:长期不动日军照样清乡,而且1942年5月的<b>五一大扫荡</b>是躲不掉的历史剧本。</p>
+<p><b>胜利:</b>①坚持到1945年8月日本投降且保有≥${CFG.survivalWinVillages}村(≥${CFG.greatWinVillages}村为大胜);②完成【战略反攻】整训后攻克<b>县城</b>,提前解放全县。<br><b>失败:</b>总部村被扫荡摧残至民心崩溃。</p>
+<p class="hint" style="color:#8a8058">操作: 拖拽平移 / 滚轮缩放 · 点单位再点绿格移动、点红框敌人攻击 · 点己方村庄建造与招兵 · [Enter]结束回合 [T]整训 [H]规则</p>
+<div class="mbtns">
+  ${isStart ? `<button class="mbtn" onclick="startGame(false)">开始游戏</button>` + (hasSave() ? `<button class="mbtn ghost" onclick="startGame(true)">继续上次进度</button>` : "") : `<button class="mbtn ghost" onclick="closeModal()">返回</button><button class="mbtn ghost" onclick="if(confirm('放弃当前进度重开?')){clearSave();location.reload()}">重新开始</button>`}
+</div>`);
+}
+
+function showTech() {
+  if (!state || state.over) return;
+  let html = `<h2>整训<small>组织力 ✊${Math.round(state.org)} · 完成一项立即生效</small></h2><div class="techTiers">`;
+  for (let tier = 1; tier <= 4; tier++) {
+    const unlocked = tierUnlocked(tier);
+    html += `<div class="techTier"><h4>第${["一","二","三","四"][tier - 1]}阶${unlocked ? "" : " 🔒"}</h4>`;
+    for (const k in TECHS) {
+      const t = TECHS[k];
+      if (t.tier !== tier) continue;
+      const done = !!state.techs[k];
+      const needOk = !t.need || t.need.every(n => state.techs[n]);
+      const can = !done && unlocked && needOk && state.org >= t.cost;
+      html += `<div class="techCard${done ? " done" : ""}"><b>${t.name}</b><div class="desc">${t.desc}</div>`;
+      if (done) html += `<div class="lock">✓ 已完成</div>`;
+      else {
+        html += `<div class="cost">✊ ${t.cost}</div>`;
+        if (t.need && !needOk) html += `<div class="lock">需先完成: ${t.need.map(n => TECHS[n].name).join("、")}</div>`;
+        else if (!unlocked) html += `<div class="lock">${tier === 2 ? "需完成1项第一阶" : "需完成2项第二阶"}</div>`;
+        html += `<button ${can ? "" : "disabled"} onclick="buyTech('${k}');showTech();updateUI();afterAction()">整训</button>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div><div class="mbtns"><button class="mbtn ghost" onclick="closeModal()">返回 [T]</button></div>`;
+  openModal(html);
+}
+
+function endGame(win, how) {
+  state.over = true;
+  clearSave();
+  const S = state;
+  const n = ownedVillages().length;
+  let title, story;
+  if (win && how === "military") {
+    title = "🎉 解放县城 — 军事大捷!";
+    story = "红旗插上" + TOWN_NAME + "城头。" + dateStr(S.turn) + ",全县光复,比日本投降还早了一步。你的根据地从一个山村起家,打出了一片天。";
+  } else if (win && how === "survival") {
+    title = n >= CFG.greatWinVillages ? "🎉 大胜 — 抗战胜利!" : "🎖 胜利 — 坚持到了最后!";
+    story = "1945年8月15日,日本无条件投降。你的根据地拥有 <b>" + n + "</b> 个村庄, " +
+      (n >= CFG.greatWinVillages ? "已连成一片解放区,主力整装待发——这片土地上的人民记得你们。" : "在最残酷的岁月里守住了火种。");
+  } else if (how === "survival") {
+    title = "😞 惨胜 — 根据地几乎打光了";
+    story = "熬到了1945年8月,但仅剩 " + n + " 个村庄(需≥" + CFG.survivalWinVillages + ")。上级来电:虽保住了旗帜,根据地已名存实亡。";
+  } else {
+    title = "💀 总部沦陷";
+    story = "扫荡的铁蹄踏碎了总部。电台在最后一刻发出讯号,余部化整为零转入深山……这一片根据地,失败了。";
+  }
+  const st = S.stats;
+  openModal(`
+<h2>${title}</h2>
+<p>${story}</p>
+<hr style="border:none;border-top:1px solid #3a3826;margin:10px 0">
+<p>📊 战绩: 坚持 <b>${Math.min(S.turn, CFG.totalTurns)}</b> 个月 · 根据地 <b>${n}</b> 村 · 歼敌 <b>${st.kills}</b> 队 · 拔炮楼 <b>${st.pillboxes}</b> 座 · 破袭铁路 <b>${st.sabotages}</b> 次 · 熬过扫荡 <b>${st.sweepsSurvived}</b> 次 · 完成整训 <b>${Object.keys(S.techs).length}</b> 项</p>
+<div class="mbtns"><button class="mbtn" onclick="clearSave();location.reload()">再来一局</button></div>`);
+  updateUI(); draw();
+}
+
+// ═══════════════════════════════ 存档 ═══════════════════════════════
+const SAVE_KEY = "taihang1941_v1";
+function saveGame() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ state, cam })); } catch (e) {}
+}
+function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+function loadGame() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (!d || !d.state || d.state.over) return false;
+    state = d.state; cam = d.cam;
+    return true;
+  } catch (e) { return false; }
+}
+
+// ═══════════════════════════════ 初始化 ═══════════════════════════════
+function newState() {
+  rng = mulberry32((Date.now() % 100000) | 0);
+  const { tiles, hq } = genMap();
+  state = {
+    turn: 1, over: false, started: false,
+    grain: CFG.startGrain, man: CFG.startMan, arms: CFG.startArms, org: CFG.startOrg,
+    tiles, hq, units: [], nextUid: 1,
+    techs: {}, exposure: 8,
+    sweep: { phase: "idle", countdown: 0, ttl: 0, total: 0, killed: 0, big: false },
+    lastSweepEnd: 0, era: "",
+    lastIncome: { g: 0, m: 0, o: 0, a: 0 },
+    stats: { kills: 0, pillboxes: 0, sabotages: 0, sweepsSurvived: 0, joined: 0 },
+  };
+  revealArea(hq.q, hq.r, 3);
+  const m = spawnUnit("militia", hq.q, hq.r); if (m) m.mp = UT.militia.mp;
+  const sc = spawnUnit("scout", hq.q, hq.r); if (sc) sc.mp = UT.scout.mp;
+  const wk = spawnUnit("work", hq.q, hq.r); if (wk) wk.mp = UT.work.mp;
+}
+function centerCam() {
+  const [cx, cy] = hexCenter(state.hq.q, state.hq.r);
+  cam.zoom = innerWidth < 640 ? 0.8 : 1;
+  cam.x = cx * cam.zoom - innerWidth / 2;
+  cam.y = cy * cam.zoom - innerHeight / 2;
+}
+function startGame(fromSave) {
+  closeModal();
+  if (fromSave && loadGame()) {
+    state.started = true;
+    log("── 进度已恢复 · " + dateStr(state.turn) + " ──", "hl");
+  } else {
+    newState();
+    state.started = true;
+    centerCam();
+    log("═══ 1941年1月 · 囚笼初现 ═══", "hl");
+    log("你在王家峪设立总部。侦察员待命, 工作队整装 — 出发, 到群众中去!", "hl");
+    log("提示: 先派侦察员探路, 工作队进邻村发动群众。日军的铁路在东边。", "good");
+  }
+  computeVis(); updateUI(); renderPanel(); draw();
+}
+
+$("endTurnBtn").addEventListener("click", endTurn);
+$("techBtn").addEventListener("click", showTech);
+$("helpBtn").addEventListener("click", () => showHelp(false));
+
+resize();
+newState();       // 先生成一张底图作为标题背景
+centerCam();
+computeVis(); updateUI(); draw();
+showHelp(true);
+
+</script>
+</body>
+</html>
