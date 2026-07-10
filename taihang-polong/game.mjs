@@ -3,7 +3,7 @@ import {
   createGame, serializeGame, deserializeGame, invariantChecks, dateLabel, chapterIndex, keyOf, hexDistance,
   tileAt, allVillages, playerVillages, enemyStructures, visibleKeys, unitAt, getUnit, suppressionAt, computeNetwork,
   villageYield, reachableTiles, shortestPath, moveUnit, combatPreview, structurePreview, attackUnit, attackStructure,
-  startBuild, recruitUnit, buyTech, changePolicy, sabotageRail, attemptDefection, reinforceUnit, fortifyUnit,
+  stationWorkTeam, cancelRoute, startBuild, cancelBuild, recruitUnit, buyTech, changePolicy, sabotageRail, attemptDefection, reinforceUnit, fortifyUnit,
   countBrokenRails, goalProgress, objectiveStatus, endTurn, unitStrength,
 } from "./rules.mjs";
 
@@ -145,9 +145,12 @@ function drawNetwork() {
   ctx.restore();
 }
 function drawPathPreview() {
-  if (!pending?.path) return;
-  ctx.save(); ctx.strokeStyle = "#ffe5a0"; ctx.lineWidth = 3 * camera.zoom; ctx.setLineDash([3 * camera.zoom, 5 * camera.zoom]); ctx.beginPath();
-  pending.path.forEach(([q, r], i) => { const [x, y] = screenCenter(q, r); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.restore();
+  const u = selectedUnit(), queued = !pending?.path && u?.route ? shortestPath(state, u, u.route.q, u.route.r, 99) : null;
+  const path = pending?.path || queued?.path; if (!path) return;
+  ctx.save(); ctx.strokeStyle = pending?.path ? "#ffe5a0" : "#71bdc5"; ctx.lineWidth = 3 * camera.zoom; ctx.setLineDash([3 * camera.zoom, 5 * camera.zoom]); ctx.beginPath();
+  path.forEach(([q, r], i) => { const [x, y] = screenCenter(q, r); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  if (pending?.stopIndex > 0 && pending.stopIndex < path.length - 1) { const [q,r] = path[pending.stopIndex], [x,y] = screenCenter(q,r); ctx.setLineDash([]); ctx.fillStyle = "#ffe5a0"; ctx.beginPath(); ctx.arc(x,y,5*camera.zoom,0,Math.PI*2); ctx.fill(); }
+  ctx.restore();
 }
 function draw() {
   const dpr = Math.min(2.5, window.devicePixelRatio || 1), w = canvas.width / dpr, h = canvas.height / dpr;
@@ -199,7 +202,9 @@ function handleTileClick(q, r) {
   if (u?.side === "player" && !u.acted) {
     if (enemy && hexDistance(u.q, u.r, q, r) === 1 && UNIT_TYPES[u.type].str > 0) { planUnitAttack(u, enemy); return; }
     if (t.structure && hexDistance(u.q, u.r, q, r) === 1 && UNIT_TYPES[u.type].str > 0) { planStructureAttack(u, q, r); return; }
-    const cost = reach.get(keyOf(q, r)); if (cost !== undefined) { planMove(u, q, r); return; }
+    if (!enemy && !t.structure) {
+      const route = shortestPath(state, u, q, r, 99); if (route?.cost > 0) { planMove(u, q, r); return; }
+    }
   }
   const ownUnits = state.units.filter(x => x.q === q && x.r === r && x.side === "player");
   if (ownUnits.length) {
@@ -208,9 +213,17 @@ function handleTileClick(q, r) {
   selection = { kind: "tile", q, r }; reach = new Map(); pending = null; hideConfirm(); renderPanel(); draw();
 }
 function planMove(u, q, r) {
-  const found = shortestPath(state, u, q, r, u.mp); if (!found) return;
-  pending = { type: "move", unitId: u.id, q, r, path: found.path };
-  showConfirm(`<strong>移动 ${u.name}</strong> → ${tileLabel(q, r)}<br><small>消耗移动力 ${found.cost}</small>`); draw();
+  const found = shortestPath(state, u, q, r, 99); if (!found) return;
+  let budget = u.mp, turns = 1, stopIndex = 0;
+  for (let i = 1; i < found.path.length; i++) {
+    const [nq, nr] = found.path[i], step = TERRAIN[tileAt(state, nq, nr).terrain].move;
+    if (step > budget) { turns++; budget = UNIT_TYPES[u.type].mp; }
+    budget -= step;
+    if (turns === 1) stopIndex = i;
+  }
+  pending = { type: "move", unitId: u.id, q, r, path: found.path, stopIndex };
+  const stop = found.path[stopIndex] || found.path[0], multi = stopIndex < found.path.length - 1;
+  showConfirm(`<strong>移动 ${u.name}</strong> → ${tileLabel(q, r)}<br><small>${multi ? `本回合先到${tileLabel(stop[0], stop[1])} · 预计${turns}回合 · 将自动续行` : `本回合抵达 · 消耗移动力 ${found.cost}`}</small>`); draw();
 }
 function planUnitAttack(a, d) {
   const p = combatPreview(state, a.id, d.id); pending = { type: "attack", unitId: a.id, targetId: d.id, q: d.q, r: d.r };
@@ -240,18 +253,23 @@ function costHtml(cost = {}) {
 }
 function renderUnitPanel(u) {
   const t = tileAt(state, u.q, u.r), ut = UNIT_TYPES[u.type], def = unitStrength(state, u, "defense"), atk = unitStrength(state, u, "attack");
-  let html = `<h3>${u.name}<small>${tileLabel(u.q, u.r)} · ${u.acted ? "本回合已行动" : `移动 ${u.mp}/${ut.mp}`}</small></h3>`;
+  const status = u.stationedVillageId ? "已驻村 · 不可移动" : u.acted ? "本回合已行动" : `移动 ${u.mp}/${ut.mp}`;
+  let html = `<h3>${u.name}<small>${tileLabel(u.q, u.r)} · ${status}</small></h3>`;
   html += `<div class="statline"><span>HP <b>${Math.round(u.hp)}</b>/100</span>${ut.str ? `<span>战力 <b>${atk.toFixed(1)}</b>/<b>${def.toFixed(1)}</b></span>` : ""}<span>经验 <b>${u.xp}</b>${u.level ? ` · ${"★".repeat(u.level)}` : ""}</span></div>`;
   html += `<div class="bar"><b style="width:${Math.max(0,u.hp)}%"></b></div><p class="hint">${ut.desc}</p>`;
+  if (u.route) html += `<div class="warning">多回合行军目标：${tileLabel(u.route.q,u.route.r)}。每个新回合会自动沿安全路径续行。</div>`;
+  if (u.stationedVillageId) html += `<div class="warning good">工作队已转入长期驻村状态；村庄并入根据地后，单位会转化为基层组织并从棋盘移除。</div>`;
   if (u.side === "player") {
     const actions = [];
     if (t.village) actions.push(`<button data-action="selectTile"><strong>查看驻地</strong><small>建设、招募与村庄产出</small></button>`);
+    if (!u.acted && u.type === "work" && t.village?.owner === "neutral" && !u.stationedVillageId) actions.push(`<button data-action="station"><strong>驻村发动群众</strong><small>确认后不能离村 · 并入时消耗</small></button>`);
+    if (u.route) actions.push(`<button data-action="cancelRoute"><strong>取消行军计划</strong><small>保留当前位置与剩余移动力</small></button>`);
     if (!u.acted && ut.str > 0) actions.push(`<button data-action="fortify"><strong>驻扎设防</strong><small>防御+4，月末缓慢恢复</small></button>`);
     if (!u.acted && u.hp < 100 && t.village?.owner === "player" && t.village.connected) actions.push(`<button data-action="reinforce"><strong>补充兵员</strong><small>消耗人力与粮，保留经验</small></button>`);
     if (!u.acted && t.rail && !t.railBroken && ["militia","commando"].includes(u.type)) actions.push(`<button data-action="sabotage"><strong>破袭铁路</strong><small>缴获物资并延迟增援</small></button>`);
     const puppets = state.units.filter(x => x.type === "puppet" && hexDistance(u.q,u.r,x.q,x.r) === 1);
     if (!u.acted && state.techs.enemywork && ["work","commando"].includes(u.type) && puppets.length) actions.push(`<button data-action="defect" data-target="${puppets[0].id}"><strong>秘密策反伪军</strong><small>组织8 · 当前进度${puppets[0].defection || 0}%</small></button>`);
-    if (!u.acted) actions.push(`<button data-action="skip"><strong>跳过本回合</strong><small>保留当前位置</small></button>`);
+    if (!u.acted && !u.stationedVillageId) actions.push(`<button data-action="skip"><strong>跳过本回合</strong><small>保留当前位置</small></button>`);
     html += `<div class="panel-section"><b>单位行动</b><div class="action-grid">${actions.join("") || "<span class='hint'>本回合没有可用行动。</span>"}</div></div>`;
   } else {
     html += `<div class="warning">敌军正在执行${u.opId ? `【${OPERATIONS[state.operation?.type]?.name || "敌军行动"}】` : "巡逻与清乡"}。</div>`;
@@ -261,21 +279,32 @@ function renderUnitPanel(u) {
 }
 function renderVillagePanel(q, r, t) {
   const v = t.village, own = v.owner === "player", tr = TRAITS[v.trait], suppressed = suppressionAt(state, q, r);
+  const stationed = state.units.find(u => u.type === "work" && u.stationedVillageId === v.id);
   let html = `<h3>${v.name}<small>${TERRAIN[t.terrain].name} · ${tr.name}</small></h3>`;
   html += `<div class="statline"><span>${own ? "根据地村庄" : "中立村庄"}</span><span>民心 <b>${Math.round(v.support)}</b>/100</span>${own ? `<span class="${v.connected ? "good" : ""}">${v.connected ? "交通畅通" : "交通中断"}</span>` : ""}</div><div class="bar support"><b style="width:${v.support}%"></b></div>`;
   html += `<p class="hint">${tr.desc}</p>`;
   if (suppressed) html += `<div class="warning">附近有敌军据点压制${v.buildings.includes("tunnel") ? "，地道网正在抵消封锁" : `，中立民心最高只能到${CFG.suppressSupportCap}`}</div>`;
-  if (!own) html += `<div class="panel-section"><b>群众工作</b><p class="hint">派工作队驻村，每回合自动提升民心；达到${CFG.joinSupport}且解除据点压制后并入根据地。</p></div>`;
+  if (!own) html += `<div class="panel-section"><b>群众工作${stationed ? ` · ${stationed.name}驻村中` : ""}</b><p class="hint">${stationed ? `工作队已经转为驻村状态，每回合自动提升民心；达到${CFG.joinSupport}且解除压制后，工作队转化为基层组织并从棋盘移除。` : "工作队进入村庄后需执行【驻村发动群众】；确认后不能再次出发。"}</p></div>`;
   else {
     const x = { q, r, tile: t, village: v }, y = villageYield(state, x), slots = v.hq ? 3 : 2;
     html += `<div class="statline"><span>月产 🌾<b>${y[0]}</b></span><span>人 <b>${y[1]}</b></span><span>组 <b>${y[2]}</b></span><span>火 <b>${y[3]}</b></span></div>`;
     html += `<div>${v.buildings.map(k => `<span class="tag">${BUILDINGS[k].name}</span>`).join("") || "<span class='hint'>尚无主要设施</span>"}</div>`;
-    html += `<div class="panel-section"><b>建设 · ${v.buildings.length}/${slots}槽${v.build ? ` · ${BUILDINGS[v.build.key].name}余${v.build.monthsLeft}月` : ""}</b><div class="action-grid">`;
-    if (!v.build && v.buildings.length < slots) for (const [k,b] of Object.entries(BUILDINGS)) {
-      if (v.buildings.includes(k)) continue; const locked = b.tech && !state.techs[b.tech], affordable = state.grain >= (b.cost.grain||0) && state.org >= (b.cost.org||0);
-      html += `<button data-action="build" data-key="${k}" ${locked || !affordable || !v.connected ? "disabled" : ""}><strong>${b.name}</strong><small>${locked ? `需${TECHS[b.tech].name}` : `${costHtml(b.cost)} · ${b.months}月`}</small></button>`;
+    v.buildProgress ||= {}; const pausedKeys = Object.keys(v.buildProgress);
+    html += `<div class="panel-section"><b>建设 · ${v.buildings.length}/${slots}槽${v.build ? ` · ${BUILDINGS[v.build.key].name}余${v.build.monthsLeft}月` : pausedKeys.length ? ` · ${pausedKeys.length}项进度保留` : ""}</b>`;
+    if (v.build) {
+      const b = BUILDINGS[v.build.key], done = b.months - v.build.monthsLeft, percent = Math.round(done / b.months * 100);
+      html += `<div class="build-progress" title="已完成${done}/${b.months}个月"><b style="width:${percent}%"></b></div><p class="hint">【${b.name}】施工中：已完成${done}个月，尚余${v.build.monthsLeft}个月。取消后不退款，但工程进度会保留。</p><div class="action-grid"><button class="cancel-build" data-action="cancelBuild"><strong>取消当前建设</strong><small>保留投入与剩余${v.build.monthsLeft}月进度</small></button></div>`;
+    } else {
+      if (pausedKeys.length) html += `<div class="paused-builds">已保留：${pausedKeys.map(k => `${BUILDINGS[k].name}（余${v.buildProgress[k]}月）`).join("、")}</div>`;
+      html += `<div class="action-grid">`;
+      if (v.buildings.length < slots) for (const [k,b] of Object.entries(BUILDINGS)) {
+        if (v.buildings.includes(k)) continue;
+        const paused = Number.isFinite(v.buildProgress[k]), locked = b.tech && !state.techs[b.tech], affordable = paused || (state.grain >= (b.cost.grain||0) && state.org >= (b.cost.org||0));
+        html += `<button data-action="build" data-key="${k}" ${locked || !affordable || !v.connected ? "disabled" : ""}><strong>${paused ? "续建 · " : ""}${b.name}</strong><small>${locked ? `需${TECHS[b.tech].name}` : paused ? `无需再次付费 · 余${v.buildProgress[k]}月` : `${costHtml(b.cost)} · ${b.months}月`}</small></button>`;
+      }
+      html += `</div>`;
     }
-    html += `</div></div><div class="panel-section"><b>组建队伍</b><div class="action-grid">`;
+    html += `</div><div class="panel-section"><b>组建队伍</b><div class="action-grid">`;
     for (const k of ["scout","work","militia","regular","commando"]) {
       const u = UNIT_TYPES[k], locked = u.tech && !state.techs[u.tech], affordable = Object.entries(u.cost).every(([rk,rv]) => state[rk] >= rv);
       html += `<button data-action="recruit" data-key="${k}" ${locked || !affordable || !v.connected ? "disabled" : ""}><strong>${u.name}${u.str ? ` · 战${u.str}` : ""}</strong><small>${locked ? `需${TECHS[u.tech].name}` : costHtml(u.cost)}</small></button>`;
@@ -297,12 +326,22 @@ function renderPanel() {
   else panel.innerHTML = renderTilePanel(selection.q, selection.r);
 }
 
-function resourceItem(icon, label, value, income, cap = null) { const inc = income ? `<small class="${income < 0 ? "neg" : ""}">${income > 0 ? "+" : ""}${income}</small>` : ""; return `<span class="resource">${icon} ${label} <b>${Math.round(value)}</b>${cap ? `/${cap}` : ""} ${inc}</span>`; }
+const RESOURCE_INFO = {
+  grain: { icon:"🌾", name:"粮食", desc:"建设设施、组建队伍和维持部队的基础物资。每月下半月结束时统一结算；归零会造成部队减员与村庄民心下降。" },
+  man: { icon:"👥", name:"人力", desc:"组建部队和补充伤亡所需的人口基础。主要来自交通畅通的村庄，兵源村和高民心会提高产出。" },
+  arms: { icon:"🔫", name:"军火", desc:"主力部队、武工队和补员所需的稀缺装备。铁匠村、兵工坊与破袭缴获是主要来源。" },
+  org: { icon:"✊", name:"组织力", desc:"用于整训、政策调整、工作队和地下设施。夜校与文化村可以提供稳定月产。" },
+};
+function resourceItem(key, label, value, income, cap = null) {
+  const info=RESOURCE_INFO[key], inc = income ? `<small class="${income < 0 ? "neg" : ""}">${income > 0 ? "+" : ""}${income}</small>` : "";
+  return `<span class="resource" tabindex="0" data-resource="${key}" aria-label="${info.name} ${Math.round(value)}${cap ? `，上限${cap}` : ""}">${info.icon} ${label} <b>${Math.round(value)}</b>${cap ? `/${cap}` : ""} ${inc}</span>`;
+}
 function updateUI() {
   if (!state) return;
+  hideResourceTooltip();
   const ch = CHAPTERS[chapterIndex(state.turn)], inc = state.lastIncome || {};
   $("dateBox").innerHTML = `<b>${dateLabel(Math.min(state.turn,CFG.totalTurns))}</b><small>${state.turn}/${CFG.totalTurns}</small>`;
-  $("resourceBar").innerHTML = resourceItem("🌾","粮",state.grain,inc.grain,CFG.grainCap)+resourceItem("👥","人",state.man,inc.man,CFG.manCap)+resourceItem("🔫","火",state.arms,inc.arms,CFG.armsCap)+resourceItem("✊","组",state.org,inc.org,CFG.orgCap);
+  $("resourceBar").innerHTML = resourceItem("grain","粮",state.grain,inc.grain,CFG.grainCap)+resourceItem("man","人",state.man,inc.man,CFG.manCap)+resourceItem("arms","火",state.arms,inc.arms,CFG.armsCap)+resourceItem("org","组",state.org,inc.org,CFG.orgCap);
   $("exposureValue").textContent = Math.round(state.exposure); $("exposureFill").style.width = `${state.exposure}%`;
   $("pressureValue").textContent = Math.round(state.pressure); $("pressureFill").style.width = `${state.pressure}%`;
   $("chapterTitle").textContent = ch.title; $("chapterStory").textContent = ch.story;
@@ -320,7 +359,7 @@ function renderLogs() {
   $("logEntries").innerHTML = state.logs.slice(-18).map(l => `<p class="${l.kind}"><time>${dateLabel(l.turn)}</time>${l.text}</p>`).join("");
   $("logPanel").scrollTop = $("logPanel").scrollHeight;
 }
-function actionableUnits() { return state.units.filter(u => u.side === "player" && !u.acted && u.mp > 0); }
+function actionableUnits() { return state.units.filter(u => u.side === "player" && !u.stationedVillageId && !u.acted && u.mp > 0); }
 function refreshMainButton() {
   const b = $("mainButton"), count = actionableUnits().length;
   if (count) { b.innerHTML = `下一单位 <small>[空格] · ${count}</small>`; b.classList.remove("ready"); }
@@ -351,6 +390,19 @@ function modalOpen() { return !$("modalWrap").classList.contains("hidden"); }
 function openModal(html) { $("modal").innerHTML = html; $("modalWrap").classList.remove("hidden"); }
 function closeModal() { $("modalWrap").classList.add("hidden"); }
 function toast(text) { const el = $("toast"); el.textContent = text; el.classList.remove("show"); void el.offsetWidth; el.classList.add("show"); }
+function placeResourceTooltip(x, y) {
+  const tip=$("resourceTooltip"), rect=tip.getBoundingClientRect();
+  let left=Math.max(10,Math.min(innerWidth-rect.width-10,x+12)), top=y+14;
+  if(top+rect.height>innerHeight-10)top=Math.max(10,y-rect.height-14);
+  tip.style.left=`${left}px`;tip.style.top=`${top}px`;
+}
+function showResourceTooltip(el, x, y) {
+  const key=el?.dataset.resource, info=RESOURCE_INFO[key];if(!info||!state)return;
+  const caps={grain:CFG.grainCap,man:CFG.manCap,arms:CFG.armsCap,org:CFG.orgCap},income=state.lastIncome?.[key]||0;
+  const change=`${income>0?"+":""}${income}`;
+  const tip=$("resourceTooltip");tip.innerHTML=`<strong>${info.icon} ${info.name}　${Math.round(state[key])}/${caps[key]}</strong><em class="${income<0?"neg":""}">最近一次月结净变化 ${change}</em><span>${info.desc}</span>`;tip.classList.remove("hidden");placeResourceTooltip(x,y);
+}
+function hideResourceTooltip() { $("resourceTooltip")?.classList.add("hidden"); }
 function introHtml() {
   const hasSave = !!localStorage.getItem(SAVE_KEY);
   return `<h1>太行·1941：破笼<small>百团大战之后 · 敌后根据地4X Lite · 纯2D六边棋盘</small></h1>
@@ -362,7 +414,7 @@ function introHtml() {
       <div class="card"><h3>建设</h3><p>每村只有2个设施槽，必须选择专业化方向。</p></div>
       <div class="card"><h3>破笼</h3><p>破袭铁路、拔炮楼、策反伪军并保存群众。</p></div>
     </div>
-    <p class="hint">操作：拖拽平移、滚轮缩放；点单位后点绿格移动；点己方村建设与招募。每月分上下半月，经济只在下半月结束时结算。</p>
+    <p class="hint">操作：拖拽平移、滚轮缩放；点单位后可点击已侦明的远方格，系统会规划并自动续行；点己方村建设与招募。鼠标悬停顶部资源可查看用途和最近月结。</p>
     <div class="modal-actions"><button data-modal="new">开始新战役</button>${hasSave ? `<button class="ghost" data-modal="continue">继续进度</button>` : ""}<button class="ghost" data-modal="rules">查看完整规则</button></div>`;
 }
 function showIntro() { openModal(introHtml()); }
@@ -370,6 +422,8 @@ function showRules() {
   const rows = CHAPTERS.map((c,i) => `<div class="chapter-row ${state && i===chapterIndex(state.turn)?"current":""}"><b>${c.start}—${c.deadline}回合</b><span><strong>${c.title}</strong><br>${c.story}</span></div>`).join("");
   openModal(`<h2>战役设定与规则<small>不是占地涂色，而是两个网络争夺同一片乡村</small></h2>
     <p><strong>根据地网络</strong>由村庄和地下交通站组成。交通畅通的村庄全额产出、可以建设与补员；被炮楼或敌军切断后只保留一半产出。</p>
+    <p><strong>工作队</strong>对标一次性开拓单位：进入中立村后需确认“驻村发动群众”；此后不能离村，村庄并入时转化为基层组织并从棋盘移除。</p>
+    <p><strong>多回合行军</strong>可以直接点击已侦明的远方空格，单位会逐回合自动续行；新命令或主动行动会取消旧路线。村庄工程可以取消，已投入资源与剩余工期保留，下次无需再次付费即可续建。</p>
     <p><strong>暴露</strong>是短期情报：行动越激烈，敌人越容易锁定准确目标；可以衰减。<strong>压力</strong>是长期形势：根据地、兵工和时间都会让敌军升级，不能靠隐蔽永久退出战争。</p>
     <p><strong>胜利</strong>有两条：完成局部反攻、切断铁路并攻克县城；或以7座畅通村庄和较高民心坚持到1945年8月。</p>
     <div class="chapter-list">${rows}</div>
@@ -413,6 +467,11 @@ $("techBtn").addEventListener("click", () => state && !state.over && showTechs()
 $("policyBtn").addEventListener("click", () => state && !state.over && showPolicies());
 $("helpBtn").addEventListener("click", showRules);
 $("soundBtn").addEventListener("click", () => { soundOn=!soundOn; $("soundBtn").setAttribute("aria-pressed", String(soundOn)); $("soundBtn").textContent=soundOn?"声":"静"; if(soundOn) beep(); });
+$("resourceBar").addEventListener("pointerover", e => { const el=e.target.closest(".resource");if(el)showResourceTooltip(el,e.clientX,e.clientY); });
+$("resourceBar").addEventListener("pointermove", e => { const el=e.target.closest(".resource");if(el&&!$("resourceTooltip").classList.contains("hidden"))placeResourceTooltip(e.clientX,e.clientY); });
+$("resourceBar").addEventListener("pointerout", e => { const el=e.target.closest(".resource");if(el&&!el.contains(e.relatedTarget))hideResourceTooltip(); });
+$("resourceBar").addEventListener("focusin", e => { const el=e.target.closest(".resource");if(el){const r=el.getBoundingClientRect();showResourceTooltip(el,r.left+r.width/2,r.bottom);} });
+$("resourceBar").addEventListener("focusout", hideResourceTooltip);
 $("modalWrap").addEventListener("click", e => { if(e.target===$("modalWrap") && state && !state.over) closeModal(); });
 $("modal").addEventListener("click", e => {
   const b=e.target.closest("button"); if(!b) return;
@@ -423,8 +482,11 @@ $("modal").addEventListener("click", e => {
 $("sidePanel").addEventListener("click", e => {
   const b=e.target.closest("button[data-action]"); if(!b) return; const action=b.dataset.action, u=selectedUnit(); let r={ok:false,error:"无效行动"};
   if(action==="build" && selection?.kind==="tile") r=startBuild(state,tileAt(state,selection.q,selection.r).village.id,b.dataset.key);
+  else if(action==="cancelBuild" && selection?.kind==="tile") r=cancelBuild(state,tileAt(state,selection.q,selection.r).village.id);
   else if(action==="recruit" && selection?.kind==="tile") r=recruitUnit(state,tileAt(state,selection.q,selection.r).village.id,b.dataset.key);
   else if(action==="selectTile" && u){selection={kind:"tile",q:u.q,r:u.r};reach=new Map();r={ok:true};}
+  else if(action==="station" && u) r=stationWorkTeam(state,u.id);
+  else if(action==="cancelRoute" && u) r=cancelRoute(state,u.id);
   else if(action==="fortify" && u) r=fortifyUnit(state,u.id);
   else if(action==="reinforce" && u) r=reinforceUnit(state,u.id);
   else if(action==="sabotage" && u) r=sabotageRail(state,u.id);

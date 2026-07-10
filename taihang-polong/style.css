@@ -34,10 +34,20 @@ button:focus-visible { outline: 2px solid #efd27f; outline-offset: 2px; }
 .top-chip { color: #dfd2ad; white-space: nowrap; font-size: 13px; padding: 4px 7px; border-left: 1px solid #4a4027; }
 .top-chip small { color: var(--muted); margin-left: 5px; }
 .resources { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-.resource { border: 0; background: transparent; padding: 4px 5px; color: #cfc3a1; font-size: 12px; cursor: default; }
+.resource { border: 0; background: transparent; padding: 4px 5px; color: #cfc3a1; font-size: 12px; cursor: help; border-radius: 4px; }
+.resource:hover, .resource:focus-visible { background: rgba(212, 173, 87, .1); }
 .resource b { color: #fff0c6; font-size: 13px; }
 .resource small { color: #799b5b; margin-left: 2px; }
 .resource small.neg { color: #d96759; }
+.resource-tooltip {
+  position: fixed; z-index: 70; width: min(270px, calc(100vw - 20px)); padding: 10px 12px; pointer-events: none;
+  border: 1px solid #9b7b3d; border-radius: 7px; background: rgba(25, 22, 14, .98); color: #cfc3a1;
+  box-shadow: 0 12px 30px rgba(0,0,0,.55); font-size: 11px; line-height: 1.55;
+}
+.resource-tooltip strong { display: block; margin-bottom: 3px; color: #fff0c6; font-size: 14px; }
+.resource-tooltip em { color: #94b66a; font-style: normal; }
+.resource-tooltip em.neg { color: #df7665; }
+.resource-tooltip span { display: block; margin-top: 5px; color: #91866d; }
 .meters { display: flex; gap: 4px; margin-left: auto; }
 .meter-button { display: flex; align-items: center; gap: 4px; min-width: 122px; border: 0; background: transparent; padding: 3px 4px; color: #bdb193; font-size: 11px; cursor: help; }
 .meter-button em { min-width: 21px; font-style: normal; color: #efe0b8; text-align: right; }
@@ -92,6 +102,10 @@ kbd { color: #8e856d; font-size: 10px; font-family: inherit; }
 .bar.support b { background: #8fac54; }
 .bar.influence b { background: #a8854e; }
 .tag { display: inline-block; margin: 2px 3px 2px 0; padding: 2px 5px; border: 1px solid #584c2e; border-radius: 10px; color: #bcb08f; font-size: 10px; }
+.build-progress { height: 6px; margin: 6px 0; overflow: hidden; border: 1px solid #5b4c2d; border-radius: 4px; background: #211e14; }
+.build-progress b { display: block; height: 100%; background: linear-gradient(90deg, #9b6f36, #d6ad58); }
+.paused-builds { margin: 5px 0; color: #bba56f; font-size: 10px; }
+#sidePanel button.cancel-build { border-color: #78483a; background: linear-gradient(#4d3027, #32231d); }
 
 #logPanel { left: 10px; bottom: 10px; width: min(430px, 45vw); max-height: 150px; padding: 8px 10px; overflow-y: auto; pointer-events: auto; }
 #logEntries p { margin: 2px 0; color: #aaa083; font-size: 11px; line-height: 1.45; }
