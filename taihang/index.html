@@ -267,7 +267,7 @@ const CFG = {
   greatWinVillages: 8,     // ≥N村=大胜
 
   // ── 地图 ──
-  mapW: 24, mapH: 20,
+  mapW: 29, mapH: 24,
   hexSize: 36,
   villageCount: 20,        // 总村庄数(含根据地)
   villageMinGap: 2,        // 村庄间最小距离
@@ -335,7 +335,7 @@ const CFG = {
   garrisonFromTurn: 1,     // 据点守备队从第几回合开始出现(开局即驻防)
   garrisonRespawn: 6,      // 守备队被歼后隔几回合从据点再补
   garrisonRadius: 2,       // 守备队巡逻半径(以所属据点为圆心)
-  banditCamps: 2,          // 土匪山寨数量(山区生成)
+  banditCamps: 3,          // 土匪山寨数量(山区生成)
   banditCampHP: 45, banditCampStr: 6,
   banditEvery: 7,          // 每隔几回合山寨派土匪下山(每寨同时最多1股)
   banditGrain: 6, banditHeart: 4, // 土匪洗劫: 每回合抢粮/掉民心
@@ -435,7 +435,7 @@ function seasonGrainMult(t) { return (hasSeason(t, "harvest") ? CFG.harvestGrain
 // ── 单位表 ──
 const UT = {
   scout:    { name: "侦察员", glyph: "侦", side: "p", layer: "mil", str: 4,  mp: 3, vis: 3, cost: { grain: 10, man: 5 },  upkeep: 0, desc: "视野3, 探索地图。战力孱弱, 别拿去拼命。" },
-  work:     { name: "工作队", glyph: "工", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 5, org: 10 }, upkeep: 0, desc: "驻在中立村自动发动群众(+民心/回合)。无武装, 落单被抓就没了。" },
+  work:     { name: "工作队", glyph: "工", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 5, org: 10 }, upkeep: 0, desc: "驻中立村发动群众(+民心/回合); 开始工作即扎根, 村庄并入时转为地方干部(单位消耗, 开拓者式)。无武装, 落单被抓就没了。" },
   militia:  { name: "民兵队", glyph: "民", side: "p", layer: "mil", str: 9,  mp: 2, vis: 2, cost: { grain: 15, man: 10, arms: 5 }, upkeep: 1, desc: "便宜耐用。可埋地雷(需地雷战)。" },
   regular:  { name: "主力连", glyph: "连", side: "p", layer: "mil", str: 16, mp: 2, vis: 2, cost: { grain: 25, man: 20, arms: 15 }, upkeep: 2, desc: "野战中坚, 拔炮楼主力。" },
   elite:    { name: "主力团", glyph: "团", side: "p", layer: "mil", str: 26, mp: 2, vis: 2, cost: { grain: 40, man: 35, arms: 30 }, upkeep: 3, needTech: "zhenggui", desc: "正规化整训后的重拳, 反攻县城的本钱。" },
@@ -610,17 +610,17 @@ function genMap() {
     for (let r = 0; r < H; r++) {
       let terrain;
       const x = q + (rng() - 0.5) * 2.2; // 列向噪声, 让分界线不是直线
-      if (x < 7) terrain = pick(["mountain","mountain","mountain","mountain","forest","forest","forest","hills","hills","plain"]);
-      else if (x < 13) terrain = pick(["hills","hills","hills","forest","forest","plain","plain","plain","mountain"]);
+      if (x < W * 0.29) terrain = pick(["mountain","mountain","mountain","mountain","forest","forest","forest","hills","hills","plain"]);
+      else if (x < W * 0.54) terrain = pick(["hills","hills","hills","forest","forest","plain","plain","plain","mountain"]);
       else terrain = pick(["plain","plain","plain","plain","plain","plain","hills","forest","plain","plain"]);
       tiles[q][r] = { q, r, terrain, rail: false, railBroken: 0, village: null, sh: null, mine: false, disc: false };
     }
   }
   // ── 铁路: 从北到南, 在 q≈19 附近蜿蜒 ──
-  let rq = 19;
+  let rq = Math.round(W * 0.79);
   const railTiles = [];
   for (let r = 0; r < H; r++) {
-    if (r > 0 && rng() < 0.3) rq = clamp(rq + (rng() < 0.5 ? -1 : 1), 17, 21);
+    if (r > 0 && rng() < 0.3) rq = clamp(rq + (rng() < 0.5 ? -1 : 1), Math.round(W * 0.71), Math.round(W * 0.875));
     tiles[rq][r].rail = true; tiles[rq][r].terrain = "plain";
     railTiles.push([rq, r]);
   }
@@ -641,7 +641,7 @@ function genMap() {
   // 封锁线炮楼(伸进丘陵, 压制中部村庄)
   let placed = 0, guard = 0;
   while (placed < 2 && guard++ < 200) {
-    const q = ri(11, 13), r = ri(2, H - 3);
+    const q = ri(Math.round(W * 0.46), Math.round(W * 0.54)), r = ri(2, H - 3);
     if (tiles[q][r].terrain !== "mountain" && !tiles[q][r].sh && !tiles[q][r].rail) { if (putPillbox(q, r)) placed++; }
   }
   // ── 砍伐带(史实): 日军为开阔视野防伏击, 铁路两侧与炮楼周边的树林尽数砍伐 ──
@@ -653,10 +653,11 @@ function genMap() {
 
   // ── 村庄 ──
   const villages = [];
+  const mA = Math.round(W * 0.29), mB = Math.round(W * 0.54);
   const zones = [ // [minQ,maxQ,数量]
-    [1, 7, 6],    // 山区
-    [8, 13, 6],   // 丘陵
-    [14, 22, 8],  // 平原
+    [1, mA, 7],        // 山区
+    [mA + 1, mB, 7],   // 丘陵
+    [mB + 1, W - 2, 10], // 平原
   ];
   const names = VNAMES.slice(); // 顺序取名
   let ni = 0;
@@ -689,7 +690,7 @@ function genMap() {
   // ── 土匪山寨(对标文明6野蛮人): 山头盘踞, 定期下山洗劫 ──
   let bc = 0, bg = 0; const camps = [];
   while (bc < CFG.banditCamps && bg++ < 500) {
-    const q = ri(1, 9), r = ri(1, H - 2), t = tiles[q][r];
+    const q = ri(1, Math.round(W * 0.37)), r = ri(1, H - 2), t = tiles[q][r];
     if (t.terrain !== "mountain" || t.sh || t.village || t.rail) continue;
     if (hexDist(q, r, hq.q, hq.r) < 4) continue; // 别贴脸开局
     if (villages.some(v => hexDist(q, r, v.q, v.r) <= 1)) continue;
@@ -729,6 +730,7 @@ function spawnUnit(type, q, r, extra) {
   }
   const u = { id: state.nextUid++, type, q: sq, r: sr, hp: 100, mp: UT[type].mp, attacked: false, side, layer, ...extra };
   state.units.push(u);
+  spawnAnims.set(u.id, animTime); // 出生弹出动画
   if (side === "p") revealArea(sq, sr, unitVis(u));
   return u;
 }
@@ -812,14 +814,17 @@ function tunnelLinks(q, r) { // 返回与(q,r)同网的其他地道村; (q,r)须
   return inNet.slice(1).map(([a, b]) => ({ q: a, r: b }));
 }
 function tunnelTargets(u) { // 该单位当前可地道转移的目标村
-  if (!u || u.mp <= 0 || u.attacked) return [];
+  if (!u || u.mp <= 0 || u.attacked || u.rooted) return [];
   const v = state.tiles[u.q][u.r].village;
   if (!v || v.owner !== "p" || !v.buildings.includes("didao")) return [];
   return tunnelLinks(u.q, u.r).filter(o => !unitAt(o.q, o.r, "p", u.layer) && !anyEnemyMilAt(o.q, o.r, "p"));
 }
 function execTunnelMove(u, q, r) {
   exitMoveMode(); clearPending(false);
+  addFx("ring", u.q, u.r); // 出发端
   doMove(u, q, r, u.mp); // 地下转移: 耗尽当回合移动力, 不经过地面
+  spawnAnims.set(u.id, animTime); // 目的端钻出弹出
+  addFx("ring", q, r);
   addFx("text", q, r, { text: "🕳 地道转移", color: "#8fd2e8" });
   log(uname(u) + "钻地道转移至" + tileName(q, r) + " — 村村相通, 敌人扑空", "hl");
   reach = null;
@@ -870,6 +875,7 @@ function pathTurns(u, path) {
 function continueAutoPaths() {
   for (const u of state.units) {
     if (u.side !== "p" || !u.autoPath || !u.autoPath.length) continue;
+    if (u.rooted) { u.autoPath = null; continue; } // 已扎根: 行军令作废
     let mp = u.mp, idx = 0; const maxN = u.autoPath.length;
     let blocked = false;
     while (mp > 0 && idx < maxN) {
@@ -981,6 +987,8 @@ function attackUnit(a, d) {
   const as = effStr(a, "atk") + flank, ds = effStr(d, "def");
   const dmg = dmgRoll(as, ds);
   d.hp -= dmg;
+  const [dtx, dty] = hexCenter(d.q, d.r);
+  atkAnims.set(a.id, { tx: dtx, ty: dty, t0: animTime, dur: 0.32 }); shakeAnims.set(d.id, animTime + 0.1);
   addFx("hit", d.q, d.r); addFx("text", d.q, d.r, { text: "-" + dmg, color: a.side === "p" ? "#ffd8c0" : "#ff9a86" });
   let txt = uname(a) + "袭击" + uname(d) + (flank ? "(侧翼+" + flank + ")" : "") + " -" + dmg;
   if (d.hp <= 0) {
@@ -1005,6 +1013,8 @@ function attackStructure(a, q, r) {
   const dmg = Math.round(dmgRoll(as, sh.str * (sh.hp / sh.maxHp * 0.4 + 0.6)) * (hasPromo(a, "baopo") ? 1.4 : 1));
   sh.hp -= dmg;
   if (a.side === "p") grantXp(a, CFG.xpAttack + (sh.hp <= 0 ? CFG.xpStruct : 0));
+  const [stx, sty] = hexCenter(q, r);
+  atkAnims.set(a.id, { tx: stx, ty: sty, t0: animTime, dur: 0.32 });
   addFx("hit", q, r); addFx("text", q, r, { text: "-" + dmg, color: "#ffd8c0" });
   if (sh.hp <= 0) {
     if (sh.kind === "pillbox") {
@@ -1134,6 +1144,7 @@ function buyTech(k) {
 function completeTech(k) {
   const t = TECHS[k];
   state.techs[k] = true;
+  if (state.hq) addFx("pop", state.hq.q, state.hq.r, { icon: "📜" });
   if (k === "tongzhan") {
     for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
       const v = state.tiles[q][r].village;
@@ -1191,6 +1202,7 @@ function endTurn() {
       if (wt) {
         v.heart = clamp(v.heart + CFG.workteamHeart + (state.techs.jianzu ? 4 : 0), 0, 100);
         if (isSuppressed(q, r)) v.heart = Math.min(v.heart, CFG.suppressCap);
+        if (!wt.rooted) { wt.rooted = true; wt.autoPath = null; log(uname(wt) + "在" + v.name + "扎根开展群众工作 — 并入前不可调动(可解散)", "hl"); }
       } else {
         // 回落
         if (v.heart > CFG.neutralDrift) v.heart = Math.max(CFG.neutralDrift, v.heart - 2);
@@ -1199,8 +1211,11 @@ function endTurn() {
         v.owner = "p";
         state.exposure = clamp(state.exposure + CFG.joinExposure, 0, 100);
         state.stats.joined++;
+        addFx("flag", q, r); addFx("ring", q, r); // 升旗+金环
         log(v.name + "挂起红旗, 正式并入根据地! (暴露+" + CFG.joinExposure + ")", "good");
         revealArea(q, r, 2);
+        // 工作队功成身退: 转为地方干部(单位消耗, 开拓者式), 民心再+8巩固
+        if (wt && wt.rooted) { removeUnit(wt); v.heart = clamp(v.heart + 8, 0, 100); addFx("text", q, r, { text: "转为地方干部", color: "#9fd28a" }); log(uname(wt) + "转为" + v.name + "地方干部, 就地扎根 — 民心+8", "good"); }
       }
     } else if (v.owner === "p") {
       const regen = CFG.ownedHeartRegen * (state.techs.jianzu ? 2 : 1) + (wt ? 3 : 0);
@@ -1214,9 +1229,11 @@ function endTurn() {
   }
 
   // ── 3. 建造推进 ──
-  for (const { v } of ownedVillages()) {
+  for (const { q, r, v } of ownedVillages()) {
     if (v.build && --v.build.left <= 0) {
       v.buildings.push(v.build.key);
+      addFx("pop", q, r, { icon: ({ kaiken: "🌾", yexiao: "📖", liangcang: "🏺", didao: "🕳", arsenal: "🔧" })[v.build.key] || "🏠" });
+      addFx("ring", q, r);
       log(v.name + "的【" + BUILDINGS[v.build.key].name + "】竣工", "good");
       v.build = null;
     }
@@ -1542,6 +1559,7 @@ function jpTurn() {
       const g = Math.round(CFG.banditGrain * (v.buildings.includes("liangcang") ? 0.5 : 1));
       S.grain = Math.max(0, S.grain - g);
       v.heart = clamp(v.heart - CFG.banditHeart, 0, 100);
+      addFx("pop", u.q, u.r, { icon: "🔥" });
       log("土匪盘踞" + v.name + "劫掠: 粮-" + g + " 民心-" + CFG.banditHeart + " — 派队伍去剿!", "bad");
     }
   }
@@ -1607,7 +1625,7 @@ function jpSpawnPoint(tq, tr) {
 function buildSite() {
   // 找一个能压制最多我方/高民心村的空格
   let best = null, bestScore = 2;
-  for (let q = 8; q < W - 1; q++) for (let r = 1; r < H - 1; r++) {
+  for (let q = Math.round(W * 0.33); q < W - 1; q++) for (let r = 1; r < H - 1; r++) {
     const t = state.tiles[q][r];
     if (t.sh || t.village || t.rail || t.terrain === "mountain") continue;
     if (!canSupplyAt(q, r)) continue; // 补给网够不到的地方修不了楼(蚕食式推进)
@@ -1807,6 +1825,9 @@ let pending = null;    // 待确认动作 { type:"atk"|"struct"|"build"|"recruit
 let moveMode = false;  // 移动命令模式(Civ6式): 先按【➜移动】再点目标格直接执行
 let moveHover = null;  // 移动模式悬停路径预览 { q, r, path, stops }
 let moveAnim = null;   // 移动滑行动画 { id, pts:[[x,y]...], t0, dur }
+const atkAnims = new Map();   // 攻击突进 id→{tx,ty,t0,dur}
+const shakeAnims = new Map(); // 受击抖动 id→t0
+const spawnAnims = new Map(); // 出生弹出 id→t0
 let bannerHits = [];   // 本帧城市横幅命中区(世界坐标, 点横幅选村庄)
 // 四种地形拉开色相与明度: 平原=暖黄开阔 / 丘陵=红棕 / 森林=绿 / 山地=冷灰, 一眼可辨
 const TERRAIN_COLOR = { plain: "#6d6634", hills: "#6f5232", forest: "#39501f", mountain: "#585449" };
@@ -1880,7 +1901,10 @@ function drawFlag(px, pyTop, s, type, phase) {
   for (let i = 0; i <= segs; i++) { const t = i / segs; ctx.lineTo(px + fw * t, pyTop + wave(t)); }
   for (let i = segs; i >= 0; i--) { const t = i / segs; ctx.lineTo(px + fw * t, pyTop + fh + wave(t)); }
   ctx.closePath();
-  if (type === "sun") {
+  if (type === "black") { // 匪旗: 黑底红边
+    ctx.fillStyle = "#16120e"; ctx.fill();
+    ctx.strokeStyle = "rgba(226,60,44,.85)"; ctx.lineWidth = 1.2; ctx.stroke();
+  } else if (type === "sun") {
     ctx.fillStyle = "#f2eee2"; ctx.fill();
     ctx.save(); ctx.clip();
     ctx.fillStyle = "#c8352a"; ctx.beginPath(); ctx.arc(px + fw * 0.54, pyTop + fh * 0.5 + wave(0.54), fh * 0.36, 0, 7); ctx.fill();
@@ -1895,7 +1919,7 @@ function drawFlag(px, pyTop, s, type, phase) {
 let fx = [];
 function addFx(type, q, r, opts) {
   const [cx, cy] = hexCenter(q, r);
-  fx.push(Object.assign({ type, x: cx, y: cy, t0: animTime, dur: type === "boom" ? 0.6 : type === "text" ? 0.95 : 0.34 }, opts || {}));
+  fx.push(Object.assign({ type, x: cx, y: cy, t0: animTime, dur: type === "boom" ? 0.6 : type === "text" ? 0.95 : type === "ring" ? 0.9 : type === "flag" ? 1.4 : type === "pop" ? 1.1 : 0.34 }, opts || {}));
 }
 function drawFx() {
   const s = CFG.hexSize;
@@ -1919,6 +1943,25 @@ function drawFx() {
       ctx.font = "700 " + (s * 0.42) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.lineWidth = 3; ctx.strokeText(e.text, e.x, e.y - s * 0.3 - p * s * 0.7);
       ctx.fillText(e.text, e.x, e.y - s * 0.3 - p * s * 0.7); ctx.globalAlpha = 1;
+    } else if (e.type === "ring") { // 金色扩散环(并入/地道转移)
+      const rr = s * 0.2 + p * s * 1.05;
+      ctx.strokeStyle = `rgba(232,192,90,${(1 - p) * 0.9})`; ctx.lineWidth = 3.5 * (1 - p) + 1;
+      ctx.beginPath(); ctx.arc(e.x, e.y, rr, 0, 7); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,240,200,${(1 - p) * 0.5})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, rr * 0.72, 0, 7); ctx.stroke();
+    } else if (e.type === "flag") { // 升红旗(村庄并入)
+      const up = Math.min(1, p * 1.6), fy = e.y + s * 0.2 - up * s * 0.95;
+      ctx.globalAlpha = p > 0.85 ? (1 - p) / 0.15 : 1;
+      ctx.strokeStyle = "#cfc6b2"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y + s * 0.2); ctx.lineTo(e.x, e.y + s * 0.2 - s * 0.95); ctx.stroke();
+      drawFlag(e.x, fy, s * (0.8 + up * 0.4), "red", animTime * 2.2);
+      ctx.globalAlpha = 1;
+    } else if (e.type === "pop") { // 图标弹出(建筑竣工/研究/洗劫)
+      const k = p < 0.3 ? p / 0.3 : 1, drop = p > 0.7 ? (p - 0.7) / 0.3 : 0;
+      ctx.globalAlpha = 1 - drop;
+      ctx.font = (s * (0.5 + k * 0.28)) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(e.icon || "✨", e.x, e.y - s * 0.35 - k * s * 0.38);
+      ctx.globalAlpha = 1;
     }
   }
 }
@@ -2323,12 +2366,18 @@ function drawStructure(cx, cy, s, sh) {
     ctx.fillRect(cx - w * 0.15, cy - h * 0.14, w * 0.3, h * 0.11);
     ctx.fillRect(cx - w * 0.07, cy + h * 0.04, w * 0.14, h * 0.17);
   } else if (sh.kind === "bandit") {
-    // 土匪山寨: 木栅圈 + 匪字寨门
-    ctx.strokeStyle = "#6a5636"; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
-    ctx.beginPath(); ctx.arc(cx, cy, s * 0.5, 0, 7); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#3e362a"; ctx.fillRect(cx - s * 0.22, cy - s * 0.14, s * 0.44, s * 0.32);
-    ctx.fillStyle = "#57493a"; ctx.beginPath(); ctx.moveTo(cx - s * 0.28, cy - s * 0.14); ctx.lineTo(cx, cy - s * 0.4); ctx.lineTo(cx + s * 0.28, cy - s * 0.14); ctx.closePath(); ctx.fill();
-    ctx.font = "700 " + (s * 0.26) + "px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#d8c9a0"; ctx.fillText("匪", cx, cy + s * 0.02);
+    // 土匪山寨(野蛮人风): 危险红晕脉冲 + 黑木寨墙 + 黑旗 + 红底"匪"字大牌
+    const pl = 0.5 + 0.5 * Math.sin(animTime * 3);
+    ctx.fillStyle = `rgba(200,32,26,${0.10 + 0.09 * pl})`; ctx.beginPath(); ctx.arc(cx, cy, s * 0.74, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#14100a"; ctx.lineWidth = 3.6; ctx.setLineDash([4, 2.6]);
+    ctx.beginPath(); ctx.arc(cx, cy, s * 0.55, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "#17120b"; ctx.fillRect(cx - s * 0.3, cy - s * 0.14, s * 0.6, s * 0.4);
+    ctx.strokeStyle = "#3a2c18"; ctx.lineWidth = 1.6; ctx.strokeRect(cx - s * 0.3, cy - s * 0.14, s * 0.6, s * 0.4);
+    ctx.fillStyle = "#241a0e"; ctx.beginPath(); ctx.moveTo(cx - s * 0.4, cy - s * 0.14); ctx.lineTo(cx, cy - s * 0.5); ctx.lineTo(cx + s * 0.4, cy - s * 0.14); ctx.closePath(); ctx.fill();
+    drawFlag(cx + s * 0.36, cy - s * 0.72, s, "black", animTime * 1.2 + (cx + cy) * 0.03);
+    ctx.fillStyle = "#8e1a12"; rrect(cx - s * 0.19, cy - s * 0.04, s * 0.38, s * 0.34, s * 0.05); ctx.fill();
+    ctx.strokeStyle = "#e2b13c"; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.font = "800 " + (s * 0.26) + "px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#f5e2c0"; ctx.fillText("匪", cx, cy + s * 0.13);
   } else { // site
     ctx.strokeStyle = "#a06a48"; ctx.lineWidth = 1.6; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.arc(cx, cy, s * 0.42, 0, 7); ctx.stroke(); ctx.setLineDash([]);
@@ -2346,12 +2395,22 @@ function drawStructure(cx, cy, s, sh) {
 
 function drawUnit(u, s) {
   let [x, y] = unitDrawPos(u, s);
-  if (moveAnim && moveAnim.id === u.id) { // 沿路径滑行动画
-    const p = Math.min(1, (animTime - moveAnim.t0) / moveAnim.dur), pts = moveAnim.pts, segs = pts.length - 1;
+  if (moveAnim && moveAnim.id === u.id) { // 沿路径滑行动画(缓入缓出)
+    const pr = Math.min(1, (animTime - moveAnim.t0) / moveAnim.dur);
+    const p = pr < 0.5 ? 2 * pr * pr : 1 - Math.pow(-2 * pr + 2, 2) / 2;
+    const pts = moveAnim.pts, segs = pts.length - 1;
     const fseg = Math.max(0, Math.min(segs - 1, Math.floor(p * segs))), lt = p * segs - fseg;
     const a = pts[fseg], b = pts[fseg + 1];
     x = a[0] + (b[0] - a[0]) * lt; y = a[1] + (b[1] - a[1]) * lt;
+    y -= Math.abs(Math.sin(p * segs * Math.PI)) * s * 0.09; // 逐格小跃动
   }
+  const la = atkAnims.get(u.id); // 攻击突进(冲向目标又收回)
+  if (la) { const p = (animTime - la.t0) / la.dur; if (p >= 0 && p <= 1) { const k = Math.sin(p * Math.PI) * 0.42; x += (la.tx - x) * k; y += (la.ty - y) * k; } else atkAnims.delete(u.id); }
+  const sk = shakeAnims.get(u.id); // 受击抖动
+  if (sk != null) { const p = (animTime - sk) / 0.4; if (p <= 1) x += Math.sin(p * 42) * (1 - p) * s * 0.09; else shakeAnims.delete(u.id); }
+  let popS = 1; // 出生弹出
+  const bo = spawnAnims.get(u.id);
+  if (bo != null) { const p = (animTime - bo) / 0.5; if (p <= 1) { const t = 1 - Math.pow(1 - Math.max(0, p), 3); popS = 0.25 + 0.75 * t + Math.sin(Math.max(0, p) * Math.PI) * 0.12; } else spawnAnims.delete(u.id); }
   const ut = UT[u.type];
   const isP = u.side === "p";
   const cfg = FIG[u.type] || FIG.militia;
@@ -2363,17 +2422,17 @@ function drawUnit(u, s) {
   }
   // 敌军杀气红晕
   if (!isP && u.type !== "puppet") { ctx.fillStyle = "rgba(206,40,30,.13)"; ctx.beginPath(); ctx.arc(x, y, s * 0.44, 0, 7); ctx.fill(); }
-  if (cfg.tank) drawTank(x, y + s * 0.05, s * 0.78, phase); else drawFigure(x, y + s * 0.05, s * 0.78, cfg, phase); // 模型缩小, 头顶横幅放大
+  if (cfg.tank) drawTank(x, y + s * 0.05, s * 0.78 * popS, phase); else drawFigure(x, y + s * 0.05, s * 0.78 * popS, cfg, phase); // 模型缩小, 头顶横幅放大; popS=出生弹出
   // Civ6式头顶大横幅(易辨认): 阵营色底+大徽标字+姿态icon, 血条嵌在横幅底边 —— 我方民事=青/军事=红棕/武工=紫, 日军=深红, 伪军=橄榄
   const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a")
-                    : (u.type === "puppet" ? "#5f5628" : u.type === "spy" ? "#463a52" : u.type === "bandit" ? "#54431e" : "#961f13");
+                    : (u.type === "puppet" ? "#5f5628" : u.type === "spy" ? "#463a52" : u.type === "bandit" ? "#191412" : "#961f13");
   const posture = u.fortified ? "🛡" : u.resting ? "🛌" : (u.autoPath && u.autoPath.length) ? "🚩" : "";
   const bw = s * (posture ? 1.08 : 0.82), bh = s * 0.52, by = y - s * 0.78;
   // 指向杆(横幅→单位)
   ctx.strokeStyle = "rgba(240,220,180,.45)"; ctx.lineWidth = 1.2;
   ctx.beginPath(); ctx.moveTo(x, by + bh / 2); ctx.lineTo(x, y - s * 0.3); ctx.stroke();
   ctx.fillStyle = badge; rrect(x - bw / 2, by - bh / 2, bw, bh, s * 0.1); ctx.fill();
-  ctx.strokeStyle = isP ? "rgba(240,220,180,.85)" : "rgba(230,120,110,.85)"; ctx.lineWidth = 1.6; ctx.stroke();
+  ctx.strokeStyle = isP ? "rgba(240,220,180,.85)" : (u.type === "bandit" ? "#e23a2c" : "rgba(230,120,110,.85)"); ctx.lineWidth = u.type === "bandit" ? 2 : 1.6; ctx.stroke();
   ctx.fillStyle = "#f8eed8"; ctx.font = "800 " + (s * 0.36) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(posture ? ut.glyph + posture : ut.glyph, x, by - (u.hp < 100 ? s * 0.03 : 0));
   // HP条(嵌横幅底边, 满血不显)
@@ -2538,7 +2597,7 @@ function showConfirmNear(q, r) {
 // ── 移动命令模式(Civ6式): 面板按【➜移动】→悬停看路径预览→点击直接执行, 不再弹确认 ──
 function exitMoveMode() { moveMode = false; moveHover = null; }
 function uiMoveCmd() {
-  const u = getSelUnit(); if (!u || u.attacked || u.mp <= 0) return;
+  const u = getSelUnit(); if (!u || u.attacked || u.mp <= 0 || u.rooted) return;
   moveMode = !moveMode;
   if (moveMode) reach = reachable(u); else moveHover = null;
   renderPanel(); draw();
@@ -2720,6 +2779,7 @@ function renderPanel() {
       html += "<div class='row' style='color:#9fbc52'>" + (u.fortified ? "🛡 驻扎设防中 · 防御+" + CFG.fortifyDef + ", 每回合回血" : "🛌 原地休整中 · 每回合+" + CFG.restHeal + "回血(至满员)") + "</div>";
       html += "<div class='uacts'><button class='uab' title='解除驻扎/休整, 恢复本回合行动' onclick='uiWake()'>⏏<span>醒转</span></button><button class='uab danger' title='解散(返还一半人力)' onclick='uiDisband()'>✖<span>解散</span></button></div>";
     } else {
+      if (u.rooted) html += "<div class='row' style='color:#9fd28a'>🌱 已扎根发动群众 — 该村并入时转为地方干部(消耗此单位); 期间不可调动, 可解散</div>";
       if (u.autoPath && u.autoPath.length) html += "<div class='row' style='color:#8fd2e8'>🚩 行军令执行中 · 余" + u.autoPath.length + "步 <button class='uab' style='display:inline-flex;vertical-align:middle' title='取消行军令' onclick='uiCancelMarch()'>✖<span>取消</span></button></div>";
       if (u.attacked) html += "<div class='warn'>本回合已行动</div>";
       if (u.type === "militia" && state.techs.dilei && !t.mine && !u.attacked)
@@ -2728,10 +2788,10 @@ function renderPanel() {
         html += "<button class='abtn' onclick='uiSabotage()'>💥 破袭铁路 <span class='cost'>(+暴露" + CFG.expSabotage + ")</span><span class='sub'>缴获军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + ", 削弱下次扫荡</span></button>";
       // 单位命令一排大图标(文明6式, 悬停看说明): 移动/驻扎/休整/跳过/解散
       html += "<div class='uacts big'>";
-      if (!u.attacked && u.mp > 0) html += "<button class='uab" + (moveMode ? " on" : "") + "' title='移动: 按下后点地图目标格(远处自动多回合行军, 再按取消)' onclick='uiMoveCmd()'>➜</button>";
+      if (!u.attacked && u.mp > 0 && !u.rooted) html += "<button class='uab" + (moveMode ? " on" : "") + "' title='移动: 按下后点地图目标格(远处自动多回合行军, 再按取消)' onclick='uiMoveCmd()'>➜</button>";
       if (!u.attacked && ut.str > 0) html += "<button class='uab' title='驻扎(文明6): 防御+" + CFG.fortifyDef + " 且每回合回血, 守到你调动它' onclick='uiFortify()'>🛡</button>";
       if (!u.attacked && u.hp < 100) html += "<button class='uab' title='休整至痊愈: 每回合回血直到满员(不加防御)' onclick='uiRest()'>🛌</button>";
-      if (!u.attacked) html += "<button class='uab' title='跳过: 本回合不再行动' onclick='uiSkip()'>⏭</button>";
+      if (!u.attacked && !u.rooted) html += "<button class='uab' title='跳过: 本回合不再行动' onclick='uiSkip()'>⏭</button>";
       html += "<button class='uab danger' title='解散: 返还一半人力' onclick='uiDisband()'>✖</button>";
       html += "</div>";
     }
@@ -2833,7 +2893,7 @@ function focusTile(q, r) {
   if (typeof mode3d !== "undefined" && mode3d && window.TH3D && window.TH3D.focus) { window.TH3D.focus(q, r); return; }
   const [cx, cy] = hexCenter(q, r); cam.x = cx * cam.zoom - innerWidth / 2; cam.y = cy * cam.zoom - innerHeight / 2;
 }
-function actionableUnits() { return state && state.units ? state.units.filter(u => u.side === "p" && u.mp > 0 && !u.attacked && !u.resting && !(u.autoPath && u.autoPath.length)) : []; }
+function actionableUnits() { return state && state.units ? state.units.filter(u => u.side === "p" && u.mp > 0 && !u.attacked && !u.resting && !u.rooted && !(u.autoPath && u.autoPath.length)) : []; }
 // 文明6式统一按钮: 有待命单位=「下一单位」, 全部行动完=「结束回合」
 function refreshMainBtn() {
   const b = $("endTurnBtn"); if (!b || !state || !state.started) return;
@@ -3318,7 +3378,7 @@ function animLoop(t) {
   animTime = t / 1000;
   if (fx.length) fx = fx.filter(e => animTime - e.t0 < e.dur); // 过期特效
   if (moveAnim && animTime - moveAnim.t0 >= moveAnim.dur) moveAnim = null; // 滑行结束
-  const active = fx.length > 0 || moveAnim || pending; // 特效/滑行/待确认脉冲时逐帧重绘, 否则节流(~22fps)只飘旗
+  const active = fx.length > 0 || moveAnim || pending || atkAnims.size || shakeAnims.size || spawnAnims.size; // 特效/滑行/突进/抖动/出生/待确认时逐帧重绘, 否则节流(~22fps)只飘旗
   if (state && !state.over && !modalOpen() && (active || t - _lastAnimDraw > 45)) { _lastAnimDraw = t; draw(); }
   requestAnimationFrame(animLoop);
 }
