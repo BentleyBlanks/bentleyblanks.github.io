@@ -4,6 +4,7 @@ import {
   createGame, invariantChecks, allVillages, playerVillages, enemyStructures, computeNetwork, neighbors, tileAt,
   startBuild, cancelBuild, changePolicy, buyTech, serializeGame, deserializeGame, endTurn, objectiveStatus,
   stationWorkTeam, cancelRoute, attackUnit, attemptDefection, shortestPath, moveUnit, suppressionAt, hexDistance,
+  fortifyUntilHealed, wakeUnit,
 } from "./rules.mjs";
 
 let checks = 0;
@@ -119,13 +120,30 @@ for (let seed = 1; seed <= 120; seed++) {
   check(JSON.stringify(state.operation) === JSON.stringify(clone.operation), "enemy operation remains deterministic after load");
 }
 
+// A damaged combat unit can remain fortified until full health or be woken manually.
+{
+  const state=createGame(1941),militia=state.units.find(u=>u.type==="militia");state.nextOperationTurn=999;
+  militia.hp=72;
+  const started=fortifyUntilHealed(state,militia.id);
+  check(started.ok&&militia.healingUntilFull&&militia.acted&&militia.mp===0,"fortify-until-healed enters a persistent skip state");
+  endTurn(state);
+  check(militia.hp===80&&militia.healingUntilFull&&militia.acted,"connected village heals 8 while persistent order remains active");
+  const woke=wakeUnit(state,militia.id);
+  check(woke.ok&&!militia.healingUntilFull&&!militia.fortified&&!militia.acted&&militia.mp>0,"wake interrupts healing and restores unit control");
+  militia.hp=76;
+  check(fortifyUntilHealed(state,militia.id).ok,"healing order can be issued again");
+  for(let i=0;i<3;i++)endTurn(state);
+  check(militia.hp===100&&!militia.healingUntilFull&&!militia.fortified&&!militia.acted,"full health automatically wakes the unit");
+  check(!fortifyUntilHealed(state,militia.id).ok,"full-health unit cannot enter healing order");
+}
+
 // Legacy v1 saves without the new optional fields are normalized instead of discarded.
 {
   const legacy=createGame(1717);
-  for(const unit of legacy.units){delete unit.route;delete unit.stationedVillageId;}
+  for(const unit of legacy.units){delete unit.route;delete unit.stationedVillageId;delete unit.healingUntilFull;}
   for(const village of allVillages(legacy))delete village.village.buildProgress;
   const restored=deserializeGame(JSON.stringify({version:CFG.saveVersion,state:legacy}));
-  check(restored.units.every(u=>u.route===null&&u.stationedVillageId===null),"legacy units receive route and station defaults");
+  check(restored.units.every(u=>u.route===null&&u.stationedVillageId===null&&u.healingUntilFull===false),"legacy units receive route, station, and healing defaults");
   check(allVillages(restored).every(x=>x.village.buildProgress&&typeof x.village.buildProgress==='object'),"legacy villages receive resumable construction storage");
 }
 

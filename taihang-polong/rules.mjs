@@ -305,7 +305,7 @@ function spawnUnit(state, type, q, r, extra = {}) {
   if (!spot) return null;
   const u = {
     id: state.nextUnitId++, type, side, layer, q: spot[0], r: spot[1], hp: 100, mp: ut.mp, acted: false, fortified: false,
-    xp: 0, level: 0, defection: 0, wavering: false, route: null, stationedVillageId: null, name: extra.name || ut.name, ...extra,
+    xp: 0, level: 0, defection: 0, wavering: false, route: null, stationedVillageId: null, healingUntilFull: false, name: extra.name || ut.name, ...extra,
   };
   state.units.push(u);
   if (side === "player") revealArea(state, u.q, u.r, ut.vis);
@@ -480,7 +480,7 @@ export function moveUnit(state, unitId, q, r) {
   if (stopIndex > 0) { u.q = found.path[stopIndex][0]; u.r = found.path[stopIndex][1]; }
   u.mp = reached ? Math.max(0, u.mp - spent) : 0;
   u.route = reached ? null : { q, r };
-  u.fortified = false;
+  u.fortified = false; u.healingUntilFull = false;
   revealArea(state, u.q, u.r, UNIT_TYPES[u.type].vis);
   computeNetwork(state);
   return { ok: true, path: found.path.slice(0, stopIndex + 1), fullPath: found.path, cost: spent, totalCost: found.cost, reached, q: u.q, r: u.r };
@@ -489,7 +489,7 @@ export function stationWorkTeam(state, unitId) {
   const u = getUnit(state, unitId), v = u ? tileAt(state, u.q, u.r)?.village : null;
   if (!u || u.side !== "player" || u.type !== "work" || u.acted || u.stationedVillageId) return { ok: false, error: "该工作队当前不能驻村" };
   if (!v || v.owner !== "neutral") return { ok: false, error: "工作队只能驻入尚未并入根据地的村庄" };
-  u.stationedVillageId = v.id; u.route = null; u.mp = 0; u.acted = true;
+  u.stationedVillageId = v.id; u.route = null; u.healingUntilFull = false; u.mp = 0; u.acted = true;
   addLog(state, `${u.name}驻入${v.name}，开始长期发动群众；此后不能离村。`, "good");
   return { ok: true, villageId: v.id };
 }
@@ -508,7 +508,7 @@ export function attackUnit(state, attackerId, defenderId) {
   const a = getUnit(state, attackerId), d = getUnit(state, defenderId);
   if (!a || !d || a.side === d.side || a.acted || hexDistance(a.q, a.r, d.q, d.r) !== 1 || UNIT_TYPES[a.type].str <= 0) return { ok: false, error: "无法攻击" };
   const dmg = damageRoll(state, unitStrength(state, a, "attack"), unitStrength(state, d, "defense"));
-  d.hp -= dmg; a.acted = true; a.mp = 0; a.fortified = false; a.route = null;
+  d.hp -= dmg; a.acted = true; a.mp = 0; a.fortified = false; a.route = null; a.healingUntilFull = false;
   let counter = 0;
   if (d.hp <= 0) { killUnit(state, d, a.side); promote(a, 5); }
   else {
@@ -536,7 +536,7 @@ export function attackStructure(state, attackerId, q, r) {
     if (livePillboxes > 3 || brokenRails < 2) return { ok: false, error: "县城仍有外围据点与铁路增援；至少拔至3座炮楼并同时切断2段铁路" };
   }
   const dmg = damageRoll(state, unitStrength(state, a, "attack"), s.str * (.6 + .4 * s.hp / s.maxHp));
-  s.hp -= dmg; a.acted = true; a.mp = 0; a.route = null; let counter = 0;
+  s.hp -= dmg; a.acted = true; a.mp = 0; a.fortified = false; a.route = null; a.healingUntilFull = false; let counter = 0;
   if (s.hp <= 0) {
     const kind = s.kind; t.structure = null; state.stats.structuresDestroyed++;
     state.arms += kind === "town" ? 25 : 12; state.grain += kind === "town" ? 30 : 16; promote(a, 5);
@@ -600,7 +600,7 @@ export function sabotageRail(state, unitId) {
   const u = getUnit(state, unitId), t = u ? tileAt(state, u.q, u.r) : null;
   if (!u || u.side !== "player" || u.acted || !t?.rail || t.railBroken > 0 || !["militia", "commando"].includes(u.type)) return { ok: false, error: "该单位无法在这里破袭" };
   const duration = state.techs.sabotage ? CFG.railRepairTurns + 3 : CFG.railRepairTurns;
-  t.railBroken = duration; u.acted = true; u.mp = 0; u.route = null;
+  t.railBroken = duration; u.acted = true; u.mp = 0; u.route = null; u.fortified = false; u.healingUntilFull = false;
   const tr = t.village ? traitOf(t.village) : null, bonus = tr?.sabotageBonus || 0;
   state.arms += 7 + bonus; state.grain += 10; state.exposure += state.techs.sabotage ? 6 : 9; state.pressure += 2;
   state.stats.sabotages++; state.recentSabotageTurn = state.turn; promote(u, 3);
@@ -611,7 +611,7 @@ export function attemptDefection(state, unitId, targetId) {
   if (!state.techs.enemywork) return { ok: false, error: "需要完成【敌工科】整训" };
   if (!u || !target || u.side !== "player" || target.type !== "puppet" || u.acted || !["work", "commando"].includes(u.type) || hexDistance(u.q, u.r, target.q, target.r) !== 1) return { ok: false, error: "必须由邻接的工作队或武工队策反伪军" };
   if (state.org < 8) return { ok: false, error: "策反行动需要8组织" };
-  state.org -= 8; u.acted = true; u.mp = 0; u.route = null; state.exposure += 3;
+  state.org -= 8; u.acted = true; u.mp = 0; u.route = null; u.fortified = false; u.healingUntilFull = false; state.exposure += 3;
   const nearby = allVillages(state).filter(x => x.village.owner === "player" && hexDistance(x.q, x.r, target.q, target.r) <= 3).sort((a, b) => b.village.support - a.village.support)[0];
   const progress = 34 + (policyOf(state).defection || 0) + Math.round((nearby?.village.support || 20) / 10);
   target.defection = clamp((target.defection || 0) + progress, 0, 100);
@@ -634,11 +634,25 @@ export function reinforceUnit(state, unitId) {
   const clinic = x.village.buildings.includes("clinic"), heal = clinic ? 45 : 30;
   const missing = Math.min(heal, 100 - u.hp), cost = { man: Math.max(1, Math.ceil(missing / (clinic ? 18 : 14))), grain: Math.max(2, Math.ceil(missing / 7)) };
   if (!canAfford(state, cost)) return { ok: false, error: "人力或粮食不足" };
-  spend(state, cost); u.hp += missing; u.acted = true; u.mp = 0; u.route = null; addLog(state, `${u.name}补充${missing}点兵力，保留了骨干和经验。`); return { ok: true };
+  spend(state, cost); u.hp += missing; u.acted = true; u.mp = 0; u.route = null; u.fortified = false; u.healingUntilFull = false; addLog(state, `${u.name}补充${missing}点兵力，保留了骨干和经验。`); return { ok: true };
 }
 export function fortifyUnit(state, unitId) {
   const u = getUnit(state, unitId); if (!u || u.side !== "player" || u.acted || UNIT_TYPES[u.type].str <= 0) return { ok: false, error: "无法设防" };
-  u.fortified = true; u.acted = true; u.mp = 0; u.route = null; return { ok: true };
+  u.fortified = true; u.healingUntilFull = false; u.acted = true; u.mp = 0; u.route = null; return { ok: true };
+}
+export function fortifyUntilHealed(state, unitId) {
+  const u = getUnit(state, unitId);
+  if (!u || u.side !== "player" || u.acted || UNIT_TYPES[u.type].str <= 0 || u.hp >= 100) return { ok: false, error: "该单位当前无法驻扎疗伤" };
+  u.fortified = true; u.healingUntilFull = true; u.acted = true; u.mp = 0; u.route = null;
+  addLog(state, `${u.name}开始驻扎疗伤，痊愈前将自动跳过行动。`, "info");
+  return { ok: true };
+}
+export function wakeUnit(state, unitId) {
+  const u = getUnit(state, unitId);
+  if (!u || u.side !== "player" || !u.healingUntilFull) return { ok: false, error: "该单位没有持续疗伤命令" };
+  u.healingUntilFull = false; u.fortified = false; u.acted = false; u.mp = UNIT_TYPES[u.type].mp;
+  addLog(state, `${u.name}中止疗伤，重新等待命令。`, "info");
+  return { ok: true };
 }
 
 export function countBrokenRails(state) { let n = 0; eachTile(state, t => { if (t.railBroken > 0) n++; }); return n; }
@@ -897,7 +911,7 @@ function checkEnd(state) {
 
 function continueQueuedMovement(state) {
   for (const u of state.units.slice()) {
-    if (u.side !== "player" || !u.route || u.stationedVillageId) continue;
+    if (u.side !== "player" || !u.route || u.stationedVillageId || u.healingUntilFull) continue;
     const target = { ...u.route }, result = moveUnit(state, u.id, target.q, target.r);
     if (result.ok && result.reached) addLog(state, `${u.name}完成多回合行军，抵达${tileAt(state, u.q, u.r).village?.name || TERRAIN[tileAt(state, u.q, u.r).terrain].name}。`, "good");
   }
@@ -911,9 +925,14 @@ export function endTurn(state) {
   progressEnemyInfrastructure(state); enemyTurn(state); computeNetwork(state);
   if (checkDefeat(state)) return { ok: true, over: true };
   for (const u of state.units) if (u.side === "player") {
-    if (u.stationedVillageId) { u.mp = 0; u.acted = true; u.route = null; }
-    else { u.mp = UNIT_TYPES[u.type].mp; u.acted = false; }
-    if (u.hp < 100 && u.fortified && playerVillages(state).some(x => x.q === u.q && x.r === u.r && x.village.connected)) u.hp = Math.min(100, u.hp + 4);
+    const connectedVillage = playerVillages(state).some(x => x.q === u.q && x.r === u.r && x.village.connected);
+    if (u.hp < 100 && u.fortified) u.hp = Math.min(100, u.hp + (connectedVillage ? 8 : 4));
+    if (u.stationedVillageId) { u.mp = 0; u.acted = true; u.route = null; u.healingUntilFull = false; }
+    else if (u.healingUntilFull && u.hp < 100) { u.mp = 0; u.acted = true; }
+    else {
+      if (u.healingUntilFull) { u.healingUntilFull = false; u.fortified = false; addLog(state, `${u.name}已经痊愈并自动结束驻扎。`, "good"); }
+      u.mp = UNIT_TYPES[u.type].mp; u.acted = false;
+    }
   }
   const oldTurn = state.turn; state.turn++; transitionChapter(state, oldTurn, state.turn); computeNetwork(state); checkEnd(state);
   if (!state.over) continueQueuedMovement(state);
@@ -947,7 +966,7 @@ export function serializeGame(state) {
 }
 export function deserializeGame(text) {
   const data = JSON.parse(text); if (!data || data.version !== CFG.saveVersion || !data.state) throw new Error("存档版本不兼容");
-  for (const u of data.state.units || []) { u.route ??= null; u.stationedVillageId ??= null; }
+  for (const u of data.state.units || []) { u.route ??= null; u.stationedVillageId ??= null; u.healingUntilFull ??= false; }
   for (const x of allVillages(data.state)) x.village.buildProgress ||= {};
   computeNetwork(data.state); return data.state;
 }
@@ -963,6 +982,7 @@ export function invariantChecks(state) {
     const k = `${u.side}:${u.layer}:${u.q},${u.r}`; if (occupied.has(k)) errors.push(`单位重叠${k}`); occupied.add(k);
     if (!Number.isFinite(u.hp) || u.hp <= 0) errors.push(`无效单位HP:${u.id}`);
     if (u.route && !inBounds(u.route.q, u.route.r)) errors.push(`单位${u.id}行军目标越界`);
+    if (u.healingUntilFull && (u.side !== "player" || UNIT_TYPES[u.type].str <= 0 || u.stationedVillageId || u.route)) errors.push(`单位${u.id}持续疗伤状态错误`);
     if (u.stationedVillageId) {
       const v = tileAt(state, u.q, u.r)?.village;
       if (u.type !== "work" || v?.id !== u.stationedVillageId || v.owner !== "neutral") errors.push(`单位${u.id}驻村状态错误`);

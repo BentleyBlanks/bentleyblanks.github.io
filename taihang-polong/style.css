@@ -97,6 +97,8 @@ kbd { color: #8e856d; font-size: 10px; font-family: inherit; }
 #sidePanel button { min-height: 38px; padding: 6px 7px; font-size: 11px; text-align: left; }
 #sidePanel button strong { display: block; color: #f0dfb5; font-size: 12px; }
 #sidePanel button small { color: #91866c; }
+#sidePanel button.active-command { border-color: #d6ad58; background: linear-gradient(#655126, #3f351d); box-shadow: inset 0 0 0 1px rgba(255,224,145,.16), 0 0 12px rgba(214,173,88,.2); }
+#sidePanel button.active-command strong { color: #ffe7a5; }
 .bar { height: 7px; margin: 4px 0; overflow: hidden; border: 1px solid #4f4429; border-radius: 4px; background: #242016; }
 .bar b { display: block; height: 100%; background: #9a3e31; }
 .bar.support b { background: #8fac54; }

@@ -3,7 +3,7 @@ import {
   createGame, serializeGame, deserializeGame, invariantChecks, dateLabel, chapterIndex, keyOf, hexDistance,
   tileAt, allVillages, playerVillages, enemyStructures, visibleKeys, unitAt, getUnit, suppressionAt, computeNetwork,
   villageYield, reachableTiles, shortestPath, moveUnit, combatPreview, structurePreview, attackUnit, attackStructure,
-  stationWorkTeam, cancelRoute, startBuild, cancelBuild, recruitUnit, buyTech, changePolicy, sabotageRail, attemptDefection, reinforceUnit, fortifyUnit,
+  stationWorkTeam, cancelRoute, startBuild, cancelBuild, recruitUnit, buyTech, changePolicy, sabotageRail, attemptDefection, reinforceUnit, fortifyUnit, fortifyUntilHealed, wakeUnit,
   countBrokenRails, goalProgress, objectiveStatus, endTurn, unitStrength,
 } from "./rules.mjs";
 
@@ -14,6 +14,7 @@ const SQ3 = Math.sqrt(3);
 let state = null;
 let selection = null; // {kind:'unit',id} | {kind:'tile',q,r}
 let pending = null;
+let commandMode = null; // {type:'move',unitId}
 let reach = new Map();
 let camera = { x: 0, y: 0, zoom: 1 };
 let dragging = null;
@@ -193,37 +194,36 @@ function tileFromPoint(x, y) {
   return bestD <= (CFG.hexSize * camera.zoom * 1.05) ** 2 ? best : null;
 }
 function selectedUnit() { return selection?.kind === "unit" ? getUnit(state, selection.id) : null; }
+function clearCommandMode() { commandMode = null; reach = new Map(); }
 function selectUnit(u) {
-  selection = { kind: "unit", id: u.id }; reach = u.side === "player" ? reachableTiles(state, u.id) : new Map(); pending = null; hideConfirm(); renderPanel(); draw();
+  selection = { kind: "unit", id: u.id }; clearCommandMode(); pending = null; hideConfirm(); renderPanel(); draw();
 }
 function handleTileClick(q, r) {
   if (!state || state.over || !tileAt(state, q, r).disc) return;
   const u = selectedUnit(), enemy = unitAt(state, q, r, "enemy", "mil"), t = tileAt(state, q, r);
   if (u?.side === "player" && !u.acted) {
-    if (enemy && hexDistance(u.q, u.r, q, r) === 1 && UNIT_TYPES[u.type].str > 0) { planUnitAttack(u, enemy); return; }
-    if (t.structure && hexDistance(u.q, u.r, q, r) === 1 && UNIT_TYPES[u.type].str > 0) { planStructureAttack(u, q, r); return; }
-    if (!enemy && !t.structure) {
-      const route = shortestPath(state, u, q, r, 99); if (route?.cost > 0) { planMove(u, q, r); return; }
-    }
+    if (enemy && hexDistance(u.q, u.r, q, r) === 1 && UNIT_TYPES[u.type].str > 0) { clearCommandMode(); planUnitAttack(u, enemy); return; }
+    if (t.structure && hexDistance(u.q, u.r, q, r) === 1 && UNIT_TYPES[u.type].str > 0) { clearCommandMode(); planStructureAttack(u, q, r); return; }
+    if (commandMode?.type === "move" && commandMode.unitId === u.id) { executeMoveCommand(u, q, r); return; }
   }
   const ownUnits = state.units.filter(x => x.q === q && x.r === r && x.side === "player");
   if (ownUnits.length) {
     const current = u && u.q === q && u.r === r ? ownUnits.findIndex(x => x.id === u.id) : -1; selectUnit(ownUnits[(current + 1) % ownUnits.length]); return;
   }
-  selection = { kind: "tile", q, r }; reach = new Map(); pending = null; hideConfirm(); renderPanel(); draw();
+  selection = { kind: "tile", q, r }; clearCommandMode(); pending = null; hideConfirm(); renderPanel(); draw();
 }
-function planMove(u, q, r) {
-  const found = shortestPath(state, u, q, r, 99); if (!found) return;
-  let budget = u.mp, turns = 1, stopIndex = 0;
-  for (let i = 1; i < found.path.length; i++) {
-    const [nq, nr] = found.path[i], step = TERRAIN[tileAt(state, nq, nr).terrain].move;
-    if (step > budget) { turns++; budget = UNIT_TYPES[u.type].mp; }
-    budget -= step;
-    if (turns === 1) stopIndex = i;
-  }
-  pending = { type: "move", unitId: u.id, q, r, path: found.path, stopIndex };
-  const stop = found.path[stopIndex] || found.path[0], multi = stopIndex < found.path.length - 1;
-  showConfirm(`<strong>移动 ${u.name}</strong> → ${tileLabel(q, r)}<br><small>${multi ? `本回合先到${tileLabel(stop[0], stop[1])} · 预计${turns}回合 · 将自动续行` : `本回合抵达 · 消耗移动力 ${found.cost}`}</small>`); draw();
+function toggleMoveCommand(u) {
+  if (!u || u.side !== "player" || u.acted || u.stationedVillageId || u.mp <= 0) { toast("该单位当前无法移动"); return; }
+  if (commandMode?.type === "move" && commandMode.unitId === u.id) clearCommandMode();
+  else { commandMode = { type: "move", unitId: u.id }; reach = reachableTiles(state, u.id); toast("移动命令：请选择已侦明的目的地"); }
+  pending = null; hideConfirm(); renderPanel(); draw();
+}
+function executeMoveCommand(u, q, r) {
+  const result = moveUnit(state, u.id, q, r);
+  if (!result.ok) { toast(result.error); draw(); return; }
+  clearCommandMode(); pending = null; hideConfirm();
+  toast(result.reached ? `${u.name}已抵达${tileLabel(u.q, u.r)}` : `${u.name}已开始多回合行军，将自动续行至${tileLabel(q, r)}`);
+  beep(340,.045,.02); afterAction();
 }
 function planUnitAttack(a, d) {
   const p = combatPreview(state, a.id, d.id); pending = { type: "attack", unitId: a.id, targetId: d.id, q: d.q, r: d.r };
@@ -238,8 +238,7 @@ function hideConfirm() { $("confirmBar").classList.add("hidden"); }
 function executePending() {
   if (!pending) return;
   let result;
-  if (pending.type === "move") result = moveUnit(state, pending.unitId, pending.q, pending.r);
-  else if (pending.type === "attack") result = attackUnit(state, pending.unitId, pending.targetId);
+  if (pending.type === "attack") result = attackUnit(state, pending.unitId, pending.targetId);
   else result = attackStructure(state, pending.unitId, pending.q, pending.r);
   pending = null; hideConfirm();
   if (!result.ok) toast(result.error); else { beep(result.damage ? 145 : 340, result.damage ? .11 : .045, result.damage ? .045 : .02, result.damage ? "sawtooth" : "sine"); }
@@ -253,23 +252,29 @@ function costHtml(cost = {}) {
 }
 function renderUnitPanel(u) {
   const t = tileAt(state, u.q, u.r), ut = UNIT_TYPES[u.type], def = unitStrength(state, u, "defense"), atk = unitStrength(state, u, "attack");
-  const status = u.stationedVillageId ? "已驻村 · 不可移动" : u.acted ? "本回合已行动" : `移动 ${u.mp}/${ut.mp}`;
+  const status = u.stationedVillageId ? "已驻村 · 不可移动" : u.healingUntilFull ? "驻扎疗伤 · 自动跳过" : u.acted ? "本回合已行动" : `移动 ${u.mp}/${ut.mp}`;
   let html = `<h3>${u.name}<small>${tileLabel(u.q, u.r)} · ${status}</small></h3>`;
   html += `<div class="statline"><span>HP <b>${Math.round(u.hp)}</b>/100</span>${ut.str ? `<span>战力 <b>${atk.toFixed(1)}</b>/<b>${def.toFixed(1)}</b></span>` : ""}<span>经验 <b>${u.xp}</b>${u.level ? ` · ${"★".repeat(u.level)}` : ""}</span></div>`;
   html += `<div class="bar"><b style="width:${Math.max(0,u.hp)}%"></b></div><p class="hint">${ut.desc}</p>`;
   if (u.route) html += `<div class="warning">多回合行军目标：${tileLabel(u.route.q,u.route.r)}。每个新回合会自动沿安全路径续行。</div>`;
+  if (u.healingUntilFull) html += `<div class="warning good">正在驻扎直至痊愈：野外每回合恢复4点，交通畅通的己方村恢复8点；满血后自动唤醒。</div>`;
   if (u.stationedVillageId) html += `<div class="warning good">工作队已转入长期驻村状态；村庄并入根据地后，单位会转化为基层组织并从棋盘移除。</div>`;
   if (u.side === "player") {
     const actions = [];
     if (t.village) actions.push(`<button data-action="selectTile"><strong>查看驻地</strong><small>建设、招募与村庄产出</small></button>`);
-    if (!u.acted && u.type === "work" && t.village?.owner === "neutral" && !u.stationedVillageId) actions.push(`<button data-action="station"><strong>驻村发动群众</strong><small>确认后不能离村 · 并入时消耗</small></button>`);
-    if (u.route) actions.push(`<button data-action="cancelRoute"><strong>取消行军计划</strong><small>保留当前位置与剩余移动力</small></button>`);
-    if (!u.acted && ut.str > 0) actions.push(`<button data-action="fortify"><strong>驻扎设防</strong><small>防御+4，月末缓慢恢复</small></button>`);
-    if (!u.acted && u.hp < 100 && t.village?.owner === "player" && t.village.connected) actions.push(`<button data-action="reinforce"><strong>补充兵员</strong><small>消耗人力与粮，保留经验</small></button>`);
-    if (!u.acted && t.rail && !t.railBroken && ["militia","commando"].includes(u.type)) actions.push(`<button data-action="sabotage"><strong>破袭铁路</strong><small>缴获物资并延迟增援</small></button>`);
-    const puppets = state.units.filter(x => x.type === "puppet" && hexDistance(u.q,u.r,x.q,x.r) === 1);
-    if (!u.acted && state.techs.enemywork && ["work","commando"].includes(u.type) && puppets.length) actions.push(`<button data-action="defect" data-target="${puppets[0].id}"><strong>秘密策反伪军</strong><small>组织8 · 当前进度${puppets[0].defection || 0}%</small></button>`);
-    if (!u.acted && !u.stationedVillageId) actions.push(`<button data-action="skip"><strong>跳过本回合</strong><small>保留当前位置</small></button>`);
+    if (u.healingUntilFull) actions.push(`<button data-action="wake"><strong>唤醒单位</strong><small>中止疗伤 · 恢复本回合移动</small></button>`);
+    else {
+      if (!u.acted && !u.stationedVillageId && u.mp > 0) actions.push(`<button data-action="moveMode" class="${commandMode?.type === "move" && commandMode.unitId === u.id ? "active-command" : ""}"><strong>${commandMode?.type === "move" && commandMode.unitId === u.id ? "取消移动命令" : "移动"}</strong><small>${commandMode?.type === "move" && commandMode.unitId === u.id ? "正在选择地图目的地" : "再在地图选择目的地"}</small></button>`);
+      if (!u.acted && u.type === "work" && t.village?.owner === "neutral" && !u.stationedVillageId) actions.push(`<button data-action="station"><strong>驻村发动群众</strong><small>确认后不能离村 · 并入时消耗</small></button>`);
+      if (u.route) actions.push(`<button data-action="cancelRoute"><strong>取消行军计划</strong><small>保留当前位置与剩余移动力</small></button>`);
+      if (!u.acted && ut.str > 0) actions.push(`<button data-action="fortify"><strong>驻扎设防</strong><small>本回合防御+4 · 逐回合恢复</small></button>`);
+      if (!u.acted && ut.str > 0 && u.hp < 100) actions.push(`<button data-action="healUntilFull"><strong>驻扎直至痊愈</strong><small>自动跳过回合 · 满血后唤醒</small></button>`);
+      if (!u.acted && u.hp < 100 && t.village?.owner === "player" && t.village.connected) actions.push(`<button data-action="reinforce"><strong>补充兵员</strong><small>消耗人力与粮，保留经验</small></button>`);
+      if (!u.acted && t.rail && !t.railBroken && ["militia","commando"].includes(u.type)) actions.push(`<button data-action="sabotage"><strong>破袭铁路</strong><small>缴获物资并延迟增援</small></button>`);
+      const puppets = state.units.filter(x => x.type === "puppet" && hexDistance(u.q,u.r,x.q,x.r) === 1);
+      if (!u.acted && state.techs.enemywork && ["work","commando"].includes(u.type) && puppets.length) actions.push(`<button data-action="defect" data-target="${puppets[0].id}"><strong>秘密策反伪军</strong><small>组织8 · 当前进度${puppets[0].defection || 0}%</small></button>`);
+      if (!u.acted && !u.stationedVillageId) actions.push(`<button data-action="skip"><strong>跳过本回合</strong><small>保留当前位置</small></button>`);
+    }
     html += `<div class="panel-section"><b>单位行动</b><div class="action-grid">${actions.join("") || "<span class='hint'>本回合没有可用行动。</span>"}</div></div>`;
   } else {
     html += `<div class="warning">敌军正在执行${u.opId ? `【${OPERATIONS[state.operation?.type]?.name || "敌军行动"}】` : "巡逻与清乡"}。</div>`;
@@ -359,7 +364,7 @@ function renderLogs() {
   $("logEntries").innerHTML = state.logs.slice(-18).map(l => `<p class="${l.kind}"><time>${dateLabel(l.turn)}</time>${l.text}</p>`).join("");
   $("logPanel").scrollTop = $("logPanel").scrollHeight;
 }
-function actionableUnits() { return state.units.filter(u => u.side === "player" && !u.stationedVillageId && !u.acted && u.mp > 0); }
+function actionableUnits() { return state.units.filter(u => u.side === "player" && !u.stationedVillageId && !u.healingUntilFull && !u.acted && u.mp > 0); }
 function refreshMainButton() {
   const b = $("mainButton"), count = actionableUnits().length;
   if (count) { b.innerHTML = `下一单位 <small>[空格] · ${count}</small>`; b.classList.remove("ready"); }
@@ -376,14 +381,14 @@ function mainAction() {
 }
 function performEndTurn() {
   const oldChapter = chapterIndex(state.turn), oldOp = state.operation?.id;
-  selection = null; pending = null; hideConfirm(); const result = endTurn(state); saveGame();
+  selection = null; pending = null; clearCommandMode(); hideConfirm(); const result = endTurn(state); saveGame();
   if (!result.ok) toast(result.error);
   const newChapter = chapterIndex(state.turn); if (newChapter !== oldChapter) toast(CHAPTERS[newChapter].title);
   else if (state.operation?.id !== oldOp && state.operation) toast(`敌军行动：${OPERATIONS[state.operation.type].name}`);
   beep(220,.08,.026,"triangle"); updateUI(); if (state.over) showEnding();
 }
 function afterAction() {
-  computeNetwork(state); saveGame(); reach = selectedUnit()?.side === "player" ? reachableTiles(state, selectedUnit().id) : new Map(); updateUI(); if (state.over) showEnding();
+  computeNetwork(state); saveGame(); reach = commandMode?.type === "move" && selectedUnit()?.id === commandMode.unitId ? reachableTiles(state, commandMode.unitId) : new Map(); updateUI(); if (state.over) showEnding();
 }
 
 function modalOpen() { return !$("modalWrap").classList.contains("hidden"); }
@@ -414,7 +419,7 @@ function introHtml() {
       <div class="card"><h3>建设</h3><p>每村只有2个设施槽，必须选择专业化方向。</p></div>
       <div class="card"><h3>破笼</h3><p>破袭铁路、拔炮楼、策反伪军并保存群众。</p></div>
     </div>
-    <p class="hint">操作：拖拽平移、滚轮缩放；点单位后可点击已侦明的远方格，系统会规划并自动续行；点己方村建设与招募。鼠标悬停顶部资源可查看用途和最近月结。</p>
+    <p class="hint">操作：拖拽平移、滚轮缩放；选中单位后先点右下角【移动】，再点已侦明的目的地，远距离会自动续行；点己方村建设与招募。鼠标悬停顶部资源可查看用途和最近月结。</p>
     <div class="modal-actions"><button data-modal="new">开始新战役</button>${hasSave ? `<button class="ghost" data-modal="continue">继续进度</button>` : ""}<button class="ghost" data-modal="rules">查看完整规则</button></div>`;
 }
 function showIntro() { openModal(introHtml()); }
@@ -423,7 +428,8 @@ function showRules() {
   openModal(`<h2>战役设定与规则<small>不是占地涂色，而是两个网络争夺同一片乡村</small></h2>
     <p><strong>根据地网络</strong>由村庄和地下交通站组成。交通畅通的村庄全额产出、可以建设与补员；被炮楼或敌军切断后只保留一半产出。</p>
     <p><strong>工作队</strong>对标一次性开拓单位：进入中立村后需确认“驻村发动群众”；此后不能离村，村庄并入时转化为基层组织并从棋盘移除。</p>
-    <p><strong>多回合行军</strong>可以直接点击已侦明的远方空格，单位会逐回合自动续行；新命令或主动行动会取消旧路线。村庄工程可以取消，已投入资源与剩余工期保留，下次无需再次付费即可续建。</p>
+    <p><strong>单位命令</strong>需要先选中单位，再点右下角【移动】并选择已侦明的目的地；移动立即执行，不再二次确认，远距离会逐回合自动续行。受损战斗单位可以【驻扎直至痊愈】，满血自动唤醒，也能随时手动中止。</p>
+    <p><strong>村庄工程</strong>可以取消，已投入资源与剩余工期保留，下次无需再次付费即可续建。</p>
     <p><strong>暴露</strong>是短期情报：行动越激烈，敌人越容易锁定准确目标；可以衰减。<strong>压力</strong>是长期形势：根据地、兵工和时间都会让敌军升级，不能靠隐蔽永久退出战争。</p>
     <p><strong>胜利</strong>有两条：完成局部反攻、切断铁路并攻克县城；或以7座畅通村庄和较高民心坚持到1945年8月。</p>
     <div class="chapter-list">${rows}</div>
@@ -453,10 +459,10 @@ function showEnding() {
 function saveGame() { if (state && !state.over) localStorage.setItem(SAVE_KEY, serializeGame(state)); else if (state?.over) localStorage.removeItem(SAVE_KEY); }
 function newGame(seed = null) {
   const urlSeed = new URLSearchParams(location.search).get("seed"), chosen = seed ?? (urlSeed ? Number(urlSeed) : Date.now() % 1000000000);
-  state = createGame(chosen); lastChapter = 0; selection = null; pending = null; reach = new Map(); camera = {x:0,y:0,zoom: innerWidth<700?.72:.92}; localStorage.removeItem(SAVE_KEY); closeModal(); centerCamera(state.hq.q,state.hq.r); updateUI(); saveGame(); toast("序章 · 百团余波");
+  state = createGame(chosen); lastChapter = 0; selection = null; pending = null; clearCommandMode(); camera = {x:0,y:0,zoom: innerWidth<700?.72:.92}; localStorage.removeItem(SAVE_KEY); closeModal(); centerCamera(state.hq.q,state.hq.r); updateUI(); saveGame(); toast("序章 · 百团余波");
 }
 function continueGame() {
-  try { state = deserializeGame(localStorage.getItem(SAVE_KEY)); selection = null; pending = null; reach = new Map(); camera.zoom = innerWidth<700?.72:.92; closeModal(); centerCamera(state.hq.q,state.hq.r); updateUI(); }
+  try { state = deserializeGame(localStorage.getItem(SAVE_KEY)); selection = null; pending = null; clearCommandMode(); camera.zoom = innerWidth<700?.72:.92; closeModal(); centerCamera(state.hq.q,state.hq.r); updateUI(); }
   catch { localStorage.removeItem(SAVE_KEY); toast("存档损坏，已准备新战役"); newGame(); }
 }
 
@@ -481,6 +487,7 @@ $("modal").addEventListener("click", e => {
 });
 $("sidePanel").addEventListener("click", e => {
   const b=e.target.closest("button[data-action]"); if(!b) return; const action=b.dataset.action, u=selectedUnit(); let r={ok:false,error:"无效行动"};
+  if(action==="moveMode" && u){toggleMoveCommand(u);return;}
   if(action==="build" && selection?.kind==="tile") r=startBuild(state,tileAt(state,selection.q,selection.r).village.id,b.dataset.key);
   else if(action==="cancelBuild" && selection?.kind==="tile") r=cancelBuild(state,tileAt(state,selection.q,selection.r).village.id);
   else if(action==="recruit" && selection?.kind==="tile") r=recruitUnit(state,tileAt(state,selection.q,selection.r).village.id,b.dataset.key);
@@ -488,11 +495,13 @@ $("sidePanel").addEventListener("click", e => {
   else if(action==="station" && u) r=stationWorkTeam(state,u.id);
   else if(action==="cancelRoute" && u) r=cancelRoute(state,u.id);
   else if(action==="fortify" && u) r=fortifyUnit(state,u.id);
+  else if(action==="healUntilFull" && u) r=fortifyUntilHealed(state,u.id);
+  else if(action==="wake" && u) r=wakeUnit(state,u.id);
   else if(action==="reinforce" && u) r=reinforceUnit(state,u.id);
   else if(action==="sabotage" && u) r=sabotageRail(state,u.id);
   else if(action==="defect" && u) r=attemptDefection(state,u.id,Number(b.dataset.target));
   else if(action==="skip" && u){u.acted=true;u.mp=0;r={ok:true};}
-  if(!r.ok) toast(r.error); else beep(360,.05,.02); afterAction();
+  if(!r.ok) toast(r.error); else { clearCommandMode(); beep(360,.05,.02); } afterAction();
 });
 
 canvas.addEventListener("pointerdown", e => { ensureAudio(); canvas.setPointerCapture(e.pointerId); dragging={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,camX:camera.x,camY:camera.y}; canvas.classList.add("dragging"); });
@@ -500,9 +509,10 @@ canvas.addEventListener("pointermove", e => { if(!dragging||e.pointerId!==draggi
 canvas.addEventListener("pointerup", e => { if(!dragging||e.pointerId!==dragging.id)return; const moved=Math.hypot(e.clientX-dragging.startX,e.clientY-dragging.startY);dragging=null;canvas.classList.remove("dragging");if(moved<7){const h=tileFromPoint(e.clientX,e.clientY);if(h)handleTileClick(h.q,h.r);} });
 canvas.addEventListener("wheel", e => { e.preventDefault();const old=camera.zoom,next=Math.max(.55,Math.min(1.7,old*(e.deltaY<0?1.1:.9)));const wx=(e.clientX+camera.x)/old,wy=(e.clientY+camera.y)/old;camera.zoom=next;camera.x=wx*next-e.clientX;camera.y=wy*next-e.clientY;draw();},{passive:false});
 addEventListener("resize",resize);
-addEventListener("keydown",e=>{if(e.code==="Space"&&!modalOpen()){e.preventDefault();mainAction();}else if((e.key==="t"||e.key==="T")&&state&&!modalOpen())showTechs();else if((e.key==="p"||e.key==="P")&&state&&!modalOpen())showPolicies();else if(e.key==="h"||e.key==="H")showRules();else if(e.key==="Escape"){if(modalOpen()&&state&&!state.over)closeModal();else{selection=null;pending=null;hideConfirm();renderPanel();draw();}}});
+addEventListener("keydown",e=>{if(e.code==="Space"&&!modalOpen()){e.preventDefault();mainAction();}else if((e.key==="t"||e.key==="T")&&state&&!modalOpen())showTechs();else if((e.key==="p"||e.key==="P")&&state&&!modalOpen())showPolicies();else if(e.key==="h"||e.key==="H")showRules();else if(e.key==="Escape"){if(modalOpen()&&state&&!state.over)closeModal();else if(commandMode){clearCommandMode();renderPanel();draw();}else{selection=null;pending=null;hideConfirm();renderPanel();draw();}}});
 
 resize();
-if(new URLSearchParams(location.search).get("test")==="1"){
-  state=createGame(1941);const errors=invariantChecks(state);document.body.dataset.selftest=errors.length?"fail":"pass";const el=document.createElement("output");el.id="selfTest";el.hidden=true;el.textContent=errors.length?errors.join(" | "):"PASS";document.body.appendChild(el);centerCamera(state.hq.q,state.hq.r);updateUI();
+const testParams=new URLSearchParams(location.search);
+if(testParams.get("test")==="1"){
+  state=createGame(1941);if(testParams.get("hurt")==="1")state.units.find(u=>u.type==="militia").hp=68;const errors=invariantChecks(state);document.body.dataset.selftest=errors.length?"fail":"pass";const el=document.createElement("output");el.id="selfTest";el.hidden=true;el.textContent=errors.length?errors.join(" | "):"PASS";document.body.appendChild(el);centerCamera(state.hq.q,state.hq.r);updateUI();
 }else showIntro();
