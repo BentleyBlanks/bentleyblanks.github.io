@@ -434,7 +434,7 @@ function seasonGrainMult(t) { return (hasSeason(t, "harvest") ? CFG.harvestGrain
 // ── 单位表 ──
 const UT = {
   scout:    { name: "侦察员", glyph: "侦", side: "p", layer: "mil", str: 4,  mp: 3, vis: 3, cost: { grain: 10, man: 5 },  upkeep: 0, desc: "视野3, 探索地图。战力孱弱, 别拿去拼命。" },
-  work:     { name: "工作队", glyph: "工", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 5, org: 10 }, upkeep: 0, desc: "驻中立村发动群众(+民心/回合); 开始工作即扎根, 村庄并入时转为地方干部(单位消耗, 开拓者式)。无武装, 落单被抓就没了。" },
+  work:     { name: "工作队", glyph: "工", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 5, org: 10 }, upkeep: 0, desc: "驻中立村发动群众(+民心/回合); 开始工作即扎根, 村庄并入时转为地方干部(消耗该队)。无武装, 落单被抓就没了。" },
   militia:  { name: "民兵队", glyph: "民", side: "p", layer: "mil", str: 9,  mp: 2, vis: 2, cost: { grain: 15, man: 10, arms: 5 }, upkeep: 1, desc: "便宜耐用。可埋地雷(需地雷战)。" },
   regular:  { name: "主力连", glyph: "连", side: "p", layer: "mil", str: 16, mp: 2, vis: 2, cost: { grain: 25, man: 20, arms: 15 }, upkeep: 2, desc: "野战中坚, 拔炮楼主力。" },
   elite:    { name: "主力团", glyph: "团", side: "p", layer: "mil", str: 26, mp: 2, vis: 2, cost: { grain: 40, man: 35, arms: 30 }, upkeep: 3, needTech: "zhenggui", desc: "正规化整训后的重拳, 反攻县城的本钱。" },
@@ -2792,7 +2792,7 @@ function renderPanel() {
       // 单位命令一排大图标(文明6式, 悬停看说明): 移动/驻扎/休整/跳过/解散
       html += "<div class='uacts big'>";
       if (!u.attacked && u.mp > 0 && !u.rooted) html += "<button class='uab" + (moveMode ? " on" : "") + "' title='移动: 按下后点地图目标格(远处自动多回合行军, 再按取消)' onclick='uiMoveCmd()'>➜</button>";
-      if (!u.attacked && ut.str > 0) html += "<button class='uab' title='驻扎(文明6): 防御+" + CFG.fortifyDef + " 且每回合回血, 守到你调动它' onclick='uiFortify()'>🛡</button>";
+      if (!u.attacked && ut.str > 0) html += "<button class='uab' title='驻扎: 防御+" + CFG.fortifyDef + ", 每回合回血, 守到你调动它' onclick='uiFortify()'>🛡</button>";
       if (!u.attacked && u.hp < 100) html += "<button class='uab' title='休整至痊愈: 每回合回血直到满员(不加防御)' onclick='uiRest()'>🛌</button>";
       if (!u.attacked && !u.rooted) html += "<button class='uab' title='跳过: 本回合不再行动' onclick='uiSkip()'>⏭</button>";
       html += "<button class='uab danger' title='解散: 返还一半人力' onclick='uiDisband()'>✖</button>";
@@ -3356,14 +3356,14 @@ function buildDebugPanel() {
   let qual = `<div class="dr"><label>ToneMapping</label><select onchange="dbgApply('tone','mode',this.value)"><option value="aces" selected>ACESFilmic</option><option value="agx">AgX</option><option value="reinhard">Reinhard</option><option value="cineon">Cineon</option><option value="linear">Linear</option><option value="none">None</option></select></div>`;
   qual += dbgSl("曝光", 0, 2, 0.05, 0.82, "exposure", "v");
   qual += `<div class="dr"><label>TAA 抗锯齿</label><input type="checkbox" onchange="dbgApply('taa','on',this.checked)"></div>`;
-  let csm = `<div class="dr"><label title="级联数(文明6式远近分级阴影)">级联数 cascades</label><select onchange="dbgApply('csm','cascades',+this.value)"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></div>`;
+  let csm = `<div class="dr"><label title="级联数(远近分级阴影)">级联数 cascades</label><select onchange="dbgApply('csm','cascades',+this.value)"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></div>`;
   csm += `<div class="dr"><label title="每级阴影贴图分辨率">每级分辨率</label><select onchange="dbgApply('csm','size',+this.value)"><option value="1024">1024</option><option value="2048" selected>2048</option><option value="4096">4096</option></select></div>`;
   csm += dbgSl("阴影距离(maxFar)", 20, 120, 1, 55, "csm", "maxFar");
   csm += `<div class="dr"><label title="级联间平滑淡出">级联淡出 fade</label><input type="checkbox" checked onchange="dbgApply('csm','fade',this.checked)"></div>`;
   csm += `<div class="dr"><label title="关闭CSM回退单阴影(跟随镜头)">启用 CSM</label><input type="checkbox" checked onchange="dbgApply('csm','enabled',this.checked)"></div>`;
   let cam = "<div class='note'>需在 3D 模式下调整 · 越俯视=越接近正上方</div>";
-  cam += dbgSl("俯视角(越小越俯视)", 0.15, 1.3, 0.02, 0.62, "cam", "polar");
-  cam += dbgSl("视野 FOV", 25, 70, 1, 42, "cam", "fov");
+  cam += dbgSl("俯视角(越小越俯视)", 0.15, 1.3, 0.02, 0.56, "cam", "polar");
+  cam += dbgSl("视野 FOV", 25, 70, 1, 34, "cam", "fov");
   cam += dbgSl("最近距离(拉最近)", 4, 30, 1, 8, "cam", "minDist");
   cam += dbgSl("最远距离(拉最远)", 30, 150, 1, 85, "cam", "maxDist");
   const tools = `<div class="dr" style="gap:8px;margin:0 0 8px"><button class="tbtn${mode3d ? " on" : ""}" id="view3dBtn" onclick="toggle3D()" title="切换 3D/2D 视角(3D 仅桌面)">${mode3d ? "🗺 2D" : "🗺 3D"}</button><button class="tbtn" onclick="showHelp(false)">📖 规则 [H]</button></div>`;
