@@ -2183,6 +2183,11 @@ function handleClick(px, py) {
     }
     const rc = reach?.get(key(q, r));
     if (rc) { planMove(selU, q, r, rc.cost); return; }
+    // 超出本回合可达 → 多回合行军(目标格有己方单位时优先选中它, 不规划路径)
+    if (!(q === selU.q && r === selU.r) && !state.units.some(x => x.q === q && x.r === r && x.side === "p")) {
+      const fp = farPath(selU, q, r);
+      if (fp && fp.length > 1) { planMoveFar(selU, fp); return; }
+    }
   }
   clearPending(false);
 
@@ -2225,14 +2230,14 @@ function showConfirmNear(q, r) {
   bar.style.transform = "none"; bar.style.left = left + "px"; bar.style.top = top + "px"; bar.style.bottom = "auto";
 }
 function planMove(u, q, r, cost) {
-  pending = { type: "move", q, r, cost, path: buildPath(u, q, r) };
+  pending = { type: "move", uid: u.id, q, r, cost, path: buildPath(u, q, r) };
   const steps = pending.path.length - 1;
   $("cInfo").innerHTML = `移动 <b>${UT[u.type].name}</b> → <b>${tileName(q, r)}</b>　行程 <b>${steps}</b> 步`;
   showConfirmNear(q, r); draw();
 }
 function planMoveFar(u, path) { // 超出本回合MP: 多回合行军(数字=第几回合抵达)
   const seg = pathTurns(u, path), [dq, dr] = path[path.length - 1];
-  pending = { type: "movefar", q: dq, r: dr, path, stops: seg.stops };
+  pending = { type: "movefar", uid: u.id, q: dq, r: dr, path, stops: seg.stops };
   $("cInfo").innerHTML = `行军 <b>${UT[u.type].name}</b> → <b>${tileName(dq, dr)}</b>　<b>${path.length - 1}</b> 步 · 约 <b>${seg.nTurns}</b> 回合抵达`;
   showConfirmNear(dq, dr); draw();
 }
@@ -2244,7 +2249,7 @@ function attackVerdict(exp, dhp, back, ahp, kill) {
   return { t: "◐ 拉锯，两败俱伤", c: "v-warn" };
 }
 function planAttack(a, d, q, r) {
-  pending = { type: "atk", q, r, targetId: d.id };
+  pending = { type: "atk", uid: a.id, q, r, targetId: d.id };
   const flank = flankBonusAt(a, q, r);
   const as = effStr(a, "atk") + flank, ds = effStr(d, "def");
   const exp = Math.max(1, Math.round(CFG.dmgBase * Math.exp((as - ds) / CFG.dmgExpDiv)));
@@ -2260,7 +2265,7 @@ function planAttack(a, d, q, r) {
 }
 function planStructAttack(a, q, r) {
   const sh = state.tiles[q][r].sh;
-  pending = { type: "struct", q, r };
+  pending = { type: "struct", uid: a.id, q, r };
   const flank = flankBonusAt(a, q, r);
   const as = effStr(a, "atk") + flank, ds = sh.str * (sh.hp / sh.maxHp * 0.4 + 0.6);
   const exp = Math.max(1, Math.round(CFG.dmgBase * Math.exp((as - ds) / CFG.dmgExpDiv) * (hasPromo(a, "baopo") ? 1.4 : 1)));
@@ -2275,6 +2280,7 @@ function execPending() {
   if (pending.type === "build") { const p = pending; clearPending(false); startBuild(p.q, p.r, p.bk); afterAction(); return; }
   if (pending.type === "recruit") { const p = pending; clearPending(false); recruit(p.q, p.r, p.tk); afterAction(); return; }
   const u = getSelUnit(); if (!u) { clearPending(); return; }
+  if (pending.uid != null && pending.uid !== u.id) { clearPending(); return; } // 规划属于上一个单位 → 作废
   const pt = pending.type, pq = pending.q, pr = pending.r, path = pending.path, cost = pending.cost, tid = pending.targetId;
   clearPending(false);
   if (pt === "move") {
@@ -2508,7 +2514,7 @@ function uiSkip() { const u = getSelUnit(); if (!u) return; u.autoPath = null; u
 // 下一待命单位: 选中并把镜头切过去
 function nextUnit() {
   if (state.over) return;
-  const acts = state.units.filter(u => u.side === "p" && u.mp > 0 && !u.attacked && !u.resting).sort((a, b) => a.id - b.id);
+  const acts = actionableUnits().sort((a, b) => a.id - b.id);
   if (!acts.length) { log("所有单位都行动完了 — 可以结束回合了。", "info"); $("endTurnBtn").classList.add("pulse"); return; }
   const cur = getSelUnit(); let next = acts[0];
   if (cur) { const i = acts.findIndex(u => u.id === cur.id); if (i >= 0) next = acts[(i + 1) % acts.length]; }
@@ -2775,8 +2781,8 @@ function handleClickTile(q, r) {
     if (canAtk && t.sh) { if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; } planStructAttack(selU, q, r); return; }
     const rc = reach && reach.get(key(q, r));
     if (rc) { planMove(selU, q, r, rc.cost); return; }
-    // 超出本回合可达 → 多回合行军规划(文明六式)
-    if (!(q === selU.q && r === selU.r)) {
+    // 超出本回合可达 → 多回合行军(目标格有己方单位时优先选中它, 不规划路径 — 修"点新单位却连出旧单位路径")
+    if (!(q === selU.q && r === selU.r) && !state.units.some(x => x.q === q && x.r === r && x.side === "p")) {
       const fp = farPath(selU, q, r);
       if (fp && fp.length > 1) { planMoveFar(selU, fp); return; }
     }
