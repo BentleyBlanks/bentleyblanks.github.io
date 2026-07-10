@@ -453,7 +453,8 @@ function signature() {
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { if (s.tiles[q][r].disc) d++; }
   const sel = G().sel(), pend = G().pending(), reach = G().reach();
   let st = ""; for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const t = s.tiles[q][r]; if (t.village) st += q + "" + r + (t.village.owner) + (t.village.buildings ? t.village.buildings.length : 0) + Math.round(t.village.heart) + (t.village.build ? "b" + t.village.build.left : ""); if (t.sh) st += "s" + q + r + Math.round(t.sh.hp); if (t.mine) st += "m" + q + r; }
-  return s.turn + "#" + d + "#" + (vis ? vis.size : 0) + "#" + u + "#" + (sel ? sel.kind + (sel.id || sel.q + "," + sel.r) : "-") + "#" + (pend ? pend.type + pend.q + "," + pend.r + (pend.path ? pend.path.length : 0) : "-") + "#" + (reach ? reach.size : 0) + "#" + st;
+  const mm = G().moveMode && G().moveMode() ? 1 : 0, mh = G().moveHover && G().moveHover();
+  return s.turn + "#" + d + "#" + (vis ? vis.size : 0) + "#" + u + "#" + (sel ? sel.kind + (sel.id || sel.q + "," + sel.r) : "-") + "#" + (pend ? pend.type + pend.q + "," + pend.r : "-") + "#" + mm + (mh ? mh.q + "," + mh.r : "-") + "#" + (reach ? reach.size : 0) + "#" + st;
 }
 function clearGroup(g) { for (let i = g.children.length - 1; i >= 0; i--) { const c = g.children[i]; g.remove(c); if (c.geometry && c.geometry !== prismGeo && c.geometry !== hexFlatGeo && c.geometry !== treeTrunkGeo && c.geometry !== treeLeafGeo) c.geometry.dispose && c.geometry.dispose(); } }
 
@@ -514,7 +515,7 @@ function syncDynamic() {
       gStruct.add(villageMesh(x, h, z, t.village));
       if (t.village.owner === "p") { // 总部/根据地村庄: Civ6式城市横幅
         const cb = new THREE.Sprite(new THREE.SpriteMaterial({ map: cityBannerTex(t.village), depthWrite: false, transparent: true }));
-        cb.scale.set(2.4, 0.45, 1); cb.position.set(x, h + 1.85, z); cb.userData = { q, r };
+        cb.scale.set(2.4, 0.45, 1); cb.position.set(x, h + 1.85, z); cb.userData = { q, r, banner: 1 };
         gStruct.add(cb);
       }
     }
@@ -530,11 +531,11 @@ function syncDynamic() {
     const [x, z] = hexWorld(un.q, un.r), h = tiles[un.q + "," + un.r].h;
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: unitTex(un), depthWrite: false, transparent: true }));
     const off = un.layer === "civ" ? -0.28 : 0.28;
-    sp.scale.set(1.0, 1.0, 1); sp.position.set(x + off, h + 0.62, z); sp.userData = { q: un.q, r: un.r };
+    sp.scale.set(0.78, 0.78, 1); sp.position.set(x + off, h + 0.5, z); sp.userData = { q: un.q, r: un.r }; // 模型缩小
     gUnits.add(sp);
     // 头顶大横幅(Civ6式, 易辨认)
     const bn = new THREE.Sprite(new THREE.SpriteMaterial({ map: unitBannerTex(un), depthWrite: false, transparent: true }));
-    bn.scale.set(1.5, 0.61, 1); bn.position.set(x + off, h + 1.35, z); bn.userData = { q: un.q, r: un.r };
+    bn.scale.set(1.9, 0.77, 1); bn.position.set(x + off, h + 1.32, z); bn.userData = { q: un.q, r: un.r }; // 横幅放大
     gUnits.add(bn);
   }
 
@@ -543,17 +544,18 @@ function syncDynamic() {
   const sel = G().sel(), reach = G().reach(), pend = G().pending();
   const selU = sel && sel.kind === "unit" ? s.units.find(x => x.id === sel.id) : null;
   if (selU) gOverlay.add(ring(selU.q, selU.r, 0xffe9a0, 0.5));
-  if (reach) for (const k of reach.keys()) { const [q, r] = k.split(",").map(Number); gOverlay.add(hexCap(q, r, 0x8fd24a, 0.14)); gOverlay.add(hexOutline(q, r, 0xcdff72)); }
+  const mvMode = G().moveMode && G().moveMode(), mvHover = G().moveHover && G().moveHover();
+  if (reach && mvMode) for (const k of reach.keys()) { const [q, r] = k.split(",").map(Number); gOverlay.add(hexCap(q, r, 0x8fd24a, 0.14)); gOverlay.add(hexOutline(q, r, 0xcdff72)); }
   const drawPath3D = (path, stops) => {
     for (let i = 0; i < path.length - 1; i++) gOverlay.add(pathSeg(path[i], path[i + 1]));
     if (stops) for (const [bq, br, bt] of stops) { const sp = numSprite(bt); const [x, z] = hexWorld(bq, br); sp.position.set(x, topY(bq, br) + 0.45, z); gOverlay.add(sp); }
   };
-  if (pend && (pend.type === "move" || pend.type === "movefar") && pend.path) {
-    drawPath3D(pend.path, pend.stops);
-    gOverlay.add(ring(pend.q, pend.r, 0xffe9a0, 0.9));
+  if (mvMode && mvHover && mvHover.path) { // 移动模式悬停路径预览(点击即执行)
+    drawPath3D(mvHover.path, mvHover.stops);
+    gOverlay.add(ring(mvHover.q, mvHover.r, 0xffe9a0, 0.9));
   }
   // 已下达的行军令(选中时): 路径+剩余回合数字
-  if (selU && selU.autoPath && selU.autoPath.length && !(pend && pend.path) && G().pathTurns) {
+  if (selU && selU.autoPath && selU.autoPath.length && !(mvMode && mvHover) && G().pathTurns) {
     const full = [[selU.q, selU.r], ...selU.autoPath];
     drawPath3D(full, G().pathTurns(selU, full).stops);
   }
@@ -622,15 +624,26 @@ function pathSeg(a, b) { const [ax, az] = hexWorld(a[0], a[1]), [bx, bz] = hexWo
 let downPt = null;
 function setupPicking() {
   const el = renderer.domElement, ray = new THREE.Raycaster(), m = new THREE.Vector2();
+  const castAt = (e) => { const rect = el.getBoundingClientRect(); m.x = ((e.clientX - rect.left) / rect.width) * 2 - 1; m.y = -((e.clientY - rect.top) / rect.height) * 2 + 1; ray.setFromCamera(m, camera); };
   el.addEventListener("pointerdown", e => { downPt = [e.clientX, e.clientY]; });
   el.addEventListener("pointerup", e => {
     if (!downPt) return; const moved = Math.abs(e.clientX - downPt[0]) + Math.abs(e.clientY - downPt[1]); downPt = null;
     if (moved > 6) return; // 拖动=旋转, 不算点击
-    const rect = el.getBoundingClientRect();
-    m.x = ((e.clientX - rect.left) / rect.width) * 2 - 1; m.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    ray.setFromCamera(m, camera);
+    castAt(e);
+    // 城市横幅优先: 点横幅直接选中村庄
+    const bh = ray.intersectObjects(gStruct.children, false).find(h => h.object.userData && h.object.userData.banner);
+    if (bh && G().selectTile) { G().selectTile(bh.object.userData.q, bh.object.userData.r); return; }
     const hit = ray.intersectObjects(gTiles.children, false).find(h => h.object.userData && h.object.userData.q !== undefined);
     if (hit) { G().click(hit.object.userData.q, hit.object.userData.r); }
+  });
+  // 移动命令模式: 悬停路径预览(节流)
+  let lastHover = 0;
+  el.addEventListener("pointermove", e => {
+    if (!G().moveMode || !G().moveMode()) return;
+    const now = performance.now(); if (now - lastHover < 50) return; lastHover = now;
+    castAt(e);
+    const hit = ray.intersectObjects(gTiles.children, false).find(h => h.object.userData && h.object.userData.q !== undefined);
+    if (hit && G().hover) G().hover(hit.object.userData.q, hit.object.userData.r);
   });
 }
 

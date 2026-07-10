@@ -45,8 +45,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ── 顶栏 ── */
 #topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 12px; background: rgba(22,18,10,.92); border-bottom: 1px solid #3a3826; font-size: 13px; }
-#topbar .ttl { font-weight: 700; letter-spacing: 2px; color: #f0e4c0; font-size: 14px; }
-#topbar .ttl small { font-weight: 400; color: #8a8058; font-size: 11px; margin-left: 4px; letter-spacing: 0; }
+#uiDate { margin-left: auto; } /* 回合/日期靠右上角, ⚙在最右 */
 #topbar .res { white-space: nowrap; }
 #topbar .res b { color: #f0e4c0; }
 #topbar .res.bad b { color: #e2564d; }
@@ -211,17 +210,14 @@ button { font-family: inherit; cursor: pointer; }
 <div id="gl"></div>
 
 <div id="topbar">
-  <span class="ttl">太行·1941<small>敌后 4X</small></span>
-  <span class="res" id="uiDate"></span>
   <span class="res" id="uiGrain"></span>
   <span class="res" id="uiMan"></span>
   <span class="res" id="uiArms"></span>
   <span class="res" id="uiOrg"></span>
-  <span id="expWrap">暴露 <span id="expBar"><span id="expFill"></span><span id="expLine"></span></span> <span id="expVal"></span></span>
+  <span id="expWrap" title="点击查看暴露度说明">暴露 <span id="expBar"><span id="expFill"></span><span id="expLine"></span></span> <span id="expVal"></span></span>
   <button class="tbtn" id="techBtn">整训 [T]</button>
-  <button class="tbtn" id="helpBtn">规则 [H]</button>
-  <button class="tbtn" id="view3dBtn" title="切换 3D/2D 视角(3D 仅桌面)">🗺 3D</button>
-  <button class="tbtn" id="dbgBtn" title="调试面板">🐞 Debug</button>
+  <span class="res" id="uiDate"></span>
+  <button class="tbtn" id="dbgBtn" title="选项 / 调试">⚙</button>
 </div>
 <div id="dbgPanel"></div>
 <div id="dbgTip"></div>
@@ -426,18 +422,18 @@ const BUILDING_YIELD = { kaiken: [4, 0, 0], yexiao: [0, 0, 2], liangcang: [0, 0,
 
 // ── 整训树(4阶, 组织力即买即得) ──
 const TECHS = {
-  jianzu:   { tier: 1, name: "减租减息", cost: 30, desc: "工作队+4民心/回合; 己方村民心回升翻倍" },
-  maque:    { tier: 1, name: "麻雀战",   cost: 30, desc: "民兵在山地/森林战力+4" },
-  zhencha:  { tier: 1, name: "侦察网",   cost: 30, desc: "全体视野+1; 可预知扫荡目标、规模与战术打法" },
-  dilei:    { tier: 2, name: "地雷战",   cost: 60, desc: "解锁【埋地雷】: 4军火布雷, 踩中-42HP" },
-  chujian:  { tier: 2, name: "锄奸部",   cost: 60, desc: "可攻击特务队; 我军踏入特务所在格当场锄奸(村民心+5, 暴露-4)" },
-  didao:    { tier: 2, name: "地道战",   cost: 60, desc: "解锁建筑【地道网】" },
-  binggong: { tier: 2, name: "兵工生产", cost: 60, desc: "解锁建筑【兵工坊】" },
-  tongzhan: { tier: 2, name: "统一战线", cost: 60, desc: "伪军战力-3(策反瓦解); 中立村初始民心+10" },
-  poxi:     { tier: 3, name: "破袭战",   cost: 100, desc: "解锁【武工队】与【破袭铁路】: 缴获+削弱扫荡" },
-  zhenggui: { tier: 3, name: "正规化整训", cost: 100, desc: "解锁【主力团】; 主力连/团战力+2" },
-  diwork:   { tier: 3, name: "敌工科",   cost: 100, desc: "看穿敌军战力详情; 暴露衰减+1/回合" },
-  fangong:  { tier: 4, name: "战略反攻", cost: 150, need: ["zhenggui", "poxi"], desc: "全军战力+2; 解锁攻击县城→军事胜利" },
+  jianzu:   { tier: 1, name: "减租减息", cost: 30, turns: 3, desc: "工作队+4民心/回合; 己方村民心回升翻倍" },
+  maque:    { tier: 1, name: "麻雀战",   cost: 30, turns: 3, desc: "民兵在山地/森林战力+4" },
+  zhencha:  { tier: 1, name: "侦察网",   cost: 30, turns: 3, desc: "全体视野+1; 可预知扫荡目标、规模与战术打法" },
+  dilei:    { tier: 2, name: "地雷战",   cost: 60, turns: 4, desc: "解锁【埋地雷】: 4军火布雷, 踩中-42HP" },
+  chujian:  { tier: 2, name: "锄奸部",   cost: 60, turns: 4, desc: "可攻击特务队; 我军踏入特务所在格当场锄奸(村民心+5, 暴露-4)" },
+  didao:    { tier: 2, name: "地道战",   cost: 60, turns: 4, desc: "解锁建筑【地道网】" },
+  binggong: { tier: 2, name: "兵工生产", cost: 60, turns: 4, desc: "解锁建筑【兵工坊】" },
+  tongzhan: { tier: 2, name: "统一战线", cost: 60, turns: 4, desc: "伪军战力-3(策反瓦解); 中立村初始民心+10" },
+  poxi:     { tier: 3, name: "破袭战",   cost: 100, turns: 5, desc: "解锁【武工队】与【破袭铁路】: 缴获+削弱扫荡" },
+  zhenggui: { tier: 3, name: "正规化整训", cost: 100, turns: 5, desc: "解锁【主力团】; 主力连/团战力+2" },
+  diwork:   { tier: 3, name: "敌工科",   cost: 100, turns: 5, desc: "看穿敌军战力详情; 暴露衰减+1/回合" },
+  fangong:  { tier: 4, name: "战略反攻", cost: 150, turns: 6, need: ["zhenggui", "poxi"], desc: "全军战力+2; 解锁攻击县城→军事胜利" },
 };
 function tierUnlocked(tier) {
   if (tier === 1) return true;
@@ -1027,12 +1023,19 @@ function recruit(q, r, type) {
   u.mp = 0;
   log(tileName(q, r) + "组建了" + ut.name, "hl");
 }
+// 整训=科技树(Civ6式): 付组织力启动, 花若干旬完成, 同时只能研究一项
 function buyTech(k) {
   const t = TECHS[k];
   if (state.techs[k] || state.org < t.cost) return;
+  if (state.research) return; // 已有在研项目
   if (!tierUnlocked(t.tier)) return;
   if (t.need && !t.need.every(n => state.techs[n])) return;
   state.org -= t.cost;
+  state.research = { k, left: t.turns };
+  log("开始整训【" + t.name + "】— 预计 " + t.turns + " 旬后完成", "hl");
+}
+function completeTech(k) {
+  const t = TECHS[k];
   state.techs[k] = true;
   if (k === "tongzhan") {
     for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
@@ -1040,7 +1043,11 @@ function buyTech(k) {
       if (v && v.owner === "n") v.heart = clamp(v.heart + 10, 0, 100);
     }
   }
-  log("完成整训【" + t.name + "】", "good");
+  log("✔ 完成整训【" + t.name + "】— " + t.desc, "good");
+}
+function tickResearch() { // 每回合推进研究
+  if (!state.research) return;
+  if (--state.research.left <= 0) { const k = state.research.k; state.research = null; completeTech(k); }
 }
 
 // ═══════════════════════════════ 回合结算 ═══════════════════════════════
@@ -1157,6 +1164,7 @@ function endTurn() {
     }
   }
   continueAutoPaths(); // 多回合行军令: 自动续走
+  tickResearch();      // 整训研究推进
 
   // ── 8. 推进回合 ──
   state.turn++;
@@ -1548,8 +1556,11 @@ const ctx = cv.getContext("2d");
 let cam = { x: 0, y: 0, zoom: 1 };
 let sel = null;        // { kind:"unit", id } | { kind:"tile", q, r }
 let reach = null;      // Map of reachable
-let pending = null;    // 待确认动作 { type:"move"|"atk"|"struct", q, r, cost?, path?, targetId? }
+let pending = null;    // 待确认动作 { type:"atk"|"struct"|"build"|"recruit", q, r, targetId? }
+let moveMode = false;  // 移动命令模式(Civ6式): 先按【➜移动】再点目标格直接执行
+let moveHover = null;  // 移动模式悬停路径预览 { q, r, path, stops }
 let moveAnim = null;   // 移动滑行动画 { id, pts:[[x,y]...], t0, dur }
+let bannerHits = [];   // 本帧城市横幅命中区(世界坐标, 点横幅选村庄)
 // 四种地形拉开色相与明度: 平原=暖黄开阔 / 丘陵=红棕 / 森林=绿 / 山地=冷灰, 一眼可辨
 const TERRAIN_COLOR = { plain: "#6d6634", hills: "#6f5232", forest: "#39501f", mountain: "#585449" };
 const TERRAIN_EDGE  = { plain: "#847a44", hills: "#8a6a44", forest: "#4c6a2c", mountain: "#726c5e" };
@@ -1767,6 +1778,7 @@ function hexPath(cx, cy, s) {
 
 function draw() {
   if (!state) return;
+  bannerHits.length = 0;
   const dpr = syncCanvas(); // 自愈: 每次绘制前校正 backing 尺寸, 摆脱对 resize 事件时序的依赖
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = "#100d07";
@@ -1799,7 +1811,7 @@ function draw() {
     // 地雷(只对玩家可见)
     if (t.mine) drawMine(cx, cy, s);
     // 村庄
-    if (t.village) drawVillage(cx, cy, s, t.village, isSuppressed(q, r));
+    if (t.village) drawVillage(cx, cy, s, t.village, isSuppressed(q, r), q, r);
     // 敌设施
     if (t.sh) drawStructure(cx, cy, s, t.sh);
     // 迷雾(已探明但不可见)
@@ -1831,8 +1843,8 @@ function draw() {
   }
   ctx.stroke();
 
-  // 可达高亮
-  if (reach && sel?.kind === "unit") {
+  // 可达高亮(仅移动命令模式下显示)
+  if (reach && moveMode && sel?.kind === "unit") {
     for (const k of reach.keys()) {
       const [q, r] = k.split(",").map(Number);
       const [cx, cy] = hexCenter(q, r);
@@ -1858,20 +1870,20 @@ function draw() {
     }
   }
 
-  // 移动路径预览(待确认): 虚线 + 途经点 + 目的地脉冲圈; movefar 加回合数字标注(文明六式)
-  if (pending && (pending.type === "move" || pending.type === "movefar") && pending.path) {
+  // 移动命令模式悬停预览: 虚线 + 途经点 + 回合数字标注(文明六式), 点击即执行
+  if (moveMode && moveHover && moveHover.path) {
     ctx.strokeStyle = "#ffe9a0"; ctx.lineWidth = 3; ctx.setLineDash([2, 6]); ctx.lineCap = "round";
     ctx.beginPath();
-    pending.path.forEach(([pq, pr], i) => { const [px, py] = hexCenter(pq, pr); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+    moveHover.path.forEach(([pq, pr], i) => { const [px, py] = hexCenter(pq, pr); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
     ctx.stroke(); ctx.setLineDash([]);
-    pending.path.forEach(([pq, pr], i) => { if (!i) return; const [px, py] = hexCenter(pq, pr); ctx.fillStyle = "rgba(255,233,160,.85)"; ctx.beginPath(); ctx.arc(px, py, 2.6, 0, 7); ctx.fill(); });
-    if (pending.stops) drawTurnBadges(pending.stops, s);
-    const [dx, dy] = hexCenter(pending.q, pending.r), pl = 0.5 + 0.5 * Math.sin(animTime * 5);
+    moveHover.path.forEach(([pq, pr], i) => { if (!i) return; const [px, py] = hexCenter(pq, pr); ctx.fillStyle = "rgba(255,233,160,.85)"; ctx.beginPath(); ctx.arc(px, py, 2.6, 0, 7); ctx.fill(); });
+    if (moveHover.stops) drawTurnBadges(moveHover.stops, s);
+    const [dx, dy] = hexCenter(moveHover.q, moveHover.r), pl = 0.5 + 0.5 * Math.sin(animTime * 5);
     ctx.strokeStyle = `rgba(255,233,160,${0.5 + 0.4 * pl})`; ctx.lineWidth = 2.5; hexPath(dx, dy, s - 4 - pl * 3); ctx.stroke();
   }
   // 选中单位已下达的行军令: 灰虚线 + 剩余回合数字
   const selMarch = getSelUnit && getSelUnit();
-  if (selMarch && selMarch.autoPath && selMarch.autoPath.length && !(pending && pending.path)) {
+  if (selMarch && selMarch.autoPath && selMarch.autoPath.length && !(moveMode && moveHover)) {
     const full = [[selMarch.q, selMarch.r], ...selMarch.autoPath];
     ctx.strokeStyle = "rgba(160,200,220,.75)"; ctx.lineWidth = 2.5; ctx.setLineDash([2, 6]); ctx.lineCap = "round";
     ctx.beginPath();
@@ -1930,7 +1942,7 @@ function draw() {
   }
 }
 
-function drawVillage(cx, cy, s, v, suppressed) {
+function drawVillage(cx, cy, s, v, suppressed, vq, vr) {
   const owned = v.owner === "p";
   const wall = owned ? "#886238" : "#4c473a";
   const roof = owned ? "#9c3b27" : "#544b3c";
@@ -1971,7 +1983,7 @@ function drawVillage(cx, cy, s, v, suppressed) {
   ctx.fillRect(cx - bw / 2, cy + s * 0.28, bw * v.heart / 100, 4);
   // 名字/城市横幅
   if (owned) {
-    drawCityBanner(cx, cy - s * 0.86, s, v); // Civ6式城市横幅(民心|名字|建造)悬在村落上方
+    drawCityBanner(cx, cy - s * 0.86, s, v, vq, vr); // Civ6式城市横幅(民心|名字|建造)悬在村落上方, 可点选
   } else {
     ctx.fillStyle = "#a2966e";
     ctx.font = "600 " + (s * 0.3) + "px 'Noto Sans SC', sans-serif";
@@ -1980,9 +1992,10 @@ function drawVillage(cx, cy, s, v, suppressed) {
   }
 }
 // Civ6式城市横幅: [民心圆] 名字 [建造中🔨n / 建筑🏠n]; 总部金边+★
-function drawCityBanner(cx, cy, s, v) {
+function drawCityBanner(cx, cy, s, v, vq, vr) {
   const name = (v.hq ? "★" : "") + v.name.replace("(总部)", "");
   const h = s * 0.42, w = s * 0.62 + name.length * s * 0.3 + s * 0.72;
+  if (vq !== undefined) bannerHits.push({ x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2, q: vq, r: vr }); // 记录命中区(世界坐标), 点横幅直接选中村庄
   ctx.fillStyle = v.hq ? "rgba(112,26,16,.95)" : "rgba(84,26,16,.92)";
   rrect(cx - w / 2, cy - h / 2, w, h, h * 0.5); ctx.fill();
   ctx.strokeStyle = v.hq ? "#e8c05a" : "rgba(240,220,180,.5)"; ctx.lineWidth = v.hq ? 2 : 1.2; ctx.stroke();
@@ -2074,18 +2087,18 @@ function drawUnit(u, s) {
   }
   // 敌军杀气红晕
   if (!isP && u.type !== "puppet") { ctx.fillStyle = "rgba(206,40,30,.13)"; ctx.beginPath(); ctx.arc(x, y, s * 0.44, 0, 7); ctx.fill(); }
-  if (cfg.tank) drawTank(x, y, s, phase); else drawFigure(x, y, s, cfg, phase);
+  if (cfg.tank) drawTank(x, y + s * 0.05, s * 0.78, phase); else drawFigure(x, y + s * 0.05, s * 0.78, cfg, phase); // 模型缩小, 头顶横幅放大
   // Civ6式头顶大横幅(易辨认): 阵营色底+大徽标字+姿态icon, 血条嵌在横幅底边 —— 我方民事=青/军事=红棕/武工=紫, 日军=深红, 伪军=橄榄
   const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a")
                     : (u.type === "puppet" ? "#5f5628" : u.type === "spy" ? "#463a52" : "#961f13");
   const posture = u.fortified ? "🛡" : u.resting ? "🛌" : (u.autoPath && u.autoPath.length) ? "🚩" : "";
-  const bw = s * (posture ? 0.92 : 0.68), bh = s * 0.44, by = y - s * 0.72;
+  const bw = s * (posture ? 1.08 : 0.82), bh = s * 0.52, by = y - s * 0.78;
   // 指向杆(横幅→单位)
   ctx.strokeStyle = "rgba(240,220,180,.45)"; ctx.lineWidth = 1.2;
   ctx.beginPath(); ctx.moveTo(x, by + bh / 2); ctx.lineTo(x, y - s * 0.3); ctx.stroke();
   ctx.fillStyle = badge; rrect(x - bw / 2, by - bh / 2, bw, bh, s * 0.1); ctx.fill();
   ctx.strokeStyle = isP ? "rgba(240,220,180,.85)" : "rgba(230,120,110,.85)"; ctx.lineWidth = 1.6; ctx.stroke();
-  ctx.fillStyle = "#f8eed8"; ctx.font = "800 " + (s * 0.3) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#f8eed8"; ctx.font = "800 " + (s * 0.36) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(posture ? ut.glyph + posture : ut.glyph, x, by - (u.hp < 100 ? s * 0.03 : 0));
   // HP条(嵌横幅底边, 满血不显)
   if (u.hp < 100) {
@@ -2144,6 +2157,12 @@ cv.addEventListener("touchmove", e => {
   }
 }, { passive: false });
 cv.addEventListener("touchend", () => { pinchD = 0; });
+// 移动命令模式: 鼠标悬停显示路径预览(2D)
+cv.addEventListener("pointermove", e => {
+  if (!moveMode || dragging || !state || !state.started) return;
+  const hex = pxToHex(e.clientX, e.clientY);
+  if (hex) hoverTile(hex[0], hex[1]); else if (moveHover) { moveHover = null; draw(); }
+});
 
 function pxToHex(px, py) {
   const wx = (px + cam.x) / cam.zoom, wy = (py + cam.y) / cam.zoom;
@@ -2156,10 +2175,14 @@ function pxToHex(px, py) {
   return bd <= (CFG.hexSize * 1.05) ** 2 ? best : null;
 }
 function getSelUnit() { return sel?.kind === "unit" ? state.units.find(u => u.id === sel.id) : null; }
-function deselect() { sel = null; reach = null; clearPending(false); renderPanel(); draw(); }
+function deselect() { sel = null; reach = null; exitMoveMode(); clearPending(false); renderPanel(); draw(); }
 
 function handleClick(px, py) {
   if (state.over) return;
+  { // 城市横幅点选: 世界坐标命中测试(后画的在上层, 倒序)
+    const wx0 = (px + cam.x) / cam.zoom, wy0 = (py + cam.y) / cam.zoom;
+    for (let i = bannerHits.length - 1; i >= 0; i--) { const b = bannerHits[i]; if (wx0 >= b.x0 && wx0 <= b.x1 && wy0 >= b.y0 && wy0 <= b.y1) { selectTileDirect(b.q, b.r); return; } }
+  }
   const hex = pxToHex(px, py);
   if (!hex) { deselect(); return; }
   const [q, r] = hex;
@@ -2181,26 +2204,32 @@ function handleClick(px, py) {
       if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; }
       planStructAttack(selU, q, r); return;
     }
-    const rc = reach?.get(key(q, r));
-    if (rc) { planMove(selU, q, r, rc.cost); return; }
-    // 超出本回合可达 → 多回合行军(目标格有己方单位时优先选中它, 不规划路径)
-    if (!(q === selU.q && r === selU.r) && !state.units.some(x => x.q === q && x.r === r && x.side === "p")) {
-      const fp = farPath(selU, q, r);
-      if (fp && fp.length > 1) { planMoveFar(selU, fp); return; }
+    if (moveMode) { // 移动命令模式: 点目标格直接执行(近=本回合移动, 远=多回合行军)
+      const rc = reach?.get(key(q, r));
+      if (rc) { execMoveNow(selU, q, r, rc.cost); return; }
+      if (!(q === selU.q && r === selU.r) && !state.units.some(x => x.q === q && x.r === r && x.side === "p")) {
+        const fp = farPath(selU, q, r);
+        if (fp && fp.length > 1) { execMoveFar(selU, fp); return; }
+      }
+      exitMoveMode(); renderPanel(); draw(); return; // 点了不可达处: 退出移动模式
     }
   }
-  clearPending(false);
+  exitMoveMode(); clearPending(false);
 
   // ── 选择本格单位(军事优先, 再民事) ──
   const mine = state.units.filter(x => x.q === q && x.r === r && x.side === "p");
   if (mine.length) {
-    // 点最近的那个模型(修移动端同格多单位选不准); 若点中的已选中且还有别的, 切到次近(便于循环)
+    // 点最近的那个模型; 同格再点则循环: 单位→次个单位→…→地格本身(可选中村庄)→回到第一个
     const wx = (px + cam.x) / cam.zoom, wy = (py + cam.y) / cam.zoom;
     const byDist = mine.map(u => { const [ux, uy] = unitDrawPos(u, CFG.hexSize); return { u, d: (ux - wx) ** 2 + (uy - wy) ** 2 }; }).sort((a, b) => a.d - b.d);
     let pick = byDist[0].u;
-    if (selU && pick.id === selU.id && byDist.length > 1) pick = byDist[1].u;
+    if (selU && selU.q === q && selU.r === r) {
+      const i = byDist.findIndex(o => o.u.id === selU.id);
+      if (i >= 0 && i === byDist.length - 1) { sel = { kind: "tile", q, r }; reach = null; exitMoveMode(); renderPanel(); draw(); return; } // 轮到地格(村庄)
+      pick = byDist[(i + 1) % byDist.length].u;
+    }
     sel = { kind: "unit", id: pick.id };
-    reach = pick.mp > 0 ? reachable(pick) : null;
+    reach = null; exitMoveMode();
     renderPanel(); draw(); return;
   }
   // ── 选择地格 ──
@@ -2229,17 +2258,51 @@ function showConfirmNear(q, r) {
   top = Math.max(50, Math.min(top, innerHeight - bh - 8));
   bar.style.transform = "none"; bar.style.left = left + "px"; bar.style.top = top + "px"; bar.style.bottom = "auto";
 }
-function planMove(u, q, r, cost) {
-  pending = { type: "move", uid: u.id, q, r, cost, path: buildPath(u, q, r) };
-  const steps = pending.path.length - 1;
-  $("cInfo").innerHTML = `移动 <b>${UT[u.type].name}</b> → <b>${tileName(q, r)}</b>　行程 <b>${steps}</b> 步`;
-  showConfirmNear(q, r); draw();
+// ── 移动命令模式(Civ6式): 面板按【➜移动】→悬停看路径预览→点击直接执行, 不再弹确认 ──
+function exitMoveMode() { moveMode = false; moveHover = null; }
+function uiMoveCmd() {
+  const u = getSelUnit(); if (!u || u.attacked || u.mp <= 0) return;
+  moveMode = !moveMode;
+  if (moveMode) reach = reachable(u); else moveHover = null;
+  renderPanel(); draw();
 }
-function planMoveFar(u, path) { // 超出本回合MP: 多回合行军(数字=第几回合抵达)
-  const seg = pathTurns(u, path), [dq, dr] = path[path.length - 1];
-  pending = { type: "movefar", uid: u.id, q: dq, r: dr, path, stops: seg.stops };
-  $("cInfo").innerHTML = `行军 <b>${UT[u.type].name}</b> → <b>${tileName(dq, dr)}</b>　<b>${path.length - 1}</b> 步 · 约 <b>${seg.nTurns}</b> 回合抵达`;
-  showConfirmNear(dq, dr); draw();
+function hoverTile(q, r) { // 移动模式悬停: 路径预览(含多回合数字)
+  if (!moveMode || !state || state.over) return;
+  const u = getSelUnit(); if (!u) return;
+  if (moveHover && moveHover.q === q && moveHover.r === r) return;
+  const t = state.tiles[q] && state.tiles[q][r];
+  const bad = !t || !t.disc || (q === u.q && r === u.r) || t.sh || anyEnemyMilAt(q, r, "p") || state.units.some(x => x.q === q && x.r === r && x.side === "p" && x.layer === u.layer);
+  if (bad) { if (moveHover) { moveHover = null; draw(); } return; }
+  const rc = reach && reach.get(key(q, r));
+  const path = rc ? buildPath(u, q, r) : farPath(u, q, r);
+  if (!path || path.length < 2) { if (moveHover) { moveHover = null; draw(); } return; }
+  moveHover = { q, r, path, stops: pathTurns(u, path).stops };
+  draw();
+}
+function execMoveNow(u, q, r, cost) { // 本回合内直接移动
+  const path = buildPath(u, q, r);
+  exitMoveMode(); clearPending(false);
+  doMove(u, q, r, cost);
+  moveAnim = { id: u.id, pts: path.map(([a, b]) => hexCenter(a, b)), t0: animTime, dur: Math.max(0.22, (path.length - 1) * 0.13) };
+  reach = null;
+  if (!getSelUnit()) sel = null;
+  afterAction();
+}
+function execMoveFar(u, path) { // 多回合行军: 走完本回合能走的, 剩余存行军令
+  exitMoveMode(); clearPending(false);
+  const [dq, dr] = path[path.length - 1];
+  let mp = u.mp, idx = 1, lastIdx = 0;
+  while (idx < path.length && mp > 0) { const [a, b] = path[idx]; mp = Math.max(0, mp - moveCost(u, state.tiles[a][b])); lastIdx = idx; idx++; }
+  const rest = path.slice(lastIdx + 1);
+  if (lastIdx > 0) {
+    const [fq, fr] = path[lastIdx], leg = path.slice(0, lastIdx + 1);
+    doMove(u, fq, fr, u.mp - mp);
+    moveAnim = { id: u.id, pts: leg.map(([a, b]) => hexCenter(a, b)), t0: animTime, dur: Math.max(0.22, (leg.length - 1) * 0.13) };
+  }
+  u.autoPath = rest.length ? rest : null;
+  if (u.autoPath) log(uname(u) + "接令行军 → " + tileName(dq, dr) + " (余" + u.autoPath.length + "步)", "hl");
+  reach = null;
+  afterAction();
 }
 function attackVerdict(exp, dhp, back, ahp, kill) {
   if (kill) return { t: "✓ 预计一击歼灭", c: "v-ok" };
@@ -2283,24 +2346,8 @@ function execPending() {
   if (pending.uid != null && pending.uid !== u.id) { clearPending(); return; } // 规划属于上一个单位 → 作废
   const pt = pending.type, pq = pending.q, pr = pending.r, path = pending.path, cost = pending.cost, tid = pending.targetId;
   clearPending(false);
-  if (pt === "move") {
-    doMove(u, pq, pr, cost);
-    moveAnim = { id: u.id, pts: path.map(([a, b]) => hexCenter(a, b)), t0: animTime, dur: Math.max(0.22, (path.length - 1) * 0.13) };
-    reach = state.units.includes(u) && u.mp > 0 ? reachable(u) : null;
-  } else if (pt === "movefar") {
-    // 走完本回合能走的部分, 剩余存为行军令
-    let mp = u.mp, idx = 1, lastIdx = 0;
-    while (idx < path.length && mp > 0) { const [a, b] = path[idx]; mp = Math.max(0, mp - moveCost(u, state.tiles[a][b])); lastIdx = idx; idx++; }
-    const rest = path.slice(lastIdx + 1);
-    if (lastIdx > 0) {
-      const [fq, fr] = path[lastIdx], leg = path.slice(0, lastIdx + 1);
-      doMove(u, fq, fr, u.mp - mp);
-      moveAnim = { id: u.id, pts: leg.map(([a, b]) => hexCenter(a, b)), t0: animTime, dur: Math.max(0.22, (leg.length - 1) * 0.13) };
-    }
-    u.autoPath = rest.length ? rest : null;
-    if (u.autoPath) log(UT[u.type].name + "接令行军 → " + tileName(pq, pr) + " (余" + u.autoPath.length + "步)", "hl");
-    reach = null;
-  } else if (pt === "atk") {
+  if (pt === "atk") { // 移动已改为命令模式直接执行(execMoveNow/execMoveFar), 不再走确认
+
     const d = state.units.find(x => x.id === tid);
     if (d) { u.autoPath = null; attackUnit(u, d); state.exposure = clamp(state.exposure + (hasPromo(u, "yexi") ? 0 : CFG.expAttack), 0, 100); }
     reach = null;
@@ -2365,8 +2412,9 @@ function updateUI() {
   // 结束回合按钮
   refreshMainBtn();
   // 整训按钮发光: 有能买的
-  const canBuy = Object.keys(TECHS).some(k => !S.techs[k] && S.org >= TECHS[k].cost && tierUnlocked(TECHS[k].tier) && (!TECHS[k].need || TECHS[k].need.every(n => S.techs[n])));
+  const canBuy = !S.research && Object.keys(TECHS).some(k => !S.techs[k] && S.org >= TECHS[k].cost && tierUnlocked(TECHS[k].tier) && (!TECHS[k].need || TECHS[k].need.every(n => S.techs[n])));
   $("techBtn").classList.toggle("glow", canBuy);
+  $("techBtn").textContent = S.research ? `整训 ⏳${S.research.left} [T]` : "整训 [T]";
 }
 
 // ── 侧面板 ──
@@ -2397,6 +2445,8 @@ function renderPanel() {
     } else {
       if (u.autoPath && u.autoPath.length) html += "<div class='row' style='color:#8fd2e8'>🚩 行军令执行中 · 余" + u.autoPath.length + "步 <button class='uab' style='display:inline-flex;vertical-align:middle' title='取消行军令' onclick='uiCancelMarch()'>✖<span>取消</span></button></div>";
       if (u.attacked) html += "<div class='warn'>本回合已行动</div>";
+      // 移动命令(Civ6式): 先按此按钮, 再点地图目标格执行; 悬停可看路径与回合数
+      if (!u.attacked && u.mp > 0) html += "<button class='abtn" + (moveMode ? " sel" : "") + "' style='" + (moveMode ? "border-color:#cdff72;color:#cdff72;" : "") + "' onclick='uiMoveCmd()'>➜ 移动" + (moveMode ? "中 — 点击地图目标格 (再按取消)" : " <span class='sub'>点此后再点目标格 · 远处自动多回合行军</span>") + "</button>";
       if (u.type === "militia" && state.techs.dilei && !t.mine && !u.attacked)
         html += "<button class='abtn' onclick='uiMine()'>💣 埋地雷 <span class='cost'>(" + costPart(state.arms, CFG.mineCostArms, "军火") + ")</span><span class='sub'>敌军踩中 -" + CFG.mineDamage + "HP</span></button>";
       if ((u.type === "commando" || u.type === "militia" && state.techs.poxi) && t.rail && t.railBroken <= 0 && !u.attacked)
@@ -2409,7 +2459,7 @@ function renderPanel() {
       html += "<button class='uab danger' title='解散: 返还一半人力' onclick='uiDisband()'>✖<span>解散</span></button>";
       html += "</div>";
     }
-    html += "<hr><div class='hint'>点绿格移动 · 点相邻红框敌人攻击</div>";
+    html += "<hr><div class='hint'>【➜移动】后点目标格 · 点相邻红框敌人攻击</div>";
   } else if (sel.kind === "tile") {
     const t = state.tiles[sel.q][sel.r];
     const TN = { plain: "平原", hills: "丘陵", forest: "林地", mountain: "山地" };
@@ -2477,7 +2527,7 @@ function uiMine() { const u = getSelUnit(); if (u) { actionMine(u); afterAction(
 function uiSabotage() { const u = getSelUnit(); if (u) { actionSabotage(u); afterAction(); } }
 function uiRest() { const u = getSelUnit(); if (!u || u.attacked || u.resting) return; u.autoPath = null; u.resting = true; u.fortified = false; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(uname(u) + "原地休整 — 每回合回血 +" + CFG.restHeal + ", 直到满员或敌军逼近", "hl"); clearPending(false); afterAction(); }
 function uiFortify() { const u = getSelUnit(); if (!u || u.attacked || u.fortified || UT[u.type].str <= 0) return; u.autoPath = null; u.fortified = true; u.resting = false; u.attacked = true; u.mp = 0; u.hp = Math.min(100, u.hp + CFG.restHeal); log(uname(u) + "驻扎设防 — 防御+" + (CFG.fortifyDef * (hasPromo(u, "gongshi") ? 2 : 1)) + ", 每回合回血, 守到你调动它", "hl"); clearPending(false); afterAction(); }
-function uiWake() { const u = getSelUnit(); if (!u) return; u.resting = false; u.fortified = false; u.attacked = false; u.mp = maxMp(u); reach = reachable(u); renderPanel(); draw(); }
+function uiWake() { const u = getSelUnit(); if (!u) return; u.resting = false; u.fortified = false; u.attacked = false; u.mp = maxMp(u); reach = moveMode ? reachable(u) : null; renderPanel(); draw(); }
 function uiCancelMarch() { const u = getSelUnit(); if (!u) return; u.autoPath = null; log(uname(u) + "行军令已取消", "info"); renderPanel(); updateUI(); draw(); }
 function uiPromo(i) { // 晋升二选一
   const u = getSelUnit();
@@ -2488,7 +2538,7 @@ function uiPromo(i) { // 晋升二选一
   if (k === "tiejiao" && !u.attacked) u.mp += 1; // 当回合即生效
   log(uname(u) + "习得特长【" + PROMOS[k].name + "】", "good");
   maybeLevel(u);
-  if (u.mp > 0 && !u.attacked) reach = reachable(u);
+  if (moveMode && u.mp > 0 && !u.attacked) reach = reachable(u);
   renderPanel(); updateUI(); draw();
 }
 // 成本标记: 不足的资源标红, 让玩家看出是哪一项卡住了建造/招募
@@ -2518,7 +2568,7 @@ function nextUnit() {
   if (!acts.length) { log("所有单位都行动完了 — 可以结束回合了。", "info"); $("endTurnBtn").classList.add("pulse"); return; }
   const cur = getSelUnit(); let next = acts[0];
   if (cur) { const i = acts.findIndex(u => u.id === cur.id); if (i >= 0) next = acts[(i + 1) % acts.length]; }
-  sel = { kind: "unit", id: next.id }; reach = next.mp > 0 ? reachable(next) : null;
+  sel = { kind: "unit", id: next.id }; reach = null; exitMoveMode();
   clearPending(false); focusTile(next.q, next.r); renderPanel(); draw();
 }
 function uiDisband() {
@@ -2557,7 +2607,8 @@ function showHelp(isStart) {
 
 function showTech() {
   if (!state || state.over) return;
-  let html = `<h2>整训<small>组织力 ✊${Math.round(state.org)} · 完成一项立即生效</small></h2><div class="techTiers">`;
+  const rs = state.research;
+  let html = `<h2>整训<small>组织力 ✊${Math.round(state.org)} · ${rs ? `研究中:【${TECHS[rs.k].name}】余 ${rs.left} 旬` : "选一项开始研究(需数旬完成)"}</small></h2><div class="techTiers">`;
   for (let tier = 1; tier <= 4; tier++) {
     const unlocked = tierUnlocked(tier);
     html += `<div class="techTier"><h4>第${["一","二","三","四"][tier - 1]}阶${unlocked ? "" : " 🔒"}</h4>`;
@@ -2565,15 +2616,18 @@ function showTech() {
       const t = TECHS[k];
       if (t.tier !== tier) continue;
       const done = !!state.techs[k];
+      const researching = rs && rs.k === k;
       const needOk = !t.need || t.need.every(n => state.techs[n]);
-      const can = !done && unlocked && needOk && state.org >= t.cost;
+      const can = !done && !rs && unlocked && needOk && state.org >= t.cost;
       html += `<div class="techCard${done ? " done" : ""}"><b>${t.name}</b><div class="desc">${t.desc}</div>`;
       if (done) html += `<div class="lock">✓ 已完成</div>`;
+      else if (researching) html += `<div class="lock" style="color:#d8a441">⏳ 研究中 · 余 ${rs.left} 旬</div>`;
       else {
-        html += `<div class="cost"${state.org < t.cost ? " style='color:#e2564d;font-weight:700'" : ""}>✊ ${t.cost}${state.org < t.cost ? "(组织不足)" : ""}</div>`;
+        html += `<div class="cost"${state.org < t.cost ? " style='color:#e2564d;font-weight:700'" : ""}>✊ ${t.cost} · ${t.turns}旬${state.org < t.cost ? " (组织不足)" : ""}</div>`;
         if (t.need && !needOk) html += `<div class="lock">需先完成: ${t.need.map(n => TECHS[n].name).join("、")}</div>`;
         else if (!unlocked) html += `<div class="lock">${tier === 2 ? "需完成1项第一阶" : "需完成2项第二阶"}</div>`;
-        html += `<button ${can ? "" : "disabled"} onclick="buyTech('${k}');showTech();updateUI();afterAction()">整训</button>`;
+        else if (rs) html += `<div class="lock">另一项研究中</div>`;
+        html += `<button ${can ? "" : "disabled"} onclick="buyTech('${k}');showTech();updateUI();afterAction()">开始研究</button>`;
       }
       html += `</div>`;
     }
@@ -2637,7 +2691,7 @@ function newState() {
     turn: 1, over: false, started: false,
     grain: CFG.startGrain, man: CFG.startMan, arms: CFG.startArms, org: CFG.startOrg,
     tiles, hq, units: [], nextUid: 1,
-    techs: {}, exposure: 8,
+    techs: {}, research: null, exposure: 8,
     sweep: { phase: "idle", countdown: 0, ttl: 0, total: 0, killed: 0, big: false },
     lastSweepEnd: 0, era: "",
     lastIncome: { g: 0, m: 0, o: 0, a: 0 },
@@ -2763,7 +2817,7 @@ $("endTurnBtn").addEventListener("click", () => { if (!$("endTurnBtn").disabled)
 $("cOk").addEventListener("click", execPending);
 $("cCancel").addEventListener("click", () => clearPending());
 $("techBtn").addEventListener("click", showTech);
-$("helpBtn").addEventListener("click", () => showHelp(false));
+// 规则按钮已移入 Debug 面板工具区(onclick="showHelp(false)")
 
 // ── 3D 视角: 供 render3d.js 读取状态 + 点格回调(复用规划/确认/攻击逻辑) ──
 function handleClickTile(q, r) {
@@ -2779,34 +2833,46 @@ function handleClickTile(q, r) {
       planAttack(selU, enemy, q, r); return;
     }
     if (canAtk && t.sh) { if (t.sh.kind === "town" && !state.techs.fangong) { log("县城城防坚固, 需完成整训【战略反攻】方可强攻", "jp"); return; } planStructAttack(selU, q, r); return; }
-    const rc = reach && reach.get(key(q, r));
-    if (rc) { planMove(selU, q, r, rc.cost); return; }
-    // 超出本回合可达 → 多回合行军(目标格有己方单位时优先选中它, 不规划路径 — 修"点新单位却连出旧单位路径")
-    if (!(q === selU.q && r === selU.r) && !state.units.some(x => x.q === q && x.r === r && x.side === "p")) {
-      const fp = farPath(selU, q, r);
-      if (fp && fp.length > 1) { planMoveFar(selU, fp); return; }
+    if (moveMode) { // 移动命令模式: 点目标格直接执行
+      const rc = reach && reach.get(key(q, r));
+      if (rc) { execMoveNow(selU, q, r, rc.cost); return; }
+      if (!(q === selU.q && r === selU.r) && !state.units.some(x => x.q === q && x.r === r && x.side === "p")) {
+        const fp = farPath(selU, q, r);
+        if (fp && fp.length > 1) { execMoveFar(selU, fp); return; }
+      }
+      exitMoveMode(); renderPanel(); draw(); return;
     }
   }
+  exitMoveMode();
   clearPending(false);
   const mine = state.units.filter(x => x.q === q && x.r === r && x.side === "p");
   if (mine.length) {
     const cur = selU && selU.q === q && selU.r === r ? mine.indexOf(selU) : -1;
+    if (cur >= 0 && cur === mine.length - 1) { sel = { kind: "tile", q, r }; reach = null; exitMoveMode(); renderPanel(); draw(); return; } // 轮到地格(村庄)
     const pick = mine[(cur + 1) % mine.length];
-    sel = { kind: "unit", id: pick.id }; reach = pick.mp > 0 ? reachable(pick) : null;
+    sel = { kind: "unit", id: pick.id }; reach = null; exitMoveMode();
     renderPanel(); draw(); return;
   }
+  sel = { kind: "tile", q, r }; reach = null; renderPanel(); draw();
+}
+function selectTileDirect(q, r) { // 直接选中地格(城市横幅点选用)
+  if (!state || state.over || !state.tiles[q] || !state.tiles[q][r] || !state.tiles[q][r].disc) return;
+  exitMoveMode(); clearPending(false);
   sel = { kind: "tile", q, r }; reach = null; renderPanel(); draw();
 }
 window.TH = {
   CFG, key, UT,
   state: () => state, visSet: () => visSet, sel: () => sel, reach: () => reach, pending: () => pending,
+  moveMode: () => moveMode, moveHover: () => moveHover,
+  hover: (q, r) => hoverTile(q, r),
   pathTurns: (u, p) => pathTurns(u, p),
   click: (q, r) => handleClickTile(q, r),
+  selectTile: (q, r) => selectTileDirect(q, r),
 };
 addEventListener("keydown", e => { if (e.code === "Space" && !modalOpen() && !/INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || "")) { e.preventDefault(); mainAction(); } });
 let mode3d = false;
-$("view3dBtn").addEventListener("click", async () => {
-  const btn = $("view3dBtn"), gl = $("gl");
+async function toggle3D() { // 3D/2D 切换(按钮在 Debug 面板顶部工具区; 面板未开过时按钮不存在, 用空壳兜底)
+  const btn = $("view3dBtn") || { textContent: "", disabled: false, classList: { add() {}, remove() {} } }, gl = $("gl");
   if (!mode3d) {
     btn.textContent = "载入中…"; btn.disabled = true;
     try {
@@ -2821,7 +2887,7 @@ $("view3dBtn").addEventListener("click", async () => {
     mode3d = false; gl.style.display = "none"; $("cv").style.display = "block";
     btn.textContent = "🗺 3D"; btn.classList.remove("on"); resize(); draw();
   }
-});
+}
 
 // ── Debug 面板 ──
 function revealAllMap() { if (!state) return; for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { state.tiles[q][r].disc = true; visSet.add(key(q, r)); } draw(); log("【Debug】已开全地图", "hl"); }
@@ -2936,7 +3002,8 @@ function buildDebugPanel() {
   cam += dbgSl("视野 FOV", 25, 70, 1, 46, "cam", "fov");
   cam += dbgSl("最近距离(拉最近)", 4, 30, 1, 8, "cam", "minDist");
   cam += dbgSl("最远距离(拉最远)", 30, 150, 1, 85, "cam", "maxDist");
-  $("dbgPanel").innerHTML = dsec("Debug", dbgInner, true) + dsec("相机 (3D)", cam, false) + dsec("环境系统 (3D)", env, false) + dsec("画质 (3D)", qual, false) + dsec("级联阴影 CSM (3D)", csm, false);
+  const tools = `<div class="dr" style="gap:8px;margin:0 0 8px"><button class="tbtn${mode3d ? " on" : ""}" id="view3dBtn" onclick="toggle3D()" title="切换 3D/2D 视角(3D 仅桌面)">${mode3d ? "🗺 2D" : "🗺 3D"}</button><button class="tbtn" onclick="showHelp(false)">📖 规则 [H]</button></div>`;
+  $("dbgPanel").innerHTML = tools + dsec("Debug", dbgInner, true) + dsec("相机 (3D)", cam, false) + dsec("环境系统 (3D)", env, false) + dsec("画质 (3D)", qual, false) + dsec("级联阴影 CSM (3D)", csm, false);
 }
 $("dbgBtn").addEventListener("click", () => { const p = $("dbgPanel"); if (p.classList.contains("show")) { p.classList.remove("show"); $("dbgBtn").classList.remove("on"); } else { buildDebugPanel(); p.classList.add("show"); $("dbgBtn").classList.add("on"); } });
 
