@@ -1,5 +1,5 @@
-// 《太行·1941》3D 渲染(文明6式 2.5D) —— Three.js。读 window.TH 的游戏状态, 复用其点格逻辑。
-// 地形: 分层六边台地 + 手绘/程序材质; 树木 PCG 实例化; 天空大气散射; 单位/建筑=轻量微缩模型。
+// 《太行·1941》3D 渲染 —— Three.js。读 window.TH 的游戏状态, 复用其点格逻辑。
+// 视觉基准: 冷灰冬季太行、连续地貌、薄雪黄土、写实比例的村落与小队；六边格只保留为克制的交互提示。
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.mjs";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.mjs";
@@ -24,11 +24,11 @@ let sunLight, sky, hemiLight, ambientLight, lastSig = "", inited = false, cx0 = 
 let _sunElev = 42, _sunAzi = 150, composer = null, taaPass = null, taaEnabled = false;
 let camPolar = 0.62; // 相机俯视极角(距+Y轴; 越小越俯视/越接近正上方俯拍 — 参考文明6)
 let csm = null; const csmCfg = { cascades: 2, size: 2048, maxFar: 55, fade: true, enabled: true };
-let atmoOn = true, cubeTex = null, _tod = 12; // 大气开关 / CubeMap / 昼夜时刻(0-24h)
+let atmoOn = true, cubeTex = null, _tod = 10.35; // 冬日上午: 冷环境光中保留一丝低角度暖光
 const skyU = {
-  uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uZenith: { value: new THREE.Color(0x2a5fa8) },
-  uHorizon: { value: new THREE.Color(0xacc6da) }, uGround: { value: new THREE.Color(0xcbb98e) }, // 地平线下=纸色(与羊皮纸桌面衔接)
-  uNight: { value: new THREE.Color(0x0a1430) }, uDay: { value: 1 }, uSunCol: { value: new THREE.Color(0xfff0d0) },
+  uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uZenith: { value: new THREE.Color(0x566a7d) },
+  uHorizon: { value: new THREE.Color(0xaeb9c0) }, uGround: { value: new THREE.Color(0x6d7778) },
+  uNight: { value: new THREE.Color(0x0a1422) }, uDay: { value: 1 }, uSunCol: { value: new THREE.Color(0xffdfb4) },
 };
 const SKY_VERT = "varying vec3 vD; void main(){ vec4 wp=modelMatrix*vec4(position,1.0); vD=wp.xyz-cameraPosition; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }";
 const SKY_FRAG = "varying vec3 vD; uniform vec3 uSunDir,uZenith,uHorizon,uGround,uNight,uSunCol; uniform float uDay; void main(){ vec3 d=normalize(vD); float up=d.y; float t=pow(clamp(up,0.0,1.0),0.55); vec3 s=mix(uHorizon,uZenith,t); if(up<0.0) s=mix(uHorizon,uGround,clamp(-up*2.5,0.0,1.0)); float sd=max(dot(d,uSunDir),0.0); float halo=pow(sd,6.0)*0.35+pow(sd,350.0)*1.2; float disk=smoothstep(0.9994,0.99975,sd); s+=uSunCol*halo; s=mix(s,uSunCol*1.3,disk); s=mix(uNight,s,uDay); gl_FragColor=vec4(pow(max(s,vec3(0.0)),vec3(0.4545)),1.0); }"; // pow=线性→sRGB输出(ShaderMaterial不带colorspace chunk)
@@ -59,10 +59,10 @@ function fbm(x, y) { let s = 0, a = .5, f = 1; for (let i = 0; i < 4; i++) { s +
 function hexWorld(q, r) { return [1.5 * R * q, SQ3 * R * (r + 0.5 * (q & 1))]; }
 
 const TERR = {
-  plain:    { base: .25, amp: .06, top: "#8b7a4b", side: "#5b4934", fleck: "#b19a67" },
-  hills:    { base: .34, amp: .14, top: "#7b6843", side: "#554337", fleck: "#a08a5d" },
-  forest:   { base: .30, amp: .08, top: "#3f4d32", side: "#3f3c31", fleck: "#667052" },
-  mountain: { base: .52, amp: .18, top: "#716d63", side: "#45413d", fleck: "#999486" },
+  plain:    { base: .070, amp: .002, top: "#a89f8c", side: "#8c8980", fleck: "#c1b9a5" },
+  hills:    { base: .071, amp: .003, top: "#9b988e", side: "#878780", fleck: "#b3b3a8" },
+  forest:   { base: .070, amp: .002, top: "#838d85", side: "#747d78", fleck: "#9ca69e" },
+  mountain: { base: .072, amp: .004, top: "#969c99", side: "#858a88", fleck: "#bec3c0" },
 };
 function tileH(q, r, terrain) {
   const cfg = TERR[terrain] || TERR.plain;
@@ -73,43 +73,44 @@ function tileH(q, r, terrain) {
 
 function makeSharedMaterials() {
   if (sharedMats.wall) return;
-  sharedMats.wall = new THREE.MeshStandardMaterial({ map: materialTex("plaster"), color: 0xd1b78a, roughness: .98 });
-  sharedMats.wallEnemy = new THREE.MeshStandardMaterial({ map: materialTex("plaster"), color: 0xa9a08c, roughness: 1 });
-  sharedMats.roof = new THREE.MeshStandardMaterial({ map: materialTex("tile"), color: 0x76695b, roughness: .9 });
-  sharedMats.roofRed = new THREE.MeshStandardMaterial({ map: materialTex("tile"), color: 0x89584a, roughness: .9 });
-  sharedMats.timber = new THREE.MeshStandardMaterial({ map: materialTex("wood"), color: 0x755a3e, roughness: .95 });
-  sharedMats.stone = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x8c887f, roughness: 1 });
-  sharedMats.darkStone = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x5d5b54, roughness: 1 });
-  sharedMats.iron = new THREE.MeshStandardMaterial({ color: 0x343635, roughness: .62, metalness: .55 });
-  sharedMats.railWood = new THREE.MeshStandardMaterial({ map: materialTex("wood"), color: 0x463628, roughness: 1 });
-  sharedMats.snow = new THREE.MeshStandardMaterial({ color: 0xdde2df, roughness: .9, transparent: true, opacity: .88 });
-  sharedMats.earth = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x826f4c, roughness: 1 });
-  sharedMats.path = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0xa28a5e, roughness: 1 });
+  sharedMats.wall = new THREE.MeshStandardMaterial({ map: materialTex("plaster"), color: 0xc4bda9, roughness: .98 });
+  sharedMats.wallEnemy = new THREE.MeshStandardMaterial({ map: materialTex("plaster"), color: 0xa7aaa4, roughness: 1 });
+  sharedMats.roof = new THREE.MeshStandardMaterial({ map: materialTex("tile"), color: 0x4d5352, roughness: .94 });
+  sharedMats.roofRed = new THREE.MeshStandardMaterial({ map: materialTex("tile"), color: 0x5f5650, roughness: .94 });
+  sharedMats.timber = new THREE.MeshStandardMaterial({ map: materialTex("wood"), color: 0x59493b, roughness: .98 });
+  sharedMats.stone = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x8b8d88, roughness: 1 });
+  sharedMats.darkStone = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x5f6665, roughness: 1 });
+  sharedMats.iron = new THREE.MeshStandardMaterial({ color: 0x343b3d, roughness: .58, metalness: .6 });
+  sharedMats.railWood = new THREE.MeshStandardMaterial({ map: materialTex("wood"), color: 0x403932, roughness: 1 });
+  sharedMats.snow = new THREE.MeshStandardMaterial({ color: 0xcdd5d6, roughness: .96, transparent: true, opacity: .52 });
+  sharedMats.earth = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x7c776d, roughness: 1 });
+  sharedMats.path = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x938a77, roughness: 1 });
   sharedMats.redCloth = new THREE.MeshStandardMaterial({ color: 0x9d2a21, roughness: .86, side: THREE.DoubleSide });
 }
 
-// 程序化羊皮纸纹理(四方连续: 每个斑点环绕绘制9份)
+// 地图外围与未探索区的冬季冻土纹理(四方连续)，避免出现“棋盘放在羊皮纸上”的桌游感。
 let _paperTex = null;
 function paperTex() {
   if (_paperTex) return _paperTex;
   const N = 256, c = document.createElement("canvas"); c.width = c.height = N; const g = c.getContext("2d");
-  g.fillStyle = "#d3c19a"; g.fillRect(0, 0, N, N);
+  g.fillStyle = "#99a5a7"; g.fillRect(0, 0, N, N);
   const wrap9 = fn => { for (const dx of [-N, 0, N]) for (const dy of [-N, 0, N]) fn(dx, dy); };
-  for (let i = 0; i < 30; i++) { // 大块晕染
+  for (let i = 0; i < 34; i++) { // 冻土与薄雪的大块晕染
     const x = Math.random() * N, y = Math.random() * N, r = 14 + Math.random() * 34, dark = Math.random() < .55;
-    wrap9((dx, dy) => { const gr = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r); gr.addColorStop(0, dark ? "rgba(140,112,66,0.10)" : "rgba(248,238,210,0.12)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(x + dx - r, y + dy - r, r * 2, r * 2); });
+    wrap9((dx, dy) => { const gr = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r); gr.addColorStop(0, dark ? "rgba(54,62,64,0.05)" : "rgba(232,237,235,0.075)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(x + dx - r, y + dy - r, r * 2, r * 2); });
   }
-  for (let i = 0; i < 2600; i++) { // 纤维/杂点
+  for (let i = 0; i < 2600; i++) { // 细碎岩屑与冰晶
     const x = Math.random() * N, y = Math.random() * N, v = Math.random() - .5, w = 1 + Math.random() * 3;
-    g.fillStyle = v > 0 ? `rgba(255,250,228,${v * .2})` : `rgba(110,88,50,${-v * .18})`;
+    g.fillStyle = v > 0 ? `rgba(235,241,239,${v * .2})` : `rgba(38,48,50,${-v * .18})`;
     wrap9((dx, dy) => g.fillRect(x + dx, y + dy, w, 1 + (Math.random() < .3 ? 1 : 0)));
   }
-  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.repeat.set(130, 130);
+  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; tex.repeat.set(30, 30);
   _paperTex = tex; return tex;
 }
 
 function terrainTex(t) {
-  if ((t === "plain" || t === "hills") && texCache.generated_loess) return texCache.generated_loess;
+  if ((t === "plain" || t === "hills") && texCache.generated_winter) return texCache.generated_winter;
+  if (t === "mountain" && texCache.generated_rock) return texCache.generated_rock;
   if (texCache[t]) return texCache[t];
   const N = 512;
   const c = document.createElement("canvas"); c.width = c.height = N; const g = c.getContext("2d");
@@ -120,23 +121,24 @@ function terrainTex(t) {
   for (let i = 0; i < 180; i++) {
     const x = rnd(i) * N, y = rnd(i + 301) * N, r = 10 + rnd(i + 611) * 42;
     const grad = g.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, i % 2 ? "rgba(20,18,13,.085)" : "rgba(245,226,176,.075)");
+    grad.addColorStop(0, i % 2 ? "rgba(27,34,35,.10)" : "rgba(224,229,222,.09)");
     grad.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = grad; g.fillRect(x - r, y - r, r * 2, r * 2);
   }
   for (let i = 0; i < 5600; i++) {
     const x = rnd(i + 971) * N, y = rnd(i + 7331) * N, a = .025 + rnd(i + 71) * .08;
-    g.fillStyle = i & 1 ? `rgba(236,220,178,${a})` : `rgba(30,28,22,${a})`;
+    g.fillStyle = i & 1 ? `rgba(222,226,216,${a})` : `rgba(29,35,35,${a})`;
     const s = rnd(i + 133) > .92 ? 2 : 1; g.fillRect(x, y, s, s);
   }
   if (t === "plain" || t === "hills") {
-    g.strokeStyle = t === "plain" ? "rgba(66,51,33,.15)" : "rgba(52,43,34,.2)"; g.lineWidth = 2;
+    g.strokeStyle = t === "plain" ? "rgba(69,67,60,.16)" : "rgba(55,57,54,.2)"; g.lineWidth = 2;
     for (let i = 0; i < 34; i++) { const y = rnd(i + 200) * N; g.beginPath(); g.moveTo(-10, y); g.bezierCurveTo(N * .3, y + rnd(i + 5) * 14 - 7, N * .7, y - rnd(i + 9) * 14 + 7, N + 10, y + rnd(i + 17) * 10 - 5); g.stroke(); }
+    for (let i = 0; i < 34; i++) { const x = rnd(i + 1730) * N, y = rnd(i + 2710) * N, rx = 8 + rnd(i + 321) * 28, ry = 2 + rnd(i + 847) * 8; g.fillStyle = `rgba(228,234,233,${.035 + rnd(i + 993) * .07})`; g.beginPath(); g.ellipse(x, y, rx, ry, rnd(i + 117) * Math.PI, 0, 7); g.fill(); }
   } else if (t === "forest") {
     g.lineWidth = 1.2;
-    for (let i = 0; i < 1200; i++) { const x = rnd(i + 12) * N, y = rnd(i + 512) * N, a = rnd(i + 911) * 6.28, l = 3 + rnd(i + 33) * 9; g.strokeStyle = i % 3 ? "rgba(27,35,24,.34)" : "rgba(118,120,76,.22)"; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); }
+    for (let i = 0; i < 1200; i++) { const x = rnd(i + 12) * N, y = rnd(i + 512) * N, a = rnd(i + 911) * 6.28, l = 3 + rnd(i + 33) * 9; g.strokeStyle = i % 3 ? "rgba(27,38,35,.34)" : "rgba(137,145,132,.20)"; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); }
   } else {
     g.lineWidth = 2;
-    for (let i = 0; i < 110; i++) { const x = rnd(i + 88) * N, y = rnd(i + 921) * N, l = 8 + rnd(i + 48) * 34; g.strokeStyle = i % 3 ? "rgba(32,31,29,.22)" : "rgba(220,214,196,.17)"; g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y + l * (.14 + rnd(i + 812) * .18)); g.stroke(); }
+    for (let i = 0; i < 110; i++) { const x = rnd(i + 88) * N, y = rnd(i + 921) * N, l = 8 + rnd(i + 48) * 34; g.strokeStyle = i % 3 ? "rgba(35,39,39,.25)" : "rgba(217,220,211,.18)"; g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y + l * (.14 + rnd(i + 812) * .18)); g.stroke(); }
   }
   const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
   tex.repeat.set(1.8, 1.8);
@@ -146,7 +148,7 @@ function terrainTex(t) {
 function materialTex(kind) {
   const k = "mat_" + kind; if (texCache[k]) return texCache[k];
   const N = 256, c = document.createElement("canvas"); c.width = c.height = N; const g = c.getContext("2d");
-  const base = { plaster: "#b9a47d", tile: "#615549", wood: "#65503a", stone: "#77736a" }[kind] || "#888";
+  const base = { plaster: "#c1b9a8", tile: "#555b5a", wood: "#65584b", stone: "#929794" }[kind] || "#888";
   g.fillStyle = base; g.fillRect(0, 0, N, N);
   const rnd = i => h2(i * 1.91 + kind.length * 11, i * 3.17 - kind.length * 7);
   if (kind === "tile") {
@@ -164,28 +166,63 @@ function materialTex(kind) {
   texCache[k] = tex; return tex;
 }
 
+function coolGradeWinterTexture(source) {
+  // 保留内置生图的土壤细节，只把过强的橙黄压到参考图的冷灰黄土范围。
+  try {
+    const img = source.image, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    if (!w || !h) return source;
+    const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d", { willReadFrequently: true });
+    g.drawImage(img, 0, 0, w, h); const px = g.getImageData(0, 0, w, h), d = px.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114;
+      d[i] = Math.max(0, Math.min(255, d[i] * .30 + lum * .70 - 10));
+      d[i + 1] = Math.max(0, Math.min(255, d[i + 1] * .30 + lum * .70 - 2));
+      d[i + 2] = Math.max(0, Math.min(255, d[i + 2] * .30 + lum * .70 + 12));
+    }
+    g.putImageData(px, 0, 0);
+    // 固定种子的风吹薄雪；九宫复制保证四边连续，不会在地块边缘露接缝。
+    g.save(); g.globalCompositeOperation = "screen"; g.filter = `blur(${Math.max(3, Math.round(w / 260))}px)`;
+    for (let i = 0; i < 30; i++) {
+      const x = h2(i * 7.13 + 4, i * 2.77 - 9) * w, y = h2(i * 3.81 - 2, i * 6.19 + 5) * h;
+      const rx = (.035 + h2(i + 41, i - 17) * .10) * w, ry = (.010 + h2(i - 31, i + 73) * .027) * h, rot = (h2(i * 9.1, i * 4.3) - .5) * .8;
+      g.fillStyle = `rgba(218,228,229,${.14 + h2(i + 101, i + 29) * .16})`;
+      for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) { g.beginPath(); g.ellipse(x + ox, y + oy, rx, ry, rot, 0, Math.PI * 2); g.fill(); }
+    }
+    g.restore(); const tex = new THREE.CanvasTexture(c); source.dispose(); return tex;
+  } catch (e) { return source; }
+}
+
 function loadSurfaceAssets() {
   if (surfaceLoadStarted) return; surfaceLoadStarted = true;
-  new THREE.TextureLoader().load("./assets/3d/taihang-loess-ground.png", tex => {
+  const ready = (tex, cacheKey, terrainKinds) => {
     if (!renderer || !scene) { tex.dispose(); surfaceLoadStarted = false; return; }
+    if (cacheKey === "generated_winter") tex = coolGradeWinterTexture(tex);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); tex.repeat.set(2.15, 2.15);
-    texCache.generated_loess = tex;
-    for (const t of ["plain", "hills"]) {
+    tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); tex.repeat.set(2.35, 2.35);
+    texCache[cacheKey] = tex;
+    for (const t of terrainKinds) {
       if (matCache[t]) { matCache[t].forEach(m => m.dispose()); delete matCache[t]; }
       if (sketchCache[t]) { sketchCache[t].forEach(m => m.dispose()); delete sketchCache[t]; }
     }
-    if (fieldMat) { fieldMat.map = tex; fieldMat.bumpMap = tex; fieldMat.needsUpdate = true; }
-    for (const k of ["earth", "path"]) if (sharedMats[k]) { sharedMats[k].map = tex; sharedMats[k].needsUpdate = true; }
-    for (const tt of Object.values(tiles)) if (tt.terrain === "plain" || tt.terrain === "hills") tt.mesh.material = tt.fogged ? sketchMats(tt.terrain) : tileMats(tt.terrain);
+    if (cacheKey === "generated_winter") {
+      if (fieldMat) { fieldMat.map = tex; fieldMat.bumpMap = tex; fieldMat.needsUpdate = true; }
+      for (const k of ["earth", "path"]) if (sharedMats[k]) { sharedMats[k].map = tex; sharedMats[k].needsUpdate = true; }
+    } else if (cacheKey === "generated_rock" && peakMat) {
+      peakMat.map = tex; peakMat.bumpMap = tex; peakMat.needsUpdate = true;
+    }
+    for (const tt of Object.values(tiles)) if (terrainKinds.includes(tt.terrain)) tt.mesh.material = tt.fogged ? sketchMats(tt.terrain) : tileMats(tt.terrain);
     csmSetupScene(); forceMatUpdate(); lastSig = "";
-  }, undefined, () => { surfaceLoadStarted = false; });
+  };
+  const loader = new THREE.TextureLoader();
+  loader.load("./assets/3d/taihang-loess-ground.png", tex => ready(tex, "generated_winter", ["plain", "hills"]), undefined, () => {});
 }
 function tileMats(t) {
   if (matCache[t]) return matCache[t];
   const map = terrainTex(t);
-  const top = new THREE.MeshStandardMaterial({ map, color: t === "hills" ? 0x938671 : 0xffffff, bumpMap: map, bumpScale: t === "mountain" ? .055 : .028, roughness: .96, metalness: 0 });
-  const side = new THREE.MeshStandardMaterial({ map: t === "mountain" ? materialTex("stone") : materialTex("plaster"), color: TERR[t].side, bumpMap: materialTex(t === "mountain" ? "stone" : "plaster"), bumpScale: .035, roughness: 1, metalness: 0 });
+  const tint = { plain: 0xf1f0e9, hills: 0xe8e7e1, forest: 0xd1d7d1, mountain: 0xe2e6e3 }[t] || 0xffffff;
+  const top = new THREE.MeshStandardMaterial({ map, color: tint, bumpMap: map, bumpScale: t === "mountain" ? .045 : .018, roughness: .98, metalness: 0 });
+  const sideMap = t === "mountain" ? terrainTex("mountain") : terrainTex(t);
+  const side = new THREE.MeshStandardMaterial({ map: sideMap, color: TERR[t].side, bumpMap: sideMap, bumpScale: .018, roughness: 1, metalness: 0 });
   matCache[t] = [side, top, side]; return matCache[t];
 }
 
@@ -198,14 +235,14 @@ function sketchify(mat) {
       .replace("#include <begin_vertex>", "#include <begin_vertex>\n{ vec4 _w=vec4(transformed,1.0);\n#ifdef USE_INSTANCING\n_w=instanceMatrix*_w;\n#endif\nvWp=(modelMatrix*_w).xyz; }");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vWp;")
-      .replace("#include <map_fragment>", "#include <map_fragment>\n{ float lum=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114)); float sk=0.70+0.34*lum; float a1=abs(fract((vWp.x+vWp.z)*3.0)-0.5)*2.0; float a2=abs(fract((vWp.x-vWp.z)*3.0)-0.5)*2.0; if(lum<0.6&&a1<0.3) sk-=0.13; if(lum<0.38&&a2<0.3) sk-=0.11; diffuseColor.rgb=vec3(0.22,0.20,0.17)*sk; }");
+      .replace("#include <map_fragment>", "#include <map_fragment>\n{ float lum=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114)); float sk=0.84+0.18*lum; float a1=abs(fract((vWp.x+vWp.z)*2.4)-0.5)*2.0; if(lum<0.62&&a1<0.12) sk-=0.045; diffuseColor.rgb=vec3(0.39,0.41,0.41)*sk; }");
   };
   mat.userData.sketch = true; return mat;
 }
 function sketchMats(t) {
   if (sketchCache[t]) return sketchCache[t];
-  const top = sketchify(new THREE.MeshBasicMaterial({ map: terrainTex(t) }));
-  const side = sketchify(new THREE.MeshBasicMaterial({ color: TERR[t].side }));
+  const top = new THREE.MeshBasicMaterial({ color: 0x6f7a7b, transparent: true, opacity: .42, depthWrite: false });
+  const side = new THREE.MeshBasicMaterial({ color: 0x5f696a, transparent: true, opacity: .34, depthWrite: false });
   sketchCache[t] = [side, top, side]; return sketchCache[t];
 }
 
@@ -307,6 +344,21 @@ function makeRoofGeometry() {
   geo.computeVertexNormals(); return geo;
 }
 
+function makeTaihangRidgeGeometry() {
+  // 跨格重叠的高度场岩脊：边缘回落到地面，不露柱体侧壁，也不再像独立摆件。
+  const geo = new THREE.PlaneGeometry(1.58, 1.28, 10, 8); geo.rotateX(-Math.PI / 2);
+  const p = geo.getAttribute("position");
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i), dx = x / .79, dz = z / .64;
+    const d = dx * dx + dz * dz, fall = Math.pow(Math.max(0, 1 - d), .40);
+    const broken = .82 + .10 * Math.sin(dx * 5.1 + dz * 2.7) + .07 * Math.sin(dx * 9.3 - dz * 6.2);
+    const shoulder = Math.max(0, 1 - (dx * 1.25 - .18) ** 2 - (dz * 1.7 + .08) ** 2) * .12;
+    const raw = Math.max(0, fall * broken + shoulder), strata = Math.floor(raw * 5) / 5;
+    p.setY(i, raw * .62 + strata * .38);
+  }
+  p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+}
+
 function loadIconAtlas() {
   if (iconAtlasImg) return;
   iconAtlasImg = new Image();
@@ -330,15 +382,15 @@ function init(container) {
   renderer.setSize(host.clientWidth || innerWidth, host.clientHeight || innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.82;
+  renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setClearColor(0x8c979d, 1);
+  renderer.setClearColor(0x93a0a8, 1);
   host.appendChild(renderer.domElement);
   loadSurfaceAssets();
 
   scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xaeb8b8, 25, 92);
+  scene.fog = new THREE.Fog(0xa9b4b9, 19, 68);
   const W = G().CFG.mapW, H = G().CFG.mapH;
   const [bx, bz] = hexWorld(W / 2, H / 2); cx0 = bx; cz0 = bz; // 板心
 
@@ -350,28 +402,28 @@ function init(container) {
   const sunPos = new THREE.Vector3(); sunPos.setFromSphericalCoords(1, DEG(90 - _sunElev), DEG(_sunAzi));
 
   // 光照
-  sunLight = new THREE.DirectionalLight(0xffead0, 2.65);
+  sunLight = new THREE.DirectionalLight(0xffe3c2, 2.35);
   sunLight.position.copy(sunPos).multiplyScalar(80); sunLight.target.position.set(cx0, 0, cz0);
   sunLight.castShadow = true; sunLight.shadow.mapSize.set(2048, 2048);
   // 兜底单阴影: 收紧范围(±18)让 2k 精度不被浪费, 每帧跟随镜头; CSM 启用时此阴影关闭
   const sc = sunLight.shadow.camera; sc.near = 1; sc.far = 90; sc.left = -18; sc.right = 18; sc.top = 18; sc.bottom = -18; sc.updateProjectionMatrix();
   sunLight.shadow.bias = -0.0005;
   scene.add(sunLight, sunLight.target);
-  hemiLight = new THREE.HemisphereLight(0xc9d7df, 0x493c2b, 0.82); scene.add(hemiLight);
-  ambientLight = new THREE.AmbientLight(0x596168, 0.28); scene.add(ambientLight);
+  hemiLight = new THREE.HemisphereLight(0xcbd7dc, 0x4e5858, 0.92); scene.add(hemiLight);
+  ambientLight = new THREE.AmbientLight(0x68757c, 0.34); scene.add(ambientLight);
 
-  // 羊皮纸桌面(Civ6风格): 地图外围与未探索区域露出纸面, 不再是天空的地平线下暗色
-  const paper = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ map: paperTex(), color: 0x94876c, roughness: 1, metalness: 0 }));
-  paper.rotation.x = -Math.PI / 2; paper.position.set(cx0, -0.02, cz0); paper.receiveShadow = true; scene.add(paper);
+  // 冻土延伸到雾中：未探索区仍属于同一片山地，不再像六边棋盘铺在桌面上。
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ map: paperTex(), color: 0xd4dcdd, roughness: 1, metalness: 0 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(cx0, -0.025, cz0); ground.receiveShadow = true; scene.add(ground);
 
   // 共享几何(thetaStart=π/2 → 顶点落在 ±x, 平顶六边形, 与 hexWorld 的 1.5R 列距对齐)
   prismGeo = new THREE.CylinderGeometry(R, R, 1, 6, 1, false, Math.PI / 2); // 半径=R → 相邻六边形贴合无缝
   coneGeo = new THREE.ConeGeometry(R * 0.64, 1, 7, 2, false, Math.PI / 2);
-  cragGeo = new THREE.DodecahedronGeometry(.46, 0);
-  ridgeGeo = new THREE.ConeGeometry(.44, 1, 6, 1, false, Math.PI / 2);
-  treeTrunkGeo = new THREE.CylinderGeometry(0.035, 0.065, 0.34, 6);
-  treeLeafGeo = new THREE.ConeGeometry(0.24, 0.46, 7);
-  treeLeafTopGeo = new THREE.ConeGeometry(0.17, 0.36, 7);
+  cragGeo = new THREE.IcosahedronGeometry(.46, 1);
+  ridgeGeo = makeTaihangRidgeGeometry();
+  treeTrunkGeo = new THREE.CylinderGeometry(0.027, 0.058, 0.46, 7);
+  treeLeafGeo = new THREE.ConeGeometry(0.205, 0.39, 9);
+  treeLeafTopGeo = new THREE.ConeGeometry(0.145, 0.31, 9);
   hexFlatGeo = new THREE.CircleGeometry(R * 0.9, 6, Math.PI / 2); hexFlatGeo.rotateX(-Math.PI / 2);
   roofGeo = makeRoofGeometry();
   makeSharedMaterials();
@@ -390,7 +442,7 @@ function init(container) {
   const hq = G().state().hq; const [hx, hz] = hexWorld(hq.q, hq.r);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(hx, 0, hz);
-  camera.position.set(hx + 2.7, 18, hz + 12.5); // 首屏拉近到可辨认人物/屋瓦，同时保留约三环探索范围
+  camera.position.set(hx + 2.7, 16.2, hz + 11.8); // 更接近参考图的中近景：小队、屋瓦与山谷层次均可辨认
   // 文明6式相机: 固定俯角(高俯视), 只允许平移+滚轮缩放, 不允许旋转/改变角度
   controls.enableRotate = false;
   controls.minPolarAngle = controls.maxPolarAngle = camPolar;
@@ -426,45 +478,50 @@ function addTerrainDecor(mesh, q, r, kind, fogMat, winterOnly) {
 }
 function buildTiles() {
   const s = G().state(), W = G().CFG.mapW, H = G().CFG.mapH;
-  peakMat = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x9b978e, bumpMap: materialTex("stone"), bumpScale: .08, roughness: .98 });
-  hillMat = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x887a65, bumpMap: materialTex("stone"), bumpScale: .045, roughness: 1 });
+  peakMat = new THREE.MeshStandardMaterial({ map: terrainTex("mountain"), color: 0xd1d6d3, bumpMap: terrainTex("mountain"), bumpScale: .055, roughness: .99 });
+  hillMat = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0xadb0ab, bumpMap: materialTex("stone"), bumpScale: .032, roughness: 1 });
   snowMat = sharedMats.snow;
-  fieldMat = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x5b4932, roughness: 1 });
-  peakMatS = sketchify(new THREE.MeshBasicMaterial({ map: materialTex("stone"), color: 0x8c877b }));
-  snowMatS = sketchify(new THREE.MeshBasicMaterial({ color: 0xb8b8ad, transparent: true, opacity: .72 }));
-  fieldMatS = sketchify(new THREE.MeshBasicMaterial({ color: 0x72634e }));
+  fieldMat = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x9c978c, roughness: 1 });
+  peakMatS = new THREE.MeshBasicMaterial({ color: 0x687375, transparent: true, opacity: .34, depthWrite: false });
+  snowMatS = new THREE.MeshBasicMaterial({ color: 0x8d999a, transparent: true, opacity: .16, depthWrite: false });
+  fieldMatS = new THREE.MeshBasicMaterial({ color: 0x667071, transparent: true, opacity: .26, depthWrite: false });
+  const gridPts = []; for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; gridPts.push(new THREE.Vector3(R * .982 * Math.cos(a), 0, R * .982 * Math.sin(a))); }
+  const gridGeo = new THREE.BufferGeometry().setFromPoints(gridPts);
+  const gridMat = new THREE.LineBasicMaterial({ color: 0xd5dede, transparent: true, opacity: .045, depthWrite: false });
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const t = s.tiles[q][r], [x, z] = hexWorld(q, r);
-    const h = Math.max(0.14, tileH(q, r, t.terrain));
+    const h = Math.max(0.055, tileH(q, r, t.terrain));
     const m = new THREE.Mesh(prismGeo, tileMats(t.terrain));
     m.scale.set(1, h, 1); m.position.set(x, h / 2, z);
     m.receiveShadow = true; m.castShadow = true; m.userData = { q, r, h };
-    gTiles.add(m); tiles[q + "," + r] = { mesh: m, h, terrain: t.terrain };
+    const grid = new THREE.LineLoop(gridGeo, gridMat); grid.position.set(x, h + .008, z); grid.renderOrder = 1;
+    gTiles.add(m, grid); tiles[q + "," + r] = { mesh: m, grid, h, terrain: t.terrain };
     if (t.terrain === "mountain") {
-      // 一格不是一根锥体：主峰 + 两块错位岩脊，形成太行层叠山势。
-      const ph = .82 + .68 * h2(q * 5.3, r * 2.1), rot = h2(q + 12, r - 9) * Math.PI;
-      const peak = new THREE.Mesh(cragGeo, peakMat); peak.scale.set(.92, ph * 1.2, .70); peak.rotation.y = rot; peak.rotation.z = (h2(q + 31, r) - .5) * .12; peak.position.set(x - .06, h + ph * .52, z + .03); peak.castShadow = peak.receiveShadow = true; addTerrainDecor(peak, q, r, "peak", peakMatS);
+      // 横向层叠的主脊 + 肩脊，压低尖峰，贴近太行台塬的块状轮廓。
+      const ph = .38 + .20 * h2(q * 5.3, r * 2.1), rot = h2(q + 12, r - 9) * Math.PI;
+      const peak = new THREE.Mesh(ridgeGeo, peakMat); peak.scale.set(1.18, ph, 1.02); peak.rotation.y = rot; peak.position.set(x - .04, h + .006, z + .02); peak.castShadow = peak.receiveShadow = true; addTerrainDecor(peak, q, r, "peak", peakMatS);
       for (let i = 0; i < 2; i++) {
-        const a = rot + (i ? 2.2 : -1.6), sc = .42 + h2(q * 9 + i, r * 4) * .26;
-        const crag = new THREE.Mesh(i ? cragGeo : ridgeGeo, i ? peakMat : hillMat);
-        crag.scale.set(sc * 1.25, sc * (i ? 1.5 : 1.15), sc * .72); crag.rotation.y = a;
-        crag.position.set(x + Math.cos(a) * .38, h + sc * .43, z + Math.sin(a) * .38); crag.castShadow = crag.receiveShadow = true;
+        const a = rot + (i ? 2.05 : -1.42), sc = .34 + h2(q * 9 + i, r * 4) * .20;
+        const crag = new THREE.Mesh(ridgeGeo, i ? peakMat : hillMat);
+        crag.scale.set(sc * 1.40, sc * .72, sc * 1.04); crag.rotation.y = a;
+        crag.position.set(x + Math.cos(a) * .42, h + .009, z + Math.sin(a) * .37); crag.castShadow = crag.receiveShadow = true;
         addTerrainDecor(crag, q, r, "crag", peakMatS);
       }
-      const cap = new THREE.Mesh(cragGeo, snowMat); cap.scale.set(.39, ph * .22, .31); cap.rotation.y = rot; cap.rotation.z = peak.rotation.z; cap.position.set(x - .08, h + ph * 1.04, z + .02); cap.castShadow = true; addTerrainDecor(cap, q, r, "snow", snowMatS);
+      // 雪只落在山肩的小平台，不再套一顶纯白锥帽。
+      for (let i = 0; i < 2; i++) { const a = rot + (i ? .75 : -1.55), cap = new THREE.Mesh(cragGeo, snowMat); cap.scale.set(.26 + i * .05, .014, .12 + i * .025); cap.rotation.y = a; cap.position.set(x + Math.cos(a) * (.18 + i * .12), h + ph * (.70 - i * .12), z + Math.sin(a) * (.16 + i * .11)); addTerrainDecor(cap, q, r, "snow", snowMatS, true); }
     } else if (t.terrain === "hills" && h2(q * 4.7, r * 6.1) > .28) {
       const a = h2(q - 2, r + 6) * Math.PI, rh = .16 + h2(q * 2, r * 8) * .18;
-      const ridge = new THREE.Mesh(ridgeGeo, hillMat); ridge.scale.set(.82, rh, .34); ridge.rotation.y = a; ridge.position.set(x + .08, h + rh / 2 - .01, z - .05); ridge.castShadow = ridge.receiveShadow = true; addTerrainDecor(ridge, q, r, "ridge", peakMatS);
+      const ridge = new THREE.Mesh(ridgeGeo, hillMat); ridge.scale.set(.78, rh, .54); ridge.rotation.y = a; ridge.position.set(x + .08, h + .006, z - .05); ridge.castShadow = ridge.receiveShadow = true; addTerrainDecor(ridge, q, r, "ridge", peakMatS);
     }
     // 稀疏裸岩与农田垄让平原/丘陵在远景也有尺度参照。
     if ((t.terrain === "plain" || t.terrain === "hills") && !t.village && !t.rail && h2(q * 7.1, r * 4.3) > .72) {
       const ang = (h2(q, r + 22) - .5) * .7;
-      for (let i = -2; i <= 2; i++) { const row = new THREE.Mesh(new THREE.BoxGeometry(.76, .025, .035), fieldMat); row.rotation.y = ang; row.position.set(x + Math.sin(ang) * i * .12, h + .025, z + Math.cos(ang) * i * .12); row.receiveShadow = true; addTerrainDecor(row, q, r, "field", fieldMatS); }
+      for (let i = -2; i <= 2; i++) { const row = new THREE.Mesh(new THREE.BoxGeometry(.72, .008, .018), fieldMat); row.rotation.y = ang; row.position.set(x + Math.sin(ang) * i * .105, h + .010, z + Math.cos(ang) * i * .105); row.receiveShadow = true; addTerrainDecor(row, q, r, "field", fieldMatS); }
     } else if (t.terrain !== "plain" && h2(q * 8.2 + 1, r * 3.6) > .78) {
       const rock = new THREE.Mesh(cragGeo, hillMat); const rs = .08 + h2(q + 4, r - 3) * .11; rock.scale.set(rs * 1.4, rs, rs); rock.position.set(x + (h2(q, r) - .5) * .8, h + rs * .42, z + (h2(q + 1, r) - .5) * .8); rock.rotation.y = h2(q + 8, r) * 5; rock.castShadow = true; addTerrainDecor(rock, q, r, "rock", peakMatS);
     }
-    if (t.terrain !== "mountain" && h2(q * 11.1, r * 9.7) > .58) {
-      const frost = new THREE.Mesh(cragGeo, snowMat); const fs = .12 + h2(q + 40, r) * .14; frost.scale.set(fs * 2.5, .012, fs * 1.2); frost.position.set(x + (h2(q + 3, r) - .5) * .82, h + .026, z + (h2(q, r + 2) - .5) * .78); frost.rotation.y = h2(q * 4, r * 3) * 6.28; addTerrainDecor(frost, q, r, "frost", snowMatS, true);
+    if (t.terrain !== "mountain" && h2(q * 11.1, r * 9.7) > .40) {
+      const frost = new THREE.Mesh(cragGeo, snowMat); const fs = .16 + h2(q + 40, r) * .17; frost.scale.set(fs * 2.8, .010, fs * 1.25); frost.position.set(x + (h2(q + 3, r) - .5) * .82, h + .022, z + (h2(q, r + 2) - .5) * .78); frost.rotation.y = h2(q * 4, r * 3) * 6.28; addTerrainDecor(frost, q, r, "frost", snowMatS, true);
     }
   }
 }
@@ -485,7 +542,7 @@ function buildBoundary() {
     }
   }
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xa98a50, transparent: true, opacity: .72 }));
+  const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xc3ced0, transparent: true, opacity: .055 }));
   line.renderOrder = 2; gTiles.add(line);
 }
 function focus(q, r) {
@@ -528,16 +585,16 @@ function setTOD(h) {
   const day = Math.max(0.05, Math.min(1, (elev + 6) / 12));  // 太阳<-6°=夜, >+6°=全昼, 之间过渡
   const low = Math.max(0, 1 - Math.abs(elev) / 16) * (elev > -6 ? 1 : 0); // 落日/日出橙红程度
   skyU.uDay.value = day; // 天顶色不动(留给 Debug 自定义); TOD 只驱动地平线/太阳暖色
-  skyU.uHorizon.value.set(0xacc6da).lerp(new THREE.Color(0xe8925a), low);
-  skyU.uSunCol.value.set(0xfff0d0).lerp(new THREE.Color(0xffa050), low);
+  skyU.uHorizon.value.set(0xaeb9c0).lerp(new THREE.Color(0xd29a72), low * .55);
+  skyU.uSunCol.value.set(0xffdfb4).lerp(new THREE.Color(0xffa96c), low * .65);
   if (!sunLight) return;
   // 光照方向: 太阳落到地平线下后不能从地底往上照, 把照明仰角钳制在 ≥8°(视觉太阳照常落下, 夜里主要靠环境光)
   const ldir = dir.clone(); if (ldir.y < 0.14) { ldir.y = 0.14; ldir.normalize(); }
   sunLight.position.copy(ldir).multiplyScalar(80);
-  sunLight.color.set(0xfff2da).lerp(new THREE.Color(0xffa860), low);
-  sunLight.intensity = 0.35 + 3.0 * day;
-  if (hemiLight) hemiLight.intensity = 0.2 + 0.75 * day;
-  if (ambientLight) ambientLight.intensity = 0.18 + 0.22 * day;
+  sunLight.color.set(0xffe6c8).lerp(new THREE.Color(0xffa86c), low * .7);
+  sunLight.intensity = 0.35 + 2.55 * day;
+  if (hemiLight) hemiLight.intensity = 0.36 + 0.88 * day;
+  if (ambientLight) ambientLight.intensity = 0.26 + 0.30 * day;
   if (csm) { csm.lightDirection.copy(ldir.clone().negate().normalize()); csm.lightIntensity = sunLight.intensity / csmCfg.cascades; csm.lights.forEach(l => { l.intensity = csm.lightIntensity; l.color.copy(sunLight.color); }); }
   if (!atmoOn && cubeTex) { cubeTex.dispose(); cubeTex = makeSkyCube(); scene.background = cubeTex; } // 关大气时随 TOD 刷新 CubeMap
 }
@@ -641,10 +698,10 @@ function clearGroup(g) {
 function syncDynamic() {
   const s = G().state(), W = G().CFG.mapW, H = G().CFG.mapH, key = G().key;
   const visSet = G().visSet();
-  // 迷雾三态: 未探明=隐藏(露出羊皮纸) / 已探明不可见=素描 / 可见=正常; 新揭开的登记展开动画
+  // 迷雾三态: 未探明=隐藏(露出连续冻土) / 已探明不可见=素描 / 可见=正常; 新揭开的登记展开动画
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const k = q + "," + r, tt = tiles[k]; if (!tt) continue;
-    const disc = s.tiles[q][r].disc; tt.mesh.visible = disc;
+    const disc = s.tiles[q][r].disc; tt.mesh.visible = disc; if (tt.grid) tt.grid.visible = disc;
     const fogged = disc && !visSet.has(k);
     if (fogged !== !!tt.fogged) { tt.fogged = fogged; tt.mesh.material = fogged ? sketchMats(tt.terrain) : tileMats(tt.terrain); tt.mesh.castShadow = tt.mesh.receiveShadow = !fogged; }
     if (disc && !tileVisPrev.has(k)) { tileVisPrev.add(k); revealAnims[k] = clock; tt.mesh.scale.y = 0.001; tt.mesh.position.y = 0.0005; }
@@ -660,38 +717,41 @@ function syncDynamic() {
 
   // 树木(PCG, 仅已探明的森林/丘陵)
   clearGroup(gTrees);
-  const trunkMat = new THREE.MeshStandardMaterial({ map: materialTex("wood"), color: 0x493625, roughness: 1 });
-  const leafMat = new THREE.MeshStandardMaterial({ color: winter ? 0x34443b : 0x385437, roughness: .95 });
-  const leafTopMat = new THREE.MeshStandardMaterial({ color: winter ? 0x46564b : 0x4a6840, roughness: .95 });
+  const trunkMat = new THREE.MeshStandardMaterial({ map: materialTex("wood"), color: 0x3b3530, roughness: 1 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: winter ? 0x30433f : 0x2f493f, roughness: .98 });
+  const leafMidMat = new THREE.MeshStandardMaterial({ color: winter ? 0x3a4d47 : 0x395548, roughness: .98 });
+  const leafTopMat = new THREE.MeshStandardMaterial({ color: winter ? 0x465950 : 0x466251, roughness: .98 });
   const dummy = new THREE.Object3D();
-  const trunks = [], leaves = [], tops = [], snowTips = [], trunksF = [], leavesF = [], topsF = []; // F=素描(雾中)
+  const trunks = [], lowers = [], middles = [], crowns = [], snowTips = [], trunksF = [], lowersF = [], middlesF = [], crownsF = []; // F=素描(雾中)
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const t = s.tiles[q][r]; if (!t.disc) continue;
-    let n = t.terrain === "forest" ? (t.village ? 4 : 9) : (t.terrain === "hills" && h2(q * 1.7, r * 3.1) > .5 ? 3 : 0);
+    let n = t.terrain === "forest" ? (t.village ? 5 : 13) : (t.terrain === "hills" && h2(q * 1.7, r * 3.1) > .5 ? 4 : 0);
     if (!n) continue;
     const fog = !visSet.has(q + "," + r);
     const [x, z] = hexWorld(q, r), h = tiles[q + "," + r].h;
     for (let i = 0; i < n; i++) {
-      const a = h2(q * 3.1 + i, r * 5.7) * 6.28, rad = 0.55 * h2(q + i * 0.3, r + i);
-      const tx = x + Math.cos(a) * rad, tz = z + Math.sin(a) * rad, sc = .62 + h2(q * (i + 1) + 1, r + i * 2) * .62;
-      (fog ? trunksF : trunks).push([tx, h + .17 * sc, tz, sc]);
-      (fog ? leavesF : leaves).push([tx, h + .43 * sc, tz, sc]);
-      (fog ? topsF : tops).push([tx, h + .67 * sc, tz, sc]);
-      if (!fog && winter && i % 2 === 0) snowTips.push([tx, h + .79 * sc, tz, sc * .72]);
+      const a = h2(q * 3.1 + i, r * 5.7) * 6.28, rad = 0.67 * Math.sqrt(h2(q + i * 0.3, r + i));
+      const tx = x + Math.cos(a) * rad, tz = z + Math.sin(a) * rad, sc = .66 + h2(q * (i + 1) + 1, r + i * 2) * .56, rot = h2(q * 13 + i, r * 7 - i) * 6.28;
+      (fog ? trunksF : trunks).push([tx, h + .23 * sc, tz, sc, rot]);
+      (fog ? lowersF : lowers).push([tx, h + .35 * sc, tz, sc * 1.08, rot]);
+      (fog ? middlesF : middles).push([tx, h + .52 * sc, tz, sc * .86, rot + .35]);
+      (fog ? crownsF : crowns).push([tx, h + .70 * sc, tz, sc * .82, rot - .18]);
+      if (!fog && winter && h2(q * 19 + i, r * 23 - i) > .76) snowTips.push([tx, h + .785 * sc, tz, sc * .42, rot]);
     }
   }
   const addInst = (geo, mat, arr, shadow) => {
     if (!arr.length) return;
     const im = new THREE.InstancedMesh(geo, mat, arr.length);
-    arr.forEach((p, i) => { dummy.position.set(p[0], p[1], p[2]); dummy.scale.set(p[3], p[3], p[3]); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); });
+    arr.forEach((p, i) => { dummy.position.set(p[0], p[1], p[2]); dummy.rotation.set(0, p[4] || 0, 0); dummy.scale.set(p[3], p[3], p[3]); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); });
     im.castShadow = shadow; gTrees.add(im);
   };
-  addInst(treeTrunkGeo, trunkMat, trunks, true); addInst(treeLeafGeo, leafMat, leaves, true);
-  addInst(treeLeafTopGeo, leafTopMat, tops, true);
+  addInst(treeTrunkGeo, trunkMat, trunks, true); addInst(treeLeafGeo, leafMat, lowers, true);
+  addInst(treeLeafGeo, leafMidMat, middles, true); addInst(treeLeafTopGeo, leafTopMat, crowns, true);
   addInst(treeLeafTopGeo, snowMat, snowTips, false);
-  addInst(treeTrunkGeo, sketchify(new THREE.MeshBasicMaterial({ color: 0x5a4326 })), trunksF, false);
-  addInst(treeLeafGeo, sketchify(new THREE.MeshBasicMaterial({ color: 0x3f6a2a })), leavesF, false);
-  addInst(treeLeafTopGeo, sketchify(new THREE.MeshBasicMaterial({ color: 0x4d5b45 })), topsF, false);
+  addInst(treeTrunkGeo, sketchify(new THREE.MeshBasicMaterial({ color: 0x4b4842 })), trunksF, false);
+  addInst(treeLeafGeo, sketchify(new THREE.MeshBasicMaterial({ color: 0x354742 })), lowersF, false);
+  addInst(treeLeafGeo, sketchify(new THREE.MeshBasicMaterial({ color: 0x3d4d47 })), middlesF, false);
+  addInst(treeLeafTopGeo, sketchify(new THREE.MeshBasicMaterial({ color: 0x465650 })), crownsF, false);
 
   // 建筑(村庄/县城/炮楼/铁路/地雷)
   clearGroup(gStruct);
@@ -702,8 +762,8 @@ function syncDynamic() {
     if (t.village) {
       gStruct.add(villageMesh(x, h, z, t.village));
       if (t.village.owner === "p") { // 总部/根据地村庄: Civ6式城市横幅
-        const cb = new THREE.Sprite(new THREE.SpriteMaterial({ map: cityBannerTex(t.village), depthWrite: false, transparent: true }));
-        cb.material.toneMapped = false; cb.scale.set(2.0, .38, 1); cb.position.set(x, h + 1.28, z); cb.userData = { q, r, banner: 1 };
+        const cb = new THREE.Sprite(new THREE.SpriteMaterial({ map: cityBannerTex(t.village), depthWrite: false, depthTest: false, transparent: true }));
+        cb.material.toneMapped = false; cb.renderOrder = 12; cb.scale.set(1.9, .36, 1); cb.position.set(x, h + 1.32, z); cb.userData = { q, r, banner: 1 };
         gStruct.add(cb);
       }
     }
@@ -719,9 +779,9 @@ function syncDynamic() {
     const [x, z] = hexWorld(un.q, un.r), h = tiles[un.q + "," + un.r].h;
     const off = un.layer === "civ" ? -0.28 : 0.28;
     gUnits.add(unitMiniature(un, x, h, z, off));
-    // 头顶大横幅(Civ6式, 易辨认)
-    const bn = new THREE.Sprite(new THREE.SpriteMaterial({ map: unitBannerTex(un), depthWrite: false, transparent: true }));
-    bn.material.toneMapped = false; bn.scale.set(1.42, .58, 1); bn.position.set(x + off, h + 1.05, z); bn.userData = { q: un.q, r: un.r }; // 横幅不再压过模型
+    // 轻量识别牌：保留玩法信息，但不再盖过人物小队。
+    const bn = new THREE.Sprite(new THREE.SpriteMaterial({ map: unitBannerTex(un), depthWrite: false, depthTest: false, transparent: true, opacity: 0.86 }));
+    bn.material.toneMapped = false; bn.renderOrder = 11; bn.scale.set(1.32, .54, 1); bn.position.set(x + off, h + 1.02, z); bn.userData = { q: un.q, r: un.r };
     gUnits.add(bn);
   }
 
@@ -769,7 +829,7 @@ function railMesh(q, r, x, h, z, t) {
     dx = b[0] - a[0]; dz = b[1] - a[1];
   }
   g.rotation.y = Math.atan2(dx, dz);
-  const bed = new THREE.Mesh(new THREE.BoxGeometry(.72, .035, 1.82), new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x625c50, roughness: 1 })); bed.position.y = .012; bed.receiveShadow = true; g.add(bed);
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(.72, .035, 1.82), new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x687071, roughness: 1 })); bed.position.y = .012; bed.receiveShadow = true; g.add(bed);
   for (let i = -3; i <= 3; i++) addBox(g, .78, .045, .095, sharedMats.railWood, 0, .052, i * .24, (t.railBroken || 0) && i === 0 ? .25 : 0);
   for (const rx of [-.23, .23]) { const rail = addBox(g, .038, .055, 1.82, sharedMats.iron, rx, .092, 0); if (t.railBroken) { rail.rotation.z = rx < 0 ? .055 : -.055; rail.position.z += rx < 0 ? .08 : -.06; } }
   if ((r + q) % 3 === 0) {
@@ -777,6 +837,17 @@ function railMesh(q, r, x, h, z, t) {
     addBox(g, .32, .025, .025, sharedMats.timber, .48, .68, -.18);
     for (const ox of [-.13, .13]) addCylinder(g, .018, .018, .04, 8, new THREE.MeshStandardMaterial({ color: 0x4b4b42, roughness: .7 }), .48 + ox, .72, -.18);
     pole.castShadow = true;
+  }
+  // 低频放置一台轻量蒸汽机车，强化“铁路封锁线”而不把每格都塞成道具展台。
+  if (!t.railBroken && ((q * 5 + r * 3) % 13 === 0)) {
+    const locoMat = new THREE.MeshStandardMaterial({ color: 0x4b5653, roughness: .72, metalness: .28 });
+    const boiler = addCylinder(g, .105, .105, .38, 14, locoMat, 0, .225, -.04); boiler.rotation.x = Math.PI / 2;
+    addBox(g, .28, .25, .20, locoMat, 0, .25, .24);
+    addBox(g, .31, .035, .52, sharedMats.iron, 0, .105, .06);
+    const stack = addCylinder(g, .038, .055, .20, 10, sharedMats.iron, 0, .39, -.16); stack.castShadow = true;
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x24292a, roughness: .72, metalness: .35 });
+    for (const wx of [-.16, .16]) for (const wz of [-.13, .16]) { const wh = addCylinder(g, .066, .066, .045, 12, wheelMat, wx, .105, wz); wh.rotation.z = Math.PI / 2; }
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(.035, 10, 7), new THREE.MeshStandardMaterial({ color: 0xffcb78, emissive: 0xff8a28, emissiveIntensity: 1.8 })); lamp.position.set(0, .27, -.25); g.add(lamp);
   }
   return markPickGroup(g, q, r);
 }
@@ -796,13 +867,20 @@ function addHouse(g, dx, dz, w, d, ht, wall, roof, ry) {
   addBox(hg, w, ht, d, wall, 0, ht / 2 + .06, 0);
   const rf = new THREE.Mesh(roofGeo, roof); rf.scale.set(w * 1.16, ht * .72, d * 1.18); rf.position.y = ht + .06; rf.castShadow = true; hg.add(rf);
   const door = addBox(hg, w * .19, ht * .48, .025, sharedMats.timber, -.12 * w, ht * .25 + .06, -d / 2 - .012);
-  const windowMat = new THREE.MeshStandardMaterial({ color: 0x9f7b43, emissive: 0x3b250d, emissiveIntensity: .8, roughness: .8 });
-  addBox(hg, w * .16, ht * .22, .022, windowMat, .2 * w, ht * .58 + .06, -d / 2 - .014);
+  const windowMat = new THREE.MeshStandardMaterial({ color: 0xe0a05c, emissive: 0xff7a22, emissiveIntensity: 1.75, roughness: .72 });
+  const frontWindow = addBox(hg, w * .20, ht * .25, .022, windowMat, .2 * w, ht * .58 + .06, -d / 2 - .014);
+  const sideWindow = addBox(hg, .022, ht * .22, d * .17, windowMat, w / 2 + .014, ht * .56 + .06, .10 * d);
+  frontWindow.castShadow = sideWindow.castShadow = false;
+  if (winterNow()) {
+    const slope = Math.atan2(ht * .36, w * .58);
+    const snow = addBox(hg, w * .48, .012, d * 1.02, sharedMats.snow, w * .22, ht + .06 + ht * .22, 0);
+    snow.rotation.z = -slope; snow.castShadow = false;
+  }
   door.castShadow = false; g.add(hg); return hg;
 }
 
 function villageMesh(x, h, z, v) {
-  const g = new THREE.Group(); g.position.set(x, h, z); const owned = v.owner === "p";
+  const g = new THREE.Group(); g.position.set(x, h, z); g.scale.setScalar(1.06); const owned = v.owner === "p";
   const wall = owned ? sharedMats.wall : sharedMats.wallEnemy, roof = owned ? sharedMats.roofRed : sharedMats.roof;
   const lane = addBox(g, .15, .018, 1.42, sharedMats.path, .16, .018, .12, -.18); lane.castShadow = false;
   const yard = new THREE.Mesh(new THREE.CircleGeometry(.42, 18), sharedMats.path); yard.rotation.x = -Math.PI / 2; yard.position.set(.02, .022, .04); yard.receiveShadow = true; g.add(yard);
@@ -810,10 +888,11 @@ function villageMesh(x, h, z, v) {
   addBox(g, 1.05, .10, .055, sharedMats.stone, 0, .05, -.47);
   addBox(g, .055, .10, .92, sharedMats.stone, -.52, .05, 0);
   addBox(g, .055, .10, .58, sharedMats.stone, .52, .05, .17);
-  addHouse(g, -.24, -.20, .42, .30, .29, wall, roof, .03);
-  addHouse(g, .22, .20, .46, .32, .34, wall, roof, -.12);
-  addHouse(g, -.18, .25, .32, .27, .24, wall, roof, .08);
-  if (v.hq) addHouse(g, .22, -.18, .38, .28, .30, wall, roof, -.05);
+  addHouse(g, -.27, -.22, .39, .29, .28, wall, roof, .03);
+  addHouse(g, .20, .22, .43, .31, .32, wall, roof, -.12);
+  addHouse(g, -.22, .25, .30, .25, .23, wall, roof, .08);
+  addHouse(g, .28, -.19, .34, .26, .27, wall, roof, -.05);
+  if (v.hq) addHouse(g, .03, -.37, .38, .25, .30, wall, roof, .02);
   // 水井、柴垛与石碾，近看有生活气，远看仍只是克制的小点。
   addCylinder(g, .095, .11, .09, 12, sharedMats.stone, .1, .06, .02);
   addCylinder(g, .065, .065, .025, 12, new THREE.MeshStandardMaterial({ color: 0x1d2526, roughness: 1 }), .1, .11, .02);
@@ -823,8 +902,7 @@ function villageMesh(x, h, z, v) {
   if (v.buildings && v.buildings.includes("didao")) { const hatch = addBox(g, .18, .025, .13, sharedMats.timber, .37, .025, .38, -.25); hatch.castShadow = false; }
   if (v.buildings && v.buildings.includes("arsenal")) { const chimney = addCylinder(g, .025, .035, .27, 7, sharedMats.darkStone, .42, .20, -.23); chimney.castShadow = true; }
   if (v.buildings && v.buildings.includes("yexiao")) { const lamp = new THREE.PointLight(0xffb35b, .32, 2); lamp.position.set(.18, .42, .06); g.add(lamp); }
-  if (owned) { const fg = flag(.39, 0, -.22, 0x9d2a21, v.hq); g.add(fg); }
-  if (v.hq) { const halo = new THREE.Mesh(new THREE.TorusGeometry(.68, .025, 6, 36), new THREE.MeshStandardMaterial({ color: 0xc9a34b, emissive: 0x4c3508 })); halo.rotation.x = Math.PI / 2; halo.position.y = .035; g.add(halo); }
+  if (owned) { const fg = flag(.39, 0, -.22, 0x9d2a21, v.hq); g.add(fg); const lamp = new THREE.PointLight(0xffa552, v.hq ? .30 : .16, 1.55); lamp.position.set(.02, .38, .02); g.add(lamp); }
   return g;
 }
 function structMesh(x, h, z, sh) {
@@ -925,11 +1003,18 @@ function armoredMiniature(u) {
 }
 
 function unitMiniature(u, x, h, z, off) {
-  const g = new THREE.Group(); g.position.set(x + off, h + .035, z); g.userData = { q: u.q, r: u.r, faceCamera: 1 };
-  const mats = unitModelMaterials(u);
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(.24, .27, .055, 20), mats.base); base.position.y = .028; base.castShadow = base.receiveShadow = true; g.add(base);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(.235, .014, 5, 24), new THREE.MeshStandardMaterial({ color: u.side === "p" ? 0xc39c54 : 0x8d7650, roughness: .7, metalness: .28 })); rim.rotation.x = Math.PI / 2; rim.position.y = .061; g.add(rim);
-  const fig = u.type === "armored" ? armoredMiniature(u) : humanMiniature(u); fig.scale.setScalar(u.type === "armored" ? .83 : .92); fig.position.y = .05; g.add(fig);
+  const g = new THREE.Group(); g.position.set(x + off, h + .012, z); g.userData = { q: u.q, r: u.r, faceCamera: 1 };
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(u.type === "armored" ? .29 : .25, 20), new THREE.MeshBasicMaterial({ color: 0x182126, transparent: true, opacity: .20, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.scale.y = .58; shadow.position.y = .006; g.add(shadow);
+  if (u.type === "armored") {
+    const tank = armoredMiniature(u); tank.scale.setScalar(.78); tank.position.y = .012; g.add(tank);
+  } else {
+    const count = u.type === "spy" ? 1 : (u.type === "work" || u.type === "scout" ? 2 : 3);
+    const spots = [[0, -.035], [-.13, .075], [.13, .09]];
+    for (let i = 0; i < count; i++) {
+      const fig = humanMiniature(u); fig.scale.setScalar(.74 + i * .025); fig.position.set(spots[i][0], .012, spots[i][1]); fig.rotation.y = (i - 1) * .10; g.add(fig);
+    }
+  }
   g.traverse(o => { if (o.isMesh) o.userData = { ...o.userData, q: u.q, r: u.r }; }); return g;
 }
 
