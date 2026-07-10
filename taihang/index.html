@@ -360,7 +360,11 @@ const CFG = {
   // ── 破袭 ──
   railRepair: 8,           // 铁路破坏N回合后修复
   sabotageArms: 12, sabotageGrain: 20,
-  sabotageSweepReduce: 0.06, // 每处断轨扫荡预算-6%(下限60%)
+  sabotageSweepReduce: 0.06, // (旧参数, 已被补给线机制取代, 保留兼容)
+  supplyRange: 2,          // 补给半径: 据点距"连通县城的铁路"≤此值=直连补给
+  supplyRelay: 4,          // 接力半径: 据点距"已有补给的据点"≤此值=接力补给(封锁线碉堡群层层前伸)
+  pillboxRepair: 4,        // 有补给的炮楼每回合自动修复HP(断补则不修)
+  sweepSupplyFloor: 0.55,  // 铁路全断时扫荡预算下限系数(连通比例线性过渡到1)
 
   // ── 地雷 ──
   mineCostArms: 4, mineDamage: 42,
@@ -1045,7 +1049,8 @@ function actionSabotage(u) {
   state.exposure = clamp(state.exposure + CFG.expSabotage, 0, 100);
   state.stats.sabotages++;
   grantXp(u, CFG.xpSabotage);
-  log("破袭铁路成功! 掀翻运输车: 军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + " (暴露+" + CFG.expSabotage + ")", "good");
+  refreshSupply();
+  log("破袭铁路成功! 掀翻运输车: 军火+" + CFG.sabotageArms + " 粮+" + CFG.sabotageGrain + " (暴露+" + CFG.expSabotage + ") — 沿线据点断补: 守备不补、炮楼不修、工地停工", "good");
 }
 function actionMine(u) {
   const t = state.tiles[u.q][u.r];
@@ -1301,7 +1306,80 @@ function checkSeason() {
   for (const s of cur) if (!old.includes(s)) log(BEGIN[s], "hl");
 }
 
-// 据点守备队: 每个存活炮楼/县城维持1支常驻巡逻; 被歼后隔 garrisonRespawn 回合再补
+// ── 铁路补给网(日军的动脉): 从县城沿未断铁路BFS连通; 据点在连通轨道≤supplyRange格内=有补给 ──
+// 断补的据点: 守备被歼不再补充、炮楼不自动维修、炮楼工地停工; 扫荡预算/出兵点也看连通度
+let supplyZone = null; // Set<key> 每回合刷新(动作后也刷)
+function railConnectedSet() {
+  const con = new Set(); let town = null;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const sh = state.tiles[q][r].sh; if (sh && sh.kind === "town") town = [q, r]; }
+  if (!town) return con; // 县城已克: 全线瘫痪
+  // 注意: 铁路逐行蜿蜒, 斜向换列在奇偶列偏移坐标下未必六边形相邻 → 用行列8邻域判连通(断轨本身仍能切断)
+  const bfs = [town]; con.add(key(town[0], town[1]));
+  while (bfs.length) {
+    const [q, r] = bfs.pop();
+    for (let dq = -1; dq <= 1; dq++) for (let dr = -1; dr <= 1; dr++) {
+      if (!dq && !dr) continue;
+      const nq = q + dq, nr = r + dr;
+      if (nq < 0 || nr < 0 || nq >= W || nr >= H) continue;
+      const t = state.tiles[nq][nr], k = key(nq, nr);
+      if (!t.rail || t.railBroken > 0 || con.has(k)) continue;
+      con.add(k); bfs.push([nq, nr]);
+    }
+  }
+  return con;
+}
+function refreshSupply() {
+  // 接力模型: 据点距连通铁路≤supplyRange=直连; 距已补给据点≤supplyRelay=接力(可传递)
+  // → 拔掉中继据点或断轨, 下游整条线断补(层层蚕食的镜像)
+  const con = [];
+  for (const k of railConnectedSet()) con.push(k.split(",").map(Number));
+  const shs = [];
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const sh = state.tiles[q][r].sh;
+    if (sh && (sh.kind === "pillbox" || sh.kind === "town" || sh.kind === "site") && sh.hp !== 0) shs.push([q, r, sh.kind]);
+  }
+  // 铁路沿线据点(距任意轨道≤supplyRange, 断没断都算"沿线")只认连通铁路 — 断轨即断补, 不许炮楼间接力绕过;
+  // 深入内陆的据点才走接力(卡车马车短途转运, 距已补给据点≤supplyRelay, 可传递)
+  const allRail = [];
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) if (state.tiles[q][r].rail) allRail.push([q, r]);
+  const railServed = ([q, r]) => allRail.some(([aq, ar]) => hexDist(q, r, aq, ar) <= CFG.supplyRange);
+  const supplied = new Set();
+  for (const [q, r, kind] of shs) if (kind === "town") supplied.add(key(q, r)); // 县城=源头
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [q, r] of shs) {
+      const k = key(q, r);
+      if (supplied.has(k)) continue;
+      let ok;
+      if (railServed([q, r])) ok = con.some(([cq, cr]) => hexDist(q, r, cq, cr) <= CFG.supplyRange);
+      else { ok = false; for (const sk of supplied) { const [sq, sr] = sk.split(",").map(Number); if (hexDist(q, r, sq, sr) <= CFG.supplyRelay) { ok = true; break; } } }
+      if (ok) { supplied.add(k); changed = true; }
+    }
+  }
+  supplyZone = supplied; return supplied;
+}
+function isSupplied(q, r) {
+  const sh = state.tiles[q][r].sh;
+  if (sh && sh.kind === "town") return true; // 县城是源头
+  if (!supplyZone) refreshSupply();
+  return supplyZone.has(key(q, r));
+}
+function canSupplyAt(q, r) { // 某空格若修据点能否接上补给网(囚笼选址用): 沿线看连通轨道, 内陆看接力
+  if (!supplyZone) refreshSupply();
+  let nearRail = false;
+  for (let aq = 0; aq < W; aq++) for (let ar = 0; ar < H; ar++) if (state.tiles[aq][ar].rail && hexDist(q, r, aq, ar) <= CFG.supplyRange) { nearRail = true; aq = W; break; }
+  if (nearRail) { for (const k of railConnectedSet()) { const [cq, cr] = k.split(",").map(Number); if (hexDist(q, r, cq, cr) <= CFG.supplyRange) return true; } return false; }
+  for (const sk of supplyZone) { const [sq, sr] = sk.split(",").map(Number); if (hexDist(q, r, sq, sr) <= CFG.supplyRelay) return true; }
+  return false;
+}
+function railConnFrac() { // 铁路连通比例(扫荡预算用)
+  let total = 0; const con = railConnectedSet();
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) if (state.tiles[q][r].rail) total++;
+  return total ? con.size / total : 0;
+}
+
+// 据点守备队: 每个存活炮楼/县城维持1支常驻巡逻; 被歼后隔 garrisonRespawn 回合再补(需铁路补给连通)
 function ensureGarrisons() {
   const S = state;
   if (S.turn < CFG.garrisonFromTurn) return;
@@ -1309,6 +1387,7 @@ function ensureGarrisons() {
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const sh = S.tiles[q][r].sh;
     if (!sh || (sh.kind !== "pillbox" && sh.kind !== "town") || sh.hp <= 0) continue;
+    if (!isSupplied(q, r)) continue; // 断补: 守备被歼后无从补充 — 破袭创造拔点窗口
     const k = key(q, r);
     if (S.units.some(x => x.side === "j" && x.guard === k)) continue;
     if ((S.garrTimer[k] || 0) > S.turn) continue;
@@ -1317,7 +1396,7 @@ function ensureGarrisons() {
     if (!free.length) continue;
     const [a, b] = pick(free);
     const u = spawnUnit(type, a, b, { guard: k, gq: q, gr: r });
-    if (u) { u.mp = 0; S.garrTimer[k] = S.turn + CFG.garrisonRespawn; }
+    if (u) { u.mp = 0; S.garrTimer[k] = S.turn + CFG.garrisonRespawn; if (S.turn > 1 && visSet.has(key(a, b))) log("铁路运来增援 — " + sh.name + "补充了守备队", "jp"); }
   }
 }
 
@@ -1348,6 +1427,7 @@ function jpTurn() {
   // 工地推进
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const sh = S.tiles[q][r].sh;
+    if (sh && sh.kind === "site" && !isSupplied(q, r)) continue; // 断补: 工地停工(材料运不上来)
     if (sh && sh.kind === "site" && --sh.left <= 0) {
       S.tiles[q][r].sh = { kind: "pillbox", name: "炮楼·新筑", hp: CFG.pillboxHP, maxHp: CFG.pillboxHP, str: CFG.pillboxStr };
       if (S.tiles[q][r].disc) log("日军新炮楼筑成, 封锁线又收紧一分", "jp");
@@ -1364,7 +1444,13 @@ function jpTurn() {
     }
   }
 
+  refreshSupply(); // 铁路补给网(破袭后当回合生效)
   ensureGarrisons(); // 据点守备队(历史: 日伪常态驻防, 非扫荡期也有活动)
+  // 炮楼维修: 有补给才修(断补的楼只能挨打)
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const sh = S.tiles[q][r].sh;
+    if (sh && sh.kind === "pillbox" && sh.hp < sh.maxHp && sh.hp > 0 && isSupplied(q, r)) sh.hp = Math.min(sh.maxHp, sh.hp + CFG.pillboxRepair);
+  }
 
   // ── 土匪下山: 每寨隔 banditEvery 回合派1股(每寨同时最多1股) ──
   if (S.turn >= 4 && S.turn % CFG.banditEvery === 0) {
@@ -1499,10 +1585,11 @@ function spyAct(u) {
 }
 
 function jpSpawnPoint(tq, tr) {
-  // 据点旁空格; 给定目标时选离目标最近的据点(就近出动)
+  // 有补给的据点旁空格(兵从铁路来); 给定目标时选离目标最近的(就近出动); 全断补则只剩县城能出兵
   let spots = [], bestD = 1e9;
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const sh = state.tiles[q][r].sh;
+    if (sh && (sh.kind === "town" || sh.kind === "pillbox") && !isSupplied(q, r)) continue;
     if (sh && (sh.kind === "town" || sh.kind === "pillbox")) {
       const d = tq !== undefined ? hexDist(q, r, tq, tr) : 0;
       if (d > bestD) continue;
@@ -1523,6 +1610,7 @@ function buildSite() {
   for (let q = 8; q < W - 1; q++) for (let r = 1; r < H - 1; r++) {
     const t = state.tiles[q][r];
     if (t.sh || t.village || t.rail || t.terrain === "mountain") continue;
+    if (!canSupplyAt(q, r)) continue; // 补给网够不到的地方修不了楼(蚕食式推进)
     let score = 0;
     for (let qq = 0; qq < W; qq++) for (let rr = 0; rr < H; rr++) {
       const v = state.tiles[qq][rr].village;
@@ -1548,10 +1636,10 @@ function launchSweep() {
   let budget = (CFG.sweepBase + S.turn * CFG.sweepPerTurn) * eraMult(S.turn) * (0.6 + S.exposure / CFG.sweepExpFactor);
   if (S.sweep.big) budget *= CFG.bigSweepMult;
   if (hasSeason(S.turn, "harvest")) budget *= CFG.harvestSweepMult; // 秋收抢粮扫荡
-  // 破袭削弱
-  let brokenCnt = 0;
-  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) if (S.tiles[q][r].railBroken > 0) brokenCnt++;
-  budget *= Math.max(0.6, 1 - brokenCnt * CFG.sabotageSweepReduce);
+  // 铁路是兵团动脉: 预算随铁路连通比例缩水(全断只剩 sweepSupplyFloor)
+  const conFrac = railConnFrac();
+  budget *= CFG.sweepSupplyFloor + (1 - CFG.sweepSupplyFloor) * conFrac;
+  if (conFrac < 0.99) log("铁路破袭见效 — 日军兵力输送受阻, 此次扫荡规模缩水" + Math.round((1 - (CFG.sweepSupplyFloor + (1 - CFG.sweepSupplyFloor) * conFrac)) * 100) + "%", "good");
   // 目标: 民心最高的非总部己方村, 否则总部
   const owned = ownedVillages();
   let target = owned.filter(x => !x.v.hq).sort((a, b) => b.v.heart - a.v.heart)[0] || owned[0];
@@ -2693,6 +2781,11 @@ function renderPanel() {
     } else if (t.sh) {
       html += "<h3>" + t.sh.name + "<small>敌军设施</small></h3>";
       html += "<div class='row'>耐久 <b>" + Math.max(0, Math.round(t.sh.hp)) + "</b>/" + t.sh.maxHp + " · 火力 <b>" + t.sh.str + "</b></div>";
+      if (t.sh.kind === "pillbox" || t.sh.kind === "town" || t.sh.kind === "site") {
+        html += isSupplied(sel.q, sel.r)
+          ? "<div class='row' style='color:#d8a441'>⛓ 铁路补给畅通: 守备可补充 · 炮楼每回合+" + CFG.pillboxRepair + "耐久" + (t.sh.kind === "site" ? " · 工地施工中" : "") + "</div>"
+          : "<div class='row' style='color:#9fbc52'>✂ 补给已被切断! 守备不补、不维修" + (t.sh.kind === "site" ? "、工地停工" : "") + " — 拔点良机</div>";
+      }
       if (t.sh.kind === "town") html += "<div class='hint'>日军华北方面军的县级据点。完成整训【战略反攻】后攻克它=军事胜利。</div>";
       else if (t.sh.kind === "pillbox") html += "<div class='hint'>封锁线炮楼, 压制周围" + CFG.suppressDist + "格内村庄民心(上限" + CFG.suppressCap + ")。拔掉它, 附近的村子才敢跟咱们走。</div>";
       else html += "<div class='hint'>修建中的炮楼, " + t.sh.left + "回合后完工。趁工事未成赶紧捣毁!</div>";
@@ -3149,6 +3242,7 @@ const CFG_DESC = {
   spyHeartLoss: "特务潜伏村庄每回合-民心", spyExpGain: "特务潜伏村庄每回合+暴露", chujianHeart: "锄奸成功所在村民心+", chujianExpDrop: "锄奸成功暴露-",
   mountainMove: "翻山移动力消耗(步兵)", mountainMoveMaque: "麻雀战民兵走山路消耗", tunnelLinkRange: "地道联网距离(村间≤此值联通)", tunnelNetDef: "联防: 网内每邻村+防(上限+4)",
   garrisonFromTurn: "据点守备队从此回合出现", garrisonRespawn: "守备队被歼后N回合再补", garrisonRadius: "守备队巡逻半径",
+  supplyRange: "据点距连通铁路≤此值=直连补给", supplyRelay: "据点距已补给据点≤此值=接力补给", pillboxRepair: "有补给的炮楼每回合自动修复", sweepSupplyFloor: "铁路全断时扫荡预算下限系数",
   banditCamps: "土匪山寨数量", banditCampHP: "山寨耐久", banditCampStr: "山寨火力", banditEvery: "每N回合土匪下山", banditGrain: "土匪洗劫每回合抢粮", banditHeart: "土匪洗劫每回合-民心", banditLootGrain: "端山寨缴获粮", banditLootArms: "端山寨缴获军火", banditRecruitMan: "统一战线收编+人力",
 };
 const CFG_GROUPS = [
@@ -3161,7 +3255,7 @@ const CFG_GROUPS = [
   ["扫荡", ["sweepBase", "sweepPerTurn", "sweepExpFactor", "sweepCooldown", "sweepTTL", "sweepMaxUnits", "pillageGrain", "pillageHeart", "pillageBuildingChance", "tunnelDamageMult", "bigSweepTurn", "bigSweepMult", "sweepWinKillRatio"]],
   ["战斗与单位", ["dmgBase", "dmgExpDiv", "counterMult", "hpScaleFloor", "tunnelDef", "tunnelLinkRange", "tunnelNetDef", "ambushBonus", "lootArmsRatio", "healVillage", "healTerritory", "restHeal", "fortifyDef", "starveHpLoss", "starveHeartLoss"]],
   ["据点/炮楼/囚笼", ["pillboxHP", "pillboxStr", "townHP", "townStr", "siteHP", "siteStr", "siteTurns", "lootPillboxArms", "lootPillboxGrain", "patrolEvery", "patrolTTL"]],
-  ["破袭/地雷/铁路", ["sabotageArms", "sabotageGrain", "mineCostArms", "mineDamage", "railRepair", "sabotageSweepReduce"]],
+  ["破袭/地雷/铁路", ["supplyRange", "supplyRelay", "pillboxRepair", "sweepSupplyFloor", "sabotageArms", "sabotageGrain", "mineCostArms", "mineDamage", "railRepair", "sabotageSweepReduce"]],
   ["季节", ["qsExpDecay", "qsPlainDef", "harvestGrainMult", "harvestSweepMult", "winterGrainMult", "winterHealMult", "winterSweepThresholdAdd"]],
   ["协同与经验", ["flankBonus", "flankMax", "encircleLootMult", "capturePuppetMan", "xpAttack", "xpKill", "xpStruct", "xpDefend", "xpSabotage"]],
   ["扫荡战术/特务", ["ironFromYear", "ironExtraUnits", "garrisonMaxUnits", "garrisonTTLMult", "spyFromTurn", "spyEvery", "spyMax", "spyTTL", "spyHeartLoss", "spyExpGain", "chujianHeart", "chujianExpDrop"]],
