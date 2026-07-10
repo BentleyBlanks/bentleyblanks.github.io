@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#18160f">
+  <meta name="description" content="《太行·1941：破笼》——百团大战之后，在铁路与炮楼织成的囚笼里经营一片敌后根据地。">
+  <title>太行·1941：破笼</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="app">
+    <canvas id="board" aria-label="太行根据地六边形战场"></canvas>
+
+    <header id="topbar">
+      <div class="brand"><strong>太行·1941</strong><span>破笼</span></div>
+      <div id="dateBox" class="top-chip"></div>
+      <div id="resourceBar" class="resources"></div>
+      <div class="meters">
+        <button id="exposureBox" class="meter-button" title="短期暴露决定敌人掌握情报的准确度与额外兵力">
+          <span>暴露</span><i class="meter"><b id="exposureFill"></b></i><em id="exposureValue">0</em>
+        </button>
+        <button id="pressureBox" class="meter-button" title="敌军压力随时间和根据地发展增长，决定敌军行动频率与基础强度">
+          <span>压力</span><i class="meter pressure"><b id="pressureFill"></b></i><em id="pressureValue">0</em>
+        </button>
+      </div>
+      <nav>
+        <button id="policyBtn">方针 <kbd>P</kbd></button>
+        <button id="techBtn">整训 <kbd>T</kbd></button>
+        <button id="helpBtn">战役 <kbd>H</kbd></button>
+        <button id="soundBtn" aria-pressed="true" title="开关音效">声</button>
+      </nav>
+    </header>
+
+    <section id="operationBanner" class="hidden" aria-live="polite"></section>
+
+    <aside id="missionPanel">
+      <div class="panel-kicker">战役目标</div>
+      <h2 id="chapterTitle"></h2>
+      <p id="chapterStory"></p>
+      <div id="objectives"></div>
+      <div id="seedLine"></div>
+    </aside>
+
+    <aside id="sidePanel" class="hidden"></aside>
+
+    <section id="logPanel" aria-live="polite">
+      <div id="logEntries"></div>
+    </section>
+
+    <section id="legend">
+      <span><i class="dot connected"></i>交通畅通</span>
+      <span><i class="dot cut"></i>交通中断</span>
+      <span><i class="dot suppress"></i>据点压制</span>
+    </section>
+
+    <button id="mainButton">下一单位 <small>[空格]</small></button>
+
+    <section id="confirmBar" class="hidden">
+      <div id="confirmText"></div>
+      <div><button id="confirmYes">确认</button><button id="confirmNo" class="ghost">取消</button></div>
+    </section>
+
+    <div id="modalWrap" class="modal-wrap hidden" role="dialog" aria-modal="true">
+      <div id="modal" class="modal"></div>
+    </div>
+
+    <div id="toast" aria-live="assertive"></div>
+  </main>
+
+  <script type="module" src="./game.mjs"></script>
+</body>
+</html>
