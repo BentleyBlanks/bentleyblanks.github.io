@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#171b17">
+  <meta name="description" content="《沁源：反向围城》——撤空乡野、截断补给、瓦解据点，用人民战争让占领无法维持的2D六边格策略游戏。">
+  <title>沁源：反向围城</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="app">
+    <canvas id="board" aria-label="沁源围困战六边形战役地图"></canvas>
+    <div class="paper-grain" aria-hidden="true"></div>
+
+    <header id="warDesk">
+      <div class="identity">
+        <span class="seal">沁</span>
+        <div><strong>反向围城</strong><small>沁源 · 1942—1945</small></div>
+      </div>
+      <div id="dateBox" class="date-box"></div>
+      <div id="resourceBar" class="resource-bar"></div>
+      <div class="war-meters">
+        <button id="willMeter" class="war-meter" title="民心归零则围困瓦解">
+          <span>民心火种</span><i><b id="willFill"></b></i><em id="willValue">0</em>
+        </button>
+        <button id="occupationMeter" class="war-meter enemy" title="据点的补给与守备意志，降至零即被迫撤离">
+          <span>敌占续命</span><i><b id="occupationFill"></b></i><em id="occupationValue">0</em>
+        </button>
+      </div>
+      <nav>
+        <button id="doctrineBtn">方略 <kbd>D</kbd></button>
+        <button id="ledgerBtn">围困账 <kbd>L</kbd></button>
+        <button id="helpBtn">战法 <kbd>H</kbd></button>
+        <button id="soundBtn" aria-pressed="true" title="开关音效">声</button>
+      </nav>
+    </header>
+
+    <aside id="campaignPanel">
+      <div class="panel-eyebrow">围困阶段</div>
+      <h1 id="chapterTitle"></h1>
+      <p id="chapterStory"></p>
+      <div id="objectives"></div>
+      <div id="doctrineStamp"></div>
+    </aside>
+
+    <section id="enemyIntent" aria-live="polite"></section>
+
+    <aside id="inspector" class="closed">
+      <button id="closeInspector" aria-label="关闭详情">×</button>
+      <div id="inspectorBody"></div>
+    </aside>
+
+    <section id="siegeLedger" aria-label="反向围城进度">
+      <div class="ledger-title"><span>占领成本</span><strong id="siegeScore">0</strong></div>
+      <div id="siegeSteps"></div>
+    </section>
+
+    <section id="fieldLog" aria-live="polite">
+      <div id="logEntries"></div>
+    </section>
+
+    <section id="commandDock">
+      <div id="selectionCard">
+        <span class="selection-mark">令</span>
+        <div><strong>选择一支队伍</strong><small>点击棋子，再点击目标六边格</small></div>
+      </div>
+      <div id="actionBar"></div>
+      <button id="nextButton">下一队 <kbd>空格</kbd></button>
+      <button id="endTurnButton">结束半月 <kbd>Enter</kbd></button>
+    </section>
+
+    <section id="confirmBar" class="hidden">
+      <div id="confirmText"></div>
+      <div><button id="confirmYes">下令</button><button id="confirmNo" class="quiet">取消</button></div>
+    </section>
+
+    <div id="modalWrap" class="modal-wrap hidden" role="dialog" aria-modal="true">
+      <div id="modal" class="modal"></div>
+    </div>
+
+    <div id="toast" aria-live="assertive"></div>
+  </main>
+
+  <script type="module" src="./game.mjs"></script>
+</body>
+</html>

@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npm run test:taihang-polong",
-    "test:taihang-polong": "node taihang-polong/smoke-test.mjs"
+    "test": "npm run test:taihang-polong && npm run test:qinyuan",
+    "test:taihang-polong": "node taihang-polong/smoke-test.mjs",
+    "test:qinyuan": "node qinyuan/smoke-test.mjs"
   },
   "repository": {
     "type": "git",
