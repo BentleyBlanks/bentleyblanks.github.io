@@ -278,7 +278,7 @@ function sketchify(mat) {
       .replace("#include <begin_vertex>", "#include <begin_vertex>\n{ vec4 _w=vec4(transformed,1.0);\n#ifdef USE_INSTANCING\n_w=instanceMatrix*_w;\n#endif\nvWp=(modelMatrix*_w).xyz; }");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vWp;")
-      .replace("#include <map_fragment>", "#include <map_fragment>\n{ float lum=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114)); float sk=0.84+0.18*lum; float a1=abs(fract((vWp.x+vWp.z)*2.4)-0.5)*2.0; if(lum<0.62&&a1<0.12) sk-=0.045; diffuseColor.rgb=vec3(0.39,0.41,0.41)*sk; }");
+      .replace("#include <map_fragment>", "#include <map_fragment>\n{ float lum=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114)); vec3 ds=mix(diffuseColor.rgb, vec3(lum), 0.60); diffuseColor.rgb=mix(ds, vec3(0.70,0.71,0.68), 0.32); }");
   };
   mat.userData.sketch = true; return mat;
 }
@@ -713,9 +713,9 @@ function buildTiles() {
   hillLipMat = new THREE.MeshStandardMaterial({ color: 0x8a7850, roughness: 1 });
   snowMat = sharedMats.snow;
   fieldMat = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x9c978c, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  peakMatS = new THREE.MeshBasicMaterial({ color: 0x687375, transparent: true, opacity: .34, depthWrite: false });
-  snowMatS = new THREE.MeshBasicMaterial({ color: 0x8d999a, transparent: true, opacity: .16, depthWrite: false });
-  fieldMatS = new THREE.MeshBasicMaterial({ color: 0x667071, transparent: true, opacity: .26, depthWrite: false });
+  peakMatS = new THREE.MeshBasicMaterial({ color: 0x9a9d99, transparent: true, opacity: .80, depthWrite: false });
+  snowMatS = new THREE.MeshBasicMaterial({ color: 0xc0c5c2, transparent: true, opacity: .50, depthWrite: false });
+  fieldMatS = new THREE.MeshBasicMaterial({ color: 0xa79d84, transparent: true, opacity: .70, depthWrite: false });
   sharedMats.tilePick = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide });
   const gridMat = new THREE.LineBasicMaterial({ color: 0x2a2620, transparent: true, opacity: .52, depthWrite: false });
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
