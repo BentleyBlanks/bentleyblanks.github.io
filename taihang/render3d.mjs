@@ -364,6 +364,7 @@ function drawUnitIcon(g, type, x, y, s, color) {
   else if (type === "spy") { g.beginPath(); g.moveTo(-s*.38,0); g.quadraticCurveTo(0,-s*.34,s*.38,0); g.quadraticCurveTo(0,s*.34,-s*.38,0); g.stroke(); g.beginPath(); g.arc(0,0,s*.1,0,7); g.fill(); }
   else if (type === "commando") { g.beginPath(); g.moveTo(-s*.24,s*.3); g.lineTo(s*.19,-s*.28); g.lineTo(s*.1,s*.16); g.closePath(); g.fill(); g.strokeRect(-s*.28,s*.2,s*.22,s*.08); }
   else if (type === "squad" || type === "company") { g.beginPath(); g.arc(0,0,s*.16,0,7); g.fill(); for(let i=0;i<8;i++){ const a=i*Math.PI/4; g.beginPath(); g.moveTo(Math.cos(a)*s*.23,Math.sin(a)*s*.23); g.lineTo(Math.cos(a)*s*.38,Math.sin(a)*s*.38); g.stroke(); } }
+  else if (type === "builder") { g.beginPath(); g.moveTo(-s*.3, s*.32); g.lineTo(s*.18, -s*.18); g.stroke(); g.beginPath(); g.moveTo(s*.1, -s*.3); g.lineTo(s*.38, -s*.12); g.lineTo(s*.2, s*.04); g.closePath(); g.fill(); } // 锄头
   else { g.beginPath(); g.moveTo(-s*.28,s*.28); g.lineTo(s*.25,-s*.27); g.moveTo(-s*.24,-s*.3); g.lineTo(s*.3,s*.24); g.stroke(); if(type==="elite"){ g.beginPath(); for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?s*.14:s*.32; const px=Math.cos(a)*rr,py=Math.sin(a)*rr; i?g.lineTo(px,py):g.moveTo(px,py);} g.closePath(); g.fill(); } }
   g.restore();
 }
@@ -979,7 +980,7 @@ function signature() {
   let d = 0; const W = G().CFG.mapW, H = G().CFG.mapH, vis = G().visSet();
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { if (s.tiles[q][r].disc) d++; }
   const sel = G().sel(), pend = G().pending(), reach = G().reach();
-  let st = ""; for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const t = s.tiles[q][r]; if (t.village) st += q + "" + r + (t.village.owner) + (t.village.buildings ? t.village.buildings.length : 0) + Math.round(t.village.heart) + (t.village.build ? "b" + t.village.build.left : ""); if (t.sh) st += "s" + q + r + Math.round(t.sh.hp); if (t.mine) st += "m" + q + r; }
+  let st = ""; for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const t = s.tiles[q][r]; if (t.village) st += q + "" + r + (t.village.owner) + (t.village.buildings ? t.village.buildings.length : 0) + Math.round(t.village.heart) + (t.village.build ? "b" + t.village.build.left : ""); if (t.sh) st += "s" + q + r + Math.round(t.sh.hp); if (t.mine) st += "m" + q + r; if (t.farm) st += "f" + q + r; }
   const mm = G().moveMode && G().moveMode() ? 1 : 0, mh = G().moveHover && G().moveHover();
   return s.turn + "#" + d + "#" + (vis ? vis.size : 0) + "#" + u + "#" + (sel ? sel.kind + (sel.id || sel.q + "," + sel.r) : "-") + "#" + (pend ? pend.type + pend.q + "," + pend.r : "-") + "#" + mm + (mh ? mh.q + "," + mh.r : "-") + "#" + (reach ? reach.size : 0) + "#" + st;
 }
@@ -1074,6 +1075,7 @@ function syncDynamic() {
         gStruct.add(cb);
       }
     }
+    if (t.farm) gStruct.add(farmMesh3D(x, h, z));
     if (t.sh) gStruct.add(structMesh(x, h, z, t.sh));
     if (t.mine) gStruct.add(mineMesh(x, h, z));
   }
@@ -1170,6 +1172,21 @@ function railMesh(q, r, x, h, z, t) {
   return markPickGroup(g, q, r);
 }
 
+let cropMat = null, soilMat = null;
+function farmMesh3D(x, h, z) { // 农田: 土色田块 + 青绿作物垄
+  if (!cropMat) {
+    cropMat = new THREE.MeshStandardMaterial({ color: 0x7d9040, roughness: 1 });
+    soilMat = new THREE.MeshStandardMaterial({ color: 0x8a7448, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  }
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CircleGeometry(R * .52, 6), soilMat);
+  base.rotation.x = -Math.PI / 2; base.position.set(x, h + .012, z); base.receiveShadow = true; g.add(base);
+  for (let i = -2; i <= 2; i++) {
+    const row = new THREE.Mesh(new THREE.BoxGeometry(.62 - Math.abs(i) * .09, .03, .05), cropMat);
+    row.position.set(x, h + .032, z + i * .11); row.receiveShadow = true; g.add(row);
+  }
+  return g;
+}
 function mineMesh(x, h, z) {
   const loaded = placedModelAsset("mine_cluster", x, h, z); if (loaded) return loaded;
   const g = new THREE.Group(); g.position.set(x, h, z);
