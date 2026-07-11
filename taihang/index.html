@@ -3595,6 +3595,7 @@ function dbgApply(cat, key, v) {
   else if (cat === "exposure") D.setTone(null, v);
   else if (cat === "taa") D.setTAA(v);
   else if (cat === "bump") { if (key === "on") D.setBump(v); else D.setBumpScale(v); }
+  else if (cat === "perf") D.setPerf(v);
   else if (cat === "cam") D.setCamera({ [key]: v });
   else if (cat === "csm") D.setCSM({ [key]: v });
 }
@@ -3686,6 +3687,7 @@ function buildDebugPanel() {
   qual += `<div class="dr"><label>TAA 抗锯齿</label><input type="checkbox" onchange="dbgApply('taa','on',this.checked)"></div>`;
   qual += `<div class="dr"><label title="关掉地表凹凸贴图, 排查地面横线是否来自bump">地表 bumpMap</label><input type="checkbox" checked onchange="dbgApply('bump','on',this.checked)"></div>`;
   qual += dbgSl("bumpMap 强度", 0, 0.1, 0.002, 0.018, "bump", "scale");
+  qual += `<div class="dr"><label title="锁1x像素比+关TAA, 高分屏提帧">性能模式</label><input type="checkbox" onchange="dbgApply('perf','on',this.checked)"></div>`;
   let csm = `<div class="dr"><label title="级联数(远近分级阴影)">级联数 cascades</label><select onchange="dbgApply('csm','cascades',+this.value)"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></div>`;
   csm += `<div class="dr"><label title="每级阴影贴图分辨率">每级分辨率</label><select onchange="dbgApply('csm','size',+this.value)"><option value="1024">1024</option><option value="2048" selected>2048</option><option value="4096">4096</option></select></div>`;
   csm += dbgSl("阴影距离(maxFar)", 20, 120, 1, 55, "csm", "maxFar");

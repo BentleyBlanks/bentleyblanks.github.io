@@ -14,7 +14,7 @@ const G = () => window.TH;
 let renderer, scene, camera, controls, animId = 0, host = null, ro = null;
 let gTiles, gTerrain, gTrees, gUnits, gStruct, gOverlay;
 const tiles = {};            // "q,r" -> { mesh, h, terrain }
-let prismGeo, coneGeo, cragGeo, ridgeGeo, treeTrunkGeo, treeLeafGeo, treeLeafTopGeo, hexFlatGeo, roofGeo, terraceGeo, terraceLipGeo, terraceDiscGeo;
+let prismGeo, coneGeo, cragGeo, ridgeGeo, treeTrunkGeo, treeLeafGeo, treeLeafTopGeo, hexFlatGeo, roofGeo, terraceGeo, terraceLipGeo, terraceDiscGeo, pickHexGeo, gridHexGeo;
 const matCache = {};
 const texCache = {};
 const sharedMats = {};
@@ -466,6 +466,8 @@ function init(container) {
   treeLeafGeo = new THREE.ConeGeometry(0.205, 0.39, 9);
   treeLeafTopGeo = new THREE.ConeGeometry(0.145, 0.31, 9);
   hexFlatGeo = new THREE.CircleGeometry(R * 0.9, 6, Math.PI / 2); hexFlatGeo.rotateX(-Math.PI / 2);
+  pickHexGeo = new THREE.CircleGeometry(R, 6, Math.PI / 2); pickHexGeo.rotateX(-Math.PI / 2);
+  { const gp = []; for (let i = 0; i <= 6; i++) { const a = Math.PI / 3 * i; gp.push(new THREE.Vector3(R * .982 * Math.cos(a), 0, R * .982 * Math.sin(a))); } gridHexGeo = new THREE.BufferGeometry().setFromPoints(gp); }
   roofGeo = makeRoofGeometry();
   makeSharedMaterials();
 
@@ -720,10 +722,9 @@ function buildTiles() {
   const gridMat = new THREE.LineBasicMaterial({ color: 0x2a2620, transparent: true, opacity: .52, depthWrite: false });
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const t = s.tiles[q][r], [x, z] = hexWorld(q, r);
-    const h = continuousHeightAt(x, z), hexGeo = makeConformingHexGeometry(x, z, h);
-    const m = new THREE.Mesh(hexGeo, sharedMats.tilePick); m.position.set(x, h + .025, z); m.userData = { q, r, h };
-    const gridPts = []; for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i, dx = R * .982 * Math.cos(a), dz = R * .982 * Math.sin(a); gridPts.push(new THREE.Vector3(dx, continuousHeightAt(x + dx, z + dz) - h, dz)); }
-    const grid = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(gridPts), gridMat); grid.position.set(x, h + .050, z); grid.renderOrder = 3;
+    const h = continuousHeightAt(x, z);
+    const m = new THREE.Mesh(pickHexGeo, sharedMats.tilePick); m.position.set(x, h + .025, z); m.userData = { q, r, h };
+    const grid = new THREE.LineLoop(gridHexGeo, gridMat); grid.position.set(x, h + .050, z); grid.renderOrder = 3;
     gTiles.add(m, grid); tiles[q + "," + r] = { mesh: m, grid, h, terrain: t.terrain };
     if (t.terrain === "mountain") {
       // 横向层叠的主脊 + 肩脊，压低尖峰，贴近太行台塬的块状轮廓。
@@ -899,6 +900,7 @@ const dbg = {
   setTAA(on) { taaEnabled = !!on; if (on) ensureComposer(); },
   setBump(on) { for (const m of [surfaceMat, peakMat, hillMat, fieldMat]) { if (!m) continue; if (on) { if (m.userData._bmp !== undefined) m.bumpMap = m.userData._bmp; } else { if (m.bumpMap) m.userData._bmp = m.bumpMap; m.bumpMap = null; } m.needsUpdate = true; } },
   setBumpScale(v) { for (const m of [surfaceMat, peakMat, hillMat, fieldMat]) { if (m) { m.bumpScale = v; m.needsUpdate = true; } } },
+  setPerf(on) { if (!renderer) return; renderer.setPixelRatio(on ? 1 : Math.min(devicePixelRatio, 2)); if (on) taaEnabled = false; onResize(); },
   setCamera(o) {
     if (!controls) return;
     if (o.polar != null) { camPolar = o.polar; controls.minPolarAngle = controls.maxPolarAngle = camPolar; lockCiv6Camera(camera.position.distanceTo(controls.target)); }
@@ -920,7 +922,7 @@ function signature() {
   return s.turn + "#" + d + "#" + (vis ? vis.size : 0) + "#" + u + "#" + (sel ? sel.kind + (sel.id || sel.q + "," + sel.r) : "-") + "#" + (pend ? pend.type + pend.q + "," + pend.r : "-") + "#" + mm + (mh ? mh.q + "," + mh.r : "-") + "#" + (reach ? reach.size : 0) + "#" + st;
 }
 function clearGroup(g) {
-  const shared = new Set([prismGeo, coneGeo, cragGeo, ridgeGeo, hexFlatGeo, treeTrunkGeo, treeLeafGeo, treeLeafTopGeo, roofGeo]);
+  const shared = new Set([prismGeo, coneGeo, cragGeo, ridgeGeo, hexFlatGeo, treeTrunkGeo, treeLeafGeo, treeLeafTopGeo, roofGeo, pickHexGeo, gridHexGeo, terraceGeo, terraceLipGeo, terraceDiscGeo]);
   const sharedMaterials = new Set([peakMat, hillMat, snowMat, peakMatS, snowMatS, fieldMat, fieldMatS]);
   for (const v of Object.values(sharedMats)) {
     if (v && v.isMaterial) sharedMaterials.add(v);
