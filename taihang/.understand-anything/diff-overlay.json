@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "baseBranch": "6bfc093",
+  "generatedAt": "2026-07-12T02:48:16.8169357+08:00",
+  "changedFiles": [
+    "index.html",
+    "render3d.mjs"
+  ],
+  "changedNodeIds": [
+    "file:index.html",
+    "file:render3d.js",
+    "function:render3d.js:skyColorJS",
+    "function:render3d.js:paperTex",
+    "function:render3d.js:terrainTex",
+    "function:render3d.js:sketchify",
+    "function:render3d.js:unitTex",
+    "function:render3d.js:unitBannerTex",
+    "function:render3d.js:cityBannerTex",
+    "function:render3d.js:init",
+    "function:render3d.js:buildTiles",
+    "function:render3d.js:buildBoundary",
+    "function:render3d.js:focus",
+    "function:render3d.js:project",
+    "function:render3d.js:buildCSM",
+    "function:render3d.js:setTOD",
+    "function:render3d.js:makeSkyCube",
+    "function:render3d.js:syncDynamic",
+    "function:render3d.js:villageMesh",
+    "function:render3d.js:structMesh",
+    "function:render3d.js:setupPicking",
+    "function:render3d.js:loop",
+    "function:render3d.js:dispose"
+  ],
+  "affectedNodeIds": [
+    "document:concept-art/screenshots/README.md"
+  ]
+}

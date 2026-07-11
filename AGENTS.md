@@ -1,5 +1,20 @@
 # Repository Guidelines
 
+## Project-wide Naming Conventions
+
+These rules apply to all project-owned files, scripts, functions, and assets in this repository.
+
+- Use English-only names for scripts, source files, and assets. Player-facing text may remain localized.
+- Use PascalCase for file stems, project-owned function names, and descriptive asset-name segments.
+- Use lowerCamelCase for variables, parameters, and local bindings.
+- Do not use hyphens (`-`) in project-owned names. When a separator is necessary, use an underscore (`_`).
+- Asset filenames must expose their category with the form `<Category>_<DescriptivePascalCase>.<ext>`.
+- Use these category prefixes unless a more specific category is agreed first: `Model_`, `Texture_`, `Icon_`, `AudioBgm_`, `AudioSfx_`, `Scene_`, `Script_`, `Shader_`, `Material_`, `Animation_`, `Font_`, and `Data_`.
+- Keep the extension lowercase unless a tool requires otherwise.
+- Before introducing a new asset category, agree on its English prefix and document it here.
+- Engine-mandated callbacks, virtual methods, signal handlers, generated metadata, and third-party/vendor files may retain the exact spelling required by their owner. Do not rename those in a way that breaks engine discovery, imports, or licenses.
+- Apply these conventions to every new name and to any project-owned name being deliberately renamed. Do not perform unrelated bulk renames without validating every reference and import.
+
 ## Commit Message Format
 
 Use the project-prefixed commit subject style shown in the existing Sophia history.
