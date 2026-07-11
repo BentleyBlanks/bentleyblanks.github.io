@@ -14,7 +14,7 @@ const G = () => window.TH;
 let renderer, scene, camera, controls, animId = 0, host = null, ro = null;
 let gTiles, gTerrain, gTrees, gUnits, gStruct, gOverlay;
 const tiles = {};            // "q,r" -> { mesh, h, terrain }
-let prismGeo, coneGeo, cragGeo, ridgeGeo, treeTrunkGeo, treeLeafGeo, treeLeafTopGeo, hexFlatGeo, roofGeo;
+let prismGeo, coneGeo, cragGeo, ridgeGeo, treeTrunkGeo, treeLeafGeo, treeLeafTopGeo, hexFlatGeo, roofGeo, terraceGeo, terraceLipGeo, terraceDiscGeo;
 const matCache = {};
 const texCache = {};
 const sharedMats = {};
@@ -459,6 +459,9 @@ function init(container) {
   coneGeo = new THREE.ConeGeometry(R * 0.64, 1, 7, 2, false, Math.PI / 2);
   cragGeo = new THREE.IcosahedronGeometry(.46, 1);
   ridgeGeo = makeTaihangRidgeGeometry();
+  terraceGeo = new THREE.BoxGeometry(1.02, .035, .30);   // 田垄
+  terraceLipGeo = new THREE.BoxGeometry(1.02, .085, .045); // 挡土坎
+  terraceDiscGeo = new THREE.CylinderGeometry(R * .56, R * .64, .075, 6); // 梯田台阶盘(六边形收分)
   treeTrunkGeo = new THREE.CylinderGeometry(0.027, 0.058, 0.46, 7);
   treeLeafGeo = new THREE.ConeGeometry(0.205, 0.39, 9);
   treeLeafTopGeo = new THREE.ConeGeometry(0.145, 0.31, 9);
@@ -500,7 +503,7 @@ function init(container) {
   return true;
 }
 
-let peakMat, hillMat, snowMat, peakMatS, snowMatS, fieldMat, fieldMatS;
+let peakMat, hillMat, snowMat, peakMatS, snowMatS, fieldMat, fieldMatS, hillTerraceMat, hillLipMat;
 function winterNow() {
   const cfg = G().CFG, span = cfg.winterMonths || [11, 2];
   const m = Math.floor((G().state().turn - 1) / cfg.turnsPerMonth) % 12 + 1;
@@ -706,6 +709,8 @@ function buildTiles() {
   buildWarFogSurface();
   peakMat = new THREE.MeshStandardMaterial({ map: terrainTex("mountain"), color: 0xd1d6d3, bumpMap: terrainTex("mountain"), bumpScale: .055, roughness: .99 });
   hillMat = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0xadb0ab, bumpMap: materialTex("stone"), bumpScale: .032, roughness: 1 });
+  hillTerraceMat = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0xb8a06a, roughness: 1 }); // 华北梯田: 枯黄黄土台地
+  hillLipMat = new THREE.MeshStandardMaterial({ color: 0x8a7850, roughness: 1 });
   snowMat = sharedMats.snow;
   fieldMat = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x9c978c, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   peakMatS = new THREE.MeshBasicMaterial({ color: 0x687375, transparent: true, opacity: .34, depthWrite: false });
@@ -733,9 +738,20 @@ function buildTiles() {
       }
       // 雪只落在山肩的小平台，不再套一顶纯白锥帽。
       for (let i = 0; i < 2; i++) { const a = rot + (i ? .75 : -1.55), cap = new THREE.Mesh(cragGeo, snowMat); cap.scale.set(.26 + i * .05, .014, .12 + i * .025); cap.rotation.y = a; cap.position.set(x + Math.cos(a) * (.18 + i * .12), h + ph * (.70 - i * .12), z + Math.sin(a) * (.16 + i * .11)); addTerrainDecor(cap, q, r, "snow", snowMatS, true); }
-    } else if (t.terrain === "hills" && h2(q * 4.7, r * 6.1) > .28) {
-      const a = h2(q - 2, r + 6) * Math.PI, rh = .16 + h2(q * 2, r * 8) * .18;
-      const ridge = new THREE.Mesh(ridgeGeo, hillMat); ridge.scale.set(.78, rh, .54); ridge.rotation.y = a; ridge.position.set(x + .08, h + .006, z - .05); ridge.castShadow = ridge.receiveShadow = true; addTerrainDecor(ridge, q, r, "ridge", peakMatS);
+    } else if (t.terrain === "hills") {
+      // 华北梯田/台塬: 平顶阶梯台地(3级递减), 枯黄黄土, 与山地灰岩尖脊明显区分
+      const rot = Math.PI / 6 + (h2(q + 1, r) - .5) * .6, levels = 2 + (h2(q * 3, r * 2) > .5 ? 1 : 0);
+      let py = h + .02;
+      for (let i = 0; i < levels; i++) {
+        const sc = 1 - i * .245;
+        const plat = new THREE.Mesh(terraceDiscGeo, i === levels - 1 ? hillTerraceMat : hillLipMat);
+        plat.scale.set(sc, 1 + i * .1, sc); plat.rotation.y = rot; plat.position.set(x, py + .0375, z);
+        plat.castShadow = plat.receiveShadow = true; addTerrainDecor(plat, q, r, i === levels - 1 ? "terrace" : "terraceLip", fieldMatS);
+        py += .066;
+      }
+      // 顶台几道田垄, 强化梯田质感
+      const ta = h2(q, r + 3) * Math.PI;
+      for (let i = -1; i <= 1; i++) { const row = new THREE.Mesh(terraceGeo, hillLipMat); row.scale.set(.52, .5, 1); row.rotation.y = ta; row.position.set(x + Math.sin(ta) * i * .12, py, z + Math.cos(ta) * i * .12); addTerrainDecor(row, q, r, "terraceLip", fieldMatS); }
     }
     // 稀疏裸岩与农田垄让平原/丘陵在远景也有尺度参照。
     if ((t.terrain === "plain" || t.terrain === "hills") && !t.village && !t.rail && h2(q * 7.1, r * 4.3) > .72) {
