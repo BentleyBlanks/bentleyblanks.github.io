@@ -77,6 +77,9 @@ button { font-family: inherit; cursor: pointer; }
 .tbtn { background: #2a2516; border: 1px solid #4a452c; color: #d8c9a0; border-radius: 5px; padding: 4px 10px; font-size: 12px; }
 .tbtn:hover { background: #3a3320; }
 .tbtn.glow { border-color: #d8a441; color: #f0d488; box-shadow: 0 0 6px rgba(216,164,65,.35); }
+#audioBtn { width: 30px; min-width: 30px; height: 27px; padding: 0; display: inline-grid; place-items: center; line-height: 1; font-size: 15px; }
+#audioBtn[aria-pressed="false"] { color: #82775a; background: #211e16; }
+#audioBtn:disabled { cursor: default; opacity: .5; }
 
 /* ── 扫荡横幅 ── */
 #sweepBanner { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 9; background: rgba(90,20,16,.92); border: 1px solid #a04338; color: #f0d0c0; border-radius: 6px; padding: 5px 14px; font-size: 13px; letter-spacing: 1px; pointer-events: none; }
@@ -251,6 +254,7 @@ button { font-family: inherit; cursor: pointer; }
   <button class="tbtn" id="phaseBtn" title="论持久战: 战略进程与思想武器">🛡 战略防御</button>
   <button class="tbtn" id="techBtn">整训 [T]</button>
   <span class="res" id="uiDate"></span>
+  <button class="tbtn" id="audioBtn" title="关闭音乐与音效" aria-label="关闭音乐与音效" aria-pressed="true">🔊</button>
   <button class="tbtn" id="dbgBtn" title="选项 / 调试">⚙</button>
 </div>
 <div id="dbgPanel"></div>
@@ -2832,6 +2836,128 @@ addEventListener("keydown", e => {
 
 // ═══════════════════════════════ UI ═══════════════════════════════
 const $ = id => document.getElementById(id);
+
+// Local prototype audio. The referenced files are intentionally gitignored.
+const AUDIO_PATHS = {
+  bgm: "./assets/audio/local-civ6/bgm_china_industrial.ogg",
+  click: "./assets/audio/local-civ6/ui_click.wav",
+  confirm: "./assets/audio/local-civ6/ui_confirm.wav",
+  cancel: "./assets/audio/local-civ6/ui_cancel.wav",
+  hover: "./assets/audio/local-civ6/ui_hover.wav",
+  panelOpen: "./assets/audio/local-civ6/ui_panel_open.wav",
+  panelClose: "./assets/audio/local-civ6/ui_panel_close.wav",
+};
+const AUDIO_VOLUMES = { click: .42, confirm: .36, cancel: .42, hover: .25, panelOpen: .34, panelClose: .34 };
+const AUDIO_STORAGE_KEY = "taihang.audio.enabled";
+let audioEnabled = true;
+let audioUnlocked = false;
+let audioAvailable = true;
+try { audioEnabled = localStorage.getItem(AUDIO_STORAGE_KEY) !== "0"; } catch (_) {}
+
+const bgmAudio = new Audio(AUDIO_PATHS.bgm);
+bgmAudio.id = "taihangBgm";
+bgmAudio.hidden = true;
+bgmAudio.setAttribute("aria-hidden", "true");
+bgmAudio.loop = true;
+bgmAudio.preload = "auto";
+bgmAudio.volume = .22;
+document.body.appendChild(bgmAudio);
+const uiAudio = {};
+for (const kind of Object.keys(AUDIO_VOLUMES)) {
+  const clip = new Audio(AUDIO_PATHS[kind]);
+  clip.preload = "auto";
+  uiAudio[kind] = clip;
+}
+
+function updateAudioButton() {
+  const button = $("audioBtn");
+  if (!button) return;
+  if (!audioAvailable) {
+    button.textContent = "🔇";
+    button.disabled = true;
+    button.title = "本机音频素材未找到";
+    button.setAttribute("aria-label", button.title);
+    return;
+  }
+  button.disabled = false;
+  button.textContent = audioEnabled ? "🔊" : "🔇";
+  button.setAttribute("aria-pressed", String(audioEnabled));
+  const label = audioEnabled ? "关闭音乐与音效" : "开启音乐与音效";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+}
+
+function startBgm() {
+  if (!audioEnabled || !audioUnlocked || document.hidden || !audioAvailable) return;
+  bgmAudio.play().then(() => {
+    delete bgmAudio.dataset.playError;
+  }).catch(error => {
+    bgmAudio.dataset.playError = `${error.name}: ${error.message}`;
+  });
+}
+
+function playUiSound(kind) {
+  if (!audioEnabled || !audioUnlocked || !audioAvailable || !uiAudio[kind]) return;
+  const clip = uiAudio[kind].cloneNode();
+  clip.volume = AUDIO_VOLUMES[kind];
+  clip.play().catch(() => {});
+}
+
+function setAudioEnabled(enabled) {
+  audioEnabled = enabled;
+  try { localStorage.setItem(AUDIO_STORAGE_KEY, enabled ? "1" : "0"); } catch (_) {}
+  if (enabled) startBgm(); else bgmAudio.pause();
+  updateAudioButton();
+}
+
+function unlockAudio(event) {
+  audioUnlocked = true;
+  if (!event?.target?.closest?.("#audioBtn")) startBgm();
+}
+
+function soundForButton(button) {
+  const text = (button.textContent || "").trim();
+  const inlineAction = button.getAttribute("onclick") || "";
+  if (button.id === "dbgBtn") return $("dbgPanel").classList.contains("show") ? "panelClose" : "panelOpen";
+  if (button.id === "techBtn" || button.id === "phaseBtn") return "panelOpen";
+  if (/closeModal\(\)/.test(inlineAction)) return "panelClose";
+  if (button.id === "cCancel" || button.classList.contains("danger") || /取消|返回|关闭|解散|放弃/.test(text + " " + (button.title || ""))) return "cancel";
+  if (button.id === "cOk" || button.id === "endTurnBtn" || /startGame\(/.test(inlineAction) || /确认|开始游戏|继续上次|结束回合|开始研究/.test(text)) return "confirm";
+  return "click";
+}
+
+addEventListener("pointerdown", unlockAudio, { capture: true, once: true });
+addEventListener("keydown", unlockAudio, { capture: true, once: true });
+addEventListener("pointerover", event => {
+  if (event.pointerType !== "mouse") return;
+  const button = event.target.closest?.("button:not(:disabled)");
+  if (button && !button.contains(event.relatedTarget)) playUiSound("hover");
+}, true);
+addEventListener("click", event => {
+  const button = event.target.closest?.("button:not(:disabled)");
+  if (!button) return;
+  audioUnlocked = true;
+  if (button.id !== "audioBtn") startBgm();
+  if (button.id === "audioBtn") {
+    const enabling = !audioEnabled;
+    if (!enabling) playUiSound("click");
+    setAudioEnabled(enabling);
+    if (enabling) playUiSound("click");
+    return;
+  }
+  playUiSound(soundForButton(button));
+}, true);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) bgmAudio.pause(); else startBgm();
+});
+bgmAudio.addEventListener("error", () => {
+  audioAvailable = false;
+  bgmAudio.pause();
+  updateAudioButton();
+});
+updateAudioButton();
+window.THAudio = { bgm: bgmAudio, isEnabled: () => audioEnabled, isAvailable: () => audioAvailable, play: playUiSound };
+
 function log(msg, cls) {
   const p = document.createElement("p");
   if (cls) p.className = cls;

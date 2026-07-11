@@ -20,9 +20,14 @@ const texCache = {};
 const sharedMats = {};
 let iconAtlasImg = null;
 let surfaceLoadStarted = false;
+let terrainSurface = null, surfaceMat = null, surfaceState = null, surfaceMapW = 0, surfaceMapH = 0, surfaceBounds = null;
+let fogSurface = null, fogFieldTex = null, fogFieldData = null;
+let fogFieldSig = "";
+const FOG_FIELD_RES = 384;
 let sunLight, sky, hemiLight, ambientLight, lastSig = "", inited = false, cx0 = 0, cz0 = 0;
 let _sunElev = 42, _sunAzi = 150, composer = null, taaPass = null, taaEnabled = false;
-let camPolar = 0.62; // 相机俯视极角(距+Y轴; 越小越俯视/越接近正上方俯拍 — 参考文明6)
+const CIV6_CAM_POLAR = DEG(44), CIV6_CAM_AZIMUTH = 0, CIV6_CAM_DISTANCE = 23;
+let camPolar = CIV6_CAM_POLAR; // 固定高俯视 + 正北朝向，避免斜向偏转和广角畸变
 let csm = null; const csmCfg = { cascades: 2, size: 2048, maxFar: 55, fade: true, enabled: true };
 let atmoOn = true, cubeTex = null, _tod = 10.35; // 冬日上午: 冷环境光中保留一丝低角度暖光
 const skyU = {
@@ -45,7 +50,7 @@ function skyColorJS(dx, dy, dz) {
   const enc = v => Math.min(255, Math.pow(Math.max(0, v), 1 / 2.2) * 255) | 0; // 线性→sRGB(纹理标记为SRGBColorSpace)
   return [enc(r), enc(g), enc(b)];
 }
-let clock = 0; const revealAnims = {}; const tileVisPrev = new Set(); // 战雾展开动画
+let clock = 0;
 
 // ── PCG 噪声 ──
 function h2(x, y) { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); }
@@ -64,6 +69,35 @@ const TERR = {
   forest:   { base: .070, amp: .002, top: "#838d85", side: "#747d78", fleck: "#9ca69e" },
   mountain: { base: .072, amp: .004, top: "#969c99", side: "#858a88", fleck: "#bec3c0" },
 };
+const TERR_SURFACE_COLOR = {
+  plain: new THREE.Color(0xf4f2eb), hills: new THREE.Color(0xe1e2dd),
+  forest: new THREE.Color(0xc8d2ca), mountain: new THREE.Color(0xd4d9d8),
+};
+const TERR_SURFACE_LIFT = { plain: 0, hills: .024, forest: .012, mountain: .052 };
+
+function sampleTerrainBlend(x, z, colorOut) {
+  if (!surfaceState) { if (colorOut) colorOut.set(0xffffff); return 0; }
+  const q0 = Math.round(x / (1.5 * R));
+  let sum = 0, lift = 0, cr = 0, cg = 0, cb = 0;
+  for (let q = Math.max(0, q0 - 2); q <= Math.min(surfaceMapW - 1, q0 + 2); q++) {
+    const r0 = Math.round(z / (SQ3 * R) - .5 * (q & 1));
+    for (let r = Math.max(0, r0 - 2); r <= Math.min(surfaceMapH - 1, r0 + 2); r++) {
+      const [tx, tz] = hexWorld(q, r), d2 = (x - tx) ** 2 + (z - tz) ** 2;
+      const w = Math.exp(-d2 * .56), type = surfaceState.tiles[q][r].terrain || "plain", c = TERR_SURFACE_COLOR[type] || TERR_SURFACE_COLOR.plain;
+      sum += w; lift += w * (TERR_SURFACE_LIFT[type] || 0); cr += w * c.r; cg += w * c.g; cb += w * c.b;
+    }
+  }
+  if (sum < .0001) { if (colorOut) colorOut.set(0xb7c0bf); return 0; }
+  if (colorOut) colorOut.setRGB(cr / Math.max(sum, .0001), cg / Math.max(sum, .0001), cb / Math.max(sum, .0001));
+  return lift / Math.max(sum, .0001);
+}
+
+function continuousHeightAt(x, z) {
+  const terrainLift = sampleTerrainBlend(x, z, null);
+  const broad = (fbm(x * .13 + 4.7, z * .13 - 2.9) - .5) * .036;
+  const fine = (vn(x * .72 - 1.4, z * .72 + 3.2) - .5) * .009;
+  return .065 + terrainLift + broad + fine;
+}
 function tileH(q, r, terrain) {
   const cfg = TERR[terrain] || TERR.plain;
   const broad = fbm(q * .18 + 2.7, r * .18 - 1.3) - .5;
@@ -192,6 +226,15 @@ function coolGradeWinterTexture(source) {
   } catch (e) { return source; }
 }
 
+function applyContinuousSurfaceTexture(source) {
+  if (!surfaceMat || !surfaceBounds || !source) return;
+  if (texCache.continuous_surface) texCache.continuous_surface.dispose();
+  const tex = source.clone(); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 4;
+  tex.repeat.set(Math.max(1, surfaceBounds.width / 4.2), Math.max(1, surfaceBounds.depth / 4.2)); tex.needsUpdate = true;
+  texCache.continuous_surface = tex; surfaceMat.map = tex; surfaceMat.bumpMap = tex; surfaceMat.needsUpdate = true;
+}
+
 function loadSurfaceAssets() {
   if (surfaceLoadStarted) return; surfaceLoadStarted = true;
   const ready = (tex, cacheKey, terrainKinds) => {
@@ -207,10 +250,10 @@ function loadSurfaceAssets() {
     if (cacheKey === "generated_winter") {
       if (fieldMat) { fieldMat.map = tex; fieldMat.bumpMap = tex; fieldMat.needsUpdate = true; }
       for (const k of ["earth", "path"]) if (sharedMats[k]) { sharedMats[k].map = tex; sharedMats[k].needsUpdate = true; }
+      applyContinuousSurfaceTexture(tex);
     } else if (cacheKey === "generated_rock" && peakMat) {
       peakMat.map = tex; peakMat.bumpMap = tex; peakMat.needsUpdate = true;
     }
-    for (const tt of Object.values(tiles)) if (terrainKinds.includes(tt.terrain)) tt.mesh.material = tt.fogged ? sketchMats(tt.terrain) : tileMats(tt.terrain);
     csmSetupScene(); forceMatUpdate(); lastSig = "";
   };
   const loader = new THREE.TextureLoader();
@@ -247,7 +290,6 @@ function sketchMats(t) {
 }
 
 // ── 单位棋子贴图(复用彩色徽标) ──
-const UGLYPH = { scout: "侦", work: "工", militia: "民", regular: "连", elite: "团", commando: "武", spy: "特", puppet: "伪", squad: "日", company: "中", armored: "装", bandit: "匪" };
 function drawUnitIcon(g, type, x, y, s, color) {
   const cells = { scout:[0,1], work:[1,1], militia:[2,1], regular:[2,1], elite:[3,1], commando:[0,2], spy:[1,2], puppet:[2,1], squad:[2,1], company:[2,1] };
   if (iconAtlasImg && iconAtlasImg.complete && iconAtlasImg.naturalWidth && cells[type]) {
@@ -280,32 +322,19 @@ function unitTex(u) {
   // (徽标改为独立的头顶大横幅 sprite, 见 unitBannerTex)
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; texCache["u_" + k] = tex; return tex;
 }
-// Civ6式头顶大横幅: 阵营色底+大徽标字+姿态icon+血条 (缓存键含姿态与血量档)
+// 3D 单位头顶 HUD：只显示一个图标，不叠加兵种字、姿态字或血条。
 function unitBannerTex(u) {
-  const posture = u.fortified ? "守" : u.resting ? "休" : (u.autoPath && u.autoPath.length ? "行" : "");
-  const hpB = Math.ceil(Math.max(0, u.hp) / 10);
-  const k = "ub_" + u.type + "_" + (posture ? posture : "-") + hpB + (u.side === "p" && u.mp > 0 ? "a" : "");
+  const k = "ub_icon_" + u.side + "_" + u.layer + "_" + u.type;
   if (texCache[k]) return texCache[k];
-  const c = document.createElement("canvas"); c.width = 256; c.height = 104; const g = c.getContext("2d");
+  const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
   const isP = u.side === "p";
   const badge = isP ? (u.layer === "civ" ? "#2f6b6b" : u.type === "commando" ? "#4a3a6a" : "#8a2a1a") : (u.type === "puppet" ? "#5f5628" : u.type === "spy" ? "#463a52" : "#961f13");
-  const w = posture ? 196 : 170, x0 = 128 - w / 2;
-  const grad = g.createLinearGradient(0, 8, 0, 92); grad.addColorStop(0, badge); grad.addColorStop(1, "#241f1a");
-  g.fillStyle = "rgba(12,12,10,.32)"; roundRect(g, x0 + 4, 12, w, 82, 20); g.fill();
-  g.fillStyle = grad; roundRect(g, x0, 8, w, 82, 20); g.fill();
-  g.strokeStyle = isP ? "rgba(224,199,143,.94)" : "rgba(202,150,112,.9)"; g.lineWidth = 4; g.stroke();
-  g.fillStyle = "rgba(12,13,12,.42)"; g.beginPath(); g.arc(x0 + 40, 47, 29, 0, 7); g.fill();
-  drawUnitIcon(g, u.type, x0 + 40, 47, 52, "#f2e4c6");
-  g.fillStyle = "#f8eed8"; g.font = "800 43px 'Noto Sans SC',sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-  g.fillText(UGLYPH[u.type] || "兵", x0 + 93, u.hp < 100 ? 40 : 48);
-  if (posture) { g.fillStyle = "#d7bd7d"; g.font = "700 26px 'Noto Sans SC',sans-serif"; g.fillText(posture, x0 + 145, 48); }
-  if (u.hp < 100) { // 血条嵌底边
-    const hw = w * 0.8;
-    g.fillStyle = "rgba(18,14,8,.9)"; g.fillRect(128 - hw / 2, 76, hw, 9);
-    g.fillStyle = u.hp > 55 ? "#9fbc52" : u.hp > 25 ? "#d8a441" : "#e2564d";
-    g.fillRect(128 - hw / 2, 76, hw * u.hp / 100, 9);
-  }
-  if (isP && u.mp > 0) { g.fillStyle = "#9fbc52"; g.strokeStyle = "rgba(18,14,8,.9)"; g.lineWidth = 3; g.beginPath(); g.arc(x0 + w, 12, 11, 0, 7); g.fill(); g.stroke(); } // 可行动绿点
+  const grad = g.createRadialGradient(54, 44, 8, 64, 64, 52); grad.addColorStop(0, badge); grad.addColorStop(1, "#211f1b");
+  g.fillStyle = "rgba(7,9,8,.40)"; g.beginPath(); g.arc(68, 69, 51, 0, Math.PI * 2); g.fill();
+  g.fillStyle = grad; g.beginPath(); g.arc(64, 64, 48, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = isP ? "rgba(224,199,143,.94)" : "rgba(202,150,112,.90)"; g.lineWidth = 5; g.stroke();
+  g.fillStyle = "rgba(12,14,13,.34)"; g.beginPath(); g.arc(64, 64, 38, 0, Math.PI * 2); g.fill();
+  drawUnitIcon(g, u.type, 64, 64, 72, "#f2e4c6");
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; texCache[k] = tex; return tex;
 }
 // Civ6式城市横幅(总部/根据地村庄): 民心圆+名字+建造/建筑
@@ -357,6 +386,15 @@ function makeTaihangRidgeGeometry() {
     p.setY(i, raw * .62 + strata * .38);
   }
   p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+}
+
+function lockCiv6Camera(distance) {
+  if (!camera || !controls) return;
+  const d = distance || camera.position.distanceTo(controls.target) || CIV6_CAM_DISTANCE;
+  const offset = new THREE.Vector3().setFromSphericalCoords(d, camPolar, CIV6_CAM_AZIMUTH);
+  camera.up.set(0, 1, 0);
+  camera.position.copy(controls.target).add(offset);
+  camera.lookAt(controls.target);
 }
 
 function loadIconAtlas() {
@@ -432,18 +470,14 @@ function init(container) {
   scene.add(gTiles, gTerrain, gTrees, gUnits, gStruct, gOverlay);
 
   buildTiles();
-  buildBoundary();
-  // 首帧: 已探明格不做展开动画(避免整片抖动), 只有之后新揭开的才动画
-  const s0 = G().state();
-  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) if (s0.tiles[q][r].disc) tileVisPrev.add(q + "," + r);
 
   // 相机 + 控制
-  camera = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 0.25, 3000);
+  camera = new THREE.PerspectiveCamera(34, host.clientWidth / host.clientHeight, 0.25, 3000);
   const hq = G().state().hq; const [hx, hz] = hexWorld(hq.q, hq.r);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(hx, 0, hz);
-  camera.position.set(hx + 2.7, 16.2, hz + 11.8); // 更接近参考图的中近景：小队、屋瓦与山谷层次均可辨认
-  // 文明6式相机: 固定俯角(高俯视), 只允许平移+滚轮缩放, 不允许旋转/改变角度
+  lockCiv6Camera(CIV6_CAM_DISTANCE);
+  // 文明6式相机: 正北朝向 + 固定高俯角 + 收窄透视，只允许平移和滚轮缩放。
   controls.enableRotate = false;
   controls.minPolarAngle = controls.maxPolarAngle = camPolar;
   controls.minDistance = 8; controls.maxDistance = 85;
@@ -476,8 +510,200 @@ function addTerrainDecor(mesh, q, r, kind, fogMat, winterOnly) {
   mesh.userData = { q, r, decor: kind, baseMat: mesh.material, fogMat: fogMat || peakMatS, winterOnly: !!winterOnly };
   gTerrain.add(mesh); return mesh;
 }
+
+function buildContinuousTerrain(s, W, H) {
+  surfaceState = s; surfaceMapW = W; surfaceMapH = H;
+  const lastX = 1.5 * R * (W - 1), lastZ = SQ3 * R * (H - .5), margin = 16;
+  const coreMinX = -R, coreMaxX = lastX + R, coreMinZ = -SQ3 * .5 * R, coreMaxZ = lastZ + SQ3 * .5 * R;
+  const minX = coreMinX - margin, maxX = coreMaxX + margin, minZ = coreMinZ - margin, maxZ = coreMaxZ + margin;
+  const width = maxX - minX, depth = maxZ - minZ, centerX = (minX + maxX) / 2, centerZ = (minZ + maxZ) / 2;
+  surfaceBounds = { minX, maxX, minZ, maxZ, width, depth, centerX, centerZ, coreMinX, coreMaxX, coreMinZ, coreMaxZ, margin };
+  const segX = Math.min(220, Math.max(96, Math.round(width * 4))), segZ = Math.min(220, Math.max(96, Math.round(depth * 4)));
+  const geo = new THREE.PlaneGeometry(width, depth, segX, segZ); geo.rotateX(-Math.PI / 2);
+  const pos = geo.getAttribute("position"), colors = new Float32Array(pos.count * 3), c = new THREE.Color(), edgeColor = new THREE.Color(0xb7c0bf);
+  for (let i = 0; i < pos.count; i++) {
+    const wx = pos.getX(i) + centerX, wz = pos.getZ(i) + centerZ;
+    sampleTerrainBlend(wx, wz, c);
+    const ox = Math.max(coreMinX - wx, 0, wx - coreMaxX), oz = Math.max(coreMinZ - wz, 0, wz - coreMaxZ);
+    const edge = THREE.MathUtils.smoothstep(Math.hypot(ox, oz), 0, margin);
+    c.lerp(edgeColor, edge * .72);
+    pos.setY(i, THREE.MathUtils.lerp(continuousHeightAt(wx, wz), -.018, edge));
+    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+  }
+  pos.needsUpdate = true; geo.setAttribute("color", new THREE.BufferAttribute(colors, 3)); geo.computeVertexNormals();
+  surfaceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .99, metalness: 0, bumpScale: .018 });
+  terrainSurface = new THREE.Mesh(geo, surfaceMat); terrainSurface.position.set(centerX, 0, centerZ); terrainSurface.receiveShadow = true; terrainSurface.renderOrder = 0;
+  gTiles.add(terrainSurface); applyContinuousSurfaceTexture(terrainTex("plain"));
+}
+
+function makeConformingHexGeometry(x, z, centerH) {
+  const p = [0, 0, 0], idx = [];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i, dx = R * Math.cos(a), dz = R * Math.sin(a);
+    p.push(dx, continuousHeightAt(x + dx, z + dz) - centerH, dz);
+  }
+  for (let i = 0; i < 6; i++) idx.push(0, 1 + ((i + 1) % 6), 1 + i);
+  const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+}
+
+function makeWarFogMaterial() {
+  // 单张连续战争迷雾：距离场负责边界，世界坐标噪声负责雾流，探索值负责素描/未知两种内部风格。
+  return new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide, toneMapped: false,
+    uniforms: {
+      uFogField: { value: fogFieldTex },
+      uWorldMin: { value: new THREE.Vector2(surfaceBounds.minX, surfaceBounds.minZ) },
+      uWorldSize: { value: new THREE.Vector2(surfaceBounds.width, surfaceBounds.depth) },
+      uTime: { value: 0 },
+      uWash: { value: new THREE.Color(0xa6aaa5) },
+      uInk: { value: new THREE.Color(0x464b48) },
+      uUnknown: { value: new THREE.Color(0x566164) },
+      uMist: { value: new THREE.Color(0xc2c9c5) },
+    },
+    vertexShader: `
+      varying vec3 vWorld;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorld = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vWorld;
+      uniform sampler2D uFogField;
+      uniform vec2 uWorldMin;
+      uniform vec2 uWorldSize;
+      uniform float uTime;
+      uniform vec3 uWash;
+      uniform vec3 uInk;
+      uniform vec3 uUnknown;
+      uniform vec3 uMist;
+
+      float hash21(vec2 p) {
+        p = fract(p * vec2(123.34, 345.45));
+        p += dot(p, p + 34.345);
+        return fract(p.x * p.y);
+      }
+      float noise21(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+          mix(hash21(i + vec2(0.0, 1.0)), hash21(i + 1.0), f.x), f.y);
+      }
+      float fbm21(vec2 p) {
+        float s = 0.0, a = 0.5;
+        for (int i = 0; i < 4; i++) {
+          s += noise21(p) * a;
+          p = p * 2.03 + vec2(7.1, -3.8);
+          a *= 0.5;
+        }
+        return s;
+      }
+      float pencilLine(float v, float thin, float soft) {
+        float d = abs(fract(v) - 0.5);
+        return 1.0 - smoothstep(thin, thin + soft, d);
+      }
+
+      void main() {
+        vec2 p = vWorld.xz;
+        float flowA = fbm21(p * 0.24 + vec2(uTime * 0.014, -uTime * 0.009));
+        float flowB = fbm21(p * 0.43 + vec2(-uTime * 0.011, uTime * 0.016) + 17.3);
+        vec2 drift = vec2(flowA - 0.5, flowB - 0.5) * 0.20 / uWorldSize;
+        vec2 uv = clamp((p - uWorldMin) / uWorldSize + drift, vec2(0.001), vec2(0.999));
+        vec4 field = texture2D(uFogField, uv);
+
+        // R 通道存可见区有符号距离；噪声只扰动过渡带，不改变远处的迷雾状态。
+        float signedFog = (field.r - 0.5) * 2.4;
+        float edgeNoise = (flowA - 0.5) * 0.30 + (flowB - 0.5) * 0.10;
+        float fogMask = smoothstep(-0.18, 0.34, signedFog + edgeNoise);
+        if (fogMask < 0.003) discard;
+
+        float seen = smoothstep(0.18, 0.82, field.g + (flowB - 0.5) * 0.08);
+        float grain = hash21(floor(p * 18.0));
+        float longNoise = hash21(floor(p * 1.7));
+        float warp = sin(p.x * 1.27 + p.y * 0.83) * 0.11 + sin(p.y * 2.11) * 0.045;
+        float h1 = pencilLine((p.x + p.y) * 4.25 + warp + grain * 0.18, 0.018, 0.032);
+        float h2 = pencilLine((p.x - p.y) * 3.55 - warp * 0.70 - grain * 0.12, 0.014, 0.028)
+          * step(0.74, longNoise);
+        float softStroke = pencilLine((p.x + p.y) * 1.25 + longNoise * 0.12, 0.025, 0.080);
+        float broken = smoothstep(0.18, 0.78, hash21(floor(p * 5.3))) * 0.64 + 0.36;
+        float ink = clamp((h1 * 0.46 + h2 * 0.20 + softStroke * 0.10) * broken, 0.0, 0.55);
+
+        vec3 paper = uWash * (0.94 + (grain - 0.5) * 0.08);
+        vec3 exploredCol = mix(paper, uInk, ink);
+        float edgeBand = 1.0 - smoothstep(0.08, 0.62, abs(signedFog));
+        float mistWisp = edgeBand * smoothstep(0.52, 0.86, flowA) * 0.18;
+        vec3 col = mix(uUnknown, exploredCol, seen);
+        col = mix(col, uMist, mistWisp);
+        float exploredAlpha = 0.32 + ink * 0.14 + (grain - 0.5) * 0.02;
+        float alpha = fogMask * (mix(0.78, exploredAlpha, seen) + mistWisp * 0.10);
+        gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.82));
+      }
+    `,
+  });
+}
+
+function buildWarFogSurface() {
+  fogFieldSig = "";
+  fogFieldData = new Uint8Array(FOG_FIELD_RES * FOG_FIELD_RES * 4);
+  for (let i = 0; i < fogFieldData.length; i += 4) { fogFieldData[i] = 255; fogFieldData[i + 3] = 255; }
+  fogFieldTex = new THREE.DataTexture(fogFieldData, FOG_FIELD_RES, FOG_FIELD_RES, THREE.RGBAFormat, THREE.UnsignedByteType);
+  fogFieldTex.minFilter = fogFieldTex.magFilter = THREE.LinearFilter;
+  fogFieldTex.wrapS = fogFieldTex.wrapT = THREE.ClampToEdgeWrapping;
+  fogFieldTex.generateMipmaps = false; fogFieldTex.colorSpace = THREE.NoColorSpace; fogFieldTex.needsUpdate = true;
+  sharedMats.fogWar = makeWarFogMaterial();
+  fogSurface = new THREE.Mesh(terrainSurface.geometry, sharedMats.fogWar);
+  fogSurface.position.copy(terrainSurface.position); fogSurface.position.y += .026;
+  fogSurface.renderOrder = 2; fogSurface.receiveShadow = false; fogSurface.castShadow = false;
+  gTiles.add(fogSurface);
+}
+
+function updateWarFogField(s, visSet) {
+  if (!fogFieldData || !fogFieldTex || !surfaceBounds) return;
+  const W = surfaceMapW, H = surfaceMapH, visible = []; let stateHash = 2166136261;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const isVisible = visSet.has(q + "," + r), stateBits = (s.tiles[q][r].disc ? 1 : 0) | (isVisible ? 2 : 0);
+    stateHash = Math.imul(stateHash ^ (stateBits + q * 37 + r * 101), 16777619) >>> 0;
+    if (isVisible) visible.push(hexWorld(q, r));
+  }
+  const nextSig = W + "x" + H + ":" + stateHash;
+  if (nextSig === fogFieldSig) return;
+  fogFieldSig = nextSig;
+  const N = FOG_FIELD_RES, b = surfaceBounds, distScale = 2.4, clearRadius = R * 1.08;
+  for (let iy = 0; iy < N; iy++) {
+    const z = b.minZ + (iy + .5) / N * b.depth;
+    for (let ix = 0; ix < N; ix++) {
+      const x = b.minX + (ix + .5) / N * b.width;
+      let signedDist = distScale * .5;
+      for (let i = 0; i < visible.length; i++) {
+        const dx = x - visible[i][0], dz = z - visible[i][1];
+        signedDist = Math.min(signedDist, Math.hypot(dx, dz) - clearRadius);
+      }
+
+      // 探索状态在相邻格之间做高斯混合，避免“已探索/未知”的颜色边界重新露出六边形硬边。
+      const q0 = Math.round(x / (1.5 * R)); let seenSum = 0, weightSum = 0;
+      for (let q = q0 - 2; q <= q0 + 2; q++) {
+        if (q < 0 || q >= W) continue;
+        const r0 = Math.round(z / (SQ3 * R) - .5 * (q & 1));
+        for (let r = r0 - 2; r <= r0 + 2; r++) {
+          if (r < 0 || r >= H) continue;
+          const c = hexWorld(q, r), d2 = (x - c[0]) ** 2 + (z - c[1]) ** 2, w = Math.exp(-d2 * 2.25);
+          weightSum += w; if (s.tiles[q][r].disc) seenSum += w;
+        }
+      }
+      const o = (iy * N + ix) * 4;
+      fogFieldData[o] = Math.round(THREE.MathUtils.clamp(.5 + signedDist / distScale, 0, 1) * 255);
+      fogFieldData[o + 1] = Math.round(THREE.MathUtils.clamp(seenSum / Math.max(weightSum, .0001), 0, 1) * 255);
+      fogFieldData[o + 2] = 0; fogFieldData[o + 3] = 255;
+    }
+  }
+  fogFieldTex.needsUpdate = true;
+}
+
 function buildTiles() {
   const s = G().state(), W = G().CFG.mapW, H = G().CFG.mapH;
+  buildContinuousTerrain(s, W, H);
+  buildWarFogSurface();
   peakMat = new THREE.MeshStandardMaterial({ map: terrainTex("mountain"), color: 0xd1d6d3, bumpMap: terrainTex("mountain"), bumpScale: .055, roughness: .99 });
   hillMat = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0xadb0ab, bumpMap: materialTex("stone"), bumpScale: .032, roughness: 1 });
   snowMat = sharedMats.snow;
@@ -485,16 +711,14 @@ function buildTiles() {
   peakMatS = new THREE.MeshBasicMaterial({ color: 0x687375, transparent: true, opacity: .34, depthWrite: false });
   snowMatS = new THREE.MeshBasicMaterial({ color: 0x8d999a, transparent: true, opacity: .16, depthWrite: false });
   fieldMatS = new THREE.MeshBasicMaterial({ color: 0x667071, transparent: true, opacity: .26, depthWrite: false });
-  const gridPts = []; for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; gridPts.push(new THREE.Vector3(R * .982 * Math.cos(a), 0, R * .982 * Math.sin(a))); }
-  const gridGeo = new THREE.BufferGeometry().setFromPoints(gridPts);
-  const gridMat = new THREE.LineBasicMaterial({ color: 0xd5dede, transparent: true, opacity: .045, depthWrite: false });
+  sharedMats.tilePick = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide });
+  const gridMat = new THREE.LineBasicMaterial({ color: 0x303c3b, transparent: true, opacity: .30, depthWrite: false });
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const t = s.tiles[q][r], [x, z] = hexWorld(q, r);
-    const h = Math.max(0.055, tileH(q, r, t.terrain));
-    const m = new THREE.Mesh(prismGeo, tileMats(t.terrain));
-    m.scale.set(1, h, 1); m.position.set(x, h / 2, z);
-    m.receiveShadow = true; m.castShadow = true; m.userData = { q, r, h };
-    const grid = new THREE.LineLoop(gridGeo, gridMat); grid.position.set(x, h + .008, z); grid.renderOrder = 1;
+    const h = continuousHeightAt(x, z), hexGeo = makeConformingHexGeometry(x, z, h);
+    const m = new THREE.Mesh(hexGeo, sharedMats.tilePick); m.position.set(x, h + .025, z); m.userData = { q, r, h };
+    const gridPts = []; for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i, dx = R * .982 * Math.cos(a), dz = R * .982 * Math.sin(a); gridPts.push(new THREE.Vector3(dx, continuousHeightAt(x + dx, z + dz) - h, dz)); }
+    const grid = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(gridPts), gridMat); grid.position.set(x, h + .050, z); grid.renderOrder = 3;
     gTiles.add(m, grid); tiles[q + "," + r] = { mesh: m, grid, h, terrain: t.terrain };
     if (t.terrain === "mountain") {
       // 横向层叠的主脊 + 肩脊，压低尖峰，贴近太行台塬的块状轮廓。
@@ -548,8 +772,8 @@ function buildBoundary() {
 function focus(q, r) {
   if (!inited) return;
   const [x, z] = hexWorld(q, r), ty = topY(q, r);
-  const dx = camera.position.x - controls.target.x, dy = camera.position.y - controls.target.y, dz = camera.position.z - controls.target.z;
-  controls.target.set(x, ty, z); camera.position.set(x + dx, ty + dy, z + dz); controls.update();
+  const distance = camera.position.distanceTo(controls.target);
+  controls.target.set(x, ty, z); lockCiv6Camera(distance); controls.update();
 }
 // 目标格顶投影到屏幕像素坐标(供确认框定位)
 function project(q, r) {
@@ -659,7 +883,7 @@ const dbg = {
   setTAA(on) { taaEnabled = !!on; if (on) ensureComposer(); },
   setCamera(o) {
     if (!controls) return;
-    if (o.polar != null) { camPolar = o.polar; controls.minPolarAngle = controls.maxPolarAngle = camPolar; }
+    if (o.polar != null) { camPolar = o.polar; controls.minPolarAngle = controls.maxPolarAngle = camPolar; lockCiv6Camera(camera.position.distanceTo(controls.target)); }
     if (o.fov != null) { camera.fov = o.fov; camera.updateProjectionMatrix(); }
     if (o.minDist != null) controls.minDistance = o.minDist;
     if (o.maxDist != null) controls.maxDistance = o.maxDist;
@@ -698,13 +922,12 @@ function clearGroup(g) {
 function syncDynamic() {
   const s = G().state(), W = G().CFG.mapW, H = G().CFG.mapH, key = G().key;
   const visSet = G().visSet();
-  // 迷雾三态: 未探明=隐藏(露出连续冻土) / 已探明不可见=素描 / 可见=正常; 新揭开的登记展开动画
+  updateWarFogField(s, visSet);
+  // 地形与战争迷雾都是连续表面；六边形只负责拾取和克制的网格提示。
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const k = q + "," + r, tt = tiles[k]; if (!tt) continue;
-    const disc = s.tiles[q][r].disc; tt.mesh.visible = disc; if (tt.grid) tt.grid.visible = disc;
-    const fogged = disc && !visSet.has(k);
-    if (fogged !== !!tt.fogged) { tt.fogged = fogged; tt.mesh.material = fogged ? sketchMats(tt.terrain) : tileMats(tt.terrain); tt.mesh.castShadow = tt.mesh.receiveShadow = !fogged; }
-    if (disc && !tileVisPrev.has(k)) { tileVisPrev.add(k); revealAnims[k] = clock; tt.mesh.scale.y = 0.001; tt.mesh.position.y = 0.0005; }
+    const disc = s.tiles[q][r].disc;
+    tt.mesh.visible = disc; if (tt.grid) tt.grid.visible = disc;
   }
   const winter = winterNow();
   gTerrain.children.forEach(m => {
@@ -779,9 +1002,9 @@ function syncDynamic() {
     const [x, z] = hexWorld(un.q, un.r), h = tiles[un.q + "," + un.r].h;
     const off = un.layer === "civ" ? -0.28 : 0.28;
     gUnits.add(unitMiniature(un, x, h, z, off));
-    // 轻量识别牌：保留玩法信息，但不再盖过人物小队。
+    // 单图标识别牌：不显示“工/民/侦”等额外文字。
     const bn = new THREE.Sprite(new THREE.SpriteMaterial({ map: unitBannerTex(un), depthWrite: false, depthTest: false, transparent: true, opacity: 0.86 }));
-    bn.material.toneMapped = false; bn.renderOrder = 11; bn.scale.set(1.32, .54, 1); bn.position.set(x + off, h + 1.02, z); bn.userData = { q: un.q, r: un.r };
+    bn.material.toneMapped = false; bn.renderOrder = 11; bn.scale.set(.54, .54, 1); bn.position.set(x + off, h + 1.02, z); bn.userData = { q: un.q, r: un.r };
     gUnits.add(bn);
   }
 
@@ -1071,17 +1294,13 @@ function onResize() { if (!renderer) return; const w = host.clientWidth || inner
 function loop() {
   animId = requestAnimationFrame(loop);
   clock = performance.now() / 1000;
+  if (sharedMats.fogWar && sharedMats.fogWar.uniforms) sharedMats.fogWar.uniforms.uTime.value = clock;
   controls.update();
   if (gUnits && camera) gUnits.children.forEach(o => { if (o.userData && o.userData.faceCamera) o.rotation.y = Math.atan2(camera.position.x - o.position.x, camera.position.z - o.position.z) + Math.PI; });
   if (sky && sky.visible) sky.position.copy(camera.position); // 天空盒跟随镜头(始终包住相机, 不被远裁剪面切掉)
   if (csm) { csm.update(); }
   else if (sunLight && sunLight.castShadow) { const d = sunDirVec(); sunLight.position.copy(controls.target).addScaledVector(d, -60); sunLight.target.position.copy(controls.target); sunLight.target.updateMatrixWorld(); } // 单阴影跟随镜头
   const sig = signature(); if (sig !== lastSig) { lastSig = sig; syncDynamic(); }
-  for (const k in revealAnims) { // 战雾展开: 新格从地面升起
-    const tt = tiles[k], p = (clock - revealAnims[k]) / 0.5;
-    if (p >= 1) { tt.mesh.scale.y = tt.h; tt.mesh.position.y = tt.h / 2; delete revealAnims[k]; }
-    else { const e = 1 - Math.pow(1 - p, 3), sy = Math.max(0.001, tt.h * e); tt.mesh.scale.y = sy; tt.mesh.position.y = sy / 2; }
-  }
   if (taaEnabled && composer) composer.render(); else renderer.render(scene, camera);
 }
 
@@ -1099,14 +1318,14 @@ function dispose() {
   renderer.dispose(); scene = null; renderer = null; sky = hemiLight = ambientLight = sunLight = null; inited = false; lastSig = "";
   gTiles = gTerrain = gTrees = gUnits = gStruct = gOverlay = null;
   for (const k in tiles) delete tiles[k];
-  for (const k in revealAnims) delete revealAnims[k];
-  tileVisPrev.clear();
   // 清缓存: 重建时用全新材质(不带上一 CSM 的 onBeforeCompile 补丁), 避免 CSM 重建崩溃
   for (const k in matCache) delete matCache[k];
   for (const k in texCache) { if (texCache[k] && texCache[k].dispose) texCache[k].dispose(); delete texCache[k]; }
   for (const k in sketchCache) delete sketchCache[k];
   for (const k in sharedMats) delete sharedMats[k];
   if (_paperTex) _paperTex.dispose(); _paperTex = null; surfaceLoadStarted = false;
+  if (fogFieldTex) fogFieldTex.dispose(); fogSurface = fogFieldTex = fogFieldData = null; fogFieldSig = "";
+  terrainSurface = surfaceMat = surfaceState = surfaceBounds = null; surfaceMapW = surfaceMapH = 0;
 }
 // 结构性重建(cascades/size/开关): 整个 3D 重来一遍最稳, 缓存已在 dispose 清空→材质全新
 function reinit() { if (!inited || !host) return; const h = host; dispose(); init(h); }
