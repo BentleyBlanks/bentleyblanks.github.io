@@ -116,7 +116,11 @@ button { font-family: inherit; cursor: pointer; }
 .heartfill.ok { background: #7a8f3a; }
 
 /* ── 日志 ── */
-#logBox { position: absolute; left: 8px; bottom: 8px; z-index: 8; width: min(360px, 60vw); max-height: 138px; overflow-y: auto; background: rgba(20,16,9,.88); border: 1px solid #33301e; border-radius: 7px; padding: 6px 10px; font-size: 12px; line-height: 1.55; pointer-events: auto; }
+#logWrap { position: absolute; left: 8px; bottom: 8px; z-index: 8; width: min(360px, 60vw); display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
+#logToggle { pointer-events: auto; margin-bottom: 3px; background: rgba(20,16,9,.9); border: 1px solid #33301e; color: #a99b74; border-radius: 5px; padding: 1px 8px; font-size: 12px; line-height: 1.5; cursor: pointer; }
+#logToggle:hover { color: #e8dcb8; border-color: #6a5f38; }
+#logBox { width: 100%; max-height: 138px; overflow-y: auto; background: rgba(20,16,9,.88); border: 1px solid #33301e; border-radius: 7px; padding: 6px 10px; font-size: 12px; line-height: 1.55; pointer-events: auto; }
+#logBox.collapsed { display: none; }
 #logBox p { color: #a99b74; }
 #logBox p.hl { color: #e8dcb8; }
 #logBox p.good { color: #9fbc52; }
@@ -228,7 +232,8 @@ button { font-family: inherit; cursor: pointer; }
     max-height: 42vh; font-size: 12.5px;
   }
   /* 日志: 收窄靠左下, 让位给抽屉与结束键 */
-  #logBox { max-height: 60px; width: 46vw; left: 6px; bottom: calc(8px + env(safe-area-inset-bottom)); }
+  #logWrap { width: 46vw; left: 6px; bottom: calc(8px + env(safe-area-inset-bottom)); }
+  #logBox { max-height: 60px; }
   /* 结束回合: 底部安全区(home 条) */
   #endTurnBtn { padding: 10px 16px; font-size: 14px; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); }
   /* 扫荡横幅下移, 避开更高的顶栏 */
@@ -262,7 +267,7 @@ button { font-family: inherit; cursor: pointer; }
 
 <div id="sweepBanner" class="hidden"></div>
 <div id="sidePanel" class="hidden"></div>
-<div id="logBox"></div>
+<div id="logWrap"><button id="logToggle" title="折叠/展开日志" onclick="toggleLog()">▾ 日志</button><div id="logBox"></div></div>
 <button id="endTurnBtn" data-sound="mainAction">结束回合</button>
 <div id="turnToast"></div>
 <div id="resPop"></div>
@@ -3211,6 +3216,14 @@ bgmAudio.addEventListener("error", () => {
 updateAudioButton();
 window.THAudio = { bgm: bgmAudio, isEnabled: () => audioEnabled, isAvailable: () => audioAvailable, play: playUiSound };
 
+function toggleLog() {
+  const box = $("logBox"), btn = $("logToggle"); if (!box || !btn) return;
+  const collapsed = box.classList.toggle("collapsed");
+  btn.textContent = collapsed ? "▸ 日志" : "▾ 日志";
+  try { localStorage.setItem("taihang.log.collapsed", collapsed ? "1" : "0"); } catch (_) {}
+  if (!collapsed) box.scrollTop = box.scrollHeight;
+}
+try { if (localStorage.getItem("taihang.log.collapsed") === "1") { const b = document.getElementById("logBox"), t = document.getElementById("logToggle"); if (b) b.classList.add("collapsed"); if (t) t.textContent = "▸ 日志"; } } catch (_) {}
 function log(msg, cls) {
   const p = document.createElement("p");
   if (cls) p.className = cls;
