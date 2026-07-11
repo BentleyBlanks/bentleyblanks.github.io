@@ -1,0 +1,118 @@
+{
+  "generated_at_utc": "2026-07-11T03:02:30.880195+00:00",
+  "source_blend": "source\\taihang-tile-assets.blend",
+  "triangle_limit": 2000,
+  "assets": {
+    "village_neutral": {
+      "label": "Neutral village",
+      "triangles": 1044,
+      "target_budget": 1800,
+      "dimensions": [
+        1.1637,
+        1.0555,
+        0.47
+      ],
+      "glb": "village-neutral.glb",
+      "under_2000": true
+    },
+    "village_hq": {
+      "label": "Headquarters village",
+      "triangles": 1068,
+      "target_budget": 1950,
+      "dimensions": [
+        1.1637,
+        1.0555,
+        0.6886
+      ],
+      "glb": "village-headquarters.glb",
+      "under_2000": true
+    },
+    "pillbox": {
+      "label": "Railway pillbox",
+      "triangles": 432,
+      "target_budget": 900,
+      "dimensions": [
+        0.9253,
+        0.8662,
+        0.6945
+      ],
+      "glb": "railway-pillbox.glb",
+      "under_2000": true
+    },
+    "pillbox_site": {
+      "label": "Pillbox construction",
+      "triangles": 496,
+      "target_budget": 1100,
+      "dimensions": [
+        0.92,
+        1.2078,
+        0.65
+      ],
+      "glb": "pillbox-construction.glb",
+      "under_2000": true
+    },
+    "county_town": {
+      "label": "County stronghold",
+      "triangles": 880,
+      "target_budget": 1800,
+      "dimensions": [
+        1.6408,
+        1.5408,
+        0.64
+      ],
+      "glb": "county-stronghold.glb",
+      "under_2000": true
+    },
+    "bandit_stockade": {
+      "label": "Bandit stockade",
+      "triangles": 1102,
+      "target_budget": 1700,
+      "dimensions": [
+        1.0,
+        0.908,
+        0.6075
+      ],
+      "glb": "bandit-stockade.glb",
+      "under_2000": true
+    },
+    "rail_segment": {
+      "label": "Railway module",
+      "triangles": 208,
+      "target_budget": 900,
+      "dimensions": [
+        0.865,
+        1.8,
+        0.77
+      ],
+      "glb": "railway-segment.glb",
+      "under_2000": true
+    },
+    "locomotive": {
+      "label": "Steam locomotive",
+      "triangles": 436,
+      "target_budget": 1100,
+      "dimensions": [
+        0.405,
+        0.6825,
+        0.4888
+      ],
+      "glb": "steam-locomotive.glb",
+      "under_2000": true
+    },
+    "mine_cluster": {
+      "label": "Mine warning cluster",
+      "triangles": 380,
+      "target_budget": 550,
+      "dimensions": [
+        0.88,
+        0.727,
+        0.51
+      ],
+      "glb": "mine-warning-cluster.glb",
+      "under_2000": true
+    }
+  },
+  "all_under_2000": true,
+  "catalog_glb": "taihang-tile-assets-catalog.glb",
+  "preview": "preview\\taihang-tile-assets-preview.png"
+}

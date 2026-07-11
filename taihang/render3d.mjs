@@ -7,6 +7,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.mjs";
 import { TAARenderPass } from "three/addons/postprocessing/TAARenderPass.mjs";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.mjs";
 import { CSM } from "three/addons/csm/CSM.mjs";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.mjs";
 
 const SQ3 = Math.sqrt(3), R = 1.0, DEG = THREE.MathUtils.degToRad;
 const G = () => window.TH;
@@ -18,6 +19,19 @@ let prismGeo, coneGeo, cragGeo, ridgeGeo, treeTrunkGeo, treeLeafGeo, treeLeafTop
 const matCache = {};
 const texCache = {};
 const sharedMats = {};
+const MODEL_URLS = Object.freeze({
+  village_neutral: "./assets/3d/models/village-neutral.glb",
+  village_hq: "./assets/3d/models/village-headquarters.glb",
+  pillbox: "./assets/3d/models/railway-pillbox.glb",
+  pillbox_site: "./assets/3d/models/pillbox-construction.glb",
+  county_town: "./assets/3d/models/county-stronghold.glb",
+  bandit_stockade: "./assets/3d/models/bandit-stockade.glb",
+  rail_segment: "./assets/3d/models/railway-segment.glb",
+  locomotive: "./assets/3d/models/steam-locomotive.glb",
+  mine_cluster: "./assets/3d/models/mine-warning-cluster.glb",
+});
+const modelTemplates = {}, modelGeometries = new Set(), modelMaterials = new Set();
+let modelLoader = null, modelLoadGeneration = 0;
 let iconAtlasImg = null;
 let surfaceLoadStarted = false;
 let terrainSurface = null, surfaceMat = null, surfaceState = null, surfaceMapW = 0, surfaceMapH = 0, surfaceBounds = null;
@@ -51,6 +65,53 @@ function skyColorJS(dx, dy, dz) {
   return [enc(r), enc(g), enc(b)];
 }
 let clock = 0;
+
+function disposeModelRoot(root) {
+  if (!root) return;
+  root.traverse(o => {
+    if (o.geometry) o.geometry.dispose && o.geometry.dispose();
+    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      if (m.map) m.map.dispose && m.map.dispose();
+      m.dispose && m.dispose();
+    });
+  });
+}
+
+function loadModelAssets() {
+  const generation = ++modelLoadGeneration;
+  modelLoader = new GLTFLoader();
+  for (const [key, url] of Object.entries(MODEL_URLS)) {
+    modelLoader.load(url, gltf => {
+      if (generation !== modelLoadGeneration) { disposeModelRoot(gltf.scene); return; }
+      const root = gltf.scene;
+      root.name = "TH_ModelTemplate_" + key;
+      root.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = o.receiveShadow = true;
+        if (o.geometry) modelGeometries.add(o.geometry);
+        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => modelMaterials.add(m));
+      });
+      root.updateMatrixWorld(true);
+      modelTemplates[key] = root;
+      lastSig = ""; // 下一帧用刚到达的 Blender 模型替换程序化兜底。
+    }, undefined, error => console.warn("3D 模型加载失败，继续使用程序化兜底:", key, error));
+  }
+}
+
+function cloneModelAsset(key) {
+  const source = modelTemplates[key];
+  if (!source) return null;
+  const clone = source.clone(true);
+  clone.name = "TH_ModelInstance_" + key;
+  clone.userData.assetKey = key;
+  return clone;
+}
+
+function placedModelAsset(key, x, h, z, scale = 1) {
+  const asset = cloneModelAsset(key); if (!asset) return null;
+  const g = new THREE.Group(); g.name = "TH_Placed_" + key; g.position.set(x, h, z); g.scale.setScalar(scale); g.add(asset);
+  return g;
+}
 
 // ── PCG 噪声 ──
 function h2(x, y) { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); }
@@ -473,6 +534,7 @@ function init(container) {
 
   gTiles = new THREE.Group(); gTerrain = new THREE.Group(); gTrees = new THREE.Group(); gUnits = new THREE.Group(); gStruct = new THREE.Group(); gOverlay = new THREE.Group();
   scene.add(gTiles, gTerrain, gTrees, gUnits, gStruct, gOverlay);
+  loadModelAssets();
 
   buildTiles();
 
@@ -924,6 +986,8 @@ function signature() {
 function clearGroup(g) {
   const shared = new Set([prismGeo, coneGeo, cragGeo, ridgeGeo, hexFlatGeo, treeTrunkGeo, treeLeafGeo, treeLeafTopGeo, roofGeo, pickHexGeo, gridHexGeo, terraceGeo, terraceLipGeo, terraceDiscGeo]);
   const sharedMaterials = new Set([peakMat, hillMat, snowMat, peakMatS, snowMatS, fieldMat, fieldMatS]);
+  modelGeometries.forEach(geo => shared.add(geo));
+  modelMaterials.forEach(mat => sharedMaterials.add(mat));
   for (const v of Object.values(sharedMats)) {
     if (v && v.isMaterial) sharedMaterials.add(v);
     else if (v && typeof v === "object") for (const m of Object.values(v)) if (m && m.isMaterial) sharedMaterials.add(m);
@@ -1072,6 +1136,17 @@ function railMesh(q, r, x, h, z, t) {
     dx = b[0] - a[0]; dz = b[1] - a[1];
   }
   g.rotation.y = Math.atan2(dx, dz);
+  if (!t.railBroken) {
+    const railAsset = cloneModelAsset("rail_segment");
+    if (railAsset) {
+      g.add(railAsset);
+      if ((q * 5 + r * 3) % 13 === 0) {
+        const locomotive = cloneModelAsset("locomotive");
+        if (locomotive) { locomotive.scale.setScalar(.92); locomotive.position.y = .11; g.add(locomotive); }
+      }
+      return markPickGroup(g, q, r);
+    }
+  }
   const bed = new THREE.Mesh(new THREE.BoxGeometry(.72, .035, 1.82), new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0x687071, roughness: 1 })); bed.position.y = .012; bed.receiveShadow = true; g.add(bed);
   for (let i = -3; i <= 3; i++) addBox(g, .78, .045, .095, sharedMats.railWood, 0, .052, i * .24, (t.railBroken || 0) && i === 0 ? .25 : 0);
   for (const rx of [-.23, .23]) { const rail = addBox(g, .038, .055, 1.82, sharedMats.iron, rx, .092, 0); if (t.railBroken) { rail.rotation.z = rx < 0 ? .055 : -.055; rail.position.z += rx < 0 ? .08 : -.06; } }
@@ -1096,6 +1171,7 @@ function railMesh(q, r, x, h, z, t) {
 }
 
 function mineMesh(x, h, z) {
+  const loaded = placedModelAsset("mine_cluster", x, h, z); if (loaded) return loaded;
   const g = new THREE.Group(); g.position.set(x, h, z);
   const mineMat = new THREE.MeshStandardMaterial({ color: 0x34352e, roughness: .8, metalness: .25 });
   for (let i = 0; i < 3; i++) { const a = i * 2.2 + .4, rad = i ? .16 : 0; const b = addCylinder(g, .08, .1, .045, 10, mineMat, Math.cos(a) * rad, .035, Math.sin(a) * rad); const pin = addCylinder(g, .012, .012, .045, 6, sharedMats.iron, b.position.x, .075, b.position.z); pin.castShadow = false; }
@@ -1123,6 +1199,18 @@ function addHouse(g, dx, dz, w, d, ht, wall, roof, ry) {
 }
 
 function villageMesh(x, h, z, v) {
+  const loaded = placedModelAsset(v.hq ? "village_hq" : "village_neutral", x, h, z);
+  if (loaded) {
+    const owned = v.owner === "p", buildings = v.buildings || [];
+    if (buildings.includes("kaiken")) for (let i = -2; i <= 2; i++) addBox(loaded, .42, .018, .025, fieldMat, .3, .02, i * .055, -.18);
+    if (buildings.includes("liangcang")) { addBox(loaded, .22, .16, .08, sharedMats.darkStone, -.38, .09, -.38, .45); addBox(loaded, .09, .10, .012, sharedMats.timber, -.38, .08, -.43, .45); }
+    if (buildings.includes("didao")) { const hatch = addBox(loaded, .18, .025, .13, sharedMats.timber, .37, .025, .38, -.25); hatch.castShadow = false; }
+    if (buildings.includes("arsenal")) addCylinder(loaded, .025, .035, .27, 7, sharedMats.darkStone, .42, .20, -.23);
+    if (buildings.includes("yexiao")) { const lamp = new THREE.PointLight(0xffb35b, .32, 2); lamp.position.set(.18, .42, .06); loaded.add(lamp); }
+    if (owned && !v.hq) loaded.add(flag(.39, 0, -.22, 0x9d2a21, false));
+    if (owned) { const lamp = new THREE.PointLight(0xffa552, v.hq ? .30 : .16, 1.55); lamp.position.set(.02, .38, .02); loaded.add(lamp); }
+    return loaded;
+  }
   const g = new THREE.Group(); g.position.set(x, h, z); g.scale.setScalar(1.06); const owned = v.owner === "p";
   const wall = owned ? sharedMats.wall : sharedMats.wallEnemy, roof = owned ? sharedMats.roofRed : sharedMats.roof;
   const lane = addBox(g, .15, .018, 1.42, sharedMats.path, .16, .018, .12, -.18); lane.castShadow = false;
@@ -1149,6 +1237,8 @@ function villageMesh(x, h, z, v) {
   return g;
 }
 function structMesh(x, h, z, sh) {
+  const assetKey = { town: "county_town", pillbox: "pillbox", bandit: "bandit_stockade", site: "pillbox_site" }[sh.kind];
+  const loaded = assetKey ? placedModelAsset(assetKey, x, h, z) : null; if (loaded) return loaded;
   const g = new THREE.Group(); g.position.set(x, h, z);
   if (sh.kind === "town") {
     const wm = sharedMats.darkStone;
@@ -1326,6 +1416,7 @@ function loop() {
 
 function dispose() {
   if (!inited) return; cancelAnimationFrame(animId); animId = 0;
+  modelLoadGeneration++; modelLoader = null; // 使上一轮尚未返回的 GLB 回调失效。
   if (ro) ro.disconnect(); window.removeEventListener("resize", onResize);
   controls.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
   disposeCSM();
@@ -1335,6 +1426,9 @@ function dispose() {
     scene.traverse(o => { if (o.geometry) geos.add(o.geometry); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => mats.add(m)); });
     geos.forEach(g => g.dispose && g.dispose()); mats.forEach(m => m.dispose && m.dispose());
   }
+  for (const root of Object.values(modelTemplates)) disposeModelRoot(root);
+  for (const key of Object.keys(modelTemplates)) delete modelTemplates[key];
+  modelGeometries.clear(); modelMaterials.clear();
   renderer.dispose(); scene = null; renderer = null; sky = hemiLight = ambientLight = sunLight = null; inited = false; lastSig = "";
   gTiles = gTerrain = gTrees = gUnits = gStruct = gOverlay = null;
   for (const k in tiles) delete tiles[k];
