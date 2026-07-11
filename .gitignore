@@ -13,3 +13,6 @@ tmp/
 
 # Local Codex bridge/watchdog infra (machine-local, not part of the site)
 .codex-tmp/
+
+# Local Civilization VI reference audio; do not publish or redistribute.
+/taihang/assets/audio/local-civ6/
