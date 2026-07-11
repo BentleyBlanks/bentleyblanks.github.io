@@ -980,7 +980,7 @@ function signature() {
   let d = 0; const W = G().CFG.mapW, H = G().CFG.mapH, vis = G().visSet();
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { if (s.tiles[q][r].disc) d++; }
   const sel = G().sel(), pend = G().pending(), reach = G().reach();
-  let st = ""; for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const t = s.tiles[q][r]; if (t.village) st += q + "" + r + (t.village.owner) + (t.village.buildings ? t.village.buildings.length : 0) + Math.round(t.village.heart) + (t.village.build ? "b" + t.village.build.left : ""); if (t.sh) st += "s" + q + r + Math.round(t.sh.hp); if (t.mine) st += "m" + q + r; if (t.farm) st += "f" + q + r; }
+  let st = ""; for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const t = s.tiles[q][r]; if (t.village) st += q + "" + r + (t.village.owner) + (t.village.buildings ? t.village.buildings.length : 0) + Math.round(t.village.heart) + (t.village.build ? "b" + t.village.build.left : ""); if (t.sh) st += "s" + q + r + Math.round(t.sh.hp); if (t.mine) st += "m" + q + r; if (t.farm) st += "f" + q + r + (t.farmBurned ? "x" : ""); }
   const mm = G().moveMode && G().moveMode() ? 1 : 0, mh = G().moveHover && G().moveHover();
   return s.turn + "#" + d + "#" + (vis ? vis.size : 0) + "#" + u + "#" + (sel ? sel.kind + (sel.id || sel.q + "," + sel.r) : "-") + "#" + (pend ? pend.type + pend.q + "," + pend.r : "-") + "#" + mm + (mh ? mh.q + "," + mh.r : "-") + "#" + (reach ? reach.size : 0) + "#" + st;
 }
@@ -1075,7 +1075,7 @@ function syncDynamic() {
         gStruct.add(cb);
       }
     }
-    if (t.farm) gStruct.add(farmMesh3D(x, h, z));
+    if (t.farm) gStruct.add(farmMesh3D(x, h, z, t.farmBurned));
     if (t.sh) gStruct.add(structMesh(x, h, z, t.sh));
     if (t.mine) gStruct.add(mineMesh(x, h, z));
   }
@@ -1172,18 +1172,20 @@ function railMesh(q, r, x, h, z, t) {
   return markPickGroup(g, q, r);
 }
 
-let cropMat = null, soilMat = null;
-function farmMesh3D(x, h, z) { // 农田: 土色田块 + 青绿作物垄
+let cropMat = null, soilMat = null, ashMat = null, charMat = null;
+function farmMesh3D(x, h, z, burned) { // 农田: 土色田块+青绿作物垄; 焦土=灰黑残茬
   if (!cropMat) {
     cropMat = new THREE.MeshStandardMaterial({ color: 0x7d9040, roughness: 1 });
     soilMat = new THREE.MeshStandardMaterial({ color: 0x8a7448, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    ashMat = new THREE.MeshStandardMaterial({ color: 0x2e2822, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    charMat = new THREE.MeshStandardMaterial({ color: 0x1c1814, roughness: 1 });
   }
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CircleGeometry(R * .52, 6), soilMat);
+  const base = new THREE.Mesh(new THREE.CircleGeometry(R * .52, 6), burned ? ashMat : soilMat);
   base.rotation.x = -Math.PI / 2; base.position.set(x, h + .012, z); base.receiveShadow = true; g.add(base);
   for (let i = -2; i <= 2; i++) {
-    const row = new THREE.Mesh(new THREE.BoxGeometry(.62 - Math.abs(i) * .09, .03, .05), cropMat);
-    row.position.set(x, h + .032, z + i * .11); row.receiveShadow = true; g.add(row);
+    const row = new THREE.Mesh(new THREE.BoxGeometry((.62 - Math.abs(i) * .09) * (burned ? .7 : 1), burned ? .015 : .03, .05), burned ? charMat : cropMat);
+    row.position.set(x, h + (burned ? .02 : .032), z + i * .11); row.receiveShadow = true; g.add(row);
   }
   return g;
 }
