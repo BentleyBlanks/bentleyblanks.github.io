@@ -881,6 +881,8 @@ const dbg = {
   },
   setTone(mode, exposure) { if (!renderer) return; if (mode && TONE[mode] !== undefined) { renderer.toneMapping = TONE[mode]; forceMatUpdate(); } if (exposure != null) renderer.toneMappingExposure = exposure; },
   setTAA(on) { taaEnabled = !!on; if (on) ensureComposer(); },
+  setBump(on) { for (const m of [surfaceMat, peakMat, hillMat, fieldMat]) { if (!m) continue; if (on) { if (m.userData._bmp !== undefined) m.bumpMap = m.userData._bmp; } else { if (m.bumpMap) m.userData._bmp = m.bumpMap; m.bumpMap = null; } m.needsUpdate = true; } },
+  setBumpScale(v) { for (const m of [surfaceMat, peakMat, hillMat, fieldMat]) { if (m) { m.bumpScale = v; m.needsUpdate = true; } } },
   setCamera(o) {
     if (!controls) return;
     if (o.polar != null) { camPolar = o.polar; controls.minPolarAngle = controls.maxPolarAngle = camPolar; lockCiv6Camera(camera.position.distanceTo(controls.target)); }
