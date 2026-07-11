@@ -712,7 +712,7 @@ function buildTiles() {
   snowMatS = new THREE.MeshBasicMaterial({ color: 0x8d999a, transparent: true, opacity: .16, depthWrite: false });
   fieldMatS = new THREE.MeshBasicMaterial({ color: 0x667071, transparent: true, opacity: .26, depthWrite: false });
   sharedMats.tilePick = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide });
-  const gridMat = new THREE.LineBasicMaterial({ color: 0x303c3b, transparent: true, opacity: .30, depthWrite: false });
+  const gridMat = new THREE.LineBasicMaterial({ color: 0x2a2620, transparent: true, opacity: .52, depthWrite: false });
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const t = s.tiles[q][r], [x, z] = hexWorld(q, r);
     const h = continuousHeightAt(x, z), hexGeo = makeConformingHexGeometry(x, z, h);
@@ -941,14 +941,14 @@ function syncDynamic() {
   // 树木(PCG, 仅已探明的森林/丘陵)
   clearGroup(gTrees);
   const trunkMat = new THREE.MeshStandardMaterial({ map: materialTex("wood"), color: 0x3b3530, roughness: 1 });
-  const leafMat = new THREE.MeshStandardMaterial({ color: winter ? 0x30433f : 0x2f493f, roughness: .98 });
-  const leafMidMat = new THREE.MeshStandardMaterial({ color: winter ? 0x3a4d47 : 0x395548, roughness: .98 });
-  const leafTopMat = new THREE.MeshStandardMaterial({ color: winter ? 0x465950 : 0x466251, roughness: .98 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: winter ? 0x2e5c34 : 0x33702f, roughness: .95 });
+  const leafMidMat = new THREE.MeshStandardMaterial({ color: winter ? 0x396a40 : 0x3f8038, roughness: .95 });
+  const leafTopMat = new THREE.MeshStandardMaterial({ color: winter ? 0x477a4a : 0x519245, roughness: .95 });
   const dummy = new THREE.Object3D();
   const trunks = [], lowers = [], middles = [], crowns = [], snowTips = [], trunksF = [], lowersF = [], middlesF = [], crownsF = []; // F=素描(雾中)
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const t = s.tiles[q][r]; if (!t.disc) continue;
-    let n = t.terrain === "forest" ? (t.village ? 5 : 13) : (t.terrain === "hills" && h2(q * 1.7, r * 3.1) > .5 ? 4 : 0);
+    let n = (t.village || t.sh) ? 0 : (t.terrain === "forest" ? 13 : (t.terrain === "hills" && h2(q * 1.7, r * 3.1) > .5 ? 4 : 0));
     if (!n) continue;
     const fog = !visSet.has(q + "," + r);
     const [x, z] = hexWorld(q, r), h = tiles[q + "," + r].h;
