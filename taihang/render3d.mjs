@@ -118,7 +118,7 @@ function makeSharedMaterials() {
   sharedMats.railWood = new THREE.MeshStandardMaterial({ map: materialTex("wood"), color: 0x403932, roughness: 1 });
   sharedMats.snow = new THREE.MeshStandardMaterial({ color: 0xcdd5d6, roughness: .96, transparent: true, opacity: .52 });
   sharedMats.earth = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x7c776d, roughness: 1 });
-  sharedMats.path = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x938a77, roughness: 1 });
+  sharedMats.path = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x938a77, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   sharedMats.redCloth = new THREE.MeshStandardMaterial({ color: 0x9d2a21, roughness: .86, side: THREE.DoubleSide });
 }
 
@@ -294,7 +294,7 @@ function drawUnitIcon(g, type, x, y, s, color) {
   const cells = { scout:[0,1], work:[1,1], militia:[2,1], regular:[2,1], elite:[3,1], commando:[0,2], spy:[1,2], puppet:[2,1], squad:[2,1], company:[2,1] };
   if (iconAtlasImg && iconAtlasImg.complete && iconAtlasImg.naturalWidth && cells[type]) {
     const [cx, cy] = cells[type], sw = iconAtlasImg.naturalWidth / 4, sh = iconAtlasImg.naturalHeight / 3;
-    g.drawImage(iconAtlasImg, cx * sw, cy * sh, sw, sh, x - s * .52, y - s * .52, s * 1.04, s * 1.04); return;
+    { const dw = s * 1.04, dh = dw * sh / sw; g.drawImage(iconAtlasImg, cx * sw, cy * sh, sw, sh, x - dw / 2, y - dh / 2, dw, dh); } return;
   }
   g.save(); g.translate(x, y); g.strokeStyle = color; g.fillStyle = color; g.lineWidth = Math.max(2, s * .09); g.lineCap = "round"; g.lineJoin = "round";
   if (type === "scout") { g.beginPath(); g.arc(0, 0, s * .34, 0, 7); g.stroke(); g.beginPath(); g.moveTo(-s*.1,s*.18); g.lineTo(s*.12,-s*.25); g.lineTo(s*.04,s*.04); g.closePath(); g.fill(); }
@@ -637,7 +637,7 @@ function makeWarFogMaterial() {
         col = mix(col, uMist, mistWisp);
         float exploredAlpha = 0.32 + ink * 0.14 + (grain - 0.5) * 0.02;
         float alpha = fogMask * (mix(0.78, exploredAlpha, seen) + mistWisp * 0.10);
-        gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.82));
+        gl_FragColor = vec4(col, clamp(alpha * 0.5, 0.0, 0.5));
       }
     `,
   });
@@ -707,7 +707,7 @@ function buildTiles() {
   peakMat = new THREE.MeshStandardMaterial({ map: terrainTex("mountain"), color: 0xd1d6d3, bumpMap: terrainTex("mountain"), bumpScale: .055, roughness: .99 });
   hillMat = new THREE.MeshStandardMaterial({ map: materialTex("stone"), color: 0xadb0ab, bumpMap: materialTex("stone"), bumpScale: .032, roughness: 1 });
   snowMat = sharedMats.snow;
-  fieldMat = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x9c978c, roughness: 1 });
+  fieldMat = new THREE.MeshStandardMaterial({ map: terrainTex("plain"), color: 0x9c978c, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   peakMatS = new THREE.MeshBasicMaterial({ color: 0x687375, transparent: true, opacity: .34, depthWrite: false });
   snowMatS = new THREE.MeshBasicMaterial({ color: 0x8d999a, transparent: true, opacity: .16, depthWrite: false });
   fieldMatS = new THREE.MeshBasicMaterial({ color: 0x667071, transparent: true, opacity: .26, depthWrite: false });
