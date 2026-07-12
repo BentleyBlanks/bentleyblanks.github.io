@@ -1079,6 +1079,16 @@ function syncDynamic() {
     if (t.sh) gStruct.add(structMesh(x, h, z, t.sh));
     if (t.mine) gStruct.add(mineMesh(x, h, z));
   }
+  // 地道网连线: 青色虚线弧(地下长城可见化)
+  if (G().tunnelPairs) for (const [[q1, r1], [q2, r2]] of G().tunnelPairs()) {
+    const [x1, z1] = hexWorld(q1, r1), [x2, z2] = hexWorld(q2, r2);
+    const y1 = topY(q1, r1) + .06, y2 = topY(q2, r2) + .06, pts = [];
+    for (let k = 0; k <= 8; k++) { const t2 = k / 8; pts.push(new THREE.Vector3(x1 + (x2 - x1) * t2, y1 + (y2 - y1) * t2 + Math.sin(t2 * Math.PI) * .10, z1 + (z2 - z1) * t2)); }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: 0x6ed6e8, dashSize: .14, gapSize: .12, transparent: true, opacity: .8 }));
+    line.computeLineDistances(); line.renderOrder = 4;
+    gStruct.add(line);
+  }
 
   // 单位(敌方需可见)
   clearGroup(gUnits);

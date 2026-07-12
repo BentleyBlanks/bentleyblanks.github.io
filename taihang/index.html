@@ -339,6 +339,8 @@ const CFG = {
   expPatrolSpot: 4,        // 巡逻队侦知村庄+暴露
   sweepThreshold: 55,      // 暴露≥此值→日军开始集结
   pitySweepGap: 40,        // 距上次扫荡>N回合且暴露≥30→强制集结(不许纯苟)
+  firstSweepTurn: 14,      // 首次"警备讨伐"保底回合(无论暴露, 半规模)
+  smallSweepMult: 0.55,    // 警备讨伐兵力倍率
   sweepTelegraph: 4,       // 集结N回合后出兵(备战窗口)
 
   // ── 扫荡 ──
@@ -400,9 +402,10 @@ const CFG = {
   pillboxHP: 150, pillboxStr: 20,
   townHP: 260, townStr: 34,
   siteHP: 60, siteStr: 6, siteTurns: 4,  // 囚笼: 修建中的炮楼
-  cagePolicy: [18, 54, 90, 126],         // 这些回合日军尝试修新炮楼
+  cageStart: 8, cageEvery: 9,            // 囚笼蚕食: 第N回合起每隔M回合修一座新炮楼(断其补给线可停工)
   lootPillboxArms: 15, lootPillboxGrain: 20,
   patrolEvery: 8, patrolTTL: 14,         // 巡逻队
+  patrolMax: 4, patrolChase: 4,          // 巡逻队同时存在上限 / 追击半径
 
   // ── 破袭 ──
   railRepair: 8,           // 铁路破坏N回合后修复
@@ -1868,12 +1871,14 @@ function jpTurn() {
     const cooling = S.lastSweepEnd > 0 && S.turn - S.lastSweepEnd < CFG.sweepCooldown;
     const force = S.turn - S.lastSweepEnd >= CFG.pitySweepGap && S.exposure >= 30;
     const thr = CFG.sweepThreshold + (hasSeason(S.turn, "winter") ? CFG.winterSweepThresholdAdd : 0); // 日军冬季收缩
-    if ((!cooling && (S.exposure >= thr || force)) || S.turn === CFG.bigSweepTurn) {
+    const firstProbe = S.lastSweepEnd === 0 && S.turn >= CFG.firstSweepTurn; // 警备讨伐: 头一次不看暴露(1941年"治安强化"是常态)
+    if ((!cooling && (S.exposure >= thr || force)) || S.turn === CFG.bigSweepTurn || firstProbe) {
       S.sweep.phase = "massing";
       S.sweep.countdown = CFG.sweepTelegraph;
       S.sweep.big = S.turn === CFG.bigSweepTurn;
+      S.sweep.small = firstProbe && !S.sweep.big;
       S.sweep.tactic = pickSweepTactic(S);
-      log(S.sweep.big ? "敌情通报: 日军空前集结, 五一大扫荡将至!!" : "敌情通报: 铁路沿线日军频繁调动, 扫荡正在集结…", "jp");
+      log(S.sweep.big ? "敌情通报: 日军空前集结, 五一大扫荡将至!!" : S.sweep.small ? "敌情通报: 日军警备队开始例行讨伐 — 新根据地都要被扫一遍, 这是躲不掉的!" : "敌情通报: 铁路沿线日军频繁调动, 扫荡正在集结…", "jp");
       if (S.techs.zhencha) log("侦察网破译敌军部署: 此次扫荡采取【" + TACTIC_INFO[S.sweep.tactic].name + "】— " + TACTIC_INFO[S.sweep.tactic].hint, "jp");
     }
   } else if (S.sweep.phase === "massing") {
@@ -1883,7 +1888,7 @@ function jpTurn() {
   }
 
   // ── 囚笼政策: 定点修炮楼 ──
-  if (CFG.cagePolicy.includes(S.turn)) buildSite();
+  if (S.turn >= CFG.cageStart && (S.turn - CFG.cageStart) % CFG.cageEvery === 0) buildSite(); // 囚笼逐步收紧
   // 工地推进
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
     const sh = S.tiles[q][r].sh;
@@ -1895,7 +1900,7 @@ function jpTurn() {
   }
 
   // ── 巡逻队生成 ──
-  if (S.turn % CFG.patrolEvery === 0 && S.units.filter(u => u.side === "j" && u.patrol).length < 3) {
+  if (S.turn % CFG.patrolEvery === 0 && S.units.filter(u => u.side === "j" && u.patrol).length < CFG.patrolMax) {
     const spawn = jpSpawnPoint();
     if (spawn) {
       const type = S.turn < 20 ? "puppet" : (rng() < 0.5 ? "puppet" : "squad");
@@ -2079,7 +2084,7 @@ function jpSpawnPoint(tq, tr) {
 
 function buildSite() {
   // 找一个能压制最多我方/高民心村的空格
-  let best = null, bestScore = 2;
+  let best = null, bestScore = 1; // ≥2分即修(一座像样的村就值得压制) — 前期囚笼才收得紧
   for (let q = Math.round(W * 0.33); q < W - 1; q++) for (let r = 1; r < H - 1; r++) {
     const t = state.tiles[q][r];
     if (t.sh || t.village || t.rail || t.terrain === "mountain") continue;
@@ -2108,6 +2113,7 @@ function launchSweep() {
   const S = state;
   let budget = (CFG.sweepBase + S.turn * CFG.sweepPerTurn) * eraMult(S.turn) * (0.6 + S.exposure / CFG.sweepExpFactor);
   if (S.sweep.big) budget *= CFG.bigSweepMult;
+  if (S.sweep.small) budget *= CFG.smallSweepMult; // 警备讨伐: 半规模
   if (hasSeason(S.turn, "harvest")) budget *= CFG.harvestSweepMult; // 秋收抢粮扫荡
   // 铁路是兵团动脉: 预算随铁路连通比例缩水(全断只剩 sweepSupplyFloor)
   const conFrac = railConnFrac();
@@ -2172,7 +2178,7 @@ function endSweep() {
   } else {
     log("日军扫荡部队撤回据点。此仗歼敌" + Math.round(ratio * 100) + "%", "hl");
   }
-  S.sweep.phase = "idle";
+  S.sweep.phase = "idle"; S.sweep.small = false;
   S.lastSweepEnd = S.turn;
   S.exposure = Math.min(S.exposure, 40); // 敌情报过时, 给喘息窗口
   S.stats.sweepsSurvived++;
@@ -2239,7 +2245,7 @@ function jpUnitAct(u) {
       }
     } else if (u.patrol) {
       // 巡逻: 附近有我方单位→追; 否则沿铁路/平原游荡
-      const prey = state.units.filter(x => x.side === "p" && x.layer === "mil" && !UT[x.type].hidden && hexDist(u.q, u.r, x.q, x.r) <= 3);
+      const prey = state.units.filter(x => x.side === "p" && x.layer === "mil" && !UT[x.type].hidden && hexDist(u.q, u.r, x.q, x.r) <= CFG.patrolChase);
       if (prey.length) dest = [prey[0].q, prey[0].r];
       else {
         const wander = nbrs(u.q, u.r).filter(([a, b]) => { const t = state.tiles[a][b]; return !t.sh && (UT[u.type].roadOnly ? (t.rail || t.terrain === "plain") : t.terrain !== "mountain") && !anyEnemyMilAt(a, b, "j") && !unitAt(a, b, "j", "mil"); });
@@ -2681,6 +2687,20 @@ function draw() {
       ctx.strokeStyle = "#ffe9a0"; ctx.lineWidth = 1.5; ctx.stroke();
       ctx.fillStyle = "#fff4d0"; ctx.font = "bold " + Math.round(s * 0.42) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(bt, bx, by + 0.5);
+    }
+  }
+  // 地道网连线: 让"地下长城"看得见(青色虚线弧, 直连距离≤tunnelLinkRange的地道村)
+  {
+    const tvs = tunnelVillages();
+    if (tvs.length > 1) {
+      ctx.setLineDash([4, 6]); ctx.lineWidth = 2.2; ctx.strokeStyle = "rgba(110,214,232,.55)"; ctx.lineCap = "round";
+      for (let i = 0; i < tvs.length; i++) for (let j = i + 1; j < tvs.length; j++) {
+        if (hexDist(tvs[i].q, tvs[i].r, tvs[j].q, tvs[j].r) > CFG.tunnelLinkRange) continue;
+        const [x1, y1] = hexCenter(tvs[i].q, tvs[i].r), [x2, y2] = hexCenter(tvs[j].q, tvs[j].r);
+        ctx.beginPath(); ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo((x1 + x2) / 2, (y1 + y2) / 2 + s * 0.35, x2, y2); ctx.stroke(); // 下垂弧=地下感
+      }
+      ctx.setLineDash([]);
     }
   }
   // 城市横幅层(在所有地块之上, 单位之下 — 免被后画的邻格遮住)
@@ -3771,8 +3791,7 @@ function newState() {
   const wk = spawnUnit("work", hq.q, hq.r); if (wk) wk.mp = UT.work.mp;
   // 开局敌情(历史: 据点驻军与巡逻是常态, 不是等你发展了才来)
   ensureGarrisons();
-  const psp = jpSpawnPoint();
-  if (psp) { const pu = spawnUnit("puppet", psp[0], psp[1], { patrol: true, ttl: CFG.patrolTTL }); if (pu) pu.mp = 0; }
+  for (let i = 0; i < 2; i++) { const psp = jpSpawnPoint(); if (psp) { const pu = spawnUnit(i ? "squad" : "puppet", psp[0], psp[1], { patrol: true, ttl: CFG.patrolTTL }); if (pu) pu.mp = 0; } }
 }
 function centerCam() {
   const [cx, cy] = hexCenter(state.hq.q, state.hq.r);
@@ -3944,6 +3963,7 @@ window.TH = {
   state: () => state, visSet: () => visSet, sel: () => sel, reach: () => reach, pending: () => pending,
   moveMode: () => moveMode, moveHover: () => moveHover,
   tunnelTargets: () => { const u = getSelUnit(); return u ? tunnelTargets(u) : []; },
+  tunnelPairs: () => { const tvs = tunnelVillages(), out = []; for (let i = 0; i < tvs.length; i++) for (let j = i + 1; j < tvs.length; j++) if (hexDist(tvs[i].q, tvs[i].r, tvs[j].q, tvs[j].r) <= CFG.tunnelLinkRange) out.push([[tvs[i].q, tvs[i].r], [tvs[j].q, tvs[j].r]]); return out; },
   hover: (q, r) => hoverTile(q, r),
   pathTurns: (u, p) => pathTurns(u, p),
   click: (q, r) => handleClickTile(q, r),
@@ -4036,6 +4056,7 @@ const CFG_DESC = {
   garrisonFromTurn: "据点守备队从此回合出现", garrisonRespawn: "守备队被歼后N回合再补", garrisonRadius: "守备队巡逻半径",
   supplyRange: "据点距连通铁路≤此值=直连补给", supplyRelay: "据点距已补给据点≤此值=接力补给",
   farmYield: "每块农田+粮/回合(吃民心系数)", farmCapPerVillage: "每村周边农田上限", builderCharges: "新建设队工作次数", builderConvertCharges: "民兵转建设队的工作次数", convertArms: "民兵⇄建设队军火流转量", tunnelDigGrain: "建设队挖地道粮耗",
+  cageStart: "囚笼蚕食起始回合", cageEvery: "囚笼每隔N回合修一座炮楼", patrolMax: "巡逻队同时存在上限", patrolChase: "巡逻队追击半径", firstSweepTurn: "首次警备讨伐保底回合", smallSweepMult: "警备讨伐兵力倍率",
   bossMinTurn: "挺进队最早触发回合", bossVillages: "触发: 根据地村数≥", bossPillboxes: "触发: 拔炮楼数≥", bossEscorts: "挺进队护卫数", bossTTL: "奇袭持续回合(逾期遁走)", bossSelfStr: "队长战力加成", bossAura: "军官光环(相邻+战力)", bossHeartReward: "斩首全村+民心", pillboxRepair: "有补给的炮楼每回合自动修复", sweepSupplyFloor: "铁路全断时扫荡预算下限系数",
   banditCamps: "土匪山寨数量", banditCampHP: "山寨耐久", banditCampStr: "山寨火力", banditEvery: "每N回合土匪下山", banditGrain: "土匪洗劫每回合抢粮", banditHeart: "土匪洗劫每回合-民心", banditLootGrain: "端山寨缴获粮", banditLootArms: "端山寨缴获军火", banditRecruitMan: "统一战线收编+人力",
 };
@@ -4047,7 +4068,7 @@ const CFG_GROUPS = [
   ["民心与扩张", ["heartFullProd", "joinThreshold", "workteamHeart", "ownedHeartRegen", "neutralDrift", "suppressDist", "suppressCap", "revertHeart", "joinExposure"]],
   ["农田与建设", ["farmYield", "farmCapPerVillage", "builderCharges", "builderConvertCharges", "convertArms", "tunnelDigGrain"]],
   ["挺进队(Boss)", ["bossMinTurn", "bossVillages", "bossPillboxes", "bossEscorts", "bossTTL", "bossSelfStr", "bossAura", "bossHeartReward"]],
-  ["暴露度", ["expPerVillage", "expPerArsenal", "expDecay", "expAttack", "expKillPillbox", "expSabotage", "expPatrolSpot", "sweepThreshold", "pitySweepGap", "sweepTelegraph"]],
+  ["暴露度", ["expPerVillage", "expPerArsenal", "expDecay", "expAttack", "expKillPillbox", "expSabotage", "expPatrolSpot", "sweepThreshold", "pitySweepGap", "sweepTelegraph", "firstSweepTurn", "smallSweepMult", "cageStart", "cageEvery", "patrolMax", "patrolChase"]],
   ["扫荡", ["sweepBase", "sweepPerTurn", "sweepExpFactor", "sweepCooldown", "sweepTTL", "sweepMaxUnits", "pillageGrain", "pillageHeart", "pillageBuildingChance", "tunnelDamageMult", "bigSweepTurn", "bigSweepMult", "sweepWinKillRatio"]],
   ["战斗与单位", ["dmgBase", "dmgExpDiv", "counterMult", "hpScaleFloor", "tunnelDef", "tunnelLinkRange", "tunnelNetDef", "ambushBonus", "lootArmsRatio", "healVillage", "healTerritory", "restHeal", "fortifyDef", "starveHpLoss", "starveHeartLoss"]],
   ["据点/炮楼/囚笼", ["pillboxHP", "pillboxStr", "townHP", "townStr", "siteHP", "siteStr", "siteTurns", "lootPillboxArms", "lootPillboxGrain", "patrolEvery", "patrolTTL"]],
