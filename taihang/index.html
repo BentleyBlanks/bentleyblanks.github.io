@@ -1150,39 +1150,6 @@ function uiUnlink() {
   log(uname(u) + "与" + uname(p) + "解除联结", "info");
   renderPanel(); updateUI(); draw();
 }
-// ── 联结移动: 工作队(民事)与同格军事单位结伴同行, 移速以慢者为准, 防落单被抓 ──
-function linkPartner(u) {
-  if (!u || !u.linkId) return null;
-  const p = state.units.find(x => x.id === u.linkId);
-  if (!p || p.q !== u.q || p.r !== u.r) { if (p) p.linkId = null; u.linkId = null; return null; } // 走散/阵亡即自动解除
-  return p;
-}
-function linkCandidate(u) { // 同格、异层、双方都未联结/未扎根 → 可联结
-  if (!u || u.side !== "p" || u.linkId || u.rooted) return null;
-  return state.units.find(x => x !== u && x.q === u.q && x.r === u.r && x.side === "p" && x.layer !== u.layer && !x.linkId && !x.rooted) || null;
-}
-function pairMp(u) { const p = linkPartner(u); return p ? Math.min(u.mp, p.mp) : u.mp; }
-function pairMaxMp(u) { const p = linkPartner(u); return p ? Math.min(maxMp(u), maxMp(p)) : maxMp(u); }
-function pairCost(u, t) { const p = linkPartner(u); const c = moveCost(u, t); return p ? Math.max(c, moveCost(p, t)) : c; }
-function pairBlocked(u, nq, nr) { // 目的格对两层都要有空位
-  if (unitAt(nq, nr, u.side, u.layer)) return true;
-  const p = linkPartner(u);
-  return !!(p && unitAt(nq, nr, u.side, p.layer));
-}
-function uiLink() {
-  const u = getSelUnit(), c = linkCandidate(u);
-  if (!c) return;
-  u.linkId = c.id; c.linkId = u.id; c.autoPath = null; u.autoPath = null;
-  log(uname(u) + "与" + uname(c) + "联结同行 — 同进同退, 以移速慢者为准", "hl");
-  clearPending(false); renderPanel(); updateUI(); draw();
-}
-function uiUnlink() {
-  const u = getSelUnit(), p = linkPartner(u);
-  if (!p) return;
-  p.linkId = null; u.linkId = null;
-  log(uname(u) + "与" + uname(p) + "解除联结", "info");
-  renderPanel(); updateUI(); draw();
-}
 function tunnelTargets(u) { // 该单位当前可地道转移的目标村
   if (!u || u.mp <= 0 || u.attacked || u.rooted) return [];
   const v = state.tiles[u.q][u.r].village;
@@ -3489,9 +3456,6 @@ function renderPanel() {
       if (!u.attacked && ut.str > 0) html += "<button class='uab' data-sound='clickMetal' title='驻扎: 防御+" + CFG.fortifyDef + ", 每回合回血, 守到你调动它' onclick='uiFortify()'>🛡</button>";
       if (!u.attacked && u.hp < 100) html += "<button class='uab' data-sound='clickMetal' title='休整至痊愈: 每回合回血直到满员(不加防御)' onclick='uiRest()'>🛌</button>";
       if (!u.attacked && !u.rooted) html += "<button class='uab' data-sound='clickMetal' title='跳过: 本回合不再行动' onclick='uiSkip()'>⏭</button>";
-      { const lpp = linkPartner(u), lcc = linkCandidate(u);
-        if (lpp) html += "<button class='uab' data-sound='clickMetal' title='解除与" + uname(lpp) + "的联结' onclick='uiUnlink()'>🔓</button>";
-        else if (lcc) html += "<button class='uab' data-sound='clickMetal' title='与同格的" + uname(lcc) + "联结同行: 同进同退, 以移速慢者为准(防落单被抓)' onclick='uiLink()'>🔗</button>"; }
       { const lpp = linkPartner(u), lcc = linkCandidate(u);
         if (lpp) html += "<button class='uab' data-sound='clickMetal' title='解除与" + uname(lpp) + "的联结' onclick='uiUnlink()'>🔓</button>";
         else if (lcc) html += "<button class='uab' data-sound='clickMetal' title='与同格的" + uname(lcc) + "联结同行: 同进同退, 以移速慢者为准(防落单被抓)' onclick='uiLink()'>🔗</button>"; }
