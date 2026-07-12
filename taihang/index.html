@@ -187,6 +187,11 @@ button { font-family: inherit; cursor: pointer; }
 .mbtn { background: #6a1f18; border: 1px solid #a04338; color: #f0d8c0; font-size: 14px; letter-spacing: 2px; border-radius: 7px; padding: 9px 20px; }
 .mbtn:hover { background: #7d281f; }
 .mbtn.ghost { background: #2a2516; border-color: #4a452c; color: #d8c9a0; }
+.mainMenu { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 14px 0 6px; }
+.mainMenu .menuBtn { min-width: 280px; font-size: 16px; padding: 12px 18px; }
+.menuRow { display: flex; gap: 10px; align-items: center; color: #8a8058; font-size: 13px; }
+.menuRow select { background: #242014; color: #d8c9a0; border: 1px solid #4a452c; border-radius: 4px; padding: 6px 10px; min-width: 208px; font-size: 13px; }
+.menuSep { width: 68%; border: 0; border-top: 1px solid #3a3826; margin: 4px 0; }
 .mbtn.ghost:hover { background: #3a3320; }
 
 /* 科技树 */
@@ -291,6 +296,12 @@ button { font-family: inherit; cursor: pointer; }
 // 《太行·1941》—— 敌后战场 4X(探索/扩张/开发/歼灭)。全部数值集中在 CFG。
 // 每回合=1个月, 1941.1 → 1945.8 共56回合, 目标游戏时长≈1小时。
 // ═══════════════════════════════════════════════════════════════════
+// 难度预设: cfg 为空 = 默认数值; 后续加档只填差异键(如 {sweepBase: 30}), 主菜单自动多一项
+const DIFFICULTIES = {
+  standard: { name: "标准 · 史实", desc: "1941年历史强度 — 按史实节奏的囚笼、扫荡与资源。", cfg: {} },
+};
+let selectedDifficulty = (() => { try { const k = localStorage.getItem("taihang.difficulty"); return DIFFICULTIES[k] ? k : "standard"; } catch (e) { return "standard"; } })();
+
 const CFG = {
   // ── 回合与胜负 ──
   turnsPerMonth: 3,        // 每回合≈10天(旬); 日期/纪元由此驱动
@@ -3172,8 +3183,8 @@ function afterAction() {
 addEventListener("keydown", e => {
   if (e.key === "Enter" && !modalOpen()) endTurn();
   if ((e.key === "t" || e.key === "T") && !modalOpen()) showTech();
-  if (e.key === "h" || e.key === "H") { modalOpen() ? closeModal() : showHelp(false); }
-  if (e.key === "Escape") { modalOpen() ? closeModal() : deselect(); }
+  if (e.key === "h" || e.key === "H") { (modalOpen() && state && state.started) ? closeModal() : showHelp(false); }
+  if (e.key === "Escape") { modalOpen() ? (state && state.started ? closeModal() : showMainMenu()) : deselect(); }
 });
 
 // ═══════════════════════════════ UI ═══════════════════════════════
@@ -3635,6 +3646,34 @@ function openModal(html) { $("modalBox").innerHTML = html; $("modalWrap").classL
 function closeModal() { $("modalWrap").classList.add("hidden"); }
 $("modalWrap").addEventListener("click", e => { if (e.target === $("modalWrap") && state && !state.over && state.started) closeModal(); });
 
+// 主菜单(传统形式, 与 Godot 版一致): 开局入口/难度/规则。未开局时的弹层都收敛到这里。
+function showMainMenu() {
+  const diffOpts = Object.keys(DIFFICULTIES).map(k =>
+    `<option value="${k}"${k === selectedDifficulty ? " selected" : ""} title="${DIFFICULTIES[k].desc}">${DIFFICULTIES[k].name}</option>`).join("");
+  const startBtns = hasSave()
+    ? `<button class="mbtn menuBtn" data-sound="menuCollapse" onclick="startGame(true)">💾 继续上次战役</button>
+       <button class="mbtn ghost menuBtn" data-sound="menuCollapse" onclick="startGame(false)">▶ 开始新战役</button>`
+    : `<button class="mbtn menuBtn" data-sound="menuCollapse" onclick="startGame(false)">▶ 开始新战役</button>`;
+  openModal(`
+<h2>太行·1941<small>敌后战场 4X · 1941–1945</small></h2>
+<div class="mainMenu">
+  ${startBtns}
+  <div class="menuRow"><span>难度</span><select onchange="setDifficulty(this.value)" title="${DIFFICULTIES[selectedDifficulty].desc}">${diffOpts}</select></div>
+  <hr class="menuSep">
+  <button class="mbtn ghost menuBtn" data-sound="pageTurn" onclick="showHelp(false)">📖 战场规则</button>
+</div>`);
+}
+function setDifficulty(k) {
+  if (!DIFFICULTIES[k]) return;
+  selectedDifficulty = k;
+  playUiSound("clickMenu");
+  try { localStorage.setItem("taihang.difficulty", k); } catch (e) {}
+}
+function applyDifficulty() { // 只叠差异键, 不重置 CFG(保留 Debug 面板"地图参数下一局生效"的工作流)
+  const d = DIFFICULTIES[selectedDifficulty];
+  if (d) for (const k in d.cfg) if (k in CFG) CFG[k] = d.cfg[k];
+}
+
 function showHelp(isStart) {
   openModal(`
 <h2>太行·1941<small>敌后战场 4X · 约1小时</small></h2>
@@ -3652,7 +3691,7 @@ function showHelp(isStart) {
 <p><b>胜利:</b>①坚持到1945年8月日本投降且保有≥${CFG.survivalWinVillages}村(≥${CFG.greatWinVillages}村为大胜);②完成【战略反攻】整训后攻克<b>县城</b>,提前解放全县。<br><b>失败:</b>总部村被扫荡摧残至民心崩溃。</p>
 <p class="hint" style="color:#8a8058">操作: 拖拽平移 / 滚轮缩放 · 点单位再点绿格移动、点红框敌人攻击 · 点己方村庄建造与招兵 · [Enter]结束回合 [T]整训 [H]规则</p>
 <div class="mbtns">
-  ${isStart ? `<button class="mbtn" data-sound="menuCollapse" onclick="startGame(false)">开始游戏</button>` + (hasSave() ? `<button class="mbtn ghost" data-sound="menuCollapse" onclick="startGame(true)">继续上次进度</button>` : "") : `<button class="mbtn ghost" data-sound="screenClose" onclick="closeModal()">返回</button><button class="mbtn ghost" data-sound="negative" onclick="if(confirm('放弃当前进度重开?')){clearSave();location.reload()}">重新开始</button>`}
+  ${state && state.started ? `<button class="mbtn ghost" data-sound="screenClose" onclick="closeModal()">返回</button><button class="mbtn ghost" data-sound="negative" onclick="if(confirm('放弃当前进度重开?')){clearSave();location.reload()}">重新开始</button>` : `<button class="mbtn ghost" data-sound="screenClose" onclick="showMainMenu()">返回主菜单</button>`}
 </div>`);
 }
 
@@ -3769,8 +3808,10 @@ function startGame(fromSave) {
     state.started = true;
     log("── 进度已恢复 · " + dateStr(state.turn) + " ──", "hl");
   } else {
+    applyDifficulty();
     newState();
     state.started = true;
+    state.difficulty = selectedDifficulty;
     centerCam();
     log("═══ 1941年1月 · 囚笼初现 ═══", "hl");
     log("你在王家峪设立总部。侦察员待命, 工作队整装 — 出发, 到群众中去!", "hl");
@@ -4094,7 +4135,7 @@ resize();
 newState();       // 先生成一张底图作为标题背景
 centerCam();
 computeVis(); updateUI(); draw();
-showHelp(true);
+showMainMenu();
 
 // 动画循环: 推进 animTime, 节流(~22fps)重绘让旗子飘荡; 弹窗打开/结束时不空转
 let _lastAnimDraw = 0;
