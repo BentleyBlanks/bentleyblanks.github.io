@@ -121,6 +121,17 @@ button { font-family: inherit; cursor: pointer; }
 #logToggle:hover { color: #e8dcb8; border-color: #6a5f38; }
 #logBox { width: 100%; max-height: 138px; overflow-y: auto; background: rgba(20,16,9,.88); border: 1px solid #33301e; border-radius: 7px; padding: 6px 10px; font-size: 12px; line-height: 1.55; pointer-events: auto; }
 #logBox.collapsed { display: none; }
+/* Boss字幕卡: 老电影胶片风 */
+#bossCard { position: fixed; inset: 0; z-index: 120; display: none; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, #171310 0%, #050403 78%); animation: bcFlicker 0.24s infinite; }
+@keyframes bcFlicker { 0%,100% { filter: brightness(1); } 50% { filter: brightness(0.94); } }
+.bc-film { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 40px; }
+.bc-bar { width: min(560px, 80vw); height: 3px; background: repeating-linear-gradient(90deg, #3a352c 0 18px, transparent 18px 30px); }
+#bcFace { border: 3px solid #3a352c; box-shadow: 0 0 60px rgba(0,0,0,.9), inset 0 0 40px rgba(0,0,0,.6); filter: sepia(.3) contrast(1.05); }
+.bc-name { color: #b9a978; font-size: 15px; letter-spacing: 4px; }
+.bc-name b { color: #e8dcb8; font-size: 18px; }
+.bc-quote { min-height: 3.2em; width: min(480px, 76vw); text-align: center; color: #e8dcb8; font-size: 19px; letter-spacing: 3px; line-height: 1.7; white-space: pre-line; font-family: "Noto Serif SC", serif; text-shadow: 0 2px 8px #000; }
+.bc-btn { background: #6a1f18; border: 1px solid #a04338; color: #f0d8c0; font-size: 16px; letter-spacing: 6px; border-radius: 6px; padding: 10px 34px; cursor: pointer; }
+.bc-btn:hover { background: #7d281f; }
 #logBox p { color: #a99b74; }
 #logBox p.hl { color: #e8dcb8; }
 #logBox p.good { color: #9fbc52; }
@@ -368,6 +379,14 @@ const CFG = {
   builderConvertCharges: 2, // 民兵转建设队获得的工作次数(兼职比专职少)
   convertArms: 5,          // 民兵⇄建设队转换的军火流转(放下枪入库+5/拿枪领装备-5)
   tunnelDigGrain: 20,      // 建设队挖地道的粮耗(另耗1次工作)
+  bossMinTurn: 12,         // 挺进队奇袭最早触发回合
+  bossVillages: 6,         // 触发条件A: 根据地村数≥
+  bossPillboxes: 3,        // 触发条件B: 累计拔炮楼≥
+  bossEscorts: 4,          // 挺进队护卫小队数
+  bossTTL: 8,              // 奇袭持续回合(逾期首领遁走)
+  bossSelfStr: 4,          // 挺进队长自身战力加成
+  bossAura: 2,             // 军官光环: 与首领相邻的挺进队+战力
+  bossHeartReward: 8,      // 斩首成功全村+民心
   ambushBonus: 3,          // 从山地/森林发起攻击+战力
   lootArmsRatio: 0.5,      // 歼敌缴获军火=敌战力*此值
   healVillage: 12, healTerritory: 4,  // 驻己方村/根据地范围内回血
@@ -481,6 +500,9 @@ const DOCTRINES = {
   nidawo:   { name: "你打你的，我打我的", src: "游击战术", quote: "你打你的，我打我的；打得赢就打，打不赢就走。",
     cond: "累计破袭铁路 3 次", effect: "山地/森林伏击攻击额外 +2",
     check: () => (state.stats.sabotages || 0) >= 3 },
+  dijinwojin: { name: "敌进我进", src: "刘伯承·反扫荡方针", quote: "敌进我进——你进我的根据地，我捣你的后方。",
+    cond: "斩首挺进队指挥官", effect: "对扫荡/挺进部队与敌据点攻击 +2",
+    check: () => (state.stats.bossKills || 0) >= 1 },
 };
 function hasDoc(k) { return !!(state.doctrines && state.doctrines[k]); }
 function checkDoctrines() {
@@ -907,6 +929,89 @@ function tunnelLinks(q, r) { // 返回与(q,r)同网的其他地道村; (q,r)须
   }
   return inNet.slice(1).map(([a, b]) => ({ q: a, r: b }));
 }
+// ── 挺进队奇袭(Boss事件): 无预警直扑总部(历史原型: 1942益子挺进队) ──
+function checkBosses() {
+  const S = state;
+  S.bossFlags = S.bossFlags || {};
+  if (S.bossFlags.yamada || S.over) return;
+  if (S.turn < CFG.bossMinTurn) return;
+  if (!(ownedVillages().length >= CFG.bossVillages || (S.stats.pillboxes || 0) >= CFG.bossPillboxes)) return;
+  if (S.techs.zhencha && !S.bossWarned) { // 侦察网: 提前一回合预警
+    S.bossWarned = true;
+    log("侦察网急报: 日军便衣队正向总部方向渗透, 来意不明 — 下回合必到, 快调兵回防总部!", "jp");
+    addFx("pop", S.hq.q, S.hq.r, { icon: "⚠" });
+    return;
+  }
+  S.bossFlags.yamada = true;
+  spawnRaid();
+  showBossCard();
+}
+function spawnRaid() { // 挺进队包围总部: 单位直接出现在总部相邻格
+  const S = state, hq = S.hq;
+  const ring = [];
+  for (const [nq, nr] of nbrs(hq.q, hq.r)) { const t = S.tiles[nq][nr]; if (!t.sh && !unitAt(nq, nr, "j", "mil")) ring.push([nq, nr]); }
+  for (const [nq, nr] of nbrs(hq.q, hq.r)) for (const [q2, r2] of nbrs(nq, nr)) { const t = S.tiles[q2][r2]; if (hexDist(q2, r2, hq.q, hq.r) === 2 && !t.sh && !unitAt(q2, r2, "j", "mil") && !ring.some(([a, b]) => a === q2 && b === r2)) ring.push([q2, r2]);
+  }
+  let spot = ring.shift() || [hq.q + 1, hq.r];
+  const boss = spawnUnit("company", spot[0], spot[1], { raid: true, boss: true, title: "山田大队长", tq: hq.q, tr: hq.r });
+  if (boss) boss.mp = 0;
+  for (let i = 0; i < CFG.bossEscorts && ring.length; i++) {
+    const [a, b] = ring.shift();
+    const u = spawnUnit(i % 3 === 2 ? "puppet" : "squad", a, b, { raid: true, tq: hq.q, tr: hq.r });
+    if (u) u.mp = 0;
+  }
+  S.raid = { active: true, ttl: CFG.bossTTL };
+  computeVis(); updateUI(); draw();
+  log("!! 日军特别挺进队突然出现在总部周围 — 化装奔袭, 一路避开了所有耳目!", "bad");
+}
+function showBossCard() {
+  const hq = state.hq;
+  let el = document.getElementById("bossCard");
+  if (!el) { el = document.createElement("div"); el.id = "bossCard"; document.body.appendChild(el); }
+  el.innerHTML = "<div class='bc-film'><div class='bc-bar'></div>"
+    + "<canvas id='bcFace' width='220' height='220'></canvas>"
+    + "<div class='bc-name'>日军特别挺进队 · <b>山田大队长</b></div>"
+    + "<div class='bc-quote' id='bcQuote'></div>"
+    + "<button class='bc-btn' id='bcGo' style='visibility:hidden'>应 战 !</button>"
+    + "<div class='bc-bar'></div></div>";
+  el.style.display = "flex";
+  // 版画风军官剪影: 军帽+圆镜+胡
+  const g = document.getElementById("bcFace").getContext("2d");
+  g.fillStyle = "#141210"; g.fillRect(0, 0, 220, 220);
+  g.strokeStyle = "#3a352c"; g.lineWidth = 2; g.strokeRect(6, 6, 208, 208);
+  g.fillStyle = "#c9bda0";
+  g.beginPath(); g.ellipse(110, 130, 46, 54, 0, 0, 7); g.fill(); // 脸
+  g.fillStyle = "#2a2620";
+  g.beginPath(); g.ellipse(110, 84, 56, 26, 0, Math.PI, 0); g.fill(); // 帽檐上盖
+  g.fillRect(54, 80, 112, 14); // 帽墙
+  g.beginPath(); g.moveTo(78, 94); g.lineTo(142, 94); g.lineTo(150, 106); g.lineTo(70, 106); g.closePath(); g.fill(); // 帽檐
+  g.fillStyle = "#a8342a"; g.fillRect(104, 70, 12, 8); // 帽星
+  g.strokeStyle = "#201d18"; g.lineWidth = 3;
+  g.beginPath(); g.arc(92, 128, 13, 0, 7); g.stroke(); g.beginPath(); g.arc(128, 128, 13, 0, 7); g.stroke(); g.beginPath(); g.moveTo(105, 128); g.lineTo(115, 128); g.stroke(); // 圆镜
+  g.fillStyle = "#efe8d8"; g.globalAlpha = .8; g.fillRect(86, 122, 6, 4); g.fillRect(122, 122, 6, 4); g.globalAlpha = 1; // 镜片反光
+  g.fillStyle = "#26221c"; g.fillRect(100, 150, 20, 7); // 胡
+  g.fillStyle = "#3a352c"; g.beginPath(); g.moveTo(60, 220); g.lineTo(110, 178); g.lineTo(160, 220); g.closePath(); g.fill(); // 领章肩部
+  // 打字机台词
+  const quote = "悄悄地进村, 打枪的不要——\n八路的总部, 就在前面的干活!";
+  const qEl = document.getElementById("bcQuote");
+  let i = 0;
+  const tick = setInterval(() => {
+    i++;
+    qEl.textContent = quote.replace("\\n", "\n").slice(0, i);
+    if (typeof playUiSound === "function" && i % 3 === 0) playUiSound("hover");
+    if (i >= quote.length) { clearInterval(tick); document.getElementById("bcGo").style.visibility = "visible"; }
+  }, 55);
+  document.getElementById("bcGo").onclick = () => {
+    clearInterval(tick);
+    el.style.display = "none";
+    focusTile(hq.q, hq.r);
+    for (const u of state.units) if (u.raid) { spawnAnims.set(u.id, animTime); addFx("ring", u.q, u.r); }
+    addFx("pop", hq.q, hq.r, { icon: "⚠" });
+    log("挺进队合围总部! 斩其首领可令其群龙无首 — 打蛇打七寸!", "hl");
+    draw();
+  };
+}
+
 // ── 农田(建设队开垦): 根据地村旁的可见田块, +粮/回合吃民心系数 ──
 function farmHomeVillage(q, r) { // 农田归属: 距离≤1的己方村(取最近)
   let best = null, bd = 9;
@@ -1221,6 +1326,8 @@ function effStr(u, ctx) {
     if (ctx === "def" && t.terrain === "plain" && hasSeason(state.turn, "qs")) s += CFG.qsPlainDef; // 青纱帐隐蔽
   } else {
     if (state.techs.tongzhan && u.type === "puppet") s = Math.max(1, s - 3);
+    if (u.boss) s += CFG.bossSelfStr; // 挺进队长
+    else if (u.raid && state.units.some(x => x.boss && hexDist(x.q, x.r, u.q, u.r) <= 1)) s += CFG.bossAura; // 军官光环
   }
   if (ctx === "def") {
     s += CFG.terrainDef[t.terrain] || 0;
@@ -1257,6 +1364,15 @@ function killUnit(u, bySide) {
     state.stats.kills++;
     if (u.sweep) state.sweep.killed += UT[u.type].str;
     log("歼灭" + UT[u.type].name + "! 缴获军火+" + loot, "good");
+    if (u.boss) { // 斩首成功: 挺进队群龙无首溃散
+      state.stats.bossKills = (state.stats.bossKills || 0) + 1;
+      if (state.raid) state.raid.active = false;
+      for (const x of state.units.slice()) if (x.raid) removeUnit(x);
+      for (const { v } of ownedVillages()) v.heart = clamp(v.heart + CFG.bossHeartReward, 0, 100);
+      addFx("flag", u.q, u.r); addFx("ring", u.q, u.r); addFx("text", u.q, u.r, { text: "斩首成功!", color: "#ffd766" });
+      log("斩首成功!! " + (u.title || "挺进队长") + "被当场击毙, 挺进队群龙无首、四散溃逃 — 军民士气大振(全村民心+" + CFG.bossHeartReward + ")", "good");
+      checkDoctrines();
+    }
   } else if (u.side === "p") {
     log(uname(u) + "全员牺牲…", "bad");
   }
@@ -1264,7 +1380,7 @@ function killUnit(u, bySide) {
 function attackUnit(a, d) {
   a.attacked = true; a.mp = 0; a.resting = false; a.fortified = false;
   const flank = a.side === "p" ? flankBonusAt(a, d.q, d.r) : 0;
-  const as = effStr(a, "atk") + flank, ds = effStr(d, "def");
+  const as = effStr(a, "atk") + flank + ((a.side === "p" && hasDoc("dijinwojin") && (d.raid || d.sweep)) ? 2 : 0), ds = effStr(d, "def");
   const dmg = dmgRoll(as, ds);
   d.hp -= dmg;
   const [dtx, dty] = hexCenter(d.q, d.r);
@@ -1289,7 +1405,7 @@ function attackStructure(a, q, r) {
   if (!sh) return;
   a.attacked = true; a.mp = 0;
   const flank = a.side === "p" ? flankBonusAt(a, q, r) : 0;
-  const as = effStr(a, "atk") + flank;
+  const as = effStr(a, "atk") + flank + ((a.side === "p" && hasDoc("dijinwojin")) ? 2 : 0);
   const dmg = Math.round(dmgRoll(as, sh.str * (sh.hp / sh.maxHp * 0.4 + 0.6)) * (hasPromo(a, "baopo") ? 1.4 : 1));
   sh.hp -= dmg;
   if (a.side === "p") grantXp(a, CFG.xpAttack + (sh.hp <= 0 ? CFG.xpStruct : 0));
@@ -1570,6 +1686,7 @@ function endTurn() {
   // ── 8. 推进回合 ──
   state.turn++;
   producedSeen.clear(); // 新回合: 重置"可生产"提示
+  checkBosses(); // 挺进队奇袭(Boss事件)
   if (state.turn > CFG.totalTurns) { endGame(ownedVillages().length >= CFG.survivalWinVillages, "survival"); return; }
   // 总部沦陷判定在 jpTurn 内
   checkDoctrines();
@@ -1787,6 +1904,17 @@ function jpTurn() {
     }
   }
 
+  // ── 挺进队收尾: 护卫死光/逾期→首领遁走(复仇线伏笔) ──
+  if (S.raid && S.raid.active) {
+    S.raid.ttl--;
+    const bossU = S.units.find(x => x.boss);
+    if (!bossU) { S.raid.active = false; }
+    else if (!S.units.some(x => x.raid && !x.boss) || S.raid.ttl <= 0) {
+      removeUnit(bossU);
+      S.raid.active = false; S.bossEscaped = true;
+      log("山田大队长见势不妙, 化装混出了包围圈…(此人还会回来的)", "jp");
+    }
+  }
   refreshSupply(); // 铁路补给网(破袭后当回合生效)
   ensureGarrisons(); // 据点守备队(历史: 日伪常态驻防, 非扫荡期也有活动)
   // 炮楼维修: 有补给才修(断补的楼只能挨打)
@@ -2085,6 +2213,11 @@ function jpUnitAct(u) {
         if (hexDist(u.q, u.r, tg.q, tg.r) <= 1 && !free) return; // 已贴身合围
         dest = [u.tq, u.tr];
       }
+    } else if (u.raid) {
+      // 挺进队: 直扑总部, 占村设防劫掠, 不恋战
+      const v0 = state.tiles[u.q][u.r].village;
+      if (v0 && v0.owner === "p") { if (!u.fortified) u.fortified = true; return; }
+      dest = [u.tq, u.tr];
     } else if (u.guard) {
       // 据点守备: 巡逻半径内有我方军事单位→追打; 跑远了→归位; 否则在据点周边转悠
       const prey = state.units.filter(x => x.side === "p" && x.layer === "mil" && !UT[x.type].hidden && hexDist(u.gq, u.gr, x.q, x.r) <= CFG.garrisonRadius);
@@ -2778,7 +2911,7 @@ function drawUnit(u, s) {
   ctx.strokeStyle = "rgba(240,220,180,.4)"; ctx.lineWidth = 1.2;
   ctx.beginPath(); ctx.moveTo(x, by + bh / 2); ctx.lineTo(x, y - s * 0.3); ctx.stroke();
   ctx.globalAlpha = 0.78; ctx.fillStyle = badge; rrect(x - bw / 2, by - bh / 2, bw, bh, s * 0.12); ctx.fill(); ctx.globalAlpha = 1; // 半透明底
-  ctx.strokeStyle = isP ? "rgba(245,228,190,.9)" : (u.type === "bandit" ? "#e23a2c" : "rgba(232,128,116,.9)"); ctx.lineWidth = u.type === "bandit" ? 2.2 : 1.7; ctx.stroke();
+  ctx.strokeStyle = isP ? "rgba(245,228,190,.9)" : (u.boss ? "#e8c05a" : u.type === "bandit" ? "#e23a2c" : "rgba(232,128,116,.9)"); ctx.lineWidth = (u.boss || u.type === "bandit") ? 2.2 : 1.7; ctx.stroke();
   ctx.fillStyle = "#fbf3e0"; ctx.font = "800 " + (s * 0.46) + "px 'Noto Sans SC', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(posture ? ut.glyph + posture : ut.glyph, x, by - (u.hp < 100 ? s * 0.04 : 0));
   // HP条(嵌横幅底边, 满血不显)
@@ -3003,7 +3136,7 @@ function attackVerdict(exp, dhp, back, ahp, kill) {
 function planAttack(a, d, q, r) {
   pending = { type: "atk", uid: a.id, q, r, targetId: d.id };
   const flank = flankBonusAt(a, q, r);
-  const as = effStr(a, "atk") + flank, ds = effStr(d, "def");
+  const as = effStr(a, "atk") + flank + ((a.side === "p" && hasDoc("dijinwojin") && (d.raid || d.sweep)) ? 2 : 0), ds = effStr(d, "def");
   const exp = Math.max(1, Math.round(CFG.dmgBase * Math.exp((as - ds) / CFG.dmgExpDiv)));
   const kill = exp >= d.hp;
   const back = kill ? 0 : Math.round(CFG.dmgBase * Math.exp((effStr(d, "atk") - as) / CFG.dmgExpDiv) * CFG.counterMult);
@@ -3019,7 +3152,7 @@ function planStructAttack(a, q, r) {
   const sh = state.tiles[q][r].sh;
   pending = { type: "struct", uid: a.id, q, r };
   const flank = flankBonusAt(a, q, r);
-  const as = effStr(a, "atk") + flank, ds = sh.str * (sh.hp / sh.maxHp * 0.4 + 0.6);
+  const as = effStr(a, "atk") + flank + ((a.side === "p" && hasDoc("dijinwojin")) ? 2 : 0), ds = sh.str * (sh.hp / sh.maxHp * 0.4 + 0.6);
   const exp = Math.max(1, Math.round(CFG.dmgBase * Math.exp((as - ds) / CFG.dmgExpDiv) * (hasPromo(a, "baopo") ? 1.4 : 1)));
   const kill = exp >= sh.hp;
   const back = Math.round(CFG.dmgBase * Math.exp((sh.str - as) / CFG.dmgExpDiv) * CFG.counterMult);
@@ -3351,7 +3484,7 @@ function renderPanel() {
     const TN = { plain: "平原", hills: "丘陵", forest: "林地", mountain: "山地" };
     const en = state.units.find(x => x.q === sel.q && x.r === sel.r && x.side === "j" && visSet.has(key(sel.q, sel.r)));
     if (en) { // 敌军单位简介
-      const eut = UT[en.type], role = en.sweep ? "扫荡纵队" : en.guard ? "据点守备" : en.bandit ? "土匪" : en.patrol ? "巡逻队" : en.type === "spy" ? "潜伏特务" : "敌军";
+      const eut = UT[en.type], role = en.boss ? "挺进队指挥官 — 斩首可令全队溃散!" : en.raid ? "特别挺进队" : en.sweep ? "扫荡纵队" : en.guard ? "据点守备" : en.bandit ? "土匪" : en.patrol ? "巡逻队" : en.type === "spy" ? "潜伏特务" : "敌军";
       html += "<h3 style='color:#e2564d'>" + eut.name + "<small>" + role + "</small></h3>";
       html += "<div class='row'>战力 <b>" + Math.round(effStr(en, "def")) + "</b>(守)" + (state.techs.diwork ? " · 兵力 <b>" + Math.round(en.hp) + "</b>%" : " · 兵力 <b>?</b>(整训【敌工科】看穿)") + "</div>";
       html += "<div class='hint'>" + (EDESC[en.type] || "") + "</div>";
@@ -3629,7 +3762,7 @@ function newState() {
     sweep: { phase: "idle", countdown: 0, ttl: 0, total: 0, killed: 0, big: false },
     lastSweepEnd: 0, era: "",
     lastIncome: { g: 0, m: 0, o: 0, a: 0 },
-    stats: { kills: 0, pillboxes: 0, sabotages: 0, sweepsSurvived: 0, joined: 0, encircled: 0, spies: 0 }, warPhaseN: 1, doctrines: {},
+    stats: { kills: 0, pillboxes: 0, sabotages: 0, sweepsSurvived: 0, joined: 0, encircled: 0, spies: 0, bossKills: 0 }, warPhaseN: 1, doctrines: {}, bossFlags: {}, bossWarned: false, raid: null,
     seasonMark: seasonsOf(1).join(","),
   };
   revealArea(hq.q, hq.r, 3);
@@ -3902,7 +4035,8 @@ const CFG_DESC = {
   mountainMove: "翻山移动力消耗(步兵)", mountainMoveMaque: "麻雀战民兵走山路消耗", tunnelLinkRange: "地道联网距离(村间≤此值联通)", tunnelNetDef: "联防: 网内每邻村+防(上限+4)",
   garrisonFromTurn: "据点守备队从此回合出现", garrisonRespawn: "守备队被歼后N回合再补", garrisonRadius: "守备队巡逻半径",
   supplyRange: "据点距连通铁路≤此值=直连补给", supplyRelay: "据点距已补给据点≤此值=接力补给",
-  farmYield: "每块农田+粮/回合(吃民心系数)", farmCapPerVillage: "每村周边农田上限", builderCharges: "新建设队工作次数", builderConvertCharges: "民兵转建设队的工作次数", convertArms: "民兵⇄建设队军火流转量", tunnelDigGrain: "建设队挖地道粮耗", pillboxRepair: "有补给的炮楼每回合自动修复", sweepSupplyFloor: "铁路全断时扫荡预算下限系数",
+  farmYield: "每块农田+粮/回合(吃民心系数)", farmCapPerVillage: "每村周边农田上限", builderCharges: "新建设队工作次数", builderConvertCharges: "民兵转建设队的工作次数", convertArms: "民兵⇄建设队军火流转量", tunnelDigGrain: "建设队挖地道粮耗",
+  bossMinTurn: "挺进队最早触发回合", bossVillages: "触发: 根据地村数≥", bossPillboxes: "触发: 拔炮楼数≥", bossEscorts: "挺进队护卫数", bossTTL: "奇袭持续回合(逾期遁走)", bossSelfStr: "队长战力加成", bossAura: "军官光环(相邻+战力)", bossHeartReward: "斩首全村+民心", pillboxRepair: "有补给的炮楼每回合自动修复", sweepSupplyFloor: "铁路全断时扫荡预算下限系数",
   banditCamps: "土匪山寨数量", banditCampHP: "山寨耐久", banditCampStr: "山寨火力", banditEvery: "每N回合土匪下山", banditGrain: "土匪洗劫每回合抢粮", banditHeart: "土匪洗劫每回合-民心", banditLootGrain: "端山寨缴获粮", banditLootArms: "端山寨缴获军火", banditRecruitMan: "统一战线收编+人力",
 };
 const CFG_GROUPS = [
@@ -3912,6 +4046,7 @@ const CFG_GROUPS = [
   ["起始与资源", ["startGrain", "startMan", "startArms", "startOrg", "startHQHeart", "grainCap", "grainCapPerBarn", "manCap", "armsCap"]],
   ["民心与扩张", ["heartFullProd", "joinThreshold", "workteamHeart", "ownedHeartRegen", "neutralDrift", "suppressDist", "suppressCap", "revertHeart", "joinExposure"]],
   ["农田与建设", ["farmYield", "farmCapPerVillage", "builderCharges", "builderConvertCharges", "convertArms", "tunnelDigGrain"]],
+  ["挺进队(Boss)", ["bossMinTurn", "bossVillages", "bossPillboxes", "bossEscorts", "bossTTL", "bossSelfStr", "bossAura", "bossHeartReward"]],
   ["暴露度", ["expPerVillage", "expPerArsenal", "expDecay", "expAttack", "expKillPillbox", "expSabotage", "expPatrolSpot", "sweepThreshold", "pitySweepGap", "sweepTelegraph"]],
   ["扫荡", ["sweepBase", "sweepPerTurn", "sweepExpFactor", "sweepCooldown", "sweepTTL", "sweepMaxUnits", "pillageGrain", "pillageHeart", "pillageBuildingChance", "tunnelDamageMult", "bigSweepTurn", "bigSweepMult", "sweepWinKillRatio"]],
   ["战斗与单位", ["dmgBase", "dmgExpDiv", "counterMult", "hpScaleFloor", "tunnelDef", "tunnelLinkRange", "tunnelNetDef", "ambushBonus", "lootArmsRatio", "healVillage", "healTerritory", "restHeal", "fortifyDef", "starveHpLoss", "starveHeartLoss"]],
