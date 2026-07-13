@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141815">
+  <meta name="description" content="《冀中·1942：无名战线》——一款以抗日战争敌后战场为历史背景、标准难度约60至100分钟的轻量即时战略游戏。">
+  <meta property="og:title" content="冀中·1942：无名战线">
+  <meta property="og:description" content="经营、侦察、联村、破袭与转移。群众安全先于歼敌数字。">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://bentleyblanks.github.io/HiddenFront1942/Texture_TitleField.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://bentleyblanks.github.io/HiddenFront1942/Texture_TitleField.png">
+  <title>冀中 · 1942：无名战线</title>
+  <link rel="stylesheet" href="./Style_Game.css">
+</head>
+<body>
+  <main id="GameShell" class="gameShell" aria-label="冀中1942无名战线游戏">
+    <canvas id="GameCanvas" class="gameCanvas" tabindex="0" aria-label="俯视战场。键盘可移动镜头并使用快捷键；选择目标需要鼠标或触控。"></canvas>
+
+    <header class="topBar" aria-label="战役状态">
+      <button id="BrandButton" class="brandBlock" type="button" aria-label="打开战役说明">
+        <span class="brandSeal" aria-hidden="true">冀</span>
+        <span class="brandCopy"><strong>冀中 · 1942</strong><small>无名战线</small></span>
+      </button>
+
+      <div id="ResourceBar" class="resourceBar" aria-label="资源">
+        <div class="resourceItem" data-resource="grain"><i>粮</i><span><small>粮秣</small><strong id="GrainValue">0</strong></span></div>
+        <div class="resourceItem" data-resource="timber"><i>木</i><span><small>木料</small><strong id="TimberValue">0</strong></span></div>
+        <div class="resourceItem" data-resource="materiel"><i>需</i><span><small>军需</small><strong id="MaterielValue">0</strong></span></div>
+        <div class="resourceItem" data-resource="intel"><i>情</i><span><small>情报</small><strong id="IntelValue">0</strong></span></div>
+        <div class="resourceItem populationItem"><i>队</i><span><small>人员</small><strong id="PopulationValue">0 / 0</strong></span></div>
+      </div>
+
+      <div class="statusMeters">
+        <button id="SupportButton" class="meterButton supportMeter" type="button" title="保护群众、纪律与公平负担会维持群众支持">
+          <span><b>群众支持</b><strong id="SupportValue">0</strong></span>
+          <i><em id="SupportFill"></em></i>
+        </button>
+        <button id="AlertButton" class="meterButton alertMeter" type="button" title="行动痕迹与交火会提高敌方警戒；脱离接触后逐步下降">
+          <span><b id="AlertLabel">敌方警戒</b><strong id="AlertValue">0</strong></span>
+          <i><em id="AlertFill"></em></i>
+        </button>
+      </div>
+
+      <div class="timeControls" role="toolbar" aria-label="时间控制">
+        <span id="GameClock" class="gameClock">00:00</span>
+        <button id="PauseButton" type="button" aria-label="暂停或继续" title="暂停 / 继续（空格）">Ⅱ</button>
+        <button class="speedButton" type="button" data-speed="0.5">½</button>
+        <button class="speedButton active" type="button" data-speed="1">1×</button>
+        <button class="speedButton" type="button" data-speed="2">2×</button>
+        <button id="MenuButton" type="button" aria-label="打开菜单" title="菜单（Esc）">☰</button>
+      </div>
+    </header>
+
+    <aside id="MissionPanel" class="missionPanel" aria-label="当前任务">
+      <div class="panelEyebrow"><span id="PhaseDate">1942年5月上旬</span><button id="CollapseMissionButton" type="button" aria-label="折叠任务面板" aria-expanded="true" aria-controls="ObjectiveList">‹</button></div>
+      <h1 id="PhaseTitle">第一章 · 立足</h1>
+      <p id="PhaseBriefing"></p>
+      <div id="ObjectiveList" class="objectiveList"></div>
+      <button id="HistoryCardButton" class="historyCardButton" type="button"><span>史实背景</span><strong id="HistoryCardTitle">封锁网下的生存</strong><em>查看依据 →</em></button>
+    </aside>
+
+    <section id="WorldHint" class="worldHint hidden" aria-live="polite"></section>
+
+    <aside id="MiniPanel" class="miniPanel">
+      <div class="miniHeader"><span>态势图</span><button id="CenterBaseButton" type="button">回到工作站</button></div>
+      <canvas id="MiniCanvas" width="240" height="154" aria-label="战场缩略图"></canvas>
+      <div class="legendRow"><span><i class="playerDot"></i>我方</span><span><i class="villageDot"></i>联络村</span><span><i class="enemyDot"></i>敌情</span></div>
+    </aside>
+
+    <section id="SelectionPanel" class="selectionPanel" aria-label="选择信息">
+      <div id="SelectionIcon" class="selectionIcon">—</div>
+      <div class="selectionCopy">
+        <div><strong id="SelectionName">未选择</strong><span id="SelectionCount"></span></div>
+        <p id="SelectionDescription">点选小队或建筑查看详情。</p>
+        <div id="SelectionBars" class="selectionBars"></div>
+      </div>
+    </section>
+
+    <section id="CommandPanel" class="commandPanel" aria-label="命令">
+      <div id="CommandGrid" class="commandGrid"></div>
+      <div class="commandHelp"><span><kbd>右键</kbd> 情境命令</span><span><kbd>Shift</kbd> 队列</span><span><kbd>空格</kbd> 暂停</span></div>
+    </section>
+
+    <section id="EventLog" class="eventLog" aria-live="polite" aria-label="战况记录"></section>
+
+    <div id="SelectionBox" class="selectionBox hidden" aria-hidden="true"></div>
+    <div id="BuildCursor" class="buildCursor hidden" aria-hidden="true"><span></span><small>左键选址 · 右键取消</small></div>
+    <div id="TouchCommandBanner" class="touchCommandBanner hidden" aria-live="polite"></div>
+
+    <div id="ModalLayer" class="modalLayer" aria-live="polite">
+      <section id="StartScreen" class="startScreen modalVisible" aria-labelledby="StartTitle">
+        <div class="startAtmosphere" aria-hidden="true"></div>
+        <div class="startTopline"><span>轻量即时战略 · 单人战役</span><button id="StartHistoryButton" type="button">史实与创作边界</button></div>
+        <div class="startContent">
+          <p class="startDate">一九四二年 · 冀中平原</p>
+          <h2 id="StartTitle"><span>冀中 · 1942</span><strong>无名战线</strong></h2>
+          <p class="startLead">在封锁线之间经营一处敌后工作站。组织生产、联络村庄、侦察道路、有限破袭，然后把人和档案带出去。</p>
+          <div class="boundaryNote">
+            <strong>历史边界</strong>
+            <p>地点、人物与具体行动均为复合创作；背景与职能参考公开史料。全国抗战由正面战场、敌后战场以及各抗日力量共同支撑，本作只呈现其中一个县域切面。</p>
+          </div>
+          <div id="DifficultyPicker" class="difficultyPicker" role="radiogroup" aria-label="选择难度">
+            <button type="button" role="radio" aria-checked="false" data-difficulty="story"><span>从容部署</span><small>约 45–70 分钟</small><em>预警更早，适合初次体验</em></button>
+            <button class="selected" type="button" role="radio" aria-checked="true" data-difficulty="standard"><span>标准战役</span><small>约 60–100 分钟</small><em>推荐 · 以 1 倍速初次游玩</em></button>
+            <button type="button" role="radio" aria-checked="false" data-difficulty="pressure"><span>封锁重压</span><small>约 75–120 分钟</small><em>资源更紧，搜索更频繁</em></button>
+          </div>
+          <div class="startActions">
+            <button id="NewGameButton" class="primaryButton" type="button"><span>开始战役</span><small>从第一章开始</small></button>
+            <button id="ContinueButton" class="secondaryButton hidden" type="button"><span>继续上次战役</span><small id="ContinueMeta"></small></button>
+          </div>
+          <p class="controlSummary">桌面：左键选择 / 右键命令 / WASD 移动镜头 / 滚轮缩放　·　触屏：点选后使用命令按钮</p>
+        </div>
+      </section>
+
+      <section id="BriefingModal" class="paperModal hidden" role="dialog" aria-modal="true" aria-labelledby="BriefingTitle">
+        <div class="paperStamp" aria-hidden="true">密</div>
+        <p id="BriefingDate" class="modalEyebrow"></p>
+        <h2 id="BriefingTitle"></h2>
+        <p id="BriefingText" class="modalLead"></p>
+        <div class="briefingHistory"><span>史实锚点</span><strong id="BriefingHistoryTitle"></strong><p id="BriefingHistoryText"></p></div>
+        <button id="BriefingContinueButton" class="primaryButton" type="button">接受任务</button>
+      </section>
+
+      <section id="HistoryModal" class="archiveModal hidden" role="dialog" aria-modal="true" aria-labelledby="HistoryTitle">
+        <header><div><p class="modalEyebrow">历史说明与公开来源</p><h2 id="HistoryTitle">这场游戏如何处理真实历史</h2></div><button id="CloseHistoryButton" type="button" aria-label="关闭">×</button></header>
+        <div class="archiveBody">
+          <section class="historyBoundary"><h3>复合场景，不伪造真实战斗</h3><p id="HistoryBoundaryText"></p><p id="HistoryRespectText"></p></section>
+          <section><h3>关键术语</h3><div id="TermList" class="termList"></div></section>
+          <section><h3>本作采用的史实依据</h3><div id="SourceList" class="sourceList"></div></section>
+          <section class="fullWarNote"><h3>全民族抗战</h3><p>1937年全国性抗战爆发后，正面战场与敌后战场相互配合，中国共产党领导的八路军、新四军及广大敌后军民，与国民党军队和其他抗日力量共同承担民族抗战。本作聚焦冀中敌后县域，不代表战争全貌。</p></section>
+        </div>
+      </section>
+
+      <section id="TutorialModal" class="tutorialModal hidden" role="dialog" aria-modal="true" aria-labelledby="TutorialTitle">
+        <p id="TutorialCount" class="modalEyebrow"></p>
+        <h2 id="TutorialTitle"></h2>
+        <p id="TutorialText"></p>
+        <div class="tutorialActions"><button id="SkipTutorialButton" type="button">跳过教学</button><button id="NextTutorialButton" class="primaryButton" type="button">下一条</button></div>
+      </section>
+
+      <section id="MenuModal" class="menuModal hidden" role="dialog" aria-modal="true" aria-labelledby="MenuTitle">
+        <p class="modalEyebrow">战役菜单</p><h2 id="MenuTitle">暂停部署</h2>
+        <div class="menuStats"><span>战役时间 <b id="MenuTime">00:00</b></span><span>当前阶段 <b id="MenuPhase">立足</b></span><span>自动存档 <b id="MenuSaveState">已开启</b></span></div>
+        <div class="menuActions">
+          <button id="ResumeButton" class="primaryButton" type="button">返回战场</button>
+          <button id="SaveButton" type="button">立即存档</button>
+          <button id="MenuHistoryButton" type="button">史实与操作说明</button>
+          <button id="RestartButton" type="button">重新开始本局</button>
+          <button id="ReturnTitleButton" type="button">返回标题</button>
+        </div>
+      </section>
+
+      <section id="ResultModal" class="resultModal hidden" role="dialog" aria-modal="true" aria-labelledby="ResultTitle">
+        <p id="ResultEyebrow" class="modalEyebrow"></p>
+        <h2 id="ResultTitle"></h2>
+        <p id="ResultSummary" class="modalLead"></p>
+        <div id="ScoreRing" class="scoreRing"><strong id="ScoreValue">0</strong><small>综合评估</small></div>
+        <div id="ScoreComponents" class="scoreComponents"></div>
+        <blockquote id="NationalOutcome"></blockquote>
+        <div class="resultActions"><button id="ResultHistoryButton" type="button">查看史实依据</button><button id="ResultRestartButton" class="primaryButton" type="button">再来一局</button></div>
+      </section>
+    </div>
+
+    <div id="OrientationNotice" class="orientationNotice" role="status" aria-live="polite"><span>请横屏部署</span><small>横屏能完整显示地图与命令面板</small></div>
+    <div id="ScreenReaderStatus" class="screenReaderOnly" aria-live="assertive"></div>
+  </main>
+
+  <script type="module" src="./Script_Game.mjs"></script>
+</body>
+</html>

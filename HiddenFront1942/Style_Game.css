@@ -1,0 +1,1828 @@
+:root {
+  color-scheme: dark;
+  --ink: #171b18;
+  --inkSoft: #222822;
+  --panel: rgba(24, 29, 25, 0.94);
+  --panelLight: rgba(37, 44, 36, 0.94);
+  --line: rgba(219, 205, 168, 0.18);
+  --lineStrong: rgba(219, 205, 168, 0.34);
+  --paper: #d6c9a7;
+  --paperBright: #f0e5c8;
+  --paperDim: #9b927c;
+  --red: #a94737;
+  --redBright: #d66a4d;
+  --gold: #c6a55f;
+  --green: #839b70;
+  --teal: #76999a;
+  --danger: #c85b43;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  --topHeight: 74px;
+  --bottomHeight: 146px;
+  font-family: "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #0e120f;
+}
+
+body {
+  color: var(--paperBright);
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+  border: 0;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid #f0c36f;
+  outline-offset: 2px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.gameShell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-width: 860px;
+  min-height: 560px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(116, 134, 96, 0.14), transparent 46%),
+    #0f1410;
+}
+
+.gameShell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.54);
+  background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 4px);
+  mix-blend-mode: soft-light;
+}
+
+.gameCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+  touch-action: none;
+  background: #101510;
+}
+
+.topBar {
+  position: absolute;
+  z-index: 40;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--topHeight);
+  display: grid;
+  grid-template-columns: 220px minmax(420px, 1fr) 300px 270px;
+  align-items: stretch;
+  border-bottom: 1px solid var(--lineStrong);
+  background:
+    linear-gradient(180deg, rgba(30, 36, 31, 0.985), rgba(18, 23, 19, 0.965)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 6px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+}
+
+.brandBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  text-align: left;
+  background: linear-gradient(100deg, rgba(141, 61, 45, 0.27), transparent);
+  border-right: 1px solid var(--line);
+}
+
+.brandSeal {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(222, 171, 106, 0.55);
+  color: #e3bd7d;
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 24px;
+  transform: rotate(-2deg);
+  box-shadow: inset 0 0 0 3px rgba(104, 45, 34, 0.38);
+}
+
+.brandCopy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brandCopy strong {
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  color: var(--paperBright);
+}
+
+.brandCopy small {
+  margin-top: 6px;
+  color: #c9866c;
+  letter-spacing: 0.32em;
+  font-size: 10px;
+}
+
+.resourceBar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(82px, 1fr));
+  align-items: center;
+  padding: 8px 12px;
+  gap: 4px;
+  border-right: 1px solid var(--line);
+}
+
+.resourceItem {
+  min-width: 0;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.resourceItem:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.resourceItem > i {
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgba(216, 194, 146, 0.08);
+  border: 1px solid rgba(216, 194, 146, 0.2);
+  color: var(--gold);
+  font-family: "STKaiti", "KaiTi", serif;
+  font-style: normal;
+  font-size: 14px;
+}
+
+.resourceItem > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.resourceItem small {
+  color: var(--paperDim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.resourceItem strong {
+  margin-top: 3px;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.populationItem > i {
+  color: #91aaa1;
+}
+
+.statusMeters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-right: 1px solid var(--line);
+}
+
+.meterButton {
+  min-width: 0;
+  height: 48px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(10, 13, 11, 0.38);
+}
+
+.meterButton > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.meterButton b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--paperDim);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.meterButton strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meterButton > i {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.meterButton em {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 50%;
+  background: var(--green);
+  transition: width 220ms linear, background 220ms ease;
+}
+
+.alertMeter em {
+  background: #a67c52;
+}
+
+.timeControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 0 12px;
+}
+
+.gameClock {
+  min-width: 58px;
+  color: var(--paperDim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.timeControls button {
+  min-width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--paperDim);
+  background: rgba(255,255,255,0.025);
+}
+
+.timeControls button:hover,
+.timeControls .active {
+  color: var(--paperBright);
+  border-color: rgba(207, 169, 97, 0.46);
+  background: rgba(172, 123, 69, 0.14);
+}
+
+.missionPanel {
+  position: absolute;
+  z-index: 35;
+  top: calc(var(--topHeight) + 18px);
+  left: 18px;
+  width: 310px;
+  max-height: calc(100vh - var(--topHeight) - var(--bottomHeight) - 66px);
+  overflow: hidden auto;
+  border: 1px solid var(--lineStrong);
+  background: linear-gradient(145deg, rgba(35, 42, 35, 0.96), rgba(19, 24, 20, 0.95));
+  box-shadow: var(--shadow);
+  transition: width 180ms ease, transform 180ms ease;
+}
+
+.missionPanel.collapsed {
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+}
+
+.missionPanel.collapsed > :not(.panelEyebrow) {
+  display: none;
+}
+
+.missionPanel.collapsed .panelEyebrow span {
+  display: none;
+}
+
+.missionPanel.collapsed .panelEyebrow button {
+  transform: rotate(180deg);
+}
+
+.panelEyebrow {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 16px;
+  border-bottom: 1px solid var(--line);
+  color: #c09070;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+
+.panelEyebrow button {
+  width: 40px;
+  height: 38px;
+  color: var(--paperDim);
+  background: transparent;
+  font-size: 22px;
+}
+
+.missionPanel h1 {
+  margin: 18px 17px 8px;
+  font-family: "STKaiti", "KaiTi", serif;
+  color: var(--paperBright);
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+}
+
+.missionPanel > p {
+  margin: 0 17px 15px;
+  color: #b7b09d;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.objectiveList {
+  padding: 3px 12px 12px;
+}
+
+.objectiveItem {
+  position: relative;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  border-bottom: 1px solid rgba(219, 205, 168, 0.09);
+}
+
+.objectiveCheck {
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(207, 194, 157, 0.28);
+  border-radius: 50%;
+  color: transparent;
+  font-size: 10px;
+}
+
+.objectiveItem.complete .objectiveCheck {
+  color: #172017;
+  border-color: #9cb27c;
+  background: #9cb27c;
+}
+
+.objectiveItem.complete .objectiveLabel {
+  color: #99a287;
+  text-decoration: line-through;
+  text-decoration-color: rgba(153, 162, 135, 0.45);
+}
+
+.objectiveLabel {
+  color: #ded5bc;
+  font-size: 12px;
+}
+
+.objectiveValue {
+  color: #b69a67;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.objectiveItem::after {
+  content: "";
+  position: absolute;
+  left: 36px;
+  right: 4px;
+  bottom: 2px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(179, 137, 78, 0.6) var(--progress, 0%), rgba(255,255,255,0.04) var(--progress, 0%));
+}
+
+.historyCardButton {
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+  padding: 11px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  text-align: left;
+  border: 1px solid rgba(186, 147, 87, 0.24);
+  background: rgba(117, 77, 43, 0.12);
+}
+
+.historyCardButton span {
+  grid-column: 1;
+  color: #a87c60;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+}
+
+.historyCardButton strong {
+  grid-column: 1;
+  color: #d4c7a6;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.historyCardButton em {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: #a89f89;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.worldHint {
+  position: absolute;
+  z-index: 38;
+  top: calc(var(--topHeight) + 18px);
+  left: 50%;
+  max-width: 500px;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border: 1px solid rgba(214, 181, 115, 0.38);
+  background: rgba(28, 34, 29, 0.94);
+  color: var(--paperBright);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  animation: hintIn 240ms ease both;
+}
+
+@keyframes hintIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+}
+
+.miniPanel {
+  position: absolute;
+  z-index: 34;
+  left: 16px;
+  bottom: 16px;
+  width: 254px;
+  height: 200px;
+  padding: 6px;
+  border: 1px solid var(--lineStrong);
+  background: rgba(17, 22, 18, 0.96);
+  box-shadow: var(--shadow);
+}
+
+.miniHeader {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 0 7px;
+  color: var(--paperDim);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.miniHeader button {
+  padding: 4px 7px;
+  color: #bcae8e;
+  background: transparent;
+  border: 1px solid var(--line);
+  font-size: 9px;
+}
+
+.miniPanel canvas {
+  display: block;
+  width: 240px;
+  height: 132px;
+  border: 1px solid rgba(219, 205, 168, 0.13);
+  background: #161b17;
+  cursor: crosshair;
+}
+
+.legendRow {
+  height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #898577;
+  font-size: 9px;
+}
+
+.legendRow span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legendRow i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.playerDot { background: #cb5743; }
+.villageDot { background: #c4a462; }
+.enemyDot { background: #d7d2bd; }
+
+.selectionPanel {
+  position: absolute;
+  z-index: 36;
+  left: 282px;
+  bottom: 16px;
+  width: min(420px, 30vw);
+  height: 130px;
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--lineStrong);
+  background: linear-gradient(135deg, rgba(30, 36, 31, 0.97), rgba(17, 22, 18, 0.97));
+  box-shadow: var(--shadow);
+}
+
+.selectionIcon {
+  width: 78px;
+  height: 78px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(206, 174, 111, 0.28);
+  background:
+    radial-gradient(circle, rgba(186, 139, 75, 0.15), transparent 62%),
+    rgba(255,255,255,0.018);
+  color: #d2af6e;
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 30px;
+}
+
+.selectionCopy {
+  min-width: 0;
+}
+
+.selectionCopy > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.selectionCopy strong {
+  color: var(--paperBright);
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+
+.selectionCopy > div:first-child span {
+  color: #b47f5f;
+  font-size: 11px;
+}
+
+.selectionCopy p {
+  height: 34px;
+  margin: 7px 0 8px;
+  overflow: hidden;
+  color: #9f9a89;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.selectionBars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.selectionBar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 5px;
+  align-items: center;
+  color: #898678;
+  font-size: 9px;
+}
+
+.selectionBar i {
+  position: relative;
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+}
+
+.selectionBar em {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--green);
+}
+
+.commandPanel {
+  position: absolute;
+  z-index: 37;
+  right: 16px;
+  bottom: 16px;
+  width: min(560px, 39vw);
+  height: 130px;
+  display: grid;
+  grid-template-rows: 1fr 24px;
+  padding: 9px 10px 5px;
+  border: 1px solid var(--lineStrong);
+  background: linear-gradient(145deg, rgba(34, 40, 34, 0.97), rgba(17, 21, 18, 0.97));
+  box-shadow: var(--shadow);
+}
+
+.commandGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(56px, 1fr));
+  gap: 6px;
+}
+
+.commandButton {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  padding: 7px 5px 5px;
+  overflow: hidden;
+  border: 1px solid rgba(219, 205, 168, 0.18);
+  border-radius: 2px;
+  background: rgba(255,255,255,0.025);
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.commandButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(207, 169, 96, 0.56);
+  background: rgba(161, 112, 63, 0.12);
+}
+
+.commandButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.commandButton strong {
+  color: #d8c39b;
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.commandButton span {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #bbb4a1;
+  font-size: 10px;
+}
+
+.commandButton small {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  color: #8b8575;
+  font-size: 8px;
+}
+
+.commandButton em {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 2px;
+  height: 2px;
+  background: linear-gradient(90deg, #b49152 var(--queueProgress, 0%), transparent var(--queueProgress, 0%));
+}
+
+.commandHelp {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 14px;
+  color: #77766d;
+  font-size: 8px;
+}
+
+kbd {
+  padding: 1px 4px;
+  border: 1px solid rgba(220, 207, 169, 0.18);
+  border-bottom-color: rgba(220, 207, 169, 0.32);
+  border-radius: 2px;
+  color: #a7a18d;
+  background: rgba(255,255,255,0.025);
+  font-family: inherit;
+  font-size: 0.9em;
+}
+
+.eventLog {
+  position: absolute;
+  z-index: 32;
+  right: 18px;
+  top: calc(var(--topHeight) + 18px);
+  width: 340px;
+  pointer-events: none;
+}
+
+.eventToast {
+  position: relative;
+  margin-bottom: 7px;
+  padding: 9px 12px 9px 14px;
+  overflow: hidden;
+  border-left: 2px solid #a58b5a;
+  background: linear-gradient(90deg, rgba(26, 31, 27, 0.94), rgba(26, 31, 27, 0.78));
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  animation: toastIn 260ms ease both;
+}
+
+.eventToast::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(219, 205, 168, 0.12);
+  pointer-events: none;
+}
+
+.eventToast strong {
+  display: block;
+  color: #d9cfb5;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.eventToast p {
+  margin: 3px 0 0;
+  color: #999586;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.eventToast.success { border-left-color: #829b68; }
+.eventToast.warning { border-left-color: #c49552; }
+.eventToast.danger { border-left-color: #c25440; }
+.eventToast.system { border-left-color: #a74937; }
+.eventToast.muted { opacity: 0.82; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(16px); }
+}
+
+.selectionBox {
+  position: absolute;
+  z-index: 31;
+  pointer-events: none;
+  border: 1px solid rgba(241, 208, 132, 0.85);
+  background: rgba(226, 189, 106, 0.08);
+}
+
+.buildCursor {
+  position: absolute;
+  z-index: 42;
+  width: 112px;
+  height: 112px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.buildCursor.shelterCoverage::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--coverageSize, 300px);
+  height: var(--coverageSize, 300px);
+  transform: translate(-50%, -50%);
+  border: 1px dashed rgba(219, 193, 126, 0.72);
+  border-radius: 50%;
+  background: rgba(184, 157, 92, 0.035);
+  content: "";
+}
+
+.buildCursor span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 2px dashed rgba(130, 177, 113, 0.9);
+  border-radius: 50%;
+  background: rgba(96, 153, 83, 0.12);
+}
+
+.buildCursor.invalid span {
+  border-color: rgba(202, 78, 61, 0.95);
+  background: rgba(173, 59, 48, 0.12);
+}
+
+.buildCursor small {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  width: max-content;
+  transform: translateX(-50%);
+  padding: 4px 7px;
+  color: #d8cfb8;
+  background: rgba(18, 22, 19, 0.9);
+  font-size: 9px;
+}
+
+.touchCommandBanner {
+  position: absolute;
+  z-index: 43;
+  left: 50%;
+  bottom: 158px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border: 1px solid rgba(211, 177, 110, 0.4);
+  color: #e4d4b2;
+  background: rgba(27, 32, 27, 0.94);
+  font-size: 11px;
+}
+
+.modalLayer {
+  position: absolute;
+  z-index: 100;
+  inset: 0;
+  pointer-events: none;
+}
+
+.modalLayer.blocking {
+  pointer-events: auto;
+}
+
+.modalLayer > section:not(.hidden) {
+  pointer-events: auto;
+}
+
+.startScreen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(15, 19, 16, 0.97) 0%, rgba(15, 19, 16, 0.90) 42%, rgba(15, 19, 16, 0.36) 72%, rgba(15, 19, 16, 0.74) 100%),
+    linear-gradient(180deg, rgba(5, 8, 6, 0.12), rgba(9, 13, 10, 0.82)),
+    url("./Texture_TitleField.png") center / cover no-repeat,
+    radial-gradient(circle at 72% 42%, #67735c, #293329 43%, #101511 79%);
+}
+
+.startScreen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 74% 30%, transparent 0 30%, rgba(0,0,0,0.46) 78%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.016) 0, rgba(255,255,255,0.016) 1px, transparent 1px, transparent 4px);
+}
+
+.startAtmosphere {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 45%, rgba(221, 191, 132, 0.06) 65%, transparent 82%),
+    linear-gradient(180deg, transparent 62%, rgba(8, 12, 9, 0.7));
+  animation: atmosphereDrift 12s ease-in-out infinite alternate;
+}
+
+@keyframes atmosphereDrift {
+  from { transform: scale(1); opacity: 0.75; }
+  to { transform: scale(1.035); opacity: 1; }
+}
+
+.startTopline {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5vw;
+  border-bottom: 1px solid rgba(224, 208, 169, 0.14);
+  color: #a09b8b;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+}
+
+.startTopline button {
+  padding: 8px 12px;
+  border: 1px solid rgba(224, 208, 169, 0.2);
+  color: #c8bda3;
+  background: rgba(18, 23, 19, 0.35);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.startContent {
+  position: relative;
+  z-index: 2;
+  width: min(720px, 54vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 82px 0 28px 6.2vw;
+}
+
+.startDate {
+  margin: 0 0 15px;
+  color: #bf8c6c;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+}
+
+.startContent h2 {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-family: "STKaiti", "KaiTi", serif;
+  line-height: 0.94;
+  text-shadow: 0 4px 24px rgba(0,0,0,0.55);
+}
+
+.startContent h2 span {
+  color: #f0e4c5;
+  font-size: clamp(44px, 5vw, 76px);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.startContent h2 strong {
+  margin-top: 17px;
+  color: #bd5944;
+  font-size: clamp(28px, 3vw, 47px);
+  font-weight: 500;
+  letter-spacing: 0.35em;
+}
+
+.startLead {
+  width: min(590px, 95%);
+  margin: 25px 0 16px;
+  color: #c6bfac;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.boundaryNote {
+  width: min(620px, 96%);
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  padding: 11px 14px;
+  border-left: 2px solid rgba(177, 82, 61, 0.72);
+  background: rgba(15, 20, 16, 0.48);
+}
+
+.boundaryNote strong {
+  color: #c28e72;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+}
+
+.boundaryNote p {
+  margin: 0;
+  color: #969486;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.difficultyPicker {
+  width: min(660px, 98%);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.difficultyPicker button {
+  min-height: 66px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid rgba(219, 205, 168, 0.16);
+  background: rgba(19, 24, 20, 0.58);
+}
+
+.difficultyPicker button:hover,
+.difficultyPicker .selected {
+  border-color: rgba(203, 160, 84, 0.58);
+  background: rgba(112, 74, 42, 0.24);
+}
+
+.difficultyPicker span {
+  color: #ded2b5;
+  font-size: 12px;
+}
+
+.difficultyPicker small {
+  margin-top: 3px;
+  color: #b28b62;
+  font-size: 9px;
+}
+
+.difficultyPicker em {
+  margin-top: 4px;
+  color: #838175;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.startActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-width: 178px;
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 9px 18px;
+}
+
+.primaryButton {
+  border: 1px solid #b0523e;
+  background: linear-gradient(135deg, #a74736, #713225);
+  box-shadow: 0 10px 28px rgba(101, 34, 24, 0.26);
+}
+
+.primaryButton:hover {
+  background: linear-gradient(135deg, #bc5842, #813829);
+}
+
+.primaryButton span,
+.secondaryButton span {
+  font-size: 13px;
+}
+
+.primaryButton small,
+.secondaryButton small {
+  margin-top: 2px;
+  color: rgba(255,255,255,0.6);
+  font-size: 8px;
+}
+
+.secondaryButton {
+  border: 1px solid rgba(221, 205, 168, 0.26);
+  background: rgba(26, 32, 27, 0.76);
+}
+
+.controlSummary {
+  margin: 13px 0 0;
+  color: #6f716a;
+  font-size: 8px;
+}
+
+.paperModal,
+.tutorialModal,
+.menuModal,
+.resultModal {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: 50%;
+  width: min(580px, calc(100vw - 60px));
+  max-height: calc(100vh - 80px);
+  padding: 36px 40px;
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(223, 205, 165, 0.34);
+  background:
+    linear-gradient(145deg, rgba(40, 46, 38, 0.985), rgba(20, 25, 21, 0.99)),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 4px);
+  box-shadow: 0 0 0 100vmax rgba(6, 9, 7, 0.76), 0 24px 80px rgba(0,0,0,0.65);
+  animation: modalIn 210ms ease both;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 12px)); }
+}
+
+.paperStamp {
+  position: absolute;
+  top: 24px;
+  right: 30px;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(172, 67, 49, 0.58);
+  color: rgba(200, 85, 63, 0.72);
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 25px;
+  transform: rotate(8deg);
+}
+
+.modalEyebrow {
+  margin: 0 0 8px;
+  color: #b37d61;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+}
+
+.paperModal h2,
+.tutorialModal h2,
+.menuModal h2,
+.resultModal h2,
+.archiveModal h2 {
+  margin: 0;
+  color: var(--paperBright);
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 29px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+}
+
+.modalLead {
+  margin: 16px 0 20px;
+  color: #bbb4a2;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.briefingHistory {
+  margin: 18px 0 24px;
+  padding: 16px;
+  border: 1px solid rgba(204, 164, 91, 0.2);
+  background: rgba(126, 88, 48, 0.1);
+}
+
+.briefingHistory span {
+  color: #b07c5f;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+}
+
+.briefingHistory strong {
+  display: block;
+  margin-top: 5px;
+  color: #dbceb0;
+  font-size: 13px;
+}
+
+.briefingHistory p {
+  margin: 7px 0 0;
+  color: #9e9a8d;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.paperModal > .primaryButton {
+  margin-left: auto;
+  align-items: center;
+}
+
+.archiveModal {
+  position: absolute;
+  z-index: 8;
+  inset: 5vh 7vw;
+  display: grid;
+  grid-template-rows: 78px 1fr;
+  overflow: hidden;
+  border: 1px solid rgba(223, 205, 165, 0.28);
+  background: linear-gradient(145deg, rgba(39, 45, 38, 0.99), rgba(18, 23, 20, 0.995));
+  box-shadow: 0 0 0 100vmax rgba(6, 9, 7, 0.82), var(--shadow);
+  animation: modalIn 210ms ease both;
+}
+
+.archiveModal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 27px;
+  border-bottom: 1px solid var(--line);
+}
+
+.archiveModal > header .modalEyebrow {
+  margin-bottom: 3px;
+}
+
+.archiveModal h2 {
+  font-size: 24px;
+}
+
+.archiveModal > header button {
+  width: 40px;
+  height: 40px;
+  color: #a49e8c;
+  background: transparent;
+  font-size: 28px;
+}
+
+.archiveBody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 22px 27px 32px;
+  overflow: auto;
+}
+
+.archiveBody section {
+  padding: 18px;
+  border: 1px solid rgba(219, 205, 168, 0.14);
+  background: rgba(255,255,255,0.018);
+}
+
+.archiveBody h3 {
+  margin: 0 0 12px;
+  color: #d7c9aa;
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.archiveBody p {
+  color: #a8a294;
+  font-size: 11px;
+  line-height: 1.75;
+}
+
+.historyBoundary,
+.fullWarNote {
+  border-left: 2px solid rgba(174, 71, 53, 0.64) !important;
+}
+
+.termItem {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(219, 205, 168, 0.08);
+}
+
+.termItem strong {
+  color: #c9ab76;
+  font-size: 11px;
+}
+
+.termItem p {
+  margin: 0;
+  font-size: 10px;
+}
+
+.sourceItem {
+  display: block;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(219, 205, 168, 0.08);
+  color: inherit;
+  text-decoration: none;
+}
+
+.sourceItem:hover strong {
+  color: #e0bd7d;
+}
+
+.sourceItem span {
+  color: #a2735c;
+  font-size: 9px;
+}
+
+.sourceItem strong {
+  display: block;
+  margin: 3px 0;
+  color: #d0c3a5;
+  font-size: 11px;
+  transition: color 120ms ease;
+}
+
+.sourceItem p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.tutorialModal {
+  width: min(470px, calc(100vw - 60px));
+  padding: 31px 34px;
+}
+
+.tutorialModal > p:not(.modalEyebrow) {
+  margin: 15px 0 24px;
+  color: #b8b2a0;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.tutorialActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.tutorialActions > button:first-child {
+  padding: 0 15px;
+  color: #989383;
+  background: transparent;
+}
+
+.tutorialActions .primaryButton {
+  min-width: 120px;
+  min-height: 42px;
+  align-items: center;
+}
+
+.menuStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.menuStats span {
+  padding: 10px;
+  border: 1px solid var(--line);
+  color: #8f8c80;
+  font-size: 9px;
+}
+
+.menuStats b {
+  display: block;
+  margin-top: 4px;
+  color: #cfc3a8;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.menuActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.menuActions button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.026);
+  color: #bdb6a3;
+  font-size: 11px;
+}
+
+.menuActions .primaryButton {
+  grid-column: 1 / -1;
+  align-items: center;
+  border-color: #a94b38;
+  color: #fff3dc;
+  background: linear-gradient(135deg, #a74736, #713225);
+}
+
+.resultModal {
+  width: min(670px, calc(100vw - 60px));
+  text-align: center;
+}
+
+.scoreRing {
+  width: 118px;
+  height: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+  border: 1px solid rgba(204, 165, 92, 0.55);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 7px rgba(157, 102, 51, 0.08), 0 0 36px rgba(180, 116, 48, 0.1);
+}
+
+.scoreRing strong {
+  color: #e4c27b;
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 39px;
+  font-weight: 500;
+}
+
+.scoreRing small {
+  color: #8d897b;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.scoreComponents {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.scoreComponent {
+  padding: 11px 7px;
+  border: 1px solid var(--line);
+}
+
+.scoreComponent span {
+  display: block;
+  color: #8f8b7c;
+  font-size: 9px;
+}
+
+.scoreComponent strong {
+  display: block;
+  margin-top: 4px;
+  color: #d5c6a5;
+  font-size: 18px;
+}
+
+.resultModal blockquote {
+  margin: 18px 0;
+  padding: 12px 16px;
+  border-left: 2px solid rgba(177, 74, 55, 0.65);
+  color: #a6a092;
+  background: rgba(255,255,255,0.018);
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.resultActions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.resultActions > button:first-child {
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: #aaa493;
+}
+
+.resultActions .primaryButton {
+  min-width: 130px;
+  min-height: 42px;
+  align-items: center;
+}
+
+.orientationNotice {
+  display: none;
+}
+
+.screenReaderOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 1280px) {
+  :root {
+    --topHeight: 66px;
+  }
+
+  .topBar {
+    grid-template-columns: 188px minmax(360px, 1fr) 260px 226px;
+  }
+
+  .brandBlock { padding: 0 13px; }
+  .brandSeal { width: 34px; height: 34px; font-size: 21px; }
+  .brandCopy strong { font-size: 17px; }
+  .resourceBar { padding-inline: 6px; }
+  .resourceItem { gap: 5px; }
+  .resourceItem > i { width: 23px; height: 23px; font-size: 12px; }
+  .resourceItem strong { font-size: 14px; }
+  .statusMeters { padding-inline: 7px; gap: 5px; }
+  .timeControls { padding-inline: 7px; }
+  .timeControls button { min-width: 31px; height: 31px; }
+  .missionPanel { width: 286px; }
+  .eventLog { width: 290px; }
+  .selectionPanel { width: 340px; }
+  .commandPanel { width: 41vw; }
+  .commandGrid { grid-template-columns: repeat(5, minmax(52px, 1fr)); }
+}
+
+@media (max-width: 1000px) {
+  .gameShell { min-width: 760px; }
+  .topBar { grid-template-columns: 170px 1fr 235px; }
+  .statusMeters { display: none; }
+  .resourceBar { grid-template-columns: repeat(5, minmax(65px, 1fr)); }
+  .resourceItem small { display: none; }
+  .resourceItem > span { align-items: center; }
+  .missionPanel { width: 258px; }
+  .miniPanel { width: 210px; height: 170px; }
+  .miniPanel canvas { width: 196px; height: 105px; }
+  .legendRow { gap: 8px; }
+  .selectionPanel { left: 238px; width: 290px; grid-template-columns: 62px 1fr; }
+  .selectionIcon { width: 58px; height: 58px; }
+  .commandPanel { width: calc(100vw - 544px); }
+  .commandHelp span:nth-child(-n+2) { display: none; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .commandButton { min-height: 58px; }
+  .timeControls button { min-width: 40px; height: 40px; }
+  .commandHelp { display: none; }
+  .commandPanel { grid-template-rows: 1fr; padding-bottom: 9px; }
+  .miniHeader button { min-height: 28px; }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  :root {
+    --topHeight: 56px;
+  }
+
+  .gameShell {
+    min-height: 0;
+  }
+
+  .startScreen {
+    overflow-y: auto;
+  }
+
+  .startTopline {
+    height: 48px;
+    padding-inline: 4vw;
+  }
+
+  .startContent {
+    width: min(620px, 88vw);
+    height: auto;
+    min-height: 100%;
+    justify-content: flex-start;
+    padding: 58px 0 14px 4vw;
+  }
+
+  .startDate {
+    margin-bottom: 5px;
+    font-size: 9px;
+  }
+
+  .startContent h2 span {
+    font-size: 34px;
+  }
+
+  .startContent h2 strong {
+    margin-top: 6px;
+    font-size: 22px;
+  }
+
+  .startLead {
+    margin: 9px 0;
+    font-size: 11px;
+    line-height: 1.55;
+  }
+
+  .boundaryNote,
+  .controlSummary {
+    display: none;
+  }
+
+  .difficultyPicker {
+    margin-top: 6px;
+  }
+
+  .difficultyPicker button {
+    min-height: 52px;
+    padding: 7px 9px;
+  }
+
+  .difficultyPicker em {
+    display: none;
+  }
+
+  .startActions {
+    margin-top: 8px;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    min-height: 42px;
+  }
+
+  .topBar {
+    grid-template-columns: 150px minmax(330px, 1fr) 220px;
+  }
+
+  .brandBlock {
+    gap: 7px;
+    padding-inline: 9px;
+  }
+
+  .brandSeal {
+    width: 29px;
+    height: 29px;
+    font-size: 18px;
+  }
+
+  .brandCopy strong { font-size: 14px; }
+  .brandCopy small { margin-top: 3px; font-size: 8px; }
+  .resourceItem { height: 43px; }
+  .resourceItem > i { display: none; }
+  .resourceItem strong { font-size: 13px; }
+  .timeControls { gap: 3px; }
+  .gameClock { min-width: 48px; font-size: 10px; }
+  .timeControls button { min-width: 32px; height: 32px; }
+
+  .missionPanel {
+    top: 64px;
+    left: 8px;
+    width: 230px;
+    max-height: calc(100vh - 184px);
+  }
+
+  .missionPanel h1 {
+    margin: 11px 13px 5px;
+    font-size: 18px;
+  }
+
+  .missionPanel > p,
+  .historyCardButton {
+    display: none;
+  }
+
+  .objectiveList {
+    padding: 2px 9px 8px;
+  }
+
+  .objectiveItem {
+    min-height: 34px;
+    grid-template-columns: 20px 1fr auto;
+    padding-block: 4px;
+  }
+
+  .eventLog {
+    top: 64px;
+    right: 8px;
+    width: 260px;
+  }
+
+  .eventToast {
+    padding-block: 6px;
+  }
+
+  .miniPanel {
+    left: 8px;
+    bottom: 8px;
+    width: 176px;
+    height: 112px;
+  }
+
+  .miniHeader { height: 22px; }
+  .miniPanel canvas { width: 162px; height: 74px; }
+  .legendRow { display: none; }
+
+  .selectionPanel {
+    left: 192px;
+    bottom: 8px;
+    width: 242px;
+    height: 102px;
+    grid-template-columns: 54px 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .selectionIcon {
+    width: 50px;
+    height: 50px;
+    font-size: 22px;
+  }
+
+  .selectionCopy p { display: none; }
+  .selectionBars { margin-top: 8px; }
+  .selectionBar:nth-child(n+2) { display: none; }
+
+  .commandPanel {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 450px);
+    min-width: 300px;
+    height: 102px;
+    padding: 6px;
+  }
+
+  .commandGrid {
+    grid-template-columns: repeat(6, minmax(44px, 1fr));
+    gap: 4px;
+  }
+
+  .commandButton {
+    min-height: 64px;
+    padding-top: 4px;
+  }
+
+  .commandButton strong { font-size: 17px; }
+  .commandHelp { display: none; }
+  .touchCommandBanner { bottom: 116px; }
+}
+
+@media (orientation: landscape) and (max-width: 760px) {
+  .gameShell {
+    min-width: 0;
+  }
+
+  .topBar {
+    grid-template-columns: 104px minmax(310px, 1fr) 166px;
+  }
+
+  .brandSeal { display: none; }
+  .brandCopy strong { font-size: 12px; letter-spacing: 0.04em; }
+  .brandCopy small { letter-spacing: 0.12em; }
+  .resourceBar { grid-template-columns: repeat(5, minmax(48px, 1fr)); }
+  .resourceItem strong { font-size: 11px; }
+  .timeControls .speedButton:not(.active) { display: none; }
+  .gameClock { display: none; }
+  .missionPanel { width: 200px; }
+  .eventLog { display: none; }
+  .miniPanel { width: 150px; }
+  .miniPanel canvas { width: 136px; }
+  .selectionPanel { left: 166px; width: 205px; }
+  .selectionIcon { display: none; }
+  .selectionPanel { grid-template-columns: 1fr; }
+  .commandPanel { width: calc(100vw - 388px); min-width: 270px; }
+  .commandGrid { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
+  .commandButton { min-height: 39px; }
+}
+
+@media (orientation: landscape) and (max-width: 650px) {
+  .topBar { grid-template-columns: 90px minmax(270px, 1fr) 150px; }
+  .brandBlock { padding-inline: 6px; }
+  .resourceBar { grid-template-columns: repeat(5, minmax(42px, 1fr)); }
+  .miniPanel { width: 140px; }
+  .miniPanel canvas { width: 126px; }
+  .selectionPanel { left: 156px; width: 150px; }
+  .commandPanel { width: calc(100vw - 318px); min-width: 240px; }
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  .gameShell > :not(.orientationNotice) {
+    visibility: hidden;
+  }
+
+  .orientationNotice {
+    position: absolute;
+    z-index: 999;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #141915;
+    color: #dfd2b4;
+  }
+
+  .orientationNotice span {
+    font-family: "STKaiti", "KaiTi", serif;
+    font-size: 28px;
+  }
+
+  .orientationNotice small {
+    color: #8d8a7d;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
