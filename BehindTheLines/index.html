@@ -565,6 +565,121 @@
       margin-bottom: 0;
     }
 
+    .guide-shot {
+      margin: 28px 0 34px;
+      border: 1px solid rgba(78, 66, 49, 0.22);
+      border-radius: 16px;
+      background: rgba(255, 252, 243, 0.82);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .shot-frame {
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      background: #151817;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .shot-frame img {
+      position: absolute;
+      display: block;
+      width: auto;
+      max-width: none;
+      height: 250%;
+      user-select: none;
+    }
+
+    .shot-focus-map img {
+      top: -9%;
+      left: -30%;
+    }
+
+    .shot-focus-right-top img {
+      top: 0;
+      right: 0;
+    }
+
+    .shot-focus-right-bottom img {
+      right: 0;
+      bottom: 0;
+    }
+
+    .shot-full img {
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .shot-marker {
+      position: absolute;
+      top: var(--y);
+      left: var(--x);
+      display: grid;
+      width: 31px;
+      height: 31px;
+      color: white;
+      border: 2px solid #fff8e9;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 4px 14px rgba(24, 18, 12, 0.45);
+      place-items: center;
+      font-size: 13px;
+      font-weight: 850;
+      transform: translate(-50%, -50%);
+    }
+
+    .shot-caption {
+      padding: 18px 20px 20px;
+    }
+
+    .shot-caption > p {
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .shot-caption > p a {
+      white-space: nowrap;
+    }
+
+    .annotation-list {
+      display: grid;
+      margin: 0;
+      padding: 0;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px 18px;
+      list-style: none;
+      counter-reset: shot-annotation;
+    }
+
+    .annotation-list li {
+      position: relative;
+      min-height: 28px;
+      padding-left: 34px;
+      color: #4f483e;
+      font-size: 13px;
+      counter-increment: shot-annotation;
+    }
+
+    .annotation-list li::before {
+      position: absolute;
+      top: 1px;
+      left: 0;
+      display: grid;
+      width: 23px;
+      height: 23px;
+      color: white;
+      content: counter(shot-annotation);
+      border-radius: 50%;
+      background: var(--red);
+      place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
     details {
       margin-bottom: 10px;
       border: 1px solid var(--line);
@@ -645,6 +760,10 @@
       .facts {
         grid-template-columns: 1fr;
       }
+
+      .annotation-list {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 620px) {
@@ -679,6 +798,12 @@
 
       .split {
         grid-template-columns: 1fr;
+      }
+
+      .shot-marker {
+        width: 27px;
+        height: 27px;
+        font-size: 12px;
       }
 
       .footer-inner {
@@ -866,6 +991,25 @@
           <div class="fact"><small>基准语言</small><strong>zh-CN</strong></div>
         </div>
 
+        <figure class="guide-shot">
+          <div class="shot-frame shot-focus-right-bottom">
+            <img src="Assets/Texture_ContentEditor.png" width="3440" height="1392" loading="lazy" alt="Godot 编辑器右下角的 BTL 内容 Dock，包含提取、保存、语言选择、过滤和译文表格">
+            <span class="shot-marker" style="--x: 67%; --y: 19%;">1</span>
+            <span class="shot-marker" style="--x: 72%; --y: 34%;">2</span>
+            <span class="shot-marker" style="--x: 72%; --y: 48%;">3</span>
+            <span class="shot-marker" style="--x: 76%; --y: 72%;">4</span>
+          </div>
+          <figcaption class="shot-caption">
+            <p>BTL 内容 Dock 实际界面。<a href="Assets/Texture_ContentEditor.png">打开完整截图</a></p>
+            <ol class="annotation-list">
+              <li>从 GameData 提取词条，并把修改保存到字符串表。</li>
+              <li>选择目标语言，或输入 BCP-47 代码新增语言。</li>
+              <li>按键值、基准文本、译文过滤，也可只看缺翻译。</li>
+              <li>对照「键 / 基准 / 译文」三列，双击译文列编辑。</li>
+            </ol>
+          </figcaption>
+        </figure>
+
         <h3>添加或更新翻译</h3>
         <ol class="steps">
           <li>点击「从游戏数据提取」，扫描白名单数据表并补充尚不存在的词条。</li>
@@ -907,6 +1051,25 @@
           <div class="fact"><small>数据</small><strong>Data_BalanceOverrides.json</strong></div>
           <div class="fact"><small>范围</small><strong>单位参数 + 数值 CFG</strong></div>
         </div>
+
+        <figure class="guide-shot">
+          <div class="shot-frame shot-focus-right-top">
+            <img src="Assets/Texture_BalanceEditor.png" width="3440" height="1392" loading="lazy" alt="Godot 编辑器右上角的 BTL 数值 Dock，显示单位选择、单位参数、重置按钮和 CFG 搜索">
+            <span class="shot-marker" style="--x: 69%; --y: 19%;">1</span>
+            <span class="shot-marker" style="--x: 73%; --y: 34%;">2</span>
+            <span class="shot-marker" style="--x: 77%; --y: 57%;">3</span>
+            <span class="shot-marker" style="--x: 73%; --y: 84%;">4</span>
+          </div>
+          <figcaption class="shot-caption">
+            <p>BTL 数值 Dock 实际界面。<a href="Assets/Texture_BalanceEditor.png">打开完整截图</a></p>
+            <ol class="annotation-list">
+              <li>保存、全部重置、重新载入三个全局操作。</li>
+              <li>先选择要调整的单位类型。</li>
+              <li>修改战力、移动、视野、维护和造价；右侧按钮单项还原。</li>
+              <li>搜索数值型 CFG，选中后点加号加入覆盖。</li>
+            </ol>
+          </figcaption>
+        </figure>
 
         <h3>调整单位</h3>
         <ol class="steps">
@@ -960,6 +1123,25 @@
           <div class="fact"><small>同源算法</small><strong>GameModel.GenMap</strong></div>
         </div>
 
+        <figure class="guide-shot">
+          <div class="shot-frame shot-focus-map">
+            <img src="Assets/Texture_MapEditor.png" width="3440" height="1392" loading="lazy" alt="Godot 的 BTL 地图主屏，左侧是种子、生成参数和统计，右侧是六边格地图预览">
+            <span class="shot-marker" style="--x: 29%; --y: 15%;">1</span>
+            <span class="shot-marker" style="--x: 29%; --y: 45%;">2</span>
+            <span class="shot-marker" style="--x: 29%; --y: 78%;">3</span>
+            <span class="shot-marker" style="--x: 69%; --y: 53%;">4</span>
+          </div>
+          <figcaption class="shot-caption">
+            <p>BTL 地图主屏实际界面。<a href="Assets/Texture_MapEditor.png">打开完整截图</a></p>
+            <ol class="annotation-list">
+              <li>输入固定种子，点击骰子换种子，点击「生成」重建地图。</li>
+              <li>调整宽高、村庄数量、最小间距和土匪山寨数量。</li>
+              <li>速览地形、村庄、铁路和设施数量。</li>
+              <li>六边格预览用于检查分布；颜色和标记不等于最终美术。</li>
+            </ol>
+          </figcaption>
+        </figure>
+
         <h3>生成一张地图</h3>
         <ol class="steps">
           <li>填写种子；相同配置与相同种子应生成相同地图。</li>
@@ -1003,6 +1185,25 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
           <div class="fact"><small>预览</small><strong>Scene_VisualPreview.tscn</strong></div>
         </div>
 
+        <figure class="guide-shot">
+          <div class="shot-frame shot-focus-right-top">
+            <img src="Assets/Texture_VisualEditor.png" width="3440" height="1392" loading="lazy" alt="Godot 编辑器右上角的 BTL 视效 Dock，显示保存、预览、检查器、恢复默认及相机环境参数">
+            <span class="shot-marker" style="--x: 69%; --y: 19%;">1</span>
+            <span class="shot-marker" style="--x: 75%; --y: 39%;">2</span>
+            <span class="shot-marker" style="--x: 75%; --y: 66%;">3</span>
+            <span class="shot-marker" style="--x: 75%; --y: 90%;">4</span>
+          </div>
+          <figcaption class="shot-caption">
+            <p>BTL 视效 Dock 实际界面。<a href="Assets/Texture_VisualEditor.png">打开完整截图</a></p>
+            <ol class="annotation-list">
+              <li>保存 Resource、打开预览场景、进入 Inspector、恢复默认。</li>
+              <li>相机俯角、FOV 与镜头距离。</li>
+              <li>时刻、昼夜接管、体积雾、天空、太阳和环境光。</li>
+              <li>继续向下可调整色调映射、曝光、TAA、性能和阴影。</li>
+            </ol>
+          </figcaption>
+        </figure>
+
         <h3>推荐流程</h3>
         <ol class="steps">
           <li>点击「预览场景」，打开 <code>Scene_VisualPreview.tscn</code>。</li>
@@ -1010,6 +1211,25 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
           <li>预览满意后点击「保存」，写入视效 Resource。</li>
           <li>如果游戏正在运行，在 Debug 面板点击「重载视效配置」拉取刚保存的结果。</li>
         </ol>
+
+        <figure class="guide-shot">
+          <div class="shot-frame shot-full">
+            <img src="Assets/Texture_VisualPreview.png" width="1920" height="1080" loading="lazy" alt="Godot 中运行 Scene_VisualPreview 后显示的 1920×1080 太行战场 3D 预览，包含地形、设施、单位、铁路和迷雾">
+            <span class="shot-marker" style="--x: 35%; --y: 35%;">1</span>
+            <span class="shot-marker" style="--x: 66%; --y: 40%;">2</span>
+            <span class="shot-marker" style="--x: 55%; --y: 54%;">3</span>
+            <span class="shot-marker" style="--x: 55%; --y: 74%;">4</span>
+          </div>
+          <figcaption class="shot-caption">
+            <p>按 F6 运行预览场景后的真实 1920 × 1080 输出。<a href="Assets/Texture_VisualPreview.png">打开完整截图</a></p>
+            <ol class="annotation-list">
+              <li>四类地形和森林装饰，用于判断色调、雾和阴影层次。</li>
+              <li>村庄、县城、炮楼、工地与匪寨等设施模型。</li>
+              <li>单位徽标、单位模型与格子上的可读性。</li>
+              <li>铁路、炮楼、地雷等线性和小体积设施的辨识度。</li>
+            </ol>
+          </figcaption>
+        </figure>
 
         <div class="table-wrap">
           <table>
