@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171b19">
+  <meta name="description" content="《烽火交通线：敌后 1938—1945》——一款以真实历史为锚点的敌后战场网络策略游戏。">
+  <title>烽火交通线：敌后 1938—1945</title>
+  <link rel="stylesheet" href="./Style.css">
+</head>
+<body>
+  <div class="paper-noise" aria-hidden="true"></div>
+
+  <main id="gameShell" class="game-shell" aria-label="烽火交通线游戏界面">
+    <header class="command-bar">
+      <button id="brandButton" class="brand-block" type="button" aria-label="打开游戏说明">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="brand-copy">
+          <strong>烽火交通线</strong>
+          <small>敌后 · 1938—1945</small>
+        </span>
+      </button>
+
+      <div class="time-block" aria-label="当前历史时间">
+        <span id="dateLabel" class="date-label">1938年 · 冬</span>
+        <div class="time-track" aria-hidden="true">
+          <span id="timeFill"></span>
+          <i class="time-crisis" style="left:50%"></i>
+        </div>
+        <span id="turnLabel" class="turn-label">第 1 / 28 季</span>
+      </div>
+
+      <div class="resource-strip" aria-label="全局资源">
+        <button class="resource-chip" type="button" data-resource="grain" title="粮秣用于行动与维持联络网络">
+          <span class="resource-symbol grain-symbol" aria-hidden="true"></span>
+          <span><small>粮秣</small><strong id="grainValue">9</strong></span>
+          <em id="grainDelta">+0</em>
+        </button>
+        <button class="resource-chip" type="button" data-resource="intel" title="情报可预判敌方行动并降低风险">
+          <span class="resource-symbol intel-symbol" aria-hidden="true"></span>
+          <span><small>情报</small><strong id="intelValue">3</strong></span>
+          <em id="intelDelta">+0</em>
+        </button>
+        <button class="resource-chip safety-chip" type="button" data-resource="safety" title="群众安全不是可消费资源；过低将使网络无法维系">
+          <span class="resource-symbol safety-symbol" aria-hidden="true"></span>
+          <span><small>群众安全</small><strong id="safetyValue">82</strong></span>
+          <em id="safetyDelta">稳定</em>
+        </button>
+        <button class="resource-chip contribution-chip" type="button" data-resource="contribution" title="敌后贡献记录联络、破袭与牵制成效">
+          <span class="resource-symbol contribution-symbol" aria-hidden="true"></span>
+          <span><small>敌后贡献</small><strong id="contributionValue">0</strong></span>
+          <em id="contributionDelta">累计</em>
+        </button>
+      </div>
+
+      <div class="header-actions">
+        <button id="historyButton" class="icon-button" type="button" title="历史资料" aria-label="打开历史资料">史</button>
+        <button id="soundButton" class="icon-button" type="button" title="声音" aria-label="切换声音" aria-pressed="false">◌</button>
+        <button id="menuButton" class="icon-button" type="button" title="菜单" aria-label="打开菜单">≡</button>
+      </div>
+    </header>
+
+    <aside class="left-rail">
+      <section class="rail-section situation-section">
+        <div class="section-heading">
+          <span>当前态势</span>
+          <strong id="situationTag">建立联络</strong>
+        </div>
+        <p id="situationText" class="situation-text">武汉、广州失守后，抗日战争进入战略相持阶段。先在封锁线之间保存并联结敌后工作网络。</p>
+        <div class="forecast-card">
+          <span class="forecast-kicker"><i></i> 敌情研判</span>
+          <strong id="forecastTitle">交通线封锁</strong>
+          <p id="forecastText">情报有限：敌军正在强化交通线，但目标尚不明确。</p>
+          <div id="forecastLevel" class="forecast-level" aria-label="威胁等级">
+            <i class="active"></i><i></i><i></i><i></i><i></i>
+          </div>
+        </div>
+      </section>
+
+      <section class="rail-section mandate-section">
+        <div class="section-heading">
+          <span>本季部署</span>
+          <strong id="ordersLabel">2 / 2</strong>
+        </div>
+        <div id="orderPips" class="order-pips" aria-label="剩余部署令">
+          <i></i><i></i>
+        </div>
+        <p>一支骨干队每季只能执行一次任务。行动后可继续部署，或提前结束本季。</p>
+      </section>
+
+      <section class="rail-section policy-section">
+        <div class="section-heading">
+          <span>年度方针</span>
+          <button id="policyButton" class="text-button" type="button">调整</button>
+        </div>
+        <div id="policyList" class="policy-list">
+          <button class="policy-token" type="button" data-policy-slot="0"><span>尚未制定</span><small>选择年度工作重点</small></button>
+          <button class="policy-token" type="button" data-policy-slot="1"><span>尚未制定</span><small>可并行两项方针</small></button>
+        </div>
+      </section>
+
+      <section class="rail-section score-section">
+        <div class="section-heading">
+          <span>网络评估</span>
+          <strong id="scoreValue">—</strong>
+        </div>
+        <div class="score-grid">
+          <span>活跃区域 <b id="activeRegionsValue">5</b></span>
+          <span>跨区联络 <b id="connectionsValue">2</b></span>
+          <span>受阻干线 <b id="railValue">0</b></span>
+          <span>骨干队 <b id="teamValue">2</b></span>
+        </div>
+      </section>
+    </aside>
+
+    <section class="map-stage" aria-label="华北与华中敌后交通网络示意图">
+      <div class="map-toolbar" role="toolbar" aria-label="地图工具">
+        <button id="centerMapButton" type="button" title="还原地图视图">⌖</button>
+        <button id="legendButton" type="button" title="显示图例">图例</button>
+      </div>
+      <div class="map-caption">
+        <span>敌后交通网络示意图</span>
+        <small>非精确疆界 · 区域与交通线作教学性压缩</small>
+      </div>
+      <svg id="networkMap" class="network-map" viewBox="0 0 1000 720" role="img" aria-labelledby="mapTitle mapDescription">
+        <title id="mapTitle">敌后抗战区域交通网络</title>
+        <desc id="mapDescription">以区域节点、乡间联络线和敌军控制的铁路干线构成的交互式示意地图。</desc>
+        <defs>
+          <filter id="inkBleed" x="-20%" y="-20%" width="140%" height="140%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="2" seed="4" result="noise"></feTurbulence>
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4"></feDisplacementMap>
+          </filter>
+          <filter id="softShadow" x="-60%" y="-60%" width="220%" height="220%">
+            <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#050706" flood-opacity=".65"></feDropShadow>
+          </filter>
+          <pattern id="mountainPattern" width="32" height="24" patternUnits="userSpaceOnUse">
+            <path d="M0 19 L8 8 L15 19 M11 19 L22 4 L32 19" fill="none" stroke="#ded3ad" stroke-opacity=".055" stroke-width="1.2"></path>
+          </pattern>
+          <pattern id="plainPattern" width="42" height="18" patternUnits="userSpaceOnUse">
+            <path d="M2 9 C10 4 14 14 22 9 S34 4 42 9" fill="none" stroke="#d8cba2" stroke-opacity=".035"></path>
+          </pattern>
+          <radialGradient id="mapGlow" cx="50%" cy="48%" r="60%">
+            <stop offset="0" stop-color="#37453c" stop-opacity=".75"></stop>
+            <stop offset=".65" stop-color="#1e2823" stop-opacity=".32"></stop>
+            <stop offset="1" stop-color="#121714" stop-opacity="0"></stop>
+          </radialGradient>
+        </defs>
+        <g class="map-underlay" aria-hidden="true">
+          <path class="region-mass" d="M145 72 C245 22 410 42 505 96 C605 63 760 101 837 192 C909 280 881 400 924 490 C862 585 736 658 618 647 C519 695 373 659 315 604 C199 588 100 502 116 392 C62 288 86 158 145 72 Z"></path>
+          <path class="terrain-zone terrain-mountain" d="M102 137 C194 72 315 91 382 164 C405 256 358 342 308 408 C230 469 130 426 91 345 C56 269 62 192 102 137 Z"></path>
+          <path class="terrain-zone terrain-plain" d="M397 125 C530 62 726 97 826 210 C874 292 854 407 903 487 C821 589 692 630 580 606 C498 545 477 429 442 340 C405 261 361 187 397 125 Z"></path>
+          <path class="river-line" d="M430 76 C456 162 421 214 467 285 C512 356 471 423 517 493 C552 547 542 600 570 659"></path>
+          <path class="river-line minor" d="M707 125 C674 184 703 235 663 288 C632 329 648 383 612 426"></path>
+          <rect x="0" y="0" width="1000" height="720" fill="url(#mapGlow)"></rect>
+          <rect x="55" y="48" width="350" height="430" fill="url(#mountainPattern)" opacity=".9"></rect>
+          <rect x="360" y="68" width="570" height="570" fill="url(#plainPattern)"></rect>
+        </g>
+        <g id="railLayer" class="rail-layer"></g>
+        <g id="linkLayer" class="link-layer"></g>
+        <g id="warningLayer" class="warning-layer"></g>
+        <g id="nodeLayer" class="node-layer"></g>
+        <g id="teamLayer" class="team-layer"></g>
+      </svg>
+      <div id="mapLegend" class="map-legend" hidden>
+        <strong>图例</strong>
+        <span><i class="legend-node level-three"></i> 巩固根据地</span>
+        <span><i class="legend-node level-one"></i> 联络点 / 工作区</span>
+        <span><i class="legend-node dormant"></i> 尚未开辟</span>
+        <span><i class="legend-line local"></i> 乡间联络线</span>
+        <span><i class="legend-line railway"></i> 敌军交通干线</span>
+        <span><i class="legend-warning"></i> 预警目标</span>
+      </div>
+      <div class="map-scale" aria-hidden="true"><i></i><span>空间关系示意</span></div>
+    </section>
+
+    <aside id="detailPanel" class="detail-panel" aria-label="区域详情与部署命令">
+      <div class="detail-handle" aria-hidden="true"></div>
+      <div class="region-heading">
+        <div>
+          <span id="regionType" class="eyebrow">山地工作区</span>
+          <h1 id="regionName">太行</h1>
+          <p id="regionSubtitle">晋冀豫边区 · 联络网络等级 2</p>
+        </div>
+        <button id="closeDetailButton" class="panel-close" type="button" aria-label="关闭区域详情">×</button>
+      </div>
+
+      <div class="region-metrics">
+        <div class="metric-row">
+          <span>群众信任</span>
+          <div class="meter"><i id="supportMeter" style="width:68%"></i></div>
+          <strong id="supportValue">68</strong>
+        </div>
+        <div class="metric-row exposure-row">
+          <span>暴露程度</span>
+          <div class="meter"><i id="exposureMeter" style="width:22%"></i></div>
+          <strong id="exposureValue">22</strong>
+        </div>
+        <div class="metric-row pressure-row">
+          <span>敌方压力</span>
+          <div class="pressure-pips" id="pressurePips"><i></i><i></i><i></i><i></i></div>
+          <strong id="pressureValue">1</strong>
+        </div>
+      </div>
+
+      <div class="region-status-row">
+        <span id="terrainTag" class="status-tag">山地</span>
+        <span id="networkTag" class="status-tag network-tag">工作区</span>
+        <span id="structureTag" class="status-tag muted">无专项建设</span>
+      </div>
+
+      <section class="team-section">
+        <div class="panel-heading">
+          <span>执行骨干队</span>
+          <small id="teamHint">选择一支本区可用队伍</small>
+        </div>
+        <div id="teamCards" class="team-cards"></div>
+      </section>
+
+      <section class="action-section">
+        <div class="panel-heading">
+          <span>部署命令</span>
+          <small id="actionHint">每个命令消耗 1 部署令</small>
+        </div>
+        <div id="actionGrid" class="action-grid"></div>
+      </section>
+
+      <div id="actionPreview" class="action-preview" aria-live="polite">
+        <div>
+          <span>选择命令查看风险</span>
+          <small>结果取决于情报、信任、地形、压力与队伍疲劳。</small>
+        </div>
+      </div>
+    </aside>
+
+    <footer class="turn-bar">
+      <button id="logToggleButton" class="log-toggle" type="button" aria-expanded="false">
+        <span class="signal-dot" aria-hidden="true"></span>
+        <span id="latestLog">交通员已抵达太行联络点，等待本季部署。</span>
+        <i aria-hidden="true">⌃</i>
+      </button>
+      <div class="turn-actions">
+        <span id="autosaveLabel" class="autosave-label">自动保存已开启</span>
+        <button id="endTurnButton" class="end-turn-button" type="button">
+          <span>结束本季</span>
+          <small id="endTurnHint">尚有 2 次部署</small>
+          <i aria-hidden="true">›</i>
+        </button>
+      </div>
+    </footer>
+  </main>
+
+  <section id="openingScreen" class="opening-screen" role="dialog" aria-modal="true" aria-labelledby="openingTitle">
+    <svg class="opening-network" viewBox="0 0 1200 800" aria-hidden="true">
+      <g class="opening-lines">
+        <path d="M120 598 L276 442 L430 510 L581 349 L741 423 L898 252 L1064 338"></path>
+        <path d="M276 442 L247 235 L457 158 L581 349 L667 142 L898 252"></path>
+        <path d="M430 510 L509 662 L741 631 L741 423 L965 557"></path>
+      </g>
+      <g class="opening-points">
+        <circle cx="120" cy="598" r="8"></circle><circle cx="276" cy="442" r="10"></circle>
+        <circle cx="430" cy="510" r="7"></circle><circle cx="581" cy="349" r="13"></circle>
+        <circle cx="741" cy="423" r="9"></circle><circle cx="898" cy="252" r="11"></circle>
+        <circle cx="1064" cy="338" r="7"></circle><circle cx="247" cy="235" r="7"></circle>
+        <circle cx="457" cy="158" r="8"></circle><circle cx="667" cy="142" r="6"></circle>
+        <circle cx="509" cy="662" r="7"></circle><circle cx="741" cy="631" r="8"></circle>
+        <circle cx="965" cy="557" r="7"></circle>
+      </g>
+    </svg>
+    <div class="opening-vignette"></div>
+    <div class="opening-content">
+      <span class="opening-kicker">一部关于联络、保存与坚持的策略游戏</span>
+      <h1 id="openingTitle"><span>烽火</span>交通线</h1>
+      <p class="opening-subtitle">敌后 · 1938—1945</p>
+      <div class="opening-rule"></div>
+      <p class="opening-intro">铁路、公路与碉堡把敌后切成孤岛。你的目标不是涂色占领，而是在封锁与扫荡之间发动群众、维持交通、保存力量，让分散的火种连成网络。</p>
+      <div class="opening-actions">
+        <button id="newGameButton" class="primary-opening-button" type="button"><span>开始新局</span><small>普通 · 约 60—110 分钟</small></button>
+        <button id="continueButton" class="secondary-opening-button" type="button" hidden><span>继续上次进度</span><small id="continueSummary"></small></button>
+      </div>
+      <button id="openingHistoryButton" class="opening-link" type="button">阅读历史与抽象说明</button>
+    </div>
+    <div class="opening-disclaimer">
+      <strong>历史说明</strong>
+      <p>1931—1945年是中国人民十四年抗战，1937年起进入全民族抗战。本作以1938年冬后的史实时间点为锚；区域、季度和统筹视角经过教学性压缩，游戏不会改变宏观历史结局。</p>
+    </div>
+  </section>
+
+  <section id="tutorialOverlay" class="tutorial-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" aria-live="polite">
+    <div id="tutorialCard" class="tutorial-card">
+      <span id="tutorialStep" class="tutorial-step">01 / 04</span>
+      <h2 id="tutorialTitle">先看网络，不看疆界</h2>
+      <p id="tutorialText">点击地图上的区域节点。这里衡量的是联络和群众工作能否维持，并不表示领土归属。</p>
+      <div class="tutorial-actions">
+        <button id="skipTutorialButton" class="text-button" type="button">跳过引导</button>
+        <button id="nextTutorialButton" class="primary-button" type="button">明白了</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="eventModal" class="modal-layer" hidden role="dialog" aria-modal="true" aria-labelledby="eventTitle">
+    <article class="event-card">
+      <div class="event-index"><span id="eventYear">1938</span><small id="eventQuarter">冬</small></div>
+      <div class="event-content">
+        <span id="eventKind" class="event-kind history-kind">史实锚点</span>
+        <h2 id="eventTitle">战略相持阶段</h2>
+        <p id="eventBody"></p>
+        <blockquote id="eventNote"></blockquote>
+        <div id="eventChoices" class="event-choices"></div>
+        <button id="eventSourceButton" class="event-source-button" type="button">查看史料说明与来源</button>
+      </div>
+    </article>
+  </section>
+
+  <section id="policyModal" class="modal-layer" hidden role="dialog" aria-modal="true" aria-labelledby="policyTitle">
+    <article class="dialog-card policy-dialog">
+      <header>
+        <div>
+          <span class="eyebrow">年度工作安排</span>
+          <h2 id="policyTitle">选择两项方针</h2>
+          <p>方针会持续到下一个年度调整期。它们代表不同阶段的工作侧重，不是架空历史路线。</p>
+        </div>
+        <button class="panel-close" type="button" data-close-modal="policyModal" aria-label="关闭">×</button>
+      </header>
+      <div id="policyOptions" class="policy-options"></div>
+      <footer>
+        <span id="policySelectionHint">已选择 0 / 2</span>
+        <button id="confirmPolicyButton" class="primary-button" type="button" disabled>采用方针</button>
+      </footer>
+    </article>
+  </section>
+
+  <section id="historyDrawer" class="drawer-layer" hidden role="dialog" aria-modal="true" aria-label="历史资料与游戏说明">
+    <button class="drawer-scrim" type="button" data-close-modal="historyDrawer" aria-label="关闭历史资料"></button>
+    <article class="history-drawer">
+      <header>
+        <div><span class="eyebrow">史实校核</span><h2>历史与抽象说明</h2></div>
+        <button class="panel-close" type="button" data-close-modal="historyDrawer" aria-label="关闭">×</button>
+      </header>
+      <nav class="history-tabs" aria-label="资料分类">
+        <button class="active" type="button" data-history-tab="premise">设计边界</button>
+        <button type="button" data-history-tab="timeline">历史时间线</button>
+        <button type="button" data-history-tab="sources">参考来源</button>
+        <button type="button" data-history-tab="guide">玩法说明</button>
+      </nav>
+      <div id="historyContent" class="history-content"></div>
+    </article>
+  </section>
+
+  <section id="logDrawer" class="log-drawer" hidden aria-label="行动记录">
+    <header><strong>交通电报与行动记录</strong><button id="closeLogButton" type="button" aria-label="关闭记录">×</button></header>
+    <ol id="logList"></ol>
+  </section>
+
+  <section id="menuModal" class="modal-layer" hidden role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+    <article class="dialog-card menu-dialog">
+      <header><div><span class="eyebrow">行军册</span><h2 id="menuTitle">游戏菜单</h2></div><button class="panel-close" type="button" data-close-modal="menuModal" aria-label="关闭">×</button></header>
+      <div class="menu-actions">
+        <button id="resumeButton" type="button"><span>返回地图</span><small>继续当前季度</small></button>
+        <button id="saveButton" type="button"><span>保存进度</span><small>写入本机浏览器</small></button>
+        <button id="helpButton" type="button"><span>玩法与快捷键</span><small>打开完整说明</small></button>
+        <button id="restartButton" class="danger-action" type="button"><span>重新开始</span><small>当前进度将被替换</small></button>
+      </div>
+      <p class="menu-note">本作不上传存档或个人信息。版本 <span id="versionLabel">1.0.0</span></p>
+    </article>
+  </section>
+
+  <section id="outcomeModal" class="outcome-screen" hidden role="dialog" aria-modal="true" aria-labelledby="outcomeTitle">
+    <svg class="outcome-network" viewBox="0 0 1000 600" aria-hidden="true"><g id="outcomeLines"></g></svg>
+    <article class="outcome-content">
+      <span id="outcomeKicker">历史抵达 1945 年秋</span>
+      <h2 id="outcomeTitle">根系相连</h2>
+      <p id="outcomeSummary"></p>
+      <div id="outcomeScore" class="outcome-score">68<small>/ 100</small></div>
+      <div id="outcomeBreakdown" class="outcome-breakdown"></div>
+      <p class="outcome-history">1945年8月15日，日本宣布接受《波茨坦公告》；9月2日签署投降书。中国人民抗日战争的胜利，属于长期坚持抗战的全体中国人民，也是世界反法西斯战争胜利的重要组成部分。</p>
+      <div class="outcome-actions">
+        <button id="outcomeHistoryButton" class="secondary-opening-button" type="button"><span>回看历史资料</span></button>
+        <button id="outcomeRestartButton" class="primary-opening-button" type="button"><span>再走一次交通线</span></button>
+      </div>
+    </article>
+  </section>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <noscript><p class="noscript-message">此游戏需要启用 JavaScript 才能运行。</p></noscript>
+  <script type="module" src="./Game.mjs"></script>
+</body>
+</html>
