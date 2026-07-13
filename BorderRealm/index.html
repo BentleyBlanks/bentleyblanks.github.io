@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#171b17">
+  <meta name="description" content="《山河有信》是一款以1940—1942年晋察冀敌后战场为背景的关系与治理策略游戏。用约90分钟守住群众、交通与基层组织。">
+  <meta property="og:title" content="山河有信：晋察冀1940—1942">
+  <meta property="og:description" content="十八个双月回合，守住敌后战场的一县灯火。人物关系、基层治理与隐蔽斗争的历史策略游戏。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bentleyblanks.github.io/BorderRealm/">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>山河有信：晋察冀1940—1942</title>
+  <link rel="stylesheet" href="./Style.css">
+</head>
+<body>
+  <main id="app">
+    <div class="paper-grain" aria-hidden="true"></div>
+
+    <section id="startScreen" class="start-screen">
+      <div class="start-map" aria-hidden="true">
+        <i class="ridge ridge-a"></i><i class="ridge ridge-b"></i><i class="ridge ridge-c"></i>
+        <i class="route route-a"></i><i class="route route-b"></i><i class="route route-c"></i>
+        <span class="map-mark mark-a">五台</span><span class="map-mark mark-b">阜平</span><span class="map-mark mark-c">冀中</span>
+      </div>
+      <div class="start-copy">
+        <p class="eyebrow">一九四〇 · 晋察冀敌后战场</p>
+        <div class="title-lockup"><span class="title-seal">信</span><h1>山河有信</h1></div>
+        <p class="subtitle">不是夺取疆土，而是让一县的群众、交通与组织活过封锁。</p>
+        <div class="campaign-facts" aria-label="游戏信息">
+          <span><b>18</b> 个双月回合</span><span><b>75–105</b> 分钟</span><span><b>关系 × 治理</b> 核心玩法</span>
+        </div>
+        <div class="start-actions">
+          <button id="newGameButton" class="primary-button">开始战役 <small>坚守难度</small></button>
+          <button id="continueButton" class="secondary-button" hidden>继续上次进度</button>
+        </div>
+        <div class="start-links">
+          <button data-open="history">史实与创作边界</button>
+          <button data-open="guide">玩法说明</button>
+          <button data-open="accessibility">显示设置</button>
+        </div>
+        <p class="content-note">本作明确反对侵略战争。重大历史进程固定不变；可改变的是虚构基层人物与地方网络的命运。无血腥画面。</p>
+      </div>
+      <div class="start-quote" aria-hidden="true"><span>晋</span><span>察</span><span>冀</span></div>
+    </section>
+
+    <section id="gameScreen" class="game-screen" hidden>
+      <header class="command-header">
+        <div class="brand-block">
+          <span class="mini-seal">信</span>
+          <div><strong>山河有信</strong><small>岳北县联席议事处 · 虚构县域</small></div>
+        </div>
+        <div class="date-block">
+          <span id="dateLabel">1940年1—2月</span>
+          <div class="campaign-track"><i id="campaignProgress"></i></div>
+          <small id="turnLabel">第 1 / 18 回合</small>
+        </div>
+        <div id="resourceBar" class="resource-bar" aria-label="全局资源"></div>
+        <nav class="header-actions" aria-label="游戏菜单">
+          <button id="policyButton" title="调整本回合方略">方略 <kbd>F</kbd></button>
+          <button data-open="chronicle" title="查看本局抗战纪事">纪事 <kbd>J</kbd></button>
+          <button data-open="history" title="查看史实档案">史实</button>
+          <button data-open="guide" title="查看玩法说明">战法 <kbd>H</kbd></button>
+          <button id="soundButton" aria-pressed="true" title="开关音效">声</button>
+        </nav>
+      </header>
+
+      <div class="war-room">
+        <aside class="council-panel panel">
+          <div class="panel-heading">
+            <div><span class="panel-kicker">军政议事</span><h2>联席成员</h2></div>
+            <button id="relationViewButton" class="text-button">关系简图</button>
+          </div>
+          <p class="panel-note">每人每回合只能领一道令。信任和特质会改变执行结果。</p>
+          <div id="advisorList" class="advisor-list"></div>
+          <div id="councilMood" class="council-mood"></div>
+        </aside>
+
+        <section class="map-panel panel">
+          <div class="map-heading">
+            <div>
+              <span class="panel-kicker">岳北县态势图 · 虚构复合节点 / 非比例</span>
+              <h2 id="situationTitle">封锁线尚未合拢</h2>
+            </div>
+            <div class="map-legend" aria-label="地图图例">
+              <span><i class="legend-support"></i>群众联系</span>
+              <span><i class="legend-danger"></i>敌情压力</span>
+            </div>
+          </div>
+          <div id="strategicMap" class="strategic-map" aria-label="七个地区节点">
+            <div class="map-relief" aria-hidden="true"></div>
+            <div class="rail-line" aria-hidden="true"><span>铁路封锁线（虚构示意）</span></div>
+            <div id="mapRoutes" class="map-routes" aria-hidden="true"></div>
+            <div id="regionNodes"></div>
+            <div class="map-compass" aria-hidden="true"><b>北</b><i></i></div>
+          </div>
+          <div class="map-footer">
+            <div id="threatBrief" class="threat-brief"></div>
+            <button id="timelineButton" class="timeline-button">展开历史时间线</button>
+          </div>
+        </section>
+
+        <aside class="order-panel panel">
+          <div id="regionInspector" class="region-inspector"></div>
+          <div class="order-heading">
+            <div><span class="panel-kicker">本回合行动</span><h2>下达一道行动令</h2></div>
+            <span id="orderCountBadge" class="order-count">0 / 2</span>
+          </div>
+          <p id="orderHint" class="panel-note">先在地图上选择一个地区。</p>
+          <div id="actionList" class="action-list"></div>
+        </aside>
+      </div>
+
+      <footer class="turn-desk">
+        <section class="policy-summary">
+          <span class="panel-kicker">当前方略</span>
+          <button id="policySummaryButton"><strong id="policyName"></strong><small id="policyDescription"></small></button>
+        </section>
+        <section class="planned-orders">
+          <div class="desk-title"><span>已拟命令</span><small>可在结算前撤回</small></div>
+          <div id="orderQueue" class="order-queue"></div>
+        </section>
+        <section class="turn-action">
+          <div id="saveStatus" class="save-status">本地自动存档</div>
+          <button id="endTurnButton" class="end-turn-button" disabled>还需 2 道命令</button>
+        </section>
+      </footer>
+    </section>
+
+    <div id="modalWrap" class="modal-wrap" hidden>
+      <section id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></section>
+    </div>
+    <div id="toast" class="toast" aria-live="polite"></div>
+  </main>
+  <script type="module" src="./Game.mjs"></script>
+</body>
+</html>
