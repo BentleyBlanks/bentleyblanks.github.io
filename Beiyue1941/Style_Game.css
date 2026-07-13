@@ -431,7 +431,7 @@ a:focus-visible {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(318px, 27vw, 378px);
-  grid-template-rows: minmax(0, 1fr) 142px;
+  grid-template-rows: minmax(0, 1fr) 180px;
   grid-template-areas:
     "map command"
     "timeline command";
@@ -1686,6 +1686,8 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .timelineHeading {
@@ -3082,7 +3084,7 @@ a:focus-visible {
   }
 
   .gameBoard {
-    grid-template-rows: minmax(0, 1fr) 126px;
+    grid-template-rows: minmax(0, 1fr) 164px;
     gap: 7px;
   }
 
@@ -3201,5 +3203,733 @@ a:focus-visible {
   .mapModeButton[aria-pressed="true"] {
     outline: 3px solid Highlight;
     outline-offset: 2px;
+  }
+}
+
+/* Strategy rules v2: persistent formations, routes, intelligence and plans. */
+.gameBoard {
+  grid-template-rows: minmax(0, 1fr) 205px;
+}
+
+.mapPanel {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.mapToolbar {
+  justify-content: flex-start;
+}
+
+.mapModeGroup {
+  flex: 0 0 auto;
+}
+
+.mapLegend {
+  position: static;
+  inset: auto;
+  width: auto;
+  max-width: 350px;
+  min-width: 245px;
+  margin-left: auto;
+  padding: 4px 7px;
+  flex: 1 1 300px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 7px;
+  font-size: 8px;
+  pointer-events: auto;
+}
+
+.mapLegend strong,
+.mapLegend > b {
+  padding: 0;
+  border: 0;
+}
+
+.mapLegend > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.routeStateLegend {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #d7d2bc;
+  white-space: nowrap;
+}
+
+.routeStateLegend i {
+  width: 18px;
+  height: 3px;
+  margin-left: 4px;
+  display: inline-block;
+}
+
+.routeStateLegend i[data-state="open"] {
+  background: #78beb2;
+}
+
+.routeStateLegend i[data-state="watched"] {
+  background: repeating-linear-gradient(90deg, #dbbc6d 0 5px, transparent 5px 8px);
+}
+
+.routeStateLegend i[data-state="strained"] {
+  background: repeating-linear-gradient(90deg, #c25e47 0 3px, transparent 3px 7px);
+}
+
+.routeStateLegend i[data-state="cut"] {
+  background: repeating-linear-gradient(90deg, #8c4c42 0 2px, transparent 2px 6px);
+  opacity: 0.55;
+}
+
+.forecastBanner {
+  position: relative;
+  inset: auto;
+  z-index: 8;
+  width: auto;
+  min-height: 43px;
+  padding: 5px 10px 5px 12px;
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr) minmax(190px, 0.75fr);
+  align-items: center;
+  gap: 4px 10px;
+  border-width: 0 0 1px 4px;
+  border-radius: 0;
+  box-shadow: none;
+  pointer-events: auto;
+}
+
+.forecastBanner > span:first-child,
+.forecastBanner > b,
+.forecastBanner p,
+.forecastBanner ul {
+  margin: 0;
+}
+
+.forecastBanner > b {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.forecastBanner ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.forecastBanner p {
+  grid-column: 2 / -1;
+  font-size: 9px;
+}
+
+.regionStatus {
+  padding-inline: 8px;
+  gap: 4px;
+}
+
+.regionStatus > span[data-band],
+.regionStatus > .cacheChip,
+.regionStatus > .institutionChip {
+  padding-inline: 6px;
+}
+
+.routeLayer > .routeLine[data-state="open"] {
+  opacity: 0.96;
+  background: linear-gradient(90deg, #78beb2, #96c9b9);
+  box-shadow: 0 0 0 1px rgba(19, 33, 27, 0.42), 0 0 8px rgba(71, 123, 121, 0.34);
+}
+
+.timelineTrack:has(> button) {
+  min-width: 650px;
+  grid-template-columns: repeat(12, minmax(42px, 1fr));
+}
+
+.routeLayer > .routeLine[data-state="watched"] {
+  opacity: 0.9;
+  background: repeating-linear-gradient(90deg, #dbbc6d 0 6px, transparent 6px 10px);
+}
+
+.routeLayer > .routeLine[data-state="strained"] {
+  opacity: 0.94;
+  background: repeating-linear-gradient(90deg, #c25e47 0 4px, transparent 4px 9px);
+}
+
+.routeLayer > .routeLine[data-state="cut"] {
+  opacity: 0.5;
+  background: repeating-linear-gradient(90deg, #8c4c42 0 2px, transparent 2px 7px);
+}
+
+.routeLayer > .routeLine {
+  pointer-events: auto;
+  cursor: help;
+}
+
+.turnPanel {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.regionButton[data-connected="false"] {
+  filter: saturate(0.72) brightness(0.86);
+}
+
+.formationMarks {
+  position: absolute;
+  right: 11%;
+  bottom: 20%;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px;
+  max-width: 72%;
+  pointer-events: none;
+}
+
+.formationMarks i {
+  min-width: 22px;
+  padding: 2px 4px;
+  color: #17221c;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
+  background: #d8c47d;
+  border: 1px solid #273a30;
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.38);
+}
+
+.forecastBanner ul {
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 7px;
+  list-style: none;
+}
+
+.forecastBanner li {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  color: rgba(242, 234, 211, 0.74);
+  font-size: 8px;
+}
+
+.forecastBanner li b,
+.forecastBanner li span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.forecastBanner li[data-confirmed="true"] {
+  color: #f6d99e;
+}
+
+.cacheChip {
+  min-height: 25px;
+  padding: 4px 8px;
+  color: #6b5220;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+  background: rgba(184, 142, 72, 0.14);
+  border: 1px solid rgba(105, 79, 32, 0.35);
+  border-radius: 99px;
+}
+
+.formationRoster {
+  padding-bottom: 2px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.formationButton {
+  min-width: 0;
+  min-height: 49px;
+  padding: 6px 7px;
+  display: grid;
+  grid-template-columns: 27px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 1px 5px;
+  color: var(--ink);
+  text-align: left;
+  background: rgba(246, 238, 215, 0.62);
+  border: 1px solid rgba(30, 36, 31, 0.24);
+  border-radius: 3px;
+}
+
+.formationButton > span {
+  grid-row: 1 / 3;
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  color: var(--paperBright);
+  font-size: 8px;
+  font-weight: 900;
+  background: var(--oliveDeep);
+  border-radius: 50%;
+}
+
+.formationButton b {
+  font-family: var(--fontSerif);
+  font-size: 10px;
+}
+
+.formationButton small {
+  color: var(--inkMuted);
+  font-size: 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.formationButton[data-selected="true"] {
+  background: rgba(71, 123, 121, 0.17);
+  border: 2px solid var(--tealDeep);
+}
+
+.formationButton[data-assigned="true"] > span::after {
+  content: "令";
+}
+
+.formationButton[data-assigned="true"] > span {
+  font-size: 0;
+  background: var(--cinnabarDeep);
+}
+
+.formationButton[data-assigned="true"] > span::after {
+  font-size: 10px;
+}
+
+.selectedFormationCard {
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(47, 75, 65, 0.08);
+  border-left: 3px solid var(--tealDeep);
+}
+
+.selectedFormationCard > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 2px 6px;
+}
+
+.selectedFormationCard > div > span {
+  color: var(--cinnabarDeep);
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.selectedFormationCard h4 {
+  margin: 0;
+  font-family: var(--fontSerif);
+  font-size: 12px;
+}
+
+.selectedFormationCard p {
+  grid-column: 1 / 3;
+  margin: 0;
+  color: var(--inkMuted);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.selectedFormationCard em,
+.reserveTag {
+  max-width: 105px;
+  color: var(--cinnabarDeep);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: right;
+}
+
+.selectedFormationCard .reserveTag {
+  color: var(--tealDeep);
+}
+
+.actionList > .probeButton {
+  min-height: 46px;
+  padding: 7px 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  text-align: left;
+  background: rgba(47, 75, 65, 0.1);
+  border: 1px dashed var(--tealDeep);
+  border-radius: 3px;
+}
+
+.actionList > .probeButton::after {
+  display: none;
+}
+
+.probeButton span {
+  color: var(--paperBright);
+  padding: 5px 7px;
+  font-size: 9px;
+  font-weight: 900;
+  background: var(--tealDeep);
+  border-radius: 2px;
+}
+
+.probeButton b {
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.planControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  gap: 7px;
+}
+
+.planControls fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid rgba(30, 36, 31, 0.18);
+}
+
+.planControls legend,
+.planControls label {
+  color: var(--inkMuted);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.planControls label {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.planControls select {
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 7px;
+  color: var(--ink);
+  background: var(--paperBright);
+  border: 1px solid rgba(30, 36, 31, 0.28);
+  border-radius: 2px;
+}
+
+.stanceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.stanceButton {
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px;
+  color: var(--inkMuted);
+  background: rgba(246, 238, 215, 0.6);
+  border: 1px solid rgba(30, 36, 31, 0.18);
+  border-radius: 2px;
+}
+
+.stanceButton b {
+  display: block;
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.stanceButton small {
+  display: none;
+}
+
+.stanceButton[aria-pressed="true"] {
+  color: var(--paperBright);
+  background: var(--tealDeep);
+  border-color: var(--tealDeep);
+}
+
+.stanceButton[aria-pressed="true"] b {
+  color: inherit;
+}
+
+.missionGrid {
+  display: grid;
+  gap: 6px;
+}
+
+.missionGrid .actionButton {
+  position: relative;
+  width: 100%;
+  min-height: 70px;
+  padding: 8px 9px;
+  color: var(--ink);
+  text-align: left;
+  background: rgba(246, 238, 215, 0.58);
+  border: 1px solid rgba(30, 36, 31, 0.2);
+  border-radius: var(--radiusSmall);
+}
+
+.missionGrid .actionButton:hover:not(:disabled) {
+  background: var(--paperBright);
+  border-color: var(--tealDeep);
+}
+
+.missionGrid .actionButton:disabled {
+  opacity: 0.58;
+}
+
+.actionCopy > strong {
+  color: var(--tealDeep);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.synergyTag {
+  padding: 2px 4px;
+  color: #285c54;
+  font-size: 8px;
+  font-weight: 900;
+  background: rgba(71, 123, 121, 0.1);
+  border-left: 2px solid var(--tealDeep);
+}
+
+.actionCost {
+  display: grid;
+  gap: 2px;
+}
+
+.actionCost b {
+  color: var(--cinnabarDeep);
+  font-size: 9px;
+}
+
+.actionCost small {
+  font-size: 7px;
+  line-height: 1.25;
+}
+
+.turnCopy p {
+  display: grid;
+  gap: 3px;
+}
+
+.turnCopy p strong,
+.turnCopy p span,
+.turnCopy p em,
+.turnCopy p small {
+  display: block;
+}
+
+.turnCopy p strong {
+  color: var(--ink);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.turnCopy p span {
+  color: var(--inkMuted);
+  font-size: 8px;
+}
+
+.turnCopy p em {
+  color: var(--tealDeep);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.turnCopy p small {
+  color: var(--cinnabarDeep);
+  font-size: 7px;
+  line-height: 1.3;
+}
+
+.turnCopy p .planReady {
+  color: var(--tealDeep);
+}
+
+.objectiveResult {
+  margin: 9px 0;
+  padding: 9px 11px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  background: rgba(71, 123, 121, 0.1);
+  border-left: 4px solid var(--tealDeep);
+}
+
+.objectiveResult[data-success="false"] {
+  background: rgba(166, 77, 60, 0.09);
+  border-left-color: var(--cinnabarDeep);
+}
+
+.objectiveResult span {
+  grid-row: 1 / 3;
+  align-self: center;
+  max-width: 72px;
+  color: var(--tealDeep);
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.objectiveResult[data-success="false"] span {
+  color: var(--cinnabarDeep);
+}
+
+.objectiveResult b {
+  font-family: var(--fontSerif);
+  font-size: 12px;
+}
+
+.objectiveResult p {
+  margin: 0;
+  color: var(--inkMuted);
+  font-size: 8px;
+}
+
+.enemyReport small {
+  display: block;
+  margin-top: 4px;
+  color: var(--inkMuted);
+  font-size: 8px;
+  font-style: italic;
+}
+
+.briefNodeList,
+.historyNodeList {
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  list-style: none;
+}
+
+.briefNodeList li,
+.historyNodeList li {
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
+  background: rgba(52, 59, 52, 0.05);
+  border-left: 2px solid var(--paperShadow);
+}
+
+.briefNodeList time,
+.historyNodeList time {
+  color: var(--cinnabarDeep);
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.briefNodeList span,
+.historyNodeList b {
+  font-size: 10px;
+}
+
+.historyNodeList p {
+  margin: 2px 0 0;
+  color: var(--inkMuted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.commitWarnings {
+  margin-top: 9px;
+  padding: 8px 10px;
+  color: var(--cinnabarDeep);
+  background: rgba(166, 77, 60, 0.08);
+  border-left: 3px solid currentColor;
+}
+
+.commitWarnings p {
+  margin: 3px 0 0;
+  font-size: 10px;
+}
+
+.formationButton small,
+.actionCost small,
+.turnCopy p small {
+  font-size: 9px;
+}
+
+.turnCopy p span,
+.turnCopy p em {
+  font-size: 9px;
+}
+
+@media (max-width: 1180px) {
+  .mapToolbar {
+    flex-wrap: wrap;
+  }
+
+  .mapLegend {
+    max-width: none;
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+
+  .forecastBanner {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+
+  .forecastBanner ul {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .forecastBanner {
+    grid-template-columns: 1fr;
+  }
+
+  .forecastBanner > span:first-child,
+  .forecastBanner > b,
+  .forecastBanner p,
+  .forecastBanner ul {
+    grid-column: 1;
+  }
+
+  .forecastBanner ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .routeStateLegend {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .formationButton {
+    min-height: 54px;
+  }
+
+  .planControls {
+    grid-template-columns: 1fr;
+  }
+
+  .missionGrid .actionButton {
+    min-height: 78px;
+  }
+
+  .briefNodeList li,
+  .historyNodeList li {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 }

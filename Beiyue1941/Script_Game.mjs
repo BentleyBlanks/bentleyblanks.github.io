@@ -2,6 +2,9 @@ import {
   gameConfig,
   regionDefinitions,
   actionDefinitions,
+  formationDefinitions,
+  stanceDefinitions,
+  routeDefinitions as strategyRouteDefinitions,
   policyDefinitions,
   historicalTurns,
   CreateGame,
@@ -13,15 +16,20 @@ import {
   CommitTurn,
   GetActionPreview,
   GetEnemyForecast,
+  GetOperationalBrief,
+  GetProbePreview,
+  ProbeRegion,
+  GetPlanAssessment,
+  GetConnectedRegionIds,
   GetCampaignScore,
   SerializeGame,
   DeserializeGame,
   CheckInvariants,
-} from "./Script_Rules.mjs";
+} from "./Script_StrategyRules.mjs";
 
-const saveKey = "Beiyue1941_Save_1";
-const backupKey = "Beiyue1941_Backup_1";
-const backupGuardKey = "Beiyue1941_BackupGuard_1";
+const saveKey = "Beiyue1941_Save_2";
+const backupKey = "Beiyue1941_Backup_2";
+const backupGuardKey = "Beiyue1941_BackupGuard_2";
 const soundKey = "Beiyue1941_Sound_1";
 const mapModeKey = "Beiyue1941_MapMode_1";
 
@@ -39,13 +47,6 @@ const regionLayouts = Object.freeze({
   xingtang: { left: 45, top: 75, width: 27, height: 24, shape: "polygon(8% 17%, 57% 0, 100% 24%, 91% 78%, 47% 100%, 0 68%)" },
   xinle: { left: 70, top: 73, width: 27, height: 25, shape: "polygon(8% 16%, 56% 0, 100% 23%, 91% 79%, 47% 100%, 0 67%)" },
 });
-
-const routeDefinitions = Object.freeze([
-  { from: [85, 1], to: [91, 99], kind: "rail", label: "平汉铁路走廊", labelAt: [87, 43] },
-  { from: [18, 94], to: [100, 94], kind: "rail", label: "正太铁路走廊", labelAt: [73, 90] },
-  { from: [17, 22], to: [40, 42], kind: "path", label: "五台—阜平山路", labelAt: [22, 31] },
-  { from: [40, 42], to: [68, 46], kind: "path", label: "冀西秘密交通线", labelAt: [48, 47] },
-]);
 
 const archiveSources = Object.freeze([
   {
@@ -107,15 +108,23 @@ const mapModeDefinitions = Object.freeze({
 
 let gameState = null;
 let selectedRegionId = "fuping";
+let selectedFormationId = "mobileGuard";
+let selectedStanceId = "balanced";
+let selectedFallbackId = "";
 let currentMapMode = localStorage.getItem(mapModeKey) || "situation";
 let soundEnabled = localStorage.getItem(soundKey) === "true";
 let audioContext = null;
 let pendingReport = null;
 let modalCloseAction = null;
+let modalReturnTarget = null;
 let sessionStartedAt = Date.now();
 
 function GetElement(id) {
   return document.getElementById(id);
+}
+
+function RestoreFocus(selector) {
+  window.requestAnimationFrame(() => document.querySelector(selector)?.focus());
 }
 
 function EscapeHtml(value) {
@@ -234,6 +243,7 @@ function OpenModal(content, options = {}) {
   const backdrop = GetElement("modalBackdrop");
   const panel = GetElement("modalPanel");
   if (!backdrop || !panel) return;
+  if (backdrop.hidden) modalReturnTarget = document.activeElement;
   panel.innerHTML = content;
   backdrop.hidden = false;
   document.body.classList.add("modalOpen");
@@ -253,6 +263,13 @@ function CloseModal(force = false) {
   const action = modalCloseAction;
   modalCloseAction = null;
   action?.();
+  const returnTarget = modalReturnTarget;
+  modalReturnTarget = null;
+  window.requestAnimationFrame(() => {
+    if (!backdrop.hidden) return;
+    if (returnTarget?.isConnected && typeof returnTarget.focus === "function") returnTarget.focus();
+    else GetElement("brandButton")?.focus();
+  });
 }
 
 function SaveGame() {
@@ -292,6 +309,9 @@ function NewCampaign(seed = 19410707) {
   }
   gameState = CreateGame(seed);
   selectedRegionId = "fuping";
+  selectedFormationId = "mobileGuard";
+  selectedStanceId = "balanced";
+  selectedFallbackId = "";
   sessionStartedAt = Date.now();
   localStorage.removeItem(saveKey);
   SaveGame();
@@ -308,6 +328,9 @@ function ContinueCampaign() {
   }
   gameState = loaded;
   selectedRegionId = gameState.selectedRegionId || "fuping";
+  selectedFormationId = gameState.selectedFormationId && gameState.formations?.[gameState.selectedFormationId]
+    ? gameState.selectedFormationId
+    : "mobileGuard";
   sessionStartedAt = Date.now();
   RenderAll();
   CloseModal(true);
@@ -326,11 +349,11 @@ function ShowMainMenu() {
     <section class="titleScene">
       <p class="modalKicker">敌后根据地 · 区域经营战略</p>
       <h1>北岳烽火 <small>1941—1942</small></h1>
-      <p class="titleLead">铁路、公路与据点切开山河；抗日组织仍在村庄、山路与群众掩护中延续。你要做的不是涂满地图，而是在合围中处理好四件事：<b>打、走、藏、养</b>。</p>
+      <p class="titleLead">铁路、公路与据点切开山河。你必须判断不完整敌情，把五支有位置、有疲劳的编组放到正确的交通线上，并提前写好退路。<b>不是点数值，而是决定谁去、从哪走、放弃哪里。</b></p>
       <div class="titleFacts">
-        <article><span>18</span><b>史实节点</b><small>1941年7月至1942年6月</small></article>
-        <article><span>3</span><b>每回合命令</b><small>约70—100分钟完整战役</small></article>
-        <article><span>4</span><b>核心资源</b><small>物资 · 组织 · 情报 · 信任</small></article>
+        <article><span>12</span><b>作战回合</b><small>涵盖18个固定史实节点</small></article>
+        <article><span>5</span><b>持久编组</b><small>位置、疲劳与任务能力各不相同</small></article>
+        <article><span>4</span><b>指挥点</b><small>不能让全部编组每期都出动</small></article>
       </div>
       <div class="ethicsNote"><b>叙事边界</b><span>玩家操作的是虚构的综合协调界面，不扮演真实历史人物；全国战争走向与重大牺牲不会被改写。地图边界、行动尺度与部分地方情境为明确标注的策略抽象。</span></div>
       <div class="modalActions">
@@ -376,16 +399,18 @@ function ShowHelp() {
   `).join("");
   OpenModal(`
     <section class="wideModal">
-      <div class="modalHeader"><div><p class="modalKicker">核心玩法</p><h2>一回合，三道命令</h2></div><button class="closeButton" data-close-modal aria-label="关闭玩法说明">×</button></div>
+      <div class="modalHeader"><div><p class="modalKicker">核心玩法</p><h2>先读敌情，再编组路线</h2></div><button class="closeButton" data-close-modal aria-label="关闭玩法说明">×</button></div>
       <div class="helpColumns">
         <div>
           <ol class="flowList">
-            <li><b>读敌情</b><span>地图只显示我方确实掌握的征候；情报越多，预警越具体。</span></li>
-            <li><b>选地区</b><span>一个地区同回合只能承担一道命令，避免把风险全部压给同一批群众。</span></li>
-            <li><b>排三令</b><span>命令先进入计划栏，提交前都可撤回；资源在结算时扣除。</span></li>
-            <li><b>看战报</b><span>我方行动与敌方行动同步结算，结果会解释准备、地形、情报与风险。</span></li>
+            <li><b>读征候</b><span>敌方本期计划在你下令前已经锁定。斜纹只表示可观察征候；可花情报核实最多三处。</span></li>
+            <li><b>选编组</b><span>五支编组位置、疲劳和能力不同。每支至多一项任务，移动受相邻交通边约束。</span></li>
+            <li><b>做组合</b><span>侦察＋迟滞、掩护＋疏散、联络＋运输会形成联动；孤立点一项任务收益有限。</span></li>
+            <li><b>按阶段结算</b><span>侦察先核实，随后掩护与联络展开，再处理运输、救济和转移；同阶段按既定编组序列同步归并，不受点击先后影响。</span></li>
+            <li><b>留预案</b><span>为疏散与机构转移指定退路。未出动编组会休整并成为预备，但也意味着少完成一项主动任务。</span></li>
+            <li><b>看后果</b><span>交通边会受损，机构转移会停摆一回合，疲劳与暴露会延续；没有全图自动回血。</span></li>
           </ol>
-          <div class="ruleNote"><b>胜利不是歼敌榜</b><p>总评以群众安全、组织网络、机构存续、组织力与群众信任为准。敌后战场也不是清晰国界：城市据点被占与乡村网络存在可以同时发生。</p></div>
+          <div class="ruleNote"><b>军事行动服务于保护与时间</b><p>没有歼敌榜。迟滞的价值是争取转移窗口；结局看全区安全及最薄弱四分之一地区、结局时的阜平连通网络、机构运转、编组保存与固定接应责任。</p></div>
         </div>
         <div class="helpActionGrid">${actionCards}</div>
       </div>
@@ -405,9 +430,9 @@ function ShowArchive(onCloseAction = null) {
       <div class="modalHeader"><div><p class="modalKicker">史实说明</p><h2>事实、视角与策略抽象</h2></div><button class="closeButton" data-close-modal aria-label="关闭史实说明">×</button></div>
       <div class="archiveGrid">
         <article><span class="factTag">史实</span><h3>固定不改写</h3><p>冈村宁次接任、1941年秋季大“扫荡”、狼牙山五壮士、1942年春困难及冀中“五一”大“扫荡”等节点按史实发生。真实人物不使用虚构台词。</p></article>
-        <article><span class="abstractTag">抽象</span><h3>明确被压缩</h3><p>十二地区的边界与邻接、三道命令的时间尺度、资源数值、综合协调机构及局部结果均为游戏抽象，不是当时行政区划或精确战场复原。</p></article>
+        <article><span class="abstractTag">抽象</span><h3>明确被压缩</h3><p>十二地区的边界与邻接、有限指挥点下同步任务的时间尺度、资源数值、综合协调机构及局部结果均为游戏抽象，不是当时行政区划或精确战场复原。</p></article>
         <article><span class="contextTag">全局</span><h3>敌后不是全部</h3><p>本作聚焦中国共产党领导的晋察冀敌后根据地，同时承认国民党军正面战场、其他抗日力量与国际反法西斯战争的贡献。第二次国共合作中的协同与摩擦均不被简化成第二个敌人。</p></article>
-        <article><span class="careTag">表达</span><h3>克制呈现创伤</h3><p>侵略暴力只通过疏散、救济、机构损失与群众安全后果表达；没有可操作的暴行场面、伤亡奇观、民族侮辱语或以平民代价换分的机制。</p></article>
+        <article><span class="careTag">表达</span><h3>克制呈现创伤</h3><p>侵略暴力只通过疏散、救济、机构损失与群众安全后果表达；没有可操作的暴行场面、伤亡奇观、民族侮辱语或以平民代价换分的机制。活动痕迹只抽象局部搜索方向，绝不转移侵略者责任。</p></article>
       </div>
       <h3 class="sourceTitle">主要核史资料</h3>
       <ol class="sourceList">${sourceCards}</ol>
@@ -424,34 +449,57 @@ function BindModalCloseButtons() {
 
 function RenderRoutes() {
   const layer = GetElement("routeLayer");
-  if (!layer || layer.childElementCount) return;
-  for (const route of routeDefinitions) {
+  if (!layer || !gameState) return;
+  layer.innerHTML = "";
+  const layerWidth = layer.clientWidth || GetElement("strategyMap")?.clientWidth || 1;
+  const layerHeight = layer.clientHeight || GetElement("strategyMap")?.clientHeight || 1;
+  for (const route of Object.values(strategyRouteDefinitions)) {
+    const fromLayout = regionLayouts[route.fromId];
+    const toLayout = regionLayouts[route.toId];
+    const routeState = gameState.routes?.[route.id];
+    if (!fromLayout || !toLayout || !routeState) continue;
+    const from = [fromLayout.left + fromLayout.width / 2, fromLayout.top + fromLayout.height / 2];
+    const to = [toLayout.left + toLayout.width / 2, toLayout.top + toLayout.height / 2];
     const line = document.createElement("div");
-    const deltaX = route.to[0] - route.from[0];
-    const deltaY = route.to[1] - route.from[1];
+    const deltaX = (to[0] - from[0]) / 100 * layerWidth;
+    const deltaY = (to[1] - from[1]) / 100 * layerHeight;
     const distance = Math.hypot(deltaX, deltaY);
     const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
     line.className = `routeLine ${route.kind}`;
-    line.style.left = `${route.from[0]}%`;
-    line.style.top = `${route.from[1]}%`;
-    line.style.width = `${distance}%`;
+    line.dataset.routeId = route.id;
+    line.dataset.state = routeState.integrity >= 58 ? "open" : routeState.integrity >= 30 ? "watched" : routeState.integrity > 0 ? "strained" : "cut";
+    line.style.left = `${from[0]}%`;
+    line.style.top = `${from[1]}%`;
+    line.style.width = `${distance}px`;
     line.style.transform = `rotate(${angle}deg)`;
-    line.setAttribute("aria-hidden", "true");
+    const stateName = routeState.integrity >= 58 ? "畅通" : routeState.integrity >= 30 ? "受监视" : routeState.integrity > 0 ? "吃紧" : "中断";
+    line.title = `${route.name}：${stateName}，完整度${Math.round(routeState.integrity)}`;
+    line.setAttribute("role", "img");
+    line.setAttribute("aria-label", line.title);
     layer.appendChild(line);
-    const label = document.createElement("span");
-    label.className = `routeLabel ${route.kind}`;
-    label.style.left = `${route.labelAt[0]}%`;
-    label.style.top = `${route.labelAt[1]}%`;
-    label.textContent = route.label;
-    layer.appendChild(label);
+    if (route.kind === "rail") {
+      const label = document.createElement("span");
+      label.className = `routeLabel ${route.kind}`;
+      label.style.left = `${(from[0] + to[0]) / 2}%`;
+      label.style.top = `${(from[1] + to[1]) / 2}%`;
+      label.textContent = `封锁 ${Math.round(routeState.integrity)}`;
+      label.setAttribute("aria-hidden", "true");
+      layer.appendChild(label);
+    }
   }
+}
+
+function ScheduleRouteRender() {
+  window.clearTimeout(ScheduleRouteRender.timerId);
+  ScheduleRouteRender.timerId = window.setTimeout(RenderRoutes, 80);
 }
 
 function RenderRegions() {
   const layer = GetElement("regionLayer");
   if (!layer || !gameState) return;
   const forecast = GetEnemyForecast(gameState) || {};
-  const forecastIds = new Set(forecast.targetIds || forecast.targets?.map((target) => target.id || target.regionId) || []);
+  const forecastIds = new Set((forecast.targets || []).filter((target) => !target.confirmed || target.isTarget).map((target) => target.regionId));
+  const connectedIds = new Set(GetConnectedRegionIds(gameState));
   layer.innerHTML = "";
   for (const definition of GetCollectionItems(regionDefinitions)) {
     const region = GetRegionState(definition.id);
@@ -464,10 +512,12 @@ function RenderRegions() {
     button.dataset.mapMode = currentMapMode;
     button.dataset.selected = String(definition.id === selectedRegionId);
     button.dataset.forecast = String(forecastIds.has(definition.id));
+    button.dataset.connected = String(connectedIds.has(definition.id));
     button.dataset.safetyBand = GetBand(region.safety);
     button.dataset.networkBand = GetBand(region.network);
     button.dataset.enemyBand = GetBand(100 - region.enemyControl);
     button.dataset.exposureBand = GetBand(100 - region.exposure);
+    button.setAttribute("aria-pressed", String(definition.id === selectedRegionId));
     button.style.left = `${layout.left}%`;
     button.style.top = `${layout.top}%`;
     button.style.width = `${layout.width}%`;
@@ -478,14 +528,16 @@ function RenderRegions() {
     button.style.setProperty("--enemy", `${Clamp(region.enemyControl, 0, 100)}%`);
     button.style.setProperty("--exposure", `${Clamp(region.exposure, 0, 100)}%`);
     const institutionCount = GetInstitutionList().filter((institution) => institution.regionId === definition.id && institution.active !== false).length;
+    const formations = Object.values(gameState.formations || {}).filter((formation) => formation.regionId === definition.id);
     const protection = Number(region.protection || 0);
     button.innerHTML = `
       <span class="regionName">${EscapeHtml(definition.name)}</span>
       <span class="regionTerrain">${EscapeHtml(definition.terrainName || definition.terrain || "")}</span>
       <span class="regionReadout"><b>网 ${Math.round(region.network)}</b><b>安 ${Math.round(region.safety)}</b></span>
       <span class="regionMarks">${region.enemyControl >= 55 ? '<i title="敌伪据点压力高">据</i>' : ""}${protection >= 55 ? '<i title="长期掩护能力较强">护</i>' : ""}${institutionCount ? `<i title="有${institutionCount}处机构">机${institutionCount}</i>` : ""}</span>
+      <span class="formationMarks">${formations.map((formation) => `<i title="${EscapeHtml(formation.name)}">${EscapeHtml(formationDefinitions[formation.id]?.shortName || "组")}</i>`).join("")}</span>
     `;
-    button.setAttribute("aria-label", `${definition.name}，组织网络${Math.round(region.network)}，群众安全${Math.round(region.safety)}，敌情压力${Math.round(region.enemyControl)}，暴露${Math.round(region.exposure)}`);
+    button.setAttribute("aria-label", `${definition.name}，组织网络${Math.round(region.network)}，群众安全${Math.round(region.safety)}，据点与封锁压力${Math.round(region.enemyControl)}，地方缓存${Math.round(region.localCache)}，驻有${formations.length}支编组`);
     button.addEventListener("click", () => SelectRegion(definition.id));
     layer.appendChild(button);
   }
@@ -500,10 +552,13 @@ function GetBand(value) {
 }
 
 function SelectRegion(regionId) {
+  const restoreFocus = document.activeElement?.classList?.contains("regionButton");
   selectedRegionId = regionId;
+  selectedFallbackId = "";
   if (gameState) gameState.selectedRegionId = regionId;
   RenderRegions();
   RenderCommandPanel();
+  if (restoreFocus) RestoreFocus(`[data-region-id="${regionId}"]`);
   SaveGame();
   PlayTone("tap");
 }
@@ -535,7 +590,7 @@ function RenderHeader() {
 }
 
 function RenderMapModes() {
-  document.querySelectorAll("[data-map-mode]").forEach((button) => {
+  document.querySelectorAll(".mapModeButton[data-map-mode]").forEach((button) => {
     const active = button.dataset.mapMode === currentMapMode;
     button.setAttribute("aria-pressed", String(active));
     button.classList.toggle("active", active);
@@ -543,7 +598,12 @@ function RenderMapModes() {
   const legend = GetElement("mapLegend");
   if (legend) {
     const mode = mapModeDefinitions[currentMapMode] || mapModeDefinitions.situation;
-    legend.innerHTML = `<b>${EscapeHtml(mode.name)}</b><span>${EscapeHtml(mode.help)}</span><small><i class="legendForecast"></i>斜纹与“预”字表示已侦知的敌军重点方向</small>`;
+    const routeCounts = { open: 0, watched: 0, strained: 0, cut: 0 };
+    for (const route of Object.values(gameState?.routes || {})) {
+      const state = route.integrity >= 58 ? "open" : route.integrity >= 30 ? "watched" : route.integrity > 0 ? "strained" : "cut";
+      routeCounts[state] += 1;
+    }
+    legend.innerHTML = `<b>${EscapeHtml(mode.name)}</b><span title="${EscapeHtml(mode.help)}">${EscapeHtml(mode.help)}</span><div class="routeStateLegend" aria-label="交通线状态：畅通${routeCounts.open}条，受监视${routeCounts.watched}条，吃紧${routeCounts.strained}条，中断${routeCounts.cut}条"><i data-state="open"></i>畅通 ${routeCounts.open}<i data-state="watched"></i>受监视 ${routeCounts.watched}<i data-state="strained"></i>吃紧 ${routeCounts.strained}<i data-state="cut"></i>中断 ${routeCounts.cut}</div>`;
   }
 }
 
@@ -553,7 +613,8 @@ function RenderForecast() {
   const forecast = GetEnemyForecast(gameState) || {};
   const confidence = forecast.certainty || forecast.confidence || forecast.level || "模糊";
   const summary = forecast.summary || forecast.text || "交通线上出现调动征候，但目标尚不明确。";
-  banner.innerHTML = `<span>敌情预判 · ${EscapeHtml(confidence)}</span><b>${EscapeHtml(summary)}</b>`;
+  const reports = (forecast.targets || []).slice(0, 4).map((target) => `<li data-confirmed="${Boolean(target.confirmed)}"><b>${EscapeHtml(target.regionName)}</b><span>${EscapeHtml(target.likelihood)}</span></li>`).join("");
+  banner.innerHTML = `<span>敌情预判 · ${EscapeHtml(confidence)}</span><b id="forecastTitle" title="${EscapeHtml(summary)}">${EscapeHtml(summary)}</b>${reports ? `<ul>${reports}</ul>` : ""}`;
   banner.dataset.confidence = String(confidence);
 }
 
@@ -572,18 +633,23 @@ function RenderCommandPanel() {
   const status = GetElement("regionStatus");
   const stats = GetElement("regionStats");
   if (title) title.textContent = definition.name;
-  if (subtitle) subtitle.textContent = `${definition.terrainName || definition.terrain || "地区"} · ${definition.role || definition.note || "北岳区战略地区"}`;
+  if (subtitle) subtitle.textContent = `${definition.terrainName || definition.terrain || "地区"} · ${definition.role || definition.note || "北岳区战略地区"} · 地方缓存 ${Math.round(region.localCache || 0)}`;
   const institutions = GetInstitutionList().filter((institution) => institution.regionId === selectedRegionId && institution.active !== false);
   if (status) {
-    status.innerHTML = `<span data-band="${GetBand(region.network)}">网络 ${GetBandName(region.network)}</span><span data-band="${GetBand(region.safety)}">安全 ${GetBandName(region.safety)}</span><span data-band="${GetBand(region.protection)}">掩护 ${GetBandName(region.protection)}</span>${institutions.map((institution) => `<span class="institutionChip">${EscapeHtml(institution.shortName || institution.name)}</span>`).join("")}`;
+    const connected = GetConnectedRegionIds(gameState).includes(selectedRegionId);
+    const institutionNames = institutions.map((institution) => `${institution.name}${institution.disruptedTurns ? "·停摆" : ""}`).join("、");
+    const institutionStatus = institutions.length
+      ? `<span class="institutionChip" title="${EscapeHtml(institutionNames)}" aria-label="本地机构：${EscapeHtml(institutionNames)}">机构 ${institutions.length}</span>`
+      : "";
+    status.innerHTML = `<span data-band="${GetBand(region.network)}">网络 ${GetBandName(region.network)}</span><span data-band="${GetBand(region.safety)}">安全 ${GetBandName(region.safety)}</span><span data-band="${connected ? "strong" : "critical"}">${connected ? "连通阜平" : "交通隔离"}</span><span class="cacheChip">缓存 ${Math.round(region.localCache || 0)}</span>${institutionStatus}`;
   }
   if (stats) {
     stats.innerHTML = [
       BuildStatRow("组织网络", region.network, "network", "秘密交通、村级组织与地方联络"),
       BuildStatRow("群众安全", region.safety, "safety", "转移、粮食、医疗与日常生计"),
-      BuildStatRow("敌情压力", region.enemyControl, "enemy", "据点、封锁线与可出动能力"),
+      BuildStatRow("据点压力", region.enemyControl, "enemy", "长期据点、封锁与道路控制；不等于本期隐藏目标"),
       BuildStatRow("暴露程度", region.exposure, "exposure", "侵略军对本地网络掌握的线索"),
-      BuildStatRow("战争破坏", region.devastation, "devastation", "生产、住房和交通受损程度"),
+      BuildStatRow("交通准备", Math.min(100, region.network * 0.6 + region.protection * 0.4), "protection", "联络、掩护和相邻交通边的综合准备"),
     ].join("");
   }
   RenderActionList();
@@ -594,27 +660,101 @@ function GetBandName(value) {
   return { strong: "稳固", steady: "尚可", strained: "吃紧", critical: "危急" }[band];
 }
 
+function SelectFormation(formationId) {
+  if (!gameState?.formations?.[formationId]) return;
+  selectedFormationId = formationId;
+  selectedFallbackId = "";
+  gameState.selectedFormationId = formationId;
+  SaveGame();
+  RenderRegions();
+  RenderActionList();
+  RestoreFocus(`[data-formation-id="${formationId}"]`);
+  PlayTone("tap");
+}
+
+function GetFallbackOptions(regionId) {
+  const region = GetRegionState(regionId);
+  return (region?.adjacentIds || []).filter((adjacentId) => {
+    const routeId = `route_${[regionId, adjacentId].sort().join("_")}`;
+    return Number(gameState.routes?.[routeId]?.integrity || 0) >= 20;
+  });
+}
+
+function HandleProbe() {
+  if (!gameState) return;
+  try {
+    gameState = ProbeRegion(gameState, selectedRegionId);
+  } catch (error) {
+    ShowToast(error?.message || "这一区域暂时无法继续核实", "warn");
+    return;
+  }
+  SaveGame();
+  RenderAll();
+  RestoreFocus("#probeRegionButton");
+  const report = GetEnemyForecast(gameState).targets.find((target) => target.regionId === selectedRegionId && target.confirmed);
+  ShowToast(report?.likelihood ? `${GetRegionState(selectedRegionId).name}：${report.likelihood}` : "征候已经核实", "confirm");
+}
+
 function RenderActionList() {
   const list = GetElement("actionList");
   if (!list || !gameState) return;
-  const existingOrder = GetOrders().find((order) => (order.regionId || order.targetId) === selectedRegionId);
-  list.innerHTML = "";
-  for (const [actionId, action] of Object.entries(actionDefinitions)) {
-    const preview = GetActionPreview(gameState, actionId, selectedRegionId) || {};
-    const allowed = preview.valid ?? preview.ok ?? preview.allowed ?? !preview.error;
+  const formation = gameState.formations[selectedFormationId] || Object.values(gameState.formations)[0];
+  selectedFormationId = formation.id;
+  const formationDefinition = formationDefinitions[formation.id];
+  const currentOrder = GetOrders().find((order) => order.formationId === formation.id);
+  const fallbackOptions = GetFallbackOptions(selectedRegionId);
+  if (!fallbackOptions.includes(selectedFallbackId)) selectedFallbackId = fallbackOptions[0] || "";
+  const probePreview = GetProbePreview(gameState, selectedRegionId);
+  const formationButtons = Object.values(formationDefinitions).map((definition) => {
+    const state = gameState.formations[definition.id];
+    const assigned = GetOrders().find((order) => order.formationId === definition.id);
+    return `<button type="button" class="formationButton" data-formation-id="${EscapeHtml(definition.id)}" data-selected="${definition.id === formation.id}" data-assigned="${Boolean(assigned)}" aria-pressed="${definition.id === formation.id}"><span>${EscapeHtml(definition.shortName)}</span><b>${EscapeHtml(definition.name)}</b><small>${EscapeHtml(GetRegionState(state.regionId)?.name || state.regionId)} · 凝聚${Math.round(state.cohesion)} · 疲劳${Math.round(state.fatigue)}</small></button>`;
+  }).join("");
+  const stanceButtons = Object.values(stanceDefinitions).map((stance) => `<button type="button" class="stanceButton" data-stance-id="${EscapeHtml(stance.id)}" aria-pressed="${stance.id === selectedStanceId}"><b>${EscapeHtml(stance.name)}</b><small>${EscapeHtml(stance.description)}</small></button>`).join("");
+  const fallbackMarkup = fallbackOptions.map((regionId) => `<option value="${EscapeHtml(regionId)}" ${regionId === selectedFallbackId ? "selected" : ""}>${EscapeHtml(GetRegionState(regionId)?.name || regionId)}</option>`).join("");
+  list.innerHTML = `
+    <div class="formationRoster" role="group" aria-label="可用编组">${formationButtons}</div>
+    <section class="selectedFormationCard"><div><span>${EscapeHtml(formationDefinition.shortName)}</span><h4>${EscapeHtml(formation.name)}</h4><p>当前在${EscapeHtml(GetRegionState(formation.regionId)?.name || formation.regionId)}；本期只能执行一项任务，重新下令会替换原计划。</p></div>${currentOrder ? `<em>已计划：${EscapeHtml(actionDefinitions[currentOrder.missionId].name)}</em>` : '<em class="reserveTag">未出动＝隐蔽预备</em>'}</section>
+    <button type="button" class="probeButton" id="probeRegionButton" ${probePreview.valid ? "" : "disabled"}><span>核实敌情</span><b>${EscapeHtml(probePreview.summary)}</b></button>
+    <div class="planControls"><fieldset><legend>行动姿态</legend><div class="stanceGrid">${stanceButtons}</div></fieldset><label>疏散／机构转移退路<select id="fallbackSelect" ${fallbackOptions.length ? "" : "disabled"}>${fallbackMarkup || '<option value="">无可用相邻退路</option>'}</select></label></div>
+    <div class="missionGrid" role="group" aria-label="当前编组可执行任务"></div>
+  `;
+  const missionGrid = list.querySelector(".missionGrid");
+  for (const actionId of formationDefinition.missionIds) {
+    const action = actionDefinitions[actionId];
+    const preview = GetActionPreview(gameState, {
+      missionId: actionId,
+      formationId: formation.id,
+      targetRegionId: selectedRegionId,
+      stanceId: selectedStanceId,
+      fallbackRegionId: action.requiresFallback ? selectedFallbackId : null,
+    });
+    const allowed = preview.valid && !IsCampaignEnded();
     const button = document.createElement("button");
     button.type = "button";
     button.className = "actionButton";
     button.dataset.actionId = actionId;
-    button.disabled = !allowed || Boolean(existingOrder) || IsCampaignEnded();
-    const costs = preview.costs || preview.cost || action.cost || {};
+    button.disabled = !allowed;
+    const costs = preview.costs || {};
     const costText = Object.entries(costs).filter(([, value]) => Number(value) > 0).map(([key, value]) => `${GetResourceName(key)} ${value}`).join(" · ");
-    const summary = preview.summary || preview.effect || action.description || action.desc || "";
-    const reason = preview.reason || preview.error || preview.warnings?.[0] || (existingOrder ? "本地区本回合已有命令" : "");
-    button.innerHTML = `<span class="actionIcon">${EscapeHtml(action.icon || "令")}</span><span class="actionCopy"><b>${EscapeHtml(action.name || actionId)}</b><small>${EscapeHtml(summary)}</small>${reason ? `<em>${EscapeHtml(reason)}</em>` : ""}</span><span class="actionCost">${EscapeHtml(costText || "不耗物资")}</span>`;
+    const reason = preview.warnings?.[0] || "";
+    const synergyMarkup = preview.synergies?.length ? `<span class="synergyTag">联动 ${EscapeHtml(preview.synergies.join("；"))}</span>` : "";
+    button.innerHTML = `<span class="actionIcon">${EscapeHtml(action.icon || "令")}</span><span class="actionCopy"><b>${EscapeHtml(action.name || actionId)}</b><small>${EscapeHtml(action.description)}</small><strong>${EscapeHtml(preview.summary)}</strong>${synergyMarkup}${reason ? `<em>${EscapeHtml(reason)}</em>` : ""}</span><span class="actionCost"><b>${preview.commandCost} 指挥</b><small>${EscapeHtml(costText || "无资源消耗")}</small></span>`;
     button.addEventListener("click", () => AddOrder(actionId));
-    list.appendChild(button);
+    missionGrid.appendChild(button);
   }
+  list.querySelectorAll("[data-formation-id]").forEach((button) => button.addEventListener("click", () => SelectFormation(button.dataset.formationId)));
+  list.querySelectorAll("[data-stance-id]").forEach((button) => button.addEventListener("click", () => {
+    selectedStanceId = button.dataset.stanceId;
+    RenderActionList();
+    RestoreFocus(`[data-stance-id="${selectedStanceId}"]`);
+  }));
+  GetElement("probeRegionButton")?.addEventListener("click", HandleProbe);
+  GetElement("fallbackSelect")?.addEventListener("change", (event) => {
+    selectedFallbackId = event.target.value;
+    RenderActionList();
+    RestoreFocus("#fallbackSelect");
+  });
 }
 
 function GetResourceName(key) {
@@ -623,22 +763,31 @@ function GetResourceName(key) {
 
 function AddOrder(actionId) {
   if (!gameState) return;
-  const preview = GetActionPreview(gameState, actionId, selectedRegionId);
+  const action = actionDefinitions[actionId];
+  const input = {
+    missionId: actionId,
+    formationId: selectedFormationId,
+    targetRegionId: selectedRegionId,
+    stanceId: selectedStanceId,
+    fallbackRegionId: action?.requiresFallback ? selectedFallbackId : null,
+  };
+  const preview = GetActionPreview(gameState, input);
   if (!preview?.valid) {
     ShowToast(preview?.warnings?.[0] || preview?.reason || "这道命令目前无法执行", "warn");
     return;
   }
   try {
-    gameState = QueueOrder(gameState, actionId, selectedRegionId);
+    gameState = QueueOrder(gameState, input);
   } catch (error) {
     ShowToast(error?.message || "这道命令目前无法执行", "warn");
     return;
   }
-  const action = GetDefinitionById(actionDefinitions, actionId);
   const region = GetDefinitionById(regionDefinitions, selectedRegionId);
-  ShowToast(`已计划：${region?.name || "该地区"} · ${action?.name || actionId}`);
+  const formation = formationDefinitions[selectedFormationId];
+  ShowToast(`已计划：${formation?.name || "编组"} → ${region?.name || "该地区"} · ${action?.name || actionId}`);
   SaveGame();
   RenderAll();
+  RestoreFocus(`[data-action-id="${actionId}"]`);
 }
 
 function RenderOrders() {
@@ -647,52 +796,57 @@ function RenderOrders() {
   const commitButton = GetElement("commitTurnButton");
   if (!list || !gameState) return;
   const orders = GetOrders();
+  const assessment = GetPlanAssessment(gameState);
   if (!orders.length) {
-    list.innerHTML = '<li class="emptyOrder"><span>01</span><b>先从地图选择地区</b><small>每回合最多三道命令；提交前可全部撤回。</small></li>';
+    list.innerHTML = '<li class="emptyOrder"><span>预</span><div><b>尚未配置编组</b><small>先选编组，再点地图目标和任务；未出动编组会隐蔽休整。</small></div></li>';
   } else {
     list.innerHTML = orders.map((order, index) => {
-      const actionId = order.actionId || order.action;
-      const regionId = order.regionId || order.targetId;
-      const action = GetDefinitionById(actionDefinitions, actionId);
-      const region = GetDefinitionById(regionDefinitions, regionId);
-      return `<li><span>${String(index + 1).padStart(2, "0")}</span><div><b>${EscapeHtml(region?.name || regionId)} · ${EscapeHtml(action?.name || actionId)}</b><small>${EscapeHtml(action?.shortDescription || action?.description || action?.desc || "")}</small></div><button data-remove-order="${index}" aria-label="撤回第${index + 1}道命令">撤回</button></li>`;
+      const action = actionDefinitions[order.missionId];
+      const region = GetRegionState(order.targetRegionId);
+      const formation = formationDefinitions[order.formationId];
+      const stance = stanceDefinitions[order.stanceId];
+      const synergies = GetActionPreview(gameState, order).synergies || [];
+      return `<li><span>${action.commandCost}</span><div><b>${EscapeHtml(formation.name)} → ${EscapeHtml(region.name)} · ${EscapeHtml(action.name)}</b><small>${EscapeHtml(stance.name)}${order.fallbackRegionId ? ` · 退往${EscapeHtml(GetRegionState(order.fallbackRegionId)?.name || order.fallbackRegionId)}` : ""}${synergies.length ? ` · 联动：${EscapeHtml(synergies.join("；"))}` : ""}</small></div><button data-remove-order="${EscapeHtml(order.formationId)}" aria-label="撤回${EscapeHtml(formation.name)}的命令">撤回</button></li>`;
     }).join("");
   }
   list.querySelectorAll("[data-remove-order]").forEach((button) => button.addEventListener("click", () => {
-    const order = GetOrders()[Number(button.dataset.removeOrder)];
-    if (!order) return;
-    gameState = RemoveOrder(gameState, order.id || order.regionId);
+    const formationId = button.dataset.removeOrder;
+    gameState = RemoveOrder(gameState, formationId);
     SaveGame();
     RenderAll();
+    RestoreFocus(`[data-formation-id="${formationId}"]`);
     ShowToast("命令已撤回");
   }));
   if (clearButton) clearButton.disabled = !orders.length;
   if (commitButton) {
     commitButton.disabled = HasPendingEvent() || IsCampaignEnded();
-    commitButton.innerHTML = `<span>提交本回合</span><b>${orders.length} / ${gameConfig.ordersPerTurn || 3} 道命令</b>`;
+    commitButton.innerHTML = `<span>锁定同步计划</span><b>${assessment.commandUsed} / ${assessment.commandAvailable} 指挥${assessment.synergies.length ? ` · ${assessment.synergies.length}项联动` : ""}</b>`;
   }
 }
 
 function RenderTurnPanel() {
   if (!gameState) return;
   const turn = GetCurrentTurnDefinition();
+  const brief = GetOperationalBrief(gameState);
+  const assessment = GetPlanAssessment(gameState);
   const title = GetElement("turnTitle");
   const context = GetElement("turnContext");
   if (title) title.textContent = turn.title || turn.name || "本回合局势";
-  if (context) context.textContent = turn.shortContext || turn.context || turn.summary || "";
+  if (context) context.innerHTML = `<strong>${EscapeHtml(brief?.objective || "")}</strong><span>${EscapeHtml(brief?.future || "")}</span>${assessment.synergies.length ? `<em>已形成：${EscapeHtml(assessment.synergies.join("；"))}</em>` : ""}${assessment.gaps.length ? `<small>计划缺口：${EscapeHtml(assessment.gaps.join("；"))}</small>` : '<small class="planReady">当前计划覆盖了简报要求；仍需承担敌情判断错误的风险。</small>'}`;
 }
 
 function RenderTimeline() {
   const track = GetElement("timelineTrack");
   if (!track || !gameState) return;
   const current = GetTurnIndex();
-  track.innerHTML = historicalTurns.map((turn, index) => `<button type="button" data-timeline-index="${index}" data-state="${index < current ? "past" : index === current ? "current" : "future"}" aria-label="${EscapeHtml(GetTurnDisplayDate(turn))} ${EscapeHtml(turn.title || turn.name || "")}" title="${EscapeHtml(turn.title || turn.name || "")}"><i></i><span>${index + 1}</span></button>`).join("");
+  track.innerHTML = historicalTurns.map((turn, index) => `<button type="button" data-timeline-index="${index}" data-state="${index < current ? "past" : index === current ? "current" : "future"}" ${index === current ? 'aria-current="step"' : ""} aria-label="${EscapeHtml(GetTurnDisplayDate(turn))} ${EscapeHtml(turn.title || turn.name || "")}" title="${EscapeHtml(turn.title || turn.name || "")}"><i></i><span>${index + 1}</span></button>`).join("");
   track.querySelectorAll("[data-timeline-index]").forEach((button) => button.addEventListener("click", () => ShowTimelineEntry(Number(button.dataset.timelineIndex))));
 }
 
 function ShowTimelineEntry(index) {
   const turn = historicalTurns[index];
   if (!turn) return;
+  const nodeMarkup = (turn.archiveNodes || []).map((node) => `<li><time>${EscapeHtml(node.date)}</time><div><b>${EscapeHtml(node.title)}</b><p>${EscapeHtml(node.fact)}</p></div></li>`).join("");
   OpenModal(`
     <section class="compactModal">
       <p class="modalKicker">${EscapeHtml(GetTurnDisplayDate(turn))}</p>
@@ -700,6 +854,7 @@ function ShowTimelineEntry(index) {
       <p class="modalLead">${EscapeHtml(turn.context || turn.summary || turn.description || "")}</p>
       <div class="historyBoundary"><span class="factTag">史实锚点</span><p>${EscapeHtml(GetTurnFactText(turn))}</p></div>
       <div class="historyBoundary abstract"><span class="abstractTag">${EscapeHtml(turn.abstraction?.label || "游戏抽象")}</span><p>${EscapeHtml(GetTurnAbstractionText(turn))}</p></div>
+      ${nodeMarkup ? `<ol class="historyNodeList">${nodeMarkup}</ol>` : ""}
       <div class="modalActions"><button class="primaryButton" data-close-modal autofocus>关闭</button></div>
     </section>
   `);
@@ -715,7 +870,7 @@ function RenderReports() {
     const text = typeof entry === "string" ? entry : entry.text || entry.message || "";
     const tone = typeof entry === "string" ? "neutral" : entry.tone || entry.kind || "neutral";
     return `<li data-tone="${EscapeHtml(tone)}"><span></span><p>${EscapeHtml(text)}</p></li>`;
-  }).join("") : '<li data-tone="neutral"><span></span><p>战局刚刚展开。先阅读敌情，再下达三道命令。</p></li>';
+  }).join("") : '<li data-tone="neutral"><span></span><p>战局刚刚展开。先阅读敌情，再配置本期同步计划。</p></li>';
 }
 
 function RenderAll() {
@@ -736,12 +891,8 @@ function RenderAll() {
 function ShowTurnEvent(isFirst = false) {
   if (!gameState || IsCampaignEnded() || !HasPendingEvent()) return;
   const turn = GetCurrentTurnDefinition();
-  const choices = turn.choices || turn.options || [];
-  const choiceMarkup = choices.length ? choices.map((choice, index) => `
-    <button class="eventChoice" data-event-choice="${EscapeHtml(choice.id ?? String(index))}">
-      <span>${String.fromCharCode(65 + index)}</span><div><b>${EscapeHtml(choice.name || choice.title || choice.label || `方案${index + 1}`)}</b><p>${EscapeHtml(choice.description || choice.text || "")}</p><small>${EscapeHtml(choice.preview || choice.effectText || "")}</small></div>
-    </button>
-  `).join("") : '<button class="eventChoice fixed" data-event-choice="continue"><span>记</span><div><b>谨记史实，继续部署</b><p>这一节点不提供改写真实人物命运的选项。</p></div></button>';
+  const brief = GetOperationalBrief(gameState);
+  const nodeMarkup = (turn.archiveNodes || []).map((node) => `<li><time>${EscapeHtml(node.date)}</time><span>${EscapeHtml(node.title)}</span></li>`).join("");
   OpenModal(`
     <section class="eventModal">
       <div class="eventDate"><span>${EscapeHtml(GetTurnDisplayDate(turn))}</span><small>${isFirst ? "战役开端" : `第 ${GetTurnIndex() + 1} 回合`}</small></div>
@@ -750,8 +901,10 @@ function ShowTurnEvent(isFirst = false) {
       <p class="eventContext">${EscapeHtml(turn.context || turn.summary || turn.description || "")}</p>
       <div class="historyBoundary"><span class="factTag">史实</span><p>${EscapeHtml(GetTurnFactText(turn))}</p></div>
       <div class="historyBoundary abstract"><span class="abstractTag">${EscapeHtml(turn.abstraction?.label || "游戏抽象")}</span><p>${EscapeHtml(GetTurnAbstractionText(turn))}</p></div>
-      <div class="historyBoundary duty"><span class="contextTag">你的职责</span><p>${EscapeHtml(GetTurnPromptText(turn))}</p></div>
-      <div class="eventChoices">${choiceMarkup}</div>
+      ${nodeMarkup ? `<ol class="briefNodeList">${nodeMarkup}</ol>` : ""}
+      <div class="historyBoundary duty"><span class="contextTag">本期责任</span><p>${EscapeHtml(GetTurnPromptText(turn))}</p></div>
+      <div class="historyBoundary future"><span class="careTag">提前判断</span><p>${EscapeHtml(brief?.future || "")}</p></div>
+      <div class="eventChoices"><button class="eventChoice fixed" data-event-choice="briefed"><span>图</span><div><b>打开地图并开始编组</b><p>这里没有即时加分选项；真正的决策发生在编组位置、交通路线、行动联动和退路预案中。</p><small>敌方本期计划已经锁定，不会读取你即将下达的命令后临时换目标。</small></div></button></div>
     </section>
   `, { dismissible: false });
   GetElement("modalPanel")?.querySelectorAll("[data-event-choice]").forEach((button) => button.addEventListener("click", () => HandleEventChoice(button.dataset.eventChoice)));
@@ -768,23 +921,25 @@ function HandleEventChoice(choiceId) {
   SaveGame();
   CloseModal(true);
   RenderAll();
-  ShowToast("方略已记录", "confirm");
+  ShowToast("简报已接收：请先读征候，再配置编组", "confirm");
 }
 
 function CommitCurrentTurn() {
   if (!gameState || IsCampaignEnded()) return;
   const orders = GetOrders();
+  const assessment = GetPlanAssessment(gameState);
   if (HasPendingEvent()) {
     ShowTurnEvent();
     return;
   }
-  if (orders.length < (gameConfig.ordersPerTurn || 3)) {
-    const orderDescription = orders.length ? `只提交 ${orders.length} 道命令` : "本回合不下达地区命令";
+  if (assessment.commandUsed < assessment.commandAvailable) {
+    const orderDescription = orders.length ? `保留 ${assessment.commandAvailable - assessment.commandUsed} 点指挥能力` : "让全部编组隐蔽休整";
     OpenModal(`
       <section class="compactModal">
-        <p class="modalKicker">仍有空余指令</p>
+        <p class="modalKicker">仍有预备余量</p>
         <h2>${orderDescription}？</h2>
-        <p>困难时期也可以主动保留组织力，但本回合未用的指令不会累积。</p>
+        <p>未出动编组会降低疲劳并恢复凝聚，但本期阶段责任与交通缺口不会自动完成。敌方既定行动仍会发生。</p>
+        ${assessment.gaps.length ? `<div class="commitWarnings"><b>当前缺口</b><p>${EscapeHtml(assessment.gaps.join("；"))}</p></div>` : ""}
         <div class="modalActions"><button class="primaryButton" id="confirmCommitButton" autofocus>确认提交</button><button data-close-modal>再想想</button></div>
       </section>
     `);
@@ -823,12 +978,13 @@ function ShowTurnReport(previousTurn, report) {
   const enemyResults = report.enemyResults || report.enemyActions || report.enemy || [];
   const resourceDelta = report.resourceChanges || report.resourceDelta || report.resources || {};
   const resultMarkup = playerResults.length ? playerResults.map((result) => `<li data-tone="${EscapeHtml(result.tone || (result.success === false ? "warn" : "good"))}"><b>${EscapeHtml(result.title || result.name || "我方行动")}</b><p>${EscapeHtml(result.text || result.summary || result.reason || "命令已经执行。")}</p></li>`).join("") : '<li><b>整顿待命</b><p>本回合没有下达地区命令，协调力量用于恢复、隐蔽与等待情报。</p></li>';
-  const enemyMarkup = enemyResults.length ? enemyResults.map((result) => `<li><b>${EscapeHtml(result.title || result.name || "敌军行动")}</b><p>${EscapeHtml(result.text || result.summary || "敌军沿交通线调整部署。")}</p></li>`).join("") : `<li><b>${EscapeHtml(report.enemyTitle || "敌方回应")}</b><p>${EscapeHtml(report.enemySummary || "敌军沿既有据点与交通线继续施压。")}</p></li>`;
+  const enemyMarkup = enemyResults.length ? enemyResults.map((result) => `<li><b>${EscapeHtml(result.title || result.name || "敌军行动")}</b><p>${EscapeHtml(result.text || result.summary || "敌军沿交通线调整部署。")}</p>${result.previouslyKnowable ? `<small>${EscapeHtml(result.previouslyKnowable)}</small>` : ""}</li>`).join("") : `<li><b>${EscapeHtml(report.enemyTitle || "敌方回应")}</b><p>${EscapeHtml(report.enemySummary || "敌军沿既有据点与交通线继续施压。")}</p></li>`;
   const deltaMarkup = ["supply", "organization", "intelligence", "trust"].map((key) => `<span data-delta="${Number(resourceDelta[key] || 0) < 0 ? "down" : "up"}"><small>${GetResourceName(key)}</small><b>${FormatSigned(resourceDelta[key])}</b></span>`).join("");
   OpenModal(`
     <section class="reportModal">
       <div class="modalHeader"><div><p class="modalKicker">回合战报 · ${EscapeHtml(GetTurnDisplayDate(turn))}</p><h2>${EscapeHtml(report.title || turn.title || turn.name || "局势结算")}</h2></div></div>
       <div class="reportSummary">${EscapeHtml(report.summary || "每一道命令都改变了下一回合的风险与恢复能力。")}</div>
+      ${report.objective ? `<div class="objectiveResult" data-success="${Boolean(report.objective.success)}"><span>${report.objective.success ? "阶段责任基本完成" : "阶段责任未完全完成"}</span><b>${EscapeHtml(report.objective.title)}</b><p>${EscapeHtml((report.objective.success ? report.objective.met : report.objective.missed).join("；") || report.objective.summary)}</p></div>` : ""}
       <div class="reportColumns"><div><h3>我方部署</h3><ul>${resultMarkup}</ul></div><div><h3>敌方行动</h3><ul class="enemyReport">${enemyMarkup}</ul></div></div>
       <div class="resourceDelta">${deltaMarkup}</div>
       <div class="modalActions"><button class="primaryButton" id="continueReportButton" autofocus>${IsCampaignEnded() ? "查看战役总结" : "进入下一节点"}</button></div>
@@ -875,17 +1031,17 @@ function ShowEnding() {
   if (!gameState) return;
   const score = GetCampaignScore(gameState) || {};
   const total = Math.round(score.total ?? score.score ?? 0);
-  const title = score.label || score.title || score.endingTitle || (total >= 75 ? "保存元气，接续烽火" : total >= 55 ? "在困境中坚持下来" : "网络受创，火种未灭");
+  const title = score.label || score.title || score.endingTitle || (total >= 62 ? "保存元气，接续烽火" : total >= 52 ? "在困境中坚持下来" : "网络受创，火种未灭");
   const dimensions = score.components || score.dimensions || score.breakdown || {};
   function ReadDimension(key) {
     return Number(dimensions[key]?.value ?? dimensions[key] ?? score[key] ?? 0);
   }
   const dimensionCards = [
-    ["群众安全", ReadDimension("safety"), 40],
-    ["组织网络", ReadDimension("network"), 25],
+    ["群众安全", ReadDimension("safety"), 30],
+    ["组织网络", ReadDimension("network"), 20],
     ["机构存续", ReadDimension("institutions"), 20],
-    ["战场牵制", ReadDimension("resistance"), 10],
-    ["群众信任", ReadDimension("trust"), 5],
+    ["编组保存", ReadDimension("readiness"), 5],
+    ["阶段责任", ReadDimension("duties"), 25],
   ].map(([name, value, weight]) => `<article><span>${EscapeHtml(name)}</span><b>${Math.round(Number(value) || 0)}</b><small>权重 ${weight}%</small></article>`).join("");
   OpenModal(`
     <section class="endingModal">
@@ -939,11 +1095,12 @@ function BindInterface() {
     gameState = ClearOrders(gameState);
     SaveGame();
     RenderAll();
+    RestoreFocus(`[data-formation-id="${selectedFormationId}"]`);
     ShowToast("本回合计划已清空");
   });
   GetElement("commitTurnButton")?.addEventListener("click", CommitCurrentTurn);
   GetElement("reportToggle")?.addEventListener("click", ToggleReportPanel);
-  document.querySelectorAll("[data-map-mode]").forEach((button) => button.addEventListener("click", () => ChangeMapMode(button.dataset.mapMode)));
+  document.querySelectorAll(".mapModeButton[data-map-mode]").forEach((button) => button.addEventListener("click", () => ChangeMapMode(button.dataset.mapMode)));
   GetElement("modalBackdrop")?.addEventListener("click", (event) => {
     if (event.target === GetElement("modalBackdrop")) CloseModal();
   });
@@ -982,7 +1139,11 @@ function HandleKeyboard(event) {
     }
     return;
   }
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
   if (!gameState) return;
+  const activeElement = document.activeElement;
+  const interactiveTags = new Set(["BUTTON", "SELECT", "A", "INPUT", "TEXTAREA"]);
+  if (interactiveTags.has(activeElement?.tagName) || activeElement?.isContentEditable) return;
   if (event.key.toLowerCase() === "p") ShowPolicyMenu();
   if (event.key.toLowerCase() === "h") ShowHelp();
   if (event.key.toLowerCase() === "a") ShowArchive();
@@ -990,9 +1151,9 @@ function HandleKeyboard(event) {
     const modes = Object.keys(mapModeDefinitions);
     ChangeMapMode(modes[(modes.indexOf(currentMapMode) + 1) % modes.length]);
   }
-  if (event.key === "Enter" && !event.ctrlKey && !event.metaKey && document.activeElement?.tagName !== "BUTTON") CommitCurrentTurn();
+  if (event.key === "Enter" && activeElement === document.body) CommitCurrentTurn();
   const actionIndex = Number(event.key) - 1;
-  const actionIds = Object.keys(actionDefinitions);
+  const actionIds = formationDefinitions[selectedFormationId]?.missionIds || [];
   if (actionIndex >= 0 && actionIndex < actionIds.length) AddOrder(actionIds[actionIndex]);
 }
 
@@ -1005,11 +1166,21 @@ function InitializeGame() {
     RenderAll();
   }
   ShowMainMenu();
+  window.addEventListener("resize", ScheduleRouteRender);
   window.beiyueGame = {
-    GetState: () => gameState,
+    GetPublicState: () => gameState ? {
+      turnIndex: gameState.turnIndex,
+      phase: gameState.phase,
+      resources: { ...gameState.resources },
+      regions: JSON.parse(JSON.stringify(gameState.regions)),
+      formations: JSON.parse(JSON.stringify(gameState.formations)),
+      forecast: GetEnemyForecast(gameState),
+    } : null,
     NewCampaign,
     SelectRegion,
+    SelectFormation,
     AddOrder,
+    ProbeRegion: HandleProbe,
     CommitCurrentTurn,
     ShowArchive,
     RenderAll,

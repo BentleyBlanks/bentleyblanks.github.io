@@ -8,7 +8,7 @@
     "test:taihang-polong": "node taihang-polong/smoke-test.mjs",
     "test:qinyuan": "node qinyuan/smoke-test.mjs",
     "test:resistanceNetwork": "node ResistanceNetwork/SmokeTest.mjs",
-    "test:beiyue1941": "node Beiyue1941/Script_SmokeTest.mjs"
+    "test:beiyue1941": "node Beiyue1941/Script_StrategySmokeTest.mjs"
   },
   "repository": {
     "type": "git",

@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#252c27">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="《北岳烽火：1941—1942》是一款以晋察冀边区北岳区敌后战场为背景、重视民众安全与历史语境的轻量回合制战略游戏。">
+  <meta name="description" content="《北岳烽火：1941—1942》是一款以晋察冀边区北岳区敌后战场为背景，围绕编组、交通线、不完整情报与同步计划展开的历史战略游戏。">
   <meta property="og:title" content="北岳烽火：1941—1942">
-  <meta property="og:description" content="在封锁、扫荡与物资匮乏之中维系敌后组织、群众信任与交通联络。">
+  <meta property="og:description" content="调度五支有位置与疲劳的编组，判断不完整敌情，维系会被切断的秘密交通网。">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="zh_CN">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="北岳烽火：1941—1942">
-  <meta name="twitter:description" content="一场关于建设、保存与行动取舍的北岳敌后战场轻量战略推演。">
-  <title>北岳烽火：1941—1942｜敌后战场轻量战略游戏</title>
-  <link rel="stylesheet" href="./Style_Game.css">
+  <meta name="twitter:description" content="一场关于编组、交通、情报与预案的北岳敌后战场战略推演。">
+  <title>北岳烽火：1941—1942｜敌后战场战略推演</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=2">
 </head>
 <body>
   <a class="skipLink" href="#strategyMap">跳至战略地图</a>
@@ -85,11 +85,21 @@
               <span class="modeSwatch modeEnemy" aria-hidden="true"></span>敌情
             </button>
           </div>
+          <aside id="mapLegend" class="mapLegend" aria-label="战略地图图例">
+            <strong>图例</strong>
+            <span>交通线状态将在载入战局后显示</span>
+          </aside>
         </div>
+
+        <aside id="forecastBanner" class="forecastBanner" aria-labelledby="forecastTitle">
+          <span class="forecastLabel">本回合敌情研判</span>
+          <strong id="forecastTitle">封锁线正在收紧</strong>
+          <p>可靠情报尚在汇集。行动前请同时考虑地区暴露与群众风险。</p>
+        </aside>
 
         <div id="strategyMap" class="strategyMap" role="region" aria-label="北岳敌后战场战略地图，按 Tab 键可依次浏览地区" tabindex="-1">
           <div class="mapGrid" aria-hidden="true"></div>
-          <div id="routeLayer" class="routeLayer" aria-hidden="true"></div>
+          <div id="routeLayer" class="routeLayer" role="group" aria-label="地区之间的交通线状态"></div>
           <div id="regionLayer" class="regionLayer" role="group" aria-label="可选择的战略地区">
             <div class="mapLoading" role="status">
               <span class="mapLoadingMark" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -98,27 +108,13 @@
             </div>
           </div>
 
-          <aside id="forecastBanner" class="forecastBanner" aria-labelledby="forecastTitle">
-            <span class="forecastLabel">本回合敌情研判</span>
-            <strong id="forecastTitle">封锁线正在收紧</strong>
-            <p>可靠情报尚在汇集。行动前请同时考虑地区暴露与群众风险。</p>
-          </aside>
-
-          <aside id="mapLegend" class="mapLegend" aria-label="战略地图图例">
-            <strong>图例</strong>
-            <span><i class="legendMark legendNetwork" aria-hidden="true"></i>联络区域</span>
-            <span><i class="legendMark legendPressure" aria-hidden="true"></i>高压区域</span>
-            <span><i class="legendLine legendRail" aria-hidden="true"></i>铁路封锁</span>
-            <span><i class="legendLine legendRoute" aria-hidden="true"></i>秘密交通</span>
-          </aside>
-
           <p class="mapCaption">边界、节点与邻接关系均为战略抽象，并非精确历史地图。</p>
         </div>
       </section>
 
       <aside id="commandPanel" class="commandPanel" aria-labelledby="commandPanelTitle">
         <header id="selectionHeader" class="selectionHeader">
-          <span class="sectionKicker">地区行动簿</span>
+          <span class="sectionKicker">编组与地区任务</span>
           <h2 id="commandPanelTitle"><span id="regionTitle">尚未选定地区</span></h2>
           <p id="regionSubtitle">战略地图载入后，选择一个地区查看情况并拟定行动。</p>
         </header>
@@ -151,10 +147,10 @@
         <section class="actionSection" aria-labelledby="actionTitle">
           <div class="panelHeading">
             <div>
-              <span class="sectionKicker">可用行动</span>
-              <h3 id="actionTitle">拟定本回合命令</h3>
+              <span class="sectionKicker">同步作战计划</span>
+              <h3 id="actionTitle">选择编组、地区与预案</h3>
             </div>
-            <small>最多三项</small>
+            <small>5支编组 · 4点指挥</small>
           </div>
           <div id="actionList" class="actionList" aria-live="polite">
             <div class="actionLoading" aria-hidden="true">
@@ -190,7 +186,7 @@
             </div>
             <small>全局历史进程固定，地区代价与贡献由你的选择改变</small>
           </header>
-          <div id="timelineTrack" class="timelineTrack" role="group" aria-label="1941年至1942年季度时间线">
+          <div id="timelineTrack" class="timelineTrack" role="group" aria-label="1941年至1942年十二个作战期时间线">
             <span class="timelineStep timelineCurrent" aria-current="step"><span>1941</span><strong>春</strong></span>
             <span class="timelineStep"><span>1941</span><strong>夏</strong></span>
             <span class="timelineStep"><span>1941</span><strong>秋</strong></span>
@@ -209,11 +205,11 @@
             <p id="turnContext">先辨明封锁线内外的态势，再决定建设、行动或转移。</p>
           </div>
           <ol id="orderList" class="orderList" aria-label="已拟定命令">
-            <li class="emptyOrder">尚未拟定命令</li>
+            <li class="emptyOrder">尚未配置编组</li>
           </ol>
           <div class="turnActions">
             <button id="clearOrdersButton" class="secondaryButton" type="button" disabled>撤回命令</button>
-            <button id="commitTurnButton" class="primaryButton" type="button" disabled>提交本回合</button>
+            <button id="commitTurnButton" class="primaryButton" type="button" disabled>锁定同步计划</button>
           </div>
         </aside>
       </section>
@@ -231,6 +227,6 @@
 
   <noscript><div class="noScript" role="alert">本游戏需要启用 JavaScript 才能载入战略地图与回合系统。</div></noscript>
 
-  <script type="module" src="./Script_Game.mjs"></script>
+  <script type="module" src="./Script_Game.mjs?v=2"></script>
 </body>
 </html>
