@@ -1,0 +1,1136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="太行·1941 BehindTheLines Godot 编辑器工具使用手册：内容、数值、地图与视效工作流。">
+  <meta name="theme-color" content="#1f2923">
+  <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/">
+  <title>太行·1941｜Godot 编辑器工具手册</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #242018;
+      --muted: #6e6558;
+      --paper: #f3eddd;
+      --paper-deep: #e8dfca;
+      --panel: rgba(255, 252, 243, 0.78);
+      --line: rgba(78, 66, 49, 0.2);
+      --forest: #1f2923;
+      --forest-soft: #33453a;
+      --red: #96392e;
+      --red-soft: #ead3ca;
+      --gold: #b48a45;
+      --gold-soft: #efe1bd;
+      --green: #3e6952;
+      --shadow: 0 20px 52px rgba(51, 42, 29, 0.12);
+      --radius: 18px;
+      --content: 1160px;
+      font-family: Inter, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      font-synthesis: none;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 78px;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% -5%, rgba(180, 138, 69, 0.18), transparent 30rem),
+        linear-gradient(180deg, #f8f3e7 0%, var(--paper) 35%, #eee6d4 100%);
+      line-height: 1.75;
+    }
+
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      content: "";
+      opacity: 0.22;
+      background-image:
+        linear-gradient(rgba(65, 53, 38, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(65, 53, 38, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: linear-gradient(to bottom, black, transparent 70%);
+    }
+
+    a {
+      color: var(--red);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
+    }
+
+    a:hover {
+      color: #6f261f;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--gold);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      padding: 8px 12px;
+      color: white;
+      background: var(--red);
+      border-radius: 8px;
+      transform: translateY(-160%);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(31, 41, 35, 0.95);
+      backdrop-filter: blur(16px);
+    }
+
+    .topbar-inner {
+      display: flex;
+      width: min(var(--content), calc(100% - 36px));
+      min-height: 58px;
+      margin: 0 auto;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      color: #fff9e9;
+      align-items: center;
+      gap: 12px;
+      font-weight: 750;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 31px;
+      height: 31px;
+      color: #fff8e9;
+      background: var(--red);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 50%;
+      place-items: center;
+      font-family: Georgia, serif;
+      font-size: 17px;
+      box-shadow: 0 0 0 4px rgba(180, 138, 69, 0.15);
+    }
+
+    .topnav {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .topnav a {
+      color: rgba(255, 249, 233, 0.74);
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    .topnav a:hover {
+      color: white;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      color: #fff9e9;
+      background:
+        linear-gradient(120deg, rgba(31, 41, 35, 0.96), rgba(45, 56, 46, 0.91)),
+        var(--forest);
+    }
+
+    .hero::after {
+      position: absolute;
+      right: -90px;
+      bottom: -170px;
+      width: 530px;
+      height: 360px;
+      content: "";
+      border: 1px solid rgba(239, 225, 189, 0.14);
+      border-radius: 50%;
+      box-shadow:
+        0 0 0 50px rgba(239, 225, 189, 0.035),
+        0 0 0 100px rgba(239, 225, 189, 0.025);
+      transform: rotate(-9deg);
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      width: min(var(--content), calc(100% - 36px));
+      margin: 0 auto;
+      padding: 76px 0 68px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      margin: 0 0 18px;
+      padding: 5px 11px;
+      color: #f3ddb0;
+      border: 1px solid rgba(243, 221, 176, 0.28);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+      line-height: 1.25;
+    }
+
+    h1 {
+      max-width: 820px;
+      margin: 0;
+      font-size: clamp(40px, 6vw, 72px);
+      font-weight: 820;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-lead {
+      max-width: 760px;
+      margin: 22px 0 28px;
+      color: rgba(255, 249, 233, 0.76);
+      font-size: clamp(17px, 2vw, 21px);
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .meta-chip {
+      padding: 7px 12px;
+      color: #fff9e9;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.055);
+      font-size: 13px;
+    }
+
+    .tool-strip {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      width: min(var(--content), calc(100% - 36px));
+      margin: -28px auto 46px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .tool-card {
+      display: block;
+      min-height: 150px;
+      padding: 22px;
+      color: var(--ink);
+      border: 1px solid rgba(78, 66, 49, 0.12);
+      border-top: 4px solid var(--gold);
+      border-radius: var(--radius);
+      background: rgba(255, 252, 243, 0.96);
+      box-shadow: var(--shadow);
+      text-decoration: none;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .tool-card:nth-child(2) {
+      border-top-color: var(--red);
+    }
+
+    .tool-card:nth-child(3) {
+      border-top-color: var(--green);
+    }
+
+    .tool-card:nth-child(4) {
+      border-top-color: #6a6b8e;
+    }
+
+    .tool-card:hover {
+      color: var(--ink);
+      box-shadow: 0 22px 58px rgba(51, 42, 29, 0.18);
+      transform: translateY(-4px);
+    }
+
+    .tool-index {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .tool-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-family: "Noto Serif SC", "Songti SC", Georgia, serif;
+      font-size: 21px;
+    }
+
+    .tool-card span:last-child {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .document-shell {
+      display: grid;
+      width: min(var(--content), calc(100% - 36px));
+      margin: 0 auto;
+      padding-bottom: 80px;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 54px;
+      align-items: start;
+    }
+
+    .side-nav {
+      position: sticky;
+      top: 86px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 252, 243, 0.52);
+    }
+
+    .side-nav p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .side-nav a {
+      display: block;
+      padding: 7px 10px;
+      color: #4f493f;
+      border-left: 2px solid transparent;
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    .side-nav a:hover {
+      color: var(--red);
+      border-left-color: var(--red);
+      background: rgba(150, 57, 46, 0.05);
+    }
+
+    .content {
+      min-width: 0;
+    }
+
+    .chapter {
+      margin-bottom: 68px;
+      scroll-margin-top: 86px;
+    }
+
+    .chapter-label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--red);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: clamp(30px, 4vw, 44px);
+      letter-spacing: -0.025em;
+    }
+
+    h3 {
+      margin: 34px 0 12px;
+      font-size: 23px;
+    }
+
+    p {
+      margin: 0 0 16px;
+    }
+
+    .lede {
+      max-width: 760px;
+      color: #51493e;
+      font-size: 18px;
+    }
+
+    code {
+      padding: 0.14em 0.4em;
+      color: #73352e;
+      border: 1px solid rgba(150, 57, 46, 0.12);
+      border-radius: 5px;
+      background: rgba(234, 211, 202, 0.42);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.9em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 18px 0;
+      padding: 18px 20px;
+      color: #f7f1df;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      background: #222a24;
+      box-shadow: inset 4px 0 0 var(--gold);
+    }
+
+    pre code {
+      padding: 0;
+      color: inherit;
+      border: 0;
+      background: transparent;
+      font-size: 13px;
+    }
+
+    .callout {
+      margin: 22px 0;
+      padding: 18px 20px;
+      border: 1px solid rgba(180, 138, 69, 0.3);
+      border-left: 4px solid var(--gold);
+      border-radius: 12px;
+      background: rgba(239, 225, 189, 0.44);
+    }
+
+    .callout.warning {
+      border-color: rgba(150, 57, 46, 0.24);
+      border-left-color: var(--red);
+      background: rgba(234, 211, 202, 0.4);
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .callout p:last-child {
+      margin-bottom: 0;
+    }
+
+    .facts {
+      display: grid;
+      margin: 24px 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .fact {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+
+    .fact small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fact strong {
+      display: block;
+      margin-top: 5px;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    .steps {
+      margin: 22px 0 28px;
+      padding: 0;
+      list-style: none;
+      counter-reset: guide-step;
+    }
+
+    .steps li {
+      position: relative;
+      min-height: 42px;
+      margin: 0 0 14px;
+      padding: 8px 0 8px 50px;
+      counter-increment: guide-step;
+    }
+
+    .steps li::before {
+      position: absolute;
+      top: 4px;
+      left: 0;
+      display: grid;
+      width: 34px;
+      height: 34px;
+      color: white;
+      content: counter(guide-step, decimal-leading-zero);
+      border-radius: 50%;
+      background: var(--forest-soft);
+      place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .plain-list {
+      padding-left: 1.25rem;
+    }
+
+    .plain-list li {
+      margin-bottom: 8px;
+      padding-left: 4px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 22px 0;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 252, 243, 0.62);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 620px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: #4d463d;
+      background: rgba(232, 223, 202, 0.62);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .mini-panel {
+      margin-bottom: 16px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+    }
+
+    .mini-panel h3 {
+      margin-top: 0;
+      font-size: 19px;
+    }
+
+    .mini-panel p:last-child,
+    .mini-panel ul:last-child,
+    .mini-panel ol:last-child {
+      margin-bottom: 0;
+    }
+
+    details {
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+
+    summary {
+      padding: 15px 18px;
+      cursor: pointer;
+      font-weight: 720;
+    }
+
+    details p {
+      margin: 0;
+      padding: 0 18px 17px;
+      color: #575044;
+    }
+
+    .footer {
+      color: rgba(255, 249, 233, 0.68);
+      background: var(--forest);
+    }
+
+    .footer-inner {
+      display: flex;
+      width: min(var(--content), calc(100% - 36px));
+      min-height: 120px;
+      margin: 0 auto;
+      padding: 28px 0;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .footer strong {
+      display: block;
+      color: #fff9e9;
+    }
+
+    .footer p {
+      margin: 3px 0 0;
+      font-size: 13px;
+    }
+
+    .footer a {
+      color: #f0d8a8;
+    }
+
+    @media (max-width: 900px) {
+      .tool-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .document-shell {
+        grid-template-columns: 1fr;
+        gap: 28px;
+      }
+
+      .side-nav {
+        position: static;
+        display: flex;
+        overflow-x: auto;
+        padding: 10px;
+        gap: 2px;
+      }
+
+      .side-nav p {
+        display: none;
+      }
+
+      .side-nav a {
+        flex: 0 0 auto;
+        border-left: 0;
+        border-bottom: 2px solid transparent;
+      }
+
+      .facts {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .topbar-inner,
+      .hero-inner,
+      .tool-strip,
+      .document-shell,
+      .footer-inner {
+        width: min(100% - 24px, var(--content));
+      }
+
+      .topnav a:first-child {
+        display: none;
+      }
+
+      .hero-inner {
+        padding: 54px 0 52px;
+      }
+
+      h1 {
+        font-size: 40px;
+      }
+
+      .tool-strip {
+        margin-top: -22px;
+        grid-template-columns: 1fr;
+      }
+
+      .tool-card {
+        min-height: auto;
+      }
+
+      .split {
+        grid-template-columns: 1fr;
+      }
+
+      .footer-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      *,
+      *::before,
+      *::after {
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media print {
+      .topbar,
+      .side-nav,
+      .tool-strip {
+        display: none;
+      }
+
+      .hero {
+        color: var(--ink);
+        background: white;
+      }
+
+      .hero-lead {
+        color: var(--ink);
+      }
+
+      .document-shell {
+        display: block;
+        width: 100%;
+      }
+
+      .chapter {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到正文</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/BehindTheLines/" aria-label="BehindTheLines 文档首页">
+        <span class="brand-mark" aria-hidden="true">太</span>
+        <span>BehindTheLines 文档</span>
+      </a>
+      <nav class="topnav" aria-label="站点导航">
+        <a href="#overview">快速开始</a>
+        <a href="/taihang/">网页版原型</a>
+        <a href="/">返回主站</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero-inner">
+      <p class="eyebrow">Godot 4.7 · Editor Field Manual</p>
+      <h1 id="page-title">太行·1941<br>编辑器工具手册</h1>
+      <p class="hero-lead">用四个编辑期工作台维护文本、平衡、地图与 3D 视效。本文说明每个入口怎么用、数据保存在哪里、何时生效，以及怎样避免污染权威默认表。</p>
+      <div class="meta-row" aria-label="文档摘要">
+        <span class="meta-chip">4 个编辑器工具</span>
+        <span class="meta-chip">覆盖层优先</span>
+        <span class="meta-chip">1920 × 1080 主验收</span>
+        <span class="meta-chip">更新于 2026-07-13</span>
+      </div>
+    </div>
+  </section>
+
+  <nav class="tool-strip" aria-label="四个编辑器工具">
+    <a class="tool-card" href="#content-editor">
+      <span class="tool-index">Tool 01 · Localization</span>
+      <strong>BTL 内容</strong>
+      <span>提取 GameData 文案，维护多语言翻译与缺失回落。</span>
+    </a>
+    <a class="tool-card" href="#balance-editor">
+      <span class="tool-index">Tool 02 · Balance</span>
+      <strong>BTL 数值</strong>
+      <span>调整单位参数和数值型 CFG，仅保存与默认值的差异。</span>
+    </a>
+    <a class="tool-card" href="#map-editor">
+      <span class="tool-index">Tool 03 · World</span>
+      <strong>BTL 地图</strong>
+      <span>按种子生成、速览、保存并读回可复用地图。</span>
+    </a>
+    <a class="tool-card" href="#visual-editor">
+      <span class="tool-index">Tool 04 · Rendering</span>
+      <strong>BTL 视效</strong>
+      <span>实时调整相机、环境、画质与级联阴影。</span>
+    </a>
+  </nav>
+
+  <div class="document-shell">
+    <aside class="side-nav" aria-label="本文目录">
+      <p>本文目录</p>
+      <a href="#overview">入口与原则</a>
+      <a href="#content-editor">BTL 内容</a>
+      <a href="#balance-editor">BTL 数值</a>
+      <a href="#map-editor">BTL 地图</a>
+      <a href="#visual-editor">BTL 视效</a>
+      <a href="#workflows">常用工作流</a>
+      <a href="#troubleshooting">故障排查</a>
+      <a href="#validation">验证与提交</a>
+    </aside>
+
+    <main class="content" id="main-content">
+      <section class="chapter" id="overview">
+        <span class="chapter-label">00 · Start here</span>
+        <h2>入口与共通原则</h2>
+        <p class="lede">使用 Godot 4.7 打开工程并等待首次资源导入完成。三个 Dock 位于编辑器右侧，「BTL 地图」位于顶部 2D、3D、Script 同一排的主屏入口。</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>工具</th>
+                <th>Godot 中的位置</th>
+                <th>保存文件</th>
+                <th>主要生效时机</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>BTL 内容</td>
+                <td>右下 Dock</td>
+                <td><code>Data_StringTable.json</code></td>
+                <td>重建模型文本或切换语言</td>
+              </tr>
+              <tr>
+                <td>BTL 数值</td>
+                <td>右上 Dock</td>
+                <td><code>Data_BalanceOverrides.json</code></td>
+                <td>新建模型、新开对局</td>
+              </tr>
+              <tr>
+                <td>BTL 地图</td>
+                <td>顶部主屏</td>
+                <td><code>maps/Data_Map*.json</code></td>
+                <td>读取地图后传入新对局</td>
+              </tr>
+              <tr>
+                <td>BTL 视效</td>
+                <td>右上 Dock</td>
+                <td><code>Data_VisualSettings.tres</code></td>
+                <td>启动游戏或运行时重载</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <strong>先看黄色圆点。</strong>
+          <p>工具标题出现「● 未保存」时，必须点击工具自己的保存按钮。只保存当前 Godot 场景，不等于保存这些编辑器数据。</p>
+        </div>
+
+        <h3>四条不可破坏的数据规则</h3>
+        <ul class="plain-list">
+          <li>默认数值和基准文案只存在于 <code>src/Script_GameData.gd</code>。</li>
+          <li>编辑器写入覆盖层或数据文件，不直接修改权威默认表。</li>
+          <li>运行时只读取当前模型的 <code>model.tables</code> 与 <code>model.cfg</code>，禁止修改 <code>Rules.*</code> 常量内容。</li>
+          <li>开始批量调整前先确认 Git 状态，保存后只审查对应数据文件的差异。</li>
+        </ul>
+
+        <h3>入口不见了怎么办</h3>
+        <p>打开「Project → Project Settings → Plugins」，确认 BTL Balance Editor、BTL Content Editor、BTL Map Editor、BTL Visual Editor 均已启用。重新启用后仍未出现，先检查底部输出面板中的脚本错误，再重启 Godot。</p>
+      </section>
+
+      <section class="chapter" id="content-editor">
+        <span class="chapter-label">01 · Localization</span>
+        <h2>BTL 内容</h2>
+        <p class="lede">把 GameData 中允许本地化的文本转成稳定键值，并在一个表格里维护各语言译文。键与数据路径一一对应，例如 <code>UT.militia.name</code>、<code>WAR_PHASES.0.name</code>。</p>
+
+        <div class="facts">
+          <div class="fact"><small>入口</small><strong>右下「BTL 内容」Dock</strong></div>
+          <div class="fact"><small>数据</small><strong>Data_StringTable.json</strong></div>
+          <div class="fact"><small>基准语言</small><strong>zh-CN</strong></div>
+        </div>
+
+        <h3>添加或更新翻译</h3>
+        <ol class="steps">
+          <li>点击「从游戏数据提取」，扫描白名单数据表并补充尚不存在的词条。</li>
+          <li>在语言输入框填写 BCP-47 代码，例如 <code>en</code>、<code>ja</code> 或 <code>zh-TW</code>，点击「➕语言」。</li>
+          <li>从下拉框选择目标语言，双击「译文」列填写。清空译文会删除该语言值。</li>
+          <li>使用搜索框按键、基准文本或译文过滤；勾选「只看缺翻译」集中处理空项。</li>
+          <li>确认标题状态后点击「保存」，写入字符串表。</li>
+        </ol>
+
+        <div class="callout">
+          <strong>缺翻译会自动回落。</strong>
+          <p>目标语言没有内容时，运行时显示基准语言文本，不会出现空白 UI。</p>
+        </div>
+
+        <h3>提取按钮实际会做什么</h3>
+        <ul class="plain-list">
+          <li>只新增缺失词条，或补上空缺的基准文本。</li>
+          <li>不会覆盖已有基准文本，也不会覆盖已有翻译。</li>
+          <li>如果上游基准文案有意修改，需要手工同步既有基准文本。</li>
+          <li>新增了可本地化的数据表或字段时，还要更新 <code>Script_StringTable.gd</code> 的 <code>TEXT_FIELDS</code> 白名单。</li>
+        </ul>
+
+        <h3>运行时表现</h3>
+        <p>字符串表包含两个及以上语言时，游戏 Debug 面板出现「语言」下拉框。切换语言会重建当前模型数据表、刷新界面并保存选择。保存后，已经运行的游戏不会自动监听文件变化；切换一次语言使其重读，或重新启动游戏。</p>
+
+        <div class="callout warning">
+          <strong>当前覆盖范围有限。</strong>
+          <p>只有 GameData 白名单中的数据表文案会被提取。<code>Script_GameModel.gd</code> 等脚本里的内联日志文本仍属于后续阶段。</p>
+        </div>
+      </section>
+
+      <section class="chapter" id="balance-editor">
+        <span class="chapter-label">02 · Balance</span>
+        <h2>BTL 数值</h2>
+        <p class="lede">用于调单位战斗参数、维护与造价，也可覆盖任意数值型 CFG。文件只记录与默认值的差异，因此平衡实验不会改动 DataParity 保护的权威表。</p>
+
+        <div class="facts">
+          <div class="fact"><small>入口</small><strong>右上「BTL 数值」Dock</strong></div>
+          <div class="fact"><small>数据</small><strong>Data_BalanceOverrides.json</strong></div>
+          <div class="fact"><small>范围</small><strong>单位参数 + 数值 CFG</strong></div>
+        </div>
+
+        <h3>调整单位</h3>
+        <ol class="steps">
+          <li>在「单位参数」下拉框选择单位。</li>
+          <li>修改战力、移动力、视野、每回合维护，或粮食、人力、军火、组织造价。</li>
+          <li>黄色标签与「●」表示该项已有覆盖。点击单项右侧「↺」会删除覆盖并恢复默认。</li>
+          <li>点击「保存」写入覆盖文件，新开的对局才会使用新值。</li>
+        </ol>
+
+        <h3>添加 CFG 覆盖</h3>
+        <ol class="steps">
+          <li>在 CFG 搜索框输入键名的一部分，例如 <code>charges</code>。</li>
+          <li>从候选列表选中目标键，点击加号。</li>
+          <li>修改新出现的数值行；不再需要时点击该行「↺」。</li>
+        </ol>
+
+        <div class="callout warning">
+          <strong>刚加入的 CFG 也算覆盖。</strong>
+          <p>即使数值尚未改变，它也会出现在覆盖文件中。不需要时主动点击「↺」，避免制造无意义差异。</p>
+        </div>
+
+        <h3>顶部三个按钮</h3>
+        <div class="split">
+          <div class="mini-panel">
+            <h3>保存 / 全部重置</h3>
+            <p>「保存」写入磁盘。「全部重置」只在内存中清空全部覆盖，还要再次保存才会形成空覆盖文件。</p>
+          </div>
+          <div class="mini-panel">
+            <h3>重新载入</h3>
+            <p>放弃 Dock 中尚未保存的改动，从磁盘重新读取覆盖文件。</p>
+          </div>
+        </div>
+
+        <h3>什么时候生效</h3>
+        <ul class="plain-list">
+          <li>新建 <code>GameModel</code> 或新开对局时应用。</li>
+          <li>已运行模型与进行中的存档保留原值，不会热更新。</li>
+          <li>地图编辑器每次生成都会新建模型，因此会读取已经保存的覆盖。</li>
+          <li>MapParity 在剥离覆盖层的纯净默认数据上运行，普通平衡覆盖不会改变基准哈希。</li>
+        </ul>
+      </section>
+
+      <section class="chapter" id="map-editor">
+        <span class="chapter-label">03 · World generation</span>
+        <h2>BTL 地图</h2>
+        <p class="lede">直接调用游戏的 <code>GameModel.GenMap</code>，按固定种子和参数生成可复现地图。中央预览用于快速检查地形、村庄、铁路和设施布局。</p>
+
+        <div class="facts">
+          <div class="fact"><small>入口</small><strong>顶部「BTL 地图」主屏</strong></div>
+          <div class="fact"><small>数据</small><strong>maps/Data_Map*.json</strong></div>
+          <div class="fact"><small>同源算法</small><strong>GameModel.GenMap</strong></div>
+        </div>
+
+        <h3>生成一张地图</h3>
+        <ol class="steps">
+          <li>填写种子；相同配置与相同种子应生成相同地图。</li>
+          <li>设置地图宽、高、村庄数、村庄最小间距和土匪山寨数。</li>
+          <li>点击「生成」。骰子按钮会随机更换种子并立即生成。</li>
+          <li>检查中央六边格预览，以及左侧各地形、村庄、铁路、炮楼、县城和匪寨统计。</li>
+        </ol>
+
+        <p>预览色块和标记只用于布局验收，不代表游戏内最终 2D 或 3D 美术效果。</p>
+
+        <h3>保存与命名</h3>
+        <ol class="steps">
+          <li>在顶部输入显示名，可以使用中文，也可以留空。</li>
+          <li>点击「保存」，文件写入 <code>res://maps/</code>。</li>
+          <li>文件主干会整理为 <code>Data_Map&lt;AsciiPascalCase&gt;.json</code>；没有可用 ASCII 字符时退回 <code>Data_MapSeed&lt;种子&gt;.json</code>。</li>
+          <li>完整显示名保存在 <code>meta.name</code>，不依赖文件名保存。</li>
+        </ol>
+
+        <div class="callout warning">
+          <strong>同名文件会直接覆盖。</strong>
+          <p>地图文件只包含生成元数据、格子数据和总部位置，不包含单位、回合进度或其他进行中对局状态。</p>
+        </div>
+
+        <h3>读回与开局</h3>
+        <p>点击刷新按钮更新列表，选择 <code>Data_Map*</code> 后点击「读取」。这只会更新编辑器预览和参数显示，不会自动启动游戏。代码侧开局入口如下：</p>
+
+        <pre><code>var loaded := TaihangMapFiles.LoadMap("Data_MapExample")
+model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
+
+        <p>地图通常是体积较大的单行 JSON。人工检查时优先使用本工具的速览，或调用 <code>TaihangMapFiles.MapStats()</code>，不要依赖逐行阅读。</p>
+      </section>
+
+      <section class="chapter" id="visual-editor">
+        <span class="chapter-label">04 · Rendering</span>
+        <h2>BTL 视效</h2>
+        <p class="lede">在不启动完整游戏的情况下调整真正的 <code>Script_Map3D</code> 渲染路径。预览台包含四种地形、村庄、铁路、设施、单位与三级战争迷雾。</p>
+
+        <div class="facts">
+          <div class="fact"><small>入口</small><strong>右上「BTL 视效」Dock</strong></div>
+          <div class="fact"><small>数据</small><strong>Data_VisualSettings.tres</strong></div>
+          <div class="fact"><small>预览</small><strong>Scene_VisualPreview.tscn</strong></div>
+        </div>
+
+        <h3>推荐流程</h3>
+        <ol class="steps">
+          <li>点击「预览场景」，打开 <code>Scene_VisualPreview.tscn</code>。</li>
+          <li>保持 3D 编辑器视口可见，在 Dock 中调整滑条、颜色、选项和开关。</li>
+          <li>预览满意后点击「保存」，写入视效 Resource。</li>
+          <li>如果游戏正在运行，在 Debug 面板点击「重载视效配置」拉取刚保存的结果。</li>
+        </ol>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>分组</th><th>可调整参数</th></tr></thead>
+            <tbody>
+              <tr><td>相机</td><td>俯角、FOV、镜头距离</td></tr>
+              <tr><td>环境系统</td><td>时刻、时刻驱动氛围、体积雾、雾密度、天空、太阳、环境光</td></tr>
+              <tr><td>画质</td><td>色调映射、曝光、TAA、性能模式</td></tr>
+              <tr><td>级联阴影</td><td>关闭 / 2 级 / 4 级、阴影距离</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>时刻与手工颜色</h3>
+        <div class="split">
+          <div class="mini-panel">
+            <h3>关闭时刻驱动氛围</h3>
+            <p>默认模式。时刻主要控制太阳角度，天空、太阳与环境光采用手工颜色。</p>
+          </div>
+          <div class="mini-panel">
+            <h3>开启时刻驱动氛围</h3>
+            <p>昼夜曲线接管天空、太阳与环境光，手工颜色不再是最终显示值。</p>
+          </div>
+        </div>
+
+        <h3>检查器与恢复默认</h3>
+        <p>「检查器」会在 Godot Inspector 中打开同一个 Resource，适合精确输入。「恢复默认」只修改内存值并标记为未保存；确认采用默认值后仍须点击「保存」。Dock 修改会先作用于内存，因此预览可在保存前实时变化。</p>
+      </section>
+
+      <section class="chapter" id="workflows">
+        <span class="chapter-label">05 · Recipes</span>
+        <h2>三套常用工作流</h2>
+
+        <div class="mini-panel">
+          <h3>调一版平衡</h3>
+          <ol class="steps">
+            <li>在「BTL 数值」中只修改目标项并保存。</li>
+            <li>新开对局验证；涉及生成参数时，在「BTL 地图」中重新生成。</li>
+            <li>检查 <code>Data_BalanceOverrides.json</code> 的 Git 差异。</li>
+            <li>迭代期间跑快速回归，提交前跑全量回归。</li>
+          </ol>
+        </div>
+
+        <div class="mini-panel">
+          <h3>增加一种语言</h3>
+          <ol class="steps">
+            <li>从游戏数据提取，添加语言代码并填写译文。</li>
+            <li>使用「只看缺翻译」处理全部空项并保存。</li>
+            <li>在游戏 Debug 面板切换语言，检查回落和界面刷新。</li>
+            <li>以 1920 × 1080 检查裁切、对齐、弹窗和模态边界。</li>
+          </ol>
+        </div>
+
+        <div class="mini-panel">
+          <h3>制作并验收地图</h3>
+          <ol class="steps">
+            <li>记录种子和全部生成参数。</li>
+            <li>生成后用速览检查设施数量与地形分布。</li>
+            <li>使用明确的 ASCII 文件名部分和可读显示名保存。</li>
+            <li>重新读取一次，并在真实对局中验证可游玩性。</li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="chapter" id="troubleshooting">
+        <span class="chapter-label">06 · Troubleshooting</span>
+        <h2>常见故障</h2>
+
+        <details><summary>Dock 或「BTL 地图」入口不见了</summary><p>检查 Project Settings → Plugins，查看输出面板脚本错误，然后重启 Godot。</p></details>
+        <details><summary>改动在重启后消失</summary><p>检查工具标题是否仍显示「未保存」，使用工具自己的保存按钮。</p></details>
+        <details><summary>数值在当前存档中没有变化</summary><p>这是预期行为。保存后新开对局验证，进行中的存档不会被覆盖。</p></details>
+        <details><summary>翻译保存后当前游戏没有变化</summary><p>切换一次语言让模型重读字符串表，或重新启动游戏。</p></details>
+        <details><summary>视效预览变化了，游戏却没有变化</summary><p>先点击「保存」，再在运行时 Debug 面板点击「重载视效配置」。</p></details>
+        <details><summary>地图列表没有刚保存的文件</summary><p>点击右侧刷新按钮。仍缺失时检查输出面板和 <code>maps/</code> 目录。</p></details>
+        <details><summary>JSON 或 Resource 无法读取</summary><p>检查最近的手工编辑是否破坏格式，优先从 Git 恢复对应数据文件。</p></details>
+      </section>
+
+      <section class="chapter" id="validation">
+        <span class="chapter-label">07 · Validation</span>
+        <h2>验证与提交</h2>
+        <p>编辑器工具或数据文件改变后，先做无窗口编辑器检查并跑快速回归：</p>
+
+        <pre><code>$godot = 'C:\Users\Bentl\Downloads\Installer\Godot_v4.7-stable_win64.exe\Godot_v4.7-stable_win64_console.exe'
+&amp; $godot --headless --path . --editor --quit
+.\RunTests.ps1 -Fast</code></pre>
+
+        <p>提交前必须执行完整回归：</p>
+        <pre><code>.\RunTests.ps1</code></pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>专项回归</th><th>保护内容</th></tr></thead>
+            <tbody>
+              <tr><td><code>Script_TestContentTools.gd</code></td><td>内容、数值与地图数据链路</td></tr>
+              <tr><td><code>Script_TestVisualSettings.gd</code></td><td>视效 Resource、应用路径和预览场景</td></tr>
+              <tr><td><code>Script_TestDataParity.gd</code></td><td>GameData 默认表哈希</td></tr>
+              <tr><td><code>Script_TestMapParity.gd</code></td><td>固定种子地图生成哈希</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout warning">
+          <strong>公开站点资产红线</strong>
+          <p><code>assets/audio/</code> 中的 Civilization VI 素材只供本机对照验收。不得复制、嵌入或上传到本页面及任何公开部署产物。</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div>
+        <strong>BehindTheLines · 太行·1941 Godot 移植</strong>
+        <p>编辑器工具公开手册 · 最后更新 <time datetime="2026-07-13">2026-07-13</time></p>
+      </div>
+      <div>
+        <a href="#page-title">回到顶部</a>
+        &nbsp;·&nbsp;
+        <a href="/">bentleyblanks.github.io</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
