@@ -896,7 +896,7 @@ kbd {
   background:
     linear-gradient(90deg, rgba(15, 19, 16, 0.97) 0%, rgba(15, 19, 16, 0.90) 42%, rgba(15, 19, 16, 0.36) 72%, rgba(15, 19, 16, 0.74) 100%),
     linear-gradient(180deg, rgba(5, 8, 6, 0.12), rgba(9, 13, 10, 0.82)),
-    url("./Texture_TitleField.png") center / cover no-repeat,
+    url("./Texture_TitleField.jpg") center / cover no-repeat,
     radial-gradient(circle at 72% 42%, #67735c, #293329 43%, #101511 79%);
 }
 
