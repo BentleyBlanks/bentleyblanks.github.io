@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="BehindTheLines 单位帧动画生产规范：Lovart 原画、即梦视频、定长采样、抠图、脚线、投影、验收与 OneDrive 交付。">
+  <meta name="description" content="BehindTheLines BTL 角色动画编辑器与单位帧动画生产规范：Reference、Idle、Move、Attack 的生成、查询、重生成、重新处理、候选转正式及完整 Dreamina 流程。">
   <meta name="theme-color" content="#1f2923">
   <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/AnimationProduction/">
-  <title>单位帧动画生产规范｜BehindTheLines</title>
+  <title>BTL 角色动画编辑器与单位帧动画生产规范｜BehindTheLines</title>
   <style>
     :root {
       color-scheme: light;
@@ -275,6 +275,17 @@
     .checklist li { position: relative; padding: 10px 12px 10px 38px; border-bottom: 1px solid var(--line); }
     .checklist li::before { position: absolute; left: 10px; color: var(--green); content: "✓"; font-weight: 900; }
     .path-tree { margin: 20px 0 0; padding: 18px 20px; color: #f8efd9; background: #202923; border-radius: 14px; white-space: pre; overflow-x: auto; }
+    .editor-shot {
+      margin: 26px 0 6px;
+      overflow: hidden;
+      background: #172019;
+      border: 1px solid rgba(62, 105, 82, 0.3);
+      border-radius: 14px;
+      box-shadow: 0 14px 32px rgba(31, 41, 35, 0.16);
+    }
+    .editor-shot a { display: block; background: #11171b; }
+    .editor-shot img { display: block; width: 100%; height: auto; }
+    .editor-shot figcaption { padding: 12px 15px; color: #5f594f; background: #f7f0df; font-size: 13px; }
 
     .footer { color: rgba(255, 249, 233, 0.78); background: var(--forest); }
     .footer-inner {
@@ -332,7 +343,8 @@
         <span>BehindTheLines 文档</span>
       </a>
       <nav class="topnav" aria-label="站点导航">
-        <a href="#contract">硬性规范</a>
+        <a href="#editor">角色动画编辑器</a>
+        <a href="#contract">源图与动画契约</a>
         <a href="#pipeline">制作流程</a>
         <a href="#acceptance">验收交付</a>
         <a href="/BehindTheLines/">返回手册首页</a>
@@ -342,10 +354,11 @@
 
   <section class="hero" aria-labelledby="page-title">
     <div class="hero-inner">
-      <p class="eyebrow">Lovart → Dreamina → Godot</p>
-      <h1 id="page-title">单位帧动画<br>生产规范</h1>
-      <p class="hero-lead">从用户确认的正确原画设定出发，保留生成任务、视频、连续采样帧、透明图集、脚底投影与实机证据。以后每个动作使用同一时长、同一帧率和同一脚线。</p>
+      <p class="eyebrow">Image Provider → Dreamina → Godot</p>
+      <h1 id="page-title">BTL 角色动画编辑器<br>与单位帧动画生产规范</h1>
+      <p class="hero-lead">在 Godot 里集中管理 Reference、Idle、Move、Attack 的原始提示词、修订、provider 任务与处理状态，再从用户确认的原画出发，生成白底源图、Dreamina 视频、连续采样帧、透明图集、脚底投影与实机证据。</p>
       <div class="chips" aria-label="规范摘要">
+        <span class="chip">每次请求 1 张白底源图</span>
         <span class="chip">1.000 秒</span>
         <span class="chip">8 FPS</span>
         <span class="chip">每动作 8 帧</span>
@@ -359,7 +372,8 @@
   <div class="page-shell">
     <aside class="side-nav" aria-label="本文目录">
       <strong>本文目录</strong>
-      <a href="#contract">动画契约</a>
+      <a href="#editor">角色动画编辑器</a>
+      <a href="#contract">源图与动画契约</a>
       <a href="#pipeline">完整流程</a>
       <a href="#actions">动作状态</a>
       <a href="#shadow">脚底投影</a>
@@ -368,10 +382,70 @@
     </aside>
 
     <main class="content" id="main-content">
+      <section class="section" id="editor">
+        <span class="section-label">01 · Editor</span>
+        <h2>从任务发起到正式图集，都在一处看清</h2>
+        <p class="lede">在 Godot 顶部主屏切换到“BTL 角色动画”。左栏选择单位，中栏管理 Reference 与三个动作的生成输入和任务，右栏同时检查参考图、图集与逐帧动画。生成中的候选不会污染当前游戏图集；只有下载、抠图、装配与 QA 全部通过的 ready 结果才可进入正式输出。</p>
+
+        <figure class="editor-shot">
+          <a href="../Assets/Texture_UnitAnimationEditor.png" target="_blank" rel="noopener"><img src="../Assets/Texture_UnitAnimationEditor.png" alt="BTL 角色动画编辑器在 1920×1080 下的完整界面，包含单位列表、Reference 与动作任务、状态详情、图集和逐帧动画预览" width="1920" height="1080" loading="lazy"></a>
+          <figcaption>BTL 角色动画编辑器全貌。点击图片可查看原始尺寸；下方预览同时提供整张 atlas 与逐帧播放，便于检查错行、脚线和循环。</figcaption>
+        </figure>
+
+        <h3>一个单位由四个生产槽位组成</h3>
+        <div class="grid-2">
+          <div class="card"><h3>Reference</h3><p>角色身份基准。先生成并确认白底源图，再派生透明参考和 Dreamina 输入；动作视频不能越过未确认的 Reference 直接开工。</p></div>
+          <div class="card"><h3>Idle / Move / Attack</h3><p>三个动作各自拥有不可混用的提示词修订、Dreamina 任务、源视频、处理状态、候选帧和最终图集行。</p></div>
+        </div>
+
+        <h3>生成记录为什么分“原始提示词”和“修订”</h3>
+        <p>第一次提交给图像或视频 provider 的提示词是不可变生产事实。后续要求“帽檐更低”“移动不改变朝向”时，只能追加修订并形成新的有效提示词与新任务，不能覆盖原文。这样才能回答：哪次任务使用了什么条件、消耗是否确认、结果为何被接受或放弃。</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>编辑器操作</th><th>什么时候使用</th><th>结果</th></tr></thead>
+            <tbody>
+              <tr><td>生成 / 重生成</td><td>首次创建，或需要修改视觉/动作条件并让 provider 重新推理。</td><td>保留原始提示词，追加修订，创建新的 provider 任务身份；旧结果不被覆盖。</td></tr>
+              <tr><td>查询状态</td><td>任务已提交但仍在排队、生成或下载。</td><td>刷新 provider 状态、进度、结果 URL 与错误；不重复提交、不重复扣费。</td></tr>
+              <tr><td>重新处理</td><td>源图或源视频已经正确，只是抠图、采样、脚线、图集装配失败或参数更新。</td><td>复用已有 provider artifact，从本地处理阶段重新执行，不产生新的生成任务。</td></tr>
+              <tr><td>验收正式输出</td><td>候选已通过身份、循环、透明边缘、锚点、文件哈希和实机验证。</td><td>worker 只有在完整处理与 QA 成功后才写正式路径；失败或生成中的候选不覆盖现有图集。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout warning">
+          <strong>费用确认先于提交</strong>
+          <p>任何会新建图像或视频 provider 任务的操作，都要先展示 provider、模型、预计消耗和本次修订，并由操作者确认。查询状态和对既有 artifact 重新处理不应伪装成新生成，也不应重复扣费。</p>
+        </div>
+
+        <h3>状态模型：生成与处理分开表达</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>层级</th><th>典型状态</th><th>下一步</th></tr></thead>
+            <tbody>
+              <tr><td>Provider 生成</td><td>notSubmitted、queued、running、pendingConfirmation、succeeded、failed、cancelled、unknown</td><td>成功后下载并校验 artifact；失败时查看错误，再决定追加修订或重生成。</td></tr>
+              <tr><td>本地处理</td><td>queued、generating、downloading、matting、packing、importing、ready、failed、awaitingConfirmation、legacyImported、missing</td><td><code>legacyImported</code> 表示旧正式资产已导入，但生产履历或来源证据可能不完整，<code>missing</code> 表示正式文件缺失；处理失败优先“重新抽帧/抠图”，只有源内容错误才回到 provider 重生成。</td></tr>
+              <tr><td>正式资产</td><td>正式图集已安装 / 正式图集缺失</td><td>与候选阶段分开显示；ready 结果还必须存在正式输出并通过 artifact 哈希校验。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <strong>候选与正式必须隔离</strong>
+          <p>provider 成功只代表生成结束，不代表处理与美术验收通过。候选任务允许并存历史尝试；正式路径只接收完整处理、QA 和哈希验证成功的 ready 结果，并继续记录来源任务与处理参数。整张 atlas 预览用于核对行列，逐帧预览用于核对循环、漂移、脚线与残边，两者都通过后再交付。</p>
+        </div>
+      </section>
+
       <section class="section" id="contract">
-        <span class="section-label">01 · Contract</span>
-        <h2>帧数与时间只保留一套口径</h2>
-        <p class="lede">游戏内每个动作固定播放一秒。8 FPS 意味着每个动作必须正好 8 帧；禁止同一批单位出现相同时长却不同帧数、或相同帧数却不同播放时长。</p>
+        <span class="section-label">02 · Contract</span>
+        <h2>源图、帧数与时间只保留一套口径</h2>
+        <p class="lede">全项目 AI 原始素材统一遵守“一次 provider 请求、一张纯白底源图”；单位动画在此基础上固定每个动作播放一秒。8 FPS 意味着每个动作必须正好 8 帧。</p>
+
+        <div class="callout">
+          <strong>全项目 AI 原始素材统一契约</strong>
+          <p>单位、地块与散布物、UI 的原始素材图都必须由 ImageGen、Lovart 或其他图像 provider 直接生成为恰好一个图像 artifact，画布背景是不透明、均匀、纯 <code>#FFFFFF</code>。提示词目标始终是精确白，文件门禁只容许 provider 导出量化造成的每个 RGB 通道最多 2 级偏差（253–255）；禁止把透明图、烘焙棋盘格、品红底、渐变、环境背景或本地洗白当作合格源图。</p>
+          <p>一张固定网格 atlas 或 UI kit 可以包含多个规定对象，仍是一张源图；透明参考、<code>#FF00FF</code> Dreamina 输入、最终资产与图集、接触表和 QA 图都是后续派生物。</p>
+        </div>
 
         <div class="formula" aria-label="帧数等于时长乘以帧率">
           <div class="formula-card"><small>片段时长</small><strong>1.000 s</strong></div>
@@ -385,6 +459,7 @@
           <table>
             <thead><tr><th>项目</th><th>固定值</th><th>原因</th></tr></thead>
             <tbody>
+              <tr><td>图像 provider 原始素材</td><td>每请求 1 张；不透明纯 <code>#FFFFFF</code>，导出量化容差 ≤ 2/通道</td><td>让来源、抠图和任务身份保持唯一且可验证。</td></tr>
               <tr><td>即梦源视频</td><td>4 秒或更长</td><td>满足模型最短时长，并提供稳定连续窗口。</td></tr>
               <tr><td>游戏动作片段</td><td>1.000 秒</td><td>所有单位、所有动作共用同一运行时长度。</td></tr>
               <tr><td>播放速度</td><td>8 FPS</td><td>保留像素动画节奏，又不造成过宽图集。</td></tr>
@@ -403,13 +478,14 @@
       </section>
 
       <section class="section" id="pipeline">
-        <span class="section-label">02 · Pipeline</span>
+        <span class="section-label">03 · Pipeline</span>
         <h2>从正确原画到游戏资产</h2>
         <ol class="steps">
           <li><strong>锁定原画基准</strong>只使用用户明确确认的截图或设定图；临时生成图不能反向成为风格基准。</li>
-          <li><strong>Lovart 生成单位原图</strong>把原画作为真实附件传入相关项目与线程；保留 project ID、thread ID、提示词、积分确认、artifact URL、原始文件和 SHA-256。</li>
-          <li><strong>通过原画身份门禁</strong>送入即梦前逐项核对兵种、人数、坐骑、武器、朝向、俯视角和地图棋子比例。任一身份特征不符就退回 Lovart，禁止用旧临时图或“风格接近但角色错误”的图继续烧视频额度。</li>
-          <li><strong>清理 Lovart 背景</strong>检查文件是否具有真实 Alpha。若棋盘格被烘焙进 RGB，先用项目抠图工具转为透明 PNG，再合成统一 <code>#FF00FF</code> 即梦输入。</li>
+          <li><strong>图像 provider 生成白底源图</strong>通过 ImageGen、Lovart 或其他图像 provider 生成恰好一张不透明、均匀、纯 <code>#FFFFFF</code> 原始素材图；把原画作为真实附件传入，并保留 provider、项目或线程 ID、提示词、积分确认、artifact URL、原始文件和 SHA-256。</li>
+          <li><strong>通过原画身份与源图门禁</strong>逐项核对兵种、人数、坐骑、武器、朝向、俯视角和地图棋子比例，同时拒绝额外图片、透明、棋盘格、品红、渐变与环境背景。任一项不符就退回图像 provider，禁止继续消耗视频额度。</li>
+          <li><strong>白底转透明参考</strong>保留 provider 原始文件不变，用项目抠图工具从纯白底源图派生透明 PNG；透明图是处理结果，不是 provider 原图。</li>
+          <li><strong>透明参考转品红输入</strong>把透明参考图确定性合成到统一 <code>#FF00FF</code> 背景，作为 Dreamina 输入。品红只从这一步开始出现。</li>
           <li><strong>即梦生成源视频</strong>固定正交相机、人物位置、等距角度、服装与武器；输入图不含地面和投影。保留 session、submit ID、模型、积分、分辨率、时长与视频哈希。</li>
           <li><strong>审看完整视频</strong>制作整段接触表，判断身份漂移、比例变化、背景污染和循环。选取一个连续、稳定的 1 秒窗口。</li>
           <li><strong>定时采样与抠图</strong>按 8 FPS 的时间片中点采样：<code>start + (n + 0.5) / 8</code>。统一去除品红，不逐帧改尺寸。</li>
@@ -419,7 +495,7 @@
       </section>
 
       <section class="section" id="actions">
-        <span class="section-label">03 · Actions</span>
+        <span class="section-label">04 · Actions</span>
         <h2>三行动作必须诚实标记</h2>
         <div class="grid-2">
           <div class="card"><h3>Idle</h3><p>原地警戒或轻微呼吸。双脚不发生世界坐标平移，首尾能自然相接。</p></div>
@@ -430,9 +506,9 @@
       </section>
 
       <section class="section" id="shadow">
-        <span class="section-label">04 · Grounding</span>
+        <span class="section-label">05 · Grounding</span>
         <h2>人物图不烘焙投影，游戏统一贴地</h2>
-        <p class="lede">Lovart 原图、即梦输入、视频帧和透明图集都不包含地面与投影。Godot 在人物绘制前，用同一个 ground point 绘制软椭圆，因此动作换帧不会让影子漂移。</p>
+        <p class="lede">图像 provider 的白底原始素材图、透明参考图、Dreamina 品红输入、视频帧和透明图集都不包含地面与投影。Godot 在人物绘制前，用同一个 ground point 绘制软椭圆，因此动作换帧不会让影子漂移。</p>
         <div class="table-wrap">
           <table>
             <thead><tr><th>参数</th><th>运行时配置</th></tr></thead>
@@ -448,32 +524,42 @@
       </section>
 
       <section class="section" id="files">
-        <span class="section-label">05 · Evidence</span>
+        <span class="section-label">06 · Evidence</span>
         <h2>OneDrive 目录与可追溯记录</h2>
         <p>每次运行同步到既定根目录：</p>
         <pre><code>C:\Users\Bentl\OneDrive\Sync\饮河\4X游戏\BehindTheLines\AnimationProduction\RunYYYYMMDD&lt;Unit&gt;VNNN</code></pre>
         <div class="path-tree" role="img" aria-label="动画生产运行目录结构">RunYYYYMMDD&lt;Unit&gt;VNNN/
-├─ ReferenceImage/      正确原画、Lovart 原图、透明结果
+├─ ReferenceImage/      正确原画、provider 白底原图、透明参考图
 ├─ DreaminaInput/       统一品红背景输入
 ├─ SourceVideo/         即梦原始视频
 ├─ ExtractedFrames/     连续时间窗源帧
 ├─ CutoutFrames/        透明帧
-├─ ProjectReady/        可直接覆盖到仓库的资产结构
+├─ Candidates/          可并存、待验收的 Reference 与动作候选
+├─ ProjectReady/        人工确认后才可进入的正式资产结构
 ├─ Qa/                  接触表、GIF、1920×1080 实机截图
 ├─ Tools/               确定性重建脚本与自测
-├─ Data_*Task.json      Lovart / 即梦任务、积分、ID、哈希
+├─ Data_ArtGeneration.json  不可变原始提示词、追加修订、任务状态与派生路径
+├─ Data_*Task.json      ImageGen / Lovart / Dreamina 任务、积分、ID、哈希
 ├─ Data_*Manifest.json  时间点、锚点、缩放、输出哈希
 └─ README_*.md          本次运行记录与已知限制</div>
         <p>自动验收通过后，再复制同一份证据到 <code>Delivery/Map2DUnit&lt;Unit&gt;AnimationVNNN/</code>。Production 目录保留过程，Delivery 目录保留本次交付快照。</p>
       </section>
 
       <section class="section" id="acceptance">
-        <span class="section-label">06 · Acceptance</span>
+        <span class="section-label">07 · Acceptance</span>
         <h2>验收、回归、提交与同步</h2>
         <ul class="checklist">
           <li>原画基准是用户确认版本，不是旧临时图。</li>
+          <li>Reference、Idle、Move、Attack 的原始提示词已锁定，后续变化只以修订追加。</li>
+          <li>重生成前已核对本次修改条件、provider、模型与费用确认。</li>
+          <li>查询操作复用现有任务身份，没有重复提交或重复扣费。</li>
+          <li>Provider 状态、本地处理阶段、正式图集状态在编辑器中彼此分离。</li>
+          <li>生成中或失败候选没有覆盖当前正式图集。</li>
+          <li>整张 atlas 与逐帧预览均通过行列、循环、漂移和脚线检查。</li>
           <li>兵种、人数、坐骑、武器、朝向、俯视角和棋子比例全部通过身份门禁。</li>
-          <li>Lovart 原图、线程、画布、积分和哈希已记录。</li>
+          <li>图像 provider、任务身份、画布、积分和原图哈希已记录。</li>
+          <li>每次 provider 请求只返回一张不透明、均匀、纯 <code>#FFFFFF</code> 源图。</li>
+          <li>白底源图、透明参考图、<code>#FF00FF</code> Dreamina 输入的派生顺序清晰可追溯。</li>
           <li>即梦任务成功，submit ID、积分和源视频已保存。</li>
           <li>每个正式动作严格 1 秒、8 FPS、8 帧。</li>
           <li>八帧来自连续窗口，时间点按固定公式生成。</li>
@@ -506,8 +592,8 @@ python -B tools\Script_TestUnitAnimationPipeline.py
   <footer class="footer">
     <div class="footer-inner">
       <div>
-        <strong>BehindTheLines · 单位帧动画生产规范</strong>
-        <p>最后更新 <time datetime="2026-07-14">2026-07-14</time></p>
+        <strong>BehindTheLines · BTL 角色动画编辑器与单位帧动画生产规范</strong>
+        <p>最后更新 <time datetime="2026-07-17">2026-07-17</time></p>
       </div>
       <div><a href="#page-title">回到顶部</a> · <a href="/BehindTheLines/">文档首页</a></div>
     </div>

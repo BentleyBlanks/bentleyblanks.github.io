@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BehindTheLines BTL UI 编辑器使用手册：18 个界面元素、逐字段显式覆盖、1920×1080 示意预览、保存重载重置与实机验收。">
+  <meta name="theme-color" content="#1f2923">
+  <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/UiEditor/">
+  <title>BTL UI 编辑器｜BehindTheLines</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #242018;
+      --muted: #6e6558;
+      --paper: #f3eddd;
+      --panel: rgba(255, 252, 243, 0.84);
+      --line: rgba(78, 66, 49, 0.2);
+      --forest: #1f2923;
+      --forest-soft: #33453a;
+      --red: #96392e;
+      --red-dark: #6f261f;
+      --gold: #b48a45;
+      --gold-soft: #efe1bd;
+      --green: #3e6952;
+      --shadow: 0 20px 52px rgba(51, 42, 29, 0.12);
+      --radius: 18px;
+      --content: 1120px;
+      font-family: Inter, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      font-synthesis: none;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% -4%, rgba(180, 138, 69, 0.18), transparent 30rem),
+        linear-gradient(180deg, #f8f3e7 0%, var(--paper) 38%, #eee6d4 100%);
+      line-height: 1.72;
+    }
+    body::before {
+      position: fixed; inset: 0; z-index: -1; pointer-events: none; content: ""; opacity: 0.2;
+      background-image: linear-gradient(rgba(65, 53, 38, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(65, 53, 38, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: linear-gradient(to bottom, black, transparent 72%);
+    }
+    a { color: var(--red); text-underline-offset: 0.2em; }
+    a:hover { color: var(--red-dark); }
+    :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+    code { padding: 0.12em 0.35em; background: rgba(150, 57, 46, 0.08); border-radius: 5px; font-family: "Cascadia Code", Consolas, monospace; font-size: 0.9em; overflow-wrap: anywhere; }
+    .skip-link { position: fixed; top: 10px; left: 10px; z-index: 100; padding: 8px 12px; color: white; background: var(--red); border-radius: 8px; transform: translateY(-160%); }
+    .skip-link:focus { transform: translateY(0); }
+    .topbar { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(31,41,35,0.95); backdrop-filter: blur(16px); }
+    .topbar-inner { display: flex; width: min(var(--content), calc(100% - 36px)); min-height: 58px; margin: 0 auto; align-items: center; justify-content: space-between; gap: 22px; }
+    .brand { display: inline-flex; align-items: center; gap: 11px; color: #fff9e9; font-weight: 760; letter-spacing: 0.02em; text-decoration: none; }
+    .brand-mark { display: grid; width: 31px; height: 31px; color: #fff8e9; background: var(--red); border: 1px solid rgba(255,255,255,0.28); border-radius: 50%; place-items: center; font-family: Georgia, serif; box-shadow: 0 0 0 4px rgba(180,138,69,0.15); }
+    .topnav { display: flex; align-items: center; gap: 18px; }
+    .topnav a { color: rgba(255,249,233,0.76); font-size: 14px; text-decoration: none; }
+    .topnav a:hover { color: white; }
+    .hero { position: relative; overflow: hidden; color: #fff9e9; background: linear-gradient(120deg, rgba(31,41,35,0.98), rgba(52,61,49,0.93)); }
+    .hero::after { position: absolute; right: -100px; bottom: -210px; width: 560px; height: 410px; content: ""; border: 1px solid rgba(239,225,189,0.14); border-radius: 50%; box-shadow: 0 0 0 52px rgba(239,225,189,0.04), 0 0 0 104px rgba(239,225,189,0.025); transform: rotate(-8deg); }
+    .hero-inner { position: relative; z-index: 1; width: min(var(--content), calc(100% - 36px)); margin: 0 auto; padding: 72px 0 68px; }
+    .eyebrow { margin: 0 0 10px; color: #e5c77b; font-size: 13px; font-weight: 760; letter-spacing: 0.16em; text-transform: uppercase; }
+    h1, h2, h3 { line-height: 1.25; }
+    h1 { max-width: 820px; margin: 0; font-size: clamp(38px, 6vw, 70px); letter-spacing: -0.035em; }
+    .hero-lead { max-width: 780px; margin: 22px 0 0; color: rgba(255,249,233,0.79); font-size: 18px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .chip { padding: 7px 11px; color: #fff8e9; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 999px; font-size: 13px; }
+    .page-shell { display: grid; grid-template-columns: 220px minmax(0,1fr); width: min(var(--content), calc(100% - 36px)); margin: 42px auto 72px; gap: 34px; align-items: start; }
+    .side-nav { position: sticky; top: 82px; display: grid; padding: 18px; background: rgba(255,252,243,0.62); border: 1px solid var(--line); border-radius: 14px; gap: 4px; }
+    .side-nav strong { margin: 0 0 8px; color: var(--forest); font-size: 13px; letter-spacing: 0.08em; }
+    .side-nav a { padding: 7px 9px; color: var(--muted); border-radius: 8px; font-size: 14px; text-decoration: none; }
+    .side-nav a:hover { color: var(--red-dark); background: rgba(180,138,69,0.12); }
+    .content { min-width: 0; }
+    .section { margin-bottom: 28px; padding: clamp(24px,4vw,42px); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .section-label { color: var(--red); font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+    h2 { margin: 7px 0 14px; color: var(--forest); font-size: clamp(27px,4vw,40px); letter-spacing: -0.025em; }
+    h3 { margin: 26px 0 8px; color: var(--forest-soft); font-size: 20px; }
+    .lede { margin-top: 0; color: var(--muted); font-size: 17px; }
+    .editor-shot { margin: 26px 0 6px; overflow: hidden; background: #172019; border: 1px solid rgba(62,105,82,0.3); border-radius: 14px; box-shadow: 0 14px 32px rgba(31,41,35,0.16); }
+    .editor-shot a { display: block; background: #11171b; }
+    .editor-shot img { display: block; width: 100%; height: auto; }
+    .editor-shot figcaption { padding: 12px 15px; color: #5f594f; background: #f7f0df; font-size: 13px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin-top: 22px; }
+    .card { padding: 18px; background: rgba(255,255,255,0.42); border: 1px solid var(--line); border-radius: 13px; }
+    .card h3 { margin: 0 0 8px; }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .steps { display: grid; margin: 24px 0 0; padding: 0; counter-reset: flow; gap: 12px; list-style: none; }
+    .steps li { position: relative; min-height: 76px; padding: 16px 18px 16px 66px; background: rgba(255,255,255,0.42); border: 1px solid var(--line); border-radius: 13px; }
+    .steps li::before { position: absolute; top: 16px; left: 17px; display: grid; width: 34px; height: 34px; color: white; background: var(--red); border-radius: 50%; counter-increment: flow; content: counter(flow, decimal-leading-zero); place-items: center; font-size: 12px; font-weight: 800; }
+    .steps strong { display: block; color: var(--forest); }
+    .table-wrap { overflow-x: auto; margin-top: 22px; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.35); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--forest); background: rgba(62,105,82,0.08); font-size: 13px; }
+    tr:last-child td { border-bottom: 0; }
+    .callout { margin-top: 22px; padding: 17px 19px; background: var(--gold-soft); border-left: 5px solid var(--gold); border-radius: 10px; }
+    .callout.warning { background: #ead3ca; border-left-color: var(--red); }
+    .checklist { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 20px 0 0; padding: 0; gap: 10px 18px; list-style: none; }
+    .checklist li { position: relative; padding: 10px 12px 10px 38px; border-bottom: 1px solid var(--line); }
+    .checklist li::before { position: absolute; left: 10px; color: var(--green); content: "✓"; font-weight: 900; }
+    .footer { color: rgba(255,249,233,0.78); background: var(--forest); }
+    .footer-inner { display: flex; width: min(var(--content), calc(100% - 36px)); margin: 0 auto; padding: 26px 0; justify-content: space-between; gap: 22px; }
+    .footer p { margin: 4px 0 0; }
+    .footer a { color: #e5c77b; }
+    @media (max-width: 860px) {
+      .topbar-inner { align-items: flex-start; padding: 12px 0; }
+      .topnav { flex-wrap: wrap; justify-content: flex-end; gap: 8px 14px; }
+      .page-shell { display: block; }
+      .side-nav { position: static; grid-template-columns: repeat(3,minmax(0,1fr)); margin-bottom: 24px; }
+      .side-nav strong { grid-column: 1 / -1; }
+    }
+    @media (max-width: 640px) {
+      .topbar-inner { display: block; }
+      .topnav { margin-top: 8px; justify-content: flex-start; }
+      .hero-inner { padding: 54px 0 50px; }
+      .hero-lead { font-size: 16px; }
+      .page-shell { width: min(100% - 22px,var(--content)); margin-top: 22px; }
+      .side-nav { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .section { padding: 22px 18px; }
+      .grid-2, .checklist { grid-template-columns: 1fr; }
+      .footer-inner { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    @media print { .topbar, .side-nav { display: none; } .hero { color: var(--ink); background: white; } .hero-lead { color: var(--ink); } .page-shell { display: block; width: 100%; } .section { box-shadow: none; break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到正文</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/BehindTheLines/" aria-label="BehindTheLines 文档首页"><span class="brand-mark" aria-hidden="true">太</span><span>BehindTheLines 文档</span></a>
+      <nav class="topnav" aria-label="站点导航">
+        <a href="#scope">可编辑范围</a><a href="#workflow">使用流程</a><a href="#acceptance">实机验收</a><a href="/BehindTheLines/">返回手册首页</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero-inner">
+      <p class="eyebrow">Godot Editor · Difference Only</p>
+      <h1 id="page-title">BTL UI 编辑器</h1>
+      <p class="hero-lead">用一张 1920 × 1080 布局示意图统一调整主界面与地图 HUD。每个字段都必须主动勾选“覆盖”才写入差异文件；没勾选的字段继续使用运行时自己的默认值。</p>
+      <div class="chips" aria-label="编辑器摘要"><span class="chip">17 个 UI 元素</span><span class="chip">15 类可选字段</span><span class="chip">逐字段 opt-in</span><span class="chip">只保存差异</span><span class="chip">1920 × 1080 实机复核</span></div>
+    </div>
+  </section>
+
+  <div class="page-shell">
+    <aside class="side-nav" aria-label="本文目录"><strong>本文目录</strong><a href="#overview">编辑器总览</a><a href="#scope">可编辑范围</a><a href="#fields">字段与覆盖</a><a href="#workflow">使用流程</a><a href="#preview">预览边界</a><a href="#acceptance">实机验收</a></aside>
+    <main class="content" id="main-content">
+      <section class="section" id="overview">
+        <span class="section-label">01 · Overview</span>
+        <h2>一处看全局，一处只写差异</h2>
+        <p class="lede">在 Godot 顶部主屏切换到“BTL UI”。左栏选择界面元素，中栏勾选并修改字段，右栏观察 16:9 布局示意；底部状态会显示未保存标记与显式覆盖数量。</p>
+        <figure class="editor-shot">
+          <a href="../Assets/Texture_UiEditor.png" target="_blank" rel="noopener"><img src="../Assets/Texture_UiEditor.png" alt="BTL UI 编辑器在 1920×1080 下的完整界面，左侧为 18 个 UI 元素，中部为逐字段覆盖，右侧为布局示意预览" width="1920" height="1080" loading="lazy"></a>
+          <figcaption>BTL UI 编辑器全貌。点击图片可查看原始尺寸；右侧画布用于布局推演，不替代游戏实机。</figcaption>
+        </figure>
+        <div class="callout"><strong>权威数据边界</strong><p>工具只写 <code>Data_UiLayoutOverrides.tres</code>。运行时默认布局仍由各界面自身提供；编辑器不会复制一套默认值，也不会把示意预览变成新的运行时来源。</p></div>
+      </section>
+
+      <section class="section" id="scope">
+        <span class="section-label">02 · Scope</span>
+        <h2>18 个元素覆盖主界面与地图 HUD</h2>
+        <div class="grid-2">
+          <div class="card"><h3>主界面 · 10 项</h3><p>顶部资源栏、资源信息组、战略按钮、整训按钮、FPS 信息、小地图、主行动按钮、侧边信息面板、战报面板、详细弹出框。</p></div>
+          <div class="card"><h3>地图 HUD · 8 项</h3><p>单位 HUD 底板、单位战力节点、单位名称、单位兵种图标、单位血量圆盘、单位详细信息框、据点 HUD、设施 HUD。</p></div>
+        </div>
+        <p>元素树按“主界面 / 地图 HUD”分组。选中元素只会切换当前属性面板，不会自动产生覆盖；这使策划可以安全浏览所有默认布局。</p>
+      </section>
+
+      <section class="section" id="fields">
+        <span class="section-label">03 · Fields</span>
+        <h2>每个字段都独立选择是否接管</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>字段组</th><th>可编辑内容</th><th>适用问题</th></tr></thead>
+          <tbody>
+            <tr><td>显示与几何</td><td>显示、位置 X/Y、宽度、高度</td><td>隐藏模块、移动位置、扩大点击区或容器。</td></tr>
+            <tr><td>图标与文字</td><td>Icon 路径、Icon 大小、文字大小</td><td>替换正式图标，统一信息层级与远景可读性。</td></tr>
+            <tr><td>布局规则</td><td>横向、纵向、横/纵流式、叠放；起点、居中、终点、撑满</td><td>改变子元素排列和容器对齐。</td></tr>
+            <tr><td>间距</td><td>四向留空、元素间距</td><td>解决边缘拥挤、文字贴边和控件碰撞。</td></tr>
+          </tbody>
+        </table></div>
+        <div class="callout warning"><strong>opt-in 是数据安全机制</strong><p>只有勾选“覆盖”的字段才进入差异资源。取消勾选会删除对应键并恢复运行时默认；不要为了“看起来完整”把所有字段都勾上，否则未来默认布局升级将被旧覆盖挡住。</p></div>
+      </section>
+
+      <section class="section" id="workflow">
+        <span class="section-label">04 · Workflow</span>
+        <h2>从一个布局问题到可回退的改动</h2>
+        <ol class="steps">
+          <li><strong>先描述问题</strong>记录分辨率、界面状态和发生裁切或遮挡的元素，避免只凭感觉挪动。</li>
+          <li><strong>选择元素</strong>从左栏定位目标；先观察右侧示意和当前值，不勾选就不会写数据。</li>
+          <li><strong>只接管必要字段</strong>勾选“覆盖”后再改值。例如只需下移小地图，就只覆盖 Y，不必接管宽高与其他样式。</li>
+          <li><strong>检查示意预览</strong>确认目标没有明显越过 1920 × 1080 安全边界，也没有与其他标记重叠。</li>
+          <li><strong>保存差异</strong>点击“保存差异”写入 <code>Data_UiLayoutOverrides.tres</code>；状态栏未保存标记应消失。</li>
+          <li><strong>启动游戏实机验证</strong>在 1920 × 1080 检查真实字体、容器、弹窗、HUD 与交互，再补测缩窄窗口。</li>
+        </ol>
+        <h3>四个恢复动作不要混用</h3>
+        <div class="grid-2">
+          <div class="card"><h3>重新载入</h3><p>放弃当前未保存内容，并重新读取磁盘中的差异资源。</p></div>
+          <div class="card"><h3>恢复当前默认</h3><p>删除所选 UI 元素的全部显式覆盖；还要点击保存才会落盘。</p></div>
+          <div class="card"><h3>恢复全部默认</h3><p>清空全部 UI 覆盖；适合整体回退，执行前先确认没有仍需保留的调优。</p></div>
+          <div class="card"><h3>保存差异</h3><p>只把当前显式覆盖写盘，并触发编辑器资源扫描；不会改动默认表。</p></div>
+        </div>
+      </section>
+
+      <section class="section" id="preview">
+        <span class="section-label">05 · Preview</span>
+        <h2>示意预览不是像素级 WYSIWYG</h2>
+        <p class="lede">右侧固定按 1920 × 1080 设计坐标绘制地图底色、元素矩形与标签，适合快速看位置、范围和相互关系；它不运行真实界面树。</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>预览能回答</th><th>预览不能保证</th></tr></thead>
+          <tbody>
+            <tr><td>元素是否大致在正确象限、是否越界、多个面板是否重叠。</td><td>真实字体栅格化、长文案换行、图标透明边距和主题 StyleBox 的最终像素。</td></tr>
+            <tr><td>显式覆盖后矩形、可见性与排列方向的变化。</td><td>运行时容器最小尺寸、弹窗状态、输入焦点、鼠标命中和不同窗口比例。</td></tr>
+          </tbody>
+        </table></div>
+        <div class="callout"><strong>正确使用方式</strong><p>把示意图当作“布局草图与碰撞预警”，把 1920 × 1080 游戏实机当作最终验收。两者不一致时，以运行时为准，并回到编辑器缩小覆盖范围或修正数值。</p></div>
+      </section>
+
+      <section class="section" id="acceptance">
+        <span class="section-label">06 · Acceptance</span>
+        <h2>保存后必须做一次真实界面走查</h2>
+        <ul class="checklist">
+          <li>差异文件只包含本次主动勾选的字段。</li><li>取消覆盖后对应键确实被删除。</li>
+          <li>1920 × 1080 下无文字裁切、元素越界和弹窗遮挡。</li><li>顶部资源栏、小地图、主行动按钮均可读可点。</li>
+          <li>单位名称、战力、兵种图标和血量没有互相覆盖。</li><li>侧边面板、战报、详情框打开后仍在安全区内。</li>
+          <li>缩窄窗口时容器没有因固定尺寸产生严重溢出。</li><li>重新进入项目后覆盖仍能正确载入。</li>
+        </ul>
+        <div class="callout warning"><strong>遇到异常时</strong><p>先用“重新载入”排除未保存试验；再取消单个字段覆盖定位问题。只有确认整组覆盖都不再需要时，才使用“恢复当前默认”或“恢复全部默认”。</p></div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer"><div class="footer-inner"><div><strong>BehindTheLines · BTL UI 编辑器</strong><p>最后更新 <time datetime="2026-07-17">2026-07-17</time></p></div><div><a href="#page-title">回到顶部</a> · <a href="/BehindTheLines/">文档首页</a></div></div></footer>
+</body>
+</html>

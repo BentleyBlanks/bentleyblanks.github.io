@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BehindTheLines 抠图编辑器手册：单图与目录输入、边缘连通色键、阈值羽化、RGBA 通道预览、全分辨率批处理与 CLI 自动化。">
+  <meta name="theme-color" content="#1f2923">
+  <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/ImageMattingEditor/">
+  <title>BTL 抠图编辑器｜BehindTheLines</title>
+  <style>
+    :root { color-scheme: light; --ink: #242018; --muted: #6e6558; --paper: #f3eddd; --panel: rgba(255, 252, 243, 0.84); --line: rgba(78, 66, 49, 0.2); --forest: #1f2923; --forest-soft: #33453a; --red: #96392e; --red-dark: #6f261f; --gold: #b48a45; --gold-soft: #efe1bd; --green: #3e6952; --shadow: 0 20px 52px rgba(51, 42, 29, 0.12); --radius: 18px; --content: 1120px; font-family: Inter, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif; font-synthesis: none; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+    body { margin: 0; color: var(--ink); background: radial-gradient(circle at 8% -4%, rgba(180, 138, 69, 0.18), transparent 30rem), linear-gradient(180deg, #f8f3e7 0%, var(--paper) 38%, #eee6d4 100%); line-height: 1.72; }
+    body::before { position: fixed; inset: 0; z-index: -1; pointer-events: none; content: ""; opacity: 0.2; background-image: linear-gradient(rgba(65, 53, 38, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(65, 53, 38, 0.04) 1px, transparent 1px); background-size: 32px 32px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
+    a { color: var(--red); text-underline-offset: 0.2em; }
+    a:hover { color: var(--red-dark); }
+    :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+    code, pre { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
+    code { padding: 0.12em 0.35em; background: rgba(150, 57, 46, 0.08); border-radius: 5px; font-size: 0.9em; overflow-wrap: anywhere; }
+    pre { overflow-x: auto; margin: 18px 0 0; padding: 18px 20px; color: #f8efd9; background: #202923; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; line-height: 1.55; }
+    pre code { padding: 0; color: inherit; background: transparent; overflow-wrap: normal; }
+    .skip-link { position: fixed; top: 10px; left: 10px; z-index: 100; padding: 8px 12px; color: white; background: var(--red); border-radius: 8px; transform: translateY(-160%); }
+    .skip-link:focus { transform: translateY(0); }
+    .topbar { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgba(255, 255, 255, 0.1); background: rgba(31, 41, 35, 0.95); backdrop-filter: blur(16px); }
+    .topbar-inner { display: flex; width: min(var(--content), calc(100% - 36px)); min-height: 58px; margin: 0 auto; align-items: center; justify-content: space-between; gap: 22px; }
+    .brand { display: inline-flex; align-items: center; gap: 11px; color: #fff9e9; font-weight: 760; letter-spacing: 0.02em; text-decoration: none; }
+    .brand-mark { display: grid; width: 31px; height: 31px; color: #fff8e9; background: var(--red); border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 50%; place-items: center; font-family: Georgia, serif; box-shadow: 0 0 0 4px rgba(180, 138, 69, 0.15); }
+    .topnav { display: flex; align-items: center; gap: 18px; }
+    .topnav a { color: rgba(255, 249, 233, 0.76); font-size: 14px; text-decoration: none; }
+    .topnav a:hover { color: white; }
+    .hero { position: relative; overflow: hidden; color: #fff9e9; background: linear-gradient(120deg, rgba(31, 41, 35, 0.98), rgba(52, 61, 49, 0.93)); }
+    .hero::after { position: absolute; right: -100px; bottom: -210px; width: 560px; height: 410px; content: ""; border: 1px solid rgba(239, 225, 189, 0.14); border-radius: 50%; box-shadow: 0 0 0 52px rgba(239, 225, 189, 0.04), 0 0 0 104px rgba(239, 225, 189, 0.025); transform: rotate(-8deg); }
+    .hero-inner { position: relative; z-index: 1; width: min(var(--content), calc(100% - 36px)); margin: 0 auto; padding: 72px 0 68px; }
+    .eyebrow { margin: 0 0 10px; color: #e5c77b; font-size: 13px; font-weight: 760; letter-spacing: 0.16em; text-transform: uppercase; }
+    h1, h2, h3 { line-height: 1.25; }
+    h1 { max-width: 850px; margin: 0; font-size: clamp(38px, 6vw, 70px); letter-spacing: -0.035em; }
+    .hero-lead { max-width: 790px; margin: 22px 0 0; color: rgba(255, 249, 233, 0.79); font-size: 18px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .chip { padding: 7px 11px; color: #fff8e9; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 999px; font-size: 13px; }
+    .page-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); width: min(var(--content), calc(100% - 36px)); margin: 42px auto 72px; gap: 34px; align-items: start; }
+    .side-nav { position: sticky; top: 82px; display: grid; padding: 18px; background: rgba(255, 252, 243, 0.62); border: 1px solid var(--line); border-radius: 14px; gap: 4px; }
+    .side-nav strong { margin: 0 0 8px; color: var(--forest); font-size: 13px; letter-spacing: 0.08em; }
+    .side-nav a { padding: 7px 9px; color: var(--muted); border-radius: 8px; font-size: 14px; text-decoration: none; }
+    .side-nav a:hover { color: var(--red-dark); background: rgba(180, 138, 69, 0.12); }
+    .content { min-width: 0; }
+    .section { margin-bottom: 28px; padding: clamp(24px, 4vw, 42px); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .section-label { color: var(--red); font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+    h2 { margin: 7px 0 14px; color: var(--forest); font-size: clamp(27px, 4vw, 40px); letter-spacing: -0.025em; }
+    h3 { margin: 28px 0 8px; color: var(--forest-soft); font-size: 20px; }
+    .lede { margin-top: 0; color: var(--muted); font-size: 17px; }
+    .screenshot { margin: 26px 0 8px; overflow: hidden; background: #161b18; border: 1px solid rgba(31, 41, 35, 0.34); border-radius: 14px; box-shadow: 0 16px 34px rgba(31, 41, 35, 0.18); }
+    .screenshot a { display: block; }
+    .screenshot img { display: block; width: 100%; height: auto; }
+    .screenshot figcaption { padding: 12px 15px; color: #f4ead3; background: #273129; font-size: 13px; }
+    .table-wrap { overflow-x: auto; margin-top: 22px; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.35); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--forest); background: rgba(62, 105, 82, 0.08); font-size: 13px; }
+    tr:last-child td { border-bottom: 0; }
+    .steps { display: grid; margin: 24px 0 0; padding: 0; counter-reset: flow; gap: 12px; list-style: none; }
+    .steps li { position: relative; min-height: 76px; padding: 16px 18px 16px 66px; background: rgba(255, 255, 255, 0.42); border: 1px solid var(--line); border-radius: 13px; }
+    .steps li::before { position: absolute; top: 16px; left: 17px; display: grid; width: 34px; height: 34px; color: white; background: var(--red); border-radius: 50%; counter-increment: flow; content: counter(flow, decimal-leading-zero); place-items: center; font-size: 12px; font-weight: 800; }
+    .steps strong { display: block; color: var(--forest); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+    .card { padding: 18px; background: rgba(255, 255, 255, 0.42); border: 1px solid var(--line); border-radius: 13px; }
+    .card h3 { margin: 0 0 8px; }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .callout { margin-top: 22px; padding: 17px 19px; background: var(--gold-soft); border-left: 5px solid var(--gold); border-radius: 10px; }
+    .callout.warning { background: #ead3ca; border-left-color: var(--red); }
+    .checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 20px 0 0; padding: 0; gap: 10px 18px; list-style: none; }
+    .checklist li { position: relative; padding: 10px 12px 10px 38px; border-bottom: 1px solid var(--line); }
+    .checklist li::before { position: absolute; left: 10px; color: var(--green); content: "✓"; font-weight: 900; }
+    .footer { color: rgba(255, 249, 233, 0.78); background: var(--forest); }
+    .footer-inner { display: flex; width: min(var(--content), calc(100% - 36px)); margin: 0 auto; padding: 26px 0; justify-content: space-between; gap: 22px; }
+    .footer p { margin: 4px 0 0; }
+    .footer a { color: #e5c77b; }
+    @media (max-width: 860px) { .topbar-inner { align-items: flex-start; padding: 12px 0; } .topnav { flex-wrap: wrap; justify-content: flex-end; gap: 8px 14px; } .page-shell { display: block; } .side-nav { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 24px; } .side-nav strong { grid-column: 1 / -1; } }
+    @media (max-width: 640px) { .topbar-inner { display: block; } .topnav { margin-top: 8px; justify-content: flex-start; } .hero-inner { padding: 54px 0 50px; } .hero-lead { font-size: 16px; } .page-shell { width: min(100% - 22px, var(--content)); margin-top: 22px; } .side-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } .section { padding: 22px 18px; } .grid-2, .checklist { grid-template-columns: 1fr; } .footer-inner { display: block; } }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: 0.01ms !important; } }
+    @media print { .topbar, .side-nav { display: none; } .hero { color: var(--ink); background: white; } .hero-lead { color: var(--ink); } .page-shell { display: block; width: 100%; } .section { box-shadow: none; break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到正文</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/BehindTheLines/" aria-label="BehindTheLines 文档首页"><span class="brand-mark" aria-hidden="true">太</span><span>BehindTheLines 文档</span></a>
+      <nav class="topnav" aria-label="站点导航">
+        <a href="#inputs">输入输出</a>
+        <a href="#parameters">参数与预览</a>
+        <a href="#cli">CLI 自动化</a>
+        <a href="/BehindTheLines/">返回手册首页</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero-inner">
+      <p class="eyebrow">Edge-connected Matte · RGBA Diagnostics · Full-resolution Export</p>
+      <h1 id="page-title">BTL 抠图<br>编辑器手册</h1>
+      <p class="hero-lead">从单张图片、整个目录或 Godot“文件系统”当前选区取材，用背景色、阈值、羽化和默认的“只抠边缘”模式生成透明 PNG；预览快速缩小，正式导出始终使用原图全分辨率，同一算法也能由 Agent 通过 CLI 批量调用。</p>
+      <div class="chips" aria-label="功能摘要">
+        <span class="chip">单图 / 目录</span>
+        <span class="chip">文件系统选区</span>
+        <span class="chip">取四角背景色</span>
+        <span class="chip">只抠边缘默认开启</span>
+        <span class="chip">RGBA / R / G / B / A</span>
+        <span class="chip">原分辨率 PNG</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="page-shell">
+    <aside class="side-nav" aria-label="本文目录">
+      <strong>本文目录</strong>
+      <a href="#overview">界面总览</a>
+      <a href="#inputs">输入与输出</a>
+      <a href="#parameters">抠图参数</a>
+      <a href="#preview">通道与导出</a>
+      <a href="#batch">批处理</a>
+      <a href="#cli">CLI 与 Agent</a>
+      <a href="#workflow">典型流程</a>
+      <a href="#troubleshooting">限制与排错</a>
+    </aside>
+
+    <main class="content" id="main-content">
+      <section class="section" id="overview">
+        <span class="section-label">01 · Overview</span>
+        <h2>所见参数与自动化使用同一算法</h2>
+        <p class="lede">Dock、单图导出、目录批处理和 headless CLI 全部调用同一个 <code>Script_ImageMatting.gd</code>。因此策划 / 美术在界面里调出的背景色、阈值与羽化，可以原样交给 Agent 批量运行，不存在两套近似实现。</p>
+        <figure class="screenshot">
+          <a href="../Assets/Texture_ImageMattingEditor.png" aria-label="打开 BTL 抠图编辑器原始截图">
+            <img src="../Assets/Texture_ImageMattingEditor.png" alt="Godot 中的 BTL 抠图 Dock，展示输入选择、输出设置、背景色、阈值、羽化、只抠边缘、RGBA 预览与透明 PNG 导出按钮" width="1920" height="1080" loading="lazy">
+          </a>
+          <figcaption>BTL 抠图 Dock：从上到下依次完成输入、输出、参数、预览和导出。预览框高度可以拖动，通道选择器用于定位边缘问题。点击图片可查看原尺寸。</figcaption>
+        </figure>
+        <div class="callout"><strong>默认行为适合白底 AI 源图</strong><p>背景色默认为纯白，阈值为 <code>0.08</code>，羽化为 <code>0.12</code>，“只抠边缘”默认开启。这能去掉与画面外圈连通的白底，同时保留人物内部的白衬衫、高光或封闭白色图案。</p></div>
+      </section>
+
+      <section class="section" id="inputs">
+        <span class="section-label">02 · Inputs &amp; Outputs</span>
+        <h2>三种输入方式，一套命名规则</h2>
+        <div class="grid-2">
+          <div class="card"><h3>选择单图</h3><p>通过系统文件对话框选择一张 <code>png</code>、<code>jpg/jpeg</code>、<code>webp</code>、<code>bmp</code> 或 <code>tga</code>。适合精调边缘或处理一个 Provider artifact。</p></div>
+          <div class="card"><h3>选择文件夹</h3><p>发现目录中的受支持图片；勾选“递归子文件夹”后，会连同下级目录一起建立任务。</p></div>
+          <div class="card"><h3>选择当前图片</h3><p>先在 Godot“文件系统”面板点一张图片或一个文件夹，再点击该按钮。它只在编辑器环境可用，headless 下会安全返回空选区。</p></div>
+          <div class="card"><h3>输出位置与后缀</h3><p>输出固定为透明 PNG。目录留空时工具自动选择位置；默认文件名是“原文件名 + <code>_Cutout</code> + <code>.png</code>”。</p></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>选项</th><th>关闭时</th><th>开启时</th></tr></thead>
+            <tbody>
+              <tr><td>批量时递归子文件夹</td><td>只处理输入目录第一层。</td><td>遍历子目录；共享输出目录时保留相对目录结构。</td></tr>
+              <tr><td>覆盖已有输出</td><td>目标存在则报告失败，不改写文件。</td><td>允许替换目标 PNG；正式资产使用前仍应检查版本与来源。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warning"><strong>防止覆盖源图</strong><p>后缀不能为空，也不能含路径分隔符或保留字符。单图精确输出必须是 <code>.png</code>，且同一批次中的多个输入不能解析到同一个目标路径。</p></div>
+      </section>
+
+      <section class="section" id="parameters">
+        <span class="section-label">03 · Parameters</span>
+        <h2>背景色决定目标，阈值与羽化决定过渡</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>参数</th><th>作用</th><th>调节建议</th></tr></thead>
+            <tbody>
+              <tr><td>背景色</td><td>要去除的色键目标；默认 <code>#FFFFFF</code>。</td><td>源图本来就是均匀白底时保持纯白。若导出有轻微整体偏色，可用取色器或“取四角”。</td></tr>
+              <tr><td>取四角</td><td>计算当前预览图四个角的平均颜色并设为背景色。</td><td>适合四角确实都属于背景的源图；角落被人物或装饰占据时不要用。</td></tr>
+              <tr><td>阈值</td><td>与背景色距离落在阈值内的像素完全透明。</td><td>从 <code>0.08</code> 开始。背景残留时小步提高；主体被吃掉时降低。</td></tr>
+              <tr><td>羽化</td><td>在阈值之外建立半透明过渡带；<code>0</code> 是硬边。</td><td>从 <code>0.12</code> 开始。锯齿明显时增加；边缘发虚时减少。</td></tr>
+              <tr><td>只抠边缘</td><td>只删除从图像边界以 4 邻接连通进入的背景；羽化带可以继续传递连通。</td><td>默认开启。它会保留主体内部封闭的同色像素。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>什么时候关闭“只抠边缘”</h3>
+        <p>只有主体内部存在必须挖空、且被前景完全包围的同色孔洞时，才切换到全局色键。全局色键会把整张图所有接近背景色的像素都变透明，因此也可能误删白色服装、眼白、高光或 UI 图案。</p>
+        <div class="callout"><strong>半透明边缘会去背景污染</strong><p>对白底和品红底，算法不仅计算 alpha，还会重建半透明边缘的前景 RGB，减少合成到深色地图时出现白边或粉边。源图已有 alpha 时，输出同时尊重原透明度。</p></div>
+      </section>
+
+      <section class="section" id="preview">
+        <span class="section-label">04 · Preview</span>
+        <h2>预览为了快，导出为了真</h2>
+        <p class="lede">拖动滑条时会在短暂去抖后刷新。预览输入最长边最多缩到 512 px，以免逐像素处理卡住 Godot；“导出透明 PNG”重新读取原文件并以全分辨率处理，预览缩放不会降低正式输出质量。</p>
+        <div class="grid-2">
+          <div class="card"><h3>查看原图 / 抠图结果</h3><p>用切换按钮做 A/B 对照。RGBA 结果铺在棋盘底上，便于看透明区、半透明边缘和是否残留整块背景。</p></div>
+          <div class="card"><h3>可调预览高度</h3><p>Dock 窄时可拉高预览；高度只影响界面，不改变输入、算法与导出尺寸。</p></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>视图</th><th>主要检查</th></tr></thead>
+            <tbody>
+              <tr><td>RGBA</td><td>透明合成后的总体外观、轮廓、残底与可见毛边。</td></tr>
+              <tr><td>R 红</td><td>红通道灰度；诊断品红、红色主体或边缘去污染是否异常。</td></tr>
+              <tr><td>G 绿</td><td>绿通道灰度；辅助区分纯白与品红背景，以及绿色主体细节。</td></tr>
+              <tr><td>B 蓝</td><td>蓝通道灰度；检查蓝紫色背景污染或蓝色前景损失。</td></tr>
+              <tr><td>A 透明度</td><td>以不透明灰度展示 alpha：黑为透明、白为不透明、灰为羽化过渡。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warning"><strong>不要只看棋盘合成</strong><p>RGBA 预览“看起来没问题”仍可能藏着过宽的半透明灰边。至少再看一次 A 通道；正式单位或图集还应合成到深色和品红背景做 QA。</p></div>
+      </section>
+
+      <section class="section" id="batch">
+        <span class="section-label">05 · Batch</span>
+        <h2>批量任务先发现，再逐文件处理</h2>
+        <ol class="steps">
+          <li><strong>选择输入目录</strong>需要下级目录时开启递归；工具显示发现的图片数量。</li>
+          <li><strong>确定输出策略</strong>选择共享输出目录或保留自动位置，检查后缀，决定是否覆盖。</li>
+          <li><strong>先用代表图调参数</strong>预览通常取批次中的一张。若不同来源背景色不同，应拆分批次。</li>
+          <li><strong>开始导出</strong>工具按同一参数逐张读取全分辨率源图、处理并保存 PNG。</li>
+          <li><strong>阅读汇总</strong>成功输出与错误分别记录；已有文件、读图失败或写盘失败不会被静默忽略。</li>
+        </ol>
+        <p>批量不是“自动判断每张背景”的智能模式：背景色、阈值、羽化和边缘策略对整个批次一致。若四季图集或不同 Provider 批次的底色差异明显，分开运行更安全。</p>
+      </section>
+
+      <section class="section" id="cli">
+        <span class="section-label">06 · CLI &amp; Agent</span>
+        <h2>同一流程可以无界面复现</h2>
+        <p>自定义参数必须写在 Godot 的 <code>--</code> 之后。以下 PowerShell 示例处理一张白底图并精确指定输出：</p>
+        <pre><code>$godot = 'C:\Users\Bentl\Downloads\Installer\Godot_v4.7-stable_win64.exe\Godot_v4.7-stable_win64_console.exe'
+&amp; $godot --headless --path . `
+  --script res://tools/Script_ImageMattingCli.gd -- `
+  --input 'C:\Art\Source.png' `
+  --output 'C:\Art\Texture_SourceCutout.png' `
+  --background '#ffffff' `
+  --threshold 0.08 `
+  --softness 0.12</code></pre>
+        <p>目录批处理可用 <code>--input-dir</code>、<code>--output-dir</code>、<code>--recursive</code> 和 <code>--suffix</code>；先加 <code>--dry-run</code> 只校验并打印计划输出。默认是边缘连通模式，只有确实需要全局色键时才加 <code>--global-key</code>。</p>
+        <pre><code>&amp; $godot --headless --path . `
+  --script res://tools/Script_ImageMattingCli.gd -- `
+  --input-dir 'C:\Art\Batch' `
+  --output-dir 'C:\Art\Cutout' `
+  --recursive --suffix '_Cutout' --dry-run</code></pre>
+        <div class="grid-2">
+          <div class="card"><h3>JSON 请求文件</h3><p>Agent 也可用 <code>--request Request.json</code> 传入 inputs、outputDir、background、threshold、softness、suffix、recursive、overwrite、dryRun 与 edgeConnectedOnly。命令行参数会在请求文件之后解析，可覆盖单项。</p></div>
+          <div class="card"><h3>机器可读结果</h3><p>除 <code>--help</code> 外，最终状态以单行 <code>IMAGE_MATTING_RESULT {…}</code> 输出，含 ok、processed、failed、outputs、errors 与逐文件 results；Agent 应读取 JSON 与退出码，不能只猜文件是否生成。</p></div>
+        </div>
+        <div class="callout"><strong>在生产链中的位置</strong><p><a href="/BehindTheLines/CellArtEditor/">BTL 单元格美术编辑器</a>的 Codex worker 会在下载白底图集后调用确定性抠图与打包；<a href="/BehindTheLines/AnimationProduction/">角色动画流程</a>也用同一抠图核心处理白底参考与品红视频帧。</p></div>
+      </section>
+
+      <section class="section" id="workflow">
+        <span class="section-label">07 · Recipes</span>
+        <h2>推荐的人工验收顺序</h2>
+        <ol class="steps">
+          <li><strong>保留原始文件</strong>不要覆盖 Provider 下载源图；选择单图或从 Godot 文件系统接入。</li>
+          <li><strong>先确认背景色</strong>合格白底源图保持 <code>#FFFFFF</code>。只有确认角落都属于背景时才点“取四角”。</li>
+          <li><strong>保持“只抠边缘”</strong>先用默认阈值 <code>0.08</code>、羽化 <code>0.12</code> 看结果，保护内部同色区域。</li>
+          <li><strong>小步调阈值与羽化</strong>先清残底，再修边缘；每次只动一个变量，避免不知道是哪项造成损失。</li>
+          <li><strong>检查 RGBA 与 A</strong>确认轮廓、内部白色、封闭区域和半透明过渡。必要时再看 RGB 单通道。</li>
+          <li><strong>导出全分辨率</strong>使用安全后缀，不覆盖原图；把输出放进候选 / build 区等待后续 QA。</li>
+          <li><strong>放回真实场景</strong>在深色、浅色、品红或游戏地图背景上检查白边 / 粉边、比例和锚点，再决定是否成为正式资产。</li>
+        </ol>
+        <ul class="checklist">
+          <li>源图与透明派生图路径不同。</li>
+          <li>主体内部白色或高光没有被挖空。</li>
+          <li>A 通道边缘连续，没有孤立灰点。</li>
+          <li>深色底与品红底都没有明显色边。</li>
+          <li>正式导出尺寸与源图完全一致。</li>
+          <li>批量汇总中的 failed 为 0。</li>
+        </ul>
+      </section>
+
+      <section class="section" id="troubleshooting">
+        <span class="section-label">08 · Troubleshooting</span>
+        <h2>常见问题与边界</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>现象</th><th>原因</th><th>处理</th></tr></thead>
+            <tbody>
+              <tr><td>人物内部白色变透明</td><td>关闭了“只抠边缘”，全局色键删除了所有近似背景色。</td><td>重新开启默认模式；只有必须挖空封闭孔洞时才用全局色键。</td></tr>
+              <tr><td>外圈还有白底</td><td>背景色不准、阈值太低，或背景与边缘没有连通。</td><td>确认源图合规，必要时取四角，小步提高阈值；封闭残底才考虑全局色键。</td></tr>
+              <tr><td>深色底上出现白边 / 粉边</td><td>羽化过宽、背景色选错，或源图有复杂光晕 / 阴影。</td><td>先纠正背景色并减少羽化；源图若不是均匀纯色，应退回生成而非无限放大阈值。</td></tr>
+              <tr><td>预览较糊</td><td>预览最长边限制为 512 px。</td><td>这是性能策略；正式导出使用全分辨率。导出后用原尺寸查看。</td></tr>
+              <tr><td>“选择当前图片”提示没有选中项</td><td>Godot 文件系统面板没有选中受支持图片 / 文件夹，或当前是 headless 环境。</td><td>先在文件系统面板点选；自动化改用 CLI。</td></tr>
+              <tr><td>已有输出被报告失败</td><td>“覆盖已有输出”未勾选，这是默认保护。</td><td>确认目标可替换后开启 overwrite，或改后缀 / 输出目录。</td></tr>
+              <tr><td>目录处理速度慢</td><td>正式导出逐像素处理每张原分辨率图片。</td><td>先 dry-run 核对范围，按一致背景拆小批次，避免把无关大图纳入递归目录。</td></tr>
+              <tr><td>CLI 返回非零退出码</td><td>参数、输入、输出冲突、读写或逐文件处理失败。</td><td>解析最后一行 <code>IMAGE_MATTING_RESULT</code> 的 errors，不要只重跑命令。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warning"><strong>工具不是万能分割模型</strong><p>它针对已知均匀背景色做确定性抠图。复杂场景、渐变背景、烘焙地面和投影不应靠极大阈值硬抠；应退回源图 Provider，按“一张不透明纯白底源图”的契约重新生成。</p></div>
+        <div class="callout warning"><strong>公开文档边界</strong><p>本页只发布工具界面和算法用法，不发布私有生成源文件，不复制 <code>assets/audio/</code> 中的 Civilization VI 对照素材。</p></div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div><strong>BehindTheLines · BTL 抠图编辑器</strong><p>最后更新 <time datetime="2026-07-17">2026-07-17</time></p></div>
+      <div><a href="#page-title">回到顶部</a> · <a href="/BehindTheLines/CellArtEditor/">单元格美术</a> · <a href="/BehindTheLines/AnimationProduction/">角色动画</a> · <a href="/BehindTheLines/">文档首页</a></div>
+    </div>
+  </footer>
+</body>
+</html>

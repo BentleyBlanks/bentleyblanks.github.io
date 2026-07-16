@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BehindTheLines 单元格美术编辑器手册：四季图集映射、真实 Map2D 预览、Lovart 图集修订、状态查询、差异数据与安全边界。">
+  <meta name="theme-color" content="#1f2923">
+  <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/CellArtEditor/">
+  <title>BTL 单元格美术编辑器｜BehindTheLines</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #242018;
+      --muted: #6e6558;
+      --paper: #f3eddd;
+      --panel: rgba(255, 252, 243, 0.84);
+      --line: rgba(78, 66, 49, 0.2);
+      --forest: #1f2923;
+      --forest-soft: #33453a;
+      --red: #96392e;
+      --red-dark: #6f261f;
+      --gold: #b48a45;
+      --gold-soft: #efe1bd;
+      --green: #3e6952;
+      --shadow: 0 20px 52px rgba(51, 42, 29, 0.12);
+      --radius: 18px;
+      --content: 1120px;
+      font-family: Inter, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      font-synthesis: none;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% -4%, rgba(180, 138, 69, 0.18), transparent 30rem),
+        linear-gradient(180deg, #f8f3e7 0%, var(--paper) 38%, #eee6d4 100%);
+      line-height: 1.72;
+    }
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      content: "";
+      opacity: 0.2;
+      background-image:
+        linear-gradient(rgba(65, 53, 38, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(65, 53, 38, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: linear-gradient(to bottom, black, transparent 72%);
+    }
+    a { color: var(--red); text-underline-offset: 0.2em; }
+    a:hover { color: var(--red-dark); }
+    :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+    code, pre { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
+    code { padding: 0.12em 0.35em; background: rgba(150, 57, 46, 0.08); border-radius: 5px; font-size: 0.9em; overflow-wrap: anywhere; }
+    pre { overflow-x: auto; margin: 18px 0 0; padding: 18px 20px; color: #f8efd9; background: #202923; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; line-height: 1.55; }
+    pre code { padding: 0; color: inherit; background: transparent; overflow-wrap: normal; }
+    .skip-link { position: fixed; top: 10px; left: 10px; z-index: 100; padding: 8px 12px; color: white; background: var(--red); border-radius: 8px; transform: translateY(-160%); }
+    .skip-link:focus { transform: translateY(0); }
+    .topbar { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgba(255, 255, 255, 0.1); background: rgba(31, 41, 35, 0.95); backdrop-filter: blur(16px); }
+    .topbar-inner { display: flex; width: min(var(--content), calc(100% - 36px)); min-height: 58px; margin: 0 auto; align-items: center; justify-content: space-between; gap: 22px; }
+    .brand { display: inline-flex; align-items: center; gap: 11px; color: #fff9e9; font-weight: 760; letter-spacing: 0.02em; text-decoration: none; }
+    .brand-mark { display: grid; width: 31px; height: 31px; color: #fff8e9; background: var(--red); border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 50%; place-items: center; font-family: Georgia, serif; box-shadow: 0 0 0 4px rgba(180, 138, 69, 0.15); }
+    .topnav { display: flex; align-items: center; gap: 18px; }
+    .topnav a { color: rgba(255, 249, 233, 0.76); font-size: 14px; text-decoration: none; }
+    .topnav a:hover { color: white; }
+    .hero { position: relative; overflow: hidden; color: #fff9e9; background: linear-gradient(120deg, rgba(31, 41, 35, 0.98), rgba(52, 61, 49, 0.93)); }
+    .hero::after { position: absolute; right: -100px; bottom: -210px; width: 560px; height: 410px; content: ""; border: 1px solid rgba(239, 225, 189, 0.14); border-radius: 50%; box-shadow: 0 0 0 52px rgba(239, 225, 189, 0.04), 0 0 0 104px rgba(239, 225, 189, 0.025); transform: rotate(-8deg); }
+    .hero-inner { position: relative; z-index: 1; width: min(var(--content), calc(100% - 36px)); margin: 0 auto; padding: 72px 0 68px; }
+    .eyebrow { margin: 0 0 10px; color: #e5c77b; font-size: 13px; font-weight: 760; letter-spacing: 0.16em; text-transform: uppercase; }
+    h1, h2, h3 { line-height: 1.25; }
+    h1 { max-width: 850px; margin: 0; font-size: clamp(38px, 6vw, 70px); letter-spacing: -0.035em; }
+    .hero-lead { max-width: 790px; margin: 22px 0 0; color: rgba(255, 249, 233, 0.79); font-size: 18px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .chip { padding: 7px 11px; color: #fff8e9; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 999px; font-size: 13px; }
+    .page-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); width: min(var(--content), calc(100% - 36px)); margin: 42px auto 72px; gap: 34px; align-items: start; }
+    .side-nav { position: sticky; top: 82px; display: grid; padding: 18px; background: rgba(255, 252, 243, 0.62); border: 1px solid var(--line); border-radius: 14px; gap: 4px; }
+    .side-nav strong { margin: 0 0 8px; color: var(--forest); font-size: 13px; letter-spacing: 0.08em; }
+    .side-nav a { padding: 7px 9px; color: var(--muted); border-radius: 8px; font-size: 14px; text-decoration: none; }
+    .side-nav a:hover { color: var(--red-dark); background: rgba(180, 138, 69, 0.12); }
+    .content { min-width: 0; }
+    .section { margin-bottom: 28px; padding: clamp(24px, 4vw, 42px); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .section-label { color: var(--red); font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+    h2 { margin: 7px 0 14px; color: var(--forest); font-size: clamp(27px, 4vw, 40px); letter-spacing: -0.025em; }
+    h3 { margin: 28px 0 8px; color: var(--forest-soft); font-size: 20px; }
+    .lede { margin-top: 0; color: var(--muted); font-size: 17px; }
+    .screenshot { margin: 26px 0 8px; overflow: hidden; background: #161b18; border: 1px solid rgba(31, 41, 35, 0.34); border-radius: 14px; box-shadow: 0 16px 34px rgba(31, 41, 35, 0.18); }
+    .screenshot a { display: block; }
+    .screenshot img { display: block; width: 100%; height: auto; }
+    .screenshot figcaption { padding: 12px 15px; color: #f4ead3; background: #273129; font-size: 13px; }
+    .table-wrap { overflow-x: auto; margin-top: 22px; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.35); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--forest); background: rgba(62, 105, 82, 0.08); font-size: 13px; }
+    tr:last-child td { border-bottom: 0; }
+    .steps { display: grid; margin: 24px 0 0; padding: 0; counter-reset: flow; gap: 12px; list-style: none; }
+    .steps li { position: relative; min-height: 76px; padding: 16px 18px 16px 66px; background: rgba(255, 255, 255, 0.42); border: 1px solid var(--line); border-radius: 13px; }
+    .steps li::before { position: absolute; top: 16px; left: 17px; display: grid; width: 34px; height: 34px; color: white; background: var(--red); border-radius: 50%; counter-increment: flow; content: counter(flow, decimal-leading-zero); place-items: center; font-size: 12px; font-weight: 800; }
+    .steps strong { display: block; color: var(--forest); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+    .card { padding: 18px; background: rgba(255, 255, 255, 0.42); border: 1px solid var(--line); border-radius: 13px; }
+    .card h3 { margin: 0 0 8px; }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .callout { margin-top: 22px; padding: 17px 19px; background: var(--gold-soft); border-left: 5px solid var(--gold); border-radius: 10px; }
+    .callout.warning { background: #ead3ca; border-left-color: var(--red); }
+    .checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 20px 0 0; padding: 0; gap: 10px 18px; list-style: none; }
+    .checklist li { position: relative; padding: 10px 12px 10px 38px; border-bottom: 1px solid var(--line); }
+    .checklist li::before { position: absolute; left: 10px; color: var(--green); content: "✓"; font-weight: 900; }
+    .footer { color: rgba(255, 249, 233, 0.78); background: var(--forest); }
+    .footer-inner { display: flex; width: min(var(--content), calc(100% - 36px)); margin: 0 auto; padding: 26px 0; justify-content: space-between; gap: 22px; }
+    .footer p { margin: 4px 0 0; }
+    .footer a { color: #e5c77b; }
+    @media (max-width: 860px) {
+      .topbar-inner { align-items: flex-start; padding: 12px 0; }
+      .topnav { flex-wrap: wrap; justify-content: flex-end; gap: 8px 14px; }
+      .page-shell { display: block; }
+      .side-nav { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 24px; }
+      .side-nav strong { grid-column: 1 / -1; }
+    }
+    @media (max-width: 640px) {
+      .topbar-inner { display: block; }
+      .topnav { margin-top: 8px; justify-content: flex-start; }
+      .hero-inner { padding: 54px 0 50px; }
+      .hero-lead { font-size: 16px; }
+      .page-shell { width: min(100% - 22px, var(--content)); margin-top: 22px; }
+      .side-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .section { padding: 22px 18px; }
+      .grid-2, .checklist { grid-template-columns: 1fr; }
+      .footer-inner { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: 0.01ms !important; } }
+    @media print { .topbar, .side-nav { display: none; } .hero { color: var(--ink); background: white; } .hero-lead { color: var(--ink); } .page-shell { display: block; width: 100%; } .section { box-shadow: none; break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到正文</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/BehindTheLines/" aria-label="BehindTheLines 文档首页"><span class="brand-mark" aria-hidden="true">太</span><span>BehindTheLines 文档</span></a>
+      <nav class="topnav" aria-label="站点导航">
+        <a href="#mapping">映射调参</a>
+        <a href="#generation">生成修订</a>
+        <a href="#data">数据边界</a>
+        <a href="/BehindTheLines/">返回手册首页</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero-inner">
+      <p class="eyebrow">Atlas Mapping · Live Map2D · Generation Ledger</p>
+      <h1 id="page-title">BTL 单元格美术<br>编辑器手册</h1>
+      <p class="hero-lead">在同一主屏完成四季地形、摆件与特效的图集指派和参数微调，并直接用真实 Map2D 渲染结果验收；需要重做图集时，切换到“生成修订”，保留原始提示词、追加修改条件、确认费用并追踪到正式资产。</p>
+      <div class="chips" aria-label="功能摘要">
+        <span class="chip">四季与多类别</span>
+        <span class="chip">图集格子指派</span>
+        <span class="chip">真实 Map2D 预览</span>
+        <span class="chip">单个 / 多选 / 同组</span>
+        <span class="chip">状态查询</span>
+        <span class="chip">只写差异</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="page-shell">
+    <aside class="side-nav" aria-label="本文目录">
+      <strong>本文目录</strong>
+      <a href="#overview">界面总览</a>
+      <a href="#mapping">映射与预览</a>
+      <a href="#generation">生成与查询</a>
+      <a href="#status">状态怎么读</a>
+      <a href="#data">数据与安全</a>
+      <a href="#workflow">典型流程</a>
+      <a href="#troubleshooting">限制与排错</a>
+    </aside>
+
+    <main class="content" id="main-content">
+      <section class="section" id="overview">
+        <span class="section-label">01 · Overview</span>
+        <h2>一个主屏，两个职责页签</h2>
+        <p class="lede">“映射调参”负责游戏最终怎样使用图集；“生成修订”负责图集从哪来、为什么重做、Provider 与本地处理进行到哪里。两套数据刻意分离，避免一边调画面，一边意外改写生产历史。</p>
+        <figure class="screenshot">
+          <a href="../Assets/Texture_CellArtEditorMapping.png" aria-label="打开 BTL 单元格映射调参界面原始截图">
+            <img src="../Assets/Texture_CellArtEditorMapping.png" alt="BTL 单元格编辑器映射调参页，左侧为类别、季节、角色与参数，中间为可点击图集，右侧为真实 Map2D 预览" width="1920" height="1080" loading="lazy">
+          </a>
+          <figcaption>映射调参页：左侧选择对象与参数，中间点击图集槽位，右侧立即看到真实 Map2D 的 2.5D 结果。点击图片可查看原尺寸。</figcaption>
+        </figure>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>区域</th><th>用途</th><th>操作结果</th></tr></thead>
+            <tbody>
+              <tr><td>左栏</td><td>类别、季节、角色和数值参数；在“映射调参 / 生成修订”间切换。</td><td>改变当前编辑上下文，不直接写盘。</td></tr>
+              <tr><td>中栏</td><td>显示当前类别对应的正式图集与槽位网格。</td><td>点击行或格子，把它指派给左侧选中的角色。</td></tr>
+              <tr><td>右栏</td><td>内嵌真实规则内核与真实 Map2D 渲染器。</td><td>参数和映射即时注入预览；不需要先保存、重启游戏。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout"><strong>单位动画已经拆出</strong><p>类别列表仍可看到 Units，但逐帧预览、动作重生成和视频状态已迁移到独立“BTL 角色动画”主屏。制作 Idle、Move、Attack 时请使用<a href="/BehindTheLines/AnimationProduction/">单位帧动画生产规范</a>。</p></div>
+      </section>
+
+      <section class="section" id="mapping">
+        <span class="section-label">02 · Mapping</span>
+        <h2>先选语义，再把图集槽位交给它</h2>
+        <p class="lede">编辑器不是在图片上“画地形”，而是在维护“游戏语义 → 图集位置 + 渲染参数”的小型差异层。默认配置仍在源码，保存文件只记录与默认值不同的部分。</p>
+        <div class="grid-2">
+          <div class="card"><h3>地形 Terrain</h3><p>按 Winter、Spring、Summer、Autumn 切换正式图集；从 plain、hills、forest、mountain 中选择角色，再点击图集行完成映射。</p></div>
+          <div class="card"><h3>摆件 Props</h3><p>同样按四季切换；村庄、设施等对象使用明确的二维格子坐标，因此点击的是某一列与某一行的交点。</p></div>
+          <div class="card"><h3>特效 Effects</h3><p>红旗、太阳旗、黑旗、火焰等效果映射到图集行；用于保持战场信息层与地形图集解耦。</p></div>
+          <div class="card"><h3>季节预览</h3><p>编辑器把预览回合切到对应月份，Map2D 会沿运行时的季节路径换图，而不是只替换中栏图片。</p></div>
+        </div>
+        <ol class="steps">
+          <li><strong>选择类别与季节</strong>先确定 Terrain、Props 或 Effects；地形和摆件再选 Winter、Spring、Summer、Autumn。</li>
+          <li><strong>选择语义角色</strong>在角色列表点选要修改的对象。左栏只展示该对象适用的参数，减少误改。</li>
+          <li><strong>点击图集槽位</strong>地形和特效按行指派，摆件按单元格指派；金色框标识当前映射。</li>
+          <li><strong>在真实地图里验收</strong>检查尺度、脚点、遮挡、季节搭配和远近辨认度。拖动数值时，昂贵的全层重录会自动合并，停手后刷新。</li>
+          <li><strong>明确保存</strong>确认满意后点击“保存”。“重载文件”丢弃未保存改动并重新读取差异层；“恢复全部默认”把本次配置还原为源码默认。</li>
+        </ol>
+        <div class="callout warning"><strong>预览与保存是两件事</strong><p>画面即时变化只代表当前编辑器内存已更新。看到“已保存 <code>Data_Map25DArt.json</code>”后，差异层才真正落盘；修改生产提示词也不会替你保存映射。</p></div>
+      </section>
+
+      <section class="section" id="generation">
+        <span class="section-label">03 · Regeneration</span>
+        <h2>原始提示词不覆盖，修改条件只追加</h2>
+        <p class="lede">每张图集都有稳定的 asset ID、一次锁定的真实原始提示词和不断追加的 revision。重生成时真正送出的 effective prompt 是“原始提示词 + 本次修改条件”，历史原因不会被新描述抹掉。</p>
+        <figure class="screenshot">
+          <a href="../Assets/Texture_CellArtEditorGeneration.png" aria-label="打开 BTL 单元格生成修订界面原始截图">
+            <img src="../Assets/Texture_CellArtEditorGeneration.png" alt="BTL 单元格编辑器生成修订页，包含图集多选、原始提示词、修改条件、重生成、查询与状态显示" width="1920" height="1080" loading="lazy">
+          </a>
+          <figcaption>生成修订页：可选单张、Ctrl 多选或“选择同组”，录入本次修改条件后发起任务，并在原位置查看 Provider 与本地阶段。点击图片可查看原尺寸。</figcaption>
+        </figure>
+        <h3>首次接管旧图集</h3>
+        <p>旧资产如果没有台账，先单选它，在“原始提示词”中录入当时真实使用的提示词，再点击“锁定所选原始提示词”。一旦锁定，字段变为只读；系统拒绝用另一段文本覆盖它。没有真实提示词时，不要凭印象编写，更不要发起重生成。</p>
+        <h3>发起修改 / 重生成</h3>
+        <ol class="steps">
+          <li><strong>选择作用范围</strong>单选只改当前图集；Ctrl 多选可组成自定义批次；“选择同组”会选择同类四季图集，例如四张 terrain atlas。</li>
+          <li><strong>写本次修改条件</strong>只描述增量，如“压低山地侧面，保持 4×4 槽位顺序与其他内容不变”。不要重写整份原始提示词。</li>
+          <li><strong>点击“修改并重生成”</strong>编辑器先显示费用确认弹窗；只有明确确认后，才创建 revision 与 request，并允许 Codex worker 向 Lovart 提交。</li>
+          <li><strong>处理二次确认</strong>Provider 若返回 <code>pendingConfirmation</code>，列表会进入“Awaiting confirmation”，此时用“确认待处理费用”明确继续。</li>
+          <li><strong>查询并完成处理</strong>已有 thread ID 或 submit ID 的任务可以查询。Provider 完成后，Codex 下载源图、抠图、组装图集、运行 QA，再把正式输出导入项目。</li>
+        </ol>
+        <div class="callout"><strong>源图契约</strong><p>每次图像 Provider 请求必须只返回一张、不透明、均匀纯 <code>#FFFFFF</code> 背景的源图；容许的导出量化偏差最多为每通道 2 级。透明图、接触表和最终图集都是后续派生物，不能倒充 Provider 原图。需要人工检查边缘时，使用<a href="/BehindTheLines/ImageMattingEditor/">BTL 抠图编辑器</a>。</p></div>
+      </section>
+
+      <section class="section" id="status">
+        <span class="section-label">04 · Status</span>
+        <h2>同时看 Provider 状态与本地阶段</h2>
+        <p class="lede">列表中的状态由两部分组成：Provider 回答“远端任务怎么样”，local stage 回答“下载与资产处理走到哪一步”。编辑器每秒只检查台账指纹与 worker 进程；只有状态变化时才重新解析完整台账，避免轮询拖慢调参。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>本地阶段</th><th>含义</th><th>你应该做什么</th></tr></thead>
+            <tbody>
+              <tr><td><code>Queued / Generating</code></td><td>请求已排队，或 worker 正在调用 Provider。</td><td>等待；同一资产在活动请求结束前会被锁定。</td></tr>
+              <tr><td><code>Awaiting confirmation</code></td><td>Provider 要求再次确认预计费用。</td><td>核对批次数量与费用，再点击“确认待处理费用”。</td></tr>
+              <tr><td><code>Downloading</code></td><td>远端 artifact 已成功，正在下载并核对来源。</td><td>保持项目目录可写，不要手工移动 build 目录。</td></tr>
+              <tr><td><code>Matting / Packing / Importing</code></td><td>Codex 正在抠图、按既定槽位打包并导入。</td><td>等待 QA；不要把中间文件直接覆盖正式图集。</td></tr>
+              <tr><td><code>Ready</code></td><td>正式输出存在，台账 artifact 路径与 SHA-256 一致。</td><td>回到“映射调参”，在真实 Map2D 中做最终视觉验收。</td></tr>
+              <tr><td><code>Failed</code></td><td>Provider、下载、处理、校验或写盘失败。</td><td>先看 message / error history，修复原因后再发新 revision。</td></tr>
+              <tr><td><code>Legacy imported / Missing</code></td><td>旧资产已存在但来源不完整，或正式输出缺失。</td><td>补录真实提示词与来源，或重新生成；不要伪造 provenance。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Provider 常见状态包括 <code>notSubmitted</code>、<code>queued</code>、<code>running</code>、<code>pendingConfirmation</code>、<code>succeeded</code>、<code>failed</code> 与 <code>cancelled</code>。只有看到 Provider ID 的资产才能执行“查询并完成处理”。</p>
+      </section>
+
+      <section class="section" id="data">
+        <span class="section-label">05 · Data Boundary</span>
+        <h2>运行时覆盖与生产台账严格隔离</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>文件 / 目录</th><th>保存什么</th><th>谁可以读取</th></tr></thead>
+            <tbody>
+              <tr><td><code>Data_Map25DArt.json</code></td><td>与默认配置不同的图集映射和渲染参数；不是完整默认表。</td><td>编辑器与游戏运行时。</td></tr>
+              <tr><td><code>Data_ArtGeneration.json</code></td><td>不可变 base prompt、追加 revisions、requests、Provider 任务身份和状态、处理阶段、artifact 路径 / URL / MIME / SHA-256 与依赖快照。</td><td>只供美术生产工具；游戏运行时禁止读取，导出包排除。</td></tr>
+              <tr><td><code>build/artGeneration/cells/…</code></td><td>Provider 下载源图、处理候选、接触表与 QA 报告。</td><td>生产工具；这些是候选与证据，不是正式运行时资产。</td></tr>
+              <tr><td><code>assets/map2d/…/Texture_Map2D*Atlas.png</code></td><td>通过处理与校验后的正式图集。</td><td>游戏运行时。进入 Ready 前必须存在并与台账哈希一致。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid-2">
+          <div class="card"><h3>台账可以保存</h3><p>Provider 名称、thread / submit ID、非敏感参数、状态、时间、修改条件、处理阶段、路径、URL、MIME、哈希、依赖快照和错误历史。</p></div>
+          <div class="card"><h3>台账绝不能保存</h3><p>密码、API key、access token、Authorization、cookie 或任何凭据。工具会拒绝常见 secret 字段；凭据只应由 Provider 自己的安全环境管理。</p></div>
+        </div>
+        <div class="callout warning"><strong>候选不等于正式资产</strong><p>下载成功只说明有一个候选源图。只有抠图、打包、导入和 QA 全部成功，且正式路径与 SHA-256 都通过校验，状态才可以是 Ready。不要绕过流程把 <code>build/</code> 文件手工复制成正式图集。</p></div>
+      </section>
+
+      <section class="section" id="workflow">
+        <span class="section-label">06 · Recipes</span>
+        <h2>三种最常用的工作方法</h2>
+        <div class="grid-2">
+          <div class="card"><h3>只修映射或尺度</h3><ol><li>进入“映射调参”。</li><li>选类别、季节和角色。</li><li>点槽位或调整参数。</li><li>在 Map2D 检查遮挡与比例。</li><li>点击保存。</li></ol></div>
+          <div class="card"><h3>只重做一张图集</h3><ol><li>进入“生成修订”并单选。</li><li>确认 base prompt 已锁定。</li><li>写清一个增量条件。</li><li>确认费用并等待 / 查询。</li><li>Ready 后回到地图验收。</li></ol></div>
+          <div class="card"><h3>四季保持同一修改</h3><ol><li>先选任一季节图集。</li><li>点击“选择同组”。</li><li>确认确实选中四张。</li><li>写不改变槽位的统一条件。</li><li>一次确认批次数量与费用。</li></ol></div>
+          <div class="card"><h3>接着处理已有远端任务</h3><ol><li>选中状态中带 Provider ID 的资产。</li><li>点击“查询并完成处理”。</li><li>若要求费用确认，明确确认。</li><li>关注 Downloading → Ready。</li><li>失败时先读 message，不重复盲投。</li></ol></div>
+        </div>
+        <ul class="checklist">
+          <li>修改条件说明“改什么”与“保持什么不变”。</li>
+          <li>多选前核对数量，避免错误批量消耗额度。</li>
+          <li>每张图集保存自己的 base prompt，不相互覆盖。</li>
+          <li>Ready 后仍在四季地图中逐一检查。</li>
+          <li>保存映射前确认状态栏没有未写入错误。</li>
+          <li>正式图集、QA 记录和台账哈希保持一致。</li>
+        </ul>
+      </section>
+
+      <section class="section" id="troubleshooting">
+        <span class="section-label">07 · Troubleshooting</span>
+        <h2>限制、错误与恢复</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>现象</th><th>原因</th><th>处理</th></tr></thead>
+            <tbody>
+              <tr><td>重生成按钮灰色</td><td>没有选择、缺少真实 base prompt、Codex / Lovart 环境 missing，或资产已有活动请求。</td><td>按状态文字逐项补齐；不要用假提示词绕过门禁。</td></tr>
+              <tr><td>查询按钮灰色</td><td>所选资产没有 thread ID / submit ID，或 Codex worker 不可用。</td><td>先完成一次提交，或恢复 Codex 环境后重载。</td></tr>
+              <tr><td>显示“未写入，请重试”</td><td>另一个编辑器或 worker 同时更新台账，CAS / 目录锁阻止了覆盖。</td><td>让当前 worker 完成，点击重载后再操作；不要手工合并活动请求。</td></tr>
+              <tr><td>worker 退出但仍显示运行中</td><td>租约尚未过期，系统为避免双 worker 暂不抢占。</td><td>保持编辑器打开；租约过期后会从 checkpoint 安全恢复。</td></tr>
+              <tr><td>Provider 成功但没有 Ready</td><td>下载、源图契约、抠图、打包、导入或哈希校验尚未通过。</td><td>读本地 stage 与 message；用抠图编辑器诊断边缘，但不要跳过 QA。</td></tr>
+              <tr><td>地图预览和预期不同</td><td>季节、当前角色、正式图集或未保存差异不一致。</td><td>核对左栏上下文、金色槽位框和状态栏，再重载文件复查。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout"><strong>一键重载</strong><p>点击主屏标题旁的重载按钮，或使用 <code>Ctrl+R</code>，可以重新读取磁盘状态。它适合 worker 刚完成或外部文件刚更新的场景；有未保存的映射改动时，先决定是否保存。</p></div>
+        <div class="callout warning"><strong>公开文档边界</strong><p>本页只展示工具界面与流程，不发布私有生成源文件，不复制 <code>assets/audio/</code> 中的 Civilization VI 对照素材，也不公开任何 Provider 凭据。</p></div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div><strong>BehindTheLines · BTL 单元格美术编辑器</strong><p>最后更新 <time datetime="2026-07-17">2026-07-17</time></p></div>
+      <div><a href="#page-title">回到顶部</a> · <a href="/BehindTheLines/ImageMattingEditor/">抠图编辑器</a> · <a href="/BehindTheLines/AnimationProduction/">角色动画</a> · <a href="/BehindTheLines/">文档首页</a></div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BehindTheLines BTL 音频编辑器使用手册：BGM 与 20 个界面 SFX 的试听、音量、文件映射、重置、差异保存及重启生效。">
+  <meta name="theme-color" content="#1f2923">
+  <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/AudioEditor/">
+  <title>BTL 音频编辑器｜BehindTheLines</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink:#242018;--muted:#6e6558;--paper:#f3eddd;--panel:rgba(255,252,243,.84);--line:rgba(78,66,49,.2);
+      --forest:#1f2923;--forest-soft:#33453a;--red:#96392e;--red-dark:#6f261f;--gold:#b48a45;--gold-soft:#efe1bd;--green:#3e6952;
+      --shadow:0 20px 52px rgba(51,42,29,.12);--radius:18px;--content:1120px;
+      font-family:Inter,"Segoe UI","Noto Sans SC","Microsoft YaHei",sans-serif;font-synthesis:none;
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth;scroll-padding-top:76px}
+    body{margin:0;color:var(--ink);background:radial-gradient(circle at 8% -4%,rgba(180,138,69,.18),transparent 30rem),linear-gradient(180deg,#f8f3e7 0%,var(--paper) 38%,#eee6d4 100%);line-height:1.72}
+    body::before{position:fixed;inset:0;z-index:-1;pointer-events:none;content:"";opacity:.2;background-image:linear-gradient(rgba(65,53,38,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(65,53,38,.04) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,black,transparent 72%)}
+    a{color:var(--red);text-underline-offset:.2em}a:hover{color:var(--red-dark)}:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+    code{padding:.12em .35em;background:rgba(150,57,46,.08);border-radius:5px;font-family:"Cascadia Code",Consolas,monospace;font-size:.9em;overflow-wrap:anywhere}
+    .skip-link{position:fixed;top:10px;left:10px;z-index:100;padding:8px 12px;color:white;background:var(--red);border-radius:8px;transform:translateY(-160%)}.skip-link:focus{transform:translateY(0)}
+    .topbar{position:sticky;top:0;z-index:20;border-bottom:1px solid rgba(255,255,255,.1);background:rgba(31,41,35,.95);backdrop-filter:blur(16px)}
+    .topbar-inner{display:flex;width:min(var(--content),calc(100% - 36px));min-height:58px;margin:0 auto;align-items:center;justify-content:space-between;gap:22px}
+    .brand{display:inline-flex;align-items:center;gap:11px;color:#fff9e9;font-weight:760;letter-spacing:.02em;text-decoration:none}.brand-mark{display:grid;width:31px;height:31px;color:#fff8e9;background:var(--red);border:1px solid rgba(255,255,255,.28);border-radius:50%;place-items:center;font-family:Georgia,serif;box-shadow:0 0 0 4px rgba(180,138,69,.15)}
+    .topnav{display:flex;align-items:center;gap:18px}.topnav a{color:rgba(255,249,233,.76);font-size:14px;text-decoration:none}.topnav a:hover{color:white}
+    .hero{position:relative;overflow:hidden;color:#fff9e9;background:linear-gradient(120deg,rgba(31,41,35,.98),rgba(52,61,49,.93))}.hero::after{position:absolute;right:-100px;bottom:-210px;width:560px;height:410px;content:"";border:1px solid rgba(239,225,189,.14);border-radius:50%;box-shadow:0 0 0 52px rgba(239,225,189,.04),0 0 0 104px rgba(239,225,189,.025);transform:rotate(-8deg)}
+    .hero-inner{position:relative;z-index:1;width:min(var(--content),calc(100% - 36px));margin:0 auto;padding:72px 0 68px}.eyebrow{margin:0 0 10px;color:#e5c77b;font-size:13px;font-weight:760;letter-spacing:.16em;text-transform:uppercase}
+    h1,h2,h3{line-height:1.25}h1{max-width:820px;margin:0;font-size:clamp(38px,6vw,70px);letter-spacing:-.035em}.hero-lead{max-width:780px;margin:22px 0 0;color:rgba(255,249,233,.79);font-size:18px}.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}.chip{padding:7px 11px;color:#fff8e9;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:999px;font-size:13px}
+    .page-shell{display:grid;grid-template-columns:220px minmax(0,1fr);width:min(var(--content),calc(100% - 36px));margin:42px auto 72px;gap:34px;align-items:start}.side-nav{position:sticky;top:82px;display:grid;padding:18px;background:rgba(255,252,243,.62);border:1px solid var(--line);border-radius:14px;gap:4px}.side-nav strong{margin:0 0 8px;color:var(--forest);font-size:13px;letter-spacing:.08em}.side-nav a{padding:7px 9px;color:var(--muted);border-radius:8px;font-size:14px;text-decoration:none}.side-nav a:hover{color:var(--red-dark);background:rgba(180,138,69,.12)}.content{min-width:0}
+    .section{margin-bottom:28px;padding:clamp(24px,4vw,42px);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.section-label{color:var(--red);font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}h2{margin:7px 0 14px;color:var(--forest);font-size:clamp(27px,4vw,40px);letter-spacing:-.025em}h3{margin:26px 0 8px;color:var(--forest-soft);font-size:20px}.lede{margin-top:0;color:var(--muted);font-size:17px}
+    .editor-shot{margin:26px 0 6px;overflow:hidden;background:#172019;border:1px solid rgba(62,105,82,.3);border-radius:14px;box-shadow:0 14px 32px rgba(31,41,35,.16)}.editor-shot a{display:block;background:#11171b}.editor-shot img{display:block;width:100%;height:auto}.editor-shot figcaption{padding:12px 15px;color:#5f594f;background:#f7f0df;font-size:13px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:22px}.card{padding:18px;background:rgba(255,255,255,.42);border:1px solid var(--line);border-radius:13px}.card h3{margin:0 0 8px}.card p:last-child,.card ul:last-child{margin-bottom:0}
+    .steps{display:grid;margin:24px 0 0;padding:0;counter-reset:flow;gap:12px;list-style:none}.steps li{position:relative;min-height:76px;padding:16px 18px 16px 66px;background:rgba(255,255,255,.42);border:1px solid var(--line);border-radius:13px}.steps li::before{position:absolute;top:16px;left:17px;display:grid;width:34px;height:34px;color:white;background:var(--red);border-radius:50%;counter-increment:flow;content:counter(flow,decimal-leading-zero);place-items:center;font-size:12px;font-weight:800}.steps strong{display:block;color:var(--forest)}
+    .table-wrap{overflow-x:auto;margin-top:22px;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;background:rgba(255,255,255,.35)}th,td{padding:13px 15px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--forest);background:rgba(62,105,82,.08);font-size:13px}tr:last-child td{border-bottom:0}
+    .callout{margin-top:22px;padding:17px 19px;background:var(--gold-soft);border-left:5px solid var(--gold);border-radius:10px}.callout.warning{background:#ead3ca;border-left-color:var(--red)}.checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:20px 0 0;padding:0;gap:10px 18px;list-style:none}.checklist li{position:relative;padding:10px 12px 10px 38px;border-bottom:1px solid var(--line)}.checklist li::before{position:absolute;left:10px;color:var(--green);content:"✓";font-weight:900}
+    .footer{color:rgba(255,249,233,.78);background:var(--forest)}.footer-inner{display:flex;width:min(var(--content),calc(100% - 36px));margin:0 auto;padding:26px 0;justify-content:space-between;gap:22px}.footer p{margin:4px 0 0}.footer a{color:#e5c77b}
+    @media(max-width:860px){.topbar-inner{align-items:flex-start;padding:12px 0}.topnav{flex-wrap:wrap;justify-content:flex-end;gap:8px 14px}.page-shell{display:block}.side-nav{position:static;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:24px}.side-nav strong{grid-column:1/-1}}
+    @media(max-width:640px){.topbar-inner{display:block}.topnav{margin-top:8px;justify-content:flex-start}.hero-inner{padding:54px 0 50px}.hero-lead{font-size:16px}.page-shell{width:min(100% - 22px,var(--content));margin-top:22px}.side-nav{grid-template-columns:repeat(2,minmax(0,1fr))}.section{padding:22px 18px}.grid-2,.checklist{grid-template-columns:1fr}.footer-inner{display:block}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}@media print{.topbar,.side-nav{display:none}.hero{color:var(--ink);background:white}.hero-lead{color:var(--ink)}.page-shell{display:block;width:100%}.section{box-shadow:none;break-inside:avoid}}
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到正文</a>
+  <header class="topbar"><div class="topbar-inner"><a class="brand" href="/BehindTheLines/" aria-label="BehindTheLines 文档首页"><span class="brand-mark" aria-hidden="true">太</span><span>BehindTheLines 文档</span></a><nav class="topnav" aria-label="站点导航"><a href="#controls">试听与映射</a><a href="#workflow">保存流程</a><a href="#licensing">素材边界</a><a href="/BehindTheLines/">返回手册首页</a></nav></div></header>
+
+  <section class="hero" aria-labelledby="page-title"><div class="hero-inner"><p class="eyebrow">Godot Editor · Audio Override</p><h1 id="page-title">BTL 音频编辑器</h1><p class="hero-lead">在同一个主屏里试听 BGM 和 20 个界面 SFX，调整音量、替换单文件映射并清除覆盖。工具只保存与默认配置不同的部分，正式运行时在游戏启动阶段读取。</p><div class="chips" aria-label="编辑器摘要"><span class="chip">1 组 BGM</span><span class="chip">20 个 SFX</span><span class="chip">即时试听</span><span class="chip">变体轮换试听</span><span class="chip">只保存差异</span><span class="chip">保存后重启生效</span></div></div></section>
+
+  <div class="page-shell">
+    <aside class="side-nav" aria-label="本文目录"><strong>本文目录</strong><a href="#overview">编辑器总览</a><a href="#controls">试听与映射</a><a href="#variants">变体限制</a><a href="#workflow">保存与重载</a><a href="#acceptance">验收清单</a><a href="#licensing">素材边界</a></aside>
+    <main class="content" id="main-content">
+      <section class="section" id="overview"><span class="section-label">01 · Overview</span><h2>听到结果，再决定是否写入</h2><p class="lede">在 Godot 顶部主屏切换到“BTL 音频”。上方是 BGM，下面逐行列出 20 个 SFX 键；金色名称表示该项与默认值不同，顶部状态会提示是否仍有未保存修改。</p>
+        <figure class="editor-shot"><a href="../Assets/Texture_AudioEditor.png" target="_blank" rel="noopener"><img src="../Assets/Texture_AudioEditor.png" alt="BTL 音频编辑器完整界面，上方为 BGM 试听和音量，下面是 20 个 SFX 的试听、音量、文件映射与重置" width="1920" height="1080" loading="lazy"></a><figcaption>BTL 音频编辑器全貌。点击图片可查看原始尺寸；图中只展示工具界面，不提供或复制任何音频素材。</figcaption></figure>
+        <div class="callout"><strong>配置边界</strong><p>默认值保留在游戏数据代码中；编辑器只写 <code>Data_AudioSettings.json</code> 的版本号和差异。删除一个覆盖，就会自然回到当前版本的默认配置。</p></div>
+      </section>
+
+      <section class="section" id="controls"><span class="section-label">02 · Controls</span><h2>BGM 与 SFX 各自怎么操作</h2>
+        <div class="grid-2">
+          <div class="card"><h3>BGM</h3><p>选择扫描到的 <code>AudioBgm_*</code> 文件，拖动音量；“试听”会循环播放，再点一次停止。切换曲目时，正在播放的预览会随选择更新。</p></div>
+          <div class="card"><h3>20 个 SFX</h3><p>每行用“▶”按当前音量试听，拖动滑条设置该键音量；单文件 SFX 还可改为扫描到的 <code>AudioSfx_*</code> 文件。</p></div>
+          <div class="card"><h3>停止试听</h3><p>底部“停止试听”同时停止 BGM 与 SFX，切换编辑器主屏或离开工具时也会清理预览播放。</p></div>
+          <div class="card"><h3>映射缺失</h3><p>配置中引用的文件若已移动，会以“缺失”项保留显示；试听时状态栏会明确报告无法找到或加载的文件。</p></div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>操作</th><th>立即影响</th><th>是否写盘</th></tr></thead><tbody>
+          <tr><td>试听 / 停止</td><td>只控制编辑器内预览播放器。</td><td>否</td></tr>
+          <tr><td>拖动音量 / 选择文件</td><td>更新内存中的差异；正在试听的 BGM 音量同步变化。</td><td>否，先标记未保存</td></tr>
+          <tr><td>单行重置</td><td>清除 BGM 或指定 SFX 的覆盖。</td><td>否，仍需保存</td></tr>
+          <tr><td>保存</td><td>清理等于默认值的项，再写入差异 JSON。</td><td>是</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section class="section" id="variants"><span class="section-label">03 · Variants</span><h2>变体可以试听轮换，不能在这里拆开改文件</h2><p class="lede">部分 SFX 键在默认配置中是一组变体。编辑器每次点击试听都会轮到下一条，与运行时的轮换语义一致。</p>
+        <div class="callout warning"><strong>变体限制</strong><p>变体行显示“变体 ×N（轮换播放，文件固定）”，只能调整整组共用音量，不能在界面中单独替换某个变体文件，也不能改变数量或顺序。需要修改变体集合时，应走默认数据与资源评审，而不是把数组结构塞进差异文件。</p></div>
+        <p>单文件 SFX 才会出现文件下拉框。这个限制可避免策划误把一组脚步、金属点击等轮换音效退化成单一重复声音。</p>
+      </section>
+
+      <section class="section" id="workflow"><span class="section-label">04 · Workflow</span><h2>保存、文件重载与编辑器重载是三件事</h2>
+        <ol class="steps">
+          <li><strong>定位目标键</strong>先试听当前 BGM 或 SFX，确认要解决的是响度、素材映射还是变体内容问题。</li>
+          <li><strong>在内存中调试</strong>拖动音量或替换单文件映射，反复试听；金色与“有未保存的修改”用于提醒当前差异。</li>
+          <li><strong>只保留必要覆盖</strong>如果结果不优于默认值，点该行“重置”；恢复全部默认会清空所有音频覆盖，仍处于未保存状态。</li>
+          <li><strong>保存差异</strong>点击“保存”，工具写入 <code>Data_AudioSettings.json</code>，并重新加载规范化后的差异。</li>
+          <li><strong>重启游戏验证</strong>运行时在游戏启动时读取音频覆盖，因此保存后需停止并重新启动游戏，才能验证正式流程。</li>
+        </ol>
+        <div class="grid-2">
+          <div class="card"><h3>重载文件</h3><p>丢弃工具中尚未保存的改动，重新读取 <code>Data_AudioSettings.json</code>。它不重启 Godot。</p></div>
+          <div class="card"><h3>⟳ 重载 / Ctrl+R</h3><p>保存并重启整个 Godot 编辑器项目，让已保存的工具脚本改动和主屏结构完全重建。它不是音频配置的“撤销”。</p></div>
+        </div>
+        <div class="callout"><strong>生效时机</strong><p>编辑器中的试听直接使用当前内存状态；游戏中的 BGM 与 SFX 使用启动时读取的状态。不要用“编辑器里已经听到了”代替保存后重启的实机验收。</p></div>
+      </section>
+
+      <section class="section" id="acceptance"><span class="section-label">05 · Acceptance</span><h2>一次音频修改的最低验收</h2><ul class="checklist">
+        <li>BGM 可开始、循环、停止，音量与显示百分比一致。</li><li>目标 SFX 在当前音量下可正常试听。</li>
+        <li>变体键连续试听时按组轮换，而非固定同一条。</li><li>缺失文件能在状态栏明确暴露。</li>
+        <li>重置后金色差异标记按预期消失。</li><li>JSON 只保留与默认值不同的键。</li>
+        <li>保存后重启游戏，正式 BGM 与 20 个 SFX 映射均可用。</li><li>Ctrl+R 重建编辑器后主屏仍能加载和试听。</li>
+      </ul><div class="callout warning"><strong>音量不是越大越好</strong><p>先保证同类反馈音量一致，再与 BGM、系统环境音和高频操作节奏一起评估。连续点击会暴露单次试听听不出来的疲劳感和峰值叠加。</p></div></section>
+
+      <section class="section" id="licensing"><span class="section-label">06 · Licensing</span><h2>文档解释映射，不分发音频</h2><p class="lede">本页只记录工具能力、键名语义和验收方式。所有音频文件继续留在其许可允许的私有范围内。</p>
+        <div class="callout warning"><strong>公开站点红线</strong><p>不得向本站复制、嵌入或提供 <code>assets/audio/</code> 中的 Civilization VI 对照素材，也不得发布私有仓库中的受限音频、波形导出或可还原音频的派生文件。截图必须保持静态且不含音频数据。</p></div>
+        <p>正式项目音频替换前需确认来源、许可、署名要求和再分发范围；编辑器能把文件映射进游戏，不代表该文件自动获得可发布授权。</p>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer"><div class="footer-inner"><div><strong>BehindTheLines · BTL 音频编辑器</strong><p>最后更新 <time datetime="2026-07-17">2026-07-17</time></p></div><div><a href="#page-title">回到顶部</a> · <a href="/BehindTheLines/">文档首页</a></div></div></footer>
+</body>
+</html>

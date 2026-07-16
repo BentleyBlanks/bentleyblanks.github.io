@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="太行·1941 BehindTheLines Godot 编辑器工具使用手册：内容、数值、地图与视效工作流。">
+  <meta name="description" content="山河背面 BehindTheLines Godot 编辑器工具手册：游戏数据库、内容、地图、视效、UI、音频与 AI 美术生产工作流。">
   <meta name="theme-color" content="#1f2923">
   <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/">
-  <title>太行·1941｜Godot 编辑器工具手册</title>
+  <title>山河背面｜Godot 编辑器工具手册</title>
   <style>
     :root {
       color-scheme: light;
@@ -241,7 +241,7 @@
       display: grid;
       width: min(var(--content), calc(100% - 36px));
       margin: -28px auto 46px;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
     }
 
@@ -270,6 +270,10 @@
     .tool-card:nth-child(4) {
       border-top-color: #6a6b8e;
     }
+
+    .tool-card[data-group="data"] { border-top-color: var(--red); }
+    .tool-card[data-group="world"] { border-top-color: var(--green); }
+    .tool-card[data-group="art"] { border-top-color: #6a6b8e; }
 
     .tool-card:hover {
       color: var(--ink);
@@ -434,6 +438,10 @@
 
     .callout p:last-child {
       margin-bottom: 0;
+    }
+
+    #source-image-contract {
+      scroll-margin-top: 86px;
     }
 
     .facts {
@@ -730,6 +738,17 @@
     }
 
     @media (max-width: 900px) {
+      .topbar-inner {
+        align-items: flex-start;
+        padding: 12px 0;
+      }
+
+      .topnav {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px 14px;
+      }
+
       .tool-strip {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
@@ -767,6 +786,10 @@
     }
 
     @media (max-width: 620px) {
+      html {
+        scroll-padding-top: 132px;
+      }
+
       .topbar-inner,
       .hero-inner,
       .tool-strip,
@@ -775,8 +798,21 @@
         width: min(100% - 24px, var(--content));
       }
 
+      .topbar-inner {
+        display: block;
+      }
+
+      .topnav {
+        margin-top: 8px;
+        justify-content: flex-start;
+      }
+
       .topnav a:first-child {
         display: none;
+      }
+
+      #source-image-contract {
+        scroll-margin-top: 132px;
       }
 
       .hero-inner {
@@ -861,7 +897,8 @@
         <span>BehindTheLines 文档</span>
       </a>
       <nav class="topnav" aria-label="站点导航">
-        <a href="#overview">快速开始</a>
+        <a href="#overview">编辑器总览</a>
+        <a href="/BehindTheLines/CellArtEditor/">美术生产</a>
         <a href="/BehindTheLines/AnimationProduction/">动画制作</a>
         <a href="/BehindTheLines/Play/">在线试玩</a>
         <a href="/taihang/">网页版原型</a>
@@ -873,37 +910,67 @@
   <section class="hero" aria-labelledby="page-title">
     <div class="hero-inner">
       <p class="eyebrow">Godot 4.7 · Editor Field Manual</p>
-      <h1 id="page-title">太行·1941<br>编辑器工具手册</h1>
-      <p class="hero-lead">用四个编辑期工作台维护文本、平衡、地图与 3D 视效。本文说明每个入口怎么用、数据保存在哪里、何时生效，以及怎样避免污染权威默认表。</p>
+      <h1 id="page-title">山河背面<br>编辑器工具手册</h1>
+      <p class="hero-lead">用十个编辑期工作台维护游戏数据库、文本、地图、视效、UI、音频与 AI 美术生产。这里给出职责总览；复杂工具进入独立专题，说明状态、输出、验收与安全边界。</p>
       <div class="meta-row" aria-label="文档摘要">
-        <span class="meta-chip">4 个编辑器工具</span>
+        <span class="meta-chip">10 个编辑器工具</span>
         <span class="meta-chip">覆盖层优先</span>
         <span class="meta-chip">1920 × 1080 主验收</span>
-        <span class="meta-chip">更新于 2026-07-13</span>
+        <span class="meta-chip">更新于 2026-07-17</span>
       </div>
     </div>
   </section>
 
-  <nav class="tool-strip" aria-label="四个编辑器工具">
-    <a class="tool-card" href="#content-editor">
+  <nav class="tool-strip" aria-label="十个编辑器工具">
+    <a class="tool-card" data-group="data" href="#content-editor">
       <span class="tool-index">Tool 01 · Localization</span>
       <strong>BTL 内容</strong>
       <span>提取 GameData 文案，维护多语言翻译与缺失回落。</span>
     </a>
-    <a class="tool-card" href="#balance-editor">
+    <a class="tool-card" data-group="data" href="#balance-editor">
       <span class="tool-index">Tool 02 · Balance</span>
       <strong>BTL 数值</strong>
-      <span>调整单位参数和数值型 CFG，仅保存与默认值的差异。</span>
+      <span>快速调整单位参数与数值型 CFG，适合小范围平衡试验。</span>
     </a>
-    <a class="tool-card" href="#map-editor">
-      <span class="tool-index">Tool 03 · World</span>
+    <a class="tool-card" data-group="data" href="/BehindTheLines/RulesEditor/">
+      <span class="tool-index">Tool 03 · Database</span>
+      <strong>BTL 规则</strong>
+      <span>完整游戏数据库、关系图、验证、ChangeSet 与安全保存。</span>
+    </a>
+    <a class="tool-card" data-group="world" href="#map-editor">
+      <span class="tool-index">Tool 04 · World</span>
       <strong>BTL 地图</strong>
       <span>按种子生成、速览、保存并读回可复用地图。</span>
     </a>
-    <a class="tool-card" href="#visual-editor">
-      <span class="tool-index">Tool 04 · Rendering</span>
+    <a class="tool-card" data-group="world" href="#visual-editor">
+      <span class="tool-index">Tool 05 · Rendering</span>
       <strong>BTL 视效</strong>
-      <span>实时调整相机、环境、画质与级联阴影。</span>
+      <span>调整相机、环境、画质、阴影与 2.5D 单元格边缘。</span>
+    </a>
+    <a class="tool-card" data-group="world" href="/BehindTheLines/UiEditor/">
+      <span class="tool-index">Tool 06 · Interface</span>
+      <strong>BTL UI</strong>
+      <span>按元素显式覆盖 HUD 布局、图标、字体与间距。</span>
+    </a>
+    <a class="tool-card" data-group="world" href="/BehindTheLines/AudioEditor/">
+      <span class="tool-index">Tool 07 · Audio</span>
+      <strong>BTL 音频</strong>
+      <span>试听并配置 BGM、UI 音效、音量与文件映射。</span>
+    </a>
+    <a class="tool-card" data-group="art" href="/BehindTheLines/CellArtEditor/">
+      <span class="tool-index">Tool 08 · Cell art</span>
+      <strong>BTL 单元格</strong>
+      <span>图集映射、四季实景预览，以及可追溯的图集重生成。</span>
+    </a>
+    <a class="tool-card" data-group="art" href="/BehindTheLines/ImageMattingEditor/">
+      <span class="tool-index">Tool 09 · Matting</span>
+      <strong>BTL 抠图</strong>
+      <span>单图或批量背景色抠图，并检查 RGBA 各通道。</span>
+    </a>
+    <a class="tool-card" data-group="art" href="/BehindTheLines/AnimationProduction/">
+      <span class="tool-index">Tool 10 · Animation</span>
+      <strong>BTL 角色动画</strong>
+      <span>角色原图、视频、关键帧、抠图、图集与状态查询。</span>
     </a>
   </nav>
 
@@ -911,10 +978,18 @@
     <aside class="side-nav" aria-label="本文目录">
       <p>本文目录</p>
       <a href="#overview">入口与原则</a>
+      <a href="#editor-cli">Agent / CLI 公共入口</a>
+      <a href="/BehindTheLines/RulesEditor/">BTL 规则</a>
       <a href="#content-editor">BTL 内容</a>
       <a href="#balance-editor">BTL 数值</a>
       <a href="#map-editor">BTL 地图</a>
       <a href="#visual-editor">BTL 视效</a>
+      <a href="/BehindTheLines/UiEditor/">BTL UI</a>
+      <a href="/BehindTheLines/AudioEditor/">BTL 音频</a>
+      <a href="/BehindTheLines/CellArtEditor/">BTL 单元格</a>
+      <a href="/BehindTheLines/ImageMattingEditor/">BTL 抠图</a>
+      <a href="/BehindTheLines/AnimationProduction/">BTL 角色动画</a>
+      <a href="#source-image-contract">AI 原始素材契约</a>
       <a href="#workflows">常用工作流</a>
       <a href="#troubleshooting">故障排查</a>
       <a href="#validation">验证与提交</a>
@@ -924,7 +999,7 @@
       <section class="chapter" id="overview">
         <span class="chapter-label">00 · Start here</span>
         <h2>入口与共通原则</h2>
-        <p class="lede">使用 Godot 4.7 打开工程并等待首次资源导入完成。三个 Dock 位于编辑器右侧，「BTL 地图」位于顶部 2D、3D、Script 同一排的主屏入口。</p>
+        <p class="lede">使用 Godot 4.7 打开工程并等待首次资源导入完成。轻量配置工具位于 Dock；地图、规则、单元格、UI、音频与角色动画使用顶部主屏，避免复杂工作流被挤在狭窄侧栏。</p>
 
         <div class="table-wrap">
           <table>
@@ -950,6 +1025,12 @@
                 <td>新建模型、新开对局</td>
               </tr>
               <tr>
+                <td><a href="/BehindTheLines/RulesEditor/">BTL 规则</a></td>
+                <td>顶部主屏</td>
+                <td><code>Data_BalanceOverrides.json</code></td>
+                <td>验证并保存后，新建模型或新开对局</td>
+              </tr>
+              <tr>
                 <td>BTL 地图</td>
                 <td>顶部主屏</td>
                 <td><code>maps/Data_Map*.json</code></td>
@@ -961,6 +1042,36 @@
                 <td><code>Data_VisualSettings.tres</code></td>
                 <td>启动游戏或运行时重载</td>
               </tr>
+              <tr>
+                <td><a href="/BehindTheLines/UiEditor/">BTL UI</a></td>
+                <td>顶部主屏</td>
+                <td><code>Data_UiLayoutOverrides.tres</code></td>
+                <td>对应界面重建或重新进入游戏</td>
+              </tr>
+              <tr>
+                <td><a href="/BehindTheLines/AudioEditor/">BTL 音频</a></td>
+                <td>顶部主屏</td>
+                <td><code>Data_AudioSettings.json</code></td>
+                <td>保存后重启游戏</td>
+              </tr>
+              <tr>
+                <td><a href="/BehindTheLines/CellArtEditor/">BTL 单元格</a></td>
+                <td>顶部主屏</td>
+                <td><code>Data_Map25DArt.json</code> / <code>Data_ArtGeneration.json</code></td>
+                <td>预览即时；正式资产通过 QA 后替换</td>
+              </tr>
+              <tr>
+                <td><a href="/BehindTheLines/ImageMattingEditor/">BTL 抠图</a></td>
+                <td>右侧 Dock</td>
+                <td>透明 PNG</td>
+                <td>导出后由资产生产流程引用</td>
+              </tr>
+              <tr>
+                <td><a href="/BehindTheLines/AnimationProduction/">BTL 角色动画</a></td>
+                <td>顶部主屏</td>
+                <td><code>Data_ArtGeneration.json</code> + 派生资产</td>
+                <td>候选处理和 QA 全通过后替换正式图集</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -970,16 +1081,74 @@
           <p>工具标题出现「● 未保存」时，必须点击工具自己的保存按钮。只保存当前 Godot 场景，不等于保存这些编辑器数据。</p>
         </div>
 
-        <h3>四条不可破坏的数据规则</h3>
+        <h3>五条不可破坏的数据规则</h3>
         <ul class="plain-list">
           <li>默认数值和基准文案只存在于 <code>src/Script_GameData.gd</code>。</li>
           <li>编辑器写入覆盖层或数据文件，不直接修改权威默认表。</li>
           <li>运行时只读取当前模型的 <code>model.tables</code> 与 <code>model.cfg</code>，禁止修改 <code>Rules.*</code> 常量内容。</li>
+          <li><code>Data_ArtGeneration.json</code> 只保存不可变原始提示词、追加修订、非敏感任务身份与派生资产证据；不保存凭据，也不被运行时读取。</li>
           <li>开始批量调整前先确认 Git 状态，保存后只审查对应数据文件的差异。</li>
         </ul>
 
         <h3>入口不见了怎么办</h3>
-        <p>打开「Project → Project Settings → Plugins」，确认 BTL Balance Editor、BTL Content Editor、BTL Map Editor、BTL Visual Editor 均已启用。重新启用后仍未出现，先检查底部输出面板中的脚本错误，再重启 Godot。</p>
+        <p>打开「Project → Project Settings → Plugins」，确认对应的 <code>Btl*Editor</code> 插件已启用。当前工程默认启用内容、数值、规则、地图、视效、UI、音频、单元格、抠图与角色动画十个插件。重新启用后仍未出现，先检查底部输出面板中的脚本错误，再重启 Godot。</p>
+      </section>
+
+      <section class="chapter" id="editor-cli">
+        <span class="chapter-label">00A · Agent interface</span>
+        <h2>所有编辑器共用一套 Agent / CLI 契约</h2>
+        <p class="lede"><code>RunEditorTools.ps1</code> 是十个编辑器数据面的统一入口。GUI 负责所见即所得、试听、图集点击与动画播放；Agent 负责可审计的读取、验证、dry-run、CAS 写入和状态查询，不再复制各个 Dock 或主屏的内部逻辑。</p>
+
+        <div class="callout">
+          <strong>每次操作先发现能力。</strong>
+          <p>Agent 在检查或修改编辑器管理的数据前，必须先执行 <code>list</code>，再对目标工具执行 <code>describe</code>。以返回的 action、参数、管理路径、交互边界和外部额度边界为准。</p>
+        </div>
+
+        <pre><code>.\RunEditorTools.ps1 list -Json
+.\RunEditorTools.ps1 describe rules -Json
+.\RunEditorTools.ps1 rules show --table UT --entity militia -Json</code></pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tool ID</th><th>可自动化能力</th><th>仍属于 GUI / 外部边界</th></tr></thead>
+            <tbody>
+              <tr><td><code>audio</code></td><td>catalog、show、set、clear、reset、validate</td><td>预览播放只在 GUI；管理 <code>Data_AudioSettings.json</code></td></tr>
+              <tr><td><code>balance</code></td><td>tables、entities、show、set、clear、apply、diff、validate</td><td>只开放 CFG 与 UT 快速平衡字段</td></tr>
+              <tr><td><code>cell_art</code></td><td>映射 schema/show/set/clear/reset/validate；生成 assets/status/set_prompt/queue/dispatch/environment</td><td>图集点击与实时 Map2D 预览只在 GUI；regenerate、confirm、dispatch 有额度边界</td></tr>
+              <tr><td><code>content</code></td><td>locales、list、show、extract、add_locale、set、clear、validate</td><td>只管理字符串表白名单字段</td></tr>
+              <tr><td><code>image_matting</code></td><td>plan、process，支持单图或目录</td><td>棋盘预览、四角取色、通道预览只在 GUI</td></tr>
+              <tr><td><code>map</code></td><td>schema、list、show、stats、validate、generate、save</td><td>六角画布预览只在 GUI</td></tr>
+              <tr><td><code>rules</code></td><td>schema、tables、entities、fields、show、references、set、clear、apply、diff、validate、changeset</td><td>完整规则与关系数据面；与 Balance 共享覆盖文件</td></tr>
+              <tr><td><code>ui</code></td><td>schema、elements、show、set、clear、reset、validate</td><td>18 个元素；1920 × 1080 示意预览与图标选择只在 GUI</td></tr>
+              <tr><td><code>unit_animation</code></td><td>assets、status、validate、set_prompt、configure、queue、dispatch、environment</td><td>图集逐帧预览与播放只在 GUI；regenerate、confirm、dispatch 有额度边界</td></tr>
+              <tr><td><code>visual</code></td><td>schema、show、get、set、reset、validate</td><td>运行时重载、Inspector 与预览场景只在 GUI</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>写操作的固定顺序</h3>
+        <ol class="steps">
+          <li><strong>先读取并取得 <code>sourceHash</code></strong>保存这次决策依据的精确版本。</li>
+          <li><strong>先跑 <code>--dry-run</code></strong>验证类型、引用、目标路径和变更内容，不写盘、不启动 worker。</li>
+          <li><strong>带 <code>--expected-hash</code> 正式写入</strong>确保写回的仍是刚刚审阅的版本；退出码 4 表示 CAS 冲突，必须重新读取并重放。</li>
+          <li><strong>解析 JSON 或结果前缀</strong>自动化优先使用 <code>-Json</code>；普通输出只读取最后一条 <code>BTL_EDITOR_TOOL_RESULT </code> 结果行，不能靠日志猜成功。</li>
+        </ol>
+
+        <pre><code>.\RunEditorTools.ps1 rules set --table UT --entity militia --field str --value 10 `
+  --expected-hash &lt;sourceHash&gt; --dry-run -Json
+
+# dry-run 通过后，复用同一 sourceHash 并移除 --dry-run 才会写入。</code></pre>
+
+        <div class="split">
+          <div class="mini-panel">
+            <h3>语义退出码</h3>
+            <p><code>0</code> 成功；<code>2</code> 用法错误；<code>3</code> 验证失败；<code>4</code> CAS 冲突；<code>5</code> I/O 或外部服务失败；<code>6</code> 部分完成。</p>
+          </div>
+          <div class="mini-panel">
+            <h3>Provider 额度红线</h3>
+            <p>只有用户明确授权后，regenerate / confirm / dispatch 等外部成本动作才能带 <code>--credit-confirmed</code>。回归与文档验收不得消费真实额度，也不得自动替用户补确认参数。</p>
+          </div>
+        </div>
       </section>
 
       <section class="chapter" id="content-editor">
@@ -1052,6 +1221,11 @@
           <div class="fact"><small>入口</small><strong>右上「BTL 数值」Dock</strong></div>
           <div class="fact"><small>数据</small><strong>Data_BalanceOverrides.json</strong></div>
           <div class="fact"><small>范围</small><strong>单位参数 + 数值 CFG</strong></div>
+        </div>
+
+        <div class="callout">
+          <strong>这是快速数值入口，不是完整规则数据库。</strong>
+          <p>只改单位数值或少量 CFG 时用「BTL 数值」最快；需要跨表搜索、关系追踪、科技前置、类型与引用验证、ChangeSet 或 Agent 调用时，进入 <a href="/BehindTheLines/RulesEditor/">BTL 规则编辑器</a>。两者共享同一个覆盖文件，不要同时打开旧快照后交叉保存。</p>
         </div>
 
         <figure class="guide-shot">
@@ -1241,9 +1415,21 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
               <tr><td>环境系统</td><td>时刻、时刻驱动氛围、体积雾、雾密度、天空、太阳、环境光</td></tr>
               <tr><td>画质</td><td>色调映射、曝光、TAA、性能模式</td></tr>
               <tr><td>级联阴影</td><td>关闭 / 2 级 / 4 级、阴影距离</td></tr>
+              <tr><td>单元格边缘（2.5D）</td><td>白晕颜色与强度、噪声侵蚀、颗粒尺度、春夏秋冬边缘带颜色</td></tr>
             </tbody>
           </table>
         </div>
+
+        <figure class="guide-shot">
+          <div class="shot-frame shot-full">
+            <a href="Assets/Texture_VisualEditorCellEdge.png" aria-label="打开 BTL 视效编辑器完整截图">
+              <img src="Assets/Texture_VisualEditorCellEdge.png" width="1920" height="1080" loading="lazy" alt="BTL 视效编辑器完整面板，底部展开 2.5D 单元格边缘参数，包括白晕、侵蚀、噪声和四季色带">
+            </a>
+          </div>
+          <figcaption class="shot-caption">
+            <p>新增的「单元格边缘（2.5D）」分组与原有相机、环境、画质、阴影参数共用同一份视效差异资源。</p>
+          </figcaption>
+        </figure>
 
         <h3>时刻与手工颜色</h3>
         <div class="split">
@@ -1263,7 +1449,17 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
 
       <section class="chapter" id="workflows">
         <span class="chapter-label">05 · Recipes</span>
-        <h2>三套常用工作流</h2>
+        <h2>常用工作流与生产契约</h2>
+
+        <div class="callout" id="source-image-contract">
+          <strong>AI 原始素材统一契约</strong>
+          <p>凡是准备继续抠图、切片、打包或转成动画输入的 AI 原始素材图，单位、地块与散布物、UI 都使用同一条 provider 入口规则。</p>
+          <ul class="plain-list">
+            <li><strong>每次请求恰好一张：</strong>一次 ImageGen、Lovart 或其他图像 provider 请求只接受一个可下载的源图 artifact，不接受多张备选图。固定网格的 atlas 或 UI kit 可以在这一张图内包含多个对象，仍只算一个源图 artifact。</li>
+            <li><strong>直接生成纯白底：</strong>provider 返回的源图必须使用不透明、均匀、纯 <code>#FFFFFF</code> 背景；提示词目标始终是精确白，文件门禁只容许 provider 导出量化造成的每个 RGB 通道最多 2 级偏差（253–255）。禁止透明背景、烘焙棋盘格、品红底、渐变、纹理、环境场景背景或本地洗白冒充原图。</li>
+            <li><strong>派生物另行处理：</strong>透明参考图、供 Dreamina 使用的 <code>#FF00FF</code> 输入、视频帧、最终资产与图集、接触表及其他 QA 证据都由源图之后的确定性流程产生，不反向充当 provider 原始素材图。</li>
+          </ul>
+        </div>
 
         <div class="mini-panel">
           <h3>调一版平衡</h3>
@@ -1297,8 +1493,26 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
 
         <div class="mini-panel">
           <h3>制作单位帧动画</h3>
-          <p>从正确原画基准开始，经 Lovart、即梦、连续时间窗采样、抠图、固定脚线与游戏投影完成可追溯接入。</p>
+          <p>从正确原画基准开始，经 ImageGen、Lovart 或其他图像 provider 生成一张纯白底源图，再通过 Dreamina、连续时间窗采样、抠图、固定脚线与游戏投影完成可追溯接入。</p>
           <p><a href="/BehindTheLines/AnimationProduction/">打开单位帧动画生产规范 →</a></p>
+        </div>
+
+        <div class="mini-panel">
+          <h3>完整规则与关系图</h3>
+          <p>在 Default / Override / Effective 三层之间检查真实生效值，沿正反向引用评估影响，验证无误后再保存最小差异。</p>
+          <p><a href="/BehindTheLines/RulesEditor/">打开 BTL 规则编辑器手册 →</a></p>
+        </div>
+
+        <div class="mini-panel">
+          <h3>单元格生成、抠图与状态</h3>
+          <p>图集映射与生成修订属于「BTL 单元格」；透明 PNG 的单图/批量诊断属于「BTL 抠图」。两者都保留原始输入，不在预览阶段污染正式资产。</p>
+          <p><a href="/BehindTheLines/CellArtEditor/">单元格手册 →</a> · <a href="/BehindTheLines/ImageMattingEditor/">抠图手册 →</a></p>
+        </div>
+
+        <div class="mini-panel">
+          <h3>UI 与音频配置</h3>
+          <p>UI 使用逐字段显式覆盖并通过 1920 × 1080 示意预览；音频支持 BGM 与 UI SFX 的映射、音量和无副作用试听。</p>
+          <p><a href="/BehindTheLines/UiEditor/">UI 手册 →</a> · <a href="/BehindTheLines/AudioEditor/">音频手册 →</a></p>
         </div>
       </section>
 
@@ -1313,6 +1527,9 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
         <details><summary>视效预览变化了，游戏却没有变化</summary><p>先点击「保存」，再在运行时 Debug 面板点击「重载视效配置」。</p></details>
         <details><summary>地图列表没有刚保存的文件</summary><p>点击右侧刷新按钮。仍缺失时检查输出面板和 <code>maps/</code> 目录。</p></details>
         <details><summary>JSON 或 Resource 无法读取</summary><p>检查最近的手工编辑是否破坏格式，优先从 Git 恢复对应数据文件。</p></details>
+        <details><summary>规则编辑器拒绝保存</summary><p>先查看底部诊断。Error 会阻断保存；如果提示文件已变化，说明磁盘版本与当前会话的 SHA-256 不一致，重新载入后再重放改动。</p></details>
+        <details><summary>生成按钮灰掉或状态一直等待</summary><p>确认已锁定原始提示词、没有同资产的活动请求，并检查 Codex、Lovart、Dreamina 与 FFmpeg 环境状态。Provider 查询是显式操作，点击「查询并完成处理」继续。</p></details>
+        <details><summary>抠图把主体内部的白色也挖掉</summary><p>开启默认的「只抠边缘（保留内部同色）」；只有确实需要挖空封闭孔洞时才关闭它使用全局色键。</p></details>
       </section>
 
       <section class="chapter" id="validation">
@@ -1333,6 +1550,12 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
             <tbody>
               <tr><td><code>Script_TestContentTools.gd</code></td><td>内容、数值与地图数据链路</td></tr>
               <tr><td><code>Script_TestVisualSettings.gd</code></td><td>视效 Resource、应用路径和预览场景</td></tr>
+              <tr><td><code>Script_TestRulesEditor.gd</code></td><td>完整数据库、关系、验证、ChangeSet 与安全持久化</td></tr>
+              <tr><td><code>Script_TestMap25DArt.gd</code> / <code>Script_TestArtGeneration.gd</code></td><td>单元格映射、不可变提示词、修订、任务状态与候选发布</td></tr>
+              <tr><td><code>Script_TestUnitAnimationEditor.gd</code></td><td>角色动画生产状态、图集与逐帧预览</td></tr>
+              <tr><td><code>Script_TestImageMatting.gd</code></td><td>边缘连通抠图、通道预览、批处理与输出安全</td></tr>
+              <tr><td><code>Script_TestUiLayoutOverrides.gd</code></td><td>UI 逐字段覆盖、默认回落与资源保存</td></tr>
+              <tr><td><code>Script_TestAudioSettings.gd</code></td><td>BGM/SFX 最小差异、路径与音量设置</td></tr>
               <tr><td><code>Script_TestDataParity.gd</code></td><td>GameData 默认表哈希</td></tr>
               <tr><td><code>Script_TestMapParity.gd</code></td><td>固定种子地图生成哈希</td></tr>
             </tbody>
@@ -1350,8 +1573,8 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
   <footer class="footer">
     <div class="footer-inner">
       <div>
-        <strong>BehindTheLines · 太行·1941 Godot 移植</strong>
-        <p>编辑器工具公开手册 · 最后更新 <time datetime="2026-07-13">2026-07-13</time></p>
+        <strong>BehindTheLines · 山河背面 Godot 游戏</strong>
+        <p>编辑器工具公开手册 · 最后更新 <time datetime="2026-07-17">2026-07-17</time></p>
       </div>
       <div>
         <a href="#page-title">回到顶部</a>
