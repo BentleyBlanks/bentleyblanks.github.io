@@ -1,0 +1,296 @@
+<!doctype html>
+<!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#111711">
+  <meta name="description" content="《荒界回声：临界行动》是一款原创真 3D 浏览器战术竞技游戏：1 平方公里战场、AI 对手、完整空投生存流程与 WebRTC 局域网直连。">
+  <meta property="og:title" content="荒界回声：临界行动｜原创 3D 战术竞技">
+  <meta property="og:description" content="进入 1000 × 1000 米真三维战区，跳伞、搜刮、交战并成为最后的幸存者。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bentleyblanks.github.io/FrontierDrop3D/">
+  <meta name="twitter:card" content="summary">
+  <title>荒界回声：临界行动｜Frontier Echo 3D</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="./Style_Game3D.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="app" class="appShell">
+    <canvas id="gameCanvas" class="gameCanvas" aria-label="荒界回声三维游戏战场"></canvas>
+    <div class="screenShade" aria-hidden="true"></div>
+    <div class="reticleDecor" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+    <section id="menuScreen" class="menuScreen">
+      <div class="menuAtmosphere" aria-hidden="true">
+        <i class="terrainLine terrainLineOne"></i>
+        <i class="terrainLine terrainLineTwo"></i>
+        <i class="terrainLine terrainLineThree"></i>
+        <span class="coordinateGrid"></span>
+      </div>
+
+      <header class="menuHeader">
+        <a class="studioMark" href="../" aria-label="返回 Bentley Blanks 首页">
+          <span class="studioGlyph">BB</span>
+          <span><b>BENTLEY BLANKS</b><small>FIELD SYSTEMS DIVISION</small></span>
+        </a>
+        <div class="buildMark"><i></i> THREE.JS 实战构建 <b>3D / 1.0</b></div>
+      </header>
+
+      <div class="menuGrid">
+        <section class="titleBlock">
+          <p class="eyebrow"><span></span> ORIGINAL 3D TACTICAL SURVIVAL <em>战区已开放</em></p>
+          <div class="titleLockup">
+            <h1>荒界<span>回声</span></h1>
+            <b>FRONTIER<br>ECHO <i>3D</i></b>
+          </div>
+          <div class="operationLabel"><b>临界行动</b><span>OPERATION GROUND ZERO</span></div>
+          <p class="tagline">越过舱门，进入一平方公里的立体战区。<br>观察地形，争夺装备，活着穿过不断收紧的边界。</p>
+
+          <div class="featureStrip" aria-label="游戏特色">
+            <span><b>1 KM²</b><small>完整三维战场</small></span>
+            <span><b>32</b><small>真人与战术 AI</small></span>
+            <span><b>P2P</b><small>局域网直连</small></span>
+            <span><b>60 FPS</b><small>动态渲染目标</small></span>
+          </div>
+
+          <div class="menuActions">
+            <button id="soloButton" class="primaryButton">
+              <span class="buttonIcon">▶</span>
+              <span><b>部署至战区</b><small>单兵进入完整 3D AI 对局</small></span>
+              <i>ENTER</i>
+            </button>
+            <button id="lanButton" class="secondaryButton">
+              <span class="buttonIcon">⌁</span>
+              <span><b>建立局域网小队</b><small>房主权威 · WebRTC 点对点</small></span>
+            </button>
+          </div>
+
+          <div class="menuLinks">
+            <button id="guideButton">作战手册</button>
+            <button id="settingsButton">显示与性能</button>
+            <span>WASD 移动 · 鼠标观察 / 射击 · 无需安装</span>
+          </div>
+        </section>
+
+        <aside class="mapBrief" aria-label="战场任务简报">
+          <div class="briefTop">
+            <span><i></i> 战区 GRID 07</span>
+            <b>行动状态 / GREEN</b>
+          </div>
+          <div class="briefMap" aria-hidden="true">
+            <i class="mapRoad mapRoadOne"></i>
+            <i class="mapRoad mapRoadTwo"></i>
+            <i class="mapRiver"></i>
+            <i class="mapZone mapZoneOuter"></i>
+            <i class="mapZone mapZoneInner"></i>
+            <i class="flightRoute"></i>
+            <span class="siteLabel siteLabelOne">北港仓区</span>
+            <span class="siteLabel siteLabelTwo">石脊矿场</span>
+            <span class="siteLabel siteLabelThree">河谷聚落</span>
+            <span class="siteLabel siteLabelFour">远程雷达站</span>
+            <span class="northMark">N</span>
+            <span class="scaleMark">200 M</span>
+          </div>
+          <div class="missionBriefLines">
+            <span><small>地形类型</small><b>丘陵 / 林区 / 城镇</b></span>
+            <span><small>可见距离</small><b>850 M</b></span>
+            <span><small>交战规则</small><b>最后生还</b></span>
+          </div>
+          <div class="briefFooter">
+            <span><i class="signalDot"></i> 三维场景遥测正常</span>
+            <span>预计 6–9 分钟</span>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="menuFooter">
+        <span>原创玩法、三维资产与视觉系统；不含任何第三方游戏资产</span>
+        <span>WEBGL 2 · THREE.JS · WEBRTC</span>
+      </footer>
+    </section>
+
+    <section id="hud" class="hud" hidden>
+      <header class="combatHeader">
+        <div class="matchIdentity">
+          <b>FE</b>
+          <span><strong>灰脊盆地 / 3D</strong><small id="matchSeedLabel">SEED 000000</small></span>
+        </div>
+        <div class="compass" aria-label="方位罗盘">
+          <span>W</span><span>NW</span><b>N</b><span>NE</span><span>E</span><i></i>
+        </div>
+        <div class="matchStats">
+          <span><small>存活</small><b id="aliveLabel">30</b></span>
+          <span><small>淘汰</small><b id="killsLabel">0</b></span>
+          <button id="pauseButton" aria-label="暂停游戏">Ⅱ</button>
+        </div>
+      </header>
+
+      <section class="zoneNotice" id="zoneNotice">
+        <i></i><span><b id="zoneTitle">安全区已标记</b><small id="zoneSubtitle">距离收缩 01:30</small></span>
+      </section>
+
+      <section class="flightPanel" id="flightPanel" hidden>
+        <span class="flightGlyph">✈</span>
+        <div><b>运输机正在穿越战区</b><small id="flightDistanceLabel">距航线终点 1160 m</small></div>
+        <button id="jumpButton">脱离机舱 <kbd>SPACE</kbd></button>
+      </section>
+
+      <aside class="killFeed" id="killFeed" aria-live="polite"></aside>
+
+      <aside class="minimapWrap">
+        <canvas id="minimapCanvas" width="220" height="220" aria-label="三维战区战术小地图"></canvas>
+        <span class="minimapNorth">N</span><span class="minimapScale">200 M</span>
+        <button id="mapButton" aria-label="展开战术地图">M</button>
+      </aside>
+
+      <section class="playerStatus">
+        <div class="playerBadge"><span>01</span><i id="networkIndicator"></i></div>
+        <div class="vitalBars">
+          <div class="playerName"><b id="playerNameLabel">开拓者</b><span id="statusLabel">状态正常</span></div>
+          <div class="healthTrack"><i id="healthFill"></i><b id="healthLabel">100</b></div>
+          <div class="armorTrack"><i id="armorFill"></i><span>护甲 <b id="armorLabel">0</b></span></div>
+        </div>
+      </section>
+
+      <section class="weaponPanel">
+        <div class="weaponIcon" id="weaponIcon">R</div>
+        <div class="weaponInfo">
+          <span><b id="weaponNameLabel">未装备</b><small id="fireModeLabel">—</small></span>
+          <div><b id="magazineLabel">0</b><i>/</i><span id="reserveLabel">0</span></div>
+        </div>
+        <div class="itemSlots">
+          <button id="medkitButton"><b>+</b><span id="medkitLabel">0</span><kbd>4</kbd></button>
+          <button id="reloadButton"><b>↻</b><span>换弹</span><kbd>R</kbd></button>
+        </div>
+      </section>
+
+      <div id="interactionPrompt" class="interactionPrompt" hidden><kbd>F</kbd><span id="interactionLabel">拾取物资</span></div>
+      <div class="controlHint" id="controlHint">
+        <span><kbd>WASD</kbd> 移动</span><span><kbd>SHIFT</kbd> 冲刺</span><span><kbd>鼠标</kbd> 观察 / 射击</span><span><kbd>F</kbd> 拾取</span>
+      </div>
+
+      <div class="touchControls" id="touchControls" aria-label="触屏操作">
+        <div class="touchStick" id="moveStick"><i></i></div>
+        <div class="touchActions">
+          <button id="touchPickup">拾取</button><button id="touchHeal">治疗</button><button id="touchFire">开火</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="fullMapScreen" class="fullMapScreen" hidden>
+      <div class="fullMapPanel">
+        <header>
+          <div><span>TACTICAL TERRAIN DISPLAY</span><h2>灰脊盆地 · 1000 × 1000 米</h2></div>
+          <button id="closeMapButton">关闭 <kbd>M</kbd></button>
+        </header>
+        <canvas id="fullMapCanvas" width="900" height="900" aria-label="完整战术地图"></canvas>
+        <footer><span><i class="legendPlayer"></i>你的位置</span><span><i class="legendZone"></i>安全区</span><span><i class="legendRoute"></i>航线</span></footer>
+      </div>
+    </section>
+
+    <section id="resultsScreen" class="resultsScreen" hidden>
+      <div class="resultsGlow" aria-hidden="true"></div>
+      <p id="resultKicker">行动结算 / AFTER ACTION REPORT</p>
+      <h2 id="resultTitle">成功撤离</h2>
+      <p id="resultSubtitle">你是灰脊盆地最后的幸存者</p>
+      <div class="resultRank"><span>本局排名</span><b id="rankLabel">#1</b><small id="totalPlayersLabel">/ 30</small></div>
+      <div class="resultStats">
+        <span><small>淘汰</small><b id="resultKillsLabel">0</b></span>
+        <span><small>造成伤害</small><b id="damageLabel">0</b></span>
+        <span><small>生存时间</small><b id="survivalLabel">00:00</b></span>
+        <span><small>移动距离</small><b id="distanceLabel">0 m</b></span>
+      </div>
+      <div class="resultActions">
+        <button id="rematchButton" class="primaryButton"><span class="buttonIcon">↻</span><span><b>再次部署</b><small>使用新的三维战区种子</small></span></button>
+        <button id="menuButton" class="secondaryButton">返回行动中心</button>
+      </div>
+    </section>
+
+    <div id="modalWrap" class="modalWrap" hidden>
+      <section id="lobbyModal" class="modal lobbyModal" role="dialog" aria-modal="true" aria-labelledby="lobbyTitle" hidden>
+        <header class="modalHeader"><div><span>MISSION CONFIGURATION</span><h2 id="lobbyTitle">单人作战大厅</h2></div><button class="modalClose" dataCloseModal aria-label="关闭">×</button></header>
+        <div class="modalBody">
+          <div class="lobbySummary">
+            <span class="summaryMap"><i></i></span>
+            <div><b>灰脊盆地 · 三维战区</b><span>1000 × 1000 米 · 城镇 / 林地 / 河谷</span><small>随机航线、地形高度与物资分布</small></div>
+            <em>经典生存</em>
+          </div>
+          <div class="settingGrid">
+            <label><span>参赛人数<small>真人与 AI 合计</small></span><select id="actorCountSelect"><option value="24">24 人</option><option value="28">28 人</option><option value="30" selected>30 人</option><option value="32">32 人</option></select></label>
+            <label><span>AI 强度<small>反应、准度与决策</small></span><select id="difficultySelect"><option value="rookie">新兵</option><option value="veteran" selected>老兵</option><option value="elite">精锐</option></select></label>
+            <label><span>对局节奏<small>安全区等待时间</small></span><select id="paceSelect"><option value="quick" selected>快速 · 6 分钟</option><option value="standard">标准 · 9 分钟</option></select></label>
+            <label><span>地图种子<small>留空自动生成</small></span><input id="seedInput" inputmode="numeric" maxlength="9" placeholder="随机"></label>
+          </div>
+          <div class="readyRow"><span><i></i>WebGL 三维战区已就绪</span><button id="deployButton" class="deployButton">进入战区 <kbd>ENTER</kbd></button></div>
+        </div>
+      </section>
+
+      <section id="lanModal" class="modal lanModal" role="dialog" aria-modal="true" aria-labelledby="lanTitle" hidden>
+        <header class="modalHeader"><div><span>ENCRYPTED LOCAL LINK</span><h2 id="lanTitle">建立局域网作战小队</h2></div><button class="modalClose" dataCloseModal aria-label="关闭">×</button></header>
+        <div class="modalBody">
+          <p class="lanIntro">两台设备打开本页面，通过一次复制与粘贴建立加密直连。房主同步三维战场、AI、伤害与安全区状态，不需要账号或中央游戏服务器。</p>
+          <div class="roleTabs"><button id="hostTab" class="active">我是房主</button><button id="joinTab">我要加入</button></div>
+          <div id="hostPane" class="lanPane">
+            <ol class="stepList">
+              <li><span>1</span><div><b>生成邀请信息</b><small>浏览器将收集可用的局域网连接地址。</small></div><button id="createOfferButton">生成</button></li>
+              <li><span>2</span><div><b>把邀请信息发给队友</b><textarea id="offerOutput" readonly placeholder="生成后显示在这里"></textarea></div><button id="copyOfferButton" disabled>复制</button></li>
+              <li><span>3</span><div><b>粘贴队友返回的应答</b><textarea id="answerInput" placeholder="在此粘贴应答信息"></textarea></div><button id="acceptAnswerButton">连接</button></li>
+            </ol>
+          </div>
+          <div id="joinPane" class="lanPane" hidden>
+            <ol class="stepList">
+              <li><span>1</span><div><b>粘贴房主的邀请信息</b><textarea id="offerInput" placeholder="在此粘贴邀请信息"></textarea></div></li>
+              <li><span>2</span><div><b>生成应答并发回房主</b><textarea id="answerOutput" readonly placeholder="应答将在这里生成"></textarea></div><button id="createAnswerButton">生成</button></li>
+              <li><span>3</span><div><b>等待房主完成连接</b><small>连接成功后将同步进入同一三维战区。</small></div><button id="copyAnswerButton" disabled>复制</button></li>
+            </ol>
+          </div>
+          <div class="lanStatus"><i id="lanStatusDot"></i><span><b id="lanStatusTitle">尚未连接</b><small id="lanStatusMessage">请先选择房主或加入方流程</small></span><button id="lanStartButton" disabled>开始联机对局</button></div>
+          <details><summary>为什么没有“搜索房间”？</summary><p>静态网页无法在局域网广播房间。手动交换信息可让设备直接相连，并避免把游戏数据上传到中间服务器；部分企业网络可能阻止 WebRTC。</p></details>
+        </div>
+      </section>
+
+      <section id="guideModal" class="modal guideModal" role="dialog" aria-modal="true" aria-labelledby="guideTitle" hidden>
+        <header class="modalHeader"><div><span>FIELD OPERATIONS MANUAL</span><h2 id="guideTitle">从离舱到最后一人</h2></div><button class="modalClose" dataCloseModal aria-label="关闭">×</button></header>
+        <div class="modalBody guideGrid">
+          <article><b>01</b><h3>观察并选择落点</h3><p>运输机横穿一平方公里战区。按空格离舱，使用移动键控制降落方向；低空自动开伞。</p></article>
+          <article><b>02</b><h3>利用三维地形</h3><p>丘陵、建筑与树林会真实阻挡视线。借助高差观察，在暴露前规划掩体间的移动路线。</p></article>
+          <article><b>03</b><h3>搜刮与交战</h3><p>靠近发光物资并按 F。鼠标控制镜头和瞄准，按住左键射击；武器、弹药、护甲与医疗品自动归位。</p></article>
+          <article><b>04</b><h3>跟随安全区</h3><p>边界外会持续失去生命。白圈预告下一阶段，越到后期伤害越高，使用 M 查看完整战术地图。</p></article>
+          <article class="wide"><h3>键鼠操作</h3><div class="keyTable"><span><kbd>W A S D</kbd>移动</span><span><kbd>鼠标</kbd>观察</span><span><kbd>左键</kbd>射击</span><span><kbd>SHIFT</kbd>冲刺</span><span><kbd>R</kbd>换弹</span><span><kbd>F</kbd>拾取</span><span><kbd>4</kbd>治疗</span><span><kbd>M / ESC</kbd>地图 / 暂停</span></div></article>
+        </div>
+      </section>
+
+      <section id="settingsModal" class="modal settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+        <header class="modalHeader"><div><span>DISPLAY &amp; FIELD EXPERIENCE</span><h2 id="settingsTitle">游戏设置</h2></div><button class="modalClose" dataCloseModal aria-label="关闭">×</button></header>
+        <div class="modalBody settingList">
+          <label><span><b>程序化音效</b><small>枪声、命中与界面反馈</small></span><input id="soundToggle" type="checkbox" checked></label>
+          <label><span><b>三维镜头震动</b><small>射击、冲刺与受伤时的空间反馈</small></span><input id="shakeToggle" type="checkbox" checked></label>
+          <label><span><b>高对比度界面</b><small>增强文字与战斗状态区分度</small></span><input id="contrastToggle" type="checkbox"></label>
+          <label><span><b>减少动态效果</b><small>降低过渡、粒子与镜头震动</small></span><input id="motionToggle" type="checkbox"></label>
+        </div>
+      </section>
+
+      <section id="pauseModal" class="modal pauseModal" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+        <header class="modalHeader"><div><span>OPERATION PAUSED</span><h2 id="pauseTitle">灰脊盆地 / 3D</h2></div></header>
+        <div class="modalBody pauseActions">
+          <button id="resumeButton" class="deployButton">继续行动 <kbd>ESC</kbd></button>
+          <button id="pauseGuideButton">查看作战手册</button>
+          <button id="quitButton" class="dangerButton">退出本局</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+  </main>
+  <script type="module" src="./Script_Game3D.mjs"></script>
+</body>
+</html>
