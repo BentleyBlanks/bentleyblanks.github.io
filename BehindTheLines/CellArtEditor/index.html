@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="BehindTheLines 单元格美术编辑器手册：四季图集映射、真实 Map2D 预览、Lovart 图集修订、状态查询、差异数据与安全边界。">
+  <meta name="description" content="BehindTheLines 单元格美术编辑器手册：dual-grid 地表、64-mask 邻接地貌、真实 Map2D 预览、图集修订、状态查询与安全边界。">
   <meta name="theme-color" content="#1f2923">
   <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/CellArtEditor/">
   <title>BTL 单元格美术编辑器｜BehindTheLines</title>
@@ -142,6 +142,7 @@
       <a class="brand" href="/BehindTheLines/" aria-label="BehindTheLines 文档首页"><span class="brand-mark" aria-hidden="true">太</span><span>BehindTheLines 文档</span></a>
       <nav class="topnav" aria-label="站点导航">
         <a href="#mapping">映射调参</a>
+        <a href="/BehindTheLines/HexFeatureAssets/">邻接地貌规范</a>
         <a href="#generation">生成修订</a>
         <a href="#data">数据边界</a>
         <a href="/BehindTheLines/">返回手册首页</a>
@@ -153,10 +154,10 @@
     <div class="hero-inner">
       <p class="eyebrow">Atlas Mapping · Live Map2D · Generation Ledger</p>
       <h1 id="page-title">BTL 单元格美术<br>编辑器手册</h1>
-      <p class="hero-lead">在同一主屏完成四季地形、摆件与特效的图集指派和参数微调，并直接用真实 Map2D 渲染结果验收；需要重做图集时，切换到“生成修订”，保留原始提示词、追加修改条件、确认费用并追踪到正式资产。</p>
+      <p class="hero-lead">在同一主屏检查 dual-grid 地表与 64-mask 邻接地貌的固定槽位，调整摆件和特效映射，并用真实 Map2D 验收；需要重做图集时，切换到“生成修订”，保留原始提示词与完整生产历史。</p>
       <div class="chips" aria-label="功能摘要">
         <span class="chip">四季与多类别</span>
-        <span class="chip">图集格子指派</span>
+        <span class="chip">固定拓扑槽位检查</span>
         <span class="chip">真实 Map2D 预览</span>
         <span class="chip">单个 / 多选 / 同组</span>
         <span class="chip">状态查询</span>
@@ -193,20 +194,22 @@
             <thead><tr><th>区域</th><th>用途</th><th>操作结果</th></tr></thead>
             <tbody>
               <tr><td>左栏</td><td>类别、季节、角色和数值参数；在“映射调参 / 生成修订”间切换。</td><td>改变当前编辑上下文，不直接写盘。</td></tr>
-              <tr><td>中栏</td><td>显示当前类别对应的正式图集与槽位网格。</td><td>点击行或格子，把它指派给左侧选中的角色。</td></tr>
+              <tr><td>中栏</td><td>显示当前类别对应的正式图集与槽位网格。</td><td>Ground / Features 检查固定合同；Props / Effects 才允许映射。</td></tr>
               <tr><td>右栏</td><td>内嵌真实规则内核与真实 Map2D 渲染器。</td><td>参数和映射即时注入预览；不需要先保存、重启游戏。</td></tr>
             </tbody>
           </table>
         </div>
         <div class="callout"><strong>单位动画已经拆出</strong><p>类别列表仍可看到 Units，但逐帧预览、动作重生成和视频状态已迁移到独立“BTL 角色动画”主屏。制作 Idle、Move、Attack 时请使用<a href="/BehindTheLines/AnimationProduction/">单位帧动画生产规范</a>。</p></div>
+        <div class="callout"><strong>邻接地貌已改为固定合同</strong><p>Forest、Hills、Mountain 不再是 4 个随机贴纸，而是 8×8 的 64 个六邻接 mask。完整像素坐标、12 张正式文件和生产门槛见<a href="/BehindTheLines/HexFeatureAssets/">六边形邻接地貌资产规范</a>。</p></div>
       </section>
 
       <section class="section" id="mapping">
         <span class="section-label">02 · Mapping</span>
-        <h2>先选语义，再把图集槽位交给它</h2>
-        <p class="lede">编辑器不是在图片上“画地形”，而是在维护“游戏语义 → 图集位置 + 渲染参数”的小型差异层。默认配置仍在源码，保存文件只记录与默认值不同的部分。</p>
+        <h2>先分清固定合同与可写映射</h2>
+        <p class="lede">Ground 与 Features 的格位由渲染拓扑固定，只能检查，不能重映射；Props 与 Effects 才维护“游戏语义 → 图集位置 + 渲染参数”的小型差异层。</p>
         <div class="grid-2">
-          <div class="card"><h3>地形 Terrain</h3><p>按 Winter、Spring、Summer、Autumn 切换正式图集；从 plain、hills、forest、mountain 中选择角色，再点击图集行完成映射。</p></div>
+          <div class="card"><h3>地表 Ground</h3><p>每个视觉变体一张 7×2 图集：列为 1–7 掩码，行是 EAST/WEST 三角。点击只显示固定语义；缺图时展示程序化版式。</p></div>
+          <div class="card"><h3>地貌 Features</h3><p>Forest、Hills、Mountain 按季节显示 8×8/64-mask 图集；格位为 <code>(mask &amp; 7, mask &gt;&gt; 3)</code>。缺正式图时展示并运行程序化邻接图集。</p></div>
           <div class="card"><h3>摆件 Props</h3><p>同样按四季切换；村庄、设施等对象使用明确的二维格子坐标，因此点击的是某一列与某一行的交点。</p></div>
           <div class="card"><h3>特效 Effects</h3><p>红旗、太阳旗、黑旗、火焰等效果映射到图集行；用于保持战场信息层与地形图集解耦。</p></div>
           <div class="card"><h3>季节预览</h3><p>编辑器把预览回合切到对应月份，Map2D 会沿运行时的季节路径换图，而不是只替换中栏图片。</p></div>
@@ -214,7 +217,7 @@
         <ol class="steps">
           <li><strong>选择类别与季节</strong>先确定 Terrain、Props 或 Effects；地形和摆件再选 Winter、Spring、Summer、Autumn。</li>
           <li><strong>选择语义角色</strong>在角色列表点选要修改的对象。左栏只展示该对象适用的参数，减少误改。</li>
-          <li><strong>点击图集槽位</strong>地形和特效按行指派，摆件按单元格指派；金色框标识当前映射。</li>
+          <li><strong>检查或指派槽位</strong>Ground / Features 点击后核对固定 mask 语义；Props 按格、Effects 按行指派。</li>
           <li><strong>在真实地图里验收</strong>检查尺度、脚点、遮挡、季节搭配和远近辨认度。拖动数值时，昂贵的全层重录会自动合并，停手后刷新。</li>
           <li><strong>明确保存</strong>确认满意后点击“保存”。“重载文件”丢弃未保存改动并重新读取差异层；“恢复全部默认”把本次配置还原为源码默认。</li>
         </ol>
@@ -236,7 +239,7 @@
         <h3>发起修改 / 重生成</h3>
         <ol class="steps">
           <li><strong>选择作用范围</strong>单选只改当前图集；Ctrl 多选可组成自定义批次；“选择同组”会选择同类四季图集，例如四张 terrain atlas。</li>
-          <li><strong>写本次修改条件</strong>只描述增量，如“压低山地侧面，保持 4×4 槽位顺序与其他内容不变”。不要重写整份原始提示词。</li>
+          <li><strong>写本次修改条件</strong>只描述增量；Feature 必须明确“保持 8×8/64-mask 顺序、六个 socket 与透明保护区不变”。不要重写整份原始提示词。</li>
           <li><strong>点击“修改并重生成”</strong>编辑器先显示费用确认弹窗；只有明确确认后，才创建 revision 与 request，并允许 Codex worker 向 Lovart 提交。</li>
           <li><strong>处理二次确认</strong>Provider 若返回 <code>pendingConfirmation</code>，列表会进入“Awaiting confirmation”，此时用“确认待处理费用”明确继续。</li>
           <li><strong>查询并完成处理</strong>已有 thread ID 或 submit ID 的任务可以查询。Provider 完成后，Codex 下载源图、抠图、组装图集、运行 QA，再把正式输出导入项目。</li>
@@ -275,7 +278,7 @@
               <tr><td><code>Data_Map25DArt.json</code></td><td>与默认配置不同的图集映射和渲染参数；不是完整默认表。</td><td>编辑器与游戏运行时。</td></tr>
               <tr><td><code>Data_ArtGeneration.json</code></td><td>不可变 base prompt、追加 revisions、requests、Provider 任务身份和状态、处理阶段、artifact 路径 / URL / MIME / SHA-256 与依赖快照。</td><td>只供美术生产工具；游戏运行时禁止读取，导出包排除。</td></tr>
               <tr><td><code>build/artGeneration/cells/…</code></td><td>Provider 下载源图、处理候选、接触表与 QA 报告。</td><td>生产工具；这些是候选与证据，不是正式运行时资产。</td></tr>
-              <tr><td><code>assets/map2d/…/Texture_Map2D*Atlas.png</code></td><td>通过处理与校验后的正式图集。</td><td>游戏运行时。进入 Ready 前必须存在并与台账哈希一致。</td></tr>
+              <tr><td><code>assets/map25d/ground/…</code> / <code>assets/map25d/features/…</code></td><td>通过处理与校验后的 dual-grid 地表和邻接地貌正式图集。</td><td>游戏运行时。进入 Ready 前必须存在并与台账哈希一致。</td></tr>
             </tbody>
           </table>
         </div>
@@ -329,8 +332,8 @@
 
   <footer class="footer">
     <div class="footer-inner">
-      <div><strong>BehindTheLines · BTL 单元格美术编辑器</strong><p>最后更新 <time datetime="2026-07-17">2026-07-17</time></p></div>
-      <div><a href="#page-title">回到顶部</a> · <a href="/BehindTheLines/ImageMattingEditor/">抠图编辑器</a> · <a href="/BehindTheLines/AnimationProduction/">角色动画</a> · <a href="/BehindTheLines/">文档首页</a></div>
+      <div><strong>BehindTheLines · BTL 单元格美术编辑器</strong><p>最后更新 <time datetime="2026-07-19">2026-07-19</time></p></div>
+      <div><a href="#page-title">回到顶部</a> · <a href="/BehindTheLines/HexFeatureAssets/">邻接地貌规范</a> · <a href="/BehindTheLines/ImageMattingEditor/">抠图编辑器</a> · <a href="/BehindTheLines/AnimationProduction/">角色动画</a> · <a href="/BehindTheLines/">文档首页</a></div>
     </div>
   </footer>
 </body>

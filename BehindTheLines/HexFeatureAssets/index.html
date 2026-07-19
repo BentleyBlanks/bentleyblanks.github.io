@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BehindTheLines 2.5D 六边形邻接地貌资产规范：12 张四季 Feature 图集、64 个六邻接掩码、socket 几何、提示词、生产与验收门槛。">
+  <link rel="canonical" href="https://bentleyblanks.github.io/BehindTheLines/HexFeatureAssets/">
+  <title>六边形邻接地貌资产规范｜BehindTheLines</title>
+  <style>
+    :root { --ink:#29261f; --muted:#655f52; --paper:#f2ead6; --card:#fffaf0; --line:#c7b78f; --gold:#ae7f31; --red:#8e3029; --forest:#294d3a; --code:#1d2422; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; color:var(--ink); background:linear-gradient(135deg,#e7dbc0,#f7f1e3 45%,#ded0af); font:16px/1.72 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+    a { color:var(--red); }
+    code { padding:.12em .35em; color:#f2e7c9; background:var(--code); border-radius:4px; overflow-wrap:anywhere; }
+    .topbar { position:sticky; top:0; z-index:10; color:#fff8e8; background:rgba(28,31,27,.96); border-bottom:2px solid var(--gold); }
+    .topbar-inner { width:min(1180px,calc(100% - 32px)); margin:auto; min-height:62px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .brand { color:inherit; text-decoration:none; font-weight:760; letter-spacing:.04em; }
+    .topnav { display:flex; flex-wrap:wrap; gap:14px; }
+    .topnav a { color:#e8dcc1; text-decoration:none; font-size:14px; }
+    .hero { color:#fff7e5; background:radial-gradient(circle at 78% 24%,rgba(179,137,62,.35),transparent 28%),linear-gradient(120deg,#1b3428,#28302b 52%,#4f3329); }
+    .hero-inner { width:min(1180px,calc(100% - 32px)); margin:auto; padding:68px 0 62px; }
+    .eyebrow { margin:0 0 8px; color:#d8bd75; font-size:13px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; }
+    h1 { max-width:900px; margin:0; font:800 clamp(36px,6vw,66px)/1.08 Georgia,"Microsoft YaHei",serif; }
+    .hero p:last-child { max-width:900px; margin:24px 0 0; color:#e2dac7; font-size:18px; }
+    .layout { width:min(1180px,calc(100% - 32px)); margin:34px auto 70px; display:grid; grid-template-columns:220px minmax(0,1fr); gap:28px; align-items:start; }
+    .side { position:sticky; top:88px; display:grid; gap:5px; padding:17px; background:rgba(255,250,240,.75); border:1px solid var(--line); border-radius:13px; }
+    .side strong { margin-bottom:6px; color:var(--forest); }
+    .side a { padding:6px 8px; color:var(--muted); text-decoration:none; border-radius:7px; }
+    .side a:hover { color:var(--red); background:#eadfc6; }
+    main { min-width:0; }
+    section { margin-bottom:24px; padding:30px; background:rgba(255,250,240,.92); border:1px solid var(--line); border-radius:16px; box-shadow:0 14px 38px rgba(76,58,29,.10); }
+    h2 { margin:0 0 12px; color:var(--forest); font:800 30px/1.25 Georgia,"Microsoft YaHei",serif; }
+    h3 { margin:24px 0 8px; color:#664429; }
+    .lede { margin-top:0; color:var(--muted); font-size:17px; }
+    .callout { margin:18px 0; padding:16px 18px; background:#e9e0c8; border-left:5px solid var(--gold); border-radius:8px; }
+    .warning { background:#f1ded6; border-left-color:var(--red); }
+    .ok { background:#dce9df; border-left-color:var(--forest); }
+    .grid2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .card { padding:17px; background:#f7f0df; border:1px solid #d7c9a7; border-radius:10px; }
+    .card h3 { margin-top:0; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th,td { padding:10px 11px; text-align:left; vertical-align:top; border-bottom:1px solid #d9ccb0; }
+    th { color:#fff7e5; background:#3b4d42; }
+    .mask-grid { display:grid; grid-template-columns:repeat(8,minmax(112px,1fr)); min-width:920px; border-left:1px solid #cbbd9d; border-top:1px solid #cbbd9d; }
+    .mask-cell { min-height:66px; padding:7px; background:#faf4e6; border-right:1px solid #cbbd9d; border-bottom:1px solid #cbbd9d; }
+    .mask-cell strong { display:block; color:var(--red); }
+    .mask-cell span { color:var(--muted); font-size:12px; }
+    .formula { padding:15px; color:#e8e1cf; background:var(--code); border-radius:9px; overflow-x:auto; white-space:pre-wrap; }
+    .checklist li { margin:6px 0; }
+    .footer { color:#d8ceba; background:#1f2521; }
+    .footer-inner { width:min(1180px,calc(100% - 32px)); margin:auto; padding:25px 0; display:flex; justify-content:space-between; gap:20px; }
+    .footer a { color:#efcf87; }
+    @media (max-width:900px) { .layout { grid-template-columns:1fr; } .side { position:static; grid-template-columns:repeat(3,minmax(0,1fr)); } .side strong { grid-column:1/-1; } .grid2 { grid-template-columns:1fr; } }
+    @media (max-width:560px) { .topbar-inner,.footer-inner { align-items:flex-start; flex-direction:column; padding:12px 0; } .hero-inner { padding:44px 0; } section { padding:21px 17px; } .side { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/BehindTheLines/">BehindTheLines 文档</a>
+      <nav class="topnav" aria-label="站点导航">
+        <a href="#contract">资产合同</a><a href="#masks">64 掩码</a><a href="#art">美术要求</a><a href="#production">生产流程</a><a href="#qa">验收</a><a href="/BehindTheLines/CellArtEditor/">单元格编辑器</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Hex Feature Tilemap · Contract v1</p>
+      <h1>六边形邻接地貌<br>资产生产规范</h1>
+      <p>面向 Forest、Hills、Mountain 三类 2.5D 地貌。最终交付 3 地形 × 4 季节 = 12 张透明图集；每张包含完整 64 个六邻接 mask，并与现有 dual-grid 地表共同工作。</p>
+    </div>
+  </section>
+
+  <div class="layout">
+    <aside class="side" aria-label="本文目录"><strong>本文目录</strong><a href="#scope">适用边界</a><a href="#contract">文件与几何</a><a href="#masks">掩码版式</a><a href="#art">美术语义</a><a href="#prompts">提示词模板</a><a href="#production">生产流程</a><a href="#qa">验收门槛</a></aside>
+    <main>
+      <section id="scope">
+        <h2>先把两种邻接问题分开</h2>
+        <p class="lede">地表与抬升地貌不是同一个素材合同，不能再把“每片看三个格”误写成“所有素材只有三种情况”。</p>
+        <div class="grid2">
+          <div class="card"><h3>Ground：对偶三角网</h3><p>flat-top odd-q 六边网格的 dual-grid 三角片，每片读取三个格心。每种地表实际需要 <strong>7 个非空掩码 × EAST/WEST = 14 槽</strong>，负责草地、土壤、基岩和未侦查边界的平面过渡。</p></div>
+          <div class="card"><h3>Feature：完整六邻接</h3><p>Forest、Hills、Mountain 必须知道六条公共边是否继续，因此使用 6 bit mask，共 64 槽。它负责林缘、丘脊和山脊；不能回退成每格一个圆底盆景。</p></div>
+        </div>
+        <div class="callout warning"><strong>不在本合同内：</strong>河流、普通道路、铁路需要自己的逐边连接合同；村庄、建筑和单位仍是实体。不能用 Feature 图集代替这些系统。</div>
+      </section>
+
+      <section id="contract">
+        <h2>12 张正式图集</h2>
+        <div class="callout ok"><strong>当前可运行基线：</strong>以下 12 个目标路径均已预烘焙并安装程序化 v1 PNG（3 类地貌 × 4 季节），运行时直接加载这些确定性资产，不再在启动时临时生成。它们用于验证 64-mask、socket、季节切换、缓存与性能合同；仍不是 Provider/Lovart 产出的正式美术图集。</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>地形</th><th>四季 asset ID</th><th>正式文件</th></tr></thead>
+          <tbody>
+            <tr><td>Forest</td><td><code>cell.hexfeature.forest.{spring|summer|autumn|winter}</code></td><td><code>assets/map25d/features/Texture_Map25DFeatureForest{Season}Atlas.png</code></td></tr>
+            <tr><td>Hills</td><td><code>cell.hexfeature.hills.{spring|summer|autumn|winter}</code></td><td><code>assets/map25d/features/Texture_Map25DFeatureHills{Season}Atlas.png</code></td></tr>
+            <tr><td>Mountain</td><td><code>cell.hexfeature.mountain.{spring|summer|autumn|winter}</code></td><td><code>assets/map25d/features/Texture_Map25DFeatureMountain{Season}Atlas.png</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="grid2">
+          <div class="card"><h3>单格</h3><p><code>192 × 240 px</code>，透明 RGBA。逻辑格心 <code>(96,176)</code>，锚点 <code>(0.5, 176/240)</code>，运行时固定绘制为 <code>2.4 × 3.0 hexSize</code>。不允许逐格缩放、旋转或随机镜像。</p></div>
+          <div class="card"><h3>整图</h3><p><code>8 × 8</code>，原始 PNG <code>1536 × 1920 px</code>。运行时会给每格加 8 px gutter 并生成 mip，活动纹理约为 <code>1664 × 2048 px</code>；只驻留当前季节三张。</p></div>
+        </div>
+        <h3>六个 socket</h3>
+        <div class="table-wrap"><table><thead><tr><th>bit</th><th>方向</th><th>单格像素</th><th>opposite</th></tr></thead><tbody>
+          <tr><td>0</td><td>SE</td><td>(156, 202)</td><td>3 · NW</td></tr><tr><td>1</td><td>S</td><td>(96, 228)</td><td>4 · N</td></tr><tr><td>2</td><td>SW</td><td>(36, 202)</td><td>5 · NE</td></tr><tr><td>3</td><td>NW</td><td>(36, 150)</td><td>0 · SE</td></tr><tr><td>4</td><td>N</td><td>(96, 124)</td><td>1 · S</td></tr><tr><td>5</td><td>NE</td><td>(156, 150)</td><td>2 · SW</td></tr>
+        </tbody></table></div>
+        <p>bit=1 时，形体必须以固定宽度、色板和 alpha 到达该 socket；bit=0 时，该 socket 周围至少 10 px 保护区必须透明。相反方向在世界坐标中必须重合，误差不超过 1 px。</p>
+      </section>
+
+      <section id="masks">
+        <h2>mask → 图集格位</h2>
+        <pre class="formula">direction bits = [SE, S, SW, NW, N, NE]
+mask = Σ(connected[direction] ? 1 &lt;&lt; direction : 0)
+cell.x = mask &amp; 7
+cell.y = mask &gt;&gt; 3</pre>
+        <p>下表按最终 8×8 版式生成。数字是 mask，文字是必须打开的接口；<code>0</code> 是孤立件，<code>63</code> 是六面腹地。</p>
+        <div class="table-wrap"><div class="mask-grid" id="mask-grid" aria-label="64 个 Feature mask 图集格位"></div></div>
+        <div class="callout"><strong>允许按 14 类拓扑语义组织生产，但最终必须烘成 64 个屏幕方向正确的格位。</strong>不要把完成的 2.5D raster 旋转 60°：树会倾倒，山体光向也会旋转。镜像同样会反转固定光源。</div>
+      </section>
+
+      <section id="art">
+        <h2>三种地貌的画面语义</h2>
+        <div class="grid2">
+          <div class="card"><h3>Forest</h3><p>透明底的竖直单树、灌木与林下暗部。边缘稀、腹地密；连接 socket 可由共用边缘树或很窄的林下带完成。单格视觉目标约 3–7 株，禁止整片花园状圆底。</p></div>
+          <div class="card"><h3>Hills</h3><p>低矮、不闭合的丘脊：东南侧宽而淡的阴影，西北侧窄高光，少量内部等高暗线。不得画实心草垛、完整椭圆圈或六边底板。</p></div>
+          <div class="card"><h3>Mountain</h3><p>连续山脚骨架 + 1 个主峰及必要肩峰。主轴跟随连接方向，边缘低、腹地高；固定左上光、右下阴影。禁止每格同一个完整圆底山包。</p></div>
+          <div class="card"><h3>共同要求</h3><p>三分之四俯视正交、低分辨率手绘像素质感、有限色板、硬边像素、统一暖色自然光；四周透明，不带文字、UI、旗帜、道路、河流、建筑或单位。</p></div>
+        </div>
+        <h3>四季只改自然状态，不改拓扑与镜头</h3>
+        <ul><li><strong>Spring：</strong>湿润新绿、少量花色，山石偏暖灰。</li><li><strong>Summer：</strong>深绿与较强叶冠，土石略干。</li><li><strong>Autumn：</strong>赭黄、棕红、橄榄绿混合，保持相同接口宽度。</li><li><strong>Winter：</strong>低饱和灰绿、枯枝与克制积雪；积雪不能填满透明保护区。</li></ul>
+        <div class="callout warning"><strong>绝对禁止：</strong>圆形/椭圆形地台、完整六角底座、浅色贴纸边、背景色块、白边或品红边；禁止在相邻 mask 间改变 socket 位置、宽度、色板或 alpha。</div>
+      </section>
+
+      <section id="prompts">
+        <h2>给图像 Agent 的不可变提示词骨架</h2>
+        <pre class="formula">Create one transparent-source board for BehindTheLines {TERRAIN} {SEASON} hex-feature production.
+Fixed three-quarter orthographic strategy-game camera; upright vegetation and peaks; fixed upper-left light.
+Hand-painted low-resolution pixel art, hard square pixels, restrained wartime earth palette.
+The final derivative is an 8x8 atlas of 64 six-neighbor masks in bit order SE,S,SW,NW,N,NE.
+Cell 192x240; ground center (96,176); sockets SE(156,202), S(96,228), SW(36,202), NW(36,150), N(96,124), NE(156,150).
+Every active socket must use identical geometry/color/alpha; every inactive socket guard must remain empty.
+Transparent feature content only. No circular base, hex base, tile floor, scenery, river, road, rail, building, unit, flag, text, UI, glow, cast background, checkerboard or contact-sheet labels.</pre>
+        <p>在骨架后追加本页对应的地形与季节段落；不要依赖对话上下文，不要只写“同上一张”。Provider 原图、切分脚本和最终图集是三个阶段，最终尺寸必须由处理器确定，不应相信模型自行精确排出 1536×1920。</p>
+      </section>
+
+      <section id="production">
+        <h2>生产顺序与当前状态</h2>
+        <ol>
+          <li>在「BTL 单元格」选择 Features、地形和季节，导出当前 64-mask 程序化图集作为版式与 socket 参考。</li>
+          <li>按同一完整提示词生成两个候选：Lovart Unlimited 的 <code>generate_image_gpt_image_2</code> 必须处于 <code>low 1K</code>；同时用 <code>generate_image_nano_banana_pro</code> 以 1K 生成对照。保留两份输出并比较。</li>
+          <li>人工选择更符合固定镜头、透明边与地貌语义的候选；不得只因细节多就选中破坏接口的一张。</li>
+          <li>专用处理器切分/抠图/组装 64 格，补 gutter 前先执行 socket、透明区、尺寸和圆底检测。</li>
+          <li>在 Spring 与 Winter 的 1920×1080 固定种子地图中检查默认、0.75×、1.35× 三档缩放，再发布正式 PNG 与 QA 哈希。</li>
+        </ol>
+        <div class="callout warning"><strong>截至 2026-07-19，12 张程序化 v1 PNG 已预烘焙安装；Provider/Lovart 正式 8×8 资产管线仍未接入。</strong>12 个 <code>cell.hexfeature.*</code> asset ID 目前仅为合同保留项，尚未注册为可生成任务；registry、专用 processor 与 ready validator 均未完成。本次程序化首版没有提交 Provider 请求、没有调用 Lovart，也没有消耗任何生成额度。在这条管线接通前，不要用旧 <code>GeneratedAtlasProcessor</code> 伪装处理，也不要发起 regenerate。</div>
+      </section>
+
+      <section id="qa">
+        <h2>自动与人工验收</h2>
+        <ul class="checklist">
+          <li>文件名、1536×1920 尺寸、8×8/64 格和 RGBA 全部正确；单格角落透明。</li>
+          <li>64 个 mask 与格位双射；相邻连接 bit 互为 opposite；bit=0 保护区透明。</li>
+          <li>每一对相反 socket 的世界落点误差 ≤ 1 px，颜色/alpha 无可见跳变。</li>
+          <li>完整圆形或椭圆形整格底座数量为 0；无白边、黑矩形、品红残边和 mip 串色。</li>
+          <li>Forest 默认视野每格约 3–7 株；Mountain 腹地以 1 个主峰为主，端头可有肩峰；Hills 不形成粗线网。</li>
+          <li>村庄、铁路、单位、名字和选择框仍可读；未探明格不会通过 Feature 泄露地形。</li>
+          <li>清缓存重建两次，atlas hash、画家条目和截图保持确定；同季运行时活动 Feature 图集不超过三张。</li>
+          <li>1920×1080 桌面与约 390×844 移动宽度下，本页表格可横向滚动、正文不溢出。</li>
+        </ul>
+        <div class="callout ok"><strong>完成定义：</strong>12/12 正式 PNG、生产台账、专用处理器、自动 QA、Spring/Winter 视觉截图和全量回归同时通过，才可以移除“程序化首版”标记。</div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer"><div class="footer-inner"><div><strong>BehindTheLines · 六边形邻接地貌资产规范</strong><br>合同版本 v1 · 2026-07-19</div><div><a href="/BehindTheLines/CellArtEditor/">单元格编辑器</a> · <a href="/BehindTheLines/">文档首页</a></div></div></footer>
+  <script>
+    (() => {
+      const labels = ["SE", "S", "SW", "NW", "N", "NE"];
+      const grid = document.getElementById("mask-grid");
+      for (let mask = 0; mask < 64; mask += 1) {
+        const active = labels.filter((_, bit) => (mask & (1 << bit)) !== 0);
+        const cell = document.createElement("div");
+        cell.className = "mask-cell";
+        cell.innerHTML = `<strong>${mask}</strong><span>${active.length ? active.join(" + ") : "isolated"}</span>`;
+        grid.appendChild(cell);
+      }
+    })();
+  </script>
+</body>
+</html>

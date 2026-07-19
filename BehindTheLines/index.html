@@ -960,7 +960,7 @@
     <a class="tool-card" data-group="art" href="/BehindTheLines/CellArtEditor/">
       <span class="tool-index">Tool 08 · Cell art</span>
       <strong>BTL 单元格</strong>
-      <span>图集映射、四季实景预览，以及可追溯的图集重生成。</span>
+      <span>dual-grid 地表、64-mask 邻接地貌、四季实景预览与可追溯生产。</span>
     </a>
     <a class="tool-card" data-group="art" href="/BehindTheLines/ImageMattingEditor/">
       <span class="tool-index">Tool 09 · Matting</span>
@@ -1504,9 +1504,9 @@ model.NewGame(int(loaded.meta.get("seed", 0)), loaded.map)</code></pre>
         </div>
 
         <div class="mini-panel">
-          <h3>单元格生成、抠图与状态</h3>
-          <p>图集映射与生成修订属于「BTL 单元格」；透明 PNG 的单图/批量诊断属于「BTL 抠图」。两者都保留原始输入，不在预览阶段污染正式资产。</p>
-          <p><a href="/BehindTheLines/CellArtEditor/">单元格手册 →</a> · <a href="/BehindTheLines/ImageMattingEditor/">抠图手册 →</a></p>
+          <h3>六边形地貌资产与抠图</h3>
+          <p>「BTL 单元格」检查 dual-grid 地表与邻接地貌合同；正式 Forest、Hills、Mountain 生产遵守独立的 12 图集 / 64-mask 规范。透明 PNG 诊断属于「BTL 抠图」。</p>
+          <p><a href="/BehindTheLines/CellArtEditor/">单元格手册 →</a> · <a href="/BehindTheLines/HexFeatureAssets/">邻接地貌规范 →</a> · <a href="/BehindTheLines/ImageMattingEditor/">抠图手册 →</a></p>
         </div>
 
         <div class="mini-panel">
