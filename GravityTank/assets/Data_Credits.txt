@@ -10,3 +10,9 @@ Terrain tiles (brick / steel / water / ice) and HUD chrome are original
 drawings inspired by classic Battle City / 坦克大战 layouts.
 
 Game twist: all shells use downward gravity (parabolic arcs).
+
+Battle City–style sound effects:
+  Generated retro 8-bit WAVs from StefanBS/battle-city-clone (MIT License)
+  https://github.com/StefanBS/battle-city-clone
+  Classic shoot / brick / explode / power-up / stage / game-over set.
+  These are open recreations in the NES tank-battle style, not Namco ROM rips.

@@ -167,6 +167,40 @@ class AudioBus {
   constructor() {
     this.ctx = null;
     this.enabled = true;
+    this.buffers = {};
+    this.engineNode = null;
+    this.engineGain = null;
+    this.powerSpawnNode = null;
+    this.ready = false;
+  }
+
+  async LoadAll() {
+    const list = {
+      shoot: "assets/AudioSfx_Shoot.wav",
+      brick: "assets/AudioSfx_BrickHit.wav",
+      steel: "assets/AudioSfx_SteelHit.wav",
+      explode: "assets/AudioSfx_Explosion.wav",
+      power: "assets/AudioSfx_Powerup.wav",
+      powerSpawn: "assets/AudioSfx_PowerupSpawn.wav",
+      stage: "assets/AudioSfx_StageStart.wav",
+      gameOver: "assets/AudioSfx_GameOver.wav",
+      victory: "assets/AudioSfx_Victory.wav",
+      pause: "assets/AudioSfx_Pause.wav",
+      ice: "assets/AudioSfx_Ice.wav",
+      engine: "assets/AudioSfx_Engine.wav",
+    };
+    const ctx = this.Ensure();
+    if (!ctx) return;
+    await Promise.all(Object.entries(list).map(async ([key, src]) => {
+      try {
+        const res = await fetch(src);
+        const buf = await res.arrayBuffer();
+        this.buffers[key] = await ctx.decodeAudioData(buf.slice(0));
+      } catch (err) {
+        console.warn("SFX load failed", key, err);
+      }
+    }));
+    this.ready = true;
   }
 
   Ensure() {
@@ -177,6 +211,27 @@ class AudioBus {
     }
     if (this.ctx.state === "suspended") this.ctx.resume();
     return this.ctx;
+  }
+
+  Play(name, { gain = 0.45, loop = false, rate = 1 } = {}) {
+    if (!this.enabled) return null;
+    const ctx = this.Ensure();
+    if (!ctx) return null;
+    const buffer = this.buffers[name];
+    if (!buffer) {
+      this.ToneFallback(name);
+      return null;
+    }
+    const src = ctx.createBufferSource();
+    const g = ctx.createGain();
+    src.buffer = buffer;
+    src.loop = loop;
+    src.playbackRate.value = rate;
+    g.gain.value = gain;
+    src.connect(g);
+    g.connect(ctx.destination);
+    src.start();
+    return { src, g };
   }
 
   Tone(freq, dur, type = "square", gain = 0.04, slide = 0) {
@@ -197,16 +252,66 @@ class AudioBus {
     osc.stop(t0 + dur + 0.02);
   }
 
-  Shoot() { this.Tone(320, 0.08, "square", 0.035, -180); }
-  Bounce() { this.Tone(140, 0.05, "triangle", 0.03); }
-  Explode() {
-    this.Tone(90, 0.22, "sawtooth", 0.05, -60);
-    this.Tone(55, 0.28, "square", 0.03, -20);
+  ToneFallback(name) {
+    if (name === "shoot") this.Tone(320, 0.08, "square", 0.035, -180);
+    else if (name === "brick" || name === "hit") this.Tone(200, 0.06, "square", 0.04, -80);
+    else if (name === "steel") this.Tone(140, 0.05, "triangle", 0.03);
+    else if (name === "explode") {
+      this.Tone(90, 0.22, "sawtooth", 0.05, -60);
+      this.Tone(55, 0.28, "square", 0.03, -20);
+    } else if (name === "power") {
+      this.Tone(520, 0.12, "square", 0.04, 200);
+      this.Tone(780, 0.18, "triangle", 0.03);
+    } else if (name === "victory") {
+      this.Tone(440, 0.12, "square", 0.04);
+      setTimeout(() => this.Tone(660, 0.18, "square", 0.04), 120);
+    } else if (name === "gameOver") this.Tone(180, 0.35, "sawtooth", 0.05, -120);
+    else if (name === "pause") this.Tone(600, 0.04, "square", 0.03);
   }
-  Power() { this.Tone(520, 0.12, "square", 0.04, 200); this.Tone(780, 0.18, "triangle", 0.03); }
-  Hit() { this.Tone(200, 0.06, "square", 0.04, -80); }
-  Win() { this.Tone(440, 0.12, "square", 0.04); setTimeout(() => this.Tone(660, 0.18, "square", 0.04), 120); }
-  Lose() { this.Tone(180, 0.35, "sawtooth", 0.05, -120); }
+
+  Shoot() { this.Play("shoot", { gain: 0.5 }); }
+  Bounce() { this.Play("steel", { gain: 0.45 }); }
+  Hit() { this.Play("brick", { gain: 0.5 }); }
+  Explode() { this.Play("explode", { gain: 0.55 }); }
+  Power() {
+    this.StopPowerSpawn();
+    this.Play("power", { gain: 0.5 });
+  }
+  PowerSpawn() {
+    this.StopPowerSpawn();
+    this.powerSpawnNode = this.Play("powerSpawn", { gain: 0.28, loop: true });
+  }
+  StopPowerSpawn() {
+    try { this.powerSpawnNode?.src?.stop(); } catch (_) { /* already stopped */ }
+    this.powerSpawnNode = null;
+  }
+  StageStart() { this.Play("stage", { gain: 0.45 }); }
+  Win() {
+    this.StopEngine();
+    this.StopPowerSpawn();
+    this.Play("victory", { gain: 0.5 });
+  }
+  Lose() {
+    this.StopEngine();
+    this.StopPowerSpawn();
+    this.Play("gameOver", { gain: 0.5 });
+  }
+  PauseBlip() { this.Play("pause", { gain: 0.4 }); }
+  Ice() { this.Play("ice", { gain: 0.25 }); }
+
+  SetEngine(on) {
+    if (on) {
+      if (this.engineNode) return;
+      this.engineNode = this.Play("engine", { gain: 0.18, loop: true });
+    } else {
+      this.StopEngine();
+    }
+  }
+
+  StopEngine() {
+    try { this.engineNode?.src?.stop(); } catch (_) { /* already stopped */ }
+    this.engineNode = null;
+  }
 }
 
 class Game {
@@ -281,6 +386,7 @@ class Game {
 
   async Init() {
     await this.LoadAssets();
+    await this.audio.LoadAll().catch((err) => console.warn("SFX pack load", err));
     this.BindUi();
     this.RenderEnemyIcons();
     this.DrawBootFrame();
@@ -551,6 +657,9 @@ class Game {
     this.UpdateHud();
     this.RenderEnemyIcons();
     this.audio.Ensure();
+    this.audio.StopEngine();
+    this.audio.StopPowerSpawn();
+    this.audio.StageStart();
   }
 
   BuildSpawnQueue() {
@@ -600,12 +709,15 @@ class Game {
       this.state = "paused";
       this.overlays.pause.hidden = false;
       this.ResetTouchInput();
+      this.audio.StopEngine();
+      this.audio.PauseBlip();
       this.SyncTouchControlsVisibility();
     } else if (!paused && this.state === "paused") {
       this.state = "playing";
       this.overlays.pause.hidden = true;
       this.lastTs = 0;
       this.ResetTouchInput();
+      this.audio.PauseBlip();
       // If death timeout was skipped while paused, still respawn.
       if ((!this.player || !this.player.alive) && this.lives > 0 && this.respawnTimer <= 0) {
         this.respawnTimer = 0.05;
@@ -701,8 +813,14 @@ class Game {
       this.MoveTank(p, d.x * speed * dt, d.y * speed * dt);
       p.moving = true;
       if (onIce) {
+        if (!p.onIceSfx) {
+          this.audio.Ice();
+          p.onIceSfx = true;
+        }
         p.slipVx = d.x * speed;
         p.slipVy = d.y * speed;
+      } else {
+        p.onIceSfx = false;
       }
     } else if (onIce && (Math.abs(p.slipVx) > 8 || Math.abs(p.slipVy) > 8)) {
       this.MoveTank(p, p.slipVx * dt, p.slipVy * dt);
@@ -712,7 +830,10 @@ class Game {
     } else {
       p.slipVx = 0;
       p.slipVy = 0;
+      p.onIceSfx = false;
     }
+
+    this.audio.SetEngine(p.moving);
 
     if (this.WantsFire()) this.TryFire(p, true);
 
@@ -1098,6 +1219,7 @@ class Game {
     const p = this.player;
     if (!p?.alive) return;
     p.alive = false;
+    this.audio.StopEngine();
     this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.2);
     this.audio.Explode();
     this.lives -= 1;
@@ -1136,6 +1258,7 @@ class Game {
       ttl: 12,
       blink: 0,
     });
+    this.audio.PowerSpawn();
   }
 
   ApplyPowerup(kind) {
@@ -1247,6 +1370,7 @@ class Game {
       if (pu.ttl <= 0) pu.alive = false;
     }
     this.powerups = this.powerups.filter((p) => p.alive);
+    if (this.powerups.length === 0) this.audio.StopPowerSpawn();
   }
 
   TrySpawnEnemy(dt) {
