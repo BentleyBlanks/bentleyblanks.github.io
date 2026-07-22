@@ -1,0 +1,6 @@
+Background music: AudioBgm_Battle.ogg
+Source: "8 bit battle theme (famitracker)" by celestialghost8
+https://opengameart.org/content/8-bit-battle-theme-famitracker
+License: CC-BY 3.0 (attribution appreciated; author notes none strictly necessary)
+Converted to mono 22050 Hz Ogg Vorbis for web delivery.
+Not a Namco Battle City ROM rip.
