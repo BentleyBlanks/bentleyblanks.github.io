@@ -20,4 +20,7 @@ Background music:
   (NES tank-battle inspired square-wave motif; not a Namco ROM rip).
   Stage-start / jingle SFX remain from the MIT battle-city-clone pack.
 
-Game twist: all shells use downward gravity (parabolic arcs).
+Game twist: all shells use downward gravity (parabolic arcs; +20% vs initial build).
+
+Stages 1–5 maps & enemy mixes:
+  Adapted from StefanBS/battle-city-clone Tiled levels (MIT).

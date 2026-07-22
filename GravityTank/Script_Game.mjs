@@ -1,7 +1,9 @@
 /**
- * GravityTank — Battle City stage 1 with gravity bullets.
+ * GravityTank — classic Battle City stages 1–5 with gravity bullets.
  * Visuals: classic NES Battle City–style sprites (StefanBS/battle-city-clone, MIT).
  */
+
+import { STAGE_COUNT, GetStage } from "./Data_Stages.mjs";
 
 const TILE = 16;
 const MAP_W = 26;
@@ -12,10 +14,11 @@ const TANK_SIZE = 32;
 const SHEET_CELL = 8;
 const SPRITE = 16; // classic tank / metatile source size in the sheet
 const MAX_ENEMIES_ON_FIELD = 4;
-const TOTAL_ENEMIES = 20;
 const PLAYER_LIVES = 3;
-const GRAVITY = 420; // px/s^2 — bullets fall toward bottom of map
+const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
 const BULLET_SPEED = 280;
+/** Classic ~1/5 tanks flash (~0.20); +50% → 0.30. Only flashing tanks drop. */
+const POWER_DROP_RATE = 0.3;
 const PLAYER_SPEED = 88;
 const SPAWN_PROTECT = 3.0;
 
@@ -108,90 +111,10 @@ const BULLET_SHEET = {
   right: [346, 102, 4, 3],
 };
 
-/** Classic-inspired Stage 1 layout (26x26 half-tiles). Legend in buildStageMap. */
-function BuildStageMap() {
-  // Compact authoring: each char is one half-tile.
-  // . empty  # brick  @ steel  ~ water  % grass  = ice  B base zone (filled later)
-  const rows = [
-    "..........................",
-    "..........................",
-    "..##..##..##..##..##..##..",
-    "..##..##..##..##..##..##..",
-    "..##..##..##@@##..##..##..",
-    "..##..##..##@@##..##..##..",
-    "..##..##..##..##..##..##..",
-    "..##..##..........##..##..",
-    "..##..##..####....##..##..",
-    "..........####............",
-    "####..##..........##..####",
-    "####..##..%%..%%..##..####",
-    "......##..%%..%%..##......",
-    "..##......##..##......##..",
-    "..##@@....##..##....@@##..",
-    "..##@@................@@..",
-    "..##......####........##..",
-    "..........####............",
-    "..##..##..........##..##..",
-    "..##..##..##..##..##..##..",
-    "..##..##..##..##..##..##..",
-    "..##..............##..##..",
-    "..##....##....##....##....",
-    "........##BBBB##..........",
-    "........##BBBB##..........",
-    "..........BBBB............",
-  ];
-
-  const map = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(TILE_EMPTY));
-  const legend = {
-    ".": TILE_EMPTY,
-    "#": TILE_BRICK,
-    "@": TILE_STEEL,
-    "~": TILE_WATER,
-    "%": TILE_GRASS,
-    "=": TILE_ICE,
-    B: TILE_EMPTY,
-  };
-
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      const ch = rows[y][x];
-      map[y][x] = legend[ch] ?? TILE_EMPTY;
-    }
-  }
-
-  // Eagle base 2x2 at classic bottom-center
-  const bx = 12;
-  const by = 24;
-  map[by][bx] = TILE_BASE;
-  map[by][bx + 1] = TILE_BASE;
-  map[by + 1][bx] = TILE_BASE;
-  map[by + 1][bx + 1] = TILE_BASE;
-
-  // Brick fort around base
-  const fort = [
-    [11, 23], [12, 23], [13, 23], [14, 23],
-    [11, 24], [14, 24],
-    [11, 25], [14, 25],
-  ];
-  for (const [fx, fy] of fort) {
-    if (map[fy][fx] === TILE_EMPTY) map[fy][fx] = TILE_BRICK;
-  }
-
-  // Extra water pools for classic feel
-  for (let x = 8; x <= 9; x++) {
-    for (let y = 12; y <= 13; y++) map[y][x] = TILE_WATER;
-  }
-  for (let x = 16; x <= 17; x++) {
-    for (let y = 12; y <= 13; y++) map[y][x] = TILE_WATER;
-  }
-
-  // Ice patch
-  for (let x = 11; x <= 14; x++) {
-    map[10][x] = TILE_ICE;
-    map[11][x] = TILE_ICE;
-  }
-
-  return map;
+/** Deep-copy a classic stage map (26×26 int grid). */
+function BuildStageMap(stageIndex1Based) {
+  const stage = GetStage(stageIndex1Based);
+  return stage.map.map((row) => row.slice());
 }
 
 function Clamp(v, a, b) {
@@ -435,18 +358,24 @@ class Game {
       power: document.getElementById("powerValue"),
       score: document.getElementById("scoreValue"),
       remain: document.getElementById("remainValue"),
+      stage: document.getElementById("stageValue"),
       enemyIcons: document.getElementById("enemyIcons"),
       mobileLives: document.getElementById("mobileLives"),
       mobilePower: document.getElementById("mobilePower"),
       mobileScore: document.getElementById("mobileScore"),
       mobileRemain: document.getElementById("mobileRemain"),
+      mobileStage: document.getElementById("mobileStage"),
     };
     this.overlays = {
       start: document.getElementById("startOverlay"),
+      startTitle: document.getElementById("startStageTitle"),
+      startBlurb: document.getElementById("startStageBlurb"),
       pause: document.getElementById("pauseOverlay"),
       end: document.getElementById("endOverlay"),
       endTitle: document.getElementById("endTitle"),
       endMessage: document.getElementById("endMessage"),
+      endPrimary: document.getElementById("restartButton"),
+      endSecondary: document.getElementById("nextStageButton"),
     };
     this.touchUi = {
       stickWrap: document.getElementById("touchStickWrap"),
@@ -470,6 +399,10 @@ class Game {
     this.respawnTimer = 0;
 
     this.state = "boot";
+    this.stage = 1;
+    this.stageData = GetStage(1);
+    this.totalEnemies = 20;
+    this.endAction = "restart"; // restart | next | retry
     this.map = [];
     this.player = null;
     this.enemies = [];
@@ -479,7 +412,7 @@ class Game {
     this.spawnQueue = [];
     this.score = 0;
     this.lives = PLAYER_LIVES;
-    this.enemiesRemaining = TOTAL_ENEMIES;
+    this.enemiesRemaining = 20;
     this.spawnTimer = 0;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
@@ -487,13 +420,10 @@ class Game {
     this.baseAlive = true;
     this.waterPhase = 0;
     this.lastTs = 0;
-    this.spawnSlots = [
-      { x: 0 * TILE, y: 0 },
-      { x: 12 * TILE, y: 0 },
-      { x: 24 * TILE, y: 0 },
-    ];
+    this.spawnSlots = [];
     this.nextSpawnSlot = 0;
     this.frame = 0;
+    this.ApplyStageMeta(1);
   }
 
   async Init() {
@@ -503,7 +433,7 @@ class Game {
     this.RenderEnemyIcons();
     this.DrawBootFrame();
     if (new URLSearchParams(location.search).has("autostart")) {
-      this.StartGame();
+      this.StartCampaign();
     }
     requestAnimationFrame((t) => this.Loop(t));
   }
@@ -540,8 +470,9 @@ class Game {
   BindUi() {
     this.DetectTouchUi();
 
-    document.getElementById("startButton").addEventListener("click", () => this.StartGame());
-    document.getElementById("restartButton").addEventListener("click", () => this.StartGame());
+    document.getElementById("startButton").addEventListener("click", () => this.StartCampaign());
+    document.getElementById("restartButton").addEventListener("click", () => this.HandleEndPrimary());
+    document.getElementById("nextStageButton")?.addEventListener("click", () => this.AdvanceStage());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
 
     window.addEventListener("keydown", (e) => {
@@ -552,8 +483,9 @@ class Game {
       this.keys.add(k);
       if (e.code === "Space") this.keys.add(" ");
       if (k === "p") this.TogglePause();
-      if ((k === "enter" || k === " ") && this.state === "ready") this.StartGame();
-      if ((k === "enter" || k === " ") && (this.state === "won" || this.state === "lost")) this.StartGame();
+      if ((k === "enter" || k === " ") && this.state === "ready") this.StartCampaign();
+      if ((k === "enter" || k === " ") && this.state === "won") this.HandleEndPrimary();
+      if ((k === "enter" || k === " ") && this.state === "lost") this.HandleEndPrimary();
       this.audio.Ensure();
     });
     window.addEventListener("keyup", (e) => {
@@ -775,15 +707,63 @@ class Game {
     hudPause?.addEventListener("click", onPauseTap);
   }
 
-  StartGame() {
-    this.map = BuildStageMap();
+  ApplyStageMeta(stageIndex1Based) {
+    this.stage = Math.max(1, Math.min(STAGE_COUNT, stageIndex1Based | 0));
+    this.stageData = GetStage(this.stage);
+    const e = this.stageData.enemies;
+    this.totalEnemies = e.basic + e.fast + e.power + e.armor;
+    this.spawnSlots = (this.stageData.enemySpawns || [[0, 0], [12, 0], [24, 0]]).map(([x, y]) => ({
+      x: x * TILE,
+      y: y * TILE,
+    }));
+    this.SyncStageLabels();
+  }
+
+  SyncStageLabels() {
+    const label = String(this.stage);
+    if (this.hud.stage) this.hud.stage.textContent = label;
+    if (this.hud.mobileStage) this.hud.mobileStage.textContent = label;
+    if (this.overlays.startTitle) this.overlays.startTitle.textContent = `STAGE ${this.stage}`;
+    if (this.overlays.startBlurb) {
+      const e = this.stageData.enemies;
+      this.overlays.startBlurb.textContent =
+        `第 ${this.stage}/${STAGE_COUNT} 关 · 敌军 ${this.totalEnemies}（普${e.basic}/快${e.fast}/强${e.power}/甲${e.armor}）。保卫老鹰。炮弹带重力，水平射击会下坠。七种道具掉率比原版高 50%。`;
+    }
+  }
+
+  StartCampaign() {
+    this.score = 0;
+    this.lives = PLAYER_LIVES;
+    this.StartGame({ stage: 1, keepStats: false });
+  }
+
+  AdvanceStage() {
+    if (this.stage >= STAGE_COUNT) {
+      this.StartCampaign();
+      return;
+    }
+    const keep = this.player
+      ? { power: this.player.power, maxBullets: this.player.maxBullets }
+      : { power: 1, maxBullets: 1 };
+    this.StartGame({ stage: this.stage + 1, keepStats: keep, keepScore: true, keepLives: true });
+  }
+
+  HandleEndPrimary() {
+    if (this.endAction === "next") this.AdvanceStage();
+    else if (this.endAction === "retry") this.StartGame({ stage: this.stage, keepStats: false, keepScore: false, keepLives: false });
+    else this.StartCampaign();
+  }
+
+  StartGame({ stage = 1, keepStats = false, keepScore = false, keepLives = false } = {}) {
+    this.ApplyStageMeta(stage);
+    this.map = BuildStageMap(this.stage);
     this.bullets = [];
     this.explosions = [];
     this.powerups = [];
     this.enemies = [];
-    this.score = 0;
-    this.lives = PLAYER_LIVES;
-    this.enemiesRemaining = TOTAL_ENEMIES;
+    if (!keepScore) this.score = 0;
+    if (!keepLives) this.lives = PLAYER_LIVES;
+    this.enemiesRemaining = this.totalEnemies;
     this.spawnTimer = 0.2;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
@@ -791,8 +771,9 @@ class Game {
     this.baseAlive = true;
     this.nextSpawnSlot = 0;
     this.respawnTimer = 0;
+    this.endAction = "restart";
     this.BuildSpawnQueue();
-    this.SpawnPlayer(true);
+    this.SpawnPlayer(true, keepStats || null);
     this.spawnTimer = 0;
     for (let i = 0; i < 3; i++) {
       this.TrySpawnEnemy(10);
@@ -803,6 +784,7 @@ class Game {
     this.overlays.start.hidden = true;
     this.overlays.pause.hidden = true;
     this.overlays.end.hidden = true;
+    if (this.overlays.endSecondary) this.overlays.endSecondary.hidden = true;
     this.ResetTouchInput();
     this.SyncTouchControlsVisibility();
     this.UpdateHud();
@@ -819,13 +801,12 @@ class Game {
   }
 
   BuildSpawnQueue() {
-    // Stage 1 mix: mostly basic, some fast/power/armor
+    const counts = this.stageData.enemies;
     const mix = [];
-    for (let i = 0; i < 10; i++) mix.push(ENEMY_TYPES[0]);
-    for (let i = 0; i < 5; i++) mix.push(ENEMY_TYPES[1]);
-    for (let i = 0; i < 3; i++) mix.push(ENEMY_TYPES[2]);
-    for (let i = 0; i < 2; i++) mix.push(ENEMY_TYPES[3]);
-    // shuffle
+    for (let i = 0; i < counts.basic; i++) mix.push(ENEMY_TYPES[0]);
+    for (let i = 0; i < counts.fast; i++) mix.push(ENEMY_TYPES[1]);
+    for (let i = 0; i < counts.power; i++) mix.push(ENEMY_TYPES[2]);
+    for (let i = 0; i < counts.armor; i++) mix.push(ENEMY_TYPES[3]);
     for (let i = mix.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [mix[i], mix[j]] = [mix[j], mix[i]];
@@ -833,18 +814,19 @@ class Game {
     this.spawnQueue = mix;
   }
 
-  SpawnPlayer(fullProtect) {
-    const px = 8 * TILE + 2;
-    const py = 24 * TILE + 2;
+  SpawnPlayer(fullProtect, keepStats = null) {
+    const [sx, sy] = this.stageData.playerSpawns?.[0] || [8, 24];
+    const power = keepStats?.power ?? 1;
+    const maxBullets = keepStats?.maxBullets ?? (power >= 2 ? 2 : 1);
     this.player = {
-      x: px,
-      y: py,
+      x: sx * TILE + 2,
+      y: sy * TILE + 2,
       w: TANK_SIZE,
       h: TANK_SIZE,
       dir: "up",
       speed: PLAYER_SPEED,
-      power: 1,
-      maxBullets: 1,
+      power,
+      maxBullets,
       alive: true,
       protect: fullProtect ? SPAWN_PROTECT : 2.2,
       fireCd: 0,
@@ -911,6 +893,7 @@ class Game {
       if (this.respawnTimer <= 0) {
         this.respawnTimer = 0;
         if (this.state === "playing" && this.lives > 0 && (!this.player || !this.player.alive)) {
+          // Classic: death resets star power.
           this.SpawnPlayer(true);
           this.UnstickTank(this.player);
         }
@@ -1373,8 +1356,8 @@ class Game {
       this.score += e.score;
       this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1);
       this.audio.Explode();
-      // drop powerup chance (classic ~ flashing tank); use armor/power or random
-      if (e.dropsPower || Math.random() < 0.22) this.DropPowerup(e.x, e.y);
+      // Classic: only flashing (dropsPower) tanks drop. Rate +50% vs original ~0.20.
+      if (e.dropsPower) this.DropPowerup(e.x, e.y);
       this.RenderEnemyIcons();
     }
   }
@@ -1579,7 +1562,7 @@ class Game {
       aiTimer: 0.3,
       spawnFlash: 1.0,
       protect: 0,
-      dropsPower: type.id === "armor" || Math.random() < 0.15,
+      dropsPower: type.id === "armor" || Math.random() < POWER_DROP_RATE,
       deathTimer: 0,
       animTick: 0,
       moving: false,
@@ -1608,15 +1591,31 @@ class Game {
     if (!this.baseAlive) return;
     const alive = this.enemies.filter((e) => e.alive).length;
     if (alive === 0 && this.spawnQueue.length === 0) {
-      this.EndGame(true, `敌军肃清。得分 ${this.score}`);
+      if (this.stage < STAGE_COUNT) {
+        this.EndGame(true, `第 ${this.stage} 关肃清！得分 ${this.score}`, "next");
+      } else {
+        this.EndGame(true, `五关全通！最终得分 ${this.score}`, "restart");
+      }
     }
   }
 
-  EndGame(won, message) {
+  EndGame(won, message, action = "restart") {
     this.state = won ? "won" : "lost";
+    this.endAction = won ? action : "retry";
     this.overlays.end.hidden = false;
-    this.overlays.endTitle.textContent = won ? "关卡通过" : "游戏结束";
+    this.overlays.endTitle.textContent = won
+      ? (this.stage >= STAGE_COUNT && action === "restart" ? "战役胜利" : "关卡通过")
+      : "游戏结束";
     this.overlays.endMessage.textContent = message;
+    if (this.overlays.endPrimary) {
+      this.overlays.endPrimary.textContent = won
+        ? (action === "next" ? "下一关" : "再来一局")
+        : "重试本关";
+    }
+    if (this.overlays.endSecondary) {
+      // Keep a second shortcut only when advancing — same action as primary.
+      this.overlays.endSecondary.hidden = true;
+    }
     this.respawnTimer = 0;
     this.ResetTouchInput();
     this.SyncTouchControlsVisibility();
@@ -1629,24 +1628,27 @@ class Game {
     const power = String(this.player?.power ?? 1);
     const score = String(this.score);
     const remain = String(this.spawnQueue.length + this.enemies.filter((e) => e.alive).length);
+    const stage = String(this.stage);
     this.hud.lives.textContent = lives;
     this.hud.power.textContent = power;
     this.hud.score.textContent = score;
     this.hud.remain.textContent = remain;
+    if (this.hud.stage) this.hud.stage.textContent = stage;
     if (this.hud.mobileLives) this.hud.mobileLives.textContent = lives;
     if (this.hud.mobilePower) this.hud.mobilePower.textContent = power;
     if (this.hud.mobileScore) this.hud.mobileScore.textContent = score;
     if (this.hud.mobileRemain) this.hud.mobileRemain.textContent = remain;
+    if (this.hud.mobileStage) this.hud.mobileStage.textContent = stage;
   }
 
   RenderEnemyIcons() {
-    const queued = this.spawnQueue?.length ?? TOTAL_ENEMIES;
+    const queued = this.spawnQueue?.length ?? this.totalEnemies;
     const alive = this.enemies.filter((e) => e.alive).length;
-    const pending = this.state === "ready" || this.state === "boot" ? TOTAL_ENEMIES : queued + alive;
-    const killed = Math.max(0, TOTAL_ENEMIES - pending);
+    const pending = this.state === "ready" || this.state === "boot" ? this.totalEnemies : queued + alive;
+    const killed = Math.max(0, this.totalEnemies - pending);
     const box = this.hud.enemyIcons;
     box.innerHTML = "";
-    for (let i = 0; i < TOTAL_ENEMIES; i++) {
+    for (let i = 0; i < this.totalEnemies; i++) {
       const icon = document.createElement("i");
       if (i < killed) icon.classList.add("gone");
       box.appendChild(icon);
@@ -1654,8 +1656,9 @@ class Game {
   }
 
   DrawBootFrame() {
+    this.ApplyStageMeta(this.stage || 1);
     this.state = "ready";
-    this.map = BuildStageMap();
+    this.map = BuildStageMap(this.stage);
     this.Render();
   }
 

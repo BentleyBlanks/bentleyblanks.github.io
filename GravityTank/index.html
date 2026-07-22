@@ -7,9 +7,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="重力弹坦克大战：经典一关坦克大战，子弹带重力抛物线。素材来自 Kenney CC0。">
+  <meta name="description" content="重力弹坦克大战：经典前五关，炮弹带重力抛物线。七种道具，掉率比原版高50%。">
   <meta property="og:title" content="重力弹 · 坦克大战">
-  <meta property="og:description" content="一关经典坦克大战。玩家与敌方炮弹都受重力影响，形成抛物线弹道。">
+  <meta property="og:description" content="经典坦克大战前五关。玩家与敌方炮弹都受重力影响，形成抛物线弹道。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/GravityTank/">
   <title>重力弹 · 坦克大战</title>
@@ -21,10 +21,11 @@
       <div>
         <h1 class="brand">重力弹<small>Gravity Tank Battle</small></h1>
       </div>
-      <p class="tagline">经典坦克大战一关复刻。唯一变数：炮弹会往下坠——瞄准时要算抛物线。</p>
+      <p class="tagline">经典坦克大战前五关。炮弹更重（重力 +20%），七种道具掉率比原版高 50%——瞄准要算抛物线。</p>
     </header>
 
     <div class="mobile-hud" aria-live="polite">
+      <span>关 <b id="mobileStage">1</b></span>
       <span>命 <b id="mobileLives">3</b></span>
       <span>火力 <b id="mobilePower">1</b></span>
       <span>分 <b id="mobileScore">0</b></span>
@@ -35,8 +36,8 @@
     <section class="stage-shell" aria-label="游戏画面">
       <canvas id="gameCanvas" width="416" height="416"></canvas>
       <div id="startOverlay" class="overlay">
-        <h2>STAGE 1</h2>
-        <p>保卫老鹰总部。消灭全部敌军。注意：炮弹带重力，水平射击会下坠。</p>
+        <h2 id="startStageTitle">STAGE 1</h2>
+        <p id="startStageBlurb">保卫老鹰总部。消灭全部敌军。注意：炮弹带重力，水平射击会下坠。</p>
         <button id="startButton" class="primary" type="button">开始战斗</button>
         <p class="hint desktop-hint">方向键 / WASD 移动 · 空格 / J 开火 · P 暂停</p>
         <p class="hint mobile-hint">左侧虚拟摇杆移动 · 右侧按钮开火</p>
@@ -60,6 +61,7 @@
         <h2 id="endTitle">胜利</h2>
         <p id="endMessage">敌军全部歼灭。</p>
         <button id="restartButton" class="primary" type="button">再来一局</button>
+        <button id="nextStageButton" class="primary" type="button" hidden>下一关</button>
       </div>
     </section>
 
@@ -98,7 +100,7 @@
 
       <div class="panel panel-stats">
         <h3>战况</h3>
-        <div class="stat-row"><span>关卡</span><b>1</b></div>
+        <div class="stat-row"><span>关卡</span><b id="stageValue">1</b></div>
         <div class="stat-row"><span>生命</span><b id="livesValue">3</b></div>
         <div class="stat-row"><span>火力</span><b id="powerValue">1</b></div>
         <div class="stat-row"><span>得分</span><b id="scoreValue">0</b></div>
@@ -112,7 +114,7 @@
 
       <div class="panel">
         <h3>本关特色</h3>
-        <p class="feature">子弹带<strong>重力</strong>：向上射击会减速回落，左右射击成抛物线。敌我皆然。<strong>自己的炮弹也能砸到自己</strong>——抬头开火要小心自杀。</p>
+        <p class="feature">子弹带<strong>重力</strong>（比初版再重 20%）：向上射击会减速回落，左右射击成抛物线。敌我皆然。<strong>自己的炮弹也能砸到自己</strong>。闪红敌军掉道具，掉率比原版高 50%。</p>
       </div>
 
       <div class="panel panel-controls-help">
@@ -128,12 +130,12 @@
 
       <div class="panel">
         <h3>经典要素</h3>
-        <p class="feature" style="color:#c3d0b6">砖墙可打、钢墙需三星、水域不可通行、草丛遮蔽、冰块打滑、老鹰总部、四类敌军、七种道具（星/炸弹/时钟/铲子/头盔/坦克/枪）。</p>
+        <p class="feature" style="color:#c3d0b6">前五关经典地图。砖墙可打、钢墙需三星/手枪、水域不可通行、草丛遮蔽、冰块打滑、老鹰总部、四类敌军、七种道具（星 / 炸弹 / 时钟 / 铲子 / 头盔 / 坦克 / 枪）。</p>
       </div>
 
-      <p class="credit">坦克与特效素材：<a href="https://kenney.nl/assets/top-down-tanks-redux" target="_blank" rel="noopener">Kenney Top-down Tanks Redux</a>（CC0）。音效为开源坦克大战复刻风格 8-bit WAV（MIT）。BGM 为本页生成的经典 8-bit 关卡循环。地形与 UI 为经典坦克大战风格自绘。</p>
+      <p class="credit">贴图与音效：开源坦克大战复刻风格（StefanBS/battle-city-clone，MIT）。BGM 为本页生成的 8-bit 关卡循环。非 Namco ROM 资源。</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=classic1"></script>
+  <script type="module" src="./Script_Game.mjs?v=stages5"></script>
 </body>
 </html>
