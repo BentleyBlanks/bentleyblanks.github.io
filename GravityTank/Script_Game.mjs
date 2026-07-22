@@ -47,39 +47,68 @@ const POWER = {
   helmet: "helmet",
   life: "life",
   gun: "gun",
-  // GravityTank originals — weird on purpose
-  antigrav: "antigrav", // 反重力：己方炮弹几乎不下落
-  bounce: "bounce", // 弹跳弹：打钢板/边界会反弹
-  meteor: "meteor", // 陨石雨：天上砸下超重炮弹
-  ghost: "ghost", // 幽灵：穿砖过水
-  mirror: "mirror", // 镜像炮：前后同时开火
-  magnet: "magnet", // 磁导：炮弹轻微追踪敌军
-  warp: "warp", // 闪现：随机安全点传送
+  antigrav: "antigrav",
+  bounce: "bounce",
+  meteor: "meteor",
+  ghost: "ghost",
+  mirror: "mirror",
+  magnet: "magnet",
+  warp: "warp",
+  // Field pickup is always a roulette token now.
+  token: "token",
+  // Ultra-strong
+  nuke: "nuke",
+  overdrive: "overdrive",
+  apocalypse: "apocalypse",
+  juggernaut: "juggernaut",
+  // Curses / negatives
+  spawnExtra: "spawnExtra",
+  enemyShield: "enemyShield",
+  heavyCurse: "heavyCurse",
+  enemyRage: "enemyRage",
+  softStun: "softStun",
+  fortBreak: "fortBreak",
 };
 
-const CLASSIC_POWERS = [
-  POWER.star, POWER.bomb, POWER.clock, POWER.shovel, POWER.helmet, POWER.life, POWER.gun,
-];
-const FUN_POWERS = [
-  POWER.antigrav, POWER.bounce, POWER.meteor, POWER.ghost, POWER.mirror, POWER.magnet, POWER.warp,
+/** Fixed wheel layout — equal wedges; outcome = physics land, never pre-rolled. */
+const ROULETTE_SEGMENTS = [
+  { kind: POWER.star, label: "★星", tier: "good", color: "#f0c040", bg: "#5a4010" },
+  { kind: POWER.spawnExtra, label: "援军", tier: "bad", color: "#ff6060", bg: "#401010" },
+  { kind: POWER.nuke, label: "核爆", tier: "ultra", color: "#ffffff", bg: "#801010" },
+  { kind: POWER.bomb, label: "炸弹", tier: "good", color: "#ff6a4a", bg: "#4a1810" },
+  { kind: POWER.enemyShield, label: "敌盾", tier: "bad", color: "#a0a0ff", bg: "#101040" },
+  { kind: POWER.overdrive, label: "超武", tier: "ultra", color: "#ffe080", bg: "#604000" },
+  { kind: POWER.helmet, label: "护盾", tier: "good", color: "#80e090", bg: "#184028" },
+  { kind: POWER.heavyCurse, label: "超重", tier: "bad", color: "#c0a080", bg: "#302010" },
+  { kind: POWER.apocalypse, label: "天罚", tier: "ultra", color: "#ff40c0", bg: "#400020" },
+  { kind: POWER.life, label: "命+1", tier: "good", color: "#ff90c0", bg: "#401828" },
+  { kind: POWER.enemyRage, label: "狂暴", tier: "bad", color: "#ff4020", bg: "#300800" },
+  { kind: POWER.juggernaut, label: "霸体", tier: "ultra", color: "#b0ffff", bg: "#004050" },
 ];
 
-const POWER_STYLE = {
-  star: { label: "★", color: "#f0c040", bg: "#5a4010" },
-  bomb: { label: "炸", color: "#ff6a4a", bg: "#4a1810" },
-  clock: { label: "时", color: "#7ec8ff", bg: "#183048" },
-  shovel: { label: "铲", color: "#c0c0c0", bg: "#303038" },
-  helmet: { label: "盾", color: "#80e090", bg: "#184028" },
-  life: { label: "命", color: "#ff90c0", bg: "#401828" },
-  gun: { label: "枪", color: "#ffd080", bg: "#403010" },
-  antigrav: { label: "反G", color: "#b8f0ff", bg: "#103040" },
-  bounce: { label: "弹", color: "#ffe060", bg: "#403808" },
-  meteor: { label: "陨", color: "#ff8040", bg: "#401808" },
-  ghost: { label: "幽", color: "#d0a0ff", bg: "#281840" },
-  mirror: { label: "镜", color: "#a0ffe0", bg: "#104030" },
-  magnet: { label: "磁", color: "#ff90a0", bg: "#401018" },
-  warp: { label: "闪", color: "#ffffff", bg: "#204060" },
-};
+const POWER_STYLE = Object.fromEntries(
+  ROULETTE_SEGMENTS.map((s) => [s.kind, { label: s.label, color: s.color, bg: s.bg, tier: s.tier }])
+);
+Object.assign(POWER_STYLE, {
+  clock: { label: "时", color: "#7ec8ff", bg: "#183048", tier: "good" },
+  shovel: { label: "铲", color: "#c0c0c0", bg: "#303038", tier: "good" },
+  gun: { label: "枪", color: "#ffd080", bg: "#403010", tier: "good" },
+  antigrav: { label: "反G", color: "#b8f0ff", bg: "#103040", tier: "good" },
+  bounce: { label: "弹", color: "#ffe060", bg: "#403808", tier: "good" },
+  meteor: { label: "陨", color: "#ff8040", bg: "#401808", tier: "good" },
+  ghost: { label: "幽", color: "#d0a0ff", bg: "#281840", tier: "good" },
+  mirror: { label: "镜", color: "#a0ffe0", bg: "#104030", tier: "good" },
+  magnet: { label: "磁", color: "#ff90a0", bg: "#401018", tier: "good" },
+  warp: { label: "闪", color: "#ffffff", bg: "#204060", tier: "good" },
+  token: { label: "?", color: "#ffe08a", bg: "#2a2410", tier: "good" },
+  fortBreak: { label: "破堡", tier: "bad", color: "#d08060", bg: "#301808" },
+  softStun: { label: "眩晕", tier: "bad", color: "#d0d0d0", bg: "#303030" },
+});
+
+const ROULETTE_FRICTION = 2.6; // viscous 1/s
+const ROULETTE_COULOMB = 1.35; // rad/s^2 opposing
+const ROULETTE_STOP = 0.18; // rad/s
+const ROULETTE_MAX_OMEGA = 42;
 
 const ENEMY_TYPES = [
   { id: "basic", hp: 1, speed: 54, score: 100, shootCd: 1.4, texture: "enemyBasic", weight: 10 },
@@ -453,7 +482,12 @@ class Game {
     this.ghostTimer = 0;
     this.mirrorTimer = 0;
     this.magnetTimer = 0;
+    this.overdriveTimer = 0;
+    this.heavyCurseTimer = 0;
+    this.enemyRageTimer = 0;
+    this.playerStunTimer = 0;
     this.buffToast = null;
+    this.roulette = null;
     this.pendingFortRestore = false;
     this.baseAlive = true;
     this.waterPhase = 0;
@@ -513,9 +547,10 @@ class Game {
     document.getElementById("nextStageButton")?.addEventListener("click", () => this.AdvanceStage());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
 
-    this.canvas.addEventListener("pointerdown", () => {
-      if (this.state === "stageIntro") this.SkipStageIntro();
-    });
+    this.canvas.addEventListener("pointerdown", (ev) => this.OnCanvasPointerDown(ev));
+    this.canvas.addEventListener("pointermove", (ev) => this.OnCanvasPointerMove(ev));
+    this.canvas.addEventListener("pointerup", (ev) => this.OnCanvasPointerUp(ev));
+    this.canvas.addEventListener("pointercancel", (ev) => this.OnCanvasPointerUp(ev));
 
     window.addEventListener("keydown", (e) => {
       const k = e.key.toLowerCase();
@@ -527,6 +562,7 @@ class Game {
       if (k === "p") this.TogglePause();
       if ((k === "enter" || k === " ") && this.state === "ready") this.StartCampaign();
       if ((k === "enter" || k === " ") && this.state === "stageIntro") this.SkipStageIntro();
+      if ((k === " " || k === "j") && this.state === "roulette") this.RouletteKick(14 + Math.random() * 10);
       if ((k === "enter" || k === " ") && this.state === "won") this.HandleEndPrimary();
       if ((k === "enter" || k === " ") && this.state === "lost") this.HandleEndPrimary();
       this.audio.Ensure();
@@ -586,7 +622,7 @@ class Game {
   }
 
   SyncTouchControlsVisibility() {
-    const show = this.isTouchDevice && (this.state === "playing" || this.state === "paused");
+    const show = this.isTouchDevice && (this.state === "playing" || this.state === "paused" || this.state === "roulette");
     if (this.touchUi.stickWrap) this.touchUi.stickWrap.hidden = !show;
     if (this.touchUi.actionsWrap) this.touchUi.actionsWrap.hidden = !show;
   }
@@ -720,6 +756,11 @@ class Game {
         this.SkipStageIntro();
         return;
       }
+      if (this.state === "roulette") {
+        ev.preventDefault();
+        this.RouletteKick(16 + Math.random() * 12);
+        return;
+      }
       if (this.firePointerId !== null && this.firePointerId !== ev.pointerId) {
         this.firePointerId = null;
       }
@@ -820,7 +861,12 @@ class Game {
     this.ghostTimer = 0;
     this.mirrorTimer = 0;
     this.magnetTimer = 0;
+    this.overdriveTimer = 0;
+    this.heavyCurseTimer = 0;
+    this.enemyRageTimer = 0;
+    this.playerStunTimer = 0;
     this.buffToast = null;
+    this.roulette = null;
     this.pendingFortRestore = false;
     this.baseAlive = true;
     this.nextSpawnSlot = 0;
@@ -945,6 +991,7 @@ class Game {
       this.SkipStageIntro();
       return;
     }
+    if (this.state === "roulette") return; // finish the spin first
     if (this.state === "playing") this.SetPaused(true);
     else if (this.state === "paused") this.SetPaused(false);
   }
@@ -980,6 +1027,7 @@ class Game {
 
     if (this.state === "playing") this.Update(dt);
     else if (this.state === "stageIntro") this.UpdateStageIntro(dt);
+    else if (this.state === "roulette") this.UpdateRoulette(dt);
     this.Render();
     requestAnimationFrame((t) => this.Loop(t));
   }
@@ -996,6 +1044,10 @@ class Game {
     if (this.ghostTimer > 0) this.ghostTimer -= dt;
     if (this.mirrorTimer > 0) this.mirrorTimer -= dt;
     if (this.magnetTimer > 0) this.magnetTimer -= dt;
+    if (this.overdriveTimer > 0) this.overdriveTimer -= dt;
+    if (this.heavyCurseTimer > 0) this.heavyCurseTimer -= dt;
+    if (this.enemyRageTimer > 0) this.enemyRageTimer -= dt;
+    if (this.playerStunTimer > 0) this.playerStunTimer -= dt;
     if (this.buffToast) {
       this.buffToast.ttl -= dt;
       if (this.buffToast.ttl <= 0) this.buffToast = null;
@@ -1049,6 +1101,12 @@ class Game {
     // Always try to escape accidental embeds (wall / fort / tank overlap).
     this.UnstickTank(p);
 
+    if (this.playerStunTimer > 0) {
+      p.moving = false;
+      this.audio.SetEngine(false);
+      return;
+    }
+
     const input = this.GetMoveInput();
     p.moving = false;
 
@@ -1096,12 +1154,12 @@ class Game {
 
     if (this.WantsFire()) this.TryFire(p, true);
 
-    // pickup powerups
+    // pickup → physics roulette (outcome not pre-rolled)
     for (const pu of this.powerups) {
       if (!pu.alive) continue;
-      if (RectsOverlap(p, { x: pu.x, y: pu.y, w: 24, h: 24 })) {
+      if (RectsOverlap(p, { x: pu.x, y: pu.y, w: 28, h: 28 })) {
         pu.alive = false;
-        this.ApplyPowerup(pu.kind);
+        this.OpenRoulette();
       }
     }
   }
@@ -1143,7 +1201,8 @@ class Game {
       const d = DIR[e.dir];
       const beforeX = e.x;
       const beforeY = e.y;
-      this.MoveTank(e, d.x * e.speed * dt, d.y * e.speed * dt);
+      const rage = this.enemyRageTimer > 0 ? 1.55 : 1;
+      this.MoveTank(e, d.x * e.speed * rage * dt, d.y * e.speed * rage * dt);
       if (Math.abs(e.x - beforeX) > 0.01 || Math.abs(e.y - beforeY) > 0.01) {
         e.moving = true;
         e.animTick += dt * 10;
@@ -1300,9 +1359,11 @@ class Game {
   }
 
   TryFire(tank, isPlayer) {
+    if (isPlayer && this.playerStunTimer > 0) return;
     if (tank.fireCd > 0) return;
     const owned = this.bullets.filter((b) => b.alive && b.owner === tank).length;
-    const maxB = isPlayer ? tank.maxBullets : 1;
+    let maxB = isPlayer ? tank.maxBullets : 1;
+    if (isPlayer && this.overdriveTimer > 0) maxB = Math.max(maxB, 3);
     if (owned >= maxB) return;
 
     this.SpawnShell(tank, tank.dir, isPlayer);
@@ -1310,7 +1371,8 @@ class Game {
       const opp = { up: "down", down: "up", left: "right", right: "left" }[tank.dir];
       this.SpawnShell(tank, opp, true, { bonusShot: true });
     }
-    tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd;
+    if (isPlayer && this.overdriveTimer > 0) tank.fireCd = 0.1;
+    else tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd * (this.enemyRageTimer > 0 ? 0.55 : 1);
     this.audio.Shoot();
   }
 
@@ -1325,7 +1387,8 @@ class Game {
     const cx = tank.x + tank.w / 2;
     const cy = tank.y + tank.h / 2;
     let gravityMul = 1;
-    if (isPlayer && this.antigravTimer > 0) gravityMul = -0.35; // floats upward slowly
+    if (isPlayer && this.antigravTimer > 0) gravityMul = -0.35;
+    if (isPlayer && this.heavyCurseTimer > 0) gravityMul *= 2.6;
     const bounceLeft = isPlayer && this.bounceTimer > 0 ? 5 : 0;
     const homing = isPlayer && this.magnetTimer > 0;
 
@@ -1576,22 +1639,176 @@ class Game {
   }
 
   DropPowerup(x, y) {
-    // Fun props are listed twice so they show up a bit more often.
-    const kinds = [...CLASSIC_POWERS, ...FUN_POWERS, ...FUN_POWERS];
-    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    // Field token only — the roulette decides the real prize with physics.
     this.powerups.push({
       x: Clamp(x, 8, CANVAS_W - 32),
       y: Clamp(y, 8, CANVAS_H - 32),
-      kind,
+      kind: POWER.token,
       alive: true,
-      ttl: 12,
+      ttl: 14,
       blink: 0,
     });
     this.audio.PowerSpawn();
   }
 
   ShowBuffToast(text) {
-    this.buffToast = { text, ttl: 2.4 };
+    this.buffToast = { text, ttl: 2.6 };
+  }
+
+  OpenRoulette() {
+    this.audio.StopEngine();
+    this.ResetTouchInput();
+    this.state = "roulette";
+    this.roulette = {
+      angle: Math.random() * Math.PI * 2, // orientation only — NOT the result
+      omega: 0,
+      dragging: false,
+      pointerId: null,
+      lastAng: null,
+      lastT: 0,
+      stillT: 0,
+      hasSpun: false,
+      phase: "spin", // spin | result
+      result: null,
+      resultT: 0,
+      cx: CANVAS_W / 2,
+      cy: CANVAS_H / 2,
+      radius: 148,
+    };
+    this.SyncTouchControlsVisibility();
+    this.ShowBuffToast("甩转轮盘！转到哪算哪");
+    this.audio.PowerSpawn();
+  }
+
+  CanvasToLocal(ev) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = ((ev.clientX - rect.left) / rect.width) * CANVAS_W;
+    const y = ((ev.clientY - rect.top) / rect.height) * CANVAS_H;
+    return { x, y };
+  }
+
+  OnCanvasPointerDown(ev) {
+    if (this.state === "stageIntro") {
+      this.SkipStageIntro();
+      return;
+    }
+    if (this.state !== "roulette" || !this.roulette || this.roulette.phase !== "spin") return;
+    const r = this.roulette;
+    const p = this.CanvasToLocal(ev);
+    const dx = p.x - r.cx;
+    const dy = p.y - r.cy;
+    if (Math.hypot(dx, dy) > r.radius + 8) return;
+    ev.preventDefault();
+    this.canvas.setPointerCapture?.(ev.pointerId);
+    r.dragging = true;
+    r.pointerId = ev.pointerId;
+    r.lastAng = Math.atan2(dy, dx);
+    r.lastT = performance.now() / 1000;
+    r.stillT = 0;
+  }
+
+  OnCanvasPointerMove(ev) {
+    const r = this.roulette;
+    if (this.state !== "roulette" || !r?.dragging || ev.pointerId !== r.pointerId) return;
+    const p = this.CanvasToLocal(ev);
+    const ang = Math.atan2(p.y - r.cy, p.x - r.cx);
+    const now = performance.now() / 1000;
+    let dAng = ang - r.lastAng;
+    while (dAng > Math.PI) dAng -= Math.PI * 2;
+    while (dAng < -Math.PI) dAng += Math.PI * 2;
+    const dt = Math.max(0.001, now - r.lastT);
+    // Direct drive + flick impulse from angular velocity of the finger.
+    r.angle += dAng;
+    const flick = dAng / dt;
+    r.omega = Clamp(r.omega * 0.35 + flick * 0.65, -ROULETTE_MAX_OMEGA, ROULETTE_MAX_OMEGA);
+    if (Math.abs(r.omega) > 0.5 || Math.abs(dAng) > 0.02) r.hasSpun = true;
+    r.lastAng = ang;
+    r.lastT = now;
+  }
+
+  OnCanvasPointerUp(ev) {
+    const r = this.roulette;
+    if (!r || ev.pointerId !== r.pointerId) return;
+    r.dragging = false;
+    r.pointerId = null;
+    r.lastAng = null;
+  }
+
+  RouletteKick(amount) {
+    const r = this.roulette;
+    if (!r || r.phase !== "spin" || r.dragging) return;
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    r.omega = Clamp(r.omega + dir * amount, -ROULETTE_MAX_OMEGA, ROULETTE_MAX_OMEGA);
+    r.hasSpun = true;
+    r.stillT = 0;
+    this.audio.Shoot();
+  }
+
+  UpdateRoulette(dt) {
+    const r = this.roulette;
+    if (!r) return;
+
+    if (r.phase === "result") {
+      r.resultT += dt;
+      if (r.resultT >= 1.35) this.CloseRoulette();
+      return;
+    }
+
+    if (!r.dragging) {
+      // Viscous + coulomb friction — real deceleration, no pre-chosen stop angle.
+      r.omega *= Math.exp(-ROULETTE_FRICTION * dt);
+      if (r.omega > 0) r.omega = Math.max(0, r.omega - ROULETTE_COULOMB * dt);
+      else if (r.omega < 0) r.omega = Math.min(0, r.omega + ROULETTE_COULOMB * dt);
+      r.angle += r.omega * dt;
+      if (Math.abs(r.omega) < ROULETTE_STOP) {
+        r.omega = 0;
+        if (r.hasSpun) {
+          r.stillT += dt;
+          if (r.stillT > 0.22) this.ResolveRoulette();
+        }
+      } else {
+        r.stillT = 0;
+        r.hasSpun = true;
+      }
+    } else {
+      r.stillT = 0;
+    }
+
+    if (this.buffToast) {
+      this.buffToast.ttl -= dt;
+      if (this.buffToast.ttl <= 0) this.buffToast = null;
+    }
+  }
+
+  /** Needle fixed at top; segment under it wins from current angle. */
+  RouletteIndexAtNeedle() {
+    const n = ROULETTE_SEGMENTS.length;
+    const slice = (Math.PI * 2) / n;
+    // Segment i is drawn from angle (i*slice + wheel.angle).
+    // Needle at -PI/2 (top). Find i where needle lies in that wedge.
+    let a = (-Math.PI / 2 - this.roulette.angle) % (Math.PI * 2);
+    if (a < 0) a += Math.PI * 2;
+    return Math.floor(a / slice) % n;
+  }
+
+  ResolveRoulette() {
+    const r = this.roulette;
+    if (!r || r.phase !== "spin") return;
+    const idx = this.RouletteIndexAtNeedle();
+    const seg = ROULETTE_SEGMENTS[idx];
+    r.phase = "result";
+    r.result = seg;
+    r.resultT = 0;
+    r.omega = 0;
+    r.dragging = false;
+    this.ApplyPowerup(seg.kind);
+  }
+
+  CloseRoulette() {
+    this.roulette = null;
+    if (this.state === "roulette") this.state = "playing";
+    this.lastTs = 0;
+    this.SyncTouchControlsVisibility();
   }
 
   ApplyPowerup(kind) {
@@ -1602,9 +1819,8 @@ class Game {
         if (p) {
           p.power = Math.min(3, p.power + 1);
           if (p.power >= 2) p.maxBullets = 2;
-          if (p.power >= 3) p.maxBullets = 2;
         }
-        this.ShowBuffToast("火力升级 ★");
+        this.ShowBuffToast("★ 火力升级");
         break;
       case POWER.gun:
         if (p) {
@@ -1618,61 +1834,119 @@ class Game {
         this.ShowBuffToast("额外生命 +1");
         break;
       case POWER.helmet:
-        if (p) p.protect = 8;
-        this.ShowBuffToast("护盾 8 秒");
+        if (p) p.protect = 10;
+        this.ShowBuffToast("护盾 10 秒");
         break;
       case POWER.clock:
-        this.freezeTimer = 8;
+        this.freezeTimer = 10;
         this.ShowBuffToast("敌军冻结");
         break;
       case POWER.bomb:
-        for (const e of this.enemies) {
-          if (e.alive && e.spawnFlash <= 0) {
-            e.hp = 0;
-            e.alive = false;
-            e.deathTimer = 0.01;
-            this.score += e.score;
-            this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1);
-          }
-        }
-        this.audio.Explode();
-        this.RenderEnemyIcons();
+        this.KillAllFieldEnemies();
         this.ShowBuffToast("全场爆破");
         break;
       case POWER.shovel:
-        this.shovelTimer = 12;
+        this.shovelTimer = 14;
         this.pendingFortRestore = false;
         this.FortifyBase(true);
         this.ShowBuffToast("总部钢墙加固");
         break;
       case POWER.antigrav:
-        this.antigravTimer = 10;
-        this.ShowBuffToast("反重力：炮弹往上飘！");
+        this.antigravTimer = 12;
+        this.ShowBuffToast("反重力！");
         break;
       case POWER.bounce:
-        this.bounceTimer = 12;
-        this.ShowBuffToast("弹跳弹：钢板也能弹！");
+        this.bounceTimer = 14;
+        this.ShowBuffToast("弹跳弹！");
         break;
       case POWER.meteor:
-        this.SpawnMeteorRain();
-        this.ShowBuffToast("陨石雨从天而降");
+        this.SpawnMeteorRain(8);
+        this.ShowBuffToast("陨石雨");
         break;
       case POWER.ghost:
-        this.ghostTimer = 8;
+        this.ghostTimer = 10;
         if (p) this.UnstickTank(p);
-        this.ShowBuffToast("幽灵：穿砖过水 8 秒");
+        this.ShowBuffToast("幽灵穿墙");
         break;
       case POWER.mirror:
-        this.mirrorTimer = 10;
-        this.ShowBuffToast("镜像炮：前后一起打");
+        this.mirrorTimer = 12;
+        this.ShowBuffToast("镜像炮");
         break;
       case POWER.magnet:
-        this.magnetTimer = 10;
-        this.ShowBuffToast("磁导：炮弹会拐弯追敌");
+        this.magnetTimer = 12;
+        this.ShowBuffToast("磁导追踪");
         break;
       case POWER.warp:
         this.WarpPlayer();
-        this.ShowBuffToast("闪现！");
+        this.ShowBuffToast("闪现");
+        break;
+      case POWER.nuke:
+        this.KillAllFieldEnemies();
+        this.NukeBricks();
+        if (p) p.protect = Math.max(p.protect, 4);
+        this.ShowBuffToast("☢ 核爆：清场+掀砖");
+        break;
+      case POWER.overdrive:
+        if (p) {
+          p.power = 3;
+          p.maxBullets = 3;
+        }
+        this.overdriveTimer = 16;
+        this.bounceTimer = Math.max(this.bounceTimer, 8);
+        this.magnetTimer = Math.max(this.magnetTimer, 8);
+        this.ShowBuffToast("超武：三联装疯射 16 秒");
+        break;
+      case POWER.apocalypse:
+        this.freezeTimer = 12;
+        this.KillAllFieldEnemies();
+        this.SpawnMeteorRain(12);
+        this.FortifyBase(true);
+        this.shovelTimer = Math.max(this.shovelTimer, 10);
+        if (p) {
+          p.power = 3;
+          p.maxBullets = 3;
+          p.protect = 12;
+        }
+        this.ShowBuffToast("天罚降临！！");
+        break;
+      case POWER.juggernaut:
+        if (p) {
+          p.power = Math.max(p.power, 2);
+          p.maxBullets = Math.max(p.maxBullets, 2);
+          p.protect = 18;
+        }
+        this.ghostTimer = 14;
+        this.bounceTimer = 14;
+        this.magnetTimer = 14;
+        this.antigravTimer = 6;
+        this.ShowBuffToast("霸体：几乎无敌的 14 秒");
+        break;
+      case POWER.spawnExtra:
+        this.ForceSpawnExtras(4);
+        this.ShowBuffToast("⚠ 敌军援军 ×4");
+        break;
+      case POWER.enemyShield:
+        for (const e of this.enemies) {
+          if (e.alive) e.protect = Math.max(e.protect || 0, 14);
+        }
+        this.ShowBuffToast("⚠ 全员敌盾");
+        break;
+      case POWER.heavyCurse:
+        this.heavyCurseTimer = 14;
+        this.antigravTimer = 0;
+        this.ShowBuffToast("⚠ 超重诅咒：弹更坠");
+        break;
+      case POWER.enemyRage:
+        this.enemyRageTimer = 12;
+        this.ShowBuffToast("⚠ 敌军狂暴");
+        break;
+      case POWER.softStun:
+        this.playerStunTimer = 2.8;
+        this.ShowBuffToast("⚠ 眩晕！动不了");
+        break;
+      case POWER.fortBreak:
+        this.BreakBaseFort();
+        this.ShowBuffToast("⚠ 堡垒崩塌");
         break;
       default:
         break;
@@ -1680,25 +1954,105 @@ class Game {
     this.UpdateHud();
   }
 
-  SpawnMeteorRain() {
+  KillAllFieldEnemies() {
+    for (const e of this.enemies) {
+      if (e.alive && e.spawnFlash <= 0) {
+        e.hp = 0;
+        e.alive = false;
+        e.deathTimer = 0.01;
+        this.score += e.score;
+        this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1.1);
+      }
+    }
+    this.audio.Explode();
+    this.RenderEnemyIcons();
+  }
+
+  NukeBricks() {
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        if (this.map[y][x] === TILE_BRICK && Math.random() < 0.55) this.map[y][x] = TILE_EMPTY;
+      }
+    }
+  }
+
+  BreakBaseFort() {
+    const cells = [
+      [11, 23], [12, 23], [13, 23], [14, 23],
+      [11, 24], [14, 24],
+      [11, 25], [14, 25],
+    ];
+    for (const [x, y] of cells) {
+      if (this.map[y][x] === TILE_BRICK || this.map[y][x] === TILE_STEEL) this.map[y][x] = TILE_EMPTY;
+    }
+    this.shovelTimer = 0;
+    this.pendingFortRestore = false;
+  }
+
+  ForceSpawnExtras(n) {
+    for (let i = 0; i < n; i++) {
+      const type = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
+      this.spawnQueue.unshift(type);
+    }
+    this.totalEnemies += n;
+    // Try to dump them onto the field beyond the usual cap.
+    for (let i = 0; i < n; i++) this.TrySpawnEnemyForced();
+    this.RenderEnemyIcons();
+    this.UpdateHud();
+  }
+
+  TrySpawnEnemyForced() {
+    if (!this.spawnQueue.length) return;
+    const slot = this.spawnSlots[this.nextSpawnSlot % this.spawnSlots.length];
+    this.nextSpawnSlot++;
+    const type = this.spawnQueue.shift();
+    const enemy = {
+      x: slot.x + 2,
+      y: slot.y + 2,
+      w: TANK_SIZE,
+      h: TANK_SIZE,
+      dir: "down",
+      speed: type.speed,
+      hp: type.hp,
+      maxHp: type.hp,
+      score: type.score,
+      shootCd: type.shootCd,
+      bulletBoost: type.bulletBoost || 1,
+      typeId: type.id,
+      texture: type.texture,
+      alive: true,
+      fireCd: 0.4,
+      aiTimer: 0.2,
+      spawnFlash: 0.35,
+      protect: 0,
+      dropsPower: Math.random() < POWER_DROP_RATE,
+      deathTimer: 0,
+      animTick: 0,
+      moving: false,
+    };
+    this.enemies.push(enemy);
+    this.UnstickTank(enemy);
+  }
+
+  SpawnMeteorRain(count = 6) {
     const owner = this.player;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < count; i++) {
       const x = 24 + Math.random() * (CANVAS_W - 48);
       this.bullets.push({
         x,
-        y: -30 - i * 18,
+        y: -30 - i * 14,
         w: 10,
         h: 10,
-        vx: (Math.random() - 0.5) * 60,
-        vy: 40 + Math.random() * 40,
+        vx: (Math.random() - 0.5) * 70,
+        vy: 50 + Math.random() * 50,
         alive: true,
         owner,
         isPlayer: true,
         power: Math.max(2, owner?.power || 2),
         trail: [],
-        arm: 0.35,
+        arm: 0.3,
         traveled: 0,
-        gravityMul: 2.2,
+        gravityMul: 2.4,
         bounceLeft: 0,
         homing: false,
         meteor: true,
@@ -1723,7 +2077,6 @@ class Game {
         candidates.push({ x: x * TILE + 2, y: y * TILE + 2 });
       }
     }
-    // Prefer spots away from current position.
     const far = candidates.filter((c) => Math.hypot(c.x - p.x, c.y - p.y) > 80);
     const pool = far.length ? far : candidates;
     if (!pool.length) return;
@@ -1965,6 +2318,7 @@ class Game {
     // gravity hint arc when aiming sideways/up (playing only)
     if (this.state === "playing" && this.player?.alive) this.DrawAimGhost(ctx);
     this.DrawBuffHud(ctx);
+    if (this.state === "roulette") this.DrawRoulette(ctx);
   }
 
   /** Classic Battle City curtain: grey shutters + STAGE N. */
@@ -2134,7 +2488,7 @@ class Game {
       ctx.strokeRect(tank.x + 1, tank.y + 1, tank.w - 2, tank.h - 2);
     }
 
-    if (isPlayer && tank.protect > 0) {
+    if (tank.protect > 0) {
       const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 4) % 2];
       this.BlitGrid(ctx, sx, sy, tank.x, tank.y, tank.w, tank.h);
     }
@@ -2211,30 +2565,135 @@ class Game {
 
   DrawPowerup(ctx, pu) {
     if (pu.ttl < 3 && Math.floor(pu.blink * 6) % 2 === 0) return;
-    const style = POWER_STYLE[pu.kind] || POWER_STYLE.star;
-    const isClassic = POWER_SHEET[pu.kind];
-    if (isClassic && !FUN_POWERS.includes(pu.kind)) {
-      const [gx, gy] = POWER_SHEET[pu.kind];
-      this.BlitGrid(ctx, gx, gy, pu.x, pu.y, 28, 28);
-      return;
-    }
-    // Fun / fallback: chunky labeled token
-    const pulse = 1 + 0.06 * Math.sin(this.frame * 0.25);
+    // Generic roulette token
+    const pulse = 1 + 0.08 * Math.sin(this.frame * 0.3);
     const s = 28 * pulse;
     const ox = pu.x + 14 - s / 2;
     const oy = pu.y + 14 - s / 2;
-    ctx.fillStyle = style.bg;
-    ctx.fillRect(ox, oy, s, s);
-    ctx.strokeStyle = style.color;
+    ctx.fillStyle = "#2a2410";
+    ctx.beginPath();
+    ctx.arc(ox + s / 2, oy + s / 2, s / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#ffe08a";
     ctx.lineWidth = 2;
-    ctx.strokeRect(ox + 1, oy + 1, s - 2, s - 2);
-    ctx.fillStyle = style.color;
-    ctx.font = "bold 11px monospace";
+    ctx.beginPath();
+    ctx.arc(ox + s / 2, oy + s / 2, s / 2 - 1, 0, Math.PI * 2);
+    ctx.stroke();
+    // spinning spokes hint
+    ctx.save();
+    ctx.translate(ox + s / 2, oy + s / 2);
+    ctx.rotate(this.frame * 0.12);
+    ctx.strokeStyle = "rgba(255,200,80,0.7)";
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 4);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -s * 0.35);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = "#ffe08a";
+    ctx.font = "bold 14px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(style.label, ox + s / 2, oy + s / 2 + 1);
+    ctx.fillText("?", ox + s / 2, oy + s / 2 + 1);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
+  }
+
+  DrawRoulette(ctx) {
+    const r = this.roulette;
+    if (!r) return;
+    const n = ROULETTE_SEGMENTS.length;
+    const slice = (Math.PI * 2) / n;
+
+    ctx.fillStyle = "rgba(0,0,0,0.62)";
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Wheel
+    ctx.save();
+    ctx.translate(r.cx, r.cy);
+    ctx.rotate(r.angle);
+    for (let i = 0; i < n; i++) {
+      const seg = ROULETTE_SEGMENTS[i];
+      const a0 = i * slice;
+      const a1 = a0 + slice;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r.radius, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = seg.bg;
+      ctx.fill();
+      ctx.strokeStyle = seg.tier === "ultra" ? "#ffe080" : seg.tier === "bad" ? "#ff6060" : "#888";
+      ctx.lineWidth = seg.tier === "ultra" ? 2.5 : 1;
+      ctx.stroke();
+
+      // label
+      ctx.save();
+      ctx.rotate(a0 + slice / 2);
+      ctx.fillStyle = seg.color;
+      ctx.font = "bold 13px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(seg.label, r.radius * 0.62, 4);
+      ctx.restore();
+    }
+    // hub
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fill();
+    ctx.strokeStyle = "#ffe08a";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // Fixed needle at top
+    ctx.fillStyle = "#ffe08a";
+    ctx.beginPath();
+    ctx.moveTo(r.cx, r.cy - r.radius - 4);
+    ctx.lineTo(r.cx - 10, r.cy - r.radius - 22);
+    ctx.lineTo(r.cx + 10, r.cy - r.radius - 22);
+    ctx.closePath();
+    ctx.fill();
+
+    // rim
+    ctx.strokeStyle = "#c0c0c0";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(r.cx, r.cy, r.radius + 2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff8e0";
+    ctx.font = "bold 16px monospace";
+    ctx.textAlign = "center";
+    if (r.phase === "spin") {
+      const moving = Math.abs(r.omega) > 0.2 || r.dragging;
+      ctx.fillText(moving ? "减速中…转到哪算哪" : "拖动甩转 / 空格加力", r.cx, 28);
+      ctx.font = "12px monospace";
+      ctx.fillStyle = "#c0c0c0";
+      ctx.fillText(`角速度 ${r.omega.toFixed(1)} rad/s`, r.cx, 48);
+    } else if (r.result) {
+      const tier = r.result.tier === "ultra" ? "超强！" : r.result.tier === "bad" ? "负面！" : "获得";
+      ctx.fillStyle = r.result.color;
+      ctx.font = "bold 22px monospace";
+      ctx.fillText(`${tier} ${r.result.label}`, r.cx, 36);
+    }
+    ctx.textAlign = "left";
+
+    if (this.buffToast) {
+      const alpha = Clamp(this.buffToast.ttl / 0.4, 0, 1);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      const msg = this.buffToast.text;
+      ctx.font = "bold 14px monospace";
+      const tw = ctx.measureText(msg).width + 20;
+      ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H - 48, tw, 24);
+      ctx.fillStyle = "#ffe08a";
+      ctx.textAlign = "center";
+      ctx.fillText(msg, CANVAS_W / 2, CANVAS_H - 31);
+      ctx.textAlign = "left";
+      ctx.globalAlpha = 1;
+    }
   }
 
   DrawBuffHud(ctx) {
@@ -2244,6 +2703,10 @@ class Game {
     if (this.ghostTimer > 0) chips.push({ t: `幽 ${Math.ceil(this.ghostTimer)}`, c: "#d0a0ff" });
     if (this.mirrorTimer > 0) chips.push({ t: `镜 ${Math.ceil(this.mirrorTimer)}`, c: "#a0ffe0" });
     if (this.magnetTimer > 0) chips.push({ t: `磁 ${Math.ceil(this.magnetTimer)}`, c: "#ff90a0" });
+    if (this.overdriveTimer > 0) chips.push({ t: `超武 ${Math.ceil(this.overdriveTimer)}`, c: "#ffe080" });
+    if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#d08060" });
+    if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff4020" });
+    if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#d0d0d0" });
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#7ec8ff" });
 
     let x = 6;
@@ -2257,7 +2720,7 @@ class Game {
       x += w + 4;
     }
 
-    if (this.buffToast) {
+    if (this.buffToast && this.state !== "roulette") {
       const alpha = Clamp(this.buffToast.ttl / 0.4, 0, 1);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = "rgba(0,0,0,0.65)";
