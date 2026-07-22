@@ -278,6 +278,7 @@ class Game {
       enemyFast: "assets/Texture_TankEnemyFast.png",
       enemyPower: "assets/Texture_TankEnemyPower.png",
       enemyArmor: "assets/Texture_TankEnemyArmor.png",
+      enemyAlt: "assets/Texture_TankEnemyAlt.png",
       bulletPlayer: "assets/Texture_BulletPlayer.png",
       bulletEnemy: "assets/Texture_BulletEnemy.png",
       bush: "assets/Texture_Bush.png",
