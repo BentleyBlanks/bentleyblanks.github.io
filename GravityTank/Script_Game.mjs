@@ -148,6 +148,18 @@ const POWER_SHEET = {
   life: [42, 14],
   gun: [40, 14],
 };
+/** Custom (non-classic) power icons — Battle City–style generated sprites. */
+const POWER_ICON_IMG = {
+  token: "powerToken",
+  nuke: "powerNuke",
+  overdrive: "powerOverdrive",
+  apocalypse: "powerApocalypse",
+  juggernaut: "powerJuggernaut",
+  spawnExtra: "powerSpawnExtra",
+  enemyShield: "powerEnemyShield",
+  heavyCurse: "powerHeavyCurse",
+  enemyRage: "powerEnemyRage",
+};
 const FX_SHEET = {
   spawn: [
     [32, 12],
@@ -511,9 +523,40 @@ class Game {
   }
 
   async LoadAssets() {
+    const load = (src) => LoadImage(src).catch((err) => {
+      console.warn("asset miss", src, err);
+      return null;
+    });
     this.images = {
-      sheet: await LoadImage("assets/Texture_ClassicSheet.png"),
+      sheet: await load("assets/Texture_ClassicSheet.png"),
+      powerToken: await load("assets/Texture_PowerToken.png"),
+      rouletteWheel: await load("assets/Texture_UiRouletteWheel.png"),
+      rouletteNeedle: await load("assets/Texture_UiRouletteNeedle.png"),
+      powerNuke: await load("assets/Texture_PowerNuke.png"),
+      powerOverdrive: await load("assets/Texture_PowerOverdrive.png"),
+      powerApocalypse: await load("assets/Texture_PowerApocalypse.png"),
+      powerJuggernaut: await load("assets/Texture_PowerJuggernaut.png"),
+      powerSpawnExtra: await load("assets/Texture_PowerSpawnExtra.png"),
+      powerEnemyShield: await load("assets/Texture_PowerEnemyShield.png"),
+      powerHeavyCurse: await load("assets/Texture_PowerHeavyCurse.png"),
+      powerEnemyRage: await load("assets/Texture_PowerEnemyRage.png"),
     };
+  }
+
+  /** Draw a power icon (custom texture or classic sheet cell) centered at (cx,cy). */
+  DrawPowerIcon(ctx, kind, cx, cy, size = 16) {
+    const key = POWER_ICON_IMG[kind];
+    const img = key ? this.images[key] : null;
+    if (img) {
+      ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
+      return true;
+    }
+    const cell = POWER_SHEET[kind];
+    if (cell) {
+      this.BlitGrid(ctx, cell[0], cell[1], cx - size / 2, cy - size / 2, size, size);
+      return true;
+    }
+    return false;
   }
 
   /** Blit a grid-aligned 16×16 (or larger) sprite from the classic sheet. */
@@ -2629,38 +2672,27 @@ class Game {
 
   DrawPowerup(ctx, pu) {
     if (pu.ttl < 3 && Math.floor(pu.blink * 6) % 2 === 0) return;
-    // Generic roulette token
-    const pulse = 1 + 0.08 * Math.sin(this.frame * 0.3);
-    const s = 28 * pulse;
-    const ox = pu.x + 14 - s / 2;
-    const oy = pu.y + 14 - s / 2;
-    ctx.fillStyle = "#2a2410";
-    ctx.beginPath();
-    ctx.arc(ox + s / 2, oy + s / 2, s / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#ffe08a";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(ox + s / 2, oy + s / 2, s / 2 - 1, 0, Math.PI * 2);
-    ctx.stroke();
-    // spinning spokes hint
-    ctx.save();
-    ctx.translate(ox + s / 2, oy + s / 2);
-    ctx.rotate(this.frame * 0.12);
-    ctx.strokeStyle = "rgba(255,200,80,0.7)";
-    for (let i = 0; i < 4; i++) {
-      ctx.rotate(Math.PI / 4);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(0, -s * 0.35);
-      ctx.stroke();
+    const pulse = 1 + 0.06 * Math.sin(this.frame * 0.28);
+    const s = Math.round(26 * pulse);
+    const cx = pu.x + TILE / 2;
+    const cy = pu.y + TILE / 2;
+    const token = this.images.powerToken;
+    if (token) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(token, cx - s / 2, cy - s / 2, s, s);
+      return;
     }
-    ctx.restore();
-    ctx.fillStyle = "#ffe08a";
-    ctx.font = "bold 14px monospace";
+    // Fallback classic-framed "?"
+    ctx.fillStyle = "#000";
+    ctx.fillRect(cx - s / 2, cy - s / 2, s, s);
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - s / 2 + 1, cy - s / 2 + 1, s - 2, s - 2);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 16px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("?", ox + s / 2, oy + s / 2 + 1);
+    ctx.fillText("?", cx, cy + 1);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
   }
@@ -2673,45 +2705,45 @@ class Game {
     const needleIdx = this.RouletteIndexAtNeedle();
     const under = ROULETTE_SEGMENTS[needleIdx];
     const focus = r.phase === "result" && r.result ? r.result : under;
+    ctx.imageSmoothingEnabled = false;
 
-    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // === Focus banner (the one thing that matters) ===
-    const bannerY = 10;
-    const bannerH = 58;
-    ctx.fillStyle = focus.tier === "ultra" ? "rgba(120,40,10,0.92)"
-      : focus.tier === "bad" ? "rgba(80,10,10,0.92)"
-        : "rgba(20,40,28,0.92)";
-    ctx.fillRect(18, bannerY, CANVAS_W - 36, bannerH);
-    ctx.strokeStyle = focus.color;
+    const bannerY = 8;
+    const bannerH = 56;
+    ctx.fillStyle = "#101010";
+    ctx.fillRect(16, bannerY, CANVAS_W - 32, bannerH);
+    ctx.strokeStyle = "#a8a8a8";
     ctx.lineWidth = 3;
-    ctx.strokeRect(18, bannerY, CANVAS_W - 36, bannerH);
+    ctx.strokeRect(16, bannerY, CANVAS_W - 32, bannerH);
+    ctx.strokeStyle = focus.tier === "ultra" ? "#f0d060" : focus.tier === "bad" ? "#e04040" : "#e8e8e8";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(20, bannerY + 4, CANVAS_W - 40, bannerH - 8);
 
-    ctx.textAlign = "center";
+    this.DrawPowerIcon(ctx, focus.kind, 48, bannerY + bannerH / 2, 28);
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    if (r.phase === "spin") {
-      ctx.fillStyle = "#c8c8c8";
-      ctx.font = "bold 11px monospace";
-      ctx.fillText("▼ 指针指向", CANVAS_W / 2, bannerY + 14);
-      ctx.fillStyle = focus.color;
-      ctx.font = "bold 26px monospace";
-      const tierTag = focus.tier === "ultra" ? "【超强】" : focus.tier === "bad" ? "【负面】" : "";
-      ctx.fillText(`${tierTag}${focus.label}`, CANVAS_W / 2, bannerY + 38);
-    } else {
-      const tier = focus.tier === "ultra" ? "超强命中！" : focus.tier === "bad" ? "负面命中！" : "获得";
-      ctx.fillStyle = focus.color;
-      ctx.font = "bold 13px monospace";
-      ctx.fillText(tier, CANVAS_W / 2, bannerY + 14);
-      ctx.font = "bold 28px monospace";
-      ctx.fillText(focus.label, CANVAS_W / 2, bannerY + 40);
-    }
+    ctx.fillStyle = "#a0a0a0";
+    ctx.font = "bold 10px monospace";
+    ctx.fillText(r.phase === "spin" ? "NEEDLE" : "HIT", 72, bannerY + 16);
+    ctx.fillStyle = focus.color;
+    ctx.font = "bold 20px monospace";
+    const tierTag = focus.tier === "ultra" ? "ULTRA " : focus.tier === "bad" ? "BAD " : "";
+    ctx.fillText(`${tierTag}${focus.label}`, 72, bannerY + 38);
     ctx.textBaseline = "alphabetic";
 
-    // Wheel
+    const wheelImg = this.images.rouletteWheel;
     ctx.save();
     ctx.translate(r.cx, r.cy);
     ctx.rotate(r.angle);
+    if (wheelImg) {
+      const diam = r.radius * 2 + 8;
+      ctx.globalAlpha = 0.35;
+      ctx.drawImage(wheelImg, -diam / 2, -diam / 2, diam, diam);
+      ctx.globalAlpha = 1;
+    }
+
     for (let i = 0; i < n; i++) {
       const seg = ROULETTE_SEGMENTS[i];
       const a0 = i * slice;
@@ -2721,112 +2753,91 @@ class Game {
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, r.radius, a0, a1);
       ctx.closePath();
-      ctx.fillStyle = isFocus ? seg.color : seg.bg;
-      if (isFocus) ctx.globalAlpha = 0.88;
+      ctx.fillStyle = isFocus ? seg.bg : "#080808";
+      ctx.globalAlpha = isFocus ? 0.95 : 0.82;
       ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = seg.tier === "ultra" ? "#ffe080" : seg.tier === "bad" ? "#ff6060" : "#666";
-      ctx.lineWidth = isFocus ? 3.5 : seg.tier === "ultra" ? 2.2 : 1;
+      ctx.strokeStyle = isFocus ? seg.color : (seg.tier === "ultra" ? "#806010" : seg.tier === "bad" ? "#601010" : "#303030");
+      ctx.lineWidth = isFocus ? 3 : 1;
       ctx.stroke();
 
       ctx.save();
       ctx.rotate(a0 + slice / 2);
-      ctx.fillStyle = isFocus ? "#101010" : seg.color;
-      ctx.font = isFocus ? "bold 15px monospace" : seg.tier === "ultra" ? "bold 13px monospace" : "bold 12px monospace";
+      const iconR = r.radius * 0.62;
+      this.DrawPowerIcon(ctx, seg.kind, 0, -iconR, isFocus ? 22 : 16);
+      ctx.fillStyle = isFocus ? "#ffffff" : seg.color;
+      ctx.font = isFocus ? "bold 11px monospace" : "bold 9px monospace";
       ctx.textAlign = "center";
-      ctx.fillText(seg.label, r.radius * 0.62, 4);
-      if (seg.tier === "ultra" && !isFocus) {
-        ctx.fillStyle = "#ffe080";
-        ctx.font = "bold 9px monospace";
-        ctx.fillText("超", r.radius * 0.88, 3);
-      } else if (seg.tier === "bad" && !isFocus) {
-        ctx.fillStyle = "#ff8080";
-        ctx.font = "bold 9px monospace";
-        ctx.fillText("负", r.radius * 0.88, 3);
-      }
+      ctx.fillText(seg.label, 0, -iconR + 18);
       ctx.restore();
     }
-    // hub
+
     ctx.beginPath();
-    ctx.arc(0, 0, 26, 0, Math.PI * 2);
-    ctx.fillStyle = "#121212";
+    ctx.arc(0, 0, 24, 0, Math.PI * 2);
+    ctx.fillStyle = "#181818";
     ctx.fill();
-    ctx.strokeStyle = focus.color;
+    ctx.strokeStyle = "#c0c0c0";
     ctx.lineWidth = 3;
     ctx.stroke();
-    ctx.fillStyle = focus.color;
-    ctx.font = "bold 11px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(focus.tier === "ultra" ? "超" : focus.tier === "bad" ? "负" : "奖", 0, 4);
+    this.DrawPowerIcon(ctx, focus.kind, 0, 0, 20);
     ctx.restore();
 
-    // Fixed needle at top — bigger, high-contrast
     const ny = r.cy - r.radius;
-    ctx.fillStyle = "#101010";
-    ctx.beginPath();
-    ctx.moveTo(r.cx, ny - 2);
-    ctx.lineTo(r.cx - 14, ny - 28);
-    ctx.lineTo(r.cx + 14, ny - 28);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#ffe08a";
-    ctx.beginPath();
-    ctx.moveTo(r.cx, ny);
-    ctx.lineTo(r.cx - 12, ny - 24);
-    ctx.lineTo(r.cx + 12, ny - 24);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    const needle = this.images.rouletteNeedle;
+    if (needle) {
+      ctx.drawImage(needle, r.cx - 16, ny - 40, 32, 48);
+    } else {
+      ctx.fillStyle = "#f0d060";
+      ctx.beginPath();
+      ctx.moveTo(r.cx, ny);
+      ctx.lineTo(r.cx - 12, ny - 24);
+      ctx.lineTo(r.cx + 12, ny - 24);
+      ctx.closePath();
+      ctx.fill();
+    }
 
-    // rim + focus arc glow
-    ctx.strokeStyle = "#d0d0d0";
+    ctx.strokeStyle = "#b0b0b0";
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.arc(r.cx, r.cy, r.radius + 2, 0, Math.PI * 2);
     ctx.stroke();
-
-    // Highlight the needle wedge on the rim
     ctx.save();
     ctx.translate(r.cx, r.cy);
     const aFocus0 = needleIdx * slice + r.angle;
     ctx.strokeStyle = focus.color;
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.arc(0, 0, r.radius + 6, aFocus0, aFocus0 + slice);
     ctx.stroke();
     ctx.restore();
 
-    ctx.fillStyle = "#d8d8d8";
-    ctx.font = "11px monospace";
+    ctx.fillStyle = "#a8a8a8";
+    ctx.font = "10px monospace";
     ctx.textAlign = "center";
     if (r.phase === "spin") {
       const moving = Math.abs(r.omega) > 0.2 || r.dragging;
-      ctx.fillText(moving ? "减速中…转到哪算哪" : "拖动甩转 / 空格加力", r.cx, CANVAS_H - 28);
-      ctx.fillStyle = "#888";
-      ctx.fillText(`ω ${r.omega.toFixed(1)}`, r.cx, CANVAS_H - 12);
+      ctx.fillText(moving ? "SPIN..." : "DRAG / SPACE", r.cx, CANVAS_H - 22);
     } else {
       ctx.fillStyle = focus.color;
       ctx.font = "bold 12px monospace";
-      ctx.fillText("生效中…", r.cx, CANVAS_H - 18);
+      ctx.fillText("GET!", r.cx, CANVAS_H - 22);
     }
     ctx.textAlign = "left";
 
     if (this.buffToast) {
       const alpha = Clamp(this.buffToast.ttl / 0.4, 0, 1);
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = "rgba(0,0,0,0.78)";
       const msg = this.buffToast.text;
-      ctx.font = "bold 15px monospace";
+      ctx.font = "bold 13px monospace";
       const tw = Math.min(CANVAS_W - 24, ctx.measureText(msg).width + 24);
-      ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H - 56, tw, 28);
-      ctx.strokeStyle = focus.color;
+      ctx.fillStyle = "#000";
+      ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H - 52, tw, 26);
+      ctx.strokeStyle = "#c0c0c0";
       ctx.lineWidth = 2;
-      ctx.strokeRect((CANVAS_W - tw) / 2, CANVAS_H - 56, tw, 28);
-      ctx.fillStyle = "#ffe08a";
+      ctx.strokeRect((CANVAS_W - tw) / 2, CANVAS_H - 52, tw, 26);
+      ctx.fillStyle = "#f0d060";
       ctx.textAlign = "center";
-      ctx.fillText(msg, CANVAS_W / 2, CANVAS_H - 37);
+      ctx.fillText(msg, CANVAS_W / 2, CANVAS_H - 34);
       ctx.textAlign = "left";
       ctx.globalAlpha = 1;
     }
