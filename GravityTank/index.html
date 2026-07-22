@@ -44,6 +44,16 @@
       <div id="pauseOverlay" class="overlay" hidden>
         <h2>暂停</h2>
         <p>点击继续，或再按暂停</p>
+        <div class="pause-audio">
+          <label class="vol-row">
+            <span>音乐</span>
+            <input id="bgmVolumePause" type="range" min="0" max="100" value="45" aria-label="音乐音量">
+          </label>
+          <label class="vol-row">
+            <span>音效</span>
+            <input id="sfxVolumePause" type="range" min="0" max="100" value="70" aria-label="音效音量">
+          </label>
+        </div>
         <button id="resumeButton" class="primary" type="button">继续</button>
       </div>
       <div id="endOverlay" class="overlay" hidden>
@@ -71,6 +81,21 @@
     </div>
 
     <aside class="side">
+      <div class="panel panel-audio">
+        <h3>声音</h3>
+        <label class="vol-row">
+          <span>音乐</span>
+          <input id="bgmVolume" type="range" min="0" max="100" value="45" aria-label="音乐音量">
+          <b id="bgmVolumeValue">45</b>
+        </label>
+        <label class="vol-row">
+          <span>音效</span>
+          <input id="sfxVolume" type="range" min="0" max="100" value="70" aria-label="音效音量">
+          <b id="sfxVolumeValue">70</b>
+        </label>
+        <label class="mute-row"><input id="muteToggle" type="checkbox"> 静音</label>
+      </div>
+
       <div class="panel panel-stats">
         <h3>战况</h3>
         <div class="stat-row"><span>关卡</span><b>1</b></div>
@@ -106,9 +131,9 @@
         <p class="feature" style="color:#c3d0b6">砖墙可打、钢墙需三星、水域不可通行、草丛遮蔽、冰块打滑、老鹰总部、四类敌军、七种道具（星/炸弹/时钟/铲子/头盔/坦克/枪）。</p>
       </div>
 
-      <p class="credit">坦克与特效素材：<a href="https://kenney.nl/assets/top-down-tanks-redux" target="_blank" rel="noopener">Kenney Top-down Tanks Redux</a>（CC0）。音效为开源坦克大战复刻风格 8-bit WAV（MIT，StefanBS/battle-city-clone）。地形与 UI 为经典坦克大战风格自绘。</p>
+      <p class="credit">坦克与特效素材：<a href="https://kenney.nl/assets/top-down-tanks-redux" target="_blank" rel="noopener">Kenney Top-down Tanks Redux</a>（CC0）。音效为开源坦克大战复刻风格 8-bit WAV（MIT）。BGM 为本页生成的经典 8-bit 关卡循环。地形与 UI 为经典坦克大战风格自绘。</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=facing1"></script>
+  <script type="module" src="./Script_Game.mjs?v=audio2"></script>
 </body>
 </html>

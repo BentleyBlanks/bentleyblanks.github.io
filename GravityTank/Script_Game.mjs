@@ -169,8 +169,14 @@ class AudioBus {
     this.enabled = true;
     this.buffers = {};
     this.engineNode = null;
-    this.engineGain = null;
     this.powerSpawnNode = null;
+    this.bgmNode = null;
+    this.sfxGain = null;
+    this.bgmGain = null;
+    this.masterGain = null;
+    this.sfxVolume = 0.7;
+    this.bgmVolume = 0.45;
+    this.muted = false;
     this.ready = false;
   }
 
@@ -188,9 +194,11 @@ class AudioBus {
       pause: "assets/AudioSfx_Pause.wav",
       ice: "assets/AudioSfx_Ice.wav",
       engine: "assets/AudioSfx_Engine.wav",
+      bgm: "assets/AudioBgm_Battle.wav",
     };
     const ctx = this.Ensure();
     if (!ctx) return;
+    this.EnsureGraph();
     await Promise.all(Object.entries(list).map(async ([key, src]) => {
       try {
         const res = await fetch(src);
@@ -213,13 +221,50 @@ class AudioBus {
     return this.ctx;
   }
 
-  Play(name, { gain = 0.45, loop = false, rate = 1 } = {}) {
-    if (!this.enabled) return null;
+  EnsureGraph() {
     const ctx = this.Ensure();
+    if (!ctx) return null;
+    if (!this.masterGain) {
+      this.masterGain = ctx.createGain();
+      this.sfxGain = ctx.createGain();
+      this.bgmGain = ctx.createGain();
+      this.sfxGain.connect(this.masterGain);
+      this.bgmGain.connect(this.masterGain);
+      this.masterGain.connect(ctx.destination);
+      this.ApplyVolumes();
+    }
+    return ctx;
+  }
+
+  ApplyVolumes() {
+    if (!this.sfxGain || !this.bgmGain || !this.masterGain) return;
+    this.sfxGain.gain.value = this.sfxVolume;
+    this.bgmGain.gain.value = this.bgmVolume;
+    this.masterGain.gain.value = this.muted ? 0 : 1;
+  }
+
+  SetSfxVolume(v) {
+    this.sfxVolume = Clamp(v, 0, 1);
+    this.ApplyVolumes();
+  }
+
+  SetBgmVolume(v) {
+    this.bgmVolume = Clamp(v, 0, 1);
+    this.ApplyVolumes();
+  }
+
+  SetMuted(muted) {
+    this.muted = !!muted;
+    this.ApplyVolumes();
+  }
+
+  Play(name, { gain = 0.45, loop = false, rate = 1, bus = "sfx" } = {}) {
+    if (!this.enabled) return null;
+    const ctx = this.EnsureGraph();
     if (!ctx) return null;
     const buffer = this.buffers[name];
     if (!buffer) {
-      this.ToneFallback(name);
+      if (bus === "sfx") this.ToneFallback(name);
       return null;
     }
     const src = ctx.createBufferSource();
@@ -229,14 +274,14 @@ class AudioBus {
     src.playbackRate.value = rate;
     g.gain.value = gain;
     src.connect(g);
-    g.connect(ctx.destination);
+    g.connect(bus === "bgm" ? this.bgmGain : this.sfxGain);
     src.start();
     return { src, g };
   }
 
   Tone(freq, dur, type = "square", gain = 0.04, slide = 0) {
     if (!this.enabled) return;
-    const ctx = this.Ensure();
+    const ctx = this.EnsureGraph();
     if (!ctx) return;
     const t0 = ctx.currentTime;
     const osc = ctx.createOscillator();
@@ -247,7 +292,7 @@ class AudioBus {
     g.gain.setValueAtTime(gain, t0);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     osc.connect(g);
-    g.connect(ctx.destination);
+    g.connect(this.sfxGain);
     osc.start(t0);
     osc.stop(t0 + dur + 0.02);
   }
@@ -285,16 +330,26 @@ class AudioBus {
     try { this.powerSpawnNode?.src?.stop(); } catch (_) { /* already stopped */ }
     this.powerSpawnNode = null;
   }
-  StageStart() { this.Play("stage", { gain: 0.45 }); }
+  StageStart() { this.Play("stage", { gain: 0.5 }); }
+  StartBgm() {
+    this.StopBgm();
+    this.bgmNode = this.Play("bgm", { gain: 0.55, loop: true, bus: "bgm" });
+  }
+  StopBgm() {
+    try { this.bgmNode?.src?.stop(); } catch (_) { /* already stopped */ }
+    this.bgmNode = null;
+  }
   Win() {
     this.StopEngine();
     this.StopPowerSpawn();
-    this.Play("victory", { gain: 0.5 });
+    this.StopBgm();
+    this.Play("victory", { gain: 0.55 });
   }
   Lose() {
     this.StopEngine();
     this.StopPowerSpawn();
-    this.Play("gameOver", { gain: 0.5 });
+    this.StopBgm();
+    this.Play("gameOver", { gain: 0.55 });
   }
   PauseBlip() { this.Play("pause", { gain: 0.4 }); }
   Ice() { this.Play("ice", { gain: 0.25 }); }
@@ -302,7 +357,7 @@ class AudioBus {
   SetEngine(on) {
     if (on) {
       if (this.engineNode) return;
-      this.engineNode = this.Play("engine", { gain: 0.18, loop: true });
+      this.engineNode = this.Play("engine", { gain: 0.16, loop: true });
     } else {
       this.StopEngine();
     }
@@ -455,6 +510,7 @@ class Game {
     });
 
     this.BindTouchControls();
+    this.BindVolumeControls();
 
     // Stop page scroll / pinch while interacting with the stage on mobile.
     const shell = document.querySelector(".stage-shell");
@@ -505,6 +561,48 @@ class Game {
     const show = this.isTouchDevice && (this.state === "playing" || this.state === "paused");
     if (this.touchUi.stickWrap) this.touchUi.stickWrap.hidden = !show;
     if (this.touchUi.actionsWrap) this.touchUi.actionsWrap.hidden = !show;
+  }
+
+  BindVolumeControls() {
+    const bgm = document.getElementById("bgmVolume");
+    const sfx = document.getElementById("sfxVolume");
+    const bgmPause = document.getElementById("bgmVolumePause");
+    const sfxPause = document.getElementById("sfxVolumePause");
+    const bgmVal = document.getElementById("bgmVolumeValue");
+    const sfxVal = document.getElementById("sfxVolumeValue");
+    const mute = document.getElementById("muteToggle");
+
+    const syncLabels = () => {
+      if (bgmVal) bgmVal.textContent = String(Math.round(this.audio.bgmVolume * 100));
+      if (sfxVal) sfxVal.textContent = String(Math.round(this.audio.sfxVolume * 100));
+      if (bgm) bgm.value = String(Math.round(this.audio.bgmVolume * 100));
+      if (sfx) sfx.value = String(Math.round(this.audio.sfxVolume * 100));
+      if (bgmPause) bgmPause.value = String(Math.round(this.audio.bgmVolume * 100));
+      if (sfxPause) sfxPause.value = String(Math.round(this.audio.sfxVolume * 100));
+      if (mute) mute.checked = this.audio.muted;
+    };
+
+    const onBgm = (ev) => {
+      this.audio.Ensure();
+      this.audio.SetBgmVolume(Number(ev.target.value) / 100);
+      syncLabels();
+    };
+    const onSfx = (ev) => {
+      this.audio.Ensure();
+      this.audio.SetSfxVolume(Number(ev.target.value) / 100);
+      syncLabels();
+    };
+
+    bgm?.addEventListener("input", onBgm);
+    sfx?.addEventListener("input", onSfx);
+    bgmPause?.addEventListener("input", onBgm);
+    sfxPause?.addEventListener("input", onSfx);
+    mute?.addEventListener("change", () => {
+      this.audio.Ensure();
+      this.audio.SetMuted(mute.checked);
+      syncLabels();
+    });
+    syncLabels();
   }
 
   BindTouchControls() {
@@ -659,7 +757,12 @@ class Game {
     this.audio.Ensure();
     this.audio.StopEngine();
     this.audio.StopPowerSpawn();
+    this.audio.StopBgm();
     this.audio.StageStart();
+    // Start looping battle BGM shortly after the stage jingle.
+    setTimeout(() => {
+      if (this.state === "playing") this.audio.StartBgm();
+    }, 1800);
   }
 
   BuildSpawnQueue() {
@@ -710,6 +813,7 @@ class Game {
       this.overlays.pause.hidden = false;
       this.ResetTouchInput();
       this.audio.StopEngine();
+      this.audio.StopBgm();
       this.audio.PauseBlip();
       this.SyncTouchControlsVisibility();
     } else if (!paused && this.state === "paused") {
@@ -718,6 +822,7 @@ class Game {
       this.lastTs = 0;
       this.ResetTouchInput();
       this.audio.PauseBlip();
+      this.audio.StartBgm();
       // If death timeout was skipped while paused, still respawn.
       if ((!this.player || !this.player.alive) && this.lives > 0 && this.respawnTimer <= 0) {
         this.respawnTimer = 0.05;
@@ -1683,15 +1788,11 @@ class Game {
       ctx.fillStyle = isPlayer ? "#c6b23a" : "#cfcfcf";
       ctx.fillRect(-tank.w / 2, -tank.h / 2, tank.w, tank.h);
     }
-    // silhouette ring so dark tanks read on dark ground
-    if (!isPlayer) {
-      ctx.strokeStyle = "rgba(255,255,255,0.55)";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(-tank.w / 2 + 1, -tank.h / 2 + 1, tank.w - 2, tank.h - 2);
-    }
+    // No fake outline — white ring looked like a protection shield.
     ctx.restore();
 
-    if (tank.protect > 0) {
+    // Only the player spawn/helmet shield should render.
+    if (isPlayer && tank.protect > 0) {
       ctx.save();
       ctx.strokeStyle = `hsla(${(this.frame * 8) % 360}, 90%, 60%, 0.85)`;
       ctx.lineWidth = 2;
