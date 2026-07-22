@@ -344,10 +344,6 @@ p.mobile-hint { display: none; }
   display: none !important;
 }
 
-.touch-controls-legacy {
-  display: none !important;
-}
-
 .touch-stick {
   display: flex;
   flex-direction: column;

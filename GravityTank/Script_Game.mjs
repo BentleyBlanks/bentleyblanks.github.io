@@ -364,13 +364,16 @@ class Game {
   }
 
   DetectTouchUi() {
+    const params = new URLSearchParams(location.search);
+    const forced = params.has("touch") || params.has("mobile");
     const coarse = window.matchMedia("(pointer: coarse)").matches;
     const noHover = window.matchMedia("(hover: none)").matches;
     const narrow = window.matchMedia("(max-width: 860px)").matches;
     const shortLandscape = window.matchMedia("(orientation: landscape) and (max-height: 560px)").matches;
     const touchPoints = navigator.maxTouchPoints > 0;
-    this.isTouchDevice = coarse || noHover || touchPoints || narrow || shortLandscape;
+    this.isTouchDevice = forced || coarse || noHover || touchPoints || narrow || shortLandscape;
     document.body.classList.toggle("is-touch", this.isTouchDevice);
+    document.body.classList.toggle("force-touch", forced);
     this.SyncTouchControlsVisibility();
   }
 
