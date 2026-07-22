@@ -941,6 +941,9 @@ class Game {
       isPlayer,
       power: isPlayer ? tank.power : (tank.typeId === "power" ? 2 : 1),
       trail: [],
+      // Short fuse so the muzzle doesn't instantly suicide; gravity arcs can still fall back.
+      arm: 0.22,
+      traveled: 0,
     };
     this.bullets.push(bullet);
     tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd;
@@ -953,8 +956,12 @@ class Game {
 
       // GRAVITY — the signature mechanic
       b.vy += GRAVITY * dt;
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
+      const stepX = b.vx * dt;
+      const stepY = b.vy * dt;
+      b.x += stepX;
+      b.y += stepY;
+      b.traveled += Math.hypot(stepX, stepY);
+      if (b.arm > 0) b.arm -= dt;
 
       b.trail.push({ x: b.x + 4, y: b.y + 4 });
       if (b.trail.length > 10) b.trail.shift();
@@ -967,26 +974,34 @@ class Game {
       // terrain hit
       if (this.BulletHitTerrain(b)) continue;
 
-      // tank hits
-      if (b.isPlayer) {
-        for (const e of this.enemies) {
-          if (!e.alive || e.spawnFlash > 0) continue;
-          if (RectsOverlap(b, e)) {
-            b.alive = false;
-            this.DamageEnemy(e, b.power);
-            break;
-          }
+      // Armed bullets can hit any tank, including the shooter (gravity self-kill).
+      const canSelfHit = b.arm <= 0 || b.traveled >= 36;
+
+      // hit enemies
+      for (const e of this.enemies) {
+        if (!e.alive || e.spawnFlash > 0) continue;
+        if (!canSelfHit && e === b.owner) continue;
+        if (RectsOverlap(b, e)) {
+          b.alive = false;
+          this.DamageEnemy(e, b.power);
+          break;
         }
-      } else if (this.player?.alive) {
-        if (this.player.protect > 0) {
-          if (RectsOverlap(b, this.player)) {
-            b.alive = false;
-            this.SpawnExplosion(b.x, b.y, 0.5);
-            this.audio.Bounce();
-          }
+      }
+      if (!b.alive) continue;
+
+      // hit player (enemy fire, or own returning shell)
+      if (this.player?.alive) {
+        const isOwnShell = b.owner === this.player;
+        if (isOwnShell && !canSelfHit) {
+          // still leaving the barrel
         } else if (RectsOverlap(b, this.player)) {
           b.alive = false;
-          this.KillPlayer();
+          if (this.player.protect > 0) {
+            this.SpawnExplosion(b.x, b.y, 0.5);
+            this.audio.Bounce();
+          } else {
+            this.KillPlayer();
+          }
         }
       }
 
