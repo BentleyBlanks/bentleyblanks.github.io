@@ -1,0 +1,12 @@
+Gravity Tank Battle — asset credits
+===================================
+
+Tank sprites, bullets, explosions, bushes, barrels, and power-up props:
+  Kenney — Top-down Tanks Redux
+  https://kenney.nl/assets/top-down-tanks-redux
+  License: Creative Commons CC0 1.0 Universal
+
+Terrain tiles (brick / steel / water / ice) and HUD chrome are original
+drawings inspired by classic Battle City / 坦克大战 layouts.
+
+Game twist: all shells use downward gravity (parabolic arcs).
