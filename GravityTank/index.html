@@ -2,8 +2,11 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#121510">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="重力弹坦克大战：经典一关坦克大战，子弹带重力抛物线。素材来自 Kenney CC0。">
   <meta property="og:title" content="重力弹 · 坦克大战">
   <meta property="og:description" content="一关经典坦克大战。玩家与敌方炮弹都受重力影响，形成抛物线弹道。">
@@ -20,17 +23,26 @@
       <p class="tagline">经典坦克大战一关复刻。唯一变数：炮弹会往下坠——瞄准时要算抛物线。</p>
     </header>
 
+    <div class="mobile-hud" aria-live="polite">
+      <span>命 <b id="mobileLives">3</b></span>
+      <span>火力 <b id="mobilePower">1</b></span>
+      <span>分 <b id="mobileScore">0</b></span>
+      <span>敌 <b id="mobileRemain">20</b></span>
+      <button id="mobilePauseButton" class="hud-pause" type="button" aria-label="暂停">暂停</button>
+    </div>
+
     <section class="stage-shell" aria-label="游戏画面">
       <canvas id="gameCanvas" width="416" height="416"></canvas>
       <div id="startOverlay" class="overlay">
         <h2>STAGE 1</h2>
         <p>保卫老鹰总部。消灭全部敌军。注意：炮弹带重力，水平射击会下坠。</p>
         <button id="startButton" class="primary" type="button">开始战斗</button>
-        <p class="hint">方向键 / WASD 移动 · 空格 / J 开火 · P 暂停</p>
+        <p class="hint desktop-hint">方向键 / WASD 移动 · 空格 / J 开火 · P 暂停</p>
+        <p class="hint mobile-hint">左侧虚拟摇杆移动 · 右侧按钮开火</p>
       </div>
       <div id="pauseOverlay" class="overlay" hidden>
         <h2>暂停</h2>
-        <p>按 P 或点击继续</p>
+        <p>点击继续，或再按暂停</p>
         <button id="resumeButton" class="primary" type="button">继续</button>
       </div>
       <div id="endOverlay" class="overlay" hidden>
@@ -38,17 +50,27 @@
         <p id="endMessage">敌军全部歼灭。</p>
         <button id="restartButton" class="primary" type="button">再来一局</button>
       </div>
-      <div class="mobile-pad" aria-label="触控操作">
-        <button class="up" data-dir="up" type="button">▲</button>
-        <button class="left" data-dir="left" type="button">◀</button>
-        <button class="fire" data-act="fire" type="button">开火</button>
-        <button class="right" data-dir="right" type="button">▶</button>
-        <button class="down" data-dir="down" type="button">▼</button>
-      </div>
     </section>
 
+    <div id="touchStickWrap" class="touch-stick-wrap" hidden>
+      <div class="touch-stick" id="touchStick" aria-label="移动摇杆">
+        <div class="stick-base">
+          <div class="stick-knob" id="stickKnob"></div>
+          <span class="stick-cross" aria-hidden="true"></span>
+        </div>
+        <p class="touch-label">移动</p>
+      </div>
+    </div>
+
+    <div id="touchActionsWrap" class="touch-actions-wrap" hidden>
+      <div class="touch-actions">
+        <button id="touchFire" class="touch-fire" type="button" aria-label="开火">开火</button>
+        <button id="touchPause" class="touch-pause" type="button" aria-label="暂停">暂停</button>
+      </div>
+    </div>
+
     <aside class="side">
-      <div class="panel">
+      <div class="panel panel-stats">
         <h3>战况</h3>
         <div class="stat-row"><span>关卡</span><b>1</b></div>
         <div class="stat-row"><span>生命</span><b id="livesValue">3</b></div>
@@ -67,12 +89,14 @@
         <p class="feature">子弹带<strong>重力</strong>：向上射击会减速回落，左右射击成抛物线。敌我皆然。</p>
       </div>
 
-      <div class="panel">
+      <div class="panel panel-controls-help">
         <h3>操作</h3>
         <ul class="controls">
-          <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</li>
-          <li><kbd>Space</kbd> / <kbd>J</kbd> 开火</li>
-          <li><kbd>P</kbd> 暂停</li>
+          <li class="desktop-hint"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</li>
+          <li class="desktop-hint"><kbd>Space</kbd> / <kbd>J</kbd> 开火</li>
+          <li class="desktop-hint"><kbd>P</kbd> 暂停</li>
+          <li class="mobile-hint">左侧摇杆移动，右侧开火；可双指同时操作</li>
+          <li class="mobile-hint">横屏更佳；页面已锁定缩放，避免误触</li>
         </ul>
       </div>
 

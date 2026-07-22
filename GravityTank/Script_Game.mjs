@@ -219,6 +219,10 @@ class Game {
       score: document.getElementById("scoreValue"),
       remain: document.getElementById("remainValue"),
       enemyIcons: document.getElementById("enemyIcons"),
+      mobileLives: document.getElementById("mobileLives"),
+      mobilePower: document.getElementById("mobilePower"),
+      mobileScore: document.getElementById("mobileScore"),
+      mobileRemain: document.getElementById("mobileRemain"),
     };
     this.overlays = {
       start: document.getElementById("startOverlay"),
@@ -227,12 +231,25 @@ class Game {
       endTitle: document.getElementById("endTitle"),
       endMessage: document.getElementById("endMessage"),
     };
+    this.touchUi = {
+      stickWrap: document.getElementById("touchStickWrap"),
+      actionsWrap: document.getElementById("touchActionsWrap"),
+      stick: document.getElementById("touchStick"),
+      knob: document.getElementById("stickKnob"),
+      fire: document.getElementById("touchFire"),
+      pause: document.getElementById("touchPause"),
+      hudPause: document.getElementById("mobilePauseButton"),
+    };
 
     this.audio = new AudioBus();
     this.images = {};
     this.keys = new Set();
     this.touchDir = null;
     this.touchFire = false;
+    this.stickPointerId = null;
+    this.firePointerId = null;
+    this.stickVec = { x: 0, y: 0 };
+    this.isTouchDevice = false;
 
     this.state = "boot";
     this.map = [];
@@ -305,6 +322,8 @@ class Game {
   }
 
   BindUi() {
+    this.DetectTouchUi();
+
     document.getElementById("startButton").addEventListener("click", () => this.StartGame());
     document.getElementById("restartButton").addEventListener("click", () => this.StartGame());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
@@ -327,33 +346,148 @@ class Game {
       if (e.code === "Space") this.keys.delete(" ");
     });
 
-    const pad = document.querySelector(".mobile-pad");
-    if (pad) {
-      pad.querySelectorAll("[data-dir]").forEach((btn) => {
-        const start = (ev) => {
-          ev.preventDefault();
-          this.touchDir = btn.dataset.dir;
-          this.audio.Ensure();
-        };
-        const end = (ev) => {
-          ev.preventDefault();
-          if (this.touchDir === btn.dataset.dir) this.touchDir = null;
-        };
-        btn.addEventListener("pointerdown", start);
-        btn.addEventListener("pointerup", end);
-        btn.addEventListener("pointerleave", end);
-        btn.addEventListener("pointercancel", end);
-      });
-      const fireBtn = pad.querySelector("[data-act=fire]");
-      fireBtn.addEventListener("pointerdown", (ev) => {
-        ev.preventDefault();
-        this.touchFire = true;
-        this.audio.Ensure();
-      });
-      fireBtn.addEventListener("pointerup", () => { this.touchFire = false; });
-      fireBtn.addEventListener("pointerleave", () => { this.touchFire = false; });
-      fireBtn.addEventListener("pointercancel", () => { this.touchFire = false; });
-    }
+    this.BindTouchControls();
+
+    // Stop page scroll / pinch while interacting with the stage on mobile.
+    const shell = document.querySelector(".stage-shell");
+    const block = (ev) => {
+      if (this.isTouchDevice && this.state === "playing") ev.preventDefault();
+    };
+    shell?.addEventListener("touchmove", block, { passive: false });
+    this.touchUi.stickWrap?.addEventListener("touchmove", (ev) => ev.preventDefault(), { passive: false });
+    this.touchUi.actionsWrap?.addEventListener("touchmove", (ev) => ev.preventDefault(), { passive: false });
+
+    window.addEventListener("resize", () => this.DetectTouchUi());
+    window.addEventListener("orientationchange", () => {
+      setTimeout(() => this.DetectTouchUi(), 120);
+    });
+  }
+
+  DetectTouchUi() {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const noHover = window.matchMedia("(hover: none)").matches;
+    const narrow = window.matchMedia("(max-width: 860px)").matches;
+    const shortLandscape = window.matchMedia("(orientation: landscape) and (max-height: 560px)").matches;
+    const touchPoints = navigator.maxTouchPoints > 0;
+    this.isTouchDevice = coarse || noHover || touchPoints || narrow || shortLandscape;
+    document.body.classList.toggle("is-touch", this.isTouchDevice);
+    this.SyncTouchControlsVisibility();
+  }
+
+  SyncTouchControlsVisibility() {
+    const show = this.isTouchDevice && (this.state === "playing" || this.state === "paused");
+    if (this.touchUi.stickWrap) this.touchUi.stickWrap.hidden = !show;
+    if (this.touchUi.actionsWrap) this.touchUi.actionsWrap.hidden = !show;
+  }
+
+  BindTouchControls() {
+    const { stick, knob, fire, pause, hudPause } = this.touchUi;
+    if (!stick || !fire) return;
+
+    const stickRadius = () => {
+      const base = stick.querySelector(".stick-base");
+      return (base?.clientWidth || 118) * 0.5;
+    };
+
+    const setKnob = (nx, ny) => {
+      if (!knob) return;
+      const max = stickRadius() * 0.55;
+      knob.style.transform = `translate(${nx * max}px, ${ny * max}px)`;
+    };
+
+    const clearStick = () => {
+      this.stickPointerId = null;
+      this.stickVec.x = 0;
+      this.stickVec.y = 0;
+      this.touchDir = null;
+      setKnob(0, 0);
+    };
+
+    const updateStickFromEvent = (ev) => {
+      const base = stick.querySelector(".stick-base");
+      if (!base) return;
+      const rect = base.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let dx = ev.clientX - cx;
+      let dy = ev.clientY - cy;
+      const max = rect.width * 0.5;
+      const len = Math.hypot(dx, dy) || 1;
+      if (len > max) {
+        dx = (dx / len) * max;
+        dy = (dy / len) * max;
+      }
+      const nx = dx / max;
+      const ny = dy / max;
+      this.stickVec.x = nx;
+      this.stickVec.y = ny;
+      setKnob(nx, ny);
+
+      const dead = 0.28;
+      if (Math.hypot(nx, ny) < dead) {
+        this.touchDir = null;
+        return;
+      }
+      this.touchDir = Math.abs(nx) > Math.abs(ny)
+        ? (nx < 0 ? "left" : "right")
+        : (ny < 0 ? "up" : "down");
+    };
+
+    stick.addEventListener("pointerdown", (ev) => {
+      if (this.stickPointerId !== null) return;
+      ev.preventDefault();
+      stick.setPointerCapture?.(ev.pointerId);
+      this.stickPointerId = ev.pointerId;
+      this.audio.Ensure();
+      updateStickFromEvent(ev);
+    });
+    stick.addEventListener("pointermove", (ev) => {
+      if (ev.pointerId !== this.stickPointerId) return;
+      ev.preventDefault();
+      updateStickFromEvent(ev);
+    });
+    const endStick = (ev) => {
+      if (ev.pointerId !== this.stickPointerId) return;
+      ev.preventDefault();
+      clearStick();
+    };
+    stick.addEventListener("pointerup", endStick);
+    stick.addEventListener("pointercancel", endStick);
+    stick.addEventListener("lostpointercapture", () => {
+      if (this.stickPointerId !== null) clearStick();
+    });
+
+    fire.addEventListener("pointerdown", (ev) => {
+      if (this.firePointerId !== null) return;
+      ev.preventDefault();
+      fire.setPointerCapture?.(ev.pointerId);
+      this.firePointerId = ev.pointerId;
+      this.touchFire = true;
+      fire.classList.add("is-active");
+      this.audio.Ensure();
+    });
+    const endFire = (ev) => {
+      if (ev.pointerId !== this.firePointerId) return;
+      ev.preventDefault();
+      this.firePointerId = null;
+      this.touchFire = false;
+      fire.classList.remove("is-active");
+    };
+    fire.addEventListener("pointerup", endFire);
+    fire.addEventListener("pointercancel", endFire);
+    fire.addEventListener("lostpointercapture", () => {
+      this.firePointerId = null;
+      this.touchFire = false;
+      fire.classList.remove("is-active");
+    });
+
+    const onPauseTap = (ev) => {
+      ev.preventDefault();
+      this.audio.Ensure();
+      this.TogglePause();
+    };
+    pause?.addEventListener("click", onPauseTap);
+    hudPause?.addEventListener("click", onPauseTap);
   }
 
   StartGame() {
@@ -382,6 +516,15 @@ class Game {
     this.overlays.start.hidden = true;
     this.overlays.pause.hidden = true;
     this.overlays.end.hidden = true;
+    this.touchFire = false;
+    this.stickPointerId = null;
+    this.firePointerId = null;
+    this.stickVec.x = 0;
+    this.stickVec.y = 0;
+    this.touchDir = null;
+    if (this.touchUi.knob) this.touchUi.knob.style.transform = "translate(0, 0)";
+    this.touchUi.fire?.classList.remove("is-active");
+    this.SyncTouchControlsVisibility();
     this.UpdateHud();
     this.RenderEnemyIcons();
     this.audio.Ensure();
@@ -433,10 +576,14 @@ class Game {
     if (paused && this.state === "playing") {
       this.state = "paused";
       this.overlays.pause.hidden = false;
+      this.touchFire = false;
+      this.touchDir = null;
+      this.SyncTouchControlsVisibility();
     } else if (!paused && this.state === "paused") {
       this.state = "playing";
       this.overlays.pause.hidden = true;
       this.lastTs = 0;
+      this.SyncTouchControlsVisibility();
     }
   }
 
@@ -1015,16 +1162,26 @@ class Game {
     this.overlays.end.hidden = false;
     this.overlays.endTitle.textContent = won ? "关卡通过" : "游戏结束";
     this.overlays.endMessage.textContent = message;
+    this.touchFire = false;
+    this.touchDir = null;
+    this.SyncTouchControlsVisibility();
     if (won) this.audio.Win();
     else this.audio.Lose();
   }
 
   UpdateHud() {
-    this.hud.lives.textContent = String(Math.max(0, this.lives));
-    this.hud.power.textContent = String(this.player?.power ?? 1);
-    this.hud.score.textContent = String(this.score);
-    const remain = this.spawnQueue.length + this.enemies.filter((e) => e.alive).length;
-    this.hud.remain.textContent = String(remain);
+    const lives = String(Math.max(0, this.lives));
+    const power = String(this.player?.power ?? 1);
+    const score = String(this.score);
+    const remain = String(this.spawnQueue.length + this.enemies.filter((e) => e.alive).length);
+    this.hud.lives.textContent = lives;
+    this.hud.power.textContent = power;
+    this.hud.score.textContent = score;
+    this.hud.remain.textContent = remain;
+    if (this.hud.mobileLives) this.hud.mobileLives.textContent = lives;
+    if (this.hud.mobilePower) this.hud.mobilePower.textContent = power;
+    if (this.hud.mobileScore) this.hud.mobileScore.textContent = score;
+    if (this.hud.mobileRemain) this.hud.mobileRemain.textContent = remain;
   }
 
   RenderEnemyIcons() {
