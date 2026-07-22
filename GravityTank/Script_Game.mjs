@@ -513,6 +513,10 @@ class Game {
     document.getElementById("nextStageButton")?.addEventListener("click", () => this.AdvanceStage());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
 
+    this.canvas.addEventListener("pointerdown", () => {
+      if (this.state === "stageIntro") this.SkipStageIntro();
+    });
+
     window.addEventListener("keydown", (e) => {
       const k = e.key.toLowerCase();
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "w", "a", "s", "d", "j"].includes(k) || e.code === "Space") {
@@ -522,6 +526,7 @@ class Game {
       if (e.code === "Space") this.keys.add(" ");
       if (k === "p") this.TogglePause();
       if ((k === "enter" || k === " ") && this.state === "ready") this.StartCampaign();
+      if ((k === "enter" || k === " ") && this.state === "stageIntro") this.SkipStageIntro();
       if ((k === "enter" || k === " ") && this.state === "won") this.HandleEndPrimary();
       if ((k === "enter" || k === " ") && this.state === "lost") this.HandleEndPrimary();
       this.audio.Ensure();
@@ -710,6 +715,11 @@ class Game {
     });
 
     fire.addEventListener("pointerdown", (ev) => {
+      if (this.state === "stageIntro") {
+        ev.preventDefault();
+        this.SkipStageIntro();
+        return;
+      }
       if (this.firePointerId !== null && this.firePointerId !== ev.pointerId) {
         this.firePointerId = null;
       }
@@ -818,13 +828,8 @@ class Game {
     this.endAction = "restart";
     this.BuildSpawnQueue();
     this.SpawnPlayer(true, keepStats || null);
-    this.spawnTimer = 0;
-    for (let i = 0; i < 3; i++) {
-      this.TrySpawnEnemy(10);
-      const last = this.enemies[this.enemies.length - 1];
-      if (last) last.spawnFlash = 0;
-    }
-    this.state = "playing";
+    // Enemies spawn after the STAGE curtain finishes.
+    this.spawnTimer = 0.15;
     this.overlays.start.hidden = true;
     this.overlays.pause.hidden = true;
     this.overlays.end.hidden = true;
@@ -837,11 +842,64 @@ class Game {
     this.audio.StopEngine();
     this.audio.StopPowerSpawn();
     this.audio.StopBgm();
+    this.BeginStageIntro();
+  }
+
+  BeginStageIntro() {
+    this.state = "stageIntro";
+    this.stageIntro = {
+      t: 0,
+      phase: "close", // close → hold → open → playing
+      closeDur: 0.55,
+      holdDur: 1.65,
+      openDur: 0.55,
+    };
     this.audio.StageStart();
-    // Start looping battle BGM shortly after the stage jingle.
-    setTimeout(() => {
-      if (this.state === "playing") this.audio.StartBgm();
-    }, 1800);
+    this.SyncTouchControlsVisibility();
+  }
+
+  SkipStageIntro() {
+    if (this.state !== "stageIntro" || !this.stageIntro) return;
+    // Jump to open if still closing/holding; finish if already opening.
+    if (this.stageIntro.phase === "open") {
+      this.FinishStageIntro();
+      return;
+    }
+    this.stageIntro.phase = "open";
+    this.stageIntro.t = 0;
+  }
+
+  UpdateStageIntro(dt) {
+    const intro = this.stageIntro;
+    if (!intro) return;
+    intro.t += dt;
+    const dur =
+      intro.phase === "close" ? intro.closeDur :
+      intro.phase === "hold" ? intro.holdDur :
+      intro.openDur;
+    if (intro.t >= dur) {
+      intro.t = 0;
+      if (intro.phase === "close") intro.phase = "hold";
+      else if (intro.phase === "hold") intro.phase = "open";
+      else this.FinishStageIntro();
+    }
+  }
+
+  FinishStageIntro() {
+    this.stageIntro = null;
+    this.state = "playing";
+    this.lastTs = 0;
+    // Classic: a few enemies already on field when the curtain lifts.
+    for (let i = 0; i < 3; i++) {
+      this.TrySpawnEnemy(10);
+      const last = this.enemies[this.enemies.length - 1];
+      if (last) last.spawnFlash = 0;
+    }
+    this.spawnTimer = 1.2;
+    this.UpdateHud();
+    this.RenderEnemyIcons();
+    this.SyncTouchControlsVisibility();
+    this.audio.StartBgm();
   }
 
   BuildSpawnQueue() {
@@ -883,6 +941,10 @@ class Game {
   }
 
   TogglePause() {
+    if (this.state === "stageIntro") {
+      this.SkipStageIntro();
+      return;
+    }
     if (this.state === "playing") this.SetPaused(true);
     else if (this.state === "paused") this.SetPaused(false);
   }
@@ -917,6 +979,7 @@ class Game {
     this.frame++;
 
     if (this.state === "playing") this.Update(dt);
+    else if (this.state === "stageIntro") this.UpdateStageIntro(dt);
     this.Render();
     requestAnimationFrame((t) => this.Loop(t));
   }
@@ -1883,6 +1946,11 @@ class Game {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
+    if (this.state === "stageIntro") {
+      this.DrawStageIntro(ctx);
+      return;
+    }
+
     this.DrawGround(ctx);
     this.DrawTiles(ctx, false); // non-grass
     this.DrawBase(ctx);
@@ -1897,6 +1965,77 @@ class Game {
     // gravity hint arc when aiming sideways/up (playing only)
     if (this.state === "playing" && this.player?.alive) this.DrawAimGhost(ctx);
     this.DrawBuffHud(ctx);
+  }
+
+  /** Classic Battle City curtain: grey shutters + STAGE N. */
+  DrawStageIntro(ctx) {
+    const intro = this.stageIntro;
+    if (!intro) return;
+
+    const dur =
+      intro.phase === "close" ? intro.closeDur :
+      intro.phase === "hold" ? intro.holdDur :
+      intro.openDur;
+    const u = Clamp(intro.t / Math.max(0.001, dur), 0, 1);
+
+    // Underlay: stage map peeks during close/open.
+    if (intro.phase === "close" || intro.phase === "open") {
+      this.DrawGround(ctx);
+      this.DrawTiles(ctx, false);
+      this.DrawBase(ctx);
+      if (this.player?.alive) this.DrawTank(ctx, this.player, true);
+      this.DrawTiles(ctx, true);
+    } else {
+      ctx.fillStyle = "#636363";
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    }
+
+    // Curtain coverage: 1 = fully closed, 0 = open.
+    let cover = 1;
+    if (intro.phase === "close") cover = u;
+    else if (intro.phase === "hold") cover = 1;
+    else cover = 1 - u;
+
+    const half = CANVAS_H / 2;
+    const h = half * cover;
+    ctx.fillStyle = "#737373";
+    ctx.fillRect(0, 0, CANVAS_W, h);
+    ctx.fillRect(0, CANVAS_H - h, CANVAS_W, h);
+
+    // Seam line when nearly closed
+    if (cover > 0.92) {
+      ctx.fillStyle = "#4a4a4a";
+      ctx.fillRect(0, half - 1, CANVAS_W, 2);
+    }
+
+    // STAGE label while closed enough
+    if (cover > 0.55) {
+      const fade = Clamp((cover - 0.55) / 0.35, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = "#000";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 36px monospace";
+      ctx.fillText("STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
+
+      // Big stage number with a slight blink on hold
+      const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
+      ctx.globalAlpha = fade * blink;
+      ctx.font = "bold 64px monospace";
+      ctx.fillText(String(this.stage), CANVAS_W / 2, CANVAS_H / 2 + 28);
+
+      ctx.globalAlpha = fade * 0.9;
+      ctx.font = "bold 16px monospace";
+      ctx.fillText(`第 ${this.stage} 关 / 共 ${STAGE_COUNT} 关`, CANVAS_W / 2, CANVAS_H / 2 + 72);
+
+      if (intro.phase === "hold") {
+        ctx.globalAlpha = fade * (0.35 + 0.35 * Math.sin(intro.t * 4));
+        ctx.font = "12px monospace";
+        ctx.fillText("按空格 / 点击跳过", CANVAS_W / 2, CANVAS_H - 28);
+      }
+      ctx.restore();
+    }
   }
 
   DrawGround(ctx) {
