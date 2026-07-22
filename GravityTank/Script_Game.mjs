@@ -47,6 +47,38 @@ const POWER = {
   helmet: "helmet",
   life: "life",
   gun: "gun",
+  // GravityTank originals — weird on purpose
+  antigrav: "antigrav", // 反重力：己方炮弹几乎不下落
+  bounce: "bounce", // 弹跳弹：打钢板/边界会反弹
+  meteor: "meteor", // 陨石雨：天上砸下超重炮弹
+  ghost: "ghost", // 幽灵：穿砖过水
+  mirror: "mirror", // 镜像炮：前后同时开火
+  magnet: "magnet", // 磁导：炮弹轻微追踪敌军
+  warp: "warp", // 闪现：随机安全点传送
+};
+
+const CLASSIC_POWERS = [
+  POWER.star, POWER.bomb, POWER.clock, POWER.shovel, POWER.helmet, POWER.life, POWER.gun,
+];
+const FUN_POWERS = [
+  POWER.antigrav, POWER.bounce, POWER.meteor, POWER.ghost, POWER.mirror, POWER.magnet, POWER.warp,
+];
+
+const POWER_STYLE = {
+  star: { label: "★", color: "#f0c040", bg: "#5a4010" },
+  bomb: { label: "炸", color: "#ff6a4a", bg: "#4a1810" },
+  clock: { label: "时", color: "#7ec8ff", bg: "#183048" },
+  shovel: { label: "铲", color: "#c0c0c0", bg: "#303038" },
+  helmet: { label: "盾", color: "#80e090", bg: "#184028" },
+  life: { label: "命", color: "#ff90c0", bg: "#401828" },
+  gun: { label: "枪", color: "#ffd080", bg: "#403010" },
+  antigrav: { label: "反G", color: "#b8f0ff", bg: "#103040" },
+  bounce: { label: "弹", color: "#ffe060", bg: "#403808" },
+  meteor: { label: "陨", color: "#ff8040", bg: "#401808" },
+  ghost: { label: "幽", color: "#d0a0ff", bg: "#281840" },
+  mirror: { label: "镜", color: "#a0ffe0", bg: "#104030" },
+  magnet: { label: "磁", color: "#ff90a0", bg: "#401018" },
+  warp: { label: "闪", color: "#ffffff", bg: "#204060" },
 };
 
 const ENEMY_TYPES = [
@@ -416,6 +448,12 @@ class Game {
     this.spawnTimer = 0;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
+    this.antigravTimer = 0;
+    this.bounceTimer = 0;
+    this.ghostTimer = 0;
+    this.mirrorTimer = 0;
+    this.magnetTimer = 0;
+    this.buffToast = null;
     this.pendingFortRestore = false;
     this.baseAlive = true;
     this.waterPhase = 0;
@@ -767,6 +805,12 @@ class Game {
     this.spawnTimer = 0.2;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
+    this.antigravTimer = 0;
+    this.bounceTimer = 0;
+    this.ghostTimer = 0;
+    this.mirrorTimer = 0;
+    this.magnetTimer = 0;
+    this.buffToast = null;
     this.pendingFortRestore = false;
     this.baseAlive = true;
     this.nextSpawnSlot = 0;
@@ -883,6 +927,15 @@ class Game {
     if (this.shovelTimer > 0) {
       this.shovelTimer -= dt;
       if (this.shovelTimer <= 0) this.pendingFortRestore = true;
+    }
+    if (this.antigravTimer > 0) this.antigravTimer -= dt;
+    if (this.bounceTimer > 0) this.bounceTimer -= dt;
+    if (this.ghostTimer > 0) this.ghostTimer -= dt;
+    if (this.mirrorTimer > 0) this.mirrorTimer -= dt;
+    if (this.magnetTimer > 0) this.magnetTimer -= dt;
+    if (this.buffToast) {
+      this.buffToast.ttl -= dt;
+      if (this.buffToast.ttl <= 0) this.buffToast = null;
     }
     if (this.pendingFortRestore) {
       if (this.TryRestoreBaseFort()) this.pendingFortRestore = false;
@@ -1136,6 +1189,7 @@ class Game {
   }
 
   CollidesTerrain(tank) {
+    const ghost = tank === this.player && this.ghostTimer > 0;
     const pads = [
       [tank.x + 3, tank.y + 3],
       [tank.x + tank.w - 4, tank.y + 3],
@@ -1148,6 +1202,11 @@ class Game {
       const ty = Math.floor(py / TILE);
       if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
       const t = this.map[ty][tx];
+      if (ghost) {
+        // Ghost slips through brick & water; steel / base still solid.
+        if (t === TILE_STEEL || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
+        continue;
+      }
       if (t === TILE_BRICK || t === TILE_STEEL || t === TILE_WATER || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
     }
     return false;
@@ -1183,21 +1242,31 @@ class Game {
     const maxB = isPlayer ? tank.maxBullets : 1;
     if (owned >= maxB) return;
 
-    const d = DIR[tank.dir];
+    this.SpawnShell(tank, tank.dir, isPlayer);
+    if (isPlayer && this.mirrorTimer > 0) {
+      const opp = { up: "down", down: "up", left: "right", right: "left" }[tank.dir];
+      this.SpawnShell(tank, opp, true, { bonusShot: true });
+    }
+    tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd;
+    this.audio.Shoot();
+  }
+
+  SpawnShell(tank, dirName, isPlayer, opts = {}) {
+    const d = DIR[dirName];
     const speed = BULLET_SPEED * (tank.bulletBoost || 1) * (isPlayer && tank.power >= 2 ? 1.12 : 1);
-    // Gravity bullets: initial velocity along barrel; gravity pulls +Y every frame.
-    // Give slight upward bias when shooting sideways so arcs are usable.
     let vx = d.x * speed;
     let vy = d.y * speed;
-    if (tank.dir === "left" || tank.dir === "right") {
-      vy -= 90; // loft for horizontal shots
-    } else if (tank.dir === "up") {
-      vy -= 40; // extra loft against gravity
-    }
+    if (dirName === "left" || dirName === "right") vy -= 90;
+    else if (dirName === "up") vy -= 40;
 
     const cx = tank.x + tank.w / 2;
     const cy = tank.y + tank.h / 2;
-    const bullet = {
+    let gravityMul = 1;
+    if (isPlayer && this.antigravTimer > 0) gravityMul = -0.35; // floats upward slowly
+    const bounceLeft = isPlayer && this.bounceTimer > 0 ? 5 : 0;
+    const homing = isPlayer && this.magnetTimer > 0;
+
+    this.bullets.push({
       x: cx - 4 + d.x * 14,
       y: cy - 4 + d.y * 14,
       w: 8,
@@ -1209,21 +1278,49 @@ class Game {
       isPlayer,
       power: isPlayer ? tank.power : (tank.typeId === "power" ? 2 : 1),
       trail: [],
-      // Short fuse so the muzzle doesn't instantly suicide; gravity arcs can still fall back.
-      arm: 0.22,
+      arm: opts.bonusShot ? 0.12 : 0.22,
       traveled: 0,
-    };
-    this.bullets.push(bullet);
-    tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd;
-    this.audio.Shoot();
+      gravityMul,
+      bounceLeft,
+      homing,
+      meteor: !!opts.meteor,
+    });
   }
 
   UpdateBullets(dt) {
     for (const b of this.bullets) {
       if (!b.alive) continue;
 
-      // GRAVITY — the signature mechanic
-      b.vy += GRAVITY * dt;
+      // GRAVITY — the signature mechanic (per-bullet multiplier for antigrav / meteors)
+      const gMul = b.gravityMul ?? 1;
+      b.vy += GRAVITY * gMul * dt;
+
+      if (b.homing && b.isPlayer) {
+        let best = null;
+        let bestD = 160;
+        for (const e of this.enemies) {
+          if (!e.alive || e.spawnFlash > 0) continue;
+          const dx = e.x + e.w / 2 - (b.x + 4);
+          const dy = e.y + e.h / 2 - (b.y + 4);
+          const d = Math.hypot(dx, dy);
+          if (d < bestD) {
+            bestD = d;
+            best = { dx, dy, d };
+          }
+        }
+        if (best && best.d > 1) {
+          const steer = 220 * dt;
+          b.vx += (best.dx / best.d) * steer;
+          b.vy += (best.dy / best.d) * steer;
+          const spd = Math.hypot(b.vx, b.vy) || 1;
+          const cap = BULLET_SPEED * 1.25;
+          if (spd > cap) {
+            b.vx = (b.vx / spd) * cap;
+            b.vy = (b.vy / spd) * cap;
+          }
+        }
+      }
+
       const stepX = b.vx * dt;
       const stepY = b.vy * dt;
       b.x += stepX;
@@ -1234,7 +1331,18 @@ class Game {
       b.trail.push({ x: b.x + 4, y: b.y + 4 });
       if (b.trail.length > 10) b.trail.shift();
 
-      if (b.x < -20 || b.y < -40 || b.x > CANVAS_W + 20 || b.y > CANVAS_H + 40) {
+      // Screen-edge bounce for bounce shells; otherwise despawn out of bounds.
+      if (b.bounceLeft > 0) {
+        let bounced = false;
+        if (b.x < 0) { b.x = 0; b.vx = Math.abs(b.vx); bounced = true; }
+        if (b.x > CANVAS_W - b.w) { b.x = CANVAS_W - b.w; b.vx = -Math.abs(b.vx); bounced = true; }
+        if (b.y < 0) { b.y = 0; b.vy = Math.abs(b.vy) * 0.85; bounced = true; }
+        if (b.y > CANVAS_H - b.h) { b.y = CANVAS_H - b.h; b.vy = -Math.abs(b.vy) * 0.85; bounced = true; }
+        if (bounced) {
+          b.bounceLeft -= 1;
+          this.audio.Bounce();
+        }
+      } else if (b.x < -20 || b.y < -40 || b.x > CANVAS_W + 20 || b.y > CANVAS_H + 40) {
         b.alive = false;
         continue;
       }
@@ -1308,6 +1416,16 @@ class Game {
         return true;
       }
       if (t === TILE_STEEL) {
+        if (b.bounceLeft > 0 && b.power < 3) {
+          // Ricochet off steel — prefer flipping the stronger axis of motion.
+          if (Math.abs(b.vx) >= Math.abs(b.vy)) b.vx *= -1;
+          else b.vy *= -1;
+          b.x += Math.sign(b.vx) * 4;
+          b.y += Math.sign(b.vy) * 4;
+          b.bounceLeft -= 1;
+          this.audio.Bounce();
+          return false;
+        }
         if (b.power >= 3) {
           this.map[ty][tx] = TILE_EMPTY;
           this.audio.Hit();
@@ -1395,7 +1513,8 @@ class Game {
   }
 
   DropPowerup(x, y) {
-    const kinds = [POWER.star, POWER.bomb, POWER.clock, POWER.shovel, POWER.helmet, POWER.life, POWER.gun];
+    // Fun props are listed twice so they show up a bit more often.
+    const kinds = [...CLASSIC_POWERS, ...FUN_POWERS, ...FUN_POWERS];
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     this.powerups.push({
       x: Clamp(x, 8, CANVAS_W - 32),
@@ -1408,6 +1527,10 @@ class Game {
     this.audio.PowerSpawn();
   }
 
+  ShowBuffToast(text) {
+    this.buffToast = { text, ttl: 2.4 };
+  }
+
   ApplyPowerup(kind) {
     this.audio.Power();
     const p = this.player;
@@ -1418,21 +1541,26 @@ class Game {
           if (p.power >= 2) p.maxBullets = 2;
           if (p.power >= 3) p.maxBullets = 2;
         }
+        this.ShowBuffToast("火力升级 ★");
         break;
       case POWER.gun:
         if (p) {
           p.power = 3;
           p.maxBullets = 2;
         }
+        this.ShowBuffToast("手枪：钢墙可破");
         break;
       case POWER.life:
         this.lives += 1;
+        this.ShowBuffToast("额外生命 +1");
         break;
       case POWER.helmet:
         if (p) p.protect = 8;
+        this.ShowBuffToast("护盾 8 秒");
         break;
       case POWER.clock:
         this.freezeTimer = 8;
+        this.ShowBuffToast("敌军冻结");
         break;
       case POWER.bomb:
         for (const e of this.enemies) {
@@ -1446,16 +1574,103 @@ class Game {
         }
         this.audio.Explode();
         this.RenderEnemyIcons();
+        this.ShowBuffToast("全场爆破");
         break;
       case POWER.shovel:
         this.shovelTimer = 12;
         this.pendingFortRestore = false;
         this.FortifyBase(true);
+        this.ShowBuffToast("总部钢墙加固");
+        break;
+      case POWER.antigrav:
+        this.antigravTimer = 10;
+        this.ShowBuffToast("反重力：炮弹往上飘！");
+        break;
+      case POWER.bounce:
+        this.bounceTimer = 12;
+        this.ShowBuffToast("弹跳弹：钢板也能弹！");
+        break;
+      case POWER.meteor:
+        this.SpawnMeteorRain();
+        this.ShowBuffToast("陨石雨从天而降");
+        break;
+      case POWER.ghost:
+        this.ghostTimer = 8;
+        if (p) this.UnstickTank(p);
+        this.ShowBuffToast("幽灵：穿砖过水 8 秒");
+        break;
+      case POWER.mirror:
+        this.mirrorTimer = 10;
+        this.ShowBuffToast("镜像炮：前后一起打");
+        break;
+      case POWER.magnet:
+        this.magnetTimer = 10;
+        this.ShowBuffToast("磁导：炮弹会拐弯追敌");
+        break;
+      case POWER.warp:
+        this.WarpPlayer();
+        this.ShowBuffToast("闪现！");
         break;
       default:
         break;
     }
     this.UpdateHud();
+  }
+
+  SpawnMeteorRain() {
+    const owner = this.player;
+    for (let i = 0; i < 6; i++) {
+      const x = 24 + Math.random() * (CANVAS_W - 48);
+      this.bullets.push({
+        x,
+        y: -30 - i * 18,
+        w: 10,
+        h: 10,
+        vx: (Math.random() - 0.5) * 60,
+        vy: 40 + Math.random() * 40,
+        alive: true,
+        owner,
+        isPlayer: true,
+        power: Math.max(2, owner?.power || 2),
+        trail: [],
+        arm: 0.35,
+        traveled: 0,
+        gravityMul: 2.2,
+        bounceLeft: 0,
+        homing: false,
+        meteor: true,
+      });
+    }
+    this.audio.Explode();
+  }
+
+  WarpPlayer() {
+    const p = this.player;
+    if (!p?.alive) return;
+    const candidates = [];
+    for (let y = 0; y < MAP_H - 1; y++) {
+      for (let x = 0; x < MAP_W - 1; x++) {
+        const ok = [0, 1].every((oy) =>
+          [0, 1].every((ox) => {
+            const t = this.map[y + oy][x + ox];
+            return t === TILE_EMPTY || t === TILE_GRASS || t === TILE_ICE;
+          })
+        );
+        if (!ok) continue;
+        candidates.push({ x: x * TILE + 2, y: y * TILE + 2 });
+      }
+    }
+    // Prefer spots away from current position.
+    const far = candidates.filter((c) => Math.hypot(c.x - p.x, c.y - p.y) > 80);
+    const pool = far.length ? far : candidates;
+    if (!pool.length) return;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.7);
+    p.x = pick.x;
+    p.y = pick.y;
+    p.protect = Math.max(p.protect, 1.5);
+    this.UnstickTank(p);
+    this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.7);
   }
 
   FortifyBase(steel) {
@@ -1681,10 +1896,7 @@ class Game {
 
     // gravity hint arc when aiming sideways/up (playing only)
     if (this.state === "playing" && this.player?.alive) this.DrawAimGhost(ctx);
-
-    if (this.state === "ready") {
-      // dim already handled by overlay
-    }
+    this.DrawBuffHud(ctx);
   }
 
   DrawGround(ctx) {
@@ -1773,8 +1985,15 @@ class Game {
       return;
     }
 
+    const ghosting = isPlayer && this.ghostTimer > 0;
+    if (ghosting) ctx.globalAlpha = 0.45 + 0.35 * Math.sin(this.frame * 0.35);
     const { gx, gy } = this.TankSheetOrigin(tank, isPlayer);
     this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
+    if (ghosting) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "rgba(200,160,255,0.7)";
+      ctx.strokeRect(tank.x + 1, tank.y + 1, tank.w - 2, tank.h - 2);
+    }
 
     if (isPlayer && tank.protect > 0) {
       const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 4) % 2];
@@ -1784,12 +2003,26 @@ class Game {
 
   DrawBullet(ctx, b) {
     if (b.trail.length > 1) {
-      ctx.strokeStyle = b.isPlayer ? "rgba(255,220,120,0.35)" : "rgba(255,120,100,0.3)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = b.meteor
+        ? "rgba(255,120,40,0.55)"
+        : b.isPlayer
+          ? (b.homing ? "rgba(255,120,160,0.45)" : "rgba(255,220,120,0.35)")
+          : "rgba(255,120,100,0.3)";
+      ctx.lineWidth = b.meteor ? 3 : 2;
       ctx.beginPath();
       ctx.moveTo(b.trail[0].x, b.trail[0].y);
       for (let i = 1; i < b.trail.length; i++) ctx.lineTo(b.trail[i].x, b.trail[i].y);
       ctx.stroke();
+    }
+
+    if (b.meteor) {
+      ctx.fillStyle = "#ff6020";
+      ctx.beginPath();
+      ctx.arc(b.x + 5, b.y + 5, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffd080";
+      ctx.fillRect(b.x + 2, b.y + 2, 4, 4);
+      return;
     }
 
     // Pick nearest cardinal for classic 4-dir bullet sprite.
@@ -1813,16 +2046,17 @@ class Game {
     let vy = d.y * BULLET_SPEED * (p.power >= 2 ? 1.12 : 1);
     if (p.dir === "left" || p.dir === "right") vy -= 90;
     else if (p.dir === "up") vy -= 40;
+    const gMul = this.antigravTimer > 0 ? -0.35 : 1;
 
     let x = p.x + p.w / 2 + d.x * 14;
     let y = p.y + p.h / 2 + d.y * 14;
-    ctx.strokeStyle = "rgba(232, 160, 90, 0.35)";
+    ctx.strokeStyle = this.antigravTimer > 0 ? "rgba(120,220,255,0.45)" : "rgba(232, 160, 90, 0.35)";
     ctx.setLineDash([3, 4]);
     ctx.beginPath();
     ctx.moveTo(x, y);
     const step = 1 / 30;
     for (let i = 0; i < 55; i++) {
-      vy += GRAVITY * step;
+      vy += GRAVITY * gMul * step;
       x += vx * step;
       y += vy * step;
       ctx.lineTo(x, y);
@@ -1838,10 +2072,66 @@ class Game {
 
   DrawPowerup(ctx, pu) {
     if (pu.ttl < 3 && Math.floor(pu.blink * 6) % 2 === 0) return;
-    const key = pu.kind === "life" ? "life" : pu.kind;
-    const grid = POWER_SHEET[key] || POWER_SHEET.star;
-    const [gx, gy] = grid;
-    this.BlitGrid(ctx, gx, gy, pu.x, pu.y, 28, 28);
+    const style = POWER_STYLE[pu.kind] || POWER_STYLE.star;
+    const isClassic = POWER_SHEET[pu.kind];
+    if (isClassic && !FUN_POWERS.includes(pu.kind)) {
+      const [gx, gy] = POWER_SHEET[pu.kind];
+      this.BlitGrid(ctx, gx, gy, pu.x, pu.y, 28, 28);
+      return;
+    }
+    // Fun / fallback: chunky labeled token
+    const pulse = 1 + 0.06 * Math.sin(this.frame * 0.25);
+    const s = 28 * pulse;
+    const ox = pu.x + 14 - s / 2;
+    const oy = pu.y + 14 - s / 2;
+    ctx.fillStyle = style.bg;
+    ctx.fillRect(ox, oy, s, s);
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(ox + 1, oy + 1, s - 2, s - 2);
+    ctx.fillStyle = style.color;
+    ctx.font = "bold 11px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(style.label, ox + s / 2, oy + s / 2 + 1);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+
+  DrawBuffHud(ctx) {
+    const chips = [];
+    if (this.antigravTimer > 0) chips.push({ t: `反G ${Math.ceil(this.antigravTimer)}`, c: "#b8f0ff" });
+    if (this.bounceTimer > 0) chips.push({ t: `弹 ${Math.ceil(this.bounceTimer)}`, c: "#ffe060" });
+    if (this.ghostTimer > 0) chips.push({ t: `幽 ${Math.ceil(this.ghostTimer)}`, c: "#d0a0ff" });
+    if (this.mirrorTimer > 0) chips.push({ t: `镜 ${Math.ceil(this.mirrorTimer)}`, c: "#a0ffe0" });
+    if (this.magnetTimer > 0) chips.push({ t: `磁 ${Math.ceil(this.magnetTimer)}`, c: "#ff90a0" });
+    if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#7ec8ff" });
+
+    let x = 6;
+    ctx.font = "bold 10px monospace";
+    for (const chip of chips) {
+      const w = ctx.measureText(chip.t).width + 10;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(x, 4, w, 14);
+      ctx.fillStyle = chip.c;
+      ctx.fillText(chip.t, x + 5, 14);
+      x += w + 4;
+    }
+
+    if (this.buffToast) {
+      const alpha = Clamp(this.buffToast.ttl / 0.4, 0, 1);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      const msg = this.buffToast.text;
+      ctx.font = "bold 13px monospace";
+      const tw = ctx.measureText(msg).width + 20;
+      ctx.fillRect((CANVAS_W - tw) / 2, 22, tw, 22);
+      ctx.fillStyle = "#ffe08a";
+      ctx.textAlign = "center";
+      ctx.fillText(msg, CANVAS_W / 2, 38);
+      ctx.textAlign = "left";
+      ctx.globalAlpha = 1;
+    }
   }
 
   DrawExplosion(ctx, ex) {
