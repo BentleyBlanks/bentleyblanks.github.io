@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="͛9">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f241c"/>
+      <stop offset="100%" stop-color="#121510"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#bg)"/>
+  <rect x="24" y="28" width="170" height="144" rx="6" fill="#2a3324" stroke="#4a5a3a" stroke-width="3"/>
+  <g fill="#b54a2a">
+    <rect x="40" y="48" width="18" height="36"/>
+    <rect x="70" y="48" width="18" height="36"/>
+    <rect x="100" y="78" width="40" height="14"/>
+    <rect x="48" y="120" width="18" height="28"/>
+    <rect x="130" y="120" width="18" height="28"/>
+  </g>
+  <g fill="#9aa0a8">
+    <rect x="88" y="52" width="16" height="16"/>
+    <rect x="148" y="52" width="16" height="16"/>
+  </g>
+  <rect x="78" y="98" width="28" height="12" fill="#3a8cc8"/>
+  <circle cx="72" cy="150" r="10" fill="#6aaa3a" stroke="#e8a05a" stroke-width="2"/>
+  <path d="M150 148 L162 156 L158 168 L142 168 L138 156 Z" fill="#c43a2a"/>
+  <path d="M210 70 Q250 40 290 95" fill="none" stroke="#e8a05a" stroke-width="3" stroke-dasharray="6 4"/>
+  <circle cx="290" cy="95" r="5" fill="#fff8ec"/>
+  <text x="210" y="140" fill="#e8a05a" font-family="Segoe UI, sans-serif" font-size="28" font-weight="700">͛9</text>
+  <text x="210" y="162" fill="#a8b89a" font-family="Segoe UI, sans-serif" font-size="11" letter-spacing="1">GRAVITY TANK</text>
+</svg>

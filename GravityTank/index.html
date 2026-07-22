@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#121510">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="重力弹坦克大战：经典一关坦克大战，子弹带重力抛物线。素材来自 Kenney CC0。">
+  <meta property="og:title" content="重力弹 · 坦克大战">
+  <meta property="og:description" content="一关经典坦克大战。玩家与敌方炮弹都受重力影响，形成抛物线弹道。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bentleyblanks.github.io/GravityTank/">
+  <title>重力弹 · 坦克大战</title>
+  <link rel="stylesheet" href="./Style_Game.css">
+</head>
+<body>
+  <div id="app">
+    <header class="hero">
+      <div>
+        <h1 class="brand">重力弹<small>Gravity Tank Battle</small></h1>
+      </div>
+      <p class="tagline">经典坦克大战一关复刻。唯一变数：炮弹会往下坠——瞄准时要算抛物线。</p>
+    </header>
+
+    <div class="mobile-hud" aria-live="polite">
+      <span>命 <b id="mobileLives">3</b></span>
+      <span>火力 <b id="mobilePower">1</b></span>
+      <span>分 <b id="mobileScore">0</b></span>
+      <span>敌 <b id="mobileRemain">20</b></span>
+      <button id="mobilePauseButton" class="hud-pause" type="button" aria-label="暂停">暂停</button>
+    </div>
+
+    <section class="stage-shell" aria-label="游戏画面">
+      <canvas id="gameCanvas" width="416" height="416"></canvas>
+      <div id="startOverlay" class="overlay">
+        <h2>STAGE 1</h2>
+        <p>保卫老鹰总部。消灭全部敌军。注意：炮弹带重力，水平射击会下坠。</p>
+        <button id="startButton" class="primary" type="button">开始战斗</button>
+        <p class="hint desktop-hint">方向键 / WASD 移动 · 空格 / J 开火 · P 暂停</p>
+        <p class="hint mobile-hint">左侧虚拟摇杆移动 · 右侧按钮开火</p>
+      </div>
+      <div id="pauseOverlay" class="overlay" hidden>
+        <h2>暂停</h2>
+        <p>点击继续，或再按暂停</p>
+        <button id="resumeButton" class="primary" type="button">继续</button>
+      </div>
+      <div id="endOverlay" class="overlay" hidden>
+        <h2 id="endTitle">胜利</h2>
+        <p id="endMessage">敌军全部歼灭。</p>
+        <button id="restartButton" class="primary" type="button">再来一局</button>
+      </div>
+    </section>
+
+    <div id="touchStickWrap" class="touch-stick-wrap" hidden>
+      <div class="touch-stick" id="touchStick" aria-label="移动摇杆">
+        <div class="stick-base">
+          <div class="stick-knob" id="stickKnob"></div>
+          <span class="stick-cross" aria-hidden="true"></span>
+        </div>
+        <p class="touch-label">移动</p>
+      </div>
+    </div>
+
+    <div id="touchActionsWrap" class="touch-actions-wrap" hidden>
+      <div class="touch-actions">
+        <button id="touchFire" class="touch-fire" type="button" aria-label="开火">开火</button>
+        <button id="touchPause" class="touch-pause" type="button" aria-label="暂停">暂停</button>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="panel panel-stats">
+        <h3>战况</h3>
+        <div class="stat-row"><span>关卡</span><b>1</b></div>
+        <div class="stat-row"><span>生命</span><b id="livesValue">3</b></div>
+        <div class="stat-row"><span>火力</span><b id="powerValue">1</b></div>
+        <div class="stat-row"><span>得分</span><b id="scoreValue">0</b></div>
+        <div class="stat-row"><span>剩余敌军</span><b id="remainValue">20</b></div>
+      </div>
+
+      <div class="panel">
+        <h3>敌军队列</h3>
+        <div id="enemyIcons" class="enemy-icons" aria-hidden="true"></div>
+      </div>
+
+      <div class="panel">
+        <h3>本关特色</h3>
+        <p class="feature">子弹带<strong>重力</strong>：向上射击会减速回落，左右射击成抛物线。敌我皆然。</p>
+      </div>
+
+      <div class="panel panel-controls-help">
+        <h3>操作</h3>
+        <ul class="controls">
+          <li class="desktop-hint"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</li>
+          <li class="desktop-hint"><kbd>Space</kbd> / <kbd>J</kbd> 开火</li>
+          <li class="desktop-hint"><kbd>P</kbd> 暂停</li>
+          <li class="mobile-hint">左侧摇杆移动，右侧开火；可双指同时操作</li>
+          <li class="mobile-hint">横屏更佳；页面已锁定缩放，避免误触</li>
+        </ul>
+      </div>
+
+      <div class="panel">
+        <h3>经典要素</h3>
+        <p class="feature" style="color:#c3d0b6">砖墙可打、钢墙需三星、水域不可通行、草丛遮蔽、冰块打滑、老鹰总部、四类敌军、七种道具（星/炸弹/时钟/铲子/头盔/坦克/枪）。</p>
+      </div>
+
+      <p class="credit">坦克与特效素材：<a href="https://kenney.nl/assets/top-down-tanks-redux" target="_blank" rel="noopener">Kenney Top-down Tanks Redux</a>（CC0）。地形与 UI 为经典坦克大战风格自绘。</p>
+    </aside>
+  </div>
+  <script type="module" src="./Script_Game.mjs"></script>
+</body>
+</html>
