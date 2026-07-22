@@ -250,6 +250,7 @@ class Game {
     this.firePointerId = null;
     this.stickVec = { x: 0, y: 0 };
     this.isTouchDevice = false;
+    this.respawnTimer = 0;
 
     this.state = "boot";
     this.map = [];
@@ -265,6 +266,7 @@ class Game {
     this.spawnTimer = 0;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
+    this.pendingFortRestore = false;
     this.baseAlive = true;
     this.waterPhase = 0;
     this.lastTs = 0;
@@ -361,6 +363,22 @@ class Game {
     window.addEventListener("orientationchange", () => {
       setTimeout(() => this.DetectTouchUi(), 120);
     });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) this.ResetTouchInput();
+    });
+    window.addEventListener("pagehide", () => this.ResetTouchInput());
+    window.addEventListener("blur", () => this.ResetTouchInput());
+  }
+
+  ResetTouchInput() {
+    this.stickPointerId = null;
+    this.firePointerId = null;
+    this.touchFire = false;
+    this.touchDir = null;
+    this.stickVec.x = 0;
+    this.stickVec.y = 0;
+    if (this.touchUi.knob) this.touchUi.knob.style.transform = "translate(0, 0)";
+    this.touchUi.fire?.classList.remove("is-active");
   }
 
   DetectTouchUi() {
@@ -437,6 +455,10 @@ class Game {
     };
 
     stick.addEventListener("pointerdown", (ev) => {
+      // Allow reclaim if previous pointer was lost without an up event.
+      if (this.stickPointerId !== null && this.stickPointerId !== ev.pointerId) {
+        this.stickPointerId = null;
+      }
       if (this.stickPointerId !== null) return;
       ev.preventDefault();
       stick.setPointerCapture?.(ev.pointerId);
@@ -461,6 +483,9 @@ class Game {
     });
 
     fire.addEventListener("pointerdown", (ev) => {
+      if (this.firePointerId !== null && this.firePointerId !== ev.pointerId) {
+        this.firePointerId = null;
+      }
       if (this.firePointerId !== null) return;
       ev.preventDefault();
       fire.setPointerCapture?.(ev.pointerId);
@@ -505,8 +530,10 @@ class Game {
     this.spawnTimer = 0.2;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
+    this.pendingFortRestore = false;
     this.baseAlive = true;
     this.nextSpawnSlot = 0;
+    this.respawnTimer = 0;
     this.BuildSpawnQueue();
     this.SpawnPlayer(true);
     this.spawnTimer = 0;
@@ -519,14 +546,7 @@ class Game {
     this.overlays.start.hidden = true;
     this.overlays.pause.hidden = true;
     this.overlays.end.hidden = true;
-    this.touchFire = false;
-    this.stickPointerId = null;
-    this.firePointerId = null;
-    this.stickVec.x = 0;
-    this.stickVec.y = 0;
-    this.touchDir = null;
-    if (this.touchUi.knob) this.touchUi.knob.style.transform = "translate(0, 0)";
-    this.touchUi.fire?.classList.remove("is-active");
+    this.ResetTouchInput();
     this.SyncTouchControlsVisibility();
     this.UpdateHud();
     this.RenderEnemyIcons();
@@ -579,13 +599,17 @@ class Game {
     if (paused && this.state === "playing") {
       this.state = "paused";
       this.overlays.pause.hidden = false;
-      this.touchFire = false;
-      this.touchDir = null;
+      this.ResetTouchInput();
       this.SyncTouchControlsVisibility();
     } else if (!paused && this.state === "paused") {
       this.state = "playing";
       this.overlays.pause.hidden = true;
       this.lastTs = 0;
+      this.ResetTouchInput();
+      // If death timeout was skipped while paused, still respawn.
+      if ((!this.player || !this.player.alive) && this.lives > 0 && this.respawnTimer <= 0) {
+        this.respawnTimer = 0.05;
+      }
       this.SyncTouchControlsVisibility();
     }
   }
@@ -605,7 +629,21 @@ class Game {
     if (this.freezeTimer > 0) this.freezeTimer -= dt;
     if (this.shovelTimer > 0) {
       this.shovelTimer -= dt;
-      if (this.shovelTimer <= 0) this.RestoreBaseFort(false);
+      if (this.shovelTimer <= 0) this.pendingFortRestore = true;
+    }
+    if (this.pendingFortRestore) {
+      if (this.TryRestoreBaseFort()) this.pendingFortRestore = false;
+    }
+
+    if (this.respawnTimer > 0) {
+      this.respawnTimer -= dt;
+      if (this.respawnTimer <= 0) {
+        this.respawnTimer = 0;
+        if (this.state === "playing" && this.lives > 0 && (!this.player || !this.player.alive)) {
+          this.SpawnPlayer(true);
+          this.UnstickTank(this.player);
+        }
+      }
     }
 
     this.UpdatePlayer(dt);
@@ -638,6 +676,9 @@ class Game {
     if (p.fireCd > 0) p.fireCd -= dt;
     p.blink += dt;
 
+    // Always try to escape accidental embeds (wall / fort / tank overlap).
+    this.UnstickTank(p);
+
     const input = this.GetMoveInput();
     p.moving = false;
 
@@ -645,9 +686,15 @@ class Game {
     if (input) {
       if (p.dir !== input) {
         p.dir = input;
-        // snap lightly when turning for classic grid feel
-        p.x = SnapToGrid(p.x, 2);
-        p.y = SnapToGrid(p.y, 2);
+        // snap lightly when turning — revert if it would embed in a wall
+        const ox = p.x;
+        const oy = p.y;
+        p.x = SnapToGrid(p.x, 4);
+        p.y = SnapToGrid(p.y, 4);
+        if (this.TankBlocked(p)) {
+          p.x = ox;
+          p.y = oy;
+        }
       }
       const d = DIR[input];
       const speed = p.speed * (onIce ? 1.15 : 1);
@@ -684,8 +731,13 @@ class Game {
       if (!e.alive) continue;
       if (e.spawnFlash > 0) {
         e.spawnFlash -= dt;
+        if (e.spawnFlash <= 0) {
+          e.spawnFlash = 0;
+          this.UnstickTank(e);
+        }
         continue;
       }
+      this.UnstickTank(e);
       if (e.protect > 0) e.protect -= dt;
       if (e.fireCd > 0) e.fireCd -= dt;
 
@@ -743,24 +795,84 @@ class Game {
   }
 
   MoveTank(tank, dx, dy) {
+    this.UnstickTank(tank);
+
     if (dx !== 0) {
+      const before = tank.x;
       tank.x += dx;
-      if (this.CollidesTerrain(tank) || this.CollidesTanks(tank)) tank.x -= dx;
+      if (this.TankBlocked(tank)) {
+        tank.x = before;
+        this.TrySlideAssist(tank, dx, 0);
+      }
       tank.x = Clamp(tank.x, 0, CANVAS_W - tank.w);
     }
     if (dy !== 0) {
+      const before = tank.y;
       tank.y += dy;
-      if (this.CollidesTerrain(tank) || this.CollidesTanks(tank)) tank.y -= dy;
+      if (this.TankBlocked(tank)) {
+        tank.y = before;
+        this.TrySlideAssist(tank, 0, dy);
+      }
       tank.y = Clamp(tank.y, 0, CANVAS_H - tank.h);
     }
   }
 
+  TankBlocked(tank) {
+    return this.CollidesTerrain(tank) || this.CollidesTanks(tank);
+  }
+
+  UnstickTank(tank) {
+    if (!tank || !tank.alive) return false;
+    if (!this.TankBlocked(tank)) return false;
+
+    const originX = tank.x;
+    const originY = tank.y;
+    const steps = [4, 8, 12, 16, 20, 24, 28, 32];
+    const dirs = [
+      [1, 0], [-1, 0], [0, 1], [0, -1],
+      [1, 1], [1, -1], [-1, 1], [-1, -1],
+    ];
+    for (const dist of steps) {
+      for (const [ox, oy] of dirs) {
+        tank.x = Clamp(originX + ox * dist, 0, CANVAS_W - tank.w);
+        tank.y = Clamp(originY + oy * dist, 0, CANVAS_H - tank.h);
+        if (!this.TankBlocked(tank)) return true;
+      }
+    }
+    tank.x = originX;
+    tank.y = originY;
+    return false;
+  }
+
+  TrySlideAssist(tank, dx, dy) {
+    // If blocked forward, try a small perpendicular snap so corners don't soft-lock.
+    const axis = dx !== 0 ? "y" : "x";
+    const origin = tank[axis];
+    const snapped = SnapToGrid(origin, 8);
+    const limit = axis === "x" ? CANVAS_W - tank.w : CANVAS_H - tank.h;
+    const candidates = [snapped, snapped - 8, snapped + 8, origin - 4, origin + 4];
+    for (const candidate of candidates) {
+      tank[axis] = Clamp(candidate, 0, limit);
+      if (dx !== 0) {
+        tank.x += dx;
+        if (!this.TankBlocked(tank)) return true;
+        tank.x -= dx;
+      } else {
+        tank.y += dy;
+        if (!this.TankBlocked(tank)) return true;
+        tank.y -= dy;
+      }
+    }
+    tank[axis] = origin;
+    return false;
+  }
+
   CollidesTerrain(tank) {
     const pads = [
-      [tank.x + 2, tank.y + 2],
-      [tank.x + tank.w - 3, tank.y + 2],
-      [tank.x + 2, tank.y + tank.h - 3],
-      [tank.x + tank.w - 3, tank.y + tank.h - 3],
+      [tank.x + 3, tank.y + 3],
+      [tank.x + tank.w - 4, tank.y + 3],
+      [tank.x + 3, tank.y + tank.h - 4],
+      [tank.x + tank.w - 4, tank.y + tank.h - 4],
       [tank.x + tank.w / 2, tank.y + tank.h / 2],
     ];
     for (const [px, py] of pads) {
@@ -777,7 +889,8 @@ class Game {
     const bodies = [];
     if (this.player?.alive && self !== this.player) bodies.push(this.player);
     for (const e of this.enemies) {
-      if (e.alive && e !== self && e.spawnFlash <= 0) bodies.push(e);
+      // Include spawning tanks so nobody drives into a spawn flash and hard-locks.
+      if (e.alive && e !== self) bodies.push(e);
     }
     const box = { x: self.x + 2, y: self.y + 2, w: self.w - 4, h: self.h - 4 };
     for (const o of bodies) {
@@ -976,13 +1089,12 @@ class Game {
     this.UpdateHud();
     if (this.lives <= 0) {
       this.lives = 0;
+      this.respawnTimer = 0;
       this.EndGame(false, "生命耗尽。老鹰还在，但无人驾驶。");
       return;
     }
-    setTimeout(() => {
-      if (this.state !== "playing") return;
-      this.SpawnPlayer(true);
-    }, 900);
+    // Use update-loop timer so pause cannot cancel respawn forever.
+    this.respawnTimer = 0.9;
   }
 
   DestroyBase() {
@@ -1052,6 +1164,7 @@ class Game {
         break;
       case POWER.shovel:
         this.shovelTimer = 12;
+        this.pendingFortRestore = false;
         this.FortifyBase(true);
         break;
       default:
@@ -1067,14 +1180,48 @@ class Game {
       [11, 25], [14, 25],
     ];
     for (const [x, y] of cells) {
-      if (this.map[y][x] !== TILE_BASE && this.map[y][x] !== TILE_BASE_DEAD) {
-        this.map[y][x] = steel ? TILE_STEEL : TILE_BRICK;
-      }
+      if (this.map[y][x] === TILE_BASE || this.map[y][x] === TILE_BASE_DEAD) continue;
+      // Never bury a live tank inside fort walls — that soft-locks movement.
+      if (this.TileOccupiedByTank(x, y)) continue;
+      this.map[y][x] = steel ? TILE_STEEL : TILE_BRICK;
+    }
+    if (this.player?.alive) this.UnstickTank(this.player);
+    for (const e of this.enemies) {
+      if (e.alive) this.UnstickTank(e);
     }
   }
 
+  TileOccupiedByTank(tx, ty) {
+    const rect = { x: tx * TILE, y: ty * TILE, w: TILE, h: TILE };
+    if (this.player?.alive && RectsOverlap(this.player, rect)) return true;
+    for (const e of this.enemies) {
+      if (e.alive && RectsOverlap(e, rect)) return true;
+    }
+    return false;
+  }
+
+  TryRestoreBaseFort() {
+    // Defer restore while any fort cell is occupied, otherwise wait one frame and place free cells.
+    const cells = [
+      [11, 23], [12, 23], [13, 23], [14, 23],
+      [11, 24], [14, 24],
+      [11, 25], [14, 25],
+    ];
+    let blocked = false;
+    for (const [x, y] of cells) {
+      if (this.map[y][x] === TILE_BASE || this.map[y][x] === TILE_BASE_DEAD) continue;
+      if (this.TileOccupiedByTank(x, y)) {
+        blocked = true;
+        continue;
+      }
+      this.map[y][x] = TILE_BRICK;
+    }
+    if (this.player?.alive) this.UnstickTank(this.player);
+    return !blocked;
+  }
+
   RestoreBaseFort() {
-    this.FortifyBase(false);
+    this.TryRestoreBaseFort();
   }
 
   UpdatePowerups(dt) {
@@ -1165,8 +1312,8 @@ class Game {
     this.overlays.end.hidden = false;
     this.overlays.endTitle.textContent = won ? "关卡通过" : "游戏结束";
     this.overlays.endMessage.textContent = message;
-    this.touchFire = false;
-    this.touchDir = null;
+    this.respawnTimer = 0;
+    this.ResetTouchInput();
     this.SyncTouchControlsVisibility();
     if (won) this.audio.Win();
     else this.audio.Lose();
