@@ -326,6 +326,47 @@ button.primary:active {
   color: #b8c9a4;
 }
 
+.vol-row {
+  display: grid;
+  grid-template-columns: 2.5em 1fr 2em;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 0.9rem;
+  color: #c3d0b6;
+}
+
+.vol-row input[type="range"] {
+  width: 100%;
+  accent-color: #c45c26;
+}
+
+.vol-row b {
+  font-family: var(--font-mono);
+  color: var(--accent-soft);
+  text-align: right;
+  font-size: 0.85rem;
+}
+
+.mute-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: #c3d0b6;
+  font-size: 0.88rem;
+}
+
+.pause-audio {
+  width: min(260px, 90%);
+  text-align: left;
+  margin: 4px 0 8px;
+}
+
+.pause-audio .vol-row {
+  grid-template-columns: 2.5em 1fr;
+}
+
 .mobile-hint { display: none; }
 .desktop-hint { display: list-item; }
 p.desktop-hint { display: block; }

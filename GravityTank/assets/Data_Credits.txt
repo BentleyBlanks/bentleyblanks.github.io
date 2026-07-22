@@ -16,3 +16,8 @@ Battle City–style sound effects:
   https://github.com/StefanBS/battle-city-clone
   Classic shoot / brick / explode / power-up / stage / game-over set.
   These are open recreations in the NES tank-battle style, not Namco ROM rips.
+
+Background music:
+  AudioBgm_Battle.wav — original 8-bit style stage loop generated for this page
+  (NES tank-battle inspired square-wave motif; not a Namco ROM rip).
+  Stage-start / jingle SFX remain from the MIT battle-city-clone pack.
