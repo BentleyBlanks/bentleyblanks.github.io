@@ -45,7 +45,7 @@ const POWER = {
 };
 
 const ENEMY_TYPES = [
-  { id: "basic", hp: 1, speed: 54, score: 100, shootCd: 1.4, texture: "enemyBasic", weight: 10 },
+  { id: "basic", hp: 1, speed: 54, score: 100, shootCd: 1.4, texture: "enemyAlt", weight: 10 },
   { id: "fast", hp: 1, speed: 96, score: 200, shootCd: 1.1, texture: "enemyFast", weight: 5 },
   { id: "power", hp: 1, speed: 62, score: 300, shootCd: 0.75, texture: "enemyPower", weight: 3, bulletBoost: 1.15 },
   { id: "armor", hp: 4, speed: 48, score: 400, shootCd: 1.2, texture: "enemyArmor", weight: 2 },
@@ -1076,17 +1076,17 @@ class Game {
     if (img) {
       for (let y = 0; y < MAP_H; y += 2) {
         for (let x = 0; x < MAP_W; x += 2) {
-          ctx.globalAlpha = 0.35;
+          ctx.globalAlpha = 0.55;
           ctx.drawImage(img, x * TILE, y * TILE, TILE * 2, TILE * 2);
         }
       }
       ctx.globalAlpha = 1;
     } else {
-      ctx.fillStyle = "#3a3a3a";
+      ctx.fillStyle = "#4a5a3a";
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     }
-    // battlefield tint
-    ctx.fillStyle = "rgba(20, 28, 16, 0.55)";
+    // battlefield tint — keep readable against dark enemy tanks
+    ctx.fillStyle = "rgba(36, 48, 28, 0.35)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   }
 
@@ -1224,13 +1224,21 @@ class Game {
       // armor HP tint
       if (!isPlayer && tank.maxHp > 1) {
         const hurt = 1 - tank.hp / tank.maxHp;
-        ctx.filter = `hue-rotate(${hurt * 60}deg) saturate(${1.2 - hurt})`;
+        ctx.filter = `hue-rotate(${hurt * 60}deg) saturate(${1.2 - hurt}) brightness(1.15)`;
+      } else if (!isPlayer) {
+        ctx.filter = "brightness(1.25) contrast(1.1)";
       }
       ctx.drawImage(img, -tank.w / 2, -tank.h / 2, tank.w, tank.h);
       ctx.filter = "none";
     } else {
       ctx.fillStyle = isPlayer ? "#c6b23a" : "#cfcfcf";
       ctx.fillRect(-tank.w / 2, -tank.h / 2, tank.w, tank.h);
+    }
+    // silhouette ring so dark tanks read on dark ground
+    if (!isPlayer) {
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-tank.w / 2 + 1, -tank.h / 2 + 1, tank.w - 2, tank.h - 2);
     }
     ctx.restore();
 
