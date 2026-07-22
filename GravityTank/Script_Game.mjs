@@ -589,6 +589,8 @@ class Game {
     window.addEventListener("orientationchange", () => {
       setTimeout(() => this.DetectTouchUi(), 120);
     });
+    window.visualViewport?.addEventListener("resize", () => this.FitPortraitStage());
+    window.visualViewport?.addEventListener("scroll", () => this.FitPortraitStage());
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) this.ResetTouchInput();
     });
@@ -618,13 +620,46 @@ class Game {
     this.isTouchDevice = forced || coarse || noHover || touchPoints || narrow || shortLandscape;
     document.body.classList.toggle("is-touch", this.isTouchDevice);
     document.body.classList.toggle("force-touch", forced);
+    document.body.classList.toggle("is-portrait", window.matchMedia("(orientation: portrait)").matches);
     this.SyncTouchControlsVisibility();
+    this.FitPortraitStage();
+  }
+
+  /** Size the square stage so HUD + canvas + controls fit in one portrait viewport. */
+  FitPortraitStage() {
+    const shell = document.querySelector(".stage-shell");
+    if (!shell) return;
+    const portrait = window.matchMedia("(orientation: portrait)").matches;
+    const narrow = window.innerWidth <= 900;
+    if (!(this.isTouchDevice && portrait && narrow)) {
+      shell.style.width = "";
+      shell.style.maxWidth = "";
+      return;
+    }
+    const vv = window.visualViewport;
+    const viewH = vv?.height ?? window.innerHeight;
+    const viewW = vv?.width ?? window.innerWidth;
+    const padX = 16;
+    const hud = document.querySelector(".mobile-hud");
+    const hudH = Math.max(36, hud ? hud.getBoundingClientRect().height : 44);
+    const controlsOn = this.touchUi.stickWrap && !this.touchUi.stickWrap.hidden;
+    const controlsBudget = controlsOn ? 128 : 16;
+    const gapBudget = 24;
+    const size = Math.floor(Math.max(180, Math.min(viewW - padX, viewH - hudH - controlsBudget - gapBudget)));
+    shell.style.width = `${size}px`;
+    shell.style.maxWidth = `${size}px`;
   }
 
   SyncTouchControlsVisibility() {
     const show = this.isTouchDevice && (this.state === "playing" || this.state === "paused" || this.state === "roulette");
     if (this.touchUi.stickWrap) this.touchUi.stickWrap.hidden = !show;
     if (this.touchUi.actionsWrap) this.touchUi.actionsWrap.hidden = !show;
+    // Immersive mobile chrome: hide long marketing/side panels so portrait fits one screen.
+    const immersive = this.isTouchDevice && ["playing", "paused", "roulette", "stageIntro", "won", "lost"].includes(this.state);
+    document.body.classList.toggle("is-touch-play", immersive);
+    document.body.classList.toggle("is-portrait", window.matchMedia("(orientation: portrait)").matches);
+    // Defer so layout reflects control visibility before measuring.
+    requestAnimationFrame(() => this.FitPortraitStage());
   }
 
   BindVolumeControls() {
