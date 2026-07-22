@@ -16,8 +16,9 @@ Battle City–style sound effects:
   These are open recreations in the NES tank-battle style, not Namco ROM rips.
 
 Background music:
-  AudioBgm_Battle.wav — original 8-bit style stage loop generated for this page
-  (NES tank-battle inspired square-wave motif; not a Namco ROM rip).
+  AudioBgm_Battle.ogg — "8 bit battle theme (famitracker)" by celestialghost8
+  https://opengameart.org/content/8-bit-battle-theme-famitracker
+  License: CC-BY 3.0 (see Data_BgmLicense.txt). Not a Namco ROM rip.
   Stage-start / jingle SFX remain from the MIT battle-city-clone pack.
 
 Game twist: all shells use downward gravity (parabolic arcs; +20% vs initial build).

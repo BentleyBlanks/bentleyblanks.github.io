@@ -235,7 +235,7 @@ class AudioBus {
       pause: "assets/AudioSfx_Pause.wav",
       ice: "assets/AudioSfx_Ice.wav",
       engine: "assets/AudioSfx_Engine.wav",
-      bgm: "assets/AudioBgm_Battle.wav",
+      bgm: "assets/AudioBgm_Battle.ogg",
     };
     const ctx = this.Ensure();
     if (!ctx) return;
@@ -1363,7 +1363,7 @@ class Game {
     if (tank.fireCd > 0) return;
     const owned = this.bullets.filter((b) => b.alive && b.owner === tank).length;
     let maxB = isPlayer ? tank.maxBullets : 1;
-    if (isPlayer && this.overdriveTimer > 0) maxB = Math.max(maxB, 3);
+    if (isPlayer && this.overdriveTimer > 0) maxB = Math.max(maxB, 4);
     if (owned >= maxB) return;
 
     this.SpawnShell(tank, tank.dir, isPlayer);
@@ -1371,7 +1371,7 @@ class Game {
       const opp = { up: "down", down: "up", left: "right", right: "left" }[tank.dir];
       this.SpawnShell(tank, opp, true, { bonusShot: true });
     }
-    if (isPlayer && this.overdriveTimer > 0) tank.fireCd = 0.1;
+    if (isPlayer && this.overdriveTimer > 0) tank.fireCd = 0.07;
     else tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd * (this.enemyRageTimer > 0 ? 0.55 : 1);
     this.audio.Shoot();
   }
@@ -1652,7 +1652,7 @@ class Game {
   }
 
   ShowBuffToast(text) {
-    this.buffToast = { text, ttl: 2.6 };
+    this.buffToast = { text, ttl: 3.2 };
   }
 
   OpenRoulette() {
@@ -1672,8 +1672,8 @@ class Game {
       result: null,
       resultT: 0,
       cx: CANVAS_W / 2,
-      cy: CANVAS_H / 2,
-      radius: 148,
+      cy: CANVAS_H / 2 + 28,
+      radius: 132,
     };
     this.SyncTouchControlsVisibility();
     this.ShowBuffToast("甩转轮盘！转到哪算哪");
@@ -1750,7 +1750,7 @@ class Game {
 
     if (r.phase === "result") {
       r.resultT += dt;
-      if (r.resultT >= 1.35) this.CloseRoulette();
+      if (r.resultT >= 1.85) this.CloseRoulette();
       return;
     }
 
@@ -1818,108 +1818,130 @@ class Game {
       case POWER.star:
         if (p) {
           p.power = Math.min(3, p.power + 1);
-          if (p.power >= 2) p.maxBullets = 2;
+          if (p.power >= 2) p.maxBullets = Math.max(p.maxBullets, 2);
+          if (p.power >= 3) {
+            p.maxBullets = Math.max(p.maxBullets, 3);
+            this.overdriveTimer = Math.max(this.overdriveTimer, 8);
+          }
         }
-        this.ShowBuffToast("★ 火力升级");
+        this.ShowBuffToast(p?.power >= 3 ? "★ 火力满载 + 超武" : "★ 火力升级");
         break;
       case POWER.gun:
         if (p) {
           p.power = 3;
-          p.maxBullets = 2;
+          p.maxBullets = Math.max(p.maxBullets, 3);
         }
-        this.ShowBuffToast("手枪：钢墙可破");
+        this.overdriveTimer = Math.max(this.overdriveTimer, 10);
+        this.ShowBuffToast("手枪：钢墙可破 + 疯射");
         break;
       case POWER.life:
-        this.lives += 1;
-        this.ShowBuffToast("额外生命 +1");
+        this.lives += 2;
+        this.ShowBuffToast("额外生命 +2");
         break;
       case POWER.helmet:
-        if (p) p.protect = 10;
-        this.ShowBuffToast("护盾 10 秒");
+        if (p) p.protect = Math.max(p.protect, 16);
+        this.ShowBuffToast("护盾 16 秒");
         break;
       case POWER.clock:
-        this.freezeTimer = 10;
-        this.ShowBuffToast("敌军冻结");
+        this.freezeTimer = 16;
+        this.ShowBuffToast("敌军冻结 16 秒");
         break;
       case POWER.bomb:
         this.KillAllFieldEnemies();
-        this.ShowBuffToast("全场爆破");
+        this.NukeBricks(0.45);
+        this.ShowBuffToast("全场爆破 + 掀砖");
         break;
       case POWER.shovel:
-        this.shovelTimer = 14;
+        this.shovelTimer = 22;
         this.pendingFortRestore = false;
         this.FortifyBase(true);
-        this.ShowBuffToast("总部钢墙加固");
+        this.ShowBuffToast("总部钢墙加固 22 秒");
         break;
       case POWER.antigrav:
-        this.antigravTimer = 12;
-        this.ShowBuffToast("反重力！");
+        this.antigravTimer = 18;
+        this.ShowBuffToast("反重力 18 秒！");
         break;
       case POWER.bounce:
-        this.bounceTimer = 14;
-        this.ShowBuffToast("弹跳弹！");
+        this.bounceTimer = 20;
+        this.ShowBuffToast("弹跳弹 20 秒！");
         break;
       case POWER.meteor:
-        this.SpawnMeteorRain(8);
-        this.ShowBuffToast("陨石雨");
+        this.SpawnMeteorRain(16);
+        this.ShowBuffToast("陨石雨 ×16");
         break;
       case POWER.ghost:
-        this.ghostTimer = 10;
-        if (p) this.UnstickTank(p);
-        this.ShowBuffToast("幽灵穿墙");
+        this.ghostTimer = 16;
+        if (p) {
+          this.UnstickTank(p);
+          p.protect = Math.max(p.protect, 4);
+        }
+        this.ShowBuffToast("幽灵穿墙 16 秒");
         break;
       case POWER.mirror:
-        this.mirrorTimer = 12;
-        this.ShowBuffToast("镜像炮");
+        this.mirrorTimer = 18;
+        this.ShowBuffToast("镜像炮 18 秒");
         break;
       case POWER.magnet:
-        this.magnetTimer = 12;
-        this.ShowBuffToast("磁导追踪");
+        this.magnetTimer = 18;
+        this.ShowBuffToast("磁导追踪 18 秒");
         break;
       case POWER.warp:
         this.WarpPlayer();
-        this.ShowBuffToast("闪现");
+        if (p) p.protect = Math.max(p.protect, 5);
+        this.ShowBuffToast("闪现 + 短盾");
         break;
       case POWER.nuke:
         this.KillAllFieldEnemies();
-        this.NukeBricks();
-        if (p) p.protect = Math.max(p.protect, 4);
-        this.ShowBuffToast("☢ 核爆：清场+掀砖");
+        this.NukeBricks(0.92);
+        this.SpawnMeteorRain(6);
+        if (p) {
+          p.protect = Math.max(p.protect, 10);
+          p.power = 3;
+          p.maxBullets = Math.max(p.maxBullets, 3);
+        }
+        this.ShowBuffToast("☢ 核爆：清场+掀砖+陨石");
         break;
       case POWER.overdrive:
         if (p) {
           p.power = 3;
-          p.maxBullets = 3;
+          p.maxBullets = 4;
+          p.protect = Math.max(p.protect, 6);
         }
-        this.overdriveTimer = 16;
-        this.bounceTimer = Math.max(this.bounceTimer, 8);
-        this.magnetTimer = Math.max(this.magnetTimer, 8);
-        this.ShowBuffToast("超武：三联装疯射 16 秒");
+        this.overdriveTimer = 24;
+        this.bounceTimer = Math.max(this.bounceTimer, 14);
+        this.magnetTimer = Math.max(this.magnetTimer, 14);
+        this.antigravTimer = Math.max(this.antigravTimer, 8);
+        this.ShowBuffToast("超武：四联疯射 24 秒！！");
         break;
       case POWER.apocalypse:
-        this.freezeTimer = 12;
+        this.freezeTimer = 18;
         this.KillAllFieldEnemies();
-        this.SpawnMeteorRain(12);
+        this.NukeBricks(0.7);
+        this.SpawnMeteorRain(24);
         this.FortifyBase(true);
-        this.shovelTimer = Math.max(this.shovelTimer, 10);
+        this.shovelTimer = Math.max(this.shovelTimer, 16);
+        this.overdriveTimer = Math.max(this.overdriveTimer, 14);
         if (p) {
           p.power = 3;
-          p.maxBullets = 3;
-          p.protect = 12;
+          p.maxBullets = 4;
+          p.protect = 20;
         }
-        this.ShowBuffToast("天罚降临！！");
+        this.bounceTimer = Math.max(this.bounceTimer, 12);
+        this.magnetTimer = Math.max(this.magnetTimer, 12);
+        this.ShowBuffToast("天罚降临！！清场+陨石海");
         break;
       case POWER.juggernaut:
         if (p) {
-          p.power = Math.max(p.power, 2);
-          p.maxBullets = Math.max(p.maxBullets, 2);
-          p.protect = 18;
+          p.power = 3;
+          p.maxBullets = 4;
+          p.protect = 28;
         }
-        this.ghostTimer = 14;
-        this.bounceTimer = 14;
-        this.magnetTimer = 14;
-        this.antigravTimer = 6;
-        this.ShowBuffToast("霸体：几乎无敌的 14 秒");
+        this.ghostTimer = 22;
+        this.bounceTimer = 22;
+        this.magnetTimer = 22;
+        this.antigravTimer = 12;
+        this.overdriveTimer = Math.max(this.overdriveTimer, 12);
+        this.ShowBuffToast("霸体：几乎无敌的 22 秒！！");
         break;
       case POWER.spawnExtra:
         this.ForceSpawnExtras(4);
@@ -1968,10 +1990,10 @@ class Game {
     this.RenderEnemyIcons();
   }
 
-  NukeBricks() {
+  NukeBricks(chance = 0.55) {
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
-        if (this.map[y][x] === TILE_BRICK && Math.random() < 0.55) this.map[y][x] = TILE_EMPTY;
+        if (this.map[y][x] === TILE_BRICK && Math.random() < chance) this.map[y][x] = TILE_EMPTY;
       }
     }
   }
@@ -2489,8 +2511,15 @@ class Game {
     }
 
     if (tank.protect > 0) {
+      // Outline-only shield frames (black keyed transparent) — scale up so body stays readable.
       const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 4) % 2];
-      this.BlitGrid(ctx, sx, sy, tank.x, tank.y, tank.w, tank.h);
+      const pad = 3;
+      this.BlitGrid(ctx, sx, sy, tank.x - pad, tank.y - pad, tank.w + pad * 2, tank.h + pad * 2);
+      // Soft pulse ring so shield reads even when sheet contrast is low.
+      const pulse = 0.45 + 0.35 * Math.abs(Math.sin(this.frame * 0.28));
+      ctx.strokeStyle = `rgba(200,240,255,${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tank.x - 1, tank.y - 1, tank.w + 2, tank.h + 2);
     }
   }
 
@@ -2606,9 +2635,43 @@ class Game {
     if (!r) return;
     const n = ROULETTE_SEGMENTS.length;
     const slice = (Math.PI * 2) / n;
+    const needleIdx = this.RouletteIndexAtNeedle();
+    const under = ROULETTE_SEGMENTS[needleIdx];
+    const focus = r.phase === "result" && r.result ? r.result : under;
 
-    ctx.fillStyle = "rgba(0,0,0,0.62)";
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // === Focus banner (the one thing that matters) ===
+    const bannerY = 10;
+    const bannerH = 58;
+    ctx.fillStyle = focus.tier === "ultra" ? "rgba(120,40,10,0.92)"
+      : focus.tier === "bad" ? "rgba(80,10,10,0.92)"
+        : "rgba(20,40,28,0.92)";
+    ctx.fillRect(18, bannerY, CANVAS_W - 36, bannerH);
+    ctx.strokeStyle = focus.color;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(18, bannerY, CANVAS_W - 36, bannerH);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    if (r.phase === "spin") {
+      ctx.fillStyle = "#c8c8c8";
+      ctx.font = "bold 11px monospace";
+      ctx.fillText("▼ 指针指向", CANVAS_W / 2, bannerY + 14);
+      ctx.fillStyle = focus.color;
+      ctx.font = "bold 26px monospace";
+      const tierTag = focus.tier === "ultra" ? "【超强】" : focus.tier === "bad" ? "【负面】" : "";
+      ctx.fillText(`${tierTag}${focus.label}`, CANVAS_W / 2, bannerY + 38);
+    } else {
+      const tier = focus.tier === "ultra" ? "超强命中！" : focus.tier === "bad" ? "负面命中！" : "获得";
+      ctx.fillStyle = focus.color;
+      ctx.font = "bold 13px monospace";
+      ctx.fillText(tier, CANVAS_W / 2, bannerY + 14);
+      ctx.font = "bold 28px monospace";
+      ctx.fillText(focus.label, CANVAS_W / 2, bannerY + 40);
+    }
+    ctx.textBaseline = "alphabetic";
 
     // Wheel
     ctx.save();
@@ -2618,79 +2681,117 @@ class Game {
       const seg = ROULETTE_SEGMENTS[i];
       const a0 = i * slice;
       const a1 = a0 + slice;
+      const isFocus = i === needleIdx;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, r.radius, a0, a1);
       ctx.closePath();
-      ctx.fillStyle = seg.bg;
+      ctx.fillStyle = isFocus ? seg.color : seg.bg;
+      if (isFocus) ctx.globalAlpha = 0.88;
       ctx.fill();
-      ctx.strokeStyle = seg.tier === "ultra" ? "#ffe080" : seg.tier === "bad" ? "#ff6060" : "#888";
-      ctx.lineWidth = seg.tier === "ultra" ? 2.5 : 1;
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = seg.tier === "ultra" ? "#ffe080" : seg.tier === "bad" ? "#ff6060" : "#666";
+      ctx.lineWidth = isFocus ? 3.5 : seg.tier === "ultra" ? 2.2 : 1;
       ctx.stroke();
 
-      // label
       ctx.save();
       ctx.rotate(a0 + slice / 2);
-      ctx.fillStyle = seg.color;
-      ctx.font = "bold 13px monospace";
+      ctx.fillStyle = isFocus ? "#101010" : seg.color;
+      ctx.font = isFocus ? "bold 15px monospace" : seg.tier === "ultra" ? "bold 13px monospace" : "bold 12px monospace";
       ctx.textAlign = "center";
       ctx.fillText(seg.label, r.radius * 0.62, 4);
+      if (seg.tier === "ultra" && !isFocus) {
+        ctx.fillStyle = "#ffe080";
+        ctx.font = "bold 9px monospace";
+        ctx.fillText("超", r.radius * 0.88, 3);
+      } else if (seg.tier === "bad" && !isFocus) {
+        ctx.fillStyle = "#ff8080";
+        ctx.font = "bold 9px monospace";
+        ctx.fillText("负", r.radius * 0.88, 3);
+      }
       ctx.restore();
     }
     // hub
     ctx.beginPath();
-    ctx.arc(0, 0, 22, 0, Math.PI * 2);
-    ctx.fillStyle = "#1a1a1a";
+    ctx.arc(0, 0, 26, 0, Math.PI * 2);
+    ctx.fillStyle = "#121212";
     ctx.fill();
-    ctx.strokeStyle = "#ffe08a";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = focus.color;
+    ctx.lineWidth = 3;
     ctx.stroke();
+    ctx.fillStyle = focus.color;
+    ctx.font = "bold 11px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(focus.tier === "ultra" ? "超" : focus.tier === "bad" ? "负" : "奖", 0, 4);
     ctx.restore();
 
-    // Fixed needle at top
-    ctx.fillStyle = "#ffe08a";
+    // Fixed needle at top — bigger, high-contrast
+    const ny = r.cy - r.radius;
+    ctx.fillStyle = "#101010";
     ctx.beginPath();
-    ctx.moveTo(r.cx, r.cy - r.radius - 4);
-    ctx.lineTo(r.cx - 10, r.cy - r.radius - 22);
-    ctx.lineTo(r.cx + 10, r.cy - r.radius - 22);
+    ctx.moveTo(r.cx, ny - 2);
+    ctx.lineTo(r.cx - 14, ny - 28);
+    ctx.lineTo(r.cx + 14, ny - 28);
     ctx.closePath();
     ctx.fill();
+    ctx.fillStyle = "#ffe08a";
+    ctx.beginPath();
+    ctx.moveTo(r.cx, ny);
+    ctx.lineTo(r.cx - 12, ny - 24);
+    ctx.lineTo(r.cx + 12, ny - 24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-    // rim
-    ctx.strokeStyle = "#c0c0c0";
+    // rim + focus arc glow
+    ctx.strokeStyle = "#d0d0d0";
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.arc(r.cx, r.cy, r.radius + 2, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = "#fff8e0";
-    ctx.font = "bold 16px monospace";
+    // Highlight the needle wedge on the rim
+    ctx.save();
+    ctx.translate(r.cx, r.cy);
+    const aFocus0 = needleIdx * slice + r.angle;
+    ctx.strokeStyle = focus.color;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(0, 0, r.radius + 6, aFocus0, aFocus0 + slice);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = "#d8d8d8";
+    ctx.font = "11px monospace";
     ctx.textAlign = "center";
     if (r.phase === "spin") {
       const moving = Math.abs(r.omega) > 0.2 || r.dragging;
-      ctx.fillText(moving ? "减速中…转到哪算哪" : "拖动甩转 / 空格加力", r.cx, 28);
-      ctx.font = "12px monospace";
-      ctx.fillStyle = "#c0c0c0";
-      ctx.fillText(`角速度 ${r.omega.toFixed(1)} rad/s`, r.cx, 48);
-    } else if (r.result) {
-      const tier = r.result.tier === "ultra" ? "超强！" : r.result.tier === "bad" ? "负面！" : "获得";
-      ctx.fillStyle = r.result.color;
-      ctx.font = "bold 22px monospace";
-      ctx.fillText(`${tier} ${r.result.label}`, r.cx, 36);
+      ctx.fillText(moving ? "减速中…转到哪算哪" : "拖动甩转 / 空格加力", r.cx, CANVAS_H - 28);
+      ctx.fillStyle = "#888";
+      ctx.fillText(`ω ${r.omega.toFixed(1)}`, r.cx, CANVAS_H - 12);
+    } else {
+      ctx.fillStyle = focus.color;
+      ctx.font = "bold 12px monospace";
+      ctx.fillText("生效中…", r.cx, CANVAS_H - 18);
     }
     ctx.textAlign = "left";
 
     if (this.buffToast) {
       const alpha = Clamp(this.buffToast.ttl / 0.4, 0, 1);
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillStyle = "rgba(0,0,0,0.78)";
       const msg = this.buffToast.text;
-      ctx.font = "bold 14px monospace";
-      const tw = ctx.measureText(msg).width + 20;
-      ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H - 48, tw, 24);
+      ctx.font = "bold 15px monospace";
+      const tw = Math.min(CANVAS_W - 24, ctx.measureText(msg).width + 24);
+      ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H - 56, tw, 28);
+      ctx.strokeStyle = focus.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect((CANVAS_W - tw) / 2, CANVAS_H - 56, tw, 28);
       ctx.fillStyle = "#ffe08a";
       ctx.textAlign = "center";
-      ctx.fillText(msg, CANVAS_W / 2, CANVAS_H - 31);
+      ctx.fillText(msg, CANVAS_W / 2, CANVAS_H - 37);
       ctx.textAlign = "left";
       ctx.globalAlpha = 1;
     }
