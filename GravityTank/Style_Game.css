@@ -272,9 +272,14 @@ button.primary:active {
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  background: linear-gradient(135deg, #6a6a6a, #3a3a3a);
-  clip-path: polygon(20% 10%, 80% 10%, 90% 35%, 90% 70%, 70% 90%, 30% 90%, 10% 70%, 10% 35%);
-  opacity: 0.9;
+  background:
+    linear-gradient(#c8c8c8, #c8c8c8) 30% 20% / 40% 12% no-repeat,
+    linear-gradient(#8a8a8a, #8a8a8a) 20% 35% / 60% 45% no-repeat,
+    linear-gradient(#5a5a5a, #5a5a5a) 8% 20% / 18% 70% no-repeat,
+    linear-gradient(#5a5a5a, #5a5a5a) 74% 20% / 18% 70% no-repeat,
+    #2a2a2a;
+  image-rendering: pixelated;
+  opacity: 0.95;
 }
 
 .enemy-icons i.gone {

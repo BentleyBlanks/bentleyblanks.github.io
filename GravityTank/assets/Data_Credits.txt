@@ -1,15 +1,13 @@
 Gravity Tank Battle — asset credits
 ===================================
 
-Tank sprites, bullets, explosions, bushes, barrels, and power-up props:
-  Kenney — Top-down Tanks Redux
-  https://kenney.nl/assets/top-down-tanks-redux
-  License: Creative Commons CC0 1.0 Universal
-
-Terrain tiles (brick / steel / water / ice) and HUD chrome are original
-drawings inspired by classic Battle City / 坦克大战 layouts.
-
-Game twist: all shells use downward gravity (parabolic arcs).
+Classic NES Battle City–style sprites (tanks, bricks, steel, water, ice,
+grass, eagle base, bullets, power-ups, explosions, shield, spawn FX):
+  StefanBS/battle-city-clone — assets/sprites/sprites.png
+  https://github.com/StefanBS/battle-city-clone
+  License: MIT
+  Classic look-alike recreation for browser/desktop clones.
+  Not Namco ROM dumps. Original Battle City remains © Namco / Bandai Namco.
 
 Battle City–style sound effects:
   Generated retro 8-bit WAVs from StefanBS/battle-city-clone (MIT License)
@@ -21,3 +19,5 @@ Background music:
   AudioBgm_Battle.wav — original 8-bit style stage loop generated for this page
   (NES tank-battle inspired square-wave motif; not a Namco ROM rip).
   Stage-start / jingle SFX remain from the MIT battle-city-clone pack.
+
+Game twist: all shells use downward gravity (parabolic arcs).

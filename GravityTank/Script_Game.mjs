@@ -1,6 +1,6 @@
 /**
  * GravityTank — Battle City stage 1 with gravity bullets.
- * Visual tank/FX assets: Kenney Top-down Tanks Redux (CC0).
+ * Visuals: classic NES Battle City–style sprites (StefanBS/battle-city-clone, MIT).
  */
 
 const TILE = 16;
@@ -8,7 +8,9 @@ const MAP_W = 26;
 const MAP_H = 26;
 const CANVAS_W = MAP_W * TILE; // 416
 const CANVAS_H = MAP_H * TILE;
-const TANK_SIZE = 28;
+const TANK_SIZE = 32;
+const SHEET_CELL = 8;
+const SPRITE = 16; // classic tank / metatile source size in the sheet
 const MAX_ENEMIES_ON_FIELD = 4;
 const TOTAL_ENEMIES = 20;
 const PLAYER_LIVES = 3;
@@ -45,11 +47,66 @@ const POWER = {
 };
 
 const ENEMY_TYPES = [
-  { id: "basic", hp: 1, speed: 54, score: 100, shootCd: 1.4, texture: "enemyAlt", weight: 10 },
+  { id: "basic", hp: 1, speed: 54, score: 100, shootCd: 1.4, texture: "enemyBasic", weight: 10 },
   { id: "fast", hp: 1, speed: 96, score: 200, shootCd: 1.1, texture: "enemyFast", weight: 5 },
   { id: "power", hp: 1, speed: 62, score: 300, shootCd: 0.75, texture: "enemyPower", weight: 3, bulletBoost: 1.15 },
   { id: "armor", hp: 4, speed: 48, score: 400, shootCd: 1.2, texture: "enemyArmor", weight: 2 },
 ];
+
+/** Classic sheet grid origins [gx, gy] in 8×8 cells (16×16 sprite = 2×2 cells). */
+const TANK_DIR_COL = { up: 0, left: 4, down: 8, right: 12 };
+const ENEMY_SHEET = {
+  enemyBasic: { row: 8, redRow: 24, col: 16 },
+  enemyFast: { row: 10, redRow: 26, col: 16 },
+  enemyPower: { row: 12, redRow: 28, col: 16 },
+  enemyArmor: { row: 14, redRow: 30, col: 16 },
+  enemyAlt: { row: 24, redRow: 24, col: 16 },
+};
+const TILE_SHEET = {
+  brick: [32, 8],
+  steel: [32, 9],
+  bush: [33, 9],
+  ice: [34, 9],
+  water: [
+    [32, 10],
+    [33, 10],
+    [34, 10],
+  ],
+  baseAlive: [38, 4],
+  baseDead: [40, 4],
+};
+const POWER_SHEET = {
+  helmet: [32, 14],
+  clock: [34, 14],
+  shovel: [36, 14],
+  star: [38, 14],
+  bomb: [40, 14],
+  life: [42, 14],
+  gun: [40, 14],
+};
+const FX_SHEET = {
+  spawn: [
+    [32, 12],
+    [34, 12],
+    [36, 12],
+    [38, 12],
+  ],
+  shield: [
+    [32, 18],
+    [34, 18],
+  ],
+  explosion: [
+    [32, 16],
+    [34, 16],
+    [36, 16],
+  ],
+};
+const BULLET_SHEET = {
+  up: [323, 102, 3, 4],
+  left: [330, 102, 4, 3],
+  down: [339, 102, 3, 4],
+  right: [346, 102, 4, 3],
+};
 
 /** Classic-inspired Stage 1 layout (26x26 half-tiles). Legend in buildStageMap. */
 function BuildStageMap() {
@@ -452,36 +509,32 @@ class Game {
   }
 
   async LoadAssets() {
-    const list = {
-      player: "assets/Texture_TankPlayer.png",
-      enemyBasic: "assets/Texture_TankEnemyBasic.png",
-      enemyFast: "assets/Texture_TankEnemyFast.png",
-      enemyPower: "assets/Texture_TankEnemyPower.png",
-      enemyArmor: "assets/Texture_TankEnemyArmor.png",
-      enemyAlt: "assets/Texture_TankEnemyAlt.png",
-      bulletPlayer: "assets/Texture_BulletPlayer.png",
-      bulletEnemy: "assets/Texture_BulletEnemy.png",
-      bush: "assets/Texture_Bush.png",
-      baseAlive: "assets/Texture_BaseAlive.png",
-      baseDead: "assets/Texture_BaseDead.png",
-      powerStar: "assets/Texture_PowerStar.png",
-      powerClock: "assets/Texture_PowerClock.png",
-      powerBomb: "assets/Texture_PowerBomb.png",
-      powerHelmet: "assets/Texture_PowerHelmet.png",
-      muzzle: "assets/Texture_Muzzle.png",
-      explosion1: "assets/Texture_Explosion1.png",
-      explosion2: "assets/Texture_Explosion2.png",
-      explosion3: "assets/Texture_Explosion3.png",
-      explosion4: "assets/Texture_Explosion4.png",
-      explosion5: "assets/Texture_Explosion5.png",
-      brick: "assets/Texture_Brick.png",
-      steel: "assets/Texture_Steel.png",
-      ground: "assets/Texture_Ground.png",
+    this.images = {
+      sheet: await LoadImage("assets/Texture_ClassicSheet.png"),
     };
-    const entries = await Promise.all(
-      Object.entries(list).map(async ([key, src]) => [key, await LoadImage(src)])
+  }
+
+  /** Blit a grid-aligned 16×16 (or larger) sprite from the classic sheet. */
+  BlitGrid(ctx, gx, gy, dx, dy, dw = TILE, dh = TILE, gw = 2, gh = 2) {
+    const sheet = this.images.sheet;
+    if (!sheet) return;
+    ctx.drawImage(
+      sheet,
+      gx * SHEET_CELL,
+      gy * SHEET_CELL,
+      gw * SHEET_CELL,
+      gh * SHEET_CELL,
+      dx,
+      dy,
+      dw,
+      dh
     );
-    this.images = Object.fromEntries(entries);
+  }
+
+  BlitRect(ctx, sx, sy, sw, sh, dx, dy, dw, dh) {
+    const sheet = this.images.sheet;
+    if (!sheet) return;
+    ctx.drawImage(sheet, sx, sy, sw, sh, dx, dy, dw, dh);
   }
 
   BindUi() {
@@ -799,6 +852,7 @@ class Game {
       slipVx: 0,
       slipVy: 0,
       blink: 0,
+      animTick: 0,
     };
   }
 
@@ -939,6 +993,7 @@ class Game {
     }
 
     this.audio.SetEngine(p.moving);
+    if (p.moving) p.animTick += dt * 10;
 
     if (this.WantsFire()) this.TryFire(p, true);
 
@@ -990,7 +1045,11 @@ class Game {
       const beforeX = e.x;
       const beforeY = e.y;
       this.MoveTank(e, d.x * e.speed * dt, d.y * e.speed * dt);
-      if (Math.abs(e.x - beforeX) < 0.01 && Math.abs(e.y - beforeY) < 0.01) {
+      if (Math.abs(e.x - beforeX) > 0.01 || Math.abs(e.y - beforeY) > 0.01) {
+        e.moving = true;
+        e.animTick += dt * 10;
+      } else {
+        e.moving = false;
         // blocked — pick new dir soon
         e.aiTimer = Math.min(e.aiTimer, 0.15);
       }
@@ -1522,6 +1581,8 @@ class Game {
       protect: 0,
       dropsPower: type.id === "armor" || Math.random() < 0.15,
       deathTimer: 0,
+      animTick: 0,
+      moving: false,
     };
     this.enemies.push(enemy);
     this.RenderEnemyIcons();
@@ -1624,21 +1685,8 @@ class Game {
   }
 
   DrawGround(ctx) {
-    const img = this.images.ground;
-    if (img) {
-      for (let y = 0; y < MAP_H; y += 2) {
-        for (let x = 0; x < MAP_W; x += 2) {
-          ctx.globalAlpha = 0.55;
-          ctx.drawImage(img, x * TILE, y * TILE, TILE * 2, TILE * 2);
-        }
-      }
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.fillStyle = "#4a5a3a";
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    }
-    // battlefield tint — keep readable against dark enemy tanks
-    ctx.fillStyle = "rgba(36, 48, 28, 0.35)";
+    // Classic Battle City playfield is flat black.
+    ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   }
 
@@ -1652,159 +1700,86 @@ class Game {
           if (t === TILE_GRASS) this.DrawGrass(ctx, px, py);
           continue;
         }
-        if (t === TILE_BRICK) this.DrawBrick(ctx, px, py, x, y);
+        if (t === TILE_BRICK) this.DrawBrick(ctx, px, py);
         else if (t === TILE_STEEL) this.DrawSteel(ctx, px, py);
-        else if (t === TILE_WATER) this.DrawWater(ctx, px, py, x, y);
+        else if (t === TILE_WATER) this.DrawWater(ctx, px, py);
         else if (t === TILE_ICE) this.DrawIce(ctx, px, py);
       }
     }
   }
 
   DrawBrick(ctx, px, py) {
-    // Classic brick pattern
-    ctx.fillStyle = "#b54a2a";
-    ctx.fillRect(px, py, TILE, TILE);
-    ctx.fillStyle = "#8a3018";
-    ctx.fillRect(px, py + TILE / 2 - 1, TILE, 2);
-    ctx.fillRect(px + TILE / 2 - 1, py, 2, TILE / 2);
-    ctx.fillRect(px + TILE / 4 - 1, py + TILE / 2, 2, TILE / 2);
-    ctx.fillRect(px + (3 * TILE) / 4 - 1, py + TILE / 2, 2, TILE / 2);
-    ctx.strokeStyle = "#5a1c0c";
-    ctx.strokeRect(px + 0.5, py + 0.5, TILE - 1, TILE - 1);
+    const [gx, gy] = TILE_SHEET.brick;
+    this.BlitGrid(ctx, gx, gy, px, py, TILE, TILE, 1, 1);
   }
 
   DrawSteel(ctx, px, py) {
-    ctx.fillStyle = "#9aa0a8";
-    ctx.fillRect(px, py, TILE, TILE);
-    ctx.fillStyle = "#d0d4da";
-    ctx.fillRect(px + 2, py + 2, TILE - 4, 3);
-    ctx.fillRect(px + 2, py + 2, 3, TILE - 4);
-    ctx.fillStyle = "#5a6068";
-    ctx.fillRect(px + 2, py + TILE - 5, TILE - 4, 3);
-    ctx.fillRect(px + TILE - 5, py + 2, 3, TILE - 4);
-    ctx.fillStyle = "#707880";
-    ctx.fillRect(px + 5, py + 5, TILE - 10, TILE - 10);
+    const [gx, gy] = TILE_SHEET.steel;
+    this.BlitGrid(ctx, gx, gy, px, py, TILE, TILE, 1, 1);
   }
 
-  DrawWater(ctx, px, py, x, y) {
-    const wave = Math.sin(this.waterPhase * 3 + x * 0.7 + y * 0.5) * 0.5 + 0.5;
-    ctx.fillStyle = `rgb(${30 + wave * 20}, ${90 + wave * 40}, ${170 + wave * 40})`;
-    ctx.fillRect(px, py, TILE, TILE);
-    ctx.strokeStyle = "rgba(180,220,255,0.35)";
-    ctx.beginPath();
-    ctx.moveTo(px, py + 6 + wave * 4);
-    ctx.lineTo(px + TILE, py + 4 + (1 - wave) * 4);
-    ctx.stroke();
+  DrawWater(ctx, px, py) {
+    const frames = TILE_SHEET.water;
+    const idx = Math.floor(this.waterPhase * 3) % frames.length;
+    const [gx, gy] = frames[idx];
+    this.BlitGrid(ctx, gx, gy, px, py, TILE, TILE, 1, 1);
   }
 
   DrawIce(ctx, px, py) {
-    ctx.fillStyle = "#b8d4e8";
-    ctx.fillRect(px, py, TILE, TILE);
-    ctx.strokeStyle = "rgba(255,255,255,0.5)";
-    ctx.beginPath();
-    ctx.moveTo(px + 2, py + 12);
-    ctx.lineTo(px + 10, py + 3);
-    ctx.lineTo(px + 14, py + 8);
-    ctx.stroke();
+    const [gx, gy] = TILE_SHEET.ice;
+    this.BlitGrid(ctx, gx, gy, px, py, TILE, TILE, 1, 1);
   }
 
   DrawGrass(ctx, px, py) {
-    const img = this.images.bush;
-    if (img) {
-      ctx.globalAlpha = 0.92;
-      ctx.drawImage(img, px - 2, py - 2, TILE + 4, TILE + 4);
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.fillStyle = "#2f7a28";
-      ctx.fillRect(px, py, TILE, TILE);
-    }
+    const [gx, gy] = TILE_SHEET.bush;
+    this.BlitGrid(ctx, gx, gy, px, py, TILE, TILE, 1, 1);
   }
 
   DrawBase(ctx) {
-    // find base cells
-    let bx = 12 * TILE;
-    let by = 24 * TILE;
-    const img = this.baseAlive ? this.images.baseAlive : this.images.baseDead;
-    if (img) {
-      ctx.drawImage(img, bx, by, TILE * 2, TILE * 2);
-    } else {
-      ctx.fillStyle = this.baseAlive ? "#e8c84a" : "#444";
-      ctx.fillRect(bx, by, TILE * 2, TILE * 2);
+    const bx = 12 * TILE;
+    const by = 24 * TILE;
+    const key = this.baseAlive ? "baseAlive" : "baseDead";
+    const [gx, gy] = TILE_SHEET[key];
+    this.BlitGrid(ctx, gx, gy, bx, by, TILE * 2, TILE * 2, 2, 2);
+  }
+
+  TankSheetOrigin(tank, isPlayer) {
+    const dirCol = TANK_DIR_COL[tank.dir] ?? 0;
+    const anim = Math.floor(tank.animTick || 0) % 2;
+    const colOff = anim * 2;
+    if (isPlayer) {
+      const tier = Math.max(0, Math.min(3, (tank.power || 1) - 1));
+      return { gx: dirCol + colOff, gy: tier * 2 };
     }
-    // eagle hint plate
-    ctx.fillStyle = this.baseAlive ? "rgba(200,40,40,0.85)" : "rgba(40,40,40,0.85)";
-    ctx.beginPath();
-    ctx.moveTo(bx + 16, by + 6);
-    ctx.lineTo(bx + 26, by + 14);
-    ctx.lineTo(bx + 22, by + 26);
-    ctx.lineTo(bx + 10, by + 26);
-    ctx.lineTo(bx + 6, by + 14);
-    ctx.closePath();
-    ctx.fill();
+    const spec = ENEMY_SHEET[tank.texture] || ENEMY_SHEET.enemyBasic;
+    let row = spec.row;
+    if (tank.dropsPower && Math.floor(this.frame / 8) % 2 === 0) row = spec.redRow;
+    // Armor HP flash: cycle brightness via red sheet when damaged hard.
+    if (tank.maxHp > 1 && tank.hp <= 2 && Math.floor(this.frame / 6) % 2 === 0) {
+      row = spec.redRow;
+    }
+    return { gx: spec.col + dirCol + colOff, gy: row };
   }
 
   DrawTank(ctx, tank, isPlayer) {
-    const imgKey = isPlayer ? "player" : tank.texture;
-    const img = this.images[imgKey];
-    const cx = tank.x + tank.w / 2;
-    const cy = tank.y + tank.h / 2;
-    // Kenney top-down tanks in this pack face DOWN in the PNG (body mass on top).
-    // DIR.angle uses math convention (0 = right); convert so "up" rotates the art to face up.
-    const ang = DIR[tank.dir].angle - Math.PI / 2;
-
     if (tank.spawnFlash > 0) {
-      ctx.save();
-      const pulse = 0.45 + 0.45 * Math.sin(tank.spawnFlash * 20);
-      ctx.globalAlpha = pulse;
-      ctx.strokeStyle = "#ffe08a";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(tank.x, tank.y, tank.w, tank.h);
-      ctx.fillStyle = "rgba(255, 240, 180, 0.2)";
-      ctx.fillRect(tank.x, tank.y, tank.w, tank.h);
-      if (img) {
-        ctx.globalAlpha = pulse * 0.7;
-        ctx.translate(cx, cy);
-        ctx.rotate(ang);
-        ctx.drawImage(img, -tank.w / 2, -tank.h / 2, tank.w, tank.h);
-      }
-      ctx.restore();
+      const frames = FX_SHEET.spawn;
+      const idx = Math.min(frames.length - 1, Math.floor((1 - tank.spawnFlash) * frames.length));
+      const [gx, gy] = frames[idx];
+      this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
       return;
     }
 
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(ang);
-    if (img) {
-      // armor HP tint
-      if (!isPlayer && tank.maxHp > 1) {
-        const hurt = 1 - tank.hp / tank.maxHp;
-        ctx.filter = `hue-rotate(${hurt * 60}deg) saturate(${1.2 - hurt}) brightness(1.15)`;
-      } else if (!isPlayer) {
-        ctx.filter = "brightness(1.25) contrast(1.1)";
-      }
-      ctx.drawImage(img, -tank.w / 2, -tank.h / 2, tank.w, tank.h);
-      ctx.filter = "none";
-    } else {
-      ctx.fillStyle = isPlayer ? "#c6b23a" : "#cfcfcf";
-      ctx.fillRect(-tank.w / 2, -tank.h / 2, tank.w, tank.h);
-    }
-    // No fake outline — white ring looked like a protection shield.
-    ctx.restore();
+    const { gx, gy } = this.TankSheetOrigin(tank, isPlayer);
+    this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
 
-    // Only the player spawn/helmet shield should render.
     if (isPlayer && tank.protect > 0) {
-      ctx.save();
-      ctx.strokeStyle = `hsla(${(this.frame * 8) % 360}, 90%, 60%, 0.85)`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, tank.w * 0.55, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 4) % 2];
+      this.BlitGrid(ctx, sx, sy, tank.x, tank.y, tank.w, tank.h);
     }
   }
 
   DrawBullet(ctx, b) {
-    // trail
     if (b.trail.length > 1) {
       ctx.strokeStyle = b.isPlayer ? "rgba(255,220,120,0.35)" : "rgba(255,120,100,0.3)";
       ctx.lineWidth = 2;
@@ -1814,17 +1789,17 @@ class Game {
       ctx.stroke();
     }
 
-    const img = b.isPlayer ? this.images.bulletPlayer : this.images.bulletEnemy;
-    const ang = Math.atan2(b.vy, b.vx) + Math.PI / 2;
-    ctx.save();
-    ctx.translate(b.x + 4, b.y + 4);
-    ctx.rotate(ang);
-    if (img) ctx.drawImage(img, -6, -10, 12, 20);
-    else {
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(-2, -4, 4, 8);
-    }
-    ctx.restore();
+    // Pick nearest cardinal for classic 4-dir bullet sprite.
+    const ang = Math.atan2(b.vy, b.vx);
+    let dir = "right";
+    if (ang >= -Math.PI * 0.75 && ang < -Math.PI * 0.25) dir = "up";
+    else if (ang >= -Math.PI * 0.25 && ang < Math.PI * 0.25) dir = "right";
+    else if (ang >= Math.PI * 0.25 && ang < Math.PI * 0.75) dir = "down";
+    else dir = "left";
+    const [sx, sy, sw, sh] = BULLET_SHEET[dir];
+    const dw = sw * 2;
+    const dh = sh * 2;
+    this.BlitRect(ctx, sx, sy, sw, sh, b.x + 4 - dw / 2, b.y + 4 - dh / 2, dw, dh);
   }
 
   DrawAimGhost(ctx) {
@@ -1860,51 +1835,18 @@ class Game {
 
   DrawPowerup(ctx, pu) {
     if (pu.ttl < 3 && Math.floor(pu.blink * 6) % 2 === 0) return;
-    const map = {
-      [POWER.star]: this.images.powerStar,
-      [POWER.clock]: this.images.powerClock,
-      [POWER.bomb]: this.images.powerBomb,
-      [POWER.helmet]: this.images.powerHelmet,
-      [POWER.life]: this.images.powerStar,
-      [POWER.gun]: this.images.powerBomb,
-      [POWER.shovel]: this.images.powerClock,
-    };
-    const img = map[pu.kind];
-    ctx.save();
-    if (img) ctx.drawImage(img, pu.x, pu.y, 26, 26);
-    else {
-      ctx.fillStyle = "#fc0";
-      ctx.fillRect(pu.x, pu.y, 22, 22);
-    }
-    // label
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 9px monospace";
-    const label = { star: "★", bomb: "B", clock: "T", shovel: "铲", helmet: "盾", life: "1UP", gun: "G" }[pu.kind] || "?";
-    ctx.fillText(label, pu.x + 4, pu.y + 32);
-    ctx.restore();
+    const key = pu.kind === "life" ? "life" : pu.kind;
+    const grid = POWER_SHEET[key] || POWER_SHEET.star;
+    const [gx, gy] = grid;
+    this.BlitGrid(ctx, gx, gy, pu.x, pu.y, 28, 28);
   }
 
   DrawExplosion(ctx, ex) {
-    const frames = [
-      this.images.explosion1,
-      this.images.explosion2,
-      this.images.explosion3,
-      this.images.explosion4,
-      this.images.explosion5,
-    ].filter(Boolean);
+    const frames = FX_SHEET.explosion;
     const idx = Math.min(frames.length - 1, Math.floor((ex.t / ex.dur) * frames.length));
-    const img = frames[idx];
+    const [gx, gy] = frames[idx];
     const size = 28 * ex.scale + 20 * (ex.t / ex.dur);
-    if (img) {
-      ctx.globalAlpha = 1 - ex.t / ex.dur * 0.4;
-      ctx.drawImage(img, ex.x - size / 2, ex.y - size / 2, size, size);
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.fillStyle = `rgba(255,180,60,${1 - ex.t / ex.dur})`;
-      ctx.beginPath();
-      ctx.arc(ex.x, ex.y, size / 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    this.BlitGrid(ctx, gx, gy, ex.x - size / 2, ex.y - size / 2, size, size);
   }
 }
 
