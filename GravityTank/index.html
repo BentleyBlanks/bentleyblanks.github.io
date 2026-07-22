@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./Style_Game.css?v=retro1">
+  <link rel="stylesheet" href="./Style_Game.css?v=roulette10">
 </head>
 <body>
   <div id="app">
@@ -45,7 +45,7 @@
       </div>
       <div id="pauseOverlay" class="overlay" hidden>
         <h2>PAUSE</h2>
-        <p>再按暂停继续</p>
+        <p>P / Esc / 按钮 继续</p>
         <div class="pause-audio">
           <label class="vol-row">
             <span>BGM</span>
@@ -106,6 +106,7 @@
         <div class="stat-row"><span>POWER</span><b id="powerValue">1</b></div>
         <div class="stat-row"><span>SCORE</span><b id="scoreValue">0</b></div>
         <div class="stat-row"><span>ENEMY</span><b id="remainValue">20</b></div>
+        <button id="desktopPauseButton" class="panel-pause" type="button">PAUSE (P / Esc)</button>
       </div>
 
       <div class="panel">
@@ -115,7 +116,7 @@
 
       <div class="panel">
         <h3>RULE</h3>
-        <p class="feature">场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮。指针落下：超强（核爆/超武/天罚/霸体）或负面（援军/敌盾/狂暴…）。</p>
+        <p class="feature">场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮（每次随机 10 格）。<strong style="color:#70ff98">绿=好</strong> · <strong style="color:#ffe060">金=超</strong> · <strong style="color:#ff6060">红=负</strong>。含分叉/速射/穿甲等子弹变体。</p>
       </div>
 
       <div class="panel panel-controls-help">
@@ -123,7 +124,7 @@
         <ul class="controls">
           <li class="desktop-hint"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>WASD</kbd></li>
           <li class="desktop-hint"><kbd>SPACE</kbd> / <kbd>J</kbd> FIRE</li>
-          <li class="desktop-hint"><kbd>P</kbd> PAUSE</li>
+          <li class="desktop-hint"><kbd>P</kbd> / <kbd>Esc</kbd> PAUSE</li>
           <li class="mobile-hint">左摇杆 · 右开火 · 双指可同时</li>
           <li class="mobile-hint">竖屏 / 横屏均可</li>
         </ul>
@@ -132,6 +133,6 @@
       <p class="credit">SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=retro1"></script>
+  <script type="module" src="./Script_Game.mjs?v=roulette10"></script>
 </body>
 </html>

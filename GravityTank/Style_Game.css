@@ -283,6 +283,27 @@ button.primary:active {
   font-weight: 400;
 }
 
+.panel-pause {
+  appearance: none;
+  width: 100%;
+  margin-top: 10px;
+  border: 2px solid #c0c0c0;
+  background: #202020;
+  color: #f0d060;
+  border-radius: 0;
+  padding: 10px 8px;
+  font: inherit;
+  font-size: 0.42rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.panel-pause:active {
+  background: #802010;
+  color: #fff8e0;
+}
+
 .enemy-icons {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
