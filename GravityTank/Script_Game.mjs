@@ -54,6 +54,12 @@ const POWER = {
   mirror: "mirror",
   magnet: "magnet",
   warp: "warp",
+  // Bullet variants (positive)
+  fork: "fork",
+  rapid: "rapid",
+  pierce: "pierce",
+  spread: "spread",
+  sniper: "sniper",
   // Field pickup is always a roulette token now.
   token: "token",
   // Ultra-strong
@@ -70,40 +76,87 @@ const POWER = {
   fortBreak: "fortBreak",
 };
 
-/** Fixed wheel layout — equal wedges; outcome = physics land, never pre-rolled. */
-const ROULETTE_SEGMENTS = [
-  { kind: POWER.star, label: "★星", tier: "good", color: "#f0c040", bg: "#5a4010" },
-  { kind: POWER.spawnExtra, label: "援军", tier: "bad", color: "#ff6060", bg: "#401010" },
-  { kind: POWER.nuke, label: "核爆", tier: "ultra", color: "#ffffff", bg: "#801010" },
-  { kind: POWER.bomb, label: "炸弹", tier: "good", color: "#ff6a4a", bg: "#4a1810" },
-  { kind: POWER.enemyShield, label: "敌盾", tier: "bad", color: "#a0a0ff", bg: "#101040" },
-  { kind: POWER.overdrive, label: "超武", tier: "ultra", color: "#ffe080", bg: "#604000" },
-  { kind: POWER.helmet, label: "护盾", tier: "good", color: "#80e090", bg: "#184028" },
-  { kind: POWER.heavyCurse, label: "超重", tier: "bad", color: "#c0a080", bg: "#302010" },
-  { kind: POWER.apocalypse, label: "天罚", tier: "ultra", color: "#ff40c0", bg: "#400020" },
-  { kind: POWER.life, label: "命+1", tier: "good", color: "#ff90c0", bg: "#401828" },
-  { kind: POWER.enemyRage, label: "狂暴", tier: "bad", color: "#ff4020", bg: "#300800" },
-  { kind: POWER.juggernaut, label: "霸体", tier: "ultra", color: "#b0ffff", bg: "#004050" },
+/** Tier colors — strong guidance: cool green = good, gold = ultra, hot red = bad. */
+const TIER_PALETTE = {
+  good: { color: "#70ff98", bg: "#0c2818", rim: "#38c060" },
+  ultra: { color: "#ffe060", bg: "#3a2808", rim: "#f0b020" },
+  bad: { color: "#ff6060", bg: "#380808", rim: "#e02828" },
+};
+
+function MakeSeg(kind, label, tier) {
+  const pal = TIER_PALETTE[tier];
+  return { kind, label, tier, color: pal.color, bg: pal.bg, rim: pal.rim };
+}
+
+/** Full prize pool — each spin picks ROULETTE_SIZE at random from here. */
+const ROULETTE_POOL = [
+  MakeSeg(POWER.star, "★星", "good"),
+  MakeSeg(POWER.bomb, "炸弹", "good"),
+  MakeSeg(POWER.helmet, "护盾", "good"),
+  MakeSeg(POWER.life, "命+1", "good"),
+  MakeSeg(POWER.clock, "冻结", "good"),
+  MakeSeg(POWER.shovel, "钢墙", "good"),
+  MakeSeg(POWER.gun, "钢弹", "good"),
+  MakeSeg(POWER.antigrav, "反G", "good"),
+  MakeSeg(POWER.bounce, "弹跳", "good"),
+  MakeSeg(POWER.meteor, "陨石", "good"),
+  MakeSeg(POWER.ghost, "幽灵", "good"),
+  MakeSeg(POWER.mirror, "镜像", "good"),
+  MakeSeg(POWER.magnet, "追踪", "good"),
+  MakeSeg(POWER.warp, "闪现", "good"),
+  MakeSeg(POWER.fork, "分叉", "good"),
+  MakeSeg(POWER.rapid, "速射", "good"),
+  MakeSeg(POWER.pierce, "穿甲", "good"),
+  MakeSeg(POWER.spread, "散射", "good"),
+  MakeSeg(POWER.sniper, "狙击", "good"),
+  MakeSeg(POWER.nuke, "核爆", "ultra"),
+  MakeSeg(POWER.overdrive, "超武", "ultra"),
+  MakeSeg(POWER.apocalypse, "天罚", "ultra"),
+  MakeSeg(POWER.juggernaut, "霸体", "ultra"),
+  MakeSeg(POWER.spawnExtra, "援军", "bad"),
+  MakeSeg(POWER.enemyShield, "敌盾", "bad"),
+  MakeSeg(POWER.heavyCurse, "超重", "bad"),
+  MakeSeg(POWER.enemyRage, "狂暴", "bad"),
+  MakeSeg(POWER.softStun, "眩晕", "bad"),
+  MakeSeg(POWER.fortBreak, "破堡", "bad"),
 ];
 
-const POWER_STYLE = Object.fromEntries(
-  ROULETTE_SEGMENTS.map((s) => [s.kind, { label: s.label, color: s.color, bg: s.bg, tier: s.tier }])
-);
+const ROULETTE_SIZE = 10;
+
+const POWER_STYLE = Object.fromEntries(ROULETTE_POOL.map((s) => [s.kind, s]));
 Object.assign(POWER_STYLE, {
-  clock: { label: "时", color: "#7ec8ff", bg: "#183048", tier: "good" },
-  shovel: { label: "铲", color: "#c0c0c0", bg: "#303038", tier: "good" },
-  gun: { label: "枪", color: "#ffd080", bg: "#403010", tier: "good" },
-  antigrav: { label: "反G", color: "#b8f0ff", bg: "#103040", tier: "good" },
-  bounce: { label: "弹", color: "#ffe060", bg: "#403808", tier: "good" },
-  meteor: { label: "陨", color: "#ff8040", bg: "#401808", tier: "good" },
-  ghost: { label: "幽", color: "#d0a0ff", bg: "#281840", tier: "good" },
-  mirror: { label: "镜", color: "#a0ffe0", bg: "#104030", tier: "good" },
-  magnet: { label: "磁", color: "#ff90a0", bg: "#401018", tier: "good" },
-  warp: { label: "闪", color: "#ffffff", bg: "#204060", tier: "good" },
-  token: { label: "?", color: "#ffe08a", bg: "#2a2410", tier: "good" },
-  fortBreak: { label: "破堡", tier: "bad", color: "#d08060", bg: "#301808" },
-  softStun: { label: "眩晕", tier: "bad", color: "#d0d0d0", bg: "#303030" },
+  token: MakeSeg(POWER.token, "?", "good"),
 });
+
+function ShuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/** Pick 10 unique prizes: mix good / ultra / bad so the wheel stays readable. */
+function PickRouletteSegments(count = ROULETTE_SIZE) {
+  const goods = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "good").slice());
+  const ultras = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "ultra").slice());
+  const bads = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "bad").slice());
+  const badN = Math.min(bads.length, 2 + Math.floor(Math.random() * 2)); // 2–3
+  const ultraN = Math.min(ultras.length, 1 + Math.floor(Math.random() * 2)); // 1–2
+  const goodN = Math.max(0, count - badN - ultraN);
+  const picked = [
+    ...goods.slice(0, goodN),
+    ...ultras.slice(0, ultraN),
+    ...bads.slice(0, badN),
+  ];
+  // Fill if pool short
+  while (picked.length < count) {
+    const rest = ROULETTE_POOL.filter((s) => !picked.includes(s));
+    if (!rest.length) break;
+    picked.push(rest[Math.floor(Math.random() * rest.length)]);
+  }
+  return ShuffleInPlace(picked.slice(0, count));
+}
 
 const ROULETTE_FRICTION = 2.6; // viscous 1/s
 const ROULETTE_COULOMB = 1.35; // rad/s^2 opposing
@@ -495,6 +548,11 @@ class Game {
     this.mirrorTimer = 0;
     this.magnetTimer = 0;
     this.overdriveTimer = 0;
+    this.forkTimer = 0;
+    this.rapidTimer = 0;
+    this.pierceTimer = 0;
+    this.spreadTimer = 0;
+    this.sniperTimer = 0;
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
@@ -602,7 +660,7 @@ class Game {
       }
       this.keys.add(k);
       if (e.code === "Space") this.keys.add(" ");
-      if (k === "p") this.TogglePause();
+      if (k === "p" || k === "escape") this.TogglePause();
       if ((k === "enter" || k === " ") && this.state === "ready") this.StartCampaign();
       if ((k === "enter" || k === " ") && this.state === "stageIntro") this.SkipStageIntro();
       if ((k === " " || k === "j") && this.state === "roulette") this.RouletteKick(14 + Math.random() * 10);
@@ -872,6 +930,7 @@ class Game {
     };
     pause?.addEventListener("click", onPauseTap);
     hudPause?.addEventListener("click", onPauseTap);
+    document.getElementById("desktopPauseButton")?.addEventListener("click", onPauseTap);
   }
 
   ApplyStageMeta(stageIndex1Based) {
@@ -940,6 +999,11 @@ class Game {
     this.mirrorTimer = 0;
     this.magnetTimer = 0;
     this.overdriveTimer = 0;
+    this.forkTimer = 0;
+    this.rapidTimer = 0;
+    this.pierceTimer = 0;
+    this.spreadTimer = 0;
+    this.sniperTimer = 0;
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
@@ -1123,6 +1187,11 @@ class Game {
     if (this.mirrorTimer > 0) this.mirrorTimer -= dt;
     if (this.magnetTimer > 0) this.magnetTimer -= dt;
     if (this.overdriveTimer > 0) this.overdriveTimer -= dt;
+    if (this.forkTimer > 0) this.forkTimer -= dt;
+    if (this.rapidTimer > 0) this.rapidTimer -= dt;
+    if (this.pierceTimer > 0) this.pierceTimer -= dt;
+    if (this.spreadTimer > 0) this.spreadTimer -= dt;
+    if (this.sniperTimer > 0) this.sniperTimer -= dt;
     if (this.heavyCurseTimer > 0) this.heavyCurseTimer -= dt;
     if (this.enemyRageTimer > 0) this.enemyRageTimer -= dt;
     if (this.playerStunTimer > 0) this.playerStunTimer -= dt;
@@ -1442,33 +1511,59 @@ class Game {
     const owned = this.bullets.filter((b) => b.alive && b.owner === tank).length;
     let maxB = isPlayer ? tank.maxBullets : 1;
     if (isPlayer && this.overdriveTimer > 0) maxB = Math.max(maxB, 4);
+    if (isPlayer && this.rapidTimer > 0) maxB = Math.max(maxB, 3);
+    if (isPlayer && (this.forkTimer > 0 || this.spreadTimer > 0)) maxB = Math.max(maxB, 5);
     if (owned >= maxB) return;
 
     this.SpawnShell(tank, tank.dir, isPlayer);
+    if (isPlayer && this.forkTimer > 0) {
+      this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: -0.38 });
+      this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: 0.38 });
+    } else if (isPlayer && this.spreadTimer > 0) {
+      this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: -0.55 });
+      this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: 0.55 });
+    }
     if (isPlayer && this.mirrorTimer > 0) {
       const opp = { up: "down", down: "up", left: "right", right: "left" }[tank.dir];
       this.SpawnShell(tank, opp, true, { bonusShot: true });
     }
-    if (isPlayer && this.overdriveTimer > 0) tank.fireCd = 0.07;
+    if (isPlayer && this.rapidTimer > 0) tank.fireCd = 0.045;
+    else if (isPlayer && this.overdriveTimer > 0) tank.fireCd = 0.07;
+    else if (isPlayer && this.sniperTimer > 0) tank.fireCd = 0.42;
     else tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd * (this.enemyRageTimer > 0 ? 0.55 : 1);
     this.audio.Shoot();
   }
 
   SpawnShell(tank, dirName, isPlayer, opts = {}) {
     const d = DIR[dirName];
-    const speed = BULLET_SPEED * (tank.bulletBoost || 1) * (isPlayer && tank.power >= 2 ? 1.12 : 1);
+    let speedMul = 1;
+    if (isPlayer && tank.power >= 2) speedMul *= 1.12;
+    if (isPlayer && this.sniperTimer > 0) speedMul *= 1.55;
+    if (isPlayer && this.rapidTimer > 0) speedMul *= 1.1;
+    const speed = BULLET_SPEED * (tank.bulletBoost || 1) * speedMul;
     let vx = d.x * speed;
     let vy = d.y * speed;
     if (dirName === "left" || dirName === "right") vy -= 90;
     else if (dirName === "up") vy -= 40;
+
+    if (opts.angleOffset) {
+      const c = Math.cos(opts.angleOffset);
+      const s = Math.sin(opts.angleOffset);
+      const rx = vx * c - vy * s;
+      const ry = vx * s + vy * c;
+      vx = rx;
+      vy = ry;
+    }
 
     const cx = tank.x + tank.w / 2;
     const cy = tank.y + tank.h / 2;
     let gravityMul = 1;
     if (isPlayer && this.antigravTimer > 0) gravityMul = -0.35;
     if (isPlayer && this.heavyCurseTimer > 0) gravityMul *= 2.6;
+    if (isPlayer && this.sniperTimer > 0) gravityMul *= 0.45;
     const bounceLeft = isPlayer && this.bounceTimer > 0 ? 5 : 0;
     const homing = isPlayer && this.magnetTimer > 0;
+    const pierceLeft = isPlayer && this.pierceTimer > 0 ? 3 : 0;
 
     this.bullets.push({
       x: cx - 4 + d.x * 14,
@@ -1480,12 +1575,13 @@ class Game {
       alive: true,
       owner: tank,
       isPlayer,
-      power: isPlayer ? tank.power : (tank.typeId === "power" ? 2 : 1),
+      power: isPlayer ? (this.sniperTimer > 0 ? Math.max(tank.power, 3) : tank.power) : (tank.typeId === "power" ? 2 : 1),
       trail: [],
       arm: opts.bonusShot ? 0.12 : 0.22,
       traveled: 0,
       gravityMul,
       bounceLeft,
+      pierceLeft,
       homing,
       meteor: !!opts.meteor,
     });
@@ -1562,8 +1658,13 @@ class Game {
         if (!e.alive || e.spawnFlash > 0) continue;
         if (!canSelfHit && e === b.owner) continue;
         if (RectsOverlap(b, e)) {
-          b.alive = false;
           this.DamageEnemy(e, b.power);
+          if (b.pierceLeft > 0) {
+            b.pierceLeft -= 1;
+            b.arm = Math.max(b.arm, 0.05);
+          } else {
+            b.alive = false;
+          }
           break;
         }
       }
@@ -1737,6 +1838,7 @@ class Game {
     this.audio.StopEngine();
     this.ResetTouchInput();
     this.state = "roulette";
+    const segments = PickRouletteSegments(ROULETTE_SIZE);
     this.roulette = {
       angle: Math.random() * Math.PI * 2, // orientation only — NOT the result
       omega: 0,
@@ -1749,13 +1851,20 @@ class Game {
       phase: "spin", // spin | result
       result: null,
       resultT: 0,
+      segments,
       cx: CANVAS_W / 2,
       cy: CANVAS_H / 2 + 28,
       radius: 132,
     };
     this.SyncTouchControlsVisibility();
-    this.ShowBuffToast("甩转轮盘！转到哪算哪");
+    const nBad = segments.filter((s) => s.tier === "bad").length;
+    const nUltra = segments.filter((s) => s.tier === "ultra").length;
+    this.ShowBuffToast(`转轮 ×${segments.length}（绿好 / 金超 / 红负${nBad}）`);
     this.audio.PowerSpawn();
+  }
+
+  RouletteSegments() {
+    return this.roulette?.segments || [];
   }
 
   CanvasToLocal(ev) {
@@ -1860,7 +1969,8 @@ class Game {
 
   /** Needle fixed at top; segment under it wins from current angle. */
   RouletteIndexAtNeedle() {
-    const n = ROULETTE_SEGMENTS.length;
+    const segs = this.RouletteSegments();
+    const n = Math.max(1, segs.length);
     const slice = (Math.PI * 2) / n;
     // Segment i is drawn from angle (i*slice + wheel.angle).
     // Needle at -PI/2 (top). Find i where needle lies in that wedge.
@@ -1873,7 +1983,8 @@ class Game {
     const r = this.roulette;
     if (!r || r.phase !== "spin") return;
     const idx = this.RouletteIndexAtNeedle();
-    const seg = ROULETTE_SEGMENTS[idx];
+    const seg = this.RouletteSegments()[idx];
+    if (!seg) return;
     r.phase = "result";
     r.result = seg;
     r.resultT = 0;
@@ -1967,6 +2078,30 @@ class Game {
         this.WarpPlayer();
         if (p) p.protect = Math.max(p.protect, 5);
         this.ShowBuffToast("闪现 + 短盾");
+        break;
+      case POWER.fork:
+        this.forkTimer = 16;
+        this.spreadTimer = 0;
+        this.ShowBuffToast("分叉弹：一次三发 16 秒");
+        break;
+      case POWER.rapid:
+        this.rapidTimer = 14;
+        if (p) p.maxBullets = Math.max(p.maxBullets, 3);
+        this.ShowBuffToast("超快射速 14 秒！");
+        break;
+      case POWER.pierce:
+        this.pierceTimer = 14;
+        this.ShowBuffToast("穿甲弹：可穿透敌坦 14 秒");
+        break;
+      case POWER.spread:
+        this.spreadTimer = 14;
+        this.forkTimer = 0;
+        this.ShowBuffToast("散射弹：大角度三发 14 秒");
+        break;
+      case POWER.sniper:
+        this.sniperTimer = 12;
+        if (p) p.power = Math.max(p.power, 3);
+        this.ShowBuffToast("狙击：高速低坠高伤 12 秒");
         break;
       case POWER.nuke:
         this.KillAllFieldEnemies();
@@ -2700,37 +2835,52 @@ class Game {
   DrawRoulette(ctx) {
     const r = this.roulette;
     if (!r) return;
-    const n = ROULETTE_SEGMENTS.length;
+    const segs = this.RouletteSegments();
+    const n = Math.max(1, segs.length);
     const slice = (Math.PI * 2) / n;
     const needleIdx = this.RouletteIndexAtNeedle();
-    const under = ROULETTE_SEGMENTS[needleIdx];
+    const under = segs[needleIdx] || segs[0];
     const focus = r.phase === "result" && r.result ? r.result : under;
     ctx.imageSmoothingEnabled = false;
 
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    const bannerY = 8;
-    const bannerH = 56;
-    ctx.fillStyle = "#101010";
+    // Legend strip: green good / gold ultra / red bad
+    ctx.fillStyle = TIER_PALETTE.good.bg;
+    ctx.fillRect(16, 4, 90, 14);
+    ctx.fillStyle = TIER_PALETTE.good.color;
+    ctx.font = "bold 9px monospace";
+    ctx.fillText("好", 22, 14);
+    ctx.fillStyle = TIER_PALETTE.ultra.bg;
+    ctx.fillRect(110, 4, 90, 14);
+    ctx.fillStyle = TIER_PALETTE.ultra.color;
+    ctx.fillText("超", 116, 14);
+    ctx.fillStyle = TIER_PALETTE.bad.bg;
+    ctx.fillRect(204, 4, 90, 14);
+    ctx.fillStyle = TIER_PALETTE.bad.color;
+    ctx.fillText("负", 210, 14);
+    ctx.fillStyle = "#808080";
+    ctx.fillText(`×${n}`, 310, 14);
+
+    const bannerY = 22;
+    const bannerH = 48;
+    ctx.fillStyle = focus.bg;
     ctx.fillRect(16, bannerY, CANVAS_W - 32, bannerH);
-    ctx.strokeStyle = "#a8a8a8";
+    ctx.strokeStyle = focus.rim || focus.color;
     ctx.lineWidth = 3;
     ctx.strokeRect(16, bannerY, CANVAS_W - 32, bannerH);
-    ctx.strokeStyle = focus.tier === "ultra" ? "#f0d060" : focus.tier === "bad" ? "#e04040" : "#e8e8e8";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(20, bannerY + 4, CANVAS_W - 40, bannerH - 8);
 
-    this.DrawPowerIcon(ctx, focus.kind, 48, bannerY + bannerH / 2, 28);
+    this.DrawPowerIcon(ctx, focus.kind, 48, bannerY + bannerH / 2, 26);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#a0a0a0";
-    ctx.font = "bold 10px monospace";
-    ctx.fillText(r.phase === "spin" ? "NEEDLE" : "HIT", 72, bannerY + 16);
+    ctx.font = "bold 9px monospace";
+    ctx.fillText(r.phase === "spin" ? "NEEDLE" : "HIT", 72, bannerY + 14);
     ctx.fillStyle = focus.color;
-    ctx.font = "bold 20px monospace";
-    const tierTag = focus.tier === "ultra" ? "ULTRA " : focus.tier === "bad" ? "BAD " : "";
-    ctx.fillText(`${tierTag}${focus.label}`, 72, bannerY + 38);
+    ctx.font = "bold 18px monospace";
+    const tierTag = focus.tier === "ultra" ? "超 " : focus.tier === "bad" ? "负 " : "好 ";
+    ctx.fillText(`${tierTag}${focus.label}`, 72, bannerY + 34);
     ctx.textBaseline = "alphabetic";
 
     const wheelImg = this.images.rouletteWheel;
@@ -2739,13 +2889,13 @@ class Game {
     ctx.rotate(r.angle);
     if (wheelImg) {
       const diam = r.radius * 2 + 8;
-      ctx.globalAlpha = 0.35;
+      ctx.globalAlpha = 0.22;
       ctx.drawImage(wheelImg, -diam / 2, -diam / 2, diam, diam);
       ctx.globalAlpha = 1;
     }
 
     for (let i = 0; i < n; i++) {
-      const seg = ROULETTE_SEGMENTS[i];
+      const seg = segs[i];
       const a0 = i * slice;
       const a1 = a0 + slice;
       const isFocus = i === needleIdx;
@@ -2753,33 +2903,33 @@ class Game {
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, r.radius, a0, a1);
       ctx.closePath();
-      ctx.fillStyle = isFocus ? seg.bg : "#080808";
-      ctx.globalAlpha = isFocus ? 0.95 : 0.82;
+      ctx.fillStyle = isFocus ? seg.bg : (seg.tier === "bad" ? "#200808" : seg.tier === "ultra" ? "#201808" : "#081808");
+      ctx.globalAlpha = isFocus ? 0.98 : 0.88;
       ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = isFocus ? seg.color : (seg.tier === "ultra" ? "#806010" : seg.tier === "bad" ? "#601010" : "#303030");
-      ctx.lineWidth = isFocus ? 3 : 1;
+      ctx.strokeStyle = isFocus ? (seg.rim || seg.color) : (seg.rim || "#404040");
+      ctx.lineWidth = isFocus ? 3.5 : 1.5;
       ctx.stroke();
 
       ctx.save();
       ctx.rotate(a0 + slice / 2);
-      const iconR = r.radius * 0.62;
-      this.DrawPowerIcon(ctx, seg.kind, 0, -iconR, isFocus ? 22 : 16);
+      const iconR = r.radius * 0.58;
+      const drew = this.DrawPowerIcon(ctx, seg.kind, 0, -iconR, isFocus ? 20 : 15);
       ctx.fillStyle = isFocus ? "#ffffff" : seg.color;
       ctx.font = isFocus ? "bold 11px monospace" : "bold 9px monospace";
       ctx.textAlign = "center";
-      ctx.fillText(seg.label, 0, -iconR + 18);
+      ctx.fillText(seg.label, 0, -iconR + (drew ? 16 : 4));
       ctx.restore();
     }
 
     ctx.beginPath();
-    ctx.arc(0, 0, 24, 0, Math.PI * 2);
-    ctx.fillStyle = "#181818";
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fillStyle = focus.bg;
     ctx.fill();
-    ctx.strokeStyle = "#c0c0c0";
+    ctx.strokeStyle = focus.rim || focus.color;
     ctx.lineWidth = 3;
     ctx.stroke();
-    this.DrawPowerIcon(ctx, focus.kind, 0, 0, 20);
+    this.DrawPowerIcon(ctx, focus.kind, 0, 0, 18);
     ctx.restore();
 
     const ny = r.cy - r.radius;
@@ -2804,8 +2954,8 @@ class Game {
     ctx.save();
     ctx.translate(r.cx, r.cy);
     const aFocus0 = needleIdx * slice + r.angle;
-    ctx.strokeStyle = focus.color;
-    ctx.lineWidth = 5;
+    ctx.strokeStyle = focus.rim || focus.color;
+    ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.arc(0, 0, r.radius + 6, aFocus0, aFocus0 + slice);
     ctx.stroke();
@@ -2828,11 +2978,11 @@ class Game {
       const alpha = Clamp(this.buffToast.ttl / 0.4, 0, 1);
       ctx.globalAlpha = alpha;
       const msg = this.buffToast.text;
-      ctx.font = "bold 13px monospace";
+      ctx.font = "bold 12px monospace";
       const tw = Math.min(CANVAS_W - 24, ctx.measureText(msg).width + 24);
       ctx.fillStyle = "#000";
       ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H - 52, tw, 26);
-      ctx.strokeStyle = "#c0c0c0";
+      ctx.strokeStyle = focus.color;
       ctx.lineWidth = 2;
       ctx.strokeRect((CANVAS_W - tw) / 2, CANVAS_H - 52, tw, 26);
       ctx.fillStyle = "#f0d060";
@@ -2846,15 +2996,20 @@ class Game {
   DrawBuffHud(ctx) {
     const chips = [];
     if (this.antigravTimer > 0) chips.push({ t: `反G ${Math.ceil(this.antigravTimer)}`, c: "#b8f0ff" });
-    if (this.bounceTimer > 0) chips.push({ t: `弹 ${Math.ceil(this.bounceTimer)}`, c: "#ffe060" });
-    if (this.ghostTimer > 0) chips.push({ t: `幽 ${Math.ceil(this.ghostTimer)}`, c: "#d0a0ff" });
-    if (this.mirrorTimer > 0) chips.push({ t: `镜 ${Math.ceil(this.mirrorTimer)}`, c: "#a0ffe0" });
-    if (this.magnetTimer > 0) chips.push({ t: `磁 ${Math.ceil(this.magnetTimer)}`, c: "#ff90a0" });
-    if (this.overdriveTimer > 0) chips.push({ t: `超武 ${Math.ceil(this.overdriveTimer)}`, c: "#ffe080" });
-    if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#d08060" });
-    if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff4020" });
-    if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#d0d0d0" });
-    if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#7ec8ff" });
+    if (this.bounceTimer > 0) chips.push({ t: `弹 ${Math.ceil(this.bounceTimer)}`, c: "#70ff98" });
+    if (this.ghostTimer > 0) chips.push({ t: `幽 ${Math.ceil(this.ghostTimer)}`, c: "#70ff98" });
+    if (this.mirrorTimer > 0) chips.push({ t: `镜 ${Math.ceil(this.mirrorTimer)}`, c: "#70ff98" });
+    if (this.magnetTimer > 0) chips.push({ t: `磁 ${Math.ceil(this.magnetTimer)}`, c: "#70ff98" });
+    if (this.forkTimer > 0) chips.push({ t: `叉 ${Math.ceil(this.forkTimer)}`, c: "#70ff98" });
+    if (this.rapidTimer > 0) chips.push({ t: `速 ${Math.ceil(this.rapidTimer)}`, c: "#70ff98" });
+    if (this.pierceTimer > 0) chips.push({ t: `穿 ${Math.ceil(this.pierceTimer)}`, c: "#70ff98" });
+    if (this.spreadTimer > 0) chips.push({ t: `散 ${Math.ceil(this.spreadTimer)}`, c: "#70ff98" });
+    if (this.sniperTimer > 0) chips.push({ t: `狙 ${Math.ceil(this.sniperTimer)}`, c: "#70ff98" });
+    if (this.overdriveTimer > 0) chips.push({ t: `超武 ${Math.ceil(this.overdriveTimer)}`, c: "#ffe060" });
+    if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
+    if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
+    if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
+    if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
 
     let x = 6;
     ctx.font = "bold 10px monospace";
