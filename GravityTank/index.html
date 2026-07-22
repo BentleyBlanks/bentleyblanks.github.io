@@ -3,65 +3,66 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <meta name="theme-color" content="#121510">
+  <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="重力弹坦克大战：道具触发物理大转轮，转到哪算哪；含超强与负面格。">
-  <meta property="og:title" content="重力弹 · 坦克大战">
-  <meta property="og:description" content="捡道具弹出可甩的大转轮，真减速旋停。核爆/天罚/霸体超强，也有援军/敌盾等负面。">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="description" content="重力弹坦克大战：复古坦克大战画风，捡到 ? 触发物理大转轮。">
+  <meta property="og:title" content="GRAVITY TANK BATTLE">
+  <meta property="og:description" content="NES 坦克大战画风。? 道具甩转轮盘，超强与负面并存。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/GravityTank/">
-  <title>重力弹 · 坦克大战</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=portrait1">
+  <title>GRAVITY TANK BATTLE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./Style_Game.css?v=retro1">
 </head>
 <body>
   <div id="app">
     <header class="hero">
-      <div>
-        <h1 class="brand">重力弹<small>Gravity Tank Battle</small></h1>
-      </div>
-      <p class="tagline">捡到道具弹出<strong>物理大转轮</strong>——甩转到哪算哪。竖屏 / 横屏都能玩。</p>
+      <img class="title-banner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE">
+      <p class="tagline">捡到 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="16" height="16" alt="?"> 弹出物理转轮——甩转到哪算哪</p>
     </header>
 
     <div class="mobile-hud" aria-live="polite">
-      <span>关 <b id="mobileStage">1</b></span>
-      <span>命 <b id="mobileLives">3</b></span>
-      <span>火力 <b id="mobilePower">1</b></span>
-      <span>分 <b id="mobileScore">0</b></span>
-      <span>敌 <b id="mobileRemain">20</b></span>
-      <button id="mobilePauseButton" class="hud-pause" type="button" aria-label="暂停">暂停</button>
+      <span>STAGE <b id="mobileStage">1</b></span>
+      <span>LIFE <b id="mobileLives">3</b></span>
+      <span>POW <b id="mobilePower">1</b></span>
+      <span>SC <b id="mobileScore">0</b></span>
+      <span>EN <b id="mobileRemain">20</b></span>
+      <button id="mobilePauseButton" class="hud-pause" type="button" aria-label="暂停">PAUSE</button>
     </div>
 
     <section class="stage-shell" aria-label="游戏画面">
       <canvas id="gameCanvas" width="416" height="416"></canvas>
       <div id="startOverlay" class="overlay">
         <h2 id="startStageTitle">STAGE 1</h2>
-        <p id="startStageBlurb">保卫老鹰总部。消灭全部敌军。注意：炮弹带重力，水平射击会下坠。</p>
-        <button id="startButton" class="primary" type="button">开始战斗</button>
-        <p class="hint desktop-hint">方向键 / WASD 移动 · 空格 / J 开火 · P 暂停</p>
-        <p class="hint mobile-hint">左侧虚拟摇杆移动 · 右侧按钮开火</p>
+        <p id="startStageBlurb">保卫老鹰总部。炮弹带重力，水平射击会下坠。</p>
+        <button id="startButton" class="primary" type="button">START</button>
+        <p class="hint desktop-hint">↑↓←→ / WASD · SPACE/J FIRE · P PAUSE</p>
+        <p class="hint mobile-hint">左摇杆移动 · 右键开火</p>
       </div>
       <div id="pauseOverlay" class="overlay" hidden>
-        <h2>暂停</h2>
-        <p>点击继续，或再按暂停</p>
+        <h2>PAUSE</h2>
+        <p>再按暂停继续</p>
         <div class="pause-audio">
           <label class="vol-row">
-            <span>音乐</span>
+            <span>BGM</span>
             <input id="bgmVolumePause" type="range" min="0" max="100" value="45" aria-label="音乐音量">
           </label>
           <label class="vol-row">
-            <span>音效</span>
+            <span>SFX</span>
             <input id="sfxVolumePause" type="range" min="0" max="100" value="70" aria-label="音效音量">
           </label>
         </div>
-        <button id="resumeButton" class="primary" type="button">继续</button>
+        <button id="resumeButton" class="primary" type="button">RESUME</button>
       </div>
       <div id="endOverlay" class="overlay" hidden>
-        <h2 id="endTitle">胜利</h2>
+        <h2 id="endTitle">STAGE CLEAR</h2>
         <p id="endMessage">敌军全部歼灭。</p>
-        <button id="restartButton" class="primary" type="button">再来一局</button>
-        <button id="nextStageButton" class="primary" type="button" hidden>下一关</button>
+        <button id="restartButton" class="primary" type="button">RETRY</button>
+        <button id="nextStageButton" class="primary" type="button" hidden>NEXT</button>
       </div>
     </section>
 
@@ -71,71 +72,66 @@
           <div class="stick-knob" id="stickKnob"></div>
           <span class="stick-cross" aria-hidden="true"></span>
         </div>
-        <p class="touch-label">移动</p>
+        <p class="touch-label">MOVE</p>
       </div>
     </div>
 
     <div id="touchActionsWrap" class="touch-actions-wrap" hidden>
       <div class="touch-actions">
-        <button id="touchFire" class="touch-fire" type="button" aria-label="开火">开火</button>
-        <button id="touchPause" class="touch-pause" type="button" aria-label="暂停">暂停</button>
+        <button id="touchFire" class="touch-fire" type="button" aria-label="开火">FIRE</button>
+        <button id="touchPause" class="touch-pause" type="button" aria-label="暂停">PAUSE</button>
       </div>
     </div>
 
     <aside class="side">
       <div class="panel panel-audio">
-        <h3>声音</h3>
+        <h3>AUDIO</h3>
         <label class="vol-row">
-          <span>音乐</span>
+          <span>BGM</span>
           <input id="bgmVolume" type="range" min="0" max="100" value="45" aria-label="音乐音量">
           <b id="bgmVolumeValue">45</b>
         </label>
         <label class="vol-row">
-          <span>音效</span>
+          <span>SFX</span>
           <input id="sfxVolume" type="range" min="0" max="100" value="70" aria-label="音效音量">
           <b id="sfxVolumeValue">70</b>
         </label>
-        <label class="mute-row"><input id="muteToggle" type="checkbox"> 静音</label>
+        <label class="mute-row"><input id="muteToggle" type="checkbox"> MUTE</label>
       </div>
 
       <div class="panel panel-stats">
-        <h3>战况</h3>
-        <div class="stat-row"><span>关卡</span><b id="stageValue">1</b></div>
-        <div class="stat-row"><span>生命</span><b id="livesValue">3</b></div>
-        <div class="stat-row"><span>火力</span><b id="powerValue">1</b></div>
-        <div class="stat-row"><span>得分</span><b id="scoreValue">0</b></div>
-        <div class="stat-row"><span>剩余敌军</span><b id="remainValue">20</b></div>
+        <h3>STATUS</h3>
+        <div class="stat-row"><span>STAGE</span><b id="stageValue">1</b></div>
+        <div class="stat-row"><span>LIFE</span><b id="livesValue">3</b></div>
+        <div class="stat-row"><span>POWER</span><b id="powerValue">1</b></div>
+        <div class="stat-row"><span>SCORE</span><b id="scoreValue">0</b></div>
+        <div class="stat-row"><span>ENEMY</span><b id="remainValue">20</b></div>
       </div>
 
       <div class="panel">
-        <h3>敌军队列</h3>
+        <h3>ENEMY</h3>
         <div id="enemyIcons" class="enemy-icons" aria-hidden="true"></div>
       </div>
 
       <div class="panel">
-        <h3>本关特色</h3>
-        <p class="feature">场上「?」是转轮触发器。甩转后看指针：<strong>核爆 / 超武 / 天罚 / 霸体</strong>极强；也会抽到<strong>援军、敌盾、狂暴、超重、破堡</strong>等负面。</p>
+        <h3>RULE</h3>
+        <p class="feature">场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮。指针落下：超强（核爆/超武/天罚/霸体）或负面（援军/敌盾/狂暴…）。</p>
       </div>
 
       <div class="panel panel-controls-help">
-        <h3>操作</h3>
+        <h3>CTRL</h3>
         <ul class="controls">
-          <li class="desktop-hint"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</li>
-          <li class="desktop-hint"><kbd>Space</kbd> / <kbd>J</kbd> 开火</li>
-          <li class="desktop-hint"><kbd>P</kbd> 暂停</li>
-          <li class="mobile-hint">左侧摇杆移动，右侧开火；可双指同时操作</li>
-          <li class="mobile-hint">竖屏一屏游玩；横屏左右分键；页面已锁定缩放</li>
+          <li class="desktop-hint"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>WASD</kbd></li>
+          <li class="desktop-hint"><kbd>SPACE</kbd> / <kbd>J</kbd> FIRE</li>
+          <li class="desktop-hint"><kbd>P</kbd> PAUSE</li>
+          <li class="mobile-hint">左摇杆 · 右开火 · 双指可同时</li>
+          <li class="mobile-hint">竖屏 / 横屏均可</li>
         </ul>
       </div>
 
-      <div class="panel">
-        <h3>经典要素</h3>
-        <p class="feature" style="color:#c3d0b6">道具 = 大转轮。金色超强、红色负面、普通增益。结果由转盘角速度 + 阻力决定，不是开奖前随机好的。</p>
-      </div>
-
-      <p class="credit">贴图与音效：开源坦克大战复刻风格（StefanBS/battle-city-clone，MIT）。BGM：celestialghost8 8-bit battle theme（CC-BY）。非 Namco ROM 资源。</p>
+      <p class="credit">SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=portrait1"></script>
+  <script type="module" src="./Script_Game.mjs?v=retro1"></script>
 </body>
 </html>

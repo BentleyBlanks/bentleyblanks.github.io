@@ -25,3 +25,11 @@ Game twist: all shells use downward gravity (parabolic arcs; +20% vs initial bui
 
 Stages 1–5 maps & enemy mixes:
   Adapted from StefanBS/battle-city-clone Tiled levels (MIT).
+
+Custom Battle City–style generated sprites (roulette / ? token / ultra & curse icons / UI chrome):
+  Texture_PowerToken.png, Texture_UiRouletteWheel.png, Texture_UiRouletteNeedle.png,
+  Texture_PowerNuke.png, Texture_PowerOverdrive.png, Texture_PowerApocalypse.png,
+  Texture_PowerJuggernaut.png, Texture_PowerSpawnExtra.png, Texture_PowerEnemyShield.png,
+  Texture_PowerHeavyCurse.png, Texture_PowerEnemyRage.png,
+  Texture_UiTitleBanner.png, Texture_UiPanelFrame.png
+  Created for this page to match the classic NES tank-battle look (not Namco assets).
