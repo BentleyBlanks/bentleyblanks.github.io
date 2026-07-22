@@ -1643,7 +1643,9 @@ class Game {
     const img = this.images[imgKey];
     const cx = tank.x + tank.w / 2;
     const cy = tank.y + tank.h / 2;
-    const ang = DIR[tank.dir].angle + Math.PI / 2; // assets face up
+    // Kenney top-down tanks in this pack face DOWN in the PNG (body mass on top).
+    // DIR.angle uses math convention (0 = right); convert so "up" rotates the art to face up.
+    const ang = DIR[tank.dir].angle - Math.PI / 2;
 
     if (tank.spawnFlash > 0) {
       ctx.save();
