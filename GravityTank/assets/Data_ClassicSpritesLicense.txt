@@ -1,0 +1,11 @@
+Classic Battle City–style spritesheet used by GravityTank.
+
+Source: StefanBS/battle-city-clone (MIT License)
+  https://github.com/StefanBS/battle-city-clone
+  assets/sprites/sprites.png
+
+These graphics are a classic NES Battle City look-alike recreation
+redistributed under the MIT License of that project. They are not
+Namco ROM dumps.
+
+Original Battle City (Namco, 1985) remains copyright Namco/Bandai Namco.
