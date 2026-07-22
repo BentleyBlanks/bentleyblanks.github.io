@@ -448,6 +448,12 @@ class Game {
     this.spawnTimer = 0;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
+    this.antigravTimer = 0;
+    this.bounceTimer = 0;
+    this.ghostTimer = 0;
+    this.mirrorTimer = 0;
+    this.magnetTimer = 0;
+    this.buffToast = null;
     this.pendingFortRestore = false;
     this.baseAlive = true;
     this.waterPhase = 0;
