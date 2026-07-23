@@ -21,6 +21,10 @@ const TANK_SIZE = 32;
 const SHEET_CELL = 8;
 const SPRITE = 16; // classic tank / metatile source size in the sheet
 const MAX_ENEMIES_ON_FIELD = 4;
+const MAX_ENEMIES_LATE = 5;
+/** From this stage onward, enemy shells never damage other enemies. */
+const ENEMY_FRIENDLY_FIRE_OFF_STAGE = 6;
+const MAX_ABSORB_HITS = 8;
 const PLAYER_LIVES = 3;
 const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
 const BULLET_SPEED = 280;
@@ -104,6 +108,9 @@ const POWER = {
   enemyRage: "enemyRage",
   softStun: "softStun",
   fortBreak: "fortBreak",
+  // Hit-charge armor (survives N lethal hits)
+  plates: "plates",
+  bastion: "bastion",
 };
 
 /** Tier colors — strong guidance: cool green = good, gold = ultra, hot red = bad. */
@@ -123,6 +130,7 @@ const ROULETTE_POOL = [
   MakeSeg(POWER.star, "★星", "good"),
   MakeSeg(POWER.bomb, "炸弹", "good"),
   MakeSeg(POWER.helmet, "护盾", "good"),
+  MakeSeg(POWER.plates, "装甲", "good"),
   MakeSeg(POWER.life, "命+1", "good"),
   MakeSeg(POWER.clock, "冻结", "good"),
   MakeSeg(POWER.shovel, "钢墙", "good"),
@@ -143,6 +151,7 @@ const ROULETTE_POOL = [
   MakeSeg(POWER.overdrive, "超武", "ultra"),
   MakeSeg(POWER.apocalypse, "天罚", "ultra"),
   MakeSeg(POWER.juggernaut, "霸体", "ultra"),
+  MakeSeg(POWER.bastion, "壁垒", "ultra"),
   MakeSeg(POWER.spawnExtra, "援军", "bad"),
   MakeSeg(POWER.enemyShield, "敌盾", "bad"),
   MakeSeg(POWER.heavyCurse, "超重", "bad"),
@@ -280,6 +289,8 @@ const POWER_SHEET = {
   bomb: [40, 14],
   life: [42, 14],
   gun: [40, 14],
+  plates: [32, 14], // reuse helmet plate art
+  bastion: [32, 14],
 };
 /** Custom (non-classic) power icons — Battle City–style generated sprites. */
 const POWER_ICON_IMG = {
@@ -649,6 +660,7 @@ class Game {
     this.stagePerk = null; // active this stage only
     this.pendingStagePerk = null; // chosen after clear, applied on next StartGame
     this.runPerks = []; // permanent after boss until campaign ends
+    this.absorbHits = 0; // run-wide armor charges (lethal-hit absorbs)
     this.meteorPulseTimer = 0;
     this.timeRiftCd = 0;
     this.upgradePick = null; // { special, cards, resumeAction }
@@ -1426,11 +1438,11 @@ class Game {
           `${diffTag} 你在河北岸。河对面过不来——用重力弹幕（朝下/斜射）清理南岸敌军，再选一张入门升级进入战役。`;
       } else if (this.state === "ready" || this.state === "boot") {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关坦克王 · 第 6 关重力巨炮）。保卫老鹰；炮弹带重力会下坠。`;
+          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关坦克王 · 第 6 关重力巨炮 · 第 9 关钢铁王座）。保卫老鹰；炮弹带重力会下坠。`;
       } else if (this.isBossStage) {
         if (this.stageData.bossKind === "tankKing") {
           this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关 · 坦克王。单炮追猎；残血终焉会把你变成老鹰（开场有护盾），被打倒直接失败。`;
+            `${diffTag} BOSS 关 · ${this.stageData.title || "坦克王"}。单炮追猎；残血终焉会把你变成老鹰（开场有护盾），被打倒直接失败。`;
         } else {
           this.overlays.startBlurb.textContent =
             `${diffTag} BOSS 关 · 重力巨炮。八向炮筒弹幕；残血终焉老鹰诅咒更久（开场有护盾），被打倒直接失败。`;
@@ -1450,6 +1462,7 @@ class Game {
     this.stagePerk = null;
     this.pendingStagePerk = null;
     this.runPerks = [];
+    this.absorbHits = 0;
     this.meteorPulseTimer = 0;
     this.timeRiftCd = 0;
     this.StartGame({ stage: 0, keepStats: false });
@@ -1465,8 +1478,8 @@ class Game {
       return;
     }
     const keep = this.player
-      ? { power: this.player.power, maxBullets: this.player.maxBullets }
-      : { power: 1, maxBullets: 1 };
+      ? { power: this.player.power, maxBullets: this.player.maxBullets, absorbHits: this.absorbHits }
+      : { power: 1, maxBullets: 1, absorbHits: this.absorbHits };
     this.StartGame({ stage: this.stage + 1, keepStats: keep, keepScore: true, keepLives: true });
   }
 
@@ -1584,6 +1597,8 @@ class Game {
     this.enemies = [];
     if (!keepScore) this.score = 0;
     if (!keepLives) this.lives = this.GetStartLives();
+    if (!keepStats) this.absorbHits = 0;
+    else if (keepStats.absorbHits != null) this.absorbHits = keepStats.absorbHits;
     // 普通升级：本关有效。过关时选卡 → pending → 进入下一关生效；
     // Boss 永久卡不写 pending，换关时清掉上一关的本关强化。重试同关则保留。
     if (this.pendingStagePerk != null) {
@@ -1737,8 +1752,37 @@ class Game {
       this.pendingFortRestore = false;
       this.FortifyBase(true);
     }
+    if (this.HasPerk("hitPlates")) {
+      this.GrantAbsorbHits(2);
+    }
+    if (this.HasPerk("ironHide")) {
+      this.GrantAbsorbHits(1);
+    }
     this.meteorPulseTimer = this.HasPerk("meteorPulse") ? 9 : 0;
     this.timeRiftCd = 0;
+  }
+
+  GrantAbsorbHits(n) {
+    const add = Math.max(0, n | 0);
+    this.absorbHits = Math.min(MAX_ABSORB_HITS, (this.absorbHits || 0) + add);
+    if (this.player) this.player.absorbHits = this.absorbHits;
+  }
+
+  SyncAbsorbHitsToPlayer() {
+    if (this.player) this.player.absorbHits = this.absorbHits || 0;
+  }
+
+  /** Enemy shells never hurt bosses; from stage 6+ no enemy↔enemy damage at all. */
+  BlocksEnemyFriendlyFire(bullet, target) {
+    if (!bullet || bullet.isPlayer) return false;
+    if (target?.isBoss || target?.tankKing) return true;
+    if (!this.isTutorial && this.stage >= ENEMY_FRIENDLY_FIRE_OFF_STAGE) return true;
+    return false;
+  }
+
+  GetMaxEnemiesOnField() {
+    if (!this.isTutorial && this.stage >= 7) return MAX_ENEMIES_LATE;
+    return MAX_ENEMIES_ON_FIELD;
   }
 
   BuildSpawnQueue() {
@@ -1765,6 +1809,7 @@ class Game {
     const [sx, sy] = this.stageData.playerSpawns?.[0] || [8, 24];
     const power = keepStats?.power ?? 1;
     const maxBullets = keepStats?.maxBullets ?? (power >= 2 ? 2 : 1);
+    if (keepStats?.absorbHits != null) this.absorbHits = keepStats.absorbHits;
     this.player = {
       x: sx * TILE + 2,
       y: sy * TILE + 2,
@@ -1774,6 +1819,7 @@ class Game {
       speed: PLAYER_SPEED,
       power,
       maxBullets,
+      absorbHits: this.absorbHits || 0,
       alive: true,
       protect: fullProtect ? SPAWN_PROTECT : 2.2,
       fireCd: 0,
@@ -2952,6 +2998,7 @@ class Game {
       for (const e of this.enemies) {
         if (!e.alive || e.spawnFlash > 0) continue;
         if (!canSelfHit && e === b.owner) continue;
+        if (this.BlocksEnemyFriendlyFire(b, e)) continue;
         if (RectsOverlap(b, e)) {
           this.DamageEnemy(e, b.power);
           if (b.pierceLeft > 0) {
@@ -2977,6 +3024,13 @@ class Game {
             this.audio.Bounce();
           } else if (this.player.protect > 0) {
             this.SpawnExplosion(b.x, b.y, 0.5);
+            this.audio.Bounce();
+          } else if ((this.absorbHits || 0) > 0 || (this.player.absorbHits || 0) > 0) {
+            this.absorbHits = Math.max(0, (this.absorbHits || 0) - 1);
+            this.player.absorbHits = this.absorbHits;
+            this.player.protect = Math.max(this.player.protect, 1.0);
+            this.SpawnExplosion(b.x, b.y, 0.55);
+            this.ShowBuffToast(this.absorbHits > 0 ? `装甲抵挡！剩余 ${this.absorbHits}` : "装甲耗尽！");
             this.audio.Bounce();
           } else if (
             this.HasPerk("timeRift") &&
@@ -3561,6 +3615,15 @@ class Game {
         if (p) p.protect = Math.max(p.protect, 16);
         this.ShowBuffToast("护盾 16 秒");
         break;
+      case POWER.plates:
+        this.GrantAbsorbHits(2);
+        this.ShowBuffToast(`装甲 +2（现有 ${this.absorbHits} 层）`);
+        break;
+      case POWER.bastion:
+        this.GrantAbsorbHits(4);
+        if (p) p.protect = Math.max(p.protect, 6);
+        this.ShowBuffToast(`壁垒装甲 +4（现有 ${this.absorbHits} 层）`);
+        break;
       case POWER.clock:
         this.freezeTimer = 16;
         this.ShowBuffToast("敌军冻结 16 秒");
@@ -3679,12 +3742,13 @@ class Game {
           p.maxBullets = 4;
           p.protect = 28;
         }
+        this.GrantAbsorbHits(2);
         this.ghostTimer = 22;
         this.bounceTimer = 22;
         this.magnetTimer = 22;
         this.antigravTimer = 12;
         this.overdriveTimer = Math.max(this.overdriveTimer, 12);
-        this.ShowBuffToast("霸体：几乎无敌的 22 秒！！");
+        this.ShowBuffToast("霸体：几乎无敌的 22 秒 + 装甲！");
         break;
       case POWER.spawnExtra:
         this.ForceSpawnExtras(4);
@@ -3900,7 +3964,7 @@ class Game {
     const remainingToSpawn = this.spawnQueue.length;
     this.enemiesRemaining = remainingToSpawn + aliveCount;
     if (remainingToSpawn <= 0) return;
-    if (aliveCount >= MAX_ENEMIES_ON_FIELD) return;
+    if (aliveCount >= this.GetMaxEnemiesOnField()) return;
 
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
@@ -3925,6 +3989,8 @@ class Game {
 
   MakeEnemyFromType(type, x, y) {
     const size = type.size || TANK_SIZE;
+    const hpMul = type.boss ? (this.stageData?.bossHpMul || 1) : 1;
+    const hp = Math.max(1, Math.round(type.hp * hpMul));
     return {
       x,
       y,
@@ -3932,8 +3998,8 @@ class Game {
       h: size,
       dir: this.IsBaseAtTop() ? "up" : "down",
       speed: type.speed,
-      hp: type.hp,
-      maxHp: type.hp,
+      hp,
+      maxHp: hp,
       score: type.score,
       shootCd: type.shootCd,
       bulletBoost: type.bulletBoost || 1,
@@ -4506,6 +4572,16 @@ class Game {
       ctx.strokeStyle = `rgba(200,240,255,${pulse})`;
       ctx.lineWidth = 2;
       ctx.strokeRect(tank.x - 1, tank.y - 1, tank.w + 2, tank.h + 2);
+    } else if (isPlayer && (this.absorbHits || 0) > 0) {
+      const pulse = 0.4 + 0.3 * Math.abs(Math.sin(this.frame * 0.22));
+      ctx.strokeStyle = `rgba(180,210,255,${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tank.x - 2, tank.y - 2, tank.w + 4, tank.h + 4);
+      ctx.fillStyle = `rgba(200,220,255,${0.55 + pulse * 0.3})`;
+      ctx.font = `9px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      ctx.fillText(`甲${this.absorbHits}`, tank.x + tank.w / 2, tank.y - 3);
+      ctx.textAlign = "left";
     }
 
     if (tank.isBoss && tank.alive && tank.spawnFlash <= 0) {
@@ -4939,6 +5015,7 @@ class Game {
       });
     }
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
+    if ((this.absorbHits || 0) > 0) chips.push({ t: `装甲×${this.absorbHits}`, c: "#c8e0ff" });
     if (this.stagePerk) {
       const u = FindUpgrade(this.stagePerk);
       if (u) chips.push({ t: `本关·${u.title}`, c: "#70ff98" });

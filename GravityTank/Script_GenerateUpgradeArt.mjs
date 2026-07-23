@@ -474,6 +474,42 @@ const GLYPHS = {
     "..........111...",
     "................",
   ],
+  hitPlates: [
+    "................",
+    "...2222222222...",
+    "...2........2...",
+    "...2.111111.2...",
+    "...2.1....1.2...",
+    "...2.1.66.1.2...",
+    "...2.1.66.1.2...",
+    "...2.1....1.2...",
+    "...2.111111.2...",
+    "...2........2...",
+    "...2222222222...",
+    "......2..2......",
+    ".....22..22.....",
+    "....2......2....",
+    "................",
+    "................",
+  ],
+  ironHide: [
+    "................",
+    "....33333333....",
+    "...3........3...",
+    "..3..222222..3..",
+    "..3.2......2.3..",
+    "..3.2.1111.2.3..",
+    "..3.2.1..1.2.3..",
+    "..3.2.1111.2.3..",
+    "..3.2......2.3..",
+    "..3..222222..3..",
+    "...3........3...",
+    "....33333333....",
+    "......3..3......",
+    ".....33..33.....",
+    "....33333333....",
+    "................",
+  ],
 };
 
 function makeIcon(id, special = false) {
@@ -540,11 +576,11 @@ function save(img, name) {
 const stageIds = [
   "noSelfHit", "rapidFire", "multiShot", "bulletSpeed",
   "lightGravity", "longerShield", "bounceShell", "pierceShell",
-  "doubleShield", "baseArmor",
+  "doubleShield", "baseArmor", "hitPlates",
 ];
 const bossIds = [
   "mirrorShot", "meteorPulse", "phaseGhost", "enemyAnchor",
-  "overloadFan", "fortressWill", "timeRift", "huntMark",
+  "overloadFan", "fortressWill", "timeRift", "huntMark", "ironHide",
 ];
 
 function toAssetName(id) {
