@@ -407,6 +407,7 @@ button.primary:active {
 .upgrade-overlay h2 {
   font-size: clamp(0.85rem, 3.5vw, 1.15rem);
   color: #f0d060;
+  text-shadow: 2px 2px 0 #000;
 }
 
 .upgrade-overlay > p {
@@ -420,90 +421,142 @@ button.primary:active {
 .upgrade-cards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: min(420px, 100%);
+  gap: 12px;
+  width: min(440px, 100%);
 }
 
 .upgrade-card {
   appearance: none;
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 12px;
-  align-items: center;
-  text-align: left;
-  border: 3px solid #909090;
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
   color: #f2f2f2;
-  /* Readable UI font — Press Start is unreadable for Chinese body copy. */
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
-  padding: 12px 12px;
   cursor: pointer;
   touch-action: manipulation;
-  box-shadow:
-    inset 0 0 0 2px #2a2a2a,
-    0 4px 0 #000;
-  background: #121212;
-  image-rendering: auto;
+  background: transparent;
+  box-shadow: 0 5px 0 #000;
+  image-rendering: pixelated;
 }
 
 .upgrade-card:active {
-  transform: translateY(2px);
-  box-shadow:
-    inset 0 0 0 2px #2a2a2a,
-    0 2px 0 #000;
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #000;
 }
 
-.upgrade-card.is-special {
-  border-color: #f0d060;
-  background: #1a1208;
-  box-shadow:
-    inset 0 0 0 2px #4a3010,
-    0 4px 0 #301808;
+.upgrade-card-body {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  min-height: 92px;
+  padding: 14px 14px 12px 12px;
+  /* Battle City riveted metal plaque via 9-slice */
+  border: 12px solid transparent;
+  border-image-source: url("./assets/Texture_UpgradeCardSlice.png");
+  border-image-slice: 14 fill;
+  border-image-width: 12px;
+  border-image-outset: 0;
+  border-image-repeat: stretch;
+  background-color: #0e0e0e;
 }
 
-.upgrade-card.is-tutorial {
-  border-color: #70b0f0;
-  background: #0c141c;
+.upgrade-card.is-special .upgrade-card-body {
+  border-image-source: url("./assets/Texture_UpgradeCardSliceSpecial.png");
+  background-color: #1a1208;
+}
+
+.upgrade-card.is-tutorial .upgrade-card-body {
+  border-image-source: url("./assets/Texture_UpgradeCardSliceTutorial.png");
+  background-color: #0c141c;
+}
+
+.upgrade-icon-well {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(#303030, #303030) padding-box,
+    linear-gradient(135deg, #c0c0c0, #404040 45%, #101010) border-box;
+  border: 3px solid transparent;
   box-shadow:
-    inset 0 0 0 2px #183048,
-    0 4px 0 #081018;
+    inset 0 0 0 2px #000,
+    inset 0 0 0 4px #1a1a1a;
+}
+
+.upgrade-card.is-special .upgrade-icon-well {
+  background:
+    linear-gradient(#201808, #201808) padding-box,
+    linear-gradient(135deg, #ffe080, #a07020 45%, #402000) border-box;
+}
+
+.upgrade-card.is-tutorial .upgrade-icon-well {
+  background:
+    linear-gradient(#081018, #081018) padding-box,
+    linear-gradient(135deg, #b0d8ff, #3060a0 45%, #102030) border-box;
+}
+
+.upgrade-icon-well::before,
+.upgrade-icon-well::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #808080;
+  box-shadow: inset 1px 1px 0 #e0e0e0, inset -1px -1px 0 #303030;
+  pointer-events: none;
+}
+
+.upgrade-icon-well::before { top: 2px; left: 2px; }
+.upgrade-icon-well::after { bottom: 2px; right: 2px; }
+
+.upgrade-card.is-special .upgrade-icon-well::before,
+.upgrade-card.is-special .upgrade-icon-well::after {
+  background: #f0d060;
+  box-shadow: inset 1px 1px 0 #fff0b0, inset -1px -1px 0 #805010;
+}
+
+.upgrade-card.is-tutorial .upgrade-icon-well::before,
+.upgrade-card.is-tutorial .upgrade-icon-well::after {
+  background: #70b0f0;
+  box-shadow: inset 1px 1px 0 #d0e8ff, inset -1px -1px 0 #204070;
 }
 
 .upgrade-icon {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  flex-shrink: 0;
-  border: 2px solid #606060;
+  display: block;
   background: #000;
-  box-shadow: inset 0 0 0 1px #202020;
-}
-
-.upgrade-card.is-special .upgrade-icon {
-  border-color: #f0d060;
-}
-
-.upgrade-card.is-tutorial .upgrade-icon {
-  border-color: #70b0f0;
 }
 
 .upgrade-copy {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
+  padding: 4px 2px 2px;
 }
 
 .upgrade-card .upgrade-tag {
   display: inline-block;
   align-self: start;
   margin: 0;
-  padding: 3px 6px;
+  padding: 4px 7px;
   font-family: var(--font-display);
-  font-size: 0.52rem;
-  letter-spacing: 0.06em;
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
   color: #101010;
   background: #70ff98;
+  border: 2px solid #101010;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
   text-transform: uppercase;
   line-height: 1.2;
 }
@@ -521,20 +574,21 @@ button.primary:active {
 .upgrade-card .upgrade-name {
   display: block;
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.12rem;
   font-weight: 700;
   color: #ffffff;
   letter-spacing: 0.02em;
   line-height: 1.25;
+  text-shadow: 1px 1px 0 #000;
 }
 
 .upgrade-card .upgrade-desc {
   display: block;
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 500;
   line-height: 1.45;
-  color: #d0d0d0;
+  color: #d6d6d6;
 }
 
 .side {
