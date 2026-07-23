@@ -247,6 +247,8 @@ const EAGLE_CURSE_DURATION_STAGE3 = 6.2;
 const EAGLE_CURSE_DURATION_STAGE6 = 10.5;
 const EAGLE_CURSE_SHIELD_STAGE3 = 2.8;
 const EAGLE_CURSE_SHIELD_STAGE6 = 4.0;
+/** Transform telegraph before eagle form — gives players time to read the prompt. */
+const EAGLE_MORPH_DUR = 2.15;
 
 /** Classic sheet grid origins [gx, gy] in 8×8 cells (16×16 sprite = 2×2 cells). */
 const TANK_DIR_COL = { up: 0, left: 4, down: 8, right: 12 };
@@ -686,6 +688,7 @@ class Game {
     this.playerStunTimer = 0;
     this.playerEagleTimer = 0;
     this.eagleWarnT = 0;
+    this.eagleMorph = null;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -1609,6 +1612,7 @@ class Game {
     this.ClearEagleForm(false);
     this.playerEagleTimer = 0;
     this.eagleWarnT = 0;
+    this.eagleMorph = null;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -1863,7 +1867,10 @@ class Game {
         this.ShowBuffToast("陨石协议触发");
       }
     }
-    if (this.playerEagleTimer > 0) {
+    if (this.eagleMorph) {
+      this.UpdateEagleMorph(dt);
+    }
+    if (this.playerEagleTimer > 0 && !this.eagleMorph) {
       this.playerEagleTimer -= dt;
       if (this.playerEagleTimer <= 0) {
         this.playerEagleTimer = 0;
@@ -1927,6 +1934,13 @@ class Game {
     this.UnstickTank(p);
 
     if (this.playerStunTimer > 0) {
+      p.moving = false;
+      this.audio.SetEngine(false);
+      return;
+    }
+
+    // Transform telegraph: freeze control, glide toward HQ while morph plays.
+    if (this.eagleMorph) {
       p.moving = false;
       this.audio.SetEngine(false);
       return;
@@ -2125,7 +2139,7 @@ class Game {
       e.finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
       const barrels = e.barrelCount || 1;
       let pattern;
-      if (e.finalPhase && this.playerEagleTimer <= 0) {
+      if (e.finalPhase && this.playerEagleTimer <= 0 && !this.eagleMorph) {
         const firstUltimate = !e.eagleCurseUsed;
         if (firstUltimate || Math.random() < 0.3) {
           pattern = "eagleCurse";
@@ -2154,17 +2168,17 @@ class Game {
     const face = e.castFace || "down";
 
     if (pattern === "eagleCurse") {
-      e.attackQueue.push({ t: 0.4 * cdScale, kind: "eagleCurse" });
-      // Light pressure after the opening shield window.
+      e.attackQueue.push({ t: 0.35 * cdScale, kind: "eagleCurse" });
+      // Wait for morph + opening shield before pressure.
       for (let i = 0; i < 3; i++) {
         e.attackQueue.push({
-          t: (1.15 + i * 0.2) * cdScale,
+          t: (EAGLE_MORPH_DUR + 1.1 + i * 0.2) * cdScale,
           kind: "kingShell",
           dir: face,
           angleOffset: (i - 1) * 0.12,
         });
       }
-      e.fireCd = 5.8 * cdScale;
+      e.fireCd = (EAGLE_MORPH_DUR + 5.2) * cdScale;
       this.ShowBuffToast("终极诅咒蓄力…");
       return;
     }
@@ -2293,7 +2307,7 @@ class Game {
       const finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
       e.finalPhase = finalPhase;
       let pattern;
-      if (finalPhase && this.playerEagleTimer <= 0) {
+      if (finalPhase && this.playerEagleTimer <= 0 && !this.eagleMorph) {
         // Final phase: guarantee first ultimate, then periodically recast.
         const firstUltimate = !e.eagleCurseUsed;
         if (firstUltimate || Math.random() < 0.38) {
@@ -2405,14 +2419,19 @@ class Game {
       e.fireCd = 2.1 * cdScale;
       this.ShowBuffToast("三点连射");
     } else if (pattern === "eagleCurse") {
-      e.attackQueue.push({ t: 0.45 * cdScale, kind: "eagleCurse" });
-      // Follow-up starts after the opening shield so the player gets a readable grace.
+      e.attackQueue.push({ t: 0.4 * cdScale, kind: "eagleCurse" });
+      // Follow-up after morph telegraph + opening shield.
       for (let i = 0; i < 6; i++) {
         const t = i / 5;
         const ang = -0.85 + t * 1.7;
-        e.attackQueue.push({ t: (1.35 + i * 0.12) * cdScale, kind: "shell", dir: "down", angleOffset: ang });
+        e.attackQueue.push({
+          t: (EAGLE_MORPH_DUR + 1.25 + i * 0.12) * cdScale,
+          kind: "shell",
+          dir: "down",
+          angleOffset: ang,
+        });
       }
-      e.fireCd = 7.2 * cdScale;
+      e.fireCd = (EAGLE_MORPH_DUR + 6.5) * cdScale;
       this.ShowBuffToast("终极诅咒蓄力…");
     } else {
       e.fireCd = 1.5 * cdScale;
@@ -2761,6 +2780,7 @@ class Game {
 
   TryFire(tank, isPlayer) {
     if (isPlayer && this.playerStunTimer > 0) return;
+    if (isPlayer && this.eagleMorph) return;
     if (isPlayer && this.playerEagleTimer > 0) return;
     if (tank.fireCd > 0) return;
     const owned = this.bullets.filter((b) => b.alive && b.owner === tank).length;
@@ -3130,7 +3150,7 @@ class Game {
       return;
     }
     // Ultimate eagle curse: dying as the eagle fails the stage regardless of lives.
-    if (this.playerEagleTimer > 0 || p.asEagle) {
+    if (this.playerEagleTimer > 0 || p.asEagle || this.eagleMorph || p.eagleMorphing) {
       p.alive = false;
       this.audio.StopEngine();
       this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.6);
@@ -3173,28 +3193,74 @@ class Game {
   ApplyEagleCurse() {
     const p = this.player;
     if (!p?.alive) return;
+    if (this.eagleMorph || p.asEagle) return;
     const duration = this.GetEagleCurseDuration();
     const shield = this.GetEagleCurseShield();
-    this.playerEagleTimer = Math.max(this.playerEagleTimer, duration);
-    p.asEagle = true;
-    // Opening shield so the transform does not get one-shot by residual shells.
-    p.protect = Math.max(p.protect, shield);
-    this.eagleWarnT = Math.max(this.eagleWarnT, 3.2);
-    // Snap near the HQ so the eagle curse reads clearly.
-    p.x = Clamp(12 * TILE, 0, CANVAS_W - p.w);
-    p.y = Clamp(23 * TILE, CANVAS_H * 0.55, CANVAS_H - p.h - 2);
-    this.UnstickTank(p);
-    this.ShowBuffToast(`老鹰诅咒 ${Math.ceil(duration)}s · 护盾 ${Math.ceil(shield)}s · 护盾后被打倒即失败`);
+    const toX = Clamp(12 * TILE, 0, CANVAS_W - p.w);
+    const toY = Clamp(23 * TILE, CANVAS_H * 0.55, CANVAS_H - p.h - 2);
+    // Morph telegraph first — eagle timer starts when the animation finishes.
+    this.eagleMorph = {
+      t: 0,
+      dur: EAGLE_MORPH_DUR,
+      fromX: p.x,
+      fromY: p.y,
+      toX,
+      toY,
+      duration,
+      shield,
+    };
+    p.asEagle = false;
+    p.eagleMorphing = true;
+    // Protect through the whole transform + opening shield after.
+    p.protect = Math.max(p.protect, EAGLE_MORPH_DUR + shield);
+    this.eagleWarnT = Math.max(this.eagleWarnT, EAGLE_MORPH_DUR + 1.4);
+    this.ShowBuffToast("终极诅咒变身中… 看清提示再躲！");
+    this.audio.Hit();
+  }
+
+  UpdateEagleMorph(dt) {
+    const morph = this.eagleMorph;
+    const p = this.player;
+    if (!morph || !p?.alive) {
+      this.eagleMorph = null;
+      if (p) p.eagleMorphing = false;
+      return;
+    }
+    morph.t += dt;
+    const u = Clamp(morph.t / morph.dur, 0, 1);
+    // Ease-in-out glide to HQ while transforming.
+    const ease = u * u * (3 - 2 * u);
+    p.x = morph.fromX + (morph.toX - morph.fromX) * ease;
+    p.y = morph.fromY + (morph.toY - morph.fromY) * ease;
+    p.protect = Math.max(p.protect, 0.2);
+
+    if (u >= 1) {
+      p.x = morph.toX;
+      p.y = morph.toY;
+      this.UnstickTank(p);
+      p.eagleMorphing = false;
+      p.asEagle = true;
+      p.speed = PLAYER_SPEED * 0.55;
+      this.playerEagleTimer = Math.max(this.playerEagleTimer, morph.duration);
+      p.protect = Math.max(p.protect, morph.shield);
+      this.eagleMorph = null;
+      this.eagleWarnT = Math.max(this.eagleWarnT, 2.8);
+      this.ShowBuffToast(`老鹰形态 ${Math.ceil(morph.duration)}s · 护盾 ${Math.ceil(morph.shield)}s · 护盾后被打倒即失败`);
+      this.audio.Explode();
+    }
   }
 
   ClearEagleForm(restoreTank = true) {
     const p = this.player;
     if (!p) {
       this.playerEagleTimer = 0;
+      this.eagleMorph = null;
       return;
     }
     p.asEagle = false;
+    p.eagleMorphing = false;
     p.speed = PLAYER_SPEED;
+    this.eagleMorph = null;
     if (restoreTank && p.alive) {
       p.protect = Math.max(p.protect, 1.2);
     }
@@ -4247,12 +4313,79 @@ class Game {
     ctx.drawImage(tc, 0, 0, sw, sh, dx, dy, dw, dh);
   }
 
+  /** Tank ↔ eagle cross-fade + expanding rings while gliding to HQ. */
+  DrawEagleMorph(ctx, tank) {
+    const morph = this.eagleMorph;
+    if (!morph) return;
+    const u = Clamp(morph.t / Math.max(0.001, morph.dur), 0, 1);
+    const cx = tank.x + tank.w / 2;
+    const cy = tank.y + tank.h / 2;
+    // Flash rate speeds up as transform completes.
+    const flashHz = 4 + u * 10;
+    const showEagle = Math.floor(morph.t * flashHz) % 2 === 1 || u > 0.72;
+
+    // Expanding warning rings
+    for (let i = 0; i < 3; i++) {
+      const wave = (u * 2.2 + i * 0.28) % 1;
+      const rad = 10 + wave * (28 + u * 36);
+      ctx.strokeStyle = `rgba(255,${90 - i * 20},${60 - i * 15},${(1 - wave) * 0.7})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // White flash pulses
+    if (Math.floor(morph.t * 12) % 3 === 0) {
+      ctx.fillStyle = `rgba(255,255,255,${0.12 + u * 0.18})`;
+      ctx.fillRect(tank.x - 4, tank.y - 4, tank.w + 8, tank.h + 8);
+    }
+
+    if (showEagle) {
+      const [gx, gy] = this.baseAlive ? TILE_SHEET.baseAlive : TILE_SHEET.baseDead;
+      const scale = 0.85 + u * 0.2;
+      const dw = tank.w * scale;
+      const dh = tank.h * scale;
+      ctx.globalAlpha = 0.55 + u * 0.45;
+      this.BlitGrid(ctx, gx, gy, cx - dw / 2, cy - dh / 2, dw, dh);
+      ctx.globalAlpha = 1;
+    } else {
+      const { gx, gy } = this.TankSheetOrigin(tank, true);
+      ctx.globalAlpha = 1 - u * 0.35;
+      this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
+      ctx.globalAlpha = 1;
+    }
+
+    // Shield during morph
+    const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 3) % 2];
+    this.BlitGrid(ctx, sx, sy, tank.x - 5, tank.y - 5, tank.w + 10, tank.h + 10);
+    ctx.strokeStyle = `rgba(180,240,255,${0.55 + 0.4 * Math.abs(Math.sin(this.frame * 0.4))})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tank.x - 3, tank.y - 3, tank.w + 6, tank.h + 6);
+
+    // Progress label above unit
+    ctx.fillStyle = "#ffe060";
+    ctx.font = `11px ${PIXEL_FONT}`;
+    ctx.textAlign = "center";
+    ctx.fillText("变身中", cx, tank.y - 14);
+    ctx.fillStyle = "#80e0ff";
+    ctx.font = `10px ${PIXEL_FONT}`;
+    ctx.fillText(`${Math.ceil((1 - u) * morph.dur)}`, cx, tank.y - 2);
+    ctx.textAlign = "left";
+  }
+
   DrawTank(ctx, tank, isPlayer) {
     if (tank.spawnFlash > 0) {
       const frames = FX_SHEET.spawn;
       const idx = Math.min(frames.length - 1, Math.floor((1 - tank.spawnFlash) * frames.length));
       const [gx, gy] = frames[idx];
       this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
+      return;
+    }
+
+    // Eagle transform telegraph — flash tank ↔ eagle while gliding to HQ.
+    if (isPlayer && this.eagleMorph) {
+      this.DrawEagleMorph(ctx, tank);
       return;
     }
 
@@ -4714,7 +4847,10 @@ class Game {
     if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
     if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
     if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
-    if (this.playerEagleTimer > 0) {
+    if (this.eagleMorph) {
+      const left = Math.max(0, Math.ceil(this.eagleMorph.dur - this.eagleMorph.t));
+      chips.push({ t: `变身中 ${left}`, c: "#ffe060" });
+    } else if (this.playerEagleTimer > 0) {
       const p = this.player;
       const shieldLeft = p?.protect > 0 ? Math.ceil(p.protect) : 0;
       chips.push({
@@ -4747,24 +4883,33 @@ class Game {
 
     // Big eagle-curse banner so the transform is impossible to miss.
     if (this.eagleWarnT > 0 && this.state === "playing") {
+      const morphing = !!this.eagleMorph;
       const alpha = Clamp(this.eagleWarnT / 0.55, 0, 1);
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = "rgba(40,0,0,0.78)";
       ctx.fillRect(16, CANVAS_H * 0.28, CANVAS_W - 32, 58);
-      ctx.strokeStyle = "#ff6060";
+      ctx.strokeStyle = morphing ? "#ffe060" : "#ff6060";
       ctx.lineWidth = 2;
       ctx.strokeRect(16, CANVAS_H * 0.28, CANVAS_W - 32, 58);
       ctx.fillStyle = "#ffe060";
       ctx.font = `14px ${PIXEL_FONT}`;
       ctx.textAlign = "center";
-      ctx.fillText("终极诅咒 · 你变成了老鹰", CANVAS_W / 2, CANVAS_H * 0.28 + 22);
-      ctx.fillStyle = "#80e0ff";
-      ctx.font = `11px ${PIXEL_FONT}`;
-      const shieldHint = this.player?.protect > 0
-        ? `开场护盾 ${Math.ceil(this.player.protect)} 秒 · 护盾结束后被打倒即失败`
-        : "护盾已结束 · 被打倒即失败";
-      ctx.fillText(shieldHint, CANVAS_W / 2, CANVAS_H * 0.28 + 44);
+      if (morphing) {
+        const left = Math.max(0, Math.ceil(this.eagleMorph.dur - this.eagleMorph.t));
+        ctx.fillText(`终极诅咒变身中… ${left}`, CANVAS_W / 2, CANVAS_H * 0.28 + 22);
+        ctx.fillStyle = "#80e0ff";
+        ctx.font = `11px ${PIXEL_FONT}`;
+        ctx.fillText("变身期间无敌 · 结束后护盾继续 · 无盾被打倒即失败", CANVAS_W / 2, CANVAS_H * 0.28 + 44);
+      } else {
+        ctx.fillText("终极诅咒 · 你变成了老鹰", CANVAS_W / 2, CANVAS_H * 0.28 + 22);
+        ctx.fillStyle = "#80e0ff";
+        ctx.font = `11px ${PIXEL_FONT}`;
+        const shieldHint = this.player?.protect > 0
+          ? `开场护盾 ${Math.ceil(this.player.protect)} 秒 · 护盾结束后被打倒即失败`
+          : "护盾已结束 · 被打倒即失败";
+        ctx.fillText(shieldHint, CANVAS_W / 2, CANVAS_H * 0.28 + 44);
+      }
       ctx.textAlign = "left";
       ctx.restore();
     }
