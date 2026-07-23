@@ -234,7 +234,7 @@ const ENEMY_TYPES = [
   },
 ];
 
-const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst", "gunBreak"];
+const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst"];
 const TANK_KING_ATTACKS = ["quadCross", "spinFire", "axisBurst", "chaseVolley", "ringShot"];
 const BOSS_OCTO_ATTACKS = ["octoCross", "octoSpin", "octoRing"];
 const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
@@ -679,7 +679,6 @@ class Game {
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
-    this.playerDisarmTimer = 0;
     this.playerEagleTimer = 0;
     this.buffToast = null;
     this.roulette = null;
@@ -1425,7 +1424,7 @@ class Game {
             `${diffTag} BOSS 关 · 坦克王。单炮追猎；在开阔战场中周旋并击破它。`;
         } else {
           this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关 · 重力巨炮。八向炮筒弹幕；小心拆炮禁射，残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
+            `${diffTag} BOSS 关 · 重力巨炮。八向炮筒弹幕；残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
         }
       } else {
         const e = this.stageData.enemies;
@@ -1601,7 +1600,6 @@ class Game {
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
-    this.playerDisarmTimer = 0;
     this.ClearEagleForm(false);
     this.playerEagleTimer = 0;
     this.buffToast = null;
@@ -1849,7 +1847,6 @@ class Game {
     if (this.heavyCurseTimer > 0) this.heavyCurseTimer -= dt;
     if (this.enemyRageTimer > 0) this.enemyRageTimer -= dt;
     if (this.playerStunTimer > 0) this.playerStunTimer -= dt;
-    if (this.playerDisarmTimer > 0) this.playerDisarmTimer -= dt;
     if (this.timeRiftCd > 0) this.timeRiftCd -= dt;
     if (this.HasPerk("meteorPulse") && this.state === "playing") {
       this.meteorPulseTimer -= dt;
@@ -2274,8 +2271,6 @@ class Game {
       if (!pattern) {
         if ((e.barrelCount || 0) >= 8 && Math.random() < 0.34) {
           pattern = BOSS_OCTO_ATTACKS[Math.floor(Math.random() * BOSS_OCTO_ATTACKS.length)];
-        } else if (this.playerDisarmTimer <= 0 && Math.random() < 0.22) {
-          pattern = "gunBreak";
         } else {
           pattern = BOSS_ATTACKS[Math.floor(Math.random() * BOSS_ATTACKS.length)];
         }
@@ -2376,10 +2371,6 @@ class Game {
       }
       e.fireCd = 2.1 * cdScale;
       this.ShowBuffToast("三点连射");
-    } else if (pattern === "gunBreak") {
-      e.attackQueue.push({ t: 0.15 * cdScale, kind: "gunBreak" });
-      e.fireCd = 3.6 * cdScale;
-      this.ShowBuffToast("拆炮蓄力…");
     } else if (pattern === "eagleCurse") {
       e.attackQueue.push({ t: 0.45 * cdScale, kind: "eagleCurse" });
       // Follow-up pressure while the player is a helpless eagle.
@@ -2413,11 +2404,6 @@ class Game {
   }
 
   FireBossShot(e, shot) {
-    if (shot.kind === "gunBreak") {
-      this.ApplyGunBreak(this.IsEasy() ? 3.8 : 5.2);
-      this.audio.Hit();
-      return;
-    }
     if (shot.kind === "eagleCurse") {
       this.ApplyEagleCurse(this.IsEasy() ? 6.5 : 8.5);
       this.audio.Explode();
@@ -2742,7 +2728,6 @@ class Game {
 
   TryFire(tank, isPlayer) {
     if (isPlayer && this.playerStunTimer > 0) return;
-    if (isPlayer && this.playerDisarmTimer > 0) return;
     if (isPlayer && this.playerEagleTimer > 0) return;
     if (tank.fireCd > 0) return;
     const owned = this.bullets.filter((b) => b.alive && b.owner === tank).length;
@@ -3139,16 +3124,10 @@ class Game {
     this.respawnTimer = 0.9;
   }
 
-  ApplyGunBreak(duration = 5) {
-    this.playerDisarmTimer = Math.max(this.playerDisarmTimer, duration);
-    this.ShowBuffToast("⚠ 炮管被拆！无法开火");
-  }
-
   ApplyEagleCurse(duration = 8) {
     const p = this.player;
     if (!p?.alive) return;
     this.playerEagleTimer = Math.max(this.playerEagleTimer, duration);
-    this.playerDisarmTimer = Math.max(this.playerDisarmTimer, duration);
     p.asEagle = true;
     p.protect = Math.min(p.protect, 0.35); // brief grace, then fully vulnerable
     // Snap near the HQ so the eagle curse reads clearly.
@@ -4674,7 +4653,6 @@ class Game {
     if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
     if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
     if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
-    if (this.playerDisarmTimer > 0) chips.push({ t: `拆炮 ${Math.ceil(this.playerDisarmTimer)}`, c: "#ff6060" });
     if (this.playerEagleTimer > 0) chips.push({ t: `老鹰 ${Math.ceil(this.playerEagleTimer)}`, c: "#ff3030" });
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
     if (this.stagePerk) {
