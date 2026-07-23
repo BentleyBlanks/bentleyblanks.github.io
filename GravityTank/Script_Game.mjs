@@ -101,6 +101,7 @@ const POWER = {
   fortress: "fortress",
   phoenix: "phoenix",
   arsenal: "arsenal",
+  eagleAlly: "eagleAlly",
   // Curses / negatives
   spawnExtra: "spawnExtra",
   enemyShield: "enemyShield",
@@ -144,6 +145,7 @@ const ROULETTE_POOL = [
   MakeSeg(POWER.fortress, "铁壁", "ultra"),
   MakeSeg(POWER.phoenix, "凤凰", "ultra"),
   MakeSeg(POWER.arsenal, "军火", "ultra"),
+  MakeSeg(POWER.eagleAlly, "鹰援", "ultra"),
   // Bad — fewer kinds; pick rate also low
   MakeSeg(POWER.spawnExtra, "援军", "bad"),
   MakeSeg(POWER.enemyShield, "敌盾", "bad"),
@@ -693,6 +695,7 @@ class Game {
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
+    this.eagleAlly = null;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -756,6 +759,12 @@ class Game {
     const cell = POWER_SHEET[kind];
     if (cell) {
       this.BlitGrid(ctx, cell[0], cell[1], cx - size / 2, cy - size / 2, size, size);
+      return true;
+    }
+    // Eagle ally — use classic HQ eagle sprite on the wheel.
+    if (kind === POWER.eagleAlly) {
+      const [gx, gy] = TILE_SHEET.baseAlive;
+      this.BlitGrid(ctx, gx, gy, cx - size / 2, cy - size / 2, size, size, 2, 2);
       return true;
     }
     return false;
@@ -1614,6 +1623,7 @@ class Game {
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
+    this.eagleAlly = null;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -1862,6 +1872,7 @@ class Game {
     if (this.heavyCurseTimer > 0) this.heavyCurseTimer -= dt;
     if (this.enemyRageTimer > 0) this.enemyRageTimer -= dt;
     if (this.playerStunTimer > 0) this.playerStunTimer -= dt;
+    if (this.eagleAlly) this.UpdateEagleAlly(dt);
     if (this.timeRiftCd > 0) this.timeRiftCd -= dt;
     if (this.HasPerk("meteorPulse") && this.state === "playing") {
       this.meteorPulseTimer -= dt;
@@ -2895,6 +2906,14 @@ class Game {
         continue;
       }
 
+      // Enemy shells can shoot down the sortie eagle (mobile HQ).
+      if (!b.isPlayer && this.eagleAlly && this.baseAlive && RectsOverlap(b, this.eagleAlly)) {
+        b.alive = false;
+        this.SpawnExplosion(b.x, b.y, 0.55);
+        this.DestroyBase();
+        continue;
+      }
+
       // Armed bullets can hit any tank, including the shooter (gravity self-kill).
       const canSelfHit = b.arm <= 0 || b.traveled >= 36;
 
@@ -3171,12 +3190,24 @@ class Game {
   DestroyBase() {
     if (!this.baseAlive) return;
     this.baseAlive = false;
+    const hq = this.GetBaseTarget();
+    const home = this.eagleAlly?.home || this.FindBaseCell();
+    this.eagleAlly = null;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         if (this.map[y][x] === TILE_BASE) this.map[y][x] = TILE_BASE_DEAD;
       }
     }
-    const hq = this.GetBaseTarget();
+    // Nest may already be empty while eagle is out — stamp ruined tiles at home.
+    for (let dy = 0; dy < 2; dy++) {
+      for (let dx = 0; dx < 2; dx++) {
+        const x = home.x + dx;
+        const y = home.y + dy;
+        if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue;
+        this.map[y][x] = TILE_BASE_DEAD;
+      }
+    }
+    this._baseCell = { x: home.x, y: home.y };
     this.SpawnExplosion(hq.x + hq.w / 2, hq.y + hq.h / 2, 1.4);
     this.audio.Lose();
     this.EndGame(false, "总部被毁。战役失败。");
@@ -3184,6 +3215,9 @@ class Game {
 
   /** Top-left tile of the 2×2 eagle base (live or ruined). */
   FindBaseCell() {
+    if (this.eagleAlly?.home) {
+      return { x: this.eagleAlly.home.x, y: this.eagleAlly.home.y };
+    }
     if (this._baseCell) {
       const { x, y } = this._baseCell;
       const t = this.map?.[y]?.[x];
@@ -3207,8 +3241,164 @@ class Game {
   }
 
   GetBaseTarget() {
+    if (this.eagleAlly && this.baseAlive) {
+      const e = this.eagleAlly;
+      return { x: e.x, y: e.y, w: e.w, h: e.h };
+    }
     const c = this.FindBaseCell();
     return { x: c.x * TILE, y: c.y * TILE, w: TILE * 2, h: TILE * 2 };
+  }
+
+  /** Golden ultra: HQ eagle sorties and rains missiles on field enemies. */
+  StartEagleAlly(duration = 16) {
+    if (!this.baseAlive) {
+      this.ShowBuffToast("总部已毁，无法出击");
+      return;
+    }
+    if (this.eagleAlly) {
+      this.eagleAlly.ttl = Math.max(this.eagleAlly.ttl, duration);
+      this.ShowBuffToast("鹰援续航！");
+      return;
+    }
+    const cell = this.FindBaseCell();
+    this.BreakBaseFort();
+    for (let dy = 0; dy < 2; dy++) {
+      for (let dx = 0; dx < 2; dx++) {
+        const x = cell.x + dx;
+        const y = cell.y + dy;
+        if (this.map[y]?.[x] === TILE_BASE) this.map[y][x] = TILE_EMPTY;
+      }
+    }
+    this._baseCell = { x: cell.x, y: cell.y };
+    const stepOut = this.IsBaseAtTop() ? TILE * 2.2 : -TILE * 2.2;
+    this.eagleAlly = {
+      x: Clamp(cell.x * TILE, 0, CANVAS_W - TILE * 2),
+      y: Clamp(cell.y * TILE + stepOut, 0, CANVAS_H - TILE * 2),
+      w: TILE * 2,
+      h: TILE * 2,
+      home: { x: cell.x, y: cell.y },
+      ttl: duration,
+      fireCd: 0.25,
+      retargetT: 0,
+      aimX: CANVAS_W * 0.5,
+      aimY: CANVAS_H * 0.5,
+      animTick: 0,
+    };
+    this.ShowBuffToast("鹰援出击！导弹清兵 16 秒");
+    this.audio.Power();
+  }
+
+  EndEagleAlly() {
+    const ally = this.eagleAlly;
+    this.eagleAlly = null;
+    if (!ally?.home || !this.baseAlive) return;
+    const { x: hx, y: hy } = ally.home;
+    for (let dy = 0; dy < 2; dy++) {
+      for (let dx = 0; dx < 2; dx++) {
+        const x = hx + dx;
+        const y = hy + dy;
+        if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue;
+        if (this.map[y][x] === TILE_EMPTY || this.map[y][x] === TILE_GRASS || this.map[y][x] === TILE_ICE) {
+          this.map[y][x] = TILE_BASE;
+        }
+      }
+    }
+    this._baseCell = { x: hx, y: hy };
+    this.ShowBuffToast("老鹰归巢");
+  }
+
+  UpdateEagleAlly(dt) {
+    const e = this.eagleAlly;
+    if (!e || !this.baseAlive) {
+      this.eagleAlly = null;
+      return;
+    }
+    e.ttl -= dt;
+    if (e.ttl <= 0) {
+      this.EndEagleAlly();
+      return;
+    }
+    e.animTick += dt * 10;
+    e.retargetT -= dt;
+    e.fireCd -= dt;
+
+    if (e.retargetT <= 0) {
+      e.retargetT = 0.45 + Math.random() * 0.35;
+      let best = null;
+      let bestD = 1e9;
+      for (const en of this.enemies) {
+        if (!en.alive || en.spawnFlash > 0) continue;
+        const dx = en.x + en.w * 0.5 - (e.x + e.w * 0.5);
+        const dy = en.y + en.h * 0.5 - (e.y + e.h * 0.5);
+        const d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          best = en;
+        }
+      }
+      if (best) {
+        e.aimX = best.x + best.w * 0.5;
+        e.aimY = best.y + best.h * 0.5;
+      } else {
+        e.aimX = CANVAS_W * 0.5 + (Math.random() - 0.5) * 120;
+        e.aimY = CANVAS_H * 0.45 + (Math.random() - 0.5) * 80;
+      }
+    }
+
+    const cx = e.x + e.w * 0.5;
+    const cy = e.y + e.h * 0.5;
+    const dx = e.aimX - cx;
+    const dy = e.aimY - cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const speed = 78;
+    // Flyer — ignore terrain so it can actually clear lanes.
+    e.x = Clamp(e.x + (dx / dist) * speed * dt, 4, CANVAS_W - e.w - 4);
+    e.y = Clamp(e.y + (dy / dist) * speed * dt, 4, CANVAS_H - e.h - 4);
+
+    if (e.fireCd <= 0) {
+      const live = this.enemies.filter((en) => en.alive && en.spawnFlash <= 0);
+      if (live.length) {
+        this.SpawnEagleMissile(e, live[Math.floor(Math.random() * live.length)]);
+        if (live.length > 1 && Math.random() < 0.55) {
+          this.SpawnEagleMissile(e, live[Math.floor(Math.random() * live.length)]);
+        }
+        e.fireCd = 0.48;
+        this.audio.Shoot();
+      } else {
+        e.fireCd = 0.7;
+      }
+    }
+  }
+
+  SpawnEagleMissile(ally, target) {
+    const cx = ally.x + ally.w * 0.5;
+    const cy = ally.y + ally.h * 0.5;
+    const tx = target.x + target.w * 0.5;
+    const ty = target.y + target.h * 0.5;
+    const ang = Math.atan2(ty - cy, tx - cx);
+    const spd = BULLET_SPEED * 1.15;
+    const face = DirFromVector(Math.cos(ang), Math.sin(ang));
+    this.bullets.push({
+      x: cx - 4 + Math.cos(ang) * 10,
+      y: cy - 4 + Math.sin(ang) * 10,
+      w: 8,
+      h: 8,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd,
+      alive: true,
+      owner: this.player,
+      isPlayer: true,
+      power: 3,
+      trail: [],
+      arm: 0.12,
+      traveled: 0,
+      gravityMul: 0.2,
+      bounceLeft: 0,
+      pierceLeft: 1,
+      face,
+      homing: true,
+      eagleMissile: true,
+    });
   }
 
   /** Fort ring open toward the battlefield (below top HQ / above bottom HQ). */
@@ -3605,6 +3795,9 @@ class Game {
         this.spreadTimer = 0;
         this.bounceTimer = Math.max(this.bounceTimer, 12);
         this.ShowBuffToast("军火库：疯射分叉穿甲！！");
+        break;
+      case POWER.eagleAlly:
+        this.StartEagleAlly(16);
         break;
       case POWER.spawnExtra:
         this.ForceSpawnExtras(4);
@@ -4003,6 +4196,7 @@ class Game {
     this.DrawGround(ctx);
     this.DrawTiles(ctx, false); // non-grass
     this.DrawBase(ctx);
+    if (this.eagleAlly) this.DrawEagleAlly(ctx);
 
     for (const pu of this.powerups) this.DrawPowerup(ctx, pu);
     for (const e of this.enemies) if (e.alive) this.DrawTank(ctx, e, false);
@@ -4210,9 +4404,41 @@ class Game {
     const cell = this.FindBaseCell();
     const bx = cell.x * TILE;
     const by = cell.y * TILE;
+    if (this.eagleAlly && this.baseAlive) {
+      // Empty nest — eagle is out on sortie.
+      ctx.fillStyle = "#0c0c12";
+      ctx.fillRect(bx, by, TILE * 2, TILE * 2);
+      ctx.strokeStyle = "#3a3a48";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + 1, by + 1, TILE * 2 - 2, TILE * 2 - 2);
+      ctx.fillStyle = "#2a2a34";
+      ctx.fillRect(bx + 6, by + 6, TILE * 2 - 12, TILE * 2 - 12);
+      return;
+    }
     const key = this.baseAlive ? "baseAlive" : "baseDead";
     const [gx, gy] = TILE_SHEET[key];
     this.BlitGrid(ctx, gx, gy, bx, by, TILE * 2, TILE * 2, 2, 2);
+  }
+
+  DrawEagleAlly(ctx) {
+    const e = this.eagleAlly;
+    if (!e || !this.baseAlive) return;
+    const [gx, gy] = TILE_SHEET.baseAlive;
+    const bob = Math.sin(e.animTick * 0.9) * 2;
+    const pulse = 0.7 + 0.3 * Math.abs(Math.sin(this.frame * 0.22));
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    this.BlitGrid(ctx, gx, gy, e.x, e.y + bob, e.w, e.h, 2, 2);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = `rgba(255,224,96,${0.45 + 0.4 * pulse})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(e.x - 1, e.y + bob - 1, e.w + 2, e.h + 2);
+    // Missile hardpoints flash
+    if (e.fireCd > 0.35) {
+      ctx.fillStyle = "#ffe060";
+      ctx.fillRect(Math.round(e.x + e.w * 0.5 - 2), Math.round(e.y + e.h + bob), 4, 5);
+    }
+    ctx.restore();
   }
 
   TankSheetOrigin(tank, isPlayer) {
@@ -4445,12 +4671,14 @@ class Game {
     if (b.trail.length > 1) {
       ctx.strokeStyle = b.meteor
         ? "rgba(255,120,40,0.55)"
-        : b.isPlayer
-          ? (b.homing ? "rgba(255,120,160,0.45)" : "rgba(255,220,120,0.35)")
-          : b.bossShell
-            ? "rgba(255,180,80,0.45)"
-            : "rgba(255,120,100,0.3)";
-      ctx.lineWidth = b.meteor || b.bossShell ? 3 : 2;
+        : b.eagleMissile
+          ? "rgba(255,224,96,0.7)"
+          : b.isPlayer
+            ? (b.homing ? "rgba(255,120,160,0.45)" : "rgba(255,220,120,0.35)")
+            : b.bossShell
+              ? "rgba(255,180,80,0.45)"
+              : "rgba(255,120,100,0.3)";
+      ctx.lineWidth = b.meteor || b.bossShell || b.eagleMissile ? 3 : 2;
       ctx.beginPath();
       ctx.moveTo(b.trail[0].x, b.trail[0].y);
       for (let i = 1; i < b.trail.length; i++) ctx.lineTo(b.trail[i].x, b.trail[i].y);
@@ -4764,6 +4992,7 @@ class Game {
     if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
     if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
     if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
+    if (this.eagleAlly) chips.push({ t: `鹰援 ${Math.ceil(this.eagleAlly.ttl)}`, c: "#ffe060" });
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
     if (this.stagePerk) {
       const u = FindUpgrade(this.stagePerk);
