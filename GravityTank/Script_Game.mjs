@@ -586,7 +586,9 @@ class Game {
     this.touchDir = null;
     this.touchFire = false;
     this.stickPointerId = null;
+    this.stickTouchId = null;
     this.firePointerId = null;
+    this.fireTouchId = null;
     this.stickVec = { x: 0, y: 0 };
     this.isTouchDevice = false;
     this.respawnTimer = 0;
@@ -776,7 +778,9 @@ class Game {
 
   ResetTouchInput() {
     this.stickPointerId = null;
+    this.stickTouchId = null;
     this.firePointerId = null;
+    this.fireTouchId = null;
     this.touchFire = false;
     this.touchDir = null;
     this.stickVec.x = 0;
@@ -834,6 +838,9 @@ class Game {
     const immersive = this.isTouchDevice && ["playing", "paused", "roulette", "stageIntro", "won", "lost"].includes(this.state);
     document.body.classList.toggle("is-touch-play", immersive);
     document.body.classList.toggle("is-portrait", window.matchMedia("(orientation: portrait)").matches);
+    // Lock page gestures while the virtual stick is live — critical on iOS Safari.
+    document.documentElement.classList.toggle("touch-play-lock", show);
+    document.body.classList.toggle("touch-play-lock", show);
     // Defer so layout reflects control visibility before measuring.
     requestAnimationFrame(() => this.FitPortraitStage());
   }
@@ -881,7 +888,7 @@ class Game {
   }
 
   BindTouchControls() {
-    const { stick, knob, fire, pause, hudPause } = this.touchUi;
+    const { stick, stickWrap, knob, fire, pause, hudPause, actionsWrap } = this.touchUi;
     if (!stick || !fire) return;
 
     const stickRadius = () => {
@@ -897,21 +904,29 @@ class Game {
 
     const clearStick = () => {
       this.stickPointerId = null;
+      this.stickTouchId = null;
       this.stickVec.x = 0;
       this.stickVec.y = 0;
       this.touchDir = null;
       setKnob(0, 0);
     };
 
-    const updateStickFromEvent = (ev) => {
-      const base = stick.querySelector(".stick-base");
-      if (!base) return;
+    const clearFire = () => {
+      this.firePointerId = null;
+      this.fireTouchId = null;
+      this.touchFire = false;
+      fire.classList.remove("is-active");
+    };
+
+    const updateStickFromClient = (clientX, clientY) => {
+      const base = stick.querySelector(".stick-base") || stick;
       const rect = base.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) return;
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      let dx = ev.clientX - cx;
-      let dy = ev.clientY - cy;
-      const max = rect.width * 0.5;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const max = Math.max(rect.width, rect.height) * 0.5;
       const len = Math.hypot(dx, dy) || 1;
       if (len > max) {
         dx = (dx / len) * max;
@@ -923,7 +938,8 @@ class Game {
       this.stickVec.y = ny;
       setKnob(nx, ny);
 
-      const dead = 0.28;
+      // Slightly softer deadzone — Safari touch jitter is noisier than mouse.
+      const dead = 0.22;
       if (Math.hypot(nx, ny) < dead) {
         this.touchDir = null;
         return;
@@ -933,35 +949,132 @@ class Game {
         : (ny < 0 ? "up" : "down");
     };
 
-    stick.addEventListener("pointerdown", (ev) => {
-      // Allow reclaim if previous pointer was lost without an up event.
-      if (this.stickPointerId !== null && this.stickPointerId !== ev.pointerId) {
-        this.stickPointerId = null;
-      }
-      if (this.stickPointerId !== null) return;
-      ev.preventDefault();
-      stick.setPointerCapture?.(ev.pointerId);
-      this.stickPointerId = ev.pointerId;
+    const beginStick = (clientX, clientY, trackId) => {
+      if (this.stickTouchId != null && this.stickTouchId !== trackId) return false;
+      this.stickTouchId = trackId;
+      this.stickPointerId = trackId;
       this.audio.Ensure();
-      updateStickFromEvent(ev);
-    });
-    stick.addEventListener("pointermove", (ev) => {
-      if (ev.pointerId !== this.stickPointerId) return;
-      ev.preventDefault();
-      updateStickFromEvent(ev);
-    });
-    const endStick = (ev) => {
-      if (ev.pointerId !== this.stickPointerId) return;
-      ev.preventDefault();
+      updateStickFromClient(clientX, clientY);
+      return true;
+    };
+
+    const moveStick = (clientX, clientY, trackId) => {
+      if (this.stickTouchId !== trackId && this.stickPointerId !== trackId) return;
+      updateStickFromClient(clientX, clientY);
+    };
+
+    const endStickIf = (trackId) => {
+      if (this.stickTouchId !== trackId && this.stickPointerId !== trackId) return;
       clearStick();
     };
-    stick.addEventListener("pointerup", endStick);
-    stick.addEventListener("pointercancel", endStick);
-    stick.addEventListener("lostpointercapture", () => {
-      if (this.stickPointerId !== null) clearStick();
+
+    const beginFire = (trackId) => {
+      if (this.state === "stageIntro") {
+        this.SkipStageIntro();
+        return false;
+      }
+      if (this.state === "roulette") {
+        this.RouletteKick(16 + Math.random() * 12);
+        return false;
+      }
+      if (this.fireTouchId != null && this.fireTouchId !== trackId) return false;
+      this.fireTouchId = trackId;
+      this.firePointerId = trackId;
+      this.touchFire = true;
+      fire.classList.add("is-active");
+      this.audio.Ensure();
+      return true;
+    };
+
+    const endFireIf = (trackId) => {
+      if (this.fireTouchId !== trackId && this.firePointerId !== trackId) return;
+      clearFire();
+    };
+
+    // —— Touch path (Safari-reliable): track on document so moves outside the pad still work ——
+    const onTouchStart = (ev) => {
+      const target = ev.target;
+      const onStick = stick.contains(target) || stickWrap?.contains(target);
+      const onFire = fire === target || fire.contains(target);
+      if (!onStick && !onFire) return;
+
+      // Claim new touches; support multitouch (stick + fire together).
+      for (let i = 0; i < ev.changedTouches.length; i++) {
+        const t = ev.changedTouches[i];
+        if (onStick && this.stickTouchId == null) {
+          if (beginStick(t.clientX, t.clientY, t.identifier)) ev.preventDefault();
+        } else if (onFire && this.fireTouchId == null) {
+          if (beginFire(t.identifier)) ev.preventDefault();
+        }
+      }
+    };
+
+    const onTouchMove = (ev) => {
+      let used = false;
+      for (let i = 0; i < ev.changedTouches.length; i++) {
+        const t = ev.changedTouches[i];
+        if (t.identifier === this.stickTouchId) {
+          moveStick(t.clientX, t.clientY, t.identifier);
+          used = true;
+        }
+      }
+      // Also check active touches list — some Safari builds only update touches, not changedTouches consistently.
+      if (this.stickTouchId != null) {
+        for (let i = 0; i < ev.touches.length; i++) {
+          const t = ev.touches[i];
+          if (t.identifier === this.stickTouchId) {
+            moveStick(t.clientX, t.clientY, t.identifier);
+            used = true;
+          }
+        }
+      }
+      if (used) ev.preventDefault();
+    };
+
+    const onTouchEnd = (ev) => {
+      for (let i = 0; i < ev.changedTouches.length; i++) {
+        const t = ev.changedTouches[i];
+        endStickIf(t.identifier);
+        endFireIf(t.identifier);
+      }
+    };
+
+    const touchOpts = { passive: false, capture: true };
+    // Bind on wraps (larger hit area). Avoid double-binding child + parent.
+    stickWrap?.addEventListener("touchstart", onTouchStart, touchOpts);
+    actionsWrap?.addEventListener("touchstart", onTouchStart, touchOpts);
+    // Document-level move/end so finger can leave the pad (Safari pointer-capture is flaky).
+    document.addEventListener("touchmove", onTouchMove, touchOpts);
+    document.addEventListener("touchend", onTouchEnd, touchOpts);
+    document.addEventListener("touchcancel", onTouchEnd, touchOpts);
+
+    // —— Pointer path (desktop / browsers where Pointer Events work) ——
+    // Skip pointer handlers when the event is a touch — touch path already owns it.
+    const isTouchPointer = (ev) => ev.pointerType === "touch";
+
+    stick.addEventListener("pointerdown", (ev) => {
+      if (isTouchPointer(ev)) return; // handled by touch listeners
+      if (!beginStick(ev.clientX, ev.clientY, ev.pointerId)) return;
+      ev.preventDefault();
+      try { stick.setPointerCapture?.(ev.pointerId); } catch (_) { /* Safari may throw */ }
     });
+    stick.addEventListener("pointermove", (ev) => {
+      if (isTouchPointer(ev)) return;
+      if (ev.pointerId !== this.stickPointerId) return;
+      ev.preventDefault();
+      moveStick(ev.clientX, ev.clientY, ev.pointerId);
+    });
+    const endStickPointer = (ev) => {
+      if (isTouchPointer(ev)) return;
+      endStickIf(ev.pointerId);
+    };
+    stick.addEventListener("pointerup", endStickPointer);
+    stick.addEventListener("pointercancel", endStickPointer);
+    // Do NOT clear on lostpointercapture alone — iOS Safari can fire this spuriously
+    // while the finger is still down, which used to kill the stick instantly.
 
     fire.addEventListener("pointerdown", (ev) => {
+      if (isTouchPointer(ev)) return;
       if (this.state === "stageIntro") {
         ev.preventDefault();
         this.SkipStageIntro();
@@ -972,31 +1085,16 @@ class Game {
         this.RouletteKick(16 + Math.random() * 12);
         return;
       }
-      if (this.firePointerId !== null && this.firePointerId !== ev.pointerId) {
-        this.firePointerId = null;
-      }
-      if (this.firePointerId !== null) return;
+      if (!beginFire(ev.pointerId)) return;
       ev.preventDefault();
-      fire.setPointerCapture?.(ev.pointerId);
-      this.firePointerId = ev.pointerId;
-      this.touchFire = true;
-      fire.classList.add("is-active");
-      this.audio.Ensure();
+      try { fire.setPointerCapture?.(ev.pointerId); } catch (_) { /* ignore */ }
     });
-    const endFire = (ev) => {
-      if (ev.pointerId !== this.firePointerId) return;
-      ev.preventDefault();
-      this.firePointerId = null;
-      this.touchFire = false;
-      fire.classList.remove("is-active");
+    const endFirePointer = (ev) => {
+      if (isTouchPointer(ev)) return;
+      endFireIf(ev.pointerId);
     };
-    fire.addEventListener("pointerup", endFire);
-    fire.addEventListener("pointercancel", endFire);
-    fire.addEventListener("lostpointercapture", () => {
-      this.firePointerId = null;
-      this.touchFire = false;
-      fire.classList.remove("is-active");
-    });
+    fire.addEventListener("pointerup", endFirePointer);
+    fire.addEventListener("pointercancel", endFirePointer);
 
     const onPauseTap = (ev) => {
       ev.preventDefault();
