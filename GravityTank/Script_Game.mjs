@@ -1749,9 +1749,14 @@ class Game {
   }
 
   BulletHitTerrain(b) {
+    const face = b.face || DirFromVector(b.vx, b.vy);
+    const fd = DIR[face] || { x: Math.sign(b.vx), y: Math.sign(b.vy) };
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
     const samples = [
-      [b.x + 4, b.y + 4],
-      [b.x + 4 + Math.sign(b.vx) * 3, b.y + 4 + Math.sign(b.vy) * 3],
+      [cx + fd.x * 5, cy + fd.y * 5], // tip in facing direction
+      [cx + fd.x * 2, cy + fd.y * 2],
+      [cx, cy],
     ];
     for (const [px, py] of samples) {
       const tx = Math.floor(px / TILE);
@@ -1811,17 +1816,32 @@ class Game {
     return (mask & BrickBitAtLocal(ox, oy)) !== 0;
   }
 
-  /** Classic: one shot shaves a half-tile (8px strip); power≥2 clears the whole cell. */
-  DestroyBrickHalf(tx, ty, bullet, power) {
+  /**
+   * Classic Battle City: each hit removes ONE half of the 16×16 brick
+   * (the half that was actually struck). Second hit clears the rest.
+   */
+  DestroyBrickHalf(tx, ty, bullet, _power) {
     if (!this.brickMask?.[ty]) return;
     if (this.map[ty][tx] !== TILE_BRICK) return;
     let mask = this.brickMask[ty][tx] || BRICK_FULL;
-    if (power >= 2) {
-      mask = 0;
+    const hitX = bullet.x + bullet.w / 2;
+    const hitY = bullet.y + bullet.h / 2;
+    const ox = hitX - tx * TILE;
+    const oy = hitY - ty * TILE;
+    const face = bullet.face || DirFromVector(bullet.vx, bullet.vy);
+    let clear;
+    if (face === "left" || face === "right") {
+      // Vertical half containing the impact point.
+      clear = ox < TILE / 2 ? (BRICK_TL | BRICK_BL) : (BRICK_TR | BRICK_BR);
     } else {
-      const face = bullet.face || DirFromVector(bullet.vx, bullet.vy);
-      mask &= ~BrickHalfMaskFromDir(face);
+      // Horizontal half containing the impact point.
+      clear = oy < TILE / 2 ? (BRICK_TL | BRICK_TR) : (BRICK_BL | BRICK_BR);
     }
+    // If that half is already gone, clear whichever solid half remains.
+    if ((mask & clear) === 0) {
+      clear = mask;
+    }
+    mask &= ~clear;
     this.brickMask[ty][tx] = mask;
     if (mask === 0) this.map[ty][tx] = TILE_EMPTY;
   }
@@ -2740,11 +2760,27 @@ class Game {
     const mask = this.brickMask?.[ty]?.[tx] ?? BRICK_FULL;
     if (!mask) return;
     const [gx, gy] = TILE_SHEET.brick;
-    // Draw remaining 8×8 quarters — classic half-brick look.
-    if (mask & BRICK_TL) this.BlitGrid(ctx, gx, gy, px, py, 8, 8, 1, 1);
-    if (mask & BRICK_TR) this.BlitGrid(ctx, gx, gy, px + 8, py, 8, 8, 1, 1);
-    if (mask & BRICK_BL) this.BlitGrid(ctx, gx, gy, px, py + 8, 8, 8, 1, 1);
-    if (mask & BRICK_BR) this.BlitGrid(ctx, gx, gy, px + 8, py + 8, 8, 8, 1, 1);
+    // Always the same 16×16 brick art — clip away destroyed halves.
+    const blitFull = () => this.BlitGrid(ctx, gx, gy, px, py, TILE, TILE, 1, 1);
+    if (mask === BRICK_FULL) {
+      blitFull();
+      return;
+    }
+    const parts = [
+      [BRICK_TL, px, py, 8, 8],
+      [BRICK_TR, px + 8, py, 8, 8],
+      [BRICK_BL, px, py + 8, 8, 8],
+      [BRICK_BR, px + 8, py + 8, 8, 8],
+    ];
+    for (const [bit, x, y, w, h] of parts) {
+      if (!(mask & bit)) continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+      blitFull();
+      ctx.restore();
+    }
   }
 
   DrawSteel(ctx, px, py) {
@@ -2935,154 +2971,130 @@ class Game {
     const focus = r.phase === "result" && r.result ? r.result : under;
     ctx.imageSmoothingEnabled = false;
 
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Legend strip: green good / gold ultra / red bad
-    ctx.fillStyle = TIER_PALETTE.good.bg;
-    ctx.fillRect(16, 4, 90, 14);
-    ctx.fillStyle = TIER_PALETTE.good.color;
-    ctx.font = "bold 9px monospace";
-    ctx.fillText("好", 22, 14);
-    ctx.fillStyle = TIER_PALETTE.ultra.bg;
-    ctx.fillRect(110, 4, 90, 14);
-    ctx.fillStyle = TIER_PALETTE.ultra.color;
-    ctx.fillText("超", 116, 14);
-    ctx.fillStyle = TIER_PALETTE.bad.bg;
-    ctx.fillRect(204, 4, 90, 14);
-    ctx.fillStyle = TIER_PALETTE.bad.color;
-    ctx.fillText("负", 210, 14);
-    ctx.fillStyle = "#808080";
-    ctx.fillText(`×${n}`, 310, 14);
-
-    const bannerY = 22;
-    const bannerH = 48;
+    // Result / pointer banner
     ctx.fillStyle = focus.bg;
-    ctx.fillRect(16, bannerY, CANVAS_W - 32, bannerH);
+    ctx.fillRect(18, 8, CANVAS_W - 36, 40);
     ctx.strokeStyle = focus.rim || focus.color;
     ctx.lineWidth = 3;
-    ctx.strokeRect(16, bannerY, CANVAS_W - 32, bannerH);
-
-    this.DrawPowerIcon(ctx, focus.kind, 48, bannerY + bannerH / 2, 26);
+    ctx.strokeRect(18, 8, CANVAS_W - 36, 40);
+    this.DrawPowerIcon(ctx, focus.kind, 42, 28, 22);
+    ctx.fillStyle = focus.color;
+    ctx.font = "bold 15px monospace";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = "#a0a0a0";
-    ctx.font = "bold 9px monospace";
-    ctx.fillText(r.phase === "spin" ? "NEEDLE" : "HIT", 72, bannerY + 14);
-    ctx.fillStyle = focus.color;
-    ctx.font = "bold 18px monospace";
-    const tierTag = focus.tier === "ultra" ? "超 " : focus.tier === "bad" ? "负 " : "好 ";
-    ctx.fillText(`${tierTag}${focus.label}`, 72, bannerY + 34);
+    const tag = focus.tier === "ultra" ? "超 " : focus.tier === "bad" ? "负 " : "好 ";
+    ctx.fillText(`${tag}${focus.label}`, 62, 28);
     ctx.textBaseline = "alphabetic";
 
     const wheelImg = this.images.rouletteWheel;
+    const diam = r.radius * 2 + 20;
+
+    // Shadow
+    ctx.beginPath();
+    ctx.arc(r.cx + 2, r.cy + 4, r.radius + 2, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fill();
+
+    // 1) Generated base wheel (rotates)
     ctx.save();
     ctx.translate(r.cx, r.cy);
     ctx.rotate(r.angle);
     if (wheelImg) {
-      const diam = r.radius * 2 + 8;
-      ctx.globalAlpha = 0.22;
       ctx.drawImage(wheelImg, -diam / 2, -diam / 2, diam, diam);
-      ctx.globalAlpha = 1;
     }
 
+    // 2) Colored wedges + labels on top of base
     for (let i = 0; i < n; i++) {
       const seg = segs[i];
       const a0 = i * slice;
       const a1 = a0 + slice;
       const isFocus = i === needleIdx;
+
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, r.radius, a0, a1);
+      ctx.arc(0, 0, r.radius * 0.88, a0, a1);
       ctx.closePath();
-      ctx.fillStyle = isFocus ? seg.bg : (seg.tier === "bad" ? "#200808" : seg.tier === "ultra" ? "#201808" : "#081808");
-      ctx.globalAlpha = isFocus ? 0.98 : 0.88;
+      ctx.fillStyle = isFocus ? seg.color : seg.bg;
+      ctx.globalAlpha = isFocus ? 0.92 : 0.78;
       ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = isFocus ? (seg.rim || seg.color) : (seg.rim || "#404040");
-      ctx.lineWidth = isFocus ? 3.5 : 1.5;
+      ctx.strokeStyle = seg.rim || "#606060";
+      ctx.lineWidth = isFocus ? 2.5 : 1;
       ctx.stroke();
 
       ctx.save();
       ctx.rotate(a0 + slice / 2);
-      const iconR = r.radius * 0.58;
-      const drew = this.DrawPowerIcon(ctx, seg.kind, 0, -iconR, isFocus ? 20 : 15);
-      ctx.fillStyle = isFocus ? "#ffffff" : seg.color;
-      ctx.font = isFocus ? "bold 11px monospace" : "bold 9px monospace";
       ctx.textAlign = "center";
-      ctx.fillText(seg.label, 0, -iconR + (drew ? 16 : 4));
+      ctx.textBaseline = "middle";
+      // dark plate behind text for readability
+      const ty = -r.radius * 0.58;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(-18, ty - 10, 36, 20);
+      ctx.fillStyle = isFocus ? "#101010" : "#ffffff";
+      ctx.font = isFocus ? "bold 12px monospace" : "bold 11px monospace";
+      ctx.fillText(seg.label, 0, ty);
       ctx.restore();
     }
 
+    // Hub
     ctx.beginPath();
-    ctx.arc(0, 0, 22, 0, Math.PI * 2);
-    ctx.fillStyle = focus.bg;
+    ctx.arc(0, 0, 26, 0, Math.PI * 2);
+    ctx.fillStyle = "#141414";
     ctx.fill();
-    ctx.strokeStyle = focus.rim || focus.color;
+    ctx.strokeStyle = focus.color;
     ctx.lineWidth = 3;
     ctx.stroke();
-    this.DrawPowerIcon(ctx, focus.kind, 0, 0, 18);
+    ctx.fillStyle = focus.color;
+    ctx.font = "bold 11px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(focus.tier === "bad" ? "负" : focus.tier === "ultra" ? "超" : "好", 0, 1);
     ctx.restore();
 
-    const ny = r.cy - r.radius;
+    // 3) Fixed needle (not rotating)
     const needle = this.images.rouletteNeedle;
+    const ny = r.cy - r.radius;
     if (needle) {
-      ctx.drawImage(needle, r.cx - 16, ny - 40, 32, 48);
+      ctx.drawImage(needle, r.cx - 20, ny - 50, 40, 52);
     } else {
       ctx.fillStyle = "#f0d060";
       ctx.beginPath();
       ctx.moveTo(r.cx, ny);
-      ctx.lineTo(r.cx - 12, ny - 24);
-      ctx.lineTo(r.cx + 12, ny - 24);
+      ctx.lineTo(r.cx - 12, ny - 26);
+      ctx.lineTo(r.cx + 12, ny - 26);
       ctx.closePath();
       ctx.fill();
     }
 
-    ctx.strokeStyle = "#b0b0b0";
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#c0c0c0";
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(r.cx, r.cy, r.radius + 2, 0, Math.PI * 2);
+    ctx.arc(r.cx, r.cy, r.radius + 5, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.save();
-    ctx.translate(r.cx, r.cy);
-    const aFocus0 = needleIdx * slice + r.angle;
-    ctx.strokeStyle = focus.rim || focus.color;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(0, 0, r.radius + 6, aFocus0, aFocus0 + slice);
-    ctx.stroke();
-    ctx.restore();
 
     ctx.fillStyle = "#a8a8a8";
     ctx.font = "10px monospace";
     ctx.textAlign = "center";
-    if (r.phase === "spin") {
-      const moving = Math.abs(r.omega) > 0.2 || r.dragging;
-      ctx.fillText(moving ? "SPIN..." : "DRAG / SPACE", r.cx, CANVAS_H - 22);
-    } else {
-      ctx.fillStyle = focus.color;
-      ctx.font = "bold 12px monospace";
-      ctx.fillText("GET!", r.cx, CANVAS_H - 22);
-    }
+    ctx.fillText(
+      r.phase === "spin"
+        ? (Math.abs(r.omega) > 0.2 || r.dragging ? "减速中…" : "拖动甩转 / 空格")
+        : "获得！",
+      r.cx,
+      CANVAS_H - 20
+    );
     ctx.textAlign = "left";
 
-    if (this.buffToast) {
-      const alpha = Clamp(this.buffToast.ttl / 0.4, 0, 1);
-      ctx.globalAlpha = alpha;
-      const msg = this.buffToast.text;
-      ctx.font = "bold 12px monospace";
-      const tw = Math.min(CANVAS_W - 24, ctx.measureText(msg).width + 24);
-      ctx.fillStyle = "#000";
-      ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H - 52, tw, 26);
-      ctx.strokeStyle = focus.color;
-      ctx.lineWidth = 2;
-      ctx.strokeRect((CANVAS_W - tw) / 2, CANVAS_H - 52, tw, 26);
-      ctx.fillStyle = "#f0d060";
-      ctx.textAlign = "center";
-      ctx.fillText(msg, CANVAS_W / 2, CANVAS_H - 34);
-      ctx.textAlign = "left";
-      ctx.globalAlpha = 1;
-    }
+    // Tier legend
+    ctx.font = "bold 9px monospace";
+    ctx.fillStyle = TIER_PALETTE.good.color;
+    ctx.fillText("绿=好", 20, CANVAS_H - 8);
+    ctx.fillStyle = TIER_PALETTE.ultra.color;
+    ctx.fillText("金=超", 70, CANVAS_H - 8);
+    ctx.fillStyle = TIER_PALETTE.bad.color;
+    ctx.fillText("红=负", 120, CANVAS_H - 8);
   }
 
   DrawBuffHud(ctx) {
