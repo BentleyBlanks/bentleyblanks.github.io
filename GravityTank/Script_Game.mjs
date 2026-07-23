@@ -1142,6 +1142,21 @@ class Game {
     const stagePick = document.getElementById("debugStagePick");
     if (!banner || !panel) return;
 
+    const syncStatus = () => {
+      if (status) {
+        const stageTag = this.isTutorial ? "T" : (this.isBossStage ? `${this.stage}B` : String(this.stage));
+        status.textContent = `god ${this.debugGodMode ? "ON" : "OFF"} · stage ${stageTag}`;
+      }
+      const godBtn = panel.querySelector('[data-debug="god"]');
+      godBtn?.classList.toggle("is-on", this.debugGodMode);
+      if (stagePick) {
+        const cur = this.isTutorial ? 0 : this.stage;
+        stagePick.querySelectorAll("[data-debug-stage]").forEach((btn) => {
+          btn.classList.toggle("is-on", Number(btn.dataset.debugStage) === cur);
+        });
+      }
+    };
+
     if (stagePick && !stagePick.dataset.built) {
       stagePick.dataset.built = "1";
       const stages = [
@@ -1170,21 +1185,6 @@ class Game {
         stagePick.appendChild(btn);
       }
     }
-
-    const syncStatus = () => {
-      if (status) {
-        const stageTag = this.isTutorial ? "T" : (this.isBossStage ? `${this.stage}B` : String(this.stage));
-        status.textContent = `god ${this.debugGodMode ? "ON" : "OFF"} · stage ${stageTag}`;
-      }
-      const godBtn = panel.querySelector('[data-debug="god"]');
-      godBtn?.classList.toggle("is-on", this.debugGodMode);
-      if (stagePick) {
-        const cur = this.isTutorial ? 0 : this.stage;
-        stagePick.querySelectorAll("[data-debug-stage]").forEach((btn) => {
-          btn.classList.toggle("is-on", Number(btn.dataset.debugStage) === cur);
-        });
-      }
-    };
 
     const setOpen = (open) => {
       this.debugPanelOpen = open;
