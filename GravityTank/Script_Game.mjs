@@ -1424,22 +1424,21 @@ class Game {
       const diffTag = this.IsEasy() ? "简易：双倍生命 · 负面更少 · ?掉率+50%。" : "标准难度。";
       if (this.isTutorial) {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 你在河北岸。河对面过不来——用重力弹幕（朝下/斜射）清理南岸敌军，再选一张入门升级进入战役。`;
+          `${diffTag} 炮弹带重力会下坠——朝下/斜着打对岸；别把自己轰死。`;
       } else if (this.state === "ready" || this.state === "boot") {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关坦克王 · 第 6 关重力巨炮）。保卫老鹰；炮弹带重力会下坠。`;
+          `${diffTag} 炮弹带重力，打出去会往下掉。自己也要当心，别被自己的弹幕炸到。`;
       } else if (this.isBossStage) {
         if (this.stageData.bossKind === "tankKing") {
           this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关 · 坦克王。单炮追猎；残血终焉会把你变成老鹰（开场有护盾），被打倒直接失败。`;
+            `${diffTag} 炮弹带重力——自己也要当心落弹。残血终焉会把你变成老鹰，被打倒直接失败。`;
         } else {
           this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关 · 重力巨炮。八向炮筒弹幕；残血终焉老鹰诅咒更久（开场有护盾），被打倒直接失败。`;
+            `${diffTag} 炮弹带重力——自己也要当心落弹。残血终焉老鹰诅咒更久，被打倒直接失败。`;
         }
       } else {
-        const e = this.stageData.enemies;
         this.overlays.startBlurb.textContent =
-          `${diffTag} 第 ${this.stage}/${STAGE_COUNT} 关 · 敌军 ${this.totalEnemies}（普${e.basic}/快${e.fast}/强${e.power}/甲${e.armor}）。保卫老鹰。炮弹带重力，水平射击会下坠。`;
+          `${diffTag} 第 ${this.stage}/${STAGE_COUNT} 关。炮弹带重力会下坠，自己也要当心。`;
       }
     }
     this.SyncDebugStatus?.();
