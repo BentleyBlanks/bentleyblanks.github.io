@@ -1814,7 +1814,14 @@ class Game {
     }
     if (this.antigravTimer > 0) this.antigravTimer -= dt;
     if (this.bounceTimer > 0) this.bounceTimer -= dt;
-    if (this.ghostTimer > 0) this.ghostTimer -= dt;
+    if (this.ghostTimer > 0) {
+      const prevGhost = this.ghostTimer;
+      this.ghostTimer -= dt;
+      if (prevGhost > 0 && this.ghostTimer <= 0) {
+        this.ghostTimer = 0;
+        this.ResolveGhostExpire();
+      }
+    }
     if (this.mirrorTimer > 0) this.mirrorTimer -= dt;
     if (this.magnetTimer > 0) this.magnetTimer -= dt;
     if (this.overdriveTimer > 0) this.overdriveTimer -= dt;
@@ -2516,13 +2523,16 @@ class Game {
     return this.CollidesTerrain(tank) || this.CollidesTanks(tank);
   }
 
-  UnstickTank(tank) {
+  /** Push a tank out of embeds. Larger radius used when ghost ends inside walls. */
+  UnstickTank(tank, opts = {}) {
     if (!tank || !tank.alive) return false;
     if (!this.TankBlocked(tank)) return false;
 
     const originX = tank.x;
     const originY = tank.y;
-    const steps = [4, 8, 12, 16, 20, 24, 28, 32];
+    const maxDist = opts.maxDist ?? 32;
+    const steps = [];
+    for (let d = 4; d <= maxDist; d += 4) steps.push(d);
     const dirs = [
       [1, 0], [-1, 0], [0, 1], [0, -1],
       [1, 1], [1, -1], [-1, 1], [-1, -1],
@@ -2532,6 +2542,47 @@ class Game {
         tank.x = Clamp(originX + ox * dist, 0, CANVAS_W - tank.w);
         tank.y = Clamp(originY + oy * dist, 0, CANVAS_H - tank.h);
         if (!this.TankBlocked(tank)) return true;
+      }
+    }
+    tank.x = originX;
+    tank.y = originY;
+    return false;
+  }
+
+  /** After ghost fades: eject from brick/steel so the tank is not soft-locked. */
+  ResolveGhostExpire() {
+    const p = this.player;
+    if (!p?.alive) return;
+    if (!this.TankBlocked(p)) return;
+    if (this.UnstickTank(p, { maxDist: 96 })) {
+      p.protect = Math.max(p.protect, 1.2);
+      return;
+    }
+    if (this.EjectTankToOpenTile(p)) {
+      p.protect = Math.max(p.protect, 1.5);
+      this.ShowBuffToast("幽灵消散 · 已弹出墙体");
+    }
+  }
+
+  EjectTankToOpenTile(tank) {
+    const cx = Math.floor((tank.x + tank.w / 2) / TILE);
+    const cy = Math.floor((tank.y + tank.h / 2) / TILE);
+    const originX = tank.x;
+    const originY = tank.y;
+    for (let radius = 0; radius <= 14; radius++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (radius > 0 && Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+          const tx = cx + dx;
+          const ty = cy + dy;
+          if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) continue;
+          const t = this.map[ty][tx];
+          if (t === TILE_STEEL || t === TILE_WATER || t === TILE_BASE || t === TILE_BASE_DEAD) continue;
+          if (t === TILE_BRICK && (this.brickMask?.[ty]?.[tx] ?? BRICK_FULL) !== 0) continue;
+          tank.x = Clamp(tx * TILE + (TILE - tank.w) / 2, 0, CANVAS_W - tank.w);
+          tank.y = Clamp(ty * TILE + (TILE - tank.h) / 2, 0, CANVAS_H - tank.h);
+          if (!this.TankBlocked(tank)) return true;
+        }
       }
     }
     tank.x = originX;
@@ -2577,8 +2628,8 @@ class Game {
       if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
       const t = this.map[ty][tx];
       if (ghost) {
-        // Ghost slips through brick & water; steel / base still solid.
-        if (t === TILE_STEEL || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
+        // Phase through brick / steel / water; only the eagle base stays solid.
+        if (t === TILE_BASE || t === TILE_BASE_DEAD) return true;
         continue;
       }
       if (t === TILE_BRICK) {
@@ -3298,10 +3349,10 @@ class Game {
       case POWER.ghost:
         this.ghostTimer = 16;
         if (p) {
-          this.UnstickTank(p);
+          this.UnstickTank(p, { maxDist: 48 });
           p.protect = Math.max(p.protect, 4);
         }
-        this.ShowBuffToast("幽灵穿墙 16 秒");
+        this.ShowBuffToast("幽灵穿墙（砖/钢）16 秒");
         break;
       case POWER.mirror:
         this.mirrorTimer = 18;
