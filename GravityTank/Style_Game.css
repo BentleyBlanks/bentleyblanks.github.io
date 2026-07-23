@@ -217,6 +217,45 @@ body {
   line-height: 1.7;
 }
 
+.difficulty-pick {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.diff-btn {
+  appearance: none;
+  border: 2px solid #707070;
+  background: #1a1a1a;
+  color: #c8c8c8;
+  font: inherit;
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+  padding: 10px 14px;
+  min-height: 40px;
+  min-width: 88px;
+  border-radius: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  text-transform: uppercase;
+}
+
+.diff-btn.is-active {
+  border-color: #f0d060;
+  background: #603010;
+  color: #fff8e0;
+  box-shadow: 0 3px 0 #301808;
+}
+
+.diff-hint {
+  margin: 0;
+  max-width: 34ch;
+  color: #a8a070;
+  line-height: 1.6;
+  font-size: 0.4rem;
+}
+
 button.primary {
   appearance: none;
   border: 3px solid #f0d060;

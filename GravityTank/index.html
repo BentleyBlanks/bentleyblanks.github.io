@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./Style_Game.css?v=wheelbase1">
+  <link rel="stylesheet" href="./Style_Game.css?v=diffTutor1">
 </head>
 <body>
   <div id="app">
@@ -39,6 +39,11 @@
       <div id="startOverlay" class="overlay">
         <h2 id="startStageTitle">STAGE 1</h2>
         <p id="startStageBlurb">保卫老鹰总部。炮弹带重力，水平射击会下坠。</p>
+        <div id="difficultyPick" class="difficulty-pick" role="radiogroup" aria-label="难度">
+          <button type="button" class="diff-btn" data-diff="easy" role="radio" aria-checked="false">简易</button>
+          <button type="button" class="diff-btn is-active" data-diff="normal" role="radio" aria-checked="true">标准</button>
+        </div>
+        <p class="diff-hint" id="difficultyHint">简易：双倍生命 · 负面更少 · ?掉率+50%</p>
         <button id="startButton" class="primary" type="button">START</button>
         <p class="hint desktop-hint">↑↓←→ / WASD · SPACE/J FIRE · P PAUSE</p>
         <p class="hint mobile-hint">左摇杆移动 · 右键开火</p>
@@ -116,7 +121,7 @@
 
       <div class="panel">
         <h3>RULE</h3>
-        <p class="feature">场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮（每次随机 10 格）。<strong style="color:#70ff98">绿=好</strong> · <strong style="color:#ffe060">金=超</strong> · <strong style="color:#ff6060">红=负</strong>。含分叉/速射/穿甲等子弹变体。</p>
+        <p class="feature">开局可选简易/标准。场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮（每次随机 10 格）。<strong style="color:#70ff98">绿=好</strong> · <strong style="color:#ffe060">金=超</strong> · <strong style="color:#ff6060">红=负</strong>。含分叉/速射/穿甲等子弹变体。首关为新手引导：向上炮弹会落回打自己。</p>
       </div>
 
       <div class="panel panel-controls-help">
@@ -133,6 +138,6 @@
       <p class="credit">SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=wheelbase1"></script>
+  <script type="module" src="./Script_Game.mjs?v=diffTutor1"></script>
 </body>
 </html>

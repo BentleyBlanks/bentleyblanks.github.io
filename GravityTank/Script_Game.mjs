@@ -3,7 +3,12 @@
  * Visuals: classic NES Battle City–style sprites (StefanBS/battle-city-clone, MIT).
  */
 
-import { STAGE_COUNT, GetStage } from "./Data_Stages.mjs";
+import { STAGE_COUNT, GetStage, IsTutorialStage, TUTORIAL_STAGE } from "./Data_Stages.mjs";
+
+const DIFFICULTY = {
+  easy: "easy",
+  normal: "normal",
+};
 
 const TILE = 16;
 const MAP_W = 26;
@@ -145,11 +150,14 @@ function ShuffleInPlace(arr) {
 }
 
 /** Pick 10 unique prizes: mix good / ultra / bad so the wheel stays readable. */
-function PickRouletteSegments(count = ROULETTE_SIZE) {
+function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.normal) {
   const goods = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "good").slice());
   const ultras = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "ultra").slice());
   const bads = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "bad").slice());
-  const badN = Math.min(bads.length, 2 + Math.floor(Math.random() * 2)); // 2–3
+  // Easy: fewer negative wedges (0–1). Normal: 2–3.
+  const badN = difficulty === DIFFICULTY.easy
+    ? Math.min(bads.length, Math.floor(Math.random() * 2))
+    : Math.min(bads.length, 2 + Math.floor(Math.random() * 2));
   const ultraN = Math.min(ultras.length, 1 + Math.floor(Math.random() * 2)); // 1–2
   const goodN = Math.max(0, count - badN - ultraN);
   const picked = [
@@ -157,11 +165,15 @@ function PickRouletteSegments(count = ROULETTE_SIZE) {
     ...ultras.slice(0, ultraN),
     ...bads.slice(0, badN),
   ];
-  // Fill if pool short
+  // Fill if pool short — prefer non-bad on easy
   while (picked.length < count) {
     const rest = ROULETTE_POOL.filter((s) => !picked.includes(s));
     if (!rest.length) break;
-    picked.push(rest[Math.floor(Math.random() * rest.length)]);
+    const prefer = difficulty === DIFFICULTY.easy
+      ? rest.filter((s) => s.tier !== "bad")
+      : rest;
+    const pool = prefer.length ? prefer : rest;
+    picked.push(pool[Math.floor(Math.random() * pool.length)]);
   }
   return ShuffleInPlace(picked.slice(0, count));
 }
@@ -565,8 +577,10 @@ class Game {
     this.respawnTimer = 0;
 
     this.state = "boot";
+    this.difficulty = DIFFICULTY.normal;
     this.stage = 1;
     this.stageData = GetStage(1);
+    this.isTutorial = false;
     this.totalEnemies = 20;
     this.endAction = "restart"; // restart | next | retry
     this.map = [];
@@ -688,6 +702,7 @@ class Game {
     document.getElementById("restartButton").addEventListener("click", () => this.HandleEndPrimary());
     document.getElementById("nextStageButton")?.addEventListener("click", () => this.AdvanceStage());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
+    this.BindDifficultyPick();
 
     this.canvas.addEventListener("pointerdown", (ev) => this.OnCanvasPointerDown(ev));
     this.canvas.addEventListener("pointermove", (ev) => this.OnCanvasPointerMove(ev));
@@ -974,9 +989,54 @@ class Game {
     document.getElementById("desktopPauseButton")?.addEventListener("click", onPauseTap);
   }
 
+  BindDifficultyPick() {
+    const root = document.getElementById("difficultyPick");
+    const hint = document.getElementById("difficultyHint");
+    if (!root) return;
+    const buttons = [...root.querySelectorAll("[data-diff]")];
+    const apply = (diff) => {
+      this.difficulty = diff === DIFFICULTY.easy ? DIFFICULTY.easy : DIFFICULTY.normal;
+      for (const btn of buttons) {
+        const on = btn.dataset.diff === this.difficulty;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-checked", on ? "true" : "false");
+      }
+      if (hint) {
+        hint.textContent = this.IsEasy()
+          ? "简易：双倍生命 · 负面更少 · ?掉率+50%"
+          : "标准：原版生命与掉率";
+      }
+      this.SyncStageLabels();
+    };
+    for (const btn of buttons) {
+      btn.addEventListener("click", () => apply(btn.dataset.diff));
+    }
+    apply(this.difficulty);
+  }
+
+  IsEasy() {
+    return this.difficulty === DIFFICULTY.easy;
+  }
+
+  GetStartLives() {
+    return this.IsEasy() ? PLAYER_LIVES * 2 : PLAYER_LIVES;
+  }
+
+  GetPowerDropRate() {
+    // Easy: ? tokens appear 50% more often.
+    return this.IsEasy() ? POWER_DROP_RATE * 1.5 : POWER_DROP_RATE;
+  }
+
   ApplyStageMeta(stageIndex1Based) {
-    this.stage = Math.max(1, Math.min(STAGE_COUNT, stageIndex1Based | 0));
-    this.stageData = GetStage(this.stage);
+    if (IsTutorialStage(stageIndex1Based)) {
+      this.stage = 0;
+      this.isTutorial = true;
+      this.stageData = TUTORIAL_STAGE;
+    } else {
+      this.isTutorial = false;
+      this.stage = Math.max(1, Math.min(STAGE_COUNT, stageIndex1Based | 0));
+      this.stageData = GetStage(this.stage);
+    }
     const e = this.stageData.enemies;
     this.totalEnemies = e.basic + e.fast + e.power + e.armor;
     this.spawnSlots = (this.stageData.enemySpawns || [[0, 0], [12, 0], [24, 0]]).map(([x, y]) => ({
@@ -987,24 +1047,39 @@ class Game {
   }
 
   SyncStageLabels() {
-    const label = String(this.stage);
+    const label = this.isTutorial ? "T" : String(this.stage);
     if (this.hud.stage) this.hud.stage.textContent = label;
     if (this.hud.mobileStage) this.hud.mobileStage.textContent = label;
-    if (this.overlays.startTitle) this.overlays.startTitle.textContent = `STAGE ${this.stage}`;
+    if (this.overlays.startTitle) {
+      this.overlays.startTitle.textContent = this.isTutorial ? "新手引导" : "GRAVITY TANK";
+    }
     if (this.overlays.startBlurb) {
-      const e = this.stageData.enemies;
-      this.overlays.startBlurb.textContent =
-        `第 ${this.stage}/${STAGE_COUNT} 关 · 敌军 ${this.totalEnemies}（普${e.basic}/快${e.fast}/强${e.power}/甲${e.armor}）。保卫老鹰。炮弹带重力，水平射击会下坠。七种道具掉率比原版高 50%。`;
+      const diffTag = this.IsEasy() ? "简易：双倍生命 · 负面更少 · ?掉率+50%。" : "标准难度。";
+      if (this.isTutorial) {
+        this.overlays.startBlurb.textContent =
+          `${diffTag} 向上射出的炮弹带重力，会落回并可能打死自己。清掉教学敌军后进入战役。`;
+      } else if (this.state === "ready" || this.state === "boot") {
+        this.overlays.startBlurb.textContent =
+          `${diffTag} 开局先进入新手引导（自伤炮弹），再打 ${STAGE_COUNT} 关战役。保卫老鹰；炮弹带重力会下坠。`;
+      } else {
+        const e = this.stageData.enemies;
+        this.overlays.startBlurb.textContent =
+          `${diffTag} 第 ${this.stage}/${STAGE_COUNT} 关 · 敌军 ${this.totalEnemies}（普${e.basic}/快${e.fast}/强${e.power}/甲${e.armor}）。保卫老鹰。炮弹带重力，水平射击会下坠。`;
+      }
     }
   }
 
   StartCampaign() {
     this.score = 0;
-    this.lives = PLAYER_LIVES;
-    this.StartGame({ stage: 1, keepStats: false });
+    this.lives = this.GetStartLives();
+    this.StartGame({ stage: 0, keepStats: false });
   }
 
   AdvanceStage() {
+    if (this.isTutorial) {
+      this.StartGame({ stage: 1, keepStats: false, keepScore: true, keepLives: true });
+      return;
+    }
     if (this.stage >= STAGE_COUNT) {
       this.StartCampaign();
       return;
@@ -1017,20 +1092,20 @@ class Game {
 
   HandleEndPrimary() {
     if (this.endAction === "next") this.AdvanceStage();
-    else if (this.endAction === "retry") this.StartGame({ stage: this.stage, keepStats: false, keepScore: false, keepLives: false });
+    else if (this.endAction === "retry") this.StartGame({ stage: this.isTutorial ? 0 : this.stage, keepStats: false, keepScore: false, keepLives: false });
     else this.StartCampaign();
   }
 
   StartGame({ stage = 1, keepStats = false, keepScore = false, keepLives = false } = {}) {
     this.ApplyStageMeta(stage);
-    this.map = BuildStageMap(this.stage);
+    this.map = BuildStageMap(this.isTutorial ? 0 : this.stage);
     this.brickMask = BuildBrickMask(this.map);
     this.bullets = [];
     this.explosions = [];
     this.powerups = [];
     this.enemies = [];
     if (!keepScore) this.score = 0;
-    if (!keepLives) this.lives = PLAYER_LIVES;
+    if (!keepLives) this.lives = this.GetStartLives();
     this.enemiesRemaining = this.totalEnemies;
     this.spawnTimer = 0.2;
     this.freezeTimer = 0;
@@ -1081,7 +1156,7 @@ class Game {
       t: 0,
       phase: "close", // close → hold → open → playing
       closeDur: 0.55,
-      holdDur: 1.65,
+      holdDur: this.isTutorial ? 2.4 : 1.65,
       openDur: 0.55,
     };
     this.audio.StageStart();
@@ -1120,12 +1195,16 @@ class Game {
     this.state = "playing";
     this.lastTs = 0;
     // Classic: a few enemies already on field when the curtain lifts.
-    for (let i = 0; i < 3; i++) {
+    const preSpawn = this.isTutorial ? 1 : 3;
+    for (let i = 0; i < preSpawn; i++) {
       this.TrySpawnEnemy(10);
       const last = this.enemies[this.enemies.length - 1];
       if (last) last.spawnFlash = 0;
     }
-    this.spawnTimer = 1.2;
+    this.spawnTimer = this.isTutorial ? 2.4 : 1.2;
+    if (this.isTutorial) {
+      this.ShowBuffToast("注意：向上射出的炮弹会落回，能打死自己！");
+    }
     this.UpdateHud();
     this.RenderEnemyIcons();
     this.SyncTouchControlsVisibility();
@@ -1932,7 +2011,7 @@ class Game {
     this.audio.StopEngine();
     this.ResetTouchInput();
     this.state = "roulette";
-    const segments = PickRouletteSegments(ROULETTE_SIZE);
+    const segments = PickRouletteSegments(ROULETTE_SIZE, this.difficulty);
     this.roulette = {
       angle: Math.random() * Math.PI * 2, // orientation only — NOT the result
       omega: 0,
@@ -2355,7 +2434,7 @@ class Game {
       aiTimer: 0.2,
       spawnFlash: 0.35,
       protect: 0,
-      dropsPower: Math.random() < POWER_DROP_RATE,
+      dropsPower: Math.random() < this.GetPowerDropRate(),
       deathTimer: 0,
       animTick: 0,
       moving: false,
@@ -2530,7 +2609,7 @@ class Game {
       aiTimer: 0.3,
       spawnFlash: 1.0,
       protect: 0,
-      dropsPower: type.id === "armor" || Math.random() < POWER_DROP_RATE,
+      dropsPower: type.id === "armor" || Math.random() < this.GetPowerDropRate(),
       deathTimer: 0,
       animTick: 0,
       moving: false,
@@ -2559,7 +2638,9 @@ class Game {
     if (!this.baseAlive) return;
     const alive = this.enemies.filter((e) => e.alive).length;
     if (alive === 0 && this.spawnQueue.length === 0) {
-      if (this.stage < STAGE_COUNT) {
+      if (this.isTutorial) {
+        this.EndGame(true, "引导完成！记住：向上的炮弹会落回打自己。进入战役。", "next");
+      } else if (this.stage < STAGE_COUNT) {
         this.EndGame(true, `第 ${this.stage} 关肃清！得分 ${this.score}`, "next");
       } else {
         this.EndGame(true, `五关全通！最终得分 ${this.score}`, "restart");
@@ -2572,12 +2653,14 @@ class Game {
     this.endAction = won ? action : "retry";
     this.overlays.end.hidden = false;
     this.overlays.endTitle.textContent = won
-      ? (this.stage >= STAGE_COUNT && action === "restart" ? "战役胜利" : "关卡通过")
+      ? (this.isTutorial
+        ? "引导通过"
+        : (this.stage >= STAGE_COUNT && action === "restart" ? "战役胜利" : "关卡通过"))
       : "游戏结束";
     this.overlays.endMessage.textContent = message;
     if (this.overlays.endPrimary) {
       this.overlays.endPrimary.textContent = won
-        ? (action === "next" ? "下一关" : "再来一局")
+        ? (action === "next" ? (this.isTutorial ? "进入战役" : "下一关") : "再来一局")
         : "重试本关";
     }
     if (this.overlays.endSecondary) {
@@ -2596,7 +2679,7 @@ class Game {
     const power = String(this.player?.power ?? 1);
     const score = String(this.score);
     const remain = String(this.spawnQueue.length + this.enemies.filter((e) => e.alive).length);
-    const stage = String(this.stage);
+    const stage = this.isTutorial ? "T" : String(this.stage);
     this.hud.lives.textContent = lives;
     this.hud.power.textContent = power;
     this.hud.score.textContent = score;
@@ -2656,7 +2739,23 @@ class Game {
     // gravity hint arc when aiming sideways/up (playing only)
     if (this.state === "playing" && this.player?.alive) this.DrawAimGhost(ctx);
     this.DrawBuffHud(ctx);
+    if (this.state === "playing" && this.isTutorial) this.DrawTutorialHint(ctx);
     if (this.state === "roulette") this.DrawRoulette(ctx);
+  }
+
+  DrawTutorialHint(ctx) {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(28, CANVAS_H - 36, CANVAS_W - 56, 28);
+    ctx.strokeStyle = "#f0d060";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(28, CANVAS_H - 36, CANVAS_W - 56, 28);
+    ctx.fillStyle = "#ffe08a";
+    ctx.font = "bold 11px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("↑ 向上射击会落回 · 别把自己打死", CANVAS_W / 2, CANVAS_H - 22);
+    ctx.restore();
   }
 
   /** Classic Battle City curtain: grey shutters + STAGE N. */
@@ -2708,18 +2807,30 @@ class Game {
       ctx.fillStyle = "#000";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = "bold 36px monospace";
-      ctx.fillText("STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
+      if (this.isTutorial) {
+        ctx.font = "bold 28px monospace";
+        ctx.fillText("TUTORIAL", CANVAS_W / 2, CANVAS_H / 2 - 36);
+        const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
+        ctx.globalAlpha = fade * blink;
+        ctx.font = "bold 42px monospace";
+        ctx.fillText("新手", CANVAS_W / 2, CANVAS_H / 2 + 18);
+        ctx.globalAlpha = fade * 0.95;
+        ctx.font = "bold 13px monospace";
+        ctx.fillText("向上射击的炮弹会落回打自己", CANVAS_W / 2, CANVAS_H / 2 + 62);
+      } else {
+        ctx.font = "bold 36px monospace";
+        ctx.fillText("STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
 
-      // Big stage number with a slight blink on hold
-      const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
-      ctx.globalAlpha = fade * blink;
-      ctx.font = "bold 64px monospace";
-      ctx.fillText(String(this.stage), CANVAS_W / 2, CANVAS_H / 2 + 28);
+        // Big stage number with a slight blink on hold
+        const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
+        ctx.globalAlpha = fade * blink;
+        ctx.font = "bold 64px monospace";
+        ctx.fillText(String(this.stage), CANVAS_W / 2, CANVAS_H / 2 + 28);
 
-      ctx.globalAlpha = fade * 0.9;
-      ctx.font = "bold 16px monospace";
-      ctx.fillText(`第 ${this.stage} 关 / 共 ${STAGE_COUNT} 关`, CANVAS_W / 2, CANVAS_H / 2 + 72);
+        ctx.globalAlpha = fade * 0.9;
+        ctx.font = "bold 16px monospace";
+        ctx.fillText(`第 ${this.stage} 关 / 共 ${STAGE_COUNT} 关`, CANVAS_W / 2, CANVAS_H / 2 + 72);
+      }
 
       if (intro.phase === "hold") {
         ctx.globalAlpha = fade * (0.35 + 0.35 * Math.sin(intro.t * 4));
@@ -3026,16 +3137,17 @@ class Game {
       ctx.stroke();
 
       ctx.save();
+      // Mid-angle of wedge points along +X after this rotate; place label on that ray
+      // (using -Y was 90° off and parked text on the segment boundaries).
       ctx.rotate(a0 + slice / 2);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      // dark plate behind text for readability
-      const ty = -r.radius * 0.58;
+      const tx = r.radius * 0.58;
       ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(-18, ty - 10, 36, 20);
+      ctx.fillRect(tx - 18, -10, 36, 20);
       ctx.fillStyle = isFocus ? "#101010" : "#ffffff";
       ctx.font = isFocus ? "bold 12px monospace" : "bold 11px monospace";
-      ctx.fillText(seg.label, 0, ty);
+      ctx.fillText(seg.label, tx, 0);
       ctx.restore();
     }
 
