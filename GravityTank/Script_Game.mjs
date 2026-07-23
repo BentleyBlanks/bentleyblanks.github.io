@@ -179,6 +179,43 @@ Object.assign(POWER_STYLE, {
   token: MakeSeg(POWER.token, "?", "good"),
 });
 
+/** NES-style pickup FX presets. Some styles are fullscreen CRT wipes / tints. */
+const POWER_FX = {
+  [POWER.star]: { style: "buff", label: "火力", tint: "#ffe060", dur: 1.05, shake: 3, fullscreen: false },
+  [POWER.gun]: { style: "buff", label: "钢弹", tint: "#d0d0d0", dur: 1.1, shake: 4, fullscreen: false },
+  [POWER.life]: { style: "life", label: "命+2", tint: "#70ff98", dur: 1.2, shake: 2, fullscreen: true },
+  [POWER.helmet]: { style: "shield", label: "护盾", tint: "#80c8ff", dur: 1.25, shake: 2, fullscreen: false },
+  [POWER.plates]: { style: "armor", label: "装甲", tint: "#c8c8c8", dur: 1.05, shake: 3, fullscreen: false },
+  [POWER.bastion]: { style: "armor", label: "壁垒", tint: "#f0d060", dur: 1.4, shake: 5, fullscreen: true },
+  [POWER.clock]: { style: "freeze", label: "冻结", tint: "#a0e8ff", dur: 1.45, shake: 2, fullscreen: true },
+  [POWER.bomb]: { style: "blast", label: "爆破", tint: "#ffe08a", dur: 1.05, shake: 8, fullscreen: true, rings: 2, blastN: 10, flashFrames: 10 },
+  [POWER.shovel]: { style: "fort", label: "钢墙", tint: "#c0c0c0", dur: 1.25, shake: 4, fullscreen: false },
+  [POWER.antigrav]: { style: "antigrav", label: "反G", tint: "#70ffe0", dur: 1.4, shake: 3, fullscreen: true },
+  [POWER.bounce]: { style: "bounce", label: "弹跳", tint: "#ffc060", dur: 1.15, shake: 3, fullscreen: false },
+  [POWER.meteor]: { style: "meteor", label: "陨石", tint: "#ff8040", dur: 1.5, shake: 7, fullscreen: true },
+  [POWER.ghost]: { style: "ghost", label: "幽灵", tint: "#c0e0ff", dur: 1.35, shake: 1, fullscreen: true },
+  [POWER.mirror]: { style: "mirror", label: "镜像", tint: "#e8e8ff", dur: 1.2, shake: 3, fullscreen: true },
+  [POWER.magnet]: { style: "magnet", label: "追踪", tint: "#80ffc0", dur: 1.25, shake: 2, fullscreen: false },
+  [POWER.warp]: { style: "warp", label: "闪现", tint: "#ffffff", dur: 0.95, shake: 6, fullscreen: false },
+  [POWER.fork]: { style: "weapon", label: "分叉", tint: "#ffe080", dur: 1.05, shake: 3, fullscreen: false },
+  [POWER.rapid]: { style: "weapon", label: "速射", tint: "#ff9060", dur: 1.05, shake: 4, fullscreen: false },
+  [POWER.pierce]: { style: "weapon", label: "穿甲", tint: "#d0d8ff", dur: 1.05, shake: 3, fullscreen: false },
+  [POWER.spread]: { style: "weapon", label: "散射", tint: "#ffd060", dur: 1.05, shake: 3, fullscreen: false },
+  [POWER.sniper]: { style: "weapon", label: "狙击", tint: "#ff7060", dur: 1.1, shake: 2, fullscreen: false },
+  [POWER.nuke]: { style: "blast", label: "核爆", tint: "#ff6040", dur: 1.65, shake: 14, fullscreen: true, rings: 4, blastN: 18, flashFrames: 16 },
+  [POWER.overdrive]: { style: "ultra", label: "超武", tint: "#ffe060", dur: 1.55, shake: 8, fullscreen: true },
+  [POWER.apocalypse]: { style: "blast", label: "天罚", tint: "#fff2a0", dur: 2.35, shake: 18, fullscreen: true, rings: 6, blastN: 28, flashFrames: 22 },
+  [POWER.juggernaut]: { style: "ultra", label: "霸体", tint: "#f0d060", dur: 1.5, shake: 7, fullscreen: true },
+  [POWER.giant]: { style: "giant", label: "巨大", tint: "#f0d060", dur: 1.45, shake: 6, fullscreen: true },
+  [POWER.spawnExtra]: { style: "curse", label: "援军", tint: "#ff5050", dur: 1.3, shake: 5, fullscreen: true },
+  [POWER.enemyShield]: { style: "curse", label: "敌盾", tint: "#ff7070", dur: 1.25, shake: 3, fullscreen: false },
+  [POWER.heavyCurse]: { style: "curse", label: "超重", tint: "#c06030", dur: 1.35, shake: 4, fullscreen: true },
+  [POWER.enemyRage]: { style: "curse", label: "狂暴", tint: "#ff3030", dur: 1.3, shake: 6, fullscreen: true },
+  [POWER.softStun]: { style: "stun", label: "眩晕", tint: "#ffe060", dur: 1.15, shake: 9, fullscreen: true },
+  [POWER.fortBreak]: { style: "fortBreak", label: "破堡", tint: "#ff8060", dur: 1.35, shake: 7, fullscreen: false },
+  [POWER.eagleStroll]: { style: "eagle", label: "遛鹰", tint: "#ff9090", dur: 1.45, shake: 4, fullscreen: true },
+};
+
 function ShuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -787,6 +824,7 @@ class Game {
     this.bombs = [];
     this.fxDebris = [];
     this.fxBlastQueue = [];
+    this.fxMarks = [];
     this.screenFx = null;
     this.carryables = [];
     this.carriedBlock = null;
@@ -1871,6 +1909,7 @@ class Game {
     this.bombs = [];
     this.fxDebris = [];
     this.fxBlastQueue = [];
+    this.fxMarks = [];
     this.screenFx = null;
     this.carryables = [];
     this.carriedBlock = null;
@@ -4877,10 +4916,7 @@ class Game {
     r.phase = "result";
     r.result = seg;
     r.resultT = 0;
-    r.resultHold = (seg.kind === POWER.apocalypse) ? 2.55
-      : (seg.kind === POWER.nuke) ? 2.05
-        : (seg.kind === POWER.bomb) ? 1.95
-          : 1.85;
+    r.resultHold = Math.max(1.85, ((POWER_FX[seg.kind]?.dur) || 1.1) + 0.55);
     r.omega = 0;
     r.dragging = false;
     this.ApplyPowerup(seg.kind);
@@ -4895,6 +4931,7 @@ class Game {
 
   ApplyPowerup(kind) {
     this.audio.Power();
+    this.PlayPowerFx(kind);
     const p = this.player;
     switch (kind) {
       case POWER.star:
@@ -4938,7 +4975,6 @@ class Game {
         this.ShowBuffToast("敌军冻结 16 秒");
         break;
       case POWER.bomb:
-        this.PlayBlastFx("bomb");
         this.KillAllFieldEnemies({ spareBoss: true });
         this.NukeBricks(0.45);
         this.SpawnBrickDebris(18);
@@ -5008,7 +5044,6 @@ class Game {
         this.ShowBuffToast("狙击：高速低坠高伤 12 秒");
         break;
       case POWER.nuke:
-        this.PlayBlastFx("nuke");
         this.KillAllFieldEnemies({ spareBoss: true });
         this.NukeBricks(0.92);
         this.SpawnBrickDebris(36);
@@ -5033,7 +5068,6 @@ class Game {
         this.ShowBuffToast("超武：四联疯射 24 秒！！");
         break;
       case POWER.apocalypse:
-        this.PlayBlastFx("apocalypse");
         this.freezeTimer = 18;
         this.KillAllFieldEnemies({ spareBoss: true });
         this.NukeBricks(0.7);
@@ -5369,30 +5403,56 @@ class Game {
     });
   }
 
-  /** NES-flavored ultra blast: shake + frame flash + sheet explosion rings + brick chips. */
-  PlayBlastFx(kind = "nuke") {
-    const spec = {
-      bomb: { dur: 1.05, shake: 8, rings: 2, blastN: 10, flashFrames: 10 },
-      nuke: { dur: 1.65, shake: 14, rings: 4, blastN: 18, flashFrames: 16 },
-      apocalypse: { dur: 2.35, shake: 18, rings: 6, blastN: 28, flashFrames: 22 },
-    }[kind] || { dur: 1.4, shake: 12, rings: 3, blastN: 14, flashFrames: 14 };
+  /** Kick off NES-flavored FX for any roulette / ultra power. */
+  PlayPowerFx(kind) {
+    const spec = POWER_FX[kind];
+    if (!spec) return;
+    if (spec.style === "blast") {
+      this.PlayBlastFx(kind, spec);
+      return;
+    }
 
     this.screenFx = {
       kind,
+      style: spec.style,
+      label: spec.label,
+      tint: spec.tint,
+      t: 0,
+      dur: spec.dur,
+      shake: spec.shake || 0,
+      fullscreen: !!spec.fullscreen,
+      flashFrames: spec.flashFrames || 10,
+    };
+    this.SpawnPowerFxBurst(kind, spec);
+  }
+
+  /** NES-flavored ultra blast: shake + frame flash + sheet explosion rings + brick chips. */
+  PlayBlastFx(kind = "nuke", specIn = null) {
+    const spec = specIn || POWER_FX[kind] || {
+      dur: 1.4, shake: 12, rings: 3, blastN: 14, flashFrames: 14, label: "爆破", tint: "#ffe08a",
+    };
+
+    this.screenFx = {
+      kind,
+      style: "blast",
+      label: spec.label || "爆破",
+      tint: spec.tint || "#ffe08a",
       t: 0,
       dur: spec.dur,
       shake: spec.shake,
-      flashFrames: spec.flashFrames,
+      fullscreen: true,
+      flashFrames: spec.flashFrames || 12,
+      rings: spec.rings || 3,
     };
 
     const cx = CANVAS_W * 0.5;
     const cy = CANVAS_H * 0.42;
-    // Core bloom — classic 3-frame sheet explosions stacked.
     this.SpawnExplosion(cx, cy, 2.4, { dur: 0.55, flash: true });
     this.SpawnExplosion(cx - 18, cy + 8, 1.6, { dur: 0.5 });
     this.SpawnExplosion(cx + 18, cy + 8, 1.6, { dur: 0.5 });
 
-    for (let ring = 0; ring < spec.rings; ring++) {
+    const ringCount = spec.rings || 3;
+    for (let ring = 0; ring < ringCount; ring++) {
       const n = 6 + ring * 2;
       const rad = 36 + ring * 34;
       for (let i = 0; i < n; i++) {
@@ -5407,14 +5467,185 @@ class Game {
       }
     }
 
-    // Scattered secondary pops across the playfield.
-    for (let i = 0; i < spec.blastN; i++) {
+    const blastN = spec.blastN || 14;
+    for (let i = 0; i < blastN; i++) {
       this.fxBlastQueue.push({
         delay: 0.12 + Math.random() * (spec.dur * 0.55),
         x: 20 + Math.random() * (CANVAS_W - 40),
         y: 24 + Math.random() * (CANVAS_H - 60),
         scale: 0.7 + Math.random() * 1.1,
       });
+    }
+  }
+
+  /** Style-specific spark / mark bursts anchored on player, HQ, or field. */
+  SpawnPowerFxBurst(kind, spec) {
+    if (!this.fxDebris) this.fxDebris = [];
+    if (!this.fxMarks) this.fxMarks = [];
+    const p = this.player;
+    const px = p ? p.x + p.w * 0.5 : CANVAS_W * 0.5;
+    const py = p ? p.y + p.h * 0.5 : CANVAS_H * 0.55;
+    const tint = spec.tint || "#ffe08a";
+    const hq = this.GetBaseTarget?.() || { x: CANVAS_W * 0.5, y: CANVAS_H - 24 };
+
+    const spark = (x, y, colors, n = 10, speed = 140) => {
+      for (let i = 0; i < n; i++) {
+        const s = 2 + Math.floor(Math.random() * 4);
+        const ang = Math.random() * Math.PI * 2;
+        const spd = speed * (0.4 + Math.random());
+        this.fxDebris.push({
+          x, y, w: s, h: s,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd - 40,
+          life: 0.45 + Math.random() * 0.45,
+          ttl: 0.45 + Math.random() * 0.45,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          grav: 280,
+        });
+      }
+    };
+
+    const mark = (type, opts) => {
+      this.fxMarks.push({
+        type,
+        ttl: opts.ttl ?? 0.9,
+        life: opts.ttl ?? 0.9,
+        color: opts.color || tint,
+        x: opts.x ?? px,
+        y: opts.y ?? py,
+        x2: opts.x2,
+        y2: opts.y2,
+        r: opts.r || 20,
+        text: opts.text,
+      });
+    };
+
+    switch (spec.style) {
+      case "buff":
+      case "weapon":
+      case "ultra":
+        spark(px, py, [tint, "#ffffff", "#ffe080"], spec.style === "ultra" ? 22 : 14, 180);
+        this.SpawnExplosion(px, py, spec.style === "ultra" ? 1.8 : 1.1, { flash: true, dur: 0.4 });
+        break;
+      case "life":
+        spark(px, py, ["#70ff98", "#ffffff", "#40c060"], 16, 120);
+        for (let i = 0; i < 4; i++) {
+          mark("plus", { x: px + (i - 1.5) * 22, y: py - 10 - i * 8, ttl: 0.9 + i * 0.05, color: "#70ff98" });
+        }
+        break;
+      case "shield":
+        spark(px, py, ["#80c8ff", "#ffffff", "#4080c0"], 12, 100);
+        mark("ring", { x: px, y: py, r: 28, ttl: 1.0, color: "#80c8ff" });
+        mark("ring", { x: px, y: py, r: 42, ttl: 0.85, color: "#a0d8ff" });
+        break;
+      case "armor":
+        spark(px, py, ["#d0d0d0", "#f0d060", "#808080"], 14, 110);
+        mark("plate", { x: px, y: py, ttl: 1.0, color: tint });
+        break;
+      case "freeze":
+        for (let i = 0; i < 28; i++) {
+          spark(
+            16 + Math.random() * (CANVAS_W - 32),
+            20 + Math.random() * (CANVAS_H - 40),
+            ["#a0e8ff", "#ffffff", "#60b0e0"],
+            1,
+            40,
+          );
+        }
+        break;
+      case "fort":
+        spark(hq.x, hq.y, ["#c0c0c0", "#ffffff", "#808080"], 18, 130);
+        mark("ring", { x: hq.x, y: hq.y, r: 36, ttl: 1.0, color: "#d0d0d0" });
+        this.SpawnExplosion(hq.x, hq.y, 1.2, { flash: true });
+        break;
+      case "fortBreak":
+        spark(hq.x, hq.y, ["#ff8060", "#b05028", "#603018"], 22, 160);
+        this.SpawnBrickDebris(20);
+        this.SpawnExplosion(hq.x, hq.y, 1.5, { flash: true });
+        break;
+      case "antigrav":
+        for (let i = 0; i < 18; i++) {
+          mark("arrowUp", {
+            x: 24 + Math.random() * (CANVAS_W - 48),
+            y: CANVAS_H - 30 - Math.random() * 80,
+            ttl: 0.7 + Math.random() * 0.4,
+            color: tint,
+          });
+        }
+        spark(px, py, [tint, "#ffffff"], 10, 90);
+        break;
+      case "bounce":
+        spark(px, py, [tint, "#ffffff"], 12, 150);
+        mark("bounce", { x: px, y: py, ttl: 0.9, color: tint });
+        break;
+      case "meteor":
+        for (let i = 0; i < 10; i++) {
+          mark("meteor", {
+            x: 30 + Math.random() * (CANVAS_W - 60),
+            y: -10 - Math.random() * 40,
+            x2: 20 + Math.random() * 40,
+            y2: 80 + Math.random() * 60,
+            ttl: 0.7 + Math.random() * 0.35,
+            color: "#ff8040",
+          });
+        }
+        break;
+      case "ghost":
+        spark(px, py, ["#c0e0ff", "#ffffff"], 10, 70);
+        mark("ring", { x: px, y: py, r: 34, ttl: 0.9, color: "#c0e0ff" });
+        break;
+      case "mirror":
+        spark(px, py, [tint, "#ffffff"], 12, 120);
+        mark("mirror", { x: px, y: py, ttl: 1.0, color: tint });
+        break;
+      case "magnet":
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          mark("beam", {
+            x: px, y: py,
+            x2: e.x + e.w * 0.5,
+            y2: e.y + e.h * 0.5,
+            ttl: 0.85,
+            color: tint,
+          });
+        }
+        spark(px, py, [tint, "#ffffff"], 8, 90);
+        break;
+      case "warp":
+        spark(px, py, ["#ffffff", "#c0e0ff", "#80c8ff"], 20, 200);
+        this.SpawnExplosion(px, py, 1.4, { flash: true, dur: 0.35 });
+        break;
+      case "giant":
+        spark(px, py, [tint, "#ffffff"], 18, 160);
+        mark("ring", { x: px, y: py, r: 24, ttl: 1.1, color: tint });
+        mark("ring", { x: px, y: py, r: 48, ttl: 1.0, color: "#ffe080" });
+        mark("ring", { x: px, y: py, r: 72, ttl: 0.85, color: "#f0d060" });
+        break;
+      case "curse":
+        spark(px, py, [tint, "#600000", "#ff8080"], 16, 140);
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          spark(e.x + e.w * 0.5, e.y + e.h * 0.5, [tint, "#ff6060"], 4, 80);
+        }
+        break;
+      case "stun":
+        spark(px, py, [tint, "#ffffff"], 14, 100);
+        for (let i = 0; i < 5; i++) {
+          mark("star", {
+            x: px + Math.cos(i * 1.25) * 28,
+            y: py + Math.sin(i * 1.25) * 20 - 8,
+            ttl: 0.85,
+            color: tint,
+          });
+        }
+        break;
+      case "eagle":
+        spark(hq.x, hq.y, [tint, "#ffffff", "#ffd0d0"], 16, 120);
+        mark("ring", { x: hq.x, y: hq.y, r: 40, ttl: 1.1, color: tint });
+        break;
+      default:
+        spark(px, py, [tint, "#ffffff"], 10, 120);
+        break;
     }
   }
 
@@ -5435,6 +5666,7 @@ class Game {
         life: 0.55 + Math.random() * 0.7,
         ttl: 0.55 + Math.random() * 0.7,
         color: colors[Math.floor(Math.random() * colors.length)],
+        grav: 420,
       });
     }
   }
@@ -5459,12 +5691,25 @@ class Game {
     if (this.fxDebris?.length) {
       for (const d of this.fxDebris) {
         d.ttl -= dt;
-        d.vy += 420 * dt;
+        d.vy += (d.grav ?? 420) * dt;
         d.x += d.vx * dt;
         d.y += d.vy * dt;
         d.vx *= 0.985;
       }
       this.fxDebris = this.fxDebris.filter((d) => d.ttl > 0 && d.y < CANVAS_H + 20);
+    }
+
+    if (this.fxMarks?.length) {
+      for (const m of this.fxMarks) {
+        m.ttl -= dt;
+        if (m.type === "arrowUp") m.y -= 70 * dt;
+        if (m.type === "meteor") {
+          m.x += (m.x2 || 30) * dt;
+          m.y += (m.y2 || 90) * dt;
+        }
+        if (m.type === "plus") m.y -= 40 * dt;
+      }
+      this.fxMarks = this.fxMarks.filter((m) => m.ttl > 0);
     }
 
     if (this.screenFx) {
@@ -5612,6 +5857,7 @@ class Game {
     this.DrawTiles(ctx, true); // grass on top
     for (const ex of this.explosions) this.DrawExplosion(ctx, ex);
     this.DrawFxDebris(ctx);
+    this.DrawFxMarks(ctx);
     this.DrawScreenFxOverlay(ctx);
     ctx.restore();
 
@@ -6882,60 +7128,200 @@ class Game {
     ctx.globalAlpha = 1;
   }
 
-  /** Full-screen NES flash frames + expanding pixel shock squares. */
+  DrawFxMarks(ctx) {
+    if (!this.fxMarks?.length) return;
+    ctx.save();
+    for (const m of this.fxMarks) {
+      const a = Clamp(m.ttl / Math.max(0.05, m.life), 0, 1);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = m.color;
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 2;
+      const x = Math.round(m.x);
+      const y = Math.round(m.y);
+      if (m.type === "ring") {
+        const r = Math.round(m.r || 24);
+        ctx.strokeRect(x - r, y - Math.round(r * 0.7), r * 2, Math.round(r * 1.4));
+      } else if (m.type === "plus") {
+        ctx.fillRect(x - 1, y - 6, 3, 13);
+        ctx.fillRect(x - 6, y - 1, 13, 3);
+      } else if (m.type === "plate") {
+        ctx.fillStyle = "#000";
+        ctx.fillRect(x - 14, y - 10, 28, 20);
+        ctx.fillStyle = m.color;
+        ctx.fillRect(x - 12, y - 8, 24, 16);
+        ctx.fillStyle = "#101010";
+        ctx.fillRect(x - 8, y - 3, 16, 6);
+      } else if (m.type === "arrowUp") {
+        ctx.fillRect(x - 1, y - 10, 3, 14);
+        ctx.fillRect(x - 4, y - 10, 9, 3);
+        ctx.fillRect(x - 3, y - 13, 7, 3);
+      } else if (m.type === "bounce") {
+        ctx.beginPath();
+        ctx.moveTo(x - 10, y + 6);
+        ctx.lineTo(x - 4, y - 2);
+        ctx.lineTo(x + 2, y + 6);
+        ctx.lineTo(x + 8, y - 4);
+        ctx.stroke();
+      } else if (m.type === "meteor") {
+        ctx.fillRect(x - 2, y - 6, 4, 10);
+        ctx.fillStyle = "#ffe080";
+        ctx.fillRect(x - 1, y - 10, 2, 5);
+      } else if (m.type === "mirror") {
+        ctx.fillRect(x - 1, y - 16, 2, 32);
+        ctx.globalAlpha = a * 0.45;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x - 18, y - 14, 14, 28);
+        ctx.fillRect(x + 4, y - 14, 14, 28);
+      } else if (m.type === "beam") {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(Math.round(m.x2), Math.round(m.y2));
+        ctx.stroke();
+        ctx.fillRect(Math.round(m.x2) - 2, Math.round(m.y2) - 2, 4, 4);
+      } else if (m.type === "star") {
+        ctx.fillRect(x - 1, y - 5, 3, 11);
+        ctx.fillRect(x - 5, y - 1, 11, 3);
+        ctx.fillRect(x - 3, y - 3, 7, 7);
+      }
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  /** Full-screen / local NES flash overlays keyed by power style. */
   DrawScreenFxOverlay(ctx) {
     const fx = this.screenFx;
     if (!fx) return;
     const u = fx.t / Math.max(0.001, fx.dur);
     const early = fx.t < (fx.flashFrames || 12) / 60;
+    const style = fx.style || "blast";
+    const tint = fx.tint || "#ffe08a";
 
-    if (early || (u < 0.45 && Math.floor(this.frame / 2) % 2 === 0)) {
+    // Fullscreen color wash + CRT scan bands for big styles.
+    const wantsWash = fx.fullscreen || style === "blast" || style === "ultra" || style === "freeze"
+      || style === "ghost" || style === "curse" || style === "stun" || style === "antigrav"
+      || style === "meteor" || style === "mirror" || style === "eagle" || style === "life";
+    if (wantsWash && (early || (u < 0.5 && Math.floor(this.frame / 2) % 2 === 0))) {
       ctx.save();
-      const hot = fx.kind === "apocalypse" ? "#fff2a0" : (fx.kind === "nuke" ? "#fff8d0" : "#ffffff");
-      ctx.globalAlpha = early ? 0.55 : 0.22 * (1 - u / 0.45);
-      ctx.fillStyle = hot;
+      let wash = tint;
+      if (style === "blast") {
+        wash = fx.kind === "apocalypse" ? "#fff2a0" : (fx.kind === "nuke" ? "#fff8d0" : "#ffffff");
+      } else if (style === "freeze") wash = "#a0e8ff";
+      else if (style === "ghost") wash = "#d8e8ff";
+      else if (style === "curse" || style === "eagle") wash = "#401010";
+      else if (style === "life") wash = "#184028";
+      else if (style === "antigrav") wash = "#103028";
+      else if (style === "meteor") wash = "#401808";
+      else if (style === "stun") wash = "#403010";
+      else if (style === "ultra" || style === "giant") wash = "#302008";
+      ctx.globalAlpha = early ? 0.5 : 0.2 * (1 - u / 0.5);
+      if (style === "curse" || style === "eagle" || style === "meteor") ctx.globalAlpha *= 1.15;
+      ctx.fillStyle = wash;
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-      // Checker bands — reads like old CRT wipe, not a soft bloom.
       ctx.globalAlpha *= 0.55;
-      ctx.fillStyle = "#000";
+      ctx.fillStyle = style === "freeze" || style === "ghost" ? "#ffffff" : "#000";
       for (let y = 0; y < CANVAS_H; y += 8) {
         if (((y / 8) + this.frame) % 2 === 0) ctx.fillRect(0, y, CANVAS_W, 2);
       }
       ctx.restore();
     }
 
-    // Expanding pixel rings from center.
-    if (u < 0.7) {
+    // Ghost: horizontal wipe bar.
+    if (style === "ghost" && u < 0.7) {
+      const y = Math.round((u / 0.7) * CANVAS_H);
+      ctx.save();
+      ctx.globalAlpha = 0.55 * (1 - u / 0.7);
+      ctx.fillStyle = "#c0e0ff";
+      ctx.fillRect(0, y - 6, CANVAS_W, 12);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, y - 2, CANVAS_W, 4);
+      ctx.restore();
+    }
+
+    // Mirror: vertical split flash.
+    if (style === "mirror" && u < 0.55) {
+      ctx.save();
+      ctx.globalAlpha = 0.4 * (1 - u / 0.55);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(CANVAS_W * 0.5 - 2, 0, 4, CANVAS_H);
+      ctx.globalAlpha *= 0.7;
+      ctx.fillRect(0, 0, CANVAS_W * 0.5 - 2, CANVAS_H);
+      ctx.restore();
+    }
+
+    // Antigrav: rising scan dashes.
+    if (style === "antigrav" && u < 0.75) {
+      ctx.save();
+      ctx.globalAlpha = 0.45 * (1 - u / 0.75);
+      ctx.fillStyle = tint;
+      const off = Math.floor(this.frame * 2) % 12;
+      for (let x = 8; x < CANVAS_W; x += 16) {
+        for (let y = off; y < CANVAS_H; y += 12) {
+          ctx.fillRect(x, CANVAS_H - y, 2, 5);
+        }
+      }
+      ctx.restore();
+    }
+
+    // Freeze: ice lattice.
+    if (style === "freeze" && u < 0.65) {
+      ctx.save();
+      ctx.globalAlpha = 0.35 * (1 - u / 0.65);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 8; i++) {
+        const x = 20 + i * 48;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + 30, CANVAS_H);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Blast / ultra expanding pixel rings.
+    if ((style === "blast" || style === "ultra" || style === "giant") && u < 0.7) {
       const cx = CANVAS_W * 0.5;
       const cy = CANVAS_H * 0.42;
-      const rings = fx.kind === "apocalypse" ? 4 : (fx.kind === "nuke" ? 3 : 2);
+      const rings = style === "blast"
+        ? (fx.kind === "apocalypse" ? 4 : (fx.kind === "nuke" ? 3 : 2))
+        : (style === "giant" ? 3 : 3);
       ctx.save();
       for (let i = 0; i < rings; i++) {
         const progress = Clamp((fx.t - i * 0.08) / 0.55, 0, 1);
         if (progress <= 0 || progress >= 1) continue;
         const r = 20 + progress * (110 + i * 28);
         ctx.globalAlpha = 0.55 * (1 - progress);
-        ctx.strokeStyle = i % 2 === 0 ? "#ffe060" : "#ff8040";
+        ctx.strokeStyle = i % 2 === 0 ? tint : "#ff8040";
         ctx.lineWidth = 3;
         ctx.strokeRect(Math.round(cx - r), Math.round(cy - r * 0.7), Math.round(r * 2), Math.round(r * 1.4));
       }
       ctx.restore();
     }
 
-    // Caption stamp during ultra blasts.
-    if (u < 0.55 && (fx.kind === "nuke" || fx.kind === "apocalypse" || fx.kind === "bomb")) {
-      const label = fx.kind === "apocalypse" ? "天罚" : (fx.kind === "nuke" ? "核爆" : "爆破");
-      ctx.save();
-      ctx.globalAlpha = 0.9 * (1 - u / 0.55);
-      ctx.fillStyle = "#000";
-      ctx.font = `18px ${PIXEL_FONT}`;
-      ctx.textAlign = "center";
-      const tw = ctx.measureText(label).width + 24;
-      ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H * 0.18, tw, 28);
-      ctx.fillStyle = fx.kind === "bomb" ? "#ffe08a" : "#ff6040";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, CANVAS_W / 2, CANVAS_H * 0.18 + 14);
-      ctx.restore();
+    // Caption stamp for notable powers.
+    if (u < 0.55 && fx.label) {
+      const showLabel = style === "blast" || style === "ultra" || style === "giant"
+        || style === "freeze" || style === "curse" || style === "stun"
+        || style === "eagle" || style === "meteor" || style === "ghost"
+        || style === "antigrav" || style === "life" || style === "armor"
+        || early;
+      if (showLabel) {
+        ctx.save();
+        ctx.globalAlpha = 0.92 * (1 - u / 0.55);
+        ctx.fillStyle = "#000";
+        ctx.font = `16px ${PIXEL_FONT}`;
+        ctx.textAlign = "center";
+        const tw = ctx.measureText(fx.label).width + 22;
+        ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H * 0.16, tw, 26);
+        ctx.fillStyle = (style === "curse" || style === "eagle" || (style === "blast" && fx.kind !== "bomb"))
+          ? "#ff6040"
+          : tint;
+        ctx.textBaseline = "middle";
+        ctx.fillText(fx.label, CANVAS_W / 2, CANVAS_H * 0.16 + 13);
+        ctx.restore();
+      }
     }
   }
 }
