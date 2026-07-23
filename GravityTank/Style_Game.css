@@ -1,3 +1,25 @@
+/* Fusion Pixel Font (OFL-1.1) — 12px proportional, latin + zh_hans */
+@font-face {
+  font-family: "Fusion Pixel 12";
+  src: url("./assets/Font_FusionPixel12Latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Fusion Pixel 12";
+  src: url("./assets/Font_FusionPixel12ZhHans.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF,
+    U+20000-2A6DF, U+2F800-2FA1F;
+}
+
 :root {
   --ink: #000000;
   --paper: #e8e8e8;
@@ -10,8 +32,10 @@
   --danger: #e04040;
   --ok: #60c040;
   --shadow: rgba(0, 0, 0, 0.8);
-  --font-display: "Press Start 2P", "Segoe UI", "PingFang SC", monospace;
-  --font-mono: "Press Start 2P", "IBM Plex Mono", "Consolas", monospace;
+  /* Latin pixel titles + CJK pixel body — matches 8-bit stage art */
+  --font-pixel: "Fusion Pixel 12", "Press Start 2P", monospace;
+  --font-display: "Press Start 2P", "Fusion Pixel 12", monospace;
+  --font-mono: "Press Start 2P", "Fusion Pixel 12", monospace;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -30,7 +54,11 @@ body {
     radial-gradient(circle at 50% 0%, #1a1a1a 0%, #000 55%),
     #000;
   color: var(--hud);
-  font-family: var(--font-display);
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  font-synthesis: none;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
   image-rendering: pixelated;
 }
 
@@ -228,7 +256,7 @@ body.touch-play-lock {
   color: #a8a8a8;
   max-width: 48ch;
   line-height: 1.8;
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   font-size: 0.85rem;
 }
 
@@ -331,13 +359,13 @@ body.touch-play-lock {
   max-width: 38ch;
   color: #e8e8e8;
   line-height: 1.55;
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   font-size: 1rem;
   font-weight: 500;
 }
 
 .overlay .hint {
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   font-size: 0.82rem;
   color: #a0a0a0;
   line-height: 1.55;
@@ -379,7 +407,7 @@ body.touch-play-lock {
   max-width: 38ch;
   color: #c8b870;
   line-height: 1.5;
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   font-size: 0.85rem;
 }
 
@@ -420,7 +448,7 @@ button.primary:active {
 
 .upgrade-overlay > p {
   max-width: 28rem;
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   font-size: 0.95rem;
   line-height: 1.5;
   color: #e0e0e0;
@@ -442,7 +470,7 @@ button.primary:active {
   padding: 0;
   border: 0;
   color: #f2f2f2;
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   cursor: pointer;
   touch-action: manipulation;
   background: transparent;
@@ -697,7 +725,7 @@ button.primary:active {
   padding-left: 1.1rem;
   color: #c8c8c8;
   line-height: 1.85;
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   font-size: 0.82rem;
 }
 
@@ -717,7 +745,7 @@ button.primary:active {
 
 .feature {
   color: #e0e0e0;
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   font-size: 0.88rem;
   line-height: 1.55;
   margin: 0;
@@ -727,7 +755,7 @@ button.primary:active {
 
 .credit {
   margin: 0;
-  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+  font-family: var(--font-pixel);
   font-size: 0.72rem;
   color: #808080;
   line-height: 1.55;
@@ -959,7 +987,7 @@ body.force-touch #app {
   .title-banner { max-height: 96px; }
 
   .tagline {
-    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+    font-family: var(--font-pixel);
     font-size: 0.78rem;
     max-width: none;
   }
