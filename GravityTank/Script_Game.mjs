@@ -2481,18 +2481,37 @@ class Game {
       e.aiTimer -= dt;
       if (e.aiTimer <= 0) {
         e.aiTimer = 0.4 + Math.random() * 1.2;
-        // prefer moving toward player / base
-        const roll = Math.random();
-        if (roll < 0.45 && this.player?.alive) {
-          const dx = this.player.x - e.x;
-          const dy = this.player.y - e.y;
-          e.dir = DirFromVector(dx, dy);
-        } else if (roll < 0.7) {
-          // toward base
-          const hq = this.GetBaseTarget();
-          e.dir = DirFromVector(hq.x - e.x, hq.y - e.y);
+        if (this.isTutorial) {
+          // South-bank tutorial: staring north and firing drops shells on yourself.
+          // Prefer strafing; only rarely aim straight up at the player.
+          const roll = Math.random();
+          if (roll < 0.55 && this.player?.alive) {
+            const dx = this.player.x - e.x;
+            if (Math.abs(dx) > 10 || Math.random() < 0.7) {
+              e.dir = dx < 0 ? "left" : "right";
+            } else {
+              e.dir = DirFromVector(dx, this.player.y - e.y);
+            }
+          } else if (roll < 0.82) {
+            e.dir = Math.random() < 0.5 ? "left" : "right";
+          } else {
+            const dirs = ["left", "right", "down", "down", "up"];
+            e.dir = dirs[Math.floor(Math.random() * dirs.length)];
+          }
         } else {
-          e.dir = DIR_KEYS[Math.floor(Math.random() * 4)];
+          // prefer moving toward player / base
+          const roll = Math.random();
+          if (roll < 0.45 && this.player?.alive) {
+            const dx = this.player.x - e.x;
+            const dy = this.player.y - e.y;
+            e.dir = DirFromVector(dx, dy);
+          } else if (roll < 0.7) {
+            // toward base
+            const hq = this.GetBaseTarget();
+            e.dir = DirFromVector(hq.x - e.x, hq.y - e.y);
+          } else {
+            e.dir = DIR_KEYS[Math.floor(Math.random() * 4)];
+          }
         }
       }
 
@@ -2512,7 +2531,11 @@ class Game {
 
       // shoot logic: if roughly aligned with player or base, fire
       if (e.fireCd <= 0) {
-        const should = Math.random() < 0.025 || this.AlignedForShot(e, this.player) || this.AlignedForShot(e, this.GetBaseTarget());
+        let should = Math.random() < 0.025 || this.AlignedForShot(e, this.player) || this.AlignedForShot(e, this.GetBaseTarget());
+        if (should && this.isTutorial && e.dir === "up") {
+          // Keep a few upward shots so gravity is visible, but cut most self-kills.
+          should = Math.random() < 0.3;
+        }
         if (should) this.TryFire(e, false);
       }
     }
