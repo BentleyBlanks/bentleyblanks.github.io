@@ -3221,7 +3221,7 @@ class Game {
       segments,
       cx: CANVAS_W / 2,
       cy: CANVAS_H / 2 + 28,
-      radius: 138,
+      radius: 128,
     };
     this.SyncTouchControlsVisibility();
     const nBad = segments.filter((s) => s.tier === "bad").length;
@@ -4509,150 +4509,136 @@ class Game {
     const focus = r.phase === "result" && r.result ? r.result : under;
     const wheelImg = this.images.rouletteWheel;
     const needle = this.images.rouletteNeedle;
-    const diam = r.radius * 2 + 18;
+    const rad = r.radius;
 
-    ctx.imageSmoothingEnabled = true;
-    ctx.fillStyle = "rgba(4, 8, 14, 0.82)";
+    const muted = (tier, focusSeg) => {
+      if (tier === "good") return focusSeg ? "rgba(56,120,78,0.95)" : "rgba(42,92,62,0.92)";
+      if (tier === "ultra") return focusSeg ? "rgba(176,140,56,0.95)" : "rgba(148,116,44,0.92)";
+      return focusSeg ? "rgba(148,64,64,0.95)" : "rgba(118,52,52,0.92)";
+    };
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Soft glow behind the wheel — atmosphere without muddying the art.
-    const aura = ctx.createRadialGradient(r.cx, r.cy, r.radius * 0.2, r.cx, r.cy, r.radius * 1.4);
-    aura.addColorStop(0, "rgba(255, 210, 110, 0.14)");
-    aura.addColorStop(0.55, "rgba(60, 120, 180, 0.08)");
-    aura.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = aura;
-    ctx.beginPath();
-    ctx.arc(r.cx, r.cy, r.radius * 1.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Focus banner
+    // Compact result strip (less chrome)
     ctx.fillStyle = focus.bg;
-    ctx.fillRect(18, 8, CANVAS_W - 36, 40);
+    ctx.fillRect(28, 10, CANVAS_W - 56, 28);
     ctx.strokeStyle = focus.rim || focus.color;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(18, 8, CANVAS_W - 36, 40);
-    this.DrawPowerIcon(ctx, focus.kind, 42, 28, 22);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(28, 10, CANVAS_W - 56, 28);
+    this.DrawPowerIcon(ctx, focus.kind, 44, 24, 16);
     ctx.fillStyle = focus.color;
-    ctx.font = `15px ${PIXEL_FONT}`;
+    ctx.font = `12px ${PIXEL_FONT}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     const tag = focus.tier === "ultra" ? "超 " : focus.tier === "bad" ? "负 " : "好 ";
-    ctx.fillText(`${tag}${focus.label}`, 62, 28);
+    ctx.fillText(`${tag}${focus.label}`, 58, 24);
     ctx.textBaseline = "alphabetic";
 
-    // Drop shadow
-    ctx.beginPath();
-    ctx.arc(r.cx + 2, r.cy + 5, r.radius + 2, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fill();
-
-    // Wheel art (rotates). Fallback: solid tier wedges if image missing.
     ctx.save();
     ctx.translate(r.cx, r.cy);
+
+    // Soft shadow only
+    ctx.beginPath();
+    ctx.arc(2, 3, rad + 2, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fill();
+
     ctx.rotate(r.angle);
+
+    // Rim texture underlay (aligned 10-slice bake); segment fills overwrite colors to match prizes.
     if (wheelImg) {
+      const diam = rad * 2 + 10;
+      ctx.globalAlpha = 0.35;
       ctx.drawImage(wheelImg, -diam / 2, -diam / 2, diam, diam);
-    } else {
-      for (let i = 0; i < n; i++) {
-        const seg = segs[i];
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, r.radius, i * slice, (i + 1) * slice);
-        ctx.closePath();
-        ctx.fillStyle = seg.bg;
-        ctx.fill();
-        ctx.strokeStyle = seg.rim;
-        ctx.stroke();
-      }
+      ctx.globalAlpha = 1;
     }
 
-    // Soft focus wedge tint — keep pixel art readable.
-    {
-      const seg = segs[needleIdx] || focus;
-      const a0 = needleIdx * slice;
+    // Source-of-truth wedges from live segments — always match needle + labels.
+    for (let i = 0; i < n; i++) {
+      const seg = segs[i];
+      const a0 = i * slice;
+      const a1 = a0 + slice;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, r.radius * 0.92, a0, a0 + slice);
+      ctx.arc(0, 0, rad, a0, a1);
       ctx.closePath();
-      ctx.fillStyle =
-        seg.tier === "good"
-          ? "rgba(90,255,160,0.16)"
-          : seg.tier === "ultra"
-            ? "rgba(255,220,100,0.16)"
-            : "rgba(255,110,110,0.16)";
+      ctx.fillStyle = muted(seg.tier, i === needleIdx);
       ctx.fill();
-      ctx.strokeStyle = seg.color;
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(12,12,16,0.7)";
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
 
-    // Outer tier ticks + readable labels on dark plates.
+    // Quiet focus outline
+    {
+      const a0 = needleIdx * slice;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, rad - 1, a0, a0 + slice);
+      ctx.closePath();
+      ctx.strokeStyle = focus.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Labels sit in wedge midpoints (same math as RouletteIndexAtNeedle).
     for (let i = 0; i < n; i++) {
       const seg = segs[i];
       const mid = i * slice + slice * 0.5;
       const isFocus = i === needleIdx;
-      const cos = Math.cos(mid);
-      const sin = Math.sin(mid);
-
-      ctx.beginPath();
-      ctx.arc(cos * (r.radius + 8), sin * (r.radius + 8), isFocus ? 4.5 : 3.2, 0, Math.PI * 2);
-      ctx.fillStyle = seg.color;
-      ctx.fill();
-
       ctx.save();
       ctx.rotate(mid);
-      const tx = r.radius * 0.62;
-      const tw = Math.max(34, seg.label.length * 11);
-      const th = 18;
-      ctx.fillStyle = isFocus ? "rgba(8,10,16,0.86)" : "rgba(8,10,16,0.68)";
+      const tx = rad * 0.62;
+      const tw = Math.max(28, seg.label.length * 10);
+      const th = 14;
+      ctx.fillStyle = isFocus ? "rgba(0,0,0,0.72)" : "rgba(0,0,0,0.5)";
       ctx.fillRect(tx - tw / 2, -th / 2, tw, th);
-      ctx.strokeStyle = seg.rim || seg.color;
-      ctx.lineWidth = isFocus ? 2 : 1;
-      ctx.strokeRect(tx - tw / 2 + 0.5, -th / 2 + 0.5, tw - 1, th - 1);
-      ctx.fillStyle = "#fff8e8";
-      ctx.font = isFocus ? `12px ${PIXEL_FONT}` : `11px ${PIXEL_FONT}`;
+      ctx.fillStyle = isFocus ? "#fff4d0" : "#e8e8e8";
+      ctx.font = `11px ${PIXEL_FONT}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(seg.label, tx, 0.5);
       ctx.restore();
     }
 
-    // Hub jewel
+    // Small hub
     ctx.beginPath();
-    ctx.arc(0, 0, 22, 0, Math.PI * 2);
-    ctx.fillStyle = "#121820";
+    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+    ctx.fillStyle = "#141820";
     ctx.fill();
-    ctx.strokeStyle = focus.color;
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = focus.rim || "#a09050";
+    ctx.lineWidth = 2;
     ctx.stroke();
     ctx.fillStyle = focus.color;
-    ctx.font = `12px ${PIXEL_FONT}`;
+    ctx.font = `11px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(focus.tier === "bad" ? "负" : focus.tier === "ultra" ? "超" : "好", 0, 1);
     ctx.restore();
 
-    // Fixed needle (points down onto the wheel)
-    const ny = r.cy - r.radius;
+    // Slim needle — tip lands on rim at top
+    const ny = r.cy - rad;
     if (needle) {
-      ctx.drawImage(needle, r.cx - 18, ny - 46, 36, 54);
+      ctx.drawImage(needle, r.cx - 10, ny - 28, 20, 32);
     } else {
-      ctx.fillStyle = "#f0d060";
+      ctx.fillStyle = "#e0c060";
       ctx.beginPath();
-      ctx.moveTo(r.cx, ny + 4);
-      ctx.lineTo(r.cx - 11, ny - 24);
-      ctx.lineTo(r.cx + 11, ny - 24);
+      ctx.moveTo(r.cx, ny + 2);
+      ctx.lineTo(r.cx - 7, ny - 16);
+      ctx.lineTo(r.cx + 7, ny - 16);
       ctx.closePath();
       ctx.fill();
     }
 
-    ctx.strokeStyle = "rgba(200,210,220,0.55)";
+    ctx.strokeStyle = "rgba(160,168,176,0.45)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(r.cx, r.cy, r.radius + 6, 0, Math.PI * 2);
+    ctx.arc(r.cx, r.cy, rad + 3, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = "#c8d4e4";
+    ctx.fillStyle = "#a8b0b8";
     ctx.font = `10px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.fillText(
@@ -4660,17 +4646,16 @@ class Game {
         ? (Math.abs(r.omega) > 0.2 || r.dragging ? "减速中…" : "拖动甩转 / 空格")
         : "获得！",
       r.cx,
-      CANVAS_H - 20
+      CANVAS_H - 18
     );
     ctx.textAlign = "left";
-
     ctx.font = `9px ${PIXEL_FONT}`;
     ctx.fillStyle = TIER_PALETTE.good.color;
-    ctx.fillText("绿=好", 20, CANVAS_H - 8);
+    ctx.fillText("绿=好", 20, CANVAS_H - 6);
     ctx.fillStyle = TIER_PALETTE.ultra.color;
-    ctx.fillText("金=超", 70, CANVAS_H - 8);
+    ctx.fillText("金=超", 70, CANVAS_H - 6);
     ctx.fillStyle = TIER_PALETTE.bad.color;
-    ctx.fillText("红=负", 120, CANVAS_H - 8);
+    ctx.fillText("红=负", 120, CANVAS_H - 6);
   }
 
   DrawBuffHud(ctx) {
