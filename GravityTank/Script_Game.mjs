@@ -192,18 +192,34 @@ const ENEMY_TYPES = [
   {
     id: "boss",
     hp: 28,
-    speed: 38,
+    speed: 19, // -50% vs original 38
     score: 5000,
     shootCd: 2.4,
     texture: "enemyArmor",
     weight: 0,
-    bulletBoost: 0.7, // gravity shells at 70% normal speed
+    bulletBoost: 0.7,
     size: 56,
     boss: true,
+    fireIntervalMul: 0.5, // 射击间隔 -50%
+  },
+  {
+    id: "tankKing",
+    hp: 40,
+    speed: 36,
+    score: 8000,
+    shootCd: 1.5,
+    texture: "enemyArmor",
+    weight: 0,
+    bulletBoost: 1,
+    size: 64,
+    boss: true,
+    tankKing: true,
+    fireIntervalMul: 1,
   },
 ];
 
 const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst", "gunBreak"];
+const TANK_KING_ATTACKS = ["quadCross", "spinFire", "axisBurst", "chaseVolley", "ringShot"];
 const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
 /** Fire-rate multipliers vs the original boss cadence (lower = slower). */
 const BOSS_FIRE_RATE_NORMAL = 0.7;
@@ -1335,10 +1351,13 @@ class Game {
     return this.IsEasy() ? POWER_DROP_RATE * 1.5 : POWER_DROP_RATE;
   }
 
-  /** Boss attack cadence scale: normal 70% rate, easy 50% rate → longer cooldowns. */
-  GetBossFireCdScale() {
+  /** Boss attack cadence scale: normal 70% rate, easy 50% rate → longer cooldowns.
+   *  Per-enemy fireIntervalMul further shortens/lengthens (stage-3 boss uses 0.5). */
+  GetBossFireCdScale(enemy = null) {
     const rate = this.IsEasy() ? BOSS_FIRE_RATE_EASY : BOSS_FIRE_RATE_NORMAL;
-    return 1 / Math.max(0.05, rate);
+    const base = 1 / Math.max(0.05, rate);
+    const mul = enemy?.fireIntervalMul ?? 1;
+    return base * mul;
   }
 
   ApplyStageMeta(stageIndex1Based) {
@@ -1353,7 +1372,7 @@ class Game {
     }
     this.isBossStage = !!this.stageData.bossStage;
     const e = this.stageData.enemies;
-    this.totalEnemies = e.basic + e.fast + e.power + e.armor + (e.boss || 0);
+    this.totalEnemies = e.basic + e.fast + e.power + e.armor + (e.boss || 0) + (e.tankKing || 0);
     this.spawnSlots = (this.stageData.enemySpawns || [[0, 0], [12, 0], [24, 0]]).map(([x, y]) => ({
       x: x * TILE,
       y: y * TILE,
@@ -1375,10 +1394,15 @@ class Game {
           `${diffTag} 你在河北岸。河对面过不来——用重力弹幕（朝下/斜射）清理南岸敌军，再选一张入门升级进入战役。`;
       } else if (this.state === "ready" || this.state === "boot") {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 开局先进入新手引导（河对岸重力教学），再打 ${STAGE_COUNT} 关战役（第 3 关 Boss 弹幕）。保卫老鹰；炮弹带重力会下坠。`;
+          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关重力巨炮 · 第 6 关坦克王）。保卫老鹰；炮弹带重力会下坠。`;
       } else if (this.isBossStage) {
-        this.overlays.startBlurb.textContent =
-          `${diffTag} BOSS 关 · 重力巨炮。躲避弹幕；小心拆炮禁射，残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
+        if (this.stageData.bossKind === "tankKing") {
+          this.overlays.startBlurb.textContent =
+            `${diffTag} BOSS 关 · 坦克王。四向炮筒齐射；在开阔战场中周旋并击破它。`;
+        } else {
+          this.overlays.startBlurb.textContent =
+            `${diffTag} BOSS 关 · 重力巨炮。躲避弹幕；小心拆炮禁射，残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
+        }
       } else {
         const e = this.stageData.enemies;
         this.overlays.startBlurb.textContent =
@@ -1405,7 +1429,7 @@ class Game {
       return;
     }
     if (this.stage >= STAGE_COUNT) {
-      this.StartCampaign();
+      this.EndGame(true, `${STAGE_COUNT} 关全通！最终得分 ${this.score}`, "restart");
       return;
     }
     const keep = this.player
@@ -1640,8 +1664,9 @@ class Game {
       this.ShowBuffToast("河北岸：朝下/斜射，用重力清理南岸敌军");
     } else if (this.isBossStage) {
       const perk = FindUpgrade(this.stagePerk);
+      const bossTitle = this.stageData.bossKind === "tankKing" ? "坦克王" : "重力巨炮";
       this.ShowBuffToast(
-        perk ? `BOSS · 本关强化：${perk.title}` : "BOSS：重力巨炮 — 躲避弹幕！"
+        perk ? `BOSS · 本关强化：${perk.title}` : `BOSS：${bossTitle} — 准备战斗！`
       );
     } else {
       const perk = FindUpgrade(this.stagePerk);
@@ -1689,7 +1714,12 @@ class Game {
     for (let i = 0; i < counts.fast; i++) mix.push(ENEMY_TYPES[1]);
     for (let i = 0; i < counts.power; i++) mix.push(ENEMY_TYPES[2]);
     for (let i = 0; i < counts.armor; i++) mix.push(ENEMY_TYPES[3]);
-    for (let i = 0; i < (counts.boss || 0); i++) mix.push(ENEMY_TYPES[4]);
+    const bossKind = this.stageData.bossKind || "boss";
+    const bossType = ENEMY_TYPES.find((t) => t.id === bossKind) || ENEMY_TYPES.find((t) => t.id === "boss");
+    for (let i = 0; i < (counts.boss || 0); i++) mix.push(bossType);
+    for (let i = 0; i < (counts.tankKing || 0); i++) {
+      mix.push(ENEMY_TYPES.find((t) => t.id === "tankKing") || bossType);
+    }
     for (let i = mix.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [mix[i], mix[j]] = [mix[j], mix[i]];
@@ -1958,6 +1988,10 @@ class Game {
         this.UpdateBoss(e, dt);
         continue;
       }
+      if (e.typeId === "tankKing") {
+        this.UpdateTankKing(e, dt);
+        continue;
+      }
 
       e.aiTimer -= dt;
       if (e.aiTimer <= 0) {
@@ -2002,6 +2036,129 @@ class Game {
       if (!e.alive && e.deathTimer > 0) e.deathTimer -= dt;
     }
     this.enemies = this.enemies.filter((e) => e.alive || e.deathTimer > 0);
+  }
+
+  /** Stage-6 坦克王: four cardinal barrels, each can fire independently. */
+  UpdateTankKing(e, dt) {
+    if (e.barrelFlash) {
+      for (const k of Object.keys(e.barrelFlash)) {
+        if (e.barrelFlash[k] > 0) e.barrelFlash[k] -= dt;
+      }
+    }
+    e.aiTimer -= dt;
+    if (e.aiTimer <= 0) {
+      e.aiTimer = 0.45 + Math.random() * 0.55;
+      if (this.player?.alive && Math.random() < 0.55) {
+        e.dir = DirFromVector(this.player.x - e.x, this.player.y - e.y);
+      } else {
+        e.dir = DIR_KEYS[Math.floor(Math.random() * 4)];
+      }
+      // Keep somewhat central — not stuck on the rim.
+      if (e.x < 40) e.dir = "right";
+      if (e.x > CANVAS_W - e.w - 40) e.dir = "left";
+      if (e.y < 40) e.dir = "down";
+      if (e.y > CANVAS_H * 0.55) e.dir = "up";
+    }
+
+    const d = DIR[e.dir];
+    const beforeX = e.x;
+    const beforeY = e.y;
+    this.MoveTank(e, d.x * e.speed * dt, d.y * e.speed * dt);
+    e.x = Clamp(e.x, 8, CANVAS_W - e.w - 8);
+    e.y = Clamp(e.y, 8, CANVAS_H * 0.62);
+    if (Math.abs(e.x - beforeX) > 0.01 || Math.abs(e.y - beforeY) > 0.01) {
+      e.moving = true;
+      e.animTick += dt * 10;
+    } else {
+      e.moving = false;
+      e.aiTimer = Math.min(e.aiTimer, 0.12);
+    }
+
+    if (this.player?.alive) {
+      e.castFace = DirFromVector(this.player.x - e.x, this.player.y - e.y);
+    } else {
+      e.castFace = "down";
+    }
+
+    if (e.attackQueue?.length) {
+      this.UpdateBossAttackQueue(e, dt);
+      return;
+    }
+    if (e.fireCd <= 0) {
+      const ratio = e.hp / Math.max(1, e.maxHp);
+      e.finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
+      let pattern = TANK_KING_ATTACKS[Math.floor(Math.random() * TANK_KING_ATTACKS.length)];
+      if (e.finalPhase && Math.random() < 0.45) pattern = "ringShot";
+      this.BeginTankKingAttack(e, pattern);
+    }
+  }
+
+  BeginTankKingAttack(e, pattern) {
+    e.attackPattern = pattern;
+    e.attackQueue = [];
+    e.attackAge = 0;
+    const cdScale = this.GetBossFireCdScale(e);
+    const dirs = ["up", "down", "left", "right"];
+    const face = e.castFace || "down";
+
+    if (pattern === "quadCross") {
+      // All four barrels fire once.
+      for (let i = 0; i < dirs.length; i++) {
+        e.attackQueue.push({ t: i * 0.04 * cdScale, kind: "kingShell", dir: dirs[i] });
+      }
+      e.fireCd = 2.0 * cdScale;
+      this.ShowBuffToast("坦克王 · 十字齐射");
+    } else if (pattern === "spinFire") {
+      // Rotate through barrels twice.
+      for (let r = 0; r < 2; r++) {
+        for (let i = 0; i < dirs.length; i++) {
+          e.attackQueue.push({
+            t: (r * 4 + i) * 0.12 * cdScale,
+            kind: "kingShell",
+            dir: dirs[i],
+          });
+        }
+      }
+      e.fireCd = 2.6 * cdScale;
+      this.ShowBuffToast("坦克王 · 四向轮射");
+    } else if (pattern === "axisBurst") {
+      // Opposite pairs: horizontal then vertical.
+      for (const dir of ["left", "right"]) {
+        e.attackQueue.push({ t: 0.02 * cdScale, kind: "kingShell", dir });
+        e.attackQueue.push({ t: 0.14 * cdScale, kind: "kingShell", dir });
+      }
+      for (const dir of ["up", "down"]) {
+        e.attackQueue.push({ t: 0.32 * cdScale, kind: "kingShell", dir });
+        e.attackQueue.push({ t: 0.44 * cdScale, kind: "kingShell", dir });
+      }
+      e.fireCd = 2.2 * cdScale;
+      this.ShowBuffToast("坦克王 · 轴对称连射");
+    } else if (pattern === "chaseVolley") {
+      // Barrel facing the player dumps a volley; side barrels support.
+      for (let i = 0; i < 4; i++) {
+        e.attackQueue.push({ t: i * 0.1 * cdScale, kind: "kingShell", dir: face });
+      }
+      const sideA = face === "up" || face === "down" ? "left" : "up";
+      const sideB = face === "up" || face === "down" ? "right" : "down";
+      e.attackQueue.push({ t: 0.08 * cdScale, kind: "kingShell", dir: sideA, angleOffset: -0.18 });
+      e.attackQueue.push({ t: 0.08 * cdScale, kind: "kingShell", dir: sideB, angleOffset: 0.18 });
+      e.fireCd = 2.1 * cdScale;
+      this.ShowBuffToast("坦克王 · 追猎齐射");
+    } else {
+      // ringShot: three layers from all barrels
+      for (let wave = 0; wave < 3; wave++) {
+        for (let i = 0; i < dirs.length; i++) {
+          e.attackQueue.push({
+            t: (wave * 0.22 + i * 0.03) * cdScale,
+            kind: "kingShell",
+            dir: dirs[i],
+            angleOffset: (wave - 1) * 0.2,
+          });
+        }
+      }
+      e.fireCd = 3.0 * cdScale;
+      this.ShowBuffToast("坦克王 · 环形弹幕");
+    }
   }
 
   /** Boss patrols the upper band and cycles gravity-shell attack patterns. */
@@ -2074,7 +2231,7 @@ class Game {
     e.attackQueue = [];
     const face = e.castFace || "down";
     e.dir = face === "up" ? "down" : face;
-    const cdScale = this.GetBossFireCdScale();
+    const cdScale = this.GetBossFireCdScale(e);
 
     if (pattern === "barrage") {
       // 万炮齐发：宽扇形下压弹幕
@@ -2177,6 +2334,12 @@ class Game {
       this.audio.Explode();
       return;
     }
+    if (shot.kind === "kingShell") {
+      this.SpawnKingShellFromDir(e, shot.dir || "down", shot.angleOffset || 0);
+      if (e.barrelFlash && shot.dir) e.barrelFlash[shot.dir] = 0.14;
+      this.audio.Shoot();
+      return;
+    }
     if (shot.kind === "rain") {
       const x = 24 + Math.random() * (CANVAS_W - 48);
       this.SpawnBossShell(e, {
@@ -2205,6 +2368,52 @@ class Game {
     // Default gravity shell with optional angle offset.
     this.SpawnBossShellFromDir(e, shot.dir || "down", shot.angleOffset || 0);
     this.audio.Shoot();
+  }
+
+  SpawnKingShellFromDir(e, dirName, angleOffset = 0) {
+    const d = DIR[dirName] || DIR.down;
+    const spd = BULLET_SPEED * 0.92;
+    let vx = d.x * spd;
+    let vy = d.y * spd;
+    if (dirName === "left" || dirName === "right") vy -= 55;
+    else if (dirName === "up") vy -= 25;
+    else vy += 8;
+
+    if (angleOffset) {
+      const c = Math.cos(angleOffset);
+      const s = Math.sin(angleOffset);
+      const rx = vx * c - vy * s;
+      const ry = vx * s + vy * c;
+      vx = rx;
+      vy = ry;
+    }
+
+    const muzzle = Math.max(18, e.w * 0.42);
+    const cx = e.x + e.w / 2;
+    const cy = e.y + e.h / 2;
+    this.bullets.push({
+      x: cx - 4 + d.x * muzzle,
+      y: cy - 4 + d.y * muzzle,
+      w: 8,
+      h: 8,
+      vx,
+      vy,
+      alive: true,
+      owner: e,
+      isPlayer: false,
+      face: dirName,
+      power: 1,
+      trail: [],
+      arm: 0.12,
+      traveled: 0,
+      gravityMul: 1,
+      bounceLeft: 0,
+      pierceLeft: 0,
+      homing: false,
+      meteor: false,
+      bossShell: true,
+      kingShell: true,
+    });
   }
 
   SpawnBossShellFromDir(e, dirName, angleOffset = 0) {
@@ -3439,7 +3648,7 @@ class Game {
       typeId: type.id,
       texture: type.texture,
       alive: true,
-      fireCd: type.boss ? 1.6 * this.GetBossFireCdScale() : 0.8,
+      fireCd: type.boss ? 1.6 * this.GetBossFireCdScale({ fireIntervalMul: type.fireIntervalMul ?? 1 }) : 0.8,
       aiTimer: 0.3,
       spawnFlash: type.boss ? 0.6 : 1.0,
       protect: type.boss ? 1.2 : 0,
@@ -3452,8 +3661,11 @@ class Game {
       attackAge: 0,
       castFace: "down",
       isBoss: !!type.boss,
+      tankKing: !!type.tankKing,
+      fireIntervalMul: type.fireIntervalMul ?? 1,
       eagleCurseUsed: false,
       finalPhase: false,
+      barrelFlash: { up: 0, down: 0, left: 0, right: 0 },
     };
   }
 
@@ -3480,7 +3692,8 @@ class Game {
       if (this.isTutorial) {
         this.EndGame(true, "河对岸肃清！选一张入门升级，带进第一关。", "next");
       } else if (this.isBossStage) {
-        this.EndGame(true, `重力巨炮击破！得分 ${this.score}`, "next");
+        const title = this.stageData.title || "Boss";
+        this.EndGame(true, `${title}击破！得分 ${this.score}`, "next");
       } else if (this.stage < STAGE_COUNT) {
         this.EndGame(true, `第 ${this.stage} 关肃清！得分 ${this.score}`, "next");
       } else {
@@ -3665,15 +3878,20 @@ class Game {
         ctx.font = "bold 13px monospace";
         ctx.fillText("向上射击的炮弹会落回打自己", CANVAS_W / 2, CANVAS_H / 2 + 62);
       } else if (this.isBossStage) {
+        const isKing = this.stageData.bossKind === "tankKing";
         ctx.font = "bold 28px monospace";
         ctx.fillText("BOSS", CANVAS_W / 2, CANVAS_H / 2 - 36);
         const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
         ctx.globalAlpha = fade * blink;
         ctx.font = "bold 36px monospace";
-        ctx.fillText("重力巨炮", CANVAS_W / 2, CANVAS_H / 2 + 18);
+        ctx.fillText(isKing ? "坦克王" : "重力巨炮", CANVAS_W / 2, CANVAS_H / 2 + 18);
         ctx.globalAlpha = fade * 0.95;
         ctx.font = "bold 12px monospace";
-        ctx.fillText("躲避万炮齐发 · 子弹带重力", CANVAS_W / 2, CANVAS_H / 2 + 58);
+        ctx.fillText(
+          isKing ? "四向炮筒 · 每筒可射" : "躲避万炮齐发 · 子弹带重力",
+          CANVAS_W / 2,
+          CANVAS_H / 2 + 58
+        );
       } else {
         ctx.font = "bold 36px monospace";
         ctx.fillText("STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
@@ -3829,6 +4047,7 @@ class Game {
     if (ghosting) ctx.globalAlpha = 0.45 + 0.35 * Math.sin(this.frame * 0.35);
     const { gx, gy } = this.TankSheetOrigin(tank, isPlayer);
     this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
+    if (tank.tankKing || tank.typeId === "tankKing") this.DrawTankKingBarrels(ctx, tank);
     if (ghosting) {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = "rgba(200,160,255,0.7)";
@@ -3852,6 +4071,34 @@ class Game {
     }
   }
 
+  DrawTankKingBarrels(ctx, tank) {
+    const cx = tank.x + tank.w / 2;
+    const cy = tank.y + tank.h / 2;
+    const len = Math.max(10, tank.w * 0.28);
+    const thick = Math.max(5, tank.w * 0.14);
+    const flash = tank.barrelFlash || {};
+    const barrels = [
+      { dir: "up", x: cx - thick / 2, y: tank.y - len + 4, w: thick, h: len },
+      { dir: "down", x: cx - thick / 2, y: tank.y + tank.h - 4, w: thick, h: len },
+      { dir: "left", x: tank.x - len + 4, y: cy - thick / 2, w: len, h: thick },
+      { dir: "right", x: tank.x + tank.w - 4, y: cy - thick / 2, w: len, h: thick },
+    ];
+    for (const b of barrels) {
+      const lit = (flash[b.dir] || 0) > 0;
+      ctx.fillStyle = lit ? "#ffe060" : "#c0c0c0";
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = lit ? "#fff8c0" : "#606060";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+    }
+    // Crown mark
+    ctx.fillStyle = "#f0d060";
+    ctx.fillRect(cx - 6, tank.y + 4, 12, 4);
+    ctx.fillRect(cx - 8, tank.y + 2, 4, 4);
+    ctx.fillRect(cx - 2, tank.y + 1, 4, 5);
+    ctx.fillRect(cx + 4, tank.y + 2, 4, 4);
+  }
+
   DrawBossHud(ctx, boss) {
     const barW = 120;
     const barH = 8;
@@ -3865,7 +4112,10 @@ class Game {
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     const finalPhase = (boss.hp / Math.max(1, boss.maxHp)) <= BOSS_FINAL_HP_RATIO;
-    ctx.fillText(finalPhase ? "BOSS 终焉阶段" : "BOSS 重力巨炮", CANVAS_W / 2, y - 1);
+    const bossName = boss.typeId === "tankKing" || boss.tankKing
+      ? (finalPhase ? "坦克王 · 狂暴" : "BOSS 坦克王")
+      : (finalPhase ? "BOSS 终焉阶段" : "BOSS 重力巨炮");
+    ctx.fillText(bossName, CANVAS_W / 2, y - 1);
     ctx.fillStyle = "#302010";
     ctx.fillRect(x, y, barW, barH);
     ctx.fillStyle = ratio > BOSS_FINAL_HP_RATIO ? "#ff6060" : "#ff3030";
@@ -4003,12 +4253,25 @@ class Game {
     const needleIdx = this.RouletteIndexAtNeedle();
     const under = segs[needleIdx] || segs[0];
     const focus = r.phase === "result" && r.result ? r.result : under;
-    ctx.imageSmoothingEnabled = false;
+    const wheelImg = this.images.rouletteWheel;
+    const needle = this.images.rouletteNeedle;
+    const diam = r.radius * 2 + 18;
 
-    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.imageSmoothingEnabled = true;
+    ctx.fillStyle = "rgba(4, 8, 14, 0.82)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Result / pointer banner
+    // Soft glow behind the wheel — atmosphere without muddying the art.
+    const aura = ctx.createRadialGradient(r.cx, r.cy, r.radius * 0.2, r.cx, r.cy, r.radius * 1.4);
+    aura.addColorStop(0, "rgba(255, 210, 110, 0.14)");
+    aura.addColorStop(0.55, "rgba(60, 120, 180, 0.08)");
+    aura.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(r.cx, r.cy, r.radius * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Focus banner
     ctx.fillStyle = focus.bg;
     ctx.fillRect(18, 8, CANVAS_W - 36, 40);
     ctx.strokeStyle = focus.rim || focus.color;
@@ -4023,94 +4286,119 @@ class Game {
     ctx.fillText(`${tag}${focus.label}`, 62, 28);
     ctx.textBaseline = "alphabetic";
 
-    const wheelImg = this.images.rouletteWheel;
-    const diam = r.radius * 2 + 20;
-
-    // Shadow
+    // Drop shadow
     ctx.beginPath();
-    ctx.arc(r.cx + 2, r.cy + 4, r.radius + 2, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.arc(r.cx + 2, r.cy + 5, r.radius + 2, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fill();
 
-    // 1) Generated base wheel (rotates)
+    // Wheel art (rotates). Fallback: solid tier wedges if image missing.
     ctx.save();
     ctx.translate(r.cx, r.cy);
     ctx.rotate(r.angle);
     if (wheelImg) {
       ctx.drawImage(wheelImg, -diam / 2, -diam / 2, diam, diam);
+    } else {
+      for (let i = 0; i < n; i++) {
+        const seg = segs[i];
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, r.radius, i * slice, (i + 1) * slice);
+        ctx.closePath();
+        ctx.fillStyle = seg.bg;
+        ctx.fill();
+        ctx.strokeStyle = seg.rim;
+        ctx.stroke();
+      }
     }
 
-    // 2) Colored wedges + labels on top of base
-    for (let i = 0; i < n; i++) {
-      const seg = segs[i];
-      const a0 = i * slice;
-      const a1 = a0 + slice;
-      const isFocus = i === needleIdx;
-
+    // Soft focus wedge tint — keep pixel art readable.
+    {
+      const seg = segs[needleIdx] || focus;
+      const a0 = needleIdx * slice;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, r.radius * 0.88, a0, a1);
+      ctx.arc(0, 0, r.radius * 0.92, a0, a0 + slice);
       ctx.closePath();
-      ctx.fillStyle = isFocus ? seg.color : seg.bg;
-      ctx.globalAlpha = isFocus ? 0.92 : 0.78;
+      ctx.fillStyle =
+        seg.tier === "good"
+          ? "rgba(90,255,160,0.16)"
+          : seg.tier === "ultra"
+            ? "rgba(255,220,100,0.16)"
+            : "rgba(255,110,110,0.16)";
       ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = seg.rim || "#606060";
-      ctx.lineWidth = isFocus ? 2.5 : 1;
+      ctx.strokeStyle = seg.color;
+      ctx.lineWidth = 3;
       ctx.stroke();
+    }
+
+    // Outer tier ticks + readable labels on dark plates.
+    for (let i = 0; i < n; i++) {
+      const seg = segs[i];
+      const mid = i * slice + slice * 0.5;
+      const isFocus = i === needleIdx;
+      const cos = Math.cos(mid);
+      const sin = Math.sin(mid);
+
+      ctx.beginPath();
+      ctx.arc(cos * (r.radius + 8), sin * (r.radius + 8), isFocus ? 4.5 : 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = seg.color;
+      ctx.fill();
 
       ctx.save();
-      // Mid-angle of wedge points along +X after this rotate; place label on that ray
-      // (using -Y was 90° off and parked text on the segment boundaries).
-      ctx.rotate(a0 + slice / 2);
+      ctx.rotate(mid);
+      const tx = r.radius * 0.62;
+      const tw = Math.max(34, seg.label.length * 11);
+      const th = 18;
+      ctx.fillStyle = isFocus ? "rgba(8,10,16,0.86)" : "rgba(8,10,16,0.68)";
+      ctx.fillRect(tx - tw / 2, -th / 2, tw, th);
+      ctx.strokeStyle = seg.rim || seg.color;
+      ctx.lineWidth = isFocus ? 2 : 1;
+      ctx.strokeRect(tx - tw / 2 + 0.5, -th / 2 + 0.5, tw - 1, th - 1);
+      ctx.fillStyle = "#fff8e8";
+      ctx.font = isFocus ? "bold 12px monospace" : "bold 11px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const tx = r.radius * 0.58;
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(tx - 18, -10, 36, 20);
-      ctx.fillStyle = isFocus ? "#101010" : "#ffffff";
-      ctx.font = isFocus ? "bold 12px monospace" : "bold 11px monospace";
-      ctx.fillText(seg.label, tx, 0);
+      ctx.fillText(seg.label, tx, 0.5);
       ctx.restore();
     }
 
-    // Hub
+    // Hub jewel
     ctx.beginPath();
-    ctx.arc(0, 0, 26, 0, Math.PI * 2);
-    ctx.fillStyle = "#141414";
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fillStyle = "#121820";
     ctx.fill();
     ctx.strokeStyle = focus.color;
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.fillStyle = focus.color;
-    ctx.font = "bold 11px monospace";
+    ctx.font = "bold 12px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(focus.tier === "bad" ? "负" : focus.tier === "ultra" ? "超" : "好", 0, 1);
     ctx.restore();
 
-    // 3) Fixed needle (not rotating)
-    const needle = this.images.rouletteNeedle;
+    // Fixed needle (points down onto the wheel)
     const ny = r.cy - r.radius;
     if (needle) {
-      ctx.drawImage(needle, r.cx - 20, ny - 50, 40, 52);
+      ctx.drawImage(needle, r.cx - 18, ny - 46, 36, 54);
     } else {
       ctx.fillStyle = "#f0d060";
       ctx.beginPath();
-      ctx.moveTo(r.cx, ny);
-      ctx.lineTo(r.cx - 12, ny - 26);
-      ctx.lineTo(r.cx + 12, ny - 26);
+      ctx.moveTo(r.cx, ny + 4);
+      ctx.lineTo(r.cx - 11, ny - 24);
+      ctx.lineTo(r.cx + 11, ny - 24);
       ctx.closePath();
       ctx.fill();
     }
 
-    ctx.strokeStyle = "#c0c0c0";
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(200,210,220,0.55)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(r.cx, r.cy, r.radius + 5, 0, Math.PI * 2);
+    ctx.arc(r.cx, r.cy, r.radius + 6, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = "#a8a8a8";
+    ctx.fillStyle = "#c8d4e4";
     ctx.font = "10px monospace";
     ctx.textAlign = "center";
     ctx.fillText(
@@ -4122,7 +4410,6 @@ class Game {
     );
     ctx.textAlign = "left";
 
-    // Tier legend
     ctx.font = "bold 9px monospace";
     ctx.fillStyle = TIER_PALETTE.good.color;
     ctx.fillText("绿=好", 20, CANVAS_H - 8);
