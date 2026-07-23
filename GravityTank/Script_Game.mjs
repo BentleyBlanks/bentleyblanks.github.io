@@ -33,6 +33,10 @@ const BULLET_SPEED = 280;
 /** Classic ~1/5 tanks flash (~0.20); +50% → 0.30. Only flashing tanks drop. */
 const POWER_DROP_RATE = 0.3;
 const PLAYER_SPEED = 88;
+const GIANT_SCALE = 2;
+const GIANT_DURATION = 14;
+const GIANT_HITS = 12;
+const GIANT_SPEED_MUL = 0.7;
 const SPAWN_PROTECT = 3.0;
 
 const DIR = {
@@ -103,6 +107,7 @@ const POWER = {
   overdrive: "overdrive",
   apocalypse: "apocalypse",
   juggernaut: "juggernaut",
+  giant: "giant",
   // Curses / negatives
   spawnExtra: "spawnExtra",
   enemyShield: "enemyShield",
@@ -157,6 +162,7 @@ const ROULETTE_POOL = [
   MakeSeg(POWER.apocalypse, "天罚", "ultra"),
   MakeSeg(POWER.juggernaut, "霸体", "ultra"),
   MakeSeg(POWER.bastion, "壁垒", "ultra"),
+  MakeSeg(POWER.giant, "巨大", "ultra"),
   MakeSeg(POWER.spawnExtra, "援军", "bad"),
   MakeSeg(POWER.enemyShield, "敌盾", "bad"),
   MakeSeg(POWER.heavyCurse, "超重", "bad"),
@@ -181,10 +187,13 @@ function ShuffleInPlace(arr) {
   return arr;
 }
 
-/** Pick 10 unique prizes: mix good / ultra / bad so the wheel stays readable. */
-function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.normal) {
+/** Pick 10 unique prizes: mix good / ultra / bad so the wheel stays readable.
+ *  opts.allowGiant — late-game only (after stage 6). */
+function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.normal, opts = {}) {
   const goods = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "good").slice());
-  const ultras = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "ultra").slice());
+  let ultras = ROULETTE_POOL.filter((s) => s.tier === "ultra");
+  if (!opts.allowGiant) ultras = ultras.filter((s) => s.kind !== POWER.giant);
+  ultras = ShuffleInPlace(ultras.slice());
   const bads = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "bad").slice());
   // Easy: fewer negative wedges (0–1). Normal: 2–3.
   const badN = difficulty === DIFFICULTY.easy
@@ -197,9 +206,18 @@ function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.nor
     ...ultras.slice(0, ultraN),
     ...bads.slice(0, badN),
   ];
+  // Late-game: sometimes guarantee 巨大 on the wheel so it shows up.
+  if (opts.allowGiant && ultraN > 0 && Math.random() < 0.4) {
+    const giantSeg = ROULETTE_POOL.find((s) => s.kind === POWER.giant);
+    if (giantSeg && !picked.includes(giantSeg)) {
+      const swapIdx = picked.findIndex((s) => s.tier === "ultra" && s.kind !== POWER.giant);
+      if (swapIdx >= 0) picked[swapIdx] = giantSeg;
+      else if (picked.length < count) picked.push(giantSeg);
+    }
+  }
   // Fill if pool short — prefer non-bad on easy
   while (picked.length < count) {
-    const rest = ROULETTE_POOL.filter((s) => !picked.includes(s));
+    const rest = ROULETTE_POOL.filter((s) => !picked.includes(s) && (opts.allowGiant || s.kind !== POWER.giant));
     if (!rest.length) break;
     const prefer = difficulty === DIFFICULTY.easy
       ? rest.filter((s) => s.tier !== "bad")
@@ -750,6 +768,8 @@ class Game {
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
+    this.giantTimer = 0;
+    this.giantHits = 0;
     this.playerEagleTimer = 0;
     this.eagleWarnT = 0;
     this.eagleMorph = null;
@@ -825,6 +845,21 @@ class Game {
     if (kind === POWER.eagleStroll) {
       const [gx, gy] = TILE_SHEET.baseAlive;
       this.BlitGrid(ctx, gx, gy, cx - size / 2, cy - size / 2, size, size, 2, 2);
+      return true;
+    }
+    if (kind === POWER.giant) {
+      ctx.fillStyle = "#3a2808";
+      ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+      ctx.strokeStyle = "#ffe060";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx - size / 2 + 0.5, cy - size / 2 + 0.5, size - 1, size - 1);
+      ctx.fillStyle = "#ffe060";
+      ctx.font = `${Math.max(9, size * 0.5)}px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("巨", cx, cy + 1);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
       return true;
     }
     if (kind === POWER.softStun || kind === POWER.fortBreak) {
@@ -1807,6 +1842,7 @@ class Game {
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
+    this.ClearGiantForm(false);
     this.ClearEagleForm(false);
     this.playerEagleTimer = 0;
     this.eagleWarnT = 0;
@@ -1985,6 +2021,90 @@ class Game {
     if (this.player) this.player.absorbHits = this.absorbHits || 0;
   }
 
+  /** Ultra「巨大」unlocks only after clearing stage 6 (teach + stages 7–9). */
+  IsGiantPowerUnlocked() {
+    if (this.isTutorial) return false;
+    if (this.isBarricadeTeach) return true;
+    return typeof this.stage === "number" && this.stage >= 7;
+  }
+
+  StartGiantForm(duration = GIANT_DURATION) {
+    const p = this.player;
+    if (!p?.alive || this.playerEagleTimer > 0 || this.eagleMorph || p.asEagle) {
+      this.ShowBuffToast("老鹰形态下无法巨大化");
+      return;
+    }
+    const cx = p.x + p.w * 0.5;
+    const cy = p.y + p.h * 0.5;
+    const size = TANK_SIZE * GIANT_SCALE;
+    p.w = size;
+    p.h = size;
+    p.x = Clamp(cx - size * 0.5, 0, CANVAS_W - size);
+    p.y = Clamp(cy - size * 0.5, 0, CANVAS_H - size);
+    p.speed = PLAYER_SPEED * GIANT_SPEED_MUL;
+    this.giantTimer = Math.max(this.giantTimer, duration);
+    this.giantHits = Math.max(this.giantHits, GIANT_HITS);
+    p.protect = Math.max(p.protect, 1.2);
+    this.UnstickTank(p, { maxDist: 80 });
+    this.CrushBricksTouchingPlayer();
+    this.ShowBuffToast(`巨大化 ${Math.ceil(this.giantTimer)}s · 撞碎砖墙 · 扛伤×${this.giantHits}`);
+  }
+
+  ClearGiantForm(restoreTank = true) {
+    this.giantTimer = 0;
+    this.giantHits = 0;
+    const p = this.player;
+    if (!restoreTank || !p) return;
+    if (!p.alive) {
+      p.w = TANK_SIZE;
+      p.h = TANK_SIZE;
+      return;
+    }
+    if (p.asEagle || this.playerEagleTimer > 0) return;
+    const cx = p.x + p.w * 0.5;
+    const cy = p.y + p.h * 0.5;
+    p.w = TANK_SIZE;
+    p.h = TANK_SIZE;
+    p.x = Clamp(cx - TANK_SIZE * 0.5, 0, CANVAS_W - TANK_SIZE);
+    p.y = Clamp(cy - TANK_SIZE * 0.5, 0, CANVAS_H - TANK_SIZE);
+    p.speed = PLAYER_SPEED;
+    this.UnstickTank(p, { maxDist: 64 });
+  }
+
+  CrushBricksTouchingPlayer() {
+    const p = this.player;
+    if (!p?.alive || this.giantTimer <= 0) return;
+    const box = { x: p.x + 1, y: p.y + 1, w: p.w - 2, h: p.h - 2 };
+    const x0 = Math.floor(box.x / TILE);
+    const y0 = Math.floor(box.y / TILE);
+    const x1 = Math.floor((box.x + box.w - 0.001) / TILE);
+    const y1 = Math.floor((box.y + box.h - 0.001) / TILE);
+    let crushed = 0;
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) continue;
+        if (this.map[ty][tx] !== TILE_BRICK) continue;
+        if (!this.BrickRectHitsSolid(box, tx, ty)) continue;
+        this.SetBrickCell(tx, ty, false);
+        crushed++;
+      }
+    }
+    if (crushed > 0 && Math.random() < 0.35) this.audio.Hit();
+  }
+
+  /** Spend a giant-form hit charge if available. */
+  TryAbsorbWithGiant() {
+    if (this.giantTimer <= 0 || this.giantHits <= 0 || !this.player?.alive) return false;
+    this.giantHits -= 1;
+    this.player.protect = Math.max(this.player.protect, 0.55);
+    this.SpawnExplosion(this.player.x + this.player.w * 0.5, this.player.y + this.player.h * 0.5, 0.5);
+    this.ShowBuffToast(
+      this.giantHits > 0 ? `巨大化扛住！剩余 ${this.giantHits}` : "巨大化护甲耗尽"
+    );
+    this.audio.Bounce();
+    return true;
+  }
+
   /** Enemy shells never hurt bosses; from stage 6+ no enemy↔enemy damage at all. */
   BlocksEnemyFriendlyFire(bullet, target) {
     if (!bullet || bullet.isPlayer) return false;
@@ -2123,6 +2243,15 @@ class Game {
     if (this.heavyCurseTimer > 0) this.heavyCurseTimer -= dt;
     if (this.enemyRageTimer > 0) this.enemyRageTimer -= dt;
     if (this.playerStunTimer > 0) this.playerStunTimer -= dt;
+    if (this.giantTimer > 0) {
+      this.giantTimer -= dt;
+      if (this.giantTimer <= 0) {
+        this.ClearGiantForm(true);
+        this.ShowBuffToast("巨大化结束");
+      } else {
+        this.CrushBricksTouchingPlayer();
+      }
+    }
     if (this.timeRiftCd > 0) this.timeRiftCd -= dt;
     if (this.HasPerk("meteorPulse") && this.state === "playing") {
       this.meteorPulseTimer -= dt;
@@ -2430,6 +2559,7 @@ class Game {
 
     this.audio.SetEngine(p.moving && !eagleForm);
     if (p.moving) p.animTick += dt * 10;
+    if (this.giantTimer > 0) this.CrushBricksTouchingPlayer();
 
     if (this.ConsumeInteractPress()) this.TryInteractCarry();
     if (this.WantsFire()) this.TryFire(p, true);
@@ -3265,6 +3395,7 @@ class Game {
       this.audio.Bounce();
       return;
     }
+    if (this.TryAbsorbWithGiant()) return;
     if ((this.absorbHits || 0) > 0) {
       this.absorbHits -= 1;
       p.absorbHits = this.absorbHits;
@@ -3555,6 +3686,8 @@ class Game {
           continue;
         }
         if (t === TILE_BRICK) {
+          // Giant form smashes ordinary bricks instead of being blocked.
+          if (tank === this.player && this.giantTimer > 0) continue;
           if (this.BrickRectHitsSolid(box, tx, ty)) return true;
           continue;
         }
@@ -3785,6 +3918,7 @@ class Game {
 
     const cx = tank.x + tank.w / 2;
     const cy = tank.y + tank.h / 2;
+    const muzzle = Math.max(14, (tank.w || TANK_SIZE) * 0.42);
     let gravityMul = 1;
     if (isPlayer && this.antigravTimer > 0) gravityMul = -0.35;
     if (isPlayer && this.heavyCurseTimer > 0) gravityMul *= 2.6;
@@ -3798,8 +3932,8 @@ class Game {
     if (isPlayer && this.HasPerk("pierceShell")) pierceLeft = Math.max(pierceLeft, 1);
 
     this.bullets.push({
-      x: cx - 4 + d.x * 14,
-      y: cy - 4 + d.y * 14,
+      x: cx - 4 + d.x * muzzle,
+      y: cy - 4 + d.y * muzzle,
       w: 8,
       h: 8,
       vx,
@@ -3932,6 +4066,8 @@ class Game {
           } else if (this.player.protect > 0) {
             this.SpawnExplosion(b.x, b.y, 0.5);
             this.audio.Bounce();
+          } else if (this.TryAbsorbWithGiant()) {
+            // giant form absorbed
           } else if ((this.absorbHits || 0) > 0 || (this.player.absorbHits || 0) > 0) {
             this.absorbHits = Math.max(0, (this.absorbHits || 0) - 1);
             this.player.absorbHits = this.absorbHits;
@@ -4098,6 +4234,7 @@ class Game {
       this.audio.Bounce();
       return;
     }
+    this.ClearGiantForm(false);
     this.DropCarriedBlock(true);
     // Ultimate eagle curse: dying as the eagle fails the stage regardless of lives.
     if (this.playerEagleTimer > 0 || p.asEagle || this.eagleMorph || p.eagleMorphing) {
@@ -4144,6 +4281,7 @@ class Game {
     const p = this.player;
     if (!p?.alive) return;
     if (this.eagleMorph || p.asEagle) return;
+    this.ClearGiantForm(true);
     const duration = this.GetEagleCurseDuration();
     const shield = this.GetEagleCurseShield();
     const { toX, toY } = this.GetEagleMorphTarget(p);
@@ -4444,7 +4582,9 @@ class Game {
     this.audio.StopEngine();
     this.ResetTouchInput();
     this.state = "roulette";
-    const segments = PickRouletteSegments(ROULETTE_SIZE, this.difficulty);
+    const segments = PickRouletteSegments(ROULETTE_SIZE, this.difficulty, {
+      allowGiant: this.IsGiantPowerUnlocked(),
+    });
     const touch = this.isTouchDevice;
     this.roulette = {
       angle: Math.random() * Math.PI * 2, // orientation only — NOT the result
@@ -4772,6 +4912,9 @@ class Game {
         this.antigravTimer = 12;
         this.overdriveTimer = Math.max(this.overdriveTimer, 12);
         this.ShowBuffToast("霸体：几乎无敌的 22 秒 + 装甲！");
+        break;
+      case POWER.giant:
+        this.StartGiantForm(GIANT_DURATION);
         break;
       case POWER.spawnExtra:
         this.ForceSpawnExtras(4);
@@ -5694,6 +5837,17 @@ class Game {
     } else {
       this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
     }
+    if (isPlayer && this.giantTimer > 0) {
+      const pulse = 0.45 + 0.35 * Math.abs(Math.sin(this.frame * 0.22));
+      ctx.strokeStyle = `rgba(255,220,80,${pulse})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(tank.x - 2, tank.y - 2, tank.w + 4, tank.h + 4);
+      ctx.fillStyle = "rgba(255,224,96,0.9)";
+      ctx.font = `10px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      ctx.fillText(`巨${Math.ceil(this.giantTimer)}·甲${this.giantHits}`, tank.x + tank.w / 2, tank.y - 6);
+      ctx.textAlign = "left";
+    }
     if ((tank.isBoss || tank.tankKing) && (tank.barrelCount || 0) > 0) {
       this.DrawBossBarrels(ctx, tank);
     }
@@ -6276,6 +6430,9 @@ class Game {
     if (this.spreadTimer > 0) chips.push({ t: `散 ${Math.ceil(this.spreadTimer)}`, c: "#70ff98" });
     if (this.sniperTimer > 0) chips.push({ t: `狙 ${Math.ceil(this.sniperTimer)}`, c: "#70ff98" });
     if (this.overdriveTimer > 0) chips.push({ t: `超武 ${Math.ceil(this.overdriveTimer)}`, c: "#ffe060" });
+    if (this.giantTimer > 0) {
+      chips.push({ t: `巨大 ${Math.ceil(this.giantTimer)}·甲${this.giantHits}`, c: "#ffe060" });
+    }
     if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
     if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
     if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
