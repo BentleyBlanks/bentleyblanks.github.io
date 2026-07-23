@@ -1,37 +1,41 @@
 /** Stage / run upgrade card pools for GravityTank. */
 
+function IconPath(id) {
+  return `./assets/Icon_Upgrade${id[0].toUpperCase()}${id.slice(1)}.png`;
+}
+
 /** Tutorial clear: basic starter cards — 本关有效 into stage 1. */
 export const TUTORIAL_UPGRADES = [
-  { id: "rapidFire", title: "速射入门", desc: "本关：开火冷却缩短", tag: "入门" },
-  { id: "doubleShield", title: "护盾加倍", desc: "本关：出生护盾时间延长一倍", tag: "入门" },
-  { id: "baseArmor", title: "钢墙护垒", desc: "本关：开场总部钢墙加固更久、更耐打", tag: "入门" },
-  { id: "multiShot", title: "双弹入门", desc: "本关：同时可存弹 +1", tag: "入门" },
-  { id: "bulletSpeed", title: "初速入门", desc: "本关：炮弹飞得更快", tag: "入门" },
-  { id: "noSelfHit", title: "安全撞针", desc: "本关：己方炮弹不误伤自己", tag: "入门" },
+  { id: "rapidFire", title: "速射入门", desc: "本关：开火冷却缩短", tag: "入门", icon: IconPath("rapidFire") },
+  { id: "doubleShield", title: "护盾加倍", desc: "本关：出生护盾时间延长一倍", tag: "入门", icon: IconPath("doubleShield") },
+  { id: "baseArmor", title: "钢墙护垒", desc: "本关：开场总部钢墙加固更久、更耐打", tag: "入门", icon: IconPath("baseArmor") },
+  { id: "multiShot", title: "双弹入门", desc: "本关：同时可存弹 +1", tag: "入门", icon: IconPath("multiShot") },
+  { id: "bulletSpeed", title: "初速入门", desc: "本关：炮弹飞得更快", tag: "入门", icon: IconPath("bulletSpeed") },
+  { id: "noSelfHit", title: "安全撞针", desc: "本关：己方炮弹不误伤自己", tag: "入门", icon: IconPath("noSelfHit") },
 ];
 
 /** Normal clears: 本关有效 — applies only to the next stage you enter. */
 export const STAGE_UPGRADES = [
-  { id: "noSelfHit", title: "保险撞针", desc: "本关：自己的炮弹不再误伤自己", tag: "本关" },
-  { id: "rapidFire", title: "速射齿轮", desc: "本关：开火冷却显著缩短", tag: "本关" },
-  { id: "multiShot", title: "弹仓扩容", desc: "本关：同时可存弹 +1", tag: "本关" },
-  { id: "bulletSpeed", title: "增压炮口", desc: "本关：炮弹初速提高", tag: "本关" },
-  { id: "lightGravity", title: "轻弹涂层", desc: "本关：己方炮弹重力减弱", tag: "本关" },
-  { id: "longerShield", title: "护盾电池", desc: "本关：出生护盾更久", tag: "本关" },
-  { id: "bounceShell", title: "弹性弹头", desc: "本关：炮弹可弹跳 2 次", tag: "本关" },
-  { id: "pierceShell", title: "破甲锥", desc: "本关：炮弹可穿透 1 名敌军", tag: "本关" },
+  { id: "noSelfHit", title: "保险撞针", desc: "本关：自己的炮弹不再误伤自己", tag: "本关", icon: IconPath("noSelfHit") },
+  { id: "rapidFire", title: "速射齿轮", desc: "本关：开火冷却显著缩短", tag: "本关", icon: IconPath("rapidFire") },
+  { id: "multiShot", title: "弹仓扩容", desc: "本关：同时可存弹 +1", tag: "本关", icon: IconPath("multiShot") },
+  { id: "bulletSpeed", title: "增压炮口", desc: "本关：炮弹初速提高", tag: "本关", icon: IconPath("bulletSpeed") },
+  { id: "lightGravity", title: "轻弹涂层", desc: "本关：己方炮弹重力减弱", tag: "本关", icon: IconPath("lightGravity") },
+  { id: "longerShield", title: "护盾电池", desc: "本关：出生护盾更久", tag: "本关", icon: IconPath("longerShield") },
+  { id: "bounceShell", title: "弹性弹头", desc: "本关：炮弹可弹跳 2 次", tag: "本关", icon: IconPath("bounceShell") },
+  { id: "pierceShell", title: "破甲锥", desc: "本关：炮弹可穿透 1 名敌军", tag: "本关", icon: IconPath("pierceShell") },
 ];
 
 /** Boss clear: permanent until the campaign run ends (通关结束). */
 export const BOSS_UPGRADES = [
-  { id: "mirrorShot", title: "镜影炮", desc: "永久：每次开火额外向反方向射一发", tag: "永久" },
-  { id: "meteorPulse", title: "陨石协议", desc: "永久：每隔一段时间降下重力弹雨", tag: "永久" },
-  { id: "phaseGhost", title: "相位坦克", desc: "永久：每关开场获得较长幽灵穿墙", tag: "永久" },
-  { id: "enemyAnchor", title: "引力锚", desc: "永久：敌军炮弹更重、下落更快", tag: "永久" },
-  { id: "overloadFan", title: "过载核心", desc: "永久：开火时概率触发扇形三连发", tag: "永久" },
-  { id: "fortressWill", title: "堡垒意志", desc: "永久：每关开场总部钢墙加固一段时间", tag: "永久" },
-  { id: "timeRift", title: "时间裂缝", desc: "永久：受击时短暂冻结敌军（有冷却）", tag: "永久" },
-  { id: "huntMark", title: "猎杀标记", desc: "永久：己方炮弹轻微追踪敌军", tag: "永久" },
+  { id: "mirrorShot", title: "镜影炮", desc: "永久：每次开火额外向反方向射一发", tag: "永久", icon: IconPath("mirrorShot") },
+  { id: "meteorPulse", title: "陨石协议", desc: "永久：每隔一段时间降下重力弹雨", tag: "永久", icon: IconPath("meteorPulse") },
+  { id: "phaseGhost", title: "相位坦克", desc: "永久：每关开场获得较长幽灵穿墙", tag: "永久", icon: IconPath("phaseGhost") },
+  { id: "enemyAnchor", title: "引力锚", desc: "永久：敌军炮弹更重、下落更快", tag: "永久", icon: IconPath("enemyAnchor") },
+  { id: "overloadFan", title: "过载核心", desc: "永久：开火时概率触发扇形三连发", tag: "永久", icon: IconPath("overloadFan") },
+  { id: "fortressWill", title: "堡垒意志", desc: "永久：每关开场总部钢墙加固一段时间", tag: "永久", icon: IconPath("fortressWill") },
+  { id: "timeRift", title: "时间裂缝", desc: "永久：受击时短暂冻结敌军（有冷却）", tag: "永久", icon: IconPath("timeRift") },
+  { id: "huntMark", title: "猎杀标记", desc: "永久：己方炮弹轻微追踪敌军", tag: "永久", icon: IconPath("huntMark") },
 ];
 
 export function PickUpgradeCards(pool, count = 3) {

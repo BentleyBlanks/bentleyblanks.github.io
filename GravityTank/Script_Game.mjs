@@ -1469,10 +1469,14 @@ class Game {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = `upgrade-card${special ? " is-special" : ""}${tutorial ? " is-tutorial" : ""}`;
+      const iconSrc = card.icon || `./assets/Icon_Upgrade${card.id[0].toUpperCase()}${card.id.slice(1)}.png`;
       btn.innerHTML =
+        `<img class="upgrade-icon" src="${iconSrc}" width="48" height="48" alt="" draggable="false">` +
+        `<span class="upgrade-copy">` +
         `<span class="upgrade-tag">${card.tag}</span>` +
         `<span class="upgrade-name">${card.title}</span>` +
-        `<span class="upgrade-desc">${card.desc}</span>`;
+        `<span class="upgrade-desc">${card.desc}</span>` +
+        `</span>`;
       btn.addEventListener("click", () => this.ConfirmUpgradePick(card.id));
       cardsRoot.appendChild(btn);
     }
