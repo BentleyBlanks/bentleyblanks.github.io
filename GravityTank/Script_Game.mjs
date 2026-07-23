@@ -187,19 +187,27 @@ function ShuffleInPlace(arr) {
   return arr;
 }
 
+/** Powers that wipe the field — banned on boss stages (would skip the fight). */
+const BOSS_BANNED_POWERS = new Set([POWER.nuke, POWER.apocalypse, POWER.bomb]);
+
 /** Pick 10 unique prizes: mix good / ultra / bad so the wheel stays readable.
- *  opts.allowGiant — late-game only (after stage 6). */
+ *  opts.allowGiant — late-game only (after stage 6).
+ *  opts.bossSafe — strip field-wipe ultras/goods that would skip a boss. */
 function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.normal, opts = {}) {
-  const goods = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "good").slice());
-  let ultras = ROULETTE_POOL.filter((s) => s.tier === "ultra");
+  const allow = (s) => !(opts.bossSafe && BOSS_BANNED_POWERS.has(s.kind));
+  const goods = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "good" && allow(s)).slice());
+  let ultras = ROULETTE_POOL.filter((s) => s.tier === "ultra" && allow(s));
   if (!opts.allowGiant) ultras = ultras.filter((s) => s.kind !== POWER.giant);
   ultras = ShuffleInPlace(ultras.slice());
-  const bads = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "bad").slice());
+  const bads = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "bad" && allow(s)).slice());
   // Easy: fewer negative wedges (0–1). Normal: 2–3.
   const badN = difficulty === DIFFICULTY.easy
     ? Math.min(bads.length, Math.floor(Math.random() * 2))
     : Math.min(bads.length, 2 + Math.floor(Math.random() * 2));
-  const ultraN = Math.min(ultras.length, 1 + Math.floor(Math.random() * 2)); // 1–2
+  // Boss wheels lean on good buffs; still allow 1 non-wipe ultra when available.
+  const ultraN = opts.bossSafe
+    ? Math.min(ultras.length, Math.random() < 0.7 ? 1 : 0)
+    : Math.min(ultras.length, 1 + Math.floor(Math.random() * 2)); // 1–2
   const goodN = Math.max(0, count - badN - ultraN);
   const picked = [
     ...goods.slice(0, goodN),
@@ -217,7 +225,7 @@ function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.nor
   }
   // Fill if pool short — prefer non-bad on easy
   while (picked.length < count) {
-    const rest = ROULETTE_POOL.filter((s) => !picked.includes(s) && (opts.allowGiant || s.kind !== POWER.giant));
+    const rest = ROULETTE_POOL.filter((s) => !picked.includes(s) && allow(s) && (opts.allowGiant || s.kind !== POWER.giant));
     if (!rest.length) break;
     const prefer = difficulty === DIFFICULTY.easy
       ? rest.filter((s) => s.tier !== "bad")
@@ -777,6 +785,9 @@ class Game {
     this.explosions = [];
     this.powerups = [];
     this.bombs = [];
+    this.fxDebris = [];
+    this.fxBlastQueue = [];
+    this.screenFx = null;
     this.carryables = [];
     this.carriedBlock = null;
     this.prepTimer = 0;
@@ -1603,6 +1614,8 @@ class Game {
   GetPowerDropRate() {
     // Tutorial: player cannot cross the river to collect tokens.
     if (this.isTutorial) return 0;
+    // Boss fights: more ? drops from minions so the wheel stays in play.
+    if (this.isBossStage) return this.IsEasy() ? 0.72 : 0.55;
     // Easy: ? tokens appear 50% more often.
     return this.IsEasy() ? POWER_DROP_RATE * 1.5 : POWER_DROP_RATE;
   }
@@ -1840,6 +1853,9 @@ class Game {
     this.explosions = [];
     this.powerups = [];
     this.bombs = [];
+    this.fxDebris = [];
+    this.fxBlastQueue = [];
+    this.screenFx = null;
     this.carryables = [];
     this.carriedBlock = null;
     this.prepTimer = 0;
@@ -2352,6 +2368,7 @@ class Game {
     this.UpdateBombs(dt);
     this.UpdatePowerups(dt);
     this.UpdateExplosions(dt);
+    this.UpdateScreenFx(dt);
     this.TrySpawnEnemy(dt);
     this.CheckEnd();
     this.UpdateHud();
@@ -4282,7 +4299,10 @@ class Game {
       this.DropPowerup(e.x, e.y);
       e.dropsPower = false;
     }
+    const prevRatio = e.hp / Math.max(1, e.maxHp);
     e.hp -= Math.max(1, power >= 3 ? 2 : 1);
+    const nextRatio = e.hp / Math.max(1, e.maxHp);
+    this.MaybeDropBossMilestoneToken(e, prevRatio, nextRatio);
     this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 0.55);
     this.audio.Hit();
     if (e.hp <= 0) {
@@ -4292,6 +4312,22 @@ class Game {
       this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1);
       this.audio.Explode();
       this.RenderEnemyIcons();
+    }
+  }
+
+  /** Boss HP milestones drop safe ? tokens (roulette bans field-wipe prizes). */
+  MaybeDropBossMilestoneToken(e, prevRatio, nextRatio) {
+    if (!e?.isBoss || !this.isBossStage) return;
+    if (!e.bossDropMarks) e.bossDropMarks = [0.66, 0.33];
+    for (let i = e.bossDropMarks.length - 1; i >= 0; i--) {
+      const mark = e.bossDropMarks[i];
+      if (prevRatio > mark && nextRatio <= mark) {
+        e.bossDropMarks.splice(i, 1);
+        const ox = (Math.random() - 0.5) * 48;
+        const oy = 28 + Math.random() * 24;
+        this.DropPowerup(e.x + e.w * 0.5 + ox, e.y + e.h * 0.5 + oy);
+        this.ShowBuffToast("Boss 掉落道具！");
+      }
     }
   }
 
@@ -4654,6 +4690,7 @@ class Game {
     this.state = "roulette";
     const segments = PickRouletteSegments(ROULETTE_SIZE, this.difficulty, {
       allowGiant: this.IsGiantPowerUnlocked(),
+      bossSafe: this.isBossStage,
     });
     const touch = this.isTouchDevice;
     this.roulette = {
@@ -4676,7 +4713,11 @@ class Game {
     this.SyncTouchControlsVisibility();
     const nBad = segments.filter((s) => s.tier === "bad").length;
     const nUltra = segments.filter((s) => s.tier === "ultra").length;
-    this.ShowBuffToast(`转轮 ×${segments.length}（绿好 / 金超 / 红负${nBad}）`);
+    this.ShowBuffToast(
+      this.isBossStage
+        ? `Boss转轮 ×${segments.length}（无核爆/天罚/炸弹 · 负${nBad}）`
+        : `转轮 ×${segments.length}（绿好 / 金超 / 红负${nBad}）`
+    );
     this.audio.PowerSpawn();
   }
 
@@ -4754,7 +4795,9 @@ class Game {
 
     if (r.phase === "result") {
       r.resultT += dt;
-      if (r.resultT >= 1.85) this.CloseRoulette();
+      this.UpdateExplosions(dt);
+      this.UpdateScreenFx(dt);
+      if (r.resultT >= (r.resultHold || 1.85)) this.CloseRoulette();
       return;
     }
 
@@ -4805,6 +4848,10 @@ class Game {
     r.phase = "result";
     r.result = seg;
     r.resultT = 0;
+    r.resultHold = (seg.kind === POWER.apocalypse) ? 2.55
+      : (seg.kind === POWER.nuke) ? 2.05
+        : (seg.kind === POWER.bomb) ? 1.95
+          : 1.85;
     r.omega = 0;
     r.dragging = false;
     this.ApplyPowerup(seg.kind);
@@ -4862,8 +4909,10 @@ class Game {
         this.ShowBuffToast("敌军冻结 16 秒");
         break;
       case POWER.bomb:
-        this.KillAllFieldEnemies();
+        this.PlayBlastFx("bomb");
+        this.KillAllFieldEnemies({ spareBoss: true });
         this.NukeBricks(0.45);
+        this.SpawnBrickDebris(18);
         this.ShowBuffToast("全场爆破 + 掀砖");
         break;
       case POWER.shovel:
@@ -4930,8 +4979,10 @@ class Game {
         this.ShowBuffToast("狙击：高速低坠高伤 12 秒");
         break;
       case POWER.nuke:
-        this.KillAllFieldEnemies();
+        this.PlayBlastFx("nuke");
+        this.KillAllFieldEnemies({ spareBoss: true });
         this.NukeBricks(0.92);
+        this.SpawnBrickDebris(36);
         this.SpawnMeteorRain(6);
         if (p) {
           p.protect = Math.max(p.protect, 10);
@@ -4953,9 +5004,11 @@ class Game {
         this.ShowBuffToast("超武：四联疯射 24 秒！！");
         break;
       case POWER.apocalypse:
+        this.PlayBlastFx("apocalypse");
         this.freezeTimer = 18;
-        this.KillAllFieldEnemies();
+        this.KillAllFieldEnemies({ spareBoss: true });
         this.NukeBricks(0.7);
+        this.SpawnBrickDebris(48);
         this.SpawnMeteorRain(24);
         this.FortifyBase(true);
         this.shovelTimer = Math.max(this.shovelTimer, 16);
@@ -5022,15 +5075,15 @@ class Game {
     this.UpdateHud();
   }
 
-  KillAllFieldEnemies() {
+  KillAllFieldEnemies({ spareBoss = false } = {}) {
     for (const e of this.enemies) {
-      if (e.alive && e.spawnFlash <= 0) {
-        e.hp = 0;
-        e.alive = false;
-        e.deathTimer = 0.01;
-        this.score += e.score;
-        this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1.1);
-      }
+      if (!e.alive || e.spawnFlash > 0) continue;
+      if (spareBoss && e.isBoss) continue;
+      e.hp = 0;
+      e.alive = false;
+      e.deathTimer = 0.01;
+      this.score += e.score;
+      this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1.1);
     }
     this.audio.Explode();
     this.RenderEnemyIcons();
@@ -5253,7 +5306,9 @@ class Game {
       aiTimer: 0.3,
       spawnFlash: type.boss ? 0.6 : 1.0,
       protect: type.boss ? 1.2 : 0,
-      dropsPower: type.boss ? false : (type.id === "armor" || Math.random() < this.GetPowerDropRate()),
+      dropsPower: type.boss
+        ? false
+        : (type.id === "armor" || Math.random() < this.GetPowerDropRate() || (this.isBossStage && Math.random() < 0.35)),
       deathTimer: 0,
       animTick: 0,
       moving: false,
@@ -5267,19 +5322,126 @@ class Game {
       fireIntervalMul: type.fireIntervalMul ?? 1,
       eagleCurseUsed: false,
       finalPhase: false,
+      bossDropMarks: type.boss ? [0.66, 0.33] : null,
       barrelCount: type.barrelCount ?? this.stageData?.barrelCount ?? (type.tankKing ? 4 : 0),
       barrelFlash: Object.fromEntries(DIR_OCTO.map((d) => [d, 0])),
     };
   }
 
-  SpawnExplosion(x, y, scale = 1) {
+  SpawnExplosion(x, y, scale = 1, opts = {}) {
     this.explosions.push({
       x,
       y,
       t: 0,
-      dur: 0.35 + scale * 0.1,
+      dur: opts.dur ?? (0.35 + scale * 0.1),
       scale,
+      ring: !!opts.ring,
+      flash: !!opts.flash,
     });
+  }
+
+  /** NES-flavored ultra blast: shake + frame flash + sheet explosion rings + brick chips. */
+  PlayBlastFx(kind = "nuke") {
+    const spec = {
+      bomb: { dur: 1.05, shake: 8, rings: 2, blastN: 10, flashFrames: 10 },
+      nuke: { dur: 1.65, shake: 14, rings: 4, blastN: 18, flashFrames: 16 },
+      apocalypse: { dur: 2.35, shake: 18, rings: 6, blastN: 28, flashFrames: 22 },
+    }[kind] || { dur: 1.4, shake: 12, rings: 3, blastN: 14, flashFrames: 14 };
+
+    this.screenFx = {
+      kind,
+      t: 0,
+      dur: spec.dur,
+      shake: spec.shake,
+      flashFrames: spec.flashFrames,
+    };
+
+    const cx = CANVAS_W * 0.5;
+    const cy = CANVAS_H * 0.42;
+    // Core bloom — classic 3-frame sheet explosions stacked.
+    this.SpawnExplosion(cx, cy, 2.4, { dur: 0.55, flash: true });
+    this.SpawnExplosion(cx - 18, cy + 8, 1.6, { dur: 0.5 });
+    this.SpawnExplosion(cx + 18, cy + 8, 1.6, { dur: 0.5 });
+
+    for (let ring = 0; ring < spec.rings; ring++) {
+      const n = 6 + ring * 2;
+      const rad = 36 + ring * 34;
+      for (let i = 0; i < n; i++) {
+        const ang = (i / n) * Math.PI * 2 + ring * 0.22;
+        this.fxBlastQueue.push({
+          delay: 0.05 + ring * 0.09 + i * 0.012,
+          x: cx + Math.cos(ang) * rad,
+          y: cy + Math.sin(ang) * rad * 0.72,
+          scale: 1.15 + ring * 0.18,
+          ring: true,
+        });
+      }
+    }
+
+    // Scattered secondary pops across the playfield.
+    for (let i = 0; i < spec.blastN; i++) {
+      this.fxBlastQueue.push({
+        delay: 0.12 + Math.random() * (spec.dur * 0.55),
+        x: 20 + Math.random() * (CANVAS_W - 40),
+        y: 24 + Math.random() * (CANVAS_H - 60),
+        scale: 0.7 + Math.random() * 1.1,
+      });
+    }
+  }
+
+  SpawnBrickDebris(count = 24) {
+    if (!this.fxDebris) this.fxDebris = [];
+    const colors = ["#b05028", "#d87838", "#804020", "#e8a050", "#603018"];
+    for (let i = 0; i < count; i++) {
+      const x = 16 + Math.random() * (CANVAS_W - 32);
+      const y = 24 + Math.random() * (CANVAS_H * 0.7);
+      const s = 3 + Math.floor(Math.random() * 5);
+      this.fxDebris.push({
+        x,
+        y,
+        w: s,
+        h: s,
+        vx: (Math.random() - 0.5) * 220,
+        vy: -80 - Math.random() * 160,
+        life: 0.55 + Math.random() * 0.7,
+        ttl: 0.55 + Math.random() * 0.7,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      });
+    }
+  }
+
+  UpdateScreenFx(dt) {
+    if (this.fxBlastQueue?.length) {
+      const keep = [];
+      for (const blast of this.fxBlastQueue) {
+        blast.delay -= dt;
+        if (blast.delay <= 0) {
+          this.SpawnExplosion(blast.x, blast.y, blast.scale, {
+            dur: 0.32 + blast.scale * 0.08,
+            ring: blast.ring,
+          });
+        } else {
+          keep.push(blast);
+        }
+      }
+      this.fxBlastQueue = keep;
+    }
+
+    if (this.fxDebris?.length) {
+      for (const d of this.fxDebris) {
+        d.ttl -= dt;
+        d.vy += 420 * dt;
+        d.x += d.vx * dt;
+        d.y += d.vy * dt;
+        d.vx *= 0.985;
+      }
+      this.fxDebris = this.fxDebris.filter((d) => d.ttl > 0 && d.y < CANVAS_H + 20);
+    }
+
+    if (this.screenFx) {
+      this.screenFx.t += dt;
+      if (this.screenFx.t >= this.screenFx.dur) this.screenFx = null;
+    }
   }
 
   UpdateExplosions(dt) {
@@ -5393,6 +5555,16 @@ class Game {
       return;
     }
 
+    ctx.save();
+    if (this.screenFx) {
+      const u = Clamp(1 - this.screenFx.t / this.screenFx.dur, 0, 1);
+      const amp = this.screenFx.shake * u;
+      // Integer pixel shake — keeps the NES nearest-neighbor look.
+      const sx = Math.round((Math.random() * 2 - 1) * amp);
+      const sy = Math.round((Math.random() * 2 - 1) * amp * 0.75);
+      ctx.translate(sx, sy);
+    }
+
     this.DrawGround(ctx);
     this.DrawTiles(ctx, false); // non-grass
     this.DrawBase(ctx);
@@ -5410,6 +5582,9 @@ class Game {
     for (const b of this.bullets) this.DrawBullet(ctx, b);
     this.DrawTiles(ctx, true); // grass on top
     for (const ex of this.explosions) this.DrawExplosion(ctx, ex);
+    this.DrawFxDebris(ctx);
+    this.DrawScreenFxOverlay(ctx);
+    ctx.restore();
 
     // gravity hint arc when aiming sideways/up (playing only)
     if (this.state === "playing" && this.player?.alive) this.DrawAimGhost(ctx);
@@ -6645,8 +6820,94 @@ class Game {
     const frames = FX_SHEET.explosion;
     const idx = Math.min(frames.length - 1, Math.floor((ex.t / ex.dur) * frames.length));
     const [gx, gy] = frames[idx];
-    const size = 28 * ex.scale + 20 * (ex.t / ex.dur);
+    const grow = ex.t / Math.max(0.001, ex.dur);
+    const size = 28 * ex.scale + 20 * grow;
     this.BlitGrid(ctx, gx, gy, ex.x - size / 2, ex.y - size / 2, size, size);
+
+    // Extra NES pop: hard white core + pixel shock ring on big blasts.
+    if (ex.flash || ex.scale >= 1.6) {
+      const pulse = 1 - grow;
+      ctx.save();
+      ctx.globalAlpha = 0.55 * pulse;
+      ctx.fillStyle = grow < 0.35 ? "#ffffff" : "#ffe060";
+      const core = Math.max(4, size * 0.18);
+      ctx.fillRect(Math.round(ex.x - core / 2), Math.round(ex.y - core / 2), Math.round(core), Math.round(core));
+      if (ex.ring || ex.scale >= 2) {
+        ctx.globalAlpha = 0.4 * pulse;
+        ctx.strokeStyle = "#ffd040";
+        ctx.lineWidth = 2;
+        const r = size * (0.55 + grow * 0.55);
+        ctx.strokeRect(Math.round(ex.x - r / 2), Math.round(ex.y - r / 2), Math.round(r), Math.round(r));
+      }
+      ctx.restore();
+    }
+  }
+
+  DrawFxDebris(ctx) {
+    if (!this.fxDebris?.length) return;
+    for (const d of this.fxDebris) {
+      ctx.globalAlpha = Clamp(d.ttl / Math.max(0.05, d.life), 0, 1);
+      ctx.fillStyle = d.color;
+      ctx.fillRect(Math.round(d.x), Math.round(d.y), d.w, d.h);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Full-screen NES flash frames + expanding pixel shock squares. */
+  DrawScreenFxOverlay(ctx) {
+    const fx = this.screenFx;
+    if (!fx) return;
+    const u = fx.t / Math.max(0.001, fx.dur);
+    const early = fx.t < (fx.flashFrames || 12) / 60;
+
+    if (early || (u < 0.45 && Math.floor(this.frame / 2) % 2 === 0)) {
+      ctx.save();
+      const hot = fx.kind === "apocalypse" ? "#fff2a0" : (fx.kind === "nuke" ? "#fff8d0" : "#ffffff");
+      ctx.globalAlpha = early ? 0.55 : 0.22 * (1 - u / 0.45);
+      ctx.fillStyle = hot;
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      // Checker bands — reads like old CRT wipe, not a soft bloom.
+      ctx.globalAlpha *= 0.55;
+      ctx.fillStyle = "#000";
+      for (let y = 0; y < CANVAS_H; y += 8) {
+        if (((y / 8) + this.frame) % 2 === 0) ctx.fillRect(0, y, CANVAS_W, 2);
+      }
+      ctx.restore();
+    }
+
+    // Expanding pixel rings from center.
+    if (u < 0.7) {
+      const cx = CANVAS_W * 0.5;
+      const cy = CANVAS_H * 0.42;
+      const rings = fx.kind === "apocalypse" ? 4 : (fx.kind === "nuke" ? 3 : 2);
+      ctx.save();
+      for (let i = 0; i < rings; i++) {
+        const progress = Clamp((fx.t - i * 0.08) / 0.55, 0, 1);
+        if (progress <= 0 || progress >= 1) continue;
+        const r = 20 + progress * (110 + i * 28);
+        ctx.globalAlpha = 0.55 * (1 - progress);
+        ctx.strokeStyle = i % 2 === 0 ? "#ffe060" : "#ff8040";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(Math.round(cx - r), Math.round(cy - r * 0.7), Math.round(r * 2), Math.round(r * 1.4));
+      }
+      ctx.restore();
+    }
+
+    // Caption stamp during ultra blasts.
+    if (u < 0.55 && (fx.kind === "nuke" || fx.kind === "apocalypse" || fx.kind === "bomb")) {
+      const label = fx.kind === "apocalypse" ? "天罚" : (fx.kind === "nuke" ? "核爆" : "爆破");
+      ctx.save();
+      ctx.globalAlpha = 0.9 * (1 - u / 0.55);
+      ctx.fillStyle = "#000";
+      ctx.font = `18px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      const tw = ctx.measureText(label).width + 24;
+      ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H * 0.18, tw, 28);
+      ctx.fillStyle = fx.kind === "bomb" ? "#ffe08a" : "#ff6040";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, CANVAS_W / 2, CANVAS_H * 0.18 + 14);
+      ctx.restore();
+    }
   }
 }
 
