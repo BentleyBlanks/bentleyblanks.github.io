@@ -3251,6 +3251,8 @@ class Game {
       attackAge: 0,
       castFace: "down",
       isBoss: !!type.boss,
+      eagleCurseUsed: false,
+      finalPhase: false,
     };
   }
 
