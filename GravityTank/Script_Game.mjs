@@ -4573,17 +4573,17 @@ class Game {
     const rad = r.radius;
     const bannerH = touch ? 44 : 28;
     const bannerY = touch ? 8 : 10;
-    const labelPx = touch ? 16 : 11;
-    const bannerPx = touch ? 18 : 12;
-    const hintPx = touch ? 14 : 10;
-    const legendPx = touch ? 13 : 9;
+    const labelPx = touch ? 18 : 14;
+    const bannerPx = touch ? 18 : 13;
+    const hintPx = touch ? 14 : 11;
+    const legendPx = touch ? 13 : 10;
     const hubR = touch ? 22 : 16;
     const hubPx = touch ? 15 : 11;
 
     const muted = (tier, focusSeg) => {
-      if (tier === "good") return focusSeg ? "rgba(56,120,78,0.95)" : "rgba(42,92,62,0.92)";
-      if (tier === "ultra") return focusSeg ? "rgba(176,140,56,0.95)" : "rgba(148,116,44,0.92)";
-      return focusSeg ? "rgba(148,64,64,0.95)" : "rgba(118,52,52,0.92)";
+      if (tier === "good") return focusSeg ? "rgba(48,140,88,0.97)" : "rgba(28,88,52,0.94)";
+      if (tier === "ultra") return focusSeg ? "rgba(188,148,40,0.97)" : "rgba(120,88,24,0.94)";
+      return focusSeg ? "rgba(168,56,56,0.97)" : "rgba(112,36,36,0.94)";
     };
 
     ctx.imageSmoothingEnabled = false;
@@ -4655,24 +4655,37 @@ class Game {
       ctx.stroke();
     }
 
-    // Labels sit in wedge midpoints (same math as RouletteIndexAtNeedle).
+    // Labels: screen-upright at wedge midpoints (no radial spin — CJK stays readable).
     for (let i = 0; i < n; i++) {
       const seg = segs[i];
       const mid = i * slice + slice * 0.5;
       const isFocus = i === needleIdx;
+      const dist = rad * (touch ? 0.62 : 0.64);
+      const lx = Math.cos(mid) * dist;
+      const ly = Math.sin(mid) * dist;
       ctx.save();
-      ctx.rotate(mid);
-      const tx = rad * (touch ? 0.58 : 0.62);
-      ctx.font = `${labelPx}px ${PIXEL_FONT}`;
+      ctx.translate(lx, ly);
+      // Cancel wheel rotation so glyph baselines stay horizontal on screen.
+      ctx.rotate(-r.angle);
+      ctx.font = `bold ${labelPx}px ${PIXEL_FONT}`;
       const textW = ctx.measureText(seg.label).width;
-      const tw = Math.max(touch ? 40 : 28, textW + (touch ? 14 : 8));
-      const th = touch ? 22 : 14;
-      ctx.fillStyle = isFocus ? "rgba(0,0,0,0.82)" : "rgba(0,0,0,0.62)";
-      ctx.fillRect(tx - tw / 2, -th / 2, tw, th);
-      ctx.fillStyle = isFocus ? "#fff4d0" : "#f0f0f0";
+      const padX = touch ? 8 : 6;
+      const tw = Math.max(touch ? 44 : 32, textW + padX * 2);
+      const th = touch ? 24 : 18;
+      ctx.fillStyle = isFocus ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.84)";
+      ctx.fillRect(-tw / 2, -th / 2, tw, th);
+      ctx.strokeStyle = isFocus ? (seg.rim || seg.color) : "rgba(255,255,255,0.35)";
+      ctx.lineWidth = isFocus ? 2 : 1;
+      ctx.strokeRect(-tw / 2 + 0.5, -th / 2 + 0.5, tw - 1, th - 1);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(seg.label, tx, 0.5);
+      // Hard black outline then bright fill — readable on green/gold/red wedges.
+      ctx.lineWidth = touch ? 4 : 3;
+      ctx.strokeStyle = "#000";
+      ctx.lineJoin = "round";
+      ctx.strokeText(seg.label, 0, 1);
+      ctx.fillStyle = isFocus ? "#fff8d0" : "#ffffff";
+      ctx.fillText(seg.label, 0, 1);
       ctx.restore();
     }
 
