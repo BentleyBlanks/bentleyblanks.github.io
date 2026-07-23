@@ -4,6 +4,7 @@
  */
 
 import { STAGE_COUNT, GetStage, IsTutorialStage, TUTORIAL_STAGE } from "./Data_Stages.mjs";
+import { STAGE_UPGRADES, BOSS_UPGRADES, PickUpgradeCards, FindUpgrade } from "./Data_Upgrades.mjs";
 
 const DIFFICULTY = {
   easy: "easy",
@@ -573,6 +574,10 @@ class Game {
       endMessage: document.getElementById("endMessage"),
       endPrimary: document.getElementById("restartButton"),
       endSecondary: document.getElementById("nextStageButton"),
+      upgrade: document.getElementById("upgradeOverlay"),
+      upgradeTitle: document.getElementById("upgradeTitle"),
+      upgradeBlurb: document.getElementById("upgradeBlurb"),
+      upgradeCards: document.getElementById("upgradeCards"),
     };
     this.touchUi = {
       stickWrap: document.getElementById("touchStickWrap"),
@@ -601,6 +606,12 @@ class Game {
     this.difficulty = DIFFICULTY.normal;
     this.debugGodMode = false;
     this.debugPanelOpen = false;
+    this.stagePerk = null; // active this stage only
+    this.pendingStagePerk = null; // chosen after clear, applied on next StartGame
+    this.runPerks = []; // permanent after boss until campaign ends
+    this.meteorPulseTimer = 0;
+    this.timeRiftCd = 0;
+    this.upgradePick = null; // { special, cards, resumeAction }
     this.stage = 1;
     this.stageData = GetStage(1);
     this.isTutorial = false;
@@ -841,7 +852,7 @@ class Game {
     if (this.touchUi.stickWrap) this.touchUi.stickWrap.hidden = !show;
     if (this.touchUi.actionsWrap) this.touchUi.actionsWrap.hidden = !show;
     // Immersive mobile chrome: hide long marketing/side panels so portrait fits one screen.
-    const immersive = this.isTouchDevice && ["playing", "paused", "roulette", "stageIntro", "won", "lost"].includes(this.state);
+    const immersive = this.isTouchDevice && ["playing", "paused", "roulette", "stageIntro", "won", "lost", "upgrade"].includes(this.state);
     document.body.classList.toggle("is-touch-play", immersive);
     document.body.classList.toggle("is-portrait", window.matchMedia("(orientation: portrait)").matches);
     // Lock page gestures while the virtual stick is live — critical on iOS Safari.
@@ -1214,6 +1225,10 @@ class Game {
     this.audio.Ensure();
     if (this.state === "roulette") this.CloseRoulette();
     if (this.state === "paused") this.SetPaused(false);
+    if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
+    this.upgradePick = null;
+    this.pendingStagePerk = null;
+    this.stagePerk = null;
     const keepPlaying = !["ready", "boot"].includes(this.state);
     const stage = IsTutorialStage(stageId) ? 0 : Math.max(1, Math.min(STAGE_COUNT, stageId | 0));
     this.StartGame({
@@ -1374,6 +1389,11 @@ class Game {
   StartCampaign() {
     this.score = 0;
     this.lives = this.GetStartLives();
+    this.stagePerk = null;
+    this.pendingStagePerk = null;
+    this.runPerks = [];
+    this.meteorPulseTimer = 0;
+    this.timeRiftCd = 0;
     this.StartGame({ stage: 0, keepStats: false });
   }
 
@@ -1393,13 +1413,96 @@ class Game {
   }
 
   HandleEndPrimary() {
-    if (this.endAction === "next") this.AdvanceStage();
-    else if (this.endAction === "retry") this.StartGame({ stage: this.isTutorial ? 0 : this.stage, keepStats: false, keepScore: false, keepLives: false });
-    else this.StartCampaign();
+    if (this.endAction === "next") {
+      if (this.ShouldOfferUpgrade()) {
+        this.OpenUpgradePick({ special: this.isBossStage });
+        return;
+      }
+      this.AdvanceStage();
+    } else if (this.endAction === "retry") {
+      this.StartGame({ stage: this.isTutorial ? 0 : this.stage, keepStats: false, keepScore: false, keepLives: false });
+    } else {
+      this.StartCampaign();
+    }
+  }
+
+  ShouldOfferUpgrade() {
+    if (this.isTutorial) return false;
+    if (this.endAction !== "next") return false;
+    // Campaign clear uses restart — no pick. Mid-run next-stage clears offer cards.
+    return this.stage < STAGE_COUNT || this.isBossStage;
+  }
+
+  OpenUpgradePick({ special = false } = {}) {
+    const overlay = this.overlays.upgrade;
+    const cardsRoot = this.overlays.upgradeCards;
+    if (!overlay || !cardsRoot) {
+      this.AdvanceStage();
+      return;
+    }
+    this.state = "upgrade";
+    this.overlays.end.hidden = true;
+    const pool = special ? BOSS_UPGRADES : STAGE_UPGRADES;
+    // Avoid offering boss perks already owned.
+    const filtered = special
+      ? pool.filter((u) => !this.runPerks.includes(u.id))
+      : pool.slice();
+    const cards = PickUpgradeCards(filtered.length ? filtered : pool, 3);
+    this.upgradePick = { special, cards };
+    if (this.overlays.upgradeTitle) {
+      this.overlays.upgradeTitle.textContent = special ? "Boss 特殊能力" : "关卡升级";
+    }
+    if (this.overlays.upgradeBlurb) {
+      this.overlays.upgradeBlurb.textContent = special
+        ? "三选一：永久能力，带到本局通关结束。"
+        : "三选一：本关有效（仅下一关）。";
+    }
+    cardsRoot.innerHTML = "";
+    for (const card of cards) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `upgrade-card${special ? " is-special" : ""}`;
+      btn.innerHTML =
+        `<span class="upgrade-tag">${card.tag}</span>` +
+        `<span class="upgrade-name">${card.title}</span>` +
+        `<span class="upgrade-desc">${card.desc}</span>`;
+      btn.addEventListener("click", () => this.ConfirmUpgradePick(card.id));
+      cardsRoot.appendChild(btn);
+    }
+    overlay.hidden = false;
+    this.SyncTouchControlsVisibility();
+  }
+
+  ConfirmUpgradePick(id) {
+    const pick = this.upgradePick;
+    if (!pick) return;
+    if (pick.special) {
+      if (!this.runPerks.includes(id)) this.runPerks.push(id);
+      this.stagePerk = null; // boss pick does not refresh 本关卡
+      this.ShowBuffToast(`永久能力：${FindUpgrade(id)?.title || id}`);
+    } else {
+      this.pendingStagePerk = id;
+      this.ShowBuffToast(`本关强化：${FindUpgrade(id)?.title || id}`);
+    }
+    this.upgradePick = null;
+    if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
+    this.AdvanceStage();
+  }
+
+  HasPerk(id) {
+    return this.stagePerk === id || this.runPerks.includes(id);
+  }
+
+  ActivePerkIds() {
+    const ids = this.runPerks.slice();
+    if (this.stagePerk) ids.push(this.stagePerk);
+    return ids;
   }
 
   StartGame({ stage = 1, keepStats = false, keepScore = false, keepLives = false } = {}) {
+    const prevStageKey = this.isTutorial ? 0 : this.stage;
     this.ApplyStageMeta(stage);
+    const newStageKey = this.isTutorial ? 0 : this.stage;
     this.map = BuildStageMap(this.isTutorial ? 0 : this.stage);
     this.brickMask = BuildBrickMask(this.map);
     this.bullets = [];
@@ -1408,6 +1511,14 @@ class Game {
     this.enemies = [];
     if (!keepScore) this.score = 0;
     if (!keepLives) this.lives = this.GetStartLives();
+    // 普通升级：本关有效。过关时选卡 → pending → 进入下一关生效；
+    // Boss 永久卡不写 pending，换关时清掉上一关的本关强化。重试同关则保留。
+    if (this.pendingStagePerk != null) {
+      this.stagePerk = this.pendingStagePerk;
+      this.pendingStagePerk = null;
+    } else if (newStageKey !== prevStageKey) {
+      this.stagePerk = null;
+    }
     this.enemiesRemaining = this.totalEnemies;
     this.spawnTimer = 0.2;
     this.freezeTimer = 0;
@@ -1443,6 +1554,7 @@ class Game {
     this.overlays.start.hidden = true;
     this.overlays.pause.hidden = true;
     this.overlays.end.hidden = true;
+    if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
     if (this.overlays.endSecondary) this.overlays.endSecondary.hidden = true;
     this.ResetTouchInput();
     this.SyncTouchControlsVisibility();
@@ -1507,15 +1619,43 @@ class Game {
       if (last) last.spawnFlash = 0;
     }
     this.spawnTimer = this.isTutorial ? 2.4 : (this.isBossStage ? 99 : 1.2);
+    this.ApplyStageStartPerks();
     if (this.isTutorial) {
       this.ShowBuffToast("注意：向上射出的炮弹会落回，能打死自己！");
     } else if (this.isBossStage) {
-      this.ShowBuffToast("BOSS：重力巨炮 — 躲避弹幕！");
+      const perk = FindUpgrade(this.stagePerk);
+      this.ShowBuffToast(
+        perk ? `BOSS · 本关强化：${perk.title}` : "BOSS：重力巨炮 — 躲避弹幕！"
+      );
+    } else {
+      const perk = FindUpgrade(this.stagePerk);
+      if (perk) this.ShowBuffToast(`本关强化：${perk.title}`);
     }
     this.UpdateHud();
     this.RenderEnemyIcons();
     this.SyncTouchControlsVisibility();
     this.audio.StartBgm();
+  }
+
+  ApplyStageStartPerks() {
+    const p = this.player;
+    if (!p?.alive) return;
+    if (this.HasPerk("multiShot")) {
+      p.maxBullets = Math.max(p.maxBullets, (p.power >= 2 ? 2 : 1) + 1);
+    }
+    if (this.HasPerk("longerShield")) {
+      p.protect = Math.max(p.protect, SPAWN_PROTECT * 1.85);
+    }
+    if (this.HasPerk("phaseGhost")) {
+      this.ghostTimer = Math.max(this.ghostTimer, 10);
+    }
+    if (this.HasPerk("fortressWill")) {
+      this.shovelTimer = Math.max(this.shovelTimer, 14);
+      this.pendingFortRestore = false;
+      this.FortifyBase(true);
+    }
+    this.meteorPulseTimer = this.HasPerk("meteorPulse") ? 9 : 0;
+    this.timeRiftCd = 0;
   }
 
   BuildSpawnQueue() {
@@ -1625,6 +1765,15 @@ class Game {
     if (this.enemyRageTimer > 0) this.enemyRageTimer -= dt;
     if (this.playerStunTimer > 0) this.playerStunTimer -= dt;
     if (this.playerDisarmTimer > 0) this.playerDisarmTimer -= dt;
+    if (this.timeRiftCd > 0) this.timeRiftCd -= dt;
+    if (this.HasPerk("meteorPulse") && this.state === "playing") {
+      this.meteorPulseTimer -= dt;
+      if (this.meteorPulseTimer <= 0) {
+        this.meteorPulseTimer = 11;
+        this.SpawnMeteorRain(5);
+        this.ShowBuffToast("陨石协议触发");
+      }
+    }
     if (this.playerEagleTimer > 0) {
       this.playerEagleTimer -= dt;
       if (this.playerEagleTimer <= 0) {
@@ -2234,6 +2383,7 @@ class Game {
     if (isPlayer && this.overdriveTimer > 0) maxB = Math.max(maxB, 4);
     if (isPlayer && this.rapidTimer > 0) maxB = Math.max(maxB, 3);
     if (isPlayer && (this.forkTimer > 0 || this.spreadTimer > 0)) maxB = Math.max(maxB, 5);
+    if (isPlayer && this.HasPerk("multiShot")) maxB = Math.max(maxB, tank.maxBullets);
     if (owned >= maxB) return;
 
     this.SpawnShell(tank, tank.dir, isPlayer);
@@ -2243,14 +2393,21 @@ class Game {
     } else if (isPlayer && this.spreadTimer > 0) {
       this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: -0.55 });
       this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: 0.55 });
+    } else if (isPlayer && this.HasPerk("overloadFan") && Math.random() < 0.28) {
+      this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: -0.42 });
+      this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: 0.42 });
     }
     if (isPlayer && this.mirrorTimer > 0) {
+      const opp = { up: "down", down: "up", left: "right", right: "left" }[tank.dir];
+      this.SpawnShell(tank, opp, true, { bonusShot: true });
+    } else if (isPlayer && this.HasPerk("mirrorShot")) {
       const opp = { up: "down", down: "up", left: "right", right: "left" }[tank.dir];
       this.SpawnShell(tank, opp, true, { bonusShot: true });
     }
     if (isPlayer && this.rapidTimer > 0) tank.fireCd = 0.045;
     else if (isPlayer && this.overdriveTimer > 0) tank.fireCd = 0.07;
     else if (isPlayer && this.sniperTimer > 0) tank.fireCd = 0.42;
+    else if (isPlayer && this.HasPerk("rapidFire")) tank.fireCd = tank.power >= 2 ? 0.12 : 0.18;
     else tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd * (this.enemyRageTimer > 0 ? 0.55 : 1);
     this.audio.Shoot();
   }
@@ -2261,6 +2418,7 @@ class Game {
     if (isPlayer && tank.power >= 2) speedMul *= 1.12;
     if (isPlayer && this.sniperTimer > 0) speedMul *= 1.55;
     if (isPlayer && this.rapidTimer > 0) speedMul *= 1.1;
+    if (isPlayer && this.HasPerk("bulletSpeed")) speedMul *= 1.22;
     const speed = BULLET_SPEED * (tank.bulletBoost || 1) * speedMul;
     let vx = d.x * speed;
     let vy = d.y * speed;
@@ -2282,9 +2440,13 @@ class Game {
     if (isPlayer && this.antigravTimer > 0) gravityMul = -0.35;
     if (isPlayer && this.heavyCurseTimer > 0) gravityMul *= 2.6;
     if (isPlayer && this.sniperTimer > 0) gravityMul *= 0.45;
-    const bounceLeft = isPlayer && this.bounceTimer > 0 ? 5 : 0;
-    const homing = isPlayer && this.magnetTimer > 0;
-    const pierceLeft = isPlayer && this.pierceTimer > 0 ? 3 : 0;
+    if (isPlayer && this.HasPerk("lightGravity")) gravityMul *= 0.55;
+    if (!isPlayer && this.HasPerk("enemyAnchor")) gravityMul *= 1.5;
+    let bounceLeft = isPlayer && this.bounceTimer > 0 ? 5 : 0;
+    if (isPlayer && this.HasPerk("bounceShell")) bounceLeft = Math.max(bounceLeft, 2);
+    const homing = (isPlayer && this.magnetTimer > 0) || (isPlayer && this.HasPerk("huntMark"));
+    let pierceLeft = isPlayer && this.pierceTimer > 0 ? 3 : 0;
+    if (isPlayer && this.HasPerk("pierceShell")) pierceLeft = Math.max(pierceLeft, 1);
 
     this.bullets.push({
       x: cx - 4 + d.x * 14,
@@ -2399,9 +2561,24 @@ class Game {
           // still leaving the barrel
         } else if (RectsOverlap(b, this.player)) {
           b.alive = false;
-          if (this.player.protect > 0) {
+          if (isOwnShell && this.HasPerk("noSelfHit")) {
+            this.SpawnExplosion(b.x, b.y, 0.35);
+            this.audio.Bounce();
+          } else if (this.player.protect > 0) {
             this.SpawnExplosion(b.x, b.y, 0.5);
             this.audio.Bounce();
+          } else if (
+            this.HasPerk("timeRift") &&
+            this.timeRiftCd <= 0 &&
+            this.playerEagleTimer <= 0 &&
+            !this.player.asEagle
+          ) {
+            this.timeRiftCd = 12;
+            this.freezeTimer = Math.max(this.freezeTimer, 2.5);
+            this.player.protect = Math.max(this.player.protect, 1.4);
+            this.SpawnExplosion(b.x, b.y, 0.6);
+            this.ShowBuffToast("时间裂缝！敌军冻结");
+            this.audio.Power();
           } else {
             this.KillPlayer();
           }
@@ -3291,6 +3468,8 @@ class Game {
   EndGame(won, message, action = "restart") {
     this.state = won ? "won" : "lost";
     this.endAction = won ? action : "retry";
+    if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
+    this.upgradePick = null;
     this.overlays.end.hidden = false;
     this.overlays.endTitle.textContent = won
       ? (this.isTutorial
@@ -3302,7 +3481,9 @@ class Game {
     this.overlays.endMessage.textContent = message;
     if (this.overlays.endPrimary) {
       this.overlays.endPrimary.textContent = won
-        ? (action === "next" ? (this.isTutorial ? "进入战役" : "下一关") : "再来一局")
+        ? (action === "next"
+          ? (this.isTutorial ? "进入战役" : (this.isBossStage ? "选择永久能力" : "选择升级"))
+          : "再来一局")
         : "重试本关";
     }
     if (this.overlays.endSecondary) {
@@ -3946,6 +4127,14 @@ class Game {
     if (this.playerDisarmTimer > 0) chips.push({ t: `拆炮 ${Math.ceil(this.playerDisarmTimer)}`, c: "#ff6060" });
     if (this.playerEagleTimer > 0) chips.push({ t: `老鹰 ${Math.ceil(this.playerEagleTimer)}`, c: "#ff3030" });
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
+    if (this.stagePerk) {
+      const u = FindUpgrade(this.stagePerk);
+      if (u) chips.push({ t: `本关·${u.title}`, c: "#70ff98" });
+    }
+    for (const id of this.runPerks) {
+      const u = FindUpgrade(id);
+      if (u) chips.push({ t: `永久·${u.title}`, c: "#ffe060" });
+    }
 
     let x = 6;
     ctx.font = "bold 10px monospace";

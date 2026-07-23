@@ -396,6 +396,73 @@ button.primary:active {
   box-shadow: 0 2px 0 #401008;
 }
 
+.upgrade-overlay {
+  gap: 12px;
+  padding: 16px 12px;
+}
+
+.upgrade-overlay p {
+  max-width: 40ch;
+}
+
+.upgrade-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(340px, 100%);
+}
+
+.upgrade-card {
+  appearance: none;
+  text-align: left;
+  border: 3px solid #707070;
+  background: #141414;
+  color: #e8e8e8;
+  font: inherit;
+  padding: 10px 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 3px 0 #000;
+}
+
+.upgrade-card:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #000;
+}
+
+.upgrade-card.is-special {
+  border-color: #f0d060;
+  background: #2a1808;
+}
+
+.upgrade-card .upgrade-tag {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 0.34rem;
+  letter-spacing: 0.08em;
+  color: #70ff98;
+  text-transform: uppercase;
+}
+
+.upgrade-card.is-special .upgrade-tag {
+  color: #ffe060;
+}
+
+.upgrade-card .upgrade-name {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.48rem;
+  color: #fff8e0;
+  letter-spacing: 0.06em;
+}
+
+.upgrade-card .upgrade-desc {
+  display: block;
+  font-size: 0.36rem;
+  line-height: 1.6;
+  color: #b0b0b0;
+}
+
 .side {
   display: flex;
   flex-direction: column;
