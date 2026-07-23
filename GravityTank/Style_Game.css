@@ -83,6 +83,80 @@ body {
   box-shadow:
     inset 0 0 0 2px #303030,
     0 0 0 2px #000;
+  cursor: pointer;
+}
+
+.debug-panel {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 40;
+  width: min(220px, calc(100vw - 24px));
+  background:
+    linear-gradient(#1c1c1c, #1c1c1c) padding-box,
+    linear-gradient(135deg, #c0c0c0, #505050 40%, #202020) border-box;
+  border: 3px solid transparent;
+  box-shadow: 0 8px 0 #000, inset 0 0 0 1px #101010;
+  padding: 8px;
+  font-family: "Press Start 2P", monospace;
+}
+
+.debug-panel[hidden] { display: none !important; }
+
+.debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #f0d060;
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+}
+
+.debug-close {
+  appearance: none;
+  border: 2px solid #808080;
+  background: #303030;
+  color: #fff;
+  font: inherit;
+  font-size: 0.55rem;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.debug-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.debug-body button {
+  appearance: none;
+  border: 2px solid #707070;
+  background: #101010;
+  color: #e8e8e8;
+  font: inherit;
+  font-size: 0.38rem;
+  letter-spacing: 0.04em;
+  padding: 8px 4px;
+  min-height: 34px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.debug-body button.is-on {
+  border-color: #70ff98;
+  color: #70ff98;
+  background: #0c2818;
+}
+
+.debug-status {
+  margin: 8px 0 0;
+  color: #808080;
+  font-size: 0.34rem;
+  line-height: 1.5;
 }
 
 .brand {
