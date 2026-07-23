@@ -110,6 +110,7 @@ const POWER = {
   enemyRage: "enemyRage",
   softStun: "softStun",
   fortBreak: "fortBreak",
+  eagleStroll: "eagleStroll",
   // Hit-charge armor (survives N lethal hits)
   plates: "plates",
   bastion: "bastion",
@@ -162,6 +163,7 @@ const ROULETTE_POOL = [
   MakeSeg(POWER.enemyRage, "狂暴", "bad"),
   MakeSeg(POWER.softStun, "眩晕", "bad"),
   MakeSeg(POWER.fortBreak, "破堡", "bad"),
+  MakeSeg(POWER.eagleStroll, "遛鹰", "bad"),
 ];
 
 const ROULETTE_SIZE = 10;
@@ -751,6 +753,7 @@ class Game {
     this.playerEagleTimer = 0;
     this.eagleWarnT = 0;
     this.eagleMorph = null;
+    this.eagleStroll = null;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -816,6 +819,26 @@ class Game {
     const cell = POWER_SHEET[kind];
     if (cell) {
       this.BlitGrid(ctx, cell[0], cell[1], cx - size / 2, cy - size / 2, size, size);
+      return true;
+    }
+    // Roulette badges without dedicated art — draw classic eagle for 遛鹰.
+    if (kind === POWER.eagleStroll) {
+      const [gx, gy] = TILE_SHEET.baseAlive;
+      this.BlitGrid(ctx, gx, gy, cx - size / 2, cy - size / 2, size, size, 2, 2);
+      return true;
+    }
+    if (kind === POWER.softStun || kind === POWER.fortBreak) {
+      ctx.fillStyle = "#380808";
+      ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+      ctx.strokeStyle = "#ff6060";
+      ctx.strokeRect(cx - size / 2 + 0.5, cy - size / 2 + 0.5, size - 1, size - 1);
+      ctx.fillStyle = "#ff8080";
+      ctx.font = `${Math.max(8, size * 0.45)}px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(kind === POWER.softStun ? "眩" : "堡", cx, cy + 1);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
       return true;
     }
     return false;
@@ -1788,6 +1811,7 @@ class Game {
     this.playerEagleTimer = 0;
     this.eagleWarnT = 0;
     this.eagleMorph = null;
+    this.eagleStroll = null;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -2110,6 +2134,9 @@ class Game {
     }
     if (this.eagleMorph) {
       this.UpdateEagleMorph(dt);
+    }
+    if (this.eagleStroll) {
+      this.UpdateEagleStroll(dt);
     }
     if (this.playerEagleTimer > 0 && !this.eagleMorph) {
       this.playerEagleTimer -= dt;
@@ -3807,6 +3834,7 @@ class Game {
       // Flush against a remaining half-brick: resolve before the first step can tunnel.
       if (this.BulletHitTerrain(b)) continue;
       if (this.BulletHitCarryables(b)) continue;
+      if (this.BulletHitEagleStroll(b)) continue;
 
       const stepX = b.vx * dt;
       const stepY = b.vy * dt;
@@ -3819,7 +3847,7 @@ class Game {
       for (let i = 1; i <= subCount; i++) {
         b.x = prevX + stepX * (i / subCount);
         b.y = prevY + stepY * (i / subCount);
-        if (this.BulletHitTerrain(b) || this.BulletHitCarryables(b)) {
+        if (this.BulletHitTerrain(b) || this.BulletHitCarryables(b) || this.BulletHitEagleStroll(b)) {
           hitSolid = true;
           break;
         }
@@ -4167,6 +4195,7 @@ class Game {
   DestroyBase() {
     if (!this.baseAlive) return;
     this.baseAlive = false;
+    this.eagleStroll = null;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         if (this.map[y][x] === TILE_BASE) this.map[y][x] = TILE_BASE_DEAD;
@@ -4180,6 +4209,9 @@ class Game {
 
   /** Top-left tile of the 2×2 eagle base (live or ruined). */
   FindBaseCell() {
+    if (this.eagleStroll?.home) {
+      return { x: this.eagleStroll.home.x, y: this.eagleStroll.home.y };
+    }
     if (this._baseCell) {
       const { x, y } = this._baseCell;
       const t = this.map?.[y]?.[x];
@@ -4203,6 +4235,10 @@ class Game {
   }
 
   GetBaseTarget() {
+    if (this.eagleStroll && this.baseAlive) {
+      const e = this.eagleStroll;
+      return { x: e.x, y: e.y, w: e.w, h: e.h };
+    }
     const c = this.FindBaseCell();
     return { x: c.x * TILE, y: c.y * TILE, w: TILE * 2, h: TILE * 2 };
   }
@@ -4237,6 +4273,132 @@ class Game {
       toX,
       toY: Clamp((c.y - 1) * TILE, CANVAS_H * 0.55, CANVAS_H - p.h - 2),
     };
+  }
+
+  /** Negative: eagle kicks the fort open and waddles around the field. */
+  StartEagleStroll(duration = 18) {
+    if (!this.baseAlive) return;
+    if (this.eagleStroll) {
+      this.eagleStroll.ttl = Math.max(this.eagleStroll.ttl, duration);
+      this.BreakBaseFort();
+      this.ShowBuffToast("⚠ 老鹰还在遛弯…门又开了");
+      return;
+    }
+    const cell = this.FindBaseCell();
+    const nest = [];
+    for (let dy = 0; dy < 2; dy++) {
+      for (let dx = 0; dx < 2; dx++) {
+        const x = cell.x + dx;
+        const y = cell.y + dy;
+        if (y < 0 || y >= MAP_H || x < 0 || x >= MAP_W) continue;
+        if (this.map[y][x] === TILE_BASE) {
+          this.map[y][x] = TILE_EMPTY;
+          nest.push([x, y]);
+        }
+      }
+    }
+    this._baseCell = { x: cell.x, y: cell.y };
+    this.BreakBaseFort();
+    const top = cell.y < MAP_H / 2;
+    this.eagleStroll = {
+      x: cell.x * TILE,
+      y: cell.y * TILE,
+      w: TILE * 2,
+      h: TILE * 2,
+      dir: top ? "down" : "up",
+      speed: 42,
+      aiTimer: 0.15,
+      ttl: duration,
+      home: { x: cell.x, y: cell.y },
+      nest,
+      bob: 0,
+    };
+    // Nudge out of the nest so the stroll is obvious.
+    const face = DIR[this.eagleStroll.dir];
+    this.eagleStroll.x = Clamp(this.eagleStroll.x + face.x * TILE * 1.2, 0, CANVAS_W - this.eagleStroll.w);
+    this.eagleStroll.y = Clamp(this.eagleStroll.y + face.y * TILE * 1.2, 0, CANVAS_H - this.eagleStroll.h);
+    this.ShowBuffToast("⚠ 老鹰自己开门遛去了！护住它！");
+    this.eagleWarnT = Math.max(this.eagleWarnT, 2.4);
+  }
+
+  UpdateEagleStroll(dt) {
+    const e = this.eagleStroll;
+    if (!e) return;
+    if (!this.baseAlive) {
+      this.eagleStroll = null;
+      return;
+    }
+    e.ttl -= dt;
+    e.bob += dt * 8;
+    if (e.ttl <= 0) {
+      this.ReturnEagleHome();
+      return;
+    }
+    e.aiTimer -= dt;
+    if (e.aiTimer <= 0) {
+      e.aiTimer = 0.55 + Math.random() * 1.1;
+      // Mostly wander; sometimes head farther from the empty nest.
+      if (Math.random() < 0.35) {
+        const hx = e.home.x * TILE + TILE;
+        const hy = e.home.y * TILE + TILE;
+        e.dir = DirFromVector(e.x + e.w * 0.5 - hx, e.y + e.h * 0.5 - hy);
+      } else {
+        e.dir = DIR_KEYS[Math.floor(Math.random() * 4)];
+      }
+    }
+    const d = DIR[e.dir] || DIR.down;
+    const beforeX = e.x;
+    const beforeY = e.y;
+    e.x += d.x * e.speed * dt;
+    e.y += d.y * e.speed * dt;
+    e.x = Clamp(e.x, 0, CANVAS_W - e.w);
+    e.y = Clamp(e.y, 0, CANVAS_H - e.h);
+    if (this.EagleStrollBlocked(e)) {
+      e.x = beforeX;
+      e.y = beforeY;
+      e.aiTimer = 0;
+    }
+  }
+
+  EagleStrollBlocked(e) {
+    const box = { x: e.x + 2, y: e.y + 2, w: e.w - 4, h: e.h - 4 };
+    const x0 = Math.floor(box.x / TILE);
+    const y0 = Math.floor(box.y / TILE);
+    const x1 = Math.floor((box.x + box.w - 0.001) / TILE);
+    const y1 = Math.floor((box.y + box.h - 0.001) / TILE);
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
+        const t = this.map[ty][tx];
+        if (t === TILE_STEEL || t === TILE_WATER || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
+        if (t === TILE_BRICK && this.BrickRectHitsSolid(box, tx, ty)) return true;
+      }
+    }
+    return false;
+  }
+
+  ReturnEagleHome() {
+    const e = this.eagleStroll;
+    if (!e) return;
+    if (this.baseAlive) {
+      for (const [x, y] of e.nest || []) {
+        if (y < 0 || y >= MAP_H || x < 0 || x >= MAP_W) continue;
+        this.map[y][x] = TILE_BASE;
+      }
+      this._baseCell = { x: e.home.x, y: e.home.y };
+      this.pendingFortRestore = true;
+      this.ShowBuffToast("老鹰遛完回家了");
+    }
+    this.eagleStroll = null;
+  }
+
+  BulletHitEagleStroll(b) {
+    if (!this.eagleStroll || !this.baseAlive) return false;
+    if (!RectsOverlap(b, this.eagleStroll)) return false;
+    b.alive = false;
+    this.SpawnExplosion(b.x, b.y, 0.55);
+    this.DestroyBase();
+    return true;
   }
 
   DropPowerup(x, y, kind = POWER.token) {
@@ -4614,6 +4776,9 @@ class Game {
       case POWER.fortBreak:
         this.BreakBaseFort();
         this.ShowBuffToast("⚠ 堡垒崩塌");
+        break;
+      case POWER.eagleStroll:
+        this.StartEagleStroll(18);
         break;
       default:
         break;
@@ -5275,8 +5440,33 @@ class Game {
 
   DrawBase(ctx) {
     const cell = this.FindBaseCell();
-    const bx = cell.x * TILE;
-    const by = cell.y * TILE;
+    const nestX = cell.x * TILE;
+    const nestY = cell.y * TILE;
+
+    if (this.eagleStroll && this.baseAlive) {
+      // Empty nest pad — eagle walked out.
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = "#402010";
+      ctx.fillRect(nestX + 4, nestY + 4, TILE * 2 - 8, TILE * 2 - 8);
+      ctx.strokeStyle = "#806040";
+      ctx.strokeRect(nestX + 4.5, nestY + 4.5, TILE * 2 - 9, TILE * 2 - 9);
+      ctx.restore();
+
+      const e = this.eagleStroll;
+      const bob = Math.sin(e.bob) * 1.5;
+      const [gx, gy] = TILE_SHEET.baseAlive;
+      this.BlitGrid(ctx, gx, gy, e.x, e.y + bob, e.w, e.h, 2, 2);
+      // Danger ring so it's obvious the HQ is mobile.
+      const pulse = 0.4 + 0.35 * Math.abs(Math.sin(this.frame * 0.2));
+      ctx.strokeStyle = `rgba(255,80,80,${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(e.x + 1, e.y + bob + 1, e.w - 2, e.h - 2);
+      return;
+    }
+
+    const bx = nestX;
+    const by = nestY;
     const key = this.baseAlive ? "baseAlive" : "baseDead";
     const [gx, gy] = TILE_SHEET[key];
     this.BlitGrid(ctx, gx, gy, bx, by, TILE * 2, TILE * 2, 2, 2);
@@ -6082,6 +6272,9 @@ class Game {
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
     if ((this.absorbHits || 0) > 0) chips.push({ t: `装甲×${this.absorbHits}`, c: "#c8e0ff" });
     if (this.playerDisarmed) chips.push({ t: "无炮管·去捡", c: "#ff6060" });
+    if (this.eagleStroll && this.baseAlive) {
+      chips.push({ t: `遛鹰 ${Math.ceil(this.eagleStroll.ttl)}`, c: "#ff6060" });
+    }
     if (this.prepTimer > 0) chips.push({ t: `准备 ${Math.ceil(this.prepTimer)}`, c: "#80e0ff" });
     if (this.carriedBlock) {
       const kind = this.carriedBlock.kind === "metal" ? "铁盾" : "木盾";
@@ -6107,9 +6300,10 @@ class Game {
       x += w + 4;
     }
 
-    // Big eagle-curse banner so the transform is impossible to miss.
+    // Big eagle-curse / stroll banner so HQ events are impossible to miss.
     if (this.eagleWarnT > 0 && this.state === "playing") {
       const morphing = !!this.eagleMorph;
+      const strolling = !!this.eagleStroll && !morphing;
       const alpha = Clamp(this.eagleWarnT / 0.55, 0, 1);
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -6127,6 +6321,11 @@ class Game {
         ctx.fillStyle = "#80e0ff";
         ctx.font = `11px ${PIXEL_FONT}`;
         ctx.fillText("变身期间无敌 · 结束后护盾继续 · 无盾被打倒即失败", CANVAS_W / 2, CANVAS_H * 0.28 + 44);
+      } else if (strolling) {
+        ctx.fillText("⚠ 老鹰出门遛弯了！", CANVAS_W / 2, CANVAS_H * 0.28 + 22);
+        ctx.fillStyle = "#ff9090";
+        ctx.font = `11px ${PIXEL_FONT}`;
+        ctx.fillText("堡垒已开 · 敌军会追它 · 被打中即失败", CANVAS_W / 2, CANVAS_H * 0.28 + 44);
       } else {
         ctx.fillText("终极诅咒 · 你变成了老鹰", CANVAS_W / 2, CANVAS_H * 0.28 + 22);
         ctx.fillStyle = "#80e0ff";
