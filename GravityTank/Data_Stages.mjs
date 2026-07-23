@@ -120,8 +120,10 @@ export const STAGES = [
   {
     id: 3,
     bossStage: true,
-    title: "重力巨炮",
-    enemies: { basic: 0, fast: 0, power: 0, armor: 0, boss: 1 },
+    title: "坦克王",
+    bossKind: "tankKing",
+    barrelCount: 1,
+    enemies: { basic: 0, fast: 0, power: 0, armor: 0, boss: 0, tankKing: 1 },
     enemySpawns: [[12, 2]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -224,9 +226,10 @@ export const STAGES = [
   {
     id: 6,
     bossStage: true,
-    title: "坦克王",
-    bossKind: "tankKing",
-    enemies: { basic: 0, fast: 0, power: 0, armor: 0, boss: 0, tankKing: 1 },
+    title: "重力巨炮",
+    bossKind: "boss",
+    barrelCount: 8,
+    enemies: { basic: 0, fast: 0, power: 0, armor: 0, boss: 1 },
     enemySpawns: [[12, 4]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [

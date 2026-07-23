@@ -34,8 +34,23 @@ const DIR = {
   down: { x: 0, y: 1, angle: Math.PI / 2 },
   left: { x: -1, y: 0, angle: Math.PI },
   right: { x: 1, y: 0, angle: 0 },
+  upRight: { x: Math.SQRT1_2, y: -Math.SQRT1_2, angle: -Math.PI / 4 },
+  downRight: { x: Math.SQRT1_2, y: Math.SQRT1_2, angle: Math.PI / 4 },
+  downLeft: { x: -Math.SQRT1_2, y: Math.SQRT1_2, angle: (Math.PI * 3) / 4 },
+  upLeft: { x: -Math.SQRT1_2, y: -Math.SQRT1_2, angle: (-Math.PI * 3) / 4 },
 };
 const DIR_KEYS = ["up", "down", "left", "right"];
+const DIR_CARDINAL = ["up", "right", "down", "left"];
+const DIR_OCTO = ["up", "upRight", "right", "downRight", "down", "downLeft", "left", "upLeft"];
+
+/** Classic Battle City armor-tank palette by remaining HP (Columbia NES clone notes). */
+const ARMOR_HP_PALETTE = {
+  // mid gray / dark teal / white on the gray enemy sheet → remapped
+  4: { mid: [0, 168, 72], dark: [0, 90, 40], light: [200, 255, 220], flash: [230, 230, 230] }, // green↔white
+  3: { mid: [230, 180, 40], dark: [120, 90, 10], light: [255, 240, 170], flash: [240, 240, 240] }, // yellow↔white
+  2: { mid: [0, 168, 72], dark: [0, 90, 40], light: [200, 255, 220], flash: [230, 180, 40] }, // green↔yellow
+  1: { mid: [200, 200, 200], dark: [70, 70, 80], light: [255, 255, 255], flash: [200, 200, 200] }, // white/gray
+};
 
 const TILE_EMPTY = 0;
 const TILE_BRICK = 1;
@@ -221,6 +236,7 @@ const ENEMY_TYPES = [
 
 const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst", "gunBreak"];
 const TANK_KING_ATTACKS = ["quadCross", "spinFire", "axisBurst", "chaseVolley", "ringShot"];
+const BOSS_OCTO_ATTACKS = ["octoCross", "octoSpin", "octoRing"];
 const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
 /** Fire-rate multipliers vs the original boss cadence (lower = slower). */
 const BOSS_FIRE_RATE_NORMAL = 0.7;
@@ -1402,14 +1418,14 @@ class Game {
           `${diffTag} 你在河北岸。河对面过不来——用重力弹幕（朝下/斜射）清理南岸敌军，再选一张入门升级进入战役。`;
       } else if (this.state === "ready" || this.state === "boot") {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关重力巨炮 · 第 6 关坦克王）。保卫老鹰；炮弹带重力会下坠。`;
+          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关坦克王 · 第 6 关重力巨炮）。保卫老鹰；炮弹带重力会下坠。`;
       } else if (this.isBossStage) {
         if (this.stageData.bossKind === "tankKing") {
           this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关 · 坦克王。四向炮筒齐射；在开阔战场中周旋并击破它。`;
+            `${diffTag} BOSS 关 · 坦克王。单炮追猎；在开阔战场中周旋并击破它。`;
         } else {
           this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关 · 重力巨炮。躲避弹幕；小心拆炮禁射，残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
+            `${diffTag} BOSS 关 · 重力巨炮。八向炮筒弹幕；小心拆炮禁射，残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
         }
       } else {
         const e = this.stageData.enemies;
@@ -2053,7 +2069,7 @@ class Game {
     this.enemies = this.enemies.filter((e) => e.alive || e.deathTimer > 0);
   }
 
-  /** Stage-6 坦克王: four cardinal barrels, each can fire independently. */
+  /** Tank King: 1 barrel (stage 3) or multi-barrel volleys. */
   UpdateTankKing(e, dt) {
     if (e.barrelFlash) {
       for (const k of Object.keys(e.barrelFlash)) {
@@ -2102,8 +2118,14 @@ class Game {
     if (e.fireCd <= 0) {
       const ratio = e.hp / Math.max(1, e.maxHp);
       e.finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
-      let pattern = TANK_KING_ATTACKS[Math.floor(Math.random() * TANK_KING_ATTACKS.length)];
-      if (e.finalPhase && Math.random() < 0.45) pattern = "ringShot";
+      const barrels = e.barrelCount || 1;
+      let pattern;
+      if (barrels <= 1) {
+        pattern = e.finalPhase && Math.random() < 0.4 ? "chaseVolley" : (Math.random() < 0.5 ? "chaseVolley" : "axisBurst");
+      } else {
+        pattern = TANK_KING_ATTACKS[Math.floor(Math.random() * TANK_KING_ATTACKS.length)];
+        if (e.finalPhase && Math.random() < 0.45) pattern = "ringShot";
+      }
       this.BeginTankKingAttack(e, pattern);
     }
   }
@@ -2113,31 +2135,45 @@ class Game {
     e.attackQueue = [];
     e.attackAge = 0;
     const cdScale = this.GetBossFireCdScale(e);
-    const dirs = ["up", "down", "left", "right"];
+    const barrels = e.barrelCount || 1;
+    const dirs = barrels >= 8 ? DIR_OCTO : barrels <= 1 ? null : DIR_CARDINAL;
     const face = e.castFace || "down";
 
+    if (barrels <= 1) {
+      // Stage-3 single turret: focused chase / short bursts.
+      const n = pattern === "chaseVolley" ? 5 : 3;
+      for (let i = 0; i < n; i++) {
+        e.attackQueue.push({
+          t: i * 0.12 * cdScale,
+          kind: "kingShell",
+          dir: face,
+          angleOffset: (i - (n - 1) / 2) * 0.08,
+        });
+      }
+      e.fireCd = 1.85 * cdScale;
+      this.ShowBuffToast(pattern === "chaseVolley" ? "坦克王 · 单炮连射" : "坦克王 · 点射");
+      return;
+    }
+
     if (pattern === "quadCross") {
-      // All four barrels fire once.
       for (let i = 0; i < dirs.length; i++) {
         e.attackQueue.push({ t: i * 0.04 * cdScale, kind: "kingShell", dir: dirs[i] });
       }
       e.fireCd = 2.0 * cdScale;
-      this.ShowBuffToast("坦克王 · 十字齐射");
+      this.ShowBuffToast(barrels >= 8 ? "坦克王 · 八向齐射" : "坦克王 · 十字齐射");
     } else if (pattern === "spinFire") {
-      // Rotate through barrels twice.
       for (let r = 0; r < 2; r++) {
         for (let i = 0; i < dirs.length; i++) {
           e.attackQueue.push({
-            t: (r * 4 + i) * 0.12 * cdScale,
+            t: (r * dirs.length + i) * 0.1 * cdScale,
             kind: "kingShell",
             dir: dirs[i],
           });
         }
       }
       e.fireCd = 2.6 * cdScale;
-      this.ShowBuffToast("坦克王 · 四向轮射");
+      this.ShowBuffToast("坦克王 · 轮射");
     } else if (pattern === "axisBurst") {
-      // Opposite pairs: horizontal then vertical.
       for (const dir of ["left", "right"]) {
         e.attackQueue.push({ t: 0.02 * cdScale, kind: "kingShell", dir });
         e.attackQueue.push({ t: 0.14 * cdScale, kind: "kingShell", dir });
@@ -2149,7 +2185,6 @@ class Game {
       e.fireCd = 2.2 * cdScale;
       this.ShowBuffToast("坦克王 · 轴对称连射");
     } else if (pattern === "chaseVolley") {
-      // Barrel facing the player dumps a volley; side barrels support.
       for (let i = 0; i < 4; i++) {
         e.attackQueue.push({ t: i * 0.1 * cdScale, kind: "kingShell", dir: face });
       }
@@ -2160,7 +2195,6 @@ class Game {
       e.fireCd = 2.1 * cdScale;
       this.ShowBuffToast("坦克王 · 追猎齐射");
     } else {
-      // ringShot: three layers from all barrels
       for (let wave = 0; wave < 3; wave++) {
         for (let i = 0; i < dirs.length; i++) {
           e.attackQueue.push({
@@ -2178,6 +2212,11 @@ class Game {
 
   /** Boss patrols the upper band and cycles gravity-shell attack patterns. */
   UpdateBoss(e, dt) {
+    if (e.barrelFlash) {
+      for (const k of Object.keys(e.barrelFlash)) {
+        if (e.barrelFlash[k] > 0) e.barrelFlash[k] -= dt;
+      }
+    }
     e.aiTimer -= dt;
     if (e.aiTimer <= 0) {
       e.aiTimer = 0.55 + Math.random() * 0.7;
@@ -2233,9 +2272,13 @@ class Game {
         }
       }
       if (!pattern) {
-        // Prefer gunBreak occasionally so the disarm shows up mid-fight.
-        if (this.playerDisarmTimer <= 0 && Math.random() < 0.22) pattern = "gunBreak";
-        else pattern = BOSS_ATTACKS[Math.floor(Math.random() * BOSS_ATTACKS.length)];
+        if ((e.barrelCount || 0) >= 8 && Math.random() < 0.34) {
+          pattern = BOSS_OCTO_ATTACKS[Math.floor(Math.random() * BOSS_OCTO_ATTACKS.length)];
+        } else if (this.playerDisarmTimer <= 0 && Math.random() < 0.22) {
+          pattern = "gunBreak";
+        } else {
+          pattern = BOSS_ATTACKS[Math.floor(Math.random() * BOSS_ATTACKS.length)];
+        }
       }
       this.BeginBossAttack(e, pattern);
     }
@@ -2248,7 +2291,38 @@ class Game {
     e.dir = face === "up" ? "down" : face;
     const cdScale = this.GetBossFireCdScale(e);
 
-    if (pattern === "barrage") {
+    if (pattern === "octoCross") {
+      for (let i = 0; i < DIR_OCTO.length; i++) {
+        e.attackQueue.push({ t: i * 0.03 * cdScale, kind: "kingShell", dir: DIR_OCTO[i] });
+      }
+      e.fireCd = 2.4 * cdScale;
+      this.ShowBuffToast("八管齐射！");
+    } else if (pattern === "octoSpin") {
+      for (let r = 0; r < 2; r++) {
+        for (let i = 0; i < DIR_OCTO.length; i++) {
+          e.attackQueue.push({
+            t: (r * DIR_OCTO.length + i) * 0.08 * cdScale,
+            kind: "kingShell",
+            dir: DIR_OCTO[i],
+          });
+        }
+      }
+      e.fireCd = 3.0 * cdScale;
+      this.ShowBuffToast("八管轮射");
+    } else if (pattern === "octoRing") {
+      for (let wave = 0; wave < 2; wave++) {
+        for (let i = 0; i < DIR_OCTO.length; i++) {
+          e.attackQueue.push({
+            t: (wave * 0.28 + i * 0.025) * cdScale,
+            kind: "kingShell",
+            dir: DIR_OCTO[i],
+            angleOffset: (wave - 0.5) * 0.12,
+          });
+        }
+      }
+      e.fireCd = 3.2 * cdScale;
+      this.ShowBuffToast("八管环射");
+    } else if (pattern === "barrage") {
       // 万炮齐发：宽扇形下压弹幕
       const n = 11;
       for (let i = 0; i < n; i++) {
@@ -2382,6 +2456,7 @@ class Game {
     }
     // Default gravity shell with optional angle offset.
     this.SpawnBossShellFromDir(e, shot.dir || "down", shot.angleOffset || 0);
+    if (e.barrelFlash && shot.dir) e.barrelFlash[shot.dir] = 0.14;
     this.audio.Shoot();
   }
 
@@ -3008,6 +3083,12 @@ class Game {
       this.audio.Bounce();
       return;
     }
+    // Classic: flashing (dropsPower) tanks drop on the hit that strips the flash,
+    // including multi-hit armor tanks that stay alive after the drop.
+    if (e.dropsPower) {
+      this.DropPowerup(e.x, e.y);
+      e.dropsPower = false;
+    }
     e.hp -= Math.max(1, power >= 3 ? 2 : 1);
     this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 0.55);
     this.audio.Hit();
@@ -3017,8 +3098,6 @@ class Game {
       this.score += e.score;
       this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1);
       this.audio.Explode();
-      // Classic: only flashing (dropsPower) tanks drop. Rate +50% vs original ~0.20.
-      if (e.dropsPower) this.DropPowerup(e.x, e.y);
       this.RenderEnemyIcons();
     }
   }
@@ -3711,7 +3790,7 @@ class Game {
       aiTimer: 0.3,
       spawnFlash: type.boss ? 0.6 : 1.0,
       protect: type.boss ? 1.2 : 0,
-      dropsPower: type.boss || type.id === "armor" || Math.random() < this.GetPowerDropRate(),
+      dropsPower: type.boss ? false : (type.id === "armor" || Math.random() < this.GetPowerDropRate()),
       deathTimer: 0,
       animTick: 0,
       moving: false,
@@ -3724,7 +3803,8 @@ class Game {
       fireIntervalMul: type.fireIntervalMul ?? 1,
       eagleCurseUsed: false,
       finalPhase: false,
-      barrelFlash: { up: 0, down: 0, left: 0, right: 0 },
+      barrelCount: type.barrelCount ?? this.stageData?.barrelCount ?? (type.tankKing ? 4 : 0),
+      barrelFlash: Object.fromEntries(DIR_OCTO.map((d) => [d, 0])),
     };
   }
 
@@ -3947,7 +4027,7 @@ class Game {
         ctx.globalAlpha = fade * 0.95;
         ctx.font = `12px ${PIXEL_FONT}`;
         ctx.fillText(
-          isKing ? "四向炮筒 · 每筒可射" : "躲避万炮齐发 · 子弹带重力",
+          isKing ? "单炮追猎 · 开阔战场" : "八管弹幕 · 炮弹带重力",
           CANVAS_W / 2,
           CANVAS_H / 2 + 58
         );
@@ -4068,12 +4148,74 @@ class Game {
     }
     const spec = ENEMY_SHEET[tank.texture] || ENEMY_SHEET.enemyBasic;
     let row = spec.row;
+    // Power-up carriers flash red (classic).
     if (tank.dropsPower && Math.floor(this.frame / 8) % 2 === 0) row = spec.redRow;
-    // Armor / boss HP flash: red sheet when damaged.
-    if (tank.maxHp > 1 && tank.hp <= Math.ceil(tank.maxHp * 0.35) && Math.floor(this.frame / 6) % 2 === 0) {
-      row = spec.redRow;
+    return { gx: spec.col + dirCol + colOff, gy: row, redFlash: row === spec.redRow };
+  }
+
+  /** Remap gray enemy armor sprite into classic HP color stages. */
+  BlitArmorTinted(ctx, gx, gy, dx, dy, dw, dh, hp) {
+    const sheet = this.images.sheet;
+    if (!sheet) return;
+    const sw = 2 * SHEET_CELL;
+    const sh = 2 * SHEET_CELL;
+    if (!this._tintCanvas) {
+      this._tintCanvas = document.createElement("canvas");
+      this._tintCtx = this._tintCanvas.getContext("2d", { willReadFrequently: true });
     }
-    return { gx: spec.col + dirCol + colOff, gy: row };
+    const tc = this._tintCanvas;
+    const tctx = this._tintCtx;
+    if (tc.width !== sw || tc.height !== sh) {
+      tc.width = sw;
+      tc.height = sh;
+    }
+    tctx.clearRect(0, 0, sw, sh);
+    tctx.drawImage(sheet, gx * SHEET_CELL, gy * SHEET_CELL, sw, sh, 0, 0, sw, sh);
+    const img = tctx.getImageData(0, 0, sw, sh);
+    const data = img.data;
+    const stage = Clamp(hp | 0, 1, 4);
+    const pal = ARMOR_HP_PALETTE[stage] || ARMOR_HP_PALETTE[1];
+    const flashOn = Math.floor(this.frame / 7) % 2 === 0;
+    const mid = flashOn && stage > 1 ? (stage === 1 ? pal.mid : (stage === 4 || stage === 3 ? pal.flash : pal.flash)) : pal.mid;
+    // HP4: green↔white; HP3: yellow↔white; HP2: green↔yellow; HP1: solid white/gray
+    let useMid = pal.mid;
+    let useDark = pal.dark;
+    let useLight = pal.light;
+    if (stage === 4) {
+      useMid = flashOn ? pal.mid : pal.flash;
+      useDark = flashOn ? pal.dark : [90, 90, 100];
+      useLight = flashOn ? pal.light : [255, 255, 255];
+    } else if (stage === 3) {
+      useMid = flashOn ? pal.mid : pal.flash;
+      useDark = flashOn ? pal.dark : [100, 100, 110];
+    } else if (stage === 2) {
+      useMid = flashOn ? pal.mid : pal.flash;
+      useDark = flashOn ? pal.dark : [120, 90, 10];
+      useLight = flashOn ? pal.light : [255, 240, 170];
+    }
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 20) continue;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      // Sheet mid gray ~173, dark teal ~0,66,74, white ~255
+      if (r > 200 && g > 200 && b > 200) {
+        data[i] = useLight[0];
+        data[i + 1] = useLight[1];
+        data[i + 2] = useLight[2];
+      } else if (r > 140 && g > 140 && b > 140) {
+        data[i] = useMid[0];
+        data[i + 1] = useMid[1];
+        data[i + 2] = useMid[2];
+      } else if (r < 40 && g < 100) {
+        data[i] = useDark[0];
+        data[i + 1] = useDark[1];
+        data[i + 2] = useDark[2];
+      }
+    }
+    tctx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tc, 0, 0, sw, sh, dx, dy, dw, dh);
   }
 
   DrawTank(ctx, tank, isPlayer) {
@@ -4104,9 +4246,16 @@ class Game {
 
     const ghosting = isPlayer && this.ghostTimer > 0;
     if (ghosting) ctx.globalAlpha = 0.45 + 0.35 * Math.sin(this.frame * 0.35);
-    const { gx, gy } = this.TankSheetOrigin(tank, isPlayer);
-    this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
-    if (tank.tankKing || tank.typeId === "tankKing") this.DrawTankKingBarrels(ctx, tank);
+    const { gx, gy, redFlash } = this.TankSheetOrigin(tank, isPlayer);
+    const isArmor = !isPlayer && tank.typeId === "armor" && tank.maxHp > 1;
+    if (isArmor && !redFlash) {
+      this.BlitArmorTinted(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h, tank.hp);
+    } else {
+      this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
+    }
+    if ((tank.isBoss || tank.tankKing) && (tank.barrelCount || 0) > 0) {
+      this.DrawBossBarrels(ctx, tank);
+    }
     if (ghosting) {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = "rgba(200,160,255,0.7)";
@@ -4130,32 +4279,78 @@ class Game {
     }
   }
 
-  DrawTankKingBarrels(ctx, tank) {
+  /** Distinct boss barrels (not classic sheet turrets): tapered tubes + muzzle ring. */
+  DrawBossBarrels(ctx, tank) {
+    const count = tank.barrelCount || 0;
+    if (count <= 0) return;
     const cx = tank.x + tank.w / 2;
     const cy = tank.y + tank.h / 2;
-    const len = Math.max(10, tank.w * 0.28);
-    const thick = Math.max(5, tank.w * 0.14);
     const flash = tank.barrelFlash || {};
-    const barrels = [
-      { dir: "up", x: cx - thick / 2, y: tank.y - len + 4, w: thick, h: len },
-      { dir: "down", x: cx - thick / 2, y: tank.y + tank.h - 4, w: thick, h: len },
-      { dir: "left", x: tank.x - len + 4, y: cy - thick / 2, w: len, h: thick },
-      { dir: "right", x: tank.x + tank.w - 4, y: cy - thick / 2, w: len, h: thick },
-    ];
-    for (const b of barrels) {
-      const lit = (flash[b.dir] || 0) > 0;
-      ctx.fillStyle = lit ? "#ffe060" : "#c0c0c0";
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-      ctx.strokeStyle = lit ? "#fff8c0" : "#606060";
+    const king = !!tank.tankKing;
+    const face = tank.castFace || tank.dir || "down";
+    const dirs = count <= 1 ? [face] : count >= 8 ? DIR_OCTO : DIR_CARDINAL;
+    const reach = Math.max(12, tank.w * (count <= 1 ? 0.42 : 0.34));
+    const thick = Math.max(4, tank.w * (count <= 1 ? 0.18 : 0.11));
+
+    for (const dir of dirs) {
+      const d = DIR[dir] || DIR.down;
+      const lit = (flash[dir] || 0) > 0;
+      const ang = d.angle;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      // Base socket
+      ctx.fillStyle = king ? "#5a4010" : "#2a3038";
+      ctx.fillRect(tank.w * 0.18, -thick * 0.55, 5, thick * 1.1);
+      // Tapered tube
+      const x0 = tank.w * 0.2;
+      const len = reach;
+      ctx.beginPath();
+      ctx.moveTo(x0, -thick * 0.45);
+      ctx.lineTo(x0 + len * 0.72, -thick * 0.32);
+      ctx.lineTo(x0 + len, -thick * 0.22);
+      ctx.lineTo(x0 + len, thick * 0.22);
+      ctx.lineTo(x0 + len * 0.72, thick * 0.32);
+      ctx.lineTo(x0, thick * 0.45);
+      ctx.closePath();
+      ctx.fillStyle = lit ? "#ffe070" : king ? "#d0a030" : "#8a93a0";
+      ctx.fill();
+      ctx.strokeStyle = lit ? "#fff8c8" : king ? "#705010" : "#3a4048";
       ctx.lineWidth = 1;
-      ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+      ctx.stroke();
+      // Highlight stripe
+      ctx.strokeStyle = lit ? "rgba(255,255,220,0.9)" : "rgba(255,255,255,0.25)";
+      ctx.beginPath();
+      ctx.moveTo(x0 + 2, -thick * 0.12);
+      ctx.lineTo(x0 + len - 2, -thick * 0.08);
+      ctx.stroke();
+      // Muzzle ring (distinct from classic stub barrel)
+      ctx.fillStyle = lit ? "#fff0a0" : king ? "#f0c050" : "#c8d0d8";
+      ctx.fillRect(x0 + len - 3, -thick * 0.38, 4, thick * 0.76);
+      ctx.fillStyle = "#101418";
+      ctx.fillRect(x0 + len + 1, -thick * 0.16, 2, thick * 0.32);
+      ctx.restore();
     }
-    // Crown mark
-    ctx.fillStyle = "#f0d060";
-    ctx.fillRect(cx - 6, tank.y + 4, 12, 4);
-    ctx.fillRect(cx - 8, tank.y + 2, 4, 4);
-    ctx.fillRect(cx - 2, tank.y + 1, 4, 5);
-    ctx.fillRect(cx + 4, tank.y + 2, 4, 4);
+
+    if (king) {
+      // Small crown plate — reads as Tank King, not stock armor tank.
+      ctx.fillStyle = "#f0d060";
+      ctx.fillRect(cx - 7, tank.y + 3, 14, 4);
+      ctx.fillRect(cx - 8, tank.y + 1, 4, 4);
+      ctx.fillRect(cx - 2, tank.y, 4, 5);
+      ctx.fillRect(cx + 4, tank.y + 1, 4, 4);
+    } else if (count >= 8) {
+      // Gravity cannon hub ring
+      ctx.strokeStyle = "#c07040";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, tank.w * 0.16, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#402010";
+      ctx.beginPath();
+      ctx.arc(cx, cy, tank.w * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   DrawBossHud(ctx, boss) {
