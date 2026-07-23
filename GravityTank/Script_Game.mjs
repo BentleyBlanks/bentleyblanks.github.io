@@ -3,7 +3,7 @@
  * Visuals: classic NES Battle City–style sprites (StefanBS/battle-city-clone, MIT).
  */
 
-import { STAGE_COUNT, GetStage, IsTutorialStage, TUTORIAL_STAGE } from "./Data_Stages.mjs";
+import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL_STAGE, BARRICADE_TEACH_STAGE } from "./Data_Stages.mjs";
 import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade } from "./Data_Upgrades.mjs";
 
 const DIFFICULTY = {
@@ -26,6 +26,8 @@ const MAX_ENEMIES_LATE = 5;
 const ENEMY_FRIENDLY_FIRE_OFF_STAGE = 6;
 const MAX_ABSORB_HITS = 8;
 const PLAYER_LIVES = 3;
+const CARRY_WOOD_HP = 2;
+const CARRY_METAL_HP = 5;
 const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
 const BULLET_SPEED = 280;
 /** Classic ~1/5 tanks flash (~0.20); +50% → 0.30. Only flashing tanks drop. */
@@ -656,6 +658,7 @@ class Game {
       stick: document.getElementById("touchStick"),
       knob: document.getElementById("stickKnob"),
       fire: document.getElementById("touchFire"),
+      carry: document.getElementById("touchCarry"),
       pause: document.getElementById("touchPause"),
       hudPause: document.getElementById("mobilePauseButton"),
     };
@@ -665,10 +668,15 @@ class Game {
     this.keys = new Set();
     this.touchDir = null;
     this.touchFire = false;
+    this.touchCarry = false;
+    this.touchCarryPressed = false;
+    this.interactArmed = true;
     this.stickPointerId = null;
     this.stickTouchId = null;
     this.firePointerId = null;
     this.fireTouchId = null;
+    this.carryPointerId = null;
+    this.carryTouchId = null;
     this.stickVec = { x: 0, y: 0 };
     this.isTouchDevice = false;
     this.respawnTimer = 0;
@@ -687,6 +695,7 @@ class Game {
     this.stage = 1;
     this.stageData = GetStage(1);
     this.isTutorial = false;
+    this.isBarricadeTeach = false;
     this.isBossStage = false;
     this.totalEnemies = 20;
     this.endAction = "restart"; // restart | next | retry
@@ -698,6 +707,9 @@ class Game {
     this.explosions = [];
     this.powerups = [];
     this.bombs = [];
+    this.carryables = [];
+    this.carriedBlock = null;
+    this.prepTimer = 0;
     this.playerDisarmed = false;
     this.spawnQueue = [];
     this.score = 0;
@@ -772,6 +784,8 @@ class Game {
       powerEnemyShield: await load("assets/Texture_PowerEnemyShield.png"),
       powerHeavyCurse: await load("assets/Texture_PowerHeavyCurse.png"),
       powerEnemyRage: await load("assets/Texture_PowerEnemyRage.png"),
+      barricadeWood: await load("assets/Texture_BarricadeWood.png"),
+      barricadeMetal: await load("assets/Texture_BarricadeMetal.png"),
     };
   }
 
@@ -831,7 +845,7 @@ class Game {
 
     window.addEventListener("keydown", (e) => {
       const k = e.key.toLowerCase();
-      if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "w", "a", "s", "d", "j"].includes(k) || e.code === "Space") {
+      if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "w", "a", "s", "d", "j", "k"].includes(k) || e.code === "Space") {
         e.preventDefault();
       }
       this.keys.add(k);
@@ -880,12 +894,18 @@ class Game {
     this.stickTouchId = null;
     this.firePointerId = null;
     this.fireTouchId = null;
+    this.carryPointerId = null;
+    this.carryTouchId = null;
     this.touchFire = false;
+    this.touchCarry = false;
+    this.touchCarryPressed = false;
+    this.interactArmed = true;
     this.touchDir = null;
     this.stickVec.x = 0;
     this.stickVec.y = 0;
     if (this.touchUi.knob) this.touchUi.knob.style.transform = "translate(0, 0)";
     this.touchUi.fire?.classList.remove("is-active");
+    this.touchUi.carry?.classList.remove("is-active");
   }
 
   DetectTouchUi() {
@@ -933,10 +953,16 @@ class Game {
     const show = this.isTouchDevice && (this.state === "playing" || this.state === "paused" || this.state === "roulette");
     if (this.touchUi.stickWrap) this.touchUi.stickWrap.hidden = !show;
     if (this.touchUi.actionsWrap) this.touchUi.actionsWrap.hidden = !show;
+    const hasCarry =
+      !!(this.stageData?.carryBlocks?.length) ||
+      !!this.carriedBlock ||
+      this.carryables.some((c) => c.alive);
+    if (this.touchUi.carry) this.touchUi.carry.hidden = !(show && hasCarry);
     // Immersive mobile chrome: hide long marketing/side panels so portrait fits one screen.
     const immersive = this.isTouchDevice && ["playing", "paused", "roulette", "stageIntro", "won", "lost", "upgrade"].includes(this.state);
     document.body.classList.toggle("is-touch-play", immersive);
     document.body.classList.toggle("is-portrait", window.matchMedia("(orientation: portrait)").matches);
+    document.body.classList.toggle("has-carry-control", show && hasCarry);
     // Lock page gestures while the virtual stick is live — critical on iOS Safari.
     document.documentElement.classList.toggle("touch-play-lock", show);
     document.body.classList.toggle("touch-play-lock", show);
@@ -987,7 +1013,7 @@ class Game {
   }
 
   BindTouchControls() {
-    const { stick, stickWrap, knob, fire, pause, hudPause, actionsWrap } = this.touchUi;
+    const { stick, stickWrap, knob, fire, carry, pause, hudPause, actionsWrap } = this.touchUi;
     if (!stick || !fire) return;
 
     const stickRadius = () => {
@@ -1015,6 +1041,13 @@ class Game {
       this.fireTouchId = null;
       this.touchFire = false;
       fire.classList.remove("is-active");
+    };
+
+    const clearCarry = () => {
+      this.carryPointerId = null;
+      this.carryTouchId = null;
+      this.touchCarry = false;
+      carry?.classList.remove("is-active");
     };
 
     const updateStickFromClient = (clientX, clientY) => {
@@ -1090,12 +1123,34 @@ class Game {
       clearFire();
     };
 
+    const beginCarry = (trackId) => {
+      if (this.state === "stageIntro") {
+        this.SkipStageIntro();
+        return false;
+      }
+      if (!carry || carry.hidden) return false;
+      if (this.carryTouchId != null && this.carryTouchId !== trackId) return false;
+      this.carryTouchId = trackId;
+      this.carryPointerId = trackId;
+      this.touchCarry = true;
+      this.touchCarryPressed = true;
+      carry.classList.add("is-active");
+      this.audio.Ensure();
+      return true;
+    };
+
+    const endCarryIf = (trackId) => {
+      if (this.carryTouchId !== trackId && this.carryPointerId !== trackId) return;
+      clearCarry();
+    };
+
     // —— Touch path (Safari-reliable): track on document so moves outside the pad still work ——
     const onTouchStart = (ev) => {
       const target = ev.target;
       const onStick = stick.contains(target) || stickWrap?.contains(target);
       const onFire = fire === target || fire.contains(target);
-      if (!onStick && !onFire) return;
+      const onCarry = !!(carry && (carry === target || carry.contains(target)));
+      if (!onStick && !onFire && !onCarry) return;
 
       // Claim new touches; support multitouch (stick + fire together).
       for (let i = 0; i < ev.changedTouches.length; i++) {
@@ -1104,6 +1159,8 @@ class Game {
           if (beginStick(t.clientX, t.clientY, t.identifier)) ev.preventDefault();
         } else if (onFire && this.fireTouchId == null) {
           if (beginFire(t.identifier)) ev.preventDefault();
+        } else if (onCarry && this.carryTouchId == null) {
+          if (beginCarry(t.identifier)) ev.preventDefault();
         }
       }
     };
@@ -1135,6 +1192,7 @@ class Game {
         const t = ev.changedTouches[i];
         endStickIf(t.identifier);
         endFireIf(t.identifier);
+        endCarryIf(t.identifier);
       }
     };
 
@@ -1195,6 +1253,19 @@ class Game {
     fire.addEventListener("pointerup", endFirePointer);
     fire.addEventListener("pointercancel", endFirePointer);
 
+    carry?.addEventListener("pointerdown", (ev) => {
+      if (isTouchPointer(ev)) return;
+      if (!beginCarry(ev.pointerId)) return;
+      ev.preventDefault();
+      try { carry.setPointerCapture?.(ev.pointerId); } catch (_) { /* ignore */ }
+    });
+    const endCarryPointer = (ev) => {
+      if (isTouchPointer(ev)) return;
+      endCarryIf(ev.pointerId);
+    };
+    carry?.addEventListener("pointerup", endCarryPointer);
+    carry?.addEventListener("pointercancel", endCarryPointer);
+
     const onPauseTap = (ev) => {
       ev.preventDefault();
       this.audio.Ensure();
@@ -1240,15 +1311,17 @@ class Game {
 
     const syncStatus = () => {
       if (status) {
-        const stageTag = this.isTutorial ? "T" : (this.isBossStage ? `${this.stage}B` : String(this.stage));
+        const stageTag = this.isTutorial
+          ? "T"
+          : (this.isBarricadeTeach ? "教" : (this.isBossStage ? `${this.stage}B` : String(this.stage)));
         status.textContent = `god ${this.debugGodMode ? "ON" : "OFF"} · stage ${stageTag}`;
       }
       const godBtn = panel.querySelector('[data-debug="god"]');
       godBtn?.classList.toggle("is-on", this.debugGodMode);
       if (stagePick) {
-        const cur = this.isTutorial ? 0 : this.stage;
+        const cur = this.isTutorial ? "0" : (this.isBarricadeTeach ? "barricadeTeach" : String(this.stage));
         stagePick.querySelectorAll("[data-debug-stage]").forEach((btn) => {
-          btn.classList.toggle("is-on", Number(btn.dataset.debugStage) === cur);
+          btn.classList.toggle("is-on", btn.dataset.debugStage === cur);
         });
       }
     };
@@ -1267,6 +1340,8 @@ class Game {
           };
         }),
       ];
+      // Insert barricade teach after stage 6 (before campaign 7).
+      stages.splice(7, 0, { id: "barricadeTeach", label: "教", title: "路障教学" });
       for (const s of stages) {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -1312,14 +1387,21 @@ class Game {
     this.pendingStagePerk = null;
     this.stagePerk = null;
     const keepPlaying = !["ready", "boot"].includes(this.state);
-    const stage = IsTutorialStage(stageId) ? 0 : Math.max(1, Math.min(STAGE_COUNT, stageId | 0));
+    let stage;
+    if (IsTutorialStage(stageId)) stage = 0;
+    else if (IsBarricadeTeachStage(stageId)) stage = "barricadeTeach";
+    else stage = Math.max(1, Math.min(STAGE_COUNT, stageId | 0));
     this.StartGame({
       stage,
       keepStats: false,
       keepScore: keepPlaying,
       keepLives: keepPlaying,
     });
-    const label = stage === 0 ? "新手" : (GetStage(stage).bossStage ? `${stage} Boss` : String(stage));
+    const label = stage === 0
+      ? "新手"
+      : (stage === "barricadeTeach"
+        ? "路障教学"
+        : (GetStage(stage).bossStage ? `${stage} Boss` : String(stage)));
     this.ShowBuffToast(`DEBUG 选关 → ${label}`);
     this.SyncDebugStatus?.();
   }
@@ -1430,9 +1512,16 @@ class Game {
     if (IsTutorialStage(stageIndex1Based)) {
       this.stage = 0;
       this.isTutorial = true;
+      this.isBarricadeTeach = false;
       this.stageData = TUTORIAL_STAGE;
+    } else if (IsBarricadeTeachStage(stageIndex1Based)) {
+      this.stage = "barricadeTeach";
+      this.isTutorial = false;
+      this.isBarricadeTeach = true;
+      this.stageData = BARRICADE_TEACH_STAGE;
     } else {
       this.isTutorial = false;
+      this.isBarricadeTeach = false;
       this.stage = Math.max(1, Math.min(STAGE_COUNT, stageIndex1Based | 0));
       this.stageData = GetStage(this.stage);
     }
@@ -1447,20 +1536,25 @@ class Game {
   }
 
   SyncStageLabels() {
-    const label = this.isTutorial ? "T" : String(this.stage);
+    const label = this.isTutorial ? "T" : (this.isBarricadeTeach ? "教" : String(this.stage));
     if (this.hud.stage) this.hud.stage.textContent = label;
     if (this.hud.mobileStage) this.hud.mobileStage.textContent = label;
     if (this.overlays.startTitle) {
-      this.overlays.startTitle.textContent = this.isTutorial ? "新手引导" : "GRAVITY TANK";
+      this.overlays.startTitle.textContent = this.isTutorial
+        ? "新手引导"
+        : (this.isBarricadeTeach ? "路障教学" : "GRAVITY TANK");
     }
     if (this.overlays.startBlurb) {
       const diffTag = this.IsEasy() ? "简易：双倍生命 · 负面更少 · ?掉率+50%。" : "标准难度。";
       if (this.isTutorial) {
         this.overlays.startBlurb.textContent =
           `${diffTag} 你在河北岸。河对面过不来——用重力弹幕（朝下/斜射）清理南岸敌军，再选一张入门升级进入战役。`;
+      } else if (this.isBarricadeTeach) {
+        this.overlays.startBlurb.textContent =
+          `${diffTag} 路障教学：靠近木/钢路障，按 K（触屏「扛」）扛起——挡在身前可当护盾；再按同一键放下封路。开场有准备时间，先封住上方出口！`;
       } else if (this.state === "ready" || this.state === "boot") {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关坦克王 · 第 6 关重力巨炮 · 第 9 关腿甲坦克人）。保卫老鹰；炮弹带重力会下坠。`;
+          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关坦克王 · 第 6 关重力巨炮 · 第 9 关腿甲坦克人）。第 6 关后有路障教学；第 7–8 关可提前装配陷阱。保卫老鹰；炮弹带重力会下坠。`;
       } else if (this.isBossStage) {
         if (this.stageData.bossKind === "tankMan") {
           this.overlays.startBlurb.textContent =
@@ -1472,6 +1566,10 @@ class Game {
           this.overlays.startBlurb.textContent =
             `${diffTag} BOSS 关 · 重力巨炮。八向炮筒弹幕；残血终焉老鹰诅咒更久（开场有护盾），被打倒直接失败。`;
         }
+      } else if (this.stageData.prepSeconds) {
+        const e = this.stageData.enemies;
+        this.overlays.startBlurb.textContent =
+          `${diffTag} 第 ${this.stage}/${STAGE_COUNT} 关 · ${this.stageData.title || ""} · 敌军 ${this.totalEnemies}。开场准备 ${this.stageData.prepSeconds}s：用路障封死敌窝出口，让它们出不来！`;
       } else {
         const e = this.stageData.enemies;
         this.overlays.startBlurb.textContent =
@@ -1498,6 +1596,13 @@ class Game {
       this.StartGame({ stage: 1, keepStats: false, keepScore: true, keepLives: true });
       return;
     }
+    if (this.isBarricadeTeach) {
+      const keep = this.player
+        ? { power: this.player.power, maxBullets: this.player.maxBullets, absorbHits: this.absorbHits }
+        : { power: 1, maxBullets: 1, absorbHits: this.absorbHits };
+      this.StartGame({ stage: 7, keepStats: keep, keepScore: true, keepLives: true });
+      return;
+    }
     if (this.stage >= STAGE_COUNT) {
       this.EndGame(true, `${STAGE_COUNT} 关全通！最终得分 ${this.score}`, "restart");
       return;
@@ -1505,6 +1610,11 @@ class Game {
     const keep = this.player
       ? { power: this.player.power, maxBullets: this.player.maxBullets, absorbHits: this.absorbHits }
       : { power: 1, maxBullets: 1, absorbHits: this.absorbHits };
+    // After gravity-cannon boss: interstitial barricade teach before stages 7–8 trap maps.
+    if (this.stage === 6) {
+      this.StartGame({ stage: "barricadeTeach", keepStats: keep, keepScore: true, keepLives: true });
+      return;
+    }
     this.StartGame({ stage: this.stage + 1, keepStats: keep, keepScore: true, keepLives: true });
   }
 
@@ -1516,7 +1626,8 @@ class Game {
       }
       this.AdvanceStage();
     } else if (this.endAction === "retry") {
-      this.StartGame({ stage: this.isTutorial ? 0 : this.stage, keepStats: false, keepScore: false, keepLives: false });
+      const stage = this.isTutorial ? 0 : (this.isBarricadeTeach ? "barricadeTeach" : this.stage);
+      this.StartGame({ stage, keepStats: false, keepScore: false, keepLives: false });
     } else {
       this.StartCampaign();
     }
@@ -1525,6 +1636,7 @@ class Game {
   ShouldOfferUpgrade() {
     if (this.endAction !== "next") return false;
     if (this.isTutorial) return true;
+    if (this.isBarricadeTeach) return false;
     // Campaign clear uses restart — no pick. Mid-run next-stage clears offer cards.
     return this.stage < STAGE_COUNT || this.isBossStage;
   }
@@ -1620,8 +1732,12 @@ class Game {
     this.explosions = [];
     this.powerups = [];
     this.bombs = [];
+    this.carryables = [];
+    this.carriedBlock = null;
+    this.prepTimer = 0;
     this.enemies = [];
     this.playerDisarmed = false;
+    this.SpawnCarryBlocksFromStage();
     if (!keepScore) this.score = 0;
     if (!keepLives) this.lives = this.GetStartLives();
     if (!keepStats) this.absorbHits = 0;
@@ -1727,20 +1843,30 @@ class Game {
     this.stageIntro = null;
     this.state = "playing";
     this.lastTs = 0;
-    // Classic: a few enemies already on field when the curtain lifts.
-    const preSpawn = this.isTutorial || this.isBossStage ? 1 : 3;
-    for (let i = 0; i < preSpawn; i++) {
-      this.TrySpawnEnemy(10);
-      const last = this.enemies[this.enemies.length - 1];
-      if (last) last.spawnFlash = 0;
+    const prep = this.stageData?.prepSeconds || 0;
+    this.prepTimer = prep;
+    if (prep > 0) {
+      // Trap / teach stages: give the player time to seal exits before spawns.
+      this.spawnTimer = prep;
+      this.ShowBuffToast(`准备 ${Math.ceil(prep)}s：扛路障封死敌窝出口！（K / 扛）`);
+    } else {
+      const preSpawn = this.isTutorial || this.isBossStage || this.isBarricadeTeach ? 1 : 3;
+      for (let i = 0; i < preSpawn; i++) {
+        this.TrySpawnEnemy(10);
+        const last = this.enemies[this.enemies.length - 1];
+        if (last) last.spawnFlash = 0;
+      }
+      this.spawnTimer = this.isTutorial || this.isBarricadeTeach ? 2.4 : (this.isBossStage ? 99 : 1.2);
     }
-    this.spawnTimer = this.isTutorial ? 2.4 : (this.isBossStage ? 99 : 1.2);
     this.ApplyStageStartPerks();
-    if (this.isTutorial) {
+    if (this.isBarricadeTeach) {
+      this.ShowBuffToast("靠近路障按 K（或「扛」）：扛起=护盾，再按=放下封路");
+    } else if (this.isTutorial) {
       this.ShowBuffToast("河北岸：朝下/斜射，用重力清理南岸敌军");
     } else if (this.isBossStage) {
       const perk = FindUpgrade(this.stagePerk);
-      const bossTitle = this.stageData.bossKind === "tankKing" ? "坦克王" : "重力巨炮";
+      const bossTitle = this.stageData.title
+        || (this.stageData.bossKind === "tankKing" ? "坦克王" : "重力巨炮");
       this.ShowBuffToast(
         perk ? `BOSS · 本关强化：${perk.title}` : `BOSS：${bossTitle} — 准备战斗！`
       );
@@ -1752,6 +1878,26 @@ class Game {
     this.RenderEnemyIcons();
     this.SyncTouchControlsVisibility();
     this.audio.StartBgm();
+  }
+
+  SpawnCarryBlocksFromStage() {
+    this.carryables = [];
+    this.carriedBlock = null;
+    const list = this.stageData?.carryBlocks || [];
+    for (const b of list) {
+      const kind = b.kind === "metal" ? "metal" : "wood";
+      this.carryables.push({
+        x: b.x * TILE,
+        y: b.y * TILE,
+        w: TILE,
+        h: TILE,
+        kind,
+        hp: kind === "metal" ? CARRY_METAL_HP : CARRY_WOOD_HP,
+        maxHp: kind === "metal" ? CARRY_METAL_HP : CARRY_WOOD_HP,
+        alive: true,
+        carried: false,
+      });
+    }
   }
 
   ApplyStageStartPerks() {
@@ -1966,6 +2112,14 @@ class Game {
       if (this.TryRestoreBaseFort()) this.pendingFortRestore = false;
     }
 
+    if (this.prepTimer > 0) {
+      this.prepTimer -= dt;
+      if (this.prepTimer <= 0) {
+        this.prepTimer = 0;
+        this.ShowBuffToast("敌军出动！");
+      }
+    }
+
     if (this.respawnTimer > 0) {
       this.respawnTimer -= dt;
       if (this.respawnTimer <= 0) {
@@ -2000,6 +2154,151 @@ class Game {
 
   WantsFire() {
     return this.keys.has(" ") || this.keys.has("j") || this.touchFire;
+  }
+
+  WantsInteract() {
+    return this.keys.has("k") || this.touchCarry || this.touchCarryPressed;
+  }
+
+  ConsumeInteractPress() {
+    const pressed = this.WantsInteract();
+    if (!pressed) {
+      this.interactArmed = true;
+      this.touchCarryPressed = false;
+      return false;
+    }
+    if (!this.interactArmed) return false;
+    this.interactArmed = false;
+    this.touchCarryPressed = false;
+    return true;
+  }
+
+  CarryShieldRect(tank) {
+    if (!this.carriedBlock || !tank) return null;
+    const len = TILE * 0.95;
+    const thick = TILE * 0.42;
+    const gap = TILE * 0.55;
+    if (tank.dir === "up" || tank.dir === "down") {
+      const ahead = tank.dir === "up" ? -gap : gap;
+      return {
+        x: tank.x + tank.w * 0.5 - len * 0.5,
+        y: tank.y + tank.h * 0.5 + ahead - thick * 0.5,
+        w: len,
+        h: thick,
+      };
+    }
+    const ahead = tank.dir === "left" ? -gap : gap;
+    return {
+      x: tank.x + tank.w * 0.5 + ahead - thick * 0.5,
+      y: tank.y + tank.h * 0.5 - len * 0.5,
+      w: thick,
+      h: len,
+    };
+  }
+
+  NearestCarryable(tank, maxDist = TILE * 1.45) {
+    let best = null;
+    let bestDist = maxDist;
+    for (const block of this.carryables) {
+      if (!block.alive || block.carried) continue;
+      const dist = Math.hypot(block.x + block.w * 0.5 - (tank.x + tank.w * 0.5), block.y + block.h * 0.5 - (tank.y + tank.h * 0.5));
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = block;
+      }
+    }
+    return best;
+  }
+
+  DropCarriedBlock(atPlayer = true) {
+    if (!this.carriedBlock) return;
+    const block = this.carriedBlock;
+    const p = this.player;
+    if (atPlayer && p) {
+      block.x = Clamp(p.x + (p.w - block.w) * 0.5, 0, CANVAS_W - block.w);
+      block.y = Clamp(p.y + (p.h - block.h) * 0.5, 0, CANVAS_H - block.h);
+    }
+    block.carried = false;
+    this.carriedBlock = null;
+  }
+
+  RectHitsTerrain(rect) {
+    const pads = [
+      [rect.x + 1, rect.y + 1],
+      [rect.x + rect.w - 2, rect.y + 1],
+      [rect.x + 1, rect.y + rect.h - 2],
+      [rect.x + rect.w - 2, rect.y + rect.h - 2],
+      [rect.x + rect.w * 0.5, rect.y + rect.h * 0.5],
+    ];
+    for (const [px, py] of pads) {
+      const tx = Math.floor(px / TILE);
+      const ty = Math.floor(py / TILE);
+      if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
+      const t = this.map[ty][tx];
+      if (t === TILE_BRICK) {
+        if (this.BrickSolidAt(px, py)) return true;
+        continue;
+      }
+      if (t === TILE_STEEL || t === TILE_WATER || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
+    }
+    return false;
+  }
+
+  RectHitsTanks(rect, ignore = null) {
+    const bodies = [];
+    if (this.player?.alive && this.player !== ignore) bodies.push(this.player);
+    for (const e of this.enemies) {
+      if (e.alive && e !== ignore) bodies.push(e);
+    }
+    for (const o of bodies) {
+      const ob = { x: o.x + 2, y: o.y + 2, w: o.w - 4, h: o.h - 4 };
+      if (RectsOverlap(rect, ob)) return true;
+    }
+    return false;
+  }
+
+  TryInteractCarry() {
+    if (!this.player?.alive || this.playerStunTimer > 0 || this.eagleMorph || this.playerEagleTimer > 0) return;
+    if (this.carriedBlock) {
+      const face = DIR[this.player.dir] || DIR.up;
+      const placeX = this.player.x + this.player.w * 0.5 + face.x * TILE * 0.95 - TILE * 0.5;
+      const placeY = this.player.y + this.player.h * 0.5 + face.y * TILE * 0.95 - TILE * 0.5;
+      const rect = {
+        x: Clamp(placeX, 0, CANVAS_W - TILE),
+        y: Clamp(placeY, 0, CANVAS_H - TILE),
+        w: TILE,
+        h: TILE,
+      };
+      if (this.RectHitsTerrain(rect) || this.RectHitsTanks(rect, this.player)) {
+        this.ShowBuffToast("前方放不下，换个位置再放下");
+        return;
+      }
+      for (const other of this.carryables) {
+        if (!other.alive || other.carried || other === this.carriedBlock) continue;
+        if (RectsOverlap(rect, other)) {
+          this.ShowBuffToast("这里已有路障");
+          return;
+        }
+      }
+      this.carriedBlock.x = rect.x;
+      this.carriedBlock.y = rect.y;
+      this.carriedBlock.carried = false;
+      this.carriedBlock = null;
+      this.ShowBuffToast("已放下挡板");
+      this.audio.Hit();
+      return;
+    }
+    const near = this.NearestCarryable(this.player);
+    if (!near) {
+      if (this.isBarricadeTeach || this.stageData?.carryBlocks?.length) {
+        this.ShowBuffToast("靠近木板/铁板再按 K（或「扛」）");
+      }
+      return;
+    }
+    near.carried = true;
+    this.carriedBlock = near;
+    this.ShowBuffToast(near.kind === "metal" ? "扛起铁板 · 身前护盾，再按放下" : "扛起木板 · 身前护盾，再按放下");
+    this.audio.Power();
   }
 
   UpdatePlayer(dt) {
@@ -2054,7 +2353,7 @@ class Game {
       }
       const d = DIR[input];
       const baseSpeed = eagleForm ? PLAYER_SPEED * 0.55 : p.speed;
-      const speed = baseSpeed * (onIce ? 1.15 : 1);
+      const speed = baseSpeed * (onIce ? 1.15 : 1) * (this.carriedBlock ? 0.88 : 1);
       this.MoveTank(p, d.x * speed * dt, d.y * speed * dt);
       if (eagleForm) {
         // Keep the cursed eagle near the HQ band (top or bottom).
@@ -2089,6 +2388,7 @@ class Game {
     this.audio.SetEngine(p.moving && !eagleForm);
     if (p.moving) p.animTick += dt * 10;
 
+    if (this.ConsumeInteractPress()) this.TryInteractCarry();
     if (this.WantsFire()) this.TryFire(p, true);
 
     // pickup → gun barrel restore, or physics roulette
@@ -3079,7 +3379,7 @@ class Game {
   }
 
   TankBlocked(tank) {
-    return this.CollidesTerrain(tank) || this.CollidesTanks(tank);
+    return this.CollidesTerrain(tank) || this.CollidesTanks(tank) || this.CollidesCarryables(tank);
   }
 
   /** Push a tank out of embeds. Larger radius used when ghost ends inside walls. */
@@ -3211,6 +3511,15 @@ class Game {
     for (const o of bodies) {
       const ob = { x: o.x + 2, y: o.y + 2, w: o.w - 4, h: o.h - 4 };
       if (RectsOverlap(box, ob)) return true;
+    }
+    return false;
+  }
+
+  CollidesCarryables(self) {
+    const box = { x: self.x + 2, y: self.y + 2, w: self.w - 4, h: self.h - 4 };
+    for (const block of this.carryables) {
+      if (!block.alive || block.carried) continue;
+      if (RectsOverlap(box, block)) return true;
     }
     return false;
   }
@@ -3388,6 +3697,7 @@ class Game {
 
       // terrain hit
       if (this.BulletHitTerrain(b)) continue;
+      if (this.BulletHitCarryables(b)) continue;
 
       // Armed bullets can hit any tank, including the shooter (gravity self-kill).
       const canSelfHit = b.arm <= 0 || b.traveled >= 36;
@@ -3528,6 +3838,48 @@ class Game {
     return false;
   }
 
+  DamageCarryable(block, power = 1) {
+    if (!block?.alive) return;
+    const dmg = Math.max(1, power | 0);
+    block.hp -= dmg;
+    if (block.hp <= 0) {
+      block.alive = false;
+      block.carried = false;
+      if (this.carriedBlock === block) this.carriedBlock = null;
+      this.SpawnExplosion(block.x + block.w * 0.5, block.y + block.h * 0.5, 0.5);
+      this.audio.Explode();
+    } else {
+      this.audio.Hit();
+    }
+  }
+
+  BulletHitCarryables(b) {
+    // Held shield: blocks enemy (and stray) shells in front of the player.
+    if (this.carriedBlock?.alive && this.player?.alive) {
+      const shield = this.CarryShieldRect(this.player);
+      if (shield && RectsOverlap(b, shield)) {
+        // Own outgoing shells ignore the shield briefly.
+        if (b.isPlayer && b.owner === this.player && (b.arm > 0 || b.traveled < 28)) {
+          return false;
+        }
+        this.DamageCarryable(this.carriedBlock, b.power || 1);
+        b.alive = false;
+        this.SpawnExplosion(b.x, b.y, 0.4);
+        return true;
+      }
+    }
+
+    for (const block of this.carryables) {
+      if (!block.alive || block.carried) continue;
+      if (!RectsOverlap(b, block)) continue;
+      this.DamageCarryable(block, b.power || 1);
+      b.alive = false;
+      this.SpawnExplosion(b.x, b.y, 0.4);
+      return true;
+    }
+    return false;
+  }
+
   BrickSolidAt(px, py) {
     const tx = Math.floor(px / TILE);
     const ty = Math.floor(py / TILE);
@@ -3616,6 +3968,7 @@ class Game {
       this.audio.Bounce();
       return;
     }
+    this.DropCarriedBlock(true);
     // Ultimate eagle curse: dying as the eagle fails the stage regardless of lives.
     if (this.playerEagleTimer > 0 || p.asEagle || this.eagleMorph || p.eagleMorphing) {
       p.alive = false;
@@ -4457,6 +4810,8 @@ class Game {
     if (alive === 0 && this.spawnQueue.length === 0) {
       if (this.isTutorial) {
         this.EndGame(true, "河对岸肃清！选一张入门升级，带进第一关。", "next");
+      } else if (this.isBarricadeTeach) {
+        this.EndGame(true, "路障学会了！接下来用它封死敌窝出口。", "next");
       } else if (this.isBossStage) {
         const title = this.stageData.title || "Boss";
         this.EndGame(true, `${title}击破！得分 ${this.score}`, "next");
@@ -4477,9 +4832,11 @@ class Game {
     this.overlays.endTitle.textContent = won
       ? (this.isTutorial
         ? "引导通过"
-        : this.isBossStage
-          ? "Boss 击破"
-          : (this.stage >= STAGE_COUNT && action === "restart" ? "战役胜利" : "关卡通过"))
+        : this.isBarricadeTeach
+          ? "教学完成"
+          : this.isBossStage
+            ? "Boss 击破"
+            : (this.stage >= STAGE_COUNT && action === "restart" ? "战役胜利" : "关卡通过"))
       : "游戏结束";
     this.overlays.endMessage.textContent = message;
     if (this.overlays.endPrimary) {
@@ -4505,7 +4862,7 @@ class Game {
     const power = String(this.player?.power ?? 1);
     const score = String(this.score);
     const remain = String(this.spawnQueue.length + this.enemies.filter((e) => e.alive).length);
-    const stage = this.isTutorial ? "T" : String(this.stage);
+    const stage = this.isTutorial ? "T" : (this.isBarricadeTeach ? "教" : String(this.stage));
     this.hud.lives.textContent = lives;
     this.hud.power.textContent = power;
     this.hud.score.textContent = score;
@@ -4555,11 +4912,17 @@ class Game {
     this.DrawGround(ctx);
     this.DrawTiles(ctx, false); // non-grass
     this.DrawBase(ctx);
+    for (const block of this.carryables) {
+      if (block.alive && !block.carried) this.DrawCarryable(ctx, block);
+    }
 
     for (const pu of this.powerups) this.DrawPowerup(ctx, pu);
     for (const bomb of this.bombs || []) if (bomb.alive) this.DrawTimedBomb(ctx, bomb);
     for (const e of this.enemies) if (e.alive) this.DrawTank(ctx, e, false);
-    if (this.player?.alive) this.DrawTank(ctx, this.player, true);
+    if (this.player?.alive) {
+      this.DrawTank(ctx, this.player, true);
+      if (this.carriedBlock?.alive) this.DrawCarriedShield(ctx, this.player, this.carriedBlock);
+    }
     for (const b of this.bullets) this.DrawBullet(ctx, b);
     this.DrawTiles(ctx, true); // grass on top
     for (const ex of this.explosions) this.DrawExplosion(ctx, ex);
@@ -4568,6 +4931,7 @@ class Game {
     if (this.state === "playing" && this.player?.alive) this.DrawAimGhost(ctx);
     this.DrawBuffHud(ctx);
     if (this.state === "playing" && this.isTutorial) this.DrawTutorialHint(ctx);
+    if (this.state === "playing" && this.isBarricadeTeach) this.DrawBarricadeTeachHint(ctx);
     if (this.state === "roulette") this.DrawRoulette(ctx);
   }
 
@@ -4583,6 +4947,62 @@ class Game {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("↓ 朝下/斜射 · 重力越过河清理敌军", CANVAS_W / 2, CANVAS_H - 22);
+    ctx.restore();
+  }
+
+  DrawBarricadeTeachHint(ctx) {
+    const holding = !!this.carriedBlock;
+    const line = holding
+      ? "护盾已举起 · 再按 K /「扛」放下封路"
+      : "靠近木/铁板 · 按 K /「扛」举起（同键=护盾/放下）";
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(18, CANVAS_H - 36, CANVAS_W - 36, 28);
+    ctx.strokeStyle = "#80e0ff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(18, CANVAS_H - 36, CANVAS_W - 36, 28);
+    ctx.fillStyle = "#b8f0ff";
+    ctx.font = `10px ${PIXEL_FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(line, CANVAS_W / 2, CANVAS_H - 22);
+    ctx.restore();
+  }
+
+  DrawCarryable(ctx, block) {
+    const img = block.kind === "metal" ? this.images.barricadeMetal : this.images.barricadeWood;
+    if (img) {
+      ctx.drawImage(img, 0, 0, img.width, img.height, block.x, block.y, block.w, block.h);
+    } else {
+      ctx.fillStyle = block.kind === "metal" ? "#8a9aa8" : "#8a5a28";
+      ctx.fillRect(block.x, block.y, block.w, block.h);
+      ctx.strokeStyle = "#201008";
+      ctx.strokeRect(block.x + 0.5, block.y + 0.5, block.w - 1, block.h - 1);
+    }
+    if (block.hp < block.maxHp) {
+      const ratio = Clamp(block.hp / block.maxHp, 0, 1);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(block.x + 2, block.y - 4, block.w - 4, 3);
+      ctx.fillStyle = block.kind === "metal" ? "#c0d0e0" : "#d0a060";
+      ctx.fillRect(block.x + 2, block.y - 4, (block.w - 4) * ratio, 3);
+    }
+  }
+
+  DrawCarriedShield(ctx, tank, block) {
+    const rect = this.CarryShieldRect(tank);
+    if (!rect) return;
+    const img = block.kind === "metal" ? this.images.barricadeMetal : this.images.barricadeWood;
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    if (img) {
+      ctx.drawImage(img, 0, 0, img.width, img.height, rect.x, rect.y, rect.w, rect.h);
+    } else {
+      ctx.fillStyle = block.kind === "metal" ? "#9ab0c0" : "#a06830";
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    }
+    ctx.strokeStyle = "rgba(255,224,120,0.85)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
     ctx.restore();
   }
 
@@ -4645,21 +5065,35 @@ class Game {
         ctx.globalAlpha = fade * 0.95;
         ctx.font = `13px ${PIXEL_FONT}`;
         ctx.fillText("向上射击的炮弹会落回打自己", CANVAS_W / 2, CANVAS_H / 2 + 62);
+      } else if (this.isBarricadeTeach) {
+        ctx.font = `28px ${PIXEL_FONT}`;
+        ctx.fillText("TEACH", CANVAS_W / 2, CANVAS_H / 2 - 36);
+        const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
+        ctx.globalAlpha = fade * blink;
+        ctx.font = `36px ${PIXEL_FONT}`;
+        ctx.fillText("路障教学", CANVAS_W / 2, CANVAS_H / 2 + 18);
+        ctx.globalAlpha = fade * 0.95;
+        ctx.font = `12px ${PIXEL_FONT}`;
+        ctx.fillText("K /「扛」：举起护盾 · 再按放下封路", CANVAS_W / 2, CANVAS_H / 2 + 58);
       } else if (this.isBossStage) {
-        const isKing = this.stageData.bossKind === "tankKing";
+        const kind = this.stageData.bossKind;
+        const bossTitle =
+          kind === "tankKing" ? "坦克王" :
+          kind === "tankMan" ? "腿甲坦克人" :
+          "重力巨炮";
+        const bossHint =
+          kind === "tankKing" ? "单炮追猎 · 开阔战场" :
+          kind === "tankMan" ? "拆炮 · 炸弹 · 弹射狙击" :
+          "八管弹幕 · 炮弹带重力";
         ctx.font = `28px ${PIXEL_FONT}`;
         ctx.fillText("BOSS", CANVAS_W / 2, CANVAS_H / 2 - 36);
         const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
         ctx.globalAlpha = fade * blink;
         ctx.font = `36px ${PIXEL_FONT}`;
-        ctx.fillText(isKing ? "坦克王" : "重力巨炮", CANVAS_W / 2, CANVAS_H / 2 + 18);
+        ctx.fillText(bossTitle, CANVAS_W / 2, CANVAS_H / 2 + 18);
         ctx.globalAlpha = fade * 0.95;
         ctx.font = `12px ${PIXEL_FONT}`;
-        ctx.fillText(
-          isKing ? "单炮追猎 · 开阔战场" : "八管弹幕 · 炮弹带重力",
-          CANVAS_W / 2,
-          CANVAS_H / 2 + 58
-        );
+        ctx.fillText(bossHint, CANVAS_W / 2, CANVAS_H / 2 + 58);
       } else {
         ctx.font = `36px ${PIXEL_FONT}`;
         ctx.fillText("STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
@@ -4672,7 +5106,8 @@ class Game {
 
         ctx.globalAlpha = fade * 0.9;
         ctx.font = `16px ${PIXEL_FONT}`;
-        ctx.fillText(`第 ${this.stage} 关 / 共 ${STAGE_COUNT} 关`, CANVAS_W / 2, CANVAS_H / 2 + 72);
+        const title = this.stageData?.title ? ` · ${this.stageData.title}` : "";
+        ctx.fillText(`第 ${this.stage} 关 / 共 ${STAGE_COUNT} 关${title}`, CANVAS_W / 2, CANVAS_H / 2 + 72);
       }
 
       if (intro.phase === "hold") {
@@ -5568,6 +6003,11 @@ class Game {
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
     if ((this.absorbHits || 0) > 0) chips.push({ t: `装甲×${this.absorbHits}`, c: "#c8e0ff" });
     if (this.playerDisarmed) chips.push({ t: "无炮管·去捡", c: "#ff6060" });
+    if (this.prepTimer > 0) chips.push({ t: `准备 ${Math.ceil(this.prepTimer)}`, c: "#80e0ff" });
+    if (this.carriedBlock) {
+      const kind = this.carriedBlock.kind === "metal" ? "铁盾" : "木盾";
+      chips.push({ t: `${kind} ${this.carriedBlock.hp}/${this.carriedBlock.maxHp}`, c: "#ffe08a" });
+    }
     if (this.stagePerk) {
       const u = FindUpgrade(this.stagePerk);
       if (u) chips.push({ t: `本关·${u.title}`, c: "#70ff98" });

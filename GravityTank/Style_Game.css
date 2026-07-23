@@ -817,11 +817,12 @@ p.mobile-hint { display: none; }
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-  /* Stick matches FIRE + gap + PAUSE column footprint. */
+  /* Stick matches FIRE + CARRY + gap + PAUSE column footprint. */
   --touch-fire: 108px;
+  --touch-carry-h: 48px;
   --touch-pause-h: 40px;
   --touch-actions-gap: 10px;
-  --touch-stick: calc(var(--touch-fire) + var(--touch-actions-gap) + var(--touch-pause-h));
+  --touch-stick: calc(var(--touch-fire) + var(--touch-carry-h) + var(--touch-pause-h) + 2 * var(--touch-actions-gap));
   --touch-knob: calc(var(--touch-stick) * 0.38);
 }
 
@@ -909,6 +910,38 @@ p.mobile-hint { display: none; }
   transform: translateY(3px);
   box-shadow: 0 2px 0 #401008;
   filter: brightness(1.1);
+}
+
+.touch-carry {
+  appearance: none;
+  width: var(--touch-fire);
+  height: var(--touch-carry-h);
+  border-radius: 0;
+  border: 3px solid #80e0ff;
+  background: #184868;
+  color: #e8f8ff;
+  font: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  box-shadow: 0 4px 0 #0a2030;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.touch-carry[hidden] {
+  display: none !important;
+}
+
+.touch-carry:active,
+.touch-carry.is-active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #0a2030;
+  filter: brightness(1.12);
+}
+
+body:not(.has-carry-control) .touch-actions-wrap {
+  --touch-carry-h: 0px;
+  --touch-stick: calc(var(--touch-fire) + var(--touch-pause-h) + var(--touch-actions-gap));
 }
 
 .touch-pause {
