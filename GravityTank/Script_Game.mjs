@@ -207,7 +207,7 @@ const ENEMY_TYPES = [
   { id: "armor", hp: 4, speed: 48, score: 400, shootCd: 1.2, texture: "enemyArmor", weight: 2 },
   {
     id: "boss",
-    hp: 28,
+    hp: 120,
     speed: 19, // -50% vs original 38
     score: 5000,
     shootCd: 2.4,
@@ -1577,6 +1577,7 @@ class Game {
     const newStageKey = this.isTutorial ? 0 : this.stage;
     this.map = BuildStageMap(this.isTutorial ? 0 : this.stage);
     this.brickMask = BuildBrickMask(this.map);
+    this._baseCell = null;
     this.bullets = [];
     this.explosions = [];
     this.powerups = [];
@@ -1977,8 +1978,12 @@ class Game {
       const speed = baseSpeed * (onIce ? 1.15 : 1);
       this.MoveTank(p, d.x * speed * dt, d.y * speed * dt);
       if (eagleForm) {
-        // Keep the cursed eagle in the lower HQ band.
-        p.y = Clamp(p.y, CANVAS_H * 0.55, CANVAS_H - p.h - 2);
+        // Keep the cursed eagle near the HQ band (top or bottom).
+        if (this.IsBaseAtTop()) {
+          p.y = Clamp(p.y, 2, Math.min(CANVAS_H * 0.45, CANVAS_H - p.h - 2));
+        } else {
+          p.y = Clamp(p.y, CANVAS_H * 0.55, CANVAS_H - p.h - 2);
+        }
       }
       p.moving = true;
       if (onIce) {
@@ -2054,7 +2059,8 @@ class Game {
           e.dir = DirFromVector(dx, dy);
         } else if (roll < 0.7) {
           // toward base
-          e.dir = DirFromVector(12 * TILE - e.x, 24 * TILE - e.y);
+          const hq = this.GetBaseTarget();
+          e.dir = DirFromVector(hq.x - e.x, hq.y - e.y);
         } else {
           e.dir = DIR_KEYS[Math.floor(Math.random() * 4)];
         }
@@ -2076,7 +2082,7 @@ class Game {
 
       // shoot logic: if roughly aligned with player or base, fire
       if (e.fireCd <= 0) {
-        const should = Math.random() < 0.025 || this.AlignedForShot(e, this.player) || this.AlignedForShot(e, { x: 12 * TILE, y: 24 * TILE, w: 32, h: 32 });
+        const should = Math.random() < 0.025 || this.AlignedForShot(e, this.player) || this.AlignedForShot(e, this.GetBaseTarget());
         if (should) this.TryFire(e, false);
       }
     }
@@ -3196,8 +3202,7 @@ class Game {
     if (this.eagleMorph || p.asEagle) return;
     const duration = this.GetEagleCurseDuration();
     const shield = this.GetEagleCurseShield();
-    const toX = Clamp(12 * TILE, 0, CANVAS_W - p.w);
-    const toY = Clamp(23 * TILE, CANVAS_H * 0.55, CANVAS_H - p.h - 2);
+    const { toX, toY } = this.GetEagleMorphTarget(p);
     // Morph telegraph first — eagle timer starts when the animation finishes.
     this.eagleMorph = {
       t: 0,
@@ -3274,9 +3279,71 @@ class Game {
         if (this.map[y][x] === TILE_BASE) this.map[y][x] = TILE_BASE_DEAD;
       }
     }
-    this.SpawnExplosion(13 * TILE, 25 * TILE, 1.4);
+    const hq = this.GetBaseTarget();
+    this.SpawnExplosion(hq.x + hq.w / 2, hq.y + hq.h / 2, 1.4);
     this.audio.Lose();
     this.EndGame(false, "总部被毁。战役失败。");
+  }
+
+  /** Top-left tile of the 2×2 eagle base (live or ruined). */
+  FindBaseCell() {
+    if (this._baseCell) {
+      const { x, y } = this._baseCell;
+      const t = this.map?.[y]?.[x];
+      if (t === TILE_BASE || t === TILE_BASE_DEAD) return this._baseCell;
+    }
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const t = this.map[y][x];
+        if (t === TILE_BASE || t === TILE_BASE_DEAD) {
+          this._baseCell = { x, y };
+          return this._baseCell;
+        }
+      }
+    }
+    this._baseCell = { x: 12, y: 24 };
+    return this._baseCell;
+  }
+
+  IsBaseAtTop() {
+    return this.FindBaseCell().y < MAP_H / 2;
+  }
+
+  GetBaseTarget() {
+    const c = this.FindBaseCell();
+    return { x: c.x * TILE, y: c.y * TILE, w: TILE * 2, h: TILE * 2 };
+  }
+
+  /** Fort ring open toward the battlefield (below top HQ / above bottom HQ). */
+  GetBaseFortCells() {
+    const { x: bx, y: by } = this.FindBaseCell();
+    if (by < MAP_H / 2) {
+      return [
+        [bx - 1, by], [bx + 2, by],
+        [bx - 1, by + 1], [bx + 2, by + 1],
+        [bx - 1, by + 2], [bx, by + 2], [bx + 1, by + 2], [bx + 2, by + 2],
+      ];
+    }
+    return [
+      [bx - 1, by - 1], [bx, by - 1], [bx + 1, by - 1], [bx + 2, by - 1],
+      [bx - 1, by], [bx + 2, by],
+      [bx - 1, by + 1], [bx + 2, by + 1],
+    ];
+  }
+
+  GetEagleMorphTarget(p) {
+    const c = this.FindBaseCell();
+    const toX = Clamp(c.x * TILE, 0, CANVAS_W - p.w);
+    if (c.y < MAP_H / 2) {
+      return {
+        toX,
+        toY: Clamp((c.y + 2) * TILE, 2, Math.min(CANVAS_H * 0.45, CANVAS_H - p.h - 2)),
+      };
+    }
+    return {
+      toX,
+      toY: Clamp((c.y - 1) * TILE, CANVAS_H * 0.55, CANVAS_H - p.h - 2),
+    };
   }
 
   DropPowerup(x, y) {
@@ -3301,6 +3368,7 @@ class Game {
     this.ResetTouchInput();
     this.state = "roulette";
     const segments = PickRouletteSegments(ROULETTE_SIZE, this.difficulty);
+    const touch = this.isTouchDevice;
     this.roulette = {
       angle: Math.random() * Math.PI * 2, // orientation only — NOT the result
       omega: 0,
@@ -3315,8 +3383,8 @@ class Game {
       resultT: 0,
       segments,
       cx: CANVAS_W / 2,
-      cy: CANVAS_H / 2 + 28,
-      radius: 128,
+      cy: CANVAS_H / 2 + (touch ? 40 : 28),
+      radius: touch ? 158 : 128,
     };
     this.SyncTouchControlsVisibility();
     const nBad = segments.filter((s) => s.tier === "bad").length;
@@ -3674,12 +3742,9 @@ class Game {
   }
 
   BreakBaseFort() {
-    const cells = [
-      [11, 23], [12, 23], [13, 23], [14, 23],
-      [11, 24], [14, 24],
-      [11, 25], [14, 25],
-    ];
+    const cells = this.GetBaseFortCells();
     for (const [x, y] of cells) {
+      if (y < 0 || y >= MAP_H || x < 0 || x >= MAP_W) continue;
       if (this.map[y][x] === TILE_BRICK) this.SetBrickCell(x, y, false);
       else if (this.map[y][x] === TILE_STEEL) this.map[y][x] = TILE_EMPTY;
     }
@@ -3770,12 +3835,9 @@ class Game {
   }
 
   FortifyBase(steel) {
-    const cells = [
-      [11, 23], [12, 23], [13, 23], [14, 23],
-      [11, 24], [14, 24],
-      [11, 25], [14, 25],
-    ];
+    const cells = this.GetBaseFortCells();
     for (const [x, y] of cells) {
+      if (y < 0 || y >= MAP_H || x < 0 || x >= MAP_W) continue;
       if (this.map[y][x] === TILE_BASE || this.map[y][x] === TILE_BASE_DEAD) continue;
       // Never bury a live tank inside fort walls — that soft-locks movement.
       if (this.TileOccupiedByTank(x, y)) continue;
@@ -3803,13 +3865,10 @@ class Game {
 
   TryRestoreBaseFort() {
     // Defer restore while any fort cell is occupied, otherwise wait one frame and place free cells.
-    const cells = [
-      [11, 23], [12, 23], [13, 23], [14, 23],
-      [11, 24], [14, 24],
-      [11, 25], [14, 25],
-    ];
+    const cells = this.GetBaseFortCells();
     let blocked = false;
     for (const [x, y] of cells) {
+      if (y < 0 || y >= MAP_H || x < 0 || x >= MAP_W) continue;
       if (this.map[y][x] === TILE_BASE || this.map[y][x] === TILE_BASE_DEAD) continue;
       if (this.TileOccupiedByTank(x, y)) {
         blocked = true;
@@ -3871,7 +3930,7 @@ class Game {
       y,
       w: size,
       h: size,
-      dir: "down",
+      dir: this.IsBaseAtTop() ? "up" : "down",
       speed: type.speed,
       hp: type.hp,
       maxHp: type.hp,
@@ -4005,6 +4064,7 @@ class Game {
     this.state = "ready";
     this.map = BuildStageMap(this.stage);
     this.brickMask = BuildBrickMask(this.map);
+    this._baseCell = null;
     this.Render();
   }
 
@@ -4226,8 +4286,9 @@ class Game {
   }
 
   DrawBase(ctx) {
-    const bx = 12 * TILE;
-    const by = 24 * TILE;
+    const cell = this.FindBaseCell();
+    const bx = cell.x * TILE;
+    const by = cell.y * TILE;
     const key = this.baseAlive ? "baseAlive" : "baseDead";
     const [gx, gy] = TILE_SHEET[key];
     this.BlitGrid(ctx, gx, gy, bx, by, TILE * 2, TILE * 2, 2, 2);
@@ -4674,6 +4735,7 @@ class Game {
   DrawRoulette(ctx) {
     const r = this.roulette;
     if (!r) return;
+    const touch = this.isTouchDevice;
     const segs = this.RouletteSegments();
     const n = Math.max(1, segs.length);
     const slice = (Math.PI * 2) / n;
@@ -4683,6 +4745,14 @@ class Game {
     const wheelImg = this.images.rouletteWheel;
     const needle = this.images.rouletteNeedle;
     const rad = r.radius;
+    const bannerH = touch ? 44 : 28;
+    const bannerY = touch ? 8 : 10;
+    const labelPx = touch ? 16 : 11;
+    const bannerPx = touch ? 18 : 12;
+    const hintPx = touch ? 14 : 10;
+    const legendPx = touch ? 13 : 9;
+    const hubR = touch ? 22 : 16;
+    const hubPx = touch ? 15 : 11;
 
     const muted = (tier, focusSeg) => {
       if (tier === "good") return focusSeg ? "rgba(56,120,78,0.95)" : "rgba(42,92,62,0.92)";
@@ -4694,19 +4764,22 @@ class Game {
     ctx.fillStyle = "rgba(0,0,0,0.72)";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Compact result strip (less chrome)
+    // Result strip — taller + larger type on touch so CJK stays readable.
     ctx.fillStyle = focus.bg;
-    ctx.fillRect(28, 10, CANVAS_W - 56, 28);
+    ctx.fillRect(20, bannerY, CANVAS_W - 40, bannerH);
     ctx.strokeStyle = focus.rim || focus.color;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(28, 10, CANVAS_W - 56, 28);
-    this.DrawPowerIcon(ctx, focus.kind, 44, 24, 16);
+    ctx.lineWidth = touch ? 3 : 2;
+    ctx.strokeRect(20, bannerY, CANVAS_W - 40, bannerH);
+    const iconSize = touch ? 22 : 16;
+    const iconCx = touch ? 48 : 44;
+    const iconCy = bannerY + bannerH / 2;
+    this.DrawPowerIcon(ctx, focus.kind, iconCx, iconCy, iconSize);
     ctx.fillStyle = focus.color;
-    ctx.font = `12px ${PIXEL_FONT}`;
+    ctx.font = `${bannerPx}px ${PIXEL_FONT}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     const tag = focus.tier === "ultra" ? "超 " : focus.tier === "bad" ? "负 " : "好 ";
-    ctx.fillText(`${tag}${focus.label}`, 58, 24);
+    ctx.fillText(`${tag}${focus.label}`, iconCx + iconSize / 2 + 10, iconCy);
     ctx.textBaseline = "alphabetic";
 
     ctx.save();
@@ -4752,7 +4825,7 @@ class Game {
       ctx.arc(0, 0, rad - 1, a0, a0 + slice);
       ctx.closePath();
       ctx.strokeStyle = focus.color;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = touch ? 3 : 2;
       ctx.stroke();
     }
 
@@ -4763,29 +4836,30 @@ class Game {
       const isFocus = i === needleIdx;
       ctx.save();
       ctx.rotate(mid);
-      const tx = rad * 0.62;
-      const tw = Math.max(28, seg.label.length * 10);
-      const th = 14;
-      ctx.fillStyle = isFocus ? "rgba(0,0,0,0.72)" : "rgba(0,0,0,0.5)";
+      const tx = rad * (touch ? 0.58 : 0.62);
+      ctx.font = `${labelPx}px ${PIXEL_FONT}`;
+      const textW = ctx.measureText(seg.label).width;
+      const tw = Math.max(touch ? 40 : 28, textW + (touch ? 14 : 8));
+      const th = touch ? 22 : 14;
+      ctx.fillStyle = isFocus ? "rgba(0,0,0,0.82)" : "rgba(0,0,0,0.62)";
       ctx.fillRect(tx - tw / 2, -th / 2, tw, th);
-      ctx.fillStyle = isFocus ? "#fff4d0" : "#e8e8e8";
-      ctx.font = `11px ${PIXEL_FONT}`;
+      ctx.fillStyle = isFocus ? "#fff4d0" : "#f0f0f0";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(seg.label, tx, 0.5);
       ctx.restore();
     }
 
-    // Small hub
+    // Hub
     ctx.beginPath();
-    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+    ctx.arc(0, 0, hubR, 0, Math.PI * 2);
     ctx.fillStyle = "#141820";
     ctx.fill();
     ctx.strokeStyle = focus.rim || "#a09050";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = touch ? 3 : 2;
     ctx.stroke();
     ctx.fillStyle = focus.color;
-    ctx.font = `11px ${PIXEL_FONT}`;
+    ctx.font = `${hubPx}px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(focus.tier === "bad" ? "负" : focus.tier === "ultra" ? "超" : "好", 0, 1);
@@ -4793,8 +4867,10 @@ class Game {
 
     // Slim needle — tip lands on rim at top
     const ny = r.cy - rad;
+    const needleW = touch ? 28 : 20;
+    const needleH = touch ? 40 : 32;
     if (needle) {
-      ctx.drawImage(needle, r.cx - 10, ny - 28, 20, 32);
+      ctx.drawImage(needle, r.cx - needleW / 2, ny - needleH + 4, needleW, needleH);
     } else {
       ctx.fillStyle = "#e0c060";
       ctx.beginPath();
@@ -4811,24 +4887,26 @@ class Game {
     ctx.arc(r.cx, r.cy, rad + 3, 0, Math.PI * 2);
     ctx.stroke();
 
+    const footY = CANVAS_H - (touch ? 28 : 18);
+    const legendY = CANVAS_H - (touch ? 10 : 6);
     ctx.fillStyle = "#a8b0b8";
-    ctx.font = `10px ${PIXEL_FONT}`;
+    ctx.font = `${hintPx}px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.fillText(
       r.phase === "spin"
         ? (Math.abs(r.omega) > 0.2 || r.dragging ? "减速中…" : "拖动甩转 / 空格")
         : "获得！",
       r.cx,
-      CANVAS_H - 18
+      footY
     );
     ctx.textAlign = "left";
-    ctx.font = `9px ${PIXEL_FONT}`;
+    ctx.font = `${legendPx}px ${PIXEL_FONT}`;
     ctx.fillStyle = TIER_PALETTE.good.color;
-    ctx.fillText("绿=好", 20, CANVAS_H - 6);
+    ctx.fillText("绿=好", 16, legendY);
     ctx.fillStyle = TIER_PALETTE.ultra.color;
-    ctx.fillText("金=超", 70, CANVAS_H - 6);
+    ctx.fillText("金=超", touch ? 90 : 70, legendY);
     ctx.fillStyle = TIER_PALETTE.bad.color;
-    ctx.fillText("红=负", 120, CANVAS_H - 6);
+    ctx.fillText("红=负", touch ? 170 : 120, legendY);
   }
 
   DrawBuffHud(ctx) {

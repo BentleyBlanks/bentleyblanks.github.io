@@ -4,6 +4,18 @@
  */
 export const STAGE_COUNT = 6;
 
+/** Flip a classic bottom-base stage so eagle + player sit at the top (newbie-safer). */
+function FlipStageVertical(stage) {
+  const h = stage.map.length;
+  return {
+    ...stage,
+    map: stage.map.map((_, i) => stage.map[h - 1 - i].slice()),
+    enemySpawns: (stage.enemySpawns || []).map(([x, y]) => [x, h - 1 - y]),
+    playerSpawns: (stage.playerSpawns || []).map(([x, y]) => [x, Math.max(0, h - 1 - y)]),
+  };
+}
+
+
 /** Beginner stage: player north of a river; clear south-bank enemies with gravity shells. */
 export const TUTORIAL_STAGE = {
   id: 0,
@@ -262,6 +274,12 @@ export const STAGES = [
     ],
   },
 ];
+
+
+// Stages 1–3: eagle nest at the top so early enemies travel farther before hitting HQ.
+STAGES[0] = FlipStageVertical(STAGES[0]);
+STAGES[1] = FlipStageVertical(STAGES[1]);
+STAGES[2] = FlipStageVertical(STAGES[2]);
 
 export function IsTutorialStage(stageId) {
   return stageId === 0 || stageId === "tutorial";
