@@ -567,8 +567,8 @@ p.mobile-hint { display: none; }
 
 .stick-base {
   position: relative;
-  width: 118px;
-  height: 118px;
+  width: 140px;
+  height: 140px;
   border-radius: 0;
   border: 3px solid #808080;
   background:
@@ -587,9 +587,9 @@ p.mobile-hint { display: none; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 44px;
-  height: 44px;
-  margin: -22px 0 0 -22px;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
   border-radius: 0;
   border: 3px solid #f0d060;
   background: #802010;
@@ -615,8 +615,8 @@ p.mobile-hint { display: none; }
 
 .touch-fire {
   appearance: none;
-  width: 96px;
-  height: 96px;
+  width: 108px;
+  height: 108px;
   border-radius: 0;
   border: 3px solid #f0d060;
   background: #802010;
@@ -866,43 +866,50 @@ body.force-touch #app {
   body.force-touch.is-touch-play .touch-stick-wrap:not([hidden]),
   body.is-touch.is-touch-play .touch-actions-wrap:not([hidden]),
   body.force-touch.is-touch-play .touch-actions-wrap:not([hidden]) {
-    min-height: 118px;
+    min-height: 148px;
     padding-bottom: max(10px, var(--safe-bottom));
     align-self: end;
   }
 
   body.is-touch.is-touch-play .stick-base,
   body.force-touch.is-touch-play .stick-base {
-    width: 112px;
-    height: 112px;
+    width: 136px;
+    height: 136px;
+  }
+
+  body.is-touch.is-touch-play .stick-knob,
+  body.force-touch.is-touch-play .stick-knob {
+    width: 52px;
+    height: 52px;
+    margin: -26px 0 0 -26px;
   }
 
   body.is-touch.is-touch-play .touch-fire,
   body.force-touch.is-touch-play .touch-fire {
-    width: 92px;
-    height: 92px;
+    width: 108px;
+    height: 108px;
   }
 }
 
 @media (orientation: portrait) and (max-width: 420px) {
   body.is-touch.is-touch-play .stick-base,
   body.force-touch.is-touch-play .stick-base {
-    width: 100px;
-    height: 100px;
+    width: 128px;
+    height: 128px;
   }
 
   body.is-touch.is-touch-play .stick-knob,
   body.force-touch.is-touch-play .stick-knob {
-    width: 40px;
-    height: 40px;
-    margin: -20px 0 0 -20px;
+    width: 48px;
+    height: 48px;
+    margin: -24px 0 0 -24px;
   }
 
   body.is-touch.is-touch-play .touch-fire,
   body.force-touch.is-touch-play .touch-fire {
-    width: 80px;
-    height: 80px;
-    font-size: 0.48rem;
+    width: 100px;
+    height: 100px;
+    font-size: 0.5rem;
   }
 
   body.is-touch.is-touch-play .touch-label,
@@ -925,20 +932,27 @@ body.force-touch #app {
   body.force-touch.is-touch-play .touch-stick-wrap:not([hidden]),
   body.is-touch.is-touch-play .touch-actions-wrap:not([hidden]),
   body.force-touch.is-touch-play .touch-actions-wrap:not([hidden]) {
-    min-height: 96px;
+    min-height: 128px;
     padding-bottom: max(6px, var(--safe-bottom));
   }
 
   body.is-touch.is-touch-play .stick-base,
   body.force-touch.is-touch-play .stick-base {
-    width: 88px;
-    height: 88px;
+    width: 120px;
+    height: 120px;
+  }
+
+  body.is-touch.is-touch-play .stick-knob,
+  body.force-touch.is-touch-play .stick-knob {
+    width: 46px;
+    height: 46px;
+    margin: -23px 0 0 -23px;
   }
 
   body.is-touch.is-touch-play .touch-fire,
   body.force-touch.is-touch-play .touch-fire {
-    width: 72px;
-    height: 72px;
+    width: 96px;
+    height: 96px;
   }
 
   body.is-touch.is-touch-play .touch-pause,
@@ -954,9 +968,9 @@ body.force-touch #app {
 }
 
 @media (max-width: 420px) {
-  .stick-base { width: 104px; height: 104px; }
-  .stick-knob { width: 42px; height: 42px; margin: -21px 0 0 -21px; }
-  .touch-fire { width: 84px; height: 84px; font-size: 0.48rem; }
+  .stick-base { width: 128px; height: 128px; }
+  .stick-knob { width: 48px; height: 48px; margin: -24px 0 0 -24px; }
+  .touch-fire { width: 100px; height: 100px; font-size: 0.5rem; }
   .overlay { padding: 14px; gap: 10px; }
   .overlay p { font-size: 0.45rem; }
 }
@@ -1026,8 +1040,8 @@ body.force-touch #app {
 }
 
 @media (orientation: landscape) and (max-height: 420px) {
-  .stick-base { width: 88px; height: 88px; }
-  .stick-knob { width: 36px; height: 36px; margin: -18px 0 0 -18px; }
-  .touch-fire { width: 72px; height: 72px; font-size: 0.42rem; }
+  .stick-base { width: 112px; height: 112px; }
+  .stick-knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+  .touch-fire { width: 92px; height: 92px; font-size: 0.45rem; }
   .touch-label { display: none; }
 }
