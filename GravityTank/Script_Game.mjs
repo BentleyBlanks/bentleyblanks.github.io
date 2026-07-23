@@ -188,7 +188,22 @@ const ENEMY_TYPES = [
   { id: "fast", hp: 1, speed: 96, score: 200, shootCd: 1.1, texture: "enemyFast", weight: 5 },
   { id: "power", hp: 1, speed: 62, score: 300, shootCd: 0.75, texture: "enemyPower", weight: 3, bulletBoost: 1.15 },
   { id: "armor", hp: 4, speed: 48, score: 400, shootCd: 1.2, texture: "enemyArmor", weight: 2 },
+  {
+    id: "boss",
+    hp: 28,
+    speed: 42,
+    score: 5000,
+    shootCd: 2.4,
+    texture: "enemyArmor",
+    weight: 0,
+    bulletBoost: 0.7, // gravity shells at 70% normal speed
+    size: 40,
+    boss: true,
+  },
 ];
+
+const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst"];
+const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
 
 /** Classic sheet grid origins [gx, gy] in 8×8 cells (16×16 sprite = 2×2 cells). */
 const TANK_DIR_COL = { up: 0, left: 4, down: 8, right: 12 };
@@ -578,9 +593,12 @@ class Game {
 
     this.state = "boot";
     this.difficulty = DIFFICULTY.normal;
+    this.debugGodMode = false;
+    this.debugPanelOpen = false;
     this.stage = 1;
     this.stageData = GetStage(1);
     this.isTutorial = false;
+    this.isBossStage = false;
     this.totalEnemies = 20;
     this.endAction = "restart"; // restart | next | retry
     this.map = [];
@@ -703,6 +721,7 @@ class Game {
     document.getElementById("nextStageButton")?.addEventListener("click", () => this.AdvanceStage());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
     this.BindDifficultyPick();
+    this.BindDebugPanel();
 
     this.canvas.addEventListener("pointerdown", (ev) => this.OnCanvasPointerDown(ev));
     this.canvas.addEventListener("pointermove", (ev) => this.OnCanvasPointerMove(ev));
@@ -1014,6 +1033,120 @@ class Game {
     apply(this.difficulty);
   }
 
+  BindDebugPanel() {
+    const banner = document.getElementById("titleBanner") || document.querySelector(".title-banner");
+    const panel = document.getElementById("debugPanel");
+    const status = document.getElementById("debugStatus");
+    const closeBtn = document.getElementById("debugClose");
+    if (!banner || !panel) return;
+
+    const syncStatus = () => {
+      if (status) {
+        status.textContent = `god ${this.debugGodMode ? "ON" : "OFF"} · stage ${this.isTutorial ? "T" : this.stage}`;
+      }
+      const godBtn = panel.querySelector('[data-debug="god"]');
+      godBtn?.classList.toggle("is-on", this.debugGodMode);
+    };
+
+    const setOpen = (open) => {
+      this.debugPanelOpen = open;
+      panel.hidden = !open;
+      if (open) syncStatus();
+    };
+
+    banner.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      setOpen(panel.hidden);
+    });
+    closeBtn?.addEventListener("click", () => setOpen(false));
+
+    panel.querySelectorAll("[data-debug]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.RunDebugAction(btn.dataset.debug);
+        syncStatus();
+      });
+    });
+    this.SyncDebugStatus = syncStatus;
+  }
+
+  RunDebugAction(action) {
+    this.audio.Ensure();
+    switch (action) {
+      case "skip":
+        if (this.state === "stageIntro") this.FinishStageIntro();
+        if (this.state === "roulette") this.CloseRoulette();
+        if (this.state === "ready" || this.state === "boot") {
+          this.StartCampaign();
+          return;
+        }
+        if (this.isTutorial || this.stage < STAGE_COUNT) {
+          this.EndGame(true, "DEBUG 跳关", "next");
+        } else {
+          this.EndGame(true, "DEBUG 通关", "restart");
+        }
+        break;
+      case "prev": {
+        if (this.state === "ready" || this.state === "boot") {
+          this.StartGame({ stage: STAGE_COUNT, keepStats: false });
+          return;
+        }
+        if (this.isTutorial) {
+          this.StartGame({ stage: STAGE_COUNT, keepStats: false, keepScore: true, keepLives: true });
+        } else if (this.stage <= 1) {
+          this.StartGame({ stage: 0, keepStats: false, keepScore: true, keepLives: true });
+        } else {
+          this.StartGame({ stage: this.stage - 1, keepStats: false, keepScore: true, keepLives: true });
+        }
+        break;
+      }
+      case "god":
+        this.debugGodMode = !this.debugGodMode;
+        if (this.debugGodMode && this.player?.alive) {
+          this.player.protect = Math.max(this.player.protect, 999);
+        }
+        this.ShowBuffToast(this.debugGodMode ? "DEBUG 无敌 ON" : "DEBUG 无敌 OFF");
+        break;
+      case "life":
+        this.lives += 1;
+        this.UpdateHud();
+        this.ShowBuffToast("DEBUG 生命 +1");
+        break;
+      case "power":
+        if (this.player) {
+          this.player.power = 3;
+          this.player.maxBullets = 3;
+          this.overdriveTimer = Math.max(this.overdriveTimer, 12);
+        }
+        this.UpdateHud();
+        this.ShowBuffToast("DEBUG 火力满");
+        break;
+      case "clear":
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          e.alive = false;
+          e.deathTimer = 0.01;
+          this.score += e.score;
+          this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1);
+        }
+        this.spawnQueue = [];
+        this.RenderEnemyIcons();
+        this.UpdateHud();
+        this.ShowBuffToast("DEBUG 清场");
+        this.CheckEnd();
+        break;
+      case "roulette":
+        if (this.state === "playing" || this.state === "paused") {
+          if (this.state === "paused") this.SetPaused(false);
+          this.OpenRoulette();
+        } else {
+          this.ShowBuffToast("DEBUG 需在对局中开转轮");
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   IsEasy() {
     return this.difficulty === DIFFICULTY.easy;
   }
@@ -1037,8 +1170,9 @@ class Game {
       this.stage = Math.max(1, Math.min(STAGE_COUNT, stageIndex1Based | 0));
       this.stageData = GetStage(this.stage);
     }
+    this.isBossStage = !!this.stageData.bossStage;
     const e = this.stageData.enemies;
-    this.totalEnemies = e.basic + e.fast + e.power + e.armor;
+    this.totalEnemies = e.basic + e.fast + e.power + e.armor + (e.boss || 0);
     this.spawnSlots = (this.stageData.enemySpawns || [[0, 0], [12, 0], [24, 0]]).map(([x, y]) => ({
       x: x * TILE,
       y: y * TILE,
@@ -1060,13 +1194,17 @@ class Game {
           `${diffTag} 向上射出的炮弹带重力，会落回并可能打死自己。清掉教学敌军后进入战役。`;
       } else if (this.state === "ready" || this.state === "boot") {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 开局先进入新手引导（自伤炮弹），再打 ${STAGE_COUNT} 关战役。保卫老鹰；炮弹带重力会下坠。`;
+          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关 Boss 弹幕）。保卫老鹰；炮弹带重力会下坠。`;
+      } else if (this.isBossStage) {
+        this.overlays.startBlurb.textContent =
+          `${diffTag} BOSS 关 · 重力巨炮。躲避万炮齐发 / 扇形 / 曲射 / 扫射 / 天降弹雨。子弹带重力，速度 70%。`;
       } else {
         const e = this.stageData.enemies;
         this.overlays.startBlurb.textContent =
           `${diffTag} 第 ${this.stage}/${STAGE_COUNT} 关 · 敌军 ${this.totalEnemies}（普${e.basic}/快${e.fast}/强${e.power}/甲${e.armor}）。保卫老鹰。炮弹带重力，水平射击会下坠。`;
       }
     }
+    this.SyncDebugStatus?.();
   }
 
   StartCampaign() {
@@ -1195,15 +1333,17 @@ class Game {
     this.state = "playing";
     this.lastTs = 0;
     // Classic: a few enemies already on field when the curtain lifts.
-    const preSpawn = this.isTutorial ? 1 : 3;
+    const preSpawn = this.isTutorial || this.isBossStage ? 1 : 3;
     for (let i = 0; i < preSpawn; i++) {
       this.TrySpawnEnemy(10);
       const last = this.enemies[this.enemies.length - 1];
       if (last) last.spawnFlash = 0;
     }
-    this.spawnTimer = this.isTutorial ? 2.4 : 1.2;
+    this.spawnTimer = this.isTutorial ? 2.4 : (this.isBossStage ? 99 : 1.2);
     if (this.isTutorial) {
       this.ShowBuffToast("注意：向上射出的炮弹会落回，能打死自己！");
+    } else if (this.isBossStage) {
+      this.ShowBuffToast("BOSS：重力巨炮 — 躲避弹幕！");
     }
     this.UpdateHud();
     this.RenderEnemyIcons();
@@ -1218,6 +1358,7 @@ class Game {
     for (let i = 0; i < counts.fast; i++) mix.push(ENEMY_TYPES[1]);
     for (let i = 0; i < counts.power; i++) mix.push(ENEMY_TYPES[2]);
     for (let i = 0; i < counts.armor; i++) mix.push(ENEMY_TYPES[3]);
+    for (let i = 0; i < (counts.boss || 0); i++) mix.push(ENEMY_TYPES[4]);
     for (let i = mix.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [mix[i], mix[j]] = [mix[j], mix[i]];
@@ -1362,6 +1503,7 @@ class Game {
   UpdatePlayer(dt) {
     const p = this.player;
     if (!p || !p.alive) return;
+    if (this.debugGodMode) p.protect = Math.max(p.protect, 2);
     if (p.protect > 0) p.protect -= dt;
     if (p.fireCd > 0) p.fireCd -= dt;
     p.blink += dt;
@@ -1449,6 +1591,11 @@ class Game {
 
       if (this.freezeTimer > 0) continue;
 
+      if (e.typeId === "boss") {
+        this.UpdateBoss(e, dt);
+        continue;
+      }
+
       e.aiTimer -= dt;
       if (e.aiTimer <= 0) {
         e.aiTimer = 0.4 + Math.random() * 1.2;
@@ -1492,6 +1639,222 @@ class Game {
       if (!e.alive && e.deathTimer > 0) e.deathTimer -= dt;
     }
     this.enemies = this.enemies.filter((e) => e.alive || e.deathTimer > 0);
+  }
+
+  /** Boss patrols the upper band and cycles gravity-shell attack patterns. */
+  UpdateBoss(e, dt) {
+    e.aiTimer -= dt;
+    if (e.aiTimer <= 0) {
+      e.aiTimer = 0.55 + Math.random() * 0.7;
+      const preferLeft = e.x > CANVAS_W * 0.55;
+      const preferRight = e.x < CANVAS_W * 0.35;
+      if (preferLeft) e.dir = "left";
+      else if (preferRight) e.dir = "right";
+      else e.dir = Math.random() < 0.7 ? (Math.random() < 0.5 ? "left" : "right") : "down";
+      // Keep boss in the upper third.
+      if (e.y > CANVAS_H * 0.32) e.dir = "up";
+      if (e.y < 24) e.dir = Math.random() < 0.5 ? "left" : "right";
+    }
+
+    const d = DIR[e.dir];
+    const beforeX = e.x;
+    const beforeY = e.y;
+    this.MoveTank(e, d.x * e.speed * dt, d.y * e.speed * dt);
+    e.x = Clamp(e.x, 8, CANVAS_W - e.w - 8);
+    e.y = Clamp(e.y, 8, CANVAS_H * 0.38);
+    if (Math.abs(e.x - beforeX) > 0.01 || Math.abs(e.y - beforeY) > 0.01) {
+      e.moving = true;
+      e.animTick += dt * 10;
+    } else {
+      e.moving = false;
+      e.aiTimer = Math.min(e.aiTimer, 0.12);
+    }
+
+    // Face the player when casting.
+    if (this.player?.alive) {
+      const face = DirFromVector(this.player.x - e.x, this.player.y - e.y);
+      if (face === "down" || face === "left" || face === "right") e.castFace = face;
+      else e.castFace = "down";
+    } else {
+      e.castFace = "down";
+    }
+
+    if (e.attackQueue?.length) {
+      this.UpdateBossAttackQueue(e, dt);
+      return;
+    }
+
+    if (e.fireCd <= 0) {
+      const pattern = BOSS_ATTACKS[Math.floor(Math.random() * BOSS_ATTACKS.length)];
+      this.BeginBossAttack(e, pattern);
+    }
+  }
+
+  BeginBossAttack(e, pattern) {
+    e.attackPattern = pattern;
+    e.attackQueue = [];
+    const face = e.castFace || "down";
+    e.dir = face === "up" ? "down" : face;
+
+    if (pattern === "barrage") {
+      // 万炮齐发：宽扇形下压弹幕
+      const n = 11;
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0.5 : i / (n - 1);
+        const ang = -1.05 + t * 2.1;
+        e.attackQueue.push({ t: i * 0.04, kind: "shell", dir: "down", angleOffset: ang, label: i === 0 });
+      }
+      e.fireCd = 3.2;
+      this.ShowBuffToast("万炮齐发！");
+    } else if (pattern === "fan") {
+      // 扇形追击：朝玩家扇形 5 发
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0.5 : i / (n - 1);
+        const ang = -0.55 + t * 1.1;
+        e.attackQueue.push({ t: 0.02 * i, kind: "shell", dir: face, angleOffset: ang });
+      }
+      e.fireCd = 2.4;
+      this.ShowBuffToast("扇形追击");
+    } else if (pattern === "mortar") {
+      // 曲射迫击：高抛弧线砸向玩家附近
+      const px = this.player?.alive ? this.player.x + this.player.w / 2 : CANVAS_W / 2;
+      for (let i = 0; i < 5; i++) {
+        const aimX = px + (i - 2) * 36;
+        e.attackQueue.push({ t: i * 0.12, kind: "mortar", aimX });
+      }
+      e.fireCd = 2.8;
+      this.ShowBuffToast("曲射迫击");
+    } else if (pattern === "sweep") {
+      // 横向扫射：从左到右（或反向）依次发射
+      const leftToRight = Math.random() < 0.5;
+      const n = 9;
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0.5 : i / (n - 1);
+        const ang = leftToRight ? (-0.95 + t * 1.9) : (0.95 - t * 1.9);
+        e.attackQueue.push({ t: i * 0.08, kind: "shell", dir: "down", angleOffset: ang });
+      }
+      e.fireCd = 3.0;
+      this.ShowBuffToast("横向扫射");
+    } else if (pattern === "rain") {
+      // 天降弹雨：上方落下慢速重力弹
+      for (let i = 0; i < 8; i++) {
+        e.attackQueue.push({ t: i * 0.1, kind: "rain" });
+      }
+      e.fireCd = 3.1;
+      this.ShowBuffToast("天降弹雨");
+    } else if (pattern === "burst") {
+      // 三点连射：对准玩家连发
+      for (let i = 0; i < 3; i++) {
+        e.attackQueue.push({ t: i * 0.22, kind: "shell", dir: face, angleOffset: 0 });
+      }
+      e.fireCd = 2.1;
+      this.ShowBuffToast("三点连射");
+    } else {
+      e.fireCd = 1.5;
+    }
+    e.attackAge = 0;
+  }
+
+  UpdateBossAttackQueue(e, dt) {
+    e.attackAge = (e.attackAge || 0) + dt;
+    const due = [];
+    const rest = [];
+    for (const shot of e.attackQueue) {
+      if (e.attackAge >= shot.t) due.push(shot);
+      else rest.push(shot);
+    }
+    e.attackQueue = rest;
+    for (const shot of due) this.FireBossShot(e, shot);
+    if (!e.attackQueue.length) {
+      e.attackPattern = null;
+      e.attackAge = 0;
+    }
+  }
+
+  FireBossShot(e, shot) {
+    if (shot.kind === "rain") {
+      const x = 24 + Math.random() * (CANVAS_W - 48);
+      this.SpawnBossShell(e, {
+        x,
+        y: -12,
+        vx: (Math.random() - 0.5) * 40,
+        vy: 40 + Math.random() * 30,
+        face: "down",
+      });
+      this.audio.Shoot();
+      return;
+    }
+    if (shot.kind === "mortar") {
+      const cx = e.x + e.w / 2;
+      const cy = e.y + e.h / 2;
+      const aimX = shot.aimX ?? CANVAS_W / 2;
+      const dx = aimX - cx;
+      const speed = BULLET_SPEED * BOSS_SHELL_SPEED;
+      // High lob: strong upward kick then gravity brings it down near aimX.
+      const vx = Clamp(dx * 0.55, -speed * 0.85, speed * 0.85);
+      const vy = -220 - Math.random() * 40;
+      this.SpawnBossShell(e, { x: cx - 4, y: cy - 4, vx, vy, face: "up" });
+      this.audio.Shoot();
+      return;
+    }
+    // Default gravity shell with optional angle offset.
+    this.SpawnBossShellFromDir(e, shot.dir || "down", shot.angleOffset || 0);
+    this.audio.Shoot();
+  }
+
+  SpawnBossShellFromDir(e, dirName, angleOffset = 0) {
+    const d = DIR[dirName] || DIR.down;
+    const spd = BULLET_SPEED * BOSS_SHELL_SPEED;
+    let vx = d.x * spd;
+    let vy = d.y * spd;
+    if (dirName === "left" || dirName === "right") vy -= 70;
+    else if (dirName === "up") vy -= 30;
+    else vy += 10; // slight push when firing down
+
+    if (angleOffset) {
+      const c = Math.cos(angleOffset);
+      const s = Math.sin(angleOffset);
+      const rx = vx * c - vy * s;
+      const ry = vx * s + vy * c;
+      vx = rx;
+      vy = ry;
+    }
+
+    const cx = e.x + e.w / 2;
+    const cy = e.y + e.h / 2;
+    this.SpawnBossShell(e, {
+      x: cx - 4 + d.x * 16,
+      y: cy - 4 + d.y * 16,
+      vx,
+      vy,
+      face: dirName,
+    });
+  }
+
+  SpawnBossShell(e, { x, y, vx, vy, face }) {
+    this.bullets.push({
+      x,
+      y,
+      w: 8,
+      h: 8,
+      vx,
+      vy,
+      alive: true,
+      owner: e,
+      isPlayer: false,
+      face: face || "down",
+      power: 1,
+      trail: [],
+      arm: 0.18,
+      traveled: 0,
+      gravityMul: 1,
+      bounceLeft: 0,
+      pierceLeft: 0,
+      homing: false,
+      meteor: false,
+      bossShell: true,
+    });
   }
 
   AlignedForShot(from, target) {
@@ -1961,6 +2324,12 @@ class Game {
   KillPlayer() {
     const p = this.player;
     if (!p?.alive) return;
+    if (this.debugGodMode) {
+      p.protect = Math.max(p.protect, 2);
+      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.45);
+      this.audio.Bounce();
+      return;
+    }
     p.alive = false;
     this.audio.StopEngine();
     this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.2);
@@ -2415,30 +2784,10 @@ class Game {
     const slot = this.spawnSlots[this.nextSpawnSlot % this.spawnSlots.length];
     this.nextSpawnSlot++;
     const type = this.spawnQueue.shift();
-    const enemy = {
-      x: slot.x + 2,
-      y: slot.y + 2,
-      w: TANK_SIZE,
-      h: TANK_SIZE,
-      dir: "down",
-      speed: type.speed,
-      hp: type.hp,
-      maxHp: type.hp,
-      score: type.score,
-      shootCd: type.shootCd,
-      bulletBoost: type.bulletBoost || 1,
-      typeId: type.id,
-      texture: type.texture,
-      alive: true,
-      fireCd: 0.4,
-      aiTimer: 0.2,
-      spawnFlash: 0.35,
-      protect: 0,
-      dropsPower: Math.random() < this.GetPowerDropRate(),
-      deathTimer: 0,
-      animTick: 0,
-      moving: false,
-    };
+    const enemy = this.MakeEnemyFromType(type, slot.x + 2, slot.y + 2);
+    enemy.fireCd = 0.4;
+    enemy.aiTimer = 0.2;
+    enemy.spawnFlash = 0.35;
     this.enemies.push(enemy);
     this.UnstickTank(enemy);
   }
@@ -2581,20 +2930,27 @@ class Game {
     const slot = this.spawnSlots[this.nextSpawnSlot % this.spawnSlots.length];
     this.nextSpawnSlot++;
     const type = this.spawnQueue.shift();
+    const size = type.size || TANK_SIZE;
 
     // ensure slot free
-    const probe = { x: slot.x + 2, y: slot.y + 2, w: TANK_SIZE, h: TANK_SIZE };
+    const probe = { x: slot.x + 2, y: slot.y + 2, w: size, h: size };
     if (this.CollidesTanks(probe) || (this.player?.alive && RectsOverlap(probe, this.player))) {
       this.spawnQueue.unshift(type);
       this.spawnTimer = 0.6;
       return;
     }
 
-    const enemy = {
-      x: slot.x + 2,
-      y: slot.y + 2,
-      w: TANK_SIZE,
-      h: TANK_SIZE,
+    this.enemies.push(this.MakeEnemyFromType(type, slot.x + 2, slot.y + 2));
+    this.RenderEnemyIcons();
+  }
+
+  MakeEnemyFromType(type, x, y) {
+    const size = type.size || TANK_SIZE;
+    return {
+      x,
+      y,
+      w: size,
+      h: size,
       dir: "down",
       speed: type.speed,
       hp: type.hp,
@@ -2605,17 +2961,20 @@ class Game {
       typeId: type.id,
       texture: type.texture,
       alive: true,
-      fireCd: 0.8,
+      fireCd: type.boss ? 1.6 : 0.8,
       aiTimer: 0.3,
-      spawnFlash: 1.0,
-      protect: 0,
-      dropsPower: type.id === "armor" || Math.random() < this.GetPowerDropRate(),
+      spawnFlash: type.boss ? 0.6 : 1.0,
+      protect: type.boss ? 1.2 : 0,
+      dropsPower: type.boss || type.id === "armor" || Math.random() < this.GetPowerDropRate(),
       deathTimer: 0,
       animTick: 0,
       moving: false,
+      attackQueue: null,
+      attackPattern: null,
+      attackAge: 0,
+      castFace: "down",
+      isBoss: !!type.boss,
     };
-    this.enemies.push(enemy);
-    this.RenderEnemyIcons();
   }
 
   SpawnExplosion(x, y, scale = 1) {
@@ -2640,10 +2999,12 @@ class Game {
     if (alive === 0 && this.spawnQueue.length === 0) {
       if (this.isTutorial) {
         this.EndGame(true, "引导完成！记住：向上的炮弹会落回打自己。进入战役。", "next");
+      } else if (this.isBossStage) {
+        this.EndGame(true, `重力巨炮击破！得分 ${this.score}`, "next");
       } else if (this.stage < STAGE_COUNT) {
         this.EndGame(true, `第 ${this.stage} 关肃清！得分 ${this.score}`, "next");
       } else {
-        this.EndGame(true, `五关全通！最终得分 ${this.score}`, "restart");
+        this.EndGame(true, `${STAGE_COUNT} 关全通！最终得分 ${this.score}`, "restart");
       }
     }
   }
@@ -2817,6 +3178,16 @@ class Game {
         ctx.globalAlpha = fade * 0.95;
         ctx.font = "bold 13px monospace";
         ctx.fillText("向上射击的炮弹会落回打自己", CANVAS_W / 2, CANVAS_H / 2 + 62);
+      } else if (this.isBossStage) {
+        ctx.font = "bold 28px monospace";
+        ctx.fillText("BOSS", CANVAS_W / 2, CANVAS_H / 2 - 36);
+        const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
+        ctx.globalAlpha = fade * blink;
+        ctx.font = "bold 36px monospace";
+        ctx.fillText("重力巨炮", CANVAS_W / 2, CANVAS_H / 2 + 18);
+        ctx.globalAlpha = fade * 0.95;
+        ctx.font = "bold 12px monospace";
+        ctx.fillText("躲避万炮齐发 · 子弹带重力", CANVAS_W / 2, CANVAS_H / 2 + 58);
       } else {
         ctx.font = "bold 36px monospace";
         ctx.fillText("STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
@@ -2972,6 +3343,34 @@ class Game {
       ctx.lineWidth = 2;
       ctx.strokeRect(tank.x - 1, tank.y - 1, tank.w + 2, tank.h + 2);
     }
+
+    if (tank.isBoss && tank.alive && tank.spawnFlash <= 0) {
+      this.DrawBossHud(ctx, tank);
+    }
+  }
+
+  DrawBossHud(ctx, boss) {
+    const barW = 120;
+    const barH = 8;
+    const x = (CANVAS_W - barW) / 2;
+    const y = 22;
+    const ratio = Clamp(boss.hp / Math.max(1, boss.maxHp), 0, 1);
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(x - 2, y - 12, barW + 4, barH + 18);
+    ctx.fillStyle = "#f0d060";
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("BOSS 重力巨炮", CANVAS_W / 2, y - 1);
+    ctx.fillStyle = "#302010";
+    ctx.fillRect(x, y, barW, barH);
+    ctx.fillStyle = ratio > 0.35 ? "#ff6060" : "#ff3030";
+    ctx.fillRect(x, y, barW * ratio, barH);
+    ctx.strokeStyle = "#f0d060";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, barW, barH);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
   }
 
   DrawBullet(ctx, b) {
@@ -2980,8 +3379,10 @@ class Game {
         ? "rgba(255,120,40,0.55)"
         : b.isPlayer
           ? (b.homing ? "rgba(255,120,160,0.45)" : "rgba(255,220,120,0.35)")
-          : "rgba(255,120,100,0.3)";
-      ctx.lineWidth = b.meteor ? 3 : 2;
+          : b.bossShell
+            ? "rgba(255,180,80,0.45)"
+            : "rgba(255,120,100,0.3)";
+      ctx.lineWidth = b.meteor || b.bossShell ? 3 : 2;
       ctx.beginPath();
       ctx.moveTo(b.trail[0].x, b.trail[0].y);
       for (let i = 1; i < b.trail.length; i++) ctx.lineTo(b.trail[i].x, b.trail[i].y);

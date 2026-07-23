@@ -16,14 +16,31 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./Style_Game.css?v=tutorSteel1">
+  <link rel="stylesheet" href="./Style_Game.css?v=debugBoss1">
 </head>
 <body>
   <div id="app">
     <header class="hero">
-      <img class="title-banner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE">
+      <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
       <p class="tagline">捡到 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="16" height="16" alt="?"> 弹出物理转轮——甩转到哪算哪</p>
     </header>
+
+    <div id="debugPanel" class="debug-panel" hidden>
+      <div class="debug-head">
+        <strong>DEBUG</strong>
+        <button type="button" id="debugClose" class="debug-close" aria-label="关闭">×</button>
+      </div>
+      <div class="debug-body">
+        <button type="button" data-debug="skip">跳关</button>
+        <button type="button" data-debug="prev">上一关</button>
+        <button type="button" data-debug="god">无敌</button>
+        <button type="button" data-debug="life">生命+1</button>
+        <button type="button" data-debug="power">火力满</button>
+        <button type="button" data-debug="clear">清场</button>
+        <button type="button" data-debug="roulette">开转轮</button>
+      </div>
+      <p class="debug-status" id="debugStatus">god OFF</p>
+    </div>
 
     <div class="mobile-hud" aria-live="polite">
       <span>STAGE <b id="mobileStage">1</b></span>
@@ -121,7 +138,7 @@
 
       <div class="panel">
         <h3>RULE</h3>
-        <p class="feature">开局可选简易/标准。场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮（每次随机 10 格）。<strong style="color:#70ff98">绿=好</strong> · <strong style="color:#ffe060">金=超</strong> · <strong style="color:#ff6060">红=负</strong>。含分叉/速射/穿甲等子弹变体。首关为新手引导：向上炮弹会落回打自己。</p>
+        <p class="feature">开局可选简易/标准。点击标题可开 Debug。场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮。<strong style="color:#70ff98">绿=好</strong> · <strong style="color:#ffe060">金=超</strong> · <strong style="color:#ff6060">红=负</strong>。第 3 关 Boss 重力弹幕（万炮齐发等，速度 70%）。</p>
       </div>
 
       <div class="panel panel-controls-help">
@@ -138,6 +155,6 @@
       <p class="credit">SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=tutorSteel1"></script>
+  <script type="module" src="./Script_Game.mjs?v=debugBoss1"></script>
 </body>
 </html>
