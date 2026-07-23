@@ -4,7 +4,7 @@
  */
 
 import { STAGE_COUNT, GetStage, IsTutorialStage, TUTORIAL_STAGE } from "./Data_Stages.mjs";
-import { STAGE_UPGRADES, BOSS_UPGRADES, PickUpgradeCards, FindUpgrade } from "./Data_Upgrades.mjs";
+import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade } from "./Data_Upgrades.mjs";
 
 const DIFFICULTY = {
   easy: "easy",
@@ -1370,10 +1370,10 @@ class Game {
       const diffTag = this.IsEasy() ? "简易：双倍生命 · 负面更少 · ?掉率+50%。" : "标准难度。";
       if (this.isTutorial) {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 向上射出的炮弹带重力，会落回并可能打死自己。清掉教学敌军后进入战役。`;
+          `${diffTag} 你在河北岸。河对面过不来——用重力弹幕（朝下/斜射）清理南岸敌军，再选一张入门升级进入战役。`;
       } else if (this.state === "ready" || this.state === "boot") {
         this.overlays.startBlurb.textContent =
-          `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关 Boss 弹幕）。保卫老鹰；炮弹带重力会下坠。`;
+          `${diffTag} 开局先进入新手引导（河对岸重力教学），再打 ${STAGE_COUNT} 关战役（第 3 关 Boss 弹幕）。保卫老鹰；炮弹带重力会下坠。`;
       } else if (this.isBossStage) {
         this.overlays.startBlurb.textContent =
           `${diffTag} BOSS 关 · 重力巨炮。躲避弹幕；小心拆炮禁射，残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
@@ -1427,8 +1427,8 @@ class Game {
   }
 
   ShouldOfferUpgrade() {
-    if (this.isTutorial) return false;
     if (this.endAction !== "next") return false;
+    if (this.isTutorial) return true;
     // Campaign clear uses restart — no pick. Mid-run next-stage clears offer cards.
     return this.stage < STAGE_COUNT || this.isBossStage;
   }
@@ -1442,26 +1442,31 @@ class Game {
     }
     this.state = "upgrade";
     this.overlays.end.hidden = true;
-    const pool = special ? BOSS_UPGRADES : STAGE_UPGRADES;
+    const tutorial = this.isTutorial && !special;
+    const pool = tutorial ? TUTORIAL_UPGRADES : (special ? BOSS_UPGRADES : STAGE_UPGRADES);
     // Avoid offering boss perks already owned.
     const filtered = special
       ? pool.filter((u) => !this.runPerks.includes(u.id))
       : pool.slice();
     const cards = PickUpgradeCards(filtered.length ? filtered : pool, 3);
-    this.upgradePick = { special, cards };
+    this.upgradePick = { special, tutorial, cards };
     if (this.overlays.upgradeTitle) {
-      this.overlays.upgradeTitle.textContent = special ? "Boss 特殊能力" : "关卡升级";
+      this.overlays.upgradeTitle.textContent = tutorial
+        ? "入门升级"
+        : (special ? "Boss 特殊能力" : "关卡升级");
     }
     if (this.overlays.upgradeBlurb) {
-      this.overlays.upgradeBlurb.textContent = special
-        ? "三选一：永久能力，带到本局通关结束。"
-        : "三选一：本关有效（仅下一关）。";
+      this.overlays.upgradeBlurb.textContent = tutorial
+        ? "三选一：基础强化，带进第一关（本关有效）。"
+        : (special
+          ? "三选一：永久能力，带到本局通关结束。"
+          : "三选一：本关有效（仅下一关）。");
     }
     cardsRoot.innerHTML = "";
     for (const card of cards) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `upgrade-card${special ? " is-special" : ""}`;
+      btn.className = `upgrade-card${special ? " is-special" : ""}${tutorial ? " is-tutorial" : ""}`;
       btn.innerHTML =
         `<span class="upgrade-tag">${card.tag}</span>` +
         `<span class="upgrade-name">${card.title}</span>` +
@@ -1476,13 +1481,14 @@ class Game {
   ConfirmUpgradePick(id) {
     const pick = this.upgradePick;
     if (!pick) return;
+    const card = pick.cards?.find((c) => c.id === id) || FindUpgrade(id);
     if (pick.special) {
       if (!this.runPerks.includes(id)) this.runPerks.push(id);
       this.stagePerk = null; // boss pick does not refresh 本关卡
-      this.ShowBuffToast(`永久能力：${FindUpgrade(id)?.title || id}`);
+      this.ShowBuffToast(`永久能力：${card?.title || id}`);
     } else {
       this.pendingStagePerk = id;
-      this.ShowBuffToast(`本关强化：${FindUpgrade(id)?.title || id}`);
+      this.ShowBuffToast(`${pick.tutorial ? "入门强化" : "本关强化"}：${card?.title || id}`);
     }
     this.upgradePick = null;
     if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
@@ -1621,7 +1627,7 @@ class Game {
     this.spawnTimer = this.isTutorial ? 2.4 : (this.isBossStage ? 99 : 1.2);
     this.ApplyStageStartPerks();
     if (this.isTutorial) {
-      this.ShowBuffToast("注意：向上射出的炮弹会落回，能打死自己！");
+      this.ShowBuffToast("河北岸：朝下/斜射，用重力清理南岸敌军");
     } else if (this.isBossStage) {
       const perk = FindUpgrade(this.stagePerk);
       this.ShowBuffToast(
@@ -1646,11 +1652,19 @@ class Game {
     if (this.HasPerk("longerShield")) {
       p.protect = Math.max(p.protect, SPAWN_PROTECT * 1.85);
     }
+    if (this.HasPerk("doubleShield")) {
+      p.protect = Math.max(p.protect, SPAWN_PROTECT * 2);
+    }
     if (this.HasPerk("phaseGhost")) {
       this.ghostTimer = Math.max(this.ghostTimer, 10);
     }
     if (this.HasPerk("fortressWill")) {
       this.shovelTimer = Math.max(this.shovelTimer, 14);
+      this.pendingFortRestore = false;
+      this.FortifyBase(true);
+    }
+    if (this.HasPerk("baseArmor")) {
+      this.shovelTimer = Math.max(this.shovelTimer, 24);
       this.pendingFortRestore = false;
       this.FortifyBase(true);
     }
@@ -1682,7 +1696,7 @@ class Game {
       y: sy * TILE + 2,
       w: TANK_SIZE,
       h: TANK_SIZE,
-      dir: "up",
+      dir: this.isTutorial ? "down" : "up",
       speed: PLAYER_SPEED,
       power,
       maxBullets,
@@ -3454,7 +3468,7 @@ class Game {
     const alive = this.enemies.filter((e) => e.alive).length;
     if (alive === 0 && this.spawnQueue.length === 0) {
       if (this.isTutorial) {
-        this.EndGame(true, "引导完成！记住：向上的炮弹会落回打自己。进入战役。", "next");
+        this.EndGame(true, "河对岸肃清！选一张入门升级，带进第一关。", "next");
       } else if (this.isBossStage) {
         this.EndGame(true, `重力巨炮击破！得分 ${this.score}`, "next");
       } else if (this.stage < STAGE_COUNT) {
@@ -3482,7 +3496,7 @@ class Game {
     if (this.overlays.endPrimary) {
       this.overlays.endPrimary.textContent = won
         ? (action === "next"
-          ? (this.isTutorial ? "进入战役" : (this.isBossStage ? "选择永久能力" : "选择升级"))
+          ? (this.isTutorial ? "选择升级" : (this.isBossStage ? "选择永久能力" : "选择升级"))
           : "再来一局")
         : "重试本关";
     }
@@ -3577,7 +3591,7 @@ class Game {
     ctx.font = "bold 11px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("↑ 向上射击会落回 · 别把自己打死", CANVAS_W / 2, CANVAS_H - 22);
+    ctx.fillText("↓ 朝下/斜射 · 重力越过河清理敌军", CANVAS_W / 2, CANVAS_H - 22);
     ctx.restore();
   }
 

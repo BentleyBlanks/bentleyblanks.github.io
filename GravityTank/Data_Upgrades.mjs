@@ -1,5 +1,15 @@
 /** Stage / run upgrade card pools for GravityTank. */
 
+/** Tutorial clear: basic starter cards — 本关有效 into stage 1. */
+export const TUTORIAL_UPGRADES = [
+  { id: "rapidFire", title: "速射入门", desc: "本关：开火冷却缩短", tag: "入门" },
+  { id: "doubleShield", title: "护盾加倍", desc: "本关：出生护盾时间延长一倍", tag: "入门" },
+  { id: "baseArmor", title: "钢墙护垒", desc: "本关：开场总部钢墙加固更久、更耐打", tag: "入门" },
+  { id: "multiShot", title: "双弹入门", desc: "本关：同时可存弹 +1", tag: "入门" },
+  { id: "bulletSpeed", title: "初速入门", desc: "本关：炮弹飞得更快", tag: "入门" },
+  { id: "noSelfHit", title: "安全撞针", desc: "本关：己方炮弹不误伤自己", tag: "入门" },
+];
+
 /** Normal clears: 本关有效 — applies only to the next stage you enter. */
 export const STAGE_UPGRADES = [
   { id: "noSelfHit", title: "保险撞针", desc: "本关：自己的炮弹不再误伤自己", tag: "本关" },
@@ -34,5 +44,10 @@ export function PickUpgradeCards(pool, count = 3) {
 }
 
 export function FindUpgrade(id) {
-  return STAGE_UPGRADES.find((u) => u.id === id) || BOSS_UPGRADES.find((u) => u.id === id) || null;
+  return (
+    STAGE_UPGRADES.find((u) => u.id === id) ||
+    TUTORIAL_UPGRADES.find((u) => u.id === id) ||
+    BOSS_UPGRADES.find((u) => u.id === id) ||
+    null
+  );
 }

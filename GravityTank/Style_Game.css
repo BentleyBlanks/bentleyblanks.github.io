@@ -448,6 +448,15 @@ button.primary:active {
   color: #ffe060;
 }
 
+.upgrade-card.is-tutorial {
+  border-color: #60a0f0;
+  background: #101820;
+}
+
+.upgrade-card.is-tutorial .upgrade-tag {
+  color: #80c8ff;
+}
+
 .upgrade-card .upgrade-name {
   display: block;
   margin-bottom: 4px;
