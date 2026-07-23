@@ -7,11 +7,14 @@ export const STAGE_COUNT = 9;
 /** Flip a classic bottom-base stage so eagle + player sit at the top (newbie-safer). */
 function FlipStageVertical(stage) {
   const h = stage.map.length;
+  // Tanks are 2 half-tiles tall and spawn with a +2px inset — keep them fully on-canvas.
+  const maxSpawnY = h - 3;
+  const flipY = (y) => Math.max(0, Math.min(maxSpawnY, h - 1 - y));
   return {
     ...stage,
     map: stage.map.map((_, i) => stage.map[h - 1 - i].slice()),
-    enemySpawns: (stage.enemySpawns || []).map(([x, y]) => [x, h - 1 - y]),
-    playerSpawns: (stage.playerSpawns || []).map(([x, y]) => [x, Math.max(0, h - 1 - y)]),
+    enemySpawns: (stage.enemySpawns || []).map(([x, y]) => [x, flipY(y)]),
+    playerSpawns: (stage.playerSpawns || []).map(([x, y]) => [x, flipY(y)]),
   };
 }
 
