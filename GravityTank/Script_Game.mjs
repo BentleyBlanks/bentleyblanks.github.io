@@ -39,6 +39,14 @@ const TILE_ICE = 5;
 const TILE_BASE = 6;
 const TILE_BASE_DEAD = 7;
 
+/** Classic Battle City brick = four 8×8 quarters inside a 16×16 cell. */
+const BRICK_TL = 1;
+const BRICK_TR = 2;
+const BRICK_BL = 4;
+const BRICK_BR = 8;
+const BRICK_FULL = BRICK_TL | BRICK_TR | BRICK_BL | BRICK_BR;
+
+
 const POWER = {
   star: "star",
   bomb: "bomb",
@@ -241,6 +249,38 @@ const BULLET_SHEET = {
 function BuildStageMap(stageIndex1Based) {
   const stage = GetStage(stageIndex1Based);
   return stage.map.map((row) => row.slice());
+}
+
+function BuildBrickMask(map) {
+  const mask = [];
+  for (let y = 0; y < MAP_H; y++) {
+    const row = new Array(MAP_W);
+    for (let x = 0; x < MAP_W; x++) {
+      row[x] = map[y][x] === TILE_BRICK ? BRICK_FULL : 0;
+    }
+    mask.push(row);
+  }
+  return mask;
+}
+
+function BrickHalfMaskFromDir(dir) {
+  if (dir === "right") return BRICK_TL | BRICK_BL;
+  if (dir === "left") return BRICK_TR | BRICK_BR;
+  if (dir === "down") return BRICK_TL | BRICK_TR;
+  return BRICK_BL | BRICK_BR; // up
+}
+
+function BrickHalfMaskFromVelocity(vx, vy) {
+  return BrickHalfMaskFromDir(DirFromVector(vx, vy));
+}
+
+function BrickBitAtLocal(ox, oy) {
+  const right = ox >= TILE / 2;
+  const bottom = oy >= TILE / 2;
+  if (!bottom && !right) return BRICK_TL;
+  if (!bottom && right) return BRICK_TR;
+  if (bottom && !right) return BRICK_BL;
+  return BRICK_BR;
 }
 
 function Clamp(v, a, b) {
@@ -530,6 +570,7 @@ class Game {
     this.totalEnemies = 20;
     this.endAction = "restart"; // restart | next | retry
     this.map = [];
+    this.brickMask = [];
     this.player = null;
     this.enemies = [];
     this.bullets = [];
@@ -983,6 +1024,7 @@ class Game {
   StartGame({ stage = 1, keepStats = false, keepScore = false, keepLives = false } = {}) {
     this.ApplyStageMeta(stage);
     this.map = BuildStageMap(this.stage);
+    this.brickMask = BuildBrickMask(this.map);
     this.bullets = [];
     this.explosions = [];
     this.powerups = [];
@@ -1476,7 +1518,11 @@ class Game {
         if (t === TILE_STEEL || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
         continue;
       }
-      if (t === TILE_BRICK || t === TILE_STEEL || t === TILE_WATER || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
+      if (t === TILE_BRICK) {
+        if (this.BrickSolidAt(px, py)) return true;
+        continue;
+      }
+      if (t === TILE_STEEL || t === TILE_WATER || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
     }
     return false;
   }
@@ -1575,6 +1621,7 @@ class Game {
       alive: true,
       owner: tank,
       isPlayer,
+      face: dirName,
       power: isPlayer ? (this.sniperTimer > 0 ? Math.max(tank.power, 3) : tank.power) : (tank.typeId === "power" ? 2 : 1),
       trail: [],
       arm: opts.bonusShot ? 0.12 : 0.22,
@@ -1714,7 +1761,8 @@ class Game {
       if (t === TILE_EMPTY || t === TILE_GRASS || t === TILE_ICE || t === TILE_WATER) continue;
 
       if (t === TILE_BRICK) {
-        this.DestroyBrickCluster(tx, ty, b.power);
+        if (!this.BrickSolidAt(px, py)) continue;
+        this.DestroyBrickHalf(tx, ty, b, b.power);
         b.alive = false;
         this.SpawnExplosion(b.x, b.y, 0.45);
         this.audio.Hit();
@@ -1751,17 +1799,43 @@ class Game {
     return false;
   }
 
-  DestroyBrickCluster(tx, ty, power) {
-    // destroy a small cluster for juicier feel; higher power clears more
-    const r = power >= 2 ? 1 : 0;
-    for (let y = ty - r; y <= ty + r; y++) {
-      for (let x = tx - r; x <= tx + r; x++) {
-        if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue;
-        if (this.map[y][x] === TILE_BRICK) this.map[y][x] = TILE_EMPTY;
-      }
+  BrickSolidAt(px, py) {
+    const tx = Math.floor(px / TILE);
+    const ty = Math.floor(py / TILE);
+    if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return false;
+    if (this.map[ty][tx] !== TILE_BRICK) return false;
+    const mask = this.brickMask?.[ty]?.[tx] ?? BRICK_FULL;
+    if (!mask) return false;
+    const ox = px - tx * TILE;
+    const oy = py - ty * TILE;
+    return (mask & BrickBitAtLocal(ox, oy)) !== 0;
+  }
+
+  /** Classic: one shot shaves a half-tile (8px strip); power≥2 clears the whole cell. */
+  DestroyBrickHalf(tx, ty, bullet, power) {
+    if (!this.brickMask?.[ty]) return;
+    if (this.map[ty][tx] !== TILE_BRICK) return;
+    let mask = this.brickMask[ty][tx] || BRICK_FULL;
+    if (power >= 2) {
+      mask = 0;
+    } else {
+      const face = bullet.face || DirFromVector(bullet.vx, bullet.vy);
+      mask &= ~BrickHalfMaskFromDir(face);
     }
-    // always clear the hit cell
-    if (this.map[ty]?.[tx] === TILE_BRICK) this.map[ty][tx] = TILE_EMPTY;
+    this.brickMask[ty][tx] = mask;
+    if (mask === 0) this.map[ty][tx] = TILE_EMPTY;
+  }
+
+  SetBrickCell(x, y, on) {
+    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return;
+    if (on) {
+      this.map[y][x] = TILE_BRICK;
+      if (!this.brickMask[y]) this.brickMask[y] = new Array(MAP_W).fill(0);
+      this.brickMask[y][x] = BRICK_FULL;
+    } else {
+      if (this.map[y][x] === TILE_BRICK) this.map[y][x] = TILE_EMPTY;
+      if (this.brickMask[y]) this.brickMask[y][x] = 0;
+    }
   }
 
   DamageEnemy(e, power) {
@@ -1854,7 +1928,7 @@ class Game {
       segments,
       cx: CANVAS_W / 2,
       cy: CANVAS_H / 2 + 28,
-      radius: 132,
+      radius: 138,
     };
     this.SyncTouchControlsVisibility();
     const nBad = segments.filter((s) => s.tier === "bad").length;
@@ -2206,7 +2280,7 @@ class Game {
   NukeBricks(chance = 0.55) {
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
-        if (this.map[y][x] === TILE_BRICK && Math.random() < chance) this.map[y][x] = TILE_EMPTY;
+        if (this.map[y][x] === TILE_BRICK && Math.random() < chance) this.SetBrickCell(x, y, false);
       }
     }
   }
@@ -2218,7 +2292,8 @@ class Game {
       [11, 25], [14, 25],
     ];
     for (const [x, y] of cells) {
-      if (this.map[y][x] === TILE_BRICK || this.map[y][x] === TILE_STEEL) this.map[y][x] = TILE_EMPTY;
+      if (this.map[y][x] === TILE_BRICK) this.SetBrickCell(x, y, false);
+      else if (this.map[y][x] === TILE_STEEL) this.map[y][x] = TILE_EMPTY;
     }
     this.shovelTimer = 0;
     this.pendingFortRestore = false;
@@ -2289,6 +2364,8 @@ class Game {
         traveled: 0,
         gravityMul: 2.4,
         bounceLeft: 0,
+        pierceLeft: 0,
+        face: "down",
         homing: false,
         meteor: true,
       });
@@ -2334,7 +2411,12 @@ class Game {
       if (this.map[y][x] === TILE_BASE || this.map[y][x] === TILE_BASE_DEAD) continue;
       // Never bury a live tank inside fort walls — that soft-locks movement.
       if (this.TileOccupiedByTank(x, y)) continue;
-      this.map[y][x] = steel ? TILE_STEEL : TILE_BRICK;
+      if (steel) {
+        this.map[y][x] = TILE_STEEL;
+        if (this.brickMask[y]) this.brickMask[y][x] = 0;
+      } else {
+        this.SetBrickCell(x, y, true);
+      }
     }
     if (this.player?.alive) this.UnstickTank(this.player);
     for (const e of this.enemies) {
@@ -2365,7 +2447,7 @@ class Game {
         blocked = true;
         continue;
       }
-      this.map[y][x] = TILE_BRICK;
+      this.SetBrickCell(x, y, true);
     }
     if (this.player?.alive) this.UnstickTank(this.player);
     return !blocked;
@@ -2525,6 +2607,7 @@ class Game {
     this.ApplyStageMeta(this.stage || 1);
     this.state = "ready";
     this.map = BuildStageMap(this.stage);
+    this.brickMask = BuildBrickMask(this.map);
     this.Render();
   }
 
@@ -2652,8 +2735,16 @@ class Game {
   }
 
   DrawBrick(ctx, px, py) {
+    const tx = Math.floor(px / TILE);
+    const ty = Math.floor(py / TILE);
+    const mask = this.brickMask?.[ty]?.[tx] ?? BRICK_FULL;
+    if (!mask) return;
     const [gx, gy] = TILE_SHEET.brick;
-    this.BlitGrid(ctx, gx, gy, px, py, TILE, TILE, 1, 1);
+    // Draw remaining 8×8 quarters — classic half-brick look.
+    if (mask & BRICK_TL) this.BlitGrid(ctx, gx, gy, px, py, 8, 8, 1, 1);
+    if (mask & BRICK_TR) this.BlitGrid(ctx, gx, gy, px + 8, py, 8, 8, 1, 1);
+    if (mask & BRICK_BL) this.BlitGrid(ctx, gx, gy, px, py + 8, 8, 8, 1, 1);
+    if (mask & BRICK_BR) this.BlitGrid(ctx, gx, gy, px + 8, py + 8, 8, 8, 1, 1);
   }
 
   DrawSteel(ctx, px, py) {
@@ -2799,7 +2890,8 @@ class Game {
       const tx = Math.floor(x / TILE);
       const ty = Math.floor(y / TILE);
       const t = this.map[ty]?.[tx];
-      if (t === TILE_BRICK || t === TILE_STEEL || t === TILE_BASE) break;
+      if (t === TILE_STEEL || t === TILE_BASE) break;
+      if (t === TILE_BRICK && this.BrickSolidAt(x, y)) break;
     }
     ctx.stroke();
     ctx.setLineDash([]);
