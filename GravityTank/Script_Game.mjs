@@ -2408,7 +2408,7 @@ class Game {
     else if (isPlayer && this.overdriveTimer > 0) tank.fireCd = 0.07;
     else if (isPlayer && this.sniperTimer > 0) tank.fireCd = 0.42;
     else if (isPlayer && this.HasPerk("rapidFire")) tank.fireCd = tank.power >= 2 ? 0.12 : 0.18;
-    else tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.22 : 0.32) : tank.shootCd * (this.enemyRageTimer > 0 ? 0.55 : 1);
+    else tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.286 : 0.416) : tank.shootCd * (this.enemyRageTimer > 0 ? 0.55 : 1);
     this.audio.Shoot();
   }
 
