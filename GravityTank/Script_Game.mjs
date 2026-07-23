@@ -4266,9 +4266,20 @@ class Game {
       ctx.strokeStyle = `rgba(255,80,80,${0.5 + 0.5 * pulse})`;
       ctx.lineWidth = 2;
       ctx.strokeRect(tank.x - 1, tank.y - 1, tank.w + 2, tank.h + 2);
+      // Opening curse shield — keep it loud so players notice the grace window.
       if (tank.protect > 0) {
-        const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 4) % 2];
-        this.BlitGrid(ctx, sx, sy, tank.x - 3, tank.y - 3, tank.w + 6, tank.h + 6);
+        const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 3) % 2];
+        const pad = 5;
+        this.BlitGrid(ctx, sx, sy, tank.x - pad, tank.y - pad, tank.w + pad * 2, tank.h + pad * 2);
+        const ring = 0.55 + 0.45 * Math.abs(Math.sin(this.frame * 0.35));
+        ctx.strokeStyle = `rgba(180,240,255,${ring})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(tank.x - 3, tank.y - 3, tank.w + 6, tank.h + 6);
+        ctx.fillStyle = "rgba(180,240,255,0.85)";
+        ctx.font = `10px ${PIXEL_FONT}`;
+        ctx.textAlign = "center";
+        ctx.fillText(`护盾 ${Math.ceil(tank.protect)}`, tank.x + tank.w / 2, tank.y - 6);
+        ctx.textAlign = "left";
       }
       return;
     }
@@ -4703,7 +4714,16 @@ class Game {
     if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
     if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
     if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
-    if (this.playerEagleTimer > 0) chips.push({ t: `老鹰 ${Math.ceil(this.playerEagleTimer)}`, c: "#ff3030" });
+    if (this.playerEagleTimer > 0) {
+      const p = this.player;
+      const shieldLeft = p?.protect > 0 ? Math.ceil(p.protect) : 0;
+      chips.push({
+        t: shieldLeft > 0
+          ? `老鹰 ${Math.ceil(this.playerEagleTimer)} · 盾${shieldLeft}`
+          : `老鹰 ${Math.ceil(this.playerEagleTimer)} · 无盾危险`,
+        c: shieldLeft > 0 ? "#80e0ff" : "#ff3030",
+      });
+    }
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
     if (this.stagePerk) {
       const u = FindUpgrade(this.stagePerk);
@@ -4723,6 +4743,30 @@ class Game {
       ctx.fillStyle = chip.c;
       ctx.fillText(chip.t, x + 5, 14);
       x += w + 4;
+    }
+
+    // Big eagle-curse banner so the transform is impossible to miss.
+    if (this.eagleWarnT > 0 && this.state === "playing") {
+      const alpha = Clamp(this.eagleWarnT / 0.55, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "rgba(40,0,0,0.78)";
+      ctx.fillRect(16, CANVAS_H * 0.28, CANVAS_W - 32, 58);
+      ctx.strokeStyle = "#ff6060";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(16, CANVAS_H * 0.28, CANVAS_W - 32, 58);
+      ctx.fillStyle = "#ffe060";
+      ctx.font = `14px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      ctx.fillText("终极诅咒 · 你变成了老鹰", CANVAS_W / 2, CANVAS_H * 0.28 + 22);
+      ctx.fillStyle = "#80e0ff";
+      ctx.font = `11px ${PIXEL_FONT}`;
+      const shieldHint = this.player?.protect > 0
+        ? `开场护盾 ${Math.ceil(this.player.protect)} 秒 · 护盾结束后被打倒即失败`
+        : "护盾已结束 · 被打倒即失败";
+      ctx.fillText(shieldHint, CANVAS_W / 2, CANVAS_H * 0.28 + 44);
+      ctx.textAlign = "left";
+      ctx.restore();
     }
 
     if (this.buffToast && this.state !== "roulette") {
