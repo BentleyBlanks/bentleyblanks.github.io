@@ -33,3 +33,9 @@ Custom Battle City–style generated sprites (roulette / ? token / ultra & curse
   Texture_PowerHeavyCurse.png, Texture_PowerEnemyRage.png,
   Texture_UiTitleBanner.png, Texture_UiPanelFrame.png
   Created for this page to match the classic NES tank-battle look (not Namco assets).
+
+Pixel UI / canvas Chinese typeface:
+  Font_FusionPixel12ZhHans.woff2, Font_FusionPixel12Latin.woff2
+  「缝合像素字体 / Fusion Pixel Font」12px proportional — TakWolf
+  https://github.com/TakWolf/fusion-pixel-font
+  License: OFL-1.1 (see Font_FusionPixelOfl.txt)

@@ -11,6 +11,7 @@ const DIFFICULTY = {
   normal: "normal",
 };
 
+const PIXEL_FONT = '"Fusion Pixel 12", monospace';
 const TILE = 16;
 const MAP_W = 26;
 const MAP_H = 26;
@@ -693,6 +694,13 @@ class Game {
       console.warn("asset miss", src, err);
       return null;
     });
+    // Ensure pixel CJK is ready before first canvas text (stage intro / HUD).
+    if (document.fonts?.load) {
+      await Promise.all([
+        document.fonts.load(`12px ${PIXEL_FONT}`),
+        document.fonts.load(`24px ${PIXEL_FONT}`),
+      ]).catch(() => {});
+    }
     this.images = {
       sheet: await load("assets/Texture_ClassicSheet.png"),
       powerToken: await load("assets/Texture_PowerToken.png"),
@@ -3811,7 +3819,7 @@ class Game {
     ctx.lineWidth = 2;
     ctx.strokeRect(28, CANVAS_H - 36, CANVAS_W - 56, 28);
     ctx.fillStyle = "#ffe08a";
-    ctx.font = "bold 11px monospace";
+    ctx.font = `11px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("↓ 朝下/斜射 · 重力越过河清理敌军", CANVAS_W / 2, CANVAS_H - 22);
@@ -3868,48 +3876,48 @@ class Game {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       if (this.isTutorial) {
-        ctx.font = "bold 28px monospace";
+        ctx.font = `28px ${PIXEL_FONT}`;
         ctx.fillText("TUTORIAL", CANVAS_W / 2, CANVAS_H / 2 - 36);
         const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
         ctx.globalAlpha = fade * blink;
-        ctx.font = "bold 42px monospace";
+        ctx.font = `42px ${PIXEL_FONT}`;
         ctx.fillText("新手", CANVAS_W / 2, CANVAS_H / 2 + 18);
         ctx.globalAlpha = fade * 0.95;
-        ctx.font = "bold 13px monospace";
+        ctx.font = `13px ${PIXEL_FONT}`;
         ctx.fillText("向上射击的炮弹会落回打自己", CANVAS_W / 2, CANVAS_H / 2 + 62);
       } else if (this.isBossStage) {
         const isKing = this.stageData.bossKind === "tankKing";
-        ctx.font = "bold 28px monospace";
+        ctx.font = `28px ${PIXEL_FONT}`;
         ctx.fillText("BOSS", CANVAS_W / 2, CANVAS_H / 2 - 36);
         const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
         ctx.globalAlpha = fade * blink;
-        ctx.font = "bold 36px monospace";
+        ctx.font = `36px ${PIXEL_FONT}`;
         ctx.fillText(isKing ? "坦克王" : "重力巨炮", CANVAS_W / 2, CANVAS_H / 2 + 18);
         ctx.globalAlpha = fade * 0.95;
-        ctx.font = "bold 12px monospace";
+        ctx.font = `12px ${PIXEL_FONT}`;
         ctx.fillText(
           isKing ? "四向炮筒 · 每筒可射" : "躲避万炮齐发 · 子弹带重力",
           CANVAS_W / 2,
           CANVAS_H / 2 + 58
         );
       } else {
-        ctx.font = "bold 36px monospace";
+        ctx.font = `36px ${PIXEL_FONT}`;
         ctx.fillText("STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
 
         // Big stage number with a slight blink on hold
         const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
         ctx.globalAlpha = fade * blink;
-        ctx.font = "bold 64px monospace";
+        ctx.font = `64px ${PIXEL_FONT}`;
         ctx.fillText(String(this.stage), CANVAS_W / 2, CANVAS_H / 2 + 28);
 
         ctx.globalAlpha = fade * 0.9;
-        ctx.font = "bold 16px monospace";
+        ctx.font = `16px ${PIXEL_FONT}`;
         ctx.fillText(`第 ${this.stage} 关 / 共 ${STAGE_COUNT} 关`, CANVAS_W / 2, CANVAS_H / 2 + 72);
       }
 
       if (intro.phase === "hold") {
         ctx.globalAlpha = fade * (0.35 + 0.35 * Math.sin(intro.t * 4));
-        ctx.font = "12px monospace";
+        ctx.font = `12px ${PIXEL_FONT}`;
         ctx.fillText("按空格 / 点击跳过", CANVAS_W / 2, CANVAS_H - 28);
       }
       ctx.restore();
@@ -4108,7 +4116,7 @@ class Game {
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(x - 2, y - 12, barW + 4, barH + 18);
     ctx.fillStyle = "#f0d060";
-    ctx.font = "bold 9px monospace";
+    ctx.font = `9px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     const finalPhase = (boss.hp / Math.max(1, boss.maxHp)) <= BOSS_FINAL_HP_RATIO;
@@ -4236,7 +4244,7 @@ class Game {
     ctx.lineWidth = 2;
     ctx.strokeRect(cx - s / 2 + 1, cy - s / 2 + 1, s - 2, s - 2);
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 16px monospace";
+    ctx.font = `16px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("?", cx, cy + 1);
@@ -4279,7 +4287,7 @@ class Game {
     ctx.strokeRect(18, 8, CANVAS_W - 36, 40);
     this.DrawPowerIcon(ctx, focus.kind, 42, 28, 22);
     ctx.fillStyle = focus.color;
-    ctx.font = "bold 15px monospace";
+    ctx.font = `15px ${PIXEL_FONT}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     const tag = focus.tier === "ultra" ? "超 " : focus.tier === "bad" ? "负 " : "好 ";
@@ -4356,7 +4364,7 @@ class Game {
       ctx.lineWidth = isFocus ? 2 : 1;
       ctx.strokeRect(tx - tw / 2 + 0.5, -th / 2 + 0.5, tw - 1, th - 1);
       ctx.fillStyle = "#fff8e8";
-      ctx.font = isFocus ? "bold 12px monospace" : "bold 11px monospace";
+      ctx.font = isFocus ? `12px ${PIXEL_FONT}` : `11px ${PIXEL_FONT}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(seg.label, tx, 0.5);
@@ -4372,7 +4380,7 @@ class Game {
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.fillStyle = focus.color;
-    ctx.font = "bold 12px monospace";
+    ctx.font = `12px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(focus.tier === "bad" ? "负" : focus.tier === "ultra" ? "超" : "好", 0, 1);
@@ -4399,7 +4407,7 @@ class Game {
     ctx.stroke();
 
     ctx.fillStyle = "#c8d4e4";
-    ctx.font = "10px monospace";
+    ctx.font = `10px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.fillText(
       r.phase === "spin"
@@ -4410,7 +4418,7 @@ class Game {
     );
     ctx.textAlign = "left";
 
-    ctx.font = "bold 9px monospace";
+    ctx.font = `9px ${PIXEL_FONT}`;
     ctx.fillStyle = TIER_PALETTE.good.color;
     ctx.fillText("绿=好", 20, CANVAS_H - 8);
     ctx.fillStyle = TIER_PALETTE.ultra.color;
@@ -4448,7 +4456,7 @@ class Game {
     }
 
     let x = 6;
-    ctx.font = "bold 10px monospace";
+    ctx.font = `10px ${PIXEL_FONT}`;
     for (const chip of chips) {
       const w = ctx.measureText(chip.t).width + 10;
       ctx.fillStyle = "rgba(0,0,0,0.55)";
@@ -4463,7 +4471,7 @@ class Game {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = "rgba(0,0,0,0.65)";
       const msg = this.buffToast.text;
-      ctx.font = "bold 13px monospace";
+      ctx.font = `13px ${PIXEL_FONT}`;
       const tw = ctx.measureText(msg).width + 20;
       ctx.fillRect((CANVAS_W - tw) / 2, 22, tw, 22);
       ctx.fillStyle = "#ffe08a";
