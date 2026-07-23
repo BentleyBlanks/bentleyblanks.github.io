@@ -202,11 +202,12 @@ const ENEMY_TYPES = [
   },
 ];
 
-const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst"];
+const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst", "gunBreak"];
 const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
 /** Fire-rate multipliers vs the original boss cadence (lower = slower). */
 const BOSS_FIRE_RATE_NORMAL = 0.7;
 const BOSS_FIRE_RATE_EASY = 0.5;
+const BOSS_FINAL_HP_RATIO = 0.35;
 
 /** Classic sheet grid origins [gx, gy] in 8×8 cells (16×16 sprite = 2×2 cells). */
 const TANK_DIR_COL = { up: 0, left: 4, down: 8, right: 12 };
@@ -634,6 +635,8 @@ class Game {
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
+    this.playerDisarmTimer = 0;
+    this.playerEagleTimer = 0;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -1358,7 +1361,7 @@ class Game {
           `${diffTag} 开局先进入新手引导，再打 ${STAGE_COUNT} 关战役（第 3 关 Boss 弹幕）。保卫老鹰；炮弹带重力会下坠。`;
       } else if (this.isBossStage) {
         this.overlays.startBlurb.textContent =
-          `${diffTag} BOSS 关 · 重力巨炮。躲避万炮齐发 / 扇形 / 曲射 / 扫射 / 天降弹雨。子弹带重力，速度 70%。`;
+          `${diffTag} BOSS 关 · 重力巨炮。躲避弹幕；小心拆炮禁射，残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
       } else {
         const e = this.stageData.enemies;
         this.overlays.startBlurb.textContent =
@@ -1423,6 +1426,9 @@ class Game {
     this.heavyCurseTimer = 0;
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
+    this.playerDisarmTimer = 0;
+    this.ClearEagleForm(false);
+    this.playerEagleTimer = 0;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -1618,6 +1624,15 @@ class Game {
     if (this.heavyCurseTimer > 0) this.heavyCurseTimer -= dt;
     if (this.enemyRageTimer > 0) this.enemyRageTimer -= dt;
     if (this.playerStunTimer > 0) this.playerStunTimer -= dt;
+    if (this.playerDisarmTimer > 0) this.playerDisarmTimer -= dt;
+    if (this.playerEagleTimer > 0) {
+      this.playerEagleTimer -= dt;
+      if (this.playerEagleTimer <= 0) {
+        this.playerEagleTimer = 0;
+        this.ClearEagleForm(true);
+        this.ShowBuffToast("老鹰诅咒解除，变回坦克");
+      }
+    }
     if (this.buffToast) {
       this.buffToast.ttl -= dt;
       if (this.buffToast.ttl <= 0) this.buffToast = null;
@@ -1678,6 +1693,15 @@ class Game {
       return;
     }
 
+    // Eagle form: slow waddle near the HQ; no shooting (handled in TryFire).
+    const eagleForm = this.playerEagleTimer > 0;
+    if (eagleForm) {
+      p.asEagle = true;
+      p.speed = PLAYER_SPEED * 0.55;
+    } else if (p.asEagle) {
+      this.ClearEagleForm(true);
+    }
+
     const input = this.GetMoveInput();
     p.moving = false;
 
@@ -1696,8 +1720,13 @@ class Game {
         }
       }
       const d = DIR[input];
-      const speed = p.speed * (onIce ? 1.15 : 1);
+      const baseSpeed = eagleForm ? PLAYER_SPEED * 0.55 : p.speed;
+      const speed = baseSpeed * (onIce ? 1.15 : 1);
       this.MoveTank(p, d.x * speed * dt, d.y * speed * dt);
+      if (eagleForm) {
+        // Keep the cursed eagle in the lower HQ band.
+        p.y = Clamp(p.y, CANVAS_H * 0.55, CANVAS_H - p.h - 2);
+      }
       p.moving = true;
       if (onIce) {
         if (!p.onIceSfx) {
@@ -1720,7 +1749,7 @@ class Game {
       p.onIceSfx = false;
     }
 
-    this.audio.SetEngine(p.moving);
+    this.audio.SetEngine(p.moving && !eagleForm);
     if (p.moving) p.animTick += dt * 10;
 
     if (this.WantsFire()) this.TryFire(p, true);
@@ -1846,7 +1875,23 @@ class Game {
     }
 
     if (e.fireCd <= 0) {
-      const pattern = BOSS_ATTACKS[Math.floor(Math.random() * BOSS_ATTACKS.length)];
+      const ratio = e.hp / Math.max(1, e.maxHp);
+      const finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
+      e.finalPhase = finalPhase;
+      let pattern;
+      if (finalPhase && this.playerEagleTimer <= 0) {
+        // Final phase: guarantee first ultimate, then periodically recast.
+        const firstUltimate = !e.eagleCurseUsed;
+        if (firstUltimate || Math.random() < 0.38) {
+          pattern = "eagleCurse";
+          e.eagleCurseUsed = true;
+        }
+      }
+      if (!pattern) {
+        // Prefer gunBreak occasionally so the disarm shows up mid-fight.
+        if (this.playerDisarmTimer <= 0 && Math.random() < 0.22) pattern = "gunBreak";
+        else pattern = BOSS_ATTACKS[Math.floor(Math.random() * BOSS_ATTACKS.length)];
+      }
       this.BeginBossAttack(e, pattern);
     }
   }
@@ -1912,6 +1957,20 @@ class Game {
       }
       e.fireCd = 2.1 * cdScale;
       this.ShowBuffToast("三点连射");
+    } else if (pattern === "gunBreak") {
+      e.attackQueue.push({ t: 0.15 * cdScale, kind: "gunBreak" });
+      e.fireCd = 3.6 * cdScale;
+      this.ShowBuffToast("拆炮蓄力…");
+    } else if (pattern === "eagleCurse") {
+      e.attackQueue.push({ t: 0.45 * cdScale, kind: "eagleCurse" });
+      // Follow-up pressure while the player is a helpless eagle.
+      for (let i = 0; i < 6; i++) {
+        const t = i / 5;
+        const ang = -0.85 + t * 1.7;
+        e.attackQueue.push({ t: (0.7 + i * 0.1) * cdScale, kind: "shell", dir: "down", angleOffset: ang });
+      }
+      e.fireCd = 7.2 * cdScale;
+      this.ShowBuffToast("终极诅咒蓄力…");
     } else {
       e.fireCd = 1.5 * cdScale;
     }
@@ -1935,6 +1994,16 @@ class Game {
   }
 
   FireBossShot(e, shot) {
+    if (shot.kind === "gunBreak") {
+      this.ApplyGunBreak(this.IsEasy() ? 3.8 : 5.2);
+      this.audio.Hit();
+      return;
+    }
+    if (shot.kind === "eagleCurse") {
+      this.ApplyEagleCurse(this.IsEasy() ? 6.5 : 8.5);
+      this.audio.Explode();
+      return;
+    }
     if (shot.kind === "rain") {
       const x = 24 + Math.random() * (CANVAS_W - 48);
       this.SpawnBossShell(e, {
@@ -2157,6 +2226,8 @@ class Game {
 
   TryFire(tank, isPlayer) {
     if (isPlayer && this.playerStunTimer > 0) return;
+    if (isPlayer && this.playerDisarmTimer > 0) return;
+    if (isPlayer && this.playerEagleTimer > 0) return;
     if (tank.fireCd > 0) return;
     const owned = this.bullets.filter((b) => b.alive && b.owner === tank).length;
     let maxB = isPlayer ? tank.maxBullets : 1;
@@ -2492,6 +2563,18 @@ class Game {
       this.audio.Bounce();
       return;
     }
+    // Ultimate eagle curse: dying as the eagle fails the stage regardless of lives.
+    if (this.playerEagleTimer > 0 || p.asEagle) {
+      p.alive = false;
+      this.audio.StopEngine();
+      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.6);
+      this.audio.Explode();
+      this.playerEagleTimer = 0;
+      this.ClearEagleForm(false);
+      this.respawnTimer = 0;
+      this.EndGame(false, "老鹰形态被击破！不论剩余生命，本关失败。");
+      return;
+    }
     p.alive = false;
     this.audio.StopEngine();
     this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.2);
@@ -2506,6 +2589,38 @@ class Game {
     }
     // Use update-loop timer so pause cannot cancel respawn forever.
     this.respawnTimer = 0.9;
+  }
+
+  ApplyGunBreak(duration = 5) {
+    this.playerDisarmTimer = Math.max(this.playerDisarmTimer, duration);
+    this.ShowBuffToast("⚠ 炮管被拆！无法开火");
+  }
+
+  ApplyEagleCurse(duration = 8) {
+    const p = this.player;
+    if (!p?.alive) return;
+    this.playerEagleTimer = Math.max(this.playerEagleTimer, duration);
+    this.playerDisarmTimer = Math.max(this.playerDisarmTimer, duration);
+    p.asEagle = true;
+    p.protect = Math.min(p.protect, 0.35); // brief grace, then fully vulnerable
+    // Snap near the HQ so the eagle curse reads clearly.
+    p.x = Clamp(12 * TILE, 0, CANVAS_W - p.w);
+    p.y = Clamp(23 * TILE, CANVAS_H * 0.55, CANVAS_H - p.h - 2);
+    this.UnstickTank(p);
+    this.ShowBuffToast("⚠ 终极：你变成了老鹰！被打倒直接失败！");
+  }
+
+  ClearEagleForm(restoreTank = true) {
+    const p = this.player;
+    if (!p) {
+      this.playerEagleTimer = 0;
+      return;
+    }
+    p.asEagle = false;
+    p.speed = PLAYER_SPEED;
+    if (restoreTank && p.alive) {
+      p.protect = Math.max(p.protect, 1.2);
+    }
   }
 
   DestroyBase() {
@@ -3136,6 +3251,8 @@ class Game {
       attackAge: 0,
       castFace: "down",
       isBoss: !!type.boss,
+      eagleCurseUsed: false,
+      finalPhase: false,
     };
   }
 
@@ -3486,6 +3603,23 @@ class Game {
       return;
     }
 
+    // Boss ultimate: player is visually the HQ eagle.
+    if (isPlayer && (this.playerEagleTimer > 0 || tank.asEagle)) {
+      const [gx, gy] = this.baseAlive ? TILE_SHEET.baseAlive : TILE_SHEET.baseDead;
+      const pulse = 0.55 + 0.45 * Math.abs(Math.sin(this.frame * 0.25));
+      ctx.globalAlpha = pulse;
+      this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = `rgba(255,80,80,${0.5 + 0.5 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tank.x - 1, tank.y - 1, tank.w + 2, tank.h + 2);
+      if (tank.protect > 0) {
+        const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 4) % 2];
+        this.BlitGrid(ctx, sx, sy, tank.x - 3, tank.y - 3, tank.w + 6, tank.h + 6);
+      }
+      return;
+    }
+
     const ghosting = isPlayer && this.ghostTimer > 0;
     if (ghosting) ctx.globalAlpha = 0.45 + 0.35 * Math.sin(this.frame * 0.35);
     const { gx, gy } = this.TankSheetOrigin(tank, isPlayer);
@@ -3525,10 +3659,11 @@ class Game {
     ctx.font = "bold 9px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    ctx.fillText("BOSS 重力巨炮", CANVAS_W / 2, y - 1);
+    const finalPhase = (boss.hp / Math.max(1, boss.maxHp)) <= BOSS_FINAL_HP_RATIO;
+    ctx.fillText(finalPhase ? "BOSS 终焉阶段" : "BOSS 重力巨炮", CANVAS_W / 2, y - 1);
     ctx.fillStyle = "#302010";
     ctx.fillRect(x, y, barW, barH);
-    ctx.fillStyle = ratio > 0.35 ? "#ff6060" : "#ff3030";
+    ctx.fillStyle = ratio > BOSS_FINAL_HP_RATIO ? "#ff6060" : "#ff3030";
     ctx.fillRect(x, y, barW * ratio, barH);
     ctx.strokeStyle = "#f0d060";
     ctx.lineWidth = 1;
@@ -3808,6 +3943,8 @@ class Game {
     if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
     if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
     if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
+    if (this.playerDisarmTimer > 0) chips.push({ t: `拆炮 ${Math.ceil(this.playerDisarmTimer)}`, c: "#ff6060" });
+    if (this.playerEagleTimer > 0) chips.push({ t: `老鹰 ${Math.ceil(this.playerEagleTimer)}`, c: "#ff3030" });
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
 
     let x = 6;
