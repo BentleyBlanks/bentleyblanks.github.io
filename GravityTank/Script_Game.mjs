@@ -3230,6 +3230,8 @@ class Game {
   ArmBossSkill(e, pattern) {
     e.pendingPattern = pattern;
     e.skillWindup = BOSS_SKILL_WINDUP;
+    // Lock special cadence for the windup; Begin*Attack overwrites with the real cooldown.
+    e.fireCd = Math.max(e.fireCd || 0, BOSS_SKILL_WINDUP + 0.05);
     let warn = BOSS_SKILL_WARN[pattern] || "⚠ 特殊攻击蓄力";
     if (pattern === "axisBurst" && (e.barrelCount || 1) <= 1) warn = "⚠ 点射蓄力";
     e.skillWarn = warn;
