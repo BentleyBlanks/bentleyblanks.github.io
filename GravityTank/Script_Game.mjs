@@ -355,6 +355,22 @@ function BrickBitAtLocal(ox, oy) {
   return BRICK_BR;
 }
 
+/** Axis-aligned rect for one 8×8 brick quarter inside a 16×16 cell. */
+function BrickQuarterRect(tx, ty, bit) {
+  const px = tx * TILE;
+  const py = ty * TILE;
+  const right = (bit === BRICK_TR || bit === BRICK_BR);
+  const bottom = (bit === BRICK_BL || bit === BRICK_BR);
+  return {
+    x: px + (right ? TILE / 2 : 0),
+    y: py + (bottom ? TILE / 2 : 0),
+    w: TILE / 2,
+    h: TILE / 2,
+  };
+}
+
+const BRICK_QUARTER_BITS = [BRICK_TL, BRICK_TR, BRICK_BL, BRICK_BR];
+
 function Clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
 }
@@ -2737,28 +2753,38 @@ class Game {
 
   CollidesTerrain(tank) {
     const ghost = tank === this.player && this.ghostTimer > 0;
-    const pads = [
-      [tank.x + 3, tank.y + 3],
-      [tank.x + tank.w - 4, tank.y + 3],
-      [tank.x + 3, tank.y + tank.h - 4],
-      [tank.x + tank.w - 4, tank.y + tank.h - 4],
-      [tank.x + tank.w / 2, tank.y + tank.h / 2],
-    ];
-    for (const [px, py] of pads) {
-      const tx = Math.floor(px / TILE);
-      const ty = Math.floor(py / TILE);
-      if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
-      const t = this.map[ty][tx];
-      if (ghost) {
-        // Phase through brick / steel / water; only the eagle base stays solid.
-        if (t === TILE_BASE || t === TILE_BASE_DEAD) return true;
-        continue;
+    // AABB vs tiles (and brick quarters) — point pads miss remaining half-bricks and soft-lock.
+    const box = { x: tank.x + 2, y: tank.y + 2, w: tank.w - 4, h: tank.h - 4 };
+    const x0 = Math.floor(box.x / TILE);
+    const y0 = Math.floor(box.y / TILE);
+    const x1 = Math.floor((box.x + box.w - 0.001) / TILE);
+    const y1 = Math.floor((box.y + box.h - 0.001) / TILE);
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
+        const t = this.map[ty][tx];
+        if (ghost) {
+          if (t === TILE_BASE || t === TILE_BASE_DEAD) return true;
+          continue;
+        }
+        if (t === TILE_BRICK) {
+          if (this.BrickRectHitsSolid(box, tx, ty)) return true;
+          continue;
+        }
+        if (t === TILE_STEEL || t === TILE_WATER || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
       }
-      if (t === TILE_BRICK) {
-        if (this.BrickSolidAt(px, py)) return true;
-        continue;
-      }
-      if (t === TILE_STEEL || t === TILE_WATER || t === TILE_BASE || t === TILE_BASE_DEAD) return true;
+    }
+    return false;
+  }
+
+  /** True if rect overlaps any remaining solid 8×8 quarter of brick cell (tx,ty). */
+  BrickRectHitsSolid(rect, tx, ty) {
+    if (this.map[ty]?.[tx] !== TILE_BRICK) return false;
+    const mask = this.brickMask?.[ty]?.[tx] ?? BRICK_FULL;
+    if (!mask) return false;
+    for (const bit of BRICK_QUARTER_BITS) {
+      if (!(mask & bit)) continue;
+      if (RectsOverlap(rect, BrickQuarterRect(tx, ty, bit))) return true;
     }
     return false;
   }
@@ -2919,15 +2945,31 @@ class Game {
         }
       }
 
+      // Flush against a remaining half-brick: resolve before the first step can tunnel.
+      if (this.BulletHitTerrain(b)) continue;
+
       const stepX = b.vx * dt;
       const stepY = b.vy * dt;
-      b.x += stepX;
-      b.y += stepY;
-      b.traveled += Math.hypot(stepX, stepY);
+      const dist = Math.hypot(stepX, stepY);
+      // Half-bricks are only 8px thick — substep so shells cannot skip through them.
+      const subCount = Math.max(1, Math.ceil(dist / 3));
+      const prevX = b.x;
+      const prevY = b.y;
+      let hitSolid = false;
+      for (let i = 1; i <= subCount; i++) {
+        b.x = prevX + stepX * (i / subCount);
+        b.y = prevY + stepY * (i / subCount);
+        if (this.BulletHitTerrain(b)) {
+          hitSolid = true;
+          break;
+        }
+      }
+      b.traveled += dist;
       if (b.arm > 0) b.arm -= dt;
 
       b.trail.push({ x: b.x + 4, y: b.y + 4 });
       if (b.trail.length > 10) b.trail.shift();
+      if (hitSolid) continue;
 
       // Screen-edge bounce for bounce shells; otherwise despawn out of bounds.
       if (b.bounceLeft > 0) {
@@ -2944,9 +2986,6 @@ class Game {
         b.alive = false;
         continue;
       }
-
-      // terrain hit
-      if (this.BulletHitTerrain(b)) continue;
 
       // Armed bullets can hit any tank, including the shooter (gravity self-kill).
       const canSelfHit = b.arm <= 0 || b.traveled >= 36;
@@ -3014,34 +3053,87 @@ class Game {
     this.bullets = this.bullets.filter((b) => b.alive);
   }
 
-  BulletHitTerrain(b) {
+  /** First brick cell whose solid quarter overlaps the bullet body (prefer facing tip). */
+  FindBrickCellHitByBullet(b) {
     const face = b.face || DirFromVector(b.vx, b.vy);
-    const fd = DIR[face] || { x: Math.sign(b.vx), y: Math.sign(b.vy) };
-    const cx = b.x + b.w / 2;
-    const cy = b.y + b.h / 2;
-    const samples = [
-      [cx + fd.x * 5, cy + fd.y * 5], // tip in facing direction
+    const fd = DIR[face] || { x: Math.sign(b.vx) || 0, y: Math.sign(b.vy) || 0 };
+    const cx = b.x + b.w * 0.5;
+    const cy = b.y + b.h * 0.5;
+    // Prefer tip samples so the entry-side cell wins when straddling two tiles.
+    const probes = [
+      [cx + fd.x * 5, cy + fd.y * 5],
       [cx + fd.x * 2, cy + fd.y * 2],
       [cx, cy],
+      [b.x, b.y],
+      [b.x + b.w, b.y],
+      [b.x, b.y + b.h],
+      [b.x + b.w, b.y + b.h],
+    ];
+    for (const [px, py] of probes) {
+      const tx = Math.floor(px / TILE);
+      const ty = Math.floor(py / TILE);
+      if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) continue;
+      if (this.map[ty][tx] !== TILE_BRICK) continue;
+      if (this.BrickSolidAt(px, py) || this.BrickRectHitsSolid(b, tx, ty)) {
+        return { tx, ty };
+      }
+    }
+    // Full AABB sweep over covered cells (nestled flush / gravity curve).
+    const x0 = Math.floor(b.x / TILE);
+    const y0 = Math.floor(b.y / TILE);
+    const x1 = Math.floor((b.x + b.w - 0.001) / TILE);
+    const y1 = Math.floor((b.y + b.h - 0.001) / TILE);
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) continue;
+        if (this.map[ty][tx] !== TILE_BRICK) continue;
+        if (this.BrickRectHitsSolid(b, tx, ty)) return { tx, ty };
+      }
+    }
+    return null;
+  }
+
+  BulletHitTerrain(b) {
+    const face = b.face || DirFromVector(b.vx, b.vy);
+    const fd = DIR[face] || { x: Math.sign(b.vx) || 0, y: Math.sign(b.vy) || 0 };
+    const cx = b.x + b.w * 0.5;
+    const cy = b.y + b.h * 0.5;
+
+    const brickHit = this.FindBrickCellHitByBullet(b);
+    if (brickHit) {
+      const { tx, ty } = brickHit;
+      if (b.sniper && b.bounceLeft > 0) {
+        if (Math.abs(b.vx) >= Math.abs(b.vy)) b.vx *= -1;
+        else b.vy *= -1;
+        b.x += Math.sign(b.vx || 1) * 4;
+        b.y += Math.sign(b.vy || 1) * 4;
+        b.bounceLeft -= 1;
+        this.audio.Bounce();
+        return false;
+      }
+      this.DestroyBrickHalf(tx, ty, b, b.power);
+      b.alive = false;
+      this.SpawnExplosion(b.x, b.y, 0.45);
+      this.audio.Hit();
+      return true;
+    }
+
+    // Steel / base: tip + body samples (full cells).
+    const samples = [
+      [cx + fd.x * 5, cy + fd.y * 5],
+      [cx + fd.x * 2, cy + fd.y * 2],
+      [cx, cy],
+      [b.x + b.w * 0.5, b.y + b.h * 0.5],
     ];
     for (const [px, py] of samples) {
       const tx = Math.floor(px / TILE);
       const ty = Math.floor(py / TILE);
       if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) continue;
       const t = this.map[ty][tx];
-      if (t === TILE_EMPTY || t === TILE_GRASS || t === TILE_ICE || t === TILE_WATER) continue;
+      if (t === TILE_EMPTY || t === TILE_GRASS || t === TILE_ICE || t === TILE_WATER || t === TILE_BRICK) continue;
 
-      if (t === TILE_BRICK) {
-        if (!this.BrickSolidAt(px, py)) continue;
-        this.DestroyBrickHalf(tx, ty, b, b.power);
-        b.alive = false;
-        this.SpawnExplosion(b.x, b.y, 0.45);
-        this.audio.Hit();
-        return true;
-      }
       if (t === TILE_STEEL) {
         if (b.bounceLeft > 0 && b.power < 3) {
-          // Ricochet off steel — prefer flipping the stronger axis of motion.
           if (Math.abs(b.vx) >= Math.abs(b.vy)) b.vx *= -1;
           else b.vy *= -1;
           b.x += Math.sign(b.vx) * 4;
@@ -3083,31 +3175,27 @@ class Game {
   }
 
   /**
-   * Classic Battle City: each hit removes ONE half of the 16×16 brick
-   * (the half that was actually struck). Second hit clears the rest.
+   * Classic Battle City: shot direction removes the near half of the 16×16 cell.
+   * Second shot (or nestled against the remaining half) clears the rest.
+   * Power ≥ 3 (gun / 3★) clears the whole cell in one hit.
    */
-  DestroyBrickHalf(tx, ty, bullet, _power) {
+  DestroyBrickHalf(tx, ty, bullet, power = 1) {
     if (!this.brickMask?.[ty]) return;
     if (this.map[ty][tx] !== TILE_BRICK) return;
     let mask = this.brickMask[ty][tx] || BRICK_FULL;
-    const hitX = bullet.x + bullet.w / 2;
-    const hitY = bullet.y + bullet.h / 2;
-    const ox = hitX - tx * TILE;
-    const oy = hitY - ty * TILE;
-    const face = bullet.face || DirFromVector(bullet.vx, bullet.vy);
-    let clear;
-    if (face === "left" || face === "right") {
-      // Vertical half containing the impact point.
-      clear = ox < TILE / 2 ? (BRICK_TL | BRICK_BL) : (BRICK_TR | BRICK_BR);
+    if ((power | 0) >= 3) {
+      mask = 0;
     } else {
-      // Horizontal half containing the impact point.
-      clear = oy < TILE / 2 ? (BRICK_TL | BRICK_TR) : (BRICK_BL | BRICK_BR);
+      const face = bullet.face || DirFromVector(bullet.vx, bullet.vy);
+      let clear = BrickHalfMaskFromDir(face);
+      // Diagonal / curved shells: fall back to dominant velocity axis.
+      if (face !== "up" && face !== "down" && face !== "left" && face !== "right") {
+        clear = BrickHalfMaskFromVelocity(bullet.vx, bullet.vy);
+      }
+      // Entry half already gone (sitting in the hollow) → shave whatever solid remains.
+      if ((mask & clear) === 0) clear = mask;
+      mask &= ~clear;
     }
-    // If that half is already gone, clear whichever solid half remains.
-    if ((mask & clear) === 0) {
-      clear = mask;
-    }
-    mask &= ~clear;
     this.brickMask[ty][tx] = mask;
     if (mask === 0) this.map[ty][tx] = TILE_EMPTY;
   }
