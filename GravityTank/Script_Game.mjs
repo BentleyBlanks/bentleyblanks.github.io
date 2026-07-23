@@ -1407,7 +1407,8 @@ class Game {
     this.totalEnemies = e.basic + e.fast + e.power + e.armor + (e.boss || 0) + (e.tankKing || 0);
     this.spawnSlots = (this.stageData.enemySpawns || [[0, 0], [12, 0], [24, 0]]).map(([x, y]) => ({
       x: x * TILE,
-      y: y * TILE,
+      // Keep 2-tile tanks (+2px inset) fully on-canvas even if a stage table is stale.
+      y: Math.max(0, Math.min(y, MAP_H - 3)) * TILE,
     }));
     this.SyncStageLabels();
   }
@@ -1762,15 +1763,18 @@ class Game {
   }
 
   SpawnPlayer(fullProtect, keepStats = null) {
-    const [sx, sy] = this.stageData.playerSpawns?.[0] || [8, 24];
+    const [sx, rawSy] = this.stageData.playerSpawns?.[0] || [8, 24];
+    const sy = Math.max(0, Math.min(rawSy, MAP_H - 3));
     const power = keepStats?.power ?? 1;
     const maxBullets = keepStats?.maxBullets ?? (power >= 2 ? 2 : 1);
+    // Top HQ / tutorial: face the battlefield. Classic bottom HQ: face up toward enemies.
+    const faceDown = this.isTutorial || sy < MAP_H / 2 || this.IsBaseAtTop();
     this.player = {
       x: sx * TILE + 2,
       y: sy * TILE + 2,
       w: TANK_SIZE,
       h: TANK_SIZE,
-      dir: this.isTutorial ? "down" : "up",
+      dir: faceDown ? "down" : "up",
       speed: PLAYER_SPEED,
       power,
       maxBullets,
