@@ -191,19 +191,22 @@ const ENEMY_TYPES = [
   {
     id: "boss",
     hp: 28,
-    speed: 42,
+    speed: 38,
     score: 5000,
     shootCd: 2.4,
     texture: "enemyArmor",
     weight: 0,
     bulletBoost: 0.7, // gravity shells at 70% normal speed
-    size: 40,
+    size: 56,
     boss: true,
   },
 ];
 
 const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst"];
 const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
+/** Fire-rate multipliers vs the original boss cadence (lower = slower). */
+const BOSS_FIRE_RATE_NORMAL = 0.7;
+const BOSS_FIRE_RATE_EASY = 0.5;
 
 /** Classic sheet grid origins [gx, gy] in 8×8 cells (16×16 sprite = 2×2 cells). */
 const TANK_DIR_COL = { up: 0, left: 4, down: 8, right: 12 };
@@ -1258,6 +1261,12 @@ class Game {
     return this.IsEasy() ? POWER_DROP_RATE * 1.5 : POWER_DROP_RATE;
   }
 
+  /** Boss attack cadence scale: normal 70% rate, easy 50% rate → longer cooldowns. */
+  GetBossFireCdScale() {
+    const rate = this.IsEasy() ? BOSS_FIRE_RATE_EASY : BOSS_FIRE_RATE_NORMAL;
+    return 1 / Math.max(0.05, rate);
+  }
+
   ApplyStageMeta(stageIndex1Based) {
     if (IsTutorialStage(stageIndex1Based)) {
       this.stage = 0;
@@ -1793,6 +1802,7 @@ class Game {
     e.attackQueue = [];
     const face = e.castFace || "down";
     e.dir = face === "up" ? "down" : face;
+    const cdScale = this.GetBossFireCdScale();
 
     if (pattern === "barrage") {
       // 万炮齐发：宽扇形下压弹幕
@@ -1800,9 +1810,9 @@ class Game {
       for (let i = 0; i < n; i++) {
         const t = n === 1 ? 0.5 : i / (n - 1);
         const ang = -1.05 + t * 2.1;
-        e.attackQueue.push({ t: i * 0.04, kind: "shell", dir: "down", angleOffset: ang, label: i === 0 });
+        e.attackQueue.push({ t: i * 0.04 * cdScale, kind: "shell", dir: "down", angleOffset: ang, label: i === 0 });
       }
-      e.fireCd = 3.2;
+      e.fireCd = 3.2 * cdScale;
       this.ShowBuffToast("万炮齐发！");
     } else if (pattern === "fan") {
       // 扇形追击：朝玩家扇形 5 发
@@ -1810,18 +1820,18 @@ class Game {
       for (let i = 0; i < n; i++) {
         const t = n === 1 ? 0.5 : i / (n - 1);
         const ang = -0.55 + t * 1.1;
-        e.attackQueue.push({ t: 0.02 * i, kind: "shell", dir: face, angleOffset: ang });
+        e.attackQueue.push({ t: 0.02 * i * cdScale, kind: "shell", dir: face, angleOffset: ang });
       }
-      e.fireCd = 2.4;
+      e.fireCd = 2.4 * cdScale;
       this.ShowBuffToast("扇形追击");
     } else if (pattern === "mortar") {
       // 曲射迫击：高抛弧线砸向玩家附近
       const px = this.player?.alive ? this.player.x + this.player.w / 2 : CANVAS_W / 2;
       for (let i = 0; i < 5; i++) {
         const aimX = px + (i - 2) * 36;
-        e.attackQueue.push({ t: i * 0.12, kind: "mortar", aimX });
+        e.attackQueue.push({ t: i * 0.12 * cdScale, kind: "mortar", aimX });
       }
-      e.fireCd = 2.8;
+      e.fireCd = 2.8 * cdScale;
       this.ShowBuffToast("曲射迫击");
     } else if (pattern === "sweep") {
       // 横向扫射：从左到右（或反向）依次发射
@@ -1830,26 +1840,26 @@ class Game {
       for (let i = 0; i < n; i++) {
         const t = n === 1 ? 0.5 : i / (n - 1);
         const ang = leftToRight ? (-0.95 + t * 1.9) : (0.95 - t * 1.9);
-        e.attackQueue.push({ t: i * 0.08, kind: "shell", dir: "down", angleOffset: ang });
+        e.attackQueue.push({ t: i * 0.08 * cdScale, kind: "shell", dir: "down", angleOffset: ang });
       }
-      e.fireCd = 3.0;
+      e.fireCd = 3.0 * cdScale;
       this.ShowBuffToast("横向扫射");
     } else if (pattern === "rain") {
       // 天降弹雨：上方落下慢速重力弹
       for (let i = 0; i < 8; i++) {
-        e.attackQueue.push({ t: i * 0.1, kind: "rain" });
+        e.attackQueue.push({ t: i * 0.1 * cdScale, kind: "rain" });
       }
-      e.fireCd = 3.1;
+      e.fireCd = 3.1 * cdScale;
       this.ShowBuffToast("天降弹雨");
     } else if (pattern === "burst") {
       // 三点连射：对准玩家连发
       for (let i = 0; i < 3; i++) {
-        e.attackQueue.push({ t: i * 0.22, kind: "shell", dir: face, angleOffset: 0 });
+        e.attackQueue.push({ t: i * 0.22 * cdScale, kind: "shell", dir: face, angleOffset: 0 });
       }
-      e.fireCd = 2.1;
+      e.fireCd = 2.1 * cdScale;
       this.ShowBuffToast("三点连射");
     } else {
-      e.fireCd = 1.5;
+      e.fireCd = 1.5 * cdScale;
     }
     e.attackAge = 0;
   }
@@ -1934,8 +1944,8 @@ class Game {
     this.bullets.push({
       x,
       y,
-      w: 8,
-      h: 8,
+      w: 6,
+      h: 14,
       vx,
       vy,
       alive: true,
@@ -3059,7 +3069,7 @@ class Game {
       typeId: type.id,
       texture: type.texture,
       alive: true,
-      fireCd: type.boss ? 1.6 : 0.8,
+      fireCd: type.boss ? 1.6 * this.GetBossFireCdScale() : 0.8,
       aiTimer: 0.3,
       spawnFlash: type.boss ? 0.6 : 1.0,
       protect: type.boss ? 1.2 : 0,
@@ -3496,6 +3506,24 @@ class Game {
       ctx.fill();
       ctx.fillStyle = "#ffd080";
       ctx.fillRect(b.x + 2, b.y + 2, 4, 4);
+      return;
+    }
+
+    // Boss shells: elongated glowing rods oriented along velocity (distinct from player/normal).
+    if (b.bossShell) {
+      const cx = b.x + b.w / 2;
+      const cy = b.y + b.h / 2;
+      const ang = Math.atan2(b.vy, b.vx);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      ctx.fillStyle = "#3a1808";
+      ctx.fillRect(-9, -3, 18, 6);
+      ctx.fillStyle = "#ff9040";
+      ctx.fillRect(-8, -2, 16, 4);
+      ctx.fillStyle = "#ffe0a0";
+      ctx.fillRect(2, -1, 6, 2);
+      ctx.restore();
       return;
     }
 
