@@ -3016,7 +3016,9 @@ class Game {
     this.overlays.endTitle.textContent = won
       ? (this.isTutorial
         ? "引导通过"
-        : (this.stage >= STAGE_COUNT && action === "restart" ? "战役胜利" : "关卡通过"))
+        : this.isBossStage
+          ? "Boss 击破"
+          : (this.stage >= STAGE_COUNT && action === "restart" ? "战役胜利" : "关卡通过"))
       : "游戏结束";
     this.overlays.endMessage.textContent = message;
     if (this.overlays.endPrimary) {
@@ -3306,8 +3308,8 @@ class Game {
     const spec = ENEMY_SHEET[tank.texture] || ENEMY_SHEET.enemyBasic;
     let row = spec.row;
     if (tank.dropsPower && Math.floor(this.frame / 8) % 2 === 0) row = spec.redRow;
-    // Armor HP flash: cycle brightness via red sheet when damaged hard.
-    if (tank.maxHp > 1 && tank.hp <= 2 && Math.floor(this.frame / 6) % 2 === 0) {
+    // Armor / boss HP flash: red sheet when damaged.
+    if (tank.maxHp > 1 && tank.hp <= Math.ceil(tank.maxHp * 0.35) && Math.floor(this.frame / 6) % 2 === 0) {
       row = spec.redRow;
     }
     return { gx: spec.col + dirCol + colOff, gy: row };
