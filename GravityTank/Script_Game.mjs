@@ -32,7 +32,7 @@ const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
 const BULLET_SPEED = 280;
 /** Classic ~1/5 tanks flash (~0.20); +50% → 0.30. Only flashing tanks drop. */
 const POWER_DROP_RATE = 0.3;
-const PLAYER_SPEED = 88;
+const PLAYER_SPEED = 96;
 const GIANT_SCALE = 2;
 const GIANT_DURATION = 14;
 const GIANT_HITS = 12;
@@ -2058,8 +2058,21 @@ class Game {
     if (this.HasPerk("ironHide")) {
       this.GrantAbsorbHits(1);
     }
+    // Mobility cards — applied after spawn so giant/eagle can re-scale on top.
+    if (!(this.giantTimer > 0) && !(this.playerEagleTimer > 0) && !p.asEagle) {
+      p.speed = this.GetPlayerBaseSpeed();
+    }
     this.meteorPulseTimer = this.HasPerk("meteorPulse") ? 9 : 0;
     this.timeRiftCd = 0;
+  }
+
+  /** Move speed from base + stage/run mobility cards (stackable). */
+  GetPlayerBaseSpeed() {
+    let mul = 1;
+    if (this.HasPerk("turboTreads")) mul *= 1.38;
+    else if (this.HasPerk("moveSpeed")) mul *= 1.28;
+    if (this.HasPerk("swiftChassis")) mul *= 1.22;
+    return PLAYER_SPEED * mul;
   }
 
   GrantAbsorbHits(n) {
@@ -2092,7 +2105,7 @@ class Game {
     p.h = size;
     p.x = Clamp(cx - size * 0.5, 0, CANVAS_W - size);
     p.y = Clamp(cy - size * 0.5, 0, CANVAS_H - size);
-    p.speed = PLAYER_SPEED * GIANT_SPEED_MUL;
+    p.speed = this.GetPlayerBaseSpeed() * GIANT_SPEED_MUL;
     this.giantTimer = Math.max(this.giantTimer, duration);
     this.giantHits = Math.max(this.giantHits, GIANT_HITS);
     p.protect = Math.max(p.protect, 1.2);
@@ -2118,7 +2131,7 @@ class Game {
     p.h = TANK_SIZE;
     p.x = Clamp(cx - TANK_SIZE * 0.5, 0, CANVAS_W - TANK_SIZE);
     p.y = Clamp(cy - TANK_SIZE * 0.5, 0, CANVAS_H - TANK_SIZE);
-    p.speed = PLAYER_SPEED;
+    p.speed = this.GetPlayerBaseSpeed();
     this.UnstickTank(p, { maxDist: 64 });
   }
 
@@ -2211,7 +2224,7 @@ class Game {
       w: TANK_SIZE,
       h: TANK_SIZE,
       dir: this.isTutorial ? "down" : "up",
-      speed: PLAYER_SPEED,
+      speed: this.GetPlayerBaseSpeed(),
       power,
       maxBullets,
       absorbHits: this.absorbHits || 0,
@@ -2560,7 +2573,7 @@ class Game {
     const eagleForm = this.playerEagleTimer > 0;
     if (eagleForm) {
       p.asEagle = true;
-      p.speed = PLAYER_SPEED * 0.55;
+      p.speed = this.GetPlayerBaseSpeed() * 0.55;
     } else if (p.asEagle) {
       this.ClearEagleForm(true);
     }
@@ -2583,7 +2596,7 @@ class Game {
         }
       }
       const d = DIR[input];
-      const baseSpeed = eagleForm ? PLAYER_SPEED * 0.55 : p.speed;
+      const baseSpeed = eagleForm ? this.GetPlayerBaseSpeed() * 0.55 : p.speed;
       const speed = baseSpeed * (onIce ? 1.15 : 1) * (this.carriedBlock ? 0.88 : 1);
       this.MoveTank(p, d.x * speed * dt, d.y * speed * dt);
       if (eagleForm) {
@@ -4433,7 +4446,7 @@ class Game {
       this.UnstickTank(p);
       p.eagleMorphing = false;
       p.asEagle = true;
-      p.speed = PLAYER_SPEED * 0.55;
+      p.speed = this.GetPlayerBaseSpeed() * 0.55;
       this.playerEagleTimer = Math.max(this.playerEagleTimer, morph.duration);
       p.protect = Math.max(p.protect, morph.shield);
       this.eagleMorph = null;
@@ -4452,7 +4465,7 @@ class Game {
     }
     p.asEagle = false;
     p.eagleMorphing = false;
-    p.speed = PLAYER_SPEED;
+    p.speed = this.GetPlayerBaseSpeed();
     this.eagleMorph = null;
     if (restoreTank && p.alive) {
       p.protect = Math.max(p.protect, 1.2);
