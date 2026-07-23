@@ -973,7 +973,7 @@ body.force-touch #app {
   body.is-touch.is-touch-play .stage-shell,
   body.force-touch.is-touch-play .stage-shell {
     width: min(100%, calc(100vw - 16px));
-    max-width: min(100%, calc(100dvh - 200px));
+    max-width: min(100%, calc(100dvh - 220px));
     align-self: center;
     justify-self: center;
   }
