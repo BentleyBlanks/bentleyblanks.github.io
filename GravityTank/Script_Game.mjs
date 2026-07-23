@@ -242,6 +242,11 @@ const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
 const BOSS_FIRE_RATE_NORMAL = 0.7;
 const BOSS_FIRE_RATE_EASY = 0.5;
 const BOSS_FINAL_HP_RATIO = 0.35;
+/** Eagle curse: stage-3 Tank King shorter; stage-6 Gravity Cannon longer. */
+const EAGLE_CURSE_DURATION_STAGE3 = 6.2;
+const EAGLE_CURSE_DURATION_STAGE6 = 10.5;
+const EAGLE_CURSE_SHIELD_STAGE3 = 2.8;
+const EAGLE_CURSE_SHIELD_STAGE6 = 4.0;
 
 /** Classic sheet grid origins [gx, gy] in 8×8 cells (16×16 sprite = 2×2 cells). */
 const TANK_DIR_COL = { up: 0, left: 4, down: 8, right: 12 };
@@ -680,6 +685,7 @@ class Game {
     this.enemyRageTimer = 0;
     this.playerStunTimer = 0;
     this.playerEagleTimer = 0;
+    this.eagleWarnT = 0;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -1421,10 +1427,10 @@ class Game {
       } else if (this.isBossStage) {
         if (this.stageData.bossKind === "tankKing") {
           this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关 · 坦克王。单炮追猎；在开阔战场中周旋并击破它。`;
+            `${diffTag} BOSS 关 · 坦克王。单炮追猎；残血终焉会把你变成老鹰（开场有护盾），被打倒直接失败。`;
         } else {
           this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关 · 重力巨炮。八向炮筒弹幕；残血终焉阶段会把你变成老鹰——被打倒直接失败。`;
+            `${diffTag} BOSS 关 · 重力巨炮。八向炮筒弹幕；残血终焉老鹰诅咒更久（开场有护盾），被打倒直接失败。`;
         }
       } else {
         const e = this.stageData.enemies;
@@ -1602,6 +1608,7 @@ class Game {
     this.playerStunTimer = 0;
     this.ClearEagleForm(false);
     this.playerEagleTimer = 0;
+    this.eagleWarnT = 0;
     this.buffToast = null;
     this.roulette = null;
     this.pendingFortRestore = false;
@@ -1864,6 +1871,7 @@ class Game {
         this.ShowBuffToast("老鹰诅咒解除，变回坦克");
       }
     }
+    if (this.eagleWarnT > 0) this.eagleWarnT -= dt;
     if (this.buffToast) {
       this.buffToast.ttl -= dt;
       if (this.buffToast.ttl <= 0) this.buffToast = null;
@@ -2117,11 +2125,20 @@ class Game {
       e.finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
       const barrels = e.barrelCount || 1;
       let pattern;
-      if (barrels <= 1) {
-        pattern = e.finalPhase && Math.random() < 0.4 ? "chaseVolley" : (Math.random() < 0.5 ? "chaseVolley" : "axisBurst");
-      } else {
-        pattern = TANK_KING_ATTACKS[Math.floor(Math.random() * TANK_KING_ATTACKS.length)];
-        if (e.finalPhase && Math.random() < 0.45) pattern = "ringShot";
+      if (e.finalPhase && this.playerEagleTimer <= 0) {
+        const firstUltimate = !e.eagleCurseUsed;
+        if (firstUltimate || Math.random() < 0.3) {
+          pattern = "eagleCurse";
+          e.eagleCurseUsed = true;
+        }
+      }
+      if (!pattern) {
+        if (barrels <= 1) {
+          pattern = e.finalPhase && Math.random() < 0.4 ? "chaseVolley" : (Math.random() < 0.5 ? "chaseVolley" : "axisBurst");
+        } else {
+          pattern = TANK_KING_ATTACKS[Math.floor(Math.random() * TANK_KING_ATTACKS.length)];
+          if (e.finalPhase && Math.random() < 0.45) pattern = "ringShot";
+        }
       }
       this.BeginTankKingAttack(e, pattern);
     }
@@ -2135,6 +2152,22 @@ class Game {
     const barrels = e.barrelCount || 1;
     const dirs = barrels >= 8 ? DIR_OCTO : barrels <= 1 ? null : DIR_CARDINAL;
     const face = e.castFace || "down";
+
+    if (pattern === "eagleCurse") {
+      e.attackQueue.push({ t: 0.4 * cdScale, kind: "eagleCurse" });
+      // Light pressure after the opening shield window.
+      for (let i = 0; i < 3; i++) {
+        e.attackQueue.push({
+          t: (1.15 + i * 0.2) * cdScale,
+          kind: "kingShell",
+          dir: face,
+          angleOffset: (i - 1) * 0.12,
+        });
+      }
+      e.fireCd = 5.8 * cdScale;
+      this.ShowBuffToast("终极诅咒蓄力…");
+      return;
+    }
 
     if (barrels <= 1) {
       // Stage-3 single turret: focused chase / short bursts.
@@ -2373,11 +2406,11 @@ class Game {
       this.ShowBuffToast("三点连射");
     } else if (pattern === "eagleCurse") {
       e.attackQueue.push({ t: 0.45 * cdScale, kind: "eagleCurse" });
-      // Follow-up pressure while the player is a helpless eagle.
+      // Follow-up starts after the opening shield so the player gets a readable grace.
       for (let i = 0; i < 6; i++) {
         const t = i / 5;
         const ang = -0.85 + t * 1.7;
-        e.attackQueue.push({ t: (0.7 + i * 0.1) * cdScale, kind: "shell", dir: "down", angleOffset: ang });
+        e.attackQueue.push({ t: (1.35 + i * 0.12) * cdScale, kind: "shell", dir: "down", angleOffset: ang });
       }
       e.fireCd = 7.2 * cdScale;
       this.ShowBuffToast("终极诅咒蓄力…");
@@ -2405,7 +2438,7 @@ class Game {
 
   FireBossShot(e, shot) {
     if (shot.kind === "eagleCurse") {
-      this.ApplyEagleCurse(this.IsEasy() ? 6.5 : 8.5);
+      this.ApplyEagleCurse();
       this.audio.Explode();
       return;
     }
@@ -3124,17 +3157,34 @@ class Game {
     this.respawnTimer = 0.9;
   }
 
-  ApplyEagleCurse(duration = 8) {
+  /** Stage-6 lasts longer than stage-3; easy mode slightly shorter. */
+  GetEagleCurseDuration() {
+    const stage6 = this.stage === 6 || this.stageData?.bossKind === "boss";
+    const base = stage6 ? EAGLE_CURSE_DURATION_STAGE6 : EAGLE_CURSE_DURATION_STAGE3;
+    return this.IsEasy() ? base * 0.85 : base;
+  }
+
+  GetEagleCurseShield() {
+    const stage6 = this.stage === 6 || this.stageData?.bossKind === "boss";
+    const base = stage6 ? EAGLE_CURSE_SHIELD_STAGE6 : EAGLE_CURSE_SHIELD_STAGE3;
+    return this.IsEasy() ? base * 1.15 : base;
+  }
+
+  ApplyEagleCurse() {
     const p = this.player;
     if (!p?.alive) return;
+    const duration = this.GetEagleCurseDuration();
+    const shield = this.GetEagleCurseShield();
     this.playerEagleTimer = Math.max(this.playerEagleTimer, duration);
     p.asEagle = true;
-    p.protect = Math.min(p.protect, 0.35); // brief grace, then fully vulnerable
+    // Opening shield so the transform does not get one-shot by residual shells.
+    p.protect = Math.max(p.protect, shield);
+    this.eagleWarnT = Math.max(this.eagleWarnT, 3.2);
     // Snap near the HQ so the eagle curse reads clearly.
     p.x = Clamp(12 * TILE, 0, CANVAS_W - p.w);
     p.y = Clamp(23 * TILE, CANVAS_H * 0.55, CANVAS_H - p.h - 2);
     this.UnstickTank(p);
-    this.ShowBuffToast("⚠ 终极：你变成了老鹰！被打倒直接失败！");
+    this.ShowBuffToast(`老鹰诅咒 ${Math.ceil(duration)}s · 护盾 ${Math.ceil(shield)}s · 护盾后被打倒即失败`);
   }
 
   ClearEagleForm(restoreTank = true) {
@@ -4216,9 +4266,20 @@ class Game {
       ctx.strokeStyle = `rgba(255,80,80,${0.5 + 0.5 * pulse})`;
       ctx.lineWidth = 2;
       ctx.strokeRect(tank.x - 1, tank.y - 1, tank.w + 2, tank.h + 2);
+      // Opening curse shield — keep it loud so players notice the grace window.
       if (tank.protect > 0) {
-        const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 4) % 2];
-        this.BlitGrid(ctx, sx, sy, tank.x - 3, tank.y - 3, tank.w + 6, tank.h + 6);
+        const [sx, sy] = FX_SHEET.shield[Math.floor(this.frame / 3) % 2];
+        const pad = 5;
+        this.BlitGrid(ctx, sx, sy, tank.x - pad, tank.y - pad, tank.w + pad * 2, tank.h + pad * 2);
+        const ring = 0.55 + 0.45 * Math.abs(Math.sin(this.frame * 0.35));
+        ctx.strokeStyle = `rgba(180,240,255,${ring})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(tank.x - 3, tank.y - 3, tank.w + 6, tank.h + 6);
+        ctx.fillStyle = "rgba(180,240,255,0.85)";
+        ctx.font = `10px ${PIXEL_FONT}`;
+        ctx.textAlign = "center";
+        ctx.fillText(`护盾 ${Math.ceil(tank.protect)}`, tank.x + tank.w / 2, tank.y - 6);
+        ctx.textAlign = "left";
       }
       return;
     }
@@ -4653,7 +4714,16 @@ class Game {
     if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
     if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
     if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
-    if (this.playerEagleTimer > 0) chips.push({ t: `老鹰 ${Math.ceil(this.playerEagleTimer)}`, c: "#ff3030" });
+    if (this.playerEagleTimer > 0) {
+      const p = this.player;
+      const shieldLeft = p?.protect > 0 ? Math.ceil(p.protect) : 0;
+      chips.push({
+        t: shieldLeft > 0
+          ? `老鹰 ${Math.ceil(this.playerEagleTimer)} · 盾${shieldLeft}`
+          : `老鹰 ${Math.ceil(this.playerEagleTimer)} · 无盾危险`,
+        c: shieldLeft > 0 ? "#80e0ff" : "#ff3030",
+      });
+    }
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
     if (this.stagePerk) {
       const u = FindUpgrade(this.stagePerk);
@@ -4673,6 +4743,30 @@ class Game {
       ctx.fillStyle = chip.c;
       ctx.fillText(chip.t, x + 5, 14);
       x += w + 4;
+    }
+
+    // Big eagle-curse banner so the transform is impossible to miss.
+    if (this.eagleWarnT > 0 && this.state === "playing") {
+      const alpha = Clamp(this.eagleWarnT / 0.55, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "rgba(40,0,0,0.78)";
+      ctx.fillRect(16, CANVAS_H * 0.28, CANVAS_W - 32, 58);
+      ctx.strokeStyle = "#ff6060";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(16, CANVAS_H * 0.28, CANVAS_W - 32, 58);
+      ctx.fillStyle = "#ffe060";
+      ctx.font = `14px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      ctx.fillText("终极诅咒 · 你变成了老鹰", CANVAS_W / 2, CANVAS_H * 0.28 + 22);
+      ctx.fillStyle = "#80e0ff";
+      ctx.font = `11px ${PIXEL_FONT}`;
+      const shieldHint = this.player?.protect > 0
+        ? `开场护盾 ${Math.ceil(this.player.protect)} 秒 · 护盾结束后被打倒即失败`
+        : "护盾已结束 · 被打倒即失败";
+      ctx.fillText(shieldHint, CANVAS_W / 2, CANVAS_H * 0.28 + 44);
+      ctx.textAlign = "left";
+      ctx.restore();
     }
 
     if (this.buffToast && this.state !== "roulette") {
