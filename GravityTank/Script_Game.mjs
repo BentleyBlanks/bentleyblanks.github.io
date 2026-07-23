@@ -2139,7 +2139,7 @@ class Game {
       e.finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
       const barrels = e.barrelCount || 1;
       let pattern;
-      if (e.finalPhase && this.playerEagleTimer <= 0) {
+      if (e.finalPhase && this.playerEagleTimer <= 0 && !this.eagleMorph) {
         const firstUltimate = !e.eagleCurseUsed;
         if (firstUltimate || Math.random() < 0.3) {
           pattern = "eagleCurse";
@@ -2307,7 +2307,7 @@ class Game {
       const finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
       e.finalPhase = finalPhase;
       let pattern;
-      if (finalPhase && this.playerEagleTimer <= 0) {
+      if (finalPhase && this.playerEagleTimer <= 0 && !this.eagleMorph) {
         // Final phase: guarantee first ultimate, then periodically recast.
         const firstUltimate = !e.eagleCurseUsed;
         if (firstUltimate || Math.random() < 0.38) {
@@ -3150,7 +3150,7 @@ class Game {
       return;
     }
     // Ultimate eagle curse: dying as the eagle fails the stage regardless of lives.
-    if (this.playerEagleTimer > 0 || p.asEagle) {
+    if (this.playerEagleTimer > 0 || p.asEagle || this.eagleMorph || p.eagleMorphing) {
       p.alive = false;
       this.audio.StopEngine();
       this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.6);
