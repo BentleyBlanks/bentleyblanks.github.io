@@ -352,8 +352,8 @@ class AudioBus {
     this.sfxGain = null;
     this.bgmGain = null;
     this.masterGain = null;
-    this.sfxVolume = 0.7;
-    this.bgmVolume = 0.45;
+    this.sfxVolume = 0.25;
+    this.bgmVolume = 0.4;
     this.muted = false;
     this.ready = false;
   }
