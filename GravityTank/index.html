@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./Style_Game.css?v=bigStick1">
+  <link rel="stylesheet" href="./Style_Game.css?v=debugStage1">
 </head>
 <body>
   <div id="app">
@@ -39,6 +39,8 @@
         <button type="button" data-debug="clear">清场</button>
         <button type="button" data-debug="roulette">开转轮</button>
       </div>
+      <div class="debug-stage-label">选关</div>
+      <div id="debugStagePick" class="debug-stage-pick" role="group" aria-label="选关"></div>
       <p class="debug-status" id="debugStatus">god OFF</p>
     </div>
 
@@ -155,6 +157,6 @@
       <p class="credit">SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=bigStick1"></script>
+  <script type="module" src="./Script_Game.mjs?v=debugStage1"></script>
 </body>
 </html>
