@@ -162,6 +162,40 @@ body.touch-play-lock {
   background: #0c2818;
 }
 
+.debug-stage-label {
+  margin: 10px 0 6px;
+  color: #f0d060;
+  font-size: 0.34rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.debug-stage-pick {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.debug-stage-pick button {
+  appearance: none;
+  border: 2px solid #707070;
+  background: #101010;
+  color: #e8e8e8;
+  font: inherit;
+  font-size: 0.36rem;
+  letter-spacing: 0.04em;
+  padding: 8px 2px;
+  min-height: 34px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.debug-stage-pick button.is-on {
+  border-color: #f0d060;
+  color: #fff8e0;
+  background: #603010;
+}
+
 .debug-status {
   margin: 8px 0 0;
   color: #808080;

@@ -1139,15 +1139,52 @@ class Game {
     const panel = document.getElementById("debugPanel");
     const status = document.getElementById("debugStatus");
     const closeBtn = document.getElementById("debugClose");
+    const stagePick = document.getElementById("debugStagePick");
     if (!banner || !panel) return;
 
     const syncStatus = () => {
       if (status) {
-        status.textContent = `god ${this.debugGodMode ? "ON" : "OFF"} · stage ${this.isTutorial ? "T" : this.stage}`;
+        const stageTag = this.isTutorial ? "T" : (this.isBossStage ? `${this.stage}B` : String(this.stage));
+        status.textContent = `god ${this.debugGodMode ? "ON" : "OFF"} · stage ${stageTag}`;
       }
       const godBtn = panel.querySelector('[data-debug="god"]');
       godBtn?.classList.toggle("is-on", this.debugGodMode);
+      if (stagePick) {
+        const cur = this.isTutorial ? 0 : this.stage;
+        stagePick.querySelectorAll("[data-debug-stage]").forEach((btn) => {
+          btn.classList.toggle("is-on", Number(btn.dataset.debugStage) === cur);
+        });
+      }
     };
+
+    if (stagePick && !stagePick.dataset.built) {
+      stagePick.dataset.built = "1";
+      const stages = [
+        { id: 0, label: "T", title: "新手引导" },
+        ...Array.from({ length: STAGE_COUNT }, (_, i) => {
+          const n = i + 1;
+          const stage = GetStage(n);
+          return {
+            id: n,
+            label: stage.bossStage ? `${n}B` : String(n),
+            title: stage.bossStage ? `第 ${n} 关 Boss` : `第 ${n} 关`,
+          };
+        }),
+      ];
+      for (const s of stages) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.dataset.debugStage = String(s.id);
+        btn.textContent = s.label;
+        btn.title = s.title;
+        btn.setAttribute("aria-label", s.title);
+        btn.addEventListener("click", () => {
+          this.DebugGotoStage(s.id);
+          syncStatus();
+        });
+        stagePick.appendChild(btn);
+      }
+    }
 
     const setOpen = (open) => {
       this.debugPanelOpen = open;
@@ -1168,6 +1205,23 @@ class Game {
       });
     });
     this.SyncDebugStatus = syncStatus;
+  }
+
+  DebugGotoStage(stageId) {
+    this.audio.Ensure();
+    if (this.state === "roulette") this.CloseRoulette();
+    if (this.state === "paused") this.SetPaused(false);
+    const keepPlaying = !["ready", "boot"].includes(this.state);
+    const stage = IsTutorialStage(stageId) ? 0 : Math.max(1, Math.min(STAGE_COUNT, stageId | 0));
+    this.StartGame({
+      stage,
+      keepStats: false,
+      keepScore: keepPlaying,
+      keepLives: keepPlaying,
+    });
+    const label = stage === 0 ? "新手" : (GetStage(stage).bossStage ? `${stage} Boss` : String(stage));
+    this.ShowBuffToast(`DEBUG 选关 → ${label}`);
+    this.SyncDebugStatus?.();
   }
 
   RunDebugAction(action) {
