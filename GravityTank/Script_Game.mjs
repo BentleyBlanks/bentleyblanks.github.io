@@ -1329,6 +1329,8 @@ class Game {
   }
 
   GetPowerDropRate() {
+    // Tutorial: player cannot cross the river to collect tokens.
+    if (this.isTutorial) return 0;
     // Easy: ? tokens appear 50% more often.
     return this.IsEasy() ? POWER_DROP_RATE * 1.5 : POWER_DROP_RATE;
   }
