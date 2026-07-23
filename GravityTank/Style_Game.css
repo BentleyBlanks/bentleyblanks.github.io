@@ -658,6 +658,12 @@ p.mobile-hint { display: none; }
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  /* Stick matches FIRE + gap + PAUSE column footprint. */
+  --touch-fire: 108px;
+  --touch-pause-h: 40px;
+  --touch-actions-gap: 10px;
+  --touch-stick: calc(var(--touch-fire) + var(--touch-actions-gap) + var(--touch-pause-h));
+  --touch-knob: calc(var(--touch-stick) * 0.38);
 }
 
 .touch-stick-wrap[hidden],
@@ -677,8 +683,8 @@ p.mobile-hint { display: none; }
 
 .stick-base {
   position: relative;
-  width: 140px;
-  height: 140px;
+  width: var(--touch-stick);
+  height: var(--touch-stick);
   border-radius: 0;
   border: 3px solid #808080;
   background:
@@ -697,9 +703,9 @@ p.mobile-hint { display: none; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 52px;
-  height: 52px;
-  margin: -26px 0 0 -26px;
+  width: var(--touch-knob);
+  height: var(--touch-knob);
+  margin: calc(var(--touch-knob) / -2) 0 0 calc(var(--touch-knob) / -2);
   border-radius: 0;
   border: 3px solid #f0d060;
   background: #802010;
@@ -720,13 +726,13 @@ p.mobile-hint { display: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--touch-actions-gap);
 }
 
 .touch-fire {
   appearance: none;
-  width: 108px;
-  height: 108px;
+  width: var(--touch-fire);
+  height: var(--touch-fire);
   border-radius: 0;
   border: 3px solid #f0d060;
   background: #802010;
@@ -749,7 +755,7 @@ p.mobile-hint { display: none; }
 .touch-pause {
   appearance: none;
   min-width: 72px;
-  min-height: 40px;
+  min-height: var(--touch-pause-h);
   border-radius: 0;
   border: 2px solid #808080;
   background: #181818;
@@ -976,49 +982,25 @@ body.force-touch #app {
   body.force-touch.is-touch-play .touch-stick-wrap:not([hidden]),
   body.is-touch.is-touch-play .touch-actions-wrap:not([hidden]),
   body.force-touch.is-touch-play .touch-actions-wrap:not([hidden]) {
-    min-height: 148px;
+    --touch-fire: 108px;
+    --touch-pause-h: 40px;
+    min-height: calc(var(--touch-stick) + 24px);
     padding-bottom: max(10px, var(--safe-bottom));
     align-self: end;
-  }
-
-  body.is-touch.is-touch-play .stick-base,
-  body.force-touch.is-touch-play .stick-base {
-    width: 136px;
-    height: 136px;
-  }
-
-  body.is-touch.is-touch-play .stick-knob,
-  body.force-touch.is-touch-play .stick-knob {
-    width: 52px;
-    height: 52px;
-    margin: -26px 0 0 -26px;
-  }
-
-  body.is-touch.is-touch-play .touch-fire,
-  body.force-touch.is-touch-play .touch-fire {
-    width: 108px;
-    height: 108px;
   }
 }
 
 @media (orientation: portrait) and (max-width: 420px) {
-  body.is-touch.is-touch-play .stick-base,
-  body.force-touch.is-touch-play .stick-base {
-    width: 128px;
-    height: 128px;
-  }
-
-  body.is-touch.is-touch-play .stick-knob,
-  body.force-touch.is-touch-play .stick-knob {
-    width: 48px;
-    height: 48px;
-    margin: -24px 0 0 -24px;
+  body.is-touch.is-touch-play .touch-stick-wrap:not([hidden]),
+  body.force-touch.is-touch-play .touch-stick-wrap:not([hidden]),
+  body.is-touch.is-touch-play .touch-actions-wrap:not([hidden]),
+  body.force-touch.is-touch-play .touch-actions-wrap:not([hidden]) {
+    --touch-fire: 100px;
+    --touch-pause-h: 40px;
   }
 
   body.is-touch.is-touch-play .touch-fire,
   body.force-touch.is-touch-play .touch-fire {
-    width: 100px;
-    height: 100px;
     font-size: 0.5rem;
   }
 
@@ -1042,32 +1024,14 @@ body.force-touch #app {
   body.force-touch.is-touch-play .touch-stick-wrap:not([hidden]),
   body.is-touch.is-touch-play .touch-actions-wrap:not([hidden]),
   body.force-touch.is-touch-play .touch-actions-wrap:not([hidden]) {
-    min-height: 128px;
+    --touch-fire: 96px;
+    --touch-pause-h: 32px;
+    min-height: calc(var(--touch-stick) + 12px);
     padding-bottom: max(6px, var(--safe-bottom));
-  }
-
-  body.is-touch.is-touch-play .stick-base,
-  body.force-touch.is-touch-play .stick-base {
-    width: 120px;
-    height: 120px;
-  }
-
-  body.is-touch.is-touch-play .stick-knob,
-  body.force-touch.is-touch-play .stick-knob {
-    width: 46px;
-    height: 46px;
-    margin: -23px 0 0 -23px;
-  }
-
-  body.is-touch.is-touch-play .touch-fire,
-  body.force-touch.is-touch-play .touch-fire {
-    width: 96px;
-    height: 96px;
   }
 
   body.is-touch.is-touch-play .touch-pause,
   body.force-touch.is-touch-play .touch-pause {
-    min-height: 32px;
     font-size: 0.35rem;
   }
 
@@ -1078,9 +1042,12 @@ body.force-touch #app {
 }
 
 @media (max-width: 420px) {
-  .stick-base { width: 128px; height: 128px; }
-  .stick-knob { width: 48px; height: 48px; margin: -24px 0 0 -24px; }
-  .touch-fire { width: 100px; height: 100px; font-size: 0.5rem; }
+  .touch-stick-wrap,
+  .touch-actions-wrap {
+    --touch-fire: 100px;
+    --touch-pause-h: 40px;
+  }
+  .touch-fire { font-size: 0.5rem; }
   .overlay { padding: 14px; gap: 10px; }
   .overlay p { font-size: 0.45rem; }
 }
@@ -1150,8 +1117,11 @@ body.force-touch #app {
 }
 
 @media (orientation: landscape) and (max-height: 420px) {
-  .stick-base { width: 112px; height: 112px; }
-  .stick-knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
-  .touch-fire { width: 92px; height: 92px; font-size: 0.45rem; }
+  .touch-stick-wrap,
+  .touch-actions-wrap {
+    --touch-fire: 92px;
+    --touch-pause-h: 32px;
+  }
+  .touch-fire { font-size: 0.45rem; }
   .touch-label { display: none; }
 }

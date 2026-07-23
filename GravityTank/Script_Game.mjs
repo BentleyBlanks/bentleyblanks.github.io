@@ -840,7 +840,7 @@ class Game {
     const hud = document.querySelector(".mobile-hud");
     const hudH = Math.max(36, hud ? hud.getBoundingClientRect().height : 44);
     const controlsOn = this.touchUi.stickWrap && !this.touchUi.stickWrap.hidden;
-    const controlsBudget = controlsOn ? 168 : 16;
+    const controlsBudget = controlsOn ? 196 : 16;
     const gapBudget = 24;
     const size = Math.floor(Math.max(180, Math.min(viewW - padX, viewH - hudH - controlsBudget - gapBudget)));
     shell.style.width = `${size}px`;
