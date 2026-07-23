@@ -292,6 +292,40 @@ const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
 const BOSS_FIRE_RATE_NORMAL = 0.7;
 const BOSS_FIRE_RATE_EASY = 0.5;
 const BOSS_FINAL_HP_RATIO = 0.35;
+/** Readable windup before every special skill resolves. */
+const BOSS_SKILL_WINDUP = 0.95;
+/** Boss field caps: boss + concurrent minions (escalate by stage). */
+const MAX_ENEMIES_BOSS_S3 = 5;
+const MAX_ENEMIES_BOSS_S6 = 6;
+const MAX_ENEMIES_BOSS_S9 = 7;
+/** Plain directed shells between specials. */
+const BOSS_NORMAL_FIRE_MIN = 1.25;
+const BOSS_NORMAL_FIRE_SPAN = 0.55;
+/** Player-facing telegraph labels for every special pattern. */
+const BOSS_SKILL_WARN = {
+  eagleCurse: "⚠ 终极诅咒蓄力",
+  chaseVolley: "⚠ 单炮连射蓄力",
+  axisBurst: "⚠ 轴对称连射蓄力",
+  quadCross: "⚠ 十字齐射蓄力",
+  spinFire: "⚠ 轮射蓄力",
+  ringShot: "⚠ 环形弹幕蓄力",
+  octoCross: "⚠ 八管齐射蓄力",
+  octoSpin: "⚠ 八管轮射蓄力",
+  octoRing: "⚠ 八管环射蓄力",
+  barrage: "⚠ 万炮齐发蓄力",
+  fan: "⚠ 扇形追击蓄力",
+  mortar: "⚠ 曲射迫击蓄力",
+  sweep: "⚠ 横向扫射蓄力",
+  rain: "⚠ 天降弹雨蓄力",
+  burst: "⚠ 三点连射蓄力",
+  disarmThrow: "⚠ 拆炮蓄力",
+  layBomb: "⚠ 定时炸弹蓄力",
+  sniperVolley: "⚠ 狙击连射蓄力",
+  bounceFan: "⚠ 弹射扇形蓄力",
+  mortarLob: "⚠ 榴弹抛射蓄力",
+  chaseBurst: "⚠ 近身连射蓄力",
+  stompRain: "⚠ 踩踏弹雨蓄力",
+};
 /** Eagle curse: stage-3 Tank King shorter; stage-6 Gravity Cannon longer. */
 const EAGLE_CURSE_DURATION_STAGE3 = 6.2;
 const EAGLE_CURSE_DURATION_STAGE6 = 10.5;
@@ -1932,7 +1966,8 @@ class Game {
         const last = this.enemies[this.enemies.length - 1];
         if (last) last.spawnFlash = 0;
       }
-      this.spawnTimer = this.isTutorial || this.isBarricadeTeach ? 2.4 : (this.isBossStage ? 99 : 1.2);
+      // Boss stages keep spawning minions after the boss is pre-spawned.
+      this.spawnTimer = this.isTutorial || this.isBarricadeTeach ? 2.4 : (this.isBossStage ? 2.5 : 1.2);
     }
     this.ApplyStageStartPerks();
     if (this.isBarricadeTeach) {
@@ -2114,31 +2149,38 @@ class Game {
   }
 
   GetMaxEnemiesOnField() {
+    if (this.isBossStage) {
+      if (this.stage === 3) return MAX_ENEMIES_BOSS_S3;
+      if (this.stage === 6) return MAX_ENEMIES_BOSS_S6;
+      return MAX_ENEMIES_BOSS_S9;
+    }
     if (!this.isTutorial && this.stage >= 7) return MAX_ENEMIES_LATE;
     return MAX_ENEMIES_ON_FIELD;
   }
 
   BuildSpawnQueue() {
     const counts = this.stageData.enemies;
-    const mix = [];
-    for (let i = 0; i < counts.basic; i++) mix.push(ENEMY_TYPES[0]);
-    for (let i = 0; i < counts.fast; i++) mix.push(ENEMY_TYPES[1]);
-    for (let i = 0; i < counts.power; i++) mix.push(ENEMY_TYPES[2]);
-    for (let i = 0; i < counts.armor; i++) mix.push(ENEMY_TYPES[3]);
+    const minions = [];
+    for (let i = 0; i < counts.basic; i++) minions.push(ENEMY_TYPES[0]);
+    for (let i = 0; i < counts.fast; i++) minions.push(ENEMY_TYPES[1]);
+    for (let i = 0; i < counts.power; i++) minions.push(ENEMY_TYPES[2]);
+    for (let i = 0; i < counts.armor; i++) minions.push(ENEMY_TYPES[3]);
+    for (let i = minions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [minions[i], minions[j]] = [minions[j], minions[i]];
+    }
+    // Bosses always lead the queue so intro pre-spawn places the boss first.
+    const bosses = [];
     const bossKind = this.stageData.bossKind || "boss";
     const bossType = ENEMY_TYPES.find((t) => t.id === bossKind) || ENEMY_TYPES.find((t) => t.id === "boss");
-    for (let i = 0; i < (counts.boss || 0); i++) mix.push(bossType);
+    for (let i = 0; i < (counts.boss || 0); i++) bosses.push(bossType);
     for (let i = 0; i < (counts.tankKing || 0); i++) {
-      mix.push(ENEMY_TYPES.find((t) => t.id === "tankKing") || bossType);
+      bosses.push(ENEMY_TYPES.find((t) => t.id === "tankKing") || bossType);
     }
     for (let i = 0; i < (counts.tankMan || 0); i++) {
-      mix.push(ENEMY_TYPES.find((t) => t.id === "tankMan") || bossType);
+      bosses.push(ENEMY_TYPES.find((t) => t.id === "tankMan") || bossType);
     }
-    for (let i = mix.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [mix[i], mix[j]] = [mix[j], mix[i]];
-    }
-    this.spawnQueue = mix;
+    this.spawnQueue = bosses.concat(minions);
   }
 
   SpawnPlayer(fullProtect, keepStats = null) {
@@ -2592,6 +2634,7 @@ class Game {
       this.UnstickTank(e);
       if (e.protect > 0) e.protect -= dt;
       if (e.fireCd > 0) e.fireCd -= dt;
+      if (e.normalFireCd > 0) e.normalFireCd -= dt;
 
       if (this.freezeTimer > 0) continue;
 
@@ -2723,6 +2766,8 @@ class Game {
       this.UpdateBossAttackQueue(e, dt);
       return;
     }
+    if (this.TickBossSkillWindup(e, dt, this.BeginTankKingAttack)) return;
+    this.TryBossNormalShot(e);
     if (e.fireCd <= 0) {
       const ratio = e.hp / Math.max(1, e.maxHp);
       e.finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
@@ -2743,7 +2788,7 @@ class Game {
           if (e.finalPhase && Math.random() < 0.45) pattern = "ringShot";
         }
       }
-      this.BeginTankKingAttack(e, pattern);
+      this.ArmBossSkill(e, pattern);
     }
   }
 
@@ -2768,7 +2813,6 @@ class Game {
         });
       }
       e.fireCd = (EAGLE_MORPH_DUR + 5.2) * cdScale;
-      this.ShowBuffToast("终极诅咒蓄力…");
       return;
     }
 
@@ -2784,7 +2828,6 @@ class Game {
         });
       }
       e.fireCd = 1.85 * cdScale;
-      this.ShowBuffToast(pattern === "chaseVolley" ? "坦克王 · 单炮连射" : "坦克王 · 点射");
       return;
     }
 
@@ -2793,7 +2836,6 @@ class Game {
         e.attackQueue.push({ t: i * 0.04 * cdScale, kind: "kingShell", dir: dirs[i] });
       }
       e.fireCd = 2.0 * cdScale;
-      this.ShowBuffToast(barrels >= 8 ? "坦克王 · 八向齐射" : "坦克王 · 十字齐射");
     } else if (pattern === "spinFire") {
       for (let r = 0; r < 2; r++) {
         for (let i = 0; i < dirs.length; i++) {
@@ -2805,7 +2847,6 @@ class Game {
         }
       }
       e.fireCd = 2.6 * cdScale;
-      this.ShowBuffToast("坦克王 · 轮射");
     } else if (pattern === "axisBurst") {
       for (const dir of ["left", "right"]) {
         e.attackQueue.push({ t: 0.02 * cdScale, kind: "kingShell", dir });
@@ -2816,7 +2857,6 @@ class Game {
         e.attackQueue.push({ t: 0.44 * cdScale, kind: "kingShell", dir });
       }
       e.fireCd = 2.2 * cdScale;
-      this.ShowBuffToast("坦克王 · 轴对称连射");
     } else if (pattern === "chaseVolley") {
       for (let i = 0; i < 4; i++) {
         e.attackQueue.push({ t: i * 0.1 * cdScale, kind: "kingShell", dir: face });
@@ -2826,7 +2866,6 @@ class Game {
       e.attackQueue.push({ t: 0.08 * cdScale, kind: "kingShell", dir: sideA, angleOffset: -0.18 });
       e.attackQueue.push({ t: 0.08 * cdScale, kind: "kingShell", dir: sideB, angleOffset: 0.18 });
       e.fireCd = 2.1 * cdScale;
-      this.ShowBuffToast("坦克王 · 追猎齐射");
     } else {
       for (let wave = 0; wave < 3; wave++) {
         for (let i = 0; i < dirs.length; i++) {
@@ -2839,7 +2878,6 @@ class Game {
         }
       }
       e.fireCd = 3.0 * cdScale;
-      this.ShowBuffToast("坦克王 · 环形弹幕");
     }
   }
 
@@ -2888,6 +2926,8 @@ class Game {
       this.UpdateBossAttackQueue(e, dt);
       return;
     }
+    if (this.TickBossSkillWindup(e, dt, this.BeginTankManAttack)) return;
+    this.TryBossNormalShot(e);
     if (e.fireCd <= 0) {
       const ratio = e.hp / Math.max(1, e.maxHp);
       const finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
@@ -2907,7 +2947,7 @@ class Game {
         else if (Math.random() < 0.32) pattern = "sniperVolley";
         else pattern = pool[Math.floor(Math.random() * pool.length)];
       }
-      this.BeginTankManAttack(e, pattern);
+      this.ArmBossSkill(e, pattern);
     }
   }
 
@@ -2929,7 +2969,6 @@ class Game {
         });
       }
       e.fireCd = (EAGLE_MORPH_DUR + 4.8) * cdScale;
-      this.ShowBuffToast("腿甲坦克人 · 终极诅咒");
       return;
     }
 
@@ -2937,7 +2976,6 @@ class Game {
       e.attackQueue.push({ t: 0.25 * cdScale, kind: "disarmThrow" });
       e.attackQueue.push({ t: 0.55 * cdScale, kind: "layBomb" });
       e.fireCd = 3.2 * cdScale;
-      this.ShowBuffToast("拆炮！炮管被扔走了");
       return;
     }
 
@@ -2947,7 +2985,6 @@ class Game {
         e.attackQueue.push({ t: i * 0.22 * cdScale, kind: "layBomb" });
       }
       e.fireCd = 2.4 * cdScale;
-      this.ShowBuffToast("定时炸弹！找掩体");
       return;
     }
 
@@ -2962,7 +2999,6 @@ class Game {
         });
       }
       e.fireCd = 2.6 * cdScale;
-      this.ShowBuffToast("狙击直线弹 · 会反弹");
       return;
     }
 
@@ -2976,7 +3012,6 @@ class Game {
         });
       }
       e.fireCd = 2.8 * cdScale;
-      this.ShowBuffToast("弹射扇形狙击");
       return;
     }
 
@@ -2990,7 +3025,6 @@ class Game {
         });
       }
       e.fireCd = 2.5 * cdScale;
-      this.ShowBuffToast("榴弹抛射");
       return;
     }
 
@@ -3004,7 +3038,6 @@ class Game {
         });
       }
       e.fireCd = 2.1 * cdScale;
-      this.ShowBuffToast("近身连射");
       return;
     }
 
@@ -3015,7 +3048,6 @@ class Game {
     e.attackQueue.push({ t: 0.35 * cdScale, kind: "layBomb" });
     e.attackQueue.push({ t: 0.55 * cdScale, kind: "layBomb" });
     e.fireCd = 3.1 * cdScale;
-    this.ShowBuffToast("踩踏弹雨 + 炸弹");
   }
 
   /** Boss patrols the upper band and cycles gravity-shell attack patterns. */
@@ -3065,7 +3097,8 @@ class Game {
       this.UpdateBossAttackQueue(e, dt);
       return;
     }
-
+    if (this.TickBossSkillWindup(e, dt, this.BeginBossAttack)) return;
+    this.TryBossNormalShot(e);
     if (e.fireCd <= 0) {
       const ratio = e.hp / Math.max(1, e.maxHp);
       const finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
@@ -3086,7 +3119,7 @@ class Game {
           pattern = BOSS_ATTACKS[Math.floor(Math.random() * BOSS_ATTACKS.length)];
         }
       }
-      this.BeginBossAttack(e, pattern);
+      this.ArmBossSkill(e, pattern);
     }
   }
 
@@ -3102,7 +3135,6 @@ class Game {
         e.attackQueue.push({ t: i * 0.03 * cdScale, kind: "kingShell", dir: DIR_OCTO[i] });
       }
       e.fireCd = 2.4 * cdScale;
-      this.ShowBuffToast("八管齐射！");
     } else if (pattern === "octoSpin") {
       for (let r = 0; r < 2; r++) {
         for (let i = 0; i < DIR_OCTO.length; i++) {
@@ -3114,7 +3146,6 @@ class Game {
         }
       }
       e.fireCd = 3.0 * cdScale;
-      this.ShowBuffToast("八管轮射");
     } else if (pattern === "octoRing") {
       for (let wave = 0; wave < 2; wave++) {
         for (let i = 0; i < DIR_OCTO.length; i++) {
@@ -3127,7 +3158,6 @@ class Game {
         }
       }
       e.fireCd = 3.2 * cdScale;
-      this.ShowBuffToast("八管环射");
     } else if (pattern === "barrage") {
       // 万炮齐发：宽扇形下压弹幕
       const n = 11;
@@ -3137,7 +3167,6 @@ class Game {
         e.attackQueue.push({ t: i * 0.04 * cdScale, kind: "shell", dir: "down", angleOffset: ang, label: i === 0 });
       }
       e.fireCd = 3.2 * cdScale;
-      this.ShowBuffToast("万炮齐发！");
     } else if (pattern === "fan") {
       // 扇形追击：朝玩家扇形 5 发
       const n = 5;
@@ -3147,7 +3176,6 @@ class Game {
         e.attackQueue.push({ t: 0.02 * i * cdScale, kind: "shell", dir: face, angleOffset: ang });
       }
       e.fireCd = 2.4 * cdScale;
-      this.ShowBuffToast("扇形追击");
     } else if (pattern === "mortar") {
       // 曲射迫击：高抛弧线砸向玩家附近
       const px = this.player?.alive ? this.player.x + this.player.w / 2 : CANVAS_W / 2;
@@ -3156,7 +3184,6 @@ class Game {
         e.attackQueue.push({ t: i * 0.12 * cdScale, kind: "mortar", aimX });
       }
       e.fireCd = 2.8 * cdScale;
-      this.ShowBuffToast("曲射迫击");
     } else if (pattern === "sweep") {
       // 横向扫射：从左到右（或反向）依次发射
       const leftToRight = Math.random() < 0.5;
@@ -3167,21 +3194,18 @@ class Game {
         e.attackQueue.push({ t: i * 0.08 * cdScale, kind: "shell", dir: "down", angleOffset: ang });
       }
       e.fireCd = 3.0 * cdScale;
-      this.ShowBuffToast("横向扫射");
     } else if (pattern === "rain") {
       // 天降弹雨：上方落下慢速重力弹
       for (let i = 0; i < 8; i++) {
         e.attackQueue.push({ t: i * 0.1 * cdScale, kind: "rain" });
       }
       e.fireCd = 3.1 * cdScale;
-      this.ShowBuffToast("天降弹雨");
     } else if (pattern === "burst") {
       // 三点连射：对准玩家连发
       for (let i = 0; i < 3; i++) {
         e.attackQueue.push({ t: i * 0.22 * cdScale, kind: "shell", dir: face, angleOffset: 0 });
       }
       e.fireCd = 2.1 * cdScale;
-      this.ShowBuffToast("三点连射");
     } else if (pattern === "eagleCurse") {
       e.attackQueue.push({ t: 0.4 * cdScale, kind: "eagleCurse" });
       // Follow-up after morph telegraph + opening shield.
@@ -3196,11 +3220,55 @@ class Game {
         });
       }
       e.fireCd = (EAGLE_MORPH_DUR + 6.5) * cdScale;
-      this.ShowBuffToast("终极诅咒蓄力…");
     } else {
       e.fireCd = 1.5 * cdScale;
     }
     e.attackAge = 0;
+  }
+
+  /** Start a readable telegraph, then resolve via TickBossSkillWindup → Begin*Attack. */
+  ArmBossSkill(e, pattern) {
+    e.pendingPattern = pattern;
+    e.skillWindup = BOSS_SKILL_WINDUP;
+    let warn = BOSS_SKILL_WARN[pattern] || "⚠ 特殊攻击蓄力";
+    if (pattern === "axisBurst" && (e.barrelCount || 1) <= 1) warn = "⚠ 点射蓄力";
+    e.skillWarn = warn;
+    this.ShowBuffToast(warn);
+  }
+
+  /** @returns {boolean} true while windup is active (caller should skip other attacks). */
+  TickBossSkillWindup(e, dt, beginFn) {
+    if (!(e.skillWindup > 0)) return false;
+    e.skillWindup -= dt;
+    if (e.skillWindup <= 0) {
+      e.skillWindup = 0;
+      const pattern = e.pendingPattern;
+      e.pendingPattern = null;
+      e.skillWarn = null;
+      if (pattern) beginFn.call(this, e, pattern);
+    }
+    return true;
+  }
+
+  /** Ordinary directed boss shells between special skills. */
+  TryBossNormalShot(e) {
+    if ((e.skillWindup || 0) > 0) return;
+    if (e.attackQueue?.length) return;
+    if ((e.normalFireCd || 0) > 0) return;
+    if ((e.protect || 0) > 0) return;
+    if ((e.spawnFlash || 0) > 0) return;
+
+    let face = e.castFace || e.dir || "down";
+    if (this.player?.alive && Math.random() < 0.72) {
+      face = DirFromVector(this.player.x - e.x, this.player.y - e.y);
+    } else {
+      const hq = this.GetBaseTarget();
+      face = DirFromVector(hq.x - e.x, hq.y - e.y);
+    }
+    e.castFace = face;
+    this.SpawnBossShellFromDir(e, face, (Math.random() - 0.5) * 0.08);
+    e.normalFireCd = BOSS_NORMAL_FIRE_MIN + Math.random() * BOSS_NORMAL_FIRE_SPAN;
+    this.audio.Shoot();
   }
 
   UpdateBossAttackQueue(e, dt) {
@@ -5176,6 +5244,10 @@ class Game {
       texture: type.texture,
       alive: true,
       fireCd: type.boss ? 1.6 * this.GetBossFireCdScale({ fireIntervalMul: type.fireIntervalMul ?? 1 }) : 0.8,
+      normalFireCd: type.boss ? 0.9 : 0,
+      skillWindup: 0,
+      pendingPattern: null,
+      skillWarn: null,
       aiTimer: 0.3,
       spawnFlash: type.boss ? 0.6 : 1.0,
       protect: type.boss ? 1.2 : 0,
@@ -6083,6 +6155,38 @@ class Game {
     ctx.strokeStyle = "#f0d060";
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, barW, barH);
+
+    // Skill telegraph: pulse ring on boss + warn under HP bar.
+    if ((boss.skillWindup || 0) > 0) {
+      const pulse = 0.55 + 0.45 * Math.sin(performance.now() * 0.018);
+      const cx = boss.x + boss.w / 2;
+      const cy = boss.y + boss.h / 2;
+      const radius = Math.max(boss.w, boss.h) * (0.62 + 0.12 * pulse);
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.35 * pulse;
+      ctx.strokeStyle = "#ffcc44";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.2 + 0.25 * pulse;
+      ctx.fillStyle = "#ffaa22";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (boss.skillWarn) {
+        ctx.fillStyle = `rgba(0,0,0,${0.55 + 0.25 * pulse})`;
+        ctx.font = `11px ${PIXEL_FONT}`;
+        const tw = ctx.measureText(boss.skillWarn).width + 16;
+        ctx.fillRect((CANVAS_W - tw) / 2, y + barH + 6, tw, 18);
+        ctx.fillStyle = "#ffcc44";
+        ctx.textBaseline = "middle";
+        ctx.fillText(boss.skillWarn, CANVAS_W / 2, y + barH + 15);
+      }
+    }
+
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
   }

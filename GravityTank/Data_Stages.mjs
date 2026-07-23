@@ -135,8 +135,9 @@ export const STAGES = [
     title: "坦克王",
     bossKind: "tankKing",
     barrelCount: 1,
-    enemies: { basic: 0, fast: 0, power: 0, armor: 0, boss: 0, tankKing: 1 },
-    enemySpawns: [[12, 2]],
+    // Boss + escalating minions (fewest of the three bosses).
+    enemies: { basic: 4, fast: 2, power: 0, armor: 0, boss: 0, tankKing: 1 },
+    enemySpawns: [[0, 2], [12, 2], [24, 2]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -241,8 +242,9 @@ export const STAGES = [
     title: "重力巨炮",
     bossKind: "boss",
     barrelCount: 8,
-    enemies: { basic: 0, fast: 0, power: 0, armor: 0, boss: 1 },
-    enemySpawns: [[12, 4]],
+    // More minions than stage-3 Tank King.
+    enemies: { basic: 4, fast: 3, power: 2, armor: 1, boss: 1 },
+    enemySpawns: [[0, 2], [12, 4], [24, 2]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -365,15 +367,16 @@ export const STAGES = [
       [0,0,0,0,0,0,0,0,0,0,0,2,6,6,2,0,0,0,0,0,0,0,0,0,0,0],
     ],
   },
-    {
+  {
     id: 9,
     bossStage: true,
     title: "腿甲坦克人",
     bossKind: "tankMan",
     barrelCount: 1,
     bossHpMul: 1,
-    enemies: { basic: 0, fast: 0, power: 0, armor: 0, tankMan: 1 },
-    enemySpawns: [[12, 2]],
+    // Most minions of the three bosses.
+    enemies: { basic: 4, fast: 4, power: 4, armor: 2, tankMan: 1 },
+    enemySpawns: [[1, 2], [12, 2], [24, 2], [6, 1], [18, 1]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
       [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
