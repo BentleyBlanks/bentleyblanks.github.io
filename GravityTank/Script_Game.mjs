@@ -4,7 +4,7 @@
  */
 
 import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL_STAGE, BARRICADE_TEACH_STAGE } from "./Data_Stages.mjs";
-import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade } from "./Data_Upgrades.mjs";
+import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade, IsUpgradeRecommended, PeekNextStageId } from "./Data_Upgrades.mjs";
 
 const DIFFICULTY = {
   easy: "easy",
@@ -1778,7 +1778,16 @@ class Game {
       ? pool.filter((u) => !this.runPerks.includes(u.id))
       : pool.slice();
     const cards = PickUpgradeCards(filtered.length ? filtered : pool, 3);
-    this.upgradePick = { special, tutorial, cards };
+    const nextStage = tutorial
+      ? 1
+      : (special ? PeekNextStageId(this.stage) : PeekNextStageId(this.isBarricadeTeach ? "barricadeTeach" : this.stage));
+    // Soft-sort: recommended cards float to the top of the three picks.
+    cards.sort((a, b) => {
+      const ar = IsUpgradeRecommended(a, { special, tutorial, nextStage }) ? 1 : 0;
+      const br = IsUpgradeRecommended(b, { special, tutorial, nextStage }) ? 1 : 0;
+      return br - ar;
+    });
+    this.upgradePick = { special, tutorial, cards, nextStage };
     if (this.overlays.upgradeTitle) {
       this.overlays.upgradeTitle.textContent = tutorial
         ? "入门升级"
@@ -1786,19 +1795,26 @@ class Game {
     }
     if (this.overlays.upgradeBlurb) {
       this.overlays.upgradeBlurb.textContent = tutorial
-        ? "三选一：基础强化，带进第一关（本关有效）。"
+        ? "三选一：基础强化，带进第一关（本关有效）。黄边=推荐。"
         : (special
-          ? "三选一：永久能力，带到本局通关结束。"
-          : "三选一：本关有效（仅下一关）。");
+          ? "三选一：永久能力，带到本局通关结束。黄边=推荐。"
+          : "三选一：本关有效（仅下一关）。黄边=对下一关更划算。");
     }
     cardsRoot.innerHTML = "";
     for (const card of cards) {
+      const recommended = IsUpgradeRecommended(card, { special, tutorial, nextStage });
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `upgrade-card${special ? " is-special" : ""}${tutorial ? " is-tutorial" : ""}`;
+      btn.className = [
+        "upgrade-card",
+        special ? "is-special" : "",
+        tutorial ? "is-tutorial" : "",
+        recommended ? "is-recommend" : "",
+      ].filter(Boolean).join(" ");
       const iconSrc = card.icon || `./assets/Icon_Upgrade${card.id[0].toUpperCase()}${card.id.slice(1)}.png`;
       btn.innerHTML =
         `<span class="upgrade-card-body">` +
+        (recommended ? `<span class="upgrade-rec" aria-hidden="true">推荐</span>` : "") +
         `<span class="upgrade-icon-well">` +
         `<img class="upgrade-icon" src="${iconSrc}" width="48" height="48" alt="" draggable="false">` +
         `</span>` +
