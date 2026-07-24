@@ -7,13 +7,8 @@ import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL
 import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade, IsUpgradeRecommended, PeekNextStageId } from "./Data_Upgrades.mjs";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.4";
+export const GAME_VERSION = "0.5";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
-
-const DIFFICULTY = {
-  easy: "easy",
-  normal: "normal",
-};
 
 const PIXEL_FONT = '"Fusion Pixel 12", monospace';
 const TILE = 16;
@@ -30,7 +25,6 @@ const MAX_ENEMIES_LATE = 5;
 const ENEMY_FRIENDLY_FIRE_OFF_STAGE = 6;
 const MAX_ABSORB_HITS = 8;
 const PLAYER_LIVES = 3;
-const PLAYER_LIVES_EASY = 5;
 const PLAYER_MAX_HP = 3;
 /** Brief i-frames after a non-lethal hit so one volley cannot shred all HP. */
 const HIT_IFRAME = 1.0;
@@ -40,8 +34,10 @@ const CARRY_WOOD_HP = 2;
 const CARRY_METAL_HP = 5;
 const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
 const BULLET_SPEED = 280;
-/** Classic ~1/5 tanks flash (~0.20); dialed down so ? tokens are rarer. */
+/** Classic ~1/5 tanks flash (~0.20); early stages deliberately run 20% leaner. */
 const POWER_DROP_RATE = 0.15;
+const EARLY_POWER_DROP_RATE_MUL = 0.8;
+const EARLY_POWER_DROP_END_STAGE = 3;
 const PLAYER_SPEED = 88;
 const GIANT_SCALE = 2;
 const GIANT_DURATION = 14;
@@ -257,17 +253,15 @@ const BOSS_BANNED_POWERS = new Set([POWER.nuke, POWER.apocalypse, POWER.bomb]);
 /** Pick exactly `count` prizes: rare red, more gold, rest green.
  *  opts.allowGiant — late-game only (after stage 6).
  *  opts.bossSafe — strip field-wipe ultras/goods that would skip a boss. */
-function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.normal, opts = {}) {
+function PickRouletteSegments(count = ROULETTE_SIZE, opts = {}) {
   const allow = (s) => !(opts.bossSafe && BOSS_BANNED_POWERS.has(s.kind));
   const goods = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "good" && allow(s)).slice());
   let ultras = ROULETTE_POOL.filter((s) => s.tier === "ultra" && allow(s));
   if (!opts.allowGiant) ultras = ultras.filter((s) => s.kind !== POWER.giant);
   ultras = ShuffleInPlace(ultras.slice());
   const bads = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "bad" && allow(s)).slice());
-  // Easy: never red. Normal: ~25% chance of a single red wedge.
-  const badN = difficulty === DIFFICULTY.easy
-    ? 0
-    : Math.min(bads.length, Math.random() < 0.25 ? 1 : 0);
+  // Standard wheel: ~25% chance of a single red wedge.
+  const badN = Math.min(bads.length, Math.random() < 0.25 ? 1 : 0);
   // Gold: 2-3 wedges normally; boss-safe wheels keep at least one non-wipe ultra when available.
   const ultraN = opts.bossSafe
     ? Math.min(ultras.length, 1 + Math.floor(Math.random() * 2))
@@ -287,15 +281,11 @@ function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.nor
       else if (picked.length < count) picked.push(giantSeg);
     }
   }
-  // Fill if pool short — prefer non-bad on easy.
+  // Fill if the pool is short.
   while (picked.length < count) {
     const rest = ROULETTE_POOL.filter((s) => !picked.includes(s) && allow(s) && (opts.allowGiant || s.kind !== POWER.giant));
     if (!rest.length) break;
-    const prefer = difficulty === DIFFICULTY.easy
-      ? rest.filter((s) => s.tier !== "bad")
-      : rest;
-    const pool = prefer.length ? prefer : rest;
-    picked.push(pool[Math.floor(Math.random() * pool.length)]);
+    picked.push(rest[Math.floor(Math.random() * rest.length)]);
   }
   return ShuffleInPlace(picked.slice(0, count));
 }
@@ -343,7 +333,7 @@ const ENEMY_TYPES = [
   },
   {
     id: "tankKing",
-    hp: 40,
+    hp: 52, // Stage-3 boss: +30% durability (40 → 52).
     speed: 36,
     score: 8000,
     shootCd: 1.5,
@@ -397,7 +387,6 @@ const PRISM_TANK_ATTACKS = ["prismBlink", "prismFan", "prismPierce", "chaseVolle
 const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
 /** Fire-rate multipliers vs the original boss cadence (lower = slower). */
 const BOSS_FIRE_RATE_NORMAL = 0.7;
-const BOSS_FIRE_RATE_EASY = 0.5;
 const BOSS_FINAL_HP_RATIO = 0.35;
 /** Readable windup before every special skill resolves. */
 const BOSS_SKILL_WINDUP = 0.95;
@@ -855,9 +844,9 @@ class Game {
     this.respawnTimer = 0;
     this.stageReviveUsed = false;
     this.pendingRespawnStats = null;
+    this.respawnFx = null;
 
     this.state = "boot";
-    this.difficulty = DIFFICULTY.normal;
     this.debugGodMode = false;
     this.debugPanelOpen = false;
     this.stagePerk = null; // active this stage only
@@ -886,6 +875,7 @@ class Game {
     this.fxBlastQueue = [];
     this.fxMarks = [];
     this.screenFx = null;
+    this.respawnFx = null;
     this.carryables = [];
     this.carriedBlock = null;
     this.prepTimer = 0;
@@ -1070,7 +1060,6 @@ class Game {
     document.getElementById("restartButton").addEventListener("click", () => this.HandleEndPrimary());
     document.getElementById("nextStageButton")?.addEventListener("click", () => this.AdvanceStage());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
-    this.BindDifficultyPick();
     this.BindDebugPanel();
 
     this.canvas.addEventListener("pointerdown", (ev) => this.OnCanvasPointerDown(ev));
@@ -1511,31 +1500,6 @@ class Game {
     document.getElementById("desktopPauseButton")?.addEventListener("click", onPauseTap);
   }
 
-  BindDifficultyPick() {
-    const root = document.getElementById("difficultyPick");
-    const hint = document.getElementById("difficultyHint");
-    if (!root) return;
-    const buttons = [...root.querySelectorAll("[data-diff]")];
-    const apply = (diff) => {
-      this.difficulty = diff === DIFFICULTY.easy ? DIFFICULTY.easy : DIFFICULTY.normal;
-      for (const btn of buttons) {
-        const on = btn.dataset.diff === this.difficulty;
-        btn.classList.toggle("is-active", on);
-        btn.setAttribute("aria-checked", on ? "true" : "false");
-      }
-      if (hint) {
-        hint.textContent = this.IsEasy()
-          ? "简易：5 条座驾 · 每台 3 点生命 · 负面更少 · ?掉率+50%"
-          : "标准：3 条座驾 · 每台 3 点生命";
-      }
-      this.SyncStageLabels();
-    };
-    for (const btn of buttons) {
-      btn.addEventListener("click", () => apply(btn.dataset.diff));
-    }
-    apply(this.difficulty);
-  }
-
   BindDebugPanel() {
     const banner = document.getElementById("titleBanner") || document.querySelector(".title-banner");
     const panel = document.getElementById("debugPanel");
@@ -1719,27 +1683,22 @@ class Game {
     }
   }
 
-  IsEasy() {
-    return this.difficulty === DIFFICULTY.easy;
-  }
-
   GetStartLives() {
-    return this.IsEasy() ? PLAYER_LIVES_EASY : PLAYER_LIVES;
+    return PLAYER_LIVES;
   }
 
   GetPowerDropRate() {
     // Tutorial: player cannot cross the river to collect tokens.
     if (this.isTutorial) return 0;
-    // Easy: slightly more tokens, still rarer than classic.
     // Boss fights: more ? drops from minions so the wheel stays in play.
-    if (this.isBossStage) return this.IsEasy() ? 0.72 : 0.55;
-    return this.IsEasy() ? POWER_DROP_RATE * 1.35 : POWER_DROP_RATE;
+    if (this.isBossStage) return 0.55;
+    if (this.stage <= EARLY_POWER_DROP_END_STAGE) return POWER_DROP_RATE * EARLY_POWER_DROP_RATE_MUL;
+    return POWER_DROP_RATE;
   }
 
-  /** Boss attack cadence scale: normal 70% rate, easy 50% rate → longer cooldowns.
-   *  Per-enemy fireIntervalMul further shortens/lengthens (stage-3 boss uses 0.5). */
+  /** Boss attack cadence scale. Per-enemy fireIntervalMul further adjusts cooldowns. */
   GetBossFireCdScale(enemy = null) {
-    const rate = this.IsEasy() ? BOSS_FIRE_RATE_EASY : BOSS_FIRE_RATE_NORMAL;
+    const rate = BOSS_FIRE_RATE_NORMAL;
     const base = 1 / Math.max(0.05, rate);
     const mul = enemy?.fireIntervalMul ?? 1;
     return base * mul;
@@ -1784,10 +1743,7 @@ class Game {
         : (this.isBarricadeTeach ? "路障教学" : "GRAVITY TANK");
     }
     if (this.overlays.startBlurb) {
-      const diffLine = this.IsEasy()
-        ? "简易：5 条座驾 · 每台 3 点生命 · 负面更少 · ?掉率+50%"
-        : "标准：3 条座驾 · 每台 3 点生命";
-      const lines = [diffLine, ""];
+      const lines = ["标准：3 条座驾 · 每台 3 点生命 · 前期道具率 -20%", ""];
       if (this.isTutorial) {
         lines.push("炮弹带重力会下坠。", "朝下 / 斜着打对岸。", "别把自己轰死。");
       } else if (this.isBarricadeTeach) {
@@ -2347,7 +2303,7 @@ class Game {
     this.spawnQueue = bosses.concat(minions);
   }
 
-  SpawnPlayer(fullProtect, keepStats = null) {
+  SpawnPlayer(fullProtect, keepStats = null, showRespawnFx = false) {
     const [sx, rawSy] = this.stageData.playerSpawns?.[0] || [8, 24];
     const sy = Math.max(0, Math.min(rawSy, MAP_H - 3));
     const power = keepStats?.power ?? 1;
@@ -2378,6 +2334,16 @@ class Game {
       slipVy: 0,
       blink: 0,
       animTick: 0,
+    };
+    if (showRespawnFx) this.StartRespawnFx(this.player.x + this.player.w / 2, this.player.y + this.player.h / 2);
+  }
+
+  StartRespawnFx(x, y) {
+    this.respawnFx = {
+      x,
+      y,
+      t: 0,
+      dur: 1.25,
     };
   }
 
@@ -2507,10 +2473,15 @@ class Game {
             hp: PLAYER_MAX_HP,
           };
           this.pendingRespawnStats = null;
-          this.SpawnPlayer(true, keep);
+          this.SpawnPlayer(true, keep, true);
           this.UnstickTank(this.player);
         }
       }
+    }
+
+    if (this.respawnFx) {
+      this.respawnFx.t += dt;
+      if (this.respawnFx.t >= this.respawnFx.dur) this.respawnFx = null;
     }
 
     this.UpdatePlayer(dt);
@@ -2867,6 +2838,32 @@ class Game {
     this.enemies = this.enemies.filter((e) => e.alive || e.deathTimer > 0);
   }
 
+  /** Give bosses a real escape path when a wall or minion pins them in place. */
+  RecoverBossMovement(tank) {
+    if (!tank?.alive) return false;
+    const originX = tank.x;
+    const originY = tank.y;
+    if (this.UnstickTank(tank, { maxDist: 96 })) return true;
+
+    const dirs = ["left", "right", "up", "down", "upLeft", "upRight", "downLeft", "downRight"];
+    for (const dirName of dirs) {
+      const d = DIR[dirName];
+      tank.x = Clamp(originX + d.x * 10, 0, CANVAS_W - tank.w);
+      tank.y = Clamp(originY + d.y * 10, 0, CANVAS_H - tank.h);
+      if (!this.TankBlocked(tank)) {
+        tank.dir = dirName;
+        return true;
+      }
+    }
+
+    tank.x = originX;
+    tank.y = originY;
+    if (this.EjectTankToOpenTile(tank)) return true;
+    tank.x = originX;
+    tank.y = originY;
+    return false;
+  }
+
   /** Tank King: 1 barrel (stage 3) or multi-barrel volleys. */
   UpdateTankKing(e, dt) {
     if (e.barrelFlash) {
@@ -2900,7 +2897,14 @@ class Game {
       e.animTick += dt * 10;
     } else {
       e.moving = false;
-      e.aiTimer = Math.min(e.aiTimer, 0.12);
+      // A blocked direction used to leave the stage-3 boss pinned forever.
+      // Probe all nearby lanes, then eject to the nearest open tile as a last resort.
+      if (this.RecoverBossMovement(e)) {
+        e.moving = true;
+        e.animTick += dt * 6;
+      } else {
+        e.aiTimer = Math.min(e.aiTimer, 0.12);
+      }
     }
 
     if (this.player?.alive) {
@@ -4352,6 +4356,7 @@ class Game {
       if (this.BulletHitTerrain(b)) continue;
       if (this.BulletHitCarryables(b)) continue;
       if (this.BulletHitEagleStroll(b)) continue;
+      if (this.BulletHitEagleAlly(b)) continue;
 
       const stepX = b.vx * dt;
       const stepY = b.vy * dt;
@@ -4364,7 +4369,7 @@ class Game {
       for (let i = 1; i <= subCount; i++) {
         b.x = prevX + stepX * (i / subCount);
         b.y = prevY + stepY * (i / subCount);
-        if (this.BulletHitTerrain(b) || this.BulletHitCarryables(b) || this.BulletHitEagleStroll(b)) {
+        if (this.BulletHitTerrain(b) || this.BulletHitCarryables(b) || this.BulletHitEagleStroll(b) || this.BulletHitEagleAlly(b)) {
           hitSolid = true;
           break;
         }
@@ -4394,14 +4399,7 @@ class Game {
 
       if (this.BulletHitCarryables(b)) continue;
       if (this.BulletHitEagleStroll(b)) continue;
-
-      // Enemy shells can shoot down the sortie eagle (mobile HQ).
-      if (!b.isPlayer && this.eagleAlly && this.baseAlive && RectsOverlap(b, this.eagleAlly)) {
-        b.alive = false;
-        this.SpawnExplosion(b.x, b.y, 0.55);
-        this.DestroyBase();
-        continue;
-      }
+      if (this.BulletHitEagleAlly(b)) continue;
 
       // Armed bullets can hit any tank, including the shooter (gravity self-kill).
       const canSelfHit = b.arm <= 0 || b.traveled >= 36;
@@ -4717,6 +4715,7 @@ class Game {
       p.disarmed = false;
       this.playerDisarmed = false;
       this.UnstickTank(p, { maxDist: 64 });
+      this.StartRespawnFx(p.x + p.w / 2, p.y + p.h / 2);
       this.ShowBuffToast(`原地复活！火力保留 ${p.power} · 护盾 ${STAGE_REVIVE_PROTECT}s`);
       this.UpdateHud();
       return;
@@ -4841,8 +4840,9 @@ class Game {
       aimX: CANVAS_W * 0.5,
       aimY: CANVAS_H * 0.5,
       animTick: 0,
+      steelShield: true,
     };
-    this.ShowBuffToast("鹰援出击！导弹清兵 16 秒");
+    this.ShowBuffToast("钢铁鹰援出击！敌方炮弹会被弹开");
     this.audio.Power();
   }
 
@@ -5098,6 +5098,24 @@ class Game {
     this.eagleStroll = null;
   }
 
+  /** Eagle Ally is a steel escort: enemy shells are deflected, never a base hit. */
+  BulletHitEagleAlly(b) {
+    if (!b || b.isPlayer || !this.eagleAlly || !this.baseAlive) return false;
+    if (!RectsOverlap(b, this.eagleAlly)) return false;
+    b.alive = false;
+    this.SpawnExplosion(b.x, b.y, 0.42);
+    this.fxMarks.push({
+      type: "plate",
+      x: b.x + b.w / 2,
+      y: b.y + b.h / 2,
+      color: "#b8e8ff",
+      ttl: 0.32,
+      life: 0.32,
+    });
+    this.audio.Bounce();
+    return true;
+  }
+
   BulletHitEagleStroll(b) {
     if (!this.eagleStroll || !this.baseAlive) return false;
     if (!RectsOverlap(b, this.eagleStroll)) return false;
@@ -5128,7 +5146,7 @@ class Game {
     this.audio.StopEngine();
     this.ResetTouchInput();
     this.state = "roulette";
-    const segments = PickRouletteSegments(ROULETTE_SIZE, this.difficulty, {
+    const segments = PickRouletteSegments(ROULETTE_SIZE, {
       allowGiant: this.IsGiantPowerUnlocked(),
       bossSafe: this.isBossStage,
     });
@@ -6314,6 +6332,7 @@ class Game {
       this.overlays.endSecondary.hidden = true;
     }
     this.respawnTimer = 0;
+    this.respawnFx = null;
     this.ResetTouchInput();
     this.SyncTouchControlsVisibility();
     if (won) this.audio.Win();
@@ -6404,6 +6423,7 @@ class Game {
     for (const ex of this.explosions) this.DrawExplosion(ctx, ex);
     this.DrawFxDebris(ctx);
     this.DrawFxMarks(ctx);
+    this.DrawRespawnFx(ctx);
     // Screen FX under the wheel while spinning; after fly-out redraw on top so fullscreen reads.
     this.DrawScreenFxOverlay(ctx);
     ctx.restore();
@@ -6736,6 +6756,19 @@ class Game {
     ctx.strokeStyle = `rgba(255,224,96,${0.45 + 0.4 * pulse})`;
     ctx.lineWidth = 2;
     ctx.strokeRect(e.x - 1, e.y + bob - 1, e.w + 2, e.h + 2);
+    if (e.steelShield) {
+      const shieldPulse = 0.55 + 0.35 * Math.abs(Math.sin(this.frame * 0.18));
+      ctx.strokeStyle = `rgba(184,232,255,${shieldPulse})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(e.x - 4, e.y + bob - 4, e.w + 8, e.h + 8);
+      ctx.fillStyle = `rgba(120,176,208,${0.7 + shieldPulse * 0.2})`;
+      for (const [ox, oy] of [[-5, -5], [e.w + 2, -5], [-5, e.h + 2], [e.w + 2, e.h + 2]]) {
+        ctx.fillRect(Math.round(e.x + ox), Math.round(e.y + bob + oy), 3, 3);
+      }
+      ctx.strokeStyle = `rgba(112,224,255,${0.4 + shieldPulse * 0.35})`;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(e.x - 7, e.y + bob - 7, e.w + 14, e.h + 14);
+    }
     // Missile hardpoints flash
     if (e.fireCd > 0.35) {
       ctx.fillStyle = "#ffe060";
@@ -7843,6 +7876,42 @@ class Game {
     ctx.globalAlpha = 1;
   }
 
+  DrawRespawnFx(ctx) {
+    const fx = this.respawnFx;
+    if (!fx) return;
+    const progress = Clamp(fx.t / Math.max(0.001, fx.dur), 0, 1);
+    const fade = progress > 0.72 ? 1 - (progress - 0.72) / 0.28 : 1;
+    const radius = 18 + progress * 52;
+    const pulse = 0.65 + 0.35 * Math.abs(Math.sin(this.frame * 0.3));
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = `rgba(128,224,255,${0.55 + pulse * 0.3})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(fx.x - radius, fx.y - radius * 0.72, radius * 2, radius * 1.44);
+    ctx.strokeStyle = `rgba(255,224,96,${0.7 + pulse * 0.25})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, radius * 0.72, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const beamHeight = 12 + (1 - progress) * 42;
+    ctx.fillStyle = `rgba(184,240,255,${0.2 + 0.25 * (1 - progress)})`;
+    ctx.fillRect(Math.round(fx.x - 4), Math.round(fx.y - beamHeight), 8, beamHeight * 2);
+    for (let i = 0; i < 8; i++) {
+      const angle = i * (Math.PI / 4) + progress * Math.PI * 1.5;
+      const distance = radius * (0.72 + (i % 2) * 0.18);
+      const px = Math.round(fx.x + Math.cos(angle) * distance);
+      const py = Math.round(fx.y + Math.sin(angle) * distance);
+      ctx.fillStyle = i % 2 ? "#ffe060" : "#80e8ff";
+      ctx.fillRect(px - 2, py - 2, 4, 4);
+    }
+    ctx.fillStyle = "#e8fbff";
+    ctx.font = `11px ${PIXEL_FONT}`;
+    ctx.textAlign = "center";
+    ctx.fillText("复活", fx.x, fx.y - radius - 8);
+    ctx.restore();
+  }
+
   DrawFxMarks(ctx) {
     if (!this.fxMarks?.length) return;
     ctx.save();
@@ -7924,7 +7993,8 @@ class Game {
         wash = fx.kind === "apocalypse" ? "#fff2a0" : (fx.kind === "nuke" ? "#fff8d0" : "#ffffff");
       } else if (style === "freeze") wash = "#a0e8ff";
       else if (style === "ghost") wash = "#d8e8ff";
-      else if (style === "curse" || style === "eagle") wash = "#401010";
+      else if (style === "curse") wash = "#401010";
+      else if (style === "eagle") wash = "#183848";
       else if (style === "life") wash = "#184028";
       else if (style === "antigrav") wash = "#103028";
       else if (style === "meteor") wash = "#401808";
@@ -8030,7 +8100,7 @@ class Game {
         ctx.textAlign = "center";
         const tw = ctx.measureText(fx.label).width + 22;
         ctx.fillRect((CANVAS_W - tw) / 2, CANVAS_H * 0.16, tw, 26);
-        ctx.fillStyle = (style === "curse" || style === "eagle" || (style === "blast" && fx.kind !== "bomb"))
+        ctx.fillStyle = (style === "curse" || (style === "blast" && fx.kind !== "bomb"))
           ? "#ff6040"
           : tint;
         ctx.textBaseline = "middle";
