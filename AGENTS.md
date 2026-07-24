@@ -41,6 +41,19 @@ Rules:
 - Do not end the subject with a period.
 - If a commit touches multiple areas, summarize the player-facing or highest-impact change first.
 
+## GravityTank / GitHub Pages
+
+- Site deploys from **`master` only** (`https://bentleyblanks.github.io/GravityTank/`). Draft PR stacks do not ship.
+- GravityTank commit subjects use `GravityTank: short change summary` (same style as Sophia: prefix + space, no Conventional Commit prefixes, no trailing period).
+- Bump `GravityTank/index.html` cache-bust (`Script_Game.mjs?v=…`) whenever game scripts/assets change for Pages.
+
+### Small requests: merge to master yourself
+
+- For small player-facing / copy / balance / bugfix asks (blurbs, RULE text, cache-bust, minor tweaks): **do not leave work sitting in an open draft PR**.
+- Agent workflow: branch → commit → push → open PR → **merge into `master` yourself** → confirm Pages is live (or at least that the merge landed) before treating the task as done.
+- Do not wait for the user to merge “小需求”. Unmerged draft stacks that block Pages have already burned trust—avoid repeating that.
+- Larger multi-feature stacks may still use PRs for review, but unique shippable work must still reach `master` (port/merge) rather than rotting on stacked draft branches.
+
 ## BehindTheLines Documentation
 
 - `BehindTheLines/` is the public documentation namespace for the private BehindTheLines Godot repository. Its canonical URL is `https://bentleyblanks.github.io/BehindTheLines/`.
