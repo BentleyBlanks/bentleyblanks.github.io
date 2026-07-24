@@ -281,6 +281,20 @@ const ROULETTE_FRICTION = 2.6; // viscous 1/s
 const ROULETTE_COULOMB = 1.35; // rad/s^2 opposing
 const ROULETTE_STOP = 0.18; // rad/s
 const ROULETTE_MAX_OMEGA = 42;
+const ROULETTE_ENTER_DUR = 0.4;
+const ROULETTE_EXIT_DUR = 0.34;
+
+function EaseOutBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  const u = Clamp(t, 0, 1);
+  return 1 + c3 * (u - 1) ** 3 + c1 * (u - 1) ** 2;
+}
+
+function EaseInCubic(t) {
+  const u = Clamp(t, 0, 1);
+  return u * u * u;
+}
 
 const ENEMY_TYPES = [
   { id: "basic", hp: 1, speed: 54, score: 100, shootCd: 1.4, texture: "enemyBasic", weight: 10 },
@@ -4750,7 +4764,10 @@ class Game {
       lastT: 0,
       stillT: 0,
       hasSpun: false,
-      phase: "spin", // spin | result
+      phase: "enter", // enter | spin | exit | result
+      enterT: 0,
+      exitT: 0,
+      pendingKind: null,
       result: null,
       resultT: 0,
       segments,
@@ -4841,6 +4858,36 @@ class Game {
     const r = this.roulette;
     if (!r) return;
 
+    if (r.phase === "enter") {
+      r.enterT += dt;
+      if (r.enterT >= ROULETTE_ENTER_DUR) {
+        r.enterT = ROULETTE_ENTER_DUR;
+        r.phase = "spin";
+      }
+      if (this.buffToast) {
+        this.buffToast.ttl -= dt;
+        if (this.buffToast.ttl <= 0) this.buffToast = null;
+      }
+      return;
+    }
+
+    if (r.phase === "exit") {
+      r.exitT += dt;
+      // Keep residual sparks alive while the wheel flies out.
+      this.UpdateExplosions(dt);
+      this.UpdateScreenFx(dt);
+      if (r.exitT >= ROULETTE_EXIT_DUR) {
+        r.exitT = ROULETTE_EXIT_DUR;
+        const kind = r.pendingKind;
+        r.pendingKind = null;
+        r.phase = "result";
+        r.resultT = 0;
+        // Apply after fly-out so fullscreen FX is not covered by the wheel.
+        if (kind) this.ApplyPowerup(kind);
+      }
+      return;
+    }
+
     if (r.phase === "result") {
       r.resultT += dt;
       this.UpdateExplosions(dt);
@@ -4893,13 +4940,42 @@ class Game {
     const idx = this.RouletteIndexAtNeedle();
     const seg = this.RouletteSegments()[idx];
     if (!seg) return;
-    r.phase = "result";
+    r.phase = "exit";
+    r.exitT = 0;
     r.result = seg;
-    r.resultT = 0;
-    r.resultHold = Math.max(1.85, ((POWER_FX[seg.kind]?.dur) || 1.1) + 0.55);
+    r.pendingKind = seg.kind;
+    r.resultHold = Math.max(1.35, ((POWER_FX[seg.kind]?.dur) || 1.1) + 0.35);
     r.omega = 0;
     r.dragging = false;
-    this.ApplyPowerup(seg.kind);
+    r.pointerId = null;
+    // Toast while flying out — FX starts after the wheel clears.
+    this.ShowBuffToast(`${seg.tier === "ultra" ? "超" : seg.tier === "bad" ? "负" : "好"} · ${seg.label}`);
+  }
+
+  /** Enter / exit motion for the wheel chrome (dim + transform). */
+  RouletteMotion(r) {
+    if (!r || r.phase === "result") return null;
+    if (r.phase === "enter") {
+      const u = Clamp(r.enterT / ROULETTE_ENTER_DUR, 0, 1);
+      const e = EaseOutBack(u);
+      return {
+        offsetY: (1 - e) * (CANVAS_H * 0.62),
+        scale: 0.28 + 0.72 * e,
+        alpha: Clamp(u * 1.35, 0, 1),
+        dim: 0.72 * Clamp(u * 1.2, 0, 1),
+      };
+    }
+    if (r.phase === "exit") {
+      const u = Clamp(r.exitT / ROULETTE_EXIT_DUR, 0, 1);
+      const e = EaseInCubic(u);
+      return {
+        offsetY: -e * (CANVAS_H * 0.78),
+        scale: 1 - 0.55 * e,
+        alpha: 1 - e,
+        dim: 0.72 * (1 - e),
+      };
+    }
+    return { offsetY: 0, scale: 1, alpha: 1, dim: 0.72 };
   }
 
   CloseRoulette() {
@@ -5869,6 +5945,7 @@ class Game {
     for (const ex of this.explosions) this.DrawExplosion(ctx, ex);
     this.DrawFxDebris(ctx);
     this.DrawFxMarks(ctx);
+    // Screen FX under the wheel while spinning; after fly-out redraw on top so fullscreen reads.
     this.DrawScreenFxOverlay(ctx);
     ctx.restore();
 
@@ -5878,6 +5955,7 @@ class Game {
     if (this.state === "playing" && this.isTutorial) this.DrawTutorialHint(ctx);
     if (this.state === "playing" && this.isBarricadeTeach) this.DrawBarricadeTeachHint(ctx);
     if (this.state === "roulette") this.DrawRoulette(ctx);
+    if (this.state === "roulette" && this.roulette?.phase === "result") this.DrawScreenFxOverlay(ctx);
   }
 
   DrawTutorialHint(ctx) {
@@ -6738,13 +6816,17 @@ class Game {
   DrawRoulette(ctx) {
     const r = this.roulette;
     if (!r) return;
+    const motion = this.RouletteMotion(r);
+    // After fly-out: leave the canvas clear so fullscreen power FX can read.
+    if (!motion) return;
+
     const touch = this.isTouchDevice;
     const segs = this.RouletteSegments();
     const n = Math.max(1, segs.length);
     const slice = (Math.PI * 2) / n;
     const needleIdx = this.RouletteIndexAtNeedle();
     const under = segs[needleIdx] || segs[0];
-    const focus = r.phase === "result" && r.result ? r.result : under;
+    const focus = r.result || under;
     const wheelImg = this.images.rouletteWheel;
     const needle = this.images.rouletteNeedle;
     const rad = r.radius;
@@ -6756,6 +6838,10 @@ class Game {
     const legendPx = touch ? 13 : 10;
     const hubR = touch ? 22 : 16;
     const hubPx = touch ? 15 : 11;
+    const ox = 0;
+    const oy = motion.offsetY;
+    const sc = motion.scale;
+    const alpha = motion.alpha;
 
     const muted = (tier, focusSeg) => {
       if (tier === "good") return focusSeg ? "rgba(48,140,88,0.97)" : "rgba(28,88,52,0.94)";
@@ -6764,18 +6850,23 @@ class Game {
     };
 
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.save();
+    ctx.fillStyle = `rgba(0,0,0,${Clamp(motion.dim, 0, 0.85)})`;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
 
     // Result strip — taller + larger type on touch so CJK stays readable.
     ctx.fillStyle = focus.bg;
-    ctx.fillRect(20, bannerY, CANVAS_W - 40, bannerH);
+    ctx.fillRect(20, bannerY + oy * 0.35, CANVAS_W - 40, bannerH);
     ctx.strokeStyle = focus.rim || focus.color;
     ctx.lineWidth = touch ? 3 : 2;
-    ctx.strokeRect(20, bannerY, CANVAS_W - 40, bannerH);
+    ctx.strokeRect(20, bannerY + oy * 0.35, CANVAS_W - 40, bannerH);
     const iconSize = touch ? 22 : 16;
     const iconCx = touch ? 48 : 44;
-    const iconCy = bannerY + bannerH / 2;
+    const iconCy = bannerY + oy * 0.35 + bannerH / 2;
     this.DrawPowerIcon(ctx, focus.kind, iconCx, iconCy, iconSize);
     ctx.fillStyle = focus.color;
     ctx.font = `${bannerPx}px ${PIXEL_FONT}`;
@@ -6786,7 +6877,8 @@ class Game {
     ctx.textBaseline = "alphabetic";
 
     ctx.save();
-    ctx.translate(r.cx, r.cy);
+    ctx.translate(r.cx + ox, r.cy + oy);
+    ctx.scale(sc, sc);
 
     // Soft shadow only
     ctx.beginPath();
@@ -6799,9 +6891,9 @@ class Game {
     // Rim texture underlay (aligned 10-slice bake); segment fills overwrite colors to match prizes.
     if (wheelImg) {
       const diam = rad * 2 + 10;
-      ctx.globalAlpha = 0.35;
+      ctx.globalAlpha = alpha * 0.35;
       ctx.drawImage(wheelImg, -diam / 2, -diam / 2, diam, diam);
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = alpha;
     }
 
     // Source-of-truth wedges from live segments — always match needle + labels.
@@ -6881,18 +6973,20 @@ class Game {
     ctx.fillText(focus.tier === "bad" ? "负" : focus.tier === "ultra" ? "超" : "好", 0, 1);
     ctx.restore();
 
-    // Slim needle — tip lands on rim at top
-    const ny = r.cy - rad;
-    const needleW = touch ? 28 : 20;
-    const needleH = touch ? 40 : 32;
+    // Slim needle — tip lands on rim at top (follow wheel transform).
+    const needleCx = r.cx + ox;
+    const needleCy = r.cy + oy;
+    const ny = needleCy - rad * sc;
+    const needleW = (touch ? 28 : 20) * sc;
+    const needleH = (touch ? 40 : 32) * sc;
     if (needle) {
-      ctx.drawImage(needle, r.cx - needleW / 2, ny - needleH + 4, needleW, needleH);
+      ctx.drawImage(needle, needleCx - needleW / 2, ny - needleH + 4 * sc, needleW, needleH);
     } else {
       ctx.fillStyle = "#e0c060";
       ctx.beginPath();
-      ctx.moveTo(r.cx, ny + 2);
-      ctx.lineTo(r.cx - 7, ny - 16);
-      ctx.lineTo(r.cx + 7, ny - 16);
+      ctx.moveTo(needleCx, ny + 2 * sc);
+      ctx.lineTo(needleCx - 7 * sc, ny - 16 * sc);
+      ctx.lineTo(needleCx + 7 * sc, ny - 16 * sc);
       ctx.closePath();
       ctx.fill();
     }
@@ -6900,29 +6994,32 @@ class Game {
     ctx.strokeStyle = "rgba(160,168,176,0.45)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(r.cx, r.cy, rad + 3, 0, Math.PI * 2);
+    ctx.arc(needleCx, needleCy, rad * sc + 3, 0, Math.PI * 2);
     ctx.stroke();
 
-    const footY = CANVAS_H - (touch ? 28 : 18);
-    const legendY = CANVAS_H - (touch ? 10 : 6);
-    ctx.fillStyle = "#a8b0b8";
-    ctx.font = `${hintPx}px ${PIXEL_FONT}`;
-    ctx.textAlign = "center";
-    ctx.fillText(
-      r.phase === "spin"
-        ? (Math.abs(r.omega) > 0.2 || r.dragging ? "减速中…" : "拖动甩转 / 空格")
-        : "获得！",
-      r.cx,
-      footY
-    );
-    ctx.textAlign = "left";
-    ctx.font = `${legendPx}px ${PIXEL_FONT}`;
-    ctx.fillStyle = TIER_PALETTE.good.color;
-    ctx.fillText("绿=好", 16, legendY);
-    ctx.fillStyle = TIER_PALETTE.ultra.color;
-    ctx.fillText("金=超", touch ? 90 : 70, legendY);
-    ctx.fillStyle = TIER_PALETTE.bad.color;
-    ctx.fillText("红=负", touch ? 170 : 120, legendY);
+    if (r.phase === "spin" || r.phase === "enter") {
+      const footY = CANVAS_H - (touch ? 28 : 18);
+      const legendY = CANVAS_H - (touch ? 10 : 6);
+      ctx.fillStyle = "#a8b0b8";
+      ctx.font = `${hintPx}px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      ctx.fillText(
+        r.phase === "enter"
+          ? "转轮就位…"
+          : (Math.abs(r.omega) > 0.2 || r.dragging ? "减速中…" : "拖动甩转 / 空格"),
+        r.cx,
+        footY
+      );
+      ctx.textAlign = "left";
+      ctx.font = `${legendPx}px ${PIXEL_FONT}`;
+      ctx.fillStyle = TIER_PALETTE.good.color;
+      ctx.fillText("绿=好", 16, legendY);
+      ctx.fillStyle = TIER_PALETTE.ultra.color;
+      ctx.fillText("金=超", touch ? 90 : 70, legendY);
+      ctx.fillStyle = TIER_PALETTE.bad.color;
+      ctx.fillText("红=负", touch ? 170 : 120, legendY);
+    }
+    ctx.restore();
   }
 
   DrawBuffHud(ctx) {
@@ -6999,7 +7096,7 @@ class Game {
       ctx.restore();
     }
 
-    if (this.buffToast && this.state !== "roulette") {
+    if (this.buffToast && (this.state !== "roulette" || this.roulette?.phase === "result" || this.roulette?.phase === "exit")) {
       const alpha = Clamp(this.buffToast.ttl / 0.4, 0, 1);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = "rgba(0,0,0,0.65)";
