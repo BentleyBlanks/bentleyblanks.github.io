@@ -18,12 +18,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="preload" href="./assets/Font_FusionPixel12ZhHans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/Font_FusionPixel12Latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./Style_Game.css?v=portStack1">
+  <link rel="stylesheet" href="./Style_Game.css?v=v03">
 </head>
 <body>
   <div id="app">
     <header class="hero">
-      <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
+      <div class="hero-logo">
+        <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.3</span>
+      </div>
       <p class="tagline">捡到 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="16" height="16" alt="?"> 弹出物理转轮——甩转到哪算哪</p>
     </header>
 
@@ -184,9 +187,9 @@
         </ul>
       </div>
 
-      <p class="credit">SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.3</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=restoreNames1"></script>
+  <script type="module" src="./Script_Game.mjs?v=v03"></script>
 </body>
 </html>
