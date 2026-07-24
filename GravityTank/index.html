@@ -18,14 +18,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="preload" href="./assets/Font_FusionPixel12ZhHans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/Font_FusionPixel12Latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./Style_Game.css?v=v05">
+  <link rel="stylesheet" href="./Style_Game.css?v=v06">
 </head>
 <body>
   <div id="app">
     <header class="hero">
       <div class="hero-logo">
         <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
-        <span class="game-version" id="gameVersion" aria-label="版本">v0.6</span>
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.7</span>
       </div>
       <p class="tagline">捡到 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="16" height="16" alt="?"> 弹出物理转轮——甩转到哪算哪</p>
     </header>
@@ -65,7 +65,7 @@
         <p id="startStageBlurb" class="start-blurb">炮弹带重力，打出去会往下掉。
 
 自己也要当心，别被自己的弹幕炸到。</p>
-        <p class="diff-hint" id="difficultyHint">标准战斗：3 条座驾 · 每台 3 点生命 · 前期道具率 -20%</p>
+        <p class="diff-hint" id="difficultyHint">正式战役：15 关 · 3 条座驾 · 每台 3 点生命 · 前期道具率 -20%</p>
         <button id="startButton" class="primary" type="button">START</button>
         <p class="hint desktop-hint">↑↓←→ / WASD · SPACE/J FIRE · P PAUSE</p>
         <p class="hint mobile-hint">左摇杆移动 · 右键开火</p>
@@ -173,6 +173,10 @@
           <li>红色负面可含「老鹰跑」：老鹰开门出去乱逛，护住它。</li>
           <li>木/铁路障：靠近按 <kbd>K</kbd>（触屏「扛」）举起当护盾，同键放下封路。</li>
           <li>部分关卡开场有准备时间，可先封住敌窝出口。</li>
+          <li>第 4、7、10、13 关是弹道谜题：先看墙和重力，再安排炮线。</li>
+          <li>锚定坦克不受重力转向影响，还能硬推路障；它们会分散出现在中后期关卡。</li>
+          <li>第 14 关「一枪不开」不能开火；敌军会互相误伤，但仍会追击你。</li>
+          <li>每过一关获得经验；升级时自动多一层装甲，经验和装甲会在战役中保留。</li>
           <li>标准战斗 3 条座驾；每台 3 点生命。车身随生命变色：金→橙→红。</li>
           <li>普通子弹伤 1 点，重炮/Boss弹/炸弹秒杀；受伤后 1 秒无敌。</li>
           <li>阵亡最多掉 1 级火力；每关首次死亡可原地复活（2 秒护盾）。火力清空只在整局失败。</li>
@@ -192,9 +196,9 @@
         </ul>
       </div>
 
-      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.6</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.7</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=gravityTank06"></script>
+  <script type="module" src="./Script_Game.mjs?v=gravityTank07"></script>
 </body>
 </html>

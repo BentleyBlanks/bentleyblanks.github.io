@@ -2,7 +2,7 @@
  *  Source maps: StefanBS/battle-city-clone (MIT).
  *  Tile codes: 0 empty, 1 brick, 2 steel, 3 water, 4 grass, 5 ice, 6 base.
  */
-export const STAGE_COUNT = 12;
+export const STAGE_COUNT = 15;
 
 /** Flip a classic bottom-base stage so eagle + player sit at the top (newbie-safer). */
 function FlipStageVertical(stage) {
@@ -173,6 +173,9 @@ export const STAGES = [
   },
   {
     id: 4,
+    specialStage: true,
+    specialKind: "ballisticPuzzle",
+    title: "弹道折线",
     enemies: {"basic": 14, "fast": 4, "power": 0, "armor": 2},
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
     playerSpawns: [[8, 24], [16, 24]],
@@ -207,7 +210,7 @@ export const STAGES = [
   },
   {
     id: 5,
-    enemies: {"basic": 2, "fast": 5, "power": 10, "armor": 3},
+    enemies: {"basic": 2, "fast": 5, "power": 10, "armor": 3, "anchor": 1},
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -280,6 +283,8 @@ export const STAGES = [
   },
   {
     id: 7,
+    specialStage: true,
+    specialKind: "ballisticPuzzle",
     title: "封喉陷阱",
     prepSeconds: 14,
     enemies: { basic: 6, fast: 6, power: 6, armor: 4 },
@@ -327,7 +332,7 @@ export const STAGES = [
     id: 8,
     title: "瓮中捉鳖",
     prepSeconds: 16,
-    enemies: { basic: 4, fast: 8, power: 8, armor: 6 },
+    enemies: { basic: 4, fast: 8, power: 8, armor: 6, anchor: 1 },
     enemySpawns: [[1, 2], [24, 2], [12, 1]],
     playerSpawns: [[12, 21]],
     carryBlocks: [
@@ -412,7 +417,9 @@ export const STAGES = [
   },
   {
     id: 10,
-    title: "潮涌走廊",
+    specialStage: true,
+    specialKind: "ballisticPuzzle",
+    title: "潮涌弹道",
     // Ordinary swarm: 3× classic ~20-enemy density.
     enemies: { basic: 54, fast: 6, power: 0, armor: 0 },
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
@@ -450,7 +457,7 @@ export const STAGES = [
     id: 11,
     title: "火力丛林",
     // Ordinary swarm: 3× stage-5 mix.
-    enemies: { basic: 6, fast: 15, power: 30, armor: 9 },
+    enemies: { basic: 6, fast: 15, power: 30, armor: 9, anchor: 1 },
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -521,6 +528,93 @@ export const STAGES = [
     ],
   },
 ];
+
+
+/** Build compact late-campaign maps without duplicating another 26×26 table. */
+function BuildExtendedMap(style = 0) {
+  const map = Array.from({ length: 26 }, () => Array(26).fill(0));
+  const paint = (x, y, width, height, tile = 1) => {
+    for (let row = y; row < y + height; row++) {
+      for (let column = x; column < x + width; column++) {
+        if (row >= 0 && row < 26 && column >= 0 && column < 26) map[row][column] = tile;
+      }
+    }
+  };
+  const paintPair = (x, y, width, tile = 1) => paint(x, y, width, 2, tile);
+
+  // The upper half is deliberately open so three spawn gates cannot trap tanks.
+  if (style === 1) {
+    paintPair(2, 5, 8);
+    paintPair(16, 5, 8);
+    paintPair(5, 9, 7);
+    paintPair(14, 9, 7);
+    paintPair(2, 13, 7);
+    paintPair(17, 13, 7);
+    paintPair(8, 17, 10);
+    paintPair(3, 20, 5, 2);
+    paintPair(18, 20, 5, 2);
+  } else if (style === 2) {
+    paintPair(3, 5, 6, 2);
+    paintPair(17, 5, 6, 2);
+    paintPair(2, 9, 4, 1);
+    paintPair(20, 9, 4, 1);
+    paintPair(6, 12, 14, 2);
+    paintPair(2, 16, 6, 2);
+    paintPair(18, 16, 6, 2);
+    paintPair(9, 19, 8, 2, 2);
+  } else {
+    paintPair(3, 5, 6, 1);
+    paintPair(17, 5, 6, 1);
+    paintPair(2, 9, 5, 2);
+    paintPair(19, 9, 5, 2);
+    paintPair(7, 13, 12, 1, 2);
+    paintPair(3, 16, 6, 2);
+    paintPair(17, 16, 6, 2);
+    paintPair(10, 19, 6, 2);
+  }
+
+  // Steel crown around the HQ, matching the hand-authored maps.
+  paint(11, 23, 4, 1, 2);
+  paint(11, 24, 1, 2, 2);
+  paint(12, 24, 2, 2, 6);
+  paint(14, 24, 1, 2, 2);
+  return map;
+}
+
+STAGES.push(
+  {
+    id: 13,
+    specialStage: true,
+    specialKind: "ballisticPuzzle",
+    title: "弹道迷宫",
+    enemies: { basic: 10, fast: 7, power: 7, armor: 3, anchor: 1 },
+    enemySpawns: [[1, 1], [12, 1], [23, 1]],
+    playerSpawns: [[8, 20]],
+    map: BuildExtendedMap(1),
+  },
+  {
+    id: 14,
+    specialStage: true,
+    specialKind: "noFire",
+    title: "一枪不开",
+    prepSeconds: 5,
+    enemies: { basic: 10, fast: 8, power: 8, armor: 4, anchor: 2 },
+    enemySpawns: [[1, 1], [12, 1], [23, 1]],
+    playerSpawns: [[8, 20]],
+    map: BuildExtendedMap(2),
+  },
+  {
+    id: 15,
+    bossStage: true,
+    title: "重力看守者",
+    bossKind: "gravityWarden",
+    barrelCount: 1,
+    enemies: { basic: 4, fast: 4, power: 2, armor: 2, anchor: 1, gravityWarden: 1 },
+    enemySpawns: [[1, 2], [12, 2], [23, 2]],
+    playerSpawns: [[8, 20]],
+    map: BuildExtendedMap(3),
+  },
+);
 
 
 /** After stage-6 boss: teach pick-up barricades (carry = shield, place = wall). */

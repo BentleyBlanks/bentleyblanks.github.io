@@ -7,7 +7,7 @@ import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL
 import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade, IsUpgradeRecommended, PeekNextStageId } from "./Data_Upgrades.mjs";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.6";
+export const GAME_VERSION = "0.7";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
 
 const PIXEL_FONT = '"Fusion Pixel 12", monospace';
@@ -48,6 +48,12 @@ const GIANT_DURATION = 14;
 const GIANT_HITS = 12;
 const GIANT_SPEED_MUL = 0.7;
 const SPAWN_PROTECT = 3.0;
+const XP_BASE_STAGE = 80;
+const XP_STAGE_STEP = 20;
+const XP_BOSS_BONUS = 90;
+const XP_SPECIAL_BONUS = 35;
+const XP_LEVEL_BASE = 120;
+const XP_LEVEL_STEP = 80;
 
 const DIR = {
   up: { x: 0, y: -1, angle: -Math.PI / 2 },
@@ -377,6 +383,32 @@ const ENEMY_TYPES = [
     boss: true,
     prismTank: true,
     fireIntervalMul: 0.8,
+    barrelCount: 1,
+  },
+  {
+    id: "anchor",
+    hp: 5,
+    speed: 58,
+    score: 650,
+    shootCd: 1.25,
+    texture: "enemyArmor",
+    weight: 0,
+    bulletBoost: 1,
+    anchorTank: true,
+  },
+  {
+    id: "gravityWarden",
+    hp: 150,
+    speed: 108,
+    score: 18000,
+    shootCd: 1.15,
+    texture: "enemyArmor",
+    weight: 0,
+    bulletBoost: 1.05,
+    size: 44,
+    boss: true,
+    gravityWarden: true,
+    fireIntervalMul: 0.72,
     barrelCount: 1,
   },
 ];
@@ -864,6 +896,11 @@ class Game {
     this.pendingStagePerk = null; // chosen after clear, applied on next StartGame
     this.runPerks = []; // permanent after boss until campaign ends
     this.absorbHits = 0; // run-wide armor charges (lethal-hit absorbs)
+    this.experience = 0;
+    this.experienceLevel = 0;
+    this.experienceNext = XP_LEVEL_BASE;
+    this.gravityDir = "down";
+    this.gravityVector = { x: 0, y: 1 };
     this.meteorPulseTimer = 0;
     this.timeRiftCd = 0;
     this.upgradePick = null; // { special, cards, resumeAction }
@@ -872,6 +909,9 @@ class Game {
     this.isTutorial = false;
     this.isBarricadeTeach = false;
     this.isBossStage = false;
+    this.isSpecialStage = false;
+    this.specialKind = null;
+    this.isNoFireStage = false;
     this.totalEnemies = 20;
     this.endAction = "restart"; // restart | next | retry
     this.map = [];
@@ -1191,6 +1231,10 @@ class Game {
     const show = this.isTouchDevice && (this.state === "playing" || this.state === "paused" || this.state === "roulette");
     if (this.touchUi.stickWrap) this.touchUi.stickWrap.hidden = !show;
     if (this.touchUi.actionsWrap) this.touchUi.actionsWrap.hidden = !show;
+    if (this.touchUi.fire) {
+      this.touchUi.fire.disabled = this.isNoFireStage;
+      this.touchUi.fire.classList.toggle("is-disabled", this.isNoFireStage);
+    }
     const hasCarry =
       !!(this.stageData?.carryBlocks?.length) ||
       !!this.carriedBlock ||
@@ -1542,7 +1586,6 @@ class Game {
     if (stagePick && !stagePick.dataset.built) {
       stagePick.dataset.built = "1";
       const stages = [
-        { id: 0, label: "T", title: "新手引导" },
         ...Array.from({ length: STAGE_COUNT }, (_, i) => {
           const n = i + 1;
           const stage = GetStage(n);
@@ -1643,7 +1686,7 @@ class Game {
         if (this.isTutorial) {
           this.StartGame({ stage: STAGE_COUNT, keepStats: false, keepScore: true, keepLives: true });
         } else if (this.stage <= 1) {
-          this.StartGame({ stage: 0, keepStats: false, keepScore: true, keepLives: true });
+          this.StartGame({ stage: STAGE_COUNT, keepStats: false, keepScore: true, keepLives: true });
         } else {
           this.StartGame({ stage: this.stage - 1, keepStats: false, keepScore: true, keepLives: true });
         }
@@ -1718,6 +1761,25 @@ class Game {
     return base * mul;
   }
 
+  SetGravityDirection(dirName = "down", announce = false) {
+    const next = DIR_KEYS.includes(dirName) ? dirName : "down";
+    this.gravityDir = next;
+    const vector = DIR[next] || DIR.down;
+    this.gravityVector = { x: vector.x, y: vector.y };
+    if (announce) {
+      const labels = { up: "上", down: "下", left: "左", right: "右" };
+      this.ShowBuffToast(`重力转向：${labels[next] || next}`);
+      this.fxMarks.push({
+        type: "gravity",
+        x: CANVAS_W / 2,
+        y: CANVAS_H / 2,
+        color: "#80e8ff",
+        ttl: 0.7,
+        life: 0.7,
+      });
+    }
+  }
+
   ApplyStageMeta(stageIndex1Based) {
     if (IsTutorialStage(stageIndex1Based)) {
       this.stage = 0;
@@ -1736,9 +1798,13 @@ class Game {
       this.stageData = GetStage(this.stage);
     }
     this.isBossStage = !!this.stageData.bossStage;
+    this.isSpecialStage = !!this.stageData.specialStage;
+    this.specialKind = this.stageData.specialKind || null;
+    this.isNoFireStage = this.specialKind === "noFire";
     const e = this.stageData.enemies;
     this.totalEnemies = e.basic + e.fast + e.power + e.armor
-      + (e.boss || 0) + (e.tankKing || 0) + (e.tankMan || 0) + (e.prismTank || 0);
+      + (e.boss || 0) + (e.tankKing || 0) + (e.tankMan || 0) + (e.prismTank || 0)
+      + (e.anchor || 0) + (e.gravityWarden || 0);
     this.spawnSlots = (this.stageData.enemySpawns || [[0, 0], [12, 0], [24, 0]]).map(([x, y]) => ({
       x: x * TILE,
       // Keep 2-tile tanks (+2px inset) fully on-canvas even if a stage table is stale.
@@ -1754,7 +1820,7 @@ class Game {
     if (this.overlays.startTitle) {
       this.overlays.startTitle.textContent = this.isTutorial
         ? "新手引导"
-        : (this.isBarricadeTeach ? "路障教学" : "GRAVITY TANK");
+        : (this.isBarricadeTeach ? "路障教学" : (this.isSpecialStage ? (this.stageData.title || "特殊关") : "GRAVITY TANK"));
     }
     if (this.overlays.startBlurb) {
       const lines = ["标准：3 条座驾 · 每台 3 点生命 · 前期道具率 -20%", ""];
@@ -1765,6 +1831,17 @@ class Game {
           "靠近路障按 K（触屏「扛」）举起。",
           "挡在身前可当护盾；同键放下封路。",
           "开场有准备时间，先封出口。",
+        );
+      } else if (this.isNoFireStage) {
+        lines.push(
+          "一枪不开：你的炮管被锁死。",
+          "敌军会互相误伤，但仍会追击你。",
+          "让它们自己把弹道变成事故现场。",
+        );
+      } else if (this.specialKind === "ballisticPuzzle") {
+        lines.push(
+          "弹道谜题：先看墙，再决定从哪条线开火。",
+          "炮弹会下坠，借墙反弹或引敌人互射。",
         );
       } else if (this.state === "ready" || this.state === "boot") {
         lines.push("炮弹带重力，打出去会往下掉。", "自己也要当心，别被自己的弹幕炸到。");
@@ -1792,9 +1869,13 @@ class Game {
     this.pendingStagePerk = null;
     this.runPerks = [];
     this.absorbHits = 0;
+    this.experience = 0;
+    this.experienceLevel = 0;
+    this.experienceNext = XP_LEVEL_BASE;
+    this.SetGravityDirection("down");
     this.meteorPulseTimer = 0;
     this.timeRiftCd = 0;
-    this.StartGame({ stage: 0, keepStats: false });
+    this.StartGame({ stage: 1, keepStats: false });
   }
 
   AdvanceStage() {
@@ -1946,6 +2027,7 @@ class Game {
   StartGame({ stage = 1, keepStats = false, keepScore = false, keepLives = false } = {}) {
     const prevStageKey = this.isTutorial ? 0 : this.stage;
     this.ApplyStageMeta(stage);
+    this.SetGravityDirection("down");
     const newStageKey = this.isTutorial ? 0 : this.stage;
     this.map = BuildStageMap(this.isTutorial ? 0 : this.stage);
     this.brickMask = BuildBrickMask(this.map);
@@ -1962,7 +2044,7 @@ class Game {
     this.carriedBlock = null;
     this.prepTimer = 0;
     this.enemies = [];
-    this.playerDisarmed = false;
+    this.playerDisarmed = this.isNoFireStage;
     this.SpawnCarryBlocksFromStage();
     if (!keepScore) this.score = 0;
     if (!keepLives) this.lives = this.GetStartLives();
@@ -2075,7 +2157,9 @@ class Game {
     if (prep > 0) {
       // Trap / teach stages: give the player time to seal exits before spawns.
       this.spawnTimer = prep;
-      this.ShowBuffToast(`准备 ${Math.ceil(prep)}s：扛路障封死敌窝出口！（K / 扛）`);
+      this.ShowBuffToast(this.isNoFireStage
+        ? `准备 ${Math.ceil(prep)}s：观察敌军弹道，炮管锁死。`
+        : `准备 ${Math.ceil(prep)}s：扛路障封死敌窝出口！（K / 扛）`);
     } else {
       const preSpawn = this.isTutorial || this.isBossStage || this.isBarricadeTeach ? 1 : 3;
       for (let i = 0; i < preSpawn; i++) {
@@ -2091,12 +2175,17 @@ class Game {
       this.ShowBuffToast("靠近路障按 K（或「扛」）：扛起=护盾，再按=放下封路");
     } else if (this.isTutorial) {
       this.ShowBuffToast("河北岸：朝下/斜射，用重力清理南岸敌军");
+    } else if (this.isNoFireStage) {
+      this.ShowBuffToast("一枪不开：敌军会互相误伤，继续追击你！");
+    } else if (this.specialKind === "ballisticPuzzle") {
+      this.ShowBuffToast("弹道谜题：借墙、借重力，也借敌人的炮弹开路");
     } else if (this.isBossStage) {
       const perk = FindUpgrade(this.stagePerk);
       const bossTitle = this.stageData.title || (
         this.stageData.bossKind === "tankMan" ? "腿甲坦克人"
           : this.stageData.bossKind === "tankKing" ? "坦克王"
             : this.stageData.bossKind === "prismTank" ? "光棱坦克"
+              : this.stageData.bossKind === "gravityWarden" ? "重力看守者"
               : "重力巨炮"
       );
       this.ShowBuffToast(
@@ -2186,6 +2275,32 @@ class Game {
     if (this.player) this.player.absorbHits = this.absorbHits;
   }
 
+  GetStageExperienceReward() {
+    if (typeof this.stage !== "number") return 0;
+    let reward = XP_BASE_STAGE + this.stage * XP_STAGE_STEP;
+    if (this.isBossStage) reward += XP_BOSS_BONUS;
+    if (this.isSpecialStage) reward += XP_SPECIAL_BONUS;
+    return reward;
+  }
+
+  AwardStageExperience() {
+    const reward = this.GetStageExperienceReward();
+    if (!reward) return "";
+    this.experience += reward;
+    let levels = 0;
+    while (this.experience >= this.experienceNext) {
+      this.experience -= this.experienceNext;
+      this.experienceLevel += 1;
+      this.experienceNext = XP_LEVEL_BASE + this.experienceLevel * XP_LEVEL_STEP;
+      this.GrantAbsorbHits(1);
+      levels += 1;
+    }
+    const progress = `经验 +${reward} · LV${this.experienceLevel} ${this.experience}/${this.experienceNext}`;
+    const armor = levels > 0 ? ` · 装甲升级！护甲 +${levels}` : "";
+    this.ShowBuffToast(`${progress}${armor}`);
+    return `${progress}${armor}`;
+  }
+
   SyncAbsorbHitsToPlayer() {
     if (this.player) this.player.absorbHits = this.absorbHits || 0;
   }
@@ -2273,6 +2388,7 @@ class Game {
   /** Enemy shells never hurt bosses; from stage 6+ no enemy↔enemy damage at all. */
   BlocksEnemyFriendlyFire(bullet, target) {
     if (!bullet || bullet.isPlayer) return false;
+    if (this.isNoFireStage) return false;
     if (target?.isBoss || target?.tankKing || target?.tankMan || target?.prismTank) return true;
     if (!this.isTutorial && this.stage >= ENEMY_FRIENDLY_FIRE_OFF_STAGE) return true;
     return false;
@@ -2297,6 +2413,9 @@ class Game {
     for (let i = 0; i < counts.fast; i++) minions.push(ENEMY_TYPES[1]);
     for (let i = 0; i < counts.power; i++) minions.push(ENEMY_TYPES[2]);
     for (let i = 0; i < counts.armor; i++) minions.push(ENEMY_TYPES[3]);
+    for (let i = 0; i < (counts.anchor || 0); i++) {
+      minions.push(ENEMY_TYPES.find((t) => t.id === "anchor"));
+    }
     for (let i = minions.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [minions[i], minions[j]] = [minions[j], minions[i]];
@@ -2315,6 +2434,9 @@ class Game {
     for (let i = 0; i < (counts.prismTank || 0); i++) {
       bosses.push(ENEMY_TYPES.find((t) => t.id === "prismTank") || bossType);
     }
+    for (let i = 0; i < (counts.gravityWarden || 0); i++) {
+      bosses.push(ENEMY_TYPES.find((t) => t.id === "gravityWarden") || bossType);
+    }
     this.spawnQueue = bosses.concat(minions);
   }
 
@@ -2324,7 +2446,7 @@ class Game {
     const power = keepStats?.power ?? 1;
     const maxBullets = keepStats?.maxBullets ?? (power >= 2 ? 2 : 1);
     if (keepStats?.absorbHits != null) this.absorbHits = keepStats.absorbHits;
-    this.playerDisarmed = false;
+    this.playerDisarmed = !!this.isNoFireStage;
     // Top HQ / tutorial: face the battlefield. Classic bottom HQ: face up toward enemies.
     const faceDown = this.isTutorial || sy < MAP_H / 2 || this.IsBaseAtTop();
     const hp = keepStats?.hp != null ? Clamp(keepStats.hp | 0, 1, PLAYER_MAX_HP) : PLAYER_MAX_HP;
@@ -2340,7 +2462,7 @@ class Game {
       hp,
       maxHp: PLAYER_MAX_HP,
       absorbHits: this.absorbHits || 0,
-      disarmed: false,
+      disarmed: !!this.isNoFireStage,
       alive: true,
       protect: fullProtect ? SPAWN_PROTECT : 2.2,
       fireCd: 0,
@@ -2750,7 +2872,7 @@ class Game {
     if (this.giantTimer > 0) this.CrushBricksTouchingPlayer();
 
     if (this.ConsumeInteractPress()) this.TryInteractCarry();
-    if (this.WantsFire()) this.TryFire(p, true);
+    if (!this.isNoFireStage && this.WantsFire()) this.TryFire(p, true);
 
     // pickup → gunBarrel restores armament; other tokens open physics roulette
     for (const pu of this.powerups) {
@@ -2800,6 +2922,10 @@ class Game {
         this.UpdatePrismTank(e, dt);
         continue;
       }
+      if (e.typeId === "gravityWarden") {
+        this.UpdateGravityWarden(e, dt);
+        continue;
+      }
 
       e.aiTimer -= dt;
       if (e.aiTimer <= 0) {
@@ -2824,7 +2950,8 @@ class Game {
         } else {
           // prefer moving toward player / base
           const roll = Math.random();
-          if (roll < 0.45 && this.player?.alive) {
+          const chaseChance = this.isNoFireStage ? 0.78 : 0.45;
+          if (roll < chaseChance && this.player?.alive) {
             const dx = this.player.x - e.x;
             const dy = this.player.y - e.y;
             e.dir = DirFromVector(dx, dy);
@@ -3412,6 +3539,55 @@ class Game {
     this.ShowBuffToast("光棱降临！");
   }
 
+  /** Stage-15 boss: a small fast hunter that periodically rotates global gravity. */
+  UpdateGravityWarden(e, dt) {
+    e.gravityTimer -= dt;
+    if (e.gravityTimer <= 0) {
+      const choices = DIR_KEYS.filter((dirName) => dirName !== this.gravityDir);
+      const next = choices[Math.floor(Math.random() * choices.length)] || "down";
+      this.SetGravityDirection(next, true);
+      e.gravityTimer = 2.7 + Math.random() * 1.4;
+    }
+
+    e.aiTimer -= dt;
+    if (e.aiTimer <= 0) {
+      e.aiTimer = 0.22 + Math.random() * 0.35;
+      if (this.player?.alive && Math.random() < 0.82) {
+        e.dir = DirFromVector(this.player.x - e.x, this.player.y - e.y);
+      } else {
+        e.dir = DIR_KEYS[Math.floor(Math.random() * DIR_KEYS.length)];
+      }
+    }
+
+    const d = DIR[e.dir] || DIR.down;
+    const beforeX = e.x;
+    const beforeY = e.y;
+    this.MoveTank(e, d.x * e.speed * dt, d.y * e.speed * dt);
+    e.x = Clamp(e.x, 4, CANVAS_W - e.w - 4);
+    e.y = Clamp(e.y, 4, CANVAS_H * 0.72);
+    if (Math.abs(e.x - beforeX) > 0.01 || Math.abs(e.y - beforeY) > 0.01) {
+      e.moving = true;
+      e.animTick += dt * 15;
+    } else {
+      e.moving = false;
+      if (this.RecoverBossMovement(e)) e.moving = true;
+      else e.aiTimer = Math.min(e.aiTimer, 0.08);
+    }
+
+    e.castFace = this.player?.alive
+      ? DirFromVector(this.player.x - e.x, this.player.y - e.y)
+      : (e.dir || "down");
+    this.TryBossNormalShot(e);
+    if (e.fireCd <= 0 && !e.attackQueue?.length && !(e.skillWindup > 0)) {
+      const face = e.castFace || "down";
+      const side = face === "up" || face === "down" ? "right" : "down";
+      this.SpawnBossShellFromDir(e, face, 0);
+      this.SpawnBossShellFromDir(e, side, 0.16);
+      e.fireCd = 2.15 * this.GetBossFireCdScale(e);
+      this.audio.Shoot();
+    }
+  }
+
   /** Boss patrols the upper band and cycles gravity-shell attack patterns. */
   UpdateBoss(e, dt) {
     if (e.barrelFlash) {
@@ -3813,6 +3989,7 @@ class Game {
   }
 
   RestorePlayerBarrel() {
+    if (this.isNoFireStage) return;
     this.playerDisarmed = false;
     if (this.player) {
       this.player.disarmed = false;
@@ -3961,7 +4138,8 @@ class Game {
     if (dx !== 0) {
       const before = tank.x;
       tank.x += dx;
-      if (this.TankBlocked(tank)) {
+      const pushed = tank.anchorTank ? this.PushCarryablesForTank(tank, dx, 0) : true;
+      if (!pushed || this.TankBlocked(tank)) {
         tank.x = before;
         this.TrySlideAssist(tank, dx, 0);
       }
@@ -3970,12 +4148,45 @@ class Game {
     if (dy !== 0) {
       const before = tank.y;
       tank.y += dy;
-      if (this.TankBlocked(tank)) {
+      const pushed = tank.anchorTank ? this.PushCarryablesForTank(tank, 0, dy) : true;
+      if (!pushed || this.TankBlocked(tank)) {
         tank.y = before;
         this.TrySlideAssist(tank, 0, dy);
       }
       tank.y = Clamp(tank.y, 0, CANVAS_H - tank.h);
     }
+  }
+
+  PushCarryablesForTank(tank, dx, dy) {
+    const overlaps = this.carryables.filter((block) =>
+      block.alive && !block.carried && RectsOverlap(tank, block)
+    );
+    if (!overlaps.length) return true;
+    const originals = overlaps.map((block) => ({ block, x: block.x, y: block.y }));
+    for (const block of overlaps) {
+      block.x += dx;
+      block.y += dy;
+      if (RectsOverlap(tank, block)) {
+        if (dx > 0) block.x = tank.x + tank.w + 0.01;
+        else if (dx < 0) block.x = tank.x - block.w - 0.01;
+        if (dy > 0) block.y = tank.y + tank.h + 0.01;
+        else if (dy < 0) block.y = tank.y - block.h - 0.01;
+      }
+    }
+    const blocked = overlaps.some((block) => {
+      if (this.CollidesTerrain(block)) return true;
+      return this.carryables.some((other) =>
+        other !== block && other.alive && !other.carried && RectsOverlap(block, other)
+      );
+    });
+    if (blocked) {
+      for (const original of originals) {
+        original.block.x = original.x;
+        original.block.y = original.y;
+      }
+      return false;
+    }
+    return true;
   }
 
   TankBlocked(tank) {
@@ -4255,6 +4466,7 @@ class Game {
   }
 
   TryFire(tank, isPlayer) {
+    if (isPlayer && this.isNoFireStage) return;
     if (isPlayer && this.playerStunTimer > 0) return;
     if (isPlayer && (this.playerDisarmed || tank.disarmed)) return;
     if (tank.fireCd > 0) return;
@@ -4323,6 +4535,7 @@ class Game {
     if (isPlayer && this.sniperTimer > 0) gravityMul *= 0.45;
     if (isPlayer && this.HasPerk("lightGravity")) gravityMul *= 0.55;
     if (!isPlayer && this.HasPerk("enemyAnchor")) gravityMul *= 1.5;
+    if (!isPlayer && tank.anchorTank) gravityMul = 0;
     let bounceLeft = isPlayer && this.bounceTimer > 0 ? 5 : 0;
     if (isPlayer && this.HasPerk("bounceShell")) bounceLeft = Math.max(bounceLeft, 2);
     const homing = (isPlayer && this.magnetTimer > 0) || (isPlayer && this.HasPerk("huntMark"));
@@ -4357,9 +4570,11 @@ class Game {
     for (const b of this.bullets) {
       if (!b.alive) continue;
 
-      // GRAVITY — the signature mechanic (per-bullet multiplier for antigrav / meteors)
+      // GRAVITY — the signature mechanic (stage 15 can rotate the vector)
       const gMul = b.gravityMul ?? 1;
-      b.vy += GRAVITY * gMul * dt;
+      const gravity = this.gravityVector || { x: 0, y: 1 };
+      b.vx += GRAVITY * gravity.x * gMul * dt;
+      b.vy += GRAVITY * gravity.y * gMul * dt;
 
       if (b.homing && b.isPlayer) {
         let best = null;
@@ -4775,8 +4990,8 @@ class Game {
       p.y = deathY;
       p.dir = deathDir;
       p.protect = STAGE_REVIVE_PROTECT;
-      p.disarmed = false;
-      this.playerDisarmed = false;
+      p.disarmed = !!this.isNoFireStage;
+      this.playerDisarmed = !!this.isNoFireStage;
       this.UnstickTank(p, { maxDist: 64 });
       this.StartRespawnFx(p.x + p.w / 2, p.y + p.h / 2);
       this.ShowBuffToast(`原地复活！火力保留 ${p.power} · 护盾 ${STAGE_REVIVE_PROTECT}s`);
@@ -6005,6 +6220,9 @@ class Game {
         ?? (type.boss ? (this.stageData?.barrelCount ?? (type.tankKing ? 4 : 1)) : 1),
       barrelFlash: Object.fromEntries(DIR_OCTO.map((d) => [d, 0])),
       blinkTarget: null,
+      anchorTank: !!type.anchorTank,
+      gravityWarden: !!type.gravityWarden,
+      gravityTimer: type.gravityWarden ? 2.4 : 0,
     };
   }
 
@@ -6346,17 +6564,18 @@ class Game {
     if (!this.baseAlive) return;
     const alive = this.enemies.filter((e) => e.alive).length;
     if (alive === 0 && this.spawnQueue.length === 0) {
+      const experienceReport = this.AwardStageExperience();
       if (this.isTutorial) {
-        this.EndGame(true, "河对岸肃清！选一张入门升级，带进第一关。", "next");
+        this.EndGame(true, `河对岸肃清！选一张入门升级，带进第一关。${experienceReport ? `\n${experienceReport}` : ""}`, "next");
       } else if (this.isBarricadeTeach) {
-        this.EndGame(true, "路障学会了！接下来用它封死敌窝出口。", "next");
+        this.EndGame(true, `路障学会了！接下来用它封死敌窝出口。${experienceReport ? `\n${experienceReport}` : ""}`, "next");
       } else if (this.isBossStage) {
         const title = this.stageData.title || "Boss";
-        this.EndGame(true, `${title}击破！得分 ${this.score}`, "next");
+        this.EndGame(true, `${title}击破！得分 ${this.score}${experienceReport ? `\n${experienceReport}` : ""}`, "next");
       } else if (this.stage < STAGE_COUNT) {
-        this.EndGame(true, `第 ${this.stage} 关肃清！得分 ${this.score}`, "next");
+        this.EndGame(true, `第 ${this.stage} 关肃清！得分 ${this.score}${experienceReport ? `\n${experienceReport}` : ""}`, "next");
       } else {
-        this.EndGame(true, `${STAGE_COUNT} 关全通！最终得分 ${this.score}`, "restart");
+        this.EndGame(true, `${STAGE_COUNT} 关全通！最终得分 ${this.score}${experienceReport ? `\n${experienceReport}` : ""}`, "restart");
       }
     }
   }
@@ -6643,17 +6862,39 @@ class Game {
         ctx.globalAlpha = fade * 0.95;
         ctx.font = `12px ${PIXEL_FONT}`;
         ctx.fillText("K /「扛」：举起护盾 · 再按放下封路", CANVAS_W / 2, CANVAS_H / 2 + 58);
+      } else if (this.isNoFireStage) {
+        ctx.font = `28px ${PIXEL_FONT}`;
+        ctx.fillText("SPECIAL", CANVAS_W / 2, CANVAS_H / 2 - 36);
+        const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
+        ctx.globalAlpha = fade * blink;
+        ctx.font = `34px ${PIXEL_FONT}`;
+        ctx.fillText("一枪不开", CANVAS_W / 2, CANVAS_H / 2 + 18);
+        ctx.globalAlpha = fade * 0.95;
+        ctx.font = `12px ${PIXEL_FONT}`;
+        ctx.fillText("你的炮管锁死 · 让敌军互相误伤", CANVAS_W / 2, CANVAS_H / 2 + 58);
+      } else if (this.specialKind === "ballisticPuzzle") {
+        ctx.font = `28px ${PIXEL_FONT}`;
+        ctx.fillText("SPECIAL", CANVAS_W / 2, CANVAS_H / 2 - 36);
+        const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
+        ctx.globalAlpha = fade * blink;
+        ctx.font = `32px ${PIXEL_FONT}`;
+        ctx.fillText(this.stageData.title || "弹道谜题", CANVAS_W / 2, CANVAS_H / 2 + 18);
+        ctx.globalAlpha = fade * 0.95;
+        ctx.font = `12px ${PIXEL_FONT}`;
+        ctx.fillText("先读墙，再读重力，最后开火", CANVAS_W / 2, CANVAS_H / 2 + 58);
       } else if (this.isBossStage) {
         const kind = this.stageData.bossKind;
         const bossTitle =
           kind === "tankKing" ? "坦克王" :
           kind === "tankMan" ? "腿甲坦克人" :
           kind === "prismTank" ? "光棱坦克" :
+          kind === "gravityWarden" ? "重力看守者" :
           "重力巨炮";
         const bossHint =
           kind === "tankKing" ? "单炮追猎 · 开阔战场" :
           kind === "tankMan" ? "拆炮 · 定时炸弹 · 无重力狙击" :
           kind === "prismTank" ? "光棱降临 · 闪现贴身 · 注意落点提示" :
+          kind === "gravityWarden" ? "小体型高速 · 随机改变重力方向" :
           "八管弹幕 · 炮弹带重力";
         ctx.font = `28px ${PIXEL_FONT}`;
         ctx.fillText("BOSS", CANVAS_W / 2, CANVAS_H / 2 - 36);
@@ -7005,6 +7246,8 @@ class Game {
         this.DrawTankBarrel(ctx, tank, isPlayer);
       }
     }
+    if (!isPlayer && tank.gravityWarden) this.DrawGravityWardenMark(ctx, tank);
+    if (!isPlayer && tank.anchorTank) this.DrawAnchorTankMark(ctx, tank);
     if (isPlayer && this.giantTimer > 0) {
       const pulse = 0.45 + 0.35 * Math.abs(Math.sin(this.frame * 0.22));
       ctx.strokeStyle = `rgba(255,220,80,${pulse})`;
@@ -7090,6 +7333,43 @@ class Game {
     if (tank.isBoss && tank.alive && tank.spawnFlash <= 0) {
       this.DrawBossHud(ctx, tank);
     }
+  }
+
+  DrawGravityWardenMark(ctx, tank) {
+    const pulse = 0.45 + 0.35 * Math.abs(Math.sin(this.frame * 0.22));
+    ctx.save();
+    ctx.strokeStyle = `rgba(112,224,255,${pulse})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tank.x - 2, tank.y - 2, tank.w + 4, tank.h + 4);
+    ctx.fillStyle = "#80e8ff";
+    const cx = Math.round(tank.x + tank.w / 2);
+    const cy = Math.round(tank.y + tank.h / 2);
+    const drawArrow = (x, y, dx, dy) => {
+      ctx.fillRect(x - (dx ? 5 : 1), y - (dy ? 5 : 1), dx ? 11 : 3, dy ? 11 : 3);
+      ctx.fillRect(x - (dx ? (dx > 0 ? 1 : 10) : 4), y - (dy ? (dy > 0 ? 1 : 10) : 1), dx ? 3 : 9, dy ? 3 : 3);
+    };
+    const gravity = DIR[this.gravityDir] || DIR.down;
+    drawArrow(cx + gravity.x * 10, cy + gravity.y * 10, gravity.x, gravity.y);
+    ctx.fillStyle = "#ffe060";
+    ctx.fillRect(cx - 2, cy - 2, 4, 4);
+    ctx.restore();
+  }
+
+  DrawAnchorTankMark(ctx, tank) {
+    ctx.save();
+    ctx.strokeStyle = "#b8d8e8";
+    ctx.fillStyle = "#80c8e8";
+    ctx.lineWidth = 2;
+    const cx = Math.round(tank.x + tank.w / 2);
+    const cy = Math.round(tank.y + tank.h / 2);
+    ctx.beginPath();
+    ctx.moveTo(cx, tank.y + tank.h - 8);
+    ctx.lineTo(cx, tank.y + tank.h + 3);
+    ctx.arc(cx, tank.y + tank.h + 3, 6, 0, Math.PI);
+    ctx.stroke();
+    ctx.fillRect(cx - 7, tank.y + tank.h - 8, 14, 3);
+    ctx.strokeRect(tank.x - 1, tank.y - 1, tank.w + 2, tank.h + 2);
+    ctx.restore();
   }
 
   /** Bipedal stage-9 boss: torso + swinging legs + shoulder sniper. */
@@ -7288,8 +7568,10 @@ class Game {
       ? (finalPhase ? "光棱坦克 · 狂暴" : "BOSS 光棱坦克")
       : (boss.tankMan || boss.typeId === "tankMan")
         ? (finalPhase ? "腿甲坦克人 · 狂暴" : "BOSS 腿甲坦克人")
-        : (boss.typeId === "tankKing" || boss.tankKing)
+      : (boss.typeId === "tankKing" || boss.tankKing)
           ? (finalPhase ? "坦克王 · 狂暴" : "BOSS 坦克王")
+          : (boss.gravityWarden || boss.typeId === "gravityWarden")
+            ? (finalPhase ? "重力看守者 · 狂暴" : "BOSS 重力看守者")
           : (finalPhase ? "BOSS 终焉阶段" : "BOSS 重力巨炮");
     ctx.fillText(bossName, CANVAS_W / 2, y - 1);
     ctx.fillStyle = "#302010";
@@ -7837,7 +8119,15 @@ class Game {
     if (this.eagleAlly) chips.push({ t: `鹰援 ${Math.ceil(this.eagleAlly.ttl)}`, c: "#ffe060" });
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
     if ((this.absorbHits || 0) > 0) chips.push({ t: `装甲×${this.absorbHits}`, c: "#c8e0ff" });
-    if (this.playerDisarmed) chips.push({ t: "无炮管·去捡", c: "#ff6060" });
+    if (this.playerDisarmed) {
+      chips.push({ t: this.isNoFireStage ? "一枪不开·不能开火" : "无炮管·去捡", c: "#ff6060" });
+    }
+    if (this.experienceNext > 0) {
+      chips.push({ t: `经验 LV${this.experienceLevel} ${this.experience}/${this.experienceNext}`, c: "#ffe08a" });
+    }
+    if (this.isBossStage && this.stageData?.bossKind === "gravityWarden") {
+      chips.push({ t: `重力：${this.gravityDir}`, c: "#80e8ff" });
+    }
     if (this.eagleStroll && this.baseAlive) {
       chips.push({ t: `老鹰跑 ${Math.ceil(this.eagleStroll.ttl)}`, c: "#ff6060" });
     }
@@ -8012,6 +8302,11 @@ class Game {
       } else if (m.type === "plus") {
         ctx.fillRect(x - 1, y - 6, 3, 13);
         ctx.fillRect(x - 6, y - 1, 13, 3);
+      } else if (m.type === "gravity") {
+        const d = DIR[this.gravityDir] || DIR.down;
+        ctx.fillRect(x - d.x * 18 - 1, y - d.y * 18 - 1, 3, 3);
+        ctx.fillRect(x + d.x * 18 - 1, y + d.y * 18 - 1, 3, 3);
+        ctx.strokeRect(x - 22, y - 22, 44, 44);
       } else if (m.type === "plate") {
         ctx.fillStyle = "#000";
         ctx.fillRect(x - 14, y - 10, 28, 20);

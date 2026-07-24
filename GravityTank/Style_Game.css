@@ -123,7 +123,22 @@ body.touch-play-lock {
   box-shadow:
     inset 0 0 0 2px #303030,
     0 0 0 2px #000;
+  transform: perspective(480px) rotateX(4deg) skewX(-2deg) translateY(3px);
+  transform-origin: 50% 8%;
+  filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.75));
   cursor: pointer;
+}
+
+/* Gravity is pulling the title down too; keep the bend in hard pixel steps. */
+@media (prefers-reduced-motion: no-preference) {
+  .title-banner {
+    animation: gravity-title-drop 3.6s steps(6, end) infinite;
+  }
+}
+
+@keyframes gravity-title-drop {
+  0%, 100% { transform: perspective(480px) rotateX(4deg) skewX(-2deg) translateY(2px); }
+  50% { transform: perspective(480px) rotateX(6deg) skewX(-3deg) translateY(6px); }
 }
 
 .hero-logo {
@@ -1057,6 +1072,15 @@ p.mobile-hint { display: none; }
   transform: translateY(3px);
   box-shadow: 0 2px 0 #401008;
   filter: brightness(1.1);
+}
+
+.touch-fire.is-disabled,
+.touch-fire:disabled {
+  border-color: #808080;
+  background: #302020;
+  color: #ff8080;
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 .touch-carry {

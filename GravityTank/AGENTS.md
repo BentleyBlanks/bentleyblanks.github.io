@@ -77,7 +77,11 @@ Player sheet is classic yellow; draw remaps by remaining HP:
 
 Symbols: `BlitPlayerHpTinted`, `DrawTank` (player branch), overhead HP pips. Power tier still picks sheet row via `TankSheetOrigin` (`gy = (power-1)*2`). Enemy armor tanks use `BlitArmorTinted` + `ARMOR_HP_PALETTE` separately.
 
-Difficulty copy: fixed standard mode; `SyncStageLabels` / `#difficultyHint` say「3 条座驾」+「每台 3 点生命」. Ordinary stages 1–3 use `POWER_DROP_RATE * 0.8`.
+Difficulty copy: fixed standard mode; campaign now starts directly at stage 1 (the old tutorial is legacy/debug-only). `SyncStageLabels` / `#difficultyHint` say「3 条座驾」+「每台 3 点生命」. Ordinary stages 1–3 use `POWER_DROP_RATE * 0.8`.
+
+Campaign progression: 15 stages. Stages 4, 7, 10, and 13 are `ballisticPuzzle` specials; stage 14 is `noFire` (player fire is hard-blocked and enemy friendly fire is enabled). Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
+
+Experience: `AwardStageExperience` grants a stage-scaled reward, with boss/special bonuses. Each level grants one `absorbHits` armor charge, carried across the campaign and shown in the HUD/clear report.
 
 ---
 
@@ -117,8 +121,8 @@ Grep these first:
 | Fort / HQ | `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll` |
 | Eagle ally | `steelShield`, `BulletHitEagleAlly`, `DrawEagleAlly` — enemy shells deflect; never destroy HQ |
 | Barricades | `carryBlocks`, `carriedBlock`, `WantsInteract`, barricade teach stage id |
-| Bosses | `UpdateBoss`, `UpdateTankKing`, `RecoverBossMovement`, `UpdateTankMan`, `UpdatePrismTank`, `ArmBossSkill` — stage 3 `tankKing` HP 52; stage 12 `prismTank` / `prismBlink` |
-| Stages | `STAGE_COUNT` (12), `BuildStageMap`, `Data_Stages.mjs` — stages **10–11** ordinary ~3× density |
+| Bosses | `UpdateBoss`, `UpdateTankKing`, `RecoverBossMovement`, `UpdateTankMan`, `UpdatePrismTank`, `UpdateGravityWarden`, `ArmBossSkill` — stage 3 `tankKing` HP 52; stage 12 `prismTank`; stage 15 `gravityWarden` |
+| Stages | `STAGE_COUNT` (15), `BuildStageMap`, `Data_Stages.mjs` — stages **4/7/10/13** ballistic puzzles, **14** no-fire, **10–11** ordinary ~3× density |
 
 ---
 
