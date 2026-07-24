@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="preload" href="./assets/Font_FusionPixel12ZhHans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/Font_FusionPixel12Latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./Style_Game.css?v=mobileBaseBoss1">
+  <link rel="stylesheet" href="./Style_Game.css?v=portStack1">
 </head>
 <body>
   <div id="app">
@@ -110,6 +110,7 @@
     <div id="touchActionsWrap" class="touch-actions-wrap" hidden>
       <div class="touch-actions">
         <button id="touchFire" class="touch-fire" type="button" aria-label="开火">FIRE</button>
+        <button id="touchCarry" class="touch-carry" type="button" aria-label="扛起路障" hidden>扛</button>
         <button id="touchPause" class="touch-pause" type="button" aria-label="暂停">PAUSE</button>
       </div>
     </div>
@@ -147,7 +148,7 @@
 
       <div class="panel">
         <h3>RULE</h3>
-        <p class="feature">开局可选简易/标准。点击标题可开 Debug。场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮。<strong style="color:#70ff98">绿=好</strong> · <strong style="color:#ffe060">金=超</strong> · <strong style="color:#ff6060">红=负</strong>。新手关：河北岸用重力清南岸敌军，通关选入门卡。第 3 关坦克王（单炮）；第 6 关重力巨炮（八管）。过关三选一：普通升级本关有效；Boss 关永久带到通关结束。</p>
+        <p class="feature">开局可选简易/标准。点击标题可开 Debug。场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮。<strong style="color:#70ff98">绿=好</strong> · <strong style="color:#ffe060">金=超</strong>（第 6 关后可出「巨大」：体型翻倍、撞碎砖、扛多次伤害） · <strong style="color:#ff6060">红=负</strong>（含「遛鹰」：老鹰自己开门出去乱逛）。新手关：河北岸用重力清南岸敌军，通关选入门卡。第 3 关坦克王；第 6 关重力巨炮。第 6 关后路障教学：靠近木/铁板按 K（触屏「扛」）举起当护盾，同键放下封路。第 7–8 关开场有准备时间，可提前封死敌窝。第 9 关腿甲坦克人。过关三选一：普通升级本关有效；Boss 关永久带到通关结束。</p>
       </div>
 
       <div class="panel panel-controls-help">
@@ -155,8 +156,9 @@
         <ul class="controls">
           <li class="desktop-hint"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>WASD</kbd></li>
           <li class="desktop-hint"><kbd>SPACE</kbd> / <kbd>J</kbd> FIRE</li>
+          <li class="desktop-hint"><kbd>K</kbd> 扛起/放下路障（护盾）</li>
           <li class="desktop-hint"><kbd>P</kbd> / <kbd>Esc</kbd> PAUSE</li>
-          <li class="mobile-hint">左摇杆 · 右开火 · 双指可同时</li>
+          <li class="mobile-hint">左摇杆 · 右开火 · 「扛」路障</li>
           <li class="mobile-hint">竖屏 / 横屏均可</li>
         </ul>
       </div>
@@ -164,6 +166,6 @@
       <p class="credit">SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=stages9tankMan1"></script>
+  <script type="module" src="./Script_Game.mjs?v=portStack1"></script>
 </body>
 </html>
