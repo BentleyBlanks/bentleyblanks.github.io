@@ -823,6 +823,7 @@ class Game {
     this.isTouchDevice = false;
     this.respawnTimer = 0;
     this.stageReviveUsed = false;
+    this.pendingRespawnStats = null;
 
     this.state = "boot";
     this.difficulty = DIFFICULTY.normal;
@@ -3493,6 +3494,7 @@ class Game {
       homing: false,
       meteor: false,
       bossShell: true,
+      heavy: true,
       sniper: !!sniper,
     });
   }
