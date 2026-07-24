@@ -1698,32 +1698,32 @@ class Game {
         : (this.isBarricadeTeach ? "路障教学" : "GRAVITY TANK");
     }
     if (this.overlays.startBlurb) {
-      const diffTag = this.IsEasy() ? "简易：双倍生命 · 负面更少 · ?掉率+50%。" : "标准难度。";
+      const diffLine = this.IsEasy()
+        ? "简易：双倍生命 · 负面更少 · ?掉率+50%"
+        : "标准难度";
+      const lines = [diffLine, ""];
       if (this.isTutorial) {
-        this.overlays.startBlurb.textContent =
-          `${diffTag} 炮弹带重力会下坠——朝下/斜着打对岸；别把自己轰死。`;
+        lines.push("炮弹带重力会下坠。", "朝下 / 斜着打对岸。", "别把自己轰死。");
       } else if (this.isBarricadeTeach) {
-        this.overlays.startBlurb.textContent =
-          `${diffTag} 路障教学：靠近木/钢路障，按 K（触屏「扛」）扛起——挡在身前可当护盾；再按同一键放下封路。开场有准备时间，先封住上方出口！`;
+        lines.push(
+          "靠近路障按 K（触屏「扛」）举起。",
+          "挡在身前可当护盾；同键放下封路。",
+          "开场有准备时间，先封出口。",
+        );
       } else if (this.state === "ready" || this.state === "boot") {
-        this.overlays.startBlurb.textContent =
-          `${diffTag} 炮弹带重力，打出去会往下掉。自己也要当心，别被自己的弹幕炸到。`;
+        lines.push("炮弹带重力，打出去会往下掉。", "自己也要当心，别被自己的弹幕炸到。");
       } else if (this.isBossStage) {
-        if (this.stageData.bossKind === "tankMan") {
-          this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS · 腿甲坦克人。会拆炮管、扔定时炸弹、无重力狙击；捡回炮管才能开火。`;
-        } else {
-          this.overlays.startBlurb.textContent =
-            `${diffTag} BOSS 关。炮弹带重力——自己也要当心落弹。`;
-        }
+        lines.push("BOSS 关。", "炮弹带重力——自己也要当心落弹。");
       } else if (this.stageData.prepSeconds) {
-        const e = this.stageData.enemies;
-        this.overlays.startBlurb.textContent =
-          `${diffTag} 第 ${this.stage}/${STAGE_COUNT} 关 · ${this.stageData.title || ""} · 敌军 ${this.totalEnemies}。开场准备 ${this.stageData.prepSeconds}s：用路障封死敌窝出口，让它们出不来！`;
+        lines.push(
+          `开场准备 ${Math.ceil(this.stageData.prepSeconds)} 秒。`,
+          "用路障封死敌窝出口。",
+          "炮弹带重力，别炸到自己。",
+        );
       } else {
-        this.overlays.startBlurb.textContent =
-          `${diffTag} 第 ${this.stage}/${STAGE_COUNT} 关。炮弹带重力会下坠，自己也要当心。`;
+        lines.push("炮弹带重力会下坠。", "自己也要当心落弹。");
       }
+      this.overlays.startBlurb.textContent = lines.join("\n");
     }
     this.SyncDebugStatus?.();
   }
