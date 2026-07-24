@@ -30,6 +30,11 @@ const MAX_ENEMIES_LATE = 5;
 const ENEMY_FRIENDLY_FIRE_OFF_STAGE = 6;
 const MAX_ABSORB_HITS = 8;
 const PLAYER_LIVES = 3;
+const PLAYER_MAX_HP = 3;
+/** Brief i-frames after a non-lethal hit so one volley cannot shred all HP. */
+const HIT_IFRAME = 1.0;
+/** First death each stage: revive in place with this protect window. */
+const STAGE_REVIVE_PROTECT = 2.0;
 const CARRY_WOOD_HP = 2;
 const CARRY_METAL_HP = 5;
 const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
@@ -817,6 +822,8 @@ class Game {
     this.stickVec = { x: 0, y: 0 };
     this.isTouchDevice = false;
     this.respawnTimer = 0;
+    this.stageReviveUsed = false;
+    this.pendingRespawnStats = null;
 
     this.state = "boot";
     this.difficulty = DIFFICULTY.normal;
@@ -1963,6 +1970,7 @@ class Game {
     }
     this.enemiesRemaining = this.totalEnemies;
     this.spawnTimer = 0.2;
+    this.stageReviveUsed = false;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
     this.antigravTimer = 0;
@@ -2242,7 +2250,7 @@ class Game {
   TryAbsorbWithGiant() {
     if (this.giantTimer <= 0 || this.giantHits <= 0 || !this.player?.alive) return false;
     this.giantHits -= 1;
-    this.player.protect = Math.max(this.player.protect, 0.55);
+    this.player.protect = Math.max(this.player.protect, HIT_IFRAME);
     this.SpawnExplosion(this.player.x + this.player.w * 0.5, this.player.y + this.player.h * 0.5, 0.5);
     this.ShowBuffToast(
       this.giantHits > 0 ? `巨大化扛住！剩余 ${this.giantHits}` : "巨大化护甲耗尽"
@@ -2303,6 +2311,7 @@ class Game {
     this.playerDisarmed = false;
     // Top HQ / tutorial: face the battlefield. Classic bottom HQ: face up toward enemies.
     const faceDown = this.isTutorial || sy < MAP_H / 2 || this.IsBaseAtTop();
+    const hp = keepStats?.hp != null ? Clamp(keepStats.hp | 0, 1, PLAYER_MAX_HP) : PLAYER_MAX_HP;
     this.player = {
       x: sx * TILE + 2,
       y: sy * TILE + 2,
@@ -2312,6 +2321,8 @@ class Game {
       speed: this.GetPlayerBaseSpeed(),
       power,
       maxBullets,
+      hp,
+      maxHp: PLAYER_MAX_HP,
       absorbHits: this.absorbHits || 0,
       disarmed: false,
       alive: true,
@@ -2443,8 +2454,15 @@ class Game {
       if (this.respawnTimer <= 0) {
         this.respawnTimer = 0;
         if (this.state === "playing" && this.lives > 0 && (!this.player || !this.player.alive)) {
-          // Classic: death resets star power.
-          this.SpawnPlayer(true);
+          // Keep firepower across deaths — at most already dropped 1 tier in KillPlayer.
+          const keep = this.pendingRespawnStats || {
+            power: 1,
+            maxBullets: 1,
+            absorbHits: this.absorbHits,
+            hp: PLAYER_MAX_HP,
+          };
+          this.pendingRespawnStats = null;
+          this.SpawnPlayer(true, keep);
           this.UnstickTank(this.player);
         }
       }
@@ -3476,6 +3494,7 @@ class Game {
       homing: false,
       meteor: false,
       bossShell: true,
+      heavy: true,
       sniper: !!sniper,
     });
   }
@@ -3596,16 +3615,7 @@ class Game {
       this.audio.Bounce();
       return;
     }
-    if (this.TryAbsorbWithGiant()) return;
-    if ((this.absorbHits || 0) > 0) {
-      this.absorbHits -= 1;
-      p.absorbHits = this.absorbHits;
-      p.protect = Math.max(p.protect, 1.0);
-      this.ShowBuffToast(this.absorbHits > 0 ? `装甲抵挡炸弹！剩余 ${this.absorbHits}` : "装甲耗尽！");
-      this.audio.Bounce();
-      return;
-    }
-    this.KillPlayer();
+    this.DamagePlayer({ heavy: true, source: "bomb" });
   }
 
   SpawnSniperShellFromDir(e, dirName, angleOffset = 0) {
@@ -4168,30 +4178,11 @@ class Game {
           if (isOwnShell && this.HasPerk("noSelfHit")) {
             this.SpawnExplosion(b.x, b.y, 0.35);
             this.audio.Bounce();
-          } else if (this.player.protect > 0) {
-            this.SpawnExplosion(b.x, b.y, 0.5);
-            this.audio.Bounce();
-          } else if (this.TryAbsorbWithGiant()) {
-            // giant form absorbed
-          } else if ((this.absorbHits || 0) > 0 || (this.player.absorbHits || 0) > 0) {
-            this.absorbHits = Math.max(0, (this.absorbHits || 0) - 1);
-            this.player.absorbHits = this.absorbHits;
-            this.player.protect = Math.max(this.player.protect, 1.0);
-            this.SpawnExplosion(b.x, b.y, 0.55);
-            this.ShowBuffToast(this.absorbHits > 0 ? `装甲抵挡！剩余 ${this.absorbHits}` : "装甲耗尽！");
-            this.audio.Bounce();
-          } else if (
-            this.HasPerk("timeRift") &&
-            this.timeRiftCd <= 0
-          ) {
-            this.timeRiftCd = 12;
-            this.freezeTimer = Math.max(this.freezeTimer, 2.5);
-            this.player.protect = Math.max(this.player.protect, 1.4);
-            this.SpawnExplosion(b.x, b.y, 0.6);
-            this.ShowBuffToast("时间裂缝！敌军冻结");
-            this.audio.Power();
           } else {
-            this.KillPlayer();
+            this.DamagePlayer({
+              heavy: this.IsHeavyIncoming(b),
+              source: isOwnShell ? "self" : "bullet",
+            });
           }
         }
       }
@@ -4347,6 +4338,93 @@ class Game {
     }
   }
 
+  /** Heavy = boss/sniper/meteor/power-cannon shells (and bombs). Normal shells deal 1 HP. */
+  IsHeavyIncoming(b) {
+    if (!b) return false;
+    if (b.heavy || b.bossShell || b.sniper || b.meteor) return true;
+    if ((b.power | 0) >= 3) return true;
+    const owner = b.owner;
+    if (owner && (owner.isBoss || owner.tankKing || owner.tankMan || owner.typeId === "boss"
+      || owner.typeId === "tankKing" || owner.typeId === "tankMan" || owner.typeId === "power")) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Apply damage to the player tank.
+   * Normal hits: −1 HP + HIT_IFRAME. Heavy hits: lethal (drain remaining HP).
+   * Armor / giant / time-rift still intercept before HP loss.
+   */
+  DamagePlayer({ heavy = false, source = "bullet" } = {}) {
+    const p = this.player;
+    if (!p?.alive) return false;
+    if (this.debugGodMode) {
+      p.protect = Math.max(p.protect, 2);
+      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.45);
+      this.audio.Bounce();
+      return false;
+    }
+    if (p.protect > 0) {
+      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.45);
+      this.audio.Bounce();
+      return false;
+    }
+    if (this.TryAbsorbWithGiant()) return false;
+    if ((this.absorbHits || 0) > 0 || (p.absorbHits || 0) > 0) {
+      this.absorbHits = Math.max(0, (this.absorbHits || 0) - 1);
+      p.absorbHits = this.absorbHits;
+      p.protect = Math.max(p.protect, HIT_IFRAME);
+      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.55);
+      this.ShowBuffToast(
+        this.absorbHits > 0
+          ? `装甲抵挡${source === "bomb" ? "炸弹" : ""}！剩余 ${this.absorbHits}`
+          : "装甲耗尽！"
+      );
+      this.audio.Bounce();
+      return false;
+    }
+    if (this.HasPerk("timeRift") && this.timeRiftCd <= 0) {
+      this.timeRiftCd = 12;
+      this.freezeTimer = Math.max(this.freezeTimer, 2.5);
+      p.protect = Math.max(p.protect, Math.max(HIT_IFRAME, 1.4));
+      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.6);
+      this.ShowBuffToast("时间裂缝！敌军冻结");
+      this.audio.Power();
+      return false;
+    }
+
+    if (p.hp == null) p.hp = PLAYER_MAX_HP;
+    if (p.maxHp == null) p.maxHp = PLAYER_MAX_HP;
+
+    if (heavy) {
+      p.hp = 0;
+    } else {
+      p.hp = Math.max(0, (p.hp | 0) - 1);
+    }
+
+    if (p.hp > 0) {
+      p.protect = Math.max(p.protect, HIT_IFRAME);
+      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.65);
+      this.audio.Bounce();
+      this.ShowBuffToast(`受伤！生命 ${p.hp}/${p.maxHp}`);
+      this.UpdateHud();
+      return false;
+    }
+
+    this.KillPlayer();
+    return true;
+  }
+
+  /** Soft firepower penalty on death: keep upgrades, drop at most 1 star tier. */
+  SoftenFirepowerOnDeath(p) {
+    const power = Math.max(1, (p?.power | 0) - 1);
+    let maxBullets = p?.maxBullets || 1;
+    if (power <= 1) maxBullets = Math.min(maxBullets, 1);
+    else if (power === 2) maxBullets = Math.min(Math.max(maxBullets, 2), 3);
+    return { power, maxBullets, absorbHits: this.absorbHits || 0, hp: PLAYER_MAX_HP };
+  }
+
   KillPlayer() {
     const p = this.player;
     if (!p?.alive) return;
@@ -4356,39 +4434,51 @@ class Game {
       this.audio.Bounce();
       return;
     }
-    if (this.giantHits > 0) {
-      this.giantHits -= 1;
-      p.protect = Math.max(p.protect, 0.9);
-      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.7);
-      this.ShowBuffToast(this.giantHits > 0 ? `巨大化扛伤！剩余 ${this.giantHits}` : "巨大化护甲耗尽！");
-      this.audio.Bounce();
-      return;
-    }
-    if ((this.absorbHits || 0) > 0 || (p.absorbHits || 0) > 0) {
-      this.absorbHits = Math.max(0, (this.absorbHits || 0) - 1);
-      p.absorbHits = this.absorbHits;
-      p.protect = Math.max(p.protect, 1.0);
-      this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.55);
-      this.ShowBuffToast(this.absorbHits > 0 ? `装甲抵挡！剩余 ${this.absorbHits}` : "装甲耗尽！");
-      this.audio.Bounce();
-      return;
-    }
     this.ClearGiantForm(false);
     this.DropCarriedBlock(true);
+    const keep = this.SoftenFirepowerOnDeath(p);
+    const deathX = p.x;
+    const deathY = p.y;
+    const deathDir = p.dir;
     p.alive = false;
     this.audio.StopEngine();
     this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.2);
     this.audio.Explode();
+
+    // First death each stage: revive in place with short protect. Firepower soft-kept.
+    if (!this.stageReviveUsed) {
+      this.stageReviveUsed = true;
+      p.alive = true;
+      p.hp = PLAYER_MAX_HP;
+      p.maxHp = PLAYER_MAX_HP;
+      p.power = keep.power;
+      p.maxBullets = keep.maxBullets;
+      p.absorbHits = keep.absorbHits;
+      p.x = deathX;
+      p.y = deathY;
+      p.dir = deathDir;
+      p.protect = STAGE_REVIVE_PROTECT;
+      p.disarmed = false;
+      this.playerDisarmed = false;
+      this.UnstickTank(p, { maxDist: 64 });
+      this.ShowBuffToast(`原地复活！火力保留 ${p.power} · 护盾 ${STAGE_REVIVE_PROTECT}s`);
+      this.UpdateHud();
+      return;
+    }
+
     this.lives -= 1;
     this.UpdateHud();
     if (this.lives <= 0) {
       this.lives = 0;
       this.respawnTimer = 0;
+      this.pendingRespawnStats = null;
+      // Full wipe of run firepower / perks only when the campaign fails.
       this.EndGame(false, "生命耗尽。战役失败。");
       return;
     }
-    // Use update-loop timer so pause cannot cancel respawn forever.
+    this.pendingRespawnStats = keep;
     this.respawnTimer = 0.9;
+    this.ShowBuffToast(`阵亡 · 火力保留 ${keep.power} · 剩余座驾 ×${this.lives}`);
   }
 
   DestroyBase() {
@@ -5932,6 +6022,14 @@ class Game {
   EndGame(won, message, action = "restart") {
     this.state = won ? "won" : "lost";
     this.endAction = won ? action : "retry";
+    if (!won) {
+      // Full upgrade wipe only when the run fails (not on mid-stage deaths).
+      this.runPerks = [];
+      this.absorbHits = 0;
+      this.pendingRespawnStats = null;
+      this.stagePerk = null;
+      this.pendingStagePerk = null;
+    }
     if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
     this.upgradePick = null;
     this.overlays.end.hidden = false;
@@ -5964,17 +6062,19 @@ class Game {
   }
 
   UpdateHud() {
-    const lives = String(Math.max(0, this.lives));
+    const hp = this.player?.alive ? Math.max(0, this.player.hp ?? PLAYER_MAX_HP) : 0;
+    const stock = Math.max(0, this.lives);
+    const lifeText = `${hp}/${PLAYER_MAX_HP}×${stock}`;
     const power = String(this.player?.power ?? 1);
     const score = String(this.score);
     const remain = String(this.spawnQueue.length + this.enemies.filter((e) => e.alive).length);
     const stage = this.isTutorial ? "T" : (this.isBarricadeTeach ? "教" : String(this.stage));
-    this.hud.lives.textContent = lives;
+    this.hud.lives.textContent = lifeText;
     this.hud.power.textContent = power;
     this.hud.score.textContent = score;
     this.hud.remain.textContent = remain;
     if (this.hud.stage) this.hud.stage.textContent = stage;
-    if (this.hud.mobileLives) this.hud.mobileLives.textContent = lives;
+    if (this.hud.mobileLives) this.hud.mobileLives.textContent = lifeText;
     if (this.hud.mobilePower) this.hud.mobilePower.textContent = power;
     if (this.hud.mobileScore) this.hud.mobileScore.textContent = score;
     if (this.hud.mobileRemain) this.hud.mobileRemain.textContent = remain;
@@ -6546,6 +6646,24 @@ class Game {
       ctx.textAlign = "center";
       ctx.fillText(`甲${this.absorbHits}`, tank.x + tank.w / 2, tank.y - 3);
       ctx.textAlign = "left";
+    }
+
+    if (isPlayer && tank.alive) {
+      const hp = Math.max(0, tank.hp ?? PLAYER_MAX_HP);
+      const maxHp = tank.maxHp || PLAYER_MAX_HP;
+      const pipW = 5;
+      const gap = 2;
+      const totalW = maxHp * pipW + (maxHp - 1) * gap;
+      let px = tank.x + tank.w / 2 - totalW / 2;
+      const py = tank.y - 7;
+      for (let i = 0; i < maxHp; i++) {
+        ctx.fillStyle = i < hp ? "#70ff98" : "#303038";
+        ctx.fillRect(px, py, pipW, 3);
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 0.5, py + 0.5, pipW - 1, 2);
+        px += pipW + gap;
+      }
     }
 
     if (tank.isBoss && tank.alive && tank.spawnFlash <= 0) {
