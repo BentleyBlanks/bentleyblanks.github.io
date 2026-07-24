@@ -12,6 +12,7 @@ export const TUTORIAL_UPGRADES = [
   { id: "multiShot", title: "双弹入门", desc: "本关：同时可存弹 +1", tag: "入门", icon: IconPath("multiShot") },
   { id: "bulletSpeed", title: "初速入门", desc: "本关：炮弹飞得更快", tag: "入门", icon: IconPath("bulletSpeed") },
   { id: "noSelfHit", title: "安全撞针", desc: "本关：己方炮弹不误伤自己", tag: "入门", icon: IconPath("noSelfHit") },
+  { id: "hitPlates", title: "叠甲入门", desc: "本关：开场获得 2 层装甲，可抵挡致命一击", tag: "入门", icon: IconPath("hitPlates") },
 ];
 
 /** Normal clears: 本关有效 — applies only to the next stage you enter. */
@@ -24,6 +25,7 @@ export const STAGE_UPGRADES = [
   { id: "longerShield", title: "护盾电池", desc: "本关：出生护盾更久", tag: "本关", icon: IconPath("longerShield") },
   { id: "bounceShell", title: "弹性弹头", desc: "本关：炮弹可弹跳 2 次", tag: "本关", icon: IconPath("bounceShell") },
   { id: "pierceShell", title: "破甲锥", desc: "本关：炮弹可穿透 1 名敌军", tag: "本关", icon: IconPath("pierceShell") },
+  { id: "hitPlates", title: "反应装甲", desc: "本关：开场 +2 层装甲，抵挡致命伤害", tag: "本关", icon: IconPath("hitPlates") },
 ];
 
 /** Boss clear: permanent until the campaign run ends (通关结束). */
@@ -36,6 +38,7 @@ export const BOSS_UPGRADES = [
   { id: "fortressWill", title: "堡垒意志", desc: "永久：每关开场总部钢墙加固一段时间", tag: "永久", icon: IconPath("fortressWill") },
   { id: "timeRift", title: "时间裂缝", desc: "永久：受击时短暂冻结敌军（有冷却）", tag: "永久", icon: IconPath("timeRift") },
   { id: "huntMark", title: "猎杀标记", desc: "永久：己方炮弹轻微追踪敌军", tag: "永久", icon: IconPath("huntMark") },
+  { id: "ironHide", title: "钢铁外皮", desc: "永久：每关开场 +1 层装甲，可叠层抵挡伤害", tag: "永久", icon: IconPath("ironHide") },
 ];
 
 export function PickUpgradeCards(pool, count = 3) {
