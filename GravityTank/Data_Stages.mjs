@@ -488,7 +488,7 @@ export const STAGES = [
     title: "光棱坦克",
     bossKind: "prismTank",
     barrelCount: 1,
-    enemies: { basic: 12, fast: 12, power: 9, armor: 6, prismTank: 1 },
+    enemies: { basic: 4, fast: 4, power: 3, armor: 2, prismTank: 1 },
     enemySpawns: [[0, 2], [12, 4], [24, 2]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
