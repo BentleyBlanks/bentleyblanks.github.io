@@ -1,5 +1,45 @@
 # Repository Guidelines
 
+## Git Worktree Workflow（强制 · 优先级最高）
+
+**本仓库的主检出 `C:\Users\Bentl\Documents\Program\bentleyblanks.github.io` 由多个 agent 并发共用**（Claude / Cursor / Codex 各自可能正在其中切分支、留未提交改动）。因此：
+
+- **任何 agent 的任何改动，一律在自己的独立 git worktree 里完成**：读代码可以在主检出，但**编辑、提交、推送、切分支一律不许在主检出进行**。
+- **绝不碰主检出的分支与工作区**：不 `checkout`、不 `switch`、不 `reset`、不 `stash`、不提交别人的脏文件。主检出停在哪个分支就让它停在哪。
+- 若发现自己已误在主检出提交，用 `git reset --soft HEAD~1` 摘除该提交并还原暂存区，再改用 worktree 重做，不得将错就错。
+
+### 目录与分支命名
+
+- Worktree 目录与主仓同级，放在 `C:\Users\Bentl\Documents\Program\` 下，格式：
+  `bentleyblanks_<AgentName>_<Purpose>_<YYYYMMDD>`
+  - `<AgentName>`：Agent 短名，PascalCase（`Claude`、`Codex`、`Cursor`、`Grok`）。
+  - `<Purpose>`：本次目的的简短英文 PascalCase，仅字母数字，禁止空格与连字符（如 `TaihangDemoNightOps`、`GravityTankRoulette`）。
+  - `<YYYYMMDD>`：创建当日日期。
+  - 路径已存在时不得复用；换新目的或新会话就换新目录名。
+- 分支名与目的对齐：`<agent-lowercase>/<purpose-kebab>-<YYYYMMDD>`，例如 `claude/taihang-demo-night-ops-20260725`。分支仅服务本会话，不与其他会话共用。
+
+### 创建与交付步骤（PowerShell）
+
+```powershell
+git fetch origin master
+$wt = 'C:\Users\Bentl\Documents\Program\bentleyblanks_Claude_TaihangDemoNightOps_20260725'
+if (Test-Path -LiteralPath $wt) { throw "Worktree path already exists: $wt" }
+git worktree add -b claude/taihang-demo-night-ops-20260725 $wt origin/master
+# 之后所有编辑与提交都在 $wt 内进行
+```
+
+交付（站点只从 `master` 部署）：
+
+1. 在 worktree 内提交（提交信息用项目前缀，见 Commit Message Format）。
+2. `git fetch origin master`；若 `origin/master` 已前进，先 rebase 到最新再继续。
+3. `git push origin HEAD:master` 快进推送。**禁止 force push**，禁止覆盖其他会话已推送的提交。
+4. 推送后验证线上生效（`curl -sI https://bentleyblanks.github.io/<Page>/`），再向用户报告完成。
+5. 确认本任务没有未提交内容后，`git worktree remove <path>` 清理本会话 worktree 与任务分支。
+
+### 主检出被占用时的应急路径
+
+主检出停在别的 agent 的分支上、或你的提交需要落到 `master` 而主检出无法快进时：**从 `origin/master` 新建临时 worktree → cherry-pick 你的提交 → 推送 → 删除临时 worktree**。永远不要为了推送而去改动主检出的分支状态。
+
 ## Project-wide Naming Conventions
 
 These rules apply to all project-owned files, scripts, functions, and assets in this repository.
@@ -50,7 +90,7 @@ Rules:
 ### Small requests: merge to master yourself
 
 - For small player-facing / copy / balance / bugfix asks (blurbs, RULE text, cache-bust, minor tweaks): **do not leave work sitting in an open draft PR**.
-- Agent workflow: branch → commit → push → open PR → **merge into `master` yourself** → confirm Pages is live (or at least that the merge landed) before treating the task as done.
+- Agent workflow: **worktree**（见 Git Worktree Workflow，强制）→ branch → commit → push → open PR → **merge into `master` yourself** → confirm Pages is live (or at least that the merge landed) before treating the task as done.
 - Do not wait for the user to merge “小需求”. Unmerged draft stacks that block Pages have already burned trust—avoid repeating that.
 - Larger multi-feature stacks may still use PRs for review, but unique shippable work must still reach `master` (port/merge) rather than rotting on stacked draft branches.
 
@@ -58,6 +98,14 @@ Rules:
 
 - Full GravityTank agent map (ship workflow, file owners, HP/lives contract, roulette names, symbol index): **`GravityTank/AGENTS.md`**
 - Prefer that guide over dumping `Script_Game.mjs`. Keep it updated when contracts change (lives, HP look, prize names, deploy rules).
+
+## TaihangDemo（玩法白盒）
+
+- `TaihangDemo/index.html` 是 BehindTheLines（私有 Godot 仓库）的**玩法白盒测试环境**：单文件、纯 2D 程序化 Canvas、零外部依赖（无 three.js / 无音频 / 无图片资源）。线上地址 `https://bentleyblanks.github.io/TaihangDemo/`。
+- 用途是**先在白盒验证核心玩法循环，再移植回 Godot 生产版**。因此优先保证规则可读、参数可调（Debug 面板已暴露全部 `CFG`），不追求美术表现。
+- 文件内有「白盒同步区」注释块，集中存放与 Godot 版对齐的玩法常量与函数（暴露度账本、终局评级、上级任务、夜袭/夜行、时代规则化）。改这些规则时保持与 Godot 版 `Script_GameModel.gd` 的函数级对应关系，方便双向移植。
+- 不要给这个页面加外部依赖或美术资产；不要与旧页面 `taihang/`（含历史 3D 实验）混用存档键，白盒固定用 `taihangdemo_*`。
+- 提交前至少做一次语法校验（抽出 `<script>` 后 `node --check`），并保持移动端可用（viewport / 触摸拖拽 / 双指缩放 / `@media 640px`）。
 
 ## BehindTheLines Documentation
 
