@@ -7,7 +7,7 @@ import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL
 import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade, IsUpgradeRecommended, PeekNextStageId } from "./Data_Upgrades.mjs";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.5";
+export const GAME_VERSION = "0.6";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
 
 const PIXEL_FONT = '"Fusion Pixel 12", monospace';
@@ -30,6 +30,10 @@ const PLAYER_MAX_HP = 3;
 const HIT_IFRAME = 1.0;
 /** First death each stage: revive in place with this protect window. */
 const STAGE_REVIVE_PROTECT = 2.0;
+/** Death presentation: briefly let the fatal moment hang before normal speed returns. */
+const DEATH_SLOW_DURATION = 0.85;
+const DEATH_SLOW_SCALE = 0.2;
+const INCIDENT_REPORT_DURATION = 3.2;
 const CARRY_WOOD_HP = 2;
 const CARRY_METAL_HP = 5;
 const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
@@ -809,6 +813,10 @@ class Game {
       endMessage: document.getElementById("endMessage"),
       endPrimary: document.getElementById("restartButton"),
       endSecondary: document.getElementById("nextStageButton"),
+      incident: document.getElementById("incidentReport"),
+      incidentOwner: document.getElementById("incidentOwner"),
+      incidentLaunch: document.getElementById("incidentLaunch"),
+      incidentCause: document.getElementById("incidentCause"),
       upgrade: document.getElementById("upgradeOverlay"),
       upgradeTitle: document.getElementById("upgradeTitle"),
       upgradeBlurb: document.getElementById("upgradeBlurb"),
@@ -845,6 +853,9 @@ class Game {
     this.stageReviveUsed = false;
     this.pendingRespawnStats = null;
     this.respawnFx = null;
+    this.deathSlowTimer = 0;
+    this.incidentReport = null;
+    this.playClock = 0;
 
     this.state = "boot";
     this.debugGodMode = false;
@@ -876,6 +887,9 @@ class Game {
     this.fxMarks = [];
     this.screenFx = null;
     this.respawnFx = null;
+    this.deathSlowTimer = 0;
+    this.incidentReport = null;
+    if (this.overlays.incident) this.overlays.incident.hidden = true;
     this.carryables = [];
     this.carriedBlock = null;
     this.prepTimer = 0;
@@ -1773,6 +1787,7 @@ class Game {
   StartCampaign() {
     this.score = 0;
     this.lives = this.GetStartLives();
+    this.playClock = 0;
     this.stagePerk = null;
     this.pendingStagePerk = null;
     this.runPerks = [];
@@ -2386,11 +2401,28 @@ class Game {
     this.lastTs = ts;
     this.frame++;
 
-    if (this.state === "playing") this.Update(dt);
+    if (this.state === "playing") {
+      this.playClock += dt;
+      const simDt = this.deathSlowTimer > 0 ? dt * DEATH_SLOW_SCALE : dt;
+      this.Update(simDt);
+    }
     else if (this.state === "stageIntro") this.UpdateStageIntro(dt);
     else if (this.state === "roulette") this.UpdateRoulette(dt);
+    this.UpdateDeathPresentation(dt);
     this.Render();
     requestAnimationFrame((t) => this.Loop(t));
+  }
+
+  UpdateDeathPresentation(realDt) {
+    if (this.deathSlowTimer > 0) {
+      this.deathSlowTimer = Math.max(0, this.deathSlowTimer - realDt);
+    }
+    if (!this.incidentReport) return;
+    this.incidentReport.t += realDt;
+    if (this.incidentReport.t >= this.incidentReport.dur) {
+      this.incidentReport = null;
+      if (this.overlays.incident) this.overlays.incident.hidden = true;
+    }
   }
 
   Update(dt) {
@@ -3693,6 +3725,7 @@ class Game {
       trail: [],
       arm: 0.12,
       traveled: 0,
+      firedAt: this.playClock,
       gravityMul: 1,
       bounceLeft: 0,
       pierceLeft: 0,
@@ -3748,6 +3781,7 @@ class Game {
       trail: [],
       arm,
       traveled: 0,
+      firedAt: this.playClock,
       gravityMul,
       bounceLeft,
       pierceLeft: 0,
@@ -4310,6 +4344,7 @@ class Game {
       trail: [],
       arm: opts.bonusShot ? 0.12 : 0.22,
       traveled: 0,
+      firedAt: this.playClock,
       gravityMul,
       bounceLeft,
       pierceLeft,
@@ -4436,6 +4471,7 @@ class Game {
             this.DamagePlayer({
               heavy: this.IsHeavyIncoming(b),
               source: isOwnShell ? "self" : "bullet",
+              bullet: b,
             });
           }
         }
@@ -4605,12 +4641,38 @@ class Game {
     return false;
   }
 
+  StartIncidentReport({ source = "bullet", bullet = null } = {}) {
+    const age = Number.isFinite(bullet?.firedAt)
+      ? Math.max(0, this.playClock - bullet.firedAt)
+      : null;
+    const cause = source === "self"
+      ? "事故类型：自毁炮弹回旋镖（命中自己）"
+      : source === "bomb"
+        ? "事故类型：炸弹近距离爆炸（距离管理失败）"
+        : this.IsHeavyIncoming(bullet)
+          ? "事故类型：重炮 / Boss 炮弹（规避失败）"
+          : "事故类型：走位与炮弹发生交集";
+    this.incidentReport = {
+      t: 0,
+      dur: INCIDENT_REPORT_DURATION,
+    };
+    if (this.overlays.incident) {
+      this.overlays.incidentOwner.textContent = "你自己";
+      this.overlays.incidentLaunch.textContent = age == null
+        ? "记录缺失（保险照样拒赔）"
+        : `${age.toFixed(2)} 秒前`;
+      this.overlays.incidentCause.textContent = cause;
+      this.overlays.incident.hidden = false;
+    }
+    this.deathSlowTimer = DEATH_SLOW_DURATION;
+  }
+
   /**
    * Apply damage to the player tank.
    * Normal hits: −1 HP + HIT_IFRAME. Heavy hits: lethal (drain remaining HP).
    * Armor / giant / time-rift still intercept before HP loss.
    */
-  DamagePlayer({ heavy = false, source = "bullet" } = {}) {
+  DamagePlayer({ heavy = false, source = "bullet", bullet = null } = {}) {
     const p = this.player;
     if (!p?.alive) return false;
     if (this.debugGodMode) {
@@ -4666,7 +4728,7 @@ class Game {
       return false;
     }
 
-    this.KillPlayer();
+    this.KillPlayer({ source, bullet });
     return true;
   }
 
@@ -4679,7 +4741,7 @@ class Game {
     return { power, maxBullets, absorbHits: this.absorbHits || 0, hp: PLAYER_MAX_HP };
   }
 
-  KillPlayer() {
+  KillPlayer({ source = "unknown", bullet = null } = {}) {
     const p = this.player;
     if (!p?.alive) return;
     if (this.debugGodMode) {
@@ -4695,6 +4757,7 @@ class Game {
     const deathY = p.y;
     const deathDir = p.dir;
     p.alive = false;
+    this.StartIncidentReport({ source, bullet });
     this.audio.StopEngine();
     this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.2);
     this.audio.Explode();
@@ -4954,6 +5017,7 @@ class Game {
       trail: [],
       arm: 0.12,
       traveled: 0,
+      firedAt: this.playClock,
       gravityMul: 0.2,
       bounceLeft: 0,
       pierceLeft: 1,
@@ -5767,6 +5831,7 @@ class Game {
         trail: [],
         arm: 0.3,
         traveled: 0,
+        firedAt: this.playClock,
         gravityMul: 2.4,
         bounceLeft: 0,
         pierceLeft: 0,
@@ -6424,6 +6489,7 @@ class Game {
     this.DrawFxDebris(ctx);
     this.DrawFxMarks(ctx);
     this.DrawRespawnFx(ctx);
+    this.DrawIncidentSlowFx(ctx);
     // Screen FX under the wheel while spinning; after fly-out redraw on top so fullscreen reads.
     this.DrawScreenFxOverlay(ctx);
     ctx.restore();
@@ -7909,6 +7975,23 @@ class Game {
     ctx.font = `11px ${PIXEL_FONT}`;
     ctx.textAlign = "center";
     ctx.fillText("复活", fx.x, fx.y - radius - 8);
+    ctx.restore();
+  }
+
+  DrawIncidentSlowFx(ctx) {
+    if (this.deathSlowTimer <= 0) return;
+    const progress = Clamp(this.deathSlowTimer / DEATH_SLOW_DURATION, 0, 1);
+    ctx.save();
+    ctx.fillStyle = `rgba(70, 0, 0, ${0.12 + progress * 0.12})`;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.globalAlpha = 0.32 + progress * 0.28;
+    ctx.strokeStyle = "#ff6040";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(5, 5, CANVAS_W - 10, CANVAS_H - 10);
+    ctx.fillStyle = "#ffb090";
+    ctx.font = `10px ${PIXEL_FONT}`;
+    ctx.textAlign = "left";
+    ctx.fillText("事故回放 / SLOW-MO", 12, CANVAS_H - 12);
     ctx.restore();
   }
 
