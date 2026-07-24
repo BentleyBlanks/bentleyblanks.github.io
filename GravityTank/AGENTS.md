@@ -111,12 +111,12 @@ Grep these first:
 | Version | `GAME_VERSION` |
 | Difficulty | `DIFFICULTY`, `IsEasy`, `GetStartLives`, `GetPowerDropRate`, `BindDifficultyPick` |
 | Player HP / death | `DamagePlayer`, `KillPlayer`, `BlitPlayerHpTinted`, `stageReviveUsed`, `SoftenFirepowerOnDeath` |
-| Draw | `DrawTank`, `TankSheetOrigin`, `BlitArmorTinted`, `BlitGrid` |
+| Draw | `DrawTank`, `DrawTankBarrel`, `DrawBossBarrels`, `TankSheetOrigin`, `BlitArmorTinted`, `BlitGrid` |
 | Roulette | `ROULETTE_POOL`, `OpenRoulette`, `ResolveRoulette`, `DrawRoulette`, `DrawRoulettePlunger`, `ApplyPowerup`, `POWER_FX` |
 | Fort / HQ | `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll` |
 | Barricades | `carryBlocks`, `carriedBlock`, `WantsInteract`, barricade teach stage id |
-| Bosses | `UpdateBoss`, `UpdateTankKing`, `UpdateTankMan`, `ArmBossSkill` |
-| Stages | `BuildStageMap`, `Data_Stages.mjs` exports |
+| Bosses | `UpdateBoss`, `UpdateTankKing`, `UpdateTankMan`, `UpdatePrismTank`, `ArmBossSkill` — stage 12 `prismTank` / `prismBlink` |
+| Stages | `STAGE_COUNT` (12), `BuildStageMap`, `Data_Stages.mjs` — stages **10–11** ordinary ~3× density |
 
 ---
 

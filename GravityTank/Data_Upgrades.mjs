@@ -61,7 +61,7 @@ export function PeekNextStageId(current) {
   if (current === "barricadeTeach" || current === "teach" || current === -1) return 7;
   if (typeof current === "number") {
     if (current === 6) return "barricadeTeach";
-    if (current >= 9) return null;
+    if (current >= 12) return null;
     return current + 1;
   }
   return null;
@@ -76,7 +76,7 @@ export function IsUpgradeRecommended(card, ctx = {}) {
   if (ctx.special) return !!card.recommend;
   if (ctx.tutorial) return !!card.recommend;
   const next = ctx.nextStage;
-  if (next === 3 || next === 6 || next === 9) return BEFORE_BOSS_IDS.has(card.id);
+  if (next === 3 || next === 6 || next === 9 || next === 12) return BEFORE_BOSS_IDS.has(card.id);
   if (next === 7 || next === 8 || next === "barricadeTeach") return BEFORE_TRAP_IDS.has(card.id);
   return !!card.recommend;
 }
