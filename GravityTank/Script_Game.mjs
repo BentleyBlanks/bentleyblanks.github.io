@@ -1,10 +1,14 @@
 /**
- * GravityTank — classic Battle City stages 1–5 with gravity bullets.
+ * GravityTank — classic Battle City stages with gravity bullets.
  * Visuals: classic NES Battle City–style sprites (StefanBS/battle-city-clone, MIT).
  */
 
 import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL_STAGE, BARRICADE_TEACH_STAGE } from "./Data_Stages.mjs";
 import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade, IsUpgradeRecommended, PeekNextStageId } from "./Data_Upgrades.mjs";
+
+/** Player-facing build id — keep in sync with index.html `#gameVersion`. */
+export const GAME_VERSION = "0.3";
+export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
 
 const DIFFICULTY = {
   easy: "easy",
@@ -885,6 +889,7 @@ class Game {
   async Init() {
     await this.LoadAssets();
     await this.audio.LoadAll().catch((err) => console.warn("SFX pack load", err));
+    this.SyncVersionUi();
     this.BindUi();
     this.RenderEnemyIcons();
     this.DrawBootFrame();
@@ -892,6 +897,19 @@ class Game {
       this.StartCampaign();
     }
     requestAnimationFrame((t) => this.Loop(t));
+  }
+
+  /** Keep logo / credit / document title aligned with GAME_VERSION. */
+  SyncVersionUi() {
+    const label = GAME_VERSION_LABEL;
+    const verEl = document.getElementById("gameVersion");
+    if (verEl) verEl.textContent = label;
+    const creditEl = document.getElementById("creditVersion");
+    if (creditEl) creditEl.textContent = label;
+    const baseTitle = "GRAVITY TANK BATTLE";
+    if (!document.title.includes(label)) {
+      document.title = `${baseTitle} ${label}`;
+    }
   }
 
   async LoadAssets() {

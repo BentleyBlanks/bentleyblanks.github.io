@@ -126,6 +126,33 @@ body.touch-play-lock {
   cursor: pointer;
 }
 
+.hero-logo {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.hero-logo .title-banner {
+  width: min(780px, 100%);
+}
+
+.game-version {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 7px;
+  border: 2px solid #808080;
+  background: #101010;
+  color: #ffe060;
+  font-family: "Press Start 2P", var(--font-mono), monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+  user-select: none;
+}
+
 .debug-panel {
   position: fixed;
   top: 12px;
