@@ -36,7 +36,7 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 
 | Path | Owns |
 |------|------|
-| `index.html` | Shell UI, RULE copy, logo/version, difficulty pick, cache-bust `?v=` |
+| `index.html` | Shell UI, RULE copy, logo/version, fixed standard-mode copy, cache-bust `?v=` |
 | `Style_Game.css` | Layout, RULE list, logo badge, touch HUD, overlays |
 | `Script_Game.mjs` | Runtime loop, tanks, bullets, roulette, bosses, FX, HUD |
 | `Data_Stages.mjs` | Stage maps, enemy counts, barricade teach, HQ flip helpers |
@@ -54,13 +54,13 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 
 | Knob | Value | Symbol |
 |------|--------|--------|
-| Easy seats (lives) | **5** | `PLAYER_LIVES_EASY` / `GetStartLives()` |
-| Standard seats | **3** | `PLAYER_LIVES` |
+| Seats (standard only) | **3** | `PLAYER_LIVES` / `GetStartLives()` |
 | HP per seat | **3** | `PLAYER_MAX_HP` |
 | Normal shell | −1 HP | `DamagePlayer` |
 | Heavy / boss shell / bomb | oneshot | `IsHeavyIncoming` / `DamagePlayer({ heavy: true })` |
 | Hit i-frames | 1.0 s | `HIT_IFRAME` |
 | First death / stage | revive in place + 2 s shield | `stageReviveUsed`, `STAGE_REVIVE_PROTECT` |
+| Revive presentation | 1.25 s ring / beam / particles | `respawnFx`, `StartRespawnFx`, `DrawRespawnFx` |
 | On death | keep firepower (−1 max) | `SoftenFirepowerOnDeath` / `KillPlayer` |
 | Wipe upgrades | only on run fail | (not on seat loss) |
 
@@ -76,7 +76,7 @@ Player sheet is classic yellow; draw remaps by remaining HP:
 
 Symbols: `BlitPlayerHpTinted`, `DrawTank` (player branch), overhead HP pips. Power tier still picks sheet row via `TankSheetOrigin` (`gy = (power-1)*2`). Enemy armor tanks use `BlitArmorTinted` + `ARMOR_HP_PALETTE` separately.
 
-Difficulty copy: `BindDifficultyPick`, `SyncStageLabels`, `#difficultyHint` — say「座驾」+「每台 3 点生命」, not「双倍生命」.
+Difficulty copy: fixed standard mode; `SyncStageLabels` / `#difficultyHint` say「3 条座驾」+「每台 3 点生命」. Ordinary stages 1–3 use `POWER_DROP_RATE * 0.8`.
 
 ---
 
@@ -109,13 +109,14 @@ Grep these first:
 | Area | Symbols |
 |------|---------|
 | Version | `GAME_VERSION` |
-| Difficulty | `DIFFICULTY`, `IsEasy`, `GetStartLives`, `GetPowerDropRate`, `BindDifficultyPick` |
+| Balance / difficulty | `GetStartLives`, `GetPowerDropRate`, `SyncStageLabels` |
 | Player HP / death | `DamagePlayer`, `KillPlayer`, `BlitPlayerHpTinted`, `stageReviveUsed`, `SoftenFirepowerOnDeath` |
 | Draw | `DrawTank`, `DrawTankBarrel`, `DrawBossBarrels`, `TankSheetOrigin`, `BlitArmorTinted`, `BlitGrid` |
 | Roulette | `ROULETTE_POOL`, `OpenRoulette`, `ResolveRoulette`, `DrawRoulette`, `DrawRoulettePlunger`, `ApplyPowerup`, `POWER_FX` |
 | Fort / HQ | `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll` |
+| Eagle ally | `steelShield`, `BulletHitEagleAlly`, `DrawEagleAlly` — enemy shells deflect; never destroy HQ |
 | Barricades | `carryBlocks`, `carriedBlock`, `WantsInteract`, barricade teach stage id |
-| Bosses | `UpdateBoss`, `UpdateTankKing`, `UpdateTankMan`, `UpdatePrismTank`, `ArmBossSkill` — stage 12 `prismTank` / `prismBlink` |
+| Bosses | `UpdateBoss`, `UpdateTankKing`, `RecoverBossMovement`, `UpdateTankMan`, `UpdatePrismTank`, `ArmBossSkill` — stage 3 `tankKing` HP 52; stage 12 `prismTank` / `prismBlink` |
 | Stages | `STAGE_COUNT` (12), `BuildStageMap`, `Data_Stages.mjs` — stages **10–11** ordinary ~3× density |
 
 ---
@@ -134,7 +135,7 @@ Grep these first:
 1. Constants near top of `Script_Game.mjs` (`PLAYER_LIVES*`, `PLAYER_MAX_HP`, iframes)
 2. `DamagePlayer` / `KillPlayer` / revive path
 3. `BlitPlayerHpTinted` + pips if look changes
-4. `BindDifficultyPick` / `SyncStageLabels` / `#difficultyHint` / RULE `<li>`
+4. `SyncStageLabels` / `#difficultyHint` / RULE `<li>`
 5. Cache-bust `?v=`
 
 ### Changing a roulette prize

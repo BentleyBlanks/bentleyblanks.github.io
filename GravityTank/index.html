@@ -18,14 +18,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="preload" href="./assets/Font_FusionPixel12ZhHans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/Font_FusionPixel12Latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./Style_Game.css?v=v03">
+  <link rel="stylesheet" href="./Style_Game.css?v=v04">
 </head>
 <body>
   <div id="app">
     <header class="hero">
       <div class="hero-logo">
         <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
-        <span class="game-version" id="gameVersion" aria-label="版本">v0.4</span>
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.5</span>
       </div>
       <p class="tagline">捡到 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="16" height="16" alt="?"> 弹出物理转轮——甩转到哪算哪</p>
     </header>
@@ -65,11 +65,7 @@
         <p id="startStageBlurb" class="start-blurb">炮弹带重力，打出去会往下掉。
 
 自己也要当心，别被自己的弹幕炸到。</p>
-        <div id="difficultyPick" class="difficulty-pick" role="radiogroup" aria-label="难度">
-          <button type="button" class="diff-btn" data-diff="easy" role="radio" aria-checked="false">简易</button>
-          <button type="button" class="diff-btn is-active" data-diff="normal" role="radio" aria-checked="true">标准</button>
-        </div>
-        <p class="diff-hint" id="difficultyHint">简易：5 条座驾 · 每台 3 点生命 · 负面更少 · ?掉率+50%</p>
+        <p class="diff-hint" id="difficultyHint">标准战斗：3 条座驾 · 每台 3 点生命 · 前期道具率 -20%</p>
         <button id="startButton" class="primary" type="button">START</button>
         <p class="hint desktop-hint">↑↓←→ / WASD · SPACE/J FIRE · P PAUSE</p>
         <p class="hint mobile-hint">左摇杆移动 · 右键开火</p>
@@ -155,7 +151,7 @@
         <h3>RULE</h3>
         <ul class="rule-list">
           <li>炮弹带重力，会下坠。别被自己的弹炸到。</li>
-          <li>保卫老鹰总部，敌军打掉老鹰即失败。</li>
+          <li>鹰援期间老鹰披钢甲，敌军炮弹会被弹开；结束后老家自动补钢墙。</li>
           <li>
             场上
             <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?">
@@ -170,7 +166,7 @@
           <li>红色负面可含「老鹰跑」：老鹰开门出去乱逛，护住它。</li>
           <li>木/铁路障：靠近按 <kbd>K</kbd>（触屏「扛」）举起当护盾，同键放下封路。</li>
           <li>部分关卡开场有准备时间，可先封住敌窝出口。</li>
-          <li>简易 5 条座驾、标准 3 条；每台 3 点生命。车身随生命变色：金→橙→红。</li>
+          <li>标准战斗 3 条座驾；每台 3 点生命。车身随生命变色：金→橙→红。</li>
           <li>普通子弹伤 1 点，重炮/Boss弹/炸弹秒杀；受伤后 1 秒无敌。</li>
           <li>阵亡最多掉 1 级火力；每关首次死亡可原地复活（2 秒护盾）。火力清空只在整局失败。</li>
           <li>过关三选一：普通升级本关有效；Boss 关能力永久至通关。</li>
@@ -189,9 +185,9 @@
         </ul>
       </div>
 
-      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.4</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.5</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=prismStages1"></script>
+  <script type="module" src="./Script_Game.mjs?v=gravityTank05"></script>
 </body>
 </html>
