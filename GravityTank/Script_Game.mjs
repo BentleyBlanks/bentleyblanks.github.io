@@ -7,7 +7,7 @@ import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL
 import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade, IsUpgradeRecommended, PeekNextStageId } from "./Data_Upgrades.mjs";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.3";
+export const GAME_VERSION = "0.4";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
 
 const DIFFICULTY = {
@@ -370,6 +370,21 @@ const ENEMY_TYPES = [
     fireIntervalMul: 0.85,
     barrelCount: 1,
   },
+  {
+    id: "prismTank",
+    hp: 130,
+    speed: 48,
+    score: 15000,
+    shootCd: 1.1,
+    texture: "enemyArmor",
+    weight: 0,
+    bulletBoost: 1.05,
+    size: 60,
+    boss: true,
+    prismTank: true,
+    fireIntervalMul: 0.8,
+    barrelCount: 1,
+  },
 ];
 
 const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst"];
@@ -377,6 +392,8 @@ const TANK_KING_ATTACKS = ["quadCross", "spinFire", "axisBurst", "chaseVolley", 
 const BOSS_OCTO_ATTACKS = ["octoCross", "octoSpin", "octoRing"];
 /** Stage-9 bipedal tank man: disarm / bombs / sniper + flashy mix. */
 const TANK_MAN_ATTACKS = ["disarmThrow", "layBomb", "sniperVolley", "bounceFan", "mortarLob", "chaseBurst", "stompRain"];
+/** Stage-12 prism tank: blink-in + crystal volleys. */
+const PRISM_TANK_ATTACKS = ["prismBlink", "prismFan", "prismPierce", "chaseVolley"];
 const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
 /** Fire-rate multipliers vs the original boss cadence (lower = slower). */
 const BOSS_FIRE_RATE_NORMAL = 0.7;
@@ -388,6 +405,9 @@ const BOSS_SKILL_WINDUP = 0.95;
 const MAX_ENEMIES_BOSS_S3 = 5;
 const MAX_ENEMIES_BOSS_S6 = 6;
 const MAX_ENEMIES_BOSS_S9 = 7;
+const MAX_ENEMIES_BOSS_S12 = 7;
+/** Late swarm stages (10–11) need a slightly higher concurrent cap. */
+const MAX_ENEMIES_SWARM = 6;
 /** Plain directed shells between specials. */
 const BOSS_NORMAL_FIRE_MIN = 1.25;
 const BOSS_NORMAL_FIRE_SPAN = 0.55;
@@ -414,6 +434,9 @@ const BOSS_SKILL_WARN = {
   mortarLob: "⚠ 榴弹抛射蓄力",
   chaseBurst: "⚠ 近身连射蓄力",
   stompRain: "⚠ 踩踏弹雨蓄力",
+  prismBlink: "⚠ 光棱降临 · 闪现到你身边",
+  prismFan: "⚠ 棱镜扇射蓄力",
+  prismPierce: "⚠ 棱镜穿射蓄力",
 };
 
 /** Classic sheet grid origins [gx, gy] in 8×8 cells (16×16 sprite = 2×2 cells). */
@@ -958,6 +981,11 @@ class Game {
       powerEnemyRage: await load("assets/Texture_PowerEnemyRage.png"),
       barricadeWood: await load("assets/Texture_BarricadeWood.png"),
       barricadeMetal: await load("assets/Texture_BarricadeMetal.png"),
+      barrelPlayer: await load("assets/Texture_BarrelPlayer.png"),
+      barrelEnemy: await load("assets/Texture_BarrelEnemy.png"),
+      barrelPower: await load("assets/Texture_BarrelPower.png"),
+      barrelPrism: await load("assets/Texture_BarrelPrism.png"),
+      muzzle: await load("assets/Texture_Muzzle.png"),
     };
   }
 
@@ -1736,7 +1764,8 @@ class Game {
     }
     this.isBossStage = !!this.stageData.bossStage;
     const e = this.stageData.enemies;
-    this.totalEnemies = e.basic + e.fast + e.power + e.armor + (e.boss || 0) + (e.tankKing || 0) + (e.tankMan || 0);
+    this.totalEnemies = e.basic + e.fast + e.power + e.armor
+      + (e.boss || 0) + (e.tankKing || 0) + (e.tankMan || 0) + (e.prismTank || 0);
     this.spawnSlots = (this.stageData.enemySpawns || [[0, 0], [12, 0], [24, 0]]).map(([x, y]) => ({
       x: x * TILE,
       // Keep 2-tile tanks (+2px inset) fully on-canvas even if a stage table is stale.
@@ -2093,9 +2122,12 @@ class Game {
       this.ShowBuffToast("河北岸：朝下/斜射，用重力清理南岸敌军");
     } else if (this.isBossStage) {
       const perk = FindUpgrade(this.stagePerk);
-      const bossTitle = this.stageData.title || (this.stageData.bossKind === "tankMan"
-        ? "腿甲坦克人"
-        : (this.stageData.bossKind === "tankKing" ? "坦克王" : "重力巨炮"));
+      const bossTitle = this.stageData.title || (
+        this.stageData.bossKind === "tankMan" ? "腿甲坦克人"
+          : this.stageData.bossKind === "tankKing" ? "坦克王"
+            : this.stageData.bossKind === "prismTank" ? "光棱坦克"
+              : "重力巨炮"
+      );
       this.ShowBuffToast(
         perk ? `BOSS · 本关强化：${perk.title}` : `BOSS：${bossTitle} — 准备战斗！`
       );
@@ -2270,7 +2302,7 @@ class Game {
   /** Enemy shells never hurt bosses; from stage 6+ no enemy↔enemy damage at all. */
   BlocksEnemyFriendlyFire(bullet, target) {
     if (!bullet || bullet.isPlayer) return false;
-    if (target?.isBoss || target?.tankKing || target?.tankMan) return true;
+    if (target?.isBoss || target?.tankKing || target?.tankMan || target?.prismTank) return true;
     if (!this.isTutorial && this.stage >= ENEMY_FRIENDLY_FIRE_OFF_STAGE) return true;
     return false;
   }
@@ -2279,8 +2311,10 @@ class Game {
     if (this.isBossStage) {
       if (this.stage === 3) return MAX_ENEMIES_BOSS_S3;
       if (this.stage === 6) return MAX_ENEMIES_BOSS_S6;
+      if (this.stage === 12) return MAX_ENEMIES_BOSS_S12;
       return MAX_ENEMIES_BOSS_S9;
     }
+    if (!this.isTutorial && this.stage >= 10) return MAX_ENEMIES_SWARM;
     if (!this.isTutorial && this.stage >= 7) return MAX_ENEMIES_LATE;
     return MAX_ENEMIES_ON_FIELD;
   }
@@ -2306,6 +2340,9 @@ class Game {
     }
     for (let i = 0; i < (counts.tankMan || 0); i++) {
       bosses.push(ENEMY_TYPES.find((t) => t.id === "tankMan") || bossType);
+    }
+    for (let i = 0; i < (counts.prismTank || 0); i++) {
+      bosses.push(ENEMY_TYPES.find((t) => t.id === "prismTank") || bossType);
     }
     this.spawnQueue = bosses.concat(minions);
   }
@@ -2756,6 +2793,10 @@ class Game {
         this.UpdateTankMan(e, dt);
         continue;
       }
+      if (e.typeId === "prismTank") {
+        this.UpdatePrismTank(e, dt);
+        continue;
+      }
 
       e.aiTimer -= dt;
       if (e.aiTimer <= 0) {
@@ -3126,6 +3167,213 @@ class Game {
     e.attackQueue.push({ t: 0.35 * cdScale, kind: "layBomb" });
     e.attackQueue.push({ t: 0.55 * cdScale, kind: "layBomb" });
     e.fireCd = 3.1 * cdScale;
+  }
+
+  /** Stage-12 光棱坦克: crystal volleys + blink next to the player. */
+  UpdatePrismTank(e, dt) {
+    if (e.barrelFlash) {
+      for (const k of Object.keys(e.barrelFlash)) {
+        if (e.barrelFlash[k] > 0) e.barrelFlash[k] -= dt;
+      }
+    }
+    // Keep blink landing marker fresh while telegraphing.
+    if ((e.skillWindup || 0) > 0 && e.pendingPattern === "prismBlink" && this.player?.alive) {
+      e.blinkTarget = this.FindBlinkLandingNearPlayer(e) || e.blinkTarget;
+    }
+
+    e.aiTimer -= dt;
+    if (e.aiTimer <= 0) {
+      e.aiTimer = 0.4 + Math.random() * 0.5;
+      if (this.player?.alive && Math.random() < 0.65) {
+        e.dir = DirFromVector(this.player.x - e.x, this.player.y - e.y);
+      } else {
+        e.dir = DIR_KEYS[Math.floor(Math.random() * 4)];
+      }
+      if (e.x < 32) e.dir = "right";
+      if (e.x > CANVAS_W - e.w - 32) e.dir = "left";
+      if (e.y < 28) e.dir = "down";
+      if (e.y > CANVAS_H * 0.58) e.dir = "up";
+    }
+
+    const d = DIR[e.dir];
+    const beforeX = e.x;
+    const beforeY = e.y;
+    this.MoveTank(e, d.x * e.speed * dt, d.y * e.speed * dt);
+    e.x = Clamp(e.x, 8, CANVAS_W - e.w - 8);
+    e.y = Clamp(e.y, 8, CANVAS_H * 0.65);
+    if (Math.abs(e.x - beforeX) > 0.01 || Math.abs(e.y - beforeY) > 0.01) {
+      e.moving = true;
+      e.animTick += dt * 11;
+    } else {
+      e.moving = false;
+      e.aiTimer = Math.min(e.aiTimer, 0.12);
+    }
+
+    if (this.player?.alive) {
+      e.castFace = DirFromVector(this.player.x - e.x, this.player.y - e.y);
+    } else {
+      e.castFace = "down";
+    }
+
+    if (e.attackQueue?.length) {
+      this.UpdateBossAttackQueue(e, dt);
+      return;
+    }
+    if (this.TickBossSkillWindup(e, dt, this.BeginPrismTankAttack)) return;
+    this.TryBossNormalShot(e);
+    if (e.fireCd <= 0) {
+      const ratio = e.hp / Math.max(1, e.maxHp);
+      e.finalPhase = ratio <= BOSS_FINAL_HP_RATIO;
+      let pattern;
+      if (e.finalPhase) {
+        const firstUltimate = !e.finalBurstUsed;
+        if (firstUltimate || Math.random() < 0.4) {
+          pattern = "prismBlink";
+          e.finalBurstUsed = true;
+        }
+      }
+      if (!pattern) {
+        // Blink is the signature — keep it frequent but telegraphed.
+        if (Math.random() < (e.finalPhase ? 0.55 : 0.38)) pattern = "prismBlink";
+        else pattern = PRISM_TANK_ATTACKS[Math.floor(Math.random() * PRISM_TANK_ATTACKS.length)];
+      }
+      this.ArmBossSkill(e, pattern);
+      if (pattern === "prismBlink") {
+        e.skillWindup = Math.max(e.skillWindup || 0, 1.25);
+        e.fireCd = Math.max(e.fireCd || 0, e.skillWindup + 0.05);
+        e.blinkTarget = this.FindBlinkLandingNearPlayer(e);
+        e.skillWarn = BOSS_SKILL_WARN.prismBlink;
+        this.ShowBuffToast(e.skillWarn);
+      }
+    }
+  }
+
+  BeginPrismTankAttack(e, pattern) {
+    e.attackPattern = pattern;
+    e.attackQueue = [];
+    e.attackAge = 0;
+    const cdScale = this.GetBossFireCdScale(e);
+    const face = e.castFace || e.dir || "down";
+
+    if (pattern === "prismBlink") {
+      this.ResolvePrismBlink(e);
+      // Point-blank burst after landing.
+      for (let i = 0; i < 4; i++) {
+        e.attackQueue.push({
+          t: 0.08 + i * 0.1 * cdScale,
+          kind: "kingShell",
+          dir: e.castFace || face,
+          angleOffset: (i - 1.5) * 0.06,
+        });
+      }
+      e.fireCd = 2.2 * cdScale;
+      e.blinkTarget = null;
+      return;
+    }
+
+    if (pattern === "prismFan") {
+      for (let i = 0; i < 5; i++) {
+        e.attackQueue.push({
+          t: i * 0.07 * cdScale,
+          kind: "kingShell",
+          dir: face,
+          angleOffset: (i - 2) * 0.16,
+        });
+      }
+      e.fireCd = 1.9 * cdScale;
+      return;
+    }
+
+    if (pattern === "prismPierce") {
+      for (let i = 0; i < 3; i++) {
+        e.attackQueue.push({
+          t: i * 0.14 * cdScale,
+          kind: "sniper",
+          dir: face,
+          angleOffset: 0,
+        });
+      }
+      e.fireCd = 2.0 * cdScale;
+      return;
+    }
+
+    // chaseVolley default
+    for (let i = 0; i < 5; i++) {
+      e.attackQueue.push({
+        t: i * 0.11 * cdScale,
+        kind: "kingShell",
+        dir: face,
+        angleOffset: (i - 2) * 0.05,
+      });
+    }
+    e.fireCd = 1.85 * cdScale;
+  }
+
+  /** Prefer empty tiles beside the player (cardinal first, then diagonals). */
+  FindBlinkLandingNearPlayer(boss) {
+    const p = this.player;
+    if (!p?.alive) return null;
+    const bw = boss.w || TANK_SIZE;
+    const bh = boss.h || TANK_SIZE;
+    const offsets = [
+      [bw + 4, 0], [-bw - 4, 0], [0, bh + 4], [0, -bh - 4],
+      [bw + 4, bh + 4], [-bw - 4, bh + 4], [bw + 4, -bh - 4], [-bw - 4, -bh - 4],
+      [bw * 1.6, 0], [-bw * 1.6, 0], [0, bh * 1.6], [0, -bh * 1.6],
+    ];
+    const candidates = [];
+    for (const [ox, oy] of offsets) {
+      const x = Clamp(p.x + ox, 4, CANVAS_W - bw - 4);
+      const y = Clamp(p.y + oy, 4, CANVAS_H - bh - 4);
+      const probe = { x, y, w: bw, h: bh };
+      if (this.TankBlocked(probe)) continue;
+      candidates.push({ x, y });
+    }
+    if (!candidates.length) {
+      // Fallback: any empty cell near player.
+      const px = Math.floor((p.x + p.w / 2) / TILE);
+      const py = Math.floor((p.y + p.h / 2) / TILE);
+      for (let r = 1; r <= 4; r++) {
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.abs(dx) + Math.abs(dy) !== r) continue;
+            const tx = px + dx;
+            const ty = py + dy;
+            if (tx < 0 || ty < 0 || tx >= MAP_W - 1 || ty >= MAP_H - 1) continue;
+            const x = tx * TILE + 2;
+            const y = ty * TILE + 2;
+            const probe = { x, y, w: bw, h: bh };
+            if (this.TankBlocked(probe)) continue;
+            candidates.push({ x, y });
+          }
+        }
+      }
+    }
+    if (!candidates.length) return null;
+    // Prefer closest to player among valid landings.
+    candidates.sort((a, b) => {
+      const da = Math.hypot(a.x - p.x, a.y - p.y);
+      const db = Math.hypot(b.x - p.x, b.y - p.y);
+      return da - db;
+    });
+    return candidates[0];
+  }
+
+  ResolvePrismBlink(e) {
+    const landing = e.blinkTarget || this.FindBlinkLandingNearPlayer(e);
+    this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 0.85, { ring: true, flash: true });
+    if (landing) {
+      e.x = landing.x;
+      e.y = landing.y;
+    }
+    if (this.player?.alive) {
+      e.dir = DirFromVector(this.player.x - e.x, this.player.y - e.y);
+      e.castFace = e.dir;
+    }
+    e.protect = Math.max(e.protect || 0, 0.45);
+    this.UnstickTank(e, { maxDist: 48 });
+    this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1.0, { ring: true, flash: true });
+    this.audio.Explode();
+    this.ShowBuffToast("光棱降临！");
   }
 
   /** Boss patrols the upper band and cycles gravity-shell attack patterns. */
@@ -5665,12 +5913,15 @@ class Game {
       isBoss: !!type.boss,
       tankKing: !!type.tankKing,
       tankMan: !!type.tankMan,
+      prismTank: !!type.prismTank,
       fireIntervalMul: type.fireIntervalMul ?? 1,
       finalBurstUsed: false,
       finalPhase: false,
       bossDropMarks: type.boss ? [0.66, 0.33] : null,
-      barrelCount: type.barrelCount ?? this.stageData?.barrelCount ?? (type.tankKing ? 4 : 0),
+      barrelCount: type.barrelCount
+        ?? (type.boss ? (this.stageData?.barrelCount ?? (type.tankKing ? 4 : 1)) : 1),
       barrelFlash: Object.fromEntries(DIR_OCTO.map((d) => [d, 0])),
+      blinkTarget: null,
     };
   }
 
@@ -6311,10 +6562,12 @@ class Game {
         const bossTitle =
           kind === "tankKing" ? "坦克王" :
           kind === "tankMan" ? "腿甲坦克人" :
+          kind === "prismTank" ? "光棱坦克" :
           "重力巨炮";
         const bossHint =
           kind === "tankKing" ? "单炮追猎 · 开阔战场" :
           kind === "tankMan" ? "拆炮 · 定时炸弹 · 无重力狙击" :
+          kind === "prismTank" ? "光棱降临 · 闪现贴身 · 注意落点提示" :
           "八管弹幕 · 炮弹带重力";
         ctx.font = `28px ${PIXEL_FONT}`;
         ctx.fillText("BOSS", CANVAS_W / 2, CANVAS_H / 2 - 36);
@@ -6644,6 +6897,15 @@ class Game {
     } else {
       this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
     }
+    // Pixel barrel overlay covers the classic 1px stub.
+    const disarmed = isPlayer && (this.playerDisarmed || tank.disarmed);
+    if (!disarmed) {
+      if ((tank.isBoss || tank.tankKing || tank.prismTank) && (tank.barrelCount || 0) > 0) {
+        this.DrawBossBarrels(ctx, tank);
+      } else {
+        this.DrawTankBarrel(ctx, tank, isPlayer);
+      }
+    }
     if (isPlayer && this.giantTimer > 0) {
       const pulse = 0.45 + 0.35 * Math.abs(Math.sin(this.frame * 0.22));
       ctx.strokeStyle = `rgba(255,220,80,${pulse})`;
@@ -6654,9 +6916,6 @@ class Game {
       ctx.textAlign = "center";
       ctx.fillText(`巨${Math.ceil(this.giantTimer)}·甲${this.giantHits}`, tank.x + tank.w / 2, tank.y - 6);
       ctx.textAlign = "left";
-    }
-    if ((tank.isBoss || tank.tankKing) && (tank.barrelCount || 0) > 0) {
-      this.DrawBossBarrels(ctx, tank);
     }
     if (ghosting) {
       ctx.globalAlpha = 1;
@@ -6802,7 +7061,43 @@ class Game {
     ctx.fillRect(bomb.x + s / 2 - 1, bomb.y - 4, 2, 5);
   }
 
-  /** Distinct boss barrels (not classic sheet turrets): tapered tubes + muzzle ring. */
+  /** NES-style barrel overlay — covers classic sheet stub. Sprite points UP; rotate by DIR.angle. */
+  DrawTankBarrel(ctx, tank, isPlayer) {
+    const face = tank.castFace || tank.dir || "up";
+    const img = this.PickBarrelImage(tank, isPlayer);
+    if (!img) return;
+    const cx = tank.x + tank.w / 2;
+    const cy = tank.y + tank.h / 2;
+    const scale = Math.max(0.9, tank.w / TANK_SIZE);
+    const bw = 10 * scale;
+    const bh = 16 * scale;
+    const ang = (DIR[face] || DIR.up).angle;
+    const lit = (tank.barrelFlash && (tank.barrelFlash[face] || 0) > 0);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ang);
+    ctx.imageSmoothingEnabled = false;
+    // Sprite tip is -Y in local space after rotate(0)=right; DIR.right angle=0 → tip along +X.
+    // Our PNG points UP (-Y). Rotate so tip follows DIR: use angle + PI/2.
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(img, -bw / 2, -bh + 2 * scale, bw, bh);
+    if (lit && this.images.muzzle) {
+      const mw = 12 * scale;
+      const mh = 10 * scale;
+      ctx.drawImage(this.images.muzzle, -mw / 2, -bh - mh * 0.35, mw, mh);
+    }
+    ctx.restore();
+  }
+
+  PickBarrelImage(tank, isPlayer) {
+    const imgs = this.images || {};
+    if (tank.prismTank || tank.typeId === "prismTank") return imgs.barrelPrism;
+    if (isPlayer) return imgs.barrelPlayer;
+    if (tank.typeId === "power" || tank.texture === "enemyPower") return imgs.barrelPower;
+    return imgs.barrelEnemy;
+  }
+
+  /** Boss barrels: textured tubes (multi-barrel bosses fan around the hub). */
   DrawBossBarrels(ctx, tank) {
     const count = tank.barrelCount || 0;
     if (count <= 0) return;
@@ -6811,60 +7106,60 @@ class Game {
     const flash = tank.barrelFlash || {};
     const king = !!tank.tankKing;
     const man = !!tank.tankMan || tank.typeId === "tankMan";
+    const prism = !!tank.prismTank || tank.typeId === "prismTank";
     const face = tank.castFace || tank.dir || "down";
     const dirs = count <= 1 ? [face] : count >= 8 ? DIR_OCTO : DIR_CARDINAL;
-    const reach = Math.max(12, tank.w * (count <= 1 ? 0.42 : 0.34));
-    const thick = Math.max(4, tank.w * (count <= 1 ? 0.18 : 0.11));
+    const img = this.PickBarrelImage(tank, false);
+    const scale = Math.max(1.15, tank.w / TANK_SIZE * 0.95);
+    const bw = (img ? 10 : 8) * scale;
+    const bh = (img ? 18 : 16) * scale;
 
     for (const dir of dirs) {
       const d = DIR[dir] || DIR.down;
       const lit = (flash[dir] || 0) > 0;
-      const ang = d.angle;
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate(ang);
-      // Base socket
-      ctx.fillStyle = king || man ? "#5a4010" : "#2a3038";
-      ctx.fillRect(tank.w * 0.18, -thick * 0.55, 5, thick * 1.1);
-      // Tapered tube
-      const x0 = tank.w * 0.2;
-      const len = reach;
-      ctx.beginPath();
-      ctx.moveTo(x0, -thick * 0.45);
-      ctx.lineTo(x0 + len * 0.72, -thick * 0.32);
-      ctx.lineTo(x0 + len, -thick * 0.22);
-      ctx.lineTo(x0 + len, thick * 0.22);
-      ctx.lineTo(x0 + len * 0.72, thick * 0.32);
-      ctx.lineTo(x0, thick * 0.45);
-      ctx.closePath();
-      ctx.fillStyle = lit ? "#ffe070" : man ? "#70d0ff" : king ? "#d0a030" : "#8a93a0";
-      ctx.fill();
-      ctx.strokeStyle = lit ? "#fff8c8" : man ? "#206080" : king ? "#705010" : "#3a4048";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      // Highlight stripe
-      ctx.strokeStyle = lit ? "rgba(255,255,220,0.9)" : "rgba(255,255,255,0.25)";
-      ctx.beginPath();
-      ctx.moveTo(x0 + 2, -thick * 0.12);
-      ctx.lineTo(x0 + len - 2, -thick * 0.08);
-      ctx.stroke();
-      // Muzzle ring (distinct from classic stub barrel)
-      ctx.fillStyle = lit ? "#fff0a0" : king ? "#f0c050" : "#c8d0d8";
-      ctx.fillRect(x0 + len - 3, -thick * 0.38, 4, thick * 0.76);
-      ctx.fillStyle = "#101418";
-      ctx.fillRect(x0 + len + 1, -thick * 0.16, 2, thick * 0.32);
+      ctx.rotate(d.angle + Math.PI / 2);
+      ctx.imageSmoothingEnabled = false;
+      if (img) {
+        ctx.drawImage(img, -bw / 2, -bh + 4 * scale, bw, bh);
+        if (lit && this.images.muzzle) {
+          const mw = 14 * scale;
+          const mh = 12 * scale;
+          ctx.globalAlpha = 0.95;
+          ctx.drawImage(this.images.muzzle, -mw / 2, -bh - mh * 0.2, mw, mh);
+        }
+      } else {
+        // Fallback procedural tube if asset missing.
+        const thick = Math.max(4, tank.w * 0.12);
+        const len = Math.max(12, tank.w * 0.4);
+        ctx.fillStyle = lit ? "#ffe070" : prism ? "#70e0ff" : man ? "#70d0ff" : king ? "#d0a030" : "#8a93a0";
+        ctx.fillRect(-thick / 2, -len, thick, len);
+      }
       ctx.restore();
     }
 
     if (king) {
-      // Small crown plate — reads as Tank King, not stock armor tank.
       ctx.fillStyle = "#f0d060";
       ctx.fillRect(cx - 7, tank.y + 3, 14, 4);
       ctx.fillRect(cx - 8, tank.y + 1, 4, 4);
       ctx.fillRect(cx - 2, tank.y, 4, 5);
       ctx.fillRect(cx + 4, tank.y + 1, 4, 4);
+    } else if (prism) {
+      // Crystal hub gem
+      const pulse = 0.55 + 0.45 * Math.abs(Math.sin(this.frame * 0.2));
+      ctx.fillStyle = `rgba(120,220,255,${0.55 + 0.35 * pulse})`;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 7);
+      ctx.lineTo(cx + 6, cy);
+      ctx.lineTo(cx, cy + 7);
+      ctx.lineTo(cx - 6, cy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#e0a0ff";
+      ctx.lineWidth = 1;
+      ctx.stroke();
     } else if (count >= 8) {
-      // Gravity cannon hub ring
       ctx.strokeStyle = "#c07040";
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -6890,11 +7185,13 @@ class Game {
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     const finalPhase = (boss.hp / Math.max(1, boss.maxHp)) <= BOSS_FINAL_HP_RATIO;
-    const bossName = (boss.tankMan || boss.typeId === "tankMan")
-      ? (finalPhase ? "腿甲坦克人 · 狂暴" : "BOSS 腿甲坦克人")
-      : (boss.typeId === "tankKing" || boss.tankKing)
-        ? (finalPhase ? "坦克王 · 狂暴" : "BOSS 坦克王")
-        : (finalPhase ? "BOSS 终焉阶段" : "BOSS 重力巨炮");
+    const bossName = (boss.prismTank || boss.typeId === "prismTank")
+      ? (finalPhase ? "光棱坦克 · 狂暴" : "BOSS 光棱坦克")
+      : (boss.tankMan || boss.typeId === "tankMan")
+        ? (finalPhase ? "腿甲坦克人 · 狂暴" : "BOSS 腿甲坦克人")
+        : (boss.typeId === "tankKing" || boss.tankKing)
+          ? (finalPhase ? "坦克王 · 狂暴" : "BOSS 坦克王")
+          : (finalPhase ? "BOSS 终焉阶段" : "BOSS 重力巨炮");
     ctx.fillText(bossName, CANVAS_W / 2, y - 1);
     ctx.fillStyle = "#302010";
     ctx.fillRect(x, y, barW, barH);
@@ -6912,24 +7209,47 @@ class Game {
       const radius = Math.max(boss.w, boss.h) * (0.62 + 0.12 * pulse);
       ctx.save();
       ctx.globalAlpha = 0.35 + 0.35 * pulse;
-      ctx.strokeStyle = "#ffcc44";
+      ctx.strokeStyle = boss.pendingPattern === "prismBlink" ? "#70e8ff" : "#ffcc44";
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 0.2 + 0.25 * pulse;
-      ctx.fillStyle = "#ffaa22";
+      ctx.fillStyle = boss.pendingPattern === "prismBlink" ? "#40c0e8" : "#ffaa22";
       ctx.beginPath();
       ctx.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+
+      // Prism blink: clear landing marker next to the player.
+      if (boss.pendingPattern === "prismBlink" && boss.blinkTarget) {
+        const tx = boss.blinkTarget.x + boss.w / 2;
+        const ty = boss.blinkTarget.y + boss.h / 2;
+        const r = Math.max(boss.w, boss.h) * (0.55 + 0.1 * pulse);
+        ctx.save();
+        ctx.globalAlpha = 0.45 + 0.4 * pulse;
+        ctx.strokeStyle = "#ffe060";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(boss.blinkTarget.x - 2, boss.blinkTarget.y - 2, boss.w + 4, boss.h + 4);
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(tx, ty, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#70e8ff";
+        ctx.font = `10px ${PIXEL_FONT}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText("降临", tx, boss.blinkTarget.y - 4);
+        ctx.restore();
+      }
 
       if (boss.skillWarn) {
         ctx.fillStyle = `rgba(0,0,0,${0.55 + 0.25 * pulse})`;
         ctx.font = `11px ${PIXEL_FONT}`;
         const tw = ctx.measureText(boss.skillWarn).width + 16;
         ctx.fillRect((CANVAS_W - tw) / 2, y + barH + 6, tw, 18);
-        ctx.fillStyle = "#ffcc44";
+        ctx.fillStyle = boss.pendingPattern === "prismBlink" ? "#70e8ff" : "#ffcc44";
         ctx.textBaseline = "middle";
         ctx.fillText(boss.skillWarn, CANVAS_W / 2, y + barH + 15);
       }
