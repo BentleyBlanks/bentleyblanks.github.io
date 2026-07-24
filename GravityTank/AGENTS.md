@@ -24,7 +24,8 @@ Deploy branch: **`master` only**. Small fixes: branch → PR → **merge yoursel
 
 ## High-traffic symbols in `Script_Game.mjs`
 
-- Roulette: `ROULETTE_POOL`, `OpenRoulette`, `ResolveRoulette`, `DrawRoulette`, `ApplyPowerup`, `POWER_FX`
+- Roulette: `ROULETTE_POOL`, `OpenRoulette`, `ResolveRoulette`, `DrawRoulette`, `DrawRoulettePlunger`, `ApplyPowerup`, `POWER_FX`
+  - Spin UX: right-side pinball pull-arc (`RouletteReleasePlunger`) — not wheel-drag
 - Fort / HQ: `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll`
 - Barricades: `carryBlocks`, `carriedBlock`, `WantsInteract`, barricade teach stage id
 - Bosses: `UpdateBoss`, `UpdateTankKing`, `UpdateTankMan`, `ArmBossSkill`

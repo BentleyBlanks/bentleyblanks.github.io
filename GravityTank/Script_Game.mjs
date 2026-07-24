@@ -287,12 +287,16 @@ function PickRouletteSegments(count = ROULETTE_SIZE, difficulty = DIFFICULTY.nor
   return ShuffleInPlace(picked.slice(0, count));
 }
 
-const ROULETTE_FRICTION = 2.6; // viscous 1/s
-const ROULETTE_COULOMB = 1.35; // rad/s^2 opposing
-const ROULETTE_STOP = 0.18; // rad/s
-const ROULETTE_MAX_OMEGA = 42;
+const ROULETTE_FRICTION = 1.75; // viscous 1/s — soft natural coast
+const ROULETTE_COULOMB = 0.72; // rad/s^2 opposing
+const ROULETTE_DRAG_Q = 0.022; // quadratic drag at high speed
+const ROULETTE_STOP = 0.11; // rad/s
+const ROULETTE_MAX_OMEGA = 36;
 const ROULETTE_ENTER_DUR = 0.4;
 const ROULETTE_EXIT_DUR = 0.34;
+const ROULETTE_PULL_MIN = 0.14; // below this, spring back without spinning
+const ROULETTE_PULL_OMEGA_MIN = 9;
+const ROULETTE_PULL_OMEGA_SPAN = 26;
 
 function EaseOutBack(t) {
   const c1 = 1.70158;
@@ -4786,10 +4790,10 @@ class Game {
     this.roulette = {
       angle: Math.random() * Math.PI * 2, // orientation only — NOT the result
       omega: 0,
-      dragging: false,
+      pulling: false,
       pointerId: null,
-      lastAng: null,
-      lastT: 0,
+      pull: 0, // 0 rest … 1 fully charged
+      pullVel: 0,
       stillT: 0,
       hasSpun: false,
       phase: "enter", // enter | spin | exit | result
@@ -4799,9 +4803,10 @@ class Game {
       result: null,
       resultT: 0,
       segments,
-      cx: CANVAS_W / 2,
+      // Leave room on the right for the pinball-style pull arc.
+      cx: CANVAS_W / 2 - (touch ? 22 : 28),
       cy: CANVAS_H / 2 + (touch ? 40 : 28),
-      radius: touch ? 158 : 128,
+      radius: touch ? 148 : 120,
     };
     this.SyncTouchControlsVisibility();
     const nBad = segments.filter((s) => s.tier === "bad").length;
@@ -4825,6 +4830,47 @@ class Game {
     return { x, y };
   }
 
+  /** Right-side pinball plunger arc (rest at top → charge at bottom). */
+  RoulettePlungerGeom(r = this.roulette) {
+    if (!r) return null;
+    const touch = this.isTouchDevice;
+    const arcR = r.radius * (touch ? 1.08 : 1.12);
+    const arcCx = r.cx + r.radius * 0.22;
+    const arcCy = r.cy;
+    const ang0 = -0.95; // rest (upper-right)
+    const ang1 = 1.15; // full pull (lower-right)
+    const pull = Clamp(r.pull || 0, 0, 1);
+    const ang = ang0 + (ang1 - ang0) * pull;
+    const knobX = arcCx + Math.cos(ang) * arcR;
+    const knobY = arcCy + Math.sin(ang) * arcR;
+    const knobR = touch ? 22 : 16;
+    return { arcCx, arcCy, arcR, ang0, ang1, ang, knobX, knobY, knobR, pull };
+  }
+
+  RoulettePullFromPoint(r, x, y) {
+    const g = this.RoulettePlungerGeom({ ...r, pull: 0 });
+    if (!g) return 0;
+    let ang = Math.atan2(y - g.arcCy, x - g.arcCx);
+    // Keep on the right half; clamp into [ang0, ang1].
+    if (ang < g.ang0) ang = g.ang0;
+    if (ang > g.ang1) ang = g.ang1;
+    return Clamp((ang - g.ang0) / Math.max(0.001, g.ang1 - g.ang0), 0, 1);
+  }
+
+  HitRoulettePlunger(r, x, y) {
+    const g = this.RoulettePlungerGeom(r);
+    if (!g) return false;
+    const dKnob = Math.hypot(x - g.knobX, y - g.knobY);
+    if (dKnob <= g.knobR + 14) return true;
+    // Generous vertical strip along the arc's right side.
+    const dArc = Math.hypot(x - g.arcCx, y - g.arcCy);
+    if (Math.abs(dArc - g.arcR) < (this.isTouchDevice ? 28 : 20)) {
+      const ang = Math.atan2(y - g.arcCy, x - g.arcCx);
+      if (ang >= g.ang0 - 0.15 && ang <= g.ang1 + 0.15) return true;
+    }
+    return false;
+  }
+
   OnCanvasPointerDown(ev) {
     if (this.state === "stageIntro") {
       this.SkipStageIntro();
@@ -4832,54 +4878,63 @@ class Game {
     }
     if (this.state !== "roulette" || !this.roulette || this.roulette.phase !== "spin") return;
     const r = this.roulette;
+    if (r.hasSpun || Math.abs(r.omega) > ROULETTE_STOP) return;
     const p = this.CanvasToLocal(ev);
-    const dx = p.x - r.cx;
-    const dy = p.y - r.cy;
-    if (Math.hypot(dx, dy) > r.radius + 8) return;
+    if (!this.HitRoulettePlunger(r, p.x, p.y)) return;
     ev.preventDefault();
     this.canvas.setPointerCapture?.(ev.pointerId);
-    r.dragging = true;
+    r.pulling = true;
     r.pointerId = ev.pointerId;
-    r.lastAng = Math.atan2(dy, dx);
-    r.lastT = performance.now() / 1000;
+    r.pullVel = 0;
+    r.pull = this.RoulettePullFromPoint(r, p.x, p.y);
     r.stillT = 0;
   }
 
   OnCanvasPointerMove(ev) {
     const r = this.roulette;
-    if (this.state !== "roulette" || !r?.dragging || ev.pointerId !== r.pointerId) return;
+    if (this.state !== "roulette" || !r?.pulling || ev.pointerId !== r.pointerId) return;
     const p = this.CanvasToLocal(ev);
-    const ang = Math.atan2(p.y - r.cy, p.x - r.cx);
-    const now = performance.now() / 1000;
-    let dAng = ang - r.lastAng;
-    while (dAng > Math.PI) dAng -= Math.PI * 2;
-    while (dAng < -Math.PI) dAng += Math.PI * 2;
-    const dt = Math.max(0.001, now - r.lastT);
-    // Direct drive + flick impulse from angular velocity of the finger.
-    r.angle += dAng;
-    const flick = dAng / dt;
-    r.omega = Clamp(r.omega * 0.35 + flick * 0.65, -ROULETTE_MAX_OMEGA, ROULETTE_MAX_OMEGA);
-    if (Math.abs(r.omega) > 0.5 || Math.abs(dAng) > 0.02) r.hasSpun = true;
-    r.lastAng = ang;
-    r.lastT = now;
+    r.pull = this.RoulettePullFromPoint(r, p.x, p.y);
   }
 
   OnCanvasPointerUp(ev) {
     const r = this.roulette;
     if (!r || ev.pointerId !== r.pointerId) return;
-    r.dragging = false;
+    const charge = r.pull;
+    r.pulling = false;
     r.pointerId = null;
-    r.lastAng = null;
+    this.RouletteReleasePlunger(charge);
   }
 
-  RouletteKick(amount) {
+  /** Fire the wheel from a charged pull (pinball plunger release). */
+  RouletteReleasePlunger(charge) {
     const r = this.roulette;
-    if (!r || r.phase !== "spin" || r.dragging) return;
-    const dir = Math.random() < 0.5 ? -1 : 1;
-    r.omega = Clamp(r.omega + dir * amount, -ROULETTE_MAX_OMEGA, ROULETTE_MAX_OMEGA);
+    if (!r || r.phase !== "spin" || r.hasSpun) {
+      if (r) r.pullVel = 0;
+      return;
+    }
+    const pull = Clamp(charge ?? r.pull ?? 0, 0, 1);
+    if (pull < ROULETTE_PULL_MIN) {
+      // Too light — spring back, no spin.
+      r.pullVel = 0;
+      return;
+    }
+    const power = ROULETTE_PULL_OMEGA_MIN + pull * ROULETTE_PULL_OMEGA_SPAN;
+    // Always spin the same way so release feel is consistent (clockwise on screen).
+    r.omega = Clamp(power + Math.random() * 2.5, -ROULETTE_MAX_OMEGA, ROULETTE_MAX_OMEGA);
     r.hasSpun = true;
     r.stillT = 0;
+    r.pullVel = -4.5 - pull * 3.5; // spring the knob home
     this.audio.Shoot();
+  }
+
+  /** Keyboard / touch-fire shortcut: medium-strong plunger shot. */
+  RouletteKick(amount) {
+    const r = this.roulette;
+    if (!r || r.phase !== "spin" || r.pulling || r.hasSpun || Math.abs(r.omega) > ROULETTE_STOP) return;
+    const charge = Clamp(0.55 + (amount || 16) / 40, 0.55, 1);
+    r.pull = charge;
+    this.RouletteReleasePlunger(charge);
   }
 
   UpdateRoulette(dt) {
@@ -4924,24 +4979,36 @@ class Game {
       return;
     }
 
-    if (!r.dragging) {
-      // Viscous + coulomb friction — real deceleration, no pre-chosen stop angle.
+    // Plunger spring-back when not held.
+    if (!r.pulling) {
+      if (r.pull > 0.001 || Math.abs(r.pullVel) > 0.01) {
+        r.pullVel += (-14 * r.pull) * dt; // spring to rest
+        r.pullVel *= Math.exp(-10 * dt);
+        r.pull = Clamp(r.pull + r.pullVel * dt, 0, 1);
+        if (r.pull < 0.01 && Math.abs(r.pullVel) < 0.2) {
+          r.pull = 0;
+          r.pullVel = 0;
+        }
+      }
+    }
+
+    if (!r.pulling) {
+      // Natural damping: viscous + coulomb + mild quadratic (no pre-chosen stop).
+      const w = r.omega;
+      const dragQ = ROULETTE_DRAG_Q * w * Math.abs(w);
       r.omega *= Math.exp(-ROULETTE_FRICTION * dt);
-      if (r.omega > 0) r.omega = Math.max(0, r.omega - ROULETTE_COULOMB * dt);
-      else if (r.omega < 0) r.omega = Math.min(0, r.omega + ROULETTE_COULOMB * dt);
+      if (r.omega > 0) r.omega = Math.max(0, r.omega - (ROULETTE_COULOMB + Math.abs(dragQ)) * dt);
+      else if (r.omega < 0) r.omega = Math.min(0, r.omega + (ROULETTE_COULOMB + Math.abs(dragQ)) * dt);
       r.angle += r.omega * dt;
       if (Math.abs(r.omega) < ROULETTE_STOP) {
         r.omega = 0;
         if (r.hasSpun) {
           r.stillT += dt;
-          if (r.stillT > 0.22) this.ResolveRoulette();
+          if (r.stillT > 0.28) this.ResolveRoulette();
         }
       } else {
         r.stillT = 0;
-        r.hasSpun = true;
       }
-    } else {
-      r.stillT = 0;
     }
 
     if (this.buffToast) {
@@ -4974,8 +5041,10 @@ class Game {
     r.pendingKind = seg.kind;
     r.resultHold = Math.max(1.35, ((POWER_FX[seg.kind]?.dur) || 1.1) + 0.35);
     r.omega = 0;
-    r.dragging = false;
+    r.pulling = false;
     r.pointerId = null;
+    r.pull = 0;
+    r.pullVel = 0;
     // Toast while flying out — FX starts after the wheel clears.
     this.ShowBuffToast(`${seg.tier === "ultra" ? "超" : seg.tier === "bad" ? "负" : "好"} · ${seg.label}`);
   }
@@ -7028,19 +7097,21 @@ class Game {
     ctx.arc(needleCx, needleCy, rad * sc + 3, 0, Math.PI * 2);
     ctx.stroke();
 
+    this.DrawRoulettePlunger(ctx, r, motion);
+
     if (r.phase === "spin" || r.phase === "enter") {
       const footY = CANVAS_H - (touch ? 28 : 18);
       const legendY = CANVAS_H - (touch ? 10 : 6);
       ctx.fillStyle = "#a8b0b8";
       ctx.font = `${hintPx}px ${PIXEL_FONT}`;
       ctx.textAlign = "center";
-      ctx.fillText(
-        r.phase === "enter"
-          ? "转轮就位…"
-          : (Math.abs(r.omega) > 0.2 || r.dragging ? "减速中…" : "拖动甩转 / 空格"),
-        r.cx,
-        footY
-      );
+      let hint = "转轮就位…";
+      if (r.phase === "spin") {
+        if (Math.abs(r.omega) > ROULETTE_STOP) hint = "减速中…";
+        else if (r.pulling || r.pull > 0.05) hint = "松手发射！";
+        else hint = "右边下拉蓄力 · 松手转 / 空格";
+      }
+      ctx.fillText(hint, r.cx, footY);
       ctx.textAlign = "left";
       ctx.font = `${legendPx}px ${PIXEL_FONT}`;
       ctx.fillStyle = TIER_PALETTE.good.color;
@@ -7050,6 +7121,97 @@ class Game {
       ctx.fillStyle = TIER_PALETTE.bad.color;
       ctx.fillText("红=负", touch ? 170 : 120, legendY);
     }
+    ctx.restore();
+  }
+
+  /** Pinball-style pull arc on the right — drag knob down to charge, release to spin. */
+  DrawRoulettePlunger(ctx, r, motion) {
+    if (!r || r.phase === "exit" || r.phase === "result") return;
+    const g = this.RoulettePlungerGeom(r);
+    if (!g) return;
+    const oy = motion?.offsetY || 0;
+    const sc = motion?.scale || 1;
+    const alpha = motion?.alpha ?? 1;
+    const touch = this.isTouchDevice;
+    const charged = g.pull;
+    const spinning = Math.abs(r.omega) > ROULETTE_STOP || r.hasSpun;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(0, oy);
+
+    // Arc rail
+    ctx.beginPath();
+    ctx.arc(g.arcCx, g.arcCy, g.arcR * sc, g.ang0, g.ang1, false);
+    ctx.strokeStyle = "rgba(40,40,48,0.95)";
+    ctx.lineWidth = (touch ? 14 : 11) * sc;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(g.arcCx, g.arcCy, g.arcR * sc, g.ang0, g.ang1, false);
+    ctx.strokeStyle = spinning ? "rgba(120,120,128,0.55)" : "rgba(180,188,200,0.85)";
+    ctx.lineWidth = (touch ? 6 : 5) * sc;
+    ctx.stroke();
+
+    // Charge fill along the arc
+    if (charged > 0.02) {
+      const angFill = g.ang0 + (g.ang1 - g.ang0) * charged;
+      ctx.beginPath();
+      ctx.arc(g.arcCx, g.arcCy, g.arcR * sc, g.ang0, angFill, false);
+      ctx.strokeStyle = charged >= ROULETTE_PULL_MIN ? "#ffe060" : "#c8c070";
+      ctx.lineWidth = (touch ? 6 : 5) * sc;
+      ctx.stroke();
+    }
+
+    // End caps
+    for (const ang of [g.ang0, g.ang1]) {
+      const ex = g.arcCx + Math.cos(ang) * g.arcR * sc;
+      const ey = g.arcCy + Math.sin(ang) * g.arcR * sc;
+      ctx.beginPath();
+      ctx.arc(ex, ey, (touch ? 5 : 4) * sc, 0, Math.PI * 2);
+      ctx.fillStyle = "#2a2a32";
+      ctx.fill();
+      ctx.strokeStyle = "#9098a0";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // Knob
+    const kx = g.arcCx + Math.cos(g.ang) * g.arcR * sc;
+    const ky = g.arcCy + Math.sin(g.ang) * g.arcR * sc;
+    const kr = g.knobR * sc;
+    ctx.beginPath();
+    ctx.arc(kx + 1.5 * sc, ky + 2 * sc, kr, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(kx, ky, kr, 0, Math.PI * 2);
+    const hot = charged >= ROULETTE_PULL_MIN;
+    ctx.fillStyle = spinning ? "#505058" : (r.pulling ? (hot ? "#ffe060" : "#d0d070") : "#e8e0c0");
+    ctx.fill();
+    ctx.strokeStyle = spinning ? "#808088" : "#202028";
+    ctx.lineWidth = touch ? 3 : 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(kx - kr * 0.25, ky - kr * 0.25, kr * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.fill();
+
+    // Side label
+    if (!spinning && r.phase === "spin") {
+      ctx.fillStyle = "#c8d0d8";
+      ctx.font = `${touch ? 11 : 9}px ${PIXEL_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const lx = Math.min(CANVAS_W - 18, g.arcCx + g.arcR * sc + (touch ? 18 : 14));
+      ctx.save();
+      ctx.translate(lx, g.arcCy);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(r.pulling ? "蓄力" : "下拉", 0, 0);
+      ctx.restore();
+      ctx.textBaseline = "alphabetic";
+    }
+
     ctx.restore();
   }
 
