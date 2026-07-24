@@ -59,7 +59,9 @@
       <canvas id="gameCanvas" width="416" height="416"></canvas>
       <div id="startOverlay" class="overlay">
         <h2 id="startStageTitle">STAGE 1</h2>
-        <p id="startStageBlurb">炮弹带重力，打出去会往下掉。自己也要当心，别被自己的弹幕炸到。</p>
+        <p id="startStageBlurb" class="start-blurb">炮弹带重力，打出去会往下掉。
+
+自己也要当心，别被自己的弹幕炸到。</p>
         <div id="difficultyPick" class="difficulty-pick" role="radiogroup" aria-label="难度">
           <button type="button" class="diff-btn" data-diff="easy" role="radio" aria-checked="false">简易</button>
           <button type="button" class="diff-btn is-active" data-diff="normal" role="radio" aria-checked="true">标准</button>
@@ -148,7 +150,26 @@
 
       <div class="panel">
         <h3>RULE</h3>
-        <p class="feature">开局可选简易/标准。点击标题可开 Debug。场上 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?"> = 转轮。<strong style="color:#70ff98">绿=好</strong> · <strong style="color:#ffe060">金=超</strong>（第 6 关后可出「巨大」：体型翻倍、撞碎砖、扛多次伤害） · <strong style="color:#ff6060">红=负</strong>（含「遛鹰」：老鹰自己开门出去乱逛）。新手关：河北岸用重力清南岸敌军，通关选入门卡。第 3 关坦克王；第 6 关重力巨炮。第 6 关后路障教学：靠近木/铁板按 K（触屏「扛」）举起当护盾，同键放下封路。第 7–8 关开场有准备时间，可提前封死敌窝。第 9 关腿甲坦克人。过关三选一：普通升级本关有效；Boss 关永久带到通关结束。</p>
+        <ul class="rule-list">
+          <li>炮弹带重力，会下坠。别被自己的弹炸到。</li>
+          <li>保卫老鹰总部，敌军打掉老鹰即失败。</li>
+          <li>
+            场上
+            <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?">
+            = 转轮：
+            <strong class="rule-good">绿=增益</strong>
+            ·
+            <strong class="rule-ultra">金=超武</strong>
+            ·
+            <strong class="rule-bad">红=负面</strong>
+          </li>
+          <li>超武可含「巨大」：体型翻倍、撞碎砖墙、扛多次伤害。</li>
+          <li>负面可含「遛鹰」：老鹰开门出去乱逛，护住它。</li>
+          <li>木/铁路障：靠近按 <kbd>K</kbd>（触屏「扛」）举起当护盾，同键放下封路。</li>
+          <li>部分关卡开场有准备时间，可先封住敌窝出口。</li>
+          <li>过关三选一：普通升级本关有效；Boss 关能力永久至通关。</li>
+          <li>开局可选简易 / 标准难度。</li>
+        </ul>
       </div>
 
       <div class="panel panel-controls-help">
@@ -166,6 +187,6 @@
       <p class="credit">SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=portStack1"></script>
+  <script type="module" src="./Script_Game.mjs?v=rulesOnly1"></script>
 </body>
 </html>
