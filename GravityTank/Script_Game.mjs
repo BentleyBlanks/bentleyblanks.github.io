@@ -140,39 +140,40 @@ function MakeSeg(kind, label, tier) {
   return { kind, label, tier, color: pal.color, bg: pal.bg, rim: pal.rim };
 }
 
-/** Full prize pool — each spin picks ROULETTE_SIZE at random from here. */
+/** Full prize pool — each spin picks ROULETTE_SIZE at random from here.
+ *  Labels must read as plain Chinese (what it does), short enough for wheel wedges. */
 const ROULETTE_POOL = [
-  // Good — trimmed classic / gravity staples
-  MakeSeg(POWER.star, "★星", "good"),
+  // Good
+  MakeSeg(POWER.star, "火力", "good"),
   MakeSeg(POWER.bomb, "炸弹", "good"),
   MakeSeg(POWER.helmet, "护盾", "good"),
-  MakeSeg(POWER.life, "命+1", "good"),
+  MakeSeg(POWER.life, "加命", "good"),
   MakeSeg(POWER.clock, "冻结", "good"),
-  MakeSeg(POWER.shovel, "钢墙", "good"),
-  MakeSeg(POWER.antigrav, "反G", "good"),
+  MakeSeg(POWER.shovel, "护老家", "good"),
+  MakeSeg(POWER.antigrav, "反坠", "good"),
   MakeSeg(POWER.bounce, "弹跳", "good"),
   MakeSeg(POWER.meteor, "陨石", "good"),
-  MakeSeg(POWER.ghost, "幽灵", "good"),
-  // Ultra — more gold options
-  MakeSeg(POWER.nuke, "核爆", "ultra"),
-  MakeSeg(POWER.overdrive, "超武", "ultra"),
-  MakeSeg(POWER.apocalypse, "天罚", "ultra"),
-  MakeSeg(POWER.juggernaut, "霸体", "ultra"),
-  MakeSeg(POWER.steelRain, "钢雨", "ultra"),
-  MakeSeg(POWER.fortress, "铁壁", "ultra"),
-  MakeSeg(POWER.phoenix, "凤凰", "ultra"),
-  MakeSeg(POWER.arsenal, "军火", "ultra"),
-  MakeSeg(POWER.eagleAlly, "鹰援", "ultra"),
-  MakeSeg(POWER.bastion, "壁垒", "ultra"),
-  MakeSeg(POWER.giant, "巨大", "ultra"),
-  // Bad — fewer kinds; pick rate also low
-  MakeSeg(POWER.spawnExtra, "援军", "bad"),
-  MakeSeg(POWER.enemyShield, "敌盾", "bad"),
-  MakeSeg(POWER.heavyCurse, "超重", "bad"),
-  MakeSeg(POWER.enemyRage, "狂暴", "bad"),
-  MakeSeg(POWER.softStun, "眩晕", "bad"),
-  MakeSeg(POWER.fortBreak, "破堡", "bad"),
-  MakeSeg(POWER.eagleStroll, "遛鹰", "bad"),
+  MakeSeg(POWER.ghost, "穿墙", "good"),
+  // Ultra
+  MakeSeg(POWER.nuke, "大爆炸", "ultra"),
+  MakeSeg(POWER.overdrive, "狂射", "ultra"),
+  MakeSeg(POWER.apocalypse, "清场砸", "ultra"),
+  MakeSeg(POWER.juggernaut, "无敌", "ultra"),
+  MakeSeg(POWER.steelRain, "破钢砸", "ultra"),
+  MakeSeg(POWER.fortress, "钢堡盾", "ultra"),
+  MakeSeg(POWER.phoenix, "续命", "ultra"),
+  MakeSeg(POWER.arsenal, "弹海", "ultra"),
+  MakeSeg(POWER.eagleAlly, "老鹰帮", "ultra"),
+  MakeSeg(POWER.bastion, "装甲", "ultra"),
+  MakeSeg(POWER.giant, "变大", "ultra"),
+  // Bad
+  MakeSeg(POWER.spawnExtra, "增敌", "bad"),
+  MakeSeg(POWER.enemyShield, "敌有盾", "bad"),
+  MakeSeg(POWER.heavyCurse, "弹更坠", "bad"),
+  MakeSeg(POWER.enemyRage, "敌加速", "bad"),
+  MakeSeg(POWER.softStun, "动不了", "bad"),
+  MakeSeg(POWER.fortBreak, "拆老家", "bad"),
+  MakeSeg(POWER.eagleStroll, "老鹰跑", "bad"),
 ];
 
 /** Always exactly 7 wedges on the wheel. */
@@ -186,38 +187,43 @@ Object.assign(POWER_STYLE, {
 /** NES-style pickup FX presets. Some styles are fullscreen CRT wipes / tints. */
 const POWER_FX = {
   [POWER.star]: { style: "buff", label: "火力", tint: "#ffe060", dur: 1.05, shake: 3, fullscreen: false },
-  [POWER.gun]: { style: "buff", label: "钢弹", tint: "#d0d0d0", dur: 1.1, shake: 4, fullscreen: false },
-  [POWER.life]: { style: "life", label: "命+2", tint: "#70ff98", dur: 1.2, shake: 2, fullscreen: true },
+  [POWER.gun]: { style: "buff", label: "破钢弹", tint: "#d0d0d0", dur: 1.1, shake: 4, fullscreen: false },
+  [POWER.life]: { style: "life", label: "加命", tint: "#70ff98", dur: 1.2, shake: 2, fullscreen: true },
   [POWER.helmet]: { style: "shield", label: "护盾", tint: "#80c8ff", dur: 1.25, shake: 2, fullscreen: false },
   [POWER.plates]: { style: "armor", label: "装甲", tint: "#c8c8c8", dur: 1.05, shake: 3, fullscreen: false },
-  [POWER.bastion]: { style: "armor", label: "壁垒", tint: "#f0d060", dur: 1.4, shake: 5, fullscreen: true },
+  [POWER.bastion]: { style: "armor", label: "装甲", tint: "#f0d060", dur: 1.4, shake: 5, fullscreen: true },
   [POWER.clock]: { style: "freeze", label: "冻结", tint: "#a0e8ff", dur: 1.45, shake: 2, fullscreen: true },
-  [POWER.bomb]: { style: "blast", label: "爆破", tint: "#ffe08a", dur: 1.05, shake: 8, fullscreen: true, rings: 2, blastN: 10, flashFrames: 10 },
-  [POWER.shovel]: { style: "fort", label: "钢墙", tint: "#c0c0c0", dur: 1.25, shake: 4, fullscreen: false },
-  [POWER.antigrav]: { style: "antigrav", label: "反G", tint: "#70ffe0", dur: 1.4, shake: 3, fullscreen: true },
+  [POWER.bomb]: { style: "blast", label: "炸弹", tint: "#ffe08a", dur: 1.05, shake: 8, fullscreen: true, rings: 2, blastN: 10, flashFrames: 10 },
+  [POWER.shovel]: { style: "fort", label: "护老家", tint: "#c0c0c0", dur: 1.25, shake: 4, fullscreen: false },
+  [POWER.antigrav]: { style: "antigrav", label: "反坠", tint: "#70ffe0", dur: 1.4, shake: 3, fullscreen: true },
   [POWER.bounce]: { style: "bounce", label: "弹跳", tint: "#ffc060", dur: 1.15, shake: 3, fullscreen: false },
   [POWER.meteor]: { style: "meteor", label: "陨石", tint: "#ff8040", dur: 1.5, shake: 7, fullscreen: true },
-  [POWER.ghost]: { style: "ghost", label: "幽灵", tint: "#c0e0ff", dur: 1.35, shake: 1, fullscreen: true },
-  [POWER.mirror]: { style: "mirror", label: "镜像", tint: "#e8e8ff", dur: 1.2, shake: 3, fullscreen: true },
+  [POWER.ghost]: { style: "ghost", label: "穿墙", tint: "#c0e0ff", dur: 1.35, shake: 1, fullscreen: true },
+  [POWER.mirror]: { style: "mirror", label: "双炮", tint: "#e8e8ff", dur: 1.2, shake: 3, fullscreen: true },
   [POWER.magnet]: { style: "magnet", label: "追踪", tint: "#80ffc0", dur: 1.25, shake: 2, fullscreen: false },
   [POWER.warp]: { style: "warp", label: "闪现", tint: "#ffffff", dur: 0.95, shake: 6, fullscreen: false },
-  [POWER.fork]: { style: "weapon", label: "分叉", tint: "#ffe080", dur: 1.05, shake: 3, fullscreen: false },
+  [POWER.fork]: { style: "weapon", label: "三发", tint: "#ffe080", dur: 1.05, shake: 3, fullscreen: false },
   [POWER.rapid]: { style: "weapon", label: "速射", tint: "#ff9060", dur: 1.05, shake: 4, fullscreen: false },
-  [POWER.pierce]: { style: "weapon", label: "穿甲", tint: "#d0d8ff", dur: 1.05, shake: 3, fullscreen: false },
+  [POWER.pierce]: { style: "weapon", label: "穿透", tint: "#d0d8ff", dur: 1.05, shake: 3, fullscreen: false },
   [POWER.spread]: { style: "weapon", label: "散射", tint: "#ffd060", dur: 1.05, shake: 3, fullscreen: false },
   [POWER.sniper]: { style: "weapon", label: "狙击", tint: "#ff7060", dur: 1.1, shake: 2, fullscreen: false },
-  [POWER.nuke]: { style: "blast", label: "核爆", tint: "#ff6040", dur: 1.65, shake: 14, fullscreen: true, rings: 4, blastN: 18, flashFrames: 16 },
-  [POWER.overdrive]: { style: "ultra", label: "超武", tint: "#ffe060", dur: 1.55, shake: 8, fullscreen: true },
-  [POWER.apocalypse]: { style: "blast", label: "天罚", tint: "#fff2a0", dur: 2.35, shake: 18, fullscreen: true, rings: 6, blastN: 28, flashFrames: 22 },
-  [POWER.juggernaut]: { style: "ultra", label: "霸体", tint: "#f0d060", dur: 1.5, shake: 7, fullscreen: true },
-  [POWER.giant]: { style: "giant", label: "巨大", tint: "#f0d060", dur: 1.45, shake: 6, fullscreen: true },
-  [POWER.spawnExtra]: { style: "curse", label: "援军", tint: "#ff5050", dur: 1.3, shake: 5, fullscreen: true },
-  [POWER.enemyShield]: { style: "curse", label: "敌盾", tint: "#ff7070", dur: 1.25, shake: 3, fullscreen: false },
-  [POWER.heavyCurse]: { style: "curse", label: "超重", tint: "#c06030", dur: 1.35, shake: 4, fullscreen: true },
-  [POWER.enemyRage]: { style: "curse", label: "狂暴", tint: "#ff3030", dur: 1.3, shake: 6, fullscreen: true },
-  [POWER.softStun]: { style: "stun", label: "眩晕", tint: "#ffe060", dur: 1.15, shake: 9, fullscreen: true },
-  [POWER.fortBreak]: { style: "fortBreak", label: "破堡", tint: "#ff8060", dur: 1.35, shake: 7, fullscreen: false },
-  [POWER.eagleStroll]: { style: "eagle", label: "遛鹰", tint: "#ff9090", dur: 1.45, shake: 4, fullscreen: true },
+  [POWER.nuke]: { style: "blast", label: "大爆炸", tint: "#ff6040", dur: 1.65, shake: 14, fullscreen: true, rings: 4, blastN: 18, flashFrames: 16 },
+  [POWER.overdrive]: { style: "ultra", label: "狂射", tint: "#ffe060", dur: 1.55, shake: 8, fullscreen: true },
+  [POWER.apocalypse]: { style: "blast", label: "清场砸", tint: "#fff2a0", dur: 2.35, shake: 18, fullscreen: true, rings: 6, blastN: 28, flashFrames: 22 },
+  [POWER.juggernaut]: { style: "ultra", label: "无敌", tint: "#f0d060", dur: 1.5, shake: 7, fullscreen: true },
+  [POWER.steelRain]: { style: "meteor", label: "破钢砸", tint: "#ff9040", dur: 1.5, shake: 8, fullscreen: true },
+  [POWER.fortress]: { style: "fort", label: "钢堡盾", tint: "#e0e0e0", dur: 1.35, shake: 5, fullscreen: true },
+  [POWER.phoenix]: { style: "life", label: "续命", tint: "#ffb070", dur: 1.4, shake: 4, fullscreen: true },
+  [POWER.arsenal]: { style: "ultra", label: "弹海", tint: "#ffe080", dur: 1.45, shake: 7, fullscreen: true },
+  [POWER.eagleAlly]: { style: "eagle", label: "老鹰帮", tint: "#ffe060", dur: 1.4, shake: 4, fullscreen: true },
+  [POWER.giant]: { style: "giant", label: "变大", tint: "#f0d060", dur: 1.45, shake: 6, fullscreen: true },
+  [POWER.spawnExtra]: { style: "curse", label: "增敌", tint: "#ff5050", dur: 1.3, shake: 5, fullscreen: true },
+  [POWER.enemyShield]: { style: "curse", label: "敌有盾", tint: "#ff7070", dur: 1.25, shake: 3, fullscreen: false },
+  [POWER.heavyCurse]: { style: "curse", label: "弹更坠", tint: "#c06030", dur: 1.35, shake: 4, fullscreen: true },
+  [POWER.enemyRage]: { style: "curse", label: "敌加速", tint: "#ff3030", dur: 1.3, shake: 6, fullscreen: true },
+  [POWER.softStun]: { style: "stun", label: "动不了", tint: "#ffe060", dur: 1.15, shake: 9, fullscreen: true },
+  [POWER.fortBreak]: { style: "fortBreak", label: "拆老家", tint: "#ff8060", dur: 1.35, shake: 7, fullscreen: false },
+  [POWER.eagleStroll]: { style: "eagle", label: "老鹰跑", tint: "#ff9090", dur: 1.45, shake: 4, fullscreen: true },
 };
 
 function ShuffleInPlace(arr) {
@@ -2166,7 +2172,7 @@ class Game {
     p.protect = Math.max(p.protect, 1.2);
     this.UnstickTank(p, { maxDist: 80 });
     this.CrushBricksTouchingPlayer();
-    this.ShowBuffToast(`巨大化 ${Math.ceil(this.giantTimer)}s · 撞碎砖墙 · 扛伤×${this.giantHits}`);
+    this.ShowBuffToast(`变大 ${Math.ceil(this.giantTimer)}s · 撞碎砖墙 · 扛伤×${this.giantHits}`);
   }
 
   ClearGiantForm(restoreTank = true) {
@@ -2217,7 +2223,7 @@ class Game {
     this.player.protect = Math.max(this.player.protect, 0.55);
     this.SpawnExplosion(this.player.x + this.player.w * 0.5, this.player.y + this.player.h * 0.5, 0.5);
     this.ShowBuffToast(
-      this.giantHits > 0 ? `巨大化扛住！剩余 ${this.giantHits}` : "巨大化护甲耗尽"
+      this.giantHits > 0 ? `变大扛住！剩余 ${this.giantHits}` : "变大护甲耗尽"
     );
     this.audio.Bounce();
     return true;
@@ -2376,7 +2382,7 @@ class Game {
       this.giantTimer -= dt;
       if (this.giantTimer <= 0) {
         this.ClearGiantForm(true);
-        this.ShowBuffToast("巨大化结束");
+        this.ShowBuffToast("变大结束");
       } else {
         this.CrushBricksTouchingPlayer();
       }
@@ -3687,7 +3693,7 @@ class Game {
     }
     if (this.EjectTankToOpenTile(p)) {
       p.protect = Math.max(p.protect, 1.5);
-      this.ShowBuffToast("幽灵消散 · 已弹出墙体");
+      this.ShowBuffToast("穿墙结束 · 已弹出墙体");
     }
   }
 
@@ -4332,7 +4338,7 @@ class Game {
       this.giantHits -= 1;
       p.protect = Math.max(p.protect, 0.9);
       this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.7);
-      this.ShowBuffToast(this.giantHits > 0 ? `巨大化扛伤！剩余 ${this.giantHits}` : "巨大化护甲耗尽！");
+      this.ShowBuffToast(this.giantHits > 0 ? `变大扛伤！剩余 ${this.giantHits}` : "变大护甲耗尽！");
       this.audio.Bounce();
       return;
     }
@@ -4441,7 +4447,7 @@ class Game {
     }
     if (this.eagleAlly) {
       this.eagleAlly.ttl = Math.max(this.eagleAlly.ttl, duration);
-      this.ShowBuffToast("鹰援续航！");
+      this.ShowBuffToast("老鹰继续帮你打");
       return;
     }
     const cell = this.FindBaseCell();
@@ -4468,7 +4474,7 @@ class Game {
       aimY: CANVAS_H * 0.5,
       animTick: 0,
     };
-    this.ShowBuffToast("鹰援出击！导弹清兵 16 秒");
+    this.ShowBuffToast("老鹰帮忙出击！导弹清兵 16 秒");
     this.audio.Power();
   }
 
@@ -4488,7 +4494,7 @@ class Game {
       }
     }
     this._baseCell = { x: hx, y: hy };
-    this.ShowBuffToast("老鹰归巢");
+    this.ShowBuffToast("老鹰回家了");
   }
 
   UpdateEagleAlly(dt) {
@@ -4609,7 +4615,7 @@ class Game {
     if (this.eagleStroll) {
       this.eagleStroll.ttl = Math.max(this.eagleStroll.ttl, duration);
       this.BreakBaseFort();
-      this.ShowBuffToast("⚠ 老鹰还在遛弯…门又开了");
+      this.ShowBuffToast("⚠ 老鹰还在外面跑…门又开了");
       return;
     }
     const cell = this.FindBaseCell();
@@ -4645,7 +4651,7 @@ class Game {
     const face = DIR[this.eagleStroll.dir];
     this.eagleStroll.x = Clamp(this.eagleStroll.x + face.x * TILE * 1.2, 0, CANVAS_W - this.eagleStroll.w);
     this.eagleStroll.y = Clamp(this.eagleStroll.y + face.y * TILE * 1.2, 0, CANVAS_H - this.eagleStroll.h);
-    this.ShowBuffToast("⚠ 老鹰自己开门遛去了！护住它！");
+    this.ShowBuffToast("⚠ 老鹰自己开门跑出去了！护住它！");
     this.eagleWarnT = Math.max(this.eagleWarnT, 2.4);
   }
 
@@ -4715,7 +4721,7 @@ class Game {
       }
       this._baseCell = { x: e.home.x, y: e.home.y };
       this.pendingFortRestore = true;
-      this.ShowBuffToast("老鹰遛完回家了");
+      this.ShowBuffToast("老鹰跑完回家了");
     }
     this.eagleStroll = null;
   }
@@ -4780,7 +4786,7 @@ class Game {
     const nUltra = segments.filter((s) => s.tier === "ultra").length;
     this.ShowBuffToast(
       this.isBossStage
-        ? `Boss转轮 ×${segments.length}（金${nUltra} · 禁核爆/天罚/炸弹 · 红${nBad}）`
+        ? `Boss转轮 ×${segments.length}（金${nUltra} · 禁大爆炸/清场砸/炸弹 · 红${nBad}）`
         : `转轮 ×${segments.length}（金${nUltra} / 红${nBad}）`
     );
     this.audio.PowerSpawn();
@@ -4999,7 +5005,7 @@ class Game {
             this.overdriveTimer = Math.max(this.overdriveTimer, 8);
           }
         }
-        this.ShowBuffToast(p?.power >= 3 ? "★ 火力满载 + 超武" : "★ 火力升级");
+        this.ShowBuffToast(p?.power >= 3 ? "火力满了，顺带狂射一阵" : "火力升级");
         break;
       case POWER.gun:
         if (p) {
@@ -5007,11 +5013,11 @@ class Game {
           p.maxBullets = Math.max(p.maxBullets, 3);
         }
         this.overdriveTimer = Math.max(this.overdriveTimer, 10);
-        this.ShowBuffToast("手枪：钢墙可破 + 疯射");
+        this.ShowBuffToast("破钢弹：能打钢墙，射速加快");
         break;
       case POWER.life:
         this.lives += 2;
-        this.ShowBuffToast("额外生命 +2");
+        this.ShowBuffToast("生命 +2");
         break;
       case POWER.helmet:
         if (p) p.protect = Math.max(p.protect, 16);
@@ -5025,21 +5031,21 @@ class Game {
         this.KillAllFieldEnemies({ spareBoss: true });
         this.NukeBricks(0.45);
         this.SpawnBrickDebris(18);
-        this.ShowBuffToast("全场爆破 + 掀砖");
+        this.ShowBuffToast("炸清场上敌军，掀掉一些砖");
         break;
       case POWER.shovel:
         this.shovelTimer = 22;
         this.pendingFortRestore = false;
         this.FortifyBase(true);
-        this.ShowBuffToast("总部钢墙加固 22 秒");
+        this.ShowBuffToast("老家钢墙加固 22 秒");
         break;
       case POWER.antigrav:
         this.antigravTimer = 18;
-        this.ShowBuffToast("反重力 18 秒！");
+        this.ShowBuffToast("反坠 18 秒：炮弹不那么往下掉");
         break;
       case POWER.bounce:
         this.bounceTimer = 20;
-        this.ShowBuffToast("弹跳弹 20 秒！");
+        this.ShowBuffToast("弹跳弹 20 秒");
         break;
       case POWER.meteor:
         this.SpawnMeteorRain(16);
@@ -5051,44 +5057,44 @@ class Game {
           this.UnstickTank(p, { maxDist: 48 });
           p.protect = Math.max(p.protect, 4);
         }
-        this.ShowBuffToast("幽灵穿墙（砖/钢）16 秒");
+        this.ShowBuffToast("穿墙 16 秒：砖墙钢墙都能钻");
         break;
       case POWER.mirror:
         this.mirrorTimer = 18;
-        this.ShowBuffToast("镜像炮 18 秒");
+        this.ShowBuffToast("双炮 18 秒：背后也开火");
         break;
       case POWER.magnet:
         this.magnetTimer = 18;
-        this.ShowBuffToast("磁导追踪 18 秒");
+        this.ShowBuffToast("追踪弹 18 秒");
         break;
       case POWER.warp:
         this.WarpPlayer();
         if (p) p.protect = Math.max(p.protect, 5);
-        this.ShowBuffToast("闪现 + 短盾");
+        this.ShowBuffToast("闪现到别处 + 短护盾");
         break;
       case POWER.fork:
         this.forkTimer = 16;
         this.spreadTimer = 0;
-        this.ShowBuffToast("分叉弹：一次三发 16 秒");
+        this.ShowBuffToast("一次三发 16 秒");
         break;
       case POWER.rapid:
         this.rapidTimer = 14;
         if (p) p.maxBullets = Math.max(p.maxBullets, 3);
-        this.ShowBuffToast("超快射速 14 秒！");
+        this.ShowBuffToast("射速加快 14 秒");
         break;
       case POWER.pierce:
         this.pierceTimer = 14;
-        this.ShowBuffToast("穿甲弹：可穿透敌坦 14 秒");
+        this.ShowBuffToast("穿透弹：可打穿敌坦 14 秒");
         break;
       case POWER.spread:
         this.spreadTimer = 14;
         this.forkTimer = 0;
-        this.ShowBuffToast("散射弹：大角度三发 14 秒");
+        this.ShowBuffToast("散射：大角度三发 14 秒");
         break;
       case POWER.sniper:
         this.sniperTimer = 12;
         if (p) p.power = Math.max(p.power, 3);
-        this.ShowBuffToast("狙击：高速低坠高伤 12 秒");
+        this.ShowBuffToast("狙击弹：飞得快、掉得少、伤得高 12 秒");
         break;
       case POWER.nuke:
         this.KillAllFieldEnemies({ spareBoss: true });
@@ -5100,7 +5106,7 @@ class Game {
           p.power = 3;
           p.maxBullets = Math.max(p.maxBullets, 3);
         }
-        this.ShowBuffToast("☢ 核爆：清场+掀砖+陨石");
+        this.ShowBuffToast("大爆炸：清场 + 掀砖 + 陨石");
         break;
       case POWER.overdrive:
         if (p) {
@@ -5112,7 +5118,7 @@ class Game {
         this.bounceTimer = Math.max(this.bounceTimer, 14);
         this.magnetTimer = Math.max(this.magnetTimer, 14);
         this.antigravTimer = Math.max(this.antigravTimer, 8);
-        this.ShowBuffToast("超武：四联疯射 24 秒！！");
+        this.ShowBuffToast("狂射：四联开火 24 秒");
         break;
       case POWER.apocalypse:
         this.freezeTimer = 18;
@@ -5130,7 +5136,7 @@ class Game {
         }
         this.bounceTimer = Math.max(this.bounceTimer, 12);
         this.magnetTimer = Math.max(this.magnetTimer, 12);
-        this.ShowBuffToast("天罚降临！！清场+陨石海");
+        this.ShowBuffToast("清场砸：敌军清空 + 大片陨石");
         break;
       case POWER.juggernaut:
         if (p) {
@@ -5143,12 +5149,12 @@ class Game {
         this.magnetTimer = 22;
         this.antigravTimer = 12;
         this.overdriveTimer = Math.max(this.overdriveTimer, 12);
-        this.ShowBuffToast("霸体：几乎无敌的 22 秒！！");
+        this.ShowBuffToast("无敌：几乎打不死你 22 秒");
         break;
       case POWER.steelRain:
         this.SpawnMeteorRain(22, { power: 3 });
         if (p) p.protect = Math.max(p.protect, 6);
-        this.ShowBuffToast("钢雨：破钢陨石 ×22");
+        this.ShowBuffToast("破钢砸：能砸穿钢墙的陨石 ×22");
         break;
       case POWER.fortress:
         this.shovelTimer = Math.max(this.shovelTimer, 30);
@@ -5156,7 +5162,7 @@ class Game {
         this.FortifyBase(true);
         if (p) p.protect = Math.max(p.protect, 18);
         this.freezeTimer = Math.max(this.freezeTimer, 6);
-        this.ShowBuffToast("铁壁：钢堡 + 长盾");
+        this.ShowBuffToast("钢堡盾：老家钢墙 + 自己长护盾");
         break;
       case POWER.phoenix:
         this.lives += 2;
@@ -5167,7 +5173,7 @@ class Game {
         }
         this.FortifyBase(true);
         this.shovelTimer = Math.max(this.shovelTimer, 16);
-        this.ShowBuffToast("凤凰：命+2 · 护盾 · 钢墙");
+        this.ShowBuffToast("续命：命+2、护盾、老家钢墙");
         break;
       case POWER.arsenal:
         if (p) {
@@ -5181,7 +5187,7 @@ class Game {
         this.forkTimer = Math.max(this.forkTimer, 14);
         this.spreadTimer = 0;
         this.bounceTimer = Math.max(this.bounceTimer, 12);
-        this.ShowBuffToast("军火库：疯射分叉穿甲！！");
+        this.ShowBuffToast("弹海：狂射 + 三发 + 穿透");
         break;
       case POWER.eagleAlly:
         this.StartEagleAlly(16);
@@ -5191,30 +5197,30 @@ class Game {
         break;
       case POWER.spawnExtra:
         this.ForceSpawnExtras(4);
-        this.ShowBuffToast("⚠ 敌军援军 ×4");
+        this.ShowBuffToast("⚠ 敌军多来 4 辆");
         break;
       case POWER.enemyShield:
         for (const e of this.enemies) {
           if (e.alive) e.protect = Math.max(e.protect || 0, 14);
         }
-        this.ShowBuffToast("⚠ 全员敌盾");
+        this.ShowBuffToast("⚠ 敌军全员有盾");
         break;
       case POWER.heavyCurse:
         this.heavyCurseTimer = 14;
         this.antigravTimer = 0;
-        this.ShowBuffToast("⚠ 超重诅咒：弹更坠");
+        this.ShowBuffToast("⚠ 弹更坠：你的炮弹掉得更狠");
         break;
       case POWER.enemyRage:
         this.enemyRageTimer = 12;
-        this.ShowBuffToast("⚠ 敌军狂暴");
+        this.ShowBuffToast("⚠ 敌加速：敌军更快更凶");
         break;
       case POWER.softStun:
         this.playerStunTimer = 2.8;
-        this.ShowBuffToast("⚠ 眩晕！动不了");
+        this.ShowBuffToast("⚠ 动不了！先扛着");
         break;
       case POWER.fortBreak:
         this.BreakBaseFort();
-        this.ShowBuffToast("⚠ 堡垒崩塌");
+        this.ShowBuffToast("⚠ 老家钢墙被拆了");
         break;
       case POWER.eagleStroll:
         this.StartEagleStroll(18);
@@ -7024,29 +7030,29 @@ class Game {
 
   DrawBuffHud(ctx) {
     const chips = [];
-    if (this.antigravTimer > 0) chips.push({ t: `反G ${Math.ceil(this.antigravTimer)}`, c: "#b8f0ff" });
+    if (this.antigravTimer > 0) chips.push({ t: `反坠 ${Math.ceil(this.antigravTimer)}`, c: "#b8f0ff" });
     if (this.bounceTimer > 0) chips.push({ t: `弹 ${Math.ceil(this.bounceTimer)}`, c: "#70ff98" });
-    if (this.ghostTimer > 0) chips.push({ t: `幽 ${Math.ceil(this.ghostTimer)}`, c: "#70ff98" });
-    if (this.mirrorTimer > 0) chips.push({ t: `镜 ${Math.ceil(this.mirrorTimer)}`, c: "#70ff98" });
+    if (this.ghostTimer > 0) chips.push({ t: `穿墙 ${Math.ceil(this.ghostTimer)}`, c: "#70ff98" });
+    if (this.mirrorTimer > 0) chips.push({ t: `双炮 ${Math.ceil(this.mirrorTimer)}`, c: "#70ff98" });
     if (this.magnetTimer > 0) chips.push({ t: `磁 ${Math.ceil(this.magnetTimer)}`, c: "#70ff98" });
-    if (this.forkTimer > 0) chips.push({ t: `叉 ${Math.ceil(this.forkTimer)}`, c: "#70ff98" });
+    if (this.forkTimer > 0) chips.push({ t: `三发 ${Math.ceil(this.forkTimer)}`, c: "#70ff98" });
     if (this.rapidTimer > 0) chips.push({ t: `速 ${Math.ceil(this.rapidTimer)}`, c: "#70ff98" });
-    if (this.pierceTimer > 0) chips.push({ t: `穿 ${Math.ceil(this.pierceTimer)}`, c: "#70ff98" });
+    if (this.pierceTimer > 0) chips.push({ t: `穿透 ${Math.ceil(this.pierceTimer)}`, c: "#70ff98" });
     if (this.spreadTimer > 0) chips.push({ t: `散 ${Math.ceil(this.spreadTimer)}`, c: "#70ff98" });
     if (this.sniperTimer > 0) chips.push({ t: `狙 ${Math.ceil(this.sniperTimer)}`, c: "#70ff98" });
-    if (this.overdriveTimer > 0) chips.push({ t: `超武 ${Math.ceil(this.overdriveTimer)}`, c: "#ffe060" });
+    if (this.overdriveTimer > 0) chips.push({ t: `狂射 ${Math.ceil(this.overdriveTimer)}`, c: "#ffe060" });
     if (this.giantTimer > 0) {
-      chips.push({ t: `巨大 ${Math.ceil(this.giantTimer)}·甲${this.giantHits}`, c: "#ffe060" });
+      chips.push({ t: `变大 ${Math.ceil(this.giantTimer)}·甲${this.giantHits}`, c: "#ffe060" });
     }
-    if (this.heavyCurseTimer > 0) chips.push({ t: `超重 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
-    if (this.enemyRageTimer > 0) chips.push({ t: `狂暴 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
-    if (this.playerStunTimer > 0) chips.push({ t: `眩晕 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
-    if (this.eagleAlly) chips.push({ t: `鹰援 ${Math.ceil(this.eagleAlly.ttl)}`, c: "#ffe060" });
+    if (this.heavyCurseTimer > 0) chips.push({ t: `弹坠 ${Math.ceil(this.heavyCurseTimer)}`, c: "#ff6060" });
+    if (this.enemyRageTimer > 0) chips.push({ t: `敌加速 ${Math.ceil(this.enemyRageTimer)}`, c: "#ff6060" });
+    if (this.playerStunTimer > 0) chips.push({ t: `动不了 ${Math.ceil(this.playerStunTimer)}`, c: "#ff6060" });
+    if (this.eagleAlly) chips.push({ t: `老鹰帮 ${Math.ceil(this.eagleAlly.ttl)}`, c: "#ffe060" });
     if (this.freezeTimer > 0) chips.push({ t: `冻 ${Math.ceil(this.freezeTimer)}`, c: "#70ff98" });
     if ((this.absorbHits || 0) > 0) chips.push({ t: `装甲×${this.absorbHits}`, c: "#c8e0ff" });
     if (this.playerDisarmed) chips.push({ t: "无炮管·去捡", c: "#ff6060" });
     if (this.eagleStroll && this.baseAlive) {
-      chips.push({ t: `遛鹰 ${Math.ceil(this.eagleStroll.ttl)}`, c: "#ff6060" });
+      chips.push({ t: `老鹰跑 ${Math.ceil(this.eagleStroll.ttl)}`, c: "#ff6060" });
     }
     if (this.prepTimer > 0) chips.push({ t: `准备 ${Math.ceil(this.prepTimer)}`, c: "#80e0ff" });
     if (this.carriedBlock) {
@@ -7087,10 +7093,10 @@ class Game {
       ctx.font = `14px ${PIXEL_FONT}`;
       ctx.textAlign = "center";
       if (this.eagleStroll) {
-        ctx.fillText("⚠ 老鹰出门遛弯了！", CANVAS_W / 2, CANVAS_H * 0.28 + 22);
+        ctx.fillText("⚠ 老鹰自己跑出去了！", CANVAS_W / 2, CANVAS_H * 0.28 + 22);
         ctx.fillStyle = "#ff9090";
         ctx.font = `11px ${PIXEL_FONT}`;
-        ctx.fillText("堡垒已开 · 敌军会追它 · 被打中即失败", CANVAS_W / 2, CANVAS_H * 0.28 + 44);
+        ctx.fillText("老家门开了 · 敌军会追它 · 被打中即失败", CANVAS_W / 2, CANVAS_H * 0.28 + 44);
       }
       ctx.textAlign = "left";
       ctx.restore();
