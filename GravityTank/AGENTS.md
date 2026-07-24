@@ -61,6 +61,7 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 | Hit i-frames | 1.0 s | `HIT_IFRAME` |
 | First death / stage | revive in place + 2 s shield | `stageReviveUsed`, `STAGE_REVIVE_PROTECT` |
 | Revive presentation | 1.25 s ring / beam / particles | `respawnFx`, `StartRespawnFx`, `DrawRespawnFx` |
+| Death presentation | 0.85 s slow motion + 3.2 s incident report | `deathSlowTimer`, `StartIncidentReport`, `DrawIncidentSlowFx` |
 | On death | keep firepower (−1 max) | `SoftenFirepowerOnDeath` / `KillPlayer` |
 | Wipe upgrades | only on run fail | (not on seat loss) |
 
@@ -110,7 +111,7 @@ Grep these first:
 |------|---------|
 | Version | `GAME_VERSION` |
 | Balance / difficulty | `GetStartLives`, `GetPowerDropRate`, `SyncStageLabels` |
-| Player HP / death | `DamagePlayer`, `KillPlayer`, `BlitPlayerHpTinted`, `stageReviveUsed`, `SoftenFirepowerOnDeath` |
+| Player HP / death | `DamagePlayer`, `KillPlayer`, `StartIncidentReport`, `BlitPlayerHpTinted`, `stageReviveUsed`, `SoftenFirepowerOnDeath` |
 | Draw | `DrawTank`, `DrawTankBarrel`, `DrawBossBarrels`, `TankSheetOrigin`, `BlitArmorTinted`, `BlitGrid` |
 | Roulette | `ROULETTE_POOL`, `OpenRoulette`, `ResolveRoulette`, `DrawRoulette`, `DrawRoulettePlunger`, `ApplyPowerup`, `POWER_FX` |
 | Fort / HQ | `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll` |

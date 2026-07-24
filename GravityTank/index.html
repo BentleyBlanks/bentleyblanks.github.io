@@ -18,14 +18,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="preload" href="./assets/Font_FusionPixel12ZhHans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/Font_FusionPixel12Latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./Style_Game.css?v=v04">
+  <link rel="stylesheet" href="./Style_Game.css?v=v05">
 </head>
 <body>
   <div id="app">
     <header class="hero">
       <div class="hero-logo">
         <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
-        <span class="game-version" id="gameVersion" aria-label="版本">v0.5</span>
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.6</span>
       </div>
       <p class="tagline">捡到 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="16" height="16" alt="?"> 弹出物理转轮——甩转到哪算哪</p>
     </header>
@@ -90,6 +90,13 @@
         <p id="endMessage">敌军全部歼灭。</p>
         <button id="restartButton" class="primary" type="button">RETRY</button>
         <button id="nextStageButton" class="primary" type="button" hidden>NEXT</button>
+      </div>
+      <div id="incidentReport" class="incident-report" role="alert" aria-live="assertive" hidden>
+        <div class="incident-kicker">事故报告 / CASE CLOSED</div>
+        <p>本次事故责任人：<strong id="incidentOwner">你自己</strong></p>
+        <p>致命炮弹发射于：<strong id="incidentLaunch">0.00 秒前</strong></p>
+        <p id="incidentCause" class="incident-cause">事故类型：走位与炮弹发生交集</p>
+        <div class="incident-denial">保险拒赔</div>
       </div>
       <div id="upgradeOverlay" class="overlay upgrade-overlay" hidden>
         <h2 id="upgradeTitle">升级选择</h2>
@@ -185,9 +192,9 @@
         </ul>
       </div>
 
-      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.5</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.6</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=gravityTank05"></script>
+  <script type="module" src="./Script_Game.mjs?v=gravityTank06"></script>
 </body>
 </html>
