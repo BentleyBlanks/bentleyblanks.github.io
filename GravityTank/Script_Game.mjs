@@ -7,7 +7,7 @@ import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL
 import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade, IsUpgradeRecommended, PeekNextStageId } from "./Data_Upgrades.mjs";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.7";
+export const GAME_VERSION = "0.8";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
 
 const PIXEL_FONT = '"Fusion Pixel 12", monospace';
@@ -919,6 +919,9 @@ class Game {
     this.player = null;
     this.enemies = [];
     this.bullets = [];
+    this.shellPickups = [];
+    this.ballisticAmmo = 0;
+    this.ballisticAmmoMode = "singleShell";
     this.explosions = [];
     this.powerups = [];
     this.bombs = [];
@@ -1839,6 +1842,12 @@ class Game {
           "让它们自己把弹道变成事故现场。",
         );
       } else if (this.specialKind === "ballisticPuzzle") {
+        lines.push("每次只能装一发炮弹；打空就去捡落地炮弹，敌我都能捡，正面不能命中坦克。", "本关变体：" + ({
+          singleShell: "单发回收",
+          gravitySpin: "回旋引力炮",
+          bankShot: "墙面反弹",
+          relayMaze: "迷宫接力",
+        }[this.stageData?.ballisticVariant] || "弹道回收"));
         lines.push(
           "弹道谜题：先看墙，再决定从哪条线开火。",
           "炮弹会下坠，借墙反弹或引敌人互射。",
@@ -2033,6 +2042,7 @@ class Game {
     this.brickMask = BuildBrickMask(this.map);
     this._baseCell = null;
     this.bullets = [];
+    this.shellPickups = [];
     this.explosions = [];
     this.powerups = [];
     this.bombs = [];
@@ -2045,6 +2055,8 @@ class Game {
     this.prepTimer = 0;
     this.enemies = [];
     this.playerDisarmed = this.isNoFireStage;
+    this.ballisticAmmo = this.IsBallisticPuzzle() ? 1 : 0;
+    this.ballisticAmmoMode = this.stageData?.ballisticVariant || "singleShell";
     this.SpawnCarryBlocksFromStage();
     if (!keepScore) this.score = 0;
     if (!keepLives) this.lives = this.GetStartLives();
@@ -2394,6 +2406,10 @@ class Game {
     return false;
   }
 
+  IsBallisticPuzzle() {
+    return this.specialKind === "ballisticPuzzle";
+  }
+
   GetMaxEnemiesOnField() {
     if (this.isBossStage) {
       if (this.stage === 3) return MAX_ENEMIES_BOSS_S3;
@@ -2443,8 +2459,9 @@ class Game {
   SpawnPlayer(fullProtect, keepStats = null, showRespawnFx = false) {
     const [sx, rawSy] = this.stageData.playerSpawns?.[0] || [8, 24];
     const sy = Math.max(0, Math.min(rawSy, MAP_H - 3));
-    const power = keepStats?.power ?? 1;
-    const maxBullets = keepStats?.maxBullets ?? (power >= 2 ? 2 : 1);
+    const ballistic = this.IsBallisticPuzzle();
+    const power = ballistic ? 1 : (keepStats?.power ?? 1);
+    const maxBullets = ballistic ? 1 : (keepStats?.maxBullets ?? (power >= 2 ? 2 : 1));
     if (keepStats?.absorbHits != null) this.absorbHits = keepStats.absorbHits;
     this.playerDisarmed = !!this.isNoFireStage;
     // Top HQ / tutorial: face the battlefield. Classic bottom HQ: face up toward enemies.
@@ -2467,6 +2484,7 @@ class Game {
       protect: fullProtect ? SPAWN_PROTECT : 2.2,
       fireCd: 0,
       moving: false,
+      ballistic: ballistic,
       slipVx: 0,
       slipVy: 0,
       blink: 0,
@@ -2641,6 +2659,7 @@ class Game {
     this.UpdatePlayer(dt);
     this.UpdateEnemies(dt);
     this.UpdateBullets(dt);
+    this.UpdateBallisticShellPickups(dt);
     this.UpdateBombs(dt);
     this.UpdatePowerups(dt);
     this.UpdateExplosions(dt);
@@ -2872,6 +2891,7 @@ class Game {
     if (this.giantTimer > 0) this.CrushBricksTouchingPlayer();
 
     if (this.ConsumeInteractPress()) this.TryInteractCarry();
+    if (this.IsBallisticPuzzle()) this.TryCollectBallisticShell(p, true);
     if (!this.isNoFireStage && this.WantsFire()) this.TryFire(p, true);
 
     // pickup → gunBarrel restores armament; other tokens open physics roulette
@@ -2978,6 +2998,8 @@ class Game {
         // blocked — pick new dir soon
         e.aiTimer = Math.min(e.aiTimer, 0.15);
       }
+
+      if (this.IsBallisticPuzzle()) this.TryCollectBallisticShell(e, false);
 
       // shoot logic: if roughly aligned with player or base, fire
       if (e.fireCd <= 0) {
@@ -4382,6 +4404,7 @@ class Game {
         return false;
       }
       this.DestroyBrickHalf(tx, ty, b, b.power);
+      this.DropBallisticShell(b, "terrain");
       b.alive = false;
       this.SpawnExplosion(b.x, b.y, 0.45);
       this.audio.Hit();
@@ -4418,6 +4441,7 @@ class Game {
         } else {
           this.audio.Bounce();
         }
+        this.DropBallisticShell(b, "terrain");
         b.alive = false;
         this.SpawnExplosion(b.x, b.y, 0.4);
         return true;
@@ -4470,8 +4494,10 @@ class Game {
     if (isPlayer && this.playerStunTimer > 0) return;
     if (isPlayer && (this.playerDisarmed || tank.disarmed)) return;
     if (tank.fireCd > 0) return;
+    const ballistic = this.IsBallisticPuzzle();
+    if (ballistic && ((isPlayer && this.ballisticAmmo <= 0) || (!isPlayer && tank.ballisticAmmo <= 0))) return;
     const owned = this.bullets.filter((b) => b.alive && b.owner === tank).length;
-    let maxB = isPlayer ? tank.maxBullets : 1;
+    let maxB = ballistic ? 1 : (isPlayer ? tank.maxBullets : 1);
     if (isPlayer && this.overdriveTimer > 0) maxB = Math.max(maxB, 4);
     if (isPlayer && this.rapidTimer > 0) maxB = Math.max(maxB, 3);
     if (isPlayer && (this.forkTimer > 0 || this.spreadTimer > 0)) maxB = Math.max(maxB, 5);
@@ -4479,7 +4505,10 @@ class Game {
     if (owned >= maxB) return;
 
     this.SpawnShell(tank, tank.dir, isPlayer);
-    if (isPlayer && this.forkTimer > 0) {
+    if (ballistic) {
+      if (isPlayer) this.ballisticAmmo = 0;
+      else tank.ballisticAmmo = 0;
+    } else if (isPlayer && this.forkTimer > 0) {
       this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: -0.38 });
       this.SpawnShell(tank, tank.dir, true, { bonusShot: true, angleOffset: 0.38 });
     } else if (isPlayer && this.spreadTimer > 0) {
@@ -4496,7 +4525,8 @@ class Game {
       const opp = { up: "down", down: "up", left: "right", right: "left" }[tank.dir];
       this.SpawnShell(tank, opp, true, { bonusShot: true });
     }
-    if (isPlayer && this.rapidTimer > 0) tank.fireCd = 0.045;
+    if (ballistic) tank.fireCd = isPlayer ? 0.45 : Math.max(0.75, tank.shootCd);
+    else if (isPlayer && this.rapidTimer > 0) tank.fireCd = 0.045;
     else if (isPlayer && this.overdriveTimer > 0) tank.fireCd = 0.07;
     else if (isPlayer && this.sniperTimer > 0) tank.fireCd = 0.42;
     else if (isPlayer && this.HasPerk("rapidFire")) tank.fireCd = tank.power >= 2 ? 0.12 : 0.18;
@@ -4506,11 +4536,15 @@ class Game {
 
   SpawnShell(tank, dirName, isPlayer, opts = {}) {
     const d = DIR[dirName];
+    const ballistic = this.IsBallisticPuzzle();
+    const ballisticMode = ballistic
+      ? (opts.ballisticMode || (isPlayer ? this.ballisticAmmoMode : (tank.ballisticAmmoMode || this.stageData?.ballisticVariant)) || "singleShell")
+      : null;
     let speedMul = 1;
-    if (isPlayer && tank.power >= 2) speedMul *= 1.12;
-    if (isPlayer && this.sniperTimer > 0) speedMul *= 1.55;
-    if (isPlayer && this.rapidTimer > 0) speedMul *= 1.1;
-    if (isPlayer && this.HasPerk("bulletSpeed")) speedMul *= 1.22;
+    if (!ballistic && isPlayer && tank.power >= 2) speedMul *= 1.12;
+    if (!ballistic && isPlayer && this.sniperTimer > 0) speedMul *= 1.55;
+    if (!ballistic && isPlayer && this.rapidTimer > 0) speedMul *= 1.1;
+    if (!ballistic && isPlayer && this.HasPerk("bulletSpeed")) speedMul *= 1.22;
     const speed = BULLET_SPEED * (tank.bulletBoost || 1) * speedMul;
     let vx = d.x * speed;
     let vy = d.y * speed;
@@ -4530,17 +4564,22 @@ class Game {
     const cy = tank.y + tank.h / 2;
     const muzzle = Math.max(14, (tank.w || TANK_SIZE) * 0.42);
     let gravityMul = 1;
-    if (isPlayer && this.antigravTimer > 0) gravityMul = -0.35;
-    if (isPlayer && this.heavyCurseTimer > 0) gravityMul *= 2.6;
-    if (isPlayer && this.sniperTimer > 0) gravityMul *= 0.45;
-    if (isPlayer && this.HasPerk("lightGravity")) gravityMul *= 0.55;
-    if (!isPlayer && this.HasPerk("enemyAnchor")) gravityMul *= 1.5;
-    if (!isPlayer && tank.anchorTank) gravityMul = 0;
-    let bounceLeft = isPlayer && this.bounceTimer > 0 ? 5 : 0;
-    if (isPlayer && this.HasPerk("bounceShell")) bounceLeft = Math.max(bounceLeft, 2);
-    const homing = (isPlayer && this.magnetTimer > 0) || (isPlayer && this.HasPerk("huntMark"));
-    let pierceLeft = isPlayer && this.pierceTimer > 0 ? 3 : 0;
-    if (isPlayer && this.HasPerk("pierceShell")) pierceLeft = Math.max(pierceLeft, 1);
+    if (!ballistic && isPlayer && this.antigravTimer > 0) gravityMul = -0.35;
+    if (!ballistic && isPlayer && this.heavyCurseTimer > 0) gravityMul *= 2.6;
+    if (!ballistic && isPlayer && this.sniperTimer > 0) gravityMul *= 0.45;
+    if (!ballistic && isPlayer && this.HasPerk("lightGravity")) gravityMul *= 0.55;
+    if (!ballistic && !isPlayer && this.HasPerk("enemyAnchor")) gravityMul *= 1.5;
+    if (!ballistic && !isPlayer && tank.anchorTank) gravityMul = 0;
+    let bounceLeft = !ballistic && isPlayer && this.bounceTimer > 0 ? 5 : 0;
+    if (!ballistic && isPlayer && this.HasPerk("bounceShell")) bounceLeft = Math.max(bounceLeft, 2);
+    if (ballistic && ballisticMode === "bankShot") bounceLeft = 2;
+    if (ballistic && ballisticMode === "relayMaze") bounceLeft = 1;
+    const homing = !ballistic && ((isPlayer && this.magnetTimer > 0) || (isPlayer && this.HasPerk("huntMark")));
+    let pierceLeft = !ballistic && isPlayer && this.pierceTimer > 0 ? 3 : 0;
+    if (!ballistic && isPlayer && this.HasPerk("pierceShell")) pierceLeft = Math.max(pierceLeft, 1);
+    const spinRate = ballistic && ballisticMode === "gravitySpin"
+      ? (isPlayer ? 3.8 : -3.1)
+      : 0;
 
     this.bullets.push({
       x: cx - 4 + d.x * muzzle,
@@ -4563,6 +4602,10 @@ class Game {
       pierceLeft,
       homing,
       meteor: !!opts.meteor,
+      ballistic,
+      ballisticMode,
+      spinRate,
+      spinAngle: 0,
     });
   }
 
@@ -4575,6 +4618,17 @@ class Game {
       const gravity = this.gravityVector || { x: 0, y: 1 };
       b.vx += GRAVITY * gravity.x * gMul * dt;
       b.vy += GRAVITY * gravity.y * gMul * dt;
+
+      if (b.spinRate) {
+        const turn = b.spinRate * dt;
+        const c = Math.cos(turn);
+        const s = Math.sin(turn);
+        const vx = b.vx * c - b.vy * s;
+        const vy = b.vx * s + b.vy * c;
+        b.vx = vx;
+        b.vy = vy;
+        b.spinAngle = (b.spinAngle || 0) + turn;
+      }
 
       if (b.homing && b.isPlayer) {
         let best = null;
@@ -4643,6 +4697,7 @@ class Game {
           this.audio.Bounce();
         }
       } else if (b.x < -20 || b.y < -40 || b.x > CANVAS_W + 20 || b.y > CANVAS_H + 40) {
+        this.DropBallisticShell(b, "edge");
         b.alive = false;
         continue;
       }
@@ -4660,6 +4715,13 @@ class Game {
         if (!canSelfHit && e === b.owner) continue;
         if (this.BlocksEnemyFriendlyFire(b, e)) continue;
         if (RectsOverlap(b, e)) {
+          if (this.IsBallisticPuzzle() && this.IsBallisticFrontHit(b, e)) {
+            this.DropBallisticShell(b, "front");
+            this.SpawnExplosion(b.x, b.y, 0.3);
+            this.audio.Bounce();
+            b.alive = false;
+            break;
+          }
           this.DamageEnemy(e, b.power);
           if (b.pierceLeft > 0) {
             b.pierceLeft -= 1;
@@ -4697,6 +4759,8 @@ class Game {
         for (const o of this.bullets) {
           if (!o.alive || o === b || o.isPlayer === b.isPlayer) continue;
           if (RectsOverlap(b, o)) {
+            this.DropBallisticShell(b, "crossfire");
+            this.DropBallisticShell(o, "crossfire");
             b.alive = false;
             o.alive = false;
             this.SpawnExplosion(b.x, b.y, 0.4);
@@ -4705,6 +4769,125 @@ class Game {
       }
     }
     this.bullets = this.bullets.filter((b) => b.alive);
+  }
+
+  IsBallisticFrontHit(b, tank) {
+    const d = DIR[tank?.dir] || DIR.down;
+    const speed = Math.hypot(b?.vx || 0, b?.vy || 0);
+    if (speed < 1) return false;
+    return ((b.vx / speed) * d.x + (b.vy / speed) * d.y) < -0.35;
+  }
+
+  FindBallisticShellSpot(x, y) {
+    const base = {
+      x: Clamp(x, 4, CANVAS_W - 16),
+      y: Clamp(y, 4, CANVAS_H - 16),
+      w: 12,
+      h: 12,
+    };
+    if (!this.CollidesTerrain(base) && !this.CollidesCarryables(base)) return base;
+    const dirs = [
+      [1, 0], [-1, 0], [0, 1], [0, -1],
+      [1, 1], [-1, 1], [1, -1], [-1, -1],
+    ];
+    for (let radius = 8; radius <= 64; radius += 8) {
+      for (const [dx, dy] of dirs) {
+        const candidate = {
+          ...base,
+          x: Clamp(base.x + dx * radius, 4, CANVAS_W - 16),
+          y: Clamp(base.y + dy * radius, 4, CANVAS_H - 16),
+        };
+        if (!this.CollidesTerrain(candidate) && !this.CollidesCarryables(candidate)) return candidate;
+      }
+    }
+    return base;
+  }
+
+  DropBallisticShell(b, reason = "miss") {
+    if (!this.IsBallisticPuzzle() || !b || b.ballisticPickupDropped) return;
+    b.ballisticPickupDropped = true;
+    const spot = this.FindBallisticShellSpot(
+      (b.x || 0) + (b.w || 8) * 0.5 - 6,
+      (b.y || 0) + (b.h || 8) * 0.5 - 6,
+    );
+    this.shellPickups.push({
+      x: spot.x,
+      y: spot.y,
+      w: 12,
+      h: 12,
+      vx: Clamp((b.vx || 0) * 0.12, -54, 54),
+      vy: Clamp((b.vy || 0) * 0.12, -54, 54),
+      settled: false,
+      alive: true,
+      ttl: 60,
+      bob: Math.random() * Math.PI * 2,
+      mode: b.ballisticMode || this.stageData?.ballisticVariant || "singleShell",
+      source: b.isPlayer ? "player" : "enemy",
+    });
+    this.fxMarks.push({
+      type: "shellDrop",
+      x: spot.x + 6,
+      y: spot.y + 6,
+      color: reason === "front" ? "#ffcf70" : "#80e8ff",
+      ttl: 0.38,
+      life: 0.38,
+    });
+  }
+
+  TryCollectBallisticShell(tank, isPlayer) {
+    if (!this.IsBallisticPuzzle() || !tank?.alive) return false;
+    const hasAmmo = isPlayer ? this.ballisticAmmo > 0 : tank.ballisticAmmo > 0;
+    if (hasAmmo) return false;
+    for (const shell of this.shellPickups) {
+      if (!shell.alive || !RectsOverlap(tank, shell)) continue;
+      shell.alive = false;
+      if (isPlayer) {
+        this.ballisticAmmo = 1;
+        this.ballisticAmmoMode = shell.mode || "singleShell";
+        this.ShowBuffToast("炮弹回收：1 / 1，可以再开火");
+      } else {
+        tank.ballisticAmmo = 1;
+        tank.ballisticAmmoMode = shell.mode || this.stageData?.ballisticVariant || "singleShell";
+      }
+      this.SpawnExplosion(shell.x + shell.w / 2, shell.y + shell.h / 2, 0.25);
+      this.audio.Power();
+      return true;
+    }
+    return false;
+  }
+
+  UpdateBallisticShellPickups(dt) {
+    if (!this.IsBallisticPuzzle()) return;
+    for (const shell of this.shellPickups) {
+      if (!shell.alive) continue;
+      shell.ttl -= dt;
+      shell.bob += dt * 5;
+      if (!shell.settled) {
+        const gravity = this.gravityVector || DIR.down;
+        shell.vx += GRAVITY * gravity.x * 0.45 * dt;
+        shell.vy += GRAVITY * gravity.y * 0.45 * dt;
+        const next = {
+          x: shell.x + shell.vx * dt,
+          y: shell.y + shell.vy * dt,
+          w: shell.w,
+          h: shell.h,
+        };
+        const boundary = next.x <= 4 || next.y <= 4
+          || next.x >= CANVAS_W - shell.w - 4 || next.y >= CANVAS_H - shell.h - 4;
+        if (this.CollidesTerrain(next) || this.CollidesCarryables(next) || boundary) {
+          shell.x = Clamp(next.x, 4, CANVAS_W - shell.w - 4);
+          shell.y = Clamp(next.y, 4, CANVAS_H - shell.h - 4);
+          shell.settled = true;
+          shell.vx = 0;
+          shell.vy = 0;
+        } else {
+          shell.x = Clamp(next.x, 4, CANVAS_W - shell.w - 4);
+          shell.y = Clamp(next.y, 4, CANVAS_H - shell.h - 4);
+        }
+      }
+      if (shell.ttl <= 0) shell.alive = false;
+    }
+    this.shellPickups = this.shellPickups.filter((shell) => shell.alive);
   }
 
   DamageCarryable(block, power = 1) {
@@ -4732,6 +4915,7 @@ class Game {
           return false;
         }
         this.DamageCarryable(this.carriedBlock, b.power || 1);
+        this.DropBallisticShell(b, "terrain");
         b.alive = false;
         this.SpawnExplosion(b.x, b.y, 0.4);
         return true;
@@ -4742,6 +4926,7 @@ class Game {
       if (!block.alive || block.carried) continue;
       if (!RectsOverlap(b, block)) continue;
       this.DamageCarryable(block, b.power || 1);
+      this.DropBallisticShell(b, "terrain");
       b.alive = false;
       this.SpawnExplosion(b.x, b.y, 0.4);
       return true;
@@ -5406,6 +5591,7 @@ class Game {
 
   DropPowerup(x, y, kind = POWER.token) {
     // Field token opens roulette; gunBarrel is a direct restore pickup.
+    if (this.IsBallisticPuzzle()) return;
     this.powerups.push({
       x: Clamp(x, 8, CANVAS_W - 32),
       y: Clamp(y, 8, CANVAS_H - 32),
@@ -6223,6 +6409,8 @@ class Game {
       anchorTank: !!type.anchorTank,
       gravityWarden: !!type.gravityWarden,
       gravityTimer: type.gravityWarden ? 2.4 : 0,
+      ballisticAmmo: this.IsBallisticPuzzle() ? 1 : Infinity,
+      ballisticAmmoMode: this.stageData?.ballisticVariant || "singleShell",
     };
   }
 
@@ -6696,6 +6884,7 @@ class Game {
     }
 
     for (const pu of this.powerups) this.DrawPowerup(ctx, pu);
+    for (const shell of this.shellPickups) this.DrawBallisticShellPickup(ctx, shell);
     for (const bomb of this.bombs || []) if (bomb.alive) this.DrawTimedBomb(ctx, bomb);
     for (const e of this.enemies) if (e.alive) this.DrawTank(ctx, e, false);
     if (this.player?.alive) {
@@ -7660,6 +7849,18 @@ class Game {
       ctx.stroke();
     }
 
+    if (b.spinRate) {
+      const cx = b.x + b.w / 2;
+      const cy = b.y + b.h / 2;
+      ctx.save();
+      ctx.strokeStyle = b.isPlayer ? "#e0b0ff" : "#a070d0";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, (b.spinAngle || 0) - 1.8, (b.spinAngle || 0) + 0.9);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (b.meteor) {
       ctx.fillStyle = "#ff6020";
       ctx.beginPath();
@@ -7739,6 +7940,36 @@ class Game {
     }
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+
+  DrawBallisticShellPickup(ctx, shell) {
+    if (!shell?.alive) return;
+    const pulse = 1 + 0.12 * Math.sin(shell.bob);
+    const cx = shell.x + shell.w / 2;
+    const cy = shell.y + shell.h / 2;
+    const color = shell.mode === "gravitySpin" ? "#d8a0ff"
+      : shell.mode === "bankShot" ? "#ffcf70"
+        : shell.mode === "relayMaze" ? "#70e8ff" : "#ffe080";
+    ctx.save();
+    ctx.globalAlpha = shell.ttl < 4 && Math.floor(shell.bob * 3) % 2 === 0 ? 0.35 : 1;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 9 * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#16151d";
+    ctx.fillRect(cx - 5, cy - 5, 10, 10);
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - 3, cy - 3, 6, 6);
+    if (shell.mode === "gravitySpin") {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 13, shell.bob, shell.bob + Math.PI * 1.35);
+      ctx.stroke();
+    } else if (shell.mode === "bankShot") {
+      ctx.fillRect(cx - 8, cy - 1, 4, 2);
+      ctx.fillRect(cx + 4, cy - 1, 4, 2);
+    }
+    ctx.restore();
   }
 
   DrawPowerup(ctx, pu) {
@@ -8099,6 +8330,13 @@ class Game {
 
   DrawBuffHud(ctx) {
     const chips = [];
+    if (this.IsBallisticPuzzle()) {
+      const ammo = this.ballisticAmmo > 0 ? "●" : "○";
+      const mode = this.ballisticAmmoMode === "gravitySpin" ? "回旋引力炮"
+        : this.ballisticAmmoMode === "bankShot" ? "反弹炮"
+          : this.ballisticAmmoMode === "relayMaze" ? "迷宫炮" : "单发炮";
+      chips.push({ t: `弹药 ${ammo}  ${mode}`, c: this.ballisticAmmo > 0 ? "#ffe080" : "#80e8ff" });
+    }
     if (this.antigravTimer > 0) chips.push({ t: `反坠 ${Math.ceil(this.antigravTimer)}`, c: "#b8f0ff" });
     if (this.bounceTimer > 0) chips.push({ t: `弹 ${Math.ceil(this.bounceTimer)}`, c: "#70ff98" });
     if (this.ghostTimer > 0) chips.push({ t: `幽 ${Math.ceil(this.ghostTimer)}`, c: "#70ff98" });
@@ -8307,6 +8545,14 @@ class Game {
         ctx.fillRect(x - d.x * 18 - 1, y - d.y * 18 - 1, 3, 3);
         ctx.fillRect(x + d.x * 18 - 1, y + d.y * 18 - 1, 3, 3);
         ctx.strokeRect(x - 22, y - 22, 44, 44);
+      } else if (m.type === "shellDrop") {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 10);
+        ctx.lineTo(x + 7, y);
+        ctx.lineTo(x, y + 10);
+        ctx.lineTo(x - 7, y);
+        ctx.closePath();
+        ctx.stroke();
       } else if (m.type === "plate") {
         ctx.fillStyle = "#000";
         ctx.fillRect(x - 14, y - 10, 28, 20);
