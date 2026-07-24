@@ -160,7 +160,7 @@ const ROULETTE_POOL = [
   MakeSeg(POWER.apocalypse, "清场砸", "ultra"),
   MakeSeg(POWER.juggernaut, "无敌", "ultra"),
   MakeSeg(POWER.steelRain, "破钢砸", "ultra"),
-  MakeSeg(POWER.fortress, "钢堡盾", "ultra"),
+  MakeSeg(POWER.fortress, "加钢墙", "ultra"),
   MakeSeg(POWER.phoenix, "续命", "ultra"),
   MakeSeg(POWER.arsenal, "弹海", "ultra"),
   MakeSeg(POWER.eagleAlly, "老鹰帮", "ultra"),
@@ -212,7 +212,7 @@ const POWER_FX = {
   [POWER.apocalypse]: { style: "blast", label: "清场砸", tint: "#fff2a0", dur: 2.35, shake: 18, fullscreen: true, rings: 6, blastN: 28, flashFrames: 22 },
   [POWER.juggernaut]: { style: "ultra", label: "无敌", tint: "#f0d060", dur: 1.5, shake: 7, fullscreen: true },
   [POWER.steelRain]: { style: "meteor", label: "破钢砸", tint: "#ff9040", dur: 1.5, shake: 8, fullscreen: true },
-  [POWER.fortress]: { style: "fort", label: "钢堡盾", tint: "#e0e0e0", dur: 1.35, shake: 5, fullscreen: true },
+  [POWER.fortress]: { style: "fort", label: "加钢墙", tint: "#e0e0e0", dur: 1.35, shake: 4, fullscreen: true },
   [POWER.phoenix]: { style: "life", label: "续命", tint: "#ffb070", dur: 1.4, shake: 4, fullscreen: true },
   [POWER.arsenal]: { style: "ultra", label: "弹海", tint: "#ffe080", dur: 1.45, shake: 7, fullscreen: true },
   [POWER.eagleAlly]: { style: "eagle", label: "老鹰帮", tint: "#ffe060", dur: 1.4, shake: 4, fullscreen: true },
@@ -967,7 +967,7 @@ class Game {
       ctx.font = `${Math.max(8, size * 0.45)}px ${PIXEL_FONT}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(kind === POWER.softStun ? "眩" : "堡", cx, cy + 1);
+      ctx.fillText(kind === POWER.softStun ? "定" : "拆", cx, cy + 1);
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
       return true;
@@ -4494,7 +4494,11 @@ class Game {
       }
     }
     this._baseCell = { x: hx, y: hy };
-    this.ShowBuffToast("老鹰回家了");
+    // Gold ultra must not leave HQ naked after the sortie.
+    this.pendingFortRestore = false;
+    this.FortifyBase(true);
+    this.shovelTimer = Math.max(this.shovelTimer, 14);
+    this.ShowBuffToast("老鹰回家了 · 老家钢墙补上");
   }
 
   UpdateEagleAlly(dt) {
@@ -5156,14 +5160,18 @@ class Game {
         if (p) p.protect = Math.max(p.protect, 6);
         this.ShowBuffToast("破钢砸：能砸穿钢墙的陨石 ×22");
         break;
-      case POWER.fortress:
-        this.shovelTimer = Math.max(this.shovelTimer, 30);
+      case POWER.fortress: {
+        // If eagle is out (sortie / stroll), bring it home first so we can seal properly.
+        if (this.eagleStroll) this.ReturnEagleHome();
+        if (this.eagleAlly) this.EndEagleAlly();
+        this.shovelTimer = Math.max(this.shovelTimer, 36);
         this.pendingFortRestore = false;
         this.FortifyBase(true);
         if (p) p.protect = Math.max(p.protect, 18);
         this.freezeTimer = Math.max(this.freezeTimer, 6);
-        this.ShowBuffToast("钢堡盾：老家钢墙 + 自己长护盾");
+        this.ShowBuffToast("加钢墙：老家围上钢墙 + 你自己护盾");
         break;
+      }
       case POWER.phoenix:
         this.lives += 2;
         if (p) {
@@ -5349,11 +5357,11 @@ class Game {
 
   FortifyBase(steel) {
     const cells = this.GetBaseFortCells();
+    // Always place walls. Skipping occupied cells left permanent holes in the fort
+    // when a tank stood on the ring — shove tanks out after placing.
     for (const [x, y] of cells) {
       if (y < 0 || y >= MAP_H || x < 0 || x >= MAP_W) continue;
       if (this.map[y][x] === TILE_BASE || this.map[y][x] === TILE_BASE_DEAD) continue;
-      // Never bury a live tank inside fort walls — that soft-locks movement.
-      if (this.TileOccupiedByTank(x, y)) continue;
       if (steel) {
         this.map[y][x] = TILE_STEEL;
         if (this.brickMask[y]) this.brickMask[y][x] = 0;
@@ -5361,9 +5369,9 @@ class Game {
         this.SetBrickCell(x, y, true);
       }
     }
-    if (this.player?.alive) this.UnstickTank(this.player);
+    if (this.player?.alive) this.UnstickTank(this.player, { maxDist: 64 });
     for (const e of this.enemies) {
-      if (e.alive) this.UnstickTank(e);
+      if (e.alive) this.UnstickTank(e, { maxDist: 64 });
     }
   }
 
@@ -5648,7 +5656,8 @@ class Game {
       case "fort":
         spark(hq.x, hq.y, ["#c0c0c0", "#ffffff", "#808080"], 18, 130);
         mark("ring", { x: hq.x, y: hq.y, r: 36, ttl: 1.0, color: "#d0d0d0" });
-        this.SpawnExplosion(hq.x, hq.y, 1.2, { flash: true });
+        mark("ring", { x: hq.x, y: hq.y, r: 48, ttl: 0.85, color: "#a0a0a0" });
+        // No HQ explosion — looked like the fort was being blown open.
         break;
       case "fortBreak":
         spark(hq.x, hq.y, ["#ff8060", "#b05028", "#603018"], 22, 160);
