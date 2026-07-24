@@ -5385,20 +5385,18 @@ class Game {
   }
 
   TryRestoreBaseFort() {
-    // Defer restore while any fort cell is occupied, otherwise wait one frame and place free cells.
+    // Place brick fort back; shove tanks out afterward (same hole-bug as FortifyBase).
     const cells = this.GetBaseFortCells();
-    let blocked = false;
     for (const [x, y] of cells) {
       if (y < 0 || y >= MAP_H || x < 0 || x >= MAP_W) continue;
       if (this.map[y][x] === TILE_BASE || this.map[y][x] === TILE_BASE_DEAD) continue;
-      if (this.TileOccupiedByTank(x, y)) {
-        blocked = true;
-        continue;
-      }
       this.SetBrickCell(x, y, true);
     }
-    if (this.player?.alive) this.UnstickTank(this.player);
-    return !blocked;
+    if (this.player?.alive) this.UnstickTank(this.player, { maxDist: 64 });
+    for (const e of this.enemies) {
+      if (e.alive) this.UnstickTank(e, { maxDist: 64 });
+    }
+    return true;
   }
 
   RestoreBaseFort() {
