@@ -54,9 +54,10 @@ Rules:
 - Do not wait for the user to merge “小需求”. Unmerged draft stacks that block Pages have already burned trust—avoid repeating that.
 - Larger multi-feature stacks may still use PRs for review, but unique shippable work must still reach `master` (port/merge) rather than rotting on stacked draft branches.
 
-### Agent map
+### Agent guide
 
-- GravityTank file ownership + symbol shortcuts: see `GravityTank/AGENTS.md` (prefer that over dumping `Script_Game.mjs`).
+- Full GravityTank agent map (ship workflow, file owners, HP/lives contract, roulette names, symbol index): **`GravityTank/AGENTS.md`**
+- Prefer that guide over dumping `Script_Game.mjs`. Keep it updated when contracts change (lives, HP look, prize names, deploy rules).
 
 ## BehindTheLines Documentation
 
