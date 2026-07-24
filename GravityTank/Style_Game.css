@@ -1204,6 +1204,14 @@ body.force-touch #app {
     max-height: 72px;
   }
 
+  body.is-touch .game-version,
+  body.force-touch .game-version {
+    right: 6px;
+    bottom: 6px;
+    font-size: 0.48rem;
+    padding: 2px 5px;
+  }
+
   body.is-touch .tagline {
     font-size: 0.4rem;
     line-height: 1.6;
