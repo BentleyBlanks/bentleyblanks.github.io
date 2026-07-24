@@ -29,7 +29,7 @@ Deploy branch: **`master` only**. Small fixes: branch → PR → **merge yoursel
 - Fort / HQ: `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll`
 - Barricades: `carryBlocks`, `carriedBlock`, `WantsInteract`, barricade teach stage id
 - Bosses: `UpdateBoss`, `UpdateTankKing`, `UpdateTankMan`, `ArmBossSkill`
-- Player durability: `PLAYER_MAX_HP`, `DamagePlayer`, `KillPlayer`, `stageReviveUsed`, `SoftenFirepowerOnDeath`
+- Player durability: `PLAYER_LIVES` / `PLAYER_LIVES_EASY`, `PLAYER_MAX_HP`, `DamagePlayer`, `KillPlayer`, `BlitPlayerHpTinted`, `stageReviveUsed`, `SoftenFirepowerOnDeath`
 - Version: `GAME_VERSION`
 
 ## Do / don’t

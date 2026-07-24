@@ -30,6 +30,7 @@ const MAX_ENEMIES_LATE = 5;
 const ENEMY_FRIENDLY_FIRE_OFF_STAGE = 6;
 const MAX_ABSORB_HITS = 8;
 const PLAYER_LIVES = 3;
+const PLAYER_LIVES_EASY = 5;
 const PLAYER_MAX_HP = 3;
 /** Brief i-frames after a non-lethal hit so one volley cannot shred all HP. */
 const HIT_IFRAME = 1.0;
@@ -69,6 +70,13 @@ const ARMOR_HP_PALETTE = {
   3: { mid: [230, 180, 40], dark: [120, 90, 10], light: [255, 240, 170], flash: [240, 240, 240] }, // yellow↔white
   2: { mid: [0, 168, 72], dark: [0, 90, 40], light: [200, 255, 220], flash: [230, 180, 40] }, // green↔yellow
   1: { mid: [200, 200, 200], dark: [70, 70, 80], light: [255, 255, 255], flash: [200, 200, 200] }, // white/gray
+};
+
+/** Player body tint by remaining HP — reads clearly at a glance. */
+const PLAYER_HP_PALETTE = {
+  3: { mid: [232, 188, 36], dark: [96, 64, 8], light: [255, 244, 170], flash: [255, 250, 210] }, // full — gold
+  2: { mid: [220, 112, 32], dark: [96, 40, 8], light: [255, 196, 120], flash: [255, 220, 160] }, // hurt — orange
+  1: { mid: [208, 52, 44], dark: [88, 12, 12], light: [255, 160, 140], flash: [255, 210, 200] }, // critical — red
 };
 
 const TILE_EMPTY = 0;
@@ -1489,8 +1497,8 @@ class Game {
       }
       if (hint) {
         hint.textContent = this.IsEasy()
-          ? "简易：双倍生命 · 负面更少 · ?掉率+50%"
-          : "标准：原版生命与掉率";
+          ? "简易：5 条座驾 · 每台 3 点生命 · 负面更少 · ?掉率+50%"
+          : "标准：3 条座驾 · 每台 3 点生命";
       }
       this.SyncStageLabels();
     };
@@ -1688,7 +1696,7 @@ class Game {
   }
 
   GetStartLives() {
-    return this.IsEasy() ? PLAYER_LIVES * 2 : PLAYER_LIVES;
+    return this.IsEasy() ? PLAYER_LIVES_EASY : PLAYER_LIVES;
   }
 
   GetPowerDropRate() {
@@ -1748,8 +1756,8 @@ class Game {
     }
     if (this.overlays.startBlurb) {
       const diffLine = this.IsEasy()
-        ? "简易：双倍生命 · 负面更少 · ?掉率+50%"
-        : "标准难度";
+        ? "简易：5 条座驾 · 每台 3 点生命 · 负面更少 · ?掉率+50%"
+        : "标准：3 条座驾 · 每台 3 点生命";
       const lines = [diffLine, ""];
       if (this.isTutorial) {
         lines.push("炮弹带重力会下坠。", "朝下 / 斜着打对岸。", "别把自己轰死。");
@@ -6498,22 +6506,26 @@ class Game {
     return { gx: spec.col + dirCol + colOff, gy: row, redFlash: row === spec.redRow };
   }
 
+  EnsureTintScratch(sw, sh) {
+    if (!this._tintCanvas) {
+      this._tintCanvas = document.createElement("canvas");
+      this._tintCtx = this._tintCanvas.getContext("2d", { willReadFrequently: true });
+    }
+    const tc = this._tintCanvas;
+    if (tc.width !== sw || tc.height !== sh) {
+      tc.width = sw;
+      tc.height = sh;
+    }
+    return { tc, tctx: this._tintCtx };
+  }
+
   /** Remap gray enemy armor sprite into classic HP color stages. */
   BlitArmorTinted(ctx, gx, gy, dx, dy, dw, dh, hp) {
     const sheet = this.images.sheet;
     if (!sheet) return;
     const sw = 2 * SHEET_CELL;
     const sh = 2 * SHEET_CELL;
-    if (!this._tintCanvas) {
-      this._tintCanvas = document.createElement("canvas");
-      this._tintCtx = this._tintCanvas.getContext("2d", { willReadFrequently: true });
-    }
-    const tc = this._tintCanvas;
-    const tctx = this._tintCtx;
-    if (tc.width !== sw || tc.height !== sh) {
-      tc.width = sw;
-      tc.height = sh;
-    }
+    const { tc, tctx } = this.EnsureTintScratch(sw, sh);
     tctx.clearRect(0, 0, sw, sh);
     tctx.drawImage(sheet, gx * SHEET_CELL, gy * SHEET_CELL, sw, sh, 0, 0, sw, sh);
     const img = tctx.getImageData(0, 0, sw, sh);
@@ -6521,7 +6533,6 @@ class Game {
     const stage = Clamp(hp | 0, 1, 4);
     const pal = ARMOR_HP_PALETTE[stage] || ARMOR_HP_PALETTE[1];
     const flashOn = Math.floor(this.frame / 7) % 2 === 0;
-    const mid = flashOn && stage > 1 ? (stage === 1 ? pal.mid : (stage === 4 || stage === 3 ? pal.flash : pal.flash)) : pal.mid;
     // HP4: green↔white; HP3: yellow↔white; HP2: green↔yellow; HP1: solid white/gray
     let useMid = pal.mid;
     let useDark = pal.dark;
@@ -6563,6 +6574,50 @@ class Game {
     ctx.drawImage(tc, 0, 0, sw, sh, dx, dy, dw, dh);
   }
 
+  /**
+   * Remap classic yellow player hull by remaining HP:
+   * 3 gold → 2 orange → 1 red. Power tier still picks sheet row.
+   */
+  BlitPlayerHpTinted(ctx, gx, gy, dx, dy, dw, dh, hp) {
+    const sheet = this.images.sheet;
+    if (!sheet) return;
+    const sw = 2 * SHEET_CELL;
+    const sh = 2 * SHEET_CELL;
+    const { tc, tctx } = this.EnsureTintScratch(sw, sh);
+    tctx.clearRect(0, 0, sw, sh);
+    tctx.drawImage(sheet, gx * SHEET_CELL, gy * SHEET_CELL, sw, sh, 0, 0, sw, sh);
+    const img = tctx.getImageData(0, 0, sw, sh);
+    const data = img.data;
+    const stage = Clamp(hp | 0, 1, PLAYER_MAX_HP);
+    const pal = PLAYER_HP_PALETTE[stage] || PLAYER_HP_PALETTE[PLAYER_MAX_HP];
+    const useMid = pal.mid;
+    const useDark = pal.dark;
+    const useLight = pal.light;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 20) continue;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      // Classic sheet: light (231,231,148), mid (231,156,33), dark (107,107,0).
+      if (r > 200 && g > 200 && b > 100) {
+        data[i] = useLight[0];
+        data[i + 1] = useLight[1];
+        data[i + 2] = useLight[2];
+      } else if (r > 180 && g > 100 && b < 80) {
+        data[i] = useMid[0];
+        data[i + 1] = useMid[1];
+        data[i + 2] = useMid[2];
+      } else if (r > 70 && r < 140 && g > 70 && g < 140 && b < 40) {
+        data[i] = useDark[0];
+        data[i + 1] = useDark[1];
+        data[i + 2] = useDark[2];
+      }
+    }
+    tctx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tc, 0, 0, sw, sh, dx, dy, dw, dh);
+  }
+
   DrawTank(ctx, tank, isPlayer) {
     if (tank.spawnFlash > 0) {
       const frames = FX_SHEET.spawn;
@@ -6582,7 +6637,9 @@ class Game {
     if (ghosting) ctx.globalAlpha = 0.45 + 0.35 * Math.sin(this.frame * 0.35);
     const { gx, gy, redFlash } = this.TankSheetOrigin(tank, isPlayer);
     const isArmor = !isPlayer && tank.typeId === "armor" && tank.maxHp > 1;
-    if (isArmor && !redFlash) {
+    if (isPlayer) {
+      this.BlitPlayerHpTinted(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h, tank.hp ?? PLAYER_MAX_HP);
+    } else if (isArmor && !redFlash) {
       this.BlitArmorTinted(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h, tank.hp);
     } else {
       this.BlitGrid(ctx, gx, gy, tank.x, tank.y, tank.w, tank.h);
@@ -6656,8 +6713,14 @@ class Game {
       const totalW = maxHp * pipW + (maxHp - 1) * gap;
       let px = tank.x + tank.w / 2 - totalW / 2;
       const py = tank.y - 7;
+      const fillByHp = {
+        3: "#e8bc24",
+        2: "#dc7020",
+        1: "#d0342c",
+      };
+      const fill = fillByHp[Math.max(1, Math.min(PLAYER_MAX_HP, hp))] || fillByHp[PLAYER_MAX_HP];
       for (let i = 0; i < maxHp; i++) {
-        ctx.fillStyle = i < hp ? "#70ff98" : "#303038";
+        ctx.fillStyle = i < hp ? fill : "#303038";
         ctx.fillRect(px, py, pipW, 3);
         ctx.strokeStyle = "#000";
         ctx.lineWidth = 1;
