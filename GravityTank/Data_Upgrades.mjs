@@ -35,7 +35,7 @@ export const STAGE_UPGRADES = [
 export const BOSS_UPGRADES = [
   { id: "mirrorShot", title: "镜影炮", desc: "永久：每次开火额外向反方向射一发", tag: "永久", icon: IconPath("mirrorShot") },
   { id: "meteorPulse", title: "陨石协议", desc: "永久：每隔一段时间降下重力弹雨", tag: "永久", icon: IconPath("meteorPulse") },
-  { id: "phaseGhost", title: "相位坦克", desc: "永久：每关开场获得较长幽灵穿墙", tag: "永久", icon: IconPath("phaseGhost") },
+  { id: "phaseGhost", title: "穿墙坦克", desc: "永久：每关开场获得较长穿墙时间", tag: "永久", icon: IconPath("phaseGhost") },
   { id: "enemyAnchor", title: "引力锚", desc: "永久：敌军炮弹更重、下落更快", tag: "永久", icon: IconPath("enemyAnchor") },
   { id: "overloadFan", title: "过载核心", desc: "永久：开火时概率触发扇形三连发", tag: "永久", icon: IconPath("overloadFan") },
   { id: "fortressWill", title: "堡垒意志", desc: "永久：每关开场总部钢墙加固一段时间", tag: "永久", icon: IconPath("fortressWill"), recommend: true },
