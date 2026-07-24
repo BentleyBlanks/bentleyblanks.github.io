@@ -79,7 +79,7 @@ Symbols: `BlitPlayerHpTinted`, `DrawTank` (player branch), overhead HP pips. Pow
 
 Difficulty copy: fixed standard mode; campaign now starts directly at stage 1 (the old tutorial is legacy/debug-only). `SyncStageLabels` / `#difficultyHint` say「3 条座驾」+「每台 3 点生命」. Ordinary stages 1–3 use `POWER_DROP_RATE * 0.8`.
 
-Campaign progression: 15 stages. Stages 4, 7, 10, and 13 are `ballisticPuzzle` specials with variants `singleShell`, `gravitySpin`, `bankShot`, and `relayMaze`; stage 14 is `noFire` (player fire is hard-blocked and enemy friendly fire is enabled). Ballistic puzzles give the player one recoverable shell, allow both sides to collect landed shells, and reject frontal hits against enemies. Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
+Campaign progression: 15 stages. Stages 4, 7, 10, and 13 are `ballisticPuzzle` specials with variants `singleShell`, `gravitySpin`, `bankShot`, and `relayMaze`; stage 14 is `noFire` / `enemyOnlyCrossfire` (player fire is hard-blocked, enemies only shoot other enemies, enemy shells cannot damage player/HQ, and all enemies chase the player). Ballistic puzzles give the player one recoverable shell, allow both sides to collect landed shells, and reject frontal hits against enemies. Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
 
 Experience: `AwardStageExperience` grants a stage-scaled reward, with boss/special bonuses. Each level grants one `absorbHits` armor charge, carried across the campaign and shown in the HUD/clear report.
 

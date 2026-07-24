@@ -1838,8 +1838,8 @@ class Game {
       } else if (this.isNoFireStage) {
         lines.push(
           "一枪不开：你的炮管被锁死。",
-          "敌军会互相误伤，但仍会追击你。",
-          "让它们自己把弹道变成事故现场。",
+          "敌军只准互相开火，不会直接射你或总部。",
+          "但它们会全部回来追你，让弹道自己变成事故现场。",
         );
       } else if (this.specialKind === "ballisticPuzzle") {
         lines.push("每次只能装一发炮弹；打空就去捡落地炮弹，敌我都能捡，正面不能命中坦克。", "本关变体：" + ({
@@ -2188,7 +2188,7 @@ class Game {
     } else if (this.isTutorial) {
       this.ShowBuffToast("河北岸：朝下/斜射，用重力清理南岸敌军");
     } else if (this.isNoFireStage) {
-      this.ShowBuffToast("一枪不开：敌军会互相误伤，继续追击你！");
+      this.ShowBuffToast("一枪不开：敌军只打自己人，但全都继续追击你！");
     } else if (this.specialKind === "ballisticPuzzle") {
       this.ShowBuffToast("弹道谜题：借墙、借重力，也借敌人的炮弹开路");
     } else if (this.isBossStage) {
@@ -2970,7 +2970,7 @@ class Game {
         } else {
           // prefer moving toward player / base
           const roll = Math.random();
-          const chaseChance = this.isNoFireStage ? 0.78 : 0.45;
+          const chaseChance = this.isNoFireStage ? 1 : 0.45;
           if (roll < chaseChance && this.player?.alive) {
             const dx = this.player.x - e.x;
             const dy = this.player.y - e.y;
@@ -3003,12 +3003,31 @@ class Game {
 
       // shoot logic: if roughly aligned with player or base, fire
       if (e.fireCd <= 0) {
-        let should = Math.random() < 0.025 || this.AlignedForShot(e, this.player) || this.AlignedForShot(e, this.GetBaseTarget());
-        if (should && this.isTutorial && e.dir === "up") {
-          // Keep a few upward shots so gravity is visible, but cut most self-kills.
-          should = Math.random() < 0.3;
+        if (this.isNoFireStage) {
+          const target = this.FindNearestEnemyTarget(e);
+          const chaseDir = this.player?.alive
+            ? DirFromVector(
+              this.player.x + this.player.w * 0.5 - (e.x + e.w * 0.5),
+              this.player.y + this.player.h * 0.5 - (e.y + e.h * 0.5),
+            )
+            : null;
+          const should = !!target && (this.AlignedForShot(e, target) || Math.random() < 0.22);
+          if (should) {
+            e.dir = DirFromVector(
+              target.x + target.w * 0.5 - (e.x + e.w * 0.5),
+              target.y + target.h * 0.5 - (e.y + e.h * 0.5),
+            );
+            this.TryFire(e, false);
+            if (chaseDir) e.dir = chaseDir;
+          }
+        } else {
+          let should = Math.random() < 0.025 || this.AlignedForShot(e, this.player) || this.AlignedForShot(e, this.GetBaseTarget());
+          if (should && this.isTutorial && e.dir === "up") {
+            // Keep a few upward shots so gravity is visible, but cut most self-kills.
+            should = Math.random() < 0.3;
+          }
+          if (should) this.TryFire(e, false);
         }
-        if (should) this.TryFire(e, false);
       }
     }
 
@@ -4154,6 +4173,24 @@ class Game {
     return Math.abs(cy - ty) < tol;
   }
 
+  FindNearestEnemyTarget(from) {
+    let nearest = null;
+    let nearestDist = Infinity;
+    const fx = from.x + from.w * 0.5;
+    const fy = from.y + from.h * 0.5;
+    for (const enemy of this.enemies) {
+      if (!enemy.alive || enemy === from || enemy.spawnFlash > 0) continue;
+      const dx = enemy.x + enemy.w * 0.5 - fx;
+      const dy = enemy.y + enemy.h * 0.5 - fy;
+      const dist = dx * dx + dy * dy;
+      if (dist < nearestDist) {
+        nearest = enemy;
+        nearestDist = dist;
+      }
+    }
+    return nearest;
+  }
+
   MoveTank(tank, dx, dy) {
     this.UnstickTank(tank);
 
@@ -4447,6 +4484,11 @@ class Game {
         return true;
       }
       if (t === TILE_BASE || t === TILE_BASE_DEAD) {
+        if (this.isNoFireStage && !b.isPlayer) {
+          b.alive = false;
+          this.SpawnExplosion(b.x, b.y, 0.25);
+          return true;
+        }
         b.alive = false;
         if (t === TILE_BASE) this.DestroyBase();
         else this.SpawnExplosion(b.x, b.y, 0.4);
@@ -4735,7 +4777,7 @@ class Game {
       if (!b.alive) continue;
 
       // hit player (enemy fire, or own returning shell)
-      if (this.player?.alive) {
+      if (!(this.isNoFireStage && !b.isPlayer) && this.player?.alive) {
         const isOwnShell = b.owner === this.player;
         if (isOwnShell && !canSelfHit) {
           // still leaving the barrel
@@ -5583,6 +5625,11 @@ class Game {
   BulletHitEagleStroll(b) {
     if (!this.eagleStroll || !this.baseAlive) return false;
     if (!RectsOverlap(b, this.eagleStroll)) return false;
+    if (this.isNoFireStage && !b.isPlayer) {
+      b.alive = false;
+      this.SpawnExplosion(b.x, b.y, 0.25);
+      return true;
+    }
     b.alive = false;
     this.SpawnExplosion(b.x, b.y, 0.55);
     this.DestroyBase();

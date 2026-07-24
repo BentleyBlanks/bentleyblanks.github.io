@@ -600,6 +600,7 @@ STAGES.push(
     id: 14,
     specialStage: true,
     specialKind: "noFire",
+    noFireRule: "enemyOnlyCrossfire",
     title: "一枪不开",
     prepSeconds: 5,
     enemies: { basic: 10, fast: 8, power: 8, armor: 4, anchor: 2 },
