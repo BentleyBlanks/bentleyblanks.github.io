@@ -38,10 +38,13 @@ const CARRY_WOOD_HP = 2;
 const CARRY_METAL_HP = 5;
 const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
 const BULLET_SPEED = 280;
-/** Classic ~1/5 tanks flash (~0.20); early stages deliberately run 20% leaner. */
-const POWER_DROP_RATE = 0.15;
-const EARLY_POWER_DROP_RATE_MUL = 0.8;
-const EARLY_POWER_DROP_END_STAGE = 3;
+/** Tokens are deliberately scarce: early clears should make each roulette spin count. */
+const POWER_DROP_RATE = 0.09;
+const EARLY_POWER_DROP_RATE_MUL = 0.35;
+const EARLY_POWER_DROP_END_STAGE = 6;
+const BOSS_POWER_DROP_RATE = 0.22;
+const EARLY_ARMOR_POWER_DROP_RATE = 0.18;
+const ARMOR_POWER_DROP_RATE = 0.3;
 const PLAYER_SPEED = 88;
 const GIANT_SCALE = 2;
 const GIANT_DURATION = 14;
@@ -147,8 +150,6 @@ const POWER = {
   eagleStroll: "eagleStroll",
   // Hit-charge armor (survives N lethal hits)
   plates: "plates",
-  // Stage-9 boss throws your gun barrel as a field pickup (not on roulette pool).
-  gunBarrel: "gunBarrel",
 };
 
 /** Tier colors — strong guidance: cool green = good, gold = ultra, hot red = bad. */
@@ -416,8 +417,8 @@ const ENEMY_TYPES = [
 const BOSS_ATTACKS = ["barrage", "fan", "mortar", "sweep", "rain", "burst"];
 const TANK_KING_ATTACKS = ["quadCross", "spinFire", "axisBurst", "chaseVolley", "ringShot"];
 const BOSS_OCTO_ATTACKS = ["octoCross", "octoSpin", "octoRing"];
-/** Stage-9 bipedal tank man: disarm / bombs / sniper + flashy mix. */
-const TANK_MAN_ATTACKS = ["disarmThrow", "layBomb", "sniperVolley", "bounceFan", "mortarLob", "chaseBurst", "stompRain"];
+/** Stage-9 bipedal tank man: bombs / sniper / stomp pressure without interrupting firing. */
+const TANK_MAN_ATTACKS = ["layBomb", "sniperVolley", "bounceFan", "mortarLob", "chaseBurst", "stompRain"];
 /** Stage-12 prism tank: blink-in + crystal volleys. */
 const PRISM_TANK_ATTACKS = ["prismBlink", "prismFan", "prismPierce", "chaseVolley"];
 const BOSS_SHELL_SPEED = 0.7; // of BULLET_SPEED
@@ -452,7 +453,6 @@ const BOSS_SKILL_WARN = {
   sweep: "⚠ 横向扫射蓄力",
   rain: "⚠ 天降弹雨蓄力",
   burst: "⚠ 三点连射蓄力",
-  disarmThrow: "⚠ 拆炮蓄力",
   layBomb: "⚠ 定时炸弹蓄力",
   sniperVolley: "⚠ 狙击连射蓄力",
   bounceFan: "⚠ 弹射扇形蓄力",
@@ -494,7 +494,6 @@ const POWER_SHEET = {
   bomb: [40, 14],
   life: [42, 14],
   gun: [40, 14],
-  gunBarrel: [40, 14],
 };
 /** Custom (non-classic) power icons — Battle City–style generated sprites. */
 const POWER_ICON_IMG = {
@@ -1750,10 +1749,16 @@ class Game {
   GetPowerDropRate() {
     // Tutorial: player cannot cross the river to collect tokens.
     if (this.isTutorial) return 0;
-    // Boss fights: more ? drops from minions so the wheel stays in play.
-    if (this.isBossStage) return 0.55;
+    // Boss minions still feed the wheel, but cannot flood the arena with tokens.
+    if (this.isBossStage) return BOSS_POWER_DROP_RATE;
     if (this.stage <= EARLY_POWER_DROP_END_STAGE) return POWER_DROP_RATE * EARLY_POWER_DROP_RATE_MUL;
     return POWER_DROP_RATE;
+  }
+
+  GetArmorPowerDropRate() {
+    return this.stage <= EARLY_POWER_DROP_END_STAGE
+      ? EARLY_ARMOR_POWER_DROP_RATE
+      : ARMOR_POWER_DROP_RATE;
   }
 
   /** Boss attack cadence scale. Per-enemy fireIntervalMul further adjusts cooldowns. */
@@ -1826,7 +1831,7 @@ class Game {
         : (this.isBarricadeTeach ? "路障教学" : (this.isSpecialStage ? (this.stageData.title || "特殊关") : "GRAVITY TANK"));
     }
     if (this.overlays.startBlurb) {
-      const lines = ["标准：3 条座驾 · 每台 3 点生命 · 前期道具率 -20%", ""];
+      const lines = ["标准：3 条座驾 · 每台 3 点生命 · 前期道具稀少", ""];
       if (this.isTutorial) {
         lines.push("炮弹带重力会下坠。", "朝下 / 斜着打对岸。", "别把自己轰死。");
       } else if (this.isBarricadeTeach) {
@@ -2894,16 +2899,12 @@ class Game {
     if (this.IsBallisticPuzzle()) this.TryCollectBallisticShell(p, true);
     if (!this.isNoFireStage && this.WantsFire()) this.TryFire(p, true);
 
-    // pickup → gunBarrel restores armament; other tokens open physics roulette
+    // Every field pickup opens the physics roulette.
     for (const pu of this.powerups) {
       if (!pu.alive) continue;
       if (RectsOverlap(p, { x: pu.x, y: pu.y, w: 28, h: 28 })) {
         pu.alive = false;
-        if (pu.kind === POWER.gunBarrel) {
-          this.RestorePlayerBarrel();
-        } else {
-          this.OpenRoulette();
-        }
+        this.OpenRoulette();
       }
     }
   }
@@ -3217,7 +3218,7 @@ class Game {
     }
   }
 
-  /** Stage-9 bipedal tank man — walks the field, mixes disarm / bombs / sniper. */
+  /** Stage-9 bipedal tank man — walks the field, mixes bombs / sniper / stomps. */
   UpdateTankMan(e, dt) {
     if (e.barrelFlash) {
       for (const k of Object.keys(e.barrelFlash)) {
@@ -3272,15 +3273,14 @@ class Game {
       if (finalPhase) {
         const firstUltimate = !e.finalBurstUsed;
         if (firstUltimate || Math.random() < 0.28) {
-          const heavies = ["stompRain", "sniperVolley", "disarmThrow"];
+          const heavies = ["stompRain", "sniperVolley", "bounceFan"];
           pattern = heavies[Math.floor(Math.random() * heavies.length)];
           e.finalBurstUsed = true;
         }
       }
       if (!pattern) {
         const pool = TANK_MAN_ATTACKS.slice();
-        if (!this.playerDisarmed && Math.random() < 0.42) pattern = "disarmThrow";
-        else if (Math.random() < 0.28) pattern = "layBomb";
+        if (Math.random() < 0.3) pattern = "layBomb";
         else if (Math.random() < 0.32) pattern = "sniperVolley";
         else pattern = pool[Math.floor(Math.random() * pool.length)];
       }
@@ -3294,13 +3294,6 @@ class Game {
     e.attackAge = 0;
     const cdScale = this.GetBossFireCdScale(e);
     const face = e.castFace || "down";
-
-    if (pattern === "disarmThrow") {
-      e.attackQueue.push({ t: 0.25 * cdScale, kind: "disarmThrow" });
-      e.attackQueue.push({ t: 0.55 * cdScale, kind: "layBomb" });
-      e.fireCd = 3.2 * cdScale;
-      return;
-    }
 
     if (pattern === "layBomb") {
       const n = e.finalPhase ? 3 : 2;
@@ -3855,10 +3848,6 @@ class Game {
   }
 
   FireBossShot(e, shot) {
-    if (shot.kind === "disarmThrow") {
-      this.DisarmPlayerThrowBarrel(e);
-      return;
-    }
     if (shot.kind === "layBomb") {
       this.LayTimedBomb(e);
       return;
@@ -4008,41 +3997,6 @@ class Game {
       heavy: true,
       sniper: !!sniper,
     });
-  }
-
-  DisarmPlayerThrowBarrel(boss) {
-    const p = this.player;
-    if (!p?.alive) return;
-    if (this.playerDisarmed || p.disarmed) {
-      this.LayTimedBomb(boss);
-      return;
-    }
-    this.playerDisarmed = true;
-    p.disarmed = true;
-    for (const pu of this.powerups) {
-      if (pu.kind === POWER.gunBarrel) pu.alive = false;
-    }
-    const drop = this.FindFarEmptyDrop(p.x + p.w / 2, p.y + p.h / 2);
-    this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.7);
-    this.DropPowerup(drop.x, drop.y, POWER.gunBarrel);
-    this.ShowBuffToast("炮管被拆走！去地图捡回才能开火");
-    this.audio.Explode();
-  }
-
-  RestorePlayerBarrel() {
-    if (this.isNoFireStage) return;
-    this.playerDisarmed = false;
-    if (this.player) {
-      this.player.disarmed = false;
-      this.player.protect = Math.max(this.player.protect, 1.2);
-    }
-    this.SpawnExplosion(
-      (this.player?.x || 0) + (this.player?.w || 0) / 2,
-      (this.player?.y || 0) + (this.player?.h || 0) / 2,
-      0.45
-    );
-    this.ShowBuffToast("炮管装回！可以开火了");
-    this.audio.Power();
   }
 
   FindFarEmptyDrop(fromX, fromY) {
@@ -5637,14 +5591,14 @@ class Game {
   }
 
   DropPowerup(x, y, kind = POWER.token) {
-    // Field token opens roulette; gunBarrel is a direct restore pickup.
+    // Field tokens open the physics roulette.
     if (this.IsBallisticPuzzle()) return;
     this.powerups.push({
       x: Clamp(x, 8, CANVAS_W - 32),
       y: Clamp(y, 8, CANVAS_H - 32),
       kind,
       alive: true,
-      ttl: kind === POWER.gunBarrel ? 28 : 14,
+      ttl: 14,
       blink: 0,
     });
     this.audio.PowerSpawn();
@@ -6431,9 +6385,9 @@ class Game {
       aiTimer: 0.3,
       spawnFlash: type.boss ? 0.6 : 1.0,
       protect: type.boss ? 1.2 : 0,
-      dropsPower: type.boss
-        ? false
-        : (type.id === "armor" || Math.random() < this.GetPowerDropRate() || (this.isBossStage && Math.random() < 0.35)),
+      dropsPower: !type.boss && Math.random() < (
+        type.id === "armor" ? this.GetArmorPowerDropRate() : this.GetPowerDropRate()
+      ),
       deathTimer: 0,
       animTick: 0,
       moving: false,
@@ -6448,7 +6402,10 @@ class Game {
       fireIntervalMul: type.fireIntervalMul ?? 1,
       finalBurstUsed: false,
       finalPhase: false,
-      bossDropMarks: type.boss ? [0.66, 0.33] : null,
+      // Early bosses grant one earned spin; later bosses can pay out at two HP milestones.
+      bossDropMarks: type.boss
+        ? (this.stage <= EARLY_POWER_DROP_END_STAGE ? [0.5] : [0.66, 0.33])
+        : null,
       barrelCount: type.barrelCount
         ?? (type.boss ? (this.stageData?.barrelCount ?? (type.tankKing ? 4 : 1)) : 1),
       barrelFlash: Object.fromEntries(DIR_OCTO.map((d) => [d, 0])),
@@ -7128,7 +7085,7 @@ class Game {
           "重力巨炮";
         const bossHint =
           kind === "tankKing" ? "单炮追猎 · 开阔战场" :
-          kind === "tankMan" ? "拆炮 · 定时炸弹 · 无重力狙击" :
+          kind === "tankMan" ? "定时炸弹 · 无重力狙击 · 踩踏弹雨" :
           kind === "prismTank" ? "光棱降临 · 闪现贴身 · 注意落点提示" :
           kind === "gravityWarden" ? "小体型高速 · 随机改变重力方向" :
           "八管弹幕 · 炮弹带重力";
@@ -8025,32 +7982,6 @@ class Game {
     const s = Math.round(26 * pulse);
     const cx = pu.x + TILE / 2;
     const cy = pu.y + TILE / 2;
-
-    if (pu.kind === POWER.gunBarrel) {
-      ctx.imageSmoothingEnabled = false;
-      ctx.fillStyle = "#101418";
-      ctx.fillRect(cx - s / 2, cy - s / 2, s, s);
-      ctx.strokeStyle = "#f0d060";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(cx - s / 2 + 1, cy - s / 2 + 1, s - 2, s - 2);
-      ctx.fillStyle = "#8a93a0";
-      ctx.fillRect(cx - s * 0.35, cy - 3, s * 0.7, 6);
-      ctx.fillStyle = "#c8d0d8";
-      ctx.fillRect(cx + s * 0.22, cy - 5, 5, 10);
-      ctx.fillStyle = "#ffe060";
-      ctx.font = `9px ${PIXEL_FONT}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("炮", cx, cy - s * 0.28);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      const ring = 0.35 + 0.35 * Math.abs(Math.sin(this.frame * 0.25));
-      ctx.strokeStyle = `rgba(255,220,80,${ring})`;
-      ctx.beginPath();
-      ctx.arc(cx, cy, s * 0.7, 0, Math.PI * 2);
-      ctx.stroke();
-      return;
-    }
 
     const token = this.images.powerToken;
     if (token) {

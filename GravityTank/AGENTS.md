@@ -77,7 +77,7 @@ Player sheet is classic yellow; draw remaps by remaining HP:
 
 Symbols: `BlitPlayerHpTinted`, `DrawTank` (player branch), overhead HP pips. Power tier still picks sheet row via `TankSheetOrigin` (`gy = (power-1)*2`). Enemy armor tanks use `BlitArmorTinted` + `ARMOR_HP_PALETTE` separately.
 
-Difficulty copy: fixed standard mode; campaign now starts directly at stage 1 (the old tutorial is legacy/debug-only). `SyncStageLabels` / `#difficultyHint` say「3 条座驾」+「每台 3 点生命」. Ordinary stages 1–3 use `POWER_DROP_RATE * 0.8`.
+Difficulty copy: fixed standard mode; campaign now starts directly at stage 1 (the old tutorial is legacy/debug-only). `SyncStageLabels` / `#difficultyHint` say「3 条座驾」+「每台 3 点生命」. Ordinary stages 1–6 use `POWER_DROP_RATE * 0.35`; early Boss minions use the dedicated 22% cap, early Bosses have one milestone token only, and armor is no longer a guaranteed token source.
 
 Campaign progression: 15 stages. Stages 4, 7, 10, and 13 are `ballisticPuzzle` specials with variants `singleShell`, `gravitySpin`, `bankShot`, and `relayMaze`; stage 14 is `noFire` / `enemyOnlyCrossfire` (player fire is hard-blocked, enemies only shoot other enemies, enemy shells cannot damage player/HQ, and all enemies chase the player). Ballistic puzzles give the player one recoverable shell, allow both sides to collect landed shells, and reject frontal hits against enemies. Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
 
