@@ -3,11 +3,32 @@
  * Visuals: classic NES Battle City–style sprites (StefanBS/battle-city-clone, MIT).
  */
 
-import { STAGE_COUNT, GetStage, IsTutorialStage, IsBarricadeTeachStage, TUTORIAL_STAGE, BARRICADE_TEACH_STAGE } from "./Data_Stages.mjs";
-import { STAGE_UPGRADES, BOSS_UPGRADES, TUTORIAL_UPGRADES, PickUpgradeCards, FindUpgrade, IsUpgradeRecommended, PeekNextStageId } from "./Data_Upgrades.mjs";
+import {
+  STAGE_COUNT,
+  CAMPAIGN_STAGE_IDS,
+  CAMPAIGN_STAGE_COUNT,
+  GetCampaignStagePosition,
+  GetNextCampaignStageId,
+  IsFinalCampaignStage,
+  GetStage,
+  IsTutorialStage,
+  IsBarricadeTeachStage,
+  TUTORIAL_STAGE,
+  BARRICADE_TEACH_STAGE,
+} from "./Data_Stages.mjs";
+import {
+  STAGE_UPGRADES,
+  BOSS_UPGRADES,
+  TUTORIAL_UPGRADES,
+  PickUpgradeCards,
+  FindUpgrade,
+  IsUpgradeRecommended,
+  IsUpgradeApplicable,
+  PeekNextStageId,
+} from "./Data_Upgrades.mjs";
 
 /** Player-facing build id — keep in sync with index.html `#gameVersion`. */
-export const GAME_VERSION = "0.8";
+export const GAME_VERSION = "0.9";
 export const GAME_VERSION_LABEL = `v${GAME_VERSION}`;
 
 const PIXEL_FONT = '"Fusion Pixel 12", monospace';
@@ -21,15 +42,12 @@ const SHEET_CELL = 8;
 const SPRITE = 16; // classic tank / metatile source size in the sheet
 const MAX_ENEMIES_ON_FIELD = 4;
 const MAX_ENEMIES_LATE = 5;
-/** From this stage onward, enemy shells never damage other enemies. */
-const ENEMY_FRIENDLY_FIRE_OFF_STAGE = 6;
-const MAX_ABSORB_HITS = 8;
+const MAX_ABSORB_HITS = 4;
 const PLAYER_LIVES = 3;
 const PLAYER_MAX_HP = 3;
+const BASE_MAX_HP = 3;
 /** Brief i-frames after a non-lethal hit so one volley cannot shred all HP. */
 const HIT_IFRAME = 1.0;
-/** First death each stage: revive in place with this protect window. */
-const STAGE_REVIVE_PROTECT = 2.0;
 /** Death presentation: briefly let the fatal moment hang before normal speed returns. */
 const DEATH_SLOW_DURATION = 0.85;
 const DEATH_SLOW_SCALE = 0.2;
@@ -40,23 +58,21 @@ const GRAVITY = 504; // px/s^2 — was 420, +20% heavier
 const BULLET_SPEED = 280;
 /** Tokens are deliberately scarce: early clears should make each roulette spin count. */
 const POWER_DROP_RATE = 0.09;
-const EARLY_POWER_DROP_RATE_MUL = 0.35;
-const EARLY_POWER_DROP_END_STAGE = 6;
+const EARLY_POWER_DROP_RATE_MUL = 0.65;
+const EARLY_POWER_DROP_END_POSITION = 3;
 const BOSS_POWER_DROP_RATE = 0.22;
 const EARLY_ARMOR_POWER_DROP_RATE = 0.18;
 const ARMOR_POWER_DROP_RATE = 0.3;
+const MAX_ROULETTE_DROPS_PER_STAGE = 2;
 const PLAYER_SPEED = 88;
 const GIANT_SCALE = 2;
 const GIANT_DURATION = 14;
 const GIANT_HITS = 12;
 const GIANT_SPEED_MUL = 0.7;
 const SPAWN_PROTECT = 3.0;
-const XP_BASE_STAGE = 80;
-const XP_STAGE_STEP = 20;
-const XP_BOSS_BONUS = 90;
-const XP_SPECIAL_BONUS = 35;
-const XP_LEVEL_BASE = 120;
-const XP_LEVEL_STEP = 80;
+const CHECKPOINT_KEY = "gravitytank_campaign_v09";
+const BEST_SCORE_KEY = "gravitytank_best_v09";
+const BOSS_UPGRADE_IDS = new Set(BOSS_UPGRADES.map((upgrade) => upgrade.id));
 
 const DIR = {
   up: { x: 0, y: -1, angle: -Math.PI / 2 },
@@ -261,7 +277,7 @@ function ShuffleInPlace(arr) {
 /** Powers that wipe the field — banned on boss stages (would skip the fight). */
 const BOSS_BANNED_POWERS = new Set([POWER.nuke, POWER.apocalypse, POWER.bomb]);
 
-/** Pick exactly `count` prizes: rare red, more gold, rest green.
+/** Pick exactly `count` prizes: one readable risk, two gold targets, rest green.
  *  opts.allowGiant — late-game only (after stage 6).
  *  opts.bossSafe — strip field-wipe ultras/goods that would skip a boss. */
 function PickRouletteSegments(count = ROULETTE_SIZE, opts = {}) {
@@ -271,12 +287,9 @@ function PickRouletteSegments(count = ROULETTE_SIZE, opts = {}) {
   if (!opts.allowGiant) ultras = ultras.filter((s) => s.kind !== POWER.giant);
   ultras = ShuffleInPlace(ultras.slice());
   const bads = ShuffleInPlace(ROULETTE_POOL.filter((s) => s.tier === "bad" && allow(s)).slice());
-  // Standard wheel: ~25% chance of a single red wedge.
-  const badN = Math.min(bads.length, Math.random() < 0.25 ? 1 : 0);
-  // Gold: 2-3 wedges normally; boss-safe wheels keep at least one non-wipe ultra when available.
-  const ultraN = opts.bossSafe
-    ? Math.min(ultras.length, 1 + Math.floor(Math.random() * 2))
-    : Math.min(ultras.length, 2 + Math.floor(Math.random() * 2));
+  // Every wheel exposes one avoidable red wedge: risk is real, visible, and skill-readable.
+  const badN = Math.min(bads.length, 1);
+  const ultraN = Math.min(ultras.length, 2);
   const goodN = Math.max(0, count - badN - ultraN);
   const picked = [
     ...goods.slice(0, goodN),
@@ -827,17 +840,21 @@ class Game {
       score: document.getElementById("scoreValue"),
       remain: document.getElementById("remainValue"),
       stage: document.getElementById("stageValue"),
+      base: document.getElementById("baseValue"),
       enemyIcons: document.getElementById("enemyIcons"),
       mobileLives: document.getElementById("mobileLives"),
       mobilePower: document.getElementById("mobilePower"),
       mobileScore: document.getElementById("mobileScore"),
       mobileRemain: document.getElementById("mobileRemain"),
       mobileStage: document.getElementById("mobileStage"),
+      mobileBase: document.getElementById("mobileBase"),
     };
     this.overlays = {
       start: document.getElementById("startOverlay"),
       startTitle: document.getElementById("startStageTitle"),
       startBlurb: document.getElementById("startStageBlurb"),
+      continueButton: document.getElementById("continueButton"),
+      checkpointHint: document.getElementById("checkpointHint"),
       pause: document.getElementById("pauseOverlay"),
       end: document.getElementById("endOverlay"),
       endTitle: document.getElementById("endTitle"),
@@ -881,23 +898,24 @@ class Game {
     this.stickVec = { x: 0, y: 0 };
     this.isTouchDevice = false;
     this.respawnTimer = 0;
-    this.stageReviveUsed = false;
     this.pendingRespawnStats = null;
     this.respawnFx = null;
     this.deathSlowTimer = 0;
     this.incidentReport = null;
     this.playClock = 0;
+    this.stageClock = 0;
 
     this.state = "boot";
+    this.campaignActive = true;
+    this.campaignStagePosition = 1;
+    this.stageCheckpoint = null;
     this.debugGodMode = false;
     this.debugPanelOpen = false;
     this.stagePerk = null; // active this stage only
     this.pendingStagePerk = null; // chosen after clear, applied on next StartGame
     this.runPerks = []; // permanent after boss until campaign ends
-    this.absorbHits = 0; // run-wide armor charges (lethal-hit absorbs)
-    this.experience = 0;
-    this.experienceLevel = 0;
-    this.experienceNext = XP_LEVEL_BASE;
+    this.absorbHits = 0; // earned from explicit cards / powers only
+    this.stagePerkAbsorbHits = 0; // unspent temporary armor removed after its mission
     this.gravityDir = "down";
     this.gravityVector = { x: 0, y: 1 };
     this.meteorPulseTimer = 0;
@@ -912,6 +930,8 @@ class Game {
     this.specialKind = null;
     this.isNoFireStage = false;
     this.totalEnemies = 20;
+    this.stagePlayerKills = 0;
+    this.stageCrossfireKills = 0;
     this.endAction = "restart"; // restart | next | retry
     this.map = [];
     this.brickMask = [];
@@ -964,8 +984,14 @@ class Game {
     this.eagleWarnT = 0;
     this.buffToast = null;
     this.roulette = null;
+    this.rouletteDropsThisStage = 0;
+    this.guaranteedTokenPending = false;
+    this.firstShotCoachPending = false;
+    this.noFireFinaleHandled = false;
+    this.noFireFinaleTimer = 0;
     this.pendingFortRestore = false;
     this.baseAlive = true;
+    this.baseHp = BASE_MAX_HP;
     this.waterPhase = 0;
     this.lastTs = 0;
     this.spawnSlots = [];
@@ -979,6 +1005,10 @@ class Game {
     await this.audio.LoadAll().catch((err) => console.warn("SFX pack load", err));
     this.SyncVersionUi();
     this.BindUi();
+    this.state = "ready";
+    this.stageCheckpoint = this.ReadStageCheckpoint();
+    this.RefreshContinueUi();
+    this.UpdateHud();
     this.RenderEnemyIcons();
     this.DrawBootFrame();
     if (new URLSearchParams(location.search).has("autostart")) {
@@ -998,6 +1028,173 @@ class Game {
     if (!document.title.includes(label)) {
       document.title = `${baseTitle} ${label}`;
     }
+  }
+
+  IsCampaignStage(stageId) {
+    return CAMPAIGN_STAGE_IDS.includes(Number(stageId));
+  }
+
+  IsCurrentFinalStage() {
+    if (this.isTutorial || this.isBarricadeTeach || typeof this.stage !== "number") return false;
+    return this.campaignActive ? IsFinalCampaignStage(this.stage) : this.stage >= STAGE_COUNT;
+  }
+
+  GetStageDisplayLabel() {
+    if (this.isTutorial) return "T";
+    if (this.isBarricadeTeach) return "教";
+    if (this.campaignActive && this.campaignStagePosition > 0) {
+      return `${this.campaignStagePosition}/${CAMPAIGN_STAGE_COUNT}`;
+    }
+    return String(this.stage);
+  }
+
+  ReadStageCheckpoint() {
+    try {
+      const raw = localStorage.getItem(CHECKPOINT_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      const validStage = IsBarricadeTeachStage(data?.stage) || this.IsCampaignStage(data?.stage);
+      if (data?.schema !== 1 || !validStage) {
+        localStorage.removeItem(CHECKPOINT_KEY);
+        return null;
+      }
+      const power = Clamp(Number(data.playerStats?.power) || 1, 1, 3);
+      const maxBullets = Clamp(Number(data.playerStats?.maxBullets) || 1, 1, 6);
+      const absorbHits = Clamp(Number(data.playerStats?.absorbHits) || 0, 0, MAX_ABSORB_HITS);
+      const runPerks = Array.isArray(data.runPerks)
+        ? data.runPerks.filter((id) => BOSS_UPGRADE_IDS.has(id)).slice(0, BOSS_UPGRADES.length)
+        : [];
+      const stagePerk = FindUpgrade(data.stagePerk)?.id || null;
+      return {
+        schema: 1,
+        stage: IsBarricadeTeachStage(data.stage) ? "barricadeTeach" : Number(data.stage),
+        score: Math.max(0, Number(data.score) || 0),
+        lives: Clamp(Number(data.lives) || PLAYER_LIVES, 1, 9),
+        playClock: Math.max(0, Number(data.playClock) || 0),
+        playerStats: { power, maxBullets, absorbHits, hp: PLAYER_MAX_HP },
+        runPerks,
+        stagePerk,
+        savedAt: Number(data.savedAt) || Date.now(),
+      };
+    } catch (err) {
+      console.warn("Checkpoint read failed", err);
+      return null;
+    }
+  }
+
+  SaveStageCheckpoint() {
+    if (!this.campaignActive) return;
+    const validStage = this.isBarricadeTeach || this.IsCampaignStage(this.stage);
+    if (!validStage || !this.player) return;
+    const checkpoint = {
+      schema: 1,
+      stage: this.isBarricadeTeach ? "barricadeTeach" : this.stage,
+      score: Math.max(0, this.score | 0),
+      lives: Math.max(1, this.lives | 0),
+      playClock: Math.max(0, this.playClock || 0),
+      playerStats: {
+        power: Clamp(this.player.power | 0, 1, 3),
+        maxBullets: Clamp(this.player.maxBullets | 0, 1, 6),
+        absorbHits: Clamp(this.absorbHits | 0, 0, MAX_ABSORB_HITS),
+        hp: PLAYER_MAX_HP,
+      },
+      runPerks: this.runPerks.slice(),
+      stagePerk: this.stagePerk || null,
+      savedAt: Date.now(),
+    };
+    this.stageCheckpoint = checkpoint;
+    try {
+      localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(checkpoint));
+    } catch (err) {
+      console.warn("Checkpoint save failed", err);
+    }
+    this.RefreshContinueUi();
+  }
+
+  ClearStageCheckpoint() {
+    this.stageCheckpoint = null;
+    try {
+      localStorage.removeItem(CHECKPOINT_KEY);
+    } catch (err) {
+      console.warn("Checkpoint clear failed", err);
+    }
+    this.RefreshContinueUi();
+  }
+
+  RefreshContinueUi() {
+    const checkpoint = this.stageCheckpoint;
+    if (this.overlays.continueButton) this.overlays.continueButton.hidden = !checkpoint;
+    if (!this.overlays.checkpointHint) return;
+    if (!checkpoint) {
+      this.overlays.checkpointHint.hidden = true;
+      this.overlays.checkpointHint.textContent = "";
+      return;
+    }
+    const position = IsBarricadeTeachStage(checkpoint.stage)
+      ? "路障教学"
+      : `任务 ${GetCampaignStagePosition(checkpoint.stage)}/${CAMPAIGN_STAGE_COUNT}`;
+    this.overlays.checkpointHint.textContent = `存档：${position} · 得分 ${checkpoint.score}`;
+    this.overlays.checkpointHint.hidden = false;
+  }
+
+  ContinueCampaign() {
+    const checkpoint = this.ReadStageCheckpoint();
+    if (!checkpoint) {
+      this.stageCheckpoint = null;
+      this.RefreshContinueUi();
+      this.ShowBuffToast("没有可用的战役存档");
+      return false;
+    }
+    this.stageCheckpoint = checkpoint;
+    this.campaignActive = true;
+    this.score = checkpoint.score;
+    this.lives = checkpoint.lives;
+    this.playClock = checkpoint.playClock;
+    this.runPerks = checkpoint.runPerks.slice();
+    this.absorbHits = checkpoint.playerStats.absorbHits;
+    this.stagePerk = null;
+    this.pendingStagePerk = checkpoint.stagePerk;
+    this.StartGame({
+      stage: checkpoint.stage,
+      keepStats: checkpoint.playerStats,
+      keepScore: true,
+      keepLives: true,
+      saveCheckpoint: false,
+    });
+    return true;
+  }
+
+  RestoreStageCheckpoint() {
+    const checkpoint = this.stageCheckpoint || this.ReadStageCheckpoint();
+    if (!checkpoint) return false;
+    this.stageCheckpoint = checkpoint;
+    this.campaignActive = true;
+    this.score = checkpoint.score;
+    this.lives = checkpoint.lives;
+    this.playClock = checkpoint.playClock;
+    this.runPerks = checkpoint.runPerks.slice();
+    this.absorbHits = checkpoint.playerStats.absorbHits;
+    this.stagePerk = null;
+    this.pendingStagePerk = checkpoint.stagePerk;
+    this.StartGame({
+      stage: checkpoint.stage,
+      keepStats: checkpoint.playerStats,
+      keepScore: true,
+      keepLives: true,
+      saveCheckpoint: false,
+    });
+    return true;
+  }
+
+  UpdateBestScore() {
+    let previous = 0;
+    try {
+      previous = Math.max(0, Number(localStorage.getItem(BEST_SCORE_KEY)) || 0);
+      if (this.score > previous) localStorage.setItem(BEST_SCORE_KEY, String(this.score));
+    } catch (err) {
+      console.warn("Best score save failed", err);
+    }
+    return Math.max(previous, this.score);
   }
 
   async LoadAssets() {
@@ -1113,6 +1310,7 @@ class Game {
     this.DetectTouchUi();
 
     document.getElementById("startButton").addEventListener("click", () => this.StartCampaign());
+    this.overlays.continueButton?.addEventListener("click", () => this.ContinueCampaign());
     document.getElementById("restartButton").addEventListener("click", () => this.HandleEndPrimary());
     document.getElementById("nextStageButton")?.addEventListener("click", () => this.AdvanceStage());
     document.getElementById("resumeButton").addEventListener("click", () => this.SetPaused(false));
@@ -1638,6 +1836,7 @@ class Game {
 
   DebugGotoStage(stageId) {
     this.audio.Ensure();
+    this.campaignActive = false;
     if (this.state === "roulette") this.CloseRoulette();
     if (this.state === "paused") this.SetPaused(false);
     if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
@@ -1729,6 +1928,26 @@ class Game {
         this.ShowBuffToast("DEBUG 清场");
         this.CheckEnd();
         break;
+      case "baseHit":
+        if (this.baseAlive) this.DamageBase();
+        break;
+      case "lastEnemy": {
+        let keptOne = false;
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          if (!keptOne) {
+            keptOne = true;
+            continue;
+          }
+          e.alive = false;
+          e.deathTimer = 0.01;
+        }
+        this.spawnQueue = [];
+        this.RenderEnemyIcons();
+        this.ShowBuffToast(keptOne ? "DEBUG 留下最后 1 敌" : "DEBUG 当前无存活敌军");
+        this.CheckEnd();
+        break;
+      }
       case "roulette":
         if (this.state === "playing" || this.state === "paused") {
           if (this.state === "paused") this.SetPaused(false);
@@ -1751,12 +1970,14 @@ class Game {
     if (this.isTutorial) return 0;
     // Boss minions still feed the wheel, but cannot flood the arena with tokens.
     if (this.isBossStage) return BOSS_POWER_DROP_RATE;
-    if (this.stage <= EARLY_POWER_DROP_END_STAGE) return POWER_DROP_RATE * EARLY_POWER_DROP_RATE_MUL;
+    if (this.campaignStagePosition > 0 && this.campaignStagePosition <= EARLY_POWER_DROP_END_POSITION) {
+      return POWER_DROP_RATE * EARLY_POWER_DROP_RATE_MUL;
+    }
     return POWER_DROP_RATE;
   }
 
   GetArmorPowerDropRate() {
-    return this.stage <= EARLY_POWER_DROP_END_STAGE
+    return this.campaignStagePosition > 0 && this.campaignStagePosition <= EARLY_POWER_DROP_END_POSITION
       ? EARLY_ARMOR_POWER_DROP_RATE
       : ARMOR_POWER_DROP_RATE;
   }
@@ -1805,6 +2026,9 @@ class Game {
       this.stage = Math.max(1, Math.min(STAGE_COUNT, stageIndex1Based | 0));
       this.stageData = GetStage(this.stage);
     }
+    this.campaignStagePosition = typeof this.stage === "number"
+      ? GetCampaignStagePosition(this.stage)
+      : 0;
     this.isBossStage = !!this.stageData.bossStage;
     this.isSpecialStage = !!this.stageData.specialStage;
     this.specialKind = this.stageData.specialKind || null;
@@ -1822,16 +2046,20 @@ class Game {
   }
 
   SyncStageLabels() {
-    const label = this.isTutorial ? "T" : (this.isBarricadeTeach ? "教" : String(this.stage));
+    const label = this.GetStageDisplayLabel();
     if (this.hud.stage) this.hud.stage.textContent = label;
     if (this.hud.mobileStage) this.hud.mobileStage.textContent = label;
     if (this.overlays.startTitle) {
       this.overlays.startTitle.textContent = this.isTutorial
         ? "新手引导"
-        : (this.isBarricadeTeach ? "路障教学" : (this.isSpecialStage ? (this.stageData.title || "特殊关") : "GRAVITY TANK"));
+        : (this.isBarricadeTeach
+          ? "幕间 · 路障教学"
+          : (this.campaignActive && this.campaignStagePosition > 0
+            ? `任务 ${this.campaignStagePosition}/${CAMPAIGN_STAGE_COUNT}${this.stageData.title ? ` · ${this.stageData.title}` : ""}`
+            : (this.stageData.title || `STAGE ${this.stage}`)));
     }
     if (this.overlays.startBlurb) {
-      const lines = ["标准：3 条座驾 · 每台 3 点生命 · 前期道具稀少", ""];
+      const lines = [];
       if (this.isTutorial) {
         lines.push("炮弹带重力会下坠。", "朝下 / 斜着打对岸。", "别把自己轰死。");
       } else if (this.isBarricadeTeach) {
@@ -1858,7 +2086,7 @@ class Game {
           "炮弹会下坠，借墙反弹或引敌人互射。",
         );
       } else if (this.state === "ready" || this.state === "boot") {
-        lines.push("炮弹带重力，打出去会往下掉。", "自己也要当心，别被自己的弹幕炸到。");
+        lines.push("炮弹会下坠，也会绕回来。", "读懂落点，护住总部，完成三幕战役。");
       } else if (this.isBossStage) {
         lines.push("BOSS 关。", "炮弹带重力——自己也要当心落弹。");
       } else if (this.stageData.prepSeconds) {
@@ -1876,6 +2104,8 @@ class Game {
   }
 
   StartCampaign() {
+    this.campaignActive = true;
+    this.ClearStageCheckpoint();
     this.score = 0;
     this.lives = this.GetStartLives();
     this.playClock = 0;
@@ -1883,13 +2113,27 @@ class Game {
     this.pendingStagePerk = null;
     this.runPerks = [];
     this.absorbHits = 0;
-    this.experience = 0;
-    this.experienceLevel = 0;
-    this.experienceNext = XP_LEVEL_BASE;
     this.SetGravityDirection("down");
     this.meteorPulseTimer = 0;
     this.timeRiftCd = 0;
     this.StartGame({ stage: 1, keepStats: false });
+  }
+
+  CaptureCarryStats() {
+    const player = this.player;
+    const absorbHits = Math.max(0, (this.absorbHits || 0) - (this.stagePerkAbsorbHits || 0));
+    if (!player) return { power: 1, maxBullets: 1, absorbHits };
+    let maxBullets = player.maxBullets;
+    // `multiShot` belongs only to the mission that just ended.
+    if (this.stagePerk === "multiShot") {
+      const baseline = player.power >= 3 ? 3 : (player.power >= 2 ? 2 : 1);
+      maxBullets = Math.max(baseline, maxBullets - 1);
+    }
+    return {
+      power: player.power,
+      maxBullets,
+      absorbHits,
+    };
   }
 
   AdvanceStage() {
@@ -1898,25 +2142,27 @@ class Game {
       return;
     }
     if (this.isBarricadeTeach) {
-      const keep = this.player
-        ? { power: this.player.power, maxBullets: this.player.maxBullets, absorbHits: this.absorbHits }
-        : { power: 1, maxBullets: 1, absorbHits: this.absorbHits };
+      const keep = this.CaptureCarryStats();
       this.StartGame({ stage: 7, keepStats: keep, keepScore: true, keepLives: true });
       return;
     }
-    if (this.stage >= STAGE_COUNT) {
-      this.EndGame(true, `${STAGE_COUNT} 关全通！最终得分 ${this.score}`, "restart");
+    if (this.IsCurrentFinalStage()) {
+      const total = this.campaignActive ? CAMPAIGN_STAGE_COUNT : STAGE_COUNT;
+      this.EndGame(true, `${total} 个任务全通！最终得分 ${this.score}`, "restart");
       return;
     }
-    const keep = this.player
-      ? { power: this.player.power, maxBullets: this.player.maxBullets, absorbHits: this.absorbHits }
-      : { power: 1, maxBullets: 1, absorbHits: this.absorbHits };
+    const keep = this.CaptureCarryStats();
     // After gravity-cannon boss: interstitial barricade teach before stages 7–8 trap maps.
     if (this.stage === 6) {
       this.StartGame({ stage: "barricadeTeach", keepStats: keep, keepScore: true, keepLives: true });
       return;
     }
-    this.StartGame({ stage: this.stage + 1, keepStats: keep, keepScore: true, keepLives: true });
+    const nextStage = this.campaignActive ? GetNextCampaignStageId(this.stage) : this.stage + 1;
+    if (nextStage == null || nextStage > STAGE_COUNT) {
+      this.EndGame(true, `战役完成！最终得分 ${this.score}`, "restart");
+      return;
+    }
+    this.StartGame({ stage: nextStage, keepStats: keep, keepScore: true, keepLives: true });
   }
 
   HandleEndPrimary() {
@@ -1927,8 +2173,10 @@ class Game {
       }
       this.AdvanceStage();
     } else if (this.endAction === "retry") {
-      const stage = this.isTutorial ? 0 : (this.isBarricadeTeach ? "barricadeTeach" : this.stage);
-      this.StartGame({ stage, keepStats: false, keepScore: false, keepLives: false });
+      if (!(this.campaignActive && this.RestoreStageCheckpoint())) {
+        const stage = this.isTutorial ? 0 : (this.isBarricadeTeach ? "barricadeTeach" : this.stage);
+        this.StartGame({ stage, keepStats: false, keepScore: false, keepLives: false });
+      }
     } else {
       this.StartCampaign();
     }
@@ -1939,7 +2187,7 @@ class Game {
     if (this.isTutorial) return true;
     if (this.isBarricadeTeach) return false;
     // Campaign clear uses restart — no pick. Mid-run next-stage clears offer cards.
-    return this.stage < STAGE_COUNT || this.isBossStage;
+    return !this.IsCurrentFinalStage();
   }
 
   OpenUpgradePick({ special = false } = {}) {
@@ -1953,14 +2201,17 @@ class Game {
     this.overlays.end.hidden = true;
     const tutorial = this.isTutorial && !special;
     const pool = tutorial ? TUTORIAL_UPGRADES : (special ? BOSS_UPGRADES : STAGE_UPGRADES);
+    const nextStage = tutorial
+      ? 1
+      : (!this.campaignActive && typeof this.stage === "number"
+        ? (this.stage < STAGE_COUNT ? this.stage + 1 : null)
+        : (special ? PeekNextStageId(this.stage) : PeekNextStageId(this.isBarricadeTeach ? "barricadeTeach" : this.stage)));
+    const nextStageData = nextStage == null ? null : GetStage(nextStage);
     // Avoid offering boss perks already owned.
     const filtered = special
       ? pool.filter((u) => !this.runPerks.includes(u.id))
-      : pool.slice();
+      : pool.filter((u) => IsUpgradeApplicable(u, nextStageData));
     const cards = PickUpgradeCards(filtered.length ? filtered : pool, 3);
-    const nextStage = tutorial
-      ? 1
-      : (special ? PeekNextStageId(this.stage) : PeekNextStageId(this.isBarricadeTeach ? "barricadeTeach" : this.stage));
     // Soft-sort: recommended cards float to the top of the three picks.
     cards.sort((a, b) => {
       const ar = IsUpgradeRecommended(a, { special, tutorial, nextStage }) ? 1 : 0;
@@ -1975,10 +2226,10 @@ class Game {
     }
     if (this.overlays.upgradeBlurb) {
       this.overlays.upgradeBlurb.textContent = tutorial
-        ? "三选一：基础强化，带进第一关（本关有效）。黄边=推荐。"
+        ? "三选一：基础强化，带进下一任务。黄边=推荐。"
         : (special
           ? "三选一：永久能力，带到本局通关结束。黄边=推荐。"
-          : "三选一：本关有效（仅下一关）。黄边=对下一关更划算。");
+          : "三选一：只在下一关生效。不可用的能力不会出现；黄边=推荐。");
     }
     cardsRoot.innerHTML = "";
     for (const card of cards) {
@@ -2017,11 +2268,10 @@ class Game {
     const card = pick.cards?.find((c) => c.id === id) || FindUpgrade(id);
     if (pick.special) {
       if (!this.runPerks.includes(id)) this.runPerks.push(id);
-      this.stagePerk = null; // boss pick does not refresh 本关卡
       this.ShowBuffToast(`永久能力：${card?.title || id}`);
     } else {
       this.pendingStagePerk = id;
-      this.ShowBuffToast(`${pick.tutorial ? "入门强化" : "本关强化"}：${card?.title || id}`);
+      this.ShowBuffToast(`${pick.tutorial ? "入门强化" : "下一关强化"}：${card?.title || id}`);
     }
     this.upgradePick = null;
     if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
@@ -2038,7 +2288,13 @@ class Game {
     return ids;
   }
 
-  StartGame({ stage = 1, keepStats = false, keepScore = false, keepLives = false } = {}) {
+  StartGame({
+    stage = 1,
+    keepStats = false,
+    keepScore = false,
+    keepLives = false,
+    saveCheckpoint = true,
+  } = {}) {
     const prevStageKey = this.isTutorial ? 0 : this.stage;
     this.ApplyStageMeta(stage);
     this.SetGravityDirection("down");
@@ -2067,7 +2323,8 @@ class Game {
     if (!keepLives) this.lives = this.GetStartLives();
     if (!keepStats) this.absorbHits = 0;
     else if (keepStats.absorbHits != null) this.absorbHits = keepStats.absorbHits;
-    // 普通升级：本关有效。过关时选卡 → pending → 进入下一关生效；
+    this.stagePerkAbsorbHits = 0;
+    // 普通升级：只在下一任务有效。过关时选卡 → pending → 进入下一关生效；
     // Boss 永久卡不写 pending，换关时清掉上一关的本关强化。重试同关则保留。
     if (this.pendingStagePerk != null) {
       this.stagePerk = this.pendingStagePerk;
@@ -2077,7 +2334,9 @@ class Game {
     }
     this.enemiesRemaining = this.totalEnemies;
     this.spawnTimer = 0.2;
-    this.stageReviveUsed = false;
+    this.stageClock = 0;
+    this.stagePlayerKills = 0;
+    this.stageCrossfireKills = 0;
     this.freezeTimer = 0;
     this.shovelTimer = 0;
     this.antigravTimer = 0;
@@ -2100,13 +2359,20 @@ class Game {
     this.eagleWarnT = 0;
     this.buffToast = null;
     this.roulette = null;
+    this.rouletteDropsThisStage = 0;
+    this.guaranteedTokenPending = this.campaignActive && this.stage === 1;
+    this.firstShotCoachPending = this.campaignActive && this.stage === 1;
+    this.noFireFinaleHandled = false;
+    this.noFireFinaleTimer = 0;
     this.pendingFortRestore = false;
     this.baseAlive = true;
+    this.baseHp = BASE_MAX_HP;
     this.nextSpawnSlot = 0;
     this.respawnTimer = 0;
     this.endAction = "restart";
     this.BuildSpawnQueue();
     this.SpawnPlayer(true, keepStats || null);
+    if (saveCheckpoint) this.SaveStageCheckpoint();
     // Enemies spawn after the STAGE curtain finishes.
     this.spawnTimer = 0.15;
     this.overlays.start.hidden = true;
@@ -2208,6 +2474,10 @@ class Game {
       this.ShowBuffToast(
         perk ? `BOSS · 本关强化：${perk.title}` : `BOSS：${bossTitle} — 准备战斗！`
       );
+    } else if (this.campaignActive && this.campaignStagePosition === 1) {
+      this.ShowBuffToast("任务 1：炮弹会下坠 · 总部与每辆座驾都有 3 HP");
+    } else if (this.campaignActive && this.campaignStagePosition === 2) {
+      this.ShowBuffToast("敌军也会误伤友军；借它们的弹道清场，但误伤击破不计分");
     } else {
       const perk = FindUpgrade(this.stagePerk);
       if (perk) this.ShowBuffToast(`本关强化：${perk.title}`);
@@ -2264,7 +2534,9 @@ class Game {
       this.FortifyBase(true);
     }
     if (this.HasPerk("hitPlates")) {
+      const before = this.absorbHits;
       this.GrantAbsorbHits(2);
+      this.stagePerkAbsorbHits = Math.max(0, this.absorbHits - before);
     }
     if (this.HasPerk("ironHide")) {
       this.GrantAbsorbHits(1);
@@ -2292,30 +2564,17 @@ class Game {
     if (this.player) this.player.absorbHits = this.absorbHits;
   }
 
-  GetStageExperienceReward() {
-    if (typeof this.stage !== "number") return 0;
-    let reward = XP_BASE_STAGE + this.stage * XP_STAGE_STEP;
-    if (this.isBossStage) reward += XP_BOSS_BONUS;
-    if (this.isSpecialStage) reward += XP_SPECIAL_BONUS;
-    return reward;
-  }
-
-  AwardStageExperience() {
-    const reward = this.GetStageExperienceReward();
-    if (!reward) return "";
-    this.experience += reward;
-    let levels = 0;
-    while (this.experience >= this.experienceNext) {
-      this.experience -= this.experienceNext;
-      this.experienceLevel += 1;
-      this.experienceNext = XP_LEVEL_BASE + this.experienceLevel * XP_LEVEL_STEP;
-      this.GrantAbsorbHits(1);
-      levels += 1;
-    }
-    const progress = `经验 +${reward} · LV${this.experienceLevel} ${this.experience}/${this.experienceNext}`;
-    const armor = levels > 0 ? ` · 装甲升级！护甲 +${levels}` : "";
-    this.ShowBuffToast(`${progress}${armor}`);
-    return `${progress}${armor}`;
+  BuildStageClearReport() {
+    const elapsed = Math.max(0, Math.floor(this.stageClock));
+    const parSeconds = this.isBossStage ? 150 : (this.isBarricadeTeach ? 75 : 105);
+    const hqBonus = Math.max(0, this.baseHp | 0) * 200;
+    const killBonus = Math.max(0, this.stagePlayerKills | 0) * 25;
+    const timeBonus = Math.max(0, parSeconds - elapsed) * 5;
+    const clearBonus = hqBonus + killBonus + timeBonus;
+    this.score += clearBonus;
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = String(elapsed % 60).padStart(2, "0");
+    return `用时 ${minutes}:${seconds} · 亲手击破 ${this.stagePlayerKills} · 敌军误伤 ${this.stageCrossfireKills}\n总部 ${this.baseHp}/${BASE_MAX_HP} · 清算奖励 +${clearBonus}`;
   }
 
   SyncAbsorbHitsToPlayer() {
@@ -2326,6 +2585,7 @@ class Game {
   IsGiantPowerUnlocked() {
     if (this.isTutorial) return false;
     if (this.isBarricadeTeach) return true;
+    if (this.campaignActive) return this.campaignStagePosition >= 7;
     return typeof this.stage === "number" && this.stage >= 7;
   }
 
@@ -2402,13 +2662,10 @@ class Game {
     return true;
   }
 
-  /** Enemy shells never hurt bosses; from stage 6+ no enemy↔enemy damage at all. */
+  /** Enemy crossfire is always live; bosses remain immune to their own army. */
   BlocksEnemyFriendlyFire(bullet, target) {
     if (!bullet || bullet.isPlayer) return false;
-    if (this.isNoFireStage) return false;
-    if (target?.isBoss || target?.tankKing || target?.tankMan || target?.prismTank) return true;
-    if (!this.isTutorial && this.stage >= ENEMY_FRIENDLY_FIRE_OFF_STAGE) return true;
-    return false;
+    return !!(target?.isBoss || target?.tankKing || target?.tankMan || target?.prismTank || target?.gravityWarden);
   }
 
   IsBallisticPuzzle() {
@@ -2548,6 +2805,7 @@ class Game {
 
     if (this.state === "playing") {
       this.playClock += dt;
+      this.stageClock += dt;
       const simDt = this.deathSlowTimer > 0 ? dt * DEATH_SLOW_SCALE : dt;
       this.Update(simDt);
     }
@@ -2663,6 +2921,7 @@ class Game {
 
     this.UpdatePlayer(dt);
     this.UpdateEnemies(dt);
+    this.UpdateNoFireFinale(dt);
     this.UpdateBullets(dt);
     this.UpdateBallisticShellPickups(dt);
     this.UpdateBombs(dt);
@@ -2672,6 +2931,30 @@ class Game {
     this.TrySpawnEnemy(dt);
     this.CheckEnd();
     this.UpdateHud();
+  }
+
+  UpdateNoFireFinale(dt) {
+    if (!this.isNoFireStage) return;
+    const live = this.enemies.filter((enemy) => enemy.alive);
+    if (!this.noFireFinaleHandled && this.spawnQueue.length === 0 && live.length === 1) {
+      this.noFireFinaleHandled = true;
+      this.noFireFinaleTimer = 1.25;
+      live[0].noFireRetreat = true;
+      live[0].protect = Math.max(live[0].protect || 0, 2);
+      this.ShowBuffToast("最后一辆失去交火目标，正在撤退");
+    }
+    if (!this.noFireFinaleHandled || live.length !== 1) return;
+    const survivor = live[0];
+    this.noFireFinaleTimer -= dt;
+    survivor.dir = "up";
+    survivor.y -= Math.max(72, survivor.speed * 2.2) * dt;
+    survivor.animTick += dt * 14;
+    survivor.moving = true;
+    if (this.noFireFinaleTimer > 0 && survivor.y + survivor.h > -4) return;
+    survivor.alive = false;
+    survivor.deathTimer = 0.01;
+    this.ShowBuffToast("敌军撤离 · 任务完成");
+    this.RenderEnemyIcons();
   }
 
   GetMoveInput() {
@@ -4444,7 +4727,7 @@ class Game {
           return true;
         }
         b.alive = false;
-        if (t === TILE_BASE) this.DestroyBase();
+        if (t === TILE_BASE) this.DamageBase({ heavy: this.IsHeavyIncoming(b), bullet: b });
         else this.SpawnExplosion(b.x, b.y, 0.4);
         return true;
       }
@@ -4528,6 +4811,10 @@ class Game {
     else if (isPlayer && this.HasPerk("rapidFire")) tank.fireCd = tank.power >= 2 ? 0.12 : 0.18;
     else tank.fireCd = isPlayer ? (tank.power >= 2 ? 0.286 : 0.416) : tank.shootCd * (this.enemyRageTimer > 0 ? 0.55 : 1);
     this.audio.Shoot();
+    if (isPlayer && this.firstShotCoachPending) {
+      this.firstShotCoachPending = false;
+      this.ShowBuffToast("观察落点：炮弹会持续下坠，也可能绕回来命中自己");
+    }
   }
 
   SpawnShell(tank, dirName, isPlayer, opts = {}) {
@@ -4708,7 +4995,8 @@ class Game {
       // hit enemies
       for (const e of this.enemies) {
         if (!e.alive || e.spawnFlash > 0) continue;
-        if (!canSelfHit && e === b.owner) continue;
+        // Enemy friendly fire is live, but an enemy never damages its own hull.
+        if (e === b.owner && (!b.isPlayer || !canSelfHit)) continue;
         if (this.BlocksEnemyFriendlyFire(b, e)) continue;
         if (RectsOverlap(b, e)) {
           if (this.IsBallisticPuzzle() && this.IsBallisticFrontHit(b, e)) {
@@ -4718,7 +5006,7 @@ class Game {
             b.alive = false;
             break;
           }
-          this.DamageEnemy(e, b.power);
+          this.DamageEnemy(e, b.power, b.isPlayer);
           if (b.pierceLeft > 0) {
             b.pierceLeft -= 1;
             b.arm = Math.max(b.arm, 0.05);
@@ -4980,7 +5268,7 @@ class Game {
     }
   }
 
-  DamageEnemy(e, power) {
+  DamageEnemy(e, power, creditPlayer = true) {
     if (e.protect > 0) {
       this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 0.4);
       this.audio.Bounce();
@@ -5001,7 +5289,12 @@ class Game {
     if (e.hp <= 0) {
       e.alive = false;
       e.deathTimer = 0.01;
-      this.score += e.score;
+      if (creditPlayer) {
+        this.score += e.score;
+        this.stagePlayerKills += 1;
+      } else {
+        this.stageCrossfireKills += 1;
+      }
       this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1);
       this.audio.Explode();
       this.RenderEnemyIcons();
@@ -5018,8 +5311,9 @@ class Game {
         e.bossDropMarks.splice(i, 1);
         const ox = (Math.random() - 0.5) * 48;
         const oy = 28 + Math.random() * 24;
-        this.DropPowerup(e.x + e.w * 0.5 + ox, e.y + e.h * 0.5 + oy);
-        this.ShowBuffToast("Boss 掉落道具！");
+        if (this.DropPowerup(e.x + e.w * 0.5 + ox, e.y + e.h * 0.5 + oy)) {
+          this.ShowBuffToast("Boss 掉落道具！");
+        }
       }
     }
   }
@@ -5065,7 +5359,7 @@ class Game {
 
   /**
    * Apply damage to the player tank.
-   * Normal hits: −1 HP + HIT_IFRAME. Heavy hits: lethal (drain remaining HP).
+   * Normal hits: −1 HP + HIT_IFRAME. Heavy hits: −2 HP.
    * Armor / giant / time-rift still intercept before HP loss.
    */
   DamagePlayer({ heavy = false, source = "bullet", bullet = null } = {}) {
@@ -5085,6 +5379,7 @@ class Game {
     if (this.TryAbsorbWithGiant()) return false;
     if ((this.absorbHits || 0) > 0 || (p.absorbHits || 0) > 0) {
       this.absorbHits = Math.max(0, (this.absorbHits || 0) - 1);
+      this.stagePerkAbsorbHits = Math.max(0, (this.stagePerkAbsorbHits || 0) - 1);
       p.absorbHits = this.absorbHits;
       p.protect = Math.max(p.protect, HIT_IFRAME);
       this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 0.55);
@@ -5109,11 +5404,7 @@ class Game {
     if (p.hp == null) p.hp = PLAYER_MAX_HP;
     if (p.maxHp == null) p.maxHp = PLAYER_MAX_HP;
 
-    if (heavy) {
-      p.hp = 0;
-    } else {
-      p.hp = Math.max(0, (p.hp | 0) - 1);
-    }
+    p.hp = Math.max(0, (p.hp | 0) - (heavy ? 2 : 1));
 
     if (p.hp > 0) {
       p.protect = Math.max(p.protect, HIT_IFRAME);
@@ -5149,36 +5440,11 @@ class Game {
     this.ClearGiantForm(false);
     this.DropCarriedBlock(true);
     const keep = this.SoftenFirepowerOnDeath(p);
-    const deathX = p.x;
-    const deathY = p.y;
-    const deathDir = p.dir;
     p.alive = false;
     this.StartIncidentReport({ source, bullet });
     this.audio.StopEngine();
     this.SpawnExplosion(p.x + p.w / 2, p.y + p.h / 2, 1.2);
     this.audio.Explode();
-
-    // First death each stage: revive in place with short protect. Firepower soft-kept.
-    if (!this.stageReviveUsed) {
-      this.stageReviveUsed = true;
-      p.alive = true;
-      p.hp = PLAYER_MAX_HP;
-      p.maxHp = PLAYER_MAX_HP;
-      p.power = keep.power;
-      p.maxBullets = keep.maxBullets;
-      p.absorbHits = keep.absorbHits;
-      p.x = deathX;
-      p.y = deathY;
-      p.dir = deathDir;
-      p.protect = STAGE_REVIVE_PROTECT;
-      p.disarmed = !!this.isNoFireStage;
-      this.playerDisarmed = !!this.isNoFireStage;
-      this.UnstickTank(p, { maxDist: 64 });
-      this.StartRespawnFx(p.x + p.w / 2, p.y + p.h / 2);
-      this.ShowBuffToast(`原地复活！火力保留 ${p.power} · 护盾 ${STAGE_REVIVE_PROTECT}s`);
-      this.UpdateHud();
-      return;
-    }
 
     this.lives -= 1;
     this.UpdateHud();
@@ -5186,8 +5452,7 @@ class Game {
       this.lives = 0;
       this.respawnTimer = 0;
       this.pendingRespawnStats = null;
-      // Full wipe of run firepower / perks only when the campaign fails.
-      this.EndGame(false, "生命耗尽。战役失败。");
+      this.EndGame(false, "座驾耗尽。将从本任务起点重试，构筑与分数回档。");
       return;
     }
     this.pendingRespawnStats = keep;
@@ -5195,9 +5460,26 @@ class Game {
     this.ShowBuffToast(`阵亡 · 火力保留 ${keep.power} · 剩余座驾 ×${this.lives}`);
   }
 
+  DamageBase({ heavy = false, bullet = null } = {}) {
+    if (!this.baseAlive) return false;
+    const damage = heavy ? 2 : 1;
+    this.baseHp = Math.max(0, (this.baseHp | 0) - damage);
+    const hq = this.GetBaseTarget();
+    this.SpawnExplosion(hq.x + hq.w / 2, hq.y + hq.h / 2, this.baseHp > 0 ? 0.75 : 1.2);
+    if (this.baseHp > 0) {
+      this.ShowBuffToast(`总部受损！耐久 ${this.baseHp}/${BASE_MAX_HP}`);
+      this.audio.Bounce();
+      this.UpdateHud();
+      return false;
+    }
+    this.DestroyBase();
+    return true;
+  }
+
   DestroyBase() {
     if (!this.baseAlive) return;
     this.baseAlive = false;
+    this.baseHp = 0;
     const hq = this.GetBaseTarget();
     const home = this.eagleStroll?.home || this.eagleAlly?.home || this.FindBaseCell();
     this.eagleAlly = null;
@@ -5218,8 +5500,9 @@ class Game {
     }
     this._baseCell = { x: home.x, y: home.y };
     this.SpawnExplosion(hq.x + hq.w / 2, hq.y + hq.h / 2, 1.4);
+    this.UpdateHud();
     this.audio.Lose();
-    this.EndGame(false, "总部被毁。战役失败。");
+    this.EndGame(false, "总部被毁。将从本任务起点重试，构筑与分数回档。");
   }
 
   /** Top-left tile of the 2×2 eagle base (live or ruined). */
@@ -5586,13 +5869,15 @@ class Game {
     }
     b.alive = false;
     this.SpawnExplosion(b.x, b.y, 0.55);
-    this.DestroyBase();
+    this.DamageBase({ heavy: this.IsHeavyIncoming(b), bullet: b });
     return true;
   }
 
   DropPowerup(x, y, kind = POWER.token) {
     // Field tokens open the physics roulette.
-    if (this.IsBallisticPuzzle()) return;
+    if (this.IsBallisticPuzzle()) return false;
+    if (this.rouletteDropsThisStage >= MAX_ROULETTE_DROPS_PER_STAGE) return false;
+    this.rouletteDropsThisStage += 1;
     this.powerups.push({
       x: Clamp(x, 8, CANVAS_W - 32),
       y: Clamp(y, 8, CANVAS_H - 32),
@@ -5602,6 +5887,7 @@ class Game {
       blink: 0,
     });
     this.audio.PowerSpawn();
+    return true;
   }
 
   ShowBuffToast(text) {
@@ -5944,6 +6230,10 @@ class Game {
         if (p) p.protect = Math.max(p.protect, 16);
         this.ShowBuffToast("护盾 16 秒");
         break;
+      case POWER.plates:
+        this.GrantAbsorbHits(1);
+        this.ShowBuffToast(`装甲 +1 · 当前 ${this.absorbHits}`);
+        break;
       case POWER.clock:
         this.freezeTimer = 16;
         this.ShowBuffToast("敌军冻结 16 秒");
@@ -6117,6 +6407,11 @@ class Game {
       case POWER.eagleAlly:
         this.StartEagleAlly(16);
         break;
+      case POWER.bastion:
+        this.GrantAbsorbHits(MAX_ABSORB_HITS);
+        if (p) p.protect = Math.max(p.protect, 8);
+        this.ShowBuffToast(`装甲补满 · 可抵挡 ${this.absorbHits} 次伤害`);
+        break;
       case POWER.giant:
         this.StartGiantForm(GIANT_DURATION);
         break;
@@ -6164,6 +6459,7 @@ class Game {
       e.alive = false;
       e.deathTimer = 0.01;
       this.score += e.score;
+      this.stagePlayerKills += 1;
       this.SpawnExplosion(e.x + e.w / 2, e.y + e.h / 2, 1.1);
     }
     this.audio.Explode();
@@ -6362,6 +6658,10 @@ class Game {
 
   MakeEnemyFromType(type, x, y) {
     const size = type.size || TANK_SIZE;
+    const bossHpMul = type.boss ? (this.stageData?.bossHpMul ?? 1) : 1;
+    const hp = Math.max(1, Math.round(type.hp * bossHpMul));
+    const guaranteedDrop = !type.boss && this.guaranteedTokenPending;
+    if (guaranteedDrop) this.guaranteedTokenPending = false;
     return {
       x,
       y,
@@ -6369,8 +6669,8 @@ class Game {
       h: size,
       dir: this.IsBaseAtTop() ? "up" : "down",
       speed: type.speed,
-      hp: type.hp,
-      maxHp: type.hp,
+      hp,
+      maxHp: hp,
       score: type.score,
       shootCd: type.shootCd,
       bulletBoost: type.bulletBoost || 1,
@@ -6385,8 +6685,9 @@ class Game {
       aiTimer: 0.3,
       spawnFlash: type.boss ? 0.6 : 1.0,
       protect: type.boss ? 1.2 : 0,
-      dropsPower: !type.boss && Math.random() < (
-        type.id === "armor" ? this.GetArmorPowerDropRate() : this.GetPowerDropRate()
+      dropsPower: !type.boss && (
+        guaranteedDrop ||
+        Math.random() < (type.id === "armor" ? this.GetArmorPowerDropRate() : this.GetPowerDropRate())
       ),
       deathTimer: 0,
       animTick: 0,
@@ -6404,7 +6705,9 @@ class Game {
       finalPhase: false,
       // Early bosses grant one earned spin; later bosses can pay out at two HP milestones.
       bossDropMarks: type.boss
-        ? (this.stage <= EARLY_POWER_DROP_END_STAGE ? [0.5] : [0.66, 0.33])
+        ? (this.campaignStagePosition > 0 && this.campaignStagePosition <= EARLY_POWER_DROP_END_POSITION
+          ? [0.5]
+          : [0.66, 0.33])
         : null,
       barrelCount: type.barrelCount
         ?? (type.boss ? (this.stageData?.barrelCount ?? (type.tankKing ? 4 : 1)) : 1),
@@ -6756,18 +7059,24 @@ class Game {
     if (!this.baseAlive) return;
     const alive = this.enemies.filter((e) => e.alive).length;
     if (alive === 0 && this.spawnQueue.length === 0) {
-      const experienceReport = this.AwardStageExperience();
+      const clearReport = this.BuildStageClearReport();
       if (this.isTutorial) {
-        this.EndGame(true, `河对岸肃清！选一张入门升级，带进第一关。${experienceReport ? `\n${experienceReport}` : ""}`, "next");
+        this.EndGame(true, `河对岸肃清！选一张入门升级，带进第一关。\n${clearReport}`, "next");
       } else if (this.isBarricadeTeach) {
-        this.EndGame(true, `路障学会了！接下来用它封死敌窝出口。${experienceReport ? `\n${experienceReport}` : ""}`, "next");
+        this.EndGame(true, `路障学会了！接下来用它封死敌窝出口。\n${clearReport}`, "next");
+      } else if (this.IsCurrentFinalStage()) {
+        const best = this.campaignActive ? this.UpdateBestScore() : this.score;
+        if (this.campaignActive) this.ClearStageCheckpoint();
+        const missionCount = this.campaignActive ? CAMPAIGN_STAGE_COUNT : STAGE_COUNT;
+        this.EndGame(true, `${missionCount} 个任务全通！最终得分 ${this.score} · 最高 ${best}\n${clearReport}`, "restart");
       } else if (this.isBossStage) {
         const title = this.stageData.title || "Boss";
-        this.EndGame(true, `${title}击破！得分 ${this.score}${experienceReport ? `\n${experienceReport}` : ""}`, "next");
-      } else if (this.stage < STAGE_COUNT) {
-        this.EndGame(true, `第 ${this.stage} 关肃清！得分 ${this.score}${experienceReport ? `\n${experienceReport}` : ""}`, "next");
+        this.EndGame(true, `${title}击破！当前得分 ${this.score}\n${clearReport}`, "next");
       } else {
-        this.EndGame(true, `${STAGE_COUNT} 关全通！最终得分 ${this.score}${experienceReport ? `\n${experienceReport}` : ""}`, "restart");
+        const mission = this.campaignActive && this.campaignStagePosition > 0
+          ? `任务 ${this.campaignStagePosition}/${CAMPAIGN_STAGE_COUNT}`
+          : `第 ${this.stage} 关`;
+        this.EndGame(true, `${mission}肃清！当前得分 ${this.score}\n${clearReport}`, "next");
       }
     }
   }
@@ -6776,12 +7085,7 @@ class Game {
     this.state = won ? "won" : "lost";
     this.endAction = won ? action : "retry";
     if (!won) {
-      // Full upgrade wipe only when the run fails (not on mid-stage deaths).
-      this.runPerks = [];
-      this.absorbHits = 0;
       this.pendingRespawnStats = null;
-      this.stagePerk = null;
-      this.pendingStagePerk = null;
     }
     if (this.overlays.upgrade) this.overlays.upgrade.hidden = true;
     this.upgradePick = null;
@@ -6791,10 +7095,10 @@ class Game {
         ? "引导通过"
         : this.isBarricadeTeach
           ? "教学完成"
-          : this.isBossStage
-            ? "Boss 击破"
-            : (this.stage >= STAGE_COUNT && action === "restart" ? "战役胜利" : "关卡通过"))
-      : "游戏结束";
+          : (this.IsCurrentFinalStage() && action === "restart"
+            ? "战役胜利"
+            : (this.isBossStage ? "Boss 击破" : "任务完成")))
+      : "任务失败";
     this.overlays.endMessage.textContent = message;
     if (this.overlays.endPrimary) {
       this.overlays.endPrimary.textContent = won
@@ -6816,23 +7120,31 @@ class Game {
   }
 
   UpdateHud() {
-    const hp = this.player?.alive ? Math.max(0, this.player.hp ?? PLAYER_MAX_HP) : 0;
+    const hp = this.state === "ready" || this.state === "boot"
+      ? PLAYER_MAX_HP
+      : (this.player?.alive ? Math.max(0, this.player.hp ?? PLAYER_MAX_HP) : 0);
     const stock = Math.max(0, this.lives);
     const lifeText = `${hp}/${PLAYER_MAX_HP}×${stock}`;
     const power = String(this.player?.power ?? 1);
     const score = String(this.score);
-    const remain = String(this.spawnQueue.length + this.enemies.filter((e) => e.alive).length);
-    const stage = this.isTutorial ? "T" : (this.isBarricadeTeach ? "教" : String(this.stage));
+    const remainingEnemies = this.state === "ready" || this.state === "boot"
+      ? this.totalEnemies
+      : this.spawnQueue.length + this.enemies.filter((e) => e.alive).length;
+    const remain = String(remainingEnemies);
+    const stage = this.GetStageDisplayLabel();
+    const base = `${Math.max(0, this.baseHp | 0)}/${BASE_MAX_HP}`;
     this.hud.lives.textContent = lifeText;
     this.hud.power.textContent = power;
     this.hud.score.textContent = score;
     this.hud.remain.textContent = remain;
     if (this.hud.stage) this.hud.stage.textContent = stage;
+    if (this.hud.base) this.hud.base.textContent = base;
     if (this.hud.mobileLives) this.hud.mobileLives.textContent = lifeText;
     if (this.hud.mobilePower) this.hud.mobilePower.textContent = power;
     if (this.hud.mobileScore) this.hud.mobileScore.textContent = score;
     if (this.hud.mobileRemain) this.hud.mobileRemain.textContent = remain;
     if (this.hud.mobileStage) this.hud.mobileStage.textContent = stage;
+    if (this.hud.mobileBase) this.hud.mobileBase.textContent = base;
   }
 
   RenderEnemyIcons() {
@@ -7100,18 +7412,25 @@ class Game {
         ctx.fillText(bossHint, CANVAS_W / 2, CANVAS_H / 2 + 58);
       } else {
         ctx.font = `36px ${PIXEL_FONT}`;
-        ctx.fillText("STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
+        ctx.fillText(this.campaignActive ? "MISSION" : "STAGE", CANVAS_W / 2, CANVAS_H / 2 - 28);
 
         // Big stage number with a slight blink on hold
         const blink = intro.phase === "hold" && Math.floor(intro.t * 6) % 8 === 0 ? 0.55 : 1;
         ctx.globalAlpha = fade * blink;
         ctx.font = `64px ${PIXEL_FONT}`;
-        ctx.fillText(String(this.stage), CANVAS_W / 2, CANVAS_H / 2 + 28);
+        ctx.fillText(
+          String(this.campaignActive && this.campaignStagePosition > 0 ? this.campaignStagePosition : this.stage),
+          CANVAS_W / 2,
+          CANVAS_H / 2 + 28,
+        );
 
         ctx.globalAlpha = fade * 0.9;
         ctx.font = `16px ${PIXEL_FONT}`;
         const title = this.stageData?.title ? ` · ${this.stageData.title}` : "";
-        ctx.fillText(`第 ${this.stage} 关 / 共 ${STAGE_COUNT} 关${title}`, CANVAS_W / 2, CANVAS_H / 2 + 72);
+        const progress = this.campaignActive && this.campaignStagePosition > 0
+          ? `任务 ${this.campaignStagePosition} / ${CAMPAIGN_STAGE_COUNT}`
+          : `第 ${this.stage} 关 / 共 ${STAGE_COUNT} 关`;
+        ctx.fillText(`${progress}${title}`, CANVAS_W / 2, CANVAS_H / 2 + 72);
       }
 
       if (intro.phase === "hold") {
@@ -8337,9 +8656,6 @@ class Game {
     if ((this.absorbHits || 0) > 0) chips.push({ t: `装甲×${this.absorbHits}`, c: "#c8e0ff" });
     if (this.playerDisarmed) {
       chips.push({ t: this.isNoFireStage ? "一枪不开·不能开火" : "无炮管·去捡", c: "#ff6060" });
-    }
-    if (this.experienceNext > 0) {
-      chips.push({ t: `经验 LV${this.experienceLevel} ${this.experience}/${this.experienceNext}`, c: "#ffe08a" });
     }
     if (this.isBossStage && this.stageData?.bossKind === "gravityWarden") {
       chips.push({ t: `重力：${this.gravityDir}`, c: "#80e8ff" });

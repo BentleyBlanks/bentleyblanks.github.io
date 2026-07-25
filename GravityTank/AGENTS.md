@@ -9,11 +9,11 @@ This file is the agent map for GravityTank. Prefer it over dumping `Script_Game.
 
 ## Ship workflow
 
-1. Branch off `master`: `cursor/<short-kebab>-7bcb`
-2. Commit with `GravityTank: short change summary` (no `feat:`/`fix:`, no trailing period)
-3. Push → open PR → **for small/shippable asks, merge to `master` yourself**
-4. Bump cache-bust `Script_Game.mjs?v=…` (and CSS `?v=` if style changed) in `index.html`
-5. Confirm Pages build / live URL before treating the task as done
+1. Create an isolated worktree from current `origin/master`; never edit or switch the shared main checkout.
+2. Commit with `GravityTank: short change summary` (no `feat:`/`fix:`, no trailing period).
+3. Fetch/rebase current `origin/master`, then fast-forward push `HEAD:master` without force.
+4. Bump cache-bust `Script_Game.mjs?v=…` (and CSS `?v=` if style changed) in `index.html`.
+5. Confirm Pages build / live URL, then remove the clean task worktree and branch.
 
 Larger multi-feature stacks may stay on PRs for review, but unique shippable work must still reach `master` (port/merge), not rot on stacked drafts.
 
@@ -57,13 +57,13 @@ Bump constant + visible `vX.Y` text **together** when cutting a player-facing ve
 | Seats (standard only) | **3** | `PLAYER_LIVES` / `GetStartLives()` |
 | HP per seat | **3** | `PLAYER_MAX_HP` |
 | Normal shell | −1 HP | `DamagePlayer` |
-| Heavy / boss shell / bomb | oneshot | `IsHeavyIncoming` / `DamagePlayer({ heavy: true })` |
+| Heavy / boss shell / bomb | −2 HP | `IsHeavyIncoming` / `DamagePlayer({ heavy: true })` |
 | Hit i-frames | 1.0 s | `HIT_IFRAME` |
-| First death / stage | revive in place + 2 s shield | `stageReviveUsed`, `STAGE_REVIVE_PROTECT` |
 | Revive presentation | 1.25 s ring / beam / particles | `respawnFx`, `StartRespawnFx`, `DrawRespawnFx` |
 | Death presentation | 0.85 s slow motion + 3.2 s incident report | `deathSlowTimer`, `StartIncidentReport`, `DrawIncidentSlowFx` |
 | On death | keep firepower (−1 max) | `SoftenFirepowerOnDeath` / `KillPlayer` |
-| Wipe upgrades | only on run fail | (not on seat loss) |
+| HQ durability | **3 HP** | `BASE_MAX_HP`, `DamageBase` |
+| Mission failure | restore mission-start checkpoint | `RestoreStageCheckpoint` |
 
 ### Hull look by HP
 
@@ -77,11 +77,17 @@ Player sheet is classic yellow; draw remaps by remaining HP:
 
 Symbols: `BlitPlayerHpTinted`, `DrawTank` (player branch), overhead HP pips. Power tier still picks sheet row via `TankSheetOrigin` (`gy = (power-1)*2`). Enemy armor tanks use `BlitArmorTinted` + `ARMOR_HP_PALETTE` separately.
 
-Difficulty copy: fixed standard mode; campaign now starts directly at stage 1 (the old tutorial is legacy/debug-only). `SyncStageLabels` / `#difficultyHint` say「3 条座驾」+「每台 3 点生命」. Ordinary stages 1–6 use `POWER_DROP_RATE * 0.35`; early Boss minions use the dedicated 22% cap, early Bosses have one milestone token only, and armor is no longer a guaranteed token source.
+Difficulty copy: fixed standard mode; campaign starts directly at mission 1 (the old tutorial is legacy/debug-only). `SyncStageLabels` / `#difficultyHint` say「9 个任务 · 3 幕 · 3 辆座驾 · 车体与总部各 3 HP」. There is no free first-death revive.
 
-Campaign progression: 15 stages. Stages 4, 7, 10, and 13 are `ballisticPuzzle` specials with variants `singleShell`, `gravitySpin`, `bankShot`, and `relayMaze`; stage 14 is `noFire` / `enemyOnlyCrossfire` (player fire is hard-blocked, enemies only shoot other enemies, enemy shells cannot damage player/HQ, and all enemies chase the player). Ballistic puzzles give the player one recoverable shell, allow both sides to collect landed shells, and reject frontal hits against enemies. Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
+Focused campaign progression: **9 missions in 3 acts**, with data ids `[1, 2, 3, 4, 5, 6, 7, 8, 15]` (`CAMPAIGN_STAGE_IDS`). Stage 6 flows through `barricadeTeach`, then stage 7. All 15 legacy definitions remain selectable through Debug, but ids 9–14 are not on the default route. Main-route Bosses are ids 3, 6, and 15.
 
-Experience: `AwardStageExperience` grants a stage-scaled reward, with boss/special bonuses. Each level grants one `absorbHits` armor charge, carried across the campaign and shown in the HUD/clear report.
+Legacy special contracts remain supported: `ballisticPuzzle` missions use one recoverable shell, and stage 14 `noFire` / `enemyOnlyCrossfire` retires its last survivor so it cannot softlock. Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
+
+Enemy friendly fire is active throughout ordinary play. Enemy-caused kills increment `stageCrossfireKills` but never grant player score. `BuildStageClearReport` scores HQ durability, player kills, and clear time.
+
+Armor is explicit only: upgrade cards and roulette powers may add `absorbHits`; there is no XP or automatic level-up armor.
+
+Checkpoint contract: `SaveStageCheckpoint` captures score, seats, base firepower, armor, temporary next-mission card, and permanent Boss perks at mission start. Failure and the title-screen CONTINUE action restore that snapshot from `gravitytank_campaign_v09`; final victory clears it.
 
 ---
 
@@ -103,6 +109,8 @@ Other labels should stay short plain Chinese (what it does). `fortress` display 
 
 Spin UX: right-side **pinball pull-arc** (`RouletteReleasePlunger`) — not wheel-drag. Flow: fly-in → spin → resolve → fly-out → fullscreen FX when applicable (`OpenRoulette`, `ResolveRoulette`, `ApplyPowerup`, `POWER_FX`, `DrawRoulette`).
 
+Drop contract: at most **2 roulette tokens per mission**, mission 1 guarantees one carrier, and every seven-wedge wheel contains exactly **4 green + 2 gold + 1 red** choices. Boss-safe filtering may change prize identities, never the tier counts.
+
 When renaming a prize: update `ROULETTE_POOL` **and** matching `POWER_FX` label together.
 
 ---
@@ -115,14 +123,16 @@ Grep these first:
 |------|---------|
 | Version | `GAME_VERSION` |
 | Balance / difficulty | `GetStartLives`, `GetPowerDropRate`, `SyncStageLabels` |
-| Player HP / death | `DamagePlayer`, `KillPlayer`, `StartIncidentReport`, `BlitPlayerHpTinted`, `stageReviveUsed`, `SoftenFirepowerOnDeath` |
+| Player HP / death | `DamagePlayer`, `KillPlayer`, `StartIncidentReport`, `BlitPlayerHpTinted`, `SoftenFirepowerOnDeath` |
 | Draw | `DrawTank`, `DrawTankBarrel`, `DrawBossBarrels`, `TankSheetOrigin`, `BlitArmorTinted`, `BlitGrid` |
 | Roulette | `ROULETTE_POOL`, `OpenRoulette`, `ResolveRoulette`, `DrawRoulette`, `DrawRoulettePlunger`, `ApplyPowerup`, `POWER_FX` |
-| Fort / HQ | `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll` |
+| Fort / HQ | `DamageBase`, `DestroyBase`, `FortifyBase`, `BreakBaseFort`, `GetBaseFortCells`, `StartEagleAlly`, `StartEagleStroll` |
 | Eagle ally | `steelShield`, `BulletHitEagleAlly`, `DrawEagleAlly` — enemy shells deflect; never destroy HQ |
 | Barricades | `carryBlocks`, `carriedBlock`, `WantsInteract`, barricade teach stage id |
-| Bosses | `UpdateBoss`, `UpdateTankKing`, `RecoverBossMovement`, `UpdateTankMan`, `UpdatePrismTank`, `UpdateGravityWarden`, `ArmBossSkill` — stage 3 `tankKing` HP 52; stage 12 `prismTank`; stage 15 `gravityWarden` |
-| Stages | `STAGE_COUNT` (15), `BuildStageMap`, `Data_Stages.mjs` — stages **4/7/10/13** ballistic puzzles, **14** no-fire, **10–11** ordinary ~3× density |
+| Bosses | `UpdateBoss`, `UpdateTankKing`, `RecoverBossMovement`, `UpdateTankMan`, `UpdatePrismTank`, `UpdateGravityWarden`, `ArmBossSkill`; route HP scaling is `stageData.bossHpMul` |
+| Campaign | `CAMPAIGN_STAGE_IDS`, `GetCampaignStagePosition`, `GetNextCampaignStageId`, `IsFinalCampaignStage` |
+| Checkpoint | `ReadStageCheckpoint`, `SaveStageCheckpoint`, `ContinueCampaign`, `RestoreStageCheckpoint` |
+| Legacy stages | `STAGE_COUNT` (15), `BuildStageMap`, `Data_Stages.mjs`; Debug retains every definition |
 
 ---
 
@@ -138,7 +148,7 @@ Grep these first:
 
 ### Changing lives / HP feel
 1. Constants near top of `Script_Game.mjs` (`PLAYER_LIVES*`, `PLAYER_MAX_HP`, iframes)
-2. `DamagePlayer` / `KillPlayer` / revive path
+2. `DamagePlayer` / `KillPlayer` / mission checkpoint retry path
 3. `BlitPlayerHpTinted` + pips if look changes
 4. `SyncStageLabels` / `#difficultyHint` / RULE `<li>`
 5. Cache-bust `?v=`

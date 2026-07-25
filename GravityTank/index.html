@@ -7,9 +7,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="description" content="重力弹坦克大战：复古坦克大战画风，捡到 ? 触发物理大转轮。">
+  <meta name="description" content="重力弹坦克大战：9 个任务、3 幕战役、物理大转轮与可续玩的关卡存档。">
   <meta property="og:title" content="GRAVITY TANK BATTLE">
-  <meta property="og:description" content="NES 坦克大战画风。? 道具甩转轮盘，超强与负面并存。">
+  <meta property="og:description" content="NES 坦克大战画风。读懂下坠弹道，完成 9 个任务的三幕战役。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/GravityTank/">
   <title>GRAVITY TANK BATTLE</title>
@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="preload" href="./assets/Font_FusionPixel12ZhHans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/Font_FusionPixel12Latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./Style_Game.css?v=v08">
+  <link rel="stylesheet" href="./Style_Game.css?v=v09f">
 </head>
 <body>
   <div id="app">
@@ -27,9 +27,9 @@
         <img class="title-banner" id="titleBanner" src="./assets/Texture_UiTitleBanner.png" width="480" height="160" alt="GRAVITY TANK BATTLE" title="点击打开 Debug">
         <span class="title-gravity-cover" aria-hidden="true"></span>
         <span class="title-gravity-art" aria-hidden="true"></span>
-        <span class="game-version" id="gameVersion" aria-label="版本">v0.8</span>
+        <span class="game-version" id="gameVersion" aria-label="版本">v0.9</span>
       </div>
-      <p class="tagline">捡到 <img class="inline-token" src="./assets/Texture_PowerToken.png" width="16" height="16" alt="?"> 弹出物理转轮——甩转到哪算哪</p>
+      <p class="tagline">9 个任务 · 3 幕战役 · 重力弹道与物理转轮</p>
     </header>
 
     <div id="debugPanel" class="debug-panel" hidden>
@@ -44,6 +44,8 @@
         <button type="button" data-debug="life">生命+1</button>
         <button type="button" data-debug="power">火力满</button>
         <button type="button" data-debug="clear">清场</button>
+        <button type="button" data-debug="baseHit">总部-1</button>
+        <button type="button" data-debug="lastEnemy">留1敌</button>
         <button type="button" data-debug="roulette">开转轮</button>
       </div>
       <div class="debug-stage-label">选关</div>
@@ -57,18 +59,23 @@
       <span>POW <b id="mobilePower">1</b></span>
       <span>SC <b id="mobileScore">0</b></span>
       <span>EN <b id="mobileRemain">20</b></span>
+      <span>HQ <b id="mobileBase">3/3</b></span>
       <button id="mobilePauseButton" class="hud-pause" type="button" aria-label="暂停">PAUSE</button>
     </div>
 
     <section class="stage-shell" aria-label="游戏画面">
       <canvas id="gameCanvas" width="416" height="416"></canvas>
       <div id="startOverlay" class="overlay">
-        <h2 id="startStageTitle">STAGE 1</h2>
-        <p id="startStageBlurb" class="start-blurb">炮弹带重力，打出去会往下掉。
+        <h2 id="startStageTitle">任务 1/9</h2>
+        <p id="startStageBlurb" class="start-blurb">炮弹会下坠，也会绕回来。
 
-自己也要当心，别被自己的弹幕炸到。</p>
-        <p class="diff-hint" id="difficultyHint">正式战役：15 关 · 3 条座驾 · 每台 3 点生命 · 前期道具稀少</p>
-        <button id="startButton" class="primary" type="button">START</button>
+读懂落点，护住总部，完成三幕战役。</p>
+        <p class="diff-hint" id="difficultyHint">9 个任务 · 3 幕 · 3 辆座驾 · 车体 3 HP · 总部 3 HP</p>
+        <div class="start-actions">
+          <button id="startButton" class="primary" type="button">NEW CAMPAIGN</button>
+          <button id="continueButton" class="primary continue-action" type="button" hidden>CONTINUE</button>
+        </div>
+        <p id="checkpointHint" class="checkpoint-hint" hidden></p>
         <p class="hint desktop-hint">↑↓←→ / WASD · SPACE/J FIRE · P PAUSE</p>
         <p class="hint mobile-hint">左摇杆移动 · 右键开火</p>
       </div>
@@ -102,7 +109,7 @@
       </div>
       <div id="upgradeOverlay" class="overlay upgrade-overlay" hidden>
         <h2 id="upgradeTitle">升级选择</h2>
-        <p id="upgradeBlurb">三选一：普通升级本关有效；Boss 关为永久能力。</p>
+        <p id="upgradeBlurb">三选一：普通升级仅下一任务生效；Boss 能力永久至通关。</p>
         <div id="upgradeCards" class="upgrade-cards"></div>
       </div>
     </section>
@@ -148,6 +155,7 @@
         <div class="stat-row"><span>POWER</span><b id="powerValue">1</b></div>
         <div class="stat-row"><span>SCORE</span><b id="scoreValue">0</b></div>
         <div class="stat-row"><span>ENEMY</span><b id="remainValue">20</b></div>
+        <div class="stat-row"><span>HQ</span><b id="baseValue">3/3</b></div>
         <button id="desktopPauseButton" class="panel-pause" type="button">PAUSE (P / Esc)</button>
       </div>
 
@@ -159,31 +167,23 @@
       <div class="panel">
         <h3>RULE</h3>
         <ul class="rule-list">
-          <li>炮弹带重力，会下坠。别被自己的弹炸到。</li>
-          <li>鹰援期间老鹰披钢甲，敌军炮弹会被弹开；结束后老家自动补钢墙。</li>
           <li>
-            场上
+            炮弹持续受重力影响，会下坠甚至绕回；自己的炮弹也能伤到自己。
+          </li>
+          <li>你有 3 辆座驾，每辆 3 HP；普通弹伤 1，重炮 / Boss 弹 / 炸弹伤 2，受击后短暂无敌。</li>
+          <li>总部有 3 HP。失败会回到本任务起点，分数、火力与构筑按关卡存档恢复，也可刷新后继续。</li>
+          <li>敌军炮弹始终会误伤友军，但由敌军造成的击破不计入你的得分。</li>
+          <li>
+            每个任务最多掉落 2 枚
             <img class="inline-token" src="./assets/Texture_PowerToken.png" width="14" height="14" alt="?">
-            = 转轮：
+            转轮代币；轮盘固定含
             <strong class="rule-good">绿=增益</strong>
             ·
-            <strong class="rule-ultra">金=超强</strong>
+            <strong class="rule-ultra">金=强力</strong>
             ·
-            <strong class="rule-bad">红=负面</strong>
+            <strong class="rule-bad">红=风险</strong>。
           </li>
-          <li>金色超强可含「巨大」：体型翻倍、撞碎砖墙、扛多次伤害。</li>
-          <li>红色负面可含「老鹰跑」：老鹰开门出去乱逛，护住它。</li>
-          <li>木/铁路障：靠近按 <kbd>K</kbd>（触屏「扛」）举起当护盾，同键放下封路。</li>
-          <li>部分关卡开场有准备时间，可先封住敌窝出口。</li>
-          <li>弹道谜题：玩家一次只有一发炮弹；打空后要捡回场上炮弹才能再开火，敌我都能捡。</li>
-          <li>弹道谜题不能正面命中坦克；部分炮弹会回旋、反弹，先看清路线再出手。</li>
-          <li>锚定坦克不受重力转向影响，还能硬推路障；它们会分散出现在中后期关卡。</li>
-          <li>第 14 关「一枪不开」不能开火；敌军只会互相开火，不会伤你或总部，但会全部追击你。</li>
-          <li>每过一关获得经验；升级时自动多一层装甲，经验和装甲会在战役中保留。</li>
-          <li>标准战斗 3 条座驾；每台 3 点生命。车身随生命变色：金→橙→红。</li>
-          <li>普通子弹伤 1 点，重炮/Boss弹/炸弹秒杀；受伤后 1 秒无敌。</li>
-          <li>阵亡最多掉 1 级火力；每关首次死亡可原地复活（2 秒护盾）。火力清空只在整局失败。</li>
-          <li>过关三选一：普通升级本关有效；Boss 关能力永久至通关。</li>
+          <li>普通升级只影响下一任务；Boss 能力永久到通关。路障按 <kbd>K</kbd>（触屏「扛」）举起作盾，再按放下封路。</li>
         </ul>
       </div>
 
@@ -199,9 +199,9 @@
         </ul>
       </div>
 
-      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.8</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
+      <p class="credit">GRAVITY TANK <span id="creditVersion">v0.9</span> · SPRITES MIT · BGM CC-BY · NOT NAMCO ROM</p>
     </aside>
   </div>
-  <script type="module" src="./Script_Game.mjs?v=gravityTank08d"></script>
+  <script type="module" src="./Script_Game.mjs?v=gravityTank09f"></script>
 </body>
 </html>

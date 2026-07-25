@@ -3,6 +3,24 @@
  *  Tile codes: 0 empty, 1 brick, 2 steel, 3 water, 4 grass, 5 ice, 6 base.
  */
 export const STAGE_COUNT = 15;
+/** Focused three-act route. Legacy stages stay available through Debug. */
+export const CAMPAIGN_STAGE_IDS = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8, 15]);
+export const CAMPAIGN_STAGE_COUNT = CAMPAIGN_STAGE_IDS.length;
+
+export function GetCampaignStagePosition(stageId) {
+  const index = CAMPAIGN_STAGE_IDS.indexOf(Number(stageId));
+  return index >= 0 ? index + 1 : 0;
+}
+
+export function GetNextCampaignStageId(stageId) {
+  const index = CAMPAIGN_STAGE_IDS.indexOf(Number(stageId));
+  if (index < 0 || index >= CAMPAIGN_STAGE_IDS.length - 1) return null;
+  return CAMPAIGN_STAGE_IDS[index + 1];
+}
+
+export function IsFinalCampaignStage(stageId) {
+  return Number(stageId) === CAMPAIGN_STAGE_IDS[CAMPAIGN_STAGE_IDS.length - 1];
+}
 
 /** Flip a classic bottom-base stage so eagle + player sit at the top (newbie-safer). */
 function FlipStageVertical(stage) {
@@ -66,7 +84,7 @@ export const TUTORIAL_STAGE = {
 export const STAGES = [
   {
     id: 1,
-    enemies: {"basic": 18, "fast": 2, "power": 0, "armor": 0},
+    enemies: { basic: 10, fast: 2, power: 0, armor: 0 },
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -100,7 +118,7 @@ export const STAGES = [
   },
   {
     id: 2,
-    enemies: {"basic": 14, "fast": 4, "power": 0, "armor": 2},
+    enemies: { basic: 9, fast: 3, power: 1, armor: 1 },
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -138,8 +156,9 @@ export const STAGES = [
     title: "坦克王",
     bossKind: "tankKing",
     barrelCount: 1,
+    bossHpMul: 0.75,
     // Boss + escalating minions (fewest of the three bosses).
-    enemies: { basic: 4, fast: 2, power: 0, armor: 0, boss: 0, tankKing: 1 },
+    enemies: { basic: 2, fast: 2, power: 0, armor: 0, boss: 0, tankKing: 1 },
     enemySpawns: [[0, 2], [12, 2], [24, 2]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -177,7 +196,7 @@ export const STAGES = [
     specialKind: "ballisticPuzzle",
     ballisticVariant: "singleShell",
     title: "弹道折线",
-    enemies: {"basic": 14, "fast": 4, "power": 0, "armor": 2},
+    enemies: { basic: 8, fast: 2, power: 1, armor: 1 },
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -211,7 +230,7 @@ export const STAGES = [
   },
   {
     id: 5,
-    enemies: {"basic": 2, "fast": 5, "power": 10, "armor": 3, "anchor": 1},
+    enemies: { basic: 3, fast: 4, power: 6, armor: 2, anchor: 1 },
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -249,8 +268,9 @@ export const STAGES = [
     title: "重力巨炮",
     bossKind: "boss",
     barrelCount: 8,
+    bossHpMul: 0.65,
     // More minions than stage-3 Tank King.
-    enemies: { basic: 4, fast: 3, power: 2, armor: 1, boss: 1 },
+    enemies: { basic: 2, fast: 2, power: 1, armor: 1, boss: 1 },
     enemySpawns: [[0, 2], [12, 4], [24, 2]],
     playerSpawns: [[8, 24], [16, 24]],
     map: [
@@ -289,7 +309,7 @@ export const STAGES = [
     ballisticVariant: "gravitySpin",
     title: "封喉陷阱",
     prepSeconds: 14,
-    enemies: { basic: 6, fast: 6, power: 6, armor: 4 },
+    enemies: { basic: 4, fast: 4, power: 3, armor: 2, anchor: 1 },
     enemySpawns: [[2, 1], [12, 1], [22, 1]],
     playerSpawns: [[12, 20]],
     carryBlocks: [
@@ -334,7 +354,7 @@ export const STAGES = [
     id: 8,
     title: "瓮中捉鳖",
     prepSeconds: 16,
-    enemies: { basic: 4, fast: 8, power: 8, armor: 6, anchor: 1 },
+    enemies: { basic: 4, fast: 5, power: 4, armor: 4, anchor: 1 },
     enemySpawns: [[1, 2], [24, 2], [12, 1]],
     playerSpawns: [[12, 21]],
     carryBlocks: [
@@ -614,7 +634,8 @@ STAGES.push(
     title: "重力看守者",
     bossKind: "gravityWarden",
     barrelCount: 1,
-    enemies: { basic: 4, fast: 4, power: 2, armor: 2, anchor: 1, gravityWarden: 1 },
+    bossHpMul: 0.68,
+    enemies: { basic: 3, fast: 2, power: 1, armor: 1, anchor: 1, gravityWarden: 1 },
     enemySpawns: [[1, 2], [12, 2], [23, 2]],
     playerSpawns: [[8, 20]],
     map: BuildExtendedMap(3),

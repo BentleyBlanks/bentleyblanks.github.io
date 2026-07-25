@@ -83,13 +83,12 @@ body.touch-play-lock {
 
 #app {
   width: min(1320px, 100%);
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
   grid-template-areas:
     "hero side"
-    "stage side"
-    "stick side"
-    "actions side";
+    "stage side";
   gap: 14px;
   align-items: start;
 }
@@ -338,6 +337,8 @@ body.touch-play-lock {
 
 .mobile-hud {
   display: none;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
@@ -524,6 +525,28 @@ button.primary:active {
   transform: translateY(2px);
   box-shadow: 0 2px 0 #401008;
 }
+
+.start-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+button.continue-action {
+  border-color: #70ff98;
+  background: #14502c;
+  box-shadow: 0 4px 0 #082818;
+}
+
+.checkpoint-hint,
+.overlay .checkpoint-hint {
+  color: #8fffb0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.checkpoint-hint[hidden] { display: none !important; }
 
 .upgrade-overlay {
   gap: 14px;
@@ -774,6 +797,68 @@ button.primary:active {
   gap: 12px;
 }
 
+/* Common laptop viewport: keep the complete square battlefield above the fold. */
+@media (min-width: 861px) and (max-height: 900px) {
+  body {
+    padding: max(6px, var(--safe-top)) max(6px, var(--safe-right)) max(6px, var(--safe-bottom)) max(6px, var(--safe-left));
+  }
+
+  #app {
+    width: min(1240px, 100%);
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 8px;
+  }
+
+  .hero {
+    height: 60px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .hero-logo {
+    flex: 0 1 210px;
+    width: 210px;
+  }
+
+  .title-banner {
+    max-height: 58px;
+    border-width: 2px;
+  }
+
+  .game-version {
+    right: 5px;
+    bottom: 5px;
+    padding: 2px 5px;
+    font-size: 0.48rem;
+  }
+
+  .tagline {
+    flex: 0 1 31rem;
+    max-width: 31rem;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+
+  .stage-shell {
+    width: min(100%, calc(100dvh - 86px));
+  }
+
+  .side {
+    max-height: calc(100dvh - 12px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: 2px;
+  }
+
+}
+
 .panel {
   background:
     linear-gradient(#2a2a2a, #2a2a2a) padding-box,
@@ -993,6 +1078,25 @@ button.primary:active {
   grid-template-columns: 2.8em 1fr;
 }
 
+@media (min-width: 861px) and (max-height: 900px) {
+  .panel {
+    padding: 10px 11px 9px;
+  }
+
+  .panel h3 {
+    margin-bottom: 8px;
+  }
+
+  .stat-row {
+    padding: 5px 0;
+  }
+
+  .panel-pause {
+    margin-top: 8px;
+    padding: 9px 6px;
+  }
+}
+
 .mobile-hint { display: none; }
 .desktop-hint { display: list-item; }
 p.desktop-hint { display: block; }
@@ -1199,7 +1303,7 @@ body.force-touch #app {
   }
 
   #app {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
       "hero hero"
       "hud hud"
@@ -1263,7 +1367,7 @@ body.force-touch #app {
   body.force-touch #app {
     width: 100%;
     max-width: 100%;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
       "hero hero"
       "hud hud"
@@ -1351,7 +1455,7 @@ body.force-touch #app {
   body.force-touch.is-touch-play #app {
     height: 100%;
     max-height: 100dvh;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "hud hud"
