@@ -1,0 +1,3261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#15140f">
+<title>太行·破网 — 1942反“扫荡”策略白盒</title>
+<style>
+:root {
+  --ink: #e7dcc0;
+  --muted: #9f967d;
+  --paper: #c6b78c;
+  --night: #15140f;
+  --panel: rgba(25, 24, 18, .96);
+  --panelSoft: rgba(36, 34, 24, .92);
+  --line: #5b543c;
+  --red: #c64a3b;
+  --redDark: #652923;
+  --green: #8eae60;
+  --greenDark: #314328;
+  --gold: #d7ad55;
+  --blue: #79a9b7;
+  --shadow: rgba(0, 0, 0, .62);
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; height: 100dvh; margin: 0; overflow: hidden; background: var(--night); color: var(--ink); }
+body {
+  font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 14px;
+  user-select: none;
+}
+button, a { font: inherit; }
+button { cursor: pointer; }
+button:focus-visible, a:focus-visible, canvas:focus-visible { outline: 2px solid #f4cf75; outline-offset: 2px; }
+.hidden { display: none !important; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+
+#app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  min-height: 0;
+  background:
+    radial-gradient(circle at 52% 42%, rgba(96, 88, 58, .12), transparent 45%),
+    #15140f;
+}
+
+.topBar {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: calc(7px + env(safe-area-inset-top)) 12px 7px;
+  background: linear-gradient(#242218, #181711);
+  border-bottom: 1px solid #5c5339;
+  box-shadow: 0 3px 18px var(--shadow);
+}
+.brand { display: flex; align-items: baseline; gap: 8px; min-width: 180px; }
+.brand strong { color: #f0e2b9; font-size: 18px; letter-spacing: 3px; white-space: nowrap; }
+.brand span { color: #918872; font-size: 11px; white-space: nowrap; }
+.statusStrip { display: flex; align-items: stretch; gap: 6px; flex: 1; min-width: 0; }
+.statusCell {
+  min-width: 86px;
+  overflow: hidden;
+  padding: 4px 8px;
+  border-left: 1px solid #4d4835;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.statusCell b { display: block; overflow: hidden; color: var(--ink); font-size: 14px; margin-top: 2px; white-space: nowrap; text-overflow: ellipsis; }
+.statusCell.danger b { color: #f18a77; }
+.statusCell.good b { color: #b8d983; }
+.topActions { display: flex; gap: 6px; margin-left: auto; }
+.smallButton, .actionButton, .primaryButton, .ghostButton, .dangerButton {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #302e22;
+  color: var(--ink);
+  transition: transform .12s, background .12s, border-color .12s, opacity .12s;
+}
+.smallButton { min-height: 34px; padding: 6px 9px; color: #cfc3a4; font-size: 12px; white-space: nowrap; }
+.smallButton:hover, .actionButton:hover:not(:disabled), .ghostButton:hover { background: #403d2d; border-color: #8a7c52; }
+.smallButton:active, .actionButton:active:not(:disabled), .primaryButton:active, .ghostButton:active { transform: translateY(1px) scale(.98); }
+
+.gameLayout {
+  display: grid;
+  grid-template-columns: 260px minmax(320px, 1fr) 294px;
+  min-height: 0;
+  overflow: hidden;
+}
+.sidePanel {
+  position: relative;
+  z-index: 18;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--panel);
+  scrollbar-color: #71674a #201f18;
+}
+.leftPanel { border-right: 1px solid #4f4935; }
+.rightPanel { border-left: 1px solid #4f4935; }
+.panelSection { padding: 11px 12px; border-bottom: 1px solid #45402f; }
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: #e5d5ab;
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+.sectionTitle small { color: #817965; font-weight: 400; letter-spacing: 0; }
+.objectiveBox {
+  padding: 8px 9px;
+  border: 1px solid #6b5b38;
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(103, 78, 34, .22), rgba(33, 31, 23, .7));
+  color: #cfc2a0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.objectiveBox b { color: #f0d078; }
+.objectiveBox .unknown { color: #e07766; }
+.clueList { display: grid; gap: 5px; margin-top: 8px; }
+.clue {
+  padding: 5px 7px;
+  border-left: 2px solid #6d654d;
+  background: rgba(255, 255, 255, .025);
+  color: #aaa188;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.clue.verified { border-color: var(--blue); color: #c2d8dc; }
+.inlineButton {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: 1px solid #6c654d;
+  border-radius: 5px;
+  background: #302f24;
+  color: #d8ccb0;
+  font-size: 12px;
+}
+.inlineButton:disabled { cursor: default; opacity: .36; }
+.assetList { display: grid; gap: 5px; }
+.assetCard, .axisCard {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid #474332;
+  border-radius: 5px;
+  background: #222119;
+  color: #bdb399;
+  text-align: left;
+}
+.assetCard:hover, .axisCard:hover { border-color: #776c4b; background: #2b2a20; }
+.assetCard.selected, .axisCard.selected { border-color: #c9a94f; box-shadow: inset 3px 0 #c9a94f; }
+.assetHead, .axisHead { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.assetHead b, .axisHead b { color: #e3d5b3; font-size: 12px; }
+.assetMeta, .axisMeta { margin-top: 3px; color: #8f8771; font-size: 10.5px; line-height: 1.35; }
+.riskBar, .powerBar {
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #3a372b;
+}
+.riskFill { height: 100%; background: #c45848; }
+.powerFill { height: 100%; background: #b19049; }
+.lostStamp, .destroyedStamp, .escapedStamp {
+  display: inline-block;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  padding: 1px 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  transform: rotate(-3deg);
+}
+.lostStamp { color: #e06c5b; }
+.destroyedStamp { color: #ce604e; }
+.escapedStamp { color: #aaa17e; }
+
+.mapStage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #8f835f;
+}
+#mapCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+#mapCanvas.dragging { cursor: grabbing; }
+.mapAlert {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  z-index: 8;
+  max-width: calc(100% - 120px);
+  transform: translateX(-50%);
+  padding: 7px 13px;
+  border: 1px solid rgba(165, 83, 68, .8);
+  border-radius: 5px;
+  background: rgba(77, 30, 25, .9);
+  color: #f3c5b8;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-align: center;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, .4);
+  pointer-events: none;
+}
+.mapHint {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 7;
+  max-width: calc(100% - 120px);
+  padding: 5px 8px;
+  border: 1px solid rgba(58, 52, 38, .65);
+  border-radius: 4px;
+  background: rgba(23, 22, 17, .78);
+  color: #cec2a0;
+  font-size: 11px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+.mapTools { position: absolute; right: 9px; bottom: 9px; z-index: 9; display: flex; gap: 5px; }
+.mapTool {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(79, 72, 51, .9);
+  border-radius: 4px;
+  background: rgba(27, 26, 19, .88);
+  color: #d8caaa;
+}
+.turnToast {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 20;
+  width: min(520px, 84%);
+  transform: translate(-50%, -50%) scale(.94);
+  padding: 16px 20px;
+  border: 2px solid #d2a850;
+  background: rgba(28, 26, 18, .96);
+  color: #f1dfb1;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .65), inset 0 0 40px rgba(191, 148, 60, .08);
+  opacity: 0;
+  pointer-events: none;
+}
+.turnToast.show { animation: ToastShow 2.3s ease both; }
+.turnToast strong { display: block; font-size: 22px; letter-spacing: 4px; }
+.turnToast span { display: block; margin-top: 7px; color: #c3b694; font-size: 12px; line-height: 1.5; }
+@keyframes ToastShow {
+  0% { opacity: 0; transform: translate(-50%, -38%) scale(.9); }
+  12%, 78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -58%) scale(1.03); }
+}
+.mapStage.shake { animation: MapShake .38s linear; }
+@keyframes MapShake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-6px, 2px); }
+  40% { transform: translate(5px, -3px); }
+  65% { transform: translate(-3px, -1px); }
+  82% { transform: translate(2px, 1px); }
+}
+
+.selectionSummary { min-height: 94px; color: #b8ae95; font-size: 12px; line-height: 1.55; }
+.selectionSummary h3 { margin: 0 0 4px; color: #eadab2; font-size: 15px; letter-spacing: 1px; }
+.selectionSummary .tag {
+  display: inline-block;
+  margin: 0 3px 3px 0;
+  padding: 1px 5px;
+  border: 1px solid #625c45;
+  border-radius: 3px;
+  color: #bdb293;
+  font-size: 10px;
+}
+.selectionSummary .good { color: #b7d783; }
+.selectionSummary .bad { color: #ed8371; }
+.selectionSummary .warn { color: #e4bc64; }
+.actionGrid { display: grid; gap: 6px; }
+.actionButton {
+  width: 100%;
+  min-height: 42px;
+  padding: 7px 9px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.actionButton b { display: block; color: #ecddb6; font-size: 12.5px; }
+.actionButton span { display: block; margin-top: 2px; color: #928a73; font-size: 10.5px; }
+.actionButton.good { border-color: #577445; background: #263021; }
+.actionButton.danger { border-color: #7a4037; background: #38231f; }
+.actionButton:disabled { cursor: default; opacity: .35; }
+.orderNote {
+  margin-top: 8px;
+  padding: 7px 8px;
+  border-left: 2px solid #aa8b46;
+  background: rgba(126, 96, 40, .1);
+  color: #b9ad8d;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.endTurnButton {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid #aa5142;
+  border-radius: 6px;
+  background: linear-gradient(#84382e, #612820);
+  color: #ffe1d3;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+}
+.endTurnButton:hover { background: linear-gradient(#98453a, #713027); }
+.endTurnButton:disabled { opacity: .45; cursor: default; }
+.historyNote { color: #8c846f; font-size: 10.5px; line-height: 1.5; }
+
+.bottomBar {
+  position: relative;
+  z-index: 25;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  min-height: 132px;
+  max-height: 160px;
+  background: linear-gradient(#1e1d16, #171610);
+  border-top: 1px solid #5a5239;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, .36);
+}
+.enemyLedger { min-width: 0; padding: 9px 11px; overflow-x: auto; }
+.ledgerTitle { margin-bottom: 7px; color: #9d947d; font-size: 10px; letter-spacing: 2px; }
+.enemyCards { display: flex; gap: 7px; min-width: max-content; }
+.enemyCard {
+  width: 176px;
+  min-height: 88px;
+  padding: 7px 8px;
+  border: 1px solid #504636;
+  border-radius: 5px;
+  background: #252119;
+  text-align: left;
+  color: #c3b79a;
+}
+.enemyCard:hover { border-color: #8a694e; }
+.enemyCard.destroyed { opacity: .72; background: #211a17; border-color: #6e3c35; }
+.enemyCard.escaped { opacity: .65; }
+.enemyCard b { display: block; margin-bottom: 3px; color: #e1c8ad; font-size: 11px; }
+.enemyCard span { display: block; color: #91856f; font-size: 10px; line-height: 1.35; }
+.logPanel { padding: 9px 11px; overflow: hidden; border-left: 1px solid #49432f; }
+.logHead { display: flex; justify-content: space-between; color: #9d947d; font-size: 10px; letter-spacing: 2px; }
+.logHead button { border: 0; background: none; color: #aca186; font-size: 10px; }
+.logList { height: 96px; margin-top: 5px; overflow-y: auto; color: #aaa087; font-size: 10.5px; line-height: 1.45; }
+.logEntry { padding: 2px 0; border-bottom: 1px dotted rgba(110, 103, 77, .22); }
+.logEntry.good { color: #b4d37c; }
+.logEntry.bad { color: #e98270; }
+.logEntry.intel { color: #9fc8d2; }
+.logEntry strong { color: #e7d8af; }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background:
+    linear-gradient(rgba(10, 10, 8, .78), rgba(10, 10, 8, .9)),
+    repeating-linear-gradient(112deg, transparent 0 42px, rgba(204, 187, 131, .025) 42px 44px);
+  backdrop-filter: blur(4px);
+}
+.briefing {
+  width: min(900px, 100%);
+  max-height: min(92vh, 780px);
+  overflow-y: auto;
+  border: 1px solid #74684a;
+  border-radius: 8px;
+  background: #222018;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .72);
+}
+.briefingHeader {
+  padding: 23px 28px 18px;
+  background:
+    linear-gradient(90deg, rgba(129, 55, 43, .44), transparent 55%),
+    #29261b;
+  border-bottom: 1px solid #655c40;
+}
+.eyebrow { color: #c0954d; font-size: 11px; letter-spacing: 4px; }
+.briefingHeader h1 { margin: 7px 0 2px; color: #f0e1b8; font-size: clamp(28px, 4vw, 46px); letter-spacing: 7px; }
+.briefingHeader h1 span { color: #d05a48; }
+.briefingHeader p { margin: 5px 0 0; color: #a79d83; line-height: 1.6; }
+.briefingBody { display: grid; grid-template-columns: 1.15fr .85fr; gap: 22px; padding: 21px 28px 25px; }
+.briefingBody h2 { margin: 0 0 8px; color: #dfceaa; font-size: 14px; letter-spacing: 2px; }
+.briefingBody p, .briefingBody li { color: #b7ad92; font-size: 12px; line-height: 1.7; }
+.briefingBody ul { margin: 7px 0 16px; padding-left: 20px; }
+.operationChain {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin: 11px 0 16px;
+}
+.operationChain span {
+  position: relative;
+  padding: 7px 3px;
+  border: 1px solid #5a533c;
+  background: #29271d;
+  color: #d5c6a2;
+  font-size: 10px;
+  text-align: center;
+}
+.operationChain span:not(:last-child)::after {
+  position: absolute;
+  right: -7px;
+  top: 50%;
+  z-index: 2;
+  content: "›";
+  transform: translateY(-52%);
+  color: #cfac5a;
+  font-size: 17px;
+}
+.briefingAside {
+  padding: 13px 15px;
+  border: 1px solid #544d38;
+  border-radius: 6px;
+  background: #1d1c16;
+}
+.briefingAside strong { color: #e5ce9c; }
+.historyCaution { padding: 8px 9px; border-left: 2px solid #b85547; background: rgba(151, 61, 50, .08); }
+.buttonRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.primaryButton, .ghostButton, .dangerButton { min-height: 42px; padding: 9px 17px; }
+.primaryButton { border-color: #bb5747; background: #783127; color: #ffe1d5; font-weight: 800; letter-spacing: 2px; }
+.primaryButton:hover { background: #8d3b30; }
+.ghostButton { background: #302e22; color: #d4c8aa; }
+.dangerButton { border-color: #a14539; background: #4f211c; color: #efb4a8; }
+
+.modalCard {
+  width: min(760px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  border: 1px solid #71664a;
+  border-radius: 7px;
+  background: #232119;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .72);
+}
+.modalHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; border-bottom: 1px solid #504a37; }
+.modalHeader h2 { margin: 0; color: #eadab2; font-size: 18px; letter-spacing: 2px; }
+.modalClose { width: 34px; height: 34px; border: 1px solid #5d5742; border-radius: 4px; background: #302e23; color: #d6c8a8; }
+.modalBody { padding: 16px 18px; color: #bcb197; font-size: 12.5px; line-height: 1.7; }
+.modalBody h3 { margin: 13px 0 5px; color: #e0cfa9; font-size: 14px; }
+.modalBody h3:first-child { margin-top: 0; }
+.modalBody p { margin: 6px 0; }
+.modalBody ul, .modalBody ol { padding-left: 21px; }
+.modalBody a { color: #9ec8d1; }
+.modalBody .good { color: #b8d983; }
+.modalBody .bad { color: #f18a77; }
+.modalBody .warn { color: #e4c275; }
+.modalFooter { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 12px 18px 16px; border-top: 1px solid #494431; }
+.forecastGrid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+.forecastSide { min-height: 110px; padding: 10px; border: 1px solid #4d4937; background: #1e1d17; }
+.forecastSide.enemy { border-color: #693d35; }
+.forecastSide b { display: block; color: #e8d7b2; }
+.forecastVersus { color: #bd5a49; font-size: 25px; font-weight: 900; }
+.forecastResult { margin-top: 12px; padding: 10px; border-left: 3px solid #c3a052; background: rgba(166, 126, 46, .1); }
+.resultTitle { color: #f1dcaa; font-size: 26px; letter-spacing: 4px; text-align: center; }
+.resultStamp {
+  width: fit-content;
+  margin: 10px auto 15px;
+  padding: 7px 15px;
+  border: 3px double #b74d3e;
+  color: #d45c49;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  transform: rotate(-2deg);
+}
+.resultGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin: 13px 0; }
+.resultCell { padding: 8px 9px; border: 1px solid #4d4938; background: #1d1c16; }
+.resultCell span { display: block; color: #8f8771; font-size: 10px; }
+.resultCell b { color: #ead7ad; font-size: 16px; }
+.mobileDock { display: none; }
+
+@media (max-width: 1100px) {
+  .gameLayout { grid-template-columns: 226px minmax(300px, 1fr) 258px; }
+  .statusCell { min-width: 72px; }
+  .statusCell:nth-child(2) { display: none; }
+  .bottomBar { grid-template-columns: minmax(0, 1fr) 280px; }
+}
+
+@media (max-width: 900px) {
+  #app { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .topBar { min-height: 52px; flex-wrap: wrap; gap: 5px; padding: calc(4px + env(safe-area-inset-top)) 7px 4px; }
+  .brand { min-width: auto; }
+  .brand strong { font-size: 15px; letter-spacing: 2px; }
+  .brand span { display: none; }
+  .statusStrip { order: 3; flex-basis: 100%; gap: 0; }
+  .statusCell { flex: 1; min-width: 0; padding: 2px 5px; }
+  .statusCell b { font-size: 11.5px; }
+  .statusCell:nth-child(2) { display: block; }
+  .topActions .smallButton:nth-child(n+3) { display: none; }
+  .gameLayout { display: block; position: relative; min-height: 0; }
+  .mapStage { width: 100%; height: 100%; }
+  .sidePanel {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: calc(7px + env(safe-area-inset-bottom));
+    z-index: 42;
+    display: none;
+    width: auto;
+    max-height: min(56vh, 500px);
+    border: 1px solid #665f46;
+    border-radius: 7px;
+    box-shadow: 0 12px 42px rgba(0, 0, 0, .65);
+  }
+  .sidePanel.mobileOpen { display: block; }
+  .leftPanel, .rightPanel { border: 1px solid #665f46; }
+  .bottomBar { display: none; }
+  .mobileDock {
+    z-index: 55;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 6px 7px calc(6px + env(safe-area-inset-bottom));
+    background: #1a1913;
+    border-top: 1px solid #5d553c;
+  }
+  .mobileDock button {
+    min-height: 44px;
+    border: 1px solid #5c5540;
+    border-radius: 5px;
+    background: #2c2a20;
+    color: #d7cbae;
+    font-size: 11px;
+  }
+  .mobileDock button.end { border-color: #a4483c; background: #6b2b24; color: #ffe0d4; }
+  .mobileDock button:disabled { cursor: default; opacity: .45; }
+  .mapHint { bottom: 8px; max-width: calc(100% - 95px); }
+  .mapTools { bottom: 8px; }
+  .briefingBody { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 13px; }
+  .topActions { gap: 3px; }
+  .smallButton { min-height: 36px; padding: 5px 7px; font-size: 10.5px; }
+  .statusCell { font-size: 9.5px; }
+  .statusCell b { font-size: 11px; }
+  .statusCell:nth-child(1) { flex: 1.2; }
+  .statusCell:nth-child(2) { flex: .9; }
+  .statusCell:nth-child(3) { flex: 1.15; }
+  .statusCell:nth-child(4) { flex: .75; }
+  .statusCell:nth-child(5) { flex: 1; }
+  .mapAlert { top: 7px; max-width: calc(100% - 24px); padding: 5px 8px; font-size: 10.5px; }
+  .mapHint { font-size: 9.5px; }
+  .overlay { padding: calc(8px + env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom)); }
+  .briefing { max-height: 96vh; }
+  .briefingHeader { padding: 17px 16px 13px; }
+  .briefingHeader h1 { font-size: 28px; letter-spacing: 4px; }
+  .briefingBody { gap: 10px; padding: 15px 16px 18px; }
+  .operationChain { grid-template-columns: repeat(3, 1fr); }
+  .operationChain span:nth-child(3)::after { display: none; }
+  .modalBody { padding: 13px 14px; }
+  .forecastGrid { grid-template-columns: 1fr; }
+  .forecastVersus { text-align: center; transform: rotate(90deg); }
+  .resultGrid { grid-template-columns: 1fr; }
+  .turnToast strong { font-size: 18px; }
+}
+
+@media (pointer: coarse) {
+  .mapTool, .modalClose { width: 44px; height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<main id="app">
+  <header class="topBar">
+    <div class="brand"><strong>太行·破网</strong><span>1942 反“扫荡”策略白盒</span></div>
+    <div class="statusStrip" aria-label="战役状态">
+      <div class="statusCell"><span>日期 / 回合</span><b id="dateStatus">1942.05.24 晨</b></div>
+      <div class="statusCell"><span>作战阶段</span><b id="phaseStatus">敌情研判</b></div>
+      <div class="statusCell"><span>指挥 / 情报 / 缴获</span><b id="commandStatus">4 / ◆2 / 械0</b></div>
+      <div class="statusCell good" id="civilCell"><span>群众安全</span><b id="civilStatus">100%</b></div>
+      <div class="statusCell danger" id="networkCell"><span>推演后续“扫荡”能力</span><b id="networkStatus">100%</b></div>
+    </div>
+    <nav class="topActions" aria-label="页面操作">
+      <button class="smallButton" type="button" onclick="OpenHelp()">规则</button>
+      <button class="smallButton" type="button" onclick="OpenHistory()">史料</button>
+      <button class="smallButton" type="button" onclick="ToggleLogPanel()">战报</button>
+      <button class="smallButton" type="button" onclick="ConfirmRestart()">重开</button>
+    </nav>
+  </header>
+
+  <section class="gameLayout">
+    <aside id="leftPanel" class="sidePanel leftPanel" aria-label="情报与资产">
+      <section class="panelSection">
+        <h2 class="sectionTitle">作战任务 <small id="operationCode">代号 --</small></h2>
+        <div class="objectiveBox">
+          <b>固定总目标：阻滞日军捕捉总部机关</b><br>
+          转移本地机关和群众；查清敌当前主搜线索；拆断补给与退路后再伏击合围。
+          <div id="objectiveText" class="unknown">敌当前主搜线索：尚未查明</div>
+        </div>
+      </section>
+      <section class="panelSection">
+        <h2 class="sectionTitle">情报研判 <small id="intelTokenText">◆ 2</small></h2>
+        <div id="clueList" class="clueList"></div>
+        <button id="analyzeButton" class="inlineButton" type="button" onclick="AnalyzeIntelligence()">消耗 ◆2 交叉印证</button>
+      </section>
+      <section class="panelSection">
+        <h2 class="sectionTitle">必须保存的资产 <small>点击选择</small></h2>
+        <div id="assetList" class="assetList"></div>
+      </section>
+      <section class="panelSection">
+        <h2 class="sectionTitle">敌军动向 <small>位置不是全知</small></h2>
+        <div id="axisList" class="assetList"></div>
+      </section>
+    </aside>
+
+    <section id="mapStage" class="mapStage" aria-label="太行反扫荡作战地图">
+      <canvas id="mapCanvas" tabindex="0" aria-label="作战地图。点击选择，拖动平移，滚轮或双指缩放。"></canvas>
+      <div id="mapAlert" class="mapAlert">截获电讯：敌军正从铁路与公路据点展开，主攻方向不明。</div>
+      <div id="mapHint" class="mapHint">点选绿色部队下令；先侦察、转移与疏散，再设伏。拖动地图，滚轮或双指缩放。</div>
+      <div class="mapTools">
+        <button class="mapTool" type="button" title="缩小" aria-label="缩小地图" onclick="ZoomMap(-.18)">−</button>
+        <button class="mapTool" type="button" title="复位地图" aria-label="复位地图" onclick="ResetCamera()">◎</button>
+        <button class="mapTool" type="button" title="放大" aria-label="放大地图" onclick="ZoomMap(.18)">＋</button>
+      </div>
+      <div id="turnToast" class="turnToast" role="status" aria-live="assertive"></div>
+    </section>
+
+    <aside id="rightPanel" class="sidePanel rightPanel" aria-label="选择与命令">
+      <section class="panelSection">
+        <h2 class="sectionTitle">当前选择 <small id="selectionKind">地图</small></h2>
+        <div id="selectionSummary" class="selectionSummary">
+          <h3>等待命令</h3>
+          <p>选择部队、资产、村庄或已发现的敌军。</p>
+        </div>
+      </section>
+      <section class="panelSection">
+        <h2 class="sectionTitle">可用命令 <small>消耗指挥与行动</small></h2>
+        <div id="actionGrid" class="actionGrid"></div>
+        <div id="orderNote" class="orderNote">完整歼灭链：侦察 → 诱敌 → 断补给 → 伏击 → 封退路 → 合击。</div>
+      </section>
+      <section class="panelSection">
+        <button id="endTurnButton" class="endTurnButton" type="button" onclick="EndPlayerTurn()">执行敌方行动 [空格]</button>
+      </section>
+      <section class="panelSection">
+        <div class="historyNote">
+          本页是历史启发的机制白盒，不虚构“神剧式”战果。零战斗效能代表该行动分队失去成建制作战能力；战略评价同时计算群众、机关和组织损失。
+        </div>
+      </section>
+    </aside>
+  </section>
+
+  <footer id="bottomBar" class="bottomBar">
+    <section class="enemyLedger">
+      <div class="ledgerTitle">敌行动序列 · 被歼单位永久留档，不会按计时器消失</div>
+      <div id="enemyCards" class="enemyCards"></div>
+    </section>
+    <section id="logPanel" class="logPanel" aria-label="战报">
+      <div class="logHead"><span>战地日志</span><button type="button" onclick="OpenFullLog()">展开</button></div>
+      <div id="logList" class="logList" aria-live="polite"></div>
+    </section>
+  </footer>
+
+  <nav class="mobileDock" aria-label="移动端命令">
+    <button type="button" onclick="ToggleMobilePanel('left')">情报 / 资产</button>
+    <button type="button" onclick="ToggleMobilePanel('right')">选择 / 命令</button>
+    <button type="button" onclick="OpenFullLog()">战报</button>
+    <button id="mobileEndTurnButton" class="end" type="button" onclick="EndPlayerTurn()">结束回合</button>
+  </nav>
+</main>
+
+<section id="startOverlay" class="overlay">
+  <article class="briefing">
+    <header class="briefingHeader">
+      <div class="eyebrow">TAIHANG · 24—31 MAY 1942 · OPERATIONAL WHITEBOX</div>
+      <h1>太行<span>·破网</span></h1>
+      <p>你不是在清理一群“土匪”。你面对的是有据点、公路、情报和合围计划的侵略军体系。</p>
+    </header>
+    <div class="briefingBody">
+      <div>
+        <h2>你的任务</h2>
+        <p>24回合对应1942年5月24—31日，每日晨、昼、夜各一回合。你指挥虚构的本地军政联合组，保存机关、电台、医院和军械所；识破敌当前主搜线索，保护群众，在山地把合围拆成孤立分队。</p>
+        <div class="operationChain" aria-label="歼灭行动链">
+          <span>侦察</span><span>转移</span><span>诱敌</span><span>断粮道</span><span>设伏封口</span><span>合围歼灭</span>
+        </div>
+        <ul>
+          <li>补给完好的日军正规搜索队，正面硬攻代价极高。</li>
+          <li>破路不会自动加分：敌军真正断供、退路被封，才出现低损歼灭窗口。</li>
+          <li>歼敌会永久削弱封锁网、阻止增援、留下巡逻空隙，并进入战后报告。</li>
+          <li>只顾杀敌、丢掉群众与机关，不会得到最高评价。</li>
+        </ul>
+        <div class="buttonRow">
+          <button class="primaryButton" type="button" onclick="StartNewGame()">进入战区</button>
+          <button id="continueButton" class="ghostButton hidden" type="button" onclick="ContinueGame()">继续上次推演</button>
+          <button class="ghostButton" type="button" onclick="OpenHistory()">历史边界与参考</button>
+        </div>
+      </div>
+      <aside class="briefingAside">
+        <h2>历史边界</h2>
+        <p class="historyCaution"><strong>时间与地域：</strong>1942年夏季大“扫荡”自5月中旬展开；本局只截取5月24—31日太行山区反“扫荡”的历史窗口。它不是冀中“五一”反“扫荡”，也不允许玩家改写真实人物的经历。</p>
+        <p><strong>史实固定：</strong>日军所谓“C号作战计划”企图捕捉八路军总部、中共中央北方局与第129师机关；5月25日左权在十字岭指挥掩护突围时牺牲。玩家处理的是同一环境中的虚构本地支援行动。</p>
+        <p><strong>抽象原则：</strong>地图节点、战略资产编组和行动分队为机制合成；黎城—辽县方向仅用于表达区域补给关系，并非实地线路复刻。随机的是敌当前主搜线索和行进轴，不是日军的历史总目标。</p>
+        <p><strong>敌人有区别：</strong>日军正规队、伪军和特别挺进侦搜组的任务、战力与处置方式不同；本场景不把它们与土匪混为一谈。</p>
+        <p><strong>建议难度：</strong>第一局先保机关和群众，研判出敌当前主搜线索后，集中吃掉一支断供的正规搜索队。</p>
+      </aside>
+    </div>
+  </article>
+</section>
+
+<section id="modalOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <article class="modalCard">
+    <header class="modalHeader">
+      <h2 id="modalTitle">说明</h2>
+      <button class="modalClose" type="button" onclick="CloseModal()" aria-label="关闭">×</button>
+    </header>
+    <div id="modalBody" class="modalBody"></div>
+    <footer id="modalFooter" class="modalFooter">
+      <button class="ghostButton" type="button" onclick="CloseModal()">返回</button>
+    </footer>
+  </article>
+</section>
+
+<script>
+"use strict";
+
+const gameConfig = Object.freeze({
+  maxTurns: 24,
+  retreatTurn: 22,
+  reinforcementTurn: 8,
+  commandPerTurn: 4,
+  maxIntel: 6,
+  sabotageDuration: 5,
+  baseDate: Date.UTC(1942, 4, 24),
+  saveKey: "taihangdemo_countersweep_v1",
+  cameraMin: .82,
+  cameraMax: 2.15,
+  initialEnemyCapacity: 100
+});
+
+const locationDefs = Object.freeze([
+  { id: "WestHide", name: "西山隐蔽区", x: .08, y: .17, terrain: "mountain", kind: "hideout" },
+  { id: "NorthVillage", name: "北岭村", x: .23, y: .10, terrain: "ridge", kind: "village" },
+  { id: "NorthPass", name: "沙河口", x: .45, y: .11, terrain: "road", kind: "infrastructure", lineIds: ["NorthSupply"] },
+  { id: "EastPost", name: "东驿据点", x: .88, y: .12, terrain: "fort", kind: "enemyBase" },
+  { id: "PineRidge", name: "松林坡", x: .25, y: .34, terrain: "forest", kind: "ridge" },
+  { id: "CentralVillage", name: "柳沟村", x: .49, y: .31, terrain: "valley", kind: "village" },
+  { id: "Bridge", name: "河谷桥", x: .70, y: .31, terrain: "road", kind: "infrastructure", lineIds: ["BridgeSupply"] },
+  { id: "RailDepot", name: "东部铁路接运点", x: .92, y: .37, terrain: "fort", kind: "enemyBase" },
+  { id: "EagleCliff", name: "鹰嘴崖", x: .13, y: .58, terrain: "mountain", kind: "hideout" },
+  { id: "StoneVillage", name: "石门村", x: .38, y: .57, terrain: "ridge", kind: "village" },
+  { id: "SignalHill", name: "望台岭", x: .67, y: .49, terrain: "mountain", kind: "ridge" },
+  { id: "SouthVillage", name: "南峪村", x: .60, y: .68, terrain: "valley", kind: "village" },
+  { id: "SouthPass", name: "南关口", x: .79, y: .74, terrain: "road", kind: "infrastructure", lineIds: ["SouthSupply", "RailSpine"] },
+  { id: "SouthFort", name: "南线炮楼", x: .94, y: .82, terrain: "fort", kind: "enemyBase" },
+  { id: "HospitalCave", name: "西南石窟", x: .17, y: .84, terrain: "mountain", kind: "hideout" },
+  { id: "ArsenalGully", name: "桃花沟", x: .44, y: .86, terrain: "forest", kind: "hideout" }
+]);
+
+const edgeDefs = Object.freeze([
+  { id: "WestNorth", a: "WestHide", b: "NorthVillage", type: "trail" },
+  { id: "WestPine", a: "WestHide", b: "PineRidge", type: "trail" },
+  { id: "NorthRoad", a: "NorthVillage", b: "NorthPass", type: "road" },
+  { id: "NorthSupply", a: "NorthPass", b: "EastPost", type: "road", supply: true, label: "北线公路" },
+  { id: "NorthCentral", a: "NorthPass", b: "CentralVillage", type: "road" },
+  { id: "PineCentral", a: "PineRidge", b: "CentralVillage", type: "trail" },
+  { id: "PineEagle", a: "PineRidge", b: "EagleCliff", type: "trail" },
+  { id: "CentralBridge", a: "CentralVillage", b: "Bridge", type: "road" },
+  { id: "BridgeSupply", a: "Bridge", b: "RailDepot", type: "road", supply: true, label: "黎城—辽县公路方向（抽象）" },
+  { id: "CentralStone", a: "CentralVillage", b: "StoneVillage", type: "trail" },
+  { id: "CentralSignal", a: "CentralVillage", b: "SignalHill", type: "trail" },
+  { id: "BridgeSignal", a: "Bridge", b: "SignalHill", type: "road" },
+  { id: "EagleStone", a: "EagleCliff", b: "StoneVillage", type: "trail" },
+  { id: "EagleHospital", a: "EagleCliff", b: "HospitalCave", type: "trail" },
+  { id: "StoneSouth", a: "StoneVillage", b: "SouthVillage", type: "road" },
+  { id: "StoneArsenal", a: "StoneVillage", b: "ArsenalGully", type: "trail" },
+  { id: "HospitalArsenal", a: "HospitalCave", b: "ArsenalGully", type: "trail" },
+  { id: "ArsenalSouth", a: "ArsenalGully", b: "SouthVillage", type: "trail" },
+  { id: "SignalSouth", a: "SignalHill", b: "SouthVillage", type: "road" },
+  { id: "SouthRoad", a: "SouthVillage", b: "SouthPass", type: "road" },
+  { id: "SouthSupply", a: "SouthPass", b: "SouthFort", type: "road", supply: true, label: "南线公路" },
+  { id: "RailSpine", a: "RailDepot", b: "SouthFort", type: "rail", supply: true, label: "铁路纵线" },
+  { id: "BridgeSouth", a: "Bridge", b: "SouthPass", type: "road" }
+]);
+
+const friendlyDefs = Object.freeze({
+  MainForce: { name: "军分区主力营", type: "main", power: 9, maxHp: 100, maxAp: 2, icon: "主", desc: "伏击与合击主力；不宜强攻补给完整的正规搜索队。" },
+  CountyForce: { name: "县大队", type: "county", power: 6, maxHp: 100, maxAp: 2, icon: "县", desc: "善于封山口、支援邻接战斗，也能执行破路。" },
+  ArmedTeam: { name: "武工队", type: "wugong", power: 4, maxHp: 85, maxAp: 3, icon: "武", desc: "侦察、破袭、布置假迹象和反特的骨干。" },
+  Militia: { name: "南峪民兵", type: "militia", power: 3, maxHp: 75, maxAp: 2, icon: "民", desc: "适合疏散群众、封锁小路与提供邻接支援。" }
+});
+
+const enemyTypeDefs = Object.freeze({
+  regular: { label: "日军正规搜索队", power: 8, color: "#b94c3e", supplyLoss: 8, resolve: 8 },
+  puppet: { label: "伪军先遣队", power: 5, color: "#9b7154", supplyLoss: 10, resolve: 4 },
+  agent: { label: "日军特别挺进侦搜组", power: 2, color: "#69514c", supplyLoss: 5, resolve: 3 }
+});
+
+const assetDefs = Object.freeze({
+  Headquarters: { name: "军分区机关与干部", short: "机关", icon: "令", critical: true, desc: "本地军政指挥核心；丢失即作战失败。" },
+  Radio: { name: "通信电台", short: "电台", icon: "讯", critical: false, desc: "用于汇总敌情。转移后敌军仍可能扑向旧址。" },
+  Hospital: { name: "野战医院与伤员", short: "医院", icon: "医", critical: false, desc: "转移困难；需有部队在同地护送。" },
+  Arsenal: { name: "军械所与干部名册", short: "军械", icon: "械", critical: false, desc: "丢失会降低持续作战能力与最终评价。" }
+});
+
+const objectiveProfiles = Object.freeze({
+  Headquarters: { sector: "中部河谷", category: "军政机关", wording: "捕捉军分区机关与干部" },
+  Radio: { sector: "中东部山岭", category: "通信指挥", wording: "定位并摧毁通信电台" },
+  Hospital: { sector: "西南山地", category: "卫生与伤员系统", wording: "搜捕野战医院与伤员" },
+  Arsenal: { sector: "南部山谷", category: "军械与组织档案", wording: "夺取军械所和干部名册" }
+});
+
+let state = null;
+let selection = { kind: "none", id: null };
+let inputMode = null;
+let forecastContext = null;
+let animationFrame = 0;
+let lastFrameTime = 0;
+let particles = [];
+let camera = { zoom: 1, panX: 0, panY: 0 };
+let pointerState = new Map();
+let dragState = null;
+let pinchState = null;
+let mobilePanel = null;
+let modalLocked = false;
+let isResolvingTurn = false;
+
+const canvas = document.getElementById("mapCanvas");
+const context = canvas.getContext("2d");
+
+function Clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function GetLocation(locationId) {
+  return locationDefs.find((location) => location.id === locationId);
+}
+
+function GetEdge(edgeId) {
+  return edgeDefs.find((edge) => edge.id === edgeId);
+}
+
+function GetNeighbors(locationId) {
+  return edgeDefs
+    .filter((edge) => edge.a === locationId || edge.b === locationId)
+    .map((edge) => edge.a === locationId ? edge.b : edge.a);
+}
+
+function GetEdgeBetween(firstId, secondId) {
+  return edgeDefs.find((edge) =>
+    (edge.a === firstId && edge.b === secondId) ||
+    (edge.a === secondId && edge.b === firstId)
+  );
+}
+
+function SeededRandom() {
+  state.seed = (state.seed * 1664525 + 1013904223) >>> 0;
+  return state.seed / 4294967296;
+}
+
+function CreateInitialState(seed) {
+  const seedState = { seed: seed >>> 0 };
+  state = seedState;
+  const objectiveKeys = Object.keys(assetDefs);
+  const objectiveAssetId = objectiveKeys[Math.floor(SeededRandom() * objectiveKeys.length)];
+  const assets = {
+    Headquarters: { id: "Headquarters", locationId: "CentralVillage", exposure: 28, lost: false, moved: false },
+    Radio: { id: "Radio", locationId: "SignalHill", exposure: 32, lost: false, moved: false },
+    Hospital: { id: "Hospital", locationId: "HospitalCave", exposure: 18, lost: false, moved: false },
+    Arsenal: { id: "Arsenal", locationId: "ArsenalGully", exposure: 22, lost: false, moved: false }
+  };
+  const objectiveStart = assets[objectiveAssetId].locationId;
+  return {
+    version: 4,
+    started: true,
+    seed: state.seed,
+    operationCode: String((state.seed % 900) + 100),
+    turn: 1,
+    command: gameConfig.commandPerTurn,
+    intelTokens: 2,
+    clueLevel: 0,
+    objectiveAssetId,
+    objectiveStart,
+    civilSafety: 100,
+    capturedMateriel: 0,
+    ownLosses: 0,
+    assets,
+    villages: {
+      NorthVillage: { evacuated: false, searched: false, organized: 3 },
+      CentralVillage: { evacuated: false, searched: false, organized: 4 },
+      StoneVillage: { evacuated: false, searched: false, organized: 3 },
+      SouthVillage: { evacuated: false, searched: false, organized: 4 }
+    },
+    friendlies: {
+      MainForce: { id: "MainForce", locationId: "PineRidge", hp: 100, ap: 2, stance: "ready", status: "active", xp: 0 },
+      CountyForce: { id: "CountyForce", locationId: "CentralVillage", hp: 100, ap: 2, stance: "ready", status: "active", xp: 0 },
+      ArmedTeam: { id: "ArmedTeam", locationId: "NorthPass", hp: 85, ap: 3, stance: "ready", status: "active", xp: 0 },
+      Militia: { id: "Militia", locationId: "SouthVillage", hp: 75, ap: 2, stance: "ready", status: "active", xp: 0 }
+    },
+    enemies: {
+      NorthColumn: {
+        id: "NorthColumn", name: "日军北路搜索队", type: "regular", locationId: "EastPost", baseId: "EastPost",
+        hp: 100, morale: 100, entryTurn: 2, status: "forming", targetId: "CentralVillage", previousId: null,
+        revealedUntil: 0, lastKnownId: "EastPost", unsuppliedTurns: 0, delayed: 0, searchedNodes: [], capacityLoss: 0
+      },
+      EastColumn: {
+        id: "EastColumn", name: "日军东路主搜索队", type: "regular", locationId: "RailDepot", baseId: "RailDepot",
+        hp: 110, morale: 100, entryTurn: 3, status: "forming", targetId: objectiveStart, previousId: null,
+        revealedUntil: 0, lastKnownId: "RailDepot", unsuppliedTurns: 0, delayed: 0, searchedNodes: [], capacityLoss: 0
+      },
+      SouthColumn: {
+        id: "SouthColumn", name: "日军南路追击队", type: "regular", locationId: "SouthFort", baseId: "SouthFort",
+        hp: 90, morale: 95, entryTurn: 4, status: "forming", targetId: "ArsenalGully", previousId: null,
+        revealedUntil: 0, lastKnownId: "SouthFort", unsuppliedTurns: 0, delayed: 0, searchedNodes: [], capacityLoss: 0
+      },
+      PuppetVanguard: {
+        id: "PuppetVanguard", name: "伪军先遣大队", type: "puppet", locationId: "SouthFort", baseId: "SouthFort",
+        hp: 80, morale: 72, entryTurn: 2, status: "forming", targetId: "SouthVillage", previousId: null,
+        revealedUntil: 0, lastKnownId: "SouthFort", unsuppliedTurns: 0, delayed: 0, searchedNodes: [], capacityLoss: 0
+      },
+      SearchCell: {
+        id: "SearchCell", name: "日军特别挺进侦搜组（机制合成）", type: "agent", locationId: "RailDepot", baseId: "RailDepot",
+        hp: 45, morale: 70, entryTurn: 2, status: "forming", targetId: objectiveStart, previousId: null,
+        revealedUntil: 0, lastKnownId: "EastPost", unsuppliedTurns: 0, delayed: 0, searchedNodes: [], capacityLoss: 0
+      }
+    },
+    lines: {
+      NorthSupply: { cutUntil: 0, permanentDamage: 0 },
+      BridgeSupply: { cutUntil: 0, permanentDamage: 0 },
+      SouthSupply: { cutUntil: 0, permanentDamage: 0 },
+      RailSpine: { cutUntil: 0, permanentDamage: 0 }
+    },
+    decoys: [],
+    decoyCredibility: 100,
+    reinforcementResolved: false,
+    reinforcementDenied: false,
+    destroyedRegulars: 0,
+    destroyedEnemies: 0,
+    surrenderedEnemies: 0,
+    escapedEnemies: 0,
+    assetsLost: 0,
+    mainSearchSucceeded: false,
+    enemyDetectionPenalty: 0,
+    logs: [
+      { turn: 1, type: "intel", text: "地方交通员报告：东部铁路接运点、公路据点的敌军开始集结。" },
+      { turn: 1, type: "normal", text: "命令：先保存机关、医院和群众，再查清敌主攻方向。" }
+    ],
+    gameOver: false,
+    resultShown: false
+  };
+}
+
+function StartNewGame() {
+  const querySeed = Number(new URLSearchParams(location.search).get("seed"));
+  const seed = Number.isFinite(querySeed) && querySeed > 0 ? querySeed : (Date.now() ^ 19420520);
+  state = CreateInitialState(seed);
+  selection = { kind: "friendly", id: "ArmedTeam" };
+  inputMode = null;
+  isResolvingTurn = false;
+  camera = { zoom: 1, panX: 0, panY: 0 };
+  document.getElementById("startOverlay").classList.add("hidden");
+  AddLog("作战开始：日军捕捉总部机关的总目标已知，但其当前主搜线索与突入轴尚未查明。", "intel");
+  UpdateInterface();
+  SaveGame();
+  ShowToast("作战开始", "先研判、转移、疏散。补给完整的正规队不可硬碰。");
+  canvas.focus();
+}
+
+function ContinueGame() {
+  const loaded = LoadGame();
+  if (!loaded) {
+    StartNewGame();
+    return;
+  }
+  document.getElementById("startOverlay").classList.add("hidden");
+  selection = { kind: "none", id: null };
+  inputMode = null;
+  UpdateInterface();
+  ShowToast("恢复推演", `第 ${state.turn} 回合 · ${GetPhaseName()}`);
+}
+
+function SaveGame() {
+  if (!state || !state.started || state.gameOver) return;
+  try {
+    localStorage.setItem(gameConfig.saveKey, JSON.stringify({ state, camera }));
+  } catch (error) {
+    AddLog("浏览器未能保存本局；仍可继续当前推演。", "bad");
+  }
+}
+
+function LoadGame() {
+  try {
+    const raw = localStorage.getItem(gameConfig.saveKey);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!parsed.state || parsed.state.version !== 4) return false;
+    state = parsed.state;
+    camera = parsed.camera || { zoom: 1, panX: 0, panY: 0 };
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function ClearSave() {
+  try { localStorage.removeItem(gameConfig.saveKey); } catch (error) {}
+}
+
+function FormatDate() {
+  const date = new Date(gameConfig.baseDate + (state.turn - 1) * 8 * 3600000);
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const period = ["晨", "昼", "夜"][(state.turn - 1) % 3];
+  return `${date.getUTCFullYear()}.${month}.${day} ${period}`;
+}
+
+function GetPhaseName() {
+  if (state.turn <= 3) return "敌情展开";
+  if (state.turn <= 9) return "多路合围";
+  if (state.turn <= 15) return "压缩搜索";
+  if (state.turn < gameConfig.retreatTurn) return "争夺退路";
+  return "截击收拢";
+}
+
+function GetMapAlert() {
+  if (state.gameOver) return "本次推演已经结算。";
+  if (state.turn < 4) return "日军捕捉总部机关的总目标已经明确；当前主搜线索与突入轴尚未查明。";
+  if (state.turn < gameConfig.reinforcementTurn && !state.reinforcementResolved) return "敌军依托铁路和三条公路推进；第8回合前切断东线，可阻止预备队加入。";
+  if (state.turn < gameConfig.retreatTurn) return "合围网正在收紧：保护群众与机关，寻找断供敌军的伏击窗口。";
+  return "第22回合进入本局机制性的本地收拢阶段，并非史载统一撤退令；敌残部必须实际撤回据点。";
+}
+
+function AddLog(text, type = "normal") {
+  if (!state) return;
+  state.logs.push({ turn: state.turn, type, text });
+  if (state.logs.length > 90) state.logs.splice(0, state.logs.length - 90);
+}
+
+function ShowToast(title, detail) {
+  const toast = document.getElementById("turnToast");
+  toast.classList.remove("show");
+  void toast.offsetWidth;
+  toast.innerHTML = `<strong>${title}</strong><span>${detail}</span>`;
+  toast.classList.add("show");
+}
+
+function TriggerStrategicFeedback(locationId, title, detail) {
+  const location = GetLocation(locationId);
+  particles.push({ x: location.x, y: location.y, age: 0, life: 85, kind: "victory" });
+  const stage = document.getElementById("mapStage");
+  stage.classList.remove("shake");
+  void stage.offsetWidth;
+  stage.classList.add("shake");
+  ShowToast(title, detail);
+}
+
+function IsLineCut(edgeId) {
+  const line = state.lines[edgeId];
+  return Boolean(line && line.cutUntil >= state.turn);
+}
+
+function GetActiveEnemies() {
+  return Object.values(state.enemies).filter((enemy) =>
+    !["destroyed", "surrendered", "escaped"].includes(enemy.status) &&
+    enemy.entryTurn <= state.turn
+  );
+}
+
+function GetFriendlyAt(locationId) {
+  return Object.values(state.friendlies).filter((unit) => unit.status === "active" && unit.locationId === locationId);
+}
+
+function GetAssetAt(locationId) {
+  return Object.values(state.assets).filter((asset) => !asset.lost && asset.locationId === locationId);
+}
+
+function IsEnemyVisible(enemy) {
+  if (["destroyed", "surrendered", "escaped"].includes(enemy.status)) return true;
+  if (enemy.revealedUntil >= state.turn) return true;
+  if (enemy.entryTurn > state.turn) return false;
+  return Object.values(state.friendlies).some((unit) => {
+    if (unit.status !== "active") return false;
+    return unit.locationId === enemy.locationId || GetNeighbors(unit.locationId).includes(enemy.locationId);
+  });
+}
+
+function CalculateNetworkCapacity() {
+  let loss = 0;
+  Object.values(state.enemies).forEach((enemy) => {
+    loss += enemy.capacityLoss || 0;
+  });
+  Object.values(state.lines).forEach((line) => {
+    if (line.permanentDamage > 0) loss += line.permanentDamage;
+  });
+  if (state.reinforcementDenied) loss += 7;
+  return Clamp(Math.round(gameConfig.initialEnemyCapacity - loss), 18, 100);
+}
+
+function UpdateInterface() {
+  if (!state) return;
+  const dateLabel = FormatDate();
+  document.getElementById("dateStatus").textContent = window.innerWidth <= 640
+    ? `${dateLabel.replace("1942.", "").replace(" ", "")}·${state.turn}/${gameConfig.maxTurns}`
+    : `${dateLabel} · ${state.turn}/${gameConfig.maxTurns}`;
+  document.getElementById("phaseStatus").textContent = GetPhaseName();
+  document.getElementById("commandStatus").textContent = `${state.command} / ◆${state.intelTokens} / 械${state.capturedMateriel}`;
+  document.getElementById("civilStatus").textContent = `${Math.round(state.civilSafety)}%`;
+  document.getElementById("networkStatus").textContent = `${CalculateNetworkCapacity()}%`;
+  document.getElementById("civilCell").className = `statusCell ${state.civilSafety >= 75 ? "good" : "danger"}`;
+  document.getElementById("networkCell").className = `statusCell ${CalculateNetworkCapacity() <= 65 ? "good" : "danger"}`;
+  document.getElementById("operationCode").textContent = `代号 山隙-${state.operationCode}`;
+  document.getElementById("intelTokenText").textContent = `◆ ${state.intelTokens}`;
+  document.getElementById("mapAlert").textContent = GetMapAlert();
+  RenderObjective();
+  RenderAssets();
+  RenderAxes();
+  RenderSelection();
+  RenderEnemyLedger();
+  RenderLog();
+  const turnDisabled = state.gameOver || isResolvingTurn;
+  document.getElementById("endTurnButton").disabled = turnDisabled;
+  document.getElementById("mobileEndTurnButton").disabled = turnDisabled;
+  RequestDraw();
+}
+
+function RenderObjective() {
+  const profile = objectiveProfiles[state.objectiveAssetId];
+  const objectiveText = document.getElementById("objectiveText");
+  const clues = [];
+  if (state.clueLevel === 0) {
+    objectiveText.className = "unknown";
+    objectiveText.textContent = "敌当前主搜线索：尚未查明";
+    clues.push({ text: "多路同时展开，不能把第一支出现的敌军误判为主攻。", verified: false });
+    clues.push({ text: "群众情报、侦察和截获文件需要交叉印证。", verified: false });
+  }
+  if (state.clueLevel >= 1) {
+    objectiveText.className = "";
+    objectiveText.textContent = `主攻疑在：${profile.sector}`;
+    clues.push({ text: `线索一：敌侦搜力量持续向${profile.sector}询问道路。`, verified: true });
+  }
+  if (state.clueLevel >= 2) {
+    objectiveText.textContent = `主攻类别：${profile.category}`;
+    clues.push({ text: `线索二：截获命令反复提到“${profile.category}”。`, verified: true });
+  }
+  if (state.clueLevel >= 3) {
+    objectiveText.innerHTML = `已确认：<b>${profile.wording}</b>`;
+    clues.push({ text: `三条独立情报互证；敌军掌握的是目标初始位置 ${GetLocation(state.objectiveStart).name}。`, verified: true });
+  } else {
+    clues.push({ text: `还需 ${3 - state.clueLevel} 次有效印证，才能确认敌当前锁定的搜捕线索。`, verified: false });
+  }
+  document.getElementById("clueList").innerHTML = clues
+    .map((clue) => `<div class="clue ${clue.verified ? "verified" : ""}">${clue.text}</div>`)
+    .join("");
+  const analyzeButton = document.getElementById("analyzeButton");
+  analyzeButton.disabled = state.intelTokens < 2 || state.clueLevel >= 3 || state.gameOver;
+  analyzeButton.textContent = state.clueLevel >= 3 ? "当前主搜线索已确认" : "消耗 ◆2 交叉印证";
+}
+
+function RenderAssets() {
+  document.getElementById("assetList").innerHTML = Object.values(state.assets).map((asset) => {
+    const definition = assetDefs[asset.id];
+    const selected = selection.kind === "asset" && selection.id === asset.id;
+    const status = asset.lost
+      ? `<span class="lostStamp">已损失</span>`
+      : `<span>${GetLocation(asset.locationId).name}</span>`;
+    return `
+      <button class="assetCard ${selected ? "selected" : ""}" type="button" onclick="SelectEntity('asset','${asset.id}')">
+        <span class="assetHead"><b>${definition.icon} ${definition.name}</b>${status}</span>
+        <span class="assetMeta">${asset.lost ? "此损失将进入战略结算" : `暴露 ${Math.round(asset.exposure)}% · ${asset.moved ? "已转移，敌仍可能扑向旧址" : "尚在初始位置"}`}</span>
+        <span class="riskBar"><span class="riskFill" style="width:${asset.lost ? 100 : asset.exposure}%"></span></span>
+      </button>
+    `;
+  }).join("");
+}
+
+function GetEnemyStatusLabel(enemy) {
+  if (enemy.status === "forming") return `尚未出动 · 第${enemy.entryTurn}回合`;
+  if (enemy.status === "destroyed") return "建制被歼";
+  if (enemy.status === "surrendered") return enemy.type === "puppet" ? "瓦解 / 投诚" : "被俘失能";
+  if (enemy.status === "escaped") return "残部撤回据点";
+  if (enemy.status === "withdrawing") return "正在沿地图撤退";
+  if (!IsEnemyVisible(enemy)) return "位置不明";
+  const supplyState = GetEnemySupplyState(enemy);
+  const supplyText = supplyState === "connected" ? "补给畅通"
+    : supplyState === "carried" ? "粮道刚断 · 尚有携行补给"
+    : supplyState === "strained" ? "补给吃紧1回合"
+    : `完全断供${enemy.unsuppliedTurns}回合`;
+  return `${GetLocation(enemy.locationId).name} · ${supplyText}`;
+}
+
+function RenderAxes() {
+  document.getElementById("axisList").innerHTML = Object.values(state.enemies).map((enemy) => {
+    const visible = IsEnemyVisible(enemy);
+    const selected = selection.kind === "enemy" && selection.id === enemy.id;
+    const displayName = visible || ["destroyed", "surrendered", "escaped"].includes(enemy.status)
+      ? enemy.name
+      : enemyTypeDefs[enemy.type].label;
+    return `
+      <button class="axisCard ${selected ? "selected" : ""}" type="button" onclick="SelectEntity('enemy','${enemy.id}')">
+        <span class="axisHead"><b>${displayName}</b><span>${enemy.status === "destroyed" ? '<i class="destroyedStamp">歼</i>' : visible ? `${Math.max(0, Math.round(enemy.hp))}%` : "?"}</span></span>
+        <span class="axisMeta">${GetEnemyStatusLabel(enemy)}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function RenderSelection() {
+  const summary = document.getElementById("selectionSummary");
+  const actionGrid = document.getElementById("actionGrid");
+  const selectionKind = document.getElementById("selectionKind");
+  let actions = "";
+  let note = "完整歼灭链：侦察 → 诱敌 → 断补给 → 伏击 → 封退路 → 合击。";
+
+  if (selection.kind === "friendly") {
+    const unit = state.friendlies[selection.id];
+    if (!unit) return;
+    const definition = friendlyDefs[unit.id];
+    const location = GetLocation(unit.locationId);
+    selectionKind.textContent = "我方部队";
+    summary.innerHTML = `
+      <h3>${definition.icon} ${definition.name}</h3>
+      <span class="tag">${location.name}</span><span class="tag">战力 ${Math.round(GetFriendlyPower(unit) * 10) / 10}</span>
+      <span class="tag">行动 ${unit.ap}/${definition.maxAp}</span>
+      <span class="tag">兵力 ${Math.round(unit.hp)}%</span>
+      <p>${definition.desc}</p>
+      ${unit.stance !== "ready" ? `<p class="good">当前命令：${GetStanceLabel(unit.stance)}</p>` : ""}
+    `;
+    if (unit.status !== "active") {
+      actions = BuildActionButton("失去战斗力", "该部队本次推演不能再行动。", "", true);
+    } else {
+      const canAct = state.command > 0 && unit.ap > 0 && !state.gameOver;
+      actions += BuildActionButton("移动 / 夜行", "选择一个相邻节点；山路不是瞬移。", "BeginFriendlyMove()", !canAct);
+      actions += BuildActionButton("群众侦察", "搜索附近2—3节点，优先查明未知敌军，并获得 ◆1 情报。", "ReconWithSelected()", !canAct);
+      actions += BuildActionButton("准备伏击", "山地/林地收益最高；敌进入时自动开火。", "SetFriendlyStance('ambush')", !canAct, "good");
+      actions += BuildActionButton("封锁退路", "控制当前节点；与邻接支援共同形成合围。", "SetFriendlyStance('blockade')", !canAct);
+      if (["wugong", "county"].includes(definition.type)) {
+        const availableLines = GetSabotageLines(unit.locationId);
+        availableLines.forEach((edge) => {
+          const lineState = state.lines[edge.id];
+          const disabled = !canAct || lineState.cutUntil >= state.turn;
+          actions += BuildActionButton(
+            `破袭：${edge.label}`,
+            lineState.cutUntil >= state.turn ? `已中断至第${lineState.cutUntil}回合；敌无法凭空补给。` : `切断 ${gameConfig.sabotageDuration} 回合并造成永久网络损伤。`,
+            `SabotageLine('${edge.id}')`,
+            disabled,
+            "danger"
+          );
+        });
+        actions += BuildActionButton("布置假迹象", "最多诱开一支邻近搜索队；重复欺骗不会万能。", "PlaceDecoy()", !canAct);
+      }
+      const village = state.villages[unit.locationId];
+      if (village) {
+        actions += BuildActionButton(
+          village.evacuated ? "群众已疏散" : "疏散群众与粮秣",
+          village.evacuated ? "敌搜村也得不到向导和粮秣。" : "防止严密搜索造成群众与组织损失。",
+          "EvacuateVillage()",
+          !canAct || village.evacuated,
+          "good"
+        );
+      }
+      const localAssets = GetAssetAt(unit.locationId);
+      if (localAssets.length) note = `此地有 ${localAssets.map((asset) => assetDefs[asset.id].short).join("、")}；可点击左栏资产并护送转移。`;
+    }
+  } else if (selection.kind === "asset") {
+    const asset = state.assets[selection.id];
+    const definition = assetDefs[asset.id];
+    selectionKind.textContent = "战略资产";
+    summary.innerHTML = `
+      <h3>${definition.icon} ${definition.name}</h3>
+      ${asset.lost ? '<p class="bad">已被敌军控制；此损失不可撤销。</p>' : `
+        <span class="tag">${GetLocation(asset.locationId).name}</span>
+        <span class="tag">暴露 ${Math.round(asset.exposure)}%</span>
+        <p>${definition.desc}</p>
+        <p class="${asset.exposure >= 65 ? "bad" : "good"}">${asset.moved ? "敌军主力仍按旧情报扑向初始位置；除非特别挺进侦搜组重新找到线索。" : "尚未转移，敌军若判断正确会直接压来。"}</p>
+      `}
+    `;
+    if (!asset.lost) {
+      const escort = GetFriendlyAt(asset.locationId).find((unit) => unit.ap > 0);
+      const disabled = !escort || state.command <= 0 || state.gameOver;
+      actions += BuildActionButton(
+        "护送转移",
+        escort ? `由 ${friendlyDefs[escort.id].name} 护送到相邻节点。` : "需有尚能行动的我方部队与资产同地。",
+        "BeginAssetMove()",
+        disabled,
+        "good"
+      );
+      actions += BuildActionButton(
+        "加强隐蔽",
+        escort ? "降低暴露 30%，但不能替代及时转移。" : "需同地部队组织隐蔽。",
+        "ConcealAsset()",
+        disabled
+      );
+    }
+    note = "敌军只掌握其侦察所得，不会自动读取资产的新位置。";
+  } else if (selection.kind === "enemy") {
+    const enemy = state.enemies[selection.id];
+    const visible = IsEnemyVisible(enemy);
+    selectionKind.textContent = "敌军";
+    if (!visible && !["destroyed", "surrendered", "escaped"].includes(enemy.status)) {
+      summary.innerHTML = `
+        <h3>? ${enemyTypeDefs[enemy.type].label}</h3>
+        <p>位置和实力未查明。选择武工队执行群众侦察，或消耗情报交叉研判。</p>
+      `;
+      actions = BuildActionButton("情报不足", "敌军不是全图透明棋子。", "", true);
+    } else {
+      const supplied = CheckEnemySupply(enemy);
+      const supplyState = GetEnemySupplyState(enemy);
+      const supplyDescription = supplyState === "connected"
+        ? "补给完整：能保持警戒与战力，正面进攻极危险。"
+        : supplyState === "carried"
+          ? "粮道刚被切断，但敌携行粮弹尚足；必须维持封锁到下一敌方阶段。"
+          : supplyState === "strained"
+            ? "补给开始吃紧，但尚未完全断供；继续控制交通线。"
+            : `完全断供 ${enemy.unsuppliedTurns} 回合：战力与士气持续下降。`;
+      summary.innerHTML = `
+        <h3>${enemy.name}</h3>
+        <span class="tag">${enemyTypeDefs[enemy.type].label}</span>
+        <span class="tag">战斗效能 ${Math.max(0, Math.round(enemy.hp))}%</span>
+        <span class="tag">${GetEnemyStatusLabel(enemy)}</span>
+        <p class="${supplyState === "cut" ? "good" : supplied ? "bad" : "warn"}">${supplyDescription}</p>
+        ${enemy.status === "destroyed" ? '<p class="good">该分队已从本次敌行动序列中永久除名。</p>' : ""}
+      `;
+      const attacker = Object.values(state.friendlies).find((unit) =>
+        unit.status === "active" &&
+        unit.ap > 0 &&
+        (unit.locationId === enemy.locationId || GetNeighbors(unit.locationId).includes(enemy.locationId))
+      );
+      actions += BuildActionButton(
+        "查看合击预判",
+        attacker ? `由 ${friendlyDefs[attacker.id].name} 发起；预判会显示补给、伏击和退路。` : "需要一支能行动的我方部队在相邻节点。",
+        attacker ? `OpenForecast('${attacker.id}','${enemy.id}',false)` : "",
+        !attacker || !["active", "withdrawing"].includes(enemy.status) || state.command <= 0,
+        supplied ? "danger" : "good"
+      );
+    }
+    note = enemy.type === "puppet"
+      ? "伪军孤立、低士气且无退路时会瓦解或投诚；不与日军正规队混算。"
+      : enemy.type === "agent"
+        ? "日军特别挺进侦搜组主要威胁是发现机关，不按正规战斗队使用。"
+        : "日军正规队有组织、有补给、有协同；先拆体系，再求歼灭。";
+  } else if (selection.kind === "location") {
+    const location = GetLocation(selection.id);
+    selectionKind.textContent = "地点";
+    const village = state.villages[location.id];
+    summary.innerHTML = `
+      <h3>${GetLocationIcon(location)} ${location.name}</h3>
+      <span class="tag">${GetTerrainLabel(location.terrain)}</span>
+      <p>${GetLocationDescription(location)}</p>
+      ${village ? `<p class="${village.evacuated ? "good" : "warn"}">${village.evacuated ? "群众和粮秣已疏散隐蔽。" : "群众尚未疏散；敌军严密搜索会造成持续损失。"}</p>` : ""}
+    `;
+    actions = BuildActionButton("选择同地部队下令", "行动必须由具体部队执行。", "", true);
+  } else {
+    selectionKind.textContent = "地图";
+    summary.innerHTML = "<h3>等待命令</h3><p>选择部队、资产、村庄或已发现的敌军。</p>";
+    actions = BuildActionButton("先选择部队", "武工队适合第一回合侦察或破北线公路。", "", true);
+  }
+
+  actionGrid.innerHTML = actions;
+  document.getElementById("orderNote").textContent = note;
+}
+
+function BuildActionButton(title, subtitle, handler, disabled, styleClass = "") {
+  return `<button class="actionButton ${styleClass}" type="button" ${disabled ? "disabled" : ""} ${handler ? `onclick="${handler}"` : ""}><b>${title}</b><span>${subtitle}</span></button>`;
+}
+
+function RenderEnemyLedger() {
+  document.getElementById("enemyCards").innerHTML = Object.values(state.enemies).map((enemy) => {
+    const visible = IsEnemyVisible(enemy);
+    const className = enemy.status === "destroyed" || enemy.status === "surrendered"
+      ? "destroyed"
+      : enemy.status === "escaped" ? "escaped" : "";
+    const title = visible || className ? enemy.name : enemyTypeDefs[enemy.type].label;
+    const status = GetEnemyStatusLabel(enemy);
+    const marker = enemy.status === "destroyed"
+      ? '<i class="destroyedStamp">建制被歼</i>'
+      : enemy.status === "surrendered"
+        ? enemy.type === "agent"
+          ? '<i class="destroyedStamp">侦搜失能</i>'
+          : '<i class="destroyedStamp">瓦解投诚</i>'
+        : enemy.status === "escaped"
+          ? '<i class="escapedStamp">残部撤回</i>'
+          : "";
+    return `
+      <button class="enemyCard ${className}" type="button" onclick="SelectEntity('enemy','${enemy.id}')">
+        <b>${title}</b>
+        <span>${status}</span>
+        <span class="powerBar"><span class="powerFill" style="width:${Math.max(0, enemy.hp)}%"></span></span>
+        <span>${marker || (visible ? `士气 ${Math.max(0, Math.round(enemy.morale))}%` : "需侦察确认")}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function RenderLog() {
+  const entries = state.logs.slice(-12);
+  document.getElementById("logList").innerHTML = entries.map((entry) =>
+    `<div class="logEntry ${entry.type}"><strong>第${entry.turn}回合</strong> ${entry.text}</div>`
+  ).join("");
+  const logList = document.getElementById("logList");
+  logList.scrollTop = logList.scrollHeight;
+}
+
+function AnalyzeIntelligence() {
+  if (state.gameOver || state.intelTokens < 2 || state.clueLevel >= 3) return;
+  state.intelTokens -= 2;
+  state.clueLevel += 1;
+  const profile = objectiveProfiles[state.objectiveAssetId];
+  const messages = [
+    `交叉研判：主攻搜索扇区很可能在${profile.sector}。`,
+    `交叉研判：敌反复提到“${profile.category}”，不是一般搜粮。`,
+    `三条线索互证：敌当前主搜线索是${profile.wording}。`
+  ];
+  AddLog(messages[state.clueLevel - 1], "intel");
+  ShowToast("情报互证", messages[state.clueLevel - 1]);
+  if (state.clueLevel >= 3) {
+    Object.values(state.enemies).forEach((enemy) => {
+      if (enemy.type === "regular") enemy.revealedUntil = Math.max(enemy.revealedUntil, state.turn + 1);
+    });
+  }
+  UpdateInterface();
+  SaveGame();
+}
+
+function SelectEntity(kind, id) {
+  if (!state || state.gameOver && kind !== "enemy") return;
+  selection = { kind, id };
+  inputMode = null;
+  if (kind === "enemy") {
+    const enemy = state.enemies[id];
+    if (enemy && IsEnemyVisible(enemy) && ["active", "withdrawing"].includes(enemy.status)) {
+    const attacker = Object.values(state.friendlies).find((unit) =>
+      unit.status === "active" &&
+      unit.ap > 0 &&
+      (unit.locationId === enemy.locationId || GetNeighbors(unit.locationId).includes(enemy.locationId))
+    );
+      if (attacker && state.command > 0) {
+        selection = { kind: "enemy", id };
+      }
+    }
+  }
+  UpdateInterface();
+  CloseMobilePanels();
+}
+
+function SpendAction(unit, commandCost = 1, apCost = 1) {
+  if (state.command < commandCost || unit.ap < apCost) return false;
+  state.command -= commandCost;
+  unit.ap -= apCost;
+  return true;
+}
+
+function BeginFriendlyMove() {
+  if (selection.kind !== "friendly") return;
+  const unit = state.friendlies[selection.id];
+  if (!unit || unit.status !== "active" || unit.ap <= 0 || state.command <= 0) return;
+  inputMode = { kind: "move", unitId: unit.id };
+  document.getElementById("mapHint").textContent = "移动命令：点击一个高亮相邻节点。再次点当前部队可取消。";
+  CloseMobilePanels();
+  RequestDraw();
+}
+
+function ExecuteFriendlyMove(unitId, destinationId) {
+  const unit = state.friendlies[unitId];
+  if (!GetNeighbors(unit.locationId).includes(destinationId)) return;
+  const enemyAtDestination = GetActiveEnemies().find((enemy) => enemy.locationId === destinationId);
+  if (enemyAtDestination) {
+    OpenForecast(unit.id, enemyAtDestination.id, false);
+    return;
+  }
+  if (!SpendAction(unit)) return;
+  const originId = unit.locationId;
+  unit.locationId = destinationId;
+  unit.stance = "ready";
+  inputMode = null;
+  AddLog(`${friendlyDefs[unit.id].name} 从${GetLocation(originId).name}转进${GetLocation(destinationId).name}。`, "normal");
+  RevealNearbyEnemies(unit);
+  document.getElementById("mapHint").textContent = "点选绿色部队下令；先侦察、转移与疏散，再设伏。拖动地图，滚轮或双指缩放。";
+  UpdateInterface();
+  SaveGame();
+}
+
+function BeginAssetMove() {
+  if (selection.kind !== "asset") return;
+  const asset = state.assets[selection.id];
+  const escort = GetFriendlyAt(asset.locationId).find((unit) => unit.ap > 0);
+  if (!escort || state.command <= 0) return;
+  inputMode = { kind: "assetMove", assetId: asset.id, escortId: escort.id };
+  document.getElementById("mapHint").textContent = `护送转移：选择 ${GetLocation(asset.locationId).name} 的一个相邻节点。敌军仍记着旧位置。`;
+  CloseMobilePanels();
+  RequestDraw();
+}
+
+function ExecuteAssetMove(assetId, escortId, destinationId) {
+  const asset = state.assets[assetId];
+  const escort = state.friendlies[escortId];
+  if (!asset || !escort || escort.locationId !== asset.locationId) return;
+  if (!GetNeighbors(asset.locationId).includes(destinationId)) return;
+  const enemyAtDestination = GetActiveEnemies().find((enemy) => enemy.locationId === destinationId);
+  if (enemyAtDestination) {
+    enemyAtDestination.revealedUntil = Math.max(enemyAtDestination.revealedUntil, state.turn + 1);
+    enemyAtDestination.lastKnownId = destinationId;
+    inputMode = null;
+    AddLog(`护送队前出查明${GetLocation(destinationId).name}已有${enemyAtDestination.name}控制，战略资产转移中止，未消耗行动。`, "intel");
+    ShowToast("转移路线被敌控制", `${GetLocation(destinationId).name}不可进入；先诱开、伏击或改走别处。`);
+    UpdateInterface();
+    SaveGame();
+    return;
+  }
+  if (!SpendAction(escort)) return;
+  const originId = asset.locationId;
+  asset.locationId = destinationId;
+  asset.moved = true;
+  asset.exposure = Clamp(asset.exposure + (GetLocation(destinationId).terrain === "road" ? 12 : 4), 0, 100);
+  escort.locationId = destinationId;
+  escort.stance = "ready";
+  inputMode = null;
+  AddLog(`${assetDefs[asset.id].name}在${friendlyDefs[escort.id].name}护送下转离${GetLocation(originId).name}。敌军主力仍可能扑向旧址。`, "good");
+  ShowToast("机关转移完成", `${GetLocation(originId).name}留下空目标；新址 ${GetLocation(destinationId).name}。`);
+  UpdateInterface();
+  SaveGame();
+}
+
+function ConcealAsset() {
+  if (selection.kind !== "asset") return;
+  const asset = state.assets[selection.id];
+  const escort = GetFriendlyAt(asset.locationId).find((unit) => unit.ap > 0);
+  if (!escort || !SpendAction(escort)) return;
+  asset.exposure = Clamp(asset.exposure - 30, 0, 100);
+  AddLog(`${friendlyDefs[escort.id].name}协助${assetDefs[asset.id].short}封锁消息、分散隐蔽，暴露下降。`, "good");
+  ShowToast("隐蔽加强", `${assetDefs[asset.id].name} 暴露降至 ${Math.round(asset.exposure)}%。`);
+  UpdateInterface();
+  SaveGame();
+}
+
+function ReconWithSelected() {
+  if (selection.kind !== "friendly") return;
+  const unit = state.friendlies[selection.id];
+  if (!unit || !SpendAction(unit)) return;
+  const searchRange = ["wugong", "county"].includes(friendlyDefs[unit.id].type) ? 3 : 2;
+  const candidates = Object.values(state.enemies)
+    .map((enemy) => ({ enemy, distance: GetPathDistance(unit.locationId, enemy.locationId) }))
+    .filter(({ enemy, distance }) =>
+      enemy.entryTurn <= state.turn &&
+      !["destroyed", "surrendered", "escaped"].includes(enemy.status) &&
+      distance <= searchRange
+    )
+    .sort((first, second) => {
+      const firstUnknown = first.enemy.revealedUntil < state.turn ? 0 : 1;
+      const secondUnknown = second.enemy.revealedUntil < state.turn ? 0 : 1;
+      return firstUnknown - secondUnknown || first.distance - second.distance;
+    });
+  const enemy = candidates[0]?.enemy;
+  if (enemy) {
+    enemy.revealedUntil = Math.max(enemy.revealedUntil, state.turn + 3);
+    enemy.lastKnownId = enemy.locationId;
+    state.intelTokens = Clamp(state.intelTokens + 1, 0, gameConfig.maxIntel);
+    AddLog(`${friendlyDefs[unit.id].name}查明 ${enemy.name} 位于${GetLocation(enemy.locationId).name}，下一步疑向${GetLocation(enemy.targetId).name}。`, "intel");
+    ShowToast("侦察奏效", `${searchRange}节点群众交通网查明 ${enemy.name}；暴露三回合，获得 ◆1。`);
+  } else {
+    state.intelTokens = Clamp(state.intelTokens + 1, 0, gameConfig.maxIntel);
+    AddLog(`${friendlyDefs[unit.id].name}在${searchRange}节点范围内未发现可确认敌踪，整理普通交通情报，获得 ◆1。`, "intel");
+    ShowToast("未见确切敌踪", `没有揭开远处敌军位置；群众交通网仍提供 ◆1 情报。`);
+  }
+  UpdateInterface();
+  SaveGame();
+}
+
+function RevealNearbyEnemies(unit) {
+  GetActiveEnemies().forEach((enemy) => {
+    if (enemy.locationId === unit.locationId || GetNeighbors(unit.locationId).includes(enemy.locationId)) {
+      enemy.revealedUntil = Math.max(enemy.revealedUntil, state.turn + 1);
+      enemy.lastKnownId = enemy.locationId;
+    }
+  });
+}
+
+function SetFriendlyStance(stance) {
+  if (selection.kind !== "friendly") return;
+  const unit = state.friendlies[selection.id];
+  if (!unit) return;
+  if (stance === "blockade" && GetLocation(unit.locationId).kind === "enemyBase") {
+    ShowToast("不能直接封死敌据点", "普通分队不能把未攻克据点当作绝对封口；应控制其外侧山口与公路节点。");
+    return;
+  }
+  if (!SpendAction(unit)) return;
+  unit.stance = stance;
+  const label = GetStanceLabel(stance);
+  AddLog(`${friendlyDefs[unit.id].name}在${GetLocation(unit.locationId).name}${label}。`, "good");
+  ShowToast(label, stance === "ambush" ? "等敌进入预设战场；山地和林地加成更高。" : "退路被实际控制，合击更可能转化为成建制歼灭。");
+  UpdateInterface();
+  SaveGame();
+}
+
+function PlaceDecoy() {
+  if (selection.kind !== "friendly") return;
+  const unit = state.friendlies[selection.id];
+  if (!unit || !SpendAction(unit)) return;
+  const existing = state.decoys.find((decoy) => decoy.locationId === unit.locationId && decoy.until >= state.turn);
+  if (existing) {
+    unit.ap += 1;
+    state.command += 1;
+    return;
+  }
+  state.decoys.push({
+    id: `Decoy${state.turn}${unit.id}`,
+    locationId: unit.locationId,
+    until: state.turn + 3,
+    used: false,
+    sourceId: unit.id
+  });
+  AddLog(`${friendlyDefs[unit.id].name}在${GetLocation(unit.locationId).name}布置假宿营痕迹与假交通线。`, "good");
+  ShowToast("假迹象布成", "最多诱开一支邻近搜索队；其余敌军仍按各自任务推进。");
+  UpdateInterface();
+  SaveGame();
+}
+
+function GetSabotageLines(locationId) {
+  const location = GetLocation(locationId);
+  return (location.lineIds || []).map(GetEdge).filter(Boolean);
+}
+
+function SabotageLine(edgeId) {
+  if (selection.kind !== "friendly") return;
+  const unit = state.friendlies[selection.id];
+  const definition = friendlyDefs[unit.id];
+  const edge = GetEdge(edgeId);
+  if (!edge || !["wugong", "county"].includes(definition.type)) return;
+  if (!GetSabotageLines(unit.locationId).some((line) => line.id === edgeId)) return;
+  if (!SpendAction(unit)) return;
+  state.lines[edgeId].cutUntil = state.turn + gameConfig.sabotageDuration - 1;
+  const firstSabotage = state.lines[edgeId].permanentDamage === 0;
+  state.lines[edgeId].permanentDamage = Math.max(state.lines[edgeId].permanentDamage, 2);
+  state.intelTokens = Clamp(state.intelTokens + 1, 0, gameConfig.maxIntel);
+  AddLog(`${friendlyDefs[unit.id].name}破袭${edge.label}：补给线中断至第${state.lines[edgeId].cutUntil}回合，敌分队将真实断供。`, "good");
+  TriggerStrategicFeedback(
+    unit.locationId,
+    "交通破袭成功",
+    firstSabotage
+      ? `${edge.label}中断；首次破袭造成永久网络能力 -2%，获得 ◆1。`
+      : `${edge.label}再次中断；延长本次断供，但永久损伤不重复刷分，获得 ◆1。`
+  );
+  UpdateInterface();
+  SaveGame();
+}
+
+function EvacuateVillage() {
+  if (selection.kind !== "friendly") return;
+  const unit = state.friendlies[selection.id];
+  const village = state.villages[unit.locationId];
+  if (!village || village.evacuated || !SpendAction(unit)) return;
+  village.evacuated = true;
+  village.organized += 1;
+  AddLog(`${GetLocation(unit.locationId).name}群众和粮秣分散转入山地，交通员留下监视敌军。`, "good");
+  ShowToast("群众转移完成", "人员与粮秣避开主要伤亡；房屋和生产资料仍可能在严密搜索中受损。");
+  UpdateInterface();
+  SaveGame();
+}
+
+function GetFriendlyPower(unit) {
+  const definition = friendlyDefs[unit.id];
+  return definition.power * (unit.hp / definition.maxHp);
+}
+
+function HasEnemySupplyConnection(enemy) {
+  if (!enemy || ["destroyed", "surrendered", "escaped"].includes(enemy.status)) return false;
+  if (enemy.locationId === enemy.baseId) return true;
+  const queue = [enemy.baseId];
+  const visited = new Set(queue);
+  while (queue.length) {
+    const currentId = queue.shift();
+    if (currentId === enemy.locationId) return true;
+    edgeDefs.forEach((edge) => {
+      if (edge.type === "trail") return;
+      if (edge.supply && IsLineCut(edge.id)) return;
+      let nextId = null;
+      if (edge.a === currentId) nextId = edge.b;
+      if (edge.b === currentId) nextId = edge.a;
+      if (nextId && !visited.has(nextId)) {
+        visited.add(nextId);
+        queue.push(nextId);
+      }
+    });
+  }
+  return false;
+}
+
+function CheckEnemySupply(enemy) {
+  if (!enemy || ["destroyed", "surrendered", "escaped"].includes(enemy.status)) return false;
+  return GetEnemySupplyState(enemy) !== "cut";
+}
+
+function GetEnemySupplyState(enemy) {
+  if (HasEnemySupplyConnection(enemy)) return "connected";
+  if (enemy.unsuppliedTurns <= 0) return "carried";
+  if (enemy.unsuppliedTurns === 1) return "strained";
+  return "cut";
+}
+
+function GetPath(startId, goalId, options = {}) {
+  if (startId === goalId) return [startId];
+  const distances = new Map([[startId, 0]]);
+  const previous = new Map();
+  const unvisited = new Set(locationDefs.map((location) => location.id));
+  while (unvisited.size) {
+    let currentId = null;
+    let currentDistance = Infinity;
+    unvisited.forEach((locationId) => {
+      const distance = distances.get(locationId) ?? Infinity;
+      if (distance < currentDistance) {
+        currentDistance = distance;
+        currentId = locationId;
+      }
+    });
+    if (currentId === null || currentDistance === Infinity) break;
+    unvisited.delete(currentId);
+    if (currentId === goalId) break;
+    edgeDefs.forEach((edge) => {
+      let nextId = null;
+      if (edge.a === currentId) nextId = edge.b;
+      if (edge.b === currentId) nextId = edge.a;
+      if (!nextId || !unvisited.has(nextId)) return;
+      let weight = edge.type === "trail" ? 1.3 : edge.type === "rail" ? .75 : .9;
+      if (options.enemy && edge.supply && IsLineCut(edge.id)) weight += 2.4;
+      const blockingUnit = GetFriendlyAt(nextId).find((unit) => unit.stance === "blockade");
+      if (options.enemy && blockingUnit) weight += 2.1;
+      const newDistance = currentDistance + weight;
+      if (newDistance < (distances.get(nextId) ?? Infinity)) {
+        distances.set(nextId, newDistance);
+        previous.set(nextId, currentId);
+      }
+    });
+  }
+  if (!previous.has(goalId)) return [];
+  const path = [goalId];
+  let cursor = goalId;
+  while (cursor !== startId) {
+    cursor = previous.get(cursor);
+    if (!cursor) return [];
+    path.unshift(cursor);
+  }
+  return path;
+}
+
+function GetPathDistance(startId, goalId) {
+  const path = GetPath(startId, goalId);
+  return path.length ? path.length - 1 : 99;
+}
+
+function CountSupport(enemy, attackerId) {
+  return Object.values(state.friendlies).filter((unit) =>
+    unit.status === "active" &&
+    unit.id !== attackerId &&
+    unit.hp >= 25 &&
+    GetNeighbors(enemy.locationId).includes(unit.locationId)
+  ).length;
+}
+
+function HasBlockedRetreat(enemy, attackerId) {
+  const blockedNodes = new Set(Object.values(state.friendlies).filter((unit) =>
+    unit.status === "active" &&
+    unit.id !== attackerId &&
+    unit.hp >= 25 &&
+    unit.stance === "blockade" &&
+    GetLocation(unit.locationId).kind !== "enemyBase"
+  ).map((unit) => unit.locationId));
+  if (!blockedNodes.size) return false;
+  const queue = [enemy.locationId];
+  const visited = new Set(queue);
+  while (queue.length) {
+    const currentId = queue.shift();
+    if (currentId === enemy.baseId) return false;
+    GetNeighbors(currentId).forEach((nextId) => {
+      if (blockedNodes.has(nextId) || visited.has(nextId)) return;
+      visited.add(nextId);
+      queue.push(nextId);
+    });
+  }
+  return true;
+}
+
+function CalculateForecast(attacker, enemy, isAmbush) {
+  const supplyState = GetEnemySupplyState(enemy);
+  const supplied = supplyState === "connected" || supplyState === "carried";
+  const fullyUnsupplied = supplyState === "cut";
+  const support = CountSupport(enemy, attacker.id);
+  const location = GetLocation(enemy.locationId);
+  const terrainBonus = isAmbush && ["mountain", "forest", "ridge"].includes(location.terrain) ? 2.4 : isAmbush ? 1.2 : 0;
+  const intelBonus = enemy.revealedUntil >= state.turn ? 1.2 : 0;
+  const supplyBonus = supplied ? -1.7 : supplyState === "strained" ? -.4 : 1.4 + Math.min(2, enemy.unsuppliedTurns * .7);
+  const supportBonus = Math.min(3.6, support * 1.35);
+  const blockedRetreat = HasBlockedRetreat(enemy, attacker.id);
+  const encircled = fullyUnsupplied && blockedRetreat && support >= 1;
+  const encirclementBonus = encircled ? 2.2 : 0;
+  const friendlyPower = GetFriendlyPower(attacker);
+  const supplyMultiplier = supplied ? 1 : supplyState === "strained" ? .9 : .72;
+  const enemyPower = enemyTypeDefs[enemy.type].power * (enemy.hp / 100) * supplyMultiplier;
+  const edge = friendlyPower - enemyPower + terrainBonus + intelBonus + supplyBonus + supportBonus + encirclementBonus;
+  const enemyDamage = Clamp(Math.round(24 + edge * 6 + (isAmbush ? 10 : 0)), 10, 88);
+  const projectedEnemyHp = enemy.hp - enemyDamage;
+  const annihilation = encircled && projectedEnemyHp <= 24;
+  const surrender = enemy.type !== "regular" && encircled && projectedEnemyHp <= 35;
+  const counterSupply = supplied ? 8 : supplyState === "strained" ? 3 : 0;
+  const friendlyDamage = annihilation || surrender
+    ? Clamp(Math.round(4 - edge), 0, 12)
+    : Clamp(Math.round(20 - edge * 2.4 + counterSupply), 4, 42);
+  let rating = "力量接近";
+  let ratingClass = "warn";
+  if (edge >= 5) { rating = encircled ? "歼灭窗口已形成" : "明显优势，但敌有退路"; ratingClass = "good"; }
+  if (edge <= 0) { rating = "强攻代价很高"; ratingClass = "bad"; }
+  return {
+    supplied, supplyState, support, terrainBonus, intelBonus, blockedRetreat, encircled, friendlyPower, enemyPower,
+    edge, enemyDamage, friendlyDamage, annihilation, surrender, rating, ratingClass
+  };
+}
+
+function OpenForecast(attackerId, enemyId, isAmbush = false) {
+  const attacker = state.friendlies[attackerId];
+  const enemy = state.enemies[enemyId];
+  if (!attacker || !enemy || attacker.status !== "active" || attacker.ap <= 0 || state.command <= 0) return;
+  if (!GetNeighbors(attacker.locationId).includes(enemy.locationId) && attacker.locationId !== enemy.locationId) return;
+  const forecast = CalculateForecast(attacker, enemy, isAmbush);
+  forecastContext = { attackerId, enemyId, isAmbush };
+  const surrenderText = enemy.type === "agent"
+    ? "侦搜组已被截住，预计可被识破、控制或俘获。"
+    : "伪军已孤立低落，预计瓦解、缴械或投诚。";
+  const supplyFlag = forecast.supplyState === "connected"
+    ? '<span class="bad">敌补给畅通 −</span>'
+    : forecast.supplyState === "carried"
+      ? '<span class="warn">粮道刚断，携行补给尚足</span>'
+      : forecast.supplyState === "strained"
+        ? '<span class="warn">补给吃紧，尚未完全断供</span>'
+        : '<span class="good">敌已完全断供 +</span>';
+  const flags = [
+    supplyFlag,
+    forecast.support ? `<span class="good">邻接支援 ${forecast.support} +</span>` : '<span class="warn">无邻接支援</span>',
+    forecast.terrainBonus ? '<span class="good">伏击地形 +</span>' : '<span class="warn">无伏击地形</span>',
+    forecast.encircled ? '<span class="good">多点合围闭合 +</span>' : '<span class="warn">仍有撤退路线</span>'
+  ].join(" · ");
+  OpenModal(
+    "战斗预判",
+    `
+      <div class="forecastGrid">
+        <div class="forecastSide"><b>${friendlyDefs[attacker.id].name}</b><p>战斗效能 ${Math.round(attacker.hp)}%<br>有效战力 ${forecast.friendlyPower.toFixed(1)}</p></div>
+        <div class="forecastVersus">×</div>
+        <div class="forecastSide enemy"><b>${enemy.name}</b><p>战斗效能 ${Math.round(enemy.hp)}%<br>有效战力 ${forecast.enemyPower.toFixed(1)}</p></div>
+      </div>
+      <div class="forecastResult">
+        <b class="${forecast.ratingClass}">${forecast.rating}</b><br>
+        ${flags}<br>
+        预计敌效能 −${forecast.enemyDamage}，我方 −${forecast.friendlyDamage}。
+        ${forecast.annihilation ? "<br><strong class='good'>敌残部断供且无路可退，本次合击可成建制歼灭。</strong>" : ""}
+        ${forecast.surrender ? `<br><strong class='good'>${surrenderText}</strong>` : ""}
+        ${!forecast.encircled ? "<br><span class='warn'>即使击溃，敌残部也会真实撤向据点，不会凭空消失。</span>" : ""}
+      </div>
+    `,
+    `
+      <button class="ghostButton" type="button" onclick="CloseModal()">取消</button>
+      <button class="${forecast.ratingClass === "bad" ? "dangerButton" : "primaryButton"}" type="button" onclick="ConfirmCombat()">执行合击</button>
+    `
+  );
+}
+
+function ConfirmCombat() {
+  if (!forecastContext) return;
+  const attacker = state.friendlies[forecastContext.attackerId];
+  const enemy = state.enemies[forecastContext.enemyId];
+  const isAmbush = forecastContext.isAmbush;
+  forecastContext = null;
+  CloseModal();
+  if (!attacker || !enemy || !SpendAction(attacker)) return;
+  ResolveCombat(attacker, enemy, isAmbush);
+  attacker.stance = "ready";
+  UpdateInterface();
+  SaveGame();
+}
+
+function ResolveCombat(attacker, enemy, isAmbush) {
+  const forecast = CalculateForecast(attacker, enemy, isAmbush);
+  enemy.hp = Clamp(enemy.hp - forecast.enemyDamage, 0, 120);
+  enemy.morale = Clamp(enemy.morale - Math.round(forecast.enemyDamage * .7) - (forecast.encircled ? 18 : 0), 0, 100);
+  attacker.hp = Clamp(attacker.hp - forecast.friendlyDamage, 0, friendlyDefs[attacker.id].maxHp);
+  state.ownLosses += forecast.friendlyDamage;
+  attacker.xp += 1;
+  enemy.revealedUntil = state.turn + 3;
+  enemy.lastKnownId = enemy.locationId;
+  const battleLocation = enemy.locationId;
+  particles.push({ x: GetLocation(battleLocation).x, y: GetLocation(battleLocation).y, age: 0, life: 55, kind: "combat" });
+
+  if (forecast.surrender || (enemy.type !== "regular" && enemy.hp <= 12 && forecast.encircled)) {
+    DefeatEnemy(enemy, "surrendered", attacker);
+    return;
+  }
+  if (forecast.annihilation) {
+    DefeatEnemy(enemy, "destroyed", attacker);
+    return;
+  }
+  if (enemy.hp <= 0 && !forecast.encircled) {
+    enemy.hp = enemy.type === "regular" ? 12 : 9;
+    enemy.morale = 0;
+    AddLog(`${enemy.name}战斗队形崩溃，但退路未封；残部仍按原名称撤离，不能计作全歼。`, "intel");
+  }
+  if (attacker.hp <= 0) {
+    DisperseFriendly(attacker, enemy);
+  }
+  const retreatPath = GetPath(enemy.locationId, enemy.baseId, { enemy: true });
+  if (enemy.hp <= 28 || enemy.morale <= 25) {
+    if (retreatPath.length > 1 && !forecast.blockedRetreat) {
+      const originId = enemy.locationId;
+      enemy.previousId = originId;
+      enemy.locationId = retreatPath[1];
+      enemy.status = "withdrawing";
+      AddLog(`${enemy.name}遭重创，残部由${GetLocation(originId).name}向${GetLocation(enemy.locationId).name}退却；仍留在地图。`, "good");
+      ShowToast("敌残部退却", "未封住退路，敌分队没有被“计时删除”；可继续追截。");
+    } else {
+      enemy.status = "withdrawing";
+      enemy.targetId = enemy.baseId;
+      AddLog(`${enemy.name}残部被压在${GetLocation(enemy.locationId).name}并转入突围；下一次行动只能尝试冲开退路，不能继续搜捕资产。`, "good");
+      ShowToast("敌残部被迫突围", "敌效能很低但尚未完全失能；守住封口，再用邻接支援完成合击。");
+    }
+  } else {
+    AddLog(`${friendlyDefs[attacker.id].name}在${GetLocation(battleLocation).name}${isAmbush ? "伏击" : "合击"}${enemy.name}：敌效能 −${forecast.enemyDamage}，我方 −${forecast.friendlyDamage}。`, forecast.edge > 1 ? "good" : "bad");
+    ShowToast(isAmbush ? "伏击命中" : "合击完成", `${enemy.name} 效能降至 ${Math.round(enemy.hp)}%；${forecast.encircled ? "退路受压。" : "敌仍有撤退路线。"}`);
+  }
+}
+
+function DefeatEnemy(enemy, outcome, attacker) {
+  const locationId = enemy.locationId;
+  const regular = enemy.type === "regular";
+  enemy.status = outcome;
+  enemy.hp = 0;
+  enemy.morale = 0;
+  enemy.capacityLoss = regular ? 16 : enemy.type === "puppet" ? 7 : 4;
+  state.destroyedEnemies += 1;
+  if (regular) state.destroyedRegulars += 1;
+  if (outcome === "surrendered") state.surrenderedEnemies += 1;
+  state.capturedMateriel += regular ? 3 : 2;
+  state.intelTokens = Clamp(state.intelTokens + (enemy.type === "agent" ? 3 : 1), 0, gameConfig.maxIntel);
+  state.enemyDetectionPenalty = Clamp(state.enemyDetectionPenalty + (regular ? .12 : .05), 0, .5);
+  if (enemy.type === "agent") state.clueLevel = Math.min(3, state.clueLevel + 1);
+  const outcomeText = outcome === "surrendered"
+    ? enemy.type === "agent"
+      ? `${enemy.name}被控制并失去侦搜能力；缴获文件`
+      : `${enemy.name}瓦解或投诚；缴获文件与武器`
+    : `${enemy.name}失去成建制作战能力`;
+  AddLog(`${outcomeText}。敌行动序列永久减员，推演后续“扫荡”能力下降。`, "good");
+  const detail = regular
+    ? `缴获折算军火 +3 · 今后每回合指挥增加 · 巡逻与侦搜效率下降 · 推演后续“扫荡”能力 -16%。`
+    : `缴获折算军火 +2 · 获得新情报；累计军火可增加以后回合的指挥额度，该单位不会重生。`;
+  TriggerStrategicFeedback(locationId, regular ? "合围歼灭！" : enemy.type === "agent" ? "侦搜组失能！" : "伪军分队瓦解！", detail);
+  if (attacker) attacker.xp += regular ? 3 : 2;
+}
+
+function DisperseFriendly(unit, enemy) {
+  unit.status = "dispersed";
+  unit.hp = 0;
+  unit.ap = 0;
+  AddLog(`${friendlyDefs[unit.id].name}在与${enemy.name}交战后失去战斗力，人员分散转移。`, "bad");
+  ShowToast("我方部队失能", "正面硬攻造成严重代价；保存力量也是反“扫荡”的战略目标。");
+}
+
+function UpdateEnemySupplyCounters(applyAttrition = true) {
+  GetActiveEnemies().forEach((enemy) => {
+    if (HasEnemySupplyConnection(enemy)) {
+      enemy.unsuppliedTurns = 0;
+      return;
+    }
+    enemy.unsuppliedTurns += 1;
+    if (applyAttrition && enemy.unsuppliedTurns >= 2) {
+      const requestedLoss = enemyTypeDefs[enemy.type].supplyLoss;
+      const attritionFloor = enemy.type === "regular" ? 22 : enemy.type === "puppet" ? 18 : 12;
+      const loss = Math.min(requestedLoss, Math.max(0, enemy.hp - attritionFloor));
+      enemy.hp = Clamp(enemy.hp - loss, attritionFloor, 120);
+      enemy.morale = Clamp(enemy.morale - 11, 0, 100);
+      if (loss > 0) enemy.capacityLoss = Clamp((enemy.capacityLoss || 0) + 1, 0, 10);
+      if (IsEnemyVisible(enemy)) {
+        AddLog(`${enemy.name}断供已${enemy.unsuppliedTurns}回合：携行粮弹不足，效能 ${loss ? `−${loss}` : "已降至最低"}，士气下降；断供本身不计作歼灭。`, "good");
+      }
+      if (enemy.status === "active" && enemy.unsuppliedTurns >= 3 && (enemy.hp <= 35 || enemy.morale <= 35)) {
+        enemy.status = "withdrawing";
+        enemy.targetId = enemy.baseId;
+        AddLog(`${enemy.name}因断供与士气低落被迫沿现存路线撤向${GetLocation(enemy.baseId).name}；仍留在地图，可被追截。`, "intel");
+      }
+    }
+  });
+}
+
+function ResolveExpiredLineRepairs() {
+  const repaired = [];
+  const held = [];
+  Object.entries(state.lines).forEach(([edgeId, line]) => {
+    if (line.cutUntil > 0 && line.cutUntil < state.turn) {
+      const edge = GetEdge(edgeId);
+      const sabotageNodes = locationDefs.filter((location) => (location.lineIds || []).includes(edgeId));
+      const controller = sabotageNodes
+        .map((location) => GetFriendlyAt(location.id)[0])
+        .find(Boolean);
+      if (controller) {
+        line.cutUntil = state.turn;
+        held.push(edge.label);
+        AddLog(`${friendlyDefs[controller.id].name}仍控制${edge.label}破袭点，敌工兵无法完成抢修；中断延长一回合。`, "good");
+        return;
+      }
+      line.cutUntil = 0;
+      repaired.push(edge.label);
+      AddLog(`据点工兵经过多回合抢修，恢复${edge.label}通行；此前造成的永久网络损伤仍保留。`, "bad");
+    }
+  });
+  if (repaired.length) {
+    ShowToast("敌工兵恢复交通", `${repaired.join("、")}重新通行；需要再次破袭，或趁敌刚恢复前完成围歼。`);
+  } else if (held.length) {
+    ShowToast("破袭点仍在我方控制", `${held.join("、")}继续中断；守住节点即可阻止工兵抢修。`);
+  }
+}
+
+function EndPlayerTurn() {
+  if (!state || state.gameOver || modalLocked || isResolvingTurn) return;
+  isResolvingTurn = true;
+  CloseMobilePanels();
+  inputMode = null;
+  UpdateInterface();
+  try {
+    ExecuteEnemyPhase();
+  } finally {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        isResolvingTurn = false;
+        UpdateInterface();
+      }, 320);
+    });
+  }
+}
+
+function ExecuteEnemyPhase() {
+  const activeEnemies = GetActiveEnemies().slice();
+  for (const enemy of activeEnemies) {
+    if (state.gameOver) break;
+    if (["destroyed", "surrendered", "escaped"].includes(enemy.status)) continue;
+    ExecuteEnemyUnit(enemy);
+  }
+  if (state.gameOver) {
+    ResolveEndOfTurn();
+    return;
+  }
+  ResolveReinforcement();
+  UpdateEnemySupplyCounters(true);
+  ResolveEndOfTurn();
+}
+
+function ExecuteEnemyUnit(enemy) {
+  if (enemy.entryTurn === state.turn && enemy.status === "forming") {
+    enemy.status = "active";
+    enemy.revealedUntil = Math.max(enemy.revealedUntil, state.turn);
+    AddLog(`${enemyTypeDefs[enemy.type].label}从${GetLocation(enemy.baseId).name}进入战区。`, "bad");
+  }
+  if (enemy.entryTurn > state.turn || ["destroyed", "surrendered", "escaped"].includes(enemy.status)) return;
+  const localDefender = GetFriendlyAt(enemy.locationId)[0];
+  if (localDefender) {
+    enemy.revealedUntil = Math.max(enemy.revealedUntil, state.turn + 2);
+    if (enemy.type === "agent") {
+      AddLog(`${friendlyDefs[localDefender.id].name}在${GetLocation(enemy.locationId).name}识破并控制日军特别挺进侦搜组。`, "good");
+      DefeatEnemy(enemy, "surrendered", localDefender);
+    } else {
+      ResolveEnemyAttack(enemy, localDefender, enemy.locationId);
+    }
+    return;
+  }
+  if (GetAssetAt(enemy.locationId).length) {
+    SearchLocation(enemy);
+    return;
+  }
+  if (enemy.delayed > 0) {
+    enemy.delayed -= 1;
+    return;
+  }
+  if (state.turn >= gameConfig.retreatTurn && enemy.status !== "withdrawing") {
+    enemy.status = "withdrawing";
+    enemy.targetId = enemy.baseId;
+    AddLog(`${enemy.name}进入本局机制性的本地收拢/撤离阶段，必须沿现存交通线实际退回${GetLocation(enemy.baseId).name}；这不是史载统一撤退令。`, "intel");
+  }
+  if (enemy.status === "withdrawing" && enemy.locationId === enemy.baseId && state.turn > enemy.entryTurn) {
+    enemy.status = "escaped";
+    state.escapedEnemies += 1;
+    enemy.capacityLoss = Math.max(enemy.capacityLoss || 0, Math.round((100 - enemy.hp) * .06));
+    AddLog(`${enemy.name}残部实际撤回${GetLocation(enemy.baseId).name}；保存了${Math.round(enemy.hp)}%效能，未被计为歼灭。`, "bad");
+    return;
+  }
+
+  const decoy = ChooseDecoy(enemy);
+  const targetId = enemy.status === "withdrawing" ? enemy.baseId : decoy ? decoy.locationId : enemy.targetId;
+  if (enemy.locationId === targetId) {
+    if (decoy) {
+      decoy.used = true;
+      enemy.decoyId = null;
+      state.decoyCredibility = Clamp((state.decoyCredibility ?? 100) - 18, 28, 100);
+      enemy.morale = Clamp(enemy.morale - 5, 0, 100);
+      enemy.revealedUntil = state.turn + 2;
+      AddLog(`诱敌奏效：${enemy.name}扑到${GetLocation(targetId).name}，只发现假宿营痕迹；本次辨伪行动已经消耗，未再额外叠加停顿。`, "good");
+      ShowToast("诱敌成功", `${enemy.name}偏离原搜索轴线；同类假迹象可信度降至 ${state.decoyCredibility}%，不能无限风筝。`);
+      return;
+    }
+    SearchLocation(enemy);
+    return;
+  }
+
+  const path = GetPath(enemy.locationId, targetId, { enemy: true });
+  if (path.length < 2) return;
+  const nextId = path[1];
+  const ambusher = GetFriendlyAt(nextId).find((unit) => unit.stance === "ambush");
+  if (ambusher) {
+    enemy.previousId = enemy.locationId;
+    enemy.locationId = nextId;
+    enemy.revealedUntil = state.turn + 3;
+    AddLog(`${enemy.name}进入${GetLocation(nextId).name}预设伏击圈。`, "good");
+    ResolveCombat(ambusher, enemy, true);
+    ambusher.stance = "ready";
+    ambusher.ap = 0;
+    return;
+  }
+  const defender = GetFriendlyAt(nextId)[0];
+  if (defender) {
+    if (enemy.type === "agent") {
+      enemy.previousId = enemy.locationId;
+      enemy.locationId = nextId;
+      enemy.revealedUntil = state.turn + 3;
+      AddLog(`${friendlyDefs[defender.id].name}在${GetLocation(nextId).name}识破并控制日军特别挺进侦搜组。`, "good");
+      DefeatEnemy(enemy, "surrendered", defender);
+      return;
+    }
+    ResolveEnemyAttack(enemy, defender, nextId);
+    if (defender.status !== "active" || defender.locationId !== nextId) {
+      enemy.previousId = enemy.locationId;
+      enemy.locationId = nextId;
+    }
+    return;
+  }
+  enemy.previousId = enemy.locationId;
+  enemy.locationId = nextId;
+  if (IsEnemyVisible(enemy)) {
+    enemy.revealedUntil = Math.max(enemy.revealedUntil, state.turn + 1);
+    enemy.lastKnownId = enemy.locationId;
+  }
+  if (decoy && nextId === decoy.locationId) {
+    AddLog(`${enemy.name}循假交通线抵达${GetLocation(nextId).name}，本次行动用于追踪迹象，尚未展开搜捕。`, "intel");
+    return;
+  }
+  SearchLocation(enemy);
+}
+
+function ChooseDecoy(enemy) {
+  if (enemy.type === "agent" || enemy.status === "withdrawing") return null;
+  enemy.rejectedDecoyIds ||= [];
+  if (enemy.decoyId) {
+    const assigned = state.decoys.find((decoy) => decoy.id === enemy.decoyId && !decoy.used && decoy.until >= state.turn);
+    if (assigned) return assigned;
+    enemy.decoyId = null;
+  }
+  const alreadyAssigned = new Set(Object.values(state.enemies).map((unit) => unit.decoyId).filter(Boolean));
+  const candidates = state.decoys
+    .filter((decoy) =>
+      !decoy.used &&
+      decoy.until >= state.turn &&
+      !alreadyAssigned.has(decoy.id) &&
+      !enemy.rejectedDecoyIds.includes(decoy.id)
+    )
+    .map((decoy) => ({ decoy, distance: GetPathDistance(enemy.locationId, decoy.locationId) }))
+    .filter((entry) => entry.distance <= 3)
+    .sort((first, second) => first.distance - second.distance);
+  if (!candidates.length) return null;
+  const baseChance = enemy.type === "puppet" ? .82 : .58;
+  const chance = baseChance * ((state.decoyCredibility ?? 100) / 100);
+  if (SeededRandom() <= chance) {
+    enemy.decoyId = candidates[0].decoy.id;
+    enemy.revealedUntil = Math.max(enemy.revealedUntil, state.turn + 1);
+    AddLog(`群众观察到${enemy.name}改变行进方向，假迹象可能已被采信。`, "intel");
+    return candidates[0].decoy;
+  }
+  enemy.rejectedDecoyIds.push(candidates[0].decoy.id);
+  if (IsEnemyVisible(enemy)) {
+    AddLog(`${enemy.name}未采信${GetLocation(candidates[0].decoy.locationId).name}的假迹象；同一诱饵不会对该分队反复掷判定。`, "intel");
+  }
+  return null;
+}
+
+function SearchLocation(enemy) {
+  const locationId = enemy.locationId;
+  const village = state.villages[locationId];
+  if (village && !enemy.searchedNodes.includes(locationId)) {
+    enemy.searchedNodes.push(locationId);
+    village.searched = true;
+    if (village.evacuated) {
+      state.civilSafety = Clamp(state.civilSafety - 1, 0, 100);
+      enemy.morale = Clamp(enemy.morale - 4, 0, 100);
+      AddLog(`${enemy.name}严密搜索${GetLocation(locationId).name}，人员与粮秣已转移，避免主要伤亡；但房屋和生产资料仍可能受损。`, "good");
+    } else {
+      const loss = enemy.type === "agent" ? 5 : 9;
+      state.civilSafety = Clamp(state.civilSafety - loss, 0, 100);
+      village.organized = Math.max(0, village.organized - 1);
+      AddLog(`${enemy.name}进入未疏散的${GetLocation(locationId).name}严密搜索：群众安全 −${loss}，基层组织受损。`, "bad");
+      ShowToast("群众遭受严密搜索", "这不是随机“烧村”演出：未疏散造成了可追溯的群众与组织损失。");
+    }
+    if (enemy.type === "puppet") {
+      const remainingVillages = Object.keys(state.villages)
+        .filter((villageId) => !enemy.searchedNodes.includes(villageId))
+        .sort((firstId, secondId) => GetPathDistance(locationId, firstId) - GetPathDistance(locationId, secondId));
+      if (remainingVillages.length) {
+        enemy.targetId = remainingVillages[0];
+        AddLog(`${enemy.name}完成一次村庄搜索，转向${GetLocation(enemy.targetId).name}继续搜粮和强迫带路。`, "intel");
+      } else {
+        enemy.status = "withdrawing";
+        enemy.targetId = enemy.baseId;
+        AddLog(`${enemy.name}完成既定搜村路线，开始沿道路实际返回${GetLocation(enemy.baseId).name}。`, "intel");
+      }
+    }
+  }
+
+  const localAssets = GetAssetAt(locationId);
+  if (localAssets.length) {
+    localAssets.forEach((asset) => {
+      const searchPower = enemy.type === "agent" ? 58 : 38;
+      const terrainCover = ["mountain", "forest"].includes(GetLocation(locationId).terrain) ? 14 : 0;
+      asset.exposure = Clamp(asset.exposure + searchPower - terrainCover - Math.round(state.enemyDetectionPenalty * 20), 0, 100);
+      AddLog(`${enemy.name}在${GetLocation(locationId).name}搜查${assetDefs[asset.id].short}线索，暴露升至${Math.round(asset.exposure)}%。`, "bad");
+      if (asset.exposure >= 100) LoseAsset(asset, enemy);
+    });
+  } else if (enemy.type !== "puppet" && locationId === enemy.targetId && !enemy.searchedNodes.includes(`empty:${locationId}`)) {
+    enemy.searchedNodes.push(`empty:${locationId}`);
+    enemy.delayed = 1;
+    enemy.morale = Clamp(enemy.morale - 8, 0, 100);
+    AddLog(`${enemy.name}扑到${GetLocation(locationId).name}旧址，目标早已转移；搜索计划落空并耽搁。`, "good");
+    ShowToast("敌军扑空", "及时转移制造了真实的决策收益：敌仍按旧情报搜索，合围节奏被打乱。");
+    const nearby = GetNeighbors(locationId);
+    enemy.targetId = nearby[Math.floor(SeededRandom() * nearby.length)] || enemy.baseId;
+  }
+
+  if (enemy.type === "agent") {
+    const foundAsset = localAssets[0];
+    if (foundAsset) {
+      Object.values(state.enemies).forEach((unit) => {
+        if (unit.type === "regular" && ["active", "forming"].includes(unit.status)) unit.targetId = foundAsset.locationId;
+      });
+      AddLog("日军特别挺进侦搜组发现新的交通痕迹，日军正规搜索队开始修正目标；应尽快反特或再次转移。", "bad");
+    }
+  }
+}
+
+function LoseAsset(asset, enemy) {
+  if (asset.lost) return;
+  asset.lost = true;
+  state.assetsLost += 1;
+  if (asset.id === state.objectiveAssetId) {
+    state.mainSearchSucceeded = true;
+    AddLog(`敌当前主搜线索命中：${assetDefs[asset.id].name}失守，本地战略评价将判为搜捕得逞。`, "bad");
+  }
+  AddLog(`${assetDefs[asset.id].name}被${enemy.name}控制，造成不可逆战略损失。`, "bad");
+  ShowToast("战略资产损失", `${assetDefs[asset.id].name}没有及时转移；歼敌也不能抹去这一后果。`);
+  if (assetDefs[asset.id].critical) {
+    EndGame("defeat");
+  }
+}
+
+function ResolveEnemyAttack(enemy, defender, destinationId) {
+  const supplyState = GetEnemySupplyState(enemy);
+  const attackSupplyMultiplier = supplyState === "connected" || supplyState === "carried" ? 1.2 : supplyState === "strained" ? 1.02 : .75;
+  const enemyPower = enemyTypeDefs[enemy.type].power * (enemy.hp / 100) * attackSupplyMultiplier;
+  const defenderPower = GetFriendlyPower(defender) + (defender.stance === "blockade" ? 1.5 : 0);
+  const edge = enemyPower - defenderPower;
+  const friendlyLoss = Clamp(Math.round(18 + edge * 5), 8, 48);
+  const enemyLoss = Clamp(Math.round(10 - edge * 2), 3, 25);
+  defender.hp = Clamp(defender.hp - friendlyLoss, 0, friendlyDefs[defender.id].maxHp);
+  enemy.hp = Clamp(enemy.hp - enemyLoss, 0, 120);
+  state.ownLosses += friendlyLoss;
+  enemy.revealedUntil = state.turn + 2;
+  const contactText = defender.stance === "blockade"
+    ? `强攻${friendlyDefs[defender.id].name}封锁的${GetLocation(destinationId).name}`
+    : `在${GetLocation(destinationId).name}与${friendlyDefs[defender.id].name}交火`;
+  AddLog(`${enemy.name}${contactText}：我方 −${friendlyLoss}，敌 −${enemyLoss}。`, "bad");
+  if (enemy.hp <= 0) {
+    const encircled = GetEnemySupplyState(enemy) === "cut" &&
+      HasBlockedRetreat(enemy, defender.id) &&
+      CountSupport(enemy, defender.id) >= 1;
+    if (enemy.type === "regular" && !encircled) {
+      enemy.hp = 12;
+      enemy.morale = 0;
+      enemy.status = "withdrawing";
+      enemy.targetId = enemy.baseId;
+      AddLog(`${enemy.name}进攻受挫、战斗队形崩溃，但断供—支援—封口条件没有全部闭合；残部保留12%效能并真实突围。`, "intel");
+      ShowToast("击溃但未全歼", "正规搜索队仍有退路；追截并封闭所有撤回据点的路线。");
+    } else {
+      DefeatEnemy(enemy, enemy.type === "puppet" && encircled ? "surrendered" : "destroyed", defender);
+    }
+    return;
+  }
+  if (defender.hp <= 0) {
+    DisperseFriendly(defender, enemy);
+    return;
+  }
+  const fallback = GetNeighbors(defender.locationId).find((nodeId) =>
+    nodeId !== enemy.locationId && !GetActiveEnemies().some((unit) => unit.locationId === nodeId)
+  );
+  if (fallback) {
+    defender.locationId = fallback;
+    defender.stance = "ready";
+    AddLog(`${friendlyDefs[defender.id].name}主动脱离到${GetLocation(fallback).name}，未被原地抹除。`, "normal");
+  }
+}
+
+function ResolveReinforcement() {
+  if (state.reinforcementResolved || state.turn !== gameConfig.reinforcementTurn) return;
+  state.reinforcementResolved = true;
+  const railCut = IsLineCut("BridgeSupply") || IsLineCut("RailSpine");
+  if (railCut) {
+    state.reinforcementDenied = true;
+    AddLog("东线接运链路被持续破坏，日军机动预备队未能按时投入本地合围。", "good");
+    TriggerStrategicFeedback("Bridge", "东线增援被拒止", "没有凭空刷出新敌军；推演后续“扫荡”能力额外 -7%。");
+    return;
+  }
+  state.enemies.ReserveColumn = {
+    id: "ReserveColumn", name: "日军机动预备队", type: "regular", locationId: "RailDepot", baseId: "RailDepot",
+    hp: 75, morale: 92, entryTurn: state.turn, status: "active", targetId: state.objectiveStart, previousId: null,
+    revealedUntil: state.turn + 1, lastKnownId: "RailDepot", unsuppliedTurns: 0, delayed: 0, searchedNodes: [], capacityLoss: 0
+  };
+  AddLog("东线接运链路仍通，日军机动预备队经铁路接运点加入合围。", "bad");
+  ShowToast("敌预备队抵达", "东线接运链路未被持续破坏；破袭必须在敌增援到达前形成真实中断。");
+}
+
+function ResolveEndOfTurn() {
+  state.decoys = state.decoys.filter((decoy) => !decoy.used && decoy.until >= state.turn);
+  Object.values(state.assets).forEach((asset) => {
+    if (!asset.lost) {
+      const localEnemy = GetActiveEnemies().some((enemy) => enemy.locationId === asset.locationId);
+      if (!localEnemy) asset.exposure = Clamp(asset.exposure - 4, 0, 100);
+    }
+  });
+  const activeFriendlies = Object.values(state.friendlies).filter((unit) => unit.status === "active");
+  if (!activeFriendlies.length || state.civilSafety <= 20) {
+    EndGame("defeat");
+    return;
+  }
+  if (state.gameOver) return;
+  if (state.turn >= gameConfig.maxTurns) {
+    EndGame("complete");
+    return;
+  }
+  state.turn += 1;
+  ResolveExpiredLineRepairs();
+  state.command = gameConfig.commandPerTurn + Math.min(2, Math.floor(state.capturedMateriel / 3));
+  state.intelTokens = Clamp(state.intelTokens + 1, 0, gameConfig.maxIntel);
+  Object.values(state.friendlies).forEach((unit) => {
+    if (unit.status === "active") unit.ap = friendlyDefs[unit.id].maxAp;
+  });
+  if (state.turn === gameConfig.retreatTurn) {
+    ShowToast("进入本地收拢阶段", "这是本局机制阈值，并非史载统一撤退令；每支敌军仍须实际退回据点。");
+  } else {
+    ShowToast(`第 ${state.turn} 回合`, `${FormatDate()} · ${GetPhaseName()} · 指挥 ${state.command}`);
+  }
+  selection = { kind: "none", id: null };
+  UpdateInterface();
+  SaveGame();
+}
+
+function EndGame(reason) {
+  if (state.gameOver) return;
+  state.gameOver = true;
+  ClearSave();
+  const headquartersLost = state.assets.Headquarters.lost;
+  const capacity = CalculateNetworkCapacity();
+  const assetsSaved = Object.values(state.assets).filter((asset) => !asset.lost).length;
+  const weakenedRegularReturned = Object.values(state.enemies).some((enemy) =>
+    enemy.type === "regular" && enemy.status === "escaped" && enemy.hp <= 60
+  );
+  const networkBreakthrough = state.reinforcementDenied && capacity <= 88;
+  let grade = "本地保存力量（推演）";
+  let stamp = "保存力量";
+  let story = "当前主搜资产、主要群众与组织力量得到保存，但尚未永久拆掉一条完整合围轴线。";
+  if (reason === "defeat" || headquartersLost || state.mainSearchSucceeded || state.civilSafety <= 20) {
+    grade = "本地搜捕得逞（推演）";
+    stamp = "战略失败";
+    story = headquartersLost
+      ? "军分区机关与干部遭受不可逆损失。战术杀伤不能抵消战略目标失败。"
+      : state.mainSearchSucceeded
+        ? `${assetDefs[state.objectiveAssetId].name}正是敌当前锁定的本地搜捕线索；该资产失守，所以本局必须判为战略失败。`
+        : state.civilSafety <= 20
+          ? "群众与基层组织损失过重，已无法维持本次反“扫荡”。"
+          : "本地军政联合组失去继续掩护与转移的能力，敌搜捕行动取得阶段性结果。";
+  } else if (assetsSaved === 4 && state.civilSafety >= 80 && state.destroyedRegulars >= 1 && capacity <= 65) {
+    grade = "本地反合围成功";
+    stamp = "破网歼敌";
+    story = "机关与群众得到保存，敌合围体系被拆散，至少一支正规搜索队在断供、支援与封口全部闭合后失去建制。";
+  } else if (state.civilSafety < 65 || state.assetsLost >= 2) {
+    grade = "本地保存力量（推演）";
+    stamp = "代价沉重";
+    story = "虽造成敌军损失，但群众或组织资产受到严重破坏。反“扫荡”不能只按歼敌数量评价。";
+  } else if (state.destroyedRegulars >= 1 || weakenedRegularReturned || networkBreakthrough) {
+    grade = "本地打破合围";
+    stamp = "保存根据地";
+    story = state.destroyedRegulars >= 1
+      ? "一支日军正规搜索队被从行动序列中永久除名，敌本地合围轴线受到实质削弱。"
+      : weakenedRegularReturned
+        ? "日军正规搜索队虽撤回据点，但实际只保存不高于60%的效能，未能完整恢复合围能力。"
+        : "东线增援被拒止，且交通与分队损失已经造成可见的永久网络下降。";
+  }
+  Object.values(state.enemies).forEach((enemy) => {
+    if (!["destroyed", "surrendered", "escaped"].includes(enemy.status)) {
+      enemy.status = "trapped";
+    }
+  });
+  const statusRows = Object.values(state.enemies).map((enemy) => {
+    const status = enemy.status === "destroyed"
+      ? enemy.type === "regular" ? "建制被歼" : "行动分队失去作战能力"
+      : enemy.status === "surrendered"
+        ? enemy.type === "agent" ? "被识破、控制或俘获" : "瓦解、缴械或投诚"
+      : enemy.status === "escaped" ? `残部撤回（效能${Math.round(enemy.hp)}%）`
+      : enemy.status === "trapped" ? `仍在本地战区（效能${Math.round(enemy.hp)}%）`
+      : GetEnemyStatusLabel(enemy);
+    return `<li><strong>${enemy.name}</strong>：${status}</li>`;
+  }).join("");
+  OpenModal(
+    grade,
+    `
+      <div class="resultTitle">${grade}</div>
+      <div class="resultStamp">${stamp}</div>
+      <p>${story}</p>
+      <div class="resultGrid">
+        <div class="resultCell"><span>群众安全</span><b>${Math.round(state.civilSafety)}%</b></div>
+        <div class="resultCell"><span>保存资产</span><b>${assetsSaved}/4</b></div>
+        <div class="resultCell"><span>当前主搜资产</span><b>${state.mainSearchSucceeded ? "失守" : "守住"}</b></div>
+        <div class="resultCell"><span>正规搜索队被歼</span><b>${state.destroyedRegulars}</b></div>
+        <div class="resultCell"><span>推演后续“扫荡”能力</span><b>${capacity}%</b></div>
+        <div class="resultCell"><span>阻止铁路增援</span><b>${state.reinforcementDenied ? "是" : "否"}</b></div>
+        <div class="resultCell"><span>缴获军械折算</span><b>械${state.capturedMateriel}</b></div>
+        <div class="resultCell"><span>我方效能损失</span><b>${Math.round(state.ownLosses)}</b></div>
+      </div>
+      <h3>敌行动序列</h3>
+      <ul>${statusRows}</ul>
+      <p>“战斗效能归零”表示该行动分队失去成建制作战能力；不把抽象数值冒充具体历史伤亡数字。</p>
+      <p><strong>历史边界：</strong>本局结算只评价虚构的本地支援行动，不改变真实战役、真实人物经历及左权牺牲的历史结局。</p>
+    `,
+    `<button class="primaryButton" type="button" onclick="RestartNow()">重新推演</button>`,
+    true
+  );
+  state.resultShown = true;
+  UpdateInterface();
+}
+
+function GetStanceLabel(stance) {
+  if (stance === "ambush") return "设伏";
+  if (stance === "blockade") return "封锁退路";
+  return "待命";
+}
+
+function GetTerrainLabel(terrain) {
+  const labels = {
+    mountain: "山地", ridge: "山岭", forest: "林地", valley: "河谷",
+    road: "公路节点", fort: "敌据点"
+  };
+  return labels[terrain] || terrain;
+}
+
+function GetLocationIcon(location) {
+  if (location.kind === "village") return "村";
+  if (location.kind === "hideout") return "隐";
+  if (location.kind === "infrastructure") return "路";
+  if (location.kind === "enemyBase") return "敌";
+  return "岭";
+}
+
+function GetLocationDescription(location) {
+  if (location.kind === "village") return "群众、交通员与基层组织所在；应在敌严密搜索前疏散。";
+  if (location.kind === "hideout") return "山地隐蔽节点，适合保存资产和转进，但仍需保密。";
+  if (location.kind === "infrastructure") return "敌补给网络的要点；武工队或县大队可执行破袭。";
+  if (location.kind === "enemyBase") return "敌军补给与撤退基点；残部只有实际抵达这里才算撤出战区。";
+  return "山地交通节点，适合伏击或控制邻接退路。";
+}
+
+function OpenHelp() {
+  if (modalLocked) return;
+  OpenModal(
+    "作战规则",
+    `
+      <h3>你怎样赢</h3>
+      <ol>
+        <li><strong>查线索：</strong>日军企图捕捉总部机关的历史总目标固定；群众侦察只查附近2—3节点并获得 ◆，每消耗 ◆2 交叉印证一次，三次确认敌当前锁定的本地搜捕线索。</li>
+        <li><strong>保存力量：</strong>有部队同地才能护送机关；村庄要主动疏散群众和粮秣。疏散可避免主要伤亡，但不代表房屋和生产资料毫发无损。</li>
+        <li><strong>拆协同：</strong>在沙河口、河谷桥、南关口破袭交通。断供两回合后，敌战斗效能和士气持续下降。</li>
+        <li><strong>制造战场：</strong>假迹象最多诱开一支敌军；伏击负责首击，邻接部队与“封锁退路”负责收口。</li>
+        <li><strong>确认预判：</strong>选已发现敌军可看战斗预判。补给畅通、无支援的强攻会让你付出高代价。</li>
+        <li><strong>兑现战果：</strong>歼敌或控制侦搜组会缴获军械；每累计“械3”，以后回合增加1点指挥，最多增加2点。</li>
+      </ol>
+      <h3>不是倒计时撤军</h3>
+      <p>第22回合（5月31日晨）只是本局机制性的本地收拢/撤离阈值，<strong>并非史载的统一撤退令</strong>。每支敌军仍须沿地图实际走回补给据点；途中仍可断路、伏击、封口。战后报告会区分“建制被歼”“被控制或瓦解”“残部撤回”和“仍在战区”。</p>
+      <h3>操作</h3>
+      <p>点击选择；拖动平移；滚轮或双指缩放；空格结束回合；H 打开规则；Esc 取消命令或关闭弹窗。移动端用底栏打开情报和命令抽屉。</p>
+    `
+  );
+}
+
+function OpenHistory() {
+  if (modalLocked) return;
+  OpenModal(
+    "历史边界与参考",
+    `
+      <h3>场景定位</h3>
+      <p>1942年夏季大“扫荡”自5月中旬展开；本页只截取<strong>5月24—31日太行山区反“扫荡”</strong>的时间窗口，每日晨、昼、夜各一回合。侵华日军所谓“C号作战计划”的历史总目标，是以多路合击、“铁壁合围”和史料所称“特别挺进队”捕捉八路军总部、中共中央北方局及第129师机关。</p>
+      <p>玩家扮演虚构的“太行本地军政联合组”，处理同一环境中的支援、转移和破袭。地图节点、战略资产编组和行动分队为机制合成；黎城—辽县方向仅用于表达区域补给关系，并非实地线路复刻。当前主搜线索与可变战果同样只用于机制推演。<strong>5月25日左权在十字岭指挥掩护突围时牺牲的历史结局不会被游戏改写。</strong></p>
+      <p>这里不是冀中平原的“五一”反“扫荡”。太行山地与冀中平原的地形、交通和作战条件不同，不能混作一个场景；铁路只作为地图东缘的兵力输入线，腹地主要依赖山路和公路。</p>
+      <h3>机制为何这样设计</h3>
+      <ul>
+        <li>日军“扫荡”依托铁路、公路、据点、伪军与情报搜捕，和一般土匪不是同一威胁。</li>
+        <li>抗日根据地的反“扫荡”不只是阵地杀伤，也包括保存军政机关、转移群众、情报预警、分散隐蔽、破袭交通、伏击与反合围。</li>
+        <li>因此本页把群众和组织保存纳入胜负；“杀敌多但根据地受重创”只能算战略失分。</li>
+      </ul>
+      <p>本页的“特别挺进侦搜组”取材于史料所称两支“特别挺进队”（其中一支为益子挺进队）的伪装渗透方式；名称、规模和路线为机制合成，不将其认定为宪兵队。</p>
+      <h3>苏亭战例的边界</h3>
+      <p>5月28日晚，侦察员与两名群众送来栗城敌工站侦知的可靠情报；5月30日，第129师385旅769团1营3连（分作苏亭主伏击与煤窑沟阻击）在辽县七区民兵配合下设伏；战前另与县大队、区小队等地方武装取得联系。中国军网刊载资料（援引刘伯承总结）记载毙伤日军140余人、骡马80余匹，我方亡1人、伤1人，<strong>不是“全歼300名日军”</strong>。本页借鉴的是“可靠情报—选定谷地—军民分工—疑兵—快打快撤”的决策链，不冒充苏亭战斗复刻。</p>
+      <h3>公开参考</h3>
+      <ul>
+        <li><a href="http://www.81.cn/js_208592/jdt_208593/16387611.html" target="_blank" rel="noopener">中国军网：晋冀豫抗日根据地——我军在敌后战场上的重要指挥中枢</a></li>
+        <li><a href="http://www.81.cn/js_208592/16280442.html" target="_blank" rel="noopener">中国军网：苏亭伏击战——军民结合的模范战例</a></li>
+        <li><a href="http://www.81.cn/yw_208727/10048746.html" target="_blank" rel="noopener">中国军网：险遭“灭顶”的突袭</a></li>
+        <li><a href="http://www.81.cn/js_208592/16388231.html" target="_blank" rel="noopener">中国军网、新华社：听风吹过十字岭</a></li>
+        <li><a href="https://www.12371.cn/2021/04/30/VIDE1619780883636767.shtml" target="_blank" rel="noopener">共产党员网：何为“囚笼政策”？</a></li>
+        <li><a href="http://dangshi.people.com.cn/n/2015/0429/c85037-26926339.html" target="_blank" rel="noopener">人民网党史频道：抗战大事记·1942年</a></li>
+      </ul>
+      <p>页面避免使用后来才形成的政治口号来替代1942年的语境。</p>
+    `
+  );
+}
+
+function OpenFullLog() {
+  if (!state || modalLocked) return;
+  const logHtml = state.logs.slice().reverse().map((entry) =>
+    `<div class="logEntry ${entry.type}" style="padding:5px 0"><strong>第${entry.turn}回合</strong> ${entry.text}</div>`
+  ).join("");
+  OpenModal("完整战地日志", `<div>${logHtml}</div>`);
+}
+
+function OpenModal(title, bodyHtml, footerHtml = '<button class="ghostButton" type="button" onclick="CloseModal()">返回</button>', lock = false) {
+  if (modalLocked && !lock) return;
+  modalLocked = lock;
+  document.getElementById("modalTitle").textContent = title;
+  document.getElementById("modalBody").innerHTML = bodyHtml;
+  document.getElementById("modalFooter").innerHTML = footerHtml;
+  document.querySelector(".modalClose").classList.toggle("hidden", lock);
+  document.getElementById("modalOverlay").classList.remove("hidden");
+}
+
+function CloseModal() {
+  if (modalLocked) return;
+  document.getElementById("modalOverlay").classList.add("hidden");
+  forecastContext = null;
+}
+
+function ConfirmRestart() {
+  if (!state || modalLocked) return;
+  OpenModal(
+    "重新开始推演？",
+    "<p>当前本地存档会被清除。本操作不会影响其他页面的存档。</p>",
+    '<button class="ghostButton" type="button" onclick="CloseModal()">取消</button><button class="dangerButton" type="button" onclick="RestartNow()">清除并重开</button>'
+  );
+}
+
+function RestartNow() {
+  modalLocked = false;
+  CloseModal();
+  ClearSave();
+  StartNewGame();
+}
+
+function ToggleLogPanel() {
+  if (window.innerWidth <= 900) {
+    OpenFullLog();
+    return;
+  }
+  document.getElementById("bottomBar").classList.toggle("hidden");
+  ResizeCanvas();
+}
+
+function ToggleMobilePanel(which) {
+  const target = which === "left" ? document.getElementById("leftPanel") : document.getElementById("rightPanel");
+  const other = which === "left" ? document.getElementById("rightPanel") : document.getElementById("leftPanel");
+  const willOpen = !target.classList.contains("mobileOpen");
+  other.classList.remove("mobileOpen");
+  target.classList.toggle("mobileOpen", willOpen);
+  mobilePanel = willOpen ? which : null;
+}
+
+function CloseMobilePanels() {
+  document.getElementById("leftPanel").classList.remove("mobileOpen");
+  document.getElementById("rightPanel").classList.remove("mobileOpen");
+  mobilePanel = null;
+}
+
+function ResizeCanvas() {
+  const rectangle = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const width = Math.max(1, Math.round(rectangle.width * dpr));
+  const height = Math.max(1, Math.round(rectangle.height * dpr));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  RequestDraw();
+}
+
+function GetCanvasSize() {
+  const rectangle = canvas.getBoundingClientRect();
+  return { width: rectangle.width, height: rectangle.height };
+}
+
+function GetMapPoint(location) {
+  const size = GetCanvasSize();
+  const baseWidth = Math.max(280, size.width - 52);
+  const baseHeight = Math.max(260, size.height - 50);
+  return {
+    x: size.width / 2 + (location.x - .5) * baseWidth * camera.zoom + camera.panX,
+    y: size.height / 2 + (location.y - .5) * baseHeight * camera.zoom + camera.panY
+  };
+}
+
+function ScreenToMapRatio(screenX, screenY) {
+  const size = GetCanvasSize();
+  const baseWidth = Math.max(280, size.width - 52);
+  const baseHeight = Math.max(260, size.height - 50);
+  return {
+    x: .5 + (screenX - size.width / 2 - camera.panX) / (baseWidth * camera.zoom),
+    y: .5 + (screenY - size.height / 2 - camera.panY) / (baseHeight * camera.zoom)
+  };
+}
+
+function ClampCamera() {
+  const size = GetCanvasSize();
+  const limitX = size.width * (.18 + (camera.zoom - 1) * .48);
+  const limitY = size.height * (.18 + (camera.zoom - 1) * .48);
+  camera.panX = Clamp(camera.panX, -limitX, limitX);
+  camera.panY = Clamp(camera.panY, -limitY, limitY);
+}
+
+function ZoomMap(delta, centerX = null, centerY = null) {
+  const size = GetCanvasSize();
+  const focusX = centerX ?? size.width / 2;
+  const focusY = centerY ?? size.height / 2;
+  const before = ScreenToMapRatio(focusX, focusY);
+  camera.zoom = Clamp(camera.zoom + delta, gameConfig.cameraMin, gameConfig.cameraMax);
+  const baseWidth = Math.max(280, size.width - 52);
+  const baseHeight = Math.max(260, size.height - 50);
+  camera.panX = focusX - size.width / 2 - (before.x - .5) * baseWidth * camera.zoom;
+  camera.panY = focusY - size.height / 2 - (before.y - .5) * baseHeight * camera.zoom;
+  ClampCamera();
+  RequestDraw();
+}
+
+function ResetCamera() {
+  camera = { zoom: 1, panX: 0, panY: 0 };
+  RequestDraw();
+}
+
+function RequestDraw() {
+  if (!animationFrame) animationFrame = requestAnimationFrame(DrawFrame);
+}
+
+function DrawFrame(timestamp) {
+  animationFrame = 0;
+  const delta = Math.min(40, timestamp - lastFrameTime || 16);
+  lastFrameTime = timestamp;
+  DrawMap(delta);
+  if (particles.length) {
+    particles.forEach((particle) => { particle.age += delta / 16; });
+    particles = particles.filter((particle) => particle.age < particle.life);
+    RequestDraw();
+  }
+}
+
+function DrawMap() {
+  const size = GetCanvasSize();
+  context.clearRect(0, 0, size.width, size.height);
+  DrawBackground(size);
+  DrawEdges();
+  DrawOperationalArrows();
+  DrawNodes();
+  DrawDecoys();
+  DrawAssets();
+  DrawUnits();
+  DrawParticles();
+}
+
+function DrawBackground(size) {
+  const gradient = context.createRadialGradient(size.width * .52, size.height * .46, 10, size.width * .52, size.height * .46, Math.max(size.width, size.height) * .75);
+  gradient.addColorStop(0, "#b6a779");
+  gradient.addColorStop(.62, "#9b8d65");
+  gradient.addColorStop(1, "#776d51");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size.width, size.height);
+  context.save();
+  context.globalAlpha = .22;
+  context.strokeStyle = "#584f38";
+  context.lineWidth = 1;
+  for (let index = 0; index < 18; index += 1) {
+    const offset = (index - 9) * 42;
+    context.beginPath();
+    for (let step = -1; step <= 15; step += 1) {
+      const x = step * size.width / 13;
+      const y = size.height * .48 + Math.sin(step * .72 + index * .63) * (22 + index % 4 * 5) + offset;
+      if (step === -1) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.stroke();
+  }
+  context.restore();
+  context.fillStyle = "rgba(45, 41, 29, .12)";
+  context.font = "700 44px serif";
+  context.textAlign = "center";
+  context.fillText("太 行 山 地 · 作 战 示 意", size.width / 2, size.height * .53);
+}
+
+function DrawEdges() {
+  edgeDefs.forEach((edge) => {
+    const first = GetMapPoint(GetLocation(edge.a));
+    const second = GetMapPoint(GetLocation(edge.b));
+    context.save();
+    if (edge.type === "trail") {
+      context.strokeStyle = "rgba(72, 65, 45, .65)";
+      context.lineWidth = 2;
+      context.setLineDash([5, 6]);
+      DrawLine(first, second);
+    } else if (edge.type === "road") {
+      context.strokeStyle = "rgba(70, 59, 39, .85)";
+      context.lineWidth = 7;
+      DrawLine(first, second);
+      context.strokeStyle = "rgba(201, 181, 128, .65)";
+      context.lineWidth = 2;
+      DrawLine(first, second);
+    } else {
+      context.strokeStyle = "rgba(52, 49, 40, .86)";
+      context.lineWidth = 5;
+      DrawLine(first, second);
+      const length = Math.hypot(second.x - first.x, second.y - first.y);
+      const count = Math.max(2, Math.floor(length / 13));
+      for (let index = 0; index <= count; index += 1) {
+        const ratio = index / count;
+        const x = first.x + (second.x - first.x) * ratio;
+        const y = first.y + (second.y - first.y) * ratio;
+        const angle = Math.atan2(second.y - first.y, second.x - first.x) + Math.PI / 2;
+        context.beginPath();
+        context.moveTo(x + Math.cos(angle) * 5, y + Math.sin(angle) * 5);
+        context.lineTo(x - Math.cos(angle) * 5, y - Math.sin(angle) * 5);
+        context.strokeStyle = "rgba(45, 42, 34, .7)";
+        context.lineWidth = 1.2;
+        context.stroke();
+      }
+    }
+    if (edge.supply) {
+      const cut = IsLineCut(edge.id);
+      const midpoint = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
+      context.fillStyle = cut ? "#a93f34" : "rgba(113, 55, 42, .85)";
+      context.beginPath();
+      context.arc(midpoint.x, midpoint.y, 5, 0, Math.PI * 2);
+      context.fill();
+      if (cut) {
+        context.strokeStyle = "#e05d4a";
+        context.lineWidth = 3;
+        context.beginPath();
+        context.moveTo(midpoint.x - 9, midpoint.y - 9);
+        context.lineTo(midpoint.x + 9, midpoint.y + 9);
+        context.moveTo(midpoint.x + 9, midpoint.y - 9);
+        context.lineTo(midpoint.x - 9, midpoint.y + 9);
+        context.stroke();
+      }
+    }
+    context.restore();
+  });
+}
+
+function DrawLine(first, second) {
+  context.beginPath();
+  context.moveTo(first.x, first.y);
+  context.lineTo(second.x, second.y);
+  context.stroke();
+}
+
+function DrawOperationalArrows() {
+  if (!state) return;
+  Object.values(state.enemies).forEach((enemy) => {
+    if (!IsEnemyVisible(enemy) || !["active", "withdrawing"].includes(enemy.status)) return;
+    const targetId = enemy.status === "withdrawing" ? enemy.baseId : enemy.targetId;
+    const path = GetPath(enemy.locationId, targetId, { enemy: true });
+    if (path.length < 2) return;
+    const first = GetMapPoint(GetLocation(path[0]));
+    const second = GetMapPoint(GetLocation(path[1]));
+    context.save();
+    context.strokeStyle = enemy.status === "withdrawing" ? "rgba(102, 71, 61, .6)" : "rgba(141, 44, 35, .62)";
+    context.fillStyle = context.strokeStyle;
+    context.lineWidth = 2;
+    context.setLineDash([7, 5]);
+    DrawArrow(first, second);
+    context.restore();
+  });
+}
+
+function DrawArrow(first, second) {
+  const angle = Math.atan2(second.y - first.y, second.x - first.x);
+  const endX = second.x - Math.cos(angle) * 24;
+  const endY = second.y - Math.sin(angle) * 24;
+  context.beginPath();
+  context.moveTo(first.x, first.y);
+  context.lineTo(endX, endY);
+  context.stroke();
+  context.setLineDash([]);
+  context.beginPath();
+  context.moveTo(endX, endY);
+  context.lineTo(endX - Math.cos(angle - .55) * 10, endY - Math.sin(angle - .55) * 10);
+  context.lineTo(endX - Math.cos(angle + .55) * 10, endY - Math.sin(angle + .55) * 10);
+  context.closePath();
+  context.fill();
+}
+
+function DrawNodes() {
+  locationDefs.forEach((location) => {
+    const point = GetMapPoint(location);
+    const selected = selection.kind === "location" && selection.id === location.id;
+    const highlighted = IsLocationHighlighted(location.id);
+    context.save();
+    if (highlighted) {
+      context.strokeStyle = "#d4e889";
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(point.x, point.y, 24, 0, Math.PI * 2);
+      context.stroke();
+    }
+    if (selected) {
+      context.strokeStyle = "#e8c35f";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(point.x, point.y, 27, 0, Math.PI * 2);
+      context.stroke();
+    }
+    context.fillStyle = location.kind === "enemyBase" ? "#5a332c" : location.kind === "village" ? "#e1d0a1" : "#a59468";
+    context.strokeStyle = location.kind === "enemyBase" ? "#8f4438" : "#4e4935";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(point.x, point.y, location.kind === "enemyBase" ? 14 : 12, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.fillStyle = location.kind === "enemyBase" ? "#f2c3b6" : "#403b2a";
+    context.font = `800 ${camera.zoom > 1.35 ? 12 : 10}px sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(GetLocationIcon(location), point.x, point.y + .5);
+    const village = state && state.villages[location.id];
+    if (village) {
+      context.fillStyle = village.evacuated ? "#657f46" : village.searched ? "#a24d3f" : "#4f6c3b";
+      context.fillRect(point.x + 9, point.y - 17, 10, 8);
+    }
+    context.fillStyle = "rgba(37, 34, 24, .9)";
+    context.font = `700 ${camera.zoom > 1.4 ? 12 : 10.5}px sans-serif`;
+    context.textBaseline = "top";
+    context.fillText(location.name, point.x, point.y + 17);
+    context.restore();
+  });
+}
+
+function IsLocationHighlighted(locationId) {
+  if (!inputMode) return false;
+  if (inputMode.kind === "move") {
+    const unit = state.friendlies[inputMode.unitId];
+    return GetNeighbors(unit.locationId).includes(locationId);
+  }
+  if (inputMode.kind === "assetMove") {
+    const asset = state.assets[inputMode.assetId];
+    return GetNeighbors(asset.locationId).includes(locationId);
+  }
+  return false;
+}
+
+function DrawDecoys() {
+  state.decoys.forEach((decoy) => {
+    if (decoy.used || decoy.until < state.turn) return;
+    const point = GetMapPoint(GetLocation(decoy.locationId));
+    context.save();
+    context.strokeStyle = "#4e7890";
+    context.fillStyle = "rgba(48, 78, 96, .86)";
+    context.setLineDash([3, 3]);
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(point.x - 20, point.y + 12, 9, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.setLineDash([]);
+    context.fillStyle = "#d8edf2";
+    context.font = "800 9px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("假", point.x - 20, point.y + 12);
+    context.restore();
+  });
+}
+
+function DrawAssets() {
+  Object.values(state.assets).forEach((asset, index) => {
+    if (asset.lost) return;
+    const location = GetLocation(asset.locationId);
+    const point = GetMapPoint(location);
+    const offsetX = 20 + (index % 2) * 13;
+    const offsetY = -16 + Math.floor(index / 2) * 14;
+    context.save();
+    context.fillStyle = selection.kind === "asset" && selection.id === asset.id ? "#eacb69" : "#284d54";
+    context.strokeStyle = "#d5e5dc";
+    context.lineWidth = 1.3;
+    context.beginPath();
+    context.rect(point.x + offsetX - 7, point.y + offsetY - 7, 14, 14);
+    context.fill();
+    context.stroke();
+    context.fillStyle = "#f2eee0";
+    context.font = "800 8px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(assetDefs[asset.id].icon, point.x + offsetX, point.y + offsetY);
+    if (asset.exposure >= 65) {
+      context.fillStyle = "#c44336";
+      context.beginPath();
+      context.arc(point.x + offsetX + 7, point.y + offsetY - 7, 3.5, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.restore();
+  });
+}
+
+function GetFriendlyMarkerPoint(unit) {
+  const point = GetMapPoint(GetLocation(unit.locationId));
+  const stack = GetFriendlyAt(unit.locationId);
+  const stackIndex = stack.findIndex((entry) => entry.id === unit.id);
+  return { x: point.x - 18 - stackIndex * 12, y: point.y - 19 + stackIndex * 9 };
+}
+
+function GetEnemyMarkerPoint(enemy) {
+  const point = GetMapPoint(GetLocation(enemy.locationId));
+  const visibleStack = Object.values(state.enemies).filter((entry) =>
+    entry.locationId === enemy.locationId &&
+    IsEnemyVisible(entry) &&
+    !["destroyed", "surrendered", "escaped"].includes(entry.status)
+  );
+  const stackIndex = visibleStack.findIndex((entry) => entry.id === enemy.id);
+  return { x: point.x + 18 + stackIndex * 12, y: point.y - 19 + stackIndex * 9 };
+}
+
+function GetAssetMarkerPoint(asset) {
+  const point = GetMapPoint(GetLocation(asset.locationId));
+  const index = Object.values(state.assets).findIndex((entry) => entry.id === asset.id);
+  return {
+    x: point.x + 20 + (index % 2) * 13,
+    y: point.y - 16 + Math.floor(index / 2) * 14
+  };
+}
+
+function DrawUnits() {
+  Object.values(state.friendlies).forEach((unit) => {
+    if (unit.status !== "active") return;
+    const { x, y } = GetFriendlyMarkerPoint(unit);
+    context.save();
+    if (selection.kind === "friendly" && selection.id === unit.id) {
+      context.strokeStyle = "#f1d26d";
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(x, y, 17, 0, Math.PI * 2);
+      context.stroke();
+    }
+    if (unit.stance === "ambush" || unit.stance === "blockade") {
+      context.strokeStyle = unit.stance === "ambush" ? "#7faf58" : "#d2a34d";
+      context.lineWidth = 2;
+      context.setLineDash([3, 2]);
+      context.beginPath();
+      context.arc(x, y, 14, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+    context.fillStyle = "#315a3b";
+    context.strokeStyle = "#d9e6bf";
+    context.lineWidth = 1.4;
+    context.beginPath();
+    context.arc(x, y, 11, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.fillStyle = "#f2f0d9";
+    context.font = "800 9px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(friendlyDefs[unit.id].icon, x, y);
+    context.restore();
+  });
+
+  Object.values(state.enemies).forEach((enemy) => {
+    if (!IsEnemyVisible(enemy) || ["destroyed", "surrendered", "escaped"].includes(enemy.status) || enemy.entryTurn > state.turn) return;
+    const { x, y } = GetEnemyMarkerPoint(enemy);
+    context.save();
+    context.translate(x, y);
+    context.rotate(Math.PI / 4);
+    context.fillStyle = enemyTypeDefs[enemy.type].color;
+    context.strokeStyle = selection.kind === "enemy" && selection.id === enemy.id ? "#ffd175" : "#edc1b4";
+    context.lineWidth = selection.kind === "enemy" && selection.id === enemy.id ? 3 : 1.3;
+    context.fillRect(-9, -9, 18, 18);
+    context.strokeRect(-9, -9, 18, 18);
+    context.restore();
+    context.fillStyle = "#fff0e8";
+    context.font = "800 8px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(enemy.type === "regular" ? "日" : enemy.type === "puppet" ? "伪" : "侦", x, y);
+    const supplyState = GetEnemySupplyState(enemy);
+    if (supplyState !== "connected") {
+      context.fillStyle = "#ece1a4";
+      context.font = "800 10px sans-serif";
+      const supplyMark = supplyState === "carried" ? "携" : supplyState === "strained" ? "紧" : "断";
+      context.fillText(supplyMark, x + 12, y - 12);
+    }
+  });
+}
+
+function DrawParticles() {
+  particles.forEach((particle) => {
+    const point = GetMapPoint({ x: particle.x, y: particle.y });
+    const progress = particle.age / particle.life;
+    context.save();
+    context.globalAlpha = 1 - progress;
+    context.strokeStyle = particle.kind === "victory" ? "#f2cb5d" : "#b54336";
+    context.lineWidth = particle.kind === "victory" ? 4 : 3;
+    context.beginPath();
+    context.arc(point.x, point.y, 12 + progress * 76, 0, Math.PI * 2);
+    context.stroke();
+    if (particle.kind === "victory") {
+      context.fillStyle = "#f7de89";
+      context.font = `900 ${14 + progress * 15}px sans-serif`;
+      context.textAlign = "center";
+      context.fillText("破网", point.x, point.y - 28 - progress * 30);
+    }
+    context.restore();
+  });
+}
+
+function HitTest(screenX, screenY) {
+  if (!state) return null;
+  const threshold = window.matchMedia("(pointer: coarse)").matches ? 27 : 20;
+  const visibleEnemies = Object.values(state.enemies).filter((enemy) =>
+    IsEnemyVisible(enemy) &&
+    !["destroyed", "surrendered", "escaped"].includes(enemy.status) &&
+    enemy.entryTurn <= state.turn
+  );
+  for (const enemy of visibleEnemies.reverse()) {
+    const point = GetEnemyMarkerPoint(enemy);
+    if (Math.hypot(screenX - point.x, screenY - point.y) <= threshold) return { kind: "enemy", id: enemy.id };
+  }
+  const friendlies = Object.values(state.friendlies).filter((unit) => unit.status === "active");
+  for (const unit of friendlies.reverse()) {
+    const point = GetFriendlyMarkerPoint(unit);
+    if (Math.hypot(screenX - point.x, screenY - point.y) <= threshold) return { kind: "friendly", id: unit.id };
+  }
+  for (const asset of Object.values(state.assets)) {
+    if (asset.lost) continue;
+    const point = GetAssetMarkerPoint(asset);
+    if (Math.hypot(screenX - point.x, screenY - point.y) <= threshold) return { kind: "asset", id: asset.id };
+  }
+  for (const location of locationDefs) {
+    const point = GetMapPoint(location);
+    if (Math.hypot(screenX - point.x, screenY - point.y) <= threshold + 4) return { kind: "location", id: location.id };
+  }
+  return null;
+}
+
+function HitTestHighlightedLocation(screenX, screenY) {
+  if (!inputMode) return null;
+  const threshold = window.matchMedia("(pointer: coarse)").matches ? 34 : 28;
+  const candidates = locationDefs
+    .filter((location) => IsLocationHighlighted(location.id))
+    .map((location) => {
+      const point = GetMapPoint(location);
+      return { location, distance: Math.hypot(screenX - point.x, screenY - point.y) };
+    })
+    .filter((entry) => entry.distance <= threshold)
+    .sort((first, second) => first.distance - second.distance);
+  return candidates[0]?.location.id || null;
+}
+
+function HandleMapTap(screenX, screenY) {
+  const highlightedLocationId = HitTestHighlightedLocation(screenX, screenY);
+  if (inputMode && highlightedLocationId) {
+    if (inputMode.kind === "move") {
+      ExecuteFriendlyMove(inputMode.unitId, highlightedLocationId);
+      return;
+    }
+    if (inputMode.kind === "assetMove") {
+      ExecuteAssetMove(inputMode.assetId, inputMode.escortId, highlightedLocationId);
+      return;
+    }
+  }
+  const hit = HitTest(screenX, screenY);
+  if (hit && hit.kind === "enemy") {
+    const enemy = state.enemies[hit.id];
+    const selectedFriendly = selection.kind === "friendly" ? state.friendlies[selection.id] : null;
+    if (selectedFriendly && selectedFriendly.ap > 0 &&
+        (GetNeighbors(selectedFriendly.locationId).includes(enemy.locationId) || selectedFriendly.locationId === enemy.locationId)) {
+      OpenForecast(selectedFriendly.id, enemy.id, false);
+      return;
+    }
+  }
+  if (hit) SelectEntity(hit.kind, hit.id);
+  else {
+    selection = { kind: "none", id: null };
+    inputMode = null;
+    UpdateInterface();
+  }
+}
+
+function GetPointerPosition(event) {
+  const rectangle = canvas.getBoundingClientRect();
+  return { x: event.clientX - rectangle.left, y: event.clientY - rectangle.top };
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (!state) return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  canvas.setPointerCapture(event.pointerId);
+  const point = GetPointerPosition(event);
+  pointerState.set(event.pointerId, point);
+  if (pointerState.size === 1) {
+    dragState = { pointerId: event.pointerId, startX: point.x, startY: point.y, lastX: point.x, lastY: point.y, moved: false };
+  } else if (pointerState.size === 2) {
+    const points = Array.from(pointerState.values());
+    pinchState = {
+      startDistance: Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y),
+      startZoom: camera.zoom,
+      centerX: (points[0].x + points[1].x) / 2,
+      centerY: (points[0].y + points[1].y) / 2
+    };
+    dragState = null;
+  }
+});
+
+canvas.addEventListener("pointermove", (event) => {
+  if (!pointerState.has(event.pointerId)) return;
+  const point = GetPointerPosition(event);
+  pointerState.set(event.pointerId, point);
+  if (pointerState.size === 2 && pinchState) {
+    const points = Array.from(pointerState.values());
+    const distance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    const targetZoom = Clamp(pinchState.startZoom * distance / Math.max(1, pinchState.startDistance), gameConfig.cameraMin, gameConfig.cameraMax);
+    ZoomMap(targetZoom - camera.zoom, pinchState.centerX, pinchState.centerY);
+    return;
+  }
+  if (!dragState || dragState.pointerId !== event.pointerId) return;
+  const deltaX = point.x - dragState.lastX;
+  const deltaY = point.y - dragState.lastY;
+  if (Math.hypot(point.x - dragState.startX, point.y - dragState.startY) > 7) dragState.moved = true;
+  if (dragState.moved) {
+    camera.panX += deltaX;
+    camera.panY += deltaY;
+    ClampCamera();
+    canvas.classList.add("dragging");
+    RequestDraw();
+  }
+  dragState.lastX = point.x;
+  dragState.lastY = point.y;
+});
+
+function ReleasePointer(event, cancelled = false) {
+  if (!pointerState.has(event.pointerId)) return;
+  const point = GetPointerPosition(event);
+  const wasTap = !cancelled && dragState && dragState.pointerId === event.pointerId && !dragState.moved && pointerState.size === 1;
+  pointerState.delete(event.pointerId);
+  if (wasTap) HandleMapTap(point.x, point.y);
+  if (pointerState.size < 2) pinchState = null;
+  if (pointerState.size === 0) {
+    dragState = null;
+    canvas.classList.remove("dragging");
+    SaveGame();
+  }
+}
+
+canvas.addEventListener("pointerup", (event) => ReleasePointer(event));
+canvas.addEventListener("pointercancel", (event) => ReleasePointer(event, true));
+canvas.addEventListener("lostpointercapture", (event) => ReleasePointer(event, true));
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  const point = GetPointerPosition(event);
+  ZoomMap(event.deltaY < 0 ? .13 : -.13, point.x, point.y);
+}, { passive: false });
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    if (!document.getElementById("modalOverlay").classList.contains("hidden") && !modalLocked) CloseModal();
+    else {
+      inputMode = null;
+      CloseMobilePanels();
+      UpdateInterface();
+    }
+  }
+  const startHidden = document.getElementById("startOverlay").classList.contains("hidden");
+  const modalHidden = document.getElementById("modalOverlay").classList.contains("hidden");
+  const activeElement = document.activeElement;
+  const gameplayHasFocus = activeElement === document.body || activeElement === canvas;
+  if (
+    event.key === " " &&
+    !event.repeat &&
+    state &&
+    !state.gameOver &&
+    !isResolvingTurn &&
+    startHidden &&
+    modalHidden &&
+    gameplayHasFocus
+  ) {
+    event.preventDefault();
+    EndPlayerTurn();
+  }
+  if (event.key.toLowerCase() === "h" && startHidden && modalHidden && !modalLocked) OpenHelp();
+});
+
+window.addEventListener("resize", ResizeCanvas);
+window.addEventListener("orientationchange", () => setTimeout(ResizeCanvas, 120));
+if (window.visualViewport) window.visualViewport.addEventListener("resize", ResizeCanvas);
+if (window.ResizeObserver) {
+  new ResizeObserver(() => ResizeCanvas()).observe(document.getElementById("mapStage"));
+}
+
+function InitializeApplication() {
+  const hasSave = (() => {
+    try {
+      const raw = localStorage.getItem(gameConfig.saveKey);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (parsed.state?.version === 4) return true;
+      localStorage.removeItem(gameConfig.saveKey);
+      return false;
+    } catch (error) {
+      return false;
+    }
+  })();
+  document.getElementById("continueButton").classList.toggle("hidden", !hasSave);
+  state = CreateInitialState(19420520);
+  ResizeCanvas();
+  UpdateInterface();
+  setTimeout(ResizeCanvas, 100);
+}
+
+InitializeApplication();
+</script>
+</body>
+</html>
