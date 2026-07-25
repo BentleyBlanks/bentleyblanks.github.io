@@ -365,6 +365,7 @@ const CFG = {
   banditLootGrain: 12, banditLootArms: 6, banditRecruitMan: 15, // 端掉山寨的缴获 / 统一战线收编人力
   farmYield: 2,            // 每块农田+粮/回合(吃所属村民心系数)
   farmCapPerVillage: 3,    // 每村周边农田上限
+  clearForestGrain: 10,    // 伐木开荒: 一次性木料折粮(代价是失去林地掩护)
   builderCharges: 3,       // 新建设队的工作次数
   builderConvertCharges: 2, // 民兵转建设队获得的工作次数(兼职比专职少)
   convertArms: 5,          // 民兵⇄建设队转换的军火流转(放下枪入库+5/拿枪领装备-5)
@@ -539,8 +540,8 @@ function seasonGrainMult(t) { return (hasSeason(t, "harvest") ? CFG.harvestGrain
 // ── 单位表 ──
 const UT = {
   scout:    { name: "侦察员", glyph: "侦", side: "p", layer: "mil", str: 4,  mp: 3, vis: 3, cost: { grain: 10, man: 5 },  upkeep: 0, desc: "视野3, 探索地图。战力孱弱, 别拿去拼命。" },
-  work:     { name: "工作队", glyph: "工", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 5, org: 10 }, upkeep: 0, desc: "驻中立村发动群众(+民心/回合); 开始工作即扎根, 村庄并入时转为地方干部(消耗该队)。无武装, 落单被抓就没了。" },
-  builder:  { name: "建设队", glyph: "建", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 10 }, upkeep: 0, desc: "3次工作: 开垦农田/挖地道; 免费修复被焚的农田与村舍。工作用尽就地归农。无武装, 可🔗联结护送; 可与民兵互转(劳武结合)。" },
+  work:     { name: "工作队", glyph: "工", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 5, org: 10 }, upkeep: 0, desc: "开拓者: 移到【中立村庄】上, 点【🌱 驻村发动群众】即扎根(+民心/回合), 民心到线该村并入根据地、本队转为地方干部。无武装, 落单被抓就没了。" },
+  builder:  { name: "建设队", glyph: "建", side: "p", layer: "civ", str: 0,  mp: 2, vis: 2, cost: { grain: 15, man: 10 }, upkeep: 0, desc: "3次工作: 开垦农田(平原/丘陵)、伐木开荒(林地→平原)、挖地道; 免费修复被焚的农田与村舍。工作用尽就地归农。无武装, 可🔗联结护送; 可与民兵互转。" },
   militia:  { name: "民兵队", glyph: "民", side: "p", layer: "mil", str: 9,  mp: 2, vis: 2, cost: { grain: 15, man: 10, arms: 5 }, upkeep: 1, desc: "便宜耐用。可埋地雷(需地雷战)。" },
   regular:  { name: "主力连", glyph: "连", side: "p", layer: "mil", str: 16, mp: 2, vis: 2, cost: { grain: 25, man: 20, arms: 15 }, upkeep: 2, desc: "野战中坚, 拔炮楼主力。" },
   elite:    { name: "主力团", glyph: "团", side: "p", layer: "mil", str: 26, mp: 2, vis: 2, cost: { grain: 40, man: 35, arms: 30 }, upkeep: 3, needTech: "zhenggui", desc: "正规化整训后的重拳, 反攻县城的本钱。" },
@@ -1188,13 +1189,23 @@ function farmsAround(vq, vr) { // 某村周边(距离≤1)已有农田数
   for (const [nq, nr] of nbrs(vq, vr)) if (state.tiles[nq][nr].farm) n++;
   return n;
 }
-function canFarmAt(q, r) { // 此格能否开垦: 平原/丘陵、无占用、邻己方村且未到上限
+function canFarmAt(q, r) { // 此格能否开垦: 平原/丘陵(丘陵=修梯田)、无占用、邻己方村且未到上限
   const t = state.tiles[q][r];
   if (t.farm || t.village || t.rail || t.sh || t.mine) return { ok: false, why: "此格不可开垦" };
-  if (t.terrain !== "plain" && t.terrain !== "hills") return { ok: false, why: "只能在平原/丘陵开垦" };
+  if (t.terrain === "forest") return { ok: false, why: "林地需先【伐木开荒】再耕种" };
+  if (t.terrain !== "plain" && t.terrain !== "hills") return { ok: false, why: "山地无法耕种(平原/丘陵都可以)" };
   const home = farmHomeVillage(q, r);
-  if (!home) return { ok: false, why: "需紧邻根据地村庄" };
+  if (!home) return { ok: false, why: "需紧邻根据地村庄(农田要有村子照应)" };
   if (farmsAround(home.q, home.r) >= CFG.farmCapPerVillage) return { ok: false, why: home.v.name + "周边农田已达上限" + CFG.farmCapPerVillage };
+  return { ok: true, home };
+}
+// 伐木开荒(大生产运动): 林地→平原, 之后可开垦; 代价是失去林地的防御与伏击掩护。
+function canClearForestAt(q, r) {
+  const t = state.tiles[q][r];
+  if (t.terrain !== "forest") return { ok: false, why: "只有林地可伐木开荒" };
+  if (t.village || t.rail || t.sh || t.mine) return { ok: false, why: "此格被占用, 无法伐木" };
+  const home = farmHomeVillage(q, r);
+  if (!home) return { ok: false, why: "需紧邻根据地村庄(伐木要有人手)" };
   return { ok: true, home };
 }
 function uiFarm() {
@@ -1202,11 +1213,38 @@ function uiFarm() {
   if (!u || u.type !== "builder" || u.attacked || !u.charges) return;
   const chk = canFarmAt(u.q, u.r);
   if (!chk.ok) { log(chk.why, "jp"); return; }
+  const isHills = state.tiles[u.q][u.r].terrain === "hills";
   state.tiles[u.q][u.r].farm = true;
   u.charges--; u.attacked = true; u.mp = 0;
   addFx("pop", u.q, u.r, { icon: "🌾" }); addFx("ring", u.q, u.r);
-  log(uname(u) + "在" + tileName(u.q, u.r) + "开垦出农田 — +" + CFG.farmYield + "粮/回合(归" + chk.home.v.name + ", 吃民心系数)", "good");
+  log(uname(u) + "在" + tileName(u.q, u.r) + (isHills ? "修出梯田" : "开垦出农田") + " — +" + CFG.farmYield + "粮/回合(归" + chk.home.v.name + ", 吃民心系数)", "good");
   if (u.charges <= 0) { log(uname(u) + "完成了全部工作, 就地归农", "hl"); removeUnit(u); sel = null; }
+  clearPending(false); afterAction();
+}
+function uiClearForest() { // 伐木开荒: 林地→平原(可再开垦), 木料折粮; 代价=失去林地掩护
+  const u = getSelUnit();
+  if (!u || u.type !== "builder" || u.attacked || !u.charges) return;
+  const chk = canClearForestAt(u.q, u.r);
+  if (!chk.ok) { log(chk.why, "jp"); return; }
+  state.tiles[u.q][u.r].terrain = "plain";
+  state.grain = Math.min(grainMax(), state.grain + CFG.clearForestGrain);
+  u.charges--; u.attacked = true; u.mp = 0;
+  addFx("pop", u.q, u.r, { icon: "🪓" }); addFx("ring", u.q, u.r);
+  log(uname(u) + "在" + tileName(u.q, u.r) + "伐木开荒 — 木料折粮+" + CFG.clearForestGrain + ", 此地已可开垦; 但林地掩护没了(防御-" + CFG.terrainDef.forest + ", 伏击加成失效)", "good");
+  if (u.charges <= 0) { log(uname(u) + "完成了全部工作, 就地归农", "hl"); removeUnit(u); sel = null; }
+  clearPending(false); afterAction();
+}
+// 驻村发动群众(显式指令): 工作队进中立村一键扎根 — 不再靠"停着别动+结束回合"的隐性约定。
+function uiMobilize() {
+  const u = getSelUnit();
+  if (!u || u.type !== "work" || u.rooted) return;
+  const v = state.tiles[u.q][u.r].village;
+  if (!v || v.owner !== "n") { log("工作队要站在【中立村庄】上才能开展群众工作", "jp"); return; }
+  u.rooted = true; u.autoPath = null; u.mp = 0; u.attacked = true;
+  if (u.linkId) { const lp = state.units.find(x => x.id === u.linkId); if (lp) lp.linkId = null; u.linkId = null; }
+  addFx("pop", u.q, u.r, { icon: "🌱" }); addFx("ring", u.q, u.r);
+  const gain = Math.round((CFG.workteamHeart + (state.techs.jianzu ? 4 : 0)) * (hasDoc("minzhong") ? 1.5 : 1));
+  log(uname(u) + "在" + v.name + "扎根开展群众工作 — 每回合民心+" + gain + ", 到" + CFG.joinThreshold + "即挂红旗并入根据地; 扎根后不可调动(可解散)", "good");
   clearPending(false); afterAction();
 }
 // ── 劳武结合: 民兵⇄建设队互转(须在根据地村, 耗整回合, 保留HP/经验) ──
@@ -3494,7 +3532,10 @@ function renderPanel() {
         html += "<div class='row'>🔨 剩余工作 <b>" + (u.charges || 0) + "</b> 次<span class='sub' style='margin-left:6px;color:#8a8058'>用尽后就地归农</span></div>";
         if (!u.attacked && u.charges > 0) {
           const chk = canFarmAt(u.q, u.r);
-          html += "<button class='abtn' " + (chk.ok ? "" : "disabled") + " onclick='uiFarm()'>🌾 开垦农田 <span class='cost'>耗1次工作</span><span class='sub'>" + (chk.ok ? "+" + CFG.farmYield + "粮/回合 · 归" + chk.home.v.name : chk.why) + "</span></button>";
+          const terraceLabel = t.terrain === "hills" ? "🌾 修梯田(丘陵)" : "🌾 开垦农田";
+          html += "<button class='abtn' " + (chk.ok ? "" : "disabled") + " onclick='uiFarm()'>" + terraceLabel + " <span class='cost'>耗1次工作</span><span class='sub'>" + (chk.ok ? "+" + CFG.farmYield + "粮/回合 · 归" + chk.home.v.name + " · 平原与丘陵都能种" : chk.why) + "</span></button>";
+          const fchk = canClearForestAt(u.q, u.r);
+          if (t.terrain === "forest") html += "<button class='abtn' " + (fchk.ok ? "" : "disabled") + " onclick='uiClearForest()'>🪓 伐木开荒 <span class='cost'>耗1次工作</span><span class='sub'>" + (fchk.ok ? "林地→平原(此后可开垦) · 木料折粮+" + CFG.clearForestGrain + " · 代价: 失去林地掩护(防御-" + CFG.terrainDef.forest + "、伏击加成失效)" : fchk.why) + "</span></button>";
         }
         if (!u.attacked && t.farm && t.farmBurned)
           html += "<button class='abtn' onclick='uiRepairFarm()'>🛠 修复农田 <span class='cost'>不耗工作次数</span><span class='sub'>清理焦土重新开耕</span></button>";
@@ -3505,6 +3546,19 @@ function renderPanel() {
         if (!u.attacked) {
           const vv = t.village && t.village.owner === "p";
           html += "<button class='abtn' " + (vv && state.arms >= CFG.convertArms ? "" : "disabled") + " onclick='uiToMilitia()'>🔫 拿起枪 → 民兵 <span class='cost'>军火-" + CFG.convertArms + "</span><span class='sub'>" + (vv ? "劳武结合: 保留经验等级" : "需在根据地村庄") + "</span></button>";
+        }
+      }
+      if (u.type === "work" && !u.rooted) {
+        // 工作队的唯一正事: 进中立村扎根。做成显式按钮 + 明确的下一步指引, 不让玩家靠记忆。
+        const nv = t.village && t.village.owner === "n";
+        if (nv) {
+          const gain = Math.round((CFG.workteamHeart + (state.techs.jianzu ? 4 : 0)) * (hasDoc("minzhong") ? 1.5 : 1));
+          const sup = isSuppressed(u.q, u.r);
+          html += "<button class='abtn' " + (u.attacked ? "disabled" : "") + " data-sound='productionConfirm' style='border-color:#4a7a3c' onclick='uiMobilize()'>🌱 驻村发动群众 <span class='cost'>耗本回合</span><span class='sub'>" + t.village.name + " 民心 +" + gain + "/回合, 到" + CFG.joinThreshold + "挂红旗并入" + (sup ? " · ⚠ 此村被据点压制, 民心上限" + CFG.suppressCap + ", 需先拔据点" : "") + " · 扎根后不可调动</span></button>";
+        } else if (t.village && t.village.owner === "p") {
+          html += "<div class='hint' style='color:#d8a441'>这已经是根据地村庄了。工作队要去<b>中立村庄</b>(灰旗)发动群众 — 按【➜】移动过去, 再点【驻村发动群众】。</div>";
+        } else {
+          html += "<div class='hint' style='color:#d8a441'>工作队是开拓者: 把它移动到<b>中立村庄</b>格上, 再点【🌱 驻村发动群众】即可扎根拉民心。</div>";
         }
       }
       if (u.type === "militia" && !u.attacked) {
@@ -3569,7 +3623,7 @@ function renderPanel() {
           if (v.buildings.includes(bk)) { html += "<div class='row'>✓ " + b.name + " <span class='sub'></span></div>"; continue; }
           if (b.needTech && !state.techs[b.needTech]) { html += "<button class='abtn' data-sound='clickHigh' disabled>" + b.name + " <span class='sub'>需整训【" + TECHS[b.needTech].name + "】</span></button>"; continue; }
           const can = state.grain >= b.cost.grain;
-          html += "<button class='abtn' data-sound='clickHigh' " + (can ? "" : "disabled") + " onclick=\"uiBuild('" + bk + "')\">" + b.name + " <span class='cost'>" + costPart(state.grain, b.cost.grain, "粮") + "·" + b.turns + "回合</span><span class='sub'>" + b.desc + "</span></button>";
+          html += "<button class='abtn' data-sound='clickHigh' " + (can ? "" : "disabled") + " onclick=\"uiBuild('" + bk + "')\">" + b.name + " <span class='cost'>一次性 " + costPart(state.grain, b.cost.grain, "粮") + " · 施工" + b.turns + "回合</span><span class='sub'>建成后 " + b.desc + "</span></button>";
         }
         // 招募
         html += "<hr><div class='row'><b>组建队伍</b></div>";
@@ -3580,7 +3634,8 @@ function renderPanel() {
           if (tk === "work") c.org = (c.org || 0) + ownedVillages().length * CFG.workteamOrgRamp; // 与 recruit 同源: 干部稀缺
           const can = state.grain >= (c.grain || 0) && state.man >= (c.man || 0) && state.arms >= (c.arms || 0) && state.org >= (c.org || 0);
           const cost = [costPart(state.grain, c.grain, "粮"), costPart(state.man, c.man, "人"), costPart(state.arms, c.arms, "火"), costPart(state.org, c.org, "组")].filter(Boolean).join(" ");
-          html += "<button class='abtn' data-sound='productionConfirm' " + (can ? "" : "disabled") + " onclick=\"uiRecruit('" + tk + "')\">" + ut.name + (ut.str ? "(战" + ut.str + ")" : "") + " <span class='cost'>" + cost + "</span><span class='sub'>" + ut.desc + "</span></button>";
+          const upkeepNote = ut.upkeep ? " · 维护 " + ut.upkeep + "粮/回合" : " · 不吃维护";
+          html += "<button class='abtn' data-sound='productionConfirm' " + (can ? "" : "disabled") + " onclick=\"uiRecruit('" + tk + "')\">" + ut.name + (ut.str ? "(战" + ut.str + ")" : "") + " <span class='cost'>一次性 " + cost + upkeepNote + "</span><span class='sub'>" + ut.desc + "</span></button>";
         }
       }
     } else if (t.sh) {
@@ -3596,7 +3651,7 @@ function renderPanel() {
       else html += "<div class='hint'>修建中的炮楼, " + t.sh.left + "回合后完工。趁工事未成赶紧捣毁!</div>";
     } else {
       html += "<h3>" + TN[t.terrain] + "<small>" + (t.rail ? "铁路 " : "") + sel.q + "," + sel.r + "</small></h3>";
-      const dv = { plain: "无防御加成, 敌军装甲可通行", hills: "+3防御", forest: "+4防御, 伏击+3", mountain: "+6防御, 伏击+3, 日军行动迟缓" }[t.terrain];
+      const dv = { plain: "无防御加成, 敌军装甲可通行 · 建设队可开垦农田", hills: "+3防御 · 建设队可修梯田(与平原同产)", forest: "+4防御, 伏击+3 · 建设队可【伐木开荒】改成平原再种地(会失去掩护)", mountain: "+6防御, 伏击+3, 日军行动迟缓 · 不可耕种" }[t.terrain];
       html += "<div class='hint'>" + dv + (t.rail ? "<br>敌军命脉铁路。武工队可【破袭】。" : "") + "</div>";
       if (t.mine) html += "<div class='warn'>💣 我方地雷已布设</div>";
     }
@@ -3745,8 +3800,8 @@ function showHelp(isStart) {
 <p>1941年,华北。日军的"囚笼政策"用铁路作柱、炮楼作锁,要把敌后根据地困死、扫荡干净。你是太行山根据地的指挥员——从一个山村总部起步,坚持到<b>1945年8月</b>。</p>
 <ul class="klist">
   <li><span class="x">探索</span> — 侦察员揭开战争迷雾,找到村庄、敌据点与铁路线。</li>
-  <li><span class="x">扩张</span> — 工作队驻中立村发动群众,民心≥${CFG.joinThreshold}就挂红旗并入根据地。但炮楼附近的村会被<b>压制</b>,必须先拔据点。</li>
-  <li><span class="x">开发</span> — 村庄产<b>🌾粮/👥人力/✊组织</b>。修开垦地、夜校、藏粮洞、地道;组织力用于<b>整训</b>(科技树):地雷战、地道战、破袭战……</li>
+  <li><span class="x">扩张</span> — <b>工作队</b>移到中立村庄格上, 点面板【🌱 驻村发动群众】即扎根, 民心≥${CFG.joinThreshold}就挂红旗并入根据地(本队随之转为地方干部)。但炮楼附近的村会被<b>压制</b>,必须先拔据点。</li>
+  <li><span class="x">开发</span> — 村庄产<b>🌾粮/👥人力/✊组织</b>。<b>建设队</b>在村庄旁开垦农田(平原直接开垦、丘陵修梯田、林地先【🪓伐木开荒】变平原);村里修夜校、藏粮洞、地道;组织力用于<b>整训</b>(科技树):地雷战、地道战、破袭战……<br><span class="hint" style="color:#8a8058">建造与招兵的资源都是<b>下单时一次性扣除</b>(建筑另需若干回合施工);脱产部队此后每回合还吃粮食<b>维护</b>,民兵1、主力连2、主力团3。</span></li>
   <li><span class="x">歼灭</span> — 伏击巡逻队、拔炮楼、破袭铁路,人枪粮都靠<b>缴获</b>。多队夹击有<b>侧翼加成</b>(+2/队);残敌无路可退会被<b>合围全歼</b>(缴获×2,伪军还能俘虏转化人力)。部队战斗攒经验<b>晋升</b>,二选一特长,老部队还会以村庄冠名。但一切军事行动与扩张都会累积<b>暴露度</b>。</li>
 </ul>
 <p><b>地形</b>(看地块图标): <b>山地</b>(雪顶山峰)守+6、移动慢、日军装甲进不来——游击最稳的老窝; <b>森林</b>(松树丛)守+4、从这里发起攻击<b>伏击+3</b>; <b>丘陵</b>(圆丘)守+3; <b>平原</b>(田垄)产粮最高但一马平川、无遮蔽、日军装甲长驱直入。步兵可<b>翻山</b>(耗3移动力), 装甲不行; 山头上盘踞着<b>土匪山寨</b>——剿匪不惊动日军, 缴获可观, 有【统一战线】还能收编。</p>
@@ -3892,7 +3947,7 @@ function startGame(fromSave) {
     centerCam();
     log("═══ 1941年1月 · 囚笼初现 ═══", "hl");
     log("你在王家峪设立总部。侦察员待命, 工作队整装 — 出发, 到群众中去!", "hl");
-    log("提示: 先派侦察员探路, 工作队进邻村发动群众。日军的铁路在东边。", "good");
+    log("上手三步: ①侦察员探路 ②工作队【移动】到中立村庄格上, 点面板里的【🌱 驻村发动群众】扎根拉民心 ③民心到" + CFG.joinThreshold + "该村自动并入。日军的铁路在东边。", "good");
     if (hasSeason(1, "winter")) log("❄ 时值寒冬 — 产粮×" + CFG.winterGrainMult + "、回血减半; 日军也猫冬不爱出门, 熬到开春再图发展", "hl");
   }
   computeVis(); updateUI(); renderPanel(); draw();
