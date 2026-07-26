@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>根据地 · 1937—1945</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:#12100b;color:#d9cfb4;font-family:system-ui,"Noto Sans SC",sans-serif;font-size:13px;user-select:none}
+button{font-family:inherit;cursor:pointer}
+.hidden{display:none!important}
+#cv{position:absolute;inset:0;display:block;touch-action:none}
+#top{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+ padding:5px 10px;padding-top:calc(5px + env(safe-area-inset-top));background:linear-gradient(180deg,#221d13,#191510);border-bottom:1px solid #4a3f28}
+#top .r{white-space:nowrap;font-size:12.5px;color:#a2977c}
+#top .r b{color:#f2e8cd;font-weight:600}
+#top .r i{font-style:normal;font-size:11px}
+.up{color:#8dbf6a}.dn{color:#d9584a}
+.tb{background:#2b2418;border:1px solid #574a2e;color:#ddd2b4;border-radius:5px;padding:4px 10px;font-size:12.5px}
+.tb:hover{background:#392f1f}
+.tb.hot{border-color:#c9a44a;box-shadow:0 0 7px rgba(201,164,74,.45)}
+#endBtn{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:21;background:#6b2118;border:1px solid #c4674f;
+ color:#ffdcc9;font-size:15px;padding:11px 20px;border-radius:8px}
+#endBtn:hover{background:#87291d}
+#endBtn.ok{background:#2f5a28;border-color:#6fbf5a;color:#e8ffd9}
+#goal{position:fixed;top:calc(40px + env(safe-area-inset-top));left:10px;z-index:16;max-width:min(330px,54vw);
+ background:rgba(28,24,16,.95);border:1px solid #574a2e;border-radius:7px;padding:7px 10px;font-size:12px;line-height:1.55}
+#goal b{color:#e8c97a}
+#goal .k{color:#8dbf6a}
+#pin{position:fixed;top:calc(40px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:15;
+ background:rgba(28,24,16,.95);border:1px solid #574a2e;border-radius:6px;padding:4px 12px;font-size:12px;white-space:nowrap}
+#pin b{color:#e8c97a}
+#side{position:fixed;right:8px;top:calc(40px + env(safe-area-inset-top));z-index:18;width:330px;max-height:calc(100vh - 130px);
+ overflow-y:auto;background:rgba(28,24,16,.97);border:1px solid #574a2e;border-radius:8px;padding:10px 12px}
+#side h3{color:#f2e8cd;font-size:14.5px;margin-bottom:4px}
+#side h3 small{color:#a2977c;font-weight:400;font-size:11.5px;margin-left:6px}
+#side .row{margin:3px 0;font-size:12.5px;line-height:1.5}
+#side .hint{color:#a2977c;font-size:11.5px;line-height:1.5;margin-top:5px}
+#side .warn{color:#d9a441;font-size:12px;margin-top:3px}
+#side .good{color:#8dbf6a;font-size:12px;margin-top:3px}
+#side hr{border:none;border-top:1px solid #3b3222;margin:7px 0}
+.ab{display:block;width:100%;text-align:left;margin:3px 0;background:#2b2418;border:1px solid #4a3f28;color:#ddd2b4;
+ border-radius:5px;padding:6px 8px;font-size:12px;line-height:1.4}
+.ab:hover:not(:disabled){background:#392f1f;border-color:#8a7440}
+.ab:disabled{opacity:.4;cursor:default}
+.ab .s{display:block;color:#a2977c;font-size:11px;margin-top:1px}
+.ab .c{float:right;color:#c9a44a;font-size:11px}
+.ab.on{border-color:#c9a44a;background:#3a3020}
+.bar{height:7px;background:#1c1810;border:1px solid #3b3222;border-radius:3px;overflow:hidden;margin:3px 0}
+.bar i{display:block;height:100%}
+#logW{position:fixed;left:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:14;width:min(420px,52vw)}
+#logH{display:flex;align-items:center;gap:6px;background:rgba(28,24,16,.96);border:1px solid #574a2e;border-radius:6px 6px 0 0;
+ padding:3px 9px;font-size:11.5px;color:#a2977c;cursor:pointer}
+#logW.cl #logH{border-radius:6px}#logW.cl #logB{display:none}
+#logH .u{margin-left:auto;background:#7a2620;border:1px solid #c36a52;color:#ffd9c9;border-radius:8px;padding:0 6px;font-size:10.5px}
+#logB{max-height:24vh;overflow-y:auto;background:rgba(22,19,12,.94);border:1px solid #574a2e;border-top:none;
+ border-radius:0 0 6px 6px;padding:5px 9px;font-size:11.5px;line-height:1.5}
+#logB p{margin:2px 0;color:#a89c80}
+#logB p.g{color:#8dbf6a}#logB p.b{color:#d9584a}#logB p.j{color:#d8926a}
+#logB p.h{color:#e8c97a}#logB p.s{color:#7fb6e0}#logB p.k{color:#c0a0e0}
+#mw{position:fixed;inset:0;z-index:40;background:rgba(8,6,3,.84);display:flex;align-items:center;justify-content:center;padding:14px}
+#mb{width:min(900px,96vw);max-height:90vh;overflow:auto;background:#1c1810;border:1px solid #6b5a34;border-radius:10px;padding:16px 20px}
+#mb h2{color:#f2e8cd;font-size:19px;margin-bottom:6px}
+#mb h2 small{display:block;color:#a2977c;font-size:12px;font-weight:400;margin-top:3px}
+#mb p{margin:6px 0;font-size:12.5px;line-height:1.7}
+#mb .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.mb2{background:#5c3d16;border:1px solid #c3a052;color:#ffeccb;padding:7px 16px;border-radius:6px;font-size:13px}
+.mb2.gh{background:#2b2418;border-color:#574a2e;color:#ddd2b4}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:7px}
+.card{border:1px solid #4a3f28;background:#241f14;border-radius:7px;padding:8px 10px;font-size:12px}
+.card.ok{cursor:pointer}.card.ok:hover{border-color:#8a7440}
+.card.done{border-color:#4f7a3a;background:#1e2716}.card.done .t{color:#8dbf6a}
+.card.cur{border-color:#c9a44a;box-shadow:0 0 8px rgba(201,164,74,.4)}
+.card.lock{opacity:.42}
+.card .t{color:#f2e8cd;font-size:12.5px}
+.card .d{color:#a2977c;font-size:11px;margin-top:2px;line-height:1.4}
+.card .fx{color:#c9a44a;font-size:11px;margin-top:2px}
+.slot{border:1px dashed #6b5a34;border-radius:6px;padding:6px 8px;min-height:46px;background:#211c12;font-size:12px}
+.slot.mil{border-color:#8a4a3a}.slot.eco{border-color:#8a7a3a}.slot.pol{border-color:#5a6a8a}
+.pc{display:inline-block;border:1px solid #6b5a34;background:#2b2418;border-radius:5px;padding:3px 8px;margin:2px;font-size:11.5px;cursor:pointer}
+.pc:hover{border-color:#c9a44a}
+.pc.mil{border-left:3px solid #c4674f}.pc.eco{border-left:3px solid #c9a44a}.pc.pol{border-left:3px solid #7f9fd0}
+table.h{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0}
+table.h td,table.h th{border-bottom:1px solid #3b3222;padding:4px 6px;text-align:left}
+table.h th{color:#a2977c;font-weight:600}
+table.h td.n{text-align:right;font-variant-numeric:tabular-nums;color:#f2e8cd}
+@media(max-width:760px){
+ #side{width:min(90vw,330px);top:auto;bottom:calc(66px + env(safe-area-inset-bottom));max-height:44vh}
+ #logW{width:50vw}#logB{max-height:16vh;font-size:10.5px}
+ #top{gap:6px;font-size:11.5px;padding:4px 6px}#top .r{font-size:11px}
+ #goal{max-width:48vw;font-size:11px;padding:5px 7px}
+ #pin{font-size:10.5px;padding:3px 7px;top:calc(38px + env(safe-area-inset-top))}
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="top">
+  <span class="r" id="rFood">🌾</span>
+  <span class="r" id="rProd">🔨</span>
+  <span class="r" id="rSci">📖</span>
+  <span class="r" id="rCult">✊</span>
+  <span class="r" id="rMan">👥</span>
+  <button class="tb" id="bTech">研究</button>
+  <button class="tb" id="bGov">政策</button>
+  <button class="tb" id="bStat">战况</button>
+  <button class="tb" id="bHelp">玩法</button>
+  <span class="r" id="rTurn" style="margin-left:auto"></span>
+</div>
+<div id="goal"></div>
+<div id="pin"></div>
+<div id="side" class="hidden"></div>
+<div id="logW"><div id="logH"><span class="c">▼</span><span>战报</span><span class="u hidden" id="logU">0</span></div><div id="logB"></div></div>
+<div id="mw" class="hidden"><div id="mb"></div></div>
+<button id="endBtn">结束回合 ▶</button>
+<script>
+"use strict";
+// ════════════════════════════════════════════════════════════
+// 《根据地 · 1937—1945》 — 文明六式抗战 4X
+// 差异化(相对其他白盒): 文明六真正的招牌 —— 区域与相邻加成 / 政策卡组 /
+// 尤里卡 / 奇观, 三条主题(残酷性 · 敌后困难 · 中流砥柱)全部长在这些系统上。
+// ════════════════════════════════════════════════════════════
+const CFG = {
+  W: 30, H: 20, hex: 40,
+  startYear: 1937, startMonth: 11, turns: 94,     // 1937.11(太原失守·开辟敌后) → 1945.8
+  cityRadius: 3, workRadius: 2,
+  foodPerPop: 14, popMax: 9,
+  baseHp: 60, hpPerPop: 6, hpPerWall: 22,
+  healCity: 26, healOwn: 12, healWild: 4,
+  dmgBase: 30, dmgDiv: 13, counter: .8,
+  sweepFirst: 6, sweepGap: 4,
+};
+const TERR = {
+  mountain:{ n:"山地", food:0, prod:2, def:9,  move:3, col:"#5d5646" },
+  hills:   { n:"丘陵", food:1, prod:2, def:5,  move:2, col:"#6e6448" },
+  forest:  { n:"林地", food:1, prod:2, def:6,  move:2, col:"#3f5236" },
+  plain:   { n:"平原", food:3, prod:1, def:0,  move:1, col:"#6b7442" },
+  marsh:   { n:"洼地", food:2, prod:0, def:2,  move:2, col:"#4a5a4e" },
+};
+const RES = {
+  wheat:{ n:"麦", food:2, prod:0, on:["plain"], ic:"🌾" },
+  iron: { n:"铁矿", food:0, prod:2, on:["hills","mountain"], ic:"⛏", arms:1 },
+  coal: { n:"煤", food:0, prod:2, on:["hills","mountain"], ic:"◆" },
+  horse:{ n:"骡马", food:1, prod:1, on:["plain","hills"], ic:"🐴" },
+  cotton:{n:"棉", food:0, prod:1, on:["plain"], ic:"❀", cult:1 },
+};
+const IMP = {
+  farm:  { n:"农田", food:2, on:["plain","marsh"], t:2 },
+  terrace:{n:"梯田", food:2, on:["hills"], t:3 },
+  lumber:{ n:"伐木场", prod:2, on:["forest"], t:2 },
+  mine:  { n:"矿场", prod:2, on:["hills","mountain"], t:3, arms:1 },
+};
+// ── 区域(文明六招牌): 占一格地, 吃相邻加成 ──
+const DIST = {
+  bing:  { n:"兵工区", cost:38, need:"binggong", arms:2, prod:1,
+    adj:{ mine:1.5, iron:2, mountain:.5, hills:.5 }, d:"黄崖洞式的山沟兵工厂", adjD:"邻矿场+1.5 邻铁矿+2 邻山丘+0.5 军械" },
+  fang:  { n:"被服生产区", cost:34, need:"shengchan", prod:3,
+    adj:{ forest:.5, lumber:1, cotton:2, city:1 }, d:"被服厂、纺织与修械所", adjD:"邻棉+2 邻伐木场+1 邻林地+0.5 工分" },
+  xue:   { n:"文教区", cost:32, need:null, sci:2, cult:1,
+    adj:{ city:1, dist:.5, mountain:.5 }, d:"冬学夜校与抗大分校", adjD:"邻城+1 邻其他区域+0.5 学识" },
+  yi:    { n:"卫生区", cost:32, need:"weisheng", heal:14, cult:1,
+    adj:{ city:1, marsh:.5 }, d:"白求恩式的战地医院", adjD:"驻军每回合额外回复" },
+  didao: { n:"地道网", cost:36, need:"didao", wall:1, def:8,
+    adj:{ plain:1.5, city:1 }, d:"户户相通、村村相连的地下长城", adjD:"平原上才真正救命: 邻平原越多防御越高" },
+  liang: { n:"公粮站", cost:30, need:null, food:2, store:1,
+    adj:{ farm:1, terrace:1, wheat:1.5 }, d:"藏粮洞与公粮制度", adjD:"邻农田/梯田+1 邻麦+1.5 粮" },
+};
+// ── 单位 ──
+const UT = {
+  gongzuo:{ n:"工作队", gl:"工", str:0,  mp:4, cost:30, pop:1, d:"到无主地【建立根据地】—— 唯一的扩张手段" },
+  jianshe:{ n:"建设队", gl:"建", str:0,  mp:4, cost:22, d:"修农田/梯田/矿场/伐木场; 修复被烧毁的改良与区域" },
+  minbing:{ n:"民兵队", gl:"民", str:12, mp:4, cost:20, up:.4, d:"不脱产, 便宜耐用, 守土的根" },
+  youji:  { n:"游击队", gl:"游", str:19, mp:5, cost:30, need:"maque", terr:7, up:.8, d:"山地林地作战+7, 机动灵活" },
+  wugong: { n:"武工队", gl:"武", str:22, mp:6, cost:36, need:"poxi", hide:1, up:.7, d:"隐蔽; 破袭铁路、瓦解伪军" },
+  zhuli:  { n:"主力团", gl:"团", str:32, mp:4, cost:46, need:"zhenggui", up:1.4, d:"攻坚拔点的拳头" },
+  jingrui:{ n:"主力旅", gl:"旅", str:46, mp:4, cost:62, need:"gongjian", siege:1.7, up:2, d:"攻城×1.7 —— 打县城的本钱" },
+  // 日军
+  wei:    { n:"伪军", gl:"伪", str:12, mp:4, side:"j", siege:.7 },
+  ri:     { n:"日军小队", gl:"日", str:24, mp:4, side:"j", siege:1 },
+  zhong:  { n:"日军中队", gl:"中", str:36, mp:4, side:"j", siege:1.2 },
+  qibing: { n:"骑兵", gl:"骑", str:30, mp:6, side:"j", siege:.8 },
+};
+
+// ── 研究(带尤里卡: 做对事情就提前一半) ──
+const TECH = {
+  minyun:   { n:"民运工作", cost:26,  need:[], d:"到群众中去, 把群众组织起来", fx:"控制增长+25%, 解锁文教区", eu:"发动群众累计10次", euD:"用部队执行【发动群众】" },
+  maque:    { n:"麻雀战",   cost:38,  need:["minyun"], d:"三三两两, 忽聚忽散", fx:"解锁游击队", eu:"歼灭一支日伪军" },
+  didao:    { n:"地道战",   cost:52,  need:["minyun"], d:"平原上把村庄连成地下长城", fx:"解锁地道网区域", eu:"有平原根据地遭扫荡" },
+  dilei:    { n:"地雷战",   cost:56,  need:["maque"], d:"土法上马, 就地取材", fx:"扫荡中自动杀伤日军", eu:"顶住一次扫荡" },
+  shengchan:{ n:"根据地生产", cost:60, need:["minyun"], d:"自己动手, 丰衣足食", fx:"解锁被服生产区", eu:"建成3处改良" },
+  poxi:     { n:"破袭战",   cost:76,  need:["dilei"], d:"扒铁路、炸桥梁、拔据点", fx:"解锁武工队, 可破袭铁路", eu:"部队站上铁路" },
+  weisheng: { n:"战地卫生", cost:70,  need:["didao"], d:"白求恩精神", fx:"解锁卫生区", eu:"部队兵力低于40" },
+  binggong: { n:"兵工生产", cost:92,  need:["shengchan"], d:"黄崖洞: 造枪造弹", fx:"解锁兵工区", eu:"占领一处敌据点" },
+  zhenggui: { n:"正规化",   cost:104, need:["poxi","weisheng"], d:"由游击战向运动战转变", fx:"解锁主力团", eu:"抗日武装达8万" },
+  gongjian: { n:"攻坚战术", cost:130, need:["zhenggui","binggong"], d:"集中优势兵力打歼灭战", fx:"解锁主力旅, 方可强攻县城", eu:"拔除3处敌据点" },
+};
+// ── 政策卡(文明六招牌): 按槽位装配, 随局势换卡 ──
+const POL = {
+  jianzu:   { n:"减租减息", t:"eco", need:null, d:"减轻农民负担, 又团结开明士绅", fx:{ food:.3, cult:.15 } },
+  dasheng:  { n:"大生产运动", t:"eco", need:"shengchan", d:"南泥湾: 一把镢头一杆枪", fx:{ food:.35, prod:.25 } },
+  jingbing: { n:"精兵简政", t:"eco", need:null, d:"缩小机关、充实连队 —— 队伍小了, 但活下来了", fx:{ upkeep:-.45, str:-.08 } },
+  gongliang:{ n:"公粮统筹", t:"eco", need:null, d:"合理负担, 保障供给", fx:{ prod:.2, store:.5 } },
+  sansan:   { n:"三三制", t:"pol", need:null, d:"共产党员、党外进步人士、中间派各三分之一", fx:{ cult:.35, sci:.1 } },
+  tongzhan: { n:"统一战线", t:"pol", need:null, d:"团结一切可以团结的力量", fx:{ defect:.5, cult:.15 } },
+  yongzheng:{ n:"拥政爱民", t:"pol", need:null, d:"军民一家, 鱼水情深", fx:{ ctrl:.25, heal:.25 } },
+  dijun:    { n:"敌军工作", t:"pol", need:"poxi", d:"瓦解敌军, 争取伪军反正", fx:{ defect:1.0 } },
+  maquePol: { n:"麻雀战术", t:"mil", need:"maque", d:"山地林地的主场", fx:{ terrAtk:.3 } },
+  dileiPol: { n:"地雷战术", t:"mil", need:"dilei", d:"不见鬼子不挂弦", fx:{ sweepKill:.6 } },
+  fansao:   { n:"反扫荡预案", t:"mil", need:"didao", d:"坚壁清野、分散隐蔽", fx:{ sweepDef:.45 } },
+  jizhong:  { n:"集中优势兵力", t:"mil", need:"zhenggui", d:"伤其十指不如断其一指", fx:{ atk:.25 } },
+};
+const SLOT_BY_TECH = [   // 随科技解锁槽位
+  { tech:null, mil:1, eco:1, pol:0 },
+  { tech:"minyun", mil:1, eco:1, pol:1 },
+  { tech:"shengchan", mil:1, eco:2, pol:1 },
+  { tech:"poxi", mil:2, eco:2, pol:1 },
+  { tech:"zhenggui", mil:2, eco:2, pol:2 },
+];
+// ── 奇观(史实) ──
+const WON = {
+  huangyadong:{ n:"黄崖洞兵工厂", cost:110, need:"binggong", d:"太行深处的兵工厂, 造出了八一式马步枪", fx:"全境军械+3/回合, 本城工分+3" },
+  nanniwan:   { n:"南泥湾", cost:96, need:"shengchan", d:"三五九旅把荒山变成了陕北的好江南", fx:"全境粮食+35%, 解除封锁减产" },
+  kangda:     { n:"抗日军政大学", cost:104, need:"minyun", d:"团结、紧张、严肃、活泼 —— 培养了十万干部", fx:"学识+40%, 新部队自带经验" },
+  ranzhuang:  { n:"冉庄地道", cost:100, need:"didao", d:"地下长城: 打了就钻, 神出鬼没", fx:"全部平原城市防御+25, 反扫荡损失-30%" },
+  baiqiuen:   { n:"白求恩国际和平医院", cost:98, need:"weisheng", d:"一个外国人, 毫无利己的动机", fx:"全军每回合额外回复, 伤亡转为伤员" },
+};
+// ── 历史事件 ──
+const EV = [
+  { id:"start", t:1, ti:"太原失守 — 华北进入敌后战场时代", c:"j",
+    tx:"太原沦陷。以国民党军为主体的正规战争在华北宣告结束, <b>以共产党军队为主体的游击战争进入主要地位</b>。<br>三个师分兵挺进, 在敌人的后方生根。",
+    op:[{ t:"到敌人后方去", d:"敌后战场从此开辟", f:s=>{ s.cult += 8; } }] },
+  { id:"pingxing", t:2, ti:"平型关的余威", c:"g",
+    tx:"一一五师在平型关伏击日军辎重队, 歼敌千余。这是全国抗战开始后中国军队的第一个大胜仗, 打破了日军不可战胜的神话。<br>群众看见了希望, 参军的人多了起来。",
+    op:[{ t:"广泛宣传, 发动群众", d:"民心+, 但也更早引来敌人注意", f:s=>{ s.mass += 10; s.expo += 5; } },
+        { t:"低调整训, 隐蔽发展", d:"稳扎稳打", f:s=>{ s.mass += 4; s.sci += 12; } }] },
+  { id:"wuhan", t:13, ti:"武汉失守 — 抗战进入相持阶段", c:"j",
+    tx:"日军占领武汉后已无力再发动大规模战略进攻, 开始把主力转向敌后, 对根据地反复'扫荡'。<br>最艰苦的阶段开始了。",
+    op:[{ t:"准备长期斗争", d:"扫荡强度上升, 但你的根据地也在扩大", f:s=>{ s.phase = 2; s.sweepPow += .25; s.cult += 10; } }] },
+  { id:"baituan", t:34, ti:"百团大战", c:"g",
+    tx:"1940年8月, 一百零五个团在华北同时出击, 破袭正太路、白晋路, 拔除据点两千余个, 毙伤日伪军两万五千余人。<br>敌后战场的声威震动全国 —— 也让日军把'华北治安的心腹之患'四个字写进了作战方针。",
+    op:[{ t:"全线出击, 打出威风", d:"牵制大增、民心大涨, 但招来疯狂报复", f:s=>{ s.kill += 25000; s.mass += 18; s.cult += 25; s.expo += 40; s.sweepPow += .55; s.baituan = 1;
+        for (const c of pcity()) c.ctrl = Math.min(100, c.ctrl + 10); log("百团大战: 毙伤日伪军两万五千余 — 敌后战场声威大振", "g"); } },
+        { t:"有限出击, 保存实力", d:"战果小些, 报复也小些", f:s=>{ s.kill += 8000; s.mass += 7; s.cult += 10; s.expo += 12; s.sweepPow += .18; } }] },
+  { id:"wannan", t:41, ti:"皖南事变", c:"b",
+    tx:"新四军军部及所属九千余人在皖南遭国民党军八万人围攻, 血战七昼夜, 大部壮烈牺牲。<br>亲者痛, 仇者快。但队伍不会散 —— 一月后, 新四军在盐城重建军部。",
+    op:[{ t:"重建军部, 继续抗战", d:"损失惨重, 但统一战线仍要维护", f:s=>{ s.mass = Math.max(0, s.mass - 6); s.cult += 20; log("新四军在盐城重建军部, 全军整编为七个师", "h"); } }] },
+  { id:"sanguang", t:46, ti:"「三光」作战与治安强化运动", c:"b",
+    tx:"日军华北方面军推行治安强化运动, 对根据地实行<b>烧光、杀光、抢光</b>, 制造无人区, 修筑封锁沟墙上万公里。<br>根据地面积与人口锐减, 部队从四十万减到三十万。这是最黑暗的两年。",
+    op:[{ t:"坚壁清野, 依靠群众挺过去", d:"扫荡将带三光效果: 人口与改良永久受损", f:s=>{ s.hard = 1; s.sweepPow += .6;
+        log("治安强化运动开始 — 此后扫荡将烧毁改良、屠戮人口。切换政策卡到【精兵简政】【反扫荡预案】才顶得住", "b"); } }] },
+  { id:"zuoquan", t:55, ti:"五一大扫荡 · 左权将军殉国", c:"b",
+    tx:"冈村宁次调集五万余兵力铁壁合围冀中与太行。八路军副参谋长<b>左权</b>在辽县十字岭指挥总部机关突围时, 被炮弹击中壮烈牺牲, 年三十七岁。<br>辽县更名为左权县 —— 这个名字一直用到今天。",
+    op:[{ t:"化整为零, 保存骨干", d:"沉痛, 但队伍必须活下去", f:s=>{ s.mass = Math.max(0, s.mass - 8);
+        for (const c of pcity()) { c.hp = Math.max(6, c.hp * .55); c.pop = Math.max(1, c.pop - 1); }
+        for (const u of S.units) if (u.side === "p") u.hp = Math.max(15, u.hp - 22);
+        log("左权将军殉国于十字岭。辽县改名左权县", "b"); } }] },
+  { id:"jianbing", t:58, ti:"精兵简政", c:"h",
+    tx:"根据地缩小、负担加重, 中央决定实行精兵简政: 缩小机关、充实连队, 主力部队地方化。<br>这是一次痛苦但清醒的收缩 —— 把拳头收回来, 是为了打出去。",
+    op:[{ t:"立即实行", d:"装上【精兵简政】政策卡: 维护-45%, 但战力略降", f:s=>{ s.polUnlock.jingbing = 1; s.cult += 15;
+        log("精兵简政 — 去【政策】面板把它装进经济槽", "h"); } }] },
+  { id:"yuxianggui", t:79, ti:"豫湘桂大溃退", c:"j",
+    tx:"日军发动'一号作战'。国民党军八个月丢失一百四十六座城市、损兵五六十万, 正面战场大溃退。<br>与此同时, 敌后战场开始局部反攻, 解放区不断扩大 —— 此消彼长。",
+    op:[{ t:"抓住时机, 局部反攻", d:"敌军后方空虚", f:s=>{ s.kmt = Math.max(6, s.kmt - 26); s.cult += 22; s.counter = 1;
+        for (const c of jcity()) c.hp = Math.max(10, c.hp * .8); log("正面战场大溃退之际, 敌后转入局部反攻", "h"); } }] },
+  { id:"qida", t:90, ti:"中共七大", c:"g",
+    tx:"党的七大在延安召开。此时解放区面积近百万平方公里、人口近一亿、军队一百二十余万、民兵二百二十万。<br>八年前从这里出发时, 只有三万余人。",
+    op:[{ t:"准备大反攻", d:"全境士气高涨", f:s=>{ s.cult += 40; s.mass += 12;
+        for (const c of pcity()) c.ctrl = Math.min(100, c.ctrl + 12); } }] },
+  { id:"final", t:93, ti:"对日寇的最后一战", c:"g",
+    tx:"苏联对日宣战。毛泽东发表《对日寇的最后一战》, 朱德连发七道命令, 解放区军民向一切敌占城市与交通要道发起大反攻。",
+    op:[{ t:"全线出击", d:"敌军守备崩溃", f:s=>{ for (const c of jcity()) c.hp = Math.max(6, c.hp * .45); s.cult += 20;
+        log("大反攻开始! 各解放区军民全线出击", "g"); } }] },
+];
+// ── 工具 ──
+let rng = Math.random;
+function mul32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ri=(a,b)=>a+Math.floor(rng()*(b-a+1));
+const pick=a=>a[Math.floor(rng()*a.length)];
+const key=(q,r)=>q+","+r;
+const W=CFG.W,H=CFG.H,SQ3=Math.sqrt(3);
+function inb(q,r){return q>=0&&q<W&&r>=0&&r<H}
+function nbrs(q,r){const e=r%2===0;const d=e?[[1,0],[-1,0],[0,1],[0,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1]];const o=[];for(const[a,b]of d){const nq=q+a,nr=r+b;if(inb(nq,nr))o.push([nq,nr])}return o}
+function ax(q,r){return[q-(r-(r&1))/2,r]}
+function hexD(q1,r1,q2,r2){const[a1,b1]=ax(q1,r1),[a2,b2]=ax(q2,r2);return(Math.abs(a1-a2)+Math.abs(b1-b2)+Math.abs(a1+b1-a2-b2))/2}
+function inRing(q,r,rad){const o=[];for(let a=0;a<W;a++)for(let b=0;b<H;b++)if(hexD(q,r,a,b)<=rad)o.push([a,b]);return o}
+function hexC(q,r){const s=CFG.hex;return[s*SQ3*(q+0.5*(r&1))+s,s*1.5*r+s]}
+function turnDate(t){const i=CFG.startMonth-1+(t-1);return(CFG.startYear+Math.floor(i/12))+"年"+(i%12+1)+"月"}
+
+// ══════ 状态 / 地图 ══════
+let S = null;
+function newGame(seed) {
+  rng = mul32(seed || 90731);
+  const t = [];
+  for (let q = 0; q < W; q++) { t[q] = []; for (let r = 0; r < H; r++) {
+    const n = rng();
+    let k;
+    if (q < 6) k = n < .55 ? "mountain" : n < .82 ? "hills" : "forest";
+    else if (q < 12) k = n < .22 ? "mountain" : n < .5 ? "hills" : n < .76 ? "forest" : "plain";
+    else if (q < 19) k = n < .08 ? "mountain" : n < .3 ? "hills" : n < .5 ? "forest" : n < .94 ? "plain" : "marsh";
+    else k = n < .06 ? "hills" : n < .16 ? "forest" : n < .92 ? "plain" : "marsh";
+    t[q][r] = { t:k, res:null, imp:null, work:0, burn:0, road:0, rail:0, cut:0,
+      city:null, dist:null, own:null, ownC:null, disc:0, block:0 };
+  } }
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const tl = t[q][r];
+    if (rng() > .16) continue;
+    const o = Object.keys(RES).filter(k => RES[k].on.includes(tl.t));
+    if (o.length) tl.res = pick(o);
+  }
+  // 铁路(平汉线): 东部纵贯; 公路自铁路向西探入 —— 囚笼的骨架
+  let rq = 24;
+  const railT = [];
+  for (let r = 0; r < H; r++) { rq = clamp(rq + ri(-1, 1), 23, 25); t[rq][r].rail = 1; t[rq][r].t = "plain"; railT.push([rq, r]); }
+  S = { turn:1, over:0, result:null, started:0, tiles:t, cities:[], units:[], nextId:1,
+    sci:0, cult:0, arms:20, man:4, mass:18, expo:0, food:0,
+    tech:{}, techCur:null, techProg:0, eureka:{},
+    gov:{ mil:[null], eco:[null], pol:[] }, polUnlock:{ jianzu:1, sansan:1, yongzheng:1, gongliang:1, tongzhan:1 },
+    won:{}, evDone:{}, phase:1, hard:0, sweepPow:1, kmt:100, counter:0, baituan:0,
+    nextSweep:CFG.sweepFirst, nextCage:10,
+    st:{ kill:0, pupKill:0, loss:0, sweeps:0, held:0, popPeak:0, cap:0, imps:0, dists:0, burned:0, founded:0, fadong:0 },
+    kill:0 };
+  // 日军据点: 县城(首府) + 沿铁路车站 + 深入内地的炮楼
+  const town = railT[Math.floor(H / 2)];
+  addCity(town[0], town[1], "j", "辽县城", { cap:1, pop:6, hp:230 });
+  addCity(railT[3][0], railT[3][1], "j", "石门车站", { pop:3, hp:120 });
+  addCity(railT[H - 4][0], railT[H - 4][1], "j", "邢台车站", { pop:3, hp:120 });
+  const road = (sq, sr, len, bias) => {
+    let q = sq, r = sr; const p = [];
+    for (let i = 0; i < len; i++) {
+      const o = nbrs(q, r).filter(([a]) => a < q);
+      if (!o.length) break;
+      o.sort((x, y) => (x[0] + Math.abs(x[1] - (sr + bias)) * .5) - (y[0] + Math.abs(y[1] - (sr + bias)) * .5));
+      [q, r] = o[0];
+      if (t[q][r].t === "mountain") t[q][r].t = "hills";
+      t[q][r].road = 1; p.push([q, r]);
+    }
+    return p;
+  };
+  const paths = [road(town[0], town[1], 13, -4), road(town[0], town[1], 11, 4), road(railT[3][0], railT[3][1], 12, 3), road(railT[H-4][0], railT[H-4][1], 12, -3)];
+  const pbn = ["炮楼·甲","炮楼·乙","炮楼·丙","炮楼·丁"];
+  paths.forEach((p, i) => { if (!p.length) return; const [q, r] = p[p.length - 1]; if (!t[q][r].city) addCity(q, r, "j", pbn[i], { pop:2, hp:78 }); });
+  // 玩家首府: 西部山区最宜居处
+  let best = null, bs = -1;
+  for (let q = 2; q < 9; q++) for (let r = 2; r < H - 2; r++) {
+    if (t[q][r].city || t[q][r].t === "mountain") continue;
+    let sc = 0, pass = 0;
+    for (const [a, b] of inRing(q, r, 2)) { const x = t[a][b]; sc += TERR[x.t].food * 2 + TERR[x.t].prod + (x.res ? 3 : 0); if (x.t !== "mountain") pass++; }
+    if (pass < 9) continue;
+    if (sc > bs) { bs = sc; best = [q, r]; }
+  }
+  if (!best) best = [4, Math.floor(H / 2)];
+  const hq = addCity(best[0], best[1], "p", "王家峪", { cap:1, pop:3 });
+  S.hq = hq.id;
+  spawn("minbing", best[0], best[1], "p"); spawn("gongzuo", best[0], best[1], "p"); spawn("jianshe", best[0], best[1], "p");
+  for (const c of S.cities) if (c.side === "j") spawn(c.cap ? "zhong" : "wei", c.q, c.r, "j", { garr:c.id });
+  vis(); return S;
+}
+const VN = ["王家峪","李家庄","赵家坳","马家沟","石门村","柳树沟","黑石崖","桃花寨","大杨庄","南坡村","北岭村","东塬村","西沟村","孙家铺","青石口","枣林坪","苇子峪","麻田镇"];
+function addCity(q, r, side, name, o) {
+  o = o || {};
+  const c = { id:S.nextId++, q, r, side, name, pop:o.pop || 1, cap:!!o.cap, food:0, prod:0, queue:null,
+    dists:[], border:1, cultS:0, hp:0, maxHp:0, ctrl:side === "p" ? 55 : 0, justCap:0, ruin:0 };
+  S.cities.push(c); S.tiles[q][r].city = c.id;
+  claim(c); rehp(c); c.hp = c.maxHp;
+  if (o.hp) { c.maxHp = o.hp; c.hp = o.hp; }
+  return c;
+}
+function rehp(c) {
+  const wall = c.dists.filter(d => DIST[d.k].wall).length;
+  let dd = 0;
+  for (const d of c.dists) if (DIST[d.k].def) dd += DIST[d.k].def + (d.adj || 0) * 2;
+  c.maxHp = CFG.baseHp + c.pop * CFG.hpPerPop + wall * CFG.hpPerWall + dd + (c.cap ? 35 : 0);
+  if (S.won.ranzhuang && c.side === "p" && plainCity(c)) c.maxHp += 25;
+  c.hp = Math.min(c.hp || c.maxHp, c.maxHp);
+}
+function plainCity(c) { return S.tiles[c.q][c.r].t === "plain" || S.tiles[c.q][c.r].t === "marsh"; }
+function claim(c) { for (const [a, b] of inRing(c.q, c.r, c.border)) { const x = S.tiles[a][b]; if (!x.own || x.own === c.side) { x.own = c.side; x.ownC = c.id; } } }
+function cityAt(q, r) { const i = S.tiles[q][r].city; return i ? S.cities.find(c => c.id === i) : null; }
+function unitAt(q, r) { return S.units.find(u => u.q === q && u.r === r); }
+function uSide(q, r, s) { return S.units.find(u => u.q === q && u.r === r && u.side === s); }
+function pcity() { return S.cities.filter(c => c.side === "p"); }
+function jcity() { return S.cities.filter(c => c.side === "j"); }
+function spawn(type, q, r, side, ex) {
+  const d = UT[type];
+  let sq = q, sr = r;
+  if (unitAt(sq, sr)) {
+    const seen = new Set([key(q, r)]), qq = [[q, r]]; let f = null;
+    while (qq.length && !f) { const [cq, cr] = qq.shift();
+      for (const [a, b] of nbrs(cq, cr)) { const k = key(a, b); if (seen.has(k)) continue; seen.add(k);
+        const c2 = cityAt(a, b);
+        if (!unitAt(a, b) && !(c2 && c2.side !== (side || d.side || "p"))) { f = [a, b]; break; } qq.push([a, b]); } }
+    if (!f) return null; sq = f[0]; sr = f[1];
+  }
+  const u = Object.assign({ id:S.nextId++, type, side:side || d.side || "p", q:sq, r:sr, hp:100,
+    mp:d.mp, acted:0, fort:0, xp:0, lv:S.won.kangda && (side || "p") === "p" ? 1 : 0, work:null, path:null }, ex || {});
+  S.units.push(u); return u;
+}
+function rmU(u) { S.units = S.units.filter(x => x.id !== u.id); }
+// ── 视野 ──
+let vset = new Set();
+function vis() {
+  vset = new Set();
+  const add = (q, r, rad) => { for (const [a, b] of inRing(q, r, rad)) { vset.add(key(a, b)); S.tiles[a][b].disc = 1; } };
+  for (const u of S.units) if (u.side === "p") add(u.q, u.r, 2);
+  for (const c of pcity()) add(c.q, c.r, c.border + 1);
+}
+function seen(q, r) { return vset.has(key(q, r)); }
+// ══════ 产出: 地块 / 区域相邻加成 / 城市 ══════
+function tYield(q, r) {
+  const t = S.tiles[q][r], b = TERR[t.t];
+  let food = b.food, prod = b.prod, arms = 0, cult = 0;
+  if (t.res) { const R = RES[t.res]; food += R.food || 0; prod += R.prod || 0; arms += R.arms || 0; cult += R.cult || 0; }
+  if (t.imp && !t.burn) { const I = IMP[t.imp]; food += I.food || 0; prod += I.prod || 0; arms += I.arms || 0; }
+  if (t.block) { food = Math.max(0, food - 1); prod = Math.max(0, prod - 1); }   // 封锁沟压制
+  return { food, prod, arms, cult };
+}
+// 区域相邻加成(文明六招牌)
+function distAdj(k, q, r) {
+  const D = DIST[k]; if (!D.adj) return 0;
+  let s = 0;
+  for (const [a, b] of nbrs(q, r)) {
+    const t = S.tiles[a][b];
+    if (D.adj[t.t]) s += D.adj[t.t];
+    if (t.res && D.adj[t.res]) s += D.adj[t.res];
+    if (t.imp && D.adj[t.imp]) s += D.adj[t.imp];
+    if (t.city && D.adj.city) s += D.adj.city;
+    if (t.dist && D.adj.dist) s += D.adj.dist;
+  }
+  return Math.round(s * 10) / 10;
+}
+function worked(c) {
+  const out = [];
+  for (const [a, b] of inRing(c.q, c.r, CFG.workRadius)) {
+    if (a === c.q && b === c.r) continue;
+    const t = S.tiles[a][b];
+    if (t.own !== c.side || t.ownC !== c.id || t.city) continue;
+    if (t.dist) continue;
+    if (S.units.some(u => u.side !== c.side && u.q === a && u.r === b)) continue;
+    const y = tYield(a, b);
+    out.push({ q:a, r:b, y, s:y.food * 2 + y.prod * 1.7 + y.cult });
+  }
+  out.sort((x, y2) => y2.s - x.s);
+  return out.slice(0, c.pop);
+}
+function cYield(c) {
+  const P = polFx();
+  const o = { food:2, prod:2, sci:1, cult:1, arms:0, heal:0 };
+  for (const w of worked(c)) { o.food += w.y.food; o.prod += w.y.prod; o.arms += w.y.arms; o.cult += w.y.cult; }
+  for (const d of c.dists) {
+    const D = DIST[d.k], a = d.adj || 0;
+    o.arms += (D.arms || 0) + (D.adj && D.arms ? a : 0);
+    o.prod += (D.prod || 0) + (D.prod && D.adj ? a : 0);
+    o.sci += (D.sci || 0) + (D.sci && D.adj ? a : 0);
+    o.cult += D.cult || 0;
+    o.food += (D.food || 0) + (D.food && D.adj ? a : 0);
+    o.heal += D.heal || 0;
+  }
+  o.food *= 1 + (P.food || 0) + (S.won.nanniwan ? .35 : 0);
+  o.prod *= 1 + (P.prod || 0);
+  o.sci *= 1 + (S.won.kangda ? .4 : 0) + (P.sci || 0);
+  o.cult *= 1 + (P.cult || 0);
+  if (S.hard && !S.won.nanniwan) { o.food *= .78; o.prod *= .85; }
+  if (c.ruin > 0) { o.food *= .5; o.prod *= .6; }
+  o.food -= c.pop * 1.1;
+  o.food = Math.round(o.food * 10) / 10;
+  return o;
+}
+function polFx() {
+  const o = {};
+  for (const s of ["mil", "eco", "pol"]) for (const k of S.gov[s]) {
+    if (!k) continue;
+    const f = POL[k].fx;
+    for (const x in f) o[x] = (o[x] || 0) + f[x];
+  }
+  return o;
+}
+function empire() {
+  const o = { food:0, prod:0, sci:0, cult:0, arms:0 };
+  for (const c of pcity()) { const y = cYield(c); for (const k in o) o[k] += y[k] || 0; }
+  return o;
+}
+function foodNeed(p) { return CFG.foodPerPop + (p - 1) * 8; }
+function cultNeed(b) { return 26 * b; }
+function popCtl() { let p = 0; for (const c of pcity()) p += c.pop * .85 * (c.ruin > 0 ? .55 : 1); return p; }
+function army() { let a = 0; for (const u of S.units) if (u.side === "p" && UT[u.type].str) a += UT[u.type].str * u.hp / 100 / 13; return a; }
+function jpDiv(y) { return y <= 1937 ? 16 : y === 1938 ? 24 : y === 1939 ? 26 : y === 1940 ? 27 : y === 1941 ? 28 : y === 1942 ? 26 : y === 1943 ? 24 : y === 1944 ? 25 : 26; }
+function pinned() {
+  const y = CFG.startYear + Math.floor((CFG.startMonth - 1 + S.turn - 1) / 12);
+  const tot = jpDiv(y);
+  const popR = clamp(popCtl() / 60, 0, 1);
+  const opR = clamp(S.opPress || 0, 0, 1);
+  const r = clamp(popR * .58 + opR * .26 + (S.baituan ? .06 : 0) + S.st.cap * .012, 0, .72);
+  return { tot, ours:Math.round(tot * r), r };
+}
+function log(m, c) { if (typeof push === "function") push(m, c); }
+
+// ══════ 战斗 ══════
+function terrDef(q, r) { return TERR[S.tiles[q][r].t].def; }
+function uStr(u, ctx) {
+  const d = UT[u.type], P = polFx();
+  let s = d.str + (u.lv || 0) * 4;
+  const t = S.tiles[u.q][u.r];
+  if (d.terr && (t.t === "mountain" || t.t === "forest" || t.t === "hills")) s += d.terr * (1 + (P.terrAtk || 0));
+  if (ctx === "atk") s *= 1 + (P.atk || 0);
+  if (ctx === "def") { s += terrDef(u.q, u.r); if (u.fort) s += 5;
+    const c = cityAt(u.q, u.r); if (c && c.side === u.side) s += 8 + c.dists.filter(x => DIST[x.k].wall).length * 8; }
+  if (u.side === "p") s *= 1 + (P.str || 0);
+  return s * (.5 + .5 * u.hp / 100);
+}
+function dmg(a, d) { return clamp(Math.round(CFG.dmgBase * Math.exp((a - d) / CFG.dmgDiv) * (.85 + rng() * .3)), 5, 55); }
+function expD(a, d) { return clamp(Math.round(CFG.dmgBase * Math.exp((a - d) / CFG.dmgDiv)), 5, 55); }
+function cityDef(c) { let d = 18 + c.pop * 2 + (c.cap ? 20 : 0);
+  for (const x of c.dists) { const D = DIST[x.k]; if (D.wall) d += 12; if (D.def) d += (D.def + (x.adj || 0) * 2) / 3; }
+  if (S.won.ranzhuang && c.side === "p" && plainCity(c)) d += 8;
+  return d; }
+function siegeD(u, c) {
+  const d = UT[u.type], m = d.siege || .7;
+  return clamp(Math.round(CFG.dmgBase * Math.exp((uStr(u, "atk") * m - cityDef(c)) / CFG.dmgDiv) * (.85 + rng() * .3)), 3, 40);
+}
+function expSiege(u, c) { const d = UT[u.type], m = d.siege || .7;
+  return clamp(Math.round(CFG.dmgBase * Math.exp((uStr(u, "atk") * m - cityDef(c)) / CFG.dmgDiv)), 3, 40); }
+function xp(u, n) { if (u.side !== "p" || !UT[u.type].str) return;
+  u.xp = (u.xp || 0) + n; const need = 10 + (u.lv || 0) * 12;
+  if (u.xp >= need) { u.xp -= need; u.lv = (u.lv || 0) + 1; u.hp = Math.min(100, u.hp + 22); log(UT[u.type].n + "在战斗中成长 ★" + u.lv, "g"); } }
+function killU(u, byP) {
+  rmU(u);
+  if (u.side === "j" && byP) {
+    const n = UT[u.type].str * 120;
+    if (u.type === "wei") { S.st.pupKill += n; const P = polFx();
+      if (rng() < .25 + (P.defect || 0) * .35) { S.man += .6; log("统战见效: 一部伪军携枪反正", "g"); } }
+    else S.st.kill += n;
+    S.arms += Math.round(UT[u.type].str * .55);
+    eureka("maque");
+    log("歼灭" + UT[u.type].n + ", 缴获军械 +" + Math.round(UT[u.type].str * .55), "g");
+  } else if (u.side === "p") { S.st.loss += UT[u.type].str * 80; log(UT[u.type].n + "全员牺牲…", "b"); }
+}
+function attack(u, q, r) {
+  if (!UT[u.type].str) return;
+  u.acted = 1; u.mp = 0; u.fort = 0;
+  const foe = uSide(q, r, u.side === "p" ? "j" : "p"), c = cityAt(q, r);
+  if (foe) {
+    const hit = dmg(uStr(u, "atk"), uStr(foe, "def"));
+    foe.hp -= hit;
+    log(UT[u.type].n + "袭击" + UT[foe.type].n + " -" + hit, u.side === "p" ? "h" : "j");
+    if (foe.hp <= 0) { killU(foe, u.side === "p"); xp(u, 6); }
+    else { const bk = Math.round(dmg(uStr(foe, "atk"), uStr(u, "def")) * CFG.counter);
+      u.hp -= bk; log("对方反击 -" + bk, u.side === "p" ? "j" : "h"); xp(u, 2);
+      if (u.hp <= 0) killU(u, u.side === "j"); }
+    return;
+  }
+  if (c && c.side !== u.side) {
+    if (c.cap && c.side === "j" && !S.tech.gongjian) { log("县城城防坚固 — 需先研究【攻坚战术】", "j"); u.acted = 0; u.mp = UT[u.type].mp; return; }
+    const hit = siegeD(u, c);
+    c.hp -= hit; xp(u, 3);
+    log(UT[u.type].n + "强攻" + c.name + " -" + hit + "(余 " + Math.max(0, Math.round(c.hp)) + "/" + c.maxHp + ")"
+      + (u.side === "p" && !UT[u.type].siege && hit <= 8 ? " — 血肉之躯啃砖石! 需要主力旅" : ""), u.side === "p" ? "h" : "j");
+    if (c.hp <= 0) { c.hp = 0; log(c.name + "城防已垮, 移入即可占领", u.side === "p" ? "g" : "b"); }
+    else { const bk = Math.round(dmg(cityDef(c), uStr(u, "def")) * .5);
+      u.hp -= bk; log("守军还击 -" + bk, u.side === "p" ? "j" : "h");
+      if (u.hp <= 0) killU(u, u.side === "j"); }
+  }
+}
+function capture(c, side) {
+  const old = c.side;
+  c.side = side; c.hp = Math.round(c.maxHp * .4); c.justCap = 2; c.queue = null;
+  if (side === "p") {
+    c.pop = Math.max(1, c.pop - 1); c.ctrl = 45;
+    S.st.cap++; S.cult += 18; S.arms += 20; S.mass += 4;
+    c.name = c.name.replace("炮楼·", "解放区·").replace("车站", "站(解放)");
+    eureka("binggong"); if (S.st.cap >= 3) eureka("gongjian");
+    log("★ 攻克" + c.name + "! 囚笼上少了一颗钉子 —— 民心+18 军械+20", "g");
+    // 拔点后周边封锁沟失效
+    for (const [a, b] of inRing(c.q, c.r, 2)) S.tiles[a][b].block = 0;
+    if (old === "j" && c.cap) { end(1, "conquest"); return; }
+    if (!jcity().some(x => !x.cap)) { end(1, "cage"); return; }
+  } else {
+    c.ctrl = 0;
+    log("✖ " + c.name + "陷落! 但只要打回去就能夺回", "b");
+  }
+  claim(c); rehp(c); vis();
+}
+// ══════ 移动 ══════
+function stepC(q, r, u) { const t = S.tiles[q][r]; return (t.road || t.rail) ? 1 : TERR[t.t].move; }
+function blocked(q, r, u) {
+  const o = unitAt(q, r); if (o && o.id !== u.id) return 1;
+  const c = cityAt(q, r); if (c && c.side !== u.side && c.hp > 0) return 1;
+  return 0;
+}
+function reach(u) {
+  const o = {}; if (u.mp <= 0 || u.acted) return o;
+  const dist = { [key(u.q, u.r)]:0 }, pq = [[0, u.q, u.r]];
+  while (pq.length) { pq.sort((a, b) => a[0] - b[0]); const [d, q, r] = pq.shift();
+    for (const [a, b] of nbrs(q, r)) { if (blocked(a, b, u)) continue;
+      const nd = d + stepC(a, b, u);
+      if (nd > u.mp && d > 0) continue;
+      if (dist[key(a, b)] === undefined || nd < dist[key(a, b)]) { dist[key(a, b)] = nd; o[key(a, b)] = { q:a, r:b, c:nd }; pq.push([nd, a, b]); } } }
+  return o;
+}
+function farPath(u, tq, tr) {
+  if (blocked(tq, tr, u)) return null;
+  const dist = { [key(u.q, u.r)]:0 }, prev = {}, pq = [[0, u.q, u.r]]; let g = 0;
+  while (pq.length && g++ < 9000) { pq.sort((a, b) => a[0] - b[0]); const [d, q, r] = pq.shift();
+    if (q === tq && r === tr) break;
+    if (dist[key(q, r)] !== undefined && d > dist[key(q, r)]) continue;
+    for (const [a, b] of nbrs(q, r)) { if (blocked(a, b, u)) continue;
+      const nd = d + stepC(a, b, u);
+      if (dist[key(a, b)] === undefined || nd < dist[key(a, b)]) { dist[key(a, b)] = nd; prev[key(a, b)] = [q, r]; pq.push([nd, a, b]); } } }
+  if (dist[key(tq, tr)] === undefined) return null;
+  const p = [[tq, tr]]; let cur = key(tq, tr);
+  while (prev[cur]) { p.unshift(prev[cur]); cur = key(prev[cur][0], prev[cur][1]); }
+  return p;
+}
+function pTurns(u, p) { let mp = u.mp, t = 1;
+  for (let i = 1; i < p.length; i++) { if (mp <= 0) { t++; mp = UT[u.type].mp; } mp = Math.max(0, mp - stepC(p[i][0], p[i][1], u)); }
+  return t; }
+function advance(u) {
+  while (u.path && u.path.length && u.mp > 0) {
+    const [nq, nr] = u.path[0];
+    if (blocked(nq, nr, u)) { u.path = null; break; }
+    u.mp = Math.max(0, u.mp - stepC(nq, nr, u));
+    u.q = nq; u.r = nr; u.fort = 0; u.work = null; u.path.shift();
+    const c = cityAt(u.q, u.r);
+    if (c && c.side !== u.side && c.hp <= 0) { capture(c, u.side); u.path = null; break; }
+    if (!u.path.length) { u.path = null; break; }
+  }
+  vis();
+}
+function moveTo(u, q, r) {
+  const p = farPath(u, q, r);
+  if (!p) { log("那里过不去(有部队/城防未破/地形阻隔)", "j"); return 0; }
+  const t = pTurns(u, p);
+  u.path = p.slice(1); advance(u);
+  if (u.path && u.path.length) log(UT[u.type].n + "行军中 — 约" + t + "回合抵达", "h");
+  return 1;
+}
+// ══════ 玩家行动 ══════
+function canFound(q, r) {
+  const t = S.tiles[q][r];
+  if (t.city) return "此处已有城镇";
+  if (t.t === "mountain") return "山顶无法立村";
+  if (t.dist) return "此处是区域用地";
+  for (const c of S.cities) if (hexD(q, r, c.q, c.r) < 3) return "离" + c.name + "太近(需隔3格)";
+  return null;
+}
+function found(u) {
+  const why = canFound(u.q, u.r); if (why) { log(why, "j"); return; }
+  const c = addCity(u.q, u.r, "p", VN[(S.st.founded + 1) % VN.length], { pop:1 });
+  rmU(u); S.st.founded++;
+  log("🚩 " + c.name + "建立! 根据地又多一处堡垒 — 安排生产、派建设队修地", "g");
+  vis(); sel = { k:"city", id:c.id };
+}
+function startWork(u, k) {
+  const t = S.tiles[u.q][u.r], I = IMP[k];
+  if (!I.on.includes(t.t)) { log("此地形不能修" + I.n, "j"); return; }
+  if (t.own !== "p") { log("只能在自家地界内施工", "j"); return; }
+  if (t.imp === k && !t.burn) { log("此处已有" + I.n, "j"); return; }
+  u.work = { k, left:I.t }; u.acted = 1; u.mp = 0;
+  log(UT[u.type].n + "开始修" + I.n + "(" + I.t + "回合)", "h");
+}
+function repair(u) {
+  const t = S.tiles[u.q][u.r];
+  if (!t.burn) return;
+  u.work = { rep:1, left:1 }; u.acted = 1; u.mp = 0;
+  log("建设队开始修复被烧毁的" + (t.dist ? DIST[t.dist.k].n : IMP[t.imp].n), "h");
+}
+function tickWork() {
+  for (const u of S.units) {
+    if (u.side !== "p" || !u.work) continue;
+    u.work.left--; if (u.work.left > 0) continue;
+    const t = S.tiles[u.q][u.r];
+    if (u.work.rep) { t.burn = 0; log("修复完成 — 产出恢复", "g"); }
+    else { t.imp = u.work.k; t.burn = 0; S.st.imps++; if (S.st.imps >= 3) eureka("shengchan"); log("✔ " + IMP[u.work.k].n + "完工", "g"); }
+    u.work = null;
+  }
+}
+function fadong(u) {
+  const c = nearCity(u.q, u.r);
+  if (!c || c.side !== "p") { log("要在自家根据地范围内做群众工作", "j"); return; }
+  u.acted = 1; u.mp = 0;
+  const P = polFx();
+  const g = 6 * (1 + (P.ctrl || 0)) * (1 + S.mass / 200);
+  c.ctrl = Math.min(100, c.ctrl + g); S.mass = Math.min(100, S.mass + .8); S.st.fadong++;
+  if (S.st.fadong >= 10) eureka("minyun");
+  log(UT[u.type].n + "在" + c.name + "开展群众工作: 控制+" + g.toFixed(1) + ", 群众基础+0.8", "g");
+}
+function nearCity(q, r) { let b = null, bd = 99; for (const c of S.cities) { const d = hexD(q, r, c.q, c.r); if (d <= c.border + 1 && d < bd) { bd = d; b = c; } } return b; }
+function sabotage(u) {
+  const t = S.tiles[u.q][u.r];
+  let sp = (t.rail && !t.cut) ? [u.q, u.r] : null;
+  if (!sp) for (const [a, b] of nbrs(u.q, u.r)) { const x = S.tiles[a][b]; if (x.rail && !x.cut) { sp = [a, b]; break; } }
+  if (!sp) { log("身边没有完好铁路", "j"); return; }
+  S.tiles[sp[0]][sp[1]].cut = 8; u.acted = 1; u.mp = 0;
+  S.arms += 14; S.nextSweep += 2; S.opPress = (S.opPress || 0) + .12;
+  log("💥 破袭铁路! 缴获军械+14, 日军输送受阻(扫荡推迟2回合)", "g");
+}
+function eureka(k) {
+  if (S.eureka[k] || S.tech[k]) return;
+  S.eureka[k] = 1;
+  if (TECH[k]) log("💡 尤里卡! 【" + TECH[k].n + "】研究进度立即+50%", "s");
+}
+
+// ══════ 城市生产 / 科技 / 回合 ══════
+function buildOpts(c) {
+  const o = [];
+  for (const k in UT) {
+    const d = UT[k]; if (d.side === "j") continue;
+    if (d.need && !S.tech[d.need]) continue;
+    if (k === "gongzuo" && c.pop < 2) continue;
+    o.push({ kind:"u", k, n:d.n, cost:d.cost, d:d.d });
+  }
+  for (const k in DIST) {
+    const D = DIST[k];
+    if (D.need && !S.tech[D.need]) continue;
+    if (c.dists.some(x => x.k === k)) continue;
+    o.push({ kind:"d", k, n:D.n, cost:D.cost, d:D.d + " · " + D.adjD });
+  }
+  for (const k in WON) {
+    const w = WON[k]; if (S.won[k]) continue;
+    if (w.need && !S.tech[w.need]) continue;
+    o.push({ kind:"w", k, n:"【奇观】" + w.n, cost:w.cost, d:w.d + " · " + w.fx });
+  }
+  return o;
+}
+function setQ(c, it) { c.queue = { kind:it.kind, k:it.k, cost:it.cost }; }
+// 区域放置: 玩家点城市边上的空地
+function placeDist(c, k, q, r) {
+  const D = DIST[k], t = S.tiles[q][r];
+  if (t.city || t.dist || t.own !== "p" || t.ownC !== c.id) return "只能放在本城边界内的空地上";
+  if (hexD(c.q, c.r, q, r) > CFG.workRadius) return "太远, 必须在城市 2 格内";
+  const adj = distAdj(k, q, r);
+  t.dist = { k, city:c.id, adj };
+  c.dists.push({ k, q, r, adj });
+  S.st.dists++; rehp(c);
+  log("🏗 " + c.name + "建成【" + D.n + "】相邻加成 +" + adj.toFixed(1), "g");
+  return null;
+}
+function tickCity(c) {
+  const y = cYield(c);
+  c.food += y.food;
+  if (c.food < 0) { c.food = 0; if (c.pop > 1 && rng() < .4) { c.pop--; rehp(c); log(c.name + "缺粮, 人口流散", "b"); } }
+  else if (c.food >= foodNeed(c.pop) && c.pop < CFG.popMax) { c.food -= foodNeed(c.pop); c.pop++; rehp(c); log("🌾 " + c.name + "人口增至 " + c.pop, "g"); }
+  c.prod += y.prod;
+  if (c.queue && c.prod >= c.queue.cost) {
+    const q = c.queue; c.prod -= q.cost; c.queue = null;
+    if (q.kind === "u") { const u = spawn(q.k, c.q, c.r, "p"); if (u) { u.mp = 0; u.acted = 1; }
+      if (q.k === "gongzuo" && c.pop > 1) { c.pop--; rehp(c); }
+      log("🔨 " + c.name + "产出【" + UT[q.k].n + "】", "g");
+      if (army() >= 8) eureka("zhenggui"); }
+    else if (q.kind === "d") { c.pending = q.k; log("🏗 " + c.name + "的【" + DIST[q.k].n + "】已备料 — 点城市面板选一块空地放置", "h"); }
+    else { S.won[q.k] = 1; log("★★ 奇观建成: 【" + WON[q.k].n + "】— " + WON[q.k].fx, "k");
+      if (q.k === "ranzhuang") for (const x of pcity()) rehp(x); }
+  }
+  c.cultS += y.cult;
+  if (c.cultS >= cultNeed(c.border) && c.border < 3) { c.cultS -= cultNeed(c.border); c.border++; claim(c); log("✊ " + c.name + "边界扩张(半径" + c.border + ")", "g"); }
+  if (c.justCap > 0) c.justCap--;
+  else if (c.hp < c.maxHp && !nbrs(c.q, c.r).some(([a, b]) => uSide(a, b, "j"))) c.hp = Math.min(c.maxHp, c.hp + 5);
+  if (c.ruin > 0) c.ruin--;
+  return y;
+}
+function tickTech() {
+  const e = empire();
+  S.sci += e.sci; S.cult += e.cult; S.arms += e.arms;
+  if (!S.techCur) return;
+  const t = TECH[S.techCur];
+  const need = t.cost * (S.eureka[S.techCur] ? .5 : 1);
+  S.techProg += e.sci;
+  if (S.techProg >= need) { S.tech[S.techCur] = 1; S.techProg = 0;
+    log("📖 研究完成【" + t.n + "】— " + t.fx, "s"); S.techCur = null; }
+}
+function techOk(k) { const t = TECH[k]; return !S.tech[k] && t.need.every(n => S.tech[n]); }
+function slots() {
+  let m = { mil:1, eco:1, pol:0 };
+  for (const s of SLOT_BY_TECH) if (!s.tech || S.tech[s.tech]) m = { mil:s.mil, eco:s.eco, pol:s.pol };
+  return m;
+}
+function syncSlots() {
+  const m = slots();
+  for (const k of ["mil", "eco", "pol"]) { while (S.gov[k].length < m[k]) S.gov[k].push(null); while (S.gov[k].length > m[k]) S.gov[k].pop(); }
+}
+function polOk(k) { const p = POL[k]; return (!p.need || S.tech[p.need]) && (S.polUnlock[k] || (p.need && S.tech[p.need])); }
+// ══════ 日军 ══════
+function jpTurn() {
+  // 囚笼: 定期在你的地界边缘修封锁沟/炮楼
+  if (S.turn >= S.nextCage) {
+    S.nextCage = S.turn + 9;
+    const cand = [];
+    for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+      const t = S.tiles[q][r];
+      if (t.city || t.dist || t.block) continue;
+      if (nbrs(q, r).some(([a, b]) => S.tiles[a][b].own === "p")) cand.push([q, r]);
+    }
+    if (cand.length) { let n = 0;
+      for (let i = 0; i < 3 && cand.length; i++) { const [q, r] = cand.splice(ri(0, cand.length - 1), 1)[0]; S.tiles[q][r].block = 1; n++; }
+      if (n) log("日军修筑封锁沟墙, 根据地边缘 " + n + " 处地块产出被压制 — 派部队【破袭】或攻占据点可解除", "j"); }
+  }
+  // 扫荡
+  if (S.turn >= S.nextSweep) {
+    const rank = pcity().filter(c => !c.warn).sort((a, b) => (b.pop + b.ctrl / 18 + (plainCity(b) ? 3 : 0)) - (a.pop + a.ctrl / 18 + (plainCity(a) ? 3 : 0)));
+    const n = S.hard ? 2 : 1;                       // 三光时期同时合击两处
+    const hit = rank.slice(0, n);
+    if (hit.length) {
+      for (const tg of hit) tg.warn = 2;
+      S.nextSweep = S.turn + 2;
+      log("⚠ 敌情: 日军向" + hit.map(c => c.name).join("、") + "集结, 2回合后扫荡 — 调兵回防【驻防】, 装【反扫荡预案】, 平原靠【地道网】", "j");
+    } else S.nextSweep = S.turn + 2;
+  }
+  for (const c of pcity()) if (c.warn > 0) { c.warn--; if (c.warn === 0) doSweep(c); }
+  // 敌单位
+  for (const u of S.units.filter(x => x.side === "j").slice()) {
+    if (!S.units.includes(u)) continue;
+    u.mp = UT[u.type].mp; u.acted = 0;
+    if (u.garr) { const c = S.cities.find(x => x.id === u.garr); if (c && c.side === "j") continue; u.garr = null; }
+    jpAct(u);
+    if (S.over) return;
+  }
+  // 囚笼重建: 只要县城还在, 日军就会沿铁路重修炮楼
+  if (S.turn > 20 && S.turn % 11 === 0 && jcity().some(x => x.cap) && jcity().length < 8) {
+    const cand = [];
+    for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+      const t = S.tiles[q][r];
+      if (t.city || t.dist || t.own === "p") continue;
+      if (!(t.road || t.rail)) continue;
+      if (S.cities.some(c2 => hexD(q, r, c2.q, c2.r) < 3)) continue;
+      cand.push([q, r]);
+    }
+    if (cand.length) { const [q, r] = cand[ri(0, cand.length - 1)];
+      addCity(q, r, "j", "炮楼·新筑", { pop:2, hp:82 });
+      log("日军沿交通线重修炮楼, 囚笼又收紧一分 — 拔掉它", "j"); }
+  }
+  for (const c of jcity()) {
+    const bes = nbrs(c.q, c.r).some(([a, b]) => uSide(a, b, "p"));
+    if (!bes && c.hp < c.maxHp) c.hp = Math.min(c.maxHp, c.hp + 4);
+    if (!bes && !S.units.some(x => x.side === "j" && x.q === c.q && x.r === c.r) && rng() < .3) {
+      const u = spawn(c.cap ? "zhong" : "wei", c.q, c.r, "j", { garr:c.id }); if (u) u.mp = 0;
+    }
+  }
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) if (S.tiles[q][r].cut > 0) S.tiles[q][r].cut--;
+}
+function jpAct(u) {
+  let st = 0;
+  while (u.mp > 0 && st++ < 6) {
+    let tgt = null;
+    for (const [a, b] of nbrs(u.q, u.r)) {
+      const pu = uSide(a, b, "p"); if (pu && !UT[pu.type].hide) { tgt = [a, b]; break; }
+      const c = cityAt(a, b); if (c && c.side === "p" && !tgt) tgt = [a, b];
+    }
+    if (tgt) { attack(u, tgt[0], tgt[1]); return; }
+    let dest = u.tq !== undefined ? [u.tq, u.tr] : null;
+    const tc = dest && cityAt(dest[0], dest[1]);
+    if (!tc || tc.side !== "p") { const mc = pcity(); if (!mc.length) return;
+      mc.sort((a, b) => hexD(u.q, u.r, a.q, a.r) - hexD(u.q, u.r, b.q, b.r));
+      dest = [mc[0].q, mc[0].r]; u.tq = dest[0]; u.tr = dest[1]; }
+    const dc = cityAt(dest[0], dest[1]);
+    if (dc && dc.side === "p" && dc.hp <= 0 && hexD(u.q, u.r, dest[0], dest[1]) === 1 && !uSide(dest[0], dest[1], "p")) {
+      u.q = dest[0]; u.r = dest[1]; capture(dc, "j"); return;
+    }
+    const o = nbrs(u.q, u.r).filter(([a, b]) => !blocked(a, b, u));
+    if (!o.length) return;
+    o.sort((x, y) => hexD(x[0], x[1], dest[0], dest[1]) - hexD(y[0], y[1], dest[0], dest[1]));
+    const [nq, nr] = o[0];
+    if (hexD(nq, nr, dest[0], dest[1]) >= hexD(u.q, u.r, dest[0], dest[1])) return;
+    u.mp -= stepC(nq, nr, u); u.q = nq; u.r = nr;
+    // 沿途烧改良(三光)
+    const t = S.tiles[nq][nr];
+    if (S.hard && (t.imp || t.dist) && !t.burn && t.own === "p") { t.burn = 1; S.st.burned++;
+      log("🔥 " + (t.dist ? DIST[t.dist.k].n : IMP[t.imp].n) + "被烧毁 — 派建设队可修复", "b"); }
+  }
+}
+function doSweep(c) {
+  const P = polFx();
+  const y = CFG.startYear + Math.floor((CFG.startMonth - 1 + S.turn - 1) / 12);
+  const era = y <= 1938 ? .6 : y <= 1940 ? 1 : y <= 1942 ? 1.5 : y <= 1943 ? 1.1 : .7;
+  const scale = (.7 + rng() * .6) * era * S.sweepPow * (1 + popCtl() / 55);
+  S.st.sweeps++;
+  const from = jcity().sort((a, b) => hexD(a.q, a.r, c.q, c.r) - hexD(b.q, b.r, c.q, c.r))[0];
+  const n = Math.max(1, Math.round(scale * 2));
+  const menu = y <= 1939 ? ["wei", "wei", "ri"] : y <= 1942 ? ["wei", "ri", "ri", "zhong"] : ["ri", "zhong", "zhong", "qibing"];
+  let made = 0;
+  if (from) for (let i = 0; i < n; i++) { const u = spawn(pick(menu), from.q, from.r, "j", { tq:c.q, tr:c.r }); if (u) { u.mp = 0; made++; } }
+  // 直接冲击: 城防与人口
+  const def = unitsAround(c).reduce((a, u) => a + uStr(u, "def") * (u.fort ? 1.65 : 1), 0) * (1 + (P.sweepDef || 0)) * 1.45;
+  const power = scale * 60 * (plainCity(c) ? (S.won.ranzhuang ? .8 : 1.5) : .85);
+  const held = def * 1.15 > power;
+  const hpLoss = clamp(power / (def / 8 + 6) * 3.4, 6, 62) * (held ? .35 : 1);
+  c.hp = Math.max(0, c.hp - hpLoss);
+  let killed = scale * 950 * (1 + (P.sweepKill || 0)) * (held ? 1.9 : .5);
+  if (S.tech.dilei) killed *= 1.4;
+  S.st.kill += killed * .5; S.st.pupKill += killed * 1.1;
+  // 扫荡中我军的伤亡(顶住也要流血)
+  for (const u of unitsAround(c)) { const l = (held ? 7 : 26) * scale * (u.fort ? .7 : 1);
+    u.hp = Math.max(6, u.hp - l); S.st.loss += l * UT[u.type].str * 4.5; }
+  if (held) { S.st.held++; eureka("dilei"); }
+  if (plainCity(c)) eureka("didao");
+  // 三光: 人口与改良永久受损
+  if (S.hard) {
+    const before = c.pop;
+    const dp = held ? 1 : (rng() < .55 ? 3 : 2);
+    c.pop = Math.max(1, c.pop - dp); c.ruin = held ? 2 : 5; rehp(c);
+    S.mass = Math.max(0, S.mass - (held ? 2 : 6));
+    let bn = 0;
+    for (const [a, b] of inRing(c.q, c.r, 2)) { const t = S.tiles[a][b];
+      if ((t.imp || t.dist) && !t.burn && t.own === "p" && rng() < (held ? .3 : .8)) { t.burn = 1; bn++; S.st.burned++; } }
+    log("🔥「三光」: " + c.name + "人口 " + before + "→" + c.pop + ", " + bn + "处农田/区域被烧, "
+      + c.ruin + "个月无法恢复生产 — 派建设队修复, 装【精兵简政】减负", "b");
+  }
+  log("⚔ 日军扫荡" + c.name + "(" + made + "路, 约" + scale.toFixed(1) + "倍兵力): 城防-" + hpLoss.toFixed(0)
+    + (held ? " — 依托地形与工事顶住了, 歼敌 " + Math.round(killed) : " — 未能挡住"), held ? "h" : "b");
+  S.nextSweep = S.turn + CFG.sweepGap + ri(0, 2);
+}
+function unitsAround(c) { const o = []; for (const u of S.units) if (u.side === "p" && hexD(u.q, u.r, c.q, c.r) <= 1) o.push(u); return o; }
+// ══════ 回合 ══════
+function endTurn() {
+  if (S.over) return;
+  deselect();
+  tickWork();
+  for (const c of pcity()) tickCity(c);
+  tickTech();
+  jpTurn();
+  if (S.over) return;
+  const P = polFx();
+  for (const u of S.units) {
+    if (u.side !== "p") continue;
+    u.mp = UT[u.type].mp; u.acted = 0;
+    if (u.work) { u.acted = 1; u.mp = 0; }
+    if (u.hp < 100) {
+      const c = cityAt(u.q, u.r);
+      let h = c && c.side === "p" ? CFG.healCity + c.dists.filter(d => DIST[d.k].heal).length * 14
+        : S.tiles[u.q][u.r].own === "p" ? CFG.healOwn : CFG.healWild;
+      h *= 1 + (P.heal || 0) + (S.won.baiqiuen ? .4 : 0);
+      if (S.units.some(x => x.side === "j" && hexD(x.q, x.r, u.q, u.r) === 1)) h = 0;
+      u.hp = Math.min(100, u.hp + h);
+      if (u.hp < 40) eureka("weisheng");
+    }
+    if (u.path && u.path.length) advance(u);
+    if (UT[u.type].str && S.tiles[u.q][u.r].rail) eureka("poxi");
+  }
+  // 维护: 粮不够就掉兵力
+  let up = 0; for (const u of S.units) if (u.side === "p") up += (UT[u.type].up || 0);
+  up *= 1 + (P.upkeep || 0);
+  const e = empire();
+  S.food = e.food;
+  if (e.food < up) { for (const u of S.units) if (u.side === "p") u.hp = Math.max(8, u.hp - 4);
+    log("补给不足(需" + up.toFixed(1) + "粮/回合, 仅" + e.food.toFixed(1) + ") — 全军减员。装【精兵简政】或多修农田", "b"); }
+  S.man += popCtl() * .012 * (1 + S.mass / 200);
+  S.mass = clamp(S.mass + popCtl() * .012 - (S.hard ? .5 : 0), 0, 100);
+  S.opPress = (S.opPress || 0) * .93;
+  if (popCtl() > S.st.popPeak) S.st.popPeak = popCtl();
+  checkEv();
+  S.turn++;
+  if (S.turn > CFG.turns) { end(1, "survive"); return; }
+  if (!pcity().length) { end(0, "wiped"); return; }
+  vis(); refresh(); save();
+}
+function checkEv() {
+  for (const e of EV) { if (S.evDone[e.id]) continue; if (e.t > S.turn) continue;
+    S.evDone[e.id] = 1; if (typeof showEv === "function") showEv(e); else e.op[0].f(S); return; }
+}
+function end(win, how) {
+  if (S.over) return;
+  S.over = 1;
+  const pc = popCtl(), a = army(), p = pinned();
+  const score = Math.round(pc * 3.6 + a * 2.5 + p.r * 260 + S.st.kill / 2600 + pcity().length * 8 + S.st.cap * 22
+    + S.mass * .9 + S.st.dists * 5 + S.st.held * 14 + Object.keys(S.won).length * 22
+    - S.st.loss / 3200 - S.st.burned * 3
+    + (how === "conquest" ? 120 : how === "cage" ? 80 : 0) - (win ? 0 : 350));
+  const tier = !win ? ["失败", "根据地丧失", "但历史上, 即使在最黑暗的1942年, 这支队伍也从未被消灭。"]
+    : score >= 1180 ? ["S", "中流砥柱", "解放区连成一片, 敌后战场抗击了侵华日军的大部与几乎全部伪军 —— 这就是历史的答案。"]
+    : score >= 1050 ? ["A", "巩固发展", "在最残酷的岁月里活下来并壮大, 日军再无法安枕。"]
+    : score >= 850 ? ["B", "坚持敌后", "队伍还在, 阵地还在, 群众还在。"]
+    : score >= 600 ? ["C", "艰难支撑", "熬过来了, 但元气大伤。"]
+    : ["D", "损失惨重", "教训: 群众工作是根本, 硬拼不是出路。"];
+  S.result = { score, tier, pc, a, p, how };
+  clearSave();
+  if (typeof showEnd === "function") showEnd();
+}
+const SK = "genjudi1937_v1";
+function save() { try { localStorage.setItem(SK, JSON.stringify(S)); } catch (e) {} }
+function hasSave() { try { return !!localStorage.getItem(SK); } catch (e) { return false; } }
+function load() { try { const d = JSON.parse(localStorage.getItem(SK)); if (!d || d.over) return false; S = d; return true; } catch (e) { return false; } }
+function clearSave() { try { localStorage.removeItem(SK); } catch (e) {} }
+
+// ══════ 渲染 ══════
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let cam = { x:0, y:0, z:.85 }, sel = null, reachM = null, hover = null, placeMode = null;
+function syncCv() { const d = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.width = innerWidth * d; cv.height = innerHeight * d; cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
+  ctx.setTransform(d, 0, 0, d, 0, 0); }
+function hp(cx, cy, s) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); const x = cx + s * Math.cos(a), y = cy + s * Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); }
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function selU() { return sel && sel.k === "unit" ? S.units.find(u => u.id === sel.id) : null; }
+function selC() { return sel && sel.k === "city" ? S.cities.find(c => c.id === sel.id) : null; }
+function draw() {
+  if (!S) return;
+  ctx.save(); ctx.fillStyle = "#12100b"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+  ctx.translate(-cam.x, -cam.y); ctx.scale(cam.z, cam.z);
+  const s = CFG.hex, su = selU(), sc = selC();
+  const wk = new Set(); if (sc && sc.side === "p") for (const w of worked(sc)) wk.add(key(w.q, w.r));
+  for (let r = 0; r < H; r++) for (let q = 0; q < W; q++) {
+    const t = S.tiles[q][r], [cx, cy] = hexC(q, r);
+    if (!t.disc) { ctx.fillStyle = "#0a0906"; hp(cx, cy, s - .5); ctx.fill(); continue; }
+    ctx.fillStyle = TERR[t.t].col; hp(cx, cy, s - .5); ctx.fill();
+    if (!seen(q, r)) { ctx.fillStyle = "rgba(8,7,4,.45)"; ctx.fill(); }
+    if (t.own) { ctx.strokeStyle = t.own === "p" ? "rgba(190,70,52,.6)" : "rgba(96,110,150,.5)"; ctx.lineWidth = 2; hp(cx, cy, s - 2); ctx.stroke(); }
+    else { ctx.strokeStyle = "rgba(0,0,0,.24)"; ctx.lineWidth = 1; ctx.stroke(); }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (t.t === "mountain") { ctx.fillStyle = "rgba(0,0,0,.34)"; ctx.font = Math.round(s * .42) + "px serif"; ctx.fillText("▲", cx, cy + 2); }
+    else if (t.t === "forest") { ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.font = Math.round(s * .36) + "px serif"; ctx.fillText("♠", cx, cy + 2); }
+    else if (t.t === "hills") { ctx.fillStyle = "rgba(0,0,0,.24)"; ctx.font = Math.round(s * .38) + "px serif"; ctx.fillText("◠", cx, cy + 4); }
+    if (t.road) { ctx.strokeStyle = "#7a5c38"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx - s * .5, cy); ctx.lineTo(cx + s * .5, cy); ctx.stroke(); }
+    if (t.rail) { ctx.strokeStyle = t.cut ? "#8a3a30" : "#33333a"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(cx, cy - s * .62); ctx.lineTo(cx, cy + s * .62); ctx.stroke(); }
+    if (t.res && cam.z > .5) { ctx.font = Math.round(s * .3) + "px serif"; ctx.fillText(RES[t.res].ic, cx - s * .44, cy - s * .4); }
+    if (t.block) { ctx.strokeStyle = "#8a5a3a"; ctx.lineWidth = 2; ctx.setLineDash([3, 3]); hp(cx, cy, s - 6); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "#c98a6a"; ctx.font = "10px sans-serif"; ctx.fillText("封锁", cx, cy + s * .3); }
+    if (t.imp) { ctx.fillStyle = t.burn ? "rgba(140,40,30,.9)" : "rgba(206,186,116,.92)";
+      rr(cx - 12, cy + s * .26 - 7, 24, 14, 4); ctx.fill();
+      ctx.fillStyle = t.burn ? "#ffd9c9" : "#241d10"; ctx.font = "bold 10px sans-serif"; ctx.fillText(t.burn ? "焚" : IMP[t.imp].n[0], cx, cy + s * .26); }
+    if (t.dist) { const D = DIST[t.dist.k];
+      ctx.fillStyle = t.burn ? "#5a2a20" : "#3d5a6e"; rr(cx - 17, cy - 11, 34, 22, 5); ctx.fill();
+      ctx.strokeStyle = t.burn ? "#c4674f" : "#7fa8c4"; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.fillStyle = "#e8f0f8"; ctx.font = "bold 10px sans-serif"; ctx.fillText(D.n.slice(0, 3), cx, cy - 2);
+      ctx.fillStyle = "#c9a44a"; ctx.font = "9px sans-serif"; ctx.fillText("+" + (t.dist.adj || 0), cx, cy + 8); }
+    if (wk.has(key(q, r))) { ctx.strokeStyle = "rgba(232,201,122,.9)"; ctx.lineWidth = 2.4; ctx.setLineDash([4, 4]); hp(cx, cy, s - 6); ctx.stroke(); ctx.setLineDash([]); }
+    if (placeMode && placeMode.ok && placeMode.ok.has(key(q, r))) {
+      ctx.fillStyle = "rgba(120,190,230,.3)"; hp(cx, cy, s - 4); ctx.fill();
+      ctx.strokeStyle = "#7fd0e8"; ctx.lineWidth = 2.4; ctx.setLineDash([5, 4]); hp(cx, cy, s - 5); ctx.stroke(); ctx.setLineDash([]);
+      const a = distAdj(placeMode.k, q, r);
+      ctx.fillStyle = "#e8f4ff"; ctx.font = "bold 12px sans-serif"; ctx.fillText("+" + a.toFixed(1), cx, cy);
+    }
+  }
+  for (const c of S.cities) {
+    if (!S.tiles[c.q][c.r].disc) continue;
+    const [cx, cy] = hexC(c.q, c.r), mine = c.side === "p";
+    ctx.fillStyle = mine ? "#7d3524" : "#3a4459"; rr(cx - 20, cy - 15, 40, 28, 6); ctx.fill();
+    ctx.strokeStyle = mine ? "#e0a24d" : "#7a8cae"; ctx.lineWidth = 2; ctx.stroke();
+    if (c.cap) { ctx.fillStyle = mine ? "#ffd766" : "#cdd8ef"; ctx.font = "10px serif"; ctx.textAlign = "center"; ctx.fillText("★", cx, cy - 19); }
+    ctx.fillStyle = "#ffeccd"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(c.pop), cx - 8, cy);
+    ctx.font = "10px sans-serif"; ctx.fillStyle = mine ? "#ffd9b0" : "#cddaf5"; ctx.fillText(mine ? "村" : "敌", cx + 9, cy + 1);
+    const pct = clamp(c.hp / c.maxHp, 0, 1);
+    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(cx - 20, cy + 15, 40, 4);
+    ctx.fillStyle = pct > .6 ? "#8dbf6a" : pct > .25 ? "#d9a441" : "#d9584a"; ctx.fillRect(cx - 20, cy + 15, 40 * pct, 4);
+    if (cam.z > .55) { ctx.fillStyle = "rgba(242,232,205,.94)"; ctx.font = "11px sans-serif"; ctx.fillText(c.name, cx, cy + 28); }
+    if (mine && c.warn > 0) { ctx.fillStyle = "#e8c97a"; ctx.font = "bold 11px sans-serif"; ctx.fillText("⚠ 敌集结 " + c.warn, cx, cy - 26); }
+    else if (mine && c.ruin > 0) { ctx.fillStyle = "#d9584a"; ctx.font = "bold 10px sans-serif"; ctx.fillText("🔥 三光余烬", cx, cy - 26); }
+    if (mine && cam.z > .55) { ctx.font = "10px sans-serif";
+      if (c.pending) { ctx.fillStyle = "#7fd0e8"; ctx.fillText("待放置区域", cx, cy + 40); }
+      else if (c.queue) { const y2 = cYield(c), L = Math.max(1, Math.ceil((c.queue.cost - c.prod) / Math.max(1, y2.prod)));
+        ctx.fillStyle = "#c9a44a"; ctx.fillText("🔨" + (c.queue.kind === "u" ? UT[c.queue.k].n : c.queue.kind === "d" ? DIST[c.queue.k].n : WON[c.queue.k].n) + " " + L, cx, cy + 40); }
+      else { ctx.fillStyle = "#d9584a"; ctx.fillText("⚠ 未安排生产", cx, cy + 40); } }
+  }
+  if (reachM) for (const k in reachM) { const [cx, cy] = hexC(reachM[k].q, reachM[k].r);
+    ctx.fillStyle = "rgba(210,240,140,.28)"; hp(cx, cy, s - 4); ctx.fill();
+    ctx.strokeStyle = "rgba(232,201,122,.85)"; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); hp(cx, cy, s - 5); ctx.stroke(); ctx.setLineDash([]); }
+  for (const u of S.units) {
+    if (u.side === "j" && !seen(u.q, u.r)) continue;
+    const [cx, cy] = hexC(u.q, u.r), d = UT[u.type], mine = u.side === "p";
+    const inC = !!S.tiles[u.q][u.r].city, ox = inC ? 17 : 0, oy = inC ? -17 : 0;
+    ctx.fillStyle = mine ? (u.acted ? "#4a3a2a" : "#7a2620") : "#33405c";
+    ctx.beginPath(); ctx.arc(cx + ox, cy + oy, 14, 0, 7); ctx.fill();
+    ctx.strokeStyle = mine ? "#e8cf90" : "#8fa3cc"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#f4e8c8"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(d.gl, cx + ox, cy + oy + 1);
+    if (u.hp < 100) { ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(cx + ox - 13, cy + oy + 15, 26, 3);
+      ctx.fillStyle = mine ? "#8dbf6a" : "#d9584a"; ctx.fillRect(cx + ox - 13, cy + oy + 15, 26 * u.hp / 100, 3); }
+    if (u.lv) { ctx.fillStyle = "#ffd766"; ctx.font = "9px sans-serif"; ctx.fillText("★" + u.lv, cx + ox + 14, cy + oy - 11); }
+    if (u.work) { ctx.font = "11px serif"; ctx.fillText("🔧", cx + ox - 14, cy + oy - 11); }
+    if (u.fort) { ctx.font = "10px serif"; ctx.fillText("🛡", cx + ox + 14, cy + oy + 11); }
+  }
+  if (su) { const [cx, cy] = hexC(su.q, su.r); ctx.strokeStyle = "#ffd766"; ctx.lineWidth = 2.5; hp(cx, cy, s - 3); ctx.stroke();
+    if (su.path && su.path.length) { ctx.strokeStyle = "rgba(143,210,232,.85)"; ctx.lineWidth = 3; ctx.setLineDash([7, 6]);
+      ctx.beginPath(); ctx.moveTo(cx, cy); for (const [a, b] of su.path) { const [x2, y2] = hexC(a, b); ctx.lineTo(x2, y2); } ctx.stroke(); ctx.setLineDash([]); } }
+  if (sc) { const [cx, cy] = hexC(sc.q, sc.r); ctx.strokeStyle = "#8fd2e8"; ctx.lineWidth = 2.5; hp(cx, cy, s - 3); ctx.stroke(); }
+  if (hover && su) { const [hx, hy] = hexC(hover.q, hover.r);
+    if (hover.k === "move" && hover.p) { ctx.strokeStyle = "rgba(255,215,102,.9)"; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
+      ctx.beginPath(); for (let i = 0; i < hover.p.length; i++) { const [x2, y2] = hexC(hover.p[i][0], hover.p[i][1]); i ? ctx.lineTo(x2, y2) : ctx.moveTo(x2, y2); } ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = "#ffd766"; ctx.lineWidth = 2.5; hp(hx, hy, s - 4); ctx.stroke(); }
+    if (hover.lb) { ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const bw = ctx.measureText(hover.lb).width + 14;
+      ctx.fillStyle = "rgba(18,16,11,.92)"; rr(hx - bw / 2, hy - s * .6 - 10, bw, 20, 6); ctx.fill();
+      ctx.strokeStyle = hover.k === "atk" ? "rgba(217,88,74,.9)" : "rgba(232,201,122,.85)"; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = hover.k === "atk" ? "#ff9a86" : "#ffd766"; ctx.fillText(hover.lb, hx, hy - s * .6); } }
+  ctx.restore();
+}
+// ══════ UI 基础 ══════
+const $ = id => document.getElementById(id);
+let lc = 0, lu = 0;
+try { lc = localStorage.getItem("genjudi.log") === "1"; } catch (e) {}
+function applyLog() { const w = $("logW"); if (!w) return; w.classList.toggle("cl", !!lc);
+  $("logH").querySelector(".c").textContent = lc ? "▶" : "▼";
+  const b = $("logU"); if (lc && lu) { b.textContent = lu > 99 ? "99+" : String(lu); b.classList.remove("hidden"); } else b.classList.add("hidden"); }
+function toggleLog(f) { lc = f === undefined ? !lc : !!f; if (!lc) lu = 0; try { localStorage.setItem("genjudi.log", lc ? "1" : "0"); } catch (e) {} applyLog(); }
+function push(m, c) { const p = document.createElement("p"); if (c) p.className = c;
+  p.textContent = (S ? turnDate(S.turn) + " " : "") + m;
+  const b = $("logB"); b.appendChild(p); while (b.children.length > 80) b.removeChild(b.firstChild); b.scrollTop = b.scrollHeight;
+  if (lc) { if (c === "b") { toggleLog(false); return; } lu++; applyLog(); } }
+function openM(h) { $("mb").innerHTML = h; $("mw").classList.remove("hidden"); }
+function closeM() { $("mw").classList.add("hidden"); }
+function mOpen() { return !$("mw").classList.contains("hidden"); }
+function refresh() { updTop(); updGoal(); side(); draw(); }
+function updTop() {
+  const e = empire(), p = pinned();
+  let up = 0; for (const u of S.units) if (u.side === "p") up += (UT[u.type].up || 0);
+  up *= 1 + (polFx().upkeep || 0);
+  const fd = e.food - up;
+  $("rFood").innerHTML = "🌾 粮 <b>" + e.food.toFixed(1) + "</b><i class='" + (fd >= 0 ? "up" : "dn") + "'> 维护-" + up.toFixed(1) + "</i>";
+  $("rProd").innerHTML = "🔨 工 <b>" + e.prod.toFixed(0) + "</b>";
+  $("rSci").innerHTML = "📖 学 <b>" + e.sci.toFixed(0) + "</b>" + (S.techCur ? "<i> · " + TECH[S.techCur].n + " " + Math.max(1, Math.ceil((TECH[S.techCur].cost * (S.eureka[S.techCur] ? .5 : 1) - S.techProg) / Math.max(1, e.sci))) + "回合</i>" : "");
+  $("rCult").innerHTML = "✊ 民心 <b>" + Math.round(S.cult) + "</b><i> 群众 " + Math.round(S.mass) + "</i>";
+  $("rMan").innerHTML = "🔫 军械 <b>" + Math.round(S.arms) + "</b>";
+  $("rTurn").innerHTML = turnDate(S.turn) + " <i style='color:#a2977c'>(" + S.turn + "/" + CFG.turns + ")</i>";
+  $("bTech").classList.toggle("hot", !S.techCur);
+  $("bTech").textContent = S.techCur ? "研究:" + TECH[S.techCur].n : "研究(未定!)";
+  const m = slots(); let used = 0, tot = m.mil + m.eco + m.pol;
+  for (const k of ["mil", "eco", "pol"]) for (const x of S.gov[k]) if (x) used++;
+  $("bGov").classList.toggle("hot", used < tot);
+  $("bGov").textContent = "政策 " + used + "/" + tot;
+  $("pin").innerHTML = "🎖 敌后牵制侵华日军 <b>" + p.ours + "/" + p.tot + "</b> 个师团(" + Math.round(p.r * 100) + "%) · 解放区人口 <b>" + popCtl().toFixed(1) + "</b> 百万 · 抗日武装 <b>" + army().toFixed(1) + "</b> 万";
+  const idle = pcity().some(c => !c.queue && !c.pending);
+  $("endBtn").className = idle ? "" : "ok";
+  $("endBtn").textContent = idle ? "有城闲置 · 结束回合 ▶" : "结束回合 ▶";
+}
+function updGoal() {
+  const g = $("goal");
+  const st = [];
+  if (!S.techCur) st.push("· <b>选一项研究</b>(顶栏【研究】)");
+  const idleC = pcity().filter(c => !c.queue && !c.pending);
+  if (idleC.length) st.push("· <b>" + idleC[0].name + "闲置</b>: 点它安排生产");
+  const pend = pcity().find(c => c.pending);
+  if (pend) st.push("· <b class='k'>" + pend.name + "有区域待放置</b>: 点城市→放置");
+  const set = S.units.filter(u => u.side === "p" && u.type === "gongzuo" && !u.acted);
+  if (set.length) st.push("· 工作队可【建立根据地】(走远点, 隔3格)");
+  const bld = S.units.filter(u => u.side === "p" && u.type === "jianshe" && !u.acted && !u.work);
+  if (bld.length) st.push("· 建设队可修农田/矿场");
+  const idleU = S.units.filter(u => u.side === "p" && !u.acted && !u.work && UT[u.type].str);
+  if (idleU.length) st.push("· " + idleU.length + " 支部队待命(发动群众/驻防/进攻)");
+  const warn = pcity().find(c => c.warn > 0);
+  if (warn) st.unshift("· <b style='color:#d9584a'>" + warn.name + "遭日军集结, " + warn.warn + "回合后扫荡!</b>");
+  let m = slots(), used = 0, tot = m.mil + m.eco + m.pol;
+  for (const k of ["mil", "eco", "pol"]) for (const x of S.gov[k]) if (x) used++;
+  if (used < tot) st.push("· <b>有空政策槽</b>(顶栏【政策】)");
+  g.innerHTML = "<b>本回合可做</b><br>" + (st.length ? st.slice(0, 5).join("<br>") : "· 都安排好了 — 结束回合");
+}
+
+// ══════ 侧面板 ══════
+function side() {
+  const el = $("side");
+  if (!sel) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const u = selU(), c = selC();
+  let h = "";
+  if (u) {
+    const d = UT[u.type], t = S.tiles[u.q][u.r];
+    h += "<h3>" + d.n + (u.lv ? " ★" + u.lv : "") + "<small>兵力 " + Math.round(u.hp) + " · 机动 " + u.mp + "/" + d.mp + "</small></h3>";
+    if (d.str) h += "<div class='row'>战力 " + uStr(u, "atk").toFixed(0) + "(攻) / " + uStr(u, "def").toFixed(0) + "(守)</div>";
+    h += "<div class='hint'>" + d.d + "</div>";
+    if (u.work) h += "<div class='good'>🔧 施工中 · 余 " + u.work.left + " 回合</div>";
+    if (u.path && u.path.length) h += "<div class='row' style='color:#8fd2e8'>🚩 行军中 余" + u.path.length + "步 <button class='tb' style='padding:1px 7px;font-size:11px' onclick='cancelP()'>取消</button></div>";
+    h += u.acted ? "<div class='row' style='color:#a2977c'>本回合已行动</div>"
+      : "<div class='row' style='color:#cdff72'>➜ 点金框格移动 · 点更远处自动多回合行军 · 点相邻敌人/敌城=攻击</div>";
+    h += "<hr>";
+    if (!u.acted) {
+      if (u.type === "gongzuo") { const why = canFound(u.q, u.r);
+        h += "<button class='ab' " + (why ? "disabled" : "") + " onclick='uiFound()'>🚩 建立根据地 <span class='c'>消耗本队</span><span class='s'>" + (why || "立刻获得一座可生产的根据地村") + "</span></button>"; }
+      if (u.type === "jianshe" && !u.work) {
+        if (t.burn) h += "<button class='ab' onclick='uiRepair()'>🛠 修复被烧毁的" + (t.dist ? DIST[t.dist.k].n : IMP[t.imp] ? IMP[t.imp].n : "设施") + " <span class='c'>1回合</span></button>";
+        for (const k in IMP) { const I = IMP[k];
+          const ok = I.on.includes(t.t) && t.own === "p" && !t.city && !t.dist && !(t.imp === k && !t.burn);
+          const why = !I.on.includes(t.t) ? "需" + I.on.map(x => TERR[x].n).join("/") : t.own !== "p" ? "需在自家地界" : t.dist ? "此处是区域" : t.imp === k ? "已有" : "+" + (I.food ? I.food + "粮 " : "") + (I.prod ? I.prod + "工" : "");
+          h += "<button class='ab' " + (ok ? "" : "disabled") + " onclick=\"uiWork('" + k + "')\">🔨 修" + I.n + " <span class='c'>" + I.t + "回合</span><span class='s'>" + why + "</span></button>"; }
+      }
+      const nc = nearCity(u.q, u.r);
+      if (nc && nc.side === "p") h += "<button class='ab' onclick='uiFadong()'>✊ 发动群众 <span class='c'>耗本回合</span><span class='s'>" + nc.name + "控制度+6 · 群众基础+ · 是一切的根本</span></button>";
+      if (d.str) {
+        h += "<button class='ab' onclick='uiFort()'>🛡 驻防 <span class='c'>守+5</span><span class='s'>原地设防, 每回合回血; 反扫荡时城防大增</span></button>";
+        if (S.tech.poxi) { let has = (t.rail && !t.cut) || nbrs(u.q, u.r).some(([a, b]) => S.tiles[a][b].rail && !S.tiles[a][b].cut);
+          h += "<button class='ab' " + (has ? "" : "disabled") + " onclick='uiSab()'>💥 破袭铁路 <span class='c'>军械+14</span><span class='s'>" + (has ? "站在或紧邻铁路即可 · 推迟日军扫荡" : "身边没有完好铁路") + "</span></button>"; }
+      }
+      h += "<button class='ab' onclick='uiSkip()'>💤 跳过</button>";
+    }
+  } else if (c) {
+    const mine = c.side === "p", y = mine ? cYield(c) : null;
+    h += "<h3>" + c.name + (c.cap ? " ★" : "") + "<small>" + (mine ? "根据地" : "日军据点") + " · 人口 " + c.pop + "</small></h3>";
+    h += "<div class='row'>城防 " + Math.round(c.hp) + " / " + c.maxHp + "</div><div class='bar'><i style='width:" + clamp(c.hp / c.maxHp * 100, 0, 100) + "%;background:" + (c.hp / c.maxHp > .5 ? "#8dbf6a" : "#d9584a") + "'></i></div>";
+    if (!mine) {
+      h += "<div class='hint'>" + (c.cap ? "日军旅团部。攻克=全县解放(需先研究【攻坚战术】)" : "囚笼上的钉子。打光城防再移入即占领, 占后变成你的根据地并解除周边封锁。") + "</div>";
+      if (c.hp <= 0) h += "<div class='good'>城防已垮! 移一支部队进城即可占领</div>";
+      el.innerHTML = h; return;
+    }
+    if (c.warn > 0) h += "<div class='warn'>⚠ 日军集结中, " + c.warn + " 回合后扫荡 — 调兵回防并【驻防】</div>";
+    if (c.ruin > 0) h += "<div class='warn'>🔥 遭三光摧残, " + c.ruin + " 回合内产出腰斩</div>";
+    h += "<div class='row'>🌾" + y.food.toFixed(1) + " 🔨" + y.prod.toFixed(0) + " 📖" + y.sci.toFixed(0) + " ✊" + y.cult.toFixed(0) + (y.arms ? " 🔫" + y.arms.toFixed(0) : "") + "</div>";
+    const fn = foodNeed(c.pop);
+    h += "<div class='row'>人口成长 " + Math.round(c.food) + "/" + fn + (y.food > 0 ? "(还需" + Math.ceil((fn - c.food) / y.food) + "回合)" : y.food < 0 ? " <span style='color:#d9584a'>粮为负!</span>" : "") + "</div>";
+    h += "<div class='bar'><i style='width:" + clamp(c.food / fn * 100, 0, 100) + "%;background:#8dbf6a'></i></div>";
+    h += "<div class='row'>控制度 " + Math.round(c.ctrl) + " · 边界 " + c.border + " 圈 · 民心 " + Math.round(c.cultS) + "/" + cultNeed(c.border) + "</div>";
+    if (c.dists.length) h += "<div class='row'>区域: " + c.dists.map(d => DIST[d.k].n + "(+" + (d.adj || 0) + ")").join("、") + "</div>";
+    if (c.pending) {
+      h += "<hr><div class='row' style='color:#7fd0e8'><b>【" + DIST[c.pending].n + "】已备料 — 选一块空地放置</b></div>";
+      h += "<button class='ab on' onclick='startPlace(" + c.id + ")'>📍 开始放置(地图上蓝框格可选, 显示相邻加成)</button>";
+      h += "<div class='hint'>" + DIST[c.pending].adjD + "</div>";
+    }
+    h += "<hr><div class='row'><b>生产</b>" + (c.queue ? " — 造【" + (c.queue.kind === "u" ? UT[c.queue.k].n : c.queue.kind === "d" ? DIST[c.queue.k].n : WON[c.queue.k].n) + "】 " + Math.round(c.prod) + "/" + c.queue.cost : " <span style='color:#d9584a'>(闲置)</span>") + "</div>";
+    if (c.queue) h += "<div class='bar'><i style='width:" + clamp(c.prod / c.queue.cost * 100, 0, 100) + "%;background:#c9a44a'></i></div>";
+    for (const o of buildOpts(c)) {
+      const t2 = Math.max(1, Math.ceil((o.cost - c.prod) / Math.max(1, y.prod)));
+      const cur = c.queue && c.queue.k === o.k;
+      h += "<button class='ab' " + (cur ? "disabled" : "") + " onclick=\"uiQ('" + o.kind + "','" + o.k + "')\">"
+        + (o.kind === "u" ? "⚔ " : o.kind === "d" ? "🏗 " : "★ ") + o.n + " <span class='c'>" + o.cost + "工 ≈" + t2 + "回合</span><span class='s'>" + o.d + "</span></button>";
+    }
+    const g = S.units.filter(x => x.side === "p" && x.q === c.q && x.r === c.r);
+    if (g.length) { h += "<hr><div class='row'><b>城中部队</b></div>";
+      for (const gu of g) h += "<button class='ab' onclick='selById(" + gu.id + ")'>" + UT[gu.type].n + (gu.lv ? " ★" + gu.lv : "") + " <span class='c'>兵力" + Math.round(gu.hp) + (gu.acted ? " 已行动" : "") + "</span></button>"; }
+    else h += "<div class='warn'>⚠ 城中无驻军 — 日军打光城防即可占领</div>";
+  } else if (sel.k === "tile") {
+    const t = S.tiles[sel.q][sel.r], y = tYield(sel.q, sel.r);
+    h += "<h3>" + TERR[t.t].n + "<small>" + (t.res ? RES[t.res].n + " · " : "") + (t.road ? "公路 " : "") + (t.rail ? "铁路" : "") + "</small></h3>";
+    h += "<div class='row'>产出 🌾" + y.food + " 🔨" + y.prod + (y.arms ? " 🔫" + y.arms : "") + " · 防御+" + TERR[t.t].def + "</div>";
+    if (t.imp) h += "<div class='row'>" + (t.burn ? "<span style='color:#d9584a'>" + IMP[t.imp].n + "被烧毁 — 派建设队修复</span>" : IMP[t.imp].n) + "</div>";
+    if (t.dist) h += "<div class='row'>区域: " + DIST[t.dist.k].n + " 相邻加成 +" + t.dist.adj + (t.burn ? " <span style='color:#d9584a'>(被毁)</span>" : "") + "</div>";
+    if (t.block) h += "<div class='warn'>被封锁沟压制: 产出-1 — 拔掉附近敌据点可解除</div>";
+    h += "<div class='hint'>" + (t.own === "p" ? "自家地界" : t.own === "j" ? "日军控制" : "无主之地 — 派工作队来立村") + "</div>";
+  }
+  el.innerHTML = h;
+}
+function deselect() { sel = null; reachM = null; hover = null; placeMode = null; side(); draw(); }
+function selUnit(u) { sel = { k:"unit", id:u.id }; reachM = u.acted ? null : reach(u); side(); draw(); }
+function selById(id) { const u = S.units.find(x => x.id === id); if (u) selUnit(u); }
+function uiFound() { const u = selU(); if (u) { found(u); refresh(); } }
+function uiWork(k) { const u = selU(); if (u) { startWork(u, k); reachM = null; refresh(); } }
+function uiRepair() { const u = selU(); if (u) { repair(u); reachM = null; refresh(); } }
+function uiFadong() { const u = selU(); if (u) { fadong(u); reachM = null; refresh(); } }
+function uiFort() { const u = selU(); if (!u) return; u.fort = 1; u.acted = 1; u.mp = 0; reachM = null; log(UT[u.type].n + "就地驻防", "h"); refresh(); }
+function uiSab() { const u = selU(); if (u) { sabotage(u); reachM = null; refresh(); } }
+function uiSkip() { const u = selU(); if (!u) return; u.acted = 1; u.mp = 0; reachM = null; refresh(); }
+function cancelP() { const u = selU(); if (u) { u.path = null; side(); draw(); } }
+function uiQ(kind, k) { const c = selC(); if (!c) return;
+  const it = buildOpts(c).find(o => o.kind === kind && o.k === k); if (it) { setQ(c, it); log(c.name + "开始生产【" + it.n + "】", "h"); refresh(); } }
+function startPlace(cid) {
+  const c = S.cities.find(x => x.id === cid); if (!c || !c.pending) return;
+  const ok = new Set();
+  for (const [a, b] of inRing(c.q, c.r, CFG.workRadius)) { const t = S.tiles[a][b];
+    if (t.city || t.dist || t.own !== "p" || t.ownC !== c.id) continue; ok.add(key(a, b)); }
+  if (!ok.size) { log("本城边界内没有空地了 — 先扩张边界(积累民心)", "j"); return; }
+  placeMode = { cid, k:c.pending, ok };
+  log("选择一块蓝框空地放置【" + DIST[c.pending].n + "】— 数字是相邻加成, 选高的", "s");
+  draw();
+}
+// ══════ 面板: 研究 / 政策 / 战况 / 事件 / 帮助 ══════
+function showTech() {
+  const e = empire();
+  let h = "<div class='grid'>";
+  for (const k in TECH) { const t = TECH[k], done = !!S.tech[k], cur = S.techCur === k, ok = techOk(k), eu = !!S.eureka[k];
+    const need = t.cost * (eu ? .5 : 1);
+    const eta = ok || cur ? " · 约" + Math.max(1, Math.ceil((need - (cur ? S.techProg : 0)) / Math.max(1, e.sci))) + "回合" : "";
+    h += "<div class='card " + (done ? "done" : cur ? "cur" : ok ? "ok" : "lock") + "'" + (ok && !cur ? " onclick=\"pickT('" + k + "')\"" : "") + ">"
+      + "<div class='t'>" + t.n + (done ? " ✔" : cur ? " ⏳" : "") + (eu && !done ? " <span style='color:#7fb6e0'>💡尤里卡</span>" : "") + "</div>"
+      + "<div class='d'>" + t.d + "</div><div class='fx'>" + t.fx + " · " + Math.round(need) + "学识" + eta
+      + (t.need.length && !done ? " · 需" + t.need.map(n => TECH[n].n).join("+") : "") + "</div>"
+      + (!done && !eu ? "<div class='d' style='color:#7fb6e0'>💡 " + (t.euD || t.eu) + " → 省一半</div>" : "") + "</div>"; }
+  h += "</div>";
+  openM("<h2>研究<small>学识 +" + e.sci.toFixed(0) + "/回合 · 触发【尤里卡】可省一半 —— 做对的事本身就是研究</small></h2>" + h
+    + "<div class='btns'><button class='mb2' onclick='closeM()'>关闭</button></div>");
+}
+function pickT(k) { if (!techOk(k)) return; S.techCur = k; S.techProg = 0; log("开始研究【" + TECH[k].n + "】", "s"); showTech(); updTop(); }
+function showGov() {
+  syncSlots();
+  const m = slots();
+  let h = "<p style='color:#a2977c'>政策卡随时可换(免费)。<b>局势变了就换卡</b> —— 1941年三光作战开始后, 换上【精兵简政】【反扫荡预案】才活得下去。</p>";
+  for (const [t, nm, cls] of [["mil", "军事", "mil"], ["eco", "经济", "eco"], ["pol", "政治", "pol"]]) {
+    h += "<div style='margin:8px 0'><div style='color:#f2e8cd;margin-bottom:3px'>" + nm + "槽 (" + S.gov[t].length + ")</div>";
+    S.gov[t].forEach((cur, i) => {
+      h += "<div class='slot " + cls + "' style='margin:3px 0'>" + (cur ? "<b style='color:#f2e8cd'>" + POL[cur].n + "</b> — <span style='color:#a2977c'>" + POL[cur].d + "</span> <button class='tb' style='padding:1px 7px;font-size:11px;float:right' onclick=\"unslot('" + t + "'," + i + ")\">取下</button>" : "<span style='color:#a2977c'>空槽 — 从下方选一张装入</span>") + "</div>";
+    });
+    const avail = Object.keys(POL).filter(k => POL[k].t === t && polOk(k) && !S.gov[t].includes(k));
+    h += "<div>" + avail.map(k => "<span class='pc " + cls + "' onclick=\"slotIn('" + t + "','" + k + "')\">" + POL[k].n + "</span>").join("") + (avail.length ? "" : "<span style='color:#a2977c;font-size:11px'>(暂无可用卡, 研究科技可解锁)</span>") + "</div></div>";
+  }
+  const locked = Object.keys(POL).filter(k => !polOk(k));
+  if (locked.length) h += "<p style='color:#a2977c;font-size:11.5px'>未解锁: " + locked.map(k => POL[k].n + "(需" + (POL[k].need ? TECH[POL[k].need].n : "事件") + ")").join("、") + "</p>";
+  openM("<h2>政策卡组<small>槽位随科技增加 · 当前 " + m.mil + "军事 / " + m.eco + "经济 / " + m.pol + "政治</small></h2>" + h
+    + "<div class='btns'><button class='mb2' onclick='closeM()'>关闭</button></div>");
+}
+function slotIn(t, k) { const i = S.gov[t].indexOf(null); if (i < 0) { S.gov[t][S.gov[t].length - 1] = k; } else S.gov[t][i] = k;
+  log("装入政策卡【" + POL[k].n + "】", "k"); showGov(); refresh(); }
+function unslot(t, i) { S.gov[t][i] = null; showGov(); refresh(); }
+function showStat() {
+  const p = pinned(), pc = popCtl();
+  let h = "<table class='h'><tr><th>指标</th><th style='text-align:right'>当前</th><th>史实参照</th></tr>";
+  h += "<tr><td>解放区人口</td><td class='n'>" + pc.toFixed(1) + " 百万</td><td>1945年: 近 1 亿</td></tr>";
+  h += "<tr><td>抗日武装</td><td class='n'>" + army().toFixed(1) + " 万</td><td>1945年: 正规军 120 万</td></tr>";
+  h += "<tr><td>牵制侵华日军</td><td class='n'>" + p.ours + "/" + p.tot + " 师团(" + Math.round(p.r * 100) + "%)</td><td>1944年: 约 64%</td></tr>";
+  h += "<tr><td>歼灭日军</td><td class='n'>" + Math.round(S.st.kill).toLocaleString() + "</td><td>八路军新四军歼日军约 52 万</td></tr>";
+  h += "<tr><td>歼灭伪军</td><td class='n'>" + Math.round(S.st.pupKill).toLocaleString() + "</td><td>日伪合计 171 万</td></tr>";
+  h += "<tr><td>我军伤亡</td><td class='n dn'>" + Math.round(S.st.loss).toLocaleString() + "</td><td>60 余万</td></tr>";
+  h += "<tr><td>遭扫荡 / 顶住</td><td class='n'>" + S.st.sweeps + " / " + S.st.held + "</td><td>1941-42 千人以上扫荡 174 次</td></tr>";
+  h += "<tr><td>被烧毁设施</td><td class='n dn'>" + S.st.burned + "</td><td>三光: 制造无人区</td></tr>";
+  h += "<tr><td>攻克敌据点</td><td class='n'>" + S.st.cap + " / " + (S.st.cap + jcity().length) + "</td><td>1945: 大反攻收复失地</td></tr>";
+  h += "<tr><td>正面战场态势</td><td class='n'>" + Math.round(S.kmt) + "</td><td>1944豫湘桂: 8个月丢146城</td></tr></table>";
+  h += "<p style='color:#a2977c'>「中流砥柱」不是口号: 它是<b>牵制的日军师团数</b>、<b>解放区的人口</b>、<b>八年不曾退出的战场</b>这三个数字。</p>";
+  let r2 = "<table class='h'><tr><th>根据地</th><th>人口</th><th>控制</th><th>区域</th><th>城防</th></tr>";
+  for (const c of pcity()) r2 += "<tr><td>" + c.name + "</td><td class='n'>" + c.pop + "</td><td class='n'>" + Math.round(c.ctrl) + "</td><td class='n'>" + c.dists.length + "</td><td class='n'>" + Math.round(c.hp) + "/" + c.maxHp + "</td></tr>";
+  r2 += "</table>";
+  openM("<h2>战况 — " + turnDate(S.turn) + "<small>" + (S.turn < 14 ? "战略防御" : S.turn < 80 ? "战略相持 — 敌后是主战场" : "局部反攻") + "</small></h2>" + h + r2
+    + "<div class='btns'><button class='mb2' onclick='closeM()'>关闭</button></div>");
+}
+let curEv = null;
+function showEv(e) {
+  curEv = e;
+  let h = "<h2>" + e.ti + "<small>" + turnDate(S.turn) + "</small></h2><div style='height:4px;background:linear-gradient(90deg,#8a2b22,#c9a44a);border-radius:2px;margin:6px 0 10px'></div><p>" + e.tx + "</p><div class='btns'>";
+  e.op.forEach((o, i) => { h += "<button class='mb2" + (i ? " gh" : "") + "' onclick='evP(" + i + ")'>" + o.t + "<br><span style='font-size:11px;opacity:.85'>" + o.d + "</span></button>"; });
+  openM(h + "</div>");
+}
+function evP(i) { if (curEv) { const o = curEv.op[i]; if (o && o.f) o.f(S); log("【" + curEv.ti + "】" + o.t, curEv.c === "b" ? "b" : curEv.c === "g" ? "g" : "h"); curEv = null; } closeM(); refresh(); }
+function showEnd() {
+  const r = S.result, p = r.p;
+  openM("<h2>" + (r.tier[0] === "失败" ? "💀 " : "🎖 ") + r.tier[1] + "<small>" + (r.how === "conquest" ? "光复辽县城 — 全县解放" : r.how === "cage" ? "囚笼粉碎 — 敌据点尽数拔除" : r.how === "wiped" ? "根据地全部丧失" : "1945年8月15日 · 日本无条件投降") + "</small></h2>"
+    + "<div class='card'><div class='t' style='font-size:17px;color:#ffd766'>评定 " + r.tier[0] + " · " + r.tier[1] + "（" + r.score + " 分）</div><div class='d' style='font-size:12.5px'>" + r.tier[2] + "</div></div>"
+    + "<table class='h'><tr><th>结局指标</th><th style='text-align:right'>你的战果</th><th>史实</th></tr>"
+    + "<tr><td>解放区人口</td><td class='n'>" + r.pc.toFixed(1) + " 百万</td><td>近 1 亿</td></tr>"
+    + "<tr><td>抗日武装</td><td class='n'>" + r.a.toFixed(1) + " 万</td><td>正规军 120 万</td></tr>"
+    + "<tr><td>牵制侵华日军</td><td class='n'>" + p.ours + "/" + p.tot + "(" + Math.round(p.r * 100) + "%)</td><td>约 64%</td></tr>"
+    + "<tr><td>歼灭日伪军</td><td class='n'>" + Math.round(S.st.kill + S.st.pupKill).toLocaleString() + "</td><td>171 万</td></tr>"
+    + "<tr><td>我军伤亡</td><td class='n dn'>" + Math.round(S.st.loss).toLocaleString() + "</td><td>60 余万</td></tr>"
+    + "<tr><td>攻克敌据点</td><td class='n'>" + S.st.cap + "</td><td>—</td></tr></table>"
+    + "<p>八年抗战, 中国共产党领导的抗日武装从三万余人发展到一百二十余万, 建立十九块抗日根据地, 抗击了侵华日军的大部和几乎全部伪军。"
+    + "<b>中流砥柱不是一句口号 —— 它是牵制的师团数、是解放区的人口、是八年不曾退出的战场。</b></p>"
+    + "<div class='btns'><button class='mb2' onclick='location.reload()'>再来一局</button></div>");
+}
+function showHelp() {
+  const ing = S && S.started && !S.over;
+  openM("<h2>根据地 · 1937—1945<small>文明式抗战 4X · 94回合打完八年 · 一局约40分钟</small></h2>"
+    + "<p><b>怎么赢</b>(三选一): ①<b>拔光所有日军炮楼/车站</b> = 粉碎囚笼 ②研究【攻坚战术】造主力旅, <b>攻克辽县城</b> = 全县解放 ③撑到1945年8月按战果评级。<br><b>怎么输</b>: 根据地被全部占领(丢一两座还能打回来)。</p>"
+    + "<p><b>核心循环</b>:<br>① <b>发动群众</b> — 部队在根据地内点【发动群众】, 控制度与群众基础上升(一切的根本)。<br>"
+    + "② <b>扩张</b> — 造【工作队】走远点【建立根据地】; 【建设队】修农田/梯田/矿场。<br>"
+    + "③ <b>区域</b> — 城市生产【区域】后要在地图上<b>选一块空地放置</b>, 相邻加成决定强弱: 兵工区靠铁矿、被服区靠棉与林、<b>地道网靠平原</b>(平原才需要地道)。<br>"
+    + "④ <b>政策卡</b> — 顶栏【政策】装卡, 随时可换。局势变了就换卡。<br>"
+    + "⑤ <b>研究</b> — 触发【尤里卡】(比如'部队站上铁路'解锁破袭战)可省一半学识。</p>"
+    + "<p><b>历史的残酷</b>: 1941年起日军推行三光作战 —— 扫荡会<b>烧毁你的农田与区域、屠戮人口</b>, 被打过的城四个月产出腰斩。1942年五一大扫荡里左权将军殉国。"
+    + "历史给出的答案也在游戏里: <b>精兵简政</b>(经济卡, 维护-45%)、<b>反扫荡预案</b>(军事卡)、<b>地道网</b>(平原救命)、<b>南泥湾</b>(奇观, 解除封锁减产)。走对了才活得下来。</p>"
+    + "<p style='color:#a2977c'>操作: 点部队→点目标格移动(远处自动多回合) · 点相邻敌人/敌城=攻击 · 点自己村庄=生产面板 · 左上角常驻「本回合可做」清单 · 回车结束回合</p>"
+    + "<div class='btns'>" + (ing ? "<button class='mb2' onclick='closeM()'>返回战场</button><button class='mb2 gh' onclick='confirmR()'>重新开始…</button>"
+      : (hasSave() ? "<button class='mb2 gh' onclick='cont()'>继续上局</button>" : "") + "<button class='mb2' onclick='startNew()'>开始 1937</button>") + "</div>");
+}
+function confirmR() { openM("<h2>重新开始?<small>当前进度将丢失</small></h2><p>现在是 " + turnDate(S.turn) + ", 根据地 " + pcity().length + " 座。</p>"
+  + "<div class='btns'><button class='mb2' onclick='showHelp()'>不, 返回</button><button class='mb2 gh' onclick='startNew()'>确认重开</button></div>"); }
+function cont() { if (load()) { S.started = 1; closeM(); vis(); centerCam(); refresh(); push("进度已恢复 · " + turnDate(S.turn), "h"); } }
+function startNew() {
+  newGame(); S.started = 1; sel = null; reachM = null; placeMode = null;
+  closeM(); vis(); centerCam(); $("logB").innerHTML = ""; refresh();
+  push("═══ 1937年11月 · 太原失守, 敌后战场开辟 ═══", "h");
+  push("你有一座山村、一支民兵、一个工作队、一个建设队。左上角有「本回合可做」清单。", "h");
+  push("先做: ①点村庄安排生产 ②建设队修农田 ③民兵【发动群众】 ④顶栏选一项研究", "g");
+  const c = pcity()[0]; if (c) { sel = { k:"city", id:c.id }; side(); }
+  checkEv();
+}
+function centerCam() { const c = pcity()[0] || { q:5, r:10 }; const [cx, cy] = hexC(c.q, c.r);
+  cam.z = innerWidth < 760 ? .58 : .85; cam.x = cx * cam.z - innerWidth / 2; cam.y = cy * cam.z - innerHeight / 2 + 20; }
+// ══════ 输入 ══════
+let drag = 0, dmov = 0, lastP = null, downP = null, tapd = 0, pinch = 0;
+function pxHex(px, py) {
+  const wx = (px + cam.x) / cam.z, wy = (py + cam.y) / cam.z;
+  let b = null, bd = 1e9;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const [cx, cy] = hexC(q, r); const d = (cx - wx) ** 2 + (cy - wy) ** 2; if (d < bd) { bd = d; b = [q, r]; } }
+  return bd < (CFG.hex * 1.05) ** 2 ? b : null;
+}
+function tap(px, py) {
+  if (!S || !S.started || S.over) return;
+  tapd = 1;
+  const h = pxHex(px, py);
+  if (!h) { deselect(); return; }
+  const [q, r] = h;
+  if (placeMode) {
+    if (placeMode.ok.has(key(q, r))) {
+      const c = S.cities.find(x => x.id === placeMode.cid);
+      const err = placeDist(c, placeMode.k, q, r);
+      if (!err) { c.pending = null; placeMode = null; sel = { k:"city", id:c.id }; refresh(); return; }
+      log(err, "j");
+    } else { log("请点蓝框内的空地(或再点【放置】取消)", "j"); }
+    return;
+  }
+  const u = selU(), tc = cityAt(q, r);
+  const here = [];
+  if (tc && tc.side === "p") here.push({ k:"city", id:tc.id });
+  for (const pu of S.units) if (pu.side === "p" && pu.q === q && pu.r === r) here.push({ k:"unit", id:pu.id });
+  if (here.length && (!u || (u.q === q && u.r === r))) {
+    let i = sel ? here.findIndex(x => x.k === sel.k && x.id === sel.id) : -1;
+    const nx = here[(i + 1) % here.length];
+    sel = nx; reachM = null;
+    if (nx.k === "unit") { const nu = S.units.find(x => x.id === nx.id); if (nu && !nu.acted) reachM = reach(nu); }
+    side(); draw(); return;
+  }
+  if (u && !u.acted) {
+    if (hexD(u.q, u.r, q, r) === 1 && UT[u.type].str) {
+      const foe = uSide(q, r, "j");
+      if ((foe && seen(q, r)) || (tc && tc.side === "j")) { attack(u, q, r); reachM = null; vis(); refresh(); return; }
+    }
+    if (reachM && reachM[key(q, r)]) {
+      u.mp = Math.max(0, u.mp - reachM[key(q, r)].c); u.q = q; u.r = r; u.fort = 0; u.work = null; u.path = null;
+      const cc = cityAt(q, r);
+      if (cc && cc.side !== "p" && cc.hp <= 0) capture(cc, "p");
+      reachM = u.mp > 0 ? reach(u) : null; vis();
+      const inC = cityAt(u.q, u.r);
+      if (inC && inC.side === "p") { sel = { k:"city", id:inC.id }; reachM = null; }
+      refresh(); return;
+    }
+  }
+  const own = S.units.find(x => x.side === "p" && x.q === q && x.r === r);
+  if (own) { selUnit(own); return; }
+  if (tc && (tc.side === "p" || seen(q, r))) { sel = { k:"city", id:tc.id }; reachM = null; side(); draw(); return; }
+  if (u && !u.acted) { if (moveTo(u, q, r)) { reachM = u.mp > 0 ? reach(u) : null; refresh(); return; } }
+  sel = { k:"tile", q, r }; reachM = null; side(); draw();
+}
+function updHover(px, py) {
+  const u = selU(), h = pxHex(px, py);
+  if (!u || u.acted || !h || placeMode) { if (hover) { hover = null; draw(); } return; }
+  const [q, r] = h;
+  if (hover && hover.q === q && hover.r === r) return;
+  if (u.q === q && u.r === r) { hover = null; draw(); return; }
+  if (hexD(u.q, u.r, q, r) === 1 && UT[u.type].str) {
+    const foe = uSide(q, r, "j"), fc = cityAt(q, r);
+    if (foe && seen(q, r)) { hover = { q, r, k:"atk", lb:"⚔ 预计 -" + expD(uStr(u, "atk"), uStr(foe, "def")) + " / 挨 -" + Math.round(expD(uStr(foe, "atk"), uStr(u, "def")) * CFG.counter) }; draw(); return; }
+    if (fc && fc.side === "j") { const e = expSiege(u, fc); hover = { q, r, k:"atk", lb:"⚔ 攻城 -" + e + (e <= 6 ? "(啃不动·需主力旅)" : "") }; draw(); return; }
+  }
+  const p = farPath(u, q, r);
+  if (!p) { hover = { q, r, k:"x", lb:"✖ 过不去" }; draw(); return; }
+  hover = { q, r, k:"move", p, lb:pTurns(u, p) <= 1 ? "本回合抵达" : pTurns(u, p) + " 回合" };
+  draw();
+}
+cv.addEventListener("pointerdown", e => { drag = 1; dmov = 0; tapd = 0; downP = [e.clientX, e.clientY]; lastP = [e.clientX, e.clientY]; });
+cv.addEventListener("pointermove", e => {
+  if (drag && lastP && downP) { if (Math.abs(e.clientX - downP[0]) + Math.abs(e.clientY - downP[1]) > 10) dmov = 1;
+    if (dmov) { cam.x -= e.clientX - lastP[0]; cam.y -= e.clientY - lastP[1]; lastP = [e.clientX, e.clientY]; hover = null; draw(); return; } }
+  if (drag || e.pointerType === "touch") return;
+  updHover(e.clientX, e.clientY);
+});
+cv.addEventListener("pointerleave", () => { if (hover) { hover = null; draw(); } });
+cv.addEventListener("pointercancel", () => { drag = 0; dmov = 0; });
+cv.addEventListener("pointerup", e => { drag = 0; if (dmov || tapd) return; tap(e.clientX, e.clientY); });
+cv.addEventListener("click", e => { if (!dmov && !tapd) tap(e.clientX, e.clientY); });
+cv.addEventListener("wheel", e => { e.preventDefault(); const z = clamp(cam.z * (e.deltaY > 0 ? .9 : 1.11), .35, 2), wx = (e.clientX + cam.x) / cam.z, wy = (e.clientY + cam.y) / cam.z;
+  cam.z = z; cam.x = wx * z - e.clientX; cam.y = wy * z - e.clientY; draw(); }, { passive:false });
+cv.addEventListener("touchmove", e => { if (e.touches.length === 2) { e.preventDefault();
+  const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  if (pinch) { cam.z = clamp(cam.z * d / pinch, .35, 2); draw(); } pinch = d; } }, { passive:false });
+cv.addEventListener("touchend", () => { pinch = 0; });
+addEventListener("keydown", e => { if (mOpen()) return; if (e.key === "Enter") endTurn(); if (e.key === "Escape") deselect(); });
+$("endBtn").addEventListener("click", endTurn);
+$("bTech").addEventListener("click", showTech);
+$("bGov").addEventListener("click", showGov);
+$("bStat").addEventListener("click", showStat);
+$("bHelp").addEventListener("click", showHelp);
+$("logH").addEventListener("click", () => toggleLog());
+addEventListener("resize", () => { syncCv(); draw(); });
+// ══════ 启动 ══════
+applyLog(); syncCv(); newGame(); vis(); centerCam(); refresh(); showHelp();
+
+</script>
+</body>
+</html>
