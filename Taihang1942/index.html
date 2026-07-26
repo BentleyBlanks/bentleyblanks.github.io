@@ -36,7 +36,14 @@ button { font-family: inherit; cursor: pointer; }
 .abtn:disabled { opacity: .45; cursor: default; }
 .abtn .sub { display: block; color: #8a8058; font-size: 11.5px; }
 .abtn .cost { float: right; color: #b89a58; font-size: 11.5px; }
-#logBox { position: fixed; left: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 8; width: min(430px, 62vw); max-height: 32vh; overflow-y: auto; background: rgba(18,14,8,.88); border: 1px solid #3f3722; border-radius: 8px; padding: 7px 11px; font-size: 12.5px; line-height: 1.55; pointer-events: auto; }
+#logWrap { position: fixed; left: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 8; width: min(430px, 62vw); }
+#logHead { display: flex; align-items: center; gap: 6px; background: rgba(18,14,8,.94); border: 1px solid #3f3722; border-radius: 8px 8px 0 0; padding: 4px 10px; font-size: 12px; color: #b7a97f; cursor: pointer; user-select: none; }
+#logHead:hover { background: rgba(32,25,14,.96); color: #e8cf90; }
+#logHead .caret { width: 12px; display: inline-block; color: #8a8058; }
+#logHead .unread { margin-left: auto; background: #7a2620; border: 1px solid #c36a52; color: #ffd9c9; border-radius: 9px; padding: 0 7px; font-size: 11px; }
+#logWrap.collapsed #logHead { border-radius: 8px; }
+#logWrap.collapsed #logBox { display: none; }
+#logBox { max-height: 32vh; overflow-y: auto; background: rgba(18,14,8,.88); border: 1px solid #3f3722; border-top: none; border-radius: 0 0 8px 8px; padding: 7px 11px; font-size: 12.5px; line-height: 1.55; }
 #logBox p { margin: 2px 0; color: #b7a97f; }
 #logBox p.good { color: #9fbc52; }
 #logBox p.bad { color: #e2564d; }
@@ -63,7 +70,9 @@ button { font-family: inherit; cursor: pointer; }
 .frag.unknown { background: #221e12; border-color: #4a452c; color: #6a6046; }
 @media (max-width: 640px) {
   #sidePanel { width: min(86vw, 305px); top: auto; bottom: calc(76px + env(safe-area-inset-bottom)); max-height: 44vh; }
-  #logBox { width: 58vw; max-height: 22vh; font-size: 11.5px; }
+  #logWrap { width: 58vw; }
+  #logBox { max-height: 22vh; font-size: 11.5px; }
+  #logHead { font-size: 11px; padding: 3px 8px; }
   #opBanner { font-size: 11.5px; padding: 5px 10px; }
   #topbar { gap: 7px; font-size: 12.5px; }
 }
@@ -82,7 +91,10 @@ button { font-family: inherit; cursor: pointer; }
 </div>
 <div id="opBanner" class="hidden"></div>
 <div id="sidePanel" class="hidden"></div>
-<div id="logBox"></div>
+<div id="logWrap">
+  <div id="logHead"><span class="caret">▼</span><span>战报日志</span><span class="unread hidden" id="logUnread">0</span></div>
+  <div id="logBox"></div>
+</div>
 <div id="modalWrap" class="hidden"><div id="modalBox"></div></div>
 <button id="endTurnBtn">结束回合 ▶</button>
 <script>
@@ -945,18 +957,44 @@ function actionMine() {
   log(UT_P[u.type].name + "在敌必经之路埋下地雷 — 不见鬼子不挂弦", "hl");
   renderPanel(); draw(); updateTop();
 }
+// 破袭目标: 脚下的铁路, 或紧邻的一段(爆破组本来就是摸上路基作业, 不必真站在道心上)
+function sabotageTarget(u) {
+  if (!u || !UT_P[u.type].str) return null;
+  const here = state.tiles[u.q][u.r];
+  if (here.rail && here.railCut <= 0) return [u.q, u.r];
+  for (const [a, b] of nbrs(u.q, u.r)) {
+    const t = state.tiles[a][b];
+    if (t.rail && t.railCut <= 0 && !t.sh) return [a, b];
+  }
+  return null;
+}
+function nearestRail(u) {
+  let best = null, bd = 1e9;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const t = state.tiles[q][r];
+    if (!t.rail || t.railCut > 0 || t.sh) continue;
+    const d = hexDist(u.q, u.r, q, r);
+    if (d < bd) { bd = d; best = [q, r, d]; }
+  }
+  return best;
+}
 function actionSabotage() {
   const u = getSel();
   if (!u || u.attacked || !UT_P[u.type].str) return;
-  const t = state.tiles[u.q][u.r];
-  if (!t.rail || t.railCut > 0) { log("要站在完好的铁路上才能破袭", "jp"); return; }
+  const spot = sabotageTarget(u);
+  if (!spot) {
+    const nr = nearestRail(u);
+    log(nr ? "身边没有铁路 — 最近的一段在 " + nr[2] + " 格外(地图东侧那条黑线), 先行军过去" : "地图上已无完好铁路可破", "jp");
+    return;
+  }
+  const t = state.tiles[spot[0]][spot[1]];
   t.railCut = CFG.railCutTurns;
   u.attacked = true; u.mp = 0;
   state.arms = Math.min(CFG.armsCap, state.arms + CFG.sabotageLoot);
   const op = state.jp.op;
   let extra = "";
   if (op && op.stage === "prep") { op.prepLeft += 1; extra = " — 敌集结输送受阻, 战役推迟一旬!"; }
-  log("破袭铁路! 掀翻钢轨枕木, 缴获军械+" + CFG.sabotageLoot + extra, "good");
+  log("破袭铁路! 掀翻钢轨枕木(" + tileLabel(spot[0], spot[1]) + "), 缴获军械+" + CFG.sabotageLoot + extra, "good");
   renderPanel(); draw(); updateTop();
 }
 function actionRoot() {
@@ -1291,6 +1329,24 @@ function rrect(x, y, w, h, rad) {
 // ═══════════ UI ═══════════
 const $ = id => document.getElementById(id);
 let modalKind = null;
+// 日志可折叠: 收起后只留一条标题栏, 有新消息在标题上记未读数(重要消息自动展开)
+let logCollapsed = false, logUnread = 0;
+try { logCollapsed = localStorage.getItem("taihang1942.logCollapsed") === "1"; } catch (e) {}
+function applyLogCollapsed() {
+  const wrap = $("logWrap"), head = $("logHead"), badge = $("logUnread");
+  if (!wrap) return;
+  wrap.classList.toggle("collapsed", logCollapsed);
+  head.querySelector(".caret").textContent = logCollapsed ? "▶" : "▼";
+  if (logCollapsed && logUnread > 0) { badge.textContent = logUnread > 99 ? "99+" : String(logUnread); badge.classList.remove("hidden"); }
+  else badge.classList.add("hidden");
+}
+function toggleLog(force) {
+  logCollapsed = force === undefined ? !logCollapsed : !!force;
+  if (!logCollapsed) logUnread = 0;
+  try { localStorage.setItem("taihang1942.logCollapsed", logCollapsed ? "1" : "0"); } catch (e) {}
+  applyLogCollapsed();
+  if (!logCollapsed) { const box = $("logBox"); box.scrollTop = box.scrollHeight; }
+}
 function log(msg, cls) {
   const p = document.createElement("p");
   if (cls) p.className = cls;
@@ -1299,6 +1355,11 @@ function log(msg, cls) {
   box.appendChild(p);
   while (box.children.length > 60) box.removeChild(box.firstChild);
   box.scrollTop = box.scrollHeight;
+  if (logCollapsed) {
+    if (cls === "bad") { toggleLog(false); return; } // 坏消息(烧村/总部危急)强制展开, 不许错过
+    logUnread++;
+    applyLogCollapsed();
+  }
 }
 function updateTop() {
   $("uiGrain").textContent = Math.round(state.grain);
@@ -1358,15 +1419,29 @@ function showRoster() {
 }
 function showHelp() {
   modalKind = "help";
+  const inGame = !!(state && state.started && !state.over);
   openModal("<h2>太行·1942 — 反扫荡<small>敌后战场 4X · 十六字诀就是玩法 · 约40分钟</small></h2>"
     + "<p><b>你面对的不是刷怪器, 是" + JP_BRIGADE + "</b>: 它有台账(每个中队有名有姓, 打掉一个少一个), 有战役(集结→开进→合围→清剿→回撤), 有软肋(屯粮场、铁路、公路、疲劳)。</p>"
     + "<p><b>敌进我退</b>: 纵队锋芒正锐时(战力30+)正面硬顶=关家垴。躲进山里, 让它扑空。<br><b>敌驻我扰</b>: 地雷埋在它必经的公路上; 伏击(密林/山地设伏)自动痛击路过纵队。<br><b>敌疲我打</b>: 纵队每旬疲劳+8, 战力掉到六成, 还会掉队送人头 — 疲了再上主力。<br><b>敌退我追</b>: 清剿结束它满载回撤 — 全歼回撤纵队夺回粮食, 这是最解恨的一仗。</p>"
     + "<p><b>斗智三件套</b>: ①情报拼图(情报网村+武工队+研判)拼出合击点→提前疏散+路上布雷设伏; ②烧屯粮/破铁路→敌战役推迟、出动后疲劳更快; ③围点打援→佯攻炮楼引援军上路, 在半路密林全歼之。</p>"
     + "<p><b>政治即军事</b>: 工作队驻村拉民心 — ≥50成根据地村(产粮兵), ≥60建情报网(帮你盯死日军动向)。但根据地越红火, 越招大扫荡: 5月的铁壁合围直扑总部, 是躲不掉的历史。</p>"
     + "<p style='color:#8a8058'>操作(同文明六): <b>点部队 → 点目标格</b>。桌面端把鼠标移到哪就先<b>预览路线</b>(金色=本旬走到, 蓝色=之后几旬, 终点标几旬); 近处立即走到, 远处自动多回合行军(可取消); <b>点相邻敌人=攻击</b>(悬停先看伤害预估)。设伏/埋雷/破袭在右侧栏 · 点村庄招兵 · 顶栏看敌情台账 · Enter 结束回合</p>"
-    + "<div class='mbtns'>" + (hasSaveGame() ? "<button class='mbtn ghost' onclick='continueGame()'>继续上局</button>" : "") + "<button class='mbtn' onclick='startNew()'>" + (state && state.started ? "开打" : "新开一局") + "</button></div>");
+    // 打法说明是"随时可查"的参考页: 开局中打开它, 关掉就回战场, 绝不能顺手把这一局删了。
+    // 重开必须是单独一个按钮, 而且要再确认一次。
+    + "<div class='mbtns'>"
+    + (inGame
+        ? "<button class='mbtn' onclick='closeModal()'>返回战场</button><button class='mbtn ghost' onclick='confirmRestart()'>重新开始…</button>"
+        : (hasSaveGame() ? "<button class='mbtn ghost' onclick='continueGame()'>继续上局</button>" : "") + "<button class='mbtn' onclick='startNew()'>新开一局</button>")
+    + "</div>");
 }
 function hasSaveGame() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+// 重开是破坏性操作: 必须显式再确认一次, 默认动作是"不重开"
+function confirmRestart() {
+  modalKind = "restart";
+  openModal("<h2>重新开始?<small>当前这一局的进度会全部丢失, 无法恢复</small></h2>"
+    + "<p>你现在是 <b>" + dateStr(Math.min(state.turn, CFG.totalTurns)) + "</b>, 已歼灭日军中队 <b>" + state.stats.jpKilled + "</b> 个。</p>"
+    + "<div class='mbtns'><button class='mbtn' onclick='showHelp()'>不, 返回</button><button class='mbtn ghost' onclick='startNew()'>确认重开</button></div>");
+}
 function continueGame() { if (loadGame()) { state.started = true; closeModal(); computeVis(); centerCam(); updateTop(); updateBanner(); draw(); log("── 进度恢复 · " + dateStr(state.turn) + " ──", "hl"); } }
 function startNew() {
   newGame();
@@ -1419,11 +1494,33 @@ function renderPanel() {
       }
     }
     html += "<hr>";
-    if (ut.str && !u.attacked) html += "<button class='abtn' onclick='actionAmbush()'>🌿 设伏 <span class='cost'>耗本旬</span><span class='sub'>密林/丘陵/山地/村落; 敌纵队路过邻格自动遭我首击×" + CFG.ambushMult + "(无反击), 姿态跨旬保持</span></button>";
-    if ((u.type === "mil" || u.type === "cmd") && !u.attacked) html += "<button class='abtn' onclick='actionMine()'>💣 埋地雷 <span class='cost'>军械-" + CFG.mineCost + "</span><span class='sub'>埋在公路/铁路; 敌纵队踩中: 伤" + CFG.mineDmg + "+误期一旬</span></button>";
-    if (ut.str && !u.attacked) html += "<button class='abtn' onclick='actionSabotage()'>💥 破袭铁路 <span class='cost'>军械+" + CFG.sabotageLoot + "</span><span class='sub'>站在铁路上; 断敌输送: 集结期破袭可推迟敌战役、可迟滞敌增援</span></button>";
-    if (u.type === "cmd" && !u.attacked) html += "<button class='abtn' onclick='actionRecon()'>🕵 化装侦察 <span class='cost'>情报+3</span><span class='sub'>贴近敌军/据点时可用</span></button>";
-    if (u.type === "wk" && !u.rooted) html += "<button class='abtn' onclick='actionRoot()'>🌱 驻村发动群众 <span class='cost'>耗本旬</span><span class='sub'>民心+6/旬; ≥50根据地村, ≥60情报网(盯死日军)</span></button>";
+    if (ut.str && !u.attacked) {
+      const at = state.tiles[u.q][u.r];
+      const canAmb = ["forest", "hills", "mountain"].includes(at.terrain) || !!at.village;
+      html += "<button class='abtn' " + (canAmb ? "" : "disabled") + " onclick='actionAmbush()'>🌿 设伏 <span class='cost'>耗本旬</span><span class='sub'>" + (canAmb ? "敌纵队路过邻格即遭我首击×" + CFG.ambushMult + "(无反击), 姿态跨旬保持 — 埋在他必经之路旁" : "平原藏不住人 — 先移到密林/丘陵/山地或村落里") + "</span></button>";
+    }
+    if ((u.type === "mil" || u.type === "cmd") && !u.attacked) {
+      const mt = state.tiles[u.q][u.r];
+      const canMine = (mt.road || mt.rail) && !mt.mine && state.arms >= CFG.mineCost;
+      const mineWhy = mt.mine ? "此处已有雷" : (!mt.road && !mt.rail) ? "要埋在敌军必经的公路/铁路上 — 先走到路上去" : state.arms < CFG.mineCost ? "军械不足(需" + CFG.mineCost + ")" : "敌纵队踩中: 伤" + CFG.mineDmg + " + 误期一旬";
+      html += "<button class='abtn' " + (canMine ? "" : "disabled") + " onclick='actionMine()'>💣 埋地雷 <span class='cost'>军械-" + CFG.mineCost + "</span><span class='sub'>" + mineWhy + "</span></button>";
+    }
+    if (ut.str && !u.attacked) {
+      const spot = sabotageTarget(u);
+      const nr = spot ? null : nearestRail(u);
+      const sabWhy = spot ? (spot[0] === u.q && spot[1] === u.r ? "就在脚下这段铁路动手" : "摸上紧邻的这段路基动手") + " · 断敌输送: 集结期破袭可推迟敌战役、迟滞增援"
+        : (nr ? "身边没有铁路 — 最近一段在 " + nr[2] + " 格外(地图东侧黑线), 点它行军过去" : "地图上已无完好铁路");
+      html += "<button class='abtn' " + (spot ? "" : "disabled") + " onclick='actionSabotage()'>💥 破袭铁路 <span class='cost'>军械+" + CFG.sabotageLoot + "</span><span class='sub'>" + sabWhy + "</span></button>";
+    }
+    if (u.type === "cmd" && !u.attacked) {
+      const canRec = nbrs(u.q, u.r).some(([a, b]) => state.tiles[a][b].sh || state.units.some(x => x.side === "j" && x.q === a && x.r === b));
+      html += "<button class='abtn' " + (canRec ? "" : "disabled") + " onclick='actionRecon()'>🕵 化装侦察 <span class='cost'>情报+3</span><span class='sub'>" + (canRec ? "摸清当面之敌部署" : "要贴到敌军或敌据点旁边(相邻一格)才摸得到情报") + "</span></button>";
+    }
+    if (u.type === "wk" && !u.rooted) {
+      const vt = state.tiles[u.q][u.r].village;
+      const canRoot = !!vt && vt.burned <= 0;
+      html += "<button class='abtn' " + (canRoot ? "" : "disabled") + " onclick='actionRoot()'>🌱 驻村发动群众 <span class='cost'>耗本旬</span><span class='sub'>" + (canRoot ? "民心+6/旬 · ≥" + CFG.heartOwn + "成根据地村, ≥" + CFG.heartIntel + "建成情报网(帮你盯日军)" : (vt ? vt.name + "刚遭烧掠, 等它缓过来" : "要站在村庄上 — 点地图上的村子行军过去")) + "</span></button>";
+    }
     html += "<button class='abtn' onclick='actionDisband()'>✖ 解散 <span class='cost'>兵员+5</span></button>";
   } else if (sel.kind === "tile") {
     const t = state.tiles[sel.q][sel.r];
@@ -1577,6 +1674,7 @@ addEventListener("keydown", e => { if (e.key === "Enter" && $("modalWrap").class
 $("endTurnBtn").addEventListener("click", endTurn);
 $("rosterBtn").addEventListener("click", showRoster);
 $("helpBtn").addEventListener("click", showHelp);
+$("logHead").addEventListener("click", () => toggleLog());
 addEventListener("resize", () => { syncCanvas(); draw(); });
 function centerCam() {
   const [cx, cy] = hexCenter(state.hq.q, state.hq.r);
@@ -1585,6 +1683,7 @@ function centerCam() {
   cam.y = cy * cam.zoom - innerHeight / 2;
 }
 // ═══════════ 启动 ═══════════
+applyLogCollapsed();
 syncCanvas();
 newGame();
 computeVis();
