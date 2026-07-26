@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171814">
+  <meta name="description" content="《太行火种：敌后网络》——在敌占区保护群众、建设地下组织、瓦解占领控制的非对称策略白盒。">
+  <title>太行火种：敌后网络｜抗日战争敌后策略白盒</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260726b">
+</head>
+<body>
+  <div id="openingScreen" class="openingScreen" data-testid="opening-screen">
+    <div class="openingBackdrop" aria-hidden="true">
+      <div class="openingRail"></div>
+      <div class="openingNetwork"></div>
+    </div>
+    <main class="openingCard" aria-labelledby="openingTitle">
+      <p class="eyebrow">BEHIND THE LINES · PLAYABLE WHITEBOX</p>
+      <h1 id="openingTitle"><span>太行火种</span><small>敌后网络</small></h1>
+      <p class="openingLead">守住人，扎下根，让占领者始终管不了这片土地。</p>
+      <p class="openingCopy">地表被炮楼、铁路与扫荡控制，地下仍能生长联系人、秘密支部和群众交通线。你不是指挥一个国家去涂地图；你要在十四旬里保护群众、保存组织，让反抗的火种穿过合围。</p>
+      <div class="openingRules" aria-label="核心规则">
+        <div><b>3</b><span>干部令<br>救人 · 建网</span></div>
+        <div><b>1</b><span>武装令<br>侦察 · 破袭</span></div>
+        <div><b>14</b><span>旬<br>约 25 分钟</span></div>
+      </div>
+      <div class="openingActions">
+        <button id="startGuidedButton" class="primaryButton" type="button" data-testid="start-guided">开始教学战役</button>
+        <button id="continueButton" class="secondaryButton" type="button" hidden>继续上次战役</button>
+        <button id="startFreeButton" class="textButton" type="button">跳过教学，自由推演</button>
+      </div>
+      <button id="openingHistoryButton" class="historyBoundaryButton" type="button">史实边界与表达原则</button>
+      <p class="openingFootnote">机制合成地图 · 固定随机种子 · 无外部资源 · 不以杀敌数作为胜利条件</p>
+    </main>
+  </div>
+
+  <div id="gameShell" class="gameShell" hidden data-testid="game-shell">
+    <header class="resourceStrip">
+      <div class="gameIdentity">
+        <span class="identitySeal" aria-hidden="true">火</span>
+        <span><b>太行火种</b><small id="phaseName">秘密扎根</small></span>
+      </div>
+      <div class="resourceGroup" aria-label="全局资源">
+        <button class="resourceChip" type="button" data-resource="food" title="救济、疏散与基层建设所需的粮秣">
+          <span aria-hidden="true">粮</span><b id="foodValue">0</b><small id="foodDelta">粮秣</small>
+        </button>
+        <button class="resourceChip" type="button" data-resource="arms" title="破袭、伏击与武装掩护所需的军械">
+          <span aria-hidden="true">械</span><b id="armsValue">0</b><small>军械</small>
+        </button>
+        <button class="resourceChip" type="button" data-resource="intel" title="揭露敌军计划并缩小行动风险">
+          <span aria-hidden="true">情</span><b id="intelValue">0</b><small>情报</small>
+        </button>
+        <div class="resourceChip peopleChip" title="民生是需要保护的状态，不是可以花掉的资源">
+          <span aria-hidden="true">民</span><b id="peopleValue">0</b><small>平均民生</small>
+        </div>
+      </div>
+      <div class="dateBlock" aria-label="战役日期">
+        <b id="turnDate">1942年5月上旬</b>
+        <span id="turnCounter">第 1 / 14 旬</span>
+      </div>
+      <div class="headerActions">
+        <button id="historyButton" class="iconButton" type="button" aria-label="史实边界" title="史实边界">史</button>
+        <button id="rulesButton" class="iconButton" type="button" aria-label="规则与快捷键" title="规则与快捷键">?</button>
+        <button id="menuButton" class="iconButton" type="button" aria-label="战役菜单" title="战役菜单">☰</button>
+      </div>
+    </header>
+
+    <main id="battlefieldLayout" class="battlefieldLayout">
+      <aside id="briefingPanel" class="briefingPanel panelChrome" aria-label="本旬任务与敌情">
+        <section class="objectiveSection">
+          <div class="sectionHeading">
+            <span>本旬任务</span>
+            <button id="toggleBriefingButton" class="collapseButton" type="button" aria-label="收起任务面板">‹</button>
+          </div>
+          <div id="tutorialCard" class="tutorialCard" data-testid="tutorial-card">
+            <div class="tutorialProgress"><span id="tutorialStepLabel">教学 · 第 1 旬</span><span id="tutorialProgressText">1 / 6</span></div>
+            <h2 id="tutorialTitle">第一课：救济</h2>
+            <p id="tutorialBody">石桥村已有受灾家庭。先救人，信任才不是一句口号。</p>
+            <div id="tutorialTarget" class="tutorialTarget">下一步：点击地图上的 <b>石桥村</b></div>
+            <button id="skipTutorialButton" class="smallTextButton" type="button">跳过引导</button>
+          </div>
+        </section>
+
+        <section class="intelSection">
+          <div class="sectionHeading"><span>听风 · 敌情研判</span><small id="intelConfidence">线索零散</small></div>
+          <div id="enemyIntentList" class="enemyIntentList" data-testid="enemy-intents"></div>
+          <p id="intelHint" class="intelHint">敌军不会全图透视；你看到的是地下网络送来的线索。</p>
+        </section>
+
+        <section class="networkSection">
+          <div class="sectionHeading"><span>火种账</span><small>不是击杀榜</small></div>
+          <dl class="networkLedger">
+            <div><dt>秘密支部</dt><dd id="branchCount">0</dd></div>
+            <div><dt>已保护家庭</dt><dd id="protectedCount">0</dd></div>
+            <div><dt>受难家庭</dt><dd id="harmedCount">0</dd></div>
+            <div><dt>敌行动受挫</dt><dd id="disruptedCount">0</dd></div>
+          </dl>
+        </section>
+      </aside>
+
+      <section id="mapPanel" class="mapPanel" aria-label="太行敌后双层态势图">
+        <div class="mapToolbar">
+          <div class="layerSwitch" role="group" aria-label="地图图层">
+            <button class="layerButton isActive" type="button" data-layer="combined">双层态势</button>
+            <button class="layerButton" type="button" data-layer="surface">地表占领</button>
+            <button class="layerButton" type="button" data-layer="underground">地下网络</button>
+          </div>
+          <div class="mapLegend" aria-label="图例">
+            <span><i class="legendEnemy"></i>占领压力</span>
+            <span><i class="legendNetwork"></i>地下组织</span>
+            <span><i class="legendThreat"></i>本旬威胁</span>
+          </div>
+        </div>
+
+        <div id="mapViewport" class="mapViewport layerCombined" data-testid="map-viewport">
+          <svg class="terrainMap" viewBox="0 0 1000 620" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <defs>
+              <linearGradient id="riverGradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#567474" stop-opacity=".16"></stop>
+                <stop offset=".5" stop-color="#789b91" stop-opacity=".62"></stop>
+                <stop offset="1" stop-color="#567474" stop-opacity=".12"></stop>
+              </linearGradient>
+              <pattern id="mapGrain" width="28" height="28" patternUnits="userSpaceOnUse">
+                <circle cx="3" cy="4" r="1" fill="#fff" opacity=".035"></circle>
+                <circle cx="19" cy="17" r=".8" fill="#000" opacity=".15"></circle>
+              </pattern>
+              <marker id="threatArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#b85140"></path>
+              </marker>
+            </defs>
+            <rect width="1000" height="620" fill="url(#mapGrain)"></rect>
+            <path class="mountainBand" d="M0 70 C160 5 270 100 430 42 S730 22 1000 78 L1000 0 L0 0Z"></path>
+            <path class="mountainBand second" d="M0 620V495 C170 430 270 530 430 478 S750 438 1000 510V620Z"></path>
+            <path class="riverLine" d="M90 -30 C160 85 110 170 210 250 S305 390 268 655" fill="none" stroke="url(#riverGradient)" stroke-width="24"></path>
+            <g id="surfaceRouteLayer" class="surfaceRouteLayer"></g>
+            <g id="undergroundRouteLayer" class="undergroundRouteLayer"></g>
+            <g id="enemyPlanLineLayer" class="enemyPlanLineLayer"></g>
+          </svg>
+          <div id="siteLayer" class="siteLayer" aria-label="据点与铁路"></div>
+          <div id="villageLayer" class="villageLayer" aria-label="村庄"></div>
+          <div id="threatLayer" class="threatLayer" aria-live="polite"></div>
+          <div id="mapTooltip" class="mapTooltip" role="tooltip" hidden></div>
+          <div id="mapStatus" class="mapStatus">地表可被占领，地下仍能生长</div>
+        </div>
+      </section>
+
+      <aside id="inspectorPanel" class="inspectorPanel panelChrome" aria-label="村庄详情与可用行动">
+        <div id="emptyInspector" class="emptyInspector">
+          <span class="emptySeal" aria-hidden="true">村</span>
+          <h2>选择一座村庄</h2>
+          <p>查看地表压力、地下组织、群众处境和本旬可做的事。</p>
+        </div>
+        <div id="villageInspector" hidden>
+          <div class="inspectorHeader">
+            <div>
+              <p id="villageRegion" class="inspectorEyebrow">太行东麓</p>
+              <h2 id="villageName">南沟</h2>
+            </div>
+            <button id="closeInspectorButton" class="collapseButton" type="button" aria-label="取消选择">×</button>
+          </div>
+          <div id="villageTags" class="villageTags"></div>
+          <div class="villageMeters">
+            <div class="meterRow"><span>民生</span><b id="welfareValue">0</b><div class="meterTrack"><i id="welfareMeter"></i></div></div>
+            <div class="meterRow"><span>信任</span><b id="trustValue">0</b><div class="meterTrack"><i id="trustMeter"></i></div></div>
+            <div class="meterRow"><span>地下组织</span><b id="organizationValue">无联系</b><div class="organizationPips" id="organizationPips"></div></div>
+            <div class="meterRow suspicionRow"><span>敌疑</span><b id="suspicionValue">未知</b><div class="meterTrack"><i id="suspicionMeter"></i></div></div>
+          </div>
+          <div id="villageStory" class="villageStory"></div>
+          <div id="scarList" class="scarList"></div>
+          <div class="actionHeading"><span>本旬行动</span><small>先规划，可撤销</small></div>
+          <div id="actionList" class="actionList" data-testid="action-list"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="planDock" aria-label="行动计划">
+      <div class="orderBudget">
+        <div><span>干部令</span><b id="cadreOrdersValue">3 / 3</b><i id="cadreOrderPips"></i></div>
+        <div><span>武装令</span><b id="armedOrdersValue">1 / 1</b><i id="armedOrderPips"></i></div>
+      </div>
+      <div id="planList" class="planList" data-testid="plan-list">
+        <div class="emptyPlan"><b>本旬尚无计划</b><span>选择村庄，把行动排进这里；提交前都能撤销。</span></div>
+      </div>
+      <div class="planControls">
+        <button id="undoPlanButton" class="dockButton" type="button" disabled>撤销上一步</button>
+        <button id="clearPlanButton" class="dockButton" type="button" disabled>清空</button>
+        <button id="commitTurnButton" class="commitButton" type="button" data-testid="commit-turn">执行本旬 <span>Enter</span></button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="modalBackdrop" class="modalBackdrop" hidden></div>
+  <section id="standardModal" class="modal standardModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+    <button class="modalCloseButton" type="button" data-close-modal aria-label="关闭">×</button>
+    <p id="modalEyebrow" class="modalEyebrow">战役手册</p>
+    <h2 id="modalTitle">规则</h2>
+    <div id="modalBody" class="modalBody"></div>
+    <div id="modalFooter" class="modalFooter"></div>
+  </section>
+
+  <section id="resolutionModal" class="modal resolutionModal" role="dialog" aria-modal="true" aria-labelledby="resolutionTitle" hidden data-testid="resolution-modal">
+    <div class="resolutionHeader">
+      <div><p class="modalEyebrow">同时结算 · 因果可追</p><h2 id="resolutionTitle">本旬发生了什么</h2></div>
+      <div id="resolutionDate" class="resolutionDate"></div>
+    </div>
+    <div id="resolutionSummary" class="resolutionSummary"></div>
+    <div id="resolutionTimeline" class="resolutionTimeline"></div>
+    <div class="resolutionFooter">
+      <p id="resolutionLesson"></p>
+      <button id="nextTurnButton" class="primaryButton" type="button" data-testid="next-turn">进入下一旬</button>
+    </div>
+  </section>
+
+  <section id="outcomeModal" class="modal outcomeModal" role="dialog" aria-modal="true" aria-labelledby="outcomeTitle" hidden data-testid="outcome-modal">
+    <div id="outcomeSeal" class="outcomeSeal">火</div>
+    <p class="modalEyebrow">十四旬战役结算</p>
+    <h2 id="outcomeTitle">火种不灭</h2>
+    <p id="outcomeStory" class="outcomeStory"></p>
+    <div id="outcomeStats" class="outcomeStats"></div>
+    <div id="outcomeEvaluation" class="outcomeEvaluation"></div>
+    <div class="modalFooter">
+      <button id="restartButton" class="secondaryButton" type="button">重新推演</button>
+      <a class="primaryButton linkButton" href="../">返回太行玩法白盒</a>
+    </div>
+  </section>
+
+  <div id="toastRegion" class="toastRegion" aria-live="polite" aria-atomic="true"></div>
+  <div id="liveRegion" class="visuallyHidden" aria-live="assertive"></div>
+
+  <script type="module" src="./Script_Game.mjs?v=20260726b"></script>
+</body>
+</html>
