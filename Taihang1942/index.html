@@ -814,6 +814,12 @@ function moveBlockReason(u, q, r) {
   if (d > u.mp) return "太远了: 本旬只剩 " + u.mp + " 点机动力(山地每格2点, 其余1点)";
   return "过不去: 沿途山地耗力太大, 本旬机动力不够(剩" + u.mp + "点)";
 }
+function stepCost(q, r) { return state.tiles[q][r].terrain === "mountain" ? 2 : 1; }
+function tileBlocked(q, r, self) {
+  const t = state.tiles[q][r];
+  if (t.sh) return true;
+  return state.units.some(x => x.q === q && x.r === r && x !== self);
+}
 function reachableMap(u) {
   const out = {};
   if (u.mp <= 0 || u.attacked) return out;
@@ -823,12 +829,10 @@ function reachableMap(u) {
     pq.sort((a, b) => a[0] - b[0]);
     const [d, q, r] = pq.shift();
     for (const [nq, nr] of nbrs(q, r)) {
-      const t = state.tiles[nq][nr];
-      if (t.sh) continue;
-      if (state.units.some(x => x.q === nq && x.r === nr)) continue;
-      const c = t.terrain === "mountain" ? 2 : 1;
-      const nd = d + c;
-      if (nd > u.mp) continue;
+      if (tileBlocked(nq, nr, u)) continue;
+      const nd = d + stepCost(nq, nr);
+      // 文明六规则: 只要还剩机动力, 相邻一格总走得动(哪怕山地耗2而你只剩1)
+      if (nd > u.mp && d > 0) continue;
       if (dist[key(nq, nr)] === undefined || nd < dist[key(nq, nr)]) { dist[key(nq, nr)] = nd; out[key(nq, nr)] = { q: nq, r: nr, cost: nd }; pq.push([nd, nq, nr]); }
     }
   }
@@ -837,13 +841,87 @@ function reachableMap(u) {
 function moveSelTo(q, r) {
   const u = getSel();
   if (!u || !reach || !reach[key(q, r)]) return;
-  u.mp -= reach[key(q, r)].cost;
+  u.mp = Math.max(0, u.mp - reach[key(q, r)].cost);
   u.q = q; u.r = r;
-  u.ambush = false; u.rooted = false;
+  u.ambush = false; u.rooted = false; u.autoPath = null;
   reach = u.mp > 0 ? reachableMap(u) : null;
   computeVis(); renderPanel(); draw();
 }
+// ── 多回合行军(文明六式): 点任意远处地格 → 自动算路, 本旬走完能走的, 余程存行军令 ──
+function farPath(u, tq, tr) {
+  if (tileBlocked(tq, tr, u)) return null;
+  const dist = { [key(u.q, u.r)]: 0 }, prev = {}, pq = [[0, u.q, u.r]];
+  let guard = 0;
+  while (pq.length && guard++ < 9000) {
+    pq.sort((a, b) => a[0] - b[0]);
+    const [d, q, r] = pq.shift();
+    if (q === tq && r === tr) break;
+    if (dist[key(q, r)] !== undefined && d > dist[key(q, r)]) continue;
+    for (const [nq, nr] of nbrs(q, r)) {
+      if (tileBlocked(nq, nr, u)) continue;
+      const nd = d + stepCost(nq, nr);
+      if (dist[key(nq, nr)] === undefined || nd < dist[key(nq, nr)]) { dist[key(nq, nr)] = nd; prev[key(nq, nr)] = [q, r]; pq.push([nd, nq, nr]); }
+    }
+  }
+  if (dist[key(tq, tr)] === undefined) return null;
+  const path = [[tq, tr]];
+  let cur = key(tq, tr);
+  while (prev[cur]) { path.unshift(prev[cur]); cur = key(prev[cur][0], prev[cur][1]); }
+  return path;
+}
+function pathTurns(u, path) {
+  let mp = u.mp, turns = 1;
+  for (let i = 1; i < path.length; i++) {
+    if (mp <= 0) { turns++; mp = UT_P[u.type].mp; }
+    mp = Math.max(0, mp - stepCost(path[i][0], path[i][1]));
+  }
+  return turns;
+}
+function advanceAlong(u) {
+  let moved = false;
+  while (u.autoPath && u.autoPath.length && u.mp > 0) {
+    const [nq, nr] = u.autoPath[0];
+    if (tileBlocked(nq, nr, u)) {
+      log(UT_P[u.type].name + "的行军路被挡住, 就地停止 — 重新下令", "jp");
+      u.autoPath = null;
+      break;
+    }
+    u.mp = Math.max(0, u.mp - stepCost(nq, nr));
+    u.q = nq; u.r = nr;
+    u.autoPath.shift();
+    u.ambush = false; u.rooted = false;
+    moved = true;
+    if (!u.autoPath.length) { u.autoPath = null; break; }
+  }
+  return moved;
+}
+function issueMoveOrder(u, tq, tr) {
+  const path = farPath(u, tq, tr);
+  if (!path) { log(moveBlockReason(u, tq, tr) || "那里过不去(山川阻隔或被占)", "jp"); return false; }
+  const est = pathTurns(u, path);
+  u.autoPath = path.slice(1);
+  advanceAlong(u);
+  if (u.autoPath && u.autoPath.length) log(UT_P[u.type].name + "行军令已下达 — 目标" + tileLabel(tq, tr) + ", 预计" + est + "旬抵达(每旬自动前进; 再点它可改令)", "hl");
+  computeVis();
+  reach = u.mp > 0 && !u.attacked ? reachableMap(u) : null;
+  renderPanel(); draw(); updateTop();
+  return true;
+}
+function tileLabel(q, r) {
+  const t = state.tiles[q][r];
+  if (t.village) return t.village.name;
+  if (t.sh) return t.sh.name;
+  return ({ plain: "平原", hills: "丘陵", forest: "密林", mountain: "山地" })[t.terrain] + "(" + q + "," + r + ")";
+}
+function continueAutoPaths() {
+  for (const u of state.units) {
+    if (u.side !== "p" || !u.autoPath || !u.autoPath.length || u.attacked) continue;
+    advanceAlong(u);
+    if (!u.autoPath) log(UT_P[u.type].name + "行军抵达" + tileLabel(u.q, u.r), "hl");
+  }
+}
 function getSel() { return sel && sel.kind === "unit" ? state.units.find(u => u.id === sel.id) : null; }
+function cancelMarch() { const u = getSel(); if (!u) return; u.autoPath = null; log(UT_P[u.type].name + "行军令已取消", "hl"); renderPanel(); draw(); }
 function deselect() { sel = null; reach = null; renderPanel(); draw(); }
 function actionAmbush() {
   const u = getSel();
@@ -965,9 +1043,11 @@ function endTurn() {
     u.mp = UT_P[u.type].mp; u.attacked = false;
     if (u.ambush) { u.mp = 0; u.attacked = true; } // 伏击姿态持续, 直到触发或移动
     if (u.rooted) { u.mp = 0; u.attacked = true; }
+    if (u.hp <= 0) continue;
     const t = state.tiles[u.q][u.r];
     if (u.hp < 100) u.hp = Math.min(100, u.hp + (t.village && t.village.heart >= CFG.heartOwn ? 15 : 6));
   }
+  continueAutoPaths(); // 多回合行军令: 每旬自动续走
   state.turn++;
   if (state.turn > CFG.totalTurns) { endGame(true, "survive"); flushReports(); return; }
   computeVis(); updateTop(); updateBanner(); renderPanel(); draw(); saveGame();
@@ -1139,7 +1219,20 @@ function draw() {
     }
   }
   const su = getSel();
-  if (su) { const [cx, cy] = hexCenter(su.q, su.r); ctx.strokeStyle = "#ffd766"; ctx.lineWidth = 2.5; hexPath(cx, cy, s - 3); ctx.stroke(); }
+  if (su) {
+    const [cx, cy] = hexCenter(su.q, su.r); ctx.strokeStyle = "#ffd766"; ctx.lineWidth = 2.5; hexPath(cx, cy, s - 3); ctx.stroke();
+    // 行军令路线: 蓝色虚线 + 终点旗
+    if (su.autoPath && su.autoPath.length) {
+      ctx.strokeStyle = "rgba(143,210,232,.85)"; ctx.lineWidth = 3; ctx.setLineDash([7, 6]);
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      for (const [pq, pr] of su.autoPath) { const [px2, py2] = hexCenter(pq, pr); ctx.lineTo(px2, py2); }
+      ctx.stroke(); ctx.setLineDash([]);
+      const last = su.autoPath[su.autoPath.length - 1];
+      const [ex, ey] = hexCenter(last[0], last[1]);
+      ctx.fillStyle = "#8fd2e8"; ctx.font = "bold 15px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🚩", ex, ey - 4);
+    }
+  }
   else if (sel && sel.kind === "tile") { const [cx, cy] = hexCenter(sel.q, sel.r); ctx.strokeStyle = "#8fd2e8"; ctx.lineWidth = 2; hexPath(cx, cy, s - 3); ctx.stroke(); }
   ctx.restore();
 }
@@ -1218,7 +1311,7 @@ function showHelp() {
     + "<p><b>敌进我退</b>: 纵队锋芒正锐时(战力30+)正面硬顶=关家垴。躲进山里, 让它扑空。<br><b>敌驻我扰</b>: 地雷埋在它必经的公路上; 伏击(密林/山地设伏)自动痛击路过纵队。<br><b>敌疲我打</b>: 纵队每旬疲劳+8, 战力掉到六成, 还会掉队送人头 — 疲了再上主力。<br><b>敌退我追</b>: 清剿结束它满载回撤 — 全歼回撤纵队夺回粮食, 这是最解恨的一仗。</p>"
     + "<p><b>斗智三件套</b>: ①情报拼图(情报网村+武工队+研判)拼出合击点→提前疏散+路上布雷设伏; ②烧屯粮/破铁路→敌战役推迟、出动后疲劳更快; ③围点打援→佯攻炮楼引援军上路, 在半路密林全歼之。</p>"
     + "<p><b>政治即军事</b>: 工作队驻村拉民心 — ≥50成根据地村(产粮兵), ≥60建情报网(帮你盯死日军动向)。但根据地越红火, 越招大扫荡: 5月的铁壁合围直扑总部, 是躲不掉的历史。</p>"
-    + "<p style='color:#8a8058'>操作: 点选部队→绿格移动 · 侧栏按钮攻击/设伏/埋雷/破袭 · 点村庄招兵 · 顶栏看台账 · Enter结束回合</p>"
+    + "<p style='color:#8a8058'>操作(同文明六): <b>点部队 → 点目标格</b>。近处立即走到, 远处自动多回合行军(蓝虚线=路线, 可取消); <b>点相邻敌人=攻击</b>。设伏/埋雷/破袭在右侧栏 · 点村庄招兵 · 顶栏看敌情台账 · Enter 结束回合</p>"
     + "<div class='mbtns'>" + (hasSaveGame() ? "<button class='mbtn ghost' onclick='continueGame()'>继续上局</button>" : "") + "<button class='mbtn' onclick='startNew()'>" + (state && state.started ? "开打" : "新开一局") + "</button></div>");
 }
 function hasSaveGame() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
@@ -1229,7 +1322,7 @@ function startNew() {
   closeModal(); computeVis(); centerCam(); updateTop(); updateBanner(); draw();
   log("═══ 1942年1月 · 太行军分区 ═══", "hl");
   log("上级通报: " + JP_BRIGADE + "盘踞铁路沿线, 囚笼正在收紧。你的任务: 熬过1942, 并让敌人为每一次扫荡付出代价", "hl");
-  log("【怎么动】点部队→地图亮起金色虚线格→点任意亮格就走过去。想打仗: 走到敌人旁边, 用右侧栏的攻击按钮。", "good");
+  log("【怎么动】和文明六一样: 点部队 → 点你要去的地格。近的立刻走到, 远的自动多回合行军(蓝色虚线是路线); 点相邻的敌人就是攻击。", "good");
   log("先手三步: ①工作队进邻村【驻村发动群众】(民心≥60就是你的雷达) ②民兵去公路埋雷 ③主力藏进山林设伏", "good");
   // 开局自动选中一支部队 — 让"可移动"这件事第一眼就看得见, 不必先猜
   const first = state.units.find(u => u.side === "p" && UT_P[u.type].str > 0) || state.units.find(u => u.side === "p");
@@ -1245,7 +1338,8 @@ function renderPanel() {
     const ut = UT_P[u.type];
     html += "<h3>" + ut.name + "<small>HP " + Math.round(u.hp) + " · 机动 " + u.mp + "/" + ut.mp + "</small></h3>";
     const nreach = reach ? Object.keys(reach).length : 0;
-    html += "<div class='row' style='color:" + (nreach ? "#cdff72" : "#8a8058") + "'>" + (nreach ? "➜ 地图上 " + nreach + " 格已亮起(金色虚线) — 点它们即可移动" : (u.attacked ? "本旬已行动, 下旬恢复机动" : "本旬机动力已用尽")) + "</div>";
+    html += "<div class='row' style='color:" + (nreach ? "#cdff72" : "#8a8058") + "'>" + (nreach ? "➜ 点金框格立即移动 · 点更远处自动多回合行军 · 点相邻敌人直接开打" : (u.attacked ? "本旬已行动, 下旬恢复机动" : "本旬机动力已用尽")) + "</div>";
+    if (u.autoPath && u.autoPath.length) html += "<div class='row' style='color:#8fd2e8'>🚩 行军令执行中 · 余 " + u.autoPath.length + " 步 <button class='tbtn' style='padding:1px 8px;font-size:11.5px' onclick='cancelMarch()'>取消</button></div>";
     if (ut.str) html += "<div class='row'>战力 " + pStr(u, "atk").toFixed(1) + "(攻) / " + pStr(u, "def").toFixed(1) + "(守)</div>";
     html += "<div class='hint'>" + ut.desc + "</div>";
     if (u.ambush) html += "<div class='row' style='color:#9fbc52'>🌿 设伏中 — 敌纵队行经邻格将遭我猝然打击(移动会撤伏)</div>";
@@ -1330,20 +1424,32 @@ function handleTap(px, py) {
   if (!h) { deselect(); return; }
   const [q, r] = h;
   const u = getSel();
-  if (u && reach && reach[key(q, r)]) { moveSelTo(q, r); return; }
+  // ── 文明六语义: 选中部队后, 点相邻敌人=直接打, 点任意地格=走过去(远则多回合行军) ──
+  if (u && !u.attacked) {
+    if (hexDist(u.q, u.r, q, r) === 1 && UT_P[u.type].str > 0) {
+      const col = state.units.find(x => x.side === "j" && x.kind === "col" && x.q === q && x.r === r && seenByPlayer(x));
+      const stg = state.units.find(x => x.side === "j" && x.kind === "strag" && x.q === q && x.r === r && seenByPlayer(x));
+      const sh = state.tiles[q][r].sh;
+      if (col || stg || (sh && visSet.has(key(q, r)))) { uiAttack(col ? "col" : stg ? "strag" : "sh", q, r); return; }
+    }
+    if (reach && reach[key(q, r)]) { moveSelTo(q, r); return; }
+  }
   const own = state.units.find(x => x.side === "p" && x.q === q && x.r === r);
   if (own) {
+    const again = u && own.id === u.id; // 点已选中的自己 = 保持选中(绝不降级成选地格)
     sel = { kind: "unit", id: own.id };
     reach = own.attacked ? null : reachableMap(own);
-    const n = reach ? Object.keys(reach).length : 0;
-    if (n) log("选中" + UT_P[own.type].name + " — 地图上" + n + "格亮起(金框), 点其中任意一格即可移动(剩余机动 " + own.mp + ")", "hl");
-    else log("选中" + UT_P[own.type].name + " — " + (moveBlockReason(own, own.q, own.r + 1) || "本旬无法再移动"), "jp");
+    if (!again) {
+      const n = reach ? Object.keys(reach).length : 0;
+      if (n) log("选中" + UT_P[own.type].name + " — 点亮格立即移动, 点更远的地格会自动多回合行军(剩余机动 " + own.mp + ")", "hl");
+      else log("选中" + UT_P[own.type].name + " — " + (own.attacked ? "本旬已行动, 下旬恢复" : "本旬机动力已用尽"), "jp");
+    }
     renderPanel(); draw(); return;
   }
-  // 选中着部队却点了不可达的地方: 必须说清为什么, 不许静默
-  if (u) {
-    const why = moveBlockReason(u, q, r);
-    if (why) log(why, "jp");
+  // 选中着部队点了远处空地 → 下多回合行军令(这才是文明六的手感)
+  if (u && !u.attacked && !own) {
+    if (issueMoveOrder(u, q, r)) return;
+    sel = { kind: "tile", q, r }; reach = null; renderPanel(); draw(); return;
   }
   sel = { kind: "tile", q, r }; reach = null; renderPanel(); draw();
 }
