@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>中流砥柱 · 1937—1945 — 敌后战场大战略</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; overflow:hidden; }
+body { background:#0e1116; color:#c8cdd6; font-family:system-ui,"Noto Sans SC",sans-serif; font-size:13px; user-select:none; }
+button { font-family:inherit; cursor:pointer; }
+.hidden { display:none !important; }
+#cv { position:absolute; inset:0; display:block; touch-action:none; }
+/* ── 顶栏: 资源 + 日期 + 时间控制 ── */
+#top { position:fixed; top:0; left:0; right:0; z-index:20; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:5px 10px; padding-top:calc(5px + env(safe-area-inset-top));
+  background:linear-gradient(180deg,#1b2029,#141821); border-bottom:1px solid #38414f; }
+#top .r { white-space:nowrap; font-size:12.5px; color:#9aa4b4; }
+#top .r b { color:#e8edf5; font-weight:600; }
+#top .r i { font-style:normal; font-size:11px; }
+.up { color:#7fc98a; } .dn { color:#e2564d; }
+#dateBox { margin-left:auto; display:flex; align-items:center; gap:6px; }
+#dateTxt { font-size:14px; color:#e8edf5; font-variant-numeric:tabular-nums; min-width:104px; text-align:right; }
+.spd { background:#232a35; border:1px solid #3d4757; color:#aab4c4; width:26px; height:24px; border-radius:4px; font-size:12px; padding:0; }
+.spd.on { background:#3a5f8a; border-color:#6f9fd0; color:#fff; }
+.tb { background:#232a35; border:1px solid #3d4757; color:#c8d2e2; border-radius:5px; padding:4px 10px; font-size:12.5px; }
+.tb:hover { background:#2e3745; }
+.tb.hot { border-color:#c0a24a; box-shadow:0 0 7px rgba(192,162,74,.45); }
+/* ── 牵制指标条(中流砥柱) ── */
+#pin { position:fixed; top:calc(38px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:15;
+  background:rgba(20,24,32,.94); border:1px solid #3d4757; border-radius:6px; padding:4px 12px; font-size:12px; white-space:nowrap; }
+#pin b { color:#e8b04a; }
+/* ── 侧面板 ── */
+#side { position:fixed; right:8px; top:calc(70px + env(safe-area-inset-top)); z-index:14; width:326px;
+  max-height:calc(100vh - 150px); overflow-y:auto; background:rgba(22,26,34,.97); border:1px solid #3d4757; border-radius:8px; padding:10px 12px; }
+#side h3 { color:#e8edf5; font-size:14.5px; margin-bottom:4px; }
+#side h3 small { color:#8b95a6; font-weight:400; font-size:11.5px; margin-left:6px; }
+#side .row { margin:3px 0; font-size:12.5px; line-height:1.5; }
+#side .hint { color:#8b95a6; font-size:11.5px; line-height:1.5; margin-top:5px; }
+#side hr { border:none; border-top:1px solid #2e3541; margin:7px 0; }
+.ab { display:block; width:100%; text-align:left; margin:3px 0; background:#232a35; border:1px solid #3a4352; color:#c8d2e2;
+  border-radius:5px; padding:6px 8px; font-size:12px; line-height:1.4; }
+.ab:hover:not(:disabled) { background:#2e3745; border-color:#5a6a80; }
+.ab:disabled { opacity:.4; cursor:default; }
+.ab .s { display:block; color:#8b95a6; font-size:11px; margin-top:1px; }
+.ab .c { float:right; color:#c0a24a; font-size:11px; }
+.ab.on { border-color:#c0a24a; background:#2f3444; }
+.bar { height:7px; background:#1a1f28; border:1px solid #333c49; border-radius:3px; overflow:hidden; margin:3px 0; }
+.bar i { display:block; height:100%; }
+/* ── 日志 ── */
+#logW { position:fixed; left:8px; bottom:calc(8px + env(safe-area-inset-bottom)); z-index:13; width:min(430px,54vw); }
+#logH { display:flex; align-items:center; gap:6px; background:rgba(22,26,34,.96); border:1px solid #3d4757;
+  border-radius:6px 6px 0 0; padding:3px 9px; font-size:11.5px; color:#9aa4b4; cursor:pointer; }
+#logW.cl #logH { border-radius:6px; } #logW.cl #logB { display:none; }
+#logH .u { margin-left:auto; background:#7a2620; border:1px solid #c36a52; color:#ffd9c9; border-radius:8px; padding:0 6px; font-size:10.5px; }
+#logB { max-height:26vh; overflow-y:auto; background:rgba(18,22,29,.94); border:1px solid #3d4757; border-top:none;
+  border-radius:0 0 6px 6px; padding:5px 9px; font-size:11.5px; line-height:1.5; }
+#logB p { margin:2px 0; color:#98a2b2; }
+#logB p.g { color:#7fc98a; } #logB p.b { color:#e2564d; } #logB p.j { color:#d88a6a; }
+#logB p.h { color:#e8c97a; } #logB p.s { color:#7fb6e0; } #logB p.k { color:#b39ddb; }
+/* ── 模态 ── */
+#mw { position:fixed; inset:0; z-index:40; background:rgba(6,8,11,.82); display:flex; align-items:center; justify-content:center; padding:14px; }
+#mb { width:min(920px,96vw); max-height:90vh; overflow:auto; background:#161a22; border:1px solid #4a5566; border-radius:10px; padding:16px 20px; }
+#mb h2 { color:#e8edf5; font-size:19px; margin-bottom:6px; }
+#mb h2 small { display:block; color:#8b95a6; font-size:12px; font-weight:400; margin-top:3px; }
+#mb p { margin:6px 0; font-size:12.5px; line-height:1.65; }
+#mb .btns { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
+.mb2 { background:#2d4a6d; border:1px solid #5f8fc0; color:#e8f0fa; padding:7px 16px; border-radius:6px; font-size:13px; }
+.mb2.gh { background:#232a35; border-color:#4a5566; color:#c8d2e2; }
+/* ── 国策树 ── */
+#ftWrap { position:relative; overflow:auto; max-height:64vh; background:#11141b; border:1px solid #333c49; border-radius:7px; padding:8px; }
+.ft { position:absolute; width:132px; background:#1e2530; border:1px solid #4a5566; border-radius:6px; padding:5px 7px; font-size:11.5px; cursor:pointer; text-align:center; }
+.ft:hover { border-color:#8fa8c8; }
+.ft b { color:#e8edf5; font-size:12px; display:block; }
+.ft .d { color:#8b95a6; font-size:10.5px; display:block; margin-top:2px; line-height:1.35; }
+.ft.done { border-color:#4f8f5a; background:#1c2a20; } .ft.done b { color:#7fc98a; }
+.ft.cur { border-color:#c0a24a; box-shadow:0 0 9px rgba(192,162,74,.5); }
+.ft.lock { opacity:.42; cursor:default; }
+/* ── 事件 ── */
+.evimg { height:5px; background:linear-gradient(90deg,#8a2b22,#c0a24a); border-radius:3px; margin:6px 0 10px; }
+.ecard { border:1px solid #4a5566; background:#1a1f29; border-radius:8px; padding:11px 14px; margin:8px 0; }
+.ecard .t { color:#e8c97a; font-size:14px; margin-bottom:4px; }
+table.hist { width:100%; border-collapse:collapse; font-size:12px; margin:6px 0; }
+table.hist td,table.hist th { border-bottom:1px solid #2e3541; padding:4px 6px; text-align:left; }
+table.hist th { color:#8b95a6; font-weight:600; }
+table.hist td.n { text-align:right; font-variant-numeric:tabular-nums; color:#e8edf5; }
+@media (max-width:760px){
+  #side { width:min(90vw,326px); top:auto; bottom:calc(8px + env(safe-area-inset-bottom)); max-height:44vh; }
+  #logW { width:52vw; } #logB { max-height:18vh; font-size:10.5px; }
+  #top { gap:6px; font-size:11.5px; padding:4px 6px; }
+  #top .r { font-size:11px; } #dateTxt { font-size:12.5px; min-width:92px; }
+  #pin { font-size:10.5px; padding:3px 8px; }
+  .ft { width:112px; font-size:10.5px; }
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="top">
+  <span class="r" id="rMan">👥</span>
+  <span class="r" id="rFood">🌾</span>
+  <span class="r" id="rAmmo">🔫</span>
+  <span class="r" id="rPol">★</span>
+  <button class="tb" id="bFocus">国策</button>
+  <button class="tb" id="bTech">研究</button>
+  <button class="tb" id="bProd">生产</button>
+  <button class="tb" id="bStat">战况</button>
+  <button class="tb" id="bHelp">说明</button>
+  <span id="dateBox">
+    <span id="dateTxt">1937-07-07</span>
+    <button class="spd" id="s0">‖</button>
+    <button class="spd" id="s1">1</button>
+    <button class="spd" id="s2">2</button>
+    <button class="spd" id="s3">3</button>
+  </span>
+</div>
+<div id="pin"></div>
+<div id="side" class="hidden"></div>
+<div id="logW"><div id="logH"><span class="c">▼</span><span>战报</span><span class="u hidden" id="logU">0</span></div><div id="logB"></div></div>
+<div id="mw" class="hidden"><div id="mb"></div></div>
+<script>
+"use strict";
+// ══════════════════════════════════════════════════════════════
+// 《中流砥柱 · 1937—1945》 敌后战场大战略 (钢铁雄心式)
+// 设计原则:
+//   1) 残酷性用数据说话 — 三光作战真的把根据地人口打回去, 1941-42 你必须主动裁军才能活
+//   2) 中流砥柱用数据说话 — 常驻显示"我军牵制日军师团数 / 侵华日军总数", 与正面战场对照
+//   3) 玩家始终有解法 — 地道战/精兵简政/大生产/减租减息, 每个难关都有对应的历史答案
+// ══════════════════════════════════════════════════════════════
+const CFG = {
+  start: "1937-07-07", end: "1945-08-15",
+  tickMs: 260,                    // 1 档速度下每"天"的实时毫秒
+  W: 26, H: 17, hex: 30,
+  baseGrowth: 0.055,              // 根据地控制度自然增长基数
+  expoPerAction: 1.0,
+  sweepBase: 26,
+};
+// ── 区域(华北+华中敌后, 史实根据地) ──
+// ctrl: 0=敌占 · 1-49=游击区 · 50-100=根据地(50 起算根据地人口)
+const REG = [
+  { id:"jcj",  name:"晋察冀",   terr:"山地", pop:12.5, seed:[7,4],   ctrl:6,  core:true,  desc:"第一个敌后抗日根据地。北岳、平西、冀东连成一片。" },
+  { id:"jsui", name:"晋绥",     terr:"山地", pop:5.2,  seed:[4,7],   ctrl:4,  desc:"保卫陕甘宁的屏障, 吕梁山与雁北。" },
+  { id:"taih", name:"晋冀豫",   terr:"山地", pop:9.8,  seed:[6,10],  ctrl:5,  core:true, desc:"太行山。八路军总部与一二九师所在。" },
+  { id:"jinan",name:"冀南",     terr:"平原", pop:8.4,  seed:[11,11], ctrl:2,  desc:"平原游击战的试验场, 无险可守全靠地道与群众。" },
+  { id:"jizh", name:"冀中",     terr:"平原", pop:10.6, seed:[11,7],  ctrl:3,  desc:"华北粮仓, 也是五一大扫荡的重灾区。地道战的故乡。" },
+  { id:"jidon",name:"冀东",     terr:"山地", pop:4.6,  seed:[15,4],  ctrl:1,  desc:"长城内外, 伪满与华北交界。" },
+  { id:"luzh", name:"鲁中",     terr:"山地", pop:7.8,  seed:[16,9],  ctrl:2,  desc:"沂蒙山区, 山东纵队根基。" },
+  { id:"luxi", name:"鲁西",     terr:"平原", pop:6.4,  seed:[14,12], ctrl:1,  desc:"黄河故道, 平原游击区。" },
+  { id:"jiaod",name:"胶东",     terr:"山地", pop:6.0,  seed:[20,8],  ctrl:1,  desc:"半岛山地, 靠海可通交通线。" },
+  { id:"yubei",name:"豫北",     terr:"平原", pop:5.5,  seed:[9,14],  ctrl:1,  desc:"太行南麓与黄河之间。" },
+  { id:"subei",name:"苏北",     terr:"平原", pop:7.2,  seed:[19,14], ctrl:0,  hua:true, desc:"新四军华中根据地。皖南事变后重建军部于盐城。" },
+  { id:"wandong",name:"皖东",   terr:"平原", pop:4.8,  seed:[16,15], ctrl:0,  hua:true, desc:"淮南津浦路两侧, 新四军二师。" },
+  // 敌军重镇(城市: 控制度极难提升, 是日军兵力与铁路的枢纽)
+  { id:"pjin", name:"平津",     terr:"城市", pop:4.2,  seed:[15,2],  ctrl:0, city:true, jpBase:5, desc:"华北方面军司令部所在。" },
+  { id:"shim", name:"石门",     terr:"城市", pop:2.4,  seed:[12,8],  ctrl:0, city:true, jpBase:3, desc:"平汉线枢纽, 囚笼政策的中心。" },
+  { id:"taiyu",name:"太原",     terr:"城市", pop:2.8,  seed:[7,7],   ctrl:0, city:true, jpBase:3, desc:"第一军司令部, 同蒲线枢纽。" },
+  { id:"jinanc",name:"济南",    terr:"城市", pop:2.6,  seed:[17,11], ctrl:0, city:true, jpBase:3, desc:"津浦线枢纽, 第十二军所在。" },
+];
+const TERRB = { 山地:{ def:1.5, growth:1.15, sweep:0.75 }, 平原:{ def:0.7, growth:1.3, sweep:1.35 }, 城市:{ def:0.4, growth:0.35, sweep:1.0 } };
+// ── 部队类型 ──
+const UT = {
+  zhulì:  { name:"主力团",   man:2.4, ammo:1.0, atk:1.0,  org:1.0,  up:1.0,  desc:"正规野战部队。攻坚、伏击的骨干, 但吃粮吃弹最多。" },
+  difang: { name:"地方武装", man:1.2, ammo:0.4, atk:0.55, org:0.8,  up:0.42, desc:"军分区独立营连。扎在本地, 消耗小、恢复快。" },
+  minbing:{ name:"民兵",     man:0.5, ammo:0.15,atk:0.25, org:0.6,  up:0.1,  desc:"不脱产。战力弱但几乎不吃补给, 是根据地的根。" },
+  wugong: { name:"武工队",   man:0.6, ammo:0.3, atk:0.5,  org:1.2,  up:0.25, desc:"精干小队。深入敌后瓦解伪军、锄奸、打击据点。" },
+};
+// ── 任务(部队在区域内执行) ──
+const MISSION = {
+  fadong: { name:"发动群众", desc:"提高控制度与群众基础。不暴露。", ctrl:+0.9, expo:0.0,  kill:0,    risk:0.0 },
+  jianshe:{ name:"整训生产", desc:"恢复兵力与组织度, 增产粮食。",   ctrl:+0.2, expo:0.0,  kill:0,    risk:0.0 },
+  poxi:   { name:"破袭交通", desc:"扒铁路炸桥梁, 牵制日军。暴露高。", ctrl:+0.1, expo:1.5,  kill:0.55, risk:0.5 },
+  fuji:   { name:"伏击歼敌", desc:"打运动之敌。歼敌多, 也伤亡大。",   ctrl:+0.2, expo:1.2,  kill:0.9,  risk:0.9 },
+  gongjian:{name:"攻坚拔点", desc:"打炮楼据点, 缩小敌占区。",       ctrl:+1.4, expo:2.0,  kill:0.7,  risk:1.3 },
+  fansaodang:{name:"反扫荡", desc:"分散隐蔽、避敌锋芒、伺机反击。",  ctrl:+0.0, expo:-0.6, kill:0.35, risk:0.35, defend:1.9 },
+};
+
+// ══════════ 国策树(史实路线) ══════════
+// x,y 为树中格位; need 为前置; days 为完成天数; pol 为政治点消耗
+const FOCUS = [
+  { id:"luochuan", n:"洛川会议", x:2, y:0, days:25, pol:0, need:[],
+    d:"确定全面抗战路线与独立自主的山地游击战方针", fx:"解锁敌后开辟; 政治点+0.15/日" },
+  { id:"shandi",  n:"独立自主的山地游击战", x:2, y:1, days:40, pol:20, need:["luochuan"],
+    d:"不打阵地战, 到敌人后方去", fx:"山地区域控制增长 +25%, 部队伤亡 -15%" },
+  { id:"tingjin", n:"挺进敌后",  x:1, y:2, days:45, pol:25, need:["shandi"],
+    d:"一一五师、一二〇师、一二九师分头挺进", fx:"立即在晋察冀/晋绥/太行各获一支主力团" },
+  { id:"genjudi", n:"建立抗日根据地", x:3, y:2, days:50, pol:25, need:["shandi"],
+    d:"军事斗争与政权建设并举", fx:"全部区域控制增长 +20%; 解锁三三制" },
+  { id:"sansan",  n:"三三制政权", x:3, y:3, days:45, pol:30, need:["genjudi"],
+    d:"共产党员、党外进步人士、中间派各占三分之一", fx:"群众基础 +12, 政治点 +0.2/日" },
+  { id:"jianzu",  n:"减租减息", x:1, y:3, days:45, pol:30, need:["tingjin"],
+    d:"减轻农民负担, 又团结开明士绅", fx:"根据地粮食 +25%, 兵源 +20%" },
+  { id:"wuzhuang",n:"武装群众", x:2, y:4, days:40, pol:25, need:["jianzu","sansan"],
+    d:"村村有民兵, 人人是战士", fx:"每区自动补充民兵; 反扫荡时区域防御 +25%" },
+  { id:"baituan", n:"百团大战", x:0, y:5, days:60, pol:45, need:["wuzhuang"],
+    d:"1940年8月, 105个团破袭正太路", fx:"立即重创日军交通线, 牵制大增 — 但招致疯狂报复" },
+  { id:"jingbing",n:"精兵简政", x:2, y:5, days:50, pol:35, need:["wuzhuang"],
+    d:"缩小机关、充实连队, 主力地方化", fx:"部队消耗 -35%; 部分主力转为地方武装(痛苦但保命)" },
+  { id:"dashengchan", n:"大生产运动", x:3, y:6, days:55, pol:30, need:["jingbing"],
+    d:"自己动手, 丰衣足食 — 南泥湾", fx:"粮食 +40%, 弹药 +25%, 摆脱经济封锁" },
+  { id:"zhengfeng", n:"整风运动", x:1, y:6, days:50, pol:35, need:["jingbing"],
+    d:"实事求是, 统一思想", fx:"政治点 +0.35/日, 群众基础 +10, 干部损失 -30%" },
+  { id:"didao",   n:"地道战·地雷战", x:0, y:7, days:45, pol:25, need:["zhengfeng"],
+    d:"平原上把村庄连成地下长城", fx:"平原区域反扫荡损失 -40%, 扫荡歼敌 +50%" },
+  { id:"wugongdui",n:"敌后武工队", x:2, y:7, days:45, pol:30, need:["dashengchan"],
+    d:"深入敌占区, 瓦解伪军、开辟新区", fx:"解锁武工队; 伪军反正率大增" },
+  { id:"jidiren", n:"挤敌人", x:1, y:8, days:50, pol:35, need:["didao","wugongdui"],
+    d:"一个村一个村地夺回来", fx:"攻坚拔点效率 +50%, 敌占区控制增长 +30%" },
+  { id:"fangong", n:"局部反攻", x:3, y:8, days:60, pol:45, need:["wugongdui"],
+    d:"1944年起转入攻势, 收复失地", fx:"全部区域控制增长 +35%, 主力团战力 +25%" },
+  { id:"dafangong",n:"大反攻", x:2, y:9, days:50, pol:50, need:["jidiren","fangong"],
+    d:"1945年8月, 向一切敌占城市与交通线发起总攻", fx:"结局评价大幅提升; 全境控制暴涨" },
+];
+// ══════════ 研究 ══════════
+const TECH = [
+  { id:"youji1", n:"游击战术",   days:70,  need:[], d:"敌进我退, 敌驻我扰, 敌疲我打, 敌退我追", fx:"全部队攻击 +15%" },
+  { id:"youji2", n:"运动歼敌",   days:110, need:["youji1"], d:"集中优势兵力打歼灭战", fx:"伏击歼敌 +40%" },
+  { id:"tunnel", n:"地道工程",   days:90,  need:[], d:"户户相通, 村村相连", fx:"平原区反扫荡损失 -25%" },
+  { id:"mine",   n:"地雷技术",   days:85,  need:["tunnel"], d:"土法上马, 就地取材", fx:"扫荡期间自动杀伤日军" },
+  { id:"arsenal",n:"兵工生产",   days:100, need:[], d:"黄崖洞兵工厂: 造枪造弹", fx:"弹药产出 +50%" },
+  { id:"medic",  n:"战地卫生",   days:95,  need:["arsenal"], d:"白求恩式的战地医院", fx:"部队恢复 +60%, 伤亡转伤员" },
+  { id:"radio",  n:"无线电通信", days:120, need:["youji1"], d:"军区之间协同作战", fx:"每区可驻部队 +1, 反扫荡预警" },
+  { id:"minyun", n:"民运工作",   days:105, need:[], d:"到群众中去, 把群众组织起来", fx:"控制增长 +25%, 兵源 +25%" },
+  { id:"dijun",  n:"敌军工作",   days:130, need:["minyun","radio"], d:"瓦解敌军, 争取伪军反正", fx:"伪军持续反正为我军兵源" },
+];
+// ══════════ 历史事件 ══════════
+// when: 日期(YYYY-MM-DD) 触发; opts: 选项(带效果与史实注解)
+const EVENTS = [
+  { id:"lugou", when:"1937-07-07", t:"卢沟桥事变", cls:"b",
+    txt:"日军以士兵失踪为借口进攻宛平城。中国全民族抗战爆发。<br>红军改编为国民革命军第八路军, 东渡黄河, 开赴华北抗日前线。",
+    opts:[{ t:"到敌人后方去", d:"确立敌后战场方针", fx:s=>{ s.pol += 10; } }] },
+  { id:"pingxing", when:"1937-09-25", t:"平型关大捷", cls:"g",
+    txt:"一一五师在平型关伏击日军第五师团辎重队, 歼敌千余人。<br>这是全国抗战开始后中国军队的第一个大胜仗, 打破了日军不可战胜的神话。",
+    opts:[{ t:"通电全国", d:"民心大振, 但暴露了主力位置", fx:s=>{ s.mass += 8; s.pol += 8; s.expo += 6; addKill(s, 1000); } },
+          { t:"低调处理", d:"保存实力, 继续隐蔽发展", fx:s=>{ s.mass += 3; s.pol += 4; addKill(s, 1000); } }] },
+  { id:"taiyuan", when:"1937-11-08", t:"太原失守 — 华北正规战结束", cls:"j",
+    txt:"太原沦陷, 华北正面战场的正规战宣告结束。<br>毛泽东判断: 在华北, <b>以国民党为主体的正规战争已经结束, 以共产党为主体的游击战争进入主要地位</b>。",
+    opts:[{ t:"全面展开敌后游击战", d:"敌后战场从此成为独立战场", fx:s=>{ s.pol += 12; s.eraNote = "敌后战场开辟"; } }] },
+  { id:"wuhan", when:"1938-10-27", t:"武汉失守 — 抗战进入相持阶段", cls:"j",
+    txt:"日军占领武汉, 但已无力再发动大规模战略进攻。<br>日军开始将主力转向敌后战场, 对根据地实施反复'扫荡'。战争进入最艰苦的相持阶段。",
+    opts:[{ t:"准备长期斗争", d:"日军对敌后压力持续上升", fx:s=>{ s.phase = 2; s.pol += 8; } }] },
+  { id:"wannan", when:"1941-01-06", t:"皖南事变", cls:"b",
+    txt:"新四军军部及所属部队九千余人在皖南泾县遭国民党军八万人围攻, 血战七昼夜, 大部壮烈牺牲, 军长叶挺被扣, 副军长项英遇害。<br>亲者痛, 仇者快。",
+    opts:[{ t:"重建新四军军部", d:"在盐城重建, 全军扩编为七个师 — 打不散的队伍", fx:s=>{ s.pol += 15; s.mass += 6; for (const r of s.regs) if (r.hua) r.ctrl = Math.max(0, r.ctrl - 12); log("新四军在盐城重建军部, 华中部队整编为七个师", "h"); } },
+          { t:"以大局为重, 继续合作抗日", d:"顾全统一战线, 但华中受挫更重", fx:s=>{ s.pol += 8; s.mass += 12; for (const r of s.regs) if (r.hua) r.ctrl = Math.max(0, r.ctrl - 18); } }] },
+  { id:"sanguang", when:"1941-08-14", t:"治安强化运动与「三光」作战", cls:"b",
+    txt:"日军华北方面军推行'治安强化运动', 对根据地实行<b>烧光、杀光、抢光</b>的野蛮政策, 制造无人区, 修筑封锁沟墙上万公里。<br>根据地进入最困难的时期。",
+    opts:[{ t:"坚壁清野, 依托地道与群众", d:"损失惨重但队伍还在", fx:s=>{ s.hardTimes = true; s.sweepPower += 0.5; log("日军推行治安强化运动: 扫荡强度大幅上升, 根据地面临生死考验", "b"); } }] },
+  { id:"wuyi", when:"1942-05-01", t:"五一大扫荡", cls:"b",
+    txt:"冈村宁次调集五万余兵力'铁壁合围'冀中根据地, 拉网合击、篦梳清剿。<br>冀中根据地被摧毁大半, 八路军副参谋长<b>左权</b>在十字岭指挥突围时壮烈牺牲。",
+    opts:[{ t:"分散突围, 转入地下", d:"保存骨干, 化整为零", fx:s=>{ const r = s.regs.find(x=>x.id==="jizh"); if(r){ r.ctrl = Math.max(0, r.ctrl-42); r.pop *= 0.72; } s.mass = Math.max(0, s.mass-8); killOwn(s, 0.16); log("冀中根据地遭毁灭性打击, 左权将军殉国于十字岭", "b"); } }] },
+  { id:"famine", when:"1942-07-20", t:"华北大旱与饥荒", cls:"b",
+    txt:"华北大旱, 蝗灾接踵。日军封锁加上天灾, 根据地军民'一把黑豆一把糠'。<br>不生产, 就要饿死; 不打仗, 就要亡国。",
+    opts:[{ t:"自己动手, 丰衣足食", d:"开展大生产运动(有【大生产运动】国策则损失减半)", fx:s=>{ const m = s.focusDone.dashengchan ? 0.5 : 1; s.food = Math.max(0, s.food - 260*m); s.mass = Math.max(0, s.mass - 6*m); log("饥荒袭来 — 军队开荒种地, 与民同苦", "b"); } }] },
+  { id:"yuxianggui", when:"1944-04-18", t:"豫湘桂战役 — 正面战场大溃退", cls:"j",
+    txt:"日军发动'一号作战', 打通大陆交通线。国民党军八个月内丢失河南、湖南、广西等地146座城市, 损兵五六十万。<br>与此同时, <b>敌后战场开始局部反攻, 解放区不断扩大</b>。",
+    opts:[{ t:"抓住时机, 局部反攻", d:"敌后与正面此消彼长", fx:s=>{ s.kmtFront = Math.max(5, s.kmtFront - 22); s.pol += 18; log("正面战场大溃退之际, 敌后战场转入局部反攻", "h"); } }] },
+  { id:"qida", when:"1945-04-23", t:"中共七大", cls:"g",
+    txt:"党的七大在延安召开, 确立毛泽东思想为指导思想, 提出<b>放手发动群众, 壮大人民力量</b>的政治路线。<br>此时, 解放区面积近百万平方公里, 人口近一亿, 军队一百二十余万。",
+    opts:[{ t:"准备大反攻", d:"政治点大增, 全军士气高涨", fx:s=>{ s.pol += 40; s.mass += 12; log("中共七大召开 — 抗日战争胜利在望", "g"); } }] },
+  { id:"sujun", when:"1945-08-09", t:"苏军出兵东北 · 毛泽东发出总攻号令", cls:"g",
+    txt:"苏联对日宣战, 百万红军进入东北。<br>毛泽东发表《对日寇的最后一战》, 朱德总司令连发七道命令, 解放区军民向一切敌占城市与交通要道发起大反攻。",
+    opts:[{ t:"向一切敌占区发起总攻", d:"全境控制度暴涨", fx:s=>{ for (const r of s.regs) r.ctrl = Math.min(100, r.ctrl + (r.city ? 18 : 30)); s.pol += 25; log("大反攻开始! 解放区军民全线出击", "g"); } }] },
+];
+// ══════════ 侵华日军兵力(史实, 单位: 师团当量) ══════════
+function jpDivisions(y) { return y <= 1937 ? 16 : y === 1938 ? 24 : y === 1939 ? 26 : y === 1940 ? 27 : y === 1941 ? 28 : y === 1942 ? 26 : y === 1943 ? 24 : y === 1944 ? 25 : 26; }
+// ══════════ 工具 ══════════
+let rng = Math.random;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ri=(a,b)=>a+Math.floor(rng()*(b-a+1));
+const key=(q,r)=>q+","+r;
+const W=CFG.W,H=CFG.H,SQ3=Math.sqrt(3);
+function inb(q,r){return q>=0&&q<W&&r>=0&&r<H}
+function nbrs(q,r){const e=r%2===0;const d=e?[[1,0],[-1,0],[0,1],[0,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1]];const o=[];for(const[a,b]of d){const nq=q+a,nr=r+b;if(inb(nq,nr))o.push([nq,nr])}return o}
+function hexCenter(q,r){const s=CFG.hex;return[s*SQ3*(q+0.5*(r&1))+s,s*1.5*r+s]}
+function d2s(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),dd=String(d.getDate()).padStart(2,"0");return y+"-"+m+"-"+dd}
+function s2d(s){const[a,b,c]=s.split("-").map(Number);return new Date(a,b-1,c)}
+function cnDate(d){return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日"}
+
+// ══════════ 状态与地图 ══════════
+let S = null;
+function newGame(seed) {
+  rng = mulberry32(seed || 424242);
+  // 区域格子: 以 seed 点做 Voronoi 生长, 形成连片"省份"
+  const cells = [];
+  for (let q = 0; q < W; q++) { cells[q] = []; for (let r = 0; r < H; r++) {
+    let best = 0, bd = 1e9;
+    for (let i = 0; i < REG.length; i++) {
+      const [sq, sr] = REG[i].seed;
+      const d = (q - sq) ** 2 * 1.0 + (r - sr) ** 2 * 1.35;
+      if (d < bd) { bd = d; best = i; }
+    }
+    cells[q][r] = bd > 46 ? -1 : best;   // 太远的格子留白(边界外)
+  } }
+  const regs = REG.map((r, i) => ({
+    ...r, idx: i, ctrl: r.ctrl, pop0: r.pop, pop: r.pop,
+    jp: (r.jpBase || 0) + (r.city ? 0 : 0.6), pup: r.city ? 1.2 : 0.5,
+    sweep: 0, sweepT: 0, warn: 0, pendScale: 0, ruin: 0, cells: [],
+  }));
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const i = cells[q][r]; if (i >= 0) regs[i].cells.push([q, r]); }
+  for (const r of regs) {
+    let sx = 0, sy = 0;
+    for (const [a, b] of r.cells) { const [x, y] = hexCenter(a, b); sx += x; sy += y; }
+    r.cx = sx / Math.max(1, r.cells.length); r.cy = sy / Math.max(1, r.cells.length);
+  }
+  S = {
+    date: s2d(CFG.start), endDate: s2d(CFG.end), speed: 0, over: false, result: null, started: false,
+    cells, regs, units: [], nextId: 1,
+    man: 6, food: 300, ammo: 120, pol: 20, mass: 20, expo: 0,
+    focusDone: {}, focusCur: null, focusLeft: 0,
+    techDone: {}, techCur: null, techLeft: 0,
+    prod: { ammo: 0.5, food: 0.3, gear: 0.2 },
+    evDone: {}, phase: 1, hardTimes: false, sweepPower: 1, kmtFront: 100,
+    stats: { jpKill: 0, pupKill: 0, ownLoss: 0, sweeps: 0, sweepsHeld: 0, popPeak: 0, defect: 0 },
+    log: [],
+  };
+  // 起手: 三个师的骨干
+  addUnit("zhulì", "jcj", "一一五师主力"); addUnit("zhulì", "jsui", "一二〇师主力"); addUnit("zhulì", "taih", "一二九师主力");
+  addUnit("difang", "taih", "太行军分区");
+  return S;
+}
+function addUnit(type, regId, name) {
+  const t = UT[type];
+  const u = { id: S.nextId++, type, name: name || t.name, reg: regId, mission: "fadong",
+    str: 100, org: 100, exp: 0, eq: 70 };
+  S.units.push(u); return u;
+}
+function reg(id) { return S.regs.find(r => r.id === id); }
+function unitsIn(id) { return S.units.filter(u => u.reg === id); }
+function baseArea() { return S.regs.filter(r => r.ctrl >= 50); }
+function guerrillaArea() { return S.regs.filter(r => r.ctrl >= 15 && r.ctrl < 50); }
+// 根据地人口(百万): 控制度≥50 全额, 15-50 折半
+function popControlled() {
+  let p = 0;
+  for (const r of S.regs) { if (r.ctrl >= 50) p += r.pop * (0.5 + r.ctrl / 200); else if (r.ctrl >= 15) p += r.pop * r.ctrl / 200; }
+  return p;
+}
+function totalPop() { return S.regs.reduce((a, r) => a + r.pop, 0); }
+function armySize() { return S.units.reduce((a, u) => a + UT[u.type].man * u.str / 100, 0); }
+// 牵制日军师团(中流砥柱的量化): 根据地规模 + 近期作战强度
+function pinnedDiv() {
+  const y = S.date.getFullYear();
+  const tot = jpDivisions(y);
+  const popR = popControlled() / totalPop();
+  const opsR = clamp(S.opsPressure || 0, 0, 1);
+  const r = clamp(popR * 0.62 + opsR * 0.28 + (S.focusDone.baituan ? 0.05 : 0), 0, 0.72);
+  return { tot, ours: Math.round(tot * r), ratio: r };
+}
+function pinnedPuppet() { return clamp(0.55 + popControlled() / totalPop() * 0.55, 0, 0.98); }
+function log(msg, cls) {
+  S.log.push({ msg, cls, d: d2s(S.date) });
+  if (S.log.length > 200) S.log.shift();
+  if (typeof pushLog === "function") pushLog(msg, cls);
+}
+function addKill(s, n) { s.stats.jpKill += n; }
+function killOwn(s, frac) {
+  for (const u of s.units) { const l = u.str * frac; u.str = Math.max(6, u.str - l); s.stats.ownLoss += l * UT[u.type].man * 10000 / 100; }
+}
+// ══════════ 修正值(国策/科技的实际效果) ══════════
+function M() {
+  const f = S.focusDone, t = S.techDone;
+  return {
+    ctrlMul: 1 + (f.genjudi ? .20 : 0) + (f.fangong ? .35 : 0) + (t.minyun ? .25 : 0) + (f.jidiren ? .15 : 0),
+    mtnMul: f.shandi ? 1.25 : 1,
+    atkMul: 1 + (t.youji1 ? .15 : 0) + (t.youji2 ? .18 : 0) + (f.fangong ? .25 : 0) + (f.jidiren ? .2 : 0),
+    lossMul: (f.shandi ? .85 : 1) * (t.medic ? .72 : 1) * (f.zhengfeng ? .9 : 1),
+    upkeepMul: f.jingbing ? .65 : 1,
+    foodMul: 1 + (f.jianzu ? .25 : 0) + (f.dashengchan ? .4 : 0),
+    ammoMul: 1 + (t.arsenal ? .5 : 0) + (f.dashengchan ? .25 : 0),
+    manMul: 1 + (f.jianzu ? .2 : 0) + (t.minyun ? .25 : 0),
+    sweepDefPlain: (t.tunnel ? .75 : 1) * (f.didao ? .6 : 1),
+    sweepKill: 1 + (t.mine ? .5 : 0) + (f.didao ? .5 : 0),
+    defMul: 1 + (f.wuzhuang ? .25 : 0),
+    polDay: .12 + (f.luochuan ? .15 : 0) + (f.sansan ? .2 : 0) + (f.zhengfeng ? .35 : 0),
+    recover: 1 + (t.medic ? .6 : 0) + (f.dashengchan ? .2 : 0),
+    slots: 2 + (t.radio ? 1 : 0),
+  };
+}
+// ══════════ 日推进 ══════════
+function tick() {
+  if (S.over) return;
+  const m = M();
+  const day = S.date;
+  // 1) 国策 / 研究
+  if (S.focusCur) { S.focusLeft--; if (S.focusLeft <= 0) completeFocus(S.focusCur); }
+  if (S.techCur) { S.techLeft--; if (S.techLeft <= 0) completeTech(S.techCur); }
+  S.pol += m.polDay;
+  // 2) 区域演化
+  let ops = 0, ammoUse = 0, foodUse = 0;
+  for (const r of S.regs) {
+    const tb = TERRB[r.terr];
+    const us = unitsIn(r.id);
+    let ctrlD = 0, expoD = 0;
+    for (const u of us) {
+      const mi = MISSION[u.mission], ut = UT[u.type];
+      const eff = (u.str / 100) * (0.45 + 0.55 * u.org / 100) * (0.5 + 0.5 * u.eq / 100);
+      // 控制度: 群众工作是根本, 攻坚拔点直接夺地
+      let cg = mi.ctrl * eff * tb.growth * m.ctrlMul * (r.terr === "山地" ? m.mtnMul : 1);
+      if (r.city) cg *= 0.35;
+      cg *= (0.55 + S.mass / 140);
+      ctrlD += cg * CFG.baseGrowth * 6;
+      expoD += mi.expo * eff * 0.55;
+      // 歼敌
+      if (mi.kill > 0) {
+        const k = mi.kill * eff * ut.atk * m.atkMul * (1 + u.exp / 260) * 3.4;
+        S.stats.jpKill += k * 0.62; S.stats.pupKill += k * 1.5;
+        ops += mi.kill * eff * 0.09;
+        // 伤亡与消耗
+        const loss = mi.risk * eff * m.lossMul * (r.city ? 1.4 : 1) * (1 - Math.min(.35, u.exp / 300)) * 0.55;
+        u.str = Math.max(5, u.str - loss);
+        u.org = Math.max(8, u.org - loss * 1.6);
+        S.stats.ownLoss += loss * ut.man * 100;
+        u.exp = Math.min(100, u.exp + 0.055);
+        ammoUse += ut.ammo * mi.kill * 0.5;
+      }
+      // 整训: 恢复
+      if (u.mission === "jianshe") { u.str = Math.min(100, u.str + 0.42 * m.recover); u.org = Math.min(100, u.org + 1.1 * m.recover); }
+      else { u.org = Math.min(100, u.org + 0.28); }
+      foodUse += ut.man * ut.up * m.upkeepMul * 0.16;
+      ammoUse += ut.ammo * ut.up * m.upkeepMul * 0.02;
+    }
+    // 无部队区域: 控制度缓慢衰减(群众自发)
+    if (!us.length) ctrlD -= r.ctrl > 0 ? 0.012 : 0;
+    // 日军驻军压制
+    ctrlD -= r.jp * 0.016 * (r.city ? 2.2 : 1);
+    if (r.sweepT > 0) ctrlD -= 0.55 * S.sweepPower * tb.sweep;
+    r.ctrl = clamp(r.ctrl + ctrlD, 0, 100);
+    S.expo += expoD * 0.02;
+    // 人口恢复(被三光过的区域慢慢回血)
+    if (r.pop < r.pop0 && r.sweepT <= 0) r.pop = Math.min(r.pop0, r.pop + r.pop0 * 0.00035 * (1 + S.mass / 120));
+    if (r.sweepT > 0) r.sweepT--;
+  }
+  S.opsPressure = (S.opsPressure || 0) * 0.985 + ops * 0.015;
+  S.expo = clamp(S.expo * 0.994, 0, 100);
+  // 3) 经济
+  const pc = popControlled();
+  const foodIn = pc * 0.085 * m.foodMul * (S.hardTimes ? 0.72 : 1);
+  const ammoIn = (0.2 + pc * 0.035) * m.ammoMul * (S.hardTimes ? 0.8 : 1);
+  const manIn = pc * 0.0013 * m.manMul * (1 + S.mass / 180);
+  S.food = Math.max(0, S.food + foodIn - foodUse);
+  S.ammo = Math.max(0, S.ammo + ammoIn - ammoUse);
+  S.man += manIn;
+  S.mass = clamp(S.mass + (pc * 0.0018) - (S.hardTimes ? 0.012 : 0), 0, 100);
+  // 缺粮缺弹: 部队掉血掉装备
+  if (S.food <= 0) { for (const u of S.units) { u.str = Math.max(5, u.str - 0.22); } if (!S.starveNote || (S.date - S.starveNote) > 3e9) { S.starveNote = +S.date; log("粮食告罄 — 部队饿着肚子, 兵力持续减员", "b"); } }
+  if (S.ammo <= 0) { for (const u of S.units) u.eq = Math.max(15, u.eq - 0.3); }
+  else { for (const u of S.units) u.eq = Math.min(100, u.eq + 0.06); }
+  // 4) 兵员补充(民兵自动生成)
+  if (S.focusDone.wuzhuang && S.man > 3 && rng() < 0.012) {
+    const cands = baseArea();
+    if (cands.length) { const r = cands[ri(0, cands.length - 1)]; if (unitsIn(r.id).length < M().slots + 2) { addUnit("minbing", r.id, r.name + "民兵"); S.man -= 0.5; log(r.name + "组建起民兵队 — 村村有武装", "g"); } }
+  }
+  // 5) 伪军反正
+  if (S.techDone.dijun && rng() < 0.01) { const n = 0.3 + rng() * 0.5; S.man += n; S.stats.defect += n; log("敌军工作见效: 一部伪军携枪反正, 补充兵员 " + n.toFixed(1) + " 万", "g"); }
+  // 6) 日军扫荡
+  jpSweepLogic();
+  // 7) 事件
+  checkEvents();
+  // 8) 推进日期
+  S.date = new Date(S.date.getTime() + 864e5);
+  if (S.date > S.endDate) endGame();
+  if (popControlled() > S.stats.popPeak) S.stats.popPeak = popControlled();
+  if (!S.units.length) endGame(true);
+}
+
+// ══════════ 日军扫荡: 残酷性的主要来源, 但玩家有解 ══════════
+function jpSweepLogic() {
+  // 先处理已在集结中的扫荡: 倒计时到点才真正落下(给玩家反应窗口)
+  for (const r of S.regs) {
+    if (r.warn > 0) {
+      r.warn--;
+      if (r.warn === 0) resolveSweep(r);
+    }
+  }
+  const y = S.date.getFullYear();
+  // 扫荡频率随暴露度与根据地规模上升; 1941-42 最凶
+  const era = y <= 1938 ? 0.35 : y === 1939 ? 0.6 : y === 1940 ? 0.85 : (y === 1941 || y === 1942) ? 1.45 : y === 1943 ? 1.0 : 0.62;
+  const pressure = (S.expo / 100 * 0.6 + popControlled() / totalPop() * 0.75) * era * S.sweepPower;
+  if (rng() > pressure * 0.011) return;
+  // 挑目标: 控制度高、平原优先(平原好打)
+  const cands = S.regs.filter(r => r.ctrl > 22 && r.sweepT <= 0);
+  if (!cands.length) return;
+  cands.sort((a, b) => (b.ctrl * (b.terr === "平原" ? 1.5 : 1) + b.pop * 2) - (a.ctrl * (a.terr === "平原" ? 1.5 : 1) + a.pop * 2));
+  const tgt = cands[Math.min(cands.length - 1, ri(0, 1))];
+  if (tgt.warn > 0 || tgt.sweepT > 0) return;
+  // 集结阶段: 情报预警(有无线电研究则提前更多), 玩家可切【反扫荡】并调兵
+  const scale = (0.6 + rng() * 0.7) * era * S.sweepPower * (1 + popControlled() / 22);
+  tgt.pendScale = scale;
+  tgt.warn = S.techDone.radio ? 12 : 7;
+  log("⚠ 敌情: 日军向" + tgt.name + "方向集结(约" + scale.toFixed(1) + "个师团当量), 约 " + tgt.warn + " 天后扫荡 — 把该区部队切到【反扫荡】, 或调兵回防", "j");
+  return;
+}
+// 扫荡落地结算
+function resolveSweep(tgt) {
+  const scale = tgt.pendScale || 1;
+  const m = M(), tb = TERRB[tgt.terr];
+  tgt.sweepT = Math.round(12 + scale * 9);
+  S.stats.sweeps++;
+  // 防御: 部队反扫荡 + 地形 + 地道 + 群众
+  const us = unitsIn(tgt.id);
+  let def = 0;
+  for (const u of us) {
+    const mi = MISSION[u.mission];
+    def += (u.str / 100) * (0.4 + 0.6 * u.org / 100) * UT[u.type].atk * (mi.defend || 0.6) * m.defMul;
+  }
+  def *= tb.def * (1 + S.mass / 130);
+  const plainMul = tgt.terr === "平原" ? m.sweepDefPlain : 1;
+  const power = scale * CFG.sweepBase * plainMul;
+  const held = def * 26 > power * 0.62;
+  // 损失结算
+  const ctrlLoss = clamp(power / (def * 6 + 12) * 12, 3, 46) * (held ? 0.45 : 1);
+  const popLoss = clamp(power / 340, 0.01, 0.16) * (held ? 0.4 : 1) * (S.hardTimes ? 1.35 : 1);
+  tgt.ctrl = Math.max(0, tgt.ctrl - ctrlLoss);
+  const popBefore = tgt.pop;
+  tgt.pop = Math.max(tgt.pop0 * 0.25, tgt.pop * (1 - popLoss));
+  tgt.ruin = Math.min(1, tgt.ruin + popLoss);
+  S.mass = Math.max(0, S.mass - popLoss * 22);
+  // 部队伤亡 + 反击歼敌
+  let killed = 0;
+  for (const u of us) {
+    const isDef = u.mission === "fansaodang";
+    const l = (isDef ? 2.4 : 9.5) * scale * m.lossMul * (tgt.terr === "平原" ? plainMul : 0.8);
+    u.str = Math.max(5, u.str - l); u.org = Math.max(5, u.org - l * 2);
+    S.stats.ownLoss += l * UT[u.type].man * 100;
+    killed += (isDef ? 2.1 : 0.4) * scale * m.sweepKill * 150;
+    u.exp = Math.min(100, u.exp + 0.5);
+  }
+  killed += m.sweepKill * scale * 90 * (S.mass / 100);   // 地雷战/民兵的自发杀伤
+  S.stats.jpKill += killed * 0.55; S.stats.pupKill += killed * 1.2;
+  if (held) S.stats.sweepsHeld++;
+  const popTxt = ((popBefore - tgt.pop) * 100).toFixed(0);
+  log("⚔ 日军「扫荡」" + tgt.name + "(约" + scale.toFixed(1) + "个师团当量): 控制-" + ctrlLoss.toFixed(0)
+    + ", 群众伤亡流离 " + popTxt + " 万" + (held ? " — 我军依托地形与地道顶住了, 歼敌 " + Math.round(killed) + " 人" : " — 未能挡住, 根据地被切割"),
+    held ? "h" : "b");
+  if (!held && tgt.terr === "平原" && !S.focusDone.didao && !S.techDone.tunnel && !S.tunnelHint) {
+    S.tunnelHint = true; log("提示: 平原无险可守 — 研究【地道工程】或推进国策【地道战·地雷战】可大幅减少损失", "s");
+  }
+}
+// ══════════ 事件 ══════════
+function checkEvents() {
+  const today = d2s(S.date);
+  for (const e of EVENTS) {
+    if (S.evDone[e.id]) continue;
+    if (e.when > today) continue;
+    S.evDone[e.id] = true;
+    fireEvent(e);
+    return;
+  }
+}
+function fireEvent(e) {
+  S.speed = 0;
+  if (typeof showEvent === "function") showEvent(e);
+  else if (e.opts && e.opts[0]) e.opts[0].fx(S);
+}
+function applyEventOpt(e, i) {
+  const o = e.opts[i];
+  if (o && o.fx) o.fx(S);
+  log("【" + e.t + "】" + (o ? o.t : ""), e.cls === "b" ? "b" : e.cls === "g" ? "g" : "h");
+}
+// ══════════ 国策 / 研究 ══════════
+function focusAvail(f) {
+  if (S.focusDone[f.id] || S.focusCur === f.id) return false;
+  return f.need.every(n => S.focusDone[n]) && S.pol >= f.pol;
+}
+function startFocus(id) {
+  const f = FOCUS.find(x => x.id === id);
+  if (!f || !focusAvail(f)) return false;
+  S.pol -= f.pol; S.focusCur = id; S.focusLeft = f.days;
+  log("国策推进中: 【" + f.n + "】(" + f.days + "天)", "k");
+  return true;
+}
+function completeFocus(id) {
+  const f = FOCUS.find(x => x.id === id);
+  S.focusDone[id] = true; S.focusCur = null; S.focusLeft = 0;
+  log("★ 国策完成: 【" + f.n + "】— " + f.fx, "k");
+  // 特殊效果
+  if (id === "tingjin") { addUnit("zhulì", "jcj", "晋察冀军区主力"); addUnit("zhulì", "jsui", "晋绥军区主力"); addUnit("zhulì", "taih", "太行军区主力"); log("三师分兵挺进敌后, 各区新增主力团", "g"); }
+  if (id === "sansan") S.mass += 12;
+  if (id === "jianzu") { S.mass += 8; S.food += 200; }
+  if (id === "baituan") {
+    // 百团大战: 巨大战果 + 巨大报复(史实)
+    S.stats.jpKill += 20645 * 0.45; S.stats.pupKill += 5000;
+    for (const r of S.regs) if (!r.city) r.ctrl = Math.min(100, r.ctrl + 8);
+    S.expo = Math.min(100, S.expo + 45); S.sweepPower += 0.55; S.mass += 15; S.pol += 20;
+    log("★★ 百团大战: 破袭正太路、白晋路, 毙伤日伪军两万余 — 敌后战场声威大振", "g");
+    log("但日军因此认定华北心腹之患在八路军, 报复性扫荡将空前残酷", "b");
+  }
+  if (id === "jingbing") {
+    // 精兵简政: 主动裁军 — 残酷但保命
+    let conv = 0;
+    for (const u of S.units) if (u.type === "zhulì" && conv < 2 && rng() < .55) { u.type = "difang"; u.name = u.name.replace("主力", "地方"); conv++; }
+    S.food += 150;
+    log("精兵简政: " + conv + "支主力团转为地方武装, 机关缩小、连队充实 — 队伍小了, 但活下来了", "h");
+  }
+  if (id === "dashengchan") { S.food += 400; S.ammo += 120; log("南泥湾开出万亩良田 — 自己动手, 丰衣足食", "g"); }
+  if (id === "wugongdui") { for (let i = 0; i < 2; i++) { const b = baseArea(); if (b.length) addUnit("wugong", b[ri(0, b.length - 1)].id, "武工队"); } }
+  if (id === "dafangong") { for (const r of S.regs) r.ctrl = Math.min(100, r.ctrl + 12); }
+}
+function techAvail(t) { return !S.techDone[t.id] && S.techCur !== t.id && t.need.every(n => S.techDone[n]); }
+function startTech(id) {
+  const t = TECH.find(x => x.id === id);
+  if (!t || !techAvail(t)) return false;
+  S.techCur = id; S.techLeft = t.days;
+  log("开始研究: 【" + t.n + "】(" + t.days + "天)", "s");
+  return true;
+}
+function completeTech(id) {
+  const t = TECH.find(x => x.id === id);
+  S.techDone[id] = true; S.techCur = null; S.techLeft = 0;
+  log("✔ 研究完成: 【" + t.n + "】— " + t.fx, "s");
+}
+// ══════════ 结局 ══════════
+function endGame(wiped) {
+  if (S.over) return;
+  S.over = true; S.speed = 0;
+  const pc = popControlled(), army = armySize(), p = pinnedDiv();
+  const score = Math.round(pc * 3.2 + army * 6 + p.ratio * 260 + S.stats.jpKill / 2600 + baseArea().length * 9
+    + S.mass * 0.8 + S.stats.sweepsHeld * 9 - S.stats.ownLoss / 9000 - (wiped ? 400 : 0));
+  const tier = wiped ? ["失败", "队伍打光了", "根据地丧失殆尽。但历史上, 即使在最困难的1942年, 这支队伍也从未被消灭。"]
+    : score >= 1250 ? ["S", "中流砥柱", "解放区连成一片, 敌后战场抗击了侵华日军的大部与几乎全部伪军 — 这就是历史的答案。"]
+    : score >= 950 ? ["A", "巩固发展", "根据地在最残酷的岁月里活下来并壮大, 日军再也无法安枕。"]
+    : score >= 680 ? ["B", "坚持敌后", "队伍还在, 阵地还在, 群众还在 — 这就是胜利的本钱。"]
+    : score >= 430 ? ["C", "艰难支撑", "熬过来了, 但根据地元气大伤。"]
+    : ["D", "损失惨重", "教训: 群众工作是根本, 硬拼不是出路。"];
+  S.result = { score, tier, pc, army, p };
+  if (typeof showEnding === "function") showEnding();
+}
+// ══════════ 存档 ══════════
+const SK = "mainstay1937_v1";
+function save() { try { localStorage.setItem(SK, JSON.stringify({ ...S, date: d2s(S.date), endDate: d2s(S.endDate) })); } catch (e) {} }
+function hasSave() { try { return !!localStorage.getItem(SK); } catch (e) { return false; } }
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SK));
+    if (!d || d.over) return false;
+    d.date = s2d(d.date); d.endDate = s2d(d.endDate);
+    S = d; return true;
+  } catch (e) { return false; }
+}
+function clearSave() { try { localStorage.removeItem(SK); } catch (e) {} }
+
+// ══════════ 渲染 ══════════
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let cam = { x: 0, y: 0, zoom: 1 }, selReg = null, selUnit = null, hoverReg = null;
+function syncCv() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+  cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function hexPath(cx, cy, s) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); const x = cx + s * Math.cos(a), y = cy + s * Math.sin(a); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); }
+function ctrlColor(r) {
+  const c = r.ctrl;
+  if (r.city && c < 50) return "#3a3f52";
+  if (c >= 75) return "#8c2f26";      // 巩固根据地
+  if (c >= 50) return "#7a3b2a";      // 根据地
+  if (c >= 25) return "#6a5236";      // 游击区
+  if (c >= 10) return "#4d4a3d";      // 敌我拉锯
+  return "#2f3644";                    // 敌占区
+}
+function draw() {
+  if (!S) return;
+  ctx.save();
+  ctx.fillStyle = "#0e1116"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+  ctx.translate(-cam.x, -cam.y); ctx.scale(cam.zoom, cam.zoom);
+  const s = CFG.hex;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    const i = S.cells[q][r]; if (i < 0) continue;
+    const rg = S.regs[i];
+    const [cx, cy] = hexCenter(q, r);
+    ctx.fillStyle = ctrlColor(rg);
+    hexPath(cx, cy, s - 0.5); ctx.fill();
+    if (rg.sweepT > 0) { ctx.fillStyle = "rgba(226,86,77,.24)"; ctx.fill(); }
+    else if (rg.warn > 0) { ctx.fillStyle = "rgba(232,201,122,.16)"; ctx.fill(); }
+    if (rg.ruin > 0.25) { ctx.fillStyle = "rgba(20,20,20,.3)"; ctx.fill(); }
+    // 区域边界: 与邻格属于不同区则描线
+    ctx.strokeStyle = "rgba(0,0,0,.28)"; ctx.lineWidth = 1; ctx.stroke();
+    for (const [a, b] of nbrs(q, r)) {
+      if (S.cells[a][b] !== i) {
+        const [nx, ny] = hexCenter(a, b);
+        ctx.strokeStyle = "rgba(232,237,245,.30)"; ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        const mx = (cx + nx) / 2, my = (cy + ny) / 2, dx = nx - cx, dy = ny - cy;
+        const L = Math.hypot(dx, dy) || 1, px = -dy / L * s * 0.56, py = dx / L * s * 0.56;
+        ctx.moveTo(mx + px, my + py); ctx.lineTo(mx - px, my - py); ctx.stroke();
+      }
+    }
+  }
+  // 区域标签
+  for (const rg of S.regs) {
+    const sel = selReg === rg.id, hov = hoverReg === rg.id;
+    if (sel || hov) {
+      ctx.strokeStyle = sel ? "#e8c97a" : "rgba(232,201,122,.5)"; ctx.lineWidth = sel ? 3 : 2;
+      for (const [q, r] of rg.cells) {
+        const [cx, cy] = hexCenter(q, r);
+        for (const [a, b] of nbrs(q, r)) if (S.cells[a][b] !== rg.idx) {
+          const [nx, ny] = hexCenter(a, b);
+          const mx = (cx + nx) / 2, my = (cy + ny) / 2, dx = nx - cx, dy = ny - cy;
+          const L = Math.hypot(dx, dy) || 1, px = -dy / L * s * 0.58, py = dx / L * s * 0.58;
+          ctx.beginPath(); ctx.moveTo(mx + px, my + py); ctx.lineTo(mx - px, my - py); ctx.stroke();
+        }
+      }
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(10,12,16,.6)";
+    const w = 62, hh = 34;
+    ctx.fillRect(rg.cx - w / 2, rg.cy - hh / 2, w, hh);
+    ctx.fillStyle = "#e8edf5"; ctx.font = "bold 12px sans-serif";
+    ctx.fillText(rg.name, rg.cx, rg.cy - 8);
+    ctx.font = "10px sans-serif";
+    ctx.fillStyle = rg.ctrl >= 50 ? "#f0a08a" : rg.ctrl >= 25 ? "#e8c97a" : "#95a0b2";
+    ctx.fillText(rg.ctrl >= 50 ? "根据地 " + Math.round(rg.ctrl) : rg.ctrl >= 15 ? "游击区 " + Math.round(rg.ctrl) : rg.city ? "敌占重镇" : "敌占 " + Math.round(rg.ctrl), rg.cx, rg.cy + 4);
+    const us = unitsIn(rg.id);
+    if (us.length) { ctx.fillStyle = "#7fc98a"; ctx.font = "10px sans-serif"; ctx.fillText("部队 ×" + us.length, rg.cx, rg.cy + 15); }
+    if (rg.sweepT > 0) { ctx.fillStyle = "#e2564d"; ctx.font = "bold 11px sans-serif"; ctx.fillText("⚔ 遭扫荡", rg.cx, rg.cy - 22); }
+    else if (rg.warn > 0) { ctx.fillStyle = "#e8c97a"; ctx.font = "bold 11px sans-serif"; ctx.fillText("⚠ 敌集结 " + rg.warn + "天", rg.cx, rg.cy - 22); }
+  }
+  ctx.restore();
+}
+// ══════════ UI ══════════
+const $ = id => document.getElementById(id);
+let logCl = false, logU = 0;
+try { logCl = localStorage.getItem("mainstay.log") === "1"; } catch (e) {}
+function applyLog() {
+  const w = $("logW"); if (!w) return;
+  w.classList.toggle("cl", logCl);
+  $("logH").querySelector(".c").textContent = logCl ? "▶" : "▼";
+  const b = $("logU");
+  if (logCl && logU) { b.textContent = logU > 99 ? "99+" : String(logU); b.classList.remove("hidden"); } else b.classList.add("hidden");
+}
+function toggleLog(f) { logCl = f === undefined ? !logCl : !!f; if (!logCl) logU = 0; try { localStorage.setItem("mainstay.log", logCl ? "1" : "0"); } catch (e) {} applyLog(); }
+function pushLog(msg, cls) {
+  const p = document.createElement("p"); if (cls) p.className = cls;
+  p.textContent = (S ? d2s(S.date).slice(0, 7) + " " : "") + msg;
+  const box = $("logB"); box.appendChild(p);
+  while (box.children.length > 90) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+  if (logCl) { if (cls === "b") { toggleLog(false); return; } logU++; applyLog(); }
+}
+function openModal(h) { $("mb").innerHTML = h; $("mw").classList.remove("hidden"); }
+function closeModal() { $("mw").classList.add("hidden"); }
+function modalOpen() { return !$("mw").classList.contains("hidden"); }
+function setSpeed(n) {
+  if (S.over) n = 0;
+  S.speed = n;
+  for (let i = 0; i < 4; i++) $("s" + i).classList.toggle("on", S.speed === i);
+}
+function updTop() {
+  const m = M(), pc = popControlled(), p = pinnedDiv();
+  const foodIn = pc * .085 * m.foodMul * (S.hardTimes ? .72 : 1);
+  let foodUse = 0, ammoUse = 0;
+  for (const u of S.units) { const ut = UT[u.type]; foodUse += ut.man * ut.up * m.upkeepMul * .16; ammoUse += ut.ammo * ut.up * m.upkeepMul * .02; }
+  const fd = foodIn - foodUse;
+  $("rMan").innerHTML = "👥 兵源 <b>" + S.man.toFixed(1) + "万</b> <i>· 部队 " + armySize().toFixed(1) + "万</i>";
+  $("rFood").innerHTML = "🌾 粮 <b>" + Math.round(S.food) + "</b> <i class='" + (fd >= 0 ? "up" : "dn") + "'>" + (fd >= 0 ? "+" : "") + fd.toFixed(1) + "</i>";
+  $("rAmmo").innerHTML = "🔫 弹药 <b>" + Math.round(S.ammo) + "</b>";
+  $("rPol").innerHTML = "★ 政治点 <b>" + Math.round(S.pol) + "</b> <i>· 群众 " + Math.round(S.mass) + "</i>";
+  $("dateTxt").textContent = d2s(S.date);
+  $("bFocus").classList.toggle("hot", !S.focusCur);
+  $("bTech").classList.toggle("hot", !S.techCur);
+  $("bFocus").textContent = S.focusCur ? "国策 " + S.focusLeft + "天" : "国策(未定!)";
+  $("bTech").textContent = S.techCur ? "研究 " + S.techLeft + "天" : "研究(未定!)";
+  const pupR = Math.round(pinnedPuppet() * 100);
+  $("pin").innerHTML = "🎖 <b>敌后战场牵制侵华日军 " + p.ours + " / " + p.tot + " 个师团(" + Math.round(p.ratio * 100) + "%)</b> · 伪军 " + pupR
+    + "% · 根据地人口 <b>" + pc.toFixed(1) + "</b> 百万 · 抗日武装 <b>" + armySize().toFixed(1) + "</b> 万";
+}
+function renderSide() {
+  const el = $("side");
+  if (!selReg) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const r = reg(selReg), us = unitsIn(r.id), m = M();
+  let h = "<h3>" + r.name + "<small>" + r.terr + " · 人口 " + r.pop.toFixed(1) + " 百万" + (r.pop < r.pop0 * .95 ? "(战前 " + r.pop0.toFixed(1) + ")" : "") + "</small></h3>";
+  const st = r.ctrl >= 75 ? "巩固根据地" : r.ctrl >= 50 ? "根据地" : r.ctrl >= 25 ? "游击区" : r.ctrl >= 10 ? "敌我拉锯" : "敌占区";
+  h += "<div class='row'>控制度 <b>" + Math.round(r.ctrl) + "</b> / 100 · " + st + "</div>";
+  h += "<div class='bar'><i style='width:" + clamp(r.ctrl, 0, 100) + "%;background:" + (r.ctrl >= 50 ? "#c0503f" : r.ctrl >= 25 ? "#c0a24a" : "#5a6a80") + "'></i></div>";
+  h += "<div class='row' style='color:#8b95a6'>日军驻兵 " + r.jp.toFixed(1) + " · 伪军 " + r.pup.toFixed(1) + (r.sweepT > 0 ? " · <span style='color:#e2564d'>正遭扫荡(" + r.sweepT + "天)</span>" : r.warn > 0 ? " · <span style='color:#e8c97a'>敌集结中, " + r.warn + "天后扫荡</span>" : "") + "</div>";
+  h += "<div class='hint'>" + r.desc + "</div>";
+  if (r.ruin > .25) h += "<div class='row' style='color:#e2564d'>此地遭「三光」摧残, 人口尚未恢复</div>";
+  h += "<hr><div class='row'><b>驻此部队</b> " + us.length + " / " + (m.slots + 2) + "</div>";
+  if (!us.length) h += "<div class='hint'>没有部队在此。从其他区域调部队过来(选中部队→点目标区域), 或在国策中扩军。</div>";
+  for (const u of us) {
+    const ut = UT[u.type];
+    h += "<button class='ab" + (selUnit === u.id ? " on" : "") + "' onclick='pickUnit(" + u.id + ")'>" + u.name
+      + " <span class='c'>" + ut.name + "</span><span class='s'>兵力 " + Math.round(u.str) + " · 组织 " + Math.round(u.org)
+      + " · 装备 " + Math.round(u.eq) + " · 经验 " + Math.round(u.exp) + " · 任务: <b style='color:#e8c97a'>" + MISSION[u.mission].name + "</b></span></button>";
+  }
+  if (selUnit) {
+    const u = S.units.find(x => x.id === selUnit);
+    if (u && u.reg === r.id) {
+      h += "<hr><div class='row'><b>" + u.name + " — 下达任务</b></div>";
+      for (const k in MISSION) {
+        const mi = MISSION[k];
+        h += "<button class='ab" + (u.mission === k ? " on" : "") + "' onclick=\"setMission(" + u.id + ",'" + k + "')\">" + mi.name + "<span class='s'>" + mi.desc + "</span></button>";
+      }
+      h += "<div class='hint'>调动: 选中此部队后, 直接点地图上的其他区域。</div>";
+    }
+  }
+  el.innerHTML = h;
+}
+function pickUnit(id) { selUnit = selUnit === id ? null : id; renderSide(); draw(); }
+function setMission(id, k) { const u = S.units.find(x => x.id === id); if (u) { u.mission = k; log(u.name + " 转入任务: " + MISSION[k].name, "k"); } renderSide(); }
+function refresh() { updTop(); renderSide(); draw(); }
+
+// ══════════ 国策树 / 研究 / 战况 / 事件 / 说明 ══════════
+function showFocus() {
+  const CW = 150, CH = 92;
+  let maxX = 0, maxY = 0;
+  for (const f of FOCUS) { maxX = Math.max(maxX, f.x); maxY = Math.max(maxY, f.y); }
+  let inner = "<svg style='position:absolute;left:0;top:0;pointer-events:none' width='" + ((maxX + 1) * CW + 20) + "' height='" + ((maxY + 1) * CH + 20) + "'>";
+  for (const f of FOCUS) for (const n of f.need) {
+    const p = FOCUS.find(x => x.id === n); if (!p) continue;
+    const x1 = p.x * CW + 76, y1 = p.y * CH + 56, x2 = f.x * CW + 76, y2 = f.y * CH + 8;
+    const col = S.focusDone[n] ? "#4f8f5a" : "#3d4757";
+    inner += "<path d='M" + x1 + " " + y1 + " L" + x1 + " " + ((y1 + y2) / 2) + " L" + x2 + " " + ((y1 + y2) / 2) + " L" + x2 + " " + y2 + "' stroke='" + col + "' stroke-width='2' fill='none'/>";
+  }
+  inner += "</svg>";
+  for (const f of FOCUS) {
+    const done = !!S.focusDone[f.id], cur = S.focusCur === f.id, ok = focusAvail(f);
+    const lockWhy = done ? "" : cur ? "推进中 " + S.focusLeft + " 天"
+      : !f.need.every(n => S.focusDone[n]) ? "需先完成: " + f.need.map(n => FOCUS.find(x => x.id === n).n).join("、")
+      : S.pol < f.pol ? "政治点不足(需 " + f.pol + ")" : f.days + " 天 · 政治点 " + f.pol;
+    inner += "<div class='ft " + (done ? "done" : cur ? "cur" : ok ? "" : "lock") + "' style='left:" + (f.x * CW + 8) + "px;top:" + (f.y * CH + 8) + "px'"
+      + (ok ? " onclick=\"doFocus('" + f.id + "')\"" : "") + "><b>" + f.n + (done ? " ✔" : "") + "</b>"
+      + "<span class='d'>" + f.d + "</span><span class='d' style='color:#c0a24a'>" + (done ? f.fx : lockWhy) + "</span></div>";
+  }
+  openModal("<h2>国策 — 中国共产党的抗战路线<small>政治点 " + Math.round(S.pol) + " · 每条国策都是历史上真实做过的决定; 沿着这条线走, 就是敌后战场从无到有的全过程</small></h2>"
+    + "<div id='ftWrap' style='height:" + Math.min(560, (maxY + 1) * CH + 30) + "px'><div style='position:relative;width:" + ((maxX + 1) * CW + 20) + "px;height:" + ((maxY + 1) * CH + 20) + "px'>" + inner + "</div></div>"
+    + "<p style='color:#8b95a6'>难点提示: <b>1941-42 年是最困难的时期</b> — 日军三光作战 + 经济封锁 + 天灾。历史上的答案是【精兵简政】(主动缩编)、【大生产运动】(自己动手)、【地道战】(平原求生)。走对了才活得下来。</p>"
+    + "<div class='btns'><button class='mb2' onclick='closeModal()'>关闭</button></div>");
+}
+function doFocus(id) { if (startFocus(id)) { showFocus(); updTop(); } }
+function showTech() {
+  let h = "<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:8px'>";
+  for (const t of TECH) {
+    const done = !!S.techDone[t.id], cur = S.techCur === t.id, ok = techAvail(t);
+    h += "<div class='ecard' style='margin:0;padding:8px 10px;" + (done ? "border-color:#4f8f5a" : cur ? "border-color:#c0a24a" : ok ? "" : "opacity:.45") + ";cursor:" + (ok ? "pointer" : "default") + "'"
+      + (ok ? " onclick=\"doTech('" + t.id + "')\"" : "") + ">"
+      + "<div style='color:#e8edf5;font-size:13px'>" + t.n + (done ? " ✔" : cur ? " ⏳" + S.techLeft + "天" : "") + "</div>"
+      + "<div style='color:#8b95a6;font-size:11px;margin-top:3px'>" + t.d + "</div>"
+      + "<div style='color:#c0a24a;font-size:11px;margin-top:3px'>" + t.fx + " · " + t.days + "天"
+      + (t.need.length && !done ? " · 需 " + t.need.map(n => TECH.find(x => x.id === n).n).join("+") : "") + "</div></div>";
+  }
+  h += "</div>";
+  openModal("<h2>研究<small>同时只能研究一项。技术不是万能, 但地道战与地雷战确实救过成千上万条命</small></h2>" + h
+    + "<div class='btns'><button class='mb2' onclick='closeModal()'>关闭</button></div>");
+}
+function doTech(id) { if (startTech(id)) { showTech(); updTop(); } }
+function showProd() {
+  const m = M(), pc = popControlled();
+  let foodUse = 0, ammoUse = 0;
+  for (const u of S.units) { const ut = UT[u.type]; foodUse += ut.man * ut.up * m.upkeepMul * .16; ammoUse += ut.ammo * ut.up * m.upkeepMul * .02; }
+  let h = "<table class='hist'><tr><th>项目</th><th>说明</th><th style='text-align:right'>每日</th></tr>";
+  h += "<tr><td>粮食产出</td><td>根据地人口 × 减租减息/大生产加成</td><td class='n'>+" + (pc * .085 * m.foodMul * (S.hardTimes ? .72 : 1)).toFixed(1) + "</td></tr>";
+  h += "<tr><td>部队吃粮</td><td>主力最费, 民兵几乎不吃(精兵简政可降35%)</td><td class='n dn'>-" + foodUse.toFixed(1) + "</td></tr>";
+  h += "<tr><td>弹药产出</td><td>兵工厂 + 缴获</td><td class='n'>+" + ((.2 + pc * .035) * m.ammoMul * (S.hardTimes ? .8 : 1)).toFixed(2) + "</td></tr>";
+  h += "<tr><td>兵源增长</td><td>根据地人口 × 群众基础</td><td class='n'>+" + (pc * .0013 * m.manMul * (1 + S.mass / 180)).toFixed(3) + " 万</td></tr>";
+  h += "<tr><td>政治点</td><td>国策与整风提升</td><td class='n'>+" + m.polDay.toFixed(2) + "</td></tr></table>";
+  h += "<p style='color:#8b95a6'>敌后战场没有工业基地, <b>装备主要靠缴获</b>, 粮食全靠根据地群众。所以: 群众工作 = 补给线。</p>";
+  h += "<hr style='border:none;border-top:1px solid #2e3541;margin:8px 0'><div style='color:#e8edf5;margin-bottom:5px'>扩军(消耗兵源与粮食)</div>";
+  for (const k in UT) {
+    const t = UT[k];
+    if (k === "wugong" && !S.focusDone.wugongdui) continue;
+    const canP = S.man >= t.man && S.food >= t.man * 25;
+    h += "<button class='ab' " + (canP && baseArea().length ? "" : "disabled") + " onclick=\"raise('" + k + "')\">组建" + t.name
+      + " <span class='c'>兵源 " + t.man + "万 · 粮 " + (t.man * 25) + "</span><span class='s'>" + t.desc + "</span></button>";
+  }
+  if (!baseArea().length) h += "<p style='color:#e2564d'>还没有控制度≥50的根据地 — 先派部队【发动群众】把控制度提上去。</p>";
+  openModal("<h2>生产与扩军<small>" + d2s(S.date) + "</small></h2>" + h + "<div class='btns'><button class='mb2' onclick='closeModal()'>关闭</button></div>");
+}
+function raise(k) {
+  const t = UT[k], b = baseArea();
+  if (!b.length || S.man < t.man || S.food < t.man * 25) return;
+  S.man -= t.man; S.food -= t.man * 25;
+  const r = b.sort((x, y) => y.ctrl - x.ctrl)[0];
+  addUnit(k, r.id, r.name + t.name);
+  log("在" + r.name + "组建" + t.name, "g");
+  showProd(); refresh();
+}
+function showStat() {
+  const p = pinnedDiv(), pc = popControlled();
+  const y = S.date.getFullYear();
+  let h = "<table class='hist'><tr><th>指标</th><th style='text-align:right'>当前</th><th>史实参照</th></tr>";
+  h += "<tr><td>敌后根据地人口</td><td class='n'>" + pc.toFixed(1) + " 百万</td><td>1945年: 约 100 百万(1亿)</td></tr>";
+  h += "<tr><td>抗日武装</td><td class='n'>" + armySize().toFixed(1) + " 万</td><td>1945年: 正规军 120 万 + 民兵 260 万</td></tr>";
+  h += "<tr><td>牵制侵华日军</td><td class='n'>" + p.ours + " / " + p.tot + " 师团(" + Math.round(p.ratio * 100) + "%)</td><td>1944年: 敌后抗击约 64% 侵华日军</td></tr>";
+  h += "<tr><td>牵制伪军</td><td class='n'>" + Math.round(pinnedPuppet() * 100) + "%</td><td>史实: 约 95%</td></tr>";
+  h += "<tr><td>累计歼灭日军</td><td class='n'>" + Math.round(S.stats.jpKill).toLocaleString() + " 人</td><td>八路军新四军共歼日伪军 171 万</td></tr>";
+  h += "<tr><td>累计歼灭伪军</td><td class='n'>" + Math.round(S.stats.pupKill).toLocaleString() + " 人</td><td>—</td></tr>";
+  h += "<tr><td>我军伤亡</td><td class='n dn'>" + Math.round(S.stats.ownLoss).toLocaleString() + " 人</td><td>八路军新四军伤亡 60 余万</td></tr>";
+  h += "<tr><td>遭遇扫荡 / 顶住</td><td class='n'>" + S.stats.sweeps + " / " + S.stats.sweepsHeld + "</td><td>1941-42 年日军扫荡千人以上 174 次</td></tr>";
+  h += "<tr><td>正面战场态势</td><td class='n'>" + Math.round(S.kmtFront) + "</td><td>1944 豫湘桂: 8个月丢 146 城</td></tr>";
+  h += "</table>";
+  h += "<p style='color:#8b95a6'>「中流砥柱」不是口号: 它是<b>牵制的日军师团数</b>、是<b>解放区的人口</b>、是<b>敌后战场独立支撑到抗战胜利</b>这三个数字。</p>";
+  let rows = "<table class='hist'><tr><th>区域</th><th>状态</th><th style='text-align:right'>控制</th><th style='text-align:right'>人口</th></tr>";
+  for (const r of S.regs.slice().sort((a, b) => b.ctrl - a.ctrl)) {
+    const st = r.ctrl >= 75 ? "巩固根据地" : r.ctrl >= 50 ? "根据地" : r.ctrl >= 25 ? "游击区" : r.ctrl >= 10 ? "拉锯" : "敌占";
+    rows += "<tr><td>" + r.name + "</td><td>" + st + "</td><td class='n'>" + Math.round(r.ctrl) + "</td><td class='n'>" + r.pop.toFixed(1) + (r.pop < r.pop0 * .9 ? " <span style='color:#e2564d'>↓</span>" : "") + "</td></tr>";
+  }
+  rows += "</table>";
+  openModal("<h2>战况 — " + cnDate(S.date) + "<small>" + (y <= 1938 ? "战略防御阶段" : y <= 1943 ? "战略相持阶段 — 敌后战场是主战场" : "局部反攻阶段") + "</small></h2>" + h + rows
+    + "<div class='btns'><button class='mb2' onclick='closeModal()'>关闭</button></div>");
+}
+function showEvent(e) {
+  let h = "<h2>" + e.t + "<small>" + cnDate(S.date) + "</small></h2><div class='evimg'></div><p>" + e.txt + "</p><div class='btns'>";
+  e.opts.forEach((o, i) => { h += "<button class='mb2" + (i ? " gh" : "") + "' onclick='evPick(" + i + ")'>" + o.t + "<br><span style='font-size:11px;opacity:.8'>" + o.d + "</span></button>"; });
+  h += "</div>";
+  curEvent = e;
+  openModal(h);
+}
+let curEvent = null;
+function evPick(i) { if (curEvent) { applyEventOpt(curEvent, i); curEvent = null; } closeModal(); refresh(); }
+function showEnding() {
+  const r = S.result, p = r.p;
+  openModal("<h2>" + (r.tier[0] === "失败" ? "💀 " : "🎖 ") + r.tier[1] + "<small>1945年8月15日 · 日本无条件投降</small></h2>"
+    + "<div class='ecard'><div class='t'>评定 " + r.tier[0] + " · " + r.tier[1] + "（" + r.score + " 分）</div><div style='color:#9aa4b4'>" + r.tier[2] + "</div></div>"
+    + "<table class='hist'><tr><th>结局指标</th><th style='text-align:right'>你的战果</th><th>史实</th></tr>"
+    + "<tr><td>解放区人口</td><td class='n'>" + r.pc.toFixed(1) + " 百万</td><td>近 1 亿</td></tr>"
+    + "<tr><td>抗日武装</td><td class='n'>" + r.army.toFixed(1) + " 万</td><td>正规军 120 万</td></tr>"
+    + "<tr><td>牵制侵华日军</td><td class='n'>" + p.ours + "/" + p.tot + " 师团 (" + Math.round(p.ratio * 100) + "%)</td><td>约 64%</td></tr>"
+    + "<tr><td>歼灭日伪军</td><td class='n'>" + Math.round(S.stats.jpKill + S.stats.pupKill).toLocaleString() + " 人</td><td>171 万</td></tr>"
+    + "<tr><td>我军伤亡</td><td class='n dn'>" + Math.round(S.stats.ownLoss).toLocaleString() + " 人</td><td>60 余万</td></tr></table>"
+    + "<p>八年抗战, 中国共产党领导的抗日武装在敌后开辟了广大战场, 从三万余人发展到一百二十余万, 建立起十九块抗日根据地, "
+    + "抗击了侵华日军的大部和几乎全部伪军。<b>这就是中流砥柱的含义 — 不是口号, 是数字, 是八年不曾退出的战场。</b></p>"
+    + "<div class='btns'><button class='mb2' onclick='location.reload()'>再来一局</button></div>");
+}
+function showHelp() {
+  const ing = S && S.started && !S.over;
+  openModal("<h2>中流砥柱 · 1937—1945<small>钢铁雄心式的敌后战场大战略 · 一局约 25 分钟</small></h2>"
+    + "<p><b>你扮演谁</b>: 中国共产党领导的敌后抗日武装。1937年7月你只有三个师、地图上几乎全是敌占区; 1945年8月你要交出一份答卷。</p>"
+    + "<p><b>核心循环</b>(四步转起来):<br>"
+    + "① <b>发动群众</b> — 部队进区域执行【发动群众】, 控制度上升。控制度≥50 = 根据地, 开始产粮、出兵源。<br>"
+    + "② <b>建政与扩军</b> — 国策(减租减息/三三制)提升产出与群众基础; 生产面板扩军。<br>"
+    + "③ <b>打击日军</b> — 破袭/伏击/攻坚拔点歼敌, <b>牵制的日军师团数上升</b>(顶部常驻显示)。<br>"
+    + "④ <b>反扫荡</b> — 打得越狠, 日军扫荡越凶。把部队任务切到【反扫荡】、修地道、靠群众, 挺过去后根据地会更大。</p>"
+    + "<p><b>历史的残酷</b>: 1941-42 年日军推行三光作战与治安强化运动, 根据地人口会真的掉下去、部队会真的减员。"
+    + "历史上的答案也在国策树里: <b>精兵简政</b>(主动缩编)、<b>大生产运动</b>(自己动手)、<b>地道战</b>(平原求生)。走对了才活得下来。</p>"
+    + "<p style='color:#8b95a6'>操作: 点区域看详情 · 点部队再点任务 · 选中部队后点别的区域即可调动 · 顶栏切换速度(‖/1/2/3) · 空格暂停</p>"
+    + "<div class='btns'>" + (ing ? "<button class='mb2' onclick='closeModal()'>返回战场</button><button class='mb2 gh' onclick='confirmRestart()'>重新开始…</button>"
+      : (hasSave() ? "<button class='mb2 gh' onclick='contGame()'>继续上局</button>" : "") + "<button class='mb2' onclick='startNew()'>开始 1937</button>") + "</div>");
+}
+function confirmRestart() {
+  openModal("<h2>重新开始?<small>当前进度将丢失</small></h2><p>现在是 " + cnDate(S.date) + ", 根据地人口 " + popControlled().toFixed(1) + " 百万。</p>"
+    + "<div class='btns'><button class='mb2' onclick='showHelp()'>不, 返回</button><button class='mb2 gh' onclick='startNew()'>确认重开</button></div>");
+}
+function contGame() { if (load()) { S.started = true; closeModal(); centerCam(); refresh(); pushLog("进度已恢复 · " + d2s(S.date), "h"); } }
+function startNew() {
+  newGame(); S.started = true; selReg = null; selUnit = null;
+  closeModal(); centerCam(); refresh();
+  $("logB").innerHTML = "";
+  pushLog("═══ 1937年7月 · 全民族抗战爆发 ═══", "h");
+  pushLog("三个师东渡黄河, 挺进敌后。你手上只有 4 支部队和几乎全红的地图。", "h");
+  pushLog("第一步: 点【晋察冀】等山地区域, 给部队下【发动群众】, 把控制度做上去。", "s");
+  setSpeed(1);
+}
+function centerCam() {
+  cam.zoom = innerWidth < 760 ? .62 : .92;
+  const cx = (W * CFG.hex * SQ3) / 2 * cam.zoom, cy = (H * CFG.hex * 1.5) / 2 * cam.zoom;
+  cam.x = cx - innerWidth / 2; cam.y = cy - innerHeight / 2 + 20;
+}
+// ══════════ 输入 ══════════
+let drag = false, dmoved = false, lastPt = null, downPt = null, tapDone = false, pinchD = 0;
+function pxToReg(px, py) {
+  const wx = (px + cam.x) / cam.zoom, wy = (py + cam.y) / cam.zoom;
+  let best = null, bd = 1e9;
+  for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) {
+    if (S.cells[q][r] < 0) continue;
+    const [cx, cy] = hexCenter(q, r);
+    const d = (cx - wx) ** 2 + (cy - wy) ** 2;
+    if (d < bd) { bd = d; best = S.cells[q][r]; }
+  }
+  return bd < (CFG.hex * 1.15) ** 2 ? S.regs[best] : null;
+}
+function handleTap(px, py) {
+  if (!S || !S.started || S.over) return;
+  tapDone = true;
+  const r = pxToReg(px, py);
+  if (!r) { selReg = null; selUnit = null; refresh(); return; }
+  // 选中部队时点别的区域 = 调动
+  if (selUnit) {
+    const u = S.units.find(x => x.id === selUnit);
+    if (u && u.reg !== r.id) {
+      const cap = M().slots + 2;
+      if (unitsIn(r.id).length >= cap) { pushLog(r.name + "容纳不下更多部队(上限 " + cap + ")", "j"); }
+      else { u.reg = r.id; u.org = Math.max(20, u.org - 12); log(u.name + " 转移至 " + r.name, "k"); selReg = r.id; refresh(); return; }
+    }
+  }
+  selReg = r.id;
+  const us = unitsIn(r.id);
+  if (!us.some(u => u.id === selUnit)) selUnit = us.length ? us[0].id : null;
+  refresh();
+}
+cv.addEventListener("pointerdown", e => { drag = true; dmoved = false; tapDone = false; downPt = [e.clientX, e.clientY]; lastPt = [e.clientX, e.clientY]; });
+cv.addEventListener("pointermove", e => {
+  if (drag && lastPt && downPt) {
+    if (Math.abs(e.clientX - downPt[0]) + Math.abs(e.clientY - downPt[1]) > 10) dmoved = true;
+    if (dmoved) { cam.x -= e.clientX - lastPt[0]; cam.y -= e.clientY - lastPt[1]; lastPt = [e.clientX, e.clientY]; draw(); return; }
+  }
+  if (drag || e.pointerType === "touch" || !S || !S.started) return;
+  const r = pxToReg(e.clientX, e.clientY);
+  const id = r ? r.id : null;
+  if (id !== hoverReg) { hoverReg = id; draw(); }
+});
+cv.addEventListener("pointerleave", () => { if (hoverReg) { hoverReg = null; draw(); } });
+cv.addEventListener("pointercancel", () => { drag = false; dmoved = false; });
+cv.addEventListener("pointerup", e => { drag = false; if (dmoved || tapDone) return; handleTap(e.clientX, e.clientY); });
+cv.addEventListener("click", e => { if (!dmoved && !tapDone) handleTap(e.clientX, e.clientY); });
+cv.addEventListener("wheel", e => { e.preventDefault(); const z = clamp(cam.zoom * (e.deltaY > 0 ? .9 : 1.11), .35, 2), wx = (e.clientX + cam.x) / cam.zoom, wy = (e.clientY + cam.y) / cam.zoom; cam.zoom = z; cam.x = wx * z - e.clientX; cam.y = wy * z - e.clientY; draw(); }, { passive: false });
+cv.addEventListener("touchmove", e => { if (e.touches.length === 2) { e.preventDefault(); const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); if (pinchD) { cam.zoom = clamp(cam.zoom * d / pinchD, .35, 2); draw(); } pinchD = d; } }, { passive: false });
+cv.addEventListener("touchend", () => { pinchD = 0; });
+addEventListener("keydown", e => {
+  if (modalOpen()) return;
+  if (e.code === "Space") { e.preventDefault(); setSpeed(S.speed ? 0 : 1); }
+  if (e.key >= "0" && e.key <= "3") setSpeed(+e.key);
+});
+for (let i = 0; i < 4; i++) $("s" + i).addEventListener("click", () => setSpeed(i));
+$("bFocus").addEventListener("click", showFocus);
+$("bTech").addEventListener("click", showTech);
+$("bProd").addEventListener("click", showProd);
+$("bStat").addEventListener("click", showStat);
+$("bHelp").addEventListener("click", showHelp);
+$("logH").addEventListener("click", () => toggleLog());
+addEventListener("resize", () => { syncCv(); draw(); });
+// ══════════ 主循环 ══════════
+let acc = 0, last = 0, saveT = 0;
+function loop(t) {
+  if (!last) last = t;
+  const dt = Math.min(500, t - last); last = t;
+  if (S && S.started && !S.over && S.speed > 0 && !modalOpen()) {
+    acc += dt;
+    const per = CFG.tickMs / (S.speed === 1 ? 1 : S.speed === 2 ? 2.4 : 5);
+    let n = 0;
+    while (acc >= per && n < 12) { acc -= per; tick(); n++; if (S.over || modalOpen()) break; }
+    if (n) { refresh(); saveT += n; if (saveT > 60) { saveT = 0; save(); } }
+  }
+  requestAnimationFrame(loop);
+}
+// ══════════ 启动 ══════════
+applyLog();
+syncCv();
+newGame();
+centerCam();
+refresh();
+showHelp();
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
