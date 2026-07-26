@@ -219,9 +219,17 @@ function genMap() {
     t.village = { name: VNAMES[vi++ % VNAMES.length], heart: q < 8 ? ri(45, 62) : ri(20, 42), burned: 0, cadre: false };
     villages.push([q, r]);
   }
-  // 总部: 最西的村, 民心拉满区间
+  // 总部: 靠西但必须"站得住脚" — 至少3个非山地邻格, 否则部队一出生就被山困死
+  const passableAround = (q, r) => nbrs(q, r).filter(([a, b]) => tiles[a][b].terrain !== "mountain" && !tiles[a][b].sh).length;
   villages.sort((a, b) => a[0] - b[0]);
-  const hq = { q: villages[0][0], r: villages[0][1] };
+  let hqPick = villages.find(([q, r]) => passableAround(q, r) >= 3) || villages[0];
+  const hq = { q: hqPick[0], r: hqPick[1] };
+  // 再兜底: 硬凿出3条出山的路(山村也总得有条驮道)
+  let opened = passableAround(hq.q, hq.r);
+  for (const [a, b] of nbrs(hq.q, hq.r)) {
+    if (opened >= 3) break;
+    if (tiles[a][b].terrain === "mountain") { tiles[a][b].terrain = "hills"; opened++; }
+  }
   tiles[hq.q][hq.r].village.heart = 78;
   tiles[hq.q][hq.r].village.hq = true;
   return { tiles, hq, town: { q: town[0], r: town[1] }, stations: [{ q: st1[0], r: st1[1] }, { q: st2[0], r: st2[1] }] };
@@ -230,10 +238,11 @@ function genMap() {
 // ═══════════ 状态 ═══════════
 let state = null;
 const UT_P = {
-  reg: { name: "主力连", glyph: "连", str: 15, mp: 2, cost: { grain: 25, men: 20, arms: 16 }, desc: "拔点与歼灭的主力。正面仍打不过满员日军中队 — 等它疲了再动手。" },
-  mil: { name: "民兵队", glyph: "民", str: 7, mp: 2, cost: { grain: 10, men: 8, arms: 4 }, desc: "便宜。埋雷、袭扰、配合合围。" },
-  cmd: { name: "武工队", glyph: "武", str: 9, mp: 3, cost: { grain: 15, men: 10, arms: 8, intel: 4 }, hidden: true, desc: "敌后之敌后: 破袭、贴近敌军侦察(+情报)、烧屯粮。日军难以主动发现它。" },
-  wk:  { name: "工作队", glyph: "工", str: 0, mp: 2, cost: { grain: 10, men: 5 }, desc: "到村庄点【驻村发动群众】: 民心+6/旬。民心≥50=根据地村, ≥60=情报网(帮你盯日军)。" },
+  // 机动力是游击队的命: 走得比敌人快才谈得上"敌进我退". 山地耗2, 其余耗1。
+  reg: { name: "主力连", glyph: "连", str: 15, mp: 4, cost: { grain: 25, men: 20, arms: 16 }, desc: "拔点与歼灭的主力。正面仍打不过满员日军中队 — 等它疲了再动手。" },
+  mil: { name: "民兵队", glyph: "民", str: 7, mp: 4, cost: { grain: 10, men: 8, arms: 4 }, desc: "便宜。埋雷、袭扰、配合合围。" },
+  cmd: { name: "武工队", glyph: "武", str: 9, mp: 5, cost: { grain: 15, men: 10, arms: 8, intel: 4 }, hidden: true, desc: "敌后之敌后: 破袭、贴近敌军侦察(+情报)、烧屯粮。日军难以主动发现它。" },
+  wk:  { name: "工作队", glyph: "工", str: 0, mp: 4, cost: { grain: 10, men: 5 }, desc: "到村庄点【驻村发动群众】: 民心+6/旬。民心≥50=根据地村, ≥60=情报网(帮你盯日军)。" },
 };
 function newGame(seed) {
   rng = mulberry32(seed || ((Date.now() % 1e9) | 0));
@@ -257,8 +266,23 @@ function newGame(seed) {
 function spawnP(type, q, r) {
   let sq = q, sr = r;
   if (unitAt(sq, sr, "p")) {
-    const free = nbrs(q, r).find(([a, b]) => !unitAt(a, b, "p") && !state.tiles[a][b].sh && state.tiles[a][b].terrain !== "mountain");
-    if (free) { sq = free[0]; sr = free[1]; } else return null;
+    // 向外 BFS 找空位(原来只看直接邻格, 山村会找不到 → 单位静默消失)
+    const seen = new Set([key(q, r)]);
+    const queue = [[q, r]];
+    let found = null;
+    while (queue.length && !found) {
+      const [cq, cr] = queue.shift();
+      for (const [a, b] of nbrs(cq, cr)) {
+        const kk = key(a, b);
+        if (seen.has(kk)) continue;
+        seen.add(kk);
+        const t = state.tiles[a][b];
+        if (!t.sh && !unitAt(a, b, "p")) { found = [a, b]; break; }
+        queue.push([a, b]);
+      }
+    }
+    if (!found) { log("周围实在没有空地安置" + UT_P[type].name, "bad"); return null; }
+    sq = found[0]; sr = found[1];
   }
   const u = { id: state.nextUid++, side: "p", type, q: sq, r: sr, hp: 100, mp: UT_P[type].mp, ambush: false, attacked: false, rooted: false };
   state.units.push(u);
@@ -775,6 +799,21 @@ function endOperation(how) {
 
 // ═══════════ 玩家回合 ═══════════
 let sel = null, reach = null, pendingReports = [];
+// 为什么这格去不了 — 任何一次点击都要有说法, 绝不静默失败
+function moveBlockReason(u, q, r) {
+  if (!u) return "";
+  if (u.q === q && u.r === r) return "";
+  const t = state.tiles[q][r];
+  if (u.attacked) return UT_P[u.type].name + "本旬已行动(下旬恢复)";
+  if (u.mp <= 0) return UT_P[u.type].name + "本旬机动力已用尽";
+  if (t.sh) return "那里是敌军据点 — 要打就用侧栏的攻击按钮, 走不进去";
+  const occ = state.units.find(x => x.q === q && x.r === r);
+  if (occ) return occ.side === "p" ? "那格已有我方部队" : "那格上有敌人 — 用侧栏攻击按钮";
+  const d = hexDist(u.q, u.r, q, r);
+  const cost = t.terrain === "mountain" ? 2 : 1;
+  if (d > u.mp) return "太远了: 本旬只剩 " + u.mp + " 点机动力(山地每格2点, 其余1点)";
+  return "过不去: 沿途山地耗力太大, 本旬机动力不够(剩" + u.mp + "点)";
+}
 function reachableMap(u) {
   const out = {};
   if (u.mp <= 0 || u.attacked) return out;
@@ -1083,10 +1122,21 @@ function draw() {
       }
     }
   }
-  // 可达高亮 & 选中环
+  // 可达高亮: 亮底 + 金色虚线框 + 耗费数字 — 必须一眼看出"这些格子能走"
   if (reach) {
-    ctx.fillStyle = "rgba(159,188,82,.28)";
-    for (const k in reach) { const [cx, cy] = hexCenter(reach[k].q, reach[k].r); hexPath(cx, cy, s - 5); ctx.fill(); }
+    for (const k in reach) {
+      const [cx, cy] = hexCenter(reach[k].q, reach[k].r);
+      ctx.fillStyle = "rgba(210,240,140,.34)";
+      hexPath(cx, cy, s - 4); ctx.fill();
+      ctx.strokeStyle = "rgba(255,215,102,.95)"; ctx.lineWidth = 2.5; ctx.setLineDash([6, 5]);
+      hexPath(cx, cy, s - 5); ctx.stroke(); ctx.setLineDash([]);
+      if (cam.zoom > 0.6) {
+        ctx.fillStyle = "rgba(20,16,10,.75)";
+        ctx.beginPath(); ctx.arc(cx, cy - s * 0.42, 9, 0, 7); ctx.fill();
+        ctx.fillStyle = "#ffd766"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String(reach[k].cost), cx, cy - s * 0.42 + 1);
+      }
+    }
   }
   const su = getSel();
   if (su) { const [cx, cy] = hexCenter(su.q, su.r); ctx.strokeStyle = "#ffd766"; ctx.lineWidth = 2.5; hexPath(cx, cy, s - 3); ctx.stroke(); }
@@ -1179,7 +1229,11 @@ function startNew() {
   closeModal(); computeVis(); centerCam(); updateTop(); updateBanner(); draw();
   log("═══ 1942年1月 · 太行军分区 ═══", "hl");
   log("上级通报: " + JP_BRIGADE + "盘踞铁路沿线, 囚笼正在收紧。你的任务: 熬过1942, 并让敌人为每一次扫荡付出代价", "hl");
+  log("【怎么动】点部队→地图亮起金色虚线格→点任意亮格就走过去。想打仗: 走到敌人旁边, 用右侧栏的攻击按钮。", "good");
   log("先手三步: ①工作队进邻村【驻村发动群众】(民心≥60就是你的雷达) ②民兵去公路埋雷 ③主力藏进山林设伏", "good");
+  // 开局自动选中一支部队 — 让"可移动"这件事第一眼就看得见, 不必先猜
+  const first = state.units.find(u => u.side === "p" && UT_P[u.type].str > 0) || state.units.find(u => u.side === "p");
+  if (first) { sel = { kind: "unit", id: first.id }; reach = reachableMap(first); renderPanel(); draw(); }
 }
 function renderPanel() {
   const pn = $("sidePanel");
@@ -1189,7 +1243,9 @@ function renderPanel() {
   const u = getSel();
   if (u) {
     const ut = UT_P[u.type];
-    html += "<h3>" + ut.name + "<small>HP " + Math.round(u.hp) + " · 移动 " + u.mp + "/" + ut.mp + "</small></h3>";
+    html += "<h3>" + ut.name + "<small>HP " + Math.round(u.hp) + " · 机动 " + u.mp + "/" + ut.mp + "</small></h3>";
+    const nreach = reach ? Object.keys(reach).length : 0;
+    html += "<div class='row' style='color:" + (nreach ? "#cdff72" : "#8a8058") + "'>" + (nreach ? "➜ 地图上 " + nreach + " 格已亮起(金色虚线) — 点它们即可移动" : (u.attacked ? "本旬已行动, 下旬恢复机动" : "本旬机动力已用尽")) + "</div>";
     if (ut.str) html += "<div class='row'>战力 " + pStr(u, "atk").toFixed(1) + "(攻) / " + pStr(u, "def").toFixed(1) + "(守)</div>";
     html += "<div class='hint'>" + ut.desc + "</div>";
     if (u.ambush) html += "<div class='row' style='color:#9fbc52'>🌿 设伏中 — 敌纵队行经邻格将遭我猝然打击(移动会撤伏)</div>";
@@ -1264,25 +1320,48 @@ function pxToHex(px, py) {
   for (let q = 0; q < W; q++) for (let r = 0; r < H; r++) { const [cx, cy] = hexCenter(q, r); const d = (cx - wx) ** 2 + (cy - wy) ** 2; if (d < bd) { bd = d; best = [q, r]; } }
   return bd < (CFG.hex * 1.1) ** 2 ? best : null;
 }
-cv.addEventListener("pointerdown", e => { dragging = true; dragMoved = false; lastPt = [e.clientX, e.clientY]; });
-cv.addEventListener("pointermove", e => {
-  if (!dragging || !lastPt) return;
-  const dx = e.clientX - lastPt[0], dy = e.clientY - lastPt[1];
-  if (Math.abs(dx) + Math.abs(dy) > 3) dragMoved = true;
-  if (dragMoved) { cam.x -= dx; cam.y -= dy; lastPt = [e.clientX, e.clientY]; draw(); }
-});
-cv.addEventListener("pointerup", e => {
-  dragging = false;
-  if (dragMoved || !state || !state.started || state.over) return;
-  const h = pxToHex(e.clientX, e.clientY);
+// 点击判定: 阈值放宽到10px(3px 会把触屏轻微抖动的点按当成拖动吃掉), 且按到"按下点"的
+// 总位移判定, 而不是逐帧增量。另有 click 兜底, 保证任何环境下都点得动。
+let downPt = null, tapHandled = false;
+function handleTap(px, py) {
+  if (!state || !state.started || state.over) return;
+  tapHandled = true; // 同一次按下只处理一次(pointerup 与随后的 click 是同一次点击)
+  const h = pxToHex(px, py);
   if (!h) { deselect(); return; }
   const [q, r] = h;
   const u = getSel();
   if (u && reach && reach[key(q, r)]) { moveSelTo(q, r); return; }
   const own = state.units.find(x => x.side === "p" && x.q === q && x.r === r);
-  if (own) { sel = { kind: "unit", id: own.id }; reach = own.attacked ? null : reachableMap(own); renderPanel(); draw(); return; }
+  if (own) {
+    sel = { kind: "unit", id: own.id };
+    reach = own.attacked ? null : reachableMap(own);
+    const n = reach ? Object.keys(reach).length : 0;
+    if (n) log("选中" + UT_P[own.type].name + " — 地图上" + n + "格亮起(金框), 点其中任意一格即可移动(剩余机动 " + own.mp + ")", "hl");
+    else log("选中" + UT_P[own.type].name + " — " + (moveBlockReason(own, own.q, own.r + 1) || "本旬无法再移动"), "jp");
+    renderPanel(); draw(); return;
+  }
+  // 选中着部队却点了不可达的地方: 必须说清为什么, 不许静默
+  if (u) {
+    const why = moveBlockReason(u, q, r);
+    if (why) log(why, "jp");
+  }
   sel = { kind: "tile", q, r }; reach = null; renderPanel(); draw();
+}
+cv.addEventListener("pointerdown", e => { dragging = true; dragMoved = false; tapHandled = false; downPt = [e.clientX, e.clientY]; lastPt = [e.clientX, e.clientY]; });
+cv.addEventListener("pointermove", e => {
+  if (!dragging || !lastPt || !downPt) return;
+  const totalDx = e.clientX - downPt[0], totalDy = e.clientY - downPt[1];
+  if (Math.abs(totalDx) + Math.abs(totalDy) > 10) dragMoved = true;
+  if (dragMoved) { cam.x -= e.clientX - lastPt[0]; cam.y -= e.clientY - lastPt[1]; lastPt = [e.clientX, e.clientY]; draw(); }
 });
+cv.addEventListener("pointercancel", () => { dragging = false; dragMoved = false; });
+cv.addEventListener("pointerup", e => {
+  dragging = false;
+  if (dragMoved || tapHandled) return;
+  handleTap(e.clientX, e.clientY);
+});
+// 兜底: 某些环境(触屏手势拦截、pointer 事件被吞)下 pointerup 不达, click 仍能让你点得动
+cv.addEventListener("click", e => { if (!dragMoved && !tapHandled) handleTap(e.clientX, e.clientY); });
 cv.addEventListener("wheel", e => { e.preventDefault(); const z = clamp(cam.zoom * (e.deltaY > 0 ? 0.9 : 1.11), 0.45, 2.2); const wx = (e.clientX + cam.x) / cam.zoom, wy = (e.clientY + cam.y) / cam.zoom; cam.zoom = z; cam.x = wx * z - e.clientX; cam.y = wy * z - e.clientY; draw(); }, { passive: false });
 cv.addEventListener("touchmove", e => {
   if (e.touches.length === 2) {
