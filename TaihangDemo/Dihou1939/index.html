@@ -1,0 +1,2595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>敌后 · 1939—1945 | 华北敌后战场</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:#15110c;color:#e6d9b8;font-family:"Noto Serif SC","Songti SC",system-ui,serif;font-size:14px;user-select:none}
+button{font-family:inherit;cursor:pointer}
+.hidden{display:none !important}
+#cv{position:absolute;inset:0;display:block;touch-action:none}
+
+/* ── 顶栏 ── */
+#top{position:fixed;top:0;left:0;right:0;height:44px;z-index:12;display:flex;align-items:center;gap:12px;padding:0 12px;
+  background:linear-gradient(180deg,rgba(24,19,14,.97),rgba(24,19,14,.82));border-bottom:1px solid #4a3c26;backdrop-filter:blur(3px)}
+#dateBox{display:flex;align-items:baseline;gap:8px;min-width:150px}
+#dateNum{font-size:17px;color:#f0dfae;letter-spacing:.5px}
+#eraTag{font-size:11.5px;padding:1px 7px;border-radius:3px;border:1px solid #7d5c24;color:#f0c46a;background:#332711;white-space:nowrap}
+.stat{display:flex;align-items:center;gap:5px;font-size:12.5px;color:#bda87e;white-space:nowrap}
+.stat b{color:#f2e3ba;font-size:15px;font-weight:600}
+.stat .delta{font-size:10.5px;color:#8a9a6a}
+.bar{width:64px;height:7px;border:1px solid #5a4a2c;border-radius:2px;overflow:hidden;background:#221b12}
+.bar i{display:block;height:100%;transition:width .35s;background:linear-gradient(90deg,#8d5f2a,#d4562f)}
+#top .grow{flex:1}
+.tbtn{background:#2c2416;border:1px solid #6d5730;color:#e8d5a6;border-radius:5px;padding:5px 10px;font-size:12.5px;transition:.15s}
+.tbtn:hover{background:#3b3120;border-color:#9a7a3e}
+.tbtn.on{background:#33401f;border-color:#7fa544;color:#cfe89a}
+.tbtn.flash{animation:polflash 1.8s infinite}
+@keyframes polflash{0%,100%{border-color:#6d5730}50%{border-color:#e8b64a;color:#ffd98a}}
+
+/* ── 左侧队伍列表 ── */
+#roster{position:fixed;left:8px;top:52px;bottom:120px;z-index:11;width:168px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;scrollbar-width:thin}
+.ucard{background:linear-gradient(180deg,rgba(38,31,21,.94),rgba(28,23,16,.94));border:1px solid #4e4028;border-left:3px solid #8d3a2c;
+  border-radius:4px;padding:4px 7px;cursor:pointer;transition:.12s;flex-shrink:0}
+.ucard:hover{border-color:#8a7040;transform:translateX(2px)}
+.ucard.sel{border-color:#d9a441;background:linear-gradient(180deg,rgba(66,52,28,.97),rgba(44,35,22,.97))}
+.ucard.spent{opacity:.5}
+.ucard .un{font-size:12.5px;color:#f0e0b6;display:flex;justify-content:space-between;align-items:baseline}
+.ucard .un em{font-style:normal;font-size:10px;color:#9e8c62}
+.ucard .um{font-size:10.5px;color:#a89772;margin-top:1px;display:flex;gap:7px}
+.hpbar{height:3px;background:#2a2117;border-radius:2px;margin-top:3px;overflow:hidden}
+.hpbar i{display:block;height:100%;background:linear-gradient(90deg,#a03528,#d06a3a)}
+
+/* ── 底部：选中信息 + 行动 ── */
+#bottom{position:fixed;left:184px;right:190px;bottom:8px;z-index:11;display:flex;gap:8px;align-items:flex-end;pointer-events:none}
+#actWrap{pointer-events:auto;flex:1;min-height:50px;background:linear-gradient(180deg,rgba(30,25,17,.94),rgba(22,18,12,.96));
+  border:1px solid #4e4028;border-radius:5px;padding:6px 9px}
+#actTitle{font-size:12px;color:#bda87e;margin-bottom:4px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#actTitle b{color:#f0e0b6;font-size:13px}
+#acts{display:flex;gap:5px;flex-wrap:wrap}
+.abtn{background:#33291a;border:1px solid #7a6134;color:#f0dcae;border-radius:4px;padding:5px 11px;font-size:12.5px;transition:.12s}
+.abtn:hover{background:#4a3b22;border-color:#c09a4c;transform:translateY(-1px)}
+.abtn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.abtn .cost{font-size:10px;color:#c08a5a;margin-left:4px}
+.abtn.hot{border-color:#c4552e;background:#42221a;color:#ffd6ae}
+.abtn.gold{border-color:#c99a3a;background:#3d3116}
+
+/* ── 右下：下一回合 ── */
+#nextWrap{position:fixed;right:10px;bottom:10px;z-index:13;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+#btnNext{width:170px;padding:13px 10px;font-size:16px;letter-spacing:3px;font-weight:600;border-radius:7px;
+  background:linear-gradient(180deg,#7d2f22,#5a2016);border:1px solid #b6512f;color:#ffe9c8;box-shadow:0 4px 18px rgba(0,0,0,.5);transition:.15s}
+#btnNext:hover{background:linear-gradient(180deg,#94382a,#6d281a)}
+#btnNext.idle{background:linear-gradient(180deg,#5a4a22,#3d3316);border-color:#a08a3e;color:#f0e0b0}
+#btnNext.busy{background:#2a2418;border-color:#5a4a2c;color:#9a8a66;cursor:wait}
+#btnNext small{display:block;font-size:10.5px;letter-spacing:1px;font-weight:400;margin-top:2px;color:#d8b890}
+#recruitBar{display:flex;gap:5px}
+.rbtn{background:#2c2416;border:1px solid #6d5730;color:#e8d5a6;border-radius:5px;padding:6px 9px;font-size:12px}
+.rbtn:hover{background:#3b3120;border-color:#9a7a3e}
+.rbtn:disabled{opacity:.4;cursor:not-allowed}
+.rbtn small{display:block;font-size:9.5px;color:#b08a5a}
+
+/* ── 右侧通知流 ── */
+#feed{position:fixed;right:10px;top:52px;z-index:10;width:172px;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.note{background:rgba(24,19,13,.92);border:1px solid #43371f;border-left:3px solid #7a6134;border-radius:4px;
+  padding:5px 8px;font-size:11px;line-height:1.55;color:#c9b98e;animation:notein .3s}
+.note.good{border-left-color:#6a9a44;color:#cfe0a8}
+.note.bad{border-left-color:#b6512f;color:#e8c0a0}
+.note.key{border-left-color:#d9a441;color:#f0dfae}
+@keyframes notein{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+
+/* ── 任务横幅 ── */
+#missionBar{position:fixed;left:50%;top:50px;transform:translateX(-50%);z-index:10;max-width:520px;
+  background:rgba(26,21,13,.92);border:1px solid #6d5730;border-radius:5px;padding:5px 14px;font-size:12px;color:#d8c8a0;pointer-events:none}
+#missionBar b{color:#f0c860}
+
+/* ── 悬浮战报卡 ── */
+#fcCard{position:fixed;z-index:22;width:252px;display:none;pointer-events:none;
+  background:linear-gradient(175deg,#2b2317,#1e180f);border:1px solid #8a6a30;border-radius:6px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,.7)}
+#fcCard .fh{display:flex;justify-content:space-between;font-size:13px;color:#f0e0b6;margin-bottom:6px}
+#fcCard .fvs{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;text-align:center}
+#fcCard .fvs .v{font-size:22px;color:#e8b04a}
+#fcCard .fvs .v.e{color:#8fb4d8}
+#fcCard .fvs .lb{font-size:10px;color:#9a8a62}
+#fcCard .fmods{font-size:10.5px;color:#a89772;line-height:1.65;margin-top:6px;border-top:1px solid #40331e;padding-top:5px}
+#fcCard .fmods span{color:#d8b168}
+#fcCard .fdmg{margin-top:6px;font-size:11.5px;color:#c9b98e}
+#fcCard .fdmg b{color:#e8956a}
+#fcCard .fdmg b.g{color:#a8d47e}
+#fcCard .fcap{margin-top:5px;font-size:10.5px;color:#e8b64a;text-align:center;letter-spacing:1px}
+
+/* ── 悬停地块信息 ── */
+#tip{position:fixed;z-index:19;padding:6px 10px;font-size:11.5px;line-height:1.65;display:none;
+  background:rgba(26,21,14,.97);border:1px solid #6d5730;border-radius:4px;color:#d8c8a0;pointer-events:none;max-width:225px}
+#tip .th{color:#f0dcae;font-size:12.5px}
+#tip .ty{color:#c09a4c}
+#tip .tw{color:#e08a6a}
+#tip .tg{color:#a4d68a}
+
+/* ── 弹层 ── */
+.modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:rgba(10,8,5,.74);backdrop-filter:blur(2px);padding:16px}
+.mbox{width:min(600px,94vw);max-height:90vh;overflow-y:auto;background:linear-gradient(175deg,#2b2317,#1e180f);
+  border:1px solid #6d5730;border-radius:7px;padding:22px 26px;box-shadow:0 14px 50px rgba(0,0,0,.7)}
+.mbox h2{font-size:21px;color:#f2dda6;letter-spacing:3px;margin-bottom:4px;font-weight:600}
+.mbox h3{font-size:12.5px;color:#a08c5e;letter-spacing:1px;margin-bottom:14px;font-weight:400}
+.mbox p{font-size:13.5px;line-height:1.9;color:#c9b98e;margin-bottom:10px}
+.mbox .hl{color:#f0c860}
+.mbox .rd{color:#e08a6a}
+.mbox .gd{color:#a8d47e}
+.rule{border-top:1px solid #4a3c26;margin:14px 0}
+.mrow{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.mbtn{background:#3a2f1c;border:1px solid #8a6f38;color:#f0dcae;border-radius:5px;padding:9px 20px;font-size:14px;letter-spacing:1px}
+.mbtn:hover{background:#4d3e24;border-color:#c09a4c}
+.mbtn.pri{background:linear-gradient(180deg,#7d2f22,#5a2016);border-color:#b6512f;color:#ffe9c8}
+.mbtn.pri:hover{background:linear-gradient(180deg,#94382a,#6d281a)}
+
+/* 政策三选一 */
+.polRow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.polCard{background:rgba(0,0,0,.25);border:1px solid #6d5730;border-radius:6px;padding:12px 11px;cursor:pointer;transition:.15s}
+.polCard:hover{border-color:#e8b64a;background:rgba(66,52,28,.5);transform:translateY(-2px)}
+.polCard .pn{font-size:15px;color:#f0dfae;margin-bottom:6px;letter-spacing:1px}
+.polCard .pd{font-size:11.5px;color:#b5a37a;line-height:1.7}
+.polCard .pc{margin-top:8px;font-size:11px;color:#c08a5a}
+@media (max-width:700px){.polRow{grid-template-columns:1fr}}
+
+/* 结算 */
+.grade{font-size:74px;line-height:1;text-align:center;letter-spacing:4px;margin:6px 0 2px}
+.gS{color:#ffd95e;text-shadow:0 0 24px rgba(255,217,94,.5)}
+.gA{color:#a8d47e}.gB{color:#8fb4d8}.gC{color:#c0a878}.gD{color:#a07868}
+.stats{display:grid;grid-template-columns:1fr auto;gap:3px 14px;font-size:13px;margin:12px 0;color:#b5a37a}
+.stats b{color:#f0dcae;text-align:right;font-weight:500}
+.martyr{border-top:1px solid #4a3c26;margin-top:12px;padding-top:10px;font-size:12px;color:#9a8a62;line-height:1.9}
+.martyr .mn{color:#d8b8a0}
+
+/* 横幅 */
+#banner{position:fixed;left:0;right:0;top:36%;z-index:25;text-align:center;pointer-events:none;opacity:0;transition:opacity .3s}
+#banner.show{opacity:1}
+#banner .bt{display:inline-block;padding:11px 44px;font-size:31px;letter-spacing:12px;border-top:2px solid;border-bottom:2px solid;text-shadow:0 3px 18px rgba(0,0,0,.85)}
+#banner .bs{display:block;font-size:13px;letter-spacing:4px;margin-top:8px;opacity:.85}
+
+#toast{position:fixed;left:50%;top:56px;transform:translateX(-50%);z-index:26;padding:7px 16px;
+  background:rgba(60,26,18,.95);border:1px solid #b6512f;border-radius:4px;color:#ffd8b8;font-size:12.5px;display:none;pointer-events:none}
+
+#hint{position:fixed;z-index:20;max-width:260px;padding:9px 13px;font-size:12.5px;line-height:1.75;
+  background:linear-gradient(180deg,#4a3a1c,#332714);border:1px solid #c09a4c;border-radius:5px;color:#ffe9b8;
+  box-shadow:0 5px 20px rgba(0,0,0,.6);pointer-events:none;display:none}
+#hint b{color:#ffd05e}
+
+@media (max-width:820px){
+  #top{height:auto;flex-wrap:wrap;padding:4px 8px;gap:5px 9px}
+  #dateBox{min-width:auto}
+  .stat{font-size:11px}
+  .bar{width:44px}
+  #roster{width:116px;top:auto;bottom:120px;max-height:34vh}
+  .ucard{padding:3px 5px}
+  #feed{display:none}
+  #missionBar{display:none}
+  #bottom{left:6px;right:6px;bottom:64px}
+  #nextWrap{right:6px;bottom:6px;flex-direction:row;align-items:flex-end}
+  #btnNext{width:130px;padding:10px 8px;font-size:14px}
+  .mbox{padding:16px 14px}
+  .grade{font-size:56px}
+  #banner .bt{font-size:22px;letter-spacing:7px;padding:8px 22px}
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="top">
+  <div id="dateBox"><span id="dateNum">1939年1月</span><span id="eraTag">敌后发展</span></div>
+  <div class="stat" title="粮食：养兵的根。断粮全军掉血">粮 <b id="rFood">0</b><span class="delta" id="dFood"></span></div>
+  <div class="stat" title="兵员：组织起来的群众。招兵用">兵 <b id="rMan">0</b><span class="delta" id="dMan"></span></div>
+  <div class="stat" title="军械：枪炮弹药。主要靠缴获！">械 <b id="rArms">0</b></div>
+  <div class="stat" title="政治：根据地建设产生，攒够可颁布政策">政 <b id="rPol">0</b></div>
+  <div class="stat" title="日军警备度：你闹得越凶涨得越快，满则扫荡">警备 <div class="bar"><i id="heatFill" style="width:0%"></i></div><b id="rHeat">0</b></div>
+  <div class="grow"></div>
+  <button class="tbtn" id="btnPolicy">政策</button>
+  <button class="tbtn" id="btnMission">任务</button>
+  <button class="tbtn" id="btnHelp">说明</button>
+</div>
+
+<div id="missionBar"></div>
+<div id="roster"></div>
+
+<div id="bottom">
+  <div id="actWrap">
+    <div id="actTitle">— 点队伍下令；点敌人看战报；空格结束回合 —</div>
+    <div id="acts"></div>
+  </div>
+</div>
+
+<div id="nextWrap">
+  <div id="recruitBar"></div>
+  <button id="btnNext">下一回合<small id="nextSub"></small></button>
+</div>
+
+<div id="feed"></div>
+<div id="banner"><span class="bt" id="bannerT"></span><span class="bs" id="bannerS"></span></div>
+<div id="fcCard"></div>
+<div id="tip"></div>
+<div id="toast"></div>
+<div id="hint"></div>
+<div id="modalRoot"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   敌后 · 1939—1945 —— 华北敌后战场 类4X 白盒
+   单文件 / 零外部依赖 / 程序化 Canvas / 文明式回合制操作
+
+   十条史实任务 → 十套系统（详见说明面板）：
+   根据地=组织村庄连片；群众=兵员粮秣与民兵地雷；游击战=伏击与地形；
+   破交=铁路破袭；反扫荡=可见的讨伐纵队进山；多层武装=工作队/游击队/
+   地方团/主力团/武工队+村民兵；政权统战=政策三选一；经济=粮械兵政四账;
+   牵制=警备度与据点抽兵；反攻=1944末敌弱我强夺县城。
+   ===================================================================== */
+
+/* ── 0. 配置 ─────────────────────────────────────────────────────── */
+const CFG = {
+  W:24, H:15,
+  startYear:1939, startMonth:1, endTurn:80,
+  startFood:30, startArms:22, startMan:26, startPol:8,
+  visUnit:2, visUnitHigh:3, visVill:1, visVillOrg:2,
+  healVill:20, healZone:10, fortifyDef:4,
+  heatDecay:2,
+  saveKey:"dihou1939_v1",
+  animMs:130
+};
+
+/* 时代表：节奏骨架。sweepEvery=扫荡基准间隔, sweepCols=纵队数, eStr=敌全军强度修正 */
+const ERAS = [
+  { from:1,  to:19, key:"grow",    name:"敌后发展", sweepEvery:12, sweepCols:2, heatFloor:0,  eStr:0,  desc:"日军主力向正面，后方空虚。抓紧发动群众、遍地开花。" },
+  { from:20, to:24, key:"baituan", name:"百团大战", sweepEvery:99, sweepCols:0, heatFloor:10, eStr:0,  desc:"总部号令：大举破袭正太路！窗口期内破路拔点战果加倍。" },
+  { from:25, to:48, key:"hard",    name:"最困难时期", sweepEvery:8, sweepCols:3, heatFloor:25, eStr:4,  desc:"治安强化运动：铁壁合围、蚕食封锁。活下来。" },
+  { from:49, to:68, key:"recover", name:"恢复发展", sweepEvery:12, sweepCols:2, heatFloor:10, eStr:-4, desc:"太平洋战场吃紧，敌兵力东调。恢复根据地，局部出击。" },
+  { from:69, to:80, key:"counter", name:"战略反攻", sweepEvery:99, sweepCols:0, heatFloor:0,  eStr:-10,desc:"敌守备空虚士气涣散。扩大解放区，向县城进军！" }
+];
+
+const TERR = {
+  mtn:   { name:"山地", cost:3, def:8, hide:true,  fill:"#a89578", ink:"#5e5240" },
+  hill:  { name:"丘陵", cost:2, def:4, hide:true,  fill:"#c2b189", ink:"#6d6046" },
+  forest:{ name:"林地", cost:2, def:4, hide:true,  fill:"#94a473", ink:"#4f5c3a" },
+  plain: { name:"平原", cost:1, def:0, hide:false, fill:"#ddd0a6", ink:"#7a6d4c" },
+  water: { name:"河流", cost:-1,def:0, hide:false, fill:"#7d99a6", ink:"#4d6672" }
+};
+
+/* 我方兵种。mtn1=山地行家(山林耗1)。upkeep=每回合吃粮 */
+const UNITS = {
+  wt:  { label:"工作队", str:6,  mp:4, cost:{man:5, arms:0 }, upkeep:1, civ:true,  mtn1:true,  color:"#6d4a7a",
+         tip:"组织村庄的火种。不能打仗，但根据地全靠它开出来" },
+  guer:{ label:"游击队", str:22, mp:5, cost:{man:8, arms:5 }, upkeep:1, amb:10,    mtn1:true,  color:"#b2543a",
+         tip:"山地行家：山林只耗1机动。从隐蔽地形发起攻击+10伏击" },
+  reg: { label:"地方团", str:32, mp:4, cost:{man:12,arms:9 }, upkeep:2,                        color:"#a4322a",
+         tip:"守土主力，性价比高" },
+  main:{ label:"主力团", str:42, mp:4, cost:{man:18,arms:15}, upkeep:3, siege:true,            color:"#8d2318",
+         tip:"攻坚拳头：攻打据点/县城时敌工事加成减半" },
+  awt: { label:"武工队", str:14, mp:5, cost:{man:6, arms:4 }, upkeep:1, stealth:true, mtn1:true, needPolicy:"wugong", color:"#5a3a6a",
+         tip:"敌后之敌后：敌军看不见它。能策反伪军据点" }
+};
+
+/* 敌方兵种 */
+const EUNITS = {
+  patJ: { label:"日军巡逻队", str:36, mp:5, hp:100, jp:true,  loot:{arms:7},        color:"#3b4652" },
+  patP: { label:"伪军巡逻队", str:18, mp:4, hp:100, jp:false, loot:{arms:4,man:3},  color:"#8a7a4a" },
+  swp:  { label:"讨伐大队",   str:55, mp:4, hp:100, jp:true,  loot:{arms:9},        color:"#2e3a46" },
+  cav:  { label:"骑兵搜索队", str:40, mp:6, hp:100, jp:true,  loot:{arms:6},        color:"#46525c" }
+};
+
+/* 据点/县城模板 */
+const FORTS = {
+  block: { name:"炮楼",  fortDef:10, loot:{arms:5,man:3},  score:8  },
+  fort:  { name:"据点",  fortDef:12, loot:{arms:8},        score:14 },
+  town:  { name:"县城",  fortDef:15, loot:{arms:18,man:8,food:12}, score:40 }
+};
+
+/* 政策池：三选一的文明式加成。gate=最早出现回合 */
+const POLICIES = {
+  jianzu:  { name:"减租减息", cost:18, gate:1,  desc:"发动群众的总钥匙：工作队 1 回合即可组织村庄；每个根据地村多产粮。" },
+  sansan:  { name:"三三制政权", cost:18, gate:1,  desc:"根据地政权化：政治 +2/回合；村庄有五成把握顶住蚕食与清乡。" },
+  lianbing:{ name:"整训练兵", cost:16, gate:1,  desc:"新部队自带 10 经验；部队驻村休整时额外 +5 恢复。" },
+  dilei:   { name:"地雷战",   cost:20, gate:13, desc:"巩固村自动在邻接公路/铁路埋雷：敌军路过挨炸（每村一雷，炸后数月重埋）。" },
+  digong:  { name:"敌军工作", cost:20, gate:13, desc:"策反成功率 +15%；伪军部队血量低于 45 时可能当场溃散。" },
+  binggong:{ name:"兵工建设", cost:22, gate:13, desc:"军械 +3/回合；黄崖洞若为根据地村再 +2（水腰兵工厂）。" },
+  jingbing:{ name:"精兵简政", cost:22, gate:25, desc:"全军粮耗 -40%。困难时期的救命政策。" },
+  dasheng: { name:"大生产运动", cost:22, gate:25, desc:"军民屯田：粮 +6/回合。南泥湾就是这么来的。" },
+  didao:   { name:"地道战",   cost:24, gate:25, desc:"巩固村转入地下：扫荡烧不掉巩固村，民兵防御 +8。" },
+  wugong:  { name:"武工队",   cost:20, gate:25, desc:"解锁武工队：敌军看不见的小队，深入敌后策反伪军据点。" }
+};
+
+/* 部队名号与干部 */
+const PNAMES = {
+  main:["老三团","七七二团","新一团","平山团","独立团"],
+  reg: ["一分区二团","路西支队","回民支队","青年纵队","太行五团"],
+  guer:["飞虎队","夜袭队","太行游击一支队","滹沱河大队","雁翎队"],
+  wt:  ["武乡工作队","冀西工作队","前方工作团","民运工作队"],
+  awt: ["一号武工队","二号武工队","敌后武工队"]
+};
+const CMDRS = ["赵大川","李振海","孙铁头","陈石匠","韩秀英","马长风","郑云汉","周保中","杜铁匠","白文冠","高志远","牛老倌"];
+
+/* 村名池 */
+const VNAMES = ["阜平","王家峪","黄崖洞","陈庄","麻田","砖壁","蟠龙","西柏坡","冉庄","白洋淀","温塘","洪子店",
+  "上寨","下关","石咀","青虚山","倒马关","龙泉关","南庄","北岳村","东冶","柏叶沟","三皇庙","神仙山",
+  "李家坡","赵家沟","刘家湾","杨树铺","周家口","吴家集","张各庄","孟家坟","高家台","小觉","大龙华","官厅"];
+
+/* ── 1. 确定性随机 ───────────────────────────────────────────────── */
+function Imul32(a,b){ return Math.imul(a,b)|0; }
+function Mulberry32(seed){
+  let t = seed >>> 0;
+  return function(){
+    t = (t + 0x6D2B79F5) >>> 0;
+    let x = t;
+    x = Imul32(x ^ (x >>> 15), x | 1);
+    x ^= x + Imul32(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let RND = Mulberry32(1);
+const rnd  = ()=>RND();
+const rint = (a,b)=>a + Math.floor(RND()*(b-a+1));
+const rpick= (arr)=>arr[Math.floor(RND()*arr.length)];
+const rvar = (lo,hi)=>lo + RND()*(hi-lo);
+
+/* ── 2. 六边形数学（pointy-top 轴向） ─────────────────────────────── */
+const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+const K  = (q,r)=>q+","+r;
+const T  = (q,r)=>G.map.get(K(q,r));
+const NB = (q,r)=>DIRS.map(d=>[q+d[0], r+d[1]]);
+function hexDist(aq,ar,bq,br){
+  return Math.max(Math.abs(aq-bq), Math.abs(ar-br), Math.abs((-aq-ar)-(-bq-br)));
+}
+function hexToPix(q,r,s){ return { x:s*Math.sqrt(3)*(q + r/2), y:s*1.5*r }; }
+function pixToHex(x,y,s){
+  const fq = (Math.sqrt(3)/3*x - y/3)/s, fr = (2/3*y)/s, fs = -fq-fr;
+  let rq=Math.round(fq), rr=Math.round(fr), rs=Math.round(fs);
+  const dq=Math.abs(rq-fq), dr=Math.abs(rr-fr), ds=Math.abs(rs-fs);
+  if(dq>dr && dq>ds) rq = -rr-rs; else if(dr>ds) rr = -rq-rs;
+  return {q:rq, r:rr};
+}
+const offToAxial = (col,row)=>({ q: col - ((row - (row&1))>>1), r: row });
+
+/* ── 3. 全局状态 ─────────────────────────────────────────────────── */
+const G = {
+  seed:1, turn:1, phase:"player",
+  map:new Map(), tiles:[],
+  units:[], eUnits:[], uidSeq:1, routes:[],
+  res:{ food:0, man:0, arms:0, pol:0 },
+  heat:0, polCost:0, policies:[], polOffer:null,
+  sweep:{ state:"none", timer:0, cols:0, srcs:[], target:null, lastAt:0 },
+  nibbleAt:0, respawnQ:[],
+  missions:[], score:{ kJ:0,kP:0, razed:0, railDays:0, towns:0, burned:0, lost:0, sabo:0, flip:0 },
+  martyrs:[], over:false, busy:false, started:false, hintStep:0,
+  usedNames:{}, lastNextTs:0
+};
+let SEL = null, REACH = null, ATK = null;   // ATK: Map<eKey, {from:[q,r],cost}>
+let hoverHex = null, fastAnim = false;
+
+/* ── 4. 地图生成 ─────────────────────────────────────────────────── */
+/* 地理即战略：西部太行山(你的老家)——中部丘陵过渡——正太铁路横贯(row10)
+   ——平汉铁路纵贯(col16)交汇于石门——东部冀中大平原(富庶而危险)。 */
+function tileAt(col,row){ const {q,r}=offToAxial(col,row); return T(q,r); }
+
+function GenMap(){
+  G.map.clear(); G.tiles.length = 0;
+  const W=CFG.W, H=CFG.H, RAILROW=10, RAILCOL=16, RIVER=20;
+
+  for(let row=0; row<H; row++) for(let col=0; col<W; col++){
+    const {q,r} = offToAxial(col,row);
+    let terr;
+    if(col<=6)       terr = rnd()<0.62 ? "mtn" : (rnd()<0.55 ? "hill" : "forest");
+    else if(col<=10) terr = rnd()<0.42 ? "hill" : (rnd()<0.5 ? "forest" : (rnd()<0.5?"mtn":"plain"));
+    else if(col<=15) terr = rnd()<0.55 ? "plain" : (rnd()<0.6 ? "hill" : "forest");
+    else             terr = rnd()<0.86 ? "plain" : "forest";
+    // 滹沱河：东部平原纵贯，蜿蜒
+    const meander = Math.round(Math.sin(row*0.7)*1.2);
+    if(col === RIVER + meander && row!==RAILROW) terr = "water";
+    const t = { q,r,col,row,terr, road:false, rail:false, railCut:false, repairT:0,
+                vill:null, fort:null, site:null, mine:0, mineCd:0,
+                fog:0, wob:Math.floor(rnd()*1e6) };
+    G.map.set(K(q,r), t); G.tiles.push(t);
+  }
+
+  // 铁路：正太线(row10, col0..16) + 平汉线(col16 全纵贯)
+  for(let c=0;c<=RAILCOL;c++){ const t=tileAt(c,RAILROW); t.rail=true; t.road=true; if(t.terr==="water")t.terr="plain"; }
+  for(let r2=0;r2<H;r2++){ const t=tileAt(RAILCOL,r2); t.rail=true; t.road=true; if(t.terr==="water")t.terr="plain"; }
+  // 公路：山区纵路(col6) / 北路(row5) / 南路(row13) / 平原纵路(col21)
+  const roads = [];
+  for(let r2=2;r2<=RAILROW;r2++) roads.push([6,r2]);
+  for(let c=6;c<=23;c++) roads.push([c,5]);
+  for(let c=16;c<=22;c++) roads.push([c,13]);
+  for(let r2=5;r2<=13;r2++) roads.push([21,r2]);
+  for(const [c,r2] of roads){ const t=tileAt(c,r2); if(!t) continue; t.road=true; if(t.terr==="water") t.terr="plain"; }
+
+  // 县城（日伪重兵）：西山口 / 交通枢纽 / 北中南 / 平原 / 西北弱城
+  const towns = [
+    { c:3,  r:10, name:"阳泉", g:46, jp:true },
+    { c:16, r:10, name:"石门", g:64, jp:true, big:true },
+    { c:16, r:4,  name:"定州", g:44, jp:true },
+    { c:16, r:13, name:"邢州", g:42, jp:true },
+    { c:21, r:5,  name:"河间", g:40, jp:true },
+    { c:6,  r:2,  name:"蔚州", g:24, jp:false }     // 伪军弱城：中期第一个能啃的县城
+  ];
+  for(const tw of towns){
+    const t = tileAt(tw.c,tw.r); t.terr = "plain";
+    t.fort = { kind:"town", name:tw.name, g:tw.g, gMax:tw.g, jp:tw.jp, big:!!tw.big };
+    t.vill = null; t.road = true;
+  }
+  // 炮楼/据点：铁路沿线 + 公路要点（囚笼的骨架）
+  const forts = [
+    [1,10,"block",false],[5,10,"fort",true],[9,10,"block",false],[12,10,"fort",true],[14,10,"block",false],
+    [16,1,"block",false],[16,7,"fort",true],[16,12,"block",false],
+    [6,7,"block",false],[11,5,"block",false],[19,5,"block",false],[21,9,"fort",true],[18,13,"block",false],
+    [5,6,"block",false]   // 李家坡炮楼：开局首战目标，家门口的钉子
+  ];
+  for(const [c,r2,kind,jp] of forts){
+    const t = tileAt(c,r2); if(!t || t.fort) continue;
+    if(t.terr==="water") t.terr="plain";
+    const g = kind==="fort" ? (jp?26:20) : (jp?18:13);
+    t.fort = { kind, name:"", g, gMax:g, jp };
+    t.vill = null;
+  }
+  // 给无名据点起名（就近村名+炮楼/据点）
+  // 村庄：山区带名村，平原富村
+  const fixedV = [
+    [3,6,"阜平",3],[2,4,"王家峪",2],[1,8,"黄崖洞",2],[4,7,"陈庄",2],[2,11,"麻田",2],[4,12,"砖壁",2],
+    [8,3,"上寨",2],[9,7,"温塘",2],[7,11,"小觉",2],[11,8,"洪子店",2],[13,4,"官厅",2],[10,12,"西柏坡",2],
+    [19,3,"冉庄",3],[22,2,"白洋淀",3],[18,7,"张各庄",3],[22,7,"吴家集",3],[19,11,"周家口",3],[22,11,"孟家坟",3],
+    [13,12,"高家台",2],[14,7,"杨树铺",2],[2,2,"龙泉关",1],[5,4,"青虚山",1],[1,13,"石咀",1],[8,9,"赵家沟",2],
+    [12,2,"倒马关",2],[18,1,"大龙华",3],[20,14,"刘家湾",2],[23,4,"李家坡东",3],[10,1,"南庄",2],[6,13,"三皇庙",1],
+    [15,2,"北岳村",2],[23,9,"东冶",3],[17,9,"柏叶沟",2],[9,10,null,0]
+  ];
+  let vn = 0;
+  for(const [c,r2,name,pop] of fixedV){
+    if(!name) continue;
+    const t = tileAt(c,r2); if(!t || t.fort || t.terr==="water") continue;
+    if(t.rail) continue;
+    t.vill = { name, pop, org:0, burn:0, tunnel:false };
+    if(t.terr==="water") t.terr="hill";
+    vn++;
+  }
+  // 据点命名
+  for(const t of G.tiles){
+    if(!t.fort || t.fort.kind==="town" || t.fort.name) continue;
+    let best=null, bd=99;
+    for(const v of G.tiles){ if(!v.vill) continue; const d=hexDist(t.q,t.r,v.q,v.r); if(d<bd){bd=d;best=v;} }
+    t.fort.name = (best?best.vill.name:"路口") + (t.fort.kind==="fort"?"据点":"炮楼");
+  }
+  return vn;
+}
+
+/* ── 5. 开局 ─────────────────────────────────────────────────────── */
+function UnitName(type){
+  const pool = PNAMES[type] || ["支队"];
+  const used = G.usedNames;
+  for(const n of pool){ if(!used[n]){ used[n]=1; return n; } }
+  return pool[0] + "·新" + (G.uidSeq);
+}
+function MkUnit(type, q, r, opts){
+  const D = UNITS[type];
+  const u = {
+    id:G.uidSeq++, side:"p", type, q, r,
+    name:UnitName(type), cmd:rpick(CMDRS),
+    hp:100, mp:D.mp, xp:(G.policies.includes("lianbing")?10:0), lvl:0,
+    stance:"none", acted:false, ax:0, ay:0, alive:true
+  };
+  if(opts) Object.assign(u, opts);
+  G.units.push(u); return u;
+}
+function MkEnemy(type, q, r, task){
+  const D = EUNITS[type];
+  const e = { id:G.uidSeq++, side:"e", type, q, r, hp:D.hp, task:task||{kind:"idle"}, ax:0, ay:0, alive:true };
+  G.eUnits.push(e); return e;
+}
+function PatrolRoute(pred){ return G.tiles.filter(pred).sort((a,b)=> (a.row-b.row)||(a.col-b.col)); }
+
+function NewGame(seed){
+  G.seed = seed>>>0 || 1;
+  RND = Mulberry32(G.seed);
+  G.turn = 1; G.phase = "player"; G.over = false; G.busy = false;
+  G.units.length = 0; G.eUnits.length = 0; G.uidSeq = 1;
+  G.res = { food:CFG.startFood, man:CFG.startMan, arms:CFG.startArms, pol:CFG.startPol };
+  G.heat = 0; G.polCost = 16; G.policies = []; G.polOffer = null;
+  G.sweep = { state:"none", timer:0, cols:0, srcs:[], target:null, lastAt:0 };
+  G.nibbleAt = 0; G.respawnQ = [];
+  G.score = { kJ:0,kP:0, razed:0, railDays:0, towns:0, burned:0, lost:0, sabo:0, flip:0 };
+  G.martyrs = []; G.usedNames = {}; G.missions = MkMissions();
+  G.hintStep = 0; G.lastNextTs = 0;
+  SEL = null; REACH = null; ATK = null;
+
+  GenMap();
+
+  // 起始根据地：阜平(总部,巩固) + 王家峪 + 陈庄
+  const hq = G.tiles.find(t=>t.vill && t.vill.name==="阜平");
+  hq.vill.org = 3; hq.vill.hq = true;
+  G.tiles.find(t=>t.vill && t.vill.name==="王家峪").vill.org = 2;
+  G.tiles.find(t=>t.vill && t.vill.name==="陈庄").vill.org = 1;
+
+  // 起始部队：主力团+游击×2+工作队×2 —— 根据地是中心任务，工作队要能双线开花
+  const spots = SpawnSpots(hq, 5);
+  MkUnit("main", spots[0].q, spots[0].r);
+  MkUnit("guer", spots[1].q, spots[1].r);
+  MkUnit("guer", spots[2].q, spots[2].r);
+  MkUnit("wt",   spots[3].q, spots[3].r);
+  MkUnit("wt",   spots[4] ? spots[4].q : spots[3].q, spots[4] ? spots[4].r : spots[3].r);
+
+  // 巡逻路线注册表（索引即 routeId，存档只存 id）
+  G.routes = [
+    PatrolRoute(t=>t.rail&&t.row===10),
+    PatrolRoute(t=>t.rail&&t.col===16&&t.row<10),
+    PatrolRoute(t=>t.rail&&t.col===16&&t.row>10),
+    PatrolRoute(t=>t.road&&!t.rail&&t.col===6),
+    PatrolRoute(t=>t.road&&!t.rail&&t.row===5&&t.col>=8)
+  ];
+  // 起始敌军：三条铁路巡逻 + 两条公路伪军巡逻 —— 开屏就看得见
+  MkEnemy("patJ", ...QR(10,10), { kind:"patrol", routeId:0, ri:10, dir:1 });
+  MkEnemy("patJ", ...QR(16,6),  { kind:"patrol", routeId:1, ri:5,  dir:1 });
+  MkEnemy("patJ", ...QR(16,12), { kind:"patrol", routeId:2, ri:1,  dir:1 });
+  MkEnemy("patP", ...QR(6,6),   { kind:"patrol", routeId:3, ri:4,  dir:1 });
+  MkEnemy("patP", ...QR(19,5),  { kind:"patrol", routeId:4, ri:8,  dir:1 });
+
+  ComputeVision();
+  Log("晋察冀军区命令：巩固阜平根据地，发动群众，伺机打击敌交通线。","key");
+  G.started = true;
+  return hq;
+}
+function QR(col,row){ const t=tileAt(col,row); return [t.q,t.r]; }
+function SpawnSpots(center, n){
+  const out=[], seen=new Set([K(center.q,center.r)]), queue=[center];
+  out.push(center);
+  while(queue.length && out.length<n+1){
+    const cur=queue.shift();
+    for(const [q,r] of NB(cur.q,cur.r)){
+      const t=T(q,r); if(!t) continue;
+      const kk=K(q,r); if(seen.has(kk)) continue;
+      seen.add(kk);
+      if(t.terr==="water" || t.fort) continue;
+      out.push(t); queue.push(t);
+      if(out.length>=n+1) break;
+    }
+  }
+  return out.slice(1);
+}
+
+/* ── 6. 日志 / 横幅 / 音效 / 粒子 ────────────────────────────────── */
+function Log(text, cls){
+  const feed = document.getElementById("feed");
+  if(!feed) return;
+  const d = document.createElement("div");
+  d.className = "note" + (cls ? " "+cls : "");
+  d.textContent = text;
+  feed.appendChild(d);
+  while(feed.children.length > 7) feed.removeChild(feed.firstChild);
+}
+let toastTimer = 0;
+function Toast(msg){
+  const el = document.getElementById("toast"); if(!el) return;
+  el.textContent = msg; el.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.style.display="none"; }, 1600);
+}
+const sleep = (ms)=>new Promise(res=>setTimeout(res, (fastAnim||skipAll) ? 0 : ms));
+async function Banner(title, sub, color){
+  const b = document.getElementById("banner"); if(!b) return;
+  const t = document.getElementById("bannerT"), s = document.getElementById("bannerS");
+  t.textContent = title; t.style.color = color; t.style.borderColor = color;
+  s.textContent = sub || "";
+  b.classList.add("show");
+  await sleep(1000);
+  b.classList.remove("show");
+  await sleep(160);
+}
+let AC = null, muted = false;
+function Sfx(kind){
+  if(muted) return;
+  try{
+    if(!AC){ const C = window.AudioContext || window.webkitAudioContext; if(!C) return; AC = new C(); }
+    const now = AC.currentTime;
+    const mk = (type,f0,f1,dur,vol)=>{
+      const o=AC.createOscillator(), g=AC.createGain();
+      o.type=type; o.frequency.setValueAtTime(f0,now);
+      o.frequency.exponentialRampToValueAtTime(Math.max(20,f1), now+dur);
+      g.gain.setValueAtTime(vol,now); g.gain.exponentialRampToValueAtTime(0.001, now+dur);
+      o.connect(g); g.connect(AC.destination); o.start(now); o.stop(now+dur+0.02);
+    };
+    if(kind==="click") mk("square",620,480,.05,.03);
+    else if(kind==="move") mk("triangle",300,420,.08,.04);
+    else if(kind==="gun"){ mk("square",240,110,.12,.07); mk("sawtooth",600,200,.06,.03); }
+    else if(kind==="boom"){ mk("sawtooth",180,40,.32,.11); mk("square",90,30,.24,.06); }
+    else if(kind==="win"){ mk("triangle",520,880,.28,.07); }
+    else if(kind==="fail"){ mk("sawtooth",300,130,.28,.06); }
+    else if(kind==="turn"){ mk("sine",420,640,.4,.05); }
+    else if(kind==="alarm"){ mk("square",700,300,.5,.07); }
+    else if(kind==="coin"){ mk("triangle",880,1200,.12,.05); }
+  }catch(e){}
+}
+const FX = [];       // 粒子
+const FLOATS = [];   // 浮动文字
+let shake = 0;
+function Boom(t, color, n){
+  if(!t) return;
+  const p = hexToPix(t.q,t.r,view.s);
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, sp = 0.6+Math.random()*2.6;
+    FX.push({ x:p.x, y:p.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-0.6,
+              life:1, decay:0.012+Math.random()*0.02, color, size:1.4+Math.random()*2.2 });
+  }
+  shake = Math.min(9, shake+5);
+}
+function Float(t, text, color){
+  if(!t) return;
+  const p = hexToPix(t.q,t.r,view.s);
+  FLOATS.push({ x:p.x, y:p.y - view.s*0.6, text, color:color||"#f0dcae", life:1 });
+}
+
+/* ── 7. 时代 / 日期 ──────────────────────────────────────────────── */
+function CurEra(){ return ERAS.find(e => G.turn>=e.from && G.turn<=e.to) || ERAS[ERAS.length-1]; }
+function DateStr(turn){
+  const m = (turn-1)%12 + 1, y = CFG.startYear + Math.floor((turn-1)/12);
+  return `${y}年${m}月`;
+}
+function EnemyStrMod(){ return CurEra().eStr; }
+
+/* ── 8. 视野与迷雾 ───────────────────────────────────────────────── */
+function ComputeVision(){
+  for(const t of G.tiles) if(t.fog===2) t.fog = 1;
+  const reveal = (q,r,rad)=>{
+    for(const t of G.tiles) if(hexDist(t.q,t.r,q,r)<=rad) t.fog = 2;
+  };
+  for(const u of G.units){
+    if(!u.alive) continue;
+    const t = T(u.q,u.r);
+    reveal(u.q,u.r, (t && (t.terr==="mtn"||t.terr==="hill")) ? CFG.visUnitHigh : CFG.visUnit);
+  }
+  for(const t of G.tiles){
+    if(t.vill && t.vill.org>=1 && !t.vill.burn) reveal(t.q,t.r, t.vill.org>=2 ? CFG.visVillOrg : CFG.visVill);
+    if(t.fort && t.fort.pOwned) reveal(t.q,t.r,2);
+  }
+}
+function EnemyVisible(e){ const t=T(e.q,e.r); return t && t.fog===2; }
+
+/* ── 9. 移动：Dijkstra + ZOC + 移动即攻击 ─────────────────────────── */
+function UnitAt(q,r){ return G.units.find(u=>u.alive && u.q===q && u.r===r); }
+function EnemyAt(q,r){ return G.eUnits.find(e=>e.alive && e.q===q && e.r===r); }
+function IsZoc(q,r){
+  return NB(q,r).some(([nq,nr])=>{ const e=EnemyAt(nq,nr); return e && EnemyVisible(e); });
+}
+function MoveCost(u, from, to){
+  if(!to || to.terr==="water") return -1;
+  if(to.fort && !to.fort.pOwned) return -1;
+  if(EnemyAt(to.q,to.r)) return -1;
+  if(UnitAt(to.q,to.r)) return -1;               // 不叠子（文明式一格一军）
+  if(from.road && to.road) return 1;
+  let c = TERR[to.terr].cost;
+  if(UNITS[u.type].mtn1 && (to.terr==="mtn"||to.terr==="forest")) c = 1;
+  if(to.vill) c = Math.min(c, 1);
+  return c;
+}
+function Reachable(u){
+  const start = K(u.q,u.r);
+  const cost = new Map([[start,0]]), prev = new Map();
+  const open = [[0,u.q,u.r]];
+  while(open.length){
+    open.sort((a,b)=>a[0]-b[0]);
+    const [c,q,r] = open.shift();
+    if(c > (cost.get(K(q,r)) ?? Infinity)) continue;
+    if(K(q,r)!==start && IsZoc(q,r)) continue;   // 进入敌军邻格即停（文明式 ZOC）
+    const from = T(q,r);
+    for(const [nq,nr] of NB(q,r)){
+      const to = T(nq,nr); if(!to) continue;
+      const mc = MoveCost(u, from, to); if(mc<0) continue;
+      const nc = c+mc; if(nc>u.mp) continue;
+      if(nc < (cost.get(K(nq,nr)) ?? Infinity)){
+        cost.set(K(nq,nr), nc); prev.set(K(nq,nr), K(q,r));
+        open.push([nc,nq,nr]);
+      }
+    }
+  }
+  cost.delete(start);
+  return { cost, prev };
+}
+/* 可攻击目标集：敌单位与敌据点。value = {q,r,kind,ref, from:[q,r]|null(原地), cost} */
+function ComputeAttack(u){
+  const out = new Map();
+  if(!u || u.acted || UNITS[u.type].civ) return out;
+  const tryTgt = (q,r,kind,ref)=>{
+    const kk = K(q,r);
+    if(out.has(kk)) return;
+    // 原地相邻？
+    if(hexDist(u.q,u.r,q,r)===1){ out.set(kk,{q,r,kind,ref,from:null,cost:0}); return; }
+    if(!REACH) return;
+    let best=null, bc=1e9;
+    for(const [nq,nr] of NB(q,r)){
+      const c = REACH.cost.get(K(nq,nr));
+      if(c!==undefined && c<bc){ bc=c; best=[nq,nr]; }
+    }
+    if(best) out.set(kk,{q,r,kind,ref,from:best,cost:bc});
+  };
+  for(const e of G.eUnits){ if(e.alive && EnemyVisible(e)) tryTgt(e.q,e.r,"unit",e); }
+  for(const t of G.tiles){ if(t.fort && !t.fort.pOwned && t.fog>=1) tryTgt(t.q,t.r,"fort",t); }
+  return out;
+}
+function RefreshOrders(){
+  if(SEL && SEL.alive && !G.over && G.phase==="player" && !SEL.acted && SEL.mp>0){
+    REACH = Reachable(SEL);
+  } else REACH = null;
+  ATK = SEL ? ComputeAttack(SEL) : null;
+}
+function DoMove(u, tq, tr){
+  if(!REACH) return false;
+  const kk = K(tq,tr);
+  if(!REACH.cost.has(kk)) return false;
+  const spent = REACH.cost.get(kk);
+  const a = hexToPix(u.q,u.r,view.s), b = hexToPix(tq,tr,view.s);
+  u.ax = a.x-b.x; u.ay = a.y-b.y;
+  u.q = tq; u.r = tr; u.mp -= spent;
+  u.stance = "none";
+  const t = T(tq,tr);
+  if(t.site){ t.site=null; G.res.arms+=2; G.heat+=2; Float(t,"捣毁工地","#a8d47e"); Log(`${u.name}捣毁敌修筑工地，缴获器材。`,"good"); }
+  if(IsZoc(tq,tr)) u.mp = 0;
+  Sfx("move"); ComputeVision(); RefreshOrders(); Sync();
+  if(G.hintStep===1) SetHint(2);
+  return true;
+}
+
+/* ── 10. 战斗 ────────────────────────────────────────────────────── */
+function TgtInfo(tgt){
+  if(tgt.kind==="unit"){
+    const e = tgt.ref, D = EUNITS[e.type];
+    return { kind:"unit", e, tile:T(e.q,e.r), label:D.label, jp:D.jp,
+             str:D.str+EnemyStrMod(), hpPct:e.hp, fortDef:0 };
+  }
+  const t = tgt.ref, f = t.fort, FD = FORTS[f.kind];
+  const base = f.kind==="town" ? (f.jp?34:20) : (f.jp?26:14);
+  return { kind:"fort", tile:t, fort:f, label:f.name, jp:f.jp,
+           str:base+EnemyStrMod(), hpPct:Math.round(f.g/f.gMax*100), fortDef:FD.fortDef };
+}
+function AtkEff(u, ti, fromTile){
+  const D = UNITS[u.type];
+  let s = D.str + u.lvl*4 + (u.hp-100)*0.08;
+  const mods = [[`${D.label}·${u.lvl?["","老练","精锐"][u.lvl]:""}兵力`, Math.round(s)]];
+  const ft = fromTile || T(u.q,u.r);
+  if(ft && TERR[ft.terr].hide && ti.tile && !TERR[ti.tile.terr].hide){
+    const amb = D.amb || 4; s += amb; mods.push(["山地伏击", "+"+amb]);
+  }
+  let flank = 0;
+  for(const [nq,nr] of NB(ti.tile.q, ti.tile.r)){
+    const ally = UnitAt(nq,nr);
+    if(ally && ally!==u && !UNITS[ally.type].civ) flank += 2;
+  }
+  if(flank){ flank=Math.min(6,flank); s+=flank; mods.push(["多面夹击","+"+flank]); }
+  return { s, mods };
+}
+function DefEff(ti){
+  let s = ti.str + (ti.hpPct-100)*0.08;
+  const mods = [["守军强度", Math.round(s)]];
+  if(ti.kind==="unit"){
+    const tt = ti.tile;
+    if(tt && TERR[tt.terr].def){ s+=TERR[tt.terr].def; mods.push([TERR[tt.terr].name+"地形","+"+TERR[tt.terr].def]); }
+  }
+  return { s, mods, fortDef:ti.fortDef };
+}
+function Forecast(u, tgt){
+  const ti = TgtInfo(tgt);
+  const A = AtkEff(u, ti, tgt.from ? T(...tgt.from) : null);
+  const D = DefEff(ti);
+  let fd = D.fortDef;
+  if(fd && UNITS[u.type].siege){ fd = Math.ceil(fd/2); D.mods.push(["工事(主力团攻坚减半)","+"+fd]); }
+  else if(fd) D.mods.push(["工事","+"+fd]);
+  const a = A.s, d = D.s + fd;
+  const dmg = Math.round(26*Math.exp((a-d)/13));
+  const ret = Math.round(26*Math.exp((d-a)/13) * (A.mods.some(m=>m[0]==="山地伏击") ? 0.5 : 1));
+  return { ti, a, d:d, mods:A.mods, dmods:D.mods,
+           dmg:[Math.max(5,Math.round(dmg*0.85)), Math.min(80,Math.round(dmg*1.15))],
+           ret:[Math.max(2,Math.round(ret*0.85)), Math.min(80,Math.round(ret*1.15))],
+           kill: dmg*1.0 >= (ti.kind==="unit" ? ti.e.hp : ti.hpPct) };
+}
+function DoAttack(u, tgt){
+  if(!u || u.acted) return false;
+  if(tgt.from){ if(!DoMove(u, ...tgt.from)) return false; }
+  const fc = Forecast(u, Object.assign({}, tgt, {from:null}));
+  const ti = fc.ti;
+  u.acted = true; u.mp = 0; u.stance="none";
+  const dmg = Math.round((fc.dmg[0]+Math.random()*(fc.dmg[1]-fc.dmg[0])));
+  const ret = Math.round((fc.ret[0]+Math.random()*(fc.ret[1]-fc.ret[0])));
+  const tt = ti.tile;
+  Boom(tt, "#ffd06a", 20); Sfx("gun"); shake=Math.min(9,shake+4);
+  // 敌承伤
+  if(ti.kind==="unit"){
+    const e = ti.e;
+    e.hp -= dmg; Float(tt, "-"+dmg, "#ffd06a");
+    if(G.policies.includes("digong") && !EUNITS[e.type].jp && e.hp>0 && e.hp<45 && Math.random()<0.5){
+      Float(tt,"伪军溃散!","#c08adf"); KillEnemy(e, u, true);
+    } else if(e.hp<=0){ KillEnemy(e, u, false); }
+    else { G.heat += EUNITS[e.type].jp?2:1; }
+  }else{
+    const f = ti.fort;
+    const gd = Math.max(1, Math.round(dmg * f.gMax/100));
+    f.g -= gd; Float(tt, "-"+gd, "#ffd06a");
+    if(f.g<=0) CaptureFort(tt, u);
+    else G.heat += 2;
+  }
+  // 我承伤
+  u.hp -= ret;
+  if(ret>0) Float(T(u.q,u.r), "-"+ret, "#e8956a");
+  u.xp += 5;
+  if(u.hp<=0) KillUnit(u, ti.label);
+  else LevelCheck(u);
+  ComputeVision(); RefreshOrders(); Sync();
+  if(G.hintStep===2) SetHint(3);
+  return true;
+}
+function LevelCheck(u){
+  const nl = u.xp>=40 ? 2 : (u.xp>=15 ? 1 : 0);
+  if(nl>u.lvl){ u.lvl=nl; Float(T(u.q,u.r), nl===2?"晋升精锐★★":"晋升老练★", "#a8d47e"); Log(`${u.name}久经战阵，${nl===2?"成为精锐":"更加老练"}。`,"good"); }
+}
+function KillEnemy(e, killer, flip){
+  e.alive = false;
+  G.eUnits = G.eUnits.filter(x=>x!==e);
+  const D = EUNITS[e.type];
+  if(D.jp) G.score.kJ++; else G.score.kP++;
+  const loot = D.loot||{};
+  let s = [];
+  if(loot.arms){ G.res.arms+=loot.arms; s.push(`械+${loot.arms}`); }
+  if(loot.man){ G.res.man+=loot.man; s.push(`兵+${loot.man}`); }
+  const t = T(e.q,e.r);
+  Boom(t, "#ffd06a", 26); Sfx("win");
+  Float(t, (flip?"溃散 ":"全歼 ")+s.join(" "), "#a8d47e");
+  Log(`${killer?killer.name+"部":"我军"}${flip?"击溃":"全歼"}${D.label}！${s.join("，")}。`,"key");
+  G.heat += D.jp?5:3;
+  if(killer){ killer.xp += 8; LevelCheck(killer); }
+  // 巡逻队补员排队
+  if(e.task && e.task.kind==="patrol" && e.task.routeId!==undefined && CurEra().key!=="counter"){
+    G.respawnQ.push({ type:e.type, at:G.turn+4, routeId:e.task.routeId });
+  }
+}
+function CaptureFort(t, u){
+  const f = t.fort, FD = FORTS[f.kind];
+  const loot = FD.loot;
+  let s=[];
+  if(loot.arms){ G.res.arms+=loot.arms; s.push(`械+${loot.arms}`); }
+  if(loot.man){ G.res.man+=loot.man; s.push(`兵+${loot.man}`); }
+  if(loot.food){ G.res.food+=loot.food; s.push(`粮+${loot.food}`); }
+  Boom(t, "#ffd95e", 34); Sfx("boom");
+  if(f.kind==="town"){
+    f.pOwned = true; f.jp = false; f.g = 20; f.gMax = 24;
+    G.score.towns++;
+    Float(t, `光复${f.name}! ${s.join(" ")}`, "#ffd95e");
+    Log(`【光复】${f.name}解放！${s.join("，")}。全城易帜。`,"key");
+    Banner("光 复 "+f.name, "缴获山积 · 万人空巷", "#ffd95e");
+    G.heat += 25;
+  }else{
+    t.fort = null;
+    G.score.razed++;
+    Float(t, `拔除${FD.name} ${s.join(" ")}`, "#a8d47e");
+    Log(`${u?u.name:"我军"}拔除${f.name}！${s.join("，")}。`,"key");
+    G.heat += 8;
+  }
+  if(u){ u.xp += 10; LevelCheck(u); }
+}
+function KillUnit(u, where){
+  u.alive = false; u.hp = 0;
+  G.units = G.units.filter(x=>x!==u);
+  G.score.lost++;
+  G.martyrs.push({ name:u.name, cmd:u.cmd, turn:G.turn, where:where||PlaceName(T(u.q,u.r)) });
+  Log(`【噩耗】${u.name}在${where||PlaceName(T(u.q,u.r))}血战到底，全体殉国。`,"bad");
+  Sfx("fail");
+  if(SEL===u){ SEL=null; RefreshOrders(); }
+}
+function PlaceName(t){
+  if(!t) return "阵地";
+  if(t.vill) return t.vill.name;
+  if(t.fort) return t.fort.name;
+  return TERR[t.terr].name;
+}
+
+/* ── 11. 单位动作 ────────────────────────────────────────────────── */
+function CanOrganize(u){
+  const t = T(u.q,u.r);
+  return u.type==="wt" && t.vill && !t.vill.burn && t.vill.org<3 && !u.acted && t.vill.pop>0;
+}
+function DoOrganize(u){
+  if(!CanOrganize(u)) return false;
+  const t = T(u.q,u.r), v = t.vill;
+  const need = G.policies.includes("jianzu") ? 1 : 2;
+  v.prog = (v.prog||0) + 1;
+  u.acted = true; u.mp = 0;
+  if(v.prog >= need){
+    v.prog = 0; v.org++;
+    const names=["","组织起来","建成根据地村","建成堡垒村"];
+    Float(t, names[v.org], "#a8d47e"); Sfx("coin");
+    Log(`${v.name}${names[v.org]}${v.org===2?"（开始出粮出兵）":v.org===3?"（民兵健全，可招兵）":""}。`,"good");
+    if(v.org===2) G.res.man += 2;
+    if(G.hintStep===3) SetHint(4);
+  }else{
+    Float(t, `发动群众 ${v.prog}/${need}`, "#d8c8a0");
+  }
+  ComputeVision(); RefreshOrders(); Sync(); return true;
+}
+function CanSabotage(u){
+  const t = T(u.q,u.r);
+  return !UNITS[u.type].civ && t.rail && !t.fort && !t.railCut && !u.acted;
+}
+function SaboRisk(u){
+  const t=T(u.q,u.r);
+  return NB(t.q,t.r).some(([q,r])=>{ const n=T(q,r); return n&&n.fort&&!n.fort.pOwned&&n.fort.g>0; });
+}
+function DoSabotage(u){
+  if(!CanSabotage(u)) return false;
+  const t = T(u.q,u.r);
+  t.railCut = true; t.repairT = 0;
+  u.acted = true; u.mp = 0;
+  G.score.sabo++; G.heat += 3;
+  const bt = CurEra().key==="baituan";
+  if(bt){ G.res.arms += 2; }
+  Boom(t, "#e8a04a", 18); Sfx("boom");
+  Float(t, bt?"破袭!(百团×2)":"铁路中断", "#e8a04a");
+  Log(`${u.name}扒轨炸桥，该段铁路中断。${bt?"百团大战战果加倍！":""}`,"good");
+  if(SaboRisk(u)){
+    const d = rint(8,14); u.hp -= d;
+    Float(T(u.q,u.r), "-"+d+" 敌火力", "#e8956a");
+    if(u.hp<=0) KillUnit(u, "破袭作业");
+  }
+  RefreshOrders(); Sync(); return true;
+}
+function DoRest(u){
+  u.stance = "fortify"; u.acted = true; u.mp = 0;
+  Sfx("click"); RefreshOrders(); Sync(); return true;
+}
+function FlipTargets(u){
+  if(u.type!=="awt" || u.acted) return [];
+  return NB(u.q,u.r).map(([q,r])=>T(q,r)).filter(t=>t && t.fort && !t.fort.jp && !t.fort.pOwned);
+}
+function DoFlip(u, t){
+  u.acted = true; u.mp = 0;
+  let p = 0.35 + (G.policies.includes("digong")?0.15:0);
+  const isolated = !G.eUnits.some(e=>EUNITS[e.type].jp && hexDist(e.q,e.r,t.q,t.r)<=3)
+                && !G.tiles.some(x=>x.fort&&x.fort.jp&&!x.fort.pOwned&&hexDist(x.q,x.r,t.q,t.r)<=3);
+  if(isolated) p += 0.12;
+  if(Math.random() < p){
+    const f = t.fort;
+    G.res.man += Math.round(f.g/2); G.res.arms += Math.round(f.g/3);
+    G.score.flip++; G.score.razed++;
+    Float(t, `${f.name}反正! 兵+${Math.round(f.g/2)} 械+${Math.round(f.g/3)}`, "#c08adf");
+    Log(`${u.name}策反成功！${f.name}伪军${f.kind==="town"?"开城起义":"拖枪反正"}。`,"key");
+    if(f.kind==="town"){ f.pOwned=true; f.jp=false; f.g=18; f.gMax=24; G.score.towns++; }
+    else t.fort = null;
+    u.xp += 10; LevelCheck(u); Sfx("win");
+  }else{
+    G.heat += 2;
+    Float(t, "接头未成", "#c9b98e");
+    Log(`${u.name}与${t.fort.name}伪军接头未成，对方还在观望。`, "");
+    Sfx("fail");
+  }
+  ComputeVision(); RefreshOrders(); Sync(); return true;
+}
+
+/* ── 12. 招兵 ────────────────────────────────────────────────────── */
+let recruitMode = null;   // type 或 null
+function RecruitTypes(){
+  return Object.keys(UNITS).filter(k => !UNITS[k].needPolicy || G.policies.includes(UNITS[k].needPolicy));
+}
+function CanAfford(type){
+  const c = UNITS[type].cost;
+  return G.res.man>=c.man && G.res.arms>=c.arms;
+}
+function RecruitSpots(){
+  return G.tiles.filter(t =>
+    ((t.vill && t.vill.org>=3 && !t.vill.burn) || (t.fort && t.fort.pOwned)) &&
+    !UnitAt(t.q,t.r) && !EnemyAt(t.q,t.r));
+}
+function StartRecruit(type){
+  if(!CanAfford(type)) { Toast("兵员或军械不足"); return; }
+  recruitMode = type; SEL = null; RefreshOrders(); Sync();
+  Toast(`选择在哪座堡垒村/县城成军（高亮处）`);
+}
+function PlaceRecruit(t){
+  if(!recruitMode) return false;
+  if(!RecruitSpots().includes(t)){ Toast("只能在堡垒村或我方县城成军"); return false; }
+  const c = UNITS[recruitMode].cost;
+  G.res.man -= c.man; G.res.arms -= c.arms;
+  const u = MkUnit(recruitMode, t.q, t.r, { mp:0, acted:true });
+  Float(t, `${u.name}成军`, "#a8d47e"); Sfx("coin");
+  Log(`${UNITS[recruitMode].label}【${u.name}】在${PlaceName(t)}誓师成军。`,"good");
+  recruitMode = null;
+  ComputeVision(); Sync(); return true;
+}
+
+/* ── 13. 经济与回合结算 ──────────────────────────────────────────── */
+function OrgVills(){ return G.tiles.filter(t=>t.vill && t.vill.org>=2 && !t.vill.burn); }
+function Income(){
+  let food=0, man=0, pol=2;
+  for(const t of G.tiles){
+    if(!t.vill || t.vill.burn) continue;
+    if(t.vill.org>=2){ food += t.vill.pop + (G.policies.includes("jianzu")?1:0); man += (t.vill.org>=3?2:1); }
+    if(t.fort && t.fort.pOwned && t.fort.kind==="town"){ food+=6; man+=3; pol+=2; }
+  }
+  if(G.policies.includes("dasheng")) food += 6;
+  pol += Math.floor(OrgVills().length/4) + (G.policies.includes("sansan")?2:0);
+  let arms = G.policies.includes("binggong") ? 3 : 0;
+  if(G.policies.includes("binggong")){
+    const hy = G.tiles.find(t=>t.vill&&t.vill.name==="黄崖洞");
+    if(hy && hy.vill.org>=2 && !hy.vill.burn) arms += 2;
+  }
+  let upkeep = 0;
+  for(const u of G.units) upkeep += UNITS[u.type].upkeep;
+  if(G.policies.includes("jingbing")) upkeep = Math.ceil(upkeep*0.6);
+  return { food, man, pol, arms, upkeep };
+}
+function Resolution(){
+  const inc = Income();
+  G.res.food += inc.food - inc.upkeep;
+  G.res.man  += inc.man;
+  G.res.pol  += inc.pol;
+  G.res.arms += inc.arms;
+  if(G.res.food < 0){
+    G.res.food = 0;
+    for(const u of G.units.slice()){ u.hp -= 8; if(u.hp<=0) KillUnit(u,"断粮"); }
+    Log("粮秣断绝！全军挨饿减员——快组织村庄或精兵简政。","bad");
+  }
+  // 铁路：牵制记账 + 敌抢修。
+  // 有部队守在断口旁→修不了("牵制"=你真得押一支部队在那)；
+  // 没人守→附近有据点2个月修通，荒山野岭4个月。想永久瘫痪：拔掉沿线据点再驻守。
+  let cut = 0;
+  for(const t of G.tiles){
+    if(!t.rail || !t.railCut) continue;
+    cut++;
+    const guard = G.units.some(u=>hexDist(u.q,u.r,t.q,t.r)<=1);
+    if(guard){ t.repairT = 0; continue; }
+    const near = G.tiles.some(x=>x.fort && !x.fort.pOwned && x.fort.g>=10 && hexDist(x.q,x.r,t.q,t.r)<=4);
+    t.repairT++;
+    if(t.repairT >= (near?2:4)){
+      t.railCut=false; t.repairT=0; cut--;
+      if(t.fog===2) Log("敌工兵抢通了一段铁路。","");
+    }
+  }
+  G.score.railDays += cut * (CurEra().key==="baituan"?2:1);
+  // 地雷重埋
+  for(const t of G.tiles){ if(t.mineCd>0){ t.mineCd--; } }
+  if(G.policies.includes("dilei")){
+    for(const v of G.tiles){
+      if(!v.vill || v.vill.org<2 || v.vill.burn) continue;
+      for(const [q,r] of NB(v.q,v.r)){
+        const t=T(q,r);
+        if(t && (t.road||t.rail) && !t.fort && !t.mine && t.mineCd===0) { t.mine=1; break; }
+      }
+    }
+  }
+  // 村庄恢复 / 部队恢复
+  for(const t of G.tiles){ if(t.vill && t.vill.burn>0) t.vill.burn--; }
+  for(const u of G.units){
+    const t = T(u.q,u.r);
+    let heal = 0;
+    if(t.vill && t.vill.org>=1 && !t.vill.burn) heal = CFG.healVill;
+    else if(t.fort && t.fort.pOwned) heal = CFG.healVill;
+    else if(G.tiles.some(x=>x.vill&&x.vill.org>=2&&!x.vill.burn&&hexDist(x.q,x.r,u.q,u.r)<=2)) heal = CFG.healZone;
+    if(u.stance==="fortify" && heal>0 && G.policies.includes("lianbing")) heal += 5;
+    if(u.stance!=="fortify") heal = Math.round(heal*0.5);
+    u.hp = Math.min(100, u.hp+heal);
+    u.mp = UNITS[u.type].mp; u.acted = false;
+  }
+  // 我方县城守备恢复
+  for(const t of G.tiles){ if(t.fort && t.fort.pOwned) t.fort.g = Math.min(t.fort.gMax, t.fort.g+2); }
+  // 敌据点守备恢复
+  for(const t of G.tiles){ if(t.fort && !t.fort.pOwned) t.fort.g = Math.min(t.fort.gMax, t.fort.g+2); }
+  // 警备度衰减
+  G.heat = Math.max(CurEra().heatFloor, G.heat - CFG.heatDecay);
+  G.heat = Math.min(120, G.heat);
+}
+
+/* ── 14. 政策 ────────────────────────────────────────────────────── */
+function AvailPolicies(){
+  return Object.keys(POLICIES).filter(k => !G.policies.includes(k) && POLICIES[k].gate<=G.turn);
+}
+function MaybeOffer(){
+  if(G.polOffer || G.over) return;
+  const av = AvailPolicies().filter(k=>POLICIES[k].cost<=G.res.pol);
+  if(!av.length) return;
+  const pool = AvailPolicies();
+  const pick = [];
+  while(pick.length<3 && pool.length){ const i=Math.floor(Math.random()*pool.length); pick.push(pool.splice(i,1)[0]); }
+  G.polOffer = pick;
+  ShowPolicyModal();
+}
+function PickPolicy(key){
+  const P = POLICIES[key];
+  if(G.res.pol < P.cost){ Toast("政治点不足"); return; }
+  G.res.pol -= P.cost;
+  G.policies.push(key);
+  G.polOffer = null;
+  Log(`根据地颁布【${P.name}】。`,"key");
+  Sfx("win"); CloseModal(); Sync();
+}
+
+/* ── 15. 任务 ────────────────────────────────────────────────────── */
+function MkMissions(){
+  return [
+    { id:"m1", name:"首战立威", desc:"歼灭任意一股敌军或拔除一座炮楼（第8回合前）",
+      until:8, done:false, fail:false,
+      check:g=>g.score.kJ+g.score.kP+g.score.razed>=1,
+      reward:g=>{ g.res.arms+=8; g.res.man+=6; return "械+8 兵+6"; } },
+    { id:"m2", name:"星火燎原", desc:"根据地村（含堡垒村）达到 8 个（1940年8月前）",
+      until:19, done:false, fail:false,
+      check:g=>OrgVills().length>=8,
+      reward:g=>{ g.res.pol+=10; return "政+10"; } },
+    { id:"m4", name:"百团大战", desc:"窗口期内：破袭铁路5段 + 拔除据点1座（1940年8-12月）",
+      from:20, until:24, done:false, fail:false, base:null,
+      check:function(g){ if(g.turn<20) return false;
+        if(!this.base) this.base={sabo:g.score.sabo, razed:g.score.razed};
+        return g.score.sabo-this.base.sabo>=5 && g.score.razed-this.base.razed>=1; },
+      reward:g=>{ g.res.arms+=25; g.score.baituan=true; return "械+25 · 名震华北"; } },
+    { id:"m5", name:"挺进冀中", desc:"在平汉路以东建立 3 个根据地村（1945年前）",
+      until:72, done:false, fail:false,
+      check:g=>G.tiles.filter(t=>t.vill&&t.vill.org>=2&&!t.vill.burn&&t.col>=17).length>=3,
+      reward:g=>{ g.res.man+=15; g.res.food+=10; return "兵+15 粮+10"; } },
+    { id:"m6", name:"解放县城", desc:"光复任意一座县城",
+      until:80, done:false, fail:false,
+      check:g=>g.score.towns>=1,
+      reward:g=>{ g.res.pol+=8; return "政+8 · 威望大振"; } },
+    { id:"m7", name:"大反攻", desc:"战争结束时据有 3 座县城（1944年9月起总反攻）",
+      from:69, until:80, done:false, fail:false,
+      check:g=>g.score.towns>=3,
+      reward:g=>"载入史册" }
+  ];
+}
+function TickMissions(){
+  for(const m of G.missions){
+    if(m.done || m.fail) continue;
+    if(m.from && G.turn<m.from) continue;
+    if(m.check(G)){
+      m.done = true;
+      const r = m.reward(G);
+      Log(`【任务完成】${m.name}！奖励：${r}`,"key");
+      Banner("任 务 完 成", m.name+" · "+r, "#ffd95e");
+      Sfx("win");
+    } else if(G.turn>m.until){
+      m.fail = true;
+      Log(`【任务过期】${m.name}未能达成。`,"bad");
+    }
+  }
+}
+function ActiveMission(){
+  return G.missions.find(m=>!m.done && !m.fail && (!m.from || G.turn>=m.from));
+}
+
+/* ── 16. 回合推进 ────────────────────────────────────────────────── */
+async function EndTurn(){
+  if(G.busy || G.over || G.phase!=="player") return;
+  G.busy = true; G.phase = "enemy"; fastAnim = false;
+  SEL = null; REACH = null; ATK = null; recruitMode = null;
+  Sync();
+  await EnemyPhase();                 // Part C
+  if(G.over){ G.busy=false; return; }
+  Resolution();
+  G.turn++;
+  const era = CurEra();
+  if(G.turn > CFG.endTurn){ EndGame(); return; }
+  EraEvents();
+  TickMissions();
+  ComputeVision();
+  G.phase = "player"; G.busy = false;
+  SaveGame();
+  await Banner(DateStr(G.turn), era.name + (G.sweep.state==="warn" ? " · 敌情：扫荡在即!" : ""), G.sweep.state!=="none" ? "#e07a4a" : "#9fc4e8");
+  Sfx("turn");
+  MaybeOffer();
+  Sync();
+}
+let lastEraKey = "grow";
+function EraEvents(){
+  const era = CurEra();
+  if(era.key===lastEraKey) return;
+  lastEraKey = era.key;
+  Log(`【${DateStr(G.turn)}】${era.name}：${era.desc}`,"key");
+  if(era.key==="baituan"){ Banner("百 团 大 战", "破袭正太路！战果加倍", "#ffd95e"); Sfx("alarm"); }
+  if(era.key==="hard"){ G.heat = Math.max(G.heat, 40); Banner("治 安 强 化", "铁壁合围 · 蚕食封锁 —— 活下去", "#e04a28"); Sfx("alarm"); }
+  if(era.key==="recover"){ Banner("敌 兵 东 调", "太平洋战场吃紧 · 压力减轻", "#a8d47e"); }
+  if(era.key==="counter"){
+    Banner("战 略 反 攻", "敌守备空虚 · 向县城进军！", "#ffd95e"); Sfx("alarm");
+    for(const t of G.tiles){ if(t.fort && !t.fort.pOwned){ t.fort.g = Math.max(6, Math.round(t.fort.g*0.7)); t.fort.gMax = Math.max(8, Math.round(t.fort.gMax*0.7)); } }
+  }
+}
+
+/* ── 17. 结局 ────────────────────────────────────────────────────── */
+function ScorePts(){
+  const s = G.score;
+  // 破交收益递减：瘫痪五六段以上，这条路已经废了，再刷不加分——去干别的
+  return s.kJ*4 + s.kP*2 + s.razed*8 + Math.round(Math.min(s.railDays,420)*0.6) + OrgVills().length*5
+       + s.towns*35 + G.units.length*5 + (s.baituan?40:0) + s.flip*6 - s.burned*2 - s.lost*6;
+}
+function EndGame(){
+  G.over = true; G.busy = false; G.phase = "over";
+  try{ localStorage.removeItem(CFG.saveKey); }catch(e){}
+  const s = G.score;
+  const org = OrgVills().length;
+  const pts = ScorePts();
+  let cap = "S";
+  if(org < 8) cap = "C"; else if(org < 12) cap = "A";
+  let g="D", verdict="";
+  if(pts>=460){ g="S"; verdict="华北敌后半壁河山已入我手。囚笼粉碎，县城光复，你的名字将与这场人民战争同垂青史。"; }
+  else if(pts>=340){ g="A"; verdict="根据地连片、敌交通瘫痪，反攻号角里你的部队冲在最前。军区通令嘉奖。"; }
+  else if(pts>=230){ g="B"; verdict="坚持到了胜利。根据地还在，队伍还在——这本身就是了不起的战绩。"; }
+  else if(pts>=130){ g="C"; verdict="熬过来了，但根据地没有真正发展起来。胜利是别人的胜利。"; }
+  else { verdict="部队打散，根据地凋敝。这八年，本可以打得更好。"; }
+  const order=["D","C","B","A","S"];
+  if(order.indexOf(g)>order.indexOf(cap)){
+    g = cap;
+    verdict = `战术上有声有色，但根据地村只有 ${org} 个——没有巩固的根据地，一切战果都是浮萍。`;
+  }
+  const mList = G.martyrs.slice(0,10).map(m=>`<span class="mn">${m.name} · ${m.cmd}</span> —— ${DateStr(m.turn)}，殉国于${m.where}`);
+  if(G.martyrs.length>10) mList.push(`……等 ${G.martyrs.length} 支部队成仁`);
+  const martyrHtml = G.martyrs.length
+    ? `<div class="martyr">烈士名录<br>`+mList.join("<br>")+`</div>`
+    : `<div class="martyr" style="color:#a8d47e">八年转战，无一支成建制部队打光。</div>`;
+  Modal({
+    title:"一 九 四 五 · 八 月", sub:"日本投降 · 八年敌后战场总结算",
+    body:`
+      <div class="grade g${g}">${g}</div>
+      <p style="text-align:center;font-size:13.5px;margin-bottom:4px">${verdict}</p>
+      <div class="stats">
+        <span>歼灭日军 / 伪军</span><b>${s.kJ} / ${s.kP} 股</b>
+        <span>拔除据点（含策反 ${s.flip}）</span><b>${s.razed} 座</b>
+        <span>光复县城</span><b>${s.towns} 座</b>
+        <span>铁路瘫痪累计</span><b>${s.railDays} 段·月</b>
+        <span>根据地村</span><b>${org} 个</b>
+        <span>被烧村庄 / 损失部队</span><b>${s.burned} / ${s.lost}</b>
+        ${s.baituan?'<span style="color:#ffd95e">百团大战</span><b style="color:#ffd95e">名震华北</b>':""}
+        <span style="color:#f0c860">综合评分</span><b style="color:#f0c860">${pts}</b>
+      </div>
+      ${martyrHtml}`,
+    btns:[{ t:"再战八年", cls:"pri", fn:()=>{ CloseModal(); NewGame((Math.random()*1e9)|0); Sync(); Brief(); } }]
+  });
+}
+
+/* ── 18. 存档 ────────────────────────────────────────────────────── */
+function SaveGame(){
+  try{
+    const idx = (t)=>t ? G.tiles.indexOf(t) : -1;
+    const tiles = G.tiles.map(t=>[
+      t.vill ? [t.vill.org, t.vill.burn, t.vill.prog||0] : 0,
+      t.fort ? [t.fort.g, t.fort.gMax, t.fort.pOwned?1:0, t.fort.jp?1:0, t.fort.kind, t.fort.name] : 0,
+      t.railCut?1:0, t.repairT, t.mine, t.mineCd, t.fog,
+      t.site ? t.site.left : -1
+    ]);
+    const data = {
+      v:1, seed:G.seed, turn:G.turn, res:G.res, heat:G.heat,
+      policies:G.policies, polCost:G.polCost, polOffer:G.polOffer,
+      sweep:{ state:G.sweep.state, timer:G.sweep.timer, cols:G.sweep.cols, lastAt:G.sweep.lastAt,
+              target:idx(G.sweep.target), srcs:(G.sweep.srcs||[]).map(idx) },
+      nibbleAt:G.nibbleAt,
+      respawnQ:G.respawnQ.map(r=>({type:r.type,at:r.at,routeId:r.routeId})),
+      score:G.score, martyrs:G.martyrs, usedNames:G.usedNames, uidSeq:G.uidSeq, lastEraKey,
+      missions:G.missions.map(m=>({id:m.id,done:m.done,fail:m.fail,base:m.base||null})),
+      units:G.units.map(u=>({id:u.id,type:u.type,q:u.q,r:u.r,name:u.name,cmd:u.cmd,hp:u.hp,mp:u.mp,xp:u.xp,lvl:u.lvl,stance:u.stance,acted:u.acted})),
+      eUnits:G.eUnits.map(e=>({id:e.id,type:e.type,q:e.q,r:e.r,hp:e.hp,task:SerTask(e.task)})),
+      tiles
+    };
+    localStorage.setItem(CFG.saveKey, JSON.stringify(data));
+  }catch(e){}
+}
+function SerTask(task){
+  if(!task) return null;
+  const t = { kind:task.kind };
+  if(task.routeId!==undefined) t.routeId = task.routeId;
+  if(task.ri!==undefined) t.ri = task.ri;
+  if(task.dir!==undefined) t.dir = task.dir;
+  if(task.path) t.path = task.path.map(x=>G.tiles.indexOf(x));
+  if(task.home) t.home = G.tiles.indexOf(task.home);
+  if(task.until!==undefined) t.until = task.until;
+  return t;
+}
+function DeserTask(t){
+  if(!t) return {kind:"idle"};
+  const task = { kind:t.kind };
+  if(t.routeId!==undefined){ task.routeId=t.routeId; task.ri=t.ri; task.dir=t.dir; }
+  if(t.path) task.path = t.path.map(i=>G.tiles[i]).filter(Boolean);
+  if(t.home!==undefined && t.home>=0) task.home = G.tiles[t.home];
+  if(t.until!==undefined) task.until = t.until;
+  return task;
+}
+function HasSave(){
+  try{ return !!localStorage.getItem(CFG.saveKey); }catch(e){ return false; }
+}
+function LoadGame(){
+  let data = null;
+  try{ data = JSON.parse(localStorage.getItem(CFG.saveKey)); }catch(e){ return false; }
+  if(!data || data.v!==1) return false;
+  NewGame(data.seed);
+  G.turn=data.turn; G.res=data.res; G.heat=data.heat;
+  G.policies=data.policies; G.polCost=data.polCost; G.polOffer=data.polOffer;
+  G.sweep = { state:data.sweep.state, timer:data.sweep.timer, cols:data.sweep.cols, lastAt:data.sweep.lastAt,
+              target:(data.sweep.target>=0 ? G.tiles[data.sweep.target] : null),
+              srcs:(data.sweep.srcs||[]).map(i=>G.tiles[i]).filter(Boolean) };
+  G.nibbleAt=data.nibbleAt; G.score=data.score; G.martyrs=data.martyrs;
+  G.usedNames=data.usedNames; G.uidSeq=data.uidSeq; lastEraKey=data.lastEraKey;
+  G.respawnQ = (data.respawnQ||[]).map(r=>({type:r.type,at:r.at,routeId:r.routeId}));
+  for(const m of G.missions){
+    const sm = data.missions.find(x=>x.id===m.id);
+    if(sm){ m.done=sm.done; m.fail=sm.fail; if(sm.base) m.base=sm.base; }
+  }
+  G.units.length=0; G.eUnits.length=0;
+  for(const u of data.units) G.units.push(Object.assign({side:"p",ax:0,ay:0,alive:true},u));
+  for(const e of data.eUnits) G.eUnits.push({ id:e.id, side:"e", type:e.type, q:e.q, r:e.r, hp:e.hp, task:DeserTask(e.task), ax:0, ay:0, alive:true });
+  data.tiles.forEach((row,i)=>{
+    const t = G.tiles[i];
+    const [v,f,cut,rep,mine,mcd,fog,site] = row;
+    if(v && t.vill){ t.vill.org=v[0]; t.vill.burn=v[1]; t.vill.prog=v[2]; }
+    if(f && Array.isArray(f)){
+      if(!t.fort) t.fort = { kind:f[4]||"block", name:f[5]||"据点" };
+      t.fort.g=f[0]; t.fort.gMax=f[1]; t.fort.pOwned=!!f[2]; t.fort.jp=!!f[3];
+    } else if(t.fort && !f) t.fort = null;
+    t.railCut=!!cut; t.repairT=rep; t.mine=mine; t.mineCd=mcd; t.fog=fog;
+    t.site = site>=0 ? {left:site} : null;
+  });
+  G.phase="player"; G.over=false; G.busy=false; G.started=true;
+  ComputeVision(); Sync();
+  return true;
+}
+
+/* ── 19. 敌军 AI：巡逻 / 扫荡 / 蚕食 / 撤退 ───────────────────────── */
+function EnemySees(u){ return u && !UNITS[u.type].stealth; }
+function AdjPlayerTarget(e){
+  for(const [q,r] of NB(e.q,e.r)){
+    const u = UnitAt(q,r);
+    if(u && EnemySees(u)) return u;
+  }
+  return null;
+}
+function EnemyPathTo(from, to){
+  const prev = new Map(), seen = new Set([K(from.q,from.r)]);
+  const q = [from];
+  while(q.length){
+    const cur = q.shift();
+    if(cur === to) break;
+    for(const [nq,nr] of NB(cur.q,cur.r)){
+      const t = T(nq,nr); if(!t || seen.has(K(nq,nr))) continue;
+      if(t.terr==="water") continue;
+      if(t.fort && t!==to) continue;           // 不穿据点/县城格（目标除外）
+      seen.add(K(nq,nr)); prev.set(K(nq,nr), cur); q.push(t);
+    }
+  }
+  const path = []; let cur = to;
+  while(cur && cur !== from){ path.unshift(cur); cur = prev.get(K(cur.q,cur.r)); }
+  return path;
+}
+function EMoveTo(e, t){
+  const a = hexToPix(e.q,e.r,view.s), b = hexToPix(t.q,t.r,view.s);
+  e.ax = a.x-b.x; e.ay = a.y-b.y;
+  e.q = t.q; e.r = t.r;
+}
+async function TriggerMine(e){
+  const t = T(e.q,e.r);
+  if(!t || !t.mine) return false;
+  t.mine = 0; t.mineCd = 4;
+  const d = rint(10,18);
+  e.hp -= d;
+  Boom(t, "#e8a04a", 16); Sfx("boom");
+  Float(t, `地雷! -${d}`, "#e8a04a");
+  Log(`${EUNITS[e.type].label}在${PlaceName(t)}附近触雷。`,"good");
+  Sync(); await sleep(300);
+  if(e.hp<=0){ KillEnemy(e, null, false); return true; }
+  return false;
+}
+async function EAttack(e, u){
+  const D = EUNITS[e.type];
+  const tu = T(u.q,u.r);
+  let a = D.str + EnemyStrMod() + (e.hp-100)*0.08;
+  let d = UNITS[u.type].str + u.lvl*4 + (u.hp-100)*0.08 + (tu?TERR[tu.terr].def:0)
+        + (u.stance==="fortify"?CFG.fortifyDef:0)
+        + ((tu && tu.fort && tu.fort.pOwned) ? FORTS[tu.fort.kind].fortDef : 0);
+  const dmg = Math.max(4, Math.round(26*Math.exp((a-d)/13)*rvar(0.85,1.15)));
+  const ret = Math.max(2, Math.round(26*Math.exp((d-a)/13)*rvar(0.85,1.15)*0.7));
+  const a2 = hexToPix(e.q,e.r,view.s), b2 = hexToPix(u.q,u.r,view.s);
+  e.ax = (b2.x-a2.x)*0.4; e.ay = (b2.y-a2.y)*0.4;
+  Boom(tu, "#d05030", 16); Sfx("gun");
+  u.hp -= dmg; Float(tu, "-"+dmg, "#e8956a");
+  e.hp -= ret; Float(T(e.q,e.r), "-"+ret, "#ffd06a");
+  Log(`${D.label}进攻${u.name}！我伤${dmg}，敌伤${ret}。`, dmg>ret?"bad":"");
+  if(u.hp<=0) KillUnit(u, PlaceName(tu));
+  if(e.hp<=0) KillEnemy(e, u.alive?u:null, false);
+  Sync(); await sleep(380);
+}
+async function Pillage(e, t){
+  const v = t.vill;
+  if(!v || v.org<1 || v.burn) return;
+  const isSweep = e.task.kind==="sweep";
+  const mStr = 6 + v.org*4 + ((G.policies.includes("didao")&&v.org>=3)?8:0);
+  const eStr = EUNITS[e.type].str + EnemyStrMod() + (e.hp-100)*0.08;
+  if(G.policies.includes("didao") && v.org>=3 && isSweep){
+    e.hp -= rint(5,10);
+    Float(t, "地道杀伤!", "#a8d47e");
+    Log(`${v.name}军民转入地道，${EUNITS[e.type].label}扑空挨打。`,"good");
+  } else if(eStr > mStr + 12){
+    if(G.policies.includes("sansan") && Math.random()<0.5 && !isSweep){
+      Float(t, "政权抵抗住了", "#a8d47e");
+    }else{
+      v.org = Math.max(0, v.org-1);
+      if(isSweep){ v.burn = 3; G.score.burned++; G.sweep.burnCount = (G.sweep.burnCount||0)+1; }
+      e.hp -= rint(2, 4+v.org*2);
+      Boom(t, "#e04a28", 20); Sfx("fail");
+      Float(t, isSweep?"村庄被焚":"遭洗劫", "#e08a6a");
+      Log(`${v.name}被${EUNITS[e.type].label}${isSweep?"烧毁":"洗劫"}。`,"bad");
+    }
+  } else {
+    const d = rint(6,14);
+    e.hp -= d;
+    Float(t, `民兵击退敌军! -${d}`, "#a8d47e");
+    Log(`${v.name}民兵依托村落击退${EUNITS[e.type].label}！`,"good");
+    if(e.hp<=0) KillEnemy(e, null, false);
+  }
+  Sync(); await sleep(340);
+}
+async function AssaultOwnedTown(e, t){
+  const f = t.fort;
+  const a = EUNITS[e.type].str + EnemyStrMod() + (e.hp-100)*0.08;
+  const d = 20 + FORTS[f.kind].fortDef + (f.g/f.gMax-1)*8;
+  const dmg = Math.max(4, Math.round(22*Math.exp((a-d)/13)*rvar(0.85,1.15)));
+  const gd = Math.max(1, Math.round(dmg*f.gMax/100));
+  f.g -= gd;
+  e.hp -= rint(4,10);
+  Boom(t, "#d05030", 18); Sfx("gun");
+  Float(t, `${f.name}守军 -${gd}`, "#e8956a");
+  if(f.g<=0){
+    f.pOwned = false; f.jp = true; f.g = 20; f.gMax = Math.max(24,f.gMax);
+    G.score.towns = Math.max(0, G.score.towns-1);
+    Log(`【失守】${f.name}重陷敌手！`,"bad");
+    await Banner(f.name+" 失 守", "敌军重占县城", "#e04a28");
+  }
+  if(e.hp<=0) KillEnemy(e, null, false);
+  Sync(); await sleep(340);
+}
+
+async function StepPatrol(e){
+  const route = G.routes[e.task.routeId];
+  if(!route || !route.length) return;
+  for(let i=0;i<2;i++){
+    if(!e.alive) return;
+    const tgt = AdjPlayerTarget(e);
+    if(tgt){ await EAttack(e, tgt); return; }
+    e.task.ri += e.task.dir;
+    if(e.task.ri >= route.length){ e.task.ri = route.length-2; e.task.dir = -1; }
+    if(e.task.ri < 0){ e.task.ri = 1; e.task.dir = 1; }
+    const next = route[Math.max(0,Math.min(route.length-1,e.task.ri))];
+    if(!next) return;
+    if(UnitAt(next.q,next.r)){ const u=UnitAt(next.q,next.r); if(EnemySees(u)){ await EAttack(e,u); } return; }
+    if(EnemyAt(next.q,next.r) && EnemyAt(next.q,next.r)!==e) continue;
+    EMoveTo(e, next);
+    if(T(e.q,e.r).fog===2){ Sync(); await sleep(CFG.animMs); }
+    if(await TriggerMine(e)) return;
+    const here = T(e.q,e.r);
+    if(here.vill && here.vill.org>=1 && !here.vill.burn){ await Pillage(e, here); return; }
+  }
+}
+async function StepSweepCol(e){
+  const S = G.sweep;
+  if(G.turn >= (e.task.until||0) || e.hp<=30){
+    if(e.task.kind!=="withdraw"){
+      e.task.kind = "withdraw";
+      e.task.path = EnemyPathTo(T(e.q,e.r), e.task.home || G.tiles.find(t=>t.fort&&t.fort.kind==="town"&&!t.fort.pOwned) || G.tiles[0]);
+    }
+  }
+  const steps = e.task.kind==="withdraw" ? 3 : 2;
+  for(let i=0;i<steps;i++){
+    if(!e.alive) return;
+    if(e.task.kind!=="withdraw"){
+      const tgt = AdjPlayerTarget(e);
+      if(tgt){ await EAttack(e, tgt); return; }
+      for(const [q,r] of NB(e.q,e.r)){
+        const t = T(q,r);
+        if(t && t.fort && t.fort.pOwned){ await AssaultOwnedTown(e, t); return; }
+      }
+    }
+    if(!e.task.path || !e.task.path.length){
+      if(e.task.kind==="withdraw"){
+        const home = e.task.home;
+        if(home && home.fort && !home.fort.pOwned) home.fort.g = Math.min(home.fort.gMax, home.fort.g+10);
+        e.alive=false; G.eUnits = G.eUnits.filter(x=>x!==e);
+        Sync(); return;
+      }
+      // 到达目标区：就近祸害
+      let best=null,bd=99;
+      for(const t of G.tiles){
+        if(t.vill && t.vill.org>=1 && !t.vill.burn){
+          const d = hexDist(t.q,t.r,e.q,e.r);
+          if(d<bd && d<=3){ bd=d; best=t; }
+        }
+      }
+      if(best) e.task.path = EnemyPathTo(T(e.q,e.r), best);
+      else return;
+    }
+    const next = e.task.path.shift();
+    if(!next) return;
+    const u = UnitAt(next.q,next.r);
+    if(u){ if(EnemySees(u) && e.task.kind!=="withdraw"){ await EAttack(e,u); } return; }
+    if(EnemyAt(next.q,next.r)) continue;
+    if(next.fort && !next.fort.pOwned){ continue; }
+    EMoveTo(e, next);
+    if(T(e.q,e.r).fog===2){ Sync(); await sleep(CFG.animMs); }
+    if(await TriggerMine(e)) return;
+    const here = T(e.q,e.r);
+    if(e.task.kind!=="withdraw" && here.vill && here.vill.org>=1 && !here.vill.burn){ await Pillage(e, here); }
+  }
+  // 山地游击袭扰：讨伐队待在山林就掉血
+  if(e.alive && e.task.kind!=="withdraw"){
+    const here = T(e.q,e.r);
+    if(here && (here.terr==="mtn"||here.terr==="forest")){
+      e.hp -= 6;
+      Float(here, "游击袭扰 -6", "#a8d47e");
+      if(e.hp<=0){ KillEnemy(e, null, false); }
+    }
+  }
+}
+async function StepCav(e){
+  if(G.turn >= (e.task.until||0) || e.hp<=30){
+    if(e.task.kind!=="withdraw"){
+      e.task.kind="withdraw";
+      e.task.path=EnemyPathTo(T(e.q,e.r), e.task.home||G.tiles[0]);
+    }
+    return StepSweepCol(e);
+  }
+  let prey=null, bd=99;
+  for(const u of G.units){
+    if(!EnemySees(u)) continue;
+    const d = hexDist(u.q,u.r,e.q,e.r);
+    if(d<bd && d<=6){ bd=d; prey=u; }
+  }
+  if(!prey) return StepSweepCol(e);
+  for(let i=0;i<3;i++){
+    if(!e.alive || !prey.alive) return;
+    if(hexDist(e.q,e.r,prey.q,prey.r)===1){ await EAttack(e,prey); return; }
+    const path = EnemyPathTo(T(e.q,e.r), T(prey.q,prey.r));
+    const next = path[0];
+    if(!next || UnitAt(next.q,next.r) || EnemyAt(next.q,next.r)) return;
+    EMoveTo(e,next);
+    if(T(e.q,e.r).fog===2){ Sync(); await sleep(CFG.animMs); }
+    if(await TriggerMine(e)) return;
+  }
+}
+
+function SweepTargets(){
+  const owned = G.tiles.filter(t=>t.fort&&t.fort.pOwned&&t.fort.kind==="town");
+  if(owned.length) return owned[0];
+  let best=null, bs=-1;
+  for(const t of G.tiles){
+    if(!t.vill || t.vill.org<2) continue;
+    let s = t.vill.org*3;
+    for(const n of G.tiles) if(n.vill&&n.vill.org>=2&&hexDist(n.q,n.r,t.q,t.r)<=2) s+=n.vill.org;
+    if(s>bs){ bs=s; best=t; }
+  }
+  return best || G.tiles.find(t=>t.vill) || G.tiles[0];
+}
+async function SweepTick(){
+  const era = CurEra(), S = G.sweep;
+  if(S.state==="none"){
+    if(era.sweepCols<=0) return;
+    const due = G.turn - (S.lastAt||0) >= era.sweepEvery;
+    if(G.heat>=70 || (due && G.heat>=25)){
+      S.state="warn"; S.timer=2; S.cols=era.sweepCols;
+      S.target = SweepTargets();
+      const towns = G.tiles.filter(t=>t.fort&&t.fort.kind==="town"&&!t.fort.pOwned&&t.fort.g>=16)
+        .sort((a,b)=>hexDist(a.q,a.r,S.target.q,S.target.r)-hexDist(b.q,b.r,S.target.q,S.target.r));
+      S.srcs = towns.slice(0, Math.max(2,S.cols));
+      Log(`【敌情】日军于${S.srcs.map(t=>t.fort.name).join("、")}集结，两月内将扫荡${PlaceName(S.target)}一带！`,"key");
+      await Banner("敌 情 通 报", "大扫荡在即 · 疏散或迎击", "#e07a4a");
+      Sfx("alarm");
+    }
+  } else if(S.state==="warn"){
+    S.timer--;
+    if(S.timer<=0) await LaunchSweep();
+    else Log(`日军扫荡集结中……趁据点抽兵空虚，正是破袭好时机。`,"key");
+  } else if(S.state==="active"){
+    if(!G.eUnits.some(e=>e.task.kind==="sweep"||e.task.kind==="hunt"||(e.task.kind==="withdraw"&&(e.type==="swp"||e.type==="cav")))){
+      S.state="none"; S.lastAt=G.turn;
+      G.heat = Math.min(G.heat, 20);
+      Log("扫荡结束，敌军回窜。根据地恢复元气。","good");
+      if((S.burnCount||0)<=1){ G.res.pol+=6; Log("【反扫荡胜利】损失轻微，军民士气大振（政+6）。","key"); }
+      await Banner("扫 荡 结 束", "敌进我进 · 恢复根据地", "#a8d47e");
+    }
+  }
+}
+async function LaunchSweep(){
+  const S = G.sweep;
+  S.state="active"; S.burnCount=0;
+  let n=0;
+  for(const src of S.srcs){
+    if(n>=S.cols) break;
+    const f = src.fort;
+    const drain = Math.round(f.g*0.4);
+    f.g = Math.max(8, f.g-drain);
+    Float(src, `-${drain} 抽兵扫荡`, "#e8a04a");
+    const col = MkEnemy("swp", src.q, src.r, { kind:"sweep", path:EnemyPathTo(src, S.target), home:src, until:G.turn+5 });
+    col.hp = 100;
+    n++;
+  }
+  if(CurEra().key==="hard" && S.srcs[0]){
+    MkEnemy("cav", S.srcs[0].q, S.srcs[0].r, { kind:"hunt", home:S.srcs[0], until:G.turn+5 });
+  }
+  Log(`大扫荡开始！${n} 路讨伐队扑向根据地——沿线据点已被抽空，敌进我进！`,"key");
+  await Banner("大 扫 荡", "多路合击 · 敌进我进", "#e04a28");
+  Sfx("alarm");
+}
+function NibbleTick(){
+  if(CurEra().key!=="hard") return;
+  if(G.turn - (G.nibbleAt||0) < 4) return;
+  const cands = G.tiles.filter(t =>
+    t.road && !t.rail && !t.fort && !t.site && !t.vill && t.terr!=="water" &&
+    !UnitAt(t.q,t.r) &&
+    G.tiles.some(v=>v.vill&&v.vill.org>=1&&hexDist(v.q,v.r,t.q,t.r)<=2) &&
+    G.tiles.some(f=>f.fort&&!f.fort.pOwned&&hexDist(f.q,f.r,t.q,t.r)<=5));
+  if(!cands.length) return;
+  const t = cands[Math.floor(Math.random()*cands.length)];
+  t.site = { left:2 };
+  G.nibbleAt = G.turn;
+  if(t.fog>=1) Log(`【蚕食】敌在${PlaceName(t)}一带修筑炮楼工地——两月建成，可派兵捣毁。`,"bad");
+}
+function SiteTick(){
+  for(const t of G.tiles){
+    if(!t.site) continue;
+    const suppressed = UnitAt(t.q,t.r) || NB(t.q,t.r).some(([q,r])=>UnitAt(q,r));
+    if(suppressed) continue;
+    t.site.left--;
+    if(t.site.left<=0){
+      t.site = null;
+      t.fort = { kind:"block", name:PlaceName(t)+"新炮楼", g:14, gMax:14, jp:false };
+      if(t.fog>=1) Log(`敌新炮楼在${PlaceName(t)}建成，囚笼又收紧一格。`,"bad");
+    }
+  }
+}
+function RespawnTick(){
+  for(const r of G.respawnQ.slice()){
+    if(G.turn < r.at) continue;
+    const route = G.routes[r.routeId];
+    G.respawnQ = G.respawnQ.filter(x=>x!==r);
+    if(!route || !route.length) continue;
+    const spot = route.find(t=>!UnitAt(t.q,t.r)&&!EnemyAt(t.q,t.r));
+    if(!spot) continue;
+    MkEnemy(r.type, spot.q, spot.r, { kind:"patrol", routeId:r.routeId, ri:route.indexOf(spot), dir:1 });
+    if(spot.fog===2) Log(`敌${EUNITS[r.type].label}补充归建，重新上路。`,"");
+  }
+}
+async function EnemyPhase(){
+  RespawnTick();
+  for(const e of G.eUnits.slice()){
+    if(!e.alive) continue;
+    if(e.task.kind==="patrol") await StepPatrol(e);
+    else if(e.task.kind==="sweep"||e.task.kind==="withdraw") await StepSweepCol(e);
+    else if(e.task.kind==="hunt") await StepCav(e);
+    if(G.units.length===0){ Defeat(); return; }
+  }
+  NibbleTick();
+  SiteTick();
+  await SweepTick();
+  if(G.units.length===0){ Defeat(); return; }
+}
+function Defeat(){
+  if(G.over) return;
+  G.over = true; G.phase="over";
+  try{ localStorage.removeItem(CFG.saveKey); }catch(e){}
+  Modal({
+    title:"全 军 覆 没", sub:DateStr(G.turn),
+    body:`<p class="rd">最后一支部队打光了。根据地失去武装屏障，在下一次扫荡中凋零。</p>
+          <p style="color:#9a8a62;font-size:12.5px">保存有生力量不是口号——打得赢就打，打不赢就走。</p>`,
+    btns:[{ t:"重整旗鼓", cls:"pri", fn:()=>{ CloseModal(); NewGame((Math.random()*1e9)|0); Sync(); Brief(); } }]
+  });
+}
+
+/* ── 20. 视图与渲染 ──────────────────────────────────────────────── */
+const cv = document.getElementById("cv");
+const ctx = cv ? cv.getContext("2d") : null;
+const view = { s:26, ox:0, oy:0, dpr:1 };
+let terrainCache = null, terrainDirty = true;
+let skipAll = false;
+
+function FitView(){
+  if(!cv) return;
+  const dpr = Math.min(2, window.devicePixelRatio||1);
+  view.dpr = dpr;
+  const W = window.innerWidth, H = window.innerHeight;
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  cv.style.width = W+"px"; cv.style.height = H+"px";
+  const padL = W>820?188:8, padR = W>820?196:8, padT = 54, padB = 100;
+  const availW = Math.max(160, W-padL-padR), availH = Math.max(160, H-padT-padB);
+  const sByW = availW/(Math.sqrt(3)*(CFG.W+0.5)), sByH = availH/(1.5*CFG.H+0.5);
+  view.s = Math.max(12, Math.min(40, Math.min(sByW,sByH)));
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  for(const t of G.tiles){
+    const p = hexToPix(t.q,t.r,view.s);
+    minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+    minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
+  }
+  if(minX>maxX){ minX=maxX=minY=maxY=0; }
+  view.ox = padL + availW/2 - (minX+maxX)/2;
+  view.oy = padT + availH/2 - (minY+maxY)/2;
+  terrainDirty = true;
+}
+function W2S(x,y){ return { x:x+view.ox, y:y+view.oy }; }
+function S2W(x,y){ return { x:x-view.ox, y:y-view.oy }; }
+function CenterOn(q,r){
+  const p = hexToPix(q,r,view.s);
+  view.ox = window.innerWidth/2 - p.x;
+  view.oy = window.innerHeight/2 - p.y;
+  terrainDirty = true;
+}
+function hexPath(c,cx,cy,s,wob){
+  c.beginPath();
+  for(let i=0;i<6;i++){
+    const a = Math.PI/180*(60*i-30);
+    const j = ((wob>>(i*3))&7)/7*2-1;
+    const rr = s + j*Math.min(1.8, s*0.05);
+    const x = cx+rr*Math.cos(a), y = cy+rr*Math.sin(a);
+    i ? c.lineTo(x,y) : c.moveTo(x,y);
+  }
+  c.closePath();
+}
+function BuildTerrain(){
+  if(!cv) return;
+  if(!terrainCache) terrainCache = document.createElement("canvas");
+  terrainCache.width = cv.width; terrainCache.height = cv.height;
+  const c = terrainCache.getContext("2d");
+  c.setTransform(view.dpr,0,0,view.dpr,0,0);
+  const W = cv.width/view.dpr, H = cv.height/view.dpr;
+  const bg = c.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,"#e0d3b2"); bg.addColorStop(0.55,"#d4c49d"); bg.addColorStop(1,"#c7b690");
+  c.fillStyle = bg; c.fillRect(0,0,W,H);
+  const nr = Mulberry32(G.seed ^ 0x9e37);
+  c.globalAlpha = 0.05;
+  for(let i=0;i<700;i++){
+    c.fillStyle = nr()<0.5 ? "#6b5a3a" : "#fff8e0";
+    c.fillRect(nr()*W, nr()*H, 1.6, 1.6);
+  }
+  c.globalAlpha = 1;
+  const s = view.s;
+  for(const t of G.tiles){
+    const pw = hexToPix(t.q,t.r,s), sp = W2S(pw.x,pw.y);
+    if(t.fog===0){
+      hexPath(c,sp.x,sp.y,s*0.99,t.wob);
+      c.fillStyle = "#2a231a"; c.fill();
+      c.strokeStyle = "rgba(20,16,10,.5)"; c.lineWidth=1; c.stroke();
+      continue;
+    }
+    hexPath(c,sp.x,sp.y,s*0.985,t.wob);
+    c.fillStyle = TERR[t.terr].fill; c.fill();
+    c.strokeStyle = "rgba(60,48,30,.26)"; c.lineWidth=1; c.stroke();
+    DrawTerrGlyph(c,sp.x,sp.y,s,t);
+  }
+  // 公路
+  c.lineCap = "round";
+  for(const t of G.tiles){
+    if(!t.road || t.fog===0) continue;
+    const a = hexToPix(t.q,t.r,s), A = W2S(a.x,a.y);
+    for(const [nq,nr2] of NB(t.q,t.r)){
+      const n = T(nq,nr2); if(!n || !n.road || n.fog===0) continue;
+      if(nq*1000+nr2 < t.q*1000+t.r) continue;
+      const b = hexToPix(nq,nr2,s), B = W2S(b.x,b.y);
+      c.strokeStyle = "rgba(122,96,52,.5)"; c.lineWidth = Math.max(2,s*0.12);
+      c.setLineDash([s*0.24,s*0.2]);
+      c.beginPath(); c.moveTo(A.x,A.y); c.lineTo(B.x,B.y); c.stroke();
+    }
+  }
+  c.setLineDash([]);
+  // 铁路
+  for(const t of G.tiles){
+    if(!t.rail || t.fog===0) continue;
+    const a = hexToPix(t.q,t.r,s), A = W2S(a.x,a.y);
+    for(const [nq,nr2] of NB(t.q,t.r)){
+      const n = T(nq,nr2); if(!n || !n.rail || n.fog===0) continue;
+      if(nq*1000+nr2 < t.q*1000+t.r) continue;
+      const b = hexToPix(nq,nr2,s), B = W2S(b.x,b.y);
+      c.strokeStyle = "rgba(38,32,24,.85)"; c.lineWidth = Math.max(2,s*0.12);
+      c.beginPath(); c.moveTo(A.x,A.y); c.lineTo(B.x,B.y); c.stroke();
+      const ang = Math.atan2(B.y-A.y,B.x-A.x)+Math.PI/2;
+      c.strokeStyle = "rgba(38,32,24,.6)"; c.lineWidth = Math.max(1,s*0.05);
+      for(let i=1;i<5;i++){
+        const px = A.x+(B.x-A.x)*i/5, py = A.y+(B.y-A.y)*i/5, l = s*0.15;
+        c.beginPath();
+        c.moveTo(px+Math.cos(ang)*l, py+Math.sin(ang)*l);
+        c.lineTo(px-Math.cos(ang)*l, py-Math.sin(ang)*l);
+        c.stroke();
+      }
+    }
+  }
+  // 迷雾记忆区压暗
+  for(const t of G.tiles){
+    if(t.fog!==1) continue;
+    const pw = hexToPix(t.q,t.r,s), sp = W2S(pw.x,pw.y);
+    hexPath(c,sp.x,sp.y,s*0.99,t.wob);
+    c.fillStyle = "rgba(24,19,12,.42)"; c.fill();
+  }
+  terrainDirty = false;
+}
+function DrawTerrGlyph(c,x,y,s,t){
+  c.save();
+  c.strokeStyle = TERR[t.terr].ink;
+  c.lineWidth = Math.max(1,s*0.045); c.lineCap="round";
+  const k = s*0.28;
+  if(t.terr==="mtn"){
+    c.globalAlpha=.7;
+    for(let i=-1;i<=1;i++){
+      const ox=i*k*0.9, oy=i===0?-k*0.3:k*0.1;
+      c.beginPath();
+      c.moveTo(x+ox-k*0.6,y+oy+k*0.5); c.lineTo(x+ox,y+oy-k*0.6); c.lineTo(x+ox+k*0.6,y+oy+k*0.5);
+      c.stroke();
+    }
+  }else if(t.terr==="hill"){
+    c.globalAlpha=.55;
+    for(let i=-1;i<=1;i+=2){
+      c.beginPath(); c.arc(x+i*k*0.55,y+k*0.15,k*0.5,Math.PI*1.06,Math.PI*1.94); c.stroke();
+    }
+  }else if(t.terr==="forest"){
+    c.globalAlpha=.65;
+    for(let i=0;i<3;i++){
+      const ox=(i-1)*k*0.8, oy=(i===1?-k*0.3:k*0.12);
+      c.beginPath(); c.moveTo(x+ox,y+oy+k*0.5); c.lineTo(x+ox,y+oy-k*0.1); c.stroke();
+      c.beginPath();
+      c.moveTo(x+ox-k*0.4,y+oy+k*0.05); c.lineTo(x+ox,y+oy-k*0.6); c.lineTo(x+ox+k*0.4,y+oy+k*0.05);
+      c.stroke();
+    }
+  }else if(t.terr==="water"){
+    c.globalAlpha=.5;
+    for(let i=-1;i<=1;i++){
+      c.beginPath();
+      c.moveTo(x-k*0.8,y+i*k*0.5);
+      c.quadraticCurveTo(x,y+i*k*0.5-k*0.32,x+k*0.8,y+i*k*0.5);
+      c.stroke();
+    }
+  }
+  c.restore();
+}
+
+function Render(){
+  if(!ctx || !cv) return;
+  if(terrainDirty) BuildTerrain();
+  const dpr = view.dpr, W = cv.width/dpr, H = cv.height/dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const sh = shake>0.2?shake:0;
+  const dx = sh?(Math.random()-0.5)*sh:0, dy = sh?(Math.random()-0.5)*sh:0;
+  shake *= 0.85;
+  ctx.save(); ctx.translate(dx,dy);
+  if(terrainCache) ctx.drawImage(terrainCache,0,0,W,H);
+  const s = view.s;
+  DrawDynamicMap(ctx,s);
+  DrawOverlays(ctx,s);
+  DrawStructures(ctx,s);
+  DrawEnemies(ctx,s);
+  DrawUnits(ctx,s);
+  DrawFXAll(ctx);
+  ctx.restore();
+  DrawSweepArrow(ctx,s);
+  requestAnimationFrame(Render);
+}
+function DrawDynamicMap(c,s){
+  for(const t of G.tiles){
+    if(t.fog===0) continue;
+    const p = hexToPix(t.q,t.r,s), P = W2S(p.x,p.y);
+    if(t.railCut){
+      c.fillStyle = "rgba(160,50,28,.95)";
+      c.font = `700 ${Math.round(s*0.5)}px system-ui`;
+      c.textAlign="center"; c.textBaseline="middle";
+      c.fillText("✕", P.x, P.y);
+    }
+    if(t.mine && t.fog===2){
+      c.fillStyle = "rgba(90,66,26,.8)";
+      c.font = `${Math.round(s*0.3)}px system-ui`;
+      c.textAlign="center";
+      c.fillText("▲", P.x+s*0.5, P.y-s*0.45);
+    }
+    if(t.site){
+      c.strokeStyle = "rgba(90,80,60,.9)"; c.lineWidth = Math.max(1,s*0.06);
+      c.strokeRect(P.x-s*0.32, P.y-s*0.32, s*0.64, s*0.64);
+      c.fillStyle = "rgba(60,52,38,.9)";
+      c.font = `${Math.round(s*0.3)}px "Noto Serif SC",serif`;
+      c.textAlign="center"; c.textBaseline="middle";
+      c.fillText("筑", P.x, P.y);
+    }
+  }
+}
+function DrawOverlays(c,s){
+  const time = performance.now()/1000;
+  const pulse = 0.5+0.5*Math.sin(time*3.2);
+  if(recruitMode){
+    for(const t of RecruitSpots()){
+      const p = hexToPix(t.q,t.r,s), P = W2S(p.x,p.y);
+      hexPath(c,P.x,P.y,s*0.93,t.wob);
+      c.fillStyle = `rgba(160,210,120,${0.2+0.1*pulse})`; c.fill();
+      c.strokeStyle = `rgba(180,230,140,${0.6+0.3*pulse})`; c.lineWidth=2; c.stroke();
+    }
+    return;
+  }
+  if(REACH && SEL){
+    for(const [kk,cost] of REACH.cost){
+      const [q,r] = kk.split(",").map(Number);
+      const t = T(q,r); if(!t) continue;
+      const p = hexToPix(q,r,s), P = W2S(p.x,p.y);
+      hexPath(c,P.x,P.y,s*0.92,t.wob);
+      c.fillStyle = `rgba(120,170,235,${0.16+0.08*pulse})`; c.fill();
+      c.strokeStyle = `rgba(150,195,245,${0.45+0.2*pulse})`; c.lineWidth=1.4; c.stroke();
+      void cost;
+    }
+    // 路径预览
+    if(hoverHex && REACH.cost.has(K(hoverHex.q,hoverHex.r))){
+      c.save();
+      c.strokeStyle = "rgba(255,235,180,.85)"; c.lineWidth = 2.2; c.setLineDash([6,5]);
+      c.beginPath();
+      let cur = K(hoverHex.q,hoverHex.r);
+      const pts = [];
+      while(cur){
+        const [q,r] = cur.split(",").map(Number);
+        const p = hexToPix(q,r,s), P = W2S(p.x,p.y);
+        pts.push(P);
+        cur = REACH.prev.get(cur);
+      }
+      const start = hexToPix(SEL.q,SEL.r,s), SP = W2S(start.x,start.y);
+      pts.push(SP);
+      c.moveTo(pts[0].x,pts[0].y);
+      for(const pt of pts) c.lineTo(pt.x,pt.y);
+      c.stroke(); c.setLineDash([]);
+      const cost = REACH.cost.get(K(hoverHex.q,hoverHex.r));
+      c.fillStyle = "rgba(40,30,14,.85)";
+      c.font = `600 ${Math.round(s*0.34)}px system-ui`;
+      c.textAlign="center";
+      c.fillText(String(cost), pts[0].x, pts[0].y - s*0.7);
+      c.restore();
+    }
+  }
+  if(ATK && SEL){
+    for(const [,tgt] of ATK){
+      const t = T(tgt.q,tgt.r); if(!t) continue;
+      const p = hexToPix(tgt.q,tgt.r,s), P = W2S(p.x,p.y);
+      hexPath(c,P.x,P.y,s*0.96,t.wob);
+      c.strokeStyle = `rgba(226,80,50,${0.7+0.25*pulse})`;
+      c.lineWidth = 2.6; c.stroke();
+    }
+  }
+  if(hoverHex){
+    const t = T(hoverHex.q,hoverHex.r);
+    if(t){
+      const p = hexToPix(t.q,t.r,s), P = W2S(p.x,p.y);
+      hexPath(c,P.x,P.y,s*0.97,t.wob);
+      c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth=1.5; c.stroke();
+    }
+  }
+}
+function DrawStructures(c,s){
+  for(const t of G.tiles){
+    if(t.fog===0) continue;
+    const p = hexToPix(t.q,t.r,s), P = W2S(p.x,p.y);
+    if(t.vill){
+      const v = t.vill;
+      c.save(); c.translate(P.x,P.y);
+      const k = s*0.32;
+      c.fillStyle = v.burn ? "#6a5040" : (v.org>=2 ? "#d9b07a" : "#c9b895");
+      c.strokeStyle = "#4a3a22"; c.lineWidth = Math.max(1,s*0.045);
+      c.beginPath();
+      c.moveTo(-k,k*0.55); c.lineTo(-k,-k*0.1); c.lineTo(0,-k*0.75); c.lineTo(k,-k*0.1); c.lineTo(k,k*0.55);
+      c.closePath(); c.fill(); c.stroke();
+      if(v.org>=1 && !v.burn){
+        c.fillStyle = "#a4322a";
+        const fh = v.org>=3 ? k*0.62 : k*0.45;
+        c.fillRect(k*0.3, -k*1.45, fh, fh*0.55);
+        c.strokeStyle = "#5a2018"; c.lineWidth=1;
+        c.beginPath(); c.moveTo(k*0.3,-k*1.5); c.lineTo(k*0.3,k*0.2); c.stroke();
+      }
+      for(let i=0;i<v.org;i++){
+        c.fillStyle = "#a4322a";
+        c.beginPath(); c.arc(-k*0.7+i*k*0.5, k*0.85, s*0.06, 0, Math.PI*2); c.fill();
+      }
+      if(v.burn){
+        c.fillStyle = "rgba(210,80,40,.8)";
+        c.font = `${Math.round(s*0.32)}px "Noto Serif SC",serif`;
+        c.textAlign="center";
+        c.fillText("焚", 0, -k*1.1);
+      }
+      if(v.prog){
+        c.fillStyle = "rgba(164,50,42,.9)";
+        c.font = `${Math.round(s*0.26)}px system-ui`;
+        c.textAlign="center";
+        c.fillText("组织中…", 0, -k*1.15);
+      }
+      c.fillStyle = v.org>=2 ? "rgba(120,32,24,.95)" : "rgba(44,34,20,.85)";
+      c.font = `${Math.round(Math.max(8,s*0.26))}px "Noto Serif SC",serif`;
+      c.textAlign="center"; c.textBaseline="top";
+      c.fillText(v.name, 0, k*1.0);
+      c.restore();
+    }
+    if(t.fort){
+      const f = t.fort;
+      c.save(); c.translate(P.x,P.y);
+      const k = s*0.38;
+      const body = f.pOwned ? "#8d3a2c" : (f.jp ? "#46525c" : "#8a7a4a");
+      c.fillStyle = body; c.strokeStyle = "#20272c"; c.lineWidth = Math.max(1,s*0.05);
+      if(f.kind==="town"){
+        c.fillRect(-k*1.05,-k*0.55,k*2.1,k*1.05);
+        c.strokeRect(-k*1.05,-k*0.55,k*2.1,k*1.05);
+        c.beginPath(); c.moveTo(-k*1.2,-k*0.55); c.lineTo(0,-k*1.15); c.lineTo(k*1.2,-k*0.55);
+        c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = f.pOwned ? "#ffd95e" : "#dfe6ea";
+        c.font = `600 ${Math.round(Math.max(9,s*0.32))}px "Noto Serif SC",serif`;
+        c.textAlign="center"; c.textBaseline="middle";
+        c.fillText(f.name, 0, -k*0.05);
+      }else{
+        c.fillRect(-k*0.6,-k*0.6,k*1.2,k*1.2);
+        c.strokeRect(-k*0.6,-k*0.6,k*1.2,k*1.2);
+        c.fillStyle = "#1b2126";
+        c.fillRect(-k*0.2,-k*0.28,k*0.4,k*0.32);
+      }
+      // 旗帜
+      if(f.jp && !f.pOwned){
+        c.fillStyle = "#e8e2d4";
+        c.fillRect(k*0.55,-k*1.3,k*0.62,k*0.44);
+        c.fillStyle = "#c03028";
+        c.beginPath(); c.arc(k*0.86,-k*1.08,k*0.13,0,Math.PI*2); c.fill();
+      } else if(!f.pOwned){
+        c.fillStyle = "rgba(230,210,140,.95)";
+        c.font = `${Math.round(Math.max(8,s*0.26))}px "Noto Serif SC",serif`;
+        c.textAlign="center";
+        c.fillText("伪", 0, -k*1.1);
+      } else {
+        c.fillStyle = "#a4322a";
+        c.fillRect(k*0.55,-k*1.35,k*0.6,k*0.4);
+      }
+      // 守备数字
+      const bw = s*0.6, bh = s*0.3;
+      c.fillStyle = "rgba(20,24,28,.86)";
+      c.fillRect(-bw/2, k*0.7, bw, bh);
+      c.fillStyle = f.g < f.gMax*0.55 ? "#ffcf6a" : "#dfe6ea";
+      c.font = `600 ${Math.round(Math.max(8,s*0.26))}px system-ui`;
+      c.textAlign="center"; c.textBaseline="middle";
+      c.fillText(String(Math.max(0,Math.round(f.g))), 0, k*0.7+bh/2);
+      if(f.kind!=="town"){
+        c.fillStyle = "rgba(44,34,20,.8)";
+        c.font = `${Math.round(Math.max(7,s*0.2))}px "Noto Serif SC",serif`;
+        c.textBaseline="top";
+        c.fillText(f.name, 0, k*1.06);
+      }
+      c.restore();
+    }
+  }
+}
+function DrawEnemies(c,s){
+  for(const e of G.eUnits){
+    const t = T(e.q,e.r);
+    if(!t || t.fog!==2) continue;
+    const D = EUNITS[e.type];
+    const p = hexToPix(e.q,e.r,s);
+    e.ax*=0.76; e.ay*=0.76;
+    const P = W2S(p.x+e.ax, p.y+e.ay);
+    c.save(); c.translate(P.x,P.y);
+    const k = s*0.36;
+    c.fillStyle = D.color; c.strokeStyle="#12171c"; c.lineWidth=Math.max(1,s*0.05);
+    c.beginPath();
+    c.moveTo(0,-k*0.95); c.lineTo(k*0.9,k*0.55); c.lineTo(-k*0.9,k*0.55);
+    c.closePath(); c.fill(); c.stroke();
+    if(D.jp){
+      c.fillStyle = "#e8e2d4"; c.beginPath(); c.arc(0,-k*0.05,k*0.3,0,Math.PI*2); c.fill();
+      c.fillStyle = "#c03028"; c.beginPath(); c.arc(0,-k*0.05,k*0.15,0,Math.PI*2); c.fill();
+    }else{
+      c.fillStyle = "#f0e8c8";
+      c.font = `600 ${Math.round(Math.max(8,s*0.3))}px "Noto Serif SC",serif`;
+      c.textAlign="center"; c.textBaseline="middle";
+      c.fillText("伪", 0, 0);
+    }
+    const tag = e.task.kind==="sweep" ? "讨" : (e.task.kind==="hunt" ? "骑" : (e.task.kind==="withdraw" ? "退" : ""));
+    if(tag){
+      c.fillStyle = "#ffb090";
+      c.font = `${Math.round(Math.max(8,s*0.26))}px "Noto Serif SC",serif`;
+      c.textAlign="center";
+      c.fillText(tag, 0, -k*1.25);
+    }
+    const bw = s*0.8;
+    c.fillStyle = "rgba(20,14,10,.72)"; c.fillRect(-bw/2, k*0.75, bw, s*0.11);
+    c.fillStyle = "#7d99c8"; c.fillRect(-bw/2, k*0.75, bw*Math.max(0,e.hp)/100, s*0.11);
+    c.restore();
+  }
+}
+function DrawUnits(c,s){
+  for(const u of G.units){
+    const p = hexToPix(u.q,u.r,s);
+    u.ax*=0.74; u.ay*=0.74;
+    const P = W2S(p.x+u.ax, p.y+u.ay);
+    const D = UNITS[u.type];
+    c.save(); c.translate(P.x,P.y);
+    const k = s*0.36;
+    const spent = u.acted || u.mp<=0;
+    if(SEL===u){
+      c.strokeStyle = "#ffd05e"; c.lineWidth=2.4;
+      c.beginPath(); c.arc(0,0,s*0.7,0,Math.PI*2); c.stroke();
+    }
+    c.globalAlpha = spent ? 0.62 : 1;
+    c.fillStyle = D.color; c.strokeStyle = "#2a1410"; c.lineWidth = Math.max(1,s*0.055);
+    c.beginPath();
+    c.moveTo(-k*0.9,-k*0.7); c.lineTo(k*0.9,-k*0.7); c.lineTo(k*0.9,k*0.45); c.lineTo(0,k*0.92); c.lineTo(-k*0.9,k*0.45);
+    c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = "#ffe6c0";
+    c.font = `600 ${Math.round(Math.max(9,s*0.32))}px "Noto Serif SC",serif`;
+    c.textAlign="center"; c.textBaseline="middle";
+    c.fillText(D.label[0], 0, -k*0.1);
+    for(let i=0;i<u.lvl;i++){
+      c.fillStyle = "#ffd95e";
+      c.font = `${Math.round(s*0.22)}px system-ui`;
+      c.fillText("★", -k*0.5+i*k*0.5, -k*1.0);
+    }
+    if(u.stance==="fortify"){
+      c.fillStyle = "#a8c8e8";
+      c.font = `${Math.round(Math.max(8,s*0.24))}px "Noto Serif SC",serif`;
+      c.fillText("垒", k*1.05, -k*0.8);
+    }
+    const bw = s*0.84;
+    c.fillStyle = "rgba(20,14,10,.72)"; c.fillRect(-bw/2, k*1.0, bw, s*0.12);
+    c.fillStyle = "#e0743c"; c.fillRect(-bw/2, k*1.0, bw*Math.max(0,u.hp)/100, s*0.12);
+    c.globalAlpha = 1;
+    c.restore();
+  }
+}
+function DrawFXAll(c){
+  for(let i=FX.length-1;i>=0;i--){
+    const f = FX[i];
+    f.x+=f.vx; f.y+=f.vy; f.vy+=0.07; f.life-=f.decay;
+    if(f.life<=0){ FX.splice(i,1); continue; }
+    const P = W2S(f.x,f.y);
+    c.globalAlpha = Math.max(0,f.life);
+    c.fillStyle = f.color;
+    c.fillRect(P.x-f.size/2, P.y-f.size/2, f.size, f.size);
+  }
+  c.globalAlpha = 1;
+  for(let i=FLOATS.length-1;i>=0;i--){
+    const f = FLOATS[i];
+    f.y -= 0.5; f.life -= 0.012;
+    if(f.life<=0){ FLOATS.splice(i,1); continue; }
+    const P = W2S(f.x,f.y);
+    c.globalAlpha = Math.min(1, f.life*2);
+    c.fillStyle = "rgba(20,14,8,.75)";
+    c.font = `600 ${Math.round(view.s*0.4)}px "Noto Serif SC",serif`;
+    c.textAlign = "center";
+    c.fillText(f.text, P.x+1, P.y+1);
+    c.fillStyle = f.color;
+    c.fillText(f.text, P.x, P.y);
+  }
+  c.globalAlpha = 1;
+}
+function DrawSweepArrow(c,s){
+  const S = G.sweep;
+  if(S.state!=="warn" || !S.target || !S.srcs) return;
+  const time = performance.now()/1000;
+  for(const src of S.srcs){
+    const a = hexToPix(src.q,src.r,s), A = W2S(a.x,a.y);
+    const b = hexToPix(S.target.q,S.target.r,s), B = W2S(b.x,b.y);
+    c.save();
+    c.strokeStyle = `rgba(226,90,54,${0.4+0.3*Math.sin(time*3)})`;
+    c.lineWidth = 3.5; c.setLineDash([12,9]); c.lineDashOffset = -time*24;
+    c.beginPath(); c.moveTo(A.x,A.y); c.lineTo(B.x,B.y); c.stroke();
+    c.setLineDash([]);
+    const ang = Math.atan2(B.y-A.y,B.x-A.x);
+    c.fillStyle = "rgba(226,90,54,.85)";
+    c.translate(B.x,B.y); c.rotate(ang);
+    c.beginPath(); c.moveTo(0,0); c.lineTo(-14,-7); c.lineTo(-14,7); c.closePath(); c.fill();
+    c.restore();
+  }
+}
+
+/* ── 21. 输入（NightRaid 加固版：10px 容差 / click 兜底 / 缩放平移）── */
+let ptr = { down:false, id:null, sx:0, sy:0, lx:0, ly:0, moved:false, t0:0 };
+let pinch = null;
+const TAP_SLOP = 10;
+let pendingAtk = null;   // 触屏二次确认
+
+function CanvasPoint(ev){
+  const r = cv.getBoundingClientRect();
+  return { x:ev.clientX-r.left, y:ev.clientY-r.top };
+}
+function HexAt(sx,sy){
+  const w = S2W(sx,sy);
+  const h = pixToHex(w.x,w.y,view.s);
+  return T(h.q,h.r) ? h : null;
+}
+function OnDown(ev){
+  if(!cv) return;
+  if(!AC) Sfx("click");
+  if(G.phase==="enemy"){ fastAnim = true; return; }
+  const p = CanvasPoint(ev);
+  ptr = { down:true, id:ev.pointerId, sx:p.x, sy:p.y, lx:p.x, ly:p.y, moved:false, t0:Date.now() };
+  if(cv.setPointerCapture && ev.pointerId!=null){ try{ cv.setPointerCapture(ev.pointerId); }catch(e){} }
+}
+function OnMove(ev){
+  if(!cv) return;
+  const p = CanvasPoint(ev);
+  if(ptr.down){
+    const dx = p.x-ptr.sx, dy = p.y-ptr.sy;
+    if(!ptr.moved && Math.hypot(dx,dy)>TAP_SLOP) ptr.moved = true;
+    if(ptr.moved){ view.ox += p.x-ptr.lx; view.oy += p.y-ptr.ly; terrainDirty = true; }
+    ptr.lx = p.x; ptr.ly = p.y;
+  }else{
+    hoverHex = HexAt(p.x,p.y);
+    ShowTip(hoverHex, ev.clientX, ev.clientY);
+    ShowForecastCard(hoverHex, ev.clientX, ev.clientY);
+  }
+}
+function OnUp(ev){
+  if(!cv) return;
+  const wasDown = ptr.down, moved = ptr.moved;
+  ptr.down = false; ptr.moved = false;
+  if(!wasDown || moved) return;
+  const p = CanvasPoint(ev);
+  TapHex(p.x, p.y, ev.pointerType||"mouse");
+}
+function OnClickFallback(ev){
+  if(ptr.down || ptr.moved) return;
+  if(Date.now()-ptr.t0 < 350) return;
+  const p = CanvasPoint(ev);
+  TapHex(p.x, p.y, "mouse");
+}
+function OnWheel(ev){
+  ev.preventDefault();
+  view.s = Math.max(12, Math.min(52, view.s*(ev.deltaY<0?1.12:0.89)));
+  terrainDirty = true;
+}
+function TapHex(sx, sy, ptype){
+  if(G.over || G.busy || G.phase!=="player") return;
+  const h = HexAt(sx,sy);
+  if(!h) return;
+  const t = T(h.q,h.r);
+  // 招兵放置模式
+  if(recruitMode){
+    if(!PlaceRecruit(t)) return;
+    return;
+  }
+  // 点自己人 → 选中
+  const own = UnitAt(h.q,h.r);
+  if(own && own!==SEL){ SelectUnit(own); return; }
+  // 点可攻击目标
+  if(SEL && ATK && ATK.has(K(h.q,h.r))){
+    const tgt = ATK.get(K(h.q,h.r));
+    if(ptype!=="mouse"){
+      if(pendingAtk===K(h.q,h.r)){ pendingAtk=null; HideForecastCard(); DoAttack(SEL,tgt); }
+      else{ pendingAtk = K(h.q,h.r); ShowForecastCard(h, sx, sy, true); Toast("再点一次发起进攻"); }
+      return;
+    }
+    HideForecastCard(); DoAttack(SEL, tgt); return;
+  }
+  pendingAtk = null;
+  // 点可达格 → 移动
+  if(SEL && REACH && REACH.cost.has(K(h.q,h.r))){ DoMove(SEL,h.q,h.r); return; }
+  // 反馈
+  if(SEL){
+    if(t.fog===0) Toast("未侦察区域");
+    else if(EnemyAt(h.q,h.r)||(t.fort&&!t.fort.pOwned)) Toast("够不着：先移动到目标旁");
+    else if(SEL.mp<=0||SEL.acted) Toast(`${SEL.name}本月已行动`);
+    else if(t.terr==="water") Toast("过不去：河流");
+    else Toast("机动力不够");
+    Sfx("fail");
+  }
+}
+function SelectUnit(u){
+  if(!u) return;
+  SEL = u; recruitMode = null; pendingAtk = null;
+  RefreshOrders(); Sfx("click"); Sync();
+  if(G.hintStep===0 && G.turn===1) SetHint(1);
+}
+function CycleIdle(){
+  const idle = G.units.filter(u=>!u.acted && u.mp>0);
+  if(!idle.length) return false;
+  const i = idle.indexOf(SEL);
+  const nxt = idle[(i+1)%idle.length];
+  SelectUnit(nxt); CenterOn(nxt.q,nxt.r);
+  return true;
+}
+
+/* ── 22. UI 同步 ─────────────────────────────────────────────────── */
+function $(id){ return document.getElementById(id); }
+function Sync(){
+  if(!$("dateNum")) return;
+  $("dateNum").textContent = DateStr(G.turn);
+  $("eraTag").textContent = CurEra().name;
+  const inc = Income();
+  $("rFood").textContent = Math.round(G.res.food);
+  $("dFood").textContent = (inc.food-inc.upkeep>=0?"+":"")+(inc.food-inc.upkeep);
+  $("dFood").style.color = inc.food-inc.upkeep>=0 ? "#8a9a6a" : "#e08a6a";
+  $("rMan").textContent = Math.round(G.res.man);
+  $("dMan").textContent = "+"+inc.man;
+  $("rArms").textContent = Math.round(G.res.arms);
+  $("rPol").textContent = Math.round(G.res.pol);
+  $("rHeat").textContent = Math.round(G.heat);
+  $("heatFill").style.width = Math.min(100,G.heat)+"%";
+  $("btnPolicy").classList.toggle("flash", !!G.polOffer);
+  // 任务横幅
+  const m = ActiveMission();
+  $("missionBar").innerHTML = m ? `任务【<b>${m.name}</b>】${m.desc}` : "";
+  // 下一回合按钮
+  const bn = $("btnNext"), sub = $("nextSub");
+  if(G.phase==="enemy"){ bn.className="busy"; bn.disabled=true; bn.childNodes[0].textContent="敌军行动中"; sub.textContent="点击地图可加速"; }
+  else{
+    bn.disabled = G.over;
+    const idle = G.units.filter(u=>!u.acted && u.mp>0).length;
+    if(idle>0){ bn.className="idle"; bn.childNodes[0].textContent=`待命部队 ${idle}`; sub.textContent="点击切换 · 再点结束回合"; }
+    else{ bn.className=""; bn.childNodes[0].textContent="下一回合"; sub.textContent=DateStr(G.turn+1); }
+  }
+  // 招兵栏
+  const rb = $("recruitBar");
+  rb.innerHTML = "";
+  for(const k of RecruitTypes()){
+    const D = UNITS[k], b = document.createElement("button");
+    b.className = "rbtn" + (recruitMode===k?" on":"");
+    b.innerHTML = `${D.label}<small>兵${D.cost.man} 械${D.cost.arms}</small>`;
+    b.title = D.tip;
+    b.disabled = !CanAfford(k) || G.phase!=="player" || G.over;
+    b.onclick = ()=>{ recruitMode===k ? (recruitMode=null,Sync()) : StartRecruit(k); };
+    rb.appendChild(b);
+  }
+  // 队伍名册
+  const ros = $("roster");
+  ros.innerHTML = "";
+  for(const u of G.units){
+    const d = document.createElement("div");
+    d.className = "ucard"+(SEL===u?" sel":"")+((u.acted||u.mp<=0)?" spent":"");
+    d.style.borderLeftColor = UNITS[u.type].color;
+    d.innerHTML = `<div class="un">${u.name}${"★".repeat(u.lvl)}<em>${UNITS[u.type].label}</em></div>
+      <div class="um"><span>兵力 ${Math.max(0,Math.round(u.hp))}</span><span>机动 ${u.mp}</span></div>
+      <div class="hpbar"><i style="width:${Math.max(0,u.hp)}%"></i></div>`;
+    d.onclick = ()=>{ SelectUnit(u); CenterOn(u.q,u.r); };
+    ros.appendChild(d);
+  }
+  SyncActions();
+}
+function SyncActions(){
+  const title = $("actTitle"), acts = $("acts");
+  if(!title || !acts) return;
+  acts.innerHTML = "";
+  if(G.over){ title.textContent = "战争结束"; return; }
+  if(G.phase!=="player"){ title.textContent = "敌军行动中……（点击地图加速）"; return; }
+  if(recruitMode){ title.innerHTML = `<b>${UNITS[recruitMode].label}成军</b><span>点击高亮的堡垒村/县城放置（Esc 取消）</span>`; return; }
+  if(!SEL){ title.textContent = "— 点队伍下令；点敌人看战报；空格结束回合 —"; return; }
+  const u = SEL, D = UNITS[u.type], t = T(u.q,u.r);
+  title.innerHTML = `<b>${u.name}${"★".repeat(u.lvl)} · ${u.cmd}</b>
+    <span>${D.label}</span><span>兵力 ${Math.max(0,Math.round(u.hp))}/100</span><span>机动 ${u.mp}/${D.mp}</span>
+    <span>${PlaceName(t)}</span>`;
+  const mk = (label,cost,cls,enabled,fn,tip)=>{
+    const b = document.createElement("button");
+    b.className = "abtn"+(cls?" "+cls:"");
+    b.innerHTML = label+(cost?`<span class="cost">${cost}</span>`:"");
+    b.disabled = !enabled;
+    if(tip) b.title = tip;
+    if(enabled) b.onclick = fn;
+    acts.appendChild(b);
+    return b;
+  };
+  if(u.type==="wt" && t.vill){
+    const need = G.policies.includes("jianzu")?1:2;
+    mk("发动群众", `${need}月/级`, "gold", CanOrganize(u), ()=>DoOrganize(u),
+      CanOrganize(u)?"组织度+1：1级入会 2级出粮出兵 3级堡垒村":"该村已巩固或被焚");
+  }
+  if(CanSabotage(u)){
+    mk("破袭铁路", SaboRisk(u)?"⚠敌据点火力下":"", "hot", true, ()=>DoSabotage(u),
+      "扒轨炸桥：中断行车，牵制记分"+(CurEra().key==="baituan"?"（百团大战×2）":""));
+  }
+  for(const ft of FlipTargets(u)){
+    mk(`策反 ${ft.fort.name}`, "", "gold", true, ()=>DoFlip(u,ft), "白皮红心，不放一枪");
+  }
+  if(!u.acted) mk("休整驻防", "防+4·回血", "", true, ()=>DoRest(u), "原地设防，下月回血更多");
+  if(!u.acted || u.mp>0) mk("待命", "", "", true, ()=>{ u.acted=true; u.mp=0; RefreshOrders(); Sync(); }, "本月不再行动");
+}
+
+function ShowTip(h, cx, cy){
+  const el = $("tip"); if(!el) return;
+  if(!h || G.phase!=="player"){ el.style.display="none"; return; }
+  const t = T(h.q,h.r);
+  if(!t){ el.style.display="none"; return; }
+  if(t.fog===0){ el.innerHTML = `<div class="th">未侦察</div>派部队前出，或组织村庄扩大耳目`; }
+  else{
+    let s = `<div class="th">${PlaceName(t)}</div><span class="ty">${TERR[t.terr].name}</span> · 机动${TERR[t.terr].cost<0?"—":TERR[t.terr].cost}${TERR[t.terr].def?` · 防+${TERR[t.terr].def}`:""}`;
+    if(t.rail) s += `<br>铁路${t.railCut?'<span class="tw">（已破坏）</span>':""}`;
+    else if(t.road) s += `<br>公路`;
+    if(t.mine) s += `<br><span class="tg">已布雷</span>`;
+    if(t.site) s += `<br><span class="tw">敌炮楼工地（${t.site.left}月建成，上去捣毁）</span>`;
+    if(t.vill){
+      const lv = ["未组织","已组织","根据地村","堡垒村"][t.vill.org];
+      s += `<br>${t.vill.burn?'<span class="tw">被焚的</span>':""}${lv} · 人丁${t.vill.pop}`;
+      if(t.vill.org>=2) s += `<span class="tg"> 产粮${t.vill.pop}</span>`;
+    }
+    if(t.fort){
+      s += `<br><span class="${t.fort.pOwned?"tg":"tw"}">${t.fort.name}</span> 守备${Math.round(t.fort.g)}`;
+      if(!t.fort.jp && !t.fort.pOwned) s += `（伪军·可策反）`;
+    }
+    const e = EnemyAt(h.q,h.r);
+    if(e && t.fog===2) s += `<br><span class="tw">${EUNITS[e.type].label}</span> 兵力${Math.max(0,Math.round(e.hp))} 强度${EUNITS[e.type].str+EnemyStrMod()}`;
+    el.innerHTML = s;
+  }
+  el.style.display = "block";
+  el.style.left = Math.min(window.innerWidth-240, cx+16)+"px";
+  el.style.top  = Math.min(window.innerHeight-130, cy+14)+"px";
+}
+function ShowForecastCard(h, cx, cy, force){
+  const el = $("fcCard"); if(!el) return;
+  if(!h || !SEL || !ATK || !ATK.has(K(h.q,h.r)) || G.phase!=="player"){ el.style.display="none"; return; }
+  const tgt = ATK.get(K(h.q,h.r));
+  const fc = Forecast(SEL, tgt);
+  el.innerHTML = `
+    <div class="fh"><span>${SEL.name}</span><span style="color:#8fb4d8">${fc.ti.label}</span></div>
+    <div class="fvs">
+      <div><div class="v">${Math.round(fc.a)}</div><div class="lb">我军战力</div></div>
+      <div style="color:#8a765a">对</div>
+      <div><div class="v e">${Math.round(fc.d)}</div><div class="lb">敌军战力</div></div>
+    </div>
+    <div class="fmods">${fc.mods.map(m=>`${m[0]} <span>${m[1]}</span>`).join("<br>")}<br>${fc.dmods.map(m=>`敌·${m[0]} <span>${m[1]}</span>`).join("<br>")}</div>
+    <div class="fdmg">敌承伤 <b class="g">${fc.dmg[0]}~${fc.dmg[1]}</b> · 我承伤 <b>${fc.ret[0]}~${fc.ret[1]}</b>${fc.kill?'<br><span style="color:#ffd95e">有望全歼！</span>':""}</div>
+    ${tgt.from?`<div class="fcap">将先机动至侧翼再进攻</div>`:""}
+    <div class="fcap">${force?"再点一次执行":"点击目标即进攻"}</div>`;
+  el.style.display = "block";
+  el.style.left = Math.min(window.innerWidth-270, cx+18)+"px";
+  el.style.top  = Math.max(50, cy-160)+"px";
+}
+function HideForecastCard(){ const el=$("fcCard"); if(el) el.style.display="none"; }
+
+/* ── 23. 弹层 ────────────────────────────────────────────────────── */
+function Modal(opt){
+  const root = $("modalRoot"); if(!root) return;
+  root.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "modal";
+  const box = document.createElement("div");
+  box.className = "mbox";
+  box.innerHTML = `<h2>${opt.title}</h2><h3>${opt.sub||""}</h3>${opt.body||""}`;
+  const row = document.createElement("div");
+  row.className = "mrow";
+  (opt.btns||[{t:"知道了",cls:"pri"}]).forEach(b=>{
+    const btn = document.createElement("button");
+    btn.className = "mbtn "+(b.cls||"");
+    btn.textContent = b.t;
+    btn.onclick = ()=>{ if(b.fn) b.fn(); else CloseModal(); };
+    row.appendChild(btn);
+  });
+  box.appendChild(row); wrap.appendChild(box); root.appendChild(wrap);
+}
+function CloseModal(){ const r=$("modalRoot"); if(r) r.innerHTML=""; }
+
+function ShowPolicyModal(){
+  if(!G.polOffer){
+    const owned = G.policies.map(k=>`<p><span class="hl">${POLICIES[k].name}</span> — ${POLICIES[k].desc}</p>`).join("") || "<p>尚未颁布政策。政治点攒够后会送来三选一。</p>";
+    Modal({ title:"根据地政策", sub:`政治点 ${Math.round(G.res.pol)}`, body:owned });
+    return;
+  }
+  const cards = G.polOffer.map(k=>{
+    const P = POLICIES[k];
+    const can = G.res.pol>=P.cost;
+    return `<div class="polCard" data-k="${k}" style="${can?"":"opacity:.45"}">
+      <div class="pn">${P.name}</div><div class="pd">${P.desc}</div>
+      <div class="pc">政治 ${P.cost}${can?"":"（不足）"}</div></div>`;
+  }).join("");
+  Modal({
+    title:"政 策 三 选 一", sub:"根据地建设方向 · 选定即生效（所见即所得）",
+    body:`<div class="polRow">${cards}</div>`,
+    btns:[{ t:"稍后再定", cls:"", fn:()=>CloseModal() }]
+  });
+  setTimeout(()=>{
+    document.querySelectorAll(".polCard").forEach(el=>{
+      el.onclick = ()=>PickPolicy(el.dataset.k);
+    });
+  },0);
+}
+function ShowMissionModal(){
+  const rows = G.missions.map(m=>{
+    const st = m.done?'<span class="gd">✔ 完成</span>':m.fail?'<span class="rd">✘ 过期</span>':(m.from&&G.turn<m.from?`<span style="color:#8a765a">未开启</span>`:'<span class="hl">进行中</span>');
+    return `<p>${st}【${m.name}】${m.desc}</p>`;
+  }).join("");
+  Modal({ title:"总部任务", sub:"完成即时兑奖", body:rows });
+}
+
+/* ── 24. 提示 ────────────────────────────────────────────────────── */
+const HINTS = [
+  null,
+  { text:"点一支<b>部队</b>（地图上或左侧名册）。", sel:"#roster" },
+  { text:"蓝格=本月可到，<b>红圈=可以打</b>。悬停敌人看战报——去把家门口那座炮楼干了！", sel:"#cv" },
+  { text:"让<b>工作队</b>走进村庄，点【发动群众】——根据地就是这么一格格开出来的。", sel:"#actWrap" },
+  { text:"都安排完就点<b>【下一回合】</b>，看日军怎么动。它敢进山，你就伏击它。", sel:"#btnNext" }
+];
+function SetHint(step){
+  G.hintStep = step;
+  const el = $("hint"); if(!el) return;
+  const h = HINTS[step];
+  if(!h){ el.style.display="none"; return; }
+  el.innerHTML = h.text;
+  el.style.display = "block";
+  const anchor = document.querySelector(h.sel);
+  if(anchor){
+    const r = anchor.getBoundingClientRect();
+    el.style.left = Math.max(8, Math.min(window.innerWidth-276, r.left))+"px";
+    el.style.top  = Math.max(52, r.top - el.offsetHeight - 12)+"px";
+  }
+}
+
+/* ── 25. 说明 / 标题 ─────────────────────────────────────────────── */
+function Brief(){
+  Modal({
+    title:"敌 后 · 1939—1945", sub:"华北敌后战场 · 一回合一个月 · 80回合打完八年",
+    body:`
+      <p><span class="hl">你是敌后军区的指挥员。</span>日军握着铁路、县城和炮楼（点线），你有山、村庄和人民（面）。
+      八年里把根据地从三个村发展成半壁河山——胜负在1945年8月结算。</p>
+      <div class="rule"></div>
+      <p style="font-size:12.5px;line-height:2">
+      <span class="hl">操作＝文明</span>：点部队亮蓝格移动；红圈敌人悬停看战报、点击就打；右下【下一回合】。<br>
+      <span class="hl">根据地</span>：工作队进村【发动群众】三级：组织→根据地村(出粮出兵)→堡垒村(能招兵有民兵)。<br>
+      <span class="hl">缴获养兵</span>：军械几乎全靠打——歼灭巡逻队、拔炮楼、缴县城。没有枪没有炮，敌人给我们造。<br>
+      <span class="rd">警备度</span>：破袭杀敌都涨，满了招来<span class="rd">大扫荡</span>（提前两月预警，红箭头指向目标）。
+      扫荡的兵是从据点抽的——<span class="hl">敌进我进</span>，趁虚拔点破路！<br>
+      <span class="hl">政策三选一</span>：减租减息/地雷战/地道战/精兵简政……攒政治点开一张，立即生效。<br>
+      <span class="hl">时代</span>：40年百团大战窗口 → 41-42最困难(蚕食修炮楼+大扫荡) → 43恢复 → 44末战略反攻夺县城。</p>
+      <p style="color:#9a8a62;font-size:12px">评级看：歼敌、拔点、光复县城、铁路瘫痪、根据地村数。根据地不足8村，评级封顶C——中心任务不是打仗，是建根据地。</p>`,
+    btns:[{ t:"出 发", cls:"pri", fn:()=>{ CloseModal(); if(G.turn===1) SetHint(1); } }]
+  });
+}
+function Title(){
+  const hasSave = HasSave();
+  const btns = [];
+  if(hasSave) btns.push({ t:"继续战局", cls:"pri", fn:()=>{ CloseModal(); if(!LoadGame()){ Toast("存档损坏，已开新局"); NewGame((Math.random()*1e9)|0); } Sync(); } });
+  btns.push({ t: hasSave?"新战役":"开始战役", cls: hasSave?"":"pri", fn:()=>{ CloseModal(); NewGame((Math.random()*1e9)|0); Sync(); Brief(); } });
+  btns.push({ t:"玩法说明", cls:"", fn:()=>Brief() });
+  Modal({
+    title:"敌 后 · 1939—1945", sub:"华北敌后战场 类4X · 玩法白盒",
+    body:`<p>正太路的火车还在跑，平汉线的炮楼一眼望不到头。<br>
+      你手里有三个村、两支队伍、一支工作队。<br>
+      八年之后，这片土地是谁的？</p>
+      <p style="color:#9a8a62;font-size:12px">自动存档每月一次，关掉页面随时回来。40-60分钟一局。</p>`,
+    btns
+  });
+}
+
+/* ── 26. 启动 ────────────────────────────────────────────────────── */
+function Boot(){
+  if(!cv) return;
+  NewGame((Math.random()*1e9)|0);
+  FitView(); Sync();
+  cv.addEventListener("pointerdown", OnDown);
+  cv.addEventListener("pointermove", OnMove);
+  cv.addEventListener("pointerup", OnUp);
+  cv.addEventListener("pointercancel", ()=>{ ptr.down=false; });
+  cv.addEventListener("click", OnClickFallback);
+  cv.addEventListener("wheel", OnWheel, { passive:false });
+  cv.addEventListener("pointerleave", ()=>{ hoverHex=null; const el=$("tip"); if(el) el.style.display="none"; HideForecastCard(); });
+  window.addEventListener("resize", ()=>{ FitView(); SetHint(G.hintStep); });
+  $("btnNext").onclick = ()=>{
+    if(G.phase!=="player" || G.over) return;
+    const now = Date.now();
+    const idle = G.units.some(u=>!u.acted && u.mp>0);
+    if(idle && now-G.lastNextTs>1400){ G.lastNextTs = now; CycleIdle(); Sync(); return; }
+    G.lastNextTs = now;
+    if(G.hintStep===4) SetHint(0);
+    EndTurn();
+  };
+  $("btnPolicy").onclick = ()=>ShowPolicyModal();
+  $("btnMission").onclick = ()=>ShowMissionModal();
+  $("btnHelp").onclick = ()=>Brief();
+  window.addEventListener("keydown",(e)=>{
+    if(e.key===" "){ e.preventDefault(); $("btnNext").click(); }
+    else if(e.key==="Tab"){ e.preventDefault(); CycleIdle(); }
+    else if(e.key==="Escape"){ recruitMode=null; SEL=null; RefreshOrders(); Sync(); }
+    else if((e.key==="f"||e.key==="F") && SEL && !SEL.acted){ DoRest(SEL); }
+  });
+  requestAnimationFrame(Render);
+  Title();
+}
+
+/* 测试钩子 */
+window.DH = {
+  G, CFG, UNITS, EUNITS, TERR, FORTS, POLICIES, ERAS,
+  NewGame, LoadGame, SaveGame, HasSave, EndTurn, EnemyPhase, Resolution, ScorePts,
+  Reachable, RefreshOrders, ComputeAttack, DoMove, DoAttack, Forecast,
+  DoOrganize, DoSabotage, DoRest, DoFlip, FlipTargets, CanOrganize, CanSabotage,
+  StartRecruit, PlaceRecruit, RecruitSpots, RecruitTypes, CanAfford,
+  PickPolicy, MaybeOffer, AvailPolicies, TickMissions, ActiveMission,
+  Income, OrgVills, CurEra, DateStr, EraEvents, SweepTick, LaunchSweep,
+  ComputeVision, EnemyVisible, UnitAt, EnemyAt, tileAt, MkUnit, MkEnemy,
+  hexToPix, pixToHex, hexDist, K, T, NB, EndGame, Defeat,
+  SelectUnit, TapHex, HexAt, Sync, FitView, CenterOn, Title, Brief,
+  get SEL(){ return SEL; }, set SEL(v){ SEL=v; },
+  get REACH(){ return REACH; },
+  get ATK(){ return ATK; },
+  get recruitMode(){ return recruitMode; }, set recruitMode(v){ recruitMode=v; },
+  get view(){ return view; },
+  setSkipAnim(v){ skipAll=!!v; fastAnim=!!v; },
+  setMuted(v){ muted=!!v; }
+};
+
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", Boot);
+else Boot();
+</script>
+</body>
+</html>
