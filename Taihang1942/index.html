@@ -841,6 +841,7 @@ function reachableMap(u) {
 function moveSelTo(q, r) {
   const u = getSel();
   if (!u || !reach || !reach[key(q, r)]) return;
+  hover = null;
   u.mp = Math.max(0, u.mp - reach[key(q, r)].cost);
   u.q = q; u.r = r;
   u.ambush = false; u.rooted = false; u.autoPath = null;
@@ -896,6 +897,7 @@ function advanceAlong(u) {
   return moved;
 }
 function issueMoveOrder(u, tq, tr) {
+  hover = null;
   const path = farPath(u, tq, tr);
   if (!path) { log(moveBlockReason(u, tq, tr) || "那里过不去(山川阻隔或被占)", "jp"); return false; }
   const est = pathTurns(u, path);
@@ -1234,7 +1236,57 @@ function draw() {
     }
   }
   else if (sel && sel.kind === "tile") { const [cx, cy] = hexCenter(sel.q, sel.r); ctx.strokeStyle = "#8fd2e8"; ctx.lineWidth = 2; hexPath(cx, cy, s - 3); ctx.stroke(); }
+  // 悬停预览: 先看清楚再落点 — 本旬能到的一段金色, 之后的路蓝色, 终点标几旬
+  if (hover && su) {
+    const [hx, hy] = hexCenter(hover.q, hover.r);
+    if (hover.kind === "move" && hover.path && hover.path.length > 1) {
+      const seg = (from, to, color, width) => {
+        ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        for (let i = from; i <= to; i++) { const [px2, py2] = hexCenter(hover.path[i][0], hover.path[i][1]); i === from ? ctx.moveTo(px2, py2) : ctx.lineTo(px2, py2); }
+        ctx.stroke(); ctx.setLineDash([]);
+      };
+      const cut = Math.max(1, hover.thisTurnSteps);
+      seg(0, cut, "rgba(255,215,102,.95)", 3.5);
+      if (cut < hover.path.length - 1) seg(cut, hover.path.length - 1, "rgba(143,210,232,.7)", 3);
+      // 途经点小圆点; 本旬止步处画一个空心圈(文明六的"本回合走到这")
+      for (let i = 1; i < hover.path.length; i++) {
+        const [px2, py2] = hexCenter(hover.path[i][0], hover.path[i][1]);
+        ctx.fillStyle = i <= cut ? "rgba(255,215,102,.9)" : "rgba(143,210,232,.75)";
+        ctx.beginPath(); ctx.arc(px2, py2, 4, 0, 7); ctx.fill();
+      }
+      if (cut < hover.path.length - 1) {
+        const [sx2, sy2] = hexCenter(hover.path[cut][0], hover.path[cut][1]);
+        ctx.strokeStyle = "#ffd766"; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(sx2, sy2, 11, 0, 7); ctx.stroke();
+      }
+      ctx.strokeStyle = "#ffd766"; ctx.lineWidth = 2.5; hexPath(hx, hy, s - 4); ctx.stroke();
+      const badge = hover.turns <= 1 ? "本旬抵达" : hover.turns + " 旬";
+      ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const bw = ctx.measureText(badge).width + 14;
+      ctx.fillStyle = "rgba(20,16,10,.88)";
+      rrect(hx - bw / 2, hy - s * 0.62 - 10, bw, 20, 6); ctx.fill();
+      ctx.strokeStyle = "rgba(255,215,102,.8)"; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = "#ffd766"; ctx.fillText(badge, hx, hy - s * 0.62);
+    } else if (hover.label) {
+      ctx.strokeStyle = hover.kind === "attack" ? "#e2564d" : "#7a6a52"; ctx.lineWidth = 2.5;
+      hexPath(hx, hy, s - 4); ctx.stroke();
+      ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const bw = ctx.measureText(hover.label).width + 14;
+      ctx.fillStyle = "rgba(20,16,10,.9)";
+      rrect(hx - bw / 2, hy - s * 0.62 - 10, bw, 20, 6); ctx.fill();
+      ctx.strokeStyle = hover.kind === "attack" ? "rgba(226,86,77,.9)" : "rgba(122,106,82,.9)"; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = hover.kind === "attack" ? "#ff9a86" : "#a09070"; ctx.fillText(hover.label, hx, hy - s * 0.62);
+    }
+  }
   ctx.restore();
+}
+function rrect(x, y, w, h, rad) {
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad); ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad); ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
 }
 // ═══════════ UI ═══════════
 const $ = id => document.getElementById(id);
@@ -1311,7 +1363,7 @@ function showHelp() {
     + "<p><b>敌进我退</b>: 纵队锋芒正锐时(战力30+)正面硬顶=关家垴。躲进山里, 让它扑空。<br><b>敌驻我扰</b>: 地雷埋在它必经的公路上; 伏击(密林/山地设伏)自动痛击路过纵队。<br><b>敌疲我打</b>: 纵队每旬疲劳+8, 战力掉到六成, 还会掉队送人头 — 疲了再上主力。<br><b>敌退我追</b>: 清剿结束它满载回撤 — 全歼回撤纵队夺回粮食, 这是最解恨的一仗。</p>"
     + "<p><b>斗智三件套</b>: ①情报拼图(情报网村+武工队+研判)拼出合击点→提前疏散+路上布雷设伏; ②烧屯粮/破铁路→敌战役推迟、出动后疲劳更快; ③围点打援→佯攻炮楼引援军上路, 在半路密林全歼之。</p>"
     + "<p><b>政治即军事</b>: 工作队驻村拉民心 — ≥50成根据地村(产粮兵), ≥60建情报网(帮你盯死日军动向)。但根据地越红火, 越招大扫荡: 5月的铁壁合围直扑总部, 是躲不掉的历史。</p>"
-    + "<p style='color:#8a8058'>操作(同文明六): <b>点部队 → 点目标格</b>。近处立即走到, 远处自动多回合行军(蓝虚线=路线, 可取消); <b>点相邻敌人=攻击</b>。设伏/埋雷/破袭在右侧栏 · 点村庄招兵 · 顶栏看敌情台账 · Enter 结束回合</p>"
+    + "<p style='color:#8a8058'>操作(同文明六): <b>点部队 → 点目标格</b>。桌面端把鼠标移到哪就先<b>预览路线</b>(金色=本旬走到, 蓝色=之后几旬, 终点标几旬); 近处立即走到, 远处自动多回合行军(可取消); <b>点相邻敌人=攻击</b>(悬停先看伤害预估)。设伏/埋雷/破袭在右侧栏 · 点村庄招兵 · 顶栏看敌情台账 · Enter 结束回合</p>"
     + "<div class='mbtns'>" + (hasSaveGame() ? "<button class='mbtn ghost' onclick='continueGame()'>继续上局</button>" : "") + "<button class='mbtn' onclick='startNew()'>" + (state && state.started ? "开打" : "新开一局") + "</button></div>");
 }
 function hasSaveGame() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
@@ -1319,6 +1371,7 @@ function continueGame() { if (loadGame()) { state.started = true; closeModal(); 
 function startNew() {
   newGame();
   state.started = true;
+  hover = null; sel = null; reach = null;
   closeModal(); computeVis(); centerCam(); updateTop(); updateBanner(); draw();
   log("═══ 1942年1月 · 太行军分区 ═══", "hl");
   log("上级通报: " + JP_BRIGADE + "盘踞铁路沿线, 囚笼正在收紧。你的任务: 熬过1942, 并让敌人为每一次扫荡付出代价", "hl");
@@ -1408,6 +1461,43 @@ function uiAttack(kind, q, r) {
 }
 // ═══════════ 输入 ═══════════
 let dragging = false, dragMoved = false, lastPt = null, pinchD = 0;
+// ── 悬停路径预览(文明六式): 鼠标移到哪, 先看见路线与要走几旬, 再决定点不点 ──
+let hover = null; // { q, r, path:[[q,r]...], turns, thisTurnSteps, kind:"move"|"attack"|"blocked" }
+function hoverClear() { if (!hover) return false; hover = null; return true; }
+function updateHover(px, py) {
+  if (!state || !state.started || state.over) { if (hoverClear()) draw(); return; }
+  const u = getSel();
+  const h = pxToHex(px, py);
+  if (!u || u.attacked || !h) { if (hoverClear()) draw(); return; }
+  const [q, r] = h;
+  if (hover && hover.q === q && hover.r === r) return; // 同一格不重算
+  if (u.q === q && u.r === r) { if (hoverClear()) draw(); return; }
+  // 相邻敌人/据点 → 预览为攻击
+  if (hexDist(u.q, u.r, q, r) === 1 && UT_P[u.type].str > 0) {
+    const col = state.units.find(x => x.side === "j" && x.kind === "col" && x.q === q && x.r === r && seenByPlayer(x));
+    const stg = state.units.find(x => x.side === "j" && x.kind === "strag" && x.q === q && x.r === r && seenByPlayer(x));
+    const sh = state.tiles[q][r].sh;
+    if (col || stg || (sh && visSet.has(key(q, r)))) {
+      let label = "⚔ 攻击";
+      if (col) { const cs = colStr(col); label = "⚔ 预计 -" + Math.round(expectDmg(pStr(u, "atk"), cs * 0.55 + terrDef(q, r)) * (u.ambush ? CFG.ambushMult : 1)) + (u.ambush ? " (伏击·无反击)" : " / 挨 -" + Math.round(expectDmg(cs, pStr(u, "def")) * CFG.counterMult)); }
+      else if (stg) label = "⚔ 稳歼掉队之敌";
+      else if (sh) label = "⚔ 预计 -" + Math.round(expectDmg(pStr(u, "atk"), sh.str * 0.8) * (u.ambush ? CFG.ambushMult : 1));
+      hover = { q, r, path: null, kind: "attack", label };
+      draw(); return;
+    }
+  }
+  const path = farPath(u, q, r);
+  if (!path) { hover = { q, r, path: null, kind: "blocked", label: "✖ 过不去" }; draw(); return; }
+  // 算出本旬能走到第几步, 以及总共要几旬
+  let mp = u.mp, thisTurnSteps = 0;
+  for (let i = 1; i < path.length; i++) {
+    if (mp <= 0) break;
+    mp = Math.max(0, mp - stepCost(path[i][0], path[i][1]));
+    thisTurnSteps = i;
+  }
+  hover = { q, r, path, kind: "move", turns: pathTurns(u, path), thisTurnSteps };
+  draw();
+}
 function pxToHex(px, py) {
   const wx = (px + cam.x) / cam.zoom, wy = (py + cam.y) / cam.zoom;
   let best = null, bd = 1e9;
@@ -1455,12 +1545,17 @@ function handleTap(px, py) {
 }
 cv.addEventListener("pointerdown", e => { dragging = true; dragMoved = false; tapHandled = false; downPt = [e.clientX, e.clientY]; lastPt = [e.clientX, e.clientY]; });
 cv.addEventListener("pointermove", e => {
-  if (!dragging || !lastPt || !downPt) return;
-  const totalDx = e.clientX - downPt[0], totalDy = e.clientY - downPt[1];
-  if (Math.abs(totalDx) + Math.abs(totalDy) > 10) dragMoved = true;
-  if (dragMoved) { cam.x -= e.clientX - lastPt[0]; cam.y -= e.clientY - lastPt[1]; lastPt = [e.clientX, e.clientY]; draw(); }
+  if (dragging && lastPt && downPt) {
+    const totalDx = e.clientX - downPt[0], totalDy = e.clientY - downPt[1];
+    if (Math.abs(totalDx) + Math.abs(totalDy) > 10) dragMoved = true;
+    if (dragMoved) { cam.x -= e.clientX - lastPt[0]; cam.y -= e.clientY - lastPt[1]; lastPt = [e.clientX, e.clientY]; hoverClear(); draw(); return; }
+  }
+  if (dragging) return;
+  if (e.pointerType === "touch") { if (hoverClear()) draw(); return; } // 触屏没有悬停, 别抢手势(并清掉鼠标留下的预览)
+  updateHover(e.clientX, e.clientY);
 });
-cv.addEventListener("pointercancel", () => { dragging = false; dragMoved = false; });
+cv.addEventListener("pointerleave", () => { if (hoverClear()) draw(); });
+cv.addEventListener("pointercancel", () => { dragging = false; dragMoved = false; hoverClear(); });
 cv.addEventListener("pointerup", e => {
   dragging = false;
   if (dragMoved || tapHandled) return;
