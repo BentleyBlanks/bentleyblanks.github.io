@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b201b">
+  <meta name="description" content="《敌后火种 · 1941—1942》——中国共产党领导的华北敌后六角格根据地建设型文明 Demo。">
+  <title>敌后火种 · 1941—1942｜六角格根据地建设型文明 Demo</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260727c">
+</head>
+<body>
+  <a class="skipLink" href="#mapCanvas">跳至太行县境图</a>
+
+  <section id="openingScreen" class="openingScreen" aria-labelledby="openingTitle">
+    <div class="openingTerrain" aria-hidden="true">
+      <i class="terrainMass terrainMassOne"></i>
+      <i class="terrainMass terrainMassTwo"></i>
+      <i class="terrainRail terrainRailOne"></i>
+      <i class="terrainRail terrainRailTwo"></i>
+      <span class="terrainPoint pointOne"></span>
+      <span class="terrainPoint pointTwo"></span>
+      <span class="terrainPoint pointThree"></span>
+      <span class="terrainPoint pointFour"></span>
+    </div>
+
+    <div class="openingFrame">
+      <main class="openingStatement">
+        <p class="openingEyebrow">HEX BASE-BUILDING · HISTORICAL CIVILIZATION DEMO</p>
+        <div class="openingHeading">
+          <span class="openingSeal" aria-hidden="true">敌后</span>
+          <div>
+            <h1 id="openingTitle">敌后火种</h1>
+            <p class="openingYears">1941—1942</p>
+          </div>
+        </div>
+        <p class="openingLead">一款六角格根据地建设型文明 Demo：最困难的年月里，每一寸生存空间都来自人民、组织与生产建设的共同坚持。</p>
+        <p class="openingCopy">你受命建设并守住中国共产党领导的太行敌后根据地一县。依靠群众路线，把党组织扎进村庄，安排农田、诊所、地道与兵工等工程，使工作队、八路军正规军、地方游击队与民兵协同；在封锁、扫荡、缺粮、缺药与情报不全中保存群众、积蓄力量、破袭敌军交通。</p>
+
+        <ol class="openingLoop" aria-label="核心回合循环">
+          <li><b>研判</b><span>辨明扫荡与封锁方向</span></li>
+          <li><b>组织</b><span>配置粮秣、干部与情报</span></li>
+          <li><b>生产建设</b><span>排定村庄工程与产出队列</span></li>
+          <li><b>协同部署</b><span>工作队先行，多层武装保护成果</span></li>
+          <li><b>结算</b><span>承受反制并记录全部代价</span></li>
+        </ol>
+
+        <div class="openingActions">
+          <button id="startButton" class="primaryButton" type="button">开始建设根据地</button>
+          <button id="continueButton" class="secondaryButton" type="button" hidden>继续上次战局</button>
+          <button id="historyBoundaryButton" class="textButton" type="button">阅读史实边界与表达原则</button>
+        </div>
+      </main>
+
+      <aside class="openingBoundary" aria-label="历史边界与玩法立场">
+        <p class="boundaryIndex">历史档案 · 太行一县</p>
+        <h2>固定的历史终点，能够改变的人民代价</h2>
+        <div class="boundaryRule">
+          <b>历史终点固定</b>
+          <p>战局从 1941 年 9 月推进至 1942 年 12 月，共 16 回合。既定历史不由玩家改写；你改变的是根据地建设与保存、人民承受的代价和敌后抗战贡献。</p>
+        </div>
+        <div class="boundaryRule">
+          <b>人民不是可消费数值</b>
+          <p>平民受难不计分、不转化为资源。流离、饥饿、伤亡与村庄受创只进入不可粉饰的代价账本。</p>
+        </div>
+        <div class="boundaryRule">
+          <b>中流砥柱是一套实践</b>
+          <p>党的领导、群众路线、基层组织和多层武装协同共同支撑敌后战场，而不是一项脱离人民的被动加成。</p>
+        </div>
+        <div class="boundaryRule">
+          <b>玩法原则</b>
+          <p>保存力量，依靠人民，坚持敌后抗战；军事行动必须服务于群众安全与根据地建设。</p>
+        </div>
+        <p class="openingFootnote">程序化六角格 · 固定种子 · 本地存档 · 零外部资源</p>
+      </aside>
+    </div>
+  </section>
+
+  <div id="gameShell" class="gameShell" hidden>
+    <header class="warLedger" aria-label="战时总账">
+      <div class="campaignIdentity">
+        <span class="identitySeal" aria-hidden="true">火种</span>
+        <span><b>敌后火种</b><small>太行一县 · 1941—1942</small></span>
+      </div>
+
+      <div class="campaignClock" aria-label="当前时间与阶段">
+        <span id="dateLabel">1941 年 9 月</span>
+        <b id="turnLabel">第 1 / 16 回合</b>
+        <small id="phaseLabel">敌情研判</small>
+      </div>
+
+      <div class="resourceLedger" aria-label="根据地资源与战局指标">
+        <button class="resourceEntry" type="button" data-ledger-kind="grain" title="粮秣：部队行动、群众救济与转移所需">
+          <span>粮秣</span><b id="grainValue">18</b><small>担</small>
+        </button>
+        <button class="resourceEntry" type="button" data-ledger-kind="arms" title="军械：武装行动与民兵训练所需">
+          <span>军械</span><b id="armsValue">9</b><small>份</small>
+        </button>
+        <button class="resourceEntry" type="button" data-ledger-kind="medicine" title="医疗：救治伤员与保护群众所需">
+          <span>医疗</span><b id="medicineValue">6</b><small>箱</small>
+        </button>
+        <button class="resourceEntry" type="button" data-ledger-kind="intel" title="情报：揭示扫荡、伏击与安全路线">
+          <span>情报</span><b id="intelValue">7</b><small>级</small>
+        </button>
+        <button class="resourceEntry" type="button" data-ledger-kind="cadres" title="干部：建设基层组织与恢复群众工作">
+          <span>干部</span><b id="cadresValue">5</b><small>组</small>
+        </button>
+        <button class="resourceEntry peopleEntry" type="button" data-ledger-kind="people" title="人民安全：群众生活、组织信任与根据地韧性">
+          <span>人民安全</span><b id="peopleValue">62</b><small>/ 100</small>
+        </button>
+        <button class="resourceEntry exposureEntry" type="button" data-ledger-kind="exposure" title="暴露：过高将引来封锁与扫荡">
+          <span>暴露</span><b id="exposureValue">24</b><small>/ 100</small>
+        </button>
+        <button class="resourceEntry contributionEntry" type="button" data-ledger-kind="contribution" title="贡献：敌后牵制、破袭与根据地建设的综合记录">
+          <span>贡献</span><b id="contributionValue">0</b><small>记录</small>
+        </button>
+      </div>
+
+      <nav class="utilityRail" aria-label="指挥所工具">
+        <button id="menuButton" class="utilityButton" type="button" aria-label="打开战局菜单" title="战局菜单"><i aria-hidden="true">令</i><span>菜单</span></button>
+        <button id="saveButton" class="utilityButton" type="button" aria-label="保存当前战局" title="保存当前战局"><i aria-hidden="true">存</i><span>保存</span></button>
+        <button id="rulesButton" class="utilityButton" type="button" aria-label="查看规则与操作说明" title="规则与操作说明"><i aria-hidden="true">则</i><span>规则</span></button>
+        <button id="ledgerButton" class="utilityButton" type="button" aria-label="查看战争代价账簿" title="战争代价账簿"><i aria-hidden="true">账</i><span>账簿</span></button>
+        <button id="policyButton" class="utilityButton" type="button" aria-label="配置根据地政策" title="根据地政策"><i aria-hidden="true">策</i><span>政策</span></button>
+        <button id="doctrineButton" class="utilityButton" type="button" aria-label="查看群众与军事方针" title="群众与军事方针"><i aria-hidden="true">纲</i><span>方针</span></button>
+      </nav>
+    </header>
+
+    <main class="battlefieldGrid">
+      <section class="mapPanel panelChrome" aria-labelledby="mapPanelTitle">
+        <header class="mapHeader">
+          <div>
+            <p class="panelEyebrow">太行军区 · 县境态势</p>
+            <h2 id="mapPanelTitle">根据地、交通线与扫荡方向</h2>
+          </div>
+          <p id="mapHint">点选六角格查看村庄与部队；拖动平移，滚轮或双指缩放。键盘聚焦地图后，用方向键巡查、Enter 选择。</p>
+          <ul id="mapLegend" class="mapLegend" aria-label="地图图例">
+            <li><i class="legendBase" aria-hidden="true"></i>根据地</li>
+            <li><i class="legendRail" aria-hidden="true"></i>敌军交通</li>
+            <li><i class="legendThreat" aria-hidden="true"></i>扫荡威胁</li>
+          </ul>
+        </header>
+
+        <div class="mapStage">
+          <canvas id="mapCanvas" width="1200" height="760" tabindex="0" aria-label="太行一县可操作六角格地图" aria-describedby="mapHint mapLegend">你的浏览器需要支持 Canvas；也可以使用地图下方的地块导航。</canvas>
+          <div class="mapPaperMark mapMarkNorth" aria-hidden="true">北</div>
+          <div class="mapPaperMark mapMarkScale" aria-hidden="true">县境态势 · 比例示意</div>
+          <div class="mapControls" aria-label="地图视图控制">
+            <button id="zoomInButton" type="button" aria-label="放大地图" title="放大地图">＋</button>
+            <button id="zoomOutButton" type="button" aria-label="缩小地图" title="缩小地图">－</button>
+            <button id="centerMapButton" type="button" aria-label="地图居中" title="地图居中">中</button>
+            <button id="layerButton" type="button" aria-label="切换地图图层" title="切换地图图层">层</button>
+          </div>
+        </div>
+
+        <nav id="hexNavigator" class="hexNavigator" aria-label="可访问地块导航">
+          <p>地块导航将在战局载入后生成；可用 Tab 逐格巡查。</p>
+        </nav>
+      </section>
+
+      <div class="informationDrawer">
+        <div class="drawerGrip" aria-hidden="true"><i></i><span>战局简报与部署</span></div>
+
+        <aside class="leftRail panelChrome" aria-label="任务与历史进程">
+          <header class="panelHeader">
+            <p class="panelEyebrow">县委指挥所</p>
+            <h2>当前任务</h2>
+          </header>
+
+          <section class="objectiveCard">
+            <span class="sectionIndex">本回合要务</span>
+            <p id="objectiveText">查明敌军据点的出动方向，并在不惊动群众转移线的前提下完成两项部署。</p>
+          </section>
+
+          <section class="warningCard" aria-labelledby="warningTitle">
+            <h3 id="warningTitle">敌情警报</h3>
+            <p id="warningText">封锁线正在收紧。暴露达到 60 后，敌军可能提前发动扫荡。</p>
+          </section>
+
+          <section class="timelineSection">
+            <div class="sectionHeading">
+              <span><small>固定历史进程</small><b>1941—1942</b></span>
+              <em>16 回合</em>
+            </div>
+            <ol id="timelineList" class="timelineList">
+              <li class="isCurrent"><time>1941.9</time><span><b>最困难时期</b><small>封锁加剧，先保存群众与组织</small></span></li>
+              <li><time>1942.1</time><span><b>生产自救</b><small>安排村庄工程和冬春产出</small></span></li>
+              <li><time>1942.5</time><span><b>反扫荡准备</b><small>情报、疏散与隐蔽交通</small></span></li>
+              <li><time>1942.12</time><span><b>根据地韧性检验</b><small>以建设、保存和贡献结算本局</small></span></li>
+            </ol>
+          </section>
+
+          <section class="historyBoundaryNote">
+            <b>历史边界</b>
+            <p>胜负评价不改变抗战史实。任何平民伤亡、流离与饥饿都只记入代价账本。</p>
+          </section>
+        </aside>
+
+        <aside class="rightInspector panelChrome" aria-label="地块、单位与行动">
+          <header class="selectedHeader">
+            <div>
+              <p class="panelEyebrow">当前选中</p>
+              <h2 id="selectedTitle">尚未选择地块</h2>
+            </div>
+            <span id="selectedMeta" class="selectedMeta">县境待研判</span>
+          </header>
+
+          <div id="selectedStats" class="selectedStats">
+            <div><dt>群众基础</dt><dd>—</dd></div>
+            <div><dt>组织程度</dt><dd>—</dd></div>
+            <div><dt>敌军压力</dt><dd>—</dd></div>
+            <div><dt>地区暴露</dt><dd>—</dd></div>
+          </div>
+
+          <section id="selectedUnit" class="selectedUnit" aria-label="选中单位">
+            <span class="unitMark" aria-hidden="true">待</span>
+            <div><b>选择工作队或建设力量</b><p>优先查看工作队、村庄建设与基层组织；正规军、游击队和民兵主要负责保护建设成果，主力战斗不是唯一目标。</p></div>
+          </section>
+
+          <section class="actionSection" aria-labelledby="actionHeading">
+            <div class="sectionHeading compactHeading">
+              <span><small>本回合部署</small><b id="actionHeading">可用行动</b></span>
+              <em>先选择地块</em>
+            </div>
+            <div id="actionList" class="actionList">
+              <button class="actionCard" type="button" disabled><b>等待地图研判</b><span>选择地块后显示可执行行动及其代价。</span></button>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="commandDock" aria-label="本回合命令队列">
+      <div class="commandBudget">
+        <span>可用指挥</span>
+        <b id="commandValue">4 / 4</b>
+        <i aria-hidden="true"><em></em><em></em><em></em><em></em></i>
+      </div>
+
+      <div id="orderList" class="orderList" aria-live="polite">
+        <p class="emptyOrders"><b>尚未下达命令</b><span>从右侧行动表加入部署；同步结算前可以撤回。</span></p>
+      </div>
+
+      <div class="commandActions">
+        <button id="clearOrdersButton" class="clearOrdersButton" type="button" disabled>清空命令</button>
+        <button id="executeButton" class="executeButton" type="button">执行本回合 <kbd>Ctrl+Enter</kbd></button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="modalBackdrop" class="modalBackdrop" hidden></div>
+
+  <section id="standardModal" class="modal standardModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1" hidden>
+    <button class="modalCloseButton" type="button" data-close-modal>关闭</button>
+    <p id="modalEyebrow" class="modalEyebrow">敌后战场手册</p>
+    <h2 id="modalTitle">规则与史实边界</h2>
+    <div id="modalBody" class="modalBody"></div>
+    <footer id="modalFooter" class="modalFooter"></footer>
+  </section>
+
+  <section id="reportModal" class="modal reportModal" role="dialog" aria-modal="true" aria-labelledby="reportTitle" tabindex="-1" hidden>
+    <header class="reportHeader">
+      <div>
+        <p class="modalEyebrow">同步结算 · 因果可追</p>
+        <h2 id="reportTitle">本回合战报</h2>
+      </div>
+      <span class="reportArchive">县委作战记录</span>
+    </header>
+    <div id="reportSummary" class="reportSummary"></div>
+    <div class="reportColumns">
+      <section><h3>我方部署</h3><div id="playerReportList" class="reportList"></div></section>
+      <section><h3>敌军反制</h3><div id="enemyReportList" class="reportList"></div></section>
+      <section class="costColumn"><h3>人民与组织代价账本</h3><div id="costReportList" class="reportList costReportList"></div></section>
+    </div>
+    <footer class="reportFooter">
+      <p>平民受难不提供分数或资源；账本中的损失将持续影响后续回合。</p>
+      <button id="reportContinueButton" class="primaryButton" type="button">进入下一回合</button>
+    </footer>
+  </section>
+
+  <section id="outcomeModal" class="modal outcomeModal" role="dialog" aria-modal="true" aria-labelledby="outcomeTitle" tabindex="-1" hidden>
+    <header class="outcomeHeader">
+      <span id="outcomeGrade" class="outcomeGrade">待评</span>
+      <div>
+        <p class="modalEyebrow">1942 年冬 · 县境总结</p>
+        <h2 id="outcomeTitle">火种是否留在人民之中</h2>
+        <p id="outcomeSummary">本局结算将根据人民保护、组织保存、敌军牵制与根据地贡献作出评价。</p>
+      </div>
+    </header>
+    <div id="outcomeEvidence" class="outcomeEvidence"></div>
+    <div id="outcomeLedger" class="outcomeLedger"></div>
+    <blockquote>中国共产党领导的敌后根据地，以群众路线、基层组织与多层武装协同坚持抗战，成为全民族抗战的中流砥柱。胜利属于长期坚持抗战的中国人民。</blockquote>
+    <footer class="modalFooter outcomeFooter">
+      <button id="restartButton" class="secondaryButton" type="button">重新推演</button>
+      <a class="primaryButton linkButton" href="../">返回太行玩法白盒</a>
+    </footer>
+  </section>
+
+  <div id="toastRegion" class="toastRegion" aria-live="polite" aria-atomic="true"></div>
+  <div id="liveRegion" class="visuallyHidden" aria-live="assertive" aria-atomic="true"></div>
+
+  <script type="module" src="./Script_Game.mjs?v=20260727b"></script>
+</body>
+</html>
