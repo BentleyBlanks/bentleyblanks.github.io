@@ -66,10 +66,6 @@ export function PeekNextStageId(current) {
   return null;
 }
 
-const BALLISTIC_INACTIVE_IDS = new Set([
-  "rapidFire", "multiShot", "bulletSpeed", "lightGravity", "bounceShell", "pierceShell",
-]);
-
 const NO_FIRE_INACTIVE_IDS = new Set([
   "noSelfHit", "rapidFire", "multiShot", "bulletSpeed", "lightGravity", "bounceShell", "pierceShell",
 ]);
@@ -78,7 +74,6 @@ const NO_FIRE_INACTIVE_IDS = new Set([
 export function IsUpgradeApplicable(card, nextStageData = null) {
   if (!card || !nextStageData) return true;
   if (nextStageData.specialKind === "noFire") return !NO_FIRE_INACTIVE_IDS.has(card.id);
-  if (nextStageData.specialKind === "ballisticPuzzle") return !BALLISTIC_INACTIVE_IDS.has(card.id);
   return true;
 }
 

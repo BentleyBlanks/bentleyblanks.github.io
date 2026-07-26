@@ -81,7 +81,7 @@ Difficulty copy: fixed standard mode; campaign starts directly at mission 1 (the
 
 Focused campaign progression: **9 missions in 3 acts**, with data ids `[1, 2, 3, 4, 5, 6, 7, 8, 15]` (`CAMPAIGN_STAGE_IDS`). Stage 6 flows through `barricadeTeach`, then stage 7. All 15 legacy definitions remain selectable through Debug, but ids 9–14 are not on the default route. Main-route Bosses are ids 3, 6, and 15.
 
-Legacy special contracts remain supported: `ballisticPuzzle` missions use one recoverable shell, and stage 14 `noFire` / `enemyOnlyCrossfire` retires its last survivor so it cannot softlock. Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
+Every normal mission supports continuous firing through the standard active-bullet cap. There is no ammo pickup, shell recovery, enemy ammo theft, front-hit immunity, or mission-specific shell mode. Stage 14 `noFire` / `enemyOnlyCrossfire` intentionally locks the player cannon and retires its last survivor so it cannot softlock. Anchor tanks (`anchorTank`) ignore bullet gravity and push carryable barricades.
 
 Enemy friendly fire is active throughout ordinary play. Enemy-caused kills increment `stageCrossfireKills` but never grant player score. `BuildStageClearReport` scores HQ durability, player kills, and clear time.
 

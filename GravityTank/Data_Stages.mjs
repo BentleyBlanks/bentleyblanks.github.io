@@ -192,10 +192,7 @@ export const STAGES = [
   },
   {
     id: 4,
-    specialStage: true,
-    specialKind: "ballisticPuzzle",
-    ballisticVariant: "singleShell",
-    title: "弹道折线",
+    title: "重力走廊",
     enemies: { basic: 8, fast: 2, power: 1, armor: 1 },
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
     playerSpawns: [[8, 24], [16, 24]],
@@ -304,9 +301,6 @@ export const STAGES = [
   },
   {
     id: 7,
-    specialStage: true,
-    specialKind: "ballisticPuzzle",
-    ballisticVariant: "gravitySpin",
     title: "封喉陷阱",
     prepSeconds: 14,
     enemies: { basic: 4, fast: 4, power: 3, armor: 2, anchor: 1 },
@@ -439,10 +433,7 @@ export const STAGES = [
   },
   {
     id: 10,
-    specialStage: true,
-    specialKind: "ballisticPuzzle",
-    ballisticVariant: "bankShot",
-    title: "潮涌弹道",
+    title: "潮涌攻势",
     // Ordinary swarm: 3× classic ~20-enemy density.
     enemies: { basic: 54, fast: 6, power: 0, armor: 0 },
     enemySpawns: [[0, 0], [12, 0], [24, 0]],
@@ -607,10 +598,7 @@ function BuildExtendedMap(style = 0) {
 STAGES.push(
   {
     id: 13,
-    specialStage: true,
-    specialKind: "ballisticPuzzle",
-    ballisticVariant: "relayMaze",
-    title: "弹道迷宫",
+    title: "钢铁迷宫",
     enemies: { basic: 10, fast: 7, power: 7, armor: 3, anchor: 1 },
     enemySpawns: [[1, 1], [12, 1], [23, 1]],
     playerSpawns: [[8, 20]],
