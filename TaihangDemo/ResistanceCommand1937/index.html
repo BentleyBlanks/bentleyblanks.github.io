@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#20251f">
+  <meta name="description" content="《山河不屈：敌后战场 1937—1945》——一款聚焦中国共产党领导的敌后战场、人民战争与全国抗战联动的大战略玩法白盒。">
+  <title>山河不屈：敌后战场 1937—1945｜大战略玩法白盒</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260727a">
+</head>
+<body>
+  <section id="openingScreen" class="openingScreen" aria-labelledby="openingTitle">
+    <div class="openingBackdrop" aria-hidden="true">
+      <div class="openingContour contourOne"></div>
+      <div class="openingContour contourTwo"></div>
+      <div class="openingRail railOne"></div>
+      <div class="openingRail railTwo"></div>
+      <div class="openingNetwork">
+        <i style="--x:18%;--y:62%"></i><i style="--x:32%;--y:43%"></i><i style="--x:49%;--y:33%"></i>
+        <i style="--x:53%;--y:58%"></i><i style="--x:68%;--y:49%"></i><i style="--x:72%;--y:70%"></i>
+      </div>
+    </div>
+    <main class="openingCard">
+      <p class="openingEyebrow">NATIONAL RESISTANCE · PLAYABLE GRAND STRATEGY WHITEBOX</p>
+      <div class="openingTitleRow">
+        <span class="openingSeal" aria-hidden="true">砥</span>
+        <div>
+          <h1 id="openingTitle">山河不屈</h1>
+          <p class="openingSubtitle">敌后战场 · 1937—1945</p>
+        </div>
+      </div>
+      <p class="openingLead">城市与铁路可以被占领，人民与组织不能被一张地图抹去。</p>
+      <p class="openingCopy">你负责统筹八个敌后战略区：发展基层网络、安排粮药与军械、研判扫荡方向、保护群众、破坏侵略军交通，并把敌后牵制转化为全国战局的支撑。八个历史阶段，约 15 分钟完整走完抗战核心循环。</p>
+      <div class="openingPillars" aria-label="核心玩法">
+        <article><b>组织人民</b><span>基层网络决定情报、供给、疏散与补员</span></article>
+        <article><b>保存力量</b><span>不以平民伤亡或击杀数换取胜利分数</span></article>
+        <article><b>战略牵制</b><span>破坏交通、钉住兵力，支援全国抗战</span></article>
+      </div>
+      <div class="openingLoop" aria-label="单回合流程">
+        <span>敌情研判</span><i aria-hidden="true">›</i><span>方针与生产</span><i aria-hidden="true">›</i>
+        <span>部署四令</span><i aria-hidden="true">›</i><span>同步结算</span><i aria-hidden="true">›</i><span>代价账本</span>
+      </div>
+      <div class="openingActions">
+        <button id="startButton" class="primaryButton" type="button">开始八年抗战</button>
+        <button id="continueButton" class="secondaryButton" type="button" hidden>继续上次战局</button>
+        <button id="historyBoundaryButton" class="textButton" type="button">史实边界与表达原则</button>
+      </div>
+      <p class="openingFootnote">机制合成地图 · 固定史实终点 · 本地自动存档 · 零外部资源</p>
+    </main>
+  </section>
+
+  <div id="gameShell" class="gameShell" hidden>
+    <header class="commandBar">
+      <div class="gameIdentity">
+        <span class="identitySeal" aria-hidden="true">砥</span>
+        <span><b>山河不屈</b><small id="chapterPeriod">1937—1938</small></span>
+      </div>
+      <div class="dateBlock">
+        <span id="chapterDate">1938年春</span>
+        <b id="turnCounter">第 1 / 8 阶段</b>
+      </div>
+      <div class="resourceStrip" aria-label="战时资源">
+        <button class="resourceChip" type="button" data-resource-help="grain" title="疏散、救济、坚壁与维持部队所需">
+          <span>粮</span><b id="grainValue">0</b><small>粮药</small>
+        </button>
+        <button class="resourceChip" type="button" data-resource-help="arms" title="破袭与游击行动所需">
+          <span>械</span><b id="armsValue">0</b><small>军械</small>
+        </button>
+        <button class="resourceChip" type="button" data-resource-help="organization" title="干部、交通员与武装骨干的可用能力">
+          <span>组</span><b id="organizationValue">0</b><small>组织</small>
+        </button>
+        <button class="resourceChip" type="button" data-resource-help="intelligence" title="提高敌情置信度并支撑安全行动">
+          <span>情</span><b id="intelligenceValue">0</b><small>情报</small>
+        </button>
+      </div>
+      <div class="nationalMeters" aria-label="全国战局指标">
+        <button class="nationalMeter" type="button" data-metric-help="peopleSafety">
+          <span>人民安全 <b id="peopleSafetyValue">0</b></span><i><em id="peopleSafetyMeter"></em></i>
+        </button>
+        <button class="nationalMeter" type="button" data-metric-help="contribution">
+          <span>敌后贡献 <b id="contributionValue">0</b></span><i><em id="contributionMeter"></em></i>
+        </button>
+        <button class="nationalMeter" type="button" data-metric-help="resilience">
+          <span>抗战韧性 <b id="resilienceValue">0</b></span><i><em id="resilienceMeter"></em></i>
+        </button>
+      </div>
+      <nav class="headerActions" aria-label="游戏菜单">
+        <button id="focusButton" class="headerButton" type="button">敌后长期方针</button>
+        <button id="rulesButton" class="iconButton" type="button" aria-label="规则与操作" title="规则与操作">?</button>
+        <button id="menuButton" class="iconButton" type="button" aria-label="战役菜单" title="战役菜单">☰</button>
+      </nav>
+    </header>
+
+    <main class="campaignLayout">
+      <aside id="briefingPanel" class="briefingPanel panelChrome" aria-label="历史阶段与全国部署">
+        <section class="chapterBrief">
+          <div class="sectionLabel"><span>历史阶段</span><small id="chapterProgress">01 / 08</small></div>
+          <h2 id="chapterTitle">挺进敌后</h2>
+          <p id="chapterSubtitle"></p>
+          <button id="chapterHistoryButton" class="inlineButton" type="button">查看史实背景与机制抽象</button>
+        </section>
+
+        <section class="enemyBrief" aria-labelledby="enemyBriefTitle">
+          <div class="sectionLabel"><span id="enemyBriefTitle">敌情研判</span><small id="intelConfidence">线索零散</small></div>
+          <div class="enemyIntentHeader"><b id="enemyIntentKind">据点扩张</b><span id="enemyIntensity">压力 40</span></div>
+          <p id="enemyIntentSummary"></p>
+          <div id="enemyTargetList" class="enemyTargetList"></div>
+        </section>
+
+        <section class="focusBrief">
+          <div class="sectionLabel"><span>当前敌后长期方针</span><small id="focusProgressLabel">0 / 2</small></div>
+          <button id="focusCardButton" class="focusCardButton" type="button">
+            <span><b id="focusName">群众路线</b><small id="focusBranch">组织人民</small></span>
+            <i><em id="focusProgressMeter"></em></i>
+            <p id="focusDescription"></p>
+          </button>
+        </section>
+
+        <section class="choiceBrief">
+          <div class="sectionLabel"><span>本期战略抉择</span><small>三选一</small></div>
+          <div id="crisisChoices" class="crisisChoices" role="radiogroup" aria-label="本期战略抉择"></div>
+        </section>
+
+        <section class="stanceBrief">
+          <div class="sectionLabel"><span>本期战略重心</span><small>可随时调整</small></div>
+          <div id="stanceOptions" class="compactOptions" role="group" aria-label="战略重心"></div>
+        </section>
+
+        <section class="productionBrief">
+          <div class="sectionLabel"><span>战时生产配置</span><small id="productionForecast">预计产出</small></div>
+          <div id="productionOptions" class="compactOptions productionOptions" role="group" aria-label="生产配置"></div>
+          <p id="productionDetail" class="productionDetail"></p>
+        </section>
+      </aside>
+
+      <section id="mapPanel" class="mapPanel panelChrome" aria-label="全国敌后战略态势图" tabindex="-1">
+        <div class="mapToolbar">
+          <div>
+            <b>全国敌后战略态势</b>
+            <span>机制合成图，不代表真实疆界</span>
+          </div>
+          <div class="mapLegend" aria-label="图例">
+            <span><i class="legendNetwork"></i>基层网络</span>
+            <span><i class="legendRail"></i>敌军交通</span>
+            <span><i class="legendThreat"></i>扫荡方向</span>
+          </div>
+        </div>
+        <div id="mapViewport" class="mapViewport">
+          <canvas id="strategyCanvas" aria-hidden="true"></canvas>
+          <div id="regionLayer" class="regionLayer" aria-label="可选择的敌后战略区"></div>
+          <div class="mapCaption northCaption">华北敌占交通体系</div>
+          <div class="mapCaption frontCaption">正面战场压力</div>
+          <div class="mapCaption rearCaption">战略后方</div>
+        </div>
+        <div class="mapStatusBar">
+          <span id="mapStatusText">点选一个战略区，查看基层网络、占领压力与可下达命令。</span>
+          <div class="frontStatus"><span>全国正面韧性</span><b id="frontIntegrityValue">0</b></div>
+          <div class="logisticsStatus"><span>敌运输效率</span><b id="japaneseLogisticsValue">0</b></div>
+          <div class="pinnedStatus"><span>牵制师团当量</span><b id="pinnedDivisionsValue">0</b></div>
+        </div>
+      </section>
+
+      <aside id="inspectorPanel" class="inspectorPanel panelChrome" aria-label="战略区详情与命令" tabindex="-1">
+        <div class="inspectorHeader">
+          <div>
+            <p id="regionTheatre">太行与冀南</p>
+            <h2 id="regionName">晋冀鲁豫敌后区</h2>
+          </div>
+          <span id="regionConnectionTag" class="connectionTag">交通网连通</span>
+        </div>
+        <p id="regionTrait" class="regionTrait"></p>
+        <div class="regionMetrics">
+          <div><span>基层网络 <b id="regionNetworkValue">0 / 4</b></span><i><em id="regionNetworkMeter"></em></i></div>
+          <div><span>群众支持 <b id="regionSupportValue">0</b></span><i><em id="regionSupportMeter"></em></i></div>
+          <div><span>敌军压力 <b id="regionPressureValue">0</b></span><i><em id="regionPressureMeter"></em></i></div>
+          <div><span>我方暴露 <b id="regionExposureValue">0</b></span><i><em id="regionExposureMeter"></em></i></div>
+          <div><span>地区受创 <b id="regionDamageValue">0</b></span><i><em id="regionDamageMeter"></em></i></div>
+        </div>
+        <div id="regionTags" class="regionTags"></div>
+        <div id="threatForecast" class="threatForecast"></div>
+        <div class="actionHeading">
+          <span>下达地区命令</span>
+          <small>同一区每期最多两项</small>
+        </div>
+        <div id="actionList" class="actionList"></div>
+      </aside>
+    </main>
+
+    <footer class="planDock" aria-label="本期作战计划">
+      <div class="commandBudget">
+        <span>指挥令</span>
+        <div id="commandPips" class="commandPips" aria-hidden="true"></div>
+        <b id="commandBudgetValue">4 / 4</b>
+      </div>
+      <div id="planList" class="planList">
+        <p class="emptyPlan"><b>本期尚无部署</b><span>先点地图战略区，再把行动加入计划；执行前均可撤回。</span></p>
+      </div>
+      <div class="planActions">
+        <button id="clearPlanButton" class="dockButton" type="button" disabled>清空计划</button>
+        <button id="executeTurnButton" class="executeButton" type="button">执行本期 <kbd>Enter</kbd></button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="modalBackdrop" class="modalBackdrop" hidden></div>
+
+  <section id="standardModal" class="modal standardModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1" hidden>
+    <button class="modalCloseButton" type="button" data-close-modal aria-label="关闭弹窗">×</button>
+    <p id="modalEyebrow" class="modalEyebrow">战役手册</p>
+    <h2 id="modalTitle">规则</h2>
+    <div id="modalBody" class="modalBody"></div>
+    <div id="modalFooter" class="modalFooter"></div>
+  </section>
+
+  <section id="resolutionModal" class="modal resolutionModal" role="dialog" aria-modal="true" aria-labelledby="resolutionTitle" tabindex="-1" hidden>
+    <header class="resolutionHeader">
+      <div><p class="modalEyebrow">同步结算 · 因果可追</p><h2 id="resolutionTitle">本期战报</h2></div>
+      <div id="resolutionPeriod" class="resolutionPeriod"></div>
+    </header>
+    <div id="resolutionSummary" class="resolutionSummary"></div>
+    <div class="resolutionColumns">
+      <section><h3>我方部署</h3><div id="actionReportList" class="reportList"></div></section>
+      <section><h3>敌军行动</h3><div id="enemyReportList" class="reportList"></div></section>
+      <section class="costLedger"><h3>代价账本</h3><div id="costReportList" class="costReportList"></div></section>
+    </div>
+    <div id="systemReportList" class="systemReportList"></div>
+    <footer class="resolutionFooter">
+      <p id="resolutionLesson"></p>
+      <button id="resolutionContinueButton" class="primaryButton" type="button">进入下一阶段</button>
+    </footer>
+  </section>
+
+  <section id="outcomeModal" class="modal outcomeModal" role="dialog" aria-modal="true" aria-labelledby="outcomeTitle" tabindex="-1" hidden>
+    <div class="outcomeHero">
+      <span id="outcomeGrade" class="outcomeGrade">A</span>
+      <div>
+        <p class="modalEyebrow">1945年8月 · 抗战胜利</p>
+        <h2 id="outcomeTitle">敌后脊梁</h2>
+        <p id="outcomeSummary"></p>
+      </div>
+    </div>
+    <div id="outcomeEvidence" class="outcomeEvidence"></div>
+    <div id="outcomeLedger" class="outcomeLedger"></div>
+    <blockquote>中国共产党领导的敌后战场，以组织人民、坚持抗战和战略牵制，成为全民族抗战的中流砥柱。胜利属于长期坚持抗战的全体中国人民。</blockquote>
+    <div class="modalFooter">
+      <button id="restartButton" class="secondaryButton" type="button">重新推演</button>
+      <a class="primaryButton linkButton" href="../">返回太行玩法白盒</a>
+    </div>
+  </section>
+
+  <div id="toastRegion" class="toastRegion" aria-live="polite" aria-atomic="true"></div>
+  <div id="liveRegion" class="visuallyHidden" aria-live="assertive"></div>
+
+  <script type="module" src="./Script_Game.mjs?v=20260727a"></script>
+</body>
+</html>

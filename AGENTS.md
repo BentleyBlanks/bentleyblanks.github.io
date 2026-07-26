@@ -115,6 +115,13 @@ Rules:
 - **改动后必须跑 `node TaihangDemo/Dihou1939/Script_SmokeTest.mjs`**（退出码即成败）。套件用桩 DOM 派发合成 pointer/click 断言「点部队→选中 / 点亮格→坐标真变 / 点红圈敌人→攻击真的执行且敌方掉血 / 5px 手抖算点击 / 30px 拖动不误选」，并跑 乱打/会玩/莽撞 三种 bot 各 80 回合，断言分数排序 会玩>莽撞>乱打（防缩头最优解与拼消耗最优解回潮）。
 - 抢修规则是策略核心：断轨旁有我军驻守→修不通；没人守→2-4 个月修通。评级封顶闸门在 `EndGame()`（根据地村<8 封 C，<12 封 A），破交计分有收益递减上限（`ScorePts()`）。
 
+### 子页面 `TaihangDemo/ResistanceCommand1937/`（山河不屈，全国敌后大战略白盒）
+
+- 原创“地图研判 → 方针/生产 → 四令规划 → 同步结算 → 代价账本”大战略循环；8 个固定历史阶段覆盖 1937—1945，约 15 分钟一局。1945 年日本投降是不可改写的史实终点，玩家只改变人民与组织付出的代价、敌后力量保存和战略贡献。
+- 基层网络必须贯穿情报、粮药、疏散和组织恢复；高评价同时要求人民安全、网络连通、抗战韧性与交通牵制。平民受难、流离、粮食被夺和骨干损失只进入代价账本，不得转化为奖励或主要计分。
+- 页面使用独立存档键 `resistancecommand1937_campaign_v1` 与检查点键 `resistancecommand1937_checkpoint_v1`，零外部运行时依赖；地图 Canvas 只绘制态势线，全部地区与命令必须保留可键盘/触控操作的 DOM 按钮。
+- 改动后必须跑 `node TaihangDemo/ResistanceCommand1937/Script_SmokeTest.mjs`。测试锁定固定种子、计划纯函数、敌情/疏散/坚壁的真实因果、方针与生产、存档 round-trip、100 局批量模拟、终局锁定，以及“均衡组织路线 > 消极不作为、莽攻会摧毁人民安全”。
+
 ## BehindTheLines Documentation
 
 - `BehindTheLines/` is the public documentation namespace for the private BehindTheLines Godot repository. Its canonical URL is `https://bentleyblanks.github.io/BehindTheLines/`.
