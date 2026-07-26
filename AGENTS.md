@@ -107,6 +107,14 @@ Rules:
 - 不要给这个页面加外部依赖或美术资产；不要与旧页面 `taihang/`（含历史 3D 实验）混用存档键，白盒固定用 `taihangdemo_*`。
 - 提交前至少做一次语法校验（抽出 `<script>` 后 `node --check`），并保持移动端可用（viewport / 触摸拖拽 / 双指缩放 / `@media 640px`）。
 
+### 子页面 `TaihangDemo/NightRaid/`（夜袭 · 正太路）
+
+- 独立的短局白盒：16 个昼夜、五支具名队伍、一条正太路。核心钩子是**夜里出击、天亮前回家** —— 天亮时还站在平原/公路/铁路上就会被搜索队咬住。
+- 与母页面完全隔离：自己的 `<script>`、自己的存档键 `nightraid_v1`，不复用 `taihangdemo_*`。同样零外部依赖（音效用 WebAudio 现场合成，环境不支持时自动降级，不影响可玩）。
+- **改动后必须跑 `node TaihangDemo/NightRaid/Script_SmokeTest.mjs`**（退出码即成败）。该套件不只测规则，还用桩 DOM 捕获 canvas 真实回调、派发合成 pointer/click 事件，断言「点部队→选中 / 点亮格→坐标真的变了 / 5px 手抖仍算点击 / 30px 拖动不误选」，并跨 24 个种子校验地图连通性、开局可达格数、以及「破袭→撤回隐蔽」的往返机动力预算。这几条都是历史上真实翻过车的地方，不要删。
+- 地图生成里有一条**可玩性保证**：每段无设施的铁路，北侧一格之内必须留一处隐蔽地形，否则那一段的"夜出昼归"根本走不通。改地形分带时别绕过它。
+- 调数值看 `CFG` / `ROLES` / `FORTS`；评级阈值与「铁路没打瘫就封顶」的闸门在 `EndGame()`。
+
 ## BehindTheLines Documentation
 
 - `BehindTheLines/` is the public documentation namespace for the private BehindTheLines Godot repository. Its canonical URL is `https://bentleyblanks.github.io/BehindTheLines/`.
