@@ -6,6 +6,7 @@
 <title>根据地 · 1937—1945</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--topH:56px;--pinH:26px}
 html,body{height:100%;overflow:hidden}
 body{background:#12100b;color:#d9cfb4;font-family:system-ui,"Noto Sans SC",sans-serif;font-size:13px;user-select:none}
 button{font-family:inherit;cursor:pointer}
@@ -24,16 +25,21 @@ button{font-family:inherit;cursor:pointer}
  color:#ffdcc9;font-size:15px;padding:11px 20px;border-radius:8px}
 #endBtn:hover{background:#87291d}
 #endBtn.ok{background:#2f5a28;border-color:#6fbf5a;color:#e8ffd9}
-#goal{position:fixed;top:calc(40px + env(safe-area-inset-top));left:10px;z-index:16;max-width:min(330px,54vw);
+#goal{position:fixed;top:calc(var(--topH) + var(--pinH) + 4px);left:10px;z-index:16;max-width:min(330px,54vw);
  background:rgba(28,24,16,.95);border:1px solid #574a2e;border-radius:7px;padding:7px 10px;font-size:12px;line-height:1.55}
+#goal .gh{display:flex;align-items:center;gap:6px;cursor:pointer}
+#goal .gh .ca{color:#a2977c;font-size:10px}
+#goal.min .gb{display:none}
 #goal b{color:#e8c97a}
 #goal .k{color:#8dbf6a}
-#pin{position:fixed;top:calc(40px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:15;
+#pin{position:fixed;top:var(--topH);left:50%;transform:translateX(-50%);z-index:15;
  background:rgba(28,24,16,.95);border:1px solid #574a2e;border-radius:6px;padding:4px 12px;font-size:12px;white-space:nowrap}
 #pin b{color:#e8c97a}
-#side{position:fixed;right:8px;top:calc(40px + env(safe-area-inset-top));z-index:18;width:330px;max-height:calc(100vh - 130px);
+#side{position:fixed;right:8px;top:calc(var(--topH) + var(--pinH) + 4px);z-index:18;width:330px;max-height:calc(100vh - var(--topH) - var(--pinH) - 90px);
  overflow-y:auto;background:rgba(28,24,16,.97);border:1px solid #574a2e;border-radius:8px;padding:10px 12px}
 #side h3{color:#f2e8cd;font-size:14.5px;margin-bottom:4px}
+#side.off{display:none}
+#sideX{float:right;background:#2b2418;border:1px solid #574a2e;color:#ddd2b4;border-radius:5px;padding:1px 9px;font-size:13px;line-height:1.5}
 #side h3 small{color:#a2977c;font-weight:400;font-size:11.5px;margin-left:6px}
 #side .row{margin:3px 0;font-size:12.5px;line-height:1.5}
 #side .hint{color:#a2977c;font-size:11.5px;line-height:1.5;margin-top:5px}
@@ -86,11 +92,23 @@ table.h td,table.h th{border-bottom:1px solid #3b3222;padding:4px 6px;text-align
 table.h th{color:#a2977c;font-weight:600}
 table.h td.n{text-align:right;font-variant-numeric:tabular-nums;color:#f2e8cd}
 @media(max-width:760px){
- #side{width:min(90vw,330px);top:auto;bottom:calc(66px + env(safe-area-inset-bottom));max-height:44vh}
- #logW{width:50vw}#logB{max-height:16vh;font-size:10.5px}
- #top{gap:6px;font-size:11.5px;padding:4px 6px}#top .r{font-size:11px}
- #goal{max-width:48vw;font-size:11px;padding:5px 7px}
- #pin{font-size:10.5px;padding:3px 7px;top:calc(38px + env(safe-area-inset-top))}
+ /* 顶部三层: 顶栏 → 牵制条(整宽单行) → 目标框(整宽可折叠), 由 --topH/--pinH 精确堆叠 */
+ #top{gap:5px;font-size:11px;padding:4px 6px}
+ #top .r{font-size:10.5px}
+ #top .r i{display:none}            /* 窄屏隐藏副信息, 保证顶栏不暴涨 */
+ .tb{padding:3px 7px;font-size:11.5px}
+ #pin{left:4px;right:4px;transform:none;max-width:none;text-align:center;font-size:10px;
+   padding:3px 6px;border-radius:5px;overflow-x:auto;white-space:nowrap}
+ #goal{left:4px;right:4px;max-width:none;font-size:10.5px;padding:5px 8px;line-height:1.45}
+ /* 城市/部队面板 = 底部抽屉, 让开结束回合按钮与日志条 */
+ #side{left:4px;right:4px;width:auto;top:auto;bottom:calc(52px + env(safe-area-inset-bottom));
+   max-height:min(42vh, calc(100vh - var(--topH) - var(--pinH) - var(--goalH) - 130px))}
+ /* 日志固定为窄条, 绝不伸到结束按钮下面 */
+ #logW{width:min(48vw,220px);bottom:calc(6px + env(safe-area-inset-bottom))}
+ #logB{max-height:14vh;font-size:10px}
+ #endBtn{right:6px;bottom:calc(6px + env(safe-area-inset-bottom));padding:9px 14px;font-size:13.5px}
+ #mb{padding:12px 13px}
+ .grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -1090,7 +1108,13 @@ try { lc = localStorage.getItem("genjudi.log") === "1"; } catch (e) {}
 function applyLog() { const w = $("logW"); if (!w) return; w.classList.toggle("cl", !!lc);
   $("logH").querySelector(".c").textContent = lc ? "▶" : "▼";
   const b = $("logU"); if (lc && lu) { b.textContent = lu > 99 ? "99+" : String(lu); b.classList.remove("hidden"); } else b.classList.add("hidden"); }
-function toggleLog(f) { lc = f === undefined ? !lc : !!f; if (!lc) lu = 0; try { localStorage.setItem("genjudi.log", lc ? "1" : "0"); } catch (e) {} applyLog(); }
+function toggleLog(f) {
+  lc = f === undefined ? !lc : !!f; if (!lc) lu = 0;
+  try { localStorage.setItem("genjudi.log", lc ? "1" : "0"); } catch (e) {}
+  const sd = $("side");
+  if (sd) { if (!lc && isNarrow()) sd.classList.add("off"); else sd.classList.remove("off"); }
+  applyLog();
+}
 function push(m, c) { const p = document.createElement("p"); if (c) p.className = c;
   p.textContent = (S ? turnDate(S.turn) + " " : "") + m;
   const b = $("logB"); b.appendChild(p); while (b.children.length > 80) b.removeChild(b.firstChild); b.scrollTop = b.scrollHeight;
@@ -1098,29 +1122,46 @@ function push(m, c) { const p = document.createElement("p"); if (c) p.className 
 function openM(h) { $("mb").innerHTML = h; $("mw").classList.remove("hidden"); }
 function closeM() { $("mw").classList.add("hidden"); }
 function mOpen() { return !$("mw").classList.contains("hidden"); }
-function refresh() { updTop(); updGoal(); side(); draw(); }
+function isNarrow() { return innerWidth <= 760; }
+// 实测顶栏/牵制条/目标框的真实高度并写入 CSS 变量: 顶栏折行也不会压住下面的层
+function layout() {
+  const t = $("top"), p = $("pin"), g = $("goal");
+  const th = t ? Math.ceil(t.getBoundingClientRect().height) : 56;
+  document.documentElement.style.setProperty("--topH", th + "px");
+  const ph = p && !p.classList.contains("hidden") ? Math.ceil(p.getBoundingClientRect().height) + 3 : 0;
+  document.documentElement.style.setProperty("--pinH", ph + "px");
+  const gh = g && !g.classList.contains("hidden") ? Math.ceil(g.getBoundingClientRect().height) + 3 : 0;
+  document.documentElement.style.setProperty("--goalH", gh + "px");
+  return th + ph + gh;
+}
+function refresh() { updTop(); updGoal(); side(); layout(); draw(); }
 function updTop() {
   const e = empire(), p = pinned();
   let up = 0; for (const u of S.units) if (u.side === "p") up += (UT[u.type].up || 0);
   up *= 1 + (polFx().upkeep || 0);
   const fd = e.food - up;
-  $("rFood").innerHTML = "🌾 粮 <b>" + e.food.toFixed(1) + "</b><i class='" + (fd >= 0 ? "up" : "dn") + "'> 维护-" + up.toFixed(1) + "</i>";
-  $("rProd").innerHTML = "🔨 工 <b>" + e.prod.toFixed(0) + "</b>";
-  $("rSci").innerHTML = "📖 学 <b>" + e.sci.toFixed(0) + "</b>" + (S.techCur ? "<i> · " + TECH[S.techCur].n + " " + Math.max(1, Math.ceil((TECH[S.techCur].cost * (S.eureka[S.techCur] ? .5 : 1) - S.techProg) / Math.max(1, e.sci))) + "回合</i>" : "");
-  $("rCult").innerHTML = "✊ 民心 <b>" + Math.round(S.cult) + "</b><i> 群众 " + Math.round(S.mass) + "</i>";
-  $("rMan").innerHTML = "🔫 军械 <b>" + Math.round(S.arms) + "</b>";
-  $("rTurn").innerHTML = turnDate(S.turn) + " <i style='color:#a2977c'>(" + S.turn + "/" + CFG.turns + ")</i>";
+  const nr = isNarrow();
+  $("rFood").innerHTML = "🌾<b>" + e.food.toFixed(nr ? 0 : 1) + "</b>" + (nr ? "" : " 粮 <i class='" + (fd >= 0 ? "up" : "dn") + "'>维护-" + up.toFixed(1) + "</i>");
+  $("rProd").innerHTML = "🔨<b>" + e.prod.toFixed(0) + "</b>" + (nr ? "" : " 工");
+  $("rSci").innerHTML = "📖<b>" + e.sci.toFixed(0) + "</b>" + (nr ? "" : " 学" + (S.techCur ? "<i> · " + TECH[S.techCur].n + " " + Math.max(1, Math.ceil((TECH[S.techCur].cost * (S.eureka[S.techCur] ? .5 : 1) - S.techProg) / Math.max(1, e.sci))) + "回合</i>" : ""));
+  $("rCult").innerHTML = "✊<b>" + Math.round(S.cult) + "</b>" + (nr ? "" : " 民心 <i>群众 " + Math.round(S.mass) + "</i>");
+  $("rMan").innerHTML = "🔫<b>" + Math.round(S.arms) + "</b>" + (nr ? "" : " 军械");
+  $("rTurn").innerHTML = (nr ? turnDate(S.turn).replace("年", ".").replace("月", "") : turnDate(S.turn)) + " <i style='color:#a2977c'>(" + S.turn + "/" + CFG.turns + ")</i>";
   $("bTech").classList.toggle("hot", !S.techCur);
-  $("bTech").textContent = S.techCur ? "研究:" + TECH[S.techCur].n : "研究(未定!)";
+  $("bTech").textContent = S.techCur ? (nr ? "研究✓" : "研究:" + TECH[S.techCur].n) : (nr ? "研究!" : "研究(未定!)");
   const m = slots(); let used = 0, tot = m.mil + m.eco + m.pol;
   for (const k of ["mil", "eco", "pol"]) for (const x of S.gov[k]) if (x) used++;
   $("bGov").classList.toggle("hot", used < tot);
-  $("bGov").textContent = "政策 " + used + "/" + tot;
-  $("pin").innerHTML = "🎖 敌后牵制侵华日军 <b>" + p.ours + "/" + p.tot + "</b> 个师团(" + Math.round(p.r * 100) + "%) · 解放区人口 <b>" + popCtl().toFixed(1) + "</b> 百万 · 抗日武装 <b>" + army().toFixed(1) + "</b> 万";
+  $("bGov").textContent = (nr ? "政策" : "政策 ") + used + "/" + tot;
+  $("pin").innerHTML = nr
+    ? "🎖 牵制日军 <b>" + p.ours + "/" + p.tot + "</b>(" + Math.round(p.r * 100) + "%) · 解放区 <b>" + popCtl().toFixed(0) + "</b>百万 · 武装 <b>" + army().toFixed(0) + "</b>万"
+    : "🎖 敌后牵制侵华日军 <b>" + p.ours + "/" + p.tot + "</b> 个师团(" + Math.round(p.r * 100) + "%) · 解放区人口 <b>" + popCtl().toFixed(1) + "</b> 百万 · 抗日武装 <b>" + army().toFixed(1) + "</b> 万";
   const idle = pcity().some(c => !c.queue && !c.pending);
   $("endBtn").className = idle ? "" : "ok";
   $("endBtn").textContent = idle ? "有城闲置 · 结束回合 ▶" : "结束回合 ▶";
 }
+let goalMin = 0;
+function toggleGoal() { goalMin = !goalMin; updGoal(); layout(); draw(); }
 function updGoal() {
   const g = $("goal");
   const st = [];
@@ -1140,16 +1181,22 @@ function updGoal() {
   let m = slots(), used = 0, tot = m.mil + m.eco + m.pol;
   for (const k of ["mil", "eco", "pol"]) for (const x of S.gov[k]) if (x) used++;
   if (used < tot) st.push("· <b>有空政策槽</b>(顶栏【政策】)");
-  g.innerHTML = "<b>本回合可做</b><br>" + (st.length ? st.slice(0, 5).join("<br>") : "· 都安排好了 — 结束回合");
+  const lim = isNarrow() ? 3 : 5;
+  g.innerHTML = "<div class='gh' onclick='toggleGoal()'><b>本回合可做</b><span class='ca'>" + (goalMin ? "▸展开" : "▾收起") + "</span></div>"
+    + "<div class='gb'>" + (st.length ? st.slice(0, lim).join("<br>") : "· 都安排好了 — 结束回合") + "</div>";
+  g.classList.toggle("min", !!goalMin);
 }
 
+let lastSelK = "";
 // ══════ 侧面板 ══════
 function side() {
   const el = $("side");
-  if (!sel) { el.classList.add("hidden"); return; }
+  if (!sel) { el.classList.add("hidden"); lastSelK = ""; return; }
   el.classList.remove("hidden");
+  const selK = sel.k + ":" + sel.id;
+  if (selK !== lastSelK) { lastSelK = selK; el.classList.remove("off"); if (isNarrow()) toggleLog(true); }
   const u = selU(), c = selC();
-  let h = "";
+  let h = "<button id='sideX' onclick='deselect()'>✕</button>";
   if (u) {
     const d = UT[u.type], t = S.tiles[u.q][u.r];
     h += "<h3>" + d.n + (u.lv ? " ★" + u.lv : "") + "<small>兵力 " + Math.round(u.hp) + " · 机动 " + u.mp + "/" + d.mp + "</small></h3>";
@@ -1224,7 +1271,7 @@ function side() {
   }
   el.innerHTML = h;
 }
-function deselect() { sel = null; reachM = null; hover = null; placeMode = null; side(); draw(); }
+function deselect() { sel = null; reachM = null; hover = null; placeMode = null; side(); layout(); draw(); }
 function selUnit(u) { sel = { k:"unit", id:u.id }; reachM = u.acted ? null : reach(u); side(); draw(); }
 function selById(id) { const u = S.units.find(x => x.id === id); if (u) selUnit(u); }
 function uiFound() { const u = selU(); if (u) { found(u); refresh(); } }
@@ -1344,18 +1391,28 @@ function showHelp() {
 }
 function confirmR() { openM("<h2>重新开始?<small>当前进度将丢失</small></h2><p>现在是 " + turnDate(S.turn) + ", 根据地 " + pcity().length + " 座。</p>"
   + "<div class='btns'><button class='mb2' onclick='showHelp()'>不, 返回</button><button class='mb2 gh' onclick='startNew()'>确认重开</button></div>"); }
-function cont() { if (load()) { S.started = 1; closeM(); vis(); centerCam(); refresh(); push("进度已恢复 · " + turnDate(S.turn), "h"); } }
+function cont() { if (load()) { S.started = 1; closeM(); vis(); refresh(); centerCam(); draw(); push("进度已恢复 · " + turnDate(S.turn), "h"); } }
 function startNew() {
   newGame(); S.started = 1; sel = null; reachM = null; placeMode = null;
-  closeM(); vis(); centerCam(); $("logB").innerHTML = ""; refresh();
+  closeM(); vis(); $("logB").innerHTML = ""; refresh(); centerCam(); draw();
   push("═══ 1937年11月 · 太原失守, 敌后战场开辟 ═══", "h");
   push("你有一座山村、一支民兵、一个工作队、一个建设队。左上角有「本回合可做」清单。", "h");
   push("先做: ①点村庄安排生产 ②建设队修农田 ③民兵【发动群众】 ④顶栏选一项研究", "g");
   const c = pcity()[0]; if (c) { sel = { k:"city", id:c.id }; side(); }
   checkEv();
 }
-function centerCam() { const c = pcity()[0] || { q:5, r:10 }; const [cx, cy] = hexC(c.q, c.r);
-  cam.z = innerWidth < 760 ? .58 : .85; cam.x = cx * cam.z - innerWidth / 2; cam.y = cy * cam.z - innerHeight / 2 + 20; }
+function centerCam(again) {
+  const c = pcity()[0] || { q:5, r:10 }, [cx, cy] = hexC(c.q, c.r);
+  cam.z = innerWidth < 760 ? .62 : .85;
+  const topUI = layout();
+  const sd = $("side"), sdOn = sd && !sd.classList.contains("hidden") && !sd.classList.contains("off");
+  let botUI = isNarrow() ? 64 : 40;
+  if (isNarrow() && sdOn) botUI = Math.max(botUI, innerHeight - sd.getBoundingClientRect().top + 6);
+  cam.x = cx * cam.z - innerWidth / 2;
+  cam.y = cy * cam.z - (topUI + (innerHeight - topUI - botUI) / 2);
+  // 侧栏/目标框可能在本帧之后才排版完, 下一帧按真实高度再对一次焦
+  if (!again) requestAnimationFrame(() => { centerCam(1); draw(); });
+}
 // ══════ 输入 ══════
 let drag = 0, dmov = 0, lastP = null, downP = null, tapd = 0, pinch = 0;
 function pxHex(px, py) {
@@ -1451,9 +1508,9 @@ $("bGov").addEventListener("click", showGov);
 $("bStat").addEventListener("click", showStat);
 $("bHelp").addEventListener("click", showHelp);
 $("logH").addEventListener("click", () => toggleLog());
-addEventListener("resize", () => { syncCv(); draw(); });
+addEventListener("resize", () => { syncCv(); layout(); draw(); });
 // ══════ 启动 ══════
-applyLog(); syncCv(); newGame(); vis(); centerCam(); refresh(); showHelp();
+applyLog(); syncCv(); newGame(); vis(); if (isNarrow()) { lc = 1; applyLog(); } layout(); refresh(); centerCam(); draw(); showHelp();
 
 </script>
 </body>
