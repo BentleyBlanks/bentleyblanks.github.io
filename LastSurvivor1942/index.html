@@ -1,0 +1,134 @@
+<!doctype html>
+<!-- Three.js 0.185.1 is used under the MIT License: https://github.com/mrdoob/three.js/blob/dev/LICENSE -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#171912">
+  <meta name="description" content="《火种：1942》从普通农妇秦桂枝的视角，讲述冀中敌后百姓穿越封锁、保存联络的第三人称 3D 潜行撤离故事。">
+  <meta property="og:title" content="火种：1942 · 最后关门的人">
+  <meta property="og:description" content="不是歼敌数字，而是群众能否活着穿过封锁线。一个约 8—12 分钟的原创 3D 敌后生存原型。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bentleyblanks.github.io/LastSurvivor1942/">
+  <meta name="twitter:card" content="summary">
+  <title>火种：1942 · 最后关门的人</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="./Style_Game.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="GameShell" class="gameShell">
+    <canvas id="GameCanvas" class="gameCanvas" tabindex="0" aria-label="火种1942三维敌后战场。使用 WASD 移动，E 互动，Shift 奔跑，空格投石引开巡逻。"></canvas>
+    <div class="worldShade" aria-hidden="true"></div>
+    <div class="filmGrain" aria-hidden="true"></div>
+
+    <header id="TopBar" class="topBar hidden" aria-label="行动状态">
+      <div class="brandBlock"><span class="brandSeal">火</span><span><strong>火种 · 1942</strong><small>最后关门的人 / 冀中平原</small></span></div>
+      <div class="statusRail">
+        <div><small>随行群众</small><strong id="CivilianValue">0</strong><em>人</em></div>
+        <div><small>口粮</small><strong id="GrainValue">1</strong><em>/ 4</em></div>
+        <div><small>伤员</small><strong id="WoundedValue">2</strong><em>人</em></div>
+        <div class="alertStatus"><small>封锁警戒</small><strong id="AlertValue">12</strong><em>%</em></div>
+      </div>
+      <div class="timeBlock"><small>合围收紧</small><strong id="TimeValue">09:00</strong><button id="PauseButton" type="button" aria-label="暂停行动">Ⅱ</button></div>
+    </header>
+
+    <aside id="ObjectivePanel" class="objectivePanel hidden" aria-label="行动目标">
+      <p id="ActLabel" class="panelEyebrow">第一幕 · 灶火熄灭</p>
+      <h1>把家人和名字带出去</h1>
+      <div id="ObjectiveList" class="objectiveList"></div>
+      <button id="HistoryButton" class="historyButton" type="button"><span>史实与创作边界</span><b>查看依据 →</b></button>
+    </aside>
+
+    <aside id="ConditionPanel" class="conditionPanel hidden" aria-label="村民状态">
+      <div class="portraitGlyph" aria-hidden="true"><i></i><span>秦</span></div>
+      <div class="conditionCopy"><strong>秦桂枝 · 吴家庄农民</strong><small id="ConditionText">带伤行动</small><i><em id="HealthFill"></em></i></div>
+      <div class="hopeMeter"><small>队伍意志</small><strong id="HopeValue">28</strong></div>
+    </aside>
+
+    <section id="EventLog" class="eventLog hidden" aria-live="polite" aria-label="战场事件"></section>
+    <div id="LocationLabel" class="locationLabel hidden"><small>当前区域</small><strong>被毁交通站</strong></div>
+    <div id="InteractionPrompt" class="interactionPrompt hidden" role="status"><kbd>E</kbd><span id="InteractionText">互动</span></div>
+    <div id="DetectedWarning" class="detectedWarning hidden" role="alert"><span>已被发现</span><small>脱离视线或进入草垛 / 枯井</small></div>
+    <div id="NarrativeCaption" class="narrativeCaption hidden" aria-live="polite"><small id="CaptionTitle"></small><p id="CaptionText"></p></div>
+
+    <div id="ControlHint" class="controlHint hidden">
+      <span><kbd>WASD</kbd> 移动</span><span><kbd>Shift</kbd> 奔跑</span><span><kbd>E</kbd> 互动</span><span><kbd>空格</kbd> 投石引开</span><span><kbd>H</kbd> 使用药品</span>
+    </div>
+    <div id="TouchControls" class="touchControls hidden" aria-label="触屏操作">
+      <div id="MoveStick" class="moveStick"><i></i></div>
+      <div class="touchActions"><button id="TouchDistract" type="button">投石</button><button id="TouchMedicine" type="button">用药</button><button id="TouchInteract" class="primaryTouch" type="button">互动</button></div>
+    </div>
+
+    <section id="StartScreen" class="startScreen" aria-labelledby="StartTitle">
+      <div class="startBackdrop" aria-hidden="true"><span></span><i></i></div>
+      <header class="startHeader">
+        <a href="../" class="studioMark" aria-label="返回 Bentley Blanks 首页"><b>BB</b><span>BENTLEY BLANKS<small>HISTORICAL PLAYABLE PROTOTYPE</small></span></a>
+        <button id="StartHistoryButton" type="button">史实与创作边界</button>
+      </header>
+      <div class="startContent">
+        <p class="dateLine"><span></span>一九四二年 · 冀中敌后</p>
+        <h2 id="StartTitle"><small>最后关门的人</small><strong>火种<span>：1942</span></strong></h2>
+        <p class="leadCopy">你叫秦桂枝，是吴家庄的农民。侵华日军烧了东屋、抢走种粮，把邻里捆在祠堂前。<br>你熟悉每一道水沟、每一户家门——今天，轮到你带大家活着出去。</p>
+        <blockquote>“东沟是咱们一锹一锹修的。伤员走沟底，孩子贴西堰，我来数人。”</blockquote>
+        <div class="startFacts">
+          <span><small>任务</small><b>找回邻里 · 保住种粮</b></span>
+          <span><small>体验</small><b>第三人称 3D 潜行撤离</b></span>
+          <span><small>时长</small><b>约 8—12 分钟</b></span>
+        </div>
+        <div class="contentBoundary">
+          <strong>内容与历史说明</strong>
+          <p>本作从普通百姓视角呈现侵华日军抢粮、抓捕、纵火与封锁压迫，不使用血腥猎奇画面。地点、人物为复合创作，历史结局不可被玩家改写；评价不统计击杀，只看乡亲能否安全、种粮能否保住、联络能否接续。</p>
+        </div>
+        <div class="difficultyPicker" role="radiogroup" aria-label="选择难度">
+          <button type="button" role="radio" data-difficulty="story" aria-checked="false"><span>叙事模式</span><small>预警更早，适合首次体验</small></button>
+          <button class="selected" type="button" role="radio" data-difficulty="standard" aria-checked="true"><span>标准封锁</span><small>推荐 · 搜索更快，资源更紧</small></button>
+        </div>
+        <button id="StartButton" class="startButton" type="button"><span>进入封锁线</span><small>开始单人行动</small><kbd>ENTER</kbd></button>
+        <p class="startControl">桌面：WASD / 方向键移动 · Shift 奔跑 · E 互动　　触屏：左侧摇杆移动 · 右侧按钮行动</p>
+      </div>
+      <footer class="startFooter"><span>原创程序化低多边形场景 · THREE.JS / WEBGL</span><span>全程字幕与方向提示 · 无需音频也可完整游玩</span></footer>
+    </section>
+
+    <div id="ModalLayer" class="modalLayer hidden">
+      <section id="HistoryModal" class="archiveModal hidden" role="dialog" aria-modal="true" aria-labelledby="HistoryTitle">
+        <header><div><p>史实说明 / HISTORICAL FRAME</p><h2 id="HistoryTitle">真实的苦难，不是玩法装饰</h2></div><button type="button" data-close-modal aria-label="关闭">×</button></header>
+        <div class="archiveBody">
+          <section class="boundaryCard"><h3>复合人物，固定历史</h3><p>故事锚定1942年5月冀中反“扫荡”的历史环境；秦桂枝、林砚、吴家庄与北坡交通线均为虚构复合人物、地点与事件。玩家只能影响一次局部转移，不能改写真实损失，也不能把抗战胜利归于一个“孤胆英雄”。</p></section>
+          <section><h3>为何没有击杀分数</h3><p>敌后交通员、武工队和基层党员承担联络、群众、情报、组织与有限军事工作。这个原型把“保存群众与组织”作为胜负，避免把侵略暴行消费成战斗奖励。</p></section>
+          <section><h3>游戏明确呈现的侵略压迫</h3><ul><li>封锁沟、公路据点与巡逻网压缩群众生存空间；</li><li>强征口粮、捆押村民与纵火报复均属对平民的非人道暴力；</li><li>这些行为不会被浪漫化，也不会给玩家带来“观赏奖励”。</li></ul></section>
+          <section><h3>公开参考</h3><div class="sourceList">
+            <a href="https://www.1937china.com/views/kzzl/jng_jbcl.html" target="_blank" rel="noreferrer"><b>中国人民抗日战争纪念馆</b><span>侵华战争与占领暴行的总体框架——对应强征、拘押、纵火与集体惩罚</span></a>
+            <a href="https://www.handandangshi.gov.cn/yaolun/2463.html" target="_blank" rel="noreferrer"><b>中共邯郸市委党史研究室</b><span>冀中军民在封锁与“扫荡”中的地道战实践——对应封锁沟、隐蔽路与群众转移</span></a>
+            <a href="https://www.1937china.com/kzgdata/html/20250428/174580535436634079955.html" target="_blank" rel="noreferrer"><b>中国人民抗日战争纪念馆</b><span>武工队的宣传、群众与情报职能——对应共产党员维系联络、组织群众的工作</span></a>
+          </div></section>
+          <section class="nationalNote"><h3>全民族抗战</h3><p>1937年全国性抗战爆发后，正面战场与敌后战场相互配合，中国共产党领导的八路军、新四军及广大敌后军民，与国民党军队和其他抗日力量共同承担民族抗战。本作只聚焦其中一个敌后县域切面。</p></section>
+        </div>
+        <footer><button type="button" data-close-modal>返回</button></footer>
+      </section>
+
+      <section id="PauseModal" class="pauseModal hidden" role="dialog" aria-modal="true" aria-labelledby="PauseTitle">
+        <p>行动暂停</p><h2 id="PauseTitle">在封锁线内停下脚步</h2>
+        <div><button id="ResumeButton" class="primaryModalButton" type="button">继续行动</button><button id="PauseHistoryButton" type="button">史实与创作边界</button><button id="RestartButton" type="button">重新开始本局</button><button id="ReturnTitleButton" type="button">返回标题</button></div>
+      </section>
+
+      <section id="ResultModal" class="resultModal hidden" role="dialog" aria-modal="true" aria-labelledby="ResultTitle">
+        <p id="ResultEyebrow">行动结算</p><h2 id="ResultTitle">火种越过封锁线</h2><p id="ResultSummary" class="resultSummary"></p>
+        <div class="resultGrid"><div class="resultScore"><strong id="ResultScore">0</strong><small>行动评估</small></div><div id="ResultMetrics" class="resultMetrics"></div></div>
+        <blockquote id="ResultReflection"></blockquote>
+        <div class="resultActions"><button id="ResultHistoryButton" type="button">查看史实依据</button><button id="ResultRestartButton" class="primaryModalButton" type="button">再次行动</button></div>
+      </section>
+    </div>
+
+    <div id="LoadingScreen" class="loadingScreen"><div><span>正在铺开封锁线</span><i><em id="LoadingFill"></em></i><small id="LoadingText">构建冀中平原与交通网…</small></div></div>
+    <div id="ScreenReaderStatus" class="screenReaderOnly" aria-live="assertive"></div>
+  </main>
+  <script type="module" src="./Script_Game.mjs"></script>
+</body>
+</html>
