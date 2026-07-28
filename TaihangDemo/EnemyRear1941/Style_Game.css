@@ -26,6 +26,10 @@
   --bottomDockHeight: 148px;
   --leftRailWidth: 320px;
   --rightRailWidth: 370px;
+  --safeTop: env(safe-area-inset-top, 0px);
+  --safeRight: env(safe-area-inset-right, 0px);
+  --safeBottom: env(safe-area-inset-bottom, 0px);
+  --safeLeft: env(safe-area-inset-left, 0px);
 }
 
 * {
@@ -33,7 +37,7 @@
 }
 
 html {
-  min-width: 320px;
+  min-width: 0;
   min-height: 100%;
   background: var(--night);
   scrollbar-color: #756e57 #1c201a;
@@ -109,6 +113,7 @@ button:disabled {
   z-index: 300;
   left: 14px;
   top: 10px;
+  min-height: 44px;
   padding: 10px 14px;
   transform: translateY(-160%);
   border: 1px solid var(--goldBright);
@@ -130,7 +135,8 @@ button:disabled {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: clamp(22px, 4vw, 68px);
   background:
     linear-gradient(90deg, rgba(10, 13, 10, .96), rgba(21, 25, 19, .86) 52%, rgba(11, 14, 11, .96)),
@@ -1730,7 +1736,7 @@ button:disabled {
 }
 
 .travelUnitCard button {
-  min-height: 38px;
+  min-height: 44px;
   border: 1px solid #5d5b4b;
   color: #c0b69d;
   background: #242820;
@@ -2821,8 +2827,8 @@ kbd {
 
 @media (max-width: 1024px) {
   :root {
-    --topBarHeight: auto;
-    --bottomDockHeight: 118px;
+    --topBarHeight: calc(100px + var(--safeTop));
+    --bottomDockHeight: calc(80px + var(--safeBottom));
   }
 
   body.gameActive,
@@ -2842,7 +2848,11 @@ kbd {
 
   .openingScreen {
     place-items: start center;
-    padding: 18px;
+    padding:
+      calc(18px + var(--safeTop))
+      calc(18px + var(--safeRight))
+      calc(18px + var(--safeBottom))
+      calc(18px + var(--safeLeft));
   }
 
   .openingFrame {
@@ -2873,6 +2883,9 @@ kbd {
     top: 0;
     z-index: 50;
     min-height: 100px;
+    padding-top: var(--safeTop);
+    padding-right: var(--safeRight);
+    padding-left: var(--safeLeft);
     display: grid;
     grid-template-columns: 132px 104px minmax(0, 1fr);
     grid-template-areas:
@@ -2923,6 +2936,7 @@ kbd {
     border-top: 1px solid #41453a;
     scroll-snap-type: x proximity;
     scrollbar-width: none;
+    overscroll-behavior-x: contain;
   }
 
   .resourceLedger::-webkit-scrollbar {
@@ -2954,6 +2968,7 @@ kbd {
     height: 52px;
     justify-self: stretch;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 
   .utilityButton {
@@ -2992,7 +3007,7 @@ kbd {
     min-height: 54px;
     grid-template-columns: 1fr auto;
     gap: 8px;
-    padding: 8px 10px;
+    padding: 8px calc(10px + var(--safeRight)) 8px calc(10px + var(--safeLeft));
   }
 
   .mapHeader h2 {
@@ -3009,7 +3024,7 @@ kbd {
   }
 
   .mapControls {
-    right: 8px;
+    right: calc(8px + var(--safeRight));
     top: 8px;
   }
 
@@ -3020,7 +3035,8 @@ kbd {
 
   .hexNavigator {
     min-height: 56px;
-    padding: 6px 8px;
+    padding: 6px calc(8px + var(--safeRight)) 6px calc(8px + var(--safeLeft));
+    overscroll-behavior-x: contain;
   }
 
   .hexNavButton,
@@ -3036,6 +3052,8 @@ kbd {
     grid-template-columns: 1fr 1fr;
     margin-top: -12px;
     padding-top: 27px;
+    padding-right: var(--safeRight);
+    padding-left: var(--safeLeft);
     overflow: hidden;
     border: 1px solid #65614e;
     border-bottom: 0;
@@ -3118,8 +3136,11 @@ kbd {
     bottom: 0;
     width: 100%;
     height: var(--bottomDockHeight);
+    padding-right: var(--safeRight);
+    padding-bottom: var(--safeBottom);
+    padding-left: var(--safeLeft);
     display: grid;
-    grid-template-columns: 74px minmax(0, 1fr) 130px;
+    grid-template-columns: 74px minmax(0, 1fr) 220px;
     background: rgba(29, 34, 28, .98);
   }
 
@@ -3145,7 +3166,8 @@ kbd {
   }
 
   .orderList {
-    padding: 7px;
+    padding: 6px;
+    overscroll-behavior-x: contain;
   }
 
   .emptyOrders {
@@ -3188,9 +3210,10 @@ kbd {
   }
 
   .commandActions {
-    grid-template-columns: 1fr;
+    grid-template-columns: 72px minmax(100px, 1fr);
     gap: 6px;
-    padding: 7px;
+    align-items: center;
+    padding: 6px;
   }
 
   .clearOrdersButton {
@@ -3208,6 +3231,16 @@ kbd {
 
   .reportModal {
     overflow: auto;
+  }
+
+  .modal {
+    max-width: calc(100vw - var(--safeLeft) - var(--safeRight) - 16px);
+    max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 16px);
+  }
+
+  .toastRegion {
+    top: calc(var(--topBarHeight) + 8px);
+    width: min(410px, calc(100vw - var(--safeLeft) - var(--safeRight) - 24px));
   }
 
   .reportColumns {
@@ -3236,7 +3269,11 @@ kbd {
 
 @media (max-width: 640px) {
   .openingScreen {
-    padding: 9px;
+    padding:
+      calc(9px + var(--safeTop))
+      calc(9px + var(--safeRight))
+      calc(9px + var(--safeBottom))
+      calc(9px + var(--safeLeft));
   }
 
   .openingScreen::before {
@@ -3474,17 +3511,40 @@ kbd {
   }
 
   .commandDock {
-    grid-template-columns: 64px minmax(0, 1fr) 126px;
+    grid-template-columns: 54px minmax(0, 1fr) 144px;
   }
 
   .commandBudget {
-    padding: 6px;
+    padding: 4px;
+  }
+
+  .commandBudget span {
+    display: none;
+  }
+
+  .commandActions {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .clearOrdersButton {
+    min-height: 44px;
+    font-size: 0;
+  }
+
+  .clearOrdersButton::after {
+    content: "清空";
+    font-size: 9px;
   }
 
   .modal {
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 16px);
+    left: calc(var(--safeLeft) + 8px);
+    right: calc(var(--safeRight) + 8px);
+    width: auto;
+    max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 16px);
     padding: 24px 18px 20px;
+    transform: translateY(-50%);
   }
 
   .modal h2 {
@@ -3545,8 +3605,56 @@ kbd {
     width: 100%;
   }
 
-  .toastRegion {
-    top: 108px;
+}
+
+@media (max-width: 640px) and (max-height: 700px) {
+  .mapPanel {
+    grid-template-rows:
+      44px
+      minmax(230px, calc(100dvh - var(--safeTop) - var(--safeBottom) - 312px))
+      52px;
+  }
+
+  .mapHeader {
+    min-height: 44px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .hexNavigator {
+    min-height: 52px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .informationDrawer {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 1024px) and (max-height: 520px) and (orientation: landscape) {
+  .gameShell {
+    padding-bottom: 0;
+  }
+
+  .warLedger {
+    position: relative;
+  }
+
+  .mapPanel {
+    grid-template-rows: 44px minmax(220px, 52dvh) 52px;
+  }
+
+  .informationDrawer {
+    margin-top: 0;
+  }
+
+  .commandDock {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: auto;
   }
 }
 

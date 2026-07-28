@@ -25,7 +25,7 @@ import {
   GetVictoryAssessment,
   SerializeState,
   DeserializeState,
-} from "./Script_Rules.mjs?v=20260727b";
+} from "./Script_Rules.mjs?v=20260728e";
 
 const ui = {};
 const activePointers = new Map();
@@ -180,12 +180,14 @@ function Boot() {
   CacheElements();
   BindStaticEvents();
   RefreshContinueButton();
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  window.scrollTo(0, 0);
   if (ui.gameShell) ui.gameShell.hidden = true;
   if (ui.openingScreen) ui.openingScreen.hidden = false;
 }
 
 function BindStaticEvents() {
-  ui.startButton?.addEventListener("click", StartNewGame);
+  ui.startButton?.addEventListener("click", RequestStartNewGame);
   ui.continueButton?.addEventListener("click", ContinueGame);
   ui.historyBoundaryButton?.addEventListener("click", ShowHistoryBoundary);
   ui.zoomInButton?.addEventListener("click", () => ChangeZoom(1.18));
@@ -223,17 +225,43 @@ function BindStaticEvents() {
 
 function RefreshContinueButton() {
   if (!ui.continueButton) return;
-  let available = false;
+  ui.continueButton.hidden = !HasValidSave();
+}
+
+function HasValidSave() {
   try {
     const stored = localStorage.getItem(saveKey);
     if (stored) {
       const loaded = DeserializeState(stored);
-      available = Boolean(loaded && !loaded.lastError);
+      return Boolean(loaded && !loaded.lastError);
     }
   } catch {
-    available = false;
+    return false;
   }
-  ui.continueButton.hidden = !available;
+  return false;
+}
+
+function RequestStartNewGame() {
+  if (!HasValidSave()) {
+    StartNewGame();
+    return;
+  }
+  OpenStandardModal({
+    eyebrow: "存档保护",
+    title: "开始新战局并覆盖现有进度？",
+    body: `<p>本机已有一局可继续的敌后战局。开始新战局会覆盖现有存档、建设队列和战争损失簿；此操作不能撤销。</p>`,
+    buttons: [
+      { label: "保留存档", className: "secondaryButton", action: CloseTopModal },
+      {
+        label: "覆盖并开始",
+        className: "dangerButton",
+        action: () => {
+          CloseAllModals();
+          StartNewGame();
+        },
+      },
+    ],
+  });
 }
 
 function StartNewGame() {
@@ -278,9 +306,13 @@ function ContinueGame() {
 function EnterGame() {
   if (ui.openingScreen) ui.openingScreen.hidden = true;
   if (ui.gameShell) ui.gameShell.hidden = false;
+  window.scrollTo(0, 0);
   CenterMap();
   RenderAll();
-  window.setTimeout(() => ui.mapCanvas?.focus(), 0);
+  window.setTimeout(() => {
+    window.scrollTo(0, 0);
+    FocusWithoutScroll(ui.mapCanvas);
+  }, 0);
 }
 
 function SaveGame(showFeedback = false) {
@@ -817,7 +849,10 @@ function ShowTurnReport(report) {
   RenderReportList(ui.enemyReportList, report.enemy ?? report.enemyEvents, "敌军本月以封锁和侦察为主。");
   RenderReportList(ui.costReportList, report.costs ?? report.ledger ?? report.civilian, "本月没有新增可确认的战争代价。");
   OpenModal("reportModal");
-  window.setTimeout(() => ui.reportContinueButton?.focus(), 0);
+  window.setTimeout(() => {
+    if (ui.reportModal) ui.reportModal.scrollTop = 0;
+    FocusWithoutScroll(ui.reportModal);
+  }, 0);
   Announce(report.summary ?? "本回合结算完成", true);
 }
 
@@ -896,7 +931,10 @@ function ShowOutcome() {
     ui.outcomeLedger.innerHTML = BuildLedgerHtml(gameState.ledger, true);
   }
   OpenModal("outcomeModal");
-  window.setTimeout(() => ui.restartButton?.focus(), 0);
+  window.setTimeout(() => {
+    if (ui.outcomeModal) ui.outcomeModal.scrollTop = 0;
+    FocusWithoutScroll(ui.outcomeModal);
+  }, 0);
 }
 
 function ShowHistoryBoundary() {
@@ -1175,7 +1213,14 @@ function ConfirmRestart() {
     title: "放弃当前战局并重新开始？",
     body: `<p>现有本地存档会被新的 1941 年秋战局覆盖。战争损失簿、建设队列和所有未执行命令都将清空。</p>`,
     buttons: [
-      { label: "取消", className: "secondaryButton", action: CloseTopModal },
+      {
+        label: "取消",
+        className: "secondaryButton",
+        action: () => {
+          CloseTopModal();
+          window.setTimeout(() => FocusWithoutScroll(ui.menuButton), 0);
+        },
+      },
       {
         label: "确认重新开始",
         className: "dangerButton",
@@ -1204,7 +1249,19 @@ function OpenStandardModal({ eyebrow, title, body, buttons = [] }) {
     });
   }
   OpenModal("standardModal");
-  window.setTimeout(() => ui.standardModal?.querySelector("button:not([disabled])")?.focus(), 0);
+  window.setTimeout(() => {
+    if (ui.standardModal) ui.standardModal.scrollTop = 0;
+    FocusWithoutScroll(ui.standardModal?.querySelector("button:not([disabled])") ?? ui.standardModal);
+  }, 0);
+}
+
+function FocusWithoutScroll(element) {
+  if (!(element instanceof HTMLElement)) return;
+  try {
+    element.focus({ preventScroll: true });
+  } catch {
+    element.focus();
+  }
 }
 
 function OpenModal(id) {
@@ -1213,6 +1270,7 @@ function OpenModal(id) {
   if (ui.modalBackdrop) ui.modalBackdrop.hidden = false;
   const modal = ui[id] || Element(id);
   if (modal) {
+    modal.scrollTop = 0;
     modal.hidden = false;
     modal.dataset.open = "true";
     modal.dataset.modalOrder = String(++modalSequence);
@@ -1231,8 +1289,24 @@ function CloseModal(id) {
   const stillOpen = modalIds.some((modalId) => !(ui[modalId] || Element(modalId))?.hidden);
   if (ui.modalBackdrop) ui.modalBackdrop.hidden = !stillOpen;
   document.body.classList.toggle("modalOpen", stillOpen);
-  if (!stillOpen && lastFocusElement instanceof HTMLElement) {
-    lastFocusElement.focus();
+  const topModal = GetTopOpenModal();
+  if (stillOpen) {
+    const nestedFocusTarget = lastFocusElement instanceof HTMLElement
+      && topModal?.contains(lastFocusElement)
+      && !lastFocusElement.closest("[hidden]")
+      ? lastFocusElement
+      : topModal;
+    window.setTimeout(() => FocusWithoutScroll(nestedFocusTarget), 0);
+  } else {
+    const fallbackFocusTarget = ui.gameShell && !ui.gameShell.hidden
+      ? ui.menuButton
+      : ui.startButton;
+    const returnFocusTarget = lastFocusElement instanceof HTMLElement
+      && lastFocusElement.isConnected
+      && !lastFocusElement.closest("[hidden]")
+      ? lastFocusElement
+      : fallbackFocusTarget;
+    window.setTimeout(() => FocusWithoutScroll(returnFocusTarget), 0);
   }
 }
 
@@ -1883,7 +1957,10 @@ function HandleMapPointerMove(event) {
 function HandleMapPointerUp(event) {
   if (!activePointers.has(event.pointerId)) return;
   const point = CanvasPoint(event);
-  const shouldSelect = activePointers.size === 1 && pointerGesture && !pointerGesture.moved;
+  const shouldSelect = event.type !== "pointercancel"
+    && activePointers.size === 1
+    && pointerGesture
+    && !pointerGesture.moved;
   activePointers.delete(event.pointerId);
   if (ui.mapCanvas.hasPointerCapture(event.pointerId)) {
     ui.mapCanvas.releasePointerCapture(event.pointerId);
@@ -1907,12 +1984,14 @@ function HandleMapWheel(event) {
 
 function PickHex(screenPoint) {
   const world = ScreenToWorld(screenPoint);
+  const scale = Math.max(0.001, mapCamera.fitScale * mapCamera.zoom);
+  const hitRadius = Math.max(mapCamera.hexSize * 0.95, 22 / scale);
   let best = null;
   let bestDistance = Infinity;
   AsArray(gameState.hexes).forEach((hex) => {
     const center = HexToWorld(hex.q, hex.r);
     const distance = Math.hypot(world.x - center.x, world.y - center.y);
-    if (distance < mapCamera.hexSize * 0.95 && distance < bestDistance) {
+    if (distance < hitRadius && distance < bestDistance) {
       best = hex;
       bestDistance = distance;
     }
