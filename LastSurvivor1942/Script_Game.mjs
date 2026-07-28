@@ -837,7 +837,7 @@ class WorldRenderer {
       mesh.position.set(patrol.x, 0, patrol.z);
       mesh.rotation.y = patrol.yaw;
       mesh.children.forEach((child, childIndex) => {
-        if (child.userData.parts) this.UpdateCharacterAnimation(child, patrol.stun <= 0, this.clockTime, index + childIndex);
+        if (child.userData.parts) this.UpdateCharacterAnimation(child, patrol.mode !== "suspicious", this.clockTime, index + childIndex);
       });
       const cone = this.patrolCones.get(patrol.id);
       cone.position.set(patrol.x, .08, patrol.z);

@@ -164,6 +164,7 @@ function AssertStaticContract() {
   assert.match(gameScript, /touchInteract/);
   assert.match(gameScript, /requestAnimationFrame/);
   assert.match(gameScript, /patrolVision\.distance/);
+  assert.doesNotMatch(gameScript, /patrol\.stun/);
   assert.match(style, /prefers-reduced-motion/);
   assert.match(style, /pointer: coarse/);
   assert.doesNotMatch(html, /击杀数|连杀|爆头|战利品/);
