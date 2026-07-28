@@ -1,6 +1,6 @@
 /*
  * Taihang Letters 1942
- * Public historical framing for the interactive story 《纸上有家》.
+ * Public historical framing for the interactive story 《名册》.
  *
  * The two protagonists, the nineteen students, HuaiShuGou village and the
  * BeiGou temporary teaching point are fictional. Dates, place names and the wider

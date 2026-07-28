@@ -6,7 +6,7 @@ import {
   MemoryObjects,
   StoryScenes,
   EndingDefinitions,
-} from "./Data_Story.mjs";
+} from "./Data_Story.mjs?v=3";
 import {
   HistoricalFrame,
   HistoricalSources,
@@ -14,7 +14,7 @@ import {
   HistoricalTerms,
   HistoryById,
   SourceById,
-} from "./Data_History.mjs";
+} from "./Data_History.mjs?v=3";
 
 const archiveKey = "TaihangLetters1942_Archive_V1";
 const settingsKey = "TaihangLetters1942_Settings_V1";
@@ -28,6 +28,7 @@ const itemById = new Map(
 );
 const memoryById = new Map(MemoryObjects.map((memory) => [memory.id, memory]));
 const sceneById = new Map(StoryScenes.map((scene) => [scene.id, scene]));
+const endingById = new Map(EndingDefinitions.map((ending) => [ending.id, ending]));
 const chapterDefinitions = Object.freeze(
   Array.from(
     StoryScenes.reduce((chapters, scene) => {
@@ -500,57 +501,57 @@ function RenderTitle(shouldFocus = false) {
 
 function FormatTimeStatus(timeValue) {
   if (timeValue <= 2) {
-    return { label: "尚有余裕", percent: 92 };
+    return { label: "余量充足", percent: 92 };
   }
   if (timeValue <= 5) {
-    return { label: "脚程尚稳", percent: 70 };
+    return { label: "还有余量", percent: 70 };
   }
   if (timeValue <= 8) {
-    return { label: "天色催人", percent: 46 };
+    return { label: "余量不多", percent: 46 };
   }
   if (timeValue <= 11) {
-    return { label: "接近破晓", percent: 22 };
+    return { label: "余量很少", percent: 22 };
   }
-  return { label: "余时已尽", percent: 4 };
+  return { label: "时间不足", percent: 4 };
 }
 
 function FormatSoundStatus(soundValue) {
   if (soundValue <= 0) {
-    return { label: "无声", percent: 3 };
+    return { label: "没有动静", percent: 3 };
   }
   if (soundValue <= 2) {
-    return { label: "风声掩住", percent: 28 };
+    return { label: "动静很小", percent: 28 };
   }
   if (soundValue <= 4) {
-    return { label: "灯影靠近", percent: 57 };
+    return { label: "可能被听见", percent: 57 };
   }
   if (soundValue <= 6) {
-    return { label: "脚步可闻", percent: 78 };
+    return { label: "动静很大", percent: 78 };
   }
-  return { label: "行踪显露", percent: 100 };
+  return { label: "很容易被听见", percent: 100 };
 }
 
 function FormatBondStatus(bondValue) {
   if (bondValue <= 1) {
-    return { label: "同路", percent: 12 };
+    return { label: "还不熟", percent: 12 };
   }
   if (bondValue <= 4) {
-    return { label: "互相试探", percent: 36 };
+    return { label: "开始配合", percent: 36 };
   }
   if (bondValue <= 7) {
-    return { label: "彼此照看", percent: 66 };
+    return { label: "互相照应", percent: 66 };
   }
-  return { label: "把名字交给她", percent: 100 };
+  return { label: "彼此信任", percent: 100 };
 }
 
 function FormatHealthStatus(healthValue) {
   if (healthValue >= 7) {
-    return "脚伤已妥善固定";
+    return "脚伤已经包扎固定";
   }
   if (healthValue >= 4) {
-    return "脚伤尚可支撑";
+    return "还能继续走";
   }
-  return "脚伤需要继续照料";
+  return "脚伤越来越重";
 }
 
 function SetMeter(meter, valueElement, status) {
@@ -584,10 +585,10 @@ function RenderRoute(scene) {
       CreateElement(
         "small",
         "",
-        chapter.id < scene.chapter ? "已走过" : chapter.id === scene.chapter ? scene.place : "尚未抵达",
+        chapter.id < scene.chapter ? "已经经过" : chapter.id === scene.chapter ? scene.place : "还没到",
       ),
     );
-    item.append(CreateElement("span", "visuallyHidden", `第${chapter.id}站`), copy);
+    item.append(CreateElement("span", "visuallyHidden", `第${chapter.id}章`), copy);
     elements.RouteRail.append(item);
   }
   const currentItem = elements.RouteRail.querySelector('[aria-current="step"]');
@@ -601,14 +602,14 @@ function RenderRoute(scene) {
 function FormatEffectHint(effects = {}) {
   const parts = [];
   if (effects.time > 0) {
-    parts.push(effects.time >= 2 ? "耗时较多" : "耗费时间");
+    parts.push(effects.time >= 2 ? "多花一些时间" : "花一点时间");
   } else if (effects.time < 0) {
-    parts.push("抢回时间");
+    parts.push("节省时间");
   }
   if (effects.sound > 0) {
-    parts.push(effects.sound >= 2 ? "动静明显" : "稍有动静");
+    parts.push(effects.sound >= 2 ? "动静较大" : "会有一点动静");
   } else if (effects.sound < 0) {
-    parts.push("更隐蔽");
+    parts.push("动静更小");
   }
   if (effects.health < 0) {
     parts.push("加重脚伤");
@@ -616,12 +617,12 @@ function FormatEffectHint(effects = {}) {
     parts.push("缓解伤势");
   }
   if (effects.paper < 0) {
-    parts.push("纸张受损");
+    parts.push("耗用纸张");
   }
   if (effects.bond > 0) {
-    parts.push("更信任彼此");
+    parts.push("配合更好");
   }
-  return parts.join(" · ") || "后果未知";
+  return parts.join(" · ");
 }
 
 function GetChoiceTone(choice) {
@@ -646,7 +647,7 @@ function RenderChoices(scene) {
     const empty = CreateElement(
       "p",
       "storyAside",
-      "现有物件和先前选择无法开启下一步。请返回标题页，从自动存档继续，或重新开始这段夜路。",
+      "由于当前物件或先前选择有误，游戏无法继续。请返回标题页读取自动存档，或重新开始。",
     );
     elements.ChoiceList.append(empty);
     return;
@@ -701,7 +702,7 @@ function RenderInventory() {
     if (memory) {
       allEntries.push({
         id: `memory:${wordId}`,
-        label: `记字 · ${memory.glyph}`,
+        label: memory.label,
         note: memory.title,
         glyph: memory.glyph,
         memory,
@@ -710,7 +711,7 @@ function RenderInventory() {
   }
 
   if (allEntries.length === 0) {
-    elements.InventoryList.append(CreateElement("li", "emptyItem", "粗布包里空着。"));
+    elements.InventoryList.append(CreateElement("li", "emptyItem", "没有其他物件。"));
     return;
   }
 
@@ -722,7 +723,7 @@ function RenderInventory() {
     if (entry.memory) {
       item.tabIndex = 0;
       item.setAttribute("role", "button");
-      item.setAttribute("aria-label", `查看记字：${entry.memory.title}`);
+      item.setAttribute("aria-label", `查看途中记录：${entry.memory.title}`);
       item.addEventListener("click", () => OpenMemory(entry.memory));
       item.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -781,7 +782,7 @@ function AdvanceStory(choiceId) {
   }
   const choice = GetReachableChoices(gameState, scene).find((entry) => entry.id === choiceId);
   if (!choice) {
-    ShowToast("这条路现在无法选择。");
+    ShowToast("这项选择现在不可用。");
     return;
   }
 
@@ -806,7 +807,7 @@ function AdvanceStory(choiceId) {
   }
 
   if (!sceneById.has(choice.next)) {
-    ShowToast("下一段文字暂时无法读取。");
+    ShowToast("下一个场景无法读取。");
     return;
   }
 
@@ -817,22 +818,22 @@ function AdvanceStory(choiceId) {
 
 function BuildEndingSummary(ending) {
   const namedWords = gameState.words
-    .map((wordId) => memoryById.get(wordId)?.glyph)
+    .map((wordId) => memoryById.get(wordId)?.label)
     .filter(Boolean)
     .join("、");
   const summary = [
     {
-      label: "这一夜留下",
-      value: namedWords || "一段仍待续写的路",
+      label: "途中记录",
+      value: namedWords || "没有补充记录",
     },
     {
       label: "学生名册",
       value: gameState.flags.rosterComplete
-        ? "十九行均有去向或诚实标注“待寻”"
+        ? "十九名学生都有记录；去向不明的仍写“待寻”"
         : "部分去向仍待下一组人核对",
     },
     {
-      label: "同行关系",
+      label: "两人的配合",
       value: FormatBondStatus(gameState.bond).label,
     },
     {
@@ -841,14 +842,14 @@ function BuildEndingSummary(ending) {
     },
     {
       label: "史实边界",
-      value: "没有改写战局；人物、村庄与名单均为虚构",
+      value: "人物、村庄和学生姓名为虚构；故事不涉及或改变真实战事",
     },
   ];
 
   if (gameState.items.includes("mimeographKit")) {
-    summary.splice(2, 0, { label: "油印工具", value: "随人抵达，可继续刻写名单" });
+    summary.splice(2, 0, { label: "油印工具", value: "已经带到河东，可以继续使用" });
   } else if (gameState.flags.lostMimeographKit) {
-    summary.splice(2, 0, { label: "油印工具", value: "留有找回标记，人先过了浅滩" });
+    summary.splice(2, 0, { label: "油印工具", value: "留在河滩浅水处，位置已经做了记号" });
   }
 
   return { ending, summary };
@@ -915,7 +916,7 @@ function RenderEnding(ending) {
   }
   ShowScreen("EndingScreen");
   elements.EndingTitle.focus({ preventScroll: true });
-  Announce(`旅程结束：${ending.title}。${ending.finalLine}`);
+  Announce(`游戏结束：${ending.title}。${ending.finalLine}`);
 }
 
 function StartNewGame() {
@@ -927,7 +928,7 @@ function StartNewGame() {
 function ContinueGame() {
   const stored = LoadState();
   if (!stored || stored.completed) {
-    ShowToast("没有可继续的夜路。");
+    ShowToast("没有可读取的进行中存档。");
     return;
   }
   gameState = stored;
@@ -1020,11 +1021,11 @@ function OpenHistoryNote(historyId) {
 }
 
 function OpenMemory(memory) {
-  SetArchiveHeading("这一夜记下的字", `${memory.glyph} · ${memory.title}`);
+  SetArchiveHeading("途中记录", memory.title);
   elements.ArchiveContent.replaceChildren();
   const article = CreateElement("article", "archiveEntry");
   article.append(
-    CreateElement("time", "", `记字：${memory.glyph}`),
+    CreateElement("time", "", `记录：${memory.label}`),
     (() => {
       const copy = CreateElement("div");
       copy.append(
@@ -1039,7 +1040,7 @@ function OpenMemory(memory) {
 }
 
 function RenderJourneyArchive() {
-  SetArchiveHeading("走完的路不会替历史作证", "旅程与史实注脚");
+  SetArchiveHeading("本机保存", "游戏记录和史料");
   elements.ArchiveContent.replaceChildren();
   const entries = ReadJson(archiveKey, []);
 
@@ -1048,24 +1049,25 @@ function RenderJourneyArchive() {
       CreateElement(
         "p",
         "emptyArchive",
-        "还没有收存的旅程。走完第一趟夜路后，结局会留在这里；史实来源仍可继续查阅。",
+        "还没有完成过故事。完成一次后，结局和本次选择会保存在这里。下方的史料来源现在就可以查看。",
       ),
     );
   } else {
     for (const entry of entries) {
       const article = CreateElement("article", "archiveEntry");
       const copy = CreateElement("div");
+      const currentEnding = endingById.get(entry.endingId);
       copy.append(
-        CreateElement("h3", "", entry.endingTitle),
-        CreateElement("p", "", entry.finalLine),
+        CreateElement("h3", "", currentEnding?.title || entry.endingTitle),
+        CreateElement("p", "", currentEnding?.finalLine || entry.finalLine),
         CreateElement(
           "p",
           "",
-          `记下的字：${
+          `途中记录：${
             (entry.words || [])
-              .map((wordId) => memoryById.get(wordId)?.glyph)
+              .map((wordId) => memoryById.get(wordId)?.label)
               .filter(Boolean)
-              .join("、") || "尚未集齐"
+              .join("、") || "没有"
           }`,
         ),
       );
@@ -1105,7 +1107,7 @@ function RenderJourneyArchive() {
     CreateElement(
       "p",
       "",
-      "以下链接用于校核日期、地名、战时教育、油印方式、群众工作与太行地理；生成画面不冒充历史照片。",
+      "以下链接用于核对日期、地名、战时教育、油印方式、群众工作和太行地理。本页的虚构情节不作为历史资料。",
     ),
   );
   AddSourceLinks(

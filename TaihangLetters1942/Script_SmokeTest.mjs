@@ -151,6 +151,7 @@ function SamplePlayableJourneys(maxJourneys = 100000) {
 }
 
 assert.equal(StoryMeta.startSceneId, StoryScenes[0].id, "first scene should be the start scene");
+assert.equal(StoryMeta.title, "名册", "the plain-language title must stay in place");
 assert.equal(StoryMeta.endingMarker, "__ending__", "ending marker contract changed");
 assert.match(StoryMeta.saveKey, /^TaihangLetters1942_/, "save key must stay page-specific");
 assert.deepEqual(StoryMeta.estimatedMinutes, [15, 25], "declared playtime changed");
@@ -229,8 +230,13 @@ assert.equal(missingStudent?.status, "待寻", "赵石头 must remain honestly m
 
 assert.deepEqual(
   MemoryObjects.map((memory) => memory.glyph),
-  ["人", "名", "路", "家"],
-  "memory word order is part of the story",
+  ["伤", "册", "标", "址"],
+  "concrete record category order is part of the story",
+);
+assert.deepEqual(
+  MemoryObjects.map((memory) => memory.label),
+  ["伤员", "名册", "路标", "地址"],
+  "player-facing records must stay concrete",
 );
 AssertUnique(
   MemoryObjects.map((memory) => memory.id),
@@ -356,6 +362,11 @@ assert.doesNotMatch(
   combinedNarrative,
   /青霉素|输液袋|击杀得分|儿童兵|小八路/,
   "anachronistic or militarizing wording returned",
+);
+assert.doesNotMatch(
+  combinedNarrative,
+  /纸上有家|人先过河|名字才有地方抵达|路越走越短|走完的路不会替历史作证|把名字交给她|人、名、路、家|“人”“名”“路”“家”/,
+  "discarded slogan-like copy returned",
 );
 assert.match(storySource, /钢板[^。\n]*铁笔|铁笔[^。\n]*蜡纸/, "mimeograph method must stay explicit");
 assert.match(historySource, /1942年9月18日/, "county rename date must remain explicit");
