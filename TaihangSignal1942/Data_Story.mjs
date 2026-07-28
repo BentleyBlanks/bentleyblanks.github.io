@@ -137,7 +137,7 @@ export const chapters = Object.freeze([
     ]),
     requiredClues: Object.freeze(["WindGap", "QingshiVillage", "StoneBridge"]),
     actionLabel: "摇通槐树坪总机",
-    actionHint: "三个地标已校准。按住空格或点击电话柄，建立第一次通话。",
+    actionHint: "点击电话柄，或按住空格，建立第一次通话。",
     dialogue: Object.freeze([
       ["Liang", "甲梁按约呼叫槐花。两短一长，收到请回。"],
       ["He", "槐花收到。你的呼号是“山雀”。行动期间，线路上只用呼号和图上代号。"],

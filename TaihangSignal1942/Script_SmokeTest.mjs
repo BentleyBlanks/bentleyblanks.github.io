@@ -73,6 +73,7 @@ function TestStoryStructure() {
   });
   assert.equal(new Set(allClueIds).size, allClueIds.length);
   assert.equal(chapters[5].rollCall, true);
+  assert.match(chapters[0].actionHint, /点击电话柄/);
   assert.match(chapters[5].intro.at(-1)[1], /线路里只报编号/);
   assert.doesNotMatch(JSON.stringify(chapters.slice(0, 6)), /全到/);
   assert.equal(chapters[6].dialogue[2][1], "乙村六十七号，全到。东西丢了些，人都在。");
@@ -165,8 +166,9 @@ function TestStaticPageContract() {
   assert.match(html, /原创历史虚构叙事/);
   assert.match(html, /约 20 分钟/);
   assert.doesNotMatch(html, /Texture_SocialCard\.png/);
-  assert.match(html, /Script_Game\.mjs\?v=1/);
+  assert.match(html, /Script_Game\.mjs\?v=2/);
   assert.match(html, /Style_Game\.css\?v=1/);
+  assert.doesNotMatch(html, /holdToggle|单击电话柄/);
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /aria-label="打开记事簿"/);
   assert.match(html, /data-open-modal="history"/);
@@ -187,6 +189,12 @@ function TestStaticPageContract() {
   assert.match(gameScript, /visibilitychange/);
   assert.match(gameScript, /const stepDelay = 2000/);
   assert.match(gameScript, /activeModal \|\| document\.hidden \|\| gameState\.rollCallPaused/);
+  assert.match(gameScript, /element\.phoneButton\.addEventListener\("click", TriggerChapterAction\);/);
+  assert.match(gameScript, /Data_Story\.mjs\?v=2/);
+  assert.match(gameScript, /Data_History\.mjs\?v=2/);
+  assert.match(gameScript, /所需观察已经确认。现在点击下方/);
+  assert.match(gameScript, /element\.phoneButton\.focus\(\);/);
+  assert.doesNotMatch(gameScript, /event\.detail === 0|singleClickPhone|holdToggle/);
   assert.match(
     gameScript,
     /gameState\.rollCallIndex = Math\.min\(63, gameState\.rollCallIndex \+ 1\);\s*RenderRollCallLine\(\);\s*SaveGame\(\);/,

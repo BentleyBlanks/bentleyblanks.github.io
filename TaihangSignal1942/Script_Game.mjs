@@ -3,20 +3,19 @@ import {
   gameConfig,
   historicalSources,
   historicalTerms,
-} from "./Data_History.mjs?v=1";
+} from "./Data_History.mjs?v=2";
 import {
   chapters,
   evacueeNames,
   GetChapter,
   GetConsequence,
   speakerDefinitions,
-} from "./Data_Story.mjs?v=1";
+} from "./Data_Story.mjs?v=2";
 
 const defaultSettings = Object.freeze({
   fontScale: 1,
   highContrast: false,
   reducedMotion: false,
-  singleClickPhone: false,
   soundEnabled: false,
 });
 
@@ -145,7 +144,7 @@ function InitializeGame() {
     "speakerName", "speakerChannel", "dialogueText", "advanceButton", "rollCallModeButton", "phoneButton", "phoneButtonLabel",
     "phoneButtonHint", "interactionHint", "modalLayer", "choiceModal", "choiceTitle", "choiceContext",
     "choiceOptions", "historyModal", "historyContent", "journalModal", "journalContent", "transcriptModal",
-    "transcriptContent", "settingsModal", "fontScaleSelect", "contrastToggle", "motionToggle", "holdToggle",
+    "transcriptContent", "settingsModal", "fontScaleSelect", "contrastToggle", "motionToggle",
     "soundToggleSetting", "restartButton", "endingScreen", "endingCanvas", "endingConsequences", "reviewJournalButton",
     "replayButton",
   ].forEach((id) => { element[id] = document.getElementById(id); });
@@ -189,7 +188,6 @@ function InitializeGame() {
     element.fontScaleSelect.value = String(settings.fontScale);
     element.contrastToggle.checked = settings.highContrast;
     element.motionToggle.checked = settings.reducedMotion;
-    element.holdToggle.checked = settings.singleClickPhone;
     element.soundToggleSetting.checked = settings.soundEnabled;
     element.soundButton.setAttribute("aria-pressed", String(settings.soundEnabled));
     element.soundLabel.textContent = `声音：${settings.soundEnabled ? "开" : "关"}`;
@@ -359,10 +357,20 @@ function InitializeGame() {
       gameState.lastClueId = clueId;
       PlayTone("clue");
     }
-    if (GetObservedCount(gameState, chapter) >= chapter.requiredClues.length) gameState.stage = "ready";
+    const isReady = GetObservedCount(gameState, chapter) >= chapter.requiredClues.length;
+    if (isReady) gameState.stage = "ready";
     SaveGame();
     RenderGame();
-    SetDialogue("narrator", `${clue.label}：${clue.detail}`, { record: false, channel: "观察记录" });
+    if (isReady) {
+      SetDialogue(
+        "narrator",
+        `${clue.label}：${clue.detail} 所需观察已经确认。现在点击下方“${chapter.actionLabel}”继续。`,
+        { record: false, channel: "可以接线" },
+      );
+      element.phoneButton.focus();
+    } else {
+      SetDialogue("narrator", `${clue.label}：${clue.detail}`, { record: false, channel: "观察记录" });
+    }
   }
 
   function TriggerChapterAction() {
@@ -525,9 +533,13 @@ function InitializeGame() {
       "aria-live",
       chapter.rollCall && ["rollcall", "choice", "choiceDialogue"].includes(gameState.stage) ? "off" : "polite",
     );
-    element.phoneButton.classList.toggle("hidden", !CanTriggerChapterAction(gameState, chapter));
+    const canTriggerChapterAction = CanTriggerChapterAction(gameState, chapter);
+    element.phoneButton.classList.toggle("hidden", !canTriggerChapterAction);
     element.phoneButtonLabel.textContent = chapter.actionLabel;
-    element.phoneButtonHint.textContent = settings.singleClickPhone ? "单击执行" : chapter.actionHint;
+    element.phoneButtonHint.textContent = chapter.actionHint;
+    element.interactionHint.textContent = canTriggerChapterAction
+      ? `下一步：点击“${chapter.actionLabel}”。`
+      : "拖动画面观察；也可用方向键、Tab 和 Enter。";
 
     if (["intro", "dialogue", "choiceDialogue"].includes(gameState.stage)) {
       ShowCurrentSequenceLine();
@@ -779,10 +791,6 @@ function InitializeGame() {
 
   function BeginPhoneHold() {
     if (!CanTriggerChapterAction(gameState)) return;
-    if (settings.singleClickPhone) {
-      TriggerChapterAction();
-      return;
-    }
     CancelPhoneHold();
     phoneHoldStart = performance.now();
     element.phoneButton.classList.add("isHolding");
@@ -1234,9 +1242,7 @@ function InitializeGame() {
     element.phoneButton.addEventListener("pointerleave", (event) => {
       if (event.buttons) CancelPhoneHold();
     });
-    element.phoneButton.addEventListener("click", (event) => {
-      if (settings.singleClickPhone || event.detail === 0) TriggerChapterAction();
-    });
+    element.phoneButton.addEventListener("click", TriggerChapterAction);
 
     element.sceneCanvas.closest(".scenePanel").addEventListener("pointerdown", (event) => {
       if (event.target.closest?.(".hotspotButton, .clueDrawer, button")) return;
@@ -1289,12 +1295,6 @@ function InitializeGame() {
       settings.reducedMotion = element.motionToggle.checked;
       ApplySettings();
       SaveSettings();
-    });
-    element.holdToggle.addEventListener("change", () => {
-      settings.singleClickPhone = element.holdToggle.checked;
-      ApplySettings();
-      SaveSettings();
-      RenderGame();
     });
     element.soundToggleSetting.addEventListener("change", () => {
       settings.soundEnabled = element.soundToggleSetting.checked;
