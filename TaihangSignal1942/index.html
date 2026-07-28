@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#182421">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="《山那边，线还通着》是一款约20分钟的原创历史虚构叙事游戏：人物、村落与六十七人名册均为虚构合成，真实历史不可改写。">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="山那边，线还通着">
+  <meta property="og:description" content="原创历史虚构叙事：守住一条让山里的人彼此知道还在的电话线。人物、村落与局部行动均为虚构合成。">
+  <meta property="og:url" content="https://bentleyblanks.github.io/TaihangSignal1942/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="山那边，线还通着">
+  <meta name="twitter:description" content="太行敌后 · 1942年5月 · 原创历史虚构叙事游戏">
+  <title>山那边，线还通着｜太行敌后历史叙事游戏</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=1">
+</head>
+<body>
+  <a class="skipLink" href="#gameMain">跳到游戏内容</a>
+
+  <section id="openingScreen" class="openingScreen" aria-labelledby="openingTitle">
+    <canvas id="openingCanvas" class="openingCanvas" aria-hidden="true"></canvas>
+    <div class="openingGrain" aria-hidden="true"></div>
+    <div class="openingTelephoneLine" aria-hidden="true"><i></i><i></i><i></i></div>
+
+    <div class="openingTopline">
+      <span>原创历史虚构叙事</span>
+      <span aria-hidden="true">·</span>
+      <span>约 20 分钟</span>
+      <span aria-hidden="true">·</span>
+      <span>自动存档</span>
+    </div>
+
+    <div class="openingCopy">
+      <p class="openingDate">太行敌后 · 1942年5月</p>
+      <h1 id="openingTitle">
+        <span>山那边，</span>
+        <strong>线还通着</strong>
+      </h1>
+      <p class="openingLead">你守的不是一座山，<br>而是一条让山里的人彼此知道还在的电话线。</p>
+
+      <div class="openingActions">
+        <button id="startButton" class="primaryButton openingPrimary" type="button">
+          <span>从 5 月 23 日开始</span>
+          <small>戴耳机并非必需，所有声音都有字幕</small>
+        </button>
+        <button id="continueButton" class="secondaryButton hidden" type="button">继续上次记录</button>
+        <button class="textButton" type="button" data-open-modal="history">先读史实与创作边界</button>
+      </div>
+    </div>
+
+    <aside class="openingNotice" aria-label="内容提示">
+      <b>内容提示</b>
+      <p>人物、村落、天气与局部行动均为虚构合成。含战争威胁、群众离散、非写实远炮声与真实人物牺牲的史实说明；无血腥画面。</p>
+    </aside>
+
+    <p class="openingCredit">固定电话 · 远眺观察 · 环境叙事 · 无歼敌计分</p>
+  </section>
+
+  <div id="gameShell" class="gameShell hidden">
+    <header class="gameHeader">
+      <button id="brandButton" class="brandButton" type="button" data-open-modal="history" aria-label="打开史实说明">
+        <span class="brandSeal" aria-hidden="true">线</span>
+        <span>
+          <strong>山那边，线还通着</strong>
+          <small>太行敌后 · 1942年5月</small>
+        </span>
+      </button>
+
+      <div class="chapterIdentity" aria-live="polite">
+        <span id="chapterDate">1942年5月23日 · 黄昏</span>
+        <strong id="chapterTitle">第一章 · 接通</strong>
+      </div>
+
+      <div class="lineStatus" aria-label="电话线路状态">
+        <span class="lineStatusDot" aria-hidden="true"></span>
+        <span><small>线路</small><strong id="lineStatusText">等待校准</strong></span>
+      </div>
+
+      <nav class="headerActions" aria-label="游戏菜单">
+        <button type="button" data-open-modal="journal" aria-label="打开记事簿"><span aria-hidden="true">册</span><small>记事簿</small></button>
+        <button type="button" data-open-modal="history" aria-label="打开史实说明"><span aria-hidden="true">史</span><small>史实</small></button>
+        <button type="button" data-open-modal="settings" aria-label="打开体验设置"><span aria-hidden="true">调</span><small>设置</small></button>
+      </nav>
+    </header>
+
+    <main id="gameMain" class="gameMain" tabindex="-1">
+      <section class="scenePanel" aria-labelledby="sceneHeading">
+        <h2 id="sceneHeading" class="visuallyHidden">太行山谷观察画面</h2>
+        <canvas id="sceneCanvas" class="sceneCanvas" aria-hidden="true"></canvas>
+        <div class="sceneGrain" aria-hidden="true"></div>
+        <div id="hotspotLayer" class="hotspotLayer" aria-label="可观察线索"></div>
+
+        <aside class="objectiveCard" aria-live="polite">
+          <span class="cardEyebrow"><i aria-hidden="true"></i> 当前任务</span>
+          <h2 id="objectiveText">认清三个地标，再用手摇电话报告。</h2>
+          <div class="objectiveProgress">
+            <span id="objectiveProgressText">0 / 3 已观察</span>
+            <i><b id="objectiveProgressFill"></b></i>
+          </div>
+        </aside>
+
+        <aside class="weatherCard" aria-label="地点与天气">
+          <span id="locationText">风口梁观察哨</span>
+          <small id="weatherText">西南风二级，能见度尚好</small>
+        </aside>
+
+        <div class="viewControls" aria-label="观察视野控制">
+          <button id="panLeftButton" type="button" aria-label="向左观察">←</button>
+          <button id="zoomOutButton" type="button" aria-label="缩小视野">−</button>
+          <span id="zoomText" aria-live="polite">1.0×</span>
+          <button id="zoomInButton" type="button" aria-label="放大视野">＋</button>
+          <button id="panRightButton" type="button" aria-label="向右观察">→</button>
+        </div>
+
+        <button id="soundButton" class="soundButton" type="button" aria-pressed="false">
+          <span class="soundGlyph" aria-hidden="true"></span>
+          <span id="soundLabel">声音：关</span>
+        </button>
+
+        <section id="clueDrawer" class="clueDrawer" aria-labelledby="clueDrawerTitle">
+          <button id="clueDrawerToggle" class="clueDrawerToggle" type="button" aria-expanded="false" aria-controls="clueListWrap">
+            <span><b id="clueDrawerTitle">观察记录</b><small id="clueCounter">0 / 3</small></span>
+            <i aria-hidden="true"></i>
+          </button>
+          <div id="clueListWrap" class="clueListWrap" aria-hidden="true">
+            <ol id="clueList" class="clueList"></ol>
+          </div>
+        </section>
+      </section>
+
+      <section id="storyPanel" class="storyPanel" aria-label="故事与电话">
+        <div class="storyTopline">
+          <div id="speakerBadge" class="speakerBadge" aria-hidden="true">记</div>
+          <div>
+            <span id="speakerName">山中记事</span>
+            <small id="speakerChannel">环境记录</small>
+          </div>
+          <button id="transcriptButton" class="transcriptButton" type="button" data-open-modal="transcript">通话记录</button>
+        </div>
+
+        <div id="dialogueText" class="dialogueText" aria-live="polite">
+          五月的太行山已经有了暑气。大路被封锁，县里把你派到风口梁。
+        </div>
+
+        <div id="storyActions" class="storyActions">
+          <button id="advanceButton" class="advanceButton" type="button">
+            <span>继续</span><kbd>Enter</kbd>
+          </button>
+          <button id="rollCallModeButton" class="rollCallModeButton hidden" type="button" aria-pressed="false">
+            <span>暂停自动核对</span><small>暂停后可用“核下一名”手动阅读</small>
+          </button>
+          <button id="phoneButton" class="phoneButton hidden" type="button">
+            <span class="phoneCrank" aria-hidden="true"><i></i></span>
+            <span><b id="phoneButtonLabel">摇通槐树坪总机</b><small id="phoneButtonHint">按住空格或点击</small></span>
+          </button>
+        </div>
+
+        <p id="interactionHint" class="interactionHint">拖动画面观察；也可用方向键、Tab 和 Enter。</p>
+      </section>
+    </main>
+  </div>
+
+  <div id="modalLayer" class="modalLayer hidden" aria-hidden="true">
+    <section id="choiceModal" class="modalCard choiceModal hidden" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
+      <div class="modalKicker">这不是善恶题</div>
+      <h2 id="choiceTitle">线路只够先接一处</h2>
+      <p id="choiceContext"></p>
+      <div id="choiceOptions" class="choiceOptions"></div>
+    </section>
+
+    <section id="historyModal" class="modalCard archiveModal hidden" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+      <button class="modalClose" type="button" data-close-modal aria-label="关闭史实说明">×</button>
+      <div class="modalKicker">史实与创作边界</div>
+      <h2 id="historyTitle">真实历史不由玩家改写</h2>
+      <div id="historyContent" class="archiveContent"></div>
+    </section>
+
+    <section id="journalModal" class="modalCard archiveModal hidden" role="dialog" aria-modal="true" aria-labelledby="journalTitle">
+      <button class="modalClose" type="button" data-close-modal aria-label="关闭记事簿">×</button>
+      <div class="modalKicker">风口梁记事簿</div>
+      <h2 id="journalTitle">留下姓名，也留下代价</h2>
+      <div id="journalContent" class="archiveContent"></div>
+    </section>
+
+    <section id="transcriptModal" class="modalCard archiveModal hidden" role="dialog" aria-modal="true" aria-labelledby="transcriptTitle">
+      <button class="modalClose" type="button" data-close-modal aria-label="关闭通话记录">×</button>
+      <div class="modalKicker">线路抄收</div>
+      <h2 id="transcriptTitle">已经听见的话</h2>
+      <div id="transcriptContent" class="transcriptContent"></div>
+    </section>
+
+    <section id="settingsModal" class="modalCard settingsModal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <button class="modalClose" type="button" data-close-modal aria-label="关闭设置">×</button>
+      <div class="modalKicker">体验设置</div>
+      <h2 id="settingsTitle">让线路适合你</h2>
+      <div class="settingList">
+        <label>
+          <span><b>文字大小</b><small>同时影响对白、说明与按钮</small></span>
+          <select id="fontScaleSelect">
+            <option value="1">标准</option>
+            <option value="1.15">较大</option>
+            <option value="1.3">最大</option>
+          </select>
+        </label>
+        <label>
+          <span><b>高对比</b><small>提高面板、线索与焦点可见度</small></span>
+          <input id="contrastToggle" type="checkbox">
+        </label>
+        <label>
+          <span><b>减少动态</b><small>关闭山雾漂移、文字渐入和视野惯性</small></span>
+          <input id="motionToggle" type="checkbox">
+        </label>
+        <label>
+          <span><b>单击电话柄</b><small>无需长按空格或按钮</small></span>
+          <input id="holdToggle" type="checkbox">
+        </label>
+        <label>
+          <span><b>环境与电话声音</b><small>所有声音都同时显示文字信息</small></span>
+          <input id="soundToggleSetting" type="checkbox">
+        </label>
+      </div>
+      <div class="keyboardGuide">
+        <b>键盘</b>
+        <p><kbd>←</kbd><kbd>→</kbd> 观察　<kbd>＋</kbd><kbd>−</kbd> 缩放　<kbd>Tab</kbd> 轮转线索　<kbd>Enter</kbd> 检查／继续　<kbd>空格</kbd> 摇电话　<kbd>M</kbd> 记事簿　<kbd>H</kbd> 史实</p>
+      </div>
+      <button id="restartButton" class="dangerButton" type="button">清除本页存档，重新开始</button>
+    </section>
+  </div>
+
+  <section id="endingScreen" class="endingScreen hidden" aria-labelledby="endingTitle">
+    <canvas id="endingCanvas" class="endingCanvas" aria-hidden="true"></canvas>
+    <div class="endingScroll">
+      <p class="endingKicker">1942年5月31日 · 北山口</p>
+      <h2 id="endingTitle" tabindex="-1">人都在。</h2>
+      <p class="endingLead">你没有改变一场真实战役。你只守住了一条虚构的线，让六十七个虚构的人没有只剩下一个数字。</p>
+      <div id="endingConsequences" class="endingConsequences"></div>
+      <blockquote>
+        <p>“乙村六十七号，全到。东西丢了些，人都在。”</p>
+        <cite>——何青禾，虚构人物</cite>
+      </blockquote>
+      <div class="endingHistory">
+        <h3>真实历史继续向前</h3>
+        <p>1942年5月25日，八路军副参谋长左权在辽县十字岭战斗中牺牲。本作人物、村落与局部行动均为虚构，不参与或改变这一真实事件。</p>
+        <p>中国人民在全民族抗战和世界反法西斯战争中付出巨大牺牲，最终于1945年取得抗日战争胜利。无数通信员、交通员、民兵与群众没有留下完整姓名。</p>
+      </div>
+      <div class="endingActions">
+        <button id="reviewJournalButton" class="primaryButton" type="button">翻开六十七人名册</button>
+        <button id="replayButton" class="secondaryButton" type="button">重新走一遍山路</button>
+        <a href="/projects/">返回项目页</a>
+      </div>
+      <p class="endingBoundary">本作批判日本军国主义与侵略战争，不针对今天的日本人民。</p>
+    </div>
+  </section>
+
+  <noscript>
+    <div class="noscriptMessage">本游戏需要 JavaScript 才能运行。史实边界：人物与村落为虚构，1942年5月太行区反“扫荡”及左权牺牲等真实历史不可改写。</div>
+  </noscript>
+
+  <script type="module" src="./Script_Game.mjs?v=1"></script>
+</body>
+</html>
