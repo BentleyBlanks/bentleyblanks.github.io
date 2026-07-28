@@ -317,6 +317,133 @@ table.hljs-ln {
   object-fit: cover;
 }
 
+.projectStoryFrame {
+  overflow: hidden;
+  background: #171914;
+}
+
+.projectStoryCard {
+  align-items: stretch;
+  min-height: 18rem;
+  height: auto;
+  flex-flow: row nowrap;
+}
+
+.projectStoryCard .illustrate {
+  min-height: 18rem;
+  height: auto;
+}
+
+.projectStoryCard .projectCardContent {
+  display: flex;
+  height: auto;
+  align-items: stretch;
+  flex-flow: column nowrap;
+}
+
+.projectStoryCard .projectCardTitle,
+.projectStoryCard .projectCardLink {
+  flex: 0 0 auto;
+}
+
+.projectStoryCard .projectCardIntro {
+  flex: 1 1 auto;
+  padding-bottom: 1rem;
+}
+
+.projectStoryIllustration {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: #eadcb8;
+  background:
+    radial-gradient(circle at 72% 18%, rgba(210, 173, 96, 0.18), transparent 18%),
+    repeating-linear-gradient(96deg, rgba(236, 220, 181, 0.025) 0 1px, transparent 1px 8px),
+    linear-gradient(155deg, #303731 0%, #181b18 58%, #0e100e 100%);
+}
+
+.projectStoryIllustration:focus-visible {
+  outline: 3px solid #e8d8ad;
+  outline-offset: -4px;
+}
+
+.projectStoryIllustration::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(4deg, transparent 0 9px, rgba(0, 0, 0, 0.12) 9px 10px),
+    radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.62) 120%);
+}
+
+.projectStoryRidge {
+  position: absolute;
+  right: -12%;
+  bottom: -2%;
+  width: 112%;
+  height: 72%;
+  background: #10130f;
+  clip-path: polygon(0 100%, 0 71%, 14% 57%, 25% 65%, 39% 38%, 50% 58%, 63% 29%, 74% 49%, 88% 31%, 100% 45%, 100% 100%);
+  filter: drop-shadow(-1rem -1rem 0 rgba(123, 130, 112, 0.13));
+}
+
+.projectStoryPath {
+  position: absolute;
+  right: 20%;
+  bottom: -18%;
+  width: 31%;
+  height: 70%;
+  opacity: 0.44;
+  border-left: 0.36rem solid rgba(218, 197, 146, 0.32);
+  border-radius: 50%;
+  transform: rotate(27deg);
+}
+
+.projectStorySeal {
+  position: absolute;
+  z-index: 2;
+  top: 1.5rem;
+  left: 1.5rem;
+  display: grid;
+  width: 3.3rem;
+  height: 3.3rem;
+  place-items: center;
+  color: #e8d8ad;
+  background: #96372b;
+  border: 0.2rem double rgba(237, 218, 170, 0.72);
+  font-family: "FangSong", "STFangsong", "SimSun", serif;
+  font-size: 1.85rem;
+  transform: rotate(-4deg);
+}
+
+.projectStoryCopy {
+  position: absolute;
+  z-index: 2;
+  right: 1.6rem;
+  bottom: 1.5rem;
+  left: 1.6rem;
+  display: grid;
+  color: #eadcb8;
+  font-family: "FangSong", "STFangsong", "SimSun", serif;
+  text-shadow: 0 0.15rem 0.4rem rgba(0, 0, 0, 0.86);
+}
+
+.projectStoryCopy strong {
+  font-size: clamp(1.7rem, 3.1vw, 2.65rem);
+  letter-spacing: 0.12em;
+}
+
+.projectStoryCopy small {
+  color: #bcaa80;
+  font-family: "Microsoft YaHei", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+}
+
 .projectCardContent {
   flex: 0 0 60%;
   height: 100%;
@@ -386,12 +513,27 @@ table.hljs-ln {
 
 .projectCardLink a {
   /*flex: 0 0 25%;*/
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   font-size: 1.6rem;
   color: rgb(150, 150, 150);
 }
 
 .projectCardLink a:hover {
   color: rgb(20, 20, 20);
+}
+
+.projectCardLink a:focus-visible {
+  color: rgb(20, 20, 20);
+  outline: 3px solid #96372b;
+  outline-offset: 2px;
+}
+
+.projectStoryCard .projectCardLink a {
+  color: #767676;
 }
 
 @media screen and (max-width: 768px) {
@@ -441,5 +583,45 @@ table.hljs-ln {
 
   .projectCardLink {
     flex: 0 0 20%;
+  }
+
+  .projectStoryCard {
+    align-items: stretch;
+    min-height: 32rem;
+    height: auto;
+    flex-flow: column nowrap;
+  }
+
+  .projectStoryCard .illustrate {
+    flex: 0 0 12rem;
+    width: 100%;
+    height: 12rem;
+    min-height: 12rem;
+  }
+
+  .projectStoryCard .projectCardContent {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+    align-items: stretch;
+    flex-flow: column nowrap;
+  }
+
+  .projectStoryCard .projectCardTitle,
+  .projectStoryCard .projectCardIntro,
+  .projectStoryCard .projectCardLink {
+    flex: 0 0 auto;
+  }
+
+  .projectStoryCard .projectCardIntro {
+    padding-bottom: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wow {
+    visibility: visible !important;
+    animation: none !important;
+    transition: none !important;
   }
 }
