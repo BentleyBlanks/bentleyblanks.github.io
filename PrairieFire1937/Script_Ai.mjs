@@ -49,11 +49,15 @@ try {
   externalUnitDefinitions = null;
 }
 
+let externalWorkDefinitions = null;
+
 try {
   const module = await import('./Data_Terrain.mjs');
   externalTerrainDefinitions = module?.terrainDefinitions ?? null;
+  externalWorkDefinitions = module?.workDefinitions ?? null;
 } catch (error) {
   externalTerrainDefinitions = null;
+  externalWorkDefinitions = null;
 }
 
 try {
@@ -442,7 +446,21 @@ function MoveCostFor(hex) {
   else if (hex.road === 1) cost = Math.min(cost, 1.1);
   if (hex.feature === 'Ford' || hex.feature === 'Pass') cost = Math.min(cost, 1.4);
   if (hex.blockade > 0) cost = Math.max(0.5, cost - 0.2);
+  // 我方的破路与路障真实迟滞敌军机动——这是破交战对扫荡的直接牵制作用，
+  // 必须体现在敌方的行军消耗上，否则「破路」这项工事对 AI 完全无感。
+  cost += WorkEnemyMoveCostFor(hex);
   return cost;
+}
+
+/** 该格我方工事给敌军增加的行军消耗（破路、路障）。 */
+function WorkEnemyMoveCostFor(hex) {
+  const works = Array.isArray(hex && hex.works) ? hex.works : [];
+  if (!works.length || !externalWorkDefinitions) return 0;
+  let extra = 0;
+  for (const work of works) {
+    extra += Number(externalWorkDefinitions[work]?.effects?.enemyMoveCostDelta) || 0;
+  }
+  return Math.max(0, extra);
 }
 
 function CreateRngCursor(seedState) {

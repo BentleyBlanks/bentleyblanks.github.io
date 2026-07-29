@@ -668,6 +668,45 @@ function NormalizeEffects(effects) {
   };
 }
 
+/**
+ * 汇总该地块上已建工事的效果。
+ *
+ * `Data_Terrain.workDefinitions` 用的是一套地块级的效果词汇
+ * （concealmentDelta / defenceBonus / moveCostDelta / warningRange /
+ *  grainProtection / scorchResist / setsTunnel），与科技政策那套全局效果不同。
+ * 这些必须被真正消费，否则玩家花工和干部修的交通壕、坚壁窖、消息树全是白建。
+ */
+export function GetHexWorkEffects(hex) {
+  const totals = {
+    concealmentDelta: 0,
+    defenceBonus: 0,
+    moveCostDelta: 0,
+    enemyMoveCostDelta: 0,
+    warningRange: 0,
+    grainProtection: 0,
+    scorchResist: 0,
+    exposureDelta: 0,
+    massBaseDelta: 0,
+    sabotageBonus: 0,
+    setsTunnel: false,
+  };
+  if (!hex || !Array.isArray(hex.works)) return totals;
+  const definitions = workDefinitions();
+  for (const work of hex.works) {
+    const effects = definitions[work]?.effects;
+    if (!effects) continue;
+    for (const key of Object.keys(totals)) {
+      const value = effects[key];
+      if (value === undefined) continue;
+      if (typeof value === "boolean") totals[key] = totals[key] || value;
+      else totals[key] += Number(value) || 0;
+    }
+  }
+  totals.grainProtection = Clamp(totals.grainProtection, 0, 0.85);
+  totals.scorchResist = Clamp(totals.scorchResist, 0, 0.85);
+  return totals;
+}
+
 /** 某格是否被任一根据地工作范围覆盖。 */
 export function GetWorkingBase(state, key) {
   for (const base of state.bases) {
@@ -854,7 +893,15 @@ function DriftIntel(state) {
     else if (hex.control === "Guerrilla") target = 52;
     else if (hex.control === "Contested") target = 24;
     target += hex.massBase * 0.25;
-    if (hex.works?.includes("Beacon")) target += 18;
+    // 消息树/烽火台之类的工事按自身 warningRange 扩大情报覆盖，并惠及邻格。
+    const works = GetHexWorkEffects(hex);
+    if (works.warningRange > 0) {
+      target += 10 + works.warningRange * 6;
+      for (const neighborKey of HexNeighborKeys(key)) {
+        const neighbor = state.map.hexes[neighborKey];
+        if (neighbor) neighbor.intel = Clamp(neighbor.intel + works.warningRange * 2.5, 0, 100);
+      }
+    }
     if (hex.visibility >= 2) target += 20;
     target = Clamp(target + effects.intelRange * 6, 0, 100);
     hex.intel = Clamp(Lerp(hex.intel, target, 0.4), 0, 100);
@@ -896,11 +943,15 @@ function DriftMassBase(state) {
 
     if (hex.scorch > 0) {
       // 被"三光"过的村庄群众基础恢复更慢——代价是长期的。
-      delta -= hex.scorch * 0.03;
-      hex.scorch = Math.max(0, hex.scorch - 3.5);
+      // 地道与坚壁窖能让村子在焚掠后恢复得快些（scorchResist）。
+      const resist = GetHexWorkEffects(hex).scorchResist;
+      delta -= hex.scorch * 0.03 * (1 - resist);
+      hex.scorch = Math.max(0, hex.scorch - 3.5 * (1 + resist));
     }
     if (organized && hex.feature === "Village") delta += 0.35;
     if (organized && hex.works?.includes("Tunnel")) delta += 0.5;
+    // 梯田这类改善生计的工事直接抬高群众基础——修水利、修梯田本身就是群众工作。
+    if (organized) delta += GetHexWorkEffects(hex).massBaseDelta * 0.35;
 
     let next = hex.massBase + delta;
     if (!organized) {
@@ -920,6 +971,8 @@ function MoveCost(state, hex, effects) {
   const definition = terrainDefinitions()[hex.terrain];
   let cost = Number(definition?.moveCost) || 1;
   if (hex.road >= 1) cost = Math.min(cost, 1);
+  // 交通壕等工事让本方在自家地盘上跑得更快（moveCostDelta 为负值）。
+  cost += GetHexWorkEffects(hex).moveCostDelta;
   if (hex.works?.includes("Tunnel") && effects.tunnelMove) cost = Math.min(cost, 1);
   if (GetSeasonKey(state.turn) === "冬") cost += 0.25;
   return Math.max(0.5, cost);
@@ -1153,15 +1206,36 @@ function PushLog(state, tag, text) {
  */
 function AddLedger(state, delta, mitigate = false) {
   const effects = mitigate ? GetEffects(state) : null;
+  // 坚壁窖与地道的实际减灾能力：按根据地范围内已建工事的平均覆盖折算。
+  const works = mitigate ? GetAverageWorkProtection(state) : null;
   for (const key of ledgerKeys) {
     let amount = Number(delta?.[key]) || 0;
     if (amount <= 0) continue;
     if (effects) {
-      if (key === "grainSeized") amount *= 1 - effects.seizureResist;
-      if (key === "civilianDeaths" || key === "displaced") amount *= 1 - effects.civilianShelter;
+      if (key === "grainSeized") amount *= (1 - effects.seizureResist) * (1 - (works?.grainProtection ?? 0));
+      if (key === "civilianDeaths" || key === "displaced") {
+        amount *= (1 - effects.civilianShelter) * (1 - (works?.scorchResist ?? 0) * 0.6);
+      }
     }
     state.ledger[key] += Math.max(0, amount);
   }
+}
+
+/** 根据地范围内工事提供的平均保护度（坚壁清野真正落地的地方）。 */
+function GetAverageWorkProtection(state) {
+  let grainProtection = 0;
+  let scorchResist = 0;
+  let count = 0;
+  for (const key of state.map.order) {
+    const hex = state.map.hexes[key];
+    if (!hex || (hex.control !== "Base" && hex.control !== "Guerrilla")) continue;
+    const works = GetHexWorkEffects(hex);
+    grainProtection += works.grainProtection;
+    scorchResist += works.scorchResist;
+    count += 1;
+  }
+  if (!count) return { grainProtection: 0, scorchResist: 0 };
+  return { grainProtection: Clamp(grainProtection / count, 0, 0.7), scorchResist: Clamp(scorchResist / count, 0, 0.7) };
 }
 
 /** 执行一个行动，返回 { nextState, report }。report.effects 供渲染层派发特效。 */
@@ -1255,7 +1329,12 @@ export function PerformAction(state, action) {
       SpendStock(next, definition.cost ?? {});
       const hex = GetHex(next, action.key);
       hex.works = Array.from(new Set([...(hex.works ?? []), action.workType]));
-      if (action.workType === "Tunnel") hex.tunnel = true;
+      // 是否接通地道由工事自己的 setsTunnel 声明，而不是按名字硬编码。
+      if (definition.effects?.setsTunnel || action.workType === "Tunnel") hex.tunnel = true;
+      const workEffects = GetHexWorkEffects(hex);
+      if (workEffects.exposureDelta) {
+        next.exposure = Clamp(next.exposure + workEffects.exposureDelta, 0, 100);
+      }
       const unit = GetUnit(next, action.unitId);
       if (unit) {
         unit.acted = true;

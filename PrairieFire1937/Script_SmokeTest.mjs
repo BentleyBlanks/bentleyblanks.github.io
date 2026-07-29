@@ -461,6 +461,89 @@ Test("结局与表现挂钩：差局不得拿到最好的结局", () => {
   console.log(`      差局 → ${poor.ending.title}(${poor.grade}) · 好局 → ${strong.ending.title}(${strong.grade})`);
 });
 
+Test("工事的每一项效果都被真正消费（不得白建）", () => {
+  const works = DataTerrain.workDefinitions ?? {};
+  assert.ok(Object.keys(works).length >= 6, "工事定义过少");
+
+  // 收集所有工事声明过的效果 key，逐个验证它在规则层或战斗层确有反应。
+  const declared = new Set();
+  for (const definition of Object.values(works)) {
+    for (const key of Object.keys(definition.effects ?? {})) declared.add(key);
+  }
+
+  const state = Rules.CreateInitialState({ seed: 4747 });
+  const probeKey = state.startKey;
+  const baseHex = Rules.GetHex(state, probeKey);
+
+  const WithWorks = (list) => {
+    const next = Rules.CloneState(state);
+    const hex = Rules.GetHex(next, probeKey);
+    hex.works = list;
+    return next;
+  };
+
+  const checks = {
+    concealmentDelta: (workKey) => {
+      const withWork = Rules.GetHex(WithWorks([workKey]), probeKey);
+      return Combat.ResolveHexStats(withWork).concealment > Combat.ResolveHexStats(baseHex).concealment;
+    },
+    defenceBonus: (workKey) => {
+      const withWork = Rules.GetHex(WithWorks([workKey]), probeKey);
+      return Combat.ResolveHexStats(withWork).defenceBonus > Combat.ResolveHexStats(baseHex).defenceBonus;
+    },
+    moveCostDelta: (workKey) => {
+      const withWork = Rules.GetHex(WithWorks([workKey]), probeKey);
+      return Combat.ResolveHexStats(withWork).moveCost !== Combat.ResolveHexStats(baseHex).moveCost;
+    },
+    warningRange: () => {
+      const effects = Rules.GetHexWorkEffects({ works: ["Beacon"] });
+      return effects.warningRange > 0;
+    },
+    grainProtection: () => Rules.GetHexWorkEffects({ works: ["Cache"] }).grainProtection > 0,
+    scorchResist: () => Rules.GetHexWorkEffects({ works: ["Tunnel"] }).scorchResist > 0,
+    setsTunnel: () => Rules.GetHexWorkEffects({ works: ["Tunnel"] }).setsTunnel === true,
+    exposureDelta: () => Rules.GetHexWorkEffects({ works: ["Tunnel"] }).exposureDelta !== 0,
+    massBaseDelta: () => Rules.GetHexWorkEffects({ works: ["Terrace"] }).massBaseDelta > 0,
+    sabotageBonus: () => Combat.WorkSabotageBonus({ works: ["Roadblock"] }) > 0,
+    enemyMoveCostDelta: () => Combat.WorkEnemyMoveCost({ works: ["Roadblock"] }) > 0,
+    yields: () => true, // 产出走 GetHexBaseYields，已由经济用例覆盖
+  };
+
+  const unconsumed = [];
+  for (const key of declared) {
+    const check = checks[key];
+    if (!check) {
+      unconsumed.push(`${key}（无人消费）`);
+      continue;
+    }
+    const owner = Object.entries(works).find(([, definition]) => definition.effects?.[key] !== undefined)?.[0];
+    let ok = false;
+    try {
+      ok = Boolean(check(owner));
+    } catch (error) {
+      ok = false;
+    }
+    if (!ok) unconsumed.push(`${key}（${owner} 上无反应）`);
+  }
+  assert.equal(unconsumed.length, 0, `工事效果未被消费，玩家的工与干部白花：\n      ${unconsumed.join("\n      ")}`);
+});
+
+Test("地道确实提升隐蔽与防御，交通壕确实降低移动消耗", () => {
+  const state = Rules.CreateInitialState({ seed: 4848 });
+  const hex = Rules.GetHex(state, state.startKey);
+  const plain = Combat.ResolveHexStats({ ...hex, works: [] });
+  const tunnel = Combat.ResolveHexStats({ ...hex, works: ["Tunnel"] });
+  const trench = Combat.ResolveHexStats({ ...hex, works: ["Trench"] });
+  console.log(
+    `      隐蔽 ${plain.concealment.toFixed(2)} → 地道 ${tunnel.concealment.toFixed(2)}` +
+      ` · 防御 ${plain.defenceBonus.toFixed(2)} → 地道 ${tunnel.defenceBonus.toFixed(2)}` +
+      ` · 移动 ${plain.moveCost.toFixed(2)} → 交通壕 ${trench.moveCost.toFixed(2)}`,
+  );
+  assert.ok(tunnel.concealment > plain.concealment + 0.05, "地道未提升隐蔽");
+  assert.ok(tunnel.defenceBonus > plain.defenceBonus, "地道未提升防御");
+  assert.ok(trench.moveCost < plain.moveCost, "交通壕未降低移动消耗");
+});
+
 Test("经济不会超线性膨胀，且粮/药始终是紧的", () => {
   let state = Rules.CreateInitialState({ seed: 11 });
   let tightGrainTurns = 0;

@@ -51,11 +51,15 @@ try {
   externalUnitDefinitions = null;
 }
 
+let externalWorkDefinitions = null;
+
 try {
   const terrainModule = await import("./Data_Terrain.mjs");
   externalTerrainDefinitions = (terrainModule && terrainModule.terrainDefinitions) || null;
+  externalWorkDefinitions = (terrainModule && terrainModule.workDefinitions) || null;
 } catch (error) {
   externalTerrainDefinitions = null;
+  externalWorkDefinitions = null;
 }
 
 const unitStatsCache = new Map();
@@ -481,6 +485,61 @@ export function ResolveTerrainStats(terrain) {
   return stats;
 }
 
+/**
+ * 地块的实际战斗数值 = 地形数值 + 该格已建工事的叠加。
+ *
+ * 工事的 concealmentDelta / defenceBonus 此前从未被任何模块读取，
+ * 玩家修的交通壕、地道、坚壁窖在战斗里完全不起作用。这里把这条链路接上：
+ * 战斗层一律用本函数取值，不要再直接调 ResolveHexStats(hex)。
+ */
+export function ResolveHexStats(hex) {
+  const base = ResolveTerrainStats(hex && hex.terrain);
+  const works = Array.isArray(hex && hex.works) ? hex.works : [];
+  if (!works.length || !externalWorkDefinitions) return base;
+
+  let concealment = base.concealment;
+  let defenceBonus = base.defenceBonus;
+  let moveCost = base.moveCost;
+  for (const work of works) {
+    const effects = externalWorkDefinitions[work] && externalWorkDefinitions[work].effects;
+    if (!effects) continue;
+    concealment += Number(effects.concealmentDelta) || 0;
+    defenceBonus += Number(effects.defenceBonus) || 0;
+    moveCost += Number(effects.moveCostDelta) || 0;
+  }
+  concealment = Clamp01(concealment);
+  return Object.freeze({
+    key: base.key,
+    name: base.name,
+    moveCost: Math.max(0.5, moveCost),
+    defenceBonus,
+    concealment,
+    openness: Clamp01(1 - concealment),
+  });
+}
+
+/** 该格工事提供的破袭加成（破路、隐蔽接近路线等）。 */
+export function WorkSabotageBonus(hex) {
+  const works = Array.isArray(hex && hex.works) ? hex.works : [];
+  if (!works.length || !externalWorkDefinitions) return 0;
+  let bonus = 0;
+  for (const work of works) {
+    bonus += Number(externalWorkDefinitions[work]?.effects?.sabotageBonus) || 0;
+  }
+  return Clamp(bonus, 0, 0.4);
+}
+
+/** 该格工事给敌方增加的移动消耗（破路、路障）。供 AI 的机动评估使用。 */
+export function WorkEnemyMoveCost(hex) {
+  const works = Array.isArray(hex && hex.works) ? hex.works : [];
+  if (!works.length || !externalWorkDefinitions) return 0;
+  let extra = 0;
+  for (const work of works) {
+    extra += Number(externalWorkDefinitions[work]?.effects?.enemyMoveCostDelta) || 0;
+  }
+  return Math.max(0, extra);
+}
+
 function ResolveStrongholdStats(type) {
   return defaultStrongholdStats[String(type)] || defaultStrongholdStats.Blockhouse;
 }
@@ -712,7 +771,7 @@ export function ComputeStrength(state, unit, hex, context = {}) {
   const stats = ResolveUnitStats(unit.type);
   const isPlayer = (unit.side || stats.side) !== "Enemy";
   const role = context.role === "Defence" ? "Defence" : "Attack";
-  const terrain = ResolveTerrainStats(hex && hex.terrain);
+  const terrain = ResolveHexStats(hex);
   const constants = combatConstants;
 
   let value = role === "Attack" ? stats.attack : stats.defence;
@@ -800,8 +859,8 @@ function ResolveNightFlag(state, options) {
 
 function ComputeAmbushScore(state, attacker, attackerHex, defender, defenderHex, night) {
   if (!attacker || !attacker.hidden) return 0;
-  const attackerTerrain = ResolveTerrainStats(attackerHex && attackerHex.terrain);
-  const defenderTerrain = ResolveTerrainStats(defenderHex && defenderHex.terrain);
+  const attackerTerrain = ResolveHexStats(attackerHex);
+  const defenderTerrain = ResolveHexStats(defenderHex);
   const works = Array.isArray(attackerHex && attackerHex.works) ? attackerHex.works : [];
   const hasCover =
     attackerTerrain.concealment >= combatConstants.ambushCoverThreshold ||
@@ -856,7 +915,7 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   const supportCount = CountFriendlySupport(state, attacker);
   const attackerStats = ResolveUnitStats(attacker.type);
   const defenderStats = ResolveUnitStats(defender.type);
-  const attackerTerrain = ResolveTerrainStats(attackerHex && attackerHex.terrain);
+  const attackerTerrain = ResolveHexStats(attackerHex);
   const massBase = Clamp01((attackerHex && attackerHex.massBase ? attackerHex.massBase : 0) / 100);
   const targetMass = Clamp01((defenderHex && defenderHex.massBase ? defenderHex.massBase : 0) / 100);
 
@@ -1035,7 +1094,7 @@ export function IsUnitTargetable(state, unit, attackerType) {
   if (!unit || (unit.hp ?? 0) <= 0) return { targetable: false, reason: "目标不存在" };
   if (!unit.hidden) return { targetable: true, reason: "目标已暴露" };
   const hex = GetHex(state, unit.key);
-  const terrain = ResolveTerrainStats(hex && hex.terrain);
+  const terrain = ResolveHexStats(hex);
   const detection = attackerType ? ResolveUnitStats(attackerType).detection : 1;
   const works = Array.isArray(hex && hex.works) ? hex.works : [];
   let cover = terrain.concealment;
@@ -1392,7 +1451,7 @@ function DrawRoll(draft) {
 function ComputeRetreatChance(state, unit, hex, night) {
   const constants = combatConstants;
   const stats = ResolveUnitStats(unit.type);
-  const terrain = ResolveTerrainStats(hex && hex.terrain);
+  const terrain = ResolveHexStats(hex);
   let chance = constants.retreatBaseChance * stats.retreatBonus;
   chance += terrain.concealment * constants.retreatTerrainBonus;
   if (hex && (hex.tunnel || (Array.isArray(hex.works) && hex.works.includes("Tunnel")))) {
@@ -1414,7 +1473,7 @@ function ChooseRetreatHex(state, unit) {
     if (!hex) continue;
     if (FindEnemyAt(state, key)) continue;
     if (FindStrongholdAt(state, key)) continue;
-    const terrain = ResolveTerrainStats(hex.terrain);
+    const terrain = ResolveHexStats(hex);
     let score = terrain.concealment * 2 + Clamp01((hex.massBase || 0) / 100) * 1.5;
     if (hex.tunnel) score += 1.2;
     if (hex.control === "Base") score += 0.9;
@@ -1469,7 +1528,7 @@ export function ApplyRetreat(state, unitId, toKey) {
     }
   }
 
-  const terrain = ResolveTerrainStats(destination.terrain);
+  const terrain = ResolveHexStats(destination);
   report.lines.push(
     succeeded
       ? `部队沿${terrain.name}小路转移，甩开了追兵。保存力量比拼光更重要。`
@@ -1535,6 +1594,8 @@ export function ResolveSabotage(state, unitId, targetKey, options = {}) {
   if (night) chance += constants.sabotageNightBonus;
   chance += Clamp01(stats.sabotage) * constants.sabotageSkillBonus;
   chance -= Clamp01(((state.alert || 0) / 100)) * 0.2;
+  // 事先破路、挖好隐蔽接近路线的地段，破袭更容易得手（工事的 sabotageBonus）。
+  chance += WorkSabotageBonus(hex) + WorkSabotageBonus(GetHex(state, unit.key));
   const nearStronghold = HexNeighborKeys(targetKey).some((key) => FindStrongholdAt(state, key));
   if (nearStronghold) chance -= 0.15;
   chance = Clamp(chance, 0.1, 0.96);
@@ -2195,7 +2256,7 @@ function ChooseDisperseHex(state, unit, affectedKeys) {
     const hex = GetHex(state, key);
     if (!hex) continue;
     if (FindEnemyAt(state, key)) continue;
-    const terrain = ResolveTerrainStats(hex.terrain);
+    const terrain = ResolveHexStats(hex);
     let score = terrain.concealment * 2.2 + Clamp01((hex.massBase || 0) / 100) * 1.4;
     if (!affected.has(key)) score += 2.5; // 跳出合围圈是首要目标
     if (hex.tunnel) score += 1;
@@ -2226,7 +2287,7 @@ function ChooseCounterRaidHex(state, unit, affectedKeys) {
       nearest = Math.min(nearest, HexDistanceKeys(key, item.key));
     }
     score += Math.max(0, 6 - nearest); // 向敌后方据点靠近
-    score += ResolveTerrainStats(hex.terrain).concealment;
+    score += ResolveHexStats(hex).concealment;
     if (score > bestScore) {
       bestScore = score;
       best = key;
@@ -2253,7 +2314,7 @@ export function TickCombatRecovery(state) {
     const stats = ResolveUnitStats(unit.type);
     if (stats.side === "Enemy") continue;
     const hex = GetHex(state, unit.key);
-    const terrain = ResolveTerrainStats(hex && hex.terrain);
+    const terrain = ResolveHexStats(hex);
     const massBase = Clamp01((hex && hex.massBase ? hex.massBase : 0) / 100);
     const maxHp = unit.maxHp || stats.hp || 50;
     const unitDraft = DraftUnit(draft, unit.id);
