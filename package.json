@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npm run test:taihang-polong && npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942",
+    "test": "npm run test:taihang-polong && npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937",
+    "test:prairieFire1937": "node PrairieFire1937/Script_SmokeTest.mjs",
     "test:resistanceCommand1937": "node TaihangDemo/ResistanceCommand1937/Script_SmokeTest.mjs",
     "test:enemyRear1941": "node TaihangDemo/EnemyRear1941/Script_SmokeTest.mjs && node TaihangDemo/EnemyRear1941/Script_MobileSmokeTest.mjs",
     "test:taihangSignal1942": "node TaihangSignal1942/Script_SmokeTest.mjs",
