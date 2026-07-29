@@ -1921,12 +1921,16 @@
   color: var(--pf-paper);
   line-height: 1.25;
   max-width: 100%;
+  /* flex 默认会收缩子项高度；卡片一旦比内容矮，标题行框就被压扁并被
+     overflow:hidden 从字中间横切。锁死不收缩，宁可卡片撑高也不切字。 */
+  flex: 0 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .pf-node-cost {
+  flex: 0 0 auto;
   font-size: 11px;
   color: var(--pf-paper-dim);
   font-variant-numeric: tabular-nums;
@@ -1934,6 +1938,7 @@
 }
 
 .pf-node-state {
+  flex: 0 0 auto;
   align-self: flex-start;
   padding: 0 6px;
   border: 1px solid currentColor;

@@ -1107,12 +1107,15 @@ void main() {
 const overlayKindOrder = ["move", "attack", "build", "sweep", "intel"];
 
 /** 五种地毯高亮的配色：填充色 + 边缘辉光色。 */
+// 辉光色必须压在地形明度附近：这层地毯在开局就铺满可移动范围（约 24 格、
+// 占屏近两成），一旦用浅色高饱和边缘，它会变成全画面最亮的东西，
+// 把下面的地形、村庄、部队全部洗淡——这正是第二轮「乳白糊团」换个图层复活。
 export const overlayKindColors = Object.freeze({
-  move: { fill: 0x3aa79c, edge: 0x9fe4d8 },
-  attack: { fill: 0xb03526, edge: 0xe89a76 },
-  build: { fill: 0xb8862c, edge: 0xe8ce97 },
-  sweep: { fill: 0x82281d, edge: 0xdd7850 },
-  intel: { fill: 0x5c6ab5, edge: 0xb2bce6 },
+  move: { fill: 0x2f7d76, edge: 0x4f8f86 },
+  attack: { fill: 0x8e2a1e, edge: 0xb05c42 },
+  build: { fill: 0x8f6a22, edge: 0xb59a5c },
+  sweep: { fill: 0x6b1f16, edge: 0xa85a3c },
+  intel: { fill: 0x47548f, edge: 0x7c88b4 },
 });
 
 /** 构造 8×2 的 kind 调色板纹理：第 0 行填充色，第 1 行辉光色。 */
@@ -1223,7 +1226,9 @@ void main() {
   vec3 color = mix( fillColor, edgeColor, rim * uRimBoost );
   color *= 0.58 + 0.42 * pattern;
 
-  float alpha = uOpacity * intensity * inside * ( 0.30 + 0.36 * pattern + 0.44 * rim ) * breathe;
+  // 填充几乎透明、只留边缘描边：常数项从 0.30 压到 0.08，
+  // 让玩家读到的是「这一圈格子可以去」，而不是「地图被一层薄荷色糊住了」。
+  float alpha = uOpacity * intensity * inside * ( 0.08 + 0.30 * pattern + 0.52 * rim ) * breathe;
   gl_FragColor = vec4( color, clamp( alpha, 0.0, 1.0 ) );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -1350,8 +1355,8 @@ export function CreateOverlayMaterial(kind = "composite") {
       uTime: { value: 0 },
       uHighlightState: { value: CreateStateFallbackTexture([0, 0, 0, 0]) },
       uKindPalette: { value: CreateOverlayPaletteTexture() },
-      uOpacity: { value: 0.54 },
-      uRimBoost: { value: 0.9 },
+      uOpacity: { value: 0.24 },
+      uRimBoost: { value: 0.5 },
     };
     fragmentShader = BuildCompositeOverlayShader();
   } else if (kindKey === "hover") {

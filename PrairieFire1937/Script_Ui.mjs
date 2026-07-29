@@ -2608,10 +2608,14 @@ export function CreateUi(root, hooks = {}) {
     // （平板 1024 上原本恒有一整行看不见）。列宽仍留足两行中文标题。
     const viewport = ViewportSize();
     const metrics =
+      // 卡片固有内容高约 76px（padding 9×2 + 标题 19 + gap 3×2 + 成本 16 + 状态 17）。
+      // 窄视口下若把 nodeHeight 压到 70/72，flex 会把标题行框收缩到 11px，
+      // 再被 .pf-node-name 的 overflow:hidden 从字中间横切——节点名整片不可读。
+      // 因此窄档的高度必须 ≥ 内容固有高。
       viewport.width <= 640
-        ? { nodeWidth: 140, nodeHeight: 72, columnGap: 40, rowGap: 12 }
+        ? { nodeWidth: 140, nodeHeight: 80, columnGap: 40, rowGap: 12 }
         : viewport.width <= 1199
-          ? { nodeWidth: 158, nodeHeight: 70, columnGap: 54, rowGap: 12 }
+          ? { nodeWidth: 158, nodeHeight: 82, columnGap: 54, rowGap: 12 }
           : { nodeWidth: 184, nodeHeight: 84, columnGap: 78, rowGap: 16 };
     const nodeWidth = metrics.nodeWidth;
     const nodeHeight = metrics.nodeHeight;

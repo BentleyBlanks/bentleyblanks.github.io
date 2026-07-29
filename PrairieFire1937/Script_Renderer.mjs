@@ -1364,9 +1364,9 @@ export function CreateRenderer(canvas, options = {}) {
   const scorchTint = new THREE.Color(0.42, 0.36, 0.32);
   const neutralTint = new THREE.Color(1, 1, 1);
   const factionTints = {
-    Player: new THREE.Color(0x9dc0e2).convertSRGBToLinear(),   // 我方：灰蓝布衣
-    Enemy: new THREE.Color(0xd2ab5c).convertSRGBToLinear(),    // 敌方：土黄制服
-    Hidden: new THREE.Color(0x7ea0b2).convertSRGBToLinear(),   // 隐蔽：偏冷的青灰
+    Player: new THREE.Color(0x9dc0e2),   // 我方：灰蓝布衣
+    Enemy: new THREE.Color(0xd2ab5c),    // 敌方：土黄制服
+    Hidden: new THREE.Color(0x7ea0b2),   // 隐蔽：偏冷的青灰
   };
   /** 我方部队头顶的小红旗，一眼区分敌我。 */
   const playerFlagColors = { cloth: modelPalette.bannerRed, band: "#e8d3a4", height: 0.30 };
@@ -1468,16 +1468,20 @@ export function CreateRenderer(canvas, options = {}) {
    * canopy > 0 的类别额外做顶亮底暗的竖向梯度，让锥体树冠不再是纯平黑剪影。
    */
   const propCategoryRecipes = Object.freeze({
-    settlement: { tint: 0xd8c9a2, roofBoost: 2.25, saturation: 1.05 },   // 中立聚落：夯土黄 + 亮瓦顶
-    stronghold: { tint: 0xc3c0b4, roofBoost: 1.95, saturation: 0.80 },   // 敌据点：冷灰水泥
-    friendly: { tint: 0xe0d0b6, roofBoost: 2.20, saturation: 0.95 },     // 我方：暖褐布衣
-    enemy: { tint: 0xe8d494, roofBoost: 2.20, saturation: 1.10 },        // 敌方：土黄制服
-    hidden: { tint: 0xa8bcc6, roofBoost: 1.80, saturation: 0.78, rim: 0.34 },
-    // 植被：模型自带的 #3f5638 与识别色相乘后线性值只剩 0.05 上下，
-    // 必须靠 gain 抬回albedo，再补一层环境底光，锥体侧面才不会归零成黑洞
-    foliage: { tint: 0xa8c47e, roofBoost: 1.55, saturation: 1.16, canopy: 0.52, gain: 2.5, lift: 0.85 },
-    works: { tint: 0xcbb98c, roofBoost: 1.68, saturation: 1.02 },        // 工事 / 区域
-    neutral: { tint: 0xc8bda4, roofBoost: 1.68, saturation: 1.0 },
+    // 识别色是「微调」不是「主导」：顶点色恢复正常亮度后，tint 应当接近中性，
+    // roofBoost 只负责让朝上的面比墙体亮一档。此前这些值被抬得很高，
+    // 是为了补偿顶点色二次 sRGB→Linear 造成的黑剪影；那个根因已修，补偿必须撤掉，
+    // 否则会整体过曝并把材质本身的层次冲掉。
+    // tint 接近中性，让模型自带的配色说话；只在需要分辨阵营时轻微偏色。
+    // 数值再高就会把屋顶冲成纯黄白，反而丢掉细节。
+    settlement: { tint: 0xbdb3a4, roofBoost: 1.16, saturation: 1.05 },   // 中立聚落：夯土黄 + 亮瓦顶
+    stronghold: { tint: 0xb0aea6, roofBoost: 1.12, saturation: 0.80 },   // 敌据点：冷灰水泥
+    friendly: { tint: 0xb4bcc4, roofBoost: 1.14, saturation: 0.95 },     // 我方：灰蓝布衣
+    enemy: { tint: 0xc9b98c, roofBoost: 1.14, saturation: 1.10 },        // 敌方：土黄制服
+    hidden: { tint: 0xa8b8c2, roofBoost: 1.10, saturation: 0.78, rim: 0.34 },
+    foliage: { tint: 0xa4bc8c, roofBoost: 1.12, saturation: 1.16, canopy: 0.52 },
+    works: { tint: 0xbcb094, roofBoost: 1.12, saturation: 1.02 },        // 工事 / 区域
+    neutral: { tint: 0xb8b0a2, roofBoost: 1.12, saturation: 1.0 },
   });
 
   function GetPropMaterial(sourceMaterial, categoryKey) {

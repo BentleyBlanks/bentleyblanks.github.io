@@ -126,8 +126,10 @@ function AttachVertexColor(geometry, colorHex, variance) {
   const count = position.count;
   const array = position.array;
   const colors = new Float32Array(count * 3);
+  // three r160 默认开启 ColorManagement，`new THREE.Color(hex)` 已经把 sRGB 字面量
+  // 转成线性了。这里若再转一次，中低明度颜色会被压到接近零——实测蓝布衣 #5f6d7c
+  // 只剩 14% 亮度，于是部队、碉堡、铁丝网全部渲染成纯黑剪影，逐面 tint 抖动也失效。
   const base = new THREE.Color(colorHex);
-  base.convertSRGBToLinear();
   for (let triangle = 0; triangle < count; triangle += 3) {
     const index = triangle * 3;
     const hash = HashString(`${Math.round((array[index] + array[index + 3]) * 97)}|${Math.round((array[index + 1] + array[index + 4]) * 89)}|${Math.round((array[index + 2] + array[index + 5]) * 83)}`);
@@ -1140,8 +1142,8 @@ export function CreateRoadRibbon(pathKeys, level = 1, options = {}) {
   const position = new Float32Array(vertexCount * 3);
   const normal = new Float32Array(vertexCount * 3);
   const color = new Float32Array(vertexCount * 3);
-  const baseColor = new THREE.Color(level >= 2 ? modelPalette.roadPaved : modelPalette.roadDirt).convertSRGBToLinear();
-  const centerColor = new THREE.Color("#8f897d").convertSRGBToLinear();
+  const baseColor = new THREE.Color(level >= 2 ? modelPalette.roadPaved : modelPalette.roadDirt);
+  const centerColor = new THREE.Color("#8f897d");
   let cursor = 0;
   const WriteQuad = (p0, p1, p2, p3, tint) => {
     for (const corner of [p0, p1, p2, p0, p2, p3]) {
