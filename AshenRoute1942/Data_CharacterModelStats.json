@@ -1,0 +1,217 @@
+{
+  "schema": "AshenRouteCharacterModelsV1",
+  "generator": "Blender 5.1 background factory-startup",
+  "frontAxisAuthoring": "-Y",
+  "upAxisAuthoring": "+Z",
+  "exportFormat": "glTF Binary 2.0",
+  "sharedRigSchema": "SharedCourierRigV1",
+  "characters": {
+    "zhaoTongcen": {
+      "triangles": 3662,
+      "vertices": 1949,
+      "bones": 21,
+      "boneNames": [
+        "Root",
+        "Hips",
+        "Spine",
+        "Chest",
+        "Neck",
+        "Head",
+        "UpperArm_L",
+        "Forearm_L",
+        "Hand_L",
+        "UpperArm_R",
+        "Forearm_R",
+        "Hand_R",
+        "Prop_Sickle",
+        "Prop_Rifle",
+        "Thigh_L",
+        "Shin_L",
+        "Foot_L",
+        "Thigh_R",
+        "Shin_R",
+        "Foot_R",
+        "Prop_Satchel"
+      ],
+      "dimensionsMeters": {
+        "width": 0.9277,
+        "depth": 0.431,
+        "height": 1.7722
+      },
+      "boundsMeters": {
+        "minimum": [
+          -0.4638,
+          -0.2119,
+          0.0068
+        ],
+        "maximum": [
+          0.4639,
+          0.2191,
+          1.779
+        ]
+      },
+      "file": "Model_TongcenCourier.glb",
+      "fileBytes": 297472,
+      "characterId": "zhaoTongcen"
+    },
+    "duXiangyun": {
+      "triangles": 3638,
+      "vertices": 1933,
+      "bones": 21,
+      "boneNames": [
+        "Root",
+        "Hips",
+        "Spine",
+        "Chest",
+        "Neck",
+        "Head",
+        "UpperArm_L",
+        "Forearm_L",
+        "Hand_L",
+        "UpperArm_R",
+        "Forearm_R",
+        "Hand_R",
+        "Prop_Sickle",
+        "Prop_Rifle",
+        "Thigh_L",
+        "Shin_L",
+        "Foot_L",
+        "Thigh_R",
+        "Shin_R",
+        "Foot_R",
+        "Prop_Satchel"
+      ],
+      "dimensionsMeters": {
+        "width": 0.9522,
+        "depth": 0.3327,
+        "height": 1.6724
+      },
+      "boundsMeters": {
+        "minimum": [
+          -0.5613,
+          -0.1992,
+          0.0064
+        ],
+        "maximum": [
+          0.3909,
+          0.1335,
+          1.6788
+        ]
+      },
+      "file": "Model_XiangyunGuide.glb",
+      "fileBytes": 284784,
+      "characterId": "duXiangyun"
+    }
+  },
+  "roundTripValidation": {
+    "Model_TongcenCourier.glb": {
+      "triangles": 3662,
+      "vertices": 4875,
+      "bones": 21,
+      "boneNames": [
+        "Root",
+        "Hips",
+        "Spine",
+        "Chest",
+        "Neck",
+        "Head",
+        "UpperArm_L",
+        "Forearm_L",
+        "Hand_L",
+        "UpperArm_R",
+        "Forearm_R",
+        "Hand_R",
+        "Prop_Sickle",
+        "Prop_Rifle",
+        "Thigh_L",
+        "Shin_L",
+        "Foot_L",
+        "Thigh_R",
+        "Shin_R",
+        "Foot_R",
+        "Prop_Satchel"
+      ],
+      "dimensionsMeters": {
+        "width": 0.9277,
+        "depth": 0.431,
+        "height": 1.7722
+      },
+      "boundsMeters": {
+        "minimum": [
+          -0.4638,
+          -0.2119,
+          0.0068
+        ],
+        "maximum": [
+          0.4639,
+          0.2191,
+          1.779
+        ]
+      },
+      "armatureCount": 1,
+      "meshCount": 1,
+      "missingRequiredBones": [],
+      "manualBoneDrive": {
+        "bone": "Forearm_R",
+        "rotationDegrees": 24.0,
+        "maxVertexDeltaMeters": 0.02538,
+        "passed": true
+      }
+    },
+    "Model_XiangyunGuide.glb": {
+      "triangles": 3638,
+      "vertices": 4651,
+      "bones": 21,
+      "boneNames": [
+        "Root",
+        "Hips",
+        "Spine",
+        "Chest",
+        "Neck",
+        "Head",
+        "UpperArm_L",
+        "Forearm_L",
+        "Hand_L",
+        "UpperArm_R",
+        "Forearm_R",
+        "Hand_R",
+        "Prop_Sickle",
+        "Prop_Rifle",
+        "Thigh_L",
+        "Shin_L",
+        "Foot_L",
+        "Thigh_R",
+        "Shin_R",
+        "Foot_R",
+        "Prop_Satchel"
+      ],
+      "dimensionsMeters": {
+        "width": 0.9522,
+        "depth": 0.3327,
+        "height": 1.6724
+      },
+      "boundsMeters": {
+        "minimum": [
+          -0.5613,
+          -0.1992,
+          0.0064
+        ],
+        "maximum": [
+          0.3909,
+          0.1335,
+          1.6788
+        ]
+      },
+      "armatureCount": 1,
+      "meshCount": 1,
+      "missingRequiredBones": [],
+      "manualBoneDrive": {
+        "bone": "Forearm_R",
+        "rotationDegrees": 24.0,
+        "maxVertexDeltaMeters": 0.076,
+        "passed": true
+      }
+    }
+  },
+  "preview": "Texture_CharacterModelComparison.png"
+}
