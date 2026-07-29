@@ -32,6 +32,7 @@ import {
   Lerp,
   HexDistanceKeys,
   HexNeighborKeys,
+  HexToWorld,
   ParseHexKey,
   StepRng,
   HashString,
@@ -89,8 +90,16 @@ export const combatConstants = Object.freeze({
   strengthCacheBonus: 0.08, // 隐蔽物资点的小加成
   strengthBaseControlBonus: 0.12, // 在自己根据地内作战
   strengthEnemyControlPenalty: 0.09, // 深入敌占区作战
-  strengthSupportPerNeighbour: 0.07, // 每个相邻友邻单位的支援
-  strengthSupportCap: 0.21, // 支援加成上限
+  strengthSupportPerNeighbour: 0.07, // 攻方每个可作战友邻的支援
+  strengthSupportCap: 0.21, // 攻方支援加成上限
+  strengthSupportPerNeighbourDefence: 0.05, // 守方每个可作战友邻的支援
+  strengthSupportCapDefence: 0.15, // 守方支援加成上限
+  supportMinAttack: 2, // 支援门槛：attack 低于此值的（担架队、辎重队）帮不上火力
+  supportMinHpRatio: 0.3, // 支援门槛：残破部队自顾不暇
+  flankWinBonus: 0.06, // 合击（支援者与攻击者分居目标两侧）的胜率加成
+  flankDamageMultiplier: 1.12, // 合击杀伤倍率
+  flankLossMultiplier: 0.92, // 合击时我方减员折损
+  flankAngleThreshold: 119.5, // 自目标看两路夹角达到此度数即算合击（两侧 ≥120°）
   strengthScorchPenalty: 0.15, // 焦土（三光后）对我方后勤支撑的削弱
   enemyTerrainUseFactor: 0.65, // 敌军利用地形的效率低于我方（不熟地形）
   strengthFloor: 0.25, // 战力下限，避免除零
@@ -169,6 +178,18 @@ export const combatConstants = Object.freeze({
   retreatFailLoss: 0.16, // 撤退失败追加的减员比例
   retreatFatigue: 14,
   lastStandLossMultiplier: 2.4, // 不撤退硬顶的减员放大（数值上必须比撤退亏）
+
+  // —— 掩护（Screen 能力：侦察员 / 担架卫生队 / 骑兵通信）——
+  screenRetreatBonus: 0.15, // 同格或相邻有掩护友军时的撤退成功率加成
+  screenFailLossFactor: 0.5, // 掩护在侧时撤退失败的追加减员折半
+  screenExposureFactor: 0.8, // 掩护在侧时打完转移的暴露度增量折扣
+
+  // —— 救护（Heal 能力：担架卫生队）——
+  healBaseAmount: 6, // 每回合为同格/相邻友军补充的兵员基数
+  healSuppliedAmount: 9, // 药品库存充足（≥ healMedicineThreshold）时的救护量
+  healMedicineThreshold: 10, // 药品充足线
+  healMedicineCost: 0.5, // 每救护一支部队消耗的药
+  healNoMedicineFactor: 0.5, // 无药时救护量减半
 
   // —— 隐蔽恢复 ——
   hiddenRecoverBase: 0.2,
@@ -302,12 +323,12 @@ const defaultUnitStats = Object.freeze({
   Militia: { name: "民兵", side: "Player", attack: 6, defence: 6, hp: 50, moves: 3, concealment: 0.7, siege: 0, captureBonus: 1, retreatBonus: 1.15, range: 1 },
   DistrictSquad: { name: "区小队", side: "Player", attack: 7, defence: 7, hp: 55, moves: 3, concealment: 0.75, siege: 0, captureBonus: 1.1, retreatBonus: 1.18, range: 1 },
   RegularCompany: { name: "主力连", side: "Player", attack: 14, defence: 12, hp: 90, moves: 3, concealment: 0.5, siege: 0.2, captureBonus: 1, retreatBonus: 0.95, range: 1 },
-  Scout: { name: "侦察班", side: "Player", attack: 5, defence: 5, hp: 40, moves: 5, concealment: 0.95, siege: 0, captureBonus: 1, retreatBonus: 1.4, range: 1, intel: 2 },
+  Scout: { name: "侦察班", side: "Player", attack: 5, defence: 5, hp: 40, moves: 5, concealment: 0.95, siege: 0, captureBonus: 1, retreatBonus: 1.4, range: 1, intel: 2, screen: 1 },
   DemolitionTeam: { name: "爆破组", side: "Player", attack: 8, defence: 5, hp: 45, moves: 3, concealment: 0.8, siege: 1, captureBonus: 1.2, retreatBonus: 1.1, range: 1, sabotage: 1 },
   Engineer: { name: "工兵排", side: "Player", attack: 7, defence: 8, hp: 55, moves: 3, concealment: 0.6, siege: 0.8, captureBonus: 1, retreatBonus: 1, range: 1, sabotage: 0.8 },
   ArmedWorkTeam: { name: "武工队", side: "Player", attack: 8, defence: 6, hp: 45, moves: 4, concealment: 0.9, siege: 0.15, captureBonus: 1.35, retreatBonus: 1.3, range: 1, sabotage: 0.5, intel: 1.5 },
-  Cavalry: { name: "骑兵班", side: "Player", attack: 10, defence: 6, hp: 55, moves: 6, concealment: 0.45, siege: 0, captureBonus: 1.05, retreatBonus: 1.35, range: 1 },
-  StretcherTeam: { name: "担架队", side: "Player", attack: 1, defence: 3, hp: 35, moves: 3, concealment: 0.75, siege: 0, captureBonus: 0.6, retreatBonus: 1.25, range: 1, medic: 1 },
+  Cavalry: { name: "骑兵班", side: "Player", attack: 10, defence: 6, hp: 55, moves: 6, concealment: 0.45, siege: 0, captureBonus: 1.05, retreatBonus: 1.35, range: 1, screen: 1 },
+  StretcherTeam: { name: "担架队", side: "Player", attack: 1, defence: 3, hp: 35, moves: 3, concealment: 0.75, siege: 0, captureBonus: 0.6, retreatBonus: 1.25, range: 1, medic: 1, screen: 1 },
   MortarTeam: { name: "迫击炮班", side: "Player", attack: 12, defence: 5, hp: 45, moves: 2, concealment: 0.5, siege: 0.6, captureBonus: 0.9, retreatBonus: 0.9, range: 2 },
 
   // —— 敌方 ——
@@ -454,6 +475,7 @@ export function ResolveUnitStats(type) {
     range: Math.max(1, Math.round(PickNumber(external, ["range", "reach"], fallback.range ?? 1))),
     intel: PickNumber(external, ["intel", "scouting"], (AbilityLevel(external, "Recon") ? 1.5 : null) ?? fallback.intel ?? 0),
     medic: PickNumber(external, ["medic", "medical"], AbilityLevel(external, "Heal") ?? fallback.medic ?? 0),
+    screen: Clamp(PickNumber(external, ["screen", "cover"], AbilityLevel(external, "Screen") ?? fallback.screen ?? 0), 0, 1),
     lootValue: Clamp01(PickNumber(external, ["lootValue", "captureRate", "salvageValue"], fallback.lootValue ?? 0.35)),
     armour: Clamp01(PickNumber(external, ["armour", "armor", "plating"], fallback.armour ?? 0)),
     mechanised: PickNumber(external, ["mechanised", "mechanized", "motorised"], fallback.mechanised ?? 0),
@@ -577,16 +599,90 @@ function FindStronghold(state, strongholdId) {
   return null;
 }
 
-function CountFriendlySupport(state, unit) {
-  const units = (state && state.units) || [];
+/**
+ * 统计能实际参战的支援友军，并判定合击态势。
+ * 支援门槛：attack ≥ supportMinAttack 且兵员高于 supportMinHpRatio——
+ * 担架队、辎重队站在旁边帮不上火力，残破部队自顾不暇。
+ *
+ * options:
+ *   targetKey       攻击场合传入。支援者可在攻击者身旁，也可在目标另一侧压上（合击）；
+ *                   若存在与攻击者分居目标两侧（自目标看夹角 ≥120°）的支援者，flank 为真。
+ *   includeSameHex  反扫荡等防御场合传入：同格友军一并计入。
+ *
+ * 我方单位从 state.units 找同伴，敌方单位从 state.enemies 找同伴。
+ * 返回 { count, flank, flankDirection }。
+ */
+function CountFriendlySupport(state, unit, options = {}) {
+  const result = { count: 0, flank: false, flankDirection: null };
+  if (!unit) return result;
+  const constants = combatConstants;
+  const isEnemy = (unit.side || ResolveUnitStats(unit.type).side) === "Enemy";
+  const pool = isEnemy ? (state && state.enemies) || [] : (state && state.units) || [];
   const neighbours = new Set(HexNeighborKeys(unit.key));
-  let count = 0;
+  const targetKey = options.targetKey || null;
+  const targetNeighbours = targetKey ? new Set(HexNeighborKeys(targetKey)) : null;
+  for (const other of pool) {
+    if (!other || other.id === unit.id) continue;
+    if ((other.hp ?? 0) <= 0) continue;
+    const stats = ResolveUnitStats(other.type);
+    if ((stats.attack ?? 0) < constants.supportMinAttack) continue;
+    const maxHp = other.maxHp || stats.hp || 1;
+    if ((other.hp ?? maxHp) <= maxHp * constants.supportMinHpRatio) continue;
+    const besideUs = neighbours.has(other.key) || (options.includeSameHex && other.key === unit.key);
+    const besideTarget = Boolean(targetNeighbours && targetNeighbours.has(other.key) && other.key !== unit.key);
+    if (!besideUs && !besideTarget) continue;
+    result.count += 1;
+    if (targetKey && !result.flank && SupportAngle(targetKey, unit.key, other.key) >= constants.flankAngleThreshold) {
+      result.flank = true;
+      result.flankDirection = CompassLabel(targetKey, other.key);
+    }
+  }
+  return result;
+}
+
+/** 自目标看，攻击者与支援者两个来向的夹角（度）。 */
+function SupportAngle(targetKey, attackerKey, supporterKey) {
+  const target = ParseHexKey(targetKey);
+  const attacker = ParseHexKey(attackerKey);
+  const supporter = ParseHexKey(supporterKey);
+  const origin = HexToWorld(target.q, target.r);
+  const a = HexToWorld(attacker.q, attacker.r);
+  const b = HexToWorld(supporter.q, supporter.r);
+  const ax = a.x - origin.x;
+  const az = a.z - origin.z;
+  const bx = b.x - origin.x;
+  const bz = b.z - origin.z;
+  const magnitude = Math.sqrt(ax * ax + az * az) * Math.sqrt(bx * bx + bz * bz);
+  if (magnitude < 1e-9) return 0;
+  const cosine = Clamp((ax * bx + az * bz) / magnitude, -1, 1);
+  return (Math.acos(cosine) * 180) / Math.PI;
+}
+
+/** 自 fromKey 看 toKey 的大致方位（战报叙事用；世界坐标 +z 朝屏幕下方）。 */
+function CompassLabel(fromKey, toKey) {
+  const from = ParseHexKey(fromKey);
+  const to = ParseHexKey(toKey);
+  const a = HexToWorld(from.q, from.r);
+  const b = HexToWorld(to.q, to.r);
+  const east = b.x - a.x;
+  const north = a.z - b.z;
+  const angle = (Math.atan2(north, east) * 180) / Math.PI;
+  const names = ["东", "东北", "北", "西北", "西", "西南", "南", "东南"];
+  const index = Math.round(((angle + 360) % 360) / 45) % 8;
+  return names[index];
+}
+
+/** 同格或相邻是否有具备「掩护」能力的可用友军（侦察员、担架卫生队、骑兵通信）。 */
+function HasScreenSupport(state, unit) {
+  if (!unit) return false;
+  const units = (state && state.units) || [];
   for (const other of units) {
     if (!other || other.id === unit.id) continue;
     if ((other.hp ?? 0) <= 0) continue;
-    if (neighbours.has(other.key)) count += 1;
+    if (other.key !== unit.key && HexDistanceKeys(other.key, unit.key) > 1) continue;
+    if (ResolveUnitStats(other.type).screen > 0) return true;
   }
-  return count;
+  return false;
 }
 
 function Round1(value) {
@@ -815,9 +911,11 @@ export function ComputeStrength(state, unit, hex, context = {}) {
     }
   }
 
-  // 友邻支援
+  // 友邻支援：攻方每人 +7% 封顶 21%，守方每人 +5% 封顶 15%
   const support = Math.max(0, context.supportCount || 0);
-  value *= 1 + Math.min(constants.strengthSupportCap, support * constants.strengthSupportPerNeighbour);
+  const supportPer = role === "Defence" ? constants.strengthSupportPerNeighbourDefence : constants.strengthSupportPerNeighbour;
+  const supportCap = role === "Defence" ? constants.strengthSupportCapDefence : constants.strengthSupportCap;
+  value *= 1 + Math.min(supportCap, support * supportPer);
 
   // 夜战
   if (context.night) {
@@ -850,10 +948,11 @@ export function ComputeStrength(state, unit, hex, context = {}) {
 // 七、交战建模（Preview 与 Resolve 共用同一套核心，保证预览与结算口径一致）
 // ---------------------------------------------------------------------------
 
-function ResolveNightFlag(state, options) {
+function ResolveNightFlag(state, options, attacker = null) {
   if (options && typeof options.night === "boolean") return options.night;
+  // 隐蔽状态出击即夜行动：摸黑接敌、打完在拂晓前脱离，是敌后部队的常态战法。
+  if (attacker && attacker.hidden) return true;
   if (state && state.phaseKey === "Night") return true;
-  // 困难期与反攻期的夜袭是常态战法，但仍以显式 options 为准
   return false;
 }
 
@@ -909,10 +1008,12 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   const constants = combatConstants;
   const attackerHex = GetHex(state, attacker.key);
   const defenderHex = GetHex(state, defender.key);
-  const night = ResolveNightFlag(state, options);
+  const night = ResolveNightFlag(state, options, attacker);
   const ambushScore = ComputeAmbushScore(state, attacker, attackerHex, defender, defenderHex, night);
   const ambush = ambushScore > 0;
-  const supportCount = CountFriendlySupport(state, attacker);
+  const support = CountFriendlySupport(state, attacker, { targetKey: defender.key });
+  const defenderSupport = CountFriendlySupport(state, defender);
+  const screenSupport = HasScreenSupport(state, attacker);
   const attackerStats = ResolveUnitStats(attacker.type);
   const defenderStats = ResolveUnitStats(defender.type);
   const attackerTerrain = ResolveHexStats(attackerHex);
@@ -924,11 +1025,12 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     night,
     ambush,
     ambushScore,
-    supportCount,
+    supportCount: support.count,
   });
   const defenceStrength = ComputeStrength(state, defender, defenderHex, {
     role: "Defence",
     night,
+    supportCount: defenderSupport.count,
   });
 
   const modifiers = [];
@@ -945,7 +1047,11 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   }
   if (night) {
     winChance += constants.nightWinBonus;
-    modifiers.push({ label: "夜间行动", value: constants.nightWinBonus });
+    modifiers.push({ label: "夜袭", value: constants.nightWinBonus });
+  }
+  if (support.flank) {
+    winChance += constants.flankWinBonus;
+    modifiers.push({ label: "两翼合击", value: constants.flankWinBonus });
   }
   const massBonus = massBase * constants.massOddsBonus;
   if (massBonus > 0.001) {
@@ -967,6 +1073,7 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   const soak = 1 / (1 + defenceStrength * constants.damageSoak);
   let damageOnWin = attackStrength * constants.damageScale * soak;
   if (ambush) damageOnWin *= Lerp(1, constants.ambushDamageMultiplier, ambushScore);
+  if (support.flank) damageOnWin *= constants.flankDamageMultiplier;
   const damageOnFail = damageOnWin * constants.damageFailFactor;
 
   // 我方减员模型
@@ -976,6 +1083,7 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   lossBase *= 1 - Math.min(constants.coverLossRelief, attackerTerrain.concealment * constants.coverLossRelief);
   if (ambush) lossBase *= Lerp(1, constants.ambushLossMultiplier, ambushScore);
   if (night) lossBase *= constants.nightLossMultiplier;
+  if (support.flank) lossBase *= constants.flankLossMultiplier;
   const medicineSupply = Clamp01(((state && state.stock && state.stock.medicine) || 0) / 60);
   lossBase *= 1 - medicineSupply * constants.medicineLossRelief;
   const lossOnWin = lossBase * constants.lossWinFactor;
@@ -1015,6 +1123,9 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     risks.push({ key: "Village", label: "战场紧邻村庄，事后可能遭报复", severity: 0.65 });
   }
 
+  // 协同态势的一句话概括（预览与战报共用口径）
+  const supportLabel = support.flank ? "两翼有接应" : support.count > 0 ? "有友邻接应" : "孤军出击";
+
   return {
     attacker,
     defender,
@@ -1026,7 +1137,12 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     night,
     ambush,
     ambushScore,
-    supportCount,
+    supportCount: support.count,
+    flank: support.flank,
+    flankDirection: support.flankDirection,
+    supportLabel,
+    defenderSupportCount: defenderSupport.count,
+    screenSupport,
     massBase,
     targetMass,
     attackStrength,
@@ -1178,7 +1294,9 @@ export function PreviewAttack(state, attackerId, targetKey, options = {}) {
   };
 
   const exposureDelta = Round1(
-    model.exposureBase * (withdraw ? combatConstants.exposureWithdrawFactor : combatConstants.exposureStayFactor)
+    model.exposureBase *
+      (withdraw ? combatConstants.exposureWithdrawFactor : combatConstants.exposureStayFactor) *
+      (withdraw && model.screenSupport ? combatConstants.screenExposureFactor : 1)
   );
 
   const risks = model.risks.slice();
@@ -1206,6 +1324,10 @@ export function PreviewAttack(state, attackerId, targetKey, options = {}) {
     intelQuality: Round1(fog.quality * 100) / 100,
     ambush: model.ambush,
     night: model.night,
+    supportCount: model.supportCount,
+    flank: model.flank,
+    supportLabel: model.supportLabel,
+    screenSupport: model.screenSupport,
     expectedDamage: Round1(expectedDamage),
     expectedLoss: Round1(expectedLoss),
     capture,
@@ -1290,7 +1412,10 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
     const retreatChance = ComputeRetreatChance(state, attacker, model.attackerHex, model.night);
     const retreatRoll = DrawRoll(draft);
     retreatSucceeded = retreatRoll < retreatChance;
-    if (!retreatSucceeded) ourLoss += maxHp * constants.retreatFailLoss;
+    // 掩护分队在侧：撤退失败的追加减员折半（有人断后收容）
+    if (!retreatSucceeded) {
+      ourLoss += maxHp * constants.retreatFailLoss * (model.screenSupport ? constants.screenFailLossFactor : 1);
+    }
   } else if (options.holdGround && hpAfterFight / maxHp < constants.retreatHpThreshold) {
     // 硬顶到底：数值上明确劣于保存力量
     ourLoss *= constants.lastStandLossMultiplier;
@@ -1339,9 +1464,11 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
     attackerDraft.fatigue = Clamp(attackerDraft.fatigue + (moved ? 6 : 0), 0, 100);
   }
 
-  // 暴露度：打完不转移是四倍
+  // 暴露度：打完不转移是四倍；掩护分队接应的转移痕迹更少
   const exposureDelta = Round1(
-    model.exposureBase * (moved ? constants.exposureWithdrawFactor : constants.exposureStayFactor)
+    model.exposureBase *
+      (moved ? constants.exposureWithdrawFactor : constants.exposureStayFactor) *
+      (moved && model.screenSupport ? constants.screenExposureFactor : 1)
   );
   draft.next.exposure = Clamp((state.exposure || 0) + exposureDelta, 0, 100);
   draft.next.alert = Clamp((state.alert || 0) + (victory ? 3 : 1.5) + (model.ambush ? 1 : 2), 0, 100);
@@ -1376,6 +1503,11 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
     report.lines.unshift(`${attackerName}向${defenderName}发起正面攻击，缺少突然性。`);
   }
   if (victory) {
+    if (model.flank) {
+      report.lines.push(`${model.flankDirection ?? "侧"}面枪声一起，${defenderName}腹背受击，阵脚自乱。`);
+    } else if (model.supportCount > 0) {
+      report.lines.push("友邻分队在侧翼开火牵制，敌不敢恋战。");
+    }
     report.lines.push(
       destroyed
         ? `${defenderName}被打散，残部溃退。`
@@ -1388,6 +1520,9 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
     }
   } else {
     report.lines.push(`敌火力组织较快，部队未能得手，主动脱离接触。`);
+    if (model.flank) {
+      report.lines.push("两翼虽有接应，敌抢先占住地埂，合击未能奏效。");
+    }
   }
   if (ourLoss > 0) {
     report.lines.push(`我方减员 ${RoundInt(ourLoss)}，伤员由担架队后送。`);
@@ -1401,6 +1536,7 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
   }
   if (moved) {
     report.lines.push("打完即转移，未在原地停留。");
+    if (model.screenSupport) report.lines.push("掩护分队沿沟坎接应转移，追兵扑了空。");
   } else {
     report.lines.push("部队仍滞留原地，行踪已被敌方掌握，此处将成为下一次扫荡的重点。");
   }
@@ -1435,6 +1571,9 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
   report.victory = victory;
   report.ambush = model.ambush;
   report.night = model.night;
+  report.supportCount = model.supportCount;
+  report.flank = model.flank;
+  report.supportLabel = model.supportLabel;
   report.odds = Round1(model.winChance * 100) / 100;
 
   return { nextState: CommitDraft(draft), report };
@@ -1460,6 +1599,8 @@ function ComputeRetreatChance(state, unit, hex, night) {
   chance += Clamp01((hex && hex.massBase ? hex.massBase : 0) / 100) * constants.retreatMassBonus;
   if (unit.hidden) chance += constants.retreatHiddenBonus;
   if (night) chance += constants.nightRetreatBonus;
+  // 掩护分队（侦察员、担架队、骑兵通信）在同格或相邻：有人带路、有人断后
+  if (HasScreenSupport(state, unit)) chance += constants.screenRetreatBonus;
   chance -= Clamp01((unit.fatigue || 0) / 100) * 0.2;
   return Clamp(chance, 0.1, 0.97);
 }
@@ -1506,6 +1647,7 @@ export function ApplyRetreat(state, unitId, toKey) {
 
   const draft = CreateDraft(state);
   const night = ResolveNightFlag(state, {});
+  const screened = HasScreenSupport(state, unit);
   const chance = ComputeRetreatChance(state, unit, GetHex(state, unit.key), night);
   const roll = DrawRoll(draft);
   const succeeded = roll < chance;
@@ -1520,7 +1662,7 @@ export function ApplyRetreat(state, unitId, toKey) {
       unitDraft.moves = 0;
       unitDraft.combat = { ...(unit.combat || {}), withdrew: true, lastRetreatTurn: state.turn || 0 };
     } else {
-      loss = maxHp * combatConstants.retreatFailLoss;
+      loss = maxHp * combatConstants.retreatFailLoss * (screened ? combatConstants.screenFailLossFactor : 1);
       unitDraft.hp = Round1(Math.max(0, (unit.hp ?? maxHp) - loss));
       unitDraft.fatigue = Clamp((unit.fatigue || 0) + combatConstants.retreatFatigue + 8, 0, 100);
       unitDraft.hidden = false;
@@ -1534,6 +1676,9 @@ export function ApplyRetreat(state, unitId, toKey) {
       ? `部队沿${terrain.name}小路转移，甩开了追兵。保存力量比拼光更重要。`
       : "转移途中与敌搜索队遭遇，付出了代价才脱离接触。"
   );
+  if (screened) {
+    report.lines.push(succeeded ? "掩护分队占住路口接应，追兵扑了空。" : "幸有掩护分队断后收容，伤亡未再扩大。");
+  }
   report.effects.push({ kind: "Retreat", key: destinationKey, payload: { fromKey: unit.key, succeeded } });
   report.casualties = { ours: RoundInt(loss), theirs: 0 };
   report.moved = succeeded;
@@ -1586,7 +1731,7 @@ export function ResolveSabotage(state, unitId, targetKey, options = {}) {
 
   const draft = CreateDraft(state);
   const stats = ResolveUnitStats(unit.type);
-  const night = ResolveNightFlag(state, options);
+  const night = ResolveNightFlag(state, options, unit);
   const massBase = Clamp01((hex.massBase || 0) / 100);
 
   let chance = constants.sabotageBaseChance;
@@ -1635,6 +1780,12 @@ export function ResolveSabotage(state, unitId, targetKey, options = {}) {
     unitDraft.hidden = false;
     unitDraft.moves = Math.max(0, (unit.moves || 0) - 1);
     unitDraft.fatigue = Clamp((unit.fatigue || 0) + 10, 0, 100);
+    // 破袭得手是技术活，长经验（+4）
+    unitDraft.xp = (unit.xp || 0) + (succeeded ? 4 : 0);
+    if (unitDraft.xp >= constants.xpPerLevel) {
+      unitDraft.level = (unit.level || 0) + 1;
+      unitDraft.xp -= constants.xpPerLevel;
+    }
     unitDraft.combat = { ...(unit.combat || {}), lastActionTurn: state.turn || 0, withdrew: false };
   }
 
@@ -1703,7 +1854,7 @@ function BuildSiegeModel(state, unit, stronghold, options = {}) {
   const unitStats = ResolveUnitStats(unit.type);
   const unitHex = GetHex(state, unit.key);
   const strongholdHex = GetHex(state, stronghold.key);
-  const night = ResolveNightFlag(state, options);
+  const night = ResolveNightFlag(state, options, unit);
   const hasCapability = unitStats.siege > 0;
   const ordnanceCost = Math.round(constants.siegeOrdnanceCost * strongholdStats.siegeResistance);
   const hasOrdnance = ((state.stock && state.stock.ordnance) || 0) >= ordnanceCost;
@@ -1714,7 +1865,7 @@ function BuildSiegeModel(state, unit, stronghold, options = {}) {
     night,
     siege: true,
     noOrdnance: !hasOrdnance,
-    supportCount: CountFriendlySupport(state, unit),
+    supportCount: CountFriendlySupport(state, unit, { targetKey: stronghold.key }).count,
   });
 
   const garrison = Math.max(0, stronghold.garrison ?? strongholdStats.garrison);
@@ -2093,7 +2244,9 @@ export function ResolveSweepBattle(state, sweep) {
     if (unitStats.side === "Enemy") continue;
     const hex = GetHex(state, unit.key);
     const maxHp = unit.maxHp || unitStats.hp || 50;
-    const defence = ComputeStrength(state, unit, hex, { role: "Defence", night: false });
+    // 反扫荡不是各打各的：同格与相邻的可战友军互为依托（守方支援每人 +5%，封顶 15%）
+    const support = CountFriendlySupport(state, unit, { includeSameHex: true });
+    const defence = ComputeStrength(state, unit, hex, { role: "Defence", night: false, supportCount: support.count });
 
     const pressure = sweepStrength / Math.max(1, sweepStrength + defence * 2);
     let loss = maxHp * 0.3 * pressure * profile.ourLossFactor;
@@ -2199,6 +2352,8 @@ export function ResolveSweepBattle(state, sweep) {
   draft.next.exposure = Clamp((state.exposure || 0) + exposureDelta, 0, 100);
   draft.next.alert = Clamp((state.alert || 0) + (stanceKey === "Decisive" ? 10 : 4), 0, 100);
   draft.next.sweep = null;
+  // 方针只对本次扫荡有效：扫荡结束即清空，下一次要重新定下来
+  draft.next.sweepStance = null;
 
   // 战报
   report.lines.unshift(`敌以${RoundInt(sweepStrength)}兵力对${sweep.targetKey}一带实施扫荡，我采取「${profile.name}」。`);
@@ -2365,8 +2520,37 @@ export function TickCombatRecovery(state) {
       }
     }
 
-    // 行动力刷新
+    // 行动力刷新；本回合行军里程清零（隐蔽规则按回合累计）
     unitDraft.moves = unit.maxMoves || stats.moves || 3;
+    unitDraft.movedThisTurn = 0;
+  }
+
+  // 救护：具备 Heal 能力的单位（担架卫生队）每回合为同格与相邻友军补充兵员。
+  // 药品实际消耗（0.5/次），无药时救护量减半；救护者自身不在此列。
+  for (const healer of units) {
+    if (!healer || (healer.hp ?? 0) <= 0) continue;
+    const healerStats = ResolveUnitStats(healer.type);
+    if (healerStats.side === "Enemy" || !(healerStats.medic > 0)) continue;
+    for (const patient of units) {
+      if (!patient || patient.id === healer.id) continue;
+      if ((patient.hp ?? 0) <= 0) continue;
+      const patientStats = ResolveUnitStats(patient.type);
+      if (patientStats.side === "Enemy") continue;
+      if (patient.key !== healer.key && HexDistanceKeys(patient.key, healer.key) > 1) continue;
+      const patientDraft = DraftUnit(draft, patient.id);
+      if (!patientDraft) continue;
+      const patientMaxHp = patient.maxHp || patientStats.hp || 50;
+      if ((patientDraft.hp ?? patientMaxHp) >= patientMaxHp) continue;
+      let amount;
+      if (medicineBudget >= constants.healMedicineCost) {
+        amount = medicineBudget >= constants.healMedicineThreshold ? constants.healSuppliedAmount : constants.healBaseAmount;
+        medicineBudget -= constants.healMedicineCost;
+        medicineSpent += constants.healMedicineCost;
+      } else {
+        amount = constants.healBaseAmount * constants.healNoMedicineFactor;
+      }
+      patientDraft.hp = Round1(Math.min(patientMaxHp, (patientDraft.hp ?? 0) + amount));
+    }
   }
 
   // 药品消耗写回

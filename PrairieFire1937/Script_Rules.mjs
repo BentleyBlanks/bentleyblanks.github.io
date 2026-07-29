@@ -1110,13 +1110,50 @@ export function ListContextActions(state, unitId, key) {
         });
       }
     }
-    if (stats.abilities.includes("Sabotage") && (hex.railway || hex.road >= 2)) {
-      actions.push({ kind: "Sabotage", unitId: unit.id, targetKey: key, label: "破袭", enabled: !unit.acted });
+    // 破袭条件与结算口径一致：有铁路或任何等级的公路、且已抵近（≤1 格）。
+    // 与攻击一样拆成「转移 / 滞留」两个明确选项——破袭完赖在路边同样是四倍暴露。
+    if (stats.abilities.includes("Sabotage") && (hex.railway || hex.road >= 1) && HexDistanceKeys(unit.key, key) <= 1) {
+      const sabotageWithdraws = ListWithdrawOptions(state, unit.id, key);
+      if (sabotageWithdraws.length) {
+        actions.push({
+          kind: "Sabotage",
+          unitId: unit.id,
+          targetKey: key,
+          withdrawKey: sabotageWithdraws[0].key,
+          withdrawOptions: sabotageWithdraws,
+          label: "破袭后转移",
+          hint: `炸毁路段后撤往 ${sabotageWithdraws[0].label}，暴露度按四分之一计`,
+          enabled: !unit.acted,
+        });
+      }
+      actions.push({
+        kind: "Sabotage",
+        unitId: unit.id,
+        targetKey: key,
+        label: sabotageWithdraws.length ? "破袭并滞留" : "破袭",
+        hint: "不转移：护路队会顺着痕迹搜索，暴露度按四倍计",
+        danger: true,
+        enabled: !unit.acted,
+      });
     }
     const stronghold = GetStrongholdAt(state, key);
     if (stronghold && HexDistanceKeys(unit.key, key) <= 1) {
       actions.push({ kind: "Siege", unitId: unit.id, strongholdId: stronghold.id, mode: "Assault", label: "攻坚", enabled: !unit.acted });
       actions.push({ kind: "Siege", unitId: unit.id, strongholdId: stronghold.id, mode: "Blockade", label: "围困", enabled: !unit.acted });
+    }
+    // 平毁封锁：站在敌封锁沟/铁丝网所在格，可发动民工填沟拆网，解除对我方机动的迟滞。
+    if (unit.key === key && (hex.blockade || 0) > 0) {
+      const laborEnough = (state.stock.labor ?? 0) >= 3;
+      actions.push({
+        kind: "ClearBlockade",
+        unitId: unit.id,
+        key,
+        label: "平毁封锁",
+        hint: "发动民工填封锁沟、拆铁丝网（工 3，暴露度 +2）",
+        enabled: !unit.acted && laborEnough,
+        reason: laborEnough ? "" : "工不足",
+        cost: { labor: 3 },
+      });
     }
     if (unit.key === key) {
       actions.push({ kind: "Rest", unitId: unit.id, label: "休整 / 隐蔽", enabled: !unit.acted });
@@ -1161,13 +1198,48 @@ export function ListWithdrawOptions(state, unitId, targetKey) {
       hex.massBase * 0.5 +
       (hex.tunnel ? 25 : 0) +
       (hex.control === "Base" ? 12 : hex.control === "Guerrilla" ? 6 : 0);
+    // 一句理由：让选择器可以直接把"为什么撤这儿"讲给玩家听。
+    const reason = hex.tunnel
+      ? "有地道可依托，追兵进村也扑空"
+      : hex.control === "Base"
+        ? "根据地腹地，群众接应可靠"
+        : hex.massBase >= 50
+          ? "群众基础好，进村即可隐蔽"
+          : (Number(terrain?.concealment) || 0) >= 0.55
+            ? "地形隐蔽，便于甩开追兵"
+            : "离交火地段稍远，可暂避锋芒";
     options.push({
       key,
       score,
       label: `${terrain?.shortName ?? terrain?.name ?? hex.terrain}${hex.tunnel ? "·地道" : ""}`,
+      reason,
     });
   }
   return options.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * 可选的反扫荡方针 key（与 Script_Combat.combatConstants.sweepStanceProfiles 对齐）：
+ * Disperse 分散转移·坚壁清野 / Decisive 正面决战 / CounterRaid 敌进我进 / Fortify 依托工事节节抗击。
+ */
+export const sweepStanceKeys = Object.freeze(
+  Object.keys(Combat.combatConstants?.sweepStanceProfiles ?? { Disperse: true }),
+);
+
+/**
+ * 设定本次反扫荡的应对方针。写入 state.sweepStance，
+ * 扫荡大结算 ResolveSweepBattle 读取它；扫荡结束后自动清空（一次一定）。
+ * 无效 key 原样返回传入 state（不落日志、不推进随机数）。
+ */
+export function SetSweepStance(state, stanceKey) {
+  const profiles = Combat.combatConstants?.sweepStanceProfiles ?? {};
+  const profile = profiles[stanceKey];
+  if (!profile) return state;
+  if (state.sweepStance === stanceKey) return state;
+  const next = CloneState(state);
+  next.sweepStance = stanceKey;
+  PushLog(next, "方针", `反扫荡方针定为「${profile.name}」。`);
+  return next;
 }
 
 export function CanBuildWork(state, unitId, key, workType) {
@@ -1279,8 +1351,20 @@ export function PerformAction(state, action) {
       const fromKey = unit.key;
       unit.moves = Math.max(0, unit.moves - reachable.get(action.toKey));
       unit.key = action.toKey;
+      // 行军破隐蔽：伏击要靠事先潜伏，不是冲刺三格再开火。
+      // 本回合累计转移超过 2 格，或落脚在无遮蔽又无群众掩护的开阔地，行迹即败露；
+      // 短途转移且落点隐蔽（地形遮蔽 ≥0.45 或群众基础 ≥45）才保得住隐蔽。
+      unit.movedThisTurn = (unit.movedThisTurn || 0) + HexDistanceKeys(fromKey, action.toKey);
       const hex = GetHex(next, action.toKey);
-      if (hex && hex.massBase >= 45) unit.hidden = true;
+      const concealment =
+        typeof Combat.ResolveHexStats === "function" ? Combat.ResolveHexStats(hex).concealment : 0.3;
+      if (unit.movedThisTurn > 2) {
+        unit.hidden = false;
+      } else if (hex && hex.massBase >= 45) {
+        unit.hidden = true; // 群众掩护下的短途转移，进村即可重新隐蔽
+      } else if (concealment < 0.45) {
+        unit.hidden = false; // 开阔地上的行军藏不住
+      }
       report.effects.push({ kind: "Move", fromKey, toKey: action.toKey, unitId: unit.id });
       break;
     }
@@ -1309,6 +1393,12 @@ export function PerformAction(state, action) {
       }
       unit.acted = true;
       unit.moves = 0;
+      // 摸敌情也是历练：侦察 +2 经验
+      unit.xp = (unit.xp || 0) + 2;
+      if (unit.xp >= 100) {
+        unit.level = (unit.level || 1) + 1;
+        unit.xp -= 100;
+      }
       report.lines.push("侦察员摸清了周边的岗哨与巡逻规律。");
       report.effects.push({ kind: "IntelPing", key: unit.key });
       break;
@@ -1375,6 +1465,28 @@ export function PerformAction(state, action) {
       unit.acted = true;
       unit.moves = 0;
       report.lines.push("部队就地隐蔽休整，伤员送往老乡家中。");
+      break;
+    }
+    case "ClearBlockade": {
+      const unit = GetUnit(next, action.unitId);
+      if (!unit) return fail("单位不存在");
+      if (unit.acted) return fail("本回合已行动");
+      const hex = GetHex(next, action.key ?? unit.key);
+      if (!hex || hex.key !== unit.key) return fail("需站在封锁线上组织施工");
+      if (!((hex.blockade || 0) > 0)) return fail("此处没有敌封锁工事");
+      if ((next.stock.labor ?? 0) < 3) return fail("工不足");
+      SpendStock(next, { labor: 3 });
+      hex.blockade = Math.max(0, (hex.blockade || 0) - 2);
+      // 白日里成百人出工，敌哨所看得见（暴露度 +2）
+      next.exposure = Clamp(next.exposure + 2, 0, 100);
+      unit.acted = true;
+      unit.moves = 0;
+      report.lines.push(
+        hex.blockade > 0
+          ? "附近各村出工，填平一段封锁沟、拔掉一片铁丝网桩，余下的明日再平。工地动静不小，敌哨已有察觉。"
+          : "封锁沟填平、铁丝网拆净，大车道重新通行。工地动静不小，敌哨已有察觉。"
+      );
+      report.effects.push({ kind: "Build", key: hex.key });
       break;
     }
     case "Attack":
@@ -1818,6 +1930,7 @@ function RunEnemyTurn(state) {
         state.bases = swept.bases;
         state.rngState = swept.rngState;
         state.sweep = null;
+        state.sweepStance = null; // 方针一次一定，扫荡结束即清空
         const sweepReport = sweepOutcome.report ?? {};
         if (sweepReport.ledgerDelta) AddLedger(state, sweepReport.ledgerDelta, true);
         lines.push(...(sweepReport.lines ?? []));
@@ -1825,6 +1938,7 @@ function RunEnemyTurn(state) {
       }
     } catch (error) {
       state.sweep = null;
+      state.sweepStance = null;
     }
   }
   return { lines, effects };

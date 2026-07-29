@@ -29,7 +29,7 @@ export const abilityDefinitions = Object.freeze({
     key: 'Ambush',
     name: '设伏',
     summary: '在林地、山地、隘口对道路或开阔地上的敌人发起伏击，先手一轮且缴获更多。',
-    detail: '伏击要求本回合未移动或从隐蔽状态发起；打完必须转移，否则暴露度大涨。',
+    detail: '伏击须从隐蔽状态发起：本回合转移不超过两格、落脚处有遮蔽或有群众掩护，隐蔽才保得住；打完必须转移，否则暴露度大涨。',
   },
   Sabotage: {
     key: 'Sabotage',
