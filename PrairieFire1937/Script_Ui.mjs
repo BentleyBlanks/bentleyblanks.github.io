@@ -122,7 +122,7 @@ export const panelDefinitions = Object.freeze([
   { key: "Ledger", tab: "账本", glyph: "账", hotkey: "6", title: "代价账本", subtitle: "只作记录，不计功过" },
   { key: "Log", tab: "纪事", glyph: "报", hotkey: "7", title: "战报与纪事", subtitle: "逐回合记录" },
   { key: "Help", tab: "说明", glyph: "示", hotkey: "8", title: "操作与史实说明", subtitle: "快捷键 · 历史框架" },
-  { key: "Settings", tab: "设置", glyph: "设", hotkey: "9", title: "设置与存档", subtitle: "新局 · 画质 · 音频" },
+  { key: "Settings", tab: "设置", glyph: "设", hotkey: "9", title: "设置与存档", subtitle: "新局 · 音频 · 存档" },
 ]);
 
 export const panelNames = Object.freeze(panelDefinitions.map((item) => item.key));
@@ -134,12 +134,6 @@ const difficultyDefinitions = Object.freeze([
   { key: "Brutal", name: "残酷", note: "扫荡频繁而突然，困难期几乎没有喘息。" },
 ]);
 
-const qualityDefinitions = Object.freeze([
-  { key: "low", name: "低", note: "关闭阴影与后处理，兼容老设备。" },
-  { key: "medium", name: "中", note: "基础阴影，轻量后处理。" },
-  { key: "high", name: "高", note: "级联阴影 + 泛光 + 色彩分级。" },
-  { key: "ultra", name: "极", note: "追加 SSAA/TAA 与体积雾。" },
-]);
 
 const keyboardHelpRows = Object.freeze([
   ["空格", "结束回合"],
@@ -3429,30 +3423,10 @@ export function CreateUi(root, hooks = {}) {
       Call("OnNewGame", { seed: seedNumber, difficulty: chosenDifficulty, quality: view.quality });
     });
 
-    // 画质
-    const qualityBox = El("section", "pf-set-block", { parent: form });
-    El("h3", "pf-group-title", { text: "画质", parent: qualityBox });
-    const qualityGroup = El("div", "pf-segment", { parent: qualityBox, attrs: { role: "radiogroup" } });
-    const qualityButtons = {};
-    for (const item of qualityDefinitions) {
-      const button = El("button", "pf-seg", {
-        text: item.name,
-        parent: qualityGroup,
-        attrs: { type: "button", role: "radio", "aria-checked": item.key === view.quality ? "true" : "false" },
-        tip: { title: `画质：${item.name}`, body: item.note },
-      });
-      qualityButtons[item.key] = button;
-      SetFlag(button, "is-active", item.key === view.quality);
-      On(button, "click", () => {
-        for (const key of Object.keys(qualityButtons)) {
-          SetFlag(qualityButtons[key], "is-active", key === item.key);
-          SetAttr(qualityButtons[key], "aria-checked", key === item.key ? "true" : "false");
-        }
-        currentView.quality = item.key;
-        Call("OnSetQuality", item.key);
-        Toast(`画质已切到「${item.name}」。`, "info");
-      });
-    }
+    // 画质选择器已移除：全项目只保留一条渲染路径。
+    // 分档意味着多条各自独立的 shader 与 pass 组合，其中未被持续验证的那条
+    // 曾导致地形着色器编译失败、整张地图不绘制。现在画面按设备自动适配像素比，
+    // 不再暴露会改变渲染路径的选项。
 
     // 音频（对外语义是 muted，与 Script_Main 的 view.muted 一致）
     const audioBox = El("section", "pf-set-block", { parent: form });
