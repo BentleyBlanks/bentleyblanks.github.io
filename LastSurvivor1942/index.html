@@ -13,18 +13,12 @@
   <meta name="twitter:card" content="summary">
   <title>火种：1942 · 最后关门的人</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="stylesheet" href="./Style_Game.css">
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js"
-      }
-    }
-  </script>
 </head>
 <body>
   <main id="GameShell" class="gameShell">
-    <canvas id="GameCanvas" class="gameCanvas" tabindex="0" aria-label="火种1942三维敌后战场。使用 WASD 移动，E 互动，Shift 奔跑，空格投石引开巡逻。"></canvas>
+    <canvas id="GameCanvas" class="gameCanvas" tabindex="0" aria-label="火种1942三维敌后战场。使用 WASD 移动，E 互动，Shift 奔跑，空格投石引开巡逻，H 分配药品。"></canvas>
     <div class="worldShade" aria-hidden="true"></div>
     <div class="filmGrain" aria-hidden="true"></div>
 
@@ -36,12 +30,13 @@
         <div><small>伤员</small><strong id="WoundedValue">2</strong><em>人</em></div>
         <div class="alertStatus"><small>封锁警戒</small><strong id="AlertValue">12</strong><em>%</em></div>
       </div>
-      <div class="timeBlock"><small>合围收紧</small><strong id="TimeValue">09:00</strong><button id="PauseButton" type="button" aria-label="暂停行动">Ⅱ</button></div>
+      <div class="timeBlock"><small>合围收紧</small><strong id="TimeValue">11:00</strong><button id="PauseButton" type="button" aria-label="暂停行动">Ⅱ</button><button id="AudioButton" type="button" aria-label="静音环境音" aria-pressed="false">声</button></div>
     </header>
 
     <aside id="ObjectivePanel" class="objectivePanel hidden" aria-label="行动目标">
       <p id="ActLabel" class="panelEyebrow">第一幕 · 灶火熄灭</p>
       <h1>把家人和名字带出去</h1>
+      <div id="ObjectiveGuidance" class="objectiveGuidance"><strong>当前方向</strong><small>辨认周围地形…</small></div>
       <div id="ObjectiveList" class="objectiveList"></div>
       <button id="HistoryButton" class="historyButton" type="button"><span>史实与创作边界</span><b>查看依据 →</b></button>
     </aside>
@@ -52,11 +47,12 @@
       <div class="hopeMeter"><small>队伍意志</small><strong id="HopeValue">28</strong></div>
     </aside>
 
-    <section id="EventLog" class="eventLog hidden" aria-live="polite" aria-label="战场事件"></section>
+    <section id="EventLog" class="eventLog hidden" aria-label="战场事件"></section>
     <div id="LocationLabel" class="locationLabel hidden"><small>当前区域</small><strong>被毁交通站</strong></div>
-    <div id="InteractionPrompt" class="interactionPrompt hidden" role="status"><kbd>E</kbd><span id="InteractionText">互动</span></div>
-    <div id="DetectedWarning" class="detectedWarning hidden" role="alert"><span>已被发现</span><small>脱离视线或进入草垛 / 枯井</small></div>
-    <div id="NarrativeCaption" class="narrativeCaption hidden" aria-live="polite"><small id="CaptionTitle"></small><p id="CaptionText"></p></div>
+    <div id="GuidanceArrow" class="guidanceArrow hidden" aria-label="目标方向"><b>↑</b><span>目标方向</span></div>
+    <div id="InteractionPrompt" class="interactionPrompt hidden"><kbd>E</kbd><span id="InteractionText">互动</span></div>
+    <div id="DetectedWarning" class="detectedWarning hidden" role="status"><span id="DetectedState">有人注意到动静</span><small id="DetectedHint">立刻离开视锥，怀疑会逐渐消退</small></div>
+    <div id="NarrativeCaption" class="narrativeCaption hidden"><small id="CaptionTitle"></small><p id="CaptionText"></p></div>
 
     <div id="ControlHint" class="controlHint hidden">
       <span><kbd>WASD</kbd> 移动</span><span><kbd>Shift</kbd> 奔跑</span><span><kbd>E</kbd> 互动</span><span><kbd>空格</kbd> 投石引开</span><span><kbd>H</kbd> 使用药品</span>
@@ -87,7 +83,7 @@
           <p>本作从普通百姓视角呈现侵华日军抢粮、抓捕、纵火与封锁压迫，不使用血腥猎奇画面。地点、人物为复合创作，历史结局不可被玩家改写；评价不统计击杀，只看乡亲能否安全、种粮能否保住、联络能否接续。</p>
         </div>
         <div class="difficultyPicker" role="radiogroup" aria-label="选择难度">
-          <button type="button" role="radio" data-difficulty="story" aria-checked="false"><span>叙事模式</span><small>预警更早，适合首次体验</small></button>
+          <button type="button" role="radio" data-difficulty="story" aria-checked="false"><span>叙事模式</span><small>怀疑积累更慢，互动更短</small></button>
           <button class="selected" type="button" role="radio" data-difficulty="standard" aria-checked="true"><span>标准封锁</span><small>推荐 · 搜索更快，资源更紧</small></button>
         </div>
         <button id="StartButton" class="startButton" type="button"><span>进入封锁线</span><small>开始单人行动</small><kbd>ENTER</kbd></button>
@@ -118,17 +114,54 @@
         <div><button id="ResumeButton" class="primaryModalButton" type="button">继续行动</button><button id="PauseHistoryButton" type="button">史实与创作边界</button><button id="RestartButton" type="button">重新开始本局</button><button id="ReturnTitleButton" type="button">返回标题</button></div>
       </section>
 
+      <section id="MedicineModal" class="pauseModal hidden" role="dialog" aria-modal="true" aria-labelledby="MedicineTitle">
+        <p>半包磺胺 · 只能救治一人</p><h2 id="MedicineTitle">把药留给谁？</h2>
+        <div><button id="MedicineZhaoButton" class="primaryModalButton" type="button">给赵叔 · 队伍走得更快</button><button id="MedicineLinButton" type="button">给林砚 · 修台与背机更快</button><button id="MedicineCancelButton" type="button">暂时不决定</button></div>
+      </section>
+
       <section id="ResultModal" class="resultModal hidden" role="dialog" aria-modal="true" aria-labelledby="ResultTitle">
         <p id="ResultEyebrow">行动结算</p><h2 id="ResultTitle">火种越过封锁线</h2><p id="ResultSummary" class="resultSummary"></p>
         <div class="resultGrid"><div class="resultScore"><strong id="ResultScore">0</strong><small>行动评估</small></div><div id="ResultMetrics" class="resultMetrics"></div></div>
         <blockquote id="ResultReflection"></blockquote>
-        <div class="resultActions"><button id="ResultHistoryButton" type="button">查看史实依据</button><button id="ResultRestartButton" class="primaryModalButton" type="button">再次行动</button></div>
+        <div class="resultActions"><button id="ResultHistoryButton" type="button">查看史实依据</button><button id="ResultRestartButton" class="primaryModalButton" type="button">再次行动</button><button id="ResultReturnTitleButton" type="button">返回标题</button></div>
       </section>
     </div>
 
-    <div id="LoadingScreen" class="loadingScreen"><div><span>正在铺开封锁线</span><i><em id="LoadingFill"></em></i><small id="LoadingText">构建冀中平原与交通网…</small></div></div>
-    <div id="ScreenReaderStatus" class="screenReaderOnly" aria-live="assertive"></div>
+    <div id="LoadingScreen" class="loadingScreen" role="status"><div><span>正在铺开封锁线</span><i><em id="LoadingFill"></em></i><small id="LoadingText">构建冀中平原与交通网…</small></div></div>
+    <div id="ScreenReaderStatus" class="screenReaderOnly" aria-live="polite"></div>
   </main>
+  <noscript><section class="bootFailure"><h1>无法启动 3D 场景</h1><p>这个互动故事需要 JavaScript。你仍可以在启用后重新进入；加载失败不会被记作一次行动失败。</p></section></noscript>
+  <script>
+    (() => {
+      window.__LastSurvivorBooted = false;
+      window.ShowLastSurvivorFailure = (message) => {
+        const screen = document.getElementById("LoadingScreen");
+        if (!screen) return;
+        screen.classList.remove("ready");
+        screen.classList.add("failed");
+        screen.removeAttribute("aria-hidden");
+        screen.querySelector("span").textContent = "无法启动 3D 场景";
+        screen.querySelector("small").textContent = message || "网络或图形设备没有完成初始化。";
+        screen.querySelector("em").style.width = "100%";
+        if (!screen.querySelector("button")) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "重新载入";
+          button.addEventListener("click", () => location.reload());
+          screen.querySelector("div").append(button);
+        }
+      };
+      window.__LastSurvivorBootTimer = setTimeout(() => {
+        if (!window.__LastSurvivorBooted) window.ShowLastSurvivorFailure("资源加载超时。请检查网络后重新载入。");
+      }, 10000);
+      addEventListener("error", () => {
+        if (!window.__LastSurvivorBooted) window.ShowLastSurvivorFailure("3D 资源或图形设备初始化失败。");
+      }, true);
+      addEventListener("unhandledrejection", () => {
+        if (!window.__LastSurvivorBooted) window.ShowLastSurvivorFailure("3D 资源未能完整载入。");
+      });
+    })();
+  </script>
   <script type="module" src="./Script_Game.mjs"></script>
 </body>
 </html>
