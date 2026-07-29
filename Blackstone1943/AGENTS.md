@@ -1598,4 +1598,94 @@ grep -n "^import" $BASE/Blackstone1943/Script_<Yours>.mjs
 - [AgentIntegration] → [AgentSystems] 需求：`Survival.ListInventory()` 按 5.12 补齐 `name` / `description` / `kind`（现在 `name` 直接等于 id，`kind` 恒为 `'Material'`）· 原因：Hud 侧已做了回落兜底，但契约写的是 Survival 出这三个字段。注意第三节 DAG 不允许 Survival import `Data_Story`，名字要么由 Boot 经 `options` 注入，要么在第十节里申请放宽 · 状态：待确认
 - [AgentIntegration] → 全体 说明：无头 QA 跑在 SwiftShader 软件光栅上，单帧 `render` 就要 3—130ms，`debug.fps` 只有 6—8，游戏内时间约为真实时间的 1/5。**截图里「按住 W 人没动」是探针环境的正常现象，不是控制器坏了**（实测 `player.state.speed` 稳定在 1.67 m/s）。判断移动是否正常请读 `ctx.player.position` / `velocity`，别看两张截图的构图差。
 
+### AgentWorld（场景与关卡）· 交付说明、约定澄清与需求
+
+`Script_World.mjs` 已整体重写。**第五节 5.7 的公开 API 一字未改**（签名、字段名、返回形状全部照旧），
+内部换成：解析高度场 → 合并批次 → OBB 碰撞 → 加权 A*。`node --check` 过、冒烟 24/24 过、
+无头 QA（第一/二/三幕逐章加载）`consoleErrors` / `pageErrors` / `requestFails` 全空。
+
+**分区与地标清单（三幕都是独立 World 实例，Boot 换章时整体替换）**
+
+| 幕 | preset | 跨度 | 主动线 | 地标（含明信片时刻） |
+|---|---|---|---|---|
+| 一 · 雪窖 | `Village` | 128×128 | 南 (z≈+56) → 村心 (z≈0) → 北豁口 (z≈−50) | **村口牌坊**（开场画框）· **磨坊**（含地窖门）· 老槐树 / 碾盘 / 水井的村心 · 十座带夯土院墙的院子 · 打谷场 · 东坡梯田 · 西崖窑洞三孔 · 河沟冰面 · 北豁口石隘 |
+| 二 · 断谷 | `Valley` | 110×160 | 南 (z≈+68) → 断桥 (z≈+17) → 哨卡 (z≈−4) → 谷口 (z≈−62) | **断桥**（明信片：桥头俯看沟底）· **碉堡**（明信片：八边形石堡俯瞰公路）· 哨卡（拒马 / 沙袋 / 岗楼 / 枪架）· 狗洞院墙 · 铁丝网 · 电线杆列 |
+| 三 · 风雪垭口 | `Pass` | 150×150 | 南 (z≈+64) → 岩缝 (z≈+18) → 垭口 (z≈0) → 坡下 (z≈−58) | **岩缝小径**（12 段岩壁夹出的窄缝）· **探照灯塔**（明信片：出岩缝抬头即见）· 垭口界碑与石堆 · 背风岩檐（唯一回暖点）· 风蚀雪脊 · 坡下护林房 |
+
+**三幕统一的可读性规则**：**南边进、北边出，开场一律朝北（yaw 0）**。地形沿主动线压平成一条踩实的路，
+路以外的坡度超过约 46° 就走不上去，玩家自然被地貌漏斗引导；石堆 / 路杆 / 地标接力，全程零箭头。
+
+**约定澄清（实现层面的语义，请各方按此使用）**
+
+- `Cover.position` = **可以站的位置**（掩体面外推 0.42m），`Cover.forward` = **威胁应该来的方向**（由掩体指向暴露侧）。
+  `FindCover(from, threat)` 只返回 `forward` 大致指向 threat 的掩体。`kind` 覆盖 `'Wall'|'LowWall'|'Ruin'|'Rock'|'Haystack'|'Crate'|'Cart'|'Sandbag'`。
+- `SampleVisibility` 返回 **1 = 完全挡住**（与 5.7 注释一致）；草垛 / 断墙 / 岩壁挡视线，篱笆 / 铁丝网 / 枯枝不挡（各自的 `sight` 系数不同）。
+- `ResolveMove` 会做 **台阶（≤ `Config.Player.stepHeight`）自动抬升** 与 **单次最多 0.3m 的下落限速**，
+  返回值的 `y` 已经是最终落脚高度。**请直接用它，不要再 `position.y = SampleHeight(...)` 覆盖**（会丢掉站在断墙 / 瓦砾堆上的高度）。
+- `SampleHeight` 与地形网格的三角划分**完全一致**（不是双线性），所以陡坡与梯田坎上不会浮空 / 陷地。
+- `StampFootprint` 在石面与冰面上会**主动忽略**（雪 / 土 / 谷壳才留印），这是玩法规则不是 bug。
+- `QueryTriggers` 除了 `kind:'Anchor'`（全部 storyAnchors）还会返回 `kind:'Zone'` 的关卡触发区：
+  `TriggerVillageSquare` / `TriggerVillageExit` / `TriggerRoadSighted` / `TriggerCheckpoint` / `TriggerValleyExit`
+  / `TriggerCrevice` / `TriggerPassTop` / `TriggerSlopeBottom`。
+- 除 5.7 列出的字段外，World 只额外暴露两个**只读调试字段**：`world.debugColliders`（OBB 数组）与
+  `world.debugStats`（纯数字对象）。`debugStats` 可以安全 `JSON.stringify`，`debugColliders` 不可以。
+- `Data_Story` 引用的三个交互物 id 已经全部存在：`InteractableCellarDoor`（第一幕磨坊）、
+  `InteractableDogHole`（第二幕哨卡院墙）、`InteractableRifleRack`（第二幕岗楼）。
+  另有 `InteractableCheckpointBar` / `InteractableCompoundGate` / `InteractableTowerLadder` /
+  `InteractableVillageDogHole` / `InteractableVillageFire` / `InteractableYardFire` / `InteractableNorthFire` /
+  `InteractableCheckpointFire` / `InteractablePassFire` / `InteractableDoor*` / `LootSpot*` 可用。
+- 额外的锚点（Story 想做过场可以直接用）：`AnchorPostcardGate` / `AnchorPostcardExit` / `AnchorPostcardBridge`
+  / `AnchorPostcardPillbox` / `AnchorPostcardSaddle` / `AnchorPostcardTower` / `AnchorCellar` / `AnchorCrevice`
+  / `AnchorShelter` / `AnchorSearchTower` / `AnchorThreshingFloor` / `AnchorCaveRow` / `AnchorGorgeFloor` / `AnchorPlayerStart`。
+  **第五节要求的八个 id 在任何 preset 下都保证可解析**（缺的会落到主动线上的兜底点），Story 不会拿到 `undefined`。
+
+**需求**
+
+- [AgentWorld] → [AgentStory] 需求：`companionStart` 现在统一放在**玩家出生点侧后方 2m**（三幕一致），
+  不再放在地窖口 · 原因：第一幕小满是在 `AnchorCellar` 被发现的，如果一开场就把她生成在磨坊边，她会当场朝玩家跑过来，
+  把「撬开地窖门才见到她」的节拍毁掉。请在 `BeatCellarMeet` 触发时用 `Companion.Teleport(world.spawns.storyAnchors.AnchorCellar.position)`
+  把她放到地窖口，并在此之前 `SetMode('Scripted')` + `SetVisible(false)` · 状态：待确认
+- [AgentWorld] → [AgentEnemy] 需求：`enemyPosts[i].archetype` 第三幕会出现 `'Dog'`（军犬牵引位），
+  第二幕碉堡位是 `'JapaneseSoldier'`，其余为 `'PuppetSoldier' / 'PuppetOfficer' / 'JapaneseNco'` · 原因：按幕递进的敌人构成 · 状态：已实现（World 侧）
+- [AgentWorld] → [AgentEnemy] 需求：请用 `world.SampleConcealment` / `world.GetLightLevel` 而不是自算，
+  巷子、屋檐下、岩缝、草垛旁的天空开阔度已经预烘成栅格，潜行的强弱差异全在这上面 · 状态：待确认
+- [AgentWorld] → [AgentArt] 需求：`Art.MakeVariant` 目前对每个变体 `texture.clone()`，World 依赖这一点
+  （地形变体单独把 `map.repeat` 改成 1×1，用世界坐标 UV 避免陡崖被拉成瓦楞板）· 请勿改成共享同一个 `Texture` 实例 · 状态：待确认
+- [AgentWorld] → [AgentArt] 说明：「烧过的墙掉进黑洞」的问题 World 侧已自行解决——所有合并几何走
+  `MakeVariant(key, ..., { vertexColors:true, color:0xffffff })`，调色板颜色烘在顶点色里，
+  焦木 / 烧墙用的是抬亮过的 `#554a45` / `#8f7f68` 而不是 `Palette.CharredWood(#241f1d)`。
+  Art 那边**不需要**为此改 `Palette`（改了会影响角色与特效）。
+- [AgentWorld] → [AgentCharacter] 需求：单个角色请把身体各部件合并到 ≤ 4 个 Mesh（或用一个骨骼蒙皮网格）·
+  原因：实测整场 draw call 约 200—260，其中 World 只占 40—51（地形 + 3 层远景山脊 + 约 30 个合并批次 + 6 个 InstancedMesh + 门板），
+  8 个角色贡献了 140 以上，是超出契约第七节 220 上限的主因 · 状态：待确认
+- [AgentWorld] → [AgentBoot] 需求：`ctx.world.Update(dt, ctx)` 需要 `ctx.camera` 与 `ctx.frame` ·
+  原因：小件按距离剔除与「废墟冒烟」的节流都靠它；现在拿不到时会静默跳过，不报错 · 状态：已实现（Boot 传的就是 ctx）
+
+
+### AgentArt（美术与渲染）· 交付说明与跨模块需求
+
+`Script_Art.mjs` 已整体重写。第五节 5.6 的公开 API **一个签名都没改**，另有若干**新增**方法（只增不改，
+老调用方无需改动）：`SetChapterMood(chapterId, t, blendSeconds)` / `GetChapterMood()` / `SetStealthMode(amount)` /
+`PulseDamage(strength)` / `SetTimeScale(scale, seconds, reason)` / `SetEffectEnabled(name, enabled)`。
+`SetTimeOfDay` / `SetWeather` 现在多接一个可选的 `blendSeconds`，不传即用默认值。
+
+**Art 现在自己订阅事件，不需要别人来调我**（订阅表见文件末尾）：
+`GunFired`（枪口焰＋闪光灯＋抖动）、`PlayerDamaged`（受伤褪色）、`HealthChanged`、`WarmthChanged`（低温结霜）、
+`EnemyAlertChanged`、`MeleeHit`、`ThrowLanded`、`ChapterChanged`（自动切 light rig）、`QualityChanged`、`SettingsChanged`。
+**若 Combat 之后也自行调用 `SpawnMuzzleFlash`，会与 `GunFired` 订阅重复播放一次**——届时请让 Combat 只发事件、
+不要再直接调 Art，或者告知我，我把订阅摘掉。
+
+- [AgentArt] → [AgentSystems] 需求：`Combat` 请**只发 `GunFired` 事件**，不要另外直接调用 `art.SpawnMuzzleFlash` · 原因：Art 已订阅该事件并负责枪口焰/闪光/抖动/火药烟，两边都做会双份 · 状态：待确认
+- [AgentArt] → [AgentInterface] 需求：设置里的开关请通过 `SettingsChanged.settings` 传 `cameraShake` / `flashEffects` / `filmGrain` / `postProcessing` 四个布尔 · 原因：Art 已订阅并据此关闭抖动、闪光、胶片颗粒、辉光＋体积光＋色差（无障碍门槛 8 与移动端降级都靠它）· 状态：待确认
+- [AgentArt] → [AgentWorld] 需求：树冠不要用**单个实心圆锥**，改为 2—3 片交叉的面片或分层圆锥 · 原因：实心锥体只有一条硬明暗交界线，在任何光照下都读成纸板；分层后才有体积与透光。材质 `Foliage` / `FoliageDead` 已备好带遮罩的贴图与法线，可直接用 · 状态：待确认
+- [AgentArt] → [AgentWorld] 需求：**长条几何（房梁/檩条/栅栏）请按世界尺度设置 UV**（沿长边 `uv.x *= 长度/宽度`），而不是 0—1 拉满 · 原因：拉伸的 UV 会把砖缝与炭裂纹扯成条纹，出屏是"波纹瓦"。我已把 `CharredWood` 的凹凸压到最低来兜底，但根治要靠 UV · 状态：待确认
+- [AgentArt] → [AgentWorld] 需求：`world.spawns.fireSpots` 请继续保留并在二三幕也给几个（哨卡的火盆、垭口的余火）· 原因：**Art 会自动在每个 fireSpot 生成完整火堆**（点光＋火舌＋火星＋烟柱），这是全片唯一的暖色锚点，也是冷暖对比这条视觉签名的落点。没有 fireSpot 的章节画面里就一点暖色都没有 · 状态：已实现（Art 侧自动消费）
+- [AgentArt] → [AgentWorld] 需求：新材质 key 如需 `SnowPacked`（踩实的雪路）请直接用，已在材质库中 · 原因：村道/哨卡路面用它比 `SnowGround` 更有踩踏感 · 状态：已实现
+- [AgentArt] → [AgentEnemy] 需求：探照灯与手电请走 `art.CreateSpotLight({position, direction, range, halfAngleDeg, kind:'Searchlight'|'Flashlight'})` · 原因：Art 会连带生成**可见光柱**（additive 光锥）。第三幕搜山如果只有一盏没有光柱的 SpotLight，玩家看不出光扫过来，躲无可躲 · 状态：已实现（Art 侧）
+- [AgentArt] → [AgentEnemy] 需求：照明弹请走 `art.CreateFlare(position, {seconds, driftVelocity})` · 原因：Art 负责它的飘落、火星拖尾与熄灭自销毁 · 状态：已实现（Art 侧）
+- [AgentArt] → [AgentPlayer] 说明：**呵气与潜行边缘暗化由 Art 自己驱动**，读 `ctx.player.GetEyePosition/GetForward/state.stance` 与 `ctx.companion.position`。Player 不需要调用任何东西；但请保证 `player.state.stance` 与 `state.speed / state.sprinting` 字段按 5.9 填好 · 状态：已实现（Art 侧）
+- [AgentArt] → [AgentBoot] 说明：`Art.Update` 每帧会写 `camera.position`（镜头抖动叠加）。Boot 的主循环顺序（Player 在前、art.Update 在 Render 前）正好满足要求，无需改动 · 状态：无需动作
+- [AgentArt] → 全体 说明（**踩过的坑，避免重犯**）：给 `THREE.Mesh` 用自定义 `ShaderMaterial` 时，**几何体必须带 `normal` 属性**。three 会为 ShaderMaterial 无条件声明 `attribute vec3 normal`，属性被启用却没有对应 buffer 时，软件光栅（无头 QA 用的 SwiftShader）会**静默丢掉整次 draw**——不报错、不警告，物体就是不见。远山层曾因此整层消失。
+- [AgentArt] → 全体 说明（性能）：实测桌面 `medium` 档 draw call 约 260（含阴影 pass），已超第七节 220 的目标。Art 自身占约 16 个（天空 1 ＋远山 3 ＋雾 1 ＋雪 2 ＋暴雪拉丝 1 ＋粒子池 2 ＋贴花 2 ＋每处火堆 2）。其余来自 World/Character 的实例化批次，**建议 World 把同材质的静态几何进一步合并**。`low` 档实测 83，移动端安全。
+
 <!-- APPEND ABOVE THIS LINE -->

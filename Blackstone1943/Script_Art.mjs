@@ -247,28 +247,32 @@ function WrapTexture(canvas, colorSpace) {
  * ------------------------------------------------------------------ */
 
 const FieldRecipes = {
-  /* 雪：低频雪丘 + 风吹出的横向波纹 + 细小晶粒。风纹方向统一，读起来才像"被风梳过" */
+  /**
+   * 雪：**几乎是平的**。新雪最重要的读数是"没有细节"——大面积柔和起伏 + 风梳出的浅波纹。
+   * 早期版本在高度场里加了高频晶粒，出屏变成一地砂砾，那是石子路不是雪。
+   * 晶体的闪只走 albedo 的 speck（不进法线），才不会在远处糊成噪点。
+   */
   Texture_SnowNoise: {
     size: 256,
-    normalStrength: 2.2,
-    albedo: { base: 0.965, contrast: 0.16, shadowTint: 0x9db4cc, speck: 0.045 },
+    normalStrength: 0.85,
+    albedo: { base: 0.975, contrast: 0.075, shadowTint: 0xa8bcd2, speck: 0.022 },
     Field(u, v) {
-      const dune = TileFbm(u * 4, v * 4, 4, 4, 0.55);
-      const warp = TileFbm(u * 6 + 11, v * 6 + 3, 6, 2, 0.5) * 0.55;
-      const ripple = Math.sin((v * 9 + warp) * Math.PI * 2) * 0.5 + 0.5;
-      const crystal = TileValueNoise(u * 96, v * 96, 96);
-      return dune * 0.52 + ripple * 0.30 + crystal * 0.18;
+      const dune = TileFbm(u * 3, v * 3, 3, 4, 0.55);
+      const drift = TileFbm(u * 7 + 3, v * 7 + 7, 7, 3, 0.5);
+      const warp = TileFbm(u * 4 + 11, v * 4 + 3, 4, 2, 0.5) * 0.75;
+      const ripple = Math.sin((v * 5 + warp) * Math.PI * 2) * 0.5 + 0.5;
+      return dune * 0.54 + drift * 0.28 + ripple * 0.18;
     },
   },
-  /* 压实的雪/雪路：脚印踩烂后的团块，方向性弱，颗粒粗 */
+  /* 压实的雪/雪路：被踩过的雪会板结成浅浅的团块，比新雪略糙但仍然不是砂砾 */
   Texture_SnowPacked: {
     size: 256,
-    normalStrength: 2.6,
-    albedo: { base: 0.93, contrast: 0.30, shadowTint: 0x8ea0b6, speck: 0.06 },
+    normalStrength: 1.15,
+    albedo: { base: 0.955, contrast: 0.14, shadowTint: 0x93a8c0, speck: 0.03 },
     Field(u, v) {
-      const clump = 1 - TileWorley(u * 12, v * 12, 12);
-      const rough = TileFbm(u * 20, v * 20, 20, 3, 0.5);
-      return MathUtil.Clamp01(clump * 0.55 + rough * 0.45);
+      const clump = 1 - TileWorley(u * 6, v * 6, 6);
+      const rough = TileFbm(u * 10, v * 10, 10, 3, 0.5);
+      return MathUtil.Clamp01(clump * 0.42 + rough * 0.58);
     },
   },
   /* 冰：大块裂纹 + 内部气泡 */
@@ -282,128 +286,137 @@ const FieldRecipes = {
       return crack * 0.78 + bubble * 0.22;
     },
   },
-  /* 泥土/砂砾：碎石粒径分布 + 结冻的板结块 */
+  /* 泥土：冻硬的土面，大块板结为主，碎粒只做点缀 */
   Texture_DirtGrain: {
     size: 256,
-    normalStrength: 2.4,
-    albedo: { base: 0.92, contrast: 0.34, shadowTint: 0x6a6154, speck: 0.09 },
+    normalStrength: 1.5,
+    albedo: { base: 0.94, contrast: 0.20, shadowTint: 0x6a6154, speck: 0.05 },
     Field(u, v) {
-      const pebble = 1 - TileWorley(u * 16, v * 16, 16);
-      const grain = TileFbm(u * 34, v * 34, 34, 3, 0.5);
-      const cake = TileFbm(u * 5, v * 5, 5, 3, 0.6);
-      return MathUtil.Clamp01(pebble * 0.42 + grain * 0.33 + cake * 0.25);
+      const cake = TileFbm(u * 4, v * 4, 4, 4, 0.58);
+      const pebble = 1 - TileWorley(u * 9, v * 9, 9);
+      const grain = TileFbm(u * 18, v * 18, 18, 2, 0.5);
+      return MathUtil.Clamp01(cake * 0.46 + pebble * 0.30 + grain * 0.24);
     },
   },
   /* 岩：层理 + 崩口。层理方向固定，让山石有"沉积"的重量 */
   Texture_RockGrain: {
     size: 256,
-    normalStrength: 2.9,
-    albedo: { base: 0.90, contrast: 0.38, shadowTint: 0x59606b, speck: 0.05 },
+    normalStrength: 1.8,
+    albedo: { base: 0.93, contrast: 0.26, shadowTint: 0x59606b, speck: 0.035 },
     Field(u, v) {
       const bendWarp = TileFbm(u * 3, v * 3, 3, 3, 0.55) * 0.35;
-      const strata = Math.sin((v * 7 + bendWarp) * Math.PI * 2) * 0.5 + 0.5;
-      const chip = 1 - TileWorley(u * 9, v * 9, 9);
-      const grit = TileFbm(u * 26, v * 26, 26, 3, 0.5);
-      return MathUtil.Clamp01(strata * 0.34 + chip * 0.40 + grit * 0.26);
+      const strata = Math.sin((v * 5 + bendWarp) * Math.PI * 2) * 0.5 + 0.5;
+      const chip = 1 - TileWorley(u * 5, v * 5, 5);
+      const grit = TileFbm(u * 14, v * 14, 14, 3, 0.5);
+      return MathUtil.Clamp01(strata * 0.20 + chip * 0.48 + grit * 0.32);
     },
   },
   /* 夯土墙：抹刀横向拖痕 + 掺进去的麦秸 + 掉皮露出的粗胎 */
   Texture_MudWall: {
     size: 256,
-    normalStrength: 2.0,
-    albedo: { base: 0.94, contrast: 0.28, shadowTint: 0x6f6350, speck: 0.055 },
+    normalStrength: 1.25,
+    albedo: { base: 0.955, contrast: 0.17, shadowTint: 0x6f6350, speck: 0.035 },
     Field(u, v) {
       const trowelWarp = TileFbm(u * 4, v * 8, 4, 3, 0.5) * 0.6;
-      const trowel = Math.sin((v * 13 + trowelWarp) * Math.PI * 2) * 0.5 + 0.5;
-      const body = TileFbm(u * 7, v * 7, 7, 4, 0.55);
+      const trowel = Math.sin((v * 7 + trowelWarp) * Math.PI * 2) * 0.5 + 0.5;
+      const body = TileFbm(u * 5, v * 5, 5, 4, 0.55);
       /* 麦秸：稀疏的短亮线。用 ridge 噪声掐尖，只留下最亮的一小撮 */
-      const strawSeed = TileRidge(u * 30 + 5, v * 9 + 2, 30, 2);
-      const straw = MathUtil.Clamp01((strawSeed - 0.82) * 6);
-      const peel = MathUtil.Clamp01((TileFbm(u * 2.5 + 17, v * 2.5 + 23, 3, 3, 0.6) - 0.58) * 4);
-      return MathUtil.Clamp01(body * 0.46 + trowel * 0.20 + straw * 0.24 - peel * 0.22 + 0.12);
+      const strawSeed = TileRidge(u * 20 + 5, v * 6 + 2, 20, 2);
+      const straw = MathUtil.Clamp01((strawSeed - 0.86) * 6);
+      const peel = MathUtil.Clamp01((TileFbm(u * 2.5 + 17, v * 2.5 + 23, 3, 3, 0.6) - 0.62) * 3);
+      return MathUtil.Clamp01(body * 0.58 + trowel * 0.12 + straw * 0.16 - peel * 0.14 + 0.16);
     },
   },
-  /* 烧过的砖墙：砖缝 + 烟熏的竖向渐变 */
+  /**
+   * 烧过的墙：黑石峪是华北土坯村，不是砖城。所以砖缝只是**隐约**的一道，
+   * 主导读数是烟熏的深浅斑与掉落的墙皮。做成整齐红砖会瞬间穿越到现代。
+   */
   Texture_BrickBurnt: {
     size: 256,
-    normalStrength: 2.6,
-    albedo: { base: 0.90, contrast: 0.40, shadowTint: 0x4a423e, speck: 0.05 },
+    normalStrength: 1.35,
+    albedo: { base: 0.94, contrast: 0.24, shadowTint: 0x4a4644, speck: 0.04 },
     Field(u, v) {
-      const rows = 9;
+      const rows = 6;
       const row = Math.floor(v * rows);
       const offset = (row % 2) * 0.5;
-      const bx = (u * 4.5 + offset) % 1;
+      const bx = (u * 3 + offset) % 1;
       const by = (v * rows) % 1;
-      const mortar = Math.min(
-        MathUtil.SmoothStep(0.0, 0.09, bx) * MathUtil.SmoothStep(1.0, 0.91, bx),
-        MathUtil.SmoothStep(0.0, 0.14, by) * MathUtil.SmoothStep(1.0, 0.86, by),
+      const course = Math.min(
+        MathUtil.SmoothStep(0.0, 0.06, bx) * MathUtil.SmoothStep(1.0, 0.94, bx),
+        MathUtil.SmoothStep(0.0, 0.10, by) * MathUtil.SmoothStep(1.0, 0.90, by),
       );
-      const face = TileFbm(u * 18, v * 18, 18, 3, 0.5);
-      const soot = TileFbm(u * 3 + 31, v * 6 + 7, 3, 3, 0.6);
-      return MathUtil.Clamp01(mortar * 0.55 + face * 0.25 + (1 - soot) * 0.20);
+      const face = TileFbm(u * 8, v * 8, 8, 4, 0.55);
+      const soot = TileFbm(u * 3 + 31, v * 5 + 7, 3, 3, 0.62);
+      return MathUtil.Clamp01(course * 0.11 + face * 0.55 + (1 - soot) * 0.34);
     },
   },
   /* 木：年轮拖长的竖纹 + 结疤 */
   Texture_WoodGrain: {
     size: 256,
-    normalStrength: 1.6,
-    albedo: { base: 0.94, contrast: 0.26, shadowTint: 0x5a4a37, speck: 0.03 },
+    normalStrength: 1.05,
+    albedo: { base: 0.95, contrast: 0.18, shadowTint: 0x5a4a37, speck: 0.025 },
     Field(u, v) {
       const wobble = TileFbm(u * 3, v * 12, 3, 3, 0.5) * 0.9;
-      const rings = Math.sin((u * 17 + wobble) * Math.PI * 2) * 0.5 + 0.5;
+      const rings = Math.sin((u * 7 + wobble) * Math.PI * 2) * 0.5 + 0.5;
       const knotDistance = TileWorley(u * 2.2, v * 2.2, 3);
       const knot = MathUtil.Clamp01((0.28 - knotDistance) * 4);
-      const fibre = TileFbm(u * 40, v * 6, 40, 2, 0.5);
-      return MathUtil.Clamp01(rings * 0.5 + fibre * 0.28 - knot * 0.45 + 0.22);
+      const fibre = TileFbm(u * 20, v * 5, 20, 2, 0.5);
+      return MathUtil.Clamp01(rings * 0.34 + fibre * 0.44 - knot * 0.34 + 0.24);
     },
   },
   /* 炭化的房梁：龟裂成鳞片（alligator cracking），这才是"烧过"的真正读数 */
   Texture_CharredPlank: {
     size: 256,
-    normalStrength: 3.2,
-    albedo: { base: 0.88, contrast: 0.46, shadowTint: 0x2c2724, speck: 0.07 },
+    normalStrength: 0.85,
+    albedo: { base: 0.935, contrast: 0.17, shadowTint: 0x2f2a26, speck: 0.045 },
     Field(u, v) {
-      const cell = TileWorley(u * 14, v * 20, 14);
-      const scale = MathUtil.Clamp01(cell * 3.2);
-      const plank = Math.abs(((u * 5) % 1) - 0.5) < 0.03 ? 0.15 : 1;
-      const soot = TileFbm(u * 22, v * 22, 22, 3, 0.5);
-      return MathUtil.Clamp01(scale * 0.62 * plank + soot * 0.26 + 0.06);
+      const cell = TileWorley(u * 5, v * 5, 5);
+      const scale = MathUtil.Clamp01(cell * 2.6);
+      const soot = TileFbm(u * 6, v * 6, 6, 4, 0.55);
+      const ash = TileFbm(u * 15, v * 15, 15, 2, 0.5);
+      return MathUtil.Clamp01(scale * 0.30 + soot * 0.48 + ash * 0.22);
     },
   },
   /* 茅草/麦秸：一堆方向略乱的细杆 */
   Texture_StrawWeave: {
     size: 256,
-    normalStrength: 2.2,
-    albedo: { base: 0.93, contrast: 0.34, shadowTint: 0x6e6142, speck: 0.10 },
+    normalStrength: 1.3,
+    albedo: { base: 0.945, contrast: 0.22, shadowTint: 0x6e6142, speck: 0.06 },
     Field(u, v) {
       const lean = TileFbm(u * 5, v * 5, 5, 2, 0.5) * 0.9;
-      const stalk = TileRidge(u * 46 + lean * 6, v * 3, 46, 2);
+      const stalk = TileRidge(u * 24 + lean * 4, v * 3, 24, 2);
       const bundle = TileFbm(u * 9, v * 4, 9, 3, 0.55);
       return MathUtil.Clamp01(stalk * 0.56 + bundle * 0.44);
     },
   },
-  /* 粗布：经纬交织。棉衣/包袱皮/沙袋共用，repeat 拉开就是不同粗细 */
+  /**
+   * 粗布：经纬交织。**频率必须远低于贴图分辨率**——早期版本 128px 上放 22 个周期，
+   * 只有 5.8 像素一格，mipmap 一压就是摩尔纹，人物身上出现巨大的毛衣格子。
+   * 现在 9 个周期（14 像素一格），密度靠 repeat 调，远看是布，近看才有纹。
+   */
   Texture_ClothWeave: {
     size: 128,
-    normalStrength: 1.5,
-    albedo: { base: 0.95, contrast: 0.20, shadowTint: 0x5d5a52, speck: 0.06 },
+    normalStrength: 0.75,
+    albedo: { base: 0.965, contrast: 0.085, shadowTint: 0x5d5a52, speck: 0.035 },
     Field(u, v) {
-      const warp = Math.sin(u * Math.PI * 2 * 22) * 0.5 + 0.5;
-      const weft = Math.sin(v * Math.PI * 2 * 22) * 0.5 + 0.5;
+      const warp = Math.sin(u * Math.PI * 2 * 9) * 0.5 + 0.5;
+      const weft = Math.sin(v * Math.PI * 2 * 9) * 0.5 + 0.5;
       const weave = Math.max(warp, weft) * 0.5 + warp * weft * 0.5;
-      const slub = TileFbm(u * 11, v * 11, 11, 3, 0.55);
-      return MathUtil.Clamp01(weave * 0.6 + slub * 0.4);
+      const slub = TileFbm(u * 6, v * 6, 6, 3, 0.55);
+      /* 布不是完美的网格：让经纬本身被低频噪声推着走 */
+      const wear = TileFbm(u * 3 + 13, v * 3 + 5, 3, 2, 0.5);
+      return MathUtil.Clamp01(weave * 0.34 + slub * 0.38 + wear * 0.28);
     },
   },
   /* 棉絮/皮毛：蓬松团块 */
   Texture_FurTuft: {
     size: 128,
-    normalStrength: 2.0,
-    albedo: { base: 0.94, contrast: 0.30, shadowTint: 0x4b4238, speck: 0.09 },
+    normalStrength: 1.1,
+    albedo: { base: 0.95, contrast: 0.18, shadowTint: 0x4b4238, speck: 0.06 },
     Field(u, v) {
-      const tuft = 1 - TileWorley(u * 10, v * 10, 10);
-      const fibre = TileRidge(u * 34, v * 34, 34, 2);
-      return MathUtil.Clamp01(tuft * 0.6 + fibre * 0.4);
+      const tuft = 1 - TileWorley(u * 6, v * 6, 6);
+      const fibre = TileRidge(u * 14, v * 14, 14, 2);
+      return MathUtil.Clamp01(tuft * 0.62 + fibre * 0.38);
     },
   },
   /* 窗纸/纸张：纤维 + 破口 */
@@ -412,7 +425,7 @@ const FieldRecipes = {
     normalStrength: 0.9,
     albedo: { base: 0.97, contrast: 0.14, shadowTint: 0x9c9384, speck: 0.05 },
     Field(u, v) {
-      const fibre = TileRidge(u * 50, v * 14, 50, 2);
+      const fibre = TileRidge(u * 26, v * 8, 26, 2);
       const blotch = TileFbm(u * 6, v * 6, 6, 3, 0.55);
       return MathUtil.Clamp01(fibre * 0.35 + blotch * 0.65);
     },
@@ -420,21 +433,21 @@ const FieldRecipes = {
   /* 锈铁：锈斑吃掉漆面 */
   Texture_MetalRust: {
     size: 256,
-    normalStrength: 2.2,
-    albedo: { base: 0.91, contrast: 0.36, shadowTint: 0x5a3f2d, speck: 0.07 },
+    normalStrength: 1.3,
+    albedo: { base: 0.935, contrast: 0.24, shadowTint: 0x574636, speck: 0.05 },
     Field(u, v) {
       const patch = TileFbm(u * 6, v * 6, 6, 4, 0.6);
-      const pit = 1 - TileWorley(u * 22, v * 22, 22);
+      const pit = 1 - TileWorley(u * 11, v * 11, 11);
       return MathUtil.Clamp01(patch * 0.6 + pit * 0.4);
     },
   },
   /* 枯叶/针叶：作为面片贴图，只要有疏密即可 */
   Texture_FoliageMask: {
     size: 128,
-    normalStrength: 1.2,
-    albedo: { base: 0.93, contrast: 0.34, shadowTint: 0x424a3a, speck: 0.10 },
+    normalStrength: 0.8,
+    albedo: { base: 0.945, contrast: 0.24, shadowTint: 0x424a3a, speck: 0.07 },
     Field(u, v) {
-      const needle = TileRidge(u * 26, v * 26, 26, 2);
+      const needle = TileRidge(u * 13, v * 13, 13, 2);
       const clump = TileFbm(u * 7, v * 7, 7, 3, 0.5);
       return MathUtil.Clamp01(needle * 0.45 + clump * 0.55);
     },
@@ -625,24 +638,58 @@ function SpriteFlame(size) {
 
 const AlbedoFloor = {
   /* key → 最低感知亮度（0—1）。没列的按原 Palette 走。 */
-  CharredWood: 0.115,
-  BrickBurnt: 0.135,
-  RockDark: 0.125,
-  Rock: 0.165,
-  Mud: 0.130,
-  Dirt: 0.145,
-  Gunmetal: 0.090,
-  FabricGray: 0.135,
-  FabricOlive: 0.130,
-  FabricBlue: 0.115,
-  Foliage: 0.135,
-  BarbedWire: 0.120,
-  SootBlack: 0.085,
+  CharredWood: 0.320,
+  BrickBurnt: 0.420,
+  RockDark: 0.320,
+  Rock: 0.360,
+  Mud: 0.300,
+  Dirt: 0.310,
+  Gunmetal: 0.185,
+  FabricGray: 0.400,
+  FabricOlive: 0.300,
+  FabricBlue: 0.280,
+  FabricKhaki: 0.260,
+  Foliage: 0.290,
+  FoliageDead: 0.330,
+  BarbedWire: 0.200,
+  Fur: 0.290,
+  ClothCoarse: 0.300,
+  ClothPadded: 0.330,
+  Thatch: 0.285,
+  Wood: 0.300,
+  WoodOld: 0.290,
+  StoneWall: 0.300,
+  MudWall: 0.330,
+  MetalDull: 0.240,
 };
 
+/**
+ * 冬日冷灰是唯一底色。土坯、木头、锈铁这些天生偏暖的材质必须**往中性冷端拉**，
+ * 否则村子会读成暖褐色的黄土高原，和"火光是唯一暖色"直接冲突。
+ * 拉多少有讲究：完全拉成灰会失去材质身份，所以只拉一半，留一点土的暖底。
+ */
+const AlbedoCool = {
+  MudWall: 0.24, BrickBurnt: 0.46, Wood: 0.28, WoodOld: 0.32,
+  Thatch: 0.32, Straw: 0.30, MetalRust: 0.40, Fur: 0.28,
+  CanvasTent: 0.34, Sandbag: 0.36, Dirt: 0.34, Mud: 0.34,
+  FabricKhaki: 0.22, Paper: 0.28, PaperWindow: 0.26, CharredWood: 0.45,
+};
+const CoolGray = 0x8a9099;
+
 function AlbedoOf(key, hex) {
+  let value = hex;
+  const coolAmount = AlbedoCool[key];
+  if (coolAmount !== undefined) {
+    /* 只把色相往中性冷端推，亮度靠 LiftAlbedo 单独管 */
+    const [r, g, b] = ChannelsOf(value);
+    const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    const [cr, cg, cb] = ChannelsOf(CoolGray);
+    const cLuma = (0.2126 * cr + 0.7152 * cg + 0.0722 * cb) / 255;
+    const scale = luma / Math.max(0.01, cLuma);
+    value = MixHex(value, HexOf(cr * scale, cg * scale, cb * scale), coolAmount);
+  }
   const floorLevel = AlbedoFloor[key];
-  return floorLevel === undefined ? hex : LiftAlbedo(hex, floorLevel);
+  return floorLevel === undefined ? value : LiftAlbedo(value, floorLevel);
 }
 
 /**
@@ -651,43 +698,43 @@ function AlbedoOf(key, hex) {
  * `roughnessRange` 存在时会用高度场生成粗糙度图，让同一面墙有干湿差别。
  */
 const MaterialSpecs = {
-  SnowGround: { color: AlbedoOf('SnowGround', Palette.SnowMid), roughness: 0.93, texture: 'Texture_SnowNoise', repeat: 24, normalScale: 0.55 },
-  SnowPacked: { color: AlbedoOf('SnowPacked', Palette.SnowTrampled), roughness: 0.82, texture: 'Texture_SnowPacked', repeat: 10, normalScale: 0.7 },
-  Ice: { color: AlbedoOf('Ice', Palette.Ice), roughness: 0.22, metalness: 0.04, texture: 'Texture_Ice', repeat: 5, normalScale: 0.5 },
-  Dirt: { color: AlbedoOf('Dirt', Palette.Dirt), roughness: 0.97, texture: 'Texture_DirtGrain', repeat: 8, normalScale: 0.9 },
-  Mud: { color: AlbedoOf('Mud', Palette.Mud), roughness: 1.0, texture: 'Texture_DirtGrain', repeat: 6, normalScale: 1.0 },
-  Gravel: { color: AlbedoOf('Gravel', Palette.Gravel), roughness: 0.95, texture: 'Texture_DirtGrain', repeat: 12, normalScale: 1.1 },
-  Rock: { color: AlbedoOf('Rock', Palette.Rock), roughness: 0.88, texture: 'Texture_RockGrain', repeat: 2.5, normalScale: 1.2 },
-  RockDark: { color: AlbedoOf('RockDark', Palette.RockDark), roughness: 0.90, texture: 'Texture_RockGrain', repeat: 2.5, normalScale: 1.2 },
-  StoneWall: { color: AlbedoOf('StoneWall', Palette.StoneWall), roughness: 0.86, texture: 'Texture_RockGrain', repeat: 1.8, normalScale: 1.0 },
-  MudWall: { color: AlbedoOf('MudWall', Palette.MudWall), roughness: 0.95, texture: 'Texture_MudWall', repeat: 1.6, normalScale: 0.85 },
-  BrickBurnt: { color: AlbedoOf('BrickBurnt', Palette.BrickBurnt), roughness: 0.93, texture: 'Texture_BrickBurnt', repeat: 1.6, normalScale: 1.15 },
-  Wood: { color: AlbedoOf('Wood', Palette.Wood), roughness: 0.80, texture: 'Texture_WoodGrain', repeat: 2, normalScale: 0.7 },
-  WoodOld: { color: AlbedoOf('WoodOld', Palette.WoodOld), roughness: 0.90, texture: 'Texture_WoodGrain', repeat: 2, normalScale: 0.9 },
-  CharredWood: { color: AlbedoOf('CharredWood', Palette.CharredWood), roughness: 0.99, texture: 'Texture_CharredPlank', repeat: 2, normalScale: 1.4 },
-  Thatch: { color: AlbedoOf('Thatch', Palette.Thatch), roughness: 0.98, texture: 'Texture_StrawWeave', repeat: 4, normalScale: 1.1 },
-  Straw: { color: AlbedoOf('Straw', Palette.Straw), roughness: 0.98, texture: 'Texture_StrawWeave', repeat: 3, normalScale: 1.1 },
-  Paper: { color: AlbedoOf('Paper', Palette.Paper), roughness: 0.88, texture: 'Texture_PaperGrain', repeat: 1, normalScale: 0.35 },
-  PaperWindow: { color: AlbedoOf('PaperWindow', Palette.PaperWindow), roughness: 0.84, texture: 'Texture_PaperGrain', repeat: 1, normalScale: 0.35, transparent: true, opacity: 0.88, side: 'double' },
-  ClothCoarse: { color: AlbedoOf('ClothCoarse', Palette.ClothCoarse), roughness: 0.96, texture: 'Texture_ClothWeave', repeat: 3, normalScale: 0.6 },
-  ClothPadded: { color: AlbedoOf('ClothPadded', Palette.ClothPadded), roughness: 0.98, texture: 'Texture_ClothWeave', repeat: 1.6, normalScale: 0.75 },
-  FabricGray: { color: AlbedoOf('FabricGray', Palette.FabricGray), roughness: 0.95, texture: 'Texture_ClothWeave', repeat: 1.8, normalScale: 0.7 },
-  FabricKhaki: { color: AlbedoOf('FabricKhaki', Palette.FabricKhaki), roughness: 0.95, texture: 'Texture_ClothWeave', repeat: 1.8, normalScale: 0.7 },
-  FabricBlue: { color: AlbedoOf('FabricBlue', Palette.FabricBlue), roughness: 0.95, texture: 'Texture_ClothWeave', repeat: 1.8, normalScale: 0.7 },
-  FabricRed: { color: AlbedoOf('FabricRed', Palette.FabricRed), roughness: 0.90, texture: 'Texture_ClothWeave', repeat: 3, normalScale: 0.5 },
-  Fur: { color: AlbedoOf('Fur', Palette.Fur), roughness: 1.0, texture: 'Texture_FurTuft', repeat: 3, normalScale: 1.0 },
+  SnowGround: { color: AlbedoOf('SnowGround', Palette.SnowMid), roughness: 0.93, texture: 'Texture_SnowNoise', repeat: 30, normalScale: 0.22 },
+  SnowPacked: { color: AlbedoOf('SnowPacked', Palette.SnowTrampled), roughness: 0.82, texture: 'Texture_SnowPacked', repeat: 12, normalScale: 0.34 },
+  Ice: { color: AlbedoOf('Ice', Palette.Ice), roughness: 0.22, metalness: 0.04, texture: 'Texture_Ice', repeat: 5, normalScale: 0.32 },
+  Dirt: { color: AlbedoOf('Dirt', Palette.Dirt), roughness: 0.97, texture: 'Texture_DirtGrain', repeat: 9, normalScale: 0.45 },
+  Mud: { color: AlbedoOf('Mud', Palette.Mud), roughness: 1.0, texture: 'Texture_DirtGrain', repeat: 7, normalScale: 0.5 },
+  Gravel: { color: AlbedoOf('Gravel', Palette.Gravel), roughness: 0.95, texture: 'Texture_DirtGrain', repeat: 13, normalScale: 0.55 },
+  Rock: { color: AlbedoOf('Rock', Palette.Rock), roughness: 0.88, texture: 'Texture_RockGrain', repeat: 2.2, normalScale: 0.62 },
+  RockDark: { color: AlbedoOf('RockDark', Palette.RockDark), roughness: 0.90, texture: 'Texture_RockGrain', repeat: 2.2, normalScale: 0.62 },
+  StoneWall: { color: AlbedoOf('StoneWall', Palette.StoneWall), roughness: 0.86, texture: 'Texture_RockGrain', repeat: 3.4, normalScale: 0.38 },
+  MudWall: { color: AlbedoOf('MudWall', Palette.MudWall), roughness: 0.95, texture: 'Texture_MudWall', repeat: 3.0, normalScale: 0.30 },
+  BrickBurnt: { color: AlbedoOf('BrickBurnt', Palette.BrickBurnt), roughness: 0.93, texture: 'Texture_BrickBurnt', repeat: 2.6, normalScale: 0.28 },
+  Wood: { color: AlbedoOf('Wood', Palette.Wood), roughness: 0.80, texture: 'Texture_WoodGrain', repeat: 5.0, normalScale: 0.20 },
+  WoodOld: { color: AlbedoOf('WoodOld', Palette.WoodOld), roughness: 0.90, texture: 'Texture_WoodGrain', repeat: 5.0, normalScale: 0.24 },
+  CharredWood: { color: AlbedoOf('CharredWood', Palette.CharredWood), roughness: 0.99, texture: 'Texture_CharredPlank', repeat: 3.6, normalScale: 0.20 },
+  Thatch: { color: AlbedoOf('Thatch', Palette.Thatch), roughness: 0.98, texture: 'Texture_StrawWeave', repeat: 3.2, normalScale: 0.52 },
+  Straw: { color: AlbedoOf('Straw', Palette.Straw), roughness: 0.98, texture: 'Texture_StrawWeave', repeat: 2.6, normalScale: 0.52 },
+  Paper: { color: AlbedoOf('Paper', Palette.Paper), roughness: 0.88, texture: 'Texture_PaperGrain', repeat: 1, normalScale: 0.15 },
+  PaperWindow: { color: AlbedoOf('PaperWindow', Palette.PaperWindow), roughness: 0.84, texture: 'Texture_PaperGrain', repeat: 1, normalScale: 0.15, transparent: true, opacity: 0.88, side: 'double' },
+  ClothCoarse: { color: AlbedoOf('ClothCoarse', Palette.ClothCoarse), roughness: 0.96, texture: 'Texture_ClothWeave', repeat: 3, normalScale: 0.25 },
+  ClothPadded: { color: AlbedoOf('ClothPadded', Palette.ClothPadded), roughness: 0.98, texture: 'Texture_ClothWeave', repeat: 1.6, normalScale: 0.32 },
+  FabricGray: { color: AlbedoOf('FabricGray', Palette.FabricGray), roughness: 0.95, texture: 'Texture_ClothWeave', repeat: 1.8, normalScale: 0.29 },
+  FabricKhaki: { color: AlbedoOf('FabricKhaki', Palette.FabricKhaki), roughness: 0.95, texture: 'Texture_ClothWeave', repeat: 1.8, normalScale: 0.29 },
+  FabricBlue: { color: AlbedoOf('FabricBlue', Palette.FabricBlue), roughness: 0.95, texture: 'Texture_ClothWeave', repeat: 1.8, normalScale: 0.29 },
+  FabricRed: { color: AlbedoOf('FabricRed', Palette.FabricRed), roughness: 0.90, texture: 'Texture_ClothWeave', repeat: 3, normalScale: 0.21 },
+  Fur: { color: AlbedoOf('Fur', Palette.Fur), roughness: 1.0, texture: 'Texture_FurTuft', repeat: 3, normalScale: 0.42 },
   SkinPale: { color: AlbedoOf('SkinPale', Palette.SkinPale), roughness: 0.70 },
   SkinWeathered: { color: AlbedoOf('SkinWeathered', Palette.SkinWeathered), roughness: 0.76 },
   MetalDull: { color: AlbedoOf('MetalDull', Palette.MetalDull), roughness: 0.52, metalness: 0.62 },
-  MetalRust: { color: AlbedoOf('MetalRust', Palette.MetalRust), roughness: 0.86, metalness: 0.22, texture: 'Texture_MetalRust', repeat: 3, normalScale: 0.9 },
+  MetalRust: { color: AlbedoOf('MetalRust', Palette.MetalRust), roughness: 0.86, metalness: 0.22, texture: 'Texture_MetalRust', repeat: 3, normalScale: 0.38 },
   Gunmetal: { color: AlbedoOf('Gunmetal', Palette.Gunmetal), roughness: 0.38, metalness: 0.78 },
   Glass: { color: 0x9fb2bd, roughness: 0.08, metalness: 0.10, transparent: true, opacity: 0.32 },
   Water: { color: 0x3b4a56, roughness: 0.12, metalness: 0.24, transparent: true, opacity: 0.84 },
-  Sandbag: { color: 0x86795e, roughness: 0.98, texture: 'Texture_ClothWeave', repeat: 1.6, normalScale: 1.0 },
+  Sandbag: { color: 0x86795e, roughness: 0.98, texture: 'Texture_ClothWeave', repeat: 1.6, normalScale: 0.42 },
   BarbedWire: { color: AlbedoOf('BarbedWire', Palette.BarbedWire), roughness: 0.58, metalness: 0.52 },
-  CanvasTent: { color: 0x7a7460, roughness: 0.96, texture: 'Texture_ClothWeave', repeat: 2.4, normalScale: 0.8 },
-  Foliage: { color: AlbedoOf('Foliage', Palette.Foliage), roughness: 0.93, texture: 'Texture_FoliageMask', repeat: 2, normalScale: 0.8, side: 'double' },
-  FoliageDead: { color: AlbedoOf('FoliageDead', Palette.FoliageDead), roughness: 0.96, texture: 'Texture_FoliageMask', repeat: 2, normalScale: 0.8, side: 'double' },
+  CanvasTent: { color: 0x7a7460, roughness: 0.96, texture: 'Texture_ClothWeave', repeat: 2.4, normalScale: 0.34 },
+  Foliage: { color: AlbedoOf('Foliage', Palette.Foliage), roughness: 0.93, texture: 'Texture_FoliageMask', repeat: 2, normalScale: 0.34, side: 'double' },
+  FoliageDead: { color: AlbedoOf('FoliageDead', Palette.FoliageDead), roughness: 0.96, texture: 'Texture_FoliageMask', repeat: 2, normalScale: 0.34, side: 'double' },
 };
 
 /* ------------------------------------------------------------------ *
@@ -977,7 +1024,7 @@ const SkyFragmentShader = [
 
   /* 云：把方向投到一个高空平面上，越靠地平线云被压得越扁——这是真实的透视 */
   '  float lift = max(dir.y, 0.045);',
-  '  vec2 cloudUv = dir.xz / lift * 0.30 + uCloudOffset;',
+  '  vec2 cloudUv = dir.xz / lift * 2.4 + uCloudOffset;',
   '  float shape = SkyFbm(cloudUv);',
   '  float edge = mix(0.55, 0.06, clamp(uCloudCover, 0.0, 1.0));',
   '  float cover = smoothstep(edge, edge + uCloudSharpness, shape);',
@@ -1023,10 +1070,12 @@ const SkyFragmentShader = [
 const RidgeVertexShader = [
   'varying float vRidgeHeight;',
   'varying float vRidgeSnow;',
+  'varying float vRidgeWorldY;',
   'attribute float aSnow;',
   'void main() {',
   '  vRidgeHeight = uv.y;',
   '  vRidgeSnow = aSnow;',
+  '  vRidgeWorldY = position.y;',
   '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
   '}',
 ].join('\n');
@@ -1036,13 +1085,31 @@ const RidgeFragmentShader = [
   'uniform vec3 uTop;',
   'uniform vec3 uSnow;',
   'uniform float uSnowAmount;',
+  'uniform float uFogDensity;',
+  'uniform float uFogFalloff;',
+  'uniform float uFogBaseY;',
+  'uniform float uFogCameraY;',
+  'uniform vec3 uFogGround;',
+  'uniform vec3 uFogSky;',
+  'uniform float uDistance;',
   'varying float vRidgeHeight;',
   'varying float vRidgeSnow;',
+  'varying float vRidgeWorldY;',
   'void main() {',
   '  vec3 color = mix(uBase, uTop, pow(clamp(vRidgeHeight, 0.0, 1.0), 0.75));',
   /* 山脊线附近的积雪：只在高处、且只在朝上的坡面（用顶点烘好的 aSnow 近似） */
   '  float snowMask = smoothstep(0.55, 0.96, vRidgeHeight) * vRidgeSnow * uSnowAmount;',
   '  color = mix(color, uSnow, snowMask);',
+  /* 远山吃**同一套高度雾**：山脚埋进雾里（所以看不到那条悬空的底边），
+     山顶因为高出雾层而留下来。暴雪时整座山被白毛风吃掉——这是对的，
+     不是"山消失了"，是你根本看不到三百米外。 */
+  '  float atCamera = exp(-max(uFogCameraY - uFogBaseY, 0.0) * uFogFalloff);',
+  '  float atFragment = exp(-max(vRidgeWorldY - uFogBaseY, 0.0) * uFogFalloff);',
+  '  float term = uFogDensity * (atCamera + atFragment) * 0.5 * uDistance;',
+  '  float fogAmount = clamp(1.0 - exp(-term * term), 0.0, 1.0);',
+  '  float dirY = clamp((vRidgeWorldY - uFogCameraY) / max(uDistance, 0.001), -1.0, 1.0);',
+  '  vec3 fogTint = mix(uFogGround, uFogSky, smoothstep(-0.30, 0.62, dirY));',
+  '  color = mix(color, fogTint, fogAmount);',
   '  gl_FragColor = vec4(color, 1.0);',
   '}',
 ].join('\n');
@@ -1056,8 +1123,9 @@ function BuildRidgeGeometry(three, options) {
   const radius = options.radius;
   const height = options.height;
   const seed = options.seed || 0;
-  const baseY = options.baseY === undefined ? -40 : options.baseY;
+  const baseY = options.baseY === undefined ? -60 : options.baseY;
   const positions = new Float32Array((segments + 1) * 2 * 3);
+  const normals = new Float32Array((segments + 1) * 2 * 3);
   const uvs = new Float32Array((segments + 1) * 2 * 2);
   const snow = new Float32Array((segments + 1) * 2);
   const indices = [];
@@ -1065,15 +1133,18 @@ function BuildRidgeGeometry(three, options) {
   for (let i = 0; i <= segments; i += 1) {
     const turn = i / segments;
     /* 用可平铺 fbm 采环，保证首尾接得上 */
-    const ridge = TileFbm(turn * 9 + seed, seed * 0.37, 9, 4, 0.52);
-    const peaks = TileRidge(turn * 4 + seed * 1.7, seed * 0.11 + 3, 4, 3);
-    profile[i] = MathUtil.Clamp01(ridge * 0.55 + peaks * 0.45);
+    /* 太行山不是丘陵：大块山体 + 尖锐主峰 + 碎裂的次级齿口。
+       ridge 噪声取幂是为了把圆钝的峰"掐尖"，天际线才有骨头。 */
+    const bulk = TileFbm(turn * 5 + seed, seed * 0.37, 5, 3, 0.50);
+    const peaks = Math.pow(TileRidge(turn * 11 + seed * 1.7, seed * 0.11 + 3, 11, 3), 1.7);
+    const jag = Math.pow(TileRidge(turn * 23 + seed * 2.3, seed * 0.23 + 7, 23, 2), 2.4);
+    profile[i] = MathUtil.Clamp01(bulk * 0.40 + peaks * 0.42 + jag * 0.18);
   }
   for (let i = 0; i <= segments; i += 1) {
     const angle = (i / segments) * Math.PI * 2;
     const x = Math.sin(angle) * radius;
     const z = Math.cos(angle) * radius;
-    const top = baseY + height * (0.30 + profile[i] * 0.70);
+    const top = baseY + height * (0.12 + profile[i] * 0.88);
     const prev = profile[(i - 1 + segments) % segments];
     const next = profile[(i + 1) % segments];
     /* 坡度小 = 顶面平 = 挂得住雪 */
@@ -1082,6 +1153,12 @@ function BuildRidgeGeometry(three, options) {
     const base = i * 6;
     positions[base] = x; positions[base + 1] = baseY; positions[base + 2] = z;
     positions[base + 3] = x; positions[base + 4] = top; positions[base + 5] = z;
+    /* 法线朝环内（朝相机）。着色器用不到，但 three 会为 ShaderMaterial 声明该属性，
+       声明了却不提供 buffer 会让整次 draw 被丢弃——这条曾经让远山整层消失。 */
+    const inwardX = -Math.sin(angle);
+    const inwardZ = -Math.cos(angle);
+    normals[base] = inwardX; normals[base + 1] = 0; normals[base + 2] = inwardZ;
+    normals[base + 3] = inwardX; normals[base + 4] = 0; normals[base + 5] = inwardZ;
     const uvBase = i * 4;
     uvs[uvBase] = i / segments; uvs[uvBase + 1] = 0;
     uvs[uvBase + 2] = i / segments; uvs[uvBase + 3] = 1;
@@ -1094,6 +1171,7 @@ function BuildRidgeGeometry(three, options) {
   }
   const geometry = new three.BufferGeometry();
   geometry.setAttribute('position', new three.BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new three.BufferAttribute(normals, 3));
   geometry.setAttribute('uv', new three.BufferAttribute(uvs, 2));
   geometry.setAttribute('aSnow', new three.BufferAttribute(snow, 1));
   geometry.setIndex(indices);
@@ -1103,14 +1181,14 @@ function BuildRidgeGeometry(three, options) {
 
 function CreateRidgeLayers(three, parent) {
   const specs = [
-    { radius: 165, height: 46, seed: 3.1, parallax: 0.80, order: -9 },
-    { radius: 245, height: 74, seed: 11.7, parallax: 0.89, order: -8 },
-    { radius: 335, height: 108, seed: 23.9, parallax: 0.95, order: -7 },
+    { radius: 150, height: 104, seed: 3.1, parallax: 0.74, order: -7 },
+    { radius: 236, height: 152, seed: 11.7, parallax: 0.86, order: -8 },
+    { radius: 296, height: 200, seed: 23.9, parallax: 0.94, order: -9 },
   ];
   const layers = specs.map((spec, index) => {
     const geometry = BuildRidgeGeometry(three, {
       radius: spec.radius, height: spec.height, seed: spec.seed,
-      segments: index === 0 ? 190 : 140, baseY: -50,
+      segments: index === 0 ? 190 : 140, baseY: -60,
     });
     const material = new three.ShaderMaterial({
       uniforms: {
@@ -1118,12 +1196,19 @@ function CreateRidgeLayers(three, parent) {
         uTop: { value: new three.Color(0x8b99a8) },
         uSnow: { value: new three.Color(0xc6d0da) },
         uSnowAmount: { value: 0.6 },
+        uFogDensity: { value: 0.014 },
+        uFogFalloff: { value: 0.09 },
+        uFogBaseY: { value: -2 },
+        uFogCameraY: { value: 1.7 },
+        uFogGround: { value: new three.Color(0xb3bfca) },
+        uFogSky: { value: new three.Color(0x9fb0c2) },
+        uDistance: { value: spec.radius },
       },
       vertexShader: RidgeVertexShader,
       fragmentShader: RidgeFragmentShader,
       side: three.DoubleSide,
       depthWrite: false,
-      depthTest: false,
+      depthTest: true,
       fog: false,
     });
     const mesh = new three.Mesh(geometry, material);
@@ -1160,6 +1245,17 @@ function CreateRidgeLayers(three, parent) {
     SetVisible(visible) {
       for (let i = 0; i < layers.length; i += 1) layers[i].mesh.visible = visible;
     },
+    SyncFog(fogUniforms) {
+      for (let i = 0; i < layers.length; i += 1) {
+        const target = layers[i].material.uniforms;
+        target.uFogDensity.value = fogUniforms.uFogDensity.value;
+        target.uFogFalloff.value = fogUniforms.uFogFalloff.value;
+        target.uFogBaseY.value = fogUniforms.uFogBaseY.value;
+        target.uFogCameraY.value = fogUniforms.uFogCameraY.value;
+        target.uFogGround.value.copy(fogUniforms.uFogGround.value);
+        target.uFogSky.value.copy(fogUniforms.uFogSky.value);
+      }
+    },
     Dispose() {
       for (let i = 0; i < layers.length; i += 1) {
         layers[i].mesh.geometry.dispose();
@@ -1178,6 +1274,11 @@ function CreateRidgeLayers(three, parent) {
  * 一个 InstancedMesh = 1 个 draw call。
  * ================================================================== */
 
+/**
+ * 雾片是**面向相机的横幅**，不是贴地的水平片。
+ * 水平片从 1.7 米的视高看过去几乎是一条线，等于白画；
+ * 面向相机的宽扁软片才读得出"雾在地面上淌"。
+ */
 const MistVertexShader = [
   'attribute float aSeed;',
   'attribute float aScale;',
@@ -1192,19 +1293,19 @@ const MistVertexShader = [
   'void main() {',
   '  vMistUv = uv;',
   '  vMistSeed = aSeed;',
-  '  float spin = uTime * (0.035 + aSeed * 0.05) + aSeed * 6.283;',
-  '  float cs = cos(spin); float sn = sin(spin);',
-  '  vec3 local = vec3(position.x * cs - position.z * sn, position.y, position.x * sn + position.z * cs) * aScale;',
   /* 以相机为中心的环绕格：飘出去就从另一侧绕回来，永远不会"走出雾区" */
-  '  vec2 cell = vec2(aSeed * 37.13, aSeed * 91.71);',
+  '  vec2 cell = vec2(aSeed * 37.13, fract(aSeed * 91.71));',
   '  vec2 drift = uDrift * uTime * (0.35 + aSeed * 0.4);',
-  '  vec2 origin = fract((cell + drift) / uSpan) * uSpan - uSpan * 0.5;',
-  '  vec3 world = vec3(uCameraPosition.x + origin.x, aHeight, uCameraPosition.z + origin.y) + local;',
-  '  vec4 mv = viewMatrix * vec4(world, 1.0);',
-  '  float depth = -mv.z;',
-  /* 贴到镜头上会穿帮，近处强制淡出；太远交给高度雾 */
-  '  vMistFade = smoothstep(1.5, 9.0, depth) * (1.0 - smoothstep(uSpan * 0.34, uSpan * 0.52, depth));',
-  '  gl_Position = projectionMatrix * mv;',
+  '  vec2 origin = fract(cell + drift / uSpan) * uSpan - uSpan * 0.5;',
+  '  vec3 world = vec3(uCameraPosition.x + origin.x, aHeight, uCameraPosition.z + origin.y);',
+  '  vec4 center = viewMatrix * vec4(world, 1.0);',
+  '  float breathe = 1.0 + sin(uTime * 0.22 + aSeed * 6.283) * 0.12;',
+  /* 宽而扁：雾条的高宽比大约 1:3.2，横着铺开才像雾带 */
+  '  center.x += position.x * aScale * breathe;',
+  '  center.y += position.y * aScale * 0.31 * breathe;',
+  '  float depth = -center.z;',
+  '  vMistFade = smoothstep(2.5, 11.0, depth) * (1.0 - smoothstep(uSpan * 0.30, uSpan * 0.50, depth));',
+  '  gl_Position = projectionMatrix * center;',
   '}',
 ].join('\n');
 
@@ -1225,7 +1326,6 @@ const MistFragmentShader = [
 
 function CreateGroundMist(three, parent, sprite, capacity) {
   const plane = new three.PlaneGeometry(1, 1);
-  plane.rotateX(-Math.PI / 2);
   const geometry = new three.InstancedBufferGeometry();
   geometry.index = plane.index;
   geometry.attributes.position = plane.attributes.position;
@@ -1236,8 +1336,8 @@ function CreateGroundMist(three, parent, sprite, capacity) {
   const heights = new Float32Array(capacity);
   for (let i = 0; i < capacity; i += 1) {
     seeds[i] = MathUtil.Hash1(i * 2.71 + 0.3);
-    scales[i] = 26 + MathUtil.Hash1(i * 5.13) * 34;
-    heights[i] = 0.25 + MathUtil.Hash1(i * 9.37) * 2.6;
+    scales[i] = 12 + MathUtil.Hash1(i * 5.13) * 22;
+    heights[i] = 0.35 + MathUtil.Hash1(i * 9.37) * 1.5;
   }
   geometry.setAttribute('aSeed', new three.InstancedBufferAttribute(seeds, 1));
   geometry.setAttribute('aScale', new three.InstancedBufferAttribute(scales, 1));
@@ -1252,7 +1352,7 @@ function CreateGroundMist(three, parent, sprite, capacity) {
       uOpacity: { value: 0.30 },
       uTime: { value: 0 },
       uDrift: { value: new three.Vector2(0.4, 0.2) },
-      uSpan: { value: 110 },
+      uSpan: { value: 72 },
       uCameraPosition: { value: new three.Vector3() },
     },
     vertexShader: MistVertexShader,
@@ -1830,6 +1930,7 @@ function CreateDecalField(three, parent, options) {
   mesh.frustumCulled = false;
   mesh.instanceMatrix.setUsage(three.DynamicDrawUsage);
   mesh.count = 0;
+  mesh.visible = false;
   mesh.renderOrder = options.renderOrder === undefined ? 2 : options.renderOrder;
   mesh.receiveShadow = false;
   mesh.castShadow = false;
@@ -1849,6 +1950,7 @@ function CreateDecalField(three, parent, options) {
       const index = cursor;
       cursor = (cursor + 1) % capacity;
       if (mesh.count < capacity) mesh.count += 1;
+      mesh.visible = true;
       quaternion.setFromAxisAngle(axis, yaw);
       place.set(x, y, z);
       scale.set(width, 1, length);
@@ -1864,6 +1966,7 @@ function CreateDecalField(three, parent, options) {
     SetColor(color) { material.color.copy(color); },
     Clear() {
       mesh.count = 0;
+      mesh.visible = false;
       cursor = 0;
       for (let i = 0; i < capacity; i += 1) birth[i] = -1000;
       geometry.attributes.aBirth.needsUpdate = true;
@@ -1898,8 +2001,8 @@ const FireQuadVertexShader = [
   '  float wobble = sin(phase) * 0.10 + sin(phase * 1.87) * 0.05;',
   '  float lift = 1.0 + sin(phase * 0.83) * 0.16 * uFlicker;',
   '  vec3 local = position;',
-  '  local.x = (local.x + wobble * (1.0 - uv.y)) * uScale * (0.72 + aIndex * 0.22);',
-  '  local.y = local.y * uScale * lift * (0.85 + aIndex * 0.25);',
+  '  local.x = (local.x + wobble * uv.y) * uScale * (1.05 - aIndex * 0.24);',
+  '  local.y = local.y * uScale * lift * (0.72 + aIndex * 0.30);',
   /* 永远面向相机：只取 modelView 的位移，旋转用单位阵 */
   '  vec4 center = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);',
   '  center.xy += local.xy;',
@@ -1922,15 +2025,15 @@ const FireQuadFragmentShader = [
 
 /** 火舌：两片错位的billboard，UV 原点在底部中心。 */
 function CreateFireQuads(three, flameSprite) {
-  const plane = new three.PlaneGeometry(1, 1.6);
-  plane.translate(0, 0.8, 0);
+  const plane = new three.PlaneGeometry(1.5, 1.15);
+  plane.translate(0, 0.575, 0);
   const geometry = new three.InstancedBufferGeometry();
   geometry.index = plane.index;
   geometry.attributes.position = plane.attributes.position;
   geometry.attributes.uv = plane.attributes.uv;
-  const indices = new Float32Array([0, 1]);
+  const indices = new Float32Array([0, 1, 2]);
   geometry.setAttribute('aIndex', new three.InstancedBufferAttribute(indices, 1));
-  geometry.instanceCount = 2;
+  geometry.instanceCount = 3;
   geometry.boundingSphere = new three.Sphere(new three.Vector3(), 4);
   const material = new three.ShaderMaterial({
     uniforms: {
@@ -2137,6 +2240,9 @@ const GradeShader = {
     uDesaturation: { value: Config.Render.desaturationBase },
     uHurt: { value: 0 },
     uFrost: { value: 0 },
+    uShadowLift: { value: 0.016 },
+    uLiftColor: { value: new THREE.Color(0.56, 0.70, 0.92) },
+    uLiftRange: { value: 0.11 },
     uLetterbox: { value: 0 },
     uFlashColor: { value: new THREE.Color(1, 1, 1) },
     uFlashStrength: { value: 0 },
@@ -2158,6 +2264,9 @@ const GradeShader = {
     'uniform float uDesaturation;',
     'uniform float uHurt;',
     'uniform float uFrost;',
+    'uniform float uShadowLift;',
+    'uniform vec3 uLiftColor;',
+    'uniform float uLiftRange;',
     'uniform float uLetterbox;',
     'uniform vec3 uFlashColor;',
     'uniform float uFlashStrength;',
@@ -2181,6 +2290,11 @@ const GradeShader = {
     '    color = texture2D(tDiffuse, vUv).rgb;',
     '  }',
     '  float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));',
+    '  if (uShadowLift > 0.0001) {',
+    '    float toe = 1.0 - smoothstep(0.0, uLiftRange, luma);',
+    '    color += uLiftColor * uShadowLift * toe * toe;',
+    '    luma = dot(color, vec3(0.2126, 0.7152, 0.0722));',
+    '  }',
     '  color = mix(color, vec3(luma), clamp(uDesaturation + uHurt * 0.42, 0.0, 1.0));',
     /* 受伤：边缘压向暗红，中心保持可读（玩家还得看得见路） */
     '  float hurtEdge = smoothstep(0.22, 1.0, radius) * uHurt;',
@@ -2232,36 +2346,36 @@ const MoodRigs = {
   ChapterSnowCellar: {
     start: {
       sunElevationDeg: 9, sunAzimuthDeg: 96, shadowElevationDeg: 24,
-      sunColor: 0xc6d3e2, sunIntensity: 2.35,
-      skyLightColor: 0x7b96b8, groundLightColor: 0xb4bfca, hemiIntensity: 0.72,
-      bounceColor: 0xa8bacd, bounceIntensity: 0.42,
-      ambientColor: 0x4e5c6e, ambientIntensity: 0.20,
+      sunColor: 0xc6d3e2, sunIntensity: 4.30,
+      skyLightColor: 0x8aa6c6, groundLightColor: 0xcbd5df, hemiIntensity: 1.30,
+      bounceColor: 0xaec0d2, bounceIntensity: 0.50,
+      ambientColor: 0x6b7d93, ambientIntensity: 0.30,
       zenith: 0x4b5c72, horizon: 0xb2bfcb, hazeColor: 0xb6c2cd, hazeAmount: 0.62,
       cloudDark: 0x7c8b9c, cloudLight: 0xc3ced9, cloudCover: 0.52, cloudSharpness: 0.30, cloudSpeed: 0.0035,
       sunDiskColor: 0xdfe6ee, sunDiskStrength: 0.55, sunHalo: 0.30, stars: 0.0,
       fogDensity: 0.0150, fogFalloff: 0.115, fogBaseY: -1.5,
       fogGround: 0xb0bdc9, fogSky: 0x9db0c4, fogSun: 0xd2d0c9, fogInscatter: 0.40,
-      ridgeNear: 0x62717f, ridgeFar: 0xa5b2be, ridgeSnow: 0xc9d3dc, ridgeSnowAmount: 0.55,
-      mistColor: 0xbcc7d2, mistOpacity: 0.34, mistCount: 1.0,
+      ridgeNear: 0x475463, ridgeFar: 0x8b9aab, ridgeSnow: 0xc4cfda, ridgeSnowAmount: 0.62,
+      mistColor: 0xc2ccd6, mistOpacity: 0.50, mistCount: 1.0,
       snowColor: 0xe8eff6, snowRateScale: 1.0,
-      exposure: 1.02, vignette: 0.40, desaturation: 0.15, godray: 0.55, godrayTint: 0xd9dfe6, bloom: 1.0,
+      shadowLift: 0.020, exposure: 0.94, vignette: 0.40, desaturation: 0.15, godray: 0.55, godrayTint: 0xd9dfe6, bloom: 1.0,
       footprintColor: 0x5a6b7e, ambientLevel: 0.46,
     },
     end: {
       sunElevationDeg: 15, sunAzimuthDeg: 102, shadowElevationDeg: 30,
-      sunColor: 0xcfdae6, sunIntensity: 2.55,
-      skyLightColor: 0x829cbd, groundLightColor: 0xb9c4cf, hemiIntensity: 0.78,
-      bounceColor: 0xacbed0, bounceIntensity: 0.44,
-      ambientColor: 0x536173, ambientIntensity: 0.21,
+      sunColor: 0xcfdae6, sunIntensity: 4.55,
+      skyLightColor: 0x90abc9, groundLightColor: 0xd0d9e2, hemiIntensity: 1.36,
+      bounceColor: 0xb2c3d4, bounceIntensity: 0.52,
+      ambientColor: 0x718398, ambientIntensity: 0.31,
       zenith: 0x51637a, horizon: 0xb8c5d0, hazeColor: 0xbac6d1, hazeAmount: 0.54,
       cloudDark: 0x82909f, cloudLight: 0xc9d3de, cloudCover: 0.48, cloudSharpness: 0.32, cloudSpeed: 0.0038,
       sunDiskColor: 0xe6ecf2, sunDiskStrength: 0.70, sunHalo: 0.34, stars: 0.0,
       fogDensity: 0.0126, fogFalloff: 0.125, fogBaseY: -1.5,
       fogGround: 0xb4c0cb, fogSky: 0xa2b4c6, fogSun: 0xd6d4cd, fogInscatter: 0.42,
-      ridgeNear: 0x677683, ridgeFar: 0xa9b5c1, ridgeSnow: 0xcdd6df, ridgeSnowAmount: 0.58,
-      mistColor: 0xc0cbd5, mistOpacity: 0.27, mistCount: 0.85,
+      ridgeNear: 0x4c5967, ridgeFar: 0x909eae, ridgeSnow: 0xc8d2dc, ridgeSnowAmount: 0.64,
+      mistColor: 0xc6cfd9, mistOpacity: 0.40, mistCount: 0.85,
       snowColor: 0xeaf1f7, snowRateScale: 1.0,
-      exposure: 1.04, vignette: 0.38, desaturation: 0.14, godray: 0.62, godrayTint: 0xdde3ea, bloom: 1.0,
+      shadowLift: 0.019, exposure: 0.95, vignette: 0.38, desaturation: 0.14, godray: 0.62, godrayTint: 0xdde3ea, bloom: 1.0,
       footprintColor: 0x5e6f82, ambientLevel: 0.50,
     },
   },
@@ -2270,36 +2384,36 @@ const MoodRigs = {
   ChapterBrokenValley: {
     start: {
       sunElevationDeg: 46, sunAzimuthDeg: 172, shadowElevationDeg: 46,
-      sunColor: 0xe4ebf2, sunIntensity: 2.05,
-      skyLightColor: 0x93a9c0, groundLightColor: 0xc6ced7, hemiIntensity: 1.00,
-      bounceColor: 0xbcc7d2, bounceIntensity: 0.50,
-      ambientColor: 0x66717f, ambientIntensity: 0.26,
+      sunColor: 0xe4ebf2, sunIntensity: 3.20,
+      skyLightColor: 0x9fb5cb, groundLightColor: 0xd8dee5, hemiIntensity: 1.85,
+      bounceColor: 0xc4ced8, bounceIntensity: 0.62,
+      ambientColor: 0x828d9b, ambientIntensity: 0.38,
       zenith: 0x76889b, horizon: 0xc6d0da, hazeColor: 0xc4ced8, hazeAmount: 0.44,
       cloudDark: 0x8e9ba9, cloudLight: 0xd4dce4, cloudCover: 0.80, cloudSharpness: 0.42, cloudSpeed: 0.0050,
       sunDiskColor: 0xf0f4f8, sunDiskStrength: 0.42, sunHalo: 0.26, stars: 0.0,
       fogDensity: 0.0092, fogFalloff: 0.150, fogBaseY: -2.5,
       fogGround: 0xc0c9d2, fogSky: 0xb6c2ce, fogSun: 0xdfe4e9, fogInscatter: 0.20,
-      ridgeNear: 0x74818e, ridgeFar: 0xb4bfca, ridgeSnow: 0xd2dae2, ridgeSnowAmount: 0.62,
-      mistColor: 0xc6cfd8, mistOpacity: 0.15, mistCount: 0.55,
+      ridgeNear: 0x5b6875, ridgeFar: 0x9dabb8, ridgeSnow: 0xd0d8e1, ridgeSnowAmount: 0.66,
+      mistColor: 0xcbd3db, mistOpacity: 0.22, mistCount: 0.55,
       snowColor: 0xecf1f6, snowRateScale: 1.0,
-      exposure: 1.10, vignette: 0.33, desaturation: 0.26, godray: 0.30, godrayTint: 0xe4e9ee, bloom: 0.85,
+      shadowLift: 0.014, exposure: 0.98, vignette: 0.33, desaturation: 0.26, godray: 0.30, godrayTint: 0xe4e9ee, bloom: 0.85,
       footprintColor: 0x6b7787, ambientLevel: 0.74,
     },
     end: {
       sunElevationDeg: 38, sunAzimuthDeg: 202, shadowElevationDeg: 40,
-      sunColor: 0xdfe7ef, sunIntensity: 1.90,
-      skyLightColor: 0x8ba1b8, groundLightColor: 0xc0c9d3, hemiIntensity: 0.94,
-      bounceColor: 0xb6c1cd, bounceIntensity: 0.48,
-      ambientColor: 0x5f6a78, ambientIntensity: 0.25,
+      sunColor: 0xdfe7ef, sunIntensity: 3.00,
+      skyLightColor: 0x98aec5, groundLightColor: 0xd2d9e1, hemiIntensity: 1.72,
+      bounceColor: 0xbec9d4, bounceIntensity: 0.60,
+      ambientColor: 0x7b8695, ambientIntensity: 0.20,
       zenith: 0x6f8194, horizon: 0xc0cad5, hazeColor: 0xbec9d4, hazeAmount: 0.50,
       cloudDark: 0x86929f, cloudLight: 0xced7e0, cloudCover: 0.86, cloudSharpness: 0.38, cloudSpeed: 0.0058,
       sunDiskColor: 0xe9eef4, sunDiskStrength: 0.30, sunHalo: 0.22, stars: 0.0,
       fogDensity: 0.0108, fogFalloff: 0.140, fogBaseY: -2.5,
       fogGround: 0xbac4ce, fogSky: 0xb0bcc9, fogSun: 0xd9dfe5, fogInscatter: 0.18,
-      ridgeNear: 0x6d7a87, ridgeFar: 0xaeb9c5, ridgeSnow: 0xccd5de, ridgeSnowAmount: 0.60,
-      mistColor: 0xc0cad4, mistOpacity: 0.19, mistCount: 0.65,
+      ridgeNear: 0x556270, ridgeFar: 0x97a5b3, ridgeSnow: 0xcad3dd, ridgeSnowAmount: 0.64,
+      mistColor: 0xc5cdd7, mistOpacity: 0.28, mistCount: 0.65,
       snowColor: 0xe9eff5, snowRateScale: 1.0,
-      exposure: 1.09, vignette: 0.35, desaturation: 0.27, godray: 0.22, godrayTint: 0xdfe5eb, bloom: 0.85,
+      shadowLift: 0.015, exposure: 0.97, vignette: 0.35, desaturation: 0.27, godray: 0.22, godrayTint: 0xdfe5eb, bloom: 0.85,
       footprintColor: 0x66727f, ambientLevel: 0.68,
     },
   },
@@ -2309,38 +2423,38 @@ const MoodRigs = {
     start: {
       sunElevationDeg: 5, sunAzimuthDeg: 258, shadowElevationDeg: 22,
       /* 黄昏的最后一点光：饱和度压得极低，它在"死"，不与火争暖色 */
-      sunColor: 0x9a9490, sunIntensity: 1.25,
-      skyLightColor: 0x5d7086, groundLightColor: 0x8b96a3, hemiIntensity: 0.62,
-      bounceColor: 0x7f8c9b, bounceIntensity: 0.32,
-      ambientColor: 0x333e4b, ambientIntensity: 0.18,
+      sunColor: 0x9a9490, sunIntensity: 2.10,
+      skyLightColor: 0x6b8098, groundLightColor: 0x9aa5b2, hemiIntensity: 1.05,
+      bounceColor: 0x8b98a7, bounceIntensity: 0.40,
+      ambientColor: 0x4a586a, ambientIntensity: 0.26,
       zenith: 0x2c3745, horizon: 0x7f8794, hazeColor: 0x7d8895, hazeAmount: 0.78,
       cloudDark: 0x4d5764, cloudLight: 0x8b95a2, cloudCover: 0.90, cloudSharpness: 0.30, cloudSpeed: 0.014,
       /* 地平线那一点余烬：极小面积、极低饱和，t 一走就没 */
       sunDiskColor: 0x8a6f5c, sunDiskStrength: 0.30, sunHalo: 0.30, stars: 0.0,
       fogDensity: 0.0330, fogFalloff: 0.055, fogBaseY: -3.0,
       fogGround: 0x77828f, fogSky: 0x6e7a88, fogSun: 0x8a8079, fogInscatter: 0.20,
-      ridgeNear: 0x3f4a57, ridgeFar: 0x76828f, ridgeSnow: 0x9aa6b3, ridgeSnowAmount: 0.42,
-      mistColor: 0x8b96a3, mistOpacity: 0.44, mistCount: 1.0,
+      ridgeNear: 0x2d3844, ridgeFar: 0x616e7c, ridgeSnow: 0x8b98a6, ridgeSnowAmount: 0.48,
+      mistColor: 0x94a0ad, mistOpacity: 0.60, mistCount: 1.0,
       snowColor: 0xdde6ef, snowRateScale: 1.0,
-      exposure: 1.12, vignette: 0.46, desaturation: 0.28, godray: 0.18, godrayTint: 0xa8a49e, bloom: 1.15,
+      shadowLift: 0.017, exposure: 1.04, vignette: 0.46, desaturation: 0.28, godray: 0.18, godrayTint: 0xa8a49e, bloom: 1.15,
       footprintColor: 0x39434f, ambientLevel: 0.30,
     },
     end: {
       sunElevationDeg: 34, sunAzimuthDeg: 300, shadowElevationDeg: 34,
       /* 深夜只剩云层透下来的散射，方向光几乎只是给轮廓一点边缘 */
-      sunColor: 0x4f6180, sunIntensity: 0.52,
-      skyLightColor: 0x2c3a4c, groundLightColor: 0x424e5c, hemiIntensity: 0.46,
-      bounceColor: 0x3a4756, bounceIntensity: 0.22,
-      ambientColor: 0x151c25, ambientIntensity: 0.13,
+      sunColor: 0x4f6180, sunIntensity: 0.95,
+      skyLightColor: 0x36485f, groundLightColor: 0x4e5b6b, hemiIntensity: 0.62,
+      bounceColor: 0x445264, bounceIntensity: 0.24,
+      ambientColor: 0x232e3d, ambientIntensity: 0.17,
       zenith: 0x0e131a, horizon: 0x2f3944, hazeColor: 0x2e3844, hazeAmount: 0.86,
       cloudDark: 0x1a222c, cloudLight: 0x3d4854, cloudCover: 0.94, cloudSharpness: 0.26, cloudSpeed: 0.020,
       sunDiskColor: 0x54627a, sunDiskStrength: 0.10, sunHalo: 0.16, stars: 0.35,
       fogDensity: 0.0520, fogFalloff: 0.045, fogBaseY: -3.0,
       fogGround: 0x2c343d, fogSky: 0x333d49, fogSun: 0x3a434f, fogInscatter: 0.12,
-      ridgeNear: 0x161d25, ridgeFar: 0x323c48, ridgeSnow: 0x4a5764, ridgeSnowAmount: 0.30,
-      mistColor: 0x3d4855, mistOpacity: 0.52, mistCount: 1.0,
+      ridgeNear: 0x0d1219, ridgeFar: 0x27303b, ridgeSnow: 0x3d4954, ridgeSnowAmount: 0.34,
+      mistColor: 0x46525f, mistOpacity: 0.68, mistCount: 1.0,
       snowColor: 0xc8d4e0, snowRateScale: 1.0,
-      exposure: 1.20, vignette: 0.54, desaturation: 0.30, godray: 0.05, godrayTint: 0x6a7688, bloom: 1.35,
+      shadowLift: 0.011, exposure: 1.16, vignette: 0.54, desaturation: 0.30, godray: 0.05, godrayTint: 0x6a7688, bloom: 1.35,
       footprintColor: 0x1d242c, ambientLevel: 0.13,
     },
   },
@@ -2512,7 +2626,7 @@ export function CreateArt(ctx, options) {
 
   const snowNear = CreateSnowField(THREE, effectsGroup, {
     name: 'PointsSnowNear', capacity: QualityProfiles.high.snowNear, span: 26, ceiling: 16,
-    sizeMin: 0.055, sizeMax: 0.16, alphaMin: 0.30, alphaMax: 0.85, sway: 0.35,
+    sizeMin: 0.040, sizeMax: 0.105, alphaMin: 0.22, alphaMax: 0.62, sway: 0.35,
     seed: 1.3, sprite: flakeSprite, renderOrder: 6,
   });
   const snowFar = CreateSnowField(THREE, effectsGroup, {
@@ -2644,6 +2758,9 @@ export function CreateArt(ctx, options) {
   let elapsed = 0;
   let cloudDrift = 0;
   let lastWorld = null;
+  let breathTimer = 1.2;
+  let companionBreathTimer = 2.4;
+  let gustCooldown = 6;
   let pixelScale = 400;
   let viewportHeight = 900;
 
@@ -2733,6 +2850,7 @@ export function CreateArt(ctx, options) {
     footprintDecals.SetColor(moodColorA.setHex(spec.footprintColor));
     impactDecals.SetColor(moodColorA.setHex(MixHex(spec.footprintColor, 0x2a2320, 0.5)));
 
+    gradePass.uniforms.uShadowLift.value = spec.shadowLift;
     screen.vignetteBase = spec.vignette;
     screen.desaturationBase = spec.desaturation;
     godRayPass.uniforms.uStrength.value = spec.godray;
@@ -2984,11 +3102,11 @@ export function CreateArt(ctx, options) {
       light.castShadow = false;
       group.add(light);
       const flame = CreateFireQuads(THREE, library.GetTexture('Texture_Flame'));
-      flame.material.uniforms.uScale.value = 0.62 * scale;
+      flame.material.uniforms.uScale.value = 0.78 * scale;
       flame.mesh.position.set(0, 0.06, 0);
       group.add(flame.mesh);
-      const glow = CreateGlowSprite(THREE, dotSprite, Palette.Ember, 1.55 * scale);
-      glow.mesh.position.set(0, 0.45 * scale, 0);
+      const glow = CreateGlowSprite(THREE, dotSprite, Palette.Ember, 2.35 * scale);
+      glow.mesh.position.set(0, 0.34 * scale, 0);
       group.add(glow.mesh);
       effectsGroup.add(group);
       return MakeLightHandle({
@@ -3366,6 +3484,7 @@ export function CreateArt(ctx, options) {
       skyUniforms.uCloudOffset.value.set(cloudDrift * 1.0, cloudDrift * 0.42);
       skyUniforms.uSunDirection.value.copy(skySunDirection);
       ridges.Follow(camera.position);
+      ridges.SyncFog(fogUniforms);
 
       /* —— 6. 天气粒子 —— */
       const snowRate = MathUtil.Clamp01(weather.snowRate * moodNow.snowRateScale);
@@ -3408,7 +3527,7 @@ export function CreateArt(ctx, options) {
         if (record.kind === 'Fire') {
           record.emberTimer -= step;
           if (record.emberTimer <= 0) {
-            record.emberTimer = 0.06 + MathUtil.Hash1(elapsed * 3.1 + record.seed) * 0.10;
+            record.emberTimer = 0.035 + MathUtil.Hash1(elapsed * 3.1 + record.seed) * 0.06;
             const emberColor = scratchColor.setHex(MathUtil.Hash1(elapsed * 5.7) > 0.6 ? Palette.FireCore : Palette.Ember);
             poolGlow.Emit(
               record.group.position.x + (MathUtil.Hash1(elapsed * 9.3 + record.seed) - 0.5) * 0.35 * record.scale,
@@ -3417,7 +3536,7 @@ export function CreateArt(ctx, options) {
               (MathUtil.Hash1(elapsed * 13.1) - 0.5) * 0.5 + windX * 0.18,
               1.1 + MathUtil.Hash1(elapsed * 17.7) * 1.0,
               (MathUtil.Hash1(elapsed * 19.3) - 0.5) * 0.5 + windZ * 0.18,
-              0.030 + MathUtil.Hash1(elapsed * 23.9) * 0.022, emberColor,
+              0.045 + MathUtil.Hash1(elapsed * 23.9) * 0.035, emberColor,
               1.5 + MathUtil.Hash1(elapsed * 29.1) * 1.4, 0.35, 0.55, 1, 0,
             );
           }
@@ -3451,13 +3570,55 @@ export function CreateArt(ctx, options) {
         }
       }
 
-      /* —— 9. 阴影相机 —— */
+      /* —— 9. 呵气 / 潜行收边 / 阵风：这三件事没有别的模块会来驱动，Art 自己读 ctx 做 ——
+         纲领里"呵气"和"潜行时的边缘暗化"是点名要的氛围，等别人来调用只会永远没有。 */
+      const player = frameCtx && frameCtx.player;
+      if (player) {
+        breathTimer -= step;
+        if (breathTimer <= 0) {
+          /* 冷、累、跑起来，呼吸就急——白气的节奏本身就是状态显示 */
+          const speed = (player.state && player.state.speed) || 0;
+          const sprinting = !!(player.state && player.state.sprinting);
+          breathTimer = MathUtil.Lerp(2.6, 1.15, MathUtil.Clamp01(speed / 4.4)) * (sprinting ? 0.62 : 1);
+          if (typeof player.GetEyePosition === 'function' && typeof player.GetForward === 'function') {
+            player.GetEyePosition(scratchB);
+            player.GetForward(scratchC);
+            scratchB.addScaledVector(scratchC, 0.16).setY(scratchB.y - 0.08);
+            art.SpawnBreathPuff(scratchB, scratchC, 0.55 + MathUtil.Clamp01(speed / 4.4) * 0.75);
+          }
+        }
+        if (player.state) {
+          const crouched = player.state.stance === 'Crouch';
+          const prone = player.state.stance === 'Prone';
+          art.SetStealthMode(prone ? 1 : (crouched ? 0.6 : 0));
+        }
+      }
+      const companion = frameCtx && frameCtx.companion;
+      if (companion && companion.position) {
+        companionBreathTimer -= step;
+        if (companionBreathTimer <= 0) {
+          /* 小满个子小、呼吸快，白气更频更小——这是"她还在你旁边"的无声提示 */
+          companionBreathTimer = 1.5 + MathUtil.Hash1(elapsed * 3.7) * 1.0;
+          scratchB.set(companion.position.x, companion.position.y + 1.24, companion.position.z);
+          scratchC.set(Math.sin(elapsed * 0.4), 0, Math.cos(elapsed * 0.4));
+          art.SpawnBreathPuff(scratchB, scratchC, 0.42);
+        }
+      }
+      gustCooldown -= step;
+      if (gustCooldown <= 0) {
+        /* 风不是常数。隔一阵来一下，雪、雾、火苗一起动，世界才像活的 */
+        const base = weather.windSpeed;
+        gustCooldown = MathUtil.Lerp(9, 3.2, MathUtil.Clamp01(base / 9.5)) + MathUtil.Hash1(elapsed * 5.1) * 4;
+        art.SetWindGust(base * (0.35 + MathUtil.Hash1(elapsed * 7.3) * 0.55), 1.6 + MathUtil.Hash1(elapsed * 2.9) * 2.2);
+      }
+
+      /* —— 10. 阴影相机 —— */
       UpdateShadowCamera();
 
-      /* —— 10. 世界换了就重新点火 —— */
+      /* —— 11. 世界换了就重新点火 —— */
       EnsureWorldFires(frameCtx);
 
-      /* —— 11. 屏幕分级 —— */
+      /* —— 12. 屏幕分级 —— */
       screen.vignette = MathUtil.Damp(screen.vignette, screen.vignetteBase + screen.vignetteBias, 6, step);
       screen.desaturation = MathUtil.Damp(screen.desaturation, MathUtil.Clamp01(screen.desaturationBase + screen.desaturationBias), 4, step);
       screen.stealth = MathUtil.Damp(screen.stealth, screen.stealthTarget, 5, step);
@@ -3476,7 +3637,7 @@ export function CreateArt(ctx, options) {
       grade.uFlashStrength.value = screen.flashStrength;
       grade.uTime.value = elapsed;
 
-      /* —— 12. 体积光的太阳屏幕位置 —— */
+      /* —— 13. 体积光的太阳屏幕位置 —— */
       camera.getWorldDirection(cameraForward);
       const facing = cameraForward.dot(skySunDirection);
       if (facing > 0.02 && godRayPass.enabled) {
