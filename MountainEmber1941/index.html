@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#182120">
+  <meta name="color-scheme" content="dark">
+  <meta
+    name="description"
+    content="《山火·一九四一：槐树峪断线》是一款原创 Three.js 小队战术游戏，围绕潜行侦察、队员协作、破袭撤离与敌后营地整备展开。"
+  >
+  <title>山火 · 一九四一｜槐树峪断线</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=1">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.mjs",
+      "three/addons/": "./vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <a class="skipLink" href="#rosterPanel">跳至编队面板</a>
+  <main id="gameShell" class="gameShell">
+    <canvas id="worldCanvas" aria-label="槐树峪三维战术地图"></canvas>
+    <div class="filmGrain" aria-hidden="true"></div>
+    <div class="screenVignette" aria-hidden="true"></div>
+
+    <section id="loadingScreen" class="loadingScreen" aria-live="polite">
+      <div class="loadingMark" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p class="eyebrow">ORIGINAL SQUAD TACTICS</p>
+      <h1>山火 <span>·</span> 一九四一</h1>
+      <p id="loadingHint">正在铺开槐树峪战术图……</p>
+      <div class="loadingRail"><i id="loadingProgress"></i></div>
+    </section>
+
+    <section id="titleScreen" class="titleScreen isHidden" aria-labelledby="gameTitle">
+      <div class="titleCopy">
+        <p class="eyebrow">太行山前 · 1941 年秋</p>
+        <h1 id="gameTitle">山火 <span>·</span> 一九四一</h1>
+        <p class="operationTitle">行动切片 01 / 槐树峪断线</p>
+        <p class="titleLead">
+          电话桅杆、桥和岗楼都在眼前。先侦察，再改造声场；协同取回传令簿与线路图，剪断据点联络，带人离开。
+        </p>
+        <div class="titleActions">
+          <button id="startButton" class="primaryButton" type="button">
+            <span>展开战术图</span>
+            <kbd>Enter</kbd>
+          </button>
+          <button id="briefingButton" class="quietButton" type="button">行动简报</button>
+        </div>
+        <dl class="titleFacts">
+          <div><dt>类型</dt><dd>实时暂停 · 小队战术</dd></div>
+          <div><dt>任务</dt><dd>侦察 / 破袭 / 搜集 / 撤离</dd></div>
+          <div><dt>评分</dt><dd>群众安全与小队保全优先</dd></div>
+        </dl>
+      </div>
+      <aside class="titleDocket" aria-label="行动档案">
+        <span class="docketIndex">第 01 号行动</span>
+        <h2>槐树峪断线</h2>
+        <p>黎明前 · 虚构综合县域</p>
+        <hr>
+        <ol>
+          <li><span>壹</span>取得换防传令簿与线路图</li>
+          <li><span>贰</span>剪断据点有线联络</li>
+          <li><span>叁</span>全员进入任一撤离点</li>
+        </ol>
+        <p class="historicalNote">本作人物、地点与行动均为原创综合化设定，不对应单一真实战斗。</p>
+      </aside>
+    </section>
+
+    <section id="briefingModal" class="modalBackdrop isHidden" role="dialog" aria-modal="true" aria-labelledby="briefingTitle">
+      <article class="paperModal briefingModal">
+        <button class="modalClose" type="button" data-close-modal aria-label="关闭简报">×</button>
+        <p class="eyebrow">行动前口述记录</p>
+        <h2 id="briefingTitle">槐树峪的联络灯连续两夜没有亮起</h2>
+        <div class="briefingColumns">
+          <div>
+            <p>敌军正在沿封锁沟调度岗哨与征粮车。换防传令簿与线路图留在据点电话交换室内，被扣的交通员和医药箱还没有转移。</p>
+            <p>这里没有值得恋战的阵地。要保住的是人、药品，以及尚未断尽的联络线。</p>
+          </div>
+          <div>
+            <h3>可行路线</h3>
+            <ul>
+              <li>南侧高粱地：最快，但视线重叠</li>
+              <li>干水渠与桥洞：缓慢、隐蔽、单列</li>
+              <li>北侧村庄：顺路救人，解锁渡口</li>
+              <li>东南采石坡：落石封路，阻断车辆</li>
+            </ul>
+          </div>
+        </div>
+        <footer>
+          <p>击杀不计分。平民受难与流离只进入代价账本。</p>
+          <button class="primaryButton" type="button" data-close-modal>明白</button>
+        </footer>
+      </article>
+    </section>
+
+    <section id="gameHud" class="gameHud isHidden" aria-label="战术界面">
+      <header class="topCommandBar">
+        <div class="operationBlock" data-operation-name="槐树峪断线">
+          <span class="operationSeal" aria-hidden="true">火</span>
+          <div>
+            <small id="operationMeta">行动 01 · 1941.10.12</small>
+            <strong id="operationName">槐树峪断线</strong>
+          </div>
+        </div>
+        <div class="phaseBlock">
+          <span id="phaseLabel">侦察窗口</span>
+          <time id="missionClock" datetime="PT0M0S">00:00</time>
+        </div>
+        <div class="alertBlock">
+          <div class="alertHeading">
+            <span>敌方警戒</span>
+            <strong id="alertLabel">寂静</strong>
+          </div>
+          <div class="alertRail" aria-hidden="true"><i id="alertFill"></i></div>
+        </div>
+        <div class="topActions">
+          <button id="helpButton" class="iconButton" type="button" aria-label="打开操作说明">?</button>
+          <button id="soundButton" class="iconButton" type="button" aria-label="切换声音" aria-pressed="false">声</button>
+          <button id="pauseButton" class="pauseButton" type="button" aria-pressed="true">
+            <span id="pauseGlyph" aria-hidden="true">▶</span>
+            <span id="pauseLabel">执行计划</span>
+            <kbd>Space</kbd>
+          </button>
+        </div>
+      </header>
+
+      <nav class="mobilePanelTabs" aria-label="战术信息面板">
+        <button id="objectiveDrawerButton" type="button" data-drawer-target="objectivePanel" aria-controls="objectivePanel" aria-expanded="false">
+          <b aria-hidden="true">令</b><span>目标</span>
+        </button>
+        <button id="situationDrawerButton" type="button" data-drawer-target="situationPanel" aria-controls="situationPanel" aria-expanded="false">
+          <b aria-hidden="true">报</b><span>态势</span>
+        </button>
+      </nav>
+
+      <aside id="objectivePanel" class="objectivePanel panel" aria-labelledby="objectivePanelTitle">
+        <button class="mobileDrawerClose" type="button" data-drawer-close aria-label="关闭行动目标">×</button>
+        <header class="panelHeader">
+          <div>
+            <span class="panelKicker">行动目标</span>
+            <h2 id="objectivePanelTitle">天亮前完成</h2>
+          </div>
+          <span id="objectiveCounter">0 / 3</span>
+        </header>
+        <ul id="objectiveList" class="objectiveList"></ul>
+        <button id="routeHintButton" class="panelLink" type="button">显示路线与环境提示</button>
+      </aside>
+
+      <aside id="situationPanel" class="situationPanel panel" aria-labelledby="situationTitle">
+        <button class="mobileDrawerClose" type="button" data-drawer-close aria-label="关闭态势记录">×</button>
+        <header class="panelHeader">
+          <div>
+            <span class="panelKicker">态势记录</span>
+            <h2 id="situationTitle">局部情报</h2>
+          </div>
+          <span id="reinforcementStatus">电话畅通</span>
+        </header>
+        <div id="eventLog" class="eventLog" role="log" aria-live="polite"></div>
+        <dl class="fieldStats">
+          <div><dt>枪声</dt><dd id="shotCount">0</dd></div>
+          <div><dt>群众风险</dt><dd id="riskCount">0</dd></div>
+          <div><dt>发现目标</dt><dd id="discoverCount">2</dd></div>
+        </dl>
+      </aside>
+
+      <section id="planningBanner" class="planningBanner">
+        <span class="planningPulse" aria-hidden="true"></span>
+        <div><strong>战术暂停</strong><small>选择队员并下令；Shift 追加最多 4 条指令</small></div>
+        <button id="executeButton" type="button">执行全部指令</button>
+      </section>
+
+      <section id="rosterPanel" class="rosterPanel" aria-label="四人行动编队"></section>
+
+      <section id="actionBar" class="actionBar" aria-label="所选队员行动">
+        <div id="selectedSummary" class="selectedSummary">
+          <span class="selectedCallSign">山雀</span>
+          <div><strong>秦素秋</strong><small>侦察 · 联络</small></div>
+        </div>
+        <div class="stanceGroup" role="group" aria-label="移动姿态">
+          <button type="button" data-stance="crouch" aria-pressed="true"><span>蹲</span><small>静步</small></button>
+          <button type="button" data-stance="walk" aria-pressed="false"><span>行</span><small>常步</small></button>
+          <button type="button" data-stance="sprint" aria-pressed="false"><span>奔</span><small>疾行</small></button>
+        </div>
+        <div id="abilityGroup" class="abilityGroup"></div>
+        <button id="interactButton" class="interactButton" type="button" disabled>
+          <span>互动</span><small id="interactHint">靠近目标</small>
+        </button>
+      </section>
+
+      <div id="worldPrompt" class="worldPrompt isHidden" role="status"></div>
+      <div id="toastRegion" class="toastRegion" aria-live="assertive"></div>
+
+      <section id="tutorialCard" class="tutorialCard">
+        <button id="tutorialClose" type="button" aria-label="关闭教学">×</button>
+        <span class="tutorialIndex">01 / 04</span>
+        <h2>暂停、观察、再下令</h2>
+        <p>单击队员头像选择，单击地面移动。按住 Shift 可把指令追加进队列；空格执行或暂停。</p>
+        <div class="tutorialKeys"><kbd>左键</kbd><span>选择 / 移动</span><kbd>Shift</kbd><span>追加</span><kbd>Space</kbd><span>暂停</span></div>
+      </section>
+
+      <button id="extractionButton" class="extractionButton isHidden" type="button">确认全队撤离</button>
+    </section>
+
+    <section id="helpModal" class="modalBackdrop isHidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <article class="paperModal helpModal">
+        <button class="modalClose" type="button" data-close-modal aria-label="关闭说明">×</button>
+        <p class="eyebrow">战术手册</p>
+        <h2 id="helpTitle">看得见、听得见、来得及补救</h2>
+        <div class="manualGrid">
+          <section><span>01</span><h3>侦察</h3><p>敌人的视锥是实际感知范围。高粱降低辨认速度，石墙阻断视线。</p></section>
+          <section><span>02</span><h3>声场</h3><p>蹲行最安静，奔跑与枪声会形成声圈。敌人只调查带误差的声源位置。</p></section>
+          <section><span>03</span><h3>协作</h3><p>侦察员揭示路线，工兵剪线，救护员稳伤，班长用压制换取移动窗口。</p></section>
+          <section><span>04</span><h3>断接</h3><p>暴露不是立即失败。取到情报后别恋战，切断接触并进入撤离区。</p></section>
+        </div>
+        <footer><button class="primaryButton" type="button" data-close-modal>返回战术图</button></footer>
+      </article>
+    </section>
+
+    <section id="resultScreen" class="resultScreen isHidden" aria-labelledby="resultTitle">
+      <article class="resultReport">
+        <div class="resultStamp" id="resultGrade">A</div>
+        <p class="eyebrow">行动后报告</p>
+        <h1 id="resultTitle">线路已断，队伍撤出</h1>
+        <p id="resultSummary">村子空了，路还在。</p>
+        <div id="resultScore" class="resultScore">84<small>/ 100</small></div>
+        <div id="resultSections" class="resultSections"></div>
+        <div id="resultLedger" class="resultLedger"></div>
+        <footer>
+          <button id="campButton" class="primaryButton" type="button">返回隐蔽营地</button>
+          <button id="replayButton" class="quietButton" type="button">重开行动</button>
+        </footer>
+      </article>
+    </section>
+
+    <section id="campScreen" class="campScreen isHidden" aria-labelledby="campTitle">
+      <header class="campHeader">
+        <div><p class="eyebrow">山神庙旧址 · 隐蔽营地</p><h1 id="campTitle">任务后整备</h1></div>
+        <div class="campDay">第 <strong id="campDay">3</strong> 日</div>
+      </header>
+      <main class="campBoard">
+        <section class="afterActionCard campCard">
+          <span class="panelKicker">行动余波</span>
+          <h2 id="campOutcomeTitle">村子空了，路还在</h2>
+          <p id="campOutcomeText">线路册与药品被带回。旧交通点将暂时关闭，但联络网仍能从邻村接续。</p>
+          <div id="campReceipts" class="campReceipts"></div>
+        </section>
+        <section class="campRoster campCard">
+          <span class="panelKicker">伤情与疲劳</span>
+          <h2>行动编队</h2>
+          <div id="campRosterList"></div>
+        </section>
+        <section class="campFacilities campCard">
+          <span class="panelKicker">只选一项整备</span>
+          <h2>营地设施</h2>
+          <div class="facilityGrid">
+            <button type="button" data-camp-action="treat"><span>救护所</span><small>药品 1 · 处理一名伤员</small></button>
+            <button type="button" data-camp-action="repair"><span>简陋工坊</span><small>工具 1 · 修整破袭器材</small></button>
+            <button type="button" data-camp-action="decode"><span>情报角</span><small>零件 1 · 整理巡逻线索</small></button>
+            <button type="button" data-camp-action="rest"><span>训练空地</span><small>全队休整 · 疲劳下降</small></button>
+          </div>
+        </section>
+        <aside class="campResources campCard">
+          <span class="panelKicker">现有物资</span>
+          <h2>入库与责任</h2>
+          <dl id="campResourceList"></dl>
+          <div class="costLedger">
+            <strong>群众代价账本</strong>
+            <p id="campCostLedger">本次行动未造成群众伤亡。</p>
+            <small>此处记录不可逆损失，不产生资源、经验或奖励。</small>
+          </div>
+        </aside>
+      </main>
+      <footer class="campFooter">
+        <p id="campStatus" role="status">选择一项整备，查看它如何影响下一次行动。</p>
+        <div>
+          <button id="restartFromCampButton" class="primaryButton" type="button">带着整备重开切片</button>
+          <a href="../" class="quietButton">返回站点</a>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <noscript>本游戏需要 JavaScript 与 WebGL。</noscript>
+  <script type="module" src="./Script_Game.mjs?v=10"></script>
+</body>
+</html>

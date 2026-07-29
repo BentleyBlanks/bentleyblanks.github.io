@@ -7,6 +7,7 @@
     "test": "npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937 && npm run test:enemyRearCommand",
     "test:enemyRearCommand": "node EnemyRearCommand/Script_SmokeTest.mjs",
     "test:prairieFire1937": "node PrairieFire1937/Script_SmokeTest.mjs",
+    "test:mountainEmber1941": "node MountainEmber1941/Script_SmokeTest.mjs",
     "test:resistanceCommand1937": "node TaihangDemo/ResistanceCommand1937/Script_SmokeTest.mjs",
     "test:enemyRear1941": "node TaihangDemo/EnemyRear1941/Script_SmokeTest.mjs && node TaihangDemo/EnemyRear1941/Script_HistorySmokeTest.mjs && node TaihangDemo/EnemyRear1941/Script_ModelSmokeTest.mjs && node TaihangDemo/EnemyRear1941/Script_World3DSmokeTest.mjs && node TaihangDemo/EnemyRear1941/Script_DesktopSmokeTest.mjs",
     "test:taihangSignal1942": "node TaihangSignal1942/Script_SmokeTest.mjs",
