@@ -42,6 +42,18 @@
   .boot-note { margin: 30px auto 0; max-width: 560px; font-size: 11.5px; line-height: 2;
     color: #6f6656; border-top: 1px solid rgba(200,168,106,.14); padding-top: 18px; }
   @media (prefers-reduced-motion: reduce) { .boot, .boot-bar > i { transition: none; } }
+
+  /* 仅支持桌面端：窗口不足 1200×620 时由提示层接管。
+     移动端与平板布局已整体移除——每一条断点都是一条需要单独验证的布局路径。 */
+  #pcGate { display: none; }
+  @media (max-width: 1199px), (max-height: 619px) {
+    #pcGate { position: fixed; inset: 0; z-index: 9500; display: grid; place-items: center;
+      background: radial-gradient(120% 90% at 50% 30%, #241d16 0%, #14110e 55%, #0a0908 100%);
+      text-align: center; padding: 32px; }
+    #pcGate .gate-title { font-family: "Songti SC", "SimSun", serif; font-size: 26px;
+      letter-spacing: .2em; color: #e8dcc0; margin: 0 0 14px; }
+    #pcGate .gate-body { font-size: 14px; line-height: 2; color: #9b8f76; max-width: 30em; margin: 0 auto; }
+  }
 </style>
 <script type="importmap">
 { "imports": {
@@ -67,6 +79,13 @@
       本作为原创虚构作品，地图为综合化的华北敌后县域，不对应单一真实县份。<br>
       1945 年日本投降是不可改写的史实终点；玩家所能改变的，是人民与组织付出的代价，以及根据地的存续与建设。
     </p>
+  </div>
+</div>
+
+<div id="pcGate" aria-hidden="true">
+  <div>
+    <p class="gate-title">燎原 · 敌后1937</p>
+    <p class="gate-body">本作仅支持桌面端浏览器。<br>请在电脑上打开，并将窗口放大到 1200 × 620 以上。</p>
   </div>
 </div>
 

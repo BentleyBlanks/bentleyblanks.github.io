@@ -162,9 +162,12 @@ const eraGrade = Object.freeze({
     shadowTint: 0x353840, highlightTint: 0xffe1ae, lift: 0.012,
   },
   Hardship: {
-    sunScale: 0.80, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.42,
-    saturation: 0.80, contrast: 1.10, vignette: 0.24, grain: 0.017, bloomThreshold: 0.78, bloomStrength: 0.40,
-    shadowTint: 0x232a34, highlightTint: 0xd7dde2, lift: 0.020,
+    // 压抑感靠冷色温与低太阳角度表达，不靠抽干饱和度：
+    // 0.80 的饱和叠上 1.42 倍雾密度时，实测整帧饱和度从 0.435 掉到 0.199，
+    // 九种地形糊成一片灰绿，战役后 2/3 时间里地形色编码完全失效。
+    sunScale: 0.84, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.16,
+    saturation: 0.96, contrast: 1.10, vignette: 0.24, grain: 0.015, bloomThreshold: 0.78, bloomStrength: 0.40,
+    shadowTint: 0x232a34, highlightTint: 0xd7dde2, lift: 0.018,
   },
   Recovery: {
     sunScale: 0.96, elevationDelta: -4, azimuthDelta: 12, warm: 0.12, fogScale: 1.14,
@@ -733,8 +736,8 @@ void main() {
   sky = mix( sky, uGround * 0.52, clamp( -up * 2.2, 0.0, 1.0 ) );
 
   // 地平线雾霭带：只在地平线以上生成，且提亮幅度收敛
-  float horizonBand = exp( -abs( up ) * 9.0 ) * smoothstep( -0.03, 0.07, up );
-  sky = mix( sky, uHorizon * 1.06, horizonBand * uHaze );
+  float horizonBand = exp( -abs( up ) * 16.0 ) * smoothstep( -0.02, 0.05, up );
+  sky = mix( sky, uHorizon * 0.96, horizonBand * uHaze * 0.55 );
 
   // 太阳辉光 + 日盘
   float sunDot = max( dot( direction, normalize( uSunDirection ) ), 0.0 );
@@ -744,14 +747,14 @@ void main() {
   sky = mix( sky, uSunColor * 2.2, disk * 0.9 );
 
   // 分层云带：把方向投影到"云平面"，三层不同高度/速度滚动
-  if ( uCloudOpacity > 0.002 && up > 0.006 ) {
+  if ( uCloudOpacity > 0.002 && up > 0.004 ) {
     vec2 cloudPlane = direction.xz / max( up, 0.045 );
     float drift = uTime * uCloudSpeed;
     float layerHigh = CloudBand( cloudPlane, uCloudScale * 0.55, vec2( drift * 0.6, drift * 0.24 ), 4 );
     float layerMid = CloudBand( cloudPlane, uCloudScale, vec2( -drift * 1.1, drift * 0.5 ), 4 );
     float layerLow = CloudBand( cloudPlane, uCloudScale * 2.1, vec2( drift * 1.9, -drift * 0.8 ), 3 );
     float coverage = clamp( layerHigh * 0.55 + layerMid * 0.85 + layerLow * 0.45, 0.0, 1.0 );
-    float horizonFade = smoothstep( 0.01, 0.22, up );
+    float horizonFade = smoothstep( 0.008, 0.06, up );
     coverage *= horizonFade * uCloudOpacity;
     // 云底受太阳方向照亮，形成层次
     float lighting = 0.72 + 0.5 * pow( sunDot, 2.4 ) + 0.22 * layerHigh;

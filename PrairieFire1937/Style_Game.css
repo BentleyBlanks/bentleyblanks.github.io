@@ -453,8 +453,9 @@
 
 .pf-tab-badge {
   position: absolute;
-  top: -5px;
-  left: -5px;
+  top: 1px;
+  right: 1px;
+  left: auto;
   display: none;
   min-width: 17px;
   height: 17px;
@@ -1080,7 +1081,9 @@
   transition: width 0.5s var(--pf-ease);
 }
 
-.pf-ubar.is-hp .pf-ubar-fill { background: linear-gradient(90deg, #7a4038, var(--pf-crimson-soft)); }
+.pf-ubar.is-hp .pf-ubar-fill { background: linear-gradient(90deg, #58704e, #7fa06a); }
+.pf-ubar.is-hp.is-mid .pf-ubar-fill { background: linear-gradient(90deg, #8a6c30, var(--pf-ochre)); }
+.pf-ubar.is-hp.is-low .pf-ubar-fill { background: linear-gradient(90deg, #7a4038, var(--pf-crimson-soft)); }
 .pf-ubar.is-moves .pf-ubar-fill { background: linear-gradient(90deg, var(--pf-slate), #8fb9c9); }
 .pf-ubar.is-xp .pf-ubar-fill { background: linear-gradient(90deg, var(--pf-ochre-deep), var(--pf-ochre-glow)); }
 
@@ -1110,6 +1113,7 @@
 }
 
 .pf-action {
+  overflow: visible;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2995,59 +2999,7 @@
    做法：导航收成纯图标窄列（省出 ~80px），资源 chip 压到 66px 并把增减挪到行内。
    -------------------------------------------------------------------------- */
 
-@media (max-width: 1199px) {
-  .pf-ui { font-size: 13.5px; }
 
-  .pf-topbar { gap: 8px; padding: 6px 8px; }
-
-  .pf-era { min-width: 148px; padding: 2px 8px 4px 4px; }
-  .pf-era-name { font-size: 16px; }
-  .pf-era-date { font-size: 13px; }
-  .pf-era-ticks { display: none; }
-
-  /* 资源 chip 紧凑态：图标压到第一行、存量与增减并到第二行。
-     这样一枚 chip 只要 ~55px，六项加起来 350 上下，省下的宽度全部还给导航，
-     让九个页签得以做满 44×44 的触控目标。 */
-  .pf-resbar { gap: 4px; }
-
-  .pf-res {
-    flex-direction: column;
-    align-items: center;
-    min-width: 52px;
-    gap: 0;
-    padding: 2px 5px 3px;
-  }
-
-  .pf-res-glyph { width: 18px; height: 18px; flex-basis: 18px; font-size: 11px; }
-  .pf-res-body { flex-direction: row; align-items: baseline; gap: 3px; line-height: 1.15; }
-  .pf-res-stock { font-size: 14px; }
-  /* 10.5px 在平板上偏小，提到 11.5px；数字仍用等宽字形不跳动 */
-  .pf-res-delta { font-size: 11.5px; }
-
-  /* 导航收成图标列，但触控目标不许缩水：九个页签仍各占 44×44 */
-  .pf-tabs { gap: 2px; padding-left: 6px; }
-  .pf-tab { min-width: var(--pf-tap); min-height: var(--pf-tap); padding: 3px 2px; }
-  .pf-tab-name { display: none; }
-  .pf-tab-key { display: none; }
-  .pf-tab-glyph { font-size: 17px; }
-
-  .pf-meters { width: 190px; }
-  .pf-minimap { width: 216px; }
-  .pf-minimap-canvas { height: 158px; }
-
-  .pf-leftdock { width: min(560px, calc(100vw - 240px)); max-height: min(calc(100vh - var(--pf-topbar-h) - 82px), 52vh); }
-  .pf-enddock { width: 196px; }
-  .pf-endturn-label { font-size: 18px; letter-spacing: 0.16em; }
-
-  .pf-notify { max-width: 300px; max-height: 108px; }
-  .pf-action { min-width: 68px; }
-
-  .pf-panel-layer { padding: 14px; }
-  .pf-panel { max-height: calc(100vh - 28px); min-height: min(70vh, calc(100vh - 28px)); }
-  .pf-panel-title { font-size: 20px; }
-  .pf-cinema-body { padding: 16px 20px 6px; }
-  .pf-cinema-options { padding: 6px 20px 20px; }
-}
 
 /* --------------------------------------------------------------------------
    20. 响应式：≤640px 移动端
@@ -3059,292 +3011,10 @@
    高度由内容决定，下面的绝对定位元素再也不需要猜顶部高度。
    -------------------------------------------------------------------------- */
 
-@media (max-width: 640px) {
-  .pf-ui { font-size: 14px; }
 
-  .pf-hud {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  /* 这三件进入正常流，按内容占高，彼此不可能重叠 */
-  .pf-topbar,
-  .pf-meters,
-  .pf-sweep {
-    position: static;
-    flex: 0 0 auto;
-    transform: none;
-  }
-
-  .pf-topbar {
-    flex-wrap: wrap;
-    gap: 5px;
-    padding: 5px 8px 6px;
-  }
-
-  .pf-era {
-    order: 1;
-    flex: 1 1 100%;
-    min-width: 0;
-    padding: 0 0 3px;
-    border-right: 0;
-    border-bottom: 1px solid var(--pf-line);
-  }
-
-  .pf-era-head { gap: 6px; }
-  .pf-era-name { font-size: 15px; padding: 0 5px; }
-  .pf-era-date { font-size: 13px; }
-  .pf-era-meta { font-size: 11px; margin-top: 2px; }
-  .pf-era-track { margin-top: 3px; height: 4px; }
-
-  /* 六个资源一行铺满：图标必须保留，数字才有意义 */
-  .pf-resbar {
-    order: 2;
-    flex: 1 1 100%;
-    gap: 3px;
-    mask-image: none;
-    -webkit-mask-image: none;
-  }
-
-  .pf-res {
-    flex: 1 1 0;
-    min-width: 0;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    padding: 3px 2px 4px;
-  }
-
-  .pf-res-glyph {
-    display: grid;
-    width: 19px;
-    height: 19px;
-    flex-basis: 19px;
-    font-size: 11.5px;
-  }
-
-  .pf-res-body { flex-direction: column; align-items: center; gap: 0; line-height: 1.1; }
-  .pf-res-stock { font-size: 13.5px; }
-  .pf-res-delta { font-size: 9.5px; }
-
-  /* 九个页签等分一行，全部可达（含第九项"设"） */
-  .pf-tabs {
-    order: 3;
-    flex: 1 1 100%;
-    gap: 1px;
-    padding: 4px 0 0;
-    border-left: 0;
-    border-top: 1px solid var(--pf-line);
-    overflow: visible;
-  }
-
-  .pf-tab {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 40px;
-    padding: 2px 0;
-  }
-
-  .pf-tab-glyph { font-size: 16px; }
-  .pf-tab-name { display: none; }
-  .pf-tab-key { display: none; }
-  .pf-tab-badge { top: -3px; left: 50%; margin-left: 4px; }
-
-  /* 双仪表压成并排两枚 pill，进入正常流，不再浮在地图上 */
-  .pf-meters {
-    flex-direction: row;
-    gap: 5px;
-    width: auto;
-    padding: 5px 8px 0;
-  }
-
-  .pf-meter {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 4px 8px 5px;
-  }
-
-  .pf-meter-head { gap: 4px; }
-  .pf-meter-name { font-size: 11.5px; letter-spacing: 0.02em; }
-  .pf-meter-value { font-size: 15px; }
-  .pf-meter-track { height: 7px; margin: 3px 0 0; }
-  .pf-meter-band { display: none; }
-
-  .pf-sweep {
-    margin: 6px 8px 0;
-    max-width: none;
-    flex-wrap: wrap;
-    gap: 6px 8px;
-    padding: 7px 10px;
-  }
-
-  .pf-sweep-body { flex: 1 1 100%; order: 2; }
-  .pf-sweep-siren { order: 1; }
-  .pf-sweep-count { order: 1; margin-left: auto; }
-  .pf-sweep-title { font-size: 14px; }
-  .pf-sweep-detail { font-size: 12px; }
-  .pf-sweep-btn { order: 3; flex: 1 1 100%; min-height: var(--pf-tap); }
-
-  /* 略图默认折叠成一枚按钮，浮在地图右侧、抽屉之上；展开时也不碰其它控件 */
-  .pf-minimap {
-    top: auto;
-    bottom: calc(38vh + 62px);
-    right: 8px;
-    width: 156px;
-    z-index: 5;
-  }
-
-  .pf-minimap-canvas { height: 116px; }
-  .pf-minimap-legend { display: none; }
-  .pf-minimap-title { font-size: 12px; letter-spacing: 0.1em; }
-
-  .pf-minimap-toggle { min-width: var(--pf-tap); min-height: 34px; }
-
-  .pf-minimap.is-collapsed {
-    width: auto;
-    border-radius: var(--pf-radius);
-  }
-
-  .pf-minimap.is-collapsed .pf-minimap-head { padding: 3px 6px; gap: 4px; }
-
-  /* 底部信息抽屉：贴底但给最下方的操作条让出高度 */
-  .pf-leftdock {
-    left: 0;
-    right: 0;
-    bottom: 58px;
-    width: auto;
-    max-height: 38vh;
-    gap: 0;
-  }
-
-  .pf-context {
-    max-height: 38vh;
-    border-radius: var(--pf-radius-lg) var(--pf-radius-lg) 0 0;
-    border-left: 0;
-    border-right: 0;
-    border-bottom: 0;
-  }
-
-  .pf-context-grip { display: block; }
-  .pf-context.is-collapsed { transform: translateY(calc(100% - 30px)); }
-
-  .pf-context-inner {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "tile" "unit" "actions";
-    padding: 8px 10px 12px;
-  }
-
-  .pf-tile-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-
-  .pf-action { flex: 1 1 calc(33.333% - 6px); min-width: 0; min-height: var(--pf-tap); }
-  .pf-buildbtn,
-  .pf-garrison-unit,
-  .pf-found-base { min-height: var(--pf-tap); }
-
-  /* "结束回合"改成常驻底部操作条，不再悬浮于地图之上 */
-  .pf-enddock {
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    background: rgba(16, 14, 12, 0.96);
-    border-top: 1px solid var(--pf-line-strong);
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5);
-  }
-
-  .pf-todo { display: none; }
-
-  .pf-endturn {
-    flex: 1 1 auto;
-    min-height: var(--pf-tap);
-    flex-direction: row;
-    gap: 10px;
-    padding: 4px 14px;
-    border-radius: var(--pf-radius);
-  }
-
-  .pf-endturn-label { font-size: 16px; letter-spacing: 0.12em; }
-  .pf-endturn-sub { font-size: 11.5px; }
-
-  .pf-notify { display: none; }
-  .pf-hint { display: none; }
-
-  .pf-toast-layer { top: auto; bottom: calc(38vh + 66px); width: calc(100vw - 16px); }
-
-  .pf-panel-layer { padding: 0; }
-
-  .pf-panel {
-    width: 100%;
-    height: 100%;
-    max-height: 100%;
-    min-height: 100%;
-    border-radius: 0;
-    border: 0;
-  }
-
-  /* 移动端面板本来就是整屏，不参与"贴合内容"收缩 */
-  .pf-panel.is-fit { min-height: 100%; }
-
-  .pf-panel::before { display: none; }
-  .pf-panel-head { padding: 10px 14px 9px; }
-  .pf-panel-title { font-size: 18px; letter-spacing: 0.12em; }
-  .pf-panel-close { min-width: var(--pf-tap); min-height: var(--pf-tap); }
-  .pf-panel-body { padding: 12px 14px 24px; }
-
-  .pf-tree { max-height: none; padding-right: 16px; }
-  .pf-tree-tab { min-height: var(--pf-tap); flex: 1 1 0; padding: 0 8px; }
-  .pf-tree-era { min-height: var(--pf-tap); padding: 3px 10px; }
-  .pf-tree-rail { height: 18px; }
-  .pf-seg,
-  .pf-ghost,
-  .pf-primary,
-  .pf-intel-jump,
-  .pf-base-focus,
-  .pf-slot-drop { min-height: var(--pf-tap); }
-
-  .pf-cardgrid { grid-template-columns: minmax(0, 1fr); }
-  .pf-settings { grid-template-columns: minmax(0, 1fr); }
-  .pf-keytable { grid-template-columns: minmax(0, 1fr); }
-  .pf-timeline-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  .pf-intel-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; }
-  .pf-ledger-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-
-  .pf-cinema-layer { padding: 0; }
-
-  .pf-cinema {
-    width: 100%;
-    height: 100%;
-    max-height: 100%;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  .pf-cinema-body { padding: 14px 16px 4px; }
-  .pf-cinema-title { font-size: 20px; letter-spacing: 0.12em; }
-  .pf-cinema-text { font-size: 14.5px; }
-  .pf-cinema-options { grid-template-columns: minmax(0, 1fr); padding: 6px 16px 22px; }
-  .pf-cinema-option { min-height: var(--pf-tap); }
-
-  .pf-modal { width: 100%; }
-  .pf-modal-actions { flex-direction: column-reverse; }
-  .pf-modal-actions > * { width: 100%; min-height: var(--pf-tap); }
-
-  .pf-tooltip { max-width: calc(100vw - 24px); }
-}
 
 /* 极窄屏（≤380px）：资源数字再小一档，行动按钮两列 */
-@media (max-width: 380px) {
-  .pf-res-stock { font-size: 12.5px; }
-  .pf-res-glyph { width: 17px; height: 17px; flex-basis: 17px; font-size: 10.5px; }
-  .pf-action { flex-basis: calc(50% - 6px); }
-  .pf-minimap { width: 132px; }
-  .pf-tab-glyph { font-size: 15px; }
-}
+
 
 /* --------------------------------------------------------------------------
    横屏矮窗（手机横放，典型 844×390）
@@ -3356,103 +3026,17 @@
    一条窄横条，左下角剩下的整块高度全部让给地块卡；资源条六项等分，一次全见。
    -------------------------------------------------------------------------- */
 
-@media (max-height: 520px) and (orientation: landscape) and (max-width: 900px) {
-  /* 1) 日志条与仪表不再共存 —— 把 ≤640 的隐藏规则并到这个断点 */
-  .pf-notify { display: none; }
-  .pf-hint { display: none; }
 
-  /* 2) 双仪表改成顶栏下沿的一条窄横条（原本竖排 162px 高，正好和日志条抢地方） */
-  .pf-meters {
-    top: calc(var(--pf-topbar-h) + 4px);
-    left: 8px;
-    right: auto;
-    flex-direction: row;
-    gap: 6px;
-    width: auto;
-  }
-
-  .pf-meter { min-width: 124px; padding: 3px 8px 4px; }
-  .pf-meter-head { gap: 5px; }
-  .pf-meter-name { font-size: 11px; letter-spacing: 0.02em; }
-  .pf-meter-value { font-size: 14px; }
-  .pf-meter-track { height: 5px; margin: 2px 0 0; }
-  .pf-meter-band { display: none; }
-
-  /* 3) 顶栏：六项资源等分铺满，绝不再靠横向滚动"藏"掉两项 */
-  .pf-era { min-width: 112px; padding: 1px 6px 2px 2px; }
-  .pf-era-name { font-size: 15px; }
-  .pf-era-date { font-size: 12px; }
-  .pf-era-meta { font-size: 10.5px; }
-
-  .pf-resbar { gap: 3px; }
-  .pf-res { flex: 1 1 0; min-width: 0; padding: 2px 3px 3px; }
-  .pf-res-glyph { width: 17px; height: 17px; flex-basis: 17px; font-size: 10.5px; }
-  .pf-res-stock { font-size: 13px; }
-  .pf-res-delta { font-size: 10.5px; }
-
-  .pf-tabs { gap: 2px; padding-left: 5px; }
-  .pf-tab { min-width: 38px; min-height: 40px; }
-
-  /* 4) 左下角：仪表让出的高度全部给地块卡，底部再叠一层可滚渐隐 */
-  .pf-leftdock {
-    left: 8px;
-    bottom: 8px;
-    width: min(520px, calc(100vw - 250px));
-    max-height: calc(100vh - var(--pf-topbar-h) - 62px);
-  }
-
-  .pf-context { max-height: none; }
-
-  /* 横屏里这张卡装不下全部内容，滚动无可避免；那就把"行动"提到不用滚就看得见的第一行，
-     地块与部队的明细留在下面滚。行动是这块面板唯一的交互出口，不能藏在折叠线以下。 */
-  .pf-context-inner {
-    grid-template-areas: "actions actions" "tile unit";
-    padding: 8px 10px 10px;
-    gap: 8px;
-  }
-
-  .pf-actions {
-    padding: 0 0 8px;
-    border-top: 0;
-    border-bottom: 1px solid var(--pf-line);
-  }
-
-  .pf-tile-grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
-
-  /* 5) 略图原先同时钉住 top 与 bottom，被挤成 47px 高的一条缝；这里放开下沿 */
-  .pf-minimap { bottom: auto; width: 132px; }
-  .pf-minimap-canvas { height: 76px; }
-  .pf-minimap-legend { display: none; }
-
-  .pf-enddock { right: 8px; bottom: 8px; width: 176px; gap: 4px; }
-  .pf-todo { max-height: 92px; overflow: hidden; }
-  .pf-endturn { padding: 6px 12px; }
-  .pf-endturn-label { font-size: 16px; letter-spacing: 0.12em; }
-  /* toast 落在仪表条下沿，别再和它抢同一条带 */
-  .pf-toast-layer { top: calc(var(--pf-topbar-h) + 46px); bottom: auto; }
-
-  /* 6) 科技树在 390 高的窗口里必然竖向溢出：把面板的各层边距压到最小，
-        把剩下的高度全给树，溢出部分交给树自己的渐隐与"下面还有 N 行"提示。 */
-  .pf-panel-body { padding: 8px 12px 10px; }
-  .pf-tree-tabs { margin-bottom: 5px; }
-  .pf-tree-tab { min-height: 30px; padding: 0 12px; font-size: 13px; }
-  .pf-tree-status { margin-bottom: 5px; padding: 3px 10px; }
-  .pf-tree-current { font-size: 12.5px; }
-  .pf-tree-nav { margin-bottom: 4px; }
-  .pf-tree-era { min-height: 28px; padding: 1px 7px; }
-  .pf-tree-era-name { font-size: 11.5px; }
-  .pf-tree-era-count { display: none; }
-  .pf-tree-railbox { margin-top: 4px; }
-  .pf-tree-railnote { display: none; }
-
-  .pf-panel[data-panel="Tech"] .pf-tree-wrap,
-  .pf-panel[data-panel="Doctrine"] .pf-tree-wrap { min-height: 96px; }
-}
 
 /* --------------------------------------------------------------------------
    21. 无障碍与偏好
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   仅支持桌面端：移动端与平板断点已整体移除。
+   窗口宽度不足 1200px 时由 index.html 的 #pcGate 提示层接管，
+   这里不再维护任何小屏布局——每一条断点都是一条需要单独验证的布局路径。
+   -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .pf-ui *,
   .pf-ui *::before,

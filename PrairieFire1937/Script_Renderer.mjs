@@ -1497,10 +1497,10 @@ export function CreateRenderer(canvas, options = {}) {
     // 否则会整体过曝并把材质本身的层次冲掉。
     // tint 接近中性，让模型自带的配色说话；只在需要分辨阵营时轻微偏色。
     // 数值再高就会把屋顶冲成纯黄白，反而丢掉细节。
-    settlement: { tint: 0xbdb3a4, roofBoost: 1.16, saturation: 1.05 },   // 中立聚落：夯土黄 + 亮瓦顶
-    stronghold: { tint: 0xb0aea6, roofBoost: 1.12, saturation: 0.80 },   // 敌据点：冷灰水泥
-    friendly: { tint: 0xb4bcc4, roofBoost: 1.14, saturation: 0.95 },     // 我方：灰蓝布衣
-    enemy: { tint: 0xc9b98c, roofBoost: 1.14, saturation: 1.10 },        // 敌方：土黄制服
+    settlement: { tint: 0xd6cab6, roofBoost: 1.22, saturation: 1.05 },   // 中立聚落：夯土黄 + 亮瓦顶
+    stronghold: { tint: 0xcfcdc4, roofBoost: 1.18, saturation: 0.82 },   // 敌据点：冷灰水泥
+    friendly: { tint: 0xc8d0d8, roofBoost: 1.18, saturation: 0.95 },     // 我方：灰蓝布衣
+    enemy: { tint: 0xd8c89a, roofBoost: 1.18, saturation: 1.10 },        // 敌方：土黄制服
     hidden: { tint: 0xa8b8c2, roofBoost: 1.10, saturation: 0.78, rim: 0.34 },
     foliage: { tint: 0xa4bc8c, roofBoost: 1.12, saturation: 1.16, canopy: 0.52 },
     works: { tint: 0xbcb094, roofBoost: 1.12, saturation: 1.02 },        // 工事 / 区域

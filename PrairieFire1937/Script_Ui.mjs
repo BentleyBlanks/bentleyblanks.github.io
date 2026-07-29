@@ -117,11 +117,11 @@ export const panelDefinitions = Object.freeze([
   { key: "Tech", tab: "技术", glyph: "技", hotkey: "1", title: "军事技术", subtitle: "缴获 · 仿制 · 土法上马" },
   { key: "Doctrine", tab: "群众", glyph: "众", hotkey: "2", title: "群众与政权", subtitle: "组织起来的力量" },
   { key: "Policy", tab: "政策", glyph: "策", hotkey: "3", title: "边区政策", subtitle: "装配到有限的政策槽" },
-  { key: "Base", tab: "根据地", glyph: "地", hotkey: "4", title: "根据地建设", subtitle: "区域 · 生产 · 人口" },
-  { key: "Intel", tab: "情报", glyph: "谍", hotkey: "5", title: "敌情与情报网", subtitle: "已知意图与覆盖" },
+  { key: "Base", tab: "根据地", glyph: "根", hotkey: "4", title: "根据地建设", subtitle: "区域 · 生产 · 人口" },
+  { key: "Intel", tab: "情报", glyph: "情", hotkey: "5", title: "敌情与情报网", subtitle: "已知意图与覆盖" },
   { key: "Ledger", tab: "账本", glyph: "账", hotkey: "6", title: "代价账本", subtitle: "只作记录，不计功过" },
-  { key: "Log", tab: "纪事", glyph: "报", hotkey: "7", title: "战报与纪事", subtitle: "逐回合记录" },
-  { key: "Help", tab: "说明", glyph: "示", hotkey: "8", title: "操作与史实说明", subtitle: "快捷键 · 历史框架" },
+  { key: "Log", tab: "纪事", glyph: "纪", hotkey: "7", title: "战报与纪事", subtitle: "逐回合记录" },
+  { key: "Help", tab: "说明", glyph: "说", hotkey: "8", title: "操作与史实说明", subtitle: "快捷键 · 历史框架" },
   { key: "Settings", tab: "设置", glyph: "设", hotkey: "9", title: "设置与存档", subtitle: "新局 · 音频 · 存档" },
 ]);
 
@@ -1886,6 +1886,12 @@ export function CreateUi(root, hooks = {}) {
     });
     const fill = El("i", "pf-ubar-fill", { parent: track });
     SetBarWidth(fill, PercentOf(value, max));
+    // 兵员条按存量比例换档：满编不该顶着一条警戒红——红色要留给真正告急的时候。
+    if (kind === "hp") {
+      const ratio = max > 0 ? value / max : 0;
+      SetFlag(row, "is-low", ratio < 0.35);
+      SetFlag(row, "is-mid", ratio >= 0.35 && ratio < 0.7);
+    }
     return row;
   }
 

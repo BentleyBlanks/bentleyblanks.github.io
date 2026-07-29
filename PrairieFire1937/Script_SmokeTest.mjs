@@ -1115,14 +1115,23 @@ Test("vendor 中的 three.js 与 addons 齐备", () => {
   }
 });
 
-Test("样式表存在且含响应式断点与减少动效支持", () => {
+Test("仅支持桌面端：无移动端断点残留，且有 PC 提示门", () => {
   const css = Source("Style_Game.css");
   assert.ok(css.length > 4000, "样式表过于单薄");
-  assert.match(css, /@media[^{]*max-width:\s*640px/, "缺少移动端断点");
+  // 产品决策：只支持 PC。移动端/平板断点不允许回潜——
+  // 每一条断点都是一条需要单独验证的布局路径，砍掉的路径不许悄悄长回来。
+  assert.ok(
+    !/@media[^{]*max-width:\s*(1199|900|640|380)px/.test(css),
+    "样式表出现了移动端/平板断点，仅支持桌面端的决策被破坏",
+  );
   assert.match(css, /prefers-reduced-motion/, "未尊重 prefers-reduced-motion");
   const open = (css.match(/\{/g) ?? []).length;
   const close = (css.match(/\}/g) ?? []).length;
   assert.equal(open, close, `CSS 括号不配平 ${open}/${close}`);
+
+  const html = Source("index.html");
+  assert.match(html, /id="pcGate"/, "缺少小窗口提示门");
+  assert.match(html, /1200/, "提示门未说明最小窗口尺寸");
 });
 
 Test("命名规范：文件名使用类别前缀且无连字符", () => {

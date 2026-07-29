@@ -1438,7 +1438,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
         uRepeat: { value: Math.max(3, points.length * 1.4) },
         uSpeed: { value: arrowOptions.speed ?? 0.5 },
         uOpacity: { value: 0 },
-        uColorCore: { value: new THREE.Color(arrowOptions.colorCore || "#ff9a5c") },
+        uColorCore: { value: new THREE.Color(arrowOptions.colorCore || "#d9825a") },
         uColorEdge: { value: new THREE.Color(arrowOptions.colorEdge || "#8e2820") },
       },
       vertexShader: sweepVertexShader,
@@ -1457,7 +1457,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     AddTween(life, (t) => {
       const fadeIn = SmoothStep(0, 0.06, t);
       const fadeOut = 1 - SmoothStep(0.85, 1, t);
-      material.uniforms.uOpacity.value = fadeIn * fadeOut * (arrowOptions.opacity ?? 0.9);
+      material.uniforms.uOpacity.value = fadeIn * fadeOut * (arrowOptions.opacity ?? 0.62);
     }, () => RemoveSweepArrow(entry));
     return entry;
   }
