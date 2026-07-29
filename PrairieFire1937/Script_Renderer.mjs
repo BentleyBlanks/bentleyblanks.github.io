@@ -965,9 +965,13 @@ export function CreateRenderer(canvas, options = {}) {
   const neighbourColorScratch = new THREE.Color();
   const neighbourColorSum = new THREE.Color();
 
-  /** 边缘区颜色互融：取共享该点的相邻格在同一世界点的颜色平均值。 */
+  /**
+   * 边缘区颜色互融：取共享该点的相邻格在同一世界点的颜色平均值。
+   * 混合窗口从格心 1/4 处就开始、边界处权重给到 0.85：同类地形拼合处几乎无缝，
+   * 异类地形柔和过渡——hex 边界交给网格线去讲，不靠色块跳变。
+   */
   function BlendEdgeColor(entry, worldX, worldZ, radialT, out) {
-    const edgeWeight = SmoothStep(0.6, 1.0, radialT) * 0.5;
+    const edgeWeight = SmoothStep(0.25, 1.0, radialT) * 0.85;
     if (edgeWeight <= 0.001) return out;
     let angle = Math.atan2(worldZ - entry.z, worldX - entry.x);
     if (angle < 0) angle += Math.PI * 2;
@@ -1000,7 +1004,8 @@ export function CreateRenderer(canvas, options = {}) {
     const bandT = Clamp01(InverseLerp(band[0], band[1], entry.elevation));
     const worldX = entry.x + localX;
     const worldZ = entry.z + localZ;
-    const blotch = FractalNoise2D(worldX * 0.9, worldZ * 0.9, blotchNoiseOptions);
+    // 噪声频率减半、明暗幅度压到 ±0.08：斑块从"拼布补丁"退成大尺度的地气变化
+    const blotch = FractalNoise2D(worldX * 0.45, worldZ * 0.45, blotchNoiseOptions);
     const mix = Clamp01(bandT * 0.72 + (blotch - 0.5) * 0.55 + (1 - radialT) * 0.08);
     const low = CachedColor(colorLowCache, entry.profile.colorLow);
     const high = CachedColor(colorHighCache, entry.profile.colorHigh);
@@ -1008,7 +1013,7 @@ export function CreateRenderer(canvas, options = {}) {
     // 湿度 → 向季节植被色靠拢；河谷压暗
     scratchColor.setHex(palette.grass);
     out.lerp(scratchColor, Clamp01(entry.moisture * entry.profile.wet) * 0.44);
-    const shade = 0.86 + 0.30 * blotch - 0.10 * radialT;
+    const shade = 0.93 + 0.16 * blotch - 0.10 * radialT;
     out.multiplyScalar(shade);
     return out;
   }
@@ -1445,10 +1450,11 @@ export function CreateRenderer(canvas, options = {}) {
     PeasantAssociation: "FarmersAssociation", MilitiaGround: "MilitiaGround",
   });
 
-  /** Data_Units 的敌方 key → Script_Models 的建造器 key（补齐别名表未覆盖的四种）。 */
+  /** Data_Units / Script_Ai 的敌方 key → Script_Models 的建造器 key（补齐别名表未覆盖的几种）。 */
   const unitModelNames = Object.freeze({
     KempeitaiAgents: "EnemyGendarme", CavalryScouts: "EnemyCavalry",
     EngineerDetachment: "EnemyEngineer", ArtillerySection: "EnemyArtillery",
+    SupplyColumn: "EnemySupply",   // 辎重队：AI 扫荡纵队会动态生成，缺映射会退化成步兵
   });
 
   /** 地物 → 树种，用于林地/树丛的植被合批。 */
@@ -1469,14 +1475,18 @@ export function CreateRenderer(canvas, options = {}) {
     Enemy: new THREE.Color(0xd2ab5c),    // 敌方：土黄制服
     Hidden: new THREE.Color(0xb9a67e),   // 隐蔽：压灰的土金
   };
+  // 伪装盖片：干草席的枯黄，与秋冬植被同族，读作"苫在头上的柴草"
+  const hiddenCanopyTint = new THREE.Color(0x8a7c52);
   /** 我方部队头顶的小红旗，一眼区分敌我。 */
   const playerFlagColors = { cloth: modelPalette.bannerRed, band: "#e8d3a4", height: 0.30 };
 
-  /** 部队底座 / 隐蔽指示环 / 接地投影盘：渲染层自建的三份小几何体，各占一次 draw call。 */
+  /** 部队底座 / 隐蔽指示环 / 伪装盖片 / 接地投影盘：渲染层自建的小几何体，各占一次 draw call。 */
   let unitPadGeometry = null;
   let hiddenRingGeometry = null;
+  let hiddenCanopyGeometry = null;
   let groundShadowGeometry = null;
   let padMaterial = null;
+  let hiddenCanopyMaterial = null;
   let groundShadowMaterial = null;
   let baseModelMaterial = null;
   let hiddenModelMaterial = null;
@@ -1491,10 +1501,24 @@ export function CreateRenderer(canvas, options = {}) {
       unitPadGeometry.deleteAttribute("uv");
     }
     if (!hiddenRingGeometry) {
-      // 低矮的"伏姿"指示：贴地的破口圆环，示意队伍尚未暴露
-      hiddenRingGeometry = new THREE.TorusGeometry(0.62, 0.030, 4, 24, Math.PI * 2);
+      // 隐蔽指示：真正的虚线环——6 段圆弧留 6 个豁口，与实线六边形底座一眼分开。
+      // 原先是整圈细环，远看与普通底座几乎同构，读不出"隐蔽中"。
+      const dashPieces = [];
+      for (let dash = 0; dash < 6; dash += 1) {
+        const arc = new THREE.TorusGeometry(0.62, 0.042, 4, 6, Math.PI / 4.2);
+        arc.rotateZ(dash * (Math.PI / 3));
+        dashPieces.push(arc);
+      }
+      hiddenRingGeometry = MergeAndDispose(dashPieces);
       hiddenRingGeometry.rotateX(Math.PI / 2);
       hiddenRingGeometry.deleteAttribute("uv");
+    }
+    if (!hiddenCanopyGeometry) {
+      // "草帽伪装"盖片：低矮的七棱草席锥顶在队伍头上，远看即知"这支队伍伏着"。
+      // 程序几何、无贴图；锥底抬到自身原点，摆放时以队伍头顶为基准。
+      hiddenCanopyGeometry = new THREE.ConeGeometry(0.52, 0.15, 7, 1, false);
+      hiddenCanopyGeometry.translate(0, 0.075, 0);
+      hiddenCanopyGeometry.deleteAttribute("uv");
     }
     if (!groundShadowGeometry) {
       // 18 段在放大后能看出多边形边；32 段仍只占一次 draw call
@@ -1510,6 +1534,13 @@ export function CreateRenderer(canvas, options = {}) {
       padMaterial.polygonOffset = true;
       padMaterial.polygonOffsetFactor = -4;
       padMaterial.polygonOffsetUnits = -4;
+    }
+    if (!hiddenCanopyMaterial) {
+      // 伪装盖片要比底座实一档才读得出"草席"的物件感，但仍半透，不遮死下面的队伍
+      hiddenCanopyMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.78,
+        side: THREE.DoubleSide, depthWrite: false, name: "PrairieHiddenCanopy",
+      });
     }
     if (!groundShadowMaterial) {
       // 接地投影：径向渐隐的软圆盘，把物件"压"在地面上。
@@ -1759,8 +1790,9 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
           entry.x, surfaceY + worldConfig.propLift, entry.z, 0, radius * 1.5, tint, visible,
           { castShadow: false, shadowRadius: 0 });
       } else if (hex.feature === "Terrace") {
+        // 0.85：田埂贴着坡面收在格内，1.5 会摊成直径两格的金色"露天剧场"
         PlaceCategorised(staticPool, CreateWorkModel("Terrace"), "works",
-          entry.x, surfaceY + worldConfig.propLift, entry.z, rotation, radius * 1.5, tint, visible,
+          entry.x, surfaceY + worldConfig.propLift, entry.z, rotation, radius * 0.85, tint, visible,
           { castShadow: false, shadowRadius: 0 });
       } else if (hex.feature === "Pass") {
         PlaceCategorised(staticPool, CreateWorkModel("Barricade"), "works",
@@ -1875,7 +1907,7 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
         InstancePoolPush(unitPool, unitPadGeometry, padMaterial,
           placementMatrix.compose(placementPosition, placementQuaternion, placementScale), padTint, false);
 
-        // 隐蔽指示：贴地的破口环，明确但不喧宾夺主
+        // 隐蔽指示：贴地的虚线环，明确但不喧宾夺主
         if (hidden) {
           placementPosition.set(x, surfaceY + 0.03, z);
           placementScale.set(visible ? 1 : 0, visible ? 1 : 0, visible ? 1 : 0);
@@ -1897,10 +1929,21 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
           ? GetHiddenModelMaterial(sourceMaterial)
           : GetPropMaterial(sourceMaterial, category);
         // 1920 屏默认视距下部队原本只占 25~30px，六倍裁切才勉强看出人形，再放大一档
-        const unitScale = worldConfig.tileRadius * (hidden ? 2.64 : 3.08);
+        const unitScale = worldConfig.tileRadius * (hidden ? 3.0 : 3.55);
         // 隐蔽队伍略矮略沉，读作"伏下身"
         PlaceModel(unitPool, model, x, surfaceY + (hidden ? -0.03 : worldConfig.propLift), z,
           facing, unitScale, null, visible, materialOverride);
+
+        // 隐蔽的第二重标识：头顶一片"草帽伪装"盖片，远看也能分清"隐蔽中 vs 正常"。
+        // 同格多支部队时收小一号，避免相邻盖片与旗标互相穿插。
+        if (hidden) {
+          const canopyScale = (visible ? 1 : 0) * (list.length > 1 ? 0.76 : 1);
+          placementPosition.set(x, surfaceY + unitScale * 0.26, z);
+          placementQuaternion.setFromAxisAngle(placementAxis, (HashString(String(unit.id || key)) % 7) * 0.9);
+          placementScale.set(canopyScale, canopyScale, canopyScale);
+          InstancePoolPush(unitPool, hiddenCanopyGeometry, hiddenCanopyMaterial,
+            placementMatrix.compose(placementPosition, placementQuaternion, placementScale), hiddenCanopyTint, false);
+        }
 
         // 我方队伍插一面小红旗；隐蔽时不插（还没暴露就不该打旗号）
         if (record.faction === "Player" && !hidden) {
@@ -2811,7 +2854,9 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
     // 立体物件层：合批池、渲染层自建的底座几何、半透明隐蔽材质
     if (unitPadGeometry) { unitPadGeometry.dispose(); unitPadGeometry = null; }
     if (hiddenRingGeometry) { hiddenRingGeometry.dispose(); hiddenRingGeometry = null; }
+    if (hiddenCanopyGeometry) { hiddenCanopyGeometry.dispose(); hiddenCanopyGeometry = null; }
     if (padMaterial) { padMaterial.dispose(); padMaterial = null; }
+    if (hiddenCanopyMaterial) { hiddenCanopyMaterial.dispose(); hiddenCanopyMaterial = null; }
     if (hiddenModelMaterial) { hiddenModelMaterial.dispose(); hiddenModelMaterial = null; }
     baseModelMaterial = null;
     // 本实例独占的材质逐个释放（Script_Materials 的工厂每次调用都返回新实例）

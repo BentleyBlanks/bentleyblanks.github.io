@@ -929,8 +929,9 @@ void main() {
   // 深浅：中心深、近岸浅，由几何送来的 aShore 距离场驱动，而不是满格随机斑块
   float shoreBand = smoothstep( 0.35, 1.0, vWaterShore );
   vec3 color = mix( uDeepColor, uShallowColor, shoreBand * 0.85 ) * diffuse;
-  color = mix( color, uSkyColor, fresnel * 0.55 );
-  color += uSunColor * specular * 5.6;
+  // 菲涅尔与高光都压低：北方秋天的浅塘湾子映的是灰蓝天光，不是加勒比的青绿镜面
+  color = mix( color, uSkyColor, fresnel * 0.30 );
+  color += uSunColor * specular * 2.6;
 
   // 泡沫只出现在岸边，且斑块尺度缩到原来的四分之一，避免"霉斑"
   vec2 foamUv = vWaterWorld.xz * 13.0 + normalize( uFlowDirection + vec2( 0.0001 ) ) * uTime * uFlowSpeed * 3.0;
@@ -941,7 +942,7 @@ void main() {
   // 顺流方向的细碎流光：幂次拉高让它只剩针尖大的亮点，强度大幅下调，
   // 否则它会和镜面高光叠加，把整条河抬成一片白。
   float glitter = pow( Fbm( vWaterWorld.xz * 34.0 + uTime * 0.9, 2 ), 14.0 );
-  color += uSunColor * glitter * 1.5 * uDetail;
+  color += uSunColor * glitter * 0.9 * uDetail;
 
   // 总量钳制：以上三层（镜面 / 泡沫 / 流光）是相加的，任何一层单独看都合理，
   // 叠起来却会整体过曝。这里给水面一个明度上限，保证它始终读作"水"而不是"雪"，
@@ -985,8 +986,11 @@ void main() {
   material.userData.uniforms = uniforms;
   material.userData.ApplyPalette = function ApplyWaterPalette(palette) {
     if (!palette) return;
-    uniforms.uDeepColor.value.setHex(palette.water).multiplyScalar(0.62);
-    uniforms.uShallowColor.value.setHex(palette.water).lerp(new THREE.Color(palette.grass), 0.18);
+    // 深浅两色都向地表植被色拉一段：让水塘"长"在土黄大地里而不是浮在上面，
+    // 饱和度随之落回北方秋冬的浑浊浅水，不再是高饱和青蓝
+    const groundColor = new THREE.Color(palette.grass);
+    uniforms.uDeepColor.value.setHex(palette.water).multiplyScalar(0.62).lerp(groundColor, 0.22);
+    uniforms.uShallowColor.value.setHex(palette.water).lerp(groundColor, 0.42);
     uniforms.uSkyColor.value.setHex(palette.sky.horizon);
     uniforms.uSunColor.value.setHex(palette.sun.color);
     uniforms.uUnexploredColor.value.setHex(palette.unexplored);
@@ -1131,8 +1135,10 @@ const overlayKindOrder = ["move", "attack", "build", "sweep", "intel"];
 // 辉光色必须压在地形明度附近：这层地毯在开局就铺满可移动范围（约 24 格、
 // 占屏近两成），一旦用浅色高饱和边缘，它会变成全画面最亮的东西，
 // 把下面的地形、村庄、部队全部洗淡——这正是第二轮「乳白糊团」换个图层复活。
+// move 用与土黄大地同族的暖调（橄榄底 + 麦金边），靠「细描边 + 极轻填充」表达
+// 范围，绝不再用青色把地形整片漂白；attack 保持红系警示，同样细边弱底。
 export const overlayKindColors = Object.freeze({
-  move: { fill: 0x3d8f96, edge: 0x8ad9d2 },
+  move: { fill: 0x6b7a3e, edge: 0xc8b463 },
   attack: { fill: 0x8e2a1e, edge: 0xb05c42 },
   build: { fill: 0x8f6a22, edge: 0xb59a5c },
   sweep: { fill: 0x6b1f16, edge: 0xa85a3c },
@@ -1247,9 +1253,10 @@ void main() {
   vec3 color = mix( fillColor, edgeColor, rim * uRimBoost );
   color *= 0.58 + 0.42 * pattern;
 
-  // 填充几乎透明、只留边缘描边：常数项从 0.30 压到 0.08，
-  // 让玩家读到的是「这一圈格子可以去」，而不是「地图被一层薄荷色糊住了」。
-  float alpha = uOpacity * intensity * inside * ( 0.26 + 0.34 * pattern + 0.52 * rim ) * breathe;
+  // 「细描边 + 极轻填充」：常数项 0.06 / 纹样项 0.10 只给内部一层几乎不可见的
+  // 呼吸底，0.85 的 rim 项把亮度全部集中在边缘描边上——玩家读到的是
+  // 「这一圈格子可以去」（边亮内浅），地形、村庄、部队不再被高亮糊掉。
+  float alpha = uOpacity * intensity * inside * ( 0.06 + 0.10 * pattern + 0.85 * rim ) * breathe;
   gl_FragColor = vec4( color, clamp( alpha, 0.0, 1.0 ) );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -1289,7 +1296,8 @@ void main() {
 
   vec3 color = mix( uFillColor, uEdgeColor, rim * 0.85 );
   color *= 0.58 + 0.42 * pattern;
-  float alpha = uOpacity * inside * ( 0.30 + 0.36 * pattern + 0.44 * rim );
+  // 与合成版同一套「细描边 + 极轻填充」语言，单独摆放的一片也不许糊地形
+  float alpha = uOpacity * inside * ( 0.08 + 0.12 * pattern + 0.80 * rim );
   gl_FragColor = vec4( color, clamp( alpha, 0.0, 1.0 ) );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -1376,7 +1384,7 @@ export function CreateOverlayMaterial(kind = "composite") {
       uTime: { value: 0 },
       uHighlightState: { value: CreateStateFallbackTexture([0, 0, 0, 0]) },
       uKindPalette: { value: CreateOverlayPaletteTexture() },
-      uOpacity: { value: 0.45 },
+      uOpacity: { value: 0.34 },
       uRimBoost: { value: 0.85 },
     };
     fragmentShader = BuildCompositeOverlayShader();
@@ -1392,7 +1400,8 @@ export function CreateOverlayMaterial(kind = "composite") {
       uTime: { value: 0 },
       uFillColor: { value: new THREE.Color(0xe8b95c) },
       uEdgeColor: { value: new THREE.Color(0xfff0c8) },
-      uOpacity: { value: 0.55 },
+      // 部队放大之后选中环是唯一的"当前操作对象"锚点，透明度提到 0.85 一档
+      uOpacity: { value: 0.85 },
     };
     fragmentShader = BuildSelectShader();
   } else {

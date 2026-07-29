@@ -23,6 +23,19 @@
 //
 // 内容红线（规格书第 7 节）：特效只表现「隐蔽—突袭—转移」与「人民的组织」，
 // 不做血腥、不渲染杀戮，爆点只表现破坏交通线，动员是本模块最该有感染力的一段。
+//
+// 【特效时长契约】（供 Script_Main 的 PlayEffectQueue 做分阶段 await）：
+//   · 所有 Spawn* 的返回值都带 `duration` 字段（秒）——该特效"叙事完成"的时长：
+//     单位到位、爆点结束、飘字读完；粒子的自然消散余尾可能略长于该值。
+//   · SpawnUnitMove / SpawnTunnelTravel 返回的仍是可 await 的 Promise（行为不变），
+//     只是 Promise 对象上附加了 duration 属性；Promise 在 duration 处 resolve。
+//   · 其余 Spawn*（Ambush/Sabotage/Capture/Mobilize/Build/IntelPing/FloatingText/
+//     SweepArrow/Ring）返回 { duration, ... } 普通对象，个别附带内部句柄字段。
+//   · 被跳过的调用（disposed / 参数不足 / 并发上限占满）返回 duration 为 0 的对象，
+//     调用方可以直接把 duration 当等待秒数用，无需判空。
+//   · 烟柱不是 Spawn*：SetSmoke(key, level) 常驻、ClearSmoke() 全清、
+//     DecaySmoke() 回合边界衰减（第 1 次调用压暗、第 2 次淡出撤除），
+//     另有 90 秒实时 ttl 兜底——即使外部从不清理，烟柱也会自然散去。
 
 import * as THREE from "three";
 import { HexToWorld, ParseHexKey, HexLine, HexKey, hexSize, CreateRng, HashString, Clamp, Lerp, SmoothStep } from "./Script_Hex.mjs";
@@ -32,11 +45,13 @@ import { CreateWorkModel, CreateRailModel, TickModelWind } from "./Script_Models
 // 质量分级预设
 // --------------------------------------------------------------------------
 
+// smokeColumns 压到个位数低档：烟柱现在自带 ttl 淡出（见 SetSmoke/DecaySmoke），
+// 同屏四五根已经足够讲"多处被焚"，八根以上只会把土黄大地糊成一片灰。
 const qualityPresets = {
-  low: { particleScale: 0.34, burstEmitters: 8, lights: 0, weather: false, smokeColumns: 3, rings: 6, moves: 2, scaffolds: 4 },
-  medium: { particleScale: 0.62, burstEmitters: 14, lights: 1, weather: true, smokeColumns: 5, rings: 10, moves: 3, scaffolds: 8 },
-  high: { particleScale: 1, burstEmitters: 20, lights: 3, weather: true, smokeColumns: 8, rings: 14, moves: 5, scaffolds: 12 },
-  ultra: { particleScale: 1.4, burstEmitters: 28, lights: 5, weather: true, smokeColumns: 12, rings: 18, moves: 8, scaffolds: 16 },
+  low: { particleScale: 0.34, burstEmitters: 8, lights: 0, weather: false, smokeColumns: 2, rings: 6, moves: 2, scaffolds: 4 },
+  medium: { particleScale: 0.62, burstEmitters: 14, lights: 1, weather: true, smokeColumns: 3, rings: 10, moves: 3, scaffolds: 8 },
+  high: { particleScale: 1, burstEmitters: 20, lights: 3, weather: true, smokeColumns: 4, rings: 14, moves: 5, scaffolds: 12 },
+  ultra: { particleScale: 1.4, burstEmitters: 28, lights: 5, weather: true, smokeColumns: 6, rings: 18, moves: 8, scaffolds: 16 },
 };
 
 const emitterCapacity = 320;
@@ -693,7 +708,8 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
         ashColor: "#7a3418", fade: 0.3, lit: 0, additive: true,
       })
       : BuildParticleBatch("PUFF", smokeSlotCapacity, {
-        drag: 0.9, swirl: 0.65, sizeCurve: [0.35, 2.6], colorA: "#4a423a", colorB: "#9b968c",
+        // 末期膨胀 1.6 倍收口：2.6 会让每根烟柱顶端糊成一朵盖住半格的灰蘑菇
+        drag: 0.9, swirl: 0.65, sizeCurve: [0.35, 1.6], colorA: "#4a423a", colorB: "#9b968c",
         ashColor: "#a9a6a0", fade: 0.4, lit: 1, additive: false,
       });
     return smokeBatches[kind];
@@ -945,9 +961,9 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     RefreshRingRange(batch);
   }
 
-  /** 冲击环：地面上扩散一圈的暖色光晕。返回句柄仅供调用方提前收环。 */
+  /** 冲击环：地面上扩散一圈的暖色光晕。返回 { duration, Finish }，Finish 供提前收环。 */
   function SpawnRing(position, spec = {}) {
-    if (disposed) return null;
+    if (disposed) return { duration: 0 };
     // 同屏环数仍按画质分级封顶，超出时把最旧的一环提前收走
     while (activeRings.length >= preset.rings) {
       const oldest = activeRings.shift();
@@ -960,7 +976,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     for (let index = 0; index < usable; index += 1) {
       if (!batch.owners[index]) { slotIndex = index; break; }
     }
-    if (slotIndex < 0) return null;
+    if (slotIndex < 0) return { duration: 0 };
     batch.owners[slotIndex] = true;
     batch.generation[slotIndex] += 1;
     const generation = batch.generation[slotIndex];
@@ -979,7 +995,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     const to = spec.to ?? 0.85;
     const duration = spec.duration ?? 0.7;
     const opacity = spec.opacity ?? 0.6;
-    const record = { Finish: null };
+    const record = { duration, Finish: null };
     activeRings.push(record);
     const Retire = () => {
       ReleaseRingSlot(batch, slotIndex, generation);
@@ -1045,9 +1061,12 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
   // 行军动画
   // ------------------------------------------------------------------------
 
-  /** 沿 HexLine 路径移动单位：缓动 + 转向 + 起伏 + 扬尘拖尾 +（夜间）火把。 */
+  /**
+   * 沿 HexLine 路径移动单位：缓动 + 转向 + 起伏 + 扬尘拖尾 +（夜间）火把。
+   * 返回可 await 的 Promise（到位时 resolve），其上附带 duration（秒）。
+   */
   function SpawnUnitMove(fromKey, toKey, unitObject, moveOptions = {}) {
-    if (disposed || !unitObject) return Promise.resolve();
+    if (disposed || !unitObject) return Object.assign(Promise.resolve(), { duration: 0 });
     while (activeMoves.length >= preset.moves) {
       const oldest = activeMoves.shift();
       if (oldest && oldest.Finish) oldest.Finish();
@@ -1077,6 +1096,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     }
     let resolveMove = null;
     const promise = new Promise((resolve) => { resolveMove = resolve; });
+    promise.duration = duration;
     pendingResolvers.add(resolveMove);
 
     const record = { Finish: null };
@@ -1122,9 +1142,12 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     return promise;
   }
 
-  /** 地道转移：地表下的土包移动 + 沿途细小土屑，出入口各一次扬尘。 */
+  /**
+   * 地道转移：地表下的土包移动 + 沿途细小土屑，出入口各一次扬尘。
+   * 返回可 await 的 Promise（土包到达出口时 resolve），其上附带 duration（秒）。
+   */
   function SpawnTunnelTravel(fromKey, toKey) {
-    if (disposed) return Promise.resolve();
+    if (disposed) return Object.assign(Promise.resolve(), { duration: 0 });
     const { points } = PathOf(fromKey, toKey);
     if (points.length < 2) points.push(points[0].clone().add(new THREE.Vector3(0.02, 0, 0.02)));
     const start = points[0];
@@ -1139,6 +1162,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     CreateParticleBurst({ position: start.clone(), shape: "PUFF", count: 20, radius: 0.12, speed: [0.1, 0.3], direction: "dome", life: [0.5, 1], size: [12, 22], drag: 3, colorA: "#9c8a68", colorB: "#7a6d55", opacity: 0.5, sizeCurve: [0.6, 1.6] });
     let resolveTravel = null;
     const promise = new Promise((resolve) => { resolveTravel = resolve; });
+    promise.duration = duration;
     pendingResolvers.add(resolveTravel);
     AddTween(duration, (t, dt) => {
       curve.getPoint(EaseInOutCubic(t), sampled);
@@ -1163,7 +1187,9 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
 
   /** 伏击：草木晃动 → 短促枪口闪光 → 烟尘扩散 → 目标震动 → 迅速隐没。 */
   function SpawnAmbush(key, ambushOptions = {}) {
-    if (disposed) return;
+    // 内部时间线的真实总长：0.9s 的收场延时 + 暗尘 1.4s 寿命
+    const ambushDuration = 2.3;
+    if (disposed) return { duration: 0 };
     const center = WorldOf(key, 0);
     // 1. 草木晃动：贴地的碎叶被惊起
     CreateParticleBurst({
@@ -1212,11 +1238,14 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
         colorB: "#54513f", opacity: 0.3, fade: 0.1, sizeCurve: [0.8, 1.6],
       });
     });
+    return { duration: ambushDuration };
   }
 
   /** 破袭：冲击环 + 碎石抛射 + 尘柱升腾 + 轨条几何弯折。 */
   function SpawnSabotage(key, sabotageOptions = {}) {
-    if (disposed) return;
+    // 尘柱 0.35s 延时 + 2.6s 寿命 ≈ 轨条弯折 2.8s，取 3.0 收整
+    const sabotageDuration = 3.0;
+    if (disposed) return { duration: 0 };
     const center = WorldOf(key, 0);
     SpawnRing(center, { color: "#f0d9a4", from: 0.08, to: 1.15, duration: 0.5, opacity: 0.75, holdUntil: 0.05 });
     SpawnRing(center, { color: "#b08a4e", from: 0.2, to: 1.6, duration: 1.1, opacity: 0.3, holdUntil: 0.1 });
@@ -1270,6 +1299,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       blastLight.light.position.copy(center).setY(center.y + 0.3);
       AddTween(0.4, (t) => { blastLight.light.intensity = (1 - t) * (1 - t) * 6; }, () => ReleaseLight(blastLight));
     }
+    return { duration: sabotageDuration };
   }
 
   function NeighborKeyOf(key) {
@@ -1279,7 +1309,9 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
 
   /** 缴获：武器箱升起 + 金色飘字，强调「补给来自战场」而非战果炫耀。 */
   function SpawnCapture(key, captureOptions = {}) {
-    if (disposed) return;
+    // 木箱升起-回落的主补间 1.9s，飘字 1.7s 在其内
+    const captureDuration = 1.9;
+    if (disposed) return { duration: 0 };
     const center = WorldOf(key, 0);
     const crate = CreateWorkModel("Cache", { scale: 0.62 });
     crate.position.copy(center).setY(center.y - 0.12);
@@ -1300,6 +1332,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       if (t > 0.72) crate.position.y -= (t - 0.72) * 0.4;
     }, () => root.remove(crate));
     SpawnFloatingText(key, captureOptions.text || "缴获", captureOptions.color || "#e8c67a");
+    return { duration: captureDuration };
   }
 
   /**
@@ -1307,7 +1340,9 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
    * 这是本作最该有感染力的一段——先零星，后成片，最后汇成一股。
    */
   function SpawnMobilize(key, mobilizeOptions = {}) {
-    if (disposed) return;
+    // 人群点阵 1.5s 错峰出现 + 3s 寿命，是全场最长的一段
+    const mobilizeDuration = 4.5;
+    if (disposed) return { duration: 0 };
     const center = WorldOf(key, 0);
     const gather = mobilizeOptions.towardKey ? WorldOf(mobilizeOptions.towardKey, 0.5) : center.clone().setY(center.y + 0.85);
     SpawnRing(center, { color: "#d8a860", from: 0.2, to: 1.25, duration: 1.6, opacity: 0.34, holdUntil: 0.35 });
@@ -1345,11 +1380,14 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       warmLight.light.position.copy(center).setY(center.y + 0.5);
       AddTween(2.6, (t) => { warmLight.light.intensity = Math.sin(t * Math.PI) * 2.2; }, () => ReleaseLight(warmLight));
     }
+    return { duration: mobilizeDuration };
   }
 
   /** 建设：夯土扬尘（有节奏的四次夯击）+ 脚手架逐层升起。 */
   function SpawnBuild(key) {
-    if (disposed) return;
+    // 脚手架 2.6s 主补间；即使没抢到脚手架 slot，扬尘与夯击环也有 ~2.5s
+    const buildDuration = 2.6;
+    if (disposed) return { duration: 0 };
     const center = WorldOf(key, 0);
     CreateParticleBurst({
       position: center.clone(), shape: "PUFF", count: 56, radius: 0.24, height: 0.02, speed: [0.15, 0.45],
@@ -1367,7 +1405,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       if (oldest && oldest.Finish) oldest.Finish();
     }
     const slot = AcquireScaffoldSlot();
-    if (!slot) return;
+    if (!slot) return { duration: buildDuration };
     const layerScales = [0, 0, 0, 0];
     const record = { slot, Finish: null };
     activeScaffolds.push(record);
@@ -1390,6 +1428,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       tween.elapsed = tween.duration;
       Retire();
     };
+    return { duration: buildDuration };
   }
 
   /**
@@ -1398,10 +1437,10 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
    * 超出上限时把最旧的一条立刻收走，保证它不会随战局无限堆积。
    */
   function SpawnSweepArrow(fromKey, toKey, arrowOptions = {}) {
-    if (disposed) return null;
+    if (disposed) return { duration: 0 };
     while (sweepArrows.length >= sweepArrowLimit) RemoveSweepArrow(sweepArrows[0]);
     const { points } = PathOf(fromKey, toKey, arrowOptions.pathKeys);
-    if (points.length < 2) return null;
+    if (points.length < 2) return { duration: 0 };
     const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.4);
     const segments = Math.max(12, points.length * 6);
     const width = arrowOptions.width ?? 0.34;
@@ -1459,7 +1498,8 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       const fadeOut = 1 - SmoothStep(0.85, 1, t);
       material.uniforms.uOpacity.value = fadeIn * fadeOut * (arrowOptions.opacity ?? 0.62);
     }, () => RemoveSweepArrow(entry));
-    return entry;
+    // 箭头是警示层而非分镜：duration 报全寿命，但排队播放时不必等它走完
+    return { duration: life, entry };
   }
 
   /** 收走一条箭头。提前收走与寿命到期都会调到这里，因此必须可重入。 */
@@ -1479,7 +1519,9 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
 
   /** 情报侦察：同心环扩散 + 细光柱 + 微弱火花。 */
   function SpawnIntelPing(key) {
-    if (disposed) return;
+    // 第三道环 0.57s 起 + 1s 寿命，火花延时 0.5s + 1.5s 寿命 → 取 2.0
+    const pingDuration = 2.0;
+    if (disposed) return { duration: 0 };
     const center = WorldOf(key, 0);
     for (let index = 0; index < 3; index += 1) {
       Delay(0.05 + index * 0.26, () => {
@@ -1501,6 +1543,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       beamGeometry.dispose();
       beamMaterial.dispose();
     });
+    return { duration: pingDuration };
   }
 
   // ------------------------------------------------------------------------
@@ -1539,9 +1582,10 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
 
   /** 资源/事件飘字：始终面向相机，上浮淡出。 */
   function SpawnFloatingText(key, text, color = "#e6dcc4") {
-    if (disposed) return null;
+    const textDuration = 1.7;
+    if (disposed) return { duration: 0, sprite: null };
     const texture = GetTextTexture(String(text), color);
-    if (!texture) return null;
+    if (!texture) return { duration: 0, sprite: null };
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false, opacity: 0 });
     const sprite = new THREE.Sprite(material);
     const center = WorldOf(key, 0.55);
@@ -1549,14 +1593,14 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     sprite.scale.set(0.86, 0.24, 1);
     sprite.renderOrder = 20;
     root.add(sprite);
-    AddTween(1.7, (t) => {
+    AddTween(textDuration, (t) => {
       sprite.position.y = center.y + EaseInOutCubic(t) * 0.5;
       material.opacity = SmoothStep(0, 0.12, t) * (1 - SmoothStep(0.62, 1, t));
     }, () => {
       root.remove(sprite);
       material.dispose();
     });
-    return sprite;
+    return { duration: textDuration, sprite };
   }
 
   // ------------------------------------------------------------------------
@@ -1572,11 +1616,34 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     column.emberSlot = -1;
   }
 
+  // 烟柱寿命：外部不来任何回合信号时，90 秒后也自行淡出（loop 发射器绝不永生）
+  const smokeTtlSeconds = 90;
+  const smokeFadeSeconds = 5;
+
+  /** 把一根烟柱两个 slot 的逐粒子浓度（aBatch.y）整段改写成 base × factor。 */
+  function WriteSlotDensity(batch, slotIndex, generation, density) {
+    if (!batch || slotIndex < 0 || slotIndex >= batch.owners.length) return;
+    if (batch.generation[slotIndex] !== generation || batch.owners[slotIndex] === null) return;
+    const attribute = batch.geometry.getAttribute("aBatch");
+    const base = slotIndex * batch.slotSize;
+    for (let index = base; index < base + batch.slotSize; index += 1) attribute.array[index * 4 + 1] = density;
+    attribute.needsUpdate = true;
+  }
+
+  function ApplyColumnDensity(column, factor) {
+    if (Math.abs(factor - column.appliedFactor) < 0.012) return;
+    column.appliedFactor = factor;
+    WriteSlotDensity(smokeBatches.smoke, column.smokeSlot, column.smokeGeneration, column.smokeDensity * factor);
+    WriteSlotDensity(smokeBatches.ember, column.emberSlot, column.emberGeneration, column.emberDensity * factor);
+  }
+
   /**
    * 持续烟柱（被焚村庄 / 被炸炮楼）。level 0 撤除，1-3 控制浓度、高度与余烬。
    * 烟柱是持久特效，写进常驻合批的 slot 里：无论战场上烧着几处，浓烟与余烬各自
    * 只有一个 draw call。浓度分级（粒子数 / 半径 / 寿命 / 尺寸 / 上升 / 扰动 / 不透
    * 明度）与「随时间变灰」的诞生时刻全部逐粒子随 aBatch 走，观感与独立发射器一致。
+   * 每根烟柱自带衰减：DecaySmoke()（回合边界）两次内淡出，90 秒实时 ttl 兜底；
+   * 战况仍在燃烧时每回合重新 SetSmoke 同级即可续命（会重置衰减计数）。
    */
   function SetSmoke(key, level) {
     if (disposed) return;
@@ -1589,7 +1656,14 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       }
       return;
     }
-    if (existing && existing.level === clamped) return;
+    if (existing && existing.level === clamped) {
+      // 同级重申 = "还在烧"：重置 ttl 与回合衰减，浓度恢复满值
+      existing.bornAt = clock;
+      existing.decayStage = 0;
+      existing.fadeStart = -1;
+      ApplyColumnDensity(existing, 1);
+      return;
+    }
     if (existing) {
       ReleaseSmokeColumn(existing);
       smokeColumns.delete(key);
@@ -1604,15 +1678,19 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     const smokeSlot = AcquireBatchSlot(smokeBatch, key, preset.smokeColumns);
     if (smokeSlot < 0) return;
     const center = WorldOf(key, 0);
+    const smokeDensity = 0.2 + clamped * 0.1;
     WriteBatchSlot(smokeBatch, smokeSlot, {
       position: center, count: 26 + clamped * 22, radius: 0.1 + clamped * 0.04,
       height: 0.05, baseLift: 0.04, speed: [0.04, 0.14], direction: "up", spread: 0.4,
-      life: [2.4 + clamped * 0.7, 3.6 + clamped * 0.9], size: [18 + clamped * 5, 34 + clamped * 12],
+      // 尺寸上限 70 → 52：配合 sizeCurve 收口，最浓一档也只是"一炷"而不是"一朵"
+      life: [2.4 + clamped * 0.7, 3.6 + clamped * 0.9], size: [18 + clamped * 5, 28 + clamped * 8],
       delay: [0, 3.5],
-    }, [clock, 0.2 + clamped * 0.1, 0.22 + clamped * 0.14, 0.1 + clamped * 0.05]);
+    }, [clock, smokeDensity, 0.22 + clamped * 0.14, 0.1 + clamped * 0.05]);
     const column = {
       level: clamped, smokeSlot, smokeGeneration: smokeBatch.generation[smokeSlot],
       emberSlot: -1, emberGeneration: 0,
+      bornAt: clock, decayStage: 0, fadeStart: -1,
+      smokeDensity, emberDensity: 0.55, appliedFactor: 1,
     };
     if (clamped >= 3) {
       const emberBatch = GetSmokeBatch("ember");
@@ -1633,6 +1711,44 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
   function ClearSmoke() {
     for (const column of smokeColumns.values()) ReleaseSmokeColumn(column);
     smokeColumns.clear();
+  }
+
+  /**
+   * 回合边界衰减：集成层在每次回合结算时调用一次。
+   * 第 1 次调用把烟柱压暗到 45%，第 2 次开始淡出并撤除——"两个回合边界内散尽"。
+   * 期间若 SetSmoke 以同级重申（村子还在烧），衰减计数会被重置。
+   */
+  function DecaySmoke() {
+    for (const column of smokeColumns.values()) {
+      column.decayStage += 1;
+      if (column.decayStage >= 2 && column.fadeStart < 0) column.fadeStart = clock;
+    }
+  }
+
+  /** 每帧：套用回合衰减档位 / 实时 ttl，淡出结束的烟柱真正归还 slot。 */
+  function UpdateSmokeColumns() {
+    if (!smokeColumns.size) return;
+    let finished = null;
+    for (const [key, column] of smokeColumns) {
+      if (column.fadeStart < 0 && clock - column.bornAt > smokeTtlSeconds) column.fadeStart = clock;
+      let factor = column.decayStage >= 1 ? 0.45 : 1;
+      if (column.fadeStart >= 0) {
+        const fade = 1 - (clock - column.fadeStart) / smokeFadeSeconds;
+        if (fade <= 0) {
+          if (!finished) finished = [];
+          finished.push(key);
+          continue;
+        }
+        factor *= fade;
+      }
+      ApplyColumnDensity(column, factor);
+    }
+    if (finished) {
+      for (const key of finished) {
+        ReleaseSmokeColumn(smokeColumns.get(key));
+        smokeColumns.delete(key);
+      }
+    }
   }
 
   // ------------------------------------------------------------------------
@@ -1836,6 +1952,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
         if (emitter.busy && !emitter.looping && clock >= emitter.releaseAt) ReleaseEmitter(emitter);
       }
     }
+    UpdateSmokeColumns();
     UpdateWeather(step);
   }
 
@@ -1910,6 +2027,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     SetWeather,
     SetSmoke,
     ClearSmoke,
+    DecaySmoke,
     ClearSweepArrows,
     SetTimeOfDay,
     SetQuality,

@@ -136,6 +136,7 @@ export const effectVocabulary = Object.freeze({
   unlockUnit: "解锁单位类型",
   unlockWork: "解锁地块工事类型",
   flags: "写入 state 的字符串标记数组，供后续事件条件判断",
+  forceSweep: "事件结算时若无扫荡在案，立即强制立案一次高强度合围（铁壁合围通路，Script_Rules 消费）",
   duration: "持续回合数，0 或缺省表示永久修正",
 });
 
@@ -400,6 +401,8 @@ export function GetEraProgress(turn) {
 //
 // 每条事件：{ id, era, turnRange, weight, condition, title, dateline, body, illustration, options, flavor }
 // 每个选项：{ id, label, hint, effects, ledger }
+// mandatory: true 的事件是史实硬节点：时间窗走到最后一回合仍未触发时由
+// Script_Rules.PickHistoricalEvent 强制触发（铁壁合围、受降不因玩家打法而缺席）。
 //
 // 代价红线（本文件自我约束，Script_Rules 结算时也应复核）：
 // 只要一个选项的 ledger 里有任何正数，它的 effects 就只允许出现
@@ -423,7 +426,7 @@ export const historicalEvents = DeepFreeze([
       { id: "CollectArmsOnly", label: "只收枪械，管一顿饭发路条", hint: "省下口粮，但会打枪的人都走了。",
         effects: { stockDelta: { ordnance: 14, grain: -5 }, exposureDelta: 2 }, ledger: {} },
       { id: "EnlistWilling", label: "愿意留下的编成一个排", hint: "多了三十条汉子的饭，也多了三十双拿过枪的手。",
-        effects: { stockDelta: { ordnance: 20, grain: -16 }, unlockUnit: "Guerrilla", massDelta: -2, exposureDelta: 4 }, ledger: {} },
+        effects: { stockDelta: { ordnance: 14, grain: -16 }, unlockUnit: "Guerrilla", massDelta: -2, exposureDelta: 4 }, ledger: {} },
       { id: "ElderMediates", label: "请村里的老人出面，先管饭再谈枪", hint: "慢，但枪是村里人看着交的，账记在明处。",
         effects: { stockDelta: { ordnance: 9, grain: -11 }, massDelta: 5, flags: ["ArmsRegistered"] }, ledger: {} },
     ],
@@ -449,7 +452,7 @@ export const historicalEvents = DeepFreeze([
       { id: "ByLaw", label: "照边区条例减到二五减租，欠账分期清", hint: "按条文办，慢，但地主也认这个理。",
         effects: { massDelta: 8, yieldBonus: { grain: 0.08 }, unlockDoctrine: "RentReduction", unrestDecay: 0.3 }, ledger: {} },
       { id: "SettleHard", label: "旧账一次算清，押金当场退", hint: "痛快。也会有人把地撂荒，把粮车往城里赶。",
-        effects: { massDelta: 12, stockDelta: { grain: 22 }, yieldBonus: { grain: -0.06 }, alertDelta: 5 }, ledger: {} },
+        effects: { massDelta: 12, stockDelta: { grain: 14 }, yieldBonus: { grain: -0.06 }, alertDelta: 5 }, ledger: {} },
       { id: "InterestOnly", label: "先不动租额，只减息、只清高利贷", hint: "动静小，得罪的人少，见效也慢。",
         effects: { massDelta: 4, flatYield: { grain: 1 }, unrestDecay: 0.5 }, ledger: {} },
     ],
@@ -514,7 +517,7 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Village", tone: "warm", motifs: ["stillPot", "herbBundles", "bandageRoll", "lantern"] },
     options: [
       { id: "Distill", label: "先解决酒精和蒸馏水", hint: "不起眼，救的人最多。",
-        effects: { flatYield: { medicine: 2 }, medicineEfficiency: 0.15, healRate: 0.06, unlockDistrict: "Clinic" }, ledger: {} },
+        effects: { flatYield: { medicine: 1 }, medicineEfficiency: 0.15, healRate: 0.06, unlockDistrict: "Clinic" }, ledger: {} },
       { id: "GatherHerbs", label: "动员群众上山采药，按斤收购", hint: "药有了，也让山里人多一份进项。",
         effects: { flatYield: { medicine: 1 }, massDelta: 5, yieldBonus: { medicine: 0.2 }, stockDelta: { grain: -10 } }, ledger: {} },
       { id: "BuyFromTown", label: "花大价钱从城里换西药", hint: "见效最快，路子也最容易被摸出来。",
@@ -566,11 +569,11 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Harvest", tone: "warm", motifs: ["sickles", "sheaves", "cellarMouth", "moonlight"] },
     options: [
       { id: "NightHarvest", label: "夜收夜藏，磨面只在后半夜", hint: "累得脱形，但不惊动人。",
-        effects: { stockDelta: { grain: 38, labor: -12 }, exposureDelta: -3, massDelta: 4 }, ledger: {} },
+        effects: { stockDelta: { grain: 16, labor: -12 }, exposureDelta: -3, massDelta: 4 }, ledger: {} },
       { id: "CoverParty", label: "两个连在东梁上顶着，白天照常收", hint: "收得最多，也把位置摆到明处了。",
-        effects: { stockDelta: { grain: 52 }, exposureDelta: 9, alertDelta: 6, healRate: -0.03 }, ledger: {} },
+        effects: { stockDelta: { grain: 16 }, exposureDelta: 9, alertDelta: 6, healRate: -0.03 }, ledger: {} },
       { id: "CacheOldStock", label: "先把去年的存粮转到崖窖，再动镰", hint: "今年少收些，明年春天才有底。",
-        effects: { stockDelta: { grain: 26, labor: -16 }, exposureDecay: 1, flags: ["GrainDispersed"] }, ledger: {} },
+        effects: { stockDelta: { grain: 12, labor: -16 }, exposureDecay: 1, flags: ["GrainDispersed"] }, ledger: {} },
     ],
     flavor: "窖口用石板压好，上面撒一层土，再赶几只羊踩过去。踩过的地和没踩过的，远看是一样的。" },
   { id: "RailBreak", era: "Growth", turnRange: [10, 13], weight: 98, condition: { requireRailway: true },
@@ -614,17 +617,17 @@ export const historicalEvents = DeepFreeze([
     flavor: "改选后有个开明绅士当了副县长。上任第一件事，是把自家两顷地按新条例减了租。" },
 
   // ===== 困难期 1941春 — 1942冬 =====
-  { id: "GreatSweep", era: "Hardship", turnRange: [14, 19], weight: 100, condition: { minExposure: 30 },
+  { id: "GreatSweep", era: "Hardship", turnRange: [14, 19], weight: 100, condition: {}, mandatory: true,
     title: "十一路", dateline: "1941年 秋 · 全县",
     body: "情报是三天前送进来的：敌人集中了两个联队又两个大队，另有伪军若干，分十一路，从三面同时压过来。合击点标在北山一个小盆地——那里有后方医院、印刷所和一部电台。留给我们的时间是两夜一天。要带走的东西按轻重排：伤员、机器、账册、粮。",
     illustration: { kind: "Ridge", tone: "grim", motifs: ["smokeColumns", "ridgeline", "stretchers", "packMules"] },
     options: [
       { id: "SplitAndSlip", label: "化整为零，跳到合击圈外面去", hint: "人保得最多。印刷机和存粮带不走。",
-        effects: { exposureDelta: -14, alertDelta: -4, stockDelta: { grain: -60, ordnance: -10 } }, ledger: { civilianDeaths: 26, displaced: 1800, villagesBurned: 3, grainSeized: 24000 } },
+        effects: { forceSweep: true, exposureDelta: -14, alertDelta: -4, stockDelta: { grain: -60, ordnance: -10 } }, ledger: { civilianDeaths: 26, displaced: 1800, villagesBurned: 3, grainSeized: 24000 } },
       { id: "HoldTheRidge", label: "留一个营顶住隘口，掩护机关先走", hint: "机器保住了。顶在隘口的人不一定回得来。",
-        effects: { exposureDelta: -6, stockDelta: { ordnance: -24, medicine: -12 } }, ledger: { civilianDeaths: 41, displaced: 2400, villagesBurned: 5, cadreLost: 9, grainSeized: 31000 } },
+        effects: { forceSweep: true, exposureDelta: -6, stockDelta: { ordnance: -24, medicine: -12 } }, ledger: { civilianDeaths: 41, displaced: 2400, villagesBurned: 5, cadreLost: 9, grainSeized: 31000 } },
       { id: "MoveInward", label: "敌进我进，插到他后面去打空虚据点", hint: "把他调回去了。我们自己的伤亡最重。",
-        effects: { exposureDelta: 6, alertDelta: 10, stockDelta: { ordnance: -18, medicine: -10 } }, ledger: { civilianDeaths: 34, displaced: 1500, villagesBurned: 4, cadreLost: 6, grainSeized: 12000 } },
+        effects: { forceSweep: true, exposureDelta: 6, alertDelta: 10, stockDelta: { ordnance: -18, medicine: -10 } }, ledger: { civilianDeaths: 34, displaced: 1500, villagesBurned: 4, cadreLost: 6, grainSeized: 12000 } },
     ],
     flavor: "转移的规矩叫“三不留”：不留粮、不留人、不留字纸。字纸包括花名册、账本，和小学生的作业本。" },
   { id: "ScorchedEarth", era: "Hardship", turnRange: [15, 21], weight: 96, condition: { minExposure: 25 },
@@ -672,7 +675,7 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Assembly", tone: "cold", motifs: ["ledgerBook", "abacus", "coldRoom", "bedrollPacked"] },
     options: [
       { id: "DeepCut", label: "机关砍掉四成，主力缩编两个营", hint: "刀下去很疼，明年春天能省四十万斤。",
-        effects: { maintenanceDiscount: 0.28, massGrowth: 0.35, stockDelta: { grain: 40 }, defenceBonus: -0.08, moveBonus: -0.05 }, ledger: {} },
+        effects: { maintenanceDiscount: 0.28, massGrowth: 0.35, stockDelta: { grain: 16 }, defenceBonus: -0.08, moveBonus: -0.05 }, ledger: {} },
       { id: "ModerateCut", label: "砍两成，主力不动，先减机关", hint: "两头都不彻底，两头都还能过。",
         effects: { maintenanceDiscount: 0.14, massGrowth: 0.15, stockDelta: { grain: 16 } }, ledger: {} },
       { id: "CadreToVillage", label: "干部整批下沉到村，一村一个", hint: "机关空了，村里满了。",
@@ -845,9 +848,9 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Night", tone: "cold", motifs: ["gateAjar", "stackedRifles", "signalLamp", "quietStreet"] },
     options: [
       { id: "AcceptAll", label: "四条全答应，先把人和枪接过来", hint: "东西到手了。有的村子不认这笔账。",
-        effects: { stockDelta: { ordnance: 46, grain: -30 }, puppetDefection: 0.2, massDelta: -5, alertDelta: -8 }, ledger: {} },
+        effects: { stockDelta: { ordnance: 14, grain: -30 }, puppetDefection: 0.2, massDelta: -5, alertDelta: -8 }, ledger: {} },
       { id: "ScreenThenAccept", label: "接过来，但要甄别，有血债的另案处理", hint: "慢，麻烦，村里服气。",
-        effects: { stockDelta: { ordnance: 38, grain: -24 }, massDelta: 6, unlockDoctrine: "PuppetWork", puppetDefection: 0.12 }, ledger: {} },
+        effects: { stockDelta: { ordnance: 14, grain: -24 }, massDelta: 6, unlockDoctrine: "PuppetWork", puppetDefection: 0.12 }, ledger: {} },
       { id: "DeclineButUse", label: "不接，只要他们不打枪、放我们过路", hint: "什么都没得到，什么都没冒险。",
         effects: { alertDecay: 0.4, concealment: 0.06, flatYield: { intel: 2 } }, ledger: {} },
     ],
@@ -860,12 +863,12 @@ export const historicalEvents = DeepFreeze([
       { id: "OrderFirst", label: "先接管、先安民，部队一律不进商铺住宿", hint: "第三天集市就开了。",
         effects: { massDelta: 14, populationGrowth: 0.15, flatYield: { grain: 4, labor: 3 }, unlockDistrict: "CountyOffice" }, ledger: {} },
       { id: "SecureStores", label: "先把粮库、械弹库、电台全部控制住", hint: "东西全在手里。街上乱了两天。",
-        effects: { stockDelta: { grain: 120, ordnance: 60, medicine: 20 }, massDelta: 2, exposureDelta: -6 }, ledger: {} },
+        effects: { stockDelta: { grain: 16, ordnance: 14, medicine: 8 }, massDelta: 2, exposureDelta: -6 }, ledger: {} },
       { id: "PursueEastward", label: "分兵向东追击，扩大战果", hint: "追出去六十里。城里的接管晚了五天。",
         effects: { stockDelta: { medicine: -10, ordnance: -6 }, alertDelta: -10, massDelta: -3 }, ledger: { cadreLost: 4 } },
     ],
     flavor: "布告最后一行写着：凡日伪军人员，放下武器者不杀；有血债者依法审判，不得私自处置。" },
-  { id: "Surrender1945", era: "Counter", turnRange: [31, 31], weight: 100, condition: { once: true, minTurn: 31 },
+  { id: "Surrender1945", era: "Counter", turnRange: [31, 31], weight: 100, condition: { once: true, minTurn: 31 }, mandatory: true,
     title: "八月", dateline: "1945年 夏 · 县城与各区",
     body: "消息是从收音机里来的，头一天不敢信，第二天才确认。街上有人放鞭炮，也有人只是坐在门槛上。区上连夜布置了三件事：接受投降与收缴武器；维持秩序，防止溃兵与土匪抢掠；统计八年的损失。第三件最花时间——各村报上来的表格要填五栏：死亡、伤残、被烧房屋、被抢粮食牲口、失踪未归。有的村填了三天，有的村填不下去。",
     illustration: { kind: "Assembly", tone: "warm", motifs: ["newspaperSheet", "villageTable", "emptyChairs", "summerLight"] },
@@ -1075,6 +1078,7 @@ export function BuildEventContext(state) {
   const hexes = source.map && source.map.hexes ? source.map.hexes : {};
   const keys = Object.keys(hexes);
   let massTotal = 0;
+  let settlementMass = 0;
   let villageCount = 0;
   let baseCount = 0;
   let burned = 0;
@@ -1082,7 +1086,10 @@ export function BuildEventContext(state) {
   for (const key of keys) {
     const hex = hexes[key] || {};
     massTotal += Number(hex.massBase) || 0;
-    if (hex.feature === "Village" || hex.feature === "Town" || hex.feature === "CountySeat") villageCount += 1;
+    if (hex.feature === "Village" || hex.feature === "Town" || hex.feature === "CountySeat") {
+      villageCount += 1;
+      settlementMass += Number(hex.massBase) || 0;
+    }
     if (hex.control === "Base" || hex.control === "Guerrilla") baseCount += 1;
     if ((Number(hex.scorch) || 0) >= 60) burned += 1;
     if (hex.railway) hasRailway = true;
@@ -1091,7 +1098,9 @@ export function BuildEventContext(state) {
     turn,
     eraKey: source.eraKey || GetEraKeyForTurn(turn),
     season: GetSeason(turn),
-    massAverage: keys.length ? massTotal / keys.length : 0,
+    // 群众基础按"人住的地方"（村/镇/县城）平均：事件阈值（minMass 18~50）按此口径。
+    // 把整幅地图的荒山野岭都算进分母，阈值会永远够不着。
+    massAverage: villageCount ? settlementMass / villageCount : keys.length ? massTotal / keys.length : 0,
     exposure: Number(source.exposure) || 0,
     alert: Number(source.alert) || 0,
     stock: source.stock && typeof source.stock === "object" ? source.stock : {},

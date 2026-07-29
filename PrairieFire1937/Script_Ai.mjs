@@ -67,6 +67,15 @@ try {
   externalCombatModule = null;
 }
 
+let externalHistoryModule = null;
+
+try {
+  const module = await import('./Data_History.mjs');
+  externalHistoryModule = module ?? null;
+} catch (error) {
+  externalHistoryModule = null;
+}
+
 // ---------------------------------------------------------------------------
 // 常量表
 // ---------------------------------------------------------------------------
@@ -308,6 +317,52 @@ function TerrainLabel(key) {
 const intentLabels = Object.freeze({
   Patrol: '巡逻', Pursue: '追击', Sweep: '扫荡', Garrison: '驻防', Build: '筑垒',
   Repair: '抢修', Requisition: '征发', Withdraw: '回撤', Pacify: '宣抚', Stage: '集结',
+  Supply: '辎重输送',
+});
+
+/**
+ * 全图机动敌军（巡逻队 + 扫荡纵队 + 辎重队）的时期上限。
+ * total 是硬顶；patrol 是常态巡逻网的编制数，给扫荡纵队与辎重队留出缺口。
+ * 治安战的兵力曲线：开辟期点线薄弱 → 困难期重兵清剿 → 反攻期抽兵南调。
+ */
+const eraMobileCaps = Object.freeze({
+  Opening: Object.freeze({ total: 3, patrol: 3 }),
+  Growth: Object.freeze({ total: 5, patrol: 4 }),
+  Hardship: Object.freeze({ total: 8, patrol: 5 }),
+  Recovery: Object.freeze({ total: 5, patrol: 4 }),
+  Counter: Object.freeze({ total: 4, patrol: 3 }),
+});
+
+function EraMobileCap(eraKey, difficulty) {
+  const base = eraMobileCaps[eraKey] || eraMobileCaps.Growth;
+  const bonus = difficulty && (difficulty.key === 'Hard' || difficulty.key === 'Brutal') ? 1 : 0;
+  return { total: base.total + bonus, patrol: base.patrol + bonus };
+}
+
+/** 据点派兵：同一据点两次派兵之间的最小间隔（回合）。 */
+const dispatchCooldownTurns = 3;
+
+/** 运输队发车间隔（回合，按时期）。开辟期公路网未成，不发辎重。 */
+const convoyIntervalByEra = Object.freeze({ Growth: 4, Hardship: 3, Recovery: 4, Counter: 5 });
+
+/** 日历基线扫荡概率的内置回退（Data_History.eraDefinitions.modifiers.sweepChance 缺席时）。 */
+const fallbackSweepChanceByEra = Object.freeze({
+  Opening: 0.06, Growth: 0.16, Hardship: 0.42, Recovery: 0.2, Counter: 0.12,
+});
+
+function EraSweepChance(eraKey) {
+  const provided = externalHistoryModule?.eraDefinitions?.[eraKey]?.modifiers?.sweepChance;
+  if (Number.isFinite(provided)) return Clamp(provided, 0, 1);
+  return fallbackSweepChanceByEra[eraKey] ?? 0.15;
+}
+
+/** 给玩家看的方针提示（state.enemyReadout.doctrine.hint），档案体、面向对策。 */
+const doctrineHints = Object.freeze({
+  Nibble: '敌以修路筑楼一寸寸挤压边缘。宜袭其未成之工事，护住临敌村庄。',
+  Sweep: '敌集结兵力寻我主力，沿线据点守备骤减——正是敌进我进、袭其后方的窗口。',
+  Pacify: '敌以清乡编户争夺人心。宜多做群众工作，勿轻启战端自暴行踪。',
+  Cage: '敌以沟墙碉堡分割根据地。宜破袭公路封锁沟，保持各区联络不断。',
+  Retrench: '敌兵力被抽往正面，外围收缩。可乘虚恢复村庄，逼退孤立据点。',
 });
 
 const compassNames = Object.freeze(['东', '东北', '北', '西北', '西', '西南', '南', '东南']);
@@ -519,7 +574,8 @@ function BuildKnowledge(state) {
 
   const exposure = Clamp(Number(state.exposure) || 0, 0, 100);
   const alert = Clamp(Number(state.alert) || 0, 0, 100);
-  const strongholds = SafeList(state.strongholds);
+  // 拔掉的据点是废墟：不供视野、不算兵力、不当巡逻圆心。
+  const strongholds = LiveStrongholds(state);
   const strongholdKeys = strongholds.map((item) => item.key).filter(Boolean);
 
   // 据点视野：据点周围 patrol 半径内是"看得见"的。
@@ -577,8 +633,13 @@ function BuildKnowledge(state) {
   return knowledge;
 }
 
+/** 仍然驻有守军的据点（destroyed 的废墟一律过滤，全模块统一从这里取）。 */
+function LiveStrongholds(state) {
+  return SafeList(state && state.strongholds).filter((item) => item && !item.destroyed);
+}
+
 function NearestStrongholdDistance(state, key) {
-  const strongholds = SafeList(state.strongholds);
+  const strongholds = LiveStrongholds(state);
   if (!strongholds.length) return 12;
   const here = ParseHexKey(key);
   let best = 99;
@@ -687,7 +748,7 @@ function CountRailBroken(state) {
 
 function MeasureEnemyStrength(state) {
   let total = 0;
-  for (const stronghold of SafeList(state.strongholds)) total += Math.max(0, Number(stronghold.garrison) || 0);
+  for (const stronghold of LiveStrongholds(state)) total += Math.max(0, Number(stronghold.garrison) || 0);
   for (const enemy of SafeList(state.enemies)) {
     if ((enemy.hp ?? 0) <= 0) continue;
     total += Math.max(1, (Number(enemy.hp) || 0) / 4);
@@ -779,23 +840,57 @@ export function GetEnemyDoctrine(state, options) {
 // 战役层：扫荡规划
 // ---------------------------------------------------------------------------
 
-function SweepPressure(state, difficulty, doctrineKey) {
+/**
+ * 扫荡压力 = 日历基线 + 暴露度放大器。
+ * 日历基线来自 Data_History 各时期的 sweepChance（治安战是排上日程的例行公事，
+ * 不打你也会来）；暴露度、警备度与破袭痕迹在这条基线上放大。
+ * 暴露度越过 exposureSweepThreshold（Script_Rules.ruleConstants，经 options 传入）
+ * 时额外强加压——闹出这么大动静，讨伐令是压不住的。
+ */
+function SweepPressure(state, difficulty, doctrineKey, options) {
   const knowledge = BuildKnowledge(state);
   const eraKey = ResolveEraKey(state);
-  const eraBias = { Opening: 0.35, Growth: 0.85, Hardship: 1.35, Recovery: 0.8, Counter: 0.4 }[eraKey] ?? 0.8;
-  const doctrineBias = { Sweep: 1.9, Cage: 1.1, Nibble: 0.35, Pacify: 0.15, Retrench: 0.1 }[doctrineKey] ?? 0.5;
-  // 常数项刻意压得很低：没有暴露就没有情报，没有情报就没有合围。
-  const raw = 0.02
+  const doctrineBias = { Sweep: 1.6, Cage: 1.05, Nibble: 0.55, Pacify: 0.35, Retrench: 0.25 }[doctrineKey] ?? 0.6;
+  const threshold = Number(options && options.exposureSweepThreshold) > 0
+    ? Number(options.exposureSweepThreshold)
+    : 58;
+  let raw = 0.02
+    + EraSweepChance(eraKey) * 0.45
     + (knowledge.exposure / 100) * 0.5 * difficulty.exposureReaction
-    + (knowledge.alert / 100) * 0.1
+    + (knowledge.alert / 100) * 0.12
     + Clamp01(knowledge.railBroken.length / 6) * 0.14
-    + MeasureBaseScale(state) * 0.06;
-  return Clamp(raw * difficulty.sweepBias * eraBias * doctrineBias, 0, 0.65);
+    + MeasureBaseScale(state) * 0.08;
+  if (knowledge.exposure >= threshold) {
+    raw += 0.15 + (knowledge.exposure - threshold) / 250;
+  }
+  return Clamp(raw * difficulty.sweepBias * doctrineBias, 0, 0.7);
 }
 
 function ChooseSweepTarget(state) {
   const knowledge = BuildKnowledge(state);
-  const candidates = knowledge.baseKeys;
+  let candidates = knowledge.baseKeys;
+  if (!candidates.length) {
+    // 没有成形的根据地不等于没有目标：先合击已掌握的我方部队位置；
+    // 再退一步，按群众基础圈划"可疑地带"当合击点——治安军的地图上，
+    // 不肯纳粮出伕的村子从来都是画了圈的。
+    candidates = knowledge.knownUnits.map((unit) => unit.key);
+  }
+  if (!candidates.length) {
+    const suspicious = [];
+    for (const key of MapOrder(state)) {
+      const hex = MapHexes(state)[key];
+      if (!hex) continue;
+      if ((Number(hex.massBase) || 0) < 22) continue;
+      suspicious.push(key);
+    }
+    suspicious.sort((a, b) => {
+      const massA = Number(MapHexes(state)[a].massBase) || 0;
+      const massB = Number(MapHexes(state)[b].massBase) || 0;
+      if (Math.abs(massA - massB) > 1e-9) return massB - massA;
+      return a < b ? -1 : 1;
+    });
+    candidates = suspicious.slice(0, 12);
+  }
   if (!candidates.length) return null;
 
   const scoreByKey = new Map();
@@ -823,8 +918,9 @@ function ChooseSweepTarget(state) {
 }
 
 /** 从目标周围选出多路合围轴线（沿公路 / 河谷从各据点向核心），并抽调守备。 */
-function BuildSweepAxes(state, targetKey, difficulty, doctrine, rng) {
-  const strongholds = SafeList(state.strongholds)
+function BuildSweepAxes(state, targetKey, difficulty, doctrine, rng, force) {
+  const drawFloor = force ? 3 : 4;
+  const strongholds = LiveStrongholds(state)
     .filter((item) => item.key && GetHex(state, item.key))
     .map((item) => ({
       stronghold: item,
@@ -843,7 +939,7 @@ function BuildSweepAxes(state, targetKey, difficulty, doctrine, rng) {
   // 优先挑不同方位的据点，形成真正的多路合围而不是一条线。
   for (const entry of strongholds) {
     if (axes.length >= wanted) break;
-    if (entry.garrison < 4) continue;
+    if (entry.garrison < drawFloor) continue;
     if (usedBearings.has(entry.bearing) && axes.length > 0) continue;
     usedBearings.add(entry.bearing);
     const line = HexLine(ParseHexKey(entry.stronghold.key), ParseHexKey(targetKey))
@@ -867,7 +963,7 @@ function BuildSweepAxes(state, targetKey, difficulty, doctrine, rng) {
   if (!axes.length) {
     // 方位受限时退而求其次：只要有兵可抽就凑一路。
     for (const entry of strongholds) {
-      if (entry.garrison < 4) continue;
+      if (entry.garrison < drawFloor) continue;
       const line = HexLine(ParseHexKey(entry.stronghold.key), ParseHexKey(targetKey))
         .map((cell) => HexKey(cell.q, cell.r))
         .filter((key) => GetHex(state, key));
@@ -907,33 +1003,38 @@ function BuildSweepAxes(state, targetKey, difficulty, doctrine, rng) {
   return { axes, axisKeys, strength: Math.max(6, strength), drawnTotal };
 }
 
-function PlanSweep(state, difficulty, doctrine, rng) {
+function PlanSweep(state, difficulty, doctrine, rng, options, force) {
   const memory = ReadAiMemory(state) || {};
   const cooldown = Math.max(0, Number(memory.sweepCooldown) || 0);
   if (state.sweep) return null;
-  if (cooldown > 0) return null;
-  const eraKey = ResolveEraKey(state);
-  if (eraKey === 'Opening' && (Number(state.turn) || 0) < 2) return null;
-
-  const pressure = SweepPressure(state, difficulty, doctrine.key);
-  if (!rng.Chance(pressure)) return null;
+  if (!force) {
+    if (cooldown > 0) return null;
+    const eraKey = ResolveEraKey(state);
+    if (eraKey === 'Opening' && (Number(state.turn) || 0) < 2) return null;
+    const pressure = SweepPressure(state, difficulty, doctrine.key, options);
+    if (!rng.Chance(pressure)) return null;
+  }
 
   const target = ChooseSweepTarget(state);
   if (!target) return null;
-  const composed = BuildSweepAxes(state, target.key, difficulty, doctrine, rng);
+  const composed = BuildSweepAxes(state, target.key, difficulty, doctrine, rng, force);
   if (!composed) return null;
+
+  // 铁壁合围（事件强制立案）按史实是抽调野战师团的重兵合击，强度上浮。
+  const strength = force ? Math.round(composed.strength * 1.3) : composed.strength;
 
   return {
     id: `sweep_${state.turn}_${(HashString(`${state.seed || 0}:${state.turn || 0}:${target.key}`) % 9973)}`,
     targetKey: target.key,
     turnsUntil: difficulty.warningTurns,
-    strength: composed.strength,
+    strength,
     axisKeys: composed.axisKeys,
     axes: composed.axes,
     declaredTurn: Number(state.turn) || 0,
     doctrineKey: doctrine.key,
     difficultyKey: difficulty.key,
     drawnTotal: composed.drawnTotal,
+    forced: Boolean(force),
   };
 }
 
@@ -997,10 +1098,27 @@ function ChoosePatrolWaypoint(state, enemy, difficulty, rng) {
 
 function FindHomeKey(state, enemy) {
   if (!enemy) return null;
-  const stronghold = SafeList(state.strongholds).find((item) => item.id === enemy.homeStrongholdId);
-  if (stronghold && stronghold.key) return stronghold.key;
-  const first = SafeList(state.strongholds).find((item) => item.key);
-  return first ? first.key : enemy.key;
+  const strongholds = LiveStrongholds(state);
+  const home = strongholds.find((item) => item.id === enemy.homeStrongholdId);
+  if (home && home.key) return home.key;
+  // 老巢已被拔掉（或从未指派）：就近认领一个仍在的据点，而不是全军挤向 strongholds[0]。
+  let bestKey = null;
+  let bestDistance = Infinity;
+  const here = ParseHexKey(enemy.key);
+  for (const stronghold of strongholds) {
+    if (!stronghold.key) continue;
+    const distance = HexDistance(here, ParseHexKey(stronghold.key));
+    if (distance < bestDistance - 1e-9 || (distance === bestDistance && bestKey && stronghold.key < bestKey)) {
+      bestDistance = distance;
+      bestKey = stronghold.key;
+    }
+  }
+  return bestKey || enemy.key;
+}
+
+/** 敌军里仍活着的机动单位（含扫荡纵队与辎重队）。 */
+function LivingEnemies(state) {
+  return SafeList(state && state.enemies).filter((enemy) => (enemy.hp ?? 1) > 0);
 }
 
 function FindPursuitTarget(state, enemy, difficulty) {
@@ -1086,7 +1204,7 @@ function PlanConstruction(state, difficulty, doctrine, rng) {
   const knowledge = BuildKnowledge(state);
   const frontier = [];
   const occupied = new Set(projects.map((item) => item.key));
-  for (const stronghold of SafeList(state.strongholds)) occupied.add(stronghold.key);
+  for (const stronghold of LiveStrongholds(state)) occupied.add(stronghold.key);
   for (const key of MapOrder(state)) {
     if (occupied.has(key)) continue;
     const hex = MapHexes(state)[key];
@@ -1138,6 +1256,184 @@ function PlanConstruction(state, difficulty, doctrine, rng) {
 }
 
 // ---------------------------------------------------------------------------
+// 巡逻网：据点派兵
+// ---------------------------------------------------------------------------
+
+/** 派兵兵种：县城派日军中队，车站与一般据点派伪军警备队（Data_Units 现有 key）。 */
+function DispatchUnitTypeFor(strongholdType) {
+  if (strongholdType === 'CountySeat') return 'JapaneseInfantryCompany';
+  return 'PuppetGarrison';
+}
+
+/**
+ * 据点派兵计划：守备 ≥4 的未摧毁据点每隔若干回合可抽 1 人编成巡逻队，
+ * 全图机动敌军受时期上限约束（含扫荡纵队与辎重队）。
+ * 巡逻队被歼后据点不回补这一份守备——这就是缴获经济的兵源账。
+ */
+function PlanDispatch(state, difficulty, doctrine, rng) {
+  const eraKey = ResolveEraKey(state);
+  const caps = EraMobileCap(eraKey, difficulty);
+  const living = LivingEnemies(state);
+  const patrolCount = living.filter((enemy) => !enemy.convoy && !enemy.sweepId).length;
+  if (living.length >= caps.total || patrolCount >= caps.patrol) return null;
+  if (doctrine.key === 'Retrench') return null;
+
+  const memory = ReadAiMemory(state) || {};
+  const dispatchLog = memory.dispatchLog || {};
+  const turn = Number(state.turn) || 0;
+
+  const eligible = LiveStrongholds(state)
+    .filter((item) => item.key && GetHex(state, item.key))
+    .filter((item) => (Number(item.garrison) || 0) >= 4)
+    .filter((item) => turn - (Number(dispatchLog[item.id]) || -99) >= dispatchCooldownTurns)
+    .map((item) => ({
+      stronghold: item,
+      // 越靠近我方活动区的据点越需要巡逻网。
+      pressure: Clamp(12 - DistanceToNearestBaseKey(state, item.key), 0, 12) + (Number(item.garrison) || 0) * 0.4,
+    }))
+    .sort((a, b) => (b.pressure - a.pressure) || (a.stronghold.id < b.stronghold.id ? -1 : 1));
+
+  if (!eligible.length) return null;
+  if (!rng.Chance(0.8)) return null;
+
+  const chosen = eligible[0].stronghold;
+  return {
+    strongholdId: chosen.id,
+    key: chosen.key,
+    type: DispatchUnitTypeFor(chosen.type),
+    garrisonBefore: Math.max(0, Number(chosen.garrison) || 0),
+  };
+}
+
+function DistanceToNearestBaseKey(state, key) {
+  const knowledge = BuildKnowledge(state);
+  if (!knowledge.baseKeys.length) return 12;
+  const here = ParseHexKey(key);
+  let best = 99;
+  for (const baseKey of knowledge.baseKeys) {
+    const distance = HexDistance(here, ParseHexKey(baseKey));
+    if (distance < best) best = distance;
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------
+// 运输队：沿公路 / 铁路输送补给
+// ---------------------------------------------------------------------------
+
+/** 只许走公路或铁路的确定性 BFS 寻路。返回 hex key 数组（含起终点），不通则 null。 */
+function FindRoadRoute(state, fromKey, toKey) {
+  if (fromKey === toKey) return null;
+  const passable = (key) => {
+    const hex = GetHex(state, key);
+    if (!hex) return false;
+    return (hex.road || 0) >= 1 || Boolean(hex.railway);
+  };
+  if (!passable(fromKey) || !passable(toKey)) return null;
+  const cameFrom = new Map([[fromKey, null]]);
+  let frontier = [fromKey];
+  let guard = 0;
+  while (frontier.length && guard < 60) {
+    guard += 1;
+    const nextFrontier = [];
+    for (const current of frontier) {
+      for (const neighborKey of HexNeighborKeys(current)) {
+        if (cameFrom.has(neighborKey)) continue;
+        if (!passable(neighborKey)) continue;
+        cameFrom.set(neighborKey, current);
+        if (neighborKey === toKey) {
+          const route = [toKey];
+          let cursor = current;
+          while (cursor) {
+            route.push(cursor);
+            cursor = cameFrom.get(cursor);
+          }
+          route.reverse();
+          return route;
+        }
+        nextFrontier.push(neighborKey);
+      }
+    }
+    frontier = nextFrontier;
+  }
+  return null;
+}
+
+/**
+ * 运输队计划：发展期起，县城 / 车站每隔若干回合向另一据点发一支辎重队。
+ * 到站则该据点补给 +30、守备 +1；途中被歼则该据点补给 -25（供应线被断的真实后果）。
+ */
+function PlanConvoy(state, difficulty, doctrine, rng) {
+  const eraKey = ResolveEraKey(state);
+  const interval = convoyIntervalByEra[eraKey];
+  if (!interval) return null; // 开辟期不发车
+
+  const memory = ReadAiMemory(state) || {};
+  const turn = Number(state.turn) || 0;
+  const last = Number.isFinite(memory.lastConvoyTurn) ? memory.lastConvoyTurn : -99;
+  if (turn - last < interval) return null;
+
+  const living = LivingEnemies(state);
+  if (living.some((enemy) => enemy.convoy)) return null; // 一次只在途一队
+  const caps = EraMobileCap(eraKey, difficulty);
+  if (living.length >= caps.total) return null;
+
+  const strongholds = LiveStrongholds(state).filter((item) => item.key && GetHex(state, item.key));
+  const origins = strongholds
+    .filter((item) => item.type === 'CountySeat' || item.type === 'RailStation')
+    .filter((item) => {
+      const hex = GetHex(state, item.key);
+      return hex && ((hex.road || 0) >= 1 || hex.railway);
+    })
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  if (!origins.length) return null;
+
+  // 目的地：优先补给最低、距离 ≥3 的据点；确定性排序。
+  for (const origin of origins) {
+    const destinations = strongholds
+      .filter((item) => item.id !== origin.id)
+      .filter((item) => HexDistance(ParseHexKey(item.key), ParseHexKey(origin.key)) >= 3)
+      .sort((a, b) => ((Number(a.supply) || 0) - (Number(b.supply) || 0)) || (a.id < b.id ? -1 : 1));
+    for (const destination of destinations.slice(0, 3)) {
+      const route = FindRoadRoute(state, origin.key, destination.key);
+      if (!route || route.length < 3) continue;
+      if (!rng.Chance(0.85)) return null; // 偶尔缓发一班车，班次不至于分毫不差
+      return {
+        fromId: origin.id,
+        toId: destination.id,
+        fromKey: origin.key,
+        toKey: destination.key,
+        routeKeys: route,
+      };
+    }
+  }
+  return null;
+}
+
+/** 辎重队沿既定路线本回合能推进到的下标（不越过我方部队占据的格）。 */
+function AdvanceConvoyIndex(state, enemy, playerKeys) {
+  const convoy = enemy.convoy || {};
+  const route = SafeList(convoy.routeKeys);
+  const stats = ResolveEnemyStats(enemy.type);
+  let index = Clamp(Math.round(Number(convoy.routeIndex) || 0), 0, Math.max(0, route.length - 1));
+  let budget = Math.max(1, Number(enemy.moves) > 0 ? Number(enemy.moves) : stats.maxMoves);
+  const path = [route[index]];
+  while (index < route.length - 1 && budget > 0) {
+    const nextKey = route[index + 1];
+    const hex = GetHex(state, nextKey);
+    if (!hex) break;
+    if (playerKeys && playerKeys.has(nextKey)) break; // 路被堵住：辎重队原地待命
+    const cost = MoveCostFor(hex);
+    if (cost > budget + 1e-6 && path.length > 1) break;
+    budget -= cost;
+    index += 1;
+    path.push(nextKey);
+    if (budget <= 0) break;
+  }
+  return { index, path };
+}
+
+// ---------------------------------------------------------------------------
 // 计划：PlanEnemyTurn
 // ---------------------------------------------------------------------------
 
@@ -1155,17 +1451,19 @@ export function PlanEnemyTurn(state, options = {}) {
   const garrisonShifts = [];
 
   // ---- 战役层：扫荡 ----
+  // 事件（铁壁合围）或调用方可以强制立案：state.pendingForcedSweep 由历史事件写入，
+  // 在下一个敌方回合无视冷却与概率直接立案，立案后由 ApplyEnemyTurn 清旗。
+  const wantForced = Boolean(options.forceSweep || (state && state.pendingForcedSweep));
   let sweep = null;
   let sweepPhase = 'None';
   if (state && state.sweep) {
     const remaining = Math.max(0, (Number(state.sweep.turnsUntil) || 0) - 1);
     sweep = { ...state.sweep, turnsUntil: remaining, axisKeys: [...SafeList(state.sweep.axisKeys)] };
     sweepPhase = remaining <= 0 ? 'Execute' : 'Prepare';
-  } else if (options.forceSweep || (!options.noSweep)) {
-    const declared = options.forceSweep
-      ? (PlanSweep({ ...state, aiMemory: { ...(ReadAiMemory(state) || {}), sweepCooldown: 0 } }, difficulty, doctrineDefinitions.Sweep, rng)
-        || PlanSweep(state, difficulty, doctrine, rng))
-      : PlanSweep(state, difficulty, doctrine, rng);
+  } else if (wantForced || (!options.noSweep)) {
+    const declared = wantForced
+      ? PlanSweep(state, difficulty, doctrineDefinitions.Sweep, rng, options, true)
+      : PlanSweep(state, difficulty, doctrine, rng, options, false);
     if (declared) {
       sweep = declared;
       sweepPhase = 'Declare';
@@ -1188,7 +1486,7 @@ export function PlanEnemyTurn(state, options = {}) {
   for (const debt of SafeList(memory.garrisonDebt)) {
     if ((Number(debt.turnsLeft) || 0) <= 0) continue;
     if (sweepPhase === 'Declare' || sweepPhase === 'Prepare') continue;
-    const stronghold = SafeList(state.strongholds).find((item) => item.id === debt.strongholdId);
+    const stronghold = LiveStrongholds(state).find((item) => item.id === debt.strongholdId);
     if (!stronghold) continue;
     const back = Math.max(1, Math.round((Number(debt.amount) || 0) * difficulty.reinforceRate));
     garrisonShifts.push({
@@ -1208,9 +1506,10 @@ export function PlanEnemyTurn(state, options = {}) {
   const assignedSweepUnits = new Set();
 
   if (sweep && (sweepPhase === 'Prepare' || sweepPhase === 'Execute')) {
-    // 参与合围的部队：离轴线最近的若干支。
+    // 参与合围的部队：离轴线最近的若干支（辎重队照走自己的班次，不编入合围）。
     const axisSet = new Set(sweep.axisKeys);
     const sorted = enemies
+      .filter((enemy) => !enemy.convoy)
       .map((enemy) => ({
         enemy,
         distance: Math.min(...sweep.axisKeys.map((key) => HexDistance(ParseHexKey(enemy.key), ParseHexKey(key))), 99),
@@ -1228,6 +1527,21 @@ export function PlanEnemyTurn(state, options = {}) {
     const stats = ResolveEnemyStats(enemy.type);
     const movePoints = Math.max(1, Number(enemy.moves) > 0 ? Number(enemy.moves) : stats.maxMoves);
     const doctrineWeights = doctrine.weights;
+
+    // 辎重队只认自己的路单：沿公路 / 铁路逐格开进，堵路则待命。
+    if (enemy.convoy) {
+      const advance = AdvanceConvoyIndex(state, enemy, playerKeys);
+      const route = SafeList(enemy.convoy.routeKeys);
+      const destination = route.length ? route[route.length - 1] : enemy.key;
+      orders.push(MakeOrder('Convoy', enemy.id, enemy.key, route[advance.index] || enemy.key, {
+        path: advance.path,
+        routeIndex: advance.index,
+        targetKey: destination,
+        intent: 'Supply',
+        etaTurns: Math.max(0, Math.ceil((route.length - 1 - advance.index) / Math.max(1, stats.maxMoves))),
+      }));
+      continue;
+    }
 
     // 收缩方针 / 重伤：撤回据点。
     const hurt = (enemy.hp ?? 10) <= (enemy.maxHp ?? 10) * 0.35;
@@ -1350,6 +1664,23 @@ export function PlanEnemyTurn(state, options = {}) {
     }));
   }
 
+  // ---- 巡逻网：据点派兵（守备 -1，全图机动兵力受时期上限约束）----
+  const dispatch = PlanDispatch(state, difficulty, doctrine, rng);
+  if (dispatch) {
+    garrisonShifts.push({
+      strongholdId: dispatch.strongholdId,
+      key: dispatch.key,
+      delta: -1,
+      before: dispatch.garrisonBefore,
+      after: Math.max(0, dispatch.garrisonBefore - 1),
+      reason: 'Dispatch',
+      note: '抽出一部编成巡逻队',
+    });
+  }
+
+  // ---- 运输队：发展期起沿公路 / 铁路发车 ----
+  const convoy = PlanConvoy(state, difficulty, doctrine, rng);
+
   const forecast = sweep
     ? {
       targetKey: sweep.targetKey,
@@ -1362,7 +1693,7 @@ export function PlanEnemyTurn(state, options = {}) {
     : null;
 
   return {
-    version: 1,
+    version: 2,
     turn,
     doctrineKey: doctrine.key,
     doctrineName: doctrine.name,
@@ -1372,6 +1703,9 @@ export function PlanEnemyTurn(state, options = {}) {
     sweep: sweep ? { ...sweep, phase: sweepPhase } : null,
     garrisonShifts,
     construction,
+    dispatch,
+    convoy,
+    forcedSweepRequested: wantForced,
     forecast,
     rngState: rng.state,
   };
@@ -1390,6 +1724,7 @@ function CloneAiMemory(memory) {
   return {
     sweepCooldown: Number(source.sweepCooldown) || 0,
     sweepCount: Number(source.sweepCount) || 0,
+    sweepTurns: SafeList(source.sweepTurns).slice(-16),
     lastDoctrineKey: source.lastDoctrineKey || null,
     lastEraKey: source.lastEraKey || null,
     doctrineHistory: SafeList(source.doctrineHistory).slice(-40),
@@ -1397,6 +1732,10 @@ function CloneAiMemory(memory) {
     garrisonDebt: SafeList(source.garrisonDebt).map((item) => ({ ...item })),
     strengthBaseline: Number(source.strengthBaseline) || 0,
     contactSeeded: Boolean(source.contactSeeded),
+    // 巡逻网与运输队的跨回合账本。
+    dispatchLog: { ...(source.dispatchLog || {}) },
+    convoys: SafeList(source.convoys).map((item) => ({ ...item })),
+    lastConvoyTurn: Number.isFinite(source.lastConvoyTurn) ? source.lastConvoyTurn : -99,
   };
 }
 
@@ -1570,7 +1909,7 @@ function EnsureOpeningContact(next, difficulty) {
   // 至少 1 个可攻击目标（敌军单位或据点）落在行动范围内。
   const inReach = (key) => HexDistance(anchorPos, ParseHexKey(key)) <= reach + 1;
   const hasTarget = next.enemies.some((enemy) => (enemy.hp ?? 1) > 0 && enemy.visibleToPlayer && inReach(enemy.key))
-    || next.strongholds.some((item) => item.key && inReach(item.key));
+    || next.strongholds.some((item) => item.key && !item.destroyed && inReach(item.key));
   if (!hasTarget) {
     const targetKey = slots.find((key) => !usedSlots.has(key)) || slots[0];
     const candidate = ordered.length ? ordered[0].enemy : null;
@@ -1704,7 +2043,9 @@ function CompleteConstruction(next, project, report) {
   const hex = next.map.hexes[project.key];
   if (!hex) return;
   if (project.kind === 'Blockhouse') {
-    const exists = next.strongholds.some((item) => item.key === project.key);
+    const ruinIndex = next.strongholds.findIndex((item) => item.key === project.key && item.destroyed);
+    if (ruinIndex >= 0) next.strongholds.splice(ruinIndex, 1);
+    const exists = next.strongholds.some((item) => item.key === project.key && !item.destroyed);
     if (!exists) {
       next.strongholds.push({
         id: `sh_${project.key}_${next.turn}`,
@@ -1827,6 +2168,366 @@ function ApplyGarrison(next, order, report) {
 function ApplyWithdraw(next, order, report) {
   ApplyMoveLike(next, order, report);
   report.withdrawals += 1;
+}
+
+// --- 巡逻网 / 运输队 / 扫荡纵队的实体管理 -----------------------------------
+
+function StrongholdTypeLabel(type) {
+  if (type === 'CountySeat') return '县城';
+  if (type === 'RailStation') return '车站';
+  if (type === 'Garrison') return '据点';
+  if (type === 'Blockhouse') return '炮楼';
+  return '据点';
+}
+
+function StrongholdLabelIn(next, stronghold) {
+  if (!stronghold) return '敌据点';
+  if (stronghold.name) return stronghold.name;
+  return `${HexLabel(next, stronghold.key)}${StrongholdTypeLabel(stronghold.type)}`;
+}
+
+/** 据点派兵落地：生成巡逻队实体（守备扣减已由 garrisonShifts 处理）。 */
+function ApplyDispatch(next, dispatch, report) {
+  if (!dispatch) return;
+  const stronghold = next.strongholds.find((item) => item.id === dispatch.strongholdId && !item.destroyed);
+  if (!stronghold) return;
+  const stats = ResolveEnemyStats(dispatch.type);
+  const unit = {
+    id: `pd_${next.turn}_${dispatch.strongholdId}`,
+    key: stronghold.key,
+    type: dispatch.type,
+    hp: stats.maxHp,
+    maxHp: stats.maxHp,
+    moves: 0,
+    maxMoves: stats.maxMoves,
+    intent: 'Patrol',
+    intentDetail: {
+      kind: 'Patrol',
+      targetKey: stronghold.key,
+      etaTurns: 0,
+      note: '出据点建立巡逻圈',
+      doctrineKey: report.doctrineKey,
+    },
+    homeStrongholdId: dispatch.strongholdId,
+    visibleToPlayer: false,
+  };
+  next.enemies.push(unit);
+  next.aiMemory.dispatchLog[dispatch.strongholdId] = Number(next.turn) || 0;
+  report.dispatched += 1;
+  AppendLog(next, {
+    kind: 'Garrison',
+    key: stronghold.key,
+    text: `${StrongholdLabelIn(next, stronghold)}派出${stats.name}一路，沿路下乡巡查。`,
+  });
+}
+
+/** 发车：生成辎重队实体，并按沿线情报覆盖决定是否走漏消息（伏击玩法的核心信息源）。 */
+function ApplyConvoySpawn(next, convoy, report) {
+  if (!convoy) return;
+  const origin = next.strongholds.find((item) => item.id === convoy.fromId && !item.destroyed);
+  const destination = next.strongholds.find((item) => item.id === convoy.toId && !item.destroyed);
+  if (!origin || !destination) return;
+  const stats = ResolveEnemyStats('SupplyColumn');
+  const unit = {
+    id: `cv_${next.turn}_${convoy.fromId}`,
+    key: convoy.fromKey,
+    type: 'SupplyColumn',
+    hp: stats.maxHp,
+    maxHp: stats.maxHp,
+    moves: 0,
+    maxMoves: Math.max(2, stats.maxMoves),
+    intent: 'Supply',
+    intentDetail: {
+      kind: 'Supply',
+      targetKey: convoy.toKey,
+      etaTurns: Math.max(1, Math.ceil((convoy.routeKeys.length - 1) / Math.max(2, stats.maxMoves))),
+      note: `向${StrongholdLabelIn(next, destination)}输送给养`,
+      doctrineKey: report.doctrineKey,
+    },
+    homeStrongholdId: convoy.fromId,
+    visibleToPlayer: false,
+    convoy: {
+      fromId: convoy.fromId,
+      toId: convoy.toId,
+      routeKeys: [...convoy.routeKeys],
+      routeIndex: 0,
+    },
+  };
+  next.enemies.push(unit);
+  next.aiMemory.convoys.push({
+    enemyId: unit.id,
+    fromId: convoy.fromId,
+    toId: convoy.toId,
+    declaredTurn: Number(next.turn) || 0,
+  });
+  next.aiMemory.lastConvoyTurn = Number(next.turn) || 0;
+  report.convoysSpawned += 1;
+
+  // 沿线任一格情报 ≥40：交通站提前拿到路单。
+  const covered = convoy.routeKeys.some((key) => {
+    const hex = next.map.hexes[key];
+    return hex && (Number(hex.intel) || 0) >= 40;
+  });
+  if (covered) {
+    const middleKey = convoy.routeKeys[Math.floor(convoy.routeKeys.length / 2)];
+    const bearing = CompassLabel(convoy.fromKey, convoy.toKey);
+    const notice = `交通站报：敌辎重队自${StrongholdLabelIn(next, origin)}起运，沿公路向${bearing}行进，将过${HexLabel(next, middleKey)}一带。`;
+    AppendLog(next, { kind: 'Intel', key: middleKey, text: notice });
+    report.convoyNotices.push({ key: middleKey, fromKey: convoy.fromKey, toKey: convoy.toKey, text: notice });
+  }
+}
+
+/** 辎重队按路单开进；到站卸货：补给 +30、守备 +1，随后从棋盘上消失。 */
+function ApplyConvoyMove(next, order, report) {
+  const enemy = FindEnemy(next, order.unitId);
+  if (!enemy || (enemy.hp ?? 1) <= 0 || !enemy.convoy) return;
+  const index = next.enemies.findIndex((item) => item.id === enemy.id);
+  const route = SafeList(enemy.convoy.routeKeys);
+  const routeIndex = Clamp(Math.round(Number(order.payload.routeIndex) || 0), 0, Math.max(0, route.length - 1));
+  const destination = route[routeIndex] || enemy.key;
+  const arrived = routeIndex >= route.length - 1;
+
+  if (!arrived) {
+    next.enemies[index] = {
+      ...enemy,
+      key: destination,
+      moves: 0,
+      intent: 'Supply',
+      convoy: { ...enemy.convoy, routeIndex },
+      intentDetail: {
+        kind: 'Supply',
+        targetKey: route[route.length - 1],
+        etaTurns: Number(order.payload.etaTurns) || 0,
+        note: '押运给养沿公路行进',
+        doctrineKey: report.doctrineKey,
+      },
+    };
+    report.moved += destination === enemy.key ? 0 : 1;
+    return;
+  }
+
+  // 到站：目标据点吃到这批给养。
+  const strongholdIndex = next.strongholds.findIndex((item) => item.id === enemy.convoy.toId && !item.destroyed);
+  if (strongholdIndex >= 0) {
+    const stronghold = next.strongholds[strongholdIndex];
+    const before = Math.max(0, Number(stronghold.garrison) || 0);
+    next.strongholds[strongholdIndex] = {
+      ...stronghold,
+      supply: Math.min(200, (Number(stronghold.supply) || 0) + 30),
+      garrison: before + 1,
+    };
+    report.garrisonSummary.push({
+      strongholdId: stronghold.id,
+      key: stronghold.key,
+      before,
+      after: before + 1,
+      delta: 1,
+      reason: 'ConvoyArrive',
+      note: '辎重到站，押运队就地留驻',
+    });
+    AppendLog(next, {
+      kind: 'Garrison',
+      key: stronghold.key,
+      text: `敌辎重队抵达${StrongholdLabelIn(next, stronghold)}，弹粮入库，守备增强。`,
+    });
+  }
+  next.enemies.splice(index, 1);
+  next.aiMemory.convoys = next.aiMemory.convoys.filter((item) => item.enemyId !== enemy.id);
+  report.convoysArrived += 1;
+}
+
+/** 清点在途辎重：被我伏击歼灭的班次，目标据点的补给账立即见红。 */
+function SettleLostConvoys(next, report) {
+  const remaining = [];
+  for (const record of SafeList(next.aiMemory.convoys)) {
+    const alive = next.enemies.some((enemy) => enemy.id === record.enemyId && (enemy.hp ?? 1) > 0);
+    if (alive) {
+      remaining.push(record);
+      continue;
+    }
+    // 死掉的辎重队会被战斗模块从 enemies 里移除；带血条为 0 残留的也一并清掉。
+    next.enemies = next.enemies.filter((enemy) => enemy.id !== record.enemyId);
+    const strongholdIndex = next.strongholds.findIndex((item) => item.id === record.toId && !item.destroyed);
+    if (strongholdIndex >= 0) {
+      const stronghold = next.strongholds[strongholdIndex];
+      next.strongholds[strongholdIndex] = {
+        ...stronghold,
+        supply: Math.max(0, (Number(stronghold.supply) || 0) - 25),
+        alarm: Clamp((Number(stronghold.alarm) || 0) + 1, 0, 5),
+      };
+      AppendLog(next, {
+        kind: 'Garrison',
+        key: stronghold.key,
+        text: `开往${StrongholdLabelIn(next, stronghold)}的辎重在途被截，该据点给养告急。`,
+      });
+    }
+    report.convoysLost += 1;
+  }
+  next.aiMemory.convoys = remaining;
+}
+
+/** 立案时把抽调的守备编成看得见、打得着的扫荡纵队实体。 */
+function SpawnSweepColumns(next, sweep, difficulty, rng, report) {
+  const axes = SafeList(sweep.axes).filter((axis) => axis && axis.fromKey);
+  if (!axes.length) return;
+  const eraKey = ResolveEraKey(next);
+  const caps = EraMobileCap(eraKey, difficulty);
+  const living = next.enemies.filter((enemy) => (enemy.hp ?? 1) > 0).length;
+  const desired = Clamp(Math.round((Number(sweep.strength) || 12) / 16), 1, 3);
+  const allowed = Clamp(caps.total - living, 1, desired);
+
+  for (let index = 0; index < allowed; index += 1) {
+    const axis = axes[index % axes.length];
+    const type = index === 0 && (Number(sweep.strength) || 0) >= 26 ? 'JapaneseInfantryCompany' : 'PunitiveColumn';
+    const stats = ResolveEnemyStats(type);
+    const hpScale = Clamp(0.85 + (Number(sweep.strength) || 12) / 90, 0.85, 1.25);
+    const hp = Math.round(stats.maxHp * hpScale);
+    next.enemies.push({
+      id: `sw_${sweep.id}_${index}`,
+      key: axis.fromKey,
+      type,
+      hp,
+      maxHp: hp,
+      moves: 0,
+      maxMoves: stats.maxMoves,
+      intent: 'Stage',
+      intentDetail: {
+        kind: 'Stage',
+        targetKey: sweep.targetKey,
+        etaTurns: Number(sweep.turnsUntil) || 0,
+        note: `合围支队自${HexLabel(next, axis.fromKey)}出动`,
+        doctrineKey: report.doctrineKey,
+      },
+      sweepId: sweep.id,
+      homeStrongholdId: axis.strongholdId,
+      visibleToPlayer: false,
+    });
+    report.sweepColumnsSpawned += 1;
+  }
+  if (report.sweepColumnsSpawned > 0) {
+    AppendLog(next, {
+      kind: 'SweepPlan',
+      key: axes[0].fromKey,
+      text: `敌合围支队共${report.sweepColumnsSpawned}路先后出动，先头一路已出${HexLabel(next, axes[0].fromKey)}。`,
+    });
+  }
+  void rng;
+}
+
+/** 扫荡纵队的存活比例（0..1）。预警期内被我重创的合围，执行时强度按此折减。 */
+function SweepColumnSurvival(next, sweepId) {
+  let aliveHp = 0;
+  let totalHp = 0;
+  for (const enemy of next.enemies) {
+    if (enemy.sweepId !== sweepId) continue;
+    totalHp += Math.max(1, Number(enemy.maxHp) || 1);
+    if ((enemy.hp ?? 0) > 0) aliveHp += Math.max(0, Number(enemy.hp) || 0);
+  }
+  if (totalHp <= 0) return 1;
+  return Clamp01(aliveHp / totalHp);
+}
+
+/** 扫荡结束：纵队回撤消失，存活兵力按比例折算回来源据点的守备欠账。 */
+function RetireSweepColumns(next, sweep, report) {
+  const survival = SweepColumnSurvival(next, sweep.id);
+  const columns = next.enemies.filter((enemy) => enemy.sweepId === sweep.id);
+  if (!columns.length) return;
+  const axisIds = new Set(SafeList(sweep.axes).map((axis) => axis.strongholdId));
+  // 归建折损：存活比例越低，能回补给据点的越少（0.4 的底是掉队后陆续归队的散兵）。
+  const ratio = Clamp01(0.4 + 0.6 * survival);
+  next.aiMemory.garrisonDebt = next.aiMemory.garrisonDebt
+    .map((debt) => (axisIds.has(debt.strongholdId)
+      ? { ...debt, amount: Math.round((Number(debt.amount) || 0) * ratio) }
+      : debt))
+    .filter((debt) => (Number(debt.amount) || 0) > 0);
+  next.enemies = next.enemies.filter((enemy) => enemy.sweepId !== sweep.id);
+  const lost = columns.filter((enemy) => (enemy.hp ?? 0) <= 0).length;
+  AppendLog(next, {
+    kind: 'Sweep',
+    key: sweep.targetKey,
+    text: lost > 0
+      ? `敌合围各路先后回撤，${columns.length} 路中有 ${lost} 路残破不成建制。`
+      : '敌合围各路先后回撤归建。',
+  });
+}
+
+/** 扫荡纵队路过村庄时的就地征发（只进代价账本，红线不变）。 */
+function ApplySweepColumnForaging(next, rng, difficulty, report) {
+  if (!next.sweep) return;
+  for (const enemy of next.enemies) {
+    if (!enemy.sweepId || (enemy.hp ?? 1) <= 0) continue;
+    if (!rng.Chance(0.3 * Clamp(difficulty.harshness, 0.4, 1.2))) continue;
+    const candidates = [enemy.key, ...HexNeighborKeys(enemy.key)].filter((key) => {
+      const hex = next.map.hexes[key];
+      if (!hex) return false;
+      if (hex.feature !== 'Village' && hex.feature !== 'Town') return false;
+      if ((hex.scorch || 0) > 70) return false;
+      return (hex.yields && (hex.yields.grain || 0) > 0);
+    });
+    if (!candidates.length) continue;
+    ApplyRequisition(next, {
+      kind: 'Requisition',
+      unitId: enemy.id,
+      fromKey: enemy.key,
+      toKey: candidates[0],
+      payload: { harshness: difficulty.harshness * 1.1, intent: 'Requisition' },
+    }, rng, difficulty, report);
+  }
+}
+
+/** 恢复期 / 反攻期抽兵：机动兵力超出时期编制的部分成建制调走（每回合最多一路）。 */
+function TrimMobileForces(next, difficulty, report) {
+  const eraKey = ResolveEraKey(next);
+  if (eraKey !== 'Recovery' && eraKey !== 'Counter') return;
+  const caps = EraMobileCap(eraKey, difficulty);
+  const mobiles = next.enemies.filter((enemy) => (enemy.hp ?? 1) > 0 && !enemy.convoy && !enemy.sweepId);
+  if (mobiles.length <= caps.patrol) return;
+  // 优先调走离据点最远、编制最弱的一路。
+  const ranked = mobiles
+    .map((enemy) => ({ enemy, distance: NearestStrongholdDistance(next, enemy.key), hp: Number(enemy.hp) || 0 }))
+    .sort((a, b) => (b.distance - a.distance) || (a.hp - b.hp) || (a.enemy.id < b.enemy.id ? -1 : 1));
+  const leaving = ranked[0].enemy;
+  next.enemies = next.enemies.filter((enemy) => enemy.id !== leaving.id);
+  AppendLog(next, {
+    kind: 'Garrison',
+    key: leaving.key,
+    text: `敌${ResolveEnemyStats(leaving.type).name}奉调他去，撤出本县防区。`,
+  });
+  report.withdrawnFromFront += 1;
+}
+
+/** 敌情通报：方针、守备调动、扫荡阶段与辎重路讯，写进 state.enemyReadout 供 UI 直读。 */
+function BuildEnemyReadout(next, workingPlan, report) {
+  const definition = doctrineDefinitions[workingPlan.doctrineKey] || doctrineDefinitions.Nibble;
+  const reasonLabels = {
+    SweepDraft: '抽调编入合围支队',
+    Reinforce: '扫荡归建，守备回补',
+    Dispatch: '派出巡逻队',
+    ConvoyArrive: '辎重到站，押运留驻',
+  };
+  const sweepStage = workingPlan.sweep ? workingPlan.sweep.phase : 'None';
+  const stageLabels = { None: '无扫荡迹象', Declare: '敌已立案调兵', Prepare: '敌合围支队开进中', Execute: '合围已发起' };
+  const byId = new Map(SafeList(next.strongholds).map((item) => [item.id, item]));
+  return {
+    turn: report.turn,
+    doctrine: {
+      key: definition.key,
+      name: definition.name,
+      summary: definition.blurb,
+      hint: doctrineHints[definition.key] || '',
+    },
+    garrisonChanges: SafeList(report.garrisonSummary).map((item) => ({
+      strongholdId: item.strongholdId,
+      name: StrongholdLabelIn(next, byId.get(item.strongholdId) || { key: item.key }),
+      from: item.before,
+      to: item.after,
+      reason: reasonLabels[item.reason] || item.note || item.reason || '兵力调动',
+    })),
+    sweepStage,
+    sweepStageLabel: stageLabels[sweepStage] || stageLabels.None,
+    convoyNotices: SafeList(report.convoyNotices).map((item) => ({ ...item })),
+    mobileEnemyCount: next.enemies.filter((enemy) => (enemy.hp ?? 1) > 0).length,
+  };
 }
 
 // --- 扫荡结算 --------------------------------------------------------------
@@ -1986,19 +2687,32 @@ export function ApplyEnemyTurn(state, plan, options = {}) {
     garrisonSummary: [],
     visibleEnemyCount: 0,
     orderCount: SafeList(workingPlan.orders).length,
+    dispatched: 0,
+    convoysSpawned: 0,
+    convoysArrived: 0,
+    convoysLost: 0,
+    convoyNotices: [],
+    sweepColumnsSpawned: 0,
+    withdrawnFromFront: 0,
   };
 
   // 兵力基线（首次执行时确定，供收缩判定用）。
   if (!next.aiMemory.strengthBaseline) {
     let total = 0;
-    for (const stronghold of next.strongholds) total += Math.max(0, Number(stronghold.garrison) || 0);
+    for (const stronghold of next.strongholds) {
+      if (stronghold.destroyed) continue;
+      total += Math.max(0, Number(stronghold.garrison) || 0);
+    }
     for (const enemy of next.enemies) if ((enemy.hp ?? 0) > 0) total += Math.max(1, (Number(enemy.hp) || 0) / 4);
     next.aiMemory.strengthBaseline = Math.max(1, total);
   }
 
-  // ---- 守备调动（扫荡抽调 / 归建回补），玩家可见 ----
+  // ---- 在途辎重清点：被我伏击的班次此刻结账（目标据点补给 -25）----
+  SettleLostConvoys(next, report);
+
+  // ---- 守备调动（扫荡抽调 / 派兵 / 归建回补），玩家可见 ----
   for (const shift of SafeList(workingPlan.garrisonShifts)) {
-    const index = next.strongholds.findIndex((item) => item.id === shift.strongholdId);
+    const index = next.strongholds.findIndex((item) => item.id === shift.strongholdId && !item.destroyed);
     if (index < 0) continue;
     const stronghold = next.strongholds[index];
     const before = Math.max(0, Number(stronghold.garrison) || 0);
@@ -2013,12 +2727,14 @@ export function ApplyEnemyTurn(state, plan, options = {}) {
       reason: shift.reason,
       note: shift.note,
     });
-    if (shift.delta < 0) {
+    if (shift.delta < 0 && shift.reason === 'SweepDraft') {
       AppendLog(next, {
         kind: 'Garrison',
         key: stronghold.key,
         text: `${HexLabel(next, stronghold.key)} 据点守备由 ${before} 减至 ${after}，${shift.note || '兵力外调'}。`,
       });
+      // 只有合围抽调才挂"守备欠账"（扫荡后归建回补）；
+      // 派出去的巡逻队被歼是净损失，据点不回补——缴获经济的兵源账。
       next.aiMemory.garrisonDebt.push({
         strongholdId: shift.strongholdId,
         amount: before - after,
@@ -2032,6 +2748,10 @@ export function ApplyEnemyTurn(state, plan, options = {}) {
         .filter((debt) => debt.amount > 0 && debt.turnsLeft > 0);
     }
   }
+
+  // ---- 巡逻网与运输队落地 ----
+  ApplyDispatch(next, workingPlan.dispatch, report);
+  ApplyConvoySpawn(next, workingPlan.convoy, report);
 
   // ---- 工程队列推进 ----
   const advanced = [];
@@ -2072,6 +2792,9 @@ export function ApplyEnemyTurn(state, plan, options = {}) {
       case 'Withdraw':
         ApplyWithdraw(next, order, report);
         break;
+      case 'Convoy':
+        ApplyConvoyMove(next, order, report);
+        break;
       default:
         break;
     }
@@ -2089,15 +2812,21 @@ export function ApplyEnemyTurn(state, plan, options = {}) {
       axes: SafeList(planSweep.axes).map((axis) => ({ ...axis, keys: [...axis.keys] })),
       declaredTurn: planSweep.declaredTurn,
       doctrineKey: planSweep.doctrineKey,
+      forced: Boolean(planSweep.forced),
     };
+    SpawnSweepColumns(next, next.sweep, difficulty, rng, report);
     report.sweepDeclared = true;
     report.headlines.push(`敌正向 ${HexLabel(next, planSweep.targetKey)} 方向调兵，沿线据点守备骤减。`);
     AppendLog(next, {
       kind: 'SweepPlan',
       key: planSweep.targetKey,
-      text: `据交通站与内线报告：敌自 ${planSweep.axes.length} 个方向抽调守备 ${planSweep.drawnTotal} 部，疑将合围 ${HexLabel(next, planSweep.targetKey)}。`,
+      text: planSweep.forced
+        ? `多路电台同时增波：敌调集重兵、分路合击，将以铁壁合围之势压向 ${HexLabel(next, planSweep.targetKey)}。`
+        : `据交通站与内线报告：敌自 ${planSweep.axes.length} 个方向抽调守备 ${planSweep.drawnTotal} 部，疑将合围 ${HexLabel(next, planSweep.targetKey)}。`,
     });
     next.alert = Clamp((Number(next.alert) || 0) + 6, 0, 100);
+    // 事件强制立案已经兑现，摘掉挂起旗。
+    if (workingPlan.forcedSweepRequested || next.pendingForcedSweep) next.pendingForcedSweep = false;
   } else if (planSweep && planSweep.phase === 'Prepare') {
     next.sweep = { ...next.sweep, turnsUntil: planSweep.turnsUntil };
     AppendLog(next, {
@@ -2106,21 +2835,35 @@ export function ApplyEnemyTurn(state, plan, options = {}) {
       text: `敌集结未止，距合围发起约 ${planSweep.turnsUntil} 回合。`,
     });
   } else if (planSweep && planSweep.phase === 'Execute') {
-    ResolveSweepOutcome(next, planSweep, rng, difficulty, report, options);
+    // 预警期内合围支队被我重创的，执行强度按存活比例折减——这是"敌进我进"的直接回报。
+    const survival = SweepColumnSurvival(next, planSweep.id);
+    const effective = {
+      ...planSweep,
+      strength: Math.max(4, Math.round((Number(planSweep.strength) || 8) * (0.35 + 0.65 * survival))),
+    };
+    ResolveSweepOutcome(next, effective, rng, difficulty, report, options);
+    RetireSweepColumns(next, planSweep, report);
     next.sweep = null;
     next.aiMemory.sweepCooldown = difficulty.sweepCooldown;
     next.aiMemory.sweepCount += 1;
+    next.aiMemory.sweepTurns = [...SafeList(next.aiMemory.sweepTurns), report.turn].slice(-16);
     next.aiMemory.garrisonDebt = next.aiMemory.garrisonDebt.map((debt) => ({ ...debt, turnsLeft: Math.max(1, debt.turnsLeft) }));
   }
+
+  // ---- 扫荡纵队沿途征发（只进代价账本）----
+  ApplySweepColumnForaging(next, rng, difficulty, report);
 
   if (next.aiMemory.sweepCooldown > 0 && !report.sweepDeclared && (!planSweep || planSweep.phase === 'None')) {
     next.aiMemory.sweepCooldown = Math.max(0, next.aiMemory.sweepCooldown - 1);
   }
 
-  // ---- 反攻期：兵力被抽往正面战场 ----
+  // ---- 恢复期 / 反攻期：机动兵力超编的成建制调走 ----
+  TrimMobileForces(next, difficulty, report);
+
+  // ---- 反攻期：据点守备也被抽往正面战场 ----
   if (ResolveEraKey(next) === 'Counter') {
     if (rng.Chance(0.45)) {
-      const index = next.strongholds.findIndex((item) => (Number(item.garrison) || 0) > 1 && item.type !== 'CountySeat');
+      const index = next.strongholds.findIndex((item) => !item.destroyed && (Number(item.garrison) || 0) > 1 && item.type !== 'CountySeat');
       if (index >= 0) {
         const stronghold = next.strongholds[index];
         const before = Number(stronghold.garrison) || 0;
@@ -2135,11 +2878,10 @@ export function ApplyEnemyTurn(state, plan, options = {}) {
     }
   }
 
-  // ---- 暴露度自然回落 / 警备度随接触上升 ----
-  const decay = ResolveEraKey(next) === 'Hardship' ? 2 : 4;
-  next.exposure = Clamp((Number(next.exposure) || 0) - decay, 0, 100);
+  // ---- 警备度随接触上升 ----
+  // 暴露度与警备度的自然衰减只在 Script_Rules 的回合结算里做（时期相关，单处记账），
+  // 这里不再重复扣减，否则两处叠加会把暴露度在一回合内打回零。
   if (report.attacks > 0) next.alert = Clamp((Number(next.alert) || 0) + report.attacks * 2, 0, 100);
-  else next.alert = Clamp((Number(next.alert) || 0) - 1, 0, 100);
 
   // ---- 意图落位：没有下达命令的部队也要有可侦察的意图 ----
   for (let index = 0; index < next.enemies.length; index += 1) {
@@ -2169,6 +2911,9 @@ export function ApplyEnemyTurn(state, plan, options = {}) {
   for (const enemy of next.enemies) {
     if ((enemy.hp ?? 1) > 0 && enemy.visibleToPlayer) report.visibleEnemyCount += 1;
   }
+
+  // ---- 敌情通报（供 UI 消费的结构化敌方动态，档案体）----
+  next.enemyReadout = BuildEnemyReadout(next, workingPlan, report);
 
   // ---- 记忆与随机数写回 ----
   next.aiMemory.lastDoctrineKey = workingPlan.naturalDoctrineKey || workingPlan.doctrineKey;
@@ -2340,7 +3085,7 @@ export function SummarizeVisibleEnemies(state, intelLevel = 1) {
 
 /** 据点守备变化的摘要，用于 UI 提示"敌进我进"的窗口。 */
 export function SummarizeGarrisons(state) {
-  return SafeList(state && state.strongholds).map((stronghold) => ({
+  return LiveStrongholds(state).map((stronghold) => ({
     id: stronghold.id,
     key: stronghold.key,
     type: stronghold.type,
@@ -2353,7 +3098,7 @@ export function SummarizeGarrisons(state) {
 
 export const aiModuleInfo = Object.freeze({
   name: 'Script_Ai',
-  version: 1,
+  version: 2,
   externalUnits: Boolean(externalUnitDefinitions),
   externalTerrain: Boolean(externalTerrainDefinitions),
   externalCombat: Boolean(externalCombatModule),

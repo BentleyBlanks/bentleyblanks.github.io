@@ -576,6 +576,12 @@ const unitAliases = {
   CavalrySearchTroop: "EnemyCavalry",
   EngineerPlatoon: "EnemyEngineer",
   ArtilleryDetachment: "EnemyArtillery",
+  // —— Script_Ai.mjs 动态生成的敌军键（含早期简写），缺一个就会退化成步兵 ——
+  SupplyColumn: "EnemySupply",
+  JapaneseInfantry: "EnemyInfantry",
+  JapaneseCavalry: "EnemyCavalry",
+  PuppetInfantry: "EnemyPuppet",
+  PuppetPolice: "EnemyPuppet",
   // —— 通用同义词（容错） ——
   Partisan: "Guerrilla", Regular: "MainForce", Main: "MainForce", Veteran: "MainForce",
   Engineer: "Sapper", Demolition: "Sapper", Horse: "Cavalry", Stretcher: "Medic", Nurse: "Medic",
@@ -955,15 +961,19 @@ export function CreateDistrictModel(districtType, options = {}) {
 // --------------------------------------------------------------------------
 
 const workBuilders = {
-  /** 梯田：随等高线层层退台，作物成行。 */
+  /**
+   * 梯田：随等高线层层退台，作物成行。
+   * 三层闭合环、压暗的土埂色（#7d7048 一族）、低矮层高——它是贴着山坡的田埂，
+   * 不是金色露天剧场；断口螺旋 + 亮黄 + 四层高塔正是此前"中央金盘"突兀感的来源。
+   */
   Terrace(pieces) {
-    for (let level = 0; level < 4; level += 1) {
+    for (let level = 0; level < 3; level += 1) {
       const radius = 0.5 - level * 0.1;
       const y = level * 0.032;
-      Ring(pieces, radius - 0.085, radius, 18, { pos: [0, y + 0.004, 0], rot: [-Math.PI / 2, 0, 0], arcStart: Math.PI * 0.15, arcLength: Math.PI * 1.7, color: level % 2 ? "#94854f" : "#a08f57" });
+      Ring(pieces, radius - 0.085, radius, 18, { pos: [0, y + 0.004, 0], rot: [-Math.PI / 2, 0, 0], color: level % 2 ? "#77694a" : "#7d7048" });
       Cyl(pieces, radius, radius, 0.03, 18, { pos: [0, y - 0.012, 0], color: modelPalette.soilDark, variance: 0.04 });
       for (let crop = 0; crop < 9; crop += 1) {
-        const angle = Math.PI * 0.2 + (crop / 9) * Math.PI * 1.6;
+        const angle = (crop / 9) * Math.PI * 2;
         Box(pieces, 0.02, 0.03, 0.02, { pos: [Math.cos(angle) * (radius - 0.04), y + 0.02, Math.sin(angle) * (radius - 0.04)], color: modelPalette.foliageDry, sway: { amount: 0.7, base: y, span: 0.035 } });
       }
     }

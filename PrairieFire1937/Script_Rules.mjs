@@ -31,7 +31,7 @@ import * as MapGen from "./Script_MapGen.mjs";
 import * as Combat from "./Script_Combat.mjs";
 import * as Ai from "./Script_Ai.mjs";
 
-export const saveVersion = 1;
+export const saveVersion = 2;
 export const saveKey = "prairiefire1937_campaign_v1";
 export const maxTurns = 32;
 
@@ -71,8 +71,14 @@ const fallbackBaseTiers = {
 
 export const ruleConstants = Object.freeze({
   startingStock: { grain: 46, labor: 22, ordnance: 14, medicine: 7, intel: 6, cadre: 3 },
-  exposureDecayBase: 5,
+  // 暴露度唯一的一处自然衰减（AI 侧不再重复扣减），按时期：
+  // 正常约 -3/回合、困难期 -2。目标是主动玩家在 15~60 区间波动：
+  // 打完转移压得回去，滞留则一路失控。
+  exposureDecayBase: 3,
+  exposureDecayByEra: Object.freeze({ Opening: 3, Growth: 3, Hardship: 2, Recovery: 2.5, Counter: 3 }),
   exposureSweepThreshold: 58,
+  // 警备度的时期基线下限：治安战的常态压力，扫荡日历的底色。
+  alertFloorByEra: Object.freeze({ Opening: 8, Growth: 14, Hardship: 26, Recovery: 18, Counter: 12 }),
   alertGrowthPerBase: 1.4,
   massDriftBase: 2.1,
   massDriftEnemy: -2.6,
@@ -240,6 +246,7 @@ function MakeHex(q, r, patch = {}) {
     road: 0,
     railway: false,
     railBroken: 0,
+    blockade: 0,
     elevation: 0.3,
     moisture: 0.4,
     yields: { grain: 0, labor: 0, ordnance: 0, medicine: 0, intel: 0 },
@@ -465,8 +472,19 @@ function SeedEnemyForces(state, generated) {
 
   const patrolKeys = nearbyCandidates.slice(0, 2);
   const enemyTypes = ["PuppetGarrison", "JapaneseInfantry"];
+  const claimedHomes = new Set();
   patrolKeys.forEach((key, index) => {
-    AddEnemyUnit(state, ResolveEnemyUnitType(enemyTypes[index] ?? enemyTypes[0]), key, "Patrol");
+    const unit = AddEnemyUnit(state, ResolveEnemyUnitType(enemyTypes[index] ?? enemyTypes[0]), key, "Patrol");
+    // 巡逻队各认最近的据点为老巢，初始两支分属不同据点，巡逻圈才铺得开。
+    const ranked = state.strongholds
+      .filter((item) => item.key)
+      .map((item) => ({ id: item.id, distance: HexDistanceKeys(item.key, key) }))
+      .sort((a, b) => (a.distance - b.distance) || (a.id < b.id ? -1 : 1));
+    const home = ranked.find((item) => !claimedHomes.has(item.id)) ?? ranked[0];
+    if (home) {
+      unit.homeStrongholdId = home.id;
+      claimedHomes.add(home.id);
+    }
   });
 
   // 保证附近至少有一个据点可打。
@@ -974,6 +992,8 @@ function MoveCost(state, hex, effects) {
   // 交通壕等工事让本方在自家地盘上跑得更快（moveCostDelta 为负值）。
   cost += GetHexWorkEffects(hex).moveCostDelta;
   if (hex.works?.includes("Tunnel") && effects.tunnelMove) cost = Math.min(cost, 1);
+  // 囚笼生效：敌人的封锁沟与铁丝网真实迟滞我方机动（每级 +0.75，封顶 +1.5）。
+  cost += Math.min(1.5, Math.max(0, Number(hex.blockade) || 0) * 0.75);
   if (GetSeasonKey(state.turn) === "冬") cost += 0.25;
   return Math.max(0.5, cost);
 }
@@ -1661,10 +1681,22 @@ export function EndTurn(state) {
   report.lines.push(...enemyReport.lines);
   report.effects.push(...enemyReport.effects);
 
-  // 5. 暴露度与警备度
-  const decay = ruleConstants.exposureDecayBase * (1 + effects.exposureDecay);
-  next.exposure = Clamp(next.exposure - decay, 0, 100);
-  next.alert = Clamp(next.alert + next.bases.length * ruleConstants.alertGrowthPerBase * 0.35 + next.exposure * 0.03 - 1.5, 0, 100);
+  // 5. 暴露度与警备度（全局唯一的一处自然衰减；AI 侧不再重复扣减）
+  const eraDecay = ruleConstants.exposureDecayByEra[next.eraKey] ?? ruleConstants.exposureDecayBase;
+  next.exposure = Clamp(next.exposure - eraDecay * (1 + effects.exposureDecay), 0, 100);
+  // 警备度：时期基线之上，根据地越多、经营的村庄越多，增速越高——治安战的常态压力。
+  const baseHexCount = next.map.order.reduce(
+    (count, key) => count + (next.map.hexes[key]?.control === "Base" ? 1 : 0),
+    0,
+  );
+  const alertFloor = ruleConstants.alertFloorByEra[next.eraKey] ?? 10;
+  const alertDrift =
+    next.bases.length * ruleConstants.alertGrowthPerBase * 0.5 +
+    baseHexCount * 0.02 +
+    next.exposure * 0.03 -
+    1.2 -
+    next.alert * 0.03;
+  next.alert = Clamp(Math.max(next.alert + alertDrift, alertFloor), 0, 100);
 
   // 6. 单位回合重置
   if (typeof Combat.TickCombatRecovery === "function") {
@@ -1728,7 +1760,10 @@ function RunEnemyTurn(state) {
   }
   let plan = null;
   try {
-    plan = Ai.PlanEnemyTurn(state, { difficulty: state.difficulty });
+    plan = Ai.PlanEnemyTurn(state, {
+      difficulty: state.difficulty,
+      exposureSweepThreshold: ruleConstants.exposureSweepThreshold,
+    });
   } catch (error) {
     return { lines, effects };
   }
@@ -1754,6 +1789,9 @@ function RunEnemyTurn(state) {
   // AI 的跨回合记忆（方针迟滞、扫荡冷却、在建工程、守备欠账）必须一起搬运，
   // 否则它每回合都会失忆，战略层退化成随机切方针。
   if (applied.aiMemory) state.aiMemory = applied.aiMemory;
+  // 敌情通报与"铁壁合围"挂起旗一起搬运（事件写旗、AI 兑现后摘旗）。
+  state.enemyReadout = applied.enemyReadout ?? state.enemyReadout ?? null;
+  state.pendingForcedSweep = applied.pendingForcedSweep ?? false;
   state.alert = applied.alert ?? state.alert;
   state.exposure = applied.exposure ?? state.exposure;
   if (applied.ledger) {
@@ -1795,6 +1833,19 @@ function RunEnemyTurn(state) {
 function PickHistoricalEvent(state) {
   const events = Array.isArray(DataHistory?.historicalEvents) ? DataHistory.historicalEvents : [];
   if (!events.length) return null;
+  // 对象式条件（{ minExposure: 30 } 等）统一交给 Data_History.EvaluateEventCondition 判定，
+  // 函数式条件照旧直接调用。判定上下文每回合只构建一次。
+  const evaluateCondition =
+    typeof DataHistory?.EvaluateEventCondition === "function" ? DataHistory.EvaluateEventCondition : null;
+  const buildContext = typeof DataHistory?.BuildEventContext === "function" ? DataHistory.BuildEventContext : null;
+  let context = null;
+  if (evaluateCondition && buildContext) {
+    try {
+      context = buildContext({ ...state, firedEventIds: state.events.fired, flags: state.flags ?? [] });
+    } catch (error) {
+      context = null;
+    }
+  }
   const candidates = events.filter((event) => {
     if (!event?.id || state.events.fired.includes(event.id)) return false;
     if (event.era && event.era !== state.eraKey) return false;
@@ -1805,10 +1856,27 @@ function PickHistoricalEvent(state) {
       } catch (error) {
         return false;
       }
+    } else if (event.condition && typeof event.condition === "object" && context && evaluateCondition) {
+      try {
+        if (!evaluateCondition(event.condition, context)) return false;
+      } catch (error) {
+        return false;
+      }
     }
     return true;
   });
   if (!candidates.length) return null;
+
+  // 史实硬节点（mandatory）：时间窗走到最后一回合仍未触发的强制入列——
+  // 铁壁合围、受降这类事件不因玩家打法而缺席。
+  const due = candidates.find(
+    (event) => event.mandatory && Array.isArray(event.turnRange) && state.turn >= event.turnRange[1],
+  );
+  if (due) {
+    state.events.fired.push(due.id);
+    return due;
+  }
+
   const roll = NextRandom(state);
   if (roll > 0.62) return null;
   const totalWeight = candidates.reduce((sum, event) => sum + (event.weight ?? 1), 0);
@@ -1853,6 +1921,18 @@ export function ApplyEventChoice(state, eventId, optionId) {
   }
   AddLedger(next, option.ledger ?? {});
 
+  // 事件旗标：写入 state.flags，供后续事件条件（requireFlags）与结局评定使用。
+  if (Array.isArray(optionEffects.flags) && optionEffects.flags.length) {
+    next.flags = Array.from(new Set([...(next.flags ?? []), ...optionEffects.flags]));
+  }
+  // 铁壁合围通路：挂起强制立案旗。若此刻已有合围在途，旗子会一直保留，
+  // 等它结束后的第一个敌方回合无视冷却与概率直接再立案一次高强度合围
+  // （走 PlanSweep 的现有数据结构；1941-42 年本就是反复合击）。
+  if (optionEffects.forceSweep) {
+    next.pendingForcedSweep = true;
+    PushLog(next, "时局", "合围情报已经核实：敌重兵调动在即，各区立即坚壁清野、准备转移。");
+  }
+
   PushLog(next, "时局", `${event.title}：${option.label}`);
   RecomputeMassAndControl(next);
   RecomputeEconomy(next);
@@ -1881,7 +1961,39 @@ export function GetTurnBriefing(state) {
     needsDoctrine: !state.research.currentDoctrineId,
     openPolicySlots: Math.max(0, GetPolicySlots(state) - state.policy.equipped.length),
     net: GetNetIncome(state),
+    // 囚笼在收紧的可视化：敌方在建工事（只报我方侦知的部分）。
+    enemyWorks: ListEnemyWorks(state),
+    // AI 回合写入的结构化敌情（方针 / 守备调动 / 扫荡阶段 / 辎重路讯）。
+    enemyReadout: state.enemyReadout ?? null,
+    convoyNotices: state.enemyReadout?.convoyNotices ?? [],
   };
+}
+
+/**
+ * 敌方在建工事清单（GetTurnBriefing.enemyWorks）。
+ * 只报玩家侦知的：看得见的格（visibility ≥1）或情报覆盖 ≥25 的格。
+ */
+export function ListEnemyWorks(state) {
+  const memory = state.aiMemory ?? state.map?.aiMemory ?? null;
+  const projects = Array.isArray(memory?.construction) ? memory.construction : [];
+  const works = [];
+  for (const project of projects) {
+    const hex = state.map.hexes[project.key];
+    if (!hex) continue;
+    const known = (hex.visibility ?? 0) >= 1 || (hex.intel ?? 0) >= 25;
+    if (!known) continue;
+    const placeName = featureDefinitions()[hex.feature]?.name ?? terrainDefinitions()[hex.terrain]?.name ?? "某地";
+    const turnsLeft = Math.max(1, Number(project.turnsLeft) || 0);
+    works.push({
+      key: project.key,
+      kind: project.kind,
+      name: project.name,
+      turnsLeft,
+      totalTurns: Math.max(1, Number(project.totalTurns) || 1),
+      label: `敌在${placeName}修筑${project.name}，约 ${turnsLeft} 回合完工。`,
+    });
+  }
+  return works;
 }
 
 export function ForecastSweep(state) {
@@ -2047,7 +2159,7 @@ function PickEnding(state, summary) {
     baseCount: state.bases.length,
     techCount: state.research.done.length,
     grade: summary.grade,
-    flags: state.endingFlags ?? [],
+    flags: state.flags ?? state.endingFlags ?? [],
   };
 
   if (typeof DataHistory?.EvaluateEnding === "function") {
