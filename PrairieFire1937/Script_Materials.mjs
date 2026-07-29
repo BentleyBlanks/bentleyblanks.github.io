@@ -750,9 +750,9 @@ void main() {
   if ( uCloudOpacity > 0.002 && up > 0.004 ) {
     vec2 cloudPlane = direction.xz / max( up, 0.045 );
     float drift = uTime * uCloudSpeed;
-    float layerHigh = CloudBand( cloudPlane, uCloudScale * 0.55, vec2( drift * 0.6, drift * 0.24 ), 4 );
-    float layerMid = CloudBand( cloudPlane, uCloudScale, vec2( -drift * 1.1, drift * 0.5 ), 4 );
-    float layerLow = CloudBand( cloudPlane, uCloudScale * 2.1, vec2( drift * 1.9, -drift * 0.8 ), 3 );
+    float layerHigh = CloudBand( cloudPlane, uCloudScale * 6.0, vec2( drift * 0.6, drift * 0.24 ), 4 );
+    float layerMid = CloudBand( cloudPlane, uCloudScale * 10.0, vec2( -drift * 1.1, drift * 0.5 ), 4 );
+    float layerLow = CloudBand( cloudPlane, uCloudScale * 16.0, vec2( drift * 1.9, -drift * 0.8 ), 3 );
     float coverage = clamp( layerHigh * 0.55 + layerMid * 0.85 + layerLow * 0.45, 0.0, 1.0 );
     float horizonFade = smoothstep( 0.008, 0.06, up );
     coverage *= horizonFade * uCloudOpacity;
@@ -765,7 +765,7 @@ void main() {
   // 地平线云堤：出货相机（俯仰≤65°、fov38）能看到的"天"全部在 up∈[-0.32,-0.02]，
   // 上方那组经典云带在这个范围永远采样不到——连续两轮审核证伪的就是它。
   // 这里按方位角展开一条云堤，颜色压暗到与底色拉开 ΔL≥10%，玩家第一次能看见云。
-  float bank = smoothstep( -0.34, -0.20, up ) * ( 1.0 - smoothstep( -0.11, -0.02, up ) );
+  float bank = smoothstep( 0.015, 0.09, up ) * ( 1.0 - smoothstep( 0.28, 0.46, up ) );
   if ( bank > 0.003 && uCloudOpacity > 0.002 ) {
     float azimuth = atan( direction.z, direction.x );
     // 尺度按"全屏方位角跨度要扫过若干个噪声胞"标定：此前 uv×scale 合成后
