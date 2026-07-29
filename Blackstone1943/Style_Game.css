@@ -1,0 +1,1441 @@
+/* 《黑石峪 · 一九四三年冬》界面样式
+   冬日冷灰为底，火光橙是画面上唯一的暖色。
+   零外链：无字体文件、无图片、无 CDN。所有纹理与光晕由渐变生成。 */
+
+:root {
+  --HudFontScale: 1;
+
+  --ColdVoid: #05080b;
+  --ColdBase: #0b1014;
+  --ColdPanel: rgba(16, 22, 28, 0.82);
+  --ColdPanelSolid: #10161c;
+  --ColdEdge: rgba(146, 168, 182, 0.18);
+  --ColdEdgeStrong: rgba(168, 192, 206, 0.34);
+  --ColdMist: #7c8b95;
+  --ColdMuted: #97a6b0;
+  --ColdText: #c6d3da;
+  --ColdSnow: #eef4f7;
+
+  --Ember: #e8802f;
+  --EmberSoft: #f4a961;
+  --EmberDeep: #8a4415;
+  --EmberGlow: rgba(232, 128, 47, 0.38);
+
+  --SafeTop: env(safe-area-inset-top, 0px);
+  --SafeRight: env(safe-area-inset-right, 0px);
+  --SafeBottom: env(safe-area-inset-bottom, 0px);
+  --SafeLeft: env(safe-area-inset-left, 0px);
+  --HudPad: 18px;
+
+  --FontStack: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
+               "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  --FontMono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+              "DejaVu Sans Mono", monospace;
+
+  --Ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--ColdVoid);
+  color: var(--ColdText);
+  font-family: var(--FontStack);
+  font-size: calc(16px * var(--HudFontScale));
+  line-height: 1.55;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+body { touch-action: none; }
+
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(146, 168, 182, 0.24); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.Style_VisuallyHidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  padding: 0; border: 0; clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden;
+}
+
+/* ===================== 根容器与画布 ===================== */
+
+.Style_GameRoot {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 8%, #16202a 0%, #0a1015 55%, #05080b 100%);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.Style_GameCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+  outline: none;
+}
+
+/* ===================== HUD 根 ===================== */
+
+.Style_HudRoot {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  padding:
+    calc(var(--SafeTop) + var(--HudPad))
+    calc(var(--SafeRight) + var(--HudPad))
+    calc(var(--SafeBottom) + var(--HudPad))
+    calc(var(--SafeLeft) + var(--HudPad));
+  font-size: calc(0.86rem);
+  letter-spacing: 0.02em;
+}
+
+.Style_HudRoot[hidden] { display: none; }
+
+/* 极轻的上下压暗，保证雪地强反光下字幕与状态仍然可读 */
+.Style_HudRoot::before, .Style_HudRoot::after {
+  content: "";
+  position: absolute;
+  left: -120px; right: -120px;
+  pointer-events: none;
+}
+.Style_HudRoot::before {
+  top: calc(-1 * (var(--SafeTop) + var(--HudPad)));
+  height: 22vh;
+  background: linear-gradient(180deg, rgba(5, 8, 11, 0.5), rgba(5, 8, 11, 0));
+}
+.Style_HudRoot::after {
+  bottom: calc(-1 * (var(--SafeBottom) + var(--HudPad)));
+  height: 38vh;
+  background: linear-gradient(0deg, rgba(5, 8, 11, 0.78), rgba(5, 8, 11, 0.3) 46%, rgba(5, 8, 11, 0));
+}
+
+/* 战斗外自动淡出：Hud 在平静且一段时间无变化时置 dataCalm="1" */
+.Style_HudRoot[dataCalm="1"] .Style_Vitals,
+.Style_HudRoot[dataCalm="1"] .Style_Ammo,
+.Style_HudRoot[dataCalm="1"] .Style_Objective,
+.Style_HudRoot[dataCalm="1"] .Style_Companion,
+.Style_HudRoot[dataCalm="1"] .Style_KeyHints { opacity: 0.22; }
+
+.Style_Vitals, .Style_Ammo, .Style_Objective, .Style_Companion, .Style_KeyHints,
+.Style_Alert, .Style_Prompt, .Style_SoundCaption {
+  transition: opacity 520ms var(--Ease);
+}
+
+/* ---------- 准星 ---------- */
+
+.Style_Crosshair {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 46px; height: 46px;
+  margin: -23px 0 0 -23px;
+  opacity: 0;
+  --Spread: 6px;
+}
+.Style_Crosshair[dataMode="Dot"], .Style_Crosshair[dataMode="Aim"],
+.Style_Crosshair[dataMode="Melee"], .Style_Crosshair[dataMode="Throw"] { opacity: 1; }
+
+.Style_CrosshairDot {
+  position: absolute; left: 50%; top: 50%;
+  width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px;
+  border-radius: 50%;
+  background: var(--ColdSnow);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+.Style_CrosshairArm {
+  position: absolute; left: 50%; top: 50%;
+  background: rgba(238, 244, 247, 0.85);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+  opacity: 0;
+  transition: transform 90ms linear, opacity 120ms linear;
+}
+.Style_ArmUp, .Style_ArmDown { width: 1.5px; height: 8px; margin-left: -0.75px; }
+.Style_ArmLeft, .Style_ArmRight { width: 8px; height: 1.5px; margin-top: -0.75px; }
+.Style_ArmUp { transform: translateY(calc(-1 * var(--Spread) - 8px)); }
+.Style_ArmDown { transform: translateY(var(--Spread)); }
+.Style_ArmLeft { transform: translateX(calc(-1 * var(--Spread) - 8px)); }
+.Style_ArmRight { transform: translateX(var(--Spread)); }
+
+.Style_Crosshair[dataMode="Aim"] .Style_CrosshairArm { opacity: 1; }
+.Style_Crosshair[dataMode="Aim"] .Style_CrosshairDot { background: var(--EmberSoft); }
+.Style_Crosshair[dataMode="Melee"] .Style_CrosshairDot { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; background: none; border: 1.5px solid rgba(238, 244, 247, 0.8); }
+.Style_Crosshair[dataMode="Throw"] .Style_CrosshairDot { background: var(--Ember); box-shadow: 0 0 10px var(--EmberGlow); }
+
+.Style_ThrowArc {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+.Style_ThrowArcLine {
+  fill: none;
+  stroke: rgba(232, 128, 47, 0.72);
+  stroke-width: 0.28;
+  stroke-linecap: round;
+  stroke-dasharray: 1.2 1.6;
+  vector-effect: non-scaling-stroke;
+}
+.Style_ThrowArcMark { fill: rgba(244, 169, 97, 0.9); }
+
+/* ---------- 交互进度环 ---------- */
+
+.Style_Progress {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 62px; height: 62px;
+  margin: -31px 0 0 -31px;
+  display: flex; align-items: center; justify-content: center;
+  --ProgressFill: 0;
+}
+.Style_Progress[hidden] { display: none; }
+.Style_ProgressRing {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--Ember) calc(var(--ProgressFill) * 360deg), rgba(120, 138, 150, 0.22) 0);
+  mask: radial-gradient(circle, transparent 60%, #000 62%);
+  -webkit-mask: radial-gradient(circle, transparent 60%, #000 62%);
+}
+.Style_ProgressLabel {
+  position: relative;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ColdSnow);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+
+/* ---------- 目标 / 章节（左上） ---------- */
+
+.Style_Objective {
+  position: absolute;
+  left: calc(var(--SafeLeft) + var(--HudPad));
+  top: calc(var(--SafeTop) + var(--HudPad));
+  max-width: min(30ch, 34vw);
+}
+.Style_ObjectiveHead {
+  margin: 0 0 6px;
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 0.68rem;
+  letter-spacing: 0.24em;
+  text-transform: none;
+  color: var(--ColdMist);
+}
+.Style_ObjectiveHead b { color: var(--Ember); font-weight: 600; letter-spacing: 0.1em; }
+.Style_ObjectiveList { margin: 0; padding: 0; list-style: none; }
+.Style_ObjectiveList li {
+  position: relative;
+  padding-left: 15px;
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+  color: var(--ColdText);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+}
+.Style_ObjectiveList li::before {
+  content: "";
+  position: absolute; left: 0; top: 0.62em;
+  width: 6px; height: 6px;
+  border: 1px solid var(--ColdEdgeStrong);
+  transform: rotate(45deg);
+}
+.Style_ObjectiveList li[dataState="Active"] { color: var(--ColdSnow); }
+.Style_ObjectiveList li[dataState="Active"]::before { border-color: var(--Ember); background: var(--Ember); box-shadow: 0 0 8px var(--EmberGlow); }
+.Style_ObjectiveList li[dataState="Done"] { color: var(--ColdMist); text-decoration: line-through; text-decoration-color: rgba(124, 139, 149, 0.5); }
+.Style_ObjectiveList li[dataState="Done"]::before { background: rgba(124, 139, 149, 0.45); border-color: transparent; }
+.Style_ObjectiveList li[dataState="Failed"] { color: var(--ColdMist); opacity: 0.72; }
+.Style_ObjectiveList li[dataOptional="1"] { font-size: 0.82rem; opacity: 0.82; }
+.Style_ObjectiveHint {
+  display: block; margin-top: 6px; padding-left: 15px;
+  font-size: 0.76rem; color: var(--ColdMist);
+}
+.Style_ObjectiveFlash { animation: Style_ObjectivePulse 1.1s var(--Ease); }
+@keyframes Style_ObjectivePulse {
+  0% { opacity: 0; transform: translateX(-6px); }
+  35% { opacity: 1; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ---------- 潜行状态（右上） ---------- */
+
+.Style_Alert {
+  position: absolute;
+  right: calc(var(--SafeRight) + var(--HudPad));
+  top: calc(var(--SafeTop) + var(--HudPad));
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  --AlertFill: 0;
+  --NoiseScale: 0;
+}
+.Style_AlertDial {
+  position: relative;
+  width: 46px; height: 46px;
+}
+.Style_AlertRing {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg, var(--Ember) calc(var(--AlertFill) * 360deg), rgba(124, 139, 149, 0.2) 0);
+  mask: radial-gradient(circle, transparent 66%, #000 68%);
+  -webkit-mask: radial-gradient(circle, transparent 66%, #000 68%);
+}
+.Style_AlertNoise {
+  position: absolute; left: 50%; top: 50%;
+  width: 46px; height: 46px; margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  border: 1px solid rgba(198, 211, 218, 0.34);
+  transform: scale(calc(0.35 + var(--NoiseScale) * 0.65));
+  opacity: calc(0.15 + var(--NoiseScale) * 0.5);
+  transition: transform 180ms linear, opacity 180ms linear;
+}
+.Style_AlertEye {
+  position: absolute; left: 50%; top: 50%;
+  width: 13px; height: 7px; margin: -3.5px 0 0 -6.5px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  border: 1.4px solid var(--ColdMuted);
+}
+.Style_AlertEye::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px;
+  border-radius: 50%; background: var(--ColdMuted);
+}
+.Style_AlertThreat {
+  position: absolute; left: 50%; top: 50%;
+  width: 0; height: 0; margin: -30px 0 0 -5px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 8px solid var(--Ember);
+  transform-origin: 5px 30px;
+  transform: rotate(var(--ThreatAngle, 0deg));
+  filter: drop-shadow(0 0 5px var(--EmberGlow));
+}
+.Style_AlertThreat[hidden] { display: none; }
+.Style_AlertLabel {
+  font-size: 0.68rem; letter-spacing: 0.2em; font-weight: 500;
+  color: var(--ColdMist);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+.Style_Alert[dataLevel="1"] .Style_AlertEye,
+.Style_Alert[dataLevel="1"] .Style_AlertEye::after { border-color: var(--EmberSoft); background: var(--EmberSoft); }
+.Style_Alert[dataLevel="1"] .Style_AlertLabel { color: var(--EmberSoft); }
+.Style_Alert[dataLevel="2"] .Style_AlertEye,
+.Style_Alert[dataLevel="2"] .Style_AlertEye::after { border-color: var(--Ember); background: var(--Ember); }
+.Style_Alert[dataLevel="2"] .Style_AlertLabel { color: var(--Ember); }
+.Style_Alert[dataLevel="2"] .Style_AlertDial { animation: Style_AlertThrob 1.05s ease-in-out infinite; }
+@keyframes Style_AlertThrob {
+  0%, 100% { transform: scale(1); filter: none; }
+  50% { transform: scale(1.09); filter: drop-shadow(0 0 9px var(--EmberGlow)); }
+}
+.Style_Alert[dataConcealed="1"] .Style_AlertDial::after {
+  content: "";
+  position: absolute; inset: -4px;
+  border-radius: 50%;
+  border: 1px dashed rgba(198, 211, 218, 0.28);
+}
+
+/* ---------- 伴随状态 ---------- */
+
+.Style_Companion {
+  position: absolute;
+  right: calc(var(--SafeRight) + var(--HudPad));
+  top: calc(var(--SafeTop) + var(--HudPad) + 78px);
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 10px 6px 6px;
+  background: linear-gradient(90deg, rgba(11, 16, 20, 0), rgba(11, 16, 20, 0.62));
+  border-right: 2px solid var(--ColdEdge);
+}
+.Style_Companion[hidden] { display: none; }
+.Style_CompanionGlyph {
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.74rem; font-style: normal; font-weight: 600;
+  color: var(--ColdSnow);
+  background: rgba(124, 139, 149, 0.2);
+  border: 1px solid var(--ColdEdgeStrong);
+}
+.Style_CompanionCopy { display: flex; flex-direction: column; line-height: 1.25; }
+.Style_CompanionCopy b { font-size: 0.8rem; font-weight: 600; color: var(--ColdSnow); }
+.Style_CompanionCopy small { font-size: 0.68rem; color: var(--ColdMist); }
+.Style_CompanionDistance { font-size: 0.72rem; color: var(--ColdMuted); font-variant-numeric: tabular-nums; }
+.Style_CompanionScare {
+  width: 5px; height: 22px;
+  background: linear-gradient(to top, var(--Ember), rgba(232, 128, 47, 0.15));
+  opacity: var(--ScareLevel, 0);
+}
+.Style_CompanionScare[hidden] { display: none; }
+.Style_Companion[dataMode="Hide"] { border-right-color: var(--EmberDeep); }
+.Style_Companion[dataMode="Captured"] { border-right-color: var(--Ember); }
+.Style_Companion[dataMode="Captured"] .Style_CompanionCopy small { color: var(--Ember); }
+
+/* ---------- 生存状态（左下） ---------- */
+
+.Style_Vitals {
+  position: absolute;
+  left: calc(var(--SafeLeft) + var(--HudPad));
+  bottom: calc(var(--SafeBottom) + var(--HudPad));
+  display: flex; flex-direction: column; gap: 5px;
+  width: 168px;
+}
+.Style_VitalRow { display: flex; align-items: center; gap: 7px; }
+.Style_VitalTag {
+  width: 1.1em;
+  font-size: 0.66rem; color: var(--ColdMist);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.Style_VitalTrack {
+  position: relative;
+  flex: 1; height: 3px;
+  background: rgba(124, 139, 149, 0.2);
+  overflow: hidden;
+}
+.Style_VitalFill {
+  display: block; height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(var(--Fill, 1));
+  background: var(--ColdMuted);
+  transition: transform 260ms var(--Ease), background-color 400ms linear;
+}
+.Style_VitalRow[dataVital="Health"] .Style_VitalFill { background: #b9c6cd; }
+.Style_VitalRow[dataVital="Stamina"] .Style_VitalFill { background: #8b9aa4; }
+.Style_VitalRow[dataVital="Warmth"] .Style_VitalFill { background: #7fa0b4; }
+.Style_VitalRow[dataLow="1"] .Style_VitalFill { background: var(--Ember); }
+.Style_VitalRow[dataLow="1"] .Style_VitalTag { color: var(--EmberSoft); }
+.Style_VitalsBleed, .Style_VitalsCold {
+  margin-top: 3px;
+  font-size: 0.7rem; font-weight: 500; letter-spacing: 0.08em;
+  color: var(--Ember);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+}
+.Style_VitalsBleed[hidden], .Style_VitalsCold[hidden] { display: none; }
+
+/* ---------- 弹药（右下） ---------- */
+
+.Style_Ammo {
+  position: absolute;
+  right: calc(var(--SafeRight) + var(--HudPad));
+  bottom: calc(var(--SafeBottom) + var(--HudPad));
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+  text-align: right;
+}
+.Style_Ammo[hidden] { display: none; }
+.Style_AmmoLabel {
+  font-size: 0.74rem; font-weight: 600; letter-spacing: 0.12em;
+  color: var(--ColdText);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+.Style_AmmoPips { display: flex; gap: 3px; }
+.Style_AmmoPip {
+  width: 4px; height: 13px;
+  background: rgba(124, 139, 149, 0.26);
+  border-radius: 1px;
+}
+.Style_AmmoPip[dataLoaded="1"] { background: var(--ColdSnow); }
+.Style_AmmoPip[dataReserve="1"] { background: rgba(198, 211, 218, 0.42); }
+.Style_AmmoCount {
+  font-family: var(--FontMono);
+  font-size: 0.7rem; color: var(--ColdMist);
+  font-variant-numeric: tabular-nums;
+}
+.Style_AmmoChamber {
+  font-size: 0.68rem; font-style: normal; letter-spacing: 0.14em;
+  color: var(--Ember);
+}
+.Style_AmmoChamber[hidden] { display: none; }
+
+/* ---------- 交互提示 ---------- */
+
+.Style_Prompt {
+  position: absolute;
+  left: 50%; bottom: 26%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 13px 6px 7px;
+  background: rgba(8, 12, 16, 0.62);
+  border: 1px solid var(--ColdEdge);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: Style_PromptIn 140ms var(--Ease);
+}
+.Style_Prompt[hidden] { display: none; }
+@keyframes Style_PromptIn { from { opacity: 0; transform: translateX(-50%) translateY(5px); } to { opacity: 1; } }
+.Style_PromptKey {
+  min-width: 24px; padding: 2px 6px;
+  font-family: var(--FontMono); font-size: 0.72rem; text-align: center;
+  color: var(--ColdVoid); background: var(--ColdSnow);
+  border-radius: 2px;
+}
+.Style_PromptText { font-size: 0.86rem; color: var(--ColdSnow); }
+.Style_Prompt[dataKind="Companion"] { border-color: var(--EmberDeep); }
+.Style_Prompt[dataKind="Companion"] .Style_PromptKey { background: var(--Ember); color: #170a02; }
+.Style_Prompt[dataKind="Hint"] { background: rgba(8, 12, 16, 0.4); border-style: dashed; }
+
+/* ---------- 声音方向字幕 ---------- */
+
+.Style_SoundCaption {
+  position: absolute;
+  left: 50%; bottom: calc(var(--SafeBottom) + 33%);
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 11px;
+  background: rgba(8, 12, 16, 0.5);
+  border-left: 2px solid var(--ColdEdgeStrong);
+  font-size: 0.78rem;
+  animation: Style_SoundIn 180ms var(--Ease);
+}
+.Style_SoundCaption[hidden] { display: none; }
+@keyframes Style_SoundIn { from { opacity: 0; } to { opacity: 1; } }
+.Style_SoundArrow {
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid var(--ColdSnow);
+  transform: rotate(var(--CaptionAngle, 0deg));
+}
+.Style_SoundText { color: var(--ColdSnow); }
+.Style_SoundMeta { color: var(--ColdMist); font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+.Style_GameRoot.Style_NoSoundCaption .Style_SoundCaption { display: none; }
+
+/* ---------- 字幕 ---------- */
+
+.Style_Subtitle {
+  position: absolute;
+  left: 50%; bottom: calc(var(--SafeBottom) + var(--HudPad) + 46px);
+  transform: translateX(-50%);
+  width: min(62ch, 78vw);
+  padding: 8px 22px 10px;
+  text-align: center;
+  background: radial-gradient(58% 150% at 50% 62%, rgba(5, 8, 11, 0.62), rgba(5, 8, 11, 0) 74%);
+}
+.Style_Subtitle[hidden] { display: none; }
+.Style_GameRoot.Style_NoSubtitles .Style_Subtitle { display: none; }
+.Style_SubtitleHead {
+  margin: 0 0 3px;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.Style_SubtitleSpeaker {
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.22em;
+  color: var(--EmberSoft);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+}
+.Style_SubtitleDirection {
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 7px solid var(--EmberSoft);
+  transform: rotate(var(--SubtitleAngle, 0deg));
+}
+.Style_SubtitleDirection[hidden] { display: none; }
+.Style_SubtitleText {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ColdSnow);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.98), 0 0 18px rgba(0, 0, 0, 0.7);
+}
+.Style_Subtitle[dataSpeaker="Narrator"] .Style_SubtitleText { font-style: italic; color: var(--ColdText); }
+.Style_Subtitle[dataSpeaker="Radio"] .Style_SubtitleText { font-family: var(--FontMono); letter-spacing: 0.05em; }
+.Style_Subtitle[dataEmotion="Broken"] .Style_SubtitleText,
+.Style_Subtitle[dataEmotion="Low"] .Style_SubtitleText { color: var(--ColdText); }
+
+/* ---------- 浮条提示 ---------- */
+
+.Style_Toast {
+  position: absolute;
+  right: calc(var(--SafeRight) + var(--HudPad));
+  bottom: calc(var(--SafeBottom) + var(--HudPad) + 96px);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+  max-width: min(30ch, 34vw);
+  text-align: right;
+}
+.Style_ToastItem {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: var(--ColdText);
+  background: rgba(8, 12, 16, 0.6);
+  border-right: 2px solid var(--ColdEdgeStrong);
+  animation: Style_ToastIn 200ms var(--Ease);
+}
+.Style_ToastItem[dataKind="Item"] { border-right-color: var(--EmberSoft); color: var(--ColdSnow); }
+.Style_ToastItem[dataKind="Warning"] { border-right-color: var(--Ember); color: var(--EmberSoft); }
+.Style_ToastItem[dataKind="Cost"] {
+  border-right-color: rgba(124, 139, 149, 0.6);
+  font-style: italic; color: var(--ColdMist);
+}
+.Style_ToastItem.Style_ToastOut { opacity: 0; transform: translateX(12px); transition: opacity 320ms linear, transform 320ms var(--Ease); }
+@keyframes Style_ToastIn { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+/* ---------- 章节过场卡 ---------- */
+
+.Style_ChapterCard {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(70% 60% at 50% 50%, rgba(5, 8, 11, 0.72), rgba(5, 8, 11, 0.94));
+  opacity: 0;
+  transition: opacity 700ms var(--Ease);
+}
+.Style_ChapterCard[hidden] { display: none; }
+.Style_ChapterCard.Style_CardVisible { opacity: 1; }
+.Style_ChapterInner { text-align: center; padding: 0 24px; }
+.Style_ChapterIndex {
+  display: block;
+  font-size: 0.76rem; letter-spacing: 0.5em; text-indent: 0.5em;
+  color: var(--EmberSoft);
+}
+.Style_ChapterName {
+  margin: 10px 0 0;
+  font-size: clamp(2rem, 7vw, 3.6rem);
+  font-weight: 500;
+  letter-spacing: 0.26em; text-indent: 0.26em;
+  color: var(--ColdSnow);
+}
+.Style_ChapterRule {
+  display: block;
+  width: 90px; height: 1px;
+  margin: 18px auto;
+  background: linear-gradient(90deg, transparent, var(--EmberDeep), transparent);
+}
+.Style_ChapterSubtitle {
+  margin: 0;
+  font-size: 0.84rem; letter-spacing: 0.2em;
+  color: var(--ColdMist);
+}
+
+/* ---------- 键位速览 ---------- */
+
+.Style_KeyHints {
+  position: absolute;
+  left: 50%; bottom: calc(var(--SafeBottom) + 6px);
+  transform: translateX(-50%);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px;
+  font-size: 0.68rem; color: var(--ColdMist);
+  opacity: 0.7;
+}
+.Style_KeyHints kbd {
+  margin-right: 4px; padding: 1px 5px;
+  font-family: var(--FontMono); font-size: 0.66rem;
+  color: var(--ColdText);
+  border: 1px solid var(--ColdEdge); border-radius: 2px;
+}
+
+/* ===================== 触屏控件 ===================== */
+
+.Style_Touch {
+  position: absolute; inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  touch-action: none;
+}
+.Style_Touch[hidden] { display: none; }
+
+.Style_TouchStick {
+  position: absolute;
+  left: calc(var(--SafeLeft) + 12px);
+  bottom: calc(var(--SafeBottom) + 12px);
+  width: 40vw; max-width: 240px; height: 40vh; max-height: 240px;
+  pointer-events: auto;
+  touch-action: none;
+  --StickX: 0px; --StickY: 0px; --StickOriginX: 50%; --StickOriginY: 50%;
+}
+.Style_TouchStickRing {
+  position: absolute;
+  left: var(--StickOriginX); top: var(--StickOriginY);
+  width: 108px; height: 108px; margin: -54px 0 0 -54px;
+  border-radius: 50%;
+  border: 1px solid rgba(198, 211, 218, 0.2);
+  background: radial-gradient(circle, rgba(198, 211, 218, 0.05), transparent 70%);
+  opacity: 0.5;
+  transition: opacity 200ms linear;
+}
+.Style_TouchStickKnob {
+  position: absolute;
+  left: var(--StickOriginX); top: var(--StickOriginY);
+  width: 46px; height: 46px; margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  border: 1px solid rgba(198, 211, 218, 0.4);
+  background: rgba(20, 28, 34, 0.5);
+  transform: translate(var(--StickX), var(--StickY));
+  opacity: 0.55;
+  transition: opacity 200ms linear;
+}
+.Style_TouchStick[dataActive="1"] .Style_TouchStickRing,
+.Style_TouchStick[dataActive="1"] .Style_TouchStickKnob { opacity: 0.95; }
+
+.Style_TouchLook {
+  position: absolute;
+  right: 0; top: 0;
+  width: 56%; height: 66%;
+  pointer-events: auto;
+  touch-action: none;
+}
+.Style_TouchLookHint {
+  position: absolute; right: 18px; top: 42%;
+  font-size: 0.7rem; color: rgba(124, 139, 149, 0.4);
+  letter-spacing: 0.3em;
+}
+.Style_TouchLook[dataActive="1"] .Style_TouchLookHint { opacity: 0; }
+
+.Style_TouchButtons {
+  position: absolute;
+  right: calc(var(--SafeRight) + 12px);
+  bottom: calc(var(--SafeBottom) + 12px);
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 10px;
+  justify-items: end;
+  pointer-events: none;
+}
+.Style_TouchButton {
+  pointer-events: auto;
+  touch-action: none;
+  min-width: 58px; min-height: 58px;
+  padding: 0;
+  font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--ColdText);
+  background: rgba(16, 22, 28, 0.5);
+  border: 1px solid rgba(198, 211, 218, 0.24);
+  border-radius: 50%;
+  transition: transform 90ms var(--Ease), background-color 120ms linear;
+}
+.Style_TouchButton[dataDown="1"] {
+  transform: scale(0.92);
+  background: rgba(232, 128, 47, 0.24);
+  border-color: var(--Ember);
+  color: var(--ColdSnow);
+}
+.Style_TouchPrimary { min-width: 72px; min-height: 72px; border-color: rgba(198, 211, 218, 0.42); color: var(--ColdSnow); }
+.Style_TouchAttack { min-width: 66px; min-height: 66px; border-color: var(--EmberDeep); color: var(--EmberSoft); }
+.Style_TouchSmall { min-width: 48px; min-height: 48px; font-size: 0.72rem; }
+.Style_TouchPause {
+  position: absolute;
+  right: calc(var(--SafeRight) + 12px);
+  top: calc(var(--SafeTop) + 12px);
+  min-width: 44px; min-height: 44px;
+  pointer-events: auto;
+  color: var(--ColdMuted);
+  background: rgba(16, 22, 28, 0.44);
+  border: 1px solid var(--ColdEdge);
+  border-radius: 50%;
+}
+
+/* 触屏开启时给动作键让出右下角与右上角 */
+.Style_GameRoot[dataTouch="1"] .Style_Ammo { right: calc(var(--SafeRight) + var(--HudPad) + 232px); }
+.Style_GameRoot[dataTouch="1"] .Style_Toast {
+  right: auto;
+  left: calc(var(--SafeLeft) + var(--HudPad));
+  bottom: calc(var(--SafeBottom) + var(--HudPad) + 78px);
+  align-items: flex-start;
+  text-align: left;
+}
+.Style_GameRoot[dataTouch="1"] .Style_ToastItem {
+  border-right: 0;
+  border-left: 2px solid var(--ColdEdgeStrong);
+}
+.Style_GameRoot[dataTouch="1"] .Style_ToastItem[dataKind="Item"] { border-left-color: var(--EmberSoft); }
+.Style_GameRoot[dataTouch="1"] .Style_ToastItem[dataKind="Warning"] { border-left-color: var(--Ember); }
+.Style_GameRoot[dataTouch="1"] .Style_ToastItem[dataKind="Cost"] { border-left-color: rgba(124, 139, 149, 0.6); }
+.Style_GameRoot[dataTouch="1"] .Style_Alert { right: calc(var(--SafeRight) + var(--HudPad) + 58px); }
+.Style_GameRoot[dataTouch="1"] .Style_Companion { right: calc(var(--SafeRight) + var(--HudPad) + 58px); }
+.Style_GameRoot[dataTouch="1"] .Style_Vitals { bottom: calc(var(--SafeBottom) + var(--HudPad) + 6px); }
+.Style_GameRoot[dataTouch="1"] .Style_KeyHints { display: none; }
+
+/* ===================== 全屏叠层 ===================== */
+
+.Style_Letterbox {
+  position: absolute; inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.Style_Letterbox[hidden] { display: none; }
+.Style_Letterbox i {
+  position: absolute; left: 0; right: 0;
+  height: 9vh;
+  background: #05080b;
+  transform: scaleY(var(--BarScale, 1));
+  transition: transform 520ms var(--Ease);
+}
+.Style_Letterbox i:first-child { top: 0; transform-origin: top; }
+.Style_Letterbox i:last-child { bottom: 0; transform-origin: bottom; }
+
+.Style_Fade {
+  position: absolute; inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background: #05080b;
+  opacity: 0;
+  transition: opacity 600ms linear;
+}
+.Style_Fade[dataBlocking="1"] { pointer-events: auto; }
+
+/* ===================== 标题画面 ===================== */
+
+.Style_Title {
+  position: absolute; inset: 0;
+  z-index: 60;
+  display: flex; flex-direction: column;
+  padding:
+    calc(var(--SafeTop) + 22px)
+    calc(var(--SafeRight) + clamp(20px, 5vw, 62px))
+    calc(var(--SafeBottom) + 18px)
+    calc(var(--SafeLeft) + clamp(20px, 5vw, 62px));
+  background:
+    radial-gradient(58% 44% at 20% 88%, rgba(232, 128, 47, 0.11), transparent 66%),
+    linear-gradient(180deg, #121c25 0%, #0c141b 44%, #070c11 100%);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.Style_Title[hidden] { display: none; }
+
+.Style_TitleSky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.Style_Ridge {
+  position: absolute; left: -6%; right: -6%;
+  background: linear-gradient(180deg, transparent, var(--RidgeColor, #10181f) 42%);
+  clip-path: polygon(0 68%, 8% 52%, 16% 61%, 27% 39%, 36% 52%, 47% 31%, 58% 48%, 68% 36%, 79% 55%, 88% 44%, 100% 58%, 100% 100%, 0 100%);
+}
+.Style_RidgeFar { bottom: 36%; height: 44%; --RidgeColor: #1b2833; opacity: 0.7; }
+.Style_RidgeMid { bottom: 20%; height: 40%; --RidgeColor: #131d26; opacity: 0.92; }
+.Style_RidgeNear { bottom: 0; height: 32%; --RidgeColor: #070c11; }
+.Style_TitleEmber {
+  position: absolute;
+  left: 8%; bottom: 4%;
+  width: 30vw; height: 30vw; max-width: 380px; max-height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 128, 47, 0.26), rgba(232, 128, 47, 0.05) 44%, transparent 66%);
+  filter: blur(8px);
+  animation: Style_EmberBreath 6.5s ease-in-out infinite;
+}
+@keyframes Style_EmberBreath {
+  0%, 100% { opacity: 0.72; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.Style_TitleSnow {
+  position: absolute; inset: -20% 0 0;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 18%, rgba(238, 244, 247, 0.55), transparent),
+    radial-gradient(1.2px 1.2px at 34% 62%, rgba(238, 244, 247, 0.4), transparent),
+    radial-gradient(1.6px 1.6px at 58% 28%, rgba(238, 244, 247, 0.5), transparent),
+    radial-gradient(1.1px 1.1px at 71% 74%, rgba(238, 244, 247, 0.34), transparent),
+    radial-gradient(1.5px 1.5px at 88% 44%, rgba(238, 244, 247, 0.46), transparent),
+    radial-gradient(1.2px 1.2px at 47% 88%, rgba(238, 244, 247, 0.34), transparent),
+    radial-gradient(1.3px 1.3px at 22% 47%, rgba(238, 244, 247, 0.4), transparent),
+    radial-gradient(1.1px 1.1px at 92% 12%, rgba(238, 244, 247, 0.3), transparent);
+  background-size: 100% 60%;
+  animation: Style_SnowDrift 17s linear infinite;
+}
+.Style_TitleSnowSlow { opacity: 0.55; background-size: 100% 40%; animation-duration: 29s; animation-direction: reverse; }
+@keyframes Style_SnowDrift {
+  from { transform: translate3d(0, -20%, 0); }
+  to { transform: translate3d(-4%, 60%, 0); }
+}
+
+.Style_TitleBar {
+  position: relative;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap;
+}
+.Style_TitleMark { text-decoration: none; color: inherit; display: flex; flex-direction: column; line-height: 1.2; }
+.Style_TitleMark b { font-size: 0.94rem; font-weight: 600; letter-spacing: 0.34em; color: var(--ColdSnow); }
+.Style_TitleMark span { font-size: 0.6rem; letter-spacing: 0.24em; color: var(--ColdMist); }
+.Style_TitleBarActions { display: flex; gap: 10px; flex-wrap: wrap; }
+.Style_QuietButton {
+  padding: 7px 14px;
+  min-height: 40px;
+  font-size: 0.76rem; letter-spacing: 0.1em;
+  color: var(--ColdMuted);
+  background: transparent;
+  border: 1px solid var(--ColdEdge);
+  transition: color 160ms linear, border-color 160ms linear;
+}
+.Style_QuietButton:hover, .Style_QuietButton:focus-visible { color: var(--ColdSnow); border-color: var(--ColdEdgeStrong); outline: none; }
+
+.Style_TitleBody {
+  position: relative;
+  flex: 1;
+  display: flex; align-items: center; gap: clamp(24px, 5vw, 72px);
+  padding: clamp(18px, 4vh, 48px) 0;
+}
+.Style_TitleCopy { flex: 1 1 58%; max-width: 62ch; }
+.Style_TitleEyebrow {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 14px;
+  font-size: 0.72rem; letter-spacing: 0.3em;
+  color: var(--EmberSoft);
+}
+.Style_TitleEyebrow i { width: 34px; height: 1px; background: var(--EmberDeep); }
+.Style_TitleHeading {
+  margin: 0 0 20px;
+  font-size: clamp(2.6rem, 8vw, 5.4rem);
+  font-weight: 500;
+  line-height: 1.02;
+  letter-spacing: 0.14em;
+  color: var(--ColdSnow);
+  text-shadow: 0 6px 40px rgba(0, 0, 0, 0.7);
+}
+.Style_TitleHeading em {
+  display: block;
+  margin-top: 12px;
+  font-size: 0.26em;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0.52em; text-indent: 0.52em;
+  color: var(--EmberSoft);
+}
+.Style_TitleLead {
+  margin: 0 0 26px;
+  max-width: 54ch;
+  font-size: clamp(0.9rem, 1.5vw, 1.02rem);
+  line-height: 1.85;
+  color: var(--ColdText);
+}
+.Style_TitleActions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.Style_TitleTech { margin: 0; font-size: 0.72rem; letter-spacing: 0.08em; color: var(--ColdMist); }
+
+.Style_PrimaryButton, .Style_SecondaryButton {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-height: 52px;
+  padding: 10px 26px;
+  text-align: left;
+  border: 1px solid transparent;
+  transition: transform 130ms var(--Ease), background-color 160ms linear, border-color 160ms linear;
+}
+.Style_PrimaryButton {
+  color: #180b02;
+  background: linear-gradient(180deg, var(--EmberSoft), var(--Ember));
+  box-shadow: 0 8px 28px rgba(232, 128, 47, 0.22);
+}
+.Style_PrimaryButton span { font-size: 1rem; font-weight: 700; letter-spacing: 0.24em; }
+.Style_PrimaryButton small { font-size: 0.68rem; opacity: 0.76; letter-spacing: 0.04em; }
+.Style_PrimaryButton:hover, .Style_PrimaryButton:focus-visible { transform: translateY(-1px); outline: none; background: linear-gradient(180deg, #f8b878, var(--EmberSoft)); }
+.Style_SecondaryButton {
+  color: var(--ColdText);
+  background: rgba(20, 28, 34, 0.55);
+  border-color: var(--ColdEdge);
+}
+.Style_SecondaryButton span { font-size: 0.9rem; font-weight: 600; letter-spacing: 0.16em; }
+.Style_SecondaryButton small { font-size: 0.66rem; color: var(--ColdMist); }
+.Style_SecondaryButton:hover, .Style_SecondaryButton:focus-visible { border-color: var(--ColdEdgeStrong); color: var(--ColdSnow); outline: none; }
+.Style_SecondaryButton[hidden], .Style_PrimaryButton[hidden] { display: none; }
+
+.Style_TitleNote {
+  flex: 0 1 300px;
+  align-self: center;
+  max-width: 330px;
+  padding: 20px 22px;
+  background: linear-gradient(160deg, rgba(22, 30, 37, 0.86), rgba(11, 16, 20, 0.9));
+  border: 1px solid var(--ColdEdge);
+  border-top: 2px solid var(--EmberDeep);
+  display: flex; flex-direction: column; justify-content: center;
+}
+.Style_NoteHead { margin: 0 0 14px; font-size: 0.7rem; letter-spacing: 0.24em; color: var(--ColdMist); }
+.Style_NoteList { list-style: none; margin: 0 0 16px; padding: 0; }
+.Style_NoteList li {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed rgba(146, 168, 182, 0.14);
+  font-size: 0.8rem;
+}
+.Style_NoteList li span { color: var(--ColdText); }
+.Style_NoteList li b { font-weight: 600; color: var(--ColdSnow); white-space: nowrap; }
+.Style_NoteQuote {
+  margin: 0 0 8px;
+  font-size: 1.02rem;
+  color: var(--EmberSoft);
+  letter-spacing: 0.06em;
+}
+.Style_NoteFooter { font-size: 0.68rem; color: var(--ColdMist); }
+
+.Style_TitleFooter {
+  position: relative;
+  display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding-top: 14px;
+  border-top: 1px solid rgba(146, 168, 182, 0.12);
+  font-size: 0.68rem; color: var(--ColdMist);
+}
+
+/* ===================== 菜单 ===================== */
+
+.Style_Menu, .Style_Inventory, .Style_Choice, .Style_GameOver {
+  position: absolute; inset: 0;
+  z-index: 70;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(var(--SafeTop) + 16px) calc(var(--SafeRight) + 16px)
+           calc(var(--SafeBottom) + 16px) calc(var(--SafeLeft) + 16px);
+}
+.Style_Menu[hidden], .Style_Inventory[hidden], .Style_Choice[hidden], .Style_GameOver[hidden] { display: none; }
+.Style_Choice { z-index: 75; }
+.Style_GameOver { z-index: 80; }
+
+.Style_MenuBackdrop {
+  position: absolute; inset: 0;
+  background: rgba(5, 8, 11, 0.78);
+  backdrop-filter: blur(5px) saturate(0.6);
+  -webkit-backdrop-filter: blur(5px) saturate(0.6);
+}
+
+.Style_MenuCard {
+  position: relative;
+  width: min(880px, 100%);
+  max-height: 100%;
+  display: flex; flex-direction: column;
+  background: linear-gradient(170deg, rgba(20, 27, 34, 0.97), rgba(10, 15, 19, 0.98));
+  border: 1px solid var(--ColdEdge);
+  border-top: 2px solid var(--EmberDeep);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.62);
+  overflow: hidden;
+}
+.Style_MenuHead {
+  position: relative;
+  padding: 20px 60px 14px 26px;
+  border-bottom: 1px solid rgba(146, 168, 182, 0.12);
+}
+.Style_MenuEyebrow { margin: 0 0 4px; font-size: 0.68rem; letter-spacing: 0.3em; color: var(--EmberSoft); }
+.Style_MenuTitle { margin: 0; font-size: 1.35rem; font-weight: 500; letter-spacing: 0.2em; color: var(--ColdSnow); }
+.Style_MenuClose {
+  position: absolute; right: 14px; top: 14px;
+  width: 40px; height: 40px;
+  font-size: 1.3rem; line-height: 1;
+  color: var(--ColdMist);
+  background: transparent; border: 1px solid var(--ColdEdge);
+}
+.Style_MenuClose:hover, .Style_MenuClose:focus-visible { color: var(--ColdSnow); border-color: var(--ColdEdgeStrong); outline: none; }
+
+.Style_MenuTabs {
+  display: flex; flex-wrap: wrap; gap: 2px;
+  padding: 10px 26px 0;
+}
+.Style_MenuTab {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.78rem; letter-spacing: 0.12em;
+  color: var(--ColdMist);
+  background: transparent;
+  border: 0; border-bottom: 2px solid transparent;
+}
+.Style_MenuTab:hover, .Style_MenuTab:focus-visible { color: var(--ColdSnow); outline: none; }
+.Style_MenuTab.Style_TabActive { color: var(--EmberSoft); border-bottom-color: var(--Ember); }
+
+/* 未进入游戏时（标题画面）不显示"继续/重来/返回标题"，避免按下去没有反应 */
+.Style_GameRoot[dataPhase="Title"] .Style_MenuTab[dataMenu="Pause"],
+.Style_GameRoot[dataPhase="Title"] .Style_MenuPanel[dataMenu="Pause"] { display: none; }
+
+.Style_MenuBody { padding: 18px 26px 8px; overflow-y: auto; flex: 1; }
+.Style_MenuPanel[hidden] { display: none; }
+.Style_MenuLead { margin: 0 0 16px; font-size: 0.82rem; color: var(--ColdMist); }
+.Style_MenuActions { display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
+.Style_MenuActions .Style_PrimaryButton, .Style_MenuActions .Style_SecondaryButton { width: 100%; }
+.Style_MenuFoot { padding: 12px 26px calc(14px + var(--SafeBottom) * 0.4); border-top: 1px solid rgba(146, 168, 182, 0.1); }
+.Style_MenuFoot small { font-size: 0.68rem; color: var(--ColdMist); }
+
+.Style_SettingList { display: flex; flex-direction: column; }
+.Style_SettingRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(146, 168, 182, 0.1);
+  cursor: pointer;
+  min-height: 52px;
+}
+.Style_SettingRow span { display: flex; flex-direction: column; gap: 2px; }
+.Style_SettingRow b { font-size: 0.88rem; font-weight: 500; color: var(--ColdText); }
+.Style_SettingRow small { font-size: 0.7rem; color: var(--ColdMist); }
+.Style_SettingRow input[type="range"] {
+  flex: 0 0 clamp(120px, 26vw, 220px);
+  appearance: none; -webkit-appearance: none;
+  height: 3px; background: rgba(124, 139, 149, 0.3);
+  border-radius: 2px; cursor: pointer;
+}
+.Style_SettingRow input[type="range"]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--Ember); border: 0; cursor: pointer;
+}
+.Style_SettingRow input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--Ember); border: 0; cursor: pointer;
+}
+.Style_SettingRow input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px; height: 26px;
+  background: rgba(124, 139, 149, 0.25);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background-color 160ms linear;
+}
+.Style_SettingRow input[type="checkbox"]::after {
+  content: "";
+  position: absolute; left: 3px; top: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--ColdMuted);
+  transition: transform 160ms var(--Ease), background-color 160ms linear;
+}
+.Style_SettingRow input[type="checkbox"]:checked { background: rgba(232, 128, 47, 0.34); }
+.Style_SettingRow input[type="checkbox"]:checked::after { transform: translateX(20px); background: var(--Ember); }
+
+.Style_ControlsList { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px 22px; }
+.Style_ControlRow {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed rgba(146, 168, 182, 0.12);
+  font-size: 0.82rem;
+}
+.Style_ControlRow span { color: var(--ColdText); }
+.Style_ControlRow kbd {
+  padding: 2px 7px;
+  font-family: var(--FontMono); font-size: 0.72rem;
+  color: var(--ColdSnow);
+  border: 1px solid var(--ColdEdge); border-radius: 2px;
+  white-space: nowrap;
+}
+
+.Style_LedgerList { list-style: none; margin: 0; padding: 0; }
+.Style_LedgerList li {
+  padding: 9px 0 9px 16px;
+  position: relative;
+  border-bottom: 1px solid rgba(146, 168, 182, 0.1);
+  font-size: 0.84rem; color: var(--ColdText);
+}
+.Style_LedgerList li::before {
+  content: ""; position: absolute; left: 0; top: 1.05em;
+  width: 5px; height: 5px; background: rgba(124, 139, 149, 0.6);
+}
+.Style_LedgerList li small { display: block; font-size: 0.72rem; color: var(--ColdMist); }
+.Style_LedgerEmpty { color: var(--ColdMist); font-style: italic; }
+.Style_LedgerEmpty::before { display: none; }
+
+.Style_HistoryColumns { columns: 2; column-gap: 34px; }
+.Style_HistoryColumns section { break-inside: avoid; margin-bottom: 20px; }
+.Style_HistoryColumns h3 {
+  margin: 0 0 7px;
+  font-size: 0.82rem; font-weight: 600; letter-spacing: 0.16em;
+  color: var(--EmberSoft);
+}
+.Style_HistoryColumns p, .Style_HistoryColumns li {
+  margin: 0 0 7px;
+  font-size: 0.8rem; line-height: 1.75; color: var(--ColdText);
+}
+.Style_HistoryColumns ul { margin: 0; padding-left: 17px; }
+
+/* ===================== 背包 ===================== */
+
+.Style_InventoryCard {
+  position: relative;
+  width: min(760px, 100%); max-height: 100%;
+  display: flex; flex-direction: column;
+  background: linear-gradient(170deg, rgba(20, 27, 34, 0.97), rgba(10, 15, 19, 0.98));
+  border: 1px solid var(--ColdEdge);
+  border-top: 2px solid var(--EmberDeep);
+  overflow: hidden;
+}
+.Style_InventoryHead {
+  position: relative;
+  display: flex; align-items: baseline; gap: 14px;
+  padding: 18px 60px 12px 24px;
+  border-bottom: 1px solid rgba(146, 168, 182, 0.12);
+}
+.Style_InventoryHead h2 { margin: 0; font-size: 1.1rem; font-weight: 500; letter-spacing: 0.24em; color: var(--ColdSnow); }
+.Style_InventoryCapacity { font-family: var(--FontMono); font-size: 0.78rem; color: var(--ColdMist); }
+.Style_InventoryBody { display: flex; gap: 26px; padding: 18px 24px 22px; overflow-y: auto; }
+.Style_InventoryList { flex: 1 1 58%; list-style: none; margin: 0; padding: 0; }
+.Style_InventoryList li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(146, 168, 182, 0.1);
+  font-size: 0.84rem;
+}
+.Style_InventoryList li b { color: var(--ColdSnow); font-weight: 500; }
+.Style_InventoryList li small { display: block; font-size: 0.72rem; color: var(--ColdMist); }
+.Style_InventoryList li em { font-family: var(--FontMono); font-style: normal; color: var(--EmberSoft); }
+.Style_InventoryEmpty { color: var(--ColdMist); font-style: italic; }
+.Style_InventoryCraft { flex: 1 1 42%; }
+.Style_InventoryCraftHead { margin: 0 0 8px; font-size: 0.7rem; letter-spacing: 0.24em; color: var(--ColdMist); }
+.Style_RecipeList { list-style: none; margin: 0 0 14px; padding: 0; }
+.Style_RecipeList li { margin-bottom: 7px; }
+.Style_RecipeButton {
+  width: 100%;
+  min-height: 44px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 8px 12px;
+  text-align: left;
+  color: var(--ColdText);
+  background: rgba(28, 37, 45, 0.5);
+  border: 1px solid var(--ColdEdge);
+}
+.Style_RecipeButton small { font-size: 0.7rem; color: var(--ColdMist); }
+.Style_RecipeButton:disabled { opacity: 0.45; cursor: not-allowed; }
+.Style_RecipeButton:not(:disabled):hover { border-color: var(--EmberDeep); color: var(--ColdSnow); }
+.Style_InventoryDetail { margin: 0; font-size: 0.76rem; color: var(--ColdMist); font-style: italic; }
+
+/* ===================== 抉择 ===================== */
+
+.Style_ChoiceCard {
+  position: relative;
+  width: min(720px, 100%);
+  padding: 34px clamp(22px, 4vw, 44px) 30px;
+  background: linear-gradient(170deg, rgba(18, 25, 31, 0.96), rgba(8, 12, 16, 0.98));
+  border: 1px solid var(--ColdEdge);
+  border-top: 2px solid var(--Ember);
+  text-align: center;
+}
+.Style_ChoiceEyebrow { margin: 0 0 10px; font-size: 0.68rem; letter-spacing: 0.4em; color: var(--ColdMist); }
+.Style_ChoicePrompt {
+  margin: 0 0 26px;
+  font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+  font-weight: 500; line-height: 1.6; letter-spacing: 0.06em;
+  color: var(--ColdSnow);
+}
+.Style_ChoiceOptions { display: flex; flex-direction: column; gap: 12px; }
+.Style_ChoiceOption {
+  min-height: 56px;
+  padding: 14px 20px;
+  text-align: left;
+  color: var(--ColdText);
+  background: rgba(28, 37, 45, 0.45);
+  border: 1px solid var(--ColdEdge);
+  transition: border-color 150ms linear, background-color 150ms linear, transform 130ms var(--Ease);
+}
+.Style_ChoiceOption b { display: block; font-size: 0.96rem; font-weight: 500; color: var(--ColdSnow); }
+.Style_ChoiceOption small { display: block; margin-top: 3px; font-size: 0.74rem; color: var(--ColdMist); }
+.Style_ChoiceOption:hover, .Style_ChoiceOption:focus-visible {
+  border-color: var(--Ember); background: rgba(232, 128, 47, 0.1);
+  transform: translateX(3px); outline: none;
+}
+.Style_ChoiceTimer { display: block; height: 2px; margin-top: 18px; background: rgba(124, 139, 149, 0.24); }
+.Style_ChoiceTimer[hidden] { display: none; }
+.Style_ChoiceTimer em { display: block; height: 100%; background: var(--Ember); transform-origin: left; transform: scaleX(var(--TimerFill, 1)); }
+
+/* ===================== 结局 ===================== */
+
+.Style_Ending {
+  position: absolute; inset: 0;
+  z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(var(--SafeTop) + 20px) calc(var(--SafeRight) + 20px)
+           calc(var(--SafeBottom) + 20px) calc(var(--SafeLeft) + 20px);
+  background: linear-gradient(180deg, #070b0f 0%, #0a1015 60%, #060a0d 100%);
+  overflow-y: auto;
+}
+.Style_Ending[hidden] { display: none; }
+.Style_EndingVeil {
+  position: absolute; inset: 0;
+  background: radial-gradient(70% 60% at 30% 88%, rgba(232, 128, 47, 0.1), transparent 60%);
+  pointer-events: none;
+}
+.Style_EndingCard { position: relative; width: min(760px, 100%); }
+.Style_EndingEyebrow { margin: 0 0 10px; font-size: 0.7rem; letter-spacing: 0.36em; color: var(--EmberSoft); }
+.Style_EndingTitle {
+  margin: 0 0 24px;
+  font-size: clamp(1.7rem, 5vw, 2.8rem);
+  font-weight: 500; line-height: 1.3; letter-spacing: 0.1em;
+  color: var(--ColdSnow);
+}
+.Style_EndingLines { margin-bottom: 28px; }
+.Style_EndingLines p {
+  margin: 0 0 12px;
+  font-size: 0.94rem; line-height: 1.95; color: var(--ColdText);
+}
+.Style_EndingLines p:first-child::before { content: ""; }
+.Style_EndingLedger { margin-bottom: 22px; }
+.Style_EndingLedger header {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding-bottom: 8px; margin-bottom: 4px;
+  border-bottom: 1px solid rgba(146, 168, 182, 0.16);
+}
+.Style_EndingLedger header span { font-size: 0.76rem; letter-spacing: 0.22em; color: var(--ColdMist); }
+.Style_EndingLedger header b { font-size: 0.7rem; font-weight: 500; color: var(--EmberSoft); letter-spacing: 0.1em; }
+.Style_EndingStats { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-bottom: 26px; }
+.Style_EndingStat { display: flex; flex-direction: column; }
+.Style_EndingStat b { font-family: var(--FontMono); font-size: 1.05rem; color: var(--ColdSnow); }
+.Style_EndingStat small { font-size: 0.68rem; color: var(--ColdMist); letter-spacing: 0.1em; }
+.Style_EndingActions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.Style_EndingFoot { font-size: 0.74rem; color: var(--ColdMist); font-style: italic; }
+
+/* ===================== 失败 ===================== */
+
+.Style_GameOverCard {
+  position: relative;
+  width: min(520px, 100%);
+  padding: 34px 32px 30px;
+  text-align: center;
+  background: linear-gradient(170deg, rgba(18, 25, 31, 0.96), rgba(8, 12, 16, 0.98));
+  border: 1px solid var(--ColdEdge);
+  border-top: 2px solid var(--EmberDeep);
+}
+.Style_GameOverTitle { margin: 0 0 12px; font-size: 1.5rem; font-weight: 500; letter-spacing: 0.2em; color: var(--ColdSnow); }
+.Style_GameOverReason { margin: 0 0 26px; font-size: 0.86rem; line-height: 1.8; color: var(--ColdMist); }
+.Style_GameOverActions { display: flex; flex-direction: column; gap: 10px; }
+.Style_GameOverActions .Style_PrimaryButton, .Style_GameOverActions .Style_SecondaryButton { width: 100%; align-items: center; text-align: center; }
+
+/* ===================== 载入 / 调试 ===================== */
+
+.Style_Loading {
+  position: absolute; inset: 0;
+  z-index: 95;
+  display: flex; align-items: center; justify-content: center;
+  background: #06090c;
+}
+.Style_Loading[hidden] { display: none; }
+.Style_LoadingInner { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 0 28px; text-align: center; }
+.Style_LoadingMark {
+  width: 34px; height: 34px;
+  border: 1px solid var(--EmberDeep);
+  border-top-color: var(--Ember);
+  border-radius: 50%;
+  animation: Style_Spin 1.4s linear infinite;
+}
+@keyframes Style_Spin { to { transform: rotate(360deg); } }
+.Style_LoadingText { font-size: 0.86rem; font-weight: 400; letter-spacing: 0.16em; color: var(--ColdMuted); max-width: 34ch; }
+.Style_LoadingFailed { color: var(--EmberSoft); }
+.Style_LoadingBar { display: block; width: min(280px, 60vw); height: 2px; background: rgba(124, 139, 149, 0.22); }
+.Style_LoadingBar em { display: block; height: 100%; width: 0%; background: var(--Ember); transition: width 300ms linear; }
+
+.Style_Debug {
+  position: absolute;
+  left: calc(var(--SafeLeft) + 10px);
+  top: calc(var(--SafeTop) + 10px);
+  z-index: 99;
+  max-width: 46ch;
+  padding: 8px 11px;
+  font-family: var(--FontMono); font-size: 11px; line-height: 1.5;
+  white-space: pre-wrap;
+  color: #9fe8c0;
+  background: rgba(5, 8, 11, 0.72);
+  border: 1px solid rgba(120, 200, 160, 0.24);
+  pointer-events: none;
+}
+.Style_Debug[hidden] { display: none; }
+
+.Style_NoScript {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 30px; text-align: center;
+  background: #0a1015; color: var(--ColdText);
+}
+.Style_NoScript h1 { margin: 0; font-size: 1.4rem; font-weight: 500; letter-spacing: 0.22em; color: var(--ColdSnow); }
+.Style_NoScript p { margin: 0; font-size: 0.88rem; line-height: 1.9; }
+
+/* ===================== 高对比模式 ===================== */
+
+.Style_GameRoot.Style_HighContrast {
+  --ColdText: #eaf2f6;
+  --ColdMist: #b6c6d0;
+  --ColdMuted: #cddae2;
+  --ColdEdge: rgba(198, 220, 232, 0.42);
+  --ColdEdgeStrong: rgba(226, 240, 248, 0.68);
+  --Ember: #ff9640;
+  --EmberSoft: #ffb877;
+}
+.Style_HighContrast .Style_Subtitle .Style_SubtitleText {
+  padding: 6px 14px;
+  background: rgba(4, 7, 9, 0.86);
+  border-radius: 2px;
+}
+.Style_HighContrast .Style_SoundCaption,
+.Style_HighContrast .Style_Prompt { background: rgba(4, 7, 9, 0.9); }
+.Style_HighContrast .Style_ObjectiveList li,
+.Style_HighContrast .Style_AlertLabel,
+.Style_HighContrast .Style_AmmoLabel { text-shadow: 0 0 3px #000, 0 1px 4px #000; }
+.Style_HighContrast .Style_VitalTrack { background: rgba(198, 220, 232, 0.34); height: 5px; }
+.Style_HighContrast .Style_HudRoot[dataCalm="1"] .Style_Vitals,
+.Style_HighContrast .Style_HudRoot[dataCalm="1"] .Style_Objective { opacity: 0.6; }
+
+/* 关闭闪光：Art 层由 SettingsChanged 事件同步；界面侧同时停掉自身的强脉冲 */
+.Style_GameRoot.Style_NoFlash .Style_Alert[dataLevel="2"] .Style_AlertDial { animation: none; }
+.Style_GameRoot.Style_NoFlash .Style_TitleEmber { animation: none; }
+.Style_GameRoot.Style_NoFlash .Style_ObjectiveFlash { animation: none; }
+
+/* ===================== 响应式：触屏与窄屏 ===================== */
+
+@media (max-width: 860px) {
+  :root { --HudPad: 12px; }
+  .Style_TitleBody { flex-direction: column; align-items: stretch; gap: 22px; }
+  .Style_TitleNote { max-width: none; }
+  .Style_TitleHeading { letter-spacing: 0.1em; }
+  .Style_TitleActions .Style_PrimaryButton, .Style_TitleActions .Style_SecondaryButton { flex: 1 1 200px; }
+  .Style_HistoryColumns { columns: 1; }
+  .Style_InventoryBody { flex-direction: column; gap: 18px; }
+  .Style_ControlsList { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 820px) {
+  .Style_HudRoot { font-size: 0.82rem; }
+  .Style_Objective { max-width: 20ch; }
+  .Style_ObjectiveList li { font-size: 0.82rem; }
+  .Style_Vitals { width: 124px; }
+  .Style_Subtitle { width: min(46ch, 88vw); bottom: calc(var(--SafeBottom) + 118px); }
+  .Style_SubtitleText { font-size: 0.92rem; }
+  .Style_SoundCaption { bottom: calc(var(--SafeBottom) + 42%); }
+  .Style_Prompt { bottom: 34%; }
+  .Style_KeyHints { display: none; }
+  .Style_Companion { top: calc(var(--SafeTop) + var(--HudPad) + 66px); }
+  .Style_MenuHead { padding: 16px 56px 12px 18px; }
+  .Style_MenuTabs { padding: 8px 12px 0; }
+  .Style_MenuBody { padding: 14px 18px 6px; }
+  .Style_MenuFoot { padding: 10px 18px 14px; }
+  .Style_SettingRow { flex-direction: row; gap: 12px; }
+  .Style_SettingRow input[type="range"] { flex-basis: 110px; }
+  .Style_TitleFooter { font-size: 0.62rem; }
+}
+
+@media (max-width: 560px) {
+  /* 竖屏手机：所有 HUD 让开右下角的动作键与左下角的摇杆 */
+  .Style_GameRoot[dataTouch="1"] .Style_Ammo {
+    right: auto; left: calc(var(--SafeLeft) + var(--HudPad));
+    bottom: calc(var(--SafeBottom) + var(--HudPad) + 64px);
+    align-items: flex-start; text-align: left;
+  }
+  .Style_GameRoot[dataTouch="1"] .Style_Toast {
+    top: calc(var(--SafeTop) + var(--HudPad) + 152px);
+    bottom: auto;
+    max-width: 60vw;
+  }
+  .Style_GameRoot[dataTouch="1"] .Style_Subtitle { bottom: calc(var(--SafeBottom) + 272px); width: 86vw; }
+  .Style_GameRoot[dataTouch="1"] .Style_Prompt { bottom: calc(var(--SafeBottom) + 346px); }
+  .Style_GameRoot[dataTouch="1"] .Style_SoundCaption { bottom: calc(var(--SafeBottom) + 404px); }
+  .Style_GameRoot[dataTouch="1"] .Style_Vitals { width: 116px; bottom: calc(var(--SafeBottom) + var(--HudPad)); }
+  .Style_SoundCaption { flex-wrap: wrap; max-width: 78vw; }
+  .Style_Progress { top: 41%; }
+
+  .Style_TitleHeading { font-size: clamp(2.1rem, 12vw, 3rem); }
+  .Style_TitleLead { font-size: 0.86rem; line-height: 1.75; }
+  .Style_ChapterName { letter-spacing: 0.18em; text-indent: 0.18em; }
+  .Style_Alert { transform: scale(0.86); transform-origin: top right; }
+  .Style_TouchButtons { grid-template-columns: repeat(2, auto); }
+}
+
+@media (pointer: coarse) {
+  .Style_KeyHints { display: none; }
+  .Style_QuietButton, .Style_MenuTab, .Style_MenuClose { min-height: 44px; min-width: 44px; }
+  .Style_SettingRow { min-height: 56px; }
+  .Style_ChoiceOption { min-height: 64px; }
+  .Style_TitleLead br { display: none; }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .Style_TouchLook { width: 100%; height: 52%; }
+  .Style_TouchStick { width: 46vw; height: 30vh; }
+}
+
+/* ===================== 降低动态效果 ===================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .Style_TitleSnow, .Style_TitleEmber { display: none; }
+  .Style_ChapterCard { transition: opacity 200ms linear; }
+  .Style_Fade { transition: opacity 200ms linear; }
+}

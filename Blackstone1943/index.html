@@ -1,0 +1,616 @@
+<!doctype html>
+<!-- three.js r185 is vendored under the MIT License (see vendor/three/LICENSE). All geometry, textures and audio are generated procedurally at runtime. -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0e12">
+  <meta name="color-scheme" content="dark">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="《黑石峪 · 一九四三年冬》：1943年冬华北敌后，一名负伤的八路军侦察排长与一个失去父母的孩子，穿过被扫荡过的山村，把一台电台的关键零件送到十里外的交通站。第三人称潜行动作冒险，程序化生成的三维雪原。">
+  <meta name="keywords" content="黑石峪,一九四三,敌后,潜行,第三人称,抗日战争,叙事游戏,Three.js">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Bentley Blanks">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="黑石峪 · 一九四三年冬">
+  <meta property="og:description" content="雪落在烧空的村子上。带着孩子和一枚电台零件，走完十里山路——一枪都不开，是最好的走法。">
+  <meta property="og:url" content="https://bentleyblanks.github.io/Blackstone1943/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="黑石峪 · 一九四三年冬">
+  <meta name="twitter:description" content="1943年冬，华北敌后。第三人称潜行动作冒险，全流程弹药不超过十二发。">
+  <title>黑石峪 · 一九四三年冬</title>
+  <link rel="stylesheet" href="./Style_Game.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+<div id="GameRoot" class="Style_GameRoot" dataPhase="Title">
+
+  <canvas id="GameCanvas" class="Style_GameCanvas" tabindex="-1"
+          aria-label="黑石峪三维场景。键鼠或触屏操作，所有关键声音都有方向字幕。"></canvas>
+
+  <!-- ============ 战场 HUD（极简 diegetic，战斗外自动淡出） ============ -->
+  <div id="HudRoot" class="Style_HudRoot" hidden>
+
+    <!-- 准星 / 交互进度 / 投掷弧线 -->
+    <div id="HudCrosshair" class="Style_Crosshair" dataMode="Hidden" aria-hidden="true">
+      <i class="Style_CrosshairDot"></i>
+      <i class="Style_CrosshairArm Style_ArmUp"></i>
+      <i class="Style_CrosshairArm Style_ArmDown"></i>
+      <i class="Style_CrosshairArm Style_ArmLeft"></i>
+      <i class="Style_CrosshairArm Style_ArmRight"></i>
+    </div>
+
+    <svg id="HudThrowArc" class="Style_ThrowArc" viewBox="0 0 100 100" preserveAspectRatio="none" hidden aria-hidden="true">
+      <polyline id="HudThrowArcLine" class="Style_ThrowArcLine" points=""></polyline>
+      <circle id="HudThrowArcMark" class="Style_ThrowArcMark" cx="-10" cy="-10" r="1.1"></circle>
+    </svg>
+
+    <div id="HudProgress" class="Style_Progress" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <i class="Style_ProgressRing"></i>
+      <b id="HudProgressLabel" class="Style_ProgressLabel">翻找</b>
+    </div>
+
+    <!-- 章节 / 目标 -->
+    <section id="HudObjective" class="Style_Objective" aria-live="polite">
+      <p class="Style_ObjectiveHead"><span id="HudObjectiveChapter">第一章 · 雪窖</span><b id="HudObjectiveState"></b></p>
+      <ol id="HudObjectiveList" class="Style_ObjectiveList"></ol>
+      <small id="HudObjectiveHint" class="Style_ObjectiveHint" hidden></small>
+    </section>
+
+    <!-- 潜行状态：注意力段位 + 噪音环 + 威胁方位 -->
+    <div id="HudAlert" class="Style_Alert" dataLevel="0" aria-live="polite">
+      <div class="Style_AlertDial">
+        <i class="Style_AlertRing"></i>
+        <i class="Style_AlertNoise" id="HudAlertNoise"></i>
+        <i class="Style_AlertEye"></i>
+        <i class="Style_AlertThreat" id="HudAlertThreat" hidden></i>
+      </div>
+      <b id="HudAlertLabel" class="Style_AlertLabel">隐蔽</b>
+    </div>
+
+    <!-- 伴随状态（冯小满） -->
+    <aside id="HudCompanion" class="Style_Companion" hidden>
+      <i class="Style_CompanionGlyph" aria-hidden="true">满</i>
+      <div class="Style_CompanionCopy">
+        <b id="HudCompanionName">冯小满</b>
+        <small id="HudCompanionMode">跟着你</small>
+      </div>
+      <span id="HudCompanionDistance" class="Style_CompanionDistance">6 米</span>
+      <i id="HudCompanionScare" class="Style_CompanionScare" hidden aria-hidden="true"></i>
+    </aside>
+
+    <!-- 生存状态：体力 / 体温 / 失血 -->
+    <section id="HudVitals" class="Style_Vitals" aria-label="身体状态">
+      <div class="Style_VitalRow" dataVital="Health">
+        <span class="Style_VitalTag">伤</span>
+        <i class="Style_VitalTrack"><em id="HudVitalsHealthFill" class="Style_VitalFill"></em></i>
+      </div>
+      <div class="Style_VitalRow" dataVital="Stamina">
+        <span class="Style_VitalTag">力</span>
+        <i class="Style_VitalTrack"><em id="HudVitalsStaminaFill" class="Style_VitalFill"></em></i>
+      </div>
+      <div class="Style_VitalRow" dataVital="Warmth">
+        <span class="Style_VitalTag">温</span>
+        <i class="Style_VitalTrack"><em id="HudVitalsWarmthFill" class="Style_VitalFill"></em></i>
+      </div>
+      <b id="HudVitalsBleed" class="Style_VitalsBleed" hidden>失血 · 需要绷带</b>
+      <b id="HudVitalsCold" class="Style_VitalsCold" hidden>体温过低 · 需要生火</b>
+    </section>
+
+    <!-- 弹药：≤12 发，用弹粒表示 -->
+    <section id="HudAmmo" class="Style_Ammo" hidden aria-label="武器与弹药">
+      <b id="HudAmmoLabel" class="Style_AmmoLabel">中正式</b>
+      <div id="HudAmmoPips" class="Style_AmmoPips" aria-hidden="true"></div>
+      <small id="HudAmmoCount" class="Style_AmmoCount">0 / 0</small>
+      <em id="HudAmmoChamber" class="Style_AmmoChamber" hidden>需拉栓</em>
+    </section>
+
+    <!-- 交互提示 -->
+    <div id="HudPrompt" class="Style_Prompt" hidden dataKind="Interact">
+      <kbd id="HudPromptKey" class="Style_PromptKey">F</kbd>
+      <span id="HudPromptText" class="Style_PromptText">撬开地窖门</span>
+    </div>
+
+    <!-- 方向声音字幕（无障碍） -->
+    <div id="HudSoundCaption" class="Style_SoundCaption" hidden aria-live="polite">
+      <i id="HudSoundCaptionArrow" class="Style_SoundArrow" aria-hidden="true"></i>
+      <span id="HudSoundCaptionText" class="Style_SoundText"></span>
+      <small id="HudSoundCaptionMeta" class="Style_SoundMeta"></small>
+    </div>
+
+    <!-- 字幕条 -->
+    <section id="HudSubtitle" class="Style_Subtitle" hidden aria-live="polite" aria-atomic="true">
+      <p class="Style_SubtitleHead">
+        <b id="HudSubtitleSpeaker" class="Style_SubtitleSpeaker">沈铁</b>
+        <i id="HudSubtitleDirection" class="Style_SubtitleDirection" hidden aria-hidden="true"></i>
+      </p>
+      <blockquote id="HudSubtitleText" class="Style_SubtitleText"></blockquote>
+    </section>
+
+    <!-- 提示浮条 -->
+    <div id="HudToast" class="Style_Toast" aria-live="polite"></div>
+
+    <!-- 章节过场卡 -->
+    <section id="HudChapterTitle" class="Style_ChapterCard" hidden>
+      <div class="Style_ChapterInner">
+        <span id="HudChapterIndex" class="Style_ChapterIndex">第一章</span>
+        <h2 id="HudChapterName" class="Style_ChapterName">雪窖</h2>
+        <i class="Style_ChapterRule" aria-hidden="true"></i>
+        <p id="HudChapterSubtitle" class="Style_ChapterSubtitle">一九四三年十二月十七日 · 拂晓</p>
+      </div>
+    </section>
+
+    <!-- 键位速览（战斗外淡出） -->
+    <div id="HudKeyHints" class="Style_KeyHints">
+      <span><kbd>WASD</kbd>移动</span>
+      <span><kbd>Shift</kbd>奔跑</span>
+      <span><kbd>C</kbd>蹲伏</span>
+      <span><kbd>F</kbd>交互</span>
+      <span><kbd>右键</kbd>瞄准</span>
+      <span><kbd>Q</kbd>投掷</span>
+      <span><kbd>E</kbd>指令小满</span>
+      <span><kbd>Esc</kbd>暂停</span>
+    </div>
+  </div>
+
+  <!-- ============ 触屏控件 ============ -->
+  <div id="HudTouch" class="Style_Touch" hidden aria-label="触屏控制">
+    <div id="HudTouchStick" class="Style_TouchStick" aria-label="移动摇杆">
+      <i class="Style_TouchStickRing"></i>
+      <i id="HudTouchStickKnob" class="Style_TouchStickKnob"></i>
+    </div>
+    <div id="HudTouchLook" class="Style_TouchLook" aria-label="视角区">
+      <span class="Style_TouchLookHint">滑动观察</span>
+    </div>
+    <div id="HudTouchButtons" class="Style_TouchButtons">
+      <button type="button" id="HudTouchCrouch" class="Style_TouchButton" dataTouch="crouch" dataToggle="1">蹲</button>
+      <button type="button" id="HudTouchSprint" class="Style_TouchButton" dataTouch="sprint">跑</button>
+      <button type="button" id="HudTouchThrow" class="Style_TouchButton" dataTouch="throw">投</button>
+      <button type="button" id="HudTouchAim" class="Style_TouchButton" dataTouch="aim">瞄</button>
+      <button type="button" id="HudTouchInteract" class="Style_TouchButton Style_TouchPrimary" dataTouch="interact">交互</button>
+      <button type="button" id="HudTouchAttack" class="Style_TouchButton Style_TouchAttack" dataTouch="fire">攻击</button>
+      <button type="button" id="HudTouchCommand" class="Style_TouchButton Style_TouchSmall" dataTouch="command">小满</button>
+      <button type="button" id="HudTouchReload" class="Style_TouchButton Style_TouchSmall" dataTouch="reload">上膛</button>
+    </div>
+    <button type="button" id="HudTouchPause" class="Style_TouchPause" dataTouch="pause" aria-label="暂停">Ⅱ</button>
+  </div>
+
+  <!-- ============ 全屏叠层 ============ -->
+  <div id="HudLetterbox" class="Style_Letterbox" hidden aria-hidden="true"><i></i><i></i></div>
+  <div id="HudFade" class="Style_Fade" aria-hidden="true"></div>
+
+  <!-- 标题画面 -->
+  <section id="TitleScreen" class="Style_Title" aria-labelledby="TitleHeading">
+    <div class="Style_TitleSky" aria-hidden="true">
+      <i class="Style_Ridge Style_RidgeFar"></i>
+      <i class="Style_Ridge Style_RidgeMid"></i>
+      <i class="Style_Ridge Style_RidgeNear"></i>
+      <i class="Style_TitleEmber"></i>
+      <i class="Style_TitleSnow"></i>
+      <i class="Style_TitleSnow Style_TitleSnowSlow"></i>
+    </div>
+
+    <header class="Style_TitleBar">
+      <a href="../" class="Style_TitleMark" aria-label="返回站点首页">
+        <b>山河背面</b><span>BEHIND THE LINES · 1943 WINTER</span>
+      </a>
+      <div class="Style_TitleBarActions">
+        <button type="button" id="TitleHistoryButton" class="Style_QuietButton">史实边界与内容提示</button>
+        <button type="button" id="TitleAccessButton" class="Style_QuietButton">辅助设置</button>
+      </div>
+    </header>
+
+    <div class="Style_TitleBody">
+      <section class="Style_TitleCopy">
+        <p class="Style_TitleEyebrow"><i></i>一九四三年十二月 · 华北敌后 · 太行山区</p>
+        <h1 id="TitleHeading" class="Style_TitleHeading">黑石峪<em>一九四三年冬</em></h1>
+        <p class="Style_TitleLead">村子烧了三天，雪把灰盖住了。<br>
+          你叫沈铁，腿上带着伤，口袋里是一台电台的关键零件。<br>
+          磨坊地窖里还蹲着一个不肯出来的孩子。交通站在十里外。</p>
+        <div class="Style_TitleActions">
+          <button type="button" id="BeginButton" class="Style_PrimaryButton">
+            <span>开始</span><small>约 20—30 分钟 · 三幕 · 自动存档</small>
+          </button>
+          <button type="button" id="ContinueButton" class="Style_SecondaryButton" hidden>
+            <span>继续</span><small id="ContinueDetail">从上次的章节</small>
+          </button>
+        </div>
+        <p class="Style_TitleTech">程序化三维雪原 · 零外部素材 · 键鼠 / 触屏 · 全流程弹药不超过十二发</p>
+      </section>
+
+      <aside class="Style_TitleNote" aria-label="随身物">
+        <p class="Style_NoteHead">随身 · 侦察排长沈铁</p>
+        <ul class="Style_NoteList">
+          <li><span>中正式步枪</span><b>子弹 2 发</b></li>
+          <li><span>缴获电台 · 振荡线圈</span><b>不可丢弃</b></li>
+          <li><span>火柴</span><b>七根</b></li>
+          <li><span>棉衣</span><b>右襟被烧穿</b></li>
+        </ul>
+        <blockquote class="Style_NoteQuote">“先把鞋绑紧。”</blockquote>
+        <footer class="Style_NoteFooter">出发前 · 磨坊后墙</footer>
+      </aside>
+    </div>
+
+    <footer class="Style_TitleFooter">
+      <span>虚构村庄与复合人物 · 侵略责任明确 · 不猎奇展示苦难 · 苦难永不计分</span>
+      <span>建议佩戴耳机；所有关键声音都有方向字幕</span>
+    </footer>
+  </section>
+
+  <!-- 菜单层：暂停 / 设置 / 键位 / 无障碍 / 代价记录 / 史实边界 -->
+  <div id="HudMenu" class="Style_Menu" hidden dataPanel="Pause">
+    <div class="Style_MenuBackdrop" aria-hidden="true"></div>
+    <article class="Style_MenuCard" role="dialog" aria-modal="true" aria-labelledby="HudMenuTitle">
+      <header class="Style_MenuHead">
+        <p class="Style_MenuEyebrow" id="HudMenuEyebrow">行动暂停</p>
+        <h2 class="Style_MenuTitle" id="HudMenuTitle">黑石峪</h2>
+        <button type="button" id="HudButtonMenuClose" class="Style_MenuClose" aria-label="关闭">×</button>
+      </header>
+
+      <nav class="Style_MenuTabs" id="HudMenuTabs">
+        <button type="button" class="Style_MenuTab" dataMenu="Pause">继续</button>
+        <button type="button" class="Style_MenuTab" dataMenu="Settings">设置</button>
+        <button type="button" class="Style_MenuTab" dataMenu="Accessibility">辅助</button>
+        <button type="button" class="Style_MenuTab" dataMenu="Controls">键位</button>
+        <button type="button" class="Style_MenuTab" dataMenu="Ledger">代价记录</button>
+        <button type="button" class="Style_MenuTab" dataMenu="History">史实边界</button>
+      </nav>
+
+      <div class="Style_MenuBody">
+        <section id="HudMenuPanelPause" class="Style_MenuPanel" dataMenu="Pause">
+          <p class="Style_MenuLead" id="HudMenuChapterLine">第一章 · 雪窖 —— 一九四三年十二月十七日 · 拂晓</p>
+          <div class="Style_MenuActions">
+            <button type="button" id="HudButtonResume" class="Style_PrimaryButton"><span>继续行动</span><small>Esc</small></button>
+            <button type="button" id="HudButtonRestart" class="Style_SecondaryButton"><span>从本章开头重来</span><small>不影响已记录的代价</small></button>
+            <button type="button" id="HudButtonQuit" class="Style_SecondaryButton"><span>返回标题</span><small>进度已自动保存</small></button>
+          </div>
+        </section>
+
+        <section id="HudMenuPanelSettings" class="Style_MenuPanel" dataMenu="Settings" hidden>
+          <div class="Style_SettingList">
+            <label class="Style_SettingRow"><span><b>总音量</b><small>程序化合成，无音频文件</small></span>
+              <input type="range" id="HudSettingMasterVolume" dataSetting="masterVolume" min="0" max="100" step="1" value="80"></label>
+            <label class="Style_SettingRow"><span><b>音乐</b><small>低频弦乐与风的层</small></span>
+              <input type="range" id="HudSettingMusicVolume" dataSetting="musicVolume" min="0" max="100" step="1" value="55"></label>
+            <label class="Style_SettingRow"><span><b>音效</b><small>脚步、枪声、雪与门轴</small></span>
+              <input type="range" id="HudSettingSfxVolume" dataSetting="sfxVolume" min="0" max="100" step="1" value="90"></label>
+            <label class="Style_SettingRow"><span><b>视角灵敏度</b><small>鼠标与触屏共用</small></span>
+              <input type="range" id="HudSettingSensitivity" dataSetting="sensitivity" min="20" max="300" step="5" value="100"></label>
+            <label class="Style_SettingRow"><span><b>反转纵向视角</b><small>上下颠倒</small></span>
+              <input type="checkbox" id="HudSettingInvertY" dataSetting="invertY"></label>
+            <label class="Style_SettingRow"><span><b>按住瞄准</b><small>关闭则改为切换式瞄准</small></span>
+              <input type="checkbox" id="HudSettingHoldToAim" dataSetting="holdToAim" checked></label>
+          </div>
+        </section>
+
+        <section id="HudMenuPanelAccessibility" class="Style_MenuPanel" dataMenu="Accessibility" hidden>
+          <p class="Style_MenuLead">这些设置随时可改，标题画面也能进。</p>
+          <div class="Style_SettingList">
+            <label class="Style_SettingRow"><span><b>对白字幕</b><small>带说话人；关掉只剩画面</small></span>
+              <input type="checkbox" id="HudSettingSubtitles" dataSetting="subtitlesOn" checked></label>
+            <label class="Style_SettingRow"><span><b>声音方向字幕</b><small>脚步、枪声、犬吠标出方位与距离</small></span>
+              <input type="checkbox" id="HudSettingSoundCaptions" dataSetting="soundCaptionsOn" checked></label>
+            <label class="Style_SettingRow"><span><b>字幕方向箭头</b><small>说话人不在画面里时指出方位</small></span>
+              <input type="checkbox" id="HudSettingDirectionArrows" dataSetting="directionArrows" checked></label>
+            <label class="Style_SettingRow"><span><b>镜头抖动</b><small>关闭后取消手持微抖与受击晃动</small></span>
+              <input type="checkbox" id="HudSettingCameraShake" dataSetting="cameraShake" checked></label>
+            <label class="Style_SettingRow"><span><b>闪光与强对比特效</b><small>关闭照明弹、枪口闪与白屏</small></span>
+              <input type="checkbox" id="HudSettingFlashEffects" dataSetting="flashEffects" checked></label>
+            <label class="Style_SettingRow"><span><b>高对比界面</b><small>加深底衬，提高文字与状态可读性</small></span>
+              <input type="checkbox" id="HudSettingHighContrast" dataSetting="highContrast"></label>
+            <label class="Style_SettingRow"><span><b>界面字号</b><small>字幕、目标与菜单同步缩放</small></span>
+              <input type="range" id="HudSettingFontScale" dataSetting="fontScale" min="85" max="160" step="5" value="100"></label>
+          </div>
+        </section>
+
+        <section id="HudMenuPanelControls" class="Style_MenuPanel" dataMenu="Controls" hidden>
+          <p class="Style_MenuLead">键位表（触屏见屏幕左右两侧的摇杆与动作键）。</p>
+          <div id="HudControlsList" class="Style_ControlsList"></div>
+        </section>
+
+        <section id="HudMenuPanelLedger" class="Style_MenuPanel" dataMenu="Ledger" hidden>
+          <p class="Style_MenuLead">代价记录只记，不计分。这里不会出现分数、评级或击杀数。</p>
+          <ul id="HudLedgerList" class="Style_LedgerList"><li class="Style_LedgerEmpty">还没有需要记下的事。</li></ul>
+        </section>
+
+        <section id="HudMenuPanelHistory" class="Style_MenuPanel" dataMenu="History" hidden>
+          <div class="Style_HistoryColumns">
+            <section>
+              <h3>这段故事怎么对待历史</h3>
+              <p>侵华日军与其扶植的伪军是加害方。本作不做"双方各有苦衷"式的模糊处理，也不为侵略行为提供任何开脱。</p>
+              <p>黑石峪、沈铁、冯小满以及本作中的一切地名与人物，均为基于华北敌后普遍史实的虚构复合创作，不影射任何具体县份、村庄或个人。</p>
+            </section>
+            <section>
+              <h3>画面不会做什么</h3>
+              <ul>
+                <li>不出现尸体特写、血肉、虐杀镜头或性暴力。</li>
+                <li>暴力的重量用声音、留白和事后的痕迹表达。</li>
+                <li>平民伤亡与苦难永不计分，不转化为资源、奖励或评级。</li>
+                <li>搜刮阵亡者只写"取走弹药"，不做任何视觉展示。</li>
+              </ul>
+            </section>
+            <section>
+              <h3>画面会呈现什么</h3>
+              <ul>
+                <li>被"扫荡"后的村庄：烧塌的房梁、埋在雪下的农具、空掉的粮囤。</li>
+                <li>一个孩子在失去父母后的恐惧、倔强与逐渐建立的信任。</li>
+                <li>敌兵是被军国主义驱动的具体的人：会冷、会打盹、会喊同伴的名字——这不构成任何开脱。</li>
+              </ul>
+            </section>
+            <section>
+              <h3>为什么这里几乎打不赢</h3>
+              <p>拒绝"抗日神剧"。主角会疼、会怕、会打空；全流程弹药不超过十二发；正面交火几乎必死。潜行与逃脱永远优于交火，这是当时敌后斗争的真实条件，不是难度设计的花招。</p>
+            </section>
+          </div>
+        </section>
+      </div>
+
+      <footer class="Style_MenuFoot">
+        <small>设置自动保存在本机浏览器；不上传任何数据。</small>
+      </footer>
+    </article>
+  </div>
+
+  <!-- 背包 -->
+  <div id="HudInventory" class="Style_Inventory" hidden>
+    <div class="Style_MenuBackdrop" aria-hidden="true"></div>
+    <article class="Style_InventoryCard" role="dialog" aria-modal="true" aria-labelledby="HudInventoryTitle">
+      <header class="Style_InventoryHead">
+        <h2 id="HudInventoryTitle">背包</h2>
+        <span id="HudInventoryCapacity" class="Style_InventoryCapacity">0 / 10</span>
+        <button type="button" id="HudButtonInventoryClose" class="Style_MenuClose" aria-label="关闭">×</button>
+      </header>
+      <div class="Style_InventoryBody">
+        <ul id="HudInventoryList" class="Style_InventoryList"></ul>
+        <section class="Style_InventoryCraft">
+          <p class="Style_InventoryCraftHead">合成</p>
+          <ul id="HudInventoryRecipes" class="Style_RecipeList"></ul>
+          <p id="HudInventoryDetail" class="Style_InventoryDetail">东西很少。省着用。</p>
+        </section>
+      </div>
+    </article>
+  </div>
+
+  <!-- 抉择 -->
+  <div id="HudChoice" class="Style_Choice" hidden>
+    <div class="Style_MenuBackdrop" aria-hidden="true"></div>
+    <article class="Style_ChoiceCard" role="dialog" aria-modal="true" aria-labelledby="HudChoicePrompt">
+      <p class="Style_ChoiceEyebrow">没有更优解</p>
+      <h2 id="HudChoicePrompt" class="Style_ChoicePrompt"></h2>
+      <div id="HudChoiceOptions" class="Style_ChoiceOptions"></div>
+      <i id="HudChoiceTimer" class="Style_ChoiceTimer" hidden><em></em></i>
+    </article>
+  </div>
+
+  <!-- 结局 -->
+  <div id="HudEnding" class="Style_Ending" hidden>
+    <div class="Style_EndingVeil" aria-hidden="true"></div>
+    <article class="Style_EndingCard" role="dialog" aria-modal="true" aria-labelledby="HudEndingTitle">
+      <p class="Style_EndingEyebrow" id="HudEndingEyebrow">十里外 · 交通站</p>
+      <h2 id="HudEndingTitle" class="Style_EndingTitle"></h2>
+      <div id="HudEndingLines" class="Style_EndingLines"></div>
+      <section class="Style_EndingLedger">
+        <header><span>代价记录</span><b>不是分数</b></header>
+        <ul id="HudEndingLedger" class="Style_LedgerList"></ul>
+      </section>
+      <div id="HudEndingStats" class="Style_EndingStats"></div>
+      <div class="Style_EndingActions">
+        <button type="button" id="HudButtonEndingReplay" class="Style_PrimaryButton"><span>再走一遍</span><small>不同的选择留下不同的代价</small></button>
+        <button type="button" id="HudButtonEndingTitle" class="Style_SecondaryButton"><span>返回标题</span></button>
+      </div>
+      <footer class="Style_EndingFoot">雪还在下。十里山路不会因为谁走完了就变短。</footer>
+    </article>
+  </div>
+
+  <!-- 失败 -->
+  <div id="HudGameOver" class="Style_GameOver" hidden>
+    <div class="Style_MenuBackdrop" aria-hidden="true"></div>
+    <article class="Style_GameOverCard" role="dialog" aria-modal="true" aria-labelledby="HudGameOverTitle">
+      <h2 id="HudGameOverTitle" class="Style_GameOverTitle">没能走出去</h2>
+      <p id="HudGameOverReason" class="Style_GameOverReason"></p>
+      <div class="Style_GameOverActions">
+        <button type="button" id="HudButtonRetry" class="Style_PrimaryButton"><span>回到上一个安全点</span></button>
+        <button type="button" id="HudButtonGameOverMenu" class="Style_SecondaryButton"><span>返回标题</span></button>
+      </div>
+    </article>
+  </div>
+
+  <!-- 载入 -->
+  <div id="HudLoading" class="Style_Loading" hidden>
+    <div class="Style_LoadingInner">
+      <span class="Style_LoadingMark" aria-hidden="true"></span>
+      <b id="HudLoadingText" class="Style_LoadingText">正在铺开黑石峪的雪…</b>
+      <i class="Style_LoadingBar"><em id="HudLoadingFill"></em></i>
+    </div>
+  </div>
+
+  <div id="HudDebug" class="Style_Debug" hidden aria-hidden="true"></div>
+  <div id="HudLive" class="Style_VisuallyHidden" aria-live="assertive"></div>
+</div>
+
+<noscript>
+  <div class="Style_NoScript">
+    <h1>黑石峪 · 一九四三年冬</h1>
+    <p>本作是一个运行在浏览器里的三维游戏，需要启用 JavaScript 与 WebGL。<br>请在浏览器设置中启用脚本后刷新本页。</p>
+  </div>
+</noscript>
+
+<script type="module">
+  // 页面外壳引导：标题画面、辅助设置预应用、错误兜底。
+  // 玩法装配由 Script_Boot.mjs 负责（AgentBoot）。
+  const SettingsKey = 'blackstone1943_settings_v1';
+  const root = document.getElementById('GameRoot');
+  const titleScreen = document.getElementById('TitleScreen');
+  const menu = document.getElementById('HudMenu');
+  const loading = document.getElementById('HudLoading');
+  const live = document.getElementById('HudLive');
+  let booted = false;
+  let bootPromise = null;
+
+  function ReadSettings() {
+    try {
+      const raw = window.localStorage.getItem(SettingsKey);
+      return raw ? (JSON.parse(raw) || {}) : {};
+    } catch (error) { return {}; }
+  }
+
+  function WriteSettings(patch) {
+    try {
+      const merged = Object.assign(ReadSettings(), patch);
+      window.localStorage.setItem(SettingsKey, JSON.stringify(merged));
+      return merged;
+    } catch (error) { return patch; }
+  }
+
+  function ApplyVisualSettings(settings) {
+    const scale = Number(settings.fontScale) || 1;
+    root.style.setProperty('--HudFontScale', String(Math.min(1.6, Math.max(0.85, scale))));
+    root.classList.toggle('Style_HighContrast', settings.highContrast === true);
+    root.classList.toggle('Style_NoFlash', settings.flashEffects === false);
+    root.classList.toggle('Style_NoSubtitles', settings.subtitlesOn === false);
+  }
+
+  function SyncSettingControls(settings) {
+    const controls = menu.querySelectorAll('[dataSetting]');
+    for (const control of controls) {
+      const key = control.getAttribute('dataSetting');
+      if (!(key in settings)) continue;
+      const value = settings[key];
+      if (control.type === 'checkbox') control.checked = value !== false;
+      else if (control.type === 'range') {
+        const scaled = (key === 'fontScale' || key === 'sensitivity' ||
+                        key.endsWith('Volume')) ? Math.round(Number(value) * 100) : Number(value);
+        if (Number.isFinite(scaled)) control.value = String(scaled);
+      }
+    }
+  }
+
+  function OpenMenuPanel(panelId) {
+    menu.hidden = false;
+    menu.setAttribute('dataPanel', panelId);
+    if (!booted) {
+      document.getElementById('HudMenuEyebrow').textContent = '出发之前';
+      document.getElementById('HudMenuTitle').textContent = '黑石峪 · 一九四三年冬';
+    }
+    const panels = menu.querySelectorAll('.Style_MenuPanel');
+    for (const panel of panels) panel.hidden = panel.getAttribute('dataMenu') !== panelId;
+    const tabs = menu.querySelectorAll('.Style_MenuTab');
+    for (const tab of tabs) tab.classList.toggle('Style_TabActive', tab.getAttribute('dataMenu') === panelId);
+    const first = menu.querySelector('.Style_MenuPanel:not([hidden]) button, .Style_MenuPanel:not([hidden]) input');
+    if (first && typeof first.focus === 'function') first.focus({ preventScroll: true });
+  }
+
+  function CloseMenu() {
+    menu.hidden = true;
+  }
+
+  // 预引导阶段的设置代理：Hud 创建后会接管，但两边写入的是同一份数据，互不冲突。
+  menu.addEventListener('input', (event) => {
+    const control = event.target;
+    if (!control || !control.getAttribute) return;
+    const key = control.getAttribute('dataSetting');
+    if (!key) return;
+    let value;
+    if (control.type === 'checkbox') value = control.checked;
+    else if (key === 'fontScale' || key === 'sensitivity' || key.endsWith('Volume')) value = Number(control.value) / 100;
+    else value = Number(control.value);
+    ApplyVisualSettings(WriteSettings({ [key]: value }));
+  });
+
+  menu.addEventListener('click', (event) => {
+    const tab = event.target.closest ? event.target.closest('[dataMenu]') : null;
+    if (tab && tab.classList.contains('Style_MenuTab')) { OpenMenuPanel(tab.getAttribute('dataMenu')); return; }
+    if (event.target.id === 'HudButtonMenuClose' && !booted) CloseMenu();
+  });
+
+  document.getElementById('TitleAccessButton').addEventListener('click', () => OpenMenuPanel('Accessibility'));
+  document.getElementById('TitleHistoryButton').addEventListener('click', () => OpenMenuPanel('History'));
+
+  function ShowFailure(message) {
+    loading.hidden = false;
+    const text = document.getElementById('HudLoadingText');
+    text.textContent = message + ' 点击任意处返回标题。';
+    text.classList.add('Style_LoadingFailed');
+    const fill = document.getElementById('HudLoadingFill');
+    if (fill) fill.style.width = '100%';
+    loading.style.pointerEvents = 'auto';
+    loading.style.cursor = 'pointer';
+    loading.addEventListener('click', () => {
+      loading.hidden = true;
+      text.classList.remove('Style_LoadingFailed');
+      titleScreen.hidden = false;
+    }, { once: true });
+  }
+
+  async function StartGame(options) {
+    if (booted) return bootPromise;
+    booted = true;
+    titleScreen.hidden = true;
+    root.setAttribute('dataPhase', 'Loading');
+    loading.hidden = false;
+    live.textContent = '正在载入黑石峪。';
+    bootPromise = (async () => {
+      const module = await import('./Script_Boot.mjs');
+      const handle = await module.Boot(Object.assign({
+        mount: root,
+        canvas: document.getElementById('GameCanvas'),
+        autoStart: true,
+      }, options || {}));
+      root.setAttribute('dataPhase', 'Play');
+      loading.hidden = true;
+      return handle;
+    })();
+    bootPromise.catch((error) => {
+      booted = false;
+      root.setAttribute('dataPhase', 'Title');
+      titleScreen.hidden = false;
+      ShowFailure('这一段还没铺好雪：游戏模块尚未就绪。' + (error && error.message ? '（' + error.message + '）' : ''));
+      console.warn('[Blackstone1943] boot failed', error);
+    });
+    return bootPromise;
+  }
+
+  document.getElementById('BeginButton').addEventListener('click', () => { StartGame({}); });
+  const continueButton = document.getElementById('ContinueButton');
+  continueButton.addEventListener('click', () => { StartGame({ fromSave: true }); });
+
+  try {
+    const progress = window.localStorage.getItem('blackstone1943_progress_v1');
+    if (progress) {
+      const parsed = JSON.parse(progress);
+      if (parsed && parsed.chapterId) {
+        continueButton.hidden = false;
+        const names = { ChapterSnowCellar: '第一章 · 雪窖', ChapterBrokenValley: '第二章 · 断谷', ChapterWindPass: '第三章 · 风雪垭口' };
+        document.getElementById('ContinueDetail').textContent = names[parsed.chapterId] || '上次的章节';
+      }
+    }
+  } catch (error) { /* localStorage 不可用时静默降级 */ }
+
+  window.addEventListener('keydown', (event) => {
+    if (booted) return;
+    if (event.key === 'Enter' && menu.hidden && !titleScreen.hidden) StartGame({});
+    else if (event.key === 'Escape' && !menu.hidden) CloseMenu();
+  });
+
+  window.addEventListener('error', (event) => {
+    if (!booted) return;
+    console.warn('[Blackstone1943] runtime error', event.message);
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    console.warn('[Blackstone1943] unhandled rejection', event.reason);
+    if (event.preventDefault) event.preventDefault();
+  });
+
+  ApplyVisualSettings(ReadSettings());
+  SyncSettingControls(ReadSettings());
+</script>
+</body>
+</html>
