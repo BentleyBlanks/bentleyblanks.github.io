@@ -1175,7 +1175,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     CreateParticleBurst({
       position: center.clone(), shape: "SPARK", additive: true, count: 26, radius: 0.34, height: 0.16,
       speed: [0.05, 0.2], direction: "sphere", life: [0.07, 0.12], size: [16, 30], drag: 6, delay: [0.22, 0.52],
-      colorA: "#ffe4b0", colorB: "#d08a3a", opacity: 0.95, fade: 0.05, lit: 0, sizeCurve: [1.3, 0.3],
+      colorA: "#ecd2a2", colorB: "#c8863a", opacity: 0.82, fade: 0.05, lit: 0, sizeCurve: [1.3, 0.3],
     });
     const flashLight = AcquireLight("#ffd79a", 0, 2.6);
     if (flashLight) {
@@ -1222,7 +1222,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     SpawnRing(center, { color: "#b08a4e", from: 0.2, to: 1.6, duration: 1.1, opacity: 0.3, holdUntil: 0.1 });
     CreateParticleBurst({
       position: center.clone(), shape: "SPARK", additive: true, count: 18, radius: 0.05, height: 0.05,
-      speed: [0.6, 1.6], direction: "dome", life: [0.1, 0.22], size: [18, 40], drag: 5, colorA: "#fff0c8",
+      speed: [0.6, 1.6], direction: "dome", life: [0.1, 0.22], size: [18, 40], drag: 5, colorA: "#e8d0a0",
       colorB: "#e08a34", opacity: 1, fade: 0.02, lit: 0, sizeCurve: [1.4, 0.2],
     });
     // 碎石抛射（弹道 + 重力）

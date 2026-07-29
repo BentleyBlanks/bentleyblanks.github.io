@@ -26,7 +26,7 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.mjs";
 
 import {
   hexSize, hexDirections, HexKey, ParseHexKey, HexToWorld, WorldToHex, HexCornerOffsets,
-  Clamp, Clamp01, Lerp, InverseLerp, FractalNoise2D, ValueNoise2D, HashString, CreateRng,
+  Clamp, Clamp01, Lerp, InverseLerp, SmoothStep, FractalNoise2D, ValueNoise2D, HashString, CreateRng,
 } from "./Script_Hex.mjs";
 
 import {
@@ -585,7 +585,7 @@ export function CreateRenderer(canvas, options = {}) {
   controls.minPolarAngle = THREE.MathUtils.degToRad(15);
   controls.maxPolarAngle = THREE.MathUtils.degToRad(65);
   controls.minDistance = 6;
-  controls.maxDistance = 96;
+  controls.maxDistance = 54;
   // Civ 式操作：左键拖动平移（左键单击留给选格）、右键旋转、滚轮/双指缩放
   controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
   controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
@@ -900,19 +900,102 @@ export function CreateRenderer(canvas, options = {}) {
   const fineNoiseOptions = { octaves: 2, seed: 9311 };
   const blotchNoiseOptions = { octaves: 3, seed: 2711 };
 
-  /** 顶面某点的高度：地块高台 + 地形起伏 + 山峰隆起，边缘收敛保持棱块轮廓。 */
+  /**
+   * 文明6 方案的连续地表：六角格不再是一块块带侧壁的"饼干"，而是一张
+   * 连续起伏的大地——每个角点的高度取共享该角的至多三格的平均值，
+   * 边缘区（radialT 0.55→1.0）从本格中心值平滑融向共享角点插值。
+   * 相邻两格沿公共边算出的目标值完全一致，因此拼合处严格无缝；
+   * 高差大的地方（河谷、山脚）自然形成陡坡，而不是垂直崖缝。
+   */
+  const cornerBlendCache = new Map();
+
+  function CornerBlend(entry, cornerIndex) {
+    const cacheKey = entry.key + "#" + cornerIndex;
+    const cached = cornerBlendCache.get(cacheKey);
+    if (cached) return cached;
+    const dirs = cornerNeighbourDirections[cornerIndex];
+    let height = entry.topY;
+    let relief = entry.profile.relief;
+    let count = 1;
+    for (const side of dirs) {
+      const direction = hexDirections[side];
+      const neighbour = hexByKey.get(HexKey(entry.q + direction.q, entry.r + direction.r));
+      if (!neighbour) continue;
+      height += neighbour.topY;
+      relief += neighbour.profile.relief;
+      count += 1;
+    }
+    const blend = { height: height / count, relief: relief / count };
+    cornerBlendCache.set(cacheKey, blend);
+    return blend;
+  }
+
+  /** 由本格坐标系内的角度求所在扇区的两个角与沿边比例。 */
+  function EdgeTargetAt(entry, localX, localZ) {
+    let angle = Math.atan2(localZ, localX);
+    if (angle < 0) angle += Math.PI * 2;
+    const sector = Math.floor(angle / (Math.PI / 3)) % 6;
+    const cornerA = sector;
+    const cornerB = (sector + 1) % 6;
+    const fraction = (angle - sector * (Math.PI / 3)) / (Math.PI / 3);
+    const blendA = CornerBlend(entry, cornerA);
+    const blendB = CornerBlend(entry, cornerB);
+    return {
+      height: Lerp(blendA.height, blendB.height, fraction),
+      relief: Lerp(blendA.relief, blendB.relief, fraction),
+    };
+  }
+
   function SampleTopHeight(entry, localX, localZ, radialT) {
     const worldX = entry.x + localX;
     const worldZ = entry.z + localZ;
     const relief = FractalNoise2D(worldX * 0.62, worldZ * 0.62, reliefNoiseOptions) - 0.5;
     const fine = FractalNoise2D(worldX * 2.4, worldZ * 2.4, fineNoiseOptions) - 0.5;
-    const edgeFalloff = 1 - 0.62 * Math.pow(radialT, 2.2);
     const peak = entry.profile.peak * Math.pow(1 - radialT, 1.7);
-    return entry.topY + (relief * 2 * entry.profile.relief + fine * 0.5 * entry.profile.relief) * edgeFalloff + peak;
+    const centerHeight =
+      entry.topY + (relief * 2 * entry.profile.relief + fine * 0.5 * entry.profile.relief) * (1 - 0.62 * Math.pow(radialT, 2.2)) + peak;
+    const edgeWeight = SmoothStep(0.5, 1.0, radialT);
+    if (edgeWeight <= 0) return centerHeight;
+    const target = EdgeTargetAt(entry, localX, localZ);
+    // 边缘细节噪声只依赖世界坐标与混合后的起伏系数，两侧算出的值严格一致
+    const sharedDetail = (relief * 2 + fine * 0.5) * target.relief * 0.38;
+    return Lerp(centerHeight, target.height + sharedDetail, edgeWeight);
+  }
+
+  const neighbourColorScratch = new THREE.Color();
+  const neighbourColorSum = new THREE.Color();
+
+  /** 边缘区颜色互融：取共享该点的相邻格在同一世界点的颜色平均值。 */
+  function BlendEdgeColor(entry, worldX, worldZ, radialT, out) {
+    const edgeWeight = SmoothStep(0.6, 1.0, radialT) * 0.5;
+    if (edgeWeight <= 0.001) return out;
+    let angle = Math.atan2(worldZ - entry.z, worldX - entry.x);
+    if (angle < 0) angle += Math.PI * 2;
+    const sector = Math.floor(angle / (Math.PI / 3)) % 6;
+    neighbourColorSum.setRGB(0, 0, 0);
+    let count = 0;
+    for (const side of [sector, (sector + 1) % 6]) {
+      const direction = hexDirections[side % 6];
+      const neighbour = hexByKey.get(HexKey(entry.q + direction.q, entry.r + direction.r));
+      if (!neighbour) continue;
+      SampleTopColorRaw(neighbour, worldX - neighbour.x, worldZ - neighbour.z, 1, neighbourColorScratch);
+      neighbourColorSum.add(neighbourColorScratch);
+      count += 1;
+    }
+    if (count > 0) {
+      neighbourColorSum.multiplyScalar(1 / count);
+      out.lerp(neighbourColorSum, edgeWeight);
+    }
+    return out;
+  }
+
+  function SampleTopColor(entry, localX, localZ, radialT, out) {
+    SampleTopColorRaw(entry, localX, localZ, radialT, out);
+    return BlendEdgeColor(entry, entry.x + localX, entry.z + localZ, radialT, out);
   }
 
   /** 顶面顶点色：地形色带 × 高程 × 湿度 × 噪声打断。 */
-  function SampleTopColor(entry, localX, localZ, radialT, out) {
+  function SampleTopColorRaw(entry, localX, localZ, radialT, out) {
     const band = entry.profile.elevationBand;
     const bandT = Clamp01(InverseLerp(band[0], band[1], entry.elevation));
     const worldX = entry.x + localX;
@@ -972,13 +1055,11 @@ export function CreateRenderer(canvas, options = {}) {
         const [cornerA, cornerB] = hexEdgeCorners[side];
         const direction = hexDirections[side];
         const neighbour = hexByKey.get(HexKey(entry.q + direction.q, entry.r + direction.r));
+        // 文明6 方案：相邻格的顶面沿公共边严格共点，内部不再需要任何侧壁——
+        // 高差由边缘区的连续坡面表达（大高差自然成陡坡）。只有地图外缘保留裙壁。
+        if (neighbour) continue;
         const rimTop = Math.min(rimHeights[cornerA], rimHeights[cornerB]);
-        let bottom;
-        if (neighbour) {
-          bottom = Math.min(rimTop, neighbour.topY) - worldConfig.wallSkirt;
-        } else {
-          bottom = globalFloor;
-        }
+        let bottom = globalFloor;
         bottom = Math.min(bottom, rimTop - 0.06);
         const pointA = corners[cornerA];
         const pointB = corners[cornerB];
@@ -1384,9 +1465,9 @@ export function CreateRenderer(canvas, options = {}) {
   const scorchTint = new THREE.Color(0.42, 0.36, 0.32);
   const neutralTint = new THREE.Color(1, 1, 1);
   const factionTints = {
-    Player: new THREE.Color(0x9dc0e2),   // 我方：灰蓝布衣
+    Player: new THREE.Color(0xd8b06a),   // 我方底盘：赭金（读作臂章/袖标，不再像水塘）
     Enemy: new THREE.Color(0xd2ab5c),    // 敌方：土黄制服
-    Hidden: new THREE.Color(0x7ea0b2),   // 隐蔽：偏冷的青灰
+    Hidden: new THREE.Color(0xb9a67e),   // 隐蔽：压灰的土金
   };
   /** 我方部队头顶的小红旗，一眼区分敌我。 */
   const playerFlagColors = { cloth: modelPalette.bannerRed, band: "#e8d3a4", height: 0.30 };

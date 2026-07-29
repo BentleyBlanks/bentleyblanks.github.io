@@ -376,9 +376,9 @@ function KeysInRange(key, radius) {
 
 function HexLabel(state, key) {
   const hex = GetHex(state, key);
-  if (!hex) return `未知地段(${key})`;
+  if (!hex) return "未知地段";
   const name = featureLabels[hex.feature] || TerrainLabel(hex.terrain) || '荒地';
-  return `${name}(${key})`;
+  return name;
 }
 
 /** 由 from 指向 to 的八方位中文名（世界坐标 +q 向东、+r 向南）。 */

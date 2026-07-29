@@ -3182,7 +3182,7 @@ export function CreateUi(root, hooks = {}) {
         El("span", "pf-intel-intent", { text: IntentName(enemy.intent), parent: row });
         El("span", "pf-intel-where", { text: enemy.key ? FormatHexCoord(enemy.key) : "位置不明", parent: row });
         const strength = El("span", "pf-intel-strength", {
-          text: `${FormatNumber(enemy.hp || 0)} / ${FormatNumber(enemy.maxHp || enemy.hp || 0)}`,
+          text: `${Math.round(enemy.hp || 0)} / ${Math.round(enemy.maxHp || enemy.hp || 0)}`,
           parent: row,
         });
         SetFlag(strength, "is-weak", (enemy.hp || 0) < (enemy.maxHp || 1) * 0.4);

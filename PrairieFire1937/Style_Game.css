@@ -454,8 +454,8 @@
 .pf-tab-badge {
   position: absolute;
   top: 1px;
-  right: 1px;
-  left: auto;
+  left: 1px;
+  right: auto;
   display: none;
   min-width: 17px;
   height: 17px;

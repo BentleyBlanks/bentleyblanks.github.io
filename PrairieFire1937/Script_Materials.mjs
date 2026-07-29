@@ -166,7 +166,7 @@ const eraGrade = Object.freeze({
     // 0.80 的饱和叠上 1.42 倍雾密度时，实测整帧饱和度从 0.435 掉到 0.199，
     // 九种地形糊成一片灰绿，战役后 2/3 时间里地形色编码完全失效。
     sunScale: 0.84, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.16,
-    saturation: 0.96, contrast: 1.10, vignette: 0.24, grain: 0.015, bloomThreshold: 0.78, bloomStrength: 0.40,
+    saturation: 1.02, contrast: 1.10, vignette: 0.24, grain: 0.015, bloomThreshold: 0.80, bloomStrength: 0.28,
     shadowTint: 0x232a34, highlightTint: 0xd7dde2, lift: 0.018,
   },
   Recovery: {
@@ -760,6 +760,18 @@ void main() {
     float lighting = 0.72 + 0.5 * pow( sunDot, 2.4 ) + 0.22 * layerHigh;
     vec3 cloud = uCloudColor * lighting;
     sky = mix( sky, cloud, coverage );
+  }
+
+  // 地平线云堤：出货相机（俯仰≤65°、fov38）能看到的"天"全部在 up∈[-0.32,-0.02]，
+  // 上方那组经典云带在这个范围永远采样不到——连续两轮审核证伪的就是它。
+  // 这里按方位角展开一条云堤，颜色压暗到与底色拉开 ΔL≥10%，玩家第一次能看见云。
+  float bank = smoothstep( -0.34, -0.20, up ) * ( 1.0 - smoothstep( -0.11, -0.02, up ) );
+  if ( bank > 0.003 && uCloudOpacity > 0.002 ) {
+    float azimuth = atan( direction.z, direction.x );
+    vec2 bankUv = vec2( azimuth * 2.4 + uTime * uCloudSpeed * 0.32, up * 7.0 );
+    float bankShape = CloudBand( bankUv, uCloudScale * 1.7, vec2( uTime * uCloudSpeed * 0.5, 0.0 ), 3 );
+    vec3 bankColor = mix( uCloudColor * 0.62, uHorizon * 0.74, 0.30 );
+    sky = mix( sky, bankColor, bank * bankShape * uCloudOpacity * 0.9 );
   }
 
   gl_FragColor = vec4( max( sky * uExposure, vec3( 0.0 ) ), 1.0 );
