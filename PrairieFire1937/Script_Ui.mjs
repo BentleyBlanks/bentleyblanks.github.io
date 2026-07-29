@@ -564,6 +564,10 @@ export function CreateUi(root, hooks = {}) {
     SetAttr(root, "data-pf-ui", "1");
 
     dom.hud = El("div", "pf-hud", { parent: root, attrs: { role: "region", "aria-label": "战场界面" } });
+    // 内联双保险：这个全屏层必须穿透点击，交互元素由 .pf-hud > * 单独恢复。
+    // 只靠样式表规则曾被宿主页面的兜底样式按源顺序反杀过一次（整张地图点不了），
+    // 内联样式不受样式表加载顺序影响。
+    dom.hud.style.pointerEvents = "none";
 
     BuildTopBar();
     BuildMeterStrip();
@@ -580,6 +584,8 @@ export function CreateUi(root, hooks = {}) {
       parent: root,
       attrs: { role: "status", "aria-live": "polite", "aria-label": "提示" },
     });
+    // 提示流只展示不交互，同样内联穿透，防止它挡住下方的地图。
+    dom.toastLayer.style.pointerEvents = "none";
     dom.panelLayer = El("div", "pf-panel-layer", { parent: root, attrs: { "aria-hidden": "true" } });
     dom.cinemaLayer = El("div", "pf-cinema-layer", { parent: root, attrs: { "aria-hidden": "true" } });
     dom.modalLayer = El("div", "pf-modal-layer", { parent: root, attrs: { "aria-hidden": "true" } });

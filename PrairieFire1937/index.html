@@ -17,7 +17,11 @@
   #app { position: fixed; inset: 0; }
   #worldCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   .ui-root { position: absolute; inset: 0; pointer-events: none; }
-  .ui-root > * { pointer-events: auto; }
+  /* 兜底必须包在 :where() 里（特异度 0）。此前写成 .ui-root > * 时，
+     这条内联样式在源顺序上晚于 Style_Game.css，会把 UI 的五个全屏层
+     （hud / toast / panel / cinema / modal）全部改回可拦截点击——
+     顶层的 modal 层随即把整张地图与所有按钮都挡死，鼠标什么都点不了。 */
+  .ui-root > :where(*) { pointer-events: auto; }
 
   .boot { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center;
     background: radial-gradient(120% 90% at 50% 30%, #241d16 0%, #14110e 55%, #0a0908 100%);
