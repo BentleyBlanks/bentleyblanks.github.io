@@ -4,7 +4,6 @@ import {
   actionDefinitions,
   doctrineDefinitions,
   policyDefinitions,
-  historicalTurns,
   terrainDefinitions,
   unitDefinitions,
   institutionDefinitions,
@@ -13,6 +12,7 @@ import {
   GetHex,
   GetNeighbors,
   GetTurnBriefing,
+  GetDoctrineExperienceCost,
   FindReachableHexes,
   ListContextActions,
   GetActionPreview,
@@ -25,7 +25,20 @@ import {
   GetVictoryAssessment,
   SerializeState,
   DeserializeState,
-} from "./Script_Rules.mjs?v=20260728e";
+} from "./Script_Rules.mjs?v=20260729h";
+import {
+  CreateEnemyRearWorld3D,
+  World3DCacheIdentity,
+} from "./Script_World3D.mjs?v=20260729h";
+import {
+  GetFixedHistoricalAnchor,
+  GetHistoricalTurnNarrative,
+  GetHistorySource,
+  historicalTurnNarratives,
+  historyBoundary,
+  localPhaseDefinitions,
+  ordinaryRoleDefinitions,
+} from "./Data_History.mjs?v=20260729h";
 
 const ui = {};
 const activePointers = new Map();
@@ -52,11 +65,15 @@ let gameState = null;
 let selectedHexId = null;
 let selectedUnitId = null;
 let latestReport = null;
+let pendingWorldActionEffects = [];
 let lastFocusElement = null;
 let modalSequence = 0;
 let renderHandle = 0;
 let mapLayer = "situation";
 let pointerGesture = null;
+let world3D = null;
+let world3DFailed = false;
+let desktopBootCompleted = false;
 let mapCamera = {
   panX: 0,
   panY: 0,
@@ -106,6 +123,26 @@ function FindDefinition(collection, id) {
   return DefinitionList(collection).find((item) =>
     String(item.id ?? item.key ?? "").toLowerCase() === normalizedId
   ) ?? null;
+}
+
+function GetHistoryContext(turn = Number(gameState?.turn ?? 1)) {
+  const normalizedTurn = Clamp(Math.trunc(Number(turn) || 1), 1, turnLimit);
+  const narrative = GetHistoricalTurnNarrative(normalizedTurn);
+  const phase = narrative
+    ? FindDefinition(localPhaseDefinitions, narrative.localPhaseId)
+    : null;
+  return { turn: normalizedTurn, narrative, phase };
+}
+
+function GetHistoryRole(roleId) {
+  return FindDefinition(ordinaryRoleDefinitions, roleId);
+}
+
+function FormatHistoryRoleNames(roleIds) {
+  return AsArray(roleIds).map((roleId) => {
+    const role = GetHistoryRole(roleId);
+    return role ? `${role.displayName}（${role.role}）` : roleId;
+  }).join("、");
 }
 
 function IsFeature(hex, ...featureIds) {
@@ -161,7 +198,7 @@ function CacheElements() {
     "gameShell", "dateLabel", "turnLabel", "phaseLabel", "grainValue",
     "armsValue", "medicineValue", "intelValue", "cadresValue", "peopleValue",
     "exposureValue", "contributionValue", "objectiveText", "warningText",
-    "timelineList", "mapCanvas", "mapHint", "mapLegend", "hexNavigator",
+    "timelineList", "mapCanvas", "mapHint", "mapLegend", "hexNavigator", "worldModeBadge",
     "zoomInButton", "zoomOutButton", "centerMapButton", "layerButton",
     "selectedTitle", "selectedMeta", "selectedStats", "selectedUnit", "actionList",
     "doctrineButton", "policyButton", "ledgerButton", "rulesButton", "saveButton",
@@ -176,8 +213,63 @@ function CacheElements() {
   });
 }
 
+function IsDesktopViewportSupported() {
+  return window.innerWidth >= 1280 && window.innerHeight >= 720;
+}
+
+function ResumeBootAtDesktopViewport() {
+  if (!IsDesktopViewportSupported()) return;
+  window.removeEventListener("resize", ResumeBootAtDesktopViewport);
+  Boot();
+}
+
+function BlockUnsupportedViewportInteraction(event) {
+  if (IsDesktopViewportSupported()) return;
+  if (event.cancelable) event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+function SuspendWorld3DForViewport() {
+  try {
+    world3D?.Dispose?.();
+  } finally {
+    world3D = null;
+  }
+}
+
+function HandleDesktopViewportResize() {
+  if (!IsDesktopViewportSupported()) {
+    if (gameState) SaveGame(false);
+    if (renderHandle) {
+      window.cancelAnimationFrame(renderHandle);
+      renderHandle = 0;
+    }
+    activePointers.forEach((unusedPoint, pointerId) => {
+      try {
+        if (ui.mapCanvas?.hasPointerCapture(pointerId)) ui.mapCanvas.releasePointerCapture(pointerId);
+      } catch {
+        // Pointer capture may already have ended while the resize event was queued.
+      }
+    });
+    activePointers.clear();
+    pointerGesture = null;
+    ui.mapCanvas?.blur();
+    SuspendWorld3DForViewport();
+    return;
+  }
+  if (!gameState) RefreshContinueButton();
+  ScheduleRender();
+}
+
 function Boot() {
   CacheElements();
+  if (!IsDesktopViewportSupported()) {
+    window.addEventListener("resize", ResumeBootAtDesktopViewport, { passive: true });
+    return;
+  }
+  window.removeEventListener("resize", ResumeBootAtDesktopViewport);
+  if (desktopBootCompleted) return;
+  desktopBootCompleted = true;
   BindStaticEvents();
   RefreshContinueButton();
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
@@ -211,8 +303,12 @@ function BindStaticEvents() {
   document.querySelectorAll("[data-close-modal]").forEach((button) => {
     button.addEventListener("click", CloseTopModal);
   });
+  ["click", "keydown", "pointerdown", "pointermove", "pointerup", "pointercancel"].forEach((eventName) => {
+    window.addEventListener(eventName, BlockUnsupportedViewportInteraction, true);
+  });
+  window.addEventListener("wheel", BlockUnsupportedViewportInteraction, { capture: true, passive: false });
   window.addEventListener("keydown", HandleGlobalKeyDown);
-  window.addEventListener("resize", ScheduleRender);
+  window.addEventListener("resize", HandleDesktopViewportResize, { passive: true });
   if (ui.mapCanvas) {
     ui.mapCanvas.addEventListener("pointerdown", HandleMapPointerDown);
     ui.mapCanvas.addEventListener("pointermove", HandleMapPointerMove);
@@ -225,6 +321,10 @@ function BindStaticEvents() {
 
 function RefreshContinueButton() {
   if (!ui.continueButton) return;
+  if (!IsDesktopViewportSupported()) {
+    ui.continueButton.hidden = true;
+    return;
+  }
   ui.continueButton.hidden = !HasValidSave();
 }
 
@@ -242,6 +342,7 @@ function HasValidSave() {
 }
 
 function RequestStartNewGame() {
+  if (!IsDesktopViewportSupported()) return;
   if (!HasValidSave()) {
     StartNewGame();
     return;
@@ -265,6 +366,7 @@ function RequestStartNewGame() {
 }
 
 function StartNewGame() {
+  if (!IsDesktopViewportSupported()) return;
   gameState = CreateInitialState(19410918);
   const headquarters = AsArray(gameState.hexes).find((hex) =>
     IsFeature(hex, "Headquarters") || hex.control === "base"
@@ -274,12 +376,14 @@ function StartNewGame() {
     ?? AsArray(gameState.units)[0]?.id
     ?? null;
   latestReport = null;
+  pendingWorldActionEffects = [];
   EnterGame();
   SaveGame(false);
   ShowScenarioBrief();
 }
 
 function ContinueGame() {
+  if (!IsDesktopViewportSupported()) return;
   try {
     const stored = localStorage.getItem(saveKey);
     const loaded = stored ? DeserializeState(stored) : null;
@@ -290,6 +394,7 @@ function ContinueGame() {
       ?? AsArray(gameState.hexes)[0]?.id
       ?? null;
     selectedUnitId = gameState.selectedUnitId ?? AsArray(gameState.units)[0]?.id ?? null;
+    pendingWorldActionEffects = [];
     EnterGame();
     if (gameState.gameOver) {
       ShowOutcome();
@@ -304,6 +409,7 @@ function ContinueGame() {
 }
 
 function EnterGame() {
+  if (!IsDesktopViewportSupported() || !gameState) return;
   if (ui.openingScreen) ui.openingScreen.hidden = true;
   if (ui.gameShell) ui.gameShell.hidden = false;
   window.scrollTo(0, 0);
@@ -329,6 +435,7 @@ function SaveGame(showFeedback = false) {
 }
 
 function ScheduleRender() {
+  if (!IsDesktopViewportSupported()) return;
   if (renderHandle) return;
   renderHandle = window.requestAnimationFrame(() => {
     renderHandle = 0;
@@ -337,7 +444,7 @@ function ScheduleRender() {
 }
 
 function RenderAll() {
-  if (!gameState || ui.gameShell?.hidden) return;
+  if (!IsDesktopViewportSupported() || !gameState || ui.gameShell?.hidden) return;
   RenderCommandBar();
   RenderBriefing();
   RenderTimeline();
@@ -378,12 +485,17 @@ function RenderCommandBar() {
 
 function RenderBriefing() {
   const briefing = GetTurnBriefing(gameState) || {};
+  const historyContext = GetHistoryContext();
+  const objective = briefing.objective
+    ?? briefing.mission
+    ?? [briefing.title, briefing.summary].filter(Boolean).join("：")
+    ?? "稳住群众与根据地，完成本回合计划。";
+  const phasePrefix = historyContext.phase
+    ? `【地方阶段 · ${historyContext.phase.title}】`
+    : "";
   SetText(
     "objectiveText",
-    briefing.objective
-      ?? briefing.mission
-      ?? [briefing.title, briefing.summary].filter(Boolean).join("：")
-      ?? "稳住群众与根据地，完成本回合计划。",
+    `${phasePrefix}${objective}`,
   );
   const warningEntries = AsArray(briefing.warnings);
   const warningText = warningEntries.length
@@ -400,7 +512,7 @@ function RenderBriefing() {
   }
   if (ui.mapHint) {
     ui.mapHint.textContent = mapLayer === "situation"
-      ? "单击六角格查看地块；选择我方人员后，可点相邻格规划移动。拖动平移，滚轮或双指缩放。"
+      ? "单击六角格查看地块；选择我方人员后，可点相邻格规划移动。按住鼠标拖动平移，滚轮缩放。"
       : "建设图层：村庄联系、机构、地块改良与工程队列被突出显示。";
   }
   if (ui.mapLegend) {
@@ -411,7 +523,7 @@ function RenderBriefing() {
 function RenderTimeline() {
   if (!ui.timelineList) return;
   const currentTurn = Number(gameState.turn || 1);
-  const items = DefinitionList(historicalTurns);
+  const items = DefinitionList(historicalTurnNarratives);
   const visible = items.filter((item, index) => {
     const turn = Number(item.turn ?? index + 1);
     return Math.abs(turn - currentTurn) <= 2 || turn === 1 || turn === turnLimit;
@@ -428,12 +540,14 @@ function RenderTimeline() {
     const turn = Number(item.turn ?? index + 1);
     const status = turn < currentTurn ? "isPast" : turn === currentTurn ? "isCurrent" : "isFuture";
     const contextClass = index === contextVisibleIndex && turn !== currentTurn ? " isContext" : "";
+    const phase = FindDefinition(localPhaseDefinitions, item.localPhaseId);
+    const timelineTitle = phase ? `${phase.title} · ${item.title}` : item.title;
     return `
       <li class="${status}${contextClass}">
         <time>${EscapeHtml(item.date ?? `第${turn}回合`)}</time>
         <span>
-          <b>${EscapeHtml(item.title ?? item.name ?? "历史阶段")}</b>
-          <small>${EscapeHtml(item.summary ?? "")}</small>
+          <b>${EscapeHtml(timelineTitle ?? item.name ?? "地方历史阶段")}</b>
+          <small>${EscapeHtml(item.historicalFrame ?? item.summary ?? "")}</small>
         </span>
       </li>`;
   }).join("");
@@ -777,6 +891,7 @@ function ExecuteTurn() {
   if (ui.executeButton) ui.executeButton.disabled = true;
   let result;
   const previousState = gameState;
+  const resolvedWorldActionEffects = CaptureWorldActionEffects(previousState);
   try {
     result = ResolveTurn(gameState);
   } catch (error) {
@@ -792,6 +907,7 @@ function ExecuteTurn() {
     return;
   }
   gameState = normalized.state;
+  pendingWorldActionEffects = resolvedWorldActionEffects;
   latestReport = normalized.report ?? BuildTransitionReport(previousState, gameState);
   selectedUnitId = AsArray(gameState.units).find((unit) => unit.id === selectedUnitId)?.id
     ?? AsArray(gameState.units)[0]?.id
@@ -805,6 +921,26 @@ function ExecuteTurn() {
   ShowTurnReport(latestReport);
 }
 
+function CaptureWorldActionEffects(state) {
+  return AsArray(state?.orders)
+    .filter((order) => ["ambush", "sabotage"].includes(order?.actionId))
+    .map((order) => ({
+      id: order.id,
+      actionId: order.actionId,
+      targetHexId: order.targetHexId ?? order.hexId,
+      unitId: order.unitId ?? null,
+    }))
+    .filter((effect) => Boolean(effect.targetHexId));
+}
+
+function PlayPendingWorldActionEffects() {
+  const effects = pendingWorldActionEffects;
+  pendingWorldActionEffects = [];
+  if (!effects.length) return;
+  const activeWorld = EnsureWorld3D();
+  activeWorld?.PlayActionEffects?.(effects);
+}
+
 function BuildTransitionReport(previousState, nextState) {
   const briefing = GetTurnBriefing(previousState) || {};
   const previousLogLength = AsArray(previousState.log).length;
@@ -812,11 +948,17 @@ function BuildTransitionReport(previousState, nextState) {
   const previousCostLength = AsArray(previousState.ledger?.civilianCosts).length;
   const newCosts = AsArray(nextState.ledger?.civilianCosts).slice(previousCostLength);
   const enemyPattern = /敌军|搜索队|巡逻队|扫荡|封锁|据点|铁路修复|占领军|守备/;
+  const playerEffectPattern = /停运铁路继续牵制敌军修复与守备力量/;
   const costPattern = /受创|损失|流离|困苦|生计|伤亡|放弃|短缺/;
-  const enemyEvents = newLogEntries.filter((entry) => enemyPattern.test(String(entry)));
-  const playerEvents = newLogEntries.filter((entry) =>
-    !enemyPattern.test(String(entry)) && !costPattern.test(String(entry))
-  );
+  const enemyEvents = newLogEntries.filter((entry) => {
+    const text = String(entry);
+    return enemyPattern.test(text) && !playerEffectPattern.test(text);
+  });
+  const playerEvents = newLogEntries.filter((entry) => {
+    const text = String(entry);
+    return (!enemyPattern.test(text) || playerEffectPattern.test(text))
+      && !costPattern.test(text);
+  });
   const meterDeltas = [
     ["人民安全", Number(nextState.meters?.people ?? 0) - Number(previousState.meters?.people ?? 0)],
     ["基层网络", Number(nextState.meters?.network ?? 0) - Number(previousState.meters?.network ?? 0)],
@@ -875,11 +1017,15 @@ function RenderReportList(container, entries, emptyMessage) {
 function ContinueAfterReport() {
   CloseModal("reportModal");
   if (gameState?.gameOver || Number(gameState?.turn || 1) > turnLimit) {
+    pendingWorldActionEffects = [];
     ShowOutcome();
   } else {
     const briefing = GetTurnBriefing(gameState) || {};
     ShowToast(briefing.short ?? briefing.objective ?? "进入下一回合", "normal");
-    window.setTimeout(() => ui.mapCanvas?.focus(), 0);
+    window.setTimeout(() => {
+      PlayPendingWorldActionEffects();
+      ui.mapCanvas?.focus();
+    }, 0);
   }
 }
 
@@ -908,7 +1054,7 @@ function ShowOutcome() {
       contribution: "敌后贡献",
       institutions: "建成机构",
       unity: "抗日团结",
-      discipline: "群众纪律",
+      discipline: "群众保护组织度",
       survivingVillages: "存续村庄",
     };
     const componentEvidence = Object.entries(assessment.components ?? {}).map(([key, value]) => ({
@@ -937,16 +1083,110 @@ function ShowOutcome() {
   }, 0);
 }
 
-function ShowHistoryBoundary() {
+function BuildHistoryRoleCards(narrative) {
+  const roles = AsArray(narrative?.event?.roleIds)
+    .map((roleId) => GetHistoryRole(roleId))
+    .filter(Boolean);
+  return roles.map((role) => `
+    <section>
+      <b>${EscapeHtml(role.displayName)} · ${EscapeHtml(role.role)}</b>
+      <p>${EscapeHtml(role.description)}</p>
+      <small>${EscapeHtml(role.classification)}；能力边界：${EscapeHtml(role.agencyLimit)}</small>
+    </section>`).join("");
+}
+
+function BuildResponsibilityChainHtml(narrative) {
+  return AsArray(narrative?.responsibilityChain).map((stage) => `
+    <li>
+      <b>${EscapeHtml(stage.label)}</b>：${EscapeHtml(stage.action)}
+      <small>责任角色：${EscapeHtml(FormatHistoryRoleNames(stage.actorRoleIds))}；若遗漏：${EscapeHtml(stage.consequenceIfMissed)}</small>
+    </li>`).join("");
+}
+
+function BuildHistoricalAnchorCards(narrative) {
+  return AsArray(narrative?.fixedAnchorIds).map((anchorId) => {
+    const anchor = GetFixedHistoricalAnchor(anchorId);
+    if (!anchor) return "";
+    const sources = AsArray(anchor.sourceIds)
+      .map((sourceId) => GetHistorySource(sourceId))
+      .filter(Boolean)
+      .map((source) => `<a href="${EscapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${EscapeHtml(source.title)}</a>`)
+      .join("；");
+    return `
+      <section>
+        <b>${EscapeHtml(anchor.date)} · ${EscapeHtml(anchor.scope)}</b>
+        <p>${EscapeHtml(anchor.statement)}</p>
+        <small>玩法边界：${EscapeHtml(anchor.gameplayConstraint)}</small>
+        ${sources ? `<small>公开来源：${sources}</small>` : ""}
+      </section>`;
+  }).join("");
+}
+
+function ShowHistoryArchive(requestedTurn = Number(gameState?.turn ?? 1)) {
+  const { turn, narrative, phase } = GetHistoryContext(requestedTurn);
+  if (!narrative) {
+    ShowToast("当前回合没有可用的历史档案", "bad");
+    return;
+  }
+  const buttons = [];
+  if (turn > 1) {
+    buttons.push({
+      label: "上一月",
+      className: "secondaryButton",
+      action: () => ShowHistoryArchive(turn - 1),
+    });
+  }
+  if (turn < turnLimit) {
+    buttons.push({
+      label: "下一月",
+      className: "secondaryButton",
+      action: () => ShowHistoryArchive(turn + 1),
+    });
+  }
+  buttons.push({ label: "返回战局", className: "primaryButton", action: CloseTopModal });
+
   OpenStandardModal({
-    eyebrow: "史实边界与表达原则",
-    title: "这是一幅机制合成地图",
+    eyebrow: `${narrative.date} · 第 ${turn} / ${turnLimit} 回合历史档案`,
+    title: `${phase?.title ?? "地方阶段"} · ${narrative.title}`,
     body: `
-      <p>本作把 1941 年 9 月至 1942 年 12 月华北敌后最困难时期压缩为 16 个回合。县域、村名与格网为机制合成，不对应一张真实战役地图；历史阶段、占领政策、封锁与群众处境依据抗战敌后战场的一般史实表达。</p>
-      <p><b>历史终点不可由玩家改写：</b>中国人民经过十四年艰苦抗战，直至 1945 年赢得抗日战争伟大胜利。本局只询问：在最困难时期，能否减少人民代价、保存根据地并完成敌后牵制。</p>
-      <p><b>机制立场：</b>中国共产党领导的抗日根据地，以群众路线、抗日民族统一战线、人民武装和长期组织建设坚持敌后抗战，是全民族抗战的中流砥柱。正面战场、各抗日力量与世界反法西斯力量的牺牲和贡献同样属于这段共同历史。</p>
-      <p class="ethicsNote">平民受难、流离、伤亡与村庄损毁只进入不可逆的战争损失簿，不计分、不转化成资源，也不作为刺激性演出。</p>`,
-    buttons: [{ label: "我已了解", className: "primaryButton", action: CloseTopModal }],
+      <p><b>${EscapeHtml(phase?.classification ?? "地方阶段")}：</b>${EscapeHtml(phase?.description ?? narrative.historicalFrame)}</p>
+      <p class="ethicsNote">这是地方阶段，不是全国抗战重新分期。${EscapeHtml(narrative.historicalFrame)}</p>
+      <h3>${EscapeHtml(narrative.event.classification)}事件 · ${EscapeHtml(narrative.event.title)}</h3>
+      <p>${EscapeHtml(narrative.event.synopsis)}</p>
+      <p><small>${EscapeHtml(narrative.event.disclaimer)}</small></p>
+      <div class="briefColumns">${BuildHistoryRoleCards(narrative)}</div>
+      <h3>发现—准备—保护—应对—恢复责任链</h3>
+      <ol class="tutorialSteps">${BuildResponsibilityChainHtml(narrative)}</ol>
+      <p class="ethicsNote"><b>后果不会被战斗贡献抵消：</b>${EscapeHtml(narrative.failureCarryForward.text)}</p>
+      <h3>固定史实锚点</h3>
+      <div class="briefColumns">${BuildHistoricalAnchorCards(narrative)}</div>
+      <p><small>档案说明：${EscapeHtml(narrative.archiveNote)} 真人只出现在可追溯的档案与来源中，不作为可操作人物或数值奖励。</small></p>`,
+    buttons,
+  });
+}
+
+function ShowHistoryBoundary() {
+  const scoringRules = AsArray(historyBoundary.scoringRules)
+    .map((rule) => `<li>${EscapeHtml(rule)}</li>`)
+    .join("");
+  OpenStandardModal({
+    eyebrow: historyBoundary.classification,
+    title: historyBoundary.title,
+    body: `
+      <p>${EscapeHtml(historyBoundary.geography.mapRule)}</p>
+      <p><b>地方与全国分期：</b>${EscapeHtml(historyBoundary.claims.national)}</p>
+      <p><b>历史终点不可由玩家改写：</b>${EscapeHtml(historyBoundary.claims.fixedVictory)}</p>
+      <p><b>本局责任：</b>${EscapeHtml(historyBoundary.claims.local)}</p>
+      <ol class="tutorialSteps">${scoringRules}</ol>
+      <p class="ethicsNote">${EscapeHtml(historyBoundary.narrativeRules.join(" "))}</p>`,
+    buttons: [
+      {
+        label: gameState ? "查看本回合责任档案" : "查看首月责任档案",
+        className: "secondaryButton",
+        action: () => ShowHistoryArchive(Number(gameState?.turn ?? 1)),
+      },
+      { label: "我已了解", className: "primaryButton", action: CloseTopModal },
+    ],
   });
 }
 
@@ -990,9 +1230,12 @@ function ShowRules() {
       <p>占领军沿县城、铁路和据点补给，先侦察、再封锁、后扫荡。交通站与情报会给出方向预警；群众转移、地道网和山地隐蔽能减轻代价。警戒降低不代表侵略停止。</p>
       <h3>评价</h3>
       <p>坚持到第 ${turnLimit} 回合，依据人民保护、基层网络、根据地建设、战略牵制和战争损失综合评价。龟缩不作贡献，莽攻会摧毁人民安全，两者都不能获得高评价。</p>
-      <h3>键盘与触控</h3>
-      <p>方向键切换相邻格，方括号切换人员，数字键 1—9 选择行动，M 聚焦地图，Ctrl+Enter 结束本回合。地图支持鼠标/单指拖动、滚轮/双指缩放，所有手势都有按钮替代。</p>`,
-    buttons: [{ label: "返回战局", className: "primaryButton", action: CloseTopModal }],
+      <h3>键盘与鼠标</h3>
+      <p>方向键切换相邻格，方括号切换人员，数字键 1—9 选择行动，M 聚焦地图，Ctrl+Enter 结束本回合。地图支持按住鼠标拖动、滚轮缩放，所有操作都有界面按钮替代。</p>`,
+    buttons: [
+      { label: "本回合历史档案", className: "secondaryButton", action: () => ShowHistoryArchive() },
+      { label: "返回战局", className: "primaryButton", action: CloseTopModal },
+    ],
   });
 }
 
@@ -1017,13 +1260,14 @@ function ShowDoctrineTree() {
         ${cards.map((item) => {
           const isOwned = owned.has(item.id);
           const prerequisiteMet = !item.prerequisite || owned.has(item.prerequisite);
-          const locked = !isOwned && (!prerequisiteMet || branchState.experience < Number(item.cost ?? 1));
+          const experienceCost = GetDoctrineExperienceCost(item);
+          const locked = !isOwned && (!prerequisiteMet || branchState.experience < experienceCost);
           return `
             <button type="button" class="doctrineCard${isOwned ? " owned" : ""}"
               data-doctrine-id="${EscapeHtml(item.id)}" ${locked || isOwned ? "disabled" : ""}>
               <b>${EscapeHtml(item.label ?? item.name ?? item.id)}</b>
               <span>${EscapeHtml(item.description ?? item.effect ?? "")}</span>
-              <em>${isOwned ? "已贯彻" : !prerequisiteMet ? "前置路线未完成" : locked ? `需要 ${item.cost ?? 1} 经验` : `贯彻 · ${item.cost ?? 1} 经验`}</em>
+              <em>${isOwned ? "已贯彻" : !prerequisiteMet ? "前置路线未完成" : locked ? `需要 ${experienceCost} 经验` : `贯彻 · ${experienceCost} 经验`}</em>
             </button>`;
         }).join("")}
       </section>`;
@@ -1058,7 +1302,7 @@ function ShowPolicyBoard() {
     eyebrow: "两项政策槽 · 可随回合调整",
     title: "本月根据地方针",
     body: `
-      <p>政策不是无代价加成。每项都改变生产、暴露、群众负担或部队能力；最多同时执行两项。当前群众纪律 <b>${gameState.meters?.discipline ?? 0}</b>，纪律越稳固，扫荡中的群众损失风险越低。</p>
+      <p>政策不是无代价加成。每项都改变生产、暴露、群众负担或部队能力；最多同时执行两项。当前群众保护组织度 <b>${gameState.meters?.discipline ?? 0}</b>。数值越高，预警、隐蔽安置与联络准备越充分，越能减轻侵略军扫荡造成的伤害；侵略暴行责任始终属于实施者。</p>
       <div class="policyGrid">
         ${definitions.map((item) => `
           <button type="button" class="policyCard${active.has(item.id) ? " active" : ""}"
@@ -1068,7 +1312,7 @@ function ShowPolicyBoard() {
             <em>${active.has(item.id) ? "正在执行" : "选择"}</em>
           </button>`).join("")}
       </div>
-      <p class="ethicsNote">纪律、减租减息、生产自救与精兵简政等方针，必须落实为群众负担和根据地韧性的实际变化。</p>`,
+      <p class="ethicsNote">群众保护、减租减息、生产自救与精兵简政等方针，必须落实为群众负担和根据地韧性的实际变化。</p>`,
     buttons: [{ label: "完成调整", className: "primaryButton", action: CloseTopModal }],
   });
   ui.modalBody?.querySelectorAll("[data-policy-id]").forEach((button) => {
@@ -1208,6 +1452,7 @@ function ShowGameMenu() {
 }
 
 function ConfirmRestart() {
+  if (!IsDesktopViewportSupported()) return;
   OpenStandardModal({
     eyebrow: "不可撤销操作",
     title: "放弃当前战局并重新开始？",
@@ -1389,6 +1634,7 @@ function HandleGlobalKeyDown(event) {
     return;
   }
   if (openModalElement) return;
+  if (!IsDesktopViewportSupported() || !gameState || ui.gameShell?.hidden) return;
   const target = event.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
   if (event.key.toLowerCase() === "m") {
@@ -1434,6 +1680,7 @@ function TrapModalFocus(event, modal) {
 }
 
 function HandleMapKeyDown(event) {
+  if (!IsDesktopViewportSupported()) return;
   const directions = {
     ArrowRight: [1, 0],
     ArrowLeft: [-1, 0],
@@ -1507,9 +1754,51 @@ function CenterOnHex(hexId) {
   if (!hex || !ui.mapCanvas) return;
   const world = HexToWorld(hex.q, hex.r);
   const scale = mapCamera.fitScale * mapCamera.zoom;
-  mapCamera.panX = -(world.x - mapCamera.worldCenterX) * scale;
-  mapCamera.panY = -(world.y - mapCamera.worldCenterY) * scale;
+  mapCamera.panX = -(world.x - mapCamera.worldCenterX) * scale * mapCamera.zoom;
+  mapCamera.panY = -(world.y - mapCamera.worldCenterY) * scale * mapCamera.zoom;
   RenderMap();
+}
+
+function EnsureWorld3D() {
+  if (!IsDesktopViewportSupported()) return null;
+  if (world3D || world3DFailed || !ui.mapCanvas) return world3D;
+  try {
+    world3D = CreateEnemyRearWorld3D(ui.mapCanvas, {
+      onSelectHex: (hexId) => SelectHex(hexId),
+    });
+    ui.mapCanvas.dataset.renderer = "three";
+    ui.mapCanvas.dataset.cacheIdentity = World3DCacheIdentity;
+    if (ui.worldModeBadge) {
+      ui.worldModeBadge.textContent = "县境沙盘 · 立体战术图";
+      ui.worldModeBadge.dataset.mode = "three";
+    }
+  } catch (error) {
+    world3DFailed = true;
+    ui.mapCanvas.dataset.renderer = "canvas-fallback";
+    if (ui.worldModeBadge) {
+      ui.worldModeBadge.textContent = "县境地图 · 平面图";
+      ui.worldModeBadge.dataset.mode = "fallback";
+    }
+    console.warn("Three.js world initialization failed; using the accessible Canvas fallback.", error);
+  }
+  return world3D;
+}
+
+function MeasureMapCanvas() {
+  const rect = ui.mapCanvas?.getBoundingClientRect();
+  if (!rect || rect.width < 2 || rect.height < 2) return null;
+  return { width: rect.width, height: rect.height };
+}
+
+function GetReachableHexIds() {
+  if (!selectedUnitId || !gameState) return [];
+  try {
+    return (FindReachableHexes(gameState, selectedUnitId) || []).map((entry) =>
+      typeof entry === "string" ? entry : entry.id ?? entry.hexId
+    ).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 function ResizeCanvas() {
@@ -1578,7 +1867,27 @@ function ScreenToWorld(point) {
 }
 
 function RenderMap() {
-  if (!gameState) return;
+  if (!IsDesktopViewportSupported() || !gameState) return;
+  const canvasMeasure = MeasureMapCanvas();
+  if (!canvasMeasure) return;
+  const { width, height } = canvasMeasure;
+  UpdateMapTransform(width, height);
+  const activeWorld = EnsureWorld3D();
+  if (activeWorld) {
+    activeWorld.SetState(gameState, {
+      selectedHexId,
+      selectedUnitId,
+      mapLayer,
+      reachableHexIds: GetReachableHexIds(),
+      reducedMotion: window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false,
+      camera: { ...mapCamera },
+    });
+    return;
+  }
+  RenderMapCanvasFallback();
+}
+
+function RenderMapCanvasFallback() {
   const canvasState = ResizeCanvas();
   if (!canvasState) return;
   const { context, width, height } = canvasState;
@@ -1891,39 +2200,26 @@ function CanvasPoint(event) {
 }
 
 function HandleMapPointerDown(event) {
-  if (!gameState) return;
+  if (!IsDesktopViewportSupported() || !gameState) return;
+  if (activePointers.size > 0) return;
   ui.mapCanvas.setPointerCapture(event.pointerId);
   const point = CanvasPoint(event);
   activePointers.set(event.pointerId, point);
-  if (activePointers.size === 1) {
-    pointerGesture = {
-      start: point,
-      previous: point,
-      moved: false,
-      panX: mapCamera.panX,
-      panY: mapCamera.panY,
-    };
-  } else if (activePointers.size === 2) {
-    const points = [...activePointers.values()];
-    pointerGesture = {
-      pinchDistance: Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y),
-      zoom: mapCamera.zoom,
-      panX: mapCamera.panX,
-      panY: mapCamera.panY,
-      center: {
-        x: (points[0].x + points[1].x) / 2,
-        y: (points[0].y + points[1].y) / 2,
-      },
-      moved: true,
-    };
-  }
+  pointerGesture = {
+    start: point,
+    previous: point,
+    moved: false,
+    panX: mapCamera.panX,
+    panY: mapCamera.panY,
+  };
 }
 
 function HandleMapPointerMove(event) {
+  if (!IsDesktopViewportSupported()) return;
   if (!activePointers.has(event.pointerId) || !pointerGesture) return;
   const point = CanvasPoint(event);
   activePointers.set(event.pointerId, point);
-  if (activePointers.size === 1 && pointerGesture.previous) {
+  if (pointerGesture.previous) {
     const deltaX = point.x - pointerGesture.previous.x;
     const deltaY = point.y - pointerGesture.previous.y;
     const distance = Math.hypot(point.x - pointerGesture.start.x, point.y - pointerGesture.start.y);
@@ -1934,27 +2230,11 @@ function HandleMapPointerMove(event) {
       RenderMap();
     }
     pointerGesture.previous = point;
-  } else if (activePointers.size === 2 && pointerGesture.pinchDistance) {
-    const points = [...activePointers.values()];
-    const distance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
-    const factor = distance / Math.max(1, pointerGesture.pinchDistance);
-    mapCamera.zoom = Clamp(pointerGesture.zoom * factor, 0.65, 2.25);
-    const center = {
-      x: (points[0].x + points[1].x) / 2,
-      y: (points[0].y + points[1].y) / 2,
-    };
-    const ratio = mapCamera.zoom / Math.max(0.001, pointerGesture.zoom);
-    const startOffsetX = pointerGesture.center.x - mapCamera.centerX;
-    const startOffsetY = pointerGesture.center.y - mapCamera.centerY;
-    const currentOffsetX = center.x - mapCamera.centerX;
-    const currentOffsetY = center.y - mapCamera.centerY;
-    mapCamera.panX = currentOffsetX - (startOffsetX - pointerGesture.panX) * ratio;
-    mapCamera.panY = currentOffsetY - (startOffsetY - pointerGesture.panY) * ratio;
-    RenderMap();
   }
 }
 
 function HandleMapPointerUp(event) {
+  if (!IsDesktopViewportSupported()) return;
   if (!activePointers.has(event.pointerId)) return;
   const point = CanvasPoint(event);
   const shouldSelect = event.type !== "pointercancel"
@@ -1969,20 +2249,20 @@ function HandleMapPointerUp(event) {
     const hex = PickHex(point);
     if (hex) SelectHex(hex.id);
   }
-  if (activePointers.size === 0) {
-    pointerGesture = null;
-  } else {
-    const remaining = [...activePointers.values()][0];
-    pointerGesture = { start: remaining, previous: remaining, moved: true };
-  }
+  pointerGesture = null;
 }
 
 function HandleMapWheel(event) {
+  if (!IsDesktopViewportSupported()) return;
   event.preventDefault();
   ChangeZoom(event.deltaY < 0 ? 1.1 : 0.9, CanvasPoint(event));
 }
 
 function PickHex(screenPoint) {
+  if (world3D) {
+    const pickedHex = world3D.PickHex(screenPoint.x, screenPoint.y);
+    if (pickedHex) return pickedHex;
+  }
   const world = ScreenToWorld(screenPoint);
   const scale = Math.max(0.001, mapCamera.fitScale * mapCamera.zoom);
   const hitRadius = Math.max(mapCamera.hexSize * 0.95, 22 / scale);

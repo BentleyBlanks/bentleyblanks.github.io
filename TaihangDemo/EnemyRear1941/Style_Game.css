@@ -22,14 +22,10 @@
   --greenBright: #91ad8d;
   --threat: #a05a43;
   --shadow: 0 16px 48px rgba(0, 0, 0, .38);
-  --topBarHeight: 88px;
-  --bottomDockHeight: 148px;
-  --leftRailWidth: 320px;
-  --rightRailWidth: 370px;
-  --safeTop: env(safe-area-inset-top, 0px);
-  --safeRight: env(safe-area-inset-right, 0px);
-  --safeBottom: env(safe-area-inset-bottom, 0px);
-  --safeLeft: env(safe-area-inset-left, 0px);
+  --topBarHeight: 78px;
+  --bottomDockHeight: 112px;
+  --leftRailWidth: 220px;
+  --rightRailWidth: 260px;
 }
 
 * {
@@ -68,11 +64,6 @@ input,
 select,
 textarea {
   font: inherit;
-}
-
-button,
-a {
-  -webkit-tap-highlight-color: transparent;
 }
 
 button {
@@ -125,6 +116,68 @@ button:disabled {
 
 .skipLink:focus {
   transform: translateY(0);
+}
+
+.desktopGate {
+  display: none;
+}
+
+.desktopGateCard {
+  width: min(620px, calc(100vw - 48px));
+  padding: 44px 48px;
+  border: 1px solid rgba(214, 182, 110, .62);
+  color: var(--ink);
+  background:
+    linear-gradient(135deg, rgba(46, 51, 42, .98), rgba(20, 24, 19, .99)),
+    var(--panelDeep);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.desktopGateSeal {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 20px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #c55b45;
+  color: #f2ead2;
+  background: #7b3027;
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 20px;
+  letter-spacing: .08em;
+  transform: rotate(-2deg);
+}
+
+.desktopGateEyebrow {
+  margin: 0 0 10px;
+  color: var(--goldBright);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+.desktopGate h1 {
+  margin: 0;
+  color: var(--inkStrong);
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: clamp(34px, 5vw, 54px);
+  letter-spacing: .08em;
+}
+
+.desktopGate p:not(.desktopGateEyebrow) {
+  max-width: 470px;
+  margin: 18px auto 0;
+  color: #d4ccb4;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.desktopGate small {
+  display: block;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 /* Opening archive */
@@ -753,8 +806,8 @@ button:disabled {
   display: grid;
   grid-template-columns: var(--leftRailWidth) minmax(0, 1fr) var(--rightRailWidth);
   grid-template-areas: "left map right";
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 8px;
   overflow: hidden;
   background:
     radial-gradient(circle at 52% 30%, rgba(136, 136, 96, .07), transparent 38rem),
@@ -1006,7 +1059,7 @@ button:disabled {
 .mapHeader {
   position: relative;
   z-index: 5;
-  min-height: 62px;
+  min-height: 60px;
   display: grid;
   grid-template-columns: minmax(220px, .8fr) minmax(240px, 1.25fr) auto;
   align-items: center;
@@ -1062,8 +1115,8 @@ button:disabled {
 }
 
 .legendBase {
-  border: 2px solid #4e735f;
-  background: rgba(63, 105, 83, .18);
+  border: 2px solid #9e332b;
+  background: rgba(158, 51, 43, .18);
 }
 
 .legendRail {
@@ -1105,8 +1158,54 @@ button:disabled {
   width: 100%;
   height: 100%;
   display: block;
-  touch-action: none;
   cursor: grab;
+  background: #99947d;
+  filter: saturate(.98) contrast(1.035) brightness(1.055);
+}
+
+#mapCanvas[data-renderer="three"] {
+  background: #99947d;
+}
+
+.mapAtmosphere {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 52% 42%, transparent 47%, rgba(28, 31, 27, .055) 76%, rgba(20, 22, 19, .16) 100%),
+    linear-gradient(180deg, rgba(222, 217, 191, .025), transparent 32%, rgba(69, 57, 40, .055));
+  box-shadow: inset 0 0 52px rgba(25, 28, 24, .14);
+}
+
+.worldModeBadge {
+  position: absolute;
+  z-index: 7;
+  right: 67px;
+  top: 13px;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border: 1px solid rgba(207, 186, 133, .4);
+  color: #e8dab3;
+  background: rgba(30, 34, 29, .82);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .22);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  pointer-events: none;
+  backdrop-filter: blur(5px);
+}
+
+.worldModeBadge[data-mode="three"]::before {
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  content: "";
+  background: #c64b3d;
+  box-shadow: 0 0 0 3px rgba(198, 75, 61, .16);
 }
 
 #mapCanvas:active {
@@ -1187,7 +1286,7 @@ button:disabled {
 .hexNavigator {
   position: relative;
   z-index: 5;
-  min-height: 46px;
+  min-height: 42px;
   display: flex;
   align-items: stretch;
   gap: 6px;
@@ -2723,16 +2822,38 @@ kbd {
 
 @media (max-width: 1500px) {
   :root {
-    --leftRailWidth: 286px;
-    --rightRailWidth: 340px;
+    --topBarHeight: 68px;
+    --bottomDockHeight: 92px;
+    --leftRailWidth: 180px;
+    --rightRailWidth: 220px;
   }
 
   .warLedger {
-    grid-template-columns: 198px 132px minmax(560px, 1fr) auto;
+    grid-template-columns: 160px 154px minmax(500px, 1fr) auto;
+  }
+
+  .campaignIdentity {
+    gap: 8px;
+    padding: 6px 10px;
   }
 
   .campaignIdentity b {
     font-size: 18px;
+  }
+
+  .campaignClock {
+    padding: 5px 8px;
+  }
+
+  .campaignClock span,
+  .campaignClock small,
+  .resourceEntry span,
+  .utilityButton span {
+    font-size: 11px;
+  }
+
+  .campaignClock b {
+    font-size: 16px;
   }
 
   .campaignIdentity small,
@@ -2740,689 +2861,39 @@ kbd {
     display: none;
   }
 
-  .resourceEntry b {
-    font-size: 16px;
-  }
-
-  .mapHeader {
-    grid-template-columns: minmax(190px, .8fr) minmax(210px, 1.1fr) auto;
-    gap: 10px;
-  }
-
-  .actionList {
-    grid-template-columns: 1fr;
-  }
-
-  .actionCard,
-  #actionList > button {
-    min-height: 72px;
-  }
-
-  .commandActions {
-    grid-template-columns: 94px minmax(130px, 1fr);
-  }
-}
-
-@media (max-width: 1180px) {
-  :root {
-    --leftRailWidth: 250px;
-    --rightRailWidth: 300px;
-  }
-
-  .warLedger {
-    grid-template-columns: 170px 112px minmax(470px, 1fr) auto;
-  }
-
-  .identitySeal {
-    display: none;
-  }
-
-  .campaignIdentity {
-    padding-inline: 10px;
-  }
-
   .resourceEntry {
-    padding-inline: 2px;
-  }
-
-  .resourceEntry span {
-    font-size: 8px;
-  }
-
-  .utilityButton {
-    flex-basis: 44px;
-  }
-
-  .mapHeader {
-    grid-template-columns: 1fr auto;
-  }
-
-  #mapHint {
-    display: none;
-  }
-
-  .selectedStats {
-    grid-template-columns: 1fr;
-  }
-
-  .timelineList li {
-    grid-template-columns: 60px 1fr;
-  }
-
-  .commandActions {
-    grid-template-columns: 1fr;
-    padding: 9px;
-  }
-
-  .clearOrdersButton {
-    min-height: 34px;
-  }
-
-  .executeButton {
-    min-height: 56px;
-  }
-}
-
-/* Tablet and mobile: map first, information becomes a lower drawer */
-
-@media (max-width: 1024px) {
-  :root {
-    --topBarHeight: calc(100px + var(--safeTop));
-    --bottomDockHeight: calc(80px + var(--safeBottom));
-  }
-
-  body.gameActive,
-  body.isGameActive {
-    overflow: auto;
-  }
-
-  body.gameActive.modalOpen,
-  body.isGameActive.modalOpen {
-    overflow: hidden;
-  }
-
-  button,
-  .linkButton {
-    min-height: 44px;
-  }
-
-  .openingScreen {
-    place-items: start center;
-    padding:
-      calc(18px + var(--safeTop))
-      calc(18px + var(--safeRight))
-      calc(18px + var(--safeBottom))
-      calc(18px + var(--safeLeft));
-  }
-
-  .openingFrame {
-    grid-template-columns: 1fr;
-  }
-
-  .openingStatement,
-  .openingBoundary {
-    padding: 34px 28px;
-  }
-
-  .openingLoop {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .gameShell {
-    height: auto;
-    min-height: 100vh;
-    min-height: 100dvh;
-    display: grid;
-    grid-template-rows: auto auto auto;
-    padding-bottom: var(--bottomDockHeight);
-    overflow: visible;
-  }
-
-  .warLedger {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    min-height: 100px;
-    padding-top: var(--safeTop);
-    padding-right: var(--safeRight);
-    padding-left: var(--safeLeft);
-    display: grid;
-    grid-template-columns: 132px 104px minmax(0, 1fr);
-    grid-template-areas:
-      "identity clock utility"
-      "resources resources resources";
-    background: rgba(31, 36, 29, .98);
-  }
-
-  .campaignIdentity {
-    grid-area: identity;
-    min-width: 0;
-    height: 52px;
-    padding: 6px 9px;
-  }
-
-  .campaignIdentity b {
-    font-size: 15px;
-  }
-
-  .campaignIdentity small {
-    display: block;
-    font-size: 7px;
-  }
-
-  .campaignClock {
-    grid-area: clock;
-    height: 52px;
-    padding: 4px 5px;
-  }
-
-  .campaignClock span {
-    font-size: 8px;
-  }
-
-  .campaignClock b {
-    font-size: 11px;
-  }
-
-  .campaignClock small {
-    font-size: 8px;
-  }
-
-  .resourceLedger {
-    grid-area: resources;
-    display: flex;
-    height: 48px;
-    overflow-x: auto;
-    border-top: 1px solid #41453a;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-    overscroll-behavior-x: contain;
-  }
-
-  .resourceLedger::-webkit-scrollbar {
-    display: none;
-  }
-
-  .resourceEntry {
-    flex: 0 0 69px;
-    min-height: 46px;
-    padding: 4px 3px;
-    scroll-snap-align: start;
-  }
-
-  .resourceEntry span {
-    font-size: 7px;
+    padding: 5px 4px 4px;
   }
 
   .resourceEntry b {
-    font-size: 14px;
-  }
-
-  .resourceEntry::after {
-    bottom: 2px;
-  }
-
-  .utilityRail {
-    grid-area: utility;
-    min-width: 0;
-    height: 52px;
-    justify-self: stretch;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
+    font-size: 17px;
   }
 
   .utilityButton {
-    flex: 0 0 44px;
+    flex-basis: 46px;
     min-width: 44px;
-    min-height: 44px;
-    padding: 3px;
-  }
-
-  .utilityButton i {
-    width: 28px;
-    height: 28px;
-  }
-
-  .utilityButton span {
-    display: none;
+    padding: 3px 2px;
   }
 
   .battlefieldGrid {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    padding: 0;
-    overflow: visible;
-  }
-
-  .mapPanel {
-    order: 0;
-    min-height: 0;
-    display: grid;
-    grid-template-rows: auto minmax(390px, 55dvh) auto;
-    border-inline: 0;
-  }
-
-  .mapHeader {
-    min-height: 54px;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
-    padding: 8px calc(10px + var(--safeRight)) 8px calc(10px + var(--safeLeft));
-  }
-
-  .mapHeader h2 {
-    font-size: 14px;
-  }
-
-  .mapLegend {
-    max-width: 118px;
-    gap: 4px 7px;
-  }
-
-  .mapLegend li {
-    font-size: 7px;
-  }
-
-  .mapControls {
-    right: calc(8px + var(--safeRight));
-    top: 8px;
-  }
-
-  .mapControls button {
-    width: 44px;
-    height: 44px;
-  }
-
-  .hexNavigator {
-    min-height: 56px;
-    padding: 6px calc(8px + var(--safeRight)) 6px calc(8px + var(--safeLeft));
-    overscroll-behavior-x: contain;
-  }
-
-  .hexNavButton,
-  #hexNavigator button {
-    min-height: 44px;
-  }
-
-  .informationDrawer {
-    position: relative;
-    z-index: 8;
-    order: 1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin-top: -12px;
-    padding-top: 27px;
-    padding-right: var(--safeRight);
-    padding-left: var(--safeLeft);
-    overflow: hidden;
-    border: 1px solid #65614e;
-    border-bottom: 0;
-    border-radius: 18px 18px 0 0;
-    background: #20251e;
-    box-shadow: 0 -12px 34px rgba(0, 0, 0, .36);
-  }
-
-  .drawerGrip {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 27px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    color: #8c8979;
-    font-size: 8px;
-    letter-spacing: .08em;
-  }
-
-  .drawerGrip i {
-    width: 42px;
-    height: 3px;
-    border-radius: 2px;
-    background: #686452;
-  }
-
-  .leftRail,
-  .rightInspector {
-    max-height: none;
-    overflow: visible;
-    border: 0;
-    box-shadow: none;
-  }
-
-  .leftRail {
-    border-right: 1px solid #494d40;
-  }
-
-  .leftRail::after,
-  .rightInspector::after {
-    display: none;
+    gap: 5px;
+    padding: 5px;
   }
 
   .panelHeader,
   .selectedHeader {
-    padding: 13px;
-  }
-
-  .timelineList li {
-    display: none;
-  }
-
-  .timelineList li:first-child,
-  .timelineList li.isCurrent,
-  .timelineList li.isContext {
-    display: grid;
-  }
-
-  .historyBoundaryNote {
-    display: none;
-  }
-
-  .selectedStats {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .actionList {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .commandDock {
-    position: fixed;
-    left: 0;
-    right: 0;
-    z-index: 45;
-    bottom: 0;
-    width: 100%;
-    height: var(--bottomDockHeight);
-    padding-right: var(--safeRight);
-    padding-bottom: var(--safeBottom);
-    padding-left: var(--safeLeft);
-    display: grid;
-    grid-template-columns: 74px minmax(0, 1fr) 220px;
-    background: rgba(29, 34, 28, .98);
-  }
-
-  .commandBudget {
-    grid-template-columns: 1fr;
-    gap: 2px;
-    padding: 8px;
-    text-align: center;
-  }
-
-  .commandBudget span {
-    font-size: 8px;
-  }
-
-  .commandBudget b {
-    font-size: 15px;
-  }
-
-  .commandBudget i {
-    grid-column: 1;
-    gap: 2px;
-    height: 7px;
-  }
-
-  .orderList {
-    padding: 6px;
-    overscroll-behavior-x: contain;
-  }
-
-  .emptyOrders {
-    padding: 8px;
-  }
-
-  .emptyOrders span {
-    display: none;
-  }
-
-  .orderCard,
-  #orderList > article,
-  #orderList > button {
-    flex-basis: 132px;
-    padding: 8px 32px 8px 8px;
-  }
-
-  .orderItem {
-    flex-basis: 158px;
-    grid-template-columns: 22px minmax(0, 1fr) 44px;
-    gap: 5px;
-    padding: 7px;
-  }
-
-  .orderItem > span {
-    width: 22px;
-    height: 22px;
-  }
-
-  .orderItem button {
-    width: 44px;
-    height: 44px;
-  }
-
-  .removeOrderButton {
-    width: 44px;
-    height: 44px;
-    right: 2px;
-    top: 2px;
-  }
-
-  .commandActions {
-    grid-template-columns: 72px minmax(100px, 1fr);
-    gap: 6px;
-    align-items: center;
-    padding: 6px;
-  }
-
-  .clearOrdersButton {
-    min-height: 44px;
-  }
-
-  .executeButton {
-    min-height: 58px;
-    font-size: 11px;
-  }
-
-  .executeButton kbd {
-    display: none;
-  }
-
-  .reportModal {
-    overflow: auto;
-  }
-
-  .modal {
-    max-width: calc(100vw - var(--safeLeft) - var(--safeRight) - 16px);
-    max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 16px);
-  }
-
-  .toastRegion {
-    top: calc(var(--topBarHeight) + 8px);
-    width: min(410px, calc(100vw - var(--safeLeft) - var(--safeRight) - 24px));
-  }
-
-  .reportColumns {
-    grid-template-columns: 1fr;
-    overflow: visible;
-  }
-
-  .reportColumns > section {
-    min-height: 140px;
-  }
-
-  .reportList {
-    max-height: 240px;
-  }
-
-  .briefColumns {
-    grid-template-columns: 1fr;
-  }
-
-  .ledgerGrid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* 390px portrait reference */
-
-@media (max-width: 640px) {
-  .openingScreen {
-    padding:
-      calc(9px + var(--safeTop))
-      calc(9px + var(--safeRight))
-      calc(9px + var(--safeBottom))
-      calc(9px + var(--safeLeft));
-  }
-
-  .openingScreen::before {
-    inset: 5px;
-  }
-
-  .openingScreen::after {
-    inset: 10px;
-  }
-
-  .openingStatement,
-  .openingBoundary {
-    padding: 29px 20px 25px;
-  }
-
-  .openingEyebrow {
-    font-size: 8px;
-    line-height: 1.55;
-  }
-
-  .openingHeading {
-    gap: 14px;
-    margin: 16px 0 20px;
-  }
-
-  .openingSeal {
-    width: 64px;
-    height: 64px;
-    font-size: 18px;
-  }
-
-  .openingHeading h1 {
-    font-size: clamp(44px, 14vw, 60px);
-  }
-
-  .openingYears {
-    font-size: 19px;
-  }
-
-  .openingLead {
-    font-size: 17px;
-  }
-
-  .openingCopy {
-    font-size: 12px;
-    line-height: 1.75;
-  }
-
-  .openingLoop {
-    gap: 6px;
-    margin: 22px 0;
-  }
-
-  .openingLoop li {
-    min-height: 86px;
-    padding: 12px 8px 9px 34px;
-  }
-
-  .openingLoop li::before {
-    left: 9px;
-    top: 13px;
-  }
-
-  .openingLoop b {
-    font-size: 16px;
-  }
-
-  .openingActions {
-    display: grid;
-  }
-
-  .openingActions button {
-    width: 100%;
-    min-height: 48px;
-  }
-
-  .openingBoundary h2 {
-    font-size: 26px;
-  }
-
-  .warLedger {
-    grid-template-columns: 126px 96px minmax(0, 1fr);
-  }
-
-  .campaignIdentity {
-    padding-inline: 8px;
-  }
-
-  .campaignIdentity b {
-    font-size: 14px;
-  }
-
-  .campaignIdentity small {
-    max-width: 108px;
-  }
-
-  .utilityButton {
-    flex-basis: 44px;
-  }
-
-  .mapPanel {
-    grid-template-rows: 52px minmax(400px, 56dvh) 56px;
-  }
-
-  .mapHeader {
-    grid-template-columns: 1fr;
-    min-height: 52px;
-  }
-
-  .mapHeader .panelEyebrow {
-    display: none;
-  }
-
-  .mapHeader h2 {
-    margin: 0;
-    font-size: 13px;
-  }
-
-  .mapLegend {
-    display: none;
-  }
-
-  .mapMarkNorth {
-    left: 10px;
-    top: 10px;
-  }
-
-  .mapMarkScale {
-    left: 10px;
-    bottom: 8px;
-  }
-
-  .informationDrawer {
-    grid-template-columns: 1fr;
-    margin-top: -14px;
-  }
-
-  .leftRail {
-    border-right: 0;
-    border-bottom: 1px solid #4b4e41;
-  }
-
-  .panelHeader {
-    padding: 11px 13px;
+    padding: 12px 11px 10px;
   }
 
   .panelHeader h2,
   .selectedHeader h2 {
-    font-size: 18px;
+    font-size: 20px;
+  }
+
+  .panelEyebrow,
+  .sectionIndex,
+  .sectionHeading small {
+    font-size: 11px;
   }
 
   .objectiveCard,
@@ -3435,261 +2906,643 @@ kbd {
     margin: 10px;
   }
 
-  .timelineSection {
-    max-height: 142px;
-    overflow: hidden;
+  .objectiveCard {
+    padding: 12px;
+  }
+
+  .objectiveCard p {
+    font-size: 12px;
+    line-height: 1.66;
+  }
+
+  .warningCard {
+    padding: 10px 11px;
+  }
+
+  .warningCard h3 {
+    font-size: 12px;
+  }
+
+  .warningCard p,
+  .historyBoundaryNote p {
+    font-size: 11px;
   }
 
   .timelineList {
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    padding-top: 7px;
   }
 
   .timelineList li {
-    min-height: 66px;
-    grid-template-columns: 56px 1fr;
-    border: 1px solid #484b3f;
-    padding: 8px;
+    grid-template-columns: 58px 1fr;
+    gap: 7px;
+    min-height: 50px;
+    padding: 7px 5px 7px 15px;
   }
 
-  .timelineList li::before {
-    display: none;
+  .timelineList b {
+    font-size: 12px;
   }
 
-  .timelineList li:first-child {
-    display: none;
+  .timelineList time,
+  .timelineList small,
+  .historyBoundaryNote b {
+    font-size: 11px;
   }
 
-  .timelineList li.isCurrent,
-  .timelineList li.isContext {
-    display: grid;
+  .mapHeader {
+    min-height: 54px;
+    grid-template-columns: minmax(225px, .9fr) minmax(230px, 1.15fr) auto;
+    gap: 12px;
+    padding: 8px 12px;
+  }
+
+  .mapHeader h2 {
+    font-size: 18px;
+  }
+
+  #mapHint,
+  .mapLegend,
+  .mapMarkScale,
+  .worldModeBadge,
+  .hexNavigator p,
+  .hexNavButton,
+  #hexNavigator button {
+    font-size: 11px;
+  }
+
+  .hexNavigator {
+    min-height: 40px;
+    padding: 5px 7px;
+  }
+
+  .selectedMeta,
+  .selectedStats dt,
+  .statCard span,
+  .unitTags span,
+  .tagList span {
+    font-size: 11px;
   }
 
   .selectedStats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 5px;
+    gap: 6px;
   }
 
   .selectedStats > div,
   .statCard {
-    padding: 7px 5px;
-    text-align: center;
-  }
-
-  .selectedStats dt,
-  .statCard span {
-    font-size: 7px;
-  }
-
-  .selectedStats dd,
-  .statCard b {
-    font-size: 12px;
+    padding: 8px;
   }
 
   .selectedUnit {
-    grid-template-columns: 44px 1fr;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .selectedUnit p,
+  .unitCard p {
+    font-size: 11px;
+  }
+
+  .actionList {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .actionCard,
   #actionList > button {
-    min-height: 84px;
+    min-height: 76px;
     padding: 9px;
   }
 
-  .tutorialSteps,
-  .doctrineTree,
-  .policyGrid {
-    grid-template-columns: 1fr;
+  .actionCard b,
+  #actionList > button b {
+    font-size: 12px;
   }
 
-  .loopRibbon {
-    justify-content: flex-start;
+  .actionCard span,
+  #actionList > button span {
+    font-size: 11px;
   }
 
-  .resourceBreakdown {
-    grid-template-columns: 1fr auto;
+  .actionCard small,
+  #actionList > button small,
+  .actionCard > em {
+    font-size: 11px;
   }
 
-  .commandDock {
-    grid-template-columns: 54px minmax(0, 1fr) 144px;
+  .unknownNotice,
+  .emptySelection,
+  .selectionWarning span,
+  .statGrid small,
+  .yieldRow > span,
+  .settlementFacts dt,
+  .settlementFacts dd,
+  .constructionQueue span,
+  .constructionQueue small,
+  .unitCard small,
+  .unitCard em,
+  .travelUnitCard {
+    font-size: 11px;
+  }
+
+  .selectionWarning b,
+  .statGrid b,
+  .constructionQueue b,
+  .unitCard b {
+    font-size: 12px;
+  }
+
+  .actionIndex {
+    width: 21px;
+    height: 21px;
+    font-size: 11px !important;
   }
 
   .commandBudget {
-    padding: 4px;
+    padding: 10px 14px;
   }
 
-  .commandBudget span {
-    display: none;
+  .commandBudget span,
+  .emptyOrders span,
+  .orderCard span,
+  .orderCard small,
+  .orderItem small,
+  .clearOrdersButton {
+    font-size: 11px;
+  }
+
+  .emptyOrders b,
+  .orderCard b,
+  .orderItem b {
+    font-size: 12px;
+  }
+
+  .orderList {
+    gap: 7px;
+    padding: 8px;
+  }
+
+  .orderCard,
+  #orderList > article,
+  #orderList > button,
+  .orderItem {
+    align-self: center;
+    height: 66px;
   }
 
   .commandActions {
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 4px;
-    padding: 4px;
+    grid-template-columns: 74px minmax(0, 1fr);
+    gap: 6px;
+    padding: 7px;
   }
 
-  .clearOrdersButton {
+  .clearOrdersButton,
+  .executeButton {
     min-height: 44px;
-    font-size: 0;
-  }
-
-  .clearOrdersButton::after {
-    content: "清空";
-    font-size: 9px;
-  }
-
-  .modal {
-    left: calc(var(--safeLeft) + 8px);
-    right: calc(var(--safeRight) + 8px);
-    width: auto;
-    max-height: calc(100dvh - var(--safeTop) - var(--safeBottom) - 16px);
-    padding: 24px 18px 20px;
-    transform: translateY(-50%);
-  }
-
-  .modal h2 {
-    font-size: 26px;
-  }
-
-  .reportModal {
-    display: block;
-  }
-
-  .reportHeader,
-  .outcomeHeader,
-  .reportFooter {
-    align-items: flex-start;
-  }
-
-  .reportArchive {
-    display: none;
-  }
-
-  .reportFooter {
-    position: sticky;
-    bottom: -20px;
-    display: grid;
-    padding: 12px 0 20px;
-    background: #282c24;
-  }
-
-  .reportFooter .primaryButton {
-    width: 100%;
-  }
-
-  .outcomeHeader {
-    display: grid;
-    grid-template-columns: 72px 1fr;
-    gap: 13px;
-  }
-
-  .outcomeGrade {
-    width: 70px;
-    height: 70px;
-    font-size: 19px;
-  }
-
-  .outcomeEvidence {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .outcomeLedger {
-    grid-template-columns: 1fr;
-  }
-
-  .outcomeFooter {
-    display: grid;
-  }
-
-  .outcomeFooter > * {
-    width: 100%;
-  }
-
-}
-
-@media (max-width: 640px) and (max-height: 700px) {
-  .mapPanel {
-    grid-template-rows:
-      44px
-      minmax(230px, calc(100dvh - var(--safeTop) - var(--safeBottom) - 312px))
-      52px;
-  }
-
-  .mapHeader {
-    min-height: 44px;
-    padding-top: 6px;
-    padding-bottom: 6px;
-  }
-
-  .hexNavigator {
-    min-height: 52px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
-
-  .informationDrawer {
-    margin-top: 0;
   }
 }
 
-@media (max-width: 1024px) and (max-height: 520px) and (orientation: landscape) {
-  .gameShell {
-    padding-bottom: 0;
-  }
+/* Desktop map-priority and readability pass */
 
-  .warLedger {
-    position: relative;
-  }
-
-  .mapPanel {
-    grid-template-rows: 44px minmax(220px, 52dvh) 52px;
-  }
-
-  .informationDrawer {
-    margin-top: 0;
-  }
-
-  .commandDock {
-    position: relative;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    width: auto;
-  }
+.campaignClock {
+  min-width: 154px;
 }
 
-@media (max-height: 700px) and (min-width: 1025px) {
-  :root {
-    --topBarHeight: 74px;
-    --bottomDockHeight: 118px;
+.campaignClock span,
+.campaignClock b,
+.campaignClock small {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.18;
+}
+
+.campaignClock b {
+  color: #f1e3bf;
+  text-wrap: balance;
+}
+
+.leftRail,
+.rightInspector {
+  overscroll-behavior: contain;
+}
+
+.leftRail,
+.rightInspector {
+  color: #d4cbb5;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 4px, rgba(255, 255, 255, .012) 5px),
+    linear-gradient(145deg, rgba(255, 255, 255, .03), transparent 38%),
+    #272c24;
+}
+
+.panelHeader,
+.selectedHeader {
+  border-bottom-color: #676958;
+  background: rgba(0, 0, 0, .14);
+}
+
+.panelEyebrow,
+.sectionIndex,
+.sectionHeading small {
+  color: #c7a763;
+  font-size: 12px;
+}
+
+.openingLoop span,
+.boundaryRule p,
+.modalBody,
+.briefColumns p,
+.tutorialSteps li,
+.ethicsNote,
+.doctrineCard span,
+.policyCard span,
+.resourceBreakdown > p {
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.briefColumns b,
+.doctrineCard b,
+.policyCard b {
+  font-size: 14px;
+}
+
+.loopRibbon span,
+.doctrineCard em,
+.policyCard em,
+.resourceBreakdown > span,
+.ledgerGrid span,
+.ledgerGrid small,
+.menuSummary > span {
+  font-size: 12px;
+}
+
+.objectiveCard p,
+.warningCard p,
+.historyBoundaryNote p,
+.timelineList small,
+.selectedUnit p,
+.unitCard p,
+.unknownNotice,
+.emptySelection,
+.selectionWarning span,
+.travelUnitCard {
+  color: #c5bdab;
+  font-size: 13px;
+  line-height: 1.62;
+}
+
+.objectiveCard p {
+  color: #e0d6bd;
+}
+
+.warningCard p {
+  color: #d7c3b4;
+}
+
+.timelineList {
+  color: #c0b8a4;
+}
+
+.timelineList time {
+  color: #c9b27c;
+}
+
+.timelineList b {
+  color: #e2d7bc;
+}
+
+.timelineList small {
+  color: #bdb5a2;
+}
+
+.historyBoundaryNote {
+  color: #beb6a3;
+  background: rgba(0, 0, 0, .15);
+}
+
+.warningCard h3,
+.historyBoundaryNote b,
+.timelineList b,
+.selectedUnit b,
+.unitCard b,
+.selectionWarning b {
+  font-size: 13px;
+}
+
+.timelineList time,
+.sectionHeading em,
+.selectedMeta,
+.selectedStats dt,
+.statCard span,
+.unitTags span,
+.tagList span {
+  font-size: 12px;
+}
+
+.selectedMeta {
+  color: #d3c39b;
+}
+
+.selectedStats dt,
+.statCard span {
+  color: #bbb5a2;
+}
+
+.selectedStats dd,
+.statCard b {
+  color: #f0e5c9;
+}
+
+.selectedUnit p,
+.unitCard p {
+  color: #d0c7b2;
+}
+
+.unitTags span,
+.tagList span {
+  color: #cabfa6;
+  border-color: #666857;
+}
+
+.mapHeader .panelEyebrow,
+#mapHint,
+.mapLegend,
+.mapMarkScale,
+.worldModeBadge,
+.hexNavigator p,
+.hexNavButton,
+#hexNavigator button {
+  font-size: 12px;
+}
+
+#mapHint {
+  color: #454332;
+  line-height: 1.55;
+}
+
+.mapLegend {
+  color: #3e3d2f;
+}
+
+.actionList {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.actionCard,
+#actionList > button {
+  min-height: 96px;
+  padding: 11px;
+}
+
+.actionCard b,
+#actionList > button b {
+  color: #eee4cb;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.actionCard span,
+#actionList > button span {
+  color: #c7bfac;
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.actionCard small,
+#actionList > button small,
+.actionCard > em {
+  color: #d4ac61;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.actionCard.isRecommended::after {
+  font-size: 11px;
+}
+
+.statGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.statGrid small,
+.yieldRow > span,
+.settlementFacts dt,
+.settlementFacts dd,
+.constructionQueue span,
+.constructionQueue small,
+.unitCard small,
+.unitCard em {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.statGrid small,
+.settlementFacts dt,
+.constructionQueue span,
+.constructionQueue small,
+.unitCard small {
+  color: #bdb5a1;
+}
+
+.yieldRow > span,
+.settlementFacts dd,
+.unitCard em {
+  color: #d1c6ae;
+}
+
+.statGrid b,
+.constructionQueue b {
+  font-size: 13px;
+}
+
+.reportModal {
+  width: min(1180px, calc(100vw - 44px));
+  max-height: calc(100dvh - 36px);
+  grid-template-rows: auto auto auto auto;
+  padding: 22px 24px;
+  overflow: auto;
+}
+
+.reportSummary {
+  padding: 9px 0 10px;
+  color: #d0c7b3;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.reportColumns {
+  align-items: start;
+  gap: 10px;
+  overflow: visible;
+}
+
+.reportColumns > section {
+  align-self: start;
+  padding: 12px;
+  background: rgba(0, 0, 0, .13);
+}
+
+.reportColumns h3 {
+  margin-bottom: 8px;
+  color: #e4d8bc;
+  font-size: 14px;
+}
+
+.reportList {
+  max-height: min(42vh, 360px);
+  gap: 5px;
+}
+
+.reportItem,
+.reportList > article,
+.reportList > p,
+.reportList > div {
+  padding: 10px;
+  color: #cec5b2;
+  background: rgba(0, 0, 0, .16);
+  font-size: 13px;
+  line-height: 1.68;
+}
+
+.costReportList > *,
+.reportItem.isCost {
+  color: #d2b7a6;
+}
+
+.reportItem b,
+.reportList > article b,
+.reportList > div b {
+  margin-bottom: 4px;
+  color: #f0e3c4;
+  font-size: 14px;
+}
+
+.reportEntry > span {
+  color: #dbab7b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.reportFooter {
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.reportFooter p {
+  color: #c7bdab;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.commandDock {
+  border-top-color: #81775e;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .04), transparent 34%),
+    #242a22;
+}
+
+.commandActions {
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 6px;
+  padding: 7px;
+}
+
+.commandBudget span {
+  color: #cbc2ac;
+  font-size: 13px;
+}
+
+.commandBudget b {
+  color: #f0e2c1;
+}
+
+.emptyOrders {
+  border-color: #626555;
+  color: #c5bdab;
+  background: rgba(0, 0, 0, .1);
+}
+
+.emptyOrders b {
+  color: #e8dcc0;
+  font-size: 14px;
+}
+
+.emptyOrders span {
+  color: #c5bdab;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.orderItem {
+  border-color: #696b59;
+  color: #d1c7b0;
+  background: #30362c;
+}
+
+.orderItem b {
+  color: #eee1c3;
+  font-size: 14px;
+}
+
+.orderItem small {
+  color: #bfb6a2;
+  font-size: 12px;
+}
+
+.clearOrdersButton {
+  color: #d1c7b0;
+  border-color: #6b6d5b;
+  background: #30362c;
+  font-size: 13px;
+}
+
+.executeButton {
+  font-size: 14px;
+}
+
+.toastRegion {
+  left: 8px;
+  top: calc(var(--topBarHeight) + 8px);
+  width: calc(var(--leftRailWidth) - 8px);
+  transform: none;
+}
+
+.toast {
+  padding: 10px 11px;
+  color: #f0e5cb;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* PC-only viewport gate. Game rendering is started only at or above this contract. */
+
+@media (max-width: 1279px), (max-height: 719px) {
+  html,
+  body {
+    min-width: 0;
+    overflow: hidden !important;
   }
 
-  .warLedger {
-    grid-template-columns: 190px 130px minmax(540px, 1fr) auto;
+  body > :not(.desktopGate):not(script) {
+    display: none !important;
   }
 
-  .identitySeal {
-    width: 38px;
-    height: 38px;
-  }
-
-  .campaignIdentity b {
-    font-size: 17px;
-  }
-
-  .panelHeader,
-  .selectedHeader {
-    padding-block: 11px;
-  }
-
-  .objectiveCard,
-  .warningCard,
-  .timelineSection,
-  .historyBoundaryNote,
-  .selectedStats,
-  .selectedUnit,
-  .actionSection {
-    margin-block: 8px;
+  .desktopGate {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    padding: 24px;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(102, 130, 106, .15), transparent 38rem),
+      linear-gradient(145deg, #171c16, #0d100d 75%);
   }
 }
 
@@ -3702,6 +3555,7 @@ kbd {
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+
 }
 
 @media (prefers-contrast: more) {
