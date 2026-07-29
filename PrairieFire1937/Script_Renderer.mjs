@@ -1116,7 +1116,48 @@ export function CreateRenderer(canvas, options = {}) {
       }
     }
 
+    WeldCoincidentNormals(collector);
     return FinalizeGeometry(collector, { computeNormals: false });
+  }
+
+  /**
+   * 法线焊接后处理：位置已按共享角/边数学精确焊死（实测 4551 对共位点高度差为 0），
+   * 但解析法线是各格用自己的高度函数做前向差分——跨边两侧坡度定义不同，
+   * 夹角均值 25.6°、最大 110°，近景每条格边都是一道明暗硬边。
+   * 对连续曲面的正确做法是把共位顶点的法线求平均：一次 O(n) 哈希循环，必然连续。
+   * 顶面顶点 facets[0]=1、裙壁=0，凭这一位区分——裙壁的外向法线不参与平均，
+   * 否则边缘顶点会被拉去"半朝外"。
+   */
+  function WeldCoincidentNormals(collector) {
+    const buckets = new Map();
+    const vertexCount = collector.positions.length / 3;
+    for (let index = 0; index < vertexCount; index += 1) {
+      if (collector.facets[index * 3] < 0.5) continue; // 只焊顶面
+      const x = collector.positions[index * 3];
+      const z = collector.positions[index * 3 + 2];
+      const bucketKey = `${Math.round(x * 400)}|${Math.round(z * 400)}`;
+      let bucket = buckets.get(bucketKey);
+      if (!bucket) {
+        bucket = { nx: 0, ny: 0, nz: 0, members: [] };
+        buckets.set(bucketKey, bucket);
+      }
+      bucket.nx += collector.normals[index * 3];
+      bucket.ny += collector.normals[index * 3 + 1];
+      bucket.nz += collector.normals[index * 3 + 2];
+      bucket.members.push(index);
+    }
+    for (const bucket of buckets.values()) {
+      if (bucket.members.length < 2) continue;
+      const length = Math.hypot(bucket.nx, bucket.ny, bucket.nz) || 1;
+      const nx = bucket.nx / length;
+      const ny = bucket.ny / length;
+      const nz = bucket.nz / length;
+      for (const index of bucket.members) {
+        collector.normals[index * 3] = nx;
+        collector.normals[index * 3 + 1] = ny;
+        collector.normals[index * 3 + 2] = nz;
+      }
+    }
   }
 
   /** Data_Terrain 迟到时，只重写顶点色属性，不动几何结构。 */

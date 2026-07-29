@@ -46,7 +46,14 @@ Build / Harvest / Wind / Snow / Turn / Unlock / Bad / Good` + `.mp3`
 - 游戏会在图上自动压一层暗角保持档案质感；**不要生成血腥画面**（项目红线）。
 
 
-## 四、许可（必须做）
+## 四、启用开关
+
+默认状态下游戏**不发任何资产探测请求**（保证控制台零 404）。
+投放文件并提交后，访问时在地址栏加 `?assets=1` 即启用加载：
+`https://bentleyblanks.github.io/PrairieFire1937/?assets=1`
+确认无误后告诉我，我把开关改为默认开启。
+
+## 五、许可（必须做）
 
 在本目录建 `CREDITS.md`，逐条记下每个文件的**来源链接与许可证**
 （CC0/Pixabay License 可直接用；CC-BY 需在游戏"说明"页署名——写清楚署名文本，

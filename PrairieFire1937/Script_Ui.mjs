@@ -3980,9 +3980,17 @@ export function CreateUi(root, hooks = {}) {
     if (!file || !canvas || typeof Image === "undefined" || typeof fetch === "undefined") return;
     // 与音频同一套哨兵约定：Assets/CREDITS.md 不存在即视为未投放，零探测零 404。
     if (illustrationSentinel === null) {
-      illustrationSentinel = fetch(assetBase + "CREDITS.md", { method: "HEAD", cache: "force-cache" })
-        .then((response) => Boolean(response && response.ok))
-        .catch(() => false);
+      let enabled = false;
+      try {
+        enabled = typeof location !== "undefined" && /[?&#]assets=1\b/.test(location.search + location.hash);
+      } catch (error) {
+        enabled = false;
+      }
+      illustrationSentinel = enabled
+        ? fetch(assetBase + "CREDITS.md", { method: "HEAD", cache: "force-cache" })
+            .then((response) => Boolean(response && response.ok))
+            .catch(() => false)
+        : Promise.resolve(false);
     }
     illustrationSentinel.then((present) => {
       if (present) LoadIllustrationImage(canvas, file);

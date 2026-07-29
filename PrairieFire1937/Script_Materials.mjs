@@ -166,7 +166,7 @@ const eraGrade = Object.freeze({
     // 0.80 的饱和叠上 1.42 倍雾密度时，实测整帧饱和度从 0.435 掉到 0.199，
     // 九种地形糊成一片灰绿，战役后 2/3 时间里地形色编码完全失效。
     sunScale: 0.84, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.05,
-    saturation: 1.15, contrast: 1.08, vignette: 0.24, grain: 0.015, bloomThreshold: 0.80, bloomStrength: 0.28,
+    saturation: 1.32, contrast: 1.06, vignette: 0.24, grain: 0.015, bloomThreshold: 0.80, bloomStrength: 0.28,
     shadowTint: 0x2e3134, highlightTint: 0xd7dde2, lift: 0.018,
   },
   Recovery: {
@@ -772,8 +772,11 @@ void main() {
     // 整屏只采样约 0.25 个胞，Fbm 退化为常数，云堤只是均匀压暗、毫无云形。
     vec2 bankUv = vec2( azimuth * 6.5 + uTime * uCloudSpeed * 0.32, up * 20.0 );
     float bankShape = CloudBand( bankUv, 1.15, vec2( uTime * uCloudSpeed * 0.5, 0.0 ), 3 );
-    vec3 bankColor = mix( uCloudColor * 0.52, uHorizon * 0.66, 0.30 );
-    sky = mix( sky, bankColor, bank * bankShape * uCloudOpacity * 1.05 );
+    // 第七轮实测：云形色与该区天穹底色亮度几乎相等（ΔL≈2%），ACES 再压一道后不可见。
+    // 先把云堤区基色抬亮，再用压暗 ≥35% 的云形刻进去，把 ΔL 一次拉开。
+    vec3 bankBase = mix( sky, uHorizon * 1.12, bank * 0.6 );
+    vec3 bankCloud = mix( uCloudColor * 0.38, uHorizon * 0.52, 0.25 );
+    sky = mix( bankBase, bankCloud, bank * bankShape * uCloudOpacity * 1.15 );
   }
 
   gl_FragColor = vec4( max( sky * uExposure, vec3( 0.0 ) ), 1.0 );
