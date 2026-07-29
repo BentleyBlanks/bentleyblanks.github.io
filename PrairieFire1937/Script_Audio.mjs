@@ -14,6 +14,7 @@
 // 时期与织体：开辟期竹笛感长音 + 疏朗动机、留白多；发展期加拨弦短音型、节奏渐紧；
 // 困难期低沉长音 + 小二度不谐和 + 大量留白；恢复期回暖并加入劳作般的规律律动；反攻期加厚低音与推进感。
 import { CreateRng } from "./Script_Hex.mjs";
+import { assetBase, bgmAssets, sfxAssets } from "./Data_Assets.mjs";
 
 // ---------------------------------------------------------------------------
 // 五声音阶与调式
@@ -522,6 +523,12 @@ export function CreateAudio(options = {}) {
   let ctx = null;
   let ready = false;
   let disposed = false;
+  // 外部资产通道：Assets/ 下若有整轨 BGM 或音效文件则优先使用，缺失即回退合成。
+  // 加载是异步且尽力而为的——任何 fetch/decode 失败都只意味着"继续用合成方案"。
+  const externalBgm = {};
+  const externalSfx = {};
+  let externalMusic = null; // { source, gain, eraKey }
+  let externalLoadStarted = false;
   let masterGain = null;
   let musicGain = null;
   let musicFilter = null;
@@ -776,6 +783,10 @@ export function CreateAudio(options = {}) {
 
   /** 前瞻调度：一次性把未来 lookahead 秒内的音符全部排进 WebAudio 的时钟。 */
   function AdvanceScheduler() {
+    if (externalMusic) {
+      nextStepTime = Math.max(nextStepTime, CurrentTime() + 0.2);
+      return;
+    }
     const horizon = CurrentTime() + lookahead;
     let guard = 0;
     while (nextStepTime < horizon && guard < 96) {
@@ -859,6 +870,112 @@ export function CreateAudio(options = {}) {
     }
   }
 
+  // ---------------------------------------------------------------------
+  // 外部资产通道（可选整轨 BGM / 逐条音效替换）
+  // ---------------------------------------------------------------------
+
+  /** 淡入外部整轨；已有外部轨则交叉淡出旧轨。返回是否成功启动。 */
+  function StartExternalBgm(nextKey) {
+    const buffer = externalBgm[nextKey];
+    if (!buffer || !ctx || !musicGain) return false;
+    const now = CurrentTime();
+    const fade = 1.6;
+    if (externalMusic) {
+      const old = externalMusic;
+      Safe(function FadeOldOut() {
+        old.gain.gain.cancelScheduledValues(now);
+        old.gain.gain.setValueAtTime(old.gain.gain.value, now);
+        old.gain.gain.linearRampToValueAtTime(0, now + fade);
+        old.source.stop(now + fade + 0.08);
+      });
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    source.connect(gain);
+    gain.connect(musicGain);
+    Safe(function StartTrack() { source.start(now + 0.02); });
+    gain.gain.linearRampToValueAtTime(1, now + fade);
+    externalMusic = { source, gain, eraKey: nextKey };
+    return true;
+  }
+
+  /** 淡出外部整轨并交还生成式音乐。 */
+  function StopExternalBgm() {
+    if (!externalMusic || !ctx) {
+      externalMusic = null;
+      return;
+    }
+    const old = externalMusic;
+    externalMusic = null;
+    const now = CurrentTime();
+    Safe(function FadeOut() {
+      old.gain.gain.cancelScheduledValues(now);
+      old.gain.gain.setValueAtTime(old.gain.gain.value, now);
+      old.gain.gain.linearRampToValueAtTime(0, now + 1.2);
+      old.source.stop(now + 1.3);
+    });
+    // 生成式调度指针拉回当前，避免恢复瞬间倾泻积压音符
+    nextStepTime = CurrentTime() + 0.2;
+    StartPhrase();
+  }
+
+  /** 尽力而为地加载 Assets/ 下的整轨与音效。任何失败都静默回退合成方案。 */
+  async function LoadExternalAssets() {
+    if (externalLoadStarted || typeof fetch === "undefined" || !ctx) return;
+    externalLoadStarted = true;
+    async function TryLoad(url) {
+      try {
+        const response = await fetch(url, { cache: "force-cache" });
+        if (!response || !response.ok) return null;
+        const type = String(response.headers.get("content-type") || "");
+        // GitHub Pages 的 404 页是 text/html——绝不能把它塞给解码器
+        if (type.includes("text/html")) return null;
+        const data = await response.arrayBuffer();
+        if (!data || data.byteLength < 512) return null;
+        return await ctx.decodeAudioData(data);
+      } catch (error) {
+        return null;
+      }
+    }
+    for (const [era, file] of Object.entries(bgmAssets)) {
+      if (disposed) return;
+      const buffer = await TryLoad(assetBase + file);
+      if (buffer && !disposed) {
+        externalBgm[era] = buffer;
+        // 当前时期的整轨一到位就无缝接管
+        if (ready && era === eraKey && (!externalMusic || externalMusic.eraKey !== era)) {
+          Safe(function TakeOver() { StartExternalBgm(era); });
+        }
+      }
+    }
+    for (const [name, file] of Object.entries(sfxAssets)) {
+      if (disposed) return;
+      const buffer = await TryLoad(assetBase + file);
+      if (buffer && !disposed) externalSfx[name] = buffer;
+    }
+  }
+
+  /** 用外部音效缓冲播放一条（沿用既有的声部计数与节流总线）。 */
+  function PlayExternalSfx(name, params) {
+    const definition = sfxDefinitions[name];
+    const buffer = externalSfx[name];
+    if (!definition || !buffer) return;
+    const rate = Clamp(Number(params.rate) || 1, 0.5, 2);
+    const bus = TakeVoice(name, definition.gain * Clamp01(params.gain === undefined ? 1 : params.gain));
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = rate;
+    source.connect(bus);
+    source.start(CurrentTime() + 0.004);
+    source.onended = function HandleEnded() {
+      ReleaseVoice(name, bus);
+    };
+    ReleaseVoiceLater(name, bus, (buffer.duration / rate) * 1000 + 600);
+  }
+
   return {
     /** 必须在用户手势里调用。返回 Promise<boolean>，永不 reject。 */
     async Start() {
@@ -881,6 +998,7 @@ export function CreateAudio(options = {}) {
         ready = true;
         ApplyGains(1.5);
         await PrerenderAll();
+        Safe(function KickExternal() { LoadExternalAssets(); });
         return true;
       } catch (error) {
         Safe(() => { ctx.close(); });
@@ -904,7 +1022,8 @@ export function CreateAudio(options = {}) {
       lastPlayed[name] = now;
       const resolved = params && typeof params === "object" ? params : {};
       Safe(function PlayOne() {
-        if (buffers[name]) PlayBuffer(name, resolved);
+        if (externalSfx[name]) PlayExternalSfx(name, resolved);
+        else if (buffers[name]) PlayBuffer(name, resolved);
         else RenderRealtime(name, resolved);
       });
     },
@@ -917,6 +1036,14 @@ export function CreateAudio(options = {}) {
         profile = eraMusicProfiles[eraKey];
         return;
       }
+      if (externalBgm[nextEraKey]) {
+        eraKey = nextEraKey;
+        profile = eraMusicProfiles[eraKey];
+        pendingEraKey = null;
+        Safe(function CrossToExternal() { StartExternalBgm(nextEraKey); });
+        return;
+      }
+      if (externalMusic) Safe(StopExternalBgm);
       pendingEraKey = nextEraKey;
     },
 
@@ -988,6 +1115,8 @@ export function CreateAudio(options = {}) {
         Safe(() => { clearTimeout(timer); });
       }
       Safe(() => { musicLfo.stop(); });
+      if (externalMusic) Safe(() => { externalMusic.source.stop(); });
+      externalMusic = null;
       for (const name of Object.keys(buffers)) delete buffers[name];
       Safe(() => { ctx.close(); });
       ctx = null;

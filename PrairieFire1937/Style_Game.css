@@ -2880,7 +2880,7 @@
   pointer-events: none;
 }
 
-.pf-busy.is-open { display: flex; pointer-events: auto; }
+.pf-busy.is-open { display: flex; pointer-events: none; }
 
 /* 事件卡打开时把"推演中"沉到底部，避免和插图、日期 chip 抢同一片区域 */
 .pf-ui.has-cinema .pf-busy {
@@ -3031,6 +3031,87 @@
 /* --------------------------------------------------------------------------
    21. 无障碍与偏好
    -------------------------------------------------------------------------- */
+
+
+/* --------------------------------------------------------------------------
+   单位牌：悬浮在部队头顶的兵种标识（辨识度主承担者）
+   -------------------------------------------------------------------------- */
+
+.pf-unitlayer { position: absolute; inset: 0; z-index: 18; pointer-events: none; }
+
+.pf-plate {
+  position: absolute;
+  top: 0; left: 0;
+  width: 27px;
+  padding: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1.5px solid rgba(232, 220, 192, 0.85);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #8c2f24, #6e241c);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  color: #f4ead2;
+  will-change: transform;
+}
+.pf-plate::after {
+  /* 指向部队的小三角 */
+  content: "";
+  position: absolute;
+  left: 50%; bottom: -6px;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(232, 220, 192, 0.85);
+  border-bottom: 0;
+}
+.pf-plate-glyph {
+  display: block;
+  font-family: var(--pf-font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 21px;
+  text-align: center;
+}
+.pf-plate-bar {
+  display: block;
+  height: 3.5px;
+  margin: 0 2px 2px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.pf-plate-fill { display: block; height: 100%; background: #8fbf72; }
+.pf-plate.is-mid .pf-plate-fill { background: var(--pf-ochre); }
+.pf-plate.is-low .pf-plate-fill { background: var(--pf-crimson-soft); }
+
+.pf-plate.is-enemy {
+  background: linear-gradient(180deg, #7a6a34, #5c4f26);
+  border-color: rgba(20, 18, 14, 0.9);
+  color: #f0e6c8;
+}
+.pf-plate.is-enemy::after { border-top-color: rgba(20, 18, 14, 0.9); }
+
+.pf-plate.is-hidden-unit { border-style: dashed; opacity: 0.92; }
+.pf-plate-mark {
+  position: absolute;
+  top: -7px; right: -7px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #2f4a56;
+  border: 1px solid rgba(232, 220, 192, 0.7);
+  font-size: 9px;
+  line-height: 12px;
+  text-align: center;
+  color: #cfe4ec;
+}
+.pf-plate-mark:empty { display: none; }
+
+.pf-plate.is-acted { filter: saturate(0.45) brightness(0.8); }
+.pf-plate.is-selected {
+  border-color: var(--pf-ochre-glow);
+  box-shadow: 0 0 0 2px rgba(240, 210, 122, 0.65), 0 2px 6px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+.pf-plate:hover { filter: brightness(1.12); }
 
 /* --------------------------------------------------------------------------
    仅支持桌面端：移动端与平板断点已整体移除。

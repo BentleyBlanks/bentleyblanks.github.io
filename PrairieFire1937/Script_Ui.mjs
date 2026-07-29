@@ -27,6 +27,7 @@ import {
   Clamp,
   ValueNoise2D,
 } from "./Script_Hex.mjs";
+import { assetBase, illustrationAssets } from "./Data_Assets.mjs";
 
 // ---------------------------------------------------------------------------
 // 静态描述表（纯数据，无副作用）
@@ -574,6 +575,10 @@ export function CreateUi(root, hooks = {}) {
     BuildSweepBanner();
     BuildMinimap();
     // 通知流与底部面板同处左下角，放进同一个 flex 列里，从结构上杜绝互相压盖。
+    // 单位牌层：悬浮在部队头顶的兵种牌（辨识度的主承担者），逐帧由主循环投影定位。
+    dom.unitLayer = El("div", "pf-unitlayer", { parent: dom.hud, attrs: { "aria-hidden": "true" } });
+    dom.unitLayer.style.pointerEvents = "none";
+
     dom.leftDock = El("div", "pf-leftdock", { parent: dom.hud });
     BuildNotifyStream();
     BuildContextPanel();
@@ -591,6 +596,9 @@ export function CreateUi(root, hooks = {}) {
     dom.modalLayer = El("div", "pf-modal-layer", { parent: root, attrs: { "aria-hidden": "true" } });
     dom.tooltip = El("div", "pf-tooltip", { parent: root, attrs: { role: "tooltip", "aria-hidden": "true" } });
     dom.busy = El("div", "pf-busy", { parent: root, attrs: { "aria-hidden": "true" } });
+    // 内联三保险：这个指示层曾以 z-index 85 + pointer-events:auto 盖住事件卡，
+    // 玩家看着"推演中…"却点不了任何选项，整局永久卡死。指示器只许看不许摸。
+    dom.busy.style.pointerEvents = "none";
     const busyCard = El("div", "pf-busy-card", { parent: dom.busy });
     El("div", "pf-busy-spin", { parent: busyCard });
     dom.busyText = El("div", "pf-busy-text", { text: "推演中…", parent: busyCard });
@@ -3524,6 +3532,9 @@ export function CreateUi(root, hooks = {}) {
         MotifFor(illustration.kind || payload.motif),
         illustration.tone || payload.tone || "cold"
       );
+      // 可选外部插画：Assets/ 下若有该 kind 的图片则覆盖程序化插画（同一画布再压
+      // 一层暗角与颗粒保持档案质感）。加载失败静默保留程序化版本。
+      TryExternalIllustration(canvas, illustration.kind || payload.motif);
       El("figcaption", "pf-cinema-caption", {
         text: payload.dateline || payload.dateLabel || FormatTurnDate((currentState && currentState.turn) || 0).label,
         parent: figure,
@@ -3958,8 +3969,122 @@ export function CreateUi(root, hooks = {}) {
   if (!definitions.loaded) EnsureDefinitions();
   SetHint("点选地块查看详情；选中队伍后在底部选择行动。空格结束回合。");
 
+  /**
+   * 可选外部插画：存在即用、失败即弃。图片铺满画布后再压一层暗角 + 颗粒，
+   * 与程序化档案照片保持同一质感体系。
+   */
+  function TryExternalIllustration(canvas, kind) {
+    const file = kind ? illustrationAssets[kind] : null;
+    if (!file || !canvas || typeof Image === "undefined") return;
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      try {
+        const context = canvas.getContext("2d");
+        if (!context || !canvas.isConnected) return;
+        const scale = Math.max(canvas.width / image.width, canvas.height / image.height);
+        const drawWidth = image.width * scale;
+        const drawHeight = image.height * scale;
+        context.drawImage(image, (canvas.width - drawWidth) / 2, (canvas.height - drawHeight) / 2, drawWidth, drawHeight);
+        const vignette = context.createRadialGradient(
+          canvas.width / 2, canvas.height / 2, canvas.height * 0.32,
+          canvas.width / 2, canvas.height / 2, canvas.height * 0.85,
+        );
+        vignette.addColorStop(0, "rgba(10,9,8,0)");
+        vignette.addColorStop(1, "rgba(10,9,8,0.55)");
+        context.fillStyle = vignette;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+      } catch (error) {
+        // 保留程序化插画
+      }
+    };
+    image.src = assetBase + file;
+  }
+
+  // ---------------------------------------------------------------------
+  // 单位牌：屏幕空间的兵种标识（对标文明VI的单位旗standard）
+  // ---------------------------------------------------------------------
+  const unitPlates = new Map();
+
+  function UnitGlyph(type, side) {
+    const named = definitions.units?.unitDefinitions?.[type]?.name;
+    if (named && named.length) return named[0];
+    return side === "Enemy" ? "敌" : "队";
+  }
+
+  function AcquirePlate(id) {
+    let plate = unitPlates.get(id);
+    if (plate) return plate;
+    const rootNode = El("button", "pf-plate", { parent: dom.unitLayer, attrs: { type: "button" } });
+    const glyph = El("span", "pf-plate-glyph", { parent: rootNode });
+    const bar = El("span", "pf-plate-bar", { parent: rootNode });
+    const fill = El("i", "pf-plate-fill", { parent: bar });
+    const mark = El("span", "pf-plate-mark", { parent: rootNode });
+    plate = { rootNode, glyph, fill, mark, unitId: id };
+    On(rootNode, "click", (event) => {
+      event.stopPropagation();
+      Call("OnPickUnit", plate.unitId);
+    });
+    unitPlates.set(id, plate);
+    return plate;
+  }
+
+  /**
+   * 逐帧同步单位牌。project(key) 由主循环传入（世界坐标 → 屏幕坐标），
+   * 数量级 ≤ 三十来个，直接更新 DOM transform，不做虚拟化。
+   */
+  function SyncUnitPlates(state, viewState, project) {
+    if (!dom.unitLayer || !state || typeof project !== "function") return;
+    const seen = new Set();
+    const perHex = {};
+
+    const PlaceOne = (unit, side) => {
+      const hex = state.map && state.map.hexes ? state.map.hexes[unit.key] : null;
+      if (!hex || !hex.explored) return;
+      if (side === "Enemy" && !unit.visibleToPlayer) return;
+      const spot = project(unit.key);
+      if (!spot || spot.visible === false) return;
+      const stack = (perHex[unit.key] = (perHex[unit.key] || 0) + 1) - 1;
+      const plate = AcquirePlate(unit.id);
+      plate.unitId = unit.id;
+      seen.add(unit.id);
+      const x = Math.round(spot.x + stack * 14 - 13);
+      const y = Math.round(spot.y - 34 - stack * 5);
+      plate.rootNode.style.transform = `translate(${x}px, ${y}px)`;
+      plate.rootNode.style.display = "";
+      SetFlag(plate.rootNode, "is-enemy", side === "Enemy");
+      SetFlag(plate.rootNode, "is-friendly", side !== "Enemy");
+      SetFlag(plate.rootNode, "is-hidden-unit", side !== "Enemy" && Boolean(unit.hidden));
+      SetFlag(plate.rootNode, "is-acted", side !== "Enemy" && Boolean(unit.acted));
+      SetFlag(plate.rootNode, "is-selected", viewState && viewState.selectedUnitId === unit.id);
+      SetText(plate.glyph, UnitGlyph(unit.type, side));
+      const ratio = unit.maxHp > 0 ? Clamp01Local(unit.hp / unit.maxHp) : 0;
+      plate.fill.style.width = `${Math.round(ratio * 100)}%`;
+      SetFlag(plate.rootNode, "is-low", ratio < 0.35);
+      SetFlag(plate.rootNode, "is-mid", ratio >= 0.35 && ratio < 0.7);
+      SetText(plate.mark, side !== "Enemy" && unit.hidden ? "隐" : "");
+      const label = `${definitions.units?.unitDefinitions?.[unit.type]?.name ?? "部队"} ${Math.round(unit.hp)}/${unit.maxHp}`;
+      SetAttr(plate.rootNode, "aria-label", label);
+      SetAttr(plate.rootNode, "title", label);
+    };
+
+    for (const unit of state.units ?? []) PlaceOne(unit, "Player");
+    for (const enemy of state.enemies ?? []) PlaceOne(enemy, "Enemy");
+
+    for (const [id, plate] of unitPlates) {
+      if (!seen.has(id)) {
+        plate.rootNode.style.display = "none";
+      }
+    }
+  }
+
+  function Clamp01Local(value) {
+    return value < 0 ? 0 : value > 1 ? 1 : value;
+  }
+
   return {
     Sync,
+    SyncUnitPlates,
     ShowPanel,
     Toast,
     Cinematic,

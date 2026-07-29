@@ -172,11 +172,19 @@ export async function StartGame(options = {}) {
   // 行动派发
   // ---------------------------------------------------------------------
 
+  /** 任何特效都不许拖死回合：单个等待封顶 3.5 秒，超时就继续走。 */
+  function WithEffectTimeout(promise) {
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise((resolve) => setTimeout(resolve, 3500)),
+    ]);
+  }
+
   async function PlayEffectQueue(list) {
     for (const item of list ?? []) {
       if (!item?.kind) continue;
       try {
-        if (item.kind === "Move") await effects.SpawnUnitMove(item.fromKey, item.toKey, null, { unitId: item.unitId });
+        if (item.kind === "Move") await WithEffectTimeout(effects.SpawnUnitMove(item.fromKey, item.toKey, null, { unitId: item.unitId }));
         else if (item.kind === "Ambush") effects.SpawnAmbush(item.key);
         else if (item.kind === "Sabotage") effects.SpawnSabotage(item.key);
         else if (item.kind === "Capture") effects.SpawnCapture(item.key);
@@ -269,6 +277,7 @@ export async function StartGame(options = {}) {
   async function ShowEraCinematic(eraKey) {
     const era = Rules.GetEraForTurn(state.turn);
     if (!ui?.Cinematic || view.autoPlay) return;
+    SafeCall(() => ui?.SetBusy(false));
     await ui.Cinematic({
       kind: "Era",
       eraKey,
@@ -288,13 +297,17 @@ export async function StartGame(options = {}) {
       state = Rules.ApplyEventChoice(state, event.id, event.options?.[0]?.id);
       return;
     }
+    // 等玩家读卡点选期间不是"推演中"，busy 必须放下
+    SafeCall(() => ui?.SetBusy(false));
     const choice = await ui.Cinematic({ kind: "Event", ...event });
+    SafeCall(() => ui?.SetBusy(true));
     state = Rules.ApplyEventChoice(state, event.id, choice ?? event.options?.[0]?.id);
     SyncAll();
   }
 
   async function ShowEnding(result) {
     if (!ui?.Cinematic || view.autoPlay) return;
+    SafeCall(() => ui?.SetBusy(false));
     await ui.Cinematic({
       kind: "Ending",
       title: result?.ending?.title ?? "终局",
@@ -432,6 +445,14 @@ export async function StartGame(options = {}) {
       audio.Play("Click");
       SafeCall(() => ui?.Sync(state, view));
     },
+    OnPickUnit: (unitId) => {
+      const unit = Rules.GetUnit(state, unitId);
+      if (!unit) return;
+      view.selectedUnitId = unit.id;
+      view.selectedKey = unit.key;
+      audio.Play("Click");
+      SyncAll();
+    },
     OnSetQuality: (level) => {
       view.quality = qualityOrder.includes(level) ? level : "high";
       SafeCall(() => handle.SetQuality(view.quality));
@@ -532,6 +553,7 @@ export async function StartGame(options = {}) {
     elapsed += delta;
     SafeCall(() => handle.Update(delta, elapsed));
     SafeCall(() => audio.Update(delta));
+    SafeCall(() => ui?.SyncUnitPlates?.(state, view, (key) => handle.ProjectHexToScreen(key, 0.92)));
     requestAnimationFrame(Frame);
   }
   requestAnimationFrame(Frame);

@@ -45,14 +45,20 @@
 
   /* 仅支持桌面端：窗口不足 1200×620 时由提示层接管。
      移动端与平板布局已整体移除——每一条断点都是一条需要单独验证的布局路径。 */
+  /* 阈值必须留足余量：Windows 125%/150% 缩放下，1366×768 的笔记本
+     CSS 视口只有 1092×614——按 1200×620 拦会把大量真实 PC 关在门外，
+     用户看到的就是"整个 HUD 什么都没有"。降到 960×520 只拦真正的手机。 */
   #pcGate { display: none; }
-  @media (max-width: 1199px), (max-height: 619px) {
+  #pcGate.gate-dismissed { display: none !important; }
+  @media (max-width: 959px), (max-height: 519px) {
     #pcGate { position: fixed; inset: 0; z-index: 9500; display: grid; place-items: center;
       background: radial-gradient(120% 90% at 50% 30%, #241d16 0%, #14110e 55%, #0a0908 100%);
       text-align: center; padding: 32px; }
     #pcGate .gate-title { font-family: "Songti SC", "SimSun", serif; font-size: 26px;
       letter-spacing: .2em; color: #e8dcc0; margin: 0 0 14px; }
     #pcGate .gate-body { font-size: 14px; line-height: 2; color: #9b8f76; max-width: 30em; margin: 0 auto; }
+    #pcGate .gate-enter { margin-top: 22px; padding: 10px 26px; font-size: 14px; letter-spacing: .2em;
+      color: #e8dcc0; background: none; border: 1px solid #c8a86a; border-radius: 4px; cursor: pointer; }
   }
 </style>
 <script type="importmap">
@@ -85,7 +91,9 @@
 <div id="pcGate" aria-hidden="true">
   <div>
     <p class="gate-title">燎原 · 敌后1937</p>
-    <p class="gate-body">本作仅支持桌面端浏览器。<br>请在电脑上打开，并将窗口放大到 1200 × 620 以上。</p>
+    <p class="gate-body">本作为桌面端设计。<br>请在电脑上打开，并尽量放大浏览器窗口。</p>
+    <button class="gate-enter" type="button"
+      onclick="this.closest('#pcGate').classList.add('gate-dismissed')">仍要进入</button>
   </div>
 </div>
 

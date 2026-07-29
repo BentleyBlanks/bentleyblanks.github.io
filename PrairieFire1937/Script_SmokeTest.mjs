@@ -1131,7 +1131,8 @@ Test("仅支持桌面端：无移动端断点残留，且有 PC 提示门", () =
 
   const html = Source("index.html");
   assert.match(html, /id="pcGate"/, "缺少小窗口提示门");
-  assert.match(html, /1200/, "提示门未说明最小窗口尺寸");
+  assert.match(html, /桌面端/, "提示门未说明桌面端定位");
+  assert.match(html, /仍要进入/, "提示门必须提供“仍要进入”出口，防止缩放误伤真实 PC");
 });
 
 Test("命名规范：文件名使用类别前缀且无连字符", () => {
