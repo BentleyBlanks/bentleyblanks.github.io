@@ -605,6 +605,12 @@
 
 .pf-sweep.is-imminent { animation-duration: 0.9s; }
 
+/* 情报覆盖不足：换成虚线边并放缓脉冲，提示"判断可能有误"。 */
+.pf-sweep.is-vague {
+  border-style: dashed;
+  animation-duration: 3s;
+}
+
 /* --------------------------------------------------------------------------
    6. 小地图
    -------------------------------------------------------------------------- */
@@ -688,11 +694,29 @@
    7. 底部地块 / 单位面板
    -------------------------------------------------------------------------- */
 
-.pf-context {
+/* 左下角唯一的定位容器：通知流在上、地块面板在下，结构上不可能互相压盖。 */
+.pf-leftdock {
   position: absolute;
   left: 12px;
   bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
   width: min(660px, calc(100vw - 300px));
+  max-height: calc(100vh - 190px);
+  min-height: 0;
+  pointer-events: none;
+}
+
+.pf-leftdock > * { pointer-events: auto; }
+
+.pf-context {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   border: 1px solid var(--pf-line-strong);
   border-radius: var(--pf-radius-lg);
   background-color: rgba(24, 20, 17, 0.94);
@@ -772,15 +796,55 @@
 
 .pf-tile-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 4px 10px;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 3px 12px;
   margin: 7px 0;
 }
 
-.pf-fact { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 12px; }
-.pf-fact-label { color: var(--pf-paper-dim); }
-.pf-fact-value { color: var(--pf-paper); font-weight: 600; }
+.pf-fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pf-fact-label { flex: 0 0 auto; color: var(--pf-paper-dim); }
+
+.pf-fact-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  color: var(--pf-paper);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pf-fact.is-bad .pf-fact-value { color: var(--pf-bad); }
+
+.pf-scorch-note {
+  margin: 6px 0 7px;
+  padding: 5px 9px;
+  border-left: 3px solid var(--pf-crimson);
+  border-radius: 2px;
+  background: rgba(140, 47, 36, 0.16);
+  font-size: 12px;
+  line-height: 1.55;
+  color: #f0d9c8;
+}
+
+.pf-unit-blurb {
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--pf-paper-dim);
+  border-left: 2px solid var(--pf-ochre-deep);
+  padding-left: 7px;
+}
 
 .pf-yields { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
 
@@ -995,7 +1059,32 @@
 .pf-action.is-build { border-left: 3px solid var(--pf-ochre); }
 .pf-action.is-support { border-left: 3px solid var(--pf-slate); }
 
-.pf-action-name { font-size: 13.5px; font-weight: 600; color: var(--pf-paper); }
+/* danger:true = 打完不转移。这是本作最危险的选择，配色必须一眼认出来。 */
+.pf-action.is-danger {
+  border-color: var(--pf-crimson-bright);
+  border-left-width: 3px;
+  background:
+    repeating-linear-gradient(135deg, rgba(184, 66, 47, 0.32) 0 6px, rgba(140, 47, 36, 0.16) 6px 12px),
+    linear-gradient(180deg, rgba(120, 36, 28, 0.6), rgba(40, 20, 16, 0.75));
+}
+
+.pf-action.is-danger .pf-action-name { color: #ffd9c8; }
+.pf-action.is-danger .pf-action-cost { color: #f0b8a6; }
+
+.pf-action.is-danger:hover:not(:disabled) {
+  border-color: var(--pf-crimson-soft);
+  background:
+    repeating-linear-gradient(135deg, rgba(224, 96, 76, 0.42) 0 6px, rgba(140, 47, 36, 0.2) 6px 12px),
+    linear-gradient(180deg, rgba(150, 46, 34, 0.7), rgba(52, 24, 18, 0.8));
+}
+
+.pf-action-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--pf-paper);
+  text-align: center;
+  line-height: 1.25;
+}
 .pf-action-cost { font-size: 10.5px; color: var(--pf-paper-dim); font-variant-numeric: tabular-nums; }
 
 .pf-action-key {
@@ -1162,14 +1251,13 @@
    -------------------------------------------------------------------------- */
 
 .pf-notify {
-  position: absolute;
-  left: 12px;
-  bottom: 236px;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  width: 300px;
-  max-height: 168px;
+  width: 100%;
+  max-width: 340px;
+  max-height: 132px;
   overflow: hidden;
   pointer-events: none;
 }
@@ -2616,11 +2704,12 @@
   .pf-minimap { width: 216px; }
   .pf-minimap-canvas { height: 158px; }
 
-  .pf-context { width: min(560px, calc(100vw - 260px)); }
+  .pf-leftdock { width: min(560px, calc(100vw - 240px)); max-height: calc(100vh - 176px); }
   .pf-enddock { width: 196px; }
   .pf-endturn-label { font-size: 18px; letter-spacing: 0.16em; }
 
-  .pf-notify { width: 250px; bottom: 214px; }
+  .pf-notify { max-width: 300px; max-height: 108px; }
+  .pf-action { min-width: 68px; }
 
   .pf-panel-layer { padding: 14px; }
   .pf-panel { max-height: calc(100vh - 28px); }
@@ -2715,13 +2804,17 @@
   .pf-minimap.is-collapsed { width: 66px; }
 
   /* 底部面板 → 抽屉 */
-  .pf-context {
+  .pf-leftdock {
     left: 0;
     right: 0;
     bottom: 0;
     width: auto;
     max-height: 50vh;
-    overflow-y: auto;
+    gap: 0;
+  }
+
+  .pf-context {
+    max-height: 50vh;
     border-radius: var(--pf-radius-lg) var(--pf-radius-lg) 0 0;
     border-left: 0;
     border-right: 0;
@@ -2823,6 +2916,7 @@
 
 /* 横屏矮窗（手机横放）：底部抽屉别吃掉太多高度 */
 @media (max-height: 520px) and (orientation: landscape) {
+  .pf-leftdock { max-height: 66vh; }
   .pf-context { max-height: 62vh; }
   .pf-meters { bottom: auto; top: 78px; flex-direction: column; width: 168px; right: auto; }
   .pf-minimap { top: 78px; bottom: auto; }

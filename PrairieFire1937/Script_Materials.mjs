@@ -45,15 +45,15 @@ export const fallbackTerrainDefinitions = Object.freeze({
  * 是纯美术参数，永远由本模块提供，不依赖外部文件。
  */
 export const terrainRenderProfiles = Object.freeze({
-  Mountain: { relief: 0.150, peak: 0.230, roughness: 0.94, snowBias: 0.00, wet: 0.06, strataLow: "#413d37", strataHigh: "#867f73", water: false },
-  Ridge: { relief: 0.125, peak: 0.120, roughness: 0.95, snowBias: 0.10, wet: 0.08, strataLow: "#474137", strataHigh: "#8a8170", water: false },
-  Hill: { relief: 0.080, peak: 0.045, roughness: 0.97, snowBias: 0.26, wet: 0.20, strataLow: "#5a4f36", strataHigh: "#9b8a5f", water: false },
-  Forest: { relief: 0.070, peak: 0.030, roughness: 0.98, snowBias: 0.30, wet: 0.42, strataLow: "#3d3a2c", strataHigh: "#6e6a52", water: false },
-  Plain: { relief: 0.024, peak: 0.000, roughness: 0.99, snowBias: 0.56, wet: 0.36, strataLow: "#5c5334", strataHigh: "#a2925f", water: false },
-  Loess: { relief: 0.062, peak: 0.020, roughness: 0.99, snowBias: 0.44, wet: 0.16, strataLow: "#6d5a33", strataHigh: "#c1a978", water: false },
-  Marsh: { relief: 0.018, peak: 0.000, roughness: 0.84, snowBias: 0.64, wet: 0.86, strataLow: "#3f4736", strataHigh: "#6d7758", water: false },
-  River: { relief: -0.034, peak: -0.060, roughness: 0.72, snowBias: 0.72, wet: 1.00, strataLow: "#3c473f", strataHigh: "#6d7a6c", water: true },
-  Gorge: { relief: 0.132, peak: -0.090, roughness: 0.96, snowBias: 0.18, wet: 0.30, strataLow: "#443e37", strataHigh: "#8b8072", water: false },
+  Mountain: { relief: 0.260, peak: 0.420, roughness: 0.94, snowBias: 0.00, wet: 0.06, strataLow: "#413d37", strataHigh: "#867f73", water: false },
+  Ridge: { relief: 0.200, peak: 0.250, roughness: 0.95, snowBias: 0.10, wet: 0.08, strataLow: "#474137", strataHigh: "#8a8170", water: false },
+  Hill: { relief: 0.120, peak: 0.100, roughness: 0.97, snowBias: 0.26, wet: 0.20, strataLow: "#5a4f36", strataHigh: "#9b8a5f", water: false },
+  Forest: { relief: 0.086, peak: 0.048, roughness: 0.98, snowBias: 0.30, wet: 0.42, strataLow: "#3d3a2c", strataHigh: "#6e6a52", water: false },
+  Plain: { relief: 0.030, peak: 0.000, roughness: 0.99, snowBias: 0.56, wet: 0.36, strataLow: "#5c5334", strataHigh: "#a2925f", water: false },
+  Loess: { relief: 0.082, peak: 0.030, roughness: 0.99, snowBias: 0.44, wet: 0.16, strataLow: "#6d5a33", strataHigh: "#c1a978", water: false },
+  Marsh: { relief: 0.022, peak: 0.000, roughness: 0.84, snowBias: 0.64, wet: 0.86, strataLow: "#3f4736", strataHigh: "#6d7758", water: false },
+  River: { relief: -0.040, peak: -0.075, roughness: 0.72, snowBias: 0.72, wet: 1.00, strataLow: "#3c473f", strataHigh: "#6d7a6c", water: true },
+  Gorge: { relief: 0.190, peak: -0.120, roughness: 0.96, snowBias: 0.18, wet: 0.30, strataLow: "#443e37", strataHigh: "#8b8072", water: false },
 });
 
 const defaultProfile = Object.freeze({
@@ -113,28 +113,28 @@ const seasonBase = Object.freeze({
   Autumn: {
     sunColor: 0xffd9a4, sunElevation: 44, sunAzimuth: 138, sunIntensity: 2.55,
     skyColor: 0xa9c0d4, groundColor: 0x6a6152, ambientIntensity: 0.78,
-    fogColor: 0xb9bfb2, fogDensity: 0.0125, zenith: 0x39699d, horizon: 0xc9cfc0,
+    fogColor: 0xb9bfb2, fogDensity: 0.0092, zenith: 0x39699d, horizon: 0xc9cfc0,
     cloudColor: 0xf1ece0, cloudOpacity: 0.42, snowAmount: 0.06, snowLine: 0.86,
     grass: 0x8b8a4e, rock: 0x8b8577, snow: 0xe9edf0, water: 0x3f5d63, seasonTint: 0xd8c08a,
   },
   Winter: {
     sunColor: 0xf3e2cc, sunElevation: 28, sunAzimuth: 152, sunIntensity: 2.05,
     skyColor: 0xb6c6d2, groundColor: 0x5d6265, ambientIntensity: 0.86,
-    fogColor: 0xc3ccd2, fogDensity: 0.0168, zenith: 0x4a6f96, horizon: 0xd3dae0,
+    fogColor: 0xc3ccd2, fogDensity: 0.0124, zenith: 0x4a6f96, horizon: 0xd3dae0,
     cloudColor: 0xe7eaee, cloudOpacity: 0.58, snowAmount: 0.92, snowLine: 0.28,
     grass: 0x6f7360, rock: 0x8d8f8a, snow: 0xf0f4f7, water: 0x445e68, seasonTint: 0xb8c4cc,
   },
   Spring: {
     sunColor: 0xffe9c6, sunElevation: 50, sunAzimuth: 128, sunIntensity: 2.7,
     skyColor: 0xa8c6e0, groundColor: 0x6b6a4e, ambientIntensity: 0.82,
-    fogColor: 0xc2c9bd, fogDensity: 0.0116, zenith: 0x3b74ad, horizon: 0xd0d6c6,
+    fogColor: 0xc2c9bd, fogDensity: 0.0085, zenith: 0x3b74ad, horizon: 0xd0d6c6,
     cloudColor: 0xf6f2e8, cloudOpacity: 0.36, snowAmount: 0.22, snowLine: 0.74,
     grass: 0x7c9450, rock: 0x8a857a, snow: 0xecf1f4, water: 0x3d6068, seasonTint: 0xc6d29a,
   },
   Summer: {
     sunColor: 0xfff1d2, sunElevation: 62, sunAzimuth: 116, sunIntensity: 2.95,
     skyColor: 0x9dc2e6, groundColor: 0x6f6d4c, ambientIntensity: 0.9,
-    fogColor: 0xc7cec0, fogDensity: 0.0104, zenith: 0x2f6fb2, horizon: 0xd6dccb,
+    fogColor: 0xc7cec0, fogDensity: 0.0077, zenith: 0x2f6fb2, horizon: 0xd6dccb,
     cloudColor: 0xfaf6ec, cloudOpacity: 0.46, snowAmount: 0.0, snowLine: 0.95,
     grass: 0x5f7f3f, rock: 0x8d8878, snow: 0xeef2f5, water: 0x2f5a63, seasonTint: 0xa9c47f,
   },
@@ -251,11 +251,13 @@ export function CreateSeasonPalette(eraKey, turn) {
     memoryTint: 0x707a86,
     unexplored: 0x131820,
     scorch: 0x2a221d,
+    // 政权染色：低饱和、按"敌占暗红 → 争夺土褐 → 游击暖卡其 → 根据地暖黄"渐进，
+    // 只做地表淡染，不做高饱和描边。
     control: {
-      Enemy: 0x8a3226,
-      Contested: 0xa5813a,
-      Guerrilla: 0xb4523c,
-      Base: 0xc0492e,
+      Enemy: 0x6a2c26,
+      Contested: 0x7a6a44,
+      Guerrilla: 0x8f7c46,
+      Base: 0xac8c40,
     },
     grade: {
       saturation: era.saturation,
@@ -446,10 +448,10 @@ export function CreateTerrainMaterial(renderer, options = {}) {
     uControlContested: { value: new THREE.Color(0xa5813a) },
     uControlGuerrilla: { value: new THREE.Color(0xb4523c) },
     uControlBase: { value: new THREE.Color(0xc0492e) },
-    uControlStrength: { value: options.controlStrength ?? 0.22 },
+    uControlStrength: { value: options.controlStrength ?? 0.15 },
     uScorchColor: { value: new THREE.Color(0x2a221d) },
     uUnexploredColor: { value: new THREE.Color(0x131820) },
-    uUnexploredMix: { value: 0.88 },
+    uUnexploredMix: { value: 0.80 },
     uMemoryTint: { value: new THREE.Color(0x707a86) },
     uMemoryStrength: { value: 0.78 },
     uFogHeightBase: { value: 0.35 },
@@ -564,14 +566,15 @@ float terrainWet = vFacet.z * vFacet.x;
   // 政权归属淡染（未探索区不泄露归属）
   albedo = mix( albedo, mix( albedo, ControlTint( controlCode ), uControlStrength ), explored );
 
-  // 已探索但本回合不可见 → 灰度降饱和 + 冷调"记忆"
+  // 已探索但本回合不可见 → 降饱和的灰调"记忆"，并轻微压暗（不能变白）
   float memory = explored * ( 1.0 - smoothstep( 0.15, 0.6, visible ) );
   float memoryLum = dot( albedo, vec3( 0.2126, 0.7152, 0.0722 ) );
-  albedo = mix( albedo, mix( vec3( memoryLum ), uMemoryTint * ( 0.4 + memoryLum ), 0.44 ), memory * uMemoryStrength );
+  vec3 memoryColor = mix( vec3( memoryLum ), uMemoryTint * ( 0.30 + memoryLum * 0.55 ), 0.40 ) * 0.80;
+  albedo = mix( albedo, memoryColor, memory * uMemoryStrength );
 
-  // 未探索 → 暗色低饱和
+  // 未探索 → 低明度冷灰的"未知的暗"
   float unknownLum = dot( albedo, vec3( 0.299, 0.587, 0.114 ) );
-  vec3 unknown = uUnexploredColor * ( 0.65 + 0.9 * unknownLum );
+  vec3 unknown = uUnexploredColor * ( 0.70 + 1.25 * unknownLum );
   albedo = mix( mix( albedo, unknown, uUnexploredMix ), albedo, explored );
 
   diffuseColor.rgb = albedo;
@@ -917,9 +920,10 @@ export function CreateFogOfWarMaterial() {
   const custom = {
     uTime: { value: 0 },
     uHexState: { value: CreateStateFallbackTexture() },
-    uCloudColor: { value: new THREE.Color(0x2b323c) },
-    uCloudHighlight: { value: new THREE.Color(0x8b95a2) },
-    uOpacity: { value: 0.92 },
+    // "未知"是暗的：低明度冷灰的稀薄雾气，绝不能是高明度白棉团
+    uCloudColor: { value: new THREE.Color(0x0b0f15) },
+    uCloudHighlight: { value: new THREE.Color(0x28303a) },
+    uOpacity: { value: 0.62 },
     uRollSpeed: { value: 0.055 },
     uNoiseScale: { value: 0.9 },
   };
@@ -985,10 +989,11 @@ void main() {
   float detail = Fbm( rollUv * 2.9 + density * 1.6, 3 );
   float mass = clamp( density * 0.75 + detail * 0.45 + vPuff.z * 0.25, 0.0, 1.0 );
 
-  float alpha = body * hidden * uOpacity * smoothstep( 0.18, 0.72, mass );
+  float alpha = body * hidden * uOpacity * smoothstep( 0.30, 0.88, mass );
   if ( alpha < 0.006 ) discard;
 
-  vec3 color = mix( uCloudColor, uCloudHighlight, pow( mass, 2.0 ) * 0.7 + vPuff.y * 0.12 );
+  // 只允许极小幅度的提亮，保证整体停留在"未知的暗"里
+  vec3 color = mix( uCloudColor, uCloudHighlight, pow( mass, 2.2 ) * 0.34 + vPuff.y * 0.05 );
   gl_FragColor = vec4( color, alpha );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -1008,8 +1013,9 @@ void main() {
   material.userData.uniforms = uniforms;
   material.userData.ApplyPalette = function ApplyFogPalette(palette) {
     if (!palette) return;
-    uniforms.uCloudColor.value.setHex(palette.unexplored).lerp(new THREE.Color(palette.fog.color), 0.24);
-    uniforms.uCloudHighlight.value.setHex(palette.fog.color).multiplyScalar(0.9);
+    // 迷雾云只在未探索色附近微调，不去追雾色（那是明亮的天光色，会变成白棉团）
+    uniforms.uCloudColor.value.setHex(palette.unexplored).multiplyScalar(0.7);
+    uniforms.uCloudHighlight.value.setHex(palette.unexplored).lerp(new THREE.Color(palette.fog.color), 0.16);
   };
   materialRegistry.add(material);
   return material;

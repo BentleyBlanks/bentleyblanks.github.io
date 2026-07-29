@@ -417,6 +417,86 @@ Test("整局 32 回合可完整跑通并出结果", () => {
   assert.ok(state.result.ending?.title, "缺少结局文本");
 });
 
+Test("结局与表现挂钩：差局不得拿到最好的结局", () => {
+  const Build = (mutate) => {
+    const state = Rules.CreateInitialState({ seed: 1212 });
+    state.turn = 32;
+    mutate(state);
+    return Rules.GetVictoryAssessment(state);
+  };
+
+  // 一局什么都没干的烂摊子
+  const poor = Build(() => {});
+  // 一局建设充分、代价很低的好局
+  const strong = Build((state) => {
+    for (const key of state.map.order) {
+      const hex = state.map.hexes[key];
+      hex.massBase = 88;
+      hex.control = "Base";
+    }
+    for (let index = 0; index < 6; index += 1) {
+      state.bases.push({
+        id: `b${index}`,
+        key: state.map.order[index * 7],
+        name: "支点",
+        tier: 3,
+        population: 9000,
+        districts: Array.from({ length: 6 }, (item, slot) => ({ type: `d${slot}`, done: true })),
+        queue: [],
+        garrison: 4,
+        unrest: 0,
+      });
+    }
+    state.research.done = Object.keys(DataTech.techDefinitions ?? {}).slice(0, 20);
+  });
+
+  assert.ok(poor.ending?.title, "差局缺少结局文本");
+  assert.ok(strong.ending?.title, "好局缺少结局文本");
+  assert.notEqual(
+    poor.ending.key,
+    strong.ending.key,
+    `好局与差局拿到了同一个结局「${poor.ending.title}」，结局评定没有真正接上局面`,
+  );
+  assert.notEqual(poor.ending.key, "PrairieFire", "一局没建设的烂摊子拿到了最好的结局「燎原」");
+  console.log(`      差局 → ${poor.ending.title}(${poor.grade}) · 好局 → ${strong.ending.title}(${strong.grade})`);
+});
+
+Test("经济不会超线性膨胀，且粮/药始终是紧的", () => {
+  let state = Rules.CreateInitialState({ seed: 11 });
+  let tightGrainTurns = 0;
+  let peak = {};
+  for (const key of Rules.resourceKeys) peak[key] = 0;
+  for (let turn = 0; turn < 32 && !state.over; turn += 1) {
+    if (state.events.pending) state = Rules.ApplyEventChoice(state, state.events.pending, null);
+    const available = Rules.ListAvailableResearch(state, "tech");
+    if (!state.research.currentId && available.length) state = Rules.SetResearch(state, available[0], "tech");
+    const doctrines = Rules.ListAvailableResearch(state, "doctrine");
+    if (!state.research.currentDoctrineId && doctrines.length) state = Rules.SetResearch(state, doctrines[0], "doctrine");
+    for (const existing of [...state.units]) {
+      const unit = Rules.GetUnit(state, existing.id);
+      if (!unit || unit.acted) continue;
+      if (!Rules.GetUnitStats(unit.type).abilities.includes("Organize")) continue;
+      const found = Rules.CanFoundBase(state, unit.id, unit.key);
+      const action = found.ok
+        ? { kind: "FoundBase", unitId: unit.id, key: unit.key }
+        : { kind: "Mobilize", unitId: unit.id, key: unit.key };
+      const outcome = Rules.PerformAction(state, action);
+      if (outcome.report.ok) state = outcome.nextState;
+    }
+    state = Rules.EndTurn(state).nextState;
+    if (turn < 12 && state.stock.grain < 12) tightGrainTurns += 1;
+    for (const key of Rules.resourceKeys) peak[key] = Math.max(peak[key], state.stock[key]);
+  }
+
+  console.log(`      T32 峰值 ${Rules.resourceKeys.map((key) => `${Rules.resourceLabels[key]}${Math.round(peak[key])}`).join(" ")}`);
+  for (const key of ["grain", "labor", "ordnance", "medicine", "intel"]) {
+    assert.ok(peak[key] < 1600, `${Rules.resourceLabels[key]}峰值 ${Math.round(peak[key])}，经济已超线性膨胀，取舍失去意义`);
+  }
+  assert.ok(tightGrainTurns >= 3, `前 12 回合只有 ${tightGrainTurns} 个回合粮食吃紧，开局压力不足`);
+  assert.ok(peak.medicine < peak.grain + peak.ordnance, "药不再稀缺，与设计意图相悖");
+  assert.ok(peak.cadre < 60, `干部峰值 ${Math.round(peak.cadre)}，最贵的资源不该变得富余`);
+});
+
 Test("存档往返一致", () => {
   let state = Rules.CreateInitialState({ seed: 888 });
   for (let index = 0; index < 5; index += 1) state = Rules.EndTurn(state).nextState;
@@ -435,12 +515,26 @@ Test("评级闸门：根据地过小封顶 C，人民代价过大压档", () => 
   const weak = Rules.GetVictoryAssessment(state);
   assert.ok(["C", "D"].includes(weak.grade), `无根据地却评为 ${weak.grade}`);
 
-  const costly = Rules.CloneState(state);
-  costly.ledger.civilianDeaths = 900;
-  costly.ledger.villagesBurned = 40;
-  const costlyResult = Rules.GetVictoryAssessment(costly);
-  assert.ok(costlyResult.metrics.safety < 30, "巨大代价未反映为人民安全下降");
-  assert.ok(costlyResult.total <= weak.total, "代价越大分数反而越高");
+  // 人民安全是五项代价的加权饱和度量：某一项灾难性并不会把总分砸到 0，
+  // 但必须相对干净局面显著下滑，且拉低总分、压住评级。
+  const clean = Rules.CloneState(state);
+  const cleanResult = Rules.GetVictoryAssessment(clean);
+
+  const partial = Rules.CloneState(state);
+  partial.ledger.civilianDeaths = 900;
+  partial.ledger.villagesBurned = 40;
+  const partialResult = Rules.GetVictoryAssessment(partial);
+  assert.ok(
+    partialResult.metrics.safety < cleanResult.metrics.safety - 30,
+    `大量伤亡与焚村未显著拉低人民安全：${cleanResult.metrics.safety.toFixed(1)} → ${partialResult.metrics.safety.toFixed(1)}`,
+  );
+
+  const total = Rules.CloneState(state);
+  for (const key of Rules.ledgerKeys) total.ledger[key] = 5000;
+  const totalResult = Rules.GetVictoryAssessment(total);
+  assert.ok(totalResult.metrics.safety < 20, `五项代价全部灾难性时人民安全应逼近 0，实际 ${totalResult.metrics.safety.toFixed(1)}`);
+  assert.ok(totalResult.total < cleanResult.total, "代价越大分数反而越高");
+  assert.ok(["C", "D"].includes(totalResult.grade), `代价灾难性却评为 ${totalResult.grade}`);
 });
 
 Test("破袭计分有收益递减上限", () => {
@@ -680,6 +774,9 @@ Test("平民代价永不转化为资源或分数（红线）", () => {
 // ---------------------------------------------------------------------------
 Section("六 · 策略排序（防缩头最优解与莽撞最优解）");
 
+/** 会玩的 bot 为「开辟新根据地」保留的干部预算。 */
+const ruleReserve = Rules.ruleConstants.foundBaseCadreCost;
+
 /** 三种 bot：会玩 / 消极 / 莽撞。 */
 function RunBot(seed, style) {
   let state = Rules.CreateInitialState({ seed, difficulty: "Normal" });
@@ -698,6 +795,40 @@ function RunBot(seed, style) {
       if (!state.research.currentDoctrineId) {
         const available = Rules.ListAvailableResearch(state, "doctrine");
         if (available.length) state = Rules.SetResearch(state, available[0], "doctrine");
+      }
+    }
+    if (style === "skilled") {
+      // 装政策、建区域、扩编工作队——一个真正在经营根据地的玩家会做的事。
+      const slots = Rules.GetPolicySlots(state);
+      if (state.policy.equipped.length < slots) {
+        const usable = Object.keys(DataTech.policyDefinitions ?? {}).filter((id) => {
+          const definition = DataTech.policyDefinitions[id];
+          return (definition?.requires ?? []).every((requirement) => state.research.done.includes(requirement));
+        });
+        if (usable.length) state = Rules.SetPolicies(state, usable.slice(0, slots));
+      }
+      // 干部是最紧的资源，必须给"开辟新根据地"留出预算，不能全砸进区域建设。
+      const cadreReserve = ruleReserve;
+      for (const base of [...state.bases]) {
+        if (state.stock.cadre < cadreReserve + 2) break;
+        for (const districtType of Object.keys(DataUnits.districtDefinitions ?? {})) {
+          if (Rules.CanQueueDistrict(state, base.id, districtType).ok) {
+            state = Rules.QueueDistrict(state, base.id, districtType);
+            break;
+          }
+        }
+      }
+      // 干部富余时再派一支工作队出去开辟
+      const organizers = state.units.filter((unit) => Rules.GetUnitStats(unit.type).abilities.includes("Organize")).length;
+      if (organizers < 3 && state.bases.length && state.stock.cadre >= cadreReserve + 5) {
+        for (const unitType of Object.keys(DataUnits.unitDefinitions ?? {})) {
+          const stats = Rules.GetUnitStats(unitType);
+          if (stats.side !== "Player" || !stats.abilities.includes("Organize")) continue;
+          if (Rules.CanTrainUnit(state, state.bases[0].id, unitType).ok) {
+            state = Rules.TrainUnit(state, state.bases[0].id, unitType);
+            break;
+          }
+        }
       }
     }
 
@@ -732,18 +863,30 @@ function ChooseAction(state, unit, stats, style) {
     return null;
   }
 
-  // 会玩：先建根据地与发动群众，再有选择地伏击，打完就转移
+  // 会玩：工作队负责往外开辟——就地能建就建，建不了就往还没被覆盖的村庄走。
   if (stats.abilities.includes("Organize")) {
     const found = Rules.CanFoundBase(state, unit.id, unit.key);
     if (found.ok) return { kind: "FoundBase", unitId: unit.id, key: unit.key };
-    const hex = Rules.GetHex(state, unit.key);
-    if (hex && hex.massBase < 88) return { kind: "Mobilize", unitId: unit.id, key: unit.key };
-    const reachable = [...Rules.FindReachableHexes(state, unit.id).keys()];
-    const village = reachable.find((key) => {
-      const candidate = Rules.GetHex(state, key);
-      return candidate?.feature === "Village" && candidate.massBase < 55;
-    });
-    if (village) return { kind: "Move", unitId: unit.id, toKey: village };
+
+    const here = Rules.GetHex(state, unit.key);
+    const covered = (key) => Boolean(Rules.GetHex(state, key)?.baseId) || Boolean(Rules.GetWorkingBase(state, key));
+    const farEnough = (key) => state.bases.every((base) => HexDistanceKeys(base.key, key) >= 2);
+
+    // 已经在根据地覆盖范围内了，就该出去找下一个落脚点，而不是原地反复开会。
+    if (covered(unit.key)) {
+      const reachable = [...Rules.FindReachableHexes(state, unit.id).keys()];
+      const candidates = reachable
+        .filter((key) => !covered(key) && farEnough(key))
+        .sort((a, b) => {
+          const hexA = Rules.GetHex(state, a);
+          const hexB = Rules.GetHex(state, b);
+          const score = (hex) => (hex.feature === "Village" ? 60 : 0) + hex.massBase;
+          return score(hexB) - score(hexA);
+        });
+      if (candidates.length) return { kind: "Move", unitId: unit.id, toKey: candidates[0] };
+    }
+
+    if (here && here.massBase < 92) return { kind: "Mobilize", unitId: unit.id, key: unit.key };
     return null;
   }
 
@@ -769,6 +912,25 @@ Test("会玩 > 消极不作为，且会玩 > 莽撞拼消耗", () => {
   console.log(`      会玩 ${skilled.toFixed(1)} · 消极 ${passive.toFixed(1)} · 莽撞 ${reckless.toFixed(1)}`);
   assert.ok(skilled > passive, `会玩(${skilled.toFixed(1)}) 未超过 消极(${passive.toFixed(1)})`);
   assert.ok(skilled > reckless, `会玩(${skilled.toFixed(1)}) 未超过 莽撞(${reckless.toFixed(1)})`);
+});
+
+Test("游戏是可经营的：像样地打完一局能建成多个根据地并拿到 B 以上", () => {
+  const seeds = [11, 22, 33, 44, 55];
+  const runs = seeds.map((seed) => RunBot(seed, "skilled"));
+  const bases = runs.reduce((sum, run) => sum + run.counts.bases, 0) / runs.length;
+  const villages = runs.reduce((sum, run) => sum + run.counts.baseVillages, 0) / runs.length;
+  const districts = runs.reduce((sum, run) => sum + run.counts.districts, 0) / runs.length;
+  const techs = runs.reduce((sum, run) => sum + run.counts.techs, 0) / runs.length;
+  const best = runs.reduce((top, run) => (run.total > top.total ? run : top), runs[0]);
+  console.log(
+    `      平均 根据地 ${bases.toFixed(1)} 个 · 根据地村 ${villages.toFixed(1)} · 区域 ${districts.toFixed(1)} · 科技 ${techs.toFixed(1)}` +
+      ` · 最好一局 ${best.total} 分 ${best.grade} 级「${best.ending?.title}」`,
+  );
+  assert.ok(bases >= 2, `平均只建起 ${bases.toFixed(1)} 个根据地，扩张循环走不通`);
+  assert.ok(villages >= 8, `平均只有 ${villages.toFixed(1)} 个根据地村，连评级闸门都过不去`);
+  assert.ok(districts >= 3, `平均只建成 ${districts.toFixed(1)} 个区域，建设循环走不通`);
+  assert.ok(techs >= 4, `平均只研究出 ${techs.toFixed(1)} 项科技，科技循环走不通`);
+  assert.ok(["S", "A", "B"].includes(best.grade), `最好的一局也只有 ${best.grade} 级，上限过低`);
 });
 
 Test("莽撞打法的人民代价高于稳健打法", () => {

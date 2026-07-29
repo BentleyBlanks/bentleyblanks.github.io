@@ -36,9 +36,9 @@ export const modeDefinitions = Object.freeze({
 export const eraMusicProfiles = Object.freeze({
   Opening: Object.freeze({
     mode: "Zhi", rootMidi: 62, tempo: 64,
-    leadDensity: 0.42, leadOctave: 1, leadLength: Object.freeze([2, 5]),
-    pluckDensity: 0.06, bassDensity: 0.05, droneOctave: -1, pulseDivisor: 0,
-    dissonance: 0, restBias: 0.2, restLength: Object.freeze([3, 7]),
+    leadDensity: 0.52, leadOctave: 1, leadLength: Object.freeze([2, 5]),
+    pluckDensity: 0.12, bassDensity: 0.06, droneOctave: -1, pulseDivisor: 0,
+    dissonance: 0, restBias: 0.15, restLength: Object.freeze([2, 5]),
     filterBase: 1500, filterRange: 700, lfoRate: 0.045, reverbSend: 0.36,
     phraseLengths: Object.freeze([12, 16, 20]),
     voiceGain: Object.freeze({ lead: 0.2, pluck: 0.1, drone: 0.075, bass: 0.06, drum: 0 }),
@@ -514,7 +514,7 @@ export function CreateAudio(options = {}) {
   const ContextClass = ResolveContextClass(["AudioContext", "webkitAudioContext"]);
   if (!ContextClass) return CreateSilentAudio("no-webaudio");
 
-  const seed = Number(settings.seed) || 0x9e3779b9;
+  const seed = settings.seed === undefined ? 0x9e3779b9 : Number(settings.seed) >>> 0;
   const lookahead = Clamp(Number(settings.lookahead) || 0.65, 0.15, 2);
   const wantPrerender = settings.prerender !== false;
   const maxTotalVoices = 20;
@@ -896,7 +896,9 @@ export function CreateAudio(options = {}) {
       const definition = sfxDefinitions[name];
       if (!definition) return;
       const now = CurrentTime();
-      if (now - (lastPlayed[name] || -999) < definition.minInterval) return;
+      // 注意不能写 lastPlayed[name] || -999：currentTime 恰好为 0 时会被当成未播放过
+      const last = lastPlayed[name] === undefined ? -999 : lastPlayed[name];
+      if (now - last < definition.minInterval) return;
       if ((activeVoices[name] || 0) >= definition.maxVoices) return;
       if (totalVoices >= maxTotalVoices) return;
       lastPlayed[name] = now;

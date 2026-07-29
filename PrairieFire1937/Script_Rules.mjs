@@ -84,6 +84,19 @@ export const ruleConstants = Object.freeze({
   foundBaseLaborCost: 12,
   famineThreshold: 0,
   researchBase: 4,
+  // 经济配平：地块产出必须乘上这个系数才进国库。没有它，产出随「根据地格数 ×
+  // 科技乘数」超线性膨胀，几十回合后所有资源都以千计，一切取舍失去意义。
+  hexYieldScale: 0.3,
+  // 科技/政策的产出加成上限。允许成长，但不允许指数化。
+  yieldBonusCap: 1.2,
+  // territory upkeep：每一块被根据地实际经营的地块都要养人、跑交通、办公粮。
+  // 这是让「战线拉长有代价」成立的关键，也是防止收入无限膨胀的形状性约束。
+  hexUpkeepGrain: 0.34,
+  hexUpkeepLabor: 0.1,
+  cadreIncomeScale: 2.4,
+  // 各资源的地产系数，把设计意图写进数值：
+  // 粮是主粮、工次之；械主要靠缴获而不是种出来的；药在敌后永远稀缺。
+  resourceYieldScale: Object.freeze({ grain: 1, labor: 0.75, ordnance: 0.45, medicine: 0.26, intel: 0.8 }),
 });
 
 // ---------------------------------------------------------------------------
@@ -671,6 +684,7 @@ export function RecomputeEconomy(state) {
   const income = EmptyStock();
   const upkeep = EmptyStock();
   const detail = { grain: [], labor: [], ordnance: [], medicine: [], intel: [], cadre: [] };
+  let workedHexes = 0;
 
   for (const base of state.bases) {
     const tier = GetBaseTier(base.tier);
@@ -686,9 +700,21 @@ export function RecomputeEconomy(state) {
       const scorchScale = 1 - Clamp01(hex.scorch / 150);
       const hexYields = GetHexBaseYields(hex);
       for (const resource of ["grain", "labor", "ordnance", "medicine", "intel"]) {
-        const amount = hexYields[resource] * controlScale * massScale * scorchScale * scale * (season[resource] ?? 1);
+        const amount =
+          hexYields[resource] *
+          controlScale *
+          massScale *
+          scorchScale *
+          scale *
+          (season[resource] ?? 1) *
+          ruleConstants.hexYieldScale *
+          (ruleConstants.resourceYieldScale[resource] ?? 1);
         if (amount) income[resource] += amount;
       }
+      // 经营这块地本身要花钱花人：公粮要运、交通要养、区乡干部要吃饭。
+      upkeep.grain += ruleConstants.hexUpkeepGrain * controlScale;
+      upkeep.labor += ruleConstants.hexUpkeepLabor * controlScale;
+      workedHexes += 1;
     }
 
     for (const district of base.districts ?? []) {
@@ -702,7 +728,7 @@ export function RecomputeEconomy(state) {
     }
 
     income.grain -= base.population * ruleConstants.grainPerPopulation;
-    income.cadre += 0.06 + (base.tier - 1) * 0.05;
+    income.cadre += (0.06 + (base.tier - 1) * 0.05) * ruleConstants.cadreIncomeScale;
   }
 
   for (const unit of state.units) {
@@ -719,9 +745,10 @@ export function RecomputeEconomy(state) {
     if (resourceKeys.includes(resource)) income[resource] += Number(amount) || 0;
   }
   for (const [resource, bonus] of Object.entries(effects.yieldBonus)) {
-    if (resourceKeys.includes(resource)) income[resource] *= 1 + (Number(bonus) || 0);
+    // 加成封顶：科技该让你变强，但不该让产出指数化。
+    if (resourceKeys.includes(resource)) income[resource] *= 1 + Clamp(Number(bonus) || 0, -0.9, ruleConstants.yieldBonusCap);
   }
-  income.cadre *= 1 + effects.cadreGrowth;
+  income.cadre *= 1 + Clamp(effects.cadreGrowth, -0.9, ruleConstants.yieldBonusCap);
 
   // 情报网：基础情报按覆盖格数补足，保证情报系统在早期也能转起来。
   income.intel += 0.8 + state.bases.length * 0.35;
@@ -843,18 +870,27 @@ function DriftMassBase(state) {
     const stronghold = GetStrongholdAt(state, key);
     let delta = 0;
 
+    // 群众基础靠干部和政权维持，不会因为地理位置自己长起来。
+    // 没有根据地工作覆盖的地方一律衰减，且会被压回一个很低的自然上限——
+    // 否则相邻格互相加成会形成不需要任何投入的永久根据地，
+    // 整个"一寸一寸开辟"的扩张循环就失效了。
+    const workingBase = hex.baseId ? GetBase(state, hex.baseId) : GetWorkingBase(state, key);
+    const organized = Boolean(workingBase);
+    const unitPresent = state.units.some((unit) => unit.key === key);
+
     if (hex.baseId) delta += growth * 1.4;
+    else if (organized) delta += growth;
     else {
-      const workingBase = GetWorkingBase(state, key);
-      if (workingBase) delta += growth;
-      else if (hex.massBase > 0) delta -= 0.9;
+      // 只有工作队/部队在场时才勉强维持，否则持续下滑。
+      delta -= unitPresent ? 0.25 : 1.1;
     }
 
     if (stronghold && stronghold.garrison > 0) delta += ruleConstants.massDriftEnemy;
     for (const neighborKey of HexNeighborKeys(key)) {
       const neighbor = state.map.hexes[neighborKey];
       if (!neighbor) continue;
-      if (neighbor.control === "Base") delta += 0.32;
+      // 邻接加成只能巩固已经组织起来的地方，不能凭空创造新的根据地。
+      if (organized && neighbor.control === "Base") delta += 0.32;
       if (GetStrongholdAt(state, neighborKey)) delta -= 0.45;
     }
 
@@ -863,10 +899,16 @@ function DriftMassBase(state) {
       delta -= hex.scorch * 0.03;
       hex.scorch = Math.max(0, hex.scorch - 3.5);
     }
-    if (hex.feature === "Village") delta += 0.35;
-    if (hex.works?.includes("Tunnel")) delta += 0.5;
+    if (organized && hex.feature === "Village") delta += 0.35;
+    if (organized && hex.works?.includes("Tunnel")) delta += 0.5;
 
-    hex.massBase = Clamp(hex.massBase + delta, 0, 100);
+    let next = hex.massBase + delta;
+    if (!organized) {
+      // 无组织地区的自然上限：村庄还有些自发的同情，旷野几乎没有。
+      const ceiling = hex.feature === "Village" ? 34 : hex.feature ? 24 : 16;
+      if (next > ceiling) next = Math.max(ceiling, next - 1.6);
+    }
+    hex.massBase = Clamp(next, 0, 100);
   }
 }
 
@@ -1797,6 +1839,55 @@ function AverageIntelAround(state, key, radius) {
 }
 
 /**
+ * 「人民安全」评估参数。
+ *
+ * 关键设计：代价必须按**强度**而不是**绝对总量**来衡量。绝对总量会惩罚扩张——
+ * 根据地越大、牵动的群众越多，账面数字必然越大，于是认真经营的一局反而比
+ * 缩在山里什么都不干的一局"更不安全"，这显然是错的。
+ * 因此每一项都先除以一个规模基准（回合数 × 你实际负责的村庄数），
+ * 再过一条饱和曲线 v^k/(v^k+r^k)，避免任何单项把总分砸到 0。
+ *
+ * 这些数字仍然只用于**评价**，不产生任何资源或奖励（Spec 第 7 节红线）。
+ */
+// reference 取自实测：稳健经营一局的强度约为 reference 的一半（≈25 分惩罚），
+// 莽撞一局约为 3-6 倍（≈85 分惩罚）。改动数值后请重跑冒烟测试里的安全度排序断言。
+export const safetyReferences = Object.freeze({
+  exponent: 1.6,
+  civilianDeaths: { reference: 0.069, weight: 0.3 },
+  cadreLost: { reference: 0.034, weight: 0.2 },
+  villagesBurned: { reference: 0.0123, weight: 0.2 },
+  displaced: { reference: 6.6, weight: 0.15 },
+  grainSeized: { reference: 27.7, weight: 0.15 },
+});
+
+/** 饱和曲线：v 等于 reference 时得 50 分惩罚，两端平滑不封顶到 0/100。 */
+function SaturatingPenalty(value, reference, exponent) {
+  const v = Math.max(0, value) ** exponent;
+  const r = Math.max(1e-9, reference) ** exponent;
+  return (100 * v) / (v + r);
+}
+
+export function ComputePeopleSafety(state) {
+  const turns = Math.max(1, Math.min(state.turn, state.maxTurns));
+  // 你实际负责的地盘规模：根据地格 + 每个根据地按其工作半径折算。
+  const baseHexes = state.map.order.filter((key) => state.map.hexes[key]?.control === "Base").length;
+  const scale = Math.max(4, baseHexes + state.bases.length * 3);
+  const denominator = turns * scale;
+
+  let penalty = 0;
+  let weightTotal = 0;
+  for (const key of ledgerKeys) {
+    const setting = safetyReferences[key];
+    if (!setting) continue;
+    const intensity = (state.ledger[key] ?? 0) / denominator;
+    penalty += SaturatingPenalty(intensity, setting.reference, safetyReferences.exponent) * setting.weight;
+    weightTotal += setting.weight;
+  }
+  if (weightTotal <= 0) return 100;
+  return Clamp(100 - penalty / weightTotal, 0, 100);
+}
+
+/**
  * 终局评定。主轴是根据地存续与建设、群众基础、人民安全，
  * 破袭牵制有强收益递减，歼敌不是主要计分项（Spec 第 7 节红线）。
  */
@@ -1818,14 +1909,7 @@ export function GetVictoryAssessment(state) {
   // 破袭收益递减：前 10 次有效，之后边际迅速衰减。
   const disruption = Clamp(28 * Math.log10(1 + (state.sabotageTotal || 0) * 1.6), 0, 60);
 
-  const cost = state.ledger;
-  const costWeight =
-    cost.civilianDeaths * 0.055 +
-    cost.displaced * 0.014 +
-    cost.villagesBurned * 1.5 +
-    cost.cadreLost * 1.1 +
-    cost.grainSeized * 0.02;
-  const safety = Clamp(100 - costWeight, 0, 100);
+  const safety = ComputePeopleSafety(state);
 
   const total = Math.round(
     survival * 0.24 + massScore * 0.2 + construction * 0.19 + populationScore * 0.15 + safety * 0.16 + disruption * 0.06,
@@ -1854,19 +1938,50 @@ export function GetVictoryAssessment(state) {
   };
 }
 
+/**
+ * 结局评定。Data_History 用的是**声明式条件对象**（minBaseRatio / minMass / …）
+ * 而不是函数，所以必须走它自己的 EvaluateEnding，否则会退化成"永远取第一个"，
+ * 让最差的一局拿到最好的结局。
+ */
 function PickEnding(state, summary) {
-  const endings = Definitions(DataHistory, "endingDefinitions");
-  const list = Object.values(endings).filter(Boolean);
-  for (const ending of list) {
-    if (typeof ending.condition !== "function") continue;
+  const totalHexes = Math.max(1, state.map.order.length);
+  const villageCount = Math.max(
+    1,
+    state.map.order.filter((key) => state.map.hexes[key]?.feature === "Village").length,
+  );
+  const populationCap = state.bases.reduce((sum, base) => sum + (GetBaseTier(base.tier).populationCap ?? 900), 0);
+  const population = state.bases.reduce((sum, base) => sum + base.population, 0);
+
+  const metrics = {
+    baseRatio: summary.baseVillages / totalHexes,
+    massAverage: state.map.order.length
+      ? state.map.order.reduce((sum, key) => sum + (state.map.hexes[key]?.massBase ?? 0), 0) / state.map.order.length
+      : 0,
+    districtCount: state.bases.reduce((sum, base) => sum + (base.districts?.length ?? 0), 0),
+    populationRatio: populationCap > 0 ? population / populationCap : 0,
+    villageCount,
+    civilianDeaths: state.ledger.civilianDeaths,
+    villagesBurned: state.ledger.villagesBurned,
+    displaced: state.ledger.displaced,
+    cadreLost: state.ledger.cadreLost,
+    grainSeized: state.ledger.grainSeized,
+    baseCount: state.bases.length,
+    techCount: state.research.done.length,
+    grade: summary.grade,
+    flags: state.endingFlags ?? [],
+  };
+
+  if (typeof DataHistory?.EvaluateEnding === "function") {
     try {
-      if (ending.condition(state, summary)) return ending;
+      const ending = DataHistory.EvaluateEnding(metrics);
+      if (ending?.title) return ending;
     } catch (error) {
-      // 跳过异常的条件
+      // 回退到内置结局
     }
   }
+  const list = Object.values(Definitions(DataHistory, "endingDefinitions")).filter(Boolean);
   return (
-    list.find((ending) => ending.key === "Default") ??
+    list.find((ending) => ending.key === "QuietBuilding") ??
     list[0] ?? {
       key: "Default",
       title: "根据地留存",

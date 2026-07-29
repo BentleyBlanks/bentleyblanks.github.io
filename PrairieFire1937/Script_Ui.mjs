@@ -391,8 +391,10 @@ export function CreateUi(root, hooks = {}) {
       definitions.terrain = modules[2];
       definitions.loading = false;
       definitions.loaded = true;
-      // 定义到位后重绘一次当前面板与底部卡片。
+      // 定义到位后重绘一次图例、底部卡片与当前面板。
+      RenderMinimapLegend();
       cache.signatures.context = "";
+      cache.minimapKey = "";
       if (currentState) Sync(currentState, currentView);
     });
   }
@@ -509,9 +511,11 @@ export function CreateUi(root, hooks = {}) {
     BuildMeterStrip();
     BuildSweepBanner();
     BuildMinimap();
+    // 通知流与底部面板同处左下角，放进同一个 flex 列里，从结构上杜绝互相压盖。
+    dom.leftDock = El("div", "pf-leftdock", { parent: dom.hud });
+    BuildNotifyStream();
     BuildContextPanel();
     BuildEndTurnDock();
-    BuildNotifyStream();
     BuildHintBar();
 
     dom.toastLayer = El("div", "pf-toast-layer", {
@@ -698,9 +702,9 @@ export function CreateUi(root, hooks = {}) {
       attrs: { type: "button" },
     });
     On(dom.sweepButton, "click", () => {
-      const sweep = currentState && currentState.sweep;
-      if (!sweep) return;
-      Call("OnFocusHex", sweep.targetKey, { axisKeys: sweep.axisKeys || [], reason: "Sweep" });
+      const forecast = cache.forecast || (currentState && currentState.sweep);
+      if (!forecast || !forecast.targetKey) return;
+      Call("OnFocusHex", forecast.targetKey, { axisKeys: forecast.axisKeys || [], reason: "Sweep" });
       Toast("已把镜头带到扫荡轴线的落点。", "warn");
     });
   }
@@ -725,17 +729,27 @@ export function CreateUi(root, hooks = {}) {
     On(dom.minimapCanvas, "pointermove", (event) => HandleMinimapHover(event));
     On(dom.minimapCanvas, "pointerleave", () => HideTooltip());
 
-    const legend = El("div", "pf-minimap-legend", { parent: dom.minimapDock });
-    for (const key of ["Base", "Guerrilla", "Contested", "Enemy"]) {
-      const item = El("span", "pf-legend-item", { parent: legend });
-      El("i", "pf-legend-dot", { parent: item, style: { background: controlDisplay[key].color } });
-      El("span", null, { text: controlDisplay[key].name, parent: item });
-    }
+    dom.minimapLegend = El("div", "pf-minimap-legend", { parent: dom.minimapDock });
+    RenderMinimapLegend();
     AttachTooltip(dom.minimapCanvas, () => ({
       title: "根据地略图",
       body: "颜色为政权归属，亮点为我方队伍，暗红点为已知敌军。",
       footer: "点击任意位置把镜头带过去。",
     }));
+  }
+
+  /** 图例名称与 Data_Terrain.controlDefinitions 保持一致，避免和地块面板的徽章不同名。 */
+  function RenderMinimapLegend() {
+    const legend = ClearNode(dom.minimapLegend);
+    if (!legend) return;
+    const table = DefinitionTable("controlDefinitions");
+    for (const key of ["Base", "Guerrilla", "Contested", "Enemy"]) {
+      const fallback = controlDisplay[key];
+      const definition = table[key] || {};
+      const item = El("span", "pf-legend-item", { parent: legend });
+      El("i", "pf-legend-dot", { parent: item, style: { background: definition.color || fallback.color } });
+      El("span", null, { text: definition.name || fallback.name, parent: item });
+    }
   }
 
   function SetMinimapCollapsed(next) {
@@ -750,7 +764,7 @@ export function CreateUi(root, hooks = {}) {
   }
 
   function BuildContextPanel() {
-    dom.context = El("section", "pf-context", { parent: dom.hud, attrs: { "aria-label": "地块与单位" } });
+    dom.context = El("section", "pf-context", { parent: dom.leftDock, attrs: { "aria-label": "地块与单位" } });
     dom.contextGrip = El("button", "pf-context-grip", {
       parent: dom.context,
       attrs: { type: "button", "aria-label": "展开或收起底部面板", "aria-expanded": "true" },
@@ -793,7 +807,7 @@ export function CreateUi(root, hooks = {}) {
 
   function BuildNotifyStream() {
     dom.notify = El("div", "pf-notify", {
-      parent: dom.hud,
+      parent: dom.leftDock,
       attrs: { role: "log", "aria-live": "polite", "aria-label": "通知" },
     });
   }
@@ -1106,9 +1120,14 @@ export function CreateUi(root, hooks = {}) {
     if (spoken.length) SetText(dom.meterSpoken, spoken.join("；"));
   }
 
+  /**
+   * 扫荡预警。优先采用 view.briefing.forecast（Rules.ForecastSweep 的结果，含 confidence），
+   * 没有 briefing 时退回 state.sweep。这是本作最核心的张力提示，必须醒目。
+   */
   function RenderSweep(state) {
-    const sweep = state.sweep;
-    if (!sweep) {
+    const forecast = (currentView && currentView.briefing && currentView.briefing.forecast) || state.sweep || null;
+    cache.forecast = forecast;
+    if (!forecast || !forecast.targetKey) {
       SetAttr(dom.sweepBanner, "hidden", true);
       SetFlag(dom.sweepBanner, "is-open", false);
       SetFlag(root, "has-sweep", false);
@@ -1117,16 +1136,29 @@ export function CreateUi(root, hooks = {}) {
     SetAttr(dom.sweepBanner, "hidden", null);
     SetFlag(dom.sweepBanner, "is-open", true);
     SetFlag(root, "has-sweep", true);
-    const turns = Math.max(0, Number(sweep.turnsUntil) || 0);
-    const strength = Number(sweep.strength) || 0;
+    const turns = Math.max(0, Number(forecast.turnsUntil) || 0);
+    const strength = Number(forecast.strength) || 0;
+    const axisCount = (forecast.axisKeys && forecast.axisKeys.length) || 0;
+    const confidence = forecast.confidence === undefined ? null : Number(forecast.confidence);
     SetText(dom.sweepTitle, turns <= 0 ? "扫荡已经开始" : "扫荡预警");
-    const target = sweep.targetKey ? HexLabel(state, sweep.targetKey) : "未明";
-    SetText(
-      dom.sweepDetail,
-      `敌军自 ${(sweep.axisKeys && sweep.axisKeys.length) || 0} 条轴线合击 ${target}，估计兵力 ${FormatNumber(strength)}。坚壁清野、转移群众。`
-    );
+    const target = HexLabel(state, forecast.targetKey);
+    const parts = [];
+    parts.push(axisCount ? `敌军自 ${axisCount} 条轴线合击${target}` : `敌军正向${target}合击`);
+    if (strength > 0) parts.push(`估计兵力 ${FormatNumber(strength)}`);
+    parts.push("坚壁清野、转移群众、主力跳出合围圈");
+    let detail = `${parts.join("，")}。`;
+    if (confidence !== null && confidence < 0.45) {
+      detail += ` 该区情报覆盖仅 ${Math.round(confidence * 100)}%，判断可能有误，轴线与落点都还没吃准。`;
+    }
+    SetText(dom.sweepDetail, detail);
     SetText(dom.sweepCountdown, turns <= 0 ? "现在" : `${turns} 回合`);
     SetFlag(dom.sweepBanner, "is-imminent", turns <= 1);
+    SetFlag(dom.sweepBanner, "is-vague", confidence !== null && confidence < 0.45);
+    SetAttr(
+      dom.sweepBanner,
+      "aria-label",
+      `扫荡预警：${turns <= 0 ? "已经开始" : `还有 ${turns} 回合`}，目标 ${target}`
+    );
   }
 
   function HexLabel(state, key) {
@@ -1314,7 +1346,7 @@ export function CreateUi(root, hooks = {}) {
     }
 
     // 扫荡箭头
-    const sweep = state.sweep;
+    const sweep = cache.forecast || state.sweep;
     if (sweep && sweep.targetKey) {
       const targetCoord = ParseHexKey(sweep.targetKey);
       const targetPoint = WorldToMinimap(layout, HexToWorld(targetCoord.q, targetCoord.r, 1));
@@ -1483,6 +1515,8 @@ export function CreateUi(root, hooks = {}) {
       view.selectedUnitId || "-",
       state.turn,
       state === cache.contextState ? "0" : "1",
+      (view.actions || []).map((action) => `${action.kind}:${action.label}:${action.enabled !== false ? 1 : 0}`).join(","),
+      definitions.loaded ? "d" : "-",
     ].join("|");
     if (signature === cache.signatures.context) return;
     cache.signatures.context = signature;
@@ -1769,7 +1803,7 @@ export function CreateUi(root, hooks = {}) {
         },
       });
       SetFlag(button, "is-danger", !!action.danger);
-      El("span", "pf-action-name", { text: action.label || meta.name, parent: button });
+      El("span", "pf-action-name", { text: NormalizeActionLabel(action.label) || meta.name, parent: button });
       const costText = FormatCost(action.cost);
       El("small", "pf-action-cost", {
         text: costText || (action.enabled === false ? "不可用" : action.danger ? "代价很高" : "—"),
@@ -1785,6 +1819,18 @@ export function CreateUi(root, hooks = {}) {
         TriggerAction(action);
       });
     }
+  }
+
+  /**
+   * 规范化行动标签。Rules 用 `修建${工事名}` 拼标签，而部分工事名自带动词
+   * （如「修梯田」「挖地道」），拼出来会是「修建修梯田」。这里只做显示层去重，
+   * 不改动 Rules 传来的 action 对象本身。
+   */
+  function NormalizeActionLabel(label) {
+    if (!label) return "";
+    return String(label)
+      .replace(/^修建(修|挖|垒|设|架|埋)/, "$1")
+      .replace(/^(修建|设置)\1/, "$1");
   }
 
   function BuildActionTip(action, meta, hotkey) {
