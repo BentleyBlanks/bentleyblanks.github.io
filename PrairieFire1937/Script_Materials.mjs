@@ -897,28 +897,37 @@ void main() {
   vec3 glintNormal = normalize( normal + vec3(
     ( Fbm( vWaterWorld.xz * 3.1 + uTime * 0.42, 3 ) - 0.5 ) * 1.15, 0.0,
     ( Fbm( vWaterWorld.zx * 3.4 - uTime * 0.36, 3 ) - 0.5 ) * 1.15 ) );
-  float specular = pow( max( dot( glintNormal, halfVector ), 0.0 ), 40.0 );
+  float specular = pow( max( dot( glintNormal, halfVector ), 0.0 ), 64.0 );
   // 碎光掩膜：镜面波瓣一放宽，一格水面会整块进入高光区而糊成死白。
-  // 用一层高对比噪声把它切成分离的亮斑，才读作"阳光在水上跳"。
-  float sparkleMask = smoothstep( 0.44, 0.72, Fbm( vWaterWorld.xz * 8.5 - uTime * 0.55, 2 ) );
-  specular *= 0.16 + 0.92 * sparkleMask;
+  // 关键是掩膜必须"稀疏"——只有很小一部分面积能进入高光，其余几乎为零，
+  // 才读作"阳光在水上跳"而不是"一整条河在发光"。
+  float sparkleMask = smoothstep( 0.62, 0.80, Fbm( vWaterWorld.xz * 11.0 - uTime * 0.55, 2 ) );
+  specular *= 0.02 + 0.98 * sparkleMask;
   float diffuse = 0.52 + 0.62 * max( dot( normal, sunDirection ), 0.0 );
 
   // 深浅：中心深、近岸浅，由几何送来的 aShore 距离场驱动，而不是满格随机斑块
   float shoreBand = smoothstep( 0.35, 1.0, vWaterShore );
   vec3 color = mix( uDeepColor, uShallowColor, shoreBand * 0.85 ) * diffuse;
-  color = mix( color, uSkyColor, fresnel * 0.7 );
-  color += uSunColor * specular * 5.2;
+  color = mix( color, uSkyColor, fresnel * 0.55 );
+  color += uSunColor * specular * 2.4;
 
   // 泡沫只出现在岸边，且斑块尺度缩到原来的四分之一，避免"霉斑"
   vec2 foamUv = vWaterWorld.xz * 13.0 + normalize( uFlowDirection + vec2( 0.0001 ) ) * uTime * uFlowSpeed * 3.0;
   float foamNoise = Fbm( foamUv, 3 );
-  float foam = smoothstep( 0.55, 0.92, foamNoise ) * smoothstep( 0.5, 1.0, vWaterShore );
-  color = mix( color, vec3( 0.92, 0.95, 0.94 ), foam * 0.58 * uDetail );
+  float foam = smoothstep( 0.62, 0.94, foamNoise ) * smoothstep( 0.62, 1.0, vWaterShore );
+  color = mix( color, vec3( 0.86, 0.89, 0.87 ), foam * 0.30 * uDetail );
 
-  // 顺流方向的细碎流光
-  float glitter = pow( Fbm( vWaterWorld.xz * 34.0 + uTime * 0.9, 2 ), 8.0 );
-  color += uSunColor * glitter * 1.55 * uDetail;
+  // 顺流方向的细碎流光：幂次拉高让它只剩针尖大的亮点，强度大幅下调，
+  // 否则它会和镜面高光叠加，把整条河抬成一片白。
+  float glitter = pow( Fbm( vWaterWorld.xz * 34.0 + uTime * 0.9, 2 ), 14.0 );
+  color += uSunColor * glitter * 0.55 * uDetail;
+
+  // 总量钳制：以上三层（镜面 / 泡沫 / 流光）是相加的，任何一层单独看都合理，
+  // 叠起来却会整体过曝。这里给水面一个明度上限，保证它始终读作"水"而不是"雪"，
+  // 同时保留碎光的局部尖峰。
+  float waterLum = dot( color, vec3( 0.299, 0.587, 0.114 ) );
+  float overshoot = max( waterLum - 0.78, 0.0 );
+  color -= overshoot * 0.72;
 
   float memory = explored * ( 1.0 - smoothstep( 0.15, 0.6, visible ) );
   float lum = dot( color, vec3( 0.299, 0.587, 0.114 ) );
