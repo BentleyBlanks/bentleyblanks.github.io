@@ -1380,7 +1380,7 @@ export function CreateRenderer(canvas, options = {}) {
 
   function EnsurePropResources() {
     if (!unitPadGeometry) {
-      unitPadGeometry = new THREE.CylinderGeometry(0.42, 0.48, 0.032, 6, 1);
+      unitPadGeometry = new THREE.CylinderGeometry(0.54, 0.60, 0.034, 6, 1);
       unitPadGeometry.rotateY(Math.PI / 6);
       unitPadGeometry.deleteAttribute("uv");
     }
@@ -1397,7 +1397,7 @@ export function CreateRenderer(canvas, options = {}) {
     if (!padMaterial) {
       // 不受光：部队底座是战场标识，不能因为落在山影里就看不见
       padMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0.88,
+        color: 0xffffff, transparent: true, opacity: 0.95,
         depthWrite: false, name: "PrairieUnitPad",
       });
       padMaterial.polygonOffset = true;
@@ -1460,9 +1460,9 @@ export function CreateRenderer(canvas, options = {}) {
   const propCategoryRecipes = Object.freeze({
     settlement: { tint: 0xd8c9a2, roofBoost: 1.60, saturation: 1.05 },   // 中立聚落：夯土黄 + 亮瓦顶
     stronghold: { tint: 0xc3c0b4, roofBoost: 1.45, saturation: 0.80 },   // 敌据点：冷灰水泥
-    friendly: { tint: 0xd9b48a, roofBoost: 1.50, saturation: 1.18 },     // 我方：暖褐布衣
-    enemy: { tint: 0xd8c37e, roofBoost: 1.45, saturation: 1.10 },        // 敌方：土黄制服
-    hidden: { tint: 0x9fb6bd, roofBoost: 1.35, saturation: 0.72, opacity: 0.74 },
+    friendly: { tint: 0xe0d0b6, roofBoost: 1.62, saturation: 0.95 },     // 我方：暖褐布衣
+    enemy: { tint: 0xe8d494, roofBoost: 1.62, saturation: 1.10 },        // 敌方：土黄制服
+    hidden: { tint: 0xb8ccd4, roofBoost: 1.50, saturation: 0.72, opacity: 0.78 },
     foliage: { tint: 0xa8c47e, roofBoost: 1.30, saturation: 1.16 },      // 植被：拉回绿色
     works: { tint: 0xcbb98c, roofBoost: 1.40, saturation: 1.02 },        // 工事 / 区域
     neutral: { tint: 0xc8bda4, roofBoost: 1.40, saturation: 1.0 },
@@ -1650,7 +1650,7 @@ export function CreateRenderer(canvas, options = {}) {
       const banner = CreateBannerModel({ cloth: modelPalette.bannerRed, band: "#e0cfa2", height: base.tier >= 3 ? 0.56 : 0.46 });
       PlaceCategorised(staticPool, banner, "friendly",
         entry.x + 0.34, SurfaceAt(entry, 0.34, -0.34) + worldConfig.propLift, entry.z - 0.34,
-        0.6, radius * 1.9, null, visible, { castShadow: false, shadowRadius: 0 });
+        0.6, radius * 1.25, null, visible, { castShadow: false, shadowRadius: 0 });
       const districts = Array.isArray(base.districts) ? base.districts : [];
       for (let index = 0; index < districts.length; index += 1) {
         const district = districts[index];
@@ -1746,7 +1746,7 @@ export function CreateRenderer(canvas, options = {}) {
         if (record.faction === "Player" && !hidden) {
           const flag = CreateBannerModel(playerFlagColors);
           PlaceModel(unitPool, flag, x - 0.30, surfaceY + worldConfig.propLift, z + 0.24, 0.4,
-            worldConfig.tileRadius * 1.45, null, visible,
+            worldConfig.tileRadius * 0.85, null, visible,
             GetPropMaterial(SourceMaterialOf(flag), "friendly"), false);
         }
       }
