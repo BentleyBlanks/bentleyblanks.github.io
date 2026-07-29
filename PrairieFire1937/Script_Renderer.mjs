@@ -147,6 +147,18 @@ const cinemaGradeShader = {
     uGammaValue: { value: new THREE.Vector3(1.0, 1.0, 1.02) },
     uShadowTint: { value: new THREE.Color(0x28313c) },
     uHighlightTint: { value: new THREE.Color(0xffe3b4) },
+    // 肩部提亮：ACES 的肩部压缩很强，线性 1.0 出来只有约 0.8，
+    // 于是整幅画的 p99 卡在 0.69、亮度 0.875 以上的像素恒为 0——画面没有白点，
+    // 看上去永远蒙着一层灰。这里只把「已经足够亮」的小面积区域往上推，
+    // 中间调完全不动，从而在受光屋顶与水面碎光上建立真正的高光锚。
+    // 注意：本 pass 工作在**线性**空间，OutputPass 之后才做 sRGB 编码。
+    // 屏幕上看到的 p99≈0.64 对应线性值只有约 0.38，因此阈值必须按线性刻度设，
+    // 而不是按屏幕刻度——起点设 0.30 会正好落在曲线最平处，提亮等于没做
+    // （实测把增益开到 8.0，p99 依然纹丝不动）。
+    // 目标：线性 0.38 推到约 0.69，编码后就是屏幕上的 0.85 白点。
+    uShoulderGain: { value: 0.85 },
+    uShoulderStart: { value: 0.23 },
+    uShoulderSpan: { value: 0.13 },
     uVignette: { value: 0.24 },
     uVignetteStart: { value: 0.58 },
     uGrain: { value: 0.034 },
@@ -173,6 +185,9 @@ uniform vec3 uGain;
 uniform vec3 uGammaValue;
 uniform vec3 uShadowTint;
 uniform vec3 uHighlightTint;
+uniform float uShoulderGain;
+uniform float uShoulderStart;
+uniform float uShoulderSpan;
 uniform float uVignette;
 uniform float uVignetteStart;
 uniform float uGrain;
@@ -236,6 +251,12 @@ void main() {
 
   color = mix( vec3( luma ), color, uSaturation );
   color = ( color - 0.18 ) * uContrast + 0.18;
+
+  // 肩部：把已经接近上限的区域推到真正的白，让画面有高光锚点。
+  // 用平方权重保证只有很小一部分面积被推上去，中间调不被抬灰。
+  float shoulderLuma = dot( max( color, vec3( 0.0 ) ), lumaWeights );
+  float shoulder = smoothstep( uShoulderStart, uShoulderStart + uShoulderSpan, shoulderLuma );
+  color *= 1.0 + uShoulderGain * shoulder * shoulder;
 
   // 暗角（按画幅比例校正，避免宽屏两侧过黑）
   vec2 centered = ( vUv - 0.5 ) * vec2( max( uResolution.x / max( uResolution.y, 1.0 ), 0.001 ), 1.0 );
@@ -541,7 +562,7 @@ export function CreateRenderer(canvas, options = {}) {
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.14;
+  renderer.toneMappingExposure = 1.30;
   renderer.shadowMap.enabled = profile.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setClearColor(0x9fb0bd, 1);
@@ -1382,7 +1403,10 @@ export function CreateRenderer(canvas, options = {}) {
 
   function EnsurePropResources() {
     if (!unitPadGeometry) {
-      unitPadGeometry = new THREE.CylinderGeometry(0.60, 0.66, 0.034, 6, 1);
+      // 环形而不是实心盘：实心盘在俯视下读作"一汪水塘"，比真实河面还蓝还饱和，
+      // 部队像半陷在里面。改成贴地的窄环，只标出站位不抢画面。
+      unitPadGeometry = new THREE.RingGeometry(0.50, 0.63, 6, 1);
+      unitPadGeometry.rotateX(-Math.PI / 2);
       unitPadGeometry.rotateY(Math.PI / 6);
       unitPadGeometry.deleteAttribute("uv");
     }
@@ -1400,8 +1424,8 @@ export function CreateRenderer(canvas, options = {}) {
     if (!padMaterial) {
       // 不受光：部队底座是战场标识，不能因为落在山影里就看不见
       padMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0.95,
-        depthWrite: false, name: "PrairieUnitPad",
+        color: 0xffffff, transparent: true, opacity: 0.62,
+        side: THREE.DoubleSide, depthWrite: false, name: "PrairieUnitPad",
       });
       padMaterial.polygonOffset = true;
       padMaterial.polygonOffsetFactor = -4;

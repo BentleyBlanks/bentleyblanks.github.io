@@ -458,12 +458,12 @@ export function CreateTerrainMaterial(renderer, options = {}) {
     uControlStrength: { value: options.controlStrength ?? 0.15 },
     uScorchColor: { value: new THREE.Color(0x2a221d) },
     uUnexploredColor: { value: new THREE.Color(0x1e2430) },
-    uUnexploredMix: { value: 0.62 },
+    uUnexploredMix: { value: 0.76 },
     uMemoryTint: { value: new THREE.Color(0x707a86) },
     uMemoryStrength: { value: 0.78 },
     uFogHeightBase: { value: 0.35 },
     uFogHeightFalloff: { value: 0.42 },
-    uWallBounce: { value: 0.15 },
+    uWallBounce: { value: 0.34 },
   };
 
   const material = new THREE.MeshStandardMaterial({
@@ -591,9 +591,12 @@ float terrainWet = vFacet.z * vFacet.x;
   // 未探索 → 低明度冷灰的"未知的暗"。
   // 整局约 85% 的画面是这一片，不能糊成一坨泥：把高程差映射成 ±0.11 的明度带，
   // 再叠一点侧壁压暗，山脊 / 谷地的轮廓即使没探明也读得出来。
+  // 亮度重建必须是「压缩」而不是「线性跟随」：线性跟随会让亮地形几乎不变暗、
+  // 暗地形被压黑，结果同一地形已探/未探的明度差只有 0.001，玩家看不出自己
+  // 侦察到哪儿了。压缩后任何地形的落差都稳定在可辨范围。
   float unknownLum = dot( albedo, vec3( 0.299, 0.587, 0.114 ) );
   float unknownRelief = ( clamp( vFacet.y, 0.0, 1.0 ) - 0.42 ) * 0.62;
-  vec3 unknown = uUnexploredColor * ( 0.86 + 0.90 * unknownLum + unknownRelief );
+  vec3 unknown = uUnexploredColor * ( 0.70 + 0.35 * unknownLum + unknownRelief );
   unknown *= 1.0 - wall * 0.24;
   albedo = mix( mix( albedo, unknown, uUnexploredMix ), albedo, explored );
 
@@ -724,11 +727,14 @@ void main() {
   // 垂直渐变：天顶 → 地平 → 地面反射
   float verticalT = pow( clamp( up, 0.0, 1.0 ), 0.52 );
   vec3 sky = mix( uHorizon, uZenith, verticalT );
-  sky = mix( sky, uGround * 1.45, clamp( -up * 2.0, 0.0, 1.0 ) );
+  // 地平线以下是「远处的大地」，必须比天空暗。原来乘 1.45 反而把它提得比天还亮，
+  // 而策略视角俯角约 54°，画面上部正好落在这一段——于是地图边缘外侧变成一大片
+  // 灰白平板，既是全画面最亮的区域，又把边缘的悬空断崖衬得格外刺眼。
+  sky = mix( sky, uGround * 0.52, clamp( -up * 2.2, 0.0, 1.0 ) );
 
-  // 地平线雾霭带
-  float horizonBand = exp( -abs( up ) * 9.0 );
-  sky = mix( sky, uHorizon * 1.30, horizonBand * uHaze );
+  // 地平线雾霭带：只在地平线以上生成，且提亮幅度收敛
+  float horizonBand = exp( -abs( up ) * 9.0 ) * smoothstep( -0.03, 0.07, up );
+  sky = mix( sky, uHorizon * 1.06, horizonBand * uHaze );
 
   // 太阳辉光 + 日盘
   float sunDot = max( dot( direction, normalize( uSunDirection ) ), 0.0 );
@@ -909,7 +915,7 @@ void main() {
   float shoreBand = smoothstep( 0.35, 1.0, vWaterShore );
   vec3 color = mix( uDeepColor, uShallowColor, shoreBand * 0.85 ) * diffuse;
   color = mix( color, uSkyColor, fresnel * 0.55 );
-  color += uSunColor * specular * 2.4;
+  color += uSunColor * specular * 5.6;
 
   // 泡沫只出现在岸边，且斑块尺度缩到原来的四分之一，避免"霉斑"
   vec2 foamUv = vWaterWorld.xz * 13.0 + normalize( uFlowDirection + vec2( 0.0001 ) ) * uTime * uFlowSpeed * 3.0;
@@ -920,13 +926,13 @@ void main() {
   // 顺流方向的细碎流光：幂次拉高让它只剩针尖大的亮点，强度大幅下调，
   // 否则它会和镜面高光叠加，把整条河抬成一片白。
   float glitter = pow( Fbm( vWaterWorld.xz * 34.0 + uTime * 0.9, 2 ), 14.0 );
-  color += uSunColor * glitter * 0.55 * uDetail;
+  color += uSunColor * glitter * 1.5 * uDetail;
 
   // 总量钳制：以上三层（镜面 / 泡沫 / 流光）是相加的，任何一层单独看都合理，
   // 叠起来却会整体过曝。这里给水面一个明度上限，保证它始终读作"水"而不是"雪"，
   // 同时保留碎光的局部尖峰。
   float waterLum = dot( color, vec3( 0.299, 0.587, 0.114 ) );
-  float overshoot = max( waterLum - 0.78, 0.0 );
+  float overshoot = max( waterLum - 1.35, 0.0 );
   color -= overshoot * 0.72;
 
   float memory = explored * ( 1.0 - smoothstep( 0.15, 0.6, visible ) );
