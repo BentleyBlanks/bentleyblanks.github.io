@@ -243,7 +243,9 @@ void main() {
   color *= 1.0 - uVignette * pow( vignetteAmount, 1.4 );
 
   // 胶片颗粒：暗部更明显，高光收敛，保持画面锐利
-  float grain = Hash21( vUv * uResolution + vec2( fract( uTime * 13.0 ) * 311.0, fract( uTime * 7.0 ) * 197.0 ) ) - 0.5;
+  // 颗粒尺度锁定到 1080p 基准，高分辨率下颗粒不会退化成细密噪点
+  vec2 grainCoord = vUv * min( uResolution, vec2( 1920.0, 1080.0 ) ) * 0.75;
+  float grain = Hash21( grainCoord + vec2( fract( uTime * 13.0 ) * 311.0, fract( uTime * 7.0 ) * 197.0 ) ) - 0.5;
   color += grain * uGrain * mix( 1.0, 0.25, clamp( luma, 0.0, 1.0 ) );
 
   gl_FragColor = vec4( max( color, vec3( 0.0 ) ), 1.0 );
@@ -537,7 +539,7 @@ export function CreateRenderer(canvas, options = {}) {
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.20;
+  renderer.toneMappingExposure = 0.94;
   renderer.shadowMap.enabled = profile.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setClearColor(0x9fb0bd, 1);
@@ -659,7 +661,7 @@ export function CreateRenderer(canvas, options = {}) {
   let railMesh = null;
   let borderMesh = null;
   let overlayMesh = null;
-  let fogCloudMesh = null;
+  const fogCloudMeshes = [];
   let hoverMesh = null;
   let selectMesh = null;
 
@@ -1033,6 +1035,33 @@ export function CreateRenderer(canvas, options = {}) {
     for (const entry of hexEntries) {
       if (!entry.profile.water) continue;
       const geometry = BuildHexDisc(carpetLayout, worldConfig.tileRadius * 0.99, entry, entry.topY + worldConfig.waterLift, false, 0, 0, false);
+      // aShore：到岸的距离场。中心 0，靠近"非水邻格"的一侧趋近 1，泡沫只长在这里。
+      const openness = [];
+      for (let side = 0; side < 6; side += 1) {
+        const direction = hexDirections[side];
+        const neighbour = hexByKey.get(HexKey(entry.q + direction.q, entry.r + direction.r));
+        openness.push(!neighbour || !neighbour.profile.water ? 1 : 0);
+      }
+      const count = carpetLayout.points.length;
+      const shore = new Float32Array(count);
+      for (let index = 0; index < count; index += 1) {
+        const point = carpetLayout.points[index];
+        if (point.t <= 0.001) { shore[index] = 0; continue; }
+        // 顶点方位角 → 最近的边方向，取该方向的岸线权重
+        const angle = Math.atan2(point.z, point.x);
+        let best = 0;
+        for (let side = 0; side < 6; side += 1) {
+          if (!openness[side]) continue;
+          const direction = hexDirections[side];
+          const world = HexToWorld(direction.q, direction.r, hexSize);
+          const sideAngle = Math.atan2(world.z, world.x);
+          let delta = Math.abs(angle - sideAngle);
+          if (delta > Math.PI) delta = Math.PI * 2 - delta;
+          best = Math.max(best, Clamp01(1 - delta / (Math.PI / 2)));
+        }
+        shore[index] = point.t * point.t * best;
+      }
+      geometry.setAttribute("aShore", new THREE.BufferAttribute(shore, 1));
       pieces.push(geometry);
     }
     return MergeAndDispose(pieces);
@@ -1087,16 +1116,48 @@ export function CreateRenderer(canvas, options = {}) {
     return MergeAndDispose(pieces);
   }
 
-  function BuildFogCloudGeometry() {
-    const pieces = [];
+  /**
+   * 迷雾云按 XZ 象限切成若干块，每块一个 mesh：
+   * 整块都已探索时直接 visible=false，连提交都省掉（原来 19760 顶点的单一 mesh
+   * 即使全图探明也仍要走完 fragment 再 discard）。
+   * 每格只保留一层 disc（原来两层），覆盖面积与 overdraw 直接减半。
+   */
+  function BuildFogCloudChunks() {
+    const chunkColumns = 3;
+    const chunkRows = 3;
+    const spanX = Math.max(0.001, mapBounds.maxX - mapBounds.minX);
+    const spanZ = Math.max(0.001, mapBounds.maxZ - mapBounds.minZ);
+    const buckets = new Map();
     for (const entry of hexEntries) {
-      const highOffset = 0.14 * (entry.phaseByte / 255);
-      pieces.push(BuildHexDisc(carpetLayout, worldConfig.tileRadius * 1.06, entry,
+      const column = Clamp(Math.floor(((entry.x - mapBounds.minX) / spanX) * chunkColumns), 0, chunkColumns - 1);
+      const row = Clamp(Math.floor(((entry.z - mapBounds.minZ) / spanZ) * chunkRows), 0, chunkRows - 1);
+      const bucketKey = `${column},${row}`;
+      let bucket = buckets.get(bucketKey);
+      if (!bucket) { bucket = { entries: [], pieces: [] }; buckets.set(bucketKey, bucket); }
+      bucket.entries.push(entry);
+      const highOffset = 0.16 * (entry.phaseByte / 255);
+      bucket.pieces.push(BuildHexDisc(carpetLayout, worldConfig.tileRadius * 1.04, entry,
         entry.crestY + worldConfig.fogLowLift + highOffset, true, 1.0, 0.0));
-      pieces.push(BuildHexDisc(carpetLayout, worldConfig.tileRadius * 0.82, entry,
-        entry.crestY + worldConfig.fogHighLift + highOffset * 1.6, true, 0.55, 0.22));
     }
-    return MergeAndDispose(pieces);
+    const chunks = [];
+    for (const bucket of buckets.values()) {
+      const geometry = MergeAndDispose(bucket.pieces);
+      if (!geometry) continue;
+      chunks.push({ geometry, entries: bucket.entries });
+    }
+    return chunks;
+  }
+
+  /** 逐块判断是否还有未探索格，全探明的块整块关掉。 */
+  function UpdateFogCloudVisibility() {
+    if (!fogCloudMeshes.length) return;
+    for (const chunk of fogCloudMeshes) {
+      let hasUnknown = false;
+      for (const entry of chunk.userData.entries) {
+        if (!entry.hex.explored) { hasUnknown = true; break; }
+      }
+      chunk.visible = hasUnknown && profile.fogClouds;
+    }
   }
 
   function EdgeMidHeight(entry, neighbour) {
@@ -1737,8 +1798,8 @@ export function CreateRenderer(canvas, options = {}) {
    */
   function BuildSelectRingGeometry() {
     const collector = CreateCollector();
-    const outer = HexCornerOffsets(1.10);
-    const inner = HexCornerOffsets(0.80);
+    const outer = HexCornerOffsets(1.06);
+    const inner = HexCornerOffsets(0.90);
     const steps = 6;
     for (let side = 0; side < 6; side += 1) {
       const outerFrom = outer[side];
@@ -1845,11 +1906,11 @@ export function CreateRenderer(canvas, options = {}) {
     DisposeCsm();
     const direction = ComputeSunDirection();
     sunLight.color.setHex(palette.sun.color);
-    sunLight.intensity = palette.sun.intensity;
+    sunLight.intensity = palette.sun.intensity * 1.15;
     hemisphereLight.color.setHex(palette.ambient.sky);
     hemisphereLight.groundColor.setHex(palette.ambient.ground);
-    hemisphereLight.intensity = palette.ambient.intensity;
-    fillLight.intensity = 0.16 + (1 - Clamp01(palette.sun.intensity / 3)) * 0.22;
+    hemisphereLight.intensity = palette.ambient.intensity * 0.34;
+    fillLight.intensity = 0.03 + (1 - Clamp01(palette.sun.intensity / 3)) * 0.05;
 
     renderer.shadowMap.enabled = profile.shadows;
 
@@ -1869,11 +1930,12 @@ export function CreateRenderer(canvas, options = {}) {
     shadowCamera.right = span;
     shadowCamera.top = span;
     shadowCamera.bottom = -span;
-    shadowCamera.near = 1;
-    shadowCamera.far = span * 5 + 60;
+    shadowCamera.near = Math.max(1, span * 1.0);
+    shadowCamera.far = span * 4.2 + 30;
     shadowCamera.updateProjectionMatrix();
-    sunLight.shadow.bias = -0.0008;
-    sunLight.shadow.normalBias = 0.035;
+    sunLight.shadow.bias = -0.00035;
+    sunLight.shadow.normalBias = 0.022;
+    sunLight.shadow.radius = 1.4;
 
     // 远景补一层 CSM（仅 ultra）：近处交给上面那盏，远处才让级联接手
     if (profile.csm && profile.shadows) {
@@ -1978,10 +2040,10 @@ export function CreateRenderer(canvas, options = {}) {
     skyDome.userData.uniforms.uSunDirection.value.copy(direction);
     waterMaterial.userData.uniforms.uSunDirection.value.copy(direction);
     sunLight.color.setHex(palette.sun.color);
-    sunLight.intensity = palette.sun.intensity;
+    sunLight.intensity = palette.sun.intensity * 1.15;
     hemisphereLight.color.setHex(palette.ambient.sky);
     hemisphereLight.groundColor.setHex(palette.ambient.ground);
-    hemisphereLight.intensity = palette.ambient.intensity;
+    hemisphereLight.intensity = palette.ambient.intensity * 0.34;
     if (csm) {
       csm.lightDirection.copy(direction).negate().normalize();
       csm.lightIntensity = palette.sun.intensity / Math.max(1, profile.cascades);
@@ -2000,7 +2062,7 @@ export function CreateRenderer(canvas, options = {}) {
     waterMaterial.userData.uniforms.uDetail.value = profile.waterDetail;
     noiseTexture.anisotropy = profile.anisotropy;
     noiseTexture.needsUpdate = true;
-    if (fogCloudMesh) fogCloudMesh.visible = profile.fogClouds;
+    UpdateFogCloudVisibility();
     skyDome.userData.uniforms.uCloudOpacity.value = profile.skyClouds ? palette.sky.cloudOpacity : 0;
   }
 
@@ -2021,7 +2083,8 @@ export function CreateRenderer(canvas, options = {}) {
     DisposeMesh(railMesh, propGroup); railMesh = null;
     DisposeMesh(borderMesh, overlayGroup); borderMesh = null;
     DisposeMesh(overlayMesh, overlayGroup); overlayMesh = null;
-    DisposeMesh(fogCloudMesh, overlayGroup); fogCloudMesh = null;
+    for (const chunk of fogCloudMeshes) DisposeMesh(chunk, overlayGroup);
+    fogCloudMeshes.length = 0;
     DisposeMesh(hoverMesh, overlayGroup); hoverMesh = null;
     DisposeMesh(selectMesh, overlayGroup); selectMesh = null;
     InstancePoolDispose(staticPool);
@@ -2135,15 +2198,16 @@ export function CreateRenderer(canvas, options = {}) {
       overlayGroup.add(overlayMesh);
     }
 
-    const fogGeometry = BuildFogCloudGeometry();
-    if (fogGeometry) {
-      fogCloudMesh = new THREE.Mesh(fogGeometry, fogOfWarMaterial);
-      fogCloudMesh.name = "PrairieFogClouds";
-      fogCloudMesh.renderOrder = 8;
-      fogCloudMesh.frustumCulled = false;
-      fogCloudMesh.visible = profile.fogClouds;
-      overlayGroup.add(fogCloudMesh);
+    for (const chunk of BuildFogCloudChunks()) {
+      const mesh = new THREE.Mesh(chunk.geometry, fogOfWarMaterial);
+      mesh.name = "PrairieFogClouds";
+      mesh.renderOrder = 8;
+      mesh.userData.entries = chunk.entries;
+      mesh.visible = profile.fogClouds;
+      overlayGroup.add(mesh);
+      fogCloudMeshes.push(mesh);
     }
+    UpdateFogCloudVisibility();
 
     const hoverGeometry = BuildHoverOutlineGeometry();
     if (hoverGeometry) {
@@ -2242,6 +2306,7 @@ export function CreateRenderer(canvas, options = {}) {
     }
 
     WriteHexState();
+    UpdateFogCloudVisibility();
 
     const nextStructureSignature = ComputeStructureSignature();
     if (nextStructureSignature !== structureSignature) {
@@ -2505,7 +2570,7 @@ export function CreateRenderer(canvas, options = {}) {
     if (sunLight.visible && sunLight.castShadow) {
       // 阴影相机跟着镜头焦点走，让有限的 texel 全部花在玩家正看着的区域
       const direction = ComputeSunDirection();
-      const reach = profile.shadowSpan * 2.4 + 24;
+      const reach = profile.shadowSpan * 1.9 + 18;
       sunLight.position.copy(controls.target).addScaledVector(direction, reach);
       sunLight.target.position.copy(controls.target);
       sunLight.target.updateMatrixWorld();

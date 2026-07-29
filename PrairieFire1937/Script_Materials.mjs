@@ -148,27 +148,27 @@ const seasonBase = Object.freeze({
 const eraGrade = Object.freeze({
   Opening: {
     sunScale: 1.06, elevationDelta: 4, azimuthDelta: 0, warm: 0.16, fogScale: 0.92,
-    saturation: 1.14, contrast: 1.04, vignette: 0.28, grain: 0.028, bloomThreshold: 0.78, bloomStrength: 0.46,
+    saturation: 1.14, contrast: 1.04, vignette: 0.28, grain: 0.010, bloomThreshold: 0.78, bloomStrength: 0.46,
     shadowTint: 0x3a3a40, highlightTint: 0xffe4b2, lift: 0.010,
   },
   Growth: {
     sunScale: 1.0, elevationDelta: 0, azimuthDelta: 8, warm: 0.08, fogScale: 1.0,
-    saturation: 1.08, contrast: 1.05, vignette: 0.32, grain: 0.032, bloomThreshold: 0.80, bloomStrength: 0.42,
+    saturation: 1.08, contrast: 1.05, vignette: 0.32, grain: 0.011, bloomThreshold: 0.80, bloomStrength: 0.42,
     shadowTint: 0x353840, highlightTint: 0xffe1ae, lift: 0.012,
   },
   Hardship: {
     sunScale: 0.80, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.42,
-    saturation: 0.80, contrast: 1.10, vignette: 0.46, grain: 0.052, bloomThreshold: 0.86, bloomStrength: 0.30,
+    saturation: 0.80, contrast: 1.10, vignette: 0.46, grain: 0.017, bloomThreshold: 0.86, bloomStrength: 0.30,
     shadowTint: 0x232a34, highlightTint: 0xd7dde2, lift: 0.020,
   },
   Recovery: {
     sunScale: 0.96, elevationDelta: -4, azimuthDelta: 12, warm: 0.12, fogScale: 1.14,
-    saturation: 0.94, contrast: 1.06, vignette: 0.38, grain: 0.040, bloomThreshold: 0.82, bloomStrength: 0.38,
+    saturation: 0.94, contrast: 1.06, vignette: 0.38, grain: 0.013, bloomThreshold: 0.82, bloomStrength: 0.38,
     shadowTint: 0x2c3138, highlightTint: 0xf6dcae, lift: 0.014,
   },
   Counter: {
     sunScale: 1.12, elevationDelta: -8, azimuthDelta: -34, warm: 0.30, fogScale: 1.04,
-    saturation: 1.08, contrast: 1.08, vignette: 0.32, grain: 0.030, bloomThreshold: 0.72, bloomStrength: 0.62,
+    saturation: 1.08, contrast: 1.08, vignette: 0.32, grain: 0.010, bloomThreshold: 0.72, bloomStrength: 0.62,
     shadowTint: 0x2f2a2c, highlightTint: 0xffd58a, lift: 0.008,
   },
 });
@@ -457,6 +457,7 @@ export function CreateTerrainMaterial(renderer, options = {}) {
     uMemoryStrength: { value: 0.78 },
     uFogHeightBase: { value: 0.35 },
     uFogHeightFalloff: { value: 0.42 },
+    uWallBounce: { value: 0.26 },
   };
 
   const material = new THREE.MeshStandardMaterial({
@@ -519,6 +520,7 @@ uniform vec3 uMemoryTint;
 uniform float uMemoryStrength;
 uniform float uFogHeightBase;
 uniform float uFogHeightFalloff;
+uniform float uWallBounce;
 varying vec2 vHexUv;
 varying vec3 vFacet;
 varying vec3 vTerrainWorld;
@@ -539,21 +541,25 @@ float terrainWet = vFacet.z * vFacet.x;
   vec2 detailUv = vTerrainWorld.xz * uNoiseScale;
   vec3 fineNoise = texture2D( uNoiseMap, detailUv * 3.3 ).rgb;
   vec3 broadNoise = texture2D( uNoiseMap, detailUv * 0.43 ).rgb;
-  float breakup = mix( broadNoise.r, fineNoise.b, 0.42 );
+  // 拉开噪声对比，否则 fbm 集中在 0.3~0.7 之间，顶面看上去是一块死板的纯色
+  float breakup = mix( broadNoise.r, fineNoise.b, 0.5 );
+  breakup = clamp( ( breakup - 0.5 ) * 2.2 + 0.5, 0.0, 1.0 );
+  float grit = fineNoise.b * 0.5 + broadNoise.g * 0.5;
 
   vec3 albedo = diffuseColor.rgb;
-  albedo *= mix( 1.0, 0.78 + 0.48 * breakup, uDetailStrength );
+  albedo *= mix( 1.0, 0.62 + 0.78 * breakup, uDetailStrength );
+  // 近景砂砾：小尺度的明暗颗粒，给顶面 54 个三角一点可读的质感
+  albedo *= mix( 1.0, 0.90 + 0.22 * grit, uDetailStrength );
 
   // 侧壁：按高度分岩层，交替明暗带 + 噪声打断，做出沉积层理。
   float wall = 1.0 - vFacet.x;
   float depthT = clamp( vFacet.z, 0.0, 1.0 );
   float bandPhase = fract( depthT * 3.0 + broadNoise.g * 0.45 );
   vec3 strata = mix( uStrataHigh, uStrataLow, smoothstep( 0.0, 1.0, depthT ) );
-  strata *= 0.84 + 0.30 * step( 0.5, bandPhase ) + 0.16 * fineNoise.g;
+  strata *= 0.68 + 0.52 * step( 0.5, bandPhase ) + 0.22 * fineNoise.g;
   // 侧壁：顶点色（按地形的岩层渐变）与全局岩层色混合，并补一点来自地面的漫反射弹跳，
   // 保证背光侧仍读得出三条层理，而不是塌成一条纯黑缝。
-  albedo = mix( albedo, albedo * 0.55 + strata * 0.78, wall * 0.9 );
-  albedo += uStrataHigh * wall * 0.11;
+  albedo = mix( albedo, albedo * 0.46 + strata * 0.80, wall * 0.92 );
 
   // 山顶积雪：随季节的雪量与雪线，只覆盖顶面与近顶壁。
   float snowField = smoothstep( uSnowLine, uSnowLine + uSnowBlend, vFacet.y + breakup * 0.07 - terrainWet * 0.28 );
@@ -583,6 +589,11 @@ float terrainWet = vFacet.z * vFacet.x;
 
   diffuseColor.rgb = albedo;
 }`
+      )
+      .replace(
+        "#include <lights_fragment_end>",
+        `#include <lights_fragment_end>
+reflectedLight.indirectDiffuse += ( 1.0 - vFacet.x ) * uWallBounce * diffuseColor.rgb;`
       )
       .replace(
         "#include <roughnessmap_fragment>",
@@ -798,6 +809,7 @@ export function CreateWaterMaterial() {
 #include <common>
 #include <fog_pars_vertex>
 attribute vec2 aHexUv;
+attribute float aShore;
 uniform float uTime;
 uniform float uWaveScale;
 uniform float uWaveHeight;
@@ -806,9 +818,11 @@ uniform float uFlowSpeed;
 varying vec2 vHexUv;
 varying vec3 vWaterWorld;
 varying vec3 vWaterView;
+varying float vWaterShore;
 
 void main() {
   vHexUv = aHexUv;
+  vWaterShore = aShore;
   vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
   vec2 flow = normalize( uFlowDirection + vec2( 0.0001 ) ) * uTime * uFlowSpeed;
   float wave = sin( ( worldPosition.x * 1.7 + worldPosition.z * 1.1 ) * uWaveScale - flow.x * 6.0 ) * 0.5
@@ -841,6 +855,7 @@ uniform vec3 uUnexploredColor;
 varying vec2 vHexUv;
 varying vec3 vWaterWorld;
 varying vec3 vWaterView;
+varying float vWaterShore;
 ${glslHash}
 
 vec3 WaveNormal( vec2 p, float time ) {
@@ -851,7 +866,8 @@ vec3 WaveNormal( vec2 p, float time ) {
   float h0 = Fbm( a, 3 ) * 0.6 + Fbm( b, 2 ) * 0.4;
   float hx = Fbm( a + vec2( e, 0.0 ), 3 ) * 0.6 + Fbm( b + vec2( e, 0.0 ), 2 ) * 0.4;
   float hz = Fbm( a + vec2( 0.0, e ), 3 ) * 0.6 + Fbm( b + vec2( 0.0, e ), 2 ) * 0.4;
-  return normalize( vec3( ( h0 - hx ) * uDetail * 2.4, 0.22, ( h0 - hz ) * uDetail * 2.4 ) );
+  // y 必须占主导：水面法线只在竖直方向上做小幅扰动，否则镜面高光会炸成大片白斑
+  return normalize( vec3( ( h0 - hx ) * uDetail * 0.65, 1.0, ( h0 - hz ) * uDetail * 0.65 ) );
 }
 
 void main() {
@@ -865,17 +881,24 @@ void main() {
 
   vec3 sunDirection = normalize( uSunDirection );
   vec3 halfVector = normalize( sunDirection + viewDirection );
-  float specular = pow( max( dot( normal, halfVector ), 0.0 ), 96.0 );
+  float specular = pow( max( dot( normal, halfVector ), 0.0 ), 220.0 );
   float diffuse = 0.42 + 0.58 * max( dot( normal, sunDirection ), 0.0 );
 
-  float shore = smoothstep( 0.28, 0.72, Fbm( vWaterWorld.xz * 3.4 + uTime * 0.05, 3 ) );
-  vec3 color = mix( uDeepColor, uShallowColor, shore ) * diffuse;
-  color = mix( color, uSkyColor, fresnel * 0.62 );
-  color += uSunColor * specular * 0.85;
+  // 深浅：中心深、近岸浅，由几何送来的 aShore 距离场驱动，而不是满格随机斑块
+  float shoreBand = smoothstep( 0.35, 1.0, vWaterShore );
+  vec3 color = mix( uDeepColor, uShallowColor, shoreBand * 0.85 ) * diffuse;
+  color = mix( color, uSkyColor, fresnel * 0.7 );
+  color += uSunColor * specular * 0.55;
 
-  // 河面细碎流光
-  float glitter = pow( Fbm( vWaterWorld.xz * 22.0 + uTime * 0.6, 2 ), 6.0 );
-  color += uSunColor * glitter * 0.35 * uDetail;
+  // 泡沫只出现在岸边，且斑块尺度缩到原来的四分之一，避免"霉斑"
+  vec2 foamUv = vWaterWorld.xz * 13.0 + normalize( uFlowDirection + vec2( 0.0001 ) ) * uTime * uFlowSpeed * 3.0;
+  float foamNoise = Fbm( foamUv, 3 );
+  float foam = smoothstep( 0.55, 0.92, foamNoise ) * smoothstep( 0.5, 1.0, vWaterShore );
+  color = mix( color, vec3( 0.82, 0.85, 0.84 ), foam * 0.45 * uDetail );
+
+  // 顺流方向的细碎流光
+  float glitter = pow( Fbm( vWaterWorld.xz * 34.0 + uTime * 0.9, 2 ), 8.0 );
+  color += uSunColor * glitter * 0.22 * uDetail;
 
   float memory = explored * ( 1.0 - smoothstep( 0.15, 0.6, visible ) );
   float lum = dot( color, vec3( 0.299, 0.587, 0.114 ) );
@@ -988,10 +1011,10 @@ void main() {
   float body = smoothstep( 0.02, -0.34, edge );
   if ( body < 0.01 ) discard;
 
+  // 单次 4 octave FBM + 廉价 domain warp，取代原来的两次 FBM
   vec2 rollUv = vCloudWorld.xz * uNoiseScale + vec2( uTime * 0.026, -uTime * 0.017 );
-  float density = Fbm( rollUv, 4 );
-  float detail = Fbm( rollUv * 2.9 + density * 1.6, 3 );
-  float mass = clamp( density * 0.75 + detail * 0.45 + vPuff.z * 0.25, 0.0, 1.0 );
+  vec2 warp = vec2( sin( rollUv.y * 1.7 + uTime * 0.11 ), cos( rollUv.x * 1.9 - uTime * 0.09 ) ) * 0.35;
+  float mass = clamp( Fbm( rollUv + warp, 4 ) * 1.25 + vPuff.z * 0.25, 0.0, 1.0 );
 
   float alpha = body * hidden * uOpacity * smoothstep( 0.30, 0.88, mass );
   if ( alpha < 0.006 ) discard;
@@ -1011,7 +1034,7 @@ void main() {
     transparent: true,
     depthWrite: false,
     fog: true,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
     name: "PrairieFogOfWar",
   });
   material.userData.uniforms = uniforms;
@@ -1222,7 +1245,10 @@ void main() {
 }`;
 }
 
-/** 选中脉冲环：由 uTime 驱动的多重外扩圆环 + 六边形内框。 */
+/**
+ * 选中环：几何本身已是六边形环带，uv.y = 0 内缘 / 1 外缘，uv.x 为沿环行进参数。
+ * 着色器只做"外缘实、内缘渐隐 + 一道绕环行进的高光"，不再画同心圆脉冲。
+ */
 function BuildSelectShader() {
   return `
 uniform float uTime;
@@ -1232,31 +1258,25 @@ uniform float uOpacity;
 varying vec2 vHexUv;
 varying vec2 vLocal;
 varying vec3 vOverlayWorld;
-${glslHexSdf}
 
 void main() {
-  float radial = length( vLocal );
-  float hexDistance = SdFlatHexagon( vLocal );
+  float alongRing = vLocal.x * 0.5 + 0.5;
+  float acrossRing = vLocal.y * 0.5 + 0.5;   // 0 = 内缘, 1 = 外缘
 
-  // 三道相位错开的脉冲环
-  float pulse = 0.0;
-  for ( int i = 0; i < 3; i ++ ) {
-    float offset = float( i ) * 0.3333;
-    float t = fract( uTime * 0.55 + offset );
-    float ringRadius = mix( 0.30, 1.05, t );
-    float width = mix( 0.055, 0.012, t );
-    pulse += smoothstep( width, 0.0, abs( radial - ringRadius ) ) * ( 1.0 - t );
-  }
+  // 外缘实、内缘渐隐，形成贴合地块的六边形描边
+  float band = smoothstep( 0.0, 0.55, acrossRing );
+  float outerFade = 1.0 - smoothstep( 0.86, 1.0, acrossRing );
+  float body = band * outerFade;
 
-  // 贴合地块的六边形描边
-  float outline = smoothstep( 0.03, 0.0, abs( hexDistance + 0.045 ) );
-  float glow = smoothstep( 0.0, -0.30, hexDistance ) * 0.16;
-  float breathe = 0.8 + 0.2 * sin( uTime * 2.6 );
+  // 一道绕着六边形行进的高光，提示"当前选中"
+  float sweep = fract( alongRing - uTime * 0.22 );
+  float runner = smoothstep( 0.80, 0.98, sweep ) + smoothstep( 0.30, 0.0, sweep ) * 0.35;
+  float breathe = 0.78 + 0.22 * sin( uTime * 2.4 );
 
-  vec3 color = mix( uFillColor, uEdgeColor, clamp( pulse + outline, 0.0, 1.0 ) );
-  float alpha = uOpacity * clamp( pulse * 0.85 + outline * 0.95 + glow, 0.0, 1.0 ) * breathe;
+  vec3 color = mix( uFillColor, uEdgeColor, clamp( runner, 0.0, 1.0 ) );
+  float alpha = uOpacity * body * ( 0.55 + 0.75 * runner ) * breathe;
   if ( alpha < 0.004 ) discard;
-  gl_FragColor = vec4( color * ( 0.8 + 0.7 * ( pulse + outline ) ), alpha );
+  gl_FragColor = vec4( color * ( 0.85 + 0.6 * runner ), clamp( alpha, 0.0, 1.0 ) );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -1292,9 +1312,9 @@ export function CreateOverlayMaterial(kind = "composite") {
   } else if (kindKey === "select") {
     uniforms = {
       uTime: { value: 0 },
-      uFillColor: { value: new THREE.Color(0xffd98a) },
-      uEdgeColor: { value: new THREE.Color(0xfff6e0) },
-      uOpacity: { value: 0.95 },
+      uFillColor: { value: new THREE.Color(0xe8b95c) },
+      uEdgeColor: { value: new THREE.Color(0xfff0c8) },
+      uOpacity: { value: 0.55 },
     };
     fragmentShader = BuildSelectShader();
   } else {

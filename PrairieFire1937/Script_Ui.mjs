@@ -866,10 +866,23 @@ export function CreateUi(root, hooks = {}) {
     const keyTarget = typeof window !== "undefined" && window ? window : doc;
     On(keyTarget, "keydown", HandleKeyDown);
     On(keyTarget, "resize", () => {
+      MeasureTopBar();
       cache.minimapKey = "";
       DrawMinimap();
       HideTooltip();
     });
+  }
+
+  /**
+   * 顶栏高度随资源条换行、时期刻度显隐而变，写死 top 必然在某个视口下压叠。
+   * 这里实测一次写进 --pf-topbar-h，让仪表条与略图始终吊在顶栏下沿。
+   */
+  function MeasureTopBar() {
+    if (!dom.topBar || !root.style) return;
+    const height = Math.round(RectOf(dom.topBar).height || 0);
+    if (!height || height === cache.topBarHeight) return;
+    cache.topBarHeight = height;
+    root.style.setProperty("--pf-topbar-h", `${height}px`);
   }
 
   function IsTypingTarget(node) {
@@ -1014,6 +1027,7 @@ export function CreateUi(root, hooks = {}) {
     cache.lastView = currentView;
 
     EnsureDefinitions();
+    MeasureTopBar();
     RenderEra(currentState);
     RenderResources(currentState, stateChanged);
     RenderMeters(currentState);
@@ -2384,14 +2398,32 @@ export function CreateUi(root, hooks = {}) {
 
     const positions = {};
     const columns = [];
+    const eraOrder = eraDefinitionsFallback.map((item) => item.key);
+    const ordinals = ["一", "二", "三", "四", "五", "六", "七", "八"];
+    // 先定出每列代表的纪元，再决定要不要补序号：一个纪元跨多列时才补，
+    // 否则会出现单列的"开辟期 · 一"这种多余写法。
+    const columnEras = columnGroups.map((group) => {
+      const keys = group.map((node) => node.era).filter(Boolean);
+      keys.sort((a, b) => eraOrder.indexOf(a) - eraOrder.indexOf(b));
+      return keys[0] || null;
+    });
+    const eraTotals = {};
+    for (const eraKey of columnEras) if (eraKey) eraTotals[eraKey] = (eraTotals[eraKey] || 0) + 1;
+    const eraSeen = {};
     let maxRows = 0;
     columnGroups.forEach((group, columnIndex) => {
       const x = columnIndex * (nodeWidth + columnGap);
-      // 列头用该列里最靠前的纪元名，一列一个。
-      const eraKeys = group.map((node) => node.era).filter(Boolean);
-      const eraOrder = eraDefinitionsFallback.map((item) => item.key);
-      eraKeys.sort((a, b) => eraOrder.indexOf(a) - eraOrder.indexOf(b));
-      columns.push({ x, label: eraKeys.length ? EraShortName(eraKeys[0]) : `第 ${columnIndex + 1} 层` });
+      const eraKey = columnEras[columnIndex];
+      let label;
+      if (eraKey) {
+        eraSeen[eraKey] = (eraSeen[eraKey] || 0) + 1;
+        label = eraTotals[eraKey] > 1
+          ? `${EraShortName(eraKey)} · ${ordinals[eraSeen[eraKey] - 1] || eraSeen[eraKey]}`
+          : EraShortName(eraKey);
+      } else {
+        label = `第 ${columnIndex + 1} 层`;
+      }
+      columns.push({ x, label });
       group.forEach((node, rowIndex) => {
         positions[node.id] = { x, y: headHeight + rowIndex * (nodeHeight + rowGap) };
         if (rowIndex + 1 > maxRows) maxRows = rowIndex + 1;
@@ -3585,8 +3617,9 @@ export function CreateUi(root, hooks = {}) {
   BuildShell();
   BindGlobalInput();
   RenderMinimapLegend();
+  MeasureTopBar();
   // 移动端寸土寸金：略图默认收成图标按钮，玩家要看时再展开。
-  if (ViewportSize().width <= 700) SetMinimapCollapsed(true);
+  if (ViewportSize().width <= 640) SetMinimapCollapsed(true);
   if (!definitions.loaded) EnsureDefinitions();
   SetHint("点选地块查看详情；选中队伍后在底部选择行动。空格结束回合。");
 

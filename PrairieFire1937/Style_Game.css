@@ -47,6 +47,9 @@
   --pf-shadow-3: 0 18px 60px rgba(0, 0, 0, 0.66);
 
   /* 三套全屏层（面板 / 事件卡 / 确认框）共用同一套遮罩，观感必须一致 */
+  /* 顶栏实测高度，由 Script_Ui 的 MeasureTopBar 写入；这里的值只是首帧兜底 */
+  --pf-topbar-h: 96px;
+
   --pf-scrim: rgba(10, 9, 8, 0.62);
   --pf-scrim-blur: blur(6px);
 
@@ -87,14 +90,16 @@
   box-sizing: border-box;
 }
 
-.pf-ui button,
-.pf-ui input,
-.pf-ui kbd {
+/* 归零 UA 默认样式。
+   必须包在 :where() 里：`.pf-ui button` 的特异度是 (0,1,1)，会盖过所有
+   单类名组件规则 (0,1,0)，导致全部按钮的边框与内边距被静默清零。
+   :where() 特异度为 0，组件规则一律能覆盖。 */
+:where(.pf-ui button, .pf-ui input, .pf-ui kbd) {
   font: inherit;
   color: inherit;
 }
 
-.pf-ui button {
+:where(.pf-ui button) {
   border: 0;
   background: none;
   cursor: pointer;
@@ -447,7 +452,7 @@
 
 .pf-meters {
   position: absolute;
-  top: 74px;
+  top: calc(var(--pf-topbar-h) + 8px);
   left: 12px;
   display: flex;
   flex-direction: column;
@@ -548,7 +553,7 @@
 
 .pf-sweep {
   position: absolute;
-  top: 66px;
+  top: calc(var(--pf-topbar-h) + 6px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -635,7 +640,7 @@
 
 .pf-minimap {
   position: absolute;
-  top: 74px;
+  top: calc(var(--pf-topbar-h) + 8px);
   right: 12px;
   width: 268px;
   border: 1px solid var(--pf-line-strong);
@@ -722,7 +727,7 @@
   justify-content: flex-end;
   gap: 6px;
   width: min(660px, calc(100vw - 300px));
-  max-height: calc(100vh - 190px);
+  max-height: min(calc(100vh - var(--pf-topbar-h) - 96px), 54vh);
   min-height: 0;
   pointer-events: none;
 }
@@ -1309,7 +1314,7 @@
 
 .pf-toast-layer {
   position: absolute;
-  top: 118px;
+  top: calc(var(--pf-topbar-h) + 52px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -2769,7 +2774,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   19. 响应式：700–1199px 紧凑（笔记本 / 平板）
+   19. 响应式：641–1199px 紧凑（笔记本 / 平板）
    目标：六项资源必须全部可见且带图标，导航九项全部可达，互不侵占。
    做法：导航收成纯图标窄列（省出 ~80px），资源 chip 压到 66px 并把增减挪到行内。
    -------------------------------------------------------------------------- */
@@ -2807,7 +2812,7 @@
   .pf-minimap { width: 216px; }
   .pf-minimap-canvas { height: 158px; }
 
-  .pf-leftdock { width: min(560px, calc(100vw - 240px)); max-height: calc(100vh - 176px); }
+  .pf-leftdock { width: min(560px, calc(100vw - 240px)); max-height: min(calc(100vh - var(--pf-topbar-h) - 82px), 52vh); }
   .pf-enddock { width: 196px; }
   .pf-endturn-label { font-size: 18px; letter-spacing: 0.16em; }
 
@@ -2822,7 +2827,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   20. 响应式：≤700px 移动端
+   20. 响应式：≤640px 移动端
    布局策略（自上而下的单一纵向流，任何两件东西都不再悬浮叠压）：
      顶栏（时局 / 六资源一行 / 九页签一行）→ 双仪表紧凑行 → 扫荡横幅
      → 地图（占据剩余全部高度，只有一个折叠的略图按钮浮在右侧）
@@ -2831,7 +2836,7 @@
    高度由内容决定，下面的绝对定位元素再也不需要猜顶部高度。
    -------------------------------------------------------------------------- */
 
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .pf-ui { font-size: 14px; }
 
   .pf-hud {
@@ -2961,7 +2966,7 @@
   /* 略图默认折叠成一枚按钮，浮在地图右侧、抽屉之上；展开时也不碰其它控件 */
   .pf-minimap {
     top: auto;
-    bottom: calc(46vh + 62px);
+    bottom: calc(38vh + 62px);
     right: 8px;
     width: 156px;
     z-index: 5;
@@ -2986,12 +2991,12 @@
     right: 0;
     bottom: 58px;
     width: auto;
-    max-height: 46vh;
+    max-height: 38vh;
     gap: 0;
   }
 
   .pf-context {
-    max-height: 46vh;
+    max-height: 38vh;
     border-radius: var(--pf-radius-lg) var(--pf-radius-lg) 0 0;
     border-left: 0;
     border-right: 0;
@@ -3046,7 +3051,7 @@
   .pf-notify { display: none; }
   .pf-hint { display: none; }
 
-  .pf-toast-layer { top: auto; bottom: calc(46vh + 66px); width: calc(100vw - 16px); }
+  .pf-toast-layer { top: auto; bottom: calc(38vh + 66px); width: calc(100vw - 16px); }
 
   .pf-panel-layer { padding: 0; }
 
