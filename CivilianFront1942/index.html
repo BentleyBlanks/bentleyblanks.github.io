@@ -1,0 +1,250 @@
+<!doctype html>
+<!-- Three.js is vendored in this repository under the MIT License. All game geometry and audio are generated at runtime. -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#151713">
+  <meta name="description" content="《一把没带走的钥匙》是一段1942年华北敌后战场平民视角3D叙事序章。你不是士兵；救人、送信、推车与拉渡绳，才是这场战斗的目标。">
+  <meta property="og:title" content="一把没带走的钥匙｜1942敌后战场平民叙事序章">
+  <meta property="og:description" content="从18岁磨坊帮工梁穗儿的视角，走过一座普通村庄遭遇侵略、转移与抵抗的一天。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bentleyblanks.github.io/CivilianFront1942/">
+  <meta property="og:image" content="https://bentleyblanks.github.io/CivilianFront1942/Texture_SocialPreview.png">
+  <meta property="og:image:alt" content="《一把没带走的钥匙》：硝烟中的华北村庄、磨坊门上的钥匙与躲避战火的百姓">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="一把没带走的钥匙｜1942敌后战场平民叙事序章">
+  <meta name="twitter:description" content="从18岁磨坊帮工梁穗儿的视角，走过一座普通村庄遭遇侵略、转移与抵抗的一天。">
+  <meta name="twitter:image" content="https://bentleyblanks.github.io/CivilianFront1942/Texture_SocialPreview.png">
+  <title>一把没带走的钥匙｜1942敌后战场平民叙事序章</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260728d">
+</head>
+<body>
+  <main id="GameShell" class="gameShell">
+    <canvas id="GameCanvas" class="gameCanvas" aria-label="青槐庄三维场景。使用键盘、鼠标或触屏移动和观察。"></canvas>
+    <div class="worldGrade" aria-hidden="true"></div>
+    <div id="DamageVeil" class="damageVeil" aria-hidden="true"></div>
+
+    <section id="TitleScreen" class="titleScreen">
+      <div class="titleAtmosphere" aria-hidden="true">
+        <span class="smoke smokeOne"></span>
+        <span class="smoke smokeTwo"></span>
+        <span class="ridge ridgeFar"></span>
+        <span class="ridge ridgeNear"></span>
+        <span class="millWheel"></span>
+      </div>
+      <header class="titleHeader">
+        <a href="../" class="projectMark" aria-label="返回网站首页"><b>山河背面</b><span>BEHIND THE LINES · CIVILIAN PROLOGUE</span></a>
+        <button id="OpenAccessButton" class="quietButton">辅助设置</button>
+      </header>
+      <div class="titleLayout">
+        <section class="titleCopy">
+          <p class="eyebrow"><span></span> 1942 · 华北敌后 · 平民视角叙事序章</p>
+          <h1>一把没带走的<br><em>钥匙</em></h1>
+          <p class="titleLead">枪声会从沟那边传来。可你首先要记住的，是家里三只碗、弟弟露脚趾的鞋，和磨坊门上那把每天都要用的钥匙。</p>
+          <div class="titleActions">
+            <button id="BeginButton" class="primaryButton"><span>开始故事</span><small>约 20—30 分钟 · 自动检查点</small></button>
+            <button id="OpenHistoryButton" class="secondaryButton">史实边界与内容提示</button>
+          </div>
+          <p class="technicalNote">真 3D 程序化战场 · 键鼠 / 触屏 · 程序化音效 · 无击杀计分</p>
+        </section>
+        <aside class="fieldNote" aria-label="行动说明">
+          <div class="notePin" aria-hidden="true"></div>
+          <p>青槐庄 · 磨坊借粮簿</p>
+          <ol>
+            <li><span>梁桂芬</span><b>三升</b><small>秋后归还</small></li>
+            <li><span>孙兰贞</span><b>二升</b><small>家中五口</small></li>
+            <li><span>陈守义</span><b>一升</b><small>替西巷保管</small></li>
+          </ol>
+          <blockquote>“先带人，东西能烧。”</blockquote>
+          <footer>县交通员 · 周文嫂</footer>
+        </aside>
+      </div>
+      <footer class="titleFooter">
+        <span>虚构村庄与复合人物 · 侵略责任明确 · 不猎奇展示苦难</span>
+        <span>建议佩戴耳机，但所有关键声音都有方向字幕</span>
+      </footer>
+    </section>
+
+    <section id="PrologueScreen" class="prologueScreen" hidden aria-live="polite">
+      <article class="prologueCard">
+        <p id="PrologueEyebrow">华北敌后 · 1942年5月</p>
+        <h2 id="PrologueTitle">青槐庄没有出现在地图上</h2>
+        <p id="PrologueBody">只有四十七户人家，一盘磨、一条水渠，和一把每天都要用的门钥匙。</p>
+        <div class="prologueProgress" id="PrologueProgress" aria-label="序章导入进度"></div>
+        <button id="PrologueNextButton" class="primaryButton"><span>继续</span><small>按空格</small></button>
+      </article>
+    </section>
+
+    <section id="GameHud" class="gameHud" hidden>
+      <header class="hudTop">
+        <section class="chapterPanel">
+          <p><span id="ChapterNumber">第一章</span><time id="ChapterTime">清晨 05:42</time></p>
+          <h2 id="ChapterTitle">一碗稀粥</h2>
+          <div class="objectiveRow">
+            <span class="objectiveGlyph" aria-hidden="true"></span>
+            <div><small>眼下要做</small><b id="ObjectiveText">做完磨坊里每天都要做的三件小事。</b></div>
+          </div>
+        </section>
+        <div id="DirectionCaption" class="directionCaption" aria-live="polite"><span>东北方向</span><b>远处有卡车声</b></div>
+        <button id="PauseButton" class="pauseButton" aria-label="暂停">Ⅱ</button>
+      </header>
+
+      <div class="compass" aria-label="方位">
+        <span>西</span><i></i><b id="CompassLabel">北</b><i></i><span>东</span>
+      </div>
+
+      <aside id="PeoplePanel" class="peoplePanel">
+        <p>同行的人</p>
+        <div id="PeopleList"><span><i></i>梁小栓<small>在磨坊</small></span></div>
+      </aside>
+
+      <section id="CarryPanel" class="carryPanel" hidden>
+        <small>背在身上</small><b id="CarryLabel">卫生所药箱</b><span id="CarryDetail">两只手都占着，不能翻墙</span>
+      </section>
+
+      <div id="WorldMarker" class="worldMarker" hidden aria-hidden="true">
+        <i></i><b id="MarkerLabel">推磨</b><span id="MarkerDistance">7 米</span>
+      </div>
+
+      <section id="SubtitlePanel" class="subtitlePanel" aria-live="polite" aria-atomic="true">
+        <p id="SubtitleSpeaker">青槐庄记事</p>
+        <blockquote id="SubtitleText">天刚亮，磨盘已经转了半个时辰。</blockquote>
+      </section>
+
+      <div id="InteractionPrompt" class="interactionPrompt" hidden>
+        <kbd>F</kbd><span id="InteractionLabel">推磨</span><button id="TouchActionButton">动作</button>
+      </div>
+
+      <section class="statusPanel">
+        <div class="identity"><span>梁</span><div><b>梁穗儿</b><small>磨坊帮工 · 没有武器</small></div></div>
+        <div class="breath"><span><small>气力</small><b id="StaminaText">稳</b></span><i><em id="StaminaFill"></em></i></div>
+      </section>
+
+      <div class="controlHints" id="ControlHints">
+        <span><kbd>WASD</kbd>走动</span>
+        <span><kbd>鼠标</kbd>观察</span>
+        <span><kbd>Shift</kbd>跑</span>
+        <span><kbd>C</kbd>蹲下</span>
+        <span><kbd>F</kbd>动作</span>
+      </div>
+
+      <div id="TouchControls" class="touchControls" aria-label="触屏控制">
+        <div id="MoveStick" class="moveStick"><i></i></div>
+        <div id="LookPad" class="lookPad"><span>滑动观察</span></div>
+        <button id="TouchCrouchButton">蹲</button>
+        <button id="TouchRunButton">跑</button>
+      </div>
+    </section>
+
+    <section id="CellarScreen" class="cellarScreen" hidden>
+      <div class="cellarCrack" aria-hidden="true"><i></i><i></i><i></i></div>
+      <article>
+        <p>磨盘下面 · 只能听见</p>
+        <h2>压住木板</h2>
+        <p id="CellarInstruction">按住空格或下方按钮。让白线保持在安全区。</p>
+        <div class="quietMeter"><i><em id="QuietMeterFill"></em></i><span>木板响动</span><b id="CellarTime">00:12</b></div>
+        <button id="HoldBoardButton">按住木板</button>
+      </article>
+    </section>
+
+    <section id="ChoiceScreen" class="choiceScreen" hidden>
+      <article>
+        <header><span>铜锣只响了两下</span><h2>最多带走两样</h2><p>没有无损选择，也没有把苦难折成的分数。</p></header>
+        <div id="ChoiceItems" class="choiceItems">
+          <button data-item="Medicine"><span>药</span><b>卫生所药箱</b><small>磺胺、纱布、半瓶碘酒</small><em>救护伤员</em></button>
+          <button data-item="Seed"><span>种</span><b>七斤谷种</b><small>青槐庄明年开春的一小片地</small><em>保住生计</em></button>
+          <button data-item="Register"><span>册</span><b>交通点代号册</b><small>二十三个联络点，不含真实姓名</small><em>保住线路</em></button>
+        </div>
+        <footer><b id="ChoiceCount">已选 0 / 2</b><button id="ConfirmChoiceButton" disabled>带小栓进地窖</button></footer>
+      </article>
+    </section>
+
+    <section id="ChapterCard" class="chapterCard" hidden>
+      <article>
+        <p id="CardNumber">第一章</p>
+        <h2 id="CardTitle">一碗稀粥</h2>
+        <span id="CardTime">清晨 05:42</span>
+        <div></div>
+        <b id="CardObjective">做完磨坊里每天都要做的三件小事。</b>
+        <small id="CardHint">跟随米黄色记号。</small>
+      </article>
+    </section>
+
+    <section id="PauseScreen" class="pauseScreen" hidden>
+      <article class="pauseCard">
+        <header><p>故事暂停</p><h2 id="PauseChapterTitle">一碗稀粥</h2></header>
+        <div class="pauseActions">
+          <button id="ResumeButton" class="primaryButton"><span>继续</span><small>ESC</small></button>
+          <button id="RestartCheckpointButton">从本章开头重来</button>
+          <button id="PauseHistoryButton">史实边界与内容提示</button>
+          <button id="PauseAccessButton">辅助设置</button>
+          <button id="QuitButton">返回标题</button>
+        </div>
+      </article>
+    </section>
+
+    <section id="HistoryScreen" class="modalScreen" hidden>
+      <article class="documentModal" role="dialog" aria-modal="true" aria-labelledby="HistoryTitle">
+        <button class="modalClose" dataCloseModal aria-label="关闭">×</button>
+        <p>创作说明</p>
+        <h2 id="HistoryTitle">史实边界与内容提示</h2>
+        <div class="documentColumns">
+          <section><h3>这段故事如何对待历史</h3><p id="HistoryStatement"></p><p id="HistoryBoundary"></p></section>
+          <section><h3>画面不会做什么</h3><ul><li>不提供刑讯、处决或纵火的玩家操作。</li><li>不使用血腥特写、慢镜杀戮、爆头音效或击杀榜。</li><li>不把遇害者、流离者、房屋与粮食损失折算成奖励。</li><li>不把侵略军罪责转化为对任何民族的仇恨。</li></ul></section>
+          <section><h3>画面会呈现什么</h3><ul><li>日本侵略军抢掠粮食、拘捕盘问、杀害阻拦者、纵火破坏生计的具体后果。</li><li>普通人饥饿、负重、恐惧、互助和对故土的记忆。</li><li>共产党交通员、八路军地方小组与民兵缺粮、缺药、缺弹，却把群众撤离置于守地之前。</li></ul></section>
+          <section><h3>史料入口</h3><p>制作参考中国人民抗日战争纪念馆公开教育材料、《中国抗日战争史》与晋察冀、冀中敌后根据地相关史料。青槐庄、人物与当日行动均为复合创作，不声称复现某一真实村庄。</p></section>
+        </div>
+        <button class="modalConfirm" dataCloseModal>我已了解</button>
+      </article>
+    </section>
+
+    <section id="AccessScreen" class="modalScreen" hidden>
+      <article class="accessModal" role="dialog" aria-modal="true" aria-labelledby="AccessTitle">
+        <button class="modalClose" dataCloseModal aria-label="关闭">×</button>
+        <p>辅助设置</p>
+        <h2 id="AccessTitle">让故事适合你</h2>
+        <div class="settingList">
+          <label><span><b>程序化音效</b><small>风、脚步、枪炮与环境声；关键声音均有字幕</small></span><input id="SoundToggle" type="checkbox" checked></label>
+          <label><span><b>降低刺激强度</b><small>减弱枪炮音量、受压暗角和紧迫提示</small></span><input id="DistressToggle" type="checkbox"></label>
+          <label><span><b>减少动态效果</b><small>关闭镜头震动、强闪光和大幅过渡</small></span><input id="MotionToggle" type="checkbox"></label>
+          <label><span><b>高对比轮廓</b><small>增强目标、字幕和人物状态的可读性</small></span><input id="ContrastToggle" type="checkbox"></label>
+          <label><span><b>大号文字</b><small>把任务、字幕与菜单文字放大约 20%</small></span><input id="TextToggle" type="checkbox"></label>
+        </div>
+        <button class="modalConfirm" dataCloseModal>保存设置</button>
+      </article>
+    </section>
+
+    <section id="EndingScreen" class="endingScreen" hidden>
+      <div class="endingSmoke" aria-hidden="true"></div>
+      <article>
+        <p>黄昏 · 苇荡点名</p>
+        <h2>青槐庄没有守住<br><em>人走出来了</em></h2>
+        <blockquote>“先把人记下来。地还在，明年还得种。”</blockquote>
+        <div id="EndingOutcomes" class="endingOutcomes"></div>
+        <section class="nameLedger">
+          <header><span>青槐庄临时转移名册</span><b>不是分数</b></header>
+          <p><strong>已到水渠口：</strong>梁桂芬、梁小栓、孙兰贞、孙满囤、周文嫂……共二十七人</p>
+          <p class="missing"><strong>未归：</strong>陈守义 · 青槐庄磨坊</p>
+        </section>
+        <div class="endingActions">
+          <button id="ReplayButton" class="primaryButton"><span>再走一遍</span><small>选择会留下不同的代价</small></button>
+          <a href="../TaihangSignal1942/" class="secondaryLink">继续阅读另一位普通人的敌后故事</a>
+        </div>
+        <footer>黄昏里，湿绳还在滴水。磨坊门上的钥匙没有被带走，名字被带走了。</footer>
+      </article>
+    </section>
+
+    <aside id="QaPanel" class="qaPanel" hidden aria-label="本地试玩检查">
+      <b>LOCAL QA <span id="QaStatus">title</span></b>
+      <button id="QaTeleportButton">到目标</button>
+      <button id="QaActionButton">执行</button>
+      <button id="QaDialogueButton">对白下一句</button>
+      <button id="QaSpecialButton">完成计时动作</button>
+    </aside>
+
+    <div id="LiveRegion" class="visuallyHidden" aria-live="assertive"></div>
+  </main>
+  <script type="module" src="./Script_Game.mjs?v=20260728d"></script>
+</body>
+</html>
