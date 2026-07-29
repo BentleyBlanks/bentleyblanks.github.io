@@ -45,20 +45,21 @@ export const fallbackTerrainDefinitions = Object.freeze({
  * 是纯美术参数，永远由本模块提供，不依赖外部文件。
  */
 export const terrainRenderProfiles = Object.freeze({
-  Mountain: { relief: 0.260, peak: 0.420, roughness: 0.94, snowBias: 0.00, wet: 0.06, strataLow: "#413d37", strataHigh: "#867f73", water: false },
-  Ridge: { relief: 0.200, peak: 0.250, roughness: 0.95, snowBias: 0.10, wet: 0.08, strataLow: "#474137", strataHigh: "#8a8170", water: false },
-  Hill: { relief: 0.120, peak: 0.100, roughness: 0.97, snowBias: 0.26, wet: 0.20, strataLow: "#5a4f36", strataHigh: "#9b8a5f", water: false },
-  Forest: { relief: 0.086, peak: 0.048, roughness: 0.98, snowBias: 0.30, wet: 0.42, strataLow: "#3d3a2c", strataHigh: "#6e6a52", water: false },
-  Plain: { relief: 0.030, peak: 0.000, roughness: 0.99, snowBias: 0.56, wet: 0.36, strataLow: "#5c5334", strataHigh: "#a2925f", water: false },
-  Loess: { relief: 0.082, peak: 0.030, roughness: 0.99, snowBias: 0.44, wet: 0.16, strataLow: "#6d5a33", strataHigh: "#c1a978", water: false },
-  Marsh: { relief: 0.022, peak: 0.000, roughness: 0.84, snowBias: 0.64, wet: 0.86, strataLow: "#3f4736", strataHigh: "#6d7758", water: false },
-  River: { relief: -0.040, peak: -0.075, roughness: 0.72, snowBias: 0.72, wet: 1.00, strataLow: "#3c473f", strataHigh: "#6d7a6c", water: true },
-  Gorge: { relief: 0.190, peak: -0.120, roughness: 0.96, snowBias: 0.18, wet: 0.30, strataLow: "#443e37", strataHigh: "#8b8072", water: false },
+  Mountain: { relief: 0.300, peak: 0.480, roughness: 0.94, snowBias: 0.00, wet: 0.06, strataLow: "#4a4640", strataHigh: "#9a958c", water: false },
+  Ridge: { relief: 0.240, peak: 0.300, roughness: 0.95, snowBias: 0.10, wet: 0.08, strataLow: "#564d3e", strataHigh: "#a99b81", water: false },
+  Hill: { relief: 0.180, peak: 0.150, roughness: 0.97, snowBias: 0.26, wet: 0.20, strataLow: "#6a5c3f", strataHigh: "#b5a271", water: false },
+  Forest: { relief: 0.130, peak: 0.075, roughness: 0.98, snowBias: 0.30, wet: 0.42, strataLow: "#4b4737", strataHigh: "#8a8467", water: false },
+  Plain: { relief: 0.055, peak: 0.010, roughness: 0.99, snowBias: 0.56, wet: 0.36, strataLow: "#6e6240", strataHigh: "#bfad74", water: false },
+  Loess: { relief: 0.150, peak: 0.060, roughness: 0.99, snowBias: 0.44, wet: 0.16, strataLow: "#6d4f30", strataHigh: "#b08a5a", water: false },
+  Marsh: { relief: 0.040, peak: 0.000, roughness: 0.84, snowBias: 0.64, wet: 0.86, strataLow: "#3b3a2c", strataHigh: "#6d6a52", water: false },
+  River: { relief: -0.045, peak: -0.085, roughness: 0.72, snowBias: 0.72, wet: 1.00, strataLow: "#4a5348", strataHigh: "#8b9484", water: true },
+  Gorge: { relief: 0.250, peak: -0.150, roughness: 0.96, snowBias: 0.18, wet: 0.30, strataLow: "#524a41", strataHigh: "#a3968a", water: false },
 });
 
 const defaultProfile = Object.freeze({
-  relief: 0.05, peak: 0.0, roughness: 0.96, snowBias: 0.4, wet: 0.3,
-  strataLow: "#4d463b", strataHigh: "#8c8271", water: false,
+  relief: 0.10, peak: 0.02, roughness: 0.96, snowBias: 0.4, wet: 0.3,
+  strataLow: "#5d5648", strataHigh: "#a89c88", water: false,
+  colorLow: "#7a7460", colorHigh: "#a89f88",
 });
 
 /**
@@ -432,9 +433,9 @@ export function CreateTerrainMaterial(renderer, options = {}) {
     uTime: { value: 0 },
     uHexState: { value: options.hexStateTexture || CreateStateFallbackTexture() },
     uNoiseMap: { value: noiseTexture },
-    uNoiseScale: { value: options.noiseScale ?? 0.085 },
+    uNoiseScale: { value: options.noiseScale ?? 0.30 },
     uDetailStrength: { value: options.detailStrength ?? 1.0 },
-    uBumpStrength: { value: options.bumpStrength ?? 0.55 },
+    uBumpStrength: { value: options.bumpStrength ?? 0.9 },
     uSnowColor: { value: new THREE.Color(0xeef2f5) },
     uSnowLine: { value: 0.7 },
     uSnowBlend: { value: 0.16 },
@@ -442,8 +443,8 @@ export function CreateTerrainMaterial(renderer, options = {}) {
     uSeasonTint: { value: new THREE.Color(0xd8c08a) },
     uSeasonStrength: { value: 0.24 },
     uValleyTint: { value: new THREE.Color(0x5f7360) },
-    uStrataLow: { value: new THREE.Color(0x463f36) },
-    uStrataHigh: { value: new THREE.Color(0x8b8171) },
+    uStrataLow: { value: new THREE.Color(0x5b5246) },
+    uStrataHigh: { value: new THREE.Color(0xa89b86) },
     uControlEnemy: { value: new THREE.Color(0x8a3226) },
     uControlContested: { value: new THREE.Color(0xa5813a) },
     uControlGuerrilla: { value: new THREE.Color(0xb4523c) },
@@ -549,7 +550,10 @@ float terrainWet = vFacet.z * vFacet.x;
   float bandPhase = fract( depthT * 3.0 + broadNoise.g * 0.45 );
   vec3 strata = mix( uStrataHigh, uStrataLow, smoothstep( 0.0, 1.0, depthT ) );
   strata *= 0.84 + 0.30 * step( 0.5, bandPhase ) + 0.16 * fineNoise.g;
-  albedo = mix( albedo, albedo * 0.42 + strata * 0.74, wall * 0.88 );
+  // 侧壁：顶点色（按地形的岩层渐变）与全局岩层色混合，并补一点来自地面的漫反射弹跳，
+  // 保证背光侧仍读得出三条层理，而不是塌成一条纯黑缝。
+  albedo = mix( albedo, albedo * 0.55 + strata * 0.78, wall * 0.9 );
+  albedo += uStrataHigh * wall * 0.11;
 
   // 山顶积雪：随季节的雪量与雪线，只覆盖顶面与近顶壁。
   float snowField = smoothstep( uSnowLine, uSnowLine + uSnowBlend, vFacet.y + breakup * 0.07 - terrainWet * 0.28 );

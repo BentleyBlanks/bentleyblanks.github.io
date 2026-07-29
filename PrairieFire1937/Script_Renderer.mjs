@@ -83,25 +83,25 @@ const qualityProfiles = Object.freeze({
   low: {
     pixelRatioCap: 1.0, shadows: false, csm: false, cascades: 0, shadowMapSize: 512,
     composer: false, bloom: false, bloomTaps: 8, ssaa: false, skyClouds: false,
-    terrainDetail: 0.35, bumpStrength: 0.25, waterDetail: 0.0, fogClouds: false,
+    terrainDetail: 0.35, bumpStrength: 0.45, waterDetail: 0.0, fogClouds: false,
     anisotropy: 1, maxParticles: 220, csmMaxFar: 40, shadowSpan: 16,
   },
   medium: {
     pixelRatioCap: 1.25, shadows: true, csm: false, cascades: 1, shadowMapSize: 1024,
     composer: true, bloom: false, bloomTaps: 8, ssaa: false, skyClouds: true,
-    terrainDetail: 0.7, bumpStrength: 0.4, waterDetail: 0.6, fogClouds: true,
+    terrainDetail: 0.7, bumpStrength: 0.70, waterDetail: 0.6, fogClouds: true,
     anisotropy: 4, maxParticles: 700, csmMaxFar: 55, shadowSpan: 20,
   },
   high: {
     pixelRatioCap: 1.6, shadows: true, csm: false, cascades: 0, shadowMapSize: 2048,
     composer: true, bloom: true, bloomTaps: 14, ssaa: false, skyClouds: true,
-    terrainDetail: 1.0, bumpStrength: 0.55, waterDetail: 1.0, fogClouds: true,
+    terrainDetail: 1.0, bumpStrength: 0.90, waterDetail: 1.0, fogClouds: true,
     anisotropy: 8, maxParticles: 1600, csmMaxFar: 70, shadowSpan: 26,
   },
   ultra: {
     pixelRatioCap: 2.0, shadows: true, csm: true, cascades: 2, shadowMapSize: 2048,
     composer: true, bloom: true, bloomTaps: 22, ssaa: true, skyClouds: true,
-    terrainDetail: 1.0, bumpStrength: 0.62, waterDetail: 1.0, fogClouds: true,
+    terrainDetail: 1.0, bumpStrength: 1.00, waterDetail: 1.0, fogClouds: true,
     anisotropy: 16, maxParticles: 3200, csmMaxFar: 110, shadowSpan: 30,
   },
 });
@@ -308,7 +308,7 @@ function MergeAndDispose(list) {
 }
 
 /** 世界坐标下的一段带状面片（道路 / 铁轨 / 边界线）。 */
-function PushRibbon(target, fromX, fromY, fromZ, toX, toY, toZ, halfWidth, color, segments = 2) {
+function PushRibbon(target, fromX, fromY, fromZ, toX, toY, toZ, halfWidth, color, segments = 2, hexUv = null) {
   const dx = toX - fromX;
   const dz = toZ - fromZ;
   const length = Math.hypot(dx, dz) || 1;
@@ -324,6 +324,7 @@ function PushRibbon(target, fromX, fromY, fromZ, toX, toY, toZ, halfWidth, color
     target.normals.push(0, 1, 0, 0, 1, 0);
     target.uvs.push(0, t, 1, t);
     target.colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+    if (hexUv) target.hexUvs.push(hexUv[0], hexUv[1], hexUv[0], hexUv[1]);
   }
   for (let step = 0; step < segments; step += 1) {
     const a = baseIndex + step * 2;
@@ -454,6 +455,38 @@ function InstancePoolDispose(pool) {
   pool.groups.clear();
 }
 
+/**
+ * 给道路 / 铁路这类"线性设施"材质注入战争迷雾遮罩：
+ * 顶点带 aHexUv，片元采样 hexState，未探索直接 discard，已探索未见的转灰。
+ * 这样右半屏没侦察过的区域不会白送一整张公路铁路网给玩家。
+ */
+function AttachStructureFogFactory(uniforms) {
+  return function AttachStructureFog(material) {
+    const compile = function StructureFogOnBeforeCompile(shader) {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nattribute vec2 aHexUv;\nvarying vec2 vStructureHexUv;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvStructureHexUv = aHexUv;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform sampler2D uHexState;\nuniform vec3 uMemoryTint;\nvarying vec2 vStructureHexUv;")
+        .replace("#include <color_fragment>", [
+          "#include <color_fragment>",
+          "{",
+          "  vec4 structureState = texture2D( uHexState, vStructureHexUv );",
+          "  if ( structureState.r < 0.5 ) discard;",
+          "  float structureMemory = 1.0 - smoothstep( 0.15, 0.6, structureState.g );",
+          "  float structureLuma = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );",
+          "  diffuseColor.rgb = mix( diffuseColor.rgb, mix( vec3( structureLuma ), uMemoryTint * ( 0.3 + structureLuma * 0.55 ), 0.4 ) * 0.82, structureMemory * 0.78 );",
+          "}",
+        ].join("\n"));
+    };
+    material.onBeforeCompile = compile;
+    material.userData.baseOnBeforeCompile = compile;
+    material.userData.uniforms = uniforms;
+    material.needsUpdate = true;
+  };
+}
+
 /** 从 Script_Models 返回的 Group 中取出「几何体 + 材质 + 本地变换」，供合批池使用。 */
 function HarvestModelParts(group, target) {
   target.length = 0;
@@ -547,6 +580,14 @@ export function CreateRenderer(canvas, options = {}) {
   const selectMaterial = CreateOverlayMaterial("select");
   const roadMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.98, metalness: 0.0, name: "PrairieRoad" });
   const railMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.35, name: "PrairieRail" });
+  // 路网也要吃战争迷雾：未探索格直接 discard，已探索未见的降饱和
+  const structureFogUniforms = {
+    uHexState: { value: CreateStateFallbackTexture() },
+    uMemoryTint: { value: new THREE.Color(0x707a86) },
+  };
+  const AttachStructureFog = AttachStructureFogFactory(structureFogUniforms);
+  AttachStructureFog(roadMaterial);
+  AttachStructureFog(railMaterial);
   const borderMaterial = new THREE.MeshBasicMaterial({
     vertexColors: true, transparent: true, opacity: 0.52, depthWrite: false,
     side: THREE.DoubleSide, name: "PrairieBorder",
@@ -751,6 +792,7 @@ export function CreateRenderer(canvas, options = {}) {
     terrainMaterial.userData.uniforms.uHexState.value = hexStateTexture;
     waterMaterial.userData.uniforms.uHexState.value = hexStateTexture;
     fogOfWarMaterial.userData.uniforms.uHexState.value = hexStateTexture;
+    structureFogUniforms.uHexState.value = hexStateTexture;
     overlayMaterial.userData.uniforms.uHighlightState.value = highlightTexture;
   }
 
@@ -762,6 +804,7 @@ export function CreateRenderer(canvas, options = {}) {
       terrainMaterial.userData.uniforms.uHexState.value = fallback;
       waterMaterial.userData.uniforms.uHexState.value = fallback;
       fogOfWarMaterial.userData.uniforms.uHexState.value = fallback;
+      structureFogUniforms.uHexState.value = fallback;
     }
     if (highlightTexture) {
       highlightTexture.dispose();
@@ -1070,6 +1113,7 @@ export function CreateRenderer(canvas, options = {}) {
       const color = level >= 2 ? pavedColor : dirtColor;
       const halfWidth = level >= 2 ? 0.16 : 0.11;
       const centerY = entry.centerY + worldConfig.roadLift;
+      const hexUv = [entry.stateU, entry.stateV];
       let linked = 0;
       for (let side = 0; side < 6; side += 1) {
         const direction = hexDirections[side];
@@ -1078,12 +1122,12 @@ export function CreateRenderer(canvas, options = {}) {
         const midX = (entry.x + neighbour.x) * 0.5;
         const midZ = (entry.z + neighbour.z) * 0.5;
         const midY = EdgeMidHeight(entry, neighbour) + worldConfig.roadLift;
-        PushRibbon(collector, entry.x, centerY, entry.z, midX, midY, midZ, halfWidth, color, 3);
+        PushRibbon(collector, entry.x, centerY, entry.z, midX, midY, midZ, halfWidth, color, 3, hexUv);
         linked += 1;
       }
       // 孤立路段也画一小段，避免村口断头
       if (linked === 0) {
-        PushRibbon(collector, entry.x - 0.4, centerY, entry.z, entry.x + 0.4, centerY, entry.z, halfWidth, color, 2);
+        PushRibbon(collector, entry.x - 0.4, centerY, entry.z, entry.x + 0.4, centerY, entry.z, halfWidth, color, 2, hexUv);
       }
     }
     return FinalizeGeometry(collector);
@@ -1108,6 +1152,7 @@ export function CreateRenderer(canvas, options = {}) {
       const bed = broken ? brokenColor : bedColor;
       const rail = broken ? brokenColor : railColor;
       const centerY = entry.centerY + worldConfig.roadLift + 0.012;
+      const hexUv = [entry.stateU, entry.stateV];
       for (let side = 0; side < 6; side += 1) {
         const direction = hexDirections[side];
         const neighbour = hexByKey.get(HexKey(entry.q + direction.q, entry.r + direction.r));
@@ -1115,7 +1160,7 @@ export function CreateRenderer(canvas, options = {}) {
         const midX = (entry.x + neighbour.x) * 0.5;
         const midZ = (entry.z + neighbour.z) * 0.5;
         const midY = EdgeMidHeight(entry, neighbour) + worldConfig.roadLift + 0.012;
-        PushRibbon(collector, entry.x, centerY, entry.z, midX, midY, midZ, 0.17, bed, 3);
+        PushRibbon(collector, entry.x, centerY, entry.z, midX, midY, midZ, 0.17, bed, 3, hexUv);
         // 两条钢轨
         const dx = midX - entry.x;
         const dz = midZ - entry.z;
@@ -1123,9 +1168,9 @@ export function CreateRenderer(canvas, options = {}) {
         const offsetX = (-dz / length) * 0.075;
         const offsetZ = (dx / length) * 0.075;
         PushRibbon(collector, entry.x + offsetX, centerY + 0.02, entry.z + offsetZ,
-          midX + offsetX, midY + 0.02, midZ + offsetZ, 0.018, rail, 2);
+          midX + offsetX, midY + 0.02, midZ + offsetZ, 0.018, rail, 2, hexUv);
         PushRibbon(collector, entry.x - offsetX, centerY + 0.02, entry.z - offsetZ,
-          midX - offsetX, midY + 0.02, midZ - offsetZ, 0.018, rail, 2);
+          midX - offsetX, midY + 0.02, midZ - offsetZ, 0.018, rail, 2, hexUv);
         // 枕木
         const angle = Math.atan2(dx, dz);
         sleeperQuaternion.setFromAxisAngle(upAxis, angle);
@@ -1144,6 +1189,12 @@ export function CreateRenderer(canvas, options = {}) {
             colorArray[vertex * 3 + 2] = bed.b * 0.85;
           }
           piece.setAttribute("color", new THREE.BufferAttribute(colorArray, 3));
+          const sleeperHexUv = new Float32Array(vertexCount * 2);
+          for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+            sleeperHexUv[vertex * 2] = entry.stateU;
+            sleeperHexUv[vertex * 2 + 1] = entry.stateV;
+          }
+          piece.setAttribute("aHexUv", new THREE.BufferAttribute(sleeperHexUv, 2));
           piece.deleteAttribute("uv");
           sleeperPieces.push(piece);
         }
@@ -1172,9 +1223,27 @@ export function CreateRenderer(canvas, options = {}) {
   const borderFriendlyColor = new THREE.Color(0x9c7b38);
   const borderHostileColor = new THREE.Color(0x63281f);
 
+  /** 角点 c 由本格与这两个方向上的邻格共享，用于求共享角高度。 */
+  const cornerNeighbourDirections = Object.freeze([[0, 1], [5, 0], [4, 5], [3, 4], [2, 3], [1, 2]]);
+
+  /**
+   * 角点高度取共享该角的三格顶面最高值。
+   * 相邻两条边在同一个角上算出同一个 Y，边界带才能连成闭合折线而不是悬空断段。
+   */
+  function SharedCornerHeight(entry, cornerIndex) {
+    let height = entry.topY;
+    const dirs = cornerNeighbourDirections[cornerIndex];
+    for (const dirIndex of dirs) {
+      const direction = hexDirections[dirIndex];
+      const neighbour = hexByKey.get(HexKey(entry.q + direction.q, entry.r + direction.r));
+      if (neighbour && neighbour.topY > height) height = neighbour.topY;
+    }
+    return height;
+  }
+
   function BuildBorderGeometry() {
     const collector = CreateCollector();
-    const corners = HexCornerOffsets(worldConfig.tileRadius * 0.94);
+    const corners = HexCornerOffsets(worldConfig.tileRadius);
 
     for (const entry of hexEntries) {
       const camp = controlCamps[entry.hex.control] ?? 0;
@@ -1188,11 +1257,13 @@ export function CreateRenderer(canvas, options = {}) {
         if (neighbourCamp >= camp) continue;          // 只由高阵营一侧画，保证每条边只画一次
         const color = camp === 2 ? borderFriendlyColor : borderHostileColor;
         const [cornerA, cornerB] = hexEdgeCorners[side];
-        const height = entry.topY + worldConfig.borderLift;
+        // 顶点 Y 用共享角高度，相邻边在角上严丝合缝地接上
+        const heightA = SharedCornerHeight(entry, cornerA) + worldConfig.borderLift;
+        const heightB = SharedCornerHeight(entry, cornerB) + worldConfig.borderLift;
         PushRibbon(collector,
-          entry.x + corners[cornerA].x, height, entry.z + corners[cornerA].z,
-          entry.x + corners[cornerB].x, height, entry.z + corners[cornerB].z,
-          0.032, color, 1);
+          entry.x + corners[cornerA].x, heightA, entry.z + corners[cornerA].z,
+          entry.x + corners[cornerB].x, heightB, entry.z + corners[cornerB].z,
+          0.020, color, 1);
       }
     }
     return FinalizeGeometry(collector);
@@ -1237,24 +1308,30 @@ export function CreateRenderer(canvas, options = {}) {
   /** 我方部队头顶的小红旗，一眼区分敌我。 */
   const playerFlagColors = { cloth: modelPalette.bannerRed, band: "#e8d3a4", height: 0.30 };
 
-  /** 部队底座与隐蔽指示环：渲染层自建的两份小几何体，各占一次 draw call。 */
+  /** 部队底座 / 隐蔽指示环 / 接地投影盘：渲染层自建的三份小几何体，各占一次 draw call。 */
   let unitPadGeometry = null;
   let hiddenRingGeometry = null;
+  let groundShadowGeometry = null;
   let padMaterial = null;
+  let groundShadowMaterial = null;
   let baseModelMaterial = null;
   let hiddenModelMaterial = null;
 
   function EnsurePropResources() {
     if (!unitPadGeometry) {
-      unitPadGeometry = new THREE.CylinderGeometry(0.36, 0.42, 0.030, 6, 1);
+      unitPadGeometry = new THREE.CylinderGeometry(0.42, 0.48, 0.032, 6, 1);
       unitPadGeometry.rotateY(Math.PI / 6);
       unitPadGeometry.deleteAttribute("uv");
     }
     if (!hiddenRingGeometry) {
       // 低矮的"伏姿"指示：贴地的破口圆环，示意队伍尚未暴露
-      hiddenRingGeometry = new THREE.TorusGeometry(0.50, 0.026, 4, 16, Math.PI * 1.55);
+      hiddenRingGeometry = new THREE.TorusGeometry(0.56, 0.030, 4, 16, Math.PI * 1.55);
       hiddenRingGeometry.rotateX(Math.PI / 2);
       hiddenRingGeometry.deleteAttribute("uv");
+    }
+    if (!groundShadowGeometry) {
+      groundShadowGeometry = new THREE.CircleGeometry(1, 18);
+      groundShadowGeometry.rotateX(-Math.PI / 2);
     }
     if (!padMaterial) {
       // 不受光：部队底座是战场标识，不能因为落在山影里就看不见
@@ -1266,22 +1343,122 @@ export function CreateRenderer(canvas, options = {}) {
       padMaterial.polygonOffsetFactor = -4;
       padMaterial.polygonOffsetUnits = -4;
     }
+    if (!groundShadowMaterial) {
+      // 接地投影：径向渐隐的软圆盘，把物件"压"在地面上，
+      // 与方向光的真实投影叠加后，近处远处都不会像贴纸浮着。
+      groundShadowMaterial = new THREE.ShaderMaterial({
+        uniforms: { uOpacity: { value: 0.44 } },
+        vertexShader: [
+          "varying vec2 vShadowUv;",
+          "void main() {",
+          "  vShadowUv = uv * 2.0 - 1.0;",
+          "  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );",
+          "}",
+        ].join("\n"),
+        fragmentShader: [
+          "uniform float uOpacity;",
+          "varying vec2 vShadowUv;",
+          "void main() {",
+          "  float falloff = 1.0 - smoothstep( 0.25, 1.0, length( vShadowUv ) );",
+          "  float alpha = falloff * falloff * uOpacity;",
+          "  if ( alpha < 0.004 ) discard;",
+          "  gl_FragColor = vec4( 0.03, 0.028, 0.024, alpha );",
+          "}",
+        ].join("\n"),
+        transparent: true,
+        depthWrite: false,
+        name: "PrairieGroundShadow",
+      });
+      groundShadowMaterial.polygonOffset = true;
+      groundShadowMaterial.polygonOffsetFactor = -3;
+      groundShadowMaterial.polygonOffsetUnits = -3;
+    }
   }
 
-  /** 隐蔽部队用半透明材质，从模型库的共享材质派生，保留风摆注入。 */
+  /** 在物件脚下压一片接地投影盘。 */
+  function PushGroundShadow(pool, x, y, z, radius, visible) {
+    placementPosition.set(x, y + 0.008, z);
+    placementQuaternion.identity();
+    const size = visible === false ? 0 : radius;
+    placementScale.set(size, 1, size);
+    InstancePoolPush(pool, groundShadowGeometry, groundShadowMaterial,
+      placementMatrix.compose(placementPosition, placementQuaternion, placementScale), null, false);
+  }
+
+  /**
+   * 分类物件材质。Script_Models 的全部模型共用一份材质、共用一张土色调色板，
+   * 俯视时村庄 / 部队 / 据点会糊成同一团深蓝灰。这里在渲染层派生带色偏的变体：
+   *   · material.color 与顶点色相乘，把整体推向该类别的识别色；
+   *   · 注入"朝上面提亮"，把屋顶 / 斗笠等水平面抬高约 1.5 档，
+   *     否则高空俯视只剩墙体侧面的暗色；
+   *   · 保留模型库的风摆注入，并登记进阴影材质表。
+   */
+  const propMaterialCache = new Map();
+
+  /** 各类别的识别色 / 屋顶提亮倍数 / 饱和度。 */
+  const propCategoryRecipes = Object.freeze({
+    settlement: { tint: 0xd8c9a2, roofBoost: 1.60, saturation: 1.05 },   // 中立聚落：夯土黄 + 亮瓦顶
+    stronghold: { tint: 0xc3c0b4, roofBoost: 1.45, saturation: 0.80 },   // 敌据点：冷灰水泥
+    friendly: { tint: 0xd9b48a, roofBoost: 1.50, saturation: 1.18 },     // 我方：暖褐布衣
+    enemy: { tint: 0xd8c37e, roofBoost: 1.45, saturation: 1.10 },        // 敌方：土黄制服
+    hidden: { tint: 0x9fb6bd, roofBoost: 1.35, saturation: 0.72, opacity: 0.74 },
+    foliage: { tint: 0xa8c47e, roofBoost: 1.30, saturation: 1.16 },      // 植被：拉回绿色
+    works: { tint: 0xcbb98c, roofBoost: 1.40, saturation: 1.02 },        // 工事 / 区域
+    neutral: { tint: 0xc8bda4, roofBoost: 1.40, saturation: 1.0 },
+  });
+
+  function GetPropMaterial(sourceMaterial, categoryKey) {
+    if (!sourceMaterial) return null;
+    if (!baseModelMaterial) baseModelMaterial = sourceMaterial;
+    const cacheKey = `${sourceMaterial.uuid}|${categoryKey}`;
+    const cached = propMaterialCache.get(cacheKey);
+    if (cached) return cached;
+    const recipe = propCategoryRecipes[categoryKey] || propCategoryRecipes.neutral;
+    const material = sourceMaterial.clone();
+    material.name = `PrairieProp_${categoryKey}`;
+    material.color.setHex(recipe.tint).convertSRGBToLinear();
+    if (recipe.opacity !== undefined && recipe.opacity < 1) {
+      material.transparent = true;
+      material.opacity = recipe.opacity;
+      material.depthWrite = false;
+    }
+    const swayCompile = sourceMaterial.onBeforeCompile;
+    material.onBeforeCompile = function PropOnBeforeCompile(shader, rendererReference) {
+      if (swayCompile) swayCompile.call(this, shader, rendererReference);
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment_begin>",
+        [
+          "#include <normal_fragment_begin>",
+          "{",
+          "  vec3 upInView = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );",
+          "  float upFacing = clamp( dot( normalize( normal ), upInView ), 0.0, 1.0 );",
+          `  diffuseColor.rgb *= mix( 1.0, ${recipe.roofBoost.toFixed(2)}, pow( upFacing, 1.6 ) );`,
+          "  float propLuma = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );",
+          `  diffuseColor.rgb = mix( vec3( propLuma ), diffuseColor.rgb, ${recipe.saturation.toFixed(2)} );`,
+          "}",
+        ].join("\n")
+      );
+    };
+    material.customProgramCacheKey = () => `prairieProp_${categoryKey}`;
+    material.userData.baseOnBeforeCompile = material.onBeforeCompile;
+    propMaterialCache.set(cacheKey, material);
+    RegisterStandardMaterial(material);
+    return material;
+  }
+
+  /** 隐蔽部队：半透明 + 冷调，配合破口环与伏低姿态。 */
   function GetHiddenModelMaterial(sourceMaterial) {
     if (hiddenModelMaterial) return hiddenModelMaterial;
-    if (!sourceMaterial) return null;
-    baseModelMaterial = sourceMaterial;
-    hiddenModelMaterial = sourceMaterial.clone();
-    hiddenModelMaterial.name = "PrairieHiddenUnitMaterial";
-    hiddenModelMaterial.onBeforeCompile = sourceMaterial.onBeforeCompile;
-    hiddenModelMaterial.customProgramCacheKey = sourceMaterial.customProgramCacheKey;
-    hiddenModelMaterial.transparent = true;
-    hiddenModelMaterial.opacity = 0.72;
-    hiddenModelMaterial.depthWrite = false;
-    if (csm) AttachCsmToMaterial(hiddenModelMaterial);
+    hiddenModelMaterial = GetPropMaterial(sourceMaterial, "hidden");
     return hiddenModelMaterial;
+  }
+
+  /** 取模型 Group 的源材质（第一个 Mesh 的材质）。 */
+  function SourceMaterialOf(group) {
+    if (!group) return null;
+    let found = null;
+    group.traverse((object) => { if (!found && object.isMesh) found = object.material; });
+    return found;
   }
 
   /** 把一个模型 Group 摆到世界坐标并压入合批池；隐藏时用零缩放（不触碰几何体）。 */
@@ -1316,12 +1493,21 @@ export function CreateRenderer(canvas, options = {}) {
     return SampleTopHeight(entry, localX, localZ, Clamp01(radius));
   }
 
+  /** 摆一个带分类配色与接地投影的物件。 */
+  function PlaceCategorised(pool, model, category, x, y, z, rotationY, scale, tint, visible, options = {}) {
+    if (!model) return;
+    const material = GetPropMaterial(SourceMaterialOf(model), category);
+    PlaceModel(pool, model, x, y, z, rotationY, scale, tint, visible, material, options.castShadow !== false);
+    if (options.shadowRadius > 0) PushGroundShadow(pool, x, y, z, options.shadowRadius, visible);
+  }
+
   /** 静态物件层：聚落、据点、植被、根据地区域、工事、旗帜。 */
   function RebuildStaticProps() {
     EnsurePropResources();
     InstancePoolBegin(staticPool);
     if (!currentState) { InstancePoolCommit(staticPool); return; }
     const state = currentState;
+    const radius = worldConfig.tileRadius;
 
     for (const entry of hexEntries) {
       const hex = entry.hex;
@@ -1329,35 +1515,45 @@ export function CreateRenderer(canvas, options = {}) {
       const variantSeed = HashString(entry.key);
       const scorch = Clamp01((Number(hex.scorch) || 0) / 100);
       const tint = scorch > 0.02 ? neutralTint.clone().lerp(scorchTint, scorch) : null;
+      const surfaceY = SurfaceAt(entry, 0, 0);
+      const rotation = (variantSeed % 6) * 1.047;
 
-      // —— 聚落 ——
+      // —— 聚落：对标文明VI，县城几乎填满地块 ——
       if (hex.feature === "Village" || hex.feature === "Town" || hex.feature === "CountySeat") {
         const variantCount = hex.feature === "Village" ? 3 : 2;
         const model = CreateSettlementModel(hex.feature, 1, { seed: variantSeed % variantCount });
-        const scale = hex.feature === "CountySeat" ? 1.55 : hex.feature === "Town" ? 1.40 : 1.24;
-        PlaceModel(staticPool, model, entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-          (variantSeed % 6) * 1.047, scale, tint, visible);
+        // 模型半径约 0.36，缩放后直径 = radius × 系数
+        const scale = hex.feature === "CountySeat" ? radius * 2.60
+          : hex.feature === "Town" ? radius * 2.30 : radius * 1.95;
+        PlaceCategorised(staticPool, model, "settlement",
+          entry.x, surfaceY + worldConfig.propLift, entry.z, rotation, scale, tint, visible,
+          { shadowRadius: radius * 0.72 });
       } else if (hex.feature === "Shrine" || hex.feature === "Quarry" || hex.feature === "SaltPan") {
-        const workKind = hex.feature === "Quarry" ? "Cache" : hex.feature === "SaltPan" ? "Cache" : "Beacon";
-        PlaceModel(staticPool, CreateWorkModel(workKind), entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-          (variantSeed % 6) * 1.047, 1.25, tint, visible, null, false);
+        const workKind = hex.feature === "Shrine" ? "Beacon" : "Cache";
+        PlaceCategorised(staticPool, CreateWorkModel(workKind), "works",
+          entry.x, surfaceY + worldConfig.propLift, entry.z, rotation, radius * 1.45, tint, visible,
+          { castShadow: false, shadowRadius: radius * 0.4 });
       } else if (hex.feature === "Ford") {
-        PlaceModel(staticPool, CreateWorkModel("Ford"), entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-          0, 1.30, tint, visible, null, false);
+        PlaceCategorised(staticPool, CreateWorkModel("Ford"), "works",
+          entry.x, surfaceY + worldConfig.propLift, entry.z, 0, radius * 1.5, tint, visible,
+          { castShadow: false, shadowRadius: 0 });
       } else if (hex.feature === "Terrace") {
-        PlaceModel(staticPool, CreateWorkModel("Terrace"), entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-          (variantSeed % 6) * 1.047, 1.25, tint, visible, null, false);
+        PlaceCategorised(staticPool, CreateWorkModel("Terrace"), "works",
+          entry.x, surfaceY + worldConfig.propLift, entry.z, rotation, radius * 1.5, tint, visible,
+          { castShadow: false, shadowRadius: 0 });
       } else if (hex.feature === "Pass") {
-        PlaceModel(staticPool, CreateWorkModel("Barricade"), entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-          (variantSeed % 6) * 1.047, 1.25, tint, visible);
+        PlaceCategorised(staticPool, CreateWorkModel("Barricade"), "works",
+          entry.x, surfaceY + worldConfig.propLift, entry.z, rotation, radius * 1.5, tint, visible,
+          { shadowRadius: radius * 0.4 });
       }
 
       // —— 植被：林地与树丛 ——
       const groveKind = hex.feature === "Grove" ? "Poplar" : groveKindByTerrain[hex.terrain];
       if (groveKind && (hex.terrain === "Forest" || hex.feature === "Grove" || (hex.terrain === "Ridge" && (variantSeed & 3) === 0))) {
         const count = hex.terrain === "Forest" ? 7 : hex.feature === "Grove" ? 5 : 3;
-        const cluster = CreateTreeCluster(groveKind, count, CreateRng(entry.seed), { spread: 0.52 });
-        PlaceModel(staticPool, cluster, entry.x, SurfaceAt(entry, 0, 0), entry.z, 0, 1.45, tint, visible, null, false);
+        const cluster = CreateTreeCluster(groveKind, count, CreateRng(entry.seed), { spread: 0.5 });
+        PlaceCategorised(staticPool, cluster, "foliage",
+          entry.x, surfaceY, entry.z, 0, radius * 1.6, tint, visible, { castShadow: false, shadowRadius: 0 });
       }
 
       // —— 已建成的工事 ——
@@ -1365,21 +1561,24 @@ export function CreateRenderer(canvas, options = {}) {
       for (let index = 0; index < works.length; index += 1) {
         const workKey = typeof works[index] === "string" ? works[index] : works[index] && works[index].type;
         if (!workKey) continue;
-        const offset = StackOffset(index, Math.max(2, works.length), 0.42);
-        PlaceModel(staticPool, CreateWorkModel(workKey),
+        const offset = StackOffset(index, Math.max(2, works.length), 0.44);
+        PlaceCategorised(staticPool, CreateWorkModel(workKey), "works",
           entry.x + offset.x, SurfaceAt(entry, offset.x, offset.z) + worldConfig.propLift, entry.z + offset.z,
-          (variantSeed % 5) * 1.256, 1.05, tint, visible, null, false);
+          (variantSeed % 5) * 1.256, radius * 1.25, tint, visible,
+          { castShadow: false, shadowRadius: radius * 0.3 });
       }
     }
 
-    // —— 敌军据点 ——
+    // —— 敌军据点：冷灰水泥色，与土黄聚落一眼分开 ——
     for (const stronghold of state.strongholds || []) {
       const entry = hexByKey.get(stronghold.key);
       if (!entry) continue;
       const model = CreateStrongholdModel(stronghold.type, { scale: 1 });
-      const scale = stronghold.type === "CountySeat" ? 1.55 : 1.32;
-      PlaceModel(staticPool, model, entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-        (HashString(stronghold.key) % 6) * 1.047, scale, null, !!entry.hex.explored);
+      const scale = stronghold.type === "CountySeat" ? radius * 2.60 : radius * 2.10;
+      PlaceCategorised(staticPool, model, "stronghold",
+        entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
+        (HashString(stronghold.key) % 6) * 1.047, scale, null, !!entry.hex.explored,
+        { shadowRadius: radius * 0.62 });
     }
 
     // —— 根据地：旗帜 + 已建成区域 ——
@@ -1388,19 +1587,21 @@ export function CreateRenderer(canvas, options = {}) {
       if (!entry) continue;
       const visible = !!entry.hex.explored;
       const banner = CreateBannerModel({ cloth: modelPalette.bannerRed, band: "#e0cfa2", height: base.tier >= 3 ? 0.56 : 0.46 });
-      PlaceModel(staticPool, banner, entry.x + 0.30, SurfaceAt(entry, 0.30, -0.30) + worldConfig.propLift, entry.z - 0.30,
-        0.6, 1.5, null, visible, null, false);
+      PlaceCategorised(staticPool, banner, "friendly",
+        entry.x + 0.34, SurfaceAt(entry, 0.34, -0.34) + worldConfig.propLift, entry.z - 0.34,
+        0.6, radius * 1.9, null, visible, { castShadow: false, shadowRadius: 0 });
       const districts = Array.isArray(base.districts) ? base.districts : [];
       for (let index = 0; index < districts.length; index += 1) {
         const district = districts[index];
         const districtType = typeof district === "string" ? district : district && district.type;
         if (!districtType) continue;
         const districtEntry = (district && district.key && hexByKey.get(district.key)) || entry;
-        const offset = StackOffset(index, Math.max(3, districts.length), 0.46);
+        const offset = StackOffset(index, Math.max(3, districts.length), 0.48);
         const modelName = districtModelNames[districtType] || districtType;
-        PlaceModel(staticPool, CreateDistrictModel(modelName),
+        PlaceCategorised(staticPool, CreateDistrictModel(modelName), "works",
           districtEntry.x + offset.x, SurfaceAt(districtEntry, offset.x, offset.z) + worldConfig.propLift, districtEntry.z + offset.z,
-          (index * 1.4) % 6.283, 1.05, null, !!districtEntry.hex.explored, null, false);
+          (index * 1.4) % 6.283, radius * 1.45, null, !!districtEntry.hex.explored,
+          { castShadow: false, shadowRadius: radius * 0.34 });
       }
     }
 
@@ -1461,22 +1662,31 @@ export function CreateRenderer(canvas, options = {}) {
             placementMatrix.compose(placementPosition, placementQuaternion, placementScale), factionTints.Hidden, false);
         }
 
+        // 接地投影：把队伍压在地面上，不再像贴纸浮着
+        PushGroundShadow(unitPool, x, surfaceY, z, worldConfig.tileRadius * 0.40, visible);
+
         const modelName = unitModelNames[unit.type] || unit.type;
         const model = CreateUnitModel(modelName, {
           faction: record.faction,
           variant: HashString(String(unit.id || key)) % 3,
         });
-        const sourceMaterial = model.children[0] && model.children[0].material;
-        const materialOverride = hidden ? GetHiddenModelMaterial(sourceMaterial) : null;
-        if (!baseModelMaterial && sourceMaterial) baseModelMaterial = sourceMaterial;
-        // 隐蔽队伍略矮略小，读作"伏下身"
-        PlaceModel(unitPool, model, x, surfaceY + (hidden ? -0.02 : worldConfig.propLift), z,
-          facing, hidden ? 1.72 : 2.05, null, visible, materialOverride);
+        const sourceMaterial = SourceMaterialOf(model);
+        const category = hidden ? "hidden" : (record.faction === "Enemy" ? "enemy" : "friendly");
+        const materialOverride = hidden
+          ? GetHiddenModelMaterial(sourceMaterial)
+          : GetPropMaterial(sourceMaterial, category);
+        // 单位底面直径约 tileRadius × 0.55，剪影在默认视距下读得出来
+        const unitScale = worldConfig.tileRadius * (hidden ? 2.30 : 2.70);
+        // 隐蔽队伍略矮略沉，读作"伏下身"
+        PlaceModel(unitPool, model, x, surfaceY + (hidden ? -0.03 : worldConfig.propLift), z,
+          facing, unitScale, null, visible, materialOverride);
 
         // 我方队伍插一面小红旗；隐蔽时不插（还没暴露就不该打旗号）
         if (record.faction === "Player" && !hidden) {
-          PlaceModel(unitPool, CreateBannerModel(playerFlagColors),
-            x - 0.26, surfaceY + worldConfig.propLift, z + 0.20, 0.4, 1.1, null, visible, null, false);
+          const flag = CreateBannerModel(playerFlagColors);
+          PlaceModel(unitPool, flag, x - 0.30, surfaceY + worldConfig.propLift, z + 0.24, 0.4,
+            worldConfig.tileRadius * 1.45, null, visible,
+            GetPropMaterial(SourceMaterialOf(flag), "friendly"), false);
         }
       }
     }
@@ -1521,31 +1731,41 @@ export function CreateRenderer(canvas, options = {}) {
     return geometry;
   }
 
-  /** 选中脉冲环：半径 1.4 的圆盘，uv 以外接圆 1.0 为基准，便于着色器画六边形描边。 */
+  /**
+   * 选中环：内外两圈六边形顶点构成的环带（不是方形 plane），
+   * alpha 天然被几何裁到六边形内，不会留下方形残影。
+   */
   function BuildSelectRingGeometry() {
-    const segments = 72;
-    const radius = 1.42;
-    const positions = [0, 0, 0];
-    const normals = [0, 1, 0];
-    const uvs = [0.5, 0.5];
-    const indices = [];
-    for (let index = 0; index <= segments; index += 1) {
-      const angle = (index / segments) * Math.PI * 2;
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius;
-      positions.push(x, 0, z);
-      normals.push(0, 1, 0);
-      uvs.push(x * 0.5 + 0.5, z * 0.5 + 0.5);
+    const collector = CreateCollector();
+    const outer = HexCornerOffsets(1.10);
+    const inner = HexCornerOffsets(0.80);
+    const steps = 6;
+    for (let side = 0; side < 6; side += 1) {
+      const outerFrom = outer[side];
+      const outerTo = outer[(side + 1) % 6];
+      const innerFrom = inner[side];
+      const innerTo = inner[(side + 1) % 6];
+      for (let step = 0; step < steps; step += 1) {
+        const t0 = step / steps;
+        const t1 = (step + 1) / steps;
+        const points = [
+          { x: Lerp(outerFrom.x, outerTo.x, t0), z: Lerp(outerFrom.z, outerTo.z, t0), edge: 1 },
+          { x: Lerp(outerFrom.x, outerTo.x, t1), z: Lerp(outerFrom.z, outerTo.z, t1), edge: 1 },
+          { x: Lerp(innerFrom.x, innerTo.x, t1), z: Lerp(innerFrom.z, innerTo.z, t1), edge: 0 },
+          { x: Lerp(innerFrom.x, innerTo.x, t0), z: Lerp(innerFrom.z, innerTo.z, t0), edge: 0 },
+        ];
+        const base = collector.positions.length / 3;
+        for (const point of points) {
+          collector.positions.push(point.x, 0, point.z);
+          collector.normals.push(0, 1, 0);
+          // uv.x 记录沿环行进参数，uv.y 记录内外（0 内 1 外）
+          collector.uvs.push((side + Lerp(t0, t1, point.edge === 1 ? 0 : 1)) / 6, point.edge);
+          collector.hexUvs.push(0, 0);
+        }
+        collector.indices.push(base, base + 2, base + 1, base, base + 3, base + 2);
+      }
     }
-    for (let index = 1; index <= segments; index += 1) indices.push(0, index + 1, index);
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-    geometry.setAttribute("aHexUv", new THREE.Float32BufferAttribute(new Float32Array((segments + 2) * 2), 2));
-    geometry.setIndex(indices);
-    geometry.computeBoundingSphere();
-    return geometry;
+    return FinalizeGeometry(collector);
   }
 
   // -------------------------------------------------------------------------

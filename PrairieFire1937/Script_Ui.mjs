@@ -819,8 +819,8 @@ export function CreateUi(root, hooks = {}) {
       attrs: { type: "button", "aria-keyshortcuts": "Space" },
     });
     El("span", "pf-endturn-label", { text: "结束回合", parent: dom.endButton });
+    // 待办数直接写在副标题里；不再另做浮动角标——那是重复信息，且在窄视口必被裁切。
     dom.endTurnSub = El("span", "pf-endturn-sub", { text: "空格", parent: dom.endButton });
-    dom.endTurnBadge = El("span", "pf-endturn-badge", { parent: dom.endButton, attrs: { hidden: true } });
     On(dom.endButton, "click", () => RequestEndTurn());
     AttachTooltip(dom.endButton, () => {
       const todos = ComputeTodos(currentState, currentView);
@@ -1195,7 +1195,7 @@ export function CreateUi(root, hooks = {}) {
     if (!hex) return key;
     const feature = hex.feature && featureDisplay[hex.feature] ? featureDisplay[hex.feature].name : null;
     const terrain = terrainDisplay[hex.terrain] ? terrainDisplay[hex.terrain].name : hex.terrain;
-    return feature ? `${feature}（${terrain}）` : `${terrain} ${key}`;
+    return feature ? `${feature}（${terrain}）` : `${terrain} ${FormatHexCoord(key)}`;
   }
 
   // ---- 小地图 -------------------------------------------------------------
@@ -1723,7 +1723,7 @@ export function CreateUi(root, hooks = {}) {
     const head = El("div", "pf-card-head", { parent: card });
     const title = El("div", "pf-card-title", { parent: head });
     El("span", "pf-card-name", { text: UnitName(unit), parent: title });
-    El("span", "pf-card-sub", { text: `第 ${SafeText(unit.level, 1)} 级 · ${SafeText(unit.key, "")}`, parent: title });
+    El("span", "pf-card-sub", { text: `第 ${SafeText(unit.level, 1)} 级 · ${FormatHexCoord(unit.key)}`, parent: title });
     const stateChips = El("div", "pf-unit-flags", { parent: head });
     El("span", `pf-flag ${unit.hidden ? "is-hidden-good" : "is-exposed"}`, {
       text: unit.hidden ? "隐蔽" : "暴露",
@@ -1952,12 +1952,6 @@ export function CreateUi(root, hooks = {}) {
     const pending = todos.reduce((sum, item) => sum + (item.count || 1), 0);
     SetFlag(dom.endButton, "is-pending", todos.length > 0);
     SetFlag(dom.endDock, "has-todo", todos.length > 0);
-    if (todos.length) {
-      SetAttr(dom.endTurnBadge, "hidden", null);
-      SetText(dom.endTurnBadge, String(pending));
-    } else {
-      SetAttr(dom.endTurnBadge, "hidden", true);
-    }
     SetText(dom.endTurnSub, state.over ? "战事已终" : todos.length ? `${pending} 项待办` : "空格");
     SetAttr(dom.endButton, "disabled", busy || state.over ? true : null);
     SetAttr(
@@ -2166,17 +2160,33 @@ export function CreateUi(root, hooks = {}) {
       return;
     }
 
-    const layout = LayoutTreeNodes(nodes);
-    const canvas = El("div", "pf-tree", { parent: body });
+    const layout = LayoutTreeNodes(nodes, treeKey);
+    // 外层负责"还有内容在右边"的渐隐提示，内层负责横向滚动。
+    const wrap = El("div", "pf-tree-wrap", { parent: body });
+    const canvas = El("div", "pf-tree", {
+      parent: wrap,
+      attrs: { tabindex: "0", role: "group", "aria-label": isTech ? "军事技术树" : "群众与政权树" },
+    });
     const inner = El("div", "pf-tree-inner", {
       parent: canvas,
       style: { width: `${layout.width}px`, height: `${layout.height}px` },
     });
+
+    // 纪元标签做成列头，每列只出现一次，不再逐节点重复。
+    for (const column of layout.columns) {
+      El("span", "pf-tree-colhead", {
+        text: column.label,
+        parent: inner,
+        style: { left: `${column.x}px`, width: `${layout.nodeWidth}px` },
+      });
+    }
+
     const svg = Svg("svg", {
       class: "pf-tree-links",
       width: layout.width,
       height: layout.height,
       viewBox: `0 0 ${layout.width} ${layout.height}`,
+      "aria-hidden": "true",
     });
     inner.appendChild(svg);
 
@@ -2187,16 +2197,35 @@ export function CreateUi(root, hooks = {}) {
       for (const requirement of node.requires || []) {
         const from = positions[requirement];
         if (!from) continue;
+        // 正交折线：从上游右侧中点水平出，走列间沟槽竖直换行，再水平进下游左侧中点。
+        // 端点严格落在卡片边框上，读得出 A → B，也不会画出满屏交叉的大弧线。
         const x1 = from.x + layout.nodeWidth;
         const y1 = from.y + layout.nodeHeight / 2;
         const x2 = to.x;
         const y2 = to.y + layout.nodeHeight / 2;
-        const midX = (x1 + x2) / 2;
-        const path = Svg("path", {
-          d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`,
-          class: `pf-tree-link is-${node.state === "done" ? "done" : node.state === "locked" ? "locked" : "open"}`,
-        });
-        svg.appendChild(path);
+        const gutter = x1 + Math.max(14, (x2 - x1) * 0.45);
+        const radius = 8;
+        let path;
+        if (Math.abs(y1 - y2) < 2) {
+          path = `M ${x1} ${y1} L ${x2} ${y2}`;
+        } else {
+          const direction = y2 > y1 ? 1 : -1;
+          path =
+            `M ${x1} ${y1} L ${gutter - radius} ${y1}` +
+            ` Q ${gutter} ${y1} ${gutter} ${y1 + radius * direction}` +
+            ` L ${gutter} ${y2 - radius * direction}` +
+            ` Q ${gutter} ${y2} ${gutter + radius} ${y2}` +
+            ` L ${x2} ${y2}`;
+        }
+        const linkState = node.state === "done" ? "done" : node.state === "locked" ? "locked" : "open";
+        svg.appendChild(Svg("path", { d: path, class: `pf-tree-link is-${linkState}` }));
+        // 箭头，指明方向
+        svg.appendChild(
+          Svg("path", {
+            d: `M ${x2 - 7} ${y2 - 4} L ${x2} ${y2} L ${x2 - 7} ${y2 + 4} Z`,
+            class: `pf-tree-arrow is-${linkState}`,
+          })
+        );
       }
     }
 
@@ -2208,12 +2237,13 @@ export function CreateUi(root, hooks = {}) {
         attrs: {
           type: "button",
           "data-node": node.id,
+          "aria-label": `${node.name || node.id}，${NodeStateName(node.state)}`,
           style: `left:${position.x}px;top:${position.y}px;width:${layout.nodeWidth}px;height:${layout.nodeHeight}px`,
         },
       });
-      El("span", "pf-node-era", { text: EraShortName(node.era), parent: card });
       El("span", "pf-node-name", { text: node.name || node.id, parent: card });
       El("small", "pf-node-cost", { text: FormatCost(node.cost) || "无需消耗", parent: card });
+      El("span", "pf-node-state", { text: NodeStateName(node.state), parent: card });
       if (node.state === "done") El("i", "pf-node-seal", { text: "成", parent: card, attrs: { "aria-hidden": "true" } });
       if (node.state === "active") {
         const bar = El("i", "pf-node-progress", { parent: card });
@@ -2310,42 +2340,71 @@ export function CreateUi(root, hooks = {}) {
     return rows.slice(0, 6);
   }
 
-  function LayoutTreeNodes(nodes) {
-    const nodeWidth = 180;
-    const nodeHeight = 92;
-    const columnGap = 74;
-    const rowGap = 20;
-    const eraOrder = eraDefinitionsFallback.map((item) => item.key);
-    const columns = new Map();
-    for (const node of nodes) {
-      let column = node.column;
-      if (column === undefined || column === null) {
-        const index = eraOrder.indexOf(node.era);
-        column = index >= 0 ? index : 0;
-      }
-      if (!columns.has(column)) columns.set(column, []);
-      columns.get(column).push(node);
+  function NodeStateName(state) {
+    const names = { done: "已完成", active: "研究中", available: "可研究", locked: "未解锁" };
+    return names[state] || "未解锁";
+  }
+
+  /**
+   * 分层布局。优先采用 Data_Tech 的 techTreeLayout.tiers（按 tier 分列，
+   * 这是数据本身给出的依赖层级），没有才退回按纪元分列。
+   * 列头文字取该列节点的纪元名。
+   */
+  function LayoutTreeNodes(nodes, treeKey) {
+    const nodeWidth = 184;
+    const nodeHeight = 88;
+    const columnGap = 78;
+    const rowGap = 18;
+    const headHeight = 26;
+    const byId = {};
+    for (const node of nodes) byId[node.id] = node;
+
+    const layoutSource = definitions.tech
+      ? definitions.tech[treeKey === "Tech" ? "techTreeLayout" : "doctrineTreeLayout"]
+      : null;
+    let columnGroups = [];
+    if (layoutSource && Array.isArray(layoutSource.tiers) && layoutSource.tiers.length) {
+      columnGroups = layoutSource.tiers.map((tier) => tier.map((id) => byId[id]).filter(Boolean));
     }
-    const sortedColumns = Array.from(columns.keys()).sort((a, b) => a - b);
+    if (!columnGroups.length || !columnGroups.some((group) => group.length)) {
+      const eraOrder = eraDefinitionsFallback.map((item) => item.key);
+      const buckets = new Map();
+      for (const node of nodes) {
+        const index = node.column !== undefined && node.column !== null
+          ? node.column
+          : Math.max(0, eraOrder.indexOf(node.era));
+        if (!buckets.has(index)) buckets.set(index, []);
+        buckets.get(index).push(node);
+      }
+      columnGroups = Array.from(buckets.keys())
+        .sort((a, b) => a - b)
+        .map((key) => buckets.get(key));
+    }
+    columnGroups = columnGroups.filter((group) => group && group.length);
+
     const positions = {};
+    const columns = [];
     let maxRows = 0;
-    sortedColumns.forEach((column, columnIndex) => {
-      const items = columns.get(column);
-      items.forEach((node, rowIndex) => {
-        const row = node.row === undefined || node.row === null ? rowIndex : node.row;
-        positions[node.id] = {
-          x: columnIndex * (nodeWidth + columnGap),
-          y: row * (nodeHeight + rowGap),
-        };
-        if (row + 1 > maxRows) maxRows = row + 1;
+    columnGroups.forEach((group, columnIndex) => {
+      const x = columnIndex * (nodeWidth + columnGap);
+      // 列头用该列里最靠前的纪元名，一列一个。
+      const eraKeys = group.map((node) => node.era).filter(Boolean);
+      const eraOrder = eraDefinitionsFallback.map((item) => item.key);
+      eraKeys.sort((a, b) => eraOrder.indexOf(a) - eraOrder.indexOf(b));
+      columns.push({ x, label: eraKeys.length ? EraShortName(eraKeys[0]) : `第 ${columnIndex + 1} 层` });
+      group.forEach((node, rowIndex) => {
+        positions[node.id] = { x, y: headHeight + rowIndex * (nodeHeight + rowGap) };
+        if (rowIndex + 1 > maxRows) maxRows = rowIndex + 1;
       });
     });
+
     return {
       positions,
+      columns,
       nodeWidth,
       nodeHeight,
-      width: Math.max(nodeWidth, sortedColumns.length * (nodeWidth + columnGap) - columnGap + 8),
-      height: Math.max(nodeHeight, maxRows * (nodeHeight + rowGap) - rowGap + 8),
+      width: Math.max(nodeWidth, columnGroups.length * (nodeWidth + columnGap) - columnGap + 10),
+      height: Math.max(nodeHeight, headHeight + maxRows * (nodeHeight + rowGap) - rowGap + 10),
     };
   }
 
@@ -2735,7 +2794,7 @@ export function CreateUi(root, hooks = {}) {
         const row = El("div", "pf-intel-row", { parent: list });
         El("span", "pf-intel-name", { text: enemy.name || enemy.type || "不明部队", parent: row });
         El("span", "pf-intel-intent", { text: IntentName(enemy.intent), parent: row });
-        El("span", "pf-intel-where", { text: SafeText(enemy.key, "位置不明"), parent: row });
+        El("span", "pf-intel-where", { text: enemy.key ? FormatHexCoord(enemy.key) : "位置不明", parent: row });
         const strength = El("span", "pf-intel-strength", {
           text: `${FormatNumber(enemy.hp || 0)} / ${FormatNumber(enemy.maxHp || enemy.hp || 0)}`,
           parent: row,
@@ -2775,7 +2834,7 @@ export function CreateUi(root, hooks = {}) {
         On(cell, "click", () => Call("OnFocusHex", stronghold.key, { reason: "Stronghold" }));
         AttachTooltip(cell, () => ({
           title: StrongholdName(stronghold.type),
-          body: `位置 ${SafeText(stronghold.key)}。`,
+          body: `位置 ${FormatHexCoord(stronghold.key)}。`,
           rows: [
             { label: "守备", value: FormatNumber(stronghold.garrison || 0) },
             { label: "补给", value: FormatNumber(stronghold.supply || 0) },
@@ -3526,6 +3585,8 @@ export function CreateUi(root, hooks = {}) {
   BuildShell();
   BindGlobalInput();
   RenderMinimapLegend();
+  // 移动端寸土寸金：略图默认收成图标按钮，玩家要看时再展开。
+  if (ViewportSize().width <= 700) SetMinimapCollapsed(true);
   if (!definitions.loaded) EnsureDefinitions();
   SetHint("点选地块查看详情；选中队伍后在底部选择行动。空格结束回合。");
 
