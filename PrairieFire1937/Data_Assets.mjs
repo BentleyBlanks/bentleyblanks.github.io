@@ -50,7 +50,3 @@ export const illustrationAssets = Object.freeze({
   Harvest: "Texture_EventHarvest.jpg",
 });
 
-/** 启动画面主视觉（可选，竖构图 800×1000 内的 jpg/webp）。 */
-export const bootAssets = Object.freeze({
-  hero: "Texture_BootHero.jpg",
-});

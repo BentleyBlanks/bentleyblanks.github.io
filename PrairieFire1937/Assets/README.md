@@ -45,7 +45,6 @@ Build / Harvest / Wind / Snow / Turn / Unlock / Bad / Good` + `.mp3`
 - 建议 1280×720 jpg/webp，单张 ≤ 300KB。
 - 游戏会在图上自动压一层暗角保持档案质感；**不要生成血腥画面**（项目红线）。
 
-启动画面主视觉（可选）：`Texture_BootHero.jpg`，竖构图 800×1000 以内。
 
 ## 四、许可（必须做）
 

@@ -3973,9 +3973,24 @@ export function CreateUi(root, hooks = {}) {
    * 可选外部插画：存在即用、失败即弃。图片铺满画布后再压一层暗角 + 颗粒，
    * 与程序化档案照片保持同一质感体系。
    */
+  let illustrationSentinel = null;
+
   function TryExternalIllustration(canvas, kind) {
     const file = kind ? illustrationAssets[kind] : null;
-    if (!file || !canvas || typeof Image === "undefined") return;
+    if (!file || !canvas || typeof Image === "undefined" || typeof fetch === "undefined") return;
+    // 与音频同一套哨兵约定：Assets/CREDITS.md 不存在即视为未投放，零探测零 404。
+    if (illustrationSentinel === null) {
+      illustrationSentinel = fetch(assetBase + "CREDITS.md", { method: "HEAD", cache: "force-cache" })
+        .then((response) => Boolean(response && response.ok))
+        .catch(() => false);
+    }
+    illustrationSentinel.then((present) => {
+      if (present) LoadIllustrationImage(canvas, file);
+    });
+    return;
+  }
+
+  function LoadIllustrationImage(canvas, file) {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => {

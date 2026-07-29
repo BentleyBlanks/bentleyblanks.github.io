@@ -926,6 +926,14 @@ export function CreateAudio(options = {}) {
   async function LoadExternalAssets() {
     if (externalLoadStarted || typeof fetch === "undefined" || !ctx) return;
     externalLoadStarted = true;
+    // 哨兵：投放资产时必须附带 CREDITS.md（许可记录）。它不存在就说明没有投放，
+    // 整体跳过——否则 21 个探测请求会在控制台刷出成串 404 红字。
+    try {
+      const sentinel = await fetch(assetBase + "CREDITS.md", { method: "HEAD", cache: "force-cache" });
+      if (!sentinel || !sentinel.ok) return;
+    } catch (error) {
+      return;
+    }
     async function TryLoad(url) {
       try {
         const response = await fetch(url, { cache: "force-cache" });

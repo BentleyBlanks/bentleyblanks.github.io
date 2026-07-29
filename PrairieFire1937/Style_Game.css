@@ -3113,6 +3113,18 @@
 }
 .pf-plate:hover { filter: brightness(1.12); }
 
+
+/* 960–1279 宽的桌面窗口：顶栏紧凑档。页签只留大字与快捷键，资源章收窄，
+   保证六枚资源章（禾工械药谍干）与九枚页签互不侵占。 */
+@media (max-width: 1279px) {
+  .pf-tab-name { display: none; }
+  .pf-tab { min-width: 40px; padding: 3px 5px; }
+  .pf-res { min-width: 62px; padding: 4px 7px; }
+  .pf-res-value { font-size: 15px; }
+  .pf-res-delta { font-size: 10px; }
+  .pf-era { min-width: 0; }
+}
+
 /* --------------------------------------------------------------------------
    仅支持桌面端：移动端与平板断点已整体移除。
    窗口宽度不足 1200px 时由 index.html 的 #pcGate 提示层接管，

@@ -54,7 +54,8 @@ const highlightKinds = Object.freeze(Object.keys(overlayKindColors));
 const controlCodes = Object.freeze({ Enemy: 0, Contested: 1 / 3, Guerrilla: 2 / 3, Base: 1 });
 
 const worldConfig = Object.freeze({
-  tileRadius: 0.985,       // 略小于外接圆，留出细缝以凸显棋盘块
+  tileRadius: 1.0,         // 连续大地方案：必须取满外接圆。0.985 是侧壁时代为凸显棋盘块留的细缝，
+                           // 侧壁删除后那道缝就是露天的漏光勾缝，一个常量废掉整轮无缝重写
   elevationScale: 5.2,     // elevation 0..1 → 世界高度（相邻高差 ≤0.21 → ≈1.06 个 hexSize 的崖面）
   topRings: 3,             // 顶面环数（54 三角/格）
   strataBands: 3,          // 侧壁岩层带数
@@ -946,6 +947,10 @@ export function CreateRenderer(canvas, options = {}) {
     };
   }
 
+  function RadialTOf(localX, localZ) {
+    return Clamp01(Math.hypot(localX, localZ) / worldConfig.tileRadius);
+  }
+
   function SampleTopHeight(entry, localX, localZ, radialT) {
     const worldX = entry.x + localX;
     const worldZ = entry.z + localZ;
@@ -1030,7 +1035,20 @@ export function CreateRenderer(canvas, options = {}) {
         const localZ = point.z * worldConfig.tileRadius;
         const height = SampleTopHeight(entry, localX, localZ, point.t);
         collector.positions.push(entry.x + localX, height, entry.z + localZ);
-        collector.normals.push(0, 1, 0);
+        // 解析法线：用本格高度场的世界差分。公共边两侧的高度函数值相同、
+        // 差分也相同，因此法线跨格连续；若交给 computeVertexNormals，
+        // 相邻格顶点各自独立平均，边上必然留一道折痕。
+        {
+          const epsilon = 0.05;
+          const tX = RadialTOf(localX + epsilon, localZ);
+          const tZ = RadialTOf(localX, localZ + epsilon);
+          const hX = SampleTopHeight(entry, localX + epsilon, localZ, tX);
+          const hZ = SampleTopHeight(entry, localX, localZ + epsilon, tZ);
+          const nx = -(hX - height) / epsilon;
+          const nz = -(hZ - height) / epsilon;
+          const inv = 1 / Math.sqrt(nx * nx + 1 + nz * nz);
+          collector.normals.push(nx * inv, inv, nz * inv);
+        }
         collector.uvs.push(point.x * 0.5 + 0.5, point.z * 0.5 + 0.5);
         SampleTopColor(entry, localX, localZ, point.t, workColor);
         collector.colors.push(workColor.r, workColor.g, workColor.b);
@@ -1063,6 +1081,15 @@ export function CreateRenderer(canvas, options = {}) {
         bottom = Math.min(bottom, rimTop - 0.06);
         const pointA = corners[cornerA];
         const pointB = corners[cornerB];
+        // 裙壁外向法线：沿边向量的水平垂线，取指离格心的一侧。
+        // 不再依赖 computeVertexNormals（它会覆写顶面的解析法线）。
+        let outwardX = pointB.z - pointA.z;
+        let outwardZ = -(pointB.x - pointA.x);
+        const midX = (pointA.x + pointB.x) / 2;
+        const midZ = (pointA.z + pointB.z) / 2;
+        if (outwardX * midX + outwardZ * midZ < 0) { outwardX = -outwardX; outwardZ = -outwardZ; }
+        const outwardLength = Math.hypot(outwardX, outwardZ) || 1;
+        outwardX /= outwardLength; outwardZ /= outwardLength;
         const wallBase = collector.positions.length / 3;
         for (let bandIndex = 0; bandIndex <= bands; bandIndex += 1) {
           const depthT = bandIndex / bands;
@@ -1073,7 +1100,7 @@ export function CreateRenderer(canvas, options = {}) {
           workColor.multiplyScalar(jitter);
           collector.positions.push(entry.x + pointA.x, heightA, entry.z + pointA.z);
           collector.positions.push(entry.x + pointB.x, heightB, entry.z + pointB.z);
-          collector.normals.push(0, 0, 1, 0, 0, 1);
+          collector.normals.push(outwardX, 0, outwardZ, outwardX, 0, outwardZ);
           collector.uvs.push(0, depthT, 1, depthT);
           collector.colors.push(workColor.r, workColor.g, workColor.b, workColor.r, workColor.g, workColor.b);
           collector.hexUvs.push(entry.stateU, entry.stateV, entry.stateU, entry.stateV);
@@ -1089,7 +1116,7 @@ export function CreateRenderer(canvas, options = {}) {
       }
     }
 
-    return FinalizeGeometry(collector, { computeNormals: true });
+    return FinalizeGeometry(collector, { computeNormals: false });
   }
 
   /** Data_Terrain 迟到时，只重写顶点色属性，不动几何结构。 */
