@@ -59,6 +59,11 @@
   --pf-tap: 44px;
   --pf-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 
+  /* 通知流一行的实测高度：12px 字号 × 1.5 行高 + 上下各 4px 内边距 = 26px。
+     通知区的高度只取它的整数倍，任何一帧都不会切出半截字。 */
+  --pf-note-h: 26px;
+  --pf-note-gap: 3px;
+
   --pf-font: system-ui, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Heiti SC", sans-serif;
   --pf-font-serif: "Songti SC", "SimSun", "Noto Serif SC", Georgia, serif;
 
@@ -268,12 +273,27 @@
   overflow-y: hidden;
   scrollbar-width: none;
   scroll-snap-type: x proximity;
-  /* 右侧渐隐：一眼看出"还有资源在后面"，替代被硬裁的观感 */
-  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), transparent 100%);
-  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), transparent 100%);
+  scroll-behavior: smooth;
 }
 
 .pf-resbar::-webkit-scrollbar { height: 0; }
+
+/* 六项资源在窄视口里会横向溢出。只在真的溢出时才画渐隐，
+   并且哪一侧还有内容就只渐隐哪一侧 —— 不溢出时不许无缘无故把边上的字弄糊。 */
+.pf-resbar.is-scroll-right {
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 20px), transparent 100%);
+}
+
+.pf-resbar.is-scroll-left {
+  mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 100%);
+}
+
+.pf-resbar.is-scroll-left.is-scroll-right {
+  mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+}
 
 .pf-res {
   position: relative;
@@ -417,14 +437,19 @@
 
 .pf-tab-name { font-size: 11px; letter-spacing: 0.04em; }
 
+/* 快捷键角标原先 9px + 0.55 透明度，等于印上去也读不出来；
+   放到 10.5px 并改用实色，对深底仍有 4.5:1 以上。 */
 .pf-tab-key {
   position: absolute;
   top: 1px;
   right: 3px;
-  font-size: 9px;
-  opacity: 0.55;
+  font-size: 10.5px;
+  line-height: 1.1;
+  color: var(--pf-paper-deep);
   font-variant-numeric: tabular-nums;
 }
+
+.pf-tab.is-active .pf-tab-key { color: var(--pf-ink-soft); }
 
 .pf-tab-badge {
   position: absolute;
@@ -749,6 +774,24 @@
   transition: transform 0.3s var(--pf-ease);
 }
 
+/* 本机与多数移动端浏览器的滚动条是叠加式的，静止时完全不画：能滚也看不出来。
+   Script_Ui 会按滚动位置打 is-scroll-up / is-scroll-down，这里据此画出上下渐隐，
+   横屏矮窗里那张被拦腰截断的地块卡因此有了明确的"还能往下滚"提示。 */
+.pf-context.is-scroll-down {
+  mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 26px), transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 26px), transparent 100%);
+}
+
+.pf-context.is-scroll-up.is-scroll-down {
+  mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 calc(100% - 26px), transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 calc(100% - 26px), transparent 100%);
+}
+
+.pf-context.is-scroll-up {
+  mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 100%);
+}
+
 .pf-context-grip {
   display: none;
   width: 100%;
@@ -1053,6 +1096,19 @@
   border-top: 1px solid var(--pf-line);
 }
 
+/* 这一格有驻军但主流程还没交出 unitId 时的兜底：把队伍摆成一触即选的按钮，
+   玩家不会停在"选中一支队伍后……"这种死胡同上。 */
+.pf-actions-lead {
+  flex: 1 1 100%;
+  font-size: 12.5px;
+  color: var(--pf-paper-dim);
+}
+
+.pf-action.pf-action-pick {
+  background: linear-gradient(180deg, rgba(200, 168, 106, 0.26), rgba(30, 26, 21, 0.62));
+  border-color: var(--pf-ochre);
+}
+
 .pf-action {
   position: relative;
   display: flex;
@@ -1254,19 +1310,26 @@
    9. 通知流 / 提示条 / Toast
    -------------------------------------------------------------------------- */
 
+/* 通知流：只裁最早的一条，最新一条永远完整贴底。
+   高度取行高整数倍，顶部再叠一层渐隐，"被截断的是上面更早的记录"由此一目了然，
+   不会再出现"每帧最后一行都是半截字"。 */
 .pf-notify {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  justify-content: flex-end;
+  gap: var(--pf-note-gap);
   width: 100%;
   max-width: 340px;
-  max-height: 132px;
+  max-height: calc(5 * var(--pf-note-h) + 4 * var(--pf-note-gap));
   overflow: hidden;
   pointer-events: none;
+  mask-image: linear-gradient(180deg, transparent 0, #000 var(--pf-note-h), #000 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 var(--pf-note-h), #000 100%);
 }
 
 .pf-note {
+  flex: 0 0 auto;
   display: flex;
   align-items: baseline;
   gap: 7px;
@@ -1462,6 +1525,8 @@
   /* 所有全屏面板统一高度区间，账本不再只有科技面板一半高 */
   min-height: min(62vh, calc(100vh - 48px));
   max-height: min(860px, calc(100vh - 48px));
+  /* 内容撑不满这个下限时（代价账本开局只有五个 0），Script_Ui 会打上 is-fit
+     让面板贴合内容收上去，不在下半部留一大片空白。 */
   border: 1px solid var(--pf-line-strong);
   border-radius: var(--pf-radius-lg);
   background-color: var(--pf-panel-bg);
@@ -1471,6 +1536,9 @@
   overflow: hidden;
   animation: pf-panel-in 0.28s var(--pf-ease);
 }
+
+/* 贴合内容态：只撤下限，上限与观感完全不变。 */
+.pf-panel.is-fit { min-height: 0; }
 
 .pf-panel::before {
   content: "";
@@ -1568,7 +1636,7 @@
    12. 双树（科技 / 群众政权）
    -------------------------------------------------------------------------- */
 
-.pf-tree-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.pf-tree-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
 
 .pf-tree-tab {
   min-height: 38px;
@@ -1593,8 +1661,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
-  padding: 8px 12px;
+  margin-bottom: 8px;
+  padding: 6px 12px;
   border: 1px solid var(--pf-line);
   border-radius: var(--pf-radius);
   background: rgba(200, 168, 106, 0.08);
@@ -1619,25 +1687,89 @@
   transition: width 0.6s var(--pf-ease);
 }
 
-/* 外层只管"右边还有内容"的渐隐提示，内层负责真正的横向滚动。 */
-.pf-tree-wrap { position: relative; }
-
-.pf-tree-wrap::after {
-  content: "";
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  bottom: 1px;
-  width: 46px;
-  border-radius: 0 var(--pf-radius) var(--pf-radius) 0;
-  background: linear-gradient(90deg, rgba(16, 14, 12, 0), rgba(16, 14, 12, 0.92));
-  pointer-events: none;
+/* —— 纪元跳转条 ——
+   整棵树在任何视口都比容器宽（六列 × 卡宽）。系统滚动条在本机与多数移动端浏览器
+   是叠加式的、静止时根本不画，所以"右边还有两列"必须由这条按钮带直说。 */
+/* 双树面板：让树把面板体剩下的高度吃满，面板体自己不再产生第二层竖向滚动。
+   否则会出现"树说自己没溢出、可最后一行其实被面板体裁掉了"这种最难发现的情况。 */
+.pf-panel[data-panel="Tech"] .pf-panel-body,
+.pf-panel[data-panel="Doctrine"] .pf-panel-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
+.pf-panel[data-panel="Tech"] .pf-tree-tabs,
+.pf-panel[data-panel="Doctrine"] .pf-tree-tabs,
+.pf-panel[data-panel="Tech"] .pf-tree-status,
+.pf-panel[data-panel="Doctrine"] .pf-tree-status,
+.pf-panel[data-panel="Tech"] .pf-tree-nav,
+.pf-panel[data-panel="Doctrine"] .pf-tree-nav { flex: 0 0 auto; }
+
+/* 用 flex 逐层压下来，不用百分比 max-height：外层高度是 auto 时百分比会退化成 none，
+   于是出现"树以为自己没溢出、可最后一行其实被面板体裁掉了"这种最难发现的情况。 */
+.pf-panel[data-panel="Tech"] .pf-tree-wrap,
+.pf-panel[data-panel="Doctrine"] .pf-tree-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 150px;
+}
+
+.pf-panel[data-panel="Tech"] .pf-tree,
+.pf-panel[data-panel="Doctrine"] .pf-tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.pf-tree-nav { margin-bottom: 6px; }
+
+.pf-tree-eras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pf-tree-era {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-height: 34px;
+  padding: 2px 10px;
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius);
+  background: rgba(28, 24, 20, 0.7);
+  color: var(--pf-paper-dim);
+  text-align: left;
+  transition: color 0.2s var(--pf-ease), border-color 0.2s var(--pf-ease), background 0.2s var(--pf-ease);
+}
+
+.pf-tree-era:hover {
+  color: var(--pf-paper);
+  border-color: var(--pf-line-strong);
+  background: rgba(200, 168, 106, 0.14);
+}
+
+/* 当前正显示在视野里的列高亮，等于给出一条"我看到的是整棵树的哪一段"的位置指示 */
+.pf-tree-era.is-visible {
+  color: var(--pf-ochre-glow);
+  border-color: var(--pf-ochre);
+  background: rgba(200, 168, 106, 0.18);
+}
+
+.pf-tree-era-name { font-size: 12.5px; font-weight: 600; letter-spacing: 0.06em; white-space: nowrap; }
+.pf-tree-era-count { font-size: 10.5px; color: var(--pf-paper-deep); font-variant-numeric: tabular-nums; }
+.pf-tree-era.is-visible .pf-tree-era-count { color: var(--pf-ochre); }
+
+/* 外层只管滚动提示（横向渐隐由 .pf-tree 自己的 mask 负责，竖向渐隐吊在树下沿）。 */
+.pf-tree-wrap { position: relative; }
 
 .pf-tree {
   overflow: auto;
-  max-height: 60vh;
-  padding: 8px 52px 10px 8px;
+  max-height: min(68vh, calc(100vh - 196px));
+  padding: 8px 20px 10px 8px;
   border: 1px solid var(--pf-line);
   border-radius: var(--pf-radius);
   background:
@@ -1647,11 +1779,90 @@
   scrollbar-width: thin;
   scrollbar-color: var(--pf-ochre-deep) transparent;
   overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
 }
 
 .pf-tree::-webkit-scrollbar { width: 10px; height: 10px; }
 .pf-tree::-webkit-scrollbar-thumb { background: var(--pf-ochre-deep); border-radius: 5px; }
 .pf-tree::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.35); }
+
+/* 四个方向各自独立的渐隐：哪一侧真的还有内容才画哪一侧。 */
+.pf-tree.is-scroll-right {
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 30px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 30px), transparent 100%);
+}
+
+.pf-tree.is-scroll-left {
+  mask-image: linear-gradient(90deg, transparent 0, #000 26px, #000 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 26px, #000 100%);
+}
+
+.pf-tree.is-scroll-left.is-scroll-right {
+  mask-image: linear-gradient(90deg, transparent 0, #000 26px, #000 calc(100% - 30px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 26px, #000 calc(100% - 30px), transparent 100%);
+}
+
+/* 竖直方向的"下面还有一整行"不能再用 mask（一个元素只能叠一层遮罩，
+   横向已经占用了），改成吊在树下沿的一条实体渐隐带 + 文字直说还有多少行。 */
+.pf-tree-vfade {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 30px;
+  padding-bottom: 2px;
+  border-radius: 0 0 var(--pf-radius) var(--pf-radius);
+  background: linear-gradient(180deg, rgba(14, 12, 10, 0), rgba(14, 12, 10, 0.96));
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--pf-ochre-glow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--pf-ease);
+}
+
+.pf-tree-wrap.is-vscroll .pf-tree-vfade { opacity: 1; }
+
+/* —— 常显横向滚动轨 —— 自绘，可点可拖；滑块宽度即"我看到的比例"。
+   摆在树上方，保证任何视口下都在可视区内（摆在下面会被面板体的竖向滚动推出去）。 */
+.pf-tree-railbox { display: none; margin-top: 5px; }
+.pf-tree-nav.is-pannable .pf-tree-railbox { display: block; }
+
+.pf-tree-rail {
+  position: relative;
+  height: 12px;
+  border: 1px solid var(--pf-line);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.42);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.pf-tree-railnote {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--pf-paper-dim);
+  text-align: center;
+}
+
+.pf-tree-thumb {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 0;
+  width: 30%;
+  min-width: 28px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, var(--pf-ochre), var(--pf-ochre-deep));
+  box-shadow: 0 0 0 1px rgba(16, 14, 12, 0.6);
+  pointer-events: none;
+}
+
 
 .pf-tree-inner { position: relative; }
 
@@ -2789,21 +3000,28 @@
   .pf-era-date { font-size: 13px; }
   .pf-era-ticks { display: none; }
 
-  /* 资源 chip 紧凑态：图标保留，存量与增减并到一行 */
+  /* 资源 chip 紧凑态：图标压到第一行、存量与增减并到第二行。
+     这样一枚 chip 只要 ~55px，六项加起来 350 上下，省下的宽度全部还给导航，
+     让九个页签得以做满 44×44 的触控目标。 */
+  .pf-resbar { gap: 4px; }
+
   .pf-res {
-    min-width: 66px;
-    gap: 5px;
-    padding: 3px 7px;
+    flex-direction: column;
+    align-items: center;
+    min-width: 52px;
+    gap: 0;
+    padding: 2px 5px 3px;
   }
 
-  .pf-res-glyph { width: 20px; height: 20px; flex-basis: 20px; font-size: 12px; }
-  .pf-res-body { flex-direction: row; align-items: baseline; gap: 4px; }
-  .pf-res-stock { font-size: 15px; }
-  .pf-res-delta { font-size: 10.5px; }
+  .pf-res-glyph { width: 18px; height: 18px; flex-basis: 18px; font-size: 11px; }
+  .pf-res-body { flex-direction: row; align-items: baseline; gap: 3px; line-height: 1.15; }
+  .pf-res-stock { font-size: 14px; }
+  /* 10.5px 在平板上偏小，提到 11.5px；数字仍用等宽字形不跳动 */
+  .pf-res-delta { font-size: 11.5px; }
 
-  /* 导航收成图标列，让出的宽度真正给资源条 */
+  /* 导航收成图标列，但触控目标不许缩水：九个页签仍各占 44×44 */
   .pf-tabs { gap: 2px; padding-left: 6px; }
-  .pf-tab { min-width: 34px; padding: 3px 2px; }
+  .pf-tab { min-width: var(--pf-tap); min-height: var(--pf-tap); padding: 3px 2px; }
   .pf-tab-name { display: none; }
   .pf-tab-key { display: none; }
   .pf-tab-glyph { font-size: 17px; }
@@ -3064,14 +3282,19 @@
     border: 0;
   }
 
+  /* 移动端面板本来就是整屏，不参与"贴合内容"收缩 */
+  .pf-panel.is-fit { min-height: 100%; }
+
   .pf-panel::before { display: none; }
   .pf-panel-head { padding: 10px 14px 9px; }
   .pf-panel-title { font-size: 18px; letter-spacing: 0.12em; }
   .pf-panel-close { min-width: var(--pf-tap); min-height: var(--pf-tap); }
   .pf-panel-body { padding: 12px 14px 24px; }
 
-  .pf-tree { max-height: none; padding-right: 44px; }
+  .pf-tree { max-height: none; padding-right: 16px; }
   .pf-tree-tab { min-height: var(--pf-tap); flex: 1 1 0; padding: 0 8px; }
+  .pf-tree-era { min-height: var(--pf-tap); padding: 3px 10px; }
+  .pf-tree-rail { height: 18px; }
   .pf-seg,
   .pf-ghost,
   .pf-primary,
@@ -3118,13 +3341,107 @@
   .pf-tab-glyph { font-size: 15px; }
 }
 
-/* 横屏矮窗（手机横放）：抽屉别吃掉太多高度，仪表回到侧边 */
+/* --------------------------------------------------------------------------
+   横屏矮窗（手机横放，典型 844×390）
+   第二轮实拍的三处压叠都出在这里：
+     · 日志条（y=135–161）正压在双仪表（y=84–246）上 —— ≤640px 那条隐藏规则在 844 宽根本不生效；
+     · 地块卡只有 89px 高却要装 325px 内容，且没有任何"还能往下滚"的提示；
+     · 资源条 331px 装 513px，六项里最后两项（谍 / 干）被静默截掉。
+   对策：日志条在此断点直接收掉（重要信息仍由 toast 播报），双仪表压成顶栏下沿的
+   一条窄横条，左下角剩下的整块高度全部让给地块卡；资源条六项等分，一次全见。
+   -------------------------------------------------------------------------- */
+
 @media (max-height: 520px) and (orientation: landscape) and (max-width: 900px) {
-  .pf-leftdock { bottom: 52px; max-height: 52vh; }
-  .pf-context { max-height: 52vh; }
-  .pf-minimap { bottom: calc(52vh + 56px); width: 128px; }
-  .pf-minimap-canvas { height: 84px; }
-  .pf-toast-layer { bottom: calc(52vh + 58px); }
+  /* 1) 日志条与仪表不再共存 —— 把 ≤640 的隐藏规则并到这个断点 */
+  .pf-notify { display: none; }
+  .pf-hint { display: none; }
+
+  /* 2) 双仪表改成顶栏下沿的一条窄横条（原本竖排 162px 高，正好和日志条抢地方） */
+  .pf-meters {
+    top: calc(var(--pf-topbar-h) + 4px);
+    left: 8px;
+    right: auto;
+    flex-direction: row;
+    gap: 6px;
+    width: auto;
+  }
+
+  .pf-meter { min-width: 124px; padding: 3px 8px 4px; }
+  .pf-meter-head { gap: 5px; }
+  .pf-meter-name { font-size: 11px; letter-spacing: 0.02em; }
+  .pf-meter-value { font-size: 14px; }
+  .pf-meter-track { height: 5px; margin: 2px 0 0; }
+  .pf-meter-band { display: none; }
+
+  /* 3) 顶栏：六项资源等分铺满，绝不再靠横向滚动"藏"掉两项 */
+  .pf-era { min-width: 112px; padding: 1px 6px 2px 2px; }
+  .pf-era-name { font-size: 15px; }
+  .pf-era-date { font-size: 12px; }
+  .pf-era-meta { font-size: 10.5px; }
+
+  .pf-resbar { gap: 3px; }
+  .pf-res { flex: 1 1 0; min-width: 0; padding: 2px 3px 3px; }
+  .pf-res-glyph { width: 17px; height: 17px; flex-basis: 17px; font-size: 10.5px; }
+  .pf-res-stock { font-size: 13px; }
+  .pf-res-delta { font-size: 10.5px; }
+
+  .pf-tabs { gap: 2px; padding-left: 5px; }
+  .pf-tab { min-width: 38px; min-height: 40px; }
+
+  /* 4) 左下角：仪表让出的高度全部给地块卡，底部再叠一层可滚渐隐 */
+  .pf-leftdock {
+    left: 8px;
+    bottom: 8px;
+    width: min(520px, calc(100vw - 250px));
+    max-height: calc(100vh - var(--pf-topbar-h) - 62px);
+  }
+
+  .pf-context { max-height: none; }
+
+  /* 横屏里这张卡装不下全部内容，滚动无可避免；那就把"行动"提到不用滚就看得见的第一行，
+     地块与部队的明细留在下面滚。行动是这块面板唯一的交互出口，不能藏在折叠线以下。 */
+  .pf-context-inner {
+    grid-template-areas: "actions actions" "tile unit";
+    padding: 8px 10px 10px;
+    gap: 8px;
+  }
+
+  .pf-actions {
+    padding: 0 0 8px;
+    border-top: 0;
+    border-bottom: 1px solid var(--pf-line);
+  }
+
+  .pf-tile-grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+
+  /* 5) 略图原先同时钉住 top 与 bottom，被挤成 47px 高的一条缝；这里放开下沿 */
+  .pf-minimap { bottom: auto; width: 132px; }
+  .pf-minimap-canvas { height: 76px; }
+  .pf-minimap-legend { display: none; }
+
+  .pf-enddock { right: 8px; bottom: 8px; width: 176px; gap: 4px; }
+  .pf-todo { max-height: 92px; overflow: hidden; }
+  .pf-endturn { padding: 6px 12px; }
+  .pf-endturn-label { font-size: 16px; letter-spacing: 0.12em; }
+  /* toast 落在仪表条下沿，别再和它抢同一条带 */
+  .pf-toast-layer { top: calc(var(--pf-topbar-h) + 46px); bottom: auto; }
+
+  /* 6) 科技树在 390 高的窗口里必然竖向溢出：把面板的各层边距压到最小，
+        把剩下的高度全给树，溢出部分交给树自己的渐隐与"下面还有 N 行"提示。 */
+  .pf-panel-body { padding: 8px 12px 10px; }
+  .pf-tree-tabs { margin-bottom: 5px; }
+  .pf-tree-tab { min-height: 30px; padding: 0 12px; font-size: 13px; }
+  .pf-tree-status { margin-bottom: 5px; padding: 3px 10px; }
+  .pf-tree-current { font-size: 12.5px; }
+  .pf-tree-nav { margin-bottom: 4px; }
+  .pf-tree-era { min-height: 28px; padding: 1px 7px; }
+  .pf-tree-era-name { font-size: 11.5px; }
+  .pf-tree-era-count { display: none; }
+  .pf-tree-railbox { margin-top: 4px; }
+  .pf-tree-railnote { display: none; }
+
+  .pf-panel[data-panel="Tech"] .pf-tree-wrap,
+  .pf-panel[data-panel="Doctrine"] .pf-tree-wrap { min-height: 96px; }
 }
 
 /* --------------------------------------------------------------------------

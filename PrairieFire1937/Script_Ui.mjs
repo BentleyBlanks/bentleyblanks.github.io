@@ -166,11 +166,15 @@ const historyHelpRows = Object.freeze([
 // 无副作用的纯工具函数
 // ---------------------------------------------------------------------------
 
-/** 回合 → 公历季度标签。turn 0 = 1937 秋，一回合一季度。 */
+/**
+ * 回合 → 公历季度标签。turn 0 = 1937 秋，一回合一季度。
+ * label 的写法与 Script_Rules.FormatTurnDate / Data_History.FormatTurnDate 完全一致
+ * （"1937年 秋"，年与数字之间不留空格），顶栏与日志因此不会出现两种日期格式。
+ */
 export function FormatTurnDate(turn) {
   const index = Math.max(0, Math.floor(Number(turn) || 0));
   const year = 1937 + Math.floor((index + 2) / 4);
-  return { year, season: seasonNames[index % 4], label: `${year} 年 ${seasonNames[index % 4]}` };
+  return { year, season: seasonNames[index % 4], label: `${year}年 ${seasonNames[index % 4]}` };
 }
 
 /** 回合 → 时期定义（默认表，可被 view.era / state.eraInfo 覆盖）。 */
@@ -249,6 +253,7 @@ export function CreateUi(root, hooks = {}) {
     minimapKey: "",
     lastState: null,
     lastView: null,
+    autoSelectToken: "",
   };
   /**
    * 数据表来源有两条路：
@@ -387,6 +392,37 @@ export function CreateUi(root, hooks = {}) {
       return { width: window.innerWidth, height: window.innerHeight };
     }
     return { width: 1280, height: 800 };
+  }
+
+  // ---- 滚动可见性 ---------------------------------------------------------
+  //
+  // 本机（以及大量移动端浏览器）的滚动条是叠加式的：能滚，但静止时完全不画。
+  // 于是"内容还在下面 / 右边"这件事对玩家不可见。这里统一给可滚容器打状态类，
+  // 样式层据此画渐隐与箭头，做到"能滚就一定看得出能滚"。
+
+  /** 绑定一次滚动监听，之后由 UpdateScrollAffordance 维护状态类。 */
+  function BindScrollAffordance(node) {
+    if (!node || !node.classList) return node;
+    if (node.getAttribute && node.getAttribute("data-pf-scroll") === "1") return node;
+    SetAttr(node, "data-pf-scroll", "1");
+    On(node, "scroll", () => UpdateScrollAffordance(node), { passive: true });
+    UpdateScrollAffordance(node);
+    return node;
+  }
+
+  /** 按当前滚动位置刷新状态类；随时可调用，无副作用之外的开销。 */
+  function UpdateScrollAffordance(node) {
+    if (!node || !node.classList) return;
+    const spanY = Math.max(0, (node.scrollHeight || 0) - (node.clientHeight || 0));
+    const spanX = Math.max(0, (node.scrollWidth || 0) - (node.clientWidth || 0));
+    const top = node.scrollTop || 0;
+    const left = node.scrollLeft || 0;
+    SetFlag(node, "is-scroll-y", spanY > 2);
+    SetFlag(node, "is-scroll-up", spanY > 2 && top > 2);
+    SetFlag(node, "is-scroll-down", spanY > 2 && top < spanY - 2);
+    SetFlag(node, "is-scroll-x", spanX > 2);
+    SetFlag(node, "is-scroll-left", spanX > 2 && left > 2);
+    SetFlag(node, "is-scroll-right", spanX > 2 && left < spanX - 2);
   }
 
   function Call(name, ...args) {
@@ -567,7 +603,7 @@ export function CreateUi(root, hooks = {}) {
     const era = El("div", "pf-era", { parent: dom.topBar });
     const eraHead = El("div", "pf-era-head", { parent: era });
     dom.eraName = El("span", "pf-era-name pf-stamp", { text: "开辟期", parent: eraHead });
-    dom.eraDate = El("span", "pf-era-date", { text: "1937 年 秋", parent: eraHead });
+    dom.eraDate = El("span", "pf-era-date", { text: "1937年 秋", parent: eraHead });
     const eraMeta = El("div", "pf-era-meta", { parent: era });
     dom.eraTurn = El("span", "pf-era-turn", { text: "回合 1 / 32", parent: eraMeta });
     dom.eraPhase = El("span", "pf-era-phase", { text: "", parent: eraMeta });
@@ -613,6 +649,8 @@ export function CreateUi(root, hooks = {}) {
       dom.resourceNodes[resource.key] = { chip, stock, delta, floatLayer };
       AttachTooltip(chip, () => BuildResourceTip(resource));
     }
+    // 六项资源在窄视口里会横向溢出；不给提示就等于"静默丢项"。
+    BindScrollAffordance(dom.resourceBar);
 
     // —— 面板按钮组 ——
     dom.panelTabs = El("nav", "pf-tabs", { parent: dom.topBar, attrs: { "aria-label": "面板" } });
@@ -809,6 +847,8 @@ export function CreateUi(root, hooks = {}) {
       parent: dom.contextInner,
       attrs: { role: "group", "aria-label": "行动" },
     });
+    // 横屏矮窗里这块只有 200 上下的高度却要装三百多的内容，必须让"还能往下滚"看得见。
+    BindScrollAffordance(dom.context);
   }
 
   function BuildEndTurnDock() {
@@ -870,6 +910,9 @@ export function CreateUi(root, hooks = {}) {
       cache.minimapKey = "";
       DrawMinimap();
       HideTooltip();
+      UpdateScrollAffordance(dom.resourceBar);
+      UpdateScrollAffordance(dom.context);
+      if (activePanel) RenderPanel(activePanel, cache.panelPayload);
     });
   }
 
@@ -1034,6 +1077,7 @@ export function CreateUi(root, hooks = {}) {
     RenderSweep(currentState);
     RenderMinimap(currentState, currentView, stateChanged);
     RenderContext(currentState, currentView);
+    EnsureUnitSelection(currentState, currentView);
     RenderEndTurn(currentState, currentView);
     RenderNotify(currentState);
     RenderTabBadges(currentState, currentView);
@@ -1133,6 +1177,7 @@ export function CreateUi(root, hooks = {}) {
       }
       cache.resource[resource.key] = amount;
     }
+    UpdateScrollAffordance(dom.resourceBar);
   }
 
   function RenderMeters(state) {
@@ -1574,6 +1619,38 @@ export function CreateUi(root, hooks = {}) {
     RenderTileCard(state, view, hex);
     RenderUnitCard(state, view, unit);
     RenderActionRail(state, view, unit);
+    UpdateScrollAffordance(dom.context);
+  }
+
+  /**
+   * 主流程在每次 EndTurn 结束时会把 view.selectedUnitId 清空，而 view.selectedKey 仍停在原地；
+   * 于是"选中的地块明明驻着队伍"却渲染成「选中一支队伍后，这里会列出可用行动。」。
+   * 这里替玩家补上一次自动选中：每个 (地块, 回合) 只补一次，绝不与主流程来回打架。
+   */
+  function EnsureUnitSelection(state, view) {
+    if (!view || !view.selectedKey) return;
+    const token = `${view.selectedKey}|${state ? state.turn : 0}`;
+    if (view.selectedUnitId) {
+      cache.autoSelectToken = token;
+      return;
+    }
+    if (cache.autoSelectToken === token) return;
+    const garrison = UnitsAtKey(state, view.selectedKey);
+    if (!garrison.length) return;
+    cache.autoSelectToken = token;
+    // 延后一拍再回调：Sync 正在渲染途中，同步回调会让主流程在渲染中重入。
+    Later(() => {
+      if (disposed) return;
+      const now = currentView || {};
+      if (now.selectedKey !== view.selectedKey || now.selectedUnitId) return;
+      Call("OnSelectHex", view.selectedKey, { unitId: garrison[0].id });
+    }, 0);
+  }
+
+  function UnitsAtKey(state, key) {
+    if (!state || !key) return [];
+    const units = Array.isArray(state.units) ? state.units : [];
+    return units.filter((item) => item && item.key === key);
   }
 
   function RenderTileCard(state, view, hex) {
@@ -1818,6 +1895,23 @@ export function CreateUi(root, hooks = {}) {
     cache.hotkeyIndex = {};
     const actions = Array.isArray(view.actions) ? view.actions : [];
     if (!actions.length) {
+      // 这一格驻着我方队伍却还没选中任何一支时，不能把玩家丢在"没有行动"的死胡同里，
+      // 直接把驻军摆成一排一触即选的按钮（EnsureUnitSelection 通常已经替玩家点过了，
+      // 这里是主流程未接管 unitId 时的兜底）。
+      const garrison = unit ? [] : UnitsAtKey(state, view.selectedKey);
+      if (garrison.length) {
+        El("div", "pf-actions-lead", { text: "本格驻军 —— 点一支队伍即可列出它的行动：", parent: rail });
+        for (const item of garrison) {
+          const pick = El("button", "pf-action is-support pf-action-pick", {
+            parent: rail,
+            attrs: { type: "button", "data-action": "SelectUnit" },
+          });
+          El("span", "pf-action-name", { text: UnitName(item), parent: pick });
+          El("small", "pf-action-cost", { text: item.acted ? "本回合已行动" : "待命", parent: pick });
+          On(pick, "click", () => Call("OnSelectHex", item.key, { unitId: item.id }));
+        }
+        return;
+      }
       El("div", "pf-empty", {
         text: unit ? "这支队伍在此处没有可执行的行动。" : "选中一支队伍后，这里会列出可用行动。",
         parent: rail,
@@ -2117,7 +2211,30 @@ export function CreateUi(root, hooks = {}) {
     else if (name === "Help") RenderHelpPanel(body, state, view);
     else if (name === "Settings") RenderSettingsPanel(body, state, view, payload);
 
+    dom.panel = panel;
+    dom.panelBody = body;
+    // 内容不足以撑满统一最小高度时（代价账本开局只有五个 0），撤掉最小高度贴合内容，
+    // 免得面板下半部留一大片空白。撑得满的面板不受影响，高度区间仍然统一。
+    FitPanelHeight();
+    Later(FitPanelHeight, 30);
+
     if (close.focus) Later(() => close.focus(), 30);
+  }
+
+  /**
+   * 量一次内容高度，决定面板是否收成"贴合内容"态。
+   * 不能用 scrollHeight 判断：内容不足时它恒等于 clientHeight，什么也看不出来。
+   * 这里量最后一个子元素的下沿离面板体下沿还剩多少，剩太多就说明下半部是空的。
+   */
+  function FitPanelHeight() {
+    const panel = dom.panel;
+    const body = dom.panelBody;
+    if (!panel || !body || panel.isConnected === false) return;
+    SetFlag(panel, "is-fit", false);
+    const last = body.lastElementChild;
+    if (!last) return;
+    const slack = RectOf(body).bottom - RectOf(last).bottom;
+    SetFlag(panel, "is-fit", slack > 48);
   }
 
   // ---- 双树（科技 / 群众政权） --------------------------------------------
@@ -2175,7 +2292,16 @@ export function CreateUi(root, hooks = {}) {
     }
 
     const layout = LayoutTreeNodes(nodes, treeKey);
-    // 外层负责"还有内容在右边"的渐隐提示，内层负责横向滚动。
+
+    // 纪元跳转条 + 常显滚动轨，都摆在树的上方：面板体本身竖向余量不足时，
+    // 摆在树下面的东西会被推出可视区，摆在上面则永远看得见。
+    const nav = El("div", "pf-tree-nav", { parent: body });
+    const pager = El("div", "pf-tree-eras", {
+      parent: nav,
+      attrs: { role: "group", "aria-label": "按纪元跳转" },
+    });
+
+    // 外层负责"还有内容在右边 / 下面"的渐隐提示，内层负责真正的滚动。
     const wrap = El("div", "pf-tree-wrap", { parent: body });
     const canvas = El("div", "pf-tree", {
       parent: wrap,
@@ -2285,6 +2411,119 @@ export function CreateUi(root, hooks = {}) {
         Call("OnResearch", { id: node.id, tree: isTech ? "tech" : "doctrine" });
       });
     }
+
+    BuildTreeChrome(nav, pager, wrap, canvas, layout, treeKey);
+  }
+
+  /**
+   * 给树补上两件"看得见的滚动"：
+   *   1. 纪元跳转条 —— 每一列一枚按钮，点一下把该列滚进视野，当前可见的列高亮；
+   *   2. 常显滚动轨 —— 自绘的横向滑块（叠加式系统滚动条静止时不画，指望不上），
+   *      可点可拖，宽度按可视比例给出，玩家一眼就知道自己只看到了整棵树的多少。
+   * 竖直方向由 .pf-tree 上的 is-scroll-down / is-scroll-up 状态类画渐隐提示。
+   */
+  function BuildTreeChrome(nav, pager, wrap, canvas, layout, treeKey) {
+    const columns = Array.isArray(layout.columns) ? layout.columns : [];
+    if (!cache.treeScroll) cache.treeScroll = {};
+    const jumpButtons = [];
+    for (let index = 0; index < columns.length; index += 1) {
+      const column = columns[index];
+      const button = El("button", "pf-tree-era", {
+        parent: pager,
+        attrs: { type: "button", "data-column": String(index), "aria-label": `跳到${column.label}` },
+      });
+      El("span", "pf-tree-era-name", { text: column.label, parent: button });
+      El("small", "pf-tree-era-count", { text: `${column.count || 0} 项`, parent: button });
+      On(button, "click", () => {
+        const max = Math.max(0, canvas.scrollWidth - canvas.clientWidth);
+        canvas.scrollLeft = Clamp(column.x - 10, 0, max);
+        SyncTreeChrome();
+      });
+      jumpButtons.push(button);
+    }
+
+    const vfade = El("i", "pf-tree-vfade", { parent: wrap, attrs: { "aria-hidden": "true" } });
+    const railBox = El("div", "pf-tree-railbox", { parent: nav });
+    const rail = El("div", "pf-tree-rail", {
+      parent: railBox,
+      attrs: { role: "presentation", "aria-hidden": "true" },
+    });
+    const thumb = El("i", "pf-tree-thumb", { parent: rail });
+    El("small", "pf-tree-railnote", { text: "← 拖动滑块平移整棵树，或点上方纪元跳转 →", parent: railBox });
+
+    function SyncTreeChrome() {
+      UpdateScrollAffordance(canvas);
+      const span = Math.max(0, canvas.scrollWidth - canvas.clientWidth);
+      SetFlag(nav, "is-pannable", span > 2);
+      SetFlag(wrap, "is-pannable", span > 2);
+      const spanY = Math.max(0, canvas.scrollHeight - canvas.clientHeight);
+      SetFlag(wrap, "is-vscroll", spanY > 2 && canvas.scrollTop < spanY - 2);
+      const hiddenRows = Math.max(1, Math.round(spanY / Math.max(1, layout.nodeHeight + layout.rowGap)));
+      SetText(vfade, spanY > 2 ? `▾ 下面还有约 ${hiddenRows} 行` : "");
+      const ratio = canvas.scrollWidth > 0 ? canvas.clientWidth / canvas.scrollWidth : 1;
+      const width = Clamp(ratio * 100, 12, 100);
+      const offset = span > 0 ? (canvas.scrollLeft / span) * (100 - width) : 0;
+      if (thumb.style) {
+        thumb.style.width = `${width.toFixed(2)}%`;
+        thumb.style.left = `${Clamp(offset, 0, 100 - width).toFixed(2)}%`;
+      }
+      const left = canvas.scrollLeft;
+      const right = left + canvas.clientWidth;
+      for (let index = 0; index < jumpButtons.length; index += 1) {
+        const column = columns[index];
+        const visible = column.x + layout.nodeWidth > left + 4 && column.x < right - 4;
+        SetFlag(jumpButtons[index], "is-visible", visible);
+        SetAttr(jumpButtons[index], "aria-current", visible ? "true" : null);
+      }
+    }
+
+    // 轨道上点击 / 拖拽都按同一套换算走：把落点当作滑块中心。
+    let dragging = false;
+    function ScrollToPointer(event) {
+      const rect = RectOf(rail);
+      if (!rect.width) return;
+      const ratio = canvas.scrollWidth > 0 ? canvas.clientWidth / canvas.scrollWidth : 1;
+      const usable = Math.max(1, rect.width * (1 - ratio));
+      const position = event.clientX - rect.left - (rect.width * ratio) / 2;
+      const span = Math.max(0, canvas.scrollWidth - canvas.clientWidth);
+      canvas.scrollLeft = Clamp(position / usable, 0, 1) * span;
+      SyncTreeChrome();
+    }
+    On(rail, "pointerdown", (event) => {
+      dragging = true;
+      if (rail.setPointerCapture && event.pointerId !== undefined) {
+        try {
+          rail.setPointerCapture(event.pointerId);
+        } catch (error) {
+          // 某些环境不支持指针捕获，退化为普通拖拽即可
+        }
+      }
+      ScrollToPointer(event);
+      event.preventDefault();
+    });
+    On(rail, "pointermove", (event) => {
+      if (dragging) ScrollToPointer(event);
+    });
+    On(rail, "pointerup", () => {
+      dragging = false;
+    });
+    On(rail, "pointercancel", () => {
+      dragging = false;
+    });
+    On(canvas, "scroll", SyncTreeChrome, { passive: true });
+    On(canvas, "scroll", () => {
+      cache.treeScroll[treeKey] = { left: canvas.scrollLeft, top: canvas.scrollTop };
+    }, { passive: true });
+
+    // 面板每次 Sync 都会重建，滚动位置必须自己记住，否则玩家刚翻到第五纪元就被弹回开头。
+    const remembered = cache.treeScroll[treeKey];
+    if (remembered && typeof canvas.scrollTo === "function") {
+      canvas.scrollTo({ left: remembered.left || 0, top: remembered.top || 0, behavior: "auto" });
+    }
+
+    // 首帧布局尚未落定（面板还要做一次贴合内容的高度收缩），等一拍再量，滑块宽度才准。
+    SyncTreeChrome();
+    Later(SyncTreeChrome, 60);
   }
 
   /**
@@ -2365,10 +2604,19 @@ export function CreateUi(root, hooks = {}) {
    * 列头文字取该列节点的纪元名。
    */
   function LayoutTreeNodes(nodes, treeKey) {
-    const nodeWidth = 184;
-    const nodeHeight = 88;
-    const columnGap = 78;
-    const rowGap = 18;
+    // 卡片尺寸随视口分三档：窄视口下缩小行高，整棵树才可能在竖直方向一次装完
+    // （平板 1024 上原本恒有一整行看不见）。列宽仍留足两行中文标题。
+    const viewport = ViewportSize();
+    const metrics =
+      viewport.width <= 640
+        ? { nodeWidth: 140, nodeHeight: 72, columnGap: 40, rowGap: 12 }
+        : viewport.width <= 1199
+          ? { nodeWidth: 158, nodeHeight: 70, columnGap: 54, rowGap: 12 }
+          : { nodeWidth: 184, nodeHeight: 84, columnGap: 78, rowGap: 16 };
+    const nodeWidth = metrics.nodeWidth;
+    const nodeHeight = metrics.nodeHeight;
+    const columnGap = metrics.columnGap;
+    const rowGap = metrics.rowGap;
     const headHeight = 26;
     const byId = {};
     for (const node of nodes) byId[node.id] = node;
@@ -2423,7 +2671,7 @@ export function CreateUi(root, hooks = {}) {
       } else {
         label = `第 ${columnIndex + 1} 层`;
       }
-      columns.push({ x, label });
+      columns.push({ x, label, count: group.length });
       group.forEach((node, rowIndex) => {
         positions[node.id] = { x, y: headHeight + rowIndex * (nodeHeight + rowGap) };
         if (rowIndex + 1 > maxRows) maxRows = rowIndex + 1;
@@ -2435,6 +2683,7 @@ export function CreateUi(root, hooks = {}) {
       columns,
       nodeWidth,
       nodeHeight,
+      rowGap,
       width: Math.max(nodeWidth, columnGroups.length * (nodeWidth + columnGap) - columnGap + 10),
       height: Math.max(nodeHeight, headHeight + maxRows * (nodeHeight + rowGap) - rowGap + 10),
     };

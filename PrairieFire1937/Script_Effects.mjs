@@ -8,7 +8,18 @@
 //      uTime uniform（所有粒子材质引用同一个 uniform 对象），绝不逐粒子遍历。
 //   2. 发射器走对象池：一次性爆发（burst）与持续流（stream）分池，超出并发上限时
 //      优雅回收最旧的一个。持续流用 shader 里的 mod(age, life) 自循环，零 CPU 开销。
-//   3. SetQuality 分级控制粒子上限、点光源数量、天气是否启用。
+//   3. **持久层一律合批**，drawcall 不随战局增长：
+//      · 烟柱 / 余烬（SetSmoke，随战局不断累积、长期存在）不再各占一个发射器，
+//        而是共用两块常驻 Points 批（浓烟一块、余烬一块），每根烟柱只占其中一段
+//        slot。诞生时刻、浓度、上升速率、扰动强度改走 aBatch 顶点属性（BATCHED
+//        分支），因此浓度分级与「随时间变灰」的既有表现一字不改，draw call 恒为 2。
+//      · 建设脚手架（SpawnBuild）原先是 4 个 Group × 6 个独立 Mesh，24 个顶点一个
+//        drawcall，战局中段能堆到 240 个；现在合成 **一个 InstancedMesh**（单位立方
+//        体 + 逐实例矩阵 + 逐实例 aFade），并发多少座工地都只有 1 个 drawcall。
+//      · 两者都配 slot 对象池：撤除时真正归还 slot 并压回高水位，不是只置 visible。
+//   4. 持久层材质不参与 PBR：脚手架从 MeshStandardMaterial 换成不受光的自定义
+//      ShaderMaterial（假明暗写在顶点法线里），少一套光照 shader program。
+//   5. SetQuality 分级控制粒子上限、点光源数量、天气是否启用、并发工地数。
 //
 // 内容红线（规格书第 7 节）：特效只表现「隐蔽—突袭—转移」与「人民的组织」，
 // 不做血腥、不渲染杀戮，爆点只表现破坏交通线，动员是本模块最该有感染力的一段。
@@ -22,13 +33,34 @@ import { CreateWorkModel, CreateRailModel, TickModelWind } from "./Script_Models
 // --------------------------------------------------------------------------
 
 const qualityPresets = {
-  low: { particleScale: 0.34, burstEmitters: 8, lights: 0, weather: false, smokeColumns: 3, rings: 6, moves: 2 },
-  medium: { particleScale: 0.62, burstEmitters: 14, lights: 1, weather: true, smokeColumns: 5, rings: 10, moves: 3 },
-  high: { particleScale: 1, burstEmitters: 20, lights: 3, weather: true, smokeColumns: 8, rings: 14, moves: 5 },
-  ultra: { particleScale: 1.4, burstEmitters: 28, lights: 5, weather: true, smokeColumns: 12, rings: 18, moves: 8 },
+  low: { particleScale: 0.34, burstEmitters: 8, lights: 0, weather: false, smokeColumns: 3, rings: 6, moves: 2, scaffolds: 4 },
+  medium: { particleScale: 0.62, burstEmitters: 14, lights: 1, weather: true, smokeColumns: 5, rings: 10, moves: 3, scaffolds: 8 },
+  high: { particleScale: 1, burstEmitters: 20, lights: 3, weather: true, smokeColumns: 8, rings: 14, moves: 5, scaffolds: 12 },
+  ultra: { particleScale: 1.4, burstEmitters: 28, lights: 5, weather: true, smokeColumns: 12, rings: 18, moves: 8, scaffolds: 16 },
 };
 
 const emitterCapacity = 320;
+
+// 持久层合批的静态预算：按最高画质一次性开好，切画质只收紧使用上限、不重建缓冲。
+const smokeSlotLimit = qualityPresets.ultra.smokeColumns;
+const smokeSlotCapacity = 132; // 单根浓烟最多占的粒子数：ultra 浓度 3 → round(92 × 1.4) = 129
+const emberSlotCapacity = 36; // 单根余烬最多占的粒子数：ultra → round(20 × 1.4) = 28
+const scaffoldSlotLimit = qualityPresets.ultra.scaffolds;
+const scaffoldPiecesPerSite = 24; // 4 层 × （4 立柱 + 2 横杆）
+const ringSlotLimit = qualityPresets.ultra.rings;
+const sweepArrowLimit = 6; // 同屏最多几条扫荡箭头，超出的最旧一条提前收走
+
+/** 脚手架单座工地的构件表：局部坐标 + 尺寸，逐实例矩阵由它和层缩放算出来。 */
+const scaffoldLayout = (() => {
+  const pieces = [];
+  for (let level = 0; level < 4; level += 1) {
+    for (const x of [-0.2, 0.2]) {
+      for (const z of [-0.2, 0.2]) pieces.push({ level, x, y: 0.08, z, width: 0.02, height: 0.16, depth: 0.02 });
+    }
+    for (const z of [-0.2, 0.2]) pieces.push({ level, x: 0, y: 0.15, z, width: 0.44, height: 0.016, depth: 0.016 });
+  }
+  return pieces;
+})();
 
 // --------------------------------------------------------------------------
 // 粒子 shader
@@ -42,6 +74,11 @@ attribute float aSeed;
 attribute float aDelay;
 attribute float aLife;
 attribute float aSize;
+#ifdef BATCHED
+  // 合批常驻发射器：逐粒子携带所属烟柱的 x = 诞生时刻 / y = 浓度 / z = 上升速率 / w = 扰动
+  attribute vec4 aBatch;
+  varying vec2 vBatch;
+#endif
 uniform float uTime;
 uniform float uStart;
 uniform vec3 uGravity;
@@ -56,7 +93,17 @@ uniform float uPixelRatio;
 varying float vLife;
 varying float vSeed;
 void main() {
-  float age = uTime - uStart - aDelay;
+  #ifdef BATCHED
+    float startTime = aBatch.x;
+    float rise = aBatch.z;
+    float turbulence = aBatch.w;
+    vBatch = aBatch.xy;
+  #else
+    float startTime = uStart;
+    float rise = uRise;
+    float turbulence = uTurbulence;
+  #endif
+  float age = uTime - startTime - aDelay;
   #ifdef LOOPING
     age = mod( max( age, 0.0 ), aLife );
   #endif
@@ -68,14 +115,14 @@ void main() {
   float travel = ( 1.0 - exp( -drag * age ) ) / drag;
   vec3 offsetPosition = aOffset + aVelocity * travel + uGravity * ( 0.5 * age * age );
   float phase = aSeed * 6.2831853 + age * uSwirl;
-  offsetPosition.x += sin( phase ) * uTurbulence * ( 0.35 + aSeed );
-  offsetPosition.z += cos( phase * 1.13 ) * uTurbulence * ( 0.35 + aSeed );
-  offsetPosition.y += uRise * age;
+  offsetPosition.x += sin( phase ) * turbulence * ( 0.35 + aSeed );
+  offsetPosition.z += cos( phase * 1.13 ) * turbulence * ( 0.35 + aSeed );
+  offsetPosition.y += rise * age;
   offsetPosition = mix( offsetPosition, aTarget, uConverge * smoothstep( 0.1, 0.92, life ) );
   vec4 viewPosition = modelViewMatrix * vec4( offsetPosition, 1.0 );
   gl_Position = projectionMatrix * viewPosition;
   float grow = mix( uSizeCurve.x, uSizeCurve.y, life );
-  float visible = step( 0.0, uTime - uStart - aDelay );
+  float visible = step( 0.0, uTime - startTime - aDelay );
   gl_PointSize = aSize * uSizeScale * grow * visible * uPixelRatio * ( 260.0 / max( -viewPosition.z, 0.001 ) );
 }
 `;
@@ -93,7 +140,17 @@ uniform float uTime;
 uniform float uBirth;
 varying float vLife;
 varying float vSeed;
+#ifdef BATCHED
+  varying vec2 vBatch;
+#endif
 void main() {
+  #ifdef BATCHED
+    float birth = vBatch.x;
+    float density = vBatch.y;
+  #else
+    float birth = uBirth;
+    float density = 1.0;
+  #endif
   vec2 point = gl_PointCoord - 0.5;
   #ifdef SHAPE_STREAK
     float ct = cos( uTilt );
@@ -112,11 +169,11 @@ void main() {
     #endif
   #endif
   float fade = smoothstep( 0.0, 0.07, vLife ) * ( 1.0 - smoothstep( uFade, 1.0, vLife ) );
-  float columnAge = clamp( ( uTime - uBirth ) / 42.0, 0.0, 1.0 );
+  float columnAge = clamp( ( uTime - birth ) / 42.0, 0.0, 1.0 );
   vec3 color = mix( uColorA, uColorB, vLife );
   color = mix( color, uAshColor, columnAge * 0.75 );
   color *= mix( 1.0, uDaylight, uLit );
-  gl_FragColor = vec4( color, alpha * fade * uOpacity );
+  gl_FragColor = vec4( color, alpha * fade * uOpacity * density );
   if ( gl_FragColor.a < 0.008 ) discard;
 }
 `;
@@ -148,6 +205,64 @@ void main() {
   float intensity = ( body + arrow * 0.85 ) * tail * pulse;
   vec3 color = mix( uColorEdge, uColorCore, arrow );
   gl_FragColor = vec4( color, clamp( intensity, 0.0, 1.0 ) * uOpacity );
+  if ( gl_FragColor.a < 0.01 ) discard;
+}
+`;
+
+// 脚手架合批：单位立方体 + 逐实例矩阵 + 逐实例淡出，不受光、不投影、不参与 PBR。
+// 立面明暗直接由物体空间法线算（构件全是轴对齐盒子，逐实例缩放不改变法线朝向）。
+const scaffoldVertexShader = /* glsl */ `
+attribute float aFade;
+varying float vFade;
+varying float vShade;
+void main() {
+  vFade = aFade;
+  vec3 lightDirection = normalize( vec3( 0.42, 0.86, 0.3 ) );
+  vShade = 0.52 + 0.48 * ( dot( normal, lightDirection ) * 0.5 + 0.5 );
+  #ifdef USE_INSTANCING
+    vec4 localPosition = instanceMatrix * vec4( position, 1.0 );
+  #else
+    vec4 localPosition = vec4( position, 1.0 );
+  #endif
+  gl_Position = projectionMatrix * modelViewMatrix * localPosition;
+}
+`;
+
+const scaffoldFragmentShader = /* glsl */ `
+uniform vec3 uColor;
+uniform float uOpacity;
+uniform float uDaylight;
+varying float vFade;
+varying float vShade;
+void main() {
+  gl_FragColor = vec4( uColor * vShade * mix( 0.62, 1.0, uDaylight ), uOpacity * vFade );
+  if ( gl_FragColor.a < 0.01 ) discard;
+}
+`;
+
+// 冲击环合批：逐实例矩阵给缩放与落点，逐实例 aColor / aFade 给颜色与淡出。
+const ringVertexShader = /* glsl */ `
+attribute vec3 aColor;
+attribute float aFade;
+varying vec3 vRingColor;
+varying float vRingFade;
+void main() {
+  vRingColor = aColor;
+  vRingFade = aFade;
+  #ifdef USE_INSTANCING
+    vec4 localPosition = instanceMatrix * vec4( position, 1.0 );
+  #else
+    vec4 localPosition = vec4( position, 1.0 );
+  #endif
+  gl_Position = projectionMatrix * modelViewMatrix * localPosition;
+}
+`;
+
+const ringFragmentShader = /* glsl */ `
+varying vec3 vRingColor;
+varying float vRingFade;
+void main() {
+  gl_FragColor = vec4( vRingColor, vRingFade );
   if ( gl_FragColor.a < 0.01 ) discard;
 }
 `;
@@ -241,8 +356,11 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
   const textCache = new Map();
   const lightPool = [];
   const activeMoves = [];
-  let ringPool = [];
-  let scaffoldAssets = null;
+  const activeScaffolds = [];
+  const activeRings = [];
+  const smokeBatches = { smoke: null, ember: null };
+  const ringBatches = { additive: null, normal: null };
+  let scaffoldBatch = null;
   let weather = { kind: "Clear", intensity: 0, active: null, fadingOut: [] };
 
   // ------------------------------------------------------------------------
@@ -335,11 +453,11 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
 
   /**
    * 每种「形状 × 是否循环」独立成池。
-   * 爆发池按质量档总预算平摊到 4 种形状；持续流池要装得下全部烟柱、火把与天气，
-   * 否则会把还在用的烟柱发射器抢走。
+   * 爆发池按质量档总预算平摊到 4 种形状；持续流池现在只服务行军火把与天气——
+   * 烟柱已经搬进常驻合批，不再和它们抢发射器，池子也就不必再按烟柱数放大。
    */
   function PoolLimit(looping) {
-    if (looping) return preset.smokeColumns + preset.moves + 3;
+    if (looping) return preset.moves + 3;
     return Math.max(3, Math.ceil(preset.burstEmitters / 4));
   }
 
@@ -394,10 +512,12 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     return target;
   }
 
-  /** 填充一个发射器的全部属性。仅在 spawn 时执行一次，不在每帧循环里。 */
-  function FillEmitter(emitter, spec) {
-    const count = Clamp(Math.round((spec.count || 40) * preset.particleScale), 4, emitterCapacity);
-    const geometry = emitter.geometry;
+  /**
+   * 把 count 个粒子写进 geometry 的 [base, base + count) 区间。
+   * 独立发射器 base 恒为 0；合批发射器按 slot 起点写，互不干扰。
+   * batchValues 非空时额外写 aBatch（诞生时刻 / 浓度 / 上升速率 / 扰动强度）。
+   */
+  function WriteParticles(geometry, base, count, spec, batchValues) {
     const offset = geometry.getAttribute("aOffset");
     const velocity = geometry.getAttribute("aVelocity");
     const targetAttribute = geometry.getAttribute("aTarget");
@@ -405,31 +525,50 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     const delay = geometry.getAttribute("aDelay");
     const life = geometry.getAttribute("aLife");
     const size = geometry.getAttribute("aSize");
+    const batch = batchValues ? geometry.getAttribute("aBatch") : null;
     const direction = new THREE.Vector3();
     const origin = spec.position || new THREE.Vector3();
     const convergeTarget = spec.target || origin;
     const radius = spec.radius ?? 0.1;
     const height = spec.height ?? 0.05;
     for (let index = 0; index < count; index += 1) {
+      const slot = base + index;
       const angle = rng() * Math.PI * 2;
       const spot = radius * Math.sqrt(rng());
-      offset.array[index * 3] = origin.x + Math.cos(angle) * spot;
-      offset.array[index * 3 + 1] = origin.y + rng() * height + (spec.baseLift ?? 0);
-      offset.array[index * 3 + 2] = origin.z + Math.sin(angle) * spot;
+      offset.array[slot * 3] = origin.x + Math.cos(angle) * spot;
+      offset.array[slot * 3 + 1] = origin.y + rng() * height + (spec.baseLift ?? 0);
+      offset.array[slot * 3 + 2] = origin.z + Math.sin(angle) * spot;
       const speed = Lerp(spec.speed?.[0] ?? 0.2, spec.speed?.[1] ?? 0.6, rng());
       RandomDirection(spec, index, count, direction).multiplyScalar(speed);
-      velocity.array[index * 3] = direction.x;
-      velocity.array[index * 3 + 1] = direction.y;
-      velocity.array[index * 3 + 2] = direction.z;
-      targetAttribute.array[index * 3] = convergeTarget.x + (rng() - 0.5) * (spec.targetSpread ?? 0.14);
-      targetAttribute.array[index * 3 + 1] = convergeTarget.y + rng() * (spec.targetSpread ?? 0.14);
-      targetAttribute.array[index * 3 + 2] = convergeTarget.z + (rng() - 0.5) * (spec.targetSpread ?? 0.14);
-      seed.array[index] = rng();
-      delay.array[index] = Lerp(spec.delay?.[0] ?? 0, spec.delay?.[1] ?? 0, rng());
-      life.array[index] = Lerp(spec.life?.[0] ?? 0.8, spec.life?.[1] ?? 1.4, rng());
-      size.array[index] = Lerp(spec.size?.[0] ?? 6, spec.size?.[1] ?? 14, rng());
+      velocity.array[slot * 3] = direction.x;
+      velocity.array[slot * 3 + 1] = direction.y;
+      velocity.array[slot * 3 + 2] = direction.z;
+      targetAttribute.array[slot * 3] = convergeTarget.x + (rng() - 0.5) * (spec.targetSpread ?? 0.14);
+      targetAttribute.array[slot * 3 + 1] = convergeTarget.y + rng() * (spec.targetSpread ?? 0.14);
+      targetAttribute.array[slot * 3 + 2] = convergeTarget.z + (rng() - 0.5) * (spec.targetSpread ?? 0.14);
+      seed.array[slot] = rng();
+      delay.array[slot] = Lerp(spec.delay?.[0] ?? 0, spec.delay?.[1] ?? 0, rng());
+      life.array[slot] = Lerp(spec.life?.[0] ?? 0.8, spec.life?.[1] ?? 1.4, rng());
+      size.array[slot] = Lerp(spec.size?.[0] ?? 6, spec.size?.[1] ?? 14, rng());
+      if (batch) {
+        batch.array[slot * 4] = batchValues[0];
+        batch.array[slot * 4 + 1] = batchValues[1];
+        batch.array[slot * 4 + 2] = batchValues[2];
+        batch.array[slot * 4 + 3] = batchValues[3];
+      }
     }
-    for (const attribute of [offset, velocity, targetAttribute, seed, delay, life, size]) attribute.needsUpdate = true;
+    const touched = [offset, velocity, targetAttribute, seed, delay, life, size];
+    if (batch) touched.push(batch);
+    for (const attribute of touched) attribute.needsUpdate = true;
+  }
+
+  /** 填充一个发射器的全部属性。仅在 spawn 时执行一次，不在每帧循环里。 */
+  function FillEmitter(emitter, spec) {
+    const count = Clamp(Math.round((spec.count || 40) * preset.particleScale), 4, emitterCapacity);
+    const geometry = emitter.geometry;
+    WriteParticles(geometry, 0, count, spec, null);
+    const delay = geometry.getAttribute("aDelay");
+    const life = geometry.getAttribute("aLife");
     geometry.setDrawRange(0, count);
     const uniforms = emitter.material.uniforms;
     uniforms.uStart.value = clock;
@@ -486,54 +625,389 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
   }
 
   // ------------------------------------------------------------------------
-  // 冲击环 / 光环池
+  // 持久特效合批：常驻粒子批 + slot 池
+  //
+  // 烟柱是战局里唯一会不断累积、长期存在的粒子特效。原先一根烟柱独占一个发射器，
+  // 每根 = 1 个 draw call，还会跟天气、火把抢同一个 looping 池。现在改成两块常驻
+  // 的 Points 批：浓烟一块、余烬一块，每根烟柱只占其中一段固定 slot，draw call
+  // 恒为 2，且不再被别的系统抢占。
   // ------------------------------------------------------------------------
 
-  function AcquireRing() {
-    for (const ring of ringPool) {
-      if (!ring.busy) return ring;
+  /** 建一块常驻粒子批。slotSize × smokeSlotLimit 一次性开好，之后只改 slot 内的数据。 */
+  function BuildParticleBatch(shape, slotSize, uniformSpec) {
+    const total = slotSize * smokeSlotLimit;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(total * 3), 3));
+    for (const [name, size] of [["aOffset", 3], ["aVelocity", 3], ["aTarget", 3], ["aSeed", 1], ["aDelay", 1], ["aLife", 1], ["aSize", 1], ["aBatch", 4]]) {
+      geometry.setAttribute(name, new THREE.BufferAttribute(new Float32Array(total * size), size));
     }
-    if (ringPool.length >= preset.rings) {
-      const victim = ringPool[0];
-      victim.mesh.visible = false;
-      victim.busy = false;
-      return victim;
+    // 空 slot 必须是惰性的：aLife 给 1 避免除零，aSize 给 0 让点尺寸退化为不占像素
+    geometry.getAttribute("aLife").array.fill(1);
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 120);
+    const material = new THREE.ShaderMaterial({
+      defines: { [`SHAPE_${shape}`]: "", LOOPING: "", BATCHED: "" },
+      uniforms: {
+        uTime: sharedTime,
+        uDaylight: sharedDaylight,
+        uPixelRatio: sharedPixelRatio,
+        uStart: { value: 0 },
+        uBirth: { value: 0 },
+        uGravity: { value: new THREE.Vector3() },
+        uDrag: { value: uniformSpec.drag },
+        uSwirl: { value: uniformSpec.swirl },
+        uTurbulence: { value: 0 },
+        uRise: { value: 0 },
+        uConverge: { value: 0 },
+        uSizeScale: { value: 1 },
+        uSizeCurve: { value: new THREE.Vector2(uniformSpec.sizeCurve[0], uniformSpec.sizeCurve[1]) },
+        uColorA: { value: new THREE.Color(uniformSpec.colorA) },
+        uColorB: { value: new THREE.Color(uniformSpec.colorB) },
+        uAshColor: { value: new THREE.Color(uniformSpec.ashColor) },
+        uOpacity: { value: 1 },
+        uFade: { value: uniformSpec.fade },
+        uTilt: { value: 0 },
+        uLit: { value: uniformSpec.lit },
+      },
+      vertexShader: particleVertexShader,
+      fragmentShader: particleFragmentShader,
+      transparent: true,
+      depthWrite: false,
+      blending: uniformSpec.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    });
+    const points = new THREE.Points(geometry, material);
+    points.frustumCulled = false;
+    points.renderOrder = 6;
+    points.visible = false;
+    root.add(points);
+    disposables.add(geometry);
+    disposables.add(material);
+    geometry.setDrawRange(0, 0);
+    return { points, geometry, material, slotSize, owners: new Array(smokeSlotLimit).fill(null), generation: new Array(smokeSlotLimit).fill(0) };
+  }
+
+  function GetSmokeBatch(kind) {
+    if (smokeBatches[kind]) return smokeBatches[kind];
+    smokeBatches[kind] = kind === "ember"
+      ? BuildParticleBatch("SPARK", emberSlotCapacity, {
+        drag: 1.4, swirl: 2, sizeCurve: [1, 0.25], colorA: "#e8a352", colorB: "#7a3418",
+        ashColor: "#7a3418", fade: 0.3, lit: 0, additive: true,
+      })
+      : BuildParticleBatch("PUFF", smokeSlotCapacity, {
+        drag: 0.9, swirl: 0.65, sizeCurve: [0.35, 2.6], colorA: "#4a423a", colorB: "#9b968c",
+        ashColor: "#a9a6a0", fade: 0.4, lit: 1, additive: false,
+      });
+    return smokeBatches[kind];
+  }
+
+  /** 重算批的绘制范围与可见性：高水位之外的 slot 连顶点都不过一遍。 */
+  function RefreshBatchRange(batch) {
+    let highWater = 0;
+    for (let index = 0; index < batch.owners.length; index += 1) {
+      if (batch.owners[index] !== null) highWater = (index + 1) * batch.slotSize;
     }
-    const geometry = new THREE.RingGeometry(0.62, 1, 36);
-    geometry.rotateX(-Math.PI / 2);
-    const material = new THREE.MeshBasicMaterial({ color: "#c9b58a", transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
-    const mesh = new THREE.Mesh(geometry, material);
+    batch.geometry.setDrawRange(0, highWater);
+    batch.points.visible = highWater > 0;
+  }
+
+  /** 取一个空 slot；批已满则返回 -1（由调用方先腾位置）。 */
+  function AcquireBatchSlot(batch, ownerKey, limit) {
+    const usable = Math.min(limit, batch.owners.length);
+    for (let index = 0; index < usable; index += 1) {
+      if (batch.owners[index] === null) {
+        batch.owners[index] = ownerKey;
+        batch.generation[index] += 1;
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * 归还 slot：把整段粒子写成惰性状态（尺寸 0）并压回高水位，做到真回收而不是只藏起来。
+   * generation 校验沿用发射器 epoch 的思路，防止过期句柄误释放新主人的 slot。
+   */
+  function ReleaseBatchSlot(batch, slotIndex, generation) {
+    if (slotIndex < 0 || slotIndex >= batch.owners.length) return;
+    if (batch.owners[slotIndex] === null) return;
+    if (generation !== undefined && batch.generation[slotIndex] !== generation) return;
+    const size = batch.geometry.getAttribute("aSize");
+    const life = batch.geometry.getAttribute("aLife");
+    const base = slotIndex * batch.slotSize;
+    size.array.fill(0, base, base + batch.slotSize);
+    life.array.fill(1, base, base + batch.slotSize);
+    size.needsUpdate = true;
+    life.needsUpdate = true;
+    batch.owners[slotIndex] = null;
+    RefreshBatchRange(batch);
+  }
+
+  /** 把一根烟柱写进 slot：超出实际用量的尾部一律清成惰性粒子。 */
+  function WriteBatchSlot(batch, slotIndex, spec, batchValues) {
+    const base = slotIndex * batch.slotSize;
+    const count = Clamp(Math.round((spec.count || 40) * preset.particleScale), 4, batch.slotSize);
+    WriteParticles(batch.geometry, base, count, spec, batchValues);
+    if (count < batch.slotSize) {
+      const size = batch.geometry.getAttribute("aSize");
+      const life = batch.geometry.getAttribute("aLife");
+      size.array.fill(0, base + count, base + batch.slotSize);
+      life.array.fill(1, base + count, base + batch.slotSize);
+    }
+    RefreshBatchRange(batch);
+  }
+
+  // ------------------------------------------------------------------------
+  // 脚手架合批（建设特效）
+  //
+  // 原先一座工地 = 4 个 Group × 6 个 Mesh，24 个顶点就要一个 draw call，
+  // 战局中段能同时挂 40 个 Group / 240 个 Mesh。现在全部并进一个 InstancedMesh：
+  // 无论同时几座工地，永远 1 个 draw call。
+  // ------------------------------------------------------------------------
+
+  function GetScaffoldBatch() {
+    if (scaffoldBatch) return scaffoldBatch;
+    const capacity = scaffoldSlotLimit * scaffoldPiecesPerSite;
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const fade = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
+    fade.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute("aFade", fade);
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color("#7a6242") },
+        uOpacity: { value: 0.95 },
+        uDaylight: sharedDaylight,
+      },
+      vertexShader: scaffoldVertexShader,
+      fragmentShader: scaffoldFragmentShader,
+      transparent: true,
+      depthWrite: true,
+    });
+    const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.count = 0;
     mesh.visible = false;
-    mesh.renderOrder = 5;
+    // 全部实例先塌成零体积，避免未占用的 slot 在原点留下一堆碎片
+    for (let index = 0; index < capacity; index += 1) ClearScaffoldInstance(mesh, index);
     root.add(mesh);
     disposables.add(geometry);
     disposables.add(material);
-    const ring = { mesh, material, busy: false, epoch: 0 };
-    ringPool.push(ring);
-    return ring;
+    scaffoldBatch = { mesh, geometry, material, owners: new Array(scaffoldSlotLimit).fill(false), generation: new Array(scaffoldSlotLimit).fill(0) };
+    return scaffoldBatch;
   }
 
+  function ClearScaffoldInstance(mesh, instanceIndex) {
+    const elements = mesh.instanceMatrix.array;
+    const base = instanceIndex * 16;
+    for (let offset = 0; offset < 16; offset += 1) elements[base + offset] = 0;
+    elements[base + 15] = 1;
+    mesh.geometry.getAttribute("aFade").array[instanceIndex] = 0;
+  }
+
+  /**
+   * 写一座工地的 24 个构件。构件全是轴对齐盒子且不旋转，直接摊平写 16 个矩阵元素，
+   * 比走 Object3D.updateMatrix 便宜一个数量级。layerScales 是四层各自的生长系数。
+   * layerScales 为 0 表示该层还没长出来（对应原先的 layer.visible = false）。
+   * generation 校验保证被提前收走的工地不会再往已经易主的 slot 里写东西。
+   */
+  function WriteScaffoldSite(slotIndex, generation, center, layerScales, fadeValue) {
+    const batch = GetScaffoldBatch();
+    if (!batch.owners[slotIndex] || batch.generation[slotIndex] !== generation) return;
+    const elements = batch.mesh.instanceMatrix.array;
+    const fade = batch.geometry.getAttribute("aFade").array;
+    const instanceBase = slotIndex * scaffoldPiecesPerSite;
+    for (let piece = 0; piece < scaffoldLayout.length; piece += 1) {
+      const part = scaffoldLayout[piece];
+      const raw = layerScales[part.level];
+      const grow = raw > 0 ? Math.max(0.02, raw) : 0;
+      const base = (instanceBase + piece) * 16;
+      elements[base] = part.width;
+      elements[base + 1] = 0; elements[base + 2] = 0; elements[base + 3] = 0;
+      elements[base + 4] = 0;
+      elements[base + 5] = part.height * grow;
+      elements[base + 6] = 0; elements[base + 7] = 0;
+      elements[base + 8] = 0; elements[base + 9] = 0;
+      elements[base + 10] = part.depth;
+      elements[base + 11] = 0;
+      elements[base + 12] = center.x + part.x;
+      elements[base + 13] = center.y + part.level * 0.16 + part.y * grow;
+      elements[base + 14] = center.z + part.z;
+      elements[base + 15] = 1;
+      fade[instanceBase + piece] = grow > 0 ? fadeValue : 0;
+    }
+    batch.mesh.instanceMatrix.needsUpdate = true;
+    batch.geometry.getAttribute("aFade").needsUpdate = true;
+  }
+
+  function RefreshScaffoldRange() {
+    if (!scaffoldBatch) return;
+    let highWater = 0;
+    for (let index = 0; index < scaffoldBatch.owners.length; index += 1) {
+      if (scaffoldBatch.owners[index]) highWater = (index + 1) * scaffoldPiecesPerSite;
+    }
+    scaffoldBatch.mesh.count = highWater;
+    scaffoldBatch.mesh.visible = highWater > 0;
+  }
+
+  function AcquireScaffoldSlot() {
+    const batch = GetScaffoldBatch();
+    const usable = Math.min(preset.scaffolds, batch.owners.length);
+    for (let index = 0; index < usable; index += 1) {
+      if (!batch.owners[index]) {
+        batch.owners[index] = true;
+        batch.generation[index] += 1;
+        RefreshScaffoldRange();
+        return { index, generation: batch.generation[index] };
+      }
+    }
+    return null;
+  }
+
+  /** 归还工地 slot：构件真正塌成零体积并压回 instanceCount，重复归还是安全的空操作。 */
+  function ReleaseScaffoldSlot(slotIndex, generation) {
+    if (!scaffoldBatch || slotIndex < 0 || !scaffoldBatch.owners[slotIndex]) return;
+    if (generation !== undefined && scaffoldBatch.generation[slotIndex] !== generation) return;
+    const instanceBase = slotIndex * scaffoldPiecesPerSite;
+    for (let piece = 0; piece < scaffoldPiecesPerSite; piece += 1) ClearScaffoldInstance(scaffoldBatch.mesh, instanceBase + piece);
+    scaffoldBatch.mesh.instanceMatrix.needsUpdate = true;
+    scaffoldBatch.geometry.getAttribute("aFade").needsUpdate = true;
+    scaffoldBatch.owners[slotIndex] = false;
+    RefreshScaffoldRange();
+  }
+
+  // ------------------------------------------------------------------------
+  // 冲击环 / 光环合批
+  //
+  // 冲击环原先是一环一个 Mesh，最多能同时挂 preset.rings 个 draw call。现在按
+  // 混合模式各合成一个 InstancedMesh（实战只会用到叠加那一个），环数再多也只有
+  // 1 个 draw call；颜色与淡出走逐实例属性，逐环的表现一点没变。
+  // ------------------------------------------------------------------------
+
+  const ringColorScratch = new THREE.Color();
+
+  function GetRingBatch(additive) {
+    const kind = additive ? "additive" : "normal";
+    if (ringBatches[kind]) return ringBatches[kind];
+    const geometry = new THREE.RingGeometry(0.62, 1, 36);
+    geometry.rotateX(-Math.PI / 2);
+    const color = new THREE.InstancedBufferAttribute(new Float32Array(ringSlotLimit * 3), 3);
+    const fade = new THREE.InstancedBufferAttribute(new Float32Array(ringSlotLimit), 1);
+    color.setUsage(THREE.DynamicDrawUsage);
+    fade.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute("aColor", color);
+    geometry.setAttribute("aFade", fade);
+    const material = new THREE.ShaderMaterial({
+      uniforms: {},
+      vertexShader: ringVertexShader,
+      fragmentShader: ringFragmentShader,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    });
+    const mesh = new THREE.InstancedMesh(geometry, material, ringSlotLimit);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 5;
+    mesh.count = 0;
+    mesh.visible = false;
+    for (let index = 0; index < ringSlotLimit; index += 1) ClearRingInstance(mesh, index);
+    root.add(mesh);
+    disposables.add(geometry);
+    disposables.add(material);
+    ringBatches[kind] = { mesh, geometry, material, owners: new Array(ringSlotLimit).fill(false), generation: new Array(ringSlotLimit).fill(0) };
+    return ringBatches[kind];
+  }
+
+  function ClearRingInstance(mesh, instanceIndex) {
+    const elements = mesh.instanceMatrix.array;
+    const base = instanceIndex * 16;
+    for (let offset = 0; offset < 16; offset += 1) elements[base + offset] = 0;
+    elements[base + 15] = 1;
+    mesh.geometry.getAttribute("aFade").array[instanceIndex] = 0;
+  }
+
+  function RefreshRingRange(batch) {
+    let highWater = 0;
+    for (let index = 0; index < batch.owners.length; index += 1) {
+      if (batch.owners[index]) highWater = index + 1;
+    }
+    batch.mesh.count = highWater;
+    batch.mesh.visible = highWater > 0;
+  }
+
+  function ReleaseRingSlot(batch, slotIndex, generation) {
+    if (!batch || slotIndex < 0 || !batch.owners[slotIndex]) return;
+    if (generation !== undefined && batch.generation[slotIndex] !== generation) return;
+    ClearRingInstance(batch.mesh, slotIndex);
+    batch.mesh.instanceMatrix.needsUpdate = true;
+    batch.geometry.getAttribute("aFade").needsUpdate = true;
+    batch.owners[slotIndex] = false;
+    RefreshRingRange(batch);
+  }
+
+  /** 冲击环：地面上扩散一圈的暖色光晕。返回句柄仅供调用方提前收环。 */
   function SpawnRing(position, spec = {}) {
-    const ring = AcquireRing();
-    ring.busy = true;
-    ring.mesh.visible = true;
-    ring.mesh.position.copy(position).setY(position.y + (spec.lift ?? 0.03));
-    ring.material.color.set(spec.color || "#c9b58a");
-    ring.material.blending = spec.additive === false ? THREE.NormalBlending : THREE.AdditiveBlending;
+    if (disposed) return null;
+    // 同屏环数仍按画质分级封顶，超出时把最旧的一环提前收走
+    while (activeRings.length >= preset.rings) {
+      const oldest = activeRings.shift();
+      if (oldest && oldest.Finish) oldest.Finish();
+    }
+    const additive = spec.additive !== false;
+    const batch = GetRingBatch(additive);
+    let slotIndex = -1;
+    const usable = Math.min(preset.rings, ringSlotLimit);
+    for (let index = 0; index < usable; index += 1) {
+      if (!batch.owners[index]) { slotIndex = index; break; }
+    }
+    if (slotIndex < 0) return null;
+    batch.owners[slotIndex] = true;
+    batch.generation[slotIndex] += 1;
+    const generation = batch.generation[slotIndex];
+    RefreshRingRange(batch);
+    ringColorScratch.set(spec.color || "#c9b58a");
+    const colorArray = batch.geometry.getAttribute("aColor").array;
+    colorArray[slotIndex * 3] = ringColorScratch.r;
+    colorArray[slotIndex * 3 + 1] = ringColorScratch.g;
+    colorArray[slotIndex * 3 + 2] = ringColorScratch.b;
+    batch.geometry.getAttribute("aColor").needsUpdate = true;
+    // 落点在生成时就取值定死，避免调用方之后复用同一个 Vector3 把环拖走
+    const centerX = position.x;
+    const centerY = position.y + (spec.lift ?? 0.03);
+    const centerZ = position.z;
     const from = spec.from ?? 0.15;
     const to = spec.to ?? 0.85;
     const duration = spec.duration ?? 0.7;
     const opacity = spec.opacity ?? 0.6;
-    AddTween(duration, (t) => {
+    const record = { Finish: null };
+    activeRings.push(record);
+    const Retire = () => {
+      ReleaseRingSlot(batch, slotIndex, generation);
+      const index = activeRings.indexOf(record);
+      if (index >= 0) activeRings.splice(index, 1);
+    };
+    const tween = AddTween(duration, (t) => {
+      if (!batch.owners[slotIndex] || batch.generation[slotIndex] !== generation) return;
       const eased = 1 - Math.pow(1 - t, 2.2);
       const scale = Lerp(from, to, eased);
-      ring.mesh.scale.set(scale, 1, scale);
-      ring.material.opacity = opacity * (1 - SmoothStep(spec.holdUntil ?? 0.25, 1, t));
-    }, () => {
-      ring.mesh.visible = false;
-      ring.busy = false;
-    });
-    return ring;
+      const elements = batch.mesh.instanceMatrix.array;
+      const base = slotIndex * 16;
+      elements[base] = scale;
+      elements[base + 5] = 1;
+      elements[base + 10] = scale;
+      elements[base + 12] = centerX;
+      elements[base + 13] = centerY;
+      elements[base + 14] = centerZ;
+      elements[base + 15] = 1;
+      batch.mesh.instanceMatrix.needsUpdate = true;
+      batch.geometry.getAttribute("aFade").array[slotIndex] = opacity * (1 - SmoothStep(spec.holdUntil ?? 0.25, 1, t));
+      batch.geometry.getAttribute("aFade").needsUpdate = true;
+    }, Retire);
+    record.Finish = () => {
+      tween.elapsed = tween.duration;
+      Retire();
+    };
+    return record;
   }
 
   // ------------------------------------------------------------------------
@@ -887,56 +1361,45 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
         SpawnRing(center, { color: "#c7b48a", from: 0.1, to: 0.42, duration: 0.45, opacity: 0.3 });
       });
     }
-    // 脚手架：四层木架逐层长出来，每层带一点回弹
-    const assets = GetScaffoldAssets();
-    const pieces = [];
-    for (let level = 0; level < 4; level += 1) {
-      const layer = new THREE.Group();
-      for (const x of [-0.2, 0.2]) for (const z of [-0.2, 0.2]) {
-        const post = new THREE.Mesh(assets.post, assets.material);
-        post.position.set(x, 0.08, z);
-        layer.add(post);
-      }
-      for (const z of [-0.2, 0.2]) {
-        const rail = new THREE.Mesh(assets.rail, assets.material);
-        rail.position.set(0, 0.15, z);
-        layer.add(rail);
-      }
-      layer.position.copy(center).setY(center.y + level * 0.16);
-      layer.scale.y = 0.02;
-      layer.visible = false;
-      root.add(layer);
-      pieces.push(layer);
+    // 脚手架：四层木架逐层长出来，每层带一点回弹。整座工地只占合批里的一个 slot。
+    while (activeScaffolds.length >= preset.scaffolds) {
+      const oldest = activeScaffolds.shift();
+      if (oldest && oldest.Finish) oldest.Finish();
     }
-    AddTween(2.6, (t) => {
-      for (let level = 0; level < pieces.length; level += 1) {
+    const slot = AcquireScaffoldSlot();
+    if (!slot) return;
+    const layerScales = [0, 0, 0, 0];
+    const record = { slot, Finish: null };
+    activeScaffolds.push(record);
+    WriteScaffoldSite(slot.index, slot.generation, center, layerScales, 0);
+    const Retire = () => {
+      ReleaseScaffoldSlot(slot.index, slot.generation);
+      const index = activeScaffolds.indexOf(record);
+      if (index >= 0) activeScaffolds.splice(index, 1);
+    };
+    const tween = AddTween(2.6, (t) => {
+      for (let level = 0; level < layerScales.length; level += 1) {
         const local = Clamp((t * 2.6 - level * 0.42) / 0.4, 0, 1);
-        pieces[level].visible = local > 0;
-        pieces[level].scale.y = local > 0 ? Math.max(0.02, EaseOutBack(local)) : 0.02;
+        layerScales[level] = local > 0 ? EaseOutBack(local) : 0;
       }
-      if (t > 0.86) assets.material.opacity = Math.max(0, 1 - (t - 0.86) / 0.14) * 0.95;
-    }, () => {
-      for (const layer of pieces) root.remove(layer);
-      assets.material.opacity = 0.95;
-    });
+      const fadeValue = t > 0.86 ? Math.max(0, 1 - (t - 0.86) / 0.14) : 1;
+      WriteScaffoldSite(slot.index, slot.generation, center, layerScales, fadeValue);
+    }, Retire);
+    // 被后来的工地挤掉时立刻腾出 slot，否则新工地拿不到位置就没有脚手架可看
+    record.Finish = () => {
+      tween.elapsed = tween.duration;
+      Retire();
+    };
   }
 
-  /** 脚手架用的共享几何体与材质，只建一次。 */
-  function GetScaffoldAssets() {
-    if (scaffoldAssets) return scaffoldAssets;
-    const material = new THREE.MeshStandardMaterial({ color: "#7a6242", roughness: 0.95, metalness: 0, transparent: true, opacity: 0.95 });
-    const post = new THREE.BoxGeometry(0.02, 0.16, 0.02);
-    const rail = new THREE.BoxGeometry(0.44, 0.016, 0.016);
-    disposables.add(material);
-    disposables.add(post);
-    disposables.add(rail);
-    scaffoldAssets = { material, post, rail };
-    return scaffoldAssets;
-  }
-
-  /** 扫荡箭头：沿路径流动的红色 UV 动画带，带脉冲警示。 */
+  /**
+   * 扫荡箭头：沿路径流动的红色 UV 动画带，带脉冲警示。
+   * 每条箭头的几何都是独立的路径条带，无法与别的箭头合批，因此按并发条数封顶：
+   * 超出上限时把最旧的一条立刻收走，保证它不会随战局无限堆积。
+   */
   function SpawnSweepArrow(fromKey, toKey, arrowOptions = {}) {
     if (disposed) return null;
+    while (sweepArrows.length >= sweepArrowLimit) RemoveSweepArrow(sweepArrows[0]);
     const { points } = PathOf(fromKey, toKey, arrowOptions.pathKeys);
     if (points.length < 2) return null;
     const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.4);
@@ -989,7 +1452,7 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     mesh.renderOrder = 7;
     root.add(mesh);
     const life = arrowOptions.life ?? 9;
-    const entry = { mesh, geometry, material };
+    const entry = { mesh, geometry, material, removed: false };
     sweepArrows.push(entry);
     AddTween(life, (t) => {
       const fadeIn = SmoothStep(0, 0.06, t);
@@ -999,7 +1462,10 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     return entry;
   }
 
+  /** 收走一条箭头。提前收走与寿命到期都会调到这里，因此必须可重入。 */
   function RemoveSweepArrow(entry) {
+    if (!entry || entry.removed) return;
+    entry.removed = true;
     const index = sweepArrows.indexOf(entry);
     if (index >= 0) sweepArrows.splice(index, 1);
     root.remove(entry.mesh);
@@ -1097,58 +1563,75 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
   // 烟柱
   // ------------------------------------------------------------------------
 
-  /** 持续烟柱（被焚村庄 / 被炸炮楼）。level 0 撤除，1-3 控制浓度、高度与余烬。 */
+  /** 撤除一根烟柱：两块批里属于它的 slot 都真正归还（带 generation 校验，重复调用安全）。 */
+  function ReleaseSmokeColumn(column) {
+    if (!column) return;
+    if (column.smokeSlot >= 0 && smokeBatches.smoke) ReleaseBatchSlot(smokeBatches.smoke, column.smokeSlot, column.smokeGeneration);
+    if (column.emberSlot >= 0 && smokeBatches.ember) ReleaseBatchSlot(smokeBatches.ember, column.emberSlot, column.emberGeneration);
+    column.smokeSlot = -1;
+    column.emberSlot = -1;
+  }
+
+  /**
+   * 持续烟柱（被焚村庄 / 被炸炮楼）。level 0 撤除，1-3 控制浓度、高度与余烬。
+   * 烟柱是持久特效，写进常驻合批的 slot 里：无论战场上烧着几处，浓烟与余烬各自
+   * 只有一个 draw call。浓度分级（粒子数 / 半径 / 寿命 / 尺寸 / 上升 / 扰动 / 不透
+   * 明度）与「随时间变灰」的诞生时刻全部逐粒子随 aBatch 走，观感与独立发射器一致。
+   */
   function SetSmoke(key, level) {
     if (disposed) return;
     const existing = smokeColumns.get(key);
     const clamped = Clamp(Math.round(level || 0), 0, 3);
     if (clamped <= 0) {
       if (existing) {
-        for (const stream of existing.streams) stream.Release();
+        ReleaseSmokeColumn(existing);
         smokeColumns.delete(key);
       }
       return;
     }
-    if (existing && existing.level === clamped && existing.streams.every((stream) => stream.IsAlive())) return;
+    if (existing && existing.level === clamped) return;
     if (existing) {
-      for (const stream of existing.streams) stream.Release();
+      ReleaseSmokeColumn(existing);
       smokeColumns.delete(key);
     }
-    // 清掉发射器已被抢占的死列（表现上已经消失，账面也要跟着消失）
-    for (const [deadKey, column] of smokeColumns) {
-      if (!column.streams.some((stream) => stream.IsAlive())) smokeColumns.delete(deadKey);
-    }
-    if (smokeColumns.size >= preset.smokeColumns) {
+    while (smokeColumns.size >= preset.smokeColumns) {
       const oldestKey = smokeColumns.keys().next().value;
-      const oldest = smokeColumns.get(oldestKey);
-      for (const stream of oldest.streams) stream.Release();
+      if (oldestKey === undefined) break;
+      ReleaseSmokeColumn(smokeColumns.get(oldestKey));
       smokeColumns.delete(oldestKey);
     }
+    const smokeBatch = GetSmokeBatch("smoke");
+    const smokeSlot = AcquireBatchSlot(smokeBatch, key, preset.smokeColumns);
+    if (smokeSlot < 0) return;
     const center = WorldOf(key, 0);
-    const streams = [];
-    streams.push(CreateParticleStream({
-      position: center.clone(), shape: "PUFF", count: 26 + clamped * 22, radius: 0.1 + clamped * 0.04,
+    WriteBatchSlot(smokeBatch, smokeSlot, {
+      position: center, count: 26 + clamped * 22, radius: 0.1 + clamped * 0.04,
       height: 0.05, baseLift: 0.04, speed: [0.04, 0.14], direction: "up", spread: 0.4,
       life: [2.4 + clamped * 0.7, 3.6 + clamped * 0.9], size: [18 + clamped * 5, 34 + clamped * 12],
-      drag: 0.9, rise: 0.22 + clamped * 0.14, swirl: 0.65, turbulence: 0.1 + clamped * 0.05,
-      delay: [0, 3.5], colorA: "#4a423a", colorB: "#9b968c", ashColor: "#a9a6a0",
-      opacity: 0.2 + clamped * 0.1, fade: 0.4, sizeCurve: [0.35, 2.6], birth: clock,
-    }));
+      delay: [0, 3.5],
+    }, [clock, 0.2 + clamped * 0.1, 0.22 + clamped * 0.14, 0.1 + clamped * 0.05]);
+    const column = {
+      level: clamped, smokeSlot, smokeGeneration: smokeBatch.generation[smokeSlot],
+      emberSlot: -1, emberGeneration: 0,
+    };
     if (clamped >= 3) {
-      streams.push(CreateParticleStream({
-        position: center.clone(), shape: "SPARK", additive: true, count: 20, radius: 0.09, height: 0.04,
-        speed: [0.08, 0.22], direction: "up", spread: 0.5, life: [1, 1.9], size: [4, 8], drag: 1.4,
-        rise: 0.4, swirl: 2, turbulence: 0.07, delay: [0, 1.8], colorA: "#e8a352", colorB: "#7a3418",
-        opacity: 0.55, fade: 0.3, lit: 0, sizeCurve: [1, 0.25], birth: clock,
-      }));
+      const emberBatch = GetSmokeBatch("ember");
+      const emberSlot = AcquireBatchSlot(emberBatch, key, preset.smokeColumns);
+      if (emberSlot >= 0) {
+        WriteBatchSlot(emberBatch, emberSlot, {
+          position: center, count: 20, radius: 0.09, height: 0.04,
+          speed: [0.08, 0.22], direction: "up", spread: 0.5, life: [1, 1.9], size: [4, 8],
+          delay: [0, 1.8],
+        }, [clock, 0.55, 0.4, 0.07]);
+        column.emberSlot = emberSlot;
+        column.emberGeneration = emberBatch.generation[emberSlot];
+      }
     }
-    smokeColumns.set(key, { level: clamped, streams });
+    smokeColumns.set(key, column);
   }
 
   function ClearSmoke() {
-    for (const column of smokeColumns.values()) {
-      for (const stream of column.streams) stream.Release();
-    }
+    for (const column of smokeColumns.values()) ReleaseSmokeColumn(column);
     smokeColumns.clear();
   }
 
@@ -1305,16 +1788,24 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
         disposables.delete(removed.material);
       }
     }
-    for (let index = ringPool.length - 1; index >= 0 && ringPool.length > preset.rings; index -= 1) {
-      if (ringPool[index].busy) continue;
-      const removed = ringPool.splice(index, 1)[0];
-      root.remove(removed.mesh);
-      removed.mesh.geometry.dispose();
-      removed.material.dispose();
+    while (activeRings.length > preset.rings) {
+      const oldest = activeRings.shift();
+      if (oldest && oldest.Finish) oldest.Finish();
     }
     for (let index = lightPool.length - 1; index >= 0 && lightPool.length > preset.lights; index -= 1) {
       if (lightPool[index].busy) continue;
       root.remove(lightPool.splice(index, 1)[0].light);
+    }
+    // 持久合批的缓冲按最高档一次性开好，切档只收紧使用上限：多出来的 slot 就地归还
+    while (smokeColumns.size > preset.smokeColumns) {
+      const oldestKey = smokeColumns.keys().next().value;
+      if (oldestKey === undefined) break;
+      ReleaseSmokeColumn(smokeColumns.get(oldestKey));
+      smokeColumns.delete(oldestKey);
+    }
+    while (activeScaffolds.length > preset.scaffolds) {
+      const oldest = activeScaffolds.shift();
+      if (oldest && oldest.Finish) oldest.Finish();
     }
     if (!preset.weather && weather.active) {
       FadeOutWeather(weather.active);
@@ -1368,15 +1859,30 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       if (item && typeof item.dispose === "function") item.dispose();
     }
     disposables.clear();
-    for (const ring of ringPool) {
-      root.remove(ring.mesh);
-      ring.mesh.geometry.dispose();
-      ring.material.dispose();
+    // 常驻合批：几何与材质都在 disposables 里已经释放，这里把场景引用与账面一并清干净
+    for (const kind of Object.keys(smokeBatches)) {
+      const batch = smokeBatches[kind];
+      if (!batch) continue;
+      root.remove(batch.points);
+      smokeBatches[kind] = null;
     }
-    ringPool = [];
+    for (const kind of Object.keys(ringBatches)) {
+      const batch = ringBatches[kind];
+      if (!batch) continue;
+      batch.mesh.dispose();
+      root.remove(batch.mesh);
+      ringBatches[kind] = null;
+    }
+    if (scaffoldBatch) {
+      scaffoldBatch.mesh.dispose();
+      root.remove(scaffoldBatch.mesh);
+      scaffoldBatch = null;
+    }
     emitterPools.clear();
     lightPool.length = 0;
     activeMoves.length = 0;
+    activeScaffolds.length = 0;
+    activeRings.length = 0;
     root.traverse((child) => {
       if (child.geometry && typeof child.geometry.dispose === "function") child.geometry.dispose();
       if (child.material && typeof child.material.dispose === "function") child.material.dispose();

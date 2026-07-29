@@ -43,22 +43,27 @@ export const fallbackTerrainDefinitions = Object.freeze({
 /**
  * 渲染专属地形档案。Data_Terrain 只承诺颜色/高程带，这些"起伏、岩层、雪线偏置"
  * 是纯美术参数，永远由本模块提供，不依赖外部文件。
+ *
+ * 值阶约定（第三轮修复）：strataHigh 必须明显低于同地形的 colorHigh，
+ * strataLow 再低一档。侧壁是背光面，一旦岩层色比受光顶面还亮，
+ * 每块地砖就会镶出一道白边，整图读作"叠起来的灰条纸盒"。
+ * 这里统一取 colorHigh 的 ~0.60（高层）/ ~0.36（低层），保留色相、只压明度。
  */
 export const terrainRenderProfiles = Object.freeze({
-  Mountain: { relief: 0.300, peak: 0.480, roughness: 0.94, snowBias: 0.00, wet: 0.06, strataLow: "#4a4640", strataHigh: "#9a958c", water: false },
-  Ridge: { relief: 0.240, peak: 0.300, roughness: 0.95, snowBias: 0.10, wet: 0.08, strataLow: "#564d3e", strataHigh: "#a99b81", water: false },
-  Hill: { relief: 0.180, peak: 0.150, roughness: 0.97, snowBias: 0.26, wet: 0.20, strataLow: "#6a5c3f", strataHigh: "#b5a271", water: false },
-  Forest: { relief: 0.130, peak: 0.075, roughness: 0.98, snowBias: 0.30, wet: 0.42, strataLow: "#4b4737", strataHigh: "#8a8467", water: false },
-  Plain: { relief: 0.055, peak: 0.010, roughness: 0.99, snowBias: 0.56, wet: 0.36, strataLow: "#6e6240", strataHigh: "#bfad74", water: false },
-  Loess: { relief: 0.150, peak: 0.060, roughness: 0.99, snowBias: 0.44, wet: 0.16, strataLow: "#6d4f30", strataHigh: "#b08a5a", water: false },
-  Marsh: { relief: 0.040, peak: 0.000, roughness: 0.84, snowBias: 0.64, wet: 0.86, strataLow: "#3b3a2c", strataHigh: "#6d6a52", water: false },
-  River: { relief: -0.045, peak: -0.085, roughness: 0.72, snowBias: 0.72, wet: 1.00, strataLow: "#4a5348", strataHigh: "#8b9484", water: true },
-  Gorge: { relief: 0.250, peak: -0.150, roughness: 0.96, snowBias: 0.18, wet: 0.30, strataLow: "#524a41", strataHigh: "#a3968a", water: false },
+  Mountain: { relief: 0.300, peak: 0.480, roughness: 0.94, snowBias: 0.00, wet: 0.06, strataLow: "#403d38", strataHigh: "#6d6a62", water: false },
+  Ridge: { relief: 0.240, peak: 0.300, roughness: 0.95, snowBias: 0.10, wet: 0.08, strataLow: "#3d3930", strataHigh: "#665e4f", water: false },
+  Hill: { relief: 0.180, peak: 0.150, roughness: 0.97, snowBias: 0.26, wet: 0.20, strataLow: "#3f3826", strataHigh: "#695c3a", water: false },
+  Forest: { relief: 0.130, peak: 0.075, roughness: 0.98, snowBias: 0.30, wet: 0.42, strataLow: "#262e20", strataHigh: "#3d4a34", water: false },
+  Plain: { relief: 0.055, peak: 0.010, roughness: 0.99, snowBias: 0.56, wet: 0.36, strataLow: "#3a3c26", strataHigh: "#61643f", water: false },
+  Loess: { relief: 0.150, peak: 0.060, roughness: 0.99, snowBias: 0.44, wet: 0.16, strataLow: "#493f2b", strataHigh: "#79694a", water: false },
+  Marsh: { relief: 0.040, peak: 0.000, roughness: 0.84, snowBias: 0.64, wet: 0.86, strataLow: "#2d3223", strataHigh: "#4b533a", water: false },
+  River: { relief: -0.045, peak: -0.085, roughness: 0.72, snowBias: 0.72, wet: 1.00, strataLow: "#2c322d", strataHigh: "#49534b", water: true },
+  Gorge: { relief: 0.250, peak: -0.150, roughness: 0.96, snowBias: 0.18, wet: 0.30, strataLow: "#332f2a", strataHigh: "#554e46", water: false },
 });
 
 const defaultProfile = Object.freeze({
   relief: 0.10, peak: 0.02, roughness: 0.96, snowBias: 0.4, wet: 0.3,
-  strataLow: "#5d5648", strataHigh: "#a89c88", water: false,
+  strataLow: "#3a352d", strataHigh: "#635c50", water: false,
   colorLow: "#7a7460", colorHigh: "#a89f88",
 });
 
@@ -116,28 +121,28 @@ const seasonBase = Object.freeze({
     skyColor: 0xa9c0d4, groundColor: 0x6a6152, ambientIntensity: 0.78,
     fogColor: 0xb9bfb2, fogDensity: 0.0092, zenith: 0x39699d, horizon: 0xc9cfc0,
     cloudColor: 0xf1ece0, cloudOpacity: 0.42, snowAmount: 0.06, snowLine: 0.86,
-    grass: 0x8b8a4e, rock: 0x8b8577, snow: 0xe9edf0, water: 0x3f5d63, seasonTint: 0xd8c08a,
+    grass: 0x8b8a4e, rock: 0x8b8577, snow: 0xe9edf0, water: 0x49716d, seasonTint: 0xd8c08a,
   },
   Winter: {
     sunColor: 0xf3e2cc, sunElevation: 28, sunAzimuth: 152, sunIntensity: 2.05,
     skyColor: 0xb6c6d2, groundColor: 0x5d6265, ambientIntensity: 0.86,
     fogColor: 0xc3ccd2, fogDensity: 0.0124, zenith: 0x4a6f96, horizon: 0xd3dae0,
     cloudColor: 0xe7eaee, cloudOpacity: 0.58, snowAmount: 0.92, snowLine: 0.28,
-    grass: 0x6f7360, rock: 0x8d8f8a, snow: 0xf0f4f7, water: 0x445e68, seasonTint: 0xb8c4cc,
+    grass: 0x6f7360, rock: 0x8d8f8a, snow: 0xf0f4f7, water: 0x4e7777, seasonTint: 0xb8c4cc,
   },
   Spring: {
     sunColor: 0xffe9c6, sunElevation: 50, sunAzimuth: 128, sunIntensity: 2.7,
     skyColor: 0xa8c6e0, groundColor: 0x6b6a4e, ambientIntensity: 0.82,
     fogColor: 0xc2c9bd, fogDensity: 0.0085, zenith: 0x3b74ad, horizon: 0xd0d6c6,
     cloudColor: 0xf6f2e8, cloudOpacity: 0.36, snowAmount: 0.22, snowLine: 0.74,
-    grass: 0x7c9450, rock: 0x8a857a, snow: 0xecf1f4, water: 0x3d6068, seasonTint: 0xc6d29a,
+    grass: 0x7c9450, rock: 0x8a857a, snow: 0xecf1f4, water: 0x467874, seasonTint: 0xc6d29a,
   },
   Summer: {
     sunColor: 0xfff1d2, sunElevation: 62, sunAzimuth: 116, sunIntensity: 2.95,
     skyColor: 0x9dc2e6, groundColor: 0x6f6d4c, ambientIntensity: 0.9,
     fogColor: 0xc7cec0, fogDensity: 0.0077, zenith: 0x2f6fb2, horizon: 0xd6dccb,
     cloudColor: 0xfaf6ec, cloudOpacity: 0.46, snowAmount: 0.0, snowLine: 0.95,
-    grass: 0x5f7f3f, rock: 0x8d8878, snow: 0xeef2f5, water: 0x2f5a63, seasonTint: 0xa9c47f,
+    grass: 0x5f7f3f, rock: 0x8d8878, snow: 0xeef2f5, water: 0x37746f, seasonTint: 0xa9c47f,
   },
 });
 
@@ -148,27 +153,27 @@ const seasonBase = Object.freeze({
 const eraGrade = Object.freeze({
   Opening: {
     sunScale: 1.06, elevationDelta: 4, azimuthDelta: 0, warm: 0.16, fogScale: 0.92,
-    saturation: 1.14, contrast: 1.04, vignette: 0.28, grain: 0.010, bloomThreshold: 0.78, bloomStrength: 0.46,
+    saturation: 1.14, contrast: 1.04, vignette: 0.20, grain: 0.010, bloomThreshold: 0.70, bloomStrength: 0.58,
     shadowTint: 0x3a3a40, highlightTint: 0xffe4b2, lift: 0.010,
   },
   Growth: {
     sunScale: 1.0, elevationDelta: 0, azimuthDelta: 8, warm: 0.08, fogScale: 1.0,
-    saturation: 1.08, contrast: 1.05, vignette: 0.32, grain: 0.011, bloomThreshold: 0.80, bloomStrength: 0.42,
+    saturation: 1.08, contrast: 1.05, vignette: 0.22, grain: 0.011, bloomThreshold: 0.72, bloomStrength: 0.54,
     shadowTint: 0x353840, highlightTint: 0xffe1ae, lift: 0.012,
   },
   Hardship: {
     sunScale: 0.80, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.42,
-    saturation: 0.80, contrast: 1.10, vignette: 0.46, grain: 0.017, bloomThreshold: 0.86, bloomStrength: 0.30,
+    saturation: 0.80, contrast: 1.10, vignette: 0.24, grain: 0.017, bloomThreshold: 0.78, bloomStrength: 0.40,
     shadowTint: 0x232a34, highlightTint: 0xd7dde2, lift: 0.020,
   },
   Recovery: {
     sunScale: 0.96, elevationDelta: -4, azimuthDelta: 12, warm: 0.12, fogScale: 1.14,
-    saturation: 0.94, contrast: 1.06, vignette: 0.38, grain: 0.013, bloomThreshold: 0.82, bloomStrength: 0.38,
+    saturation: 0.94, contrast: 1.06, vignette: 0.23, grain: 0.013, bloomThreshold: 0.74, bloomStrength: 0.50,
     shadowTint: 0x2c3138, highlightTint: 0xf6dcae, lift: 0.014,
   },
   Counter: {
     sunScale: 1.12, elevationDelta: -8, azimuthDelta: -34, warm: 0.30, fogScale: 1.04,
-    saturation: 1.08, contrast: 1.08, vignette: 0.32, grain: 0.010, bloomThreshold: 0.72, bloomStrength: 0.62,
+    saturation: 1.08, contrast: 1.08, vignette: 0.22, grain: 0.010, bloomThreshold: 0.66, bloomStrength: 0.76,
     shadowTint: 0x2f2a2c, highlightTint: 0xffd58a, lift: 0.008,
   },
 });
@@ -250,7 +255,7 @@ export function CreateSeasonPalette(eraKey, turn) {
     water: base.water,
     seasonTint: ShiftColorTemperature(base.seasonTint, era.warm * 0.7),
     memoryTint: 0x707a86,
-    unexplored: 0x131820,
+    unexplored: 0x1e2430,
     scorch: 0x2a221d,
     // 政权染色：低饱和、按"敌占暗红 → 争夺土褐 → 游击暖卡其 → 根据地暖黄"渐进，
     // 只做地表淡染，不做高饱和描边。
@@ -443,21 +448,22 @@ export function CreateTerrainMaterial(renderer, options = {}) {
     uSeasonTint: { value: new THREE.Color(0xd8c08a) },
     uSeasonStrength: { value: 0.24 },
     uValleyTint: { value: new THREE.Color(0x5f7360) },
-    uStrataLow: { value: new THREE.Color(0x5b5246) },
-    uStrataHigh: { value: new THREE.Color(0xa89b86) },
+    // 岩层色必须低于受光顶面：过亮会在每块地砖顶沿镶出一道白边
+    uStrataLow: { value: new THREE.Color(0x413a31) },
+    uStrataHigh: { value: new THREE.Color(0x6f6659) },
     uControlEnemy: { value: new THREE.Color(0x8a3226) },
     uControlContested: { value: new THREE.Color(0xa5813a) },
     uControlGuerrilla: { value: new THREE.Color(0xb4523c) },
     uControlBase: { value: new THREE.Color(0xc0492e) },
     uControlStrength: { value: options.controlStrength ?? 0.15 },
     uScorchColor: { value: new THREE.Color(0x2a221d) },
-    uUnexploredColor: { value: new THREE.Color(0x131820) },
-    uUnexploredMix: { value: 0.80 },
+    uUnexploredColor: { value: new THREE.Color(0x1e2430) },
+    uUnexploredMix: { value: 0.62 },
     uMemoryTint: { value: new THREE.Color(0x707a86) },
     uMemoryStrength: { value: 0.78 },
     uFogHeightBase: { value: 0.35 },
     uFogHeightFalloff: { value: 0.42 },
-    uWallBounce: { value: 0.26 },
+    uWallBounce: { value: 0.15 },
   };
 
   const material = new THREE.MeshStandardMaterial({
@@ -552,14 +558,14 @@ float terrainWet = vFacet.z * vFacet.x;
   albedo *= mix( 1.0, 0.90 + 0.22 * grit, uDetailStrength );
 
   // 侧壁：按高度分岩层，交替明暗带 + 噪声打断，做出沉积层理。
+  // 值阶铁律——侧壁永远比受光顶面低 1~1.5 档：岩层色只做"层理调制"，
+  // 不允许把侧壁整体抬到顶面之上（那会给每块地砖镶白边）。
   float wall = 1.0 - vFacet.x;
   float depthT = clamp( vFacet.z, 0.0, 1.0 );
   float bandPhase = fract( depthT * 3.0 + broadNoise.g * 0.45 );
   vec3 strata = mix( uStrataHigh, uStrataLow, smoothstep( 0.0, 1.0, depthT ) );
-  strata *= 0.68 + 0.52 * step( 0.5, bandPhase ) + 0.22 * fineNoise.g;
-  // 侧壁：顶点色（按地形的岩层渐变）与全局岩层色混合，并补一点来自地面的漫反射弹跳，
-  // 保证背光侧仍读得出三条层理，而不是塌成一条纯黑缝。
-  albedo = mix( albedo, albedo * 0.46 + strata * 0.80, wall * 0.92 );
+  strata *= 0.62 + 0.40 * step( 0.5, bandPhase ) + 0.18 * fineNoise.g;
+  albedo = mix( albedo, albedo * 0.62 + strata * 0.45, wall * 0.90 );
 
   // 山顶积雪：随季节的雪量与雪线，只覆盖顶面与近顶壁。
   float snowField = smoothstep( uSnowLine, uSnowLine + uSnowBlend, vFacet.y + breakup * 0.07 - terrainWet * 0.28 );
@@ -582,9 +588,13 @@ float terrainWet = vFacet.z * vFacet.x;
   vec3 memoryColor = mix( vec3( memoryLum ), uMemoryTint * ( 0.30 + memoryLum * 0.55 ), 0.40 ) * 0.80;
   albedo = mix( albedo, memoryColor, memory * uMemoryStrength );
 
-  // 未探索 → 低明度冷灰的"未知的暗"
+  // 未探索 → 低明度冷灰的"未知的暗"。
+  // 整局约 85% 的画面是这一片，不能糊成一坨泥：把高程差映射成 ±0.11 的明度带，
+  // 再叠一点侧壁压暗，山脊 / 谷地的轮廓即使没探明也读得出来。
   float unknownLum = dot( albedo, vec3( 0.299, 0.587, 0.114 ) );
-  vec3 unknown = uUnexploredColor * ( 0.70 + 1.25 * unknownLum );
+  float unknownRelief = ( clamp( vFacet.y, 0.0, 1.0 ) - 0.42 ) * 0.62;
+  vec3 unknown = uUnexploredColor * ( 0.86 + 0.90 * unknownLum + unknownRelief );
+  unknown *= 1.0 - wall * 0.24;
   albedo = mix( mix( albedo, unknown, uUnexploredMix ), albedo, explored );
 
   diffuseColor.rgb = albedo;
@@ -667,7 +677,7 @@ export function CreateSkyDome() {
     uSunDirection: { value: new THREE.Vector3(0.4, 0.6, 0.7) },
     uSunColor: { value: new THREE.Color(0xffd9a4) },
     uSunSize: { value: 0.0008 },
-    uHaze: { value: 0.42 },
+    uHaze: { value: 0.56 },
     uCloudColor: { value: new THREE.Color(0xf1ece0) },
     uCloudOpacity: { value: 0.42 },
     uCloudScale: { value: 0.055 },
@@ -714,11 +724,11 @@ void main() {
   // 垂直渐变：天顶 → 地平 → 地面反射
   float verticalT = pow( clamp( up, 0.0, 1.0 ), 0.52 );
   vec3 sky = mix( uHorizon, uZenith, verticalT );
-  sky = mix( sky, uGround, clamp( -up * 2.2, 0.0, 1.0 ) );
+  sky = mix( sky, uGround * 1.45, clamp( -up * 2.0, 0.0, 1.0 ) );
 
   // 地平线雾霭带
   float horizonBand = exp( -abs( up ) * 9.0 );
-  sky = mix( sky, uHorizon * 1.06, horizonBand * uHaze );
+  sky = mix( sky, uHorizon * 1.30, horizonBand * uHaze );
 
   // 太阳辉光 + 日盘
   float sunDot = max( dot( direction, normalize( uSunDirection ) ), 0.0 );
@@ -881,35 +891,55 @@ void main() {
 
   vec3 sunDirection = normalize( uSunDirection );
   vec3 halfVector = normalize( sunDirection + viewDirection );
-  float specular = pow( max( dot( normal, halfVector ), 0.0 ), 220.0 );
-  float diffuse = 0.42 + 0.58 * max( dot( normal, sunDirection ), 0.0 );
+  // 高光是全画面唯一可靠的白点锚，但必须是"碎光"不是"泛白"：
+  // 低频波法线在一格之内几乎是常量，一旦放宽波瓣，整块水面会同时爆成一片死白。
+  // 所以高光单独用一层高频扰动法线 + 窄波瓣，强度给足，让白点散成星星点点。
+  vec3 glintNormal = normalize( normal + vec3(
+    ( Fbm( vWaterWorld.xz * 3.1 + uTime * 0.42, 3 ) - 0.5 ) * 1.15, 0.0,
+    ( Fbm( vWaterWorld.zx * 3.4 - uTime * 0.36, 3 ) - 0.5 ) * 1.15 ) );
+  float specular = pow( max( dot( glintNormal, halfVector ), 0.0 ), 40.0 );
+  // 碎光掩膜：镜面波瓣一放宽，一格水面会整块进入高光区而糊成死白。
+  // 用一层高对比噪声把它切成分离的亮斑，才读作"阳光在水上跳"。
+  float sparkleMask = smoothstep( 0.44, 0.72, Fbm( vWaterWorld.xz * 8.5 - uTime * 0.55, 2 ) );
+  specular *= 0.16 + 0.92 * sparkleMask;
+  float diffuse = 0.52 + 0.62 * max( dot( normal, sunDirection ), 0.0 );
 
   // 深浅：中心深、近岸浅，由几何送来的 aShore 距离场驱动，而不是满格随机斑块
   float shoreBand = smoothstep( 0.35, 1.0, vWaterShore );
   vec3 color = mix( uDeepColor, uShallowColor, shoreBand * 0.85 ) * diffuse;
   color = mix( color, uSkyColor, fresnel * 0.7 );
-  color += uSunColor * specular * 0.55;
+  color += uSunColor * specular * 5.2;
 
   // 泡沫只出现在岸边，且斑块尺度缩到原来的四分之一，避免"霉斑"
   vec2 foamUv = vWaterWorld.xz * 13.0 + normalize( uFlowDirection + vec2( 0.0001 ) ) * uTime * uFlowSpeed * 3.0;
   float foamNoise = Fbm( foamUv, 3 );
   float foam = smoothstep( 0.55, 0.92, foamNoise ) * smoothstep( 0.5, 1.0, vWaterShore );
-  color = mix( color, vec3( 0.82, 0.85, 0.84 ), foam * 0.45 * uDetail );
+  color = mix( color, vec3( 0.92, 0.95, 0.94 ), foam * 0.58 * uDetail );
 
   // 顺流方向的细碎流光
   float glitter = pow( Fbm( vWaterWorld.xz * 34.0 + uTime * 0.9, 2 ), 8.0 );
-  color += uSunColor * glitter * 0.22 * uDetail;
+  color += uSunColor * glitter * 1.55 * uDetail;
 
   float memory = explored * ( 1.0 - smoothstep( 0.15, 0.6, visible ) );
   float lum = dot( color, vec3( 0.299, 0.587, 0.114 ) );
   color = mix( color, vec3( lum ) * 0.86, memory * 0.72 );
   color = mix( uUnexploredColor, color, explored );
 
+  // 距离雾必须在 tonemapping 之前施加，否则是对已编码的 sRGB 值做线性混合，
+  // 远处水面会被明亮雾色整体抬白
+  #ifdef USE_FOG
+    #ifdef FOG_EXP2
+      float waterFogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+    #else
+      float waterFogFactor = smoothstep( fogNear, fogFar, vFogDepth );
+    #endif
+    color = mix( color, fogColor, clamp( waterFogFactor, 0.0, 1.0 ) * 0.85 );
+  #endif
+
   float alpha = uOpacity * ( 0.55 + 0.45 * explored );
   gl_FragColor = vec4( color, alpha );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
-  #include <fog_fragment>
 }`;
 
   const material = new THREE.ShaderMaterial({
@@ -1021,10 +1051,23 @@ void main() {
 
   // 只允许极小幅度的提亮，保证整体停留在"未知的暗"里
   vec3 color = mix( uCloudColor, uCloudHighlight, pow( mass, 2.2 ) * 0.34 + vPuff.y * 0.05 );
+
+  // 距离衰减：绝不能套用 three 的 <fog_fragment>。
+  // 它把结果 mix 向 fogColor（明亮天光色），中远景会把设计好的低明度冷灰云
+  // 整体拉成中灰白，糊掉炮楼 / 村庄 / 河流与控制区边界——与设计意图完全相反。
+  // 这里改成"越远越沉"，并且必须在 tonemapping 之前完成。
+  #ifdef USE_FOG
+    #ifdef FOG_EXP2
+      float cloudFogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+    #else
+      float cloudFogFactor = smoothstep( fogNear, fogFar, vFogDepth );
+    #endif
+    color = mix( color, uCloudColor * 0.8, clamp( cloudFogFactor, 0.0, 1.0 ) * 0.9 );
+  #endif
+
   gl_FragColor = vec4( color, alpha );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
-  #include <fog_fragment>
 }`;
 
   const material = new THREE.ShaderMaterial({
@@ -1056,11 +1099,11 @@ const overlayKindOrder = ["move", "attack", "build", "sweep", "intel"];
 
 /** 五种地毯高亮的配色：填充色 + 边缘辉光色。 */
 export const overlayKindColors = Object.freeze({
-  move: { fill: 0x4fd0c0, edge: 0xd6fff6 },
-  attack: { fill: 0xd8452f, edge: 0xffb08a },
-  build: { fill: 0xe0a334, edge: 0xffe6ac },
-  sweep: { fill: 0x9a2f22, edge: 0xff8a5c },
-  intel: { fill: 0x6f7fd8, edge: 0xd0d8ff },
+  move: { fill: 0x3aa79c, edge: 0x9fe4d8 },
+  attack: { fill: 0xb03526, edge: 0xe89a76 },
+  build: { fill: 0xb8862c, edge: 0xe8ce97 },
+  sweep: { fill: 0x82281d, edge: 0xdd7850 },
+  intel: { fill: 0x5c6ab5, edge: 0xb2bce6 },
 });
 
 /** 构造 8×2 的 kind 调色板纹理：第 0 行填充色，第 1 行辉光色。 */
@@ -1169,9 +1212,9 @@ void main() {
 
   float breathe = 0.82 + 0.18 * sin( uTime * 1.9 + phase );
   vec3 color = mix( fillColor, edgeColor, rim * uRimBoost );
-  color *= 0.72 + 0.55 * pattern;
+  color *= 0.58 + 0.42 * pattern;
 
-  float alpha = uOpacity * intensity * inside * ( 0.34 + 0.42 * pattern + 0.5 * rim ) * breathe;
+  float alpha = uOpacity * intensity * inside * ( 0.30 + 0.36 * pattern + 0.44 * rim ) * breathe;
   gl_FragColor = vec4( color, clamp( alpha, 0.0, 1.0 ) );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -1210,8 +1253,8 @@ void main() {
   if ( uPatternMode > 4.5 ) pattern = 0.32 + 0.68 * smoothstep( 0.86, 1.0, fract( vLocal.y * 0.5 + 0.5 - uTime * 0.32 ) );
 
   vec3 color = mix( uFillColor, uEdgeColor, rim * 0.85 );
-  color *= 0.72 + 0.55 * pattern;
-  float alpha = uOpacity * inside * ( 0.34 + 0.42 * pattern + 0.5 * rim );
+  color *= 0.58 + 0.42 * pattern;
+  float alpha = uOpacity * inside * ( 0.30 + 0.36 * pattern + 0.44 * rim );
   gl_FragColor = vec4( color, clamp( alpha, 0.0, 1.0 ) );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -1298,7 +1341,7 @@ export function CreateOverlayMaterial(kind = "composite") {
       uTime: { value: 0 },
       uHighlightState: { value: CreateStateFallbackTexture([0, 0, 0, 0]) },
       uKindPalette: { value: CreateOverlayPaletteTexture() },
-      uOpacity: { value: 0.72 },
+      uOpacity: { value: 0.54 },
       uRimBoost: { value: 0.9 },
     };
     fragmentShader = BuildCompositeOverlayShader();

@@ -64,7 +64,7 @@ const worldConfig = Object.freeze({
   overlayLift: 0.026,
   borderLift: 0.040,
   roadLift: 0.045,
-  fogLowLift: 0.62,
+  fogLowLift: 0.44,
   fogHighLift: 1.00,
   propLift: 0.012,         // 立体物件离地高度
 });
@@ -147,13 +147,13 @@ const cinemaGradeShader = {
     uGammaValue: { value: new THREE.Vector3(1.0, 1.0, 1.02) },
     uShadowTint: { value: new THREE.Color(0x28313c) },
     uHighlightTint: { value: new THREE.Color(0xffe3b4) },
-    uVignette: { value: 0.34 },
-    uVignetteStart: { value: 0.42 },
+    uVignette: { value: 0.24 },
+    uVignetteStart: { value: 0.58 },
     uGrain: { value: 0.034 },
     uBloomThreshold: { value: 0.8 },
     uBloomSoftness: { value: 0.45 },
     uBloomStrength: { value: 0.42 },
-    uBloomRadius: { value: 22.0 },
+    uBloomRadius: { value: 31.0 },
   },
   vertexShader: `
 varying vec2 vUv;
@@ -242,11 +242,13 @@ void main() {
   float vignetteAmount = smoothstep( uVignetteStart, 1.05, length( centered ) * 1.35 );
   color *= 1.0 - uVignette * pow( vignetteAmount, 1.4 );
 
-  // 胶片颗粒：暗部更明显，高光收敛，保持画面锐利
-  // 颗粒尺度锁定到 1080p 基准，高分辨率下颗粒不会退化成细密噪点
+  // 胶片颗粒：峰值落在中间调。深暗部（未探索区占整局 85% 画面）必须让开，
+  // 满强度颗粒会把那里仅有的 ±0.1 高程明暗带整个吃掉；高光同样收敛。
   vec2 grainCoord = vUv * min( uResolution, vec2( 1920.0, 1080.0 ) ) * 0.75;
   float grain = Hash21( grainCoord + vec2( fract( uTime * 13.0 ) * 311.0, fract( uTime * 7.0 ) * 197.0 ) ) - 0.5;
-  color += grain * uGrain * mix( 1.0, 0.25, clamp( luma, 0.0, 1.0 ) );
+  float grainWeight = mix( 0.30, 1.0, smoothstep( 0.16, 0.40, luma ) )
+                    * mix( 1.0, 0.30, smoothstep( 0.45, 0.95, luma ) );
+  color += grain * uGrain * grainWeight;
 
   gl_FragColor = vec4( max( color, vec3( 0.0 ) ), 1.0 );
 }`,
@@ -539,7 +541,7 @@ export function CreateRenderer(canvas, options = {}) {
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.94;
+  renderer.toneMappingExposure = 1.14;
   renderer.shadowMap.enabled = profile.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setClearColor(0x9fb0bd, 1);
@@ -1136,7 +1138,7 @@ export function CreateRenderer(canvas, options = {}) {
       if (!bucket) { bucket = { entries: [], pieces: [] }; buckets.set(bucketKey, bucket); }
       bucket.entries.push(entry);
       const highOffset = 0.16 * (entry.phaseByte / 255);
-      bucket.pieces.push(BuildHexDisc(carpetLayout, worldConfig.tileRadius * 1.04, entry,
+      bucket.pieces.push(BuildHexDisc(carpetLayout, worldConfig.tileRadius * 0.98, entry,
         entry.crestY + worldConfig.fogLowLift + highOffset, true, 1.0, 0.0));
     }
     const chunks = [];
@@ -1380,18 +1382,19 @@ export function CreateRenderer(canvas, options = {}) {
 
   function EnsurePropResources() {
     if (!unitPadGeometry) {
-      unitPadGeometry = new THREE.CylinderGeometry(0.54, 0.60, 0.034, 6, 1);
+      unitPadGeometry = new THREE.CylinderGeometry(0.60, 0.66, 0.034, 6, 1);
       unitPadGeometry.rotateY(Math.PI / 6);
       unitPadGeometry.deleteAttribute("uv");
     }
     if (!hiddenRingGeometry) {
       // 低矮的"伏姿"指示：贴地的破口圆环，示意队伍尚未暴露
-      hiddenRingGeometry = new THREE.TorusGeometry(0.56, 0.030, 4, 16, Math.PI * 1.55);
+      hiddenRingGeometry = new THREE.TorusGeometry(0.62, 0.034, 4, 20, Math.PI * 1.55);
       hiddenRingGeometry.rotateX(Math.PI / 2);
       hiddenRingGeometry.deleteAttribute("uv");
     }
     if (!groundShadowGeometry) {
-      groundShadowGeometry = new THREE.CircleGeometry(1, 18);
+      // 18 段在放大后能看出多边形边；32 段仍只占一次 draw call
+      groundShadowGeometry = new THREE.CircleGeometry(1, 32);
       groundShadowGeometry.rotateX(-Math.PI / 2);
     }
     if (!padMaterial) {
@@ -1405,10 +1408,11 @@ export function CreateRenderer(canvas, options = {}) {
       padMaterial.polygonOffsetUnits = -4;
     }
     if (!groundShadowMaterial) {
-      // 接地投影：径向渐隐的软圆盘，把物件"压"在地面上，
-      // 与方向光的真实投影叠加后，近处远处都不会像贴纸浮着。
+      // 接地投影：径向渐隐的软圆盘，把物件"压"在地面上。
+      // 它与方向光的真实阴影是叠加关系——一旦浓度过高、半径过大，
+      // 每个物件脚下就是一个比物件还大的近黑椭圆，读作"地上的洞"。
       groundShadowMaterial = new THREE.ShaderMaterial({
-        uniforms: { uOpacity: { value: 0.44 } },
+        uniforms: { uOpacity: { value: 0.20 } },
         vertexShader: [
           "varying vec2 vShadowUv;",
           "void main() {",
@@ -1420,10 +1424,10 @@ export function CreateRenderer(canvas, options = {}) {
           "uniform float uOpacity;",
           "varying vec2 vShadowUv;",
           "void main() {",
-          "  float falloff = 1.0 - smoothstep( 0.25, 1.0, length( vShadowUv ) );",
-          "  float alpha = falloff * falloff * uOpacity;",
+          "  float falloff = 1.0 - smoothstep( 0.10, 1.0, length( vShadowUv ) );",
+          "  float alpha = falloff * uOpacity;",
           "  if ( alpha < 0.004 ) discard;",
-          "  gl_FragColor = vec4( 0.03, 0.028, 0.024, alpha );",
+          "  gl_FragColor = vec4( 0.055, 0.050, 0.044, alpha );",
           "}",
         ].join("\n"),
         transparent: true,
@@ -1436,11 +1440,11 @@ export function CreateRenderer(canvas, options = {}) {
     }
   }
 
-  /** 在物件脚下压一片接地投影盘。 */
+  /** 在物件脚下压一片接地投影盘。半径统一收到调用值的 0.7 倍，避免大过物件本身。 */
   function PushGroundShadow(pool, x, y, z, radius, visible) {
     placementPosition.set(x, y + 0.008, z);
     placementQuaternion.identity();
-    const size = visible === false ? 0 : radius;
+    const size = visible === false ? 0 : radius * 0.7;
     placementScale.set(size, 1, size);
     InstancePoolPush(pool, groundShadowGeometry, groundShadowMaterial,
       placementMatrix.compose(placementPosition, placementQuaternion, placementScale), null, false);
@@ -1456,16 +1460,24 @@ export function CreateRenderer(canvas, options = {}) {
    */
   const propMaterialCache = new Map();
 
-  /** 各类别的识别色 / 屋顶提亮倍数 / 饱和度。 */
+  /**
+   * 各类别的识别色 / 屋顶提亮倍数 / 饱和度 / 轮廓压暗。
+   * opacity 一律保持 1：实心模型一旦半透明就会自身互相穿透，
+   * 破口环会从身体里钻出来显示在身前，兵种、朝向、姿态全部读不出来。
+   * "隐蔽"改由破口环 + 边缘暗角（rim）+ dither 表达。
+   * canopy > 0 的类别额外做顶亮底暗的竖向梯度，让锥体树冠不再是纯平黑剪影。
+   */
   const propCategoryRecipes = Object.freeze({
-    settlement: { tint: 0xd8c9a2, roofBoost: 1.60, saturation: 1.05 },   // 中立聚落：夯土黄 + 亮瓦顶
-    stronghold: { tint: 0xc3c0b4, roofBoost: 1.45, saturation: 0.80 },   // 敌据点：冷灰水泥
-    friendly: { tint: 0xe0d0b6, roofBoost: 1.62, saturation: 0.95 },     // 我方：暖褐布衣
-    enemy: { tint: 0xe8d494, roofBoost: 1.62, saturation: 1.10 },        // 敌方：土黄制服
-    hidden: { tint: 0xb8ccd4, roofBoost: 1.50, saturation: 0.72, opacity: 0.78 },
-    foliage: { tint: 0xa8c47e, roofBoost: 1.30, saturation: 1.16 },      // 植被：拉回绿色
-    works: { tint: 0xcbb98c, roofBoost: 1.40, saturation: 1.02 },        // 工事 / 区域
-    neutral: { tint: 0xc8bda4, roofBoost: 1.40, saturation: 1.0 },
+    settlement: { tint: 0xd8c9a2, roofBoost: 2.25, saturation: 1.05 },   // 中立聚落：夯土黄 + 亮瓦顶
+    stronghold: { tint: 0xc3c0b4, roofBoost: 1.95, saturation: 0.80 },   // 敌据点：冷灰水泥
+    friendly: { tint: 0xe0d0b6, roofBoost: 2.20, saturation: 0.95 },     // 我方：暖褐布衣
+    enemy: { tint: 0xe8d494, roofBoost: 2.20, saturation: 1.10 },        // 敌方：土黄制服
+    hidden: { tint: 0xa8bcc6, roofBoost: 1.80, saturation: 0.78, rim: 0.34 },
+    // 植被：模型自带的 #3f5638 与识别色相乘后线性值只剩 0.05 上下，
+    // 必须靠 gain 抬回albedo，再补一层环境底光，锥体侧面才不会归零成黑洞
+    foliage: { tint: 0xa8c47e, roofBoost: 1.55, saturation: 1.16, canopy: 0.52, gain: 2.5, lift: 0.85 },
+    works: { tint: 0xcbb98c, roofBoost: 1.68, saturation: 1.02 },        // 工事 / 区域
+    neutral: { tint: 0xc8bda4, roofBoost: 1.68, saturation: 1.0 },
   });
 
   function GetPropMaterial(sourceMaterial, categoryKey) {
@@ -1477,28 +1489,68 @@ export function CreateRenderer(canvas, options = {}) {
     const recipe = propCategoryRecipes[categoryKey] || propCategoryRecipes.neutral;
     const material = sourceMaterial.clone();
     material.name = `PrairieProp_${categoryKey}`;
-    material.color.setHex(recipe.tint).convertSRGBToLinear();
-    if (recipe.opacity !== undefined && recipe.opacity < 1) {
-      material.transparent = true;
-      material.opacity = recipe.opacity;
-      material.depthWrite = false;
-    }
+    // 注意：THREE.ColorManagement 默认开启时 setHex 已经做过 sRGB → Linear，
+    // 再调一次 convertSRGBToLinear 等于转换两遍，识别色会凭空暗掉约四成，
+    // 是"所有立体物件都读作黑剪影"的直接原因之一。
+    material.color.setHex(recipe.tint);
+    if (recipe.gain) material.color.multiplyScalar(recipe.gain);
+    material.transparent = false;
+    material.opacity = 1;
+    material.depthWrite = true;
+    material.dithering = true;
+    const canopy = recipe.canopy || 0;
+    const rim = recipe.rim || 0;
+    const lift = recipe.lift || 0;
     const swayCompile = sourceMaterial.onBeforeCompile;
     material.onBeforeCompile = function PropOnBeforeCompile(shader, rendererReference) {
       if (swayCompile) swayCompile.call(this, shader, rendererReference);
+      if (canopy > 0) {
+        shader.vertexShader = shader.vertexShader
+          .replace("#include <common>", "#include <common>\nvarying float vPropLocalY;")
+          .replace("#include <begin_vertex>", "#include <begin_vertex>\nvPropLocalY = position.y;");
+        shader.fragmentShader = shader.fragmentShader
+          .replace("#include <common>", "#include <common>\nvarying float vPropLocalY;");
+      }
+      const injected = ["#include <normal_fragment_begin>", "{"];
+      injected.push(
+        "  vec3 upInView = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );",
+        "  float upFacing = clamp( dot( normalize( normal ), upInView ), 0.0, 1.0 );",
+        `  diffuseColor.rgb *= mix( 1.0, ${recipe.roofBoost.toFixed(2)}, pow( upFacing, 1.6 ) );`,
+      );
+      if (canopy > 0) {
+        // 树冠：顶亮底暗的竖向梯度。只靠光照做不出来——锥体侧面几乎收不到主光，
+        // 缺了这道梯度，整丛树在缩略尺度下就是一块零明暗的纯平黑剪影。
+        // 树模型局部高度 0.16~0.42，×3.2 把树顶归一到 1.0 附近。
+        injected.push(
+          "  float canopyT = clamp( vPropLocalY * 3.2, 0.0, 1.0 );",
+          `  diffuseColor.rgb *= mix( ${(1 - canopy * 0.55).toFixed(2)}, ${(1 + canopy).toFixed(2)}, pow( canopyT, 1.35 ) );`,
+        );
+      }
+      if (rim > 0) {
+        // 隐蔽：轮廓压暗代替整体半透明——保住实心剪影，同时读得出"藏起来了"
+        injected.push(
+          "  float rimFacing = 1.0 - clamp( dot( normalize( normal ), normalize( vViewPosition ) ), 0.0, 1.0 );",
+          `  diffuseColor.rgb *= 1.0 - ${rim.toFixed(2)} * pow( rimFacing, 2.2 );`,
+        );
+      }
+      injected.push(
+        "  float propLuma = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );",
+        `  diffuseColor.rgb = mix( vec3( propLuma ), diffuseColor.rgb, ${recipe.saturation.toFixed(2)} );`,
+        "}",
+      );
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <normal_fragment_begin>",
-        [
-          "#include <normal_fragment_begin>",
-          "{",
-          "  vec3 upInView = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );",
-          "  float upFacing = clamp( dot( normalize( normal ), upInView ), 0.0, 1.0 );",
-          `  diffuseColor.rgb *= mix( 1.0, ${recipe.roofBoost.toFixed(2)}, pow( upFacing, 1.6 ) );`,
-          "  float propLuma = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );",
-          `  diffuseColor.rgb = mix( vec3( propLuma ), diffuseColor.rgb, ${recipe.saturation.toFixed(2)} );`,
-          "}",
-        ].join("\n")
+        injected.join("\n"),
       );
+      if (lift > 0) {
+        // 环境底光：给背光面一个不为零的下限，等价于树冠内部的散射。
+        // 没有它，主光照不到的锥面只能吃到半球光的零头，缩略尺度下必然塌成剪影。
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <lights_fragment_end>",
+          `#include <lights_fragment_end>
+reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
+        );
+      }
     };
     material.customProgramCacheKey = () => `prairieProp_${categoryKey}`;
     material.userData.baseOnBeforeCompile = material.onBeforeCompile;
@@ -1736,8 +1788,8 @@ export function CreateRenderer(canvas, options = {}) {
         const materialOverride = hidden
           ? GetHiddenModelMaterial(sourceMaterial)
           : GetPropMaterial(sourceMaterial, category);
-        // 单位底面直径约 tileRadius × 0.55，剪影在默认视距下读得出来
-        const unitScale = worldConfig.tileRadius * (hidden ? 2.30 : 2.70);
+        // 1920 屏默认视距下部队原本只占 25~30px，六倍裁切才勉强看出人形，再放大一档
+        const unitScale = worldConfig.tileRadius * (hidden ? 2.64 : 3.08);
         // 隐蔽队伍略矮略沉，读作"伏下身"
         PlaceModel(unitPool, model, x, surfaceY + (hidden ? -0.03 : worldConfig.propLift), z,
           facing, unitScale, null, visible, materialOverride);
@@ -1906,11 +1958,11 @@ export function CreateRenderer(canvas, options = {}) {
     DisposeCsm();
     const direction = ComputeSunDirection();
     sunLight.color.setHex(palette.sun.color);
-    sunLight.intensity = palette.sun.intensity * 1.15;
+    sunLight.intensity = palette.sun.intensity * 1.70;
     hemisphereLight.color.setHex(palette.ambient.sky);
     hemisphereLight.groundColor.setHex(palette.ambient.ground);
-    hemisphereLight.intensity = palette.ambient.intensity * 0.34;
-    fillLight.intensity = 0.03 + (1 - Clamp01(palette.sun.intensity / 3)) * 0.05;
+    hemisphereLight.intensity = palette.ambient.intensity * 1.05;
+    fillLight.intensity = 0.12 + (1 - Clamp01(palette.sun.intensity / 3)) * 0.06;
 
     renderer.shadowMap.enabled = profile.shadows;
 
@@ -2040,10 +2092,11 @@ export function CreateRenderer(canvas, options = {}) {
     skyDome.userData.uniforms.uSunDirection.value.copy(direction);
     waterMaterial.userData.uniforms.uSunDirection.value.copy(direction);
     sunLight.color.setHex(palette.sun.color);
-    sunLight.intensity = palette.sun.intensity * 1.15;
+    sunLight.intensity = palette.sun.intensity * 1.70;
     hemisphereLight.color.setHex(palette.ambient.sky);
     hemisphereLight.groundColor.setHex(palette.ambient.ground);
-    hemisphereLight.intensity = palette.ambient.intensity * 0.34;
+    hemisphereLight.intensity = palette.ambient.intensity * 1.05;
+    fillLight.intensity = 0.12 + (1 - Clamp01(palette.sun.intensity / 3)) * 0.06;
     if (csm) {
       csm.lightDirection.copy(direction).negate().normalize();
       csm.lightIntensity = palette.sun.intensity / Math.max(1, profile.cascades);
