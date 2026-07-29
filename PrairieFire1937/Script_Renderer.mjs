@@ -84,25 +84,25 @@ const qualityProfiles = Object.freeze({
     pixelRatioCap: 1.0, shadows: false, csm: false, cascades: 0, shadowMapSize: 512,
     composer: false, bloom: false, bloomTaps: 8, ssaa: false, skyClouds: false,
     terrainDetail: 0.35, bumpStrength: 0.25, waterDetail: 0.0, fogClouds: false,
-    anisotropy: 1, maxParticles: 220, csmMaxFar: 40,
+    anisotropy: 1, maxParticles: 220, csmMaxFar: 40, shadowSpan: 16,
   },
   medium: {
     pixelRatioCap: 1.25, shadows: true, csm: false, cascades: 1, shadowMapSize: 1024,
     composer: true, bloom: false, bloomTaps: 8, ssaa: false, skyClouds: true,
     terrainDetail: 0.7, bumpStrength: 0.4, waterDetail: 0.6, fogClouds: true,
-    anisotropy: 4, maxParticles: 700, csmMaxFar: 55,
+    anisotropy: 4, maxParticles: 700, csmMaxFar: 55, shadowSpan: 20,
   },
   high: {
-    pixelRatioCap: 1.6, shadows: true, csm: true, cascades: 2, shadowMapSize: 2048,
+    pixelRatioCap: 1.6, shadows: true, csm: false, cascades: 0, shadowMapSize: 2048,
     composer: true, bloom: true, bloomTaps: 14, ssaa: false, skyClouds: true,
     terrainDetail: 1.0, bumpStrength: 0.55, waterDetail: 1.0, fogClouds: true,
-    anisotropy: 8, maxParticles: 1600, csmMaxFar: 70,
+    anisotropy: 8, maxParticles: 1600, csmMaxFar: 70, shadowSpan: 26,
   },
   ultra: {
-    pixelRatioCap: 2.0, shadows: true, csm: true, cascades: 3, shadowMapSize: 2048,
+    pixelRatioCap: 2.0, shadows: true, csm: true, cascades: 2, shadowMapSize: 2048,
     composer: true, bloom: true, bloomTaps: 22, ssaa: true, skyClouds: true,
     terrainDetail: 1.0, bumpStrength: 0.62, waterDetail: 1.0, fogClouds: true,
-    anisotropy: 16, maxParticles: 3200, csmMaxFar: 90,
+    anisotropy: 16, maxParticles: 3200, csmMaxFar: 110, shadowSpan: 30,
   },
 });
 
@@ -231,7 +231,7 @@ void main() {
   float highlightWeight = smoothstep( 0.30, 1.05, luma );
   vec3 shadowTintNormalized = uShadowTint / max( dot( uShadowTint, lumaWeights ), 0.001 );
   vec3 highlightTintNormalized = uHighlightTint / max( dot( uHighlightTint, lumaWeights ), 0.001 );
-  color *= mix( vec3( 1.0 ), shadowTintNormalized, shadowWeight * 0.30 );
+  color *= mix( vec3( 1.0 ), shadowTintNormalized, shadowWeight * 0.16 );
   color *= mix( vec3( 1.0 ), highlightTintNormalized, highlightWeight * 0.22 );
 
   color = mix( vec3( luma ), color, uSaturation );
@@ -1231,7 +1231,7 @@ export function CreateRenderer(canvas, options = {}) {
   const neutralTint = new THREE.Color(1, 1, 1);
   const factionTints = {
     Player: new THREE.Color(0x9dc0e2).convertSRGBToLinear(),   // 我方：灰蓝布衣
-    Enemy: new THREE.Color(0xe6c46a).convertSRGBToLinear(),    // 敌方：土黄制服
+    Enemy: new THREE.Color(0xd2ab5c).convertSRGBToLinear(),    // 敌方：土黄制服
     Hidden: new THREE.Color(0x7ea0b2).convertSRGBToLinear(),   // 隐蔽：偏冷的青灰
   };
   /** 我方部队头顶的小红旗，一眼区分敌我。 */
@@ -1332,7 +1332,7 @@ export function CreateRenderer(canvas, options = {}) {
 
       // —— 聚落 ——
       if (hex.feature === "Village" || hex.feature === "Town" || hex.feature === "CountySeat") {
-        const variantCount = hex.feature === "Village" ? 4 : 2;
+        const variantCount = hex.feature === "Village" ? 3 : 2;
         const model = CreateSettlementModel(hex.feature, 1, { seed: variantSeed % variantCount });
         const scale = hex.feature === "CountySeat" ? 1.55 : hex.feature === "Town" ? 1.40 : 1.24;
         PlaceModel(staticPool, model, entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
@@ -1340,13 +1340,13 @@ export function CreateRenderer(canvas, options = {}) {
       } else if (hex.feature === "Shrine" || hex.feature === "Quarry" || hex.feature === "SaltPan") {
         const workKind = hex.feature === "Quarry" ? "Cache" : hex.feature === "SaltPan" ? "Cache" : "Beacon";
         PlaceModel(staticPool, CreateWorkModel(workKind), entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-          (variantSeed % 6) * 1.047, 1.25, tint, visible);
+          (variantSeed % 6) * 1.047, 1.25, tint, visible, null, false);
       } else if (hex.feature === "Ford") {
         PlaceModel(staticPool, CreateWorkModel("Ford"), entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-          0, 1.30, tint, visible);
+          0, 1.30, tint, visible, null, false);
       } else if (hex.feature === "Terrace") {
         PlaceModel(staticPool, CreateWorkModel("Terrace"), entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
-          (variantSeed % 6) * 1.047, 1.25, tint, visible);
+          (variantSeed % 6) * 1.047, 1.25, tint, visible, null, false);
       } else if (hex.feature === "Pass") {
         PlaceModel(staticPool, CreateWorkModel("Barricade"), entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
           (variantSeed % 6) * 1.047, 1.25, tint, visible);
@@ -1368,7 +1368,7 @@ export function CreateRenderer(canvas, options = {}) {
         const offset = StackOffset(index, Math.max(2, works.length), 0.42);
         PlaceModel(staticPool, CreateWorkModel(workKey),
           entry.x + offset.x, SurfaceAt(entry, offset.x, offset.z) + worldConfig.propLift, entry.z + offset.z,
-          (variantSeed % 5) * 1.256, 1.05, tint, visible);
+          (variantSeed % 5) * 1.256, 1.05, tint, visible, null, false);
       }
     }
 
@@ -1389,7 +1389,7 @@ export function CreateRenderer(canvas, options = {}) {
       const visible = !!entry.hex.explored;
       const banner = CreateBannerModel({ cloth: modelPalette.bannerRed, band: "#e0cfa2", height: base.tier >= 3 ? 0.56 : 0.46 });
       PlaceModel(staticPool, banner, entry.x + 0.30, SurfaceAt(entry, 0.30, -0.30) + worldConfig.propLift, entry.z - 0.30,
-        0.6, 1.5, null, visible);
+        0.6, 1.5, null, visible, null, false);
       const districts = Array.isArray(base.districts) ? base.districts : [];
       for (let index = 0; index < districts.length; index += 1) {
         const district = districts[index];
@@ -1400,7 +1400,7 @@ export function CreateRenderer(canvas, options = {}) {
         const modelName = districtModelNames[districtType] || districtType;
         PlaceModel(staticPool, CreateDistrictModel(modelName),
           districtEntry.x + offset.x, SurfaceAt(districtEntry, offset.x, offset.z) + worldConfig.propLift, districtEntry.z + offset.z,
-          (index * 1.4) % 6.283, 1.05, null, !!districtEntry.hex.explored);
+          (index * 1.4) % 6.283, 1.05, null, !!districtEntry.hex.explored, null, false);
       }
     }
 
@@ -1633,6 +1633,29 @@ export function CreateRenderer(canvas, options = {}) {
 
     renderer.shadowMap.enabled = profile.shadows;
 
+    // 主阴影：一盏跟随镜头的方向光 + 单张高分辨率阴影图，正交范围只罩住镜头附近的
+    // shadowSpan 个世界单位。相比让 CSM 去覆盖整张 520 格地图，每 texel 覆盖的世界
+    // 尺寸小一个数量级，地块之间与单位脚下才会出现清晰的投影。
+    sunLight.visible = true;
+    sunLight.castShadow = profile.shadows;
+    if (sunLight.shadow.map && sunLight.shadow.mapSize.width !== profile.shadowMapSize) {
+      sunLight.shadow.map.dispose();
+      sunLight.shadow.map = null;
+    }
+    sunLight.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize);
+    const span = profile.shadowSpan;
+    const shadowCamera = sunLight.shadow.camera;
+    shadowCamera.left = -span;
+    shadowCamera.right = span;
+    shadowCamera.top = span;
+    shadowCamera.bottom = -span;
+    shadowCamera.near = 1;
+    shadowCamera.far = span * 5 + 60;
+    shadowCamera.updateProjectionMatrix();
+    sunLight.shadow.bias = -0.0008;
+    sunLight.shadow.normalBias = 0.035;
+
+    // 远景补一层 CSM（仅 ultra）：近处交给上面那盏，远处才让级联接手
     if (profile.csm && profile.shadows) {
       try {
         csm = new CSM({
@@ -1642,15 +1665,15 @@ export function CreateRenderer(canvas, options = {}) {
           maxFar: profile.csmMaxFar,
           mode: "practical",
           shadowMapSize: profile.shadowMapSize,
-          shadowBias: -0.00045,
+          shadowBias: -0.0006,
           lightDirection: direction.clone().negate(),
-          lightIntensity: palette.sun.intensity / profile.cascades,
-          lightMargin: 60,
+          lightIntensity: palette.sun.intensity / (profile.cascades + 1),
+          lightMargin: 80,
         });
         csm.fade = true;
         for (const light of csm.lights) light.color.setHex(palette.sun.color);
-        sunLight.visible = false;
-        sunLight.castShadow = false;
+        // 主光降到补光强度，避免与级联叠加过曝
+        sunLight.intensity = palette.sun.intensity / (profile.cascades + 1);
         for (const material of standardMaterials) AttachCsmToMaterial(material);
         return;
       } catch (error) {
@@ -1658,10 +1681,6 @@ export function CreateRenderer(canvas, options = {}) {
       }
     }
 
-    sunLight.visible = true;
-    sunLight.castShadow = profile.shadows;
-    if (sunLight.shadow.map) { sunLight.shadow.map.dispose(); sunLight.shadow.map = null; }
-    sunLight.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize);
     for (const material of standardMaterials) material.needsUpdate = true;
   }
 
@@ -1946,15 +1965,31 @@ export function CreateRenderer(canvas, options = {}) {
     const targetZ = startEntry ? startEntry.z : mapBounds.centerZ;
     const targetY = startEntry ? startEntry.centerY : mapBounds.averageTopY;
     controls.target.set(targetX, targetY, targetZ);
-    const distance = options.cameraDistance || 44;
-    // 极角 42°（俯仰 48°）+ 约 20° 方位角，形成三分之四俯视的战略视角
+    controls.object.updateProjectionMatrix();
+    const distance = options.cameraDistance || ComputeFitDistance(options.visibleHexRows || 10);
+    // 极角 36°（俯仰 54°）+ 约 18° 方位角：三分之四俯视，天空占比小、棋盘占满画面
     camera.position.set(
-      targetX + distance * 0.229,
-      targetY + distance * 0.743,
-      targetZ + distance * 0.629
+      targetX + distance * 0.182,
+      targetY + distance * 0.809,
+      targetZ + distance * 0.559
     );
     controls.update();
     Resize();
+  }
+
+  /**
+   * 默认缩放只按 XZ 平面上的"期望可见格数"反算，与 elevationScale 无关，
+   * 这样以后调整地形高度不会把镜头顶远。
+   */
+  function ComputeFitDistance(visibleRows) {
+    const rows = Clamp(Number(visibleRows) || 10, 5, 24);
+    // 平顶六边形纵向排距 = √3 · hexSize
+    const worldSpan = rows * hexSize * Math.sqrt(3);
+    const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+    // 俯仰 54° 时，屏幕纵向覆盖的地面长度约为视锥高度 / sin(俯仰角)
+    const pitchCompensation = 1 / Math.sin(THREE.MathUtils.degToRad(54));
+    const distance = (worldSpan * 0.5) / Math.tan(verticalFov * 0.5) / pitchCompensation;
+    return Clamp(distance, controls.minDistance + 2, controls.maxDistance - 2);
   }
 
   function SyncWorld(state) {
@@ -2246,11 +2281,15 @@ export function CreateRenderer(canvas, options = {}) {
 
     if (csm) {
       csm.update();
-    } else if (sunLight.visible) {
+    }
+    if (sunLight.visible && sunLight.castShadow) {
+      // 阴影相机跟着镜头焦点走，让有限的 texel 全部花在玩家正看着的区域
       const direction = ComputeSunDirection();
-      sunLight.position.copy(controls.target).addScaledVector(direction, 60);
+      const reach = profile.shadowSpan * 2.4 + 24;
+      sunLight.position.copy(controls.target).addScaledVector(direction, reach);
       sunLight.target.position.copy(controls.target);
       sunLight.target.updateMatrixWorld();
+      sunLight.updateMatrixWorld();
     }
 
     if (handle.effects && typeof handle.effects.Update === "function") {

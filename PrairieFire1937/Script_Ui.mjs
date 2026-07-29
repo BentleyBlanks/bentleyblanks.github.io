@@ -208,6 +208,15 @@ function SafeText(value, fallback = "—") {
   return String(value);
 }
 
+/** 六角坐标键 "7,5" → "(7, 5)"，避免被读成小数。 */
+export function FormatHexCoord(key) {
+  if (!key) return "";
+  const text = String(key);
+  const comma = text.indexOf(",");
+  if (comma < 0) return text;
+  return `(${text.slice(0, comma).trim()}, ${text.slice(comma + 1).trim()})`;
+}
+
 function PercentOf(value, total) {
   const amount = Number(value) || 0;
   const span = Number(total) || 100;
@@ -242,11 +251,27 @@ export function CreateUi(root, hooks = {}) {
     lastView: null,
   };
   /**
-   * 数据表按需软加载：面板需要科技/政策/区域/地形定义时才动态 import，
-   * 任何一个失败都只降级为“定义缺失”的空态，绝不拖垮 HUD。
+   * 数据表来源有两条路：
+   *  1) 首选 hooks.definitions —— Script_Main 在调用 CreateUi 前已经 import 好，
+   *     传进来的是各模块的完整 namespace（units / tech / terrain / history）。
+   *     走这条路第一帧就有中文名，不会闪英文 key。
+   *  2) 缺失时才回退到动态 import()，任何一个失败都只降级为空态，绝不拖垮 HUD。
    * 这样 Script_Ui 在 node 里仍可零依赖导入。
    */
-  const definitions = { tech: null, units: null, terrain: null, loading: false, loaded: false };
+  const definitions = { tech: null, units: null, terrain: null, history: null, loading: false, loaded: false };
+
+  function AdoptDefinitions(source) {
+    if (!source || typeof source !== "object") return false;
+    let adopted = false;
+    for (const slot of ["units", "tech", "terrain", "history"]) {
+      if (source[slot] && typeof source[slot] === "object") {
+        definitions[slot] = source[slot];
+        adopted = true;
+      }
+    }
+    if (adopted) definitions.loaded = true;
+    return adopted;
+  }
   let tooltipCounter = 0;
   let disposed = false;
   let activePanel = null;
@@ -384,11 +409,13 @@ export function CreateUi(root, hooks = {}) {
       import("./Data_Tech.mjs").catch(() => null),
       import("./Data_Units.mjs").catch(() => null),
       import("./Data_Terrain.mjs").catch(() => null),
+      import("./Data_History.mjs").catch(() => null),
     ]).then((modules) => {
       if (disposed) return;
-      definitions.tech = modules[0];
-      definitions.units = modules[1];
-      definitions.terrain = modules[2];
+      definitions.tech = definitions.tech || modules[0];
+      definitions.units = definitions.units || modules[1];
+      definitions.terrain = definitions.terrain || modules[2];
+      definitions.history = definitions.history || modules[3];
       definitions.loading = false;
       definitions.loaded = true;
       // 定义到位后重绘一次图例、底部卡片与当前面板。
@@ -405,6 +432,7 @@ export function CreateUi(root, hooks = {}) {
       (definitions.tech && definitions.tech[name]) ||
       (definitions.units && definitions.units[name]) ||
       (definitions.terrain && definitions.terrain[name]) ||
+      (definitions.history && definitions.history[name]) ||
       null;
     return source && typeof source === "object" ? source : {};
   }
@@ -1551,8 +1579,13 @@ export function CreateUi(root, hooks = {}) {
 
     const head = El("div", "pf-card-head", { parent: card });
     const title = El("div", "pf-card-title", { parent: head });
-    El("span", "pf-card-name", { text: feature ? feature.name : terrain.name, parent: title });
-    El("span", "pf-card-sub", { text: `${terrain.name} · ${hex.key}`, parent: title });
+    const headline = feature ? feature.name : terrain.name;
+    El("span", "pf-card-name", { text: headline, parent: title });
+    // 没有地物时标题本身就是地形名，副标题只留坐标，避免"丘陵 / 丘陵 · 7,5"这种重复。
+    El("span", "pf-card-sub", {
+      text: feature ? `${terrain.name} · ${FormatHexCoord(hex.key)}` : FormatHexCoord(hex.key),
+      parent: title,
+    });
     const badge = El("span", "pf-control-badge", { text: control.name, parent: head });
     if (badge.style) {
       badge.style.borderColor = control.color;
@@ -3452,6 +3485,13 @@ export function CreateUi(root, hooks = {}) {
 
   function Bind(nextHooks) {
     callbacks = Object.assign({}, callbacks, nextHooks || {});
+    // hooks 里可以顺带带来数据表命名空间，随时接受更新。
+    if (nextHooks && AdoptDefinitions(nextHooks.definitions)) {
+      RenderMinimapLegend();
+      cache.signatures.context = "";
+      cache.minimapKey = "";
+      if (currentState) Sync(currentState, currentView);
+    }
     return callbacks;
   }
 
@@ -3481,8 +3521,12 @@ export function CreateUi(root, hooks = {}) {
 
   // ---- 启动 ---------------------------------------------------------------
 
+  // 构造时就吃下主循环预先加载好的定义表，保证第一帧即为中文。
+  AdoptDefinitions(hooks && hooks.definitions);
   BuildShell();
   BindGlobalInput();
+  RenderMinimapLegend();
+  if (!definitions.loaded) EnsureDefinitions();
   SetHint("点选地块查看详情；选中队伍后在底部选择行动。空格结束回合。");
 
   return {

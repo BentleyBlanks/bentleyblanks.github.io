@@ -147,13 +147,13 @@ const seasonBase = Object.freeze({
 const eraGrade = Object.freeze({
   Opening: {
     sunScale: 1.06, elevationDelta: 4, azimuthDelta: 0, warm: 0.16, fogScale: 0.92,
-    saturation: 1.04, contrast: 1.03, vignette: 0.30, grain: 0.030, bloomThreshold: 0.78, bloomStrength: 0.46,
-    shadowTint: 0x2a3340, highlightTint: 0xffe7bd, lift: 0.010,
+    saturation: 1.14, contrast: 1.04, vignette: 0.28, grain: 0.028, bloomThreshold: 0.78, bloomStrength: 0.46,
+    shadowTint: 0x3a3a40, highlightTint: 0xffe4b2, lift: 0.010,
   },
   Growth: {
     sunScale: 1.0, elevationDelta: 0, azimuthDelta: 8, warm: 0.08, fogScale: 1.0,
-    saturation: 1.0, contrast: 1.05, vignette: 0.34, grain: 0.034, bloomThreshold: 0.80, bloomStrength: 0.42,
-    shadowTint: 0x28313c, highlightTint: 0xffe3b4, lift: 0.012,
+    saturation: 1.08, contrast: 1.05, vignette: 0.32, grain: 0.032, bloomThreshold: 0.80, bloomStrength: 0.42,
+    shadowTint: 0x353840, highlightTint: 0xffe1ae, lift: 0.012,
   },
   Hardship: {
     sunScale: 0.80, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.42,

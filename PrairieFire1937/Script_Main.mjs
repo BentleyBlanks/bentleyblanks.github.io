@@ -115,7 +115,18 @@ export async function StartGame(options = {}) {
 
   report(0.8, "布置指挥所……");
 
-  const ui = uiModule?.CreateUi ? SafeCall(() => uiModule.CreateUi(uiRoot, {})) ?? null : null;
+  // 定义表同步注入：UI 若自己异步 import，冷启动头一两秒会真的把英文内部 key 显示给玩家。
+  // 这几个模块 Script_Rules 已经静态 import 过了，这里直接把它们递给 UI。
+  const [dataUnits, dataTech, dataTerrain, dataHistory] = await Promise.all([
+    import("./Data_Units.mjs").catch(() => null),
+    import("./Data_Tech.mjs").catch(() => null),
+    import("./Data_Terrain.mjs").catch(() => null),
+    import("./Data_History.mjs").catch(() => null),
+  ]);
+  const definitions = { units: dataUnits, tech: dataTech, terrain: dataTerrain, history: dataHistory };
+
+  const ui = uiModule?.CreateUi ? SafeCall(() => uiModule.CreateUi(uiRoot, { definitions })) ?? null : null;
+  SafeCall(() => handle.SetTerrainDefinitions?.(dataTerrain?.terrainDefinitions));
 
   // ---------------------------------------------------------------------
   // 视图与同步
@@ -257,7 +268,7 @@ export async function StartGame(options = {}) {
 
   async function ShowEraCinematic(eraKey) {
     const era = Rules.GetEraForTurn(state.turn);
-    if (!ui?.Cinematic) return;
+    if (!ui?.Cinematic || view.autoPlay) return;
     await ui.Cinematic({
       kind: "Era",
       eraKey,
@@ -271,7 +282,9 @@ export async function StartGame(options = {}) {
   }
 
   async function ShowHistoricalEvent(event) {
-    if (!ui?.Cinematic) {
+    // autoPlay 供冒烟/视觉自动化使用：不弹卡、直接取默认选项，
+    // 否则 EndTurn 会一直等玩家点选，自动化流程会在事件卡上永久挂起。
+    if (!ui?.Cinematic || view.autoPlay) {
       state = Rules.ApplyEventChoice(state, event.id, event.options?.[0]?.id);
       return;
     }
@@ -281,7 +294,7 @@ export async function StartGame(options = {}) {
   }
 
   async function ShowEnding(result) {
-    if (!ui?.Cinematic) return;
+    if (!ui?.Cinematic || view.autoPlay) return;
     await ui.Cinematic({
       kind: "Ending",
       title: result?.ending?.title ?? "终局",
@@ -544,6 +557,11 @@ export async function StartGame(options = {}) {
     audio,
     view,
     EndTurn: RunEndTurn,
+    /** 自动化用：跳过全部过场与事件卡，直接取默认选项，保证 EndTurn 一定会 resolve。 */
+    SetAutoPlay(enabled) {
+      view.autoPlay = Boolean(enabled);
+    },
+    definitions,
   };
 
   return window.PrairieFire;
