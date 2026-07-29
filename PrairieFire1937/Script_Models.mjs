@@ -344,8 +344,10 @@ function Horse(pieces, x, z, facing, scale, color) {
 
 /** 单位底座：六角矮台，颜色区分敌我。 */
 function UnitPlinth(pieces, radius, color) {
-  Cyl(pieces, radius, radius * 1.04, 0.022, 6, { pos: [0, 0.011, 0], color, variance: 0.03 });
-  Cyl(pieces, radius * 0.86, radius * 0.86, 0.008, 6, { pos: [0, 0.026, 0], color: modelPalette.soilDark, variance: 0.02 });
+  // 只留一圈很薄的矮台。原先叠的那层 soilDark 内盘会被渲染层的 unitScale
+  // （约 3 倍）一起放大到世界半径 0.53-0.64，而格内切半径只有 0.853，
+  // 于是每支部队脚下都压着一块覆盖三分之二格的暗盘，读作"地上的洞"。
+  Cyl(pieces, radius, radius * 1.04, 0.018, 6, { pos: [0, 0.009, 0], color, variance: 0.03 });
 }
 
 /** 我方松散队形（有机、错落）。 */

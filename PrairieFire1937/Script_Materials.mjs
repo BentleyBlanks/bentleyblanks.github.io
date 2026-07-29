@@ -1117,7 +1117,7 @@ const overlayKindOrder = ["move", "attack", "build", "sweep", "intel"];
 // 占屏近两成），一旦用浅色高饱和边缘，它会变成全画面最亮的东西，
 // 把下面的地形、村庄、部队全部洗淡——这正是第二轮「乳白糊团」换个图层复活。
 export const overlayKindColors = Object.freeze({
-  move: { fill: 0x2f7d76, edge: 0x4f8f86 },
+  move: { fill: 0x3d8f96, edge: 0x8ad9d2 },
   attack: { fill: 0x8e2a1e, edge: 0xb05c42 },
   build: { fill: 0x8f6a22, edge: 0xb59a5c },
   sweep: { fill: 0x6b1f16, edge: 0xa85a3c },
@@ -1234,7 +1234,7 @@ void main() {
 
   // 填充几乎透明、只留边缘描边：常数项从 0.30 压到 0.08，
   // 让玩家读到的是「这一圈格子可以去」，而不是「地图被一层薄荷色糊住了」。
-  float alpha = uOpacity * intensity * inside * ( 0.08 + 0.30 * pattern + 0.52 * rim ) * breathe;
+  float alpha = uOpacity * intensity * inside * ( 0.26 + 0.34 * pattern + 0.52 * rim ) * breathe;
   gl_FragColor = vec4( color, clamp( alpha, 0.0, 1.0 ) );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -1361,8 +1361,8 @@ export function CreateOverlayMaterial(kind = "composite") {
       uTime: { value: 0 },
       uHighlightState: { value: CreateStateFallbackTexture([0, 0, 0, 0]) },
       uKindPalette: { value: CreateOverlayPaletteTexture() },
-      uOpacity: { value: 0.24 },
-      uRimBoost: { value: 0.5 },
+      uOpacity: { value: 0.45 },
+      uRimBoost: { value: 0.85 },
     };
     fragmentShader = BuildCompositeOverlayShader();
   } else if (kindKey === "hover") {

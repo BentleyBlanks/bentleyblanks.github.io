@@ -294,10 +294,16 @@ const featureLabels = Object.freeze({
   Shrine: '庙宇', Terrace: '梯田', Grove: '林场', Quarry: '石场', SaltPan: '盐滩',
 });
 
-const terrainLabels = Object.freeze({
-  Mountain: '高山', Ridge: '山脊', Hill: '丘陵', Forest: '林地', Plain: '平原',
-  Loess: '黄土塬', Marsh: '沼泽', River: '河川', Gorge: '峡谷',
+// 地形中文名以 Data_Terrain 为唯一来源。此前这里维护了一份副本，
+// 于是战报写「山脊(5,5)」而点开格子显示「山梁」，同一块地两个名字。
+const terrainLabelFallback = Object.freeze({
+  Mountain: '高山', Ridge: '山梁', Hill: '丘陵', Forest: '林地', Plain: '平原',
+  Loess: '黄土塬', Marsh: '洼淀', River: '河谷', Gorge: '峡谷',
 });
+
+function TerrainLabel(key) {
+  return externalTerrainDefinitions?.[key]?.name || terrainLabelFallback[key] || key;
+}
 
 const intentLabels = Object.freeze({
   Patrol: '巡逻', Pursue: '追击', Sweep: '扫荡', Garrison: '驻防', Build: '筑垒',
@@ -371,7 +377,7 @@ function KeysInRange(key, radius) {
 function HexLabel(state, key) {
   const hex = GetHex(state, key);
   if (!hex) return `未知地段(${key})`;
-  const name = featureLabels[hex.feature] || terrainLabels[hex.terrain] || '荒地';
+  const name = featureLabels[hex.feature] || TerrainLabel(hex.terrain) || '荒地';
   return `${name}(${key})`;
 }
 

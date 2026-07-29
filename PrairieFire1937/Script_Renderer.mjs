@@ -1412,7 +1412,7 @@ export function CreateRenderer(canvas, options = {}) {
     }
     if (!hiddenRingGeometry) {
       // 低矮的"伏姿"指示：贴地的破口圆环，示意队伍尚未暴露
-      hiddenRingGeometry = new THREE.TorusGeometry(0.62, 0.034, 4, 20, Math.PI * 1.55);
+      hiddenRingGeometry = new THREE.TorusGeometry(0.62, 0.030, 4, 24, Math.PI * 2);
       hiddenRingGeometry.rotateX(Math.PI / 2);
       hiddenRingGeometry.deleteAttribute("uv");
     }
@@ -1424,7 +1424,7 @@ export function CreateRenderer(canvas, options = {}) {
     if (!padMaterial) {
       // 不受光：部队底座是战场标识，不能因为落在山影里就看不见
       padMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0.62,
+        color: 0xffffff, transparent: true, opacity: 0.40,
         side: THREE.DoubleSide, depthWrite: false, name: "PrairieUnitPad",
       });
       padMaterial.polygonOffset = true;
@@ -1804,7 +1804,7 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
         }
 
         // 接地投影：把队伍压在地面上，不再像贴纸浮着
-        PushGroundShadow(unitPool, x, surfaceY, z, worldConfig.tileRadius * 0.40, visible);
+        // 部队已有方向光的真实投影，不再叠接地盘——否则脚下共四层标记。
 
         const modelName = unitModelNames[unit.type] || unit.type;
         const model = CreateUnitModel(modelName, {
@@ -2063,6 +2063,10 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
       return;
     }
     composer = new EffectComposer(renderer);
+    // 离屏 RT 默认 samples=0，会把画布自带的 antialias 旁路掉——
+    // 于是启用了后处理的 high 档反而比不启用的 low 档更锯齿。
+    if (composer.renderTarget1) composer.renderTarget1.samples = 4;
+    if (composer.renderTarget2) composer.renderTarget2.samples = 4;
     composer.setPixelRatio(renderer.getPixelRatio());
 
     if (profile.ssaa) {

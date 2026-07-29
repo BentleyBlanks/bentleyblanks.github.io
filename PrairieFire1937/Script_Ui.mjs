@@ -2579,14 +2579,101 @@ export function CreateUi(root, hooks = {}) {
     return era ? era.name : eraKey ? String(eraKey) : "—";
   }
 
+  /** 效果 key → 中文名。缺一条就会把工程 key 直接印给玩家。 */
+  const effectLabels = {
+    yieldBonus: "产出加成",
+    flatYield: "每回合额外产出",
+    unlockUnits: "解锁部队",
+    unlockDistricts: "解锁区域",
+    unlockWorks: "解锁工事",
+    unlockPolicies: "解锁政策",
+    policySlots: "政策槽位",
+    baseSlots: "区域槽位",
+    massGrowth: "群众工作成效",
+    populationGrowth: "人口增长",
+    cadreGrowth: "干部培养",
+    unrestDecay: "民情安定",
+    exposureDecay: "暴露度消退",
+    intelRange: "情报覆盖",
+    sweepWarning: "扫荡预警提前量",
+    garrisonReveal: "可见敌军守备",
+    combatAmbush: "伏击效果",
+    combatAttack: "攻击力",
+    combatDefence: "防御力",
+    captureRate: "缴获率",
+    healRate: "伤员恢复",
+    buildSpeed: "建设速度",
+    moveBonus: "行动力",
+    sabotageBonus: "破袭成效",
+    siegeBonus: "攻坚效果",
+    upkeepDiscount: "维持费减免",
+    tunnelMove: "地道通行",
+    seizureResist: "抗征粮",
+    civilianShelter: "群众掩蔽",
+  };
+
+  /** 资源 key → 中文名，用于展开 yieldBonus / flatYield 这类资源映射。 */
+  const resourceShortLabels = {
+    grain: "粮", labor: "工", ordnance: "械", medicine: "药", intel: "情报", cadre: "干部",
+  };
+
+  /** 把解锁项的内部 id 解析成中文名，解析不到才退回 id。 */
+  function ResolveUnlockName(key, id) {
+    const tables = {
+      unlockUnits: () => definitions.units?.unitDefinitions?.[id]?.name,
+      unlockDistricts: () => definitions.units?.districtDefinitions?.[id]?.name,
+      unlockWorks: () => definitions.terrain?.workDefinitions?.[id]?.name,
+      unlockPolicies: () => definitions.tech?.policyDefinitions?.[id]?.name,
+    };
+    try {
+      return tables[key]?.() || String(id);
+    } catch (error) {
+      return String(id);
+    }
+  }
+
+  /**
+   * 格式化单条效果。此前直接 String(value)，于是 yieldBonus / flatYield 这类
+   * 资源映射会印成 [object Object]，unlock* 会把内部 id 抛给玩家——
+   * 62 条科技/政权/政策定义全部走这条路径。
+   */
+  function FormatEffectValue(key, value) {
+    if (typeof value === "boolean") return value ? "是" : "否";
+    if (typeof value === "number") {
+      const percentKeys = new Set([
+        "yieldBonus", "massGrowth", "populationGrowth", "cadreGrowth", "unrestDecay", "exposureDecay",
+        "combatAmbush", "combatAttack", "combatDefence", "captureRate", "healRate", "buildSpeed",
+        "sabotageBonus", "siegeBonus", "upkeepDiscount", "seizureResist", "civilianShelter",
+      ]);
+      if (percentKeys.has(key)) return `${value > 0 ? "+" : ""}${Math.round(value * 100)}%`;
+      return FormatSigned(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map((id) => ResolveUnlockName(key, id)).join("、") || "—";
+    }
+    if (value && typeof value === "object") {
+      const parts = [];
+      for (const [resource, amount] of Object.entries(value)) {
+        const number = Number(amount) || 0;
+        if (!number) continue;
+        const name = resourceShortLabels[resource] ?? resource;
+        const isRatio = key === "yieldBonus";
+        parts.push(`${name} ${number > 0 ? "+" : ""}${isRatio ? `${Math.round(number * 100)}%` : number}`);
+      }
+      return parts.join(" · ") || "—";
+    }
+    return String(value);
+  }
+
   function DescribeEffects(effects) {
     const rows = [];
     for (const name of Object.keys(effects || {})) {
       const value = effects[name];
       if (value === null || value === undefined) continue;
+      if (Array.isArray(value) && !value.length) continue;
       rows.push({
-        label: name,
-        value: typeof value === "number" ? FormatSigned(value) : String(value),
+        label: effectLabels[name] ?? name,
+        value: FormatEffectValue(name, value),
         tone: typeof value === "number" ? ToneForDelta(value) : "flat",
       });
     }
@@ -3077,7 +3164,7 @@ export function CreateUi(root, hooks = {}) {
       const list = El("div", "pf-intel-list", { parent: body });
       for (const enemy of enemies) {
         const row = El("div", "pf-intel-row", { parent: list });
-        El("span", "pf-intel-name", { text: enemy.name || enemy.type || "不明部队", parent: row });
+        El("span", "pf-intel-name", { text: EnemyUnitName(enemy), parent: row });
         El("span", "pf-intel-intent", { text: IntentName(enemy.intent), parent: row });
         El("span", "pf-intel-where", { text: enemy.key ? FormatHexCoord(enemy.key) : "位置不明", parent: row });
         const strength = El("span", "pf-intel-strength", {
@@ -3140,6 +3227,12 @@ export function CreateUi(root, hooks = {}) {
   }
 
   /** 敌军意图键（由 Script_Ai 写入 enemy.intent）→ 中文。 */
+  /** 敌方部队中文名：优先查定义表，查不到给中性描述，不暴露内部 key。 */
+  function EnemyUnitName(enemy) {
+    const named = definitions.units?.unitDefinitions?.[enemy?.type]?.name;
+    return named || enemy?.name || "不明部队";
+  }
+
   function IntentName(intent) {
     const names = {
       Patrol: "巡逻",
@@ -3151,8 +3244,11 @@ export function CreateUi(root, hooks = {}) {
       Garrison: "驻守",
       Withdraw: "回撤",
       Escort: "护运",
+      Pacify: "宣抚",
+      Stage: "集结",
     };
-    return names[intent] || (intent ? String(intent) : "意图不明");
+    // 兜底一律给中文，绝不把内部 key 抛给玩家。
+    return names[intent] || "意图不明";
   }
 
   function StrongholdName(type) {
