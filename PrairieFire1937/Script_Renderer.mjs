@@ -78,32 +78,31 @@ const terrainHeightLift = Object.freeze({
   Loess: 0.03, Plain: 0.0, Marsh: -0.08, River: -0.26,
 });
 
-/** 画质分级：真实切换阴影、后处理链、几何细节与像素比。 */
+/**
+ * 单一画质档。
+ *
+ * 这里原本有 low / medium / high / ultra 四档，也就是四条各自独立的渲染路径
+ * （不同的 pass 链、不同的 shader define 组合）。实际只有 high 被持续验证过，
+ * 而 ultra 独有的 CSM 会让地形的片元着色器编译失败（`directionalLights[]`
+ * 数组越界），three 拿不到程序就整块不画——页面看起来在正常运行，地图却是空的。
+ * 这种问题只在没被验证的那条路径上出现，而分档本身就是在制造这种路径。
+ *
+ * 因此只保留一条渲染路径：所有设备用同一套 shader、同一条 pass 链。
+ * 设备差异只通过 pixelRatio 与粒子上限调节——这两项不改变 shader 编译结果，
+ * 因而不会引入未验证的分支。
+ */
+const singleQualityProfile = Object.freeze({
+  pixelRatioCap: 1.6, shadows: true, csm: false, cascades: 0, shadowMapSize: 2048,
+  composer: true, bloom: true, bloomTaps: 14, ssaa: false, skyClouds: true,
+  terrainDetail: 1.0, bumpStrength: 0.90, waterDetail: 1.0, fogClouds: true,
+  anisotropy: 8, maxParticles: 1600, csmMaxFar: 70, shadowSpan: 26,
+});
+
 const qualityProfiles = Object.freeze({
-  low: {
-    pixelRatioCap: 1.0, shadows: false, csm: false, cascades: 0, shadowMapSize: 512,
-    composer: false, bloom: false, bloomTaps: 8, ssaa: false, skyClouds: false,
-    terrainDetail: 0.35, bumpStrength: 0.45, waterDetail: 0.0, fogClouds: false,
-    anisotropy: 1, maxParticles: 220, csmMaxFar: 40, shadowSpan: 16,
-  },
-  medium: {
-    pixelRatioCap: 1.25, shadows: true, csm: false, cascades: 1, shadowMapSize: 1024,
-    composer: true, bloom: false, bloomTaps: 8, ssaa: false, skyClouds: true,
-    terrainDetail: 0.7, bumpStrength: 0.70, waterDetail: 0.6, fogClouds: true,
-    anisotropy: 4, maxParticles: 700, csmMaxFar: 55, shadowSpan: 20,
-  },
-  high: {
-    pixelRatioCap: 1.6, shadows: true, csm: false, cascades: 0, shadowMapSize: 2048,
-    composer: true, bloom: true, bloomTaps: 14, ssaa: false, skyClouds: true,
-    terrainDetail: 1.0, bumpStrength: 0.90, waterDetail: 1.0, fogClouds: true,
-    anisotropy: 8, maxParticles: 1600, csmMaxFar: 70, shadowSpan: 26,
-  },
-  ultra: {
-    pixelRatioCap: 2.0, shadows: true, csm: true, cascades: 2, shadowMapSize: 2048,
-    composer: true, bloom: true, bloomTaps: 22, ssaa: true, skyClouds: true,
-    terrainDetail: 1.0, bumpStrength: 1.00, waterDetail: 1.0, fogClouds: true,
-    anisotropy: 16, maxParticles: 3200, csmMaxFar: 110, shadowSpan: 30,
-  },
+  low: singleQualityProfile,
+  medium: singleQualityProfile,
+  high: singleQualityProfile,
+  ultra: singleQualityProfile,
 });
 
 /**
@@ -2682,8 +2681,14 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
     const width = canvas.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 1280);
     const height = canvas.clientHeight || (typeof window !== "undefined" ? window.innerHeight : 720);
     if (!width || !height) return;
+    // 只有一条渲染路径，设备差异全部由像素比吸收——它不改变 shader 编译结果，
+    // 因此不会像分档那样制造未经验证的分支。窄屏与低核心数机器再降一档。
     const devicePixelRatio = typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1;
-    renderer.setPixelRatio(Math.min(devicePixelRatio, profile.pixelRatioCap));
+    const cores = typeof navigator !== "undefined" ? (navigator.hardwareConcurrency || 4) : 4;
+    let cap = profile.pixelRatioCap;
+    if (width < 820 || cores <= 4) cap = Math.min(cap, 1.0);
+    else if (width < 1400) cap = Math.min(cap, 1.3);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, cap));
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
