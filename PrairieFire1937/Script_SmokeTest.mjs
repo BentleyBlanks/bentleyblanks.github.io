@@ -1144,6 +1144,155 @@ Test("命名规范：文件名使用类别前缀且无连字符", () => {
   }
 });
 
+Section("八 · 活性与协同接线回归");
+
+Test("历史事件账本量纲：单项 ≤ 1000，杜绝史实万斤级常数混入系统账本", () => {
+  for (const event of DataHistory.historicalEvents) {
+    for (const option of event.options ?? []) {
+      for (const [key, value] of Object.entries(option.ledger ?? {})) {
+        assert.ok(Number(value) <= 1000, `${event.id}/${option.id} 的 ${key}=${value} 超出系统量级`);
+        assert.ok(Number(value) >= 0, `${event.id}/${option.id} 的 ${key}=${value} 为负（账本只进不退）`);
+      }
+    }
+  }
+});
+
+Test("暴露度衰减单一来源：第 1 回合结束后不归零，且敌情通报就位", () => {
+  let state = Rules.CreateInitialState({ seed: 1937, difficulty: "Normal" });
+  state = Rules.EndTurn(state).nextState;
+  assert.ok(state.exposure > 0, `第 1 回合后 exposure=${state.exposure}，双重衰减疑似回归`);
+  assert.ok(state.enemyReadout && state.enemyReadout.doctrine, "state.enemyReadout.doctrine 缺失");
+});
+
+Test("消极局也有治安战：扫荡≥2、机动敌军峰值≥4、辎重队上路、铁壁合围必触发", () => {
+  let state = Rules.CreateInitialState({ seed: 1937, difficulty: "Normal" });
+  let peak = state.enemies.length;
+  let sawConvoy = false;
+  for (let i = 0; i < 32; i++) {
+    state = Rules.EndTurn(state).nextState;
+    peak = Math.max(peak, state.enemies.length);
+    sawConvoy = sawConvoy || state.enemies.some((enemy) => enemy.type === "SupplyColumn");
+    // 模拟 autoplay 的默认选项路径，让 forceSweep 等事件效果真实生效。
+    if (state.events.pending) {
+      const event = DataHistory.historicalEvents.find((item) => item.id === state.events.pending);
+      if (event) state = Rules.ApplyEventChoice(state, event.id, event.options?.[0]?.id);
+    }
+  }
+  const sweeps = state.aiMemory?.sweepTurns ?? [];
+  assert.ok(sweeps.length >= 2, `全程扫荡仅 ${sweeps.length} 次`);
+  assert.ok(peak >= 4, `机动敌军峰值仅 ${peak}`);
+  assert.ok(sawConvoy, "整局未见 SupplyColumn 辎重队");
+  assert.ok(state.events.fired.includes("GreatSweep"), "铁壁合围（GreatSweep）未触发");
+});
+
+Test("协同接线：友邻支援提升胜率、对侧合击有旗标、隐蔽出击即夜袭", () => {
+  const initial = Rules.CreateInitialState({ seed: 1937, difficulty: "Normal" });
+  // 找一个敌人与一对「对侧」空邻格：攻击者与支援者分居目标两侧。
+  let placed = null;
+  for (const enemy of initial.enemies) {
+    const ring = HexNeighborKeys(enemy.key);
+    for (let i = 0; i < 3 && !placed; i++) {
+      const a = ring[i];
+      const b = ring[(i + 3) % 6];
+      const ok = (key) =>
+        initial.map.hexes[key] && !Rules.GetStrongholdAt(initial, key) && !Rules.GetEnemiesAt(initial, key).length;
+      if (ok(a) && ok(b)) placed = { enemy, a, b };
+    }
+    if (placed) break;
+  }
+  assert.ok(placed, "找不到可布置合击的敌人邻格组合");
+
+  // 远置点：把无关单位挪出支援半径，保证「孤军」真的孤军。
+  const farKey = initial.map.order.find(
+    (key) =>
+      initial.map.hexes[key] &&
+      !Rules.GetStrongholdAt(initial, key) &&
+      !Rules.GetEnemiesAt(initial, key).length &&
+      HexDistanceKeys(key, placed.a) >= 6 &&
+      HexDistanceKeys(key, placed.b) >= 6,
+  );
+  assert.ok(farKey, "找不到远置格");
+
+  const Arrange = (withSupport) => {
+    const state = Rules.CloneState(initial);
+    const attacker = state.units[0];
+    const supporter = state.units[1];
+    for (const unit of state.units) {
+      if (unit.id !== attacker.id) unit.key = farKey;
+    }
+    attacker.key = placed.a;
+    attacker.hidden = true;
+    attacker.acted = false;
+    if (withSupport) {
+      supporter.key = placed.b;
+      supporter.hidden = true;
+    }
+    return { state, attacker };
+  };
+
+  const solo = Arrange(false);
+  const pair = Arrange(true);
+  const previewSolo = Rules.GetActionPreview(solo.state, { kind: "Attack", unitId: solo.attacker.id, targetKey: placed.enemy.key });
+  const previewPair = Rules.GetActionPreview(pair.state, { kind: "Attack", unitId: pair.attacker.id, targetKey: placed.enemy.key });
+  assert.ok(previewSolo?.valid && previewPair?.valid, "攻击预览不可用");
+  assert.equal(previewSolo.supportCount, 0, "孤军预览的 supportCount 应为 0");
+  assert.ok(previewPair.supportCount >= 1, "合击预览未计入支援者");
+  assert.equal(previewPair.flank, true, "对侧支援未触发合击旗标");
+  assert.ok(previewPair.odds > previewSolo.odds, `合击胜率 ${previewPair.odds} 未高于孤军 ${previewSolo.odds}`);
+  assert.ok(typeof previewPair.supportLabel === "string" && previewPair.supportLabel.length > 0, "supportLabel 缺失");
+  assert.equal(previewSolo.night, true, "隐蔽出击应视为夜袭");
+
+  const exposed = Arrange(false);
+  exposed.attacker.hidden = false;
+  const previewExposed = Rules.GetActionPreview(exposed.state, { kind: "Attack", unitId: exposed.attacker.id, targetKey: placed.enemy.key });
+  assert.equal(previewExposed.night, false, "暴露状态不应享受夜袭");
+  assert.ok(previewExposed.odds < previewSolo.odds, "失去隐蔽/夜袭后胜率应下降");
+});
+
+Test("平毁封锁闭环：动作可列出、执行后 blockade 归零且付出暴露代价", () => {
+  const state = Rules.CloneState(Rules.CreateInitialState({ seed: 1937, difficulty: "Normal" }));
+  const unit = state.units[0];
+  state.map.hexes[unit.key].blockade = 2;
+  const actions = Rules.ListContextActions(state, unit.id, unit.key);
+  const clear = actions.find((action) => action.kind === "ClearBlockade");
+  assert.ok(clear, "封锁格上未列出「平毁封锁」");
+  assert.ok(clear.enabled !== false, `平毁封锁不可用：${clear.reason ?? ""}`);
+  const outcome = Rules.PerformAction(state, clear);
+  assert.equal(outcome.report.ok, true, "平毁封锁执行失败");
+  assert.equal(outcome.nextState.map.hexes[unit.key].blockade, 0, "blockade 未清除");
+  assert.ok(outcome.nextState.exposure > state.exposure, "平毁封锁应付出暴露度代价");
+});
+
+Test("破袭列出即可打：带撤退路线，且执行不被结算条件打回", () => {
+  const initial = Rules.CreateInitialState({ seed: 1937, difficulty: "Normal" });
+  const state = Rules.CloneState(initial);
+  const target = state.map.order.find((key) => {
+    const hex = state.map.hexes[key];
+    if (!hex || (!hex.railway && !(hex.road >= 1))) return false;
+    if (Rules.GetStrongholdAt(state, key)) return false;
+    return HexNeighborKeys(key).some(
+      (nk) => state.map.hexes[nk] && !Rules.GetStrongholdAt(state, nk) && !Rules.GetEnemiesAt(state, nk).length,
+    );
+  });
+  assert.ok(target, "地图上找不到可测试的铁路/公路格");
+  const perch = HexNeighborKeys(target).find(
+    (nk) => state.map.hexes[nk] && !Rules.GetStrongholdAt(state, nk) && !Rules.GetEnemiesAt(state, nk).length,
+  );
+  const unit = state.units.find((item) => {
+    const stats = Rules.GetUnitStats(item.type);
+    return stats.abilities.includes("Sabotage");
+  });
+  assert.ok(unit, "初始部队中没有可破袭的单位");
+  unit.key = perch;
+  unit.acted = false;
+  const actions = Rules.ListContextActions(state, unit.id, target);
+  const sabotage = actions.find((action) => action.kind === "Sabotage" && action.enabled !== false);
+  assert.ok(sabotage, "相邻铁路/公路未列出可用破袭");
+  assert.ok(sabotage.withdrawKey || (sabotage.withdrawOptions ?? []).length, "破袭动作缺撤退路线");
+  const outcome = Rules.PerformAction(state, sabotage);
+  assert.equal(outcome.report.ok, true, `破袭被结算条件打回：${outcome.report.reason ?? ""}`);
+});
+
 // ---------------------------------------------------------------------------
 console.log(`\n${"─".repeat(56)}`);
 const passed = results.filter((item) => item.passed).length;
