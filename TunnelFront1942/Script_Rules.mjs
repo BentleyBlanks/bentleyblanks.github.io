@@ -312,6 +312,11 @@ export function CreateInitialState(options = {}) {
       exitKey: null,
       delayed: false,
       waitingForSignal: false,
+      launchTurn: null,
+      launchOrder: null,
+      trafficDelays: 0,
+      lastTrafficDelayTileKey: null,
+      exitArrivalTurn: null,
     })),
     tiles,
     tunnels: {
@@ -366,6 +371,7 @@ export function CreateInitialState(options = {}) {
     decoyDiversions: 0,
     usedDecoyIds: [],
     lastEvacuationLaunchTurn: 0,
+    civilianLaunchSerial: 1,
     lastTraceTileKey: "6,2",
     routePath: "undecided",
     outcome: null,
@@ -534,6 +540,64 @@ export function GetDecoyTargets(state, unitId) {
   ));
 }
 
+function StableSeedRank(seed, targetKey, enemyId) {
+  const text = `${seed}|${targetKey}|${enemyId}`;
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function EnemyHasPriorityCommitment(state, enemy) {
+  if (
+    (enemy.inactiveUntilTurn ?? 0) > state.turn
+    || (enemy.stunnedUntilTurn ?? 0) >= state.turn
+  ) {
+    return true;
+  }
+  if (state.warnings.some((warning) => (
+    !warning.resolved && warning.enemyId === enemy.enemyId
+  ))) {
+    return true;
+  }
+  return state.units.some((unit) => (
+    IsAlive(unit)
+    && unit.layer === LayerIds.SURFACE
+    && HexDistance(unit.tileKey, enemy.tileKey) === 1
+  ));
+}
+
+export function GetDecoyResponder(state, targetKey) {
+  if (!state.tiles[targetKey]) {
+    return null;
+  }
+  const candidates = state.enemies
+    .filter(IsAlive)
+    .filter((enemy) => !EnemyHasPriorityCommitment(state, enemy))
+    .map((enemy) => ({
+      enemy,
+      distance: HexDistance(enemy.tileKey, targetKey),
+    }))
+    .filter(({ distance }) => distance <= 5)
+    .sort((first, second) => (
+      first.distance - second.distance
+      || (first.enemy.role === "Patrol" ? 0 : 1) - (second.enemy.role === "Patrol" ? 0 : 1)
+      || StableSeedRank(state.seed, targetKey, first.enemy.enemyId)
+        - StableSeedRank(state.seed, targetKey, second.enemy.enemyId)
+      || first.enemy.enemyId.localeCompare(second.enemy.enemyId)
+    ));
+  if (!candidates.length) {
+    return null;
+  }
+  return {
+    enemyId: candidates[0].enemy.enemyId,
+    name: candidates[0].enemy.name,
+    distance: candidates[0].distance,
+  };
+}
+
 export function GetEvacuationTargets(state, unitId) {
   const unit = GetUnit(state, unitId);
   if (
@@ -555,6 +619,24 @@ export function GetEvacuationTargets(state, unitId) {
     return [];
   }
   return paths.map((entry) => entry.exitKey);
+}
+
+export function GetCivilianTransitEstimate(state, groupId, exitKey) {
+  const group = state.civilians.find((entry) => entry.groupId === groupId);
+  const route = FindEvacuationPaths(state).find((entry) => entry.exitKey === exitKey);
+  if (!group || !route) {
+    return null;
+  }
+  const routeSegments = Math.max(0, route.path.length - 1);
+  const moveSteps = Math.max(1, group.moveSteps ?? 2);
+  return {
+    groupId,
+    exitKey,
+    routeSegments,
+    moveSteps,
+    trafficLoad: group.trafficLoad ?? 1,
+    earliestSafeTurn: state.turn + Math.floor(routeSegments / moveSteps),
+  };
 }
 
 export function GetReconTargets(state, unitId) {
@@ -853,6 +935,7 @@ function ApplyDig(state, unit, targetKey) {
       group.pathIndex = 0;
       group.exitKey = reroute.exitKey;
       group.delayed = false;
+      group.exitArrivalTurn = null;
       AddLog(state, "good", `${group.name}所在塌方段已抢通，改向${state.tiles[reroute.exitKey].name}。`);
     }
   }
@@ -986,6 +1069,7 @@ function ApplyDecoy(state, unit, targetKey) {
   }
   SpendAction(unit);
   state.organization -= 1;
+  const responder = GetDecoyResponder(state, targetKey);
   const decoyId = `Decoy${state.eventSerial}`;
   state.decoys.push({
     decoyId,
@@ -993,17 +1077,21 @@ function ApplyDecoy(state, unit, targetKey) {
     strength: 0.95,
     createdTurn: state.turn,
     expiresTurn: state.turn + 4,
+    claimedEnemyId: responder?.enemyId ?? null,
   });
   const evidence = AddEvidence(state, "Decoy", targetKey, 0.95, unit.shortName);
   state.decoys.at(-1).evidenceId = evidence.evidenceId;
   evidence.expiresTurn = state.turn + 4;
+  evidence.claimedEnemyId = responder?.enemyId ?? null;
   state.exposure = Clamp(state.exposure - 8, 0, 100);
   state.decoysUsed += 1;
   state.lastTraceTileKey = targetKey;
   AddLog(
     state,
     "good",
-    `${unit.shortName}在${state.tiles[targetKey].name}布下假脚印，掩去真实行迹并把搜索引向这里。`,
+    responder
+      ? `${unit.shortName}在${state.tiles[targetKey].name}布下假脚印；预计${responder.name}（距 ${responder.distance} 格）会在下次规划时响应。`
+      : `${unit.shortName}在${state.tiles[targetKey].name}布下假脚印，但五格内没有可响应敌军，假迹可能自然落空。`,
   );
   return { ok: true };
 }
@@ -1124,13 +1212,19 @@ function ApplyEvacuate(state, unit, exitKey, groupId = null) {
   group.pathIndex = 0;
   group.tileKey = route.path[0];
   group.exitKey = exitKey;
+  group.launchTurn = state.turn;
+  group.launchOrder = state.civilianLaunchSerial ?? 1;
+  group.trafficDelays = 0;
+  group.lastTrafficDelayTileKey = null;
+  group.exitArrivalTurn = null;
+  state.civilianLaunchSerial = (state.civilianLaunchSerial ?? 1) + 1;
   state.lastEvacuationLaunchTurn = state.turn;
   state.organization -= 1;
   SpendAction(unit);
   AddLog(
     state,
     "good",
-    `${group.name}开始沿${state.tiles[exitKey].name}路线转移。群众每回合前进两段。`,
+    `${group.name}第 ${group.launchOrder} 批沿${state.tiles[exitKey].name}路线转移：每回合 ${group.moveSteps ?? 2} 段，通行负载 ${group.trafficLoad ?? 1}。`,
   );
   return { ok: true };
 }
@@ -1228,6 +1322,9 @@ export function CollectEnemyObservations(state) {
       createdTurn: evidence.createdTurn,
       expiresTurn: evidence.expiresTurn,
       source: evidence.source,
+      ...(Object.hasOwn(evidence, "claimedEnemyId")
+        ? { claimedEnemyId: evidence.claimedEnemyId }
+        : {}),
     }));
 }
 
@@ -1283,6 +1380,11 @@ function ChooseEvidenceTarget(state, enemy, claimedEvidenceIds = new Set()) {
     .filter((entry) => entry.kind !== "KnownEntrance")
     .filter((entry) => !claimedEvidenceIds.has(entry.evidenceId))
     .filter((entry) => entry.kind !== "Decoy" || !state.usedDecoyIds.includes(entry.evidenceId))
+    .filter((entry) => (
+      entry.kind !== "Decoy"
+      || !Object.hasOwn(entry, "claimedEnemyId")
+      || entry.claimedEnemyId === enemy.enemyId
+    ))
     .filter((entry) => (
       enemy.role !== "Patrol"
       || [
@@ -1590,10 +1692,13 @@ function DefenseAnswersIntent(defenseWarningId, defenseEnemyId, enemy, warningId
   if (!defenseWarningId && !defenseEnemyId) {
     return true;
   }
-  return defenseWarningId === warningId && defenseEnemyId === enemy.enemyId;
+  if (defenseEnemyId !== enemy.enemyId) {
+    return false;
+  }
+  return defenseWarningId === warningId || warningId === null;
 }
 
-function TriggerEntranceDefense(state, enemy, targetKey, warningId) {
+function TriggerEntranceDefense(state, enemy, targetKey, warningId, actionContext = "entry") {
   const node = state.tunnels[targetKey];
   if (!node) {
     return false;
@@ -1602,6 +1707,7 @@ function TriggerEntranceDefense(state, enemy, targetKey, warningId) {
     node.trap
     && DefenseAnswersIntent(node.trapWarningId, node.trapEnemyId, enemy, warningId)
   ) {
+    const reservedWarningId = node.trapWarningId;
     node.trap = false;
     node.trapWarningId = null;
     node.trapEnemyId = null;
@@ -1616,8 +1722,10 @@ function TriggerEntranceDefense(state, enemy, targetKey, warningId) {
     AddLog(
       state,
       "good",
-      `${state.tiles[targetKey].name}洞口陷阱中断了${enemy.name}的行动。`,
-      warningId,
+      reservedWarningId && actionContext === "attack" && IsAlive(enemy)
+        ? `${state.tiles[targetKey].name}洞口陷阱截断了${enemy.name}的本次攻击；原封洞/灌烟预警仍待处理。`
+        : `${state.tiles[targetKey].name}洞口陷阱中断了${enemy.name}的行动。`,
+      warningId ?? reservedWarningId,
     );
     return true;
   }
@@ -1773,7 +1881,7 @@ function ResolveEnemyIntent(state, enemy) {
       ) {
         if (
           state.tiles[unit.tileKey]?.hasEntrance
-          && TriggerEntranceDefense(state, enemy, unit.tileKey, null)
+          && TriggerEntranceDefense(state, enemy, unit.tileKey, null, "attack")
         ) {
           break;
         }
@@ -1934,11 +2042,17 @@ function ResolveCracksAndSmoke(state) {
 
 function AdvanceCivilians(state) {
   const trafficByTile = new Map();
-  for (const group of state.civilians) {
-    if (group.status !== "Moving") {
-      continue;
-    }
-    let steps = 2;
+  const movingGroups = state.civilians
+    .filter((group) => group.status === "Moving")
+    .sort((first, second) => (
+      (first.launchOrder ?? Number.MAX_SAFE_INTEGER)
+        - (second.launchOrder ?? Number.MAX_SAFE_INTEGER)
+      || (first.launchTurn ?? Number.MAX_SAFE_INTEGER)
+        - (second.launchTurn ?? Number.MAX_SAFE_INTEGER)
+      || first.groupId.localeCompare(second.groupId)
+    ));
+  for (const group of movingGroups) {
+    let steps = Math.max(1, group.moveSteps ?? 2);
     group.delayed = false;
     group.waitingForSignal = false;
     const plannedWindow = GetExitWindow(state, group.exitKey);
@@ -1951,6 +2065,7 @@ function AdvanceCivilians(state) {
         group.pathIndex = 0;
         group.exitKey = alternate.exitKey;
         group.delayed = true;
+        group.exitArrivalTurn = null;
         AddLog(
           state,
           "good",
@@ -1971,6 +2086,7 @@ function AdvanceCivilians(state) {
             group.pathIndex = 0;
             group.exitKey = alternate.exitKey;
             group.delayed = true;
+            group.exitArrivalTurn = null;
             AddLog(
               state,
               "warning",
@@ -1986,6 +2102,7 @@ function AdvanceCivilians(state) {
         if (windowState.status !== "Clear") {
           group.delayed = true;
           group.waitingForSignal = true;
+          group.exitArrivalTurn ??= state.turn;
           if (group.lastWindowWaitTurn !== state.turn) {
             group.lastWindowWaitTurn = state.turn;
             AddLog(
@@ -2010,6 +2127,7 @@ function AdvanceCivilians(state) {
           group.path = reroute.path;
           group.pathIndex = 0;
           group.exitKey = reroute.exitKey;
+          group.exitArrivalTurn = null;
           AddLog(state, "warning", `${group.name}因塌方改走${state.tiles[reroute.exitKey].name}支线。`);
           continue;
         }
@@ -2019,18 +2137,21 @@ function AdvanceCivilians(state) {
         AddLog(state, "danger", `${group.name}前方地道中断，被困在地下。`);
         break;
       }
-      const capacity = node.braced ? 2 : 1;
+      const capacity = node.braced ? 3 : 2;
+      const trafficLoad = group.trafficLoad ?? 1;
       const usedCapacity = trafficByTile.get(nextKey) ?? 0;
-      if (usedCapacity >= capacity) {
+      if (usedCapacity + trafficLoad > capacity) {
         group.delayed = true;
+        group.trafficDelays = (group.trafficDelays ?? 0) + 1;
+        group.lastTrafficDelayTileKey = nextKey;
         AddLog(
           state,
           "warning",
-          `${group.name}在${state.tiles[group.tileKey].name}等待：前方生土地道本回合通行量已满。`,
+          `${group.name}在${state.tiles[group.tileKey].name}等待：前方容量 ${capacity}，已占 ${usedCapacity}，本批还需 ${trafficLoad}。先发批次优先通行。`,
         );
         break;
       }
-      trafficByTile.set(nextKey, usedCapacity + 1);
+      trafficByTile.set(nextKey, usedCapacity + trafficLoad);
       group.pathIndex = nextIndex;
       group.tileKey = nextKey;
       if (node.cracked && !node.braced && node.dugTurn < state.turn) {
@@ -2056,14 +2177,17 @@ function ApplyVillagePressure(state) {
   const waitingPeople = state.civilians
     .filter((group) => group.status === "Waiting")
     .reduce((sum, group) => sum + group.people, 0);
+  const waitingPressure = state.civilians
+    .filter((group) => group.status === "Waiting")
+    .reduce((sum, group) => sum + (group.pressureWeight ?? 1), 0);
   if (state.sweepActive && nearbyEnemies > 0 && waitingPeople > 0) {
-    const harm = Math.min(8, nearbyEnemies * 2 + Math.ceil(waitingPeople / 3));
+    const harm = Math.min(8, nearbyEnemies * 2 + Math.ceil(waitingPressure / 2));
     state.peopleSafety = Math.max(0, state.peopleSafety - harm);
     state.lastFailureCause = {
       failureId: "VillageEncircled",
       warningId: null,
-      text: `扫荡队逼近赵庄，仍在等待的 ${waitingPeople} 名群众承受封锁压力。`,
-      tip: "尽早接通出口并分批疏散，或用假迹把搜索组拉离赵庄。",
+      text: `扫荡队逼近赵庄，仍在等待的 ${waitingPeople} 名群众承受封锁压力；家属组的照护负担会放大留村风险。`,
+      tip: "最迟在第 4 回合发出首批；可优先转移家属降低留村风险，或由民兵布置假迹把搜索组拉离赵庄。",
     };
     AddLog(state, "danger", state.lastFailureCause.text);
   }
@@ -2094,9 +2218,117 @@ function CountSafeCivilians(state) {
     .reduce((sum, group) => sum + group.people, 0);
 }
 
+function FindAliveUnitByRoles(state, roles) {
+  return state.units.find((unit) => IsAlive(unit) && roles.includes(unit.role)) ?? null;
+}
+
+function BuildReconMissingTip(state) {
+  const scout = GetUnit(state, "Scout");
+  if (!IsAlive(scout)) {
+    return "交通员已阵亡，本局无法补回开挖前的规划侦察；下一局第 1 回合先保住交通员，并在首次开挖前选择北枣窖或西南苇井完成走廊勘线。";
+  }
+  return "下一局第 1 回合让交通员执行【侦察】，选择北枣窖或西南苇井比较快掘/静掘走廊，再开始首次开挖。";
+}
+
+function DescribeCivilianBatch(group) {
+  const order = Number.isInteger(group?.launchOrder)
+    ? `第 ${group.launchOrder} 批`
+    : "该批";
+  const launch = Number.isInteger(group?.launchTurn)
+    ? `，T${group.launchTurn} 发车`
+    : "";
+  return `${order}（${group?.name ?? "群众"}${launch}，${group?.moveSteps ?? 2} 段/回合）`;
+}
+
+function BuildExitWindowTip(state, missedWindowGroup) {
+  const exitKey = missedWindowGroup.exitKey;
+  const scout = GetUnit(state, "Scout");
+  const defender = FindAliveUnitByRoles(state, ["Militia", "Guerrilla"]);
+  const connectedPaths = FindEvacuationPaths(state);
+  const exitName = state.tiles[exitKey]?.name ?? "目标出口";
+  const batch = DescribeCivilianBatch(missedWindowGroup);
+  const arrivalTurn = missedWindowGroup.exitArrivalTurn ?? Math.max(1, state.turn - 1);
+  const alternate = connectedPaths.find((entry) => entry.exitKey !== exitKey);
+  const actionActor = defender?.shortName ?? "幸存行动组";
+  const decoyStatus = state.decoyDiversions > 0
+    ? "假迹已经消耗；"
+    : `可先让${actionActor}布置假迹；`;
+  const response = alternate
+    ? `若窗口受压，让${actionActor}压制、设陷阱或伏击，也可改走已接通的${state.tiles[alternate.exitKey].name}`
+    : connectedPaths.length === 1
+      ? `当前仅接通${state.tiles[connectedPaths[0].exitKey].name}，不存在可立即改走的备用出口；让${actionActor}在批次到达前一回合压制、设陷阱或伏击`
+      : `当前没有从赵庄连通的出口；下一局最迟第 4 回合先接通主线，再让${actionActor}保护窗口`;
+  if (!IsAlive(scout)) {
+    return `${batch}已于 T${arrivalTurn} 到达${exitName}下方，但交通员已阵亡，本局无法补发安全信号；下一局须保住交通员，并在该批预计到达前一回合完成出口复查。${decoyStatus}${response}。`;
+  }
+  return `${batch}已于 T${arrivalTurn} 到达${exitName}下方；下一局让交通员在该批预计到达前一回合从${exitName}上浮并复查。${decoyStatus}${response}。`;
+}
+
+function BuildIncompleteEvacuationTip(state, waitingGroups, missingPeople) {
+  const connectedPaths = FindEvacuationPaths(state);
+  const route = connectedPaths[0] ?? null;
+  const nextGroup = waitingGroups
+    .map((group) => ({
+      group,
+      latestLaunchTurn: route
+        ? state.maxTurns - Math.floor(
+          Math.max(0, route.path.length - 1) / Math.max(1, group.moveSteps ?? 2),
+        )
+        : MissionConfig.evacuationTurn,
+    }))
+    .sort((first, second) => first.latestLaunchTurn - second.latestLaunchTurn)[0];
+  const actor = state.units.find((unit) => (
+    IsAlive(unit) && unit.layer === LayerIds.TUNNEL && unit.tileKey === "6,2"
+  )) ?? FindAliveUnitByRoles(state, ["Militia", "Guerrilla", "Digger", "Scout"]);
+  const timing = nextGroup
+    ? `下一局最迟 T${nextGroup.latestLaunchTurn} 由${actor?.shortName ?? "一名地下单位"}在赵庄发出${nextGroup.group.name}`
+    : `下一局最迟 T${MissionConfig.evacuationTurn} 由${actor?.shortName ?? "一名地下单位"}在赵庄继续发车`;
+  return `还差 ${missingPeople} 人；三批必须全部发车，不能把待命群众留作资源余量。${timing}，并在其到达前复查出口。`;
+}
+
+function BuildEvacuationLateTip(state) {
+  const waitingGroups = state.civilians.filter((group) => group.status === "Waiting");
+  if (waitingGroups.length) {
+    const missingPeople = MissionConfig.requiredEvacuees - CountSafeCivilians(state);
+    return BuildIncompleteEvacuationTip(state, waitingGroups, missingPeople);
+  }
+  const lateGroups = state.civilians
+    .filter((group) => ["Moving", "Trapped"].includes(group.status))
+    .sort((first, second) => (
+      (second.launchOrder ?? 0) - (first.launchOrder ?? 0)
+      || (first.moveSteps ?? 2) - (second.moveSteps ?? 2)
+    ));
+  const group = lateGroups[0];
+  if (!group) {
+    return "三批都必须在 T11 结束前进入安全状态；复盘最后一批的出口信号、封口与拥堵日志。";
+  }
+  const batch = DescribeCivilianBatch(group);
+  const exitName = state.tiles[group.exitKey]?.name ?? "目标出口";
+  const exitNode = state.tunnels[group.exitKey];
+  const collapsedKey = group.path
+    ?.slice(group.pathIndex ?? 0)
+    .find((tileKey) => state.tunnels[tileKey]?.collapsed) ?? null;
+  if (collapsedKey) {
+    return `${batch}被${state.tiles[collapsedKey]?.name ?? collapsedKey}塌方截住；下一局在该批进入前让地道队支护返沙段，或提前接通可改走的备用出口。`;
+  }
+  if (!exitNode || exitNode.sealed) {
+    return `${batch}到达${exitName}时洞口已封闭；下一局在该批抵达前由地道队抢通，或提前接通并保护备用出口。`;
+  }
+  if ((group.trafficDelays ?? 0) > 0) {
+    const delayTileName = state.tiles[group.lastTrafficDelayTileKey]?.name ?? "共用咽喉";
+    return `${batch}曾在${delayTileName}因拥堵等待 ${group.trafficDelays} 回合；下一局拉开发车间隔，或在重载批次经过前支护该咽喉，把容量从 2 提到 3。`;
+  }
+  const remainingSegments = Math.max(0, (group.path?.length ?? 1) - 1 - (group.pathIndex ?? 0));
+  if ((group.moveSteps ?? 2) === 1 && (group.launchOrder ?? 1) > 1) {
+    return `${batch}到天亮仍距${exitName} ${remainingSegments} 段；伤员每回合只能走 1 段，末发留不出封锁余量。下一局优先发出伤员，并支护出口咽喉让轻队并行。`;
+  }
+  return `${batch}到天亮仍距${exitName} ${remainingSegments} 段；下一局按速度倒排发车时点，把慢批提前，并在其到达前一回合复查出口。`;
+}
+
 export function EvaluateMission(state) {
   const survivingUnits = state.units.filter(IsAlive).length;
   const safePeople = CountSafeCivilians(state);
+  const allGroupsSafe = state.civilians.every((group) => group.status === "Safe");
   const hasUnresolvedLaunchedGroup = state.civilians.some((group) => (
     ["Moving", "Trapped"].includes(group.status)
   ));
@@ -2134,7 +2366,8 @@ export function EvaluateMission(state) {
     };
   }
   if (
-    safePeople >= MissionConfig.requiredEvacuees
+    safePeople === MissionConfig.requiredEvacuees
+    && allGroupsSafe
     && state.civiliansSafe === safePeople
     && !hasUnresolvedLaunchedGroup
     && state.tunnelsDug >= 1
@@ -2163,7 +2396,7 @@ export function EvaluateMission(state) {
         title: "路线通了，敌情却没有查清",
         summary: `虽已转移 ${safePeople}/${MissionConfig.totalEvacuees} 人，但首次开挖前没有选择主出口完成走廊勘线，无法证明路线基于当局敌情。`,
         failureId: "ReconMissing",
-        tip: "第一回合让交通员执行【侦察】，在地图上选择北枣窖或西南苇井，比较快掘/静掘走廊后再开挖。",
+        tip: BuildReconMissingTip(state),
         causeChain: state.eventLedger.slice(-6),
         peopleSafety: state.peopleSafety,
         survivingUnits,
@@ -2174,16 +2407,13 @@ export function EvaluateMission(state) {
     ));
     if (missedWindowGroup) {
       const windowState = GetExitWindow(state, missedWindowGroup.exitKey);
-      const counterplayTip = state.decoyDiversions > 0
-        ? "假迹已经消耗；改用压制、陷阱、伏击或备用出口接住后续压力"
-        : "若窗口受压，可先诱敌、压制，或改走另一出口";
       return {
         status: "Defeat",
         path: ClassifyRoute(state),
         title: "群众到了洞口，地面信号却没接上",
         summary: `${missedWindowGroup.name}停在${state.tiles[missedWindowGroup.exitKey].name}下方；${windowState.detail}。`,
         failureId: "ExitWindowMissed",
-        tip: `让交通员从${state.tiles[missedWindowGroup.exitKey].name}上浮并复查；${counterplayTip}。`,
+        tip: BuildExitWindowTip(state, missedWindowGroup),
         causeChain: state.eventLedger.slice(-6),
         peopleSafety: state.peopleSafety,
         survivingUnits,
@@ -2192,14 +2422,46 @@ export function EvaluateMission(state) {
         threatEnemyId: windowState.threatEnemyId,
       };
     }
+    const trappedGroup = state.civilians.find((group) => group.status === "Trapped");
+    if (trappedGroup && state.lastFailureCause?.failureId === "UnbracedCollapse") {
+      return {
+        status: "Defeat",
+        path: ClassifyRoute(state),
+        title: "返沙层切断了撤离纵线",
+        summary: state.lastFailureCause.text,
+        failureId: state.lastFailureCause.failureId,
+        tip: state.lastFailureCause.tip,
+        causeChain: state.eventLedger.slice(-6),
+        warningId: state.lastFailureCause.warningId,
+        peopleSafety: state.peopleSafety,
+        survivingUnits,
+        groupId: trappedGroup.groupId,
+      };
+    }
+    const waitingGroups = state.civilians.filter((group) => group.status === "Waiting");
+    if (!hasUnresolvedLaunchedGroup && safePeople < MissionConfig.requiredEvacuees && waitingGroups.length) {
+      const missingPeople = MissionConfig.requiredEvacuees - safePeople;
+      return {
+        status: "Defeat",
+        path: ClassifyRoute(state),
+        title: "还有一批没有发车",
+        summary: `仅安全转移 ${safePeople}/${MissionConfig.totalEvacuees} 人，还差 ${missingPeople} 人；${waitingGroups.map((group) => group.name).join("、")}仍在赵庄待命。`,
+        failureId: "EvacuationIncomplete",
+        tip: BuildIncompleteEvacuationTip(state, waitingGroups, missingPeople),
+        causeChain: state.eventLedger.slice(-6),
+        peopleSafety: state.peopleSafety,
+        survivingUnits,
+        missingPeople,
+        waitingGroupIds: waitingGroups.map((group) => group.groupId),
+      };
+    }
     return {
       status: "Defeat",
       path: ClassifyRoute(state),
       title: "天亮时封锁仍未穿过",
       summary: `仅转移 ${state.civiliansSafe}/${MissionConfig.totalEvacuees} 人，另有 ${movingPeople} 人仍在地下。`,
       failureId: "EvacuationLate",
-      tip: state.lastFailureCause?.tip
-        ?? "在第 3—4 回合接通第一出口，并用另一名地下单位立即组织第一批疏散。",
+      tip: BuildEvacuationLateTip(state),
       causeChain: state.eventLedger.slice(-6),
       peopleSafety: state.peopleSafety,
       survivingUnits,
@@ -2388,6 +2650,28 @@ export function DeserializeState(serialized) {
   if (!parsed || parsed.version !== 1) {
     throw new Error("Unsupported TunnelFront1942 save version");
   }
+  let legacyLaunchOrder = 1;
+  for (const group of parsed.civilians ?? []) {
+    const template = CivilianGroupTemplates.find((entry) => entry.groupId === group.groupId);
+    group.moveSteps ??= template?.moveSteps ?? 2;
+    group.trafficLoad ??= template?.trafficLoad ?? 1;
+    group.pressureWeight ??= template?.pressureWeight ?? 1;
+    group.logisticsNote ??= template?.logisticsNote ?? "标准转移批次";
+    group.trafficDelays ??= 0;
+    group.lastTrafficDelayTileKey ??= null;
+    if (group.status !== "Waiting" && group.launchOrder == null) {
+      group.launchOrder = legacyLaunchOrder;
+      legacyLaunchOrder += 1;
+    }
+    group.launchTurn ??= group.status === "Waiting" ? null : MissionConfig.evacuationTurn;
+    group.exitArrivalTurn ??= group.waitingForSignal
+      ? Math.max(group.launchTurn ?? MissionConfig.evacuationTurn, (parsed.turn ?? 1) - 1)
+      : null;
+  }
+  parsed.civilianLaunchSerial ??= Math.max(
+    1,
+    ...(parsed.civilians ?? []).map((group) => (group.launchOrder ?? 0) + 1),
+  );
   parsed.planningReconCompleted ??= parsed.reconActions > 0 && parsed.tunnelsDug === 0;
   if (parsed.planningReconCompleted && !parsed.plannedExitKey) {
     const connectedExit = FindEvacuationPaths(parsed)[0]?.exitKey ?? null;
@@ -2453,6 +2737,7 @@ export function CreateRulesApi() {
     GetDigTargets,
     GetAttackTargets,
     GetEvacuationTargets,
+    GetCivilianTransitEstimate,
     GetReconTargets,
     GetRouteSurvey,
     FindTunnelPath,
@@ -2460,6 +2745,7 @@ export function CreateRulesApi() {
     GetCombatPreview,
     GetObjectiveSummary,
     GetExitWindow,
+    GetDecoyResponder,
     CollectEnemyObservations,
     UpdateEnemyBeliefs,
     PlanEnemyTurn,

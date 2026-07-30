@@ -15,6 +15,8 @@ import {
   GetActionTargets,
   GetAvailableActions,
   GetCombatPreview,
+  GetCivilianTransitEstimate,
+  GetDecoyResponder,
   GetExitWindow,
   GetObjectiveSummary,
   GetRouteSurvey,
@@ -132,7 +134,7 @@ const ActionCopy = Object.freeze({
   },
   [ActionIds.EVACUATE]: {
     label: "组织疏散",
-    hint: "选安全出口 · 组织 1",
+    hint: "三批全撤 · 速度/负载各异",
   },
   [ActionIds.CLEAR_SEAL]: {
     label: "抢通封口",
@@ -853,7 +855,7 @@ function CivilianStatusLabel(group) {
     case "Moving":
       return group.waitingForSignal
         ? `${gameState.tiles[group.exitKey]?.name ?? "出口"}下方 · 等待信号`
-        : `地下转移 · ${group.tileKey}`;
+        : `第 ${group.launchOrder ?? "?"} 批 · 地下 ${group.tileKey}`;
     case "Trapped":
       return `被困 · ${group.tileKey}`;
     default:
@@ -944,6 +946,7 @@ function RenderHud() {
     <button type="button" data-group="${group.groupId}" class="civilianEntry ${group.status.toLowerCase()} ${group.groupId === selectedEvacGroupId ? "selected" : ""}" ${group.status === "Waiting" ? "" : "disabled"}>
       <b>${group.name} · ${group.people}人</b>
       <span>${CivilianStatusLabel(group)}</span>
+      <small>${group.moveSteps ?? 2} 段/回合 · 负载 ${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 已堵 ${group.trafficDelays} 回合` : ""}<br>${group.logisticsNote ?? "标准转移批次"}</small>
     </button>
   `).join("");
   for (const button of ui.CivilianLedger.querySelectorAll("[data-group]")) {
@@ -1095,12 +1098,14 @@ function BuildPreview(action) {
           ? "1 AP｜组织 1｜情报 +2｜暴露 -5｜每回合限一次；同一格须间隔一回合"
           : "1 AP｜情报 +2｜暴露 +1｜揭示半径 2",
       };
-    case ActionIds.DECOY:
+    case ActionIds.DECOY: {
+      const responder = GetDecoyResponder(gameState, action.targetKey);
       return {
         eyebrow: "欺骗预览",
         title: `在${tile.name}布置假迹`,
-        body: "1 AP｜组织 1｜暴露 -8｜假迹持续 4 回合；成功诱导会让搜索组浪费当次行动改道，但不会额外停摆",
+        body: `1 AP｜组织 1｜暴露 -8｜假迹持续 4 回合；${responder ? `预计响应：${responder.name}（距 ${responder.distance} 格，下次敌军规划时响应）` : "五格内没有可响应敌军，可能自然落空"}；成功诱导只浪费该敌军一次调查行动`,
       };
+    }
     case ActionIds.AMBUSH: {
       const warningReserved = gameState.warnings.some((warning) => (
         !warning.resolved
@@ -1156,10 +1161,13 @@ function BuildPreview(action) {
         .find((entry) => entry.exitKey === action.targetKey);
       const group = gameState.civilians.find((entry) => entry.groupId === action.groupId)
         ?? gameState.civilians.find((entry) => entry.status === "Waiting");
+      const estimate = group
+        ? GetCivilianTransitEstimate(gameState, group.groupId, action.targetKey)
+        : null;
       return {
         eyebrow: "群众转移预览",
         title: `让${group?.name ?? "下一批群众"}沿${gameState.tiles[action.targetKey].name}转移`,
-        body: `共 ${group?.people ?? "?"} 人｜1 AP｜组织 1｜路线 ${route?.path.length ?? "?"} 格｜当前出口：${GetExitWindow(gameState, action.targetKey).detail}；到达后须等交通员安全信号`,
+        body: `共 ${group?.people ?? "?"} 人｜1 AP｜组织 1｜${group?.moveSteps ?? "?"} 段/回合｜负载 ${group?.trafficLoad ?? "?"}｜路线 ${estimate?.routeSegments ?? Math.max(0, (route?.path.length ?? 1) - 1)} 段｜无拥堵且信号及时最早 T${estimate?.earliestSafeTurn ?? "?"} 安全撤出｜当前出口：${GetExitWindow(gameState, action.targetKey).detail}`,
       };
     }
     case ActionIds.CLEAR_SEAL:

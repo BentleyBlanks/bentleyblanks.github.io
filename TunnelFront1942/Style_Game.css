@@ -463,6 +463,14 @@ a:focus-visible {
   color: var(--muted);
 }
 
+.civilianEntry small {
+  grid-column: 1 / -1;
+  margin-top: 5px;
+  color: color-mix(in srgb, var(--muted) 88%, var(--cyan));
+  font-size: 10px;
+  line-height: 1.35;
+}
+
 .civilianEntry.safe {
   border-left: 3px solid var(--green);
 }

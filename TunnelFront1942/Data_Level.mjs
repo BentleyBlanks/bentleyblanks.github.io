@@ -4,7 +4,7 @@ export const MissionConfig = Object.freeze({
   maxTurns: 11,
   sweepTurn: 5,
   evacuationTurn: 4,
-  requiredEvacuees: 6,
+  requiredEvacuees: 8,
   totalEvacuees: 8,
   startingTools: 15,
   startingOrganization: 6,
@@ -284,9 +284,33 @@ export const EnemyTemplates = Object.freeze([
 ]);
 
 export const CivilianGroupTemplates = Object.freeze([
-  { groupId: "Wounded", name: "伤员与担架队", people: 3 },
-  { groupId: "Families", name: "两户乡亲", people: 2 },
-  { groupId: "Contacts", name: "交通站骨干", people: 3 },
+  {
+    groupId: "Wounded",
+    name: "伤员与担架队",
+    people: 3,
+    moveSteps: 1,
+    trafficLoad: 2,
+    pressureWeight: 2,
+    logisticsNote: "担架重载；支护咽喉可与轻队并行",
+  },
+  {
+    groupId: "Families",
+    name: "两户乡亲",
+    people: 2,
+    moveSteps: 2,
+    trafficLoad: 1,
+    pressureWeight: 4,
+    logisticsNote: "轻载稳行；留村时最怕封锁逼近",
+  },
+  {
+    groupId: "Contacts",
+    name: "交通站骨干",
+    people: 3,
+    moveSteps: 3,
+    trafficLoad: 2,
+    pressureWeight: 1,
+    logisticsNote: "快速重队；易追上前批形成拥堵",
+  },
 ]);
 
 export const BriefingPages = Object.freeze([
@@ -302,7 +326,7 @@ export const BriefingPages = Object.freeze([
   },
   {
     eyebrow: "胜利条件",
-    title: "十一回合内护送至少六人",
-    body: "至少完成一次地面侦察、新挖一段地道，并让 6/8 名群众在新鲜的出口安全信号中完成转移。未知窗口只会让群众等待，不会凭空造成伤害。杀敌不是任务目标。",
+    title: "十一回合内护送全部八人",
+    body: "至少完成一次规划侦察、新挖一段地道，并让三批共 8 人全部在新鲜的出口安全信号中完成转移。三批速度与负载不同：生土地道容量 2，支护段容量 3，发车顺序和咽喉支护都会改变到达时机。杀敌不是任务目标。",
   },
 ]);
