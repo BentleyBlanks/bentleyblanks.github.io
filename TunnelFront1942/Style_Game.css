@@ -1009,6 +1009,7 @@ kbd {
   background: rgba(25, 25, 21, 0.97);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
   font-size: 12px;
+  pointer-events: none;
 }
 
 @media (max-width: 1050px) {
@@ -1290,7 +1291,19 @@ kbd {
   }
 
   .toast {
-    bottom: 464px;
+    top: 154px;
+    left: 212px;
+    right: 7px;
+    bottom: auto;
+    max-width: none;
+    padding: 8px;
+    transform: none;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .gameShell.previewOpen .toast {
+    display: none;
   }
 
   .titleRule,
