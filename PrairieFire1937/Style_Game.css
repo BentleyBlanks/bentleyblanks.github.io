@@ -971,6 +971,8 @@
 .pf-plan-badge.is-night { color: #a8c0e0; border-color: rgba(168, 192, 224, 0.55); background: rgba(52, 74, 110, 0.32); }
 /* 情报不足时的"敌情不明"徽章：胜算只是猜测，配警戒色。 */
 .pf-plan-badge.is-foggy { color: var(--pf-warn); border-color: rgba(232, 183, 74, 0.6); background: rgba(232, 183, 74, 0.12); cursor: help; }
+/* 围困攒下的坑道作业：削工事是我方优势，配暖金。 */
+.pf-plan-badge.is-undermined { color: var(--pf-ochre-glow); border-color: var(--pf-ochre); background: rgba(200, 168, 106, 0.14); cursor: help; }
 .pf-plan-badge.is-flank { color: var(--pf-ochre-glow); border-color: var(--pf-ochre); background: rgba(200, 168, 106, 0.16); }
 .pf-plan-badge.is-backed { color: var(--pf-good); border-color: rgba(127, 191, 106, 0.5); }
 .pf-plan-badge.is-alone { color: var(--pf-warn); border-color: rgba(232, 183, 74, 0.5); }
@@ -1385,6 +1387,14 @@
     linear-gradient(180deg, rgba(150, 46, 34, 0.7), rgba(52, 24, 18, 0.8));
 }
 
+/* 胜算 <15% 的强攻：红色警示态（点击会再过一道轻确认）。 */
+.pf-action.is-longshot {
+  border-color: var(--pf-crimson-bright);
+  box-shadow: inset 0 0 0 1px rgba(224, 96, 76, 0.4);
+}
+
+.pf-action.is-longshot .pf-action-cost { color: var(--pf-crimson-soft); }
+
 .pf-action-name {
   font-size: 13.5px;
   font-weight: 600;
@@ -1598,12 +1608,17 @@
 
 .pf-note-text { min-width: 0; }
 
+/* 提示条停靠在左下地块面板（~660px）与右下结束回合列（236px+边距）之间的空档里，
+   不再横跨底部中线压住动作条第二排（R5 复审：1280×620 下与 dock 视觉拥挤）。
+   宽度用 clamp 数学随视口收缩，不引入任何断点：
+   1600 → 520px；1280 → ~304px；960（pcGate 底线）→ 保底 180px（此时允许轻微搭线，
+   仍远好于旧版横贯中线）。 */
 .pf-hint {
   position: absolute;
-  left: 50%;
+  left: auto;
+  right: 264px;
   bottom: 12px;
-  transform: translateX(-50%);
-  max-width: min(520px, calc(100vw - 40px));
+  max-width: clamp(180px, calc(100vw - 976px), 520px);
   padding: 5px 14px;
   border: 1px solid var(--pf-line);
   border-radius: 14px;
@@ -2660,6 +2675,8 @@
 .pf-stronghold-name { font-size: 13px; font-weight: 600; color: var(--pf-paper); }
 .pf-stronghold-where { font-size: 11px; color: var(--pf-paper-dim); }
 .pf-stronghold small { font-size: 11px; color: var(--pf-paper-dim); }
+/* 坑道作业进度：我方优势项，用暖金而非敌情红。 */
+.pf-stronghold small.pf-stronghold-mine { color: var(--pf-ochre-glow); }
 
 /* 整卡即定位按钮，用角标把这层交互说破。 */
 .pf-stronghold-jump {

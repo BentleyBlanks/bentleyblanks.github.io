@@ -300,13 +300,17 @@ function FormatCheng(percent) {
 }
 
 /**
- * 胜算的诚实呈现：情报误差超过 ±15 个百分点时不再报单点数字，
- * 改报成数区间（"约 六成～九成五"）；情报充足时保持精确百分比。
+ * 胜算的诚实呈现：情报误差达到 ±10 个百分点起就不再报单点数字，
+ * 改报成数区间（"约 六成～九成五"）+「敌情不明」徽章；情报充足时保持精确百分比。
+ * 阈值只在 UI 侧：迷雾数学上限约 ±17.5%、常态最高约 ±14%，
+ * 阈值定 ±15 时整局都触发不了（R5 复审实测 52 目标零触发），±10 才真的进得了正常对局。
  */
+const oddsUncertainThreshold = 10;
+
 function OddsDisplay(preview) {
   const oddsPct = Math.round((Number(preview && preview.odds) || 0) * 100);
   const errorPct = PreviewFogError(preview);
-  if (errorPct > 15) {
+  if (errorPct >= oddsUncertainThreshold) {
     const low = Clamp(oddsPct - errorPct, 2, 98);
     const high = Clamp(oddsPct + errorPct, 2, 98);
     return { text: `约 ${FormatCheng(low)}～${FormatCheng(high)}`, uncertain: true, errorPct, oddsPct };
@@ -1211,9 +1215,20 @@ export function CreateUi(root, hooks = {}) {
   /**
    * 把 Rules 给出的 action 对象交回主循环（契约见 Script_Main.hooks.OnUnitAction）。
    * 玩家在撤退路线选择器里点过别的路线时，出发前替换 withdrawKey；其余字段原样保留。
+   * 胜算 <15% 的攻击/强攻先过一道轻确认（点击与快捷键同一道门），围困不拦——那是正当战法。
    */
   function TriggerAction(action) {
     if (!action || action.enabled === false) return;
+    if (NeedsLongshotConfirm(action)) {
+      ConfirmLongshot(action).then((confirmed) => {
+        if (confirmed) DispatchAction(action);
+      });
+      return;
+    }
+    DispatchAction(action);
+  }
+
+  function DispatchAction(action) {
     let outgoing = action;
     if (
       Array.isArray(action.withdrawOptions) &&
@@ -1225,6 +1240,40 @@ export function CreateUi(root, hooks = {}) {
       if (chosen && chosen.key !== action.withdrawKey) outgoing = { ...action, withdrawKey: chosen.key };
     }
     Call("OnUnitAction", outgoing);
+  }
+
+  /**
+   * 低胜算强攻判定：攻击 / 攻坚（强攻模式）且当前预览胜算低于 15%。
+   * view.preview 由主循环按选中格计算，攻击与攻坚共用同一目标格的预览口径。
+   */
+  function NeedsLongshotConfirm(action) {
+    if (!action) return false;
+    const isAssault = action.kind === "Attack" || (action.kind === "Siege" && action.mode !== "Blockade");
+    if (!isAssault) return false;
+    const preview = currentView && currentView.preview;
+    if (!preview || preview.valid === false || preview.odds === undefined) return false;
+    return (Number(preview.odds) || 0) < 0.15;
+  }
+
+  /** 低胜算强攻的确认小卡：把赔本账摆在眼前，仍然放行——拦截的是误触，不是选择。 */
+  function ConfirmLongshot(action) {
+    const preview = (currentView && currentView.preview) || {};
+    const odds = OddsDisplay(preview);
+    const rows = [{ label: "胜算", value: odds.text, tone: "bad" }];
+    if (preview.expectedLoss !== undefined) {
+      rows.push({ label: "预计我方减员", value: FormatNumber(preview.expectedLoss), tone: "bad" });
+    }
+    if (preview.exposureDelta !== undefined) {
+      rows.push({ label: "暴露度", value: FormatSigned(preview.exposureDelta), tone: "bad" });
+    }
+    return Confirm({
+      title: NormalizeActionLabel(action.label) || "强攻",
+      body: "按敌情判断，这一仗胜算不足一成五：大概率损兵折将、暴露激增，还会把扫荡引过来。真要打？",
+      rows,
+      confirmLabel: "仍然打",
+      cancelLabel: "再想想",
+      tone: "warn",
+    });
   }
 
   // ---- 时期与派生数据 ------------------------------------------------------
@@ -1964,6 +2013,21 @@ export function CreateUi(root, hooks = {}) {
           tip: { title: "掩护分队", body: "有侦察/掩护性质的分队接应转移，撤出时暴露度更低。" },
         });
       }
+      // 围困攒下的坑道作业（stronghold.undermined 0-4）：强攻前这笔账要摆在预览里。
+      const siegeTarget = (state.strongholds || []).find(
+        (item) => item && item.key === view.selectedKey && !item.destroyed && (item.undermined || 0) > 0
+      );
+      if (siegeTarget) {
+        const undermined = Clamp(Math.round(siegeTarget.undermined), 0, 4);
+        El("span", "pf-plan-badge is-undermined", {
+          text: `坑道作业 ${undermined}/4`,
+          parent: row,
+          tip: {
+            title: "坑道作业",
+            body: "围困期间民兵与工兵向据点掘进。作业越足，强攻时敌工事防御被削得越狠；撤围后敌会逐季回填。",
+          },
+        });
+      }
     }
 
     // —— 第二行：撤退路线选择器 ——
@@ -2375,6 +2439,8 @@ export function CreateUi(root, hooks = {}) {
       });
       SetFlag(button, "is-danger", !!action.danger);
       SetFlag(button, "is-disabled", action.enabled === false);
+      // 低胜算强攻：红色警示态 + 点击时过轻确认（TriggerAction 里同一判定）。
+      SetFlag(button, "is-longshot", action.enabled !== false && NeedsLongshotConfirm(action));
       El("span", "pf-action-name", { text: NormalizeActionLabel(action.label) || meta.name, parent: button });
       const costText = FormatCost(action.cost);
       El("small", "pf-action-cost", {
@@ -3800,6 +3866,13 @@ export function CreateUi(root, hooks = {}) {
           parent: cell,
         });
         El("small", null, { text: `守备 ${FormatNumber(stronghold.garrison || 0)}`, parent: cell });
+        // 围困攒下的坑道作业进度：有值才显示。
+        if ((stronghold.undermined || 0) > 0) {
+          El("small", "pf-stronghold-mine", {
+            text: `坑道作业 ${Clamp(Math.round(stronghold.undermined), 0, 4)}/4`,
+            parent: cell,
+          });
+        }
         El("span", "pf-stronghold-jump", { text: "定位 →", parent: cell, attrs: { "aria-hidden": "true" } });
         const alarm = El("i", "pf-stronghold-alarm", { parent: cell });
         SetBarWidth(alarm, stronghold.alarm || 0);
@@ -3814,7 +3887,11 @@ export function CreateUi(root, hooks = {}) {
             { label: "守备", value: FormatNumber(stronghold.garrison || 0) },
             { label: "补给", value: FormatNumber(stronghold.supply || 0) },
             { label: "戒备", value: `${Math.round(stronghold.alarm || 0)}%` },
-          ],
+          ].concat(
+            (stronghold.undermined || 0) > 0
+              ? [{ label: "坑道作业", value: `${Clamp(Math.round(stronghold.undermined), 0, 4)}/4`, tone: "good" }]
+              : []
+          ),
         }));
       }
     }
@@ -4038,6 +4115,16 @@ export function CreateUi(root, hooks = {}) {
       "代价账本只记录、不折算：平民伤亡、焚村、流离永远不会变成你的任何收益。",
     ];
     for (const line of loopLines) El("p", "pf-corehelp-line", { text: line, parent: loop });
+    // 情报既是预警的本钱、又是研究的燃料——这笔账必须当面讲清，不能让玩家撞见才知道。
+    El("h3", "pf-group-title", { text: "情报的两种花法", parent: body });
+    const intelHelp = El("div", "pf-corehelp is-intel", { parent: body });
+    for (const line of [
+      "情报库存只有一份，两头都伸手：攒着，扫荡预警的可信度按情报覆盖走，报得准才躲得开；",
+      "花掉，研究开动时每季从库存里抽走一笔换科技进度——研究越快，手里的预警本钱越薄。",
+      "账上没有两全。大扫荡将至的季度，宁可停一停研究，也别把眼睛卖了。",
+    ]) {
+      El("p", "pf-corehelp-line", { text: line, parent: intelHelp });
+    }
     // 「重开新局 / 换难度」的可发现入口：不再只藏在设置面板里。
     const restart = El("div", "pf-help-restart", { parent: body });
     El("span", "pf-help-restart-text", { text: "想重开一局或换个难度？", parent: restart });
