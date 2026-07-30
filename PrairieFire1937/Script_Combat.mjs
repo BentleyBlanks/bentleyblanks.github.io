@@ -149,7 +149,9 @@ export const combatConstants = Object.freeze({
   coverLossRelief: 0.3, // 己方地形隐蔽带来的减员折损上限
 
   // —— 缴获（械的主来源）——
-  captureScale: 0.16, // 杀伤 → 缴获械的换算
+  // 0.55：一次像样的伏击缴获 4~6 械，高于同期任何种田渠道——
+  // 「械主要靠缴获」必须是数值现实而不是设计口号。
+  captureScale: 0.55, // 杀伤 → 缴获械的换算
   captureGrainRatio: 0.5, // 缴获中粮的比例
   captureMedicineRatio: 0.16, // 缴获中药的比例
   captureMassBonus: 0.4, // 群众基础带来的搬运/清理战场效率
@@ -228,7 +230,7 @@ export const combatConstants = Object.freeze({
   sabotageRailTurns: 3, // 铁路被破坏后需抢修的回合
   sabotageRoadTurns: 2,
   sabotageAlertGain: 5,
-  sabotageCaptureOrdnance: 5,
+  sabotageCaptureOrdnance: 8,
   sabotageCaptureGrain: 8,
 
   // —— 反扫荡 ——
@@ -797,6 +799,40 @@ function DraftStock(draft) {
   return draft.next.stock;
 }
 
+function DraftBase(draft, baseId) {
+  if (!Array.isArray(draft.next.bases)) return null;
+  if (!draft.basesCopied) {
+    draft.next.bases = draft.next.bases.slice();
+    draft.basesCopied = true;
+  }
+  const index = draft.next.bases.findIndex((item) => item && item.id === baseId);
+  if (index < 0) return null;
+  const copy = {
+    ...draft.next.bases[index],
+    districts: Array.isArray(draft.next.bases[index].districts) ? draft.next.bases[index].districts.slice() : [],
+    queue: Array.isArray(draft.next.bases[index].queue) ? draft.next.bases[index].queue.slice() : [],
+  };
+  draft.next.bases[index] = copy;
+  return copy;
+}
+
+/** 代价账本逐条记录（只呈现、不折算——账本红线）。与 Script_Rules.PushLedgerLog 同一契约。 */
+function DraftLedgerLog(draft, entry) {
+  if (!entry || !entry.text) return;
+  if (!draft.ledgerLogCopied) {
+    draft.next.ledgerLog = Array.isArray(draft.next.ledgerLog) ? draft.next.ledgerLog.slice() : [];
+    draft.ledgerLogCopied = true;
+  }
+  draft.next.ledgerLog.push({
+    turn: draft.next.turn || 0,
+    kind: entry.kind || "General",
+    key: entry.key ?? null,
+    text: entry.text,
+    delta: entry.delta || {},
+  });
+  if (draft.next.ledgerLog.length > 200) draft.next.ledgerLog.splice(0, draft.next.ledgerLog.length - 200);
+}
+
 function DraftLedger(draft) {
   if (!draft.ledgerCopied) {
     draft.next.ledger = { ...EmptyLedger(), ...(draft.next.ledger || {}) };
@@ -928,10 +964,19 @@ export function ComputeStrength(state, unit, hex, context = {}) {
     }
   }
 
+  // 科技/政策/事件的战斗效果（Rules 每次经济重算时缓存到 state.playerEffects）。
+  // 曾经整棵军事树的 combatAttack/Defence/Ambush 无任何消费点——是评审揪出的假选择根源之一。
+  const playerEffects = (state && state.playerEffects) || null;
+  if (playerEffects && isPlayer) {
+    if (role === "Attack") value *= 1 + Clamp(playerEffects.combatAttack || 0, 0, 0.6);
+    else value *= 1 + Clamp(playerEffects.combatDefence || 0, 0, 0.6);
+  }
+
   // 伏击：只有我方在有掩护的位置对开阔地之敌才成立
   if (context.ambush && role === "Attack" && isPlayer) {
     const intensity = Clamp01(context.ambushScore ?? 1);
-    value *= Lerp(1, constants.ambushAttackMultiplier, intensity);
+    const ambushMultiplier = constants.ambushAttackMultiplier + Clamp((playerEffects && playerEffects.combatAmbush) || 0, 0, 0.7);
+    value *= Lerp(1, ambushMultiplier, intensity);
   }
 
   // 攻坚：没有爆破/工兵能力，血肉之躯撞砖墙
@@ -1095,6 +1140,7 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     lootValue *
     constants.captureScale *
     attackerStats.captureBonus *
+    (1 + Clamp01((state && state.playerEffects && state.playerEffects.captureRate) || 0)) *
     (1 + targetMass * constants.captureMassBonus) *
     (ambush ? Lerp(1, constants.ambushCaptureMultiplier, ambushScore) : 1);
 
@@ -1481,14 +1527,28 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
     const retaliationRoll = DrawRoll(draft);
     const shield = Clamp01((defenderHexRef.massBase || 0) / 100) * 0.5 + (defenderHexRef.tunnel ? 0.25 : 0);
     if (retaliationRoll > shield + 0.35) {
-      ledgerDelta.civilianDeaths += RoundInt(2 + retaliationRoll * 5);
-      ledgerDelta.displaced += RoundInt(8 + retaliationRoll * 24);
+      const civilianHit = RoundInt(2 + retaliationRoll * 5);
+      const displacedHit = RoundInt(8 + retaliationRoll * 24);
+      ledgerDelta.civilianDeaths += civilianHit;
+      ledgerDelta.displaced += displacedHit;
       costLines.push("战斗未及远离村庄，敌军事后到村上寻仇，乡亲有伤亡，部分人家投亲避难。");
+      DraftLedgerLog(draft, {
+        kind: "Retaliation",
+        key: targetKey,
+        text: `村边交火后敌回村寻仇：${civilianHit} 名乡亲遇害，${displacedHit} 人投亲避难。`,
+        delta: { civilianDeaths: civilianHit, displaced: displacedHit },
+      });
     }
   }
   if (ourLoss > maxHp * 0.55) {
     ledgerDelta.cadreLost += 1;
     costLines.push("此战减员较重，一名班排骨干未能归队。");
+    DraftLedgerLog(draft, {
+      kind: "UnitLoss",
+      key: targetKey,
+      text: "一次硬仗减员过半，一名班排骨干未能归队。",
+      delta: { cadreLost: 1 },
+    });
   }
 
   // 战报文案：克制、具体
@@ -1812,11 +1872,28 @@ export function ResolveSabotage(state, unitId, targetKey, options = {}) {
 
   // 破路会波及沿线百姓的行路与运输，记入代价账本（不产生任何收益）
   if (succeeded && hex.feature === "Village") {
-    ledgerDelta.displaced += RoundInt(4 + gradeRoll * 8);
+    const displacedGain = RoundInt(4 + gradeRoll * 8);
+    ledgerDelta.displaced += displacedGain;
+    report.lines.push(`破袭殃及村旁道路，${displacedGain} 户乡亲暂避他村。`);
+    DraftLedgerLog(draft, {
+      kind: "Sabotage",
+      key: targetKey,
+      text: `破袭波及村庄交通，${displacedGain} 人暂时流离。`,
+      delta: { displaced: displacedGain },
+    });
   }
   if (!succeeded && massBase < 0.35) {
-    ledgerDelta.civilianDeaths += RoundInt(gradeRoll * 3);
+    const civilianHit = RoundInt(gradeRoll * 3);
+    ledgerDelta.civilianDeaths += civilianHit;
     report.lines.push("敌人在附近村庄抓人盘问，有乡亲遇害。");
+    if (civilianHit > 0) {
+      DraftLedgerLog(draft, {
+        kind: "Retaliation",
+        key: targetKey,
+        text: `破袭未遂，敌在附近村庄抓人盘问，${civilianHit} 名乡亲遇害。`,
+        delta: { civilianDeaths: civilianHit },
+      });
+    }
   }
   ApplyLedgerDelta(draft, ledgerDelta);
 
@@ -1856,7 +1933,9 @@ function BuildSiegeModel(state, unit, stronghold, options = {}) {
   const strongholdHex = GetHex(state, stronghold.key);
   const night = ResolveNightFlag(state, options, unit);
   const hasCapability = unitStats.siege > 0;
-  const ordnanceCost = Math.round(constants.siegeOrdnanceCost * strongholdStats.siegeResistance);
+  // 反攻期敌军械弹与士气双衰，攻坚的弹药门槛减半（史实：成建制攻坚从 1944 年秋展开）。
+  const eraSiegeScale = state.eraKey === "Counter" ? 0.5 : 1;
+  const ordnanceCost = Math.round(constants.siegeOrdnanceCost * strongholdStats.siegeResistance * eraSiegeScale);
   const hasOrdnance = ((state.stock && state.stock.ordnance) || 0) >= ordnanceCost;
   const massBase = Clamp01((strongholdHex && strongholdHex.massBase ? strongholdHex.massBase : 0) / 100);
 
@@ -2033,7 +2112,9 @@ export function ResolveSiege(state, unitId, strongholdId, options = {}) {
       if (strongholdDraft.supply <= 0) {
         const attrition = model.garrison * constants.blockadeGarrisonDrain * (1 + tightness);
         strongholdDraft.garrison = Round1(Math.max(0, model.garrison - attrition));
-        const surrenderChance = constants.blockadeSurrenderBase + tightness * 0.25;
+        // 伪军工作（puppetDefection）在围困里兑现：里应外合，促其反正/瓦解。
+        const defectionBonus = Clamp01((state.playerEffects && state.playerEffects.puppetDefection) || 0) * 0.5;
+        const surrenderChance = constants.blockadeSurrenderBase + tightness * 0.25 + defectionBonus;
         surrendered = roll < surrenderChance || strongholdDraft.garrison <= 0;
         report.casualties = { ours: 0, theirs: RoundInt(attrition) };
       }
@@ -2184,6 +2265,16 @@ function ApplyCaptureStronghold(draft, stronghold, report) {
     hexDraft.control = "Guerrilla";
     hexDraft.intel = Math.min(100, (hexDraft.intel || 0) + 25);
   }
+  // 拔点的群众红利：压在炮楼阴影下的村子敢喘气了——躲出去的人回来、
+  // 白天也敢下地。这是"打仗保护百姓"最直接的兑现（一次性开花 + 压制场解除）。
+  for (const key of [stronghold.key, ...HexNeighborKeys(stronghold.key)]) {
+    const nearby = DraftHex(draft, key);
+    if (!nearby) continue;
+    const bloom = key === stronghold.key ? 12 : 8;
+    nearby.massBase = Clamp((nearby.massBase || 0) + bloom, 0, 100);
+    nearby.scorch = Math.max(0, (nearby.scorch || 0) - 20);
+  }
+  report.lines.push("据点周边各村当夜点起灯火：躲反的人陆续回庄，群众基础显著回升。");
   report.effects.push({ kind: "Capture", key: stronghold.key, payload: { stronghold: true } });
 }
 
@@ -2234,22 +2325,49 @@ export function ResolveSweepBattle(state, sweep) {
   const tunnelRatio = affectedKeys.length ? tunnelCount / affectedKeys.length : 0;
   const shelter = Clamp01(massAverage * constants.sweepMassRelief + tunnelRatio * constants.sweepTunnelRelief);
 
-  // 我方部队：按方针处置
+  // 我方部队：先合计圈内防御战力（决战判定要用），再按方针逐一处置。
   const units = state.units || [];
+  const defenceByUnit = new Map();
+  let totalDefence = 0;
   for (const unit of units) {
     if (!unit || (unit.hp ?? 0) <= 0) continue;
-    const inArea = affectedKeys.includes(unit.key);
-    if (!inArea) continue;
+    if (!affectedKeys.includes(unit.key)) continue;
     const unitStats = ResolveUnitStats(unit.type);
     if (unitStats.side === "Enemy") continue;
     const hex = GetHex(state, unit.key);
-    const maxHp = unit.maxHp || unitStats.hp || 50;
     // 反扫荡不是各打各的：同格与相邻的可战友军互为依托（守方支援每人 +5%，封顶 15%）
     const support = CountFriendlySupport(state, unit, { includeSameHex: true });
     const defence = ComputeStrength(state, unit, hex, { role: "Defence", night: false, supportCount: support.count });
+    defenceByUnit.set(unit.id, defence);
+    totalDefence += defence;
+  }
+
+  // 正面决战是一次真赌博：兵力与掩护足够就把敌顶回去，村庄工事全保；
+  // 顶不住就是灾难。ledgerScale 把"这一仗打得怎么样"传导进百姓的代价。
+  let repelled = false;
+  let ledgerScale = 1;
+  if (stanceKey === "Decisive") {
+    const repelRoll = DrawRoll(draft);
+    const repelChance = Clamp01(
+      (totalDefence * 1.7) / Math.max(1, sweepStrength + totalDefence * 1.7) - 0.22 + shelter * 0.2,
+    );
+    repelled = repelRoll < repelChance;
+    if (repelled) {
+      ledgerScale = 0.25;
+      theirLoss += sweepStrength * 0.3;
+    }
+  }
+
+  for (const unit of units) {
+    if (!defenceByUnit.has(unit.id)) continue;
+    const unitStats = ResolveUnitStats(unit.type);
+    const hex = GetHex(state, unit.key);
+    const maxHp = unit.maxHp || unitStats.hp || 50;
+    const defence = defenceByUnit.get(unit.id);
 
     const pressure = sweepStrength / Math.max(1, sweepStrength + defence * 2);
     let loss = maxHp * 0.3 * pressure * profile.ourLossFactor;
+    if (stanceKey === "Decisive" && repelled) loss *= 0.55;
     if (stanceKey === "Disperse" || stanceKey === "CounterRaid") {
       const escapeRoll = DrawRoll(draft);
       const escapeChance = ComputeRetreatChance(state, unit, hex, false);
@@ -2269,6 +2387,7 @@ export function ResolveSweepBattle(state, sweep) {
         unitDraft.fatigue = Clamp((unit.fatigue || 0) + 22, 0, 100);
         unitDraft.hidden = stanceKey === "Disperse" ? true : unitDraft.hidden;
         unitDraft.moves = 0;
+        unitDraft.combat = { ...(unit.combat || {}), sweptTurn: state.turn || 0 };
       }
     } else {
       const unitDraft = DraftUnit(draft, unit.id);
@@ -2277,6 +2396,7 @@ export function ResolveSweepBattle(state, sweep) {
         unitDraft.fatigue = Clamp((unit.fatigue || 0) + 26, 0, 100);
         unitDraft.hidden = false;
         unitDraft.moves = 0;
+        unitDraft.combat = { ...(unit.combat || {}), sweptTurn: state.turn || 0 };
       }
     }
     ourLoss += loss;
@@ -2301,22 +2421,30 @@ export function ResolveSweepBattle(state, sweep) {
         strongholdDraft.alarm = Clamp((target.alarm || 0) + 20, 0, 100);
       }
       theirLoss += raidDamage;
-      captures.ordnance += RoundInt(raidDamage * 0.5 * profile.captureFactor);
-      captures.grain += RoundInt(raidDamage * 0.6 * profile.captureFactor);
+      // 敌后起火，合围被迫提前收兵——这一次扫荡对地方的破坏显著减轻。
+      ledgerScale = Math.min(ledgerScale, 0.72);
+      captures.ordnance += RoundInt(raidDamage * 2.2 * profile.captureFactor);
+      captures.grain += RoundInt(raidDamage * 1.4 * profile.captureFactor);
       report.lines.push(
-        `敌主力西进扫荡，后方空虚。武工队反向出击，袭击了${ResolveStrongholdStats(target.type).name}，敌被迫回调兵力。`
+        `敌主力西进扫荡，后方空虚。武工队反向出击，袭击了${ResolveStrongholdStats(target.type).name}，敌被迫提前回兵。`
       );
       report.effects.push({ kind: "Ambush", key: target.key, payload: { counterRaid: true } });
     }
   }
 
-  // 代价账本：扫荡对人民的损害只记账，绝不产生任何收益
+  // 代价账本：扫荡对人民的损害只记账，绝不产生任何收益。
+  // ledgerScale 是唯一的调节口：把敌顶回去（决战得手）或迫其早撤（敌进我进得手）
+  // 才能真正减轻百姓的代价——这就是"打仗换平安"的传导链。
   const civilianBase = constants.sweepCivilianBase * villageCount * (sweepStrength / 40);
-  ledgerDelta.civilianDeaths = RoundInt(civilianBase * profile.civilianFactor * (1 - shelter));
-  ledgerDelta.villagesBurned = RoundInt(constants.sweepVillageBase * villageCount * profile.villageFactor * (1 - shelter * 0.6));
-  ledgerDelta.grainSeized = RoundInt(constants.sweepGrainBase * villageCount * profile.grainFactor * (1 - shelter));
-  ledgerDelta.displaced = RoundInt(constants.sweepDisplacedBase * villageCount * profile.displacedFactor * (1 - shelter * 0.4));
-  ledgerDelta.cadreLost = RoundInt(constants.sweepCadreBase * villageCount * profile.cadreFactor * (1 - shelter * 0.5));
+  ledgerDelta.civilianDeaths = RoundInt(civilianBase * profile.civilianFactor * (1 - shelter) * ledgerScale);
+  ledgerDelta.villagesBurned = RoundInt(
+    constants.sweepVillageBase * villageCount * profile.villageFactor * (1 - shelter * 0.6) * ledgerScale,
+  );
+  ledgerDelta.grainSeized = RoundInt(constants.sweepGrainBase * villageCount * profile.grainFactor * (1 - shelter) * ledgerScale);
+  ledgerDelta.displaced = RoundInt(
+    constants.sweepDisplacedBase * villageCount * profile.displacedFactor * (1 - shelter * 0.4) * ledgerScale,
+  );
+  ledgerDelta.cadreLost = RoundInt(constants.sweepCadreBase * villageCount * profile.cadreFactor * (1 - shelter * 0.5) * ledgerScale);
 
   // 被夺走的粮食从库存中扣除（这是损失，不是收益）
   if (ledgerDelta.grainSeized > 0) {
@@ -2328,7 +2456,9 @@ export function ResolveSweepBattle(state, sweep) {
     stockDraft.cadre = Math.max(0, (stockDraft.cadre || 0) - ledgerDelta.cadreLost);
   }
 
-  // 地块状态：焦土、控制权动摇、群众基础受创
+  // 地块状态：焦土、控制权动摇、群众基础受创、沿线工事被平毁
+  const protectWorks = stanceKey === "Fortify" || repelled;
+  let worksLost = 0;
   for (const key of affectedKeys) {
     const source = hexes[key];
     if (!source) continue;
@@ -2336,13 +2466,45 @@ export function ResolveSweepBattle(state, sweep) {
     if (!isSettlement && (source.massBase || 0) < 20) continue;
     const hexDraft = DraftHex(draft, key);
     if (!hexDraft) continue;
-    const scorchGain = (isSettlement ? 16 : 6) * profile.villageFactor * (1 - shelter * 0.6);
+    const onAxis = axis.has(key);
+    const scorchGain = (isSettlement ? 16 : 6) * profile.villageFactor * (1 - shelter * 0.6) * ledgerScale;
     hexDraft.scorch = Clamp((hexDraft.scorch || 0) + scorchGain, 0, 100);
-    // 群众基础：扫荡会打掉一些，但坚壁清野与地道能保住人心
-    const massHit = (isSettlement ? 6 : 2) * profile.civilianFactor * (1 - shelter);
+    // 群众基础：扫荡会打掉一些，但坚壁清野与地道能保住人心。
+    // 化整为零让开正面（Disperse/CounterRaid）意味着敌沿轴线通行无阻——保人失地。
+    let massHit = (isSettlement ? 6 : 2) * profile.civilianFactor * (1 - shelter) * ledgerScale;
+    if (onAxis && (stanceKey === "Disperse" || stanceKey === "CounterRaid")) massHit += 2.5;
     const massGain = stanceKey === "Disperse" || stanceKey === "CounterRaid" ? 2 * massAverage : 0;
     hexDraft.massBase = Clamp((hexDraft.massBase || 0) - massHit + massGain, 0, 100);
-    if (hexDraft.control === "Base" && profile.villageFactor >= 1) hexDraft.control = "Contested";
+    // 扫荡沿途平毁工事：只有依托工事死守（Fortify）或把敌顶回去（决战得手）才保得住。
+    if (!protectWorks && hexDraft.works.length && (onAxis || isSettlement) && (1 - shelter) * sweepStrength >= 18) {
+      const razed = hexDraft.works.pop();
+      if (razed === "Tunnel") hexDraft.tunnel = false;
+      worksLost += 1;
+    }
+    if (hexDraft.control === "Base" && profile.villageFactor >= 1 && !repelled) hexDraft.control = "Contested";
+  }
+  if (worksLost > 0) report.lines.push(`敌沿途平毁工事 ${worksLost} 处：地道口被灌，壕沟被填。`);
+
+  // 根据地受创：合围圈里的基地顶不住时降级/停摆——政权转入地下，人口疏散。
+  for (const base of state.bases || []) {
+    if (!affectedKeys.includes(base.key)) continue;
+    const shelterHere = Clamp01(shelter + (stanceKey === "Fortify" ? 0.2 : 0));
+    if (repelled || sweepStrength * (1 - shelterHere) < 26) continue;
+    const baseDraft = DraftBase(draft, base.id);
+    if (!baseDraft) continue;
+    const popBefore = baseDraft.population || 0;
+    if ((baseDraft.tier || 1) > 1) {
+      baseDraft.tier -= 1;
+      baseDraft.population = Math.max(60, Math.round(popBefore * 0.72));
+      report.lines.push(`${baseDraft.name}遭合围重创：区署与仓库转入地下，政权降级坚持。`);
+    } else {
+      baseDraft.disrupted = Math.max(baseDraft.disrupted || 0, 2);
+      baseDraft.population = Math.max(60, Math.round(popBefore * 0.85));
+      report.lines.push(`${baseDraft.name}被敌反复清剿，机关分散隐蔽，生产停顿。`);
+    }
+    const fled = Math.max(0, popBefore - baseDraft.population);
+    if (fled > 0) ledgerDelta.displaced += RoundInt(fled * 0.4);
+    report.effects.push({ kind: "Smoke", key: base.key, payload: { level: 2 } });
   }
 
   ApplyLedgerDelta(draft, ledgerDelta);
@@ -2355,24 +2517,40 @@ export function ResolveSweepBattle(state, sweep) {
   // 方针只对本次扫荡有效：扫荡结束即清空，下一次要重新定下来
   draft.next.sweepStance = null;
 
-  // 战报
-  report.lines.unshift(`敌以${RoundInt(sweepStrength)}兵力对${sweep.targetKey}一带实施扫荡，我采取「${profile.name}」。`);
+  // 战报（不泄漏裸坐标：用地形名指代地域）
+  const targetHexRef = GetHex(state, sweep.targetKey);
+  const targetLabel = targetHexRef ? `${ResolveTerrainStats(targetHexRef.terrain).name}一带` : "根据地一带";
+  report.lines.unshift(`敌以${RoundInt(sweepStrength)}兵力合围${targetLabel}，我采取「${profile.name}」。`);
   if (stanceKey === "Disperse") {
     report.lines.push("各村提前坚壁清野，粮食入窖、碾磨拆散，部队化整为零跳出合围。");
-    report.lines.push(`${unitsMoved} 支分队转移到外线，未与敌主力硬碰。`);
+    report.lines.push(`${unitsMoved} 支分队转移到外线，未与敌主力硬碰；敌沿合围轴线如入无人之境。`);
   } else if (stanceKey === "Decisive") {
-    report.lines.push("部队在预设阵地与敌主力正面对抗。敌火力与兵力均占优，阵地反复易手。");
-    report.lines.push("这一仗把家底打进去了，村庄也没能保住。");
+    if (repelled) {
+      report.lines.push("主力依托预设阵地顶住了合围正面。敌攻势受挫，天黑前脱离接触。");
+      report.lines.push("村庄、工事与在建工程大部保全——这一仗赌赢了。");
+    } else {
+      report.lines.push("部队在预设阵地与敌主力正面对抗。敌火力与兵力均占优，阵地反复易手。");
+      report.lines.push("这一仗把家底打进去了，村庄也没能保住。");
+    }
   } else if (stanceKey === "CounterRaid") {
     report.lines.push("主力跳到外线，反向袭击敌后方交通与据点，迫敌回援。");
   } else {
-    report.lines.push("依托地道与工事节节抗击，掩护群众转移。");
+    report.lines.push("依托地道与工事节节抗击，掩护群众转移，保住了地上的工程。");
   }
   report.lines.push(
     `代价账本：乡亲遇害 ${ledgerDelta.civilianDeaths} 人，被焚村庄 ${ledgerDelta.villagesBurned} 个，` +
       `被抢粮 ${ledgerDelta.grainSeized}，流离失所 ${ledgerDelta.displaced} 人，骨干损失 ${ledgerDelta.cadreLost} 人。`
   );
   report.lines.push("这些数字只记在账上，不换任何东西。");
+  DraftLedgerLog(draft, {
+    kind: "Sweep",
+    key: sweep.targetKey,
+    text:
+      `敌${RoundInt(sweepStrength)}兵力合围${targetLabel}（我采取${profile.name}）：` +
+      `乡亲遇害 ${ledgerDelta.civilianDeaths}，焚村 ${ledgerDelta.villagesBurned}，被抢粮 ${ledgerDelta.grainSeized}，` +
+      `流离 ${ledgerDelta.displaced}，骨干损失 ${ledgerDelta.cadreLost}。`,
+    delta: { ...ledgerDelta },
+  });
 
   report.effects.push({ kind: "Smoke", key: sweep.targetKey, payload: { level: 3, wide: true } });
   if (stanceKey === "Disperse" || stanceKey === "CounterRaid") {
@@ -2466,6 +2644,8 @@ export function TickCombatRecovery(state) {
   const units = state.units || [];
   for (const unit of units) {
     if (!unit) continue;
+    // hp 归零的部队已经被打散，不参与恢复——由回合结算的打散/归队管线接手。
+    if ((unit.hp ?? 0) <= 0) continue;
     const stats = ResolveUnitStats(unit.type);
     if (stats.side === "Enemy") continue;
     const hex = GetHex(state, unit.key);
@@ -2476,15 +2656,21 @@ export function TickCombatRecovery(state) {
     if (!unitDraft) continue;
 
     // 减员恢复：靠根据地、群众基础与药品。药品实际消耗，绝不凭空生人。
-    if ((unit.hp ?? maxHp) < maxHp) {
+    // 刚被扫荡打击过的部队当回合不恢复——扫荡的伤必须真的痛一回合，
+    // 否则全游戏最大的威胁对部队的净伤害是 0（评审实测翻过的车）。
+    const sweptThisTurn = (unit.combat || {}).sweptTurn === turn;
+    if ((unit.hp ?? maxHp) < maxHp && !sweptThisTurn) {
       let rate = constants.recoverHpBase + massBase * constants.recoverHpMass;
       if (hex && hex.control === "Base") rate += constants.recoverHpBase2;
       const wantMedicine = medicineBudget > 0;
       if (wantMedicine) rate += constants.recoverHpMedicine;
+      const healRateBonus = (state.playerEffects && state.playerEffects.healRate) || 0;
+      rate = Math.max(0.01, rate + healRateBonus);
       const healed = Math.min(maxHp - (unit.hp ?? maxHp), maxHp * rate);
       unitDraft.hp = Round1((unit.hp ?? maxHp) + healed);
       if (wantMedicine) {
-        const cost = healed * constants.recoverMedicineCostPerHp;
+        const efficiency = Clamp01((state.playerEffects && state.playerEffects.medicineEfficiency) || 0);
+        const cost = healed * constants.recoverMedicineCostPerHp * (1 - efficiency);
         const paid = Math.min(medicineBudget, cost);
         medicineBudget -= paid;
         medicineSpent += paid;
@@ -2509,6 +2695,7 @@ export function TickCombatRecovery(state) {
           chance += constants.hiddenRecoverTunnel;
         }
         if (combat.withdrew) chance += constants.hiddenRecoverMovedBonus;
+        chance += Clamp01((state.playerEffects && state.playerEffects.concealment) || 0) * 0.4;
         chance -= Clamp01((unitDraft.fatigue || 0) / 100) * constants.hiddenRecoverFatiguePenalty;
         if (hex && hex.control === "Enemy") chance -= 0.15;
         chance = Clamp(chance, 0.02, 0.95);

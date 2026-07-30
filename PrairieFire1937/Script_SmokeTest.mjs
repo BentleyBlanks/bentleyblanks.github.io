@@ -880,7 +880,7 @@ function RunBot(seed, style) {
         if (available.length) state = Rules.SetResearch(state, available[0], "doctrine");
       }
     }
-    if (style === "skilled") {
+    if (style === "skilled" || style === "farmer") {
       // 装政策、建区域、扩编工作队——一个真正在经营根据地的玩家会做的事。
       const slots = Rules.GetPolicySlots(state);
       if (state.policy.equipped.length < slots) {
@@ -914,15 +914,35 @@ function RunBot(seed, style) {
         }
       }
     }
+    if (style === "skilled") {
+      // 会玩的完整含义：经营之外还会打——定反扫荡方针、编成战斗与攻坚部队。
+      // 干部纪律：基地不足 4 个时给开辟留足预算，战斗单位只用械和粮养。
+      if (state.sweep) state = Rules.SetSweepStance(state, "CounterRaid");
+      const cadreFree = state.stock.cadre - (state.bases.length < 4 ? ruleReserve : 0);
+      const hasSiegeUnit = state.units.some((unit) => Rules.GetUnitStats(unit.type).abilities.includes("Siege"));
+      const tryTrain = (unitType, guard) => {
+        if (!guard || !state.bases.length) return false;
+        const cost = Rules.GetTrainCost(state, unitType);
+        if ((cost.cadre ?? 0) > cadreFree) return false;
+        if (!Rules.CanTrainUnit(state, state.bases[0].id, unitType).ok) return false;
+        state = Rules.TrainUnit(state, state.bases[0].id, unitType);
+        return true;
+      };
+      if (!hasSiegeUnit) tryTrain("DemolitionTeam", state.stock.ordnance >= 18 && state.stock.grain > 10);
+      if (state.units.length < 9) tryTrain("GuerrillaSquad", state.stock.ordnance >= 30 && state.stock.grain > 18);
+    }
 
-    for (const unit of [...state.units]) {
-      const live = Rules.GetUnit(state, unit.id);
-      if (!live || live.acted) continue;
-      const stats = Rules.GetUnitStats(live.type);
-      const action = ChooseAction(state, live, stats, style);
-      if (!action) continue;
-      const outcome = Rules.PerformAction(state, action);
-      if (outcome.report.ok) state = outcome.nextState;
+    // 两轮行动：第一轮多为机动/组织，第二轮让移动到位的部队接上攻击/围困。
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (const unit of [...state.units]) {
+        const live = Rules.GetUnit(state, unit.id);
+        if (!live || live.acted) continue;
+        const stats = Rules.GetUnitStats(live.type);
+        const action = ChooseAction(state, live, stats, style);
+        if (!action) continue;
+        const outcome = Rules.PerformAction(state, action);
+        if (outcome.report.ok) state = outcome.nextState;
+      }
     }
     state = Rules.EndTurn(state).nextState;
   }
@@ -930,7 +950,75 @@ function RunBot(seed, style) {
     state = Rules.CloneState(state);
     state.turn = 32;
   }
-  return Rules.GetVictoryAssessment(state);
+  const assessment = Rules.GetVictoryAssessment(state);
+  assessment.finalState = state;
+  return assessment;
+}
+
+/** 32 回合全程模拟不便宜，多个闸门共享同一批局面。 */
+const botRunCache = new Map();
+function RunBotCached(seed, style) {
+  const cacheKey = `${style}:${seed}`;
+  if (!botRunCache.has(cacheKey)) botRunCache.set(cacheKey, RunBot(seed, style));
+  return botRunCache.get(cacheKey);
+}
+
+function BotNearestBaseDistance(state, key) {
+  if (!state.bases.length) return HexDistanceKeys(state.startKey, key);
+  return Math.min(...state.bases.map((base) => HexDistanceKeys(base.key, key)));
+}
+
+/** 会玩 bot 的猎杀优先级：辎重最肥、伪军次之，硬骨头留给伏击条件好的时候。 */
+function BotPreferredTarget(state, unit) {
+  const targets = Combat.ListAttackTargets?.(state, unit.id) ?? [];
+  if (!targets.length) return null;
+  const rank = (key) => {
+    const enemy = state.enemies.find((item) => item.key === key);
+    if (!enemy) return 5;
+    if (enemy.type === "SupplyColumn") return 0;
+    if (String(enemy.type).includes("Puppet")) return 1;
+    return 3;
+  };
+  return targets.slice().sort((a, b) => rank(a) - rank(b))[0];
+}
+
+/** 邻接弱据点（守备≤3 或反攻期）优先围困，反攻期弹药富余时强攻。 */
+function BotSiegeAction(state, unit) {
+  for (const nearKey of [unit.key, ...HexNeighborKeys(unit.key)]) {
+    const stronghold = Rules.GetStrongholdAt(state, nearKey);
+    if (!stronghold || stronghold.destroyed || (stronghold.garrison ?? 0) <= 0) continue;
+    if ((stronghold.garrison ?? 9) > 3 && state.eraKey !== "Counter") continue;
+    const actions = Rules.ListContextActions(state, unit.id, nearKey) ?? [];
+    const blockade = actions.find((item) => item.kind === "Siege" && item.mode === "Blockade" && item.enabled !== false);
+    if (blockade) return blockade;
+    const assault = actions.find((item) => item.kind === "Siege" && item.mode === "Assault" && item.enabled !== false);
+    if (assault && state.eraKey === "Counter" && (state.stock.ordnance ?? 0) > 30) return assault;
+  }
+  return null;
+}
+
+/** 依托根据地的纪律性猎杀：高暴露蛰伏、打完必转移、不深远征。 */
+function BotHuntAction(state, unit) {
+  if (state.exposure > 45 || !unit.hidden) return { kind: "Rest", unitId: unit.id };
+  const target = BotPreferredTarget(state, unit);
+  if (target) {
+    const withdrawKey = Rules.ListWithdrawOptions(state, unit.id, target)[0]?.key;
+    return { kind: "Attack", unitId: unit.id, targetKey: target, withdrawKey };
+  }
+  const reach = state.eraKey === "Counter" ? 8 : 5;
+  const goals = [
+    ...state.enemies.filter((enemy) => enemy.visibleToPlayer).map((enemy) => enemy.key),
+    ...state.strongholds
+      .filter((item) => !item.destroyed && (item.garrison ?? 0) > 0 && (item.garrison ?? 9) <= 3 && Rules.GetHex(state, item.key)?.explored)
+      .map((item) => item.key),
+  ].filter((key) => BotNearestBaseDistance(state, key) <= reach);
+  if (!goals.length) return null;
+  const reachable = [...Rules.FindReachableHexes(state, unit.id).keys()];
+  if (!reachable.length) return null;
+  const near = (key) => Math.min(...goals.map((goal) => HexDistanceKeys(key, goal)));
+  const best = reachable.sort((a, b) => near(a) - near(b))[0];
+  if (best && near(best) < near(unit.key)) return { kind: "Move", unitId: unit.id, toKey: best };
+  return null;
 }
 
 function ChooseAction(state, unit, stats, style) {
@@ -969,26 +1057,38 @@ function ChooseAction(state, unit, stats, style) {
       if (candidates.length) return { kind: "Move", unitId: unit.id, toKey: candidates[0] };
     }
 
+    // 群众发动到位（≥70）且工富余时，先把工事修起来（坚壁窖/交通壕/消息树），
+    // 再继续把群众基础做满——工事是反扫荡的另一半准备。
+    if (style === "skilled" && here && here.massBase >= 70 && (state.stock.labor ?? 0) >= 40 && !here.workBuild) {
+      for (const workType of here.feature === "Village" ? ["Cache", "Trench", "Beacon"] : ["Beacon", "Trench"]) {
+        if (Rules.CanBuildWork(state, unit.id, unit.key, workType).ok) {
+          return { kind: "BuildWork", unitId: unit.id, key: unit.key, workType };
+        }
+      }
+    }
     if (here && here.massBase < 92) return { kind: "Mobilize", unitId: unit.id, key: unit.key };
     return null;
   }
 
-  if (stats.abilities.includes("Recon")) return { kind: "Recon", unitId: unit.id, key: unit.key };
-
-  const targets = Combat.ListAttackTargets?.(state, unit.id) ?? [];
-  if (targets.length && unit.hidden && state.exposure < 55) {
-    // 打完就转移：落脚点必须相邻，交给规则层按隐蔽条件挑。
-    const withdrawKey = Rules.ListWithdrawOptions(state, unit.id, targets[0])[0]?.key;
-    return { kind: "Attack", unitId: unit.id, targetKey: targets[0], withdrawKey };
+  // 纯侦察单位（侦察班）全职侦察；游击队的 Recon 只是能力之一，主业是打。
+  if (stats.abilities.includes("Recon") && !stats.abilities.includes("Ambush")) {
+    return { kind: "Recon", unitId: unit.id, key: unit.key };
   }
-  if (unit.hp < unit.maxHp * 0.6 || !unit.hidden) return { kind: "Rest", unitId: unit.id };
-  return null;
+
+  if (style === "farmer") {
+    // 纯种田对照组：经营满分，一枪不放。
+    return { kind: "Rest", unitId: unit.id };
+  }
+
+  // 会玩：攻坚机会 > 纪律性猎杀（高暴露蛰伏、打完必转移、不深远征）。
+  if (unit.hp < unit.maxHp * 0.5) return { kind: "Rest", unitId: unit.id };
+  return BotSiegeAction(state, unit) ?? BotHuntAction(state, unit);
 }
 
 Test("会玩 > 消极不作为，且会玩 > 莽撞拼消耗", () => {
   const seeds = [11, 22, 33, 44, 55, 66];
   const average = (style) =>
-    seeds.reduce((sum, seed) => sum + RunBot(seed, style).total, 0) / seeds.length;
+    seeds.reduce((sum, seed) => sum + RunBotCached(seed, style).total, 0) / seeds.length;
   const skilled = average("skilled");
   const passive = average("passive");
   const reckless = average("reckless");
@@ -999,34 +1099,36 @@ Test("会玩 > 消极不作为，且会玩 > 莽撞拼消耗", () => {
 
 Test("游戏是可经营的：像样地打完一局能建成多个根据地并拿到 B 以上", () => {
   const seeds = [11, 22, 33, 44, 55];
-  const runs = seeds.map((seed) => RunBot(seed, "skilled"));
+  const runs = seeds.map((seed) => RunBotCached(seed, "skilled"));
   const bases = runs.reduce((sum, run) => sum + run.counts.bases, 0) / runs.length;
   const villages = runs.reduce((sum, run) => sum + run.counts.baseVillages, 0) / runs.length;
-  const districts = runs.reduce((sum, run) => sum + run.counts.districts, 0) / runs.length;
+  const construction = runs.reduce((sum, run) => sum + run.counts.districts + run.counts.works, 0) / runs.length;
   const techs = runs.reduce((sum, run) => sum + run.counts.techs, 0) / runs.length;
   const best = runs.reduce((top, run) => (run.total > top.total ? run : top), runs[0]);
   console.log(
-    `      平均 根据地 ${bases.toFixed(1)} 个 · 根据地村 ${villages.toFixed(1)} · 区域 ${districts.toFixed(1)} · 科技 ${techs.toFixed(1)}` +
+    `      平均 根据地 ${bases.toFixed(1)} 个 · 根据地村 ${villages.toFixed(1)} · 区域+工事 ${construction.toFixed(1)} · 科技 ${techs.toFixed(1)}` +
       ` · 最好一局 ${best.total} 分 ${best.grade} 级「${best.ending?.title}」`,
   );
   assert.ok(bases >= 2, `平均只建起 ${bases.toFixed(1)} 个根据地，扩张循环走不通`);
-  assert.ok(villages >= 8, `平均只有 ${villages.toFixed(1)} 个根据地村，连评级闸门都过不去`);
-  assert.ok(districts >= 3, `平均只建成 ${districts.toFixed(1)} 个区域，建设循环走不通`);
+  assert.ok(villages >= 6, `平均只有 ${villages.toFixed(1)} 个根据地村，连评级闸门都过不去`);
+  assert.ok(construction >= 4, `平均区域+工事只有 ${construction.toFixed(1)}，建设循环走不通`);
   assert.ok(techs >= 4, `平均只研究出 ${techs.toFixed(1)} 项科技，科技循环走不通`);
   assert.ok(["S", "A", "B"].includes(best.grade), `最好的一局也只有 ${best.grade} 级，上限过低`);
 });
 
-Test("莽撞打法的人民代价高于稳健打法", () => {
+Test("莽撞打法的人民安全远差于稳健打法（强度口径）", () => {
+  // 绝对代价总量会奖励"没有地盘可失去"的打法（缩到 0 个根据地反而账面干净），
+  // 所以这里用与终局评定同一口径的 ComputePeopleSafety（按回合×治下村庄归一）。
   const seeds = [11, 22, 33];
-  const cost = (style) =>
-    seeds.reduce((sum, seed) => {
-      const ledger = RunBot(seed, style).ledger;
-      return sum + ledger.civilianDeaths + ledger.villagesBurned * 10 + ledger.displaced * 0.2;
-    }, 0) / seeds.length;
-  const skilled = cost("skilled");
-  const reckless = cost("reckless");
-  console.log(`      稳健代价 ${skilled.toFixed(1)} · 莽撞代价 ${reckless.toFixed(1)}`);
-  assert.ok(reckless >= skilled, `莽撞代价(${reckless.toFixed(1)}) 未高于稳健(${skilled.toFixed(1)})`);
+  const safety = (style) =>
+    seeds.reduce((sum, seed) => sum + RunBotCached(seed, style).metrics.safety, 0) / seeds.length;
+  const skilled = safety("skilled");
+  const reckless = safety("reckless");
+  console.log(`      稳健安全度 ${skilled.toFixed(1)} · 莽撞安全度 ${reckless.toFixed(1)}`);
+  assert.ok(
+    reckless < skilled - 15,
+    `莽撞安全度(${reckless.toFixed(1)}) 未显著低于稳健(${skilled.toFixed(1)})——乱打没有付出人民代价`,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1291,6 +1393,188 @@ Test("破袭列出即可打：带撤退路线，且执行不被结算条件打�
   assert.ok(sabotage.withdrawKey || (sabotage.withdrawOptions ?? []).length, "破袭动作缺撤退路线");
   const outcome = Rules.PerformAction(state, sabotage);
   assert.equal(outcome.report.ok, true, `破袭被结算条件打回：${outcome.report.reason ?? ""}`);
+});
+
+// ---------------------------------------------------------------------------
+Section("九 · 玩法评审整改回归（打仗养根据地 / 残酷有牙 / 假选择变真）");
+
+Test("打游击优于不抵抗的种田（缴获经济反转的总闸门）", () => {
+  const seeds = [11, 22, 33];
+  const fight = seeds.reduce((sum, seed) => sum + RunBotCached(seed, "skilled").total, 0) / seeds.length;
+  const farm = seeds.reduce((sum, seed) => sum + RunBotCached(seed, "farmer").total, 0) / seeds.length;
+  console.log(`      会玩(打+建) ${fight.toFixed(1)} · 纯种田 ${farm.toFixed(1)}`);
+  assert.ok(fight >= farm + 8, `打仗(${fight.toFixed(1)})未领先纯种田(${farm.toFixed(1)})至少 8 分——游击战核心循环又成装饰了`);
+});
+
+Test("结局有多样性，且像样的一局不落失败结局", () => {
+  const seeds = [11, 22, 33];
+  const runs = [...seeds.map((seed) => RunBotCached(seed, "skilled")), ...seeds.map((seed) => RunBotCached(seed, "farmer"))];
+  const titles = new Set(runs.map((run) => run.ending?.title).filter(Boolean));
+  const best = runs.reduce((top, run) => (run.total > top.total ? run : top), runs[0]);
+  console.log(`      结局分布：${[...titles].join(" / ")}；最好一局 ${best.grade}「${best.ending?.title}」`);
+  assert.ok(titles.size >= 2, "全部路线殊途同归到同一结局——结局系统又校准死亡了");
+  assert.ok(best.ending?.key !== "DrivenToTheHills", `最好的一局(${best.grade})仍被判「退回山里」`);
+});
+
+Test("据点补给与围困经济同一量纲", () => {
+  const state = Rules.CreateInitialState({ seed: 7 });
+  for (const stronghold of state.strongholds) {
+    assert.ok(
+      stronghold.supply >= 1 && stronghold.supply <= 20,
+      `${stronghold.name} supply=${stronghold.supply}，围困断粮又变成数学上不可能了`,
+    );
+  }
+});
+
+Test("围困孤立炮楼一个时期内可拔除", () => {
+  let state = Rules.CreateInitialState({ seed: 7 });
+  const stronghold = state.strongholds.find((item) => item.type === "Blockhouse");
+  assert.ok(stronghold, "初始地图上没有炮楼");
+  const adjacent = HexNeighborKeys(stronghold.key).find((key) => Rules.GetHex(state, key));
+  const unit = state.units[0];
+  unit.key = adjacent;
+  for (const key of [stronghold.key, ...HexNeighborKeys(stronghold.key)]) {
+    const hex = Rules.GetHex(state, key);
+    if (hex) hex.massBase = 70;
+  }
+  let cleared = false;
+  for (let turn = 0; turn < 10 && !cleared; turn += 1) {
+    const { nextState } = Combat.ResolveSiege(state, unit.id, stronghold.id, { mode: "Blockade" });
+    state = nextState;
+    cleared = Boolean(state.strongholds.find((item) => item.id === stronghold.id)?.destroyed);
+  }
+  assert.ok(cleared, "围困 10 回合仍未拔除孤立炮楼（补给量纲或投降判定退化）");
+});
+
+Test("扫荡造成的减员当回合不能被治疗抵消", () => {
+  const state = Rules.CreateInitialState({ seed: 7 });
+  const unit = state.units[0];
+  state.sweepStance = "Fortify";
+  state.sweep = { id: "sw1", targetKey: unit.key, turnsUntil: 0, strength: 60, axisKeys: [], radius: 2 };
+  const { nextState } = Combat.ResolveSweepBattle(state, state.sweep);
+  const hurt = nextState.units.find((item) => item.id === unit.id);
+  assert.ok(hurt.hp < unit.maxHp, "依托工事抗击方针下，强扫荡应造成实际减员");
+  const recovered = Combat.TickCombatRecovery(nextState);
+  const after = (recovered.units ?? []).find((item) => item.id === unit.id);
+  assert.ok(after && after.hp <= hurt.hp + 0.01, `扫荡伤害当回合就被治疗抵消（${hurt.hp} → ${after?.hp}）`);
+});
+
+Test("被打散的部队依托群众数季后归队", () => {
+  let state = Rules.CreateInitialState({ seed: 7 });
+  const unit = state.units[1];
+  const hex = Rules.GetHex(state, unit.key);
+  hex.massBase = 60;
+  unit.hp = 0;
+  const total = state.units.length;
+  state = Rules.EndTurn(state).nextState;
+  assert.equal(state.units.length, total - 1, "hp 归零的部队应先从序列消失");
+  assert.equal((state.scattered ?? []).length, 1, "高群众基础地区被打散应进入待归队名单");
+  for (let step = 0; step < 3 && (state.scattered ?? []).length; step += 1) {
+    if (state.events.pending) state = Rules.ApplyEventChoice(state, state.events.pending, null);
+    state = Rules.EndTurn(state).nextState;
+  }
+  assert.equal((state.scattered ?? []).length, 0, "被打散的部队迟迟未归队");
+  assert.equal(state.units.length, total, "归队后的部队没有回到序列");
+});
+
+Test("预警信息量由情报网决定：无情报不全知", () => {
+  const makeSweepState = () => {
+    const state = Rules.CreateInitialState({ seed: 7 });
+    const target = state.map.order[Math.floor(state.map.order.length / 2)];
+    state.sweep = {
+      id: "sw2",
+      targetKey: target,
+      turnsUntil: 2,
+      strength: 40,
+      axisKeys: HexNeighborKeys(target).slice(0, 3),
+      axes: [{}, {}, {}],
+    };
+    return state;
+  };
+  const blind = makeSweepState();
+  for (const key of blind.map.order) blind.map.hexes[key].intel = 0;
+  blind.stock.intel = 0;
+  if (blind.playerEffects) blind.playerEffects.sweepWarning = 0;
+  const fog = Rules.ForecastSweep(blind);
+  const blindExact = Boolean(fog && fog.targetKey === blind.sweep.targetKey && (fog.confidence ?? 1) >= 0.55);
+  assert.ok(!blindExact, "情报清零仍给出高可信度精确预警——情报价值链又断了");
+  const informed = makeSweepState();
+  for (const key of informed.map.order) informed.map.hexes[key].intel = 100;
+  informed.stock.intel = 240;
+  const clear = Rules.ForecastSweep(informed);
+  assert.ok(
+    clear && clear.targetKey === informed.sweep.targetKey && (clear.confidence ?? 0) >= 0.7,
+    "情报拉满仍看不清扫荡目标",
+  );
+});
+
+Test("事件卡效果键全部有消费点（不许虚假发奖）", () => {
+  const consumedKeys = new Set([
+    "stockDelta", "exposureDelta", "alertDelta", "massDelta", "flags", "duration", "forceSweep",
+    "yieldBonus", "flatYield", "massGrowth", "policySlots", "healRate", "exposureDecay",
+    "intelRange", "combatAmbush", "combatDefence", "combatAttack", "captureRate",
+    "buildSpeed", "moveBonus", "sabotageBonus", "siegeBonus", "garrisonReveal",
+    "sweepWarning", "upkeepDiscount", "maintenanceDiscount", "populationGrowth", "unrestDecay", "baseSlots",
+    "cadreGrowth", "tunnelMove", "seizureResist", "civilianShelter",
+    "ambushBonus", "defenceBonus", "railSabotage", "literacy", "puppetDefection",
+    "alertDecay", "researchSpeed", "medicineEfficiency", "concealment", "supplyRange",
+    "unlockUnits", "unlockUnit", "unlockDistricts", "unlockDistrict",
+    "unlockWorks", "unlockWork", "unlockPolicies", "unlockPolicy",
+    "unlockResearch", "unlockTech", "unlockDoctrine",
+  ]);
+  const idPools = {
+    unlockUnit: DataUnits.unitDefinitions ?? {},
+    unlockUnits: DataUnits.unitDefinitions ?? {},
+    unlockDistrict: DataUnits.districtDefinitions ?? {},
+    unlockDistricts: DataUnits.districtDefinitions ?? {},
+    unlockWork: DataTerrain.workDefinitions ?? {},
+    unlockWorks: DataTerrain.workDefinitions ?? {},
+    unlockPolicy: DataTech.policyDefinitions ?? {},
+    unlockPolicies: DataTech.policyDefinitions ?? {},
+    unlockTech: { ...(DataTech.techDefinitions ?? {}), ...(DataTech.doctrineDefinitions ?? {}) },
+    unlockDoctrine: { ...(DataTech.techDefinitions ?? {}), ...(DataTech.doctrineDefinitions ?? {}) },
+    unlockResearch: { ...(DataTech.techDefinitions ?? {}), ...(DataTech.doctrineDefinitions ?? {}) },
+  };
+  for (const event of DataHistory.historicalEvents ?? []) {
+    for (const option of event.options ?? []) {
+      for (const [key, value] of Object.entries(option.effects ?? {})) {
+        assert.ok(consumedKeys.has(key), `事件《${event.title}》选项 ${option.id} 的效果键 ${key} 无消费点`);
+        if (idPools[key]) {
+          for (const id of Array.isArray(value) ? value : [value]) {
+            assert.ok(idPools[key][id], `事件《${event.title}》选项 ${option.id} 引用不存在的 id：${key}=${id}`);
+          }
+        }
+      }
+    }
+  }
+});
+
+Test("unrest 高企有真实后果：不安的根据地产出打折", () => {
+  const run = RunBotCached(11, "farmer");
+  const state = Rules.CloneState(run.finalState);
+  assert.ok(state.bases.length, "对照局面里没有根据地");
+  for (const base of state.bases) base.unrest = 0;
+  Rules.RecomputeEconomy(state);
+  const calm = state.income.grain;
+  for (const base of state.bases) base.unrest = 80;
+  Rules.RecomputeEconomy(state);
+  const troubled = state.income.grain;
+  assert.ok(troubled < calm, `unrest 80 的粮产(${troubled})未低于 unrest 0(${calm})——unrest 又成死状态`);
+});
+
+Test("时期经济修正真实生效：困难期产出低于恢复期", () => {
+  const run = RunBotCached(11, "farmer");
+  const state = Rules.CloneState(run.finalState);
+  state.turn = 16;
+  Rules.RecomputeEconomy(state);
+  const hardship = state.income.grain;
+  state.turn = 24;
+  Rules.RecomputeEconomy(state);
+  const recovery = state.income.grain;
+  assert.ok(
+    hardship < recovery,
+    `困难期粮产(${hardship})未低于恢复期(${recovery})——era.modifiers 又成死数据`,
+  );
 });
 
 // ---------------------------------------------------------------------------

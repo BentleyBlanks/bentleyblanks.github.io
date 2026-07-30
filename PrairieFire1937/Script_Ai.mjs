@@ -325,12 +325,14 @@ const intentLabels = Object.freeze({
  * total 是硬顶；patrol 是常态巡逻网的编制数，给扫荡纵队与辎重队留出缺口。
  * 治安战的兵力曲线：开辟期点线薄弱 → 困难期重兵清剿 → 反攻期抽兵南调。
  */
+// 密度按"目标饥饿"评审结论上调：伏击/情报系统建了全套，得有足够的意图可读、
+// 有足够的巡逻与辎重可打，缴获经济才转得起来。
 const eraMobileCaps = Object.freeze({
-  Opening: Object.freeze({ total: 3, patrol: 3 }),
-  Growth: Object.freeze({ total: 5, patrol: 4 }),
-  Hardship: Object.freeze({ total: 8, patrol: 5 }),
-  Recovery: Object.freeze({ total: 5, patrol: 4 }),
-  Counter: Object.freeze({ total: 4, patrol: 3 }),
+  Opening: Object.freeze({ total: 5, patrol: 4 }),
+  Growth: Object.freeze({ total: 8, patrol: 6 }),
+  Hardship: Object.freeze({ total: 12, patrol: 7 }),
+  Recovery: Object.freeze({ total: 8, patrol: 6 }),
+  Counter: Object.freeze({ total: 6, patrol: 4 }),
 });
 
 function EraMobileCap(eraKey, difficulty) {
@@ -343,7 +345,7 @@ function EraMobileCap(eraKey, difficulty) {
 const dispatchCooldownTurns = 3;
 
 /** 运输队发车间隔（回合，按时期）。开辟期公路网未成，不发辎重。 */
-const convoyIntervalByEra = Object.freeze({ Growth: 4, Hardship: 3, Recovery: 4, Counter: 5 });
+const convoyIntervalByEra = Object.freeze({ Growth: 3, Hardship: 2, Recovery: 3, Counter: 4 });
 
 /** 日历基线扫荡概率的内置回退（Data_History.eraDefinitions.modifiers.sweepChance 缺席时）。 */
 const fallbackSweepChanceByEra = Object.freeze({
@@ -2019,14 +2021,16 @@ function ApplyAttack(next, order, rng, difficulty, report, options) {
     };
     report.attacks += 1;
     report.playerHpLost += simple.damage;
+    // 敌方攻击必须可归因：点名是哪支部队、在哪里、掉了多少（体验评审 P1）。
+    const targetName = externalUnitDefinitions?.[target.type]?.name ?? '我方分队';
     AppendLog(next, {
       kind: 'Combat',
       key: target.key,
-      text: `敌${ResolveEnemyStats(enemy.type).name}在 ${HexLabel(next, target.key)} 咬住我一部，我减员 ${simple.damage}。`,
+      text: `敌${ResolveEnemyStats(enemy.type).name}在 ${HexLabel(next, target.key)} 咬住${targetName}，该部减员 ${simple.damage}。`,
     });
     if (nextHp <= 0) {
       AddLedger(next, 'cadreLost', 1);
-      AppendLog(next, { kind: 'Combat', key: target.key, text: `我一部在 ${HexLabel(next, target.key)} 被打散，骨干失散。` });
+      AppendLog(next, { kind: 'Combat', key: target.key, text: `${targetName}在 ${HexLabel(next, target.key)} 被打散，骨干失散。` });
     }
   }
 }
@@ -2959,7 +2963,9 @@ function SweepIntelCoverage(state, sweep) {
   if (!counted) return 0;
   const average = total / counted / 100;
   const stockBonus = Clamp01(((state.stock && Number(state.stock.intel)) || 0) / 240);
-  return Clamp01(average * 0.8 + stockBonus * 0.35);
+  // 消息树/电台/青抗先等预警科技（sweepWarning）直接抬高预报可信度。
+  const warningBonus = Clamp(((state.playerEffects && state.playerEffects.sweepWarning) || 0) * 0.12, 0, 0.3);
+  return Clamp01(average * 0.8 + stockBonus * 0.35 + warningBonus);
 }
 
 /**

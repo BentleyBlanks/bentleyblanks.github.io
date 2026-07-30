@@ -31,7 +31,7 @@ import * as MapGen from "./Script_MapGen.mjs";
 import * as Combat from "./Script_Combat.mjs";
 import * as Ai from "./Script_Ai.mjs";
 
-export const saveVersion = 2;
+export const saveVersion = 3;
 export const saveKey = "prairiefire1937_campaign_v1";
 export const maxTurns = 32;
 
@@ -47,6 +47,14 @@ export const resourceLabels = Object.freeze({
 });
 
 export const ledgerKeys = ["civilianDeaths", "displaced", "villagesBurned", "cadreLost", "grainSeized"];
+
+export const ledgerLabels = Object.freeze({
+  civilianDeaths: "平民伤亡",
+  displaced: "流离失所",
+  villagesBurned: "被焚村庄",
+  cadreLost: "骨干损失",
+  grainSeized: "被夺粮食",
+});
 
 /** 五个时期的回合边界（与 Data_History 对齐，此处为内置回退）。 */
 const fallbackEras = [
@@ -71,11 +79,11 @@ const fallbackBaseTiers = {
 
 export const ruleConstants = Object.freeze({
   startingStock: { grain: 46, labor: 22, ordnance: 14, medicine: 7, intel: 6, cadre: 3 },
-  // 暴露度唯一的一处自然衰减（AI 侧不再重复扣减），按时期：
-  // 正常约 -3/回合、困难期 -2。目标是主动玩家在 15~60 区间波动：
-  // 打完转移压得回去，滞留则一路失控。
-  exposureDecayBase: 3,
-  exposureDecayByEra: Object.freeze({ Opening: 3, Growth: 3, Hardship: 2, Recovery: 2.5, Counter: 3 }),
+  // 暴露度唯一的一处自然衰减（AI 侧不再重复扣减），按存量比例：
+  // 高位回落快（避免一次战斗就整局锁死），低位回落慢（打了就是打了）。
+  // 目标是主动玩家在 15~60 区间波动：节制地打可持续，滞留连打则失控。
+  exposureDecayRateByEra: Object.freeze({ Opening: 0.16, Growth: 0.16, Hardship: 0.1, Recovery: 0.13, Counter: 0.16 }),
+  exposureDecayFloor: 1,
   exposureSweepThreshold: 58,
   // 警备度的时期基线下限：治安战的常态压力，扫荡日历的底色。
   alertFloorByEra: Object.freeze({ Opening: 8, Growth: 14, Hardship: 26, Recovery: 18, Counter: 12 }),
@@ -89,7 +97,15 @@ export const ruleConstants = Object.freeze({
   foundBaseCadreCost: 2,
   foundBaseLaborCost: 12,
   famineThreshold: 0,
+  // 饥荒按连续断粮季数累进（上限 4 级）：一季是紧张，连年断粮是灾难。
+  // 这些全部是代价方向的后果，不产生任何收益。
+  famineSeverityCap: 4,
+  famineMassHitPerLevel: 0.4,
+  famineDisplacedPerVillage: 0.8,
   researchBase: 4,
+  // 据点初始补给按类型给定，与 Script_Combat 的围困经济同一量纲
+  //（曾经播种 100 而战斗层按 6~12 设计，围困 32 回合都断不了粮）。
+  strongholdSupplyByType: Object.freeze({ Blockhouse: 6, Garrison: 8, RailStation: 9, CountySeat: 12 }),
   // 经济配平：地块产出必须乘上这个系数才进国库。没有它，产出随「根据地格数 ×
   // 科技乘数」超线性膨胀，几十回合后所有资源都以千计，一切取舍失去意义。
   hexYieldScale: 0.3,
@@ -101,8 +117,9 @@ export const ruleConstants = Object.freeze({
   hexUpkeepLabor: 0.1,
   cadreIncomeScale: 2.4,
   // 各资源的地产系数，把设计意图写进数值：
-  // 粮是主粮、工次之；械主要靠缴获而不是种出来的；药在敌后永远稀缺。
-  resourceYieldScale: Object.freeze({ grain: 1, labor: 0.75, ordnance: 0.45, medicine: 0.26, intel: 0.8 }),
+  // 粮是主粮、工次之；械主要靠缴获而不是种出来的（0.08 让种田产械
+  // 低于一次像样的伏击，否则"械主要靠缴获"就是一句空话）；药在敌后永远稀缺。
+  resourceYieldScale: Object.freeze({ grain: 1, labor: 0.75, ordnance: 0.08, medicine: 0.26, intel: 0.8 }),
 });
 
 // ---------------------------------------------------------------------------
@@ -339,6 +356,13 @@ export function CreateInitialState(options = {}) {
     sweep: null,
     sabotageTotal: 0,
     ledger: EmptyLedger(),
+    // 代价账本逐条记录：{ turn, kind, key, text, delta }，只记录、不折算（红线）。
+    ledgerLog: [],
+    // 被打散的部队：{ type, name, key, returnTurn }，靠群众基础数回合后减员归队。
+    scattered: [],
+    famineTurns: 0,
+    counterDrawdownDone: false,
+    initialPopulation: 0,
     events: { fired: [], pending: null },
     log: [],
     over: false,
@@ -347,6 +371,11 @@ export function CreateInitialState(options = {}) {
 
   SeedStartingForces(state, generated);
   SeedEnemyForces(state, generated);
+  // 县域人口基准：按聚落规模折算，用于终局"人口恢复"口径（终局治下人口 / 县域基准）。
+  state.initialPopulation = state.map.order.reduce((sum, key) => {
+    const feature = state.map.hexes[key]?.feature;
+    return sum + (feature === "CountySeat" ? 2400 : feature === "Town" ? 1200 : feature === "Village" ? 620 : 0);
+  }, 0);
   RecomputeMassAndControl(state);
   RecomputeVisibility(state);
   RecomputeEconomy(state);
@@ -453,7 +482,7 @@ function SeedEnemyForces(state, generated) {
       type,
       garrison,
       maxGarrison: garrison,
-      supply: 100,
+      supply: ruleConstants.strongholdSupplyByType[type] ?? 6,
       alarm: 0,
       name: seed.name ?? StrongholdName(type),
     });
@@ -497,7 +526,7 @@ function SeedEnemyForces(state, generated) {
       type: "Blockhouse",
       garrison: 3,
       maxGarrison: 3,
-      supply: 100,
+      supply: ruleConstants.strongholdSupplyByType.Blockhouse ?? 6,
       alarm: 0,
       name: StrongholdName("Blockhouse"),
     });
@@ -651,34 +680,46 @@ function MergeEffects(sources) {
 }
 
 function NormalizeEffects(effects) {
+  const asList = (value) => (Array.isArray(value) ? value : value ? [value] : []);
   return {
     yieldBonus: effects.yieldBonus ?? {},
     flatYield: effects.flatYield ?? {},
-    unlockUnits: effects.unlockUnits ?? [],
-    unlockDistricts: effects.unlockDistricts ?? [],
-    unlockWorks: effects.unlockWorks ?? [],
-    unlockPolicies: effects.unlockPolicies ?? [],
+    // unlock 词汇统一收拢单数/复数两种写法（事件卡里两种都在用）。
+    unlockUnits: [...asList(effects.unlockUnits), ...asList(effects.unlockUnit)],
+    unlockDistricts: [...asList(effects.unlockDistricts), ...asList(effects.unlockDistrict)],
+    unlockWorks: [...asList(effects.unlockWorks), ...asList(effects.unlockWork)],
+    unlockPolicies: [...asList(effects.unlockPolicies), ...asList(effects.unlockPolicy)],
+    unlockResearch: [...asList(effects.unlockResearch), ...asList(effects.unlockTech), ...asList(effects.unlockDoctrine)],
     policySlots: effects.policySlots ?? 0,
     massGrowth: effects.massGrowth ?? 0,
     exposureDecay: effects.exposureDecay ?? 0,
     intelRange: effects.intelRange ?? 0,
-    combatAmbush: effects.combatAmbush ?? 0,
-    combatDefence: effects.combatDefence ?? 0,
+    // ambushBonus/defenceBonus/railSabotage 是事件卡沿用的老词，并入同义主键。
+    combatAmbush: (effects.combatAmbush ?? 0) + (effects.ambushBonus ?? 0),
+    combatDefence: (effects.combatDefence ?? 0) + (effects.defenceBonus ?? 0),
     combatAttack: effects.combatAttack ?? 0,
     captureRate: effects.captureRate ?? 0,
     healRate: effects.healRate ?? 0,
     buildSpeed: effects.buildSpeed ?? 0,
     moveBonus: effects.moveBonus ?? 0,
-    sabotageBonus: effects.sabotageBonus ?? 0,
+    sabotageBonus: (effects.sabotageBonus ?? 0) + (effects.railSabotage ?? 0),
     siegeBonus: effects.siegeBonus ?? 0,
     garrisonReveal: Boolean(effects.garrisonReveal),
     sweepWarning: effects.sweepWarning ?? 0,
-    upkeepDiscount: effects.upkeepDiscount ?? 0,
+    upkeepDiscount: (effects.upkeepDiscount ?? 0) + (effects.maintenanceDiscount ?? 0),
     populationGrowth: effects.populationGrowth ?? 0,
     unrestDecay: effects.unrestDecay ?? 0,
     baseSlots: effects.baseSlots ?? 0,
-    cadreGrowth: effects.cadreGrowth ?? 0,
+    // 识字率的机制落点：干部成长与情报判读（词汇表第 125 行声明的语义）。
+    cadreGrowth: (effects.cadreGrowth ?? 0) + (effects.literacy ?? 0) * 0.6,
     tunnelMove: Boolean(effects.tunnelMove),
+    puppetDefection: Clamp(effects.puppetDefection ?? 0, 0, 0.6),
+    // 补给半径：交通线打通后根据地的实际工作范围外扩（封锁沟越沟点/地道网事件）。
+    supplyRange: Clamp(Math.round(effects.supplyRange ?? 0), 0, 2),
+    alertDecay: effects.alertDecay ?? 0,
+    researchSpeed: effects.researchSpeed ?? 0,
+    medicineEfficiency: Clamp(effects.medicineEfficiency ?? 0, 0, 0.6),
+    concealment: Clamp(effects.concealment ?? 0, 0, 0.5),
     // 减灾类效果：只降低代价账本的增长，绝不产生资源或分数（Spec 第 7 节红线）。
     seizureResist: Clamp(effects.seizureResist ?? 0, 0, 0.85),
     civilianShelter: Clamp(effects.civilianShelter ?? 0, 0, 0.85),
@@ -725,10 +766,11 @@ export function GetHexWorkEffects(hex) {
   return totals;
 }
 
-/** 某格是否被任一根据地工作范围覆盖。 */
+/** 某格是否被任一根据地工作范围覆盖（补给半径事件可外扩）。 */
 export function GetWorkingBase(state, key) {
+  const rangeBonus = GetEffects(state).supplyRange;
   for (const base of state.bases) {
-    const radius = GetBaseTier(base.tier).workRadius ?? 1;
+    const radius = (GetBaseTier(base.tier).workRadius ?? 1) + rangeBonus;
     if (HexDistanceKeys(base.key, key) <= radius) return base;
   }
   return null;
@@ -738,6 +780,9 @@ export function GetWorkingBase(state, key) {
 export function RecomputeEconomy(state) {
   const effects = GetEffects(state);
   const season = SeasonModifier(state.turn);
+  // 时期经济修正：困难期产出 ×0.72、恢复期 ×1.15 等（Data_History 声明，此处消费）。
+  const eraModifiers = GetEraForTurn(state.turn)?.modifiers ?? {};
+  const eraYieldScale = Number(eraModifiers.yieldScale) || 1;
   const income = EmptyStock();
   const upkeep = EmptyStock();
   const detail = { grain: [], labor: [], ordnance: [], medicine: [], intel: [], cadre: [] };
@@ -745,8 +790,12 @@ export function RecomputeEconomy(state) {
 
   for (const base of state.bases) {
     const tier = GetBaseTier(base.tier);
-    const radius = tier.workRadius ?? 1;
-    const scale = tier.yieldScale ?? 1;
+    const radius = (tier.workRadius ?? 1) + effects.supplyRange;
+    // 被扫荡打停的基地：机关分散隐蔽期间产出大减、区域全部停摆。
+    // 不安（unrest）高企的基地：公粮收不齐、夫役派不动，产出打折。
+    const disruptedScale = (base.disrupted || 0) > 0 ? 0.3 : 1;
+    const unrestScale = (base.unrest || 0) >= 60 ? 0.55 : 1;
+    const scale = (tier.yieldScale ?? 1) * disruptedScale * unrestScale;
     for (const coordinate of HexesInRange(ParseHexKey(base.key), radius)) {
       const key = HexKey(coordinate.q, coordinate.r);
       const hex = state.map.hexes[key];
@@ -764,6 +813,7 @@ export function RecomputeEconomy(state) {
           scorchScale *
           scale *
           (season[resource] ?? 1) *
+          eraYieldScale *
           ruleConstants.hexYieldScale *
           (ruleConstants.resourceYieldScale[resource] ?? 1);
         if (amount) income[resource] += amount;
@@ -776,6 +826,7 @@ export function RecomputeEconomy(state) {
 
     for (const district of base.districts ?? []) {
       if (!district.done) continue;
+      if (disruptedScale < 1) continue;
       const definition = districtDefinitions()[district.type];
       for (const resource of resourceKeys) {
         const amount = Number(definition?.yields?.[resource]) || 0;
@@ -806,6 +857,8 @@ export function RecomputeEconomy(state) {
     if (resourceKeys.includes(resource)) income[resource] *= 1 + Clamp(Number(bonus) || 0, -0.9, ruleConstants.yieldBonusCap);
   }
   income.cadre *= 1 + Clamp(effects.cadreGrowth, -0.9, ruleConstants.yieldBonusCap);
+  // 干部稀缺按时期起伏：开辟与困难年月培养一个干部更难。
+  income.cadre /= Math.max(0.5, Number(eraModifiers.cadreScarcity) || 1);
 
   // 情报网：基础情报按覆盖格数补足，保证情报系统在早期也能转起来。
   income.intel += 0.8 + state.bases.length * 0.35;
@@ -818,6 +871,21 @@ export function RecomputeEconomy(state) {
   state.income = income;
   state.upkeep = upkeep;
   state.incomeDetail = detail;
+  // 供 Combat / Ai 消费的效果缓存（纯数据、可序列化）。经济重算的所有入口
+  //（回合结算、政策变更、事件选择）都会刷新它。
+  state.playerEffects = {
+    combatAmbush: effects.combatAmbush,
+    combatAttack: effects.combatAttack,
+    combatDefence: effects.combatDefence,
+    captureRate: effects.captureRate,
+    healRate: effects.healRate,
+    medicineEfficiency: effects.medicineEfficiency,
+    concealment: effects.concealment,
+    puppetDefection: effects.puppetDefection,
+    sweepWarning: effects.sweepWarning,
+    siegeBonus: effects.siegeBonus,
+    sabotageBonus: effects.sabotageBonus,
+  };
   return state;
 }
 
@@ -929,10 +997,29 @@ function DriftIntel(state) {
 function DriftMassBase(state) {
   const effects = GetEffects(state);
   const growth = ruleConstants.massDriftBase * (1 + effects.massGrowth);
+
+  // 据点压制场：驻军越足、辐射越远，周边群众基础被持续压着——
+  // 这就是"不拔点，百姓就一直受难"的机制载体。守备被抽调（敌进我进/反攻南调）
+  // 或据点被拔，压制立即松动，地图肉眼可见地"活"回来。
+  const suppression = new Map();
+  for (const stronghold of state.strongholds ?? []) {
+    if (!stronghold || stronghold.destroyed || (stronghold.garrison ?? 0) <= 0) continue;
+    const strengthScale = Clamp01(
+      (stronghold.garrison ?? 0) / Math.max(1, stronghold.maxGarrison ?? stronghold.garrison ?? 1),
+    );
+    const radius = stronghold.type === "Blockhouse" ? 1 : 2;
+    for (const coordinate of HexesInRange(ParseHexKey(stronghold.key), radius)) {
+      const hexKey = HexKey(coordinate.q, coordinate.r);
+      if (!state.map.hexes[hexKey]) continue;
+      const distance = HexDistanceKeys(stronghold.key, hexKey);
+      const amount = (distance === 0 ? ruleConstants.massDriftEnemy : distance === 1 ? -0.9 : -0.35) * strengthScale;
+      suppression.set(hexKey, (suppression.get(hexKey) ?? 0) + amount);
+    }
+  }
+
   for (const key of state.map.order) {
     const hex = state.map.hexes[key];
     if (!hex) continue;
-    const stronghold = GetStrongholdAt(state, key);
     let delta = 0;
 
     // 群众基础靠干部和政权维持，不会因为地理位置自己长起来。
@@ -943,20 +1030,21 @@ function DriftMassBase(state) {
     const organized = Boolean(workingBase);
     const unitPresent = state.units.some((unit) => unit.key === key);
 
-    if (hex.baseId) delta += growth * 1.4;
-    else if (organized) delta += growth;
+    // 政权不稳（unrest 高）的基地做不动群众工作：增长减半。
+    const unrestDrag = workingBase && (workingBase.unrest || 0) >= 60 ? 0.5 : 1;
+    if (hex.baseId) delta += growth * 1.4 * unrestDrag;
+    else if (organized) delta += growth * unrestDrag;
     else {
       // 只有工作队/部队在场时才勉强维持，否则持续下滑。
       delta -= unitPresent ? 0.25 : 1.1;
     }
 
-    if (stronghold && stronghold.garrison > 0) delta += ruleConstants.massDriftEnemy;
+    delta += suppression.get(key) ?? 0;
     for (const neighborKey of HexNeighborKeys(key)) {
       const neighbor = state.map.hexes[neighborKey];
       if (!neighbor) continue;
       // 邻接加成只能巩固已经组织起来的地方，不能凭空创造新的根据地。
       if (organized && neighbor.control === "Base") delta += 0.32;
-      if (GetStrongholdAt(state, neighborKey)) delta -= 0.45;
     }
 
     if (hex.scorch > 0) {
@@ -1247,6 +1335,7 @@ export function CanBuildWork(state, unitId, key, workType) {
   const hex = GetHex(state, key);
   if (!definition || !hex) return { ok: false, reason: "未知工事", visible: false };
   if (hex.works?.includes(workType)) return { ok: false, reason: "已建成", visible: false };
+  if (hex.workBuild) return { ok: false, reason: "该地已有在建工程" };
   const effects = GetEffects(state);
   if (definition.requiresTech && !state.research.done.includes(definition.requiresTech)) {
     if (!effects.unlockWorks.includes(workType)) return { ok: false, reason: "科技未解锁", visible: false };
@@ -1290,6 +1379,23 @@ function SpendStock(state, cost) {
 function PushLog(state, tag, text) {
   state.log.push({ turn: state.turn, tag, text });
   if (state.log.length > 400) state.log.splice(0, state.log.length - 400);
+}
+
+/**
+ * 代价账本的逐条记录：何时、何地、何因、多少人。
+ * 只用于呈现（账本面板逐条页），绝不参与任何计算——账本红线不变。
+ */
+export function PushLedgerLog(state, entry) {
+  if (!entry || !entry.text) return;
+  state.ledgerLog = Array.isArray(state.ledgerLog) ? state.ledgerLog : [];
+  state.ledgerLog.push({
+    turn: entry.turn ?? state.turn,
+    kind: entry.kind ?? "General",
+    key: entry.key ?? null,
+    text: entry.text,
+    delta: entry.delta ?? {},
+  });
+  if (state.ledgerLog.length > 200) state.ledgerLog.splice(0, state.ledgerLog.length - 200);
 }
 
 /**
@@ -1438,20 +1544,20 @@ export function PerformAction(state, action) {
       const definition = workDefinitions()[action.workType];
       SpendStock(next, definition.cost ?? {});
       const hex = GetHex(next, action.key);
-      hex.works = Array.from(new Set([...(hex.works ?? []), action.workType]));
-      // 是否接通地道由工事自己的 setsTunnel 声明，而不是按名字硬编码。
-      if (definition.effects?.setsTunnel || action.workType === "Tunnel") hex.tunnel = true;
-      const workEffects = GetHexWorkEffects(hex);
-      if (workEffects.exposureDelta) {
-        next.exposure = Clamp(next.exposure + workEffects.exposureDelta, 0, 100);
+      const buildTurns = Math.max(1, Number(definition.turns) || 1);
+      if (buildTurns <= 1) {
+        FinishHexWork(next, hex, action.workType, report);
+      } else {
+        // 工期真实生效：多回合工程排进地块工地，回合结算逐步推进。
+        hex.workBuild = { type: action.workType, turnsLeft: buildTurns };
+        report.lines.push(`${definition.name ?? action.workType}破土动工，约 ${buildTurns} 个季度完工。`);
+        report.effects.push({ kind: "Build", key: action.key, payload: { started: true } });
       }
       const unit = GetUnit(next, action.unitId);
       if (unit) {
         unit.acted = true;
         unit.moves = 0;
       }
-      report.lines.push(`${definition.name ?? action.workType}修成。`);
-      report.effects.push({ kind: "Build", key: action.key });
       break;
     }
     case "Rest": {
@@ -1565,10 +1671,22 @@ function ResolveCombatAction(state, action) {
 // 科技 / 政策 / 建设
 // ---------------------------------------------------------------------------
 
+const eraOrderKeys = ["Opening", "Growth", "Hardship", "Recovery", "Counter"];
+
 export function IsResearchAvailable(state, id) {
   const definition = techDefinitions()[id] ?? doctrineDefinitions()[id];
   if (!definition) return false;
   if (state.research.done.includes(id)) return false;
+  // 时期硬门槛：定义里声明的 era 字段真正生效——大生产、反攻编制这类
+  // 后期路线不许在 1938 年就点出来。
+  if (definition.era) {
+    const needed = eraOrderKeys.indexOf(definition.era);
+    const current = eraOrderKeys.indexOf(state.eraKey);
+    if (needed >= 0 && current >= 0 && needed > current) return false;
+  }
+  // 事件解锁的条目（unlockTech/unlockDoctrine）可以越过前置直接研究——
+  // 群众运动里长出来的东西不用等实验室的顺序。
+  if (GetEffects(state).unlockResearch.includes(id)) return true;
   const requires = definition.requires ?? [];
   return requires.every((requirement) => state.research.done.includes(requirement));
 }
@@ -1601,13 +1719,28 @@ export function SetPolicies(state, ids) {
   const next = CloneState(state);
   const definitions = policyDefinitions();
   const slots = GetPolicySlots(next);
+  const unlocked = GetEffects(next).unlockPolicies;
   const valid = (ids ?? []).filter((id) => {
     const definition = definitions[id];
     if (!definition) return false;
+    if (unlocked.includes(id)) return true;
     const requires = definition.requires ?? [];
     return requires.every((requirement) => next.research.done.includes(requirement));
   });
-  next.policy.equipped = valid.slice(0, slots);
+  const equippedNow = valid.slice(0, slots);
+  // 换卡要付协调成本（干部下乡重新布置工作）：首次装填免费，此后每换上一张新卡收费。
+  const previous = new Set(state.policy.equipped ?? []);
+  if (previous.size > 0 && typeof DataTech?.GetPolicySwapCost === "function") {
+    for (const id of equippedNow) {
+      if (previous.has(id)) continue;
+      try {
+        SpendStock(next, DataTech.GetPolicySwapCost(id, previous.size) ?? {});
+      } catch (error) {
+        // 数据模块缺席时不收费
+      }
+    }
+  }
+  next.policy.equipped = equippedNow;
   next.policy.slots = slots;
   RecomputeEconomy(next);
   return next;
@@ -1648,16 +1781,26 @@ export function QueueDistrict(state, baseId, districtType) {
   return next;
 }
 
+/** 编成成本随时期起伏（困难期 ×1.35 等），UI 与校验统一从这里取。 */
+export function GetTrainCost(state, unitType) {
+  const stats = GetUnitStats(unitType);
+  const modifier = Number(GetEraForTurn(state.turn)?.modifiers?.recruitCost) || 1;
+  const cost = {};
+  for (const [resource, amount] of Object.entries(stats.cost ?? {})) {
+    cost[resource] = Math.round((Number(amount) || 0) * modifier * 10) / 10;
+  }
+  return cost;
+}
+
 export function CanTrainUnit(state, baseId, unitType) {
   const base = GetBase(state, baseId);
-  const stats = GetUnitStats(unitType);
   const definition = unitDefinitions()[unitType];
   if (!base || !definition) return { ok: false, reason: "无效目标" };
   if (definition.side !== "Player") return { ok: false, reason: "不可编成" };
   if (definition.requiresTech && !state.research.done.includes(definition.requiresTech)) {
     if (!GetEffects(state).unlockUnits.includes(unitType)) return { ok: false, reason: "科技未解锁" };
   }
-  for (const [resource, amount] of Object.entries(stats.cost ?? {})) {
+  for (const [resource, amount] of Object.entries(GetTrainCost(state, unitType))) {
     if ((state.stock[resource] ?? 0) < amount) return { ok: false, reason: `${resourceLabels[resource] ?? resource}不足` };
   }
   return { ok: true, reason: "" };
@@ -1668,7 +1811,7 @@ export function TrainUnit(state, baseId, unitType) {
   if (!check.ok) return state;
   const next = CloneState(state);
   const base = GetBase(next, baseId);
-  SpendStock(next, GetUnitStats(unitType).cost ?? {});
+  SpendStock(next, GetTrainCost(next, unitType));
   AddUnit(next, unitType, base.key);
   RecomputeVisibility(next);
   RecomputeEconomy(next);
@@ -1691,12 +1834,51 @@ function AdvanceConstruction(state) {
       PushLog(state, "建设", `${base.name}建成${definition?.name ?? item.type}。`);
     }
   }
+  // 地块工事的工期推进（多回合工程；被扫荡平毁的是已建成工事，工地不受影响）。
+  for (const key of state.map.order) {
+    const hex = state.map.hexes[key];
+    if (!hex || !hex.workBuild) continue;
+    hex.workBuild.turnsLeft -= speed;
+    if (hex.workBuild.turnsLeft <= 0) {
+      const workType = hex.workBuild.type;
+      hex.workBuild = null;
+      FinishHexWork(state, hex, workType, null);
+    }
+  }
+}
+
+/** 工事完工的统一落点：入列、接地道、结算暴露度影响、发战报。 */
+function FinishHexWork(state, hex, workType, report) {
+  const definition = workDefinitions()[workType] ?? {};
+  hex.works = Array.from(new Set([...(hex.works ?? []), workType]));
+  // 是否接通地道由工事自己的 setsTunnel 声明，而不是按名字硬编码。
+  if (definition.effects?.setsTunnel || workType === "Tunnel") hex.tunnel = true;
+  const workEffects = GetHexWorkEffects(hex);
+  if (workEffects.exposureDelta) {
+    state.exposure = Clamp(state.exposure + workEffects.exposureDelta, 0, 100);
+  }
+  const line = `${definition.name ?? workType}修成。`;
+  if (report) {
+    report.lines.push(line);
+    report.effects.push({ kind: "Build", key: hex.key });
+  } else {
+    PushLog(state, "建设", line);
+  }
 }
 
 function AdvanceResearch(state) {
-  const effects = GetEffects(state);
+  const activeTech = Boolean(state.research.currentId);
+  const activeDoctrine = Boolean(state.research.currentDoctrineId);
+  if (!activeTech && !activeDoctrine) return;
   const intelIncome = Math.max(0, (state.income.intel ?? 0));
-  const rate = ruleConstants.researchBase + intelIncome;
+  // 情报是研究的真燃料：先吃收入，再抽库存加速。攒下的情报换扫荡预警的可信度，
+  // 花掉的换科技速度——攒还是花，是一条贯穿全程的真取舍。
+  const stockDraw = activeTech ? Math.min(Math.max(0, state.stock.intel ?? 0), 6) : 0;
+  if (stockDraw > 0) state.stock.intel = Math.round((state.stock.intel - stockDraw) * 10) / 10;
+  // 两棵树共享同一班研究人手：同时开两线，两边都得慢下来。
+  const shareScale = activeTech && activeDoctrine ? 0.55 : 1;
+  const speedScale = 1 + Clamp(GetEffects(state).researchSpeed, 0, 0.5);
+  const rate = (ruleConstants.researchBase + intelIncome + stockDraw * 0.6) * shareScale * speedScale;
   const finish = (id, tree) => {
     state.research.done.push(id);
     const definition = tree === "doctrine" ? doctrineDefinitions()[id] : techDefinitions()[id];
@@ -1720,7 +1902,7 @@ function AdvanceResearch(state) {
   if (state.research.currentDoctrineId) {
     const definition = doctrineDefinitions()[state.research.currentDoctrineId];
     const cost = (definition?.cost?.intel ?? 10) + (definition?.cost?.cadre ?? 1) * 6;
-    const doctrineRate = ruleConstants.researchBase * 0.8 + (state.income.cadre ?? 0) * 8;
+    const doctrineRate = (ruleConstants.researchBase * 0.8 + (state.income.cadre ?? 0) * 8) * shareScale;
     state.research.doctrineProgress += doctrineRate;
     if (state.research.doctrineProgress >= cost) finish(state.research.currentDoctrineId, "doctrine");
   }
@@ -1735,6 +1917,18 @@ function GrowPopulation(state) {
     const massAverage = AverageMassAround(state, base.key, tier.workRadius ?? 1);
     const rate = (0.05 + massAverage / 1400) * (1 + effects.populationGrowth) * surplus;
     base.population = Clamp(Math.round(base.population * (1 + rate)), 60, cap);
+    // 不安到顶的地方留不住人：人口外流，流离入账（只记代价，不产生任何收益）。
+    if ((base.unrest || 0) >= 80 && base.population > 120) {
+      const outflow = Math.round(base.population * 0.06);
+      base.population -= outflow;
+      state.ledger.displaced += outflow;
+      PushLedgerLog(state, {
+        kind: "Unrest",
+        key: base.key,
+        text: `${FormatTurnDate(state.turn)}，${base.name}人心浮动，${outflow} 人携家外流。`,
+        delta: { displaced: outflow },
+      });
+    }
     base.unrest = Clamp(base.unrest - 1 - effects.unrestDecay * 4, 0, 100);
 
     // 升级：人口与群众基础同时到位才能升级（人口线取自 Data_Units 的 upgradePopulation）。
@@ -1773,16 +1967,50 @@ export function EndTurn(state) {
     next.stock[key] = Math.max(0, Math.round(((next.stock[key] ?? 0) + net[key]) * 10) / 10);
   }
   if (net.grain < 0 && next.stock.grain <= 0) {
-    // 缺粮：部队减员、群众基础下滑。这是代价，不产生任何收益。
-    for (const unit of next.units) unit.hp = Math.max(1, unit.hp - 1);
-    for (const base of next.bases) base.unrest = Clamp(base.unrest + 8, 0, 100);
-    report.lines.push("粮食见底。部队分散就食，机关减员。");
+    // 缺粮按连续季数累进：一季是紧张，连年断粮是灾难。全部是代价，不产生任何收益。
+    next.famineTurns = (next.famineTurns || 0) + 1;
+    const severity = Math.min(ruleConstants.famineSeverityCap, next.famineTurns);
+    for (const unit of next.units) unit.hp = Math.max(1, unit.hp - severity);
+    for (const base of next.bases) base.unrest = Clamp(base.unrest + 6 + severity * 3, 0, 100);
+    if (severity >= 2) {
+      // 持续断粮连干部队伍也保不住：下乡就食、请长假、脱队——
+      // 「一边全县断粮一边连开九个根据地」在数值上必须不成立。
+      next.stock.cadre = Math.max(0, Math.round((next.stock.cadre - 0.25 * severity) * 10) / 10);
+      let famineVillages = 0;
+      for (const key of next.map.order) {
+        const hex = next.map.hexes[key];
+        if (!hex || (hex.control !== "Base" && hex.control !== "Guerrilla")) continue;
+        hex.massBase = Clamp(hex.massBase - ruleConstants.famineMassHitPerLevel * severity, 0, 100);
+        if (hex.feature === "Village") famineVillages += 1;
+      }
+      const displacedGain = Math.round(famineVillages * ruleConstants.famineDisplacedPerVillage * (severity - 1));
+      if (displacedGain > 0) {
+        next.ledger.displaced += displacedGain;
+        PushLedgerLog(next, {
+          kind: "Famine",
+          text: `${FormatTurnDate(next.turn)}，连续第${next.famineTurns}季断粮，各村外出逃荒 ${displacedGain} 人。`,
+          delta: { displaced: displacedGain },
+        });
+      }
+      report.lines.push(
+        severity >= 3
+          ? `连续第${next.famineTurns}季断粮：部队大量减员，群众开始逃荒，根据地在塌。`
+          : "断粮进入第二季。部队分散就食，村里的存粮也见了底。",
+      );
+    } else {
+      report.lines.push("粮食见底。部队分散就食，机关减员。");
+    }
+  } else if (next.stock.grain > 0) {
+    next.famineTurns = 0;
   }
 
   // 2. 建设与研究
   AdvanceConstruction(next);
   AdvanceResearch(next);
   GrowPopulation(next);
+  for (const base of next.bases) {
+    if ((base.disrupted || 0) > 0) base.disrupted -= 1;
+  }
 
   // 3. 群众基础与情报漂移
   DriftMassBase(next);
@@ -1794,8 +2022,10 @@ export function EndTurn(state) {
   report.effects.push(...enemyReport.effects);
 
   // 5. 暴露度与警备度（全局唯一的一处自然衰减；AI 侧不再重复扣减）
-  const eraDecay = ruleConstants.exposureDecayByEra[next.eraKey] ?? ruleConstants.exposureDecayBase;
-  next.exposure = Clamp(next.exposure - eraDecay * (1 + effects.exposureDecay), 0, 100);
+  // 比例衰减：高位回落快、低位回落慢，让"节制地打"落在 15~60 的可持续带内。
+  const decayRate = ruleConstants.exposureDecayRateByEra[next.eraKey] ?? 0.14;
+  const exposureDecay = Math.max(ruleConstants.exposureDecayFloor, next.exposure * decayRate) * (1 + effects.exposureDecay);
+  next.exposure = Math.round(Clamp(next.exposure - exposureDecay, 0, 100) * 10) / 10;
   // 警备度：时期基线之上，根据地越多、经营的村庄越多，增速越高——治安战的常态压力。
   const baseHexCount = next.map.order.reduce(
     (count, key) => count + (next.map.hexes[key]?.control === "Base" ? 1 : 0),
@@ -1807,8 +2037,16 @@ export function EndTurn(state) {
     baseHexCount * 0.02 +
     next.exposure * 0.03 -
     1.2 -
+    effects.alertDecay -
     next.alert * 0.03;
   next.alert = Clamp(Math.max(next.alert + alertDrift, alertFloor), 0, 100);
+
+  // 事件持续效果的到期处理（duration 按回合递减，到 0 撤销）。
+  if (Array.isArray(next.eventEffects) && next.eventEffects.length) {
+    next.eventEffects = next.eventEffects
+      .map((entry) => (typeof entry?.duration === "number" ? { ...entry, duration: entry.duration - 1 } : entry))
+      .filter((entry) => typeof entry?.duration !== "number" || entry.duration > 0);
+  }
 
   // 6. 单位回合重置
   if (typeof Combat.TickCombatRecovery === "function") {
@@ -1831,7 +2069,47 @@ export function EndTurn(state) {
     const hex = GetHex(next, unit.key);
     if (!unit.hidden && hex && hex.massBase >= 50) unit.hidden = true;
   }
+
+  // 被打散与归队：hp 打到 0 的部队不是全灭，而是被打散——
+  // 在群众基础好的地区，人员分散隐蔽数个季度后减员归队；
+  // 没有群众掩护就是永远的损失，骨干损失记入代价账本。
+  const fallen = next.units.filter((unit) => unit.hp <= 0);
   next.units = next.units.filter((unit) => unit.hp > 0);
+  for (const unit of fallen) {
+    const stats = GetUnitStats(unit.type);
+    const hex = GetHex(next, unit.key);
+    const sheltered = hex && (hex.massBase >= 30 || hex.control === "Base" || hex.control === "Guerrilla");
+    if (sheltered) {
+      next.scattered = Array.isArray(next.scattered) ? next.scattered : [];
+      next.scattered.push({ type: unit.type, name: stats.name, key: unit.key, returnTurn: next.turn + 2 });
+      report.lines.push(`${stats.name}被打散。人员依托群众分散隐蔽，正设法归队。`);
+      report.effects.push({ kind: "Retreat", key: unit.key, payload: { scattered: true } });
+    } else {
+      next.ledger.cadreLost += 1;
+      PushLedgerLog(next, {
+        kind: "UnitLost",
+        key: unit.key,
+        text: `${FormatTurnDate(next.turn)}，${stats.name}在无群众掩护的地区被打散，人员失散未归。`,
+        delta: { cadreLost: 1 },
+      });
+      report.lines.push(`${stats.name}被打散在敌占区，人员失散未归。`);
+    }
+  }
+  next.scattered = (next.scattered ?? []).filter((entry) => {
+    if (entry.returnTurn > next.turn) return true;
+    const stats = GetUnitStats(entry.type);
+    const home = next.bases.length
+      ? next.bases.reduce(
+          (best, base) => (HexDistanceKeys(base.key, entry.key) < HexDistanceKeys(best.key, entry.key) ? base : best),
+          next.bases[0],
+        )
+      : null;
+    const unit = AddUnit(next, entry.type, home ? home.key : entry.key);
+    unit.hp = Math.max(6, Math.round(stats.maxHp * 0.45));
+    unit.fatigue = 40;
+    report.lines.push(`${stats.name}的失散人员归队，减员近半，在${home ? home.name : "原集结地"}重新集结。`);
+    return false;
+  });
 
   // 7. 推进时间
   next.turn += 1;
@@ -1841,6 +2119,31 @@ export function EndTurn(state) {
   if (eraChanged) {
     report.lines.push(`进入${era.name}。`);
     report.events.push({ kind: "Era", eraKey: era.key });
+  }
+  // 反攻期开场的史实塌方：敌大批兵力南调，各据点守备折半，撑不住的炮楼直接弃守。
+  // maxGarrison 不动——守备比骤降会解除对周边群众基础的压制，玩家能看见地图松动。
+  if (eraChanged && era.key === "Counter" && !next.counterDrawdownDone) {
+    next.counterDrawdownDone = true;
+    const abandonedNames = [];
+    for (const stronghold of next.strongholds) {
+      if (stronghold.destroyed || (stronghold.garrison ?? 0) <= 0) continue;
+      const reduced = Math.round(stronghold.garrison * 0.6 * 10) / 10;
+      if (stronghold.type === "Blockhouse" && reduced < 2) {
+        stronghold.destroyed = true;
+        stronghold.abandoned = true;
+        stronghold.garrison = 0;
+        abandonedNames.push(stronghold.name);
+        const hex = GetHex(next, stronghold.key);
+        if (hex && hex.control === "Enemy") hex.control = "Contested";
+      } else {
+        stronghold.garrison = Math.max(1, reduced);
+      }
+    }
+    report.lines.push(
+      abandonedNames.length
+        ? `敌大批兵力南调：各据点守备折半，${abandonedNames.slice(0, 3).join("、")}${abandonedNames.length > 3 ? `等 ${abandonedNames.length} 处` : ""}弃守。`
+        : "敌大批兵力南调：各据点守备折半。",
+    );
   }
 
   // 8. 历史事件
@@ -2028,12 +2331,27 @@ export function ApplyEventChoice(state, eventId, optionId) {
       }
     }
   }
-  // 事件持久效果并入研究完成列表（以虚拟 id 承载），保证 GetEffects 能吃到。
-  if (optionEffects.yieldBonus || optionEffects.flatYield || optionEffects.massGrowth) {
+  // 事件持久效果：只要含任何 GetEffects 词汇表里的持久键就整体入列
+  //（旧白名单只认 yieldBonus/flatYield/massGrowth，把村选的 policySlots、
+  //  冬装的 healRate 等静默丢弃——评审证实的"虚假发奖"）。
+  const oneShotKeys = new Set(["stockDelta", "exposureDelta", "alertDelta", "massDelta", "flags", "id", "label"]);
+  const hasPersistent = Object.keys(optionEffects).some((key) => !oneShotKeys.has(key));
+  if (hasPersistent) {
     next.eventEffects = next.eventEffects ?? [];
     next.eventEffects.push(optionEffects);
   }
-  AddLedger(next, option.ledger ?? {});
+  const ledgerCost = option.ledger ?? {};
+  AddLedger(next, ledgerCost);
+  const ledgerEntries = ledgerKeys
+    .filter((key) => Number(ledgerCost[key]) > 0)
+    .map((key) => `${ledgerLabels[key] ?? key} ${Math.round(Number(ledgerCost[key]))}`);
+  if (ledgerEntries.length) {
+    PushLedgerLog(next, {
+      kind: "Event",
+      text: `${FormatTurnDate(next.turn)}，《${event?.title ?? "事件"}》：${ledgerEntries.join("，")}。`,
+      delta: { ...ledgerCost },
+    });
+  }
 
   // 事件旗标：写入 state.flags，供后续事件条件（requireFlags）与结局评定使用。
   if (Array.isArray(optionEffects.flags) && optionEffects.flags.length) {
@@ -2111,6 +2429,17 @@ export function ListEnemyWorks(state) {
 }
 
 export function ForecastSweep(state) {
+  // 预警的信息量必须由情报网决定：优先走 AI 侧的模糊化预报——
+  // 覆盖低时只报大致方位与区间，甚至毫无预警；覆盖高才给确切目标与全部轴线。
+  // （旧实现在 state.sweep 存在时直接返回精确情报，confidence 只是装饰，
+  //  于是消息树/电台/青抗先全部变成不影响决策的摆设——评审证实的假选择。）
+  if (typeof Ai.ForecastSweep === "function") {
+    try {
+      return Ai.ForecastSweep(state);
+    } catch (error) {
+      // 落到精确兜底
+    }
+  }
   if (state.sweep) {
     const coverage = AverageIntelAround(state, state.sweep.targetKey, 2);
     return {
@@ -2120,13 +2449,6 @@ export function ForecastSweep(state) {
       axisKeys: state.sweep.axisKeys ?? [],
       confidence: Clamp01(coverage / 100),
     };
-  }
-  if (typeof Ai.ForecastSweep === "function") {
-    try {
-      return Ai.ForecastSweep(state);
-    } catch (error) {
-      return null;
-    }
   }
   return null;
 }
@@ -2197,20 +2519,40 @@ export function ComputePeopleSafety(state) {
  * 破袭牵制有强收益递减，歼敌不是主要计分项（Spec 第 7 节红线）。
  */
 export function GetVictoryAssessment(state) {
-  const baseVillages = state.map.order.filter((key) => {
+  const baseHexes = state.map.order.filter((key) => {
     const hex = state.map.hexes[key];
     return hex && hex.control === "Base";
   }).length;
+  // 口径统一为"人住的地方"：群众基础与存续都按聚落算——
+  // 把整幅地图的荒山野岭算进分母，任何阈值都永远够不着（评审证实的口径病）。
+  let villageTotal = 0;
+  let baseVillages = 0;
+  let settlementMass = 0;
+  for (const key of state.map.order) {
+    const hex = state.map.hexes[key];
+    if (!hex) continue;
+    if (hex.feature === "Village" || hex.feature === "Town" || hex.feature === "CountySeat") {
+      villageTotal += 1;
+      settlementMass += hex.massBase ?? 0;
+      if (hex.control === "Base" || hex.control === "Guerrilla") baseVillages += 1;
+    }
+  }
+  const settlementMassAverage = villageTotal ? settlementMass / villageTotal : 0;
   const population = state.bases.reduce((sum, base) => sum + base.population, 0);
-  const massTotal = state.map.order.reduce((sum, key) => sum + (state.map.hexes[key]?.massBase ?? 0), 0);
-  const massAverage = state.map.order.length ? massTotal / state.map.order.length : 0;
   const districts = state.bases.reduce((sum, base) => sum + (base.districts?.length ?? 0), 0);
   const works = state.map.order.reduce((sum, key) => sum + (state.map.hexes[key]?.works?.length ?? 0), 0);
 
-  const survival = Clamp(state.bases.length * 12 + baseVillages * 2.2, 0, 100);
+  // 存续 = 政权株数（边际递减）+ 治下村庄占比 + 经营地盘；单靠堆基地拿不满。
+  const survival = Clamp(
+    Math.sqrt(Math.max(0, state.bases.length)) * 8.5 +
+      (baseVillages / Math.max(1, villageTotal)) * 120 +
+      baseHexes * 0.5,
+    0,
+    100,
+  );
   const construction = Clamp(districts * 5 + works * 2.4 + state.research.done.length * 2.6, 0, 100);
-  const massScore = Clamp(massAverage * 1.35, 0, 100);
-  const populationScore = Clamp(population / 90, 0, 100);
+  const massScore = Clamp(settlementMassAverage * 1.5, 0, 100);
+  const populationScore = Clamp((population / Math.max(1, state.initialPopulation || 1)) * 190, 0, 100);
   // 破袭收益递减：前 10 次有效，之后边际迅速衰减。
   const disruption = Clamp(28 * Math.log10(1 + (state.sabotageTotal || 0) * 1.6), 0, 60);
 
@@ -2226,8 +2568,8 @@ export function GetVictoryAssessment(state) {
   const capTo = (cap) => {
     if (order.indexOf(grade) > order.indexOf(cap)) grade = cap;
   };
-  if (baseVillages < 8) capTo("C");
-  else if (baseVillages < 14) capTo("A");
+  if (baseVillages < 7) capTo("C");
+  else if (baseVillages < 12) capTo("A");
   if (state.bases.length < 2) capTo("C");
   if (safety < 45) capTo("B");
   if (safety < 25) capTo("C");
@@ -2249,21 +2591,27 @@ export function GetVictoryAssessment(state) {
  * 让最差的一局拿到最好的结局。
  */
 function PickEnding(state, summary) {
-  const totalHexes = Math.max(1, state.map.order.length);
-  const villageCount = Math.max(
-    1,
-    state.map.order.filter((key) => state.map.hexes[key]?.feature === "Village").length,
-  );
-  const populationCap = state.bases.reduce((sum, base) => sum + (GetBaseTier(base.tier).populationCap ?? 900), 0);
+  // 口径与 GetVictoryAssessment / 事件系统一致：一律按"人住的地方"折算。
+  // 旧口径把 520 格荒山野岭算进分母，8 个结局里只有失败档在数学上可达
+  //（45/45 局全部「退回山里」——评审证实），所以这里必须用聚落口径。
+  let villageCount = 0;
+  let settlementMass = 0;
+  for (const key of state.map.order) {
+    const hex = state.map.hexes[key];
+    if (!hex) continue;
+    if (hex.feature === "Village" || hex.feature === "Town" || hex.feature === "CountySeat") {
+      villageCount += 1;
+      settlementMass += hex.massBase ?? 0;
+    }
+  }
+  villageCount = Math.max(1, villageCount);
   const population = state.bases.reduce((sum, base) => sum + base.population, 0);
 
   const metrics = {
-    baseRatio: summary.baseVillages / totalHexes,
-    massAverage: state.map.order.length
-      ? state.map.order.reduce((sum, key) => sum + (state.map.hexes[key]?.massBase ?? 0), 0) / state.map.order.length
-      : 0,
+    baseRatio: summary.baseVillages / villageCount,
+    massAverage: settlementMass / villageCount,
     districtCount: state.bases.reduce((sum, base) => sum + (base.districts?.length ?? 0), 0),
-    populationRatio: populationCap > 0 ? population / populationCap : 0,
+    populationRatio: (state.initialPopulation || 0) > 0 ? population / state.initialPopulation : 0,
     villageCount,
     civilianDeaths: state.ledger.civilianDeaths,
     villagesBurned: state.ledger.villagesBurned,
@@ -2314,6 +2662,11 @@ export function DeserializeState(text) {
     state.stock = { ...EmptyStock(), ...(state.stock ?? {}) };
     state.events = state.events ?? { fired: [], pending: null };
     state.log = state.log ?? [];
+    state.ledgerLog = Array.isArray(state.ledgerLog) ? state.ledgerLog : [];
+    state.scattered = Array.isArray(state.scattered) ? state.scattered : [];
+    state.famineTurns = Number(state.famineTurns) || 0;
+    state.counterDrawdownDone = Boolean(state.counterDrawdownDone);
+    state.initialPopulation = Number(state.initialPopulation) || 0;
     RecomputeEconomy(state);
     return state;
   } catch (error) {
