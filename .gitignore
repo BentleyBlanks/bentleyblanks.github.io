@@ -2,6 +2,8 @@
 .claude/settings.local.json
 
 node_modules/
+# 仓库约定不落 lockfile（纯静态站，只有测试用 devDependencies）
+package-lock.json
 sophia-awakening/_dev/dist/
 sophia-awakening/_dev/.sim-build/
 sophia-awakening/_dev/.sim-build-kangri/
