@@ -364,6 +364,42 @@ a:focus-visible {
   background: var(--green);
 }
 
+.exitWindowBoard {
+  display: grid;
+  margin: 0 0 14px;
+  gap: 6px;
+}
+
+.exitWindowCard {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  padding: 7px 8px;
+  border-left: 3px solid var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.exitWindowCard span,
+.exitWindowCard b {
+  font-size: 11px;
+}
+
+.exitWindowCard small {
+  grid-column: 1 / -1;
+  margin-top: 3px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.exitWindowCard.clear {
+  border-left-color: var(--green);
+}
+
+.exitWindowCard.watched,
+.exitWindowCard.sealing,
+.exitWindowCard.smoking {
+  border-left-color: var(--red);
+}
+
 .civilianLedger {
   display: grid;
   margin-top: 18px;
@@ -976,7 +1012,7 @@ kbd {
   }
 
   .topBar {
-    height: 112px;
+    height: 146px;
     flex-wrap: wrap;
     padding: 6px;
   }
@@ -1036,7 +1072,7 @@ kbd {
   }
 
   .objectivePanel {
-    top: 120px;
+    top: 154px;
     left: 7px;
     bottom: auto;
     width: 198px;
@@ -1045,6 +1081,18 @@ kbd {
   }
 
   .objectivePanel ul li:last-child {
+    display: none;
+  }
+
+  .exitWindowBoard {
+    margin-bottom: 9px;
+  }
+
+  .exitWindowCard {
+    padding: 5px 6px;
+  }
+
+  .exitWindowCard small {
     display: none;
   }
 
@@ -1077,7 +1125,7 @@ kbd {
     top: auto;
     left: 7px;
     right: 7px;
-    bottom: 68px;
+    bottom: 74px;
     width: auto;
     height: 238px;
     padding: 10px;

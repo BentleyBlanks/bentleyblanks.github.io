@@ -15,6 +15,7 @@ import {
   GetActionTargets,
   GetAvailableActions,
   GetCombatPreview,
+  GetExitWindow,
   GetObjectiveSummary,
   GetTunnelNeighbors,
   HexDistance,
@@ -41,6 +42,7 @@ const ui = Object.fromEntries(
     "ObjectiveRecon",
     "ObjectiveDig",
     "ObjectiveSweep",
+    "ExitWindowBoard",
     "CivilianLedger",
     "InspectorEyebrow",
     "InspectorTitle",
@@ -454,8 +456,13 @@ function AddEntranceMarker(tileKey, node, group, underground = false) {
   if (!tile?.hasEntrance) {
     return;
   }
+  const exitWindow = tile.kind === "safeExit" ? GetExitWindow(gameState, tileKey) : null;
   const color = node.sealed
     ? 0xe05248
+    : exitWindow?.status === "Clear"
+      ? 0x84c77c
+      : ["Watched", "Sealing", "Smoking"].includes(exitWindow?.status)
+        ? 0xe06a4f
     : tile.entranceKnownByEnemy
       ? 0xe1a04f
       : 0x76c7be;
@@ -777,12 +784,35 @@ function CivilianStatusLabel(group) {
     case "Safe":
       return "已安全撤出";
     case "Moving":
-      return `地下转移 · ${group.tileKey}`;
+      return group.waitingForSignal
+        ? `${gameState.tiles[group.exitKey]?.name ?? "出口"}下方 · 等待信号`
+        : `地下转移 · ${group.tileKey}`;
     case "Trapped":
       return `被困 · ${group.tileKey}`;
     default:
       return "赵庄待命";
   }
+}
+
+function ExitWindowCardHtml(exitKey) {
+  const windowState = GetExitWindow(gameState, exitKey);
+  const tile = gameState.tiles[exitKey];
+  const statusLabels = {
+    Unknown: "未复查",
+    Clear: `安全至 T${windowState.checkedUntilTurn}`,
+    Watched: "工兵占压",
+    Sealing: "封洞中",
+    Smoking: "烟流威胁",
+  };
+  const threat = windowState.threatName
+    ? `${windowState.threatName}${windowState.threatEta === 0 ? "已到近旁" : `预计 ${windowState.threatEta} 回合抵近`}`
+    : "暂无可见敌军威胁";
+  return `
+    <article class="exitWindowCard ${windowState.status.toLowerCase()}">
+      <span>${tile.name}</span><b>${statusLabels[windowState.status]}</b>
+      <small>${windowState.connected ? windowState.detail : "地道尚未接通"} · ${threat}</small>
+    </article>
+  `;
 }
 
 function RenderHud() {
@@ -804,6 +834,7 @@ function RenderHud() {
   ui.ObjectiveDig.classList.toggle("complete", gameState.tunnelsDug > 0);
   ui.ObjectiveSweep.querySelector("span").textContent = objective.sweep;
   ui.ObjectiveSweep.classList.toggle("complete", gameState.sweepActive);
+  ui.ExitWindowBoard.innerHTML = ["2,1", "0,5"].map(ExitWindowCardHtml).join("");
   if (!gameState.civilians.some((group) => (
     group.groupId === selectedEvacGroupId
     && group.status === "Waiting"
@@ -943,11 +974,19 @@ function BuildPreview(action) {
       };
     }
     case ActionIds.RECON:
+      if (tile.kind === "safeExit") {
+        const windowState = GetExitWindow(gameState, tile.tileKey);
+        return {
+          eyebrow: "出口复查预览",
+          title: `在${tile.name}发出地面信号`,
+          body: `1 AP｜组织 ${gameState.reconActions > 0 ? 1 : 0}｜情报净 +1｜暴露 ${gameState.reconActions > 0 ? "-5" : "+1"}｜信号持续本回合与下一回合；当前：${windowState.detail}`,
+        };
+      }
       return {
         eyebrow: "侦察预览",
         title: `查明${tile.name}周边土层与意图`,
         body: gameState.reconActions > 0
-          ? "1 AP｜组织 1｜情报 +2｜暴露 -5｜每回合限一次，且须移动到未侦察地块"
+          ? "1 AP｜组织 1｜情报 +2｜暴露 -5｜每回合限一次；同一格须间隔一回合"
           : "1 AP｜情报 +2｜暴露 +1｜揭示半径 2",
       };
     case ActionIds.DECOY:
@@ -1002,7 +1041,7 @@ function BuildPreview(action) {
       return {
         eyebrow: "群众转移预览",
         title: `让${group?.name ?? "下一批群众"}沿${gameState.tiles[action.targetKey].name}转移`,
-        body: `共 ${group?.people ?? "?"} 人｜1 AP｜组织 1｜路线 ${route?.path.length ?? "?"} 格｜生土每回合仅容一批通过；封口会自动尝试备用支线`,
+        body: `共 ${group?.people ?? "?"} 人｜1 AP｜组织 1｜路线 ${route?.path.length ?? "?"} 格｜当前出口：${GetExitWindow(gameState, action.targetKey).detail}；到达后须等交通员安全信号`,
       };
     }
     case ActionIds.CLEAR_SEAL:
@@ -1124,6 +1163,11 @@ function ClickTile(tileKey) {
       ? `${SoilCatalog[tile.soilId].label}：${SoilCatalog[tile.soilId].risk}`
       : "土层未知；先让交通员在地面侦察。";
     ShowToast(`${tile.name}地下尚未挖通。${soilText}`);
+    return;
+  }
+  if (tile.kind === "safeExit") {
+    const windowState = GetExitWindow(gameState, tileKey);
+    ShowToast(`${tile.name} · ${windowState.detail}${windowState.threatName ? `；${windowState.threatName}预计 ${windowState.threatEta} 回合抵近` : ""}`);
     return;
   }
   ShowToast(`${tile.name} · ${tile.description || TerrainCatalog[tile.terrainId].label}`);
@@ -1274,11 +1318,12 @@ function ShowOutcome() {
   }
   ui.OutcomeEyebrow.textContent = outcome.status === "Victory" ? "任务完成" : "任务未完成";
   ui.OutcomeTitle.textContent = outcome.title;
-  ui.OutcomeSummary.textContent = `${outcome.summary} 群众安全 ${outcome.peopleSafety}；暴露 ${gameState.exposure}；工具 ${gameState.tools}；组织 ${gameState.organization}；${outcome.survivingUnits} 支行动单位仍能工作。`;
+  ui.OutcomeSummary.textContent = `${outcome.summary} 群众安全 ${outcome.peopleSafety}；出口信号 ${gameState.exitSignalsIssued ?? 0} 次；暴露 ${gameState.exposure}；工具 ${gameState.tools}；组织 ${gameState.organization}；${outcome.survivingUnits} 支行动单位仍能工作。`;
   const pathLabels = {
     stealth: "静默分流路线",
     deception: "假迹欺骗路线",
     ambush: "洞口反伏击路线",
+    interdiction: "地表压制开窗路线",
     none: "未形成有效转移路线",
   };
   ui.OutcomeRoute.textContent = `本局主要策略：${pathLabels[outcome.path] ?? "混合路线"}`;
@@ -1286,7 +1331,7 @@ function ShowOutcome() {
     .map((event) => `<li>T${event.turn} · ${event.text}</li>`)
     .join("");
   ui.OutcomeTip.textContent = outcome.status === "Victory"
-    ? "可重开尝试另一出口与另一种反制：无战斗静默分流、假迹诱导、或洞口伏击工兵。"
+    ? "可重开尝试另一种窗口答案：双出口静默改道、假迹诱敌、地表压制，或在洞口设陷与伏击。"
     : `重规划建议：${outcome.tip ?? "把最后一次红色预警当作必须回答的下一回合问题。"} `;
   ui.OutcomeScreen.hidden = false;
 }

@@ -1,7 +1,7 @@
 export const MissionConfig = Object.freeze({
   title: "地火线",
   subtitle: "冀中平原 · 一九四二年五月",
-  maxTurns: 9,
+  maxTurns: 11,
   sweepTurn: 5,
   evacuationTurn: 4,
   requiredEvacuees: 6,
@@ -274,6 +274,7 @@ export const EnemyTemplates = Object.freeze([
     maxHealth: 4,
     attack: 1,
     vision: 1,
+    sweepMove: 2,
     color: 0xe07855,
     route: ["5,0", "5,1", "6,1", "6,2"],
     inactiveUntilTurn: 5,
@@ -294,12 +295,12 @@ export const BriefingPages = Object.freeze([
   },
   {
     eyebrow: "地道不是传送门",
-    title: "每一个出口都会留下代价",
-    body: "挖掘会提高暴露，返沙层会开裂，敌军确认洞口后会先预告封堵或灌烟。支护、假迹、陷阱、伏击和第二出口都能改变结果；只挖一条无支路的直线很容易把群众困住。",
+    title: "接通出口，还要争取地面窗口",
+    body: "群众到达出口下方后会等待交通员的安全信号。让交通员从出口上浮并复查地面；若工兵或巡逻正在占压，先用假迹、压制、陷阱、伏击或第二出口争取窗口。工兵扫荡时机动 2 格，但封洞与灌烟仍会提前一整回合预告。",
   },
   {
     eyebrow: "胜利条件",
-    title: "九回合内护送至少六人",
-    body: "至少完成一次地面侦察、新挖一段地道，并让 6/8 名群众完成地上—地下—安全出口的转移。杀敌不是任务目标。失败面板会列出预警与因果链，供下一局重新规划。",
+    title: "十一回合内护送至少六人",
+    body: "至少完成一次地面侦察、新挖一段地道，并让 6/8 名群众在新鲜的出口安全信号中完成转移。未知窗口只会让群众等待，不会凭空造成伤害。杀敌不是任务目标。",
   },
 ]);
