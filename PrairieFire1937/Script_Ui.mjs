@@ -86,6 +86,17 @@ const controlDisplay = Object.freeze({
   Base: { name: "根据地", color: "#c8a86a" },
 });
 
+/** 封锁沟等级（hex.blockade 1-3）的档案叫法。 */
+const blockadeLevelNames = Object.freeze(["", "一级", "二级", "三级"]);
+
+/**
+ * 敌方特种实体的兜底中文名：这些 type 只在 Script_Ai 内定义、不进 Data_Units，
+ * 缺了这张表玩家会看到"不明部队"。辎重队是伏击玩法的入口，名字必须叫得出来。
+ */
+const enemyTypeFallback = Object.freeze({
+  SupplyColumn: "辎重队",
+});
+
 const workDisplay = Object.freeze({
   Terrace: { name: "梯田", note: "增产，抗旱。" },
   Trench: { name: "交通壕", note: "村落间隐蔽机动。" },
@@ -105,6 +116,7 @@ export const actionDefinitions = Object.freeze([
   { kind: "Attack", name: "伏击", hotkey: "A", tone: "attack", hint: "打击敌军。打完必须转移，否则暴露度按四倍计。" },
   { kind: "Sabotage", name: "破袭", hotkey: "S", tone: "attack", hint: "破坏铁路、公路与电线，牵制敌军运输。" },
   { kind: "Siege", name: "攻坚", hotkey: "K", tone: "attack", hint: "强攻或围困据点，需要械与工兵，代价很高。" },
+  { kind: "ClearBlockade", name: "平毁封锁", hotkey: "P", tone: "build", hint: "发动民工填封锁沟、拆铁丝网，恢复此地机动。" },
   { kind: "BuildWork", name: "修建", hotkey: "B", tone: "build", hint: "挖地道、修交通壕、垒梯田、设消息树。" },
   { kind: "FoundBase", name: "开辟根据地", hotkey: "F", tone: "build", hint: "派骨干立起党政军三套架子，消耗干部。" },
   { kind: "Mobilize", name: "发动群众", hotkey: "G", tone: "support", hint: "开群众会、减租减息、建农会，抬升群众基础。" },
@@ -758,6 +770,81 @@ export function CreateUi(root, hooks = {}) {
         };
       });
     }
+    BuildEnemyTicker();
+  }
+
+  /**
+   * 「敌讯」小卡：吊在左侧仪表条下，回合简报里的辎重路讯与敌方在建工事都在这里露头。
+   * 辎重预告是伏击玩法的入口，每条都带「标记」按钮把镜头带到现场。空态时整卡隐藏。
+   */
+  function BuildEnemyTicker() {
+    dom.ticker = El("aside", "pf-ticker", {
+      parent: dom.meterStrip,
+      attrs: { "aria-label": "敌讯", hidden: true },
+    });
+    const head = El("div", "pf-ticker-head", { parent: dom.ticker });
+    El("span", "pf-ticker-title", { text: "敌讯", parent: head });
+    const more = El("button", "pf-ticker-more", {
+      text: "情报",
+      parent: head,
+      attrs: { type: "button", "aria-label": "打开敌情与情报网面板" },
+    });
+    On(more, "click", () => ShowPanel("Intel"));
+    dom.tickerBody = El("div", "pf-ticker-body", { parent: dom.ticker });
+  }
+
+  function RenderEnemyTicker(state, view) {
+    if (!dom.ticker) return;
+    const briefing = (view && view.briefing) || {};
+    const readout = briefing.enemyReadout || state.enemyReadout || null;
+    const convoys = Array.isArray(briefing.convoyNotices)
+      ? briefing.convoyNotices
+      : (readout && readout.convoyNotices) || [];
+    const works = Array.isArray(briefing.enemyWorks) ? briefing.enemyWorks : [];
+
+    const entries = [];
+    if (readout && readout.sweepStage && readout.sweepStage !== "None") {
+      const sweepKey = (state.sweep && state.sweep.targetKey) || null;
+      entries.push({ tone: "bad", text: SafeText(readout.sweepStageLabel, "扫荡迹象"), key: sweepKey });
+    }
+    for (const convoy of convoys) {
+      if (!convoy) continue;
+      entries.push({ tone: "warn", text: SafeText(convoy.text, "敌辎重队上路。"), key: convoy.key || null });
+    }
+    for (const project of works) {
+      if (!project) continue;
+      entries.push({ tone: "info", text: SafeText(project.label, "敌在修筑工事。"), key: project.key || null });
+    }
+
+    const signature = entries.map((entry) => `${entry.tone}|${entry.key ?? ""}|${entry.text}`).join("¶");
+    if (signature === cache.signatures.ticker) return;
+    cache.signatures.ticker = signature;
+
+    const body = ClearNode(dom.tickerBody);
+    if (!entries.length) {
+      SetAttr(dom.ticker, "hidden", true);
+      return;
+    }
+    SetAttr(dom.ticker, "hidden", null);
+    const shown = entries.slice(0, 4);
+    for (const entry of shown) {
+      const line = El("div", `pf-ticker-line is-${entry.tone}`, { parent: body });
+      El("span", "pf-ticker-text", { text: entry.text, parent: line });
+      if (entry.key) {
+        const mark = El("button", "pf-ticker-mark", {
+          text: "标记",
+          parent: line,
+          attrs: { type: "button", "aria-label": "把镜头带到该处" },
+        });
+        On(mark, "click", () => Call("OnFocusHex", entry.key, { reason: "Ticker" }));
+      }
+    }
+    if (entries.length > shown.length) {
+      El("div", "pf-ticker-line is-more", {
+        text: `另有 ${entries.length - shown.length} 条，见「情报」面板。`,
+        parent: body,
+      });
+    }
   }
 
   function BuildSweepBanner() {
@@ -851,6 +938,8 @@ export function CreateUi(root, hooks = {}) {
     dom.contextInner = El("div", "pf-context-inner", { parent: dom.context });
     dom.tileCard = El("div", "pf-tile", { parent: dom.contextInner });
     dom.unitCard = El("div", "pf-unit", { parent: dom.contextInner });
+    // 交战判读 + 撤退路线选择器：紧贴在行动按钮上方，点「伏击后转移」前先看这里。
+    dom.attackPlan = El("div", "pf-plan", { parent: dom.contextInner, attrs: { "aria-label": "交战判读" } });
     dom.actionRail = El("div", "pf-actions", {
       parent: dom.contextInner,
       attrs: { role: "group", "aria-label": "行动" },
@@ -1016,10 +1105,23 @@ export function CreateUi(root, hooks = {}) {
     Call("OnEndTurn");
   }
 
-  /** 把 Rules 给出的 action 对象原样交回主循环（契约见 Script_Main.hooks.OnUnitAction）。 */
+  /**
+   * 把 Rules 给出的 action 对象交回主循环（契约见 Script_Main.hooks.OnUnitAction）。
+   * 玩家在撤退路线选择器里点过别的路线时，出发前替换 withdrawKey；其余字段原样保留。
+   */
   function TriggerAction(action) {
     if (!action || action.enabled === false) return;
-    Call("OnUnitAction", action);
+    let outgoing = action;
+    if (
+      Array.isArray(action.withdrawOptions) &&
+      action.withdrawOptions.length &&
+      cache.withdrawChoice &&
+      cache.withdrawChoice.token === WithdrawToken(action)
+    ) {
+      const chosen = action.withdrawOptions.find((option) => option.key === cache.withdrawChoice.key);
+      if (chosen && chosen.key !== action.withdrawKey) outgoing = { ...action, withdrawKey: chosen.key };
+    }
+    Call("OnUnitAction", outgoing);
   }
 
   // ---- 时期与派生数据 ------------------------------------------------------
@@ -1083,6 +1185,7 @@ export function CreateUi(root, hooks = {}) {
     RenderResources(currentState, stateChanged);
     RenderMeters(currentState);
     RenderSweep(currentState);
+    RenderEnemyTicker(currentState, currentView);
     RenderMinimap(currentState, currentView, stateChanged);
     RenderContext(currentState, currentView);
     EnsureUnitSelection(currentState, currentView);
@@ -1626,8 +1729,130 @@ export function CreateUi(root, hooks = {}) {
     SetFlag(dom.context, "is-empty", !hex && !unit);
     RenderTileCard(state, view, hex);
     RenderUnitCard(state, view, unit);
+    RenderAttackPlan(state, view);
     RenderActionRail(state, view, unit);
     UpdateScrollAffordance(dom.context);
+  }
+
+  // ---- 交战判读与撤退路线（攻击确认区） ------------------------------------
+
+  /** 撤退选择的归属令牌：同一（动作 × 单位 × 目标 × 回合）内记住玩家点过的路线。 */
+  function WithdrawToken(action) {
+    const turn = (currentState && currentState.turn) || 0;
+    return `${action.kind}|${action.unitId}|${action.targetKey}|${turn}`;
+  }
+
+  /**
+   * 攻击确认区。有攻击预览时给两行：支援态势（孤军 / 有接应 / 两翼合击 + 夜袭徽标）
+   * 与撤退路线选择器（withdrawOptions 前 3 项，点选后作为 action.withdrawKey 发出）。
+   * 破袭带撤退选项时也复用撤退选择器。
+   */
+  function RenderAttackPlan(state, view) {
+    const box = ClearNode(dom.attackPlan);
+    if (!box) return;
+    const actions = Array.isArray(view.actions) ? view.actions : [];
+    const withdrawAction =
+      actions.find((item) => item && item.kind === "Attack" && Array.isArray(item.withdrawOptions) && item.withdrawOptions.length) ||
+      actions.find((item) => item && item.kind === "Sabotage" && Array.isArray(item.withdrawOptions) && item.withdrawOptions.length) ||
+      null;
+    const hasAttack = actions.some((item) => item && item.kind === "Attack");
+    const preview = hasAttack && view.preview && view.preview.valid !== false ? view.preview : null;
+    if (!withdrawAction && !preview) {
+      SetFlag(dom.attackPlan, "is-hidden", true);
+      return;
+    }
+    SetFlag(dom.attackPlan, "is-hidden", false);
+
+    // —— 第一行：交战判读 ——
+    if (preview) {
+      const row = El("div", "pf-plan-row", { parent: box });
+      if (preview.odds !== undefined) {
+        El("span", "pf-plan-odds", {
+          text: `胜算 ${Math.round((Number(preview.odds) || 0) * 100)}%`,
+          parent: row,
+          tip: () => ({
+            title: "胜算",
+            body: "按敌情判断的得手概率；该区情报覆盖不足时会有误差。",
+            rows: (preview.risks || []).map((risk) => ({
+              label: "风险",
+              value: typeof risk === "string" ? risk : risk.label || risk.text || "",
+              tone: "warn",
+            })),
+          }),
+        });
+      }
+      if (preview.night) {
+        El("span", "pf-plan-badge is-night", {
+          text: "夜袭",
+          parent: row,
+          tip: {
+            title: "夜袭",
+            body: "隐蔽接敌视同夜间出击：我方攻防上浮，敌装甲与炮兵大打折扣，撤退也更容易。",
+          },
+        });
+      }
+      const supportTone = preview.flank ? "is-flank" : (preview.supportCount || 0) > 0 ? "is-backed" : "is-alone";
+      const supportText = preview.flank
+        ? "两翼合击"
+        : preview.supportLabel || ((preview.supportCount || 0) > 0 ? "有友邻接应" : "孤军出击");
+      El("span", `pf-plan-badge ${supportTone}`, {
+        text: (preview.supportCount || 0) > 0 ? `${supportText} ×${preview.supportCount}` : supportText,
+        parent: row,
+        tip: {
+          title: "支援态势",
+          body: preview.flank
+            ? "有友邻分队与你分居目标两侧，枪声一起敌腹背受击：胜率、杀伤上浮，我方减员下降。"
+            : (preview.supportCount || 0) > 0
+              ? "邻格友军会开火策应。若能绕到目标另一侧，可形成两翼合击。"
+              : "两格内没有友军接应。孤军出击，胜率与撤退都要打折扣。",
+        },
+      });
+      if (preview.screenSupport) {
+        El("span", "pf-plan-badge is-screen", {
+          text: "掩护组随行",
+          parent: row,
+          tip: { title: "掩护分队", body: "有侦察/掩护性质的分队接应转移，撤出时暴露度更低。" },
+        });
+      }
+    }
+
+    // —— 第二行：撤退路线选择器 ——
+    if (withdrawAction) {
+      const token = WithdrawToken(withdrawAction);
+      if (!cache.withdrawChoice || cache.withdrawChoice.token !== token) {
+        cache.withdrawChoice = { token, key: withdrawAction.withdrawKey ?? withdrawAction.withdrawOptions[0].key };
+      }
+      El("div", "pf-plan-head", {
+        text: withdrawAction.kind === "Sabotage" ? "破袭后撤往" : "打完撤往",
+        parent: box,
+      });
+      const list = El("div", "pf-plan-withdraws", {
+        parent: box,
+        attrs: { role: "radiogroup", "aria-label": "撤退路线" },
+      });
+      const rows = [];
+      const PaintChoice = () => {
+        for (const entry of rows) {
+          const active = entry.option.key === cache.withdrawChoice.key;
+          SetFlag(entry.node, "is-active", active);
+          SetAttr(entry.node, "aria-checked", active ? "true" : "false");
+        }
+      };
+      for (const option of withdrawAction.withdrawOptions.slice(0, 3)) {
+        const node = El("button", "pf-plan-option", {
+          parent: list,
+          attrs: { type: "button", role: "radio", "aria-label": `撤往${option.label}：${option.reason || ""}` },
+        });
+        El("b", "pf-plan-option-label", { text: option.label, parent: node });
+        El("small", "pf-plan-option-reason", { text: option.reason || "", parent: node });
+        rows.push({ node, option });
+        On(node, "click", () => {
+          cache.withdrawChoice = { token, key: option.key };
+          PaintChoice();
+        });
+      }
+      PaintChoice();
+    }
   }
 
   /**
@@ -1699,6 +1924,15 @@ export function CreateUi(root, hooks = {}) {
     AddFact(grid, "情报", `${Math.round(hex.intel || 0)}%`);
     AddFact(grid, "视野", hex.visibility >= 2 ? "直视" : hex.visibility === 1 ? "耳目" : hex.explored ? "记忆" : "未侦察");
     if (hex.scorch > 0) AddFact(grid, "焚毁", `${Math.round(hex.scorch)}%`, "bad");
+    // 囚笼的可见代价：封锁沟真实拖慢我方进出此格，站上去可「平毁封锁」。
+    if ((hex.blockade || 0) > 0) {
+      const level = blockadeLevelNames[Clamp(Math.round(hex.blockade), 1, 3)];
+      const cell = AddFact(grid, "封锁", `封锁沟·${level}`, "bad");
+      AttachTooltip(cell, () => ({
+        title: `封锁沟 · ${level}`,
+        body: "敌挖沟拉网分割根据地，我方进出此格明显减速。派队伍站上去可发动民工「平毁封锁」。",
+      }));
+    }
 
     const yields = El("div", "pf-yields", { parent: card, attrs: { "aria-label": "地块产出" } });
     for (const resource of resourceDefinitions) {
@@ -1735,6 +1969,17 @@ export function CreateUi(root, hooks = {}) {
     if ((hex.scorch || 0) > 0) {
       El("div", "pf-scorch-note", {
         text: `此村曾遭焚掠（${Math.round(hex.scorch)}%），产出与人口恢复缓慢。`,
+        parent: card,
+      });
+    }
+
+    // 敌工程进行中（囚笼预告）：该格在 briefing.enemyWorks 里则点名工期。
+    const enemyWork = ((view && view.briefing && view.briefing.enemyWorks) || []).find(
+      (item) => item && item.key === hex.key
+    );
+    if (enemyWork) {
+      El("div", "pf-scorch-note is-enemywork", {
+        text: `敌工程进行中：${SafeText(enemyWork.name, "工事")}，约 ${FormatNumber(enemyWork.turnsLeft)} 回合完工。趁未合拢可破袭阻工。`,
         parent: card,
       });
     }
@@ -2133,14 +2378,52 @@ export function CreateUi(root, hooks = {}) {
 
   // ---- Toast --------------------------------------------------------------
 
+  /** 数一遍还"活着"的普通 toast（合并条与正在退场的不算）。 */
+  function CountLiveToasts() {
+    const nodes = (dom.toastLayer && dom.toastLayer.childNodes) || [];
+    let count = 0;
+    for (let index = 0; index < nodes.length; index += 1) {
+      const node = nodes[index];
+      if (!node || !node.classList) continue;
+      if (node.classList.contains("pf-toast-more")) continue;
+      if (node.classList.contains("is-out")) continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  /**
+   * Toast 治理：同屏最多 4 条，超出的不再单独上屏，合并为一条
+   * 「+N 条纪事」——内容不丢，全部都在左下纪事流与「纪事」面板里。
+   */
   function Toast(text, kind = "info") {
     if (disposed || !dom.toastLayer) return;
+    if (CountLiveToasts() >= 4) {
+      cache.toastOverflow = (cache.toastOverflow || 0) + 1;
+      if (!dom.toastMore || !dom.toastMore.parentNode) {
+        dom.toastMore = El("div", "pf-toast pf-toast-more is-info", { parent: dom.toastLayer });
+        El("i", "pf-toast-mark", { parent: dom.toastMore, attrs: { "aria-hidden": "true" } });
+        dom.toastMoreText = El("span", "pf-toast-text", { parent: dom.toastMore });
+      }
+      SetText(dom.toastMoreText, `+${cache.toastOverflow} 条纪事（见左下纪事流）`);
+      const generation = (cache.toastMoreGen = (cache.toastMoreGen || 0) + 1);
+      Later(() => {
+        if (cache.toastMoreGen !== generation) return;
+        cache.toastOverflow = 0;
+        const merged = dom.toastMore;
+        if (!merged) return;
+        SetFlag(merged, "is-out", true);
+        Later(() => {
+          if (cache.toastMoreGen !== generation) return;
+          if (merged.parentNode) merged.parentNode.removeChild(merged);
+          if (dom.toastMore === merged) dom.toastMore = null;
+        }, 420);
+      }, 4200);
+      return dom.toastMore;
+    }
     const node = El("div", `pf-toast is-${kind}`, { parent: dom.toastLayer });
     El("i", "pf-toast-mark", { parent: node, attrs: { "aria-hidden": "true" } });
     El("span", "pf-toast-text", { text: String(text), parent: node });
-    while (dom.toastLayer.childNodes.length > 5) {
-      dom.toastLayer.removeChild(dom.toastLayer.firstChild);
-    }
     const life = kind === "bad" ? 6200 : kind === "warn" ? 5200 : 4200;
     Later(() => {
       SetFlag(node, "is-out", true);
@@ -3152,6 +3435,7 @@ export function CreateUi(root, hooks = {}) {
 
   function RenderIntelPanel(body, state, view) {
     const source = view.intel || {};
+    RenderEnemyReadout(body, state, view);
     const coverage = Number(source.coverage);
     const box = El("div", "pf-intel-top", { parent: body });
     const meter = El("div", "pf-intel-meter", { parent: box });
@@ -3231,6 +3515,53 @@ export function CreateUi(root, hooks = {}) {
     }
   }
 
+  /**
+   * 「敌军动向」块：消费 state.enemyReadout（AI 回合后写入的结构化敌情通报）。
+   * 方针 + 对策一句话、扫荡阶段、据点守备调动（≤5 条）、当面机动兵力。
+   */
+  function RenderEnemyReadout(body, state, view) {
+    El("h3", "pf-group-title", { text: "敌军动向", parent: body });
+    const readout = state.enemyReadout || (view.briefing && view.briefing.enemyReadout) || null;
+    if (!readout) {
+      El("div", "pf-empty pf-empty-block", {
+        text: "敌情通报尚未汇总——第一个回合结束后，由各交通站与内线归档送来。",
+        parent: body,
+      });
+      return;
+    }
+    const box = El("div", "pf-readout", { parent: body });
+    const doctrine = readout.doctrine || {};
+    const head = El("div", "pf-readout-head", { parent: box });
+    El("span", "pf-readout-doctrine pf-stamp", { text: SafeText(doctrine.name, "方针不明"), parent: head });
+    const stageKey = SafeText(readout.sweepStage, "None");
+    El("span", `pf-readout-stage is-${stageKey.toLowerCase()}`, {
+      text: SafeText(readout.sweepStageLabel, "无扫荡迹象"),
+      parent: head,
+    });
+    El("span", "pf-readout-count", {
+      text: `当面机动兵力 ${FormatNumber(readout.mobileEnemyCount ?? 0)} 部`,
+      parent: head,
+    });
+    if (doctrine.summary) El("p", "pf-readout-summary", { text: doctrine.summary, parent: box });
+    if (doctrine.hint) El("p", "pf-readout-hint", { text: `对策：${doctrine.hint}`, parent: box });
+
+    const changes = Array.isArray(readout.garrisonChanges) ? readout.garrisonChanges.slice(0, 5) : [];
+    if (changes.length) {
+      const list = El("div", "pf-readout-moves", { parent: box, attrs: { "aria-label": "据点守备调动" } });
+      for (const change of changes) {
+        const line = El("div", "pf-readout-move", { parent: list });
+        const drained = (Number(change.to) || 0) < (Number(change.from) || 0);
+        El("span", `pf-readout-delta ${drained ? "is-down" : "is-up"}`, {
+          text: `${SafeText(change.name, "据点")} 守备 ${FormatNumber(change.from ?? 0)}→${FormatNumber(change.to ?? 0)}`,
+          parent: line,
+        });
+        El("span", "pf-readout-reason", { text: SafeText(change.reason, "兵力调动"), parent: line });
+      }
+    } else {
+      El("p", "pf-readout-quiet", { text: "本回合未见据点守备调动。", parent: box });
+    }
+  }
+
   function ComputeIntelCoverage(state) {
     const hexes = (state.map && state.map.hexes) || {};
     const keys = Object.keys(hexes);
@@ -3244,7 +3575,7 @@ export function CreateUi(root, hooks = {}) {
   /** 敌方部队中文名：优先查定义表，查不到给中性描述，不暴露内部 key。 */
   function EnemyUnitName(enemy) {
     const named = definitions.units?.unitDefinitions?.[enemy?.type]?.name;
-    return named || enemy?.name || "不明部队";
+    return named || enemyTypeFallback[enemy?.type] || enemy?.name || "不明部队";
   }
 
   function IntentName(intent) {
@@ -3258,6 +3589,7 @@ export function CreateUi(root, hooks = {}) {
       Garrison: "驻守",
       Withdraw: "回撤",
       Escort: "护运",
+      Supply: "辎重输送",
       Pacify: "宣抚",
       Stage: "集结",
     };
@@ -4007,7 +4339,7 @@ export function CreateUi(root, hooks = {}) {
   const unitPlates = new Map();
 
   function UnitGlyph(type, side) {
-    const named = definitions.units?.unitDefinitions?.[type]?.name;
+    const named = definitions.units?.unitDefinitions?.[type]?.name || enemyTypeFallback[type];
     if (named && named.length) return named[0];
     return side === "Enemy" ? "敌" : "队";
   }
@@ -4063,7 +4395,7 @@ export function CreateUi(root, hooks = {}) {
       SetFlag(plate.rootNode, "is-low", ratio < 0.35);
       SetFlag(plate.rootNode, "is-mid", ratio >= 0.35 && ratio < 0.7);
       SetText(plate.mark, side !== "Enemy" && unit.hidden ? "隐" : "");
-      const label = `${definitions.units?.unitDefinitions?.[unit.type]?.name ?? "部队"} ${Math.round(unit.hp)}/${unit.maxHp}`;
+      const label = `${definitions.units?.unitDefinitions?.[unit.type]?.name ?? enemyTypeFallback[unit.type] ?? "部队"} ${Math.round(unit.hp)}/${unit.maxHp}`;
       SetAttr(plate.rootNode, "aria-label", label);
       SetAttr(plate.rootNode, "title", label);
     };

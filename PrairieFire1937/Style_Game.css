@@ -573,6 +573,90 @@
 
 .pf-meter.is-danger .pf-meter-band { color: var(--pf-bad); font-weight: 600; }
 
+/* --- 「敌讯」小卡：吊在仪表条下，辎重路讯 / 敌方在建工事 / 扫荡阶段 --- */
+
+.pf-ticker {
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius);
+  background-color: rgba(20, 18, 16, 0.9);
+  background-image: var(--pf-grain);
+  background-blend-mode: overlay;
+  box-shadow: var(--pf-shadow-1);
+  overflow: hidden;
+}
+
+.pf-ticker[hidden] { display: none; }
+
+.pf-ticker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--pf-line);
+  background: linear-gradient(180deg, rgba(140, 47, 36, 0.2), transparent);
+}
+
+.pf-ticker-title {
+  font-family: var(--pf-font-serif);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--pf-ochre-glow);
+}
+
+.pf-ticker-more {
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--pf-line);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--pf-paper-dim);
+}
+
+.pf-ticker-more:hover { color: var(--pf-paper); border-color: var(--pf-line-strong); }
+
+.pf-ticker-body { display: flex; flex-direction: column; }
+
+.pf-ticker-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 5px 8px;
+  border-left: 3px solid var(--pf-slate);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--pf-paper);
+}
+
+.pf-ticker-line + .pf-ticker-line { border-top: 1px solid rgba(200, 168, 106, 0.14); }
+.pf-ticker-line.is-bad { border-left-color: var(--pf-crimson-soft); }
+.pf-ticker-line.is-warn { border-left-color: var(--pf-warn); }
+.pf-ticker-line.is-info { border-left-color: var(--pf-info); }
+.pf-ticker-line.is-more { border-left-color: transparent; font-size: 11px; color: var(--pf-paper-dim); }
+
+.pf-ticker-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.pf-ticker-mark {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--pf-warn);
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pf-warn);
+  transition: background 0.15s var(--pf-ease), color 0.15s var(--pf-ease);
+}
+
+.pf-ticker-mark:hover { background: var(--pf-warn); color: var(--pf-ink); }
+
 /* --------------------------------------------------------------------------
    5. 扫荡预警横幅
    -------------------------------------------------------------------------- */
@@ -813,17 +897,98 @@
 .pf-context-inner {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-  grid-template-areas: "tile unit" "actions actions";
+  grid-template-areas: "tile unit" "plan plan" "actions actions";
   gap: 10px;
   padding: 10px 12px 12px;
 }
 
 .pf-tile { grid-area: tile; min-width: 0; }
 .pf-unit { grid-area: unit; min-width: 0; }
+.pf-plan { grid-area: plan; }
 .pf-actions { grid-area: actions; }
 
 .pf-unit.is-hidden { display: none; }
-.pf-context.is-empty .pf-context-inner { grid-template-columns: 1fr; grid-template-areas: "tile" "actions"; }
+.pf-context.is-empty .pf-context-inner { grid-template-columns: 1fr; grid-template-areas: "tile" "plan" "actions"; }
+
+/* --- 交战判读 + 撤退路线选择器（攻击确认区） --- */
+
+.pf-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 9px 8px;
+  border: 1px dashed var(--pf-line);
+  border-radius: var(--pf-radius);
+  background: rgba(200, 168, 106, 0.07);
+}
+
+.pf-plan.is-hidden { display: none; }
+
+.pf-plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.pf-plan-odds {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pf-paper);
+}
+
+.pf-plan-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.pf-plan-badge.is-night { color: #a8c0e0; border-color: rgba(168, 192, 224, 0.55); background: rgba(52, 74, 110, 0.32); }
+.pf-plan-badge.is-flank { color: var(--pf-ochre-glow); border-color: var(--pf-ochre); background: rgba(200, 168, 106, 0.16); }
+.pf-plan-badge.is-backed { color: var(--pf-good); border-color: rgba(127, 191, 106, 0.5); }
+.pf-plan-badge.is-alone { color: var(--pf-warn); border-color: rgba(232, 183, 74, 0.5); }
+.pf-plan-badge.is-screen { color: var(--pf-info); border-color: rgba(143, 185, 201, 0.5); }
+
+.pf-plan-head { font-size: 11.5px; letter-spacing: 0.06em; color: var(--pf-paper-dim); }
+
+.pf-plan-withdraws { display: flex; gap: 6px; min-width: 0; }
+
+.pf-plan-option {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 8px;
+  border: 1px solid var(--pf-line);
+  border-radius: 3px;
+  background: rgba(24, 20, 17, 0.6);
+  text-align: left;
+  transition: border-color 0.15s var(--pf-ease), background 0.15s var(--pf-ease);
+}
+
+.pf-plan-option:hover { border-color: var(--pf-line-strong); }
+
+.pf-plan-option.is-active {
+  border-color: var(--pf-ochre);
+  background: rgba(200, 168, 106, 0.14);
+  box-shadow: 0 0 0 1px var(--pf-ochre) inset;
+}
+
+.pf-plan-option-label { font-size: 12px; color: var(--pf-paper); }
+.pf-plan-option.is-active .pf-plan-option-label { color: var(--pf-ochre-glow); }
+
+.pf-plan-option-reason {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--pf-paper-dim);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 
 .pf-card-head {
   display: flex;
@@ -902,6 +1067,13 @@
   font-size: 12px;
   line-height: 1.55;
   color: #f0d9c8;
+}
+
+/* 敌工程进行中（囚笼预告）：同一版式换警戒黄，与焚村的暗红区分开。 */
+.pf-scorch-note.is-enemywork {
+  border-left-color: var(--pf-warn);
+  background: rgba(232, 183, 74, 0.13);
+  color: #f0e4c4;
 }
 
 .pf-unit-blurb {
@@ -1379,19 +1551,23 @@
 
 .pf-hint.is-empty { display: none; }
 
+/* Toast 堆：原先压在画面中心偏上，正好盖住玩家的焦点区。
+   现在挂到顶栏下方靠右——左让开仪表条、右让开略图（12px 边距 + 268px 略图 + 12px 间隙）。
+   有扫荡横幅时整体再下移一档，绝不叠在警报上。 */
 .pf-toast-layer {
   position: absolute;
-  top: calc(var(--pf-topbar-h) + 52px);
-  left: 50%;
-  transform: translateX(-50%);
+  top: calc(var(--pf-topbar-h) + 58px);
+  right: 292px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 6px;
-  width: min(420px, calc(100vw - 32px));
+  width: min(360px, calc(100vw - 560px));
   pointer-events: none;
   z-index: 40;
 }
+
+.pf-ui.has-sweep .pf-toast-layer { top: calc(var(--pf-topbar-h) + 104px); }
 
 .pf-toast {
   display: flex;
@@ -1429,6 +1605,14 @@
 .pf-toast.is-info .pf-toast-mark { background: var(--pf-info); }
 
 .pf-toast-text { min-width: 0; }
+
+/* 溢出合并条：同屏第 5 条起折叠为「+N 条纪事」，压低存在感。 */
+.pf-toast.pf-toast-more {
+  padding: 5px 14px;
+  border-style: dashed;
+  font-size: 12px;
+  color: var(--pf-paper-dim);
+}
 
 /* --------------------------------------------------------------------------
    10. Tooltip
@@ -2270,6 +2454,59 @@
 .pf-buildcard:hover:not(:disabled) { background: rgba(200, 168, 106, 0.22); border-color: var(--pf-ochre); }
 .pf-buildcard-name { font-size: 13px; font-weight: 600; color: var(--pf-paper); }
 .pf-buildcard-cost { font-size: 11px; color: var(--pf-paper-dim); font-variant-numeric: tabular-nums; }
+
+/* --- 敌军动向（情报面板顶部的敌情通报块） --- */
+
+.pf-readout {
+  margin-bottom: 14px;
+  padding: 9px 11px 10px;
+  border: 1px solid var(--pf-line);
+  border-left: 3px solid var(--pf-crimson);
+  border-radius: var(--pf-radius);
+  background: rgba(140, 47, 36, 0.09);
+}
+
+.pf-readout-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.pf-readout-doctrine { font-size: 15.5px; }
+
+.pf-readout-stage {
+  padding: 1px 8px;
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 3px;
+  font-size: 11.5px;
+  color: var(--pf-paper-dim);
+}
+
+.pf-readout-stage.is-declare,
+.pf-readout-stage.is-prepare { color: var(--pf-warn); border-color: rgba(232, 183, 74, 0.55); }
+.pf-readout-stage.is-execute { color: var(--pf-crimson-soft); border-color: rgba(216, 80, 60, 0.6); }
+
+.pf-readout-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pf-paper-dim);
+}
+
+.pf-readout-summary { margin: 6px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--pf-paper); }
+.pf-readout-hint { margin: 4px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--pf-ochre-glow); }
+
+.pf-readout-moves { margin-top: 7px; display: flex; flex-direction: column; gap: 3px; }
+
+.pf-readout-move {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pf-readout-delta { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--pf-paper); }
+.pf-readout-delta.is-down { color: var(--pf-warn); }
+.pf-readout-delta.is-up { color: var(--pf-info); }
+.pf-readout-reason { color: var(--pf-paper-dim); }
+.pf-readout-quiet { margin: 6px 0 0; font-size: 12px; color: var(--pf-paper-dim); }
 
 .pf-intel-top { margin-bottom: 8px; }
 
