@@ -40,7 +40,8 @@ export const resourceDefinitions = Object.freeze([
   { key: "ordnance", name: "械", full: "枪械弹药", glyph: "械", blurb: "补充与整编部队，主要靠缴获与土法复装。" },
   { key: "medicine", name: "药", full: "医药", glyph: "药", blurb: "救治伤员，显著降低减员与后遗损失。" },
   { key: "intel", name: "情报", full: "情报", glyph: "谍", blurb: "情报网、预警与识破敌军意图。" },
-  { key: "cadre", name: "干部", full: "骨干", glyph: "干", blurb: "最稀缺的一项：开辟新区、派工作队、推行政策。" },
+  // 数值标签统一叫「干部」（叙事文案里的“骨干”不受影响）。
+  { key: "cadre", name: "干部", full: "干部", glyph: "干", blurb: "最稀缺的一项：开辟新区、派工作队、推行政策。" },
 ]);
 
 /** 五个时期。turnRange 为闭区间，与规格书第 5 节一致。 */
@@ -232,6 +233,85 @@ function PercentOf(value, total) {
   const amount = Number(value) || 0;
   const span = Number(total) || 100;
   return Clamp((amount / (span || 1)) * 100, 0, 100);
+}
+
+/**
+ * 回合序数显示：终局后 state.turn 会走到 maxTurns（32），直接 +1 会写出「回合 33 / 32」。
+ * 所有「第 N 回合 / 共 M 回合」的展示一律经此钳制。
+ */
+function TurnDisplay(turn, maxTurns) {
+  const total = Math.max(1, Number(maxTurns) || 32);
+  return Math.min(Math.max(0, Math.floor(Number(turn) || 0)) + 1, total);
+}
+
+/**
+ * 从攻击预览里取「敌情判断误差」的幅度（±百分点）。
+ * 首选 Script_Combat.PreviewAttack 附带的 Fog 风险行（label 里带 ±X%），
+ * 缺失时按同一公式用 intelQuality 估算（阈值 0.15 / 幅度 0.35，与 Combat 常数一致）。
+ */
+function PreviewFogError(preview) {
+  if (!preview) return 0;
+  const risk = (preview.risks || []).find(
+    (item) => item && (item.key === "Fog" || /误差/.test(item.label || item.text || ""))
+  );
+  if (risk) {
+    const match = /±\s*([0-9]+)\s*%/.exec(risk.label || risk.text || "");
+    if (match) return Number(match[1]) || 0;
+  }
+  if (preview.intelQuality !== undefined) {
+    const fogAmount = Math.max(0, 1 - (Number(preview.intelQuality) || 0) - 0.15);
+    return Math.round(fogAmount * 0.35 * 100);
+  }
+  return 0;
+}
+
+/**
+ * 同回合完全相同的日志行合并为一条（附 ×N）。侦察等重复动作曾把纪事刷成一屏同一句话。
+ * 只合并相邻且同回合的重复——跨回合的同文案是不同的事，不许并。
+ */
+function CollapseLogEntries(entries) {
+  const merged = [];
+  for (const entry of entries || []) {
+    if (!entry) continue;
+    const text = entry.text || entry.message || "";
+    const turn = entry.turn ?? 0;
+    const tone = entry.tone || entry.kind || "info";
+    const last = merged[merged.length - 1];
+    if (last && last.turn === turn && last.text === text && last.tone === tone) {
+      last.count += 1;
+    } else {
+      merged.push({ entry, turn, text, tone, count: 1 });
+    }
+  }
+  return merged;
+}
+
+/** 百分比 → 中文成数（约到半成）：95 → 九成五，60 → 六成。 */
+function FormatCheng(percent) {
+  const value = Number(percent) || 0;
+  let clamped = Clamp(Math.round(value / 5) * 5, 0, 100);
+  // 不满 99% 不许写「十成」——迷雾区间的上界写成十成是在夸大确定性。
+  if (clamped >= 100 && value < 99) clamped = 95;
+  if (clamped < 10) return "不足一成";
+  if (clamped >= 100) return "十成";
+  const digits = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+  const tens = Math.floor(clamped / 10);
+  return `${digits[tens]}成${clamped % 10 === 5 ? "五" : ""}`;
+}
+
+/**
+ * 胜算的诚实呈现：情报误差超过 ±15 个百分点时不再报单点数字，
+ * 改报成数区间（"约 六成～九成五"）；情报充足时保持精确百分比。
+ */
+function OddsDisplay(preview) {
+  const oddsPct = Math.round((Number(preview && preview.odds) || 0) * 100);
+  const errorPct = PreviewFogError(preview);
+  if (errorPct > 15) {
+    const low = Clamp(oddsPct - errorPct, 2, 98);
+    const high = Clamp(oddsPct + errorPct, 2, 98);
+    return { text: `约 ${FormatCheng(low)}～${FormatCheng(high)}`, uncertain: true, errorPct, oddsPct };
+  }
+  return { text: `${oddsPct}%`, uncertain: false, errorPct, oddsPct };
 }
 
 // ---------------------------------------------------------------------------
@@ -645,7 +725,7 @@ export function CreateUi(root, hooks = {}) {
         title: `${info.name} · ${date.label}`,
         body: info.summary || "",
         rows: [
-          { label: "回合", value: `${(state.turn || 0) + 1} / ${state.maxTurns || 32}` },
+          { label: "回合", value: `${TurnDisplay(state.turn, state.maxTurns)} / ${state.maxTurns || 32}` },
           { label: "时期区间", value: `第 ${info.turnRange[0] + 1} – ${info.turnRange[1] + 1} 回合` },
           { label: "阶段", value: SafeText(state.phaseKey, "行动") },
         ],
@@ -728,12 +808,14 @@ export function CreateUi(root, hooks = {}) {
         name: "暴露度",
         note: "行动痕迹越多、离敌越近，越可能招来扫荡。打完仗必须转移。",
         tone: "warm",
+        critical: "60 起风声 · 85 扫荡在即",
       },
       {
         key: "alert",
         name: "警备度",
         note: "敌军对本区的重视程度。持续破袭会抬高警备，也会牵制其兵力。",
         tone: "cold",
+        critical: "60 增防加哨 · 85 重点清剿",
       },
     ];
     for (const spec of meterSpecs) {
@@ -764,7 +846,7 @@ export function CreateUi(root, hooks = {}) {
           body: spec.note,
           rows: [
             { label: "当前", value: `${amount} / 100`, tone: amount >= 85 ? "bad" : amount >= 60 ? "warn" : "good" },
-            { label: "临界", value: "60 起风声 · 85 极危" },
+            { label: "临界", value: spec.critical },
           ],
           footer: spec.key === "exposure" ? "进地道、转移、群众掩护都能压下去。" : "警备度高时敌军调兵回防，别处反而出现空隙。",
         };
@@ -935,21 +1017,42 @@ export function CreateUi(root, hooks = {}) {
       SetFlag(dom.context, "is-collapsed", contextCollapsed);
       SetAttr(dom.contextGrip, "aria-expanded", contextCollapsed ? "false" : "true");
     });
-    dom.contextInner = El("div", "pf-context-inner", { parent: dom.context });
+    // 结构分两层（评审 P0）：信息区（地块卡 + 单位卡）允许收缩并在内部滚动；
+    // 行动区（交战判读 + 行动按钮）作为常驻底座钉在面板底部——
+    // 任何视口高度下动作按钮都必须完整落在屏幕内可点，绝不许被内容推出视口。
+    dom.contextScroll = El("div", "pf-context-scroll", { parent: dom.context });
+    dom.contextInner = El("div", "pf-context-inner", { parent: dom.contextScroll });
     dom.tileCard = El("div", "pf-tile", { parent: dom.contextInner });
     dom.unitCard = El("div", "pf-unit", { parent: dom.contextInner });
+    dom.contextDock = El("div", "pf-context-dock", { parent: dom.context });
     // 交战判读 + 撤退路线选择器：紧贴在行动按钮上方，点「伏击后转移」前先看这里。
-    dom.attackPlan = El("div", "pf-plan", { parent: dom.contextInner, attrs: { "aria-label": "交战判读" } });
+    dom.attackPlan = El("div", "pf-plan", { parent: dom.contextDock, attrs: { "aria-label": "交战判读" } });
     dom.actionRail = El("div", "pf-actions", {
-      parent: dom.contextInner,
+      parent: dom.contextDock,
       attrs: { role: "group", "aria-label": "行动" },
     });
-    // 横屏矮窗里这块只有 200 上下的高度却要装三百多的内容，必须让"还能往下滚"看得见。
-    BindScrollAffordance(dom.context);
+    // 横屏矮窗里信息区只有 200 上下的高度却要装三百多的内容，必须让"还能往下滚"看得见。
+    BindScrollAffordance(dom.contextScroll);
   }
 
   function BuildEndTurnDock() {
     dom.endDock = El("div", "pf-enddock", { parent: dom.hud });
+    // 被打散待归队的部队计数（state.scattered）：不是待办，只是让指挥员心里有数。
+    dom.scatteredNote = El("div", "pf-scattered", {
+      parent: dom.endDock,
+      attrs: { hidden: true, tabindex: "0" },
+    });
+    AttachTooltip(dom.scatteredNote, () => {
+      const scattered = (currentState && currentState.scattered) || [];
+      return {
+        title: "失散待归队",
+        body: "被打散的部队分散隐蔽在群众里，数回合后减员归队，也可能就此失去联系。",
+        rows: scattered.slice(0, 5).map((entry) => ({
+          label: SafeText(entry.name, "部队"),
+          value: `约第 ${TurnDisplay(entry.returnTurn ?? 0, currentState && currentState.maxTurns)} 回合归队`,
+        })),
+      };
+    });
     dom.todoList = El("ul", "pf-todo", { parent: dom.endDock, attrs: { "aria-label": "待办" } });
     dom.endButton = El("button", "pf-endturn", {
       parent: dom.endDock,
@@ -1008,7 +1111,7 @@ export function CreateUi(root, hooks = {}) {
       DrawMinimap();
       HideTooltip();
       UpdateScrollAffordance(dom.resourceBar);
-      UpdateScrollAffordance(dom.context);
+      UpdateScrollAffordance(dom.contextScroll);
       if (activePanel) RenderPanel(activePanel, cache.panelPayload);
     });
   }
@@ -1246,7 +1349,7 @@ export function CreateUi(root, hooks = {}) {
     SetText(dom.eraName, era.name);
     SetText(dom.eraDate, date.label);
     SetAttr(dom.eraDate, "title", era.dateRange || `${era.name}：第 ${era.turnRange[0] + 1} – ${era.turnRange[1] + 1} 回合`);
-    SetText(dom.eraTurn, `回合 ${turn + 1} / ${maxTurns}`);
+    SetText(dom.eraTurn, `回合 ${TurnDisplay(turn, maxTurns)} / ${maxTurns}`);
     SetText(dom.eraPhase, state.phaseKey ? `· ${state.phaseKey}` : "");
     const span = Math.max(1, era.turnRange[1] - era.turnRange[0] + 1);
     const progress = PercentOf(turn - era.turnRange[0] + 1, span);
@@ -1282,6 +1385,10 @@ export function CreateUi(root, hooks = {}) {
       SetFlag(nodes.delta, "is-bad", delta < 0);
       SetFlag(nodes.chip, "is-empty", amount <= 0);
       SetFlag(nodes.chip, "is-scarce", amount > 0 && amount < 10);
+      // 连续断粮（state.famineTurns ≥ 2）时粮格加深警示：饥荒不是普通的"存量偏低"。
+      if (resource.key === "grain") {
+        SetFlag(nodes.chip, "is-famine", (Number(state.famineTurns) || 0) >= 2);
+      }
       SetAttr(nodes.chip, "aria-label", `${resource.full} ${FormatNumber(amount)}，本回合 ${FormatSigned(delta)}`);
       if (stateChanged && previous !== undefined && previous !== amount) {
         FlashResource(resource.key, amount - previous);
@@ -1336,13 +1443,37 @@ export function CreateUi(root, hooks = {}) {
     SetFlag(root, "has-sweep", true);
     const turns = Math.max(0, Number(forecast.turnsUntil) || 0);
     const strength = Number(forecast.strength) || 0;
-    const axisCount = (forecast.axisKeys && forecast.axisKeys.length) || 0;
+    // 「几路合击」只认预报口径的 forecast.axisCount（情报模糊化路径的产物）。
+    // 绝不再拿 axisKeys（轴线途经的格序列）冒充路数——那会报出「10 条轴线」的胡话；
+    // 也不直接读 state.sweep.axes（那是越过情报网的作弊读法）。
+    const routeCount =
+      (Number(forecast.axisCount) > 0 && Number(forecast.axisCount)) ||
+      (Array.isArray(forecast.axes) && forecast.axes.length) ||
+      0;
+    const ringSize = (forecast.axisKeys && forecast.axisKeys.length) || 0;
     const confidence = forecast.confidence === undefined ? null : Number(forecast.confidence);
     SetText(dom.sweepTitle, turns <= 0 ? "扫荡已经开始" : "扫荡预警");
     const target = HexLabel(state, forecast.targetKey);
     const parts = [];
-    parts.push(axisCount ? `敌军自 ${axisCount} 条轴线合击${target}` : `敌军正向${target}合击`);
-    if (strength > 0) parts.push(`估计兵力 ${FormatNumber(strength)}`);
+    // 预报自带的中文整句（label / strengthBand）优先——它们已按情报覆盖做了模糊化，
+    // UI 不再自己拼精确数字去戳穿迷雾。
+    if (forecast.label) {
+      parts.push(forecast.label);
+      if (routeCount) parts.push(`判明 ${routeCount} 路来向`);
+    } else {
+      parts.push(
+        routeCount
+          ? `敌军分 ${routeCount} 路合击${target}`
+          : ringSize
+            ? `敌军正向${target}合击，合围圈约 ${ringSize} 格`
+            : `敌军正向${target}合击`
+      );
+    }
+    if (forecast.strengthBand) {
+      parts.push(/兵力/.test(forecast.strengthBand) ? forecast.strengthBand : `兵力${forecast.strengthBand}`);
+    } else if (strength > 0) {
+      parts.push(`估计兵力 ${FormatNumber(strength)}`);
+    }
     parts.push("坚壁清野、转移群众、主力跳出合围圈");
     let detail = `${parts.join("，")}。`;
     if (confidence !== null && confidence < 0.45) {
@@ -1731,7 +1862,7 @@ export function CreateUi(root, hooks = {}) {
     RenderUnitCard(state, view, unit);
     RenderAttackPlan(state, view);
     RenderActionRail(state, view, unit);
-    UpdateScrollAffordance(dom.context);
+    UpdateScrollAffordance(dom.contextScroll);
   }
 
   // ---- 交战判读与撤退路线（攻击确认区） ------------------------------------
@@ -1767,19 +1898,38 @@ export function CreateUi(root, hooks = {}) {
     if (preview) {
       const row = El("div", "pf-plan-row", { parent: box });
       if (preview.odds !== undefined) {
+        const odds = OddsDisplay(preview);
         El("span", "pf-plan-odds", {
-          text: `胜算 ${Math.round((Number(preview.odds) || 0) * 100)}%`,
+          text: `胜算 ${odds.text}`,
           parent: row,
           tip: () => ({
             title: "胜算",
-            body: "按敌情判断的得手概率；该区情报覆盖不足时会有误差。",
-            rows: (preview.risks || []).map((risk) => ({
-              label: "风险",
-              value: typeof risk === "string" ? risk : risk.label || risk.text || "",
-              tone: "warn",
-            })),
+            body: odds.uncertain
+              ? `该区情报覆盖不足，敌情判断误差约 ±${odds.errorPct}%，胜算只能按区间估计。`
+              : "按敌情判断的得手概率；该区情报覆盖不足时会有误差。",
+            rows: (odds.errorPct > 0
+              ? [{ label: "敌情判断", value: `误差约 ±${odds.errorPct}%`, tone: odds.uncertain ? "bad" : "warn" }]
+              : []
+            ).concat(
+              (preview.risks || []).map((risk) => ({
+                label: "风险",
+                value: typeof risk === "string" ? risk : risk.label || risk.text || "",
+                tone: "warn",
+              }))
+            ),
           }),
         });
+        // 误差过大时在胜算旁挂「敌情不明」徽章，别让玩家把猜测当保票。
+        if (odds.uncertain) {
+          El("span", "pf-plan-badge is-foggy", {
+            text: "敌情不明",
+            parent: row,
+            tip: {
+              title: "敌情不明",
+              body: `该区情报覆盖仅 ${Math.round((Number(preview.intelQuality) || 0) * 100)}%，胜算判断误差约 ±${odds.errorPct}%。先侦察再动手，数字才可信。`,
+            },
+          });
+        }
       }
       if (preview.night) {
         El("span", "pf-plan-badge is-night", {
@@ -1984,14 +2134,28 @@ export function CreateUi(root, hooks = {}) {
       });
     }
 
+    // 我方在建工程（hex.workBuild = { type, turnsLeft }）：修着的东西要看得见进度。
+    if (hex.workBuild && hex.workBuild.type) {
+      const buildInfo = LookupName("workDefinitions", hex.workBuild.type, workDisplay) || { name: hex.workBuild.type };
+      El("div", "pf-scorch-note is-building", {
+        text: `在建：${buildInfo.name}，余 ${FormatNumber(Math.max(1, Math.ceil(Number(hex.workBuild.turnsLeft) || 1)))} 季完工。`,
+        parent: card,
+      });
+    }
+
     if (Array.isArray(hex.works) && hex.works.length) {
       const works = El("div", "pf-chips", { parent: card, attrs: { "aria-label": "已建工事" } });
+      El("span", "pf-chips-label", { text: "工事", parent: works, attrs: { "aria-hidden": "true" } });
       for (const work of hex.works) {
         const info = LookupName("workDefinitions", work, workDisplay) || { name: work };
         El("span", "pf-chip", {
           text: info.shortName ? `${info.name}` : info.name,
           parent: works,
-          tip: { title: info.name, body: info.blurb || info.note || "" },
+          tip: () => ({
+            title: info.name,
+            body: info.desc || info.blurb || info.note || "",
+            rows: WorkEffectRows(info),
+          }),
         });
       }
     }
@@ -2014,11 +2178,13 @@ export function CreateUi(root, hooks = {}) {
     // 开辟根据地在行动栏里也有一份（kind:'FoundBase'），这里给一个更醒目的入口。
     const foundAction = (view.actions || []).find((action) => action && action.kind === "FoundBase");
     if (foundAction) {
+      // 不用原生 disabled：那会连悬停解释一起吞掉（详见行动栏同款注释）。
       const found = El("button", "pf-found-base", {
         text: foundAction.label || "在此开辟根据地",
         parent: card,
-        attrs: { type: "button", disabled: foundAction.enabled === false ? true : null },
+        attrs: { type: "button", "aria-disabled": foundAction.enabled === false ? "true" : null },
       });
+      SetFlag(found, "is-disabled", foundAction.enabled === false);
       AttachTooltip(found, () => ({
         title: foundAction.label || "开辟根据地",
         body: "派出骨干与工作队，在群众基础较好的村庄立起党政军三套架子。",
@@ -2102,6 +2268,8 @@ export function CreateUi(root, hooks = {}) {
     if (abilityKeys.length) {
       const abilityTable = DefinitionTable("abilityDefinitions");
       const chips = El("div", "pf-chips", { parent: card, attrs: { "aria-label": "能力" } });
+      // 「能力」前缀 + 弱化样式：这些是被动特长说明，不是可以点的按钮。
+      El("span", "pf-chips-label", { text: "能力", parent: chips, attrs: { "aria-hidden": "true" } });
       for (const ability of abilityKeys) {
         const key = typeof ability === "string" ? ability : ability.id || ability.key;
         const entry = abilityTable[key] || (typeof ability === "object" ? ability : null);
@@ -2193,16 +2361,20 @@ export function CreateUi(root, hooks = {}) {
       }
       cache.actionList.push(action);
       const tone = action.danger ? "attack" : meta.tone || "support";
+      // 禁用态不用原生 disabled：disabled 按钮不冒泡 pointer 事件，悬停 tooltip 和
+      // 点击提示都到不了玩家手里——"为什么不可用"就永远没人解释。
+      // 改用 aria-disabled + is-disabled 类，点击走 Toast、悬停走 tooltip。
       const button = El("button", `pf-action is-${tone}`, {
         parent: rail,
         attrs: {
           type: "button",
           "data-action": action.kind,
-          disabled: action.enabled === false ? true : null,
+          "aria-disabled": action.enabled === false ? "true" : null,
           "aria-keyshortcuts": hotkey || null,
         },
       });
       SetFlag(button, "is-danger", !!action.danger);
+      SetFlag(button, "is-disabled", action.enabled === false);
       El("span", "pf-action-name", { text: NormalizeActionLabel(action.label) || meta.name, parent: button });
       const costText = FormatCost(action.cost);
       El("small", "pf-action-cost", {
@@ -2213,12 +2385,65 @@ export function CreateUi(root, hooks = {}) {
       AttachTooltip(button, () => BuildActionTip(action, meta, hotkey));
       On(button, "click", () => {
         if (action.enabled === false) {
-          Toast(action.reason || "现在还做不了这件事。", "warn");
+          Toast(ActionDisabledReason(action), "warn");
           return;
         }
         TriggerAction(action);
       });
     }
+  }
+
+  /**
+   * 禁用行动的解释文案。Rules 对 BuildWork / ClearBlockade / FoundBase 会给 reason；
+   * 其余动作（伏击 / 破袭 / 攻坚 / 侦察 / 发动群众 / 休整）只在 unit.acted 时禁用，
+   * 兜底文案据此写实，不留「条件不足」这种什么也没说的话。
+   */
+  function ActionDisabledReason(action) {
+    return (action && action.reason) || "该队伍本回合已行动过，下回合再来。";
+  }
+
+  /** 工事效果 key → 中文标签。只译已知项，未知 key 静默跳过，绝不把英文 key 摆给玩家。 */
+  const workEffectLabels = {
+    massBaseDelta: "群众基础",
+    defenceBonus: "防御",
+    concealmentDelta: "隐蔽",
+    moveCostDelta: "我方通行",
+    enemyMoveCostDelta: "迟滞敌军",
+    exposureDelta: "暴露度",
+    grainProtection: "护粮",
+    scorchResist: "抗焚掠",
+    warningRange: "预警范围",
+    sabotageBonus: "破袭成效",
+    setsTunnel: "打通地道",
+  };
+
+  /** 把工事定义的 yields / effects 折成 tooltip 行（每种工事因此各有各的账）。 */
+  function WorkEffectRows(definition) {
+    const rows = [];
+    for (const resource of resourceDefinitions) {
+      const amount = Number(definition.yields && definition.yields[resource.key]) || 0;
+      if (amount) rows.push({ label: `产出 · ${resource.full}`, value: FormatSigned(amount), tone: ToneForDelta(amount) });
+    }
+    const effects = definition.effects || {};
+    for (const key of Object.keys(effects)) {
+      const label = workEffectLabels[key];
+      if (!label) continue;
+      const value = effects[key];
+      if (value === true) {
+        rows.push({ label, value: "是", tone: "good" });
+        continue;
+      }
+      const amount = Number(value);
+      if (!Number.isFinite(amount) || amount === 0) continue;
+      // 比例型（|x|<1）按百分数显示；moveCostDelta 负值是好事（通行更省），暴露度负值同理。
+      const goodWhenNegative = key === "moveCostDelta" || key === "exposureDelta";
+      const tone = goodWhenNegative ? (amount < 0 ? "good" : "bad") : ToneForDelta(amount);
+      const text = Math.abs(amount) < 1
+        ? `${amount > 0 ? "+" : ""}${Math.round(amount * 100)}%`
+        : FormatSigned(amount);
+      rows.push({ label, value: text, tone });
+    }
+    return rows.slice(0, 6);
   }
 
   /**
@@ -2238,7 +2463,16 @@ export function CreateUi(root, hooks = {}) {
     const preview = currentView && currentView.preview;
     if (preview && action.kind === "Attack") {
       if (preview.odds !== undefined) {
-        rows.push({ label: "胜算", value: `${Math.round(Number(preview.odds) * 100)}%`, tone: "flat" });
+        const odds = OddsDisplay(preview);
+        rows.push({ label: "胜算", value: odds.text, tone: odds.uncertain ? "warn" : "flat" });
+        // 与胜算数字同处一格：误差行必须跟着数字走，不许只藏在二级悬停里。
+        if (odds.errorPct > 0) {
+          rows.push({
+            label: "敌情判断",
+            value: `误差约 ±${odds.errorPct}%`,
+            tone: odds.uncertain ? "bad" : "warn",
+          });
+        }
       }
       if (preview.exposureDelta !== undefined) {
         rows.push({
@@ -2248,19 +2482,33 @@ export function CreateUi(root, hooks = {}) {
         });
       }
       for (const risk of preview.risks || []) {
-        rows.push({ label: "风险", value: typeof risk === "string" ? risk : risk.text || "", tone: "warn" });
+        // Combat 的风险行字段是 label（曾误读 text，整列风险都渲染成空白）。
+        const text = typeof risk === "string" ? risk : risk.label || risk.text || "";
+        if (!text || /误差约/.test(text)) continue; // 误差已单列，不重复
+        rows.push({ label: "风险", value: text, tone: "warn" });
       }
     }
     if (Array.isArray(action.withdrawOptions) && action.withdrawOptions.length) {
       rows.push({ label: "撤往", value: action.withdrawOptions[0].label || action.withdrawOptions[0].key });
     }
+    // 修建类动作用工事自己的档案体描述（blurb）+ 效果与工期，不再五种工事共用同一段模板话。
+    let body = action.hint || meta.hint || "";
+    if (action.kind === "BuildWork" && action.workType) {
+      const definition =
+        DefinitionTable("workDefinitions")[action.workType] || workDisplay[action.workType] || null;
+      if (definition) {
+        body = definition.desc || definition.blurb || definition.note || body;
+        for (const row of WorkEffectRows(definition)) rows.push(row);
+        if (definition.turns) rows.push({ label: "工期", value: `${FormatNumber(definition.turns)} 季度` });
+      }
+    }
     return {
-      title: action.label || meta.name,
-      body: action.hint || meta.hint || "",
+      title: NormalizeActionLabel(action.label) || meta.name,
+      body,
       rows,
       footer:
         action.enabled === false
-          ? `不可用：${action.reason || "条件不足"}`
+          ? `不可用：${ActionDisabledReason(action)}`
           : action.danger
             ? "这条路会把扫荡引到村子上，慎选。"
             : hotkey
@@ -2301,6 +2549,9 @@ export function CreateUi(root, hooks = {}) {
   // ---- 结束回合 / 待办 ----------------------------------------------------
 
   function RenderEndTurn(state, view) {
+    const scatteredCount = Array.isArray(state.scattered) ? state.scattered.length : 0;
+    SetAttr(dom.scatteredNote, "hidden", scatteredCount > 0 ? null : true);
+    if (scatteredCount > 0) SetText(dom.scatteredNote, `失散待归队 ${scatteredCount} 支`);
     const todos = ComputeTodos(state, view);
     const list = ClearNode(dom.todoList);
     for (const todo of todos.slice(0, 4)) {
@@ -2363,16 +2614,19 @@ export function CreateUi(root, hooks = {}) {
 
   function RenderNotify(state) {
     const entries = (currentView && currentView.notifications) || state.log || [];
-    const tail = entries.slice(-6);
-    const signature = tail.map((item) => `${item.turn || 0}:${item.text || item.message || ""}`).join("|");
+    // 同回合重复行合并（×N），再取尾部 6 条，侦察刷屏不再吃掉整个通知流。
+    const tail = CollapseLogEntries(entries).slice(-6);
+    const signature = tail.map((item) => `${item.turn}:${item.text}:${item.count}`).join("|");
     if (signature === cache.signatures.notify) return;
     cache.signatures.notify = signature;
     const list = ClearNode(dom.notify);
-    for (const entry of tail) {
-      const tone = entry.tone || entry.kind || "info";
-      const line = El("div", `pf-note is-${tone}`, { parent: list });
-      El("i", "pf-note-turn", { text: `${(entry.turn ?? state.turn ?? 0) + 1}`, parent: line });
-      El("span", "pf-note-text", { text: entry.text || entry.message || "", parent: line });
+    for (const row of tail) {
+      const line = El("div", `pf-note is-${row.tone}`, { parent: list });
+      El("i", "pf-note-turn", { text: `${TurnDisplay(row.turn ?? state.turn ?? 0, state.maxTurns)}`, parent: line });
+      El("span", "pf-note-text", {
+        text: row.count > 1 ? `${row.text} ×${row.count}` : row.text,
+        parent: line,
+      });
     }
   }
 
@@ -2697,14 +2951,28 @@ export function CreateUi(root, hooks = {}) {
             ? "已完成"
             : node.state === "locked"
               ? node.reason || "前置条件未满足"
-              : "点击列入研究",
+              : node.state === "active"
+                ? "研究中"
+                : "点击查看详情后确认",
       }));
-      On(card, "click", () => {
+      On(card, "click", async () => {
         if (node.state === "locked") {
           Toast(node.reason || "前置条件还没满足。", "warn");
           return;
         }
-        if (node.state === "done") return;
+        if (node.state === "done" || node.state === "active") return;
+        // 防误触：一点即换研究曾让玩家白丢半条研究进度。
+        // 第一次点击只弹详情确认卡，确认后才真正设置研究方向。
+        const confirmed = await Confirm({
+          title: node.name || node.id,
+          body: node.blurb || "",
+          rows: CostRows(node.cost).concat(
+            node.effectRows || (node.effects ? DescribeEffects(node.effects) : [])
+          ),
+          confirmLabel: current && current.id !== node.id ? "改为研究此项" : "列入研究",
+          cancelLabel: "再看看",
+        });
+        if (!confirmed) return;
         Call("OnResearch", { id: node.id, tree: isTech ? "tech" : "doctrine" });
       });
     }
@@ -3262,13 +3530,25 @@ export function CreateUi(root, hooks = {}) {
         parent: head,
         attrs: { type: "button" },
       });
-      On(focus, "click", () => Call("OnFocusHex", base.key, { reason: "Base" }));
+      On(focus, "click", () => {
+        // 先关面板再跳镜头，否则镜头动了也被面板挡着看不见。
+        ShowPanel(null);
+        Call("OnFocusHex", base.key, { reason: "Base" });
+      });
 
       const stats = El("div", "pf-base-stats", { parent: card });
       AddFact(stats, "人口", FormatNumber(base.population || 0));
       AddFact(stats, "驻军", FormatNumber(base.garrison || 0));
       AddFact(stats, "不安", `${Math.round(base.unrest || 0)}`, (base.unrest || 0) > 50 ? "bad" : null);
       AddFact(stats, "区域", FormatNumber((base.districts || []).length));
+      // 扫荡把生产打停的回合数（base.disrupted）：恢复期要看得见。
+      if ((base.disrupted || 0) > 0) {
+        const cell = AddFact(stats, "生产", `停顿 ${FormatNumber(Math.ceil(base.disrupted))} 回合`, "bad");
+        AttachTooltip(cell, () => ({
+          title: "生产停顿",
+          body: "刚被扫荡过的根据地，生产与建设要停上一段时间才能缓过来。",
+        }));
+      }
 
       const districtTable = DefinitionTable("districtDefinitions");
       if ((base.districts || []).length) {
@@ -3306,8 +3586,9 @@ export function CreateUi(root, hooks = {}) {
         for (const item of buildable) {
           const button = El("button", "pf-buildcard", {
             parent: grid,
-            attrs: { type: "button", disabled: item.enabled === false ? true : null },
+            attrs: { type: "button", "aria-disabled": item.enabled === false ? "true" : null },
           });
+          SetFlag(button, "is-disabled", item.enabled === false);
           El("span", "pf-buildcard-name", { text: item.name || item.type, parent: button });
           El("small", "pf-buildcard-cost", { text: FormatCost(item.cost) || "—", parent: button });
           AttachTooltip(button, () => ({
@@ -3333,8 +3614,9 @@ export function CreateUi(root, hooks = {}) {
         for (const item of trainable) {
           const button = El("button", "pf-buildbtn", {
             parent: row,
-            attrs: { type: "button", disabled: item.enabled === false ? true : null },
+            attrs: { type: "button", "aria-disabled": item.enabled === false ? "true" : null },
           });
+          SetFlag(button, "is-disabled", item.enabled === false);
           El("span", null, { text: item.name || item.type, parent: button });
           El("small", "pf-cost", { text: FormatCost(item.cost) || "—", parent: button });
           AttachTooltip(button, () => ({
@@ -3397,13 +3679,17 @@ export function CreateUi(root, hooks = {}) {
     for (const id of ids) {
       const definition = table[id] || {};
       if (definition.side !== "Player") continue;
+      // 编成成本随时期浮动（困难期更贵）：优先向主流程要 Rules.GetTrainCost 的动态值，
+      // 拿不到（hook 未接 / 老版本）再退回定义表里的静态成本。
+      const dynamicCost = Call("QueryTrainCost", id);
+      const cost = (dynamicCost && typeof dynamicCost === "object" ? dynamicCost : null) || definition.cost || null;
       let reason = "";
       if (definition.requiresTech && !done.has(definition.requiresTech)) reason = "科技未解锁";
-      else reason = AffordReason(state, definition.cost);
+      else reason = AffordReason(state, cost);
       options.push({
         type: id,
         name: definition.name || id,
-        cost: definition.cost || null,
+        cost,
         blurb: definition.blurb || "",
         enabled: !reason,
         reason,
@@ -3471,7 +3757,15 @@ export function CreateUi(root, hooks = {}) {
         });
         SetFlag(strength, "is-weak", (enemy.hp || 0) < (enemy.maxHp || 1) * 0.4);
         const jump = El("button", "pf-intel-jump", { text: "定位", parent: row, attrs: { type: "button" } });
-        On(jump, "click", () => Call("OnFocusHex", enemy.key, { reason: "Intel" }));
+        On(jump, "click", () => {
+          if (!enemy.key) {
+            Toast("该部位置不明，先派侦察摸清。", "warn");
+            return;
+          }
+          // 先关面板再跳镜头：面板开着时镜头跳了也看不见。
+          ShowPanel(null);
+          Call("OnFocusHex", enemy.key, { reason: "Intel" });
+        });
       }
     }
 
@@ -3497,14 +3791,25 @@ export function CreateUi(root, hooks = {}) {
       const grid = El("div", "pf-stronghold-grid", { parent: body });
       for (const stronghold of strongholds) {
         const cell = El("button", "pf-stronghold", { parent: grid, attrs: { type: "button" } });
-        El("span", "pf-stronghold-type", { text: StrongholdName(stronghold.type), parent: cell });
+        const typeName = StrongholdName(stronghold.type);
+        const title = stronghold.name && stronghold.name !== typeName ? stronghold.name : typeName;
+        El("span", "pf-stronghold-name", { text: title, parent: cell });
+        // 据点叫得出名、找得到地方：类型 + 所在地名；标题已是类型名时不再重复类型。
+        El("small", "pf-stronghold-where", {
+          text: title === typeName ? HexLabel(state, stronghold.key) : `${typeName} · ${HexLabel(state, stronghold.key)}`,
+          parent: cell,
+        });
         El("small", null, { text: `守备 ${FormatNumber(stronghold.garrison || 0)}`, parent: cell });
+        El("span", "pf-stronghold-jump", { text: "定位 →", parent: cell, attrs: { "aria-hidden": "true" } });
         const alarm = El("i", "pf-stronghold-alarm", { parent: cell });
         SetBarWidth(alarm, stronghold.alarm || 0);
-        On(cell, "click", () => Call("OnFocusHex", stronghold.key, { reason: "Stronghold" }));
+        On(cell, "click", () => {
+          ShowPanel(null);
+          Call("OnFocusHex", stronghold.key, { reason: "Stronghold" });
+        });
         AttachTooltip(cell, () => ({
-          title: StrongholdName(stronghold.type),
-          body: `位置 ${FormatHexCoord(stronghold.key)}。`,
+          title,
+          body: `${typeName}，位于${HexLabel(state, stronghold.key)} ${FormatHexCoord(stronghold.key)}。点击关闭面板并把镜头带过去。`,
           rows: [
             { label: "守备", value: FormatNumber(stronghold.garrison || 0) },
             { label: "补给", value: FormatNumber(stronghold.supply || 0) },
@@ -3667,16 +3972,29 @@ export function CreateUi(root, hooks = {}) {
       }
     }
 
-    const entries = (view.ledger && Array.isArray(view.ledger.entries) ? view.ledger.entries : []).slice(-40).reverse();
+    // 逐条记录的数据源：优先 view.ledger.entries，其次 state.ledgerLog
+    // （逻辑层契约：元素 { turn, kind, key, text, delta }，newest 在末尾，上限 200 条）。
+    // 两者都缺时保持空态文案——本面板只消费，不自造数据。
+    const logSource =
+      view.ledger && Array.isArray(view.ledger.entries) && view.ledger.entries.length
+        ? view.ledger.entries
+        : Array.isArray(state.ledgerLog)
+          ? state.ledgerLog
+          : [];
+    const entries = logSource.slice(-80).reverse();
     El("h3", "pf-group-title", { text: "逐条记录", parent: body });
     if (!entries.length) {
-      El("div", "pf-empty pf-empty-block", { text: "目前尚无逐条记录。", parent: body });
+      El("div", "pf-empty pf-empty-block", { text: "目前尚无逐条记录。代价发生时，将在此逐条记下何时何地、因何、几人。", parent: body });
       return;
     }
     const list = El("ol", "pf-ledger-list", { parent: body });
     for (const entry of entries) {
+      if (!entry) continue;
       const item = El("li", "pf-ledger-item", { parent: list });
-      El("span", "pf-ledger-turn", { text: `第 ${(entry.turn ?? 0) + 1} 回合`, parent: item });
+      El("span", "pf-ledger-turn", {
+        text: `第 ${TurnDisplay(entry.turn, state.maxTurns)} 回合`,
+        parent: item,
+      });
       El("span", "pf-ledger-text", { text: entry.text || "", parent: item });
     }
   }
@@ -3684,17 +4002,22 @@ export function CreateUi(root, hooks = {}) {
   // ---- 纪事 / 战报 --------------------------------------------------------
 
   function RenderLogPanel(body, state) {
-    const entries = (state.log || []).slice().reverse();
-    if (!entries.length) {
+    // 先按时间序合并同回合重复行，再倒序展示（最新在上）。
+    const merged = CollapseLogEntries(state.log || []).reverse();
+    if (!merged.length) {
       El("div", "pf-empty pf-empty-block", { text: "还没有记录。", parent: body });
       return;
     }
     const list = El("ol", "pf-loglist", { parent: body });
-    for (const entry of entries.slice(0, 200)) {
-      const item = El("li", `pf-logitem is-${entry.tone || entry.kind || "info"}`, { parent: list });
-      El("span", "pf-logitem-turn", { text: `${(entry.turn ?? 0) + 1}`, parent: item });
+    for (const row of merged.slice(0, 200)) {
+      const entry = row.entry;
+      const item = El("li", `pf-logitem is-${row.tone}`, { parent: list });
+      El("span", "pf-logitem-turn", { text: `${TurnDisplay(row.turn, state.maxTurns)}`, parent: item });
       const text = El("div", "pf-logitem-body", { parent: item });
-      El("span", "pf-logitem-text", { text: entry.text || entry.message || "", parent: text });
+      El("span", "pf-logitem-text", {
+        text: row.count > 1 ? `${row.text} ×${row.count}` : row.text,
+        parent: text,
+      });
       if (entry.detail) El("small", "pf-logitem-detail", { text: entry.detail, parent: text });
     }
   }
@@ -3702,6 +4025,29 @@ export function CreateUi(root, hooks = {}) {
   // ---- 说明 ---------------------------------------------------------------
 
   function RenderHelpPanel(body) {
+    // 新玩家最先需要的不是快捷键表，是"这游戏到底在循环什么"。放在最前。
+    El("h3", "pf-group-title", { text: "核心循环速览", parent: body });
+    const loop = El("div", "pf-corehelp", { parent: body });
+    const loopLines = [
+      "隐蔽 → 伏击 → 暴露 → 转移：打完必须转移，滞留原地暴露度按四倍计。",
+      "群众基础是根本：产出系数、情报精度、隐蔽恢复、撤退成功率全由它决定。",
+      "「发动群众」抬群众基础；够高的村庄可「开辟根据地」，根据地才有建设与编成。",
+      "械主要靠隐蔽状态打伏击缴获；药永远稀缺；干部最贵，开辟新区都要抽人。",
+      "暴露度与警备度过高会招来扫荡：预警提前 2 回合，坚壁清野、转移群众、主力跳出合围圈。",
+      "敌组织扫荡时会抽空沿线据点守备——那正是反打其后方的窗口（敌进我进）。",
+      "代价账本只记录、不折算：平民伤亡、焚村、流离永远不会变成你的任何收益。",
+    ];
+    for (const line of loopLines) El("p", "pf-corehelp-line", { text: line, parent: loop });
+    // 「重开新局 / 换难度」的可发现入口：不再只藏在设置面板里。
+    const restart = El("div", "pf-help-restart", { parent: body });
+    El("span", "pf-help-restart-text", { text: "想重开一局或换个难度？", parent: restart });
+    const restartButton = El("button", "pf-ghost", {
+      text: "打开「设置」新开一局",
+      parent: restart,
+      attrs: { type: "button" },
+    });
+    On(restartButton, "click", () => ShowPanel("Settings"));
+
     El("h3", "pf-group-title", { text: "快捷键", parent: body });
     const table = El("div", "pf-keytable", { parent: body });
     for (const row of keyboardHelpRows) {
@@ -3810,7 +4156,7 @@ export function CreateUi(root, hooks = {}) {
     const saveBox = El("section", "pf-set-block", { parent: form });
     El("h3", "pf-group-title", { text: "存档", parent: saveBox });
     const summary = (payload && payload.saveSummary) ||
-      `第 ${(state.turn || 0) + 1} 回合 · ${FormatTurnDate(state.turn || 0).label}`;
+      `第 ${TurnDisplay(state.turn, state.maxTurns)} 回合 · ${FormatTurnDate(state.turn || 0).label}`;
     const row = El("div", "pf-saverow", { parent: saveBox });
     El("span", "pf-save-name", { text: "战役存档", parent: row });
     El("small", "pf-save-meta", { text: summary, parent: row });
@@ -3919,7 +4265,14 @@ export function CreateUi(root, hooks = {}) {
             El("i", null, { text: resource ? resource.name : item.label || item.key, parent: chip });
             El("b", null, { text: item.text || FormatSigned(item.delta), parent: chip });
           }
+        } else {
+          // 没有任何量化 chips 时至少给一行方向性小字，不让玩家对着两个纯文案选项盲选。
+          const trend = DirectionHintFromEffects(option.effects);
+          if (trend) El("small", "pf-option-trend", { text: trend, parent: button });
         }
+        // 付不起的代价：如实标注按现有存量扣除（纯显示，结算仍归逻辑层）。
+        const shortage = StockShortageNote(option.effects);
+        if (shortage) El("small", "pf-option-shortage", { text: shortage, parent: button });
         if (option.disabled && option.reason) El("small", "pf-option-lock", { text: option.reason, parent: button });
         On(button, "click", () => {
           if (option.disabled) {
@@ -4000,6 +4353,82 @@ export function CreateUi(root, hooks = {}) {
       chips.push({ label: names[key] || key, text: FormatNumber(amount), tone: "bad" });
     }
     return chips.slice(0, 6);
+  }
+
+  /**
+   * 事件选项没有任何即时数值 chips 时的方向性小字：从 effects 的持续型 key 推导
+   * "械产出↑ · 伏击↑"式提示；effects 存在但推不出内容时写「长期效果」。
+   * effects 为空 / 缺失的选项不写——那是有意的中性选项，别硬贴标签。
+   */
+  function DirectionHintFromEffects(effects) {
+    if (!effects || typeof effects !== "object") return "";
+    const keys = Object.keys(effects).filter((key) => key !== "duration");
+    if (!keys.length) return "";
+    const trendLabels = {
+      massGrowth: "群众工作",
+      exposureDecay: "暴露消退",
+      intelRange: "情报网",
+      concealment: "隐蔽",
+      ambushBonus: "伏击",
+      defenceBonus: "防御",
+      moveBonus: "机动",
+      healRate: "伤员恢复",
+      buildSpeed: "建设",
+      researchSpeed: "研究",
+      cadreGrowth: "干部培养",
+      unrestDecay: "民情安定",
+      sweepWarning: "扫荡预警",
+      captureRate: "缴获",
+      maintenanceDiscount: "维持费省减",
+      upkeepDiscount: "维持费省减",
+      seizureResist: "抗征粮",
+      civilianShelter: "群众掩蔽",
+      sabotageBonus: "破袭",
+      siegeBonus: "攻坚",
+      tunnelMove: "地道通行",
+    };
+    const parts = [];
+    for (const key of keys) {
+      const value = effects[key];
+      if (key === "yieldBonus" || key === "flatYield") {
+        // 资源映射：逐项给方向
+        if (value && typeof value === "object") {
+          for (const resource of resourceDefinitions) {
+            const amount = Number(value[resource.key]) || 0;
+            if (!amount) continue;
+            parts.push(`${resource.name}产出${amount > 0 ? "↑" : "↓"}`);
+          }
+        }
+        continue;
+      }
+      const label = trendLabels[key];
+      if (!label) continue;
+      const amount = Number(value);
+      if (Number.isFinite(amount) && amount !== 0) {
+        parts.push(`${label}${amount > 0 ? "↑" : "↓"}`);
+      } else if (value === true) {
+        parts.push(`${label}↑`);
+      }
+    }
+    const duration = Number(effects.duration) || 0;
+    const text = parts.slice(0, 4).join(" · ");
+    if (!text) return "长期效果";
+    return duration > 0 ? `${text}（约 ${duration} 回合）` : text;
+  }
+
+  /** 选项代价超出存量时的提示：只做显示，不改任何结算逻辑。 */
+  function StockShortageNote(effects) {
+    const delta = effects && effects.stockDelta;
+    if (!delta || !currentState || !currentState.stock) return "";
+    const lacking = [];
+    for (const resource of resourceDefinitions) {
+      const amount = Number(delta[resource.key]) || 0;
+      if (amount >= 0) continue;
+      const stock = Number(currentState.stock[resource.key]) || 0;
+      if (stock < -amount) lacking.push(resource.name);
+    }
+    if (!lacking.length) return "";
+    return `${lacking.join("、")}存量不足，按现有扣除`;
   }
 
   function HashText(text) {

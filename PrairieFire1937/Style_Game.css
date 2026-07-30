@@ -356,6 +356,13 @@
 .pf-res.is-scarce .pf-res-stock { color: var(--pf-warn); }
 .pf-res.is-empty .pf-res-stock { color: var(--pf-bad); }
 
+/* 连续断粮（famineTurns ≥ 2）：粮格整体压深红底，这不是普通的"存量偏低"。 */
+.pf-res.is-famine {
+  border-color: var(--pf-crimson-bright);
+  background: rgba(140, 47, 36, 0.28);
+}
+.pf-res.is-famine .pf-res-stock { color: var(--pf-crimson-soft); }
+
 .pf-res.is-flash-good { animation: pf-chip-pulse-good 0.7s var(--pf-ease); }
 .pf-res.is-flash-bad { animation: pf-chip-pulse-bad 0.7s var(--pf-ease); }
 
@@ -844,12 +851,15 @@
 
 .pf-leftdock > * { pointer-events: auto; }
 
+/* 评审 P0 教训：行动按钮曾被地块/单位信息推到视口外（1600×900 下按钮落在 y≈955+），
+   玩家选中多动作单位后什么都点不了。结构上根治：面板分「可滚信息区 + 常驻行动底座」，
+   信息区（.pf-context-scroll）允许收缩并内部滚动，行动区（.pf-context-dock）永远贴底可见。 */
 .pf-context {
+  display: flex;
+  flex-direction: column;
   flex: 0 1 auto;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
+  overflow: hidden;
   border: 1px solid var(--pf-line-strong);
   border-radius: var(--pf-radius-lg);
   background-color: rgba(24, 20, 17, 0.94);
@@ -859,20 +869,37 @@
   transition: transform 0.3s var(--pf-ease);
 }
 
+.pf-context-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.pf-context-dock {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+  background: rgba(24, 20, 17, 0.97);
+}
+
 /* 本机与多数移动端浏览器的滚动条是叠加式的，静止时完全不画：能滚也看不出来。
    Script_Ui 会按滚动位置打 is-scroll-up / is-scroll-down，这里据此画出上下渐隐，
    横屏矮窗里那张被拦腰截断的地块卡因此有了明确的"还能往下滚"提示。 */
-.pf-context.is-scroll-down {
+.pf-context-scroll.is-scroll-down {
   mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 26px), transparent 100%);
   -webkit-mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 26px), transparent 100%);
 }
 
-.pf-context.is-scroll-up.is-scroll-down {
+.pf-context-scroll.is-scroll-up.is-scroll-down {
   mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 calc(100% - 26px), transparent 100%);
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 calc(100% - 26px), transparent 100%);
 }
 
-.pf-context.is-scroll-up {
+.pf-context-scroll.is-scroll-up {
   mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 100%);
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 20px, #000 100%);
 }
@@ -897,18 +924,16 @@
 .pf-context-inner {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-  grid-template-areas: "tile unit" "plan plan" "actions actions";
+  grid-template-areas: "tile unit";
   gap: 10px;
-  padding: 10px 12px 12px;
+  padding: 10px 12px 10px;
 }
 
 .pf-tile { grid-area: tile; min-width: 0; }
 .pf-unit { grid-area: unit; min-width: 0; }
-.pf-plan { grid-area: plan; }
-.pf-actions { grid-area: actions; }
 
 .pf-unit.is-hidden { display: none; }
-.pf-context.is-empty .pf-context-inner { grid-template-columns: 1fr; grid-template-areas: "tile" "plan" "actions"; }
+.pf-context.is-empty .pf-context-inner { grid-template-columns: 1fr; grid-template-areas: "tile"; }
 
 /* --- 交战判读 + 撤退路线选择器（攻击确认区） --- */
 
@@ -944,6 +969,8 @@
 }
 
 .pf-plan-badge.is-night { color: #a8c0e0; border-color: rgba(168, 192, 224, 0.55); background: rgba(52, 74, 110, 0.32); }
+/* 情报不足时的"敌情不明"徽章：胜算只是猜测，配警戒色。 */
+.pf-plan-badge.is-foggy { color: var(--pf-warn); border-color: rgba(232, 183, 74, 0.6); background: rgba(232, 183, 74, 0.12); cursor: help; }
 .pf-plan-badge.is-flank { color: var(--pf-ochre-glow); border-color: var(--pf-ochre); background: rgba(200, 168, 106, 0.16); }
 .pf-plan-badge.is-backed { color: var(--pf-good); border-color: rgba(127, 191, 106, 0.5); }
 .pf-plan-badge.is-alone { color: var(--pf-warn); border-color: rgba(232, 183, 74, 0.5); }
@@ -1076,6 +1103,13 @@
   color: #f0e4c4;
 }
 
+/* 我方在建工程注记：黄土色，与敌工程 / 焚掠的红黄警示区分开。 */
+.pf-scorch-note.is-building {
+  border-left-color: var(--pf-ochre);
+  background: rgba(200, 168, 106, 0.12);
+  color: var(--pf-paper);
+}
+
 .pf-unit-blurb {
   margin-bottom: 6px;
   font-size: 11.5px;
@@ -1147,17 +1181,28 @@
   padding-left: 7px;
 }
 
-.pf-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
+.pf-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 7px; }
+
+/* chips 是"被动说明"，不是按钮：降对比、去按钮态底色，配「能力 / 工事」小字前缀。
+   评审曾把设伏/侦察/组织这排 chips 误认成一排可点的按钮。 */
+.pf-chips-label {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--pf-paper-dim);
+  opacity: 0.75;
+}
 
 .pf-chip {
-  padding: 2px 8px;
-  border: 1px dashed var(--pf-line-strong);
+  padding: 1px 7px;
+  border: 1px dashed var(--pf-line);
   border-radius: 3px;
-  font-size: 12px;
-  color: var(--pf-paper);
-  background: rgba(200, 168, 106, 0.1);
+  font-size: 11.5px;
+  color: var(--pf-paper-dim);
+  background: transparent;
   cursor: help;
 }
+
+.pf-chip:hover { color: var(--pf-paper); border-color: var(--pf-line-strong); }
 
 .pf-garrison { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 7px; }
 .pf-garrison-label { font-size: 12px; color: var(--pf-paper-dim); }
@@ -1191,7 +1236,7 @@
   transition: background 0.2s var(--pf-ease);
 }
 
-.pf-buildbtn:hover:not(:disabled) { background: rgba(200, 168, 106, 0.24); }
+.pf-buildbtn:hover:not(:disabled):not(.is-disabled) { background: rgba(200, 168, 106, 0.24); }
 .pf-cost { font-size: 10.5px; color: var(--pf-paper-dim); }
 
 .pf-found-base {
@@ -1207,7 +1252,7 @@
   background: linear-gradient(180deg, rgba(200, 168, 106, 0.2), rgba(200, 168, 106, 0.08));
 }
 
-.pf-found-base:hover { background: var(--pf-ochre); color: var(--pf-ink); }
+.pf-found-base:hover:not(.is-disabled) { background: var(--pf-ochre); color: var(--pf-ink); }
 
 /* —— 单位卡 —— */
 
@@ -1301,13 +1346,20 @@
   transition: transform 0.15s var(--pf-ease), background 0.2s var(--pf-ease), border-color 0.2s var(--pf-ease);
 }
 
-.pf-action:hover:not(:disabled) {
+.pf-action:hover:not(:disabled):not(.is-disabled) {
   transform: translateY(-1px);
   border-color: var(--pf-ochre-glow);
   background: linear-gradient(180deg, rgba(200, 168, 106, 0.35), rgba(60, 50, 38, 0.7));
 }
 
-.pf-action:active:not(:disabled) { transform: translateY(0); }
+.pf-action:active:not(:disabled):not(.is-disabled) { transform: translateY(0); }
+
+/* 禁用态改用 is-disabled 类（原生 disabled 会吞掉悬停 tooltip 与点击解释）。
+   视觉与 :disabled 完全一致；仍可悬停看"为什么不可用"，点击给 Toast 解释。 */
+.pf-ui button.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
 
 .pf-action.is-attack { border-left: 3px solid var(--pf-crimson-bright); }
 .pf-action.is-move { border-left: 3px solid var(--pf-info); }
@@ -1326,7 +1378,7 @@
 .pf-action.is-danger .pf-action-name { color: #ffd9c8; }
 .pf-action.is-danger .pf-action-cost { color: #f0b8a6; }
 
-.pf-action.is-danger:hover:not(:disabled) {
+.pf-action.is-danger:hover:not(:disabled):not(.is-disabled) {
   border-color: var(--pf-crimson-soft);
   background:
     repeating-linear-gradient(135deg, rgba(224, 96, 76, 0.42) 0 6px, rgba(140, 47, 36, 0.2) 6px 12px),
@@ -1378,6 +1430,19 @@
   align-items: flex-end;
   gap: 6px;
   width: 236px;
+}
+
+/* 失散待归队计数：信息牌而非按钮，悬停可看名单与预计归队回合。 */
+.pf-scattered {
+  width: 100%;
+  padding: 3px 9px;
+  border: 1px dashed rgba(232, 183, 74, 0.55);
+  border-radius: 3px;
+  background: rgba(24, 20, 17, 0.9);
+  font-size: 11.5px;
+  color: var(--pf-warn);
+  text-align: left;
+  cursor: help;
 }
 
 .pf-todo {
@@ -2451,7 +2516,7 @@
   transition: background 0.2s var(--pf-ease), border-color 0.2s var(--pf-ease);
 }
 
-.pf-buildcard:hover:not(:disabled) { background: rgba(200, 168, 106, 0.22); border-color: var(--pf-ochre); }
+.pf-buildcard:hover:not(:disabled):not(.is-disabled) { background: rgba(200, 168, 106, 0.22); border-color: var(--pf-ochre); }
 .pf-buildcard-name { font-size: 13px; font-weight: 600; color: var(--pf-paper); }
 .pf-buildcard-cost { font-size: 11px; color: var(--pf-paper-dim); font-variant-numeric: tabular-nums; }
 
@@ -2572,7 +2637,8 @@
 
 .pf-stronghold-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  /* 卡片上现在带据点名 + 所在地名，130px 会把地名横切。 */
+  grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
   gap: 7px;
 }
 
@@ -2591,8 +2657,19 @@
 }
 
 .pf-stronghold:hover { background: rgba(140, 47, 36, 0.3); }
-.pf-stronghold-type { font-size: 13px; font-weight: 600; color: var(--pf-paper); }
+.pf-stronghold-name { font-size: 13px; font-weight: 600; color: var(--pf-paper); }
+.pf-stronghold-where { font-size: 11px; color: var(--pf-paper-dim); }
 .pf-stronghold small { font-size: 11px; color: var(--pf-paper-dim); }
+
+/* 整卡即定位按钮，用角标把这层交互说破。 */
+.pf-stronghold-jump {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 10.5px;
+  color: var(--pf-crimson-soft);
+  opacity: 0.85;
+}
 
 .pf-stronghold-alarm {
   position: absolute;
@@ -2681,6 +2758,36 @@
 /* --------------------------------------------------------------------------
    15. 说明页 / 设置页
    -------------------------------------------------------------------------- */
+
+/* 核心循环速览：说明面板开头的六到八行"这游戏在循环什么"。 */
+.pf-corehelp {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--pf-line);
+  border-left: 3px solid var(--pf-ochre);
+  border-radius: var(--pf-radius);
+  background: rgba(200, 168, 106, 0.06);
+}
+
+.pf-corehelp-line {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--pf-paper);
+}
+
+/* 「重开新局 / 换难度」的可发现入口。 */
+.pf-help-restart {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.pf-help-restart-text { font-size: 12.5px; color: var(--pf-paper-dim); }
 
 .pf-keytable {
   display: grid;
@@ -3014,6 +3121,10 @@
 .pf-option-label { font-family: var(--pf-font-serif); font-size: 15.5px; font-weight: 700; color: var(--pf-ink); }
 .pf-option-detail { font-size: 12.5px; line-height: 1.55; color: var(--pf-ink-mute); }
 .pf-option-lock { font-size: 11.5px; color: var(--pf-crimson); font-style: italic; }
+/* 无量化 chips 时的方向性小字（"械产出↑ · 伏击↑" / "长期效果"）。 */
+.pf-option-trend { font-size: 11.5px; letter-spacing: 0.02em; color: var(--pf-ink-mute); opacity: 0.9; }
+/* 代价超出存量时的如实提示。 */
+.pf-option-shortage { font-size: 11px; color: var(--pf-crimson); }
 
 .pf-option-preview { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
 

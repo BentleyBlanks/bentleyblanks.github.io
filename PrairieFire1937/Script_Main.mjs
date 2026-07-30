@@ -150,13 +150,15 @@ export async function StartGame(options = {}) {
       if (attack) view.preview = Rules.GetActionPreview(state, attack);
     }
     ComputeAttackGuidance();
+    ComputeOnboardingHint();
     view.briefing = Rules.GetTurnBriefing(state);
   }
 
   /**
-   * 填充 view.attackTargets（本回合真打得着的敌格），并给新手一句节奏引导：
-   * 选中的队伍够不着任何目标、但可见敌军就在 2-3 格内时，提示"先转移到隔壁再伏击"。
-   * 同一提示最多出现 3 次（view 局部状态，不入存档）。
+   * 填充 view.attackTargets（本回合真打得着的敌格），并给新手一句节奏引导。
+   * 伏击教学只在**第一次可以安全伏击**时才出现：本队处于隐蔽、目标孤立
+   * （目标 2 格内没有第二股可见敌军）。不隐蔽就去贴脸曾是评审实测的
+   * "照着第一条提示做就被反咬"陷阱。同一提示最多出现 3 次（view 局部状态，不入存档）。
    */
   function ComputeAttackGuidance() {
     if (!view.selectedUnitId) return;
@@ -178,14 +180,48 @@ export async function StartGame(options = {}) {
       }
     }
     if (view.attackTargets.length || unit.acted) return;
-    if (!nearby.some((item) => item.distance >= 2 && item.distance <= 3)) return;
+    if (!unit.hidden) return; // 暴露状态贴上去就是送，教学不撺掇
+    const candidates = nearby.filter((item) => item.distance >= 2 && item.distance <= 3);
+    if (!candidates.length) return;
+    const isolated = candidates.some((item) => {
+      let others = 0;
+      for (const enemy of state.enemies ?? []) {
+        if ((enemy.hp ?? 1) <= 0 || enemy.visibleToPlayer === false) continue;
+        if (enemy.key === item.key) continue;
+        if (HexDistanceKeys(enemy.key, item.key) <= 2) others += 1;
+      }
+      return others === 0;
+    });
+    if (!isolated) return;
     const token = `${unit.id}|${state.turn}`;
     if (view.ambushHintToken !== token) {
       if ((view.ambushHintCount ?? 0) >= 3) return;
       view.ambushHintToken = token;
       view.ambushHintCount = (view.ambushHintCount ?? 0) + 1;
     }
-    view.hint = "敌军就在附近：先转移到敌人隔壁，再选「伏击后转移」。";
+    view.hint = "队伍隐蔽、当面之敌孤立：可先转移到敌隔壁，选「伏击后转移」——转移点选远离敌军的一侧。";
+  }
+
+  /**
+   * 冷启动引导（前 3 回合的「工作队指示」）：侦察摸清周边 → 发动群众 → 开辟第一个根据地。
+   * 只占提示条，不弹卡不拦操作；已有更具体的提示（如安全伏击教学）时让位。
+   */
+  function ComputeOnboardingHint() {
+    if (view.hint || state.over || state.turn > 2) return;
+    if ((state.bases ?? []).length > 0) return;
+    const AbilitiesOf = (unit) => definitions.units?.unitDefinitions?.[unit.type]?.abilities ?? [];
+    const idle = (state.units ?? []).filter((unit) => !unit.acted && (unit.moves ?? 0) > 0);
+    const scout = idle.find((unit) => AbilitiesOf(unit).includes("Recon"));
+    const organizer = idle.find((unit) => AbilitiesOf(unit).includes("Organize"));
+    if (state.turn === 0 && scout) {
+      view.hint = "工作队指示（一）：先侦察摸清周边——选中队伍用「侦察」，把邻近村落与敌情看清楚。";
+      return;
+    }
+    if (organizer) {
+      view.hint = "工作队指示（二）：发动群众——把队伍开进村庄用「发动群众」，群众基础是产出、情报与掩护的根本。";
+      return;
+    }
+    view.hint = "工作队指示（三）：群众基础养起来后，在村庄「开辟根据地」，把党政军的架子立起来。";
   }
 
   function SyncAll() {
@@ -418,9 +454,33 @@ export async function StartGame(options = {}) {
     SyncAll();
   }
 
+  /**
+   * 结局插画随结局情绪走：胜利集会只配得上真正撑住了的结局，
+   * 失败与惨胜配山地/空村的冷暗画面。曾经八种结局全是 warm 集会，
+   * 「一张空图」下面配欢庆人群，情绪完全接反。
+   */
+  const endingArtByKey = {
+    PrairieFire: { kind: "Assembly", tone: "warm" },
+    RootedDeep: { kind: "Assembly", tone: "warm" },
+    RebuiltInAutumn: { kind: "Village", tone: "warm" },
+    QuietBuilding: { kind: "Village", tone: "warm" },
+    HardWon: { kind: "Village", tone: "grim" },
+    ScatteredButAlive: { kind: "Ridge", tone: "cold" },
+    DrivenToTheHills: { kind: "Ridge", tone: "grim" },
+    HollowMap: { kind: "Village", tone: "grim" }, // 空村意象：村庄剪影 + 最暗的影调
+  };
+  const endingArtByGrade = {
+    S: { kind: "Assembly", tone: "warm" },
+    A: { kind: "Assembly", tone: "warm" },
+    B: { kind: "Village", tone: "cold" },
+    C: { kind: "Ridge", tone: "cold" },
+    D: { kind: "Ridge", tone: "grim" },
+  };
+
   async function ShowEnding(result) {
     if (!ui?.Cinematic || view.autoPlay) return;
     SafeCall(() => ui?.SetBusy(false));
+    const art = endingArtByKey[result?.ending?.key] ?? endingArtByGrade[result?.grade] ?? { kind: "Ridge", tone: "cold" };
     await ui.Cinematic({
       kind: "Ending",
       title: result?.ending?.title ?? "终局",
@@ -428,33 +488,81 @@ export async function StartGame(options = {}) {
       body: result?.ending?.body ?? "",
       epilogue: result?.ending?.epilogue ?? "",
       result,
-      illustration: { kind: "Assembly", tone: "warm", motifs: [] },
+      illustration: { kind: art.kind, tone: art.tone, motifs: [] },
       options: [{ id: "ok", label: "查看账本" }],
     });
     SafeCall(() => ui.ShowPanel("Ledger", result));
+  }
+
+  /** 本机是否已有战役存档（自动档或手动档任一即算）。 */
+  function HasExistingCampaign() {
+    try {
+      return Boolean(
+        window.localStorage.getItem(Rules.saveKey) || window.localStorage.getItem(`${Rules.saveKey}_manual`)
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * 首局开场卡（评审 P1：冷启动零教学，直落满配 HUD）。
+   * 只在**无存档的第一局**弹一次：30 秒读完的历史框架 + 开辟期任务，Esc / 按钮均可跳过。
+   * 素材复用 Data_History 的 Opening.opening 与 historicalFrame，不新造叙事。
+   * 等 900ms 再弹：给自动化（冒烟 / 实拍先 SetAutoPlay(true)）留出关口，autoPlay 一律不弹。
+   */
+  async function MaybeShowOpeningBriefing() {
+    if (!ui?.Cinematic || state.turn > 0 || state.over) return;
+    if (HasExistingCampaign()) return;
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    if (view.autoPlay || state.turn > 0 || state.over) return;
+    const era = dataHistory?.eraDefinitions?.Opening ?? null;
+    const opening = era?.opening ?? null;
+    const frame = dataHistory?.historicalFrame ?? null;
+    await ui.Cinematic({
+      kind: "Era",
+      eraKey: "Opening",
+      title: opening?.title ?? "队伍从这里开始只有一个连",
+      subtitle: era?.dateRange ?? "1937年秋 — 1945年夏",
+      dateline: opening?.eyebrow ?? "1937年 秋",
+      body: [
+        opening?.body ??
+          "县城丢了。留下来的工作队要把散落的枪收起来，把村里能说话的人找出来，把一个能收粮、能派差、能断案的政权立起来。",
+        opening?.note ?? "开辟期的关键不是打仗，是让一个村子肯把粮借给你，肯替你放哨。",
+        frame?.ending ??
+          "1945年8月日本投降是不可改写的史实终点。你能改变的，是这八年里人民与组织付出多大代价，根据地能不能撑住。",
+      ],
+      rules: era?.rules ?? [],
+      illustration: { kind: "Village", tone: "cold", motifs: [] },
+      options: [{ id: "ok", label: "进入战场" }],
+      dismissible: true,
+    });
   }
 
   // ---------------------------------------------------------------------
   // 反扫荡方针
   // ---------------------------------------------------------------------
 
-  /** 四种方针的玩家侧文案。key 与 Rules.sweepStanceKeys（Combat.sweepStanceProfiles）对齐。 */
+  /**
+   * 四种方针的玩家侧文案。key 与 Rules.sweepStanceKeys（Combat.sweepStanceProfiles）对齐。
+   * 每条都写明「保什么／赌什么」——四方针在结算里各有真实赌注，弹窗必须把赌注说破。
+   */
   const sweepStanceCopy = {
     Disperse: {
       label: "分散转移·坚壁清野",
-      detail: "保人保粮，主力伤亡最小；代价是暂时让出地面，流离的人最多。",
+      detail: "保：人、粮与主力，伤亡最小。／赌：让出地面——敌沿轴线通行无阻，轴线村庄群众基础额外受创、沿线工事被平毁，流离的人最多。",
     },
     Decisive: {
       label: "正面决战",
-      detail: "杀伤最大，缴获次之；我方伤亡成倍，村庄与平民代价也最重。",
+      detail: "保：顶住即村庄与工事全保，杀伤缴获俱大。／赌：击退判定是场赌博——顶不住就是灾难，部队与平民代价成倍。",
     },
     CounterRaid: {
       label: "敌进我进",
-      detail: "跳到外线打敌空虚后方，缴获最多；留守地区仍要受损。",
+      detail: "保：跳到外线打其空虚后方据点，缴获最多，并迫敌早撤（本次扫荡破坏约打七折）。／赌：留守地区仍要受损。",
     },
     Fortify: {
       label: "依托工事节节抗击",
-      detail: "凭地道与工事迟滞敌军，损失居中；工事薄的村庄要吃亏。",
+      detail: "保：工事与在建工程不被平毁，迟滞敌军。／赌：部队顶在工事里伤亡偏大，工事薄的村庄要吃亏。",
     },
   };
 
@@ -488,15 +596,22 @@ export async function StartGame(options = {}) {
     }
 
     const forecast = Rules.ForecastSweep(state) ?? {};
-    // axisKeys 是轴线途经的格序列，不是进攻路数；只有 ≤4 时才敢当路数报，否则一律「多路」。
-    const axisRaw = forecast.axisKeys?.length ?? sweep.axisKeys?.length ?? 0;
-    const axisCount = axisRaw >= 1 && axisRaw <= 4 ? axisRaw : 0;
-    const strength = Math.round(Number(forecast.strength ?? sweep.strength) || 0);
+    // 路数只认预报口径 forecast.axisCount（axisKeys 是途经格序列，冒充路数会报「10 路」；
+    // 直接读 state.sweep.axes 则是越过情报网的作弊读法）。拿不准时一律说「多路」。
+    const axisRaw = Number(forecast.axisCount) || 0;
+    const axisCount = axisRaw >= 1 && axisRaw <= 6 ? axisRaw : 0;
     const turns = Math.max(0, Number(forecast.turnsUntil ?? sweep.turnsUntil) || 0);
     const confidence = Number(forecast.confidence);
+    // 兵力优先用预报的模糊化区间句（strengthBand），没有再退到点值；0 视为不详。
+    const strengthValue = Math.round(Number(forecast.strength) || 0);
+    const strengthText = forecast.strengthBand
+      ? (/兵力/.test(forecast.strengthBand) ? forecast.strengthBand : `兵力${forecast.strengthBand}`)
+      : strengthValue > 0
+        ? `估计兵力 ${strengthValue}`
+        : "兵力不详";
     const lines = [
-      `交通站与内线接连来报：敌已立案调兵，将以${axisCount > 0 ? ` ${axisCount} 路` : "多路"}合击${LabelHex(state, forecast.targetKey ?? sweep.targetKey)}，估计兵力 ${strength}，距发起约 ${turns} 回合。`,
-      "沿线据点守备已开始抽调——这既是险局，也是打其后方的战机。各区如何应对，请即定下方针。",
+      `交通站与内线接连来报：敌已立案调兵，将以${axisCount > 0 ? ` ${axisCount} 路` : "多路"}合击${LabelHex(state, forecast.targetKey ?? sweep.targetKey)}，${strengthText}，距发起约 ${turns} 回合。`,
+      "沿线据点守备已开始抽调——这既是险局，也是打其后方的战机。各区如何应对，请即定下方针。每一条方针都保一头、赌一头。",
     ];
     if (Number.isFinite(confidence) && confidence < 0.45) {
       lines.push(`该方向情报覆盖仅 ${Math.round(confidence * 100)}%，轴线与落点判断可能有误。`);
@@ -561,6 +676,13 @@ export async function StartGame(options = {}) {
       // 行动栏才能列出对该格的伏击/破袭/攻坚与攻击预览。
       // （此前这里会把 selectedUnitId 清空，点敌格等于取消选择，攻击通路点不出来。）
     } else {
+      // 点到行动范围外：给一句为什么，不再静默改选（评审实测玩家以为点击失灵）。
+      if (view.selectedUnitId) {
+        const unit = Rules.GetUnit(state, view.selectedUnitId);
+        if (unit && !unit.acted && (unit.moves ?? 0) > 0 && key !== unit.key) {
+          SafeCall(() => ui?.Toast("该格超出本回合行动范围，已改为查看该地块。", "warn"));
+        }
+      }
       view.selectedUnitId = null;
     }
     view.selectedKey = key;
@@ -722,6 +844,10 @@ export async function StartGame(options = {}) {
       view.difficulty = level;
       SaveSettings();
     },
+    // UI 查询编成动态成本（随时期浮动，困难期 ×1.35）。老版本 Rules 没有该函数时返回 null，
+    // UI 自行退回定义表的静态成本。
+    QueryTrainCost: (unitType) =>
+      typeof Rules.GetTrainCost === "function" ? Rules.GetTrainCost(state, unitType) : null,
   };
   SafeCall(() => ui?.Bind(hooks));
 
@@ -811,6 +937,11 @@ export async function StartGame(options = {}) {
     },
     definitions,
   };
+
+  // 首局开场卡（不阻塞启动流程；自动化会在 900ms 窗口内 SetAutoPlay 从而跳过）。
+  SafeCall(() => {
+    MaybeShowOpeningBriefing();
+  });
 
   return window.PrairieFire;
 }
