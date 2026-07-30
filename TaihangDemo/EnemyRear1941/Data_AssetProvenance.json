@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "release": "20260730q",
+  "policy": {
+    "primaryGenerator": "OpenAI ImageGen",
+    "fallbackRule": "Lovart may be used only after three consecutive ImageGen failures.",
+    "imageGenFailureCountBeforeLovart": 3,
+    "imageGenFailureMessage": "network error: error sending request for url (https://chatgpt.com/backend-api/codex/images/generations)",
+    "lovartMode": "fast",
+    "lovartProjectId": "oKHfWa1O2A",
+    "lovartThreadId": "9f5e4d1b-0bc7-4b85-9076-91c158b86184",
+    "lovartCanvasUrl": "https://www.lovart.ai/canvas?projectId=oKHfWa1O2A"
+  },
+  "prompts": {
+    "TerrainGroundAlbedo20260730": "Create a square, seamless, straight-down terrain albedo texture for a premium Three.js historical strategy game set in the Taihang foothills, North China, late autumn 1941. The entire image is only continuous natural ground: warm ochre loess, compact earth, fine limestone gravel, sparse dry straw, tiny weathered pebbles, and very subtle muted olive scrub traces. Realistic PBR-style diffuse color, refined material detail, rich natural micro-variation, restrained period palette. Uniform flat overcast reference lighting with no directional shadows, highlights, ambient occlusion, gradient, vignette, perspective, horizon, or focal point. It must tile perfectly on all four edges. No roads, rails, paths, field boundaries, trenches, footprints, buildings, people, weapons, writing, symbols, logos, watermark, large rocks, or obvious repeated motif. Avoid washed-out gray-green color.",
+    "MiniatureSurfaceDetail20260730": "Use case: stylized-concept\nAsset type: seamless grayscale micro-detail texture for a Three.js and Blender stylized historical strategy-game miniature pack\nPrimary request: create a square, perfectly top-down, tileable grayscale height-and-roughness texture containing only very fine handcrafted surface grain suitable across weathered cloth, rammed earth, dark wood, stone, and painted metal miniatures; neutral mid-gray overall with subtle high-frequency fibers, pores, tiny scratches, and brush variation, no large recognizable objects\nStyle/medium: premium hand-painted PBR game texture, restrained realistic microdetail, production quality\nComposition/framing: orthographic flat texture filling the entire square; seamless on every edge; uniform detail scale with no focal point\nLighting/mood: no directional lighting, no cast shadows, no gradients, no vignette\nColor palette: grayscale only, centered near 55% gray, narrow contrast range\nConstraints: truly seamless and tileable; fine detail only; no borders, panels, atlas divisions, labels, icons, letters, numbers, watermark, logos, people, weapons, buildings, scenery, perspective, or baked lighting\nAvoid: coarse rocks, big cracks, dramatic stains, obvious repetition, photographic objects, color tint",
+    "TerrainPaperHigh20260730": "Use case: stylized-concept\nAsset type: seamless square terrain-surface texture for a high-quality Three.js historical strategy map\nPrimary request: create a production-ready, perfectly tileable 1:1 texture combining aged unbleached field paper with dry North China loess earth. It will be multiplied softly over a warm terrain albedo, so keep contrast restrained and detail evenly distributed.\nStyle/medium: realistic scanned material texture, tactile paper fibers blended with fine compacted soil, subtle handmade wartime map-document character, not an illustration.\nComposition/framing: flat orthographic surface filling the entire square; seamless on all four edges; no focal point, no horizon, no directional lighting, no vignette.\nColor palette: muted warm khaki, dusty ochre, desaturated olive-gray and faint charcoal specks; neutral enough for forests, fields, villages and mountain shading to remain readable.\nMaterials/textures: fine fibrous grain, shallow wrinkles, tiny mineral flecks, restrained stains and micro-cracks; broad variation must be very soft and non-repeating.\nConstraints: no text, no calligraphy, no symbols, no map lines, no roads, no rivers, no hexagons, no buildings, no people, no objects, no border, no watermark; avoid harsh creases, black blotches, obvious repeating motifs, strong shadows or glossy highlights. High-resolution game-ready material texture."
+  },
+  "runtimeAssets": [
+    {
+      "file": "Texture_TerrainGroundAlbedo.png",
+      "role": "Continuous terrain color overlay",
+      "dimensions": [1254, 1254],
+      "generator": "OpenAI ImageGen",
+      "model": "gpt-image-2",
+      "promptId": "TerrainGroundAlbedo20260730",
+      "sourceRecord": "generated_images/019fac77-4a49-7f52-9ae3-da4885914cdd/exec-d7f773d3-114a-4dd9-86e2-3ffa14834272.png",
+      "sourceArtifactSha256": "E6362BDCADB11E8242C8D750C6E926C8C2E4486421E876A042E517BEB9C09B1A",
+      "runtimeSha256": "E6362BDCADB11E8242C8D750C6E926C8C2E4486421E876A042E517BEB9C09B1A",
+      "derivation": "Verbatim ImageGen PNG"
+    },
+    {
+      "file": "Texture_MiniatureSurfaceDetail.png",
+      "role": "Miniature roughness and micro-surface detail",
+      "dimensions": [1254, 1254],
+      "generator": "OpenAI ImageGen",
+      "model": "gpt-image-2",
+      "promptId": "MiniatureSurfaceDetail20260730",
+      "sourceRecord": "generated_images/019fac77-4a49-7f52-9ae3-da4885914cdd/exec-580e324f-78c3-402c-b48f-c3cd25523ede.png",
+      "sourceArtifactSha256": "DBC51778DCF5260FA8532A346848E9FDFADC3655798731AD293C4651F37A771A",
+      "runtimeSha256": "DBC51778DCF5260FA8532A346848E9FDFADC3655798731AD293C4651F37A771A",
+      "derivation": "Verbatim ImageGen PNG"
+    },
+    {
+      "file": "Texture_TerrainPaperHigh.jpg",
+      "role": "Restrained paper and loess roughness overlay",
+      "dimensions": [2048, 2048],
+      "generator": "Lovart fallback using OpenAI GPT Image 2 High",
+      "modelTool": "generate_image_gpt_image_2_high",
+      "quality": "high",
+      "promptId": "TerrainPaperHigh20260730",
+      "sourceArtifactUrl": "https://a.lovart.ai/artifacts/agent/DlyHnnlqbGDBHtAs.png",
+      "sourceArtifactSha256": "CC47791C9C54EB449D6FA3DF371C54D1D64032E5F56CED46C0E7BB7A5704CAC9",
+      "runtimeSha256": "B7BF88E5567FBAC30FE46F8E74433040AA0C4813EA0DA2470ABB8400E9E06EE4",
+      "derivation": "Source RGB PNG encoded with Pillow 12.2.0 as optimized progressive JPEG, quality 96, 4:2:0 subsampling",
+      "selectionReason": "Lower visual competition with roads, units and villages; restrained contrast; horizontal and vertical seam ratios 1.098 and 1.169."
+    }
+  ],
+  "comparisonArtifacts": [
+    {
+      "purpose": "Required same-prompt Lovart comparison",
+      "selected": false,
+      "modelTool": "generate_image_nano_banana_pro",
+      "configuredTier": "1K",
+      "returnedDimensions": [2048, 2048],
+      "promptId": "TerrainPaperHigh20260730",
+      "sourceArtifactUrl": "https://a.lovart.ai/artifacts/agent/1fiHtIsyk5Eq4Fgy.png",
+      "sourceArtifactSha256": "2F817570E9AE791279A54B436EC167A6106B27FC031399ED594EBF18C8FAB938",
+      "rejectionReason": "Stronger cracks, dark flecks and broad mottling compete with strategic map readability; horizontal seam ratio 1.384."
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -11,8 +12,18 @@ const stylePath = path.join(testDirectory, "Style_Game.css");
 const terrainTexturePath = path.join(testDirectory, "Texture_TerrainPaperHigh.jpg");
 const terrainAlbedoPath = path.join(testDirectory, "Texture_TerrainGroundAlbedo.png");
 const miniatureDetailPath = path.join(testDirectory, "Texture_MiniatureSurfaceDetail.png");
+const assetProvenancePath = path.join(testDirectory, "Data_AssetProvenance.json");
 
-const [worldSource, gameSource, indexSource, styleSource, terrainTextureBuffer, terrainAlbedoBuffer, miniatureDetailBuffer] = await Promise.all([
+const [
+  worldSource,
+  gameSource,
+  indexSource,
+  styleSource,
+  terrainTextureBuffer,
+  terrainAlbedoBuffer,
+  miniatureDetailBuffer,
+  assetProvenanceSource,
+] = await Promise.all([
   readFile(worldPath, "utf8"),
   readFile(gamePath, "utf8"),
   readFile(indexPath, "utf8"),
@@ -20,9 +31,11 @@ const [worldSource, gameSource, indexSource, styleSource, terrainTextureBuffer, 
   readFile(terrainTexturePath),
   readFile(terrainAlbedoPath),
   readFile(miniatureDetailPath),
+  readFile(assetProvenancePath, "utf8"),
 ]);
 
 const worldModule = await import(`${new URL("./Script_World3D.mjs", import.meta.url).href}?smoke=1`);
+const assetProvenance = JSON.parse(assetProvenanceSource);
 const terrainTextureStat = await stat(terrainTexturePath);
 const terrainAlbedoStat = await stat(terrainAlbedoPath);
 const miniatureDetailStat = await stat(miniatureDetailPath);
@@ -31,6 +44,10 @@ let assertionCount = 0;
 function Check(condition, message) {
   assert.ok(condition, message);
   assertionCount += 1;
+}
+
+function Sha256(buffer) {
+  return createHash("sha256").update(buffer).digest("hex").toUpperCase();
 }
 
 function ExtractFunction(source, functionName) {
@@ -104,19 +121,19 @@ Check(worldSource.includes("assetMeshCount > 8"), "Each imported miniature must 
 Check(worldSource.includes("modelPackMeshCount > 55"), "The complete miniature pack must enforce its 55-mesh runtime budget.");
 Check(worldSource.includes("worldModelMeshes"), "World3D diagnostics must expose imported model mesh count.");
 Check(
-  worldModule.World3DTerrainTextureUrl.endsWith("Texture_TerrainPaperHigh.jpg?v=20260730p"),
+  worldModule.World3DTerrainTextureUrl.endsWith("Texture_TerrainPaperHigh.jpg?v=20260730q"),
   "World3D terrain texture URL must use the release cache identity.",
 );
 Check(
-  worldModule.World3DTerrainAlbedoUrl.endsWith("Texture_TerrainGroundAlbedo.png?v=20260730p"),
+  worldModule.World3DTerrainAlbedoUrl.endsWith("Texture_TerrainGroundAlbedo.png?v=20260730q"),
   "ImageGen ground albedo URL must use the release cache identity.",
 );
 Check(
-  worldModule.World3DModelPackUrl.endsWith("Model_EnemyRearMiniatures.glb?v=20260730p"),
+  worldModule.World3DModelPackUrl.endsWith("Model_EnemyRearMiniatures.glb?v=20260730q"),
   "World3D model-pack URL must use the release cache identity.",
 );
 Check(
-  worldModule.World3DMiniatureDetailUrl.endsWith("Texture_MiniatureSurfaceDetail.png?v=20260730p"),
+  worldModule.World3DMiniatureDetailUrl.endsWith("Texture_MiniatureSurfaceDetail.png?v=20260730q"),
   "ImageGen miniature micro-detail URL must use the release cache identity.",
 );
 Check(
@@ -151,6 +168,70 @@ Check(
     && miniatureDetailDimensions.width >= 1024
     && miniatureDetailDimensions.height >= 1024,
   "ImageGen miniature micro-detail must retain production-scale grayscale surface information.",
+);
+
+Check(
+  assetProvenance.schemaVersion === 1 && assetProvenance.release === "20260730q",
+  "Asset provenance must be versioned with the deployed release.",
+);
+Check(
+  Array.isArray(assetProvenance.runtimeAssets) && assetProvenance.runtimeAssets.length === 3,
+  "Every runtime bitmap must have one provenance record.",
+);
+const provenanceByFile = new Map(assetProvenance.runtimeAssets.map((asset) => [asset.file, asset]));
+for (const [file, buffer] of [
+  ["Texture_TerrainPaperHigh.jpg", terrainTextureBuffer],
+  ["Texture_TerrainGroundAlbedo.png", terrainAlbedoBuffer],
+  ["Texture_MiniatureSurfaceDetail.png", miniatureDetailBuffer],
+]) {
+  Check(
+    provenanceByFile.get(file)?.runtimeSha256 === Sha256(buffer),
+    `${file} must match its immutable provenance hash.`,
+  );
+}
+const terrainAlbedoProvenance = provenanceByFile.get("Texture_TerrainGroundAlbedo.png");
+const miniatureDetailProvenance = provenanceByFile.get("Texture_MiniatureSurfaceDetail.png");
+const terrainPaperProvenance = provenanceByFile.get("Texture_TerrainPaperHigh.jpg");
+Check(
+  terrainAlbedoProvenance?.generator === "OpenAI ImageGen"
+    && terrainAlbedoProvenance.sourceArtifactSha256 === terrainAlbedoProvenance.runtimeSha256
+    && terrainAlbedoProvenance.sourceRecord.includes("exec-d7f773d3-114a-4dd9-86e2-3ffa14834272.png"),
+  "Terrain albedo must remain a verbatim, traceable ImageGen artifact.",
+);
+Check(
+  miniatureDetailProvenance?.generator === "OpenAI ImageGen"
+    && miniatureDetailProvenance.sourceArtifactSha256 === miniatureDetailProvenance.runtimeSha256
+    && miniatureDetailProvenance.sourceRecord.includes("exec-580e324f-78c3-402c-b48f-c3cd25523ede.png"),
+  "Miniature detail must remain a verbatim, traceable ImageGen artifact.",
+);
+Check(
+  assetProvenance.policy.imageGenFailureCountBeforeLovart === 3
+    && assetProvenance.policy.lovartMode === "fast"
+    && assetProvenance.policy.lovartProjectId === "oKHfWa1O2A"
+    && assetProvenance.policy.lovartThreadId === "9f5e4d1b-0bc7-4b85-9076-91c158b86184",
+  "Lovart fallback must document three ImageGen failures, credit mode, project and thread.",
+);
+Check(
+  terrainPaperProvenance?.modelTool === "generate_image_gpt_image_2_high"
+    && terrainPaperProvenance.quality === "high"
+    && terrainPaperProvenance.sourceArtifactSha256 === "CC47791C9C54EB449D6FA3DF371C54D1D64032E5F56CED46C0E7BB7A5704CAC9"
+    && terrainPaperProvenance.sourceArtifactUrl.endsWith("/DlyHnnlqbGDBHtAs.png"),
+  "Terrain paper must trace to the authorized GPT Image 2 High fallback artifact.",
+);
+const comparisonArtifact = assetProvenance.comparisonArtifacts?.[0];
+Check(
+  assetProvenance.comparisonArtifacts?.length === 1
+    && comparisonArtifact.modelTool === "generate_image_nano_banana_pro"
+    && comparisonArtifact.configuredTier === "1K"
+    && comparisonArtifact.selected === false
+    && comparisonArtifact.promptId === terrainPaperProvenance.promptId
+    && comparisonArtifact.sourceArtifactSha256 === "2F817570E9AE791279A54B436EC167A6106B27FC031399ED594EBF18C8FAB938",
+  "The same-prompt Nano Banana Pro comparison and selection decision must remain auditable.",
+);
+Check(
+  assetProvenance.prompts[terrainPaperProvenance.promptId].includes("perfectly tileable 1:1 texture")
+    && assetProvenance.prompts[terrainPaperProvenance.promptId].includes("no text, no calligraphy, no symbols"),
+  "The selected texture prompt must preserve tileability and no-symbol constraints.",
 );
 Check(
   worldSource.includes('"TerrainImageGenAlbedoOverlay"')
@@ -523,11 +604,11 @@ Check(
 );
 
 const cacheIdentity = worldModule.World3DCacheIdentity;
-Check(cacheIdentity === "EnemyRear1941_World3D_20260730_P", "World cache identity must match the release marker.");
+Check(cacheIdentity === "EnemyRear1941_World3D_20260730_Q", "World cache identity must match the release marker.");
 Check(gameSource.includes("World3DCacheIdentity"), "Game canvas must expose the same World3D cache identity.");
-Check(indexSource.includes("Style_Game.css?v=20260730p"), "Stylesheet cache version must match the World3D release.");
-Check(indexSource.includes("Script_Game.mjs?v=20260730p"), "Game cache version must match the World3D release.");
-Check(gameSource.includes("Script_World3D.mjs?v=20260730p"), "World module cache version must match the page release.");
+Check(indexSource.includes("Style_Game.css?v=20260730q"), "Stylesheet cache version must match the World3D release.");
+Check(indexSource.includes("Script_Game.mjs?v=20260730q"), "Game cache version must match the World3D release.");
+Check(gameSource.includes("Script_World3D.mjs?v=20260730q"), "World module cache version must match the page release.");
 Check(indexSource.includes('"three": "../../taihang/vendor/three/build/three.module.mjs"'), "Import map must resolve GLTFLoader's local Three.js dependency.");
 
 Check(indexSource.includes("可操作三维六角格战术地图"), "Canvas accessibility label must describe the 3D map without engine jargon.");

@@ -25,11 +25,11 @@ import {
   GetVictoryAssessment,
   SerializeState,
   DeserializeState,
-} from "./Script_Rules.mjs?v=20260730p";
+} from "./Script_Rules.mjs?v=20260730q";
 import {
   CreateEnemyRearWorld3D,
   World3DCacheIdentity,
-} from "./Script_World3D.mjs?v=20260730p";
+} from "./Script_World3D.mjs?v=20260730q";
 import {
   GetFixedHistoricalAnchor,
   GetHistoricalTurnNarrative,
@@ -38,7 +38,7 @@ import {
   historyBoundary,
   localPhaseDefinitions,
   ordinaryRoleDefinitions,
-} from "./Data_History.mjs?v=20260730p";
+} from "./Data_History.mjs?v=20260730q";
 
 const ui = {};
 const activePointers = new Map();

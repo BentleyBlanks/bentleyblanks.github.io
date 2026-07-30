@@ -1,20 +1,20 @@
 import * as THREE from "../../taihang/vendor/three/build/three.module.mjs";
 
-export const World3DCacheIdentity = "EnemyRear1941_World3D_20260730_P";
+export const World3DCacheIdentity = "EnemyRear1941_World3D_20260730_Q";
 export const World3DTerrainTextureUrl = new URL(
-  "./Texture_TerrainPaperHigh.jpg?v=20260730p",
+  "./Texture_TerrainPaperHigh.jpg?v=20260730q",
   import.meta.url,
 ).href;
 export const World3DTerrainAlbedoUrl = new URL(
-  "./Texture_TerrainGroundAlbedo.png?v=20260730p",
+  "./Texture_TerrainGroundAlbedo.png?v=20260730q",
   import.meta.url,
 ).href;
 export const World3DModelPackUrl = new URL(
-  "./Model_EnemyRearMiniatures.glb?v=20260730p",
+  "./Model_EnemyRearMiniatures.glb?v=20260730q",
   import.meta.url,
 ).href;
 export const World3DMiniatureDetailUrl = new URL(
-  "./Texture_MiniatureSurfaceDetail.png?v=20260730p",
+  "./Texture_MiniatureSurfaceDetail.png?v=20260730q",
   import.meta.url,
 ).href;
 export const World3DModelNames = Object.freeze([
