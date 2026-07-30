@@ -125,6 +125,15 @@ function PickRange(range, roll) {
 }
 
 /** 音频层的所有异常都在这里被吞掉：出不出声绝不影响游戏循环。 */
+function ExternalAssetsEnabled() {
+  try {
+    if (typeof location === "undefined") return false;
+    return /[?&#]assets=1\b/.test(location.search + location.hash);
+  } catch (error) {
+    return false;
+  }
+}
+
 function Safe(action) {
   try {
     action();
@@ -926,6 +935,15 @@ export function CreateAudio(options = {}) {
   async function LoadExternalAssets() {
     if (externalLoadStarted || typeof fetch === "undefined" || !ctx) return;
     externalLoadStarted = true;
+    // 默认零请求：浏览器网络层的 404 红字无法被 catch 压掉，唯一的"零红字"
+    // 是根本不发请求。投放资产后在 URL 加 ?assets=1 启用加载（约定写在 Assets/README）。
+    if (!ExternalAssetsEnabled()) return;
+    try {
+      const sentinel = await fetch(assetBase + "CREDITS.md", { method: "HEAD", cache: "force-cache" });
+      if (!sentinel || !sentinel.ok) return;
+    } catch (error) {
+      return;
+    }
     async function TryLoad(url) {
       try {
         const response = await fetch(url, { cache: "force-cache" });

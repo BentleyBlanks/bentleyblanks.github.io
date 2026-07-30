@@ -1,0 +1,203 @@
+<!doctype html>
+<!-- Original Three.js vertical slice. Three.js is vendored under the MIT License; all world geometry and audio are generated at runtime. -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111714">
+  <meta name="description" content="《余烬交通线》是一段发生于1942年华北敌后的原创第三人称潜行动作冒险垂直切片。护送群众撤离、保存交通线，并承担每一次选择的代价。">
+  <meta property="og:title" content="余烬交通线｜原创 Three.js 第三人称动作冒险">
+  <meta property="og:description" content="一场雨夜转移，一条不能暴露的交通线，两个成年人共同承担的选择。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bentleyblanks.github.io/AshenRoute1942/">
+  <meta property="og:image" content="https://bentleyblanks.github.io/AshenRoute1942/Texture_TitleBackground.png">
+  <meta property="og:image:width" content="2048">
+  <meta property="og:image:height" content="1152">
+  <meta property="og:image:alt" content="黎明前的华北山村中，两名成年交通员隐蔽在石墙后观察封锁哨">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>余烬交通线｜1942 敌后潜行动作冒险</title>
+  <link rel="preload" as="image" href="./Texture_TitleBackground.png?v=20260730s" fetchpriority="high">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260730s">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "../taihang/vendor/three/build/three.module.mjs"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="GameShell" class="gameShell">
+    <canvas id="GameCanvas" class="gameCanvas" aria-label="1942年华北山村的第三人称三维潜行场景"></canvas>
+    <div class="cinemaGrade" aria-hidden="true"></div>
+    <div id="WeatherOverlay" class="weatherOverlay" aria-hidden="true"></div>
+    <div id="DamageVeil" class="damageVeil" aria-hidden="true"></div>
+    <div id="DetectionVeil" class="detectionVeil" aria-hidden="true"></div>
+
+    <section id="LoadingScreen" class="loadingScreen" aria-live="polite">
+      <div class="loadingMark" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p>正在辨认山路</p>
+      <div class="loadingBar"><i id="LoadingFill"></i></div>
+      <small id="LoadingStatus">整理交通线记录……</small>
+    </section>
+
+    <section id="TitleScreen" class="titleScreen" hidden>
+      <div class="titleAtmosphere" aria-hidden="true">
+        <i class="ridge ridgeFar"></i><i class="ridge ridgeNear"></i>
+        <i class="signalLight signalOne"></i><i class="signalLight signalTwo"></i>
+      </div>
+      <header class="titleHeader">
+        <a class="projectMark" href="../" aria-label="返回网站首页"><b>灰路档案 · 01</b><span>ORIGINAL THREE.JS VERTICAL SLICE</span></a>
+        <button id="OpenSettingsButton" class="quietButton">辅助设置</button>
+      </header>
+      <div class="titleLayout">
+        <article class="titleCopy">
+          <p class="eyebrow"><span></span> 华北敌后 · 1942 年秋 · 雨夜转移</p>
+          <h1>余烬<br><em>交通线</em></h1>
+          <p class="titleLead">灯一灭，路就只剩人的记忆。赵同岑与杜湘云必须在封锁合拢前，让十二名乡亲穿过石沟——并决定什么还能带到明天。</p>
+          <div class="titleActions">
+            <button id="BeginButton" class="primaryButton"><span>进入第一章</span><small>约 12–18 分钟 · 自动检查点</small></button>
+            <button id="ContinueButton" class="secondaryButton" hidden>继续检查点</button>
+            <button id="OpenHistoryButton" class="secondaryButton">史实边界与内容提示</button>
+          </div>
+          <p class="technicalNote">第三人称潜行 · 有限资源 · 成人同伴协作 · 可不杀通关 · 桌面键鼠 · 唯一最高画质</p>
+        </article>
+        <aside class="routeLedger" aria-label="行动记录">
+          <header><span>槐树沟交通站</span><time>天亮前</time></header>
+          <h2>转移次序</h2>
+          <ol>
+            <li><i></i><span>先送伤员与老人</span><b>石沟</b></li>
+            <li><i></i><span>再送联络簿与药品</span><b>窑洞</b></li>
+            <li><i></i><span>最后撤交通员</span><b>不点灯</b></li>
+          </ol>
+          <blockquote>“路不是画在纸上的。路是有人还肯给你开门。”</blockquote>
+          <footer>杜湘云 · 交通站负责人</footer>
+        </aside>
+      </div>
+      <footer class="titleFooter"><span>虚构人物与复合地点 · 明确侵略责任 · 不以伤亡计分</span><span>建议佩戴耳机；所有关键声音均有方向字幕</span></footer>
+    </section>
+
+    <section id="BriefingScreen" class="briefingScreen" hidden aria-live="polite">
+      <article>
+        <p id="BriefingEyebrow">第一章 · 灯灭以后</p>
+        <h2 id="BriefingTitle">雨在山背后</h2>
+        <div id="BriefingBody" class="briefingBody"></div>
+        <div id="BriefingProgress" class="briefingProgress" aria-label="序章进度"></div>
+        <button id="BriefingNextButton" class="primaryButton"><span>继续</span><small>空格</small></button>
+      </article>
+    </section>
+
+    <section id="GameHud" class="gameHud" hidden>
+      <header class="hudTop">
+        <section class="missionPanel">
+          <p><span id="ChapterLabel">第一章</span><time id="MissionClock">20:43</time></p>
+          <h2 id="MissionTitle">灯灭以后</h2>
+          <div class="objectiveRow"><i aria-hidden="true"></i><div><small>当前任务</small><b id="ObjectiveText">与杜湘云会合</b></div></div>
+        </section>
+        <section id="DirectionCaption" class="directionCaption" hidden><span id="DirectionLabel">西北方向</span><b id="DirectionText">巡逻靴声接近</b></section>
+        <button id="PauseButton" class="pauseButton" aria-label="暂停游戏">Ⅱ</button>
+      </header>
+
+      <div id="Compass" class="compass" aria-label="方向罗盘"><span>西</span><i></i><b id="CompassLabel">北</b><i></i><span>东</span></div>
+
+      <aside id="CompanionPanel" class="companionPanel">
+        <p>同行</p>
+        <div><span id="CompanionPortrait">杜</span><section><b>杜湘云</b><small id="CompanionStatus">跟随 · 安静</small></section><i id="CompanionHealth"></i></div>
+      </aside>
+
+      <section id="ResourcePanel" class="resourcePanel">
+        <div class="healthReadout"><i><em id="HealthFill"></em></i><span id="HealthText">尚能行动</span></div>
+        <div class="staminaReadout"><i><em id="StaminaFill"></em></i><span>气力</span></div>
+        <div class="quickItems">
+          <button id="BottleSlot" dataItem="Bottle" aria-label="投掷空瓶"><span>空瓶</span><b id="BottleCount">2</b><kbd>Q</kbd></button>
+          <button id="BandageSlot" dataItem="Bandage" aria-label="使用绷带"><span>绷带</span><b id="BandageCount">1</b><kbd>H</kbd></button>
+          <button id="AmmoSlot" dataItem="Ammo" aria-label="步枪弹药"><span>弹</span><b id="AmmoCount">3</b><kbd>鼠标</kbd></button>
+        </div>
+      </section>
+
+      <div id="DetectionMeter" class="detectionMeter" hidden><span id="DetectionSource">巡逻兵</span><i><em id="DetectionFill"></em></i><b id="DetectionState">怀疑</b></div>
+      <div id="WorldMarker" class="worldMarker" hidden aria-hidden="true"><i></i><b id="MarkerLabel">交通站</b><span id="MarkerDistance">32 米</span></div>
+      <div id="AimReticle" class="aimReticle" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+      <section id="SubtitlePanel" class="subtitlePanel" aria-live="polite" aria-atomic="true" hidden>
+        <p id="SubtitleSpeaker">杜湘云</p><blockquote id="SubtitleText">先听，再走。</blockquote>
+      </section>
+
+      <div id="InteractionPrompt" class="interactionPrompt" hidden><kbd>F</kbd><span id="InteractionLabel">查看窑门上的划痕</span></div>
+      <div id="ControlHints" class="controlHints">
+        <span><kbd>WASD</kbd>移动</span><span><kbd>拖动鼠标</kbd>观察</span><span><kbd>Shift</kbd>跑</span><span><kbd>C</kbd>蹲</span><span><kbd>Q</kbd>投瓶</span><span><kbd>E</kbd>同伴</span><span><kbd>I</kbd>背包</span>
+      </div>
+
+    </section>
+
+    <section id="ChoiceScreen" class="choiceScreen" hidden>
+      <article>
+        <p id="ChoiceEyebrow">路线被截断</p>
+        <h2 id="ChoiceTitle">只能把敌人引向一个方向</h2>
+        <p id="ChoiceBody">两条路都有人承担风险。选择不会给分，只会留下后果。</p>
+        <div id="ChoiceOptions" class="choiceOptions"></div>
+      </article>
+    </section>
+
+    <section id="InventoryScreen" class="inventoryScreen" hidden>
+      <article>
+        <header><div><p>布包里的东西</p><h2>每一件都有人省下来</h2></div><button id="CloseInventoryButton" aria-label="关闭背包">×</button></header>
+        <div id="InventoryItems" class="inventoryItems"></div>
+        <section class="craftingPanel"><p>就地处理</p><button id="CraftBandageButton"><span>包扎带</span><small>碎布 2 + 药酒 1</small><b>制作</b></button><button id="CraftDecoyButton"><span>响罐</span><small>碎布 1 + 铁皮 1 + 空罐 1</small><b>制作</b></button></section>
+        <footer id="InventoryHint">制作会发出轻微声响。先确认周围安全。</footer>
+      </article>
+    </section>
+
+    <section id="DocumentScreen" class="documentScreen" hidden>
+      <article><button id="CloseDocumentButton" aria-label="收起物件">×</button><p id="DocumentType">环境记录</p><h2 id="DocumentTitle">磨损的粮票</h2><div id="DocumentBody"></div><footer id="DocumentContext"></footer></article>
+    </section>
+
+    <section id="PauseScreen" class="pauseScreen" hidden>
+      <article>
+        <header><p>行动暂停</p><h2 id="PauseChapterTitle">第一章 · 灯灭以后</h2></header>
+        <div class="pauseActions"><button id="ResumeButton" class="primaryButton">继续</button><button id="RestartCheckpointButton">从检查点重来</button><button id="PauseSettingsButton">辅助设置</button><button id="PauseHistoryButton">史实边界</button><button id="ReturnTitleButton">返回标题</button></div>
+      </article>
+    </section>
+
+    <section id="SettingsScreen" class="modalScreen" hidden>
+      <article class="settingsModal" role="dialog" aria-modal="true" aria-labelledby="SettingsTitle">
+        <button class="modalClose" dataCloseModal aria-label="关闭">×</button><p>辅助设置</p><h2 id="SettingsTitle">让山路适合你</h2>
+        <div class="settingList">
+          <label><span><b>程序化声音</b><small>风雨、脚步、远枪与提示音；关键声音均有字幕</small></span><input id="SoundToggle" type="checkbox" checked></label>
+          <label><span><b>降低刺激</b><small>削弱枪声、受击闪烁和画面压迫</small></span><input id="DistressToggle" type="checkbox"></label>
+          <label><span><b>减少动态</b><small>关闭镜头震动、呼吸摆动和强粒子效果</small></span><input id="MotionToggle" type="checkbox"></label>
+          <label><span><b>高对比交互</b><small>增强目标、人物轮廓和提示可读性</small></span><input id="ContrastToggle" type="checkbox"></label>
+          <label><span><b>大号字幕</b><small>放大任务、对白和交互文字</small></span><input id="TextToggle" type="checkbox"></label>
+        </div><button class="modalConfirm" dataCloseModal>保存设置</button>
+      </article>
+    </section>
+
+    <section id="HistoryScreen" class="modalScreen" hidden>
+      <article class="historyModal" role="dialog" aria-modal="true" aria-labelledby="HistoryTitle">
+        <button class="modalClose" dataCloseModal aria-label="关闭">×</button><p>创作说明</p><h2 id="HistoryTitle">史实边界与内容提示</h2>
+        <div class="historyColumns">
+          <section><h3>复合创作</h3><p>槐树沟、人物与本次行动均为原创复合创作，不声称复现某一真实村庄或个人。时间、交通站运行方式、封锁与转移压力参考华北敌后公开史料。</p></section>
+          <section><h3>责任明确</h3><p>作品明确呈现日本侵略军实施封锁、扫荡、抢掠与暴力的历史责任，同时不把侵略军罪行转化为对任何现实民族群体的仇恨。</p></section>
+          <section><h3>表现边界</h3><p>不提供处决、拷问或伤亡计分；不把平民苦难折算为资源与奖励；有限战斗服务于脱离、掩护和争取时间。</p></section>
+          <section><h3>内容提示</h3><p>含战争压迫、远处枪声、烧毁房屋、伤员与失踪者文字描述。可在辅助设置中降低刺激强度。</p></section>
+        </div><button class="modalConfirm" dataCloseModal>我已了解</button>
+      </article>
+    </section>
+
+    <section id="ChapterCard" class="chapterCard" hidden><article><p id="CardNumber">第一章</p><h2 id="CardTitle">灯灭以后</h2><span id="CardTime">20:43</span><i></i><b id="CardObjective">与杜湘云会合</b><small id="CardHint">蹲下时，脚步更轻，也更难被看见。</small></article></section>
+
+    <section id="FailureScreen" class="failureScreen" hidden><article><p>交通线在这里断了</p><h2 id="FailureTitle">你没能离开照明范围</h2><p id="FailureBody">失败不是伤亡统计。回到最近的检查点，再听一次周围的声音。</p><button id="RetryButton" class="primaryButton">从检查点重来</button></article></section>
+
+    <section id="EndingScreen" class="endingScreen" hidden>
+      <div class="endingRidges" aria-hidden="true"><i></i><i></i></div>
+      <article><p id="EndingEyebrow">天亮以前</p><h2 id="EndingTitle">路还在人的记忆里</h2><blockquote id="EndingQuote"></blockquote><div id="EndingConsequences" class="endingConsequences"></div><p id="EndingBody"></p><div class="endingActions"><button id="ReplayButton" class="primaryButton">重新走这条路</button><a href="../">返回网站</a></div><footer>本作没有“完美路线”。只有被保护的人、被暴露的风险，以及下一次仍愿意开门的人。</footer></article>
+    </section>
+
+    <aside id="QaPanel" class="qaPanel" hidden aria-label="运行审查面板"><b>LOOP QA</b><span id="QaStatus">Boot</span><button id="QaHideButton">隐藏 QA</button><button id="QaMoveButton">移到当前交互</button><button id="QaFalseTrailButton">移到假迹工具</button><button id="QaSealButton">移到封洞石板</button><button id="QaAdvanceButton">推进阶段</button><button id="QaStationButton">交通站场景</button><button id="QaStealthButton">潜行场景</button><button id="QaCombatButton">交战场景</button><button id="QaEndingButton">结局场景</button><button id="QaLowHealthButton">40HP 无绷带</button><button id="QaWalkButton">走 3 秒</button><button id="QaCrouchButton">蹲走 3 秒</button><button id="QaSprintButton">跑 3 秒</button><button id="QaFireButton">射击一次</button></aside>
+    <div id="Toast" class="toast" hidden aria-live="polite"></div>
+    <div id="LiveRegion" class="visuallyHidden" aria-live="assertive"></div>
+  </main>
+  <noscript>《余烬交通线》需要启用 JavaScript 才能运行。</noscript>
+  <script type="module" src="./Script_Game.mjs?v=20260730s"></script>
+</body>
+</html>

@@ -2,13 +2,29 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1b201b">
-  <meta name="description" content="《敌后火种 · 1941—1942》——中国共产党领导的华北敌后六角格根据地建设型文明 Demo。">
-  <title>敌后火种 · 1941—1942｜六角格根据地建设型文明 Demo</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260728e">
+  <meta name="description" content="《敌后火种 · 1941—1942》——以华北敌后根据地建设、群众工作与非对称战争为核心的原创回合制策略游戏。">
+  <title>敌后火种 · 1941—1942｜太行敌后根据地策略</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260729h">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "../../taihang/vendor/three/build/three.module.mjs"
+      }
+    }
+  </script>
 </head>
 <body>
+  <section id="desktopGate" class="desktopGate" role="status" aria-labelledby="desktopGateTitle">
+    <div class="desktopGateCard">
+      <span class="desktopGateSeal" aria-hidden="true">桌面</span>
+      <p class="desktopGateEyebrow">敌后火种 · PC 最高画质版</p>
+      <h1 id="desktopGateTitle">请使用桌面设备</h1>
+      <p>本作仅提供桌面最高画质版本，需要至少 1280 × 720 的浏览器窗口。</p>
+    </div>
+  </section>
+
   <a class="skipLink" href="#mapCanvas">跳至太行县境图</a>
 
   <section id="openingScreen" class="openingScreen" aria-labelledby="openingTitle">
@@ -25,7 +41,7 @@
 
     <div class="openingFrame">
       <main class="openingStatement">
-        <p class="openingEyebrow">HEX BASE-BUILDING · HISTORICAL CIVILIZATION DEMO</p>
+        <p class="openingEyebrow">太行敌后工作档案 · 民国三十年起</p>
         <div class="openingHeading">
           <span class="openingSeal" aria-hidden="true">敌后</span>
           <div>
@@ -33,7 +49,7 @@
             <p class="openingYears">1941—1942</p>
           </div>
         </div>
-        <p class="openingLead">一款六角格根据地建设型文明 Demo：最困难的年月里，每一寸生存空间都来自人民、组织与生产建设的共同坚持。</p>
+        <p class="openingLead">一场围绕敌后根据地建设的战略推演：最困难的年月里，每一寸生存空间都来自人民、组织与生产建设的共同坚持。</p>
         <p class="openingCopy">你受命建设并守住中国共产党领导的太行敌后根据地一县。依靠群众路线，把党组织扎进村庄，安排农田、诊所、地道与兵工等工程，使工作队、八路军正规军、地方游击队与民兵协同；在封锁、扫荡、缺粮、缺药与情报不全中保存群众、积蓄力量、破袭敌军交通。</p>
 
         <ol class="openingLoop" aria-label="核心回合循环">
@@ -132,7 +148,7 @@
             <p class="panelEyebrow">太行军区 · 县境态势</p>
             <h2 id="mapPanelTitle">根据地、交通线与扫荡方向</h2>
           </div>
-          <p id="mapHint">点选六角格查看村庄与部队；拖动平移，滚轮或双指缩放。键盘聚焦地图后，用方向键巡查、Enter 选择。</p>
+          <p id="mapHint">点选六角格查看村庄与部队；按住鼠标拖动平移，滚轮缩放。键盘聚焦地图后，用方向键巡查、Enter 选择。</p>
           <ul id="mapLegend" class="mapLegend" aria-label="地图图例">
             <li><i class="legendBase" aria-hidden="true"></i>根据地</li>
             <li><i class="legendRail" aria-hidden="true"></i>敌军交通</li>
@@ -141,7 +157,9 @@
         </header>
 
         <div class="mapStage">
-          <canvas id="mapCanvas" width="1200" height="760" tabindex="0" aria-label="太行一县可操作六角格地图" aria-describedby="mapHint mapLegend">你的浏览器需要支持 Canvas；也可以使用地图下方的地块导航。</canvas>
+          <canvas id="mapCanvas" width="1200" height="760" tabindex="0" aria-label="太行一县可操作三维六角格战术地图" aria-describedby="mapHint mapLegend">浏览器无法显示立体县境图时，仍可使用地图下方的地块导航。</canvas>
+          <span id="worldModeBadge" class="worldModeBadge" role="status" aria-live="polite">正在展开县境沙盘</span>
+          <div class="mapAtmosphere" aria-hidden="true"></div>
           <div class="mapPaperMark mapMarkNorth" aria-hidden="true">北</div>
           <div class="mapPaperMark mapMarkScale" aria-hidden="true">县境态势 · 比例示意</div>
           <div class="mapControls" aria-label="地图视图控制">
@@ -298,6 +316,6 @@
   <div id="toastRegion" class="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div id="liveRegion" class="visuallyHidden" aria-live="assertive" aria-atomic="true"></div>
 
-  <script type="module" src="./Script_Game.mjs?v=20260728e"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260729h"></script>
 </body>
 </html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#141210">
+<title>烽线 · 敌后指挥 —— 三维回合制战役</title>
+<meta name="description" content="以抗日战争华北敌后战场为背景的原创三维回合制策略游戏。推进战线、维系补给、组织包围、协同作战并发动群众破袭交通线。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23141210'/%3E%3Cpath d='M16 5l9 5.5v11L16 27l-9-5.5v-11z' fill='none' stroke='%23c8a86a' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%238c2f24'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./Style_Game.css">
+<style>
+  /* 启动层与画布底座：不依赖 Style_Game.css，保证任何情况下开场都成立。 */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #100e0c; }
+  body { -webkit-tap-highlight-color: transparent; color: #e8dcc0;
+    font-family: system-ui, -apple-system, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  #app { position: fixed; inset: 0; }
+  #worldCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .ui-root { position: absolute; inset: 0; pointer-events: none; }
+  /* 兜底必须包在 :where() 里（特异度 0）。此前写成 .ui-root > * 时，
+     这条内联样式在源顺序上晚于 Style_Game.css，会把 UI 的五个全屏层
+     （hud / toast / panel / cinema / modal）全部改回可拦截点击——
+     顶层的 modal 层随即把整张地图与所有按钮都挡死，鼠标什么都点不了。 */
+  .ui-root > :where(*) { pointer-events: auto; }
+
+  .boot { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center;
+    background: radial-gradient(120% 90% at 50% 30%, #241d16 0%, #14110e 55%, #0a0908 100%);
+    transition: opacity .7s ease, visibility .7s ease; padding: 24px; }
+  .boot-done { opacity: 0; visibility: hidden; }
+  .boot-inner { max-width: 640px; text-align: center; }
+  .boot-mark { font-family: "Songti SC", "SimSun", "Noto Serif SC", serif; font-size: clamp(56px, 14vw, 104px);
+    font-weight: 700; letter-spacing: .16em; color: #8c2f24; opacity: .5; line-height: 1;
+    text-shadow: 0 0 46px rgba(140,47,36,.45); }
+  .boot-title { font-family: "Songti SC", "SimSun", "Noto Serif SC", serif; margin: 14px 0 6px;
+    font-size: clamp(24px, 5.4vw, 38px); letter-spacing: .28em; color: #e8dcc0; font-weight: 600; }
+  .boot-subtitle { margin: 0 0 26px; font-size: 13px; letter-spacing: .5em; color: #c8a86a; opacity: .82; }
+  .boot-bar { width: min(420px, 76vw); height: 3px; margin: 0 auto; background: rgba(200,168,106,.16); overflow: hidden; }
+  .boot-bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #8c2f24, #c8a86a);
+    transition: width .35s ease; }
+  .boot-hint { margin: 16px 0 0; font-size: 12.5px; color: #9b8f76; letter-spacing: .1em; min-height: 1.4em; }
+  .boot-hint-error { color: #d86a5c; }
+  .boot-note { margin: 30px auto 0; max-width: 560px; font-size: 11.5px; line-height: 2;
+    color: #6f6656; border-top: 1px solid rgba(200,168,106,.14); padding-top: 18px; }
+  @media (prefers-reduced-motion: reduce) { .boot, .boot-bar > i { transition: none; } }
+
+  /* 触控与窄屏使用响应式 HUD，不再用提示层挡住战场。 */
+  #pcGate { display: none !important; }
+  #pcGate.gate-dismissed { display: none !important; }
+  @media (max-width: 959px), (max-height: 519px) {
+    #pcGate { position: fixed; inset: 0; z-index: 9500; display: none; place-items: center;
+      background: radial-gradient(120% 90% at 50% 30%, #241d16 0%, #14110e 55%, #0a0908 100%);
+      text-align: center; padding: 32px; }
+    #pcGate .gate-title { font-family: "Songti SC", "SimSun", serif; font-size: 26px;
+      letter-spacing: .2em; color: #e8dcc0; margin: 0 0 14px; }
+    #pcGate .gate-body { font-size: 14px; line-height: 2; color: #9b8f76; max-width: 30em; margin: 0 auto; }
+    #pcGate .gate-enter { margin-top: 22px; padding: 10px 26px; font-size: 14px; letter-spacing: .2em;
+      color: #e8dcc0; background: none; border: 1px solid #c8a86a; border-radius: 4px; cursor: pointer; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/build/three.module.mjs",
+  "three/addons/": "./vendor/three/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="worldCanvas" aria-label="三维战场" role="img"></canvas>
+  <div id="uiRoot" class="ui-root"></div>
+</div>
+
+<div id="bootScreen" class="boot">
+  <div class="boot-inner">
+    <div class="boot-mark" aria-hidden="true">烽线</div>
+    <h1 class="boot-title">烽线 · 敌后指挥</h1>
+    <p class="boot-subtitle">山河为盘 · 交通为脉 · 人民为本</p>
+    <div class="boot-bar"><i id="bootBar"></i></div>
+    <p id="bootHint" class="boot-hint">正在装配战场……</p>
+    <p class="boot-note">
+      本作为原创虚构作品，地图为综合化的华北敌后战区，不对应单一真实县份。<br>
+      1945 年日本投降是不可改写的史实终点；玩家改变的是交通线与根据地的存续，以及人民与组织为胜利付出的代价。
+    </p>
+  </div>
+</div>
+
+<div id="pcGate" aria-hidden="true">
+  <div>
+    <p class="gate-title">烽线 · 敌后指挥</p>
+    <p class="gate-body">本作为桌面端设计。<br>请在电脑上打开，并尽量放大浏览器窗口。</p>
+    <button class="gate-enter" type="button"
+      onclick="this.closest('#pcGate').classList.add('gate-dismissed')">仍要进入</button>
+  </div>
+</div>
+
+<noscript>
+  <div class="boot"><div class="boot-inner"><h1 class="boot-title">烽线 · 敌后指挥</h1>
+  <p class="boot-hint">本页需要启用 JavaScript 与 WebGL 才能运行。</p></div></div>
+</noscript>
+
+<script type="module">
+  const bootBar = document.getElementById("bootBar");
+  const bootHint = document.getElementById("bootHint");
+  const bootScreen = document.getElementById("bootScreen");
+  let progress = 0;
+  const tick = setInterval(() => {
+    progress = Math.min(88, progress + 3 + Math.random() * 5);
+    if (bootBar) bootBar.style.width = progress + "%";
+  }, 90);
+
+  function Fail(message, error) {
+    clearInterval(tick);
+    if (bootHint) {
+      bootHint.textContent = message;
+      bootHint.classList.add("boot-hint-error");
+    }
+    if (error) console.error(error);
+  }
+
+  try {
+    const canvas = document.getElementById("worldCanvas");
+    const context = canvas.getContext("webgl2") || canvas.getContext("webgl");
+    if (!context) throw new Error("WebGL unavailable");
+  } catch (error) {
+    Fail("此设备或浏览器不支持 WebGL，无法运行三维战场。", error);
+  }
+
+  import("./Script_Main.mjs")
+    .then((module) => module.StartGame({
+      canvas: document.getElementById("worldCanvas"),
+      uiRoot: document.getElementById("uiRoot"),
+      OnProgress(value, hint) {
+        progress = Math.max(progress, value * 100);
+        if (bootBar) bootBar.style.width = progress + "%";
+        if (hint && bootHint) bootHint.textContent = hint;
+      },
+    }))
+    .then(() => {
+      clearInterval(tick);
+      if (bootBar) bootBar.style.width = "100%";
+      bootScreen.classList.add("boot-done");
+      setTimeout(() => bootScreen.remove(), 900);
+    })
+    .catch((error) => Fail("启动失败：" + (error?.message ?? error), error));
+</script>
+</body>
+</html>

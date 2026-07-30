@@ -165,9 +165,9 @@ const eraGrade = Object.freeze({
     // 压抑感靠冷色温与低太阳角度表达，不靠抽干饱和度：
     // 0.80 的饱和叠上 1.42 倍雾密度时，实测整帧饱和度从 0.435 掉到 0.199，
     // 九种地形糊成一片灰绿，战役后 2/3 时间里地形色编码完全失效。
-    sunScale: 0.84, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.16,
-    saturation: 1.02, contrast: 1.10, vignette: 0.24, grain: 0.015, bloomThreshold: 0.80, bloomStrength: 0.28,
-    shadowTint: 0x232a34, highlightTint: 0xd7dde2, lift: 0.018,
+    sunScale: 0.84, elevationDelta: -14, azimuthDelta: 22, warm: -0.22, fogScale: 1.05,
+    saturation: 1.32, contrast: 1.06, vignette: 0.24, grain: 0.015, bloomThreshold: 0.80, bloomStrength: 0.28,
+    shadowTint: 0x2e3134, highlightTint: 0xd7dde2, lift: 0.018,
   },
   Recovery: {
     sunScale: 0.96, elevationDelta: -4, azimuthDelta: 12, warm: 0.12, fogScale: 1.14,
@@ -750,9 +750,9 @@ void main() {
   if ( uCloudOpacity > 0.002 && up > 0.004 ) {
     vec2 cloudPlane = direction.xz / max( up, 0.045 );
     float drift = uTime * uCloudSpeed;
-    float layerHigh = CloudBand( cloudPlane, uCloudScale * 0.55, vec2( drift * 0.6, drift * 0.24 ), 4 );
-    float layerMid = CloudBand( cloudPlane, uCloudScale, vec2( -drift * 1.1, drift * 0.5 ), 4 );
-    float layerLow = CloudBand( cloudPlane, uCloudScale * 2.1, vec2( drift * 1.9, -drift * 0.8 ), 3 );
+    float layerHigh = CloudBand( cloudPlane, uCloudScale * 6.0, vec2( drift * 0.6, drift * 0.24 ), 4 );
+    float layerMid = CloudBand( cloudPlane, uCloudScale * 10.0, vec2( -drift * 1.1, drift * 0.5 ), 4 );
+    float layerLow = CloudBand( cloudPlane, uCloudScale * 16.0, vec2( drift * 1.9, -drift * 0.8 ), 3 );
     float coverage = clamp( layerHigh * 0.55 + layerMid * 0.85 + layerLow * 0.45, 0.0, 1.0 );
     float horizonFade = smoothstep( 0.008, 0.06, up );
     coverage *= horizonFade * uCloudOpacity;
@@ -765,13 +765,18 @@ void main() {
   // 地平线云堤：出货相机（俯仰≤65°、fov38）能看到的"天"全部在 up∈[-0.32,-0.02]，
   // 上方那组经典云带在这个范围永远采样不到——连续两轮审核证伪的就是它。
   // 这里按方位角展开一条云堤，颜色压暗到与底色拉开 ΔL≥10%，玩家第一次能看见云。
-  float bank = smoothstep( -0.34, -0.20, up ) * ( 1.0 - smoothstep( -0.11, -0.02, up ) );
+  float bank = smoothstep( 0.015, 0.09, up ) * ( 1.0 - smoothstep( 0.28, 0.46, up ) );
   if ( bank > 0.003 && uCloudOpacity > 0.002 ) {
     float azimuth = atan( direction.z, direction.x );
-    vec2 bankUv = vec2( azimuth * 2.4 + uTime * uCloudSpeed * 0.32, up * 7.0 );
-    float bankShape = CloudBand( bankUv, uCloudScale * 1.7, vec2( uTime * uCloudSpeed * 0.5, 0.0 ), 3 );
-    vec3 bankColor = mix( uCloudColor * 0.62, uHorizon * 0.74, 0.30 );
-    sky = mix( sky, bankColor, bank * bankShape * uCloudOpacity * 0.9 );
+    // 尺度按"全屏方位角跨度要扫过若干个噪声胞"标定：此前 uv×scale 合成后
+    // 整屏只采样约 0.25 个胞，Fbm 退化为常数，云堤只是均匀压暗、毫无云形。
+    vec2 bankUv = vec2( azimuth * 6.5 + uTime * uCloudSpeed * 0.32, up * 20.0 );
+    float bankShape = CloudBand( bankUv, 1.15, vec2( uTime * uCloudSpeed * 0.5, 0.0 ), 3 );
+    // 第七轮实测：云形色与该区天穹底色亮度几乎相等（ΔL≈2%），ACES 再压一道后不可见。
+    // 先把云堤区基色抬亮，再用压暗 ≥35% 的云形刻进去，把 ΔL 一次拉开。
+    vec3 bankBase = mix( sky, uHorizon * 1.12, bank * 0.6 );
+    vec3 bankCloud = mix( uCloudColor * 0.38, uHorizon * 0.52, 0.25 );
+    sky = mix( bankBase, bankCloud, bank * bankShape * uCloudOpacity * 1.15 );
   }
 
   gl_FragColor = vec4( max( sky * uExposure, vec3( 0.0 ) ), 1.0 );

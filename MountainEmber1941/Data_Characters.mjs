@@ -1,0 +1,171 @@
+export const characterDefinitions = Object.freeze([
+  Object.freeze({
+    id: "qinSuqiu",
+    name: "秦素秋",
+    role: "侦察 · 联络",
+    callSign: "山雀",
+    color: 0x7ea69a,
+    accent: "#9fd4c5",
+    weapon: "短枪",
+    ammo: 12,
+    health: 100,
+    speed: 5.1,
+    biography: "乡村教员与交通站联络员。她记道路、认乡情，也知道旧关系会在封锁中失效。",
+    passive: "乡道记忆：灌木与田埂中的移动声响降低。",
+    abilities: Object.freeze([
+      Object.freeze({
+        id: "observe",
+        name: "记哨",
+        shortcut: "1",
+        cooldown: 14,
+        description: "观察最近的未警觉敌人，揭示其巡逻路线与视野。",
+      }),
+      Object.freeze({
+        id: "stone",
+        name: "投石",
+        shortcut: "2",
+        cooldown: 9,
+        description: "在指针位置制造不精确声源，引开附近巡逻。",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    id: "hanShilei",
+    name: "韩石磊",
+    role: "工兵 · 破袭",
+    callSign: "铁楔",
+    color: 0xc29a62,
+    accent: "#e7bd7d",
+    weapon: "步枪",
+    ammo: 18,
+    health: 100,
+    speed: 4.5,
+    biography: "养路工出身，熟悉桥涵、电话线和简易机械。他反对为求声势毁掉乡亲仍要走的路。",
+    passive: "看结构：靠近设施时显示破坏效果与群众风险。",
+    abilities: Object.freeze([
+      Object.freeze({
+        id: "sabotage",
+        name: "剪线",
+        shortcut: "1",
+        cooldown: 4,
+        description: "贴近交换机、探照灯或警铃，进行安静破坏。",
+      }),
+      Object.freeze({
+        id: "charge",
+        name: "慢引信",
+        shortcut: "2",
+        cooldown: 30,
+        charges: 1,
+        description: "在目标设施旁放置破坏包。爆炸会触发全区警报。",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    id: "luLanzhi",
+    name: "吕兰枝",
+    role: "救护 · 组织",
+    callSign: "青蒿",
+    color: 0x9aa66f,
+    accent: "#c6d28a",
+    weapon: "驳壳枪",
+    ammo: 10,
+    health: 100,
+    speed: 4.8,
+    biography: "助产员与妇救会救护队员。她能止血、固定和安排转运，但不会把绷带说成痊愈。",
+    passive: "检伤：显示队友的失血时间与转移条件。",
+    abilities: Object.freeze([
+      Object.freeze({
+        id: "aid",
+        name: "压迫止血",
+        shortcut: "1",
+        cooldown: 8,
+        charges: 2,
+        description: "稳定最近的倒地队员；不会恢复其战斗能力。",
+      }),
+      Object.freeze({
+        id: "steady",
+        name: "稳住",
+        shortcut: "2",
+        cooldown: 24,
+        description: "清除附近队友的压制，并短暂提高抗压能力。",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    id: "weiShouyi",
+    name: "魏守义",
+    role: "火力 · 指挥",
+    callSign: "石门",
+    color: 0xa87160,
+    accent: "#dc9b86",
+    weapon: "轻机枪",
+    ammo: 30,
+    health: 110,
+    speed: 4.2,
+    biography: "地方抗日部队的老班长。他学会把火力当作撤离窗口，而不是留在原地拼消耗。",
+    passive: "短促口令：附近队友的压制恢复更快。",
+    abilities: Object.freeze([
+      Object.freeze({
+        id: "suppress",
+        name: "定点压制",
+        shortcut: "1",
+        cooldown: 12,
+        description: "向指针方向建立短时压制扇区，消耗弹药并暴露位置。",
+      }),
+      Object.freeze({
+        id: "overwatch",
+        name: "交叉警戒",
+        shortcut: "2",
+        cooldown: 18,
+        description: "与最近队友建立警戒线，准备同步首轮射击。",
+      }),
+    ]),
+  }),
+]);
+
+export const enemyRoleDefinitions = Object.freeze({
+  sentry: Object.freeze({
+    name: "哨兵",
+    speed: 2.5,
+    sight: 22,
+    peripheralSight: 12,
+    fov: Math.PI * 0.42,
+    health: 80,
+    morale: 70,
+  }),
+  patrol: Object.freeze({
+    name: "巡逻兵",
+    speed: 2.8,
+    sight: 20,
+    peripheralSight: 11,
+    fov: Math.PI * 0.46,
+    health: 78,
+    morale: 64,
+  }),
+  leader: Object.freeze({
+    name: "值勤军曹",
+    speed: 2.75,
+    sight: 24,
+    peripheralSight: 14,
+    fov: Math.PI * 0.5,
+    health: 95,
+    morale: 86,
+  }),
+  operator: Object.freeze({
+    name: "通信兵",
+    speed: 2.35,
+    sight: 18,
+    peripheralSight: 10,
+    fov: Math.PI * 0.4,
+    health: 72,
+    morale: 58,
+  }),
+});
+
+export function GetCharacterDefinition(characterId) {
+  return characterDefinitions.find((definition) => definition.id === characterId) ?? null;
+}
+
+export function GetEnemyRoleDefinition(roleId) {
+  return enemyRoleDefinitions[roleId] ?? enemyRoleDefinitions.patrol;
+}

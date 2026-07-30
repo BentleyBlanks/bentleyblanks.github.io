@@ -453,8 +453,8 @@
 
 .pf-tab-badge {
   position: absolute;
-  top: 1px;
-  left: 1px;
+  top: -2px;
+  left: -2px;
   right: auto;
   display: none;
   min-width: 17px;
@@ -3349,6 +3349,29 @@
   z-index: 2;
 }
 .pf-plate:hover { filter: brightness(1.12); }
+
+
+/* 960–1279 宽的桌面窗口：顶栏紧凑档。页签只留大字与快捷键，资源章收窄，
+   保证六枚资源章（禾工械药谍干）与九枚页签互不侵占。 */
+@media (max-width: 1359px) {
+  .pf-tab-name { display: none; }
+  .pf-tab { min-width: 38px; padding: 3px 4px; }
+  .pf-topbar { gap: 6px; }
+  .pf-res { min-width: 55px; padding: 3px 6px; }
+  .pf-res-stock { font-size: 15px; }
+  .pf-res-delta { font-size: 10px; }
+  /* era 名（开辟期/困难期）禁断行——折成"开辟/期"读作错字；只允许日期行换行 */
+  .pf-era { min-width: 0; max-width: 168px; }
+  .pf-era-name { white-space: nowrap; }
+}
+
+/* 960-1007px 窄带：上一档收完仍差一枚章位，再收一档补平 */
+@media (max-width: 1010px) {
+  .pf-res { min-width: 48px; padding: 3px 4px; }
+  .pf-res-stock { font-size: 14px; }
+  .pf-tab { min-width: 34px; padding: 3px 3px; }
+  .pf-era { max-width: 148px; }
+}
 
 /* --------------------------------------------------------------------------
    仅支持桌面端：移动端与平板断点已整体移除。
