@@ -406,7 +406,8 @@ export function GetEraProgress(turn) {
 //
 // 代价红线（本文件自我约束，Script_Rules 结算时也应复核）：
 // 只要一个选项的 ledger 里有任何正数，它的 effects 就只允许出现
-// stockDelta（值必须 ≤ 0）、exposureDelta、alertDelta、massDelta（必须 ≤ 0）、flags、duration。
+// stockDelta（值必须 ≤ 0）、exposureDelta、alertDelta、massDelta（必须 ≤ 0）、flags、duration，
+// 以及 forceSweep（它招来一次高强度合围，是惩罚通道而非收益）。
 // 也就是说：人的代价永远换不来粮、械、药、群众基础或任何加成。
 // ---------------------------------------------------------------------------
 
@@ -595,11 +596,11 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Night", tone: "cold", motifs: ["blockhouse", "marketBasket", "lampSignal", "wheatField"] },
     options: [
       { id: "ThreeNos", label: "只订“三不”口头约定，先立个信用", hint: "什么都没拿到，什么都开始了。",
-        effects: { puppetDefection: 0.12, flatYield: { intel: 1 }, alertDecay: 0.5, massDelta: 2 }, ledger: {} },
+        effects: { puppetDefection: 0.12, flatYield: { intel: 1 }, alertDecay: 0.5, massDelta: 2, flags: ["PuppetLine"] }, ledger: {} },
       { id: "PressForArms", label: "要他交两挺机枪作投名状", hint: "东西是硬的，人是要被逼到墙角的。",
-        effects: { stockDelta: { ordnance: 14 }, puppetDefection: 0.05, alertDelta: 8, exposureDelta: 5 }, ledger: {} },
+        effects: { stockDelta: { ordnance: 14 }, puppetDefection: 0.05, alertDelta: 8, exposureDelta: 5, flags: ["PuppetLine"] }, ledger: {} },
       { id: "FamilyGuarantee", label: "给他家出一张保状，写明将来不追究", hint: "有的群众想不通：凭什么保汉奸的家。",
-        effects: { puppetDefection: 0.2, unlockDoctrine: "PuppetWork", stockDelta: { cadre: -1 }, massDelta: -3 }, ledger: {} },
+        effects: { puppetDefection: 0.2, unlockDoctrine: "PuppetWork", stockDelta: { cadre: -1 }, massDelta: -3, flags: ["PuppetLine"] }, ledger: {} },
     ],
     flavor: "保状一式两份，一份给他家，一份存区上，上面写着日期、见证人，和一句话：以行为论。" },
   { id: "ThreeThirdsSystem", era: "Growth", turnRange: [12, 13], weight: 92, condition: { once: true, minMass: 35 },
@@ -623,11 +624,11 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Ridge", tone: "grim", motifs: ["smokeColumns", "ridgeline", "stretchers", "packMules"] },
     options: [
       { id: "SplitAndSlip", label: "化整为零，跳到合击圈外面去", hint: "人保得最多。印刷机和存粮带不走。",
-        effects: { forceSweep: true, exposureDelta: -14, alertDelta: -4, stockDelta: { grain: -60, ordnance: -10 } }, ledger: { civilianDeaths: 5, displaced: 260, villagesBurned: 3, grainSeized: 520 } },
+        effects: { forceSweep: true, exposureDelta: -14, alertDelta: -4, stockDelta: { grain: -60, ordnance: -10 }, flags: ["ScorchedVillages"] }, ledger: { civilianDeaths: 5, displaced: 260, villagesBurned: 3, grainSeized: 520 } },
       { id: "HoldTheRidge", label: "留一个营顶住隘口，掩护机关先走", hint: "机器保住了。顶在隘口的人不一定回得来。",
-        effects: { forceSweep: true, exposureDelta: -6, stockDelta: { ordnance: -24, medicine: -12 } }, ledger: { civilianDeaths: 8, displaced: 380, villagesBurned: 5, cadreLost: 6, grainSeized: 680 } },
+        effects: { forceSweep: true, exposureDelta: -6, stockDelta: { ordnance: -24, medicine: -12 }, flags: ["ScorchedVillages"] }, ledger: { civilianDeaths: 8, displaced: 380, villagesBurned: 5, cadreLost: 6, grainSeized: 680 } },
       { id: "MoveInward", label: "敌进我进，插到他后面去打空虚据点", hint: "把他调回去了。我们自己的伤亡最重。",
-        effects: { forceSweep: true, exposureDelta: 6, alertDelta: 10, stockDelta: { ordnance: -18, medicine: -10 } }, ledger: { civilianDeaths: 7, displaced: 230, villagesBurned: 4, cadreLost: 4, grainSeized: 260 } },
+        effects: { forceSweep: true, exposureDelta: 6, alertDelta: 10, stockDelta: { ordnance: -18, medicine: -10 }, flags: ["ScorchedVillages"] }, ledger: { civilianDeaths: 7, displaced: 230, villagesBurned: 4, cadreLost: 4, grainSeized: 260 } },
     ],
     flavor: "转移的规矩叫“三不留”：不留粮、不留人、不留字纸。字纸包括花名册、账本，和小学生的作业本。" },
   { id: "ScorchedEarth", era: "Hardship", turnRange: [15, 21], weight: 96, condition: { minExposure: 25 },
@@ -636,11 +637,11 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Village", tone: "grim", motifs: ["burnedRoof", "sealedWell", "buriedJars", "ashField"] },
     options: [
       { id: "FullClearance", label: "彻底坚壁：粮全埋、井全封、人全撤", hint: "留给他一座空村。空村最招火。",
-        effects: { stockDelta: { grain: -30, labor: -24 }, exposureDelta: 2 }, ledger: { civilianDeaths: 3, displaced: 400, villagesBurned: 4, grainSeized: 70 } },
+        effects: { stockDelta: { grain: -30, labor: -24 }, exposureDelta: 2, flags: ["ScorchedVillages"] }, ledger: { civilianDeaths: 3, displaced: 400, villagesBurned: 4, grainSeized: 70 } },
       { id: "PartialClearance", label: "只藏种粮和口粮，留一部分让他抢，人先走", hint: "破财免灾，是老辈人的说法。",
-        effects: { stockDelta: { grain: -16, labor: -12 } }, ledger: { civilianDeaths: 2, displaced: 340, villagesBurned: 2, grainSeized: 300 } },
+        effects: { stockDelta: { grain: -16, labor: -12 }, flags: ["ScorchedVillages"] }, ledger: { civilianDeaths: 2, displaced: 340, villagesBurned: 2, grainSeized: 300 } },
       { id: "StayAndBluff", label: "留几位老人在村里应付，装作从没来过队伍", hint: "村子也许能保住。留下的人不一定。",
-        effects: { exposureDelta: -6, stockDelta: { grain: -8 } }, ledger: { civilianDeaths: 6, displaced: 140, villagesBurned: 1, grainSeized: 190 } },
+        effects: { exposureDelta: -6, stockDelta: { grain: -8 }, flags: ["ScorchedVillages"] }, ledger: { civilianDeaths: 6, displaced: 140, villagesBurned: 1, grainSeized: 190 } },
     ],
     flavor: "埋粮要选背阴的坡，缸口朝下，上面压石板。开春起出来，最上面一层总是霉的。" },
   { id: "BlockadeDitch", era: "Hardship", turnRange: [14, 20], weight: 93, condition: {},
@@ -742,11 +743,11 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Harvest", tone: "warm", motifs: ["hoeLine", "newFurrows", "seedBags", "slopeSun"] },
     options: [
       { id: "ReclaimWaste", label: "只开荒地和河滩，不动一分熟地", hint: "开的地薄，收的心实。",
-        effects: { flatYield: { grain: 4 }, yieldBonus: { grain: 0.1 }, massDelta: 8, stockDelta: { labor: -20 }, unlockPolicy: "GreatProduction" }, ledger: {} },
+        effects: { flatYield: { grain: 4 }, yieldBonus: { grain: 0.1 }, massDelta: 8, stockDelta: { labor: -20 }, unlockPolicy: "GreatProduction", flags: ["ProductionCampaign"] }, ledger: {} },
       { id: "Workshops", label: "办纺织、造纸、榨油的作坊，换回来的比种出来的多", hint: "作坊有烟，烟能被看见。",
-        effects: { flatYield: { labor: 3 }, yieldBonus: { labor: 0.12 }, stockDelta: { grain: 16, labor: -14 }, unlockDistrict: "TextileMill" }, ledger: {} },
+        effects: { flatYield: { labor: 3 }, yieldBonus: { labor: 0.12 }, stockDelta: { grain: 16, labor: -14 }, unlockDistrict: "TextileMill", flags: ["ProductionCampaign"] }, ledger: {} },
       { id: "TransportTeams", label: "组织运输队跑脚，用牲口挣脚钱", hint: "来钱快，路上要过两道封锁线。",
-        effects: { flatYield: { grain: 2 }, supplyRange: 1, stockDelta: { grain: 10 }, exposureDelta: 3 }, ledger: {} },
+        effects: { flatYield: { grain: 2 }, supplyRange: 1, stockDelta: { grain: 10 }, exposureDelta: 3, flags: ["ProductionCampaign"] }, ledger: {} },
     ],
     flavor: "开荒的地界要跟村里立字据，写明荒地归公家种三年，三年后交回村里。字据一式三份。" },
   { id: "MutualAid", era: "Recovery", turnRange: [22, 27], weight: 95, condition: { minMass: 45 },
@@ -755,9 +756,9 @@ export const historicalEvents = DeepFreeze([
     illustration: { kind: "Harvest", tone: "warm", motifs: ["oxAndPlough", "tallySticks", "courtyardMeeting", "wheatRows"] },
     options: [
       { id: "WorkPoints", label: "定工分制，年底找齐，账目公开", hint: "账清了，人就肯出力。",
-        effects: { yieldBonus: { grain: 0.14, labor: 0.1 }, massDelta: 9, populationGrowth: 0.05, unlockDoctrine: "MutualAid" }, ledger: {} },
+        effects: { yieldBonus: { grain: 0.14, labor: 0.1 }, massDelta: 9, populationGrowth: 0.05, unlockDoctrine: "MutualAid", flags: ["ProductionCampaign"] }, ledger: {} },
       { id: "FamiliesFirst", label: "先保军属和缺劳力户，牲口优先给他们用", hint: "地种得不算最好，人心稳。",
-        effects: { yieldBonus: { grain: 0.08 }, massDelta: 12, unrestDecay: 0.5, unlockPolicy: "SupportFamilies" }, ledger: {} },
+        effects: { yieldBonus: { grain: 0.08 }, massDelta: 12, unrestDecay: 0.5, unlockPolicy: "SupportFamilies", flags: ["ProductionCampaign"] }, ledger: {} },
       { id: "Voluntary", label: "不强推，谁愿意换谁换", hint: "没人骂，也没什么变化。",
         effects: { yieldBonus: { grain: 0.05 }, massDelta: 3 }, ledger: {} },
     ],
@@ -814,9 +815,75 @@ export const historicalEvents = DeepFreeze([
         effects: { stockDelta: { ordnance: -22, medicine: -8 }, alertDelta: 10, flags: ["EastOutpostTaken"] }, ledger: { cadreLost: 7 } },
     ],
     flavor: "断集市不是不许赶集，是把集挪到我们这边的村子。挪一次集，据点里就少一份消息。" },
+  { id: "ReturnToAshes", era: "Recovery", turnRange: [22, 24], weight: 99, mandatory: true,
+    condition: { once: true, requireFlags: ["ScorchedVillages"] },
+    title: "回河西", dateline: "1943年 春 · 河西六村",
+    body: "敌人撤了据点，河西可以回人了。先回去看的人带回来的话不多：井是封的，房梁烧断了一半，去年埋的粮起出来三缸，霉了一缸。真正难的不是这些。有两户人在沟里搭了窝棚，说什么也不肯回——他们回去过一次，站在自家场院里，站了一会儿又走了。",
+    illustration: { kind: "Village", tone: "cold", motifs: ["burnedRoof", "openedWell", "unloadedCart", "springSky"] },
+    options: [
+      { id: "RebuildFirst", label: "先淘井、修房、下种，人分批回", hint: "工和粮先垫进去。第一批回去的要看得见收成。",
+        effects: { stockDelta: { labor: -18, grain: -12 }, massDelta: 6, populationGrowth: 0.06, flatYield: { grain: 2 }, flags: ["VillagesRebuilt"] }, ledger: {} },
+      { id: "FarmFirst", label: "先抢农时把地种上，人暂住窝棚", hint: "不误节气。窝棚要再住一个雨季。",
+        effects: { stockDelta: { labor: -10 }, flatYield: { grain: 3 }, massDelta: 3, healRate: -0.02, flags: ["VillagesRebuilt"] }, ledger: {} },
+      { id: "RegisterFirstStep", label: "先派工作组逐户登记损失，回迁缓一季", hint: "账立起来了，人还在沟里。",
+        effects: { flatYield: { intel: 1 }, massDelta: -2, exposureDelta: -2, flags: ["LossesRegistered"] }, ledger: {} },
+    ],
+    flavor: "回村的次序是商量出来的：先回有壮劳力的，再回有牲口的，孤老户由村里包。井淘出来那天，全村人都去看了看水。" },
+  { id: "PuppetGoBetween", era: "Recovery", turnRange: [22, 27], weight: 98, condition: { once: true, requireFlags: ["PuppetLine"] },
+    title: "留后路的人", dateline: "1943年 夏 · 赶集路上",
+    body: "三里铺的伪军班长又托人捎话了。跟前两年不一样，这回是他先开口：上头逼他们下乡清剿凑数，他想把动静做给上面看，人下去，枪抬高一寸。他只问一件事——将来算账的时候，这一笔算不算他的。捎话的货郎补了一句：据点里想问这句话的，不止他一个。",
+    illustration: { kind: "Night", tone: "cold", motifs: ["marketBasket", "blockhouseFar", "paperSlip", "duskRoad"] },
+    options: [
+      { id: "OpenTheirLedger", label: "给他们立功过簿：一人一页，只记行为", hint: "什么都没许，什么都记着。",
+        effects: { puppetDefection: 0.12, flatYield: { intel: 1 }, alertDecay: 0.3, flags: ["PuppetPipeline"] }, ledger: {} },
+      { id: "AskThreeDeeds", label: "要他们先办三件实事：放人、捎药、报存粮", hint: "话不值钱，事才值钱。",
+        effects: { stockDelta: { medicine: 6 }, flatYield: { intel: 1 }, puppetDefection: 0.08, alertDelta: 2, flags: ["PuppetPipeline"] }, ledger: {} },
+      { id: "ListenOnly", label: "只听不应，话都收下，人不接触", hint: "防的是钓鱼。路子先留着。",
+        effects: { exposureDelta: -3, flatYield: { intel: 1 }, flags: ["PuppetPipeline"] }, ledger: {} },
+    ],
+    flavor: "功过簿收在区上，牛皮纸包着。页眉只写代号不写名字，写名字的那一栏，要等他自己来填。" },
+  { id: "OrganizeUp", era: "Recovery", turnRange: [23, 27], weight: 93, condition: { once: true, requireFlags: ["ProductionCampaign"] },
+    title: "组织起来", dateline: "1943年 冬 · 全县合作社代表会",
+    body: "大生产头一年是各干各的：开荒的开荒，纺线的纺线，跑脚的跑脚。第二年要把摊子归拢——变工队并成合作社，供销、运输、熬盐各记各的股，年底按股分红，账目一季一公布。代表会开了两天，吵得最凶的是入股折价：一头驴折几个工，一架纺车折几个工，一个只有力气的人折几个工。",
+    illustration: { kind: "Assembly", tone: "warm", motifs: ["longTable", "abacus", "shareBook", "winterWindow"] },
+    options: [
+      { id: "CoopsEverywhere", label: "区区办社，供销、信用一起来", hint: "摊子大，管账的人得先训出来。",
+        effects: { yieldBonus: { grain: 0.08, labor: 0.08 }, massGrowth: 0.2, stockDelta: { cadre: -1 }, flags: ["CoopsFounded"] }, ledger: {} },
+      { id: "HeroesCongress", label: "先开劳动英雄大会，评出来的人回村带队", hint: "不发奖金，发的是话语分量。",
+        effects: { massDelta: 7, cadreGrowth: 0.15, flatYield: { labor: 2 }, flags: ["CoopsFounded"] }, ledger: {} },
+      { id: "KeepItLoose", label: "不并大社，只统一账目和斗秤", hint: "步子小，谁也不勉强。",
+        effects: { flatYield: { grain: 1, labor: 1 }, unrestDecay: 0.3 }, ledger: {} },
+    ],
+    flavor: "入股册子里有一栏是用工顶的股。有个赶脚的入了三个工，年底分红分到一斗麦，他把入股凭条又看了两遍。" },
+  { id: "EastTower", era: "Recovery", turnRange: [24, 27], weight: 95, condition: { once: true, minStock: { ordnance: 8 } },
+    title: "东岗楼", dateline: "1944年 春 · 东岗楼据点",
+    body: "挤了一年，公路上的据点收缩了三个，剩下东岗楼卡在两个区中间：二层砖楼，一圈围墙，守着的是一个伪军小队——日军的班去年冬天就撤走了。楼里的水靠一口外井，粮靠集上买，消息靠电话线。区里议了三个办法，议到后半夜。",
+    illustration: { kind: "Ridge", tone: "cold", motifs: ["brickTower", "outsideWell", "cutWire", "fieldsAround"] },
+    options: [
+      { id: "TalkThemDown", label: "先喊话：家属到墙根下见面，给三天", hint: "三天里一枪不放。放不放下枪，看这三天。",
+        effects: { puppetDefection: 0.15, massDelta: 5, stockDelta: { ordnance: 6 }, flags: ["TowerTakenByVoice"] }, ledger: {} },
+      { id: "SapAndBlast", label: "从牲口棚掘进，一夜爆破解决", hint: "快，硬。掘进的和守楼的都要付出人。",
+        effects: { stockDelta: { ordnance: -16, labor: -10 }, alertDelta: 6, flags: ["TowerBlown"] }, ledger: { cadreLost: 2 } },
+      { id: "CutAndWait", label: "填了外井、断了集市，围到他自己走", hint: "最省人，最费粮，最考验两个区的耐心。",
+        effects: { stockDelta: { grain: -14, labor: -10 }, alertDelta: -3, flags: ["TowerStarvedOut"] }, ledger: {} },
+    ],
+    flavor: "拔点的次序是区里排好的：先拔孤的，再拔横的，最后拔硬的。东岗楼排第一，因为它孤。" },
+  { id: "RentReview", era: "Recovery", turnRange: [25, 27], weight: 97, mandatory: true, condition: { once: true },
+    title: "复查", dateline: "1944年 春 · 各村",
+    body: "减租条例贴了五年，复查队下去一查，两头的问题都有。有的村明减暗不减：佃户白天当众领了退租，夜里又给东家送回去，怕的是'队伍走了怎么办'。也有的村矫枉过正，把中农的地也算进去斗了。复查的办法笨：一村一村开会，一契一契过，退多了的补，退少了的追。",
+    illustration: { kind: "Assembly", tone: "warm", motifs: ["contractPile", "inkStone", "courtyardBench", "springLight"] },
+    options: [
+      { id: "FullReview", label: "一契一契复查，退租退押当众交割", hint: "慢，得罪人。过完这一遍，账就再没有暗的了。",
+        effects: { massDelta: 8, yieldBonus: { grain: 0.06 }, unrestDecay: 0.4, stockDelta: { cadre: -1 }, flags: ["RentReviewDone"] }, ledger: {} },
+      { id: "FixExcesses", label: "先纠偏：错斗的中农，当众赔礼退还", hint: "先把过头的事收回来，条例才立得住。",
+        effects: { massDelta: 5, flatYield: { grain: 1 }, unrestDecay: 0.6, flags: ["RentReviewDone"] }, ledger: {} },
+      { id: "KeyVillagesOnly", label: "只复查问题最大的几个村，其余发通告", hint: "省人手。没查到的村，夜里送租的路还有人走。",
+        effects: { massDelta: 2, unrestDecay: 0.2, flags: ["RentReviewDone"] }, ledger: {} },
+    ],
+    flavor: "复查队的本子上有一栏叫'怕不怕'。怕的村，问题多半不在租子上，在人心里那句'队伍走了怎么办'。" },
 
   // ===== 反攻期 1944秋 — 1945夏 =====
-  { id: "SummerOffensive", era: "Counter", turnRange: [28, 30], weight: 100, condition: { once: true },
+  { id: "SummerOffensive", era: "Counter", turnRange: [28, 29], weight: 100, condition: { once: true },
     title: "轮到我们出去了", dateline: "1944年 秋 · 全县",
     body: "敌人从这一带抽走了两个大队。据点还是那些据点，可夜里炮楼上的哨从四个减到两个，白天出来的巡逻不敢走远。上级的指示只有八个字：主动出击，扩大解放区。县里定了三步：先打孤立的小据点，再断公路，最后逼县城。要紧的是打下来以后——政权、生产、防疫、学校，一样都不能少，否则老百姓不会搬回来。",
     illustration: { kind: "Assembly", tone: "warm", motifs: ["mapOnTable", "marchingColumn", "harvestBehind", "morningLight"] },
@@ -829,7 +896,7 @@ export const historicalEvents = DeepFreeze([
         effects: { massGrowth: 0.4, populationGrowth: 0.12, flatYield: { grain: 3 }, buildSpeed: 0.1 }, ledger: {} },
     ],
     flavor: "作战命令的最后一条通常是：打扫战场，掩埋双方遗体，登记缴获，向群众公布。" },
-  { id: "BlockhouseFalls", era: "Counter", turnRange: [28, 31], weight: 96, condition: { minStock: { ordnance: 20 } },
+  { id: "BlockhouseFalls", era: "Counter", turnRange: [28, 29], weight: 96, condition: { minStock: { ordnance: 20 } },
     title: "十七米", dateline: "1944年 冬 · 马蹄泉据点",
     body: "炮楼三层，砖石结构，墙厚七十公分，四面射孔，外面一道壕一道鹿砦。我们的办法是掘进：从十七米外的一个牲口棚里往下挖，挖到墙根装药。药是修械所配的黑火药，六百斤，装在四口大缸里。掘进用了九夜，最后两夜听得见头顶上哨兵的脚步。",
     illustration: { kind: "Tunnel", tone: "cold", motifs: ["sapTunnel", "powderJars", "blockhouseWall", "nightGuard"] },
@@ -842,7 +909,7 @@ export const historicalEvents = DeepFreeze([
         effects: { stockDelta: { grain: -24, labor: -14 }, alertDelta: -4, flags: ["BlockhouseAbandoned"] }, ledger: {} },
     ],
     flavor: "清点缴获：步枪三十一支、掷弹筒一具、粮八千斤。伪军里的本县人登记后放回原籍，交村里管束。" },
-  { id: "PuppetDefection", era: "Counter", turnRange: [28, 31], weight: 93, condition: { minStock: { intel: 20 } },
+  { id: "PuppetDefection", era: "Counter", turnRange: [29, 31], weight: 93, condition: { minStock: { intel: 20 } },
     title: "一个中队的夜里", dateline: "1945年 春 · 南关",
     body: "南关的伪军中队长托人送来一张纸，写着四条：一、不打散建制；二、不追究以前；三、家属安全；四、给个正式名义。区上答应了前三条，第四条要请示。反正定在初七夜里，办法是内外接应，枪械先抬出来，人再走。最怕的是走漏——一百二十人，只要有一个人说出去，全完。",
     illustration: { kind: "Night", tone: "cold", motifs: ["gateAjar", "stackedRifles", "signalLamp", "quietStreet"] },
@@ -855,6 +922,45 @@ export const historicalEvents = DeepFreeze([
         effects: { alertDecay: 0.4, concealment: 0.06, flatYield: { intel: 2 } }, ledger: {} },
     ],
     flavor: "反正的队伍要过一次群众关：在村里公开讲一遍自己干过什么，讲完由群众提意见。有人讲不下去。" },
+  { id: "RailStorm", era: "Counter", turnRange: [28, 29], weight: 99, mandatory: true, condition: {},
+    title: "总破击", dateline: "1944年 秋 · 铁路公路沿线",
+    body: "命令是全分区同一夜动手：铁路、公路、电线、桥涵一起破。一段路一个村包干，民兵带路，部队掩护，群众上手。跟四年前那次破袭不一样的地方有两处：一是人多了十倍，报名的名单收都收不完；二是护路队多半闭着眼装没看见，有一个班还提前把巡道的钟点捎了出来。",
+    illustration: { kind: "Rail", tone: "cold", motifs: ["railTrack", "torchLine", "villagersWithBars", "autumnNight"] },
+    options: [
+      { id: "AllLinesOneNight", label: "全线一夜总破，天亮前各自归村", hint: "声势最大。他要报复，也不知道该报复哪一片。",
+        effects: { railSabotage: 0.3, alertDelta: 8, exposureDelta: 6, stockDelta: { labor: -20 }, flags: ["OffensiveStarted"] }, ledger: {} },
+      { id: "BridgesFirst", label: "专挑桥涵和道岔下手，难修的先破", hint: "破得少，瘫得久。要用掉一批炸药。",
+        effects: { railSabotage: 0.25, stockDelta: { ordnance: -10, labor: -10 }, alertDelta: 6, flags: ["OffensiveStarted"] }, ledger: {} },
+      { id: "ShieldVillagesFirst", label: "沿线村庄先转移一夜，再动手", hint: "多费一夜工。动手的人不用惦记身后的村子。",
+        effects: { railSabotage: 0.2, sweepWarning: 1, stockDelta: { labor: -24, grain: -10 }, massDelta: 3, alertDelta: 6, flags: ["OffensiveStarted"] }, ledger: {} },
+    ],
+    flavor: "工具还是撬棍和门板，只多了一样：从据点里反正出来的两个铁路工，带来了自己的道钉锤。" },
+  { id: "ShoutAtTheWalls", era: "Counter", turnRange: [28, 31], weight: 98, condition: { once: true, requireFlags: ["PuppetPipeline"] },
+    title: "对着炮楼喊话", dateline: "1945年 春 · 沿线各据点",
+    body: "打头一个据点用了一夜，第二个用了一封信，第三个只用了一次喊话。喊话有一套本子：先说他们家里的事，谁家添了孙子，谁家的地代耕了；再念功过簿，谁捎过消息、谁带路烧过村，一笔一笔念；最后给期限。念功过簿的时候，墙里头很静。",
+    illustration: { kind: "Night", tone: "cold", motifs: ["blockhouse", "speakingTrumpet", "familiesAtWall", "moonField"] },
+    options: [
+      { id: "TermsPosted", label: "贴限期布告：缴械者编管，有血债者依法审判", hint: "话说在明处，路留在明处。",
+        effects: { puppetDefection: 0.2, stockDelta: { ordnance: 12 }, massDelta: 4, flags: ["TalkedDownGarrison"] }, ledger: {} },
+      { id: "FamiliesForward", label: "组织家属到墙根下喊，一家一家劝", hint: "最灵，也最熬人。家属要在枪口底下站着。",
+        effects: { puppetDefection: 0.25, massDelta: 2, exposureDelta: 3, flags: ["TalkedDownGarrison"] }, ledger: {} },
+      { id: "NoDeals", label: "不谈条件，一律武力解决", hint: "干脆。每一座楼都要用械和人去换。",
+        effects: { stockDelta: { ordnance: -18, medicine: -8 }, alertDelta: 8 }, ledger: { cadreLost: 4 } },
+    ],
+    flavor: "喊话的人要挑嗓子亮的，还要挑据点里认识的。最好的一个是货郎出身，沿线谁家什么情形都熟。" },
+  { id: "TakeTheStrongpoints", era: "Counter", turnRange: [28, 31], weight: 97, condition: { once: true },
+    title: "拔钉子", dateline: "1945年 春 · 公路沿线",
+    body: "上级要求两个月内把中小据点扫清，路只留给县城。打法排了次序：能喊话的喊话，能围的围，非打不可的夜里打。真正立了规矩的是打完以后的三件事——缴获入库要过秤登记，俘虏往后方送不许沿路示众，收复的村子三天内要有政权、有岗、有开门的学校。",
+    illustration: { kind: "Ridge", tone: "cold", motifs: ["fallenBlockhouse", "cartOfRifles", "escortColumn", "dawnRoad"] },
+    options: [
+      { id: "OneByOne", label: "打一个巩固一个，政权跟着部队进村", hint: "慢半拍。走过的地方不用再走第二遍。",
+        effects: { massGrowth: 0.3, populationGrowth: 0.08, flatYield: { grain: 2 }, stockDelta: { ordnance: -10 }, flags: ["LineCleared"] }, ledger: {} },
+      { id: "AllAtOnce", label: "多点同时动手，不给他互相增援", hint: "快，乱。伤亡在同时开打的那几个晚上。",
+        effects: { stockDelta: { ordnance: -16, medicine: -6 }, alertDelta: 6, flags: ["LineCleared"] }, ledger: { cadreLost: 3 } },
+      { id: "SiegeOnly", label: "只围不打，等打县城的命令一起动", hint: "省械省人。围困的粮和岗哨一天都不能少。",
+        effects: { stockDelta: { grain: -16, labor: -12 }, alertDelta: -4, flatYield: { intel: 1 } }, ledger: {} },
+    ],
+    flavor: "入库的枪先擦后编号，登记簿一式两份。有支汉阳造的枪号是1938年登记过的——绕了七年又回来了。" },
   { id: "CountySeatReturn", era: "Counter", turnRange: [30, 31], weight: 98, condition: { requireFlags: ["OffensiveStarted"] },
     title: "县城的门", dateline: "1945年 夏 · 县城",
     body: "城墙是明代的，六米高，四个门，护城河干了一半。围了十九天，断水断电，第十七天伪军一个大队从西门出来缴了械。那天早上，城门是从里面打开的。进城以后第一件事不是开会，是接管粮库、发电所、监狱和医院，并且贴出布告：市面照常，物价不许涨，商铺不许关门。",
@@ -868,6 +974,19 @@ export const historicalEvents = DeepFreeze([
         effects: { stockDelta: { medicine: -10, ordnance: -6 }, alertDelta: -10, massDelta: -3 }, ledger: { cadreLost: 4 } },
     ],
     flavor: "布告最后一行写着：凡日伪军人员，放下武器者不杀；有血债者依法审判，不得私自处置。" },
+  { id: "EveOfSurrender", era: "Counter", turnRange: [30, 31], weight: 99, condition: { once: true },
+    title: "受降前夜", dateline: "1945年 夏 · 县城外",
+    body: "城里的守军还没接到命令，城外的秩序先乱了。有据点的伪军成建制跑过来，枪比人先到；有溃兵在乡下抢粮抢牲口；看押俘虏的院子外头，围了几十个河西来的人，要一个人抵命——被围在里头的那个伪军班长，三年前带人烧过他们的村。区上连夜开会，天亮前要拿出章程。",
+    illustration: { kind: "Assembly", tone: "grim", motifs: ["courtyardGate", "stackedRifles", "lanternMeeting", "waitingCrowd"] },
+    options: [
+      { id: "HoldTheLine", label: "定三条：俘虏编管待审、缴械入库、任何人不得私自处置", hint: "有人当面骂我们护着仇人。这三条一条不能让。",
+        effects: { massDelta: -3, stockDelta: { cadre: -1 }, flags: ["OrderKept"] }, ledger: {} },
+      { id: "TryTheWorst", label: "血债最重的先行公审，其余一律编管", hint: "审要有证，判要有据。急，也要按程序走完。",
+        effects: { massDelta: 3, stockDelta: { cadre: -1 }, alertDelta: 2, flags: ["TrialsHeld"] }, ledger: {} },
+      { id: "LookAway", label: "人手都压在接收上，乡下的事先顾不上", hint: "接收快了。溃兵过境的那几天，村里自己扛。",
+        effects: { flags: ["LooseEnds"] }, ledger: { civilianDeaths: 4, displaced: 30, grainSeized: 90 } },
+    ],
+    flavor: "看押俘虏的院子外头，站岗的民兵一半是河西人。带队的只说了一句：谁乱来，先下谁的枪。" },
   { id: "Surrender1945", era: "Counter", turnRange: [31, 31], weight: 100, condition: { once: true, minTurn: 31 }, mandatory: true,
     title: "八月", dateline: "1945年 夏 · 县城与各区",
     body: "消息是从收音机里来的，头一天不敢信，第二天才确认。街上有人放鞭炮，也有人只是坐在门槛上。区上连夜布置了三件事：接受投降与收缴武器；维持秩序，防止溃兵与土匪抢掠；统计八年的损失。第三件最花时间——各村报上来的表格要填五栏：死亡、伤残、被烧房屋、被抢粮食牲口、失踪未归。有的村填了三天，有的村填不下去。",
@@ -973,6 +1092,9 @@ export const quotes = DeepFreeze([
   { text: "敌人有钢，我们有沟。他修一里沟，我们就多知道一里沟怎么过。", source: "交通工作总结" },
   { text: "打完就走，走的时候把该带的带走，把不该留的处理掉，把老乡的门关好。", source: "游击队行动守则" },
   { text: "胜利那天要做的第一件事，不是庆祝，是把八年的账一笔一笔算清楚。", source: "一九四五年区级会议记录摘录" },
+  { text: "回村第一件事不是盖房，是淘井。井淘净了，人心就回来一半。", source: "重建工作手册（油印本）" },
+  { text: "对据点喊话，三分靠喊，七分靠等。等的是他家里人把话捎进去。", source: "武工队喊话要点" },
+  { text: "受降不是散场。枪要入库，人要编管，账要接着记。", source: "受降接收工作须知" },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -988,10 +1110,24 @@ export const quotes = DeepFreeze([
 //   literacy,         // 识字率 0..1
 //   civilianDeaths, displaced, villagesBurned, cadreLost, grainSeized,
 //   villageCount,     // 图上村庄总数，用于把绝对代价折成相对代价
+//   flags,            // 本局事件选择落下的旗标（state.flags），供 requireFlags 分支与尾声引用
 // }
+// 尾声引用本局旗标：EvaluateEnding 选出结局后，会按 endingFlagNotes 表把本局旗标
+// 对应的档案式短句拼进 epilogue（最多三条，表序优先），让同一个结局在不同打法下
+// 的收尾明显不同——"东岗楼是喊话拿下的，一枪没放"只出现在真的喊下来的那一局。
 // ---------------------------------------------------------------------------
 
 export const endingDefinitions = DeepFreeze({
+  OrderedVictory: {
+    key: "OrderedVictory",
+    title: "交得出账",
+    priority: 8,
+    condition: { minBaseRatio: 0.5, minMass: 62, minDistricts: 8, maxDeathsPerVillage: 6, requireFlags: ["OrderKept"] },
+    body:
+      "根据地连成了大片，胜利来的时候没有乱。受降那几夜立的三条规矩——俘虏编管待审、缴械入库、任何人不得私自处置——一条也没有破。粮库的账、军械库的账、俘虏的名册、八年的损失统计，四本账摆在一张桌上，谁来都可以翻。有的干部说，这一手比打下县城还难。",
+    epilogue:
+      "秋后清账，从1937年那张糊窗户的毛边纸算起，全县的账本摞起来有半人高。管账的人换了四茬，账没有断过一季。",
+  },
   PrairieFire: {
     key: "PrairieFire",
     title: "燎原",
@@ -1029,6 +1165,16 @@ export const endingDefinitions = DeepFreeze({
       "没有惊人的战绩，也没有塌下来的年份。八年里做成的事情大多很小：修了三条渠，办了一百四十七处冬学，把两次春荒扛了过去，把地道从三个村连到了十一个村。",
     epilogue: "1945年的账本上，最扎眼的一行是“借出未还六万斤”。区上决定不追，改成了赈灾。",
   },
+  GrewFromAshes: {
+    key: "GrewFromAshes",
+    title: "灰里长苗",
+    priority: 22,
+    condition: { minBaseRatio: 0.3, minMass: 46, requireFlags: ["VillagesRebuilt"] },
+    body:
+      "最难看的年份留在了地图上：被烧过的村子、填了一半的封锁沟、撤过三次的兵工厂。可是1943年开春，人是回去了的。淘井、修房、补种，被烧的村子一个一个把炊烟升了回来。根据地不算大，家底不算厚，但每一处都是从灰里重新长出来的，根扎得比看上去深。",
+    epilogue:
+      "1945年秋天统计，回迁的户数比预计多。问起来，多数人只说了一句：地在这儿。",
+  },
   ScatteredButAlive: {
     key: "ScatteredButAlive",
     title: "化整为零",
@@ -1037,6 +1183,16 @@ export const endingDefinitions = DeepFreeze({
     body:
       "地方大半丢了，组织还在。困难时期把机关砍到最小，干部整批下沉到村，武装缩成一个个不脱产的小组。敌人的地图上这一片是白的，可他们每一次进山，都还是有人在前头点火报警。",
     epilogue: "反攻开始的时候，从各村冒出来的人比谁预计的都多。名册是分散着记的，凑起来才发现一个也没少太多。",
+  },
+  LampsInTheHills: {
+    key: "LampsInTheHills",
+    title: "山里的灯",
+    priority: 38,
+    condition: { maxBaseRatio: 0.24, requireFlags: ["PuppetPipeline"] },
+    body:
+      "地方是退回山里了，路子没有断。困难年月里立下的功过簿一直记着：据点里谁捎过消息，谁抬高过一寸枪口，谁给伤员留过一扇门。白天山外插着谁的旗子不由我们，夜里哪条路能走、哪个哨会咳嗽三声，还是我们说了算。撑到敌人抽兵，山里的人是顺着这些路子一步一步走出去的。",
+    epilogue:
+      "受降以后清点功过簿，写满名字的有一百七十多页。有人当年只是把枪抬高了一寸，这一页也给他留着。",
   },
   DrivenToTheHills: {
     key: "DrivenToTheHills",
@@ -1260,16 +1416,45 @@ function MatchesEndingCondition(condition, metrics) {
 }
 
 /**
+ * 结局尾声的旗标短句表：本局落过某个旗标，尾声就多一句对应的档案记载。
+ * 全部是白描陈述，不带任何数值含义；表序即拼接优先级，最多取三条。
+ */
+export const endingFlagNotes = DeepFreeze([
+  { flag: "TowerTakenByVoice", text: "东岗楼是喊话拿下的，一枪没放。" },
+  { flag: "TalkedDownGarrison", text: "沿线有几个据点是自己打开门等队伍进去的，功过簿在门口摆了一张桌子。" },
+  { flag: "OrderKept", text: "受降那几夜，全县没有出过一起私自处置。" },
+  { flag: "TrialsHeld", text: "血债最重的几个人过了公审，判决在城门口贴了七天，没有人撕。" },
+  { flag: "LooseEnds", text: "八月里乡下被溃兵抢了几回，账本上最后添的几笔就是那几天记下的。" },
+  { flag: "VillagesRebuilt", text: "河西六村的房子先盖了一半住人，第二年春天才盖齐。" },
+  { flag: "RentReviewDone", text: "租约复查过一遍，该退的当众退了，账贴在村口。" },
+  { flag: "LedgerCompleted", text: "损失统计是一村一村核完的，念表那天换了三个人。" },
+]);
+
+/**
  * 按四个维度评定结局。priority 数字越小越优先命中（先判特殊局面，再判一般局面）。
  * 一个都不匹配时返回"一寸一寸"，因为那是最普通、也最常见的结果。
+ * 若 metrics.flags 命中 endingFlagNotes，则返回一个浅拷贝，把对应短句拼进 epilogue
+ * （原结局定义保持冻结不动；title/key/body 均不变，存档序列化安全）。
  */
 export function EvaluateEnding(metrics) {
   const source = metrics && typeof metrics === "object" ? metrics : {};
   const ordered = Object.values(endingDefinitions).slice().sort((a, b) => a.priority - b.priority);
+  let picked = endingDefinitions.QuietBuilding;
   for (const ending of ordered) {
-    if (MatchesEndingCondition(ending.condition, source)) return ending;
+    if (MatchesEndingCondition(ending.condition, source)) {
+      picked = ending;
+      break;
+    }
   }
-  return endingDefinitions.QuietBuilding;
+  const flags = Array.isArray(source.flags) ? source.flags : [];
+  if (!flags.length) return picked;
+  const notes = [];
+  for (const note of endingFlagNotes) {
+    if (flags.includes(note.flag)) notes.push(note.text);
+    if (notes.length >= 3) break;
+  }
+  if (!notes.length) return picked;
+  return { ...picked, epilogue: [picked.epilogue, ...notes].filter(Boolean).join("") };
 }
 
 /** 时期切换时给 UI 用的一段开场文案（含日期与天气提示）。 */

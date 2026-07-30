@@ -1,11 +1,12 @@
 // 《燎原 · 敌后1937》 —— 部队、根据地区域与能力词条数据模块。
 //
-// 本模块导出四份静态数据与若干纯查询函数：
+// 本模块导出五份静态数据与若干纯查询函数：
 //   1. unitDefinitions      我方 10 种 + 敌方 8 种部队
 //   2. districtDefinitions  根据地区域 12 种（修械所/被服厂/卫生所/夜校/粮站/交通站/兵站/
 //                           地道口/电台室/靶场/农会/民兵训练场）
 //   3. baseTierDefinitions  根据地三级：村 — 区 — 县
 //   4. abilityDefinitions   能力词条的中文名与说明
+//   5. perkDefinitions      特长（授衔）表：我方单位 2/3 级各二选一，表驱动、可跨类型复用
 //
 // 数值口径（与 Script_Combat / Script_Rules 的约定）：
 //   attack / defence  战力点，`ComputeStrength` 的基数，我方普遍低于日军，靠地形与伏击补
@@ -837,4 +838,298 @@ export function GetUnitCombatProfile(unitKey) {
     maxHp: definition.maxHp,
     abilities: definition.abilities,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 5. 特长（授衔）表
+// ---------------------------------------------------------------------------
+//
+// 角色成长第三轮：我方每种部队在 2 级、3 级各有一次「记功授衔」，每档二选一。
+// 表驱动：`perkDefinitions` 是全部特长的平面表（同一特长可跨类型复用），
+// `unitPerkChoices` 把它们按 部队类型 × 档位 组织成选项。
+//
+// effects 是机器可读字段，消费点分布在 Script_Combat 与 Script_Rules：
+//   moveBonus              每回合行动力 +N（Rules：EndTurn 重置 + 授衔当回合即时生效）
+//   guideFactor            向导折扣改写（默认 ×0.7 → 该值；Rules：FindReachableHexes，取最小）
+//   reconRangeBonus        侦察半径 +N（Rules：Recon 行动）
+//   markTurns              标定时效改写（默认 2 回合 → 该值；Rules 写入，取最大）
+//   markedOddsBonus        标定胜率加成改写（默认 +0.05 → 该值；Combat.BuildEngagement 消费，取最大）
+//   attackBonus            攻击战力 ×(1+x)（Combat.ComputeStrength）
+//   defenceBonus           防御战力 ×(1+x)（Combat.ComputeStrength，含反扫荡）
+//   tunnelDefenceBonus     依托地道防御再 ×(1+x)（Combat.ComputeStrength）
+//   nightDamageBonus       夜袭杀伤 ×(1+x)（Combat.BuildEngagement）
+//   ambushOddsBonus        伏击胜率 +x（Combat.BuildEngagement）
+//   captureFactorBonus     战场缴获 ×(1+x)（Combat.BuildEngagement）
+//   lossReduction          交战我方减员 ×(1-x)（Combat.BuildEngagement）
+//   withdrawExposureFactor 打完转移的暴露度增量 ×x（Combat：预览与结算同口径，连乘）
+//   siegeOddsBonus         攻坚胜率 +x（Combat.BuildSiegeModel）
+//   siegeLossReduction     攻坚减员 ×(1-x)（Combat.BuildSiegeModel）
+//   sabotageChanceBonus    破袭成功率 +x（Combat.ResolveSabotage）
+//   sabotageCaptureBonus   破袭起获 ×(1+x)（Combat.ResolveSabotage）
+//   retreatChanceBonus     自身撤退成功率 +x（Combat.ComputeRetreatChance）
+//   screenAidBonus         被其掩护的友军撤退成功率再 +x（Combat.ComputeRetreatChance，取最高）
+//   healAmountBonus        每次救护补充兵员 +N（Combat.TickCombatRecovery）
+//   healMedicineFactor     救护耗药 ×x（Combat.TickCombatRecovery，连乘）
+//   concealmentBonus       隐蔽度 +x（Combat：IsUnitTargetable 掩护值 + 隐蔽恢复概率）
+//
+// 数值克制：单条相当于 5-15% 强度；一个单位终身至多两条（L2、L3 各一），叠不出无敌。
+// 红线不变：特长只属于玩家单位，敌军永远没有 perks 字段，也不读此表。
+
+export const perkDefinitions = Object.freeze({
+  NightTiger: Object.freeze({
+    id: "NightTiger",
+    name: "夜老虎",
+    detail: "惯走夜路，摸哨近战都在行：夜袭杀伤再 +12%。",
+    effects: Object.freeze({ nightDamageBonus: 0.12 }),
+  }),
+  SwiftFeet: Object.freeze({
+    id: "SwiftFeet",
+    name: "飞毛腿",
+    detail: "腿脚出众，一夜走得过别人一天：每回合行动力 +1。",
+    effects: Object.freeze({ moveBonus: 1 }),
+  }),
+  CaptureExpert: Object.freeze({
+    id: "CaptureExpert",
+    name: "缴获能手",
+    detail: "打扫战场手脚麻利、清点入册：战场缴获 ×1.2。",
+    effects: Object.freeze({ captureFactorBonus: 0.2 }),
+  }),
+  HitAndGo: Object.freeze({
+    id: "HitAndGo",
+    name: "打完就走",
+    detail: "撤收利索不恋战：打完转移的暴露度增量再 ×0.75。",
+    effects: Object.freeze({ withdrawExposureFactor: 0.75 }),
+  }),
+  KeenEars: Object.freeze({
+    id: "KeenEars",
+    name: "顺风耳",
+    detail: "赶集听墙根、茶棚记车马：侦察半径 +1。",
+    effects: Object.freeze({ reconRangeBonus: 1 }),
+  }),
+  PathFamiliar: Object.freeze({
+    id: "PathFamiliar",
+    name: "熟路",
+    detail: "哪道梁能翻全在脚底下：向导折扣加深至 ×0.6。",
+    effects: Object.freeze({ guideFactor: 0.6 }),
+  }),
+  MarkMaster: Object.freeze({
+    id: "MarkMaster",
+    name: "标定老手",
+    detail: "哨位换岗记得一笔不差：标定时效 3 回合，胜率加成提至 +0.07。",
+    effects: Object.freeze({ markTurns: 3, markedOddsBonus: 0.07 }),
+  }),
+  GreenVeil: Object.freeze({
+    id: "GreenVeil",
+    name: "隐入青纱",
+    detail: "进了青纱帐便没了人影：隐蔽度 +0.06，重新隐蔽也更快。",
+    effects: Object.freeze({ concealmentBonus: 0.06 }),
+  }),
+  VillageWall: Object.freeze({
+    id: "VillageWall",
+    name: "村自为战",
+    detail: "依托寨墙院落节节抗击：防御战力 +10%。",
+    effects: Object.freeze({ defenceBonus: 0.1 }),
+  }),
+  RunAlarm: Object.freeze({
+    id: "RunAlarm",
+    name: "跑警报",
+    detail: "警报一响进洞上山井然有序：撤退成功率 +0.08。",
+    effects: Object.freeze({ retreatChanceBonus: 0.08 }),
+  }),
+  TunnelNet: Object.freeze({
+    id: "TunnelNet",
+    name: "地道连村",
+    detail: "翻板机关、射孔风眼样样纯熟：依托地道防御再 +12%。",
+    effects: Object.freeze({ tunnelDefenceBonus: 0.12 }),
+  }),
+  AmbushVeteran: Object.freeze({
+    id: "AmbushVeteran",
+    name: "设伏老手",
+    detail: "口袋扎得住、火候等得起：伏击胜率 +0.05。",
+    effects: Object.freeze({ ambushOddsBonus: 0.05 }),
+  }),
+  BayonetBold: Object.freeze({
+    id: "BayonetBold",
+    name: "白刃敢拼",
+    detail: "近战肉搏敢于放对：攻击战力 +8%。",
+    effects: Object.freeze({ attackBonus: 0.08 }),
+  }),
+  OldBackbone: Object.freeze({
+    id: "OldBackbone",
+    name: "老骨干带队",
+    detail: "班排骨干经验老到、收拢得住人：交战我方减员 ×0.9。",
+    effects: Object.freeze({ lossReduction: 0.1 }),
+  }),
+  SapperApproach: Object.freeze({
+    id: "SapperApproach",
+    name: "土工近迫",
+    detail: "壕沟掘到墙根再动手：攻坚减员 ×0.88。",
+    effects: Object.freeze({ siegeLossReduction: 0.12 }),
+  }),
+  SiegeHammer: Object.freeze({
+    id: "SiegeHammer",
+    name: "攻坚锤子",
+    detail: "装药、支点、突破口一次到位：攻坚胜率 +0.06。",
+    effects: Object.freeze({ siegeOddsBonus: 0.06 }),
+  }),
+  DemoCalc: Object.freeze({
+    id: "DemoCalc",
+    name: "药量算得准",
+    detail: "装多少药、埋多深心里有数：破袭成功率 +0.08。",
+    effects: Object.freeze({ sabotageChanceBonus: 0.08 }),
+  }),
+  RailNemesis: Object.freeze({
+    id: "RailNemesis",
+    name: "铁轨克星",
+    detail: "道钉鱼尾板起得干净、器材搬得走：破袭起获 ×1.25。",
+    effects: Object.freeze({ sabotageCaptureBonus: 0.25 }),
+  }),
+  FieldDressing: Object.freeze({
+    id: "FieldDressing",
+    name: "止血得法",
+    detail: "包扎固定手法过硬：每次救护多补充 2 名兵员。",
+    effects: Object.freeze({ healAmountBonus: 2 }),
+  }),
+  ScreenAid: Object.freeze({
+    id: "ScreenAid",
+    name: "接应得力",
+    detail: "占路口、设收容组样样在行：被其掩护的友军撤退成功率再 +0.06。",
+    effects: Object.freeze({ screenAidBonus: 0.06 }),
+  }),
+  MedicineSaver: Object.freeze({
+    id: "MedicineSaver",
+    name: "省药有方",
+    detail: "土法代用药材、纱布蒸煮复用：救护耗药减半。",
+    effects: Object.freeze({ healMedicineFactor: 0.5 }),
+  }),
+});
+
+/** 各类型的授衔选项：档位（2/3 级）→ 二选一的特长 id。共 10 类型 × 4 = 40 条。 */
+export const unitPerkChoices = Object.freeze({
+  GuerrillaSquad: Object.freeze({
+    2: Object.freeze(["NightTiger", "SwiftFeet"]),
+    3: Object.freeze(["CaptureExpert", "HitAndGo"]),
+  }),
+  MilitiaSelfDefence: Object.freeze({
+    2: Object.freeze(["VillageWall", "RunAlarm"]),
+    3: Object.freeze(["TunnelNet", "GreenVeil"]),
+  }),
+  Scout: Object.freeze({
+    2: Object.freeze(["KeenEars", "PathFamiliar"]),
+    3: Object.freeze(["MarkMaster", "GreenVeil"]),
+  }),
+  DistrictSquad: Object.freeze({
+    2: Object.freeze(["NightTiger", "SwiftFeet"]),
+    3: Object.freeze(["AmbushVeteran", "CaptureExpert"]),
+  }),
+  CountyCompany: Object.freeze({
+    2: Object.freeze(["BayonetBold", "HitAndGo"]),
+    3: Object.freeze(["CaptureExpert", "OldBackbone"]),
+  }),
+  MainForceCompany: Object.freeze({
+    2: Object.freeze(["SapperApproach", "BayonetBold"]),
+    3: Object.freeze(["SiegeHammer", "OldBackbone"]),
+  }),
+  DemolitionTeam: Object.freeze({
+    2: Object.freeze(["DemoCalc", "SapperApproach"]),
+    3: Object.freeze(["RailNemesis", "SiegeHammer"]),
+  }),
+  StretcherMedicTeam: Object.freeze({
+    2: Object.freeze(["FieldDressing", "ScreenAid"]),
+    3: Object.freeze(["MedicineSaver", "SwiftFeet"]),
+  }),
+  CavalryCourier: Object.freeze({
+    2: Object.freeze(["KeenEars", "ScreenAid"]),
+    3: Object.freeze(["MarkMaster", "SwiftFeet"]),
+  }),
+  ArmedWorkTeam: Object.freeze({
+    2: Object.freeze(["NightTiger", "GreenVeil"]),
+    3: Object.freeze(["AmbushVeteran", "HitAndGo"]),
+  }),
+});
+
+/** 授衔档位（升到该级触发一次二选一）。 */
+export const perkTierLevels = Object.freeze([2, 3]);
+
+export function GetPerkDefinition(perkId) {
+  return perkDefinitions[perkId] ?? null;
+}
+
+/** 某类型某档位的两条候选特长（完整定义数组；查不到返回空数组）。 */
+export function GetPerkChoices(unitType, tier) {
+  const ids = unitPerkChoices[unitType]?.[tier] ?? [];
+  return ids.map((id) => perkDefinitions[id]).filter(Boolean);
+}
+
+/**
+ * 该单位当前应挂起的授衔档位：按 2 → 3 的顺序找出「已达级、该档未选过」的最低档。
+ * 没有待选（类型无表 / 级别不够 / 各档都已选）返回 0。
+ * 纯函数：敌方类型不在 unitPerkChoices 表内，恒返回 0。
+ */
+export function GetPendingPerkTier(unitType, level, perkIds) {
+  const table = unitPerkChoices[unitType];
+  if (!table) return 0;
+  const owned = Array.isArray(perkIds) ? perkIds : [];
+  for (const tier of perkTierLevels) {
+    const ids = table[tier];
+    if (!ids || !ids.length) continue;
+    if ((Number(level) || 0) < tier) continue;
+    if (!ids.some((id) => owned.includes(id))) return tier;
+  }
+  return 0;
+}
+
+/** 特长效果聚合的零值基线（字段语义见本节头注）。 */
+export function EmptyPerkEffects() {
+  return {
+    moveBonus: 0,
+    guideFactor: 0, // 0 = 不改写默认向导折扣
+    reconRangeBonus: 0,
+    markTurns: 0, // 0 = 沿用默认 2 回合
+    markedOddsBonus: 0, // 0 = 沿用默认 +0.05
+    attackBonus: 0,
+    defenceBonus: 0,
+    tunnelDefenceBonus: 0,
+    nightDamageBonus: 0,
+    ambushOddsBonus: 0,
+    captureFactorBonus: 0,
+    lossReduction: 0,
+    withdrawExposureFactor: 1, // 连乘
+    siegeOddsBonus: 0,
+    siegeLossReduction: 0,
+    sabotageChanceBonus: 0,
+    sabotageCaptureBonus: 0,
+    retreatChanceBonus: 0,
+    screenAidBonus: 0,
+    healAmountBonus: 0,
+    healMedicineFactor: 1, // 连乘
+    concealmentBonus: 0,
+  };
+}
+
+/**
+ * 聚合一组特长 id 的机器可读效果。合并规则按字段语义分三类：
+ * 连乘（withdrawExposureFactor / healMedicineFactor）、
+ * 取更优（guideFactor 取最小、markTurns / markedOddsBonus 取最大）、
+ * 其余相加。一个单位至多两条特长，规则务求简单可预期。
+ */
+export function SumPerkEffects(perkIds) {
+  const totals = EmptyPerkEffects();
+  for (const perkId of perkIds ?? []) {
+    const effects = perkDefinitions[perkId]?.effects;
+    if (!effects) continue;
+    for (const [key, raw] of Object.entries(effects)) {
+      const value = Number(raw) || 0;
+      if (key === "withdrawExposureFactor" || key === "healMedicineFactor") {
+        totals[key] *= value;
+      } else if (key === "guideFactor") {
+        totals[key] = totals[key] > 0 ? Math.min(totals[key], value) : value;
+      } else if (key === "markTurns" || key === "markedOddsBonus") {
+        totals[key] = Math.max(totals[key], value);
+      } else if (key in totals) {
+        totals[key] += value;
+      }
+    }
+  }
+  return totals;
 }

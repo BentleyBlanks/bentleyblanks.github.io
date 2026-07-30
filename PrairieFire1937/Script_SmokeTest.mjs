@@ -1382,6 +1382,35 @@ Test("侦察标定：视野≥3 才标定，攻击预览吃到加成，两回合
   if (later) assert.equal(later.markedUntil, undefined, "标定两回合后未清除");
 });
 
+Test("授衔闭环：升级挂待选、二选一落袋、重复选被拒、飞毛腿立即生效", () => {
+  const initial = Rules.CreateInitialState({ seed: 1937, difficulty: "Normal" });
+  let state = Rules.CloneState(initial);
+  const squad = state.units.find((u) => u.type === "GuerrillaSquad");
+  squad.xp = 98;
+  const acts = Rules.ListContextActions(state, squad.id, squad.key);
+  const recon = acts.find((a) => a.kind === "Recon" && a.enabled !== false);
+  assert.ok(recon, "游击小组无侦察动作可用");
+  state = Rules.PerformAction(state, recon).nextState;
+  const leveled = Rules.GetUnit(state, squad.id);
+  assert.equal(leveled.level, 2, "98+2 经验未升到 2 级");
+  assert.equal(leveled.pendingPerk, 2, "升级未挂 pendingPerk");
+
+  const choices = Rules.ListPerkChoices(state, squad.id);
+  assert.equal(choices.length, 2, `授衔候选应为 2 条，实际 ${choices.length}`);
+  const swift = choices.find((c) => c.id === "SwiftFeet") ?? choices[0];
+  const movesBefore = leveled.moves;
+  const chosen = Rules.ChoosePerk(state, squad.id, swift.id);
+  assert.notEqual(chosen, state, "合法授衔不应原样返回");
+  const after = Rules.GetUnit(chosen, squad.id);
+  assert.ok((after.perks ?? []).includes(swift.id), "特长未落袋");
+  assert.equal(after.pendingPerk, undefined, "授衔后 pendingPerk 未清");
+  if (swift.id === "SwiftFeet") {
+    assert.equal(after.moves, movesBefore + 1, "飞毛腿未当回合生效");
+  }
+  const again = Rules.ChoosePerk(chosen, squad.id, (choices.find((c) => c.id !== swift.id) ?? swift).id);
+  assert.equal(again, chosen, "同档重复授衔应被拒绝（原样返回）");
+});
+
 // ---------------------------------------------------------------------------
 console.log(`\n${"─".repeat(56)}`);
 const passed = results.filter((item) => item.passed).length;
