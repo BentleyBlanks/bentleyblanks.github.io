@@ -49,7 +49,8 @@
   规划侦察须揭示两条候选走廊的逐格土层，保证已选走廊上的连续开挖真实可用。
 - **敌军意图**（`EnemyIntentIds`，明牌可预读）：Patrol / Investigate / Attack / PrepareSeal→ResolveSeal
   封堵出口 / PrepareSmoke→ResolveSmoke 灌烟 / Search / Stalled。**两段式意图（Prepare→Resolve）是
-  玩家的反制窗口**，不得改成一回合完成。
+  玩家的反制窗口**，不得改成一回合完成。工兵在多个已确认洞口间先比较未过期公开证据强度、
+  再比较距离；假迹必须遵守认领归属且只消费一次调查行动，不得借“已确认洞口”重复生效。
 - **胜利**：3 批共 8 人全部 Safe，且 `tunnelsDug ≥ 1`、`planningReconCompleted`、`sweepActive`、`turn ≥ 6`
   ——即**不许抢在扫荡到来前跑光**，必须在压力下完成转移。
 - **失败**：`peopleSafety ≤ 45`（转移秩序崩溃）或存活骨干 < 2。

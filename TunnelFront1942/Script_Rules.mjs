@@ -1787,16 +1787,22 @@ export function UpdateEnemyBeliefs(memory, observations, turn) {
   return nextMemory;
 }
 
+function CanEnemyClaimEvidence(state, evidence, enemy) {
+  if (evidence.kind !== "Decoy") {
+    return true;
+  }
+  if (state.usedDecoyIds.includes(evidence.evidenceId)) {
+    return false;
+  }
+  return !Object.hasOwn(evidence, "claimedEnemyId")
+    || evidence.claimedEnemyId === enemy.enemyId;
+}
+
 function ChooseEvidenceTarget(state, enemy, claimedEvidenceIds = new Set()) {
   const activeEvidence = CollectEnemyObservations(state)
     .filter((entry) => entry.kind !== "KnownEntrance")
     .filter((entry) => !claimedEvidenceIds.has(entry.evidenceId))
-    .filter((entry) => entry.kind !== "Decoy" || !state.usedDecoyIds.includes(entry.evidenceId))
-    .filter((entry) => (
-      entry.kind !== "Decoy"
-      || !Object.hasOwn(entry, "claimedEnemyId")
-      || entry.claimedEnemyId === enemy.enemyId
-    ))
+    .filter((entry) => CanEnemyClaimEvidence(state, entry, enemy))
     .filter((entry) => (
       enemy.role !== "Patrol"
       || [
@@ -1856,20 +1862,39 @@ function StepTowardRange(startKey, targetKey, state, occupiedKeys, distance = 1)
   return currentKey;
 }
 
-function FindNearestConfirmedEntrance(state, enemy) {
+function FindConfirmedEntrancePriority(state, enemy, claimedEvidenceIds = new Set()) {
+  const priorityEvidenceByTile = new Map();
+  const eligibleEvidence = state.evidence
+    .filter((evidence) => evidence.kind !== "KnownEntrance")
+    .filter((evidence) => evidence.expiresTurn >= state.turn)
+    .filter((evidence) => !claimedEvidenceIds.has(evidence.evidenceId))
+    .filter((evidence) => CanEnemyClaimEvidence(state, evidence, enemy))
+    .sort((first, second) => (
+      Number(second.strength ?? 0) - Number(first.strength ?? 0)
+      || Number(first.kind === "Decoy") - Number(second.kind === "Decoy")
+      || Number(second.createdTurn ?? 0) - Number(first.createdTurn ?? 0)
+      || first.evidenceId.localeCompare(second.evidenceId)
+    ));
+  for (const evidence of eligibleEvidence) {
+    if (!priorityEvidenceByTile.has(evidence.tileKey)) {
+      priorityEvidenceByTile.set(evidence.tileKey, evidence);
+    }
+  }
   return state.enemyMemory.confirmedEntrances
     .filter((tileKey) => state.tiles[tileKey]?.hasEntrance)
     .filter((tileKey) => (
       state.tiles[tileKey].kind !== "emergencyExit"
-      || state.evidence.some((entry) => (
-        entry.tileKey === tileKey
-        && entry.kind !== "KnownEntrance"
-        && entry.expiresTurn >= state.turn
-      ))
+      || priorityEvidenceByTile.has(tileKey)
     ))
+    .map((tileKey) => ({
+      tileKey,
+      evidence: priorityEvidenceByTile.get(tileKey) ?? null,
+    }))
     .sort((first, second) => (
-      HexDistance(enemy.tileKey, first) - HexDistance(enemy.tileKey, second)
-      || first.localeCompare(second)
+      Number(second.evidence?.strength ?? 0) - Number(first.evidence?.strength ?? 0)
+      || HexDistance(enemy.tileKey, first.tileKey)
+        - HexDistance(enemy.tileKey, second.tileKey)
+      || first.tileKey.localeCompare(second.tileKey)
     ))[0] ?? null;
 }
 
@@ -1964,7 +1989,37 @@ export function PlanEnemyTurn(state) {
       };
       continue;
     }
-    const confirmedTarget = FindNearestConfirmedEntrance(state, enemy);
+    const confirmedPriority = FindConfirmedEntrancePriority(
+      state,
+      enemy,
+      claimedEvidenceIds,
+    );
+    const confirmedTarget = confirmedPriority?.tileKey ?? null;
+    const confirmedEvidence = confirmedPriority?.evidence ?? null;
+    if (
+      enemy.role === "Sapper"
+      && confirmedTarget
+      && confirmedEvidence?.kind === "Decoy"
+    ) {
+      claimedEvidenceIds.add(confirmedEvidence.evidenceId);
+      enemy.intent = {
+        intentId: EnemyIntentIds.INVESTIGATE,
+        label: `调查${state.tiles[confirmedTarget].name}的假迹`,
+        targetKey: enemy.tileKey === confirmedTarget
+          ? confirmedTarget
+          : StepTowardRange(
+            enemy.tileKey,
+            confirmedTarget,
+            state,
+            occupiedKeys,
+            state.sweepActive ? (enemy.sweepMove ?? 1) : 1,
+          ),
+        evidenceTarget: confirmedTarget,
+        evidenceId: confirmedEvidence.evidenceId,
+        evidenceKind: confirmedEvidence.kind,
+      };
+      continue;
+    }
     if (
       enemy.role === "Sapper"
       && confirmedTarget

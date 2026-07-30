@@ -395,16 +395,16 @@ function RunSouthContactsSecondBot(seed = 19420501) {
   state = End(state);
 
   state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "0,5");
-  state = Apply(state, "Guerrilla", ActionIds.EXIT_TUNNEL);
+  if (!state.tunnels["0,5"].trap) {
+    state = Apply(state, "Militia", ActionIds.TRAP);
+  }
   state = End(state);
 
   const northPatrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
   const blockingKey = northPatrol.intent?.targetKey ?? null;
   assert.ok(blockingKey);
-  assert.equal(GetMoveTargets(state, "Guerrilla").includes(blockingKey), true);
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, blockingKey);
+  assert.equal(GetMoveTargets(state, "Scout").includes(blockingKey), true);
+  state = Apply(state, "Scout", ActionIds.MOVE, blockingKey);
   state = End(state);
   while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
     state = End(state);
@@ -1429,6 +1429,134 @@ Test("enemy planning does not peek at a hidden sealed tunnel node", () => {
   );
 });
 
+Test("sapper follows stronger live exit evidence over a nearby weaker trace", () => {
+  function PlanWithExitEvidence(expiresTurn) {
+    const state = CreateInitialState();
+    state.turn = 8;
+    state.sweepActive = true;
+    state.evidence = [
+      {
+        evidenceId: "ActiveOriginTracks",
+        kind: "FreshTracks",
+        tileKey: "6,2",
+        strength: 0.45,
+        createdTurn: 8,
+        expiresTurn: 11,
+        source: "旧院脚印",
+      },
+      {
+        evidenceId: "ActiveExitGunfire",
+        kind: "Gunfire",
+        tileKey: "0,5",
+        strength: 1,
+        createdTurn: 8,
+        expiresTurn,
+        source: "洞口伏击",
+      },
+    ];
+    state.enemyMemory.confirmedEntrances = ["6,2", "0,5"];
+    state.enemyMemory.knownEntranceStates = {
+      "6,2": { sealed: false },
+      "0,5": { sealed: false },
+    };
+    state.units.forEach((unit) => {
+      unit.layer = LayerIds.TUNNEL;
+    });
+    state.enemies.forEach((enemy) => {
+      enemy.health = enemy.enemyId === "Sapper" ? enemy.maxHealth : 0;
+    });
+    const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
+    sapper.inactiveUntilTurn = 0;
+    sapper.stunnedUntilTurn = 0;
+    sapper.tileKey = "6,2";
+    PlanEnemyTurn(state);
+    return sapper.intent;
+  }
+
+  const active = PlanWithExitEvidence(11);
+  assert.equal(active.intentId, EnemyIntentIds.INVESTIGATE);
+  assert.equal(active.evidenceTarget, "0,5");
+  assert.equal(active.evidenceKind, "ConfirmedEntrance");
+  assert.notEqual(active.targetKey, "6,2");
+
+  const expired = PlanWithExitEvidence(7);
+  assert.equal(expired.intentId, EnemyIntentIds.PREPARE_SEAL);
+  assert.equal(expired.targetKey, "6,2");
+});
+
+Test("confirmed-entrance priority respects decoy ownership and one-use consumption", () => {
+  function PlanWithDecoy({ claimedEnemyId, consumed = false }) {
+    const state = CreateInitialState();
+    state.turn = 8;
+    state.sweepActive = true;
+    state.evidence = [
+      {
+        evidenceId: "ActiveOriginTracks",
+        kind: "FreshTracks",
+        tileKey: "6,2",
+        strength: 0.45,
+        createdTurn: 8,
+        expiresTurn: 11,
+        source: "旧院脚印",
+      },
+      {
+        evidenceId: "ActiveExitDecoy",
+        kind: "Decoy",
+        tileKey: "0,5",
+        strength: 0.95,
+        createdTurn: 8,
+        expiresTurn: 12,
+        source: "民兵组",
+        claimedEnemyId,
+      },
+    ];
+    state.usedDecoyIds = consumed ? ["ActiveExitDecoy"] : [];
+    state.enemyMemory.confirmedEntrances = ["6,2", "0,5"];
+    state.enemyMemory.knownEntranceStates = {
+      "6,2": { sealed: false },
+      "0,5": { sealed: false },
+    };
+    state.units.forEach((unit) => {
+      unit.layer = LayerIds.TUNNEL;
+    });
+    state.enemies.forEach((enemy) => {
+      enemy.health = enemy.enemyId === "Sapper" ? enemy.maxHealth : 0;
+    });
+    const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
+    sapper.inactiveUntilTurn = 0;
+    sapper.stunnedUntilTurn = 0;
+    sapper.tileKey = "6,2";
+    PlanEnemyTurn(state);
+    return state;
+  }
+
+  const sapperClaim = PlanWithDecoy({ claimedEnemyId: "Sapper" });
+  const sapperClaimIntent = sapperClaim.enemies.find((enemy) => (
+    enemy.enemyId === "Sapper"
+  )).intent;
+  assert.equal(sapperClaimIntent.intentId, EnemyIntentIds.INVESTIGATE);
+  assert.equal(sapperClaimIntent.evidenceTarget, "0,5");
+  assert.equal(sapperClaimIntent.evidenceId, "ActiveExitDecoy");
+  assert.equal(sapperClaimIntent.evidenceKind, "Decoy");
+
+  const diverted = RunEnemyPhase(sapperClaim);
+  assert.equal(diverted.usedDecoyIds.includes("ActiveExitDecoy"), true);
+  const nextSapperIntent = diverted.enemies.find((enemy) => (
+    enemy.enemyId === "Sapper"
+  )).intent;
+  assert.notEqual(nextSapperIntent.evidenceId, "ActiveExitDecoy");
+  assert.notEqual(nextSapperIntent.evidenceTarget, "0,5");
+
+  for (const ignoredState of [
+    PlanWithDecoy({ claimedEnemyId: "BridgePatrol" }),
+    PlanWithDecoy({ claimedEnemyId: "Sapper", consumed: true }),
+  ]) {
+    const ignored = ignoredState.enemies.find((enemy) => enemy.enemyId === "Sapper").intent;
+    assert.equal(ignored.intentId, EnemyIntentIds.PREPARE_SEAL);
+    assert.equal(ignored.targetKey, "6,2");
+  }
+});
+
 Test("sapper moves two hexes only during the active sweep and still follows public evidence", () => {
   function PlannedDistance(sweepActive) {
     const state = CreateInitialState();
@@ -2405,18 +2533,25 @@ Test("different launch orders survive full enemy pressure across mission seeds",
     && state.civiliansSafe === MissionConfig.totalEvacuees
     && state.exitSignalsIssued === 2
     && state.decoyDiversions === 1
-    && state.trapsTriggered === 2
+    && state.trapsTriggered === 3
     && state.enemiesDefeated === 1
     && state.peopleSafety >= 95
-    && JSON.stringify(SignalTurns(state)) === JSON.stringify([8, 10])
+    && JSON.stringify(SignalTurns(state)) === JSON.stringify([8])
     && state.civilians.find((group) => group.groupId === "Wounded").launchTurn === 4
     && state.civilians.find((group) => group.groupId === "Wounded").launchOrder === 1
     && state.civilians.find((group) => group.groupId === "Contacts").launchTurn === 5
     && state.civilians.find((group) => group.groupId === "Contacts").launchOrder === 2
     && state.civilians.find((group) => group.groupId === "Families").launchTurn === 6
     && state.civilians.find((group) => group.groupId === "Families").launchOrder === 3
-    && state.units.find((unit) => unit.unitId === "Guerrilla").tileKey === blockingKey
-  )), true);
+    && state.units.find((unit) => unit.unitId === "Scout").tileKey === blockingKey
+  )), true, JSON.stringify({
+    outcome: southResults[0].state.outcome,
+    trapsTriggered: southResults[0].state.trapsTriggered,
+    enemiesDefeated: southResults[0].state.enemiesDefeated,
+    peopleSafety: southResults[0].state.peopleSafety,
+    blockingKey: southResults[0].blockingKey,
+    signalTurns: SignalTurns(southResults[0].state),
+  }));
 });
 
 Test("public south-side digging noise breaks the fixed undefended eight-person script", () => {
