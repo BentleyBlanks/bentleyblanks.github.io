@@ -1,15 +1,34 @@
 import { characterDefinitions, GetCharacterDefinition, GetEnemyRoleDefinition } from "./Data_Characters.mjs";
 import {
-  campaignOperationDefinitions,
-  GetInteractable as GetInteractableDefinition,
-  missionDefinition,
-} from "./Data_Mission.mjs";
+  GetOperationLayout,
+  GetOperationLayoutByCampaignIndex,
+  operationLayoutDefinitions,
+} from "./Data_Operations.mjs";
+import {
+  GetAtmospherePalette,
+  GetOperationStorylet,
+  GetStoryCharacter,
+} from "./Data_HistoricalAtmosphere.mjs";
+import {
+  AdvanceOperationClock,
+  CompleteCivilianRoute,
+  DropOperationCarrierItems,
+  ExtractOperationCarrier,
+  GetAvailableInteractionForInteractable,
+  GetOperationIntegrationSnapshot,
+  PickUpDroppedOperationItem,
+  ResolveOperationInteraction,
+} from "./Script_OperationFlow.mjs";
 import { CreateAudioSystem } from "./Script_Audio.mjs";
+import { GetTacticalReadout, NormalizeVisualSettings } from "./Data_Ui.mjs";
 import { UpdateEnemySquad } from "./Script_Ai.mjs";
 import {
+  ApplyBuddyRescue,
   ApplyCampAction,
   ApplyAbilityCommand,
   ApplyMissionToCamp,
+  CanBuddyRescue,
+  CanSee,
   Clamp,
   CreateInitialCampState,
   CreateInitialMissionState,
@@ -19,6 +38,8 @@ import {
   GetBallisticImpact,
   GetCoverAt,
   GetCoverDamageMultiplier,
+  GetCampDecisionOptions,
+  GetMissionDefinitionForState,
   GetMissionEvaluation,
   GetSoundRadius,
   GetZoneAt,
@@ -29,6 +50,7 @@ import {
   PointInsideBox,
   PrepareMissionFromCamp,
   QueueCommand,
+  ResolveDeterministicShot,
   simulationConfig,
   UpdateEnemyIntel,
 } from "./Script_Rules.mjs";
@@ -42,9 +64,15 @@ function GetElement(id) {
 }
 
 function GetInteractable(interactableId) {
-  const definition = GetInteractableDefinition(interactableId);
+  const definition = GetActiveMissionDefinition().interactables.find(
+    (candidate) => candidate.id === interactableId,
+  );
   const droppedAt = state?.interactables?.[interactableId]?.droppedAt;
   return definition && droppedAt ? { ...definition, ...droppedAt } : definition;
+}
+
+function GetActiveMissionDefinition() {
+  return GetMissionDefinitionForState(state) ?? GetOperationLayoutByCampaignIndex(campState?.completedMissions ?? 0);
 }
 
 const elements = {
@@ -56,6 +84,9 @@ const elements = {
   startButton: GetElement("startButton"),
   briefingButton: GetElement("briefingButton"),
   briefingModal: GetElement("briefingModal"),
+  briefingTitle: GetElement("briefingTitle"),
+  briefingStory: GetElement("briefingStory"),
+  briefingRouteList: GetElement("briefingRouteList"),
   gameHud: GetElement("gameHud"),
   phaseLabel: GetElement("phaseLabel"),
   operationMeta: GetElement("operationMeta"),
@@ -69,6 +100,22 @@ const elements = {
   helpButton: GetElement("helpButton"),
   helpModal: GetElement("helpModal"),
   soundButton: GetElement("soundButton"),
+  settingsButton: GetElement("settingsButton"),
+  settingsModal: GetElement("settingsModal"),
+  qualitySelect: GetElement("qualitySelect"),
+  uiScaleSelect: GetElement("uiScaleSelect"),
+  screenEffectsToggle: GetElement("screenEffectsToggle"),
+  reducedMotionToggle: GetElement("reducedMotionToggle"),
+  saveSettingsButton: GetElement("saveSettingsButton"),
+  settingsStatus: GetElement("settingsStatus"),
+  tacticalReadout: GetElement("tacticalReadout"),
+  concealmentGlyph: GetElement("concealmentGlyph"),
+  concealmentLabel: GetElement("concealmentLabel"),
+  awarenessFill: GetElement("awarenessFill"),
+  awarenessLabel: GetElement("awarenessLabel"),
+  combatFeedback: GetElement("combatFeedback"),
+  combatCue: GetElement("combatCue"),
+  combatCueLabel: GetElement("combatCueLabel"),
   objectiveList: GetElement("objectiveList"),
   objectiveCounter: GetElement("objectiveCounter"),
   objectivePanel: GetElement("objectivePanel"),
@@ -115,6 +162,7 @@ const elements = {
 };
 
 function DetectQuality() {
+  if (["low", "high", "ultra"].includes(settings.quality)) return settings.quality;
   const isMobile = matchMedia("(max-width: 760px)").matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
   const cores = navigator.hardwareConcurrency || 4;
   const memory = navigator.deviceMemory || 4;
@@ -124,8 +172,9 @@ function DetectQuality() {
 }
 
 function FormatCampaignDate(completedMissions, operation) {
+  if (operation?.date) return operation.date.replace(/年|月/g, ".").replace("日", "");
   const campaignStart = Date.UTC(1941, 9, 12);
-  const operationCycle = Math.floor(completedMissions / campaignOperationDefinitions.length);
+  const operationCycle = Math.floor(completedMissions / operationLayoutDefinitions.length);
   const totalOffsetDays = operationCycle * 16 + (operation.dateOffsetDays ?? 0);
   const missionDate = new Date(campaignStart + totalOffsetDays * 86400000);
   return `${missionDate.getUTCFullYear()}.${String(missionDate.getUTCMonth() + 1).padStart(2, "0")}.${String(
@@ -134,10 +183,11 @@ function FormatCampaignDate(completedMissions, operation) {
 }
 
 function ReadSettings() {
+  const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   try {
-    return { muted: false, tutorialClosed: false, ...JSON.parse(localStorage.getItem(settingKey) || "{}") };
+    return NormalizeVisualSettings(JSON.parse(localStorage.getItem(settingKey) || "{}"), prefersReducedMotion);
   } catch {
-    return { muted: false, tutorialClosed: false };
+    return NormalizeVisualSettings({}, prefersReducedMotion);
   }
 }
 
@@ -159,9 +209,30 @@ function SaveCampState() {
 }
 
 const settings = ReadSettings();
+
+function ApplyVisualSettings() {
+  document.documentElement.dataset.uiScale = settings.uiScale;
+  document.documentElement.dataset.reducedMotion = String(Boolean(settings.reducedMotion));
+  document.documentElement.dataset.screenEffects = String(Boolean(settings.screenEffects));
+}
+
+function GetLocalOperationPreviewIndex() {
+  if (!["127.0.0.1", "localhost"].includes(window.location.hostname)) return null;
+  const value = Number.parseInt(new URLSearchParams(window.location.search).get("operationPreview") ?? "", 10);
+  return Number.isInteger(value) && value >= 0 && value < operationLayoutDefinitions.length ? value : null;
+}
+
+ApplyVisualSettings();
 const audio = CreateAudioSystem();
 audio.SetMuted(settings.muted);
 let campState = LoadCampState();
+const localOperationPreviewIndex = GetLocalOperationPreviewIndex();
+if (localOperationPreviewIndex !== null) {
+  campState = CreateInitialCampState();
+  campState.completedMissions = localOperationPreviewIndex;
+}
+campState.civilianCostLedger ??= { harm: 0, risk: 0, displacement: 0 };
+campState.civilianCostLedger.displacement ??= 0;
 let state = PrepareMissionFromCamp(CreateInitialMissionState(), campState);
 let world = null;
 let screenMode = "loading";
@@ -174,12 +245,19 @@ let renderBurstUntil = 0;
 let renderDirty = true;
 let pointerDown = null;
 let pointerMoved = false;
+let pendingHoverPointer = null;
 const activeTouchPointers = new Map();
 let pinchDistance = null;
 let pinchActive = false;
 let activeAbility = null;
+let activeAbilityAppend = false;
 let routeHintIndex = 0;
 let toastTimeout = null;
+let feedbackTimeout = null;
+let cueTimeout = null;
+let modalReturnFocus = null;
+let lastPresentedAlertLevel = state.alertLevel;
+let rendererQuality = null;
 let campActionUsed = false;
 let frameSamples = [];
 let totalWorkSamples = [];
@@ -244,6 +322,158 @@ function ShowToast(text, alert = false) {
   toastTimeout = setTimeout(() => toast.remove(), 2800);
 }
 
+function GetStorySpeakerName(speakerId) {
+  return (
+    GetCharacterDefinition(speakerId)?.name ??
+    GetStoryCharacter(speakerId)?.displayName ??
+    GetStoryCharacter(speakerId)?.name ??
+    "行动组"
+  );
+}
+
+function StoryConditionMatches(condition = "always") {
+  if (condition === "always") return true;
+  if (condition.startsWith("flag:")) {
+    return Boolean(state.operationRuntime?.flags?.[condition.slice("flag:".length)]);
+  }
+  const ledgerCondition = /^ledger:([A-Za-z]+)(=|>)(\d+)$/.exec(condition);
+  if (!ledgerCondition) return false;
+  const [, field, operator, rawValue] = ledgerCondition;
+  const actualValue = Number(state.operationRuntime?.civilianCostLedger?.[field] ?? state.ledger?.[`civilian${field[0].toUpperCase()}${field.slice(1)}`] ?? 0);
+  const expectedValue = Number(rawValue);
+  return operator === "=" ? actualValue === expectedValue : actualValue > expectedValue;
+}
+
+function ResolveStoryletLines(storyletId) {
+  const storylet = GetOperationStorylet(storyletId);
+  if (!storylet) return [];
+  if (!storylet.variants) return storylet.lines ?? [];
+  return storylet.variants.find((variant) => StoryConditionMatches(variant.when))?.lines ?? [];
+}
+
+function FormatStoryletLine(line) {
+  return `${GetStorySpeakerName(line.speakerId)}：${line.text}`;
+}
+
+function PushStorylet(storyletId) {
+  const storylet = GetOperationStorylet(storyletId);
+  if (!storylet) return false;
+  state.storyletsSeen ??= [];
+  if (storylet.once && state.storyletsSeen.includes(storyletId)) return false;
+  const lines = ResolveStoryletLines(storyletId);
+  if (lines.length === 0) return false;
+  if (storylet.once) state.storyletsSeen.push(storyletId);
+  for (const line of lines) PushMessage("brief", FormatStoryletLine(line));
+  ShowToast(FormatStoryletLine(lines[0]));
+  return true;
+}
+
+function TriggerFieldStorylets(trigger) {
+  const layout = GetOperationLayout(state.operationLayoutId);
+  for (const storyletId of layout?.narrativeRefs?.field ?? []) {
+    const storylet = GetOperationStorylet(storyletId);
+    if (storylet?.trigger === trigger) PushStorylet(storyletId);
+  }
+}
+
+function TriggerRuntimeStorylets(previousRuntime, nextRuntime) {
+  for (const objectiveId of nextRuntime?.completedObjectives ?? []) {
+    if (!previousRuntime?.completedObjectives?.includes(objectiveId)) {
+      TriggerFieldStorylets(`objective:${objectiveId}`);
+    }
+  }
+  for (const [flagId, enabled] of Object.entries(nextRuntime?.flags ?? {})) {
+    if (enabled && !previousRuntime?.flags?.[flagId]) TriggerFieldStorylets(`flag:${flagId}`);
+  }
+}
+
+function PopulateMissionBriefing() {
+  const layout = GetOperationLayout(state.operationLayoutId);
+  if (!layout || !elements.briefingStory || !elements.briefingRouteList) return;
+  elements.briefingTitle.textContent = `${layout.name}：行动前口述`;
+  const briefingLines = ResolveStoryletLines(layout.narrativeRefs?.briefing);
+  elements.briefingStory.replaceChildren(
+    ...briefingLines.map((line) => {
+      const paragraph = document.createElement("p");
+      const speaker = document.createElement("strong");
+      speaker.textContent = `${GetStorySpeakerName(line.speakerId)}：`;
+      paragraph.append(speaker, line.text);
+      return paragraph;
+    }),
+  );
+  const atmosphere = GetAtmospherePalette(layout.id);
+  const routeNotes = layout.tacticalPhases.slice(0, 3).map((phase) => `${phase.label}：${phase.decision}`);
+  if (atmosphere?.nearSounds?.[0]) {
+    routeNotes.push(`现场声景：近处${atmosphere.nearSounds[0]}；远处${atmosphere.farSounds?.[0] ?? "村路声"}`);
+  }
+  elements.briefingRouteList.replaceChildren(
+    ...routeNotes.map((note) => {
+      const item = document.createElement("li");
+      item.textContent = note;
+      return item;
+    }),
+  );
+}
+
+function ShowCombatCue(label, tone = "intel") {
+  if (!elements.combatCue || !label) return;
+  elements.combatCueLabel.textContent = label;
+  elements.combatCue.dataset.tone = tone;
+  elements.combatCue.classList.remove("isHidden", "isLeaving");
+  if (cueTimeout) clearTimeout(cueTimeout);
+  cueTimeout = setTimeout(() => {
+    elements.combatCue.classList.add("isLeaving");
+    cueTimeout = setTimeout(() => elements.combatCue.classList.add("isHidden"), 260);
+  }, 1500);
+}
+
+function TriggerCombatFeedback(kind, intensity = 0.5, label = "") {
+  if (label) ShowCombatCue(label, kind);
+  if (!settings.screenEffects || settings.reducedMotion || !elements.combatFeedback) return;
+  world?.ApplyCameraImpact?.(kind, intensity);
+  const shell = GetElement("gameShell");
+  shell.style.setProperty("--feedbackStrength", String(Clamp(intensity, 0.15, 1)));
+  shell.classList.remove("feedbackShot", "feedbackDamage", "feedbackExplosion", "feedbackAlert", "feedbackObjective");
+  void shell.offsetWidth;
+  const className = {
+    shot: "feedbackShot",
+    damage: "feedbackDamage",
+    explosion: "feedbackExplosion",
+    alert: "feedbackAlert",
+    objective: "feedbackObjective",
+  }[kind];
+  if (className) shell.classList.add(className);
+  if (feedbackTimeout) clearTimeout(feedbackTimeout);
+  feedbackTimeout = setTimeout(
+    () => shell.classList.remove("feedbackShot", "feedbackDamage", "feedbackExplosion", "feedbackAlert", "feedbackObjective"),
+    kind === "explosion" ? 720 : 430,
+  );
+  RequestInteractiveRender(kind === "explosion" ? 0.8 : 0.45);
+}
+
+function PopulateSettingsPanel() {
+  elements.qualitySelect.value = settings.quality;
+  elements.uiScaleSelect.value = settings.uiScale;
+  elements.screenEffectsToggle.checked = settings.screenEffects;
+  elements.reducedMotionToggle.checked = settings.reducedMotion;
+  elements.settingsStatus.textContent = `当前渲染：${rendererQuality ?? DetectQuality()}；设置保存在本机。`;
+}
+
+function SaveVisualSettingsFromPanel() {
+  const previousQuality = settings.quality;
+  settings.quality = elements.qualitySelect.value;
+  settings.uiScale = elements.uiScaleSelect.value;
+  settings.screenEffects = elements.screenEffectsToggle.checked;
+  settings.reducedMotion = elements.reducedMotionToggle.checked;
+  SaveSettings();
+  ApplyVisualSettings();
+  elements.settingsStatus.textContent =
+    previousQuality === settings.quality
+      ? "设置已应用。"
+      : "界面设置已应用；渲染质量会在下次载入战术图时生效。";
+  RequestInteractiveRender();
+}
+
 function GetSelectedUnit() {
   const primaryId = state.selectedUnitIds[0];
   return state.units.find((unit) => unit.id === primaryId) ?? state.units[0];
@@ -276,14 +506,22 @@ function TogglePause(forceValue = null) {
 }
 
 function InMissionBounds(position) {
+  const mission = GetActiveMissionDefinition();
   return {
-    x: Clamp(position.x, missionDefinition.bounds.minimumX, missionDefinition.bounds.maximumX),
-    z: Clamp(position.z, missionDefinition.bounds.minimumZ, missionDefinition.bounds.maximumZ),
+    x: Clamp(position.x, mission.bounds.minimumX, mission.bounds.maximumX),
+    z: Clamp(position.z, mission.bounds.minimumZ, mission.bounds.maximumZ),
   };
 }
 
+function GetNavigationObstacles() {
+  return [
+    ...GetActiveMissionDefinition().obstacles,
+    ...(state.environment.dynamicObstacles ?? []),
+  ];
+}
+
 function PositionBlocked(position, radius = 0.65) {
-  return missionDefinition.obstacles.some((obstacle) => PointInsideBox(position, obstacle, radius));
+  return GetNavigationObstacles().some((obstacle) => PointInsideBox(position, obstacle, radius));
 }
 
 function MoveActor(actor, target, speed, deltaTime) {
@@ -327,6 +565,7 @@ function DownUnit(unit) {
   unit.downedTimer = simulationConfig.downedBleedSeconds;
   unit.stabilized = false;
   state.ledger.woundedOperatives += 1;
+  TriggerCombatFeedback("damage", 1, `${unit.name}倒地`);
   PushMessage("alert", `${unit.name}倒地，${Math.round(unit.downedTimer)} 秒内可以稳定伤势。`);
   ShowToast(`${unit.name}倒地——先压住火力，再派人止血。`, true);
 }
@@ -353,6 +592,13 @@ function DropCarriedItems(unit) {
     if (itemId in state.objectives) state.objectives[itemId] = false;
   }
   state.objectives.ledger = state.units.some((candidate) => candidate.carriedItems?.includes("ledger"));
+  if (state.operationRuntime) {
+    state.operationRuntime = DropOperationCarrierItems(
+      state.operationRuntime,
+      unit.id,
+      { x: unit.x, z: unit.z },
+    );
+  }
   PushMessage("alert", `${unit.name}携带的任务物资遗落在现场，必须重新取回。`);
 }
 
@@ -362,12 +608,63 @@ function FinalizeCarriedItems() {
       .filter((unit) => unit.state !== "dead" && unit.state !== "downed")
       .flatMap((unit) => unit.carriedItems ?? []),
   );
-  state.supplies.medicine = recovered.has("medicines") ? 2 : 0;
+  const layout = GetOperationLayout(state.operationLayoutId);
+  const carryObjectiveIds = [
+    ...(layout?.objectives.mandatory ?? []),
+    ...(layout?.objectives.optional ?? []),
+  ]
+    .filter((objective) => objective.carryToExtract)
+    .map((objective) => objective.id);
+  for (const unit of state.units) {
+    if (state.operationRuntime && unit.state !== "dead" && unit.state !== "downed") {
+      state.operationRuntime = ExtractOperationCarrier(state.operationRuntime, unit.id);
+    }
+  }
+  state.supplies.medicine = recovered.has("medicines") || recovered.has("clinicSatchel") ? 2 : 0;
   state.supplies.radioParts = recovered.has("radioParts") ? 1 : 0;
-  state.supplies.tools = recovered.has("tools") ? 1 : 0;
-  for (const objectiveId of ["ledger", "medicines", "radioParts", "tools"]) {
+  state.supplies.tools = recovered.has("tools") || recovered.has("militaryDetonators") ? 1 : 0;
+  for (const objectiveId of ["ledger", "medicines", "radioParts", "tools", ...carryObjectiveIds]) {
     state.objectives[objectiveId] = recovered.has(objectiveId);
   }
+  for (const objectiveId of state.operationRuntime?.completedObjectives ?? []) {
+    state.objectives[objectiveId] = true;
+  }
+}
+
+function ClaimShotIndex() {
+  const shotIndex = state.shotIndex ?? 0;
+  state.shotIndex = shotIndex + 1;
+  return shotIndex;
+}
+
+function GetMissImpactPoint(shooter, target, resolution, shotIndex) {
+  const deltaX = target.x - shooter.x;
+  const deltaZ = target.z - shooter.z;
+  const distance = Math.max(1, Math.hypot(deltaX, deltaZ));
+  const directionX = deltaX / distance;
+  const directionZ = deltaZ / distance;
+  const perpendicularX = -directionZ;
+  const perpendicularZ = directionX;
+  const spread = 1.2 + (1 - resolution.hitChance) * Math.min(5.4, distance * 0.24);
+  const lateral = (resolution.roll * 2 - 1) * spread;
+  const secondaryRoll = (resolution.roll * 997 + shotIndex * 0.61803398875) % 1;
+  const rangeOffset = (secondaryRoll * 2 - 1) * Math.min(3.2, distance * 0.14);
+  return InMissionBounds({
+    x: target.x + perpendicularX * lateral + directionX * rangeOffset,
+    z: target.z + perpendicularZ * lateral + directionZ * rangeOffset,
+  });
+}
+
+function SpawnMissImpact(shooter, target, resolution, shotIndex, tracerColor, directObstacleImpact = null) {
+  const missPoint = GetMissImpactPoint(shooter, target, resolution, shotIndex);
+  const obstacleImpact = directObstacleImpact ?? GetBallisticImpact(shooter, missPoint);
+  if (obstacleImpact) {
+    world?.SpawnTracer(shooter, obstacleImpact, tracerColor);
+    world?.SpawnImpact?.(obstacleImpact, obstacleImpact.material);
+    return;
+  }
+  world?.SpawnTracer(shooter, missPoint, tracerColor);
+  world?.SpawnImpact?.(missPoint, "earth");
 }
 
 function FireUnitAtEnemy(unit, enemy, suppressOnly = false) {
@@ -377,22 +674,39 @@ function FireUnitAtEnemy(unit, enemy, suppressOnly = false) {
   const obstacleImpact = hasClearShot ? null : GetBallisticImpact(unit, enemy);
   if (!hasClearShot && !obstacleImpact) return false;
   const definition = GetCharacterDefinition(unit.id);
-  const burst = unit.id === "weiShouyi" || suppressOnly ? Math.min(4, unit.ammo) : 1;
+  const tracerColor = definition?.accent ? Number.parseInt(definition.accent.slice(1), 16) : 0xffd17a;
+  const burst = suppressOnly ? Math.min(4, unit.ammo) : 1;
+  const cover = GetCoverAt(enemy, unit);
+  let totalDamage = 0;
+  let totalSuppression = 0;
+  let hitCount = 0;
+  for (let round = 0; round < burst; round += 1) {
+    const shotIndex = ClaimShotIndex();
+    const resolution = ResolveDeterministicShot(unit, enemy, {
+      time: state.time,
+      seed: state.seed,
+      shotIndex,
+      mode: suppressOnly ? "suppress" : "aimed",
+      cover,
+    });
+    const hit = hasClearShot && resolution.hit;
+    totalSuppression += Math.round(resolution.suppression * (hasClearShot ? 1 : 0.35));
+    if (hit) {
+      hitCount += 1;
+      totalDamage += resolution.damage;
+      world?.SpawnTracer(unit, enemy, tracerColor);
+      world?.SpawnImpact?.(enemy, "body");
+    } else {
+      SpawnMissImpact(unit, enemy, resolution, shotIndex, tracerColor, obstacleImpact);
+    }
+  }
   unit.ammo -= burst;
   unit.shotCooldown = unit.id === "weiShouyi" ? 0.9 : 1.25;
   state.ledger.shotsFired += burst;
   state.alertLevel = Math.max(state.alertLevel, 1);
-  if (obstacleImpact) {
-    world?.SpawnTracer(unit, obstacleImpact, definition?.accent ? Number.parseInt(definition.accent.slice(1), 16) : 0xffd17a);
-    world?.SpawnImpact?.(obstacleImpact, obstacleImpact.material);
-    EmitSound(unit, unit.id === "weiShouyi" ? 54 : 46, "gunshot");
-    audio.Play("gunshot");
-    return true;
-  }
-  const damage = suppressOnly ? 5 : unit.id === "weiShouyi" ? 17 : unit.id === "hanShilei" ? 28 : 22;
-  enemy.health = Math.max(0, enemy.health - damage);
-  enemy.suppression = Clamp(enemy.suppression + (suppressOnly ? 42 : 30), 0, 100);
-  enemy.morale = Clamp(enemy.morale - (suppressOnly ? 14 : 20), 0, 100);
+  enemy.health = Math.max(0, enemy.health - totalDamage);
+  enemy.suppression = Clamp(enemy.suppression + totalSuppression, 0, 100);
+  enemy.morale = Clamp(enemy.morale - Math.max(2, Math.round(totalSuppression * (suppressOnly ? 0.36 : 0.48))), 0, 100);
   enemy.lastKnown = { x: unit.x, z: unit.z, time: state.time };
   enemy.state = enemy.health <= 0 ? "disabled" : "combat";
   if (enemy.health <= 0) {
@@ -400,8 +714,7 @@ function FireUnitAtEnemy(unit, enemy, suppressOnly = false) {
     state.ledger.enemiesDisabled += 1;
     PushMessage("combat", `${GetEnemyRoleDefinition(enemy.role).name}失去行动能力。`);
   }
-  world?.SpawnTracer(unit, enemy, definition?.accent ? Number.parseInt(definition.accent.slice(1), 16) : 0xffd17a);
-  world?.SpawnImpact?.(enemy, "body");
+  TriggerCombatFeedback("shot", hitCount > 0 ? (suppressOnly ? 0.22 : 0.34) : 0.14);
   EmitSound(unit, unit.id === "weiShouyi" ? 54 : 46, "gunshot");
   audio.Play("gunshot");
   return true;
@@ -409,14 +722,31 @@ function FireUnitAtEnemy(unit, enemy, suppressOnly = false) {
 
 function OnEnemyShot(enemy, target) {
   if (state.paused || target.state === "downed" || target.state === "evacuated") return;
-  target.suppression = Clamp(target.suppression + 24, 0, 100);
-  const foliage = GetZoneAt(target)?.kind === "foliage";
-  const cover = GetCoverAt(target, enemy);
-  const baseDamage = target.stance === "crouch" || foliage ? 5 : 8;
-  const damage = Math.max(1, Math.round(baseDamage * GetCoverDamageMultiplier(cover)));
-  target.health = Math.max(0, target.health - damage);
-  world?.SpawnTracer(enemy, target, 0xd68b65);
-  world?.SpawnImpact?.(target, "body");
+  const hasClearShot = HasLineOfSight(enemy, target);
+  const obstacleImpact = hasClearShot ? null : GetBallisticImpact(enemy, target);
+  const shotIndex = ClaimShotIndex();
+  const resolution = ResolveDeterministicShot(enemy, target, {
+    time: state.time,
+    seed: state.seed,
+    shotIndex,
+    mode: enemy.fireIntent === "suppress" ? "suppress" : "aimed",
+    cover: GetCoverAt(target, enemy),
+  });
+  const hit = hasClearShot && resolution.hit;
+  target.suppression = Clamp(
+    target.suppression + Math.round(resolution.suppression * (hasClearShot ? 1 : 0.35)),
+    0,
+    100,
+  );
+  if (hit) {
+    target.health = Math.max(0, target.health - resolution.damage);
+    world?.SpawnTracer(enemy, target, 0xd68b65);
+    world?.SpawnImpact?.(target, "body");
+    TriggerCombatFeedback("damage", Clamp(resolution.damage / 12, 0.35, 0.9), `${target.name}受击`);
+  } else {
+    SpawnMissImpact(enemy, target, resolution, shotIndex, 0xd68b65, obstacleImpact);
+    TriggerCombatFeedback("shot", 0.12);
+  }
   EmitSound(enemy, 42, "gunshot");
   audio.Play("enemyShot");
   if (target.health <= 0) DownUnit(target);
@@ -425,16 +755,33 @@ function OnEnemyShot(enemy, target) {
 function OnReinforcement() {
   const existing = state.enemies.filter((enemy) => enemy.id.startsWith("reinforcement")).length;
   if (existing >= 6) return;
+  const layout = GetOperationLayout(state.operationLayoutId);
+  const runtime = state.operationRuntime;
+  const activeReinforcementRoute = layout?.reinforcementRoutes.find(
+    (route) => route.id === state.activeReinforcementRouteId,
+  );
+  const reinforcementRoute = activeReinforcementRoute ?? layout?.reinforcementRoutes.find((route) => {
+    if (runtime?.disabledReinforcements.includes(route.id)) return false;
+    if (route.disabledByFlag && runtime?.flags[route.disabledByFlag]) return false;
+    if (route.enabledByFlag && !runtime?.flags[route.enabledByFlag] && !runtime?.enabledReinforcements.includes(route.id)) return false;
+    return true;
+  });
+  if (layout && !reinforcementRoute) {
+    PushMessage("brief", "敌方增援路线均被阻断，本轮未能进入行动区。 ");
+    return;
+  }
+  const entry = reinforcementRoute?.entry ?? { x: 57, z: -7 };
   const target = state.enemies.find((enemy) => enemy.lastKnown)?.lastKnown ?? { x: 28, z: 4 };
-  for (let index = 0; index < 3; index += 1) {
+  const reinforcementCount = reinforcementRoute?.mode === "foot" || reinforcementRoute?.mode === "messenger" ? 2 : 3;
+  for (let index = 0; index < reinforcementCount; index += 1) {
     const roleId = index === 0 ? "leader" : "patrol";
     const role = GetEnemyRoleDefinition(roleId);
     state.enemies.push({
       id: `reinforcement_${existing + index}`,
       role: roleId,
-      x: 57 - index * 1.4,
-      z: -7 + index * 2,
-      facing: -1.4,
+      x: entry.x - index * 1.4,
+      z: entry.z + index * 1.5,
+      facing: Math.atan2(target.x - entry.x, target.z - entry.z),
       health: role.health,
       maximumHealth: role.health,
       morale: role.morale,
@@ -471,17 +818,21 @@ function GetMovementSpeed(unit) {
   if (carriedItems.includes("ledger")) multiplier *= 0.96;
   if (carriedItems.includes("radioParts")) multiplier *= 0.94;
   if (carriedItems.includes("tools")) multiplier *= 0.92;
+  if (carriedItems.includes("clinicSatchel")) multiplier *= 0.82;
+  if (carriedItems.includes("stationLedger")) multiplier *= 0.96;
+  if (carriedItems.includes("militaryDetonators")) multiplier *= 0.9;
   if (unit.health < unit.maximumHealth * 0.5) multiplier *= 0.82;
   if (unit.state === "wounded") multiplier *= 0.55;
   return definition.speed * multiplier * (unit.speedMultiplier ?? 1);
 }
 
 function ApplyExplosionConsequences(position, radius = 12) {
+  TriggerCombatFeedback("explosion", 1, "爆炸冲击");
   const HasBlastLine = (target) =>
     HasLineOfSight(
       position,
       target,
-      missionDefinition.obstacles.filter(
+      GetActiveMissionDefinition().obstacles.filter(
         (obstacle) => !PointInsideBox(position, obstacle, -0.08) && !PointInsideBox(target, obstacle, -0.08),
       ),
     );
@@ -513,9 +864,20 @@ function ApplyExplosionConsequences(position, radius = 12) {
     unit.suppression = Clamp(unit.suppression + 48 + falloff * 42, 0, 100);
     if (unit.health <= 0) DownUnit(unit);
   }
-  for (const civilianId of ["detainee", "seedGrain"]) {
-    const definition = GetInteractable(civilianId);
-    if (!definition || state.interactables[civilianId]?.completed) continue;
+  for (const civilian of state.civilians ?? []) {
+    if (["evacuated", "harmed"].includes(civilian.state)) continue;
+    const distance = Distance(position, civilian);
+    if (distance <= radius + 3) state.ledger.civilianRisk += Math.max(1, civilian.groupSize ?? 1);
+    if (distance <= radius * 0.45 && HasBlastLine(civilian)) {
+      civilian.state = "harmed";
+      state.ledger.civilianHarm += Math.max(1, civilian.groupSize ?? 1);
+      if (state.civilianRoutes[civilian.routeId]) state.civilianRoutes[civilian.routeId].failed = true;
+    }
+  }
+  for (const definition of GetActiveMissionDefinition().interactables.filter(
+    (candidate) => candidate.kind === "civilian" || candidate.kind === "rescue",
+  )) {
+    if (state.interactables[definition.id]?.completed) continue;
     const distance = Distance(position, definition);
     if (distance <= radius + 3) state.ledger.civilianRisk += 1;
     if (distance <= radius * 0.45 && HasBlastLine(definition)) state.ledger.civilianHarm += 1;
@@ -526,13 +888,547 @@ function IsUnitHidden(unit) {
   return unit.stance === "crouch" && IsConcealmentZone(unit);
 }
 
+function SyncOperationRuntimeToState(nextRuntime = state.operationRuntime) {
+  if (!nextRuntime) return;
+  state.operationRuntime = nextRuntime;
+  const snapshot = GetOperationIntegrationSnapshot(nextRuntime);
+  if (!snapshot) return;
+
+  state.environment.flags = { ...nextRuntime.flags };
+  Object.assign(state.environment, snapshot.environment);
+  state.environment.generatorDisabled =
+    nextRuntime.flags.stationPowerDisabled || nextRuntime.flags.villageLampsDisabled || false;
+  state.environment.alarmBellDisabled =
+    nextRuntime.flags.warningGongDisabled || nextRuntime.flags.alarmBellDisabled || false;
+  state.environment.eastRoadBlocked = Boolean(nextRuntime.flags.mountainRoadBlocked);
+  const dynamicObstacles = [];
+  if (nextRuntime.flags.rockfallTriggeredSafely || nextRuntime.flags.rockfallTriggeredBeforeClear) {
+    dynamicObstacles.push({
+      id: "runtimeRockfallRoadBlock",
+      kind: "wall",
+      impactMaterial: "stone",
+      x: 49,
+      z: -4,
+      width: 18,
+      depth: 8,
+      height: 4,
+      color: 0x766f60,
+    });
+  } else if (nextRuntime.flags.oreCartsReleased) {
+    dynamicObstacles.push({
+      id: "runtimeOreCartRoadBlock",
+      kind: "wagon",
+      impactMaterial: "metal",
+      x: 5,
+      z: -5,
+      width: 15,
+      depth: 6,
+      height: 3,
+      color: 0x4b4840,
+    });
+  }
+  if (nextRuntime.blockedRoutes.includes("openThreshingCrossing")) {
+    dynamicObstacles.push({
+      id: "runtimeThreshingCordon",
+      kind: "wall",
+      impactMaterial: "wood",
+      x: -42,
+      z: -27,
+      width: 14,
+      depth: 5,
+      height: 2,
+      color: 0x514636,
+    });
+  }
+  state.environment.dynamicObstacles = dynamicObstacles;
+  if (
+    !state.environment.dustCloud &&
+    (nextRuntime.flags.rockfallTriggeredSafely || nextRuntime.flags.rockfallTriggeredBeforeClear)
+  ) {
+    const rockfall = GetInteractable("rockfallTimber");
+    if (rockfall) state.environment.dustCloud = { x: rockfall.x, z: rockfall.z, radius: 13, remaining: 14 };
+  }
+
+  state.extractionZones = snapshot.missionDefinition.extractionZones.map((zone) => ({ ...zone }));
+  for (const objectiveId of nextRuntime.completedObjectives) state.objectives[objectiveId] = true;
+
+  const previousCosts = state.operationLedgerApplied ?? { risk: 0, harm: 0, displacement: 0 };
+  const nextCosts = nextRuntime.civilianCostLedger;
+  state.ledger.civilianRisk += Math.max(0, nextCosts.risk - previousCosts.risk);
+  state.ledger.civilianHarm += Math.max(0, nextCosts.harm - previousCosts.harm);
+  state.ledger.civilianDisplacement ??= 0;
+  state.ledger.civilianDisplacement += Math.max(0, nextCosts.displacement - previousCosts.displacement);
+  state.operationLedgerApplied = { ...nextCosts };
+
+  for (const [enemyId, patrolId] of Object.entries(nextRuntime.patrolRouteOverrides)) {
+    const enemy = state.enemies.find((candidate) => candidate.id === enemyId);
+    if (!enemy || enemy.patrol === patrolId) continue;
+    enemy.patrol = patrolId;
+    enemy.patrolIndex = 0;
+    enemy.navigation = null;
+  }
+
+  for (const routeId of nextRuntime.activeCivilianRoutes) {
+    if (state.civilianRoutes[routeId]) state.civilianRoutes[routeId].active = true;
+  }
+  for (const routeId of nextRuntime.completedCivilianRoutes) {
+    if (state.civilianRoutes[routeId]) state.civilianRoutes[routeId].completed = true;
+  }
+  for (const dropped of nextRuntime.droppedItems) {
+    const interactableRuntime = state.interactables[dropped.itemId];
+    if (interactableRuntime) interactableRuntime.droppedAt = { x: dropped.x, z: dropped.z };
+  }
+
+  const eventLabels = {
+    lightsOut: "探照灯熄灭，值勤兵离开原巡线检查发电机。",
+    messengerDispatched: "电话失效，敌方传令兵改走地面路线。",
+    westHouseholdsDepart: "西巷村民开始沿墙分批转移。",
+    eastHouseholdsDepart: "东巷村民借流水声向暗渠移动。",
+    workersLeaveInGroups: "民工按木梆信号分组离开采坑。",
+    blastAreaClear: "最后一组民工已越过危险线，可以控制落石。",
+    controlledRockfall: "定向落石封住盘山路，尘幕正在扩散。",
+    uncontrolledRockfall: "落石提前触发，群众代价已永久记入账本。",
+    oreCartsCrash: "矿车冲入盘山路中段，巡逻被迫上下绕行。",
+    curfewTightens: "夜间封锁收紧，北侧搜索组开始进村。",
+  };
+  const processedEventCount = state.operationEventCount ?? 1;
+  for (const entry of nextRuntime.events.slice(processedEventCount)) {
+    const text = eventLabels[entry.event];
+    if (text) PushMessage(entry.event === "uncontrolledRockfall" ? "alert" : "brief", text);
+  }
+  state.operationEventCount = nextRuntime.events.length;
+}
+
+function GetRouteSample(route, requestedDistance) {
+  const totalDistance = route.points.slice(1).reduce(
+    (total, point, index) => total + Distance(route.points[index], point),
+    0,
+  );
+  const distance = Clamp(requestedDistance, 0, totalDistance);
+  let traversed = 0;
+  for (let index = 0; index < route.points.length - 1; index += 1) {
+    const start = route.points[index];
+    const end = route.points[index + 1];
+    const segmentLength = Distance(start, end);
+    if (distance <= traversed + segmentLength) {
+      const ratio = segmentLength > 0 ? (distance - traversed) / segmentLength : 1;
+      return {
+        position: {
+          x: start.x + (end.x - start.x) * ratio,
+          z: start.z + (end.z - start.z) * ratio,
+        },
+        facing: Math.atan2(end.x - start.x, end.z - start.z),
+        segmentIndex: index,
+        nextWaypointDistance: traversed + segmentLength,
+        totalDistance,
+        finished: distance >= totalDistance - 0.01,
+      };
+    }
+    traversed += segmentLength;
+  }
+  return {
+    position: { ...route.points[route.points.length - 1] },
+    facing: 0,
+    segmentIndex: Math.max(0, route.points.length - 2),
+    nextWaypointDistance: totalDistance,
+    totalDistance,
+    finished: true,
+  };
+}
+
+function GetCivilianEscort(position, radius) {
+  const units = state.units.filter(
+    (unit) =>
+      !["dead", "downed", "evacuated", "unavailable"].includes(unit.state) &&
+      Distance(unit, position) <= radius,
+  );
+  return { units, present: units.length > 0, strength: Math.min(2, units.length) };
+}
+
+function GetCivilianThreat(position) {
+  const obstacles = [
+    ...GetActiveMissionDefinition().obstacles,
+    ...(state.environment.dynamicObstacles ?? []),
+  ];
+  const zone = GetZoneAt(position, GetActiveMissionDefinition());
+  const soundMasked = state.operationRuntime?.soundMasks?.includes(zone?.id);
+  const nearbyRadius = (soundMasked ? 9 : 13) + (state.alertLevel >= 2 ? 4 : 0);
+  const activeEnemies = state.enemies.filter((enemy) => !enemy.disabled && enemy.health > 0);
+  const visibleEnemies = activeEnemies.filter((enemy) => CanSee(enemy, position, obstacles));
+  const nearbyEnemies = activeEnemies.filter(
+    (enemy) =>
+      Distance(enemy, position) <= nearbyRadius &&
+      ["patrol", "return", "suspicious", "investigate", "search", "combat", "report"].includes(enemy.state),
+  );
+  return {
+    visibleCount: visibleEnemies.length,
+    nearbyCount: nearbyEnemies.length,
+    visible: visibleEnemies.length > 0,
+    nearby: nearbyEnemies.length > 0,
+  };
+}
+
+function HasDangerousSoundNear(position) {
+  return state.soundEvents.some(
+    (event) =>
+      ["gunshot", "explosion"].includes(event.kind) &&
+      Distance(event, position) <= Math.max(18, event.radius * 0.55),
+  );
+}
+
+function GetCivilianRouteDecision(route, civilian, routeCivilians) {
+  const sample = GetRouteSample(route, civilian.routeDistance ?? 0);
+  const lookAhead = GetRouteSample(route, (civilian.routeDistance ?? 0) + 6);
+  const escortRadius = route.behavior === "stagedEvacuation" ? 16 : 14;
+  const escort = GetCivilianEscort(sample.position, escortRadius);
+  const currentThreat = GetCivilianThreat(sample.position);
+  const nextThreat = GetCivilianThreat(lookAhead.position);
+  const threat = {
+    visibleCount: Math.max(currentThreat.visibleCount, nextThreat.visibleCount),
+    nearbyCount: Math.max(currentThreat.nearbyCount, nextThreat.nearbyCount),
+    visible: currentThreat.visible || nextThreat.visible,
+    nearby: currentThreat.nearby || nextThreat.nearby,
+  };
+  const combatNoise = HasDangerousSoundNear(sample.position);
+  const safeWindow = !threat.visible && !threat.nearby && !combatNoise;
+  let canMove = true;
+  let reason = "moving";
+  let speed = 1.45;
+
+  if (route.behavior === "pauseAndYield") {
+    const crossingUnit = state.units.some(
+      (unit) => !["dead", "downed", "evacuated"].includes(unit.state) && Distance(unit, sample.position) <= 5.5,
+    );
+    canMove = safeWindow && !crossingUnit;
+    reason = threat.visible ? "enemySight" : threat.nearby ? "patrolNear" : combatNoise ? "combatNoise" : crossingUnit ? "yielding" : "moving";
+    speed = 1.25;
+  } else if (route.behavior === "followSafeWindows") {
+    canMove = escort.present && safeWindow;
+    reason = !escort.present ? "needsEscort" : threat.visible ? "enemySight" : threat.nearby ? "patrolNear" : combatNoise ? "combatNoise" : "moving";
+    speed = 1.2 + escort.strength * 0.16;
+  } else if (route.behavior === "waitAtCover") {
+    canMove = civilian.segmentCommitted || (escort.present && safeWindow);
+    reason = civilian.segmentCommitted ? "reachingCover" : !escort.present ? "needsEscort" : threat.visible ? "enemySight" : threat.nearby ? "patrolNear" : combatNoise ? "combatNoise" : "moving";
+    speed = 1.34 + escort.strength * 0.12;
+  } else if (route.behavior === "stagedEvacuation") {
+    const previousGroup = routeCivilians.find((candidate) => candidate.stageIndex === civilian.stageIndex - 1);
+    const previousGroupClear =
+      !previousGroup ||
+      previousGroup.state === "evacuated" ||
+      (previousGroup.routeDistance ?? 0) >= lookAhead.totalDistance * 0.38;
+    canMove = previousGroupClear && escort.present && safeWindow;
+    reason = !previousGroupClear ? "staging" : !escort.present ? "needsEscort" : threat.visible ? "enemySight" : threat.nearby ? "patrolNear" : combatNoise ? "combatNoise" : "moving";
+    speed = 1.18 + escort.strength * 0.14;
+  } else if (route.behavior === "leaveRoadOnAlarm") {
+    canMove = !threat.visible;
+    reason = threat.visible ? "enemySight" : "moving";
+    speed = state.alertLevel > 0 ? 2.1 : 1.3;
+  }
+
+  return { canMove, reason, speed, sample, escort, threat, combatNoise, safeWindow };
+}
+
+function RecordCivilianExposure(route, routeState, civilian, decision, deltaTime) {
+  const exposed =
+    decision.threat.visible ||
+    decision.combatNoise ||
+    (decision.threat.nearby && (decision.canMove || !decision.escort.present)) ||
+    (civilian.segmentCommitted && !decision.escort.present);
+  if (!exposed) return false;
+  const exposureRate = decision.threat.visible ? 1.5 : decision.combatNoise ? 2 : 1;
+  civilian.exposureSeconds = (civilian.exposureSeconds ?? 0) + deltaTime * exposureRate;
+  routeState.exposureSeconds = (routeState.exposureSeconds ?? 0) + deltaTime;
+  const riskMilestone = Math.min(3, Math.floor(civilian.exposureSeconds / 4));
+  const previousMilestone = civilian.riskMilestone ?? 0;
+  let changed = false;
+  if (riskMilestone > previousMilestone) {
+    const cost = (riskMilestone - previousMilestone) * civilian.groupSize;
+    state.operationRuntime.civilianCostLedger.risk += cost;
+    civilian.riskMilestone = riskMilestone;
+    routeState.riskRecorded = (routeState.riskRecorded ?? 0) + cost;
+    PushMessage("alert", `${route.name}暴露在巡逻视线或交火声场中，群众风险 +${cost}。`);
+    changed = true;
+  }
+  if (civilian.exposureSeconds >= 10 && !civilian.displacementRecorded) {
+    state.operationRuntime.civilianCostLedger.displacement += civilian.groupSize;
+    civilian.displacementRecorded = true;
+    routeState.displacementRecorded = (routeState.displacementRecorded ?? 0) + civilian.groupSize;
+    PushMessage("alert", `${route.name}被迫偏离原定隐蔽路线，流离 ${civilian.groupSize} 已记入代价账本。`);
+    changed = true;
+  }
+  return changed;
+}
+
+function ReportCivilianRouteDecision(route, routeState, decision) {
+  if (routeState.lastDecisionReason === decision.reason) return;
+  if (state.time - (routeState.lastDecisionMessageAt ?? -10) < 4) return;
+  routeState.lastDecisionReason = decision.reason;
+  routeState.lastDecisionMessageAt = state.time;
+  const messages = {
+    moving: `${route.name}获得护送与安全窗口，继续移动。`,
+    needsEscort: `${route.name}停在隐蔽处等待；至少一名队员需要保持在 14 米护送范围内。`,
+    enemySight: `${route.name}前方进入敌军视线，暂缓通过。`,
+    patrolNear: `${route.name}前方巡逻过近，等待巡逻窗口。`,
+    combatNoise: `${route.name}附近出现枪声或爆炸，群众停止移动。`,
+    yielding: `${route.name}正在给行动组让路。`,
+    staging: `${route.name}按组次等待，前一组尚未离开危险段。`,
+    reachingCover: `${route.name}已经离开掩体，正在赶往下一处遮蔽点。`,
+  };
+  if (messages[decision.reason]) PushMessage(decision.reason === "moving" ? "brief" : "alert", messages[decision.reason]);
+}
+
+function SpawnCivilianRouteGroups(route) {
+  const representativeCount = route.behavior === "stagedEvacuation"
+    ? Math.min(3, route.groupSize)
+    : Math.min(4, Math.max(1, Math.ceil(route.groupSize / 3)));
+  const baseGroupSize = Math.floor(route.groupSize / representativeCount);
+  const remainder = route.groupSize % representativeCount;
+  const first = route.points[0];
+  for (let index = 0; index < representativeCount; index += 1) {
+    state.civilians.push({
+      id: `${route.id}_${index}`,
+      routeId: route.id,
+      groupSize: baseGroupSize + (index < remainder ? 1 : 0),
+      stageIndex: index,
+      departureDelay: route.behavior === "stagedEvacuation" ? index * 10 : index * 0.4,
+      routeDistance: 0,
+      formationOffset: (index - (representativeCount - 1) * 0.5) * 0.72,
+      segmentCommitted: false,
+      exposureSeconds: 0,
+      x: first.x - index * 0.72,
+      z: first.z + index * 0.46,
+      facing: 0,
+      stance: "crouch",
+      state: "waiting",
+      suppression: 0,
+      health: 1,
+      maximumHealth: 1,
+    });
+  }
+}
+
+function UpdateCivilianRoutes(deltaTime) {
+  const layout = GetOperationLayout(state.operationLayoutId);
+  if (!layout || !state.operationRuntime) return;
+  let runtimeChanged = false;
+  state.operationClockAccumulator = (state.operationClockAccumulator ?? 0) + deltaTime;
+  if (state.operationClockAccumulator >= 0.1) {
+    state.operationRuntime = AdvanceOperationClock(
+      state.operationRuntime,
+      state.operationClockAccumulator,
+    );
+    state.operationClockAccumulator = 0;
+    runtimeChanged = true;
+  }
+
+  for (const route of layout.civilianRoutes) {
+    const routeState = state.civilianRoutes[route.id];
+    if (!routeState || routeState.completed) continue;
+    const scheduledStart = Number.isFinite(route.scheduleSeconds) && state.time >= route.scheduleSeconds;
+    const flagStart = route.startsByFlag && state.operationRuntime.flags[route.startsByFlag];
+    const alarmStart = route.behavior === "leaveRoadOnAlarm" && state.alertLevel > 0;
+    if ((scheduledStart || flagStart || alarmStart) && !state.operationRuntime.activeCivilianRoutes.includes(route.id)) {
+      state.operationRuntime.activeCivilianRoutes.push(route.id);
+      runtimeChanged = true;
+    }
+    routeState.active = state.operationRuntime.activeCivilianRoutes.includes(route.id);
+    if (!routeState.active) continue;
+    routeState.activeSeconds = (routeState.activeSeconds ?? 0) + deltaTime;
+
+    if (!state.civilians.some((civilian) => civilian.routeId === route.id)) {
+      SpawnCivilianRouteGroups(route);
+    }
+
+    const routeCivilians = state.civilians.filter((civilian) => civilian.routeId === route.id);
+    for (const civilian of routeCivilians) {
+      if (["harmed", "evacuated"].includes(civilian.state)) continue;
+      const decision = GetCivilianRouteDecision(route, civilian, routeCivilians);
+      ReportCivilianRouteDecision(route, routeState, decision);
+      if (RecordCivilianExposure(route, routeState, civilian, decision, deltaTime)) runtimeChanged = true;
+      if ((routeState.activeSeconds ?? 0) < civilian.departureDelay) {
+        civilian.state = "waiting";
+        continue;
+      }
+      if (!decision.canMove) {
+        civilian.state = decision.threat.visible ? "exposed" : "waiting";
+        continue;
+      }
+
+      civilian.state = "moving";
+      if (route.behavior === "waitAtCover" && !civilian.segmentCommitted) civilian.segmentCommitted = true;
+      const maximumDistance = route.behavior === "waitAtCover"
+        ? decision.sample.nextWaypointDistance
+        : decision.sample.totalDistance;
+      civilian.routeDistance = Math.min(
+        maximumDistance,
+        (civilian.routeDistance ?? 0) + decision.speed * deltaTime,
+      );
+      let nextSample = GetRouteSample(route, civilian.routeDistance);
+      if (
+        route.behavior === "waitAtCover" &&
+        civilian.routeDistance >= decision.sample.nextWaypointDistance - 0.01
+      ) {
+        civilian.segmentCommitted = false;
+        civilian.state = "waiting";
+      }
+      civilian.x = nextSample.position.x + Math.cos(nextSample.facing) * civilian.formationOffset;
+      civilian.z = nextSample.position.z - Math.sin(nextSample.facing) * civilian.formationOffset;
+      civilian.facing = nextSample.facing;
+      routeState.progressDistance = Math.max(routeState.progressDistance ?? 0, civilian.routeDistance);
+      routeState.pointIndex = Math.max(routeState.pointIndex ?? 0, nextSample.segmentIndex);
+      if (nextSample.finished) civilian.state = "evacuated";
+    }
+
+    const routeSettled = routeCivilians.every((civilian) => ["harmed", "evacuated"].includes(civilian.state));
+    if (!routeSettled) continue;
+
+    routeState.completed = true;
+    if (!routeState.failed) {
+      const routeResult = CompleteCivilianRoute(state.operationRuntime, route.id);
+      if (routeResult.ok) {
+        state.operationRuntime = routeResult.state;
+        runtimeChanged = true;
+      }
+    }
+  }
+  if (runtimeChanged) SyncOperationRuntimeToState(state.operationRuntime);
+}
+
+function ConsumeEmergencyNoiseEvents(previousRuntime, nextRuntime, position) {
+  const previousCount = previousRuntime?.emergencyNoiseEvents?.length ?? 0;
+  const newNoiseEvents = (nextRuntime?.emergencyNoiseEvents ?? []).slice(previousCount);
+  for (const noiseEvent of newNoiseEvents) {
+    state.soundEvents.push(
+      CreateSoundEvent(
+        position,
+        noiseEvent.radius,
+        noiseEvent.kind,
+        noiseEvent.actorId ?? "emergencyWork",
+        state.time,
+      ),
+    );
+    world?.SpawnRing(position, 0xd79d64, noiseEvent.radius, 0.78);
+    const actor = state.units.find((unit) => unit.id === noiseEvent.actorId);
+    PushMessage(
+      "alert",
+      `${actor?.name ?? "队员"}缺少对应专长，只能临时处置；额外作业声已经传出 ${Math.round(noiseEvent.radius)} 米。`,
+    );
+  }
+  if (state.soundEvents.length > 64) state.soundEvents.splice(0, state.soundEvents.length - 64);
+}
+
+function CompleteAuthoredOperationInteraction(unit, interactable, isExplosive) {
+  if (!state.operationRuntime) return false;
+  const runtime = state.interactables[interactable.id];
+  if (runtime?.droppedAt) {
+    const previousRuntime = state.operationRuntime;
+    const recovered = PickUpDroppedOperationItem(state.operationRuntime, interactable.id, unit.id);
+    if (!recovered.ok) {
+      ShowToast(`${interactable.name}暂时无法重新拾取。`);
+      return true;
+    }
+    state.operationRuntime = recovered.state;
+    runtime.completed = true;
+    runtime.progress = 1;
+    runtime.droppedAt = null;
+    CarryItem(unit, interactable.id);
+    state.objectives[interactable.id] = true;
+    SyncOperationRuntimeToState(state.operationRuntime);
+    TriggerRuntimeStorylets(previousRuntime, state.operationRuntime);
+    PushMessage("objective", `${unit.name}重新取回了${interactable.name}。`);
+    return true;
+  }
+
+  const interaction = GetAvailableInteractionForInteractable(
+    state.operationRuntime,
+    interactable.id,
+    unit.id,
+  );
+  if (!interaction) {
+    const availableForAnotherRole = GetAvailableInteractionForInteractable(
+      state.operationRuntime,
+      interactable.id,
+      null,
+    );
+    ShowToast(
+      availableForAnotherRole?.allowedRoles
+        ? `${interactable.name}需要合适的队员执行，或尚未满足安全条件。`
+        : `${interactable.name}当前没有可执行的行动。`,
+      true,
+    );
+    return true;
+  }
+
+  const previousRuntime = state.operationRuntime;
+  const resolved = ResolveOperationInteraction(
+    state.operationRuntime,
+    interaction.id,
+    unit.id,
+  );
+  if (!resolved.ok) {
+    ShowToast(`${interactable.name}未能完成：${resolved.reason}`);
+    return true;
+  }
+
+  // Interactable storylets describe the choice at the moment it is made. In particular,
+  // the quarry warning must read the pre-effect safety state, before a rockfall writes harm.
+  TriggerFieldStorylets(`interactable:${interactable.id}`);
+  state.operationRuntime = resolved.state;
+  runtime.completed = true;
+  runtime.progress = 1;
+  runtime.droppedAt = null;
+  for (const itemId of interaction.effects.startCarryItems ?? []) {
+    CarryItem(unit, itemId);
+    // This means "secured by a living carrier" for extraction gating. Final settlement only
+    // occurs in ExtractOperationCarrier; dropping or losing the carrier clears it again.
+    state.objectives[itemId] = true;
+    TriggerFieldStorylets(`objective:${itemId}`);
+  }
+  SyncOperationRuntimeToState(state.operationRuntime);
+  ConsumeEmergencyNoiseEvents(previousRuntime, state.operationRuntime, interactable);
+  TriggerRuntimeStorylets(previousRuntime, state.operationRuntime);
+
+  const isRockfall = interaction.id === "triggerSafeRockfall" || interaction.id === "triggerUnsafeRockfall";
+  if (isRockfall) {
+    world?.SpawnExplosion(interactable, true);
+    EmitSound(interactable, 65, "explosion");
+    ApplyExplosionConsequences(interactable, 13);
+    state.alertLevel = Math.max(state.alertLevel, 2);
+  } else if (interaction.id === "releaseOreCarts") {
+    EmitSound(interactable, 48, "metal");
+    state.alertLevel = Math.max(state.alertLevel, 1);
+  } else if (
+    interaction.effects.disableLighting?.length ||
+    interaction.effects.disableReinforcements?.length
+  ) {
+    EmitSound(interactable, 8, "metal");
+  }
+
+  if (isExplosive) {
+    state.alertLevel = 3;
+    state.alarmState = "explosion";
+    state.ledger.alarmsRaised += 1;
+    world?.SpawnExplosion(interactable, true);
+    EmitSound(interactable, 78, "explosion");
+    if (!isRockfall) ApplyExplosionConsequences(interactable, 12);
+  }
+
+  audio.Play(isExplosive || isRockfall ? "explosion" : interactable.kind === "objective" ? "objective" : "interaction");
+  TriggerCombatFeedback("objective", 0.3, `${interactable.name}：完成`);
+  ShowToast(`${interactable.name}：已完成。`);
+  CheckPhase();
+  return true;
+}
+
 function CompleteInteraction(unit, interactable, isExplosive = false) {
   const runtime = state.interactables[interactable.id];
   if (!runtime || runtime.completed) return;
+  if (CompleteAuthoredOperationInteraction(unit, interactable, isExplosive)) return;
   runtime.completed = true;
   runtime.progress = 1;
   runtime.droppedAt = null;
   audio.Play(isExplosive ? "explosion" : interactable.kind === "objective" ? "objective" : "interaction");
+  if (!isExplosive) TriggerCombatFeedback("objective", 0.3, `${interactable.name}：完成`);
 
   if (interactable.id === "relay") {
     state.objectives.relay = true;
@@ -616,7 +1512,11 @@ function ProcessMoveCommand(unit, command, deltaTime) {
   unit.hidden = IsUnitHidden(unit);
   const stalled = (command.stallTime ?? 0) > 0.9;
   if (!command.waypoints || stalled) {
-    command.waypoints = FindPath2D(unit, command, { clearance: 0.68 });
+    command.waypoints = FindPath2D(unit, command, {
+      clearance: 0.68,
+      obstacles: GetNavigationObstacles(),
+      bounds: GetActiveMissionDefinition().bounds,
+    });
     command.waypointIndex = 0;
     command.stallTime = 0;
     command.replanCount = stalled ? (command.replanCount ?? 0) + 1 : 0;
@@ -637,7 +1537,9 @@ function ProcessMoveCommand(unit, command, deltaTime) {
   unit.footstepTimer = (unit.footstepTimer ?? 0) - deltaTime;
   if (!reached && unit.footstepTimer <= 0) {
     unit.footstepTimer = unit.stance === "sprint" ? 0.38 : unit.stance === "crouch" ? 0.88 : 0.62;
-    const radius = GetSoundRadius(unit);
+    const currentZone = GetActiveMissionDefinition().zones.find((zone) => PointInsideBox(unit, zone));
+    const authoredSoundMask = currentZone && state.environment.soundMasks?.includes(currentZone.id) ? 0.55 : 1;
+    const radius = GetSoundRadius(unit) * authoredSoundMask;
     state.soundEvents.push(CreateSoundEvent(unit, radius, "footstep", unit.id, state.time));
     if (state.soundEvents.length > 64) state.soundEvents.shift();
     if (unit.stance === "sprint") world?.SpawnRing(unit, 0xc1b47d, radius, 0.54);
@@ -655,6 +1557,14 @@ function ProcessInteractCommand(unit, command, deltaTime, explosive = false) {
   const definition = GetInteractable(command.targetId);
   const runtime = state.interactables[command.targetId];
   if (!definition || !runtime || runtime.completed) {
+    unit.command = null;
+    return;
+  }
+  const authoredInteraction = state.operationRuntime
+    ? GetAvailableInteractionForInteractable(state.operationRuntime, definition.id, unit.id)
+    : null;
+  if (state.operationRuntime && !runtime.droppedAt && !authoredInteraction) {
+    PushMessage("brief", `${unit.name}当前无法执行${definition.name}，请先满足条件或换合适队员。`);
     unit.command = null;
     return;
   }
@@ -686,13 +1596,35 @@ function ProcessInteractCommand(unit, command, deltaTime, explosive = false) {
       : definition.action === "rescue" && unit.id !== "luLanzhi"
         ? 1.22
         : 1;
-  const duration = explosive ? 3.8 : definition.duration * specialistScale;
+  const duration = explosive ? 3.8 : (authoredInteraction?.duration ?? definition.duration) * specialistScale;
   command.progress = (command.progress ?? 0) + deltaTime;
   runtime.progress = Clamp(command.progress / duration, 0, 1);
   if (command.progress >= duration) {
     CompleteInteraction(unit, definition, explosive);
     unit.command = null;
   }
+}
+
+function ProcessBuddyRescueCommand(unit, command) {
+  if (command.resolved) {
+    unit.command = null;
+    return;
+  }
+  command.resolved = true;
+  const result = ApplyBuddyRescue(state, unit.id, command.targetId);
+  if (!result.success) {
+    PushMessage("brief", `${unit.name}失去应急止血条件，指令已取消。`);
+    unit.command = null;
+    return;
+  }
+  const patient = state.units.find((candidate) => candidate.id === result.patientId);
+  world?.SpawnRing(patient, 0x8bc5ad, 3.2, 0.48);
+  PushMessage(
+    "objective",
+    `${unit.name}为${patient.name}完成应急止血，争取到 ${Math.ceil(result.bleedingSeconds)} 秒；仍需卫生员稳定伤势。`,
+  );
+  audio.Play("objective");
+  unit.command = null;
 }
 
 function ProcessAbilityCommand(unit, command) {
@@ -783,6 +1715,7 @@ function ProcessTakedownCommand(unit, command, deltaTime) {
   state.ledger.enemiesDisabled += 1;
   EmitSound(enemy, 3.2, "body");
   world?.SpawnImpact?.(enemy, "takedown");
+  ShowCombatCue("目标已静默控制", "objective");
   PushMessage("combat", `${unit.name}从背后静默制服了${GetEnemyRoleDefinition(enemy.role).name}；尸体若留在路上仍会暴露行动。`);
   audio.Play("interaction");
   unit.command = null;
@@ -845,6 +1778,7 @@ function ProcessUnit(unit, deltaTime) {
   else if (unit.command.kind === "attack") ProcessAttackCommand(unit, unit.command, deltaTime);
   else if (unit.command.kind === "takedown") ProcessTakedownCommand(unit, unit.command, deltaTime);
   else if (unit.command.kind === "hideBody") ProcessHideBodyCommand(unit, unit.command, deltaTime);
+  else if (unit.command.kind === "buddyRescue") ProcessBuddyRescueCommand(unit, unit.command);
   else if (["observe", "stone", "aid", "steady", "suppress", "overwatch"].includes(unit.command.kind)) {
     ProcessAbilityCommand(unit, unit.command);
   }
@@ -870,14 +1804,15 @@ function StepSimulation(deltaTime) {
     state.environment.dustCloud.remaining = Math.max(0, state.environment.dustCloud.remaining - deltaTime);
     if (state.environment.dustCloud.remaining <= 0) state.environment.dustCloud = null;
   }
+  UpdateCivilianRoutes(deltaTime);
   for (const unit of state.units) {
-    unit.inLight = IsPositionLit(unit, state.environment);
+    unit.inLight = IsPositionLit(unit, state.environment, GetActiveMissionDefinition().lightingZones);
     unit.inDust = Boolean(
       state.environment.dustCloud &&
       Distance(unit, state.environment.dustCloud) <= state.environment.dustCloud.radius,
     );
   }
-  for (const definition of missionDefinition.interactables) {
+  for (const definition of GetActiveMissionDefinition().interactables) {
     const runtime = state.interactables[definition.id];
     if (!runtime || runtime.discovered) continue;
     const discovered = state.units.some(
@@ -891,6 +1826,18 @@ function StepSimulation(deltaTime) {
     }
   }
   for (const unit of state.units) ProcessUnit(unit, deltaTime);
+  const activeLayout = GetOperationLayout(state.operationLayoutId);
+  for (const zone of activeLayout?.zones ?? []) {
+    if (
+      state.units.some(
+        (unit) =>
+          unit.state !== "dead" &&
+          PointInsideBox(unit, zone),
+      )
+    ) {
+      TriggerFieldStorylets(`enterZone:${zone.id}`);
+    }
+  }
   aiAccumulator += deltaTime;
   while (aiAccumulator >= simulationConfig.aiStep) {
     UpdateEnemySquad(state, simulationConfig.aiStep, { OnEnemyShot, OnReinforcement });
@@ -911,7 +1858,11 @@ function GetApproachPoint(unit, interactable) {
       z: interactable.z + Math.sin(angle) * approachRadius,
     });
     if (PositionBlocked(point, 0.68)) continue;
-    const waypoints = FindPath2D(unit, point, { clearance: 0.68 });
+    const waypoints = FindPath2D(unit, point, {
+      clearance: 0.68,
+      obstacles: GetNavigationObstacles(),
+      bounds: GetActiveMissionDefinition().bounds,
+    });
     if (waypoints.length === 0) continue;
     let routeLength = 0;
     let previous = unit;
@@ -934,7 +1885,9 @@ function QueueMoveForSelected(position, append = false) {
     return;
   }
   let queued = 0;
+  const failedUnitNames = [];
   state.selectedUnitIds.forEach((unitId, index) => {
+    const unit = state.units.find((candidate) => candidate.id === unitId);
     const offset = state.selectedUnitIds.length > 1 ? { x: (index % 2) * 1.4, z: Math.floor(index / 2) * 1.4 } : { x: 0, z: 0 };
     if (
       QueueCommand(
@@ -944,12 +1897,16 @@ function QueueMoveForSelected(position, append = false) {
         append,
       )
     ) queued += 1;
+    else if (unit) failedUnitNames.push(unit.name);
   });
   if (queued > 0) {
     RequestInteractiveRender(0.7);
     audio.Play("command");
     world?.SpawnRing(bounded, 0x8bc5ad, 1.6, 0.35);
     if (!state.paused) PushMessage("brief", `${queued} 名队员收到移动指令。`);
+    if (failedUnitNames.length > 0) {
+      ShowToast(`${failedUnitNames.join("、")}的指令队列已满，未加入本次移动。`);
+    }
   } else {
     ShowToast("指令队列已满，每人最多 4 条。");
   }
@@ -963,6 +1920,14 @@ function QueueInteraction(interactableId, append = false, explosive = false, abi
   if (!interactable || !unit || runtime?.completed) return;
   if (unit.state === "wounded") {
     ShowToast(`${unit.name}伤势已稳定，只能缓慢撤离。`);
+    return;
+  }
+  if (
+    state.operationRuntime &&
+    !runtime?.droppedAt &&
+    !GetAvailableInteractionForInteractable(state.operationRuntime, interactableId, unit.id)
+  ) {
+    ShowToast(`${interactable.name}需要先满足行动条件，或改由对应专长队员执行。`);
     return;
   }
   const queuedCommands = [];
@@ -1000,6 +1965,35 @@ function QueueInteraction(interactableId, append = false, explosive = false, abi
   RenderHud();
 }
 
+function QueueBuddyRescue(patientId, append = false) {
+  const rescuer = GetSelectedUnit();
+  const patient = state.units.find((unit) => unit.id === patientId);
+  if (!rescuer || !patient || !CanBuddyRescue(state, rescuer.id, patient.id)) return false;
+  const rescueAlreadyPlanned = [rescuer.command, ...rescuer.queue].some(
+    (command) => command?.kind === "buddyRescue" && command.targetId === patient.id,
+  );
+  if (rescueAlreadyPlanned) {
+    ShowToast(`${patient.name}的应急止血已经在计划中。`);
+    return true;
+  }
+  const didQueue = QueueCommand(
+    state,
+    rescuer.id,
+    { kind: "buddyRescue", targetId: patient.id, label: `应急止血：${patient.name}` },
+    append,
+  );
+  if (!didQueue) {
+    ShowToast("指令队列已满，无法加入应急止血。");
+    return false;
+  }
+  activeAbility = null;
+  RequestInteractiveRender(0.7);
+  audio.Play("command");
+  ShowToast(state.paused ? "应急止血已纳入计划；恢复行动后结算。" : "队员开始为伤员应急止血。");
+  RenderHud();
+  return true;
+}
+
 function QueueAttack(enemyId, append = false) {
   const enemy = state.enemies.find((candidate) => candidate.id === enemyId);
   const unit = GetSelectedUnit();
@@ -1016,8 +2010,18 @@ function QueueAttack(enemyId, append = false) {
     ShowToast("当前没有可靠射线；先移动到侧翼或掩体。");
     return;
   }
-  QueueCommand(state, unit.id, { kind: "attack", targetId: enemy.id, label: `射击${GetEnemyRoleDefinition(enemy.role).name}` }, append);
+  const didQueue = QueueCommand(
+    state,
+    unit.id,
+    { kind: "attack", targetId: enemy.id, label: `射击${GetEnemyRoleDefinition(enemy.role).name}` },
+    append,
+  );
+  if (!didQueue) {
+    ShowToast("指令队列已满，无法加入射击。");
+    return;
+  }
   activeAbility = null;
+  activeAbilityAppend = false;
   RequestInteractiveRender();
   audio.Play("command");
   RenderHud();
@@ -1036,18 +2040,31 @@ function QueueEnemyContextAction(enemyId, append = false) {
       ShowToast("靠近失能敌人后可将其拖入遮蔽处。");
       return;
     }
-    QueueCommand(state, unit.id, { kind: "hideBody", targetId: enemy.id, label: "隐蔽失能敌人" }, append);
+    const didQueue = QueueCommand(
+      state,
+      unit.id,
+      { kind: "hideBody", targetId: enemy.id, label: "隐蔽失能敌人" },
+      append,
+    );
+    if (!didQueue) {
+      ShowToast("指令队列已满，无法加入隐蔽行动。");
+      return;
+    }
     audio.Play("command");
     RenderHud();
     return;
   }
   if (CanSilentTakedown(unit, enemy)) {
-    QueueCommand(
+    const didQueue = QueueCommand(
       state,
       unit.id,
       { kind: "takedown", targetId: enemy.id, label: `静默制服${GetEnemyRoleDefinition(enemy.role).name}` },
       append,
     );
+    if (!didQueue) {
+      ShowToast("指令队列已满，无法加入静默制服。");
+      return;
+    }
     audio.Play("command");
     ShowToast(state.paused ? "静默制服已纳入计划；恢复行动后执行。" : "静默制服指令已下达。");
     RenderHud();
@@ -1062,13 +2079,14 @@ function FindNearestEnemy(unit, range = 24) {
     .sort((left, right) => Distance(unit, left) - Distance(unit, right))[0] ?? null;
 }
 
-function QueueAbilityCommand(unit, command) {
-  const didQueue = QueueCommand(state, unit.id, command, false);
+function QueueAbilityCommand(unit, command, append = false) {
+  const didQueue = QueueCommand(state, unit.id, command, append);
   if (!didQueue) {
     ShowToast("当前无法加入这项行动。");
     return false;
   }
   activeAbility = null;
+  activeAbilityAppend = false;
   RequestInteractiveRender(0.7);
   audio.Play("command");
   ShowToast(state.paused ? "能力已纳入计划；恢复行动后结算。" : "能力指令已下达。");
@@ -1076,7 +2094,7 @@ function QueueAbilityCommand(unit, command) {
   return true;
 }
 
-function UseAbility(abilityId) {
+function UseAbility(abilityId, append = false) {
   const unit = GetSelectedUnit();
   const character = GetCharacterDefinition(unit.id);
   const ability = character?.abilities.find((candidate) => candidate.id === abilityId);
@@ -1100,19 +2118,22 @@ function UseAbility(abilityId) {
       ShowToast("视野内没有可持续观察的敌人。");
       return;
     }
-    QueueAbilityCommand(unit, { kind: "observe", targetId: enemy.id, label: `记哨：${GetEnemyRoleDefinition(enemy.role).name}` });
+    QueueAbilityCommand(unit, { kind: "observe", targetId: enemy.id, label: `记哨：${GetEnemyRoleDefinition(enemy.role).name}` }, append);
   } else if (abilityId === "stone") {
     activeAbility = "stone";
+    activeAbilityAppend = append;
     ShowToast("在地图上选择落点。投石会制造一处带误差的声源。");
   } else if (abilityId === "sabotage") {
     const target = FindNearestInteractable(unit, (definition) => definition.action === "sabotage");
-    if (target) QueueInteraction(target.id, false, false, "sabotage");
+    if (target) QueueInteraction(target.id, append, false, "sabotage");
     else {
       activeAbility = "sabotage";
+      activeAbilityAppend = append;
       ShowToast("选择交换机、发电机或铃索。");
     }
   } else if (abilityId === "charge") {
     activeAbility = "charge";
+    activeAbilityAppend = append;
     ShowToast("选择可破坏设施。爆炸必然触发全区警报。");
   } else if (abilityId === "aid") {
     const patient = state.units
@@ -1122,15 +2143,16 @@ function UseAbility(abilityId) {
       ShowToast("6 米内没有倒地队员。");
       return;
     }
-    QueueAbilityCommand(unit, { kind: "aid", targetId: patient.id, label: `压迫止血：${patient.name}` });
+    QueueAbilityCommand(unit, { kind: "aid", targetId: patient.id, label: `压迫止血：${patient.name}` }, append);
   } else if (abilityId === "steady") {
-    QueueAbilityCommand(unit, { kind: "steady", label: "稳住附近队员" });
+    QueueAbilityCommand(unit, { kind: "steady", label: "稳住附近队员" }, append);
   } else if (abilityId === "suppress") {
     if (unit.ammo < 6) {
       ShowToast("至少需要 6 发弹药建立压制。");
       return;
     }
     activeAbility = "suppress";
+    activeAbilityAppend = append;
     ShowToast("在地图上指定压制方向；它创造移动窗口，不保证击倒。");
   } else if (abilityId === "overwatch") {
     const ally = state.units
@@ -1140,20 +2162,21 @@ function UseAbility(abilityId) {
       ShowToast("需要 9 米内另一名可行动队员建立交叉警戒。");
       return;
     }
-    QueueAbilityCommand(unit, { kind: "overwatch", targetId: ally.id, label: `交叉警戒：${ally.name}` });
+    QueueAbilityCommand(unit, { kind: "overwatch", targetId: ally.id, label: `交叉警戒：${ally.name}` }, append);
   }
   RenderHud();
 }
 
-function UseTargetedAbility(position, pickedInteractableId = null) {
+function UseTargetedAbility(position, pickedInteractableId = null, append = false) {
   const unit = GetSelectedUnit();
   if (!activeAbility || !unit) return false;
+  const shouldAppend = append || activeAbilityAppend;
   if (activeAbility === "stone" && position) {
     if (Distance(unit, position) > 16) {
       ShowToast("投石落点必须在 16 米以内。");
       return true;
     }
-    QueueAbilityCommand(unit, { kind: "stone", x: position.x, z: position.z, label: "投石诱敌" });
+    QueueAbilityCommand(unit, { kind: "stone", x: position.x, z: position.z, label: "投石诱敌" }, shouldAppend);
     return true;
   }
   if (activeAbility === "suppress" && position) {
@@ -1161,7 +2184,7 @@ function UseTargetedAbility(position, pickedInteractableId = null) {
       ShowToast("压制方向必须落在 20 米以内。");
       return true;
     }
-    QueueAbilityCommand(unit, { kind: "suppress", x: position.x, z: position.z, label: "定点压制" });
+    QueueAbilityCommand(unit, { kind: "suppress", x: position.x, z: position.z, label: "定点压制" }, shouldAppend);
     return true;
   }
   if ((activeAbility === "charge" || activeAbility === "sabotage") && pickedInteractableId) {
@@ -1181,14 +2204,14 @@ function UseTargetedAbility(position, pickedInteractableId = null) {
         return true;
       }
     }
-    QueueInteraction(pickedInteractableId, false, activeAbility === "charge", activeAbility);
+    QueueInteraction(pickedInteractableId, shouldAppend, activeAbility === "charge", activeAbility);
     return true;
   }
   return false;
 }
 
 function FindNearestInteractable(unit, predicate = () => true) {
-  return missionDefinition.interactables
+  return GetActiveMissionDefinition().interactables
     .map((definition) => GetInteractable(definition.id))
     .filter((definition) => !state.interactables[definition.id]?.completed && predicate(definition))
     .sort((left, right) => Distance(unit, left) - Distance(unit, right))[0] ?? null;
@@ -1196,7 +2219,7 @@ function FindNearestInteractable(unit, predicate = () => true) {
 
 function GetNearbyInteractable(unit) {
   return (
-    missionDefinition.interactables
+    GetActiveMissionDefinition().interactables
       .map((definition) => GetInteractable(definition.id))
       .filter(
         (definition) =>
@@ -1208,8 +2231,10 @@ function GetNearbyInteractable(unit) {
 
 function HandleWorldPick(pick, append = false) {
   if (screenMode !== "mission" || state.outcome || !pick) return;
-  if (UseTargetedAbility(pick.position, pick.kind === "interactable" ? pick.id : null)) return;
+  if (UseTargetedAbility(pick.position, pick.kind === "interactable" ? pick.id : null, append)) return;
   if (pick.kind === "unit") {
+    const pickedUnit = state.units.find((unit) => unit.id === pick.id);
+    if (pickedUnit?.state === "downed" && QueueBuddyRescue(pickedUnit.id, append)) return;
     SetSelectedUnits(append ? [...state.selectedUnitIds, pick.id] : [pick.id]);
   } else if (pick.kind === "enemy") {
     QueueEnemyContextAction(pick.id, append);
@@ -1247,9 +2272,13 @@ function EndMission(success = true, title = "") {
   elements.resultGrade.textContent = evaluation.grade;
   elements.resultTitle.textContent =
     title || (evaluation.complete ? state.operation.resultTitle ?? "小队完成行动并撤出" : "行动留下缺口");
-  elements.resultSummary.textContent = evaluation.complete
+  const resultSummary = evaluation.complete
     ? state.operation.resultSummary ?? "既定任务已经完成，行动组安全撤出。"
     : evaluation.summary;
+  const debriefLines = ResolveStoryletLines(GetOperationLayout(state.operationLayoutId)?.narrativeRefs?.debrief);
+  elements.resultSummary.textContent = debriefLines.length > 0
+    ? `${resultSummary} ${debriefLines.map(FormatStoryletLine).join(" ")}`
+    : resultSummary;
   elements.resultScore.innerHTML = `${evaluation.score}<small>/ 100</small>`;
   const sectionLabels = [
     ["群众安全", evaluation.sections.civilians, 35],
@@ -1261,10 +2290,12 @@ function EndMission(success = true, title = "") {
     .map(([label, value, maximum]) => `<div class="resultMetric"><span>${label}</span><strong>${value}<small> / ${maximum}</small></strong></div>`)
     .join("");
   elements.resultLedger.textContent =
-    state.ledger.civilianHarm === 0 && state.ledger.civilianRisk === 0
+    state.ledger.civilianHarm === 0 && state.ledger.civilianRisk === 0 && (state.ledger.civilianDisplacement ?? 0) === 0
       ? "群众代价账本：本次行动未造成群众伤亡，也未把民用品转化为战利品。击杀数不计入行动得分。"
-      : `群众代价账本：受害 ${state.ledger.civilianHarm}，风险 ${state.ledger.civilianRisk}。这些记录不转化为物资或奖励。`;
+      : `群众代价账本：受害 ${state.ledger.civilianHarm}，风险 ${state.ledger.civilianRisk}，流离 ${state.ledger.civilianDisplacement ?? 0}。这些记录不转化为物资或奖励。`;
   campState = ApplyMissionToCamp(campState, state);
+  campState.civilianCostLedger ??= { harm: 0, risk: 0, displacement: 0 };
+  campState.civilianCostLedger.displacement ??= 0;
   SaveCampState();
   audio.Play(evaluation.complete ? "objective" : "alert");
 }
@@ -1277,10 +2308,67 @@ function EnterCamp() {
   RenderCamp();
 }
 
+const campDecisionPresentation = Object.freeze({
+  treat: {
+    facility: "clinic",
+    facilityName: "救护所",
+    payoff: "处理一名伤员，并提升救护轮值能力",
+  },
+  repair: {
+    facility: "workshop",
+    facilityName: "工坊",
+    payoff: "补充破袭器材容量，工兵增加 1 点疲劳",
+  },
+  decode: {
+    facility: "intelligence",
+    facilityName: "情报角",
+    payoff: "刷新下一行动巡逻情报，侦察员增加 1 点疲劳",
+  },
+  rest: {
+    facility: "training",
+    facilityName: "训练空地",
+    payoff: "全队降低疲劳并复盘训练，旧敌情时效下降",
+  },
+});
+
+function FormatCampDecisionCosts(costs) {
+  const costLabels = {
+    medicine: "药品",
+    tools: "工具",
+    radioParts: "收报零件",
+    food: "口粮",
+    fatigue: "工兵疲劳",
+    scoutFatigue: "侦察员疲劳",
+    intelFreshness: "敌情时效",
+  };
+  const parts = Object.entries(costs)
+    .filter(([costId]) => costId !== "opportunity")
+    .map(([costId, value]) => `${costLabels[costId] ?? costId} ${value}`);
+  if (costs.opportunity) parts.push("占用本轮唯一整备");
+  return parts.join(" · ");
+}
+
+function GetCampDecisionUnavailableReason(option) {
+  if (campState.lastDecisionSortie === (campState.sorties ?? 0) || campActionUsed) return "本轮整备已经完成";
+  if (option.id === "treat" && !campState.roster.some((operative) => !operative.lost && operative.wounds > 0)) {
+    return "当前没有需要处理的伤员";
+  }
+  const resourceByCost = {
+    medicine: campState.resources.medicine,
+    tools: campState.resources.tools,
+    radioParts: campState.resources.radioParts,
+    food: campState.resources.food,
+  };
+  const shortage = Object.entries(option.costs).find(
+    ([costId, cost]) => costId in resourceByCost && resourceByCost[costId] < cost,
+  );
+  if (shortage) return `${{ medicine: "药品", tools: "工具", radioParts: "收报零件", food: "口粮" }[shortage[0]]}不足`;
+  return "当前条件不满足";
+}
+
 function RenderCamp() {
   const evaluation = state.outcome ?? GetMissionEvaluation(state);
-  const nextOperation =
-    campaignOperationDefinitions[campState.completedMissions % campaignOperationDefinitions.length];
+  const nextOperation = GetOperationLayoutByCampaignIndex(campState.completedMissions);
   elements.campDay.textContent = String(campState.day);
   elements.campOutcomeTitle.textContent = evaluation.complete
     ? state.operation.campOutcomeTitle ?? "行动完成，队伍归营"
@@ -1321,20 +2409,23 @@ function RenderCamp() {
     .join("");
   elements.campCostLedger.textContent =
     campState.civilianCostLedger.harm === 0
-      ? `累计未记录群众伤亡；风险记录 ${campState.civilianCostLedger.risk}。`
-      : `累计受害 ${campState.civilianCostLedger.harm}，风险 ${campState.civilianCostLedger.risk}。`;
-  document.querySelectorAll("[data-camp-action]").forEach((button) => {
-    button.disabled = campActionUsed;
-  });
-  const facilityLabels = {
-    treat: `救护所 Lv.${campState.facilities.clinic ?? 1} · 药品 1`,
-    repair: `工坊 Lv.${campState.facilities.workshop ?? 1} · 工具 1`,
-    decode: `情报角 Lv.${campState.facilities.intelligence ?? 0} · 零件 1`,
-    rest: `训练 Lv.${campState.facilities.training ?? 0} · 休整 1 日`,
-  };
-  for (const [actionId, label] of Object.entries(facilityLabels)) {
-    const detail = document.querySelector(`[data-camp-action="${actionId}"] small`);
-    if (detail) detail.textContent = label;
+      ? `累计未记录群众伤亡；风险 ${campState.civilianCostLedger.risk}，流离 ${campState.civilianCostLedger.displacement ?? 0}。`
+      : `累计受害 ${campState.civilianCostLedger.harm}，风险 ${campState.civilianCostLedger.risk}，流离 ${campState.civilianCostLedger.displacement ?? 0}。`;
+  for (const option of GetCampDecisionOptions(campState)) {
+    const presentation = campDecisionPresentation[option.id];
+    const button = document.querySelector(`[data-camp-action="${option.id}"]`);
+    if (!presentation || !button) continue;
+    const facilityLevel = campState.facilities[presentation.facility] ?? 0;
+    const costText = FormatCampDecisionCosts(option.costs);
+    const detail = button.querySelector("small");
+    const payoff = button.querySelector("[data-camp-payoff]");
+    if (detail) detail.textContent = `${presentation.facilityName} Lv.${facilityLevel} · 成本：${costText}`;
+    if (payoff) payoff.textContent = `收益：${presentation.payoff}`;
+    button.disabled = campActionUsed || !option.available;
+    button.dataset.available = String(option.available && !campActionUsed);
+    const availability = button.disabled ? `不可用：${GetCampDecisionUnavailableReason(option)}` : "可执行";
+    button.title = `${availability}；成本：${costText}；${presentation.payoff}`;
+    button.setAttribute("aria-label", `${button.querySelector("span")?.textContent ?? presentation.facilityName}，${availability}，成本：${costText}，收益：${presentation.payoff}`);
   }
   const canDeploy = campState.roster.some((operative) => !operative.lost && operative.available && operative.wounds < 2);
   const allLost = campState.roster.every((operative) => operative.lost);
@@ -1348,6 +2439,13 @@ function RenderCamp() {
 
 function HandleCampAction(actionId) {
   if (campActionUsed) return;
+  const option = GetCampDecisionOptions(campState).find((candidate) => candidate.id === actionId);
+  if (!option?.available) {
+    elements.campStatus.textContent = option ? GetCampDecisionUnavailableReason(option) : "未知营地行动。";
+    audio.Play("alert");
+    RenderCamp();
+    return;
+  }
   const result = ApplyCampAction(campState, actionId);
   campState = result.state;
   elements.campStatus.textContent = result.message;
@@ -1362,29 +2460,27 @@ function HandleCampAction(actionId) {
 }
 
 function RenderObjectives() {
-  const objectiveDefinitions = [
-    { id: "ledger", name: "取得换防传令簿与线路图", detail: "交换室值房 · 必须" },
-    { id: "relay", name: "剪断据点有线联络", detail: "手摇电话交换机 · 必须" },
-    { id: "allExtracted", name: "行动组全员撤离", detail: "任选已解锁撤离点 · 必须" },
-    { id: "detainee", name: "救出被扣交通员", detail: "北侧牛棚 · 可选" },
-    { id: "medicines", name: "取回救护药箱", detail: "公路辎重车 · 可选" },
-    { id: "generator", name: "关闭北墙探照灯", detail: "岗楼发电机 · 可选" },
-    { id: "alarmBell", name: "剪断警报铃索", detail: "南院墙 · 可选" },
-    { id: "rockfall", name: "引发采石坡落石", detail: "东南山路 · 可选" },
-    { id: "radioParts", name: "取回通信零件", detail: "交换室外 · 可选" },
-    { id: "seedGrain", name: "把种粮留还村民", detail: "兵舍北侧 · 可选" },
-  ];
+  const layout = GetOperationLayout(state.operationLayoutId);
+  const objectiveDefinitions = layout
+    ? [...layout.objectives.mandatory, ...layout.objectives.optional].map((objective) => ({
+        id: objective.id,
+        name: objective.label,
+        detail: `${objective.carryToExtract ? "必须携带撤出" : objective.nonRewardingDuty ? "群众责任·不计物资" : "现场完成"}`,
+      }))
+    : [
+        { id: "ledger", name: "取得换防传令簿与线路图", detail: "交换室值房" },
+        { id: "relay", name: "剪断据点有线联络", detail: "手摇电话交换机" },
+        { id: "allExtracted", name: "行动组全员撤离", detail: "任选已解锁撤离点" },
+      ];
   const requiredIds = state.mainObjectiveIds;
-  const optionalIds = ["detainee", "medicines", "seedGrain", "ledger", "relay", "radioParts", "generator", "alarmBell", "rockfall"]
+  const optionalIds = objectiveDefinitions
+    .map((objective) => objective.id)
     .filter((objectiveId) => !requiredIds.includes(objectiveId))
     .slice(0, 3);
   const objectiveRows = [...requiredIds, ...optionalIds]
     .map((objectiveId) => objectiveDefinitions.find((objective) => objective.id === objectiveId))
     .filter(Boolean)
-    .map((objective) => ({
-      ...objective,
-      detail: objective.detail.replace(requiredIds.includes(objective.id) ? "可选" : "必须", requiredIds.includes(objective.id) ? "必须" : "可选"),
-    }));
+    .map((objective) => ({ ...objective, detail: `${objective.detail} · ${requiredIds.includes(objective.id) ? "必须" : "可选"}` }));
   elements.objectiveList.innerHTML = objectiveRows
     .map(
       (objective) =>
@@ -1399,12 +2495,16 @@ function RenderRoster() {
   elements.rosterPanel.innerHTML = state.units
     .map((unit, index) => {
       const definition = GetCharacterDefinition(unit.id);
+      const healthRatio = Clamp(unit.health / unit.maximumHealth, 0, 1);
       const queueCount = unit.queue.length + (unit.command ? 1 : 0);
       const carriedNames = (unit.carriedItems ?? []).map((itemId) => {
         if (itemId === "ledger") return "线路册";
         if (itemId === "medicines") return "药箱";
         if (itemId === "radioParts") return "通信零件";
         if (itemId === "tools") return "工具卷";
+        if (itemId === "stationLedger") return "换防线路图";
+        if (itemId === "clinicSatchel") return "救护药箱";
+        if (itemId === "militaryDetonators") return "军用雷管盒";
         return itemId;
       });
       const stateText =
@@ -1415,11 +2515,18 @@ function RenderRoster() {
             : carriedNames.length > 0
               ? `携带：${carriedNames.join("、")}`
               : `${unit.ammo} 发`;
+      const cardClasses = [
+        "unitCard",
+        unit.hidden ? "isConcealed" : "",
+        unit.suppression >= 55 ? "isSuppressed" : "",
+        healthRatio <= 0.35 ? "isCritical" : "",
+        unit.state === "downed" || unit.state === "dead" ? "isDowned" : "",
+      ].filter(Boolean).join(" ");
       return `
-        <button class="unitCard" type="button" data-unit-id="${unit.id}" data-index="F${index + 1}" aria-pressed="${state.selectedUnitIds.includes(unit.id)}">
+        <button class="${cardClasses}" style="--operativeAccent:${definition.accent}" type="button" data-unit-id="${unit.id}" data-index="F${index + 1}" data-state="${unit.state}" aria-pressed="${state.selectedUnitIds.includes(unit.id)}">
           <strong>${definition.name}</strong>
           <small>${definition.role} · ${stateText}</small>
-          <span class="unitHealth"><i style="width:${Clamp(unit.health / unit.maximumHealth, 0, 1) * 100}%"></i></span>
+          <span class="unitHealth" aria-label="生命 ${Math.round(healthRatio * 100)}%"><i style="width:${healthRatio * 100}%"></i></span>
           <span class="unitSuppression"><i style="width:${unit.suppression}%"></i></span>
           <span class="unitQueue">${Array.from({ length: 4 }, (_, queueIndex) => `<i class="${queueIndex < queueCount ? "isFilled" : ""}"></i>`).join("")}</span>
         </button>`;
@@ -1473,10 +2580,26 @@ function RenderStatus() {
   elements.alertLabel.textContent = alertLabels[state.alertLevel] ?? "全区警报";
   elements.alertLabel.style.color = state.alertLevel >= 3 ? "var(--danger)" : state.alertLevel >= 1 ? "var(--amber)" : "var(--friendly)";
   elements.alertFill.style.width = `${[4, 32, 68, 100][state.alertLevel] ?? 100}%`;
+  elements.gameHud.dataset.alertLevel = String(state.alertLevel);
+  elements.gameHud.classList.toggle("isPlanning", state.paused);
+  if (state.alertLevel > lastPresentedAlertLevel) {
+    TriggerCombatFeedback("alert", 0.58 + state.alertLevel * 0.12, alertLabels[state.alertLevel]);
+  }
+  lastPresentedAlertLevel = state.alertLevel;
   elements.pauseButton.setAttribute("aria-pressed", String(state.paused));
   elements.pauseGlyph.textContent = state.paused ? "▶" : "Ⅱ";
   elements.pauseLabel.textContent = state.paused ? "执行计划" : "暂停规划";
   elements.planningBanner.classList.toggle("isHidden", !state.paused);
+  const tacticalReadout = GetTacticalReadout(
+    state,
+    GetSelectedUnit(),
+    simulationConfig.awarenessInvestigate,
+  );
+  elements.tacticalReadout.dataset.status = tacticalReadout.concealment.key;
+  elements.concealmentGlyph.textContent = tacticalReadout.concealment.glyph;
+  elements.concealmentLabel.textContent = tacticalReadout.concealment.label;
+  elements.awarenessFill.style.width = `${tacticalReadout.visibleAwareness}%`;
+  elements.awarenessLabel.textContent = tacticalReadout.awarenessLabel;
   elements.shotCount.textContent = String(state.ledger.shotsFired);
   elements.riskCount.textContent = String(state.ledger.civilianRisk);
   elements.discoverCount.textContent = String(
@@ -1510,10 +2633,29 @@ function RenderExtraction() {
 function WriteDebugDataset() {
   document.documentElement.dataset.mountainEmberDebug = JSON.stringify({
     screenMode,
+    operationLayoutId: state.operationLayoutId,
+    missionBounds: GetActiveMissionDefinition().bounds,
     paused: state.paused,
     time: state.time,
+    quality: rendererQuality,
+    uiScale: settings.uiScale,
+    screenEffects: settings.screenEffects && !settings.reducedMotion,
     hoverEnemyId: view.hoverEnemyId,
     soundEventCount: state.soundEvents.length,
+    operationFlags: state.operationRuntime?.flags ?? {},
+    activeCivilianRoutes: state.operationRuntime?.activeCivilianRoutes ?? [],
+    civilianRouteStates: state.civilianRoutes,
+    civilianCostLedger: state.operationRuntime?.civilianCostLedger ?? {},
+    civilians: (state.civilians ?? []).map(({ id, routeId, groupSize, state: civilianState, x, z, routeDistance, exposureSeconds }) => ({
+      id,
+      routeId,
+      groupSize,
+      state: civilianState,
+      x,
+      z,
+      routeDistance,
+      exposureSeconds,
+    })),
     renderer: world?.GetStats() ?? null,
     performance: GetPerformanceSnapshot(),
     units: state.units.map((unit) => ({
@@ -1553,12 +2695,45 @@ function RenderHud() {
 
 function OpenModal(modal) {
   if (!modal) return;
+  modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   modal.classList.remove("isHidden");
-  modal.querySelector("button")?.focus();
+  const focusable = GetModalFocusableElements(modal);
+  focusable[0]?.focus();
 }
 
 function CloseModal(modal) {
-  modal?.classList.add("isHidden");
+  if (!modal || modal.classList.contains("isHidden")) return;
+  modal.classList.add("isHidden");
+  if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
+  modalReturnFocus = null;
+}
+
+function GetOpenModal() {
+  return [elements.settingsModal, elements.helpModal, elements.briefingModal].find(
+    (modal) => modal && !modal.classList.contains("isHidden"),
+  ) ?? null;
+}
+
+function GetModalFocusableElements(modal) {
+  if (!modal) return [];
+  return [...modal.querySelectorAll(
+    'button:not([disabled]), select:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+  )].filter((element) => !element.closest(".isHidden"));
+}
+
+function TrapModalFocus(event, modal) {
+  const focusable = GetModalFocusableElements(modal);
+  if (focusable.length === 0) {
+    event.preventDefault();
+    modal.focus();
+    return;
+  }
+  const currentIndex = focusable.indexOf(document.activeElement);
+  const nextIndex = event.shiftKey
+    ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
+    : (currentIndex < 0 || currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+  event.preventDefault();
+  focusable[nextIndex].focus();
 }
 
 function CloseMobileDrawers() {
@@ -1595,23 +2770,28 @@ function StartMission() {
   elements.titleScreen.classList.add("isHidden");
   elements.briefingModal.classList.add("isHidden");
   elements.gameHud.classList.remove("isHidden");
+  elements.gameHud.classList.add("isEntering");
+  setTimeout(() => elements.gameHud.classList.remove("isEntering"), settings.reducedMotion ? 0 : 900);
   elements.tutorialCard.classList.toggle("isHidden", settings.tutorialClosed);
   state.paused = true;
   state.planning = true;
+  ShowCombatCue("战术图已展开", "intel");
   UpdateEnemyIntel(state, 0);
   RequestInteractiveRender(0.9);
-  world?.FocusPosition({ x: -28, z: -15 }, 60);
+  const openingFocus = GetActiveMissionDefinition().zones[0] ?? GetActiveMissionDefinition().camera.target;
+  world?.FocusPosition(openingFocus, 46, { startup: true });
   RenderHud();
   ShowToast(`${state.operation.name}：战术图已展开。空格执行；第一次报警不会立即失败。`);
 }
 
 function ShowNextRouteHint() {
-  const hints = [
-    { point: { x: -27, z: -18 }, text: "南侧高粱地：蹲行可降低辨认速度。" },
-    { point: { x: -19, z: -2 }, text: "干水渠：遮住水平视线，但移动更慢。" },
-    { point: { x: -4, z: 27 }, text: "北侧村庄：救出交通员可解锁芦苇渡口。" },
-    { point: { x: 51, z: -22 }, text: "采石坡：落石能封东路，也会制造巨大声响。" },
-  ];
+  const layout = GetOperationLayout(state.operationLayoutId);
+  const hints = layout
+    ? layout.tacticalPhases.map((phase, index) => {
+        const focus = layout.zones[index % layout.zones.length] ?? layout.camera.target;
+        return { point: { x: focus.x, z: focus.z }, text: `${phase.label}：${phase.decision}` };
+      })
+    : [{ point: GetActiveMissionDefinition().camera.target, text: "先侦察巡逻，再确认撤路。" }];
   const hint = hints[routeHintIndex % hints.length];
   routeHintIndex += 1;
   world?.FocusPosition(hint.point, 42);
@@ -1627,6 +2807,7 @@ function HandleResize() {
 function HandlePointerDown(event) {
   if (screenMode !== "mission" || event.button !== 0) return;
   RequestInteractiveRender();
+  pendingHoverPointer = null;
   if (event.pointerType === "touch") {
     activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (activeTouchPointers.size >= 2) {
@@ -1644,18 +2825,27 @@ function HandlePointerDown(event) {
   elements.canvas.setPointerCapture?.(event.pointerId);
 }
 
+function FlushPendingHoverPick() {
+  if (!pendingHoverPointer) return;
+  const sample = pendingHoverPointer;
+  pendingHoverPointer = null;
+  if (screenMode !== "mission") return;
+  const hoverPick = world?.Pick(sample.clientX, sample.clientY);
+  view.currentPointerWorld = hoverPick?.position ?? null;
+  const nextHoverEnemyId = hoverPick?.kind === "enemy" ? hoverPick.id : null;
+  if (view.hoverEnemyId !== nextHoverEnemyId) {
+    view.hoverEnemyId = nextHoverEnemyId;
+    RequestInteractiveRender();
+  }
+}
+
 function HandlePointerMove(event) {
-  const hoverPick =
-    screenMode === "mission" && event.pointerType !== "touch"
-      ? world?.Pick(event.clientX, event.clientY)
-      : null;
-  view.currentPointerWorld = hoverPick?.position ?? world?.ScreenToGround(event.clientX, event.clientY);
-  if (event.pointerType !== "touch") {
-    const nextHoverEnemyId = hoverPick?.kind === "enemy" ? hoverPick.id : null;
-    if (view.hoverEnemyId !== nextHoverEnemyId) {
-      view.hoverEnemyId = nextHoverEnemyId;
-      RequestInteractiveRender();
-    }
+  if (event.pointerType === "touch" || pointerDown) {
+    pendingHoverPointer = null;
+    view.currentPointerWorld = world?.ScreenToGround(event.clientX, event.clientY);
+  } else {
+    pendingHoverPointer =
+      screenMode === "mission" ? { clientX: event.clientX, clientY: event.clientY } : null;
   }
   if (screenMode === "mission") RequestInteractiveRender(0.2);
   if (event.pointerType === "touch" && activeTouchPointers.has(event.pointerId)) {
@@ -1682,7 +2872,9 @@ function HandlePointerMove(event) {
 }
 
 function HandlePointerLeave(event) {
-  if (event.pointerType === "touch" || view.hoverEnemyId === null) return;
+  if (event.pointerType === "touch") return;
+  pendingHoverPointer = null;
+  view.currentPointerWorld = null;
   view.hoverEnemyId = null;
   RequestInteractiveRender();
 }
@@ -1718,11 +2910,22 @@ function HandleWheel(event) {
 
 function HandleKeyDown(event) {
   RequestInteractiveRender();
+  const openModal = GetOpenModal();
+  if (openModal) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      CloseModal(openModal);
+    } else if (event.key === "Tab") {
+      TrapModalFocus(event, openModal);
+    }
+    return;
+  }
   if (event.key === "Escape") {
     activeAbility = null;
     CloseMobileDrawers();
     CloseModal(elements.helpModal);
     CloseModal(elements.briefingModal);
+    CloseModal(elements.settingsModal);
     RenderHud();
     return;
   }
@@ -1748,7 +2951,7 @@ function HandleKeyDown(event) {
   } else if (event.key === "1" || event.key === "2") {
     const unit = GetSelectedUnit();
     const ability = GetCharacterDefinition(unit.id)?.abilities[Number(event.key) - 1];
-    if (ability) UseAbility(ability.id);
+    if (ability) UseAbility(ability.id, event.shiftKey);
   } else if (event.key.toLowerCase() === "f" && view.currentInteractionId) {
     QueueInteraction(view.currentInteractionId, event.shiftKey);
   } else if (event.key === "Enter" && state.paused) {
@@ -1762,6 +2965,11 @@ function BindEvents() {
   elements.pauseButton.addEventListener("click", () => TogglePause());
   elements.executeButton.addEventListener("click", () => TogglePause(false));
   elements.helpButton.addEventListener("click", () => OpenModal(elements.helpModal));
+  elements.settingsButton.addEventListener("click", () => {
+    PopulateSettingsPanel();
+    OpenModal(elements.settingsModal);
+  });
+  elements.saveSettingsButton.addEventListener("click", SaveVisualSettingsFromPanel);
   elements.soundButton.addEventListener("click", () => {
     settings.muted = !settings.muted;
     audio.SetMuted(settings.muted);
@@ -1798,7 +3006,7 @@ function BindEvents() {
     const unitButton = event.target.closest("[data-unit-id]");
     if (unitButton) SetSelectedUnits(event.shiftKey ? [...state.selectedUnitIds, unitButton.dataset.unitId] : [unitButton.dataset.unitId], event.detail > 1);
     const abilityButton = event.target.closest("[data-ability-id]");
-    if (abilityButton) UseAbility(abilityButton.dataset.abilityId);
+    if (abilityButton) UseAbility(abilityButton.dataset.abilityId, event.shiftKey);
     const campActionButton = event.target.closest("[data-camp-action]");
     if (campActionButton) HandleCampAction(campActionButton.dataset.campAction);
   });
@@ -1840,6 +3048,7 @@ function Frame(now) {
   const hidden = document.hidden;
   let didMeaningfulWork = false;
   if (!hidden) {
+    FlushPendingHoverPick();
     const simulationActive = screenMode === "mission" && !state.paused && !state.outcome;
     if (simulationActive) {
       const simulationWorkStartedAt = performance.now();
@@ -1891,9 +3100,21 @@ async function Boot() {
     elements.loadingProgress.style.width = "12%";
     elements.loadingHint.textContent = "正在读取人物与巡逻班次……";
     await Promise.resolve();
-    world = CreateWorld(elements.canvas, { quality: DetectQuality() });
+    rendererQuality = DetectQuality();
+    SyncOperationRuntimeToState();
+    world = CreateWorld(elements.canvas, {
+      quality: rendererQuality,
+      missionDefinition: GetActiveMissionDefinition(),
+    });
+    elements.loadingProgress.style.width = "36%";
+    elements.loadingHint.textContent = "正在装配村落、电话线与队员模型……";
+    const artReport = await world.LoadArtAssets();
+    if (artReport.errors.length > 0) {
+      console.warn("MountainEmber art assets fell back to procedural models", artReport.errors);
+    }
     world.BuildActors(state);
     const operationNumber = campState.completedMissions + 1;
+    elements.canvas.setAttribute("aria-label", `${state.operation.name}三维战术地图`);
     elements.operationName.textContent = state.operation.name;
     elements.operationMeta.textContent = `行动 ${String(operationNumber).padStart(2, "0")} · ${FormatCampaignDate(
       campState.completedMissions,
@@ -1905,17 +3126,14 @@ async function Boot() {
     }`;
     document.querySelector(".titleDocket h2").textContent = state.operation.name;
     document.querySelector(".titleLead").textContent = state.operation.summary;
-    const docketObjectiveNames = {
-      ledger: "取得换防传令簿与线路图",
-      relay: "剪断据点有线联络",
-      detainee: "救出被扣交通员",
-      medicines: "取回救护药箱",
-      generator: "关闭北墙探照灯",
-      alarmBell: "剪断警报铃索",
-      radioParts: "取回通信零件",
-      rockfall: "引发采石坡落石",
-      allExtracted: "全员进入同一撤离点",
-    };
+    PopulateMissionBriefing();
+    const activeLayout = GetOperationLayout(state.operationLayoutId);
+    const docketObjectiveNames = Object.fromEntries(
+      (activeLayout
+        ? [...activeLayout.objectives.mandatory, ...activeLayout.objectives.optional]
+        : [{ id: "allExtracted", label: "全员进入同一撤离点" }]
+      ).map((objective) => [objective.id, objective.label]),
+    );
     document.querySelector(".titleDocket ol").innerHTML = state.mainObjectiveIds
       .map(
         (objectiveId, index) =>

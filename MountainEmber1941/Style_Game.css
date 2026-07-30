@@ -1531,7 +1531,8 @@ kbd {
 }
 
 .facilityGrid span,
-.facilityGrid small {
+.facilityGrid small,
+.facilityGrid em {
   display: block;
 }
 
@@ -1545,6 +1546,20 @@ kbd {
   color: #7f8a82;
   font-size: 9px;
   line-height: 1.5;
+}
+
+.facilityGrid em {
+  margin-top: 7px;
+  color: #aaa48f;
+  font: normal 9px/1.5 "STSong", serif;
+}
+
+.facilityGrid button[data-available="true"] small {
+  color: #c5b98f;
+}
+
+.facilityGrid button[data-available="false"] {
+  border-color: rgba(183, 93, 77, 0.22);
 }
 
 .campResources dl,
@@ -2067,5 +2082,753 @@ kbd {
 
   .filmGrain {
     display: none;
+  }
+}
+
+/* Commercial presentation pass: information hierarchy, tactical feedback, and accessibility. */
+:root {
+  --uiTextScale: 1;
+  --feedbackStrength: 0.5;
+  --panelEdge: rgba(229, 210, 164, 0.32);
+  --panelHighlight: rgba(255, 246, 216, 0.045);
+}
+
+html[data-ui-scale="compact"] {
+  --uiTextScale: 0.92;
+}
+
+html[data-ui-scale="large"] {
+  --uiTextScale: 1.14;
+}
+
+.topCommandBar,
+.panel,
+.actionBar,
+.unitCard,
+.tacticalReadout {
+  border-color: var(--panelEdge);
+  background-image:
+    linear-gradient(115deg, var(--panelHighlight), transparent 24%),
+    linear-gradient(180deg, rgba(34, 43, 39, 0.96), rgba(15, 21, 19, 0.94));
+}
+
+.topCommandBar {
+  overflow: hidden;
+  border-top-color: rgba(226, 198, 130, 0.48);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.42),
+    inset 0 1px rgba(255, 244, 211, 0.06);
+}
+
+.topCommandBar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(202, 177, 119, 0.42), transparent);
+  pointer-events: none;
+}
+
+.operationBlock strong,
+.panelHeader h2,
+.unitCard strong,
+.selectedSummary strong {
+  text-shadow: 0 1px 0 #000;
+}
+
+html[data-ui-scale="compact"] .unitCard strong,
+html[data-ui-scale="compact"] .selectedSummary strong {
+  font-size: 12px;
+}
+
+html[data-ui-scale="large"] .unitCard strong,
+html[data-ui-scale="large"] .selectedSummary strong {
+  font-size: 15px;
+}
+
+html[data-ui-scale="large"] .unitCard small,
+html[data-ui-scale="large"] .selectedSummary small,
+html[data-ui-scale="large"] .abilityButton small {
+  font-size: 10px;
+}
+
+.panel {
+  overflow: hidden;
+  border-top-color: rgba(216, 186, 117, 0.5);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.38),
+    inset 0 1px rgba(255, 248, 221, 0.04);
+}
+
+.panelHeader {
+  background: linear-gradient(90deg, rgba(216, 186, 117, 0.06), transparent 74%);
+}
+
+.objectiveList li,
+.eventLog p,
+.fieldStats div {
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.objectiveList li:hover {
+  transform: translateX(2px);
+  background: rgba(216, 186, 117, 0.055);
+}
+
+.unitCard {
+  isolation: isolate;
+  border-top-color: color-mix(in srgb, var(--operativeAccent, var(--friendly)) 55%, transparent);
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.28),
+    inset 0 2px color-mix(in srgb, var(--operativeAccent, var(--friendly)) 42%, transparent);
+  transition: transform 150ms ease, border-color 150ms ease, filter 150ms ease;
+}
+
+.unitCard::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  width: 42%;
+  height: 100%;
+  opacity: 0.12;
+  background: linear-gradient(135deg, transparent, var(--operativeAccent, var(--friendly)));
+  pointer-events: none;
+}
+
+.unitCard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--operativeAccent, var(--friendly)) 72%, white 8%);
+}
+
+.unitCard[aria-pressed="true"] {
+  transform: translateY(-3px);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.38),
+    inset 0 2px var(--operativeAccent, var(--friendly)),
+    0 0 0 1px color-mix(in srgb, var(--operativeAccent, var(--friendly)) 45%, transparent);
+}
+
+.unitCard.isConcealed::before {
+  color: var(--friendlyBright);
+  box-shadow: inset 3px 0 var(--friendly);
+}
+
+.unitCard.isSuppressed {
+  border-bottom-color: rgba(212, 162, 89, 0.78);
+}
+
+.unitCard.isCritical {
+  border-color: rgba(190, 82, 67, 0.75);
+}
+
+.unitCard.isDowned {
+  filter: grayscale(0.7) brightness(0.72);
+}
+
+.unitHealth,
+.unitSuppression {
+  border-radius: 99px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.52);
+}
+
+.unitHealth i,
+.unitSuppression i,
+.awarenessRail i {
+  border-radius: inherit;
+  transition: width 180ms linear;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.actionBar {
+  overflow: hidden;
+  border-top-color: rgba(216, 186, 117, 0.5);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.44),
+    inset 0 1px rgba(255, 248, 220, 0.05);
+}
+
+.stanceGroup button,
+.abilityButton,
+.interactButton,
+.iconButton,
+.pauseButton {
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease, transform 100ms ease;
+}
+
+.stanceGroup button:active,
+.abilityButton:active:not(:disabled),
+.interactButton:active:not(:disabled),
+.iconButton:active,
+.pauseButton:active {
+  transform: translateY(1px);
+}
+
+.abilityButton.isActive::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(195, 229, 216, 0.18);
+  pointer-events: none;
+}
+
+.planningBanner {
+  overflow: hidden;
+  border-top-color: rgba(190, 229, 213, 0.6);
+  background:
+    linear-gradient(90deg, rgba(112, 165, 142, 0.18), transparent 48%),
+    rgba(20, 34, 29, 0.94);
+}
+
+.planningPulse {
+  animation: planningBeacon 1.8s ease-out infinite;
+}
+
+.tacticalReadout {
+  position: absolute;
+  z-index: 6;
+  bottom: calc(102px + var(--safeBottom));
+  left: 50%;
+  display: grid;
+  grid-template-columns: auto minmax(150px, 210px);
+  align-items: center;
+  min-width: 340px;
+  min-height: 54px;
+  transform: translateX(-50%);
+  border: 1px solid var(--panelEdge);
+  border-top-color: rgba(216, 186, 117, 0.48);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
+  pointer-events: none;
+}
+
+.concealmentReadout {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 148px;
+  padding: 8px 12px;
+  border-right: 1px solid var(--line);
+}
+
+.concealmentReadout > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--friendlyBright);
+  font: 700 11px/1 "STSong", serif;
+}
+
+.concealmentReadout small,
+.concealmentReadout strong,
+.awarenessReadout small,
+.awarenessReadout b {
+  display: block;
+}
+
+.concealmentReadout small,
+.awarenessReadout small {
+  color: #78867e;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.concealmentReadout strong,
+.awarenessReadout b {
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+.awarenessReadout {
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+.awarenessReadout > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.awarenessReadout b {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.awarenessRail {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.awarenessRail i {
+  display: block;
+  width: 0;
+  height: 100%;
+  color: var(--amber);
+  background: linear-gradient(90deg, var(--friendly), var(--amber) 58%, var(--danger));
+}
+
+.tacticalReadout[data-status="combat"],
+.tacticalReadout[data-status="lit"],
+.tacticalReadout[data-status="open"] {
+  border-top-color: rgba(190, 82, 67, 0.66);
+}
+
+.tacticalReadout[data-status="combat"] .concealmentReadout > span,
+.tacticalReadout[data-status="lit"] .concealmentReadout > span {
+  color: #ec9a83;
+}
+
+.combatFeedback {
+  position: absolute;
+  z-index: 14;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.feedbackWash,
+.damageVignette {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.feedbackWash {
+  background: rgba(255, 221, 160, 0.16);
+  mix-blend-mode: screen;
+}
+
+.damageVignette {
+  box-shadow: inset 0 0 16vw 4vw rgba(151, 35, 28, 0.78);
+}
+
+.feedbackReticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120px;
+  height: 120px;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+.feedbackReticle i {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: rgba(255, 221, 174, 0.7);
+}
+
+.feedbackReticle i:nth-child(1) { top: 0; left: 0; border-top: 1px solid; border-left: 1px solid; }
+.feedbackReticle i:nth-child(2) { top: 0; right: 0; border-top: 1px solid; border-right: 1px solid; }
+.feedbackReticle i:nth-child(3) { bottom: 0; left: 0; border-bottom: 1px solid; border-left: 1px solid; }
+.feedbackReticle i:nth-child(4) { right: 0; bottom: 0; border-right: 1px solid; border-bottom: 1px solid; }
+
+.combatCue {
+  position: absolute;
+  z-index: 45;
+  top: calc(164px + var(--safeTop));
+  left: 50%;
+  min-width: 260px;
+  padding: 8px 18px 9px;
+  transform: translateX(-50%);
+  border-top: 1px solid rgba(216, 186, 117, 0.72);
+  border-bottom: 1px solid rgba(216, 186, 117, 0.32);
+  background: linear-gradient(90deg, transparent, rgba(20, 27, 25, 0.96) 18% 82%, transparent);
+  text-align: center;
+  pointer-events: none;
+  animation: combatCueIn 220ms ease-out both;
+}
+
+.combatCue.isLeaving {
+  opacity: 0;
+  transform: translate(-50%, -6px);
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+.combatCue small,
+.combatCue strong {
+  display: block;
+}
+
+.combatCue small {
+  color: #827f72;
+  font: 700 8px/1.2 "Arial Narrow", sans-serif;
+  letter-spacing: 0.22em;
+}
+
+.combatCue strong {
+  margin-top: 4px;
+  color: var(--objective);
+  font: 700 13px/1.2 "STSong", serif;
+  letter-spacing: 0.08em;
+}
+
+.combatCue[data-tone="damage"] strong,
+.combatCue[data-tone="alert"] strong,
+.combatCue[data-tone="explosion"] strong {
+  color: #eca088;
+}
+
+.feedbackShot .feedbackReticle,
+.feedbackObjective .feedbackReticle {
+  animation: reticleConfirm 320ms ease-out both;
+}
+
+.feedbackDamage .damageVignette {
+  animation: damagePulse 420ms ease-out both;
+}
+
+.feedbackExplosion .feedbackWash {
+  animation: explosionWash 620ms ease-out both;
+}
+
+.feedbackAlert .damageVignette {
+  animation: alertPulse 480ms ease-out both;
+}
+
+.feedbackObjective .feedbackWash {
+  background: rgba(142, 213, 180, 0.11);
+  animation: objectiveWash 420ms ease-out both;
+}
+
+.settingsModal {
+  width: min(620px, calc(100vw - 28px));
+}
+
+.settingsModal h2 {
+  margin-bottom: 18px;
+}
+
+.settingsGrid {
+  display: grid;
+  gap: 1px;
+  border: 1px solid rgba(93, 85, 68, 0.32);
+  background: rgba(73, 62, 44, 0.12);
+}
+
+.settingsGrid label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 64px;
+  padding: 10px 14px;
+  background: rgba(255, 250, 235, 0.38);
+}
+
+.settingsGrid label > span {
+  color: #322e27;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.settingsGrid label small {
+  display: block;
+  margin-top: 4px;
+  color: #776f61;
+  font-weight: 400;
+  font-size: 9px;
+}
+
+.settingsGrid select {
+  min-width: 126px;
+  padding: 8px 10px;
+  border: 1px solid rgba(64, 57, 46, 0.36);
+  background: rgba(244, 237, 215, 0.86);
+  color: #28251f;
+}
+
+.toggleSetting input {
+  width: 38px;
+  height: 20px;
+  accent-color: #537567;
+}
+
+.settingsModal footer > small {
+  color: #6f6759;
+}
+
+.gameHud.isEntering .panel,
+.gameHud.isEntering .actionBar,
+.gameHud.isEntering .rosterPanel {
+  animation: hudDeploy 650ms cubic-bezier(0.2, 0.78, 0.2, 1) both;
+}
+
+.gameHud.isEntering .topCommandBar {
+  animation: hudDeployTop 650ms cubic-bezier(0.2, 0.78, 0.2, 1) both;
+}
+
+.gameHud.isEntering .panel,
+.gameHud.isEntering .rosterPanel {
+  animation-delay: 90ms;
+}
+
+.gameHud[data-alert-level="3"] .topCommandBar {
+  border-top-color: rgba(190, 82, 67, 0.78);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.46),
+    inset 0 2px rgba(183, 67, 52, 0.16);
+}
+
+html[data-screen-effects="false"] .filmGrain,
+html[data-screen-effects="false"] .combatFeedback {
+  display: none;
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+html[data-reduced-motion="true"] .filmGrain {
+  display: none;
+}
+
+@keyframes planningBeacon {
+  0% { box-shadow: 0 0 0 0 rgba(138, 187, 170, 0.36); }
+  70%, 100% { box-shadow: 0 0 0 8px rgba(138, 187, 170, 0); }
+}
+
+@keyframes hudDeploy {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes hudDeployTop {
+  from { opacity: 0; transform: translate(-50%, 9px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes combatCueIn {
+  from { opacity: 0; transform: translate(-50%, 8px) scaleX(0.88); }
+  to { opacity: 1; transform: translate(-50%, 0) scaleX(1); }
+}
+
+@keyframes reticleConfirm {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(1.34); }
+  35% { opacity: var(--feedbackStrength); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(0.82); }
+}
+
+@keyframes cameraKick {
+  0% { transform: translate3d(0, 0, 0); }
+  28% { transform: translate3d(-2px, 1px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes cameraDamage {
+  0% { transform: translate3d(0, 0, 0); }
+  26% { transform: translate3d(4px, -2px, 0); }
+  58% { transform: translate3d(-2px, 1px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes cameraExplosion {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  12% { transform: translate3d(-7px, 4px, 0) scale(1.006); }
+  26% { transform: translate3d(6px, -3px, 0) scale(1.006); }
+  42% { transform: translate3d(-4px, 2px, 0) scale(1.004); }
+  64% { transform: translate3d(2px, -1px, 0) scale(1.002); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes damagePulse {
+  0% { opacity: 0; }
+  18% { opacity: var(--feedbackStrength); }
+  100% { opacity: 0; }
+}
+
+@keyframes explosionWash {
+  0% { opacity: var(--feedbackStrength); }
+  100% { opacity: 0; }
+}
+
+@keyframes alertPulse {
+  0%, 100% { opacity: 0; }
+  32% { opacity: var(--feedbackStrength); }
+}
+
+@keyframes objectiveWash {
+  0% { opacity: var(--feedbackStrength); }
+  100% { opacity: 0; }
+}
+
+@media (max-width: 760px) {
+  .tacticalReadout {
+    top: calc(116px + var(--safeTop));
+    bottom: auto;
+    grid-template-columns: auto minmax(105px, 1fr);
+    min-width: 0;
+    width: min(260px, calc(100vw - 120px));
+    min-height: 44px;
+  }
+
+  .concealmentReadout {
+    min-width: 0;
+    padding: 6px 8px;
+  }
+
+  .concealmentReadout > span {
+    width: 26px;
+    height: 26px;
+  }
+
+  .concealmentReadout small,
+  .awarenessReadout small {
+    display: none;
+  }
+
+  .awarenessReadout {
+    padding: 6px 8px;
+  }
+
+  .awarenessReadout b,
+  .concealmentReadout strong {
+    margin-top: 0;
+    font-size: 9px;
+  }
+
+  .combatCue {
+    top: calc(168px + var(--safeTop));
+    min-width: 220px;
+  }
+
+  .settingsGrid label {
+    min-height: 58px;
+  }
+
+  .settingsGrid select {
+    min-width: 105px;
+  }
+
+  .unitCard:hover,
+  .unitCard[aria-pressed="true"] {
+    transform: none;
+  }
+}
+
+/* UI text scale is applied to the readable command hierarchy, not to hit targets or rails. */
+.operationBlock strong { font-size: calc(16px * var(--uiTextScale)); }
+.operationBlock small,
+.phaseBlock span,
+.alertHeading span { font-size: max(10px, calc(9px * var(--uiTextScale))); }
+.phaseBlock time { font-size: calc(20px * var(--uiTextScale)); }
+.alertHeading strong,
+.pauseButton > span:nth-child(2) { font-size: calc(12px * var(--uiTextScale)); }
+.panelHeader h2 { font-size: calc(15px * var(--uiTextScale)); }
+.panelHeader > span,
+.panelKicker,
+.objectiveList small,
+.panelLink,
+.eventLog p { font-size: max(10px, calc(10px * var(--uiTextScale))); }
+.objectiveList strong { font-size: calc(12px * var(--uiTextScale)); }
+.fieldStats dt { font-size: max(10px, calc(9px * var(--uiTextScale))); }
+.fieldStats dd { font-size: calc(13px * var(--uiTextScale)); }
+.planningBanner strong { font-size: calc(11px * var(--uiTextScale)); }
+.planningBanner small,
+.planningBanner button { font-size: max(10px, calc(9px * var(--uiTextScale))); }
+.unitCard strong,
+.selectedSummary strong { font-size: calc(13px * var(--uiTextScale)); }
+.unitCard small,
+.selectedSummary small { font-size: max(10px, calc(9px * var(--uiTextScale))); }
+.stanceGroup span,
+.abilityButton span,
+.interactButton span { font-size: calc(11px * var(--uiTextScale)); }
+.stanceGroup small,
+.abilityButton small,
+.interactButton small,
+.abilityKey { font-size: max(10px, calc(8px * var(--uiTextScale))); }
+.worldPrompt,
+.toast { font-size: calc(11px * var(--uiTextScale)); }
+.mobilePanelTabs span { font-size: calc(12px * var(--uiTextScale)); }
+.concealmentReadout small,
+.awarenessReadout small,
+.combatCue small { font-size: max(10px, calc(8px * var(--uiTextScale))); }
+.concealmentReadout strong,
+.awarenessReadout b { font-size: calc(10px * var(--uiTextScale)); }
+.combatCue strong { font-size: calc(13px * var(--uiTextScale)); }
+.facilityGrid span { font-size: calc(14px * var(--uiTextScale)); }
+.facilityGrid small,
+.facilityGrid em,
+.campFooter p,
+.costLedger p { font-size: calc(10px * var(--uiTextScale)); }
+
+@media (max-width: 760px) {
+  .mobilePanelTabs {
+    z-index: 52;
+    top: calc(64px + var(--safeTop));
+  }
+
+  .planningBanner {
+    z-index: 18;
+    top: calc(64px + var(--safeTop));
+    right: 88px;
+    left: 88px;
+    width: auto;
+    max-width: none;
+    min-height: 44px;
+    padding: 7px 6px;
+    transform: none;
+  }
+
+  .planningBanner div {
+    min-width: 0;
+    text-align: center;
+  }
+
+  .planningBanner .planningPulse {
+    display: none;
+  }
+
+  .operationBlock::before {
+    font-size: calc(13px * var(--uiTextScale));
+  }
+
+  .panel {
+    z-index: 50;
+    top: calc(116px + var(--safeTop));
+  }
+
+  .tacticalReadout {
+    z-index: 16;
+    top: calc(116px + var(--safeTop));
+    width: calc(100vw - 16px);
+    max-width: 360px;
+  }
+
+  .awarenessReadout b,
+  .concealmentReadout strong {
+    font-size: max(10px, calc(10px * var(--uiTextScale)));
+  }
+
+  .unitCard strong {
+    font-size: max(12px, calc(13px * var(--uiTextScale)));
+  }
+
+  .combatCue {
+    z-index: 45;
+    top: calc(170px + var(--safeTop));
+    width: min(340px, calc(100vw - 28px));
+  }
+
+  .toastRegion {
+    z-index: 44;
+    top: calc(224px + var(--safeTop));
   }
 }

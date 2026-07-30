@@ -1,5 +1,25 @@
 import { characterDefinitions, GetCharacterDefinition, GetEnemyRoleDefinition } from "./Data_Characters.mjs";
-import { campaignOperationDefinitions, missionDefinition } from "./Data_Mission.mjs";
+import {
+  campaignOperationDefinitions,
+  missionDefinition as legacyMissionDefinition,
+} from "./Data_Mission.mjs";
+import {
+  GetOperationLayout,
+  GetOperationLayoutByCampaignIndex,
+  operationLayoutDefinitions,
+} from "./Data_Operations.mjs";
+import { CreateOperationRuntime } from "./Script_OperationFlow.mjs";
+
+let activeMissionDefinition = legacyMissionDefinition;
+
+export function SetActiveMissionDefinition(definition = legacyMissionDefinition) {
+  activeMissionDefinition = definition ?? legacyMissionDefinition;
+  return activeMissionDefinition;
+}
+
+export function GetMissionDefinitionForState(state = null) {
+  return GetOperationLayout(state?.operationLayoutId) ?? state?.missionDefinition ?? activeMissionDefinition;
+}
 
 export const simulationConfig = Object.freeze({
   fixedStep: 1 / 30,
@@ -47,7 +67,45 @@ export function PointInsideBox(point, box, padding = 0) {
   );
 }
 
-export function SegmentIntersectsBox(start, end, box, padding = 0) {
+function PointInsideTerrainZone(point, zone) {
+  if (Number.isFinite(zone.radius)) return DistanceSquared(point, zone) <= zone.radius * zone.radius;
+  return Number.isFinite(zone.width) && Number.isFinite(zone.depth) && PointInsideBox(point, zone);
+}
+
+export function GetTerrainElevation(position, definition = activeMissionDefinition) {
+  const baseElevation = Number(definition?.baseElevation) || 0;
+  const candidates = (definition?.zones ?? [])
+    .filter((zone) => Number.isFinite(zone.elevation) && PointInsideTerrainZone(position, zone))
+    .map((zone) => {
+      const normalizedX = Number.isFinite(zone.width) && zone.width > 0
+        ? Clamp((position.x - zone.x) / zone.width, -0.5, 0.5)
+        : 0;
+      const normalizedZ = Number.isFinite(zone.depth) && zone.depth > 0
+        ? Clamp((position.z - zone.z) / zone.depth, -0.5, 0.5)
+        : 0;
+      const slope = zone.elevationSlope ?? {};
+      return {
+        elevation:
+          zone.elevation +
+          (Number(slope.x) || 0) * normalizedX +
+          (Number(slope.z) || 0) * normalizedZ,
+        priority: Number(zone.elevationPriority) || 0,
+        area: Number.isFinite(zone.radius)
+          ? Math.PI * zone.radius * zone.radius
+          : Math.max(1, (zone.width ?? 1) * (zone.depth ?? 1)),
+      };
+    })
+    .sort((left, right) => right.priority - left.priority || left.area - right.area);
+  return baseElevation + (candidates[0]?.elevation ?? 0);
+}
+
+export function GetTacticalDistance(left, right, definition = activeMissionDefinition) {
+  const horizontalDistance = Distance(left, right);
+  const elevationDelta = GetTerrainElevation(left, definition) - GetTerrainElevation(right, definition);
+  return Math.hypot(horizontalDistance, elevationDelta);
+}
+
+function GetSegmentBoxInterval(start, end, box, padding = 0) {
   const minimumX = box.x - box.width * 0.5 - padding;
   const maximumX = box.x + box.width * 0.5 + padding;
   const minimumZ = box.z - box.depth * 0.5 - padding;
@@ -62,7 +120,7 @@ export function SegmentIntersectsBox(start, end, box, padding = 0) {
     [start.z, deltaZ, minimumZ, maximumZ],
   ]) {
     if (Math.abs(delta) < 0.00001) {
-      if (origin < minimum || origin > maximum) return false;
+      if (origin < minimum || origin > maximum) return null;
       continue;
     }
     const inverse = 1 / delta;
@@ -71,22 +129,70 @@ export function SegmentIntersectsBox(start, end, box, padding = 0) {
     if (enter > leave) [enter, leave] = [leave, enter];
     minimumTime = Math.max(minimumTime, enter);
     maximumTime = Math.min(maximumTime, leave);
-    if (minimumTime > maximumTime) return false;
+    if (minimumTime > maximumTime) return null;
+  }
+  return { enterTime: minimumTime, leaveTime: maximumTime };
+}
+
+export function SegmentIntersectsBox(start, end, box, padding = 0) {
+  return GetSegmentBoxInterval(start, end, box, padding) !== null;
+}
+
+function GetActorEyeHeight(actor) {
+  if (Number.isFinite(actor.eyeHeight)) return actor.eyeHeight;
+  if (actor.state === "downed" || actor.stance === "downed") return 0.38;
+  if (actor.stance === "crouch") return 1;
+  if (actor.stance === "sprint") return 1.42;
+  return 1.58;
+}
+
+function GetObstacleHeight(obstacle) {
+  if (Number.isFinite(obstacle.height)) return obstacle.height;
+  return obstacle.kind === "building"
+    ? 4.5
+    : obstacle.kind === "tower"
+      ? 7
+      : obstacle.kind === "wall"
+        ? 1.8
+        : 2.2;
+}
+
+export function HasLineOfSight(
+  start,
+  end,
+  obstacles = activeMissionDefinition.obstacles,
+  definition = activeMissionDefinition,
+) {
+  const startHeight = GetTerrainElevation(start, definition) + GetActorEyeHeight(start);
+  const endHeight = GetTerrainElevation(end, definition) + GetActorEyeHeight(end);
+  for (const obstacle of obstacles) {
+    if (obstacle.kind === "tower" && PointInsideBox(start, obstacle, -0.05)) continue;
+    const interval = GetSegmentBoxInterval(start, end, obstacle, -0.08);
+    if (!interval) continue;
+    const obstacleTop = GetTerrainElevation(obstacle, definition) + GetObstacleHeight(obstacle);
+    const heightAtEnter = startHeight + (endHeight - startHeight) * interval.enterTime;
+    const heightAtLeave = startHeight + (endHeight - startHeight) * interval.leaveTime;
+    if (Math.min(heightAtEnter, heightAtLeave) <= obstacleTop + 0.04) return false;
+  }
+
+  const horizontalDistance = Distance(start, end);
+  const sampleCount = Math.min(96, Math.max(8, Math.ceil(horizontalDistance / 1.25)));
+  for (let index = 1; index < sampleCount; index += 1) {
+    const time = index / sampleCount;
+    const sample = {
+      x: start.x + (end.x - start.x) * time,
+      z: start.z + (end.z - start.z) * time,
+    };
+    const rayHeight = startHeight + (endHeight - startHeight) * time;
+    if (GetTerrainElevation(sample, definition) + 0.08 >= rayHeight) return false;
   }
   return true;
 }
 
-export function HasLineOfSight(start, end, obstacles = missionDefinition.obstacles) {
-  return !obstacles.some((obstacle) => {
-    if (obstacle.kind === "tower" && PointInsideBox(start, obstacle, -0.05)) return false;
-    return SegmentIntersectsBox(start, end, obstacle, -0.08);
-  });
-}
-
 export function IsNavigationBlocked(
   position,
-  obstacles = missionDefinition.obstacles,
-  bounds = missionDefinition.bounds,
+  obstacles = activeMissionDefinition.obstacles,
+  bounds = activeMissionDefinition.bounds,
   clearance = 0.45,
 ) {
   if (
@@ -126,8 +232,8 @@ function FindNearestPassableGridCell(point, grid, obstacles, bounds, clearance) 
 
 /** Deterministic eight-neighbour A* for the ground plane. Returns waypoints, excluding start. */
 export function FindPath2D(start, destination, options = {}) {
-  const obstacles = options.obstacles ?? missionDefinition.obstacles;
-  const bounds = options.bounds ?? missionDefinition.bounds;
+  const obstacles = options.obstacles ?? activeMissionDefinition.obstacles;
+  const bounds = options.bounds ?? activeMissionDefinition.bounds;
   const clearance = options.clearance ?? 0.45;
   const cellSize = options.cellSize ?? 2;
   if (!IsNavigationBlocked(start, obstacles, bounds, clearance) && HasNavigationLine(start, destination, obstacles, bounds, clearance)) {
@@ -219,7 +325,7 @@ export function FindPath2D(start, destination, options = {}) {
   return simplified;
 }
 
-export function GetCoverAt(position, threatPosition = null, obstacles = missionDefinition.obstacles) {
+export function GetCoverAt(position, threatPosition = null, obstacles = activeMissionDefinition.obstacles) {
   const protectionByKind = { building: 0.62, wall: 0.52, tower: 0.58, crate: 0.4, wagon: 0.46 };
   let best = null;
   for (const obstacle of obstacles) {
@@ -242,7 +348,159 @@ export function GetCoverDamageMultiplier(cover, attackKind = "gunfire") {
   return Clamp(1 - effectiveness, 0.25, 1);
 }
 
-export function GetBallisticImpact(start, end, obstacles = missionDefinition.obstacles) {
+function GetShotProfile(shooter) {
+  const characterProfile = GetCharacterDefinition(shooter.id)?.tacticalProfile;
+  if (characterProfile) return characterProfile;
+  const enemyProfile = GetEnemyRoleDefinition(shooter.role);
+  return {
+    firearmAccuracy: enemyProfile.firearmAccuracy ?? 0.55,
+    effectiveRange: enemyProfile.effectiveRange ?? enemyProfile.sight ?? 18,
+    shotDamage: enemyProfile.shotDamage ?? 8,
+    suppressionPower: enemyProfile.suppressionPower ?? 0.9,
+  };
+}
+
+function GetDeterministicShotRoll(shooter, target, options) {
+  const signature = [
+    options.seed ?? 1941,
+    options.shotIndex ?? 0,
+    shooter.id ?? shooter.role ?? "shooter",
+    target.id ?? target.role ?? "target",
+    Math.round(shooter.x * 10),
+    Math.round(shooter.z * 10),
+    Math.round(target.x * 10),
+    Math.round(target.z * 10),
+    options.mode ?? "aimed",
+  ].join("|");
+  let hash = 2166136261;
+  for (let index = 0; index < signature.length; index += 1) {
+    hash ^= signature.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967296;
+}
+
+/**
+ * Pure deterministic shot resolution. Callers apply the returned damage and suppression.
+ * Cover is explicit so the same inputs always produce the same result in tests and replays.
+ */
+export function ResolveDeterministicShot(shooter, target, options = {}) {
+  const time = options.time ?? 0;
+  const mode = options.mode === "suppress" ? "suppress" : "aimed";
+  const profile = GetShotProfile(shooter);
+  const definition = options.definition ?? activeMissionDefinition;
+  const shooterElevation = GetTerrainElevation(shooter, definition);
+  const targetElevation = GetTerrainElevation(target, definition);
+  const elevationDelta = shooterElevation - targetElevation;
+  const distance = GetTacticalDistance(shooter, target, definition);
+  const cover = options.cover ?? (
+    Array.isArray(options.obstacles) ? GetCoverAt(target, shooter, options.obstacles) : null
+  );
+  const steadyActive = (shooter.steadyUntil ?? 0) > time;
+  const maneuverActive = (shooter.maneuverWindowUntil ?? 0) > time;
+  const shooterRescueCoverActive = (shooter.rescueCoverUntil ?? 0) > time;
+  const targetRescueCoverActive = (target.rescueCoverUntil ?? 0) > time;
+  const coordinationActive = Boolean(
+    shooter.coordinationLink?.partnerId && (shooter.coordinationLink.expiresAt ?? 0) > time,
+  );
+  const effectiveRange = Math.max(1, profile.effectiveRange ?? 18);
+  const distanceMultiplier = Clamp(
+    1 - Math.max(0, distance - effectiveRange * 0.2) / (effectiveRange * 1.15),
+    0.28,
+    1,
+  );
+  const shooterStanceMultiplier =
+    shooter.stance === "crouch" ? 1.08 : shooter.stance === "sprint" ? 0.62 : 1;
+  const targetStanceMultiplier =
+    target.stance === "crouch" ? 0.82 : target.stance === "sprint" ? 1.12 : 1;
+  const suppressionPenalty = Clamp(1 - (shooter.suppression ?? 0) / (steadyActive ? 190 : 125), 0.26, 1);
+  const effectiveCoverProtection = Clamp(
+    (cover?.protection ?? 0) * (maneuverActive ? 0.62 : 1),
+    0,
+    0.8,
+  );
+  const coverMultiplier = Clamp(1 - effectiveCoverProtection * 0.82, 0.34, 1);
+  const coordinationBonus =
+    (steadyActive ? 0.1 : 0) +
+    (maneuverActive ? 0.08 : 0) +
+    (shooterRescueCoverActive ? 0.07 : 0) +
+    (coordinationActive ? 0.07 : 0);
+  const targetProtectionPenalty = targetRescueCoverActive ? 0.1 : 0;
+  const modeMultiplier = mode === "suppress" ? 0.52 : 1;
+  const elevationAccuracyBonus = Clamp(elevationDelta / 45, -0.1, 0.12);
+  const rawHitChance =
+    (profile.firearmAccuracy ?? 0.55) *
+      distanceMultiplier *
+      shooterStanceMultiplier *
+      targetStanceMultiplier *
+      suppressionPenalty *
+      coverMultiplier *
+      modeMultiplier +
+    coordinationBonus -
+    targetProtectionPenalty +
+    elevationAccuracyBonus;
+  const hitChance = Clamp(rawHitChance, 0.04, 0.95);
+  const roll = GetDeterministicShotRoll(shooter, target, { ...options, mode });
+  const hit = roll < hitChance;
+  const effectiveCover = cover
+    ? Object.freeze({ ...cover, protection: effectiveCoverProtection })
+    : null;
+  const coverDamageMultiplier = GetCoverDamageMultiplier(effectiveCover, "gunfire");
+  const rescueDamageMultiplier = targetRescueCoverActive ? 0.72 : 1;
+  const baseDamage = profile.shotDamage ?? 8;
+  const damage = hit
+    ? Math.max(
+        1,
+        Math.round(
+          baseDamage *
+            (mode === "suppress" ? 0.18 : 1) *
+            coverDamageMultiplier *
+            rescueDamageMultiplier,
+        ),
+      )
+    : 0;
+  const suppressionPower = profile.suppressionPower ?? 1;
+  const targetSuppressionResistance =
+    ((target.steadyUntil ?? 0) > time ? 0.68 : 1) *
+    (targetRescueCoverActive ? 0.72 : 1);
+  const coordinationSuppressionMultiplier = coordinationActive ? 1.12 : 1;
+  const suppression = Math.round(
+    (mode === "suppress" ? (hit ? 38 : 29) : hit ? 20 : 6) *
+      suppressionPower *
+      targetSuppressionResistance *
+      coordinationSuppressionMultiplier,
+  );
+
+  return Object.freeze({
+    mode,
+    hit,
+    hitChance,
+    roll,
+    damage,
+    suppression,
+    distance,
+    cover: effectiveCover,
+    modifiers: Object.freeze({
+      firearmAccuracy: profile.firearmAccuracy ?? 0.55,
+      distanceMultiplier,
+      shooterStanceMultiplier,
+      targetStanceMultiplier,
+      suppressionPenalty,
+      coverMultiplier,
+      steadyActive,
+      maneuverActive,
+      shooterRescueCoverActive,
+      targetRescueCoverActive,
+      coordinationActive,
+      shooterElevation,
+      targetElevation,
+      elevationDelta,
+      elevationAccuracyBonus,
+    }),
+  });
+}
+
+export function GetBallisticImpact(start, end, obstacles = activeMissionDefinition.obstacles) {
   let nearest = null;
   for (const obstacle of obstacles) {
     const minimumX = obstacle.x - obstacle.width * 0.5;
@@ -281,8 +539,9 @@ export function GetBallisticImpact(start, end, obstacles = missionDefinition.obs
   return nearest;
 }
 
-export function IsPositionLit(position, environment = {}, lightingZones = missionDefinition.lightingZones ?? []) {
+export function IsPositionLit(position, environment = {}, lightingZones = activeMissionDefinition.lightingZones ?? []) {
   return lightingZones.some((zone) => {
+    if (environment.disabledLighting?.includes(zone.id)) return false;
     if (zone.generatorDependent && environment.generatorDisabled) return false;
     if (zone.kind === "circle") return DistanceSquared(position, zone) <= zone.radius * zone.radius;
     if (zone.kind === "box") return PointInsideBox(position, zone);
@@ -290,17 +549,31 @@ export function IsPositionLit(position, environment = {}, lightingZones = missio
   });
 }
 
-export function CanFriendlySeeEnemy(observer, enemy, obstacles = missionDefinition.obstacles) {
+function GetElevationSightMultiplier(observer, target, definition = activeMissionDefinition) {
+  const elevationDelta = GetTerrainElevation(observer, definition) - GetTerrainElevation(target, definition);
+  const highGroundBonus = Clamp(elevationDelta * 0.035, 0, 0.3);
+  const lowGroundPenalty = Clamp(-elevationDelta * 0.025, 0, 0.2);
+  return 1 + highGroundBonus - lowGroundPenalty;
+}
+
+export function CanFriendlySeeEnemy(
+  observer,
+  enemy,
+  obstacles = activeMissionDefinition.obstacles,
+  definition = activeMissionDefinition,
+) {
   if (["downed", "dead", "evacuated", "unavailable"].includes(observer.state)) return false;
   if (enemy.bodyHidden) return false;
   const sight = observer.id === "qinSuqiu" ? simulationConfig.scoutSight : simulationConfig.friendlySight;
   const lightBonus = IsPositionLit(enemy) ? 1.18 : 1;
-  if (Distance(observer, enemy) > sight * lightBonus) return false;
-  return HasLineOfSight(observer, enemy, obstacles);
+  const elevationSightMultiplier = GetElevationSightMultiplier(observer, enemy, definition);
+  if (GetTacticalDistance(observer, enemy, definition) > sight * lightBonus * elevationSightMultiplier) return false;
+  return HasLineOfSight(observer, enemy, obstacles, definition);
 }
 
 /** Updates only the squad's intelligence record; AI truth remains on the enemy object. */
-export function UpdateEnemyIntel(state, deltaTime = 0, obstacles = missionDefinition.obstacles) {
+export function UpdateEnemyIntel(state, deltaTime = 0, obstacles = GetMissionDefinitionForState(state).obstacles) {
+  const definition = GetMissionDefinitionForState(state);
   const RememberEnemy = (enemy) => ({
     x: enemy.x,
     z: enemy.z,
@@ -314,7 +587,7 @@ export function UpdateEnemyIntel(state, deltaTime = 0, obstacles = missionDefini
     time: state.time,
   });
   for (const enemy of state.enemies) {
-    const currentlyVisible = state.units.some((unit) => CanFriendlySeeEnemy(unit, enemy, obstacles));
+    const currentlyVisible = state.units.some((unit) => CanFriendlySeeEnemy(unit, enemy, obstacles, definition));
     enemy.currentVisible = currentlyVisible;
     if (currentlyVisible) {
       enemy.intelState = "current";
@@ -370,8 +643,8 @@ export function GetEnemyIntelRenderState(enemy) {
   };
 }
 
-export function GetZoneAt(position) {
-  return missionDefinition.zones.find((zone) => PointInsideBox(position, zone)) ?? null;
+export function GetZoneAt(position, definition = activeMissionDefinition) {
+  return definition.zones.find((zone) => PointInsideBox(position, zone)) ?? null;
 }
 
 export function IsConcealmentZone(position) {
@@ -396,21 +669,26 @@ export function GetSoundRadius(unit, movementMode = unit.stance) {
   return base * (zone?.sound ?? 1) * characterQuietBonus;
 }
 
-export function CanSee(observer, target, obstacles = missionDefinition.obstacles) {
+export function CanSee(
+  observer,
+  target,
+  obstacles = activeMissionDefinition.obstacles,
+  definition = activeMissionDefinition,
+) {
   const role = GetEnemyRoleDefinition(observer.role);
-  const distance = Distance(observer, target);
-  if (distance > role.sight) return false;
+  const distance = GetTacticalDistance(observer, target, definition);
+  if (distance > role.sight * GetElevationSightMultiplier(observer, target, definition)) return false;
   const targetAngle = Math.atan2(target.x - observer.x, target.z - observer.z);
   const angleDelta = Math.abs(NormalizeAngle(targetAngle - observer.facing));
   const insideCentral = angleDelta <= role.fov * 0.5;
   const insidePeripheral = distance <= role.peripheralSight && angleDelta <= Math.PI * 0.72;
   if (!insideCentral && !insidePeripheral) return false;
-  return HasLineOfSight(observer, target, obstacles);
+  return HasLineOfSight(observer, target, obstacles, definition);
 }
 
 export function CalculateAwarenessRate(observer, target) {
   const role = GetEnemyRoleDefinition(observer.role);
-  const distanceFactor = Clamp(1 - Distance(observer, target) / role.sight, 0.08, 1);
+  const distanceFactor = Clamp(1 - GetTacticalDistance(observer, target) / role.sight, 0.08, 1);
   const motionFactor = target.command?.kind === "move" ? (target.stance === "sprint" ? 1.55 : 1.08) : 0.72;
   const lightFactor = target.inLight ? 1.4 : 0.82;
   return 44 * distanceFactor * motionFactor * lightFactor * GetVisibilityMultiplier(target);
@@ -444,10 +722,38 @@ export function HearSound(enemy, soundEvent, seed = 1) {
   };
 }
 
-export function CreateInitialMissionState(seed = 19411018) {
-  const operation = campaignOperationDefinitions[0];
+function BuildOperationMetadata(definition, campaignIndex = 0) {
+  const authoredLayout = GetOperationLayout(definition?.id);
+  const fallback = campaignOperationDefinitions[campaignIndex % campaignOperationDefinitions.length];
+  if (!authoredLayout) return { ...fallback, mainObjectiveIds: [...fallback.mainObjectiveIds] };
+  const legacyMetadata = campaignOperationDefinitions.find(
+    (candidate) => candidate.id === authoredLayout.operationId,
+  );
+  return {
+    ...(legacyMetadata ?? {}),
+    id: authoredLayout.operationId,
+    layoutId: authoredLayout.id,
+    name: authoredLayout.name,
+    date: authoredLayout.date,
+    timeOfDay: authoredLayout.timeOfDay,
+    location: authoredLayout.location,
+    summary: authoredLayout.summary,
+    mainObjectiveIds: authoredLayout.objectives.mandatory
+      .map((objective) => objective.id)
+      .filter((objectiveId) => objectiveId !== "allExtracted"),
+    resultTitle: `${authoredLayout.name}完成，小队撤出`,
+    resultSummary: `${authoredLayout.summary} 行动组已按预定撤路脱离。`,
+    campOutcomeTitle: `${authoredLayout.name}行动归营`,
+  };
+}
+
+export function CreateInitialMissionState(seed = 19411018, definition = legacyMissionDefinition, campaignIndex = 0) {
+  const mission = definition ?? activeMissionDefinition;
+  SetActiveMissionDefinition(mission);
+  const authoredLayout = GetOperationLayout(mission.id);
+  const operation = BuildOperationMetadata(mission, campaignIndex);
   const units = characterDefinitions.map((definition, index) => {
-    const spawn = missionDefinition.playerSpawns[index];
+    const spawn = mission.playerSpawns[index];
     return {
       id: definition.id,
       name: definition.name,
@@ -474,10 +780,14 @@ export function CreateInitialMissionState(seed = 19411018) {
       shotCooldown: 0,
       hidden: true,
       inLight: false,
+      steadyUntil: 0,
+      maneuverWindowUntil: 0,
+      rescueCoverUntil: 0,
+      coordinationLink: null,
     };
   });
 
-  const enemies = missionDefinition.enemies.map((definition, index) => {
+  const enemies = mission.enemies.map((definition, index) => {
     const role = GetEnemyRoleDefinition(definition.role);
     return {
       ...definition,
@@ -505,25 +815,54 @@ export function CreateInitialMissionState(seed = 19411018) {
       lastSeenTimer: 0,
       uncertainty: 0,
       seedOffset: seed + index * 97,
+      markedUntil: 0,
+      pinnedUntil: 0,
+      isolatedUntil: 0,
+      coordinationRole: "patrol",
     };
   });
 
   const interactables = Object.fromEntries(
-    missionDefinition.interactables.map((definition) => [
+    mission.interactables.map((definition) => [
       definition.id,
       {
         id: definition.id,
         completed: false,
         progress: 0,
         droppedAt: null,
-        discovered: definition.kind === "objective" || definition.id === "alarmBell",
+        discovered:
+          definition.kind === "objective" ||
+          definition.id === "alarmBell" ||
+          definition.id === "warningGong",
       },
     ]),
   );
 
+  const objectiveIds = new Set([
+    "allExtracted",
+    ...mission.interactables.map((definition) => definition.id),
+    ...(authoredLayout?.objectives.mandatory ?? []).map((objective) => objective.id),
+    ...(authoredLayout?.objectives.optional ?? []).map((objective) => objective.id),
+  ]);
+  if (!authoredLayout) {
+    for (const objectiveId of [
+      "ledger",
+      "relay",
+      "detainee",
+      "medicines",
+      "radioParts",
+      "tools",
+      "seedGrain",
+      "generator",
+      "alarmBell",
+      "rockfall",
+    ]) objectiveIds.add(objectiveId);
+  }
+
   return {
     version: 1,
     seed,
+    operationLayoutId: authoredLayout?.id ?? null,
     operation: { ...operation, mainObjectiveIds: [...operation.mainObjectiveIds] },
     mainObjectiveIds: [...operation.mainObjectiveIds, "allExtracted"],
     time: 0,
@@ -533,30 +872,36 @@ export function CreateInitialMissionState(seed = 19411018) {
     alertLevel: 0,
     alarmState: "quiet",
     reinforcementTimer: null,
+    shotIndex: 0,
     selectedUnitIds: [units[0].id],
     units,
     enemies,
     interactables,
     soundEvents: [],
     effects: [],
-    objectives: {
-      ledger: false,
-      relay: false,
-      allExtracted: false,
-      detainee: false,
-      medicines: false,
-      radioParts: false,
-      tools: false,
-      seedGrain: false,
-      generator: false,
-      alarmBell: false,
-      rockfall: false,
-    },
+    objectives: Object.fromEntries([...objectiveIds].map((objectiveId) => [objectiveId, false])),
+    operationRuntime: authoredLayout ? CreateOperationRuntime(authoredLayout.id) : null,
+    civilians: [],
+    civilianRoutes: Object.fromEntries(
+      (authoredLayout?.civilianRoutes ?? []).map((route) => [
+        route.id,
+        { id: route.id, active: false, completed: false, pointIndex: 0, progress: 0 },
+      ]),
+    ),
     environment: {
       generatorDisabled: false,
       alarmBellDisabled: false,
       eastRoadBlocked: false,
       dustCloud: null,
+      flags: {},
+      disabledLighting: [],
+      blockedRoutes: [],
+      soundMasks: [],
+      concealmentZones: [],
+      patrolRouteOverrides: {},
+      disabledReinforcements: [],
+      enabledReinforcements: [],
+      reinforcementDelaySeconds: 0,
     },
     ledger: {
       civilianHarm: 0,
@@ -573,11 +918,29 @@ export function CreateInitialMissionState(seed = 19411018) {
       radioParts: 0,
       ammunition: 0,
     },
-    extractionZones: missionDefinition.extractionZones.map((zone) => ({ ...zone })),
+    extractionZones: mission.extractionZones.map((zone) => ({ ...zone })),
     outcome: null,
+    coordination: {
+      comboCount: 0,
+      lastCombo: null,
+      diversion: null,
+    },
+    tacticalDirector: {
+      pressure: 0,
+      lastProgress: 0,
+      lastProgressTime: 0,
+      sweepCount: 0,
+      sweepCooldown: 0,
+    },
     messages: [
-      { time: 0, kind: "brief", text: "秦素秋：电话桅杆、桥、岗楼都在眼前。先把路看明白。" },
-      { time: 0, kind: "objective", text: "目标：取得换防传令簿与线路图，剪断据点有线联络，全员撤离。" },
+      {
+        time: 0,
+        kind: "brief",
+        text: authoredLayout
+          ? `秦素秋：${authoredLayout.gameplayIdentity}`
+          : "秦素秋：先把道路、岗楼和撤路看明白。",
+      },
+      { time: 0, kind: "objective", text: operation.summary },
     ],
   };
 }
@@ -593,6 +956,46 @@ export function QueueCommand(state, unitId, command, append = false) {
   if (plannedActionCount >= simulationConfig.maximumQueueLength) return false;
   unit.queue.push({ ...command, id: `${unitId}_${state.time}_${unit.queue.length}` });
   return true;
+}
+
+function RecordCoordinationCombo(state, comboId, participants, targetIds = []) {
+  state.coordination ??= { comboCount: 0, lastCombo: null, diversion: null };
+  state.coordination.comboCount += 1;
+  state.coordination.lastCombo = {
+    id: comboId,
+    participants: [...participants],
+    targetIds: [...targetIds],
+    time: state.time,
+  };
+  return comboId;
+}
+
+export function CanBuddyRescue(state, rescuerId, patientId) {
+  const rescuer = state.units.find((unit) => unit.id === rescuerId);
+  const patient = state.units.find((unit) => unit.id === patientId);
+  if (!rescuer || !patient || rescuer.id === patient.id) return false;
+  if (rescuer.state !== "ready" || patient.state !== "downed" || rescuer.suppression >= 85) return false;
+  return Distance(rescuer, patient) <= 3.2;
+}
+
+/** Any teammate can buy bleeding time; only the medic's aid restores withdrawal capability. */
+export function ApplyBuddyRescue(state, rescuerId, patientId) {
+  if (!CanBuddyRescue(state, rescuerId, patientId)) return { success: false, reason: "unavailable" };
+  const rescuer = state.units.find((unit) => unit.id === rescuerId);
+  const patient = state.units.find((unit) => unit.id === patientId);
+  const profile = GetCharacterDefinition(rescuer.id)?.tacticalProfile;
+  const skill = profile?.rescueSkill ?? 1;
+  patient.downedTimer = Math.max(patient.downedTimer ?? 0, 12 + skill * 4);
+  patient.buddyRescuedBy = rescuer.id;
+  rescuer.rescueCommitmentUntil = state.time + 5;
+  rescuer.suppression = Clamp(rescuer.suppression + 8, 0, 100);
+  return {
+    success: true,
+    patientId,
+    rescuerId,
+    bleedingSeconds: patient.downedTimer,
+    fullStabilization: false,
+  };
 }
 
 export function ApplyAbilityCommand(state, unitId, command) {
@@ -612,27 +1015,66 @@ export function ApplyAbilityCommand(state, unitId, command) {
     const enemy = state.enemies.find((candidate) => candidate.id === command.targetId);
     if (!enemy || enemy.disabled || Distance(unit, enemy) > 26 || !HasLineOfSight(unit, enemy)) return fail("targetLost");
     enemy.revealedTimer = 18;
+    enemy.markedUntil = state.time + 18;
+    enemy.markedBy = unit.id;
     enemy.awareness = Math.max(enemy.awareness, 4);
     result.targetId = enemy.id;
+    if ((enemy.pinnedUntil ?? 0) > state.time) {
+      enemy.morale = Clamp(enemy.morale - 14, 0, 100);
+      enemy.isolatedUntil = state.time + 9;
+      result.combo = RecordCoordinationCombo(state, "markAndPin", [unit.id, enemy.pinnedBy], [enemy.id]);
+    }
   } else if (command.kind === "stone") {
     if (Distance(unit, command) > 16) return fail("outOfRange");
     state.soundEvents.push(CreateSoundEvent(command, 14, "stone", unit.id, state.time));
+    state.coordination ??= { comboCount: 0, lastCombo: null, diversion: null };
+    state.coordination.diversion = { x: command.x, z: command.z, expiresAt: state.time + 8, sourceId: unit.id };
     result.position = { x: command.x, z: command.z };
+    const coveringUnit = state.units.find(
+      (ally) => ally.id !== unit.id && (ally.overwatchTimer ?? 0) > 0 && Distance(ally, command) <= 18,
+    );
+    if (coveringUnit) {
+      coveringUnit.overwatchTimer += 4;
+      result.combo = RecordCoordinationCombo(state, "baitedCrossfire", [unit.id, coveringUnit.id]);
+    }
   } else if (command.kind === "aid") {
     const patient = state.units.find((candidate) => candidate.id === command.targetId);
     if (!patient || patient.state !== "downed" || Distance(unit, patient) > 6) return fail("targetLost");
     patient.stabilized = true;
     patient.downedTimer = null;
     patient.state = "wounded";
-    patient.health = Math.max(18, patient.health);
+    const assistant = state.units
+      .filter(
+        (ally) =>
+          ally.id !== unit.id &&
+          ally.id !== patient.id &&
+          ally.state === "ready" &&
+          ally.suppression < 75 &&
+          Distance(ally, patient) <= 4,
+      )
+      .sort((left, right) => Distance(left, patient) - Distance(right, patient))[0];
+    patient.health = Math.max(assistant ? 28 : 18, patient.health);
     patient.stance = "crouch";
     result.targetId = patient.id;
+    if (assistant) {
+      patient.escortGuardId = assistant.id;
+      patient.rescueCoverUntil = state.time + 12;
+      assistant.rescueCoverUntil = state.time + 12;
+      assistant.suppression = Math.max(0, assistant.suppression - 18);
+      result.assistantId = assistant.id;
+      result.combo = RecordCoordinationCombo(state, "buddyEvacuation", [unit.id, assistant.id], [patient.id]);
+    }
   } else if (command.kind === "steady") {
     result.allyIds = [];
     for (const ally of state.units) {
       if (Distance(unit, ally) > 8) continue;
       ally.suppression = Math.max(0, ally.suppression - 70);
+      ally.steadyUntil = state.time + 12;
+      if ((ally.overwatchTimer ?? 0) > 0) ally.overwatchTimer += 4;
       result.allyIds.push(ally.id);
+    }
+    if (result.allyIds.some((allyId) => state.units.find((ally) => ally.id === allyId)?.overwatchTimer > 10)) {
+      result.combo = RecordCoordinationCombo(state, "holdTheLine", [unit.id, ...result.allyIds]);
     }
   } else if (command.kind === "suppress") {
     if (unit.ammo < 6 || Distance(unit, command) > 20) return fail("outOfRange");
@@ -645,9 +1087,25 @@ export function ApplyAbilityCommand(state, unitId, command) {
       const enemyDirection = Math.atan2(enemy.x - unit.x, enemy.z - unit.z);
       const difference = Math.abs(NormalizeAngle(enemyDirection - direction));
       if (enemy.disabled || distance > 18 || difference > 0.52 || !HasLineOfSight(unit, enemy)) continue;
-      enemy.suppression = Clamp(enemy.suppression + 68, 0, 100);
-      enemy.morale = Clamp(enemy.morale - 18, 0, 100);
+      const marked = (enemy.markedUntil ?? 0) > state.time;
+      enemy.suppression = Clamp(enemy.suppression + (marked ? 86 : 68), 0, 100);
+      enemy.morale = Clamp(enemy.morale - (marked ? 30 : 18), 0, 100);
+      enemy.pinnedBy = unit.id;
+      enemy.pinnedUntil = state.time + 8;
+      if (marked) enemy.isolatedUntil = state.time + 9;
       result.affectedEnemyIds.push(enemy.id);
+    }
+    const maneuveringAllies = state.units.filter(
+      (ally) => ally.id !== unit.id && ally.state === "ready" && Distance(unit, ally) <= 11,
+    );
+    for (const ally of maneuveringAllies) ally.maneuverWindowUntil = state.time + 8;
+    result.maneuveringAllyIds = maneuveringAllies.map((ally) => ally.id);
+    const markedTargets = result.affectedEnemyIds.filter(
+      (enemyId) => (state.enemies.find((enemy) => enemy.id === enemyId)?.markedUntil ?? 0) > state.time,
+    );
+    if (markedTargets.length > 0) {
+      const spotterId = state.enemies.find((enemy) => enemy.id === markedTargets[0])?.markedBy ?? "qinSuqiu";
+      result.combo = RecordCoordinationCombo(state, "markAndPin", [spotterId, unit.id], markedTargets);
     }
     state.soundEvents.push(CreateSoundEvent(unit, 58, "gunshot", unit.id, state.time));
     result.position = { x: command.x, z: command.z };
@@ -656,6 +1114,18 @@ export function ApplyAbilityCommand(state, unitId, command) {
     if (!ally || ally.state !== "ready" || Distance(unit, ally) > 9) return fail("targetLost");
     unit.overwatchTimer = 10;
     ally.overwatchTimer = 10;
+    const linkKind =
+      ally.id === "qinSuqiu"
+        ? "reconnaissanceCover"
+        : ally.id === "hanShilei"
+          ? "breachCover"
+          : ally.id === "luLanzhi"
+            ? "rescueCover"
+            : "crossWatch";
+    unit.coordinationLink = { partnerId: ally.id, kind: linkKind, expiresAt: state.time + 10 };
+    ally.coordinationLink = { partnerId: unit.id, kind: linkKind, expiresAt: state.time + 10 };
+    if (linkKind === "rescueCover") ally.rescueCoverUntil = state.time + 10;
+    result.combo = RecordCoordinationCombo(state, linkKind, [unit.id, ally.id]);
     result.targetId = ally.id;
   } else {
     return fail("unsupported");
@@ -677,7 +1147,14 @@ export function GetMissionEvaluation(state) {
     (objectiveId) => objectiveId !== "allExtracted",
   );
   const completedRequired = requiredObjectiveIds.filter((objectiveId) => objectives[objectiveId]).length;
-  const civilians = Clamp(35 - state.ledger.civilianHarm * 20 - state.ledger.civilianRisk * 4, 0, 35);
+  const civilians = Clamp(
+    35 -
+      state.ledger.civilianHarm * 20 -
+      state.ledger.civilianRisk * 4 -
+      (state.ledger.civilianDisplacement ?? 0) * 3,
+    0,
+    35,
+  );
   const completeness = (completedRequired / Math.max(1, requiredObjectiveIds.length)) * 25;
   const discipline = Clamp(
     25 - state.ledger.alarmsRaised * 6 - Math.max(0, state.ledger.shotsFired - 8) * 0.35,
@@ -695,7 +1172,11 @@ export function GetMissionEvaluation(state) {
     deadCount === 0 &&
     evacuated === deployedUnits.length &&
     deployedUnits.length > 0;
-  let grade = score >= 90 && complete && state.ledger.civilianHarm === 0 ? "S" : score >= 78 && complete ? "A" : score >= 62 ? "B" : score >= 45 ? "C" : "D";
+  const noCivilianCost =
+    state.ledger.civilianHarm === 0 &&
+    state.ledger.civilianRisk === 0 &&
+    (state.ledger.civilianDisplacement ?? 0) === 0;
+  let grade = score >= 90 && complete && noCivilianCost ? "S" : score >= 78 && complete ? "A" : score >= 62 ? "B" : score >= 45 ? "C" : "D";
   if (!complete && (grade === "S" || grade === "A")) grade = "B";
   return {
     score,
@@ -709,12 +1190,12 @@ export function GetMissionEvaluation(state) {
 }
 
 export function PrepareMissionFromCamp(missionState, campState) {
-  const next = structuredClone(missionState);
-  const operation = campaignOperationDefinitions[campState.completedMissions % campaignOperationDefinitions.length];
-  next.operation = { ...operation, mainObjectiveIds: [...operation.mainObjectiveIds] };
-  next.mainObjectiveIds = [...operation.mainObjectiveIds, "allExtracted"];
+  const campaignIndex = campState.completedMissions % operationLayoutDefinitions.length;
+  const layout = GetOperationLayoutByCampaignIndex(campaignIndex);
+  const next = CreateInitialMissionState(missionState?.seed ?? 19411018, layout, campaignIndex);
+  const operation = next.operation;
   next.messages = [
-    { time: 0, kind: "brief", text: `秦素秋：下一项行动是“${operation.name}”，先确认巡逻与撤路。` },
+    { time: 0, kind: "brief", text: `秦素秋：下一项行动是“${operation.name}”，先确认巡逻、群众路线与撤路。` },
     { time: 0, kind: "objective", text: operation.summary },
   ];
   const rosterById = new Map(campState.roster.map((operative) => [operative.id, operative]));
@@ -722,6 +1203,9 @@ export function PrepareMissionFromCamp(missionState, campState) {
     const operative = rosterById.get(unit.id);
     return !operative || (!operative.lost && operative.available && operative.wounds < 2);
   });
+  if (next.operationRuntime) {
+    next.operationRuntime.deployedActorIds = next.units.map((unit) => unit.id);
+  }
   for (const unit of next.units) {
     const operative = rosterById.get(unit.id) ?? { wounds: 0, fatigue: 0 };
     const clinicLevel = campState.facilities.clinic ?? 1;
@@ -744,12 +1228,24 @@ export function PrepareMissionFromCamp(missionState, campState) {
   if (sapper && workshopLevel >= 2) sapper.charges.charge += Math.floor(workshopLevel / 2);
   const intelligenceLevel = campState.facilities.intelligence ?? 0;
   const patrols = next.enemies.filter((enemy) => enemy.patrol);
-  patrols.slice(0, intelligenceLevel * 2).forEach((enemy) => { enemy.discovered = true; });
+  const intelFreshness = campState.readiness?.intelFreshness ?? 0;
+  patrols.slice(0, intelligenceLevel * 2 + intelFreshness).forEach((enemy) => { enemy.discovered = true; });
+  const workshopNoise = campState.readiness?.workshopNoise ?? 0;
+  if (workshopNoise > 0 && campState.lastDecisionId === "repair") {
+    next.environment.campSignature = workshopNoise;
+    next.enemies.slice(0, workshopNoise).forEach((enemy) => {
+      enemy.awareness = Math.max(enemy.awareness, 12);
+      enemy.state = "suspicious";
+    });
+  }
   next.preparation = {
     clinicLevel: campState.facilities.clinic ?? 1,
     workshopLevel,
     intelligenceLevel,
     trainingLevel: campState.facilities.training ?? 0,
+    lastDecisionId: campState.lastDecisionId ?? null,
+    intelFreshness,
+    workshopNoise,
     knownPatrolIds: patrols.filter((enemy) => enemy.discovered).map((enemy) => enemy.id),
   };
   return next;
@@ -758,16 +1254,25 @@ export function PrepareMissionFromCamp(missionState, campState) {
 export function CreateInitialCampState() {
   return {
     day: 1,
+    sorties: 0,
+    lastDecisionSortie: -1,
+    lastDecisionId: null,
+    decisionHistory: [],
     resources: { medicine: 1, tools: 1, radioParts: 0, food: 4, trust: 50 },
     facilities: { clinic: 1, workshop: 1, intelligence: 0, training: 0 },
+    readiness: { intelFreshness: 0, workshopNoise: 0, villageSupport: 0 },
     roster: characterDefinitions.map((character) => ({ id: character.id, wounds: 0, fatigue: 0, available: true, lost: false })),
-    civilianCostLedger: { harm: 0, risk: 0 },
+    civilianCostLedger: { harm: 0, risk: 0, displacement: 0 },
     completedMissions: 0,
   };
 }
 
 export function ApplyMissionToCamp(campState, missionState) {
   const next = structuredClone(campState);
+  next.sorties = (next.sorties ?? 0) + 1;
+  next.readiness ??= { intelFreshness: 0, workshopNoise: 0, villageSupport: 0 };
+  next.readiness.intelFreshness = Math.max(0, (next.readiness.intelFreshness ?? 0) - 1);
+  next.readiness.workshopNoise = Math.max(0, (next.readiness.workshopNoise ?? 0) - 1);
   if (GetMissionEvaluation(missionState).complete) next.completedMissions += 1;
   next.day += 2;
   next.resources.medicine += missionState.supplies.medicine;
@@ -778,12 +1283,16 @@ export function ApplyMissionToCamp(campState, missionState) {
       (missionState.objectives.detainee ? 5 : 0) +
       (missionState.objectives.seedGrain ? 7 : 0) -
       missionState.ledger.civilianRisk * 3 -
-      missionState.ledger.civilianHarm * 12,
+      missionState.ledger.civilianHarm * 12 -
+      (missionState.ledger.civilianDisplacement ?? 0) * 2,
     0,
     100,
   );
+  next.civilianCostLedger ??= { harm: 0, risk: 0, displacement: 0 };
+  next.civilianCostLedger.displacement ??= 0;
   next.civilianCostLedger.harm += missionState.ledger.civilianHarm;
   next.civilianCostLedger.risk += missionState.ledger.civilianRisk;
+  next.civilianCostLedger.displacement += missionState.ledger.civilianDisplacement ?? 0;
   for (const operative of next.roster) {
     const unit = missionState.units.find((candidate) => candidate.id === operative.id);
     if (!unit) continue;
@@ -800,28 +1309,91 @@ export function ApplyMissionToCamp(campState, missionState) {
   return next;
 }
 
+export function GetCampDecisionOptions(campState) {
+  const clinicLevel = campState.facilities.clinic ?? 1;
+  const workshopLevel = campState.facilities.workshop ?? 1;
+  const intelligenceLevel = campState.facilities.intelligence ?? 0;
+  const decisionSpent = campState.lastDecisionSortie === (campState.sorties ?? 0);
+  return [
+    {
+      id: "treat",
+      available:
+        !decisionSpent &&
+        campState.resources.medicine >= (clinicLevel >= 3 ? 2 : 1) &&
+        campState.roster.some((operative) => !operative.lost && operative.wounds > 0),
+      costs: { medicine: clinicLevel >= 3 ? 2 : 1, opportunity: "workshopSignalsTraining" },
+      payoff: "recoverWoundedAndClinicCapacity",
+    },
+    {
+      id: "repair",
+      available: !decisionSpent && campState.resources.tools >= (workshopLevel >= 2 ? 2 : 1),
+      costs: { tools: workshopLevel >= 2 ? 2 : 1, fatigue: 1, opportunity: "medicalSignalsTraining" },
+      payoff: "demolitionCapacity",
+    },
+    {
+      id: "decode",
+      available: !decisionSpent && campState.resources.radioParts >= (intelligenceLevel >= 2 ? 2 : 1),
+      costs: { radioParts: intelligenceLevel >= 2 ? 2 : 1, scoutFatigue: 1, opportunity: "medicalWorkshopTraining" },
+      payoff: "freshPatrolIntel",
+    },
+    {
+      id: "rest",
+      available: !decisionSpent && campState.resources.food >= 1,
+      costs: { food: 1, intelFreshness: 1, opportunity: "medicalWorkshopSignals" },
+      payoff: "fatigueRecoveryAndTraining",
+    },
+  ];
+}
+
 export function ApplyCampAction(campState, actionId) {
   const next = structuredClone(campState);
+  next.readiness ??= { intelFreshness: 0, workshopNoise: 0, villageSupport: 0 };
+  next.decisionHistory ??= [];
+  const currentSortie = next.sorties ?? 0;
+  if (next.lastDecisionSortie === currentSortie) {
+    return { state: campState, success: false, message: "本次出击后的整备窗口已经用于另一项工作。" };
+  }
+  const CommitDecision = (message) => {
+    next.lastDecisionSortie = currentSortie;
+    next.lastDecisionId = actionId;
+    next.decisionHistory.push({ sortie: currentSortie, day: next.day, actionId });
+    if (next.decisionHistory.length > 12) next.decisionHistory.shift();
+    return { state: next, success: true, message };
+  };
   if (actionId === "treat") {
     const patient = next.roster.find((operative) => !operative.lost && operative.wounds > 0);
+    const medicineCost = (next.facilities.clinic ?? 1) >= 3 ? 2 : 1;
+    if (next.resources.medicine < medicineCost) {
+      return { state: campState, success: false, message: "药品不足，无法维持当前救护等级的轮值。" };
+    }
     if (!patient || next.resources.medicine < 1) return { state: campState, success: false, message: "没有可用药品或没有需要处理的伤员。" };
-    next.resources.medicine -= 1;
+    next.resources.medicine -= medicineCost;
     patient.wounds -= 1;
+    patient.fatigue = Math.max(0, patient.fatigue - 1);
     patient.available = patient.wounds < 2;
     next.facilities.clinic = Math.min(3, (next.facilities.clinic ?? 1) + 1);
-    return { state: next, success: true, message: "救护所处理了一名伤员并完善流程；等级提高会改善带伤出动与救护携行量。" };
+    next.day += 1;
+    return CommitDecision("救护轮值处理一名伤员；本轮无法同时升级工坊、情报或训练。");
   }
   if (actionId === "repair") {
-    if (next.resources.tools < 1) return { state: campState, success: false, message: "工具不足。" };
-    next.resources.tools -= 1;
+    const toolCost = (next.facilities.workshop ?? 1) >= 2 ? 2 : 1;
+    if (next.resources.tools < toolCost) return { state: campState, success: false, message: "工具不足。" };
+    next.resources.tools -= toolCost;
     next.facilities.workshop = Math.min(3, next.facilities.workshop + 1);
-    return { state: next, success: true, message: "工坊完成了一次修整，下次任务可多带一件破袭器材。" };
+    const engineer = next.roster.find((operative) => operative.id === "hanShilei" && !operative.lost);
+    if (engineer) engineer.fatigue = Clamp(engineer.fatigue + 1, 0, 3);
+    next.readiness.workshopNoise = Math.min(3, (next.readiness.workshopNoise ?? 0) + 1);
+    return CommitDecision("工坊赶制破袭器材；工程员承担额外疲劳，且本轮放弃其他整备。");
   }
   if (actionId === "decode") {
-    if (next.resources.radioParts < 1) return { state: campState, success: false, message: "缺少收报机零件。" };
-    next.resources.radioParts -= 1;
+    const partsCost = (next.facilities.intelligence ?? 0) >= 2 ? 2 : 1;
+    if (next.resources.radioParts < partsCost) return { state: campState, success: false, message: "收报机零件不足。" };
+    next.resources.radioParts -= partsCost;
     next.facilities.intelligence = Math.min(3, next.facilities.intelligence + 1);
-    return { state: next, success: true, message: "情报角恢复收报，下次任务会提前揭示一段巡逻。" };
+    const scout = next.roster.find((operative) => operative.id === "qinSuqiu" && !operative.lost);
+    if (scout) scout.fatigue = Clamp(scout.fatigue + 1, 0, 3);
+    next.readiness.intelFreshness = 3;
+    return CommitDecision("情报角通宵守听，换来下一次行动的鲜活巡逻情报；联络员承担疲劳。");
   }
   if (actionId === "rest") {
     for (const operative of next.roster) {
@@ -839,15 +1411,14 @@ export function ApplyCampAction(campState, actionId) {
       }
       next.resources.food = Math.max(0, next.resources.food - 2);
       next.day += 4;
-      return {
-        state: next,
-        success: true,
-        message: "行动组停留四日疗养并消耗 2 份口粮；一名重伤队员恢复到可带伤行动。",
-      };
+      return CommitDecision("行动组停留四日疗养并消耗两份口粮；一名重伤队员恢复到可带伤行动。");
     }
+    if (next.resources.food < 1) return { state: campState, success: false, message: "口粮不足，无法组织完整休整。" };
+    next.resources.food -= 1;
     next.day += 1;
     next.facilities.training = Math.min(3, (next.facilities.training ?? 0) + 1);
-    return { state: next, success: true, message: "全队休整并复盘一日；训练等级提高会改善士气、移速与压制恢复。" };
+    next.readiness.intelFreshness = Math.max(0, (next.readiness.intelFreshness ?? 0) - 1);
+    return CommitDecision("全队消耗一份口粮休整复盘；恢复疲劳并训练，但旧敌情进一步失效。");
   }
   return { state: campState, success: false, message: "未知营地行动。" };
 }
