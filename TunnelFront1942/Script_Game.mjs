@@ -17,6 +17,7 @@ import {
   GetCombatPreview,
   GetExitWindow,
   GetObjectiveSummary,
+  GetRouteSurvey,
   GetTunnelNeighbors,
   HexDistance,
   LayerIds,
@@ -111,11 +112,11 @@ const ActionCopy = Object.freeze({
   },
   [ActionIds.RECON]: {
     label: "侦察",
-    hint: "揭示 2 格土层/意图",
+    hint: "首次选主出口 · 后续复查当前格",
   },
   [ActionIds.DECOY]: {
     label: "布置假迹",
-    hint: "组织 1 · 诱离并停滞两回合",
+    hint: "组织 1 · 诱使搜索组改道一次",
   },
   [ActionIds.AMBUSH]: {
     label: "洞口伏击",
@@ -339,6 +340,19 @@ function AddStaticMap() {
       const label = CreateLabelSprite(tile.name);
       label.position.copy(WorldPosition(tile.tileKey, 1.04));
       surfaceStaticGroup.add(label);
+
+      if (["origin", "safeExit"].includes(tile.kind)) {
+        const undergroundProjection = CreateRing(markerColor, 0.46, 0.72);
+        undergroundProjection.position.copy(WorldPosition(tile.tileKey, 0.18));
+        tunnelStaticGroup.add(undergroundProjection);
+        const undergroundLabel = CreateLabelSprite(
+          tile.kind === "origin" ? `起点 · ${tile.name}` : `候选出口 · ${tile.name}`,
+          "#dce7d8",
+          "rgba(28,34,28,.9)",
+        );
+        undergroundLabel.position.copy(WorldPosition(tile.tileKey, 0.88));
+        tunnelStaticGroup.add(undergroundLabel);
+      }
     }
   }
 
@@ -480,6 +494,53 @@ function AddEntranceMarker(tileKey, node, group, underground = false) {
   }
 }
 
+function AddPlanningOverlay() {
+  if (!gameState.planningReconCompleted || !gameState.plannedExitKey) {
+    return;
+  }
+  const routeStyles = [
+    {
+      path: gameState.plannedFastPath ?? [],
+      color: 0xe2ad58,
+      label: "快掘走廊",
+      height: 0.11,
+    },
+    {
+      path: gameState.plannedQuietPath ?? [],
+      color: 0x75bfc2,
+      label: "静掘走廊",
+      height: 0.18,
+    },
+  ];
+  for (const route of routeStyles) {
+    if (route.path.length < 2) {
+      continue;
+    }
+    const points = route.path.map((tileKey) => WorldPosition(tileKey, route.height));
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(points),
+      new THREE.LineBasicMaterial({
+        color: route.color,
+        transparent: true,
+        opacity: 0.72,
+      }),
+    );
+    tunnelDynamicGroup.add(line);
+    const divergenceIndex = route.path.findIndex((tileKey, index) => (
+      index > 0
+      && routeStyles.some((candidate) => (
+        candidate !== route
+        && candidate.path[index] !== tileKey
+      ))
+    ));
+    const labelTileKey = route.path[divergenceIndex >= 1 ? divergenceIndex : 1];
+    const label = CreateLabelSprite(route.label, "#f6edce", "rgba(32,31,24,.88)");
+    label.scale.multiplyScalar(0.72);
+    label.position.copy(WorldPosition(labelTileKey, 0.76));
+    tunnelDynamicGroup.add(label);
+  }
+}
+
 function AddTunnelNetwork() {
   const nodeKeys = Object.keys(gameState.tunnels);
   const seenEdges = new Set();
@@ -584,7 +645,11 @@ function AddCivilians() {
 }
 
 function AddDecoys() {
-  for (const decoy of gameState.decoys) {
+  for (const decoy of gameState.decoys.filter((entry) => {
+    const evidenceId = entry.evidenceId
+      ?? entry.decoyId?.replace(/^Decoy/, "Evidence");
+    return !gameState.usedDecoyIds?.includes(evidenceId);
+  })) {
     const ring = CreateRing(0xf0b968, 0.62, 0.8);
     ring.position.copy(WorldPosition(decoy.tileKey, 0.22));
     surfaceDynamicGroup.add(ring);
@@ -663,6 +728,7 @@ function AddActionTargets() {
 function RenderScene() {
   ClearGroup(surfaceDynamicGroup);
   ClearGroup(tunnelDynamicGroup);
+  AddPlanningOverlay();
   AddTunnelNetwork();
   AddCivilians();
   AddDecoys();
@@ -694,6 +760,7 @@ function ActionNeedsTarget(actionId) {
     ActionIds.DECOY,
     ActionIds.ATTACK,
     ActionIds.EVACUATE,
+    ActionIds.RECON,
   ].includes(actionId);
 }
 
@@ -794,9 +861,12 @@ function CivilianStatusLabel(group) {
   }
 }
 
-function ExitWindowCardHtml(exitKey) {
+function ExitWindowCardHtml(exitKey, actionTargets) {
   const windowState = GetExitWindow(gameState, exitKey);
   const tile = gameState.tiles[exitKey];
+  const actionable = actionTargets.includes(exitKey);
+  const selected = previewAction?.actionId === actionMode
+    && previewAction?.targetKey === exitKey;
   const statusLabels = {
     Unknown: "未复查",
     Clear: `安全至 T${windowState.checkedUntilTurn}`,
@@ -807,11 +877,18 @@ function ExitWindowCardHtml(exitKey) {
   const threat = windowState.threatName
     ? `${windowState.threatName}${windowState.threatDistance <= 1 ? "已到近旁" : `距洞口 ${windowState.threatDistance} 格`}`
     : "暂无可见敌军威胁";
+  const actionHint = actionMode === ActionIds.RECON
+    ? "选择为主勘线"
+    : "预览群众转移";
+  const actionLabel = actionMode === ActionIds.RECON
+    ? `侦察${tile.name}主出口走廊`
+    : `从${tile.name}预览群众转移`;
   return `
-    <article class="exitWindowCard ${windowState.status.toLowerCase()}">
+    <button type="button" data-exit-key="${exitKey}" class="exitWindowCard ${windowState.status.toLowerCase()} ${actionable ? "actionable" : ""} ${selected ? "selected" : ""}" ${actionable ? `aria-label="${actionLabel}"` : 'aria-disabled="true" tabindex="-1"'}>
       <span>${tile.name}</span><b>${statusLabels[windowState.status]}</b>
       <small>${windowState.connected ? windowState.detail : "地道尚未接通"} · ${threat}</small>
-    </article>
+      ${actionable ? `<em>${actionHint}</em>` : ""}
+    </button>
   `;
 }
 
@@ -830,11 +907,32 @@ function RenderHud() {
   ui.SafetyValue.style.color = gameState.peopleSafety <= 60 ? "#ef877a" : "";
   ui.ObjectivePrimary.textContent = objective.primary;
   ui.ObjectiveFill.style.width = `${Math.min(100, (gameState.civiliansSafe / MissionConfig.requiredEvacuees) * 100)}%`;
+  ui.ObjectiveRecon.querySelector("span").textContent = objective.planningReconCompleted
+    ? `主勘线：${objective.plannedExitName}；出口另需上浮复查`
+    : "首次开挖前选择北/南主出口勘线；出口另需上浮复查";
   ui.ObjectiveRecon.classList.toggle("complete", gameState.planningReconCompleted);
   ui.ObjectiveDig.classList.toggle("complete", gameState.tunnelsDug > 0);
   ui.ObjectiveSweep.querySelector("span").textContent = objective.sweep;
   ui.ObjectiveSweep.classList.toggle("complete", gameState.sweepActive);
-  ui.ExitWindowBoard.innerHTML = ["2,1", "0,5"].map(ExitWindowCardHtml).join("");
+  const exitCardActionTargets = [ActionIds.RECON, ActionIds.EVACUATE].includes(actionMode)
+    ? GetActionTargets(gameState, gameState.selectedUnitId, actionMode)
+    : [];
+  ui.ExitWindowBoard.innerHTML = ["2,1", "0,5"]
+    .map((exitKey) => ExitWindowCardHtml(exitKey, exitCardActionTargets))
+    .join("");
+  for (const button of ui.ExitWindowBoard.querySelectorAll(".exitWindowCard.actionable")) {
+    button.addEventListener("click", () => {
+      SetPreview({
+        actionId: actionMode,
+        unitId: gameState.selectedUnitId,
+        targetKey: button.dataset.exitKey,
+        groupId: actionMode === ActionIds.EVACUATE ? selectedEvacGroupId : undefined,
+      });
+      for (const card of ui.ExitWindowBoard.querySelectorAll(".exitWindowCard")) {
+        card.classList.toggle("selected", card === button);
+      }
+    });
+  }
   if (!gameState.civilians.some((group) => (
     group.groupId === selectedEvacGroupId
     && group.status === "Waiting"
@@ -974,6 +1072,14 @@ function BuildPreview(action) {
       };
     }
     case ActionIds.RECON:
+      if (gameState.tunnelsDug === 0 && !gameState.planningReconCompleted) {
+        const survey = GetRouteSurvey(gameState, action.targetKey);
+        return {
+          eyebrow: "主走廊勘线预览",
+          title: `以${survey.exitName}为主出口`,
+          body: `快掘：${survey.fast.segments} 段 / 工具 ${survey.fast.tools} / 噪音 ${survey.fast.noise}${survey.fast.unstable ? ` / 返沙 ${survey.fast.unstable}` : ""}；静掘：${survey.quiet.segments} 段 / 工具 ${survey.quiet.tools} / 噪音 ${survey.quiet.noise}${survey.quiet.knownEntrances ? ` / 已知旧洞 ${survey.quiet.knownEntrances}` : ""}。最近威胁：${survey.nearestThreat?.name ?? "无"}，距出口 ${survey.nearestThreat?.distance ?? "-"} 格。确认后揭示两条候选走廊；主出口接通前不能改用另一出口发车。`,
+        };
+      }
       if (tile.kind === "safeExit") {
         const windowState = GetExitWindow(gameState, tile.tileKey);
         return {
@@ -993,7 +1099,7 @@ function BuildPreview(action) {
       return {
         eyebrow: "欺骗预览",
         title: `在${tile.name}布置假迹`,
-        body: "1 AP｜组织 1｜暴露 -8｜假迹持续 4 回合；成功诱导会让搜索组随后停滞 2 回合",
+        body: "1 AP｜组织 1｜暴露 -8｜假迹持续 4 回合；成功诱导会让搜索组浪费当次行动改道，但不会额外停摆",
       };
     case ActionIds.AMBUSH: {
       const warningReserved = gameState.warnings.some((warning) => (
@@ -1288,7 +1394,7 @@ function StartGame({ reset = false } = {}) {
   ui.HelpScreen.hidden = true;
   ui.OutcomeScreen.hidden = true;
   SetLayer(gameState.selectedLayer ?? LayerIds.SURFACE);
-  ShowToast("第一步：先让交通员侦察，再根据当局土层与敌情规划开挖。");
+  ShowToast("第一步：让交通员侦察，并在地图上选择北枣窖或西南苇井作为主勘线出口。");
 }
 
 function RestartGame() {

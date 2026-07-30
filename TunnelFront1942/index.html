@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#171a17">
   <meta name="description" content="《地火线》是一款原创 Three.js 六角格回合制地道战策略白盒。侦察土层、规划地道、应对封锁与扫荡，掩护群众安全撤离。">
   <title>地火线｜原创 Three.js 地道战策略白盒</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260730g">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260730m">
   <script type="importmap">
     {
       "imports": {
@@ -63,7 +63,7 @@
       <div class="objectiveProgress"><i id="ObjectiveFill"></i></div>
       <section id="ExitWindowBoard" class="exitWindowBoard" aria-label="出口地面窗口"></section>
       <ul>
-        <li id="ObjectiveRecon"><i></i><span>首次开挖前侦察；出口另需上浮复查</span></li>
+        <li id="ObjectiveRecon"><i></i><span>首次开挖前选择北/南主出口勘线；出口另需上浮复查</span></li>
         <li id="ObjectiveDig"><i></i><span>至少新挖 1 段地道</span></li>
         <li id="ObjectiveSweep"><i></i><span>4 回合后扫荡</span></li>
         <li><i></i><span>杀敌不计分；群众受难只记入代价账本</span></li>
@@ -117,7 +117,7 @@
         <h1>地火线</h1>
         <h2>一条地道，不是一条没有风险的捷径</h2>
         <div class="titleRule">
-          <span><b>侦察</b>看清土层与敌军意图</span>
+          <span><b>侦察</b>选主出口，比较快掘与静掘走廊</span>
           <span><b>规划</b>短险北线或长稳南线</span>
           <span><b>反制</b>假迹、陷阱、伏击与备用出口</span>
           <span><b>撤离</b>十一回合内安全转移至少六人</span>
@@ -148,10 +148,10 @@
         <small>玩法规则</small>
         <h2>地面提供情报与窗口，地下提供路线与风险</h2>
         <div class="helpGrid">
-          <section><b>1 · 侦察与信号</b><p>首次开挖前完成侦察，才算基于当局土层与敌情规划路线。群众到达出口下方后不会自动出洞；交通员须从该出口上浮复查，消耗 1 点组织并发出两回合安全信号。同一格复查须间隔一回合。</p></section>
+          <section><b>1 · 勘线与信号</b><p>首次开挖前必须选择北枣窖或西南苇井作为主出口勘线；地图会同时投影快掘与静掘两条候选走廊，揭示其工具、噪音、返沙和最近敌情。主出口接通前不能改用另一出口发车，但接通后仍可补挖备用支线。群众到达出口下方后不会自动出洞；交通员须从该出口上浮复查，消耗 1 点组织并发出两回合安全信号。</p></section>
           <section><b>2 · 挖掘</b><p>地道队进入赵庄入口后，从相邻六角格连续开挖。黏土费工具，树根层动静大，返沙层必须及时支护。</p></section>
           <section><b>3 · 敌军证据</b><p>敌军只依据地表目击、开挖声、脚印和枪声行动，不会读取隐藏地道。工兵扫荡时机动 2 格；确认洞口并抵达相邻格后，仍会提前一整回合预告封洞或灌烟。</p></section>
-          <section><b>4 · 回答窗口</b><p>出口显示未复查、安全、敌军监视、封洞或烟流。未知状态只让群众安全等待；假迹能诱离并停滞搜索组两回合。已有封洞/灌烟预警时，伏击或陷阱会锁定预警工兵，不会被无关敌军抢先消耗。至少六人安全撤离且所有已发车群众完成结算才算胜利。</p></section>
+          <section><b>4 · 回答窗口</b><p>出口显示未复查、安全、敌军监视、封洞或烟流。未知状态只让群众安全等待；假迹会让搜索组浪费当次行动调查错误方向，但不会继续停摆，仍须用陷阱、伏击、压制或备用出口接住后续压力。已有封洞/灌烟预警时，伏击或陷阱会锁定预警工兵，不会被无关敌军抢先消耗。至少六人安全撤离且所有已发车群众完成结算才算胜利。</p></section>
         </div>
         <button id="CloseHelpConfirmButton" class="primaryModalButton" type="button">回到战场</button>
       </article>
@@ -178,6 +178,6 @@
     <div id="Toast" class="toast" hidden role="status" aria-live="polite"></div>
   </main>
   <noscript>《地火线》需要启用 JavaScript 才能运行。</noscript>
-  <script type="module" src="./Script_Game.mjs?v=20260730g"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260730m"></script>
 </body>
 </html>

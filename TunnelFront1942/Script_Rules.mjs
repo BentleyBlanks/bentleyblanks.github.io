@@ -140,6 +140,112 @@ function IsAlive(actor) {
   return actor && actor.health > 0;
 }
 
+function SurveyStepCost(state, tileKey, mode) {
+  const tile = state.tiles[tileKey];
+  const soil = SoilCatalog[tile.soilId];
+  const instabilityPenalty = soil.stability === 1 ? 8 : 0;
+  const knownEntrancePenalty = tile.entranceKnownByEnemy ? 24 : 0;
+  if (mode === "Quiet") {
+    return soil.noise * 10 + soil.digCost * 2 + instabilityPenalty + knownEntrancePenalty;
+  }
+  return soil.digCost * 10 + soil.noise + instabilityPenalty + knownEntrancePenalty;
+}
+
+function FindSurveyPath(state, exitKey, mode) {
+  const startKey = "6,2";
+  const costs = new Map([[startKey, 0]]);
+  const previous = new Map([[startKey, null]]);
+  const open = [startKey];
+  while (open.length) {
+    open.sort((first, second) => (
+      costs.get(first) - costs.get(second)
+      || first.localeCompare(second)
+    ));
+    const currentKey = open.shift();
+    if (currentKey === exitKey) {
+      break;
+    }
+    for (const neighborKey of NeighborKeys(currentKey)) {
+      if (!state.tiles[neighborKey]) {
+        continue;
+      }
+      const nextCost = costs.get(currentKey) + SurveyStepCost(state, neighborKey, mode);
+      if (nextCost >= (costs.get(neighborKey) ?? Infinity)) {
+        continue;
+      }
+      costs.set(neighborKey, nextCost);
+      previous.set(neighborKey, currentKey);
+      open.push(neighborKey);
+    }
+  }
+  if (!previous.has(exitKey)) {
+    return [];
+  }
+  const path = [];
+  for (let cursor = exitKey; cursor !== null; cursor = previous.get(cursor)) {
+    path.unshift(cursor);
+  }
+  return path;
+}
+
+function SummarizeSurveyPath(state, path) {
+  return path.slice(1).reduce((summary, tileKey) => {
+    if (state.tunnels[tileKey]) {
+      return summary;
+    }
+    const tile = state.tiles[tileKey];
+    const soil = SoilCatalog[tile.soilId];
+    summary.tools += soil.digCost;
+    summary.noise += soil.noise;
+    summary.unstable += soil.stability === 1 ? 1 : 0;
+    summary.knownEntrances += tile.entranceKnownByEnemy ? 1 : 0;
+    return summary;
+  }, {
+    segments: Math.max(0, path.length - 1),
+    tools: 0,
+    noise: 0,
+    unstable: 0,
+    knownEntrances: 0,
+  });
+}
+
+export function GetRouteSurvey(state, exitKey) {
+  if (!evacuationExitKeys.includes(exitKey) || !state.tiles[exitKey]) {
+    return null;
+  }
+  const fastPath = FindSurveyPath(state, exitKey, "Fast");
+  const quietPath = FindSurveyPath(state, exitKey, "Quiet");
+  const corridorKeys = new Set([...fastPath, ...quietPath]);
+  for (const tileKey of [...corridorKeys]) {
+    for (const neighborKey of NeighborKeys(tileKey)) {
+      if (state.tiles[neighborKey]) {
+        corridorKeys.add(neighborKey);
+      }
+    }
+  }
+  const threats = state.enemies
+    .filter(IsAlive)
+    .map((enemy) => ({
+      enemyId: enemy.enemyId,
+      name: enemy.name,
+      distance: HexDistance(enemy.tileKey, exitKey),
+    }))
+    .sort((first, second) => (
+      first.distance - second.distance
+      || first.enemyId.localeCompare(second.enemyId)
+    ));
+  return {
+    exitKey,
+    exitName: state.tiles[exitKey].name,
+    fastPath,
+    quietPath,
+    fast: SummarizeSurveyPath(state, fastPath),
+    quiet: SummarizeSurveyPath(state, quietPath),
+    corridorKeys: [...corridorKeys].sort(),
+    nearestThreat: threats[0] ?? null,
+  };
+}
+
 function CreateTunnelNode(tile, options = {}) {
   return {
     tileKey: tile.tileKey,
@@ -249,6 +355,10 @@ export function CreateInitialState(options = {}) {
     trapsTriggered: 0,
     reconActions: 0,
     planningReconCompleted: false,
+    plannedExitKey: null,
+    plannedCorridorKeys: [],
+    plannedFastPath: [],
+    plannedQuietPath: [],
     lastReconTurn: 0,
     reconVisitedTiles: [],
     reconTileTurns: {},
@@ -261,7 +371,7 @@ export function CreateInitialState(options = {}) {
     outcome: null,
     lastFailureCause: null,
   };
-  AddLog(state, "info", "第 4 回合转移信号生效，第 5 回合扫荡开始。先侦察土层与敌军意图，再决定地道走向。");
+  AddLog(state, "info", "第 4 回合转移信号生效，第 5 回合扫荡开始。先选择北枣窖或西南苇井主勘线，再比较快掘与静掘走廊。");
   PlanEnemyTurn(state);
   return state;
 }
@@ -437,7 +547,40 @@ export function GetEvacuationTargets(state, unitId) {
   ) {
     return [];
   }
-  return FindEvacuationPaths(state).map((entry) => entry.exitKey);
+  const paths = FindEvacuationPaths(state);
+  if (
+    state.plannedExitKey
+    && !paths.some((entry) => entry.exitKey === state.plannedExitKey)
+  ) {
+    return [];
+  }
+  return paths.map((entry) => entry.exitKey);
+}
+
+export function GetReconTargets(state, unitId) {
+  const unit = GetUnit(state, unitId);
+  if (
+    !UnitCanAct(unit)
+    || unit.role !== "Scout"
+    || unit.layer !== LayerIds.SURFACE
+    || state.lastReconTurn === state.turn
+  ) {
+    return [];
+  }
+  const repeatRecon = state.reconActions > 0;
+  if (repeatRecon && state.organization < 1) {
+    return [];
+  }
+  if (
+    repeatRecon
+    && (state.reconTileTurns?.[unit.tileKey] ?? -Infinity) >= state.turn - 1
+  ) {
+    return [];
+  }
+  if (state.tunnelsDug === 0 && !state.planningReconCompleted) {
+    return [...evacuationExitKeys];
+  }
+  return [unit.tileKey];
 }
 
 export function GetActionTargets(state, unitId, actionId) {
@@ -452,6 +595,8 @@ export function GetActionTargets(state, unitId, actionId) {
       return GetDecoyTargets(state, unitId);
     case ActionIds.EVACUATE:
       return GetEvacuationTargets(state, unitId);
+    case ActionIds.RECON:
+      return GetReconTargets(state, unitId);
     default:
       return [];
   }
@@ -486,13 +631,7 @@ export function GetAvailableActions(state, unitId) {
   ) {
     actions.push(ActionIds.BRACE);
   }
-  if (
-    unit.role === "Scout"
-    && unit.layer === LayerIds.SURFACE
-    && state.lastReconTurn !== state.turn
-    && (state.reconActions < 1 || state.organization >= 1)
-    && (state.reconActions < 1 || (state.reconTileTurns?.[unit.tileKey] ?? -Infinity) < state.turn - 1)
-  ) {
+  if (GetReconTargets(state, unitId).length) {
     actions.push(ActionIds.RECON);
   }
   if (GetDecoyTargets(state, unitId).length) {
@@ -755,52 +894,63 @@ function ApplyBrace(state, unit) {
   return { ok: true };
 }
 
-function ApplyRecon(state, unit) {
+function ApplyRecon(state, unit, targetKey) {
   const repeatRecon = state.reconActions > 0;
+  const planningRecon = state.tunnelsDug === 0 && !state.planningReconCompleted;
   state.reconVisitedTiles ??= [];
   state.reconTileTurns ??= {};
-  if (
-    unit.role !== "Scout"
-    || unit.layer !== LayerIds.SURFACE
-    || state.lastReconTurn === state.turn
-    || (repeatRecon && state.organization < 1)
-    || (repeatRecon && (state.reconTileTurns[unit.tileKey] ?? -Infinity) >= state.turn - 1)
-  ) {
-    return { ok: false, reason: "侦察每回合限一次；同一格需间隔一回合，复查消耗 1 点组织" };
+  if (!GetReconTargets(state, unit.unitId).includes(targetKey)) {
+    return {
+      ok: false,
+      reason: planningRecon
+        ? "首次侦察必须选择北枣窖或西南苇井作为主勘线出口"
+        : "复查只能针对交通员当前所在格；同一格需间隔一回合",
+    };
   }
-  const revealed = RevealAround(state, unit.tileKey, 2);
+  let revealed = 0;
+  let survey = null;
+  if (planningRecon) {
+    survey = GetRouteSurvey(state, targetKey);
+    state.plannedExitKey = targetKey;
+    state.plannedCorridorKeys = [...survey.corridorKeys];
+    state.plannedFastPath = [...survey.fastPath];
+    state.plannedQuietPath = [...survey.quietPath];
+    state.planningReconCompleted = true;
+  } else {
+    revealed = RevealAround(state, unit.tileKey, 2);
+  }
   state.intel = Clamp(state.intel + 2, 0, 9);
   if (repeatRecon) {
     state.organization -= 1;
   }
-  if (state.tunnelsDug === 0) {
-    state.planningReconCompleted = true;
-  }
   state.reconActions += 1;
   state.lastReconTurn = state.turn;
-  if (!state.reconVisitedTiles.includes(unit.tileKey)) {
-    state.reconVisitedTiles.push(unit.tileKey);
+  if (!state.reconVisitedTiles.includes(targetKey)) {
+    state.reconVisitedTiles.push(targetKey);
   }
-  state.reconTileTurns[unit.tileKey] = state.turn;
+  state.reconTileTurns[targetKey] = state.turn;
   state.exposure = Clamp(state.exposure + (repeatRecon ? -5 : 1), 0, 100);
   SpendAction(unit);
   for (const enemy of state.enemies) {
-    if (IsAlive(enemy) && HexDistance(unit.tileKey, enemy.tileKey) <= 3) {
+    const coveredByRecon = planningRecon
+      ? survey.corridorKeys.includes(enemy.tileKey)
+      : HexDistance(unit.tileKey, enemy.tileKey) <= 3;
+    if (IsAlive(enemy) && coveredByRecon) {
       enemy.intentRevealed = true;
-      enemy.scoutedUntilTurn = state.turn + 2;
+      enemy.scoutedUntilTurn = state.turn + 1;
     }
   }
-  const tile = state.tiles[unit.tileKey];
+  const tile = state.tiles[targetKey];
   let exitWindowLog = null;
-  if (tile?.kind === "safeExit") {
+  if (!planningRecon && targetKey === unit.tileKey && tile?.kind === "safeExit") {
     const windows = EnsureExitWindows(state);
-    const windowRecord = windows[unit.tileKey];
+    const windowRecord = windows[targetKey];
     windowRecord.checkedTurn = state.turn;
     windowRecord.checkedUntilTurn = state.turn + 1;
     windowRecord.signalCount += 1;
     state.exitSignalsIssued = (state.exitSignalsIssued ?? 0) + 1;
     state.intel = Math.max(0, state.intel - 1);
-    const windowState = GetExitWindow(state, unit.tileKey);
+    const windowState = GetExitWindow(state, targetKey);
     exitWindowLog = {
       kind: windowState.status === "Clear" ? "good" : "warning",
       text: windowState.status === "Clear"
@@ -811,14 +961,16 @@ function ApplyRecon(state, unit) {
   AddLog(
     state,
     "good",
-    repeatRecon
+    planningRecon
+      ? `交通员完成${survey.exitName}主勘线：快掘 ${survey.fast.segments} 段/工具 ${survey.fast.tools}/噪音 ${survey.fast.noise}，静掘 ${survey.quiet.segments} 段/工具 ${survey.quiet.tools}/噪音 ${survey.quiet.noise}；最近威胁为${survey.nearestThreat?.name ?? "无"}（距出口 ${survey.nearestThreat?.distance ?? "-"} 格）。主出口接通前不能改用另一出口发车。`
+      : repeatRecon
       ? `交通员消耗 1 点组织复查地表，排除旧痕并标出敌军下一步意图；暴露下降 5。`
       : `交通员查清附近 ${revealed} 格土层，并标出可见敌军下一步意图。`,
   );
   if (exitWindowLog) {
     AddLog(state, exitWindowLog.kind, exitWindowLog.text);
   }
-  if (!state.planningReconCompleted && state.tunnelsDug > 0) {
+  if (!planningRecon && !state.planningReconCompleted && state.tunnelsDug > 0) {
     AddLog(
       state,
       "warning",
@@ -843,6 +995,7 @@ function ApplyDecoy(state, unit, targetKey) {
     expiresTurn: state.turn + 4,
   });
   const evidence = AddEvidence(state, "Decoy", targetKey, 0.95, unit.shortName);
+  state.decoys.at(-1).evidenceId = evidence.evidenceId;
   evidence.expiresTurn = state.turn + 4;
   state.exposure = Clamp(state.exposure - 8, 0, 100);
   state.decoysUsed += 1;
@@ -949,12 +1102,22 @@ function ApplyEvacuate(state, unit, exitKey, groupId = null) {
     entry.status === "Waiting"
     && (!groupId || entry.groupId === groupId)
   ));
-  if (
-    !route
-    || !group
-    || !GetEvacuationTargets(state, unit.unitId).includes(exitKey)
-  ) {
-    return { ok: false, reason: "该出口尚未接通，或没有待转移群众" };
+  if (!group) {
+    return { ok: false, reason: "没有待转移群众，或所选群众已经发车" };
+  }
+  if (!route) {
+    return { ok: false, reason: "该出口的地道尚未接通" };
+  }
+  if (!GetEvacuationTargets(state, unit.unitId).includes(exitKey)) {
+    const plannedRouteConnected = !state.plannedExitKey
+      || paths.some((entry) => entry.exitKey === state.plannedExitKey);
+    if (!plannedRouteConnected) {
+      return {
+        ok: false,
+        reason: `主勘线出口${state.tiles[state.plannedExitKey].name}尚未接通；接通前不能从其他出口发车`,
+      };
+    }
+    return { ok: false, reason: "当前单位、回合或组织条件不允许发车" };
   }
   group.status = "Moving";
   group.path = [...route.path];
@@ -1024,7 +1187,7 @@ export function ApplyPlayerAction(inputState, action = {}) {
       result = ApplyBrace(state, unit);
       break;
     case ActionIds.RECON:
-      result = ApplyRecon(state, unit);
+      result = ApplyRecon(state, unit, action.targetKey);
       break;
     case ActionIds.DECOY:
       result = ApplyDecoy(state, unit, action.targetKey);
@@ -1223,8 +1386,13 @@ export function PlanEnemyTurn(state) {
   );
   const claimedEvidenceIds = new Set();
   for (const enemy of state.enemies) {
+    const coveredByRouteIntel = Boolean(
+      state.plannedCorridorKeys?.includes(enemy.tileKey)
+      && state.intel > 0
+    );
     enemy.intentRevealed = (enemy.scoutedUntilTurn ?? 0) >= state.turn
-      || HexDistance("6,2", enemy.tileKey) <= 2;
+      || HexDistance("6,2", enemy.tileKey) <= 2
+      || coveredByRouteIntel;
     if (!IsAlive(enemy)) {
       enemy.intent = null;
       continue;
@@ -1673,12 +1841,16 @@ function ResolveEnemyIntent(state, enemy) {
         && !state.usedDecoyIds.includes(intent.evidenceId)
       ) {
         state.usedDecoyIds.push(intent.evidenceId);
+        state.decoys = state.decoys.filter((decoy) => {
+          const decoyEvidenceId = decoy.evidenceId
+            ?? decoy.decoyId?.replace(/^Decoy/, "Evidence");
+          return decoyEvidenceId !== intent.evidenceId;
+        });
         state.decoyDiversions += 1;
-        enemy.stunnedUntilTurn = Math.max(enemy.stunnedUntilTurn ?? 0, state.turn + 2);
         AddLog(
           state,
           "good",
-          `${enemy.name}被假迹带离原搜索轴线；真实行动热度下降，搜索组随后两回合停滞。`,
+          `${enemy.name}被假迹带离原搜索轴线；搜索组已浪费本回合调查错误方向，但不会继续原地停摆。`,
         );
       }
       if (intent.intentId === EnemyIntentIds.INVESTIGATE && intent.evidenceTarget) {
@@ -1989,9 +2161,9 @@ export function EvaluateMission(state) {
         status: "Defeat",
         path: ClassifyRoute(state),
         title: "路线通了，敌情却没有查清",
-        summary: `虽已转移 ${safePeople}/${MissionConfig.totalEvacuees} 人，但首次开挖前没有完成地面侦察，无法证明路线基于当局敌情。`,
+        summary: `虽已转移 ${safePeople}/${MissionConfig.totalEvacuees} 人，但首次开挖前没有选择主出口完成走廊勘线，无法证明路线基于当局敌情。`,
         failureId: "ReconMissing",
-        tip: "第一回合让交通员在地面执行一次【侦察】，再决定北线或南线。",
+        tip: "第一回合让交通员执行【侦察】，在地图上选择北枣窖或西南苇井，比较快掘/静掘走廊后再开挖。",
         causeChain: state.eventLedger.slice(-6),
         peopleSafety: state.peopleSafety,
         survivingUnits,
@@ -2002,13 +2174,16 @@ export function EvaluateMission(state) {
     ));
     if (missedWindowGroup) {
       const windowState = GetExitWindow(state, missedWindowGroup.exitKey);
+      const counterplayTip = state.decoyDiversions > 0
+        ? "假迹已经消耗；改用压制、陷阱、伏击或备用出口接住后续压力"
+        : "若窗口受压，可先诱敌、压制，或改走另一出口";
       return {
         status: "Defeat",
         path: ClassifyRoute(state),
         title: "群众到了洞口，地面信号却没接上",
         summary: `${missedWindowGroup.name}停在${state.tiles[missedWindowGroup.exitKey].name}下方；${windowState.detail}。`,
         failureId: "ExitWindowMissed",
-        tip: `让交通员从${state.tiles[missedWindowGroup.exitKey].name}上浮并复查；若窗口受压，先诱敌、压制或改走另一出口。`,
+        tip: `让交通员从${state.tiles[missedWindowGroup.exitKey].name}上浮并复查；${counterplayTip}。`,
         causeChain: state.eventLedger.slice(-6),
         peopleSafety: state.peopleSafety,
         survivingUnits,
@@ -2143,6 +2318,8 @@ export function GetObjectiveSummary(state) {
     waitingPeople: MissionConfig.totalEvacuees - state.civiliansSafe - movingPeople,
     exitSignalsIssued: state.exitSignalsIssued ?? 0,
     planningReconCompleted: Boolean(state.planningReconCompleted),
+    plannedExitKey: state.plannedExitKey ?? null,
+    plannedExitName: state.plannedExitKey ? state.tiles[state.plannedExitKey]?.name ?? null : null,
   };
 }
 
@@ -2212,6 +2389,31 @@ export function DeserializeState(serialized) {
     throw new Error("Unsupported TunnelFront1942 save version");
   }
   parsed.planningReconCompleted ??= parsed.reconActions > 0 && parsed.tunnelsDug === 0;
+  if (parsed.planningReconCompleted && !parsed.plannedExitKey) {
+    const connectedExit = FindEvacuationPaths(parsed)[0]?.exitKey ?? null;
+    const dugKeys = Object.keys(parsed.tunnels ?? {}).filter((tileKey) => (
+      !parsed.tunnels[tileKey].isOriginal
+    ));
+    parsed.plannedExitKey = connectedExit ?? [...evacuationExitKeys].sort((first, second) => {
+      const firstDistance = dugKeys.length
+        ? Math.min(...dugKeys.map((tileKey) => HexDistance(tileKey, first)))
+        : evacuationExitKeys.indexOf(first);
+      const secondDistance = dugKeys.length
+        ? Math.min(...dugKeys.map((tileKey) => HexDistance(tileKey, second)))
+        : evacuationExitKeys.indexOf(second);
+      return firstDistance - secondDistance;
+    })[0];
+  }
+  if (parsed.plannedExitKey) {
+    const survey = GetRouteSurvey(parsed, parsed.plannedExitKey);
+    parsed.plannedCorridorKeys ??= [...survey.corridorKeys];
+    parsed.plannedFastPath ??= [...survey.fastPath];
+    parsed.plannedQuietPath ??= [...survey.quietPath];
+  } else {
+    parsed.plannedCorridorKeys ??= [];
+    parsed.plannedFastPath ??= [];
+    parsed.plannedQuietPath ??= [];
+  }
   return parsed;
 }
 
@@ -2251,6 +2453,8 @@ export function CreateRulesApi() {
     GetDigTargets,
     GetAttackTargets,
     GetEvacuationTargets,
+    GetReconTargets,
+    GetRouteSurvey,
     FindTunnelPath,
     FindEvacuationPaths,
     GetCombatPreview,
