@@ -1293,6 +1293,95 @@ Test("破袭列出即可打：带撤退路线，且执行不被结算条件打�
   assert.equal(outcome.report.ok, true, `破袭被结算条件打回：${outcome.report.reason ?? ""}`);
 });
 
+Section("九 · 侦察与向导分工");
+
+Test("向导：侦察员在场时，山林地形的移动范围变大", () => {
+  const initial = Rules.CreateInitialState({ seed: 1937, difficulty: "Normal" });
+  const guideTerrain = new Set(["Mountain", "Ridge", "Hill", "Forest"]);
+  const anchor = initial.map.order.find((key) => {
+    const hex = initial.map.hexes[key];
+    if (!hex || !guideTerrain.has(hex.terrain)) return false;
+    if (Rules.GetStrongholdAt(initial, key) || Rules.GetEnemiesAt(initial, key).length) return false;
+    const ring = HexNeighborKeys(key).filter((nk) => {
+      const n = initial.map.hexes[nk];
+      return n && guideTerrain.has(n.terrain) && !Rules.GetStrongholdAt(initial, nk) && !Rules.GetEnemiesAt(initial, nk).length;
+    });
+    return ring.length >= 2;
+  });
+  assert.ok(anchor, "找不到山林锚点格");
+  const far = initial.map.order.find(
+    (key) => initial.map.hexes[key] && HexDistanceKeys(key, anchor) >= 8 && !Rules.GetStrongholdAt(initial, key) && !Rules.GetEnemiesAt(initial, key).length,
+  );
+  const Arrange = (withGuide) => {
+    const state = Rules.CloneState(initial);
+    const squad = state.units.find((u) => u.type === "GuerrillaSquad");
+    const scout = state.units.find((u) => u.type === "Scout");
+    for (const unit of state.units) unit.key = far;
+    squad.key = anchor;
+    if (withGuide) scout.key = anchor;
+    return { state, squad };
+  };
+  const solo = Arrange(false);
+  const guided = Arrange(true);
+  const reachSolo = Rules.FindReachableHexes(solo.state, solo.squad.id).size;
+  const reachGuided = Rules.FindReachableHexes(guided.state, guided.squad.id).size;
+  assert.ok(reachGuided > reachSolo, `向导未扩大移动范围：${reachSolo} → ${reachGuided}`);
+});
+
+Test("侦察标定：视野≥3 才标定，攻击预览吃到加成，两回合后过期", () => {
+  const initial = Rules.CreateInitialState({ seed: 1937, difficulty: "Normal" });
+  const enemy = initial.enemies[0];
+  const perch = HexNeighborKeys(enemy.key).find(
+    (nk) => initial.map.hexes[nk] && !Rules.GetStrongholdAt(initial, nk) && !Rules.GetEnemiesAt(initial, nk).length,
+  );
+  assert.ok(perch, "敌旁无落脚格");
+
+  // 视野 2 的游击小组：不标定
+  const low = Rules.CloneState(initial);
+  const squadLow = low.units.find((u) => u.type === "GuerrillaSquad");
+  squadLow.key = perch;
+  const lowActs = Rules.ListContextActions(low, squadLow.id, perch);
+  const lowRecon = lowActs.find((a) => a.kind === "Recon");
+  assert.ok(lowRecon, "游击小组未列出侦察动作");
+  const lowOut = Rules.PerformAction(low, lowRecon);
+  assert.ok(
+    lowOut.nextState.enemies.every((e) => e.markedUntil === undefined),
+    "视野 2 的单位不应产生侦察标定",
+  );
+
+  // 侦察员：标定 + 预览加成 + 过期清理
+  let state = Rules.CloneState(initial);
+  const scout = state.units.find((u) => u.type === "Scout");
+  const squad = state.units.find((u) => u.type === "GuerrillaSquad");
+  scout.key = perch;
+  squad.key = perch;
+  const acts = Rules.ListContextActions(state, scout.id, perch);
+  const recon = acts.find((a) => a.kind === "Recon");
+  assert.ok(recon, "侦察员未列出侦察动作");
+  state = Rules.PerformAction(state, recon).nextState;
+  const markedEnemy = state.enemies.find((e) => e.id === enemy.id);
+  assert.ok(markedEnemy, "目标敌军丢失");
+  assert.equal(markedEnemy.markedUntil, state.turn + 2, "markedUntil 未按 turn+2 写入");
+
+  const previewMarked = Combat.PreviewAttack(state, squad.id, enemy.key);
+  assert.ok(previewMarked?.valid, "标定后攻击预览不可用");
+  assert.ok(
+    (previewMarked.modifiers ?? []).some((m) => m.label === "侦察标定"),
+    "预览 modifiers 缺「侦察标定」",
+  );
+  const plain = Rules.CloneState(state);
+  const plainEnemy = plain.enemies.find((e) => e.id === enemy.id);
+  delete plainEnemy.markedUntil;
+  const previewPlain = Combat.PreviewAttack(plain, squad.id, enemy.key);
+  const delta = previewMarked.trueOdds - previewPlain.trueOdds;
+  assert.ok(Math.abs(delta - 0.05) < 0.011, `标定胜率增量异常：${delta}`);
+
+  state = Rules.EndTurn(state).nextState;
+  state = Rules.EndTurn(state).nextState;
+  const later = state.enemies.find((e) => e.id === enemy.id);
+  if (later) assert.equal(later.markedUntil, undefined, "标定两回合后未清除");
+});
+
 // ---------------------------------------------------------------------------
 console.log(`\n${"─".repeat(56)}`);
 const passed = results.filter((item) => item.passed).length;

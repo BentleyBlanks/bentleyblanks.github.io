@@ -377,6 +377,14 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
   const ringBatches = { additive: null, normal: null };
   let scaffoldBatch = null;
   let weather = { kind: "Clear", intensity: 0, active: null, fadingOut: [] };
+  // 回合态敌情常驻层（SyncWorld 驱动、幂等、零逐帧 CPU 开销）：
+  //   convoyRouteLayer —— 情报覆盖下的辎重队路线虚线；
+  //   sweepWarningLayer —— 扫荡在案期间的常驻警示（宣告/准备 = 呼吸箭头，执行 = 实线）。
+  const convoyRouteLayer = { signature: "", meshes: [] };
+  const sweepWarningLayer = { token: "", meshes: [], cached: null, targetKey: null };
+  let convoyDimMaterial = null;
+  let convoyHotMaterial = null;
+  let sweepExecuteMaterial = null;
 
   // ------------------------------------------------------------------------
   // 坐标工具
@@ -1436,14 +1444,10 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
    * 每条箭头的几何都是独立的路径条带，无法与别的箭头合批，因此按并发条数封顶：
    * 超出上限时把最旧的一条立刻收走，保证它不会随战局无限堆积。
    */
-  function SpawnSweepArrow(fromKey, toKey, arrowOptions = {}) {
-    if (disposed) return { duration: 0 };
-    while (sweepArrows.length >= sweepArrowLimit) RemoveSweepArrow(sweepArrows[0]);
-    const { points } = PathOf(fromKey, toKey, arrowOptions.pathKeys);
-    if (points.length < 2) return { duration: 0 };
+  /** 沿路径点生成箭头 ribbon 几何体（uv.x 0→1 供流动箭头 shader 使用），供一次性与常驻警示共用。 */
+  function BuildSweepRibbonGeometry(points, width) {
     const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.4);
     const segments = Math.max(12, points.length * 6);
-    const width = arrowOptions.width ?? 0.34;
     const position = new Float32Array((segments + 1) * 2 * 3);
     const uv = new Float32Array((segments + 1) * 2 * 2);
     const indices = [];
@@ -1471,12 +1475,17 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
-    const material = new THREE.ShaderMaterial({
+    return geometry;
+  }
+
+  /** 流动箭头材质（uTime 共享 uniform，自带 0.72+0.28·sin 呼吸脉冲，零逐帧 JS）。 */
+  function CreateSweepRibbonMaterial(repeat, arrowOptions = {}) {
+    return new THREE.ShaderMaterial({
       uniforms: {
         uTime: sharedTime,
-        uRepeat: { value: Math.max(3, points.length * 1.4) },
+        uRepeat: { value: repeat },
         uSpeed: { value: arrowOptions.speed ?? 0.5 },
-        uOpacity: { value: 0 },
+        uOpacity: { value: arrowOptions.opacity ?? 0.62 },
         uColorCore: { value: new THREE.Color(arrowOptions.colorCore || "#d9825a") },
         uColorEdge: { value: new THREE.Color(arrowOptions.colorEdge || "#8e2820") },
       },
@@ -1487,6 +1496,18 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
     });
+  }
+
+  function SpawnSweepArrow(fromKey, toKey, arrowOptions = {}) {
+    if (disposed) return { duration: 0 };
+    // 常驻警示层已经指着同一个目标：跳过一次性箭头，避免同一条轴线双箭头叠影
+    if (sweepWarningLayer.targetKey && toKey === sweepWarningLayer.targetKey) return { duration: 0 };
+    while (sweepArrows.length >= sweepArrowLimit) RemoveSweepArrow(sweepArrows[0]);
+    const { points } = PathOf(fromKey, toKey, arrowOptions.pathKeys);
+    if (points.length < 2) return { duration: 0 };
+    const geometry = BuildSweepRibbonGeometry(points, arrowOptions.width ?? 0.34);
+    const material = CreateSweepRibbonMaterial(Math.max(3, points.length * 1.4), arrowOptions);
+    material.uniforms.uOpacity.value = 0;   // 一次性箭头由补间控制淡入淡出
     const mesh = new THREE.Mesh(geometry, material);
     mesh.renderOrder = 7;
     root.add(mesh);
@@ -1515,6 +1536,292 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
 
   function ClearSweepArrows() {
     while (sweepArrows.length) RemoveSweepArrow(sweepArrows[sweepArrows.length - 1]);
+  }
+
+  // ------------------------------------------------------------------------
+  // 回合态敌情常驻层：辎重队路线虚线 & 扫荡警示
+  // （由 Script_Renderer.SyncWorld 每回合调用一次；幂等，签名不变就什么都不做。
+  //   全部是静态几何 + 共享 uTime 的 shader 动画，不新增任何逐帧 JS 开销。）
+  // ------------------------------------------------------------------------
+
+  function StateHexOf(state, key) {
+    return state && state.map && state.map.hexes ? state.map.hexes[key] : null;
+  }
+
+  /** 贴地窄条四边形（虚线的一节）。MeshBasicMaterial 不需要法线。 */
+  function PushDashQuad(target, from, to, halfWidth) {
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+    const length = Math.hypot(dx, dz) || 1;
+    const px = (-dz / length) * halfWidth;
+    const pz = (dx / length) * halfWidth;
+    const base = target.positions.length / 3;
+    target.positions.push(
+      from.x - px, from.y, from.z - pz, from.x + px, from.y, from.z + pz,
+      to.x - px, to.y, to.z - pz, to.x + px, to.y, to.z + pz,
+    );
+    target.indices.push(base, base + 1, base + 3, base, base + 3, base + 2);
+  }
+
+  /** 沿折线按「实段 dash + 空档 gap」铺虚线节。转角处虚线节取弦线，节短看不出来。 */
+  function PushDashes(target, points, dash, gap, halfWidth) {
+    if (!points || points.length < 2) return;
+    const lengths = [0];
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1];
+      const current = points[index];
+      lengths.push(lengths[index - 1] + Math.hypot(current.x - previous.x, current.z - previous.z));
+    }
+    const total = lengths[lengths.length - 1];
+    if (total < dash * 0.5) return;
+    const PointAt = (distance, out) => {
+      let cursor = 1;
+      while (cursor < lengths.length - 1 && lengths[cursor] < distance) cursor += 1;
+      const spanStart = lengths[cursor - 1];
+      const spanEnd = lengths[cursor];
+      const t = spanEnd > spanStart ? Clamp((distance - spanStart) / (spanEnd - spanStart), 0, 1) : 0;
+      return out.lerpVectors(points[cursor - 1], points[cursor], t);
+    };
+    const from = new THREE.Vector3();
+    const to = new THREE.Vector3();
+    for (let distance = 0; distance < total; distance += dash + gap) {
+      const end = Math.min(total, distance + dash);
+      if (end - distance < dash * 0.35) continue;   // 收尾残节太短不画
+      PointAt(distance, from);
+      PointAt(end, to);
+      PushDashQuad(target, from, to, halfWidth);
+    }
+  }
+
+  function BuildStripGeometry(target) {
+    if (!target.positions.length) return null;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(target.positions, 3));
+    geometry.setIndex(target.indices);
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
+
+  function EnsureConvoyMaterials() {
+    if (!convoyDimMaterial) {
+      convoyDimMaterial = new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#c8b463"), transparent: true, opacity: 0.5,
+        depthWrite: false, side: THREE.DoubleSide, name: "PrairieConvoyRouteDim",
+      });
+      disposables.add(convoyDimMaterial);
+    }
+    if (!convoyHotMaterial) {
+      convoyHotMaterial = new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#e6d288"), transparent: true, opacity: 0.85,
+        depthWrite: false, side: THREE.DoubleSide, name: "PrairieConvoyRouteHot",
+      });
+      disposables.add(convoyHotMaterial);
+    }
+  }
+
+  function ClearConvoyRouteMeshes() {
+    for (const mesh of convoyRouteLayer.meshes) {
+      root.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+    }
+    convoyRouteLayer.meshes.length = 0;
+  }
+
+  /**
+   * 辎重队路线上图（幂等）：对每支在途 SupplyColumn，把 routeKeys 沿线
+   * `hex.intel ≥ 40` 的连续路段画成暖色贴地虚线；车队可见时，当前格→下一格
+   * 一节加亮。车队被歼 / 到站从 state.enemies 消失，签名变化时整层立即重建/清空。
+   * 多支车队各自独立成段，共用两份材质（普通 + 加亮），整层至多 2 个 draw call。
+   */
+  function SyncConvoyRoutes(state) {
+    if (disposed) return;
+    const columns = [];
+    const enemies = state && Array.isArray(state.enemies) ? state.enemies : [];
+    for (const enemy of enemies) {
+      if (!enemy || enemy.type !== "SupplyColumn" || (enemy.hp ?? 1) <= 0) continue;
+      const route = enemy.convoy && Array.isArray(enemy.convoy.routeKeys) ? enemy.convoy.routeKeys : null;
+      if (!route || route.length < 2) continue;
+      // 两条上图途径：侦察骨干标定过（routeKnown，全程已知）；或沿线格情报覆盖 ≥ 40（只画达标段）
+      const routeKnown = enemy.routeKnown === true;
+      const qualified = route.map((key) => {
+        if (routeKnown) return true;
+        const hex = StateHexOf(state, key);
+        return !!hex && (Number(hex.intel) || 0) >= 40;
+      });
+      if (!qualified.some(Boolean)) continue;   // 沿线情报全不达标：这支车队不上图
+      const visible = enemy.visibleToPlayer !== false;
+      let position = route.indexOf(enemy.key);
+      if (position < 0) position = Clamp(Math.round(Number(enemy.convoy.routeIndex) || 0), 0, route.length - 1);
+      columns.push({ id: enemy.id, route, qualified, visible, position });
+    }
+
+    let signature = "";
+    for (const column of columns) {
+      signature += `${column.id}@${column.position}#${column.visible ? 1 : 0}#`;
+      for (let index = 0; index < column.qualified.length; index += 1) {
+        if (column.qualified[index]) signature += `${index},`;
+      }
+      signature += ";";
+    }
+    if (signature === convoyRouteLayer.signature) return;
+    convoyRouteLayer.signature = signature;
+    ClearConvoyRouteMeshes();
+    if (!columns.length) return;
+
+    EnsureConvoyMaterials();
+    const lift = 0.055;
+    const dimTarget = { positions: [], indices: [] };
+    const hotTarget = { positions: [], indices: [] };
+    const MidOf = (keyA, keyB) => {
+      const a = WorldOf(keyA, lift);
+      const b = WorldOf(keyB, lift);
+      return a.add(b).multiplyScalar(0.5);
+    };
+
+    for (const column of columns) {
+      const { route, qualified } = column;
+      // 连续达标段：段首/段尾若还有后续路程，延伸到与相邻格的边中点，读得出"路还在往下走"
+      let runStart = -1;
+      for (let index = 0; index <= route.length; index += 1) {
+        const inRun = index < route.length && qualified[index];
+        if (inRun && runStart < 0) runStart = index;
+        if (!inRun && runStart >= 0) {
+          const runEnd = index - 1;
+          const points = [];
+          if (runStart > 0) points.push(MidOf(route[runStart - 1], route[runStart]));
+          for (let cursor = runStart; cursor <= runEnd; cursor += 1) points.push(WorldOf(route[cursor], lift));
+          if (runEnd < route.length - 1) points.push(MidOf(route[runEnd], route[runEnd + 1]));
+          PushDashes(dimTarget, points, 0.22, 0.15, 0.05);
+          runStart = -1;
+        }
+      }
+      // 车队当前格 → 下一格：加亮一节（车队本体可见才画，不替玩家白侦察）
+      if (column.visible && column.position < route.length - 1) {
+        const from = WorldOf(route[column.position], lift + 0.012);
+        const to = WorldOf(route[column.position + 1], lift + 0.012);
+        PushDashes(hotTarget, [from, to], 0.26, 0.10, 0.058);
+      }
+    }
+
+    const dimGeometry = BuildStripGeometry(dimTarget);
+    if (dimGeometry) {
+      const mesh = new THREE.Mesh(dimGeometry, convoyDimMaterial);
+      mesh.name = "PrairieConvoyRoutes";
+      mesh.renderOrder = 6;
+      mesh.frustumCulled = false;
+      root.add(mesh);
+      convoyRouteLayer.meshes.push(mesh);
+    }
+    const hotGeometry = BuildStripGeometry(hotTarget);
+    if (hotGeometry) {
+      const mesh = new THREE.Mesh(hotGeometry, convoyHotMaterial);
+      mesh.name = "PrairieConvoyRoutesHot";
+      mesh.renderOrder = 6;
+      mesh.frustumCulled = false;
+      root.add(mesh);
+      convoyRouteLayer.meshes.push(mesh);
+    }
+  }
+
+  function ClearSweepWarningMeshes() {
+    for (const entry of sweepWarningLayer.meshes) {
+      root.remove(entry.mesh);
+      if (entry.geometry) entry.geometry.dispose();
+      if (entry.ownsMaterial && entry.material) entry.material.dispose();
+    }
+    sweepWarningLayer.meshes.length = 0;
+  }
+
+  /**
+   * 扫荡警示常驻层（幂等）：`state.sweep` 在案期间一直可见——
+   *   宣告 / 准备阶段：每条合围轴线一支呼吸闪烁的流动箭头（据点 → 目标，至多 3 支）；
+   *   执行阶段：state.sweep 已被结算清空、enemyReadout.sweepStage === "Execute"，
+   *             用上一次同步缓存的轴线画成实线（本回合常驻）；
+   *   扫荡结束 / 取消（sweep 为空且 stage 非 Execute）：立即整层撤除。
+   * token 不变时直接返回：呼吸与流动全在 shader 的共享 uTime 里，无逐帧 JS。
+   */
+  function SyncSweepWarning(state) {
+    if (disposed) return;
+    const sweep = state ? state.sweep : null;
+    const stage = state && state.enemyReadout ? state.enemyReadout.sweepStage : null;
+    let mode = null;
+    let data = null;
+    if (sweep && sweep.targetKey) {
+      data = {
+        id: sweep.id ?? `${sweep.targetKey}|${sweep.declaredTurn ?? ""}`,
+        targetKey: sweep.targetKey,
+        axisKeys: Array.isArray(sweep.axisKeys) ? sweep.axisKeys.slice() : [],
+        axes: Array.isArray(sweep.axes)
+          ? sweep.axes.map((axis) => ({
+            fromKey: axis.fromKey,
+            keys: Array.isArray(axis.keys) ? axis.keys.slice() : [],
+          }))
+          : [],
+      };
+      sweepWarningLayer.cached = data;
+      mode = stage === "Execute" ? "execute" : "warning";
+    } else if (stage === "Execute" && sweepWarningLayer.cached) {
+      // 合围已发起：sweep 本体在结算时被置空，用缓存轴线画实线撑完本回合
+      data = sweepWarningLayer.cached;
+      mode = "execute";
+    } else {
+      sweepWarningLayer.cached = null;
+    }
+
+    const token = mode ? `${mode}|${data.id}|${data.targetKey}` : "";
+    if (token === sweepWarningLayer.token) return;
+    sweepWarningLayer.token = token;
+    sweepWarningLayer.targetKey = mode === "warning" ? data.targetKey : null;
+    ClearSweepWarningMeshes();
+    if (!mode) return;
+
+    // 轴线路径：优先用 axes 的完整路线（据点 → 目标），缺失时退化为 axisKeys 首格 → 目标
+    const axisPaths = [];
+    for (const axis of data.axes) {
+      if (!axis.fromKey || axis.fromKey === data.targetKey) continue;
+      axisPaths.push({ fromKey: axis.fromKey, pathKeys: axis.keys.length > 1 ? axis.keys : null });
+      if (axisPaths.length >= 3) break;
+    }
+    if (!axisPaths.length && data.axisKeys.length && data.axisKeys[0] !== data.targetKey) {
+      axisPaths.push({ fromKey: data.axisKeys[0], pathKeys: null });
+    }
+    if (!axisPaths.length) return;
+
+    if (mode === "warning") {
+      for (const axis of axisPaths) {
+        const { points } = PathOf(axis.fromKey, data.targetKey, axis.pathKeys);
+        if (points.length < 2) continue;
+        const geometry = BuildSweepRibbonGeometry(points, 0.34);
+        const material = CreateSweepRibbonMaterial(Math.max(3, points.length * 1.4), { speed: 0.42, opacity: 0.58 });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.name = "PrairieSweepWarning";
+        mesh.renderOrder = 7;
+        mesh.frustumCulled = false;
+        root.add(mesh);
+        sweepWarningLayer.meshes.push({ mesh, geometry, material, ownsMaterial: true });
+      }
+      return;
+    }
+
+    // 执行阶段：暗红实线沿轴线（共享一份材质，静态几何）
+    if (!sweepExecuteMaterial) {
+      sweepExecuteMaterial = new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#a03326"), transparent: true, opacity: 0.62,
+        depthWrite: false, side: THREE.DoubleSide, name: "PrairieSweepExecute",
+      });
+      disposables.add(sweepExecuteMaterial);
+    }
+    for (const axis of axisPaths) {
+      const { points } = PathOf(axis.fromKey, data.targetKey, axis.pathKeys);
+      if (points.length < 2) continue;
+      const geometry = BuildSweepRibbonGeometry(points, 0.20);
+      const mesh = new THREE.Mesh(geometry, sweepExecuteMaterial);
+      mesh.name = "PrairieSweepExecute";
+      mesh.renderOrder = 7;
+      mesh.frustumCulled = false;
+      root.add(mesh);
+      sweepWarningLayer.meshes.push({ mesh, geometry, material: sweepExecuteMaterial, ownsMaterial: false });
+    }
   }
 
   /** 情报侦察：同心环扩散 + 细光柱 + 微弱火花。 */
@@ -1961,6 +2268,12 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     disposed = true;
     ClearSmoke();
     ClearSweepArrows();
+    ClearConvoyRouteMeshes();
+    convoyRouteLayer.signature = "";
+    ClearSweepWarningMeshes();
+    sweepWarningLayer.token = "";
+    sweepWarningLayer.cached = null;
+    sweepWarningLayer.targetKey = null;
     if (weather.active) DestroyWeatherEntry(weather.active);
     for (const entry of weather.fadingOut) DestroyWeatherEntry(entry);
     weather = { kind: "Clear", intensity: 0, active: null, fadingOut: [] };
@@ -2029,6 +2342,8 @@ export function CreateEffects(scene, camera, renderer, options = {}) {
     ClearSmoke,
     DecaySmoke,
     ClearSweepArrows,
+    SyncConvoyRoutes,
+    SyncSweepWarning,
     SetTimeOfDay,
     SetQuality,
     SetHeightProvider(fn) { heightProvider = typeof fn === "function" ? fn : null; },

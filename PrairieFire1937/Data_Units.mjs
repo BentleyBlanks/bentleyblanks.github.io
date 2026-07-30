@@ -65,7 +65,13 @@ export const abilityDefinitions = Object.freeze({
     key: 'Recon',
     name: '侦察',
     summary: '扩大视野与情报覆盖，能识破敌军的行动意图。',
-    detail: '看清扫荡轴线，往往比多打一仗更有价值。',
+    detail: '看清扫荡轴线，往往比多打一仗更有价值。目力好的侦察骨干（视野≥3）还能把当面之敌的哨位与行止标定下来：两个季度内我军打它更有把握、缴获也更多。',
+  },
+  Guide: {
+    key: 'Guide',
+    name: '向导',
+    summary: '熟山路。同格与相邻友军在山地、丘陵、林地的移动费降低。',
+    detail: '哪道梁能翻、哪条沟不绕，全在向导脚底下。部队出发时身边有向导带路，翻山进林都省脚力；封锁沟与冬雪照旧误事。',
   },
   Screen: {
     key: 'Screen',
@@ -181,9 +187,9 @@ export const unitDefinitions = Object.freeze({
     ambush: 0.2,
     concealment: 0.92,
     sight: 3,
-    abilities: ['Recon', 'Screen'],
+    abilities: ['Recon', 'Screen', 'Guide'],
     requiresTech: 'TechScoutCraft',
-    blurb: '换上短衣、挑一副担子进敌占区赶集，记下据点里换岗的人数、铁路上过的车次。带枪反而危险，多数时候身上只有一张路条。',
+    blurb: '部队的眼睛与向导：换上短衣、挑一副担子进敌占区赶集，记下据点里换岗的人数、铁路上过的车次；回来再领着部队抄山路。打仗不指望他，可标定了的敌人打起来更有把握，山里行军有他带路也省一半脚力。',
   },
   DistrictSquad: {
     key: 'DistrictSquad',

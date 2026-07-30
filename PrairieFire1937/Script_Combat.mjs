@@ -136,6 +136,10 @@ export const combatConstants = Object.freeze({
   fortifyOddsPenalty: 0.12, // 打有工事的目标
   decisiveMargin: 0.55, // roll < winChance * 该值 → 干净利落的胜利
 
+  // —— 侦察标定（sight≥3 的侦察骨干执行侦察后，范围内敌军挂 markedUntil）——
+  markedOddsBonus: 0.05, // 对被标定之敌的胜率加成：哨位、兵力、换岗时刻尽在册上
+  markedCaptureMultiplier: 1.15, // 对被标定之敌的缴获倍率：知道辎重驮子走在队尾
+
   // —— 杀伤与减员 ——
   damageScale: 0.55, // 攻击力 → 杀伤的换算
   damageSoak: 0.02, // 防御力对杀伤的吸收
@@ -1058,6 +1062,13 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     winChance += massBonus;
     modifiers.push({ label: "群众带路与预警", value: Round1(massBonus * 100) / 100 });
   }
+  // 侦察标定：被标定的敌军行止在册（markedUntil 由 Script_Rules 的侦察动作写入、
+  // 到期清理），打起来更有把握，清理战场也更从容。预览与结算共用此处，口径一致。
+  const marked = Number(defender && defender.markedUntil) > ((state && state.turn) || 0);
+  if (marked) {
+    winChance += constants.markedOddsBonus;
+    modifiers.push({ label: "侦察标定", value: constants.markedOddsBonus });
+  }
   const defenderWorks = Array.isArray(defenderHex && defenderHex.works) ? defenderHex.works : [];
   if (defenderWorks.includes("Trench") || (defenderHex && defenderHex.tunnel)) {
     winChance -= constants.fortifyOddsPenalty;
@@ -1096,7 +1107,8 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     constants.captureScale *
     attackerStats.captureBonus *
     (1 + targetMass * constants.captureMassBonus) *
-    (ambush ? Lerp(1, constants.ambushCaptureMultiplier, ambushScore) : 1);
+    (ambush ? Lerp(1, constants.ambushCaptureMultiplier, ambushScore) : 1) *
+    (marked ? constants.markedCaptureMultiplier : 1);
 
   // 暴露度基数
   let exposureBase = constants.exposureAttackBase;
@@ -1137,6 +1149,7 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     night,
     ambush,
     ambushScore,
+    marked,
     supportCount: support.count,
     flank: support.flank,
     flankDirection: support.flankDirection,
@@ -1324,6 +1337,7 @@ export function PreviewAttack(state, attackerId, targetKey, options = {}) {
     intelQuality: Round1(fog.quality * 100) / 100,
     ambush: model.ambush,
     night: model.night,
+    marked: model.marked,
     supportCount: model.supportCount,
     flank: model.flank,
     supportLabel: model.supportLabel,
@@ -1571,6 +1585,7 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
   report.victory = victory;
   report.ambush = model.ambush;
   report.night = model.night;
+  report.marked = model.marked;
   report.supportCount = model.supportCount;
   report.flank = model.flank;
   report.supportLabel = model.supportLabel;

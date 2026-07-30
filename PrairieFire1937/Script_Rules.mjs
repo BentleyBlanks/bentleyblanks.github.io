@@ -891,7 +891,9 @@ export function RecomputeVisibility(state) {
 
   for (const enemy of state.enemies) {
     const hex = state.map.hexes[enemy.key];
-    enemy.visibleToPlayer = Boolean(hex && hex.visibility >= 1);
+    // 侦察标定未过期的敌军对我保持可见——名册在手，走到哪儿都有人捎信来。
+    const marked = Number(enemy.markedUntil) > state.turn;
+    enemy.visibleToPlayer = Boolean(hex && hex.visibility >= 1) || marked;
   }
   for (const stronghold of state.strongholds) {
     const hex = state.map.hexes[stronghold.key];
@@ -985,13 +987,35 @@ function DriftMassBase(state) {
 // 行动
 // ---------------------------------------------------------------------------
 
-function MoveCost(state, hex, effects) {
+/** 向导（Guide）生效的地形：山地（高山/山梁）、丘陵、林地。 */
+const guideTerrainKeys = new Set(["Mountain", "Ridge", "Hill", "Forest"]);
+
+/**
+ * 向导带路判定：移动单位自己有 Guide 能力，或以**移动起点**计同格/相邻有
+ * 存活的 Guide 友军（不做逐步路径伴随，保持简单可预期）。
+ */
+function HasGuideEscort(state, unit) {
+  if (!unit) return false;
+  if (GetUnitStats(unit.type).abilities.includes("Guide")) return true;
+  for (const other of state.units) {
+    if (!other || other.id === unit.id) continue;
+    if ((other.hp ?? 0) <= 0) continue;
+    if (!GetUnitStats(other.type).abilities.includes("Guide")) continue;
+    if (other.key === unit.key || HexDistanceKeys(other.key, unit.key) <= 1) return true;
+  }
+  return false;
+}
+
+function MoveCost(state, hex, effects, guided = false) {
   const definition = terrainDefinitions()[hex.terrain];
   let cost = Number(definition?.moveCost) || 1;
   if (hex.road >= 1) cost = Math.min(cost, 1);
   // 交通壕等工事让本方在自家地盘上跑得更快（moveCostDelta 为负值）。
   cost += GetHexWorkEffects(hex).moveCostDelta;
   if (hex.works?.includes("Tunnel") && effects.tunnelMove) cost = Math.min(cost, 1);
+  // 向导带路：山地/丘陵/林地的进入费 ×0.7（下限 0.5）。
+  // 只折地形脚程——封锁沟与冬季的迟滞在后面原样叠加，向导替代不了填沟。
+  if (guided && guideTerrainKeys.has(hex.terrain)) cost = Math.max(0.5, cost * 0.7);
   // 囚笼生效：敌人的封锁沟与铁丝网真实迟滞我方机动（每级 +0.75，封顶 +1.5）。
   cost += Math.min(1.5, Math.max(0, Number(hex.blockade) || 0) * 0.75);
   if (GetSeasonKey(state.turn) === "冬") cost += 0.25;
@@ -1006,6 +1030,7 @@ export function FindReachableHexes(state, unitId) {
   const effects = GetEffects(state);
   const budget = unit.moves + effects.moveBonus;
   if (budget <= 0) return reachable;
+  const guided = HasGuideEscort(state, unit);
 
   reachable.set(unit.key, 0);
   const frontier = [{ key: unit.key, cost: 0 }];
@@ -1019,7 +1044,7 @@ export function FindReachableHexes(state, unitId) {
       const stronghold = GetStrongholdAt(state, neighborKey);
       if (stronghold && stronghold.garrison > 0) continue;
       if (GetEnemiesAt(state, neighborKey).length) continue;
-      const cost = current.cost + MoveCost(state, hex, effects);
+      const cost = current.cost + MoveCost(state, hex, effects, guided);
       if (cost > budget + 1e-6) continue;
       if (cost < (reachable.get(neighborKey) ?? Infinity)) {
         reachable.set(neighborKey, cost);
@@ -1385,11 +1410,33 @@ export function PerformAction(state, action) {
       const unit = GetUnit(next, action.unitId);
       if (!unit) return fail("单位不存在");
       if (unit.acted) return fail("本回合已行动");
-      for (const coordinate of HexesInRange(ParseHexKey(unit.key), 2 + effects.intelRange)) {
+      const stats = GetUnitStats(unit.type);
+      const reconRange = 2 + effects.intelRange;
+      for (const coordinate of HexesInRange(ParseHexKey(unit.key), reconRange)) {
         const hex = GetHex(next, HexKey(coordinate.q, coordinate.r));
         if (!hex) continue;
         hex.explored = true;
         hex.intel = Clamp(hex.intel + ruleConstants.reconIntelGain, 0, 100);
+      }
+      // 侦察标定：只有目力过硬的侦察骨干（sight ≥3——侦察员/骑兵通信/武工队，
+      // 普通游击小组不够格）能把侦察范围内的敌军行止记成册。被标定的敌军
+      // 两个季度内对我保持可见，打它胜率更高、缴获更多（Script_Combat 消费）。
+      let markedCount = 0;
+      let markedConvoy = false;
+      if (stats.sight >= 3) {
+        for (const enemy of next.enemies) {
+          if (!enemy || (enemy.hp ?? 0) <= 0) continue;
+          if (HexDistanceKeys(enemy.key, unit.key) > reconRange) continue;
+          enemy.markedUntil = next.turn + 2;
+          enemy.visibleToPlayer = true;
+          if (enemy.type === "SupplyColumn") {
+            // 辎重队被标定：行车路线对我「已知」（渲染层据此画出 convoy 路线）。
+            enemy.routeKnown = true;
+            markedConvoy = true;
+          }
+          report.effects.push({ kind: "IntelPing", key: enemy.key });
+          markedCount += 1;
+        }
       }
       unit.acted = true;
       unit.moves = 0;
@@ -1400,6 +1447,12 @@ export function PerformAction(state, action) {
         unit.xp -= 100;
       }
       report.lines.push("侦察员摸清了周边的岗哨与巡逻规律。");
+      if (markedCount > 0) {
+        report.lines.push("侦察员把敌哨位、兵力、换岗时刻记在烟盒纸上送回来了。两个季度内，打这些敌人心里有底。");
+      }
+      if (markedConvoy) {
+        report.lines.push("辎重队的行车路线与时刻也一并探明，沿线各村已得关照。");
+      }
       report.effects.push({ kind: "IntelPing", key: unit.key });
       break;
     }
@@ -1835,6 +1888,12 @@ export function EndTurn(state) {
 
   // 7. 推进时间
   next.turn += 1;
+  // 侦察标定过期清理：名册上的敌情两个季度后就旧了，不再作数。
+  for (const enemy of next.enemies) {
+    if (enemy && enemy.markedUntil !== undefined && next.turn >= enemy.markedUntil) {
+      delete enemy.markedUntil;
+    }
+  }
   const era = GetEraForTurn(next.turn);
   const eraChanged = era.key !== next.eraKey;
   next.eraKey = era.key;
