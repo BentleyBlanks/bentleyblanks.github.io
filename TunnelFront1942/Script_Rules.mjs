@@ -151,6 +151,8 @@ function CreateTunnelNode(tile, options = {}) {
     sealed: Boolean(options.sealed),
     smoke: 0,
     trap: false,
+    trapWarningId: null,
+    trapEnemyId: null,
     dugTurn: options.dugTurn ?? 0,
     isOriginal: Boolean(options.isOriginal),
   };
@@ -246,6 +248,7 @@ export function CreateInitialState(options = {}) {
     decoysUsed: 0,
     trapsTriggered: 0,
     reconActions: 0,
+    planningReconCompleted: false,
     lastReconTurn: 0,
     reconVisitedTiles: [],
     reconTileTurns: {},
@@ -565,6 +568,7 @@ function CancelEnemyWarnings(state, enemyId, reasonText) {
     if (!warning.resolved && warning.enemyId === enemyId) {
       warning.resolved = true;
       warning.cancelled = true;
+      ReleaseEntranceDefenseReservation(state, warning.warningId);
       AddLog(state, "good", `${reasonText}；“${warning.text}”已取消。`, warning.warningId);
     }
   }
@@ -580,6 +584,8 @@ function ApplyMove(state, unit, targetKey) {
   if (unit.ambushPrepared) {
     unit.ambushPrepared = false;
     unit.ambushTileKey = null;
+    unit.ambushWarningId = null;
+    unit.ambushEnemyId = null;
     AddLog(state, "info", `${unit.shortName}离开预设洞口，伏击取消；已预留弹药不返还。`);
   }
   unit.tileKey = targetKey;
@@ -640,6 +646,8 @@ function ApplyExitTunnel(state, unit) {
   unit.layer = LayerIds.SURFACE;
   unit.ambushPrepared = false;
   unit.ambushTileKey = null;
+  unit.ambushWarningId = null;
+  unit.ambushEnemyId = null;
   unit.emergedTurn = state.turn;
   SpendAction(unit);
   state.exposure = Clamp(state.exposure + (tile.entranceKnownByEnemy ? 5 : 2), 0, 100);
@@ -765,6 +773,9 @@ function ApplyRecon(state, unit) {
   if (repeatRecon) {
     state.organization -= 1;
   }
+  if (state.tunnelsDug === 0) {
+    state.planningReconCompleted = true;
+  }
   state.reconActions += 1;
   state.lastReconTurn = state.turn;
   if (!state.reconVisitedTiles.includes(unit.tileKey)) {
@@ -806,6 +817,13 @@ function ApplyRecon(state, unit) {
   );
   if (exitWindowLog) {
     AddLog(state, exitWindowLog.kind, exitWindowLog.text);
+  }
+  if (!state.planningReconCompleted && state.tunnelsDug > 0) {
+    AddLog(
+      state,
+      "warning",
+      "本次侦察发生在首次开挖之后，只能提供当前敌情与出口信号，不能补回规划侦察目标。",
+    );
   }
   return { ok: true };
 }
@@ -851,10 +869,18 @@ function ApplyAmbush(state, unit) {
   }
   unit.ambushPrepared = true;
   unit.ambushTileKey = unit.tileKey;
+  const counterWarning = FindActiveEntranceWarning(state, unit.tileKey);
+  unit.ambushWarningId = counterWarning?.warningId ?? null;
+  unit.ambushEnemyId = counterWarning?.enemyId ?? null;
   unit.ambushPreparedUntilTurn = state.turn + 2;
   unit.ammo = Math.max(0, (unit.ammo ?? 0) - 1);
   SpendAction(unit);
-  AddLog(state, "good", `${unit.shortName}在${tile.name}洞口准备伏击，已预留 1 发弹药；有效至 T${unit.ambushPreparedUntilTurn}，离开洞口会取消。`);
+  AddLog(
+    state,
+    "good",
+    `${unit.shortName}在${tile.name}洞口准备伏击，已预留 1 发弹药；有效至 T${unit.ambushPreparedUntilTurn}，离开洞口会取消${counterWarning ? `；已锁定${GetEnemy(state, counterWarning.enemyId)?.name ?? "预警工兵"}，不会被其他敌军抢先消耗` : ""}。`,
+    counterWarning?.warningId ?? null,
+  );
   return { ok: true };
 }
 
@@ -874,8 +900,16 @@ function ApplyTrap(state, unit) {
   }
   state.tools -= 1;
   node.trap = true;
+  const counterWarning = FindActiveEntranceWarning(state, unit.tileKey);
+  node.trapWarningId = counterWarning?.warningId ?? null;
+  node.trapEnemyId = counterWarning?.enemyId ?? null;
   SpendAction(unit);
-  AddLog(state, "good", `${unit.shortName}在${tile.name}布下一次性封洞陷阱。`);
+  AddLog(
+    state,
+    "good",
+    `${unit.shortName}在${tile.name}布下一次性洞口陷阱${counterWarning ? `；已锁定${GetEnemy(state, counterWarning.enemyId)?.name ?? "预警工兵"}，不会被其他敌军抢先消耗` : ""}。`,
+    counterWarning?.warningId ?? null,
+  );
   return { ok: true };
 }
 
@@ -1088,12 +1122,24 @@ function ChooseEvidenceTarget(state, enemy, claimedEvidenceIds = new Set()) {
     .filter((entry) => entry.kind !== "Decoy" || !state.usedDecoyIds.includes(entry.evidenceId))
     .filter((entry) => (
       enemy.role !== "Patrol"
-      || ["Decoy", "FreshTracks", "SurfaceSighting", "Gunfire"].includes(entry.kind)
+      || [
+        "Decoy",
+        "FreshTracks",
+        "SurfaceSighting",
+        "Gunfire",
+        ...(Number.isFinite(enemy.digNoiseRange) ? ["DigNoise"] : []),
+      ].includes(entry.kind)
+    ))
+    .filter((entry) => (
+      entry.kind !== "DigNoise"
+      || ParseTileKey(entry.tileKey).r >= (enemy.digNoiseMinRow ?? -Infinity)
     ))
     .filter((entry) => {
       const hearingRange = entry.kind === "Decoy"
         ? 5
-        : Math.ceil(2 + entry.strength * 3);
+        : entry.kind === "DigNoise" && Number.isFinite(enemy.digNoiseRange)
+          ? enemy.digNoiseRange
+          : Math.ceil(2 + entry.strength * 3);
       return HexDistance(enemy.tileKey, entry.tileKey) <= hearingRange;
     })
     .sort((first, second) => (
@@ -1318,13 +1364,79 @@ export function PlanEnemyTurn(state) {
   return state.enemies.map((enemy) => Clone(enemy.intent));
 }
 
+function FindActiveEntranceWarning(state, targetKey) {
+  return state.warnings.find((warning) => (
+    !warning.resolved
+    && ["Seal", "Smoke"].includes(warning.kind)
+    && warning.targetKey === targetKey
+    && warning.enemyId
+  )) ?? null;
+}
+
+function ReleaseEntranceDefenseReservation(state, warningId) {
+  for (const node of Object.values(state.tunnels)) {
+    if (node.trapWarningId === warningId) {
+      node.trapWarningId = null;
+      node.trapEnemyId = null;
+    }
+  }
+  for (const unit of state.units) {
+    if (unit.ambushWarningId === warningId) {
+      unit.ambushWarningId = null;
+      unit.ambushEnemyId = null;
+    }
+  }
+}
+
+function BindEntranceDefenseToWarning(state, warning) {
+  const node = state.tunnels[warning.targetKey];
+  let defenseLabel = null;
+  if (node?.trap && !node.trapWarningId) {
+    node.trapWarningId = warning.warningId;
+    node.trapEnemyId = warning.enemyId;
+    defenseLabel = "洞口陷阱";
+  }
+  const ambusher = state.units.find((unit) => (
+    IsAlive(unit)
+    && unit.layer === LayerIds.TUNNEL
+    && unit.tileKey === warning.targetKey
+    && unit.ambushPrepared
+    && unit.ambushTileKey === warning.targetKey
+  ));
+  if (ambusher && !ambusher.ambushWarningId) {
+    ambusher.ambushWarningId = warning.warningId;
+    ambusher.ambushEnemyId = warning.enemyId;
+    defenseLabel = `${ambusher.shortName}的洞口伏击`;
+  }
+  if (defenseLabel) {
+    AddLog(
+      state,
+      "info",
+      `${state.tiles[warning.targetKey].name}的${defenseLabel}已转为预警专用反制，其他敌军不会先行消耗。`,
+      warning.warningId,
+    );
+  }
+}
+
+function DefenseAnswersIntent(defenseWarningId, defenseEnemyId, enemy, warningId) {
+  if (!defenseWarningId && !defenseEnemyId) {
+    return true;
+  }
+  return defenseWarningId === warningId && defenseEnemyId === enemy.enemyId;
+}
+
 function TriggerEntranceDefense(state, enemy, targetKey, warningId) {
   const node = state.tunnels[targetKey];
   if (!node) {
     return false;
   }
-  if (node.trap) {
+  if (
+    node.trap
+    && DefenseAnswersIntent(node.trapWarningId, node.trapEnemyId, enemy, warningId)
+  ) {
     node.trap = false;
+    node.trapWarningId = null;
+    node.trapEnemyId = null;
     enemy.health = Math.max(0, enemy.health - 2);
     enemy.stunnedUntilTurn = state.turn + 1;
     state.trapsTriggered += 1;
@@ -1349,8 +1461,18 @@ function TriggerEntranceDefense(state, enemy, targetKey, warningId) {
     && unit.ambushTileKey === targetKey
   ));
   if (ambusher) {
+    if (!DefenseAnswersIntent(
+      ambusher.ambushWarningId,
+      ambusher.ambushEnemyId,
+      enemy,
+      warningId,
+    )) {
+      return false;
+    }
     ambusher.ambushPrepared = false;
     ambusher.ambushTileKey = null;
+    ambusher.ambushWarningId = null;
+    ambusher.ambushEnemyId = null;
     enemy.health = Math.max(0, enemy.health - Math.max(2, ambusher.attack + 1));
     enemy.stunnedUntilTurn = state.turn + 1;
     state.ambushesTriggered += 1;
@@ -1481,6 +1603,12 @@ function ResolveEnemyIntent(state, enemy) {
         && unit.layer === LayerIds.SURFACE
         && HexDistance(enemy.tileKey, unit.tileKey) === 1
       ) {
+        if (
+          state.tiles[unit.tileKey]?.hasEntrance
+          && TriggerEntranceDefense(state, enemy, unit.tileKey, null)
+        ) {
+          break;
+        }
         unit.health = Math.max(0, unit.health - enemy.attack);
         state.peopleSafety = Math.max(0, state.peopleSafety - 2);
         AddLog(state, "danger", `${enemy.name}攻击${unit.shortName}；地表缠斗正在挤压撤离窗口。`);
@@ -1497,6 +1625,7 @@ function ResolveEnemyIntent(state, enemy) {
       );
       const warning = state.warnings.find((entry) => entry.warningId === warningId);
       warning.enemyId = enemy.enemyId;
+      BindEntranceDefenseToWarning(state, warning);
       break;
     }
     case EnemyIntentIds.RESOLVE_SEAL:
@@ -1512,6 +1641,7 @@ function ResolveEnemyIntent(state, enemy) {
       );
       const warning = state.warnings.find((entry) => entry.warningId === warningId);
       warning.enemyId = enemy.enemyId;
+      BindEntranceDefenseToWarning(state, warning);
       break;
     }
     case EnemyIntentIds.RESOLVE_SMOKE:
@@ -1544,11 +1674,11 @@ function ResolveEnemyIntent(state, enemy) {
       ) {
         state.usedDecoyIds.push(intent.evidenceId);
         state.decoyDiversions += 1;
-        enemy.stunnedUntilTurn = Math.max(enemy.stunnedUntilTurn ?? 0, state.turn + 1);
+        enemy.stunnedUntilTurn = Math.max(enemy.stunnedUntilTurn ?? 0, state.turn + 2);
         AddLog(
           state,
           "good",
-          `${enemy.name}被假迹带离原搜索轴线；真实行动热度下降，搜索组下回合停滞。`,
+          `${enemy.name}被假迹带离原搜索轴线；真实行动热度下降，搜索组随后两回合停滞。`,
         );
       }
       if (intent.intentId === EnemyIntentIds.INVESTIGATE && intent.evidenceTarget) {
@@ -1768,11 +1898,14 @@ function ApplyVillagePressure(state) {
 }
 
 function ClassifyRoute(state) {
-  if (state.ambushesTriggered + state.trapsTriggered > 0) {
+  if (state.ambushesTriggered > 0) {
     return "ambush";
   }
   if (state.decoyDiversions > 0) {
     return "deception";
+  }
+  if (state.trapsTriggered > 0) {
+    return "ambush";
   }
   if (state.enemiesDefeated > 0) {
     return "interdiction";
@@ -1783,8 +1916,18 @@ function ClassifyRoute(state) {
   return "none";
 }
 
+function CountSafeCivilians(state) {
+  return state.civilians
+    .filter((group) => group.status === "Safe")
+    .reduce((sum, group) => sum + group.people, 0);
+}
+
 export function EvaluateMission(state) {
   const survivingUnits = state.units.filter(IsAlive).length;
+  const safePeople = CountSafeCivilians(state);
+  const hasUnresolvedLaunchedGroup = state.civilians.some((group) => (
+    ["Moving", "Trapped"].includes(group.status)
+  ));
   if (state.peopleSafety <= 45) {
     const cause = state.lastFailureCause ?? {
       failureId: "PeopleSafetyCollapsed",
@@ -1819,9 +1962,11 @@ export function EvaluateMission(state) {
     };
   }
   if (
-    state.civiliansSafe >= MissionConfig.requiredEvacuees
+    safePeople >= MissionConfig.requiredEvacuees
+    && state.civiliansSafe === safePeople
+    && !hasUnresolvedLaunchedGroup
     && state.tunnelsDug >= 1
-    && state.reconActions >= 1
+    && state.planningReconCompleted
     && state.sweepActive
     && state.turn >= 6
   ) {
@@ -1829,7 +1974,7 @@ export function EvaluateMission(state) {
       status: "Victory",
       path: ClassifyRoute(state),
       title: "地道把人送到了天亮以前",
-      summary: `已安全转移 ${state.civiliansSafe}/${MissionConfig.totalEvacuees} 人。`,
+      summary: `已安全转移 ${safePeople}/${MissionConfig.totalEvacuees} 人。`,
       causeChain: state.eventLedger.slice(-6),
       peopleSafety: state.peopleSafety,
       survivingUnits,
@@ -1839,12 +1984,12 @@ export function EvaluateMission(state) {
     const movingPeople = state.civilians
       .filter((group) => group.status === "Moving")
       .reduce((sum, group) => sum + group.people, 0);
-    if (state.reconActions < 1 && state.civiliansSafe >= MissionConfig.requiredEvacuees) {
+    if (!state.planningReconCompleted && safePeople >= MissionConfig.requiredEvacuees) {
       return {
         status: "Defeat",
         path: ClassifyRoute(state),
         title: "路线通了，敌情却没有查清",
-        summary: `虽已转移 ${state.civiliansSafe}/${MissionConfig.totalEvacuees} 人，但整局没有完成地面侦察，无法确认后续封锁风险。`,
+        summary: `虽已转移 ${safePeople}/${MissionConfig.totalEvacuees} 人，但首次开挖前没有完成地面侦察，无法证明路线基于当局敌情。`,
         failureId: "ReconMissing",
         tip: "第一回合让交通员在地面执行一次【侦察】，再决定北线或南线。",
         causeChain: state.eventLedger.slice(-6),
@@ -1896,6 +2041,7 @@ export function RunEnemyPhase(inputState) {
     ResolveEnemyIntent(state, enemy);
   }
   AdvanceCivilians(state);
+  state.civiliansSafe = CountSafeCivilians(state);
   ApplyVillagePressure(state);
   if (state.exposure >= 35 && state.lastTraceTileKey) {
     AddEvidence(
@@ -1929,6 +2075,8 @@ export function RunEnemyPhase(inputState) {
     if (unit.ambushPrepared && state.turn > (unit.ambushPreparedUntilTurn ?? 0)) {
       unit.ambushPrepared = false;
       unit.ambushTileKey = null;
+      unit.ambushWarningId = null;
+      unit.ambushEnemyId = null;
       AddLog(state, "info", `${unit.shortName}的洞口伏击窗口已过，需重新判断敌情后再准备。`);
     }
   }
@@ -1994,6 +2142,7 @@ export function GetObjectiveSummary(state) {
     movingPeople,
     waitingPeople: MissionConfig.totalEvacuees - state.civiliansSafe - movingPeople,
     exitSignalsIssued: state.exitSignalsIssued ?? 0,
+    planningReconCompleted: Boolean(state.planningReconCompleted),
   };
 }
 
@@ -2062,6 +2211,7 @@ export function DeserializeState(serialized) {
   if (!parsed || parsed.version !== 1) {
     throw new Error("Unsupported TunnelFront1942 save version");
   }
+  parsed.planningReconCompleted ??= parsed.reconActions > 0 && parsed.tunnelsDug === 0;
   return parsed;
 }
 

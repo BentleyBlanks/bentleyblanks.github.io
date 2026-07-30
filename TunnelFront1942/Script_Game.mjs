@@ -115,7 +115,7 @@ const ActionCopy = Object.freeze({
   },
   [ActionIds.DECOY]: {
     label: "布置假迹",
-    hint: "组织 1 · 引开下一回合搜索",
+    hint: "组织 1 · 诱离并停滞两回合",
   },
   [ActionIds.AMBUSH]: {
     label: "洞口伏击",
@@ -800,12 +800,12 @@ function ExitWindowCardHtml(exitKey) {
   const statusLabels = {
     Unknown: "未复查",
     Clear: `安全至 T${windowState.checkedUntilTurn}`,
-    Watched: "工兵占压",
+    Watched: "敌军监视",
     Sealing: "封洞中",
     Smoking: "烟流威胁",
   };
   const threat = windowState.threatName
-    ? `${windowState.threatName}${windowState.threatEta === 0 ? "已到近旁" : `预计 ${windowState.threatEta} 回合抵近`}`
+    ? `${windowState.threatName}${windowState.threatDistance <= 1 ? "已到近旁" : `距洞口 ${windowState.threatDistance} 格`}`
     : "暂无可见敌军威胁";
   return `
     <article class="exitWindowCard ${windowState.status.toLowerCase()}">
@@ -830,7 +830,7 @@ function RenderHud() {
   ui.SafetyValue.style.color = gameState.peopleSafety <= 60 ? "#ef877a" : "";
   ui.ObjectivePrimary.textContent = objective.primary;
   ui.ObjectiveFill.style.width = `${Math.min(100, (gameState.civiliansSafe / MissionConfig.requiredEvacuees) * 100)}%`;
-  ui.ObjectiveRecon.classList.toggle("complete", gameState.reconActions > 0);
+  ui.ObjectiveRecon.classList.toggle("complete", gameState.planningReconCompleted);
   ui.ObjectiveDig.classList.toggle("complete", gameState.tunnelsDug > 0);
   ui.ObjectiveSweep.querySelector("span").textContent = objective.sweep;
   ui.ObjectiveSweep.classList.toggle("complete", gameState.sweepActive);
@@ -993,20 +993,32 @@ function BuildPreview(action) {
       return {
         eyebrow: "欺骗预览",
         title: `在${tile.name}布置假迹`,
-        body: "1 AP｜组织 1｜暴露 -8｜假迹持续 4 回合；成功诱导会让搜索组停滞 1 回合",
+        body: "1 AP｜组织 1｜暴露 -8｜假迹持续 4 回合；成功诱导会让搜索组随后停滞 2 回合",
       };
-    case ActionIds.AMBUSH:
+    case ActionIds.AMBUSH: {
+      const warningReserved = gameState.warnings.some((warning) => (
+        !warning.resolved
+        && warning.targetKey === tile.tileKey
+        && ["Seal", "Smoke"].includes(warning.kind)
+      ));
       return {
         eyebrow: "伏击预览",
         title: `在${tile.name}洞口伏击`,
-        body: "1 AP｜预留弹药 1｜离开洞口不返还｜敌军封洞或灌烟前先触发；会压制工兵并暴露洞口",
+        body: `1 AP｜预留弹药 1｜离开洞口不返还｜${warningReserved ? "锁定当前预警工兵，其他敌军不会抢先消耗" : "优先打断敌军进逼、封洞或灌烟"}；会暴露洞口`,
       };
-    case ActionIds.TRAP:
+    }
+    case ActionIds.TRAP: {
+      const warningReserved = gameState.warnings.some((warning) => (
+        !warning.resolved
+        && warning.targetKey === tile.tileKey
+        && ["Seal", "Smoke"].includes(warning.kind)
+      ));
       return {
         eyebrow: "洞口防御预览",
         title: `在${tile.name}布置一次性陷阱`,
-        body: "1 AP｜工具 1｜打断下一次封洞或灌烟，并压制工兵",
+        body: `1 AP｜工具 1｜${warningReserved ? "锁定当前预警工兵，其他敌军不会抢先消耗" : "打断下一次洞口进入、近旁攻击、封洞或灌烟"}`,
       };
+    }
     case ActionIds.ATTACK: {
       const combat = GetCombatPreview(gameState, unit.unitId, action.targetKey);
       return {
@@ -1276,7 +1288,7 @@ function StartGame({ reset = false } = {}) {
   ui.HelpScreen.hidden = true;
   ui.OutcomeScreen.hidden = true;
   SetLayer(gameState.selectedLayer ?? LayerIds.SURFACE);
-  ShowToast("第一步：选择交通员侦察；或让地道队进入赵庄洞口。");
+  ShowToast("第一步：先让交通员侦察，再根据当局土层与敌情规划开挖。");
 }
 
 function RestartGame() {

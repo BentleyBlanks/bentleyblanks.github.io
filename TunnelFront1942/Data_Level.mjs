@@ -262,6 +262,8 @@ export const EnemyTemplates = Object.freeze([
     maxHealth: 3,
     attack: 1,
     vision: 2,
+    digNoiseRange: 2,
+    digNoiseMinRow: 3,
     color: 0xc2654e,
     route: ["3,3", "4,3", "5,3", "4,2"],
   },
