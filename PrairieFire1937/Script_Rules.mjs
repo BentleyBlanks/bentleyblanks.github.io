@@ -836,7 +836,7 @@ export function RecomputeEconomy(state) {
     }
 
     income.grain -= base.population * ruleConstants.grainPerPopulation;
-    income.cadre += (0.06 + (base.tier - 1) * 0.05) * ruleConstants.cadreIncomeScale;
+    income.cadre += (0.08 + (base.tier - 1) * 0.05) * ruleConstants.cadreIncomeScale;
   }
 
   for (const unit of state.units) {
@@ -844,6 +844,9 @@ export function RecomputeEconomy(state) {
     for (const [resource, amount] of Object.entries(stats.upkeep ?? {})) {
       if (resourceKeys.includes(resource)) upkeep[resource] += Number(amount) || 0;
     }
+    // 枪一响就是钱：部队的日常操练、擦枪走火与警戒消耗按火力档次吃械——
+    // 械的中后期死山需要一个常态排水口（第二轮评审 P1）。
+    upkeep.ordnance += stats.attack >= 12 ? 0.5 : 0.1;
   }
 
   const discount = 1 - Clamp(effects.upkeepDiscount, 0, 0.6);
@@ -996,7 +999,10 @@ function DriftIntel(state) {
 
 function DriftMassBase(state) {
   const effects = GetEffects(state);
-  const growth = ruleConstants.massDriftBase * (1 + effects.massGrowth);
+  // 恢复期/反攻期的群众工作事半功倍（减租减息落实、伪政权动摇）——
+  // 战役曲线不能是一路阴跌到底，低谷之后要给玩家一个能赢回来的坡。
+  const eraRegrow = state.eraKey === "Recovery" ? 1.35 : state.eraKey === "Counter" ? 1.2 : 1;
+  const growth = ruleConstants.massDriftBase * (1 + effects.massGrowth) * eraRegrow;
 
   // 据点压制场：驻军越足、辐射越远，周边群众基础被持续压着——
   // 这就是"不拔点，百姓就一直受难"的机制载体。守备被抽调（敌进我进/反攻南调）
@@ -1012,7 +1018,7 @@ function DriftMassBase(state) {
       const hexKey = HexKey(coordinate.q, coordinate.r);
       if (!state.map.hexes[hexKey]) continue;
       const distance = HexDistanceKeys(stronghold.key, hexKey);
-      const amount = (distance === 0 ? ruleConstants.massDriftEnemy : distance === 1 ? -0.9 : -0.35) * strengthScale;
+      const amount = (distance === 0 ? ruleConstants.massDriftEnemy : distance === 1 ? -1.1 : -0.5) * strengthScale;
       suppression.set(hexKey, (suppression.get(hexKey) ?? 0) + amount);
     }
   }
@@ -1415,7 +1421,8 @@ function AddLedger(state, delta, mitigate = false) {
         amount *= (1 - effects.civilianShelter) * (1 - (works?.scorchResist ?? 0) * 0.6);
       }
     }
-    state.ledger[key] += Math.max(0, amount);
+    // 账本不出现小数人命：一位小数封顶（展示层取整）。
+    state.ledger[key] = Math.round((state.ledger[key] + Math.max(0, amount)) * 10) / 10;
   }
 }
 
@@ -1457,6 +1464,8 @@ export function PerformAction(state, action) {
       const fromKey = unit.key;
       unit.moves = Math.max(0, unit.moves - reachable.get(action.toKey));
       unit.key = action.toKey;
+      // 人一走，围就撤了（防 tap-and-run 把据点补给永久冻结）。
+      if (unit.combat?.blockading) unit.combat = { ...unit.combat, blockading: null };
       // 行军破隐蔽：伏击要靠事先潜伏，不是冲刺三格再开火。
       // 本回合累计转移超过 2 格，或落脚在无遮蔽又无群众掩护的开阔地，行迹即败露；
       // 短途转移且落点隐蔽（地形遮蔽 ≥0.45 或群众基础 ≥45）才保得住隐蔽。
@@ -1602,6 +1611,8 @@ export function PerformAction(state, action) {
       if (!resolved.ok) return fail(resolved.reason);
       report.lines.push(...resolved.lines);
       report.effects.push(...resolved.effects);
+      if (resolved.captures) report.captures = resolved.captures;
+      if (resolved.casualties) report.casualties = resolved.casualties;
       return { nextState: resolved.state, report };
     }
     default:
@@ -1641,18 +1652,18 @@ function ResolveCombatAction(state, action) {
   const ledgerAlreadyApplied = ledgerKeys.some((key) => (next.ledger?.[key] ?? 0) > (state.ledger?.[key] ?? 0));
   if (!ledgerAlreadyApplied && combatReport.ledgerDelta) AddLedger(next, combatReport.ledgerDelta, true);
 
-  // 缴获由规则层入账（战斗模块只负责算出数量，不碰玩家库存）。
-  for (const [resource, amount] of Object.entries(combatReport.captures ?? {})) {
-    const gained = Number(amount) || 0;
-    if (gained > 0 && resourceKeys.includes(resource)) {
-      next.stock[resource] = Math.round(((next.stock[resource] ?? 0) + gained) * 10) / 10;
-    }
-  }
+  // 缴获入账由战斗模块全权负责（Attack/Sabotage/Siege 四条路径都在 nextState
+  // 里 ApplyCaptures 过了）。规则层绝不再加一遍——曾经这里的重复入账让整个
+  // 缴获经济按声明参数的 2 倍运行（第二轮评审的 P0），冒烟有等值闸门盯着。
   if (action.kind === "Sabotage") next.sabotageTotal = (next.sabotageTotal || 0) + 1;
   const unit = GetUnit(next, action.unitId);
   if (unit) {
     unit.acted = true;
     unit.hidden = false;
+    // 打别的仗就等于撤围：围困标记只在持续围困时有效（防 tap-and-run 冻结补给）。
+    if (unit.combat?.blockading && action.kind !== "Siege") {
+      unit.combat = { ...unit.combat, blockading: null };
+    }
   }
   RecomputeMassAndControl(next);
   RecomputeVisibility(next);
@@ -1664,6 +1675,9 @@ function ResolveCombatAction(state, action) {
     state: next,
     lines: combatReport.lines ?? [],
     effects: (combatReport.effects ?? []).map((item) => ({ kind: item.kind, key: item.key, payload: item.payload })),
+    // 缴获/伤亡数字原样上传（UI 结算卡与冒烟的入账等值闸门都要用）。
+    captures: combatReport.captures ?? null,
+    casualties: combatReport.casualties ?? null,
   };
 }
 
@@ -1966,6 +1980,10 @@ export function EndTurn(state) {
   for (const key of resourceKeys) {
     next.stock[key] = Math.max(0, Math.round(((next.stock[key] ?? 0) + net[key]) * 10) / 10);
   }
+  // 情报过期作废：压过 120 的存量按 15%/季衰减——用不掉的消息不是资产。
+  if (next.stock.intel > 120) {
+    next.stock.intel = Math.round((120 + (next.stock.intel - 120) * 0.85) * 10) / 10;
+  }
   if (net.grain < 0 && next.stock.grain <= 0) {
     // 缺粮按连续季数累进：一季是紧张，连年断粮是灾难。全部是代价，不产生任何收益。
     next.famineTurns = (next.famineTurns || 0) + 1;
@@ -2098,16 +2116,31 @@ export function EndTurn(state) {
   next.scattered = (next.scattered ?? []).filter((entry) => {
     if (entry.returnTurn > next.turn) return true;
     const stats = GetUnitStats(entry.type);
-    const home = next.bases.length
-      ? next.bases.reduce(
-          (best, base) => (HexDistanceKeys(base.key, entry.key) < HexDistanceKeys(best.key, entry.key) ? base : best),
-          next.bases[0],
-        )
-      : null;
-    const unit = AddUnit(next, entry.type, home ? home.key : entry.key);
-    unit.hp = Math.max(6, Math.round(stats.maxHp * 0.45));
+    // 归队点是打散地附近最近的我方控制区，不是任意远方的基地——
+    // 被打散不能当成半价跨图传送（第二轮评审 P2）。
+    let rallyKey = entry.key;
+    let bestDistance = Infinity;
+    for (const key of next.map.order) {
+      const hex = next.map.hexes[key];
+      if (!hex || (hex.control !== "Base" && hex.control !== "Guerrilla")) continue;
+      const distance = HexDistanceKeys(entry.key, key);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        rallyKey = key;
+      }
+    }
+    // 收拢伤员要药：药够则减员近半归队，缺药则只回得来三成人。
+    const medicineCost = Math.round(stats.maxHp * 0.06 * 10) / 10;
+    const supplied = (next.stock.medicine ?? 0) >= medicineCost;
+    if (supplied) next.stock.medicine = Math.round((next.stock.medicine - medicineCost) * 10) / 10;
+    const unit = AddUnit(next, entry.type, rallyKey);
+    unit.hp = Math.max(6, Math.round(stats.maxHp * (supplied ? 0.45 : 0.3)));
     unit.fatigue = 40;
-    report.lines.push(`${stats.name}的失散人员归队，减员近半，在${home ? home.name : "原集结地"}重新集结。`);
+    report.lines.push(
+      supplied
+        ? `${stats.name}的失散人员归队，减员近半，在就近的根据地重新集结。`
+        : `${stats.name}的失散人员归队——缺医少药，抬回来的人不到三成。`,
+    );
     return false;
   });
 
@@ -2563,7 +2596,9 @@ export function GetVictoryAssessment(state) {
   );
 
   // 评级闸门：根据地规模不足或人民代价过大时封顶。
-  let grade = total >= 86 ? "S" : total >= 74 ? "A" : total >= 60 ? "B" : total >= 44 ? "C" : "D";
+  // 评级带按 2026-07 大改后的真实分布重标（与结局重标同一方法论）：
+  // 参照打法 ~45=B、优秀人类 ~56+=A、S 是极限局。
+  let grade = total >= 68 ? "S" : total >= 56 ? "A" : total >= 45 ? "B" : total >= 32 ? "C" : "D";
   const order = ["D", "C", "B", "A", "S"];
   const capTo = (cap) => {
     if (order.indexOf(grade) > order.indexOf(cap)) grade = cap;

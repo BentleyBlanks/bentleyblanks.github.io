@@ -149,10 +149,13 @@ export const combatConstants = Object.freeze({
   coverLossRelief: 0.3, // 己方地形隐蔽带来的减员折损上限
 
   // —— 缴获（械的主来源）——
-  // 0.55：一次像样的伏击缴获 4~6 械，高于同期任何种田渠道——
-  // 「械主要靠缴获」必须是数值现实而不是设计口号。
-  captureScale: 0.55, // 杀伤 → 缴获械的换算
-  captureGrainRatio: 0.5, // 缴获中粮的比例
+  // 0.7（单次入账口径）：一次像样的伏击缴获 4~6 械，高于同期任何种田渠道——
+  // 「械主要靠缴获」必须是数值现实而不是设计口号。改此值必过冒烟的
+  // 「缴获入账与战报严格等值」闸门（曾经双重入账让它实跑在声明值的 2 倍）。
+  captureScale: 0.7, // 杀伤 → 缴获械的换算
+  // 0.85：缴获的重心是粮——枪养的是仗，粮养的是根据地。打赢一仗能让全县
+  // 少饿一季，这是"打仗保民"传导链上最粗的一根管子。
+  captureGrainRatio: 0.85, // 缴获中粮的比例
   captureMedicineRatio: 0.16, // 缴获中药的比例
   captureMassBonus: 0.4, // 群众基础带来的搬运/清理战场效率
   captureWithdrawPenalty: 0.85, // 打完立即转移，来不及全部搬走
@@ -214,7 +217,7 @@ export const combatConstants = Object.freeze({
   siegeNoCapabilityAttackPenalty: 0.45, // 无攻坚能力的攻击折损
   siegeGarrisonDamageScale: 0.42,
   siegeCaptureOrdnance: 26, // 拔掉据点的缴获基准
-  siegeCaptureGrain: 30,
+  siegeCaptureGrain: 40,
   siegeCaptureMedicine: 8,
   blockadeSupplyDrain: 2, // 围困每回合削减的补给
   blockadeGarrisonDrain: 0.06, // 断粮后守备每回合的自然减员比例
@@ -260,27 +263,31 @@ export const combatConstants = Object.freeze({
       exposureFactor: 0.6,
       captureFactor: 0.55,
     }),
+    // 敌进我进：外线出击换敌早撤，但留在里面的百姓比坚壁清野时暴露——
+    // 民损系数必须高于 Disperse，否则它成为全维度支配的默认项（第二轮评审 P1）。
     CounterRaid: Object.freeze({
       name: "敌进我进",
       ourLossFactor: 0.5,
       theirLossFactor: 0.85,
-      civilianFactor: 0.4,
-      villageFactor: 0.3,
-      grainFactor: 0.35,
-      cadreFactor: 0.28,
-      displacedFactor: 0.9,
+      civilianFactor: 0.52,
+      villageFactor: 0.34,
+      grainFactor: 0.4,
+      cadreFactor: 0.3,
+      displacedFactor: 1.05,
       exposureFactor: -0.4,
       captureFactor: 1.4,
     }),
+    // 依托工事：文案承诺"掩护群众转移"，民损系数必须兑现这句话——
+    // 它的真实代价是部队顶在工事里挨打，而不是百姓遭殃。
     Fortify: Object.freeze({
       name: "依托工事节节抗击",
-      ourLossFactor: 0.85,
+      ourLossFactor: 0.95,
       theirLossFactor: 0.7,
-      civilianFactor: 0.6,
-      villageFactor: 0.55,
-      grainFactor: 0.45,
-      cadreFactor: 0.5,
-      displacedFactor: 1,
+      civilianFactor: 0.34,
+      villageFactor: 0.4,
+      grainFactor: 0.38,
+      cadreFactor: 0.42,
+      displacedFactor: 0.65,
       exposureFactor: 0.1,
       captureFactor: 0.35,
     }),
@@ -1952,14 +1959,18 @@ function BuildSiegeModel(state, unit, stronghold, options = {}) {
   let defenceStrength = strongholdStats.defence * (0.45 + 0.55 * Clamp01(garrison / Math.max(1, strongholdStats.garrison)));
   defenceStrength *= 0.6 + 0.4 * supplyRatio;
   if (night) defenceStrength *= 0.85;
+  // 坑道作业的积累：每级 undermined 削弱工事防御——先围后攻是普通部队的攻坚之路。
+  const undermined = Clamp(Number(stronghold.undermined) || 0, 0, 4);
+  defenceStrength *= 1 - undermined * 0.12;
   defenceStrength = Math.max(1, defenceStrength);
 
   const power = attackStrength / Math.max(0.001, attackStrength + defenceStrength);
   let winChance = 0.5 + (power - 0.5) * constants.oddsSlope;
-  if (!hasCapability) winChance -= constants.siegeNoCapabilityOddsPenalty;
+  if (!hasCapability) winChance -= constants.siegeNoCapabilityOddsPenalty * (1 - undermined * 0.18);
   if (!hasOrdnance) winChance -= constants.siegeNoOrdnanceOddsPenalty;
   if (night) winChance += constants.nightWinBonus;
   winChance += massBase * constants.massOddsBonus;
+  winChance += undermined * 0.05;
   winChance = Clamp(winChance, constants.oddsFloor, constants.oddsCeiling);
 
   const maxHp = unit.maxHp || unitStats.hp || 50;
@@ -2100,7 +2111,7 @@ export function ResolveSiege(state, unitId, strongholdId, options = {}) {
   const strongholdStats = model.strongholdStats;
 
   if (mode === "Blockade") {
-    // 围困：断水断粮，是最省人的解法
+    // 围困：断水断粮，是最省人的解法——但不是零风险的解法。
     const roll = DrawRoll(draft);
     const tightness = Clamp01(0.45 + model.massBase * constants.blockadeMassBonus);
     const drain = constants.blockadeSupplyDrain * (0.6 + tightness);
@@ -2109,6 +2120,9 @@ export function ResolveSiege(state, unitId, strongholdId, options = {}) {
     if (strongholdDraft) {
       strongholdDraft.supply = Round1(Math.max(0, (stronghold.supply ?? strongholdStats.supply) - drain));
       strongholdDraft.alarm = Clamp((stronghold.alarm || 0) + 6, 0, 100);
+      // 坑道作业：围得越久，墙根下的药室越深——之后强攻的胜算随之上升。
+      // 没有爆破组的部队也因此有一条"有代价但可行"的攻坚路径。
+      strongholdDraft.undermined = Clamp((stronghold.undermined || 0) + 1, 0, 4);
       if (strongholdDraft.supply <= 0) {
         const attrition = model.garrison * constants.blockadeGarrisonDrain * (1 + tightness);
         strongholdDraft.garrison = Round1(Math.max(0, model.garrison - attrition));
@@ -2135,6 +2149,21 @@ export function ResolveSiege(state, unitId, strongholdId, options = {}) {
       unitDraft.moves = 0;
       unitDraft.fatigue = Clamp((unit.fatigue || 0) + 6, 0, 100);
       unitDraft.combat = { ...(unit.combat || {}), lastActionTurn: state.turn || 0, blockading: stronghold.id };
+      // 守敌不是待宰的：补给未断时随时可能乘夜出击袭扰围困阵地。
+      // 围困从"零风险最优解"回到"省人但要蹲得住"的定位（第二轮评审 P1）。
+      if (!surrendered) {
+        const sortieRoll = DrawRoll(draft);
+        const supplyRatio = Clamp01((strongholdDraft ? strongholdDraft.supply : 0) / Math.max(1, strongholdStats.supply));
+        const sortieChance = (0.14 + Clamp01(model.garrison / 6) * 0.18) * (0.35 + supplyRatio * 0.65);
+        if (sortieRoll < sortieChance) {
+          const sortieDamage = Round1(Math.max(2, model.garrison * (0.8 + DrawRoll(draft) * 0.9)));
+          unitDraft.hp = Round1(Math.max(0, (unit.hp ?? 0) - sortieDamage));
+          unitDraft.hidden = false;
+          report.casualties = { ours: RoundInt(sortieDamage), theirs: report.casualties?.theirs ?? 0 };
+          report.lines.push(`守敌乘夜出击袭扰围困阵地，我减员 ${RoundInt(sortieDamage)}。`);
+          report.effects.push({ kind: "Smoke", key: unit.key, payload: { level: 1 } });
+        }
+      }
     }
     const grainCost = constants.siegeBlockadeGrainCost;
     const stockDraft = DraftStock(draft);
@@ -2270,7 +2299,7 @@ function ApplyCaptureStronghold(draft, stronghold, report) {
   for (const key of [stronghold.key, ...HexNeighborKeys(stronghold.key)]) {
     const nearby = DraftHex(draft, key);
     if (!nearby) continue;
-    const bloom = key === stronghold.key ? 12 : 8;
+    const bloom = key === stronghold.key ? 14 : 10;
     nearby.massBase = Clamp((nearby.massBase || 0) + bloom, 0, 100);
     nearby.scorch = Math.max(0, (nearby.scorch || 0) - 20);
   }
@@ -2421,8 +2450,9 @@ export function ResolveSweepBattle(state, sweep) {
         strongholdDraft.alarm = Clamp((target.alarm || 0) + 20, 0, 100);
       }
       theirLoss += raidDamage;
-      // 敌后起火，合围被迫提前收兵——这一次扫荡对地方的破坏显著减轻。
-      ledgerScale = Math.min(ledgerScale, 0.72);
+      // 敌后起火，合围被迫提前收兵——这一次扫荡对地方的破坏有所减轻
+      //（幅度收在 0.85：外线打得再好，圈里的村庄也已经在挨烧）。
+      ledgerScale = Math.min(ledgerScale, 0.85);
       captures.ordnance += RoundInt(raidDamage * 2.2 * profile.captureFactor);
       captures.grain += RoundInt(raidDamage * 1.4 * profile.captureFactor);
       report.lines.push(
@@ -2762,23 +2792,31 @@ export function TickCombatRecovery(state) {
     }
   }
 
-  // 据点：未被围困则恢复补给，警戒逐步松弛
+  // 据点：未被围困则恢复补给，警戒逐步松弛。
+  // 围困标记必须以"部队真的还贴在据点旁"为准——tap-and-run（围一下就走）
+  // 曾把补给永久冻结（第二轮评审 P1），所以这里做邻接校验。
   const strongholds = state.strongholds || [];
   const blockading = new Set();
   for (const unit of units) {
-    if (unit && unit.combat && unit.combat.blockading) blockading.add(unit.combat.blockading);
+    const blockadeId = unit && unit.combat && unit.combat.blockading;
+    if (!blockadeId || (unit.hp ?? 0) <= 0) continue;
+    const target = strongholds.find((item) => item && item.id === blockadeId);
+    if (target && HexDistanceKeys(unit.key, target.key) <= 1) blockading.add(blockadeId);
   }
   for (const item of strongholds) {
     if (!item || item.destroyed) continue;
     const stats = ResolveStrongholdStats(item.type);
     const needsSupply = (item.supply ?? stats.supply) < stats.supply;
     const needsAlarm = (item.alarm || 0) > 0;
-    if (!needsSupply && !needsAlarm) continue;
+    const needsRepair = (item.undermined || 0) > 0;
+    if (!needsSupply && !needsAlarm && !needsRepair) continue;
     if (blockading.has(item.id)) continue;
     const strongholdDraft = DraftStronghold(draft, item.id);
     if (strongholdDraft) {
       strongholdDraft.supply = Round1(Math.min(stats.supply, (item.supply ?? stats.supply) + 1.5));
       strongholdDraft.alarm = Clamp((item.alarm || 0) - 6, 0, 100);
+      // 围困一撤，守敌就回填坑道——坑道作业的成果不围就守不住。
+      strongholdDraft.undermined = Math.max(0, (item.undermined || 0) - 1);
     }
   }
 

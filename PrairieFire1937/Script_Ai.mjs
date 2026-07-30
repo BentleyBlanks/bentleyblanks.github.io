@@ -1189,7 +1189,13 @@ function FindRepairTarget(state, enemy) {
 
 /** 工程规划：炮楼 / 公路 / 封锁沟，按方针权重与难度预算。 */
 function PlanConstruction(state, difficulty, doctrine, rng) {
-  const budget = difficulty.buildBudget + (doctrine.key === 'Cage' || doctrine.key === 'Nibble' ? 1 : 0);
+  // 修堡预算随时期收缩：恢复期敌无力再扩网、反攻期停止一切新建——
+  // 否则"敌网恢复期比开局更密"，反攻永远名不副实（第二轮评审 P1）。
+  const eraKey = ResolveEraKey(state);
+  const eraBuildScale = eraKey === 'Recovery' ? 0.5 : eraKey === 'Counter' ? 0 : 1;
+  const budget = Math.round(
+    (difficulty.buildBudget + (doctrine.key === 'Cage' || doctrine.key === 'Nibble' ? 1 : 0)) * eraBuildScale,
+  );
   const memory = ReadAiMemory(state) || {};
   const queue = SafeList(memory.construction);
   const projects = [];
@@ -1780,10 +1786,29 @@ function AppendLog(next, entry) {
   });
 }
 
-function AddLedger(next, field, amount) {
+const ledgerFieldLabels = Object.freeze({
+  civilianDeaths: '乡亲遇害',
+  displaced: '流离失所',
+  villagesBurned: '村庄被焚',
+  cadreLost: '骨干损失',
+  grainSeized: '粮食被夺',
+});
+
+function AddLedger(next, field, amount, context) {
   if (!amount) return;
   const current = Number(next.ledger[field]) || 0;
-  next.ledger[field] = current + amount;
+  next.ledger[field] = Math.round((current + amount) * 10) / 10;
+  // 代价账本逐条记录：与 Rules.PushLedgerLog 同一契约（只呈现、不参与计算）。
+  // 敌方治安战的每一笔代价都要让玩家在账本里看得到出处。
+  next.ledgerLog = Array.isArray(next.ledgerLog) ? next.ledgerLog : [];
+  next.ledgerLog.push({
+    turn: Number(next.turn) || 0,
+    kind: (context && context.kind) || 'Enemy',
+    key: (context && context.key) || null,
+    text: (context && context.text) || `敌治安战：${ledgerFieldLabels[field] || field} ${Math.round(amount)}。`,
+    delta: { [field]: amount },
+  });
+  if (next.ledgerLog.length > 200) next.ledgerLog.splice(0, next.ledgerLog.length - 200);
 }
 
 function FindEnemy(next, unitId) {
@@ -2112,12 +2137,24 @@ function ApplyRequisition(next, order, rng, difficulty, report) {
   const harshness = Clamp(Number(order.payload.harshness) || difficulty.harshness, 0.2, 1.2);
   const grain = Math.max(1, Math.round(((hex.yields && hex.yields.grain) || 1) * (2 + rng.Next() * 4) * harshness));
   // 红线：抢粮只进代价账本，玩家不得到任何资源。
-  AddLedger(next, 'grainSeized', grain);
+  AddLedger(next, 'grainSeized', grain, {
+    kind: 'Requisition',
+    key,
+    text: `敌在 ${HexLabel(next, key)} 征发粮秣 ${grain} 石，村中口粮见底。`,
+  });
   const displaced = Math.round(grain * 0.35 * harshness);
-  AddLedger(next, 'displaced', displaced);
+  AddLedger(next, 'displaced', displaced, {
+    kind: 'Requisition',
+    key,
+    text: `${HexLabel(next, key)} 遭征发后 ${displaced} 人外出投亲逃荒。`,
+  });
   if (harshness > 0.85 && rng.Chance(0.22)) {
-    AddLedger(next, 'villagesBurned', 1);
-    AddLedger(next, 'civilianDeaths', 2 + Math.round(rng.Next() * 4));
+    AddLedger(next, 'villagesBurned', 1, { kind: 'Requisition', key, text: `${HexLabel(next, key)} 被纵火，房屋成排烧毁。` });
+    AddLedger(next, 'civilianDeaths', 2 + Math.round(rng.Next() * 4), {
+      kind: 'Requisition',
+      key,
+      text: `${HexLabel(next, key)} 纵火中有乡亲罹难。`,
+    });
     MutateHex(next, key, { scorch: Clamp((hex.scorch || 0) + 18, 0, 100) });
     AppendLog(next, { kind: 'Requisition', key, text: `${HexLabel(next, key)} 被纵火，房屋成排烧毁，村民流散。` });
     report.villagesBurned += 1;
@@ -2544,12 +2581,17 @@ function ResolveSweepOutcome(next, sweep, rng, difficulty, report, options) {
       const accepted = result && result.report ? result.report.valid !== false : Boolean(result);
       if (accepted && result.nextState && result.nextState !== next && result.nextState.map) {
         const adopted = result.nextState;
-        next.map = adopted.map;
+        // 整体采纳战斗模块的结算状态：基地降级/停摆、敌进我进的后方战果、
+        // 抢粮抽干部后的库存、代价账本逐条、方针清空——一个字段都不许丢。
+        // （曾经只回抄 map/units/enemies/ledger/exposure/alert 六个字段，
+        //   扫荡一半战果被静默丢弃、全游戏最大的威胁在玩家面前是哑的——
+        //   第二轮独立评审的 P0，同类"只抄部分字段"的采纳块以后一律禁止。）
+        Object.assign(next, adopted);
         next.units = SafeList(adopted.units).map((item) => ({ ...item }));
         next.enemies = SafeList(adopted.enemies).map((item) => ({ ...item }));
-        next.ledger = { ...(adopted.ledger || next.ledger) };
-        if (Number.isFinite(adopted.exposure)) next.exposure = adopted.exposure;
-        if (Number.isFinite(adopted.alert)) next.alert = adopted.alert;
+        for (const line of SafeList(result.report && result.report.lines)) {
+          AppendLog(next, { kind: 'Sweep', key: sweep.targetKey, text: line });
+        }
         report.sweepResolvedExternally = true;
         report.sweepsExecuted += 1;
         report.headlines.push(`大扫荡：${HexLabel(next, sweep.targetKey)}`);

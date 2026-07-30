@@ -1549,6 +1549,96 @@ Test("事件卡效果键全部有消费点（不许虚假发奖）", () => {
   }
 });
 
+Test("扫荡走全链路：战果与代价落在玩家可见处（测装配，不测零件）", () => {
+  // 第二轮评审 P0：AI 采纳块只回抄部分字段，扫荡一半战果被静默丢弃、
+  // 战报 0/26 可见。此闸门走真实 EndTurn 链路，直到一次扫荡真正执行。
+  let state = Rules.CreateInitialState({ seed: 11 });
+  let resolution = null;
+  for (let step = 0; step < 24 && !resolution; step += 1) {
+    if (state.events.pending) state = Rules.ApplyEventChoice(state, state.events.pending, null);
+    state.exposure = Math.max(state.exposure, 66); // 高暴露逼扫荡立案
+    const hadSweep = Boolean(state.sweep);
+    const before = {
+      ledger: { ...state.ledger },
+      ledgerLogLength: (state.ledgerLog ?? []).length,
+    };
+    const outcome = Rules.EndTurn(state);
+    if (hadSweep && !outcome.nextState.sweep) {
+      resolution = { report: outcome.report, before, after: outcome.nextState };
+    }
+    state = outcome.nextState;
+  }
+  assert.ok(resolution, "24 回合高暴露仍没有一次扫荡被执行");
+  const lines = resolution.report.lines.join("\n");
+  assert.ok(/合围|扫荡/.test(lines), "扫荡结算在回合战报里完全不可见");
+  const ledgerGrew = Rules.ledgerKeys.some(
+    (key) => (resolution.after.ledger[key] ?? 0) > (resolution.before.ledger[key] ?? 0),
+  );
+  assert.ok(ledgerGrew, "扫荡执行后代价账本没有任何增长——战果又被采纳块丢弃了");
+  assert.ok(
+    (resolution.after.ledgerLog ?? []).length > resolution.before.ledgerLogLength,
+    "扫荡执行后账本逐条记录没有新条目",
+  );
+  assert.ok(!resolution.after.sweepStance, "方针未在扫荡结束后清空（一次一定契约失效）");
+});
+
+Test("缴获入账与战报严格等值（不许双重入账）", () => {
+  const state = Rules.CreateInitialState({ seed: 7 });
+  const unit = state.units.find((item) => Rules.GetUnitStats(item.type).abilities.includes("Ambush"));
+  const enemy = state.enemies[0];
+  assert.ok(unit && enemy, "初始局面缺可伏击单位或敌军");
+  enemy.key = HexNeighborKeys(unit.key).find((key) => Rules.GetHex(state, key)) ?? enemy.key;
+  enemy.visibleToPlayer = true;
+  unit.hidden = true;
+  const hexUnderEnemy = Rules.GetHex(state, enemy.key);
+  if (hexUnderEnemy) hexUnderEnemy.massBase = 60;
+  const before = state.stock.ordnance;
+  const outcome = Rules.PerformAction(state, { kind: "Attack", unitId: unit.id, targetKey: enemy.key });
+  assert.equal(outcome.report.ok, true, `攻击未成立：${outcome.report.reason ?? ""}`);
+  const reported = Number(outcome.report.captures?.ordnance) || 0;
+  const applied = Math.round(((outcome.nextState.stock.ordnance ?? 0) - before) * 10) / 10;
+  assert.ok(
+    Math.abs(applied - reported) < 0.11,
+    `战报缴获械 ${reported} 但库存实际 +${applied}——入账与战报不等值（翻倍或丢失）`,
+  );
+});
+
+Test("围一下就走不能冻结据点补给（tap-and-run）", () => {
+  let state = Rules.CreateInitialState({ seed: 7 });
+  const stronghold = state.strongholds.find((item) => item.type === "Blockhouse");
+  const adjacent = HexNeighborKeys(stronghold.key).find((key) => Rules.GetHex(state, key));
+  const unit = state.units[0];
+  unit.key = adjacent;
+  state = Combat.ResolveSiege(state, unit.id, stronghold.id, { mode: "Blockade" }).nextState;
+  const drained = state.strongholds.find((item) => item.id === stronghold.id).supply;
+  const runner = state.units.find((item) => item.id === unit.id);
+  runner.key = state.map.order.find(
+    (key) => Rules.GetHex(state, key) && HexDistanceKeys(key, stronghold.key) >= 3,
+  );
+  const recovered = Combat.TickCombatRecovery(state);
+  const after = (recovered.strongholds ?? state.strongholds).find((item) => item.id === stronghold.id).supply;
+  assert.ok(after > drained, `撤围后据点补给未恢复（${drained} → ${after}）——围困标记泄漏`);
+});
+
+Test("围困不是零风险：守敌会出击袭扰围困部队", () => {
+  let state = Rules.CreateInitialState({ seed: 7 });
+  const stronghold = state.strongholds.find((item) => (item.garrison ?? 0) >= 5) ?? state.strongholds[0];
+  stronghold.garrison = 6;
+  stronghold.supply = 12;
+  const adjacent = HexNeighborKeys(stronghold.key).find((key) => Rules.GetHex(state, key));
+  const unit = state.units[0];
+  unit.key = adjacent;
+  let hurt = false;
+  for (let step = 0; step < 12 && !hurt; step += 1) {
+    state = Combat.ResolveSiege(state, unit.id, stronghold.id, { mode: "Blockade" }).nextState;
+    const besieger = state.units.find((item) => item.id === unit.id);
+    hurt = (besieger.hp ?? besieger.maxHp) < besieger.maxHp;
+    const target = state.strongholds.find((item) => item.id === stronghold.id);
+    if (target) target.supply = 12; // 维持补给，聚焦出击判定本身
+  }
+  assert.ok(hurt, "12 回合围困零伤亡——围困又成了无风险最优解");
+});
+
 Test("unrest 高企有真实后果：不安的根据地产出打折", () => {
   const run = RunBotCached(11, "farmer");
   const state = Rules.CloneState(run.finalState);
