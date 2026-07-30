@@ -471,6 +471,11 @@ a:focus-visible {
   line-height: 1.35;
 }
 
+.civilianEntry .mobileCivilianName,
+.civilianEntry .mobileCivilianSummary {
+  display: none;
+}
+
 .civilianEntry.safe {
   border-left: 3px solid var(--green);
 }
@@ -1045,11 +1050,12 @@ kbd {
 @media (max-width: 760px) {
   html,
   body {
-    overflow: auto;
+    overflow: hidden;
   }
 
   .gameShell {
-    min-height: 820px;
+    height: 100dvh;
+    min-height: 0;
   }
 
   .topBar {
@@ -1117,11 +1123,12 @@ kbd {
     left: 7px;
     bottom: auto;
     width: 198px;
-    max-height: 225px;
+    height: 170px;
+    max-height: 170px;
     padding: 10px;
   }
 
-  .objectivePanel ul li:last-child {
+  .objectivePanel ul {
     display: none;
   }
 
@@ -1130,6 +1137,7 @@ kbd {
   }
 
   .exitWindowCard {
+    min-height: 44px;
     padding: 5px 6px;
   }
 
@@ -1140,12 +1148,14 @@ kbd {
   .civilianLedger {
     position: fixed;
     z-index: 6;
+    top: 330px;
     left: 7px;
     right: 7px;
-    bottom: 313px;
+    bottom: auto;
+    height: 64px;
     display: flex;
     margin: 0;
-    padding: 5px;
+    padding: 3px;
     gap: 5px;
     overflow-x: auto;
     border: 1px solid var(--line);
@@ -1154,12 +1164,37 @@ kbd {
 
   .civilianEntry {
     flex: 0 0 118px;
-    min-height: 44px;
+    min-height: 58px;
+    max-height: 64px;
+    grid-template-columns: 1fr;
     padding: 6px 8px;
   }
 
-  .civilianEntry span {
+  .civilianEntry > span,
+  .civilianEntry .desktopCivilianName,
+  .civilianEntry .desktopCivilianSummary {
     display: none;
+  }
+
+  .civilianEntry .mobileCivilianName {
+    display: inline;
+    color: inherit;
+  }
+
+  .civilianEntry .mobileCivilianSummary {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .civilianEntry b {
+    overflow: hidden;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .inspectorPanel {
@@ -1168,7 +1203,7 @@ kbd {
     right: 7px;
     bottom: 74px;
     width: auto;
-    height: 238px;
+    height: clamp(150px, calc(100dvh - 474px), 238px);
     padding: 10px;
   }
 
@@ -1233,13 +1268,21 @@ kbd {
 
   .previewPanel {
     z-index: 8;
+    top: 154px;
     left: 7px;
     right: 7px;
-    bottom: 317px;
+    bottom: auto;
     width: auto;
+    max-height: 240px;
     min-width: 0;
+    overflow: auto;
     transform: none;
     grid-template-columns: 1fr auto;
+  }
+
+  .gameShell.previewOpen .objectivePanel,
+  .gameShell.previewOpen .civilianLedger {
+    display: none;
   }
 
   .previewPanel > div {

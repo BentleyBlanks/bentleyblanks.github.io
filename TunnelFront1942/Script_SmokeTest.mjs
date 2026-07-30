@@ -125,7 +125,11 @@ function PrepareSharedOpening(state, firstDigKey) {
   return next;
 }
 
-function RunNorthInterdictionBot(seed = 19420501) {
+function RunNorthInterdictionBot(
+  seed = 19420501,
+  groupOrder = ["Wounded", "Families", "Contacts"],
+  refreshEverySignal = false,
+) {
   let state = CreateInitialState({ seed });
   state = PrepareSharedOpening(state, "6,1");
   state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
@@ -151,19 +155,19 @@ function RunNorthInterdictionBot(seed = 19420501) {
 
   state = Apply(state, "WorkTeam", ActionIds.DIG, "2,1");
   state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
+  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupOrder[0]);
   state = Apply(state, "Guerrilla", ActionIds.MOVE, "2,1");
   state = Apply(state, "Scout", ActionIds.MOVE, "4,1");
   state = Apply(state, "Scout", ActionIds.MOVE, "3,1");
   state = End(state);
 
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Families");
+  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupOrder[1]);
   state = Apply(state, "Scout", ActionIds.MOVE, "2,1");
   state = Apply(state, "Scout", ActionIds.EXIT_TUNNEL);
   state = End(state);
 
   state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Contacts");
+  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupOrder[2]);
   state = Apply(state, "Militia", ActionIds.MOVE, "6,1");
   state = End(state);
 
@@ -188,9 +192,23 @@ function RunNorthInterdictionBot(seed = 19420501) {
   state = Apply(state, "Scout", ActionIds.RECON, "2,1");
   state = End(state);
   while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
+    if (
+      refreshEverySignal
+      && GetAvailableActions(state, "Scout").includes(ActionIds.RECON)
+    ) {
+      state = Apply(state, "Scout", ActionIds.RECON, "2,1");
+    }
     state = End(state);
   }
   return state;
+}
+
+function RunNorthFamilyFirstBot(seed = 19420501) {
+  return RunNorthInterdictionBot(
+    seed,
+    ["Families", "Wounded", "Contacts"],
+    true,
+  );
 }
 
 function RunSouthDeceptionBot(useDecoy = true, useTrap = true, seed = 19420501) {
@@ -295,6 +313,87 @@ function RunSouthDeceptionBot(useDecoy = true, useTrap = true, seed = 19420501) 
     state = End(state);
   }
   return state;
+}
+
+function RunSouthContactsSecondBot(seed = 19420501) {
+  let state = CreateInitialState({ seed });
+  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
+  state = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
+  state = Apply(state, "WorkTeam", ActionIds.DIG, "5,3");
+  state = Apply(state, "Militia", ActionIds.DECOY, "6,5");
+  state = Apply(state, "Militia", ActionIds.MOVE, "6,2");
+  state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
+  state = End(state);
+
+  state = Apply(state, "Militia", ActionIds.ENTER_TUNNEL);
+  state = Apply(state, "Militia", ActionIds.MOVE, "5,3");
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
+  state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
+  state = Apply(state, "Scout", ActionIds.MOVE, "6,2");
+  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
+  state = Apply(state, "WorkTeam", ActionIds.DIG, "4,4");
+  state = Apply(state, "WorkTeam", ActionIds.DIG, "3,4");
+  state = End(state);
+
+  state = Apply(state, "WorkTeam", ActionIds.DIG, "2,4");
+  state = Apply(state, "WorkTeam", ActionIds.DIG, "1,5");
+  state = Apply(state, "Militia", ActionIds.MOVE, "4,4");
+  state = Apply(state, "Militia", ActionIds.MOVE, "3,4");
+  state = Apply(state, "Scout", ActionIds.MOVE, "5,3");
+  state = Apply(state, "Scout", ActionIds.MOVE, "4,4");
+  state = End(state);
+
+  state = Apply(state, "WorkTeam", ActionIds.DIG, "0,5");
+  state = Apply(state, "WorkTeam", ActionIds.BRACE);
+  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Wounded");
+  state = Apply(state, "Militia", ActionIds.MOVE, "2,4");
+  state = Apply(state, "Militia", ActionIds.MOVE, "1,5");
+  state = Apply(state, "Scout", ActionIds.MOVE, "3,4");
+  state = Apply(state, "Scout", ActionIds.MOVE, "2,4");
+  state = End(state);
+
+  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Contacts");
+  state = Apply(state, "Militia", ActionIds.MOVE, "0,5");
+  state = Apply(state, "Militia", ActionIds.TRAP);
+  state = Apply(state, "Scout", ActionIds.MOVE, "1,5");
+  state = Apply(state, "Scout", ActionIds.MOVE, "0,5");
+  state = End(state);
+
+  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Families");
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, "5,3");
+  state = End(state);
+
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, "4,4");
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, "3,4");
+  state = End(state);
+
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, "2,4");
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, "1,5");
+  state = Apply(state, "Scout", ActionIds.EXIT_TUNNEL);
+  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
+  state = End(state);
+
+  if (!state.tunnels["0,5"].trap) {
+    state = Apply(state, "Militia", ActionIds.TRAP);
+  }
+  state = End(state);
+
+  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
+  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, "0,5");
+  state = Apply(state, "Guerrilla", ActionIds.EXIT_TUNNEL);
+  state = End(state);
+
+  const northPatrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
+  const blockingKey = northPatrol.intent?.targetKey ?? null;
+  assert.ok(blockingKey);
+  assert.equal(GetMoveTargets(state, "Guerrilla").includes(blockingKey), true);
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, blockingKey);
+  state = End(state);
+  while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
+    state = End(state);
+  }
+  return { state, blockingKey };
 }
 
 function RunSouthAllGroupsBot(seed) {
@@ -454,6 +553,7 @@ function RunNorthIdleBot() {
 }
 
 const northEvacuationPath = ["6,2", "6,1", "5,1", "4,1", "3,1", "2,1"];
+const southEvacuationPath = ["6,2", "5,3", "4,4", "3,4", "2,4", "1,5", "0,5"];
 
 function CreateLogisticsState(bracedExit = false) {
   const state = CreateInitialState();
@@ -494,6 +594,32 @@ function CreateLogisticsState(bracedExit = false) {
   militia.layer = LayerIds.TUNNEL;
   militia.tileKey = "6,2";
   militia.actionPoints = militia.maxActionPoints;
+  return state;
+}
+
+function CreateDualRouteLogisticsState() {
+  const state = CreateLogisticsState(false);
+  const nodeTemplate = Clone(state.tunnels["6,2"]);
+  for (const tileKey of southEvacuationPath.slice(1)) {
+    state.tunnels[tileKey] = {
+      ...Clone(nodeTemplate),
+      tileKey,
+      braced: false,
+      cracked: false,
+      collapsed: false,
+      sealed: false,
+      smoke: 0,
+      trap: false,
+      dugTurn: 1,
+      isOriginal: false,
+    };
+  }
+  state.exitWindows["0,5"] = {
+    exitKey: "0,5",
+    checkedTurn: state.turn,
+    checkedUntilTurn: 20,
+    signalCount: 1,
+  };
   return state;
 }
 
@@ -1447,9 +1573,297 @@ Test("all six launch orders create distinct timing or congestion signatures with
   assert.equal(SafetyAfterFirstLaunch("Families") > SafetyAfterFirstLaunch("Wounded"), true);
 
   const estimateState = CreateLogisticsState(false);
-  assert.equal(GetCivilianTransitEstimate(estimateState, "Wounded", "2,1").earliestSafeTurn, 9);
-  assert.equal(GetCivilianTransitEstimate(estimateState, "Families", "2,1").earliestSafeTurn, 6);
-  assert.equal(GetCivilianTransitEstimate(estimateState, "Contacts", "2,1").earliestSafeTurn, 5);
+  assert.equal(GetCivilianTransitEstimate(estimateState, "Wounded", "2,1").readyTurn, 9);
+  assert.equal(GetCivilianTransitEstimate(estimateState, "Families", "2,1").readyTurn, 6);
+  assert.equal(GetCivilianTransitEstimate(estimateState, "Contacts", "2,1").readyTurn, 5);
+});
+
+Test("queue forecasts match real movement without solving future enemy pressure", () => {
+  function ActualReadyTurn(inputState, groupId, launchExitKey = "2,1") {
+    let state = Apply(
+      inputState,
+      "Militia",
+      ActionIds.EVACUATE,
+      launchExitKey,
+      groupId,
+    );
+    while (state.civilians.find((group) => group.groupId === groupId).status !== "Safe") {
+      const phaseTurn = state.turn;
+      state = End(state);
+      if (state.civilians.find((group) => group.groupId === groupId).status === "Safe") {
+        return { phaseTurn, state };
+      }
+      assert.equal(state.turn <= MissionConfig.maxTurns + 3, true);
+    }
+    throw new Error(`${groupId} was already safe before forecast verification`);
+  }
+
+  function ActualInjectedReadyTurn(inputState, groupId, launchExitKey) {
+    let state = Clone(inputState);
+    const route = FindEvacuationPaths(state)
+      .find((entry) => entry.exitKey === launchExitKey);
+    const group = state.civilians
+      .find((entry) => entry.groupId === groupId && entry.status === "Waiting");
+    assert.ok(route);
+    assert.ok(group);
+    group.status = "Moving";
+    group.path = [...route.path];
+    group.pathIndex = 0;
+    group.tileKey = route.path[0];
+    group.exitKey = launchExitKey;
+    group.launchTurn = state.turn;
+    group.launchOrder = state.civilianLaunchSerial;
+    group.trafficDelays = 0;
+    group.lastTrafficDelayTileKey = null;
+    group.exitArrivalTurn = null;
+    state.civilianLaunchSerial += 1;
+    while (group.status !== "Safe") {
+      const phaseTurn = state.turn;
+      state = RunEnemyPhase(state);
+      const updatedGroup = state.civilians.find((entry) => entry.groupId === groupId);
+      if (updatedGroup.status === "Safe") {
+        return { phaseTurn, state };
+      }
+      assert.equal(state.turn <= MissionConfig.maxTurns + 3, true);
+    }
+    throw new Error(`${groupId} was already safe before injected forecast verification`);
+  }
+
+  let queueState = CreateLogisticsState(false);
+  const pristineState = Clone(queueState);
+  const baseline = GetCivilianTransitEstimate(queueState, "Wounded", "2,1");
+  assert.deepEqual(queueState, pristineState);
+  assert.deepEqual(GetCivilianTransitEstimate(queueState, "Wounded", "2,1"), baseline);
+  assert.equal(baseline.queueOrder, 1);
+  assert.equal(baseline.readyTurn, 9);
+  assert.equal(baseline.soloReadyTurn, 9);
+  assert.equal(baseline.congestionTurns, 0);
+  assert.equal(baseline.etaDelayTurns, 0);
+  assert.equal(baseline.signalCoverage, "Covered");
+  assert.equal(Object.hasOwn(baseline, "projectedSafeTurn"), false);
+  assert.equal(Object.hasOwn(baseline, "earliestSafeTurn"), false);
+  assert.equal(Object.hasOwn(baseline, "idealSafeTurn"), false);
+
+  const dissipatingSmoke = CreateLogisticsState(false);
+  dissipatingSmoke.tunnels["2,1"].smoke = 2;
+  const dissipatingEstimate = GetCivilianTransitEstimate(
+    dissipatingSmoke,
+    "Wounded",
+    "2,1",
+  );
+  assert.equal(GetExitWindow(dissipatingSmoke, "2,1").status, "Smoking");
+  assert.equal(dissipatingEstimate.signalCoverage, "Covered");
+  assert.equal(dissipatingEstimate.signalStatusAtReady, "Clear");
+  assert.equal(
+    ActualReadyTurn(dissipatingSmoke, "Wounded").phaseTurn,
+    dissipatingEstimate.readyTurn,
+  );
+
+  let recoveringThreat = CreateLogisticsState(false);
+  const recoveringPatrol = recoveringThreat.enemies
+    .find((enemy) => enemy.enemyId === "NorthPatrol");
+  recoveringPatrol.health = recoveringPatrol.maxHealth;
+  recoveringPatrol.tileKey = "2,2";
+  recoveringPatrol.intent = null;
+  recoveringPatrol.inactiveUntilTurn = 99;
+  recoveringPatrol.stunnedUntilTurn = recoveringThreat.turn;
+  const recoveringEstimate = GetCivilianTransitEstimate(
+    recoveringThreat,
+    "Wounded",
+    "2,1",
+  );
+  assert.equal(GetExitWindow(recoveringThreat, "2,1").status, "Clear");
+  assert.equal(recoveringEstimate.signalCoverage, "MissingOrBlocked");
+  assert.equal(recoveringEstimate.signalStatusAtReady, "Watched");
+  recoveringThreat = Apply(
+    recoveringThreat,
+    "Militia",
+    ActionIds.EVACUATE,
+    "2,1",
+    "Wounded",
+  );
+  while (recoveringThreat.turn <= recoveringEstimate.readyTurn) {
+    recoveringThreat = End(recoveringThreat);
+  }
+  const threatenedWounded = recoveringThreat.civilians
+    .find((group) => group.groupId === "Wounded");
+  assert.equal(threatenedWounded.status, "Moving");
+  assert.equal(threatenedWounded.waitingForSignal, true);
+
+  queueState = Apply(queueState, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
+  assert.equal(GetCivilianTransitEstimate(queueState, "Wounded", "2,1"), null);
+  queueState = End(queueState);
+  const familiesEstimate = GetCivilianTransitEstimate(queueState, "Families", "2,1");
+  assert.equal(familiesEstimate.queueOrder, 2);
+  assert.equal(familiesEstimate.soloReadyTurn, 7);
+  assert.equal(familiesEstimate.readyTurn, 9);
+  assert.equal(familiesEstimate.congestionTurns, 4);
+  assert.equal(familiesEstimate.etaDelayTurns, 2);
+  assert.equal(familiesEstimate.bottleneckKey, "5,1");
+  assert.equal(familiesEstimate.bottleneckUsedLoad, 2);
+  assert.equal(familiesEstimate.trafficLoad, 1);
+  assert.equal(familiesEstimate.bottleneckCapacity, 2);
+  assert.deepEqual(familiesEstimate.conflictingGroupIds, ["Wounded"]);
+  assert.equal(familiesEstimate.firstBottleneckBraceRelief, "Helps");
+  assert.equal(ActualReadyTurn(queueState, "Families").phaseTurn, familiesEstimate.readyTurn);
+  const bracedFamilyQueue = Clone(queueState);
+  bracedFamilyQueue.tunnels["5,1"].braced = true;
+  const bracedFamiliesEstimate = GetCivilianTransitEstimate(
+    bracedFamilyQueue,
+    "Families",
+    "2,1",
+  );
+  assert.equal(bracedFamiliesEstimate.congestionTurns, 3);
+  assert.equal(bracedFamiliesEstimate.congestionTurns < familiesEstimate.congestionTurns, true);
+
+  queueState = Apply(queueState, "Militia", ActionIds.EVACUATE, "2,1", "Families");
+  queueState = End(queueState);
+  const contactsEstimate = GetCivilianTransitEstimate(queueState, "Contacts", "2,1");
+  assert.equal(contactsEstimate.queueOrder, 3);
+  assert.equal(contactsEstimate.readyTurn, 10);
+  assert.equal(contactsEstimate.congestionTurns, 4);
+  assert.equal(contactsEstimate.etaDelayTurns, 3);
+  assert.equal(contactsEstimate.bottleneckUsedLoad, 1);
+  assert.equal(contactsEstimate.trafficLoad, 2);
+  assert.equal(contactsEstimate.firstBottleneckBraceRelief, "Insufficient");
+  assert.equal(ActualReadyTurn(queueState, "Contacts").phaseTurn, contactsEstimate.readyTurn);
+
+  const bracedQueue = Clone(queueState);
+  bracedQueue.tunnels["2,1"].braced = true;
+  const bracedContacts = GetCivilianTransitEstimate(bracedQueue, "Contacts", "2,1");
+  assert.equal(bracedContacts.readyTurn, 9);
+  assert.equal(ActualReadyTurn(bracedQueue, "Contacts").phaseTurn, bracedContacts.readyTurn);
+
+  const heavyConflictState = CreateLogisticsState(false);
+  let woundedMoving = Apply(
+    heavyConflictState,
+    "Militia",
+    ActionIds.EVACUATE,
+    "2,1",
+    "Wounded",
+  );
+  woundedMoving = End(woundedMoving);
+  const contactsBehindWounded = GetCivilianTransitEstimate(
+    woundedMoving,
+    "Contacts",
+    "2,1",
+  );
+  assert.equal(contactsBehindWounded.bottleneckUsedLoad, 2);
+  assert.equal(contactsBehindWounded.trafficLoad, 2);
+  assert.equal(contactsBehindWounded.firstBottleneckBraceRelief, "Insufficient");
+
+  const expiredSignal = Clone(woundedMoving);
+  expiredSignal.exitWindows["2,1"].checkedUntilTurn = expiredSignal.turn;
+  assert.equal(
+    GetCivilianTransitEstimate(expiredSignal, "Families", "2,1").signalCoverage,
+    "ExpiresBefore",
+  );
+  const missingSignal = Clone(woundedMoving);
+  missingSignal.exitWindows["2,1"].checkedTurn = 0;
+  missingSignal.exitWindows["2,1"].checkedUntilTurn = 0;
+  missingSignal.exitWindows["2,1"].signalCount = 0;
+  assert.equal(
+    GetCivilianTransitEstimate(missingSignal, "Families", "2,1").signalCoverage,
+    "MissingOrBlocked",
+  );
+  let noSignalState = CreateLogisticsState(false);
+  noSignalState.exitWindows["2,1"].checkedTurn = 0;
+  noSignalState.exitWindows["2,1"].checkedUntilTurn = 0;
+  noSignalState.exitWindows["2,1"].signalCount = 0;
+  const noSignalEstimate = GetCivilianTransitEstimate(
+    noSignalState,
+    "Wounded",
+    "2,1",
+  );
+  noSignalState = Apply(
+    noSignalState,
+    "Militia",
+    ActionIds.EVACUATE,
+    "2,1",
+    "Wounded",
+  );
+  while (noSignalState.turn <= noSignalEstimate.readyTurn) {
+    noSignalState = End(noSignalState);
+  }
+  const waitingWounded = noSignalState.civilians.find((group) => group.groupId === "Wounded");
+  assert.equal(noSignalEstimate.readyTurn, 9);
+  assert.equal(waitingWounded.status, "Moving");
+  assert.equal(waitingWounded.waitingForSignal, true);
+  assert.equal(noSignalState.civiliansSafe, 0);
+
+  const warnedReroute = CreateDualRouteLogisticsState();
+  warnedReroute.warnings = [{
+    warningId: "ForecastSmoke",
+    kind: "Smoke",
+    targetKey: "2,1",
+    resolvesTurn: warnedReroute.turn + 1,
+    resolved: false,
+    enemyId: "Sapper",
+    text: "工兵准备向北枣窖灌烟",
+  }];
+  const warnedEstimate = GetCivilianTransitEstimate(
+    warnedReroute,
+    "Wounded",
+    "2,1",
+  );
+  const warnedActual = ActualReadyTurn(warnedReroute, "Wounded");
+  assert.equal(warnedEstimate.rerouted, true);
+  assert.equal(warnedEstimate.projectedExitKey, "0,5");
+  assert.equal(warnedEstimate.readyTurn, 10);
+  assert.equal(warnedActual.phaseTurn, warnedEstimate.readyTurn);
+  assert.equal(
+    warnedActual.state.civilians.find((group) => group.groupId === "Wounded").exitKey,
+    warnedEstimate.projectedExitKey,
+  );
+
+  let reroutingQueue = CreateDualRouteLogisticsState();
+  reroutingQueue = Apply(
+    reroutingQueue,
+    "Militia",
+    ActionIds.EVACUATE,
+    "2,1",
+    "Wounded",
+  );
+  const sealedReroute = Clone(reroutingQueue);
+  sealedReroute.tunnels["2,1"].sealed = true;
+  sealedReroute.plannedExitKey = null;
+  const sealedEstimate = GetCivilianTransitEstimate(
+    sealedReroute,
+    "Families",
+    "0,5",
+  );
+  const sealedActual = ActualInjectedReadyTurn(sealedReroute, "Families", "0,5");
+  assert.equal(sealedEstimate.readyTurn, 10);
+  assert.equal(sealedEstimate.congestionTurns, 6);
+  assert.equal(sealedActual.phaseTurn, sealedEstimate.readyTurn);
+  assert.equal(
+    sealedActual.state.civilians.find((group) => group.groupId === "Wounded").exitKey,
+    "0,5",
+  );
+
+  const smokyReroute = Clone(reroutingQueue);
+  smokyReroute.tunnels["2,1"].smoke = 2;
+  const smokyEstimate = GetCivilianTransitEstimate(
+    smokyReroute,
+    "Families",
+    "0,5",
+  );
+  const smokyActual = ActualInjectedReadyTurn(smokyReroute, "Families", "0,5");
+  assert.equal(smokyEstimate.readyTurn, 10);
+  assert.equal(smokyEstimate.congestionTurns, 6);
+  assert.equal(smokyActual.phaseTurn, smokyEstimate.readyTurn);
+  assert.equal(
+    smokyActual.state.civilians.find((group) => group.groupId === "Wounded").exitKey,
+    "0,5",
+  );
+
+  const tooLate = CreateLogisticsState(false);
+  tooLate.turn = 7;
+  const lateWounded = GetCivilianTransitEstimate(tooLate, "Wounded", "2,1");
+  assert.equal(lateWounded.readyTurn, 12);
+  assert.equal(lateWounded.deadlineSlack, -1);
+  assert.equal(lateWounded.deadlineRisk, true);
+  assert.match(lateWounded.assumptions, /未计后续新增敌情、烟流、封口、塌方或玩家改道/);
 });
 
 Test("clay slows smoke by one segment and keeps civilians beyond it moving", () => {
@@ -1698,6 +2112,51 @@ Test("three legal strategy identities stay seed-stable through the full eight-pe
   )), true);
 });
 
+Test("different launch orders survive full enemy pressure across mission seeds", () => {
+  function SignalTurns(state) {
+    return state.eventLedger
+      .filter((event) => event.text.includes("发出安全信号"))
+      .map((event) => event.turn);
+  }
+
+  const seeds = Array.from({ length: 100 }, (_, index) => index + 1);
+  const northResults = seeds.map((seed) => RunNorthFamilyFirstBot(seed));
+  const southResults = seeds.map((seed) => RunSouthContactsSecondBot(seed));
+
+  assert.equal(northResults.every((state) => (
+    state.outcome?.status === "Victory"
+    && state.civiliansSafe === MissionConfig.totalEvacuees
+    && state.exitSignalsIssued === 3
+    && state.enemiesDefeated === 1
+    && state.peopleSafety >= 90
+    && JSON.stringify(SignalTurns(state)) === JSON.stringify([6, 8, 10])
+    && state.civilians.find((group) => group.groupId === "Families").launchTurn === 4
+    && state.civilians.find((group) => group.groupId === "Families").launchOrder === 1
+    && state.civilians.find((group) => group.groupId === "Wounded").launchTurn === 5
+    && state.civilians.find((group) => group.groupId === "Wounded").launchOrder === 2
+    && state.civilians.find((group) => group.groupId === "Contacts").launchTurn === 6
+    && state.civilians.find((group) => group.groupId === "Contacts").launchOrder === 3
+  )), true);
+  assert.equal(southResults.every(({ state, blockingKey }) => (
+    state.outcome?.status === "Victory"
+    && state.turn <= MissionConfig.maxTurns + 1
+    && state.civiliansSafe === MissionConfig.totalEvacuees
+    && state.exitSignalsIssued === 2
+    && state.decoyDiversions === 1
+    && state.trapsTriggered === 2
+    && state.enemiesDefeated === 1
+    && state.peopleSafety >= 95
+    && JSON.stringify(SignalTurns(state)) === JSON.stringify([8, 10])
+    && state.civilians.find((group) => group.groupId === "Wounded").launchTurn === 4
+    && state.civilians.find((group) => group.groupId === "Wounded").launchOrder === 1
+    && state.civilians.find((group) => group.groupId === "Contacts").launchTurn === 5
+    && state.civilians.find((group) => group.groupId === "Contacts").launchOrder === 2
+    && state.civilians.find((group) => group.groupId === "Families").launchTurn === 6
+    && state.civilians.find((group) => group.groupId === "Families").launchOrder === 3
+    && state.units.find((unit) => unit.unitId === "Guerrilla").tileKey === blockingKey
+  )), true);
+});
+
 Test("public south-side digging noise breaks the fixed undefended eight-person script", () => {
   const results = Array.from({ length: 100 }, (_, index) => RunSouthAllGroupsBot(index + 1));
   assert.equal(results.every(({ pressureObserved }) => pressureObserved), true);
@@ -1909,7 +2368,8 @@ Test("late evacuation advice diagnoses slow last launch, congestion, and a seale
   congested.civilians[0].lastTrafficDelayTileKey = "5,1";
   const congestionOutcome = EvaluateMission(congested);
   assert.match(congestionOutcome.tip, /麦田因拥堵等待 2 回合/);
-  assert.match(congestionOutcome.tip, /容量从 2 提到 3/);
+  assert.match(congestionOutcome.tip, /重载 2 与轻载 1.*容量 3/);
+  assert.match(congestionOutcome.tip, /两支重载 2\+2 仍须错开发车/);
 
   const sealed = Clone(slowLast);
   sealed.civilians[0].pathIndex = northEvacuationPath.length - 1;
@@ -1985,11 +2445,21 @@ Test("HTML and game source wire Three.js, both layers, previews, and touch-safe 
   assert.match(gameSource, /预计响应：/);
   assert.match(gameSource, /段\/回合 · 负载/);
   assert.match(gameSource, /三批全撤 · 速度\/负载各异/);
+  assert.match(gameSource, /约 T.*进入出洞窗口/);
+  assert.match(gameSource, /首个冲突：/);
+  assert.match(gameSource, /未计后续新增敌情、烟流、封口、塌方或玩家改道/);
+  assert.doesNotMatch(gameSource, /无拥堵且信号及时最早.*安全撤出/);
+  assert.match(gameSource, /通行容量 2→3/);
+  assert.match(gameSource, /mobileCivilianSummary/);
+  assert.match(gameSource, /classList\.add\("previewOpen"\)/);
+  assert.match(gameSource, /window\.scrollTo\(0, 0\)/);
   assert.match(gameSource, /1 AP｜预留弹药 1｜离开洞口不返还/);
   assert.match(gameSource, /锁定当前预警工兵，其他敌军不会抢先消耗/);
   assert.match(style, /touch-action:\s*none/);
   assert.match(style, /min-height:\s*44px/);
   assert.match(style, /\.exitWindowCard\.actionable/);
+  assert.match(style, /\.civilianLedger\s*\{[\s\S]*?position:\s*fixed/);
+  assert.match(style, /\.civilianEntry \.mobileCivilianSummary/);
 });
 
 console.log(`\nTunnelFront1942 smoke test: ${passed} assertions passed.`);

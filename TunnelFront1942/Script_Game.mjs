@@ -10,7 +10,6 @@ import {
   ActionIds,
   ApplyPlayerAction,
   CreateInitialState,
-  FindEvacuationPaths,
   FindTunnelPath,
   GetActionTargets,
   GetAvailableActions,
@@ -27,6 +26,7 @@ import {
 
 const saveKey = "tunnelfront1942_campaign_v1";
 const canvas = document.querySelector("#GameCanvas");
+const gameShell = document.querySelector("#GameShell");
 const ui = Object.fromEntries(
   [
     "LayerWatermark",
@@ -855,12 +855,33 @@ function CivilianStatusLabel(group) {
     case "Moving":
       return group.waitingForSignal
         ? `${gameState.tiles[group.exitKey]?.name ?? "出口"}下方 · 等待信号`
-        : `第 ${group.launchOrder ?? "?"} 批 · 地下 ${group.tileKey}`;
+        : `第 ${group.launchOrder ?? "?"} 批 · ${gameState.tiles[group.tileKey]?.name ?? "地下转移"}`;
     case "Trapped":
-      return `被困 · ${group.tileKey}`;
+      return `被困 · ${gameState.tiles[group.tileKey]?.name ?? "地道内"}`;
     default:
       return "赵庄待命";
   }
+}
+
+function CivilianMobileStatus(group) {
+  if (group.status === "Safe") {
+    return "已撤";
+  }
+  if (group.status === "Trapped") {
+    return "被困";
+  }
+  if (group.status === "Moving") {
+    return group.waitingForSignal ? "等信号" : `第${group.launchOrder ?? "?"}批`;
+  }
+  return "待命";
+}
+
+function CivilianShortName(group) {
+  return {
+    Wounded: "伤员担架",
+    Families: "两户乡亲",
+    Contacts: "交通骨干",
+  }[group.groupId] ?? group.name;
 }
 
 function ExitWindowCardHtml(exitKey, actionTargets) {
@@ -944,9 +965,10 @@ function RenderHud() {
   }
   ui.CivilianLedger.innerHTML = gameState.civilians.map((group) => `
     <button type="button" data-group="${group.groupId}" class="civilianEntry ${group.status.toLowerCase()} ${group.groupId === selectedEvacGroupId ? "selected" : ""}" ${group.status === "Waiting" ? "" : "disabled"}>
-      <b>${group.name} · ${group.people}人</b>
+      <b><span class="desktopCivilianName">${group.name}</span><span class="mobileCivilianName">${CivilianShortName(group)}</span> · ${group.people}人</b>
       <span>${CivilianStatusLabel(group)}</span>
-      <small>${group.moveSteps ?? 2} 段/回合 · 负载 ${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 已堵 ${group.trafficDelays} 回合` : ""}<br>${group.logisticsNote ?? "标准转移批次"}</small>
+      <small class="desktopCivilianSummary">${group.moveSteps ?? 2} 段/回合 · 负载 ${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 已堵 ${group.trafficDelays} 回合` : ""}<br>${group.logisticsNote ?? "标准转移批次"}</small>
+      <small class="mobileCivilianSummary">${CivilianMobileStatus(group)} · 速${group.moveSteps ?? 2} · 载${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 堵${group.trafficDelays}` : ""}</small>
     </button>
   `).join("");
   for (const button of ui.CivilianLedger.querySelectorAll("[data-group]")) {
@@ -1154,20 +1176,52 @@ function BuildPreview(action) {
       return {
         eyebrow: "工程预览",
         title: `支护${tile.name}地下薄弱段`,
-        body: "1 AP｜工具 1｜解除返沙层塌方预警，提高稳定度",
+        body: "1 AP｜工具 1｜通行容量 2→3｜解除返沙层塌方预警；可让重载 2 与轻载 1 同回合并行，但两支重载仍会冲突",
       };
     case ActionIds.EVACUATE: {
-      const route = FindEvacuationPaths(gameState)
-        .find((entry) => entry.exitKey === action.targetKey);
       const group = gameState.civilians.find((entry) => entry.groupId === action.groupId)
         ?? gameState.civilians.find((entry) => entry.status === "Waiting");
       const estimate = group
         ? GetCivilianTransitEstimate(gameState, group.groupId, action.targetKey)
         : null;
+      const projectedExitKey = estimate?.projectedExitKey ?? action.targetKey;
+      const projectedExit = gameState.tiles[projectedExitKey];
+      const windowState = GetExitWindow(gameState, projectedExitKey);
+      const readyText = estimate?.readyTurn === null || estimate?.readyTurn === undefined
+        ? "当前路线无法进入出洞窗口"
+        : `约 T${estimate.readyTurn} 进入出洞窗口`;
+      const rerouteText = estimate?.rerouted
+        ? `当前已知反制会让本批改走${projectedExit.name}`
+        : `按${projectedExit.name}现有路线`;
+      const deadlineText = estimate?.deadlineSlack === null || estimate?.deadlineSlack === undefined
+        ? "时限未知"
+        : estimate.deadlineSlack < 0
+          ? `晚于 T${gameState.maxTurns}，可能来不及`
+          : estimate.deadlineSlack === 0
+            ? `压线到 T${gameState.maxTurns}`
+            : `期限余 ${estimate.deadlineSlack} 回合`;
+      const bottleneckTile = estimate?.bottleneckKey
+        ? gameState.tiles[estimate.bottleneckKey]
+        : null;
+      const braceText = estimate?.firstBottleneckBraceRelief === "Helps"
+        ? "；支护后容量 3 可缓解此处"
+        : estimate?.firstBottleneckBraceRelief === "Insufficient"
+          ? estimate.bottleneckCapacity >= 3
+            ? "；该段容量已为 3，仍不足"
+            : "；支护后容量 3 仍不足"
+          : "";
+      const queueText = bottleneckTile
+        ? `预计被容量卡住 ${estimate.congestionTurns} 回合、出洞窗口延后 ${estimate.etaDelayTurns} 回合 · 首个冲突：${bottleneckTile.name}（${estimate.bottleneckUsedLoad}+${estimate.trafficLoad} > 容量 ${estimate.bottleneckCapacity}${braceText}）`
+        : "当前已发队列未见拥堵";
+      const signalText = estimate?.signalCoverage === "Covered"
+        ? `预计到达时信号仍覆盖至 T${windowState.checkedUntilTurn}`
+        : estimate?.signalCoverage === "ExpiresBefore"
+          ? `现有信号至 T${windowState.checkedUntilTurn}，预计不覆盖`
+          : `预计到达时：${estimate?.signalDetailAtReady ?? windowState.detail}；仍需复查并取得安全信号`;
       return {
         eyebrow: "群众转移预览",
-        title: `让${group?.name ?? "下一批群众"}沿${gameState.tiles[action.targetKey].name}转移`,
-        body: `共 ${group?.people ?? "?"} 人｜1 AP｜组织 1｜${group?.moveSteps ?? "?"} 段/回合｜负载 ${group?.trafficLoad ?? "?"}｜路线 ${estimate?.routeSegments ?? Math.max(0, (route?.path.length ?? 1) - 1)} 段｜无拥堵且信号及时最早 T${estimate?.earliestSafeTurn ?? "?"} 安全撤出｜当前出口：${GetExitWindow(gameState, action.targetKey).detail}`,
+        title: `第 ${estimate?.queueOrder ?? "?"} 批：${group?.name ?? "群众"} → ${projectedExit.name}`,
+        body: `${rerouteText} · ${readyText} · ${deadlineText}｜${queueText}｜1 AP · 组织 1 · 速 ${estimate?.moveSteps ?? "?"} · 载 ${estimate?.trafficLoad ?? "?"}｜${signalText}｜已计当前烟流、封口与已知反制；未计后续新增敌情、烟流、封口、塌方或玩家改道`,
       };
     }
     case ActionIds.CLEAR_SEAL:
@@ -1200,6 +1254,7 @@ function SetPreview(action) {
   ui.PreviewTitle.textContent = preview.title;
   ui.PreviewBody.textContent = preview.body;
   ui.PreviewPanel.hidden = false;
+  gameShell.classList.add("previewOpen");
   RenderScene();
 }
 
@@ -1207,6 +1262,7 @@ function CancelPreview(render = true) {
   previewAction = null;
   previewTileKey = null;
   ui.PreviewPanel.hidden = true;
+  gameShell.classList.remove("previewOpen");
   if (render) {
     RenderScene();
   }
@@ -1401,6 +1457,9 @@ function StartGame({ reset = false } = {}) {
   ui.BriefingScreen.hidden = true;
   ui.HelpScreen.hidden = true;
   ui.OutcomeScreen.hidden = true;
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
   SetLayer(gameState.selectedLayer ?? LayerIds.SURFACE);
   ShowToast("第一步：让交通员侦察，并在地图上选择北枣窖或西南苇井作为主勘线出口。");
 }

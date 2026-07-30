@@ -621,21 +621,197 @@ export function GetEvacuationTargets(state, unitId) {
   return paths.map((entry) => entry.exitKey);
 }
 
+function CompareCivilianLaunchOrder(first, second) {
+  return (
+    (first.launchOrder ?? Number.MAX_SAFE_INTEGER)
+      - (second.launchOrder ?? Number.MAX_SAFE_INTEGER)
+    || (first.launchTurn ?? Number.MAX_SAFE_INTEGER)
+      - (second.launchTurn ?? Number.MAX_SAFE_INTEGER)
+    || first.groupId.localeCompare(second.groupId)
+  );
+}
+
+function RunCivilianTransitProjection(
+  state,
+  candidateGroup,
+  candidateRoute,
+  bracedOverrideKey = null,
+) {
+  const projectionState = Clone(state);
+  if (bracedOverrideKey && projectionState.tunnels[bracedOverrideKey]) {
+    projectionState.tunnels[bracedOverrideKey].braced = true;
+  }
+  projectionState.civilians = projectionState.civilians
+    .filter((group) => group.status === "Moving");
+  projectionState.civilians.push({
+    ...Clone(candidateGroup),
+    status: "Moving",
+    path: [...candidateRoute.path],
+    pathIndex: 0,
+    tileKey: candidateRoute.path[0],
+    exitKey: candidateRoute.exitKey,
+    launchTurn: state.turn,
+    launchOrder: state.civilianLaunchSerial
+      ?? (Math.max(
+        0,
+        ...projectionState.civilians.map((group) => group.launchOrder ?? 0),
+      ) + 1),
+    trafficDelays: 0,
+    lastTrafficDelayTileKey: null,
+    delayed: false,
+    waitingForSignal: false,
+    exitArrivalTurn: null,
+  });
+  const candidateTrace = {
+    queueDelayTurns: 0,
+    smokeDelayTurns: 0,
+    firstBottleneckKey: null,
+    firstBottleneckCapacity: null,
+    firstBottleneckUsedLoad: null,
+    conflictingGroupIds: [],
+    blockedKey: null,
+    exitBlocked: false,
+  };
+  const transitTraces = new Map([[candidateGroup.groupId, candidateTrace]]);
+  const maxProjectionTurns = Math.max(
+    24,
+    Object.keys(projectionState.tunnels).length * 3
+      + projectionState.civilians.length * 4,
+  );
+  let readyTurn = null;
+  let windowSnapshotAtReady = null;
+  for (
+    let phaseTurn = state.turn;
+    phaseTurn < state.turn + maxProjectionTurns;
+    phaseTurn += 1
+  ) {
+    projectionState.turn = phaseTurn;
+    ResolveCracksAndSmoke(projectionState);
+    AdvanceCivilians(projectionState, transitTraces);
+    const candidate = projectionState.civilians
+      .find((group) => group.groupId === candidateGroup.groupId);
+    if (candidate.status === "Safe" || candidate.exitArrivalTurn !== null) {
+      readyTurn = phaseTurn;
+      windowSnapshotAtReady = BuildExitWindowSnapshot(
+        projectionState,
+        candidate.exitKey,
+        projectionState.exitWindows?.[candidate.exitKey]
+          ?? CreateExitWindowRecord(candidate.exitKey),
+      );
+      break;
+    }
+    if (candidate.status === "Trapped" || candidateTrace.exitBlocked) {
+      break;
+    }
+  }
+  const candidate = projectionState.civilians
+    .find((group) => group.groupId === candidateGroup.groupId);
+  return {
+    readyTurn,
+    arrivalPhaseTurn: readyTurn,
+    projectedExitKey: candidate.exitKey,
+    rerouted: candidate.exitKey !== candidateRoute.exitKey,
+    windowSnapshotAtReady,
+    queueDelayTurns: candidateTrace.queueDelayTurns,
+    smokeDelayTurns: candidateTrace.smokeDelayTurns,
+    bottleneckKey: candidateTrace.firstBottleneckKey,
+    bottleneckCapacity: candidateTrace.firstBottleneckCapacity,
+    bottleneckUsedLoad: candidateTrace.firstBottleneckUsedLoad,
+    conflictingGroupIds: candidateTrace.conflictingGroupIds,
+    blockedKey: candidateTrace.blockedKey,
+    exitBlocked: candidateTrace.exitBlocked,
+  };
+}
+
 export function GetCivilianTransitEstimate(state, groupId, exitKey) {
   const group = state.civilians.find((entry) => entry.groupId === groupId);
   const route = FindEvacuationPaths(state).find((entry) => entry.exitKey === exitKey);
-  if (!group || !route) {
+  if (!group || group.status !== "Waiting" || !route) {
     return null;
   }
   const routeSegments = Math.max(0, route.path.length - 1);
   const moveSteps = Math.max(1, group.moveSteps ?? 2);
+  const soloReadyTurn = state.turn + Math.floor(routeSegments / moveSteps);
+  const projection = RunCivilianTransitProjection(state, group, route);
+  const projectedExitKey = projection.projectedExitKey ?? exitKey;
+  const windowState = projection.windowSnapshotAtReady
+    ?? BuildExitWindowSnapshot(
+      state,
+      projectedExitKey,
+      state.exitWindows?.[projectedExitKey] ?? CreateExitWindowRecord(projectedExitKey),
+    );
+  const signalCovered = (
+    projection.arrivalPhaseTurn !== null
+    && windowState.status === "Clear"
+    && windowState.checkedUntilTurn >= projection.arrivalPhaseTurn
+  );
+  const signalBlocked = ["Watched", "Sealing", "Smoking"].includes(windowState.status);
+  const signalCoverage = signalCovered
+    ? "Covered"
+    : signalBlocked
+      ? "MissingOrBlocked"
+      : windowState.signalCount > 0
+      && projection.arrivalPhaseTurn !== null
+      && windowState.checkedUntilTurn < projection.arrivalPhaseTurn
+        ? "ExpiresBefore"
+        : "MissingOrBlocked";
+  const queueOrder = state.civilianLaunchSerial
+    ?? (Math.max(
+      0,
+      ...state.civilians.map((entry) => entry.launchOrder ?? 0),
+    ) + 1);
+  const readyTurn = projection.readyTurn;
+  const deadlineSlack = readyTurn === null ? null : state.maxTurns - readyTurn;
+  const bracedProjection = projection.bottleneckKey === null
+    ? null
+    : RunCivilianTransitProjection(state, group, route, projection.bottleneckKey);
+  const firstBottleneckBraceRelief = !bracedProjection
+    ? "None"
+    : (
+      (
+        readyTurn !== null
+        && bracedProjection.readyTurn !== null
+        && bracedProjection.readyTurn < readyTurn
+      )
+      || bracedProjection.queueDelayTurns < projection.queueDelayTurns
+    )
+      ? "Helps"
+      : "Insufficient";
   return {
     groupId,
     exitKey,
+    projectedExitKey,
+    rerouted: projection.rerouted,
+    queueOrder,
     routeSegments,
     moveSteps,
     trafficLoad: group.trafficLoad ?? 1,
-    earliestSafeTurn: state.turn + Math.floor(routeSegments / moveSteps),
+    soloReadyTurn,
+    readyTurn,
+    congestionTurns: projection.queueDelayTurns,
+    etaDelayTurns: readyTurn === null
+      ? null
+      : Math.max(0, readyTurn - soloReadyTurn),
+    queueDelayTurns: projection.queueDelayTurns,
+    smokeDelayTurns: projection.smokeDelayTurns,
+    bottleneckKey: projection.bottleneckKey,
+    bottleneckCapacity: projection.bottleneckCapacity,
+    bottleneckUsedLoad: projection.bottleneckUsedLoad,
+    conflictingGroupIds: projection.conflictingGroupIds,
+    firstBottleneckBraceRelief,
+    signalCovered,
+    signalCoverage,
+    signalRefreshTurn: projection.arrivalPhaseTurn,
+    signalStatusAtReady: windowState.status,
+    signalDetailAtReady: windowState.detail,
+    deadlineSlack,
+    deadlineRisk: (
+      readyTurn === null
+      || readyTurn > state.maxTurns
+    ),
+    blockedKey: projection.blockedKey,
+    exitBlocked: projection.exitBlocked,
+    assumptions: "已计当前烟流、封口与已知反制；未计后续新增敌情、烟流、封口、塌方或玩家改道",
   };
 }
 
@@ -2040,18 +2216,14 @@ function ResolveCracksAndSmoke(state) {
   }
 }
 
-function AdvanceCivilians(state) {
+function AdvanceCivilians(state, transitTraces = null) {
   const trafficByTile = new Map();
+  const trafficGroupsByTile = new Map();
   const movingGroups = state.civilians
     .filter((group) => group.status === "Moving")
-    .sort((first, second) => (
-      (first.launchOrder ?? Number.MAX_SAFE_INTEGER)
-        - (second.launchOrder ?? Number.MAX_SAFE_INTEGER)
-      || (first.launchTurn ?? Number.MAX_SAFE_INTEGER)
-        - (second.launchTurn ?? Number.MAX_SAFE_INTEGER)
-      || first.groupId.localeCompare(second.groupId)
-    ));
+    .sort(CompareCivilianLaunchOrder);
   for (const group of movingGroups) {
+    const transitTrace = transitTraces?.get(group.groupId) ?? null;
     let steps = Math.max(1, group.moveSteps ?? 2);
     group.delayed = false;
     group.waitingForSignal = false;
@@ -2095,6 +2267,10 @@ function AdvanceCivilians(state) {
             break;
           }
           group.delayed = true;
+          if (transitTrace) {
+            transitTrace.exitBlocked = true;
+            transitTrace.blockedKey ??= group.exitKey;
+          }
           AddLog(state, "warning", `${group.name}已到出口下方，但洞口不可用，只能等待改道或抢通。`);
           break;
         }
@@ -2133,6 +2309,9 @@ function AdvanceCivilians(state) {
         }
         group.status = "Trapped";
         group.delayed = true;
+        if (transitTrace) {
+          transitTrace.blockedKey ??= nextKey;
+        }
         state.peopleSafety = Math.max(0, state.peopleSafety - 8);
         AddLog(state, "danger", `${group.name}前方地道中断，被困在地下。`);
         break;
@@ -2144,6 +2323,17 @@ function AdvanceCivilians(state) {
         group.delayed = true;
         group.trafficDelays = (group.trafficDelays ?? 0) + 1;
         group.lastTrafficDelayTileKey = nextKey;
+        if (transitTrace) {
+          transitTrace.queueDelayTurns += 1;
+          transitTrace.firstBottleneckKey ??= nextKey;
+          transitTrace.firstBottleneckCapacity ??= capacity;
+          transitTrace.firstBottleneckUsedLoad ??= usedCapacity;
+          if (!transitTrace.conflictingGroupIds.length) {
+            transitTrace.conflictingGroupIds = [
+              ...(trafficGroupsByTile.get(nextKey) ?? []),
+            ];
+          }
+        }
         AddLog(
           state,
           "warning",
@@ -2152,14 +2342,23 @@ function AdvanceCivilians(state) {
         break;
       }
       trafficByTile.set(nextKey, usedCapacity + trafficLoad);
+      const trafficGroups = trafficGroupsByTile.get(nextKey) ?? [];
+      trafficGroups.push(group.groupId);
+      trafficGroupsByTile.set(nextKey, trafficGroups);
       group.pathIndex = nextIndex;
       group.tileKey = nextKey;
       if (node.cracked && !node.braced && node.dugTurn < state.turn) {
         CollapseTunnelNode(state, nextKey, true);
+        if (transitTrace) {
+          transitTrace.blockedKey ??= nextKey;
+        }
         break;
       }
       if (node.smoke > 0) {
         group.delayed = true;
+        if (transitTrace) {
+          transitTrace.smokeDelayTurns += 1;
+        }
         state.peopleSafety = Math.max(0, state.peopleSafety - 5);
         AddLog(state, "danger", `${group.name}遇到烟段，本回合停止前进。`);
         break;
@@ -2316,7 +2515,7 @@ function BuildEvacuationLateTip(state) {
   }
   if ((group.trafficDelays ?? 0) > 0) {
     const delayTileName = state.tiles[group.lastTrafficDelayTileKey]?.name ?? "共用咽喉";
-    return `${batch}曾在${delayTileName}因拥堵等待 ${group.trafficDelays} 回合；下一局拉开发车间隔，或在重载批次经过前支护该咽喉，把容量从 2 提到 3。`;
+    return `${batch}曾在${delayTileName}因拥堵等待 ${group.trafficDelays} 回合；下一局拉开发车间隔。重载 2 与轻载 1 可支护到容量 3 后并行；两支重载 2+2 仍须错开发车。`;
   }
   const remainingSegments = Math.max(0, (group.path?.length ?? 1) - 1 - (group.pathIndex ?? 0));
   if ((group.moveSteps ?? 2) === 1 && (group.launchOrder ?? 1) > 1) {
@@ -2585,10 +2784,7 @@ export function GetObjectiveSummary(state) {
   };
 }
 
-export function GetExitWindow(state, exitKey) {
-  const windows = EnsureExitWindows(state);
-  windows[exitKey] ??= CreateExitWindowRecord(exitKey);
-  const record = windows[exitKey];
+function BuildExitWindowSnapshot(state, exitKey, record) {
   const node = state.tunnels[exitKey] ?? null;
   const warning = state.warnings.find((entry) => (
     !entry.resolved && entry.targetKey === exitKey && ["Seal", "Smoke"].includes(entry.kind)
@@ -2639,6 +2835,12 @@ export function GetExitWindow(state, exitKey) {
     threatDistance: nearest?.distance ?? null,
     threatEta,
   };
+}
+
+export function GetExitWindow(state, exitKey) {
+  const windows = EnsureExitWindows(state);
+  windows[exitKey] ??= CreateExitWindowRecord(exitKey);
+  return BuildExitWindowSnapshot(state, exitKey, windows[exitKey]);
 }
 
 export function SerializeState(state) {
