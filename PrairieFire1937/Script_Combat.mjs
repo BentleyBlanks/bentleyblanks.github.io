@@ -44,12 +44,24 @@ import {
 
 let externalUnitDefinitions = null;
 let externalTerrainDefinitions = null;
+// 特长（授衔）表：来自 Data_Units.mjs，缺席时全部成长特长静默失效（回退为无特长）。
+let externalPerkDefinitions = null;
+let externalSumPerkEffects = null;
+let externalGetPendingPerkTier = null;
 
 try {
   const unitsModule = await import("./Data_Units.mjs");
   externalUnitDefinitions = (unitsModule && unitsModule.unitDefinitions) || null;
+  externalPerkDefinitions = (unitsModule && unitsModule.perkDefinitions) || null;
+  externalSumPerkEffects =
+    unitsModule && typeof unitsModule.SumPerkEffects === "function" ? unitsModule.SumPerkEffects : null;
+  externalGetPendingPerkTier =
+    unitsModule && typeof unitsModule.GetPendingPerkTier === "function" ? unitsModule.GetPendingPerkTier : null;
 } catch (error) {
   externalUnitDefinitions = null;
+  externalPerkDefinitions = null;
+  externalSumPerkEffects = null;
+  externalGetPendingPerkTier = null;
 }
 
 let externalWorkDefinitions = null;
@@ -65,6 +77,7 @@ try {
 
 const unitStatsCache = new Map();
 const terrainStatsCache = new Map();
+const perkEffectsCache = new Map();
 
 /** 允许上层（或测试）显式注入数值表，注入后清空缓存。 */
 export function RegisterCombatData(tables = {}) {
@@ -72,6 +85,50 @@ export function RegisterCombatData(tables = {}) {
   if (tables.terrainDefinitions) externalTerrainDefinitions = tables.terrainDefinitions;
   unitStatsCache.clear();
   terrainStatsCache.clear();
+  perkEffectsCache.clear();
+}
+
+/**
+ * 解析单位已选特长的聚合效果与来源定义（供 modifiers 点名）。
+ * AI 无感知红线：敌军单位永远没有 perks 字段，这里对无特长单位零成本返回 null——
+ * 敌军路径（含 AI 的任何评估）不会读到特长表。
+ * 返回 { totals, sources } 或 null；按 perks 组合缓存（表是静态的，组合数极少）。
+ */
+function ResolveUnitPerkEffects(unit) {
+  if (!unit || !Array.isArray(unit.perks) || unit.perks.length === 0) return null;
+  if (!externalSumPerkEffects || !externalPerkDefinitions) return null;
+  const cacheKey = unit.perks.join("|");
+  const cached = perkEffectsCache.get(cacheKey);
+  if (cached) return cached;
+  const totals = externalSumPerkEffects(unit.perks);
+  const sources = unit.perks.map((id) => externalPerkDefinitions[id]).filter(Boolean);
+  const resolved = Object.freeze({ totals: Object.freeze(totals), sources: Object.freeze(sources) });
+  perkEffectsCache.set(cacheKey, resolved);
+  return resolved;
+}
+
+/** 只要聚合数值时的快捷取用（无特长返回 null）。 */
+function UnitPerkTotals(unit) {
+  const resolved = ResolveUnitPerkEffects(unit);
+  return resolved ? resolved.totals : null;
+}
+
+/**
+ * 经验入账 + 升级 + 授衔挂起（攻击 / 破袭 / 攻坚共用，保证三条路径口径一致）。
+ * 升到 2/3 级且该档未选过时写 pendingPerk = 档位；具体选择由 Script_Rules.ChoosePerk 落账。
+ * 特长表缺席时只升级、不挂授衔。unitDraft 是 DraftUnit 的拷贝，写入不影响原 state。
+ */
+function GrantUnitXp(unitDraft, priorXp, priorLevel, gained) {
+  if (!unitDraft) return;
+  unitDraft.xp = (priorXp || 0) + gained;
+  if (unitDraft.xp >= combatConstants.xpPerLevel) {
+    unitDraft.level = (priorLevel || 0) + 1;
+    unitDraft.xp -= combatConstants.xpPerLevel;
+    if (externalGetPendingPerkTier) {
+      const tier = externalGetPendingPerkTier(unitDraft.type, unitDraft.level, unitDraft.perks ?? []);
+      if (tier) unitDraft.pendingPerk = tier;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +192,10 @@ export const combatConstants = Object.freeze({
   massOddsBonus: 0.08, // 群众基础带来的判定优势（预警、向导、掩护）
   fortifyOddsPenalty: 0.12, // 打有工事的目标
   decisiveMargin: 0.55, // roll < winChance * 该值 → 干净利落的胜利
+
+  // —— 侦察标定（sight≥3 的侦察骨干执行侦察后，范围内敌军挂 markedUntil）——
+  markedOddsBonus: 0.05, // 对被标定之敌的胜率加成：哨位、兵力、换岗时刻尽在册上
+  markedCaptureMultiplier: 1.15, // 对被标定之敌的缴获倍率：知道辎重驮子走在队尾
 
   // —— 杀伤与减员 ——
   damageScale: 0.55, // 攻击力 → 杀伤的换算
@@ -708,6 +769,25 @@ function HasScreenSupport(state, unit) {
   return false;
 }
 
+/**
+ * 掩护分队里「接应得力」老兵的额外接应：取同格/相邻掩护者中最高的 screenAidBonus。
+ * 加成属于掩护者、惠及被掩护者；扫描范围与 HasScreenSupport 完全一致。
+ */
+function ScreenAidBonus(state, unit) {
+  if (!unit) return 0;
+  let best = 0;
+  const units = (state && state.units) || [];
+  for (const other of units) {
+    if (!other || other.id === unit.id) continue;
+    if ((other.hp ?? 0) <= 0) continue;
+    if (other.key !== unit.key && HexDistanceKeys(other.key, unit.key) > 1) continue;
+    if (!(ResolveUnitStats(other.type).screen > 0)) continue;
+    const totals = UnitPerkTotals(other);
+    if (totals && totals.screenAidBonus > best) best = totals.screenAidBonus;
+  }
+  return best;
+}
+
 function Round1(value) {
   return Math.round(value * 10) / 10;
 }
@@ -939,6 +1019,13 @@ export function ComputeStrength(state, unit, hex, context = {}) {
   const xpRatio = Clamp01((unit.xp || 0) / constants.xpPerLevel);
   value *= 1 + level * constants.strengthLevelBonus + xpRatio * constants.strengthXpBonus;
 
+  // 特长（授衔）：只属于玩家单位；敌军没有 perks 字段，此处零成本跳过（AI 无感知红线）。
+  const perkTotals = isPlayer ? UnitPerkTotals(unit) : null;
+  if (perkTotals) {
+    if (role === "Attack" && perkTotals.attackBonus) value *= 1 + perkTotals.attackBonus; // 「白刃敢拼」
+    if (role === "Defence" && perkTotals.defenceBonus) value *= 1 + perkTotals.defenceBonus; // 「村自为战」
+  }
+
   // 疲劳
   const fatigue = Clamp01((unit.fatigue || 0) / 100);
   value *= 1 - fatigue * constants.strengthFatiguePenalty;
@@ -949,7 +1036,11 @@ export function ComputeStrength(state, unit, hex, context = {}) {
       value *= 1 + terrain.defenceBonus * terrainUse;
       const works = Array.isArray(hex.works) ? hex.works : [];
       if (works.includes("Trench")) value *= 1 + constants.strengthTrenchBonus * terrainUse;
-      if (hex.tunnel || works.includes("Tunnel")) value *= 1 + constants.strengthTunnelBonus * terrainUse;
+      if (hex.tunnel || works.includes("Tunnel")) {
+        value *= 1 + constants.strengthTunnelBonus * terrainUse;
+        // 「地道连村」：依托地道防御在地道网加成之上再叠乘（特长仅我方持有）
+        if (perkTotals && perkTotals.tunnelDefenceBonus) value *= 1 + perkTotals.tunnelDefenceBonus;
+      }
       if (works.includes("Cache") && isPlayer) value *= 1 + constants.strengthCacheBonus;
     } else if (isPlayer && (hex.tunnel || terrain.concealment >= constants.ambushCoverThreshold)) {
       // 进攻方从隐蔽地形出击，接敌过程损耗小、突然性高
@@ -1085,6 +1176,11 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   const attackerTerrain = ResolveHexStats(attackerHex);
   const massBase = Clamp01((attackerHex && attackerHex.massBase ? attackerHex.massBase : 0) / 100);
   const targetMass = Clamp01((defenderHex && defenderHex.massBase ? defenderHex.massBase : 0) / 100);
+  // 特长（授衔）：攻击发起方必为我方单位（CanAttack 已挡掉敌军），敌方 defender 无 perks。
+  // 预览与结算共用本模型，特长效果只在这里进账一次，口径必然一致。
+  const attackerPerks = ResolveUnitPerkEffects(attacker);
+  const perkEffects = attackerPerks ? attackerPerks.totals : null;
+  const perkSources = attackerPerks ? attackerPerks.sources : [];
 
   const attackStrength = ComputeStrength(state, attacker, attackerHex, {
     role: "Attack",
@@ -1105,11 +1201,22 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   const power = attackStrength / Math.max(0.001, attackStrength + defenceStrength);
   let winChance = 0.5 + (power - 0.5) * constants.oddsSlope;
   modifiers.push({ label: `兵力对比 ${attackStrength.toFixed(1)} : ${defenceStrength.toFixed(1)}`, value: Round1((power - 0.5) * constants.oddsSlope * 100) / 100 });
+  // 「白刃敢拼」等战力类特长已在 ComputeStrength 里进了兵力对比，这里点名让玩家看得见。
+  for (const perk of perkSources) {
+    if (perk.effects.attackBonus) modifiers.push({ label: perk.name, value: perk.effects.attackBonus });
+  }
 
   if (ambush) {
     const bonus = constants.ambushWinBonus * ambushScore;
     winChance += bonus;
     modifiers.push({ label: `${attackerTerrain.name}设伏`, value: Round1(bonus * 100) / 100 });
+    // 「设伏老手」：伏击胜率在地形设伏加成之上再加（相加，不替换）
+    if (perkEffects && perkEffects.ambushOddsBonus) {
+      winChance += perkEffects.ambushOddsBonus;
+      for (const perk of perkSources) {
+        if (perk.effects.ambushOddsBonus) modifiers.push({ label: perk.name, value: perk.effects.ambushOddsBonus });
+      }
+    }
   }
   if (night) {
     winChance += constants.nightWinBonus;
@@ -1123,6 +1230,16 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   if (massBonus > 0.001) {
     winChance += massBonus;
     modifiers.push({ label: "群众带路与预警", value: Round1(massBonus * 100) / 100 });
+  }
+  // 侦察标定：被标定的敌军行止在册（markedUntil 由 Script_Rules 的侦察动作写入、
+  // 到期清理），打起来更有把握，清理战场也更从容。预览与结算共用此处，口径一致。
+  const marked = Number(defender && defender.markedUntil) > ((state && state.turn) || 0);
+  if (marked) {
+    // 「标定老手」标定的敌军带 markedOddsBonus（0.07），普通标定沿用常量 0.05。
+    // 加成属于「这份名册」而不是打的人——谁来打这股敌人都吃到同一份情报。
+    const markedBonus = Math.max(constants.markedOddsBonus, Number(defender.markedOddsBonus) || 0);
+    winChance += markedBonus;
+    modifiers.push({ label: "侦察标定", value: markedBonus });
   }
   const defenderWorks = Array.isArray(defenderHex && defenderHex.works) ? defenderHex.works : [];
   if (defenderWorks.includes("Trench") || (defenderHex && defenderHex.tunnel)) {
@@ -1140,6 +1257,13 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   let damageOnWin = attackStrength * constants.damageScale * soak;
   if (ambush) damageOnWin *= Lerp(1, constants.ambushDamageMultiplier, ambushScore);
   if (support.flank) damageOnWin *= constants.flankDamageMultiplier;
+  // 「夜老虎」：夜袭杀伤在夜战与伏击倍率之上再叠乘，只在 night 生效
+  if (night && perkEffects && perkEffects.nightDamageBonus) {
+    damageOnWin *= 1 + perkEffects.nightDamageBonus;
+    for (const perk of perkSources) {
+      if (perk.effects.nightDamageBonus) modifiers.push({ label: perk.name, value: perk.effects.nightDamageBonus });
+    }
+  }
   const damageOnFail = damageOnWin * constants.damageFailFactor;
 
   // 我方减员模型
@@ -1152,6 +1276,13 @@ function BuildEngagement(state, attacker, defender, options = {}) {
   if (support.flank) lossBase *= constants.flankLossMultiplier;
   const medicineSupply = Clamp01(((state && state.stock && state.stock.medicine) || 0) / 60);
   lossBase *= 1 - medicineSupply * constants.medicineLossRelief;
+  // 「老骨干带队」：交战我方减员 ×(1-x)，胜败两种减员同折
+  if (perkEffects && perkEffects.lossReduction) {
+    lossBase *= 1 - Math.min(0.5, perkEffects.lossReduction);
+    for (const perk of perkSources) {
+      if (perk.effects.lossReduction) modifiers.push({ label: perk.name, value: -perk.effects.lossReduction });
+    }
+  }
   const lossOnWin = lossBase * constants.lossWinFactor;
   const lossOnFail = lossBase * constants.lossFailFactor;
 
@@ -1163,7 +1294,15 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     attackerStats.captureBonus *
     (1 + Clamp01((state && state.playerEffects && state.playerEffects.captureRate) || 0)) *
     (1 + targetMass * constants.captureMassBonus) *
-    (ambush ? Lerp(1, constants.ambushCaptureMultiplier, ambushScore) : 1);
+    (ambush ? Lerp(1, constants.ambushCaptureMultiplier, ambushScore) : 1) *
+    (marked ? constants.markedCaptureMultiplier : 1) *
+    // 「缴获能手」：清点搬运效率，与伏击/标定倍率连乘
+    (perkEffects && perkEffects.captureFactorBonus ? 1 + perkEffects.captureFactorBonus : 1);
+  if (perkEffects && perkEffects.captureFactorBonus) {
+    for (const perk of perkSources) {
+      if (perk.effects.captureFactorBonus) modifiers.push({ label: perk.name, value: perk.effects.captureFactorBonus });
+    }
+  }
 
   // 暴露度基数
   let exposureBase = constants.exposureAttackBase;
@@ -1204,6 +1343,7 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     night,
     ambush,
     ambushScore,
+    marked,
     supportCount: support.count,
     flank: support.flank,
     flankDirection: support.flankDirection,
@@ -1221,6 +1361,8 @@ function BuildEngagement(state, attacker, defender, options = {}) {
     lossOnFail,
     captureFactor,
     exposureBase,
+    perkEffects,
+    perkSources,
     modifiers,
     risks,
   };
@@ -1284,6 +1426,9 @@ export function IsUnitTargetable(state, unit, attackerType) {
   if (hex && (hex.tunnel || works.includes("Tunnel"))) cover += 0.3;
   cover += Clamp01((hex && hex.massBase ? hex.massBase : 0) / 100) * 0.25;
   cover += ResolveUnitStats(unit.type).concealment * 0.2;
+  // 「隐入青纱」：本单位的特长隐蔽度整值计入掩护（只属于我方；敌军无 perks 零成本跳过）
+  const perkTotals = UnitPerkTotals(unit);
+  if (perkTotals && perkTotals.concealmentBonus) cover += perkTotals.concealmentBonus;
   const exposure = detection * (1 - Clamp01(cover));
   const spotted = exposure >= combatConstants.spotHiddenThreshold;
   return {
@@ -1360,10 +1505,16 @@ export function PreviewAttack(state, attackerId, targetKey, options = {}) {
     medicine: Round1(capturedOrdnance * combatConstants.captureMedicineRatio),
   };
 
+  // 「打完就走」：转移暴露度增量再乘特长系数（与结算 ResolveAttack 完全同式，口径一致）
+  const perkWithdrawFactor =
+    withdraw && model.perkEffects && model.perkEffects.withdrawExposureFactor
+      ? model.perkEffects.withdrawExposureFactor
+      : 1;
   const exposureDelta = Round1(
     model.exposureBase *
       (withdraw ? combatConstants.exposureWithdrawFactor : combatConstants.exposureStayFactor) *
-      (withdraw && model.screenSupport ? combatConstants.screenExposureFactor : 1)
+      (withdraw && model.screenSupport ? combatConstants.screenExposureFactor : 1) *
+      perkWithdrawFactor
   );
 
   const risks = model.risks.slice();
@@ -1382,6 +1533,14 @@ export function PreviewAttack(state, attackerId, targetKey, options = {}) {
     label: withdraw ? "打完即转移" : "打完滞留原地",
     value: withdraw ? -Round1(model.exposureBase * 0.5) : Round1(model.exposureBase * 2),
   });
+  // 「打完就走」参与本次转移时点名（值 = 暴露度增量的折减比例）
+  if (withdraw && perkWithdrawFactor < 1) {
+    for (const perk of model.perkSources) {
+      if (perk.effects.withdrawExposureFactor && perk.effects.withdrawExposureFactor < 1) {
+        modifiers.push({ label: perk.name, value: -(Round1((1 - perk.effects.withdrawExposureFactor) * 100) / 100) });
+      }
+    }
+  }
 
   return {
     valid: true,
@@ -1391,6 +1550,7 @@ export function PreviewAttack(state, attackerId, targetKey, options = {}) {
     intelQuality: Round1(fog.quality * 100) / 100,
     ambush: model.ambush,
     night: model.night,
+    marked: model.marked,
     supportCount: model.supportCount,
     flank: model.flank,
     supportLabel: model.supportLabel,
@@ -1493,11 +1653,8 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
     attackerDraft.hp = Round1(Math.max(0, (attacker.hp ?? maxHp) - ourLoss));
     attackerDraft.hidden = false; // 开火即暴露
     attackerDraft.fatigue = Clamp((attacker.fatigue || 0) + (model.ambush ? 8 : 14), 0, 100);
-    attackerDraft.xp = (attacker.xp || 0) + constants.xpPerEngagement + (victory ? 4 : 0);
-    if (attackerDraft.xp >= constants.xpPerLevel) {
-      attackerDraft.level = (attacker.level || 0) + 1;
-      attackerDraft.xp -= constants.xpPerLevel;
-    }
+    // 经验：攻击 +6、得手再 +4；升到 2/3 级时挂起授衔待选（GrantUnitXp 统一处理）
+    GrantUnitXp(attackerDraft, attacker.xp, attacker.level, constants.xpPerEngagement + (victory ? 4 : 0));
     attackerDraft.moves = Math.max(0, (attacker.moves || 0) - 1);
     attackerDraft.combat = {
       ...(attacker.combat || {}),
@@ -1531,11 +1688,15 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
     attackerDraft.fatigue = Clamp(attackerDraft.fatigue + (moved ? 6 : 0), 0, 100);
   }
 
-  // 暴露度：打完不转移是四倍；掩护分队接应的转移痕迹更少
+  // 暴露度：打完不转移是四倍；掩护分队接应的转移痕迹更少；
+  // 「打完就走」再乘特长系数——与 PreviewAttack 完全同式，预览=结算。
   const exposureDelta = Round1(
     model.exposureBase *
       (moved ? constants.exposureWithdrawFactor : constants.exposureStayFactor) *
-      (moved && model.screenSupport ? constants.screenExposureFactor : 1)
+      (moved && model.screenSupport ? constants.screenExposureFactor : 1) *
+      (moved && model.perkEffects && model.perkEffects.withdrawExposureFactor
+        ? model.perkEffects.withdrawExposureFactor
+        : 1)
   );
   draft.next.exposure = Clamp((state.exposure || 0) + exposureDelta, 0, 100);
   draft.next.alert = Clamp((state.alert || 0) + (victory ? 3 : 1.5) + (model.ambush ? 1 : 2), 0, 100);
@@ -1652,6 +1813,7 @@ export function ResolveAttack(state, attackerId, targetKey, options = {}) {
   report.victory = victory;
   report.ambush = model.ambush;
   report.night = model.night;
+  report.marked = model.marked;
   report.supportCount = model.supportCount;
   report.flank = model.flank;
   report.supportLabel = model.supportLabel;
@@ -1680,8 +1842,12 @@ function ComputeRetreatChance(state, unit, hex, night) {
   chance += Clamp01((hex && hex.massBase ? hex.massBase : 0) / 100) * constants.retreatMassBonus;
   if (unit.hidden) chance += constants.retreatHiddenBonus;
   if (night) chance += constants.nightRetreatBonus;
-  // 掩护分队（侦察员、担架队、骑兵通信）在同格或相邻：有人带路、有人断后
-  if (HasScreenSupport(state, unit)) chance += constants.screenRetreatBonus;
+  // 掩护分队（侦察员、担架队、骑兵通信）在同格或相邻：有人带路、有人断后。
+  // 掩护者若有「接应得力」，在固定掩护加成之上再加其 screenAidBonus（相加）。
+  if (HasScreenSupport(state, unit)) chance += constants.screenRetreatBonus + ScreenAidBonus(state, unit);
+  // 「跑警报」：本单位自己的撤退功夫（相加；民兵等防御型特长）
+  const perkTotals = UnitPerkTotals(unit);
+  if (perkTotals && perkTotals.retreatChanceBonus) chance += perkTotals.retreatChanceBonus;
   chance -= Clamp01((unit.fatigue || 0) / 100) * 0.2;
   return Clamp(chance, 0.1, 0.97);
 }
@@ -1814,11 +1980,14 @@ export function ResolveSabotage(state, unitId, targetKey, options = {}) {
   const stats = ResolveUnitStats(unit.type);
   const night = ResolveNightFlag(state, options, unit);
   const massBase = Clamp01((hex.massBase || 0) / 100);
+  const perkTotals = UnitPerkTotals(unit);
 
   let chance = constants.sabotageBaseChance;
   chance += massBase * constants.sabotageMassBonus;
   if (night) chance += constants.sabotageNightBonus;
   chance += Clamp01(stats.sabotage) * constants.sabotageSkillBonus;
+  // 「药量算得准」：叠加在爆破技能加成（sabotageSkillBonus）之上，相加不替换
+  if (perkTotals && perkTotals.sabotageChanceBonus) chance += perkTotals.sabotageChanceBonus;
   chance -= Clamp01(((state.alert || 0) / 100)) * 0.2;
   // 事先破路、挖好隐蔽接近路线的地段，破袭更容易得手（工事的 sabotageBonus）。
   chance += WorkSabotageBonus(hex) + WorkSabotageBonus(GetHex(state, unit.key));
@@ -1840,8 +2009,10 @@ export function ResolveSabotage(state, unitId, targetKey, options = {}) {
     const extra = gradeRoll > 0.75 ? 1 : 0;
     hexDraft.railBroken = Math.max(hexDraft.railBroken || 0, turns + extra);
     if (hasRoad && !hasRail && gradeRoll > 0.6) hexDraft.road = Math.max(0, (hexDraft.road || 0) - 1);
-    captures.ordnance = RoundInt(constants.sabotageCaptureOrdnance * (0.6 + gradeRoll * 0.8) * (hasRail ? 1 : 0.5));
-    captures.grain = RoundInt(constants.sabotageCaptureGrain * gradeRoll * (hasRail ? 1 : 0.4));
+    // 「铁轨克星」：破袭起获 ×(1+x)，械与粮同倍
+    const sabotageLoot = 1 + (perkTotals && perkTotals.sabotageCaptureBonus ? perkTotals.sabotageCaptureBonus : 0);
+    captures.ordnance = RoundInt(constants.sabotageCaptureOrdnance * (0.6 + gradeRoll * 0.8) * (hasRail ? 1 : 0.5) * sabotageLoot);
+    captures.grain = RoundInt(constants.sabotageCaptureGrain * gradeRoll * (hasRail ? 1 : 0.4) * sabotageLoot);
     report.lines.push(
       hasRail
         ? `${stats.name}在${night ? "夜间" : "拂晓前"}破坏路轨与枕木，起出鱼尾板与道钉，此段需 ${hexDraft.railBroken} 个季度才能抢修通车。`
@@ -1861,12 +2032,8 @@ export function ResolveSabotage(state, unitId, targetKey, options = {}) {
     unitDraft.hidden = false;
     unitDraft.moves = Math.max(0, (unit.moves || 0) - 1);
     unitDraft.fatigue = Clamp((unit.fatigue || 0) + 10, 0, 100);
-    // 破袭得手是技术活，长经验（+4）
-    unitDraft.xp = (unit.xp || 0) + (succeeded ? 4 : 0);
-    if (unitDraft.xp >= constants.xpPerLevel) {
-      unitDraft.level = (unit.level || 0) + 1;
-      unitDraft.xp -= constants.xpPerLevel;
-    }
+    // 破袭得手是技术活，长经验（+4）；升到 2/3 级时挂起授衔待选
+    GrantUnitXp(unitDraft, unit.xp, unit.level, succeeded ? 4 : 0);
     unitDraft.combat = { ...(unit.combat || {}), lastActionTurn: state.turn || 0, withdrew: false };
   }
 
@@ -1978,6 +2145,11 @@ function BuildSiegeModel(state, unit, stronghold, options = {}) {
   defenceStrength *= 1 - undermined * 0.12;
   defenceStrength = Math.max(1, defenceStrength);
 
+  // 特长（授衔）：攻坚发起方必为我方单位；预览与结算共用本模型，口径一致。
+  const attackerPerks = ResolveUnitPerkEffects(unit);
+  const perkEffects = attackerPerks ? attackerPerks.totals : null;
+  const perkSources = attackerPerks ? attackerPerks.sources : [];
+
   const power = attackStrength / Math.max(0.001, attackStrength + defenceStrength);
   let winChance = 0.5 + (power - 0.5) * constants.oddsSlope;
   if (!hasCapability) winChance -= constants.siegeNoCapabilityOddsPenalty * (1 - undermined * 0.18);
@@ -1985,6 +2157,8 @@ function BuildSiegeModel(state, unit, stronghold, options = {}) {
   if (night) winChance += constants.nightWinBonus;
   winChance += massBase * constants.massOddsBonus;
   winChance += undermined * 0.05;
+  // 「攻坚锤子」：与爆破能力加成相加，不替换
+  if (perkEffects && perkEffects.siegeOddsBonus) winChance += perkEffects.siegeOddsBonus;
   winChance = Clamp(winChance, constants.oddsFloor, constants.oddsCeiling);
 
   const maxHp = unit.maxHp || unitStats.hp || 50;
@@ -1994,6 +2168,8 @@ function BuildSiegeModel(state, unit, stronghold, options = {}) {
   else lossBase *= constants.siegeNoCapabilityLossMultiplier;
   if (!hasOrdnance) lossBase *= constants.siegeNoOrdnanceLossMultiplier;
   if (night) lossBase *= constants.nightLossMultiplier;
+  // 「土工近迫」：攻坚减员 ×(1-x)，叠在爆破能力折损之上
+  if (perkEffects && perkEffects.siegeLossReduction) lossBase *= 1 - Math.min(0.5, perkEffects.siegeLossReduction);
 
   const damageOnWin = attackStrength * constants.siegeGarrisonDamageScale * (hasOrdnance ? 1 : 0.55);
   const damageOnFail = damageOnWin * 0.3;
@@ -2017,6 +2193,8 @@ function BuildSiegeModel(state, unit, stronghold, options = {}) {
     garrison,
     supplyRatio,
     massBase,
+    perkEffects,
+    perkSources,
   };
 }
 
@@ -2082,6 +2260,11 @@ function PreviewSiege(state, unitId, strongholdId, options = {}) {
     { label: model.hasCapability ? "爆破作业" : "无攻坚器材", value: model.hasCapability ? 0.2 : -constants.siegeNoCapabilityOddsPenalty },
   ];
   if (model.night) modifiers.push({ label: "夜袭据点", value: constants.nightWinBonus });
+  // 攻坚类特长点名（「攻坚锤子」胜率 / 「土工近迫」减员折损）
+  for (const perk of model.perkSources) {
+    if (perk.effects.siegeOddsBonus) modifiers.push({ label: perk.name, value: perk.effects.siegeOddsBonus });
+    if (perk.effects.siegeLossReduction) modifiers.push({ label: perk.name, value: -perk.effects.siegeLossReduction });
+  }
 
   return {
     valid: true,
@@ -2236,7 +2419,8 @@ export function ResolveSiege(state, unitId, strongholdId, options = {}) {
     unitDraft.hidden = false;
     unitDraft.moves = 0;
     unitDraft.fatigue = Clamp((unit.fatigue || 0) + 18, 0, 100);
-    unitDraft.xp = (unit.xp || 0) + constants.xpPerEngagement + (captured ? 10 : 0);
+    // 经验：攻坚 +6、拔点再 +10；此前攻坚只涨经验不升级是个断头路，统一走 GrantUnitXp
+    GrantUnitXp(unitDraft, unit.xp, unit.level, constants.xpPerEngagement + (captured ? 10 : 0));
     unitDraft.combat = { ...(unit.combat || {}), lastActionTurn: state.turn || 0, withdrew: false };
   }
 
@@ -2744,6 +2928,9 @@ export function TickCombatRecovery(state) {
         }
         if (combat.withdrew) chance += constants.hiddenRecoverMovedBonus;
         chance += Clamp01((state.playerEffects && state.playerEffects.concealment) || 0) * 0.4;
+        // 「隐入青纱」：隐蔽度类特长直接加隐蔽恢复概率
+        const perkTotals = UnitPerkTotals(unit);
+        if (perkTotals && perkTotals.concealmentBonus) chance += perkTotals.concealmentBonus;
         chance -= Clamp01((unitDraft.fatigue || 0) / 100) * constants.hiddenRecoverFatiguePenalty;
         if (hex && hex.control === "Enemy") chance -= 0.15;
         chance = Clamp(chance, 0.02, 0.95);
@@ -2766,6 +2953,11 @@ export function TickCombatRecovery(state) {
     if (!healer || (healer.hp ?? 0) <= 0) continue;
     const healerStats = ResolveUnitStats(healer.type);
     if (healerStats.side === "Enemy" || !(healerStats.medic > 0)) continue;
+    // 救护类特长属于救护者：「省药有方」耗药 ×0.5、「止血得法」每次救护 +2 兵员
+    const healerPerks = UnitPerkTotals(healer);
+    const medicineCost =
+      constants.healMedicineCost * (healerPerks && healerPerks.healMedicineFactor ? healerPerks.healMedicineFactor : 1);
+    const healBonus = healerPerks && healerPerks.healAmountBonus ? healerPerks.healAmountBonus : 0;
     for (const patient of units) {
       if (!patient || patient.id === healer.id) continue;
       if ((patient.hp ?? 0) <= 0) continue;
@@ -2777,14 +2969,14 @@ export function TickCombatRecovery(state) {
       const patientMaxHp = patient.maxHp || patientStats.hp || 50;
       if ((patientDraft.hp ?? patientMaxHp) >= patientMaxHp) continue;
       let amount;
-      if (medicineBudget >= constants.healMedicineCost) {
+      if (medicineBudget >= medicineCost) {
         amount = medicineBudget >= constants.healMedicineThreshold ? constants.healSuppliedAmount : constants.healBaseAmount;
-        medicineBudget -= constants.healMedicineCost;
-        medicineSpent += constants.healMedicineCost;
+        medicineBudget -= medicineCost;
+        medicineSpent += medicineCost;
       } else {
         amount = constants.healBaseAmount * constants.healNoMedicineFactor;
       }
-      patientDraft.hp = Round1(Math.min(patientMaxHp, (patientDraft.hp ?? 0) + amount));
+      patientDraft.hp = Round1(Math.min(patientMaxHp, (patientDraft.hp ?? 0) + amount + healBonus));
     }
   }
 

@@ -10,7 +10,7 @@
     content="《山火·一九四一：槐树峪断线》是一款原创 Three.js 小队战术游戏，围绕潜行侦察、队员协作、破袭撤离与敌后营地整备展开。"
   >
   <title>山火 · 一九四一｜槐树峪断线</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=1">
+  <link rel="stylesheet" href="./Style_Game.css?v=4">
   <script type="importmap">
   {
     "imports": {
@@ -26,6 +26,15 @@
     <canvas id="worldCanvas" aria-label="槐树峪三维战术地图"></canvas>
     <div class="filmGrain" aria-hidden="true"></div>
     <div class="screenVignette" aria-hidden="true"></div>
+    <div id="combatFeedback" class="combatFeedback" aria-hidden="true">
+      <div class="feedbackWash"></div>
+      <div class="damageVignette"></div>
+      <div class="feedbackReticle"><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div id="combatCue" class="combatCue isHidden" role="status" aria-live="polite">
+      <small>TACTICAL UPDATE</small>
+      <strong id="combatCueLabel">敌情变化</strong>
+    </div>
 
     <section id="loadingScreen" class="loadingScreen" aria-live="polite">
       <div class="loadingMark" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -76,13 +85,13 @@
         <p class="eyebrow">行动前口述记录</p>
         <h2 id="briefingTitle">槐树峪的联络灯连续两夜没有亮起</h2>
         <div class="briefingColumns">
-          <div>
+          <div id="briefingStory">
             <p>敌军正在沿封锁沟调度岗哨与征粮车。换防传令簿与线路图留在据点电话交换室内，被扣的交通员和医药箱还没有转移。</p>
             <p>这里没有值得恋战的阵地。要保住的是人、药品，以及尚未断尽的联络线。</p>
           </div>
           <div>
             <h3>可行路线</h3>
-            <ul>
+            <ul id="briefingRouteList">
               <li>南侧高粱地：最快，但视线重叠</li>
               <li>干水渠与桥洞：缓慢、隐蔽、单列</li>
               <li>北侧村庄：顺路救人，解锁渡口</li>
@@ -120,6 +129,7 @@
         <div class="topActions">
           <button id="helpButton" class="iconButton" type="button" aria-label="打开操作说明">?</button>
           <button id="soundButton" class="iconButton" type="button" aria-label="切换声音" aria-pressed="false">声</button>
+          <button id="settingsButton" class="iconButton" type="button" aria-label="打开显示设置">设</button>
           <button id="pauseButton" class="pauseButton" type="button" aria-pressed="true">
             <span id="pauseGlyph" aria-hidden="true">▶</span>
             <span id="pauseLabel">执行计划</span>
@@ -173,6 +183,17 @@
         <button id="executeButton" type="button">执行全部指令</button>
       </section>
 
+      <section id="tacticalReadout" class="tacticalReadout" aria-label="当前潜行态势">
+        <div class="concealmentReadout">
+          <span id="concealmentGlyph" aria-hidden="true">隐</span>
+          <div><small>当前状态</small><strong id="concealmentLabel">低姿隐蔽</strong></div>
+        </div>
+        <div class="awarenessReadout">
+          <div><small>可见敌情察觉</small><b id="awarenessLabel">未起疑</b></div>
+          <span class="awarenessRail" aria-hidden="true"><i id="awarenessFill"></i></span>
+        </div>
+      </section>
+
       <section id="rosterPanel" class="rosterPanel" aria-label="四人行动编队"></section>
 
       <section id="actionBar" class="actionBar" aria-label="所选队员行动">
@@ -220,6 +241,45 @@
       </article>
     </section>
 
+    <section id="settingsModal" class="modalBackdrop isHidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <article class="paperModal settingsModal">
+        <button class="modalClose" type="button" data-close-modal aria-label="关闭显示设置">×</button>
+        <p class="eyebrow">DISPLAY & ACCESSIBILITY</p>
+        <h2 id="settingsTitle">显示与反馈设置</h2>
+        <div class="settingsGrid">
+          <label>
+            <span>渲染质量<small>更改后重新载入战术图</small></span>
+            <select id="qualitySelect">
+              <option value="auto">自动</option>
+              <option value="low">性能</option>
+              <option value="high">高</option>
+              <option value="ultra">极高</option>
+            </select>
+          </label>
+          <label>
+            <span>界面尺寸<small>不影响战术地图缩放</small></span>
+            <select id="uiScaleSelect">
+              <option value="compact">紧凑</option>
+              <option value="normal">标准</option>
+              <option value="large">放大</option>
+            </select>
+          </label>
+          <label class="toggleSetting">
+            <span>战斗屏幕反馈<small>受击暗角、爆炸震动与警戒闪烁</small></span>
+            <input id="screenEffectsToggle" type="checkbox" checked>
+          </label>
+          <label class="toggleSetting">
+            <span>减少动态效果<small>保留信息，关闭镜头震动与大幅动效</small></span>
+            <input id="reducedMotionToggle" type="checkbox">
+          </label>
+        </div>
+        <footer>
+          <small id="settingsStatus">设置会保存在本机。</small>
+          <button id="saveSettingsButton" class="primaryButton" type="button">应用设置</button>
+        </footer>
+      </article>
+    </section>
+
     <section id="resultScreen" class="resultScreen isHidden" aria-labelledby="resultTitle">
       <article class="resultReport">
         <div class="resultStamp" id="resultGrade">A</div>
@@ -257,10 +317,10 @@
           <span class="panelKicker">只选一项整备</span>
           <h2>营地设施</h2>
           <div class="facilityGrid">
-            <button type="button" data-camp-action="treat"><span>救护所</span><small>药品 1 · 处理一名伤员</small></button>
-            <button type="button" data-camp-action="repair"><span>简陋工坊</span><small>工具 1 · 修整破袭器材</small></button>
-            <button type="button" data-camp-action="decode"><span>情报角</span><small>零件 1 · 整理巡逻线索</small></button>
-            <button type="button" data-camp-action="rest"><span>训练空地</span><small>全队休整 · 疲劳下降</small></button>
+            <button type="button" data-camp-action="treat"><span>救护所</span><small>正在清点药品与伤员</small><em data-camp-payoff>处理伤员并提升轮值能力</em></button>
+            <button type="button" data-camp-action="repair"><span>简陋工坊</span><small>正在清点工具</small><em data-camp-payoff>补充破袭器材容量</em></button>
+            <button type="button" data-camp-action="decode"><span>情报角</span><small>正在清点收报零件</small><em data-camp-payoff>刷新下一行动巡逻情报</em></button>
+            <button type="button" data-camp-action="rest"><span>训练空地</span><small>正在清点口粮</small><em data-camp-payoff>降低疲劳并复盘训练</em></button>
           </div>
         </section>
         <aside class="campResources campCard">
@@ -285,6 +345,6 @@
   </main>
 
   <noscript>本游戏需要 JavaScript 与 WebGL。</noscript>
-  <script type="module" src="./Script_Game.mjs?v=10"></script>
+  <script type="module" src="./Script_Game.mjs?v=17"></script>
 </body>
 </html>

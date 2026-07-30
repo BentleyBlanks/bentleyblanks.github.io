@@ -447,6 +447,26 @@ export function GetUnitStats(type) {
   };
 }
 
+/**
+ * 单位已选特长的聚合效果（规则层消费移动/侦察类字段）。
+ * 无特长（含全部敌军与旧存档单位）返回 null，零成本；表缺席时同样返回 null。
+ */
+function GetUnitPerkEffects(unit) {
+  if (!unit || !Array.isArray(unit.perks) || !unit.perks.length) return null;
+  if (typeof DataUnits.SumPerkEffects !== "function") return null;
+  return DataUnits.SumPerkEffects(unit.perks);
+}
+
+/**
+ * 升级后挂起授衔待选：升到 2/3 级且该档未选过时写 unit.pendingPerk = 档位。
+ * 与 Script_Combat 的 GrantUnitXp 同口径（同一张 Data_Units 表判定）。
+ */
+function QueuePendingPerk(unit) {
+  if (!unit || typeof DataUnits.GetPendingPerkTier !== "function") return;
+  const tier = DataUnits.GetPendingPerkTier(unit.type, unit.level ?? 1, unit.perks ?? []);
+  if (tier) unit.pendingPerk = tier;
+}
+
 function AddUnit(state, type, key) {
   const stats = GetUnitStats(type);
   const unit = {
@@ -962,7 +982,9 @@ export function RecomputeVisibility(state) {
 
   for (const enemy of state.enemies) {
     const hex = state.map.hexes[enemy.key];
-    enemy.visibleToPlayer = Boolean(hex && hex.visibility >= 1);
+    // 侦察标定未过期的敌军对我保持可见——名册在手，走到哪儿都有人捎信来。
+    const marked = Number(enemy.markedUntil) > state.turn;
+    enemy.visibleToPlayer = Boolean(hex && hex.visibility >= 1) || marked;
   }
   for (const stronghold of state.strongholds) {
     const hex = state.map.hexes[stronghold.key];
@@ -1081,13 +1103,43 @@ function DriftMassBase(state) {
 // 行动
 // ---------------------------------------------------------------------------
 
-function MoveCost(state, hex, effects) {
+/** 向导（Guide）生效的地形：山地（高山/山梁）、丘陵、林地。 */
+const guideTerrainKeys = new Set(["Mountain", "Ridge", "Hill", "Forest"]);
+
+/**
+ * 向导带路判定：移动单位自己有 Guide 能力，或以**移动起点**计同格/相邻有
+ * 存活的 Guide 友军（不做逐步路径伴随，保持简单可预期）。
+ * 返回向导折扣系数：0 = 无向导；默认 0.7；向导带「熟路」特长时加深到 0.6
+ * （多位向导取最深折扣，即最小值——替换默认值而非叠乘）。
+ */
+function GuideEscortFactor(state, unit) {
+  if (!unit) return 0;
+  let factor = 0;
+  const consider = (guideUnit) => {
+    const perkEffects = GetUnitPerkEffects(guideUnit);
+    const own = perkEffects && perkEffects.guideFactor > 0 ? perkEffects.guideFactor : 0.7;
+    if (!factor || own < factor) factor = own;
+  };
+  if (GetUnitStats(unit.type).abilities.includes("Guide")) consider(unit);
+  for (const other of state.units) {
+    if (!other || other.id === unit.id) continue;
+    if ((other.hp ?? 0) <= 0) continue;
+    if (!GetUnitStats(other.type).abilities.includes("Guide")) continue;
+    if (other.key === unit.key || HexDistanceKeys(other.key, unit.key) <= 1) consider(other);
+  }
+  return factor;
+}
+
+function MoveCost(state, hex, effects, guideFactor = 0) {
   const definition = terrainDefinitions()[hex.terrain];
   let cost = Number(definition?.moveCost) || 1;
   if (hex.road >= 1) cost = Math.min(cost, 1);
   // 交通壕等工事让本方在自家地盘上跑得更快（moveCostDelta 为负值）。
   cost += GetHexWorkEffects(hex).moveCostDelta;
   if (hex.works?.includes("Tunnel") && effects.tunnelMove) cost = Math.min(cost, 1);
+  // 向导带路：山地/丘陵/林地的进入费 ×0.7（「熟路」特长 ×0.6，下限 0.5）。
+  // 只折地形脚程——封锁沟与冬季的迟滞在后面原样叠加，向导替代不了填沟。
+  if (guideFactor > 0 && guideTerrainKeys.has(hex.terrain)) cost = Math.max(0.5, cost * guideFactor);
   // 囚笼生效：敌人的封锁沟与铁丝网真实迟滞我方机动（每级 +0.75，封顶 +1.5）。
   cost += Math.min(1.5, Math.max(0, Number(hex.blockade) || 0) * 0.75);
   if (GetSeasonKey(state.turn) === "冬") cost += 0.25;
@@ -1102,6 +1154,7 @@ export function FindReachableHexes(state, unitId) {
   const effects = GetEffects(state);
   const budget = unit.moves + effects.moveBonus;
   if (budget <= 0) return reachable;
+  const guided = GuideEscortFactor(state, unit);
 
   reachable.set(unit.key, 0);
   const frontier = [{ key: unit.key, cost: 0 }];
@@ -1115,7 +1168,7 @@ export function FindReachableHexes(state, unitId) {
       const stronghold = GetStrongholdAt(state, neighborKey);
       if (stronghold && stronghold.garrison > 0) continue;
       if (GetEnemiesAt(state, neighborKey).length) continue;
-      const cost = current.cost + MoveCost(state, hex, effects);
+      const cost = current.cost + MoveCost(state, hex, effects, guided);
       if (cost > budget + 1e-6) continue;
       if (cost < (reachable.get(neighborKey) ?? Infinity)) {
         reachable.set(neighborKey, cost);
@@ -1502,21 +1555,59 @@ export function PerformAction(state, action) {
       const unit = GetUnit(next, action.unitId);
       if (!unit) return fail("单位不存在");
       if (unit.acted) return fail("本回合已行动");
-      for (const coordinate of HexesInRange(ParseHexKey(unit.key), 2 + effects.intelRange)) {
+      const stats = GetUnitStats(unit.type);
+      const perkEffects = GetUnitPerkEffects(unit);
+      // 「顺风耳」：侦察半径 +1（与科技/区域的 intelRange 相加）
+      const reconRange = 2 + effects.intelRange + (perkEffects?.reconRangeBonus ?? 0);
+      for (const coordinate of HexesInRange(ParseHexKey(unit.key), reconRange)) {
         const hex = GetHex(next, HexKey(coordinate.q, coordinate.r));
         if (!hex) continue;
         hex.explored = true;
         hex.intel = Clamp(hex.intel + ruleConstants.reconIntelGain, 0, 100);
       }
+      // 侦察标定：只有目力过硬的侦察骨干（sight ≥3——侦察员/骑兵通信/武工队，
+      // 普通游击小组不够格）能把侦察范围内的敌军行止记成册。被标定的敌军
+      // 两个季度内对我保持可见，打它胜率更高、缴获更多（Script_Combat 消费）。
+      let markedCount = 0;
+      let markedConvoy = false;
+      if (stats.sight >= 3) {
+        // 「标定老手」：时效 3 回合（默认 2），且这份名册的胜率加成升为 +0.07（默认 +0.05）。
+        // 加成落在敌军的 markedOddsBonus 字段上（属于名册而非打的人），到期随 markedUntil 一并清除；
+        // 普通标定不写该字段，Combat 端回退到 markedOddsBonus 常量 0.05——覆盖旧名册时同样删掉。
+        const markTurns = perkEffects && perkEffects.markTurns > 0 ? perkEffects.markTurns : 2;
+        const markBonus = perkEffects?.markedOddsBonus ?? 0;
+        for (const enemy of next.enemies) {
+          if (!enemy || (enemy.hp ?? 0) <= 0) continue;
+          if (HexDistanceKeys(enemy.key, unit.key) > reconRange) continue;
+          enemy.markedUntil = next.turn + markTurns;
+          if (markBonus > 0) enemy.markedOddsBonus = markBonus;
+          else delete enemy.markedOddsBonus;
+          enemy.visibleToPlayer = true;
+          if (enemy.type === "SupplyColumn") {
+            // 辎重队被标定：行车路线对我「已知」（渲染层据此画出 convoy 路线）。
+            enemy.routeKnown = true;
+            markedConvoy = true;
+          }
+          report.effects.push({ kind: "IntelPing", key: enemy.key });
+          markedCount += 1;
+        }
+      }
       unit.acted = true;
       unit.moves = 0;
-      // 摸敌情也是历练：侦察 +2 经验
+      // 摸敌情也是历练：侦察 +2 经验；升到 2/3 级时挂起授衔待选
       unit.xp = (unit.xp || 0) + 2;
       if (unit.xp >= 100) {
         unit.level = (unit.level || 1) + 1;
         unit.xp -= 100;
+        QueuePendingPerk(unit);
       }
       report.lines.push("侦察员摸清了周边的岗哨与巡逻规律。");
+      if (markedCount > 0) {
+        report.lines.push("侦察员把敌哨位、兵力、换岗时刻记在烟盒纸上送回来了。两个季度内，打这些敌人心里有底。");
+      }
+      if (markedConvoy) {
+        report.lines.push("辎重队的行车路线与时刻也一并探明，沿线各村已得关照。");
+      }
       report.effects.push({ kind: "IntelPing", key: unit.key });
       break;
     }
@@ -1681,6 +1772,65 @@ function ResolveCombatAction(state, action) {
     captures: combatReport.captures ?? null,
     casualties: combatReport.casualties ?? null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 授衔（特长二选一）
+// ---------------------------------------------------------------------------
+//
+// 成长闭环：战斗/破袭/攻坚/侦察长经验 → 升到 2/3 级时（Script_Combat.GrantUnitXp 或
+// 本文件 Recon 分支）写 unit.pendingPerk = 档位 → UI 读 ListPerkChoices 弹二选一 →
+// ChoosePerk 落账。存档兼容：perks / pendingPerk / markedOddsBonus 全部可选，
+// 缺省 = 无特长，saveVersion 维持 2 不动。
+
+/**
+ * 该单位当前的授衔候选（完整定义，UI 可直接渲染）。
+ * 无待选（pendingPerk 缺失或表对不上）返回空数组。
+ * @returns {Array<{id:string,name:string,detail:string,effects:Object,tier:number}>}
+ */
+export function ListPerkChoices(state, unitId) {
+  const unit = GetUnit(state, unitId);
+  if (!unit || !unit.pendingPerk) return [];
+  if (typeof DataUnits.GetPerkChoices !== "function") return [];
+  const tier = unit.pendingPerk;
+  return DataUnits.GetPerkChoices(unit.type, tier).map((definition) => ({
+    id: definition.id,
+    name: definition.name,
+    detail: definition.detail,
+    effects: { ...definition.effects },
+    tier,
+  }));
+}
+
+/**
+ * 记功授衔：把 perkId 落进 unit.perks[]，清掉 pendingPerk，写一行档案体日志。
+ * 校验不过（无待选 / 不在该档候选内 / 已持有）原样返回传入 state，不落日志不动随机数。
+ * 若更高一档也已达级且未选（升级很快时可能 L2、L3 接连待选），随即再挂起下一档。
+ * 「飞毛腿」类移动特长授衔当回合即时 +1 行动力（此后由 EndTurn 的重置维持）。
+ */
+export function ChoosePerk(state, unitId, perkId) {
+  const existing = GetUnit(state, unitId);
+  if (!existing || !existing.pendingPerk) return state;
+  if (typeof DataUnits.GetPerkChoices !== "function") return state;
+  const tier = existing.pendingPerk;
+  const chosen = DataUnits.GetPerkChoices(existing.type, tier).find((definition) => definition.id === perkId);
+  if (!chosen) return state;
+  if (Array.isArray(existing.perks) && existing.perks.includes(perkId)) return state;
+
+  const next = CloneState(state);
+  const unit = GetUnit(next, unitId);
+  unit.perks = [...(unit.perks ?? []), perkId];
+  delete unit.pendingPerk;
+  const moveGain = Number(chosen.effects?.moveBonus) || 0;
+  if (moveGain > 0) {
+    const priorMoves = unit.moves ?? 0;
+    const priorMax = unit.maxMoves ?? priorMoves;
+    unit.moves = priorMoves + moveGain;
+    unit.maxMoves = priorMax + moveGain;
+  }
+  QueuePendingPerk(unit);
+  PushLog(next, "授衔", `${GetUnitStats(unit.type).name}记功授衔：「${chosen.name}」。`);
+  return next;
 }
 
 // ---------------------------------------------------------------------------
@@ -2087,7 +2237,8 @@ export function EndTurn(state) {
   }
   for (const unit of next.units) {
     const stats = GetUnitStats(unit.type);
-    unit.moves = stats.moves + effects.moveBonus;
+    // 「飞毛腿」：行动力 +1，在科技 moveBonus 之上相加（授衔当回合的即时加点见 ChoosePerk）
+    unit.moves = stats.moves + effects.moveBonus + (GetUnitPerkEffects(unit)?.moveBonus ?? 0);
     unit.maxMoves = unit.moves;
     unit.acted = false;
     unit.fatigue = Math.max(0, unit.fatigue - 1);
@@ -2153,6 +2304,14 @@ export function EndTurn(state) {
 
   // 7. 推进时间
   next.turn += 1;
+  // 侦察标定过期清理：名册上的敌情两个季度后就旧了，不再作数。
+  // 「标定老手」写下的加成（markedOddsBonus）属于名册，随名册一并作废。
+  for (const enemy of next.enemies) {
+    if (enemy && enemy.markedUntil !== undefined && next.turn >= enemy.markedUntil) {
+      delete enemy.markedUntil;
+      delete enemy.markedOddsBonus;
+    }
+  }
   const era = GetEraForTurn(next.turn);
   const eraChanged = era.key !== next.eraKey;
   next.eraKey = era.key;

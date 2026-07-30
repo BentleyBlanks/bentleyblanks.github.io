@@ -613,6 +613,11 @@ export function CreateRenderer(canvas, options = {}) {
   const AttachStructureFog = AttachStructureFogFactory(structureFogUniforms);
   AttachStructureFog(roadMaterial);
   AttachStructureFog(railMaterial);
+  // 封锁沟 / 铁丝网层：挖开的生土色一族，同吃战争迷雾（未探索格不泄露敌工事）
+  const blockadeMaterial = new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.97, metalness: 0.0, name: "PrairieBlockade",
+  });
+  AttachStructureFog(blockadeMaterial);
   const borderMaterial = new THREE.MeshBasicMaterial({
     vertexColors: true, transparent: true, opacity: 0.52, depthWrite: false,
     side: THREE.DoubleSide, name: "PrairieBorder",
@@ -620,8 +625,8 @@ export function CreateRenderer(canvas, options = {}) {
   borderMaterial.polygonOffset = true;
   borderMaterial.polygonOffsetFactor = -3;
   borderMaterial.polygonOffsetUnits = -3;
-  const localMaterials = [roadMaterial, railMaterial, borderMaterial];
-  const standardMaterials = [terrainMaterial, roadMaterial, railMaterial];
+  const localMaterials = [roadMaterial, railMaterial, blockadeMaterial, borderMaterial];
+  const standardMaterials = [terrainMaterial, roadMaterial, railMaterial, blockadeMaterial];
 
   // ---- 场景骨架 ----------------------------------------------------------
   const skyDome = CreateSkyDome();
@@ -682,6 +687,7 @@ export function CreateRenderer(canvas, options = {}) {
   let waterMesh = null;
   let roadMesh = null;
   let railMesh = null;
+  let blockadeMesh = null;
   let borderMesh = null;
   let overlayMesh = null;
   const fogCloudMeshes = [];
@@ -690,6 +696,7 @@ export function CreateRenderer(canvas, options = {}) {
 
   let structureSignature = "";
   let borderSignature = "";
+  let blockadeSignature = "";
   let paletteSignature = "";
   let staticPropSignature = "";
 
@@ -1507,6 +1514,153 @@ export function CreateRenderer(canvas, options = {}) {
   }
 
   // -------------------------------------------------------------------------
+  // 3.3a2 封锁工事层（敌"囚笼政策"的地面证据）
+  // -------------------------------------------------------------------------
+
+  /** 沟带 / 土墙 / 木桩 / 铁丝的生土配色（挖开的生土 #6b5c44 一族，整体压暗）。 */
+  const blockadeDitchColor = new THREE.Color(0x4a3f2e);   // 沟底：翻出的湿土
+  const blockadeBermColor = new THREE.Color(0x6b5c44);    // 沟沿短段土墙
+  const blockadeStakeColor = new THREE.Color(0x54463a);   // 矮木桩：风干灰褐
+  const blockadeWireColor = new THREE.Color(0x4e4a44);    // 铁丝：锈铁灰
+
+  /**
+   * 封锁工事几何：`hex.blockade` 1-2 = 沿地块边内侧的下凹暗色带（封锁沟）+ 短段土墙；
+   * 3 = 再加矮木桩与交叉铁丝。与邻格同为封锁格的内边不画，连片封锁区远看读作
+   * "这一整片被沟网圈住了"。全部零件合并为一个几何体（整层一次 draw call），
+   * 顶点带 aHexUv 吃战争迷雾：未探索 discard、探明未见转灰。
+   */
+  function BuildBlockadeGeometry() {
+    const collector = CreateCollector();
+    const boxPieces = [];
+    const boxTemplate = new THREE.BoxGeometry(1, 1, 1);
+    const boxMatrix = new THREE.Matrix4();
+    const boxEuler = new THREE.Euler(0, 0, 0, "YXZ");
+    const boxQuaternion = new THREE.Quaternion();
+    const boxPosition = new THREE.Vector3();
+    const boxScale = new THREE.Vector3(1, 1, 1);
+
+    /** 摆一个轴对齐盒零件：先绕自身长轴翻滚 roll，再绕 Y 对齐边方向，最后压色与 aHexUv。 */
+    const PushBlockadeBox = (entry, localX, localZ, width, height, depth, yaw, roll, color, sink = 0) => {
+      const y = SurfaceAt(entry, localX, localZ) + height * 0.5 - sink;
+      boxPosition.set(entry.x + localX, y, entry.z + localZ);
+      boxEuler.set(roll, yaw, 0);
+      boxQuaternion.setFromEuler(boxEuler);
+      boxScale.set(width, height, depth);
+      boxMatrix.compose(boxPosition, boxQuaternion, boxScale);
+      const piece = boxTemplate.clone();
+      piece.applyMatrix4(boxMatrix);
+      const vertexCount = piece.getAttribute("position").count;
+      const colorArray = new Float32Array(vertexCount * 3);
+      const uvArray = new Float32Array(vertexCount * 2);
+      for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+        colorArray[vertex * 3] = color.r;
+        colorArray[vertex * 3 + 1] = color.g;
+        colorArray[vertex * 3 + 2] = color.b;
+        uvArray[vertex * 2] = entry.stateU;
+        uvArray[vertex * 2 + 1] = entry.stateV;
+      }
+      piece.setAttribute("color", new THREE.BufferAttribute(colorArray, 3));
+      piece.setAttribute("aHexUv", new THREE.BufferAttribute(uvArray, 2));
+      piece.deleteAttribute("uv");
+      boxPieces.push(piece);
+    };
+
+    const corners = HexCornerOffsets(worldConfig.tileRadius);
+    for (const entry of hexEntries) {
+      const level = Math.min(3, Math.round(Number(entry.hex.blockade) || 0));
+      if (level <= 0) continue;
+      const hexUv = [entry.stateU, entry.stateV];
+      for (let side = 0; side < 6; side += 1) {
+        const direction = hexDirections[side];
+        const neighbour = hexByKey.get(HexKey(entry.q + direction.q, entry.r + direction.r));
+        // 相邻同为封锁格的内边不画：连片沟网只描外沿
+        if (neighbour && (Number(neighbour.hex.blockade) || 0) > 0) continue;
+        const [cornerA, cornerB] = hexEdgeCorners[side];
+        const ax = corners[cornerA].x, az = corners[cornerA].z;
+        const bx = corners[cornerB].x, bz = corners[cornerB].z;
+        const yaw = -Math.atan2(bz - az, bx - ax);   // 边方向 → 绕 Y 的偏航角
+
+        // —— 封锁沟：内缩 0.80 的暗色带，分 3 小段贴地跟随起伏 ——
+        const ditchInset = 0.80;
+        for (let piece = 0; piece < 3; piece += 1) {
+          const t0 = piece / 3;
+          const t1 = (piece + 1) / 3;
+          const x0 = Lerp(ax, bx, t0) * ditchInset, z0 = Lerp(az, bz, t0) * ditchInset;
+          const x1 = Lerp(ax, bx, t1) * ditchInset, z1 = Lerp(az, bz, t1) * ditchInset;
+          PushRibbon(collector,
+            entry.x + x0, SurfaceAt(entry, x0, z0) + 0.030, entry.z + z0,
+            entry.x + x1, SurfaceAt(entry, x1, z1) + 0.030, entry.z + z1,
+            0.085, blockadeDitchColor, 1, hexUv);
+        }
+
+        // —— 沟沿短段土墙：再往内一档，2-3 段，中间留豁口 ——
+        const bermInset = 0.70;
+        const bermFractions = level >= 2 ? [0.2, 0.5, 0.8] : [0.32, 0.68];
+        const edgeLength = Math.hypot(bx - ax, bz - az);
+        for (const fraction of bermFractions) {
+          const lx = Lerp(ax, bx, fraction) * bermInset;
+          const lz = Lerp(az, bz, fraction) * bermInset;
+          PushBlockadeBox(entry, lx, lz, edgeLength * 0.22, 0.055, 0.06, yaw, 0, blockadeBermColor, 0.008);
+        }
+
+        // —— 等级 3：矮木桩 4-6 根 + 交叉细铁丝 ——
+        if (level >= 3) {
+          const stakeInset = 0.88;
+          const stakeFractions = [0.10, 0.30, 0.50, 0.70, 0.90];
+          const stakePoints = [];
+          for (const fraction of stakeFractions) {
+            const lx = Lerp(ax, bx, fraction) * stakeInset;
+            const lz = Lerp(az, bz, fraction) * stakeInset;
+            stakePoints.push([lx, lz]);
+            PushBlockadeBox(entry, lx, lz, 0.024, 0.135, 0.024, yaw, 0, blockadeStakeColor, 0.006);
+          }
+          // 相邻桩之间两根斜拉铁丝，交叉成 X
+          for (let span = 0; span < stakePoints.length - 1; span += 1) {
+            const [x0, z0] = stakePoints[span];
+            const [x1, z1] = stakePoints[span + 1];
+            const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+            const spanLength = Math.hypot(x1 - x0, z1 - z0) * 1.04;
+            PushBlockadeBox(entry, mx, mz, spanLength, 0.008, 0.008, yaw, 0.42, blockadeWireColor, -0.052);
+            PushBlockadeBox(entry, mx, mz, spanLength, 0.008, 0.008, yaw, -0.42, blockadeWireColor, -0.052);
+          }
+        }
+      }
+    }
+    boxTemplate.dispose();
+
+    const ribbonGeometry = FinalizeGeometry(collector);
+    if (ribbonGeometry) ribbonGeometry.deleteAttribute("uv");
+    const boxMerged = MergeAndDispose(boxPieces);
+    if (ribbonGeometry && boxMerged) {
+      const merged = mergeGeometries([ribbonGeometry, boxMerged], false);
+      ribbonGeometry.dispose();
+      boxMerged.dispose();
+      return merged;
+    }
+    return ribbonGeometry || boxMerged;
+  }
+
+  function ComputeBlockadeSignature() {
+    let text = "";
+    for (const entry of hexEntries) {
+      const level = Number(entry.hex.blockade) || 0;
+      if (level > 0) text += `${entry.key}:${Math.min(3, Math.round(level))};`;
+    }
+    return text;
+  }
+
+  function RebuildBlockade() {
+    DisposeMesh(blockadeMesh, propGroup); blockadeMesh = null;
+    const geometry = BuildBlockadeGeometry();
+    if (!geometry) return;
+    blockadeMesh = new THREE.Mesh(geometry, blockadeMaterial);
+    blockadeMesh.name = "PrairieBlockade";
+    blockadeMesh.receiveShadow = true;
+    blockadeMesh.castShadow = false;
+    propGroup.add(blockadeMesh);
+  }
+
+  // -------------------------------------------------------------------------
   // 3.3b 立体物件层：聚落 / 据点 / 植被 / 区域 / 工事 / 部队
   // -------------------------------------------------------------------------
 
@@ -1900,6 +2054,18 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
         entry.x, SurfaceAt(entry, 0, 0) + worldConfig.propLift, entry.z,
         (HashString(stronghold.key) % 6) * 1.047, scale, null, !!entry.hex.explored,
         { shadowRadius: radius * 0.62 });
+    }
+
+    // —— 敌在建工程：小土堆 + 半成品木架，侦知（看得见或情报≥25）才落标记 ——
+    for (const project of KnownEnemyConstruction()) {
+      const entry = hexByKey.get(project.key);
+      if (!entry) continue;
+      const seed = HashString(`enemyworks:${project.key}`);
+      const offsetX = 0.30, offsetZ = 0.24;
+      PlaceCategorised(staticPool, CreateWorkModel("Earthworks"), "works",
+        entry.x + offsetX, SurfaceAt(entry, offsetX, offsetZ) + worldConfig.propLift, entry.z + offsetZ,
+        (seed % 6) * 1.047, radius * 1.3, null, !!entry.hex.explored,
+        { castShadow: false, shadowRadius: 0 });
     }
 
     // —— 根据地：旗帜 + 已建成区域 ——
@@ -2357,6 +2523,7 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
     DisposeMesh(waterMesh, terrainGroup); waterMesh = null;
     DisposeMesh(roadMesh, propGroup); roadMesh = null;
     DisposeMesh(railMesh, propGroup); railMesh = null;
+    DisposeMesh(blockadeMesh, propGroup); blockadeMesh = null;
     DisposeMesh(borderMesh, overlayGroup); borderMesh = null;
     DisposeMesh(overlayMesh, overlayGroup); overlayMesh = null;
     for (const chunk of fogCloudMeshes) DisposeMesh(chunk, overlayGroup);
@@ -2367,6 +2534,7 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
     InstancePoolDispose(unitPool);
     structureSignature = "";
     borderSignature = "";
+    blockadeSignature = "";
     staticPropSignature = "";
   }
 
@@ -2384,7 +2552,7 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
     return text;
   }
 
-  /** 静态物件签名：地物、探索、焦土、工事、据点、根据地区域任一变化都要重排。 */
+  /** 静态物件签名：地物、探索、焦土、工事、据点、根据地区域、敌在建工程任一变化都要重排。 */
   function ComputeStaticPropSignature() {
     if (!currentState) return "";
     let text = "";
@@ -2400,7 +2568,29 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
       const districts = Array.isArray(base.districts) ? base.districts : [];
       text += `B${base.key}:${base.tier}:${districts.map((d) => (typeof d === "string" ? d : `${d.type}@${d.key || ""}`)).join(",")};`;
     }
+    for (const project of KnownEnemyConstruction()) text += `W${project.key}:${project.kind};`;
     return text;
+  }
+
+  /**
+   * 渲染层可直读的敌在建工程（数据源 state.aiMemory.construction，完工即被 AI 移除）。
+   * 侦知门槛与 Rules.ListEnemyWorks 完全一致：看得见（visibility ≥ 1）或情报覆盖 ≥ 25，
+   * 渲染层不 import Rules，只复刻这一行门槛。
+   */
+  function KnownEnemyConstruction() {
+    const state = currentState;
+    const memory = state ? (state.aiMemory ?? (state.map ? state.map.aiMemory : null)) : null;
+    const projects = memory && Array.isArray(memory.construction) ? memory.construction : null;
+    if (!projects || !projects.length) return [];
+    const known = [];
+    for (const project of projects) {
+      if (!project || !project.key) continue;
+      const entry = hexByKey.get(project.key);
+      if (!entry) continue;
+      const hex = entry.hex;
+      if ((Number(hex.visibility) || 0) >= 1 || (Number(hex.intel) || 0) >= 25) known.push(project);
+    }
+    return known;
   }
 
   function RebuildStructures() {
@@ -2504,6 +2694,8 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
     structureSignature = ComputeStructureSignature();
     RebuildBorders();
     borderSignature = ComputeBorderSignature();
+    RebuildBlockade();
+    blockadeSignature = ComputeBlockadeSignature();
     RebuildStaticProps();
     staticPropSignature = ComputeStaticPropSignature();
     RebuildUnitProps();
@@ -2535,6 +2727,7 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
     );
     controls.update();
     Resize();
+    SyncEffectsOverlays();
   }
 
   /**
@@ -2597,7 +2790,14 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
       RebuildBorders();
     }
 
-    // 静态物件只在"地物 / 探索 / 焦土 / 工事 / 据点 / 区域"变化时重排；
+    // 封锁工事：只有 hex.blockade 变化时才重建（拆沟 / 敌新挖沟 / 铁丝网升级）
+    const nextBlockadeSignature = ComputeBlockadeSignature();
+    if (nextBlockadeSignature !== blockadeSignature) {
+      blockadeSignature = nextBlockadeSignature;
+      RebuildBlockade();
+    }
+
+    // 静态物件只在"地物 / 探索 / 焦土 / 工事 / 据点 / 区域 / 敌在建工程"变化时重排；
     // 部队每回合都要跟着走位，但也只是重写实例矩阵，不重建几何体。
     const nextStaticPropSignature = ComputeStaticPropSignature();
     if (nextStaticPropSignature !== staticPropSignature) {
@@ -2609,8 +2809,26 @@ reflectedLight.indirectDiffuse += diffuseColor.rgb * ${lift.toFixed(2)};`,
     RegisterStandardMaterial(hiddenModelMaterial);
     RegisterStandardMaterial(padMaterial);
 
+    // 回合态敌情可视化转交特效层（辎重路线 / 扫荡警示常驻），幂等、每回合一次
+    SyncEffectsOverlays();
+
     if (hoverKey && !hexByKey.has(hoverKey)) SetHoverHex(null);
     if (selectedKey && !hexByKey.has(selectedKey)) SetSelectedHex(null);
+  }
+
+  /**
+   * 把回合态敌情交给特效层画常驻层：辎重队路线（情报覆盖的路段）与扫荡警示。
+   * 特效模块是软依赖（可能是哑对象 / 旧版本没有这两个入口），任何异常都不许打断世界同步。
+   */
+  function SyncEffectsOverlays() {
+    const effects = handle.effects;
+    if (!effects || !currentState) return;
+    try {
+      if (typeof effects.SyncConvoyRoutes === "function") effects.SyncConvoyRoutes(currentState);
+    } catch (error) { /* 软依赖：路线层失败不影响主渲染 */ }
+    try {
+      if (typeof effects.SyncSweepWarning === "function") effects.SyncSweepWarning(currentState);
+    } catch (error) { /* 软依赖：警示层失败不影响主渲染 */ }
   }
 
   // -------------------------------------------------------------------------

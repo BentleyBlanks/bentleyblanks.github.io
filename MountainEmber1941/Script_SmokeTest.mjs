@@ -4,11 +4,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { characterDefinitions, enemyRoleDefinitions } from "./Data_Characters.mjs";
 import { missionDefinition } from "./Data_Mission.mjs";
+import { GetTacticalReadout, NormalizeVisualSettings } from "./Data_Ui.mjs";
 import { MoveToward, UpdateEnemySquad } from "./Script_Ai.mjs";
 import {
   ApplyAbilityCommand,
+  ApplyBuddyRescue,
   ApplyCampAction,
   ApplyMissionToCamp,
+  CanBuddyRescue,
   CanFriendlySeeEnemy,
   CanSee,
   CreateInitialCampState,
@@ -18,6 +21,7 @@ import {
   GetBallisticImpact,
   GetCoverAt,
   GetCoverDamageMultiplier,
+  GetCampDecisionOptions,
   GetEnemyIntelRenderState,
   GetMissionEvaluation,
   HasLineOfSight,
@@ -60,6 +64,37 @@ function TestDefinitions() {
   }
 }
 
+function TestUiPresentationContract() {
+  const normalized = NormalizeVisualSettings(
+    { quality: "impossible", uiScale: "huge", screenEffects: false },
+    true,
+  );
+  assert.equal(normalized.quality, "auto", "Invalid quality preferences must fall back safely.");
+  assert.equal(normalized.uiScale, "normal", "Invalid UI scales must not break layout.");
+  assert.equal(normalized.screenEffects, false, "Combat screen feedback must remain user-controllable.");
+  assert.equal(normalized.reducedMotion, true, "OS reduced-motion preference must seed accessibility settings.");
+
+  const selectedUnit = { hidden: true, inLight: false, stance: "crouch" };
+  const tacticalState = {
+    alertLevel: 0,
+    enemies: [
+      { currentVisible: false, intelState: "tracked", awareness: 100, disabled: false, health: 80 },
+      { currentVisible: true, intelState: "current", awareness: 34, disabled: false, health: 80 },
+      { currentVisible: true, intelState: "current", awareness: 99, disabled: true, health: 0 },
+    ],
+  };
+  const readout = GetTacticalReadout(tacticalState, selectedUnit, simulationConfig.awarenessInvestigate);
+  assert.equal(readout.visibleAwareness, 34, "The HUD must not leak awareness from tracked or disabled enemies.");
+  assert.equal(readout.concealment.key, "hidden");
+  assert.equal(readout.awarenessLabel, "有所警觉");
+  tacticalState.alertLevel = 3;
+  assert.equal(
+    GetTacticalReadout(tacticalState, selectedUnit).concealment.key,
+    "combat",
+    "Full alert must override local concealment messaging.",
+  );
+}
+
 function TestInitialState() {
   const state = CreateInitialMissionState(19411018);
   assert.equal(state.units.length, 4);
@@ -70,6 +105,7 @@ function TestInitialState() {
   assert.equal(state.objectives.relay, false);
   assert.equal(state.ledger.civilianHarm, 0);
   assert.equal(state.soundEvents.length, 0);
+  assert.equal(state.shotIndex, 0);
   for (const unit of state.units) {
     assert.equal(Number.isFinite(unit.x) && Number.isFinite(unit.z), true);
     assert.equal(unit.queue.length, 0);
@@ -451,6 +487,13 @@ function TestScoringBoundary() {
   state.ledger.enemiesDisabled = 100;
   const afterKills = GetMissionEvaluation(state);
   assert.equal(afterKills.score, baseline.score, "Kills and incapacitations must never create score.");
+  assert.equal(baseline.grade, "S");
+  state.ledger.civilianRisk = 1;
+  assert.notEqual(GetMissionEvaluation(state).grade, "S", "Any civilian risk must gate the S grade.");
+  state.ledger.civilianRisk = 0;
+  state.ledger.civilianDisplacement = 1;
+  assert.notEqual(GetMissionEvaluation(state).grade, "S", "Any civilian displacement must gate the S grade.");
+  state.ledger.civilianDisplacement = 0;
   state.ledger.civilianHarm = 1;
   const afterHarm = GetMissionEvaluation(state);
   assert.equal(afterHarm.score < baseline.score, true, "Civilian harm must reduce evaluation.");
@@ -543,12 +586,12 @@ function TestCampBoundary() {
   assert.equal(secondOperation.operation.id, "northVillageRelief", "Campaign advancement must unlock a different operation.");
   assert.deepEqual(
     secondOperation.mainObjectiveIds,
-    ["detainee", "medicines", "generator", "allExtracted"],
-    "The second operation must change the required tactical objectives.",
+    ["contactLiu", "clinicSatchel", "escortHouseholds", "allExtracted"],
+    "The second operation must use its authored rendezvous objectives.",
   );
-  secondOperation.objectives.detainee = true;
-  secondOperation.objectives.medicines = true;
-  secondOperation.objectives.generator = true;
+  secondOperation.objectives.contactLiu = true;
+  secondOperation.objectives.clinicSatchel = true;
+  secondOperation.objectives.escortHouseholds = true;
   secondOperation.units.forEach((unit) => { unit.state = "evacuated"; });
   assert.equal(GetMissionEvaluation(secondOperation).complete, true, "Alternate campaign objectives must drive completion.");
 
@@ -558,6 +601,57 @@ function TestCampBoundary() {
   assert.equal(clinicUpgrade.state.facilities.clinic, 2, "Treatment must develop the clinic.");
   const trainingUpgrade = ApplyCampAction(CreateInitialCampState(), "rest");
   assert.equal(trainingUpgrade.state.facilities.training, 1, "Rest and review must develop training.");
+
+  const decisionCostCamp = CreateInitialCampState();
+  decisionCostCamp.facilities.clinic = 3;
+  decisionCostCamp.facilities.workshop = 2;
+  decisionCostCamp.facilities.intelligence = 2;
+  decisionCostCamp.resources.medicine = 3;
+  decisionCostCamp.resources.tools = 3;
+  decisionCostCamp.resources.radioParts = 3;
+  decisionCostCamp.roster[0].wounds = 1;
+  const decisionCostOptions = Object.fromEntries(GetCampDecisionOptions(decisionCostCamp).map((option) => [option.id, option]));
+  assert.equal(decisionCostOptions.treat.costs.medicine, 2, "A level-three clinic must display and charge medicine 2.");
+  assert.equal(decisionCostOptions.repair.costs.tools, 2, "An upgraded workshop must display and charge tools 2.");
+  assert.equal(decisionCostOptions.decode.costs.radioParts, 2, "An upgraded intelligence corner must display and charge parts 2.");
+}
+
+function TestBuddyRescueQueueContract() {
+  const state = CreateInitialMissionState();
+  const rescuer = state.units.find((unit) => unit.id === "hanShilei");
+  const patient = state.units.find((unit) => unit.id === "qinSuqiu");
+  rescuer.x = 0;
+  rescuer.z = 0;
+  patient.x = 2.8;
+  patient.z = 0;
+  patient.state = "downed";
+  patient.health = 0;
+  patient.downedTimer = 6;
+  assert.equal(CanBuddyRescue(state, rescuer.id, patient.id), true);
+  const beforeQueue = {
+    timer: patient.downedTimer,
+    suppression: rescuer.suppression,
+    commitment: rescuer.rescueCommitmentUntil,
+  };
+  assert.equal(
+    QueueCommand(state, rescuer.id, { kind: "buddyRescue", targetId: patient.id }, false),
+    true,
+  );
+  assert.deepEqual(
+    {
+      timer: patient.downedTimer,
+      suppression: rescuer.suppression,
+      commitment: rescuer.rescueCommitmentUntil,
+    },
+    beforeQueue,
+    "Planning pause must only queue buddy rescue without settling its cost or bleeding-time benefit.",
+  );
+  const queued = rescuer.queue.shift();
+  const result = ApplyBuddyRescue(state, rescuer.id, queued.targetId);
+  queued.resolved = true;
+  assert.equal(result.success, true);
+  assert.equal(patient.downedTimer, 20);
+  assert.equal(rescuer.suppression, 8);
 }
 
 function TestStaticPageContract() {
@@ -565,20 +659,82 @@ function TestStaticPageContract() {
   const css = fs.readFileSync(path.join(currentDirectory, "Style_Game.css"), "utf8");
   const gameScript = fs.readFileSync(path.join(currentDirectory, "Script_Game.mjs"), "utf8");
   const worldScript = fs.readFileSync(path.join(currentDirectory, "Script_World.mjs"), "utf8");
+  const blenderBuildScript = fs.readFileSync(
+    path.join(currentDirectory, "Tools", "Script_BuildBlenderAssets.py"),
+    "utf8",
+  );
   assert.match(html, /three\.module\.mjs/, "Three.js must be vendored through the import map.");
   assert.doesNotMatch(html, /https?:\/\/[^"']+(three|font|cdn)/i, "The page must not rely on a runtime CDN.");
   assert.match(html, /id="worldCanvas"/);
   assert.match(html, /id="rosterPanel"/);
   assert.match(html, /id="campScreen"/);
   assert.match(html, /id="resultScreen"/);
+  assert.match(html, /id="tacticalReadout"/, "The mission HUD must expose a concise stealth and awareness readout.");
+  assert.match(html, /id="combatFeedback"/, "Combat feedback must have a dedicated non-interactive presentation layer.");
+  assert.match(html, /id="settingsModal"/, "Display and accessibility settings must remain available in-game.");
+  assert.match(html, /id="qualitySelect"/);
+  assert.match(html, /id="reducedMotionToggle"/);
   assert.match(html, /群众代价账本/);
+  assert.equal((html.match(/data-camp-payoff/g) ?? []).length, 4, "Every camp decision must expose a visible payoff line.");
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(css, /prefers-reduced-motion/);
+  assert.match(css, /html\[data-reduced-motion="true"\]/, "In-game reduced motion must work independently of the OS setting.");
+  assert.match(css, /\.tacticalReadout\s*\{/, "Tactical readout styling must remain explicit.");
+  assert.match(css, /@keyframes cameraExplosion/, "Explosion feedback must use a bounded CSS animation rather than extra WebGL work.");
   assert.match(gameScript, /simulationConfig\.fixedStep/);
   assert.match(gameScript, /soundEvents = state\.soundEvents\.filter/);
   assert.match(gameScript, /renderBurstUntil/, "Paused interactions must open a short high-frame rendering window.");
   assert.match(gameScript, /effectsActive/, "Paused visual effects must keep rendering until they settle.");
   assert.match(gameScript, /interactiveRendering[\s\S]+renderAccumulator >= 1 \/ 12/, "Only fully idle paused scenes may fall back to 12 fps.");
+  assert.match(gameScript, /GetTacticalReadout\(/, "HUD tactical messaging must use the tested non-leaking presentation contract.");
+  assert.match(gameScript, /function TriggerCombatFeedback\(/, "Combat events must drive bounded presentation feedback.");
+  assert.match(gameScript, /!settings\.screenEffects \|\| settings\.reducedMotion/, "Combat screen feedback must honor accessibility settings.");
+  assert.match(gameScript, /world\?\.ApplyCameraImpact\?\.\(kind, intensity\)/, "Combat feedback must use the WebGL camera-impact contract.");
+  assert.doesNotMatch(css, /\.feedback(?:Shot|Damage|Explosion)\s+#worldCanvas/, "CSS feedback must not transform the picking canvas.");
+  assert.match(gameScript, /rendererQuality = DetectQuality\(\)/, "Renderer quality must consume the persisted quality setting.");
+  assert.match(gameScript, /GetCampDecisionOptions\(campState\)/, "Camp buttons must consume the tested live decision costs.");
+  assert.match(gameScript, /function QueueAbilityCommand\(unit, command, append = false\)[\s\S]*QueueCommand\(state, unit\.id, command, append\)/, "Abilities must preserve Shift-append planning.");
+  assert.match(gameScript, /function UseTargetedAbility\(position, pickedInteractableId = null, append = false\)[\s\S]*const shouldAppend = append \|\| activeAbilityAppend/, "Targeted abilities must carry append intent through the map pick.");
+  assert.match(gameScript, /UseAbility\(abilityButton\.dataset\.abilityId, event\.shiftKey\)/, "Ability buttons must forward the Shift modifier.");
+  assert.match(gameScript, /if \(ability\) UseAbility\(ability\.id, event\.shiftKey\)/, "Ability keyboard shortcuts must forward the Shift modifier.");
+  assert.match(gameScript, /function QueueAttack[\s\S]*const didQueue = QueueCommand[\s\S]*if \(!didQueue\)/, "Attack feedback must not report success when the command queue is full.");
+  assert.match(gameScript, /const openModal = GetOpenModal\(\)[\s\S]*TrapModalFocus\(event, openModal\)[\s\S]*return;/, "Open dialogs must own keyboard focus before mission shortcuts.");
+  assert.match(gameScript, /modalReturnFocus\?\.isConnected[\s\S]*modalReturnFocus\.focus\(\)/, "Closing a dialog must restore its trigger focus.");
+  assert.match(gameScript, /elements\.canvas\.setAttribute\("aria-label", `\$\{state\.operation\.name\}三维战术地图`\)/, "The tactical canvas name must follow the active operation.");
+  assert.match(gameScript, /\["127\.0\.0\.1", "localhost"\][\s\S]*operationPreview/, "Local QA may preview each operation without mutating the campaign save.");
+  assert.match(css, /font-size:\s*calc\([^;]+var\(--uiTextScale\)/, "Primary HUD typography must consume the UI text scale variable.");
+  assert.match(css, /\.mobilePanelTabs[\s\S]*?top:\s*calc\(64px \+ var\(--safeTop\)\)/, "Mobile panel controls must own a dedicated row below the command bar.");
+  assert.match(css, /\.toastRegion[\s\S]*?top:\s*calc\(224px \+ var\(--safeTop\)\)/, "Mobile toasts must sit below the tactical and combat feedback rows.");
+  assert.match(gameScript, /TriggerCombatFeedback\("damage"/, "Friendly damage must provide immediate readable feedback.");
+  assert.equal(
+    (gameScript.match(/ResolveDeterministicShot\(/g) ?? []).length >= 2,
+    true,
+    "Player and enemy firearm paths must both consume deterministic shot resolution.",
+  );
+  assert.match(gameScript, /function ClaimShotIndex\(\)/, "Every fired round must claim a stable deterministic index.");
+  assert.match(gameScript, /function SpawnMissImpact\(/, "Misses must still produce a readable tracer and impact endpoint.");
+  assert.match(gameScript, /mode: suppressOnly \? "suppress" : "aimed"/);
+  assert.match(gameScript, /mode: enemy\.fireIntent === "suppress" \? "suppress" : "aimed"/);
+  assert.match(gameScript, /function QueueBuddyRescue\(/, "Clicking a nearby casualty must expose a real queued command path.");
+  assert.match(gameScript, /function ProcessBuddyRescueCommand\(/);
+  assert.match(gameScript, /command\.resolved = true;[\s\S]*ApplyBuddyRescue\(/, "A queued buddy rescue must settle once after resume.");
+  assert.match(gameScript, /pickedUnit\?\.state === "downed" && QueueBuddyRescue\(/);
+  assert.match(
+    gameScript,
+    /const failedUnitNames = \[\];[\s\S]*failedUnitNames\.push\(unit\.name\)[\s\S]*未加入本次移动/,
+    "Partial group movement must name operatives whose full queues rejected the command.",
+  );
+  assert.match(
+    gameScript,
+    /kind: "hideBody"[\s\S]*if \(!didQueue\)[\s\S]*无法加入隐蔽行动/,
+    "Body hiding must not present success after QueueCommand rejects a full queue.",
+  );
+  assert.match(
+    gameScript,
+    /kind: "takedown"[\s\S]*if \(!didQueue\)[\s\S]*无法加入静默制服/,
+    "Silent takedown must not present success after QueueCommand rejects a full queue.",
+  );
+  assert.match(gameScript, /TriggerCombatFeedback\("explosion"/, "Explosions must provide camera and screen feedback.");
   assert.match(worldScript, /FindPath2D\(origin, target, \{ clearance: 0\.68 \}\)/, "Route preview must use the execution A* contract.");
   assert.match(worldScript, /command\.waypoints\.slice/, "Paused mid-command previews must consume the execution's remaining waypoints.");
   assert.match(worldScript, /GetSoundRadius\(routeActor\)/, "Route sound previews must account for stance and terrain along the path.");
@@ -595,6 +751,42 @@ function TestStaticPageContract() {
   assert.match(worldScript, /body\.material\.opacity = isLastKnown[\s\S]*: 1;/, "Current and tracked models must remain solid while memories become translucent.");
   assert.match(worldScript, /body\.material\.color\.setHex\(isLastKnown \? 0x8299a8 : 0xffffff\)/, "Memory actors must use a desaturated blue-grey ghost treatment.");
   assert.match(worldScript, /memoryRing\.material\.opacity = isLastKnown/, "Last-known positions must display a decaying memory ring.");
+  assert.match(worldScript, /function GetAtmosphereProfile\(definition\)/, "Mission time and weather must select an authored atmosphere profile.");
+  assert.match(worldScript, /definition\?\.timeOfDay[\s\S]*definition\?\.weather/, "Atmosphere selection must explicitly consume both authored time and weather.");
+  assert.match(worldScript, /weatherKind: "rain"[\s\S]*weatherKind: "dust"[\s\S]*weatherKind: "mist"/, "The three operation climates must retain distinct rain, dust, and mist treatments.");
+  assert.match(worldScript, /new THREE\.LineSegments\([\s\S]*new THREE\.Points\(/, "Weather must remain a single batched line or point effect.");
+  assert.match(worldScript, /function ResolveActorPose\(actor, context\)/, "Actor animation must resolve tactical state into reusable rig poses.");
+  assert.match(worldScript, /previousShotCooldown[\s\S]*fireRecoil/, "Character rigs must detect shots and expose a bounded recoil pose.");
+  assert.match(worldScript, /hideBody[\s\S]*hanShilei[\s\S]*luLanzhi/, "Engineering, aid, and body-handling actions must remain visually differentiated.");
+  assert.match(worldScript, /function GetCameraFitDistance\(aspect = camera\.aspect/, "Portrait framing must derive its overview distance from aspect and mission bounds.");
+  assert.match(worldScript, /camera\.aspect < 0\.78[\s\S]*cameraFitState\.fitDistance/, "Portrait overview framing must consume the computed fit distance.");
+  assert.match(worldScript, /const startupTacticalFocus = options\.startup === true && playerObjects\.size > 0/, "Mission opening framing must use an explicit startup contract rather than a distance heuristic.");
+  assert.match(gameScript, /FocusPosition\(openingFocus, 46, \{ startup: true \}\)/, "Mission opening must request the authored 46-unit tactical portrait frame.");
+  assert.match(worldScript, /CalculateStartupTacticalFrame\([\s\S]*viewportWidth[\s\S]*viewportHeight[\s\S]*overviewDirection/, "Opening framing must use the tested safe-viewport squad-and-threat composition contract.");
+  assert.match(worldScript, /tacticalActorPixels:[\s\S]*tacticalThreatIncluded:/, "Renderer stats must expose portrait actor readability and threat inclusion.");
+  assert.match(worldScript, /manualOverview = delta > 0 && nextLength >= cameraFitState\.fitDistance \* 0\.92/, "Manual zoom-out must remain the explicit path to a bounds overview.");
+  assert.match(worldScript, /overviewFitDistance:[\s\S]*tacticalDistance:[\s\S]*tacticalActorSpan:[\s\S]*framingMode:/, "Renderer stats must distinguish tactical and overview framing.");
+  assert.match(worldScript, /nightRendezvous:[\s\S]*Model_EnvironmentNorthVillage\.glb[\s\S]*quarryInterdiction:[\s\S]*Model_EnvironmentQuarrySlope\.glb/, "Each later operation must own a distinct environment asset.");
+  assert.match(worldScript, /\[\["environment", environmentArtDefinition\.path\]\][\s\S]*Object\.entries\(artAssetPaths\)/, "The loader must request only the active operation environment.");
+  assert.match(worldScript, /propRoot\.visible = false;[\s\S]*productionRoot\.visible = false;[\s\S]*operationFallbackRoot\.visible = false;/, "Procedural fallbacks may hide only after the matching GLB succeeds.");
+  assert.match(blenderBuildScript, /ScriptDirectory = os\.path\.dirname\(os\.path\.abspath\(__file__\)\)[\s\S]*ProjectRoot = os\.path\.dirname\(ScriptDirectory\)/, "Blender exports must derive the project root from the build script path.");
+  assert.doesNotMatch(blenderBuildScript, /bentleyblanks_Codex|ProjectRoot\s*=\s*r["']/, "The Blender builder must not retain a temporary worktree path.");
+  assert.match(blenderBuildScript, /def AddNorthVillageWaterworks\([\s\S]*IrrigationSluice/, "The village builder must retain its creek and authored sluice landmark.");
+  assert.match(blenderBuildScript, /def CreateNorthVillageEnvironment\(/, "The village must remain a standalone environment collection.");
+  assert.match(blenderBuildScript, /def AddQuarryTrack\([\s\S]*QuarryTrack/, "The quarry builder must retain its authored rail landmark.");
+  assert.match(blenderBuildScript, /def CreateQuarryEnvironment\(/, "The quarry must remain a standalone environment collection.");
+  assert.match(blenderBuildScript, /def BuildQuarryOnly\([\s\S]*Model_EnvironmentQuarrySlope\.glb/, "The quarry environment must support isolated deterministic re-export.");
+  assert.doesNotMatch(blenderBuildScript, /AddQuarryBench|QuarryBench_/, "The quarry GLB must not duplicate the canonical Three.js terrain with broad bench slabs.");
+  assert.match(blenderBuildScript, /QuarryEdgeRock_[\s\S]*RockfallTimber_[\s\S]*QuarryTelephonePole_/, "The slab-free quarry asset must retain bounded edge rocks, timber supports, and telephone landmarks.");
+  const quarryGlb = fs.readFileSync(path.join(currentDirectory, "Models", "Model_EnvironmentQuarrySlope.glb"));
+  const quarryJsonLength = quarryGlb.readUInt32LE(12);
+  const quarryJson = JSON.parse(quarryGlb.subarray(20, 20 + quarryJsonLength).toString("utf8").replace(/\0+$/, ""));
+  const quarryExtras = quarryJson.nodes?.find((node) => node.name === "Model_EnvironmentQuarrySlope")?.extras;
+  assert.equal(quarryExtras?.terrainOwnership, "ThreeJsCanonical", "The exported quarry GLB must defer all terrain height to the shared Three.js terrain mesh.");
+  assert.equal(quarryExtras?.broadTerrainSlabs, 0, "The exported quarry GLB must certify that it contains no broad terrain slabs.");
+  assert.equal(quarryExtras?.landmarkContract, "track|oreCarts|sheds|blockhouse|walls|timberSupports|telephonePoles", "The exported quarry GLB must retain its operation-specific landmark contract.");
+  assert.match(worldScript, /function ApplyCameraImpact\(kind = "shot", intensity = 0\.5\)/, "The WebGL world must expose bounded camera impacts.");
+  assert.match(worldScript, /ApplyCameraImpact,\s*\n\s*HasActiveEffects/, "Camera impact must be part of the public world contract.");
   assert.match(worldScript, /function SpawnImpact\(/, "World feedback must implement a bounded impact-particle effect.");
   assert.match(worldScript, /SpawnImpact,\s*\n\s*SpawnExplosion/, "SpawnImpact must remain part of the public world contract.");
   assert.match(worldScript, /kind === "body"/, "Body impacts must have a dedicated restrained particle palette.");
@@ -615,6 +807,9 @@ function TestStaticPageContract() {
   assert.match(worldScript, /BakeMeshRoots\(staticObstacleRoots\)/, "Static obstacles must remain merged into a low-draw-call mesh.");
   assert.match(css, /\.unitHealth,[\s\S]*?display: block;[\s\S]*?max-height: 3px;/, "Roster health and suppression rails must stay thin block bars.");
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.unitCard strong \{[\s\S]*?font-size: 12px;/, "Mobile operative names must remain at least 12px.");
+  assert.match(css, /\.unitCard small,[\s\S]*?font-size: max\(10px, calc\(9px \* var\(--uiTextScale\)\)\);/, "Critical tactical HUD secondary text must retain a 10px readable floor in compact mode.");
+  assert.match(css, /\.awarenessReadout b,[\s\S]*?\.concealmentReadout strong \{[\s\S]*?font-size: max\(10px, calc\(10px \* var\(--uiTextScale\)\)\);/, "Compact awareness and concealment text must never fall below 10px.");
+  assert.match(worldScript, /const shadowCoverage =[\s\S]*operationBounds\.maximumX[\s\S]*operationBounds\.maximumZ/, "The shadow camera must derive full-operation coverage from the active bounds.");
   assert.doesNotMatch(worldScript, /https?:\/\//);
   assert.equal(
     (css.match(/{/g) || []).length,
@@ -625,8 +820,10 @@ function TestStaticPageContract() {
 
 function Run() {
   TestDefinitions();
+  TestUiPresentationContract();
   TestInitialState();
   TestQueueContract();
+  TestBuddyRescueQueueContract();
   TestPausedAbilityExecution();
   TestLineOfSightAndZones();
   TestBallisticImpactContract();

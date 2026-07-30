@@ -1040,6 +1040,23 @@ const workBuilders = {
       Ball(pieces, 0.022 + (stone % 3) * 0.008, { pos: [-0.2 + stone * 0.1, 0.016, 0.1 + (stone % 2) * 0.05], scale: [1, 0.7, 1.1], color: modelPalette.stone });
     }
   },
+  /**
+   * 敌在建工程标记：翻出的小土堆 + 半成品木架 + 备料。
+   * 灰褐压暗（比我方工事冷一档），读作"敌人正在这里修东西"，完工后由封锁层/据点模型接手。
+   */
+  Earthworks(pieces) {
+    // 翻出来的生土堆：两团压扁的球，灰褐土色
+    Ball(pieces, 0.085, { pos: [-0.05, 0.018, 0.02], scale: [1.35, 0.5, 1.1], color: "#6f6350", variance: 0.09 });
+    Ball(pieces, 0.06, { pos: [0.06, 0.012, -0.06], scale: [1.2, 0.45, 1.0], color: "#7a6d58", variance: 0.09 });
+    // 半成品木架：两根立柱 + 一根横梁，另一侧只立了根斜撑（还没搭完）
+    Box(pieces, 0.016, 0.15, 0.016, { pos: [-0.07, 0.075, -0.02], color: modelPalette.timberDark });
+    Box(pieces, 0.016, 0.15, 0.016, { pos: [0.07, 0.075, -0.02], color: modelPalette.timberDark });
+    Box(pieces, 0.18, 0.014, 0.014, { pos: [0, 0.148, -0.02], color: modelPalette.timber });
+    Box(pieces, 0.014, 0.16, 0.014, { pos: [0.1, 0.062, 0.05], rot: [0.5, 0, -0.32], color: modelPalette.timber });
+    // 备料：地上码放的两根木料
+    Box(pieces, 0.14, 0.018, 0.018, { pos: [-0.02, 0.012, 0.1], rot: [0, 0.35, 0], color: modelPalette.timber });
+    Box(pieces, 0.12, 0.018, 0.018, { pos: [-0.03, 0.03, 0.11], rot: [0, 0.28, 0], color: modelPalette.timberDark });
+  },
   /** 渡口：木栈桥 + 渡船 + 撑杆。 */
   Ford(pieces) {
     Box(pieces, 0.24, 0.012, 0.1, { pos: [-0.1, 0.03, 0], color: modelPalette.timber });
@@ -1055,7 +1072,7 @@ const workBuilders = {
 
 const workAliases = { Trenches: "Trench", Terraces: "Terrace", TunnelMouth: "Tunnel", Roadblock: "Barricade", Crossing: "Ford", Watchtower: "Beacon" };
 
-/** 工事 / 改良模型：梯田、战壕、地道口、铁匠炉、物资囤、烽火台、路障、渡口。 */
+/** 工事 / 改良模型：梯田、战壕、地道口、铁匠炉、物资囤、烽火台、路障、渡口、敌在建工程（Earthworks）。 */
 export function CreateWorkModel(workType, options = {}) {
   const requested = String(workType || "Trench");
   const resolved = workAliases[requested] || requested;

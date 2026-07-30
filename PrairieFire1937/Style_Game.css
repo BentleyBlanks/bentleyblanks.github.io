@@ -1222,6 +1222,35 @@
 .pf-garrison-unit:hover { background: rgba(200, 168, 106, 0.18); }
 .pf-garrison-unit.is-active { background: var(--pf-ochre); color: var(--pf-ink); font-weight: 600; }
 
+/* —— 格详情敌军行（可见敌军 + 侦察名册注记） —— */
+
+.pf-foes { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 7px; }
+
+.pf-foe {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid rgba(224, 112, 92, 0.5);
+  border-radius: 3px;
+  background: rgba(140, 47, 36, 0.16);
+  font-size: 12px;
+  color: var(--pf-paper);
+}
+
+.pf-foe-name { font-weight: 600; }
+.pf-foe-hp { font-style: normal; color: var(--pf-paper-dim); font-variant-numeric: tabular-nums; }
+
+.pf-foe-marked {
+  padding: 1px 6px;
+  border: 1px solid rgba(224, 112, 92, 0.6);
+  border-radius: 2px;
+  background: rgba(140, 47, 36, 0.32);
+  color: var(--pf-crimson-soft);
+  font-size: 11px;
+  cursor: help;
+}
+
 .pf-buildrow { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .pf-buildrow-label { font-size: 12px; color: var(--pf-paper-dim); }
 
@@ -1271,6 +1300,34 @@
 .pf-flag.is-hidden-good { background: rgba(127, 191, 106, 0.22); color: var(--pf-good); border: 1px solid rgba(127, 191, 106, 0.5); }
 .pf-flag.is-exposed { background: rgba(224, 112, 92, 0.2); color: var(--pf-bad); border: 1px solid rgba(224, 112, 92, 0.5); }
 .pf-flag.is-tired { background: rgba(232, 183, 74, 0.18); color: var(--pf-warn); border: 1px solid rgba(232, 183, 74, 0.45); }
+
+/* —— 特长（记功授衔） —— */
+
+.pf-chip.is-perk {
+  border-style: solid;
+  border-color: var(--pf-ochre);
+  background: linear-gradient(180deg, rgba(240, 210, 122, 0.2), rgba(200, 168, 106, 0.08));
+  color: var(--pf-ochre-glow);
+  font-weight: 600;
+}
+
+.pf-perk-award {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  margin-top: 6px;
+  border: 1px solid var(--pf-ochre-deep);
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--pf-ink);
+  background: linear-gradient(180deg, var(--pf-ochre-glow), var(--pf-ochre));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  transition: filter 0.2s var(--pf-ease);
+}
+
+.pf-perk-award:hover { filter: brightness(1.08); }
 
 .pf-unit-bars { display: flex; flex-direction: column; gap: 5px; margin: 7px 0; }
 
@@ -3469,6 +3526,13 @@
   color: #cfe4ec;
 }
 .pf-plate-mark:empty { display: none; }
+
+/* 侦察名册角标：与「隐」同一枚圆签，换印章红底写「册」，与旗标体系同风格 */
+.pf-plate.is-marked .pf-plate-mark {
+  background: var(--pf-crimson);
+  border-color: rgba(232, 220, 192, 0.85);
+  color: #f4ead2;
+}
 
 .pf-plate.is-acted { filter: saturate(0.45) brightness(0.8); }
 .pf-plate.is-selected {

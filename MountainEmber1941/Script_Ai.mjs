@@ -1,5 +1,6 @@
 import { GetEnemyRoleDefinition } from "./Data_Characters.mjs";
-import { GetPatrol, missionDefinition } from "./Data_Mission.mjs";
+import { missionDefinition as legacyMissionDefinition } from "./Data_Mission.mjs";
+import { GetOperationLayout } from "./Data_Operations.mjs";
 import {
   CalculateAwarenessRate,
   CanSee,
@@ -7,16 +8,38 @@ import {
   Distance,
   FindPath2D,
   GetCoverAt,
+  GetMissionDefinitionForState,
+  GetTacticalDistance,
   HearSound,
   IsNavigationBlocked,
   NormalizeAngle,
   PointInsideBox,
+  SetActiveMissionDefinition,
   simulationConfig,
 } from "./Script_Rules.mjs";
 
+let activeMissionDefinition = legacyMissionDefinition;
+
+function UseMissionDefinition(state) {
+  const definition = GetMissionDefinitionForState(state) ?? legacyMissionDefinition;
+  activeMissionDefinition = {
+    ...definition,
+    obstacles: [
+      ...definition.obstacles,
+      ...(state?.environment?.dynamicObstacles ?? []),
+    ],
+  };
+  SetActiveMissionDefinition(activeMissionDefinition);
+  return activeMissionDefinition;
+}
+
+function GetActivePatrol(patrolId) {
+  return activeMissionDefinition.patrols.find((patrol) => patrol.id === patrolId) ?? null;
+}
+
 function GetObstaclePenetration(position) {
   let penetration = 0;
-  for (const obstacle of missionDefinition.obstacles) {
+  for (const obstacle of activeMissionDefinition.obstacles) {
     if (!PointInsideBox(position, obstacle, 0.45)) continue;
     const minimumX = obstacle.x - obstacle.width * 0.5 - 0.45;
     const maximumX = obstacle.x + obstacle.width * 0.5 + 0.45;
@@ -84,7 +107,7 @@ function GetNearestVisibleUnit(enemy, state) {
   for (const unit of state.units) {
     if (["downed", "dead", "evacuated", "unavailable"].includes(unit.state)) continue;
     if (!CanSee(enemy, unit)) continue;
-    const distance = Distance(enemy, unit);
+    const distance = GetTacticalDistance(enemy, unit, activeMissionDefinition);
     if (distance < bestDistance) {
       best = unit;
       bestDistance = distance;
@@ -103,7 +126,11 @@ function GetNearestVisibleBody(enemy, state) {
         !candidate.bodyDiscovered &&
         CanSee(enemy, candidate),
     )
-    .sort((left, right) => Distance(enemy, left) - Distance(enemy, right))[0] ?? null;
+    .sort(
+      (left, right) =>
+        GetTacticalDistance(enemy, left, activeMissionDefinition) -
+        GetTacticalDistance(enemy, right, activeMissionDefinition),
+    )[0] ?? null;
 }
 
 function PushMessage(state, kind, text) {
@@ -113,16 +140,47 @@ function PushMessage(state, kind, text) {
   if (state.messages.length > 30) state.messages.shift();
 }
 
+function GetCampSuspicionHoldSeconds(state) {
+  const signature = Math.max(0, state.environment?.campSignature ?? 0);
+  return signature > 0 ? 18 + signature * 6 : 0;
+}
+
+function GetAuthoredReinforcementRoute(state) {
+  const layout = GetOperationLayout(state.operationLayoutId);
+  const runtime = state.operationRuntime;
+  if (!layout?.reinforcementRoutes?.length) return null;
+  return layout.reinforcementRoutes
+    .filter((route) => {
+      if (runtime?.disabledReinforcements?.includes(route.id)) return false;
+      if (route.disabledByFlag && runtime?.flags?.[route.disabledByFlag]) return false;
+      if (
+        route.enabledByFlag &&
+        !runtime?.flags?.[route.enabledByFlag] &&
+        !runtime?.enabledReinforcements?.includes(route.id)
+      ) return false;
+      return true;
+    })
+    .sort((left, right) => left.arrivalSeconds - right.arrivalSeconds)[0] ?? null;
+}
+
 function RaiseLocalAlarm(enemy, state) {
   if (enemy.radioed) return;
   enemy.radioed = true;
   state.alertLevel = Math.max(state.alertLevel, 2);
   state.alarmState = state.environment.alarmBellDisabled ? "shouted" : "alarm";
   state.ledger.alarmsRaised += 1;
+  const communicationsDisrupted =
+    state.objectives.relay ||
+    state.environment.eastRoadBlocked ||
+    (state.environment.disabledReinforcements?.length ?? 0) > 0;
+  const authoredDelay = Math.max(0, state.environment.reinforcementDelaySeconds ?? 0);
+  const authoredRoute = GetAuthoredReinforcementRoute(state);
+  state.activeReinforcementRouteId = authoredRoute?.id ?? null;
   state.reinforcementTimer =
-    state.objectives.relay || state.environment.eastRoadBlocked
-      ? simulationConfig.reinforcementCutlineSeconds
-      : simulationConfig.reinforcementSeconds;
+    (authoredRoute?.arrivalSeconds ??
+      (communicationsDisrupted
+        ? simulationConfig.reinforcementCutlineSeconds
+        : simulationConfig.reinforcementSeconds)) + authoredDelay;
   for (const ally of state.enemies) {
     if (ally.disabled || ally.health <= 0 || Distance(enemy, ally) > 18) continue;
     ally.lastKnown = enemy.lastKnown ? { ...enemy.lastKnown } : { x: enemy.x, z: enemy.z };
@@ -163,7 +221,14 @@ function UpdatePerception(enemy, state, deltaTime) {
     return null;
   }
 
-  enemy.awareness = Clamp(enemy.awareness - simulationConfig.awarenessDecay * deltaTime, 0, 100);
+  const campSuspicionSeconds = GetCampSuspicionHoldSeconds(state);
+  const campSuspicionActive = enemy.state === "suspicious" && state.time < campSuspicionSeconds;
+  const awarenessFloor = campSuspicionActive ? simulationConfig.awarenessSuspicious : 0;
+  enemy.awareness = Clamp(
+    Math.max(awarenessFloor, enemy.awareness - simulationConfig.awarenessDecay * deltaTime),
+    0,
+    100,
+  );
   if (enemy.state === "combat" && enemy.lastKnown) {
     enemy.state = "search";
     enemy.searchTimer = 16;
@@ -194,7 +259,7 @@ function UpdateHearing(enemy, state) {
 }
 
 function UpdatePatrol(enemy, deltaTime) {
-  const patrol = GetPatrol(enemy.patrol);
+  const patrol = GetActivePatrol(enemy.patrol);
   if (!patrol || patrol.points.length === 0) {
     enemy.facing = NormalizeAngle(enemy.facing + deltaTime * 0.18);
     return;
@@ -228,18 +293,26 @@ function UpdateSearch(enemy, state, deltaTime) {
     (!enemy.searchPoint || enemy.searchPointTimer <= 0 || Distance(enemy, enemy.searchPoint) < 1.2)
   ) {
     enemy.searchPhase = (enemy.searchPhase ?? 0) + 1;
-    const radius = 2.2 + Math.max(0.8, enemy.uncertainty ?? 1) + (enemy.searchPhase % 4) * 1.45;
+    const roleRadius =
+      enemy.coordinationRole === "searcherNear"
+        ? 0.7
+        : enemy.coordinationRole === "searcherWide"
+          ? 4.5
+          : enemy.coordinationRole === "cordon"
+            ? 7
+            : 2.2;
+    const radius = roleRadius + Math.max(0.8, enemy.uncertainty ?? 1) + (enemy.searchPhase % 4) * 1.45;
     const angle = enemy.seedOffset * 0.173 + enemy.searchPhase * 2.399;
     const candidate = {
       x: Clamp(
         enemy.lastKnown.x + Math.cos(angle) * radius,
-        missionDefinition.bounds.minimumX + 1,
-        missionDefinition.bounds.maximumX - 1,
+        activeMissionDefinition.bounds.minimumX + 1,
+        activeMissionDefinition.bounds.maximumX - 1,
       ),
       z: Clamp(
         enemy.lastKnown.z + Math.sin(angle) * radius,
-        missionDefinition.bounds.minimumZ + 1,
-        missionDefinition.bounds.maximumZ - 1,
+        activeMissionDefinition.bounds.minimumZ + 1,
+        activeMissionDefinition.bounds.maximumZ - 1,
       ),
     };
     enemy.searchPoint = IsNavigationBlocked(candidate) ? { ...enemy.lastKnown } : candidate;
@@ -258,7 +331,7 @@ function UpdateSearch(enemy, state, deltaTime) {
 
 function ChooseCoverPoint(enemy, target) {
   let best = null;
-  for (const obstacle of missionDefinition.obstacles) {
+  for (const obstacle of activeMissionDefinition.obstacles) {
     if (Distance(enemy, obstacle) > 14) continue;
     const candidates = [
       { x: obstacle.x - obstacle.width * 0.5 - 1, z: obstacle.z },
@@ -267,7 +340,7 @@ function ChooseCoverPoint(enemy, target) {
       { x: obstacle.x, z: obstacle.z + obstacle.depth * 0.5 + 1 },
     ];
     for (const candidate of candidates) {
-      if (IsNavigationBlocked(candidate, missionDefinition.obstacles, missionDefinition.bounds, 0.5)) continue;
+      if (IsNavigationBlocked(candidate, activeMissionDefinition.obstacles, activeMissionDefinition.bounds, 0.5)) continue;
       const cover = GetCoverAt(candidate, target);
       if (!cover) continue;
       const score = cover.protection * 12 - Distance(enemy, candidate) * 0.75 + Distance(target, candidate) * 0.08;
@@ -275,6 +348,132 @@ function ChooseCoverPoint(enemy, target) {
     }
   }
   return best ? { x: best.x, z: best.z } : null;
+}
+
+export function AssignEnemyCoordinationRoles(state) {
+  const active = state.enemies
+    .filter((enemy) => !enemy.disabled && enemy.health > 0)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const contactSources = active
+    .filter((enemy) => enemy.lastKnown)
+    .sort((left, right) => (right.lastKnown.time ?? 0) - (left.lastKnown.time ?? 0));
+  for (const enemy of active) {
+    const nearbySource = contactSources.find(
+      (source) => source.id !== enemy.id && Distance(source, enemy) <= 18,
+    );
+    if (nearbySource && (!enemy.lastKnown || (nearbySource.lastKnown.time ?? 0) > (enemy.lastKnown.time ?? 0))) {
+      enemy.sharedContact = { ...nearbySource.lastKnown, sourceId: nearbySource.id };
+      if (!enemy.lastKnown && !["combat", "report"].includes(enemy.state)) {
+        enemy.lastKnown = { ...enemy.sharedContact, relayed: true };
+        enemy.uncertainty = Math.max(2.5, (nearbySource.uncertainty ?? 1) + 1.5);
+        enemy.searchTimer = Math.max(enemy.searchTimer ?? 0, 8);
+        enemy.state = "search";
+      }
+    }
+    if ((enemy.isolatedUntil ?? 0) > state.time) {
+      enemy.coordinationRole = "isolated";
+      continue;
+    }
+    if (enemy.state === "sweep") {
+      if (!["searcherNear", "cordon"].includes(enemy.coordinationRole)) enemy.coordinationRole = "cordon";
+      continue;
+    }
+    if (enemy.role === "operator" && !enemy.radioed) enemy.coordinationRole = "reporter";
+    else if (enemy.role === "leader") enemy.coordinationRole = "coordinator";
+    else enemy.coordinationRole = "reserve";
+  }
+  const contactGroup = active.filter(
+    (enemy) =>
+      !["isolated", "reporter"].includes(enemy.coordinationRole) &&
+      enemy.state !== "sweep" &&
+      (["combat", "search", "investigate"].includes(enemy.state) || enemy.lastKnown || enemy.sharedContact),
+  );
+  const fieldRoles = ["anchor", "suppressor", "flankerLeft", "flankerRight", "searcherNear", "searcherWide", "cordon"];
+  contactGroup
+    .filter((enemy) => enemy.role !== "leader")
+    .forEach((enemy, index) => {
+      enemy.coordinationRole = fieldRoles[index % fieldRoles.length];
+      enemy.coordinationSlot = index;
+    });
+  return active.map((enemy) => ({ id: enemy.id, role: enemy.coordinationRole }));
+}
+
+function GetStrategicSweepPoints() {
+  return activeMissionDefinition.patrols.flatMap((patrol) => patrol.points);
+}
+
+export function UpdateTacticalDirector(state, deltaTime) {
+  UseMissionDefinition(state);
+  state.tacticalDirector ??= {
+    pressure: 0,
+    lastProgress: 0,
+    lastProgressTime: state.time,
+    idleTime: 0,
+    sweepCount: 0,
+    sweepCooldown: 0,
+  };
+  const director = state.tacticalDirector;
+  const objectiveProgress = Object.entries(state.objectives ?? {}).filter(
+    ([objectiveId, complete]) => objectiveId !== "allExtracted" && complete,
+  ).length;
+  const interactionProgress = Object.values(state.interactables ?? {}).filter((runtime) => runtime.completed).length;
+  const progress = objectiveProgress + interactionProgress;
+  if (progress > (director.lastProgress ?? 0)) {
+    director.lastProgress = progress;
+    director.lastProgressTime = state.time;
+    director.idleTime = 0;
+    director.pressure = Math.max(0, director.pressure - 38);
+  } else {
+    director.idleTime = (director.idleTime ?? 0) + deltaTime;
+    if (director.idleTime > 30) {
+      director.pressure = Clamp(
+        director.pressure + deltaTime * (0.58 + (state.alertLevel ?? 0) * 0.16),
+        0,
+        100,
+      );
+    }
+  }
+  director.sweepCooldown = Math.max(0, (director.sweepCooldown ?? 0) - deltaTime);
+  if (director.pressure < 55 || director.sweepCooldown > 0) return director;
+  const sweepPoints = GetStrategicSweepPoints();
+  const candidates = state.enemies
+    .filter(
+      (enemy) =>
+        !enemy.disabled &&
+        enemy.health > 0 &&
+        !["combat", "report", "routed"].includes(enemy.state) &&
+        (enemy.isolatedUntil ?? 0) <= state.time,
+    )
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .slice(0, 2);
+  candidates.forEach((enemy, index) => {
+    const pointIndex = ((director.sweepCount ?? 0) * 3 + index * 7 + enemy.seedOffset) % sweepPoints.length;
+    enemy.sweepTarget = { ...sweepPoints[pointIndex] };
+    enemy.state = "sweep";
+    enemy.searchTimer = 18;
+    enemy.coordinationRole = index === 0 ? "searcherNear" : "cordon";
+  });
+  if (candidates.length > 0) {
+    director.sweepCount = (director.sweepCount ?? 0) + 1;
+    director.sweepCooldown = 42;
+    director.pressure = Math.max(28, director.pressure - 26);
+  }
+  return director;
+}
+
+function UpdateSweep(enemy, deltaTime) {
+  if (!enemy.sweepTarget) {
+    enemy.state = "return";
+    return;
+  }
+  const role = GetEnemyRoleDefinition(enemy.role);
+  enemy.searchTimer = Math.max(0, (enemy.searchTimer ?? 0) - deltaTime);
+  if (MoveToward(enemy, enemy.sweepTarget, role.speed * 0.78, deltaTime) || enemy.searchTimer <= 0) {
+    enemy.sweepTarget = null;
+    enemy.state = "search";
+    enemy.searchTimer = 10;
+    enemy.lastKnown ??= { x: enemy.x, z: enemy.z };
+  }
 }
 
 function UpdateCombat(enemy, state, visible, deltaTime, hooks) {
@@ -285,7 +484,7 @@ function UpdateCombat(enemy, state, visible, deltaTime, hooks) {
     enemy.searchTimer = 15;
     return;
   }
-  const distance = Distance(enemy, target);
+  const distance = GetTacticalDistance(enemy, target, activeMissionDefinition);
   if (!visible) return;
   if (!enemy.radioed && (enemy.role === "operator" || state.alertLevel < 2)) {
     enemy.state = "report";
@@ -297,6 +496,22 @@ function UpdateCombat(enemy, state, visible, deltaTime, hooks) {
     enemy.target = null;
     PushMessage(state, "combat", `${GetEnemyRoleDefinition(enemy.role).name}在压制下退却。`);
     return;
+  }
+  const contact = enemy.lastKnown ?? enemy.sharedContact ?? target;
+  if (enemy.coordinationRole === "flankerLeft" || enemy.coordinationRole === "flankerRight") {
+    const side = enemy.coordinationRole === "flankerLeft" ? -1 : 1;
+    const approachX = enemy.x - contact.x;
+    const approachZ = enemy.z - contact.z;
+    const approachLength = Math.max(1, Math.hypot(approachX, approachZ));
+    const flank = {
+      x: contact.x + (approachX / approachLength) * 7 + (-approachZ / approachLength) * 8 * side,
+      z: contact.z + (approachZ / approachLength) * 7 + (approachX / approachLength) * 8 * side,
+    };
+    if (!IsNavigationBlocked(flank) && Distance(enemy, flank) > 1.4) {
+      MoveToward(enemy, flank, role.speed * 0.78, deltaTime);
+      enemy.fireIntent = "flank";
+      return;
+    }
   }
   enemy.coverTimer = (enemy.coverTimer ?? 0) - deltaTime;
   if (enemy.suppression > 36) {
@@ -319,12 +534,15 @@ function UpdateCombat(enemy, state, visible, deltaTime, hooks) {
   }
   enemy.shotCooldown -= deltaTime;
   if (distance < 20 && enemy.shotCooldown <= 0) {
-    enemy.shotCooldown = 1.8 + (enemy.seedOffset % 5) * 0.12;
+    enemy.fireIntent = enemy.coordinationRole === "suppressor" ? "suppress" : "aimed";
+    const cadence = enemy.coordinationRole === "suppressor" ? 1.35 : enemy.coordinationRole === "anchor" ? 1.65 : 1.8;
+    enemy.shotCooldown = cadence + (enemy.seedOffset % 5) * 0.12;
     hooks.OnEnemyShot?.(enemy, target);
   }
 }
 
 export function UpdateEnemy(enemy, state, deltaTime, hooks = {}) {
+  UseMissionDefinition(state);
   if (enemy.disabled || enemy.health <= 0) return;
   enemy.suppression = Math.max(0, enemy.suppression - deltaTime * 8);
   UpdateHearing(enemy, state);
@@ -340,13 +558,19 @@ export function UpdateEnemy(enemy, state, deltaTime, hooks = {}) {
       enemy.facing = enemy.lastKnown
         ? Math.atan2(enemy.lastKnown.x - enemy.x, enemy.lastKnown.z - enemy.z)
         : enemy.facing + deltaTime * 0.35;
-      if (enemy.awareness < simulationConfig.awarenessSuspicious * 0.5) enemy.state = "patrol";
+      if (
+        state.time >= GetCampSuspicionHoldSeconds(state) &&
+        enemy.awareness < simulationConfig.awarenessSuspicious * 0.5
+      ) enemy.state = "patrol";
       break;
     case "investigate":
       UpdateInvestigate(enemy, state, deltaTime);
       break;
     case "search":
       UpdateSearch(enemy, state, deltaTime);
+      break;
+    case "sweep":
+      UpdateSweep(enemy, deltaTime);
       break;
     case "report":
       enemy.reportTimer -= deltaTime;
@@ -372,6 +596,13 @@ export function UpdateEnemy(enemy, state, deltaTime, hooks = {}) {
 }
 
 export function UpdateEnemySquad(state, deltaTime, hooks = {}) {
+  UseMissionDefinition(state);
+  UpdateTacticalDirector(state, deltaTime);
+  state.enemyCoordinationTimer = (state.enemyCoordinationTimer ?? 0) - deltaTime;
+  if (state.enemyCoordinationTimer <= 0) {
+    AssignEnemyCoordinationRoles(state);
+    state.enemyCoordinationTimer = 1;
+  }
   for (const enemy of state.enemies) UpdateEnemy(enemy, state, deltaTime, hooks);
   if (state.reinforcementTimer !== null) {
     state.reinforcementTimer -= deltaTime;

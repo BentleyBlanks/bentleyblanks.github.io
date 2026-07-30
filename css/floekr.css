@@ -403,6 +403,65 @@ table.hljs-ln {
   transform: rotate(27deg);
 }
 
+.projectTunnelIllustration {
+  background:
+    radial-gradient(circle at 78% 24%, rgba(216, 168, 78, 0.24), transparent 15%),
+    linear-gradient(180deg, rgba(120, 126, 82, 0.4) 0 48%, rgba(19, 25, 22, 0.95) 49% 100%),
+    #171b18;
+}
+
+.projectTunnelSurface {
+  position: absolute;
+  inset: 9% 7% 50%;
+  opacity: 0.58;
+  background:
+    linear-gradient(30deg, transparent 42%, rgba(226, 216, 184, 0.2) 43% 47%, transparent 48%),
+    linear-gradient(-30deg, transparent 42%, rgba(226, 216, 184, 0.14) 43% 47%, transparent 48%);
+  background-size: 3.3rem 2.8rem;
+}
+
+.projectTunnelRoute {
+  position: absolute;
+  right: 15%;
+  bottom: 17%;
+  width: 65%;
+  height: 27%;
+  border-right: 0.32rem solid rgba(209, 166, 84, 0.88);
+  border-bottom: 0.32rem solid rgba(209, 166, 84, 0.88);
+  border-left: 0.32rem solid rgba(119, 198, 192, 0.75);
+  border-radius: 0 0 3.8rem 3.8rem;
+  transform: skewX(-14deg);
+  filter: drop-shadow(0 0 0.4rem rgba(209, 166, 84, 0.35));
+}
+
+.projectTunnelNode {
+  position: absolute;
+  z-index: 2;
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 0.2rem solid #eadcb8;
+  border-radius: 50%;
+  background: #202a25;
+  box-shadow: 0 0 0 0.25rem rgba(234, 220, 184, 0.12);
+}
+
+.projectTunnelNodeOrigin {
+  right: 13%;
+  bottom: 42%;
+}
+
+.projectTunnelNodeNorth {
+  right: 14%;
+  bottom: 13%;
+  border-color: #d1a654;
+}
+
+.projectTunnelNodeSouth {
+  left: 16%;
+  bottom: 13%;
+  border-color: #77c6c0;
+}
+
 .projectStorySeal {
   position: absolute;
   z-index: 2;

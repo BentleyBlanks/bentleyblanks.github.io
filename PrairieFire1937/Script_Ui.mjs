@@ -28,6 +28,8 @@ import {
   ValueNoise2D,
 } from "./Script_Hex.mjs";
 import { assetBase, illustrationAssets } from "./Data_Assets.mjs";
+// 纯数据模块：特长（记功授衔）定义表。UI 只读名称与说明文案，无任何副作用。
+import { GetPerkDefinition } from "./Data_Units.mjs";
 
 // ---------------------------------------------------------------------------
 // 静态描述表（纯数据，无副作用）
@@ -1308,6 +1310,17 @@ export function CreateUi(root, hooks = {}) {
     if (pendingUnits > 0) {
       todos.push({ id: "idle", text: "队伍未行动", count: pendingUnits, focusKey: idle.length ? idle[0].key : null });
     }
+    // 记功授衔：有 pendingPerk 的单位数。点击跳到第一个待授衔单位（FocusHex + 选中）。
+    const pendingPerkUnits = units.filter((unit) => unit.pendingPerk);
+    if (pendingPerkUnits.length) {
+      todos.push({
+        id: "perk",
+        text: "记功授衔",
+        count: pendingPerkUnits.length,
+        focusKey: pendingPerkUnits[0].key,
+        unitId: pendingPerkUnits[0].id,
+      });
+    }
     const research = state.research || {};
     const needsResearch = briefing ? !!briefing.needsResearch : !research.currentId;
     const needsDoctrine = briefing ? !!briefing.needsDoctrine : !research.currentDoctrineId;
@@ -2224,6 +2237,36 @@ export function CreateUi(root, hooks = {}) {
       }
     }
 
+    // 该格可见敌军：名号 + 兵力；已被侦察标定的补一句「已入名册（余 N 回合）」。
+    // 红线：敌军永无特长（perks），这一行也绝不渲染任何特长区。
+    const foes = (state.enemies || []).filter(
+      (enemy) => enemy && enemy.key === hex.key && (enemy.hp ?? 1) > 0 && enemy.visibleToPlayer !== false
+    );
+    if (foes.length) {
+      const foeBox = El("div", "pf-foes", { parent: card, attrs: { "aria-label": "该格敌军" } });
+      El("span", "pf-garrison-label", { text: "敌军", parent: foeBox });
+      for (const enemy of foes) {
+        const row = El("span", "pf-foe", { parent: foeBox });
+        El("b", "pf-foe-name", { text: EnemyUnitName(enemy), parent: row });
+        El("i", "pf-foe-hp", {
+          text: `${Math.round(enemy.hp || 0)}/${Math.round(enemy.maxHp || enemy.hp || 0)}`,
+          parent: row,
+        });
+        const remain = Number(enemy.markedUntil) - (Number(state.turn) || 0);
+        if (Number.isFinite(remain) && remain > 0) {
+          El("span", "pf-foe-marked", {
+            text: `已入名册（余 ${Math.round(remain)} 回合）`,
+            parent: row,
+            tip: {
+              title: "已入侦察名册",
+              body: `侦察组把该部岗哨换防记录在册：对其发起攻击胜算 +${Math.round((Number(enemy.markedOddsBonus) || 0.05) * 100)}%。`,
+              footer: "时效一过，名册作废。",
+            },
+          });
+        }
+      }
+    }
+
     const garrison = (state.units || []).filter((unit) => unit.key === hex.key);
     if (garrison.length) {
       const list = El("div", "pf-garrison", { parent: card });
@@ -2287,6 +2330,12 @@ export function CreateUi(root, hooks = {}) {
     return (definition && definition.name) || unit.type || "队伍";
   }
 
+  /** 特长显示信息：直接查 Data_Units 授衔表；查不到给中性兜底，不露英文 key。 */
+  function PerkInfo(perkId) {
+    const definition = typeof GetPerkDefinition === "function" ? GetPerkDefinition(perkId) : null;
+    return definition || { id: perkId, name: "特长", detail: "" };
+  }
+
   function RenderUnitCard(state, view, unit) {
     const card = ClearNode(dom.unitCard);
     if (!unit) {
@@ -2345,12 +2394,40 @@ export function CreateUi(root, hooks = {}) {
         });
       }
     }
+    // 特长徽章（记功授衔所得）：金签小字，悬停出完整说明。
+    // 红线：本卡只渲染我方单位（state.units），敌军没有 perks 字段，特长区永不会出现在敌方显示里。
+    const perkIds = Array.isArray(unit.perks) ? unit.perks : [];
+    if (perkIds.length) {
+      const perkChips = El("div", "pf-chips pf-perkchips", { parent: card, attrs: { "aria-label": "特长" } });
+      for (const perkId of perkIds) {
+        const perk = PerkInfo(perkId);
+        El("span", "pf-chip is-perk", {
+          text: perk.name,
+          parent: perkChips,
+          tip: { title: `特长 · ${perk.name}`, body: perk.detail || "", footer: "记功授衔所得，随队伍带到底。" },
+        });
+      }
+    }
     if (unitDefinition.blurb) {
       El("div", "pf-unit-blurb", { text: unitDefinition.blurb, parent: card });
     }
     const orders = Array.isArray(unit.orders) ? unit.orders : unit.orders ? [unit.orders] : [];
     if (orders.length) {
       El("div", "pf-unit-orders", { text: `当前命令：${orders.join(" → ")}`, parent: card });
+    }
+    // 有待选授衔档时给一枚金色按钮：点击直接弹授衔卡，不必等回合开始。
+    if (unit.pendingPerk) {
+      const award = El("button", "pf-perk-award", {
+        text: "记功授衔",
+        parent: card,
+        attrs: { type: "button", "aria-label": `为${UnitName(unit)}记功授衔` },
+      });
+      AttachTooltip(award, () => ({
+        title: "记功授衔",
+        body: "该队伍有一档特长待选：两条路子，取一门。",
+        footer: "点击立即授衔，不必等回合开始。",
+      }));
+      On(award, "click", () => Call("OnAwardPerk", unit.id));
     }
   }
 
@@ -2627,7 +2704,11 @@ export function CreateUi(root, hooks = {}) {
       if (todo.count) El("b", "pf-todo-count", { text: String(todo.count), parent: button });
       On(button, "click", () => {
         if (todo.panel) ShowPanel(todo.panel);
-        else if (todo.focusKey) {
+        else if (todo.unitId) {
+          // 记功授衔类待办：镜头带过去并选中该单位（单位卡上有金色授衔按钮）。
+          if (todo.focusKey) Call("OnFocusHex", todo.focusKey, { reason: "Todo" });
+          Call("OnPickUnit", todo.unitId);
+        } else if (todo.focusKey) {
           Call("OnFocusHex", todo.focusKey, { reason: "Todo" });
           Call("OnSelectHex", todo.focusKey);
         }
@@ -4933,8 +5014,11 @@ export function CreateUi(root, hooks = {}) {
       plate.fill.style.width = `${Math.round(ratio * 100)}%`;
       SetFlag(plate.rootNode, "is-low", ratio < 0.35);
       SetFlag(plate.rootNode, "is-mid", ratio >= 0.35 && ratio < 0.7);
-      SetText(plate.mark, side !== "Enemy" && unit.hidden ? "隐" : "");
-      const label = `${definitions.units?.unitDefinitions?.[unit.type]?.name ?? enemyTypeFallback[unit.type] ?? "部队"} ${Math.round(unit.hp)}/${unit.maxHp}`;
+      // 标定名册角标：敌军 markedUntil > 当前回合 = 已入侦察名册，圆签换印章红、写「册」。
+      const marked = side === "Enemy" && Number(unit.markedUntil) > (Number(state.turn) || 0);
+      SetFlag(plate.rootNode, "is-marked", marked);
+      SetText(plate.mark, side !== "Enemy" && unit.hidden ? "隐" : marked ? "册" : "");
+      const label = `${definitions.units?.unitDefinitions?.[unit.type]?.name ?? enemyTypeFallback[unit.type] ?? "部队"} ${Math.round(unit.hp)}/${unit.maxHp}${marked ? "（已入名册）" : ""}`;
       SetAttr(plate.rootNode, "aria-label", label);
       SetAttr(plate.rootNode, "title", label);
     };

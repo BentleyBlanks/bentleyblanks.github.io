@@ -412,6 +412,7 @@ export async function StartGame(options = {}) {
         SafeCall(() => effects.SpawnSweepArrow(forecast.axisKeys?.[0] ?? forecast.targetKey, forecast.targetKey));
       }
       await MaybeAskSweepStance();
+      await MaybeAwardPerk();
       for (const line of outcome.report.lines) SafeCall(() => ui?.Toast(line, "info"));
 
       view.selectedUnitId = null;
@@ -642,6 +643,94 @@ export async function StartGame(options = {}) {
   }
 
   // ---------------------------------------------------------------------
+  // 记功授衔（特长二选一）
+  // ---------------------------------------------------------------------
+
+  /** 授衔卡正文：只用等级 + 类型名做战功语境，不编造具体战史。 */
+  function PerkAwardLines(unit) {
+    const typeName = definitions.units?.unitDefinitions?.[unit.type]?.name ?? "这支队伍";
+    const level = Math.max(1, Number(unit.level) || 1);
+    return [
+      `${typeName}升至第 ${level} 级，仗打得多了，看家的本事也磨出来了。`,
+      "记功授衔，取一门便随队伍带到底。",
+    ];
+  }
+
+  /**
+   * 记功授衔弹窗（复用事件卡通路）。busy 护盾成对：等玩家读卡期间放下、
+   * 选完立刻举回；外层（RunEndTurn / RunManualPerkAward）的 finally 兜底放下。
+   * autoPlay 或 UI 缺席时不弹卡、直接取第一条候选，保证无人值守不挂起。
+   */
+  async function ShowPerkAward(unitId, options = {}) {
+    const unit = Rules.GetUnit(state, unitId);
+    if (!unit || !unit.pendingPerk) return;
+    const choices = Rules.ListPerkChoices(state, unitId);
+    if (!choices.length) return;
+    if (view.autoPlay || !ui?.Cinematic) {
+      hooks.OnChoosePerk(unitId, choices[0].id);
+      return;
+    }
+    if (options.focus !== false) SafeCall(() => handle.FocusHex(unit.key, { duration: 0.5 }));
+    // 等玩家读卡点选期间不是"推演中"，busy 必须放下；选完立刻举回。
+    SafeCall(() => ui?.SetBusy(false));
+    const choice = await ui.Cinematic({
+      kind: "Event",
+      title: "记功授衔",
+      subtitle: "此番历练，该记上一功——两条路子，取一门",
+      dateline: Rules.FormatTurnDate(state.turn),
+      body: PerkAwardLines(unit).join("\n"),
+      illustration: { kind: "Assembly", tone: "warm", motifs: [] },
+      options: choices.map((item) => ({ id: item.id, label: item.name, detail: item.detail })),
+    });
+    SafeCall(() => ui?.SetBusy(true));
+    const picked = choices.find((item) => item.id === choice) ?? null;
+    if (!picked) {
+      // Esc 暂缓：pendingPerk 保留，下回合再弹或在单位卡上手动补办。
+      SafeCall(() => ui?.Toast("授衔暂缓；单位卡上的「记功授衔」随时可补办。", "info"));
+      return;
+    }
+    hooks.OnChoosePerk(unitId, picked.id);
+    SafeCall(() => ui?.Toast(`记功授衔：「${picked.name}」`, "good"));
+  }
+
+  /**
+   * 玩家回合开始（EndTurn 收尾、事件卡/方针卡之后）：有待授衔单位时弹一张。
+   * 一回合最多一张，防连环轰炸；剩余的下回合再弹，或玩家在单位卡上手动办。
+   * autoPlay 下全部待选立即取默认（不弹卡、不挂起）。
+   */
+  async function MaybeAwardPerk() {
+    if (state.over) return;
+    if (view.autoPlay || !ui?.Cinematic) {
+      // 无人值守：清空全部待选。ChoosePerk 失败原样返回（引用相等），跳过防死循环。
+      const skip = new Set();
+      for (;;) {
+        const pending = (state.units ?? []).find((item) => item.pendingPerk && !skip.has(item.id));
+        if (!pending) break;
+        const before = state;
+        const choices = Rules.ListPerkChoices(state, pending.id);
+        if (choices.length) state = Rules.ChoosePerk(state, pending.id, choices[0].id);
+        if (state === before) skip.add(pending.id);
+      }
+      return;
+    }
+    const pending = (state.units ?? []).find((item) => item.pendingPerk);
+    if (pending) await ShowPerkAward(pending.id, { focus: true });
+  }
+
+  /** 单位卡金色按钮的入口：busy 配对与 Dispatch 同款，finally 兜底放下。 */
+  async function RunManualPerkAward(unitId) {
+    if (view.busy || state.over) return;
+    view.busy = true;
+    SafeCall(() => ui?.SetBusy(true));
+    try {
+      await ShowPerkAward(unitId, { focus: true });
+    } finally {
+      view.busy = false;
+      SafeCall(() => ui?.SetBusy(false));
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // 选择与输入
   // ---------------------------------------------------------------------
 
@@ -786,6 +875,17 @@ export async function StartGame(options = {}) {
         audio.Play("Confirm");
         SyncAll();
       }
+    },
+    OnChoosePerk: (unitId, perkId) => {
+      const before = state;
+      state = Rules.ChoosePerk(state, unitId, perkId);
+      if (state !== before) {
+        audio.Play("Unlock");
+        SyncAll();
+      }
+    },
+    OnAwardPerk: (unitId) => {
+      RunManualPerkAward(unitId);
     },
     OnFoundBase: (payload) => Dispatch({ kind: "FoundBase", unitId: payload?.unitId ?? view.selectedUnitId, key: payload?.key ?? view.selectedKey }),
     OnPanelOpen: (name) => {

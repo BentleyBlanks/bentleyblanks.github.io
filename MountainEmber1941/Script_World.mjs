@@ -1,8 +1,13 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.mjs";
-import { missionDefinition } from "./Data_Mission.mjs";
+import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.mjs";
+import { GetOperationLayoutByCampaignIndex } from "./Data_Operations.mjs";
 import { GetCharacterDefinition, GetEnemyRoleDefinition } from "./Data_Characters.mjs";
-import { FindPath2D, GetEnemyIntelRenderState, GetSoundRadius } from "./Script_Rules.mjs";
+import { FindPath2D, GetEnemyIntelRenderState, GetSoundRadius, GetTerrainElevation } from "./Script_Rules.mjs";
+import { CalculateStartupTacticalFrame, tacticalFramingContract } from "./Script_CameraFraming.mjs";
+
+let activeMissionDefinition = GetOperationLayoutByCampaignIndex(0);
+const firstOperationEnvironmentId = "infiltrateSignalStation";
 
 const terrainPalette = Object.freeze({
   earth: 0x554f3e,
@@ -19,23 +24,180 @@ const terrainPalette = Object.freeze({
   objective: 0xffdc87,
 });
 
-const terraceDefinitions = Object.freeze([
-  Object.freeze({ x: -35, z: -31, width: 27, depth: 7, height: 1.1 }),
-  Object.freeze({ x: -29, z: -24, width: 38, depth: 7, height: 0.78 }),
-  Object.freeze({ x: -25, z: -17, width: 45, depth: 7, height: 0.48 }),
-]);
+const artAssetPaths = Object.freeze({
+  qinSuqiu: "./Models/Model_OperativeScout.glb",
+  hanShilei: "./Models/Model_OperativeSapper.glb",
+  luLanzhi: "./Models/Model_OperativeMedic.glb",
+  weiShouyi: "./Models/Model_OperativeGunner.glb",
+  enemyRifleman: "./Models/Model_EnemyRifleman.glb",
+  enemyLeader: "./Models/Model_EnemyLeader.glb",
+});
+
+const environmentArtAssets = Object.freeze({
+  infiltrateSignalStation: Object.freeze({
+    path: "./Models/Model_EnvironmentCounty.glb",
+    runtimeName: "Model_EnvironmentCounty_Runtime",
+  }),
+  nightRendezvous: Object.freeze({
+    path: "./Models/Model_EnvironmentNorthVillage.glb",
+    runtimeName: "Model_EnvironmentNorthVillage_Runtime",
+  }),
+  quarryInterdiction: Object.freeze({
+    path: "./Models/Model_EnvironmentQuarrySlope.glb",
+    runtimeName: "Model_EnvironmentQuarrySlope_Runtime",
+  }),
+});
+
+// Static visual QA contract: a moonless operation stays chromatically dark, but its combined
+// ambient/key contribution and dedicated cool fill/rim lights may not fall below these floors.
+const nightReadabilityContract = Object.freeze({
+  minimumExposure: 1.25,
+  minimumHemisphereIntensity: 1.5,
+  minimumKeyIntensity: 1.7,
+  minimumActorFillIntensity: 0.85,
+  minimumActorRimIntensity: 1.1,
+  maximumFogDensity: 0.016,
+});
+
+function GetAtmosphereProfile(definition) {
+  const timeOfDay = String(definition?.timeOfDay ?? "");
+  const weather = String(definition?.weather ?? "");
+  if (timeOfDay.includes("深夜") || weather.includes("细雨") || weather.includes("无月")) {
+    return Object.freeze({
+      id: "moonlessRain",
+      timeOfDay,
+      weather,
+      background: 0x07131c,
+      fogColor: 0x152733,
+      fogDensity: 0.015,
+      hemisphereSky: 0x405d72,
+      hemisphereGround: 0x182321,
+      hemisphereIntensity: 1.62,
+      keyColor: 0xa6c2d7,
+      keyIntensity: 1.86,
+      keyPosition: [-22, 52, 34],
+      exposure: 1.3,
+      actorFillColor: 0x6f9cba,
+      actorFillIntensity: 0.92,
+      actorFillPosition: [38, 24, -46],
+      actorRimColor: 0xb6d9e8,
+      actorRimIntensity: 1.2,
+      actorRimPosition: [-48, 32, 58],
+      hillColor: 0x172a33,
+      weatherKind: "rain",
+      weatherDrift: [-2.8, -17.5, 0.9],
+      readabilityContract: nightReadabilityContract,
+    });
+  }
+  if (timeOfDay.includes("午后") || weather.includes("扬尘") || weather.includes("大风")) {
+    return Object.freeze({
+      id: "windblownAfternoon",
+      timeOfDay,
+      weather,
+      background: 0x8b8b78,
+      fogColor: 0x9b8b70,
+      fogDensity: 0.0072,
+      hemisphereSky: 0xd2d5c4,
+      hemisphereGround: 0x584836,
+      hemisphereIntensity: 1.62,
+      keyColor: 0xffd3a0,
+      keyIntensity: 3.05,
+      keyPosition: [-42, 70, -30],
+      exposure: 1.12,
+      hillColor: 0x5d6257,
+      weatherKind: "dust",
+      weatherDrift: [8.5, 0.35, 3.1],
+    });
+  }
+  return Object.freeze({
+    id: "mistBeforeDawn",
+    timeOfDay,
+    weather,
+    background: 0x1a2a30,
+    fogColor: 0x354842,
+    fogDensity: 0.0125,
+    hemisphereSky: 0x7899a6,
+    hemisphereGround: 0x302d25,
+    hemisphereIntensity: 1.34,
+    keyColor: 0xffbd87,
+    keyIntensity: 2.22,
+    keyPosition: [-48, 48, -58],
+    exposure: 0.94,
+    hillColor: 0x293831,
+    weatherKind: "mist",
+    weatherDrift: [1.7, 0.08, -3.4],
+  });
+}
+
+function UsesFirstOperationDressing() {
+  return activeMissionDefinition.id === firstOperationEnvironmentId;
+}
 
 function GetSurfaceHeight(x, z) {
-  let height = 0;
-  for (const terrace of terraceDefinitions) {
-    if (
-      Math.abs(x - terrace.x) <= terrace.width * 0.5 &&
-      Math.abs(z - terrace.z) <= terrace.depth * 0.5
-    ) {
-      height = Math.max(height, terrace.height - 0.04);
+  return GetTerrainElevation({ x, z }, activeMissionDefinition);
+}
+
+function CreateTerrainAxis(minimum, maximum, axisKey, sizeKey) {
+  const values = new Set([minimum, maximum]);
+  const maximumCellSize = 2;
+  const segmentCount = Math.max(1, Math.ceil((maximum - minimum) / maximumCellSize));
+  for (let index = 0; index <= segmentCount; index += 1) {
+    values.add(THREE.MathUtils.lerp(minimum, maximum, index / segmentCount));
+  }
+  const heightRegions = [
+    ...(activeMissionDefinition.zones ?? []).filter((zone) => Number.isFinite(zone.elevation)),
+  ];
+  for (const region of heightRegions) {
+    const lower = region[axisKey] - region[sizeKey] * 0.5;
+    const upper = region[axisKey] + region[sizeKey] * 0.5;
+    for (const boundary of [lower, upper]) {
+      if (boundary <= minimum || boundary >= maximum) continue;
+      values.add(boundary);
+      values.add(Math.max(minimum, boundary - 0.05));
+      values.add(Math.min(maximum, boundary + 0.05));
     }
   }
-  return height;
+  return [...values].sort((left, right) => left - right);
+}
+
+function CreateTerrainGeometry() {
+  const bounds = activeMissionDefinition.bounds;
+  const xValues = CreateTerrainAxis(bounds.minimumX, bounds.maximumX, "x", "width");
+  const zValues = CreateTerrainAxis(bounds.minimumZ, bounds.maximumZ, "z", "depth");
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  const width = Math.max(1, bounds.maximumX - bounds.minimumX);
+  const depth = Math.max(1, bounds.maximumZ - bounds.minimumZ);
+  for (const z of zValues) {
+    for (const x of xValues) {
+      positions.push(x, GetSurfaceHeight(x, z) - 0.06, z);
+      uvs.push((x - bounds.minimumX) / width, (z - bounds.minimumZ) / depth);
+    }
+  }
+  const rowWidth = xValues.length;
+  for (let row = 0; row < zValues.length - 1; row += 1) {
+    for (let column = 0; column < xValues.length - 1; column += 1) {
+      const topLeft = row * rowWidth + column;
+      const topRight = topLeft + 1;
+      const bottomLeft = topLeft + rowWidth;
+      const bottomRight = bottomLeft + 1;
+      indices.push(topLeft, bottomLeft, topRight, topRight, bottomLeft, bottomRight);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  geometry.userData = {
+    terrainColumns: xValues.length,
+    terrainRows: zValues.length,
+    terrainTriangles: indices.length / 3,
+  };
+  return geometry;
 }
 
 function CreateOverlayMaterial(parameters) {
@@ -344,7 +506,44 @@ function CreateWagon(obstacle) {
   return group;
 }
 
-function CreateCharacterModel(color, enemy = false, role = "") {
+function CloneArtTemplate(template) {
+  if (!template) return null;
+  const artRoot = template.clone(true);
+  const materials = [];
+  artRoot.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = false;
+    const sourceMaterials = Array.isArray(object.material) ? object.material : [object.material];
+    const clonedMaterials = sourceMaterials.map((sourceMaterial) => {
+      const material = sourceMaterial.clone();
+      material.transparent = true;
+      material.opacity = 1;
+      material.depthWrite = true;
+      material.userData.baseColor = material.color?.clone?.() ?? null;
+      material.userData.baseEmissive = material.emissive?.clone?.() ?? null;
+      material.userData.baseEmissiveIntensity = material.emissiveIntensity ?? 0;
+      materials.push(material);
+      return material;
+    });
+    object.material = Array.isArray(object.material) ? clonedMaterials : clonedMaterials[0];
+  });
+  const FindPivot = (fragment) => {
+    let pivot = null;
+    artRoot.traverse((object) => {
+      if (!pivot && object.name.includes(fragment)) pivot = object;
+    });
+    return pivot;
+  };
+  return {
+    root: artRoot,
+    materials,
+    armPivots: [FindPivot("Arm_L_Pivot"), FindPivot("Arm_R_Pivot")],
+    legPivots: [FindPivot("Leg_L_Pivot"), FindPivot("Leg_R_Pivot")],
+  };
+}
+
+function CreateCharacterModel(color, enemy = false, role = "", artTemplate = null) {
   const root = new THREE.Group();
   const uniform = CreateMaterial(color, 0.88);
   const skin = CreateMaterial(enemy ? 0xa87d5d : 0x9f775b, 0.92);
@@ -529,7 +728,28 @@ function CreateCharacterModel(color, enemy = false, role = "") {
     body.material.transparent = true;
     limbInstances.material.transparent = true;
   }
-  root.userData = { body, head, limbRig, selection, factionGlyph, memoryRing, weapon: body, pick, previousX: 0, previousZ: 0, phase: 0 };
+  const artRig = CloneArtTemplate(artTemplate);
+  if (artRig) {
+    body.visible = false;
+    limbInstances.visible = false;
+    root.add(artRig.root);
+  }
+  root.userData = {
+    body,
+    head,
+    limbRig,
+    artRig,
+    selection,
+    factionGlyph,
+    memoryRing,
+    weapon: body,
+    pick,
+    previousX: 0,
+    previousZ: 0,
+    previousShotCooldown: null,
+    fireRecoil: 0,
+    phase: 0,
+  };
   return root;
 }
 
@@ -598,7 +818,7 @@ function GetClippedSightDistance(origin, angle, maximumRange) {
   const directionX = Math.sin(angle);
   const directionZ = Math.cos(angle);
   let clippedRange = maximumRange;
-  for (const obstacle of missionDefinition.obstacles) {
+  for (const obstacle of activeMissionDefinition.obstacles) {
     if (!["building", "wall", "crate", "wagon", "tower"].includes(obstacle.kind)) continue;
     if (obstacle.kind === "tower" && PointInsideVisionObstacle(origin, obstacle, -0.05)) continue;
     const padding = -0.08;
@@ -736,20 +956,20 @@ function CreateTelephoneMast() {
   }
   group.add(insulators);
   ReplaceRootMeshesWithBaked(group, (mesh) => !mesh.isInstancedMesh);
-  group.position.set(27, 0, 8);
+  group.position.set(37, 0, 7);
   return group;
 }
 
 function CreateTelephoneNetwork() {
   const group = new THREE.Group();
   const polePoints = [
-    { x: -7, z: -2 },
-    { x: 1, z: -1 },
-    { x: 9, z: 0.5 },
-    { x: 17, z: 3 },
-    { x: 27, z: 8 },
-    { x: 38, z: 8 },
-    { x: 50, z: 7 },
+    { x: -5, z: -7 },
+    { x: 5, z: -5 },
+    { x: 15, z: -2 },
+    { x: 25, z: 2 },
+    { x: 37, z: 7 },
+    { x: 49, z: 10 },
+    { x: 58, z: 12 },
   ];
   const poleGeometry = new THREE.CylinderGeometry(0.11, 0.18, 5.8, 7);
   const crossGeometry = new THREE.BoxGeometry(1.7, 0.12, 0.16);
@@ -831,7 +1051,7 @@ function CreateGroundDetails(scene) {
   const cropCount = 620;
   const crops = new THREE.InstancedMesh(stalkGeometry, stalkMaterial, cropCount);
   for (let index = 0; index < cropCount; index += 1) {
-    const zone = index % 4 === 0 ? missionDefinition.zones[1] : missionDefinition.zones[0];
+    const zone = index % 4 === 0 ? activeMissionDefinition.zones[1] : activeMissionDefinition.zones[0];
     const x = zone.x - zone.width * 0.5 + Deterministic(index, 11) * zone.width;
     const z = zone.z - zone.depth * 0.5 + Deterministic(index, 13) * zone.depth;
     const height = 0.72 + Deterministic(index, 17) * 0.75;
@@ -871,31 +1091,8 @@ function CreateGroundDetails(scene) {
   scene.add(trunks, crowns);
 }
 
-function CreateTerraces(scene) {
-  const material = CreateMaterial(terrainPalette.terrace, 1);
-  const terraces = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, terraceDefinitions.length);
-  const matrix = new THREE.Matrix4();
-  terraceDefinitions.forEach((terrace, index) => {
-    matrix.compose(
-      new THREE.Vector3(terrace.x, terrace.height * 0.5 - 0.04, terrace.z),
-      new THREE.Quaternion(),
-      new THREE.Vector3(terrace.width, terrace.height, terrace.depth),
-    );
-    terraces.setMatrixAt(index, matrix);
-  });
-  terraces.receiveShadow = true;
-  scene.add(terraces);
-  const ditch = new THREE.Mesh(
-    new THREE.PlaneGeometry(7, 54),
-    new THREE.MeshStandardMaterial({ color: 0x293a3c, roughness: 0.82, metalness: 0.02 }),
-  );
-  ditch.rotation.x = -Math.PI * 0.5;
-  ditch.position.set(-19, 0.025, -3);
-  scene.add(ditch);
-}
-
-function CreateAtmosphere(scene) {
-  const hillMaterial = CreateMaterial(0x29342f, 1);
+function CreateAtmosphere(scene, profile) {
+  const hillMaterial = CreateMaterial(profile.hillColor, 1);
   const hills = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), hillMaterial, 18);
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
@@ -916,6 +1113,207 @@ function CreateAtmosphere(scene) {
     hills.setMatrixAt(index, matrix);
   }
   scene.add(hills);
+}
+
+function WrapWeatherCoordinate(value, minimum, maximum) {
+  const span = Math.max(0.001, maximum - minimum);
+  return minimum + (((value - minimum) % span) + span) % span;
+}
+
+function CreateWeatherEffect(profile, quality) {
+  const bounds = activeMissionDefinition.bounds;
+  const lowQuality = quality === "low";
+  const count = lowQuality ? 72 : 132;
+  if (profile.weatherKind === "rain") {
+    const positions = new Float32Array(count * 6);
+    for (let index = 0; index < count; index += 1) {
+      const offset = index * 6;
+      const x = THREE.MathUtils.lerp(bounds.minimumX, bounds.maximumX, Deterministic(index, 401));
+      const y = 1.2 + Deterministic(index, 409) * 18;
+      const z = THREE.MathUtils.lerp(bounds.minimumZ, bounds.maximumZ, Deterministic(index, 419));
+      positions[offset] = x;
+      positions[offset + 1] = y;
+      positions[offset + 2] = z;
+      positions[offset + 3] = x - profile.weatherDrift[0] * 0.035;
+      positions[offset + 4] = y - (0.78 + Deterministic(index, 421) * 0.62);
+      positions[offset + 5] = z - profile.weatherDrift[2] * 0.035;
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const effect = new THREE.LineSegments(
+      geometry,
+      new THREE.LineBasicMaterial({
+        color: 0x9bb1bd,
+        transparent: true,
+        opacity: lowQuality ? 0.19 : 0.25,
+        depthWrite: false,
+      }),
+    );
+    effect.frustumCulled = false;
+    effect.renderOrder = 2;
+    effect.userData.weatherKind = profile.weatherKind;
+    effect.userData.drift = [...profile.weatherDrift];
+    effect.userData.bounds = bounds;
+    return effect;
+  }
+
+  const positions = new Float32Array(count * 3);
+  const dust = profile.weatherKind === "dust";
+  for (let index = 0; index < count; index += 1) {
+    const offset = index * 3;
+    positions[offset] = THREE.MathUtils.lerp(bounds.minimumX, bounds.maximumX, Deterministic(index, 431));
+    positions[offset + 1] = dust
+      ? 0.35 + Deterministic(index, 433) * 4.6
+      : 0.8 + Deterministic(index, 439) * 7.5;
+    positions[offset + 2] = THREE.MathUtils.lerp(bounds.minimumZ, bounds.maximumZ, Deterministic(index, 443));
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const effect = new THREE.Points(
+    geometry,
+    new THREE.PointsMaterial({
+      color: dust ? 0xc9ad7b : 0xb4c6bd,
+      size: dust ? (lowQuality ? 0.42 : 0.55) : lowQuality ? 1.7 : 2.25,
+      transparent: true,
+      opacity: dust ? 0.2 : 0.105,
+      depthWrite: false,
+      sizeAttenuation: true,
+    }),
+  );
+  effect.frustumCulled = false;
+  effect.renderOrder = 2;
+  effect.userData.weatherKind = profile.weatherKind;
+  effect.userData.drift = [...profile.weatherDrift];
+  effect.userData.bounds = bounds;
+  return effect;
+}
+
+function UpdateWeatherEffect(effect, deltaTime, elapsed) {
+  if (!effect) return;
+  const positions = effect.geometry.getAttribute("position");
+  const { weatherKind, drift, bounds } = effect.userData;
+  const rain = weatherKind === "rain";
+  const stride = rain ? 6 : 3;
+  const particleCount = positions.array.length / stride;
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * stride;
+    let x = positions.array[offset] + drift[0] * deltaTime;
+    let y = positions.array[offset + 1] + drift[1] * deltaTime;
+    let z = positions.array[offset + 2] + drift[2] * deltaTime;
+    x = WrapWeatherCoordinate(x, bounds.minimumX, bounds.maximumX);
+    z = WrapWeatherCoordinate(z, bounds.minimumZ, bounds.maximumZ);
+    if (rain && y < 0.25) y = 15 + Deterministic(index + Math.floor(elapsed * 2), 449) * 6;
+    if (!rain) {
+      const maximumY = weatherKind === "dust" ? 5 : 8.5;
+      if (y > maximumY) y = 0.35;
+      y += Math.sin(elapsed * (weatherKind === "dust" ? 1.7 : 0.55) + index) * deltaTime * 0.08;
+    }
+    positions.array[offset] = x;
+    positions.array[offset + 1] = y;
+    positions.array[offset + 2] = z;
+    if (rain) {
+      positions.array[offset + 3] = x - drift[0] * 0.035;
+      positions.array[offset + 4] = y - 1.08;
+      positions.array[offset + 5] = z - drift[2] * 0.035;
+    }
+  }
+  positions.needsUpdate = true;
+}
+
+function ResolveActorPose(actor, context) {
+  const commandKind = actor.command?.kind ?? null;
+  const commandProgress = actor.command?.progress ?? actor.command?.aim ?? 0;
+  const locomotionSwing =
+    !context.isLastKnown && context.moved > 0.01 ? Math.sin(context.phase) * 0.48 : 0;
+  const pose = {
+    scaleY:
+      context.isLastKnown
+        ? 0.92
+        : actor.state === "downed"
+          ? 0.22
+          : actor.stance === "crouch"
+            ? 0.72
+            : actor.state === "wounded"
+              ? 0.84
+              : 1,
+    bodyPitch: 0,
+    armPitch: [locomotionSwing, -locomotionSwing],
+    armRoll: [0, 0],
+    legPitch: [-locomotionSwing, locomotionSwing],
+  };
+  const isAiming =
+    ["attack", "suppress", "overwatch"].includes(commandKind) ||
+    (context.enemy && actor.state === "combat" && Boolean(actor.fireIntent));
+  if (isAiming) {
+    const aimWeight = THREE.MathUtils.clamp(0.5 + commandProgress * 1.4, 0.5, 1);
+    pose.bodyPitch -= 0.12 * aimWeight;
+    pose.armPitch[0] = THREE.MathUtils.lerp(pose.armPitch[0], 0.94, aimWeight);
+    pose.armPitch[1] = THREE.MathUtils.lerp(pose.armPitch[1], 1.08, aimWeight);
+    pose.armRoll[0] = -0.2 * aimWeight;
+    pose.armRoll[1] = 0.12 * aimWeight;
+  } else if (commandKind === "observe") {
+    pose.bodyPitch = -0.08;
+    pose.armPitch = [1.28, 1.28];
+    pose.armRoll = [-0.16, 0.16];
+  } else if (commandKind === "stone") {
+    const throwCycle = THREE.MathUtils.clamp(commandProgress * 1.7, 0, 1);
+    pose.bodyPitch = -0.08 + throwCycle * 0.22;
+    pose.armPitch = [0.24, 1.3 - throwCycle * 0.45];
+    pose.armRoll = [-0.08, 0.32];
+  } else if (commandKind === "takedown") {
+    pose.scaleY = Math.min(pose.scaleY, 0.78);
+    pose.bodyPitch = 0.34;
+    pose.armPitch = [0.92, 0.78];
+    pose.armRoll = [-0.28, 0.28];
+  } else if (commandKind === "hideBody" || actor.carrying) {
+    pose.scaleY = Math.min(pose.scaleY, 0.74);
+    pose.bodyPitch = 0.5;
+    pose.armPitch = [0.86, 0.86];
+    pose.armRoll = [-0.34, 0.34];
+    pose.legPitch = [-0.12, 0.34];
+  } else if (
+    actor.id === "hanShilei" &&
+    (commandKind === "interact" || commandKind === "charge")
+  ) {
+    const workCycle = Math.sin(context.phase * 1.65) * 0.12;
+    pose.scaleY = 0.64;
+    pose.bodyPitch = 0.42;
+    pose.armPitch = [0.76 + workCycle, 0.96 - workCycle];
+    pose.armRoll = [-0.22, 0.18];
+    pose.legPitch = [1.06, 0.18];
+  } else if (
+    actor.id === "luLanzhi" &&
+    (commandKind === "aid" || commandKind === "interact")
+  ) {
+    const careCycle = Math.sin(context.phase) * 0.06;
+    pose.scaleY = 0.58;
+    pose.bodyPitch = 0.54;
+    pose.armPitch = [0.72 + careCycle, 0.88 - careCycle];
+    pose.armRoll = [-0.3, 0.3];
+    pose.legPitch = [1.12, 0.24];
+  } else if (commandKind === "interact" || commandKind === "charge") {
+    pose.scaleY = Math.min(pose.scaleY, 0.76);
+    pose.bodyPitch = 0.34;
+    pose.armPitch = [0.68, 0.82];
+    pose.armRoll = [-0.2, 0.2];
+  } else if (commandKind === "steady") {
+    pose.armPitch = [0.54, 0.62];
+    pose.armRoll = [-0.18, 0.18];
+  }
+
+  if (context.suppressionRatio > 0.05 && actor.state !== "downed") {
+    const curl = context.suppressionRatio;
+    pose.scaleY *= 1 - curl * 0.2;
+    pose.bodyPitch += curl * 0.38;
+    pose.armPitch[0] += curl * 0.52;
+    pose.armPitch[1] += curl * 0.52;
+    pose.armRoll[0] -= curl * 0.32;
+    pose.armRoll[1] += curl * 0.32;
+  }
+  pose.bodyPitch -= context.fireRecoil * 0.2;
+  pose.armPitch[0] -= context.fireRecoil * 0.26;
+  pose.armPitch[1] -= context.fireRecoil * 0.34;
+  return pose;
 }
 
 function CreateRoad(scene) {
@@ -982,6 +1380,56 @@ function CreateProductionDetails() {
   result.baked.castShadow = false;
   result.baked.receiveShadow = true;
   result.baked.userData.productionDetails = true;
+  return result.baked;
+}
+
+function CreateOperationFallbackDetails() {
+  const root = new THREE.Group();
+  if (activeMissionDefinition.id === "nightRendezvous") {
+    const water = CreateMaterial(0x17363e, 0.42, 0.04);
+    const stone = CreateMaterial(0x5c5c50, 1);
+    const timber = CreateMaterial(0x4f3825, 0.96);
+    const creek = new THREE.Mesh(new THREE.BoxGeometry(10, 0.18, 86), stone);
+    creek.position.set(16, -0.12, 4);
+    root.add(creek);
+    const creekWater = new THREE.Mesh(new THREE.BoxGeometry(8.7, 0.055, 85.2), water);
+    creekWater.position.set(16, 0.005, 4);
+    root.add(creekWater);
+    for (const side of [-1, 1]) {
+      const sluicePost = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.7, 0.42), timber);
+      sluicePost.position.set(26 + side * 1.35, 1.35, 34);
+      root.add(sluicePost);
+    }
+    const sluiceGate = new THREE.Mesh(new THREE.BoxGeometry(2.55, 1.9, 0.34), timber);
+    sluiceGate.position.set(26, 1, 34);
+    root.add(sluiceGate);
+  } else if (activeMissionDefinition.id === "quarryInterdiction") {
+    const timber = CreateMaterial(0x493725, 0.98);
+    const metal = CreateMaterial(0x343735, 0.5, 0.45);
+    for (const z of [-5.72, -4.28]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(88, 0.13, 0.11), metal);
+      rail.position.set(5, GetSurfaceHeight(5, z) + 0.17, z);
+      root.add(rail);
+    }
+    for (let index = 0; index < 29; index += 1) {
+      const x = -38 + index * 3.05;
+      const sleeper = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 2.45), timber);
+      sleeper.position.set(x, GetSurfaceHeight(x, -5) + 0.08, -5);
+      root.add(sleeper);
+    }
+    for (const x of [41.8, 45, 48.2]) {
+      const support = new THREE.Mesh(new THREE.BoxGeometry(0.42, 5.4, 0.42), timber);
+      support.position.set(x, GetSurfaceHeight(x, 23) + 2.7, 23);
+      support.rotation.z = THREE.MathUtils.degToRad((x - 45) * 4.4);
+      root.add(support);
+    }
+  }
+  const result = BakeMeshRoots([root]);
+  if (!result) return root;
+  result.sourceMeshes.forEach((mesh) => mesh.geometry.dispose());
+  result.baked.castShadow = false;
+  result.baked.receiveShadow = true;
+  result.baked.userData.operationFallback = activeMissionDefinition.id;
   return result.baked;
 }
 
@@ -1098,7 +1546,7 @@ function ResolveCommandPosition(command, state) {
   if (enemy) return GetEnemyIntelRenderState(enemy).position;
   const runtime = state.interactables[command.targetId];
   if (runtime?.droppedAt) return runtime.droppedAt;
-  return missionDefinition.interactables.find((candidate) => candidate.id === command.targetId) ?? null;
+  return activeMissionDefinition.interactables.find((candidate) => candidate.id === command.targetId) ?? null;
 }
 
 function GetPreviewWaypoints(origin, command, target) {
@@ -1259,7 +1707,7 @@ function UpdatePlanningOverlay(overlay, state) {
   for (const enemy of state.enemies) {
     const intel = GetEnemyIntelRenderState(enemy);
     if (!intel.showPatrol || !enemy.patrol || renderedPatrols.has(enemy.patrol)) continue;
-    const patrol = missionDefinition.patrols.find((candidate) => candidate.id === enemy.patrol);
+    const patrol = activeMissionDefinition.patrols.find((candidate) => candidate.id === enemy.patrol);
     if (!patrol || patrol.points.length < 2) continue;
     renderedPatrols.add(enemy.patrol);
     for (let pointIndex = 0; pointIndex < patrol.points.length; pointIndex += 1) {
@@ -1401,9 +1849,16 @@ function UpdateDustCloudEffect(effect, dustCloud, elapsed) {
 }
 
 export function CreateWorld(canvas, options = {}) {
+  activeMissionDefinition = options.missionDefinition ?? GetOperationLayoutByCampaignIndex(0);
+  const useFirstOperationDressing = UsesFirstOperationDressing();
+  const atmosphereProfile = GetAtmosphereProfile(activeMissionDefinition);
+  const environmentArtDefinition = environmentArtAssets[activeMissionDefinition.id] ?? null;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x263638);
-  scene.fog = new THREE.FogExp2(0x35433f, 0.009);
+  scene.background = new THREE.Color(atmosphereProfile.background);
+  const renderedFogDensity = atmosphereProfile.readabilityContract
+    ? Math.min(atmosphereProfile.fogDensity, atmosphereProfile.readabilityContract.maximumFogDensity)
+    : atmosphereProfile.fogDensity;
+  scene.fog = new THREE.FogExp2(atmosphereProfile.fogColor, renderedFogDensity);
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -1413,59 +1868,101 @@ export function CreateWorld(canvas, options = {}) {
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = atmosphereProfile.exposure;
   renderer.shadowMap.enabled = options.quality !== "low";
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const pixelRatioLimit = options.quality === "low" ? 1 : options.quality === "ultra" ? 1.5 : 1.25;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioLimit));
 
-  const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 350);
+  const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 900);
   const cameraTarget = new THREE.Vector3(
-    missionDefinition.camera.target.x,
-    missionDefinition.camera.target.y,
-    missionDefinition.camera.target.z,
+    activeMissionDefinition.camera.target.x,
+    activeMissionDefinition.camera.target.y,
+    activeMissionDefinition.camera.target.z,
   );
   camera.position.set(
-    missionDefinition.camera.position.x,
-    missionDefinition.camera.position.y,
-    missionDefinition.camera.position.z,
+    activeMissionDefinition.camera.position.x,
+    activeMissionDefinition.camera.position.y,
+    activeMissionDefinition.camera.position.z,
   );
   camera.lookAt(cameraTarget);
+  const overviewDirection = camera.position.clone().sub(cameraTarget).normalize();
+  const initialCameraDistance = camera.position.distanceTo(cameraTarget);
+  camera.userData.overviewMode = true;
+  camera.userData.framingMode = "titleOverview";
+  camera.userData.overviewRequestedDistance = initialCameraDistance;
 
-  const ambient = new THREE.HemisphereLight(0x9ebbc0, 0x3f392b, 1.8);
+  const ambient = new THREE.HemisphereLight(
+    atmosphereProfile.hemisphereSky,
+    atmosphereProfile.hemisphereGround,
+    atmosphereProfile.hemisphereIntensity,
+  );
   scene.add(ambient);
-  const dawn = new THREE.DirectionalLight(0xffdaa6, 2.65);
-  dawn.position.set(-34, 62, -48);
-  dawn.target.position.set(16, 0, 5);
-  dawn.castShadow = options.quality !== "low";
-  dawn.shadow.camera.left = -62;
-  dawn.shadow.camera.right = 62;
-  dawn.shadow.camera.top = 62;
-  dawn.shadow.camera.bottom = -62;
-  dawn.shadow.mapSize.set(options.quality === "ultra" ? 2048 : 1024, options.quality === "ultra" ? 2048 : 1024);
-  scene.add(dawn, dawn.target);
+  const keyLight = new THREE.DirectionalLight(atmosphereProfile.keyColor, atmosphereProfile.keyIntensity);
+  keyLight.position.set(...atmosphereProfile.keyPosition);
+  keyLight.target.position.set(16, 0, 5);
+  keyLight.castShadow = options.quality !== "low";
+  const operationBounds = activeMissionDefinition.bounds;
+  const shadowCoverage =
+    Math.hypot(
+      operationBounds.maximumX - operationBounds.minimumX,
+      operationBounds.maximumZ - operationBounds.minimumZ,
+    ) * 0.5 + 8;
+  keyLight.shadow.camera.left = -shadowCoverage;
+  keyLight.shadow.camera.right = shadowCoverage;
+  keyLight.shadow.camera.top = shadowCoverage;
+  keyLight.shadow.camera.bottom = -shadowCoverage;
+  keyLight.shadow.mapSize.set(options.quality === "ultra" ? 2048 : 1024, options.quality === "ultra" ? 2048 : 1024);
+  scene.add(keyLight, keyLight.target);
+  let actorFillLight = null;
+  let actorRimLight = null;
+  if (atmosphereProfile.id === "moonlessRain") {
+    const contract = atmosphereProfile.readabilityContract;
+    renderer.toneMappingExposure = Math.max(renderer.toneMappingExposure, contract.minimumExposure);
+    ambient.intensity = Math.max(ambient.intensity, contract.minimumHemisphereIntensity);
+    keyLight.intensity = Math.max(keyLight.intensity, contract.minimumKeyIntensity);
+    actorFillLight = new THREE.DirectionalLight(
+      atmosphereProfile.actorFillColor,
+      Math.max(atmosphereProfile.actorFillIntensity, contract.minimumActorFillIntensity),
+    );
+    actorFillLight.name = "MoonlessRain_ActorFill";
+    actorFillLight.position.set(...atmosphereProfile.actorFillPosition);
+    actorFillLight.target.position.set(-12, 2.4, 8);
+    actorRimLight = new THREE.DirectionalLight(
+      atmosphereProfile.actorRimColor,
+      Math.max(atmosphereProfile.actorRimIntensity, contract.minimumActorRimIntensity),
+    );
+    actorRimLight.name = "MoonlessRain_ActorRim";
+    actorRimLight.position.set(...atmosphereProfile.actorRimPosition);
+    actorRimLight.target.position.set(-12, 2.4, 8);
+    scene.add(actorFillLight, actorFillLight.target, actorRimLight, actorRimLight.target);
+  }
 
   const groundTexture = CreateCanvasTexture(1941);
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(132, 104),
+    CreateTerrainGeometry(),
     new THREE.MeshStandardMaterial({ color: terrainPalette.earth, map: groundTexture, roughness: 1 }),
   );
-  ground.rotation.x = -Math.PI * 0.5;
-  ground.position.set(1, -0.06, 1);
   ground.receiveShadow = true;
   ground.userData.pickType = "ground";
   scene.add(ground);
 
-  CreateAtmosphere(scene);
-  CreateRoad(scene);
-  CreateTerraces(scene);
-  CreateGroundDetails(scene);
-  scene.add(CreateProductionDetails());
+  CreateAtmosphere(scene, atmosphereProfile);
+  const weatherEffect = CreateWeatherEffect(atmosphereProfile, options.quality);
+  scene.add(weatherEffect);
+  if (useFirstOperationDressing) {
+    CreateRoad(scene);
+    CreateGroundDetails(scene);
+  }
+  const productionRoot = useFirstOperationDressing ? CreateProductionDetails() : new THREE.Group();
+  scene.add(productionRoot);
+  const operationFallbackRoot = CreateOperationFallbackDetails();
+  scene.add(operationFallbackRoot);
 
   const propRoot = new THREE.Group();
   scene.add(propRoot);
   const staticObstacleRoots = [];
-  for (const obstacle of missionDefinition.obstacles) {
+  for (const obstacle of activeMissionDefinition.obstacles) {
     let object;
     if (obstacle.kind === "building") object = CreateBuilding(obstacle);
     else if (obstacle.kind === "tower") object = CreateTower(obstacle);
@@ -1481,11 +1978,77 @@ export function CreateWorld(canvas, options = {}) {
   }
   const telephoneMast = CreateTelephoneMast();
   const telephoneNetwork = CreateTelephoneNetwork();
-  propRoot.add(telephoneMast, telephoneNetwork);
+  if (useFirstOperationDressing) propRoot.add(telephoneMast, telephoneNetwork);
+
+  const artTemplates = new Map();
+  const artStatus = {
+    environmentLoaded: false,
+    environmentAsset: environmentArtDefinition?.path ?? null,
+    charactersLoaded: [],
+    errors: [],
+  };
+  let environmentArt = null;
+  let artLoadPromise = null;
+
+  function LoadArtAssets() {
+    if (artLoadPromise) return artLoadPromise;
+    artLoadPromise = (async () => {
+      const loader = new GLTFLoader();
+      const entries = [
+        ...(environmentArtDefinition ? [["environment", environmentArtDefinition.path]] : []),
+        ...Object.entries(artAssetPaths),
+      ];
+      const results = await Promise.allSettled(
+        entries.map(async ([assetKey, assetPath]) => [assetKey, (await loader.loadAsync(assetPath)).scene]),
+      );
+      results.forEach((result, index) => {
+        const [assetKey, assetPath] = entries[index];
+        if (result.status === "rejected") {
+          artStatus.errors.push(`${assetKey}: ${result.reason?.message ?? result.reason ?? assetPath}`);
+          return;
+        }
+        const [, assetRoot] = result.value;
+        if (assetKey === "environment") {
+          environmentArt = assetRoot;
+          environmentArt.name = environmentArtDefinition.runtimeName;
+          environmentArt.traverse((object) => {
+            if (!object.isMesh) return;
+            object.castShadow = options.quality !== "low";
+            object.receiveShadow = true;
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            materials.forEach((material) => {
+              if (material?.map) {
+                material.map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+                material.map.needsUpdate = true;
+              }
+            });
+          });
+          scene.add(environmentArt);
+          // Each GLB is authored against exactly one operation's blocker contract. Keep that
+          // operation's procedural set visible as a load-failure fallback, then replace it atomically.
+          propRoot.visible = false;
+          productionRoot.visible = false;
+          operationFallbackRoot.visible = false;
+          artStatus.environmentLoaded = true;
+          return;
+        }
+        artTemplates.set(assetKey, assetRoot);
+        artStatus.charactersLoaded.push(assetKey);
+      });
+      return {
+        environmentLoaded: artStatus.environmentLoaded,
+        charactersLoaded: [...artStatus.charactersLoaded],
+        errors: [...artStatus.errors],
+      };
+    })();
+    return artLoadPromise;
+  }
 
   const objectiveRoot = new THREE.Group();
   const markerObjects = new Map();
-  for (const definition of missionDefinition.interactables) {
+  const dynamicBlockerObjects = new Map();
+  const activeDynamicBlockerIds = new Set();
+  for (const definition of activeMissionDefinition.interactables) {
     const marker = CreateMarker(definition);
     markerObjects.set(definition.id, marker);
     objectiveRoot.add(marker);
@@ -1493,7 +2056,7 @@ export function CreateWorld(canvas, options = {}) {
   scene.add(objectiveRoot);
 
   const extractionObjects = new Map();
-  for (const zone of missionDefinition.extractionZones) {
+  for (const zone of activeMissionDefinition.extractionZones) {
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(zone.radius - 0.3, zone.radius, 48),
       CreateOverlayMaterial({
@@ -1512,6 +2075,7 @@ export function CreateWorld(canvas, options = {}) {
 
   const playerObjects = new Map();
   const enemyObjects = new Map();
+  const civilianObjects = new Map();
   const pickObjects = [];
   const visionRoot = new THREE.Group();
   scene.add(visionRoot);
@@ -1528,14 +2092,151 @@ export function CreateWorld(canvas, options = {}) {
   const pointer = new THREE.Vector2();
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const worldPoint = new THREE.Vector3();
+  const drawingBufferSize = new THREE.Vector2();
   let elapsed = 0;
   let planningRefreshElapsed = 1;
+  const cameraFitState = {
+    aspect: 1,
+    fitDistance: initialCameraDistance,
+    tacticalDistance: null,
+    tacticalActorSpan: null,
+    tacticalActorPixels: null,
+    tacticalThreatIncluded: null,
+    tacticalSquadWithinSafeViewport: null,
+    tacticalSafeViewport: null,
+    tacticalSquadProjections: null,
+    minimumDistance: 24,
+    maximumDistance: 104,
+    framingMode: "titleOverview",
+  };
+  const cameraImpact = {
+    kind: "shot",
+    amplitude: 0,
+    duration: 0,
+    remaining: 0,
+    seed: 0,
+  };
+  const cameraImpactBase = new THREE.Vector3();
+  const cameraImpactRight = new THREE.Vector3();
+  const cameraImpactUp = new THREE.Vector3();
+
+  function GetCameraFitDistance(aspect = camera.aspect, target = cameraTarget) {
+    const safeAspect = Math.max(0.25, aspect);
+    const tangentVertical = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+    const tangentHorizontal = tangentVertical * safeAspect;
+    const worldUp = new THREE.Vector3(0, 1, 0);
+    const cameraRight = new THREE.Vector3().crossVectors(worldUp, overviewDirection).normalize();
+    const cameraUp = new THREE.Vector3().crossVectors(overviewDirection, cameraRight).normalize();
+    const bounds = activeMissionDefinition.bounds;
+    const maximumAuthoredElevation = (activeMissionDefinition.zones ?? []).reduce(
+      (maximum, zone) => Math.max(maximum, Number.isFinite(zone.elevation) ? zone.elevation : 0),
+      0,
+    );
+    const maximumSceneHeight = Math.max(10, maximumAuthoredElevation + 9);
+    let requiredDistance = 0;
+    for (const x of [bounds.minimumX, bounds.maximumX]) {
+      for (const y of [0, maximumSceneHeight]) {
+        for (const z of [bounds.minimumZ, bounds.maximumZ]) {
+          const relative = new THREE.Vector3(x - target.x, y - target.y, z - target.z);
+          const depthOffset = relative.dot(overviewDirection);
+          requiredDistance = Math.max(
+            requiredDistance,
+            depthOffset + Math.abs(relative.dot(cameraRight)) / tangentHorizontal,
+            depthOffset + Math.abs(relative.dot(cameraUp)) / tangentVertical,
+          );
+        }
+      }
+    }
+    return Math.max(42, requiredDistance * 1.08 + 3);
+  }
+
+  function ConstrainCameraToTerrain(target, desiredPosition) {
+    const targetSurface = GetSurfaceHeight(target.x, target.z);
+    target.y = Math.max(
+      target.y,
+      targetSurface + tacticalFramingContract.targetSurfaceClearance,
+    );
+    const cameraSurface = GetSurfaceHeight(desiredPosition.x, desiredPosition.z);
+    desiredPosition.y = Math.max(
+      desiredPosition.y,
+      cameraSurface + tacticalFramingContract.cameraSurfaceClearance,
+      target.y + tacticalFramingContract.minimumVerticalViewingClearance,
+    );
+    return { targetSurface, cameraSurface };
+  }
+
+  function SetCameraDistance(target, distance, snap = false, direction = overviewDirection) {
+    const safeTarget = target.clone();
+    const desiredPosition = safeTarget.clone().add(direction.clone().multiplyScalar(distance));
+    const surface = ConstrainCameraToTerrain(safeTarget, desiredPosition);
+    camera.userData.desiredTarget = safeTarget;
+    camera.userData.desiredPosition = desiredPosition;
+    camera.userData.targetSurfaceElevation = surface.targetSurface;
+    camera.userData.cameraSurfaceElevation = surface.cameraSurface;
+    if (snap) {
+      cameraTarget.copy(safeTarget);
+      camera.position.copy(desiredPosition);
+      camera.lookAt(cameraTarget);
+    }
+  }
+
+  function GetStartupTacticalFrame(
+    fallbackPosition,
+    requestedDistance,
+    viewportWidth = canvas.clientWidth || 390,
+    viewportHeight = canvas.clientHeight || 844,
+  ) {
+    const frame = CalculateStartupTacticalFrame({
+      definition: activeMissionDefinition,
+      squadPositions: [...playerObjects.values()].map((object) => object.position),
+      fallbackPosition,
+      requestedDistance,
+      aspect: camera.aspect,
+      fieldOfView: camera.fov,
+      viewportWidth,
+      viewportHeight,
+      overviewDirection,
+    });
+    return {
+      ...frame,
+      target: new THREE.Vector3(frame.target.x, frame.target.y, frame.target.z),
+      direction: new THREE.Vector3(frame.direction.x, frame.direction.y, frame.direction.z),
+    };
+  }
+
+  function ApplyCameraImpact(kind = "shot", intensity = 0.5) {
+    const profile =
+      kind === "explosion"
+        ? { amplitude: 1.05, duration: 0.52 }
+        : kind === "damage"
+          ? { amplitude: 0.52, duration: 0.32 }
+          : kind === "alert"
+            ? { amplitude: 0.28, duration: 0.36 }
+            : { amplitude: 0.22, duration: 0.18 };
+    const strength = THREE.MathUtils.clamp(Number.isFinite(intensity) ? intensity : 0.5, 0, 1.5);
+    const amplitude = profile.amplitude * strength;
+    if (amplitude >= cameraImpact.amplitude || cameraImpact.remaining <= 0) {
+      cameraImpact.kind = kind;
+      cameraImpact.amplitude = amplitude;
+      cameraImpact.duration = profile.duration;
+    } else {
+      cameraImpact.amplitude = Math.min(1.5, cameraImpact.amplitude + amplitude * 0.35);
+      cameraImpact.duration = Math.max(cameraImpact.duration, profile.duration);
+    }
+    cameraImpact.remaining = Math.max(cameraImpact.remaining, profile.duration);
+    cameraImpact.seed += 1;
+  }
 
   function BuildActors(state) {
     for (const unit of state.units) {
       if (playerObjects.has(unit.id)) continue;
       const definition = GetCharacterDefinition(unit.id);
-      const object = CreateCharacterModel(definition?.color ?? terrainPalette.friendly, false, unit.id);
+      const object = CreateCharacterModel(
+        definition?.color ?? terrainPalette.friendly,
+        false,
+        unit.id,
+        artTemplates.get(unit.id),
+      );
       object.userData.pick.userData.id = unit.id;
       object.position.set(unit.x, GetSurfaceHeight(unit.x, unit.z), unit.z);
       object.rotation.y = unit.facing;
@@ -1546,7 +2247,13 @@ export function CreateWorld(canvas, options = {}) {
     for (const enemy of state.enemies) {
       if (enemyObjects.has(enemy.id)) continue;
       const role = GetEnemyRoleDefinition(enemy.role);
-      const object = CreateCharacterModel(enemy.role === "leader" ? 0x78634c : 0x6f5d47, true, enemy.role);
+      const enemyArtKey = enemy.role === "leader" ? "enemyLeader" : "enemyRifleman";
+      const object = CreateCharacterModel(
+        enemy.role === "leader" ? 0x78634c : 0x6f5d47,
+        true,
+        enemy.role,
+        artTemplates.get(enemyArtKey),
+      );
       object.userData.pick.userData.id = enemy.id;
       object.userData.pick.userData.hiddenByIntel = true;
       object.position.set(enemy.x, GetSurfaceHeight(enemy.x, enemy.z) + (enemy.elevated ? 6.7 : 0), enemy.z);
@@ -1559,6 +2266,16 @@ export function CreateWorld(canvas, options = {}) {
       enemyObjects.set(enemy.id, object);
       pickObjects.push(object.userData.pick);
       object.visible = false;
+      scene.add(object);
+    }
+    for (const civilian of state.civilians ?? []) {
+      if (civilianObjects.has(civilian.id)) continue;
+      const object = CreateCharacterModel(0x8f8067, false, "civilian", null);
+      object.userData.pick.visible = false;
+      object.userData.pick.raycast = () => {};
+      object.position.set(civilian.x, GetSurfaceHeight(civilian.x, civilian.z), civilian.z);
+      object.rotation.y = civilian.facing ?? 0;
+      civilianObjects.set(civilian.id, object);
       scene.add(object);
     }
     for (const marker of markerObjects.values()) {
@@ -1575,32 +2292,48 @@ export function CreateWorld(canvas, options = {}) {
     const displayActor = enemy && intel?.position
       ? { ...actor, ...intel.position, facing: intel.position.facing ?? actor.facing }
       : actor;
+    const suppressionRatio = enemy && !intel?.showAwareness
+      ? 0
+      : THREE.MathUtils.clamp((displayActor.suppression ?? 0) / 100, 0, 1);
     const previousX = object.userData.previousX;
     const previousZ = object.userData.previousZ;
     const moved = Math.hypot(displayActor.x - previousX, displayActor.z - previousZ);
     object.userData.previousX = displayActor.x;
     object.userData.previousZ = displayActor.z;
     object.userData.phase += deltaTime * (moved > 0.01 ? 10 : 2);
+    const shotCooldown = Math.max(0, displayActor.shotCooldown ?? 0);
+    const previousShotCooldown = object.userData.previousShotCooldown;
+    if (previousShotCooldown !== null && shotCooldown > previousShotCooldown + 0.16) {
+      object.userData.fireRecoil = 1;
+    }
+    object.userData.previousShotCooldown = shotCooldown;
+    object.userData.fireRecoil = Math.max(0, object.userData.fireRecoil - deltaTime * 7.5);
     const baseY = GetSurfaceHeight(displayActor.x, displayActor.z) + (displayActor.elevated ? 6.7 : 0);
     const bob = moved > 0.01 ? Math.abs(Math.sin(object.userData.phase)) * 0.08 : Math.sin(object.userData.phase) * 0.015;
     object.userData.hitReaction = Math.max(0, (object.userData.hitReaction ?? 0) - deltaTime * 4.8);
-    const recoil = object.userData.hitReaction;
+    const hitReaction = object.userData.hitReaction;
+    const fireRecoil = object.userData.fireRecoil;
+    const recoil = hitReaction + fireRecoil * 0.38;
+    const pose = ResolveActorPose(displayActor, {
+      enemy,
+      moved,
+      isLastKnown,
+      suppressionRatio,
+      phase: object.userData.phase,
+      fireRecoil,
+    });
     object.position.set(
       displayActor.x - Math.sin(displayActor.facing) * recoil * 0.16,
       baseY + bob,
       displayActor.z - Math.cos(displayActor.facing) * recoil * 0.16,
     );
     object.rotation.y = displayActor.facing;
-    const crouch = isLastKnown ? 0.92 : actor.stance === "crouch" ? 0.72 : actor.state === "downed" ? 0.22 : 1;
-    object.scale.y += (crouch - object.scale.y) * Math.min(1, deltaTime * 12);
+    object.scale.y += (pose.scaleY - object.scale.y) * Math.min(1, deltaTime * 12);
     object.rotation.z += ((!isLastKnown && actor.state === "downed" ? Math.PI * 0.5 : 0) - object.rotation.z) * Math.min(1, deltaTime * 9);
     object.userData.selection.visible =
       !enemy || (intel?.showAwareness && (selected || Boolean(actor.awareness > 24))) || isLastKnown;
     object.userData.selection.material.opacity = isLastKnown ? 0.12 + memoryStrength * 0.24 : selected ? 0.9 : enemy && actor.awareness > 24 ? 0.25 : 0.22;
     object.userData.selection.material.color.setHex(isLastKnown ? 0x729cba : enemy ? 0xe87a62 : 0x83e5bc);
-    const suppressionRatio = enemy && !intel?.showAwareness
-      ? 0
-      : THREE.MathUtils.clamp((displayActor.suppression ?? 0) / 100, 0, 1);
     object.userData.body.material.color.setHex(isLastKnown ? 0x8299a8 : 0xffffff);
     object.userData.body.material.opacity = isLastKnown ? 0.16 + memoryStrength * 0.34 : 1;
     object.userData.body.material.depthWrite = !isLastKnown;
@@ -1608,7 +2341,27 @@ export function CreateWorld(canvas, options = {}) {
     object.userData.body.material.emissiveIntensity = isLastKnown
       ? 0.12 + memoryStrength * 0.13
       : suppressionRatio * (0.32 + Math.abs(Math.sin(elapsed * 11)) * 0.34);
-    object.userData.body.rotation.x = Math.sin(recoil * Math.PI) * 0.18;
+    object.userData.body.rotation.x = pose.bodyPitch + Math.sin(hitReaction * Math.PI) * 0.18;
+    if (object.userData.artRig) {
+      const artRig = object.userData.artRig;
+      artRig.root.rotation.x = pose.bodyPitch + Math.sin(hitReaction * Math.PI) * 0.18;
+      const ghostOpacity = 0.16 + memoryStrength * 0.34;
+      for (const material of artRig.materials) {
+        if (material.color && material.userData.baseColor) {
+          if (isLastKnown) material.color.setHex(0x8299a8);
+          else material.color.copy(material.userData.baseColor);
+        }
+        material.opacity = isLastKnown ? ghostOpacity : 1;
+        material.depthWrite = !isLastKnown;
+        if (material.emissive) {
+          if (isLastKnown) material.emissive.setHex(0x213b4d);
+          else if (material.userData.baseEmissive) material.emissive.copy(material.userData.baseEmissive);
+          material.emissiveIntensity = isLastKnown
+            ? 0.16
+            : (material.userData.baseEmissiveIntensity ?? 0) + suppressionRatio * 0.38;
+        }
+      }
+    }
     if (object.userData.limbRig) {
       object.userData.limbRig.limbInstances.material.color.setHex(isLastKnown ? 0x8299a8 : 0xffffff);
       object.userData.limbRig.limbInstances.material.opacity = isLastKnown ? 0.14 + memoryStrength * 0.3 : 1;
@@ -1629,20 +2382,29 @@ export function CreateWorld(canvas, options = {}) {
       (!enemy || (intel.showModel && (isLastKnown || !actor.bodyHidden)));
     if (enemy) object.userData.pick.userData.hiddenByIntel = !intel.canTarget;
     if (object.userData.limbRig) {
-      const swing = !isLastKnown && moved > 0.01 ? Math.sin(object.userData.phase) * 0.48 : 0;
       const rig = object.userData.limbRig;
       for (let index = 0; index < 2; index += 1) {
-        const direction = index === 0 ? 1 : -1;
-        rig.armPivots[index].rotation.x = swing * direction;
+        rig.armPivots[index].rotation.set(pose.armPitch[index], 0, pose.armRoll[index]);
         rig.armPivots[index].updateMatrix();
         rig.matrix.copy(rig.armPivots[index].matrix).multiply(rig.armOffset);
         rig.limbInstances.setMatrixAt(index, rig.matrix);
-        rig.legPivots[index].rotation.x = -swing * direction;
+        rig.legPivots[index].rotation.set(pose.legPitch[index], 0, 0);
         rig.legPivots[index].updateMatrix();
         rig.matrix.copy(rig.legPivots[index].matrix).multiply(rig.legOffset);
         rig.limbInstances.setMatrixAt(index + 2, rig.matrix);
       }
       rig.limbInstances.instanceMatrix.needsUpdate = true;
+      if (object.userData.artRig) {
+        const artRig = object.userData.artRig;
+        for (let index = 0; index < 2; index += 1) {
+          if (artRig.armPivots[index]) {
+            artRig.armPivots[index].rotation.set(pose.armPitch[index], 0, pose.armRoll[index]);
+          }
+          if (artRig.legPivots[index]) {
+            artRig.legPivots[index].rotation.set(pose.legPitch[index], 0, 0);
+          }
+        }
+      }
     }
     if (enemy && object.userData.vision) {
       object.userData.vision.position.set(displayActor.x, GetSurfaceHeight(displayActor.x, displayActor.z), displayActor.z);
@@ -1848,7 +2610,8 @@ export function CreateWorld(canvas, options = {}) {
   function Sync(state, view, deltaTime = 1 / 60) {
     if (
       playerObjects.size !== state.units.length ||
-      state.enemies.some((enemy) => !enemyObjects.has(enemy.id))
+      state.enemies.some((enemy) => !enemyObjects.has(enemy.id)) ||
+      (state.civilians ?? []).some((civilian) => !civilianObjects.has(civilian.id))
     ) {
       BuildActors(state);
     }
@@ -1859,6 +2622,26 @@ export function CreateWorld(canvas, options = {}) {
     for (const enemy of state.enemies) {
       const object = enemyObjects.get(enemy.id);
       if (object) UpdateActorObject(object, enemy, deltaTime, view?.hoverEnemyId === enemy.id, true);
+    }
+    for (const civilian of state.civilians ?? []) {
+      const object = civilianObjects.get(civilian.id);
+      if (!object) continue;
+      object.visible = civilian.state !== "evacuated" && civilian.state !== "harmed";
+      if (object.visible) UpdateActorObject(object, civilian, deltaTime, false, false);
+    }
+    activeDynamicBlockerIds.clear();
+    for (const obstacle of state.environment?.dynamicObstacles ?? []) {
+      activeDynamicBlockerIds.add(obstacle.id);
+      let object = dynamicBlockerObjects.get(obstacle.id);
+      if (!object) {
+        object = obstacle.kind === "wagon" ? CreateWagon(obstacle) : CreateWall(obstacle);
+        dynamicBlockerObjects.set(obstacle.id, object);
+        scene.add(object);
+      }
+      object.visible = true;
+    }
+    for (const [obstacleId, object] of dynamicBlockerObjects) {
+      if (!activeDynamicBlockerIds.has(obstacleId)) object.visible = false;
     }
     for (const [interactableId, marker] of markerObjects) {
       const runtime = state.interactables[interactableId];
@@ -1903,8 +2686,28 @@ export function CreateWorld(canvas, options = {}) {
     elapsed += deltaTime;
     Sync(state, view, deltaTime);
     UpdateEffects(deltaTime);
+    UpdateWeatherEffect(weatherEffect, deltaTime, elapsed);
     UpdateCamera(deltaTime);
+    cameraImpactBase.copy(camera.position);
+    if (cameraImpact.remaining > 0 && cameraImpact.duration > 0) {
+      const envelope = Math.pow(cameraImpact.remaining / cameraImpact.duration, 1.8);
+      const oscillation = elapsed * (cameraImpact.kind === "explosion" ? 47 : 67) + cameraImpact.seed * 2.17;
+      cameraImpactRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+      cameraImpactUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      camera.position.addScaledVector(
+        cameraImpactRight,
+        Math.sin(oscillation) * cameraImpact.amplitude * envelope,
+      );
+      camera.position.addScaledVector(
+        cameraImpactUp,
+        Math.cos(oscillation * 1.37) * cameraImpact.amplitude * envelope * 0.68,
+      );
+    }
     renderer.render(scene, camera);
+    camera.position.copy(cameraImpactBase);
+    camera.updateMatrixWorld();
+    cameraImpact.remaining = Math.max(0, cameraImpact.remaining - deltaTime);
+    if (cameraImpact.remaining === 0) cameraImpact.amplitude = 0;
   }
 
   function Resize(width, height) {
@@ -1913,6 +2716,35 @@ export function CreateWorld(canvas, options = {}) {
     renderer.setSize(safeWidth, safeHeight, false);
     camera.aspect = safeWidth / safeHeight;
     camera.updateProjectionMatrix();
+    cameraFitState.aspect = camera.aspect;
+    const target = (camera.userData.desiredTarget ?? cameraTarget).clone();
+    cameraFitState.fitDistance = GetCameraFitDistance(camera.aspect, target);
+    cameraFitState.maximumDistance = Math.max(104, cameraFitState.fitDistance * 1.12);
+    if (camera.userData.overviewMode) {
+      const requestedDistance = camera.userData.overviewRequestedDistance ?? initialCameraDistance;
+      const resizeDistance =
+        camera.aspect < 0.78
+          ? Math.max(requestedDistance, cameraFitState.fitDistance)
+          : requestedDistance;
+      SetCameraDistance(target, resizeDistance, true);
+      cameraFitState.framingMode = camera.userData.framingMode ?? "manualOverview";
+    } else if (camera.userData.framingMode === "tactical") {
+      const tacticalFrame = GetStartupTacticalFrame(
+        camera.userData.tacticalFocus ?? target,
+        camera.userData.tacticalRequestedDistance ?? 46,
+        safeWidth,
+        safeHeight,
+      );
+      cameraFitState.tacticalDistance = tacticalFrame.distance;
+      cameraFitState.tacticalActorSpan = tacticalFrame.actorSpan;
+      cameraFitState.tacticalActorPixels = tacticalFrame.projectedActorPixels;
+      cameraFitState.tacticalThreatIncluded = tacticalFrame.threatIncluded;
+      cameraFitState.tacticalSquadWithinSafeViewport = tacticalFrame.squadWithinSafeViewport;
+      cameraFitState.tacticalSafeViewport = tacticalFrame.safeViewport;
+      cameraFitState.tacticalSquadProjections = tacticalFrame.squadProjections;
+      camera.userData.tacticalDirection = tacticalFrame.direction;
+      SetCameraDistance(tacticalFrame.target, tacticalFrame.distance, true, tacticalFrame.direction);
+    }
   }
 
   function SetPointer(clientX, clientY) {
@@ -1922,8 +2754,7 @@ export function CreateWorld(canvas, options = {}) {
     raycaster.setFromCamera(pointer, camera);
   }
 
-  function ScreenToGround(clientX, clientY) {
-    SetPointer(clientX, clientY);
+  function ProjectCurrentRayToGround() {
     groundPlane.constant = 0;
     if (!raycaster.ray.intersectPlane(groundPlane, worldPoint)) return null;
     for (let iteration = 0; iteration < 2; iteration += 1) {
@@ -1934,44 +2765,94 @@ export function CreateWorld(canvas, options = {}) {
     return { x: worldPoint.x, z: worldPoint.z };
   }
 
+  function ScreenToGround(clientX, clientY) {
+    SetPointer(clientX, clientY);
+    return ProjectCurrentRayToGround();
+  }
+
   function Pick(clientX, clientY) {
     SetPointer(clientX, clientY);
     const intersections = raycaster
       .intersectObjects(pickObjects, false)
       .filter((intersection) => !intersection.object.userData.hiddenByIntel);
-    if (intersections.length === 0) return { kind: "ground", position: ScreenToGround(clientX, clientY) };
+    const position = ProjectCurrentRayToGround();
+    if (intersections.length === 0) return { kind: "ground", position };
     const data = intersections[0].object.userData;
-    return { kind: data.pickType, id: data.id, position: ScreenToGround(clientX, clientY) };
+    return { kind: data.pickType, id: data.id, position };
   }
 
-  function FocusPosition(position, distance = 46) {
-    const desiredTarget = new THREE.Vector3(position.x, GetSurfaceHeight(position.x, position.z), position.z);
-    const currentDirection = camera.position.clone().sub(cameraTarget).normalize();
-    const desiredPosition = desiredTarget.clone().add(currentDirection.multiplyScalar(distance));
-    desiredPosition.y = Math.max(22, desiredPosition.y);
-    camera.userData.desiredTarget = desiredTarget;
-    camera.userData.desiredPosition = desiredPosition;
+  function FocusPosition(position, distance = 46, options = {}) {
+    const startupTacticalFocus = options.startup === true && playerObjects.size > 0;
+    const tacticalFrame = startupTacticalFocus
+      ? GetStartupTacticalFrame(position, distance)
+      : null;
+    const desiredTarget = tacticalFrame?.target ?? new THREE.Vector3(
+      position.x,
+      GetSurfaceHeight(position.x, position.z),
+      position.z,
+    );
+    camera.userData.overviewMode = false;
+    camera.userData.framingMode = startupTacticalFocus ? "tactical" : "localFocus";
+    camera.userData.tacticalFocus = startupTacticalFocus ? { x: position.x, z: position.z } : null;
+    camera.userData.tacticalRequestedDistance = startupTacticalFocus ? distance : null;
+    camera.userData.tacticalDirection = tacticalFrame?.direction ?? null;
+    cameraFitState.fitDistance = GetCameraFitDistance(camera.aspect, desiredTarget);
+    cameraFitState.maximumDistance = Math.max(104, cameraFitState.fitDistance * 1.12);
+    cameraFitState.tacticalDistance = tacticalFrame?.distance ?? null;
+    cameraFitState.tacticalActorSpan = tacticalFrame?.actorSpan ?? null;
+    cameraFitState.tacticalActorPixels = tacticalFrame?.projectedActorPixels ?? null;
+    cameraFitState.tacticalThreatIncluded = tacticalFrame?.threatIncluded ?? null;
+    cameraFitState.tacticalSquadWithinSafeViewport = tacticalFrame?.squadWithinSafeViewport ?? null;
+    cameraFitState.tacticalSafeViewport = tacticalFrame?.safeViewport ?? null;
+    cameraFitState.tacticalSquadProjections = tacticalFrame?.squadProjections ?? null;
+    cameraFitState.framingMode = camera.userData.framingMode;
+    SetCameraDistance(
+      desiredTarget,
+      tacticalFrame?.distance ?? distance,
+      startupTacticalFocus,
+      tacticalFrame?.direction ?? overviewDirection,
+    );
   }
 
   function Pan(deltaX, deltaZ) {
     const nextTarget = (camera.userData.desiredTarget ?? cameraTarget).clone();
-    nextTarget.x = THREE.MathUtils.clamp(nextTarget.x + deltaX, missionDefinition.bounds.minimumX, missionDefinition.bounds.maximumX);
-    nextTarget.z = THREE.MathUtils.clamp(nextTarget.z + deltaZ, missionDefinition.bounds.minimumZ, missionDefinition.bounds.maximumZ);
+    nextTarget.x = THREE.MathUtils.clamp(nextTarget.x + deltaX, activeMissionDefinition.bounds.minimumX, activeMissionDefinition.bounds.maximumX);
+    nextTarget.z = THREE.MathUtils.clamp(nextTarget.z + deltaZ, activeMissionDefinition.bounds.minimumZ, activeMissionDefinition.bounds.maximumZ);
     const offset = camera.position.clone().sub(cameraTarget);
+    const desiredPosition = nextTarget.clone().add(offset);
+    const surface = ConstrainCameraToTerrain(nextTarget, desiredPosition);
     camera.userData.desiredTarget = nextTarget;
-    camera.userData.desiredPosition = nextTarget.clone().add(offset);
+    camera.userData.desiredPosition = desiredPosition;
+    camera.userData.targetSurfaceElevation = surface.targetSurface;
+    camera.userData.cameraSurfaceElevation = surface.cameraSurface;
   }
 
   function Zoom(delta) {
     const target = camera.userData.desiredTarget ?? cameraTarget;
     const position = camera.userData.desiredPosition ?? camera.position;
     const offset = position.clone().sub(target);
-    const nextLength = THREE.MathUtils.clamp(offset.length() * (delta > 0 ? 1.12 : 0.88), 24, 104);
-    camera.userData.desiredPosition = target.clone().add(offset.normalize().multiplyScalar(nextLength));
+    const nextLength = THREE.MathUtils.clamp(
+      offset.length() * (delta > 0 ? 1.12 : 0.88),
+      cameraFitState.minimumDistance,
+      cameraFitState.maximumDistance,
+    );
+    const safeTarget = target.clone();
+    const desiredPosition = safeTarget.clone().add(offset.normalize().multiplyScalar(nextLength));
+    const surface = ConstrainCameraToTerrain(safeTarget, desiredPosition);
+    camera.userData.desiredTarget = safeTarget;
+    camera.userData.desiredPosition = desiredPosition;
+    camera.userData.targetSurfaceElevation = surface.targetSurface;
+    camera.userData.cameraSurfaceElevation = surface.cameraSurface;
+    const manualOverview = delta > 0 && nextLength >= cameraFitState.fitDistance * 0.92;
+    camera.userData.overviewMode = manualOverview;
+    camera.userData.framingMode = manualOverview ? "manualOverview" : "manual";
+    camera.userData.overviewRequestedDistance = manualOverview ? nextLength : null;
+    cameraFitState.framingMode = camera.userData.framingMode;
   }
 
   function GetStats() {
     return {
+      missionId: activeMissionDefinition.id,
       calls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       points: renderer.info.render.points,
@@ -1979,13 +2860,68 @@ export function CreateWorld(canvas, options = {}) {
       geometries: renderer.info.memory.geometries,
       textures: renderer.info.memory.textures,
       effects: effects.length,
+      terrain: {
+        vertices: ground.geometry.getAttribute("position").count,
+        triangles: ground.geometry.userData.terrainTriangles,
+        columns: ground.geometry.userData.terrainColumns,
+        rows: ground.geometry.userData.terrainRows,
+      },
       pixelRatio: renderer.getPixelRatio(),
-      drawingBuffer: renderer.getDrawingBufferSize(new THREE.Vector2()).toArray(),
+      drawingBuffer: renderer.getDrawingBufferSize(drawingBufferSize).toArray(),
+      atmosphere: {
+        id: atmosphereProfile.id,
+        timeOfDay: atmosphereProfile.timeOfDay,
+        weather: atmosphereProfile.weather,
+        weatherKind: atmosphereProfile.weatherKind,
+        fogDensity: scene.fog.density,
+        exposure: atmosphereProfile.exposure,
+        renderedExposure: renderer.toneMappingExposure,
+        hemisphereIntensity: ambient.intensity,
+        keyIntensity: keyLight.intensity,
+        actorFillIntensity: actorFillLight?.intensity ?? 0,
+        actorRimIntensity: actorRimLight?.intensity ?? 0,
+      },
+      camera: {
+        aspect: cameraFitState.aspect,
+        fitDistance: cameraFitState.fitDistance,
+        overviewFitDistance: cameraFitState.fitDistance,
+        tacticalDistance: cameraFitState.tacticalDistance,
+        tacticalActorSpan: cameraFitState.tacticalActorSpan,
+        tacticalActorPixels: cameraFitState.tacticalActorPixels,
+        tacticalThreatIncluded: cameraFitState.tacticalThreatIncluded,
+        tacticalSquadWithinSafeViewport: cameraFitState.tacticalSquadWithinSafeViewport,
+        tacticalSafeViewport: cameraFitState.tacticalSafeViewport,
+        tacticalSquadProjections: cameraFitState.tacticalSquadProjections,
+        minimumDistance: cameraFitState.minimumDistance,
+        maximumDistance: cameraFitState.maximumDistance,
+        overviewMode: Boolean(camera.userData.overviewMode),
+        framingMode: cameraFitState.framingMode,
+        portraitTactical: cameraFitState.aspect < 0.78 && cameraFitState.framingMode === "tactical",
+        impactActive: cameraImpact.remaining > 0,
+        targetSurfaceElevation: camera.userData.targetSurfaceElevation ?? null,
+        targetSurfaceClearance:
+          camera.userData.targetSurfaceElevation === undefined
+            ? null
+            : (camera.userData.desiredTarget ?? cameraTarget).y - camera.userData.targetSurfaceElevation,
+        cameraSurfaceElevation: camera.userData.cameraSurfaceElevation ?? null,
+        cameraSurfaceClearance:
+          camera.userData.cameraSurfaceElevation === undefined
+            ? null
+            : (camera.userData.desiredPosition ?? camera.position).y - camera.userData.cameraSurfaceElevation,
+      },
+      art: {
+        environmentEligible: Boolean(environmentArtDefinition),
+        environmentAsset: artStatus.environmentAsset,
+        environmentLoaded: artStatus.environmentLoaded,
+        proceduralFallbackVisible: propRoot.visible || productionRoot.visible || operationFallbackRoot.visible,
+        charactersLoaded: [...artStatus.charactersLoaded],
+        errors: [...artStatus.errors],
+      },
     };
   }
 
   function HasActiveEffects() {
-    return effects.length > 0;
+    return effects.length > 0 || cameraImpact.remaining > 0;
   }
 
   function Dispose() {
@@ -2003,8 +2939,10 @@ export function CreateWorld(canvas, options = {}) {
     pickObjects.length = 0;
     playerObjects.clear();
     enemyObjects.clear();
+    civilianObjects.clear();
     markerObjects.clear();
     extractionObjects.clear();
+    dynamicBlockerObjects.clear();
     renderer.dispose();
     groundTexture.dispose();
   }
@@ -2013,6 +2951,7 @@ export function CreateWorld(canvas, options = {}) {
     scene,
     camera,
     renderer,
+    LoadArtAssets,
     BuildActors,
     Frame,
     Resize,
@@ -2025,6 +2964,7 @@ export function CreateWorld(canvas, options = {}) {
     SpawnTracer,
     SpawnImpact,
     SpawnExplosion,
+    ApplyCameraImpact,
     HasActiveEffects,
     GetStats,
     Dispose,
