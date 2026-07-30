@@ -730,6 +730,59 @@ function RunCivilianTransitProjection(
   };
 }
 
+function BuildOptimisticRemainingSchedule(state, candidateGroupId) {
+  const routes = FindEvacuationPaths(state);
+  if (!routes.length) {
+    return [];
+  }
+  const candidates = state.civilians
+    .map((group, sourceIndex) => ({ group, sourceIndex }))
+    .filter(({ group }) => (
+      group.status === "Waiting"
+      && group.groupId !== candidateGroupId
+    ))
+    .map(({ group, sourceIndex }) => {
+      const moveSteps = Math.max(1, group.moveSteps ?? 2);
+      const bestRoute = routes
+        .map((route) => ({
+          exitKey: route.exitKey,
+          routeSegments: Math.max(0, route.path.length - 1),
+        }))
+        .sort((first, second) => (
+          first.routeSegments - second.routeSegments
+          || first.exitKey.localeCompare(second.exitKey)
+        ))[0];
+      const transitTurns = Math.floor(bestRoute.routeSegments / moveSteps);
+      return {
+        groupId: group.groupId,
+        exitKey: bestRoute.exitKey,
+        routeSegments: bestRoute.routeSegments,
+        moveSteps,
+        latestLaunchTurn: state.maxTurns - transitTurns,
+        sourceIndex,
+      };
+    })
+    .sort((first, second) => (
+      first.latestLaunchTurn - second.latestLaunchTurn
+      || first.sourceIndex - second.sourceIndex
+      || first.groupId.localeCompare(second.groupId)
+    ));
+  return candidates.map((entry, index) => {
+    const earliestLaunchTurn = state.turn + 1 + index;
+    const earliestReadyTurn = earliestLaunchTurn
+      + Math.floor(entry.routeSegments / entry.moveSteps);
+    return {
+      groupId: entry.groupId,
+      exitKey: entry.exitKey,
+      routeSegments: entry.routeSegments,
+      moveSteps: entry.moveSteps,
+      earliestLaunchTurn,
+      earliestReadyTurn,
+      deadlineSlack: state.maxTurns - earliestReadyTurn,
+    };
+  });
+}
+
 export function GetCivilianTransitEstimate(state, groupId, exitKey) {
   const group = state.civilians.find((entry) => entry.groupId === groupId);
   const route = FindEvacuationPaths(state).find((entry) => entry.exitKey === exitKey);
@@ -784,6 +837,10 @@ export function GetCivilianTransitEstimate(state, groupId, exitKey) {
     )
       ? "Helps"
       : "Insufficient";
+  const remainingSchedule = BuildOptimisticRemainingSchedule(state, groupId);
+  const strandedGroupIds = remainingSchedule
+    .filter((entry) => entry.deadlineSlack < 0)
+    .map((entry) => entry.groupId);
   return {
     groupId,
     exitKey,
@@ -816,6 +873,10 @@ export function GetCivilianTransitEstimate(state, groupId, exitKey) {
       readyTurn === null
       || readyTurn > state.maxTurns
     ),
+    remainingSchedule,
+    remainingScheduleRisk: strandedGroupIds.length > 0,
+    strandedGroupIds,
+    remainingScheduleAssumption: "按当前已通路线；假设下一批发车前不再开路或抢通，且不计敌军、拥堵与其他新风险",
     blockedKey: projection.blockedKey,
     exitBlocked: projection.exitBlocked,
     assumptions: "已计当前烟流、封口与已知反制；未计后续新增敌情、烟流、封口、塌方或玩家改道",
@@ -3091,7 +3152,8 @@ function BuildExitWindowSnapshot(state, exitKey, record) {
   const nearest = activeThreats[0] ?? null;
   const blockingThreat = activeThreats.find(({ distance }) => distance <= 1) ?? null;
   const incomingThreat = activeThreats.find(({ enemy }) => (
-    enemy.intent?.targetKey === exitKey
+    enemy.intentRevealed
+    && enemy.intent?.targetKey === exitKey
     && [EnemyIntentIds.PATROL, EnemyIntentIds.INVESTIGATE, EnemyIntentIds.SEARCH]
       .includes(enemy.intent.intentId)
   )) ?? null;

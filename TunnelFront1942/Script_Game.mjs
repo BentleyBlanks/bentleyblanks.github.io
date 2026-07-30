@@ -1323,10 +1323,21 @@ function BuildPreview(action) {
         : estimate?.signalCoverage === "ExpiresBefore"
           ? `现有信号至 T${windowState.checkedUntilTurn}，预计不覆盖`
           : `预计到达时：${estimate?.signalDetailAtReady ?? windowState.detail}；仍需复查并取得安全信号`;
+      const strandedSchedule = estimate?.remainingSchedule
+        ?.filter((entry) => entry.deadlineSlack < 0) ?? [];
+      const scheduleRiskText = strandedSchedule.length
+        ? `若现在发本批，按当前已通路线且下一批前不再开路/抢通，${strandedSchedule.map((entry) => {
+          const strandedGroup = gameState.civilians
+            .find((candidate) => candidate.groupId === entry.groupId);
+          return `${strandedGroup?.name ?? entry.groupId}最早 T${entry.earliestLaunchTurn} 发车、T${entry.earliestReadyTurn} 到口`;
+        }).join("；")}，将晚于 T${gameState.maxTurns}；可先发慢批，或及时接通更短路线`
+        : "按当前已通路线的剩余排班未见必然超时";
       return {
-        eyebrow: "群众转移预览",
+        eyebrow: estimate?.remainingScheduleRisk
+          ? "群众转移预览 · 排班风险"
+          : "群众转移预览",
         title: `第 ${estimate?.queueOrder ?? "?"} 批：${group?.name ?? "群众"} → ${projectedExit.name}`,
-        body: `${rerouteText} · ${readyText} · ${deadlineText}｜${queueText}｜1 AP · 组织 1 · 速 ${estimate?.moveSteps ?? "?"} · 载 ${estimate?.trafficLoad ?? "?"}｜${signalText}｜已计当前烟流、封口与已知反制；未计后续新增敌情、烟流、封口、塌方或玩家改道`,
+        body: `${rerouteText} · ${readyText} · ${deadlineText}｜${queueText}｜${scheduleRiskText}｜1 AP · 组织 1 · 速 ${estimate?.moveSteps ?? "?"} · 载 ${estimate?.trafficLoad ?? "?"}｜${signalText}｜已计当前烟流、封口与已知反制；剩余排班固定当前已通路线，只给无敌军、无拥堵的条件下界，未计后续新增敌情、烟流、封口、塌方或玩家改道`,
       };
     }
     case ActionIds.CLEAR_SEAL:

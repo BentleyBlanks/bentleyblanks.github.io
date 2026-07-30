@@ -47,6 +47,10 @@
   `ApplyPlayerActionPath` 必须逐步重放 `ApplyPlayerAction`，不跨回合、不自动结束、不自动支护或改道。
   走廊外未知土层、返沙开裂、烟段、进入敌军视线、伏击离位与接通出口都要强制停下重新确认；
   规划侦察须揭示两条候选走廊的逐格土层，保证已选走廊上的连续开挖真实可用。
+- **撤离预测**：`GetCivilianTransitEstimate` 必须复用正式群众推进规则，保持纯读，并只使用玩家公开信息；
+  未揭示的敌军意图不得改变出口窗口或预测。`remainingSchedule` 是“当前候选批次占用本回合发车位后”的
+  剩余排班条件下界：固定当前已通路线，假设下一批前不再开路/抢通，且不计敌军、拥堵与其他新风险；
+  UI/CLI 必须连同这些条件展示，不能把它表述成无条件必败或胜利承诺。
 - **敌军意图**（`EnemyIntentIds`，明牌可预读）：Patrol / Investigate / Attack / PrepareSeal→ResolveSeal
   封堵出口 / PrepareSmoke→ResolveSmoke 灌烟 / Search / Stalled。**两段式意图（Prepare→Resolve）是
   玩家的反制窗口**，不得改成一回合完成。工兵在多个已确认洞口间先比较未过期公开证据强度、

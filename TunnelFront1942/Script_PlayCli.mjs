@@ -15,6 +15,7 @@ import {
   GetActionTargets,
   GetActionPathPlans,
   GetAvailableActions,
+  GetCivilianTransitEstimate,
   GetExitWindow,
   GetObjectiveSummary,
   GetRouteSurvey,
@@ -175,6 +176,43 @@ function PrintLegalActions(state, requestedId = "all") {
       console.log(
         `- ${actionId}${targets.length ? `｜targets=${targets.join(",")}` : ""}${groupText}`,
       );
+      if (actionId === ActionIds.EVACUATE) {
+        const waitingGroups = state.civilians
+          .filter((group) => group.status === "Waiting");
+        for (const targetKey of targets) {
+          for (const group of waitingGroups) {
+            const estimate = GetCivilianTransitEstimate(
+              state,
+              group.groupId,
+              targetKey,
+            );
+            if (!estimate) {
+              continue;
+            }
+            const bottleneck = estimate.bottleneckKey
+              ? state.tiles[estimate.bottleneckKey]
+              : null;
+            const conflictText = bottleneck
+              ? `｜首堵 ${bottleneck.name} ${estimate.bottleneckUsedLoad}+${estimate.trafficLoad}/${estimate.bottleneckCapacity}`
+              : "｜首堵 无";
+            const strandedText = estimate.remainingSchedule
+              .filter((entry) => entry.deadlineSlack < 0)
+              .map((entry) => {
+                const strandedGroup = state.civilians
+                  .find((candidate) => candidate.groupId === entry.groupId);
+                return `${strandedGroup?.name ?? entry.groupId}最早 T${entry.earliestLaunchTurn} 发车、T${entry.earliestReadyTurn} 到口`;
+              })
+              .join("；");
+            const riskText = strandedText
+              ? `｜排班风险（按当前已通路线；下一批前不再开路/抢通）${strandedText}，将晚于 T${state.maxTurns}`
+              : "";
+            console.log(
+              `  ${group.groupId}→${targetKey}｜预计到口 ${estimate.readyTurn === null ? "--" : `T${estimate.readyTurn}`}`
+                + `｜预计堵 ${estimate.congestionTurns} 回合${conflictText}${riskText}｜仅计当前队列与已知风险`,
+            );
+          }
+        }
+      }
       if ([ActionIds.MOVE, ActionIds.DIG].includes(actionId)) {
         const pathPlans = GetActionPathPlans(state, unit.unitId, actionId, {
           includeAmbiguous: true,

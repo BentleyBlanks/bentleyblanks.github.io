@@ -639,6 +639,35 @@ function CreateDualRouteLogisticsState() {
   return state;
 }
 
+function CreateSouthLogisticsState() {
+  const state = CreateLogisticsState(false);
+  const nodeTemplate = Clone(state.tunnels["6,2"]);
+  state.plannedExitKey = "0,5";
+  state.tunnelsDug = southEvacuationPath.length - 1;
+  state.tunnels = Object.fromEntries(southEvacuationPath.map((tileKey, index) => [
+    tileKey,
+    {
+      ...Clone(nodeTemplate),
+      tileKey,
+      braced: index === 0,
+      cracked: false,
+      collapsed: false,
+      sealed: false,
+      smoke: 0,
+      trap: false,
+      dugTurn: 1,
+      isOriginal: index === 0,
+    },
+  ]));
+  state.exitWindows["0,5"] = {
+    exitKey: "0,5",
+    checkedTurn: state.turn,
+    checkedUntilTurn: 20,
+    signalCount: 1,
+  };
+  return state;
+}
+
 function RunCivilianOrder(groupIds, bracedExit = false) {
   let state = CreateLogisticsState(bracedExit);
   const timeline = [];
@@ -2256,6 +2285,168 @@ Test("queue forecasts match real movement without solving future enemy pressure"
   assert.match(lateWounded.assumptions, /未计后续新增敌情、烟流、封口、塌方或玩家改道/);
 });
 
+Test("transit forecasts ignore unrevealed enemy intentions", () => {
+  const baseline = CreateLogisticsState(false);
+  const patrol = baseline.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
+  patrol.health = patrol.maxHealth;
+  patrol.tileKey = "0,0";
+  patrol.inactiveUntilTurn = 0;
+  patrol.stunnedUntilTurn = 0;
+  patrol.intent = null;
+  patrol.intentRevealed = false;
+  const baselineWindow = GetExitWindow(baseline, "2,1");
+  const baselineEstimate = GetCivilianTransitEstimate(
+    baseline,
+    "Wounded",
+    "2,1",
+  );
+
+  const hiddenIntent = Clone(baseline);
+  const hiddenPatrol = hiddenIntent.enemies
+    .find((enemy) => enemy.enemyId === "NorthPatrol");
+  hiddenPatrol.intent = {
+    intentId: EnemyIntentIds.INVESTIGATE,
+    targetKey: "2,1",
+  };
+  hiddenPatrol.intentRevealed = false;
+  const hiddenWindow = GetExitWindow(hiddenIntent, "2,1");
+  const hiddenEstimate = GetCivilianTransitEstimate(
+    hiddenIntent,
+    "Wounded",
+    "2,1",
+  );
+  assert.deepEqual(
+    {
+      status: hiddenWindow.status,
+      detail: hiddenWindow.detail,
+      signalCoverage: hiddenEstimate.signalCoverage,
+      signalStatusAtReady: hiddenEstimate.signalStatusAtReady,
+      signalDetailAtReady: hiddenEstimate.signalDetailAtReady,
+    },
+    {
+      status: baselineWindow.status,
+      detail: baselineWindow.detail,
+      signalCoverage: baselineEstimate.signalCoverage,
+      signalStatusAtReady: baselineEstimate.signalStatusAtReady,
+      signalDetailAtReady: baselineEstimate.signalDetailAtReady,
+    },
+  );
+
+  const revealedIntent = Clone(hiddenIntent);
+  revealedIntent.enemies
+    .find((enemy) => enemy.enemyId === "NorthPatrol").intentRevealed = true;
+  assert.equal(GetExitWindow(revealedIntent, "2,1").status, "Watched");
+  const revealedEstimate = GetCivilianTransitEstimate(
+    revealedIntent,
+    "Wounded",
+    "2,1",
+  );
+  assert.equal(revealedEstimate.signalCoverage, "MissingOrBlocked");
+  assert.equal(revealedEstimate.signalStatusAtReady, "Watched");
+});
+
+Test("launch forecasts warn before an optimistic remaining schedule becomes impossible", () => {
+  let south = CreateSouthLogisticsState();
+  const t4Families = GetCivilianTransitEstimate(south, "Families", "0,5");
+  assert.equal(t4Families.remainingScheduleRisk, false);
+  assert.deepEqual(
+    t4Families.remainingSchedule.map((entry) => entry.groupId),
+    ["Wounded", "Contacts"],
+  );
+  assert.deepEqual(
+    t4Families.remainingSchedule.map((entry) => [
+      entry.earliestLaunchTurn,
+      entry.earliestReadyTurn,
+    ]),
+    [[5, 11], [6, 8]],
+  );
+
+  south = Apply(south, "Militia", ActionIds.EVACUATE, "0,5", "Families");
+  south = End(south);
+  const pristine = Clone(south);
+  const contactsSecond = GetCivilianTransitEstimate(south, "Contacts", "0,5");
+  assert.deepEqual(south, pristine);
+  assert.equal(contactsSecond.remainingScheduleRisk, true);
+  assert.match(contactsSecond.remainingScheduleAssumption, /当前已通路线/);
+  assert.match(contactsSecond.remainingScheduleAssumption, /不再开路或抢通/);
+  assert.deepEqual(contactsSecond.strandedGroupIds, ["Wounded"]);
+  assert.deepEqual(contactsSecond.remainingSchedule, [{
+    groupId: "Wounded",
+    exitKey: "0,5",
+    routeSegments: 6,
+    moveSteps: 1,
+    earliestLaunchTurn: 6,
+    earliestReadyTurn: 12,
+    deadlineSlack: -1,
+  }]);
+  assert.deepEqual(
+    GetCivilianTransitEstimate(south, "Contacts", "0,5"),
+    contactsSecond,
+  );
+
+  const woundedSecond = GetCivilianTransitEstimate(south, "Wounded", "0,5");
+  assert.equal(woundedSecond.remainingScheduleRisk, false);
+  assert.deepEqual(woundedSecond.strandedGroupIds, []);
+  assert.deepEqual(
+    woundedSecond.remainingSchedule.map((entry) => [
+      entry.groupId,
+      entry.earliestLaunchTurn,
+      entry.earliestReadyTurn,
+    ]),
+    [["Contacts", 6, 8]],
+  );
+
+  let contactsFirst = CreateSouthLogisticsState();
+  contactsFirst = Apply(
+    contactsFirst,
+    "Militia",
+    ActionIds.EVACUATE,
+    "0,5",
+    "Contacts",
+  );
+  contactsFirst = End(contactsFirst);
+  const familiesSecond = GetCivilianTransitEstimate(
+    contactsFirst,
+    "Families",
+    "0,5",
+  );
+  assert.equal(familiesSecond.remainingScheduleRisk, true);
+  assert.deepEqual(familiesSecond.strandedGroupIds, ["Wounded"]);
+
+  let north = CreateLogisticsState(false);
+  north = Apply(north, "Militia", ActionIds.EVACUATE, "2,1", "Families");
+  north = End(north);
+  for (const groupId of ["Contacts", "Wounded"]) {
+    const estimate = GetCivilianTransitEstimate(north, groupId, "2,1");
+    assert.equal(estimate.remainingScheduleRisk, false);
+    assert.deepEqual(estimate.strandedGroupIds, []);
+  }
+
+  const hiddenEnemyVariant = Clone(south);
+  hiddenEnemyVariant.enemies.forEach((enemy, index) => {
+    enemy.health = enemy.maxHealth;
+    enemy.tileKey = index % 2 ? "0,0" : "8,5";
+    enemy.intent = {
+      intentId: EnemyIntentIds.PREPARE_SEAL,
+      targetKey: "0,5",
+    };
+    enemy.intentRevealed = false;
+  });
+  const hiddenVariantEstimate = GetCivilianTransitEstimate(
+    hiddenEnemyVariant,
+    "Contacts",
+    "0,5",
+  );
+  assert.deepEqual(
+    hiddenVariantEstimate.remainingSchedule,
+    contactsSecond.remainingSchedule,
+  );
+  assert.equal(
+    hiddenVariantEstimate.remainingScheduleRisk,
+    contactsSecond.remainingScheduleRisk,
+  );
+});
+
 Test("clay slows smoke by one segment and keeps civilians beyond it moving", () => {
   function ResolveTestSmoke(soilId) {
     const state = CreateInitialState();
@@ -2846,6 +3037,8 @@ Test("HTML and game source wire Three.js, path previews, both layers, and touch-
   assert.match(gameSource, /约 T.*进入出洞窗口/);
   assert.match(gameSource, /首个冲突：/);
   assert.match(gameSource, /未计后续新增敌情、烟流、封口、塌方或玩家改道/);
+  assert.match(gameSource, /按当前已通路线且下一批前不再开路\/抢通/);
+  assert.doesNotMatch(gameSource, /最乐观排班仍会/);
   assert.doesNotMatch(gameSource, /无拥堵且信号及时最早.*安全撤出/);
   assert.match(gameSource, /通行容量 2→3/);
   assert.match(gameSource, /mobileCivilianSummary/);
@@ -2870,6 +3063,9 @@ Test("HTML and game source wire Three.js, path previews, both layers, and touch-
   assert.match(style, /\.actionButtons \.pathChoice/);
   assert.match(cliSource, /case "path"/);
   assert.match(cliSource, /ApplyPlayerActionPath/);
+  assert.match(cliSource, /GetCivilianTransitEstimate/);
+  assert.match(cliSource, /排班风险/);
+  assert.match(cliSource, /下一批前不再开路\/抢通/);
 });
 
 console.log(`\nTunnelFront1942 smoke test: ${passed} assertions passed.`);
