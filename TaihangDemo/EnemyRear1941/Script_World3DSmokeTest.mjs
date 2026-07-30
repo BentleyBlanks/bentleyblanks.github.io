@@ -10,19 +10,22 @@ const indexPath = path.join(testDirectory, "index.html");
 const stylePath = path.join(testDirectory, "Style_Game.css");
 const terrainTexturePath = path.join(testDirectory, "Texture_TerrainPaperHigh.jpg");
 const terrainAlbedoPath = path.join(testDirectory, "Texture_TerrainGroundAlbedo.png");
+const miniatureDetailPath = path.join(testDirectory, "Texture_MiniatureSurfaceDetail.png");
 
-const [worldSource, gameSource, indexSource, styleSource, terrainTextureBuffer, terrainAlbedoBuffer] = await Promise.all([
+const [worldSource, gameSource, indexSource, styleSource, terrainTextureBuffer, terrainAlbedoBuffer, miniatureDetailBuffer] = await Promise.all([
   readFile(worldPath, "utf8"),
   readFile(gamePath, "utf8"),
   readFile(indexPath, "utf8"),
   readFile(stylePath, "utf8"),
   readFile(terrainTexturePath),
   readFile(terrainAlbedoPath),
+  readFile(miniatureDetailPath),
 ]);
 
 const worldModule = await import(`${new URL("./Script_World3D.mjs", import.meta.url).href}?smoke=1`);
 const terrainTextureStat = await stat(terrainTexturePath);
 const terrainAlbedoStat = await stat(terrainAlbedoPath);
+const miniatureDetailStat = await stat(miniatureDetailPath);
 let assertionCount = 0;
 
 function Check(condition, message) {
@@ -101,16 +104,20 @@ Check(worldSource.includes("assetMeshCount > 8"), "Each imported miniature must 
 Check(worldSource.includes("modelPackMeshCount > 55"), "The complete miniature pack must enforce its 55-mesh runtime budget.");
 Check(worldSource.includes("worldModelMeshes"), "World3D diagnostics must expose imported model mesh count.");
 Check(
-  worldModule.World3DTerrainTextureUrl.endsWith("Texture_TerrainPaperHigh.jpg?v=20260730m"),
+  worldModule.World3DTerrainTextureUrl.endsWith("Texture_TerrainPaperHigh.jpg?v=20260730p"),
   "World3D terrain texture URL must use the release cache identity.",
 );
 Check(
-  worldModule.World3DTerrainAlbedoUrl.endsWith("Texture_TerrainGroundAlbedo.png?v=20260730m"),
+  worldModule.World3DTerrainAlbedoUrl.endsWith("Texture_TerrainGroundAlbedo.png?v=20260730p"),
   "ImageGen ground albedo URL must use the release cache identity.",
 );
 Check(
-  worldModule.World3DModelPackUrl.endsWith("Model_EnemyRearMiniatures.glb?v=20260730m"),
+  worldModule.World3DModelPackUrl.endsWith("Model_EnemyRearMiniatures.glb?v=20260730p"),
   "World3D model-pack URL must use the release cache identity.",
+);
+Check(
+  worldModule.World3DMiniatureDetailUrl.endsWith("Texture_MiniatureSurfaceDetail.png?v=20260730p"),
+  "ImageGen miniature micro-detail URL must use the release cache identity.",
 );
 Check(
   worldModule.World3DModelNames.length === 10
@@ -137,14 +144,30 @@ Check(
     && terrainAlbedoDimensions.height >= 1024,
   "ImageGen ground albedo must retain production-scale detail without an excessive payload.",
 );
+const miniatureDetailDimensions = ReadPngDimensions(miniatureDetailBuffer);
+Check(
+  miniatureDetailStat.size > 1_000_000
+    && miniatureDetailStat.size < 5_000_000
+    && miniatureDetailDimensions.width >= 1024
+    && miniatureDetailDimensions.height >= 1024,
+  "ImageGen miniature micro-detail must retain production-scale grayscale surface information.",
+);
 Check(
   worldSource.includes('"TerrainImageGenAlbedoOverlay"')
     && worldSource.includes("material.roughnessMap = texture")
     && worldSource.includes("material.map = null")
-    && worldSource.includes("THREE.RepeatWrapping")
+    && worldSource.includes("THREE.MirroredRepeatWrapping")
+    && worldSource.includes("vertexColors: false")
     && worldModule.World3DVisualProfile.terrainTextureWorldScale >= 0.22
-    && worldModule.World3DVisualProfile.terrainAlbedoOpacity >= 0.18,
-  "Generated albedo must tile in world space and materially enrich live terrain while old paper remains roughness-only.",
+    && worldModule.World3DVisualProfile.terrainAlbedoOpacity >= 0.12
+    && worldModule.World3DVisualProfile.terrainAlbedoOpacity <= 0.22,
+  "Generated albedo must enrich terrain without multiplying the live biome colors into mud.",
+);
+Check(
+  worldSource.includes("ApplyMiniatureDetailTexture")
+    && worldSource.includes("material.bumpMap = this.miniatureDetailTexture")
+    && worldSource.includes('worldModelDetail: this.miniatureDetailStatus'),
+  "ImageGen micro-detail must be applied to the live Blender miniature materials and exposed in diagnostics.",
 );
 Check(
   worldModule.World3DQualityProfile.dprCap === 2
@@ -155,8 +178,8 @@ Check(
 );
 Check(
   worldModule.World3DVisualProfile.hemisphereIntensity >= 0.8
-    && worldModule.World3DVisualProfile.ambientIntensity >= 0.2
-    && worldModule.World3DVisualProfile.fillIntensity >= 0.55
+    && worldModule.World3DVisualProfile.ambientIntensity >= 0.12
+    && worldModule.World3DVisualProfile.fillIntensity >= 0.32
     && worldModule.World3DVisualProfile.toneMappingExposure >= 1,
   "Visual profile must preserve readable cool shadows without washing the landscape in a global tint.",
 );
@@ -189,9 +212,9 @@ Check(
 Check(
   worldSource.includes('"RailSleepersInstanced"')
     && worldModule.World3DVisualProfile.railBedWidth > worldModule.World3DVisualProfile.roadWidth
-    && worldModule.World3DVisualProfile.railWidth >= 0.028
-    && worldModule.World3DVisualProfile.railWidth <= 0.034
-    && worldModule.World3DVisualProfile.railGaugeOffset >= 0.14
+    && worldModule.World3DVisualProfile.railWidth >= 0.022
+    && worldModule.World3DVisualProfile.railWidth <= 0.03
+    && worldModule.World3DVisualProfile.railGaugeOffset >= 0.105
     && worldSource.includes("sleeperCount"),
   "Rail sleepers, double rails, gravel bed, and warm roads must be distinguishable at a glance.",
 );
@@ -319,7 +342,7 @@ Check(
 
 assert.equal(worldModule.GetWorld3DDpr(390, 3), 2, "Small viewports must retain the fixed DPR 2 cap.");
 assert.equal(worldModule.GetWorld3DDpr(1280, 3), 2, "Large viewports must use the same fixed DPR 2 cap.");
-assert.equal(worldModule.GetWorld3DDpr(390, 1.5), 1.5, "Native DPR below the cap must remain unchanged.");
+assert.equal(worldModule.GetWorld3DDpr(390, 1.5), 2, "The single highest-quality profile must force DPR 2 even on DPR 1.5 displays.");
 assert.ok(worldModule.GetTerrainHeight({ q: 2, r: 3, terrain: "Mountain" })
   > worldModule.GetTerrainHeight({ q: 2, r: 3, terrain: "Plain" }), "Mountain relief must exceed plain relief.");
 assertionCount += 4;
@@ -360,9 +383,9 @@ Check(
   "Seasonal atmosphere must use clear September weather and restrained spring dust.",
 );
 Check(
-  (worldSource.match(/new THREE\.Points\(/gu) ?? []).length === 1
-    && worldModule.World3DVisualProfile.weatherMaximumPoints <= 96,
-  "Weather may add at most one sparse particle draw call.",
+  (worldSource.match(/new THREE\.Points\(/gu) ?? []).length === 2
+    && worldModule.World3DVisualProfile.weatherMaximumPoints <= 128,
+  "Weather and transient combat smoke must each stay within one batched Points draw call.",
 );
 Check(
   worldSource.includes("worldWeather: this.weatherMode")
@@ -386,8 +409,8 @@ Check(
   [
     worldModule.World3DActionEffectProfile.ambushDuration,
     worldModule.World3DActionEffectProfile.sabotageDuration,
-  ].every((duration) => duration >= 2.2 && duration <= 2.5),
-  "Every action presentation must stay within the legible 2.2-2.5 second window.",
+  ].every((duration) => duration >= 1.7 && duration <= 2.1),
+  "Every action presentation must stay within a responsive 1.7-2.1 second window.",
 );
 Check(
   worldSource.includes("PlayActionEffects(effects)")
@@ -403,7 +426,7 @@ Check(
     && worldSource.includes('tracerBatch.name = "AmbushShortTracerBurstsInstanced"')
     && worldSource.includes('"AmbushContactDust"')
     && worldSource.includes('debrisBatch.name = "AmbushImpactEarthFragmentsInstanced"')
-    && worldSource.includes("const tracerCount = 5")
+    && worldSource.includes("const tracerCount = 3")
     && worldSource.includes("const contactRange = Clamp(measuredRange, 0.95, 1.62)")
     && worldSource.includes('actionId !== "ambush"')
     && worldSource.includes("this.state.enemies ?? []")
@@ -422,10 +445,11 @@ Check(
   "Ambush feedback must preserve the acting unit origin and aim at the visible enemy formation rather than an anonymous tile center.",
 );
 Check(
-  worldSource.includes('batch.name = `${actionId === "ambush" ? "AmbushContactDust" : "SabotageActionSmoke"}Instanced`')
+  worldSource.includes('batch.name = `${actionId === "ambush" ? "AmbushContactDust" : "SabotageActionSmoke"}SoftParticles`')
     && worldSource.includes('sparkBatch.name = "SabotageWarmSparksInstanced"')
     && worldSource.includes('debrisBatch.name = "SabotageRailAndBallastFragmentsInstanced"')
-    && worldSource.includes("sabotageSmokeCount: 16")
+    && worldSource.includes("ambushSmokeCount: 18")
+    && worldSource.includes("sabotageSmokeCount: 20")
     && !worldSource.includes('"SabotageTransientPulse"')
     && !worldSource.includes('"SabotageFireball"')
     && !worldSource.includes('"SabotageImpactRing"'),
@@ -499,11 +523,11 @@ Check(
 );
 
 const cacheIdentity = worldModule.World3DCacheIdentity;
-Check(cacheIdentity === "EnemyRear1941_World3D_20260730_M", "World cache identity must match the release marker.");
+Check(cacheIdentity === "EnemyRear1941_World3D_20260730_P", "World cache identity must match the release marker.");
 Check(gameSource.includes("World3DCacheIdentity"), "Game canvas must expose the same World3D cache identity.");
-Check(indexSource.includes("Style_Game.css?v=20260730m"), "Stylesheet cache version must match the World3D release.");
-Check(indexSource.includes("Script_Game.mjs?v=20260730m"), "Game cache version must match the World3D release.");
-Check(gameSource.includes("Script_World3D.mjs?v=20260730m"), "World module cache version must match the page release.");
+Check(indexSource.includes("Style_Game.css?v=20260730p"), "Stylesheet cache version must match the World3D release.");
+Check(indexSource.includes("Script_Game.mjs?v=20260730p"), "Game cache version must match the World3D release.");
+Check(gameSource.includes("Script_World3D.mjs?v=20260730p"), "World module cache version must match the page release.");
 Check(indexSource.includes('"three": "../../taihang/vendor/three/build/three.module.mjs"'), "Import map must resolve GLTFLoader's local Three.js dependency.");
 
 Check(indexSource.includes("可操作三维六角格战术地图"), "Canvas accessibility label must describe the 3D map without engine jargon.");

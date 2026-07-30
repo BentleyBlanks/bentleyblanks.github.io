@@ -25,11 +25,11 @@ import {
   GetVictoryAssessment,
   SerializeState,
   DeserializeState,
-} from "./Script_Rules.mjs?v=20260730m";
+} from "./Script_Rules.mjs?v=20260730p";
 import {
   CreateEnemyRearWorld3D,
   World3DCacheIdentity,
-} from "./Script_World3D.mjs?v=20260730m";
+} from "./Script_World3D.mjs?v=20260730p";
 import {
   GetFixedHistoricalAnchor,
   GetHistoricalTurnNarrative,
@@ -38,7 +38,7 @@ import {
   historyBoundary,
   localPhaseDefinitions,
   ordinaryRoleDefinitions,
-} from "./Data_History.mjs?v=20260730m";
+} from "./Data_History.mjs?v=20260730p";
 
 const ui = {};
 const activePointers = new Map();
@@ -497,9 +497,20 @@ function RenderBriefing() {
   const phasePrefix = historyContext.phase
     ? `【地方阶段 · ${historyContext.phase.title}】`
     : "";
+  const eventProgress = AsArray(briefing.historicalEvent?.hooks)
+    .map((hook) => `${hook.met ? "已落实" : "待落实"}：${hook.label}`)
+    .join("；");
+  const openingImpact = AsArray(briefing.openingCondition?.entries)
+    .map((entry) => entry.text)
+    .filter(Boolean)
+    .join("；");
   SetText(
     "objectiveText",
-    `${phasePrefix}${objective}`,
+    [
+      `${phasePrefix}${objective}`,
+      eventProgress ? `部署证据 ${briefing.historicalEvent.metCount}/${briefing.historicalEvent.requiredCount}：${eventProgress}` : "",
+      openingImpact ? `本月开局影响：${openingImpact}` : "",
+    ].filter(Boolean).join(" "),
   );
   const warningEntries = AsArray(briefing.warnings);
   const warningText = warningEntries.length
@@ -546,12 +557,19 @@ function RenderTimeline() {
     const contextClass = index === contextVisibleIndex && turn !== currentTurn ? " isContext" : "";
     const phase = FindDefinition(localPhaseDefinitions, item.localPhaseId);
     const timelineTitle = phase ? `${phase.title} · ${item.title}` : item.title;
+    const resolvedEvent = AsArray(gameState.eventState?.resolved)
+      .find((entry) => Number(entry.turn) === turn);
+    const outcomeText = resolvedEvent
+      ? `【${resolvedEvent.outcomeLabel}】${resolvedEvent.summary}`
+      : turn === currentTurn
+        ? `【本月待落实】${item.historicalFrame ?? item.summary ?? ""}`
+        : item.historicalFrame ?? item.summary ?? "";
     return `
       <li class="${status}${contextClass}">
         <time>${EscapeHtml(item.date ?? `第${turn}回合`)}</time>
         <span>
           <b>${EscapeHtml(timelineTitle ?? item.name ?? "地方历史阶段")}</b>
-          <small>${EscapeHtml(item.historicalFrame ?? item.summary ?? "")}</small>
+          <small>${EscapeHtml(outcomeText)}</small>
         </span>
       </li>`;
   }).join("");
@@ -974,9 +992,18 @@ function PlayPendingWorldActionEffects() {
 function BuildTransitionReport(previousState, nextState) {
   const briefing = GetTurnBriefing(previousState) || {};
   const previousLogLength = AsArray(previousState.log).length;
-  const newLogEntries = AsArray(nextState.log).slice(previousLogLength);
+  const openingLogEntries = new Set(
+    AsArray(nextState.openingCondition?.entries)
+      .map((entry) => String(entry?.text ?? ""))
+      .filter(Boolean),
+  );
+  const newLogEntries = AsArray(nextState.log)
+    .slice(previousLogLength)
+    .filter((entry) => !openingLogEntries.has(String(entry)));
   const previousCostLength = AsArray(previousState.ledger?.civilianCosts).length;
   const newCosts = AsArray(nextState.ledger?.civilianCosts).slice(previousCostLength);
+  const previousEventLength = AsArray(previousState.eventState?.resolved).length;
+  const newEventResults = AsArray(nextState.eventState?.resolved).slice(previousEventLength);
   const enemyPattern = /敌军|搜索队|巡逻队|扫荡|封锁|据点|铁路修复|占领军|守备/;
   const playerEffectPattern = /停运铁路继续牵制敌军修复与守备力量/;
   const costPattern = /受创|损失|流离|困苦|生计|伤亡|放弃|短缺/;
@@ -987,7 +1014,8 @@ function BuildTransitionReport(previousState, nextState) {
   const playerEvents = newLogEntries.filter((entry) => {
     const text = String(entry);
     return (!enemyPattern.test(text) || playerEffectPattern.test(text))
-      && !costPattern.test(text);
+      && !costPattern.test(text)
+      && !/任务事件“/.test(text);
   });
   const meterDeltas = [
     ["人民安全", Number(nextState.meters?.people ?? 0) - Number(previousState.meters?.people ?? 0)],
@@ -998,7 +1026,15 @@ function BuildTransitionReport(previousState, nextState) {
   return {
     title: `${briefing.date ?? "本月"} · ${briefing.title ?? "战局结算"}`,
     summary: meterDeltas.map(([label, delta]) => `${label} ${FormatDelta(delta)}`).join("；"),
-    player: playerEvents.map((text) => ({ text })),
+    player: [
+      ...newEventResults.map((entry) => ({
+        title: `任务事件 · ${entry.title}`,
+        text: entry.summary,
+        delta: entry.outcomeLabel,
+        kind: `eventOutcome ${String(entry.outcomeId || "").toLowerCase()}`,
+      })),
+      ...playerEvents.map((text) => ({ text })),
+    ],
     enemy: enemyEvents.map((text) => ({ text })),
     costs: newCosts.map((entry) => ({
       title: entry.villageName ?? "战争代价",
@@ -1065,6 +1101,7 @@ function ShowOutcome() {
   const outcomeStamp = {
     HistoricalContinuity: "坚守",
     FragileSurvival: "存续",
+    CivilianDisaster: "灾难",
     NetworkBroken: "破损",
     进行中: "未结",
   }[assessment.status] ?? "战报";
@@ -1085,7 +1122,18 @@ function ShowOutcome() {
       institutions: "建成机构",
       unity: "抗日团结",
       discipline: "群众保护组织度",
+      households: "现存住户",
+      averageHardship: "平均困苦",
       survivingVillages: "存续村庄",
+      eventResponsibilitiesProtected: "月度责任落实",
+      eventResponsibilitiesPartial: "月度责任部分落实",
+      eventResponsibilitiesNeglected: "月度责任缺口",
+      operationalReadiness: "现存部队战备",
+      logisticsReserve: "粮药周转储备",
+      aggressiveActions: "主动军事行动",
+      advancedDoctrines: "进阶路线层数",
+      activePolicies: "执行中方针",
+      combatLosses: "部队损失记录",
     };
     const componentEvidence = Object.entries(assessment.components ?? {}).map(([key, value]) => ({
       label: componentLabels[key] ?? key,
@@ -1093,7 +1141,12 @@ function ShowOutcome() {
     }));
     const evidence = AsArray(assessment.evidence ?? assessment.metrics);
     if (!evidence.length) evidence.push(...componentEvidence);
-    ui.outcomeEvidence.innerHTML = evidence.map((item) => {
+    const requirementEvidence = AsArray(assessment.unmetRequirements).map((item) => ({
+      label: "未达成",
+      value: item.label ?? item.id,
+      note: "该门槛不能由军事贡献抵消",
+    }));
+    ui.outcomeEvidence.innerHTML = [...evidence, ...requirementEvidence].map((item) => {
       const normalized = typeof item === "string" ? { label: item, value: "" } : item;
       return `
         <article>
@@ -1105,6 +1158,18 @@ function ShowOutcome() {
   }
   if (ui.outcomeLedger) {
     ui.outcomeLedger.innerHTML = BuildLedgerHtml(gameState.ledger, true);
+  }
+  const outcomeCoda = ui.outcomeModal.querySelector("blockquote");
+  if (outcomeCoda) {
+    outcomeCoda.textContent = assessment.status === "HistoricalContinuity"
+      ? "本县保存了继续抗战的条件；全国胜利仍属于长期坚持抗战的中国人民，不由一县提前改写。"
+      : assessment.status === "CivilianDisaster"
+        ? Number(assessment.components?.aggressiveActions || 0) >= 5
+          ? "既定的全国胜利不能替本县的军事冒进开脱；村庄放弃、人民受创和组织破坏必须先被完整记录。"
+          : "既定的全国胜利不能掩盖本县人民安全和村庄生计的灾难；每项损失都必须先被完整记录。"
+        : assessment.status === "NetworkBroken"
+          ? "既定的全国胜利不能倒推为本县成功；长期不作为与组织失灵同样必须接受明确结算。"
+          : "本县仍有火种，但未完成责任和不可逆代价必须带入下一阶段，不能由一句胜利叙事抹去。";
   }
   OpenModal("outcomeModal");
   window.setTimeout(() => {
@@ -1152,8 +1217,86 @@ function BuildHistoricalAnchorCards(narrative) {
   }).join("");
 }
 
+function FormatHistoryChoiceNames(collection, ids, fallback) {
+  const names = AsArray(ids)
+    .map((id) => FindDefinition(collection, id)?.label
+      ?? FindDefinition(collection, id)?.name
+      ?? id)
+    .filter(Boolean);
+  return names.length ? names.join("、") : fallback;
+}
+
+function BuildHistoricalEventRecordHtml(turn) {
+  if (!gameState) {
+    return `<p class="ethicsNote"><b>尚未进入战局：</b>档案只说明本月责任边界；进入地图后，实际命令、结果与延迟后果才会写入这里。</p>`;
+  }
+  const resolved = AsArray(gameState.eventState?.resolved)
+    .find((entry) => Number(entry.turn) === Number(turn));
+  if (!resolved) {
+    const preview = Number(turn) === Number(gameState.turn)
+      ? GetTurnBriefing(gameState)?.historicalEvent
+      : null;
+    const hooks = AsArray(preview?.hooks).map((hook) => `
+      <li>
+        <b>${hook.met ? "已在命令队列落实" : "待落实"}</b>：${EscapeHtml(hook.label)}
+      </li>`).join("");
+    return `
+      <h3>本月部署钩子 · 尚未结算</h3>
+      <p>${EscapeHtml(preview?.objective ?? "本月仍在规划，尚无可归档的部署结果。")}</p>
+      ${hooks ? `<ol class="tutorialSteps">${hooks}</ol>` : ""}
+      <p class="ethicsNote">事件不会弹出孤立选项，也不会自动替你选择；只有地图上的真实命令与已经保存的机构会成为证据。</p>`;
+  }
+
+  const actionNames = FormatHistoryChoiceNames(
+    actionDefinitions,
+    resolved.choice?.actionIds,
+    "空命令（本月未部署）",
+  );
+  const policyNames = FormatHistoryChoiceNames(
+    policyDefinitions,
+    resolved.choice?.policyIds,
+    "未配置政策",
+  );
+  const targetNames = AsArray(resolved.choice?.targetHexIds)
+    .map((hexId) => GetHex(gameState, hexId)?.name ?? hexId)
+    .filter(Boolean);
+  const evidence = AsArray(resolved.evidence).map((hook) => `
+    <li>
+      <b>${hook.met ? "已落实" : "未落实"}</b>：${EscapeHtml(hook.label)}
+    </li>`).join("");
+  const consequences = [
+    ...AsArray(gameState.eventState?.pendingConsequences)
+      .filter((entry) => Number(entry.sourceTurn) === Number(turn))
+      .map((entry) => ({ ...entry, stateLabel: `待第 ${entry.applyTurn} 回合兑现` })),
+    ...AsArray(gameState.eventState?.appliedConsequences)
+      .filter((entry) => Number(entry.sourceTurn) === Number(turn))
+      .map((entry) => ({ ...entry, stateLabel: `已于${entry.date ?? `第 ${entry.turn} 回合`}兑现` })),
+  ];
+  const consequenceHtml = consequences.map((entry) => `
+    <section>
+      <b>${EscapeHtml(entry.stateLabel)}</b>
+      <p>${EscapeHtml(entry.text)}</p>
+      ${entry.responsibilityNote ? `<small>${EscapeHtml(entry.responsibilityNote)}</small>` : ""}
+    </section>`).join("");
+  return `
+    <h3>本月选择与结果 · ${EscapeHtml(resolved.outcomeLabel)}</h3>
+    <p>${EscapeHtml(resolved.summary)}</p>
+    <div class="briefColumns">
+      <section><b>实际命令</b><p>${EscapeHtml(actionNames)}</p></section>
+      <section><b>地图目标</b><p>${EscapeHtml(targetNames.length ? targetNames.join("、") : "无指定目标")}</p></section>
+      <section><b>当月政策</b><p>${EscapeHtml(policyNames)}</p></section>
+    </div>
+    <h3>部署证据与遗漏项</h3>
+    <ol class="tutorialSteps">${evidence}</ol>
+    ${consequenceHtml
+      ? `<h3>延迟后果</h3><div class="briefColumns">${consequenceHtml}</div>`
+      : `<p class="ethicsNote"><b>延迟后果：</b>本月没有登记待兑现的历史责任后果。</p>`}`;
+}
+
 function ShowHistoryArchive(requestedTurn = Number(gameState?.turn ?? 1)) {
-  const { turn, narrative, phase } = GetHistoryContext(requestedTurn);
+  const latestVisibleTurn = Clamp(Math.trunc(Number(gameState?.turn ?? 1)), 1, turnLimit);
+  const visibleTurn = Clamp(Math.trunc(Number(requestedTurn) || 1), 1, latestVisibleTurn);
+  const { turn, narrative, phase } = GetHistoryContext(visibleTurn);
   if (!narrative) {
     ShowToast("当前回合没有可用的历史档案", "bad");
     return;
@@ -1166,7 +1309,7 @@ function ShowHistoryArchive(requestedTurn = Number(gameState?.turn ?? 1)) {
       action: () => ShowHistoryArchive(turn - 1),
     });
   }
-  if (turn < turnLimit) {
+  if (turn < latestVisibleTurn) {
     buttons.push({
       label: "下一月",
       className: "secondaryButton",
@@ -1184,6 +1327,7 @@ function ShowHistoryArchive(requestedTurn = Number(gameState?.turn ?? 1)) {
       <h3>${EscapeHtml(narrative.event.classification)}事件 · ${EscapeHtml(narrative.event.title)}</h3>
       <p>${EscapeHtml(narrative.event.synopsis)}</p>
       <p><small>${EscapeHtml(narrative.event.disclaimer)}</small></p>
+      ${BuildHistoricalEventRecordHtml(turn)}
       <div class="briefColumns">${BuildHistoryRoleCards(narrative)}</div>
       <h3>发现—准备—保护—应对—恢复责任链</h3>
       <ol class="tutorialSteps">${BuildResponsibilityChainHtml(narrative)}</ol>
@@ -1447,11 +1591,47 @@ function BuildLedgerHtml(ledger = {}, compact = false) {
     ["被迫放弃村庄", AsArray(ledger.villageAbandonments).length, "基层机构与建设队列同时失去"],
     ["战斗损失记录", AsArray(ledger.combatLosses).length, "不以击杀数抵销"],
     ["代价事件", AsArray(ledger.civilianCosts).length, "每一项均保留日期和因果"],
+    ["延迟后果", AsArray(ledger.historicalConsequences).length, "显示源事件与兑现月份"],
   ];
+  const records = [
+    ...AsArray(ledger.civilianCosts).map((entry) => ({
+      turn: Number(entry.turn) || 0,
+      date: entry.date ?? `第 ${entry.turn ?? "?"} 回合`,
+      title: entry.villageName ?? "人民与组织代价",
+      text: entry.text ?? "本项代价缺少说明。",
+      note: entry.temporary
+        ? "保护性临时安置；不自动计作永久流离"
+        : `记录类型：${entry.type ?? "战争代价"}`,
+    })),
+    ...AsArray(ledger.combatLosses).map((entry) => ({
+      turn: Number(entry.turn) || 0,
+      date: entry.date ?? `第 ${entry.turn ?? "?"} 回合`,
+      title: entry.unitName ?? "部队损失",
+      text: entry.text ?? "本项战斗损失缺少说明。",
+      note: "不以歼敌或贡献数字抵消",
+    })),
+    ...AsArray(ledger.historicalConsequences).map((entry) => ({
+      turn: Number(entry.turn) || 0,
+      date: entry.date ?? `第 ${entry.turn ?? "?"} 回合`,
+      title: `延迟后果 · ${entry.sourceTitle ?? "上月责任缺口"}`,
+      text: entry.text ?? "未完成责任在本月继续产生影响。",
+      note: `${entry.sourceDate ?? "此前"}形成；${entry.responsibilityNote ?? "责任与后果分别记录"}`,
+    })),
+  ].sort((first, second) => first.turn - second.turn);
   return `
     <div class="ledgerGrid${compact ? " compact" : ""}">
       ${entries.map(([label, value, note]) => `
         <article><span>${label}</span><b>${EscapeHtml(value)}</b><small>${note}</small></article>`).join("")}
+    </div>
+    <div class="reportList ledgerRecordList">
+      ${records.length
+        ? records.map((entry) => `
+          <article class="reportEntry cost">
+            <b>${EscapeHtml(entry.date)} · ${EscapeHtml(entry.title)}</b>
+            <p>${EscapeHtml(entry.text)}</p>
+            <span>${EscapeHtml(entry.note)}</span>
+          </article>`).join("")
+        : "<p class=\"emptyReport\">尚无逐条代价或延迟后果记录。</p>"}
     </div>`;
 }
 

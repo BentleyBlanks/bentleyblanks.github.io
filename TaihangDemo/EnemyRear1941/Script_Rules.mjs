@@ -1,3 +1,12 @@
+import {
+  ApplyDueHistoricalConsequences,
+  CreateHistoricalEventState,
+  EnsureHistoricalEventState,
+  GetHistoricalEventOutcomeCounts,
+  GetHistoricalEventPreview,
+  ResolveHistoricalEvent,
+} from "./Script_HistoricalEvents.mjs";
+
 /**
  * 《太行敌后：一九四一》纯规则层。
  *
@@ -7,7 +16,7 @@
  * 只写入不可逆的代价账本，不兑换资源，也不进入胜利分数。
  */
 
-export const saveVersion = 2;
+export const saveVersion = 3;
 // 保留既有 key，以便把线上 v1 的“疏散即永久流离”存档迁移为新语义。
 export const saveKey = "enemyrear1941_campaign_v1";
 export const turnLimit = 16;
@@ -756,6 +765,31 @@ const terrainById = new Map(terrainDefinitions.map((definition) => [definition.i
 const unitById = new Map(unitDefinitions.map((definition) => [definition.id, definition]));
 const institutionById = new Map(institutionDefinitions.map((definition) => [definition.id, definition]));
 const improvementById = new Map(improvementDefinitions.map((definition) => [definition.id, definition]));
+const civilianPracticeActionIds = new Set([
+  "organize",
+  "relief",
+  "evacuate",
+  "buildPartyBranch",
+  "buildCooperative",
+  "buildClinic",
+  "buildArsenal",
+  "buildStation",
+  "buildTunnels",
+  "constructionDrive",
+  "improveTile",
+  "selfProduction",
+]);
+const militaryPracticeActionIds = new Set([
+  "recon",
+  "ambush",
+  "sabotage",
+]);
+const meaningfulActionIds = new Set([
+  ...civilianPracticeActionIds,
+  ...militaryPracticeActionIds,
+  "emergencySupply",
+  "rest",
+]);
 
 const terrainLayout = Object.freeze([
   Object.freeze(["Mountain", "Mountain", "Forest", "Hill", "Plain", "Plain", "Hill", "Plain", "Hill"]),
@@ -894,6 +928,83 @@ function RecordEnemyObservableTrace(state, traceType, hexId) {
   routeMemory[historyField] = routeMemory[historyField].slice(-32);
 }
 
+function RevealInstitutionToEnemy(
+  state,
+  hex,
+  confidence = 1,
+  duration = 3,
+  source = "LocalSearch",
+) {
+  if (!IsVillage(hex) || !hex.institution) {
+    return;
+  }
+  const existing = hex.enemyInstitutionIntel;
+  const expiresTurn = state.turn + Math.max(1, duration);
+  hex.enemyInstitutionIntel = {
+    institutionId: hex.institution,
+    confidence: Math.max(Number(existing?.confidence) || 0, confidence),
+    detectedTurn: existing?.institutionId === hex.institution
+      ? Math.min(existing.detectedTurn || state.turn, state.turn)
+      : state.turn,
+    expiresTurn: Math.max(
+      existing?.institutionId === hex.institution ? (existing.expiresTurn || 0) : 0,
+      expiresTurn,
+    ),
+    source,
+  };
+}
+
+function UpdateEnemyInstitutionIntelligence(state) {
+  for (const village of state.hexes.filter(IsVillage)) {
+    if (!village.institution) {
+      village.enemyInstitutionIntel = null;
+      continue;
+    }
+    const nearbyEnemies = state.enemies
+      .filter((enemy) => enemy.active && ["Search", "Patrol", "Garrison", "SweepColumn"].includes(enemy.type))
+      .map((enemy) => {
+        const enemyHex = FindHexInternal(state, enemy.hexId);
+        return {
+          enemy,
+          distance: enemyHex ? HexDistance(enemyHex, village) : Number.POSITIVE_INFINITY,
+        };
+      })
+      .filter((entry) => entry.distance <= 1);
+    if (nearbyEnemies.length === 0) {
+      continue;
+    }
+    if (nearbyEnemies.some((entry) => entry.distance === 0)) {
+      RevealInstitutionToEnemy(state, village, 3, 4, "DirectSearch");
+      continue;
+    }
+    const concealment = terrainById.get(village.terrain)?.concealment || 0;
+    const searchPressure = nearbyEnemies.reduce((total, entry) => (
+      total + (entry.enemy.type === "Search" ? 24 : entry.enemy.type === "Patrol" ? 16 : 10)
+    ), 0);
+    const institutionSignature = village.institution === "Arsenal"
+      ? 18
+      : village.institution === "Station"
+        ? 8
+        : 4;
+    const detectionChance = Clamp(
+      8
+        + searchPressure
+        + institutionSignature
+        + Math.floor(state.meters.exposure * 0.35)
+        - (concealment * 17)
+        - Math.floor(state.meters.discipline * 0.12),
+      4,
+      88,
+    );
+    const roll = HashEnemyPlanText(
+      `${state.initialSeed}|${state.turn}|InstitutionSearch|${village.id}|${village.institution}`,
+    ) % 100;
+    if (roll < detectionChance) {
+      RevealInstitutionToEnemy(state, village, detectionChance >= 62 ? 2 : 1, 3, "SearchClue");
+    }
+  }
+}
+
 export function GetEnemyObservableSnapshot(state, executionTurn = state?.turn || 1) {
   const routeMemory = state?.enemyPlanning?.routeMemory || CreateEnemyPlanningState().routeMemory;
   const cutoffTurn = Math.max(1, executionTurn - 5);
@@ -911,8 +1022,19 @@ export function GetEnemyObservableSnapshot(state, executionTurn = state?.turn ||
     }))
     .sort((first, second) => first.hexId.localeCompare(second.hexId));
   const publicInstitutions = (state?.hexes || [])
-    .filter((hex) => IsVillage(hex) && typeof hex.institution === "string" && hex.institution.length > 0)
-    .map((hex) => ({ hexId: hex.id, institutionId: hex.institution }))
+    .filter((hex) => {
+      const intel = hex.enemyInstitutionIntel;
+      return IsVillage(hex)
+        && typeof hex.institution === "string"
+        && hex.institution.length > 0
+        && intel?.institutionId === hex.institution
+        && Number(intel.expiresTurn || 0) >= executionTurn;
+    })
+    .map((hex) => ({
+      hexId: hex.id,
+      institutionId: hex.institution,
+      confidence: Clamp(Number(hex.enemyInstitutionIntel?.confidence) || 1, 1, 3),
+    }))
     .sort((first, second) => first.hexId.localeCompare(second.hexId));
   const executedSabotage = (routeMemory.executedSabotage || [])
     .filter((entry) => entry.turn < executionTurn && entry.turn >= cutoffTurn)
@@ -979,7 +1101,7 @@ export function GenerateEnemyOperationalPlan(state, executionTurn = state?.turn 
         hex,
         score: (institutionIds.has(hex.hexId) ? 18 : 0)
           + (hex.road ? 7 : 0)
-          + (terrainById.get(hex.terrain)?.concealment || 0)
+          - ((terrainById.get(hex.terrain)?.concealment || 0) * 4)
           + Math.floor(snapshot.exposure / 18)
           + (sabotagePressure * 3)
           + (routePressure * 2)
@@ -1121,6 +1243,158 @@ function GetPolicyEffect(state, effectId, fallback = 0) {
   }, effectId.toLowerCase().includes("multiplier") ? 1 : fallback);
 }
 
+function GetActivePolicyIds(state) {
+  const policyIds = state.policyLock?.locked && state.policyLock.turn === state.turn
+    ? state.policyLock.policyIds
+    : state.policies;
+  return Array.isArray(policyIds) ? policyIds.filter((policyId) => policyById.has(policyId)) : [];
+}
+
+function GetPolicyFocus(state) {
+  const kinds = GetActivePolicyIds(state)
+    .map((policyId) => policyById.get(policyId)?.kind)
+    .filter(Boolean);
+  if (kinds.length < 2) {
+    return "none";
+  }
+  if (kinds.every((kind) => kind === "civilian")) {
+    return "civilian";
+  }
+  if (kinds.every((kind) => kind === "military")) {
+    return "military";
+  }
+  return "mixed";
+}
+
+function CreateStrategicLedger() {
+  return {
+    policyTurnsById: {},
+    policyCurrentStreakById: {},
+    policyLongestStreakById: {},
+    previousPolicyIds: [],
+    doctrineUnlockedTurnById: {
+      MassLine: 0,
+      MobileGuerrilla: 0,
+    },
+    doctrinePracticeById: {},
+    meaningfulTurns: 0,
+    consecutiveEmptyTurns: 0,
+    totalUnusedCommand: 0,
+    railDelayEffects: 0,
+    contactEncounters: 0,
+  };
+}
+
+function EnsureStrategicLedger(state) {
+  if (!state.strategicLedger || typeof state.strategicLedger !== "object") {
+    state.strategicLedger = CreateStrategicLedger();
+  }
+  const ledger = state.strategicLedger;
+  ledger.policyTurnsById = ledger.policyTurnsById || {};
+  ledger.policyCurrentStreakById = ledger.policyCurrentStreakById || {};
+  ledger.policyLongestStreakById = ledger.policyLongestStreakById || {};
+  ledger.previousPolicyIds = Array.isArray(ledger.previousPolicyIds)
+    ? ledger.previousPolicyIds
+    : [];
+  ledger.doctrineUnlockedTurnById = ledger.doctrineUnlockedTurnById || {
+    MassLine: 0,
+    MobileGuerrilla: 0,
+  };
+  ledger.doctrineUnlockedTurnById.MassLine = Number.isInteger(
+    ledger.doctrineUnlockedTurnById.MassLine,
+  )
+    ? ledger.doctrineUnlockedTurnById.MassLine
+    : 0;
+  ledger.doctrineUnlockedTurnById.MobileGuerrilla = Number.isInteger(
+    ledger.doctrineUnlockedTurnById.MobileGuerrilla,
+  )
+    ? ledger.doctrineUnlockedTurnById.MobileGuerrilla
+    : 0;
+  ledger.doctrinePracticeById = ledger.doctrinePracticeById || {};
+  for (const field of [
+    "meaningfulTurns",
+    "consecutiveEmptyTurns",
+    "totalUnusedCommand",
+    "railDelayEffects",
+    "contactEncounters",
+  ]) {
+    ledger[field] = Number.isFinite(Number(ledger[field]))
+      ? Math.max(0, Number(ledger[field]))
+      : 0;
+  }
+  return ledger;
+}
+
+function RecordStrategicExecution(state, orders) {
+  const ledger = EnsureStrategicLedger(state);
+  const activePolicyIds = GetActivePolicyIds(state);
+  const previousPolicyIds = new Set(ledger.previousPolicyIds);
+  for (const policyId of policyDefinitions.map((definition) => definition.id)) {
+    if (!activePolicyIds.includes(policyId)) {
+      ledger.policyCurrentStreakById[policyId] = 0;
+      continue;
+    }
+    ledger.policyTurnsById[policyId] = (ledger.policyTurnsById[policyId] || 0) + 1;
+    const currentStreak = previousPolicyIds.has(policyId)
+      ? (ledger.policyCurrentStreakById[policyId] || 0) + 1
+      : 1;
+    ledger.policyCurrentStreakById[policyId] = currentStreak;
+    ledger.policyLongestStreakById[policyId] = Math.max(
+      ledger.policyLongestStreakById[policyId] || 0,
+      currentStreak,
+    );
+  }
+  ledger.previousPolicyIds = [...activePolicyIds];
+
+  const actionIds = new Set((orders || []).map((order) => order.actionId));
+  const hasCivilianPractice = [...actionIds].some((actionId) => civilianPracticeActionIds.has(actionId));
+  const hasMilitaryPractice = [...actionIds].some((actionId) => militaryPracticeActionIds.has(actionId));
+  for (const definition of doctrineDefinitions.filter((candidate) => candidate.tier > 0)) {
+    if (!HasDoctrine(state, definition.id)) {
+      continue;
+    }
+    const practiced = definition.tree === "civilian" ? hasCivilianPractice : hasMilitaryPractice;
+    if (practiced) {
+      ledger.doctrinePracticeById[definition.id] = (ledger.doctrinePracticeById[definition.id] || 0) + 1;
+    }
+  }
+
+  const meaningfulOrderCount = (orders || [])
+    .filter((order) => meaningfulActionIds.has(order.actionId))
+    .length;
+  if (meaningfulOrderCount > 0) {
+    ledger.meaningfulTurns += 1;
+    ledger.consecutiveEmptyTurns = 0;
+  } else {
+    ledger.consecutiveEmptyTurns += 1;
+  }
+  const usedCommand = (orders || []).reduce(
+    (total, order) => total + (order.cost?.command || 1),
+    0,
+  ) + (state.policyAdjustmentCost || 0);
+  ledger.totalUnusedCommand += Math.max(0, state.commandMax - usedCommand);
+  return {
+    meaningfulOrderCount,
+    unusedCommand: Math.max(0, state.commandMax - usedCommand),
+  };
+}
+
+function ResolveStrategicTempo(state, execution) {
+  const ledger = EnsureStrategicLedger(state);
+  if (execution.meaningfulOrderCount > 0) {
+    return;
+  }
+  const pressure = GetHistoricalTurn(state.turn)?.enemyPressure || 1;
+  const networkLoss = Clamp(1 + Math.floor((ledger.consecutiveEmptyTurns - 1) / 2)
+    + (pressure >= 6 ? 1 : 0), 1, 4);
+  state.meters.network = Clamp(state.meters.network - networkLoss, 0, maximumMeter);
+  state.meters.discipline = Clamp(state.meters.discipline - 1, 0, maximumMeter);
+  state.meters.unity = Clamp(state.meters.unity - 1, 0, maximumMeter);
+  state.log.push(
+    `本月没有落实有效部署，基层联络被封锁压力蚕食：网络 -${networkLoss}、纪律 -1、团结 -1。单纯移动不能替代群众、生产、情报或防护责任。`,
+  );
+}
+
 function EnsurePolicyLock(state) {
   if (!state.policyLock || state.policyLock.turn !== state.turn) {
     state.policyLock = {
@@ -1188,6 +1462,7 @@ function CreateMap() {
         improvement: null,
         institution: null,
         construction: null,
+        enemyInstitutionIntel: null,
         evacuated: false,
         evacuationProtection: 0,
         shelteredHouseholds: 0,
@@ -1326,25 +1601,41 @@ function UpdateVisibility(state) {
 function ApplyOpeningConditions(state, turn) {
   const event = GetHistoricalTurn(turn);
   if (!event || !event.hardshipPulse) {
-    return;
+    return null;
   }
   for (const village of state.hexes.filter(IsVillage)) {
     village.hardship = Clamp(village.hardship + event.hardshipPulse, 0, maximumMeter);
   }
-  state.log.push(`${event.date}：${event.title}使各村困苦度上升 ${event.hardshipPulse}。`);
+  const text = `${event.date}：${event.title}使各村困苦度上升 ${event.hardshipPulse}。`;
+  state.log.push(text);
+  return {
+    kind: "SeasonalPressure",
+    turn,
+    date: event.date,
+    title: event.title,
+    text,
+  };
 }
 
 function SelectWarningTargets(state, targetCount, targetTurn) {
   const plan = state.enemyPlanning?.currentPlan?.executionTurn === targetTurn
     ? state.enemyPlanning.currentPlan
     : null;
+  const clarity = Clamp(plan?.reconClarity || 0, 0, 3);
   const plannedTargetIds = plan
     ? [plan.primaryTargetId, ...(plan.secondaryTargetIds || [])].filter(Boolean)
     : [];
   const plannedTargets = plannedTargetIds
     .map((hexId) => FindHexInternal(state, hexId))
     .filter((hex) => IsVillage(hex) && hex.livelihood > 0);
-  const alreadySelectedIds = new Set(plannedTargets.map((hex) => hex.id));
+  const alreadySelectedIds = new Set(
+    state.hexes
+      .filter((hex) => hex.warning?.turn === targetTurn && hex.warning.isActualTarget !== false)
+      .map((hex) => hex.id),
+  );
+  for (const target of plannedTargets) {
+    alreadySelectedIds.add(target.id);
+  }
   const fallbackTargets = state.hexes
     .filter((hex) => IsVillage(hex) && hex.livelihood > 0 && !alreadySelectedIds.has(hex.id))
     .map((hex) => ({
@@ -1356,16 +1647,55 @@ function SelectWarningTargets(state, targetCount, targetTurn) {
     }))
     .sort((first, second) => second.score - first.score || first.hex.id.localeCompare(second.hex.id))
     .map((entry) => entry.hex);
-  const targets = [...plannedTargets, ...fallbackTargets].slice(0, targetCount);
+  const actualTargets = [...plannedTargets, ...fallbackTargets]
+    .filter((target, index, targets) => targets.findIndex((candidate) => candidate.id === target.id) === index)
+    .slice(0, targetCount);
+  const actualTargetIds = new Set(actualTargets.map((target) => target.id));
+  const confidence = clarity >= 2 ? "Corroborated" : clarity >= 1 ? "Probable" : "Rumor";
+  const warningIntensity = GetHistoricalTurn(targetTurn)?.sweepIntensity
+    || (state.meters.exposure >= 75 ? 2 : 1);
 
-  for (const target of targets) {
+  for (const target of actualTargets) {
     target.warning = {
       turn: targetTurn,
       kind: "Sweep",
-      intensity: GetHistoricalTurn(targetTurn)?.sweepIntensity || (state.meters.exposure >= 75 ? 2 : 1),
-      text: `${targetTurn === 9 ? "多路扫荡" : "搜索扫荡"}可能指向${target.name}`,
+      intensity: warningIntensity,
+      text: clarity >= 2
+        ? `${targetTurn === 9 ? "多路扫荡" : "搜索扫荡"}的多源征候指向${target.name}`
+        : `${targetTurn === 9 ? "多路扫荡" : "搜索扫荡"}征候可能涉及${target.name}一带，仍需辨别真假方向`,
       sourcePlanId: plan?.id || null,
-      confidence: (plan?.reconClarity || 0) >= 2 ? "Corroborated" : "Probable",
+      confidence,
+      isActualTarget: true,
+    };
+  }
+
+  const decoyCount = clarity >= 2 ? 0 : clarity === 1 ? 1 : 2;
+  const decoyTargets = state.hexes
+    .filter((hex) => IsVillage(hex)
+      && hex.livelihood > 0
+      && !actualTargetIds.has(hex.id)
+      && hex.warning?.turn !== targetTurn)
+    .map((hex) => ({
+      hex,
+      sectorMatch: actualTargets.some(
+        (target) => GetEnemyPlanSignalSector(target) === GetEnemyPlanSignalSector(hex),
+      ) ? 1 : 0,
+      noise: HashEnemyPlanText(`${state.initialSeed}|${targetTurn}|WarningDecoy|${hex.id}`) % 17,
+    }))
+    .sort((first, second) => second.sectorMatch - first.sectorMatch
+      || second.noise - first.noise
+      || first.hex.id.localeCompare(second.hex.id))
+    .slice(0, decoyCount)
+    .map((entry) => entry.hex);
+  for (const decoy of decoyTargets) {
+    decoy.warning = {
+      turn: targetTurn,
+      kind: "Sweep",
+      intensity: warningIntensity,
+      text: `${decoy.name}一带出现未经交叉核验的搜索征候，可能是佯动或先遣搜捕`,
+      sourcePlanId: plan?.id || null,
+      confidence,
+      isActualTarget: false,
     };
   }
 }
@@ -1373,7 +1703,8 @@ function SelectWarningTargets(state, targetCount, targetTurn) {
 function PrepareWarningsForCurrentTurn(state) {
   const event = GetHistoricalTurn(state.turn);
   if (event.sweepTargets > 0) {
-    const existingCount = state.hexes.filter((hex) => hex.warning?.turn === state.turn).length;
+    const existingCount = state.hexes.filter((hex) => hex.warning?.turn === state.turn
+      && hex.warning.isActualTarget !== false).length;
     if (existingCount < event.sweepTargets) {
       SelectWarningTargets(state, event.sweepTargets - existingCount, state.turn);
     }
@@ -1474,6 +1805,9 @@ export function CreateInitialState(seed = 19410918) {
       usesByStage: {},
       civilianExperienceByStage: {},
     },
+    strategicLedger: CreateStrategicLedger(),
+    policyAdjustmentCost: 0,
+    policySwitchCooldownUntil: 0,
     intelligenceLedger: {
       reconUsesByStage: {},
       militaryExperienceByStage: {},
@@ -1484,8 +1818,11 @@ export function CreateInitialState(seed = 19410918) {
     },
     emergencySupplyCooldownUntil: 0,
     lastTurnEconomy: null,
+    eventState: CreateHistoricalEventState(),
+    openingCondition: null,
     ledger: {
       civilianCosts: [],
+      historicalConsequences: [],
       displacedHouseholds: 0,
       affectedHouseholds: 0,
       livelihoodDestroyed: 0,
@@ -1502,7 +1839,13 @@ export function CreateInitialState(seed = 19410918) {
   };
 
   state.meters.network = CalculateNetwork(state);
-  ApplyOpeningConditions(state, 1);
+  const initialOpeningCondition = ApplyOpeningConditions(state, 1);
+  state.openingCondition = {
+    turn: 1,
+    date: GetHistoricalTurn(1).date,
+    title: GetHistoricalTurn(1).title,
+    entries: initialOpeningCondition ? [initialOpeningCondition] : [],
+  };
   LockEnemyOperationalPlan(state, 1);
   PrepareWarningsForCurrentTurn(state);
   UpdateVisibility(state);
@@ -1664,31 +2007,92 @@ function GetVillageLaborFactor(village) {
   return householdFactor * hardshipFactor;
 }
 
-function IsHexSupplyConnected(state, hexId) {
+function GetSupportedConstructionGain(state, village) {
+  const laborFactor = GetVillageLaborFactor(village);
+  const policyBonus = GetPolicyEffect(state, "constructionBonus", 0)
+    + (GetPolicyFocus(state) === "civilian" ? 1 : 0);
+  return Math.max(
+    1,
+    Math.floor((1 + Math.floor(village.contact / 40) + policyBonus) * laborFactor),
+  );
+}
+
+function GetConstructionDriveGain(village) {
+  return Math.max(1, Math.floor(4 * GetVillageLaborFactor(village)));
+}
+
+function GetEarliestConstructionCompletionTurn(state, village, institution) {
+  const openingProgress = 2 + GetSupportedConstructionGain(state, village);
+  if (openingProgress >= institution.required) {
+    return state.turn;
+  }
+  const futureMonthlyGain = GetSupportedConstructionGain(state, village)
+    + GetConstructionDriveGain(village);
+  const additionalTurns = Math.ceil(
+    (institution.required - openingProgress) / Math.max(1, futureMonthlyGain),
+  );
+  return state.turn + additionalTurns;
+}
+
+function IsSupplyNodeBlockaded(state, targetHex, options = {}) {
+  const ignoreSweepColumns = Boolean(options.ignoreSweepColumns);
+  return state.enemies.some((enemy) => {
+    if (!enemy.active || !["Garrison", "Patrol", "Search", "SweepColumn"].includes(enemy.type)) {
+      return false;
+    }
+    if (ignoreSweepColumns && enemy.type === "SweepColumn") {
+      return false;
+    }
+    const enemyHex = FindHexInternal(state, enemy.hexId);
+    return enemyHex && HexDistance(enemyHex, targetHex) <= 1;
+  });
+}
+
+function GetConnectedTrafficStationIds(state) {
+  const headquarters = state.hexes.find((hex) => hex.feature === "Headquarters");
+  if (!headquarters) {
+    return new Set();
+  }
+  const stations = state.hexes.filter((hex) => IsVillage(hex)
+    && hex.institution === "Station"
+    && hex.households > 0
+    && hex.livelihood > 0
+    && !IsSupplyNodeBlockaded(state, hex));
+  const connectedIds = new Set(
+    stations
+      .filter((station) => HexDistance(headquarters, station) <= 3)
+      .map((station) => station.id),
+  );
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const station of stations) {
+      if (connectedIds.has(station.id)) {
+        continue;
+      }
+      const linked = stations.some((candidate) => connectedIds.has(candidate.id)
+        && HexDistance(candidate, station) <= 3);
+      if (linked) {
+        connectedIds.add(station.id);
+        changed = true;
+      }
+    }
+  }
+  return connectedIds;
+}
+
+function IsHexSupplyConnected(state, hexId, options = {}) {
   const targetHex = FindHexInternal(state, hexId);
-  if (!targetHex) {
+  if (!targetHex || IsSupplyNodeBlockaded(state, targetHex, options)) {
     return false;
   }
   const headquarters = state.hexes.find((hex) => hex.feature === "Headquarters");
   if (headquarters && HexDistance(headquarters, targetHex) <= 2) {
     return true;
   }
-  const operationalStations = state.hexes.filter((hex) => IsVillage(hex)
-    && hex.institution === "Station"
-    && hex.households > 0
-    && hex.livelihood > 0);
-  const stationConnected = operationalStations.some((station) => HexDistance(station, targetHex) <= 3);
-  if (!stationConnected) {
-    return false;
-  }
-  const localBlockade = state.enemies.some((enemy) => {
-    if (!enemy.active || !["Garrison", "Patrol", "Search"].includes(enemy.type)) {
-      return false;
-    }
-    const enemyHex = FindHexInternal(state, enemy.hexId);
-    return enemyHex && HexDistance(enemyHex, targetHex) <= 1;
-  });
-  return !localBlockade || targetHex.institution === "Station";
+  const connectedStationIds = GetConnectedTrafficStationIds(state);
+  return state.hexes.some((station) => connectedStationIds.has(station.id)
+    && HexDistance(station, targetHex) <= 3);
 }
 
 function IsVillageSupplyConnected(state, village) {
@@ -1900,6 +2304,13 @@ function ValidateAction(
     if (!HasDoctrine(state, institution.doctrine)) {
       return { enabled: false, reason: `需要路线：${doctrineById.get(institution.doctrine)?.label}` };
     }
+    const earliestCompletionTurn = GetEarliestConstructionCompletionTurn(state, targetHex, institution);
+    if (earliestCompletionTurn > turnLimit) {
+      return {
+        enabled: false,
+        reason: `即使连续集中施工，最早也要到第 ${earliestCompletionTurn} 回合才能建成，已超出本战役阶段`,
+      };
+    }
     return { enabled: true, reason: "" };
   }
 
@@ -2100,7 +2511,12 @@ function BuildPreviewText(state, action, targetHex, unit) {
       if (action.institutionId) {
         const institution = institutionById.get(action.institutionId);
         effects.push(`启动${institution.label}建设队列：2/${institution.required} 工程`);
-        risks.push("每村只能选择一种专业机构");
+        if (targetHex) {
+          effects.push(
+            `连续投入时最早可在第 ${GetEarliestConstructionCompletionTurn(state, targetHex, institution)} 回合建成`,
+          );
+        }
+        risks.push("每村只能选择一种专业机构；启动后仍需工作队集中施工，不能自动滚完");
       }
       break;
     }
@@ -2214,9 +2630,13 @@ export function ListContextActions(state, selectedHexId, selectedUnitId) {
 
 function UpdateReservedField(state) {
   state.reserved = GetReservedResources(state);
-  state.commandPoints = Clamp(state.commandMax - state.orders.reduce((total, order) => {
-    return total + (order.cost?.command || 1);
-  }, 0), 0, state.commandMax);
+  state.commandPoints = Clamp(
+    state.commandMax
+      - (state.policyAdjustmentCost || 0)
+      - state.orders.reduce((total, order) => total + (order.cost?.command || 1), 0),
+    0,
+    state.commandMax,
+  );
 }
 
 export function QueueOrder(state, orderLike) {
@@ -2346,7 +2766,12 @@ function CalculateVillageYield(state, village, concentrated = false, workedHex =
   const laborFactor = GetVillageLaborFactor(village);
   const livelihoodFactor = Clamp(village.livelihood / 75, 0.2, 1);
   const concentrationFactor = concentrated ? 1.1 : 0.65;
-  const outputFactor = laborFactor * livelihoodFactor * concentrationFactor * yieldMultiplier;
+  const policyFocusMultiplier = GetPolicyFocus(state) === "civilian" ? 1.15 : 1;
+  const outputFactor = laborFactor
+    * livelihoodFactor
+    * concentrationFactor
+    * yieldMultiplier
+    * policyFocusMultiplier;
   const output = {
     grain: Math.max(0, Math.floor((2 + (localYield.grain || 0) + (workedYield.grain || 0)) * outputFactor)),
     arms: Math.max(0, Math.floor(((localYield.arms || 0) + (workedYield.arms || 0)) * outputFactor)),
@@ -2504,6 +2929,8 @@ function ApplyPlayerOrder(state, order) {
       required: institution.required,
       cost: institution.required,
       startedTurn: state.turn,
+      lastDriveTurn: state.turn,
+      unattendedTurns: 0,
     };
     AddDoctrineExperience(state, "civilian", 3);
     state.meters.exposure = Clamp(
@@ -2516,10 +2943,11 @@ function ApplyPlayerOrder(state, order) {
   }
 
   if (action.id === "constructionDrive") {
-    const laborFactor = GetVillageLaborFactor(targetHex);
-    const progressGain = Math.max(1, Math.floor(4 * laborFactor));
+    const progressGain = GetConstructionDriveGain(targetHex);
     targetHex.construction.progress += progressGain;
-    AddDoctrineExperience(state, "civilian", 2);
+    targetHex.construction.lastDriveTurn = state.turn;
+    targetHex.construction.unattendedTurns = 0;
+    AddDoctrineExperience(state, "civilian", 3);
     state.log.push(`${unit.name}协助${targetHex.name}集中施工，工程 +${progressGain}。`);
     return;
   }
@@ -2575,9 +3003,22 @@ function ApplyPlayerOrder(state, order) {
     if (informedAction) {
       state.resources.intel -= 1;
     }
+    const contactSucceeded = ResolveSabotageSecurityContact(
+      state,
+      unit,
+      targetHex,
+      informedAction,
+    );
+    if (!contactSucceeded) {
+      state.meters.discipline = Clamp(state.meters.discipline - 2, 0, 100);
+      RecordEnemyObservableTrace(state, "Sabotage", targetHex.id);
+      AddDoctrineExperience(state, "military", 2);
+      return;
+    }
     const doctrineDuration = HasDoctrine(state, "MineAndSabotage") ? 1 : 0;
     const policyDuration = GetPolicyEffect(state, "sabotageDuration", 0);
-    targetHex.railDisabledTurns = 2 + doctrineDuration + policyDuration;
+    const focusDuration = GetPolicyFocus(state) === "military" ? 1 : 0;
+    targetHex.railDisabledTurns = 2 + doctrineDuration + policyDuration + focusDuration;
     const exposureMultiplier = GetPolicyEffect(state, "exposureMultiplier", 1);
     const exposureGain = Math.max(7, Math.round((informedAction ? 14 : 19) * exposureMultiplier));
     state.meters.exposure = Clamp(state.meters.exposure + exposureGain, 0, maximumMeter);
@@ -2626,6 +3067,137 @@ function GetEffectiveUnitStrength(unit) {
   return (unit?.strength || 0) * GetUnitReadinessFactor(unit);
 }
 
+function FindRetreatHex(state, originHex, side) {
+  if (!originHex) {
+    return null;
+  }
+  return GetNeighbors(state, originHex.id)
+    .filter((hex) => {
+      if (side === "player") {
+        const enemyOccupied = state.enemies.some((enemy) => enemy.active && enemy.hexId === hex.id);
+        const enemyFortification = hex.control === "enemy"
+          && ["Stronghold", "CountySeat", "RailStation"].includes(hex.feature);
+        return !enemyOccupied && !enemyFortification;
+      }
+      return !state.units.some((unit) => unit.readiness > 0 && unit.hexId === hex.id);
+    })
+    .map((hex) => ({
+      hex,
+      score: side === "player"
+        ? ((terrainById.get(hex.terrain)?.concealment || 0) * 5)
+          + (hex.control === "player" ? 4 : 0)
+          - (hex.road || hex.rail ? 2 : 0)
+        : (hex.control === "enemy" ? 5 : 0)
+          + (hex.rail && hex.railDisabledTurns <= 0 ? 4 : 0)
+          + (hex.road ? 2 : 0),
+    }))
+    .sort((first, second) => second.score - first.score || first.hex.id.localeCompare(second.hex.id))[0]
+    ?.hex || null;
+}
+
+function ResolveCoLocatedForces(state, source = "搜索接触") {
+  const contactHexIds = [...new Set(
+    state.units
+      .filter((unit) => unit.readiness > 0)
+      .map((unit) => unit.hexId)
+      .filter((hexId) => state.enemies.some((enemy) => enemy.active && enemy.hexId === hexId)),
+  )];
+  for (const hexId of contactHexIds) {
+    const contactHex = FindHexInternal(state, hexId);
+    let enemy = state.enemies
+      .filter((candidate) => candidate.active && candidate.hexId === hexId)
+      .sort((first, second) => GetEffectiveUnitStrength(second) - GetEffectiveUnitStrength(first))[0];
+    const playerUnits = state.units
+      .filter((unit) => unit.readiness > 0 && unit.hexId === hexId)
+      .sort((first, second) => GetEffectiveUnitStrength(second) - GetEffectiveUnitStrength(first));
+    for (const unit of playerUnits) {
+      if (!enemy?.active || enemy.hexId !== hexId || unit.hexId !== hexId) {
+        break;
+      }
+      const ledger = EnsureStrategicLedger(state);
+      ledger.contactEncounters += 1;
+      const terrainDefense = terrainById.get(contactHex?.terrain)?.defense || 0;
+      const playerPower = GetEffectiveUnitStrength(unit)
+        + (unit.type === "WorkTeam" ? 0 : terrainDefense);
+      const enemyPower = GetEffectiveUnitStrength(enemy) + (enemy.readiness || 0);
+      const canRepel = unit.type !== "WorkTeam" && playerPower >= enemyPower - 1;
+
+      unit.readiness = Math.max(0, unit.readiness - 1);
+      if (unit.type !== "WorkTeam" && (canRepel || unit.type === "Militia")) {
+        enemy.readiness = Math.max(0, enemy.readiness - 1);
+      }
+      state.meters.exposure = Clamp(state.meters.exposure + 4, 0, maximumMeter);
+
+      if (enemy.readiness <= 0) {
+        enemy.active = false;
+        enemy.intent = "接触受阻后退出行动";
+        state.meters.contribution = Clamp(state.meters.contribution + 1, 0, 999);
+        state.log.push(`${unit.name}在${contactHex.name}遭遇${enemy.name}，付出战备代价后迫使其退出。`);
+        continue;
+      }
+
+      const enemyMustWithdraw = unit.type === "Militia" || canRepel;
+      const retreatingUnit = enemyMustWithdraw ? enemy : unit;
+      const retreatSide = enemyMustWithdraw ? "enemy" : "player";
+      const retreatHex = FindRetreatHex(state, contactHex, retreatSide);
+      if (retreatHex) {
+        retreatingUnit.hexId = retreatHex.id;
+        if (enemyMustWithdraw) {
+          enemy.intent = "接触受阻后转移";
+          state.meters.contribution = Clamp(state.meters.contribution + 1, 0, 999);
+        }
+      } else if (enemyMustWithdraw) {
+        enemy.active = false;
+        enemy.intent = "接触受阻后退出行动";
+      } else {
+        unit.readiness = 0;
+      }
+      state.log.push(
+        `${unit.name}与${enemy.name}在${contactHex.name}发生${source}；双方不能无条件长期同格，接触方战备下降并立即脱离。`,
+      );
+      enemy = state.enemies
+        .filter((candidate) => candidate.active && candidate.hexId === hexId)
+        .sort((first, second) => GetEffectiveUnitStrength(second) - GetEffectiveUnitStrength(first))[0];
+    }
+  }
+}
+
+function ResolveSabotageSecurityContact(state, unit, targetHex, informedAction) {
+  const guards = state.enemies
+    .filter((enemy) => enemy.active && enemy.hexId === targetHex.id)
+    .sort((first, second) => GetEffectiveUnitStrength(second) - GetEffectiveUnitStrength(first));
+  if (guards.length === 0) {
+    return true;
+  }
+  const guard = guards[0];
+  const ledger = EnsureStrategicLedger(state);
+  ledger.contactEncounters += 1;
+  const concealment = terrainById.get(targetHex.terrain)?.concealment || 0;
+  const militaryFocusBonus = GetPolicyFocus(state) === "military" ? 2 : 0;
+  const infiltrationPower = GetEffectiveUnitStrength(unit)
+    + concealment
+    + (informedAction ? 2 : 0)
+    + militaryFocusBonus;
+  const guardPower = GetEffectiveUnitStrength(guard) + guard.readiness;
+
+  unit.readiness = Math.max(0, unit.readiness - 1);
+  if (infiltrationPower >= guardPower - 1) {
+    guard.readiness = Math.max(0, guard.readiness - 1);
+  }
+  if (guard.readiness <= 0) {
+    guard.active = false;
+    guard.intent = "护路受阻后撤离";
+  }
+  state.meters.exposure = Clamp(state.meters.exposure + 6, 0, maximumMeter);
+  const success = unit.readiness > 0 && infiltrationPower >= guardPower - 3;
+  state.log.push(
+    success
+      ? `${unit.name}在${targetHex.name}遭遇护路力量，付出 1 战备并增加暴露后才完成破袭。`
+      : `${unit.name}在${targetHex.name}遭遇严密护路搜索，付出战备与暴露代价后被迫中止破袭。`,
+  );
+  return success;
+}
+
 function ResolveAmbush(state, unit, targetHex) {
   const enemy = state.enemies.find((candidate) => candidate.active && candidate.hexId === targetHex.id);
   const terrainBonus = terrainById.get(targetHex.terrain)?.defense || 0;
@@ -2634,12 +3206,14 @@ function ResolveAmbush(state, unit, targetHex) {
     .reduce((total, candidate) => total + GetEffectiveUnitStrength(candidate), 0);
   const doctrineBonus = HasDoctrine(state, "IntelligenceBeforeAction") ? 1 : 0;
   const policyBonus = GetPolicyEffect(state, "ambushBonus", 0);
+  const focusBonus = GetPolicyFocus(state) === "military" ? 1 : 0;
   const readinessFactor = GetUnitReadinessFactor(unit);
   const playerPower = GetEffectiveUnitStrength(unit)
     + (terrainBonus * readinessFactor)
     + militiaDefense
     + doctrineBonus
-    + policyBonus;
+    + policyBonus
+    + focusBonus;
   const enemyPower = enemy
     ? GetEffectiveUnitStrength(enemy) + enemy.readiness
     : 5 + (targetHex.warning?.intensity || 1);
@@ -2671,17 +3245,30 @@ function ResolveAmbush(state, unit, targetHex) {
 }
 
 function ResolveConstruction(state) {
-  const constructionBonus = GetPolicyEffect(state, "constructionBonus", 0);
   for (const village of state.hexes.filter(IsVillage)) {
     if (!village.construction || village.livelihood <= 0 || village.households <= 0) {
       continue;
     }
-    const laborFactor = GetVillageLaborFactor(village);
-    const progressGain = Math.floor(
-      (1 + Math.floor(village.contact / 40) + constructionBonus) * laborFactor,
-    );
+    const workTeamOnSite = state.units.some((unit) => unit.type === "WorkTeam"
+      && unit.hexId === village.id
+      && unit.readiness > 0);
+    const supplyAvailable = IsVillageSupplyConnected(state, village) || workTeamOnSite;
+    const drivenThisTurn = village.construction.lastDriveTurn === state.turn;
+    let progressGain = 0;
+    if (drivenThisTurn && supplyAvailable) {
+      progressGain = GetSupportedConstructionGain(state, village);
+      village.construction.unattendedTurns = 0;
+    } else {
+      village.construction.unattendedTurns = (village.construction.unattendedTurns || 0) + 1;
+      const locallyGoverned = HasPolicy(state, "ThreeThirdsSystem")
+        && supplyAvailable
+        && village.construction.unattendedTurns % 2 === 0;
+      progressGain = locallyGoverned ? 1 : 0;
+    }
     if (progressGain <= 0) {
-      state.log.push(`${village.name}因有效劳力不足，建设本月停滞。`);
+      state.log.push(
+        `${village.name}建设本月停滞：需要工作队下达“集中施工”并保持交通保障，不能靠一次启动自动完成。`,
+      );
       continue;
     }
     village.construction.progress += progressGain;
@@ -2689,6 +3276,7 @@ function ResolveConstruction(state) {
       const institution = institutionById.get(village.construction.institutionId);
       village.institution = institution.id;
       village.construction = null;
+      village.enemyInstitutionIntel = null;
       AddDoctrineExperience(state, "civilian", 3);
       state.log.push(`${village.name}建成${institution.label}。`);
       state.meters.people = Clamp(state.meters.people + 2, 0, 100);
@@ -2800,7 +3388,7 @@ function GetCoordinatedDefenseSupport(state, village, committedSupporterIds = ne
     const unitHex = FindHexInternal(state, unit.hexId);
     if (!unitHex
       || unitHex.warning?.turn === state.turn
-      || !IsHexSupplyConnected(state, unit.hexId)) {
+      || !IsHexSupplyConnected(state, unit.hexId, { ignoreSweepColumns: true })) {
       continue;
     }
     const distance = HexDistance(unitHex, village);
@@ -2941,6 +3529,56 @@ function ApplySweepToVillage(state, village, intensity, source, committedSupport
   }
 }
 
+function GetRailDisruptionProfile(state) {
+  const disabledHexes = state.hexes.filter((hex) => hex.rail && hex.railDisabledTurns > 0);
+  const disruptionPoints = disabledHexes.reduce(
+    (total, hex) => total + Math.min(2, Math.max(1, hex.railDisabledTurns)),
+    0,
+  );
+  return {
+    disabledHexes,
+    disabledCount: disabledHexes.length,
+    disruptionPoints,
+    sweepReductionBudget: Math.min(3, Math.ceil(disruptionPoints / 3)),
+    strainedUnitCount: Math.min(3, Math.ceil(disruptionPoints / 2)),
+  };
+}
+
+function ApplyEnemyRailSupplyStrain(state, profile) {
+  if (!profile || profile.strainedUnitCount <= 0) {
+    return 0;
+  }
+  const candidates = state.enemies
+    .filter((enemy) => enemy.active
+      && ["Garrison", "Patrol", "Search"].includes(enemy.type)
+      && enemy.readiness > 1)
+    .map((enemy) => {
+      const enemyHex = FindHexInternal(state, enemy.hexId);
+      const distance = enemyHex
+        ? Math.min(...profile.disabledHexes.map((hex) => HexDistance(enemyHex, hex)))
+        : Number.POSITIVE_INFINITY;
+      return { enemy, distance };
+    })
+    .sort((first, second) => first.distance - second.distance
+      || second.enemy.readiness - first.enemy.readiness
+      || first.enemy.id.localeCompare(second.enemy.id))
+    .slice(0, profile.strainedUnitCount);
+  for (const entry of candidates) {
+    entry.enemy.readiness = Math.max(1, entry.enemy.readiness - 1);
+    entry.enemy.intent = "铁路补给受阻，压缩搜索范围";
+  }
+  if (candidates.length > 0) {
+    const ledger = EnsureStrategicLedger(state);
+    ledger.railDelayEffects += candidates.length;
+    const contributionGain = candidates.length * 2;
+    state.meters.contribution = Clamp(state.meters.contribution + contributionGain, 0, 999);
+    state.log.push(
+      `铁路停运切断部分补给周转，${candidates.length} 支据点或搜索力量战备下降；由真实牵制兑现贡献 +${contributionGain}。`,
+    );
+  }
+  return candidates.length;
+}
+
 function FindEnemyStep(state, enemy, targetHex) {
   const currentHex = FindHexInternal(state, enemy.hexId);
   if (!currentHex || !targetHex) {
@@ -2948,11 +3586,18 @@ function FindEnemyStep(state, enemy, targetHex) {
   }
   return GetNeighbors(state, currentHex.id)
     .map((hex) => {
-      const routeBonus = hex.rail ? 2 : (hex.road ? 1 : 0);
+      const operationalRail = hex.rail && hex.railDisabledTurns <= 0;
+      const routeBonus = operationalRail ? 2 : (hex.road ? 1 : 0);
+      const disabledRailPenalty = hex.railDisabledTurns > 0
+        ? 4 + Math.min(3, hex.railDisabledTurns)
+        : 0;
       const terrainPenalty = terrainById.get(hex.terrain)?.enemyMoveCost || 1;
       return {
         hex,
-        score: HexDistance(hex, targetHex) * 5 + terrainPenalty - routeBonus,
+        score: HexDistance(hex, targetHex) * 5
+          + terrainPenalty
+          + disabledRailPenalty
+          - routeBonus,
       };
     })
     .sort((first, second) => first.score - second.score)[0]?.hex || null;
@@ -3003,13 +3648,18 @@ function ResolveEnemyMovement(state, sweptVillageIds = new Set()) {
   const movableEnemies = state.enemies.filter((enemy) => enemy.active
     && enemy.moves > 0
     && enemy.type !== "Garrison"
+    && !enemy.acted
     && !sweptVillageIds.has(enemy.hexId));
   const reserveEnemyId = (plan?.reserveBudget || 0) >= 3
     ? [...movableEnemies].reverse().find((enemy) => enemy.type === "Patrol")?.id
     : null;
   let patrolIndex = 0;
   for (const [enemyIndex, enemy] of state.enemies.entries()) {
-    if (!enemy.active || enemy.moves <= 0 || enemy.type === "Garrison" || sweptVillageIds.has(enemy.hexId)) {
+    if (!enemy.active
+      || enemy.moves <= 0
+      || enemy.type === "Garrison"
+      || enemy.acted
+      || sweptVillageIds.has(enemy.hexId)) {
       continue;
     }
     if (enemy.id === reserveEnemyId) {
@@ -3034,6 +3684,14 @@ function ResolveEnemyMovement(state, sweptVillageIds = new Set()) {
     for (let moveIndex = 0; moveIndex < moveCount; moveIndex += 1) {
       const step = FindEnemyStep(state, enemy, target);
       if (!step) break;
+      if (step.rail && step.railDisabledTurns > 0) {
+        const ledger = EnsureStrategicLedger(state);
+        ledger.railDelayEffects += 1;
+        state.meters.contribution = Clamp(state.meters.contribution + 1, 0, 999);
+        enemy.intent = "铁路断点迫使行动延迟";
+        state.log.push(`${enemy.name}在${step.name}铁路断点前延迟，真实牵制贡献 +1。`);
+        break;
+      }
       enemy.hexId = step.id;
       if (step.id === target.id) break;
     }
@@ -3048,9 +3706,11 @@ function ResolveEnemyMovement(state, sweptVillageIds = new Set()) {
   }
 }
 
-function ResolveScheduledSweeps(state) {
+function ResolveScheduledSweeps(state, railProfile = GetRailDisruptionProfile(state)) {
   const warnedVillages = state.hexes
-    .filter((hex) => IsVillage(hex) && hex.warning?.turn === state.turn)
+    .filter((hex) => IsVillage(hex)
+      && hex.warning?.turn === state.turn
+      && hex.warning.isActualTarget !== false)
     .sort((first, second) => {
       return (second.warning?.intensity || 1) - (first.warning?.intensity || 1)
         || second.households - first.households
@@ -3059,6 +3719,7 @@ function ResolveScheduledSweeps(state) {
   const sweepUnits = state.enemies.filter((enemy) => enemy.type === "SweepColumn");
   const sweptVillageIds = new Set();
   const committedSupporterIds = new Set();
+  let remainingSweepReduction = railProfile.sweepReductionBudget;
   for (const [warningIndex, village] of warnedVillages.entries()) {
     const sweepUnit = sweepUnits[warningIndex % sweepUnits.length];
     if (sweepUnit) {
@@ -3067,7 +3728,18 @@ function ResolveScheduledSweeps(state) {
       sweepUnit.intent = `扫荡${village.name}`;
       sweepUnit.visible = village.visible;
     }
-    const intensity = village.warning?.intensity || 1;
+    const originalIntensity = village.warning?.intensity || 1;
+    const reduction = remainingSweepReduction > 0 ? 1 : 0;
+    remainingSweepReduction = Math.max(0, remainingSweepReduction - reduction);
+    const intensity = Math.max(1, originalIntensity - reduction);
+    if (reduction > 0) {
+      const ledger = EnsureStrategicLedger(state);
+      ledger.railDelayEffects += reduction;
+      state.meters.contribution = Clamp(state.meters.contribution + reduction, 0, 999);
+      state.log.push(
+        `${village.name}方向扫荡因铁路补给中断由强度 ${originalIntensity} 降为 ${intensity}；真实延误兑现贡献 +${reduction}。`,
+      );
+    }
     ApplySweepToVillage(
       state,
       village,
@@ -3075,7 +3747,22 @@ function ResolveScheduledSweeps(state) {
       intensity >= 3 ? "大规模扫荡" : "扫荡",
       committedSupporterIds,
     );
+    RevealInstitutionToEnemy(state, village, 3, 4, "SweepSearch");
     sweptVillageIds.add(village.id);
+    if (sweepUnit) {
+      const stagingHex = state.hexes.find((hex) => hex.feature === "CountySeat");
+      sweepUnit.hexId = stagingHex?.id || sweepUnit.hexId;
+      sweepUnit.active = false;
+      sweepUnit.acted = true;
+      sweepUnit.intent = "扫荡后撤回县城整补";
+    }
+  }
+  for (const village of state.hexes.filter(
+    (hex) => IsVillage(hex)
+      && hex.warning?.turn === state.turn
+      && hex.warning.isActualTarget === false,
+  )) {
+    village.warning = null;
   }
   return sweptVillageIds;
 }
@@ -3083,8 +3770,12 @@ function ResolveScheduledSweeps(state) {
 function ResolveEnemyTurn(state) {
   const event = GetHistoricalTurn(state.turn);
   const repairedRailId = ResolveRailRepair(state);
-  const sweptVillageIds = ResolveScheduledSweeps(state);
+  const railProfile = GetRailDisruptionProfile(state);
+  ApplyEnemyRailSupplyStrain(state, railProfile);
+  const sweptVillageIds = ResolveScheduledSweeps(state, railProfile);
   ResolveEnemyMovement(state, sweptVillageIds);
+  ResolveCoLocatedForces(state, "敌军搜索接触");
+  UpdateEnemyInstitutionIntelligence(state);
   const passiveExposure = event.enemyPressure >= 5 ? 1 : -2;
   state.meters.exposure = Clamp(state.meters.exposure + passiveExposure, 0, 100);
   for (const enemy of state.enemies) {
@@ -3136,11 +3827,6 @@ function RecoverBrokenUnits(state) {
 
 function ResolveRailContributionAndDecay(state, repairedRailId = null) {
   const disabledRail = state.hexes.filter((hex) => hex.rail && hex.railDisabledTurns > 0);
-  const ongoingContribution = Math.min(2, disabledRail.length);
-  if (ongoingContribution > 0) {
-    state.meters.contribution += ongoingContribution;
-    state.log.push(`停运铁路继续牵制敌军修复与守备力量：贡献 +${ongoingContribution}。`);
-  }
   for (const hex of disabledRail) {
     if (hex.id !== repairedRailId) {
       hex.railDisabledTurns = Math.max(0, hex.railDisabledTurns - 1);
@@ -3240,15 +3926,30 @@ export function ResolveTurn(state) {
   const resolvedTurn = next.turn;
   const event = GetHistoricalTurn(resolvedTurn);
   LockEnemyOperationalPlan(next, resolvedTurn);
+  const resolvedOrders = DeepClone(next.orders);
+  const eventContext = {
+    warningTargetIds: next.hexes
+      .filter((hex) => hex.warning?.turn === resolvedTurn)
+      .map((hex) => hex.id),
+  };
 
   for (const order of next.orders) {
     ApplyPlayerOrder(next, order);
   }
+  ResolveCoLocatedForces(next, "玩家行动后的遭遇");
+  const strategicExecution = RecordStrategicExecution(next, resolvedOrders);
+  ResolveStrategicTempo(next, strategicExecution);
   next.orders = [];
   next.reserved = { grain: 0, arms: 0, medicine: 0, intel: 0, cadres: 0 };
 
   ResolveConstruction(next);
   ResolveVillageEconomy(next);
+  const historicalEventResult = ResolveHistoricalEvent(
+    next,
+    resolvedTurn,
+    resolvedOrders,
+    eventContext,
+  );
   ResolveUpkeep(next);
   const repairedRailId = ResolveEnemyTurn(next);
   ArchiveEnemyOperationalPlan(next);
@@ -3268,6 +3969,8 @@ export function ResolveTurn(state) {
     meters: DeepClone(next.meters),
     institutions: next.hexes.filter((hex) => hex.institution).length,
     warningsResolved: next.ledger.civilianCosts.filter((entry) => entry.turn === resolvedTurn).length,
+    eventId: historicalEventResult?.eventId || null,
+    eventOutcomeId: historicalEventResult?.outcomeId || null,
   });
 
   if (finalTurn) {
@@ -3293,7 +3996,20 @@ export function ResolveTurn(state) {
     locked: false,
     policyIds: [...next.policies],
   };
-  ApplyOpeningConditions(next, next.turn);
+  next.policyAdjustmentCost = 0;
+  const openingEntries = [];
+  const seasonalOpening = ApplyOpeningConditions(next, next.turn);
+  if (seasonalOpening) {
+    openingEntries.push(seasonalOpening);
+  }
+  const historicalConsequences = ApplyDueHistoricalConsequences(next, next.turn);
+  openingEntries.push(...historicalConsequences);
+  next.openingCondition = {
+    turn: next.turn,
+    date: GetHistoricalTurn(next.turn).date,
+    title: GetHistoricalTurn(next.turn).title,
+    entries: openingEntries,
+  };
   ResetUnitsForNextTurn(next);
   RefreshCommandMaximum(next);
   next.commandPoints = next.commandMax;
@@ -3365,12 +4081,19 @@ export function GetTurnBriefing(state) {
       kind: hex.warning.kind,
       intensity: hex.warning.intensity,
       text: hex.warning.text,
+      confidence: hex.warning.confidence || "Probable",
       mitigations: [
         hex.evacuated ? "保护性临时安置已就绪" : "尚未安排保护性安置",
         hex.institution === "Tunnels" ? "已有地道网" : "无地道网",
         hex.institution === "Clinic" ? "已有救护所" : "无救护所",
       ],
     }));
+  const historicalEvent = GetHistoricalEventPreview(
+    state,
+    state.turn,
+    state.orders || [],
+    { warningTargetIds: warnings.map((warning) => warning.hexId) },
+  );
   const currentTreeTips = [];
   const nextCivilian = doctrineDefinitions.find((definition) => definition.tree === "civilian"
     && !state.doctrines.civilian.unlocked.includes(definition.id)
@@ -3391,7 +4114,9 @@ export function GetTurnBriefing(state) {
     date: event.date,
     title: event.title,
     summary: event.summary,
-    objective: `${event.title}：先保民生与组织，再安排建设、疏散和有限牵制。`,
+    objective: historicalEvent
+      ? `${historicalEvent.title}：${historicalEvent.objective}`
+      : `${event.title}：先保民生与组织，再安排建设、疏散和有限牵制。`,
     phase: state.phase === "planning" ? "规划阶段" : state.phase === "complete" ? "战役结算" : "敌我结算",
     commandPoints: state.commandPoints,
     commandMax: state.commandMax,
@@ -3399,6 +4124,10 @@ export function GetTurnBriefing(state) {
     enemyPressure: event.enemyPressure,
     enemySignals: BuildEnemyPlanBriefing(state),
     warnings,
+    historicalEvent,
+    openingCondition: state.openingCondition?.turn === state.turn
+      ? DeepClone(state.openingCondition)
+      : null,
     doctrineTips: currentTreeTips,
     recommendedLoop: [
       "先读敌军警告和村庄困苦",
@@ -3460,6 +4189,7 @@ export function UnlockDoctrine(state, doctrineId) {
   treeState.spentExperience = (treeState.spentExperience || 0) + experienceCost;
   treeState.lastUnlockTurn = next.turn;
   treeState.unlocked.push(doctrineId);
+  EnsureStrategicLedger(next).doctrineUnlockedTurnById[doctrineId] = next.turn;
   RefreshCommandMaximum(next);
   next.commandPoints = Math.min(next.commandMax, next.commandPoints + (doctrineId === "DemocraticBaseGovernance" ? 1 : 0));
   next.log.push(`解锁路线：${definition.label}。`);
@@ -3493,14 +4223,57 @@ export function SetPolicies(state, policyIds) {
       return next;
     }
   }
+  const changed = policyIds.length !== next.policies.length
+    || policyIds.some((policyId) => !next.policies.includes(policyId));
+  if (changed && next.turn < (next.policySwitchCooldownUntil || 0)) {
+    next.lastError = `方针调整需要重新部署干部与联络，本回合仍在冷却；第 ${next.policySwitchCooldownUntil} 回合可再次调整`;
+    return next;
+  }
+  if (changed && next.commandPoints < 1) {
+    next.lastError = "本回合没有可用于方针调整的行动令";
+    return next;
+  }
   next.policies = [...policyIds];
+  if (changed) {
+    next.policyAdjustmentCost = 1;
+    next.policySwitchCooldownUntil = next.turn + 2;
+  }
   next.policyLock = {
     turn: next.turn,
     locked: true,
     policyIds: [...policyIds],
   };
-  next.log.push(`本回合政策调整为：${policyIds.map((policyId) => policyById.get(policyId).label).join("、") || "无"}。`);
+  UpdateReservedField(next);
+  next.log.push(
+    changed
+      ? `本回合方针调整为：${policyIds.map((policyId) => policyById.get(policyId).label).join("、") || "无"}；重组联络占用 1 道行动令，下一回合不能再次切换。`
+      : `本回合继续执行既有方针：${policyIds.map((policyId) => policyById.get(policyId).label).join("、") || "无"}。`,
+  );
   return next;
+}
+
+function GetStrategicDevelopmentSummary(state) {
+  const ledger = state.strategicLedger || CreateStrategicLedger();
+  const developedDoctrines = doctrineDefinitions
+    .filter((definition) => definition.tier > 0 && HasDoctrine(state, definition.id))
+    .filter((definition) => {
+      const unlockedTurn = Number(ledger.doctrineUnlockedTurnById?.[definition.id]);
+      const practiceCount = Number(ledger.doctrinePracticeById?.[definition.id] || 0);
+      return Number.isInteger(unlockedTurn)
+        && unlockedTurn <= turnLimit - 2
+        && practiceCount >= 1;
+    });
+  const sustainedPolicies = policyDefinitions.filter((definition) => {
+    const totalTurns = Number(ledger.policyTurnsById?.[definition.id] || 0);
+    const longestStreak = Number(ledger.policyLongestStreakById?.[definition.id] || 0);
+    return totalTurns >= 4 || longestStreak >= 2;
+  });
+  return {
+    developedDoctrines,
+    developedCivilian: developedDoctrines.some((definition) => definition.tree === "civilian"),
+    developedMilitary: developedDoctrines.some((definition) => definition.tree === "military"),
+    sustainedPolicies,
+  };
 }
 
 function CalculateAssessmentScore(state) {
@@ -3511,14 +4284,46 @@ function CalculateAssessmentScore(state) {
   const contributionValue = Clamp((state.meters.contribution / 16) * 100, 0, 100);
   const institutionValue = Clamp((institutionCount / 5) * 100, 0, 100);
   const survivalValue = Clamp((survivingVillages.length / villages.length) * 100, 0, 100);
+  const fieldForces = state.units.filter((unit) => ["Guerrilla", "MainForce"].includes(unit.type));
+  const readinessValue = Clamp(
+    (Math.max(0, ...fieldForces.map((unit) => Number(unit.readiness) || 0)) / 4) * 100,
+    0,
+    100,
+  );
+  const logisticsValue = Clamp(
+    (((state.resources.grain || 0) + (state.resources.medicine || 0)) / 12) * 100,
+    0,
+    100,
+  );
+  const development = GetStrategicDevelopmentSummary(state);
+  const doctrineValue = Clamp((development.developedDoctrines.length / 4) * 100, 0, 100);
+  const policyValue = Clamp((development.sustainedPolicies.length / 2) * 100, 0, 100);
+  const combatPreservationValue = Clamp(
+    100 - ((state.ledger.combatLosses?.length || 0) * 12),
+    0,
+    100,
+  );
+  const logisticsCollapsePenalty = (
+    (state.resources.grain || 0) + (state.resources.medicine || 0)
+  ) <= 0 ? 3 : 0;
+  const combatCollapsePenalty = (state.ledger.combatLosses?.length || 0) > 8 ? 3 : 0;
   return Math.round(
-    (state.meters.people * 0.2)
-    + (state.meters.network * 0.22)
-    + (averageLivelihood * 0.18)
-    + (contributionValue * 0.2)
-    + (institutionValue * 0.12)
-    + (state.meters.unity * 0.05)
-    + (survivalValue * 0.03),
+    (state.meters.people * 0.18)
+    + (state.meters.network * 0.19)
+    + (averageLivelihood * 0.15)
+    + (contributionValue * 0.16)
+    + (institutionValue * 0.09)
+    + (state.meters.unity * 0.04)
+    + (survivalValue * 0.03)
+    + (readinessValue * 0.04)
+    + (logisticsValue * 0.03)
+    + (state.meters.discipline * 0.03)
+    + ((100 - state.meters.exposure) * 0.02)
+    + (doctrineValue * 0.015)
+    + (policyValue * 0.005)
+    + (combatPreservationValue * 0.02)
+    - logisticsCollapsePenalty
+    - combatCollapsePenalty,
   );
 }
 
@@ -3538,6 +4343,22 @@ export function GetVictoryAssessment(state) {
   );
   const institutionCount = villages.filter((village) => village.institution).length;
   const score = CalculateAssessmentScore(state);
+  const historicalEventOutcomes = GetHistoricalEventOutcomeCounts(state);
+  const fieldForces = state.units.filter((unit) => ["Guerrilla", "MainForce"].includes(unit.type));
+  const operationalReadiness = Math.max(
+    0,
+    ...fieldForces.map((unit) => Number(unit.readiness) || 0),
+  );
+  const logisticsReserve = (state.resources.grain || 0) + (state.resources.medicine || 0);
+  const development = GetStrategicDevelopmentSummary(state);
+  const resolvedActionIds = state.eventState.resolved.flatMap((entry) => entry.choice?.actionIds || []);
+  const aggressiveActionCount = resolvedActionIds.filter((actionId) => (
+    actionId === "ambush" || actionId === "sabotage"
+  )).length;
+  const passiveResponsibilityCollapse = historicalEventOutcomes.Neglected >= 10
+    && aggressiveActionCount < 4;
+  const recklessOperationalPattern = aggressiveActionCount >= 5
+    && state.meters.exposure >= 70;
   const requirements = {
     historicalEndpointReached: state.gameOver && state.turn === turnLimit,
     villagesSurviving: survivingVillages.length >= 4,
@@ -3551,6 +4372,15 @@ export function GetVictoryAssessment(state) {
     householdsMaintained: currentHouseholdTotal >= Math.ceil(originalHouseholdTotal * 0.52),
     hardshipContained: averageHardship <= 60
       && villages.every((village) => village.households <= 0 || village.hardship < 90),
+    historicalResponsibilitiesMet: historicalEventOutcomes.Protected >= 5
+      && historicalEventOutcomes.Neglected <= 5,
+    operationalForcePreserved: operationalReadiness > 0,
+    minimumLogisticsMaintained: logisticsReserve > 0,
+    exposureControlled: state.meters.exposure <= 90,
+    disciplineMaintained: state.meters.discipline >= 10,
+    doctrinesDeveloped: development.developedCivilian && development.developedMilitary,
+    policyMaintained: development.sustainedPolicies.length >= 1,
+    combatLossesContained: (state.ledger.combatLosses?.length || 0) <= 8,
   };
   const requirementValues = Object.values(requirements);
   let status = "进行中";
@@ -3559,6 +4389,26 @@ export function GetVictoryAssessment(state) {
     if (requirementValues.every(Boolean)) {
       status = "HistoricalContinuity";
       title = "敌后根据地保存了继续抗战的力量";
+    } else if (passiveResponsibilityCollapse) {
+      status = "NetworkBroken";
+      title = "消极失守使基层网络未能承担继续抗战的责任";
+    } else if (
+      state.ledger.villageAbandonments.length >= 2
+      || state.meters.people < 20
+      || state.ledger.affectedHouseholds > Math.ceil(originalHouseholdTotal * 0.42)
+      || recklessOperationalPattern
+    ) {
+      status = "CivilianDisaster";
+      title = "军事冒进与暴露使人民和根据地付出灾难代价";
+    } else if (
+      survivingVillages.length < 3
+      || state.meters.network < 20
+      || state.meters.people < 28
+      || (state.meters.contribution < 4 && institutionCount === 0)
+      || historicalEventOutcomes.Neglected >= 10
+    ) {
+      status = "NetworkBroken";
+      title = "消极失守使基层网络未能承担继续抗战的责任";
     } else if (requirements.historicalEndpointReached && survivingVillages.length >= 3) {
       status = "FragileSurvival";
       title = "艰难保存，但组织或战略任务仍有缺口";
@@ -3584,11 +4434,45 @@ export function GetVictoryAssessment(state) {
       households: currentHouseholdTotal,
       averageHardship,
       survivingVillages: survivingVillages.length,
+      eventResponsibilitiesProtected: historicalEventOutcomes.Protected,
+      eventResponsibilitiesPartial: historicalEventOutcomes.Partial,
+      eventResponsibilitiesNeglected: historicalEventOutcomes.Neglected,
+      operationalReadiness,
+      logisticsReserve,
+      aggressiveActions: aggressiveActionCount,
+      advancedDoctrines: development.developedDoctrines.length,
+      activePolicies: development.sustainedPolicies.length,
+      combatLosses: state.ledger.combatLosses?.length || 0,
     },
+    unmetRequirements: Object.entries(requirements)
+      .filter(([, met]) => !met)
+      .map(([requirementId]) => ({
+        id: requirementId,
+        label: ({
+          historicalEndpointReached: "完成十六个月历史阶段",
+          villagesSurviving: "至少四个村庄维持生计",
+          networkMaintained: "基层网络达到 38",
+          peopleMaintained: "人民安全达到 42",
+          contributionMade: "敌后贡献达到 10",
+          institutionsBuilt: "至少建成两个专业机构",
+          civilianLedgerWithinLimit: "不可逆民生代价未越过红线",
+          householdsMaintained: "多数住户仍能维持生活",
+          hardshipContained: "各村困苦得到控制",
+          historicalResponsibilitiesMet: "多数月度责任得到实际落实",
+          operationalForcePreserved: "至少一支游击或主力部队保持行动能力",
+          minimumLogisticsMaintained: "保留最低粮食与医疗周转",
+          exposureControlled: "根据地暴露不超过 90",
+          disciplineMaintained: "群众保护纪律至少达到 10",
+          doctrinesDeveloped: "民生与军事路线均须在终局前完成解锁并留下实践",
+          policyMaintained: "至少一项根据地方针连续执行两月或累计执行四月",
+          combatLossesContained: "避免部队长期陷入不可持续消耗",
+        })[requirementId] || requirementId,
+      })),
     civilianCostLedger: {
       displacedHouseholds: state.ledger.displacedHouseholds,
       affectedHouseholds: state.ledger.affectedHouseholds,
       events: state.ledger.civilianCosts.length,
+      historicalConsequences: state.ledger.historicalConsequences?.length || 0,
       excludedFromScore: true,
       note: "平民受难不计分、不兑换资源，也不能被军事贡献抵消。",
     },
@@ -3598,7 +4482,9 @@ export function GetVictoryAssessment(state) {
         ? "中国共产党领导的敌后军民依靠群众路线、基层组织、生产自救和游击战争渡过本县严重困难；斗争仍将继续，并与全国各抗日力量一道走向1945年的胜利。"
         : status === "FragileSurvival"
           ? "本县保住了部分抗战火种，但群众生活、基层网络或战略任务留下严重缺口；这些代价不能被军事数字抵消。全民族抗战仍将继续，并最终走向1945年的胜利。"
-          : "本县根据地网络在最困难阶段遭到严重破坏，人民与组织付出的代价必须被如实记录，不能用既定的全国胜利倒推为本局成功。全民族抗战仍将继续，并最终走向1945年的胜利。",
+          : status === "CivilianDisaster"
+            ? "本县的军事贡献没有抵消人民安全崩落、村庄放弃和基层网络破坏；这不是可以用牵制数字包装的成功。全国抗战仍按固定历史继续，并最终走向1945年的胜利。"
+            : "本县因长期不作为或组织失灵，未能把群众、生产和交通责任落实为可持续的根据地网络；既定的全国胜利不能倒推为本局成功。全民族抗战仍将继续，并最终走向1945年的胜利。",
   };
 }
 
@@ -3609,8 +4495,20 @@ export function SerializeState(state) {
 }
 
 function MigrateLoadedState(candidate) {
-  if (candidate?.saveVersion !== 1) return candidate;
+  if (![1, 2].includes(candidate?.saveVersion)) return candidate;
   const migrated = CloneState(candidate);
+  if (candidate.saveVersion === 2) {
+    migrated.ledger.historicalConsequences = Array.isArray(migrated.ledger.historicalConsequences)
+      ? migrated.ledger.historicalConsequences
+      : [];
+    EnsureHistoricalEventState(migrated);
+    migrated.openingCondition = migrated.openingCondition || null;
+    migrated.saveVersion = saveVersion;
+    if (Array.isArray(migrated.log)) {
+      migrated.log.push("存档已迁移：月度任务事件、实际部署选择和延迟后果开始进入战局档案。");
+    }
+    return migrated;
+  }
   const ledger = migrated.ledger;
   const costs = Array.isArray(ledger?.civilianCosts) ? ledger.civilianCosts : [];
   let restoredHouseholds = 0;
@@ -3666,6 +4564,9 @@ function MigrateLoadedState(candidate) {
       Number(ledger.displacedHouseholds) - restoredHouseholds,
     );
   }
+  ledger.historicalConsequences = [];
+  EnsureHistoricalEventState(migrated);
+  migrated.openingCondition = null;
   migrated.saveVersion = saveVersion;
   if (Array.isArray(migrated.log)) {
     migrated.log.push("存档已迁移：保护性临时安置不再自动计作永久流离，并重新核验住户去向。");
@@ -3691,9 +4592,16 @@ function IsValidLoadedState(candidate) {
     && Array.isArray(candidate.ledger.civilianCosts)
     && Array.isArray(candidate.ledger.villageAbandonments)
     && Array.isArray(candidate.ledger.combatLosses)
+    && Array.isArray(candidate.ledger.historicalConsequences)
     && Number.isFinite(Number(candidate.ledger.displacedHouseholds))
     && Number.isFinite(Number(candidate.ledger.affectedHouseholds))
     && Number.isFinite(Number(candidate.ledger.livelihoodDestroyed)),
+  );
+  const validEventState = Boolean(
+    candidate?.eventState
+    && Array.isArray(candidate.eventState.resolved)
+    && Array.isArray(candidate.eventState.pendingConsequences)
+    && Array.isArray(candidate.eventState.appliedConsequences)
   );
   const validEnemyPlanning = Boolean(
     !candidate?.enemyPlanning
@@ -3744,6 +4652,7 @@ function IsValidLoadedState(candidate) {
     && Array.isArray(candidate.policies)
     && candidate.policies.every((policyId) => typeof policyId === "string" && policyById.has(policyId))
     && validLedger
+    && validEventState
     && validEnemyPlanning
     && Array.isArray(candidate.history)
     && Array.isArray(candidate.log),
@@ -3758,9 +4667,34 @@ export function DeserializeState(text) {
     }
     const loaded = CloneState(candidate);
     loaded.lastError = null;
+    const hadStrategicLedger = Boolean(
+      loaded.strategicLedger && typeof loaded.strategicLedger === "object",
+    );
     EnsureProductionLedger(loaded);
     EnsureIntelligenceLedger(loaded);
     EnsureTurnEconomy(loaded);
+    EnsureHistoricalEventState(loaded);
+    const strategicLedger = EnsureStrategicLedger(loaded);
+    if (!hadStrategicLedger) {
+      const completedTurns = Math.max(0, loaded.history?.length || loaded.turn - 1);
+      for (const policyId of loaded.policies || []) {
+        strategicLedger.policyTurnsById[policyId] = completedTurns;
+        strategicLedger.policyCurrentStreakById[policyId] = completedTurns;
+        strategicLedger.policyLongestStreakById[policyId] = completedTurns;
+      }
+      strategicLedger.previousPolicyIds = [...(loaded.policies || [])];
+      for (const definition of doctrineDefinitions.filter(
+        (candidateDefinition) => candidateDefinition.tier > 0
+          && HasDoctrine(loaded, candidateDefinition.id),
+      )) {
+        strategicLedger.doctrineUnlockedTurnById[definition.id] = Math.max(
+          1,
+          loaded.turn - 2,
+        );
+        strategicLedger.doctrinePracticeById[definition.id] = completedTurns > 0 ? 1 : 0;
+      }
+      strategicLedger.meaningfulTurns = Math.min(completedTurns, loaded.eventState.resolved.length);
+    }
     const loadedPolicyLock = EnsurePolicyLock(loaded);
     if (loaded.orders.length > 0) {
       loadedPolicyLock.locked = true;
@@ -3785,6 +4719,21 @@ export function DeserializeState(text) {
         ? Math.max(0, Number(unit.outOfSupplyTurns))
         : 0;
     }
+    for (const hex of loaded.hexes) {
+      if (hex.construction) {
+        hex.construction.lastDriveTurn = Number.isInteger(hex.construction.lastDriveTurn)
+          ? hex.construction.lastDriveTurn
+          : hex.construction.startedTurn;
+        hex.construction.unattendedTurns = Number.isFinite(Number(hex.construction.unattendedTurns))
+          ? Math.max(0, Number(hex.construction.unattendedTurns))
+          : 0;
+      }
+      const intel = hex.enemyInstitutionIntel;
+      const validIntel = intel
+        && intel.institutionId === hex.institution
+        && Number.isFinite(Number(intel.expiresTurn));
+      hex.enemyInstitutionIntel = validIntel ? intel : null;
+    }
     loaded.doctrines.civilian.spentExperience = Number(loaded.doctrines.civilian.spentExperience || 0);
     loaded.doctrines.military.spentExperience = Number(loaded.doctrines.military.spentExperience || 0);
     loaded.doctrines.civilian.lastUnlockTurn = Number.isInteger(loaded.doctrines.civilian.lastUnlockTurn)
@@ -3795,6 +4744,12 @@ export function DeserializeState(text) {
       : null;
     loaded.emergencySupplyCooldownUntil = Number.isInteger(loaded.emergencySupplyCooldownUntil)
       ? Math.max(0, loaded.emergencySupplyCooldownUntil)
+      : 0;
+    loaded.policyAdjustmentCost = Number.isFinite(Number(loaded.policyAdjustmentCost))
+      ? Clamp(Number(loaded.policyAdjustmentCost), 0, 1)
+      : 0;
+    loaded.policySwitchCooldownUntil = Number.isInteger(loaded.policySwitchCooldownUntil)
+      ? Math.max(0, loaded.policySwitchCooldownUntil)
       : 0;
     if (loaded.gameOver || loaded.phase === "complete") {
       loaded.commandPoints = 0;

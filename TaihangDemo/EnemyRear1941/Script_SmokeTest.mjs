@@ -31,8 +31,21 @@ import {
   SerializeState,
   DeserializeState,
 } from "./Script_Rules.mjs";
+import {
+  ApplyDueHistoricalConsequences,
+  GetHistoricalEventMechanic,
+  GetHistoricalEventPreview,
+  historicalEventMechanics,
+} from "./Script_HistoricalEvents.mjs";
 
 const testResults = [];
+const requestedBalanceSeedCount = Number.parseInt(
+  process.env.ENEMY_REAR_BALANCE_SEEDS || "12",
+  10,
+);
+const balanceSeedCount = Number.isFinite(requestedBalanceSeedCount)
+  ? Math.max(12, Math.min(64, requestedBalanceSeedCount))
+  : 12;
 
 function Test(name, callback) {
   try {
@@ -116,7 +129,12 @@ function UnlockAvailableDoctrines(state) {
 
 function QueueNearestSabotage(state, unitId) {
   const unit = state.units.find((candidate) => candidate.id === unitId);
-  if (!unit || unit.readiness <= 0 || state.commandPoints <= 0 || state.resources.arms <= 0) {
+  if (!unit
+    || unit.readiness <= 0
+    || unit.recoveryRequired
+    || unit.acted
+    || state.commandPoints <= 0
+    || state.resources.arms <= 0) {
     return state;
   }
   let next = state;
@@ -152,63 +170,208 @@ function QueueNearestSabotage(state, unitId) {
 
 function QueueWorkSchedule(state) {
   const workTeamId = "Unit_WorkTeam_One";
-  const warnings = state.hexes.filter((hex) => hex.warning?.turn === state.turn);
   let next = state;
+  const workTeam = next.units.find((unit) => unit.id === workTeamId);
+  if (!workTeam || workTeam.readiness <= 0 || next.commandPoints <= 0) {
+    return next;
+  }
 
-  if (warnings.length > 0) {
-    const workHex = GetProjectedHex(next, workTeamId);
-    const target = [...warnings].sort((first, second) => {
-      return HexDistance(workHex, first) - HexDistance(workHex, second);
-    })[0];
-    next = MoveToward(next, workTeamId, target);
-    if (GetProjectedHex(next, workTeamId)?.id === target.id) {
-      next = TryQueue(next, {
-        actionId: "evacuate",
-        unitId: workTeamId,
-        hexId: target.id,
-        targetHexId: target.id,
-      });
+  const QueueAtVillage = (sourceState, target, actionId) => {
+    let planned = MoveToward(sourceState, workTeamId, target);
+    if (GetProjectedHex(planned, workTeamId)?.id !== target.id) {
+      return planned;
     }
-    return next;
-  }
-
-  const schedule = {
-    1: ["Hex_Q2_R3", "buildStation"],
-    2: ["Hex_Q2_R3", "organize"],
-    3: ["Hex_Q2_R1", "buildClinic"],
-    4: ["Hex_Q2_R1", "organize"],
-    5: ["Hex_Q2_R1", "relief"],
-    6: ["Hex_Q4_R1", "organize"],
-    7: ["Hex_Q4_R1", "relief"],
-    8: ["Hex_Q4_R1", "organize"],
-    10: ["Hex_Q4_R1", "relief"],
-    11: ["Hex_Q4_R4", "organize"],
-    12: ["Hex_Q4_R4", "organize"],
-    13: ["Hex_Q4_R4", "buildCooperative"],
-    14: ["Hex_Q5_R6", "organize"],
-    16: ["Hex_Q5_R6", "relief"],
-  };
-  const scheduledOrder = schedule[next.turn];
-  if (!scheduledOrder) {
-    return next;
-  }
-  const target = next.hexes.find((hex) => hex.id === scheduledOrder[0]);
-  next = MoveToward(next, workTeamId, target);
-  if (GetProjectedHex(next, workTeamId)?.id === target.id) {
-    next = TryQueue(next, {
-      actionId: scheduledOrder[1],
+    return TryQueue(planned, {
+      actionId,
       unitId: workTeamId,
       hexId: target.id,
       targetHexId: target.id,
     });
+  };
+
+  if (next.turn === 1) {
+    return QueueAtVillage(
+      next,
+      next.hexes.find((hex) => hex.id === "Hex_Q2_R3"),
+      "buildStation",
+    );
   }
+  if (next.turn === 3) {
+    return QueueAtVillage(
+      next,
+      next.hexes.find((hex) => hex.id === "Hex_Q2_R1"),
+      "buildClinic",
+    );
+  }
+
+  const activeConstruction = next.hexes
+    .filter((hex) => hex.construction)
+    .sort((first, second) => {
+      const firstRemaining = first.construction.required - first.construction.progress;
+      const secondRemaining = second.construction.required - second.construction.progress;
+      return firstRemaining - secondRemaining
+        || first.construction.startedTurn - second.construction.startedTurn;
+    })[0];
+  if (activeConstruction) {
+    return QueueAtVillage(next, activeConstruction, "constructionDrive");
+  }
+
+  const mechanic = GetHistoricalEventMechanic(next.turn);
+  const objectiveActions = new Set(
+    mechanic?.hooks.flatMap((hook) => hook.actionsAny || []) || [],
+  );
+  const currentHex = GetProjectedHex(next, workTeamId);
+  const reachableIds = new Set([
+    currentHex?.id,
+    ...FindReachableHexes(next, workTeamId).map((entry) => entry.hexId),
+  ]);
+  const warnings = next.hexes.filter((hex) => hex.warning?.turn === next.turn);
+  const reachableWarnings = warnings.filter((hex) => reachableIds.has(hex.id));
+  if (reachableWarnings.length > 0 && objectiveActions.has("evacuate")) {
+    const target = [...reachableWarnings].sort((first, second) => {
+      return HexDistance(currentHex, first) - HexDistance(currentHex, second);
+    })[0];
+    return QueueAtVillage(next, target, "evacuate");
+  }
+
+  const reachableVillages = next.hexes.filter((hex) => (
+    hex.feature === "Village"
+    && hex.households > 0
+    && hex.control !== "enemy"
+    && hex.q <= 4
+    && reachableIds.has(hex.id)
+  ));
+  const canAffordRelief = next.resources.grain - next.reserved.grain >= 3
+    && next.resources.medicine - next.reserved.medicine >= 1;
+  const emergencyReliefTarget = reachableVillages
+    .filter((hex) => hex.hardship >= 58)
+    .sort((first, second) => second.hardship - first.hardship
+      || HexDistance(currentHex, first) - HexDistance(currentHex, second))[0];
+  if (canAffordRelief && emergencyReliefTarget) {
+    return QueueAtVillage(next, emergencyReliefTarget, "relief");
+  }
+  const preferredActionIds = [];
+  const organizeFirst = [6, 8, 12, 14].includes(next.turn)
+    || (next.meters.network < 43 && objectiveActions.has("organize"));
+  if (organizeFirst && objectiveActions.has("organize")) {
+    preferredActionIds.push("organize");
+  }
+  if (objectiveActions.has("relief") && canAffordRelief) {
+    preferredActionIds.push("relief");
+  }
+  if (objectiveActions.has("organize")) {
+    preferredActionIds.push("organize");
+  }
+  if (objectiveActions.has("relief")) {
+    preferredActionIds.push("relief");
+  }
+  preferredActionIds.push(canAffordRelief ? "relief" : "organize", "organize");
+
+  for (const actionId of [...new Set(preferredActionIds)]) {
+    const candidates = reachableVillages
+      .filter((village) => actionId !== "organize" || village.hardship < 72)
+      .sort((first, second) => {
+        const needDifference = actionId === "relief"
+          ? second.hardship - first.hardship
+          : first.contact - second.contact;
+        return needDifference
+          || HexDistance(currentHex, first) - HexDistance(currentHex, second)
+          || first.id.localeCompare(second.id);
+      });
+    for (const target of candidates) {
+      const planned = QueueAtVillage(next, target, actionId);
+      if (planned.orders.some((order) => (
+        order.unitId === workTeamId
+        && order.actionId === actionId
+      ))) {
+        return planned;
+      }
+    }
+  }
+
   return next;
+}
+
+function QueueBestSabotage(state) {
+  const candidateUnitIds = ["Unit_Guerrilla_One", "Unit_MainForce_One"]
+    .filter((unitId) => {
+      const unit = state.units.find((candidate) => candidate.id === unitId);
+      const reserve = state.units.find((candidate) => (
+        ["Guerrilla", "MainForce"].includes(candidate.type)
+        && candidate.id !== unitId
+        && candidate.readiness >= 2
+        && !candidate.recoveryRequired
+      ));
+      return unit
+        && unit.readiness > 0
+        && !unit.recoveryRequired
+        && (unitId !== "Unit_MainForce_One" || unit.readiness >= 3)
+        && Boolean(reserve)
+        && !state.orders.some((order) => order.unitId === unitId);
+    });
+  let bestProgress = state;
+  for (const unitId of candidateUnitIds) {
+    const candidate = QueueNearestSabotage(state, unitId);
+    if (candidate.orders.some((order) => (
+      order.unitId === unitId
+      && order.actionId === "sabotage"
+    ))) {
+      return candidate;
+    }
+    if (candidate.orders.length > bestProgress.orders.length) {
+      bestProgress = candidate;
+    }
+  }
+  return bestProgress;
+}
+
+function QueueReconRotation(state) {
+  const candidateUnitIds = [
+    "Unit_Guerrilla_One",
+    "Unit_MainForce_One",
+    "Unit_WorkTeam_One",
+  ].sort((firstId, secondId) => {
+    const GetUses = (unitId) => {
+      const stageId = `Stage_${Math.ceil(state.turn / 4)}`;
+      return state.intelligenceLedger?.reconUsesByStage?.[stageId]?.[unitId] || 0;
+    };
+    return GetUses(firstId) - GetUses(secondId)
+      || firstId.localeCompare(secondId);
+  });
+  for (const unitId of candidateUnitIds) {
+    const unit = state.units.find((candidate) => candidate.id === unitId);
+    if (!unit
+      || unit.readiness <= 0
+      || unit.recoveryRequired
+      || state.orders.some((order) => order.unitId === unitId)) {
+      continue;
+    }
+    const unitHex = GetProjectedHex(state, unitId);
+    const candidate = TryQueue(state, {
+      actionId: "recon",
+      unitId,
+      hexId: unitHex?.id,
+      targetHexId: unitHex?.id,
+    });
+    if (candidate.orders.some((order) => (
+      order.unitId === unitId
+      && order.actionId === "recon"
+    ))) {
+      return candidate;
+    }
+  }
+  return state;
 }
 
 function QueueWarningDefense(state) {
   const mainForceId = "Unit_MainForce_One";
+  const mainForce = state.units.find((unit) => unit.id === mainForceId);
   const warnings = state.hexes.filter((hex) => hex.warning?.turn === state.turn);
-  if (warnings.length === 0 || state.commandPoints <= 0) {
+  if (!mainForce
+    || mainForce.readiness < 2
+    || mainForce.recoveryRequired
+    || warnings.length === 0
+    || state.commandPoints <= 0) {
     return state;
   }
   let next = state;
@@ -229,20 +392,78 @@ function QueueWarningDefense(state) {
 
 function PlanBalancedTurn(state) {
   let next = UnlockAvailableDoctrines(state);
+  const headquarters = next.hexes.find((hex) => hex.feature === "Headquarters");
+  for (const unitId of ["Unit_WorkTeam_One", "Unit_Guerrilla_One", "Unit_MainForce_One"]) {
+    const unit = next.units.find((candidate) => candidate.id === unitId);
+    if (unit?.recoveryRequired && unit.brokenTurnsRemaining === 0 && next.commandPoints > 0) {
+      const recoveryPlan = TryQueue(next, {
+        actionId: "rest",
+        unitId,
+        hexId: unit.hexId,
+        targetHexId: unit.hexId,
+      });
+      if (recoveryPlan.orders.length > next.orders.length) {
+        next = recoveryPlan;
+        break;
+      }
+    }
+    if (unit
+      && ["Guerrilla", "MainForce"].includes(unit.type)
+      && !unit.recoveryRequired
+      && unit.readiness <= 1
+      && next.commandPoints > 0) {
+      const currentHex = next.hexes.find((hex) => hex.id === unit.hexId);
+      if (currentHex?.feature === "Headquarters" || currentHex?.institution === "Clinic") {
+        const recoveryPlan = TryQueue(next, {
+          actionId: "rest",
+          unitId,
+          hexId: currentHex.id,
+          targetHexId: currentHex.id,
+        });
+        if (recoveryPlan.orders.length > next.orders.length) {
+          next = recoveryPlan;
+          break;
+        }
+      } else if (headquarters) {
+        const retreatPlan = MoveToward(next, unitId, headquarters);
+        if (retreatPlan.orders.length > next.orders.length) {
+          next = retreatPlan;
+          break;
+        }
+      }
+    }
+  }
+  if (next.turn >= 13) {
+    const clinic = next.hexes.find((hex) => hex.institution === "Clinic");
+    const reserveUnit = next.units
+      .filter((unit) => (
+        ["Guerrilla", "MainForce"].includes(unit.type)
+        && unit.readiness > 0
+        && !unit.recoveryRequired
+        && !next.orders.some((order) => order.unitId === unit.id)
+      ))
+      .sort((first, second) => second.readiness - first.readiness)[0];
+    if (clinic && reserveUnit && reserveUnit.hexId !== clinic.id) {
+      next = MoveToward(next, reserveUnit.id, clinic);
+    }
+  }
   next = QueueWorkSchedule(next);
   const warnings = next.hexes.filter((hex) => hex.warning?.turn === next.turn);
-  if (warnings.length > 0) {
+  const operationalFieldForces = next.units.filter((unit) => (
+    ["Guerrilla", "MainForce"].includes(unit.type)
+    && unit.readiness > 0
+    && !unit.recoveryRequired
+    && !next.orders.some((order) => order.unitId === unit.id)
+  ));
+  if (warnings.length > 0
+    && next.meters.contribution < 6
+    && operationalFieldForces.length >= 2) {
     next = QueueWarningDefense(next);
-  } else if ([1, 4, 7, 10, 13].includes(next.turn)) {
-    next = QueueNearestSabotage(next, "Unit_Guerrilla_One");
-  } else if (next.commandPoints > 0) {
-    const guerrillaHex = GetProjectedHex(next, "Unit_Guerrilla_One");
-    next = TryQueue(next, {
-      actionId: "recon",
-      unitId: "Unit_Guerrilla_One",
-      hexId: guerrillaHex.id,
-      targetHexId: guerrillaHex.id,
-    });
+  } else if (next.turn >= 3 && next.meters.contribution < 10) {
+    next = QueueBestSabotage(next);
+  }
+  if (next.commandPoints > 0) {
+    next = QueueReconRotation(next);
   }
   if (next.commandPoints > 0) {
     next = TryQueue(next, {
@@ -358,6 +579,22 @@ function PlanMilitaryDoctrineTurn(state) {
       next = candidate;
     }
   }
+  for (const unitId of [workTeamId, "Unit_Guerrilla_One", "Unit_MainForce_One"]) {
+    if (next.commandPoints <= 0 || next.orders.some((order) => order.unitId === unitId)) {
+      continue;
+    }
+    const unitHex = GetProjectedHex(next, unitId);
+    const reconPlan = TryQueue(next, {
+      actionId: "recon",
+      unitId,
+      hexId: unitHex?.id,
+      targetHexId: unitHex?.id,
+    });
+    if (reconPlan.orders.length > next.orders.length) {
+      next = reconPlan;
+      break;
+    }
+  }
   return next;
 }
 
@@ -375,7 +612,7 @@ function RunCampaign(seed, planner) {
 }
 
 Test("常量、双树、政策与16个历史月定义完整", () => {
-  assert.equal(saveVersion, 2);
+  assert.equal(saveVersion, 3);
   assert.match(saveKey, /^enemyrear1941_/);
   assert.equal(turnLimit, 16);
   assert.equal(historicalTurns.length, 16);
@@ -427,6 +664,89 @@ Test("常量、双树、政策与16个历史月定义完整", () => {
     "北路临时扫荡纵队（情境合成称谓）",
     "南路临时扫荡纵队（情境合成称谓）",
   ]);
+});
+
+Test("16个月任务事件均由地图部署钩子驱动，空命令必定形成责任缺口", () => {
+  assert.equal(historicalEventMechanics.length, turnLimit);
+  assert.deepEqual(
+    historicalEventMechanics.map((definition) => definition.turn),
+    Array.from({ length: turnLimit }, (_, index) => index + 1),
+  );
+  for (const definition of historicalEventMechanics) {
+    assert.equal(definition.hooks.length, 3, `第${definition.turn}回合必须有三项可验证部署钩子`);
+    assert.ok(definition.objective.length >= 12, `第${definition.turn}回合必须说明真实任务目标`);
+    assert.ok(
+      definition.hooks.every((hook) => hook.actionsAny.length
+        || hook.institutionsAny.length
+        || hook.meterAtMost
+        || hook.minimumInstitutions),
+      `第${definition.turn}回合不能存在无规则触发条件的合成事件`,
+    );
+  }
+
+  const initial = CreateInitialState(19410918);
+  const preview = GetHistoricalEventPreview(initial, 1, []);
+  assert.equal(preview.hasDeployment, false);
+  const resolved = ResolveTurn(initial);
+  assert.equal(resolved.eventState.resolved.length, 1);
+  assert.equal(resolved.eventState.resolved[0].outcomeId, "Neglected");
+  assert.deepEqual(resolved.eventState.resolved[0].choice.actionIds, []);
+  assert.equal(resolved.eventState.pendingConsequences.length, 1);
+  assert.equal(resolved.eventState.pendingConsequences[0].sourceTurn, 1);
+});
+
+Test("侦察、交通站、救济、诊疗和疏散分别命中对应历史责任钩子", () => {
+  const state = CreateInitialState(20260730);
+  const Preview = (turn, actionId, targetHexId = "Hex_Q2_R3", warningTargetIds = []) => (
+    GetHistoricalEventPreview(
+      state,
+      turn,
+      [{ actionId, targetHexId, hexId: targetHexId }],
+      { warningTargetIds },
+    )
+  );
+  assert.ok(Preview(2, "recon").hooks.find((hook) => hook.id === "CrossCheckPatrols")?.met);
+  assert.ok(Preview(2, "buildStation").hooks.find((hook) => hook.id === "SegmentTraffic")?.met);
+  assert.ok(Preview(3, "relief").hooks.find((hook) => hook.id === "TreatIllness")?.met);
+  assert.ok(Preview(3, "buildClinic").hooks.find((hook) => hook.id === "DisperseClinic")?.met);
+  assert.ok(
+    Preview(9, "evacuate", "Hex_Q2_R3", ["Hex_Q2_R3"])
+      .hooks.find((hook) => hook.id === "EvacuateWarnedVillage")?.met,
+  );
+  assert.equal(
+    Preview(9, "evacuate", "Hex_Q2_R3", ["Hex_Q4_R1"])
+      .hooks.find((hook) => hook.id === "EvacuateWarnedVillage")?.met,
+    false,
+    "疏散命令必须下在真实预警目标上，不能只凭动作名完成责任",
+  );
+  assert.equal(GetHistoricalEventMechanic(17), null);
+});
+
+Test("事件选择、结果和延迟后果能存档往返，且只在指定月份兑现一次", () => {
+  let state = CreateInitialState(19410918);
+  state = ResolveTurn(state);
+  assert.equal(state.turn, 2);
+  assert.equal(state.eventState.pendingConsequences.length, 1);
+  assert.equal(state.eventState.appliedConsequences.length, 0);
+
+  state = ResolveTurn(state);
+  assert.equal(state.turn, 3);
+  assert.equal(state.eventState.resolved.length, 2);
+  assert.equal(state.eventState.appliedConsequences.length, 1);
+  assert.equal(state.eventState.appliedConsequences[0].sourceTurn, 1);
+  assert.equal(state.eventState.appliedConsequences[0].turn, 3);
+  assert.equal(state.ledger.historicalConsequences.length, 1);
+  const beforeSecondApply = SerializeState(state);
+  assert.deepEqual(ApplyDueHistoricalConsequences(state, 3), []);
+  assert.equal(SerializeState(state), beforeSecondApply, "同一延迟后果不得重复扣除或重复入账");
+
+  const roundTrip = DeserializeState(SerializeState(state));
+  assert.deepEqual(roundTrip.eventState.resolved, state.eventState.resolved);
+  assert.deepEqual(roundTrip.eventState.pendingConsequences, state.eventState.pendingConsequences);
+  assert.deepEqual(roundTrip.eventState.appliedConsequences, state.eventState.appliedConsequences);
+  assert.deepEqual(roundTrip.ledger.historicalConsequences, state.ledger.historicalConsequences);
+  assert.equal(roundTrip.eventState.resolved[0].outcomeId, "Neglected");
+  assert.deepEqual(roundTrip.eventState.resolved[0].choice.actionIds, []);
 });
 
 Test("9×7地图、轴向邻接与战争迷雾正确", () => {
@@ -582,8 +902,27 @@ Test("政策每回合只锁定一次，订单快照阻止排单后换策套利",
   const nextTurn = ResolveTurn(queued);
   const selectedOnce = SetPolicies(nextTurn, []);
   assert.equal(selectedOnce.lastError, null);
+  assert.equal(selectedOnce.policyAdjustmentCost, 1);
+  assert.equal(selectedOnce.commandPoints, selectedOnce.commandMax - 1);
+  assert.equal(selectedOnce.policySwitchCooldownUntil, selectedOnce.turn + 2);
   const selectedTwice = SetPolicies(selectedOnce, ["MassDiscipline"]);
   assert.match(selectedTwice.lastError, /已经锁定/);
+
+  const cooldownTurn = ResolveTurn(selectedOnce);
+  const blockedByCooldown = SetPolicies(
+    cooldownTurn,
+    ["MassDiscipline", "FlexibleDispersion"],
+  );
+  assert.match(blockedByCooldown.lastError, /冷却/);
+  assert.deepEqual(blockedByCooldown.policies, []);
+
+  const cooldownExpired = ResolveTurn(cooldownTurn);
+  const switchedAfterCooldown = SetPolicies(
+    cooldownExpired,
+    ["MassDiscipline", "FlexibleDispersion"],
+  );
+  assert.equal(switchedAfterCooldown.lastError, null);
+  assert.equal(switchedAfterCooldown.commandPoints, switchedAfterCooldown.commandMax - 1);
 });
 
 Test("固定种子结算完全确定且不使用刷新刷结果", () => {
@@ -654,6 +993,11 @@ Test("军民协同防御只提供受限相邻支援，并受战备、补给与�
     organizedNeighbor = false,
   } = {}) => {
     const state = CreateInitialState(55667789);
+    for (const enemy of state.enemies) {
+      if (enemy.type !== "SweepColumn") {
+        enemy.active = false;
+      }
+    }
     state.doctrines.military.unlocked.push("IntelligenceBeforeAction", "MineAndSabotage", "AntiSweepDefense");
     if (coordinated) {
       state.doctrines.military.unlocked.push("CoordinatedDefense");
@@ -832,6 +1176,9 @@ Test("崩散单位至少整顿两回合并消耗药品，不能免费传送即�
 
 Test("补给封锁约束远端单位与生产，交通站或工作队可恢复连接", () => {
   const disconnected = CreateInitialState(1357911);
+  disconnected.enemies.forEach((enemy) => {
+    enemy.active = false;
+  });
   disconnected.units.find((unit) => unit.id === "Unit_MainForce_One").hexId = "Hex_Q4_R4";
   let disconnectedResult = ResolveTurn(disconnected);
   disconnectedResult = ResolveTurn(disconnectedResult);
@@ -839,8 +1186,29 @@ Test("补给封锁约束远端单位与生产，交通站或工作队可恢复�
   assert.equal(disconnectedForce.outOfSupplyTurns, 2);
   assert.ok(disconnectedForce.readiness < disconnectedForce.maximumReadiness);
 
+  const isolatedStation = CreateInitialState(1357911);
+  isolatedStation.enemies.forEach((enemy) => {
+    enemy.active = false;
+  });
+  isolatedStation.units.find((unit) => unit.id === "Unit_MainForce_One").hexId = "Hex_Q4_R4";
+  isolatedStation.hexes.find((hex) => hex.id === "Hex_Q4_R4").institution = "Station";
+  let isolatedStationResult = ResolveTurn(isolatedStation);
+  isolatedStationResult = ResolveTurn(isolatedStationResult);
+  const isolatedStationForce = isolatedStationResult.units.find(
+    (unit) => unit.id === "Unit_MainForce_One",
+  );
+  assert.equal(
+    isolatedStationForce.outOfSupplyTurns,
+    2,
+    "孤立交通站不能凭空重置远端部队的脱离补给回合",
+  );
+
   const connected = CreateInitialState(1357911);
+  connected.enemies.forEach((enemy) => {
+    enemy.active = false;
+  });
   connected.units.find((unit) => unit.id === "Unit_MainForce_One").hexId = "Hex_Q4_R4";
+  connected.hexes.find((hex) => hex.id === "Hex_Q2_R3").institution = "Station";
   connected.hexes.find((hex) => hex.id === "Hex_Q4_R4").institution = "Station";
   let connectedResult = ResolveTurn(connected);
   connectedResult = ResolveTurn(connectedResult);
@@ -968,6 +1336,52 @@ Test("敌军计划只使用可观察信息，不读取隐藏单位或未执行�
   );
 });
 
+Test("1024种子证明未侦获机构不泄露，山地型丘陵隐蔽真实降低敌军选点率", () => {
+  const targetCounts = {};
+  const villageCounts = {};
+  for (let seed = 1; seed <= 1024; seed += 1) {
+    const baseline = CreateInitialState(seed);
+    const hiddenInstitutions = CloneState(baseline);
+    const villages = hiddenInstitutions.hexes.filter((hex) => hex.feature === "Village");
+    villages[0].institution = "Arsenal";
+    villages[1].institution = "Station";
+    villages[0].enemyInstitutionIntel = null;
+    villages[1].enemyInstitutionIntel = null;
+
+    const baselinePlan = GenerateEnemyOperationalPlan(baseline, 4);
+    const hiddenPlan = GenerateEnemyOperationalPlan(hiddenInstitutions, 4);
+    assert.equal(
+      hiddenPlan.fingerprint,
+      baselinePlan.fingerprint,
+      `种子 ${seed} 的未侦获机构不得改变敌军计划指纹`,
+    );
+
+    const sweepPlan = GenerateEnemyOperationalPlan(baseline, 9);
+    const target = baseline.hexes.find((hex) => hex.id === sweepPlan.primaryTargetId);
+    targetCounts[target.terrain] = (targetCounts[target.terrain] || 0) + 1;
+    if (seed === 1) {
+      for (const village of baseline.hexes.filter((hex) => hex.feature === "Village")) {
+        villageCounts[village.terrain] = (villageCounts[village.terrain] || 0) + 1;
+      }
+    }
+  }
+
+  const concealedHillRate = (targetCounts.Hill || 0)
+    / Math.max(1, (villageCounts.Hill || 0) * 1024);
+  const plainRate = (targetCounts.Plain || 0)
+    / Math.max(1, (villageCounts.Plain || 0) * 1024);
+  assert.ok(targetCounts.Hill > 0, "隐蔽丘陵村不能成为绝对免疫区");
+  assert.ok(targetCounts.Plain > targetCounts.Hill, "暴露平原应更常成为敌军目标");
+  assert.ok(
+    concealedHillRate < plainRate * 0.15,
+    `隐蔽丘陵每村目标率 ${concealedHillRate} 应显著低于平原 ${plainRate}`,
+  );
+  console.log(
+    `  1024种子选点：隐蔽丘陵 ${targetCounts.Hill || 0}，`
+    + `平原 ${targetCounts.Plain || 0}，河谷 ${targetCounts.RiverValley || 0}`,
+  );
+});
+
 Test("连续破袭会使后续计划提高护路抢修预算并盯紧同一路段", () => {
   let state = CreateInitialState(19410918);
   state = QueueOrder(state, {
@@ -1023,6 +1437,62 @@ Test("佯动征候保留战略不确定性且不会提前泄露主攻", () => {
   assert.ok(configurations.size >= 3, "不同种子应形成多种主攻—佯动组合");
 });
 
+Test("零情报预警混入假征候，两次侦察后只保留交叉核验目标", () => {
+  const RunTurnEight = (reconUnitIds) => {
+    let state = CreateInitialState(42);
+    state.turn = 8;
+    state.phase = "planning";
+    state.gameOver = false;
+    state.orders = [];
+    state.commandPoints = state.commandMax;
+    state.policyAdjustmentCost = 0;
+    state.policyLock = {
+      turn: 8,
+      locked: false,
+      policyIds: [...state.policies],
+    };
+    state.hexes.forEach((hex) => {
+      hex.warning = null;
+    });
+    state.enemyPlanning.currentPlan = GenerateEnemyOperationalPlan(state, 8);
+    state.enemyPlanning.currentPlan.reconClarity = 0;
+    state.enemyPlanning.pendingReconClarity = 0;
+    for (const unitId of reconUnitIds) {
+      const unit = state.units.find((candidate) => candidate.id === unitId);
+      state = QueueOrder(state, {
+        actionId: "recon",
+        unitId,
+        hexId: unit.hexId,
+        targetHexId: unit.hexId,
+      });
+      assert.equal(state.lastError, null, `${unitId} 的交叉侦察应能排入命令`);
+    }
+    return ResolveTurn(state);
+  };
+
+  const rumorState = RunTurnEight([]);
+  const corroboratedState = RunTurnEight(["Unit_WorkTeam_One", "Unit_Guerrilla_One"]);
+  const rumorWarnings = rumorState.hexes.filter((hex) => hex.warning?.turn === 9);
+  const corroboratedWarnings = corroboratedState.hexes.filter((hex) => hex.warning?.turn === 9);
+  assert.equal(rumorState.enemyPlanning.currentPlan.reconClarity, 0);
+  assert.equal(rumorWarnings.filter((hex) => hex.warning.isActualTarget === false).length, 2);
+  assert.equal(GetTurnBriefing(rumorState).enemySignals.likelyMainTargetId, null);
+  assert.equal(corroboratedState.enemyPlanning.currentPlan.reconClarity, 2);
+  assert.equal(corroboratedWarnings.filter((hex) => hex.warning.isActualTarget === false).length, 0);
+  assert.equal(
+    GetTurnBriefing(corroboratedState).enemySignals.likelyMainTargetId,
+    corroboratedState.enemyPlanning.currentPlan.primaryTargetId,
+  );
+  assert.deepEqual(
+    new Set(corroboratedWarnings.map((hex) => hex.id)),
+    new Set([
+      corroboratedState.enemyPlanning.currentPlan.primaryTargetId,
+      ...corroboratedState.enemyPlanning.currentPlan.secondaryTargetIds,
+    ].slice(0, 2)),
+    "高侦察预警必须收敛到敌军锁定计划的真实目标",
+  );
+});
+
 Test("铁路破袭同时提高战略牵制与暴露", () => {
   let state = CreateInitialState();
   state.meters.exposure = 55;
@@ -1060,6 +1530,123 @@ Test("铁路破袭同时提高战略牵制与暴露", () => {
     0,
     "暴露触发的计划扫荡不得在生成警告的同一回合执行",
   );
+});
+
+Test("铁路停运真实削弱敌军战备与扫荡损失，而非只增加分数", () => {
+  const BuildTurnNine = (disableRail) => {
+    const state = CreateInitialState(99);
+    state.turn = 9;
+    state.phase = "planning";
+    state.gameOver = false;
+    state.orders = [];
+    state.commandPoints = state.commandMax;
+    state.policyAdjustmentCost = 0;
+    state.policyLock = {
+      turn: 9,
+      locked: false,
+      policyIds: [...state.policies],
+    };
+    state.hexes.forEach((hex) => {
+      hex.warning = null;
+      hex.railDisabledTurns = 0;
+    });
+    state.enemyPlanning.currentPlan = GenerateEnemyOperationalPlan(state, 9);
+    const targetIds = [
+      state.enemyPlanning.currentPlan.primaryTargetId,
+      ...state.enemyPlanning.currentPlan.secondaryTargetIds,
+    ].slice(0, 2);
+    for (const targetId of targetIds) {
+      const target = state.hexes.find((hex) => hex.id === targetId);
+      target.warning = {
+        turn: 9,
+        kind: "Sweep",
+        intensity: 3,
+        text: "反事实扫荡目标",
+        sourcePlanId: state.enemyPlanning.currentPlan.id,
+        confidence: "Corroborated",
+        isActualTarget: true,
+      };
+    }
+    if (disableRail) {
+      const railId = state.enemyPlanning.currentPlan.routeProtectionIds[0];
+      state.hexes.find((hex) => hex.id === railId).railDisabledTurns = 3;
+    }
+    return ResolveTurn(state);
+  };
+
+  const intactRail = BuildTurnNine(false);
+  const disabledRail = BuildTurnNine(true);
+  const SweepDamage = (state) => state.ledger.civilianCosts
+    .filter((entry) => entry.turn === 9 && ["扫荡", "大规模扫荡"].includes(entry.source))
+    .reduce((totals, entry) => ({
+      livelihood: totals.livelihood + entry.livelihoodDamage,
+      households: totals.households + entry.households,
+    }), { livelihood: 0, households: 0 });
+  const intactDamage = SweepDamage(intactRail);
+  const disabledDamage = SweepDamage(disabledRail);
+  const intactReadiness = intactRail.enemies.reduce(
+    (total, enemy) => total + (enemy.active ? enemy.readiness : 0),
+    0,
+  );
+  const disabledReadiness = disabledRail.enemies.reduce(
+    (total, enemy) => total + (enemy.active ? enemy.readiness : 0),
+    0,
+  );
+  assert.ok(disabledDamage.livelihood < intactDamage.livelihood);
+  assert.ok(disabledDamage.households < intactDamage.households);
+  assert.ok(disabledReadiness < intactReadiness);
+  assert.ok(disabledRail.strategicLedger.railDelayEffects > 0);
+  assert.ok(disabledRail.meters.contribution > intactRail.meters.contribution);
+});
+
+Test("同格接触必须损失战备并立即脱离，不能让敌我模型穿在一起", () => {
+  const state = CreateInitialState(7001);
+  state.enemies.forEach((enemy) => {
+    enemy.active = false;
+  });
+  const mainForce = state.units.find((unit) => unit.id === "Unit_MainForce_One");
+  const search = state.enemies.find((enemy) => enemy.id === "Enemy_Search_One");
+  search.active = true;
+  search.hexId = mainForce.hexId;
+  search.moves = 0;
+  const readinessBefore = mainForce.readiness;
+  const resolved = ResolveTurn(state);
+  const resolvedForce = resolved.units.find((unit) => unit.id === mainForce.id);
+  assert.ok(resolved.strategicLedger.contactEncounters >= 1);
+  assert.ok(resolvedForce.readiness < readinessBefore);
+  assert.equal(
+    resolved.units.some((unit) => unit.readiness > 0
+      && resolved.enemies.some((enemy) => enemy.active && enemy.hexId === unit.hexId)),
+    false,
+    "接触结算后不得仍有可行动敌我单位重叠",
+  );
+});
+
+Test("敌占铁路破袭必付出战备与暴露，严密护路会令行动失败", () => {
+  let state = CreateInitialState(7002);
+  state.enemies.forEach((enemy) => {
+    enemy.active = false;
+  });
+  const guerrilla = state.units.find((unit) => unit.id === "Unit_Guerrilla_One");
+  guerrilla.hexId = "Hex_Q5_R4";
+  guerrilla.readiness = 1;
+  const search = state.enemies.find((enemy) => enemy.id === "Enemy_Search_One");
+  search.active = true;
+  search.hexId = "Hex_Q6_R4";
+  search.readiness = 3;
+  const exposureBefore = state.meters.exposure;
+  state = QueueOrder(state, {
+    actionId: "sabotage",
+    unitId: guerrilla.id,
+    hexId: "Hex_Q6_R4",
+    targetHexId: "Hex_Q6_R4",
+  });
+  assert.equal(state.orders.length, 1, state.lastError || "敌占铁路仍应允许冒险尝试破袭");
+  const resolved = ResolveTurn(state);
+  assert.equal(GetHex(resolved, "Hex_Q6_R4").railDisabledTurns, 0);
+  assert.equal(resolved.units.find((unit) => unit.id === guerrilla.id).readiness, 0);
+  assert.ok(resolved.meters.exposure > exposureBefore);
+  assert.ok(resolved.log.some((entry) => entry.includes("被迫中止破袭")));
 });
 
 Test("保护性疏散显著减轻扫荡损失，且不会自动算作永久流离", () => {
@@ -1187,18 +1774,60 @@ Test("每村单队列会完成专业机构，并产生持续建设收益", () =>
   assert.equal(doubleBuildPreview.enabled, false);
   assert.match(doubleBuildPreview.reason, /一个专业机构|建设队列/);
 
-  let constructionTurns = 0;
-  while (GetHex(state, "Hex_Q2_R3").construction && constructionTurns < 8) {
+  const openingProgress = GetHex(state, "Hex_Q2_R3").construction.progress;
+  state = ResolveTurn(state);
+  assert.equal(
+    GetHex(state, "Hex_Q2_R3").construction.progress,
+    openingProgress,
+    "只下达一次启动命令后，工程必须停滞而不是自动滚完",
+  );
+  assert.ok(GetHex(state, "Hex_Q2_R3").construction.unattendedTurns >= 1);
+
+  let constructionDrives = 0;
+  while (GetHex(state, "Hex_Q2_R3").construction && constructionDrives < 8) {
+    state = QueueOrder(state, {
+      actionId: "constructionDrive",
+      unitId: "Unit_WorkTeam_One",
+      hexId: "Hex_Q2_R3",
+      targetHexId: "Hex_Q2_R3",
+    });
+    assert.equal(state.orders.length, 1, state.lastError || "集中施工应能推进既有工程");
     state = ResolveTurn(state);
-    constructionTurns += 1;
+    constructionDrives += 1;
   }
   const village = GetHex(state, "Hex_Q2_R3");
   assert.equal(village.institution, "Station");
   assert.equal(village.construction, null);
-  assert.ok(constructionTurns >= 3, "建设速度必须受本村有效劳力约束");
+  assert.ok(constructionDrives >= 1, "工程必须至少收到一次后续集中施工命令");
   const intelAfterCompletion = state.resources.intel;
   state = ResolveTurn(state);
   assert.ok(state.resources.intel > intelAfterCompletion);
+});
+
+Test("第16回合不能启动战役结束前无法完成的建设", () => {
+  const state = CreateInitialState(1616);
+  state.turn = 16;
+  state.phase = "planning";
+  state.gameOver = false;
+  state.commandPoints = state.commandMax;
+  state.policyLock = {
+    turn: 16,
+    locked: false,
+    policyIds: [...state.policies],
+  };
+  const village = state.hexes.find((hex) => hex.id === "Hex_Q2_R3");
+  village.contact = 100;
+  village.institution = null;
+  village.construction = null;
+  state.units.find((unit) => unit.id === "Unit_WorkTeam_One").hexId = village.id;
+  const preview = GetActionPreview(
+    state,
+    "buildPartyBranch",
+    village.id,
+    "Unit_WorkTeam_One",
+  );
+  assert.equal(preview.enabled, false);
+  assert.match(preview.reason, /最早.*超出本战役阶段/);
 });
 
 Test("地块改良进入持续产出系统", () => {
@@ -1396,6 +2025,10 @@ Test("84点经验不能免费连续解完整科技链", () => {
 
 Test("重复侦察按阶段递减封顶，不能空转刷满情报和军事路线", () => {
   let state = CreateInitialState(51515151);
+  state.resources.grain = 999;
+  state.enemies.forEach((enemy) => {
+    enemy.active = false;
+  });
   state.units.find((unit) => unit.id === "Unit_Guerrilla_One").hexId = "Hex_Q1_R3";
   while (!state.gameOver) {
     const queued = QueueOrder(state, {
@@ -1658,9 +2291,108 @@ Test("空命令也能完整走完16回合且历史终点不被改写", () => {
   const assessment = GetVictoryAssessment(completed);
   assert.match(assessment.historicalCoda, /1945年/);
   assert.equal(assessment.requirements.historicalEndpointReached, true);
+  assert.equal(assessment.status, "NetworkBroken", "连续空命令必须判为基层网络失守，而非脆弱存续");
+  assert.match(assessment.title, /消极失守|网络/, "空命令结局必须明确指出不作为造成的责任缺口");
 });
 
-Test("情报—破袭—交通保障路线能在真实16回合战役中抵达第四层军事学说", () => {
+Test("高结局同时检查部队、后勤、隐蔽纪律、路线政策与持续消耗", () => {
+  const baseline = RunCampaign(19410918, PlanBalancedTurn);
+  const baselineAssessment = GetVictoryAssessment(baseline);
+  assert.equal(
+    baselineAssessment.status,
+    "HistoricalContinuity",
+    JSON.stringify({
+      score: baselineAssessment.score,
+      requirements: baselineAssessment.requirements,
+      meters: baseline.meters,
+      units: baseline.units.map((unit) => ({
+        id: unit.id,
+        hexId: unit.hexId,
+        readiness: unit.readiness,
+        recoveryRequired: unit.recoveryRequired,
+        brokenTurnsRemaining: unit.brokenTurnsRemaining,
+        outOfSupplyTurns: unit.outOfSupplyTurns,
+      })),
+      institutions: baseline.hexes
+        .filter((hex) => hex.institution || hex.construction)
+        .map((hex) => ({
+          id: hex.id,
+          institution: hex.institution,
+          construction: hex.construction,
+          hardship: hex.hardship,
+          contact: hex.contact,
+        })),
+      eventOutcomes: baseline.eventState.resolved.map((event) => ({
+        turn: event.turn,
+        outcomeId: event.outcomeId,
+        actions: event.choice.actionIds,
+        matchedHookIds: event.matchedHookIds,
+      })),
+      policies: baseline.policies,
+      doctrines: baseline.doctrines,
+      strategicLedger: baseline.strategicLedger,
+    }),
+  );
+
+  const ExpectDowngrade = (requirementId, mutate) => {
+    const variant = CloneState(baseline);
+    mutate(variant);
+    const assessment = GetVictoryAssessment(variant);
+    assert.equal(assessment.requirements[requirementId], false, `${requirementId} 必须形成硬门槛`);
+    assert.notEqual(assessment.status, "HistoricalContinuity", `${requirementId} 失败时不得维持最高结局`);
+    assert.ok(
+      assessment.score < baselineAssessment.score,
+      `${requirementId} 失败时综合评分也必须真实下降`,
+    );
+  };
+
+  ExpectDowngrade("operationalForcePreserved", (state) => {
+    state.units.filter((unit) => ["Guerrilla", "MainForce"].includes(unit.type))
+      .forEach((unit) => { unit.readiness = 0; });
+  });
+  ExpectDowngrade("minimumLogisticsMaintained", (state) => {
+    state.resources.grain = 0;
+    state.resources.medicine = 0;
+  });
+  ExpectDowngrade("exposureControlled", (state) => {
+    state.meters.exposure = 100;
+    state.meters.discipline = 0;
+  });
+  ExpectDowngrade("doctrinesDeveloped", (state) => {
+    state.doctrines.civilian.unlocked = ["MassLine"];
+    state.doctrines.military.unlocked = ["MobileGuerrilla"];
+    state.policies = [];
+  });
+  ExpectDowngrade("combatLossesContained", (state) => {
+    state.ledger.combatLosses = Array.from({ length: 100 }, (_, index) => ({
+      turn: (index % turnLimit) + 1,
+      type: "TestLoss",
+      text: `第${index + 1}条不可持续战损`,
+    }));
+  });
+
+  const lastMinuteDoctrine = CloneState(baseline);
+  for (const definition of doctrineDefinitions.filter((candidate) => candidate.tier > 0)) {
+    if (lastMinuteDoctrine.doctrines[definition.tree].unlocked.includes(definition.id)) {
+      lastMinuteDoctrine.strategicLedger.doctrineUnlockedTurnById[definition.id] = 16;
+      lastMinuteDoctrine.strategicLedger.doctrinePracticeById[definition.id] = 99;
+    }
+  }
+  const lastMinuteDoctrineAssessment = GetVictoryAssessment(lastMinuteDoctrine);
+  assert.equal(lastMinuteDoctrineAssessment.requirements.doctrinesDeveloped, false);
+  assert.notEqual(lastMinuteDoctrineAssessment.status, "HistoricalContinuity");
+
+  const lastMinutePolicy = CloneState(baseline);
+  lastMinutePolicy.strategicLedger.policyTurnsById = {};
+  lastMinutePolicy.strategicLedger.policyLongestStreakById = {};
+  lastMinutePolicy.strategicLedger.policyTurnsById.MassDiscipline = 1;
+  lastMinutePolicy.strategicLedger.policyLongestStreakById.MassDiscipline = 1;
+  const lastMinutePolicyAssessment = GetVictoryAssessment(lastMinutePolicy);
+  assert.equal(lastMinutePolicyAssessment.requirements.policyMaintained, false);
+  assert.notEqual(lastMinutePolicyAssessment.status, "HistoricalContinuity");
+});
+
+Test("情报—破袭—交通保障路线能稳定形成反扫荡体系，最高层仍要求长期实践", () => {
   const seeds = [19410918, 19420501, 20260727, 7654321, 101, 2203];
   const campaigns = seeds.map((seed) => RunCampaign(seed, PlanMilitaryDoctrineTurn));
   const reports = campaigns.map((completed, index) => {
@@ -1670,16 +2402,20 @@ Test("情报—破袭—交通保障路线能在真实16回合战役中抵达第
       seed: seeds[index],
       completed,
       militaryEarned,
-      reached: completed.doctrines.military.unlocked.includes("CoordinatedDefense"),
+      reached: completed.doctrines.military.unlocked.includes("AntiSweepDefense"),
+      coordinated: completed.doctrines.military.unlocked.includes("CoordinatedDefense"),
     };
   });
   assert.ok(
     reports.every((report) => report.reached),
     `多种子专项路线未稳定可达：${reports.map((report) => `${report.seed}:${report.militaryEarned}/${report.reached ? "已解锁" : "未解锁"}`).join("，")}`,
   );
-  for (const { completed, militaryEarned, reached } of reports) {
+  for (const { completed, militaryEarned, reached, coordinated } of reports) {
     if (reached) {
-      assert.ok(militaryEarned >= 80, "第四层路线必须来自实际侦察和破袭所得，而非测试注入经验");
+      assert.ok(militaryEarned >= 56, "反扫荡体系必须来自实际侦察和破袭所得，而非测试注入经验");
+    }
+    if (coordinated) {
+      assert.ok(militaryEarned >= 80, "军民协同最高层必须来自完整长期实践");
     }
     assert.ok(
       Object.keys(completed.intelligenceLedger.reconUsesByStage).length >= 4,
@@ -1693,7 +2429,7 @@ Test("情报—破袭—交通保障路线能在真实16回合战役中抵达第
 });
 
 Test("批量平衡：组织建设路线优于龟缩和莽攻，莽攻平民代价更高", () => {
-  const seeds = [
+  const baselineSeeds = [
     19410918,
     19420501,
     19421231,
@@ -1707,6 +2443,10 @@ Test("批量平衡：组织建设路线优于龟缩和莽攻，莽攻平民代�
     1601,
     2203,
   ];
+  const seeds = [...baselineSeeds];
+  for (let index = seeds.length; index < balanceSeedCount; index += 1) {
+    seeds.push((Math.imul(index + 1, 2654435761) ^ 0x19410918) >>> 0);
+  }
   const results = {
     balanced: [],
     passive: [],
@@ -1725,6 +2465,8 @@ Test("批量平衡：组织建设路线优于龟缩和莽攻，莽攻平民代�
   const recklessCivilianCost = Average(results.reckless.map((state) => state.ledger.affectedHouseholds));
   const balancedContributions = results.balanced.map((state) => state.meters.contribution);
   const balancedAssessments = results.balanced.map((state) => GetVictoryAssessment(state));
+  const passiveAssessments = results.passive.map((state) => GetVictoryAssessment(state));
+  const recklessAssessments = results.reckless.map((state) => GetVictoryAssessment(state));
   const balancedContinuities = balancedAssessments.filter(
     (assessment) => assessment.status === "HistoricalContinuity",
   ).length;
@@ -1739,6 +2481,35 @@ Test("批量平衡：组织建设路线优于龟缩和莽攻，莽攻平民代�
   const recklessMilitaryEarned = results.reckless.map((state) => (
     state.doctrines.military.experience + state.doctrines.military.spentExperience
   ));
+  const meaningfulLateActionIds = new Set([
+    "recon",
+    "organize",
+    "relief",
+    "evacuate",
+    "buildPartyBranch",
+    "buildCooperative",
+    "buildClinic",
+    "buildArsenal",
+    "buildStation",
+    "buildTunnels",
+    "constructionDrive",
+    "improveTile",
+    "selfProduction",
+    "emergencySupply",
+    "ambush",
+    "sabotage",
+    "rest",
+  ]);
+  const lateTurnRecords = results.balanced.flatMap((state) => state.eventState.resolved
+    .filter((entry) => entry.turn >= 10)
+    .map((entry) => (entry.choice?.actionIds || [])
+      .filter((actionId) => meaningfulLateActionIds.has(actionId)).length));
+  const lateEmptyRate = lateTurnRecords.filter((count) => count === 0).length
+    / Math.max(1, lateTurnRecords.length);
+  const averageLateMeaningfulOrders = Average(lateTurnRecords);
+  const averageUnusedCommand = Average(
+    results.balanced.map((state) => state.strategicLedger.totalUnusedCommand),
+  );
   console.log(`  组织建设贡献样本：${balancedContributions.join(", ")}`);
   console.log(
     `  历史延续 ${balancedContinuities}/${seeds.length}；`
@@ -1748,6 +2519,16 @@ Test("批量平衡：组织建设路线优于龟缩和莽攻，莽攻平民代�
     + `破袭军事总经验 ${recklessMilitaryEarned.join(", ")}；`
     + `民生总经验 ${civilianEarned.join(", ")}`,
   );
+  console.log(
+    `  结局分类：balanced=${balancedAssessments.map((assessment) => assessment.status).join(",")}；`
+    + `passive=${passiveAssessments.map((assessment) => assessment.status).join(",")}；`
+    + `reckless=${recklessAssessments.map((assessment) => assessment.status).join(",")}`,
+  );
+  console.log(
+    `  平衡路线未达成项：${balancedAssessments.map((assessment, index) => (
+      `${seeds[index]}[${assessment.unmetRequirements.map((item) => item.id).join("|") || "无"}]`
+    )).join("；")}`,
+  );
 
   assert.ok(balancedScore > passiveScore, `balanced ${balancedScore} 应高于 passive ${passiveScore}`);
   assert.ok(balancedScore > recklessScore, `balanced ${balancedScore} 应高于 reckless ${recklessScore}`);
@@ -1755,23 +2536,47 @@ Test("批量平衡：组织建设路线优于龟缩和莽攻，莽攻平民代�
     recklessCivilianCost > balancedCivilianCost,
     `reckless 平民代价 ${recklessCivilianCost} 应高于 balanced ${balancedCivilianCost}`,
   );
-  assert.ok(Average(balancedContributions) >= 9.5);
+  const averageBalancedContribution = Average(balancedContributions);
+  const minimumAverageContribution = seeds.length > baselineSeeds.length ? 8.8 : 9.5;
   assert.ok(
-    balancedContributions.filter((contribution) => contribution >= 10).length >= 9,
+    averageBalancedContribution >= minimumAverageContribution,
+    `组织建设路线平均贡献 ${averageBalancedContribution.toFixed(2)} `
+      + `应达到 ${minimumAverageContribution.toFixed(1)}`,
+  );
+  assert.ok(
+    balancedContributions.filter((contribution) => contribution >= 10).length
+      >= Math.max(8, Math.ceil(seeds.length * 0.58)),
     "多数种子中的组织建设路线应完成贡献硬门槛，但仍允许少量困难局形成脆弱存续",
   );
-  assert.ok(balancedContinuities >= 8, "组织建设路线应在多数种子中达成历史延续");
   assert.ok(
-    civilianUnlockCounts.filter((count) => count >= 4).length >= 6,
+    balancedContinuities >= Math.max(8, Math.ceil(seeds.length * 0.56)),
+    "组织建设路线应在多数种子中达成历史延续",
+  );
+  assert.ok(
+    civilianUnlockCounts.filter((count) => count >= 4).length
+      >= Math.max(6, Math.ceil(seeds.length * 0.48)),
     "正常组织建设应让后期民生路线在多数种子中可达，而不是只存在于定义表",
   );
   assert.ok(results.reckless.every((state) => state.meters.exposure > results.passive[0].meters.exposure));
+  assert.ok(
+    passiveAssessments.every((assessment) => assessment.status === "NetworkBroken"),
+    "长期被动路线必须稳定判为基层网络失守",
+  );
+  assert.ok(
+    recklessAssessments.every((assessment) => assessment.status === "CivilianDisaster"),
+    "连续莽攻路线必须稳定判为人民与根据地灾难，不能与被动失守共用结局",
+  );
 
   console.log(
     `  平衡样本：balanced=${balancedScore.toFixed(1)}，`
     + `passive=${passiveScore.toFixed(1)}，reckless=${recklessScore.toFixed(1)}；`
     + `平民受影响户数 balanced=${balancedCivilianCost.toFixed(1)}，`
     + `reckless=${recklessCivilianCost.toFixed(1)}`,
+  );
+  console.log(
+    `  节奏审计：T10—16无有效行动率 ${(lateEmptyRate * 100).toFixed(2)}%，`
+    + `月均有效命令 ${averageLateMeaningfulOrders.toFixed(3)}，`
+    + `全局未用行动令均值 ${averageUnusedCommand.toFixed(1)}`,
   );
 });
 

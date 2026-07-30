@@ -4187,3 +4187,664 @@ kbd {
     border-color: #85816a;
   }
 }
+
+/* Release O: 1080p readability pass and clearer command-group hierarchy. */
+
+@media (min-width: 1600px) and (min-height: 900px) {
+  .campaignIdentity small,
+  .campaignClock span,
+  .campaignClock small,
+  .resourceEntry span,
+  .resourceEntry small,
+  .utilityButton span {
+    font-size: 13px;
+  }
+
+  .resourceEntry b {
+    font-size: 23px;
+  }
+
+  .resourceEntry[data-ledger-kind="people"] {
+    box-shadow: inset 2px 0 rgba(116, 154, 132, .6);
+  }
+
+  .resourceEntry[data-ledger-kind="exposure"] {
+    box-shadow: inset 2px 0 rgba(181, 92, 71, .6);
+  }
+
+  .resourceEntry[data-ledger-kind="contribution"] {
+    box-shadow: inset 2px 0 rgba(203, 164, 83, .62);
+  }
+
+  .panelEyebrow,
+  .sectionIndex,
+  .sectionHeading small,
+  .sectionHeading em,
+  .timelineList time,
+  .selectedMeta,
+  .selectedStats dt,
+  .statCard span,
+  .unitTags span,
+  .tagList span {
+    font-size: 13px;
+  }
+
+  .objectiveCard p,
+  .warningCard p,
+  .historyBoundaryNote p,
+  .timelineList small,
+  .selectedUnit p,
+  .unitCard p,
+  .unknownNotice,
+  .emptySelection,
+  .selectionWarning span,
+  .travelUnitCard {
+    font-size: 14px;
+    line-height: 1.58;
+  }
+
+  .timelineList b,
+  .warningCard h3,
+  .historyBoundaryNote b,
+  .selectedUnit b,
+  .unitCard b,
+  .selectionWarning b,
+  .statGrid b,
+  .constructionQueue b {
+    font-size: 15px;
+  }
+
+  .mapHeader {
+    min-height: 56px;
+    padding: 8px 13px;
+    background:
+      linear-gradient(180deg, rgba(37, 50, 43, .94), rgba(14, 23, 19, .9));
+  }
+
+  .mapHeader h2 {
+    font-size: 19px;
+  }
+
+  .mapHeader .panelEyebrow,
+  #mapHint,
+  .mapLegend,
+  .mapMarkScale,
+  .worldModeBadge,
+  .hexNavigator p,
+  .hexNavButton,
+  #hexNavigator button {
+    font-size: 13px;
+  }
+
+  .mapControls {
+    top: 82px;
+  }
+
+  .worldModeBadge {
+    top: 82px;
+  }
+
+  .mapMarkNorth {
+    top: 85px;
+  }
+
+  .actionCard b,
+  #actionList > button b,
+  .emptyOrders b,
+  .orderCard b,
+  .orderItem b,
+  .executeButton {
+    font-size: 15px;
+  }
+
+  .actionCard span,
+  #actionList > button span,
+  .actionCard small,
+  #actionList > button small,
+  .actionCard > em,
+  .statGrid small,
+  .yieldRow > span,
+  .settlementFacts dt,
+  .settlementFacts dd,
+  .constructionQueue span,
+  .constructionQueue small,
+  .unitCard small,
+  .unitCard em,
+  .commandBudget span,
+  .emptyOrders span,
+  .orderCard span,
+  .orderCard small,
+  .orderItem small,
+  .clearOrdersButton {
+    font-size: 14px;
+  }
+}
+
+/* Release N: one PC-only cinematic command table with readable native HUD. */
+
+@media (min-width: 1280px) and (min-height: 720px) {
+  :root {
+    --topBarHeight: 76px;
+    --bottomDockHeight: 86px;
+    --leftRailWidth: 236px;
+    --rightRailWidth: 310px;
+  }
+
+  .gameShell {
+    background: #0b100e;
+  }
+
+  .warLedger {
+    grid-template-columns: 250px 166px minmax(650px, 1fr) auto;
+    border-bottom-color: rgba(170, 153, 111, .52);
+    background:
+      linear-gradient(180deg, rgba(255, 247, 218, .045), transparent 58%),
+      radial-gradient(circle at 35% -80%, rgba(146, 120, 69, .14), transparent 35%),
+      #121a17;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+  }
+
+  .campaignIdentity {
+    padding: 10px 14px;
+    border-right-color: rgba(122, 134, 126, .38);
+  }
+
+  .campaignIdentity b {
+    font-size: 22px;
+  }
+
+  .campaignIdentity small,
+  .campaignClock span,
+  .campaignClock small,
+  .resourceEntry span,
+  .resourceEntry small,
+  .utilityButton span {
+    display: block;
+    font-size: 12px;
+    line-height: 1.15;
+  }
+
+  .campaignClock {
+    padding: 8px 12px;
+    border-right-color: rgba(122, 134, 126, .38);
+  }
+
+  .campaignClock b {
+    margin: 2px 0;
+    font-size: 18px;
+  }
+
+  .resourceEntry {
+    padding: 8px 6px 7px;
+    border-right-color: rgba(104, 119, 111, .3);
+  }
+
+  .resourceEntry b {
+    font-size: 21px;
+    line-height: 1.12;
+  }
+
+  .resourceEntry::after {
+    left: 14px;
+    right: 14px;
+    bottom: 5px;
+    height: 2px;
+    opacity: .78;
+  }
+
+  .utilityButton {
+    flex-basis: 52px;
+    min-width: 52px;
+    border-left-color: rgba(118, 132, 124, .34);
+  }
+
+  .utilityButton i {
+    width: 30px;
+    height: 30px;
+    border-color: rgba(176, 162, 123, .62);
+    color: #e2d3ab;
+    font-size: 15px;
+  }
+
+  .battlefieldGrid {
+    gap: 0;
+    padding: 0;
+    background: #0c1210;
+  }
+
+  .leftRail,
+  .rightInspector {
+    border: 0;
+    border-radius: 0;
+    -webkit-mask-image: none;
+    mask-image: none;
+    background:
+      linear-gradient(155deg, rgba(238, 224, 183, .035), transparent 30%),
+      repeating-linear-gradient(0deg, transparent 0 10px, rgba(255, 255, 255, .008) 11px),
+      #151e1a;
+    box-shadow: inset 0 0 38px rgba(0, 0, 0, .24);
+  }
+
+  .leftRail {
+    border-right: 1px solid rgba(139, 148, 130, .38);
+  }
+
+  .rightInspector {
+    border-left: 1px solid rgba(139, 148, 130, .38);
+  }
+
+  .panelHeader,
+  .selectedHeader {
+    padding: 16px 16px 14px;
+    border-bottom-color: rgba(151, 137, 101, .4);
+    background:
+      linear-gradient(180deg, rgba(202, 181, 126, .055), transparent 70%),
+      rgba(22, 32, 28, .98);
+  }
+
+  .panelHeader h2,
+  .selectedHeader h2 {
+    font-size: 22px;
+  }
+
+  .panelEyebrow,
+  .sectionIndex,
+  .sectionHeading small,
+  .sectionHeading em,
+  .timelineList time,
+  .selectedMeta,
+  .selectedStats dt,
+  .statCard span,
+  .unitTags span,
+  .tagList span {
+    font-size: 12px;
+  }
+
+  .objectiveCard,
+  .warningCard,
+  .timelineSection,
+  .historyBoundaryNote,
+  .selectedStats,
+  .selectedUnit,
+  .actionSection {
+    margin: 12px;
+  }
+
+  .objectiveCard,
+  .warningCard {
+    padding: 13px;
+    background: rgba(6, 11, 9, .22);
+  }
+
+  .objectiveCard p,
+  .warningCard p,
+  .historyBoundaryNote p,
+  .timelineList small,
+  .selectedUnit p,
+  .unitCard p,
+  .unknownNotice,
+  .emptySelection,
+  .selectionWarning span,
+  .travelUnitCard {
+    font-size: 13px;
+    line-height: 1.58;
+  }
+
+  .timelineList b,
+  .warningCard h3,
+  .historyBoundaryNote b,
+  .selectedUnit b,
+  .unitCard b,
+  .selectionWarning b,
+  .statGrid b,
+  .constructionQueue b {
+    font-size: 14px;
+  }
+
+  .mapPanel {
+    border: 0;
+    border-radius: 0;
+    box-shadow:
+      inset 0 0 0 1px rgba(226, 215, 177, .2),
+      inset 0 0 58px rgba(4, 7, 6, .16);
+  }
+
+  .mapHeader {
+    left: 14px;
+    right: 64px;
+    top: 14px;
+    min-height: 62px;
+    padding: 9px 13px;
+    border-color: rgba(176, 166, 132, .54);
+    background:
+      linear-gradient(180deg, rgba(43, 55, 48, .95), rgba(19, 28, 24, .91));
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .34);
+  }
+
+  .mapHeader h2 {
+    font-size: 18px;
+  }
+
+  .mapHeader .panelEyebrow,
+  #mapHint,
+  .mapLegend,
+  .mapMarkScale,
+  .worldModeBadge,
+  .hexNavigator p,
+  .hexNavButton,
+  #hexNavigator button {
+    font-size: 12px;
+  }
+
+  .mapControls {
+    right: 12px;
+    top: 88px;
+  }
+
+  .mapControls button {
+    width: 42px;
+    height: 42px;
+    border-color: rgba(184, 170, 129, .62);
+    background: rgba(18, 28, 24, .91);
+  }
+
+  .worldModeBadge {
+    right: 62px;
+    top: 88px;
+  }
+
+  .mapMarkNorth {
+    left: 18px;
+    top: 91px;
+  }
+
+  .hexNavigatorShell {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+  }
+
+  .hexNavigatorShell .hexNavigator {
+    border-color: rgba(167, 155, 118, .52);
+    background: linear-gradient(180deg, rgba(31, 43, 37, .95), rgba(13, 21, 18, .94));
+  }
+
+  .actionCard,
+  #actionList > button {
+    min-height: 88px;
+    padding: 11px;
+    border-color: rgba(139, 146, 123, .48);
+    background: rgba(29, 39, 34, .88);
+  }
+
+  .actionCard b,
+  #actionList > button b {
+    font-size: 14px;
+  }
+
+  .actionCard span,
+  #actionList > button span,
+  .actionCard small,
+  #actionList > button small,
+  .actionCard > em,
+  .statGrid small,
+  .yieldRow > span,
+  .settlementFacts dt,
+  .settlementFacts dd,
+  .constructionQueue span,
+  .constructionQueue small,
+  .unitCard small,
+  .unitCard em {
+    font-size: 13px;
+  }
+
+  .commandDock {
+    grid-template-columns: var(--leftRailWidth) minmax(0, 1fr) var(--rightRailWidth);
+    border-top-color: rgba(170, 153, 111, .5);
+    background:
+      linear-gradient(180deg, rgba(231, 210, 157, .035), transparent 46%),
+      #111915;
+  }
+
+  .commandBudget span,
+  .emptyOrders span,
+  .orderCard span,
+  .orderCard small,
+  .orderItem small,
+  .clearOrdersButton {
+    font-size: 13px;
+  }
+
+  .emptyOrders b,
+  .orderCard b,
+  .orderItem b,
+  .executeButton {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1280px) and (min-height: 720px) and (max-width: 1500px) {
+  :root {
+    --topBarHeight: 72px;
+    --bottomDockHeight: 82px;
+    --leftRailWidth: 196px;
+    --rightRailWidth: 270px;
+  }
+
+  .warLedger {
+    grid-template-columns: 200px 148px minmax(470px, 1fr) auto;
+  }
+
+  .campaignIdentity {
+    gap: 7px;
+    padding-inline: 9px;
+  }
+
+  .campaignIdentity b {
+    font-size: 18px;
+  }
+
+  .resourceEntry small {
+    display: none;
+  }
+
+  .campaignIdentity small {
+    display: block;
+    overflow: visible;
+    font-size: 10px;
+    letter-spacing: .02em;
+    text-overflow: clip;
+  }
+
+  .resourceEntry span,
+  .campaignClock span,
+  .campaignClock small,
+  .utilityButton span {
+    font-size: 11px;
+  }
+
+  .resourceEntry b {
+    font-size: 18px;
+  }
+
+  .utilityButton {
+    flex-basis: 46px;
+    min-width: 46px;
+  }
+
+  .panelHeader,
+  .selectedHeader {
+    padding: 12px 11px 10px;
+  }
+
+  .panelHeader h2,
+  .selectedHeader h2 {
+    font-size: 19px;
+  }
+
+  .objectiveCard,
+  .warningCard,
+  .timelineSection,
+  .historyBoundaryNote,
+  .selectedStats,
+  .selectedUnit,
+  .actionSection {
+    margin: 9px;
+  }
+
+  .mapHeader {
+    top: 9px;
+    left: 9px;
+    right: 57px;
+    min-height: 54px;
+  }
+
+  #mapHint {
+    display: none;
+  }
+
+  .mapControls,
+  .worldModeBadge {
+    top: 70px;
+  }
+
+  .mapControls {
+    right: 8px;
+  }
+
+  .worldModeBadge {
+    right: 56px;
+  }
+
+  .mapMarkNorth {
+    top: 73px;
+  }
+}
+
+/* Release O final cascade: 1080p readability and grouped strategic meters. */
+
+@media (min-width: 1600px) and (min-height: 900px) {
+  .gameShell .campaignIdentity small,
+  .gameShell .campaignClock span,
+  .gameShell .campaignClock small,
+  .gameShell .resourceEntry span,
+  .gameShell .resourceEntry small,
+  .gameShell .utilityButton span {
+    font-size: 13px;
+  }
+
+  .gameShell .resourceEntry b {
+    font-size: 23px;
+  }
+
+  .gameShell .resourceEntry[data-ledger-kind="people"] {
+    box-shadow: inset 2px 0 rgba(116, 154, 132, .6);
+  }
+
+  .gameShell .resourceEntry[data-ledger-kind="exposure"] {
+    box-shadow: inset 2px 0 rgba(181, 92, 71, .6);
+  }
+
+  .gameShell .resourceEntry[data-ledger-kind="contribution"] {
+    box-shadow: inset 2px 0 rgba(203, 164, 83, .62);
+  }
+
+  .gameShell .panelEyebrow,
+  .gameShell .sectionIndex,
+  .gameShell .sectionHeading small,
+  .gameShell .sectionHeading em,
+  .gameShell .timelineList time,
+  .gameShell .selectedMeta,
+  .gameShell .selectedStats dt,
+  .gameShell .statCard span,
+  .gameShell .unitTags span,
+  .gameShell .tagList span {
+    font-size: 13px;
+  }
+
+  .gameShell .objectiveCard p,
+  .gameShell .warningCard p,
+  .gameShell .historyBoundaryNote p,
+  .gameShell .timelineList small,
+  .gameShell .selectedUnit p,
+  .gameShell .unitCard p,
+  .gameShell .unknownNotice,
+  .gameShell .emptySelection,
+  .gameShell .selectionWarning span,
+  .gameShell .travelUnitCard {
+    font-size: 14px;
+    line-height: 1.58;
+  }
+
+  .gameShell .timelineList b,
+  .gameShell .warningCard h3,
+  .gameShell .historyBoundaryNote b,
+  .gameShell .selectedUnit b,
+  .gameShell .unitCard b,
+  .gameShell .selectionWarning b,
+  .gameShell .statGrid b,
+  .gameShell .constructionQueue b {
+    font-size: 15px;
+  }
+
+  .gameShell .mapHeader {
+    min-height: 56px;
+    padding: 8px 13px;
+    background: linear-gradient(180deg, rgba(37, 50, 43, .94), rgba(14, 23, 19, .9));
+  }
+
+  .gameShell .mapHeader h2 {
+    font-size: 19px;
+  }
+
+  .gameShell .mapHeader .panelEyebrow,
+  .gameShell #mapHint,
+  .gameShell .mapLegend,
+  .gameShell .mapMarkScale,
+  .gameShell .worldModeBadge,
+  .gameShell .hexNavigator p,
+  .gameShell .hexNavButton,
+  .gameShell #hexNavigator button {
+    font-size: 13px;
+  }
+
+  .gameShell .mapControls,
+  .gameShell .worldModeBadge {
+    top: 82px;
+  }
+
+  .gameShell .mapMarkNorth {
+    top: 85px;
+  }
+
+  .gameShell .actionCard b,
+  .gameShell #actionList > button b,
+  .gameShell .emptyOrders b,
+  .gameShell .orderCard b,
+  .gameShell .orderItem b,
+  .gameShell .executeButton {
+    font-size: 15px;
+  }
+
+  .gameShell .actionCard span,
+  .gameShell #actionList > button span,
+  .gameShell .actionCard small,
+  .gameShell #actionList > button small,
+  .gameShell .actionCard > em,
+  .gameShell .statGrid small,
+  .gameShell .yieldRow > span,
+  .gameShell .settlementFacts dt,
+  .gameShell .settlementFacts dd,
+  .gameShell .constructionQueue span,
+  .gameShell .constructionQueue small,
+  .gameShell .unitCard small,
+  .gameShell .unitCard em,
+  .gameShell .commandBudget span,
+  .gameShell .emptyOrders span,
+  .gameShell .orderCard span,
+  .gameShell .orderCard small,
+  .gameShell .orderItem small,
+  .gameShell .clearOrdersButton {
+    font-size: 14px;
+  }
+}

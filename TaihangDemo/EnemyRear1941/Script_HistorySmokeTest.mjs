@@ -16,9 +16,15 @@ import {
   responsibilityStageDefinitions,
   sourceReferences,
 } from "./Data_History.mjs";
+import {
+  GetHistoricalEventPreview,
+  ResolveHistoricalEvent,
+} from "./Script_HistoricalEvents.mjs";
 
 const pageDirectory = dirname(fileURLToPath(import.meta.url));
 const gameScript = readFileSync(join(pageDirectory, "Script_Game.mjs"), "utf8");
+const rulesScript = readFileSync(join(pageDirectory, "Script_Rules.mjs"), "utf8");
+const eventScript = readFileSync(join(pageDirectory, "Script_HistoricalEvents.mjs"), "utf8");
 
 let assertionCount = 0;
 
@@ -278,7 +284,7 @@ function CheckLookupAndImmutability() {
 function CheckPlayerVisibleIntegration() {
   Match(
     gameScript,
-    /from\s+["']\.\/Data_History\.mjs\?v=20260730m["']/,
+    /from\s+["']\.\/Data_History\.mjs\?v=20260730p["']/,
     "游戏必须使用当前缓存标识导入历史数据",
   );
   Match(
@@ -322,6 +328,126 @@ function CheckPlayerVisibleIntegration() {
     /label:\s*["']本回合历史档案["'][\s\S]*?ShowHistoryArchive/,
     "战局规则入口必须可打开本回合历史档案",
   );
+  Match(
+    rulesScript,
+    /from\s+["']\.\/Script_HistoricalEvents\.mjs["']/,
+    "规则结算必须接入独立的历史任务事件模块",
+  );
+  Match(
+    rulesScript,
+    /ResolveHistoricalEvent\([\s\S]*?resolvedOrders[\s\S]*?eventContext/,
+    "历史任务结果必须读取本月真实命令与结算前预警目标",
+  );
+  Match(
+    eventScript,
+    /choice:\s*\{[\s\S]*?actionIds[\s\S]*?targetHexIds[\s\S]*?policyIds/,
+    "事件档案必须保存动作、地图目标和政策选择",
+  );
+  Match(
+    eventScript,
+    /pendingConsequences[\s\S]*?appliedConsequences[\s\S]*?historicalConsequences/,
+    "遗漏责任必须保存待兑现、已兑现和逐条损失簿记录",
+  );
+  Match(
+    gameScript,
+    /function\s+BuildHistoricalEventRecordHtml[\s\S]*?实际命令[\s\S]*?部署证据与遗漏项[\s\S]*?延迟后果/,
+    "历史档案必须展示真实部署结果、遗漏项和延迟后果",
+  );
+  Match(
+    gameScript,
+    /latestVisibleTurn[\s\S]*?turn\s*<\s*latestVisibleTurn/,
+    "历史档案不得在首回合一路翻看尚未到达的未来合成事件",
+  );
+  Match(
+    gameScript,
+    /openingLogEntries[\s\S]*?\.filter\(\(entry\)\s*=>\s*!openingLogEntries\.has/,
+    "下一月开局影响不得错误归入上一月回合战报",
+  );
+  Match(
+    gameScript,
+    /function\s+BuildLedgerHtml[\s\S]*?historicalConsequences[\s\S]*?sourceTitle[\s\S]*?responsibilityNote/,
+    "损失簿必须逐条显示延迟后果的来源月份与责任说明",
+  );
+  Match(
+    gameScript,
+    /eventResponsibilitiesProtected:\s*["']月度责任落实["'][\s\S]*?eventResponsibilitiesNeglected:\s*["']月度责任缺口["']/,
+    "终局字段必须以中文说明历史责任结果",
+  );
+}
+
+function CreateHistoricalResponsibilityTestState(institutions, exposure = 35) {
+  return {
+    turn: 1,
+    hexes: institutions.map((institution, index) => ({
+      id: `TestVillage_${index + 1}`,
+      feature: "Village",
+      institution,
+      construction: null,
+    })),
+    meters: {
+      people: 50,
+      unity: 50,
+      discipline: 50,
+      exposure,
+    },
+    resources: {},
+    policies: [],
+    log: [],
+    ledger: {},
+  };
+}
+
+function CheckHistoricalResponsibilityEvidence() {
+  const moveOrder = [{
+    actionId: "move",
+    targetHexId: "TestVillage_1",
+    hexId: "TestVillage_1",
+  }];
+
+  const turn11State = CreateHistoricalResponsibilityTestState(["Station", "Clinic"]);
+  const turn11Preview = GetHistoricalEventPreview(turn11State, 11, moveOrder);
+  Equal(turn11Preview.orderCount, 1, "第11回合证据预览必须记录实际命令数");
+  Equal(turn11Preview.relevantOrderCount, 0, "纯移动不得冒充雨季交通或救护行动");
+  Equal(turn11Preview.objectiveActionCount, 0, "纯移动不得生成目标行动证据");
+  Equal(turn11Preview.structuralEvidenceCount, 2, "既有交通站和救护所应继续作为结构证据显示");
+  Equal(turn11Preview.hasDeployment, false, "部署字段只能由当月相关目标行动触发");
+  Equal(turn11Preview.hasOnlyIrrelevantOrders, true, "只有无关命令时必须显式标记证据失配");
+  Equal(
+    ResolveHistoricalEvent(turn11State, 11, moveOrder).outcomeId,
+    "Neglected",
+    "第11回合不得用一次无关移动加两座既有机构刷成责任落实",
+  );
+
+  const turn16MoveState = CreateHistoricalResponsibilityTestState(["Station", "Clinic"], 40);
+  const turn16MovePreview = GetHistoricalEventPreview(turn16MoveState, 16, moveOrder);
+  Equal(turn16MovePreview.structuralEvidenceCount, 2, "年终机构存续与隐蔽网络必须分别记作结构证据");
+  Equal(
+    ResolveHistoricalEvent(turn16MoveState, 16, moveOrder).outcomeId,
+    "Neglected",
+    "第16回合不得用无关移动把年终静态条件刷成责任落实",
+  );
+
+  const turn16StructuralState = CreateHistoricalResponsibilityTestState(["Station", "Clinic"], 40);
+  Equal(
+    ResolveHistoricalEvent(turn16StructuralState, 16, []).outcomeId,
+    "Partial",
+    "没有当月行动时，两项真实结构证据至多形成部分落实",
+  );
+
+  const turn16ProtectedState = CreateHistoricalResponsibilityTestState(["Station", "Clinic"], 40);
+  const reliefOrder = [{
+    actionId: "relief",
+    targetHexId: "TestVillage_1",
+    hexId: "TestVillage_1",
+  }];
+  const turn16ProtectedPreview = GetHistoricalEventPreview(turn16ProtectedState, 16, reliefOrder);
+  Equal(turn16ProtectedPreview.objectiveActionCount, 1, "年终救济必须形成当月目标行动证据");
+  Equal(turn16ProtectedPreview.structuralEvidenceCount, 2, "年终责任落实还必须保有机构与隐蔽网络");
+  Equal(
+    ResolveHistoricalEvent(turn16ProtectedState, 16, reliefOrder).outcomeId,
+    "Protected",
+    "只有相关行动与结构状态同时达标时才能判定责任落实",
+  );
 }
 
 CheckBoundary();
@@ -332,5 +458,6 @@ CheckSources();
 CheckForbiddenLanguage();
 CheckLookupAndImmutability();
 CheckPlayerVisibleIntegration();
+CheckHistoricalResponsibilityEvidence();
 
 console.log(`History smoke test passed: ${assertionCount} assertions across 16 historical turns.`);
