@@ -1165,7 +1165,7 @@ function CreateMap() {
   for (let r = 0; r < mapHeight; r += 1) {
     for (let q = 0; q < mapWidth; q += 1) {
       const terrain = terrainLayout[r][q];
-      const rail = q === 6 || (r === 3 && q === 7);
+      const rail = q === 6 || (r === 3 && q >= 7);
       const road = r === 3 || q === 4 || (q >= 5 && r === 6);
       hexes.push({
         id: HexId(q, r),

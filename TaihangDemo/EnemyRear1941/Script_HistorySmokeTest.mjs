@@ -278,7 +278,7 @@ function CheckLookupAndImmutability() {
 function CheckPlayerVisibleIntegration() {
   Match(
     gameScript,
-    /from\s+["']\.\/Data_History\.mjs\?v=20260729h["']/,
+    /from\s+["']\.\/Data_History\.mjs\?v=20260730m["']/,
     "游戏必须使用当前缓存标识导入历史数据",
   );
   Match(

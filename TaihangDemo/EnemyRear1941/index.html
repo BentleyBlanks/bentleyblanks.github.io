@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1b201b">
   <meta name="description" content="《敌后火种 · 1941—1942》——以华北敌后根据地建设、群众工作与非对称战争为核心的原创回合制策略游戏。">
   <title>敌后火种 · 1941—1942｜太行敌后根据地策略</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260729h">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260730m">
   <script type="importmap">
     {
       "imports": {
@@ -170,9 +170,15 @@
           </div>
         </div>
 
-        <nav id="hexNavigator" class="hexNavigator" aria-label="可访问地块导航">
-          <p>地块导航将在战局载入后生成；可用 Tab 逐格巡查。</p>
-        </nav>
+        <div class="hexNavigatorShell">
+          <button id="hexScrollLeftButton" class="hexNavigatorScrollButton isLeft" type="button"
+            aria-label="向左浏览地块" aria-controls="hexNavigator">‹</button>
+          <nav id="hexNavigator" class="hexNavigator" aria-label="可访问地块导航">
+            <p>地块导航将在战局载入后生成；可用 Tab 逐格巡查。</p>
+          </nav>
+          <button id="hexScrollRightButton" class="hexNavigatorScrollButton isRight" type="button"
+            aria-label="向右浏览地块" aria-controls="hexNavigator">›</button>
+        </div>
       </section>
 
       <div class="informationDrawer">
@@ -316,6 +322,6 @@
   <div id="toastRegion" class="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div id="liveRegion" class="visuallyHidden" aria-live="assertive" aria-atomic="true"></div>
 
-  <script type="module" src="./Script_Game.mjs?v=20260729h"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260730m"></script>
 </body>
 </html>

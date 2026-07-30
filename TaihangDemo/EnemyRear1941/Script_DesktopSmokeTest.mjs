@@ -142,7 +142,7 @@ Test("不足桌面尺寸时 Boot 在绑定游戏交互前停止", () => {
 Test("Three.js 只保留一个最高画质配置", () => {
   assert.match(worldScript, /World3DQualityProfile\s*=\s*Object\.freeze\s*\(\s*\{/);
   assert.match(worldScript, /dprCap:\s*2\b/);
-  assert.match(worldScript, /shadowMapSize:\s*2048\b/);
+  assert.match(worldScript, /shadowMapSize:\s*4096\b/);
   assert.match(worldScript, /targetFps:\s*60\b/);
   assert.match(worldScript, /paperTextureSize:\s*2048\b/);
   assert.doesNotMatch(
@@ -170,12 +170,91 @@ Test("页面没有可切换画质的控件", () => {
   assert.doesNotMatch(html, /data-quality|qualitySelector|qualityOption/i);
 });
 
+Test("地块导航保留左右浏览按钮并绑定完整滚动状态更新", () => {
+  assert.match(
+    html,
+    /id=["']hexScrollLeftButton["'][^>]*aria-controls=["']hexNavigator["']/,
+  );
+  assert.match(
+    html,
+    /id=["']hexScrollRightButton["'][^>]*aria-controls=["']hexNavigator["']/,
+  );
+  assert.match(
+    gameScript,
+    /"hexScrollLeftButton",\s*"hexScrollRightButton",\s*"worldModeBadge"/,
+  );
+  const bindStaticEvents = ExtractFunction(gameScript, "BindStaticEvents");
+  assert.match(
+    bindStaticEvents,
+    /ui\.hexScrollLeftButton\?\.addEventListener\("click",\s*\(\)\s*=>\s*ScrollHexNavigator\(-1\)\)/,
+  );
+  assert.match(
+    bindStaticEvents,
+    /ui\.hexScrollRightButton\?\.addEventListener\("click",\s*\(\)\s*=>\s*ScrollHexNavigator\(1\)\)/,
+  );
+  assert.match(
+    bindStaticEvents,
+    /ui\.hexNavigator\?\.addEventListener\("scroll",\s*UpdateHexNavigatorScrollState/,
+  );
+  assert.match(
+    ExtractFunction(gameScript, "RenderHexNavigator"),
+    /window\.requestAnimationFrame\(UpdateHexNavigatorScrollState\)/,
+  );
+});
+
+Test("ScrollHexNavigator 与边界状态函数会真实驱动左右按钮", () => {
+  const updateSource = ExtractFunction(gameScript, "UpdateHexNavigatorScrollState");
+  const scrollSource = ExtractFunction(gameScript, "ScrollHexNavigator");
+  const scrollCalls = [];
+  const uiMock = {
+    hexNavigator: {
+      scrollWidth: 1200,
+      clientWidth: 500,
+      scrollLeft: 0,
+      scrollBy(options) {
+        scrollCalls.push(options);
+      },
+    },
+    hexScrollLeftButton: { disabled: false },
+    hexScrollRightButton: { disabled: false },
+  };
+  let reducedMotion = false;
+  const windowMock = {
+    matchMedia() {
+      return { matches: reducedMotion };
+    },
+  };
+  const createNavigatorFunctions = new Function(
+    "ui",
+    "window",
+    `${updateSource}\n${scrollSource}\nreturn { UpdateHexNavigatorScrollState, ScrollHexNavigator };`,
+  );
+  const navigatorFunctions = createNavigatorFunctions(uiMock, windowMock);
+
+  navigatorFunctions.UpdateHexNavigatorScrollState();
+  assert.equal(uiMock.hexScrollLeftButton.disabled, true, "起点必须禁用左移按钮");
+  assert.equal(uiMock.hexScrollRightButton.disabled, false, "起点必须允许右移按钮");
+
+  navigatorFunctions.ScrollHexNavigator(1);
+  assert.deepEqual(scrollCalls.at(-1), { left: 360, behavior: "smooth" });
+
+  uiMock.hexNavigator.scrollLeft = 700;
+  navigatorFunctions.UpdateHexNavigatorScrollState();
+  assert.equal(uiMock.hexScrollLeftButton.disabled, false, "终点必须允许左移按钮");
+  assert.equal(uiMock.hexScrollRightButton.disabled, true, "终点必须禁用右移按钮");
+
+  reducedMotion = true;
+  navigatorFunctions.ScrollHexNavigator(-1);
+  assert.deepEqual(scrollCalls.at(-1), { left: -360, behavior: "auto" });
+});
+
 Test("战报关闭后会把真实伏击与破袭命令交给三维战斗特效", () => {
   const capture = ExtractFunction(gameScript, "CaptureWorldActionEffects");
   const playback = ExtractFunction(gameScript, "PlayPendingWorldActionEffects");
   const continueAfterReport = ExtractFunction(gameScript, "ContinueAfterReport");
   assert.match(capture, /\["ambush",\s*"sabotage"\]\.includes/);
   assert.match(capture, /targetHexId:\s*order\.targetHexId\s*\?\?\s*order\.hexId/);
+  assert.match(capture, /sourceHexId:\s*actingUnit\?\.hexId\s*\?\?\s*null/);
   assert.match(playback, /PlayActionEffects\?\.\(effects\)/);
   assert.match(continueAfterReport, /PlayPendingWorldActionEffects\(\)/);
 });

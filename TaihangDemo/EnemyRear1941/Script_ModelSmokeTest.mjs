@@ -13,6 +13,7 @@ const requiredAssets = Object.freeze([
   "Model_VillageHouse",
   "Model_EnemyBlockhouse",
   "Model_TrafficStation",
+  "Model_RailwayStation",
 ]);
 
 const assetPath = join(dirname(fileURLToPath(import.meta.url)), "Model_EnemyRearMiniatures.glb");

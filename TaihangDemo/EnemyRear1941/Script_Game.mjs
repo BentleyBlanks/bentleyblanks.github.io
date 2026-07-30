@@ -25,11 +25,11 @@ import {
   GetVictoryAssessment,
   SerializeState,
   DeserializeState,
-} from "./Script_Rules.mjs?v=20260729h";
+} from "./Script_Rules.mjs?v=20260730m";
 import {
   CreateEnemyRearWorld3D,
   World3DCacheIdentity,
-} from "./Script_World3D.mjs?v=20260729h";
+} from "./Script_World3D.mjs?v=20260730m";
 import {
   GetFixedHistoricalAnchor,
   GetHistoricalTurnNarrative,
@@ -38,7 +38,7 @@ import {
   historyBoundary,
   localPhaseDefinitions,
   ordinaryRoleDefinitions,
-} from "./Data_History.mjs?v=20260729h";
+} from "./Data_History.mjs?v=20260730m";
 
 const ui = {};
 const activePointers = new Map();
@@ -198,7 +198,8 @@ function CacheElements() {
     "gameShell", "dateLabel", "turnLabel", "phaseLabel", "grainValue",
     "armsValue", "medicineValue", "intelValue", "cadresValue", "peopleValue",
     "exposureValue", "contributionValue", "objectiveText", "warningText",
-    "timelineList", "mapCanvas", "mapHint", "mapLegend", "hexNavigator", "worldModeBadge",
+    "timelineList", "mapCanvas", "mapHint", "mapLegend", "hexNavigator",
+    "hexScrollLeftButton", "hexScrollRightButton", "worldModeBadge",
     "zoomInButton", "zoomOutButton", "centerMapButton", "layerButton",
     "selectedTitle", "selectedMeta", "selectedStats", "selectedUnit", "actionList",
     "doctrineButton", "policyButton", "ledgerButton", "rulesButton", "saveButton",
@@ -286,6 +287,9 @@ function BindStaticEvents() {
   ui.zoomOutButton?.addEventListener("click", () => ChangeZoom(0.84));
   ui.centerMapButton?.addEventListener("click", CenterMap);
   ui.layerButton?.addEventListener("click", ToggleMapLayer);
+  ui.hexScrollLeftButton?.addEventListener("click", () => ScrollHexNavigator(-1));
+  ui.hexScrollRightButton?.addEventListener("click", () => ScrollHexNavigator(1));
+  ui.hexNavigator?.addEventListener("scroll", UpdateHexNavigatorScrollState, { passive: true });
   ui.doctrineButton?.addEventListener("click", ShowDoctrineTree);
   ui.policyButton?.addEventListener("click", ShowPolicyBoard);
   ui.ledgerButton?.addEventListener("click", ShowCostLedger);
@@ -574,6 +578,28 @@ function RenderHexNavigator() {
   }).join("");
   ui.hexNavigator.querySelectorAll("[data-hex-id]").forEach((button) => {
     button.addEventListener("click", () => SelectHex(button.dataset.hexId, true));
+  });
+  window.requestAnimationFrame(UpdateHexNavigatorScrollState);
+}
+
+function UpdateHexNavigatorScrollState() {
+  if (!ui.hexNavigator) return;
+  const maximumScroll = Math.max(0, ui.hexNavigator.scrollWidth - ui.hexNavigator.clientWidth);
+  if (ui.hexScrollLeftButton) {
+    ui.hexScrollLeftButton.disabled = maximumScroll <= 1 || ui.hexNavigator.scrollLeft <= 1;
+  }
+  if (ui.hexScrollRightButton) {
+    ui.hexScrollRightButton.disabled = maximumScroll <= 1
+      || ui.hexNavigator.scrollLeft >= maximumScroll - 1;
+  }
+}
+
+function ScrollHexNavigator(direction) {
+  if (!ui.hexNavigator) return;
+  const distance = Math.max(220, Math.round(ui.hexNavigator.clientWidth * 0.72));
+  ui.hexNavigator.scrollBy({
+    left: Math.sign(direction) * distance,
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
   });
 }
 
@@ -924,12 +950,16 @@ function ExecuteTurn() {
 function CaptureWorldActionEffects(state) {
   return AsArray(state?.orders)
     .filter((order) => ["ambush", "sabotage"].includes(order?.actionId))
-    .map((order) => ({
-      id: order.id,
-      actionId: order.actionId,
-      targetHexId: order.targetHexId ?? order.hexId,
-      unitId: order.unitId ?? null,
-    }))
+    .map((order) => {
+      const actingUnit = AsArray(state?.units).find((unit) => unit.id === order.unitId);
+      return {
+        id: order.id,
+        actionId: order.actionId,
+        targetHexId: order.targetHexId ?? order.hexId,
+        sourceHexId: actingUnit?.hexId ?? null,
+        unitId: order.unitId ?? null,
+      };
+    })
     .filter((effect) => Boolean(effect.targetHexId));
 }
 

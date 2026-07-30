@@ -1,12 +1,16 @@
 import * as THREE from "../../taihang/vendor/three/build/three.module.mjs";
 
-export const World3DCacheIdentity = "EnemyRear1941_World3D_20260729_H";
+export const World3DCacheIdentity = "EnemyRear1941_World3D_20260730_M";
 export const World3DTerrainTextureUrl = new URL(
-  "./Texture_TerrainPaperHigh.jpg?v=20260729h",
+  "./Texture_TerrainPaperHigh.jpg?v=20260730m",
+  import.meta.url,
+).href;
+export const World3DTerrainAlbedoUrl = new URL(
+  "./Texture_TerrainGroundAlbedo.png?v=20260730m",
   import.meta.url,
 ).href;
 export const World3DModelPackUrl = new URL(
-  "./Model_EnemyRearMiniatures.glb?v=20260729h",
+  "./Model_EnemyRearMiniatures.glb?v=20260730m",
   import.meta.url,
 ).href;
 export const World3DModelNames = Object.freeze([
@@ -19,11 +23,12 @@ export const World3DModelNames = Object.freeze([
   "Model_VillageHouse",
   "Model_EnemyBlockhouse",
   "Model_TrafficStation",
+  "Model_RailwayStation",
 ]);
 
 export const World3DQualityProfile = Object.freeze({
   dprCap: 2,
-  shadowMapSize: 2048,
+  shadowMapSize: 4096,
   targetFps: 60,
   paperTextureSize: 2048,
   maximumAnimatedSmokePuffs: 24,
@@ -31,41 +36,48 @@ export const World3DQualityProfile = Object.freeze({
 });
 
 export const World3DVisualProfile = Object.freeze({
-  toneMappingExposure: 1.5,
-  hemisphereIntensity: 2.42,
-  ambientIntensity: 0.78,
-  sunIntensity: 2.55,
-  fillIntensity: 1.25,
-  unitModelScale: 0.78,
-  militiaModelScale: 0.7,
-  villageHouseScale: 0.6,
-  blockhouseScale: 0.88,
-  trafficStationScale: 0.8,
-  unitLabelWorldHeight: 0.72,
-  unitLabelBaseHeight: 1.42,
-  unitLabelLaneSpacing: 0.34,
-  structureLabelWorldHeight: 0.7,
-  structureLabelBaseHeight: 1.86,
-  minimumLabelScreenPixels: 20,
-  cameraHorizontalCoverage: 0.7,
-  cameraVerticalCoverage: 0.84,
-  roadWidth: 0.35,
-  railBedWidth: 0.42,
-  railWidth: 0.065,
-  railGaugeOffset: 0.12,
-  controlBorderWidth: 0.052,
-  terrainColorVariation: 0.045,
-  weatherMaximumPoints: 96,
+  toneMappingExposure: 1.06,
+  hemisphereIntensity: 1.1,
+  ambientIntensity: 0.28,
+  sunIntensity: 1.96,
+  fillIntensity: 0.68,
+  unitModelScale: 0.94,
+  militiaModelScale: 0.9,
+  villageHouseScale: 1.1,
+  blockhouseScale: 1.16,
+  trafficStationScale: 1.1,
+  railwayStationScale: 1.1,
+  unitLabelWorldHeight: 0.29,
+  unitLabelBaseHeight: 1.04,
+  unitLabelLaneSpacing: 0.28,
+  structureLabelWorldHeight: 0.36,
+  structureLabelBaseHeight: 1.17,
+  minimumLabelScreenPixels: 14,
+  maximumStructureLabelScreenPixels: 20,
+  maximumUnitLabelScreenPixels: 18,
+  cameraHorizontalCoverage: 1.06,
+  cameraVerticalCoverage: 1.06,
+  roadWidth: 0.19,
+  railBedWidth: 0.31,
+  railWidth: 0.032,
+  railGaugeOffset: 0.145,
+  controlBorderWidth: 0.02,
+  terrainColorVariation: 0.1,
+  terrainTileThickness: 0.055,
+  terrainReliefScale: 2.22,
+  terrainTextureWorldScale: 0.26,
+  terrainAlbedoOpacity: 0.2,
+  weatherMaximumPoints: 64,
 });
 
 export const World3DActionEffectProfile = Object.freeze({
   supportedActionIds: Object.freeze(["ambush", "sabotage"]),
   maximumConcurrentEffects: 4,
-  ambushDuration: 1.55,
-  sabotageDuration: 1.65,
-  ambushMuzzleFlashCount: 3,
-  ambushSmokeCount: 6,
-  sabotageSmokeCount: 10,
+  ambushDuration: 2.25,
+  sabotageDuration: 2.4,
+  ambushMuzzleFlashCount: 6,
+  ambushSmokeCount: 16,
+  sabotageSmokeCount: 16,
 });
 
 export const World3DLayerNames = Object.freeze([
@@ -77,12 +89,12 @@ export const World3DLayerNames = Object.freeze([
 ]);
 
 const terrainStyles = Object.freeze({
-  mountain: Object.freeze({ color: 0xb7b09d, height: 0.86, roughness: 0.96 }),
-  hill: Object.freeze({ color: 0xd0b57e, height: 0.47, roughness: 0.96 }),
-  forest: Object.freeze({ color: 0x8aa680, height: 0.31, roughness: 0.94 }),
-  plain: Object.freeze({ color: 0xd8c899, height: 0.18, roughness: 0.96 }),
-  rivervalley: Object.freeze({ color: 0x93b5b9, height: 0.08, roughness: 0.72 }),
-  village: Object.freeze({ color: 0xd2b88c, height: 0.22, roughness: 0.96 }),
+  mountain: Object.freeze({ color: 0x687064, height: 0.43, roughness: 0.99 }),
+  hill: Object.freeze({ color: 0x936b45, height: 0.245, roughness: 0.99 }),
+  forest: Object.freeze({ color: 0x395c42, height: 0.17, roughness: 0.98 }),
+  plain: Object.freeze({ color: 0x90784e, height: 0.095, roughness: 0.99 }),
+  rivervalley: Object.freeze({ color: 0x50766d, height: 0.042, roughness: 0.84 }),
+  village: Object.freeze({ color: 0x966949, height: 0.115, roughness: 0.99 }),
 });
 
 const controlColors = Object.freeze({
@@ -115,11 +127,77 @@ function HashNoise(first, second, seed = 0) {
   return value - Math.floor(value);
 }
 
+function GetLandscapeMacroRelief(x, z, terrain) {
+  const broadFold = Math.sin(x * 0.57 + z * 0.31 + 0.8) * 0.5
+    + Math.sin(z * 0.94 - x * 0.22 - 1.35) * 0.32
+    + Math.sin((x + z) * 1.48 + 0.24) * 0.18;
+  if (terrain === "mountain") {
+    const ridge = Math.pow(1 - Math.abs(Math.sin(x * 1.06 + z * 0.63 + 0.52)), 1.65);
+    return broadFold * 0.068 + ridge * 0.245;
+  }
+  if (terrain === "hill") {
+    const shoulder = Math.pow(1 - Math.abs(Math.sin(x * 0.82 - z * 0.7 - 0.24)), 1.9);
+    return broadFold * 0.046 + shoulder * 0.12;
+  }
+  if (terrain === "forest") return broadFold * 0.028;
+  if (terrain === "rivervalley") return broadFold * 0.01 - 0.016;
+  return broadFold * 0.018;
+}
+
+function GetLandscapeMicroRelief(x, z, terrain) {
+  const fineFold = Math.sin(x * 2.7 + z * 1.55) * 0.52
+    + Math.sin(z * 3.45 - x * 1.14 + 1.1) * 0.31
+    + Math.sin((x - z) * 5.2 - 0.7) * 0.17;
+  if (terrain === "mountain" || terrain === "hill") {
+    const drainage = Math.pow(
+      Math.max(0, 1 - Math.abs(Math.sin(x * 1.54 - z * 2.18 + 0.38)) * 4.2),
+      1.4,
+    );
+    return fineFold * (terrain === "mountain" ? 0.032 : 0.021)
+      - drainage * (terrain === "mountain" ? 0.075 : 0.045);
+  }
+  if (terrain === "rivervalley") {
+    const dryChannel = Math.pow(
+      Math.max(0, 1 - Math.abs(Math.sin(x * 0.68 + z * 1.32 - 0.55)) * 5.4),
+      1.7,
+    );
+    return fineFold * 0.008 - dryChannel * 0.046;
+  }
+  return fineFold * (terrain === "forest" ? 0.014 : 0.01);
+}
+
+function GetWinterTerrainSnowCoverage(x, z, mountainWeight, visibleWeight) {
+  const windBand = Math.sin(
+    x * 0.72
+      + z * 1.04
+      + Math.sin(z * 0.31 - 0.45) * 0.74
+      + 0.58,
+  ) * 0.5 + 0.5;
+  const broadPocket = Math.sin(x * 0.29 - z * 0.41 + 1.72) * 0.5 + 0.5;
+  const brokenDrift = Math.sin(x * 1.83 + z * 0.67 - 0.9) * 0.5 + 0.5;
+  const leewardCoverage = THREE.MathUtils.smoothstep(windBand, 0.53, 0.86);
+  const pocketCoverage = THREE.MathUtils.smoothstep(broadPocket, 0.58, 0.92);
+  const brokenCoverage = THREE.MathUtils.smoothstep(brokenDrift, 0.7, 0.96);
+  const visibility = THREE.MathUtils.smoothstep(visibleWeight, 0.36, 0.74);
+  return Clamp(
+    (
+      0.045
+      + leewardCoverage * 0.29
+      + pocketCoverage * 0.13
+      + brokenCoverage * 0.075
+      + mountainWeight * 0.18
+    ) * visibility,
+    0,
+    0.5,
+  );
+}
+
 export function GetTerrainHeight(hex) {
   const terrain = NormalizeTerrain(hex?.terrain);
   const style = terrainStyles[terrain];
-  const relief = (HashNoise(hex?.q ?? 0, hex?.r ?? 0, 7) - 0.5) * (terrain === "mountain" ? 0.28 : 0.08);
-  return Math.max(0.05, style.height + relief);
+  const relief = (HashNoise(hex?.q ?? 0, hex?.r ?? 0, 7) - 0.5)
+    * (terrain === "mountain" ? 0.13 : terrain === "hill" ? 0.075 : 0.04);
+  return Math.max(0.025, style.height + relief);
 }
 
 export function GetWorld3DDpr(width, deviceDpr = 1) {
@@ -132,11 +210,14 @@ export function GetWorld3DWeather(turn) {
   const monthIndex = 8 + normalizedTurn - 1;
   const month = (monthIndex % 12) + 1;
   const year = 1941 + Math.floor(monthIndex / 12);
-  if ([11, 12, 1, 2].includes(month)) {
-    return Object.freeze({ year, month, mode: "winter-snow", particleCount: 96 });
+  if ([12, 2].includes(month)) {
+    return Object.freeze({ year, month, mode: "winter-snow", particleCount: 44 });
+  }
+  if ([11, 1].includes(month)) {
+    return Object.freeze({ year, month, mode: "winter-dry", particleCount: 0 });
   }
   if ([3, 4, 5].includes(month)) {
-    return Object.freeze({ year, month, mode: "spring-dust", particleCount: 48 });
+    return Object.freeze({ year, month, mode: "spring-dust", particleCount: 38 });
   }
   return Object.freeze({ year, month, mode: "clear", particleCount: 0 });
 }
@@ -213,9 +294,10 @@ function LayerSignature(items) {
 }
 
 function TerrainSignature(state) {
-  return LayerSignature((state?.hexes ?? []).map((hex) =>
-    `${hex.id}:${hex.q},${hex.r}:${NormalizeTerrain(hex.terrain)}`
-  ));
+  const weatherMode = GetWorld3DWeather(state?.turn).mode;
+  return `${weatherMode}|${LayerSignature((state?.hexes ?? []).map((hex) =>
+    `${hex.id}:${hex.q},${hex.r}:${NormalizeTerrain(hex.terrain)}:${hex.visible === false ? 0 : 1}`
+  ))}`;
 }
 
 function FogSignature(state) {
@@ -285,7 +367,10 @@ function DisposeObject(object, sharedGeometries = new Set(), sharedMaterials = n
     materials.filter(Boolean).forEach((material) => {
       if (sharedMaterials.has(material) || disposedMaterials.has(material)) return;
       disposedMaterials.add(material);
-      if (material.map && material.userData?.ownsMap) material.map.dispose?.();
+      if (material.userData?.ownsMap) {
+        const ownedTextures = new Set([material.map, material.roughnessMap].filter(Boolean));
+        ownedTextures.forEach((texture) => texture.dispose?.());
+      }
       material.dispose?.();
     });
   });
@@ -346,6 +431,7 @@ function CreateLabelSprite(label, options = {}) {
   sprite.userData.labelBaseWorldHeight = height;
   sprite.userData.minimumScreenPixels = options.minimumScreenPixels
     ?? World3DVisualProfile.minimumLabelScreenPixels;
+  sprite.userData.maximumScreenPixels = options.maximumScreenPixels ?? 20;
   sprite.renderOrder = options.renderOrder ?? 20;
   return sprite;
 }
@@ -367,6 +453,123 @@ function ComposeLineMatrix(start, end, width, thickness = 0.035, yOffset = 0.04)
     rotation,
     new THREE.Vector3(width, thickness, distance),
   );
+}
+
+function CreateTaihangRidgeGeometry() {
+  const alongSegments = 8;
+  const crossProfile = Object.freeze([
+    Object.freeze({ ratio: -1, height: 0 }),
+    Object.freeze({ ratio: -0.58, height: 0.24 }),
+    Object.freeze({ ratio: -0.2, height: 0.72 }),
+    Object.freeze({ ratio: 0.12, height: 1 }),
+    Object.freeze({ ratio: 0.5, height: 0.38 }),
+    Object.freeze({ ratio: 1, height: 0 }),
+  ]);
+  const positions = [];
+  const colors = [];
+  const indices = [];
+  const footColor = new THREE.Color(0x5f685e);
+  const shoulderColor = new THREE.Color(0x8a8c7e);
+  for (let alongIndex = 0; alongIndex <= alongSegments; alongIndex += 1) {
+    const alongRatio = alongIndex / alongSegments;
+    const x = (alongRatio - 0.5) * 1.88;
+    const crestPulse = 0.82
+      + Math.sin(alongRatio * Math.PI) * 0.2
+      + Math.sin(alongRatio * Math.PI * 3.2 + 0.45) * 0.075;
+    const crestWander = Math.sin(alongRatio * Math.PI * 2.25 - 0.6) * 0.11;
+    crossProfile.forEach((profile, crossIndex) => {
+      const z = profile.ratio * 0.57
+        + crestWander * (1 - Math.abs(profile.ratio))
+        + Math.sin(alongIndex * 1.7 + crossIndex * 0.9) * 0.018;
+      const fracture = 0.96
+        + Math.sin(alongIndex * 2.3 + crossIndex * 1.17) * 0.055;
+      const y = Math.max(0, profile.height * crestPulse * fracture * 0.66);
+      positions.push(x, y, z);
+      const color = footColor.clone().lerp(shoulderColor, Clamp(profile.height * 0.9, 0, 0.9));
+      color.offsetHSL(
+        -0.006,
+        -0.025,
+        (alongIndex % 2 ? -0.018 : 0.016) + (crossIndex % 2 ? 0.008 : -0.006),
+      );
+      colors.push(color.r, color.g, color.b);
+    });
+  }
+  const rowLength = crossProfile.length;
+  for (let alongIndex = 0; alongIndex < alongSegments; alongIndex += 1) {
+    for (let crossIndex = 0; crossIndex < rowLength - 1; crossIndex += 1) {
+      const topLeft = alongIndex * rowLength + crossIndex;
+      const topRight = topLeft + 1;
+      const bottomLeft = topLeft + rowLength;
+      const bottomRight = bottomLeft + 1;
+      indices.push(
+        topLeft, topRight, bottomLeft,
+        topRight, bottomRight, bottomLeft,
+      );
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function CreateIrregularFieldGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.47, -0.18);
+  shape.lineTo(-0.16, -0.23);
+  shape.lineTo(0.19, -0.2);
+  shape.lineTo(0.47, -0.12);
+  shape.lineTo(0.43, 0.13);
+  shape.lineTo(0.14, 0.21);
+  shape.lineTo(-0.23, 0.19);
+  shape.lineTo(-0.49, 0.1);
+  shape.closePath();
+  const geometry = new THREE.ShapeGeometry(shape, 2);
+  geometry.rotateX(-Math.PI / 2);
+  return geometry;
+}
+
+function CreateWindblownSnowStripGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.5, -0.12);
+  shape.lineTo(-0.34, -0.19);
+  shape.lineTo(-0.03, -0.16);
+  shape.lineTo(0.24, -0.13);
+  shape.lineTo(0.5, -0.04);
+  shape.lineTo(0.42, 0.11);
+  shape.lineTo(0.1, 0.16);
+  shape.lineTo(-0.2, 0.13);
+  shape.lineTo(-0.47, 0.07);
+  shape.closePath();
+  const geometry = new THREE.ShapeGeometry(shape, 3);
+  geometry.rotateX(-Math.PI / 2);
+  return geometry;
+}
+
+function CreateCurvedGroundStripGeometry(length = 0.88, width = 0.016, bend = 0.055) {
+  const segmentCount = 8;
+  const positions = [];
+  const indices = [];
+  for (let index = 0; index <= segmentCount; index += 1) {
+    const ratio = index / segmentCount;
+    const x = (ratio - 0.5) * length;
+    const z = Math.sin((ratio - 0.5) * Math.PI) * bend
+      + Math.sin(ratio * Math.PI * 2.4) * bend * 0.12;
+    positions.push(x, 0, z - width / 2, x, 0, z + width / 2);
+  }
+  for (let index = 0; index < segmentCount; index += 1) {
+    const current = index * 2;
+    const next = current + 2;
+    indices.push(current, next, current + 1, current + 1, next, next + 1);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function AddBox(group, size, material, position, rotationY = 0) {
@@ -430,11 +633,26 @@ function CreateStructureModel(hex, materials, modelFactory = null) {
   const enemy = ["enemy", "occupied"].includes(String(hex.control ?? "").toLowerCase())
     || IsFeature(hex, "CountySeat", "Stronghold", "RailStation");
   if (IsFeature(hex, "CountySeat")) {
-    AddBox(group, new THREE.Vector3(1.1, 0.34, 0.92), materials.enemyStone, new THREE.Vector3(0, 0.18, 0));
-    [-0.43, 0.43].forEach((x) => [-0.34, 0.34].forEach((z) => {
-      AddCylinder(group, 0.16, 0.18, 0.53, 8, materials.enemyStone, new THREE.Vector3(x, 0.28, z));
-    }));
-    group.add(CreateFlag(materials, 0xe6dfc6, true));
+    AddBox(group, new THREE.Vector3(1.18, 0.22, 0.12), materials.enemyStone, new THREE.Vector3(0, 0.13, 0.43));
+    AddBox(group, new THREE.Vector3(1.18, 0.22, 0.12), materials.enemyStone, new THREE.Vector3(0, 0.13, -0.43));
+    AddBox(group, new THREE.Vector3(0.12, 0.22, 0.76), materials.enemyStone, new THREE.Vector3(-0.53, 0.13, 0));
+    AddBox(group, new THREE.Vector3(0.12, 0.22, 0.76), materials.enemyStone, new THREE.Vector3(0.53, 0.13, 0));
+    AddBox(group, new THREE.Vector3(0.34, 0.5, 0.24), materials.enemyWall, new THREE.Vector3(0, 0.26, -0.41));
+    const gateRoof = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.13, 4), materials.roof);
+    gateRoof.position.set(0, 0.56, -0.41);
+    gateRoof.rotation.y = Math.PI / 4;
+    gateRoof.scale.set(1.18, 1, 0.82);
+    gateRoof.castShadow = true;
+    group.add(gateRoof);
+    [
+      [-0.27, 0.08, 0.64],
+      [0.24, 0.17, 0.58],
+      [0.1, -0.12, 0.48],
+    ].forEach(([x, z, scale]) => {
+      const house = CreateHouse({ ...materials, wall: materials.enemyWall }, scale, modelFactory);
+      house.position.set(x, 0.08, z);
+      group.add(house);
+    });
   } else if (IsFeature(hex, "Stronghold")) {
     const blockhouse = modelFactory?.("Model_EnemyBlockhouse");
     if (blockhouse) {
@@ -442,17 +660,20 @@ function CreateStructureModel(hex, materials, modelFactory = null) {
       blockhouse.userData.importedModel = "Model_EnemyBlockhouse";
       group.add(blockhouse);
     } else {
-      AddCylinder(group, 0.31, 0.4, 0.62, 8, materials.enemyStone, new THREE.Vector3(0, 0.32, 0));
-      const crown = AddCylinder(group, 0.42, 0.42, 0.12, 8, materials.enemyDark, new THREE.Vector3(0, 0.68, 0));
-      crown.castShadow = true;
-      group.add(CreateFlag(materials, 0x504d40, false));
+      AddBox(group, new THREE.Vector3(0.56, 0.68, 0.5), materials.enemyWall, new THREE.Vector3(0, 0.35, 0));
+      AddBox(group, new THREE.Vector3(0.66, 0.12, 0.6), materials.enemyDark, new THREE.Vector3(0, 0.73, 0));
+      [-0.19, 0.19].forEach((x) => {
+        AddBox(group, new THREE.Vector3(0.13, 0.045, 0.025), materials.enemyDark, new THREE.Vector3(x, 0.49, -0.255));
+      });
+      AddBox(group, new THREE.Vector3(1.12, 0.12, 0.09), materials.enemyStone, new THREE.Vector3(0, 0.07, 0.48));
     }
   } else if (IsFeature(hex, "RailStation")) {
-    const trafficStation = modelFactory?.("Model_TrafficStation");
-    if (trafficStation) {
-      trafficStation.scale.setScalar(World3DVisualProfile.trafficStationScale);
-      trafficStation.userData.importedModel = "Model_TrafficStation";
-      group.add(trafficStation);
+    const railwayStation = modelFactory?.("Model_RailwayStation");
+    if (railwayStation) {
+      railwayStation.scale.setScalar(World3DVisualProfile.railwayStationScale);
+      railwayStation.position.z = 0.62;
+      railwayStation.userData.importedModel = "Model_RailwayStation";
+      group.add(railwayStation);
     } else {
       AddBox(group, new THREE.Vector3(0.92, 0.12, 0.46), materials.stone, new THREE.Vector3(0, 0.07, 0));
       const house = CreateHouse({ ...materials, wall: materials.enemyWall }, 0.8);
@@ -468,9 +689,6 @@ function CreateStructureModel(hex, materials, modelFactory = null) {
       house.position.set(x, 0, z);
       group.add(house);
     });
-    const flag = CreateFlag(materials, controlColors.player, true);
-    flag.position.set(0.13, 0, -0.27);
-    group.add(flag);
   } else if (IsFeature(hex, "Village")) {
     const offsets = [[-0.18, -0.05, 0.62], [0.2, 0.12, 0.54], [0.02, -0.28, 0.48]];
     offsets.forEach(([x, z, scale]) => {
@@ -478,31 +696,34 @@ function CreateStructureModel(hex, materials, modelFactory = null) {
       house.position.set(x, 0, z);
       group.add(house);
     });
-    if (!enemy && ["player", "base", "network"].includes(hex.control)) {
-      const flag = CreateFlag(materials, controlColors.player, false);
-      flag.position.set(0.3, 0, -0.2);
-      group.add(flag);
-    }
   }
 
   if (hex.institution) {
     const institution = new THREE.Group();
+    if (hex.institution === "Station") {
+      const trafficStation = modelFactory?.("Model_TrafficStation");
+      if (trafficStation) {
+        trafficStation.scale.setScalar(World3DVisualProfile.trafficStationScale * 0.82);
+        trafficStation.userData.importedModel = "Model_TrafficStation";
+        institution.add(trafficStation);
+        institution.position.set(-0.38, 0, 0.29);
+        group.add(institution);
+      }
+    } else {
     const institutionColor = {
       PartyBranch: 0xa8322c,
       Cooperative: 0xb88a3e,
       Clinic: 0xd9d2b7,
       Arsenal: 0x4e5950,
-      Station: 0x556e72,
       Tunnels: 0x635441,
     }[hex.institution] ?? 0x8c7753;
     const base = AddBox(institution, new THREE.Vector3(0.32, 0.2, 0.28), materials.wall, new THREE.Vector3(0, 0.1, 0));
     base.material = base.material.clone();
     base.material.color.setHex(institutionColor);
     const mast = AddCylinder(institution, 0.018, 0.022, 0.47, 6, materials.iron, new THREE.Vector3(0, 0.39, 0));
-    mast.userData.signal = hex.institution === "Station";
     institution.position.set(-0.4, 0, 0.34);
-    institution.userData.signal = hex.institution === "Station";
     group.add(institution);
+    }
   }
 
   if (hex.construction) {
@@ -529,7 +750,14 @@ function GetUnitModelName(unit, enemy) {
   }[String(unit?.type ?? "").toLowerCase()] ?? null;
 }
 
-function CreateUnitMiniature(unit, enemy, materials, modelFactory = null) {
+function CreateUnitMiniature(
+  unit,
+  enemy,
+  materials,
+  modelFactory = null,
+  selected = false,
+  markerLabel = null,
+) {
   const group = new THREE.Group();
   const bodyMaterial = enemy ? materials.enemyUniform : materials.playerUniform;
   const edgeMaterial = enemy ? materials.enemyDark : materials.paperLight;
@@ -544,9 +772,11 @@ function CreateUnitMiniature(unit, enemy, materials, modelFactory = null) {
       if (!object.isMesh) return;
       const TintMaterial = (sourceMaterial) => {
         const material = sourceMaterial.clone();
-        material.color?.multiplyScalar(1.1);
-        material.emissive?.setHex(enemy ? 0x263b35 : 0x4a2119);
-        material.emissiveIntensity = Math.max(Number(material.emissiveIntensity) || 0, 0.36);
+        material.color?.multiplyScalar(1.04);
+        material.emissive?.setHex(0x000000);
+        material.emissiveIntensity = 0;
+        material.roughness = Math.max(0.82, Number(material.roughness) || 0.92);
+        material.metalness = Math.min(0.12, Number(material.metalness) || 0);
         material.needsUpdate = true;
         return material;
       };
@@ -577,18 +807,25 @@ function CreateUnitMiniature(unit, enemy, materials, modelFactory = null) {
       group.add(person);
     });
   }
-  const glyph = CreateLabelSprite(UnitGlyph(unit.type, enemy), {
-    width: 104,
-    height: 104,
-    background: enemy ? "rgba(28,30,27,.95)" : "rgba(126,40,34,.96)",
-    border: enemy ? "rgba(201,167,119,.9)" : "rgba(245,216,143,.95)",
-    color: "#f4e5bd",
-    worldHeight: World3DVisualProfile.unitLabelWorldHeight,
-    radius: 52,
-  });
-  glyph.position.y = World3DVisualProfile.unitLabelBaseHeight;
-  glyph.userData.mapLabel = true;
-  group.add(glyph);
+  const resolvedMarkerLabel = markerLabel === false
+    ? null
+    : markerLabel ?? (enemy || selected ? UnitGlyph(unit.type, enemy) : null);
+  if (resolvedMarkerLabel) {
+    const wideMarker = String(resolvedMarkerLabel).length > 1;
+    const glyph = CreateLabelSprite(resolvedMarkerLabel, {
+      width: wideMarker ? 156 : 104,
+      height: 104,
+      background: enemy ? "rgba(28,30,27,.95)" : "rgba(126,40,34,.96)",
+      border: enemy ? "rgba(201,167,119,.9)" : "rgba(245,216,143,.95)",
+      color: "#f4e5bd",
+      worldHeight: World3DVisualProfile.unitLabelWorldHeight,
+      maximumScreenPixels: World3DVisualProfile.maximumUnitLabelScreenPixels,
+      radius: wideMarker ? 28 : 52,
+    });
+    glyph.position.y = World3DVisualProfile.unitLabelBaseHeight;
+    glyph.userData.mapLabel = true;
+    group.add(glyph);
+  }
   group.userData.unitBody = true;
   return group;
 }
@@ -631,12 +868,17 @@ class EnemyRearWorld3D {
     this.hexByCoordinate = new Map();
     this.hexPositions = new Map();
     this.terrainHeights = new Map();
+    this.terrainAlbedoTexture = null;
+    this.terrainAlbedoMaterials = new Set();
+    this.terrainAlbedoStatus = "loading";
+    this.seasonalTerrainMaterials = Object.create(null);
     this.unitVisuals = new Map();
     this.unitPedestalBatches = [];
     this.smokePuffs = [];
     this.sabotageObjects = [];
     this.signalObjects = [];
     this.warningObjects = [];
+    this.labelLeaders = [];
     this.weatherMode = "pending";
     this.weatherSignature = "";
     this.weatherParticles = null;
@@ -681,13 +923,13 @@ class EnemyRearWorld3D {
     this.renderer.toneMappingExposure = World3DVisualProfile.toneMappingExposure;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.setClearColor(0x99947d, 1);
+    this.renderer.setClearColor(0x56635d, 1);
   }
 
   InitializeScene() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x99947d);
-    this.scene.fog = new THREE.Fog(0xb0ac9b, 22, 58);
+    this.scene.background = new THREE.Color(0x5c6963);
+    this.scene.fog = new THREE.Fog(0x69766f, 27, 68);
     this.camera = new THREE.OrthographicCamera(-8, 8, 5, -5, 0.1, 120);
     this.camera.position.set(9.5, 13.5, 12.5);
     this.camera.up.set(0, 1, 0);
@@ -701,6 +943,8 @@ class EnemyRearWorld3D {
     this.effectGroup = new THREE.Group();
     this.actionEffectGroup = new THREE.Group();
     this.weatherGroup = new THREE.Group();
+    this.labelLeaderGroup = new THREE.Group();
+    this.labelLeaderGroup.name = "MapLabelLeaderLines";
     this.actionEffectGroup.name = "TransientActionEffects";
     this.scene.add(
       this.terrainGroup,
@@ -711,12 +955,13 @@ class EnemyRearWorld3D {
       this.effectGroup,
       this.actionEffectGroup,
       this.weatherGroup,
+      this.labelLeaderGroup,
     );
 
-    const hemisphere = new THREE.HemisphereLight(0xf5ead0, 0x918b74, World3DVisualProfile.hemisphereIntensity);
-    const ambient = new THREE.AmbientLight(0xd8ceb5, World3DVisualProfile.ambientIntensity);
-    const sun = new THREE.DirectionalLight(0xffdcad, World3DVisualProfile.sunIntensity);
-    sun.position.set(-8, 18, -11);
+    const hemisphere = new THREE.HemisphereLight(0xdde8e3, 0x26332e, World3DVisualProfile.hemisphereIntensity);
+    const ambient = new THREE.AmbientLight(0xaab9b1, World3DVisualProfile.ambientIntensity);
+    const sun = new THREE.DirectionalLight(0xffe4bd, World3DVisualProfile.sunIntensity);
+    sun.position.set(-13, 22, -10);
     sun.castShadow = true;
     sun.shadow.mapSize.set(World3DQualityProfile.shadowMapSize, World3DQualityProfile.shadowMapSize);
     sun.shadow.camera.left = -18;
@@ -725,8 +970,10 @@ class EnemyRearWorld3D {
     sun.shadow.camera.bottom = -18;
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 55;
-    sun.shadow.bias = -0.0007;
-    const fill = new THREE.DirectionalLight(0xc3d2ce, World3DVisualProfile.fillIntensity);
+    sun.shadow.bias = -0.00035;
+    sun.shadow.normalBias = 0.014;
+    sun.shadow.radius = 1.35;
+    const fill = new THREE.DirectionalLight(0x9fbfc3, World3DVisualProfile.fillIntensity);
     fill.position.set(12, 10, 15);
     fill.castShadow = false;
     this.sunLight = sun;
@@ -735,7 +982,7 @@ class EnemyRearWorld3D {
     this.CreateSharedResources();
     const paper = new THREE.Mesh(
       new THREE.PlaneGeometry(80, 80),
-      new THREE.MeshStandardMaterial({ color: 0xb2aa8d, roughness: 1, metalness: 0 }),
+      new THREE.MeshStandardMaterial({ color: 0x636655, roughness: 0.92, metalness: 0 }),
     );
     paper.rotation.x = -Math.PI / 2;
     paper.position.y = -0.035;
@@ -745,6 +992,7 @@ class EnemyRearWorld3D {
     this.paperGround = paper;
     this.scene.add(paper);
     this.LoadPaperGroundTexture(paper.material);
+    this.LoadTerrainAlbedoTexture();
     this.LoadMiniatureModelPack();
   }
 
@@ -761,15 +1009,16 @@ class EnemyRearWorld3D {
         const texture = loadedTexture;
         const sourceWidth = Number(loadedTexture.image?.naturalWidth ?? loadedTexture.image?.width) || 0;
         const sourceHeight = Number(loadedTexture.image?.naturalHeight ?? loadedTexture.image?.height) || 0;
-        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.colorSpace = THREE.NoColorSpace;
         texture.wrapS = THREE.ClampToEdgeWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
         texture.minFilter = THREE.LinearMipmapLinearFilter;
         texture.magFilter = THREE.LinearFilter;
         texture.generateMipmaps = true;
         texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-        material.map = texture;
-        material.color.setHex(this.weatherMode === "winter-snow" ? 0xd5d8ce : 0xc8b992);
+        material.map = null;
+        material.roughnessMap = texture;
+        material.color.setHex(this.weatherMode === "winter-snow" ? 0x747d74 : 0x636655);
         material.needsUpdate = true;
         this.paperTextureStatus = "ready";
         this.paperTextureSize = `${Number(texture.image?.width) || sourceWidth}x${Number(texture.image?.height) || sourceHeight}`;
@@ -779,6 +1028,42 @@ class EnemyRearWorld3D {
       undefined,
       () => {
         this.paperTextureStatus = "fallback-color";
+      },
+    );
+  }
+
+  LoadTerrainAlbedoTexture() {
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      World3DTerrainAlbedoUrl,
+      (texture) => {
+        if (this.disposed) {
+          texture.dispose();
+          return;
+        }
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = true;
+        texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        this.terrainAlbedoTexture = texture;
+        this.terrainAlbedoStatus = "ready";
+        this.terrainAlbedoMaterials.forEach((material) => {
+          material.map = texture;
+          material.opacity = this.weatherMode === "winter-snow"
+            ? World3DVisualProfile.terrainAlbedoOpacity * 0.68
+            : World3DVisualProfile.terrainAlbedoOpacity;
+          material.needsUpdate = true;
+        });
+        this.renderRequested = true;
+        this.PublishDiagnostics();
+      },
+      undefined,
+      () => {
+        this.terrainAlbedoStatus = "fallback-vertex-color";
+        this.PublishDiagnostics();
       },
     );
   }
@@ -793,135 +1078,162 @@ class EnemyRearWorld3D {
     this.weatherParticles = null;
 
     if (weather.mode === "winter-snow") {
-      this.scene.fog.color.setHex(0xc7ccc8);
-      this.scene.fog.near = 17;
-      this.scene.fog.far = 46;
-      this.scene.background.setHex(0xaeb5b0);
-      this.renderer.setClearColor(0xaeb5b0, 1);
-      this.paperGround?.material.color.setHex(0xd5d8ce);
+      this.scene.fog.color.setHex(0x899895);
+      this.scene.fog.near = 28;
+      this.scene.fog.far = 66;
+      this.scene.background.setHex(0x71807e);
+      this.renderer.setClearColor(0x71807e, 1);
+      this.paperGround?.material.color.setHex(0x747d74);
+      this.sunLight.color.setHex(0xffeee0);
+      this.sunLight.intensity = 1.78;
+    } else if (weather.mode === "winter-dry") {
+      this.scene.fog.color.setHex(0x6e7972);
+      this.scene.fog.near = 30;
+      this.scene.fog.far = 70;
+      this.scene.background.setHex(0x5f6b65);
+      this.renderer.setClearColor(0x5f6b65, 1);
+      this.paperGround?.material.color.setHex(0x67695a);
+      this.sunLight.color.setHex(0xffe7d1);
+      this.sunLight.intensity = 1.9;
     } else if (weather.mode === "spring-dust") {
-      this.scene.fog.color.setHex(0xb8aa8e);
-      this.scene.fog.near = 21;
-      this.scene.fog.far = 55;
-      this.scene.background.setHex(0xaaa18c);
-      this.renderer.setClearColor(0xaaa18c, 1);
-      this.paperGround?.material.color.setHex(0xcbb991);
+      this.scene.fog.color.setHex(0x847f6c);
+      this.scene.fog.near = 28;
+      this.scene.fog.far = 67;
+      this.scene.background.setHex(0x706d5e);
+      this.renderer.setClearColor(0x706d5e, 1);
+      this.paperGround?.material.color.setHex(0x6f6d57);
+      this.sunLight.color.setHex(0xffdfc1);
+      this.sunLight.intensity = 1.86;
     } else {
-      this.scene.fog.color.setHex(0xb0ac9b);
-      this.scene.fog.near = 22;
-      this.scene.fog.far = 58;
-      this.scene.background.setHex(0x99947d);
-      this.renderer.setClearColor(0x99947d, 1);
-      this.paperGround?.material.color.setHex(0xc8b992);
+      const summer = weather.month >= 6 && weather.month <= 8;
+      this.scene.fog.color.setHex(summer ? 0x607970 : 0x68766f);
+      this.scene.fog.near = summer ? 32 : 31;
+      this.scene.fog.far = summer ? 76 : 73;
+      this.scene.background.setHex(summer ? 0x506b61 : 0x5c6963);
+      this.renderer.setClearColor(summer ? 0x506b61 : 0x5c6963, 1);
+      this.paperGround?.material.color.setHex(summer ? 0x5f6f5d : 0x636655);
+      this.sunLight.color.setHex(summer ? 0xffeed9 : 0xffe7cf);
+      this.sunLight.intensity = summer ? 1.94 : World3DVisualProfile.sunIntensity;
     }
 
     if (weather.mode === "winter-snow") {
       const visibleHexes = (this.state?.hexes ?? []).filter((hex) => hex.visible !== false);
-      if (visibleHexes.length) {
-        const geometry = new THREE.RingGeometry(0.18, 0.92, 6, 1, Math.PI / 6);
-        const material = new THREE.MeshBasicMaterial({
-          color: 0xe6ebe5,
+
+      const capTransforms = [];
+      this.structureGroup.children
+        .filter((object) => object.userData?.hexId && !object.isSprite && !object.userData?.labelKind)
+        .forEach((structure) => {
+          const box = new THREE.Box3().setFromObject(structure);
+          if (box.isEmpty()) return;
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const hex = this.hexById.get(structure.userData.hexId);
+          const capCount = IsFeature(hex, "Village", "Headquarters") ? 2 : 1;
+          const stripRotation = structure.rotation.y + (size.z > size.x ? Math.PI / 2 : 0);
+          const crossX = -Math.sin(stripRotation);
+          const crossZ = Math.cos(stripRotation);
+          for (let capIndex = 0; capIndex < capCount; capIndex += 1) {
+            const stripOffset = (capIndex - (capCount - 1) / 2)
+              * Math.min(size.x, size.z) * 0.2;
+            capTransforms.push({
+              position: new THREE.Vector3(
+                center.x + crossX * stripOffset,
+                box.max.y + 0.008 + capIndex * 0.002,
+                center.z + crossZ * stripOffset,
+              ),
+              rotation: stripRotation
+                + (HashNoise(hex?.r ?? 0, capIndex, 129) - 0.5) * 0.16,
+              scaleX: Clamp(Math.max(size.x, size.z) * (capCount > 1 ? 0.34 : 0.42), 0.24, 0.68),
+              scaleZ: Clamp(Math.min(size.x, size.z) * (capCount > 1 ? 0.22 : 0.27), 0.11, 0.25),
+            });
+          }
+        });
+      visibleHexes
+        .filter((hex) => NormalizeTerrain(hex.terrain) === "mountain")
+        .forEach((hex) => {
+          const base = this.hexPositions.get(hex.id) ?? HexToWorld(hex.q, hex.r);
+          capTransforms.push({
+            position: new THREE.Vector3(
+              base.x - 0.08,
+              (this.terrainHeights.get(hex.id) ?? GetTerrainHeight(hex)) + 0.43,
+              base.z + 0.02,
+            ),
+            rotation: Math.PI * 0.335,
+            scaleX: 0.52,
+            scaleZ: 0.24,
+          });
+        });
+      if (capTransforms.length) {
+        const capGeometry = CreateWindblownSnowStripGeometry();
+        const capMaterial = new THREE.MeshStandardMaterial({
+          color: 0xd7d9d3,
+          roughness: 1,
           transparent: true,
-          opacity: 0.28,
+          opacity: 0.48,
           depthWrite: false,
-          toneMapped: false,
           polygonOffset: true,
           polygonOffsetFactor: -2,
         });
-        const snowDusting = new THREE.InstancedMesh(geometry, material, visibleHexes.length);
-        const matrix = new THREE.Matrix4();
-        const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
-        visibleHexes.forEach((hex, index) => {
-          const base = this.hexPositions.get(hex.id) ?? HexToWorld(hex.q, hex.r);
-          matrix.compose(
-            new THREE.Vector3(base.x, (this.terrainHeights.get(hex.id) ?? GetTerrainHeight(hex)) + 0.04, base.z),
-            quaternion,
-            new THREE.Vector3(1, 1, 1),
+        const capMesh = new THREE.InstancedMesh(capGeometry, capMaterial, capTransforms.length);
+        const capMatrix = new THREE.Matrix4();
+        capTransforms.forEach((cap, index) => {
+          capMatrix.compose(
+            cap.position,
+            new THREE.Quaternion().setFromEuler(new THREE.Euler(0, cap.rotation, 0)),
+            new THREE.Vector3(cap.scaleX, 1, cap.scaleZ),
           );
-          snowDusting.setMatrixAt(index, matrix);
+          capMesh.setMatrixAt(index, capMatrix);
         });
-        snowDusting.instanceMatrix.needsUpdate = true;
-        snowDusting.renderOrder = 7;
-        snowDusting.name = "WinterSnowDustingInstanced";
-        this.weatherGroup.add(snowDusting);
+        capMesh.instanceMatrix.needsUpdate = true;
+        capMesh.renderOrder = 8;
+        capMesh.name = "WinterRoofAndRidgeSnowCaps";
+        this.weatherGroup.add(capMesh);
+      }
 
-        const mountainHexes = visibleHexes.filter((hex) => ["mountain", "hill"].includes(NormalizeTerrain(hex.terrain)));
-        if (mountainHexes.length) {
-          const capGeometry = new THREE.ConeGeometry(0.5, 0.16, 7);
-          const capMaterial = new THREE.MeshBasicMaterial({
-            color: 0xf3f6f2,
-            transparent: true,
-            opacity: 0.78,
-            depthWrite: false,
-            toneMapped: false,
-          });
-          const mountainCaps = new THREE.InstancedMesh(capGeometry, capMaterial, mountainHexes.length);
-          mountainHexes.forEach((hex, index) => {
-            const base = this.hexPositions.get(hex.id) ?? HexToWorld(hex.q, hex.r);
-            const isMountain = NormalizeTerrain(hex.terrain) === "mountain";
-            matrix.compose(
-              new THREE.Vector3(
-                base.x,
-                (this.terrainHeights.get(hex.id) ?? GetTerrainHeight(hex)) + (isMountain ? 0.74 : 0.46),
-                base.z,
+      const branchCatchTransforms = [];
+      visibleHexes
+        .filter((hex) => NormalizeTerrain(hex.terrain) === "forest")
+        .forEach((hex) => {
+          const base = this.hexPositions.get(hex.id) ?? HexToWorld(hex.q, hex.r);
+          for (let catchIndex = 0; catchIndex < 3; catchIndex += 1) {
+            const angle = HashNoise(hex.q, hex.r, catchIndex + 130) * Math.PI * 2;
+            const radius = 0.18 + HashNoise(hex.r, catchIndex, 131) * 0.48;
+            branchCatchTransforms.push({
+              position: new THREE.Vector3(
+                base.x + Math.cos(angle) * radius,
+                (this.terrainHeights.get(hex.id) ?? GetTerrainHeight(hex))
+                  + 0.42 + HashNoise(hex.q, catchIndex, 132) * 0.24,
+                base.z + Math.sin(angle) * radius,
               ),
-              new THREE.Quaternion().setFromEuler(new THREE.Euler(0, HashNoise(hex.q, hex.r, 121) * Math.PI, 0)),
-              new THREE.Vector3(isMountain ? 0.72 : 0.54, isMountain ? 0.7 : 0.46, isMountain ? 0.72 : 0.54),
-            );
-            mountainCaps.setMatrixAt(index, matrix);
-          });
-          mountainCaps.instanceMatrix.needsUpdate = true;
-          mountainCaps.renderOrder = 9;
-          mountainCaps.name = "WinterMountainCapsInstanced";
-          this.weatherGroup.add(mountainCaps);
-        }
-
-        const roofHexes = visibleHexes.filter((hex) => IsFeature(
-          hex,
-          "Village",
-          "Headquarters",
-          "CountySeat",
-          "Stronghold",
-          "RailStation",
-        ));
-        if (roofHexes.length) {
-          const roofGeometry = new THREE.ConeGeometry(0.42, 0.1, 4);
-          const roofMaterial = new THREE.MeshBasicMaterial({
-            color: 0xf1f4ef,
-            transparent: true,
-            opacity: 0.82,
-            depthWrite: false,
-            toneMapped: false,
-          });
-          const roofCaps = new THREE.InstancedMesh(roofGeometry, roofMaterial, roofHexes.length);
-          roofHexes.forEach((hex, index) => {
-            const base = this.hexPositions.get(hex.id) ?? HexToWorld(hex.q, hex.r);
-            const roofHeight = IsFeature(hex, "Stronghold")
-              ? 1.23
-              : IsFeature(hex, "RailStation")
-                ? 1.08
-                : IsFeature(hex, "CountySeat")
-                  ? 0.74
-                  : IsFeature(hex, "Headquarters")
-                    ? 0.62
-                    : 0.56;
-            const roofScale = IsFeature(hex, "RailStation")
-              ? new THREE.Vector3(1.65, 0.48, 0.82)
-              : IsFeature(hex, "Stronghold", "CountySeat")
-                ? new THREE.Vector3(1.24, 0.55, 1.02)
-                : new THREE.Vector3(1.04, 0.5, 0.76);
-            matrix.compose(
-              new THREE.Vector3(base.x, (this.terrainHeights.get(hex.id) ?? GetTerrainHeight(hex)) + roofHeight, base.z),
-              new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 4, 0)),
-              roofScale,
-            );
-            roofCaps.setMatrixAt(index, matrix);
-          });
-          roofCaps.instanceMatrix.needsUpdate = true;
-          roofCaps.renderOrder = 10;
-          roofCaps.name = "WinterRoofCapsInstanced";
-          this.weatherGroup.add(roofCaps);
-        }
+              scale: 0.45 + HashNoise(hex.r, catchIndex, 133) * 0.5,
+            });
+          }
+        });
+      if (branchCatchTransforms.length) {
+        const catchGeometry = new THREE.IcosahedronGeometry(0.032, 1);
+        const catchMaterial = new THREE.MeshStandardMaterial({
+          color: 0xe1e2dc,
+          roughness: 1,
+          transparent: true,
+          opacity: 0.58,
+        });
+        const catchMesh = new THREE.InstancedMesh(
+          catchGeometry,
+          catchMaterial,
+          branchCatchTransforms.length,
+        );
+        const catchMatrix = new THREE.Matrix4();
+        branchCatchTransforms.forEach((catchTransform, index) => {
+          catchMatrix.compose(
+            catchTransform.position,
+            new THREE.Quaternion(),
+            new THREE.Vector3().setScalar(catchTransform.scale),
+          );
+          catchMesh.setMatrixAt(index, catchMatrix);
+        });
+        catchMesh.instanceMatrix.needsUpdate = true;
+        catchMesh.name = "WinterBranchSnowCatch";
+        this.weatherGroup.add(catchMesh);
       }
     }
 
@@ -945,9 +1257,9 @@ class EnemyRearWorld3D {
       const winter = weather.mode === "winter-snow";
       const material = new THREE.PointsMaterial({
         color: winter ? 0xf5f4e8 : 0xc7ae78,
-        size: winter ? 0.145 : 0.038,
+        size: winter ? 0.052 : 0.032,
         transparent: true,
-        opacity: winter ? 0.9 : 0.16,
+        opacity: winter ? 0.48 : 0.22,
         depthWrite: false,
         depthTest: true,
         sizeAttenuation: true,
@@ -962,9 +1274,26 @@ class EnemyRearWorld3D {
       this.weatherGroup.add(particles);
       this.weatherParticles = particles;
     }
+    this.ApplySeasonalTerrainPalette();
     this.objectCounts.weather = MeasureObjectGroup(this.weatherGroup);
     this.renderRequested = true;
     this.PublishDiagnostics();
+  }
+
+  ApplySeasonalTerrainPalette() {
+    const winter = this.weatherMode === "winter-snow" || this.weatherMode === "winter-dry";
+    const spring = this.weatherMode === "spring-dust";
+    const palette = winter
+      ? { olive: 0x626a5d, ochre: 0x746a58, crop: 0x595a46, hay: 0x70644e }
+      : spring
+        ? { olive: 0x68775f, ochre: 0x7a7258, crop: 0x62674b, hay: 0x786b4d }
+        : { olive: 0x737c55, ochre: 0x897653, crop: 0x6e7142, hay: 0x817044 };
+    Object.entries(palette).forEach(([key, color]) => {
+      const material = this.seasonalTerrainMaterials[key];
+      if (!material) return;
+      material.color.setHex(color);
+      material.needsUpdate = true;
+    });
   }
 
   LoadMiniatureModelPack() {
@@ -1014,11 +1343,11 @@ class EnemyRearWorld3D {
           materials.filter(Boolean).forEach((material) => {
             if (object.geometry?.getAttribute("color")) {
               material.vertexColors = true;
-              material.color?.setRGB(1.16, 1.15, 1.1);
-              material.emissive?.setHex(0x34352a);
-              material.emissiveIntensity = 0.24;
-              material.roughness = Math.min(Number(material.roughness) || 1, 0.86);
-              material.metalness = 0;
+              material.color?.setRGB(1.075, 1.06, 1.03);
+              material.emissive?.setHex(0x000000);
+              material.emissiveIntensity = 0;
+              material.roughness = Math.max(0.82, Number(material.roughness) || 0.9);
+              material.metalness = Math.min(0.1, Number(material.metalness) || 0);
               material.needsUpdate = true;
             }
             this.sharedMaterials.add(material);
@@ -1036,6 +1365,8 @@ class EnemyRearWorld3D {
           this.dirty.units = true;
           this.dirty.structures = true;
           this.RebuildDirtyLayers();
+          this.weatherSignature = "";
+          this.UpdateWeather();
         }
         this.renderRequested = true;
         this.PublishDiagnostics();
@@ -1069,49 +1400,51 @@ class EnemyRearWorld3D {
     ], 3));
     this.warningArrowGeometry.computeVertexNormals();
     this.sabotageBeamGeometry = new THREE.BoxGeometry(0.46, 0.055, 0.075);
-    this.unitPedestalGeometry = new THREE.CylinderGeometry(0.35, 0.38, 0.05, 16);
+    this.unitPedestalGeometry = new THREE.CylinderGeometry(0.3, 0.33, 0.035, 20);
     this.hexMaterial = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.9,
+      roughness: 0.98,
       metalness: 0,
-      emissive: 0x575141,
-      emissiveIntensity: 0.29,
-      flatShading: true,
+      emissive: 0x000000,
+      emissiveIntensity: 0,
+      flatShading: false,
     });
     this.pickMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
     this.fogMaterial = new THREE.MeshBasicMaterial({
-      color: 0x85877a,
+      color: 0x202c28,
       transparent: true,
-      opacity: 0.52,
+      opacity: 0.18,
       depthWrite: false,
+      toneMapped: false,
       polygonOffset: true,
       polygonOffsetFactor: -3,
     });
     this.materials = {
-      wall: new THREE.MeshStandardMaterial({ color: 0xc7ae84, emissive: 0x382c20, emissiveIntensity: 0.14, roughness: 0.96 }),
-      enemyWall: new THREE.MeshStandardMaterial({ color: 0xa5a597, emissive: 0x2e3936, emissiveIntensity: 0.2, roughness: 0.94 }),
-      roof: new THREE.MeshStandardMaterial({ color: 0x747d74, emissive: 0x26312d, emissiveIntensity: 0.18, roughness: 0.88 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xa99f88, roughness: 0.98 }),
+      enemyWall: new THREE.MeshStandardMaterial({ color: 0xa5a597, roughness: 0.96 }),
+      roof: new THREE.MeshStandardMaterial({ color: 0x747d74, roughness: 0.9 }),
       wood: new THREE.MeshStandardMaterial({ color: 0x755b42, roughness: 0.94 }),
-      stone: new THREE.MeshStandardMaterial({ color: 0xaaa89a, emissive: 0x30322d, emissiveIntensity: 0.14, roughness: 0.92 }),
-      enemyStone: new THREE.MeshStandardMaterial({ color: 0x8e9690, emissive: 0x263431, emissiveIntensity: 0.22, roughness: 0.9 }),
-      enemyDark: new THREE.MeshStandardMaterial({ color: 0x63726b, emissive: 0x1e302b, emissiveIntensity: 0.24, roughness: 0.86 }),
+      stone: new THREE.MeshStandardMaterial({ color: 0xaaa89a, roughness: 0.95 }),
+      enemyStone: new THREE.MeshStandardMaterial({ color: 0x8e9690, roughness: 0.94 }),
+      enemyDark: new THREE.MeshStandardMaterial({ color: 0x63726b, roughness: 0.9 }),
       iron: new THREE.MeshStandardMaterial({ color: 0x50605e, roughness: 0.5, metalness: 0.28 }),
-      rail: new THREE.MeshStandardMaterial({ color: 0x263938, roughness: 0.4, metalness: 0.52 }),
-      railDamaged: new THREE.MeshStandardMaterial({ color: 0x984b3b, roughness: 0.8, metalness: 0.12 }),
-      road: new THREE.MeshStandardMaterial({ color: 0xb9945f, roughness: 0.96 }),
-      railBed: new THREE.MeshStandardMaterial({ color: 0x8b8376, roughness: 0.94 }),
-      railSleeper: new THREE.MeshStandardMaterial({ color: 0x654b35, roughness: 0.94 }),
-      playerUniform: new THREE.MeshStandardMaterial({ color: 0xc36757, emissive: 0x4c1e17, emissiveIntensity: 0.24, roughness: 0.86 }),
-      playerCap: new THREE.MeshStandardMaterial({ color: 0x60645a, roughness: 0.9 }),
-      enemyUniform: new THREE.MeshStandardMaterial({ color: 0xb7b197, emissive: 0x2c3931, emissiveIntensity: 0.22, roughness: 0.86 }),
-      enemyHelmet: new THREE.MeshStandardMaterial({ color: 0x879078, emissive: 0x263329, emissiveIntensity: 0.2, roughness: 0.74 }),
+      rail: new THREE.MeshStandardMaterial({ color: 0x59615e, roughness: 0.54, metalness: 0.38 }),
+      railDamaged: new THREE.MeshStandardMaterial({ color: 0x574842, roughness: 0.9, metalness: 0.18 }),
+      road: new THREE.MeshStandardMaterial({ color: 0x655d49, roughness: 1 }),
+      roadDust: new THREE.MeshStandardMaterial({ color: 0x796c4e, roughness: 1 }),
+      railBed: new THREE.MeshStandardMaterial({ color: 0x666b67, roughness: 0.97 }),
+      railSleeper: new THREE.MeshStandardMaterial({ color: 0x62503e, roughness: 0.97 }),
+      playerUniform: new THREE.MeshStandardMaterial({ color: 0x687c82, roughness: 0.92 }),
+      playerCap: new THREE.MeshStandardMaterial({ color: 0x59696d, roughness: 0.92 }),
+      enemyUniform: new THREE.MeshStandardMaterial({ color: 0xa7a17e, roughness: 0.9 }),
+      enemyHelmet: new THREE.MeshStandardMaterial({ color: 0x777d63, roughness: 0.82 }),
       playerPedestal: new THREE.MeshStandardMaterial({
-        color: 0x8d3930, emissive: 0x451712, emissiveIntensity: 0.38, roughness: 0.82,
+        color: 0x8d3930, roughness: 0.88,
       }),
       enemyPedestal: new THREE.MeshStandardMaterial({
-        color: 0x4d625d, emissive: 0x1b302b, emissiveIntensity: 0.38, roughness: 0.82,
+        color: 0x4d625d, roughness: 0.88,
       }),
-      paperLight: new THREE.MeshStandardMaterial({ color: 0xcab88f, roughness: 1 }),
+      paperLight: new THREE.MeshStandardMaterial({ color: 0xa59a7d, roughness: 1 }),
       smoke: new THREE.MeshBasicMaterial({ color: 0x353530, transparent: true, opacity: 0.34, depthWrite: false }),
       ember: new THREE.MeshBasicMaterial({ color: 0xd0633f, transparent: true, opacity: 0.78, depthWrite: false }),
     };
@@ -1233,6 +1566,17 @@ class EnemyRearWorld3D {
           reducedMotionStatic: Boolean(world?.reducedMotion && world?.activeActionEffects.length),
         });
       },
+      projectHex(hexId) {
+        const world = worldDiagnosticsRouter.current;
+        const worldPosition = world?.hexPositions.get(String(hexId))?.clone();
+        if (!world || !worldPosition || !world.camera || !world.canvas) return null;
+        worldPosition.y = (world.terrainHeights.get(String(hexId)) ?? 0) + 0.08;
+        worldPosition.project(world.camera);
+        return Object.freeze({
+          x: (worldPosition.x + 1) * 0.5 * world.canvas.clientWidth,
+          y: (1 - worldPosition.y) * 0.5 * world.canvas.clientHeight,
+        });
+      },
       get quality() {
         const world = worldDiagnosticsRouter.current;
         return Object.freeze({
@@ -1264,6 +1608,9 @@ class EnemyRearWorld3D {
   SetState(state, view = {}) {
     this.state = state;
     this.view = view;
+    const nextWeatherMode = GetWorld3DWeather(state?.turn).mode;
+    if (nextWeatherMode !== this.weatherMode) this.dirty.terrain = true;
+    this.weatherMode = nextWeatherMode;
     const wasReducedMotion = this.reducedMotion;
     this.reducedMotion = Boolean(view.reducedMotion);
     if (this.reducedMotion && !wasReducedMotion) {
@@ -1308,51 +1655,254 @@ class EnemyRearWorld3D {
 
   RebuildTerrain() {
     ClearGroup(this.terrainGroup, this.sharedGeometries, this.sharedMaterials);
+    this.terrainAlbedoMaterials.clear();
     this.hexById.clear();
     this.hexByCoordinate.clear();
     this.hexPositions.clear();
     this.terrainHeights.clear();
     const hexes = this.state.hexes ?? [];
-    const terrainMesh = new THREE.InstancedMesh(this.hexGeometry, this.hexMaterial, Math.max(1, hexes.length));
-    const pickMesh = new THREE.InstancedMesh(this.hexGeometry, this.pickMaterial, Math.max(1, hexes.length));
     const matrix = new THREE.Matrix4();
-    const color = new THREE.Color();
     this.pickInstanceIds = [];
-    hexes.forEach((hex, index) => {
+    hexes.forEach((hex) => {
       const position = HexToWorld(hex.q, hex.r);
-      const height = GetTerrainHeight(hex);
       const terrain = NormalizeTerrain(hex.terrain);
-      const style = terrainStyles[terrain];
-      position.y = height / 2;
-      matrix.compose(position, new THREE.Quaternion(), new THREE.Vector3(1, height, 1));
-      terrainMesh.setMatrixAt(index, matrix);
-      pickMesh.setMatrixAt(index, matrix);
-      color.setHex(style.color);
-      const tint = (HashNoise(hex.q, hex.r, 4) - 0.5) * World3DVisualProfile.terrainColorVariation;
-      color.offsetHSL(0, 0, tint);
-      terrainMesh.setColorAt(index, color);
+      const unscaledHeight = GetTerrainHeight(hex)
+        + GetLandscapeMacroRelief(position.x, position.z, terrain);
+      const height = Math.max(
+        0.022,
+        0.022 + (unscaledHeight - 0.022) * World3DVisualProfile.terrainReliefScale,
+      );
       this.hexById.set(hex.id, hex);
       this.hexByCoordinate.set(CoordinateKey(hex.q, hex.r), hex);
-      this.hexPositions.set(hex.id, HexToWorld(hex.q, hex.r));
+      this.hexPositions.set(hex.id, position);
       this.terrainHeights.set(hex.id, height);
-      this.pickInstanceIds[index] = hex.id;
     });
-    terrainMesh.instanceMatrix.needsUpdate = true;
-    if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;
+    this.UpdateWorldBounds();
+
+    const terrainColorCache = new Map();
+    const GetHexColor = (hex) => {
+      if (terrainColorCache.has(hex.id)) return terrainColorCache.get(hex.id);
+      const color = new THREE.Color(terrainStyles[NormalizeTerrain(hex.terrain)].color);
+      const tint = (HashNoise(hex.q, hex.r, 4) - 0.5) * World3DVisualProfile.terrainColorVariation;
+      color.offsetHSL(0, 0, tint);
+      terrainColorCache.set(hex.id, color);
+      return color;
+    };
+    const bounds = this.worldBounds;
+    const landscapeMinX = bounds.minX - 5.4;
+    const landscapeMaxX = bounds.maxX + 5.4;
+    const landscapeMinZ = bounds.minZ - 5.4;
+    const landscapeMaxZ = bounds.maxZ + 5.4;
+    const landscapeWidth = landscapeMaxX - landscapeMinX;
+    const landscapeDepth = landscapeMaxZ - landscapeMinZ;
+    const segmentsX = 96;
+    const segmentsZ = Math.max(40, Math.round(segmentsX * landscapeDepth / landscapeWidth));
+    const surfacePositions = [];
+    const surfaceColors = [];
+    const surfaceUvs = [];
+    const surfaceIndices = [];
+    const earthColor = new THREE.Color(0x60675d);
+    const unknownTerrainColor = new THREE.Color(0x33413c);
+    const winterSnowColor = new THREE.Color(0xc5c8c0);
+    const hexSamples = hexes.map((hex) => ({
+      hex,
+      position: this.hexPositions.get(hex.id),
+      height: this.terrainHeights.get(hex.id) ?? GetTerrainHeight(hex),
+      color: GetHexColor(hex),
+    }));
+    for (let row = 0; row <= segmentsZ; row += 1) {
+      const zRatio = row / segmentsZ;
+      const z = THREE.MathUtils.lerp(landscapeMinZ, landscapeMaxZ, zRatio);
+      for (let column = 0; column <= segmentsX; column += 1) {
+        const xRatio = column / segmentsX;
+        const x = THREE.MathUtils.lerp(landscapeMinX, landscapeMaxX, xRatio);
+        const nearest = hexSamples
+          .map((sample) => ({
+            ...sample,
+            distanceSquared: ((sample.position.x - x) ** 2) + ((sample.position.z - z) ** 2),
+          }))
+          .sort((first, second) => first.distanceSquared - second.distanceSquared)
+          .slice(0, 4);
+        let totalWeight = 0;
+        let height = 0;
+        let mountainWeight = 0;
+        let hillWeight = 0;
+        let visibleWeight = 0;
+        const color = new THREE.Color(0, 0, 0);
+        nearest.forEach((sample) => {
+          const weight = 1 / ((sample.distanceSquared + 0.045) ** 1.7);
+          totalWeight += weight;
+          height += sample.height * weight;
+          const sampleTerrain = NormalizeTerrain(sample.hex.terrain);
+          if (sampleTerrain === "mountain") mountainWeight += weight;
+          if (sampleTerrain === "hill") hillWeight += weight;
+          if (sample.hex.visible !== false) visibleWeight += weight;
+          color.r += sample.color.r * weight;
+          color.g += sample.color.g * weight;
+          color.b += sample.color.b * weight;
+        });
+        height /= Math.max(0.0001, totalWeight);
+        mountainWeight /= Math.max(0.0001, totalWeight);
+        hillWeight /= Math.max(0.0001, totalWeight);
+        visibleWeight /= Math.max(0.0001, totalWeight);
+        color.multiplyScalar(1 / Math.max(0.0001, totalWeight));
+        const edgeDistance = Math.min(
+          x - landscapeMinX,
+          landscapeMaxX - x,
+          z - landscapeMinZ,
+          landscapeMaxZ - z,
+        );
+        const edgeFade = THREE.MathUtils.smoothstep(edgeDistance, 0, 4.5);
+        const nearestTerrain = NormalizeTerrain(nearest[0]?.hex?.terrain);
+        const reliefNoise = (
+          (HashNoise(column, row, 171) - 0.5) * 0.55
+          + (HashNoise(column >> 1, row >> 1, 172) - 0.5) * 0.45
+        ) * (nearestTerrain === "mountain" ? 0.038 : nearestTerrain === "hill" ? 0.024 : 0.012);
+        const carvedRelief = GetLandscapeMicroRelief(x, z, nearestTerrain);
+        const limestoneFold = Math.pow(
+          Math.max(0, 1 - Math.abs(Math.sin(x * 0.88 + z * 0.53 + 0.52)) * 1.32),
+          1.48,
+        );
+        const secondaryFold = Math.pow(
+          Math.max(0, 1 - Math.abs(Math.sin(x * 1.31 - z * 0.36 - 0.84)) * 1.8),
+          1.8,
+        );
+        const mountainRidge = mountainWeight * (limestoneFold * 0.15 + secondaryFold * 0.065);
+        const hillShoulder = hillWeight * Math.pow(
+          Math.max(0, 1 - Math.abs(Math.sin(x * 0.68 - z * 0.58 - 0.18)) * 1.48),
+          1.7,
+        ) * 0.052;
+        const localRelief = (
+          reliefNoise
+          + carvedRelief
+          + mountainRidge
+          + hillShoulder
+        ) * World3DVisualProfile.terrainReliefScale;
+        const y = 0.024 + (height + localRelief - 0.024) * edgeFade;
+        color.lerp(earthColor, 1 - edgeFade);
+        const coolSlope = nearestTerrain === "mountain" || nearestTerrain === "rivervalley";
+        const elevationLight = nearestTerrain === "mountain"
+          ? Clamp((y - 0.64) * 0.055, -0.025, 0.055)
+          : nearestTerrain === "hill"
+            ? Clamp((y - 0.34) * 0.04, -0.018, 0.035)
+            : 0;
+        color.offsetHSL(
+          coolSlope ? -0.012 : 0.006,
+          coolSlope ? -0.015 : 0.012,
+          (HashNoise(column, row, 173) - 0.5) * 0.026
+            + elevationLight
+            + mountainWeight * (limestoneFold - 0.38) * 0.045,
+        );
+        color.lerp(
+          unknownTerrainColor,
+          Clamp((1 - visibleWeight) * 0.68, 0, 0.68),
+        );
+        if (this.weatherMode === "winter-snow") {
+          color.lerp(
+            winterSnowColor,
+            GetWinterTerrainSnowCoverage(x, z, mountainWeight, visibleWeight),
+          );
+        }
+        surfacePositions.push(x, y, z);
+        surfaceColors.push(color.r, color.g, color.b);
+        surfaceUvs.push(
+          x * World3DVisualProfile.terrainTextureWorldScale,
+          -z * World3DVisualProfile.terrainTextureWorldScale,
+        );
+      }
+    }
+    const rowLength = segmentsX + 1;
+    for (let row = 0; row < segmentsZ; row += 1) {
+      for (let column = 0; column < segmentsX; column += 1) {
+        const topLeft = row * rowLength + column;
+        const topRight = topLeft + 1;
+        const bottomLeft = topLeft + rowLength;
+        const bottomRight = bottomLeft + 1;
+        surfaceIndices.push(
+          topLeft,
+          bottomLeft,
+          topRight,
+          topRight,
+          bottomLeft,
+          bottomRight,
+        );
+      }
+    }
+    const terrainGeometry = new THREE.BufferGeometry();
+    terrainGeometry.setAttribute("position", new THREE.Float32BufferAttribute(surfacePositions, 3));
+    terrainGeometry.setAttribute("color", new THREE.Float32BufferAttribute(surfaceColors, 3));
+    terrainGeometry.setAttribute("uv", new THREE.Float32BufferAttribute(surfaceUvs, 2));
+    terrainGeometry.setIndex(surfaceIndices);
+    terrainGeometry.computeVertexNormals();
+    terrainGeometry.computeBoundingSphere();
+    const terrainMaterial = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.99,
+      metalness: 0,
+      emissive: 0x000000,
+      side: THREE.FrontSide,
+    });
+    const terrainMesh = new THREE.Mesh(terrainGeometry, terrainMaterial);
     terrainMesh.castShadow = true;
     terrainMesh.receiveShadow = true;
-    terrainMesh.name = "TerrainInstancedHexes";
+    terrainMesh.name = "TerrainContinuousCountyLandscape";
+    this.terrainGroup.add(terrainMesh);
+
+    const terrainAlbedoMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: this.terrainAlbedoTexture,
+      roughness: 0.98,
+      metalness: 0,
+      transparent: true,
+      opacity: this.terrainAlbedoTexture
+        ? World3DVisualProfile.terrainAlbedoOpacity
+          * (this.weatherMode === "winter-snow" ? 0.68 : 1)
+        : 0,
+      depthWrite: false,
+      blending: THREE.MultiplyBlending,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+    });
+    const terrainAlbedoOverlay = new THREE.Mesh(terrainGeometry.clone(), terrainAlbedoMaterial);
+    terrainAlbedoOverlay.receiveShadow = true;
+    terrainAlbedoOverlay.renderOrder = 2;
+    terrainAlbedoOverlay.name = "TerrainImageGenAlbedoOverlay";
+    this.terrainAlbedoMaterials.add(terrainAlbedoMaterial);
+    this.terrainGroup.add(terrainAlbedoOverlay);
+
+    const countyGround = new THREE.Mesh(
+      new THREE.PlaneGeometry(
+        landscapeWidth + 3.6,
+        landscapeDepth + 3.6,
+      ),
+      new THREE.MeshStandardMaterial({ color: 0x59645c, roughness: 1, metalness: 0 }),
+    );
+    countyGround.rotation.x = -Math.PI / 2;
+    countyGround.position.set(bounds.centerX, 0.009, bounds.centerZ);
+    countyGround.receiveShadow = true;
+    countyGround.name = "CountyLandscapeGround";
+    this.terrainGroup.add(countyGround);
+
+    const pickMesh = new THREE.InstancedMesh(this.hexGeometry, this.pickMaterial, Math.max(1, hexes.length));
+    hexes.forEach((hex, index) => {
+      const position = this.hexPositions.get(hex.id).clone();
+      const height = this.terrainHeights.get(hex.id) ?? GetTerrainHeight(hex);
+      position.y = height / 2;
+      matrix.compose(position, new THREE.Quaternion(), new THREE.Vector3(1, Math.max(0.06, height), 1));
+      pickMesh.setMatrixAt(index, matrix);
+      this.pickInstanceIds[index] = hex.id;
+    });
     pickMesh.instanceMatrix.needsUpdate = true;
     pickMesh.name = "PickInstancedHexes";
     pickMesh.userData.pickLayer = true;
     pickMesh.visible = false;
     this.pickMesh = pickMesh;
-    this.terrainGroup.add(terrainMesh, pickMesh);
+    this.terrainGroup.add(pickMesh);
     const boundaryGeometry = new THREE.RingGeometry(0.91, 0.955, 6, 1, Math.PI / 6);
     const boundaryMaterial = new THREE.MeshBasicMaterial({
-      color: 0x50493c,
+      color: 0x5b5548,
       transparent: true,
-      opacity: 0.26,
+      opacity: 0.045,
       depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -1,
@@ -1374,7 +1924,6 @@ class EnemyRearWorld3D {
     boundaryMesh.name = "TerrainBoundaryInstanced";
     this.terrainGroup.add(boundaryMesh);
     this.AddTerrainDetails(hexes);
-    this.UpdateWorldBounds();
     this.dirty.terrain = false;
     this.dirty.structures = true;
     this.dirty.fog = true;
@@ -1384,41 +1933,304 @@ class EnemyRearWorld3D {
   }
 
   AddTerrainDetails(hexes) {
-    const treeTrunkGeometry = new THREE.CylinderGeometry(0.025, 0.055, 0.36, 6);
-    const treeCrownGeometry = new THREE.ConeGeometry(0.17, 0.42, 7);
-    const ridgeGeometry = new THREE.ConeGeometry(0.48, 0.72, 7);
-    const terraceGeometry = new THREE.BoxGeometry(0.72, 0.035, 0.09);
+    const treeTrunkGeometry = new THREE.CylinderGeometry(0.022, 0.046, 0.32, 7);
+    const treeCrownGeometry = new THREE.IcosahedronGeometry(0.19, 1);
+    const bareBranchGeometry = new THREE.CylinderGeometry(0.009, 0.015, 1, 5);
+    const shrubGeometry = new THREE.IcosahedronGeometry(0.1, 1);
+    const screeGeometry = new THREE.DodecahedronGeometry(0.11, 0);
+    const limestoneRidgeGeometry = CreateTaihangRidgeGeometry();
+    const terraceGeometry = CreateCurvedGroundStripGeometry(1.04, 0.034, 0.13);
+    const fieldGeometry = CreateIrregularFieldGeometry();
+    const furrowGeometry = CreateCurvedGroundStripGeometry();
+    const channelGeometry = new THREE.BoxGeometry(1.18, 0.014, 0.16);
+    const wallGeometry = new THREE.BoxGeometry(0.68, 0.13, 0.075);
+    const cropGeometry = new THREE.CylinderGeometry(0.008, 0.012, 0.13, 5);
+    const haystackGeometry = new THREE.ConeGeometry(0.105, 0.19, 9);
     const trunkTransforms = [];
-    const crownTransforms = [];
-    const ridgeTransforms = [];
+    const oliveCrownTransforms = [];
+    const ochreCrownTransforms = [];
+    const bareBranchSegments = [];
+    const limestoneRidgeTransforms = [];
     const terraceTransforms = [];
+    const fieldTransforms = [];
+    const furrowTransforms = [];
+    const channelTransforms = [];
+    const cropTransforms = [];
+    const haystackTransforms = [];
+    const shrubTransforms = [];
+    const screeTransforms = [];
+    const wallTransforms = [];
+    const terrainWeather = GetWorld3DWeather(this.state?.turn);
+    const winterTrees = terrainWeather.mode === "winter-dry"
+      || terrainWeather.mode === "winter-snow";
     hexes.forEach((hex) => {
       const base = this.hexPositions.get(hex.id);
       const height = this.terrainHeights.get(hex.id) ?? 0;
       const terrain = NormalizeTerrain(hex.terrain);
+      if (hex.visible === false) return;
       if (terrain === "forest") {
-        for (let index = 0; index < 7; index += 1) {
+        for (let index = 0; index < 8; index += 1) {
           const angle = HashNoise(hex.q, hex.r, index + 10) * Math.PI * 2;
-          const radius = 0.18 + HashNoise(hex.r, hex.q, index + 22) * 0.55;
-          const scale = 0.72 + HashNoise(index, hex.q + hex.r, 8) * 0.42;
+          const radius = 0.15 + HashNoise(hex.r, hex.q, index + 22) * 0.62;
+          const scale = 0.72 + HashNoise(index, hex.q + hex.r, 8) * 0.46;
           const x = base.x + Math.cos(angle) * radius;
           const z = base.z + Math.sin(angle) * radius;
-          trunkTransforms.push([x, height + 0.18 * scale, z, scale, angle]);
-          crownTransforms.push([x, height + 0.46 * scale, z, scale, angle]);
+          trunkTransforms.push([x, height + 0.16 * scale, z, scale, scale, scale, angle]);
+          const crownTransform = [
+            x,
+            height + 0.39 * scale,
+            z,
+            scale * (0.88 + HashNoise(index, hex.q, 26) * 0.25),
+            scale * (0.76 + HashNoise(index, hex.r, 27) * 0.25),
+            scale,
+            angle,
+          ];
+          const keepWinterCrown = HashNoise(hex.q + index, hex.r, 232) > 0.7;
+          if (!winterTrees || keepWinterCrown) {
+            (index % 3 === 0 ? ochreCrownTransforms : oliveCrownTransforms).push(crownTransform);
+          } else {
+            const BranchEnd = (branchAngle, radius, branchHeight) => [
+              x + Math.cos(branchAngle) * radius * scale,
+              height + branchHeight * scale,
+              z + Math.sin(branchAngle) * radius * scale,
+            ];
+            bareBranchSegments.push(
+              [
+                [x, height + 0.25 * scale, z],
+                [x, height + 0.57 * scale, z],
+                scale,
+              ],
+              [
+                [x, height + 0.34 * scale, z],
+                BranchEnd(angle + 0.62, 0.18, 0.49),
+                scale * 0.9,
+              ],
+              [
+                [x, height + 0.39 * scale, z],
+                BranchEnd(angle + 2.72, 0.17, 0.54),
+                scale * 0.86,
+              ],
+              [
+                [x, height + 0.46 * scale, z],
+                BranchEnd(angle + 1.56, 0.135, 0.61),
+                scale * 0.7,
+              ],
+              [
+                [x, height + 0.47 * scale, z],
+                BranchEnd(angle + 4.48, 0.13, 0.59),
+                scale * 0.68,
+              ],
+            );
+          }
+          if (index < 4) {
+            const shrubAngle = angle + 0.62;
+            const shrubRadius = radius * 0.72;
+            shrubTransforms.push([
+              base.x + Math.cos(shrubAngle) * shrubRadius,
+              height + 0.075,
+              base.z + Math.sin(shrubAngle) * shrubRadius,
+              0.8,
+              0.55,
+              1,
+              shrubAngle,
+            ]);
+          }
         }
       } else if (terrain === "mountain") {
-        const scale = 0.8 + HashNoise(hex.q, hex.r, 31) * 0.45;
-        ridgeTransforms.push([base.x, height + 0.31 * scale, base.z, scale, HashNoise(hex.r, hex.q, 32) * Math.PI]);
+        const ridgeAngle = Math.PI * 0.335
+          + (HashNoise(Math.floor(hex.q / 3), Math.floor(hex.r / 3), 32) - 0.5) * 0.18;
+        const ridgeAlongX = Math.cos(ridgeAngle);
+        const ridgeAlongZ = Math.sin(ridgeAngle);
+        const ridgeSideX = -Math.sin(ridgeAngle);
+        const ridgeSideZ = Math.cos(ridgeAngle);
+        const ridgeShift = (HashNoise(hex.q, hex.r, 233) - 0.5) * 0.16;
+        limestoneRidgeTransforms.push([
+          base.x + ridgeAlongX * ridgeShift,
+          height - 0.14,
+          base.z + ridgeAlongZ * ridgeShift,
+          0.9 + HashNoise(hex.q, hex.r, 234) * 0.14,
+          0.9 + HashNoise(hex.r, hex.q, 235) * 0.16,
+          0.92 + HashNoise(hex.q + hex.r, hex.q, 236) * 0.14,
+          ridgeAngle,
+        ]);
+        limestoneRidgeTransforms.push([
+          base.x - ridgeAlongX * 0.18 + ridgeSideX * 0.31,
+          height - 0.1,
+          base.z - ridgeAlongZ * 0.18 + ridgeSideZ * 0.31,
+          0.62 + HashNoise(hex.r, hex.q, 237) * 0.1,
+          0.58 + HashNoise(hex.q, hex.r, 238) * 0.12,
+          0.66,
+          ridgeAngle + 0.2,
+        ]);
+        for (let index = 0; index < 7; index += 1) {
+          const along = (index - 3) * 0.22
+            + (HashNoise(hex.q, index, 239) - 0.5) * 0.08;
+          const side = (index % 2 ? -1 : 1)
+            * (0.46 + HashNoise(hex.r, index, 240) * 0.2);
+          screeTransforms.push([
+            base.x + ridgeAlongX * along + ridgeSideX * side,
+            height + 0.035 + HashNoise(index, hex.q, 241) * 0.045,
+            base.z + ridgeAlongZ * along + ridgeSideZ * side,
+            0.55 + HashNoise(index, hex.r, 242) * 0.65,
+            0.38 + HashNoise(hex.q, index, 243) * 0.38,
+            0.52 + HashNoise(hex.r, index, 244) * 0.54,
+            ridgeAngle + HashNoise(index, hex.q + hex.r, 245) * Math.PI,
+          ]);
+        }
+        for (let index = 0; index < 3; index += 1) {
+          const shrubAngle = Math.PI * 0.18 + index * 2.1;
+          shrubTransforms.push([
+            base.x + Math.cos(shrubAngle) * (0.58 + index * 0.06),
+            height + 0.072,
+            base.z + Math.sin(shrubAngle) * (0.58 + index * 0.06),
+            0.68,
+            0.48,
+            0.84,
+            shrubAngle,
+          ]);
+        }
       } else if (terrain === "hill") {
         const angle = HashNoise(hex.q, hex.r, 42) * Math.PI;
-        for (let index = -2; index <= 2; index += 1) {
+        [-1, 0, 1].forEach((index) => {
+          const terraceAngle = angle + index * 0.028;
           terraceTransforms.push([
-            base.x + Math.cos(angle + Math.PI / 2) * index * 0.13,
-            height + 0.04 + Math.abs(index) * 0.015,
-            base.z + Math.sin(angle + Math.PI / 2) * index * 0.13,
-            1 - Math.abs(index) * 0.08,
+            base.x + Math.cos(angle + Math.PI / 2) * index * 0.112,
+            height + 0.021 + Math.abs(index) * 0.008,
+            base.z + Math.sin(angle + Math.PI / 2) * index * 0.112,
+            0.52 + HashNoise(hex.r + index, hex.q, 222) * 0.26,
+            0.72 + Math.abs(index) * 0.12,
+            1,
+            terraceAngle,
+          ]);
+        });
+        for (let index = 0; index < 3; index += 1) {
+          const shrubAngle = angle + index * 2.1;
+          shrubTransforms.push([
+            base.x + Math.cos(shrubAngle) * (0.55 + index * 0.08),
+            height + 0.072,
+            base.z + Math.sin(shrubAngle) * (0.55 + index * 0.08),
+            0.76,
+            0.52,
+            0.92,
+            shrubAngle,
+          ]);
+        }
+      } else if (terrain === "rivervalley") {
+        const riverNeighbors = neighborDirections
+          .map(([dq, dr]) => this.hexByCoordinate.get(CoordinateKey(hex.q + dq, hex.r + dr)))
+          .filter((neighbor) => NormalizeTerrain(neighbor?.terrain) === "rivervalley")
+          .map((neighbor) => this.hexPositions.get(neighbor.id))
+          .filter(Boolean);
+        const direction = riverNeighbors.length >= 2
+          ? riverNeighbors.at(-1).clone().sub(riverNeighbors[0])
+          : riverNeighbors.length === 1
+            ? riverNeighbors[0].clone().sub(base)
+            : new THREE.Vector3(1, 0, 0.36);
+        const angle = Math.atan2(-direction.z, direction.x);
+        channelTransforms.push([
+          base.x,
+          height + 0.017,
+          base.z,
+          1,
+          1,
+          0.82 + HashNoise(hex.q, hex.r, 44) * 0.18,
+          angle,
+        ]);
+      } else {
+        const angle = HashNoise(hex.q, hex.r, 46) * Math.PI;
+        const shouldPlantField = terrain === "village" || HashNoise(hex.q, hex.r, 49) > 0.43;
+        const fieldLanes = terrain === "village"
+          ? [-0.43, 0.43]
+          : HashNoise(hex.r, hex.q, 50) > 0.44
+            ? [-0.34, 0.34]
+            : [HashNoise(hex.r, hex.q, 51) > 0.5 ? -0.34 : 0.34];
+        if (shouldPlantField) fieldLanes.forEach((side, patchIndex) => {
+          const patchAngle = angle + (HashNoise(hex.q, patchIndex, 223) - 0.5) * 0.28;
+          const patchX = base.x + Math.cos(patchAngle + Math.PI / 2) * side;
+          const patchZ = base.z + Math.sin(patchAngle + Math.PI / 2) * side;
+          fieldTransforms.push([
+            patchX,
+            height + 0.038,
+            patchZ,
+            0.82 + HashNoise(hex.q, patchIndex, 47) * 0.16,
+            1,
+            0.78 + HashNoise(hex.r, patchIndex, 48) * 0.16,
+            patchAngle,
+          ]);
+          for (let lineIndex = -2; lineIndex <= 2; lineIndex += 1) {
+            const furrowAngle = patchAngle
+              + (HashNoise(hex.q, hex.r + patchIndex, 224) - 0.5) * 0.025;
+            furrowTransforms.push([
+              patchX
+                + Math.cos(patchAngle + Math.PI / 2) * lineIndex * 0.06,
+              height + 0.052,
+              patchZ
+                + Math.sin(patchAngle + Math.PI / 2) * lineIndex * 0.06,
+              0.78 + HashNoise(lineIndex, hex.r, 225) * 0.12,
+              1,
+              1,
+              furrowAngle,
+            ]);
+          }
+          if (terrain === "village") for (let cropIndex = -1; cropIndex <= 1; cropIndex += 1) {
+            const along = cropIndex * 0.14;
+            const across = ((cropIndex + patchIndex) % 2 ? -1 : 1) * 0.075;
+            cropTransforms.push([
+              patchX + Math.cos(patchAngle) * along + Math.cos(patchAngle + Math.PI / 2) * across,
+              height + 0.092,
+              patchZ + Math.sin(patchAngle) * along + Math.sin(patchAngle + Math.PI / 2) * across,
+              0.78 + HashNoise(cropIndex, hex.q, 151) * 0.4,
+              0.72 + HashNoise(cropIndex, hex.r, 152) * 0.54,
+              0.78 + HashNoise(cropIndex, patchIndex, 153) * 0.36,
+              patchAngle,
+            ]);
+          }
+        });
+        if (
+          terrain === "plain"
+          && shouldPlantField
+          && HashNoise(hex.q, hex.r, 154) > 0.62
+        ) {
+          haystackTransforms.push([
+            base.x + Math.cos(angle) * 0.48,
+            height + 0.105,
+            base.z + Math.sin(angle) * 0.48,
+            0.88,
+            0.88 + HashNoise(hex.q, hex.r, 155) * 0.32,
+            0.88,
             angle,
           ]);
+        }
+        if (terrain === "village") {
+          const along = new THREE.Vector2(Math.cos(angle), Math.sin(angle));
+          const across = new THREE.Vector2(-Math.sin(angle), Math.cos(angle));
+          [
+            [along.x * 0.53, along.y * 0.53, angle + Math.PI / 2, 0.86],
+            [-along.x * 0.53, -along.y * 0.53, angle + Math.PI / 2, 0.8],
+            [across.x * 0.49, across.y * 0.49, angle, 0.94],
+            [
+              -across.x * 0.49 + along.x * 0.3,
+              -across.y * 0.49 + along.y * 0.3,
+              angle,
+              0.3,
+            ],
+            [
+              -across.x * 0.49 - along.x * 0.3,
+              -across.y * 0.49 - along.y * 0.3,
+              angle,
+              0.3,
+            ],
+          ].forEach(([offsetX, offsetZ, wallAngle, wallScale]) => {
+            wallTransforms.push([
+              base.x + offsetX,
+              height + 0.066,
+              base.z + offsetZ,
+              wallScale,
+              1,
+              1,
+              wallAngle,
+            ]);
+          });
         }
       }
     });
@@ -1429,9 +2241,9 @@ class EnemyRearWorld3D {
       }
       const mesh = new THREE.InstancedMesh(geometry, material, transforms.length);
       const dummy = new THREE.Object3D();
-      transforms.forEach(([x, y, z, scale, rotation], index) => {
+      transforms.forEach(([x, y, z, scaleX, scaleY, scaleZ, rotation], index) => {
         dummy.position.set(x, y, z);
-        dummy.scale.setScalar(scale);
+        dummy.scale.set(scaleX, scaleY, scaleZ);
         dummy.rotation.set(0, rotation, 0);
         dummy.updateMatrix();
         mesh.setMatrixAt(index, dummy.matrix);
@@ -1442,20 +2254,94 @@ class EnemyRearWorld3D {
       mesh.name = name;
       this.terrainGroup.add(mesh);
     };
+    const AddBareBranches = () => {
+      if (!bareBranchSegments.length) {
+        bareBranchGeometry.dispose();
+        return;
+      }
+      const mesh = new THREE.InstancedMesh(
+        bareBranchGeometry,
+        this.materials.wood,
+        bareBranchSegments.length,
+      );
+      const dummy = new THREE.Object3D();
+      const up = new THREE.Vector3(0, 1, 0);
+      const start = new THREE.Vector3();
+      const end = new THREE.Vector3();
+      const direction = new THREE.Vector3();
+      bareBranchSegments.forEach(([startValues, endValues, thickness], index) => {
+        start.fromArray(startValues);
+        end.fromArray(endValues);
+        direction.copy(end).sub(start);
+        const length = Math.max(0.001, direction.length());
+        dummy.position.copy(start).add(end).multiplyScalar(0.5);
+        dummy.quaternion.setFromUnitVectors(up, direction.normalize());
+        dummy.scale.set(thickness, length, thickness);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(index, dummy.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.name = "WinterBareBranches";
+      this.terrainGroup.add(mesh);
+    };
+    const oliveCrownMaterial = new THREE.MeshStandardMaterial({ color: 0x506a45, roughness: 0.96 });
+    const ochreCrownMaterial = new THREE.MeshStandardMaterial({ color: 0x7c673f, roughness: 0.97 });
+    const cropMaterial = new THREE.MeshStandardMaterial({ color: 0x68703f, roughness: 0.98 });
+    const hayMaterial = new THREE.MeshStandardMaterial({ color: 0x817044, roughness: 1 });
+    this.seasonalTerrainMaterials = {
+      olive: oliveCrownMaterial,
+      ochre: ochreCrownMaterial,
+      crop: cropMaterial,
+      hay: hayMaterial,
+    };
+    this.ApplySeasonalTerrainPalette();
     AddInstances(treeTrunkGeometry, this.materials.wood, trunkTransforms, "ForestTrunks");
-    AddInstances(treeCrownGeometry, new THREE.MeshStandardMaterial({
-      color: 0x64865e,
-      roughness: 0.9,
-      emissive: 0x30442e,
-      emissiveIntensity: 0.22,
-    }), crownTransforms, "ForestCrowns");
-    AddInstances(ridgeGeometry, new THREE.MeshStandardMaterial({
-      color: 0x9d9e90,
-      roughness: 0.9,
-      emissive: 0x3c3d34,
-      emissiveIntensity: 0.24,
-    }), ridgeTransforms, "MountainRidges");
-    AddInstances(terraceGeometry, new THREE.MeshStandardMaterial({ color: 0xcaa96c, roughness: 0.92 }), terraceTransforms, "HillTerraces", false);
+    AddInstances(treeCrownGeometry, oliveCrownMaterial, oliveCrownTransforms, "ForestOliveCrowns");
+    AddInstances(treeCrownGeometry, ochreCrownMaterial, ochreCrownTransforms, "ForestOchreCrowns");
+    AddBareBranches();
+    AddInstances(
+      limestoneRidgeGeometry,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: 1,
+        flatShading: true,
+      }),
+      limestoneRidgeTransforms,
+      "TaihangContinuousLimestoneRidges",
+      true,
+    );
+    AddInstances(terraceGeometry, new THREE.MeshStandardMaterial({ color: 0x846f4d, roughness: 1 }), terraceTransforms, "CurvedLoessTerraceEmbankments");
+    AddInstances(fieldGeometry, new THREE.MeshStandardMaterial({
+      color: 0x5f5b45,
+      roughness: 1,
+      transparent: true,
+      opacity: 0.38,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+    }), fieldTransforms, "IrregularDryFieldPlots", false);
+    AddInstances(furrowGeometry, new THREE.MeshStandardMaterial({
+      color: 0x62583b,
+      roughness: 1,
+      side: THREE.DoubleSide,
+    }), furrowTransforms, "CurvedFieldFurrows", false);
+    AddInstances(screeGeometry, new THREE.MeshStandardMaterial({
+      color: 0x6d6f63,
+      roughness: 1,
+      flatShading: true,
+    }), screeTransforms, "TaihangRidgeFootScree");
+    AddInstances(cropGeometry, cropMaterial, cropTransforms, "StandingMilletRows");
+    AddInstances(haystackGeometry, hayMaterial, haystackTransforms, "HarvestHaystacks");
+    AddInstances(channelGeometry, new THREE.MeshStandardMaterial({
+      color: 0x3f6767,
+      roughness: 0.92,
+      metalness: 0,
+    }), channelTransforms, "DryRiverChannel", false);
+    AddInstances(shrubGeometry, new THREE.MeshStandardMaterial({ color: 0x4e6543, roughness: 0.98 }), shrubTransforms, "ScrubBushes");
+    AddInstances(wallGeometry, new THREE.MeshStandardMaterial({ color: 0x82745c, roughness: 1 }), wallTransforms, "VillageCourtyardWalls");
   }
 
   RebuildStructures() {
@@ -1472,7 +2358,33 @@ class EnemyRearWorld3D {
       const height = this.terrainHeights.get(hex.id) ?? 0;
       if (hex.feature || hex.institution || hex.construction) {
         const structure = CreateStructureModel(hex, this.materials, this.CreateModelInstance);
-        structure.position.set(base.x, height + 0.025, base.z);
+        const structureAngle = HashNoise(hex.q, hex.r, 184) * Math.PI * 2;
+        const structureRadius = IsFeature(hex, "RailStation")
+          ? 0
+          : IsFeature(hex, "Stronghold")
+            ? 0.25
+          : IsFeature(hex, "CountySeat")
+            ? 0.18
+            : 0.15;
+        structure.position.set(
+          base.x + Math.cos(structureAngle) * structureRadius,
+          height + 0.025,
+          base.z + Math.sin(structureAngle) * structureRadius,
+        );
+        if (IsFeature(hex, "RailStation")) {
+          const inlineRailPositions = neighborDirections
+            .map(([deltaQ, deltaR]) => this.hexByCoordinate.get(CoordinateKey(hex.q + deltaQ, hex.r + deltaR)))
+            .filter((neighbor) => neighbor?.rail && neighbor.q === hex.q)
+            .map((neighbor) => this.hexPositions.get(neighbor.id))
+            .filter(Boolean);
+          if (inlineRailPositions.length >= 2) {
+            const railDirection = inlineRailPositions.at(-1).clone().sub(inlineRailPositions[0]);
+            structure.rotation.y = Math.atan2(-railDirection.z, railDirection.x);
+          }
+        } else {
+          structure.rotation.y = (HashNoise(hex.r, hex.q, 185) - 0.5) * 0.28;
+        }
+        if (IsFeature(hex, "CountySeat", "Headquarters")) structure.scale.setScalar(1.08);
         structure.userData.hexId = hex.id;
         structure.traverse((object) => {
           if (object.userData?.signal) this.signalObjects.push(object);
@@ -1480,12 +2392,13 @@ class EnemyRearWorld3D {
         this.structureGroup.add(structure);
       }
       if (hex.improvement) this.AddImprovement(hex, base, height);
-      if (Number(hex.railDisabledTurns) > 0) this.AddSabotageSmoke(hex, base, height);
+      if (Number(hex.railDisabledTurns) > 0) this.AddSabotageDamage(hex, base, height);
       if (hex.feature && hex.visible !== false) {
         const label = CreateLabelSprite(hex.name ?? "据点", {
           width: 300,
           height: 72,
           worldHeight: World3DVisualProfile.structureLabelWorldHeight,
+          maximumScreenPixels: World3DVisualProfile.maximumStructureLabelScreenPixels,
           background: ["enemy", "occupied"].includes(hex.control)
             ? "rgba(42,51,48,.96)"
             : "rgba(92,47,36,.95)",
@@ -1534,6 +2447,7 @@ class EnemyRearWorld3D {
       railDamaged: [],
       railSleeper: [],
       road: [],
+      roadDust: [],
     };
     (this.state.hexes ?? []).forEach((hex) => {
       neighborDirections.forEach(([deltaQ, deltaR]) => {
@@ -1548,50 +2462,112 @@ class EnemyRearWorld3D {
         start.y = this.terrainHeights.get(hex.id) ?? 0;
         end.y = this.terrainHeights.get(neighbor.id) ?? 0;
         if (hex.rail && neighbor.rail) {
+          if (hex.q !== neighbor.q && hex.r !== neighbor.r) return;
+          const damagedStart = Number(hex.railDisabledTurns) > 0;
+          const damagedEnd = Number(neighbor.railDisabledTurns) > 0;
           batches.railBed.push({
             start,
             end,
             width: World3DVisualProfile.railBedWidth,
-            yOffset: 0.052,
+            thickness: 0.026,
+            yOffset: 0.026,
           });
           const horizontal = end.clone().sub(start);
           horizontal.y = 0;
           const side = new THREE.Vector3(-horizontal.z, 0, horizontal.x)
             .normalize()
             .multiplyScalar(World3DVisualProfile.railGaugeOffset);
-          const railBatch = Number(hex.railDisabledTurns) > 0 || Number(neighbor.railDisabledTurns) > 0
+          const railBatch = damagedStart || damagedEnd
             ? batches.railDamaged
             : batches.rail;
-          railBatch.push(
-            {
-              start: start.clone().add(side),
-              end: end.clone().add(side),
-              width: World3DVisualProfile.railWidth,
-              yOffset: 0.105,
-            },
-            {
-              start: start.clone().sub(side),
-              end: end.clone().sub(side),
-              width: World3DVisualProfile.railWidth,
-              yOffset: 0.105,
-            },
-          );
-          const midpoint = start.clone().add(end).multiplyScalar(0.5);
-          const sleeperSide = side.clone().normalize().multiplyScalar(0.2);
-          batches.railSleeper.push({
-            start: midpoint.clone().add(sleeperSide),
-            end: midpoint.clone().sub(sleeperSide),
-            width: 0.064,
-            thickness: 0.032,
-            yOffset: 0.08,
-          });
+          const segmentLength = Math.max(0.001, horizontal.length());
+          const railDirection = horizontal.clone().normalize();
+          const railStart = start.clone();
+          const railEnd = end.clone();
+          const startDamageGapInset = IsFeature(hex, "RailStation") ? 0.68 : 0.42;
+          const endDamageGapInset = IsFeature(neighbor, "RailStation") ? 0.68 : 0.42;
+          if (damagedStart) railStart.addScaledVector(railDirection, startDamageGapInset);
+          if (damagedEnd) railEnd.addScaledVector(railDirection, -endDamageGapInset);
+          if (railStart.distanceTo(railEnd) > 0.16) {
+            railBatch.push(
+              {
+                start: railStart.clone().add(side),
+                end: railEnd.clone().add(side),
+                width: World3DVisualProfile.railWidth,
+                thickness: 0.038,
+                yOffset: 0.063,
+              },
+              {
+                start: railStart.clone().sub(side),
+                end: railEnd.clone().sub(side),
+                width: World3DVisualProfile.railWidth,
+                thickness: 0.038,
+                yOffset: 0.063,
+              },
+            );
+          }
+          const sleeperCount = Math.max(4, Math.floor(segmentLength / 0.24));
+          const sleeperSide = side.clone().normalize().multiplyScalar(0.235);
+          for (let sleeperIndex = 1; sleeperIndex <= sleeperCount; sleeperIndex += 1) {
+            const ratio = sleeperIndex / (sleeperCount + 1);
+            const distanceFromStart = segmentLength * ratio;
+            const distanceFromEnd = segmentLength * (1 - ratio);
+            if ((damagedStart && distanceFromStart < startDamageGapInset + 0.1)
+              || (damagedEnd && distanceFromEnd < endDamageGapInset + 0.1)) {
+              continue;
+            }
+            const midpoint = start.clone().lerp(end, ratio);
+            batches.railSleeper.push({
+              start: midpoint.clone().add(sleeperSide),
+              end: midpoint.clone().sub(sleeperSide),
+              width: 0.052,
+              thickness: 0.022,
+              yOffset: 0.042,
+            });
+          }
         } else if (hex.road && neighbor.road) {
-          batches.road.push({
-            start,
-            end,
-            width: World3DVisualProfile.roadWidth,
-            yOffset: 0.065,
-          });
+          const startHexIsStation = IsFeature(hex, "RailStation");
+          const endHexIsStation = IsFeature(neighbor, "RailStation");
+          if (startHexIsStation) {
+            const approach = end.clone().sub(start);
+            approach.y = 0;
+            start.addScaledVector(approach.normalize(), 0.54);
+          }
+          if (endHexIsStation) {
+            const approach = start.clone().sub(end);
+            approach.y = 0;
+            end.addScaledVector(approach.normalize(), 0.54);
+          }
+          const roadDirection = end.clone().sub(start);
+          roadDirection.y = 0;
+          const roadSide = new THREE.Vector3(-roadDirection.z, 0, roadDirection.x).normalize();
+          const bend = (HashNoise(hex.q + neighbor.q, hex.r + neighbor.r, 204) - 0.5) * 0.38;
+          const control = start.clone().add(end).multiplyScalar(0.5).addScaledVector(roadSide, bend);
+          const RoadPoint = (ratio) => {
+            const inverse = 1 - ratio;
+            return start.clone().multiplyScalar(inverse * inverse)
+              .add(control.clone().multiplyScalar(2 * inverse * ratio))
+              .add(end.clone().multiplyScalar(ratio * ratio));
+          };
+          let previous = start.clone();
+          for (let roadStep = 1; roadStep <= 12; roadStep += 1) {
+            const next = RoadPoint(roadStep / 12);
+            batches.road.push({
+              start: previous,
+              end: next,
+              width: World3DVisualProfile.roadWidth,
+              thickness: 0.008,
+              yOffset: 0.016,
+            });
+            batches.roadDust.push({
+              start: previous,
+              end: next,
+              width: World3DVisualProfile.roadWidth * 0.48,
+              thickness: 0.004,
+              yOffset: 0.023,
+            });
+            previous = next;
+          }
         }
       });
     });
@@ -1613,6 +2589,7 @@ class EnemyRearWorld3D {
       this.structureGroup.add(mesh);
     };
     AddLineBatch(batches.road, this.materials.road, "RoadSegmentsInstanced");
+    AddLineBatch(batches.roadDust, this.materials.roadDust, "RoadDustCenterInstanced");
     AddLineBatch(batches.railBed, this.materials.railBed, "RailBedsInstanced");
     AddLineBatch(batches.railSleeper, this.materials.railSleeper, "RailSleepersInstanced");
     AddLineBatch(batches.rail, this.materials.rail, "RailSegmentsInstanced");
@@ -1642,66 +2619,133 @@ class EnemyRearWorld3D {
     this.structureGroup.add(group);
   }
 
-  AddSabotageSmoke(hex, base, height) {
-    const existingCount = this.smokePuffs.reduce((total, batch) =>
-      total + (batch.userData.smokeInstances?.length ?? 0), 0);
-    const count = Math.min(6, World3DQualityProfile.maximumAnimatedSmokePuffs - existingCount);
-    if (count <= 0) return;
-    const geometry = new THREE.IcosahedronGeometry(0.12, 1);
-    const material = this.materials.smoke.clone();
-    const batch = new THREE.InstancedMesh(geometry, material, count);
-    const smokeInstances = [];
-    const dummy = new THREE.Object3D();
-    for (let index = 0; index < count; index += 1) {
-      const smoke = {
-        baseX: base.x + (HashNoise(hex.q, index, 51) - 0.5) * 0.36,
-        baseY: height + 0.18 + index * 0.08,
-        baseZ: base.z + (HashNoise(hex.r, index, 52) - 0.5) * 0.34,
-        seed: HashNoise(index, hex.q + hex.r, 53) * Math.PI * 2,
-        size: 0.82 + index * 0.11,
-      };
-      smokeInstances.push(smoke);
-      dummy.position.set(smoke.baseX, smoke.baseY, smoke.baseZ);
-      dummy.scale.setScalar(smoke.size);
-      dummy.updateMatrix();
-      batch.setMatrixAt(index, dummy.matrix);
-    }
-    batch.instanceMatrix.needsUpdate = true;
-    batch.userData.smokeInstances = smokeInstances;
-    batch.name = `SabotageSmoke_${hex.id}`;
-    this.effectGroup.add(batch);
-    this.smokePuffs.push(batch);
+  AddSabotageDamage(hex, base, height) {
+    const railNeighborPositions = neighborDirections
+      .map(([deltaQ, deltaR]) => this.hexByCoordinate.get(CoordinateKey(hex.q + deltaQ, hex.r + deltaR)))
+      .filter((neighbor) => neighbor?.rail)
+      .map((neighbor) => this.hexPositions.get(neighbor.id))
+      .filter(Boolean);
+    const stationRailDirection = railNeighborPositions[0]?.clone().sub(base);
+    const railDirection = IsFeature(hex, "RailStation") && stationRailDirection
+      ? stationRailDirection
+      : railNeighborPositions.length >= 2
+        ? railNeighborPositions.at(-1).clone().sub(railNeighborPositions[0])
+      : railNeighborPositions[0]?.clone().sub(base)
+        ?? new THREE.Vector3(1, 0, 0);
+    railDirection.y = 0;
+    if (railDirection.lengthSq() < 0.001) railDirection.set(1, 0, 0);
+    railDirection.normalize();
+    const railSide = new THREE.Vector3(-railDirection.z, 0, railDirection.x);
+    const damageCenter = base.clone().addScaledVector(
+      railDirection,
+      IsFeature(hex, "RailStation") ? 0.46 : 0,
+    );
 
-    [-1, 1].forEach((direction) => {
-      const beam = new THREE.Mesh(this.sabotageBeamGeometry, this.materials.railDamaged);
-      beam.position.set(base.x, height + 0.115, base.z);
-      beam.rotation.y = direction * Math.PI / 4;
-      beam.receiveShadow = true;
-      beam.name = `SabotageBreak_${hex.id}`;
-      this.effectGroup.add(beam);
+    const scorchMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2f2c28,
+      roughness: 1,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
     });
-    const markerMaterial = this.materials.ember.clone();
-    const marker = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.035, 6, 24), markerMaterial);
-    marker.rotation.x = Math.PI / 2;
-    marker.position.set(base.x, height + 0.13, base.z);
-    marker.userData.baseOpacity = markerMaterial.opacity;
-    marker.userData.sabotage = true;
-    marker.name = `SabotageMarker_${hex.id}`;
-    this.effectGroup.add(marker);
-    this.sabotageObjects.push(marker);
+    const scorch = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), scorchMaterial);
+    scorch.rotation.x = -Math.PI / 2;
+    scorch.scale.set(1.08, 0.72, 1);
+    scorch.position.set(damageCenter.x, height + 0.073, damageCenter.z);
+    scorch.renderOrder = 12;
+    scorch.name = `SabotageScorchedTrackBed_${hex.id}`;
+    this.effectGroup.add(scorch);
+
+    [-1, 1].forEach((endDirection) => {
+      [-1, 1].forEach((railLane) => {
+        const intactEnd = damageCenter.clone()
+          .addScaledVector(railDirection, endDirection * 0.52)
+          .addScaledVector(railSide, railLane * World3DVisualProfile.railGaugeOffset);
+        intactEnd.y = height + 0.01;
+        const tornEnd = damageCenter.clone()
+          .addScaledVector(railDirection, endDirection * 0.06)
+          .addScaledVector(
+            railSide,
+            railLane * World3DVisualProfile.railGaugeOffset
+              + endDirection * railLane * 0.1,
+          );
+        tornEnd.y = height + 0.13 + (railLane > 0 ? 0.035 : 0);
+        const beam = new THREE.Mesh(this.lineGeometry, this.materials.railDamaged);
+        ComposeLineMatrix(
+          intactEnd,
+          tornEnd,
+          World3DVisualProfile.railWidth * 1.35,
+          0.052,
+          0.035,
+        ).decompose(beam.position, beam.quaternion, beam.scale);
+        beam.castShadow = true;
+        beam.receiveShadow = true;
+        beam.name = `SabotageTwistedRail_${hex.id}_${endDirection}_${railLane}`;
+        this.effectGroup.add(beam);
+      });
+    });
+
+    for (let index = -2; index <= 2; index += 1) {
+      const sleeper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.48, 0.04, 0.075),
+        this.materials.railSleeper,
+      );
+      sleeper.position.copy(damageCenter)
+        .addScaledVector(railDirection, index * 0.13)
+        .addScaledVector(railSide, ((index % 2) - 0.5) * 0.24);
+      sleeper.position.y = height + 0.095 + Math.abs(index) * 0.012;
+      sleeper.rotation.y = Math.atan2(railDirection.x, railDirection.z)
+        + Math.PI / 2
+        + index * 0.19;
+      sleeper.rotation.z = index * 0.045;
+      sleeper.castShadow = true;
+      sleeper.receiveShadow = true;
+      sleeper.name = `SabotageBrokenSleeper_${hex.id}_${index + 3}`;
+      this.effectGroup.add(sleeper);
+    }
+
+    const ballastGeometry = new THREE.DodecahedronGeometry(0.045, 0);
+    const ballastMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4a4640,
+      roughness: 1,
+      flatShading: true,
+    });
+    const ballastCount = 14;
+    const ballast = new THREE.InstancedMesh(ballastGeometry, ballastMaterial, ballastCount);
+    for (let index = 0; index < ballastCount; index += 1) {
+      const angle = HashNoise(index, hex.q, 243) * Math.PI * 2;
+      const distance = 0.25 + HashNoise(index, hex.r, 244) * 0.39;
+      this.animationDummy.position.set(
+        damageCenter.x + Math.cos(angle) * distance,
+        height + 0.085 + HashNoise(index, hex.q, 245) * 0.045,
+        damageCenter.z + Math.sin(angle) * distance,
+      );
+      this.animationDummy.rotation.set(angle * 0.3, angle, angle * 0.17);
+      this.animationDummy.scale.setScalar(0.7 + HashNoise(index, hex.r, 246) * 0.8);
+      this.animationDummy.updateMatrix();
+      ballast.setMatrixAt(index, this.animationDummy.matrix);
+    }
+    ballast.instanceMatrix.needsUpdate = true;
+    ballast.castShadow = true;
+    ballast.receiveShadow = true;
+    ballast.name = `SabotageScatteredBallast_${hex.id}`;
+    this.effectGroup.add(ballast);
   }
 
   RebuildFog() {
     ClearGroup(this.fogGroup, this.sharedGeometries, this.sharedMaterials);
     const hiddenHexes = (this.state.hexes ?? []).filter((hex) => hex.visible === false);
     if (hiddenHexes.length) {
-      const geometry = new THREE.CylinderGeometry(0.96, 0.96, 0.045, 6, 1, false, Math.PI / 6);
+      const geometry = new THREE.RingGeometry(0.932, 0.955, 6, 1, Math.PI / 6);
       const mesh = new THREE.InstancedMesh(geometry, this.fogMaterial, hiddenHexes.length);
       const matrix = new THREE.Matrix4();
+      const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
       hiddenHexes.forEach((hex, index) => {
         const position = this.hexPositions.get(hex.id)?.clone() ?? HexToWorld(hex.q, hex.r);
-        position.y = (this.terrainHeights.get(hex.id) ?? 0) + 0.08;
-        matrix.makeTranslation(position.x, position.y, position.z);
+        position.y = (this.terrainHeights.get(hex.id) ?? 0) + 0.045;
+        matrix.compose(position, quaternion, new THREE.Vector3(1, 1, 1));
         mesh.setMatrixAt(index, matrix);
       });
       mesh.instanceMatrix.needsUpdate = true;
@@ -1725,6 +2769,11 @@ class EnemyRearWorld3D {
         .filter((unit) => unit.active !== false && unit.visible !== false)
         .map((unit) => ({ ...unit, enemy: true })),
     ];
+    const enemyCountByHex = new Map();
+    units.filter((unit) => unit.enemy).forEach((unit) => {
+      enemyCountByHex.set(unit.hexId, (enemyCountByHex.get(unit.hexId) ?? 0) + 1);
+    });
+    const enemySeenByHex = new Map();
     const perHex = new Map();
     units.forEach((unit) => {
       const index = perHex.get(unit.hexId) ?? 0;
@@ -1732,13 +2781,33 @@ class EnemyRearWorld3D {
       const base = this.hexPositions.get(unit.hexId);
       if (!base) return;
       const height = this.terrainHeights.get(unit.hexId) ?? 0;
-      const offsetAngle = (index - 0.5) * 0.7;
+      const hex = this.hexById.get(unit.hexId);
+      const offsetAngle = HashNoise(hex?.q ?? 0, hex?.r ?? 0, 188) * Math.PI * 2
+        + index * (Math.PI * 2 / 3);
+      const offsetRadius = 0.41 + Math.min(0.08, index * 0.03);
       const target = new THREE.Vector3(
-        base.x + Math.sin(offsetAngle) * 0.34,
+        base.x + Math.cos(offsetAngle) * offsetRadius,
         height + 0.055,
-        base.z + Math.cos(offsetAngle) * 0.25,
+        base.z + Math.sin(offsetAngle) * offsetRadius,
       );
-      const miniature = CreateUnitMiniature(unit, unit.enemy, this.materials, this.CreateModelInstance);
+      let markerLabel = null;
+      if (unit.enemy) {
+        const enemyIndex = enemySeenByHex.get(unit.hexId) ?? 0;
+        enemySeenByHex.set(unit.hexId, enemyIndex + 1);
+        const enemyCount = enemyCountByHex.get(unit.hexId) ?? 1;
+        markerLabel = enemyIndex === 0
+          ? (enemyCount > 1 ? `敌×${enemyCount}` : "敌")
+          : false;
+      }
+      const miniature = CreateUnitMiniature(
+        unit,
+        unit.enemy,
+        this.materials,
+        this.CreateModelInstance,
+        unit.id === this.view?.selectedUnitId,
+        markerLabel,
+      );
+      miniature.rotation.y = -offsetAngle + Math.PI * 0.5;
       const unitLabel = miniature.children.find((child) => child.userData?.mapLabel);
       if (unitLabel) {
         const labelLane = index % 3;
@@ -1886,7 +2955,7 @@ class EnemyRearWorld3D {
       if (!base) return null;
       const height = this.terrainHeights.get(hexId) ?? 0;
       const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.032, 6, 36), material);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.02, 6, 36), material);
       ring.rotation.x = Math.PI / 2;
       ring.position.set(base.x, height + 0.105, base.z);
       ring.renderOrder = 15;
@@ -1895,12 +2964,12 @@ class EnemyRearWorld3D {
       this.overlayGroup.add(ring);
       return ring;
     };
-    if (this.view?.selectedHexId) AddRing(this.view.selectedHexId, 0xffdfa0, 0.74, 0.8);
-    (this.view?.reachableHexIds ?? []).forEach((hexId) => AddRing(hexId, 0xa7d477, 0.7, 0.35));
+    if (this.view?.selectedHexId) AddRing(this.view.selectedHexId, 0xffdfa0, 0.74, 0.72);
+    (this.view?.reachableHexIds ?? []).forEach((hexId) => AddRing(hexId, 0x91bc76, 0.7, 0.16));
     (this.state.hexes ?? []).filter((hex) => hex.warning).forEach((hex) => this.AddWarningIndicator(hex));
     if (this.view?.mapLayer === "construction") {
       (this.state.hexes ?? []).filter((hex) => hex.institution || hex.improvement || hex.construction).forEach((hex) => {
-        const ring = AddRing(hex.id, 0xf1bd66, 0.53, 0.52);
+        const ring = AddRing(hex.id, 0xc39c5d, 0.53, 0.12);
         if (ring) ring.scale.setScalar(0.92);
       });
     }
@@ -1918,12 +2987,12 @@ class EnemyRearWorld3D {
       groups.get(control).push(hex);
     });
     const opacityByControl = {
-      player: 0.22,
-      base: 0.22,
-      network: 0.18,
-      enemy: 0.2,
-      occupied: 0.2,
-      contested: 0.22,
+      player: 0.1,
+      base: 0.1,
+      network: 0.08,
+      enemy: 0.1,
+      occupied: 0.11,
+      contested: 0.12,
     };
     const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
     const scale = new THREE.Vector3(1, 1, 1);
@@ -1937,7 +3006,7 @@ class EnemyRearWorld3D {
       const material = new THREE.MeshBasicMaterial({
         color: controlColors[control],
         transparent: true,
-        opacity: opacityByControl[control] ?? 0.68,
+        opacity: opacityByControl[control] ?? 0.1,
         depthWrite: false,
         toneMapped: false,
         polygonOffset: true,
@@ -1991,7 +3060,7 @@ class EnemyRearWorld3D {
       bounds.centerZ - (Number(cameraState.panY) || 0) / panUnit,
     );
     this.cameraTarget = target;
-    this.cameraOffset = new THREE.Vector3(3.1, 15.8, 17.2).normalize().multiplyScalar(24);
+    this.cameraOffset = new THREE.Vector3(7.2, 16.8, 17).normalize().multiplyScalar(24);
     this.camera.position.copy(target).add(this.cameraOffset);
     this.camera.lookAt(target);
     this.camera.updateMatrixWorld(true);
@@ -2024,9 +3093,9 @@ class EnemyRearWorld3D {
       const hex = this.hexById.get(hexId);
       const height = this.terrainHeights.get(hexId) ?? 0;
       const top = height + (hex?.feature
-        ? World3DVisualProfile.structureLabelBaseHeight + 0.42
+        ? 0.92
         : unitHexIds.has(hexId)
-          ? World3DVisualProfile.unitLabelBaseHeight + 0.36
+          ? 0.78
           : 0.24);
       IncludePoint(new THREE.Vector3(base.x - 1.02, height, base.z));
       IncludePoint(new THREE.Vector3(base.x + 1.02, height, base.z));
@@ -2048,8 +3117,14 @@ class EnemyRearWorld3D {
         if (!object.isSprite || !aspect || !baseHeight) return;
         const minimumPixels = Number(object.userData.minimumScreenPixels)
           || World3DVisualProfile.minimumLabelScreenPixels;
+        const maximumPixels = Number(object.userData.maximumScreenPixels)
+          || World3DVisualProfile.maximumStructureLabelScreenPixels;
         const minimumWorldHeight = minimumPixels * viewHeight / canvasHeight;
-        const labelHeight = Math.max(baseHeight, minimumWorldHeight);
+        const maximumWorldHeight = maximumPixels * viewHeight / canvasHeight;
+        const labelHeight = Math.min(
+          Math.max(baseHeight, minimumWorldHeight),
+          Math.max(minimumWorldHeight, maximumWorldHeight),
+        );
         object.scale.set(labelHeight * aspect, labelHeight, 1);
       });
     });
@@ -2059,6 +3134,8 @@ class EnemyRearWorld3D {
     const canvasWidth = Number(this.canvas?.clientWidth) || 0;
     const canvasHeight = Number(this.canvas?.clientHeight) || 0;
     if (canvasWidth < 80 || canvasHeight < 80 || !this.currentViewHeight) return;
+    ClearGroup(this.labelLeaderGroup, this.sharedGeometries, this.sharedMaterials);
+    this.labelLeaders = [];
     this.scene.updateMatrixWorld(true);
     const worldPerPixel = this.currentViewHeight / canvasHeight;
     const cameraRight = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).normalize();
@@ -2072,8 +3149,27 @@ class EnemyRearWorld3D {
       (Number(second.userData.labelPriority) || 0) - (Number(first.userData.labelPriority) || 0)
       || String(first.userData.labelKey).localeCompare(String(second.userData.labelKey)));
     const occupied = [];
+    const safeRect = {
+      left: 8,
+      right: canvasWidth - 58,
+      top: 66,
+      bottom: canvasHeight - 54,
+    };
     const worldPosition = new THREE.Vector3();
     const projected = new THREE.Vector3();
+    const modelOccupied = [...this.unitVisuals.values()].map((visual) => {
+      worldPosition.copy(visual.position);
+      worldPosition.y += 0.48;
+      projected.copy(worldPosition).project(this.camera);
+      const centerX = (projected.x * 0.5 + 0.5) * canvasWidth;
+      const centerY = (-projected.y * 0.5 + 0.5) * canvasHeight;
+      return {
+        left: centerX - 18,
+        right: centerX + 18,
+        top: centerY - 24,
+        bottom: centerY + 24,
+      };
+    });
     const featureCandidates = [
       [0, 0], [0, -28], [0, 30], [44, -18], [-44, -18], [48, 22], [-48, 22],
       [0, -54], [66, -34], [-66, -34], [68, 32], [-68, 32], [0, 58],
@@ -2100,6 +3196,11 @@ class EnemyRearWorld3D {
     const Intersects = (first, second) =>
       first.left < second.right && first.right > second.left
       && first.top < second.bottom && first.bottom > second.top;
+    const FitsSafeRect = (box) =>
+      box.left >= safeRect.left
+      && box.right <= safeRect.right
+      && box.top >= safeRect.top
+      && box.bottom <= safeRect.bottom;
     const OverlapArea = (first, second) => Math.max(0, Math.min(first.right, second.right) - Math.max(first.left, second.left))
       * Math.max(0, Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top));
     labels.forEach((label) => {
@@ -2114,7 +3215,9 @@ class EnemyRearWorld3D {
           .addScaledVector(cameraUp, -offsetY * worldPerPixel);
         label.position.copy(anchor).add(offset);
         const box = GetBox(label);
-        const overlap = occupied.reduce((total, other) => total + OverlapArea(box, other), 0);
+        if (!FitsSafeRect(box)) return;
+        const overlap = [...occupied, ...modelOccupied]
+          .reduce((total, other) => total + OverlapArea(box, other), 0);
         if (overlap < leastOverlap) {
           leastOverlap = overlap;
           chosen = label.position.clone();
@@ -2122,13 +3225,41 @@ class EnemyRearWorld3D {
         }
         if (overlap === 0) leastOverlap = -1;
       });
-      if (leastOverlap > 0 && Number(label.userData.labelPriority) < 110) {
+      if (!chosen || (leastOverlap > 0 && Number(label.userData.labelPriority) < 120)) {
         label.visible = false;
         label.position.copy(anchor);
         return;
       }
       label.position.copy(chosen ?? anchor);
       if (chosenBox) occupied.push(chosenBox);
+      if (
+        label.userData.labelKind === "feature"
+        && label.position.distanceTo(anchor) > worldPerPixel * 18
+        && label.parent
+      ) {
+        label.parent.updateWorldMatrix(true, false);
+        const anchorWorld = label.parent.localToWorld(anchor.clone());
+        label.updateWorldMatrix(true, false);
+        const labelWorld = new THREE.Vector3();
+        label.getWorldPosition(labelWorld);
+        const leaderGeometry = new THREE.BufferGeometry().setFromPoints([
+          anchorWorld,
+          labelWorld,
+        ]);
+        const leaderMaterial = new THREE.LineBasicMaterial({
+          color: 0x4b463c,
+          transparent: true,
+          opacity: 0.56,
+          depthTest: false,
+          depthWrite: false,
+          toneMapped: false,
+        });
+        const leader = new THREE.Line(leaderGeometry, leaderMaterial);
+        leader.renderOrder = 25;
+        leader.name = `LabelLeader_${label.userData.labelKey}`;
+        this.labelLeaderGroup.add(leader);
+        this.labelLeaders.push(leader);
+      }
     });
     this.scene.updateMatrixWorld(true);
   }
@@ -2161,10 +3292,11 @@ class EnemyRearWorld3D {
     const viewHeight = viewWidth / aspect;
     const centerX = projected ? (projected.minX + projected.maxX) / 2 : 0;
     const centerY = projected ? (projected.minY + projected.maxY) / 2 : 0;
+    const compositionLift = viewHeight * 10 / Math.max(1, this.canvas.clientHeight);
     this.camera.left = centerX - viewWidth / 2;
     this.camera.right = centerX + viewWidth / 2;
-    this.camera.top = centerY + viewHeight / 2;
-    this.camera.bottom = centerY - viewHeight / 2;
+    this.camera.top = centerY - compositionLift + viewHeight / 2;
+    this.camera.bottom = centerY - compositionLift - viewHeight / 2;
     this.camera.updateProjectionMatrix();
     this.currentViewHeight = viewHeight;
     this.UpdateLabelScreenScale(viewHeight);
@@ -2201,7 +3333,8 @@ class EnemyRearWorld3D {
     const unitKey = effectData?.unitId;
     const unitVisual = this.unitVisuals.get(unitKey) ?? this.unitVisuals.get(String(unitKey ?? ""));
     const sourceHexKey = effectData?.sourceHexId;
-    const sourcePosition = unitVisual?.position
+    const sourcePosition = unitVisual?.userData?.targetPosition
+      ?? unitVisual?.position
       ?? this.hexPositions.get(sourceHexKey)
       ?? this.hexPositions.get(String(sourceHexKey ?? ""));
     if (sourcePosition) {
@@ -2213,6 +3346,23 @@ class EnemyRearWorld3D {
     return new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
   }
 
+  GetActionEffectTargetPosition(actionId, targetHex) {
+    const fallback = this.hexPositions.get(targetHex.id)?.clone()
+      ?? HexToWorld(targetHex.q, targetHex.r);
+    if (actionId !== "ambush") return fallback;
+    const enemyPositions = (this.state.enemies ?? [])
+      .filter((enemy) => enemy.active !== false
+        && enemy.visible !== false
+        && String(enemy.hexId) === String(targetHex.id))
+      .map((enemy) => this.unitVisuals.get(enemy.id))
+      .filter(Boolean)
+      .map((visual) => visual.userData?.targetPosition?.clone() ?? visual.position.clone());
+    if (!enemyPositions.length) return fallback;
+    return enemyPositions
+      .reduce((sum, position) => sum.add(position), new THREE.Vector3())
+      .multiplyScalar(1 / enemyPositions.length);
+  }
+
   CreateTransientActionSmoke(actionId, targetHex, options) {
     const count = Math.max(1, Math.floor(Number(options.count) || 1));
     const geometry = new THREE.IcosahedronGeometry(options.geometryRadius ?? 0.11, 1);
@@ -2220,8 +3370,8 @@ class EnemyRearWorld3D {
       color: options.color,
       roughness: 1,
       metalness: 0,
-      emissive: options.emissive ?? 0x25251f,
-      emissiveIntensity: options.emissiveIntensity ?? 0.14,
+      emissive: 0x000000,
+      emissiveIntensity: 0,
       transparent: true,
       opacity: options.opacity,
       depthWrite: false,
@@ -2258,11 +3408,21 @@ class EnemyRearWorld3D {
   CreateAmbushActionEffect(effectData, targetHex, targetPosition, direction) {
     const root = new THREE.Group();
     root.position.copy(targetPosition);
-    const muzzleGeometry = new THREE.ConeGeometry(0.085, 0.38, 5, 1, false);
+    const unitVisual = this.unitVisuals.get(effectData?.unitId)
+      ?? this.unitVisuals.get(String(effectData?.unitId ?? ""));
+    const sourcePosition = unitVisual?.userData?.targetPosition
+      ?? unitVisual?.position
+      ?? this.hexPositions.get(effectData?.sourceHexId)
+      ?? this.hexPositions.get(String(effectData?.sourceHexId ?? ""));
+    const measuredRange = sourcePosition
+      ? sourcePosition.clone().setY(0).distanceTo(targetPosition.clone().setY(0))
+      : 0;
+    const contactRange = Clamp(measuredRange, 0.95, 1.62);
+    const muzzleGeometry = new THREE.ConeGeometry(0.115, 0.48, 5, 1, false);
     const muzzleMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffd28a,
+      color: 0xffd79a,
       transparent: true,
-      opacity: 0.92,
+      opacity: 0.96,
       depthWrite: false,
       toneMapped: false,
       blending: THREE.AdditiveBlending,
@@ -2277,12 +3437,16 @@ class EnemyRearWorld3D {
     const upwardAxis = new THREE.Vector3(0, 1, 0);
     for (let index = 0; index < World3DActionEffectProfile.ambushMuzzleFlashCount; index += 1) {
       const lane = index - (World3DActionEffectProfile.ambushMuzzleFlashCount - 1) / 2;
-      const flashDirection = direction.clone().addScaledVector(side, lane * 0.08).setY(0.045).normalize();
-      this.animationDummy.position.copy(direction).multiplyScalar(-0.48 - index * 0.035);
-      this.animationDummy.position.addScaledVector(side, lane * 0.22);
-      this.animationDummy.position.y = 0.27 + Math.abs(lane) * 0.035;
+      const flashDirection = direction.clone().addScaledVector(side, lane * 0.045).setY(0.035).normalize();
+      this.animationDummy.position.copy(direction).multiplyScalar(-contactRange * (0.82 + index * 0.012));
+      this.animationDummy.position.addScaledVector(side, lane * 0.17);
+      this.animationDummy.position.y = 0.3 + Math.abs(lane) * 0.026;
       this.animationDummy.quaternion.setFromUnitVectors(upwardAxis, flashDirection);
-      this.animationDummy.scale.set(0.8 + index * 0.08, 0.9 + index * 0.05, 0.8 + index * 0.08);
+      this.animationDummy.scale.set(
+        0.94 + index * 0.055,
+        1.05 + index * 0.035,
+        0.94 + index * 0.055,
+      );
       this.animationDummy.updateMatrix();
       muzzleBatch.setMatrixAt(index, this.animationDummy.matrix);
     }
@@ -2292,35 +3456,98 @@ class EnemyRearWorld3D {
     muzzleBatch.name = "AmbushDirectionalMuzzleFlashesInstanced";
     root.add(muzzleBatch);
 
+    const tracerGeometry = new THREE.BoxGeometry(0.024, 0.024, 1);
+    const tracerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd9a0,
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending,
+    });
+    tracerMaterial.userData.baseOpacity = 0.78;
+    const tracerCount = 5;
+    const tracerBatch = new THREE.InstancedMesh(tracerGeometry, tracerMaterial, tracerCount);
+    const tracerRotation = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      direction,
+    );
+    for (let index = 0; index < tracerCount; index += 1) {
+      const lane = index - (tracerCount - 1) / 2;
+      const tracerLength = contactRange * (0.7 + (index % 2) * 0.08);
+      const midpointDistance = contactRange * (0.46 + index * 0.018);
+      this.animationDummy.position.copy(direction).multiplyScalar(-midpointDistance);
+      this.animationDummy.position.addScaledVector(side, lane * 0.1);
+      this.animationDummy.position.y = 0.25 + Math.abs(lane) * 0.026;
+      this.animationDummy.quaternion.copy(tracerRotation);
+      this.animationDummy.scale.set(0.9 + index * 0.04, 1, tracerLength);
+      this.animationDummy.updateMatrix();
+      tracerBatch.setMatrixAt(index, this.animationDummy.matrix);
+    }
+    tracerBatch.instanceMatrix.needsUpdate = true;
+    tracerBatch.frustumCulled = false;
+    tracerBatch.renderOrder = 33;
+    tracerBatch.name = "AmbushShortTracerBurstsInstanced";
+    root.add(tracerBatch);
+
     const smokeBatch = this.CreateTransientActionSmoke("ambush", targetHex, {
       count: World3DActionEffectProfile.ambushSmokeCount,
-      geometryRadius: 0.14,
-      color: 0x8d806b,
-      emissive: 0x493627,
-      emissiveIntensity: 0.22,
-      opacity: 0.62,
-      spread: 0.5,
-      baseY: 0.09,
-      heightVariation: 0.28,
-      minimumScale: 0.82,
-      scaleVariation: 0.68,
+      geometryRadius: 0.18,
+      color: 0x86775f,
+      opacity: 0.68,
+      spread: 0.84,
+      baseY: 0.11,
+      heightVariation: 0.42,
+      minimumScale: 0.86,
+      scaleVariation: 0.82,
     });
     root.add(smokeBatch);
 
-    const pulseMaterial = new THREE.MeshBasicMaterial({
-      color: 0xd5a249,
+    const debrisGeometry = new THREE.TetrahedronGeometry(0.068, 0);
+    const debrisMaterial = new THREE.MeshStandardMaterial({
+      color: 0x544c3f,
+      roughness: 1,
       transparent: true,
-      opacity: 0.82,
+      opacity: 0.9,
       depthWrite: false,
-      toneMapped: false,
     });
-    pulseMaterial.userData.baseOpacity = 0.82;
-    const pulseMarker = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.05, 6, 32), pulseMaterial);
-    pulseMarker.rotation.x = Math.PI / 2;
-    pulseMarker.position.y = 0.055;
-    pulseMarker.renderOrder = 33;
-    pulseMarker.name = "AmbushContactPulse";
-    root.add(pulseMarker);
+    debrisMaterial.userData.baseOpacity = 0.9;
+    const debrisCount = 11;
+    const debrisBatch = new THREE.InstancedMesh(debrisGeometry, debrisMaterial, debrisCount);
+    const debrisInstances = [];
+    for (let index = 0; index < debrisCount; index += 1) {
+      const debrisAngle = HashNoise(index, targetHex.q, 195) * Math.PI * 2;
+      const debris = {
+        baseX: (HashNoise(index, targetHex.r, 196) - 0.5) * 0.38,
+        baseY: 0.08 + HashNoise(index, targetHex.q, 197) * 0.14,
+        baseZ: (HashNoise(index, targetHex.r, 198) - 0.5) * 0.38,
+        velocity: new THREE.Vector3(
+          Math.cos(debrisAngle) * (0.34 + HashNoise(index, targetHex.q, 199) * 0.38),
+          0.62 + HashNoise(index, targetHex.r, 200) * 0.46,
+          Math.sin(debrisAngle) * (0.34 + HashNoise(index, targetHex.q, 201) * 0.38),
+        ),
+        rotation: debrisAngle,
+        size: 0.72 + HashNoise(index, targetHex.r, 202) * 0.62,
+      };
+      debrisInstances.push(debris);
+      this.animationDummy.position.set(debris.baseX, debris.baseY, debris.baseZ);
+      this.animationDummy.rotation.set(debris.rotation, debris.rotation * 0.7, 0);
+      this.animationDummy.scale.setScalar(debris.size);
+      this.animationDummy.updateMatrix();
+      debrisBatch.setMatrixAt(index, this.animationDummy.matrix);
+    }
+    debrisBatch.instanceMatrix.needsUpdate = true;
+    debrisBatch.frustumCulled = false;
+    debrisBatch.renderOrder = 32;
+    debrisBatch.name = "AmbushImpactEarthFragmentsInstanced";
+    debrisBatch.userData.debrisInstances = debrisInstances;
+    root.add(debrisBatch);
+
+    const flashLight = new THREE.PointLight(0xffc36e, 2.2, 3.4, 2);
+    flashLight.position.set(0, 0.38, 0);
+    flashLight.name = "AmbushBriefWarmLight";
+    flashLight.userData.baseIntensity = 2.2;
+    root.add(flashLight);
 
     return {
       id: `ActionEffect_${++this.actionEffectSequence}`,
@@ -2331,63 +3558,84 @@ class EnemyRearWorld3D {
       duration: World3DActionEffectProfile.ambushDuration,
       root,
       muzzleBatch,
+      tracerBatch,
       smokeBatch,
-      pulseMarker,
-      smokeRise: 0.58,
-      smokeExpansion: 0.62,
-      smokeFade: 0.68,
+      debrisBatch,
+      flashLight,
+      pulseMarker: null,
+      smokeRise: 0.72,
+      smokeExpansion: 0.76,
+      smokeFade: 0.62,
       pulseExpansion: 0.92,
       pulseFade: 0.76,
-      drawCalls: 3,
+      drawCalls: 4,
     };
   }
 
   CreateSabotageActionEffect(effectData, targetHex, targetPosition) {
     const root = new THREE.Group();
     root.position.copy(targetPosition);
+    const blastGeometry = new THREE.CircleGeometry(0.34, 9);
+    const blastMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffb35f,
+      transparent: true,
+      opacity: 0.84,
+      depthWrite: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    blastMaterial.userData.baseOpacity = 0.84;
+    const blastCore = new THREE.Mesh(blastGeometry, blastMaterial);
+    blastCore.rotation.x = -Math.PI / 2;
+    blastCore.rotation.z = HashNoise(targetHex.q, targetHex.r, 236) * Math.PI;
+    blastCore.scale.set(0.92, 0.68, 1);
+    blastCore.position.y = 0.018;
+    blastCore.renderOrder = 36;
+    blastCore.name = "SabotageBriefGroundFlash";
+    root.add(blastCore);
+
     const smokeBatch = this.CreateTransientActionSmoke("sabotage", targetHex, {
       count: World3DActionEffectProfile.sabotageSmokeCount,
-      geometryRadius: 0.24,
-      color: 0x756d61,
-      emissive: 0x57341e,
-      emissiveIntensity: 0.34,
-      opacity: 0.94,
+      geometryRadius: 0.17,
+      color: 0x716e66,
+      opacity: 0.72,
       spread: 0.86,
-      baseY: 0.16,
-      heightVariation: 0.9,
-      minimumScale: 1.55,
-      scaleVariation: 1.25,
+      baseY: 0.12,
+      heightVariation: 0.48,
+      minimumScale: 0.84,
+      scaleVariation: 0.74,
     });
     root.add(smokeBatch);
 
-    const sparkGeometry = new THREE.ConeGeometry(0.06, 0.36, 4, 1, false);
+    const sparkGeometry = new THREE.ConeGeometry(0.032, 0.22, 4, 1, false);
     const sparkMaterial = new THREE.MeshBasicMaterial({
       color: 0xffc878,
       transparent: true,
-      opacity: 0.96,
+      opacity: 0.78,
       depthWrite: false,
       toneMapped: false,
       blending: THREE.AdditiveBlending,
     });
-    sparkMaterial.userData.baseOpacity = 0.96;
-    const sparkCount = 7;
+    sparkMaterial.userData.baseOpacity = 0.78;
+    const sparkCount = 12;
     const sparkBatch = new THREE.InstancedMesh(sparkGeometry, sparkMaterial, sparkCount);
     const sparkInstances = [];
     const upwardAxis = new THREE.Vector3(0, 1, 0);
     for (let index = 0; index < sparkCount; index += 1) {
       const angle = HashNoise(index, targetHex.q, 111) * Math.PI * 2;
       const direction = new THREE.Vector3(
-        Math.cos(angle) * (0.38 + HashNoise(index, targetHex.r, 112) * 0.22),
-        0.82 + HashNoise(index, targetHex.q, 113) * 0.42,
-        Math.sin(angle) * (0.38 + HashNoise(index, targetHex.r, 114) * 0.22),
+        Math.cos(angle) * (0.34 + HashNoise(index, targetHex.r, 112) * 0.24),
+        0.7 + HashNoise(index, targetHex.q, 113) * 0.34,
+        Math.sin(angle) * (0.34 + HashNoise(index, targetHex.r, 114) * 0.24),
       ).normalize();
       const spark = {
-        baseX: (HashNoise(index, targetHex.q, 115) - 0.5) * 0.22,
-        baseY: 0.18 + HashNoise(index, targetHex.r, 116) * 0.14,
-        baseZ: (HashNoise(index, targetHex.r, 117) - 0.5) * 0.22,
+        baseX: (HashNoise(index, targetHex.q, 115) - 0.5) * 0.34,
+        baseY: 0.2 + HashNoise(index, targetHex.r, 116) * 0.2,
+        baseZ: (HashNoise(index, targetHex.r, 117) - 0.5) * 0.34,
         direction,
         quaternion: new THREE.Quaternion().setFromUnitVectors(upwardAxis, direction),
-        size: 1.08 + HashNoise(index, targetHex.q + targetHex.r, 118) * 0.52,
+        size: 0.72 + HashNoise(index, targetHex.q + targetHex.r, 118) * 0.34,
       };
       sparkInstances.push(spark);
       this.animationDummy.position.set(spark.baseX, spark.baseY, spark.baseZ);
@@ -2403,37 +3651,52 @@ class EnemyRearWorld3D {
     sparkBatch.userData.sparkInstances = sparkInstances;
     root.add(sparkBatch);
 
-    const pulseMaterial = new THREE.MeshBasicMaterial({
-      color: 0xc87938,
+    const debrisGeometry = new THREE.BoxGeometry(0.058, 0.058, 0.24);
+    const debrisMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4b4640,
+      roughness: 0.92,
+      metalness: 0.16,
       transparent: true,
-      opacity: 0.84,
+      opacity: 0.92,
       depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
     });
-    pulseMaterial.opacity = 1;
-    pulseMaterial.userData.baseOpacity = 1;
-    const pulseMarker = new THREE.Mesh(new THREE.TorusGeometry(0.86, 0.095, 6, 36), pulseMaterial);
-    pulseMarker.rotation.x = Math.PI / 2;
-    pulseMarker.position.y = 0.06;
-    pulseMarker.renderOrder = 33;
-    pulseMarker.name = "SabotageTransientPulse";
-    root.add(pulseMarker);
+    debrisMaterial.userData.baseOpacity = 0.92;
+    const debrisCount = 10;
+    const debrisBatch = new THREE.InstancedMesh(debrisGeometry, debrisMaterial, debrisCount);
+    const debrisInstances = [];
+    for (let index = 0; index < debrisCount; index += 1) {
+      const debrisAngle = HashNoise(index, targetHex.q, 211) * Math.PI * 2;
+      const debris = {
+        baseX: (HashNoise(index, targetHex.r, 212) - 0.5) * 0.34,
+        baseY: 0.14 + HashNoise(index, targetHex.q, 213) * 0.18,
+        baseZ: (HashNoise(index, targetHex.r, 214) - 0.5) * 0.34,
+        velocity: new THREE.Vector3(
+          Math.cos(debrisAngle) * (0.42 + HashNoise(index, targetHex.q, 215) * 0.42),
+          0.76 + HashNoise(index, targetHex.r, 216) * 0.5,
+          Math.sin(debrisAngle) * (0.42 + HashNoise(index, targetHex.q, 217) * 0.42),
+        ),
+        rotation: debrisAngle,
+        size: 0.68 + HashNoise(index, targetHex.r, 218) * 0.58,
+      };
+      debrisInstances.push(debris);
+      this.animationDummy.position.set(debris.baseX, debris.baseY, debris.baseZ);
+      this.animationDummy.rotation.set(0.1, debris.rotation, debris.rotation * 0.25);
+      this.animationDummy.scale.setScalar(debris.size);
+      this.animationDummy.updateMatrix();
+      debrisBatch.setMatrixAt(index, this.animationDummy.matrix);
+    }
+    debrisBatch.instanceMatrix.needsUpdate = true;
+    debrisBatch.frustumCulled = false;
+    debrisBatch.renderOrder = 33;
+    debrisBatch.name = "SabotageRailAndBallastFragmentsInstanced";
+    debrisBatch.userData.debrisInstances = debrisInstances;
+    root.add(debrisBatch);
 
-    const blastMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffb45d,
-      transparent: true,
-      opacity: 0.96,
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
-    });
-    blastMaterial.userData.baseOpacity = 0.96;
-    const blastCore = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 7), blastMaterial);
-    blastCore.position.y = 0.3;
-    blastCore.renderOrder = 36;
-    blastCore.name = "SabotageBlastCore";
-    root.add(blastCore);
+    const flashLight = new THREE.PointLight(0xffa34c, 2.8, 3.8, 2);
+    flashLight.position.set(0, 0.34, 0);
+    flashLight.name = "SabotageBriefWarmLight";
+    flashLight.userData.baseIntensity = 2.8;
+    root.add(flashLight);
 
     return {
       id: `ActionEffect_${++this.actionEffectSequence}`,
@@ -2446,14 +3709,17 @@ class EnemyRearWorld3D {
       muzzleBatch: null,
       smokeBatch,
       sparkBatch,
-      pulseMarker,
+      debrisBatch,
+      flashLight,
+      pulseMarker: null,
       blastCore,
-      smokeRise: 2.15,
-      smokeExpansion: 1.05,
-      smokeFade: 0.46,
-      pulseExpansion: 0.64,
-      pulseFade: 0.5,
-      drawCalls: 4,
+      blastDuration: 0.28,
+      smokeRise: 0.82,
+      smokeExpansion: 0.78,
+      smokeFade: 0.64,
+      pulseExpansion: 0,
+      pulseFade: 1,
+      drawCalls: 5,
     };
   }
 
@@ -2462,11 +3728,20 @@ class EnemyRearWorld3D {
       effect.muzzleBatch.material.opacity = effect.muzzleBatch.material.userData.baseOpacity;
       effect.muzzleBatch.scale.setScalar(1);
     }
+    if (effect.tracerBatch?.material) {
+      effect.tracerBatch.material.opacity = effect.tracerBatch.material.userData.baseOpacity;
+    }
     if (effect.smokeBatch?.material) {
       effect.smokeBatch.material.opacity = effect.smokeBatch.material.userData.baseOpacity;
     }
     if (effect.sparkBatch?.material) {
       effect.sparkBatch.material.opacity = effect.sparkBatch.material.userData.baseOpacity;
+    }
+    if (effect.debrisBatch?.material) {
+      effect.debrisBatch.material.opacity = effect.debrisBatch.material.userData.baseOpacity;
+    }
+    if (effect.flashLight) {
+      effect.flashLight.intensity = Number(effect.flashLight.userData.baseIntensity) || 1.4;
     }
     if (effect.blastCore?.material) {
       effect.blastCore.scale.setScalar(1.25);
@@ -2485,6 +3760,10 @@ class EnemyRearWorld3D {
       const envelope = Math.pow(1 - progress, 0.32);
       effect.muzzleBatch.material.opacity = 0.22 + burst * 0.74 * envelope;
       effect.muzzleBatch.scale.setScalar(0.94 + burst * 0.12);
+    }
+    if (effect.tracerBatch?.material) {
+      const baseOpacity = effect.tracerBatch.material.userData.baseOpacity;
+      effect.tracerBatch.material.opacity = baseOpacity * Math.max(0, 1 - progress * 2.8);
     }
     const smokeInstances = effect.smokeBatch?.userData.actionSmokeInstances ?? [];
     smokeInstances.forEach((smoke, index) => {
@@ -2524,11 +3803,42 @@ class EnemyRearWorld3D {
       const baseOpacity = effect.sparkBatch.material.userData.baseOpacity;
       effect.sparkBatch.material.opacity = baseOpacity * (1 - sparkProgress * 0.58);
     }
+    const debrisInstances = effect.debrisBatch?.userData.debrisInstances ?? [];
+    const debrisProgress = Math.min(1, progress / 0.68);
+    debrisInstances.forEach((debris, index) => {
+      const travel = debrisProgress * (0.7 + index * 0.018);
+      this.animationDummy.position.set(
+        debris.baseX + debris.velocity.x * travel,
+        debris.baseY + debris.velocity.y * travel - debrisProgress * debrisProgress * 0.55,
+        debris.baseZ + debris.velocity.z * travel,
+      );
+      this.animationDummy.rotation.set(
+        debris.rotation + debrisProgress * (2.1 + index * 0.11),
+        debris.rotation * 0.7 + debrisProgress * (3.2 + index * 0.13),
+        debrisProgress * 1.8,
+      );
+      this.animationDummy.scale.setScalar(debris.size * (1 - debrisProgress * 0.18));
+      this.animationDummy.updateMatrix();
+      effect.debrisBatch.setMatrixAt(index, this.animationDummy.matrix);
+    });
+    if (effect.debrisBatch) {
+      effect.debrisBatch.instanceMatrix.needsUpdate = true;
+      const baseOpacity = effect.debrisBatch.material.userData.baseOpacity;
+      effect.debrisBatch.material.opacity = baseOpacity * (1 - debrisProgress * 0.7);
+    }
+    if (effect.flashLight) {
+      const baseIntensity = Number(effect.flashLight.userData.baseIntensity) || 1.4;
+      effect.flashLight.intensity = baseIntensity * Math.max(0, 1 - progress * 4.4);
+    }
     if (effect.blastCore?.material) {
-      const blastProgress = Math.min(1, progress / 0.5);
-      effect.blastCore.scale.setScalar(0.78 + blastProgress * 1.45);
+      const blastProgress = Math.min(1, effect.elapsed / (effect.blastDuration ?? 0.22));
+      effect.blastCore.scale.set(
+        0.92 + blastProgress * 0.78,
+        0.68 + blastProgress * 0.54,
+        1,
+      );
       const baseOpacity = effect.blastCore.material.userData.baseOpacity;
-      effect.blastCore.material.opacity = baseOpacity * (1 - blastProgress * 0.68);
+      effect.blastCore.material.opacity = baseOpacity * (1 - blastProgress);
     }
     if (effect.pulseMarker?.material) {
       const pulseScale = 0.92 + progress * (effect.pulseExpansion ?? 0.92)
@@ -2572,7 +3882,7 @@ class EnemyRearWorld3D {
         const targetHexId = String(effectData?.targetHexId ?? "");
         const targetHex = this.hexById.get(effectData?.targetHexId) ?? this.hexById.get(targetHexId);
         if (!targetHex || targetHex.visible === false) return;
-        const targetPosition = this.hexPositions.get(targetHex.id)?.clone() ?? HexToWorld(targetHex.q, targetHex.r);
+        const targetPosition = this.GetActionEffectTargetPosition(actionId, targetHex);
         targetPosition.y = (this.terrainHeights.get(targetHex.id) ?? GetTerrainHeight(targetHex)) + 0.12;
         const direction = this.GetActionEffectDirection(effectData, targetPosition, targetHex);
         const normalizedData = { ...effectData, actionId, targetHexId };
@@ -2649,10 +3959,8 @@ class EnemyRearWorld3D {
     const hasActionEffects = this.activeActionEffects.length > 0;
     const hasAmbientMotion = !this.reducedMotion && (
       this.unitVisuals.size > 0
-      || this.signalObjects.length > 0
       || this.warningObjects.length > 0
       || this.smokePuffs.length > 0
-      || this.sabotageObjects.length > 0
       || this.weatherParticles
     );
     if (!this.renderRequested && !hasMovement && !hasAmbientMotion && !hasActionEffects) {
@@ -2713,11 +4021,6 @@ class EnemyRearWorld3D {
           );
         }
       }
-      this.signalObjects.forEach((object, index) => {
-        const pulse = 1 + Math.sin(time * 2.4 + index * 0.73) * 0.075;
-        object.scale.x = pulse;
-        if (object.material?.transparent) object.material.opacity = 0.78 + Math.sin(time * 2.2 + index) * 0.12;
-      });
       this.warningObjects.forEach((indicator, index) => {
         const intensity = Number(indicator.userData.intensity) || 1;
         const pulse = 1 + Math.sin(time * (3.1 + intensity * 0.35) + index) * (0.05 + intensity * 0.014);
@@ -2745,11 +4048,6 @@ class EnemyRearWorld3D {
           batch.setMatrixAt(index, this.animationDummy.matrix);
         });
         batch.instanceMatrix.needsUpdate = true;
-      });
-      this.sabotageObjects.forEach((marker, index) => {
-        const pulse = 1 + Math.sin(time * 4.8 + index) * 0.085;
-        marker.scale.setScalar(pulse);
-        marker.material.opacity = marker.userData.baseOpacity * (0.72 + Math.sin(time * 5.2 + index) * 0.18);
       });
     }
     const renderStartedAt = performance.now();
@@ -2785,6 +4083,9 @@ class EnemyRearWorld3D {
     });
     DisposeObject(this.scene, modelPackGeometries, modelPackMaterials);
     if (this.modelPackScene) DisposeObject(this.modelPackScene, new Set(), new Set());
+    this.terrainAlbedoTexture?.dispose?.();
+    this.terrainAlbedoTexture = null;
+    this.terrainAlbedoMaterials.clear();
     this.renderer.dispose();
     if (worldDiagnosticsRouter.current === this) worldDiagnosticsRouter.current = null;
   }

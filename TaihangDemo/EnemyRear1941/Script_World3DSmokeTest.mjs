@@ -9,22 +9,43 @@ const gamePath = path.join(testDirectory, "Script_Game.mjs");
 const indexPath = path.join(testDirectory, "index.html");
 const stylePath = path.join(testDirectory, "Style_Game.css");
 const terrainTexturePath = path.join(testDirectory, "Texture_TerrainPaperHigh.jpg");
+const terrainAlbedoPath = path.join(testDirectory, "Texture_TerrainGroundAlbedo.png");
 
-const [worldSource, gameSource, indexSource, styleSource, terrainTextureBuffer] = await Promise.all([
+const [worldSource, gameSource, indexSource, styleSource, terrainTextureBuffer, terrainAlbedoBuffer] = await Promise.all([
   readFile(worldPath, "utf8"),
   readFile(gamePath, "utf8"),
   readFile(indexPath, "utf8"),
   readFile(stylePath, "utf8"),
   readFile(terrainTexturePath),
+  readFile(terrainAlbedoPath),
 ]);
 
 const worldModule = await import(`${new URL("./Script_World3D.mjs", import.meta.url).href}?smoke=1`);
 const terrainTextureStat = await stat(terrainTexturePath);
+const terrainAlbedoStat = await stat(terrainAlbedoPath);
 let assertionCount = 0;
 
 function Check(condition, message) {
   assert.ok(condition, message);
   assertionCount += 1;
+}
+
+function ExtractFunction(source, functionName) {
+  const startPattern = new RegExp(`(?:^|\\n)function\\s+${functionName}\\s*\\(`);
+  const match = startPattern.exec(source);
+  assert.ok(match, `Missing function ${functionName}`);
+  const start = match.index + (match[0].startsWith("\n") ? 1 : 0);
+  const openingBrace = source.indexOf("{", start);
+  assert.notEqual(openingBrace, -1, `${functionName} must have an opening brace`);
+  let depth = 0;
+  for (let index = openingBrace; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  assert.fail(`${functionName} must have a closing brace`);
 }
 
 function ReadJpegDimensions(buffer) {
@@ -52,6 +73,14 @@ function ReadJpegDimensions(buffer) {
   throw new Error("Terrain JPEG does not contain a supported frame marker");
 }
 
+function ReadPngDimensions(buffer) {
+  assert.equal(buffer.subarray(1, 4).toString("ascii"), "PNG", "Terrain albedo must be a PNG image");
+  return Object.freeze({
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  });
+}
+
 Check(
   worldSource.includes('import * as THREE from "../../taihang/vendor/three/build/three.module.mjs"'),
   "World3D must import the repository-local Three.js module.",
@@ -72,18 +101,24 @@ Check(worldSource.includes("assetMeshCount > 8"), "Each imported miniature must 
 Check(worldSource.includes("modelPackMeshCount > 55"), "The complete miniature pack must enforce its 55-mesh runtime budget.");
 Check(worldSource.includes("worldModelMeshes"), "World3D diagnostics must expose imported model mesh count.");
 Check(
-  worldModule.World3DTerrainTextureUrl.endsWith("Texture_TerrainPaperHigh.jpg?v=20260729h"),
+  worldModule.World3DTerrainTextureUrl.endsWith("Texture_TerrainPaperHigh.jpg?v=20260730m"),
   "World3D terrain texture URL must use the release cache identity.",
 );
 Check(
-  worldModule.World3DModelPackUrl.endsWith("Model_EnemyRearMiniatures.glb?v=20260729h"),
+  worldModule.World3DTerrainAlbedoUrl.endsWith("Texture_TerrainGroundAlbedo.png?v=20260730m"),
+  "ImageGen ground albedo URL must use the release cache identity.",
+);
+Check(
+  worldModule.World3DModelPackUrl.endsWith("Model_EnemyRearMiniatures.glb?v=20260730m"),
   "World3D model-pack URL must use the release cache identity.",
 );
 Check(
-  worldModule.World3DModelNames.length === 9
+  worldModule.World3DModelNames.length === 10
     && worldModule.World3DModelNames.includes("Model_WorkTeam")
-    && worldModule.World3DModelNames.includes("Model_EnemyBlockhouse"),
-  "World3D must require all nine Blender-authored miniature archetypes.",
+    && worldModule.World3DModelNames.includes("Model_EnemyBlockhouse")
+    && worldModule.World3DModelNames.includes("Model_TrafficStation")
+    && worldModule.World3DModelNames.includes("Model_RailwayStation"),
+  "World3D must require all ten Blender-authored miniature archetypes.",
 );
 Check(
   terrainTextureStat.size > 1_000_000 && terrainTextureStat.size < 2_500_000,
@@ -94,25 +129,43 @@ Check(
   terrainTextureDimensions.width === 2048 && terrainTextureDimensions.height === 2048,
   "The checked-in terrain texture must remain exactly 2048x2048.",
 );
+const terrainAlbedoDimensions = ReadPngDimensions(terrainAlbedoBuffer);
+Check(
+  terrainAlbedoStat.size > 2_000_000
+    && terrainAlbedoStat.size < 5_000_000
+    && terrainAlbedoDimensions.width >= 1024
+    && terrainAlbedoDimensions.height >= 1024,
+  "ImageGen ground albedo must retain production-scale detail without an excessive payload.",
+);
+Check(
+  worldSource.includes('"TerrainImageGenAlbedoOverlay"')
+    && worldSource.includes("material.roughnessMap = texture")
+    && worldSource.includes("material.map = null")
+    && worldSource.includes("THREE.RepeatWrapping")
+    && worldModule.World3DVisualProfile.terrainTextureWorldScale >= 0.22
+    && worldModule.World3DVisualProfile.terrainAlbedoOpacity >= 0.18,
+  "Generated albedo must tile in world space and materially enrich live terrain while old paper remains roughness-only.",
+);
 Check(
   worldModule.World3DQualityProfile.dprCap === 2
     && worldModule.World3DQualityProfile.targetFps === 60
-    && worldModule.World3DQualityProfile.shadowMapSize === 2048
+    && worldModule.World3DQualityProfile.shadowMapSize === 4096
     && worldModule.World3DQualityProfile.paperTextureSize === 2048,
   "World3D must expose one fixed highest-quality render profile.",
 );
 Check(
-  worldModule.World3DVisualProfile.hemisphereIntensity >= 2
-    && worldModule.World3DVisualProfile.ambientIntensity >= 0.5
-    && worldModule.World3DVisualProfile.fillIntensity >= 0.9
-    && worldModule.World3DVisualProfile.toneMappingExposure >= 1.3,
-  "Visual profile must preserve readable mountain shadows with warm ambient and cool fill light.",
+  worldModule.World3DVisualProfile.hemisphereIntensity >= 0.8
+    && worldModule.World3DVisualProfile.ambientIntensity >= 0.2
+    && worldModule.World3DVisualProfile.fillIntensity >= 0.55
+    && worldModule.World3DVisualProfile.toneMappingExposure >= 1,
+  "Visual profile must preserve readable cool shadows without washing the landscape in a global tint.",
 );
 Check(
   worldSource.includes("new THREE.AmbientLight")
     && worldSource.includes("World3DVisualProfile.fillIntensity")
-    && worldSource.includes("material.emissiveIntensity = 0.24"),
-  "Lighting and imported vertex-color materials must lift near-black silhouettes without flattening form.",
+    && worldSource.includes("const fill = new THREE.DirectionalLight")
+    && !worldSource.includes("material.emissiveIntensity = 0.24"),
+  "Cool fill and ambient light must lift near-black silhouettes without fake emissive materials.",
 );
 Check(
   worldModule.World3DVisualProfile.unitModelScale >= 0.6
@@ -129,20 +182,24 @@ Check(
 );
 Check(
   worldSource.includes('"TerrainBoundaryInstanced"')
-    && worldModule.World3DVisualProfile.controlBorderWidth >= 0.05,
-  "Terrain and control borders must have distinct high-contrast outlines.",
+    && worldModule.World3DVisualProfile.controlBorderWidth <= 0.025
+    && worldSource.includes("opacity: 0.045"),
+  "Tactical borders must remain subordinate to the continuous landscape.",
 );
 Check(
   worldSource.includes('"RailSleepersInstanced"')
     && worldModule.World3DVisualProfile.railBedWidth > worldModule.World3DVisualProfile.roadWidth
-    && worldModule.World3DVisualProfile.railWidth >= 0.05,
+    && worldModule.World3DVisualProfile.railWidth >= 0.028
+    && worldModule.World3DVisualProfile.railWidth <= 0.034
+    && worldModule.World3DVisualProfile.railGaugeOffset >= 0.14
+    && worldSource.includes("sleeperCount"),
   "Rail sleepers, double rails, gravel bed, and warm roads must be distinguishable at a glance.",
 );
 Check(worldSource.includes("this.renderer.shadowMap.enabled = true"), "World3D shadows must remain permanently enabled.");
 Check(
   worldSource.includes("sun.shadow.mapSize.set(World3DQualityProfile.shadowMapSize")
     && !worldSource.includes("shadowMap.enabled = false"),
-  "World3D must use the fixed 2048 shadow map without a disable path.",
+  "World3D must use the fixed 4096 shadow map without a disable path.",
 );
 Check(
   worldSource.includes("texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy()")
@@ -172,13 +229,93 @@ Check(worldSource.includes("moveDuration"), "Unit movement interpolation must be
 Check(worldSource.includes("lerpVectors"), "Unit movement must interpolate transforms.");
 Check(worldSource.includes("idlePhase"), "Units must have lightweight idle animation.");
 Check(worldSource.includes("warningObjects"), "Sweep warnings must have an animated visual channel.");
-Check(worldSource.includes("AddSabotageSmoke"), "Rail sabotage must create lightweight smoke feedback.");
+Check(
+  worldSource.includes("AddSabotageDamage")
+    && !worldSource.includes("SabotageSmoke_"),
+  "Disabled rail must retain bent track and broken sleepers without months of persistent smoke.",
+);
 Check(worldSource.includes("signalObjects"), "Flags or stations must expose signal animation.");
 Check(worldSource.includes("this.reducedMotion"), "World animation must respect reduced-motion state.");
 Check(worldSource.includes("group.remove(child)"), "Dirty-layer rebuilds must detach disposed children cleanly.");
 Check(worldSource.includes("if (hex.visible === false) return;"), "Hidden hexes must not leak structure or sabotage visuals.");
 Check(worldSource.includes("AddControlOverlays"), "Visible control zones must remain readable in the 3D situation view.");
 Check(worldSource.includes("ControlOverlay_"), "Control overlays must be grouped into batched render meshes.");
+Check(
+  worldSource.includes('"TerrainContinuousCountyLandscape"')
+    && worldSource.includes('"TaihangContinuousLimestoneRidges"')
+    && worldSource.includes('"CurvedLoessTerraceEmbankments"')
+    && worldSource.includes('"TaihangRidgeFootScree"')
+    && worldSource.includes("GetLandscapeMacroRelief")
+    && worldModule.World3DVisualProfile.terrainReliefScale >= 2.1,
+  "The county must render as a continuous, deeply relieved landscape with terrain-specific organization.",
+);
+Check(
+  worldSource.includes("ApplySeasonalTerrainPalette")
+    && worldSource.includes('this.weatherMode === "winter-snow"'),
+  "Tree crowns, crops, and harvest detail must respond to winter and spring weather.",
+);
+const winterSnowCoverageSource = ExtractFunction(worldSource, "GetWinterTerrainSnowCoverage");
+const windblownSnowStripSource = ExtractFunction(worldSource, "CreateWindblownSnowStripGeometry");
+Check(
+  winterSnowCoverageSource.includes("leewardCoverage")
+    && winterSnowCoverageSource.includes("pocketCoverage")
+    && winterSnowCoverageSource.includes("brokenCoverage")
+    && winterSnowCoverageSource.includes("mountainWeight * 0.18")
+    && winterSnowCoverageSource.includes("0.5,"),
+  "Winter terrain snow must use broken wind, pocket, visibility, and mountain coverage instead of a uniform white wash.",
+);
+Check(
+  windblownSnowStripSource.includes("new THREE.Shape()")
+    && (windblownSnowStripSource.match(/shape\.lineTo\(/gu) ?? []).length >= 8
+    && windblownSnowStripSource.includes("new THREE.ShapeGeometry(shape, 3)")
+    && windblownSnowStripSource.includes("geometry.rotateX(-Math.PI / 2)"),
+  "Roof and ridge snow must use an irregular windblown strip geometry laid onto the landscape.",
+);
+Check(
+  !worldSource.includes("WinterSnowDustingInstanced")
+    && worldSource.includes('capMesh.name = "WinterRoofAndRidgeSnowCaps"')
+    && worldSource.includes('catchMesh.name = "WinterBranchSnowCatch"'),
+  "Winter must avoid paper-disc ground dusting while retaining roof, ridge, and branch snow catch.",
+);
+const irregularFieldSource = ExtractFunction(worldSource, "CreateIrregularFieldGeometry");
+const curvedFurrowSource = ExtractFunction(worldSource, "CreateCurvedGroundStripGeometry");
+Check(
+  irregularFieldSource.includes("new THREE.Shape()")
+    && (irregularFieldSource.match(/shape\.lineTo\(/gu) ?? []).length >= 7
+    && worldSource.includes('"IrregularDryFieldPlots"')
+    && curvedFurrowSource.includes("Math.sin")
+    && curvedFurrowSource.includes("segmentCount = 8")
+    && worldSource.includes('"CurvedFieldFurrows"'),
+  "Plain and village cultivation must retain irregular field polygons and genuinely curved furrow geometry.",
+);
+Check(
+  worldSource.includes("hex.q !== neighbor.q && hex.r !== neighbor.r")
+    && worldSource.includes("inlineRailPositions"),
+  "Rail geometry and the station model must avoid acute shortcut crossings.",
+);
+const structureModelSource = ExtractFunction(worldSource, "CreateStructureModel");
+Check(
+  structureModelSource.includes('modelFactory?.("Model_RailwayStation")')
+    && structureModelSource.includes("railwayStation.position.z = 0.62"),
+  "The imported railway station must keep its 0.62 local-Z topology alignment.",
+);
+Check(
+  (worldSource.match(/addScaledVector\(approach\.normalize\(\), 0\.54\)/gu) ?? []).length === 2,
+  "Road approaches must stop 0.54 world units short at either end of a station connection.",
+);
+Check(
+  worldSource.includes("railDamaged: new THREE.MeshStandardMaterial({ color: 0x574842")
+    && !worldSource.includes("railDamaged: new THREE.MeshStandardMaterial({ color: 0xff"),
+  "Disabled rail must use the locked soot-brown 0x574842 material rather than a bright warning red.",
+);
+Check(
+  worldSource.includes("const enemyCountByHex = new Map()")
+    && worldSource.includes("const enemySeenByHex = new Map()")
+    && worldSource.includes('enemyCount > 1 ? `敌×${enemyCount}` : "敌"')
+    && worldSource.includes("enemyIndex === 0")
+    && worldSource.includes(": false;"),
+  "Multiple enemies in one hex must collapse into one readable 敌×N label.",
+);
 
 assert.equal(worldModule.GetWorld3DDpr(390, 3), 2, "Small viewports must retain the fixed DPR 2 cap.");
 assert.equal(worldModule.GetWorld3DDpr(1280, 3), 2, "Large viewports must use the same fixed DPR 2 cap.");
@@ -205,9 +342,17 @@ const novemberWeather = worldModule.GetWorld3DWeather(3);
 Check(
   novemberWeather.year === 1941
     && novemberWeather.month === 11
-    && novemberWeather.mode === "winter-snow"
-    && novemberWeather.particleCount > 0,
-  "Turn 3 must resolve to restrained November 1941 winter snow.",
+    && novemberWeather.mode === "winter-dry"
+    && novemberWeather.particleCount === 0,
+  "Turn 3 must resolve to dry-cold November 1941 weather without snow particles.",
+);
+const decemberWeather = worldModule.GetWorld3DWeather(4);
+Check(
+  decemberWeather.year === 1941
+    && decemberWeather.month === 12
+    && decemberWeather.mode === "winter-snow"
+    && decemberWeather.particleCount === 44,
+  "Turn 4 must resolve to restrained December 1941 winter snow with exactly 44 particles.",
 );
 Check(
   worldModule.GetWorld3DWeather(1).mode === "clear"
@@ -241,8 +386,8 @@ Check(
   [
     worldModule.World3DActionEffectProfile.ambushDuration,
     worldModule.World3DActionEffectProfile.sabotageDuration,
-  ].every((duration) => duration >= 1.2 && duration <= 1.8),
-  "Every action presentation must stay within the restrained 1.2-1.8 second window.",
+  ].every((duration) => duration >= 2.2 && duration <= 2.5),
+  "Every action presentation must stay within the legible 2.2-2.5 second window.",
 );
 Check(
   worldSource.includes("PlayActionEffects(effects)")
@@ -250,26 +395,65 @@ Check(
     && worldSource.includes("effectData?.unitId"),
   "The public World3D action API must accept one effect or an array and consume the game report unit field.",
 );
+const ambushActionStart = worldSource.indexOf("CreateAmbushActionEffect(effectData");
+const sabotageActionStart = worldSource.indexOf("CreateSabotageActionEffect(effectData");
+const ambushActionSource = worldSource.slice(ambushActionStart, sabotageActionStart);
 Check(
   worldSource.includes('muzzleBatch.name = "AmbushDirectionalMuzzleFlashesInstanced"')
+    && worldSource.includes('tracerBatch.name = "AmbushShortTracerBurstsInstanced"')
     && worldSource.includes('"AmbushContactDust"')
-    && worldSource.includes('pulseMarker.name = "AmbushContactPulse"'),
-  "Ambush feedback must combine directional muzzle flashes, contact dust, and a restrained pulse marker.",
+    && worldSource.includes('debrisBatch.name = "AmbushImpactEarthFragmentsInstanced"')
+    && worldSource.includes("const tracerCount = 5")
+    && worldSource.includes("const contactRange = Clamp(measuredRange, 0.95, 1.62)")
+    && worldSource.includes('actionId !== "ambush"')
+    && worldSource.includes("this.state.enemies ?? []")
+    && !worldSource.includes('"AmbushContactPulse"')
+    && !worldSource.includes('"AmbushFireball"')
+    && !worldSource.includes('"AmbushImpactRing"')
+    && ambushActionSource.includes("pulseMarker: null")
+    && !ambushActionSource.includes("new THREE.RingGeometry")
+    && !ambushActionSource.includes("new THREE.SphereGeometry"),
+  "Ambush feedback must use directional muzzle flashes, short tracers, contact dust, and earth fragments without a fireball or impact ring.",
+);
+Check(
+  worldSource.includes("sourceHexId")
+    && worldSource.includes("GetActionEffectTargetPosition(actionId, targetHex)")
+    && worldSource.includes("visual.userData?.targetPosition?.clone() ?? visual.position.clone()"),
+  "Ambush feedback must preserve the acting unit origin and aim at the visible enemy formation rather than an anonymous tile center.",
 );
 Check(
   worldSource.includes('batch.name = `${actionId === "ambush" ? "AmbushContactDust" : "SabotageActionSmoke"}Instanced`')
-    && worldSource.includes('pulseMarker.name = "SabotageTransientPulse"')
-    && worldSource.includes("sabotageSmokeCount: 10"),
-  "Sabotage feedback must briefly reinforce the existing disabled-rail smoke without adding another durable marker.",
+    && worldSource.includes('sparkBatch.name = "SabotageWarmSparksInstanced"')
+    && worldSource.includes('debrisBatch.name = "SabotageRailAndBallastFragmentsInstanced"')
+    && worldSource.includes("sabotageSmokeCount: 16")
+    && !worldSource.includes('"SabotageTransientPulse"')
+    && !worldSource.includes('"SabotageFireball"')
+    && !worldSource.includes('"SabotageImpactRing"'),
+  "Sabotage feedback must use brief action smoke, warm sparks, and rail fragments without a fireball, impact ring, or durable smoke marker.",
 );
 const sabotageActionSource = worldSource.slice(
-  worldSource.indexOf("CreateSabotageActionEffect(effectData"),
-  worldSource.indexOf("ApplyStaticActionEffectPose(effect)"),
+  sabotageActionStart,
+  worldSource.indexOf("ApplyStaticActionEffectPose(effect)", sabotageActionStart),
 );
 Check(
-  !sabotageActionSource.includes("railDisabledTurns")
-    && !sabotageActionSource.includes("AddSabotageSmoke"),
-  "The sabotage action animation must never create or mutate the long-lived disabled-rail state visual.",
+  sabotageActionSource.includes("pulseMarker: null")
+    && sabotageActionSource.includes('blastCore.name = "SabotageBriefGroundFlash"')
+    && sabotageActionSource.includes("new THREE.CircleGeometry(0.34, 9)")
+    && sabotageActionSource.includes("blastDuration: 0.28")
+    && !sabotageActionSource.includes("new THREE.RingGeometry")
+    && !sabotageActionSource.includes("new THREE.SphereGeometry")
+    && !sabotageActionSource.includes("railDisabledTurns")
+    && !sabotageActionSource.includes("AddSabotageDamage"),
+  "The sabotage action animation must contain no fireball or impact ring and must never create or mutate long-lived disabled-rail smoke.",
+);
+Check(
+  worldSource.includes("startDamageGapInset")
+    && worldSource.includes('IsFeature(hex, "RailStation") ? 0.68 : 0.42')
+    && worldSource.includes("SabotageScorchedTrackBed_")
+    && worldSource.includes("SabotageTwistedRail_")
+    && worldSource.includes("SabotageBrokenSleeper_")
+    && worldSource.includes("SabotageScatteredBallast_"),
+  "Disabled railway must retain a readable physical gap, scorched ballast, twisted rails, and displaced sleepers after transient smoke clears.",
 );
 Check(
   worldSource.includes("effect.elapsed >= effect.duration")
@@ -315,11 +499,11 @@ Check(
 );
 
 const cacheIdentity = worldModule.World3DCacheIdentity;
-Check(cacheIdentity === "EnemyRear1941_World3D_20260729_H", "World cache identity must match the release marker.");
+Check(cacheIdentity === "EnemyRear1941_World3D_20260730_M", "World cache identity must match the release marker.");
 Check(gameSource.includes("World3DCacheIdentity"), "Game canvas must expose the same World3D cache identity.");
-Check(indexSource.includes("Style_Game.css?v=20260729h"), "Stylesheet cache version must match the World3D release.");
-Check(indexSource.includes("Script_Game.mjs?v=20260729h"), "Game cache version must match the World3D release.");
-Check(gameSource.includes("Script_World3D.mjs?v=20260729h"), "World module cache version must match the page release.");
+Check(indexSource.includes("Style_Game.css?v=20260730m"), "Stylesheet cache version must match the World3D release.");
+Check(indexSource.includes("Script_Game.mjs?v=20260730m"), "Game cache version must match the World3D release.");
+Check(gameSource.includes("Script_World3D.mjs?v=20260730m"), "World module cache version must match the page release.");
 Check(indexSource.includes('"three": "../../taihang/vendor/three/build/three.module.mjs"'), "Import map must resolve GLTFLoader's local Three.js dependency.");
 
 Check(indexSource.includes("可操作三维六角格战术地图"), "Canvas accessibility label must describe the 3D map without engine jargon.");
