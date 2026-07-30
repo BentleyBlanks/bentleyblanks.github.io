@@ -8,6 +8,7 @@ import {
   ActionIds,
   AdvanceTurn,
   ApplyPlayerAction,
+  ApplyPlayerActionPath,
   CollectEnemyObservations,
   CreateInitialState,
   CreateSurfaceSnapshot,
@@ -17,6 +18,7 @@ import {
   FindEvacuationPaths,
   FindTunnelPath,
   GetAttackTargets,
+  GetActionPathPlans,
   GetAvailableActions,
   GetCivilianTransitEstimate,
   GetDecoyResponder,
@@ -26,6 +28,7 @@ import {
   GetReconTargets,
   GetRouteSurvey,
   HexDistance,
+  IsSoilKnown,
   LayerIds,
   NeighborKeys,
   PlanEnemyTurn,
@@ -63,6 +66,19 @@ function Apply(state, unitId, actionId, targetKey = undefined, groupId = undefin
 
 function End(state) {
   return Apply(state, null, ActionIds.END_TURN);
+}
+
+function AddTestTunnel(state, fromKey, tileKey, options = {}) {
+  state.tunnels[tileKey] = {
+    ...Clone(state.tunnels["6,2"]),
+    tileKey,
+    isOriginal: false,
+    ...options,
+  };
+  const edgeId = [fromKey, tileKey].sort().join("|");
+  if (!state.tunnelEdges.includes(edgeId)) {
+    state.tunnelEdges.push(edgeId);
+  }
 }
 
 function RunReservedDefenseScenario(actionId) {
@@ -719,6 +735,16 @@ Test("planning reconnaissance commits to one exit and exposes distinct corridor 
   assert.equal(south.plannedExitKey, "0,5");
   assert.equal(north.planningReconCompleted, true);
   assert.equal(south.planningReconCompleted, true);
+  assert.equal(
+    north.plannedCorridorKeys.every((tileKey) => IsSoilKnown(north, tileKey)),
+    true,
+  );
+  assert.equal(
+    Object.values(north.tiles).some((tile) => (
+      !north.plannedCorridorKeys.includes(tile.tileKey) && !IsSoilKnown(north, tile.tileKey)
+    )),
+    true,
+  );
   assert.notDeepEqual(north.plannedFastPath, south.plannedFastPath);
   assert.notDeepEqual(north.plannedQuietPath, south.plannedQuietPath);
   assert.equal(northSurvey.fast.segments < southSurvey.fast.segments, true);
@@ -727,6 +753,16 @@ Test("planning reconnaissance commits to one exit and exposes distinct corridor 
   assert.equal(southSurvey.nearestThreat.enemyId, "BridgePatrol");
   assert.equal(north.exitSignalsIssued, 0);
   assert.match(north.log.at(-1).text, /快掘.*静掘.*主出口接通前/);
+
+  const northDigger = north.units.find((unit) => unit.unitId === "WorkTeam");
+  northDigger.layer = LayerIds.TUNNEL;
+  northDigger.actionPoints = 2;
+  const continuousDigPlans = GetActionPathPlans(north, "WorkTeam", ActionIds.DIG)
+    .filter((plan) => plan.steps > 1);
+  assert.equal(continuousDigPlans.length > 0, true);
+  assert.equal(continuousDigPlans.every((plan) => (
+    plan.targetKeys.every((tileKey) => IsSoilKnown(north, tileKey))
+  )), true);
 });
 
 Test("the surveyed main exit must connect before another exit can launch civilians", () => {
@@ -1060,6 +1096,232 @@ Test("north route is shorter and louder while south route is longer and steadier
   assert.equal(north.distance < south.distance, true);
   assert.equal(north.cost < south.cost, true);
   assert.equal(north.noise > south.noise, true);
+});
+
+Test("current-turn move paths are pure and exactly replay authoritative steps", () => {
+  const state = CreateInitialState();
+  const untouched = Clone(state);
+  const plans = GetActionPathPlans(state, "Scout", ActionIds.MOVE);
+  assert.deepEqual(state, untouched);
+  const plan = plans.find((entry) => entry.targetKey === "5,5");
+  assert.deepEqual(plan.targetKeys, ["5,4", "5,5"]);
+  assert.equal(plan.steps, 2);
+  const batch = ApplyPlayerActionPath(state, {
+    unitId: "Scout",
+    actionId: ActionIds.MOVE,
+    targetKeys: plan.targetKeys,
+  });
+  assert.equal(batch.ok, true);
+  let manual = Apply(state, "Scout", ActionIds.MOVE, "5,4");
+  manual = Apply(manual, "Scout", ActionIds.MOVE, "5,5");
+  assert.deepEqual(batch.state, manual);
+  assert.equal(batch.state.turn, state.turn);
+  assert.equal(batch.state.phase, "Player");
+  assert.equal(SerializeState(batch.state).includes('"targetKeys"'), false);
+});
+
+Test("move paths cannot skip costly terrain, occupied cells, or a decision stop", () => {
+  let state = CreateInitialState();
+  const scout = state.units.find((unit) => unit.unitId === "Scout");
+  scout.tileKey = "1,3";
+  scout.actionPoints = 2;
+  state.enemies.forEach((enemy) => {
+    enemy.health = 0;
+  });
+  const untouched = Clone(state);
+  const costly = ApplyPlayerActionPath(state, {
+    unitId: "Scout",
+    actionId: ActionIds.MOVE,
+    targetKeys: ["1,4", "1,5"],
+  });
+  assert.equal(costly.ok, false);
+  assert.deepEqual(costly.state, untouched);
+
+  state = CreateInitialState();
+  state.enemies.find((enemy) => enemy.enemyId === "BridgePatrol").tileKey = "5,4";
+  const occupied = ApplyPlayerActionPath(state, {
+    unitId: "Scout",
+    actionId: ActionIds.MOVE,
+    targetKeys: ["5,4", "5,5"],
+  });
+  assert.equal(occupied.ok, false);
+  assert.deepEqual(occupied.state, state);
+
+  state = CreateInitialState();
+  const sighted = ApplyPlayerActionPath(state, {
+    unitId: "Scout",
+    actionId: ActionIds.MOVE,
+    targetKeys: ["4,4", "3,4"],
+  });
+  assert.equal(sighted.ok, false);
+  assert.match(sighted.reason, /敌军视线/);
+  assert.deepEqual(sighted.state, state);
+});
+
+Test("current-turn dig paths preserve every tool, noise, warning, and log mutation", () => {
+  const state = CreateInitialState();
+  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  digger.layer = LayerIds.TUNNEL;
+  digger.actionPoints = 2;
+  state.tiles["5,3"].soilRevealed = true;
+  state.tiles["4,4"].soilRevealed = true;
+  const plans = GetActionPathPlans(state, "WorkTeam", ActionIds.DIG);
+  const plan = plans.find((entry) => entry.targetKey === "4,4");
+  assert.deepEqual(plan.targetKeys, ["5,3", "4,4"]);
+  const batch = ApplyPlayerActionPath(state, {
+    unitId: "WorkTeam",
+    actionId: ActionIds.DIG,
+    targetKeys: plan.targetKeys,
+  });
+  assert.equal(batch.ok, true);
+  let manual = Apply(state, "WorkTeam", ActionIds.DIG, "5,3");
+  manual = Apply(manual, "WorkTeam", ActionIds.DIG, "4,4");
+  assert.deepEqual(batch.state, manual);
+  assert.equal(batch.state.tunnelsDug, state.tunnelsDug + 2);
+  assert.deepEqual(
+    batch.plan.evidenceAdded.map((evidence) => [evidence.kind, evidence.tileKey]),
+    [["DigNoise", "5,3"], ["DigNoise", "4,4"]],
+  );
+  assert.equal(batch.plan.toolsCost, 2);
+});
+
+Test("CLI path discovery may expose explicit branch routes without making UI endpoints ambiguous", () => {
+  const state = CreateInitialState();
+  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  digger.layer = LayerIds.TUNNEL;
+  digger.actionPoints = 2;
+  state.plannedCorridorKeys = Object.keys(state.tiles);
+  const interfacePlans = GetActionPathPlans(state, "WorkTeam", ActionIds.DIG);
+  assert.equal(interfacePlans.some((plan) => plan.targetKey === "4,3"), false);
+  const explicitPlans = GetActionPathPlans(state, "WorkTeam", ActionIds.DIG, {
+    includeAmbiguous: true,
+  }).filter((plan) => plan.targetKey === "4,3");
+  assert.deepEqual(
+    explicitPlans.map((plan) => plan.targetKeys),
+    [["5,2", "4,3"], ["5,3", "4,3"]],
+  );
+  assert.equal(explicitPlans.every((plan) => ApplyPlayerActionPath(state, {
+    unitId: "WorkTeam",
+    actionId: ActionIds.DIG,
+    targetKeys: plan.targetKeys,
+  }).ok), true);
+});
+
+Test("dig paths reject unknown, unaffordable, or post-crack continuation atomically", () => {
+  let state = CreateInitialState();
+  let digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  digger.layer = LayerIds.TUNNEL;
+  digger.actionPoints = 2;
+  let result = ApplyPlayerActionPath(state, {
+    unitId: "WorkTeam",
+    actionId: ActionIds.DIG,
+    targetKeys: ["5,3", "4,4"],
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /土层尚未侦明/);
+  assert.deepEqual(result.state, state);
+
+  state = CreateInitialState();
+  digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  digger.layer = LayerIds.TUNNEL;
+  digger.actionPoints = 2;
+  state.tiles["5,3"].soilRevealed = true;
+  state.tiles["4,4"].soilRevealed = true;
+  state.tools = 1;
+  result = ApplyPlayerActionPath(state, {
+    unitId: "WorkTeam",
+    actionId: ActionIds.DIG,
+    targetKeys: ["5,3", "4,4"],
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.state, state);
+
+  state = CreateInitialState();
+  digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  digger.layer = LayerIds.TUNNEL;
+  digger.actionPoints = 3;
+  for (const tileKey of ["5,3", "5,4", "4,4"]) {
+    state.tiles[tileKey].soilRevealed = true;
+  }
+  result = ApplyPlayerActionPath(state, {
+    unitId: "WorkTeam",
+    actionId: ActionIds.DIG,
+    targetKeys: ["5,3", "5,4", "4,4"],
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /新挖这一段下回合将开裂/);
+  assert.deepEqual(result.state, state);
+  const stopAtCrack = ApplyPlayerActionPath(state, {
+    unitId: "WorkTeam",
+    actionId: ActionIds.DIG,
+    targetKeys: ["5,3", "5,4"],
+  });
+  assert.equal(stopAtCrack.ok, true);
+  assert.match(stopAtCrack.plan.decisionStop, /新挖这一段下回合将开裂/);
+  assert.equal(stopAtCrack.state.warnings.some((warning) => (
+    warning.kind === "Collapse" && warning.targetKey === "5,4"
+  )), true);
+});
+
+Test("path execution stops before hiding smoke damage or an ambush cancellation", () => {
+  let state = CreateInitialState();
+  let scout = state.units.find((unit) => unit.unitId === "Scout");
+  scout.layer = LayerIds.TUNNEL;
+  scout.tileKey = "6,2";
+  scout.actionPoints = 2;
+  AddTestTunnel(state, "6,2", "5,3", { smoke: 2 });
+  AddTestTunnel(state, "5,3", "4,4");
+  let result = ApplyPlayerActionPath(state, {
+    unitId: "Scout",
+    actionId: ActionIds.MOVE,
+    targetKeys: ["5,3", "4,4"],
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /烟段/);
+  assert.deepEqual(result.state, state);
+  const smokeStep = ApplyPlayerActionPath(state, {
+    unitId: "Scout",
+    actionId: ActionIds.MOVE,
+    targetKeys: ["5,3"],
+  });
+  assert.equal(smokeStep.ok, true);
+  assert.equal(smokeStep.plan.healthLoss, 1);
+
+  state.units.find((unit) => unit.unitId === "Scout").health = 1;
+  result = ApplyPlayerActionPath(state, {
+    unitId: "Scout",
+    actionId: ActionIds.MOVE,
+    targetKeys: ["5,3", "4,4"],
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /烟段/);
+  assert.deepEqual(result.state, state);
+  const minimumHealthSmokeStep = ApplyPlayerActionPath(state, {
+    unitId: "Scout",
+    actionId: ActionIds.MOVE,
+    targetKeys: ["5,3"],
+  });
+  assert.equal(minimumHealthSmokeStep.ok, true);
+  assert.equal(minimumHealthSmokeStep.state.units.find((unit) => unit.unitId === "Scout").health, 1);
+  assert.match(minimumHealthSmokeStep.plan.decisionStop, /烟段/);
+
+  state = CreateInitialState();
+  const militia = state.units.find((unit) => unit.unitId === "Militia");
+  militia.layer = LayerIds.TUNNEL;
+  militia.tileKey = "6,2";
+  militia.actionPoints = 2;
+  militia.ambushPrepared = true;
+  militia.ambushTileKey = "6,2";
+  AddTestTunnel(state, "6,2", "5,3");
+  AddTestTunnel(state, "5,3", "4,4");
+  result = ApplyPlayerActionPath(state, {
+    unitId: "Militia",
+    actionId: ActionIds.MOVE,
+    targetKeys: ["5,3", "4,4"],
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /取消伏击/);
+  assert.deepEqual(result.state, state);
 });
 
 Test("digging requires the digger underground on an adjacent cell and exact resources", () => {
@@ -2422,9 +2684,10 @@ Test("save data round-trips without losing the tunnel graph or enemy memory", ()
   assert.equal(migratedWithoutLedger.civilianLaunchSerial, 1);
 });
 
-Test("HTML and game source wire Three.js, both layers, previews, and touch-safe input", () => {
+Test("HTML and game source wire Three.js, path previews, both layers, and touch-safe input", () => {
   const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
   const gameSource = readFileSync(new URL("./Script_Game.mjs", import.meta.url), "utf8");
+  const cliSource = readFileSync(new URL("./Script_PlayCli.mjs", import.meta.url), "utf8");
   const style = readFileSync(new URL("./Style_Game.css", import.meta.url), "utf8");
   assert.match(html, /three\.module\.mjs/);
   assert.match(html, /SurfaceLayerButton/);
@@ -2452,6 +2715,14 @@ Test("HTML and game source wire Three.js, both layers, previews, and touch-safe 
   assert.match(gameSource, /通行容量 2→3/);
   assert.match(gameSource, /mobileCivilianSummary/);
   assert.match(gameSource, /classList\.add\("previewOpen"\)/);
+  assert.match(gameSource, /ApplyPlayerActionPath/);
+  assert.match(gameSource, /确认执行 \$\{steps\} 步/);
+  assert.match(gameSource, /computeLineDistances/);
+  assert.match(gameSource, /data-path-target/);
+  assert.match(gameSource, /本回合连续终点 · 仍逐格结算/);
+  assert.match(gameSource, /敌军预警只在手动结束回合后结算/);
+  assert.match(gameSource, /eventLedger\.slice\(eventCountBefore\)/);
+  assert.match(gameSource, /IsSoilKnown\(gameState, tileKey\)/);
   assert.match(gameSource, /window\.scrollTo\(0, 0\)/);
   assert.match(gameSource, /1 AP｜预留弹药 1｜离开洞口不返还/);
   assert.match(gameSource, /锁定当前预警工兵，其他敌军不会抢先消耗/);
@@ -2460,6 +2731,10 @@ Test("HTML and game source wire Three.js, both layers, previews, and touch-safe 
   assert.match(style, /\.exitWindowCard\.actionable/);
   assert.match(style, /\.civilianLedger\s*\{[\s\S]*?position:\s*fixed/);
   assert.match(style, /\.civilianEntry \.mobileCivilianSummary/);
+  assert.match(style, /grid-template-rows:\s*minmax\(0, 1fr\) 44px/);
+  assert.match(style, /\.actionButtons \.pathChoice/);
+  assert.match(cliSource, /case "path"/);
+  assert.match(cliSource, /ApplyPlayerActionPath/);
 });
 
 console.log(`\nTunnelFront1942 smoke test: ${passed} assertions passed.`);

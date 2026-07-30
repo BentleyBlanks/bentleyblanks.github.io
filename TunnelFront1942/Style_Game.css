@@ -613,6 +613,30 @@ a:focus-visible {
   opacity: 0.42;
 }
 
+.actionButtons .pathChoiceLabel,
+.actionButtons .pathChoice {
+  grid-column: 1 / -1;
+}
+
+.actionButtons .pathChoiceLabel {
+  margin: 2px 0 -1px;
+  color: var(--cyan);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.actionButtons .pathChoice {
+  min-height: 44px;
+  border-color: rgba(104, 196, 189, 0.52);
+  background: rgba(43, 78, 73, 0.48);
+}
+
+.actionButtons .pathChoice:hover,
+.actionButtons .pathChoice:focus-visible {
+  border-color: var(--cyan);
+  background: rgba(52, 99, 92, 0.72);
+}
+
 .endTurnButton {
   width: 100%;
   margin-top: 10px;
@@ -1245,6 +1269,24 @@ kbd {
     flex: 0 0 105px;
   }
 
+  .actionButtons button.active {
+    order: -4;
+  }
+
+  .actionButtons .pathChoiceLabel {
+    order: -3;
+    flex: 0 0 82px;
+    display: grid;
+    align-content: center;
+    margin: 0;
+    line-height: 1.35;
+  }
+
+  .actionButtons .pathChoice {
+    order: -2;
+    flex-basis: 112px;
+  }
+
   .endTurnButton {
     min-height: 44px;
     margin-top: 6px;
@@ -1276,9 +1318,10 @@ kbd {
     width: auto;
     max-height: 240px;
     min-width: 0;
-    overflow: auto;
+    overflow: hidden;
     transform: none;
     grid-template-columns: 1fr auto;
+    grid-template-rows: minmax(0, 1fr) 44px;
   }
 
   .gameShell.previewOpen .objectivePanel,
@@ -1288,6 +1331,14 @@ kbd {
 
   .previewPanel > div {
     grid-column: 1 / -1;
+    max-height: 174px;
+    padding-right: 4px;
+    overflow: auto;
+  }
+
+  .previewPanel button {
+    min-height: 44px;
+    padding: 0 9px;
   }
 
   .toast {

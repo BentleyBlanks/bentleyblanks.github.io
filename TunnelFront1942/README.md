@@ -11,7 +11,9 @@
 - 本地：仓库根目录起任意静态服务器，如 `python3 -m http.server 8000`，
   访问 `http://localhost:8000/TunnelFront1942/`。
 - 无浏览器完整游玩（供人或 Agent 逐步下指令）：`node TunnelFront1942/Script_PlayCli.mjs`，
-  子命令 `new / show / legal / act / end / survey`，输出双层 ASCII 地图与完整事件流。
+  子命令 `new / show / legal / act / path / end / survey`，输出双层 ASCII 地图与完整事件流。
+  `path <unitId> <Move|Dig> <targetKey...>` 可一次确认当前回合的连续移动或开挖。
+  `legal` 会把共享终点的快掘/静掘分支按完整路径分别列出，复制对应 route 即可明确下令。
 
 ## 你要做的事
 
@@ -42,3 +44,6 @@
 ## 操作（PC）
 
 `Q` 地面/地下切层、左键选中、右键下令、`Tab` 下一个未行动单位、`回车` 结束回合、`规则` 按钮查看完整规则。
+移动或开挖时可以直接选择本回合内高亮的远端格：规划侦察会标明两条候选走廊的逐格土层，预览再用序号标出路线，
+一次确认后仍逐步结算 AP、工具、暴露、烟害与证据。连续命令不会跨回合、自动结束回合、自动支护，
+也不会越过新裂缝、烟段、敌军视线或走廊外的未知土层。

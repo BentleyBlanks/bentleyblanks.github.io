@@ -8,10 +8,12 @@ import { join } from "node:path";
 import {
   ActionIds,
   ApplyPlayerAction,
+  ApplyPlayerActionPath,
   CreateInitialState,
   DeserializeState,
   FindEvacuationPaths,
   GetActionTargets,
+  GetActionPathPlans,
   GetAvailableActions,
   GetExitWindow,
   GetObjectiveSummary,
@@ -30,6 +32,7 @@ function PrintUsage() {
   node TunnelFront1942/Script_PlayCli.mjs show
   node TunnelFront1942/Script_PlayCli.mjs legal [unitId|all]
   node TunnelFront1942/Script_PlayCli.mjs act <unitId> <actionId> [targetKey] [groupId]
+  node TunnelFront1942/Script_PlayCli.mjs path <unitId> <Move|Dig> <targetKey...>
   node TunnelFront1942/Script_PlayCli.mjs end
   node TunnelFront1942/Script_PlayCli.mjs survey <exitKey>
 
@@ -39,6 +42,7 @@ actionId：${Object.values(ActionIds).join(" / ")}
   node TunnelFront1942/Script_PlayCli.mjs new 7
   node TunnelFront1942/Script_PlayCli.mjs legal Scout
   node TunnelFront1942/Script_PlayCli.mjs act Scout Recon 2,1
+  node TunnelFront1942/Script_PlayCli.mjs path Scout Move 5,4 5,5
   node TunnelFront1942/Script_PlayCli.mjs end`);
 }
 
@@ -171,6 +175,25 @@ function PrintLegalActions(state, requestedId = "all") {
       console.log(
         `- ${actionId}${targets.length ? `｜targets=${targets.join(",")}` : ""}${groupText}`,
       );
+      if ([ActionIds.MOVE, ActionIds.DIG].includes(actionId)) {
+        const pathPlans = GetActionPathPlans(state, unit.unitId, actionId, {
+          includeAmbiguous: true,
+        })
+          .filter((entry) => entry.steps > 1);
+        for (const plan of pathPlans) {
+          console.log(
+            `  path ${plan.targetKey}｜route=${plan.targetKeys.join(" → ")}`
+              + `｜AP=${plan.apCost}｜tools=${plan.toolsCost}｜exposure=+${plan.exposureDelta}`,
+          );
+        }
+        if (!pathPlans.length && targets.length) {
+          console.log(
+            actionId === ActionIds.DIG
+              ? "  path 暂无｜连续开挖只延伸规划侦察已标明且无分叉的走廊；未知土层、开裂与出口会要求逐段确认"
+              : "  path 暂无｜本回合没有无分叉的多步终点，仍可逐格移动",
+          );
+        }
+      }
     }
   }
 }
@@ -194,6 +217,33 @@ function ApplyCliAction(state, requestedUnitId, requestedActionId, targetKey, gr
     throw new Error(result.reason ?? "动作失败");
   }
   SaveState(result.state);
+  PrintState(result.state);
+}
+
+function ApplyCliPath(state, requestedUnitId, requestedActionId, targetKeys) {
+  const unitId = ResolveUnitId(state, requestedUnitId);
+  const actionId = ResolveActionId(requestedActionId);
+  if (!unitId) {
+    throw new Error(`未知单位：${requestedUnitId}`);
+  }
+  if (![ActionIds.MOVE, ActionIds.DIG].includes(actionId)) {
+    throw new Error("path 只支持 Move 或 Dig");
+  }
+  if (!targetKeys.length) {
+    throw new Error("path 至少需要一个按顺序排列的目标格");
+  }
+  const result = ApplyPlayerActionPath(state, {
+    unitId,
+    actionId,
+    targetKeys,
+  });
+  if (!result.ok) {
+    throw new Error(result.reason ?? "连续路径执行失败");
+  }
+  SaveState(result.state);
+  console.log(
+    `连续执行 ${result.plan.steps} 步：${result.plan.startKey} → ${result.plan.targetKeys.join(" → ")}`,
+  );
   PrintState(result.state);
 }
 
@@ -249,6 +299,9 @@ function Run() {
       break;
     case "act":
       ApplyCliAction(state, args[0], args[1], args[2], args[3]);
+      break;
+    case "path":
+      ApplyCliPath(state, args[0], args[1], args.slice(2));
       break;
     case "end":
       EndTurn(state);

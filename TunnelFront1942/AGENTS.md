@@ -42,6 +42,11 @@
   | 返沙层 loose | 1 | 1 | 6 | 下回合开裂，必须支护 |
 - **玩家动作**（`ActionIds`）：Move / EnterTunnel / ExitTunnel / Dig / Brace 支护 / Recon 侦察 /
   Decoy 假迹 / Ambush 伏击 / Trap 陷阱 / Attack / Evacuate 送群众 / ClearSeal 清除封堵 / EndTurn。
+- **当前回合路径**：`GetActionPathPlans` 默认只为 Move / Dig 生成无歧义的本回合连续终点；
+  CLI 的 `legal` 可请求 `includeAmbiguous`，用完整 route 分别列出共享终点的明确分支；
+  `ApplyPlayerActionPath` 必须逐步重放 `ApplyPlayerAction`，不跨回合、不自动结束、不自动支护或改道。
+  走廊外未知土层、返沙开裂、烟段、进入敌军视线、伏击离位与接通出口都要强制停下重新确认；
+  规划侦察须揭示两条候选走廊的逐格土层，保证已选走廊上的连续开挖真实可用。
 - **敌军意图**（`EnemyIntentIds`，明牌可预读）：Patrol / Investigate / Attack / PrepareSeal→ResolveSeal
   封堵出口 / PrepareSmoke→ResolveSmoke 灌烟 / Search / Stalled。**两段式意图（Prepare→Resolve）是
   玩家的反制窗口**，不得改成一回合完成。
@@ -68,6 +73,7 @@
 1. **纯逻辑模块禁止** `window` / `document` / `three` / `Math.random()` / `Date.now()`；
    随机走状态内的确定性随机源，保证同种子可复现、存档读档续跑一致。
 2. 规则内核对外接口不得就地修改传入 state（`ApplyPlayerAction` / `RunEnemyPhase` / `AdvanceTurn`）。
+   连续路径失败也必须原子返回原 state；禁止按路径长度汇总扣费、直接写终点或合并逐格证据。
 3. 表现层不自己算规则；玩家看不见的敌军信息不得泄漏到 UI 或日志。
 4. 零外部运行时依赖：无 CDN、无外部字体/图片/音频。three.js 走 `../taihang/vendor/three/`。
 5. three r152+ 颜色只转换一次：`new THREE.Color(hex)` 已 sRGB→Linear，禁止再叠 `convertSRGBToLinear()`。

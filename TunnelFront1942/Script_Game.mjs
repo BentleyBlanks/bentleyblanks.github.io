@@ -9,8 +9,10 @@ import {
 import {
   ActionIds,
   ApplyPlayerAction,
+  ApplyPlayerActionPath,
   CreateInitialState,
   FindTunnelPath,
+  GetActionPathPlans,
   GetActionTargets,
   GetAvailableActions,
   GetCombatPreview,
@@ -21,6 +23,7 @@ import {
   GetRouteSurvey,
   GetTunnelNeighbors,
   HexDistance,
+  IsSoilKnown,
   LayerIds,
 } from "./Script_Rules.mjs";
 
@@ -94,7 +97,7 @@ const ui = Object.fromEntries(
 const ActionCopy = Object.freeze({
   [ActionIds.MOVE]: {
     label: "移动",
-    hint: "相邻六角格",
+    hint: "选择本回合可达终点",
   },
   [ActionIds.ENTER_TUNNEL]: {
     label: "进入地道",
@@ -106,7 +109,7 @@ const ActionCopy = Object.freeze({
   },
   [ActionIds.DIG]: {
     label: "向前开挖",
-    hint: "选相邻格预览土层",
+    hint: "已知走廊可连续施工",
   },
   [ActionIds.BRACE]: {
     label: "支护当前段",
@@ -686,7 +689,7 @@ function AddSoilLabels() {
     return;
   }
   for (const tile of Object.values(gameState.tiles)) {
-    if (!tile.soilRevealed || gameState.tunnels[tile.tileKey]) {
+    if (!IsSoilKnown(gameState, tile.tileKey) || gameState.tunnels[tile.tileKey]) {
       continue;
     }
     const label = CreateLabelSprite(
@@ -706,7 +709,10 @@ function AddActionTargets() {
   if (!unit || unit.layer !== gameState.selectedLayer) {
     return;
   }
-  const targets = GetActionTargets(gameState, gameState.selectedUnitId, actionMode);
+  const pathPlans = GetInterfacePathPlans(gameState.selectedUnitId, actionMode);
+  const targets = pathPlans.length
+    ? pathPlans.map((plan) => plan.targetKey)
+    : GetActionTargets(gameState, gameState.selectedUnitId, actionMode);
   const color = actionMode === ActionIds.ATTACK
     ? 0xe95c4d
     : actionMode === ActionIds.DIG
@@ -719,6 +725,32 @@ function AddActionTargets() {
     ring.position.copy(WorldPosition(tileKey, 0.34));
     ring.userData.tileKey = tileKey;
     overlayGroup.add(ring);
+  }
+  if (previewAction?.targetKeys?.length) {
+    const routeKeys = [unit.tileKey, ...previewAction.targetKeys];
+    const routePoints = routeKeys.map((tileKey) => WorldPosition(tileKey, 0.48));
+    const routeLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(routePoints),
+      new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        dashSize: 0.22,
+        gapSize: 0.12,
+        transparent: true,
+        opacity: 0.92,
+      }),
+    );
+    routeLine.computeLineDistances();
+    overlayGroup.add(routeLine);
+    previewAction.targetKeys.forEach((tileKey, index) => {
+      const label = CreateLabelSprite(
+        String(index + 1),
+        "#fff7dc",
+        "rgba(24,24,21,.92)",
+      );
+      label.position.copy(WorldPosition(tileKey, 0.76));
+      label.scale.multiplyScalar(0.42);
+      overlayGroup.add(label);
+    });
   }
   if (previewTileKey) {
     const previewRing = CreateRing(0xffffff, 0.82, 1);
@@ -764,6 +796,31 @@ function ActionNeedsTarget(actionId) {
     ActionIds.EVACUATE,
     ActionIds.RECON,
   ].includes(actionId);
+}
+
+function IsPathAction(actionId) {
+  return [ActionIds.MOVE, ActionIds.DIG].includes(actionId);
+}
+
+function GetInterfacePathPlans(unitId, actionId) {
+  return IsPathAction(actionId)
+    ? GetActionPathPlans(gameState, unitId, actionId)
+    : [];
+}
+
+function GetInterfaceActionTargets(unitId, actionId) {
+  const pathPlans = GetInterfacePathPlans(unitId, actionId);
+  return pathPlans.length
+    ? pathPlans.map((plan) => plan.targetKey)
+    : GetActionTargets(gameState, unitId, actionId);
+}
+
+function GetPreviewPathPlan(action) {
+  if (!IsPathAction(action.actionId) || !action.targetKeys?.length) {
+    return null;
+  }
+  const result = ApplyPlayerActionPath(gameState, action);
+  return result.ok ? result.plan : null;
 }
 
 function CurrentUnit() {
@@ -812,6 +869,16 @@ function ActionButtonHtml(actionId) {
   return `<button type="button" data-action="${actionId}" class="${actionMode === actionId ? "active" : ""}"><span>${copy.label}</span><small>${copy.hint}</small></button>`;
 }
 
+function PathChoiceButtonHtml(plan) {
+  const destination = gameState.tiles[plan.targetKey];
+  const route = plan.targetKeys
+    .map((tileKey) => `${gameState.tiles[tileKey].name}(${tileKey})`)
+    .join(" → ");
+  const actionLabel = plan.actionId === ActionIds.DIG ? "连续开挖" : "连续移动";
+  const cost = `${plan.apCost}行动点${plan.toolsCost ? `，工具${plan.toolsCost}` : ""}，暴露增加${plan.exposureDelta}`;
+  return `<button type="button" class="pathChoice" data-path-target="${plan.targetKey}" aria-label="预览${actionLabel}${plan.steps}步到${destination.name}${plan.targetKey}，路线${route}，消耗${cost}"><span>${actionLabel} ${plan.steps} 步 → ${destination.name} ${plan.targetKey}</span><small>${route} · ${plan.apCost} AP${plan.toolsCost ? ` · 工具 ${plan.toolsCost}` : ""}</small></button>`;
+}
+
 function RenderInspector() {
   const unit = CurrentUnit();
   if (!unit) {
@@ -845,6 +912,21 @@ function RenderInspector() {
     : "<p class=\"noActions\">本回合已无可用行动</p>";
   for (const button of ui.ActionButtons.querySelectorAll("[data-action]")) {
     button.addEventListener("click", () => BeginAction(button.dataset.action));
+  }
+  const pathPlans = GetInterfacePathPlans(unit.unitId, actionMode)
+    .filter((plan) => plan.steps > 1);
+  if (pathPlans.length) {
+    ui.ActionButtons.insertAdjacentHTML(
+      "beforeend",
+      `<p class="pathChoiceLabel">本回合连续终点 · 仍逐格结算</p>${pathPlans.map(PathChoiceButtonHtml).join("")}`,
+    );
+    for (const button of ui.ActionButtons.querySelectorAll("[data-path-target]")) {
+      button.addEventListener("click", () => SetPreview({
+        actionId: actionMode,
+        unitId: unit.unitId,
+        targetKey: button.dataset.pathTarget,
+      }));
+    }
   }
 }
 
@@ -1074,26 +1156,49 @@ function BeginAction(actionId) {
 function BuildPreview(action) {
   const unit = CurrentUnit();
   const tile = action.targetKey ? gameState.tiles[action.targetKey] : gameState.tiles[unit.tileKey];
+  const pathPlan = GetPreviewPathPlan(action);
   switch (action.actionId) {
     case ActionIds.MOVE: {
-      const cost = unit.layer === LayerIds.SURFACE
-        ? TerrainCatalog[tile.terrainId].moveCost
-        : 1;
+      const routeText = action.targetKeys
+        ?.map((tileKey) => `${gameState.tiles[tileKey].name}(${tileKey})`)
+        .join(" → ");
+      const exposureText = pathPlan?.exposureDelta
+        ? `｜暴露 +${pathPlan.exposureDelta}`
+        : unit.layer === LayerIds.TUNNEL
+          ? "｜暴露不变"
+          : `｜终点掩护 ${TerrainCatalog[tile.terrainId].cover}`;
+      const healthText = pathPlan?.healthLoss
+        ? `｜烟害 ${pathPlan.healthLoss}`
+        : "";
+      const stopText = pathPlan?.decisionStop
+        ? `｜抵达后强制停下：${pathPlan.decisionStop}`
+        : "";
       return {
         eyebrow: unit.layer === LayerIds.SURFACE ? "地面移动预览" : "地下移动预览",
-        title: `移动到${tile.name}`,
-        body: `${cost} AP｜${unit.layer === LayerIds.TUNNEL ? "暴露 +1；烟段会损伤行动" : `掩护 ${TerrainCatalog[tile.terrainId].cover}`}`,
+        title: `${pathPlan?.steps > 1 ? `连续移动 ${pathPlan.steps} 步至` : "移动到"}${tile.name}`,
+        body: `${pathPlan?.apCost ?? 1} AP${exposureText}${healthText}｜路线：${routeText ?? tile.name}${stopText}｜执行后仍在我方回合；敌军预警只在手动结束回合后结算`,
       };
     }
     case ActionIds.DIG: {
       const soil = SoilCatalog[tile.soilId];
-      const known = tile.soilRevealed;
+      const pathTiles = (action.targetKeys ?? [tile.tileKey])
+        .map((tileKey) => gameState.tiles[tileKey]);
+      const known = pathTiles.every((entry) => IsSoilKnown(gameState, entry.tileKey));
+      const routeText = pathTiles
+        .map((entry) => `${entry.name}(${entry.tileKey})`)
+        .join(" → ");
+      const soilText = pathTiles
+        .map((entry) => `${entry.name}:${SoilCatalog[entry.soilId].label}`)
+        .join("、");
+      const stopText = pathPlan?.decisionStop
+        ? `｜抵达后强制停下：${pathPlan.decisionStop}`
+        : "";
       return {
         eyebrow: "开挖预览",
-        title: `向${tile.name}下方开挖`,
+        title: `${pathPlan?.steps > 1 ? `连续开挖 ${pathPlan.steps} 段至` : "向"}${tile.name}${pathPlan?.steps > 1 ? "" : "下方开挖"}`,
         body: known
-          ? `1 AP｜工具 ${soil.digCost}｜暴露 +${soil.noise}｜${soil.label}：${soil.risk}`
-          : "1 AP｜工具 1–2｜暴露约 +6–11｜土层未知：实际消耗与塌方风险须先从地面侦察",
+          ? `${pathPlan?.apCost ?? 1} AP｜工具 ${pathPlan?.toolsCost ?? soil.digCost}｜暴露 +${pathPlan?.exposureDelta ?? soil.noise}｜路线：${routeText}｜${soilText}${stopText}｜逐段留下开挖证据；本次不自动支护或结束回合`
+          : `1 AP｜工具 1–2｜暴露约 +6–11｜路线：${routeText}｜土层未知：只执行这一段，实际消耗与塌方风险须停下核对${stopText}`,
       };
     }
     case ActionIds.RECON:
@@ -1240,19 +1345,34 @@ function BuildPreview(action) {
 }
 
 function SetPreview(action) {
+  let preparedAction = { ...action };
+  const pathPlan = IsPathAction(action.actionId)
+    ? GetInterfacePathPlans(action.unitId, action.actionId)
+      .find((candidate) => candidate.targetKey === action.targetKey)
+    : null;
+  if (IsPathAction(action.actionId) && pathPlan) {
+    preparedAction = {
+      ...preparedAction,
+      targetKeys: [...pathPlan.targetKeys],
+    };
+  }
   const targets = ActionNeedsTarget(action.actionId)
-    ? GetActionTargets(gameState, action.unitId, action.actionId)
+    ? GetInterfaceActionTargets(action.unitId, action.actionId)
     : null;
   if (targets && !targets.includes(action.targetKey)) {
     ShowToast("该格不是当前命令的合法目标。");
     return;
   }
-  previewAction = action;
-  previewTileKey = action.targetKey ?? CurrentUnit()?.tileKey ?? null;
-  const preview = BuildPreview(action);
+  previewAction = preparedAction;
+  previewTileKey = preparedAction.targetKey ?? CurrentUnit()?.tileKey ?? null;
+  const preview = BuildPreview(preparedAction);
   ui.PreviewEyebrow.textContent = preview.eyebrow;
   ui.PreviewTitle.textContent = preview.title;
   ui.PreviewBody.textContent = preview.body;
+  const steps = preparedAction.targetKeys?.length ?? 1;
+  ui.ConfirmPreviewButton.innerHTML = steps > 1
+    ? `确认执行 ${steps} 步 <kbd>Enter</kbd>`
+    : "确认 <kbd>Enter</kbd>";
   ui.PreviewPanel.hidden = false;
   gameShell.classList.add("previewOpen");
   RenderScene();
@@ -1262,6 +1382,7 @@ function CancelPreview(render = true) {
   previewAction = null;
   previewTileKey = null;
   ui.PreviewPanel.hidden = true;
+  ui.ConfirmPreviewButton.innerHTML = "确认 <kbd>Enter</kbd>";
   gameShell.classList.remove("previewOpen");
   if (render) {
     RenderScene();
@@ -1273,8 +1394,11 @@ function CommitPreview() {
     return;
   }
   const action = previewAction;
+  const eventCountBefore = gameState.eventLedger.length;
   CancelPreview(false);
-  const result = ApplyPlayerAction(gameState, action);
+  const result = IsPathAction(action.actionId) && action.targetKeys?.length
+    ? ApplyPlayerActionPath(gameState, action)
+    : ApplyPlayerAction(gameState, action);
   if (!result.ok) {
     ShowToast(result.reason ?? "行动无法执行。");
     RenderAll();
@@ -1285,8 +1409,12 @@ function CommitPreview() {
   if (unit) {
     gameState.selectedLayer = unit.layer;
   }
-  selectedTileKey = action.targetKey ?? unit?.tileKey ?? null;
-  ShowToast(gameState.log.at(-1)?.text ?? "行动已执行。");
+  selectedTileKey = action.targetKeys?.at(-1) ?? action.targetKey ?? unit?.tileKey ?? null;
+  const stepText = action.targetKeys?.length > 1
+    ? `连续执行 ${action.targetKeys.length} 步，抵达${gameState.tiles[selectedTileKey]?.name ?? "终点"} ${selectedTileKey}；`
+    : "";
+  const newLogText = gameState.eventLedger.slice(eventCountBefore).at(-1)?.text;
+  ShowToast(`${stepText}${newLogText ?? (stepText ? "仍在我方回合。" : "行动已执行。")}`);
   RenderAll();
 }
 
@@ -1317,7 +1445,7 @@ function ClickTile(tileKey) {
     SelectUnit(unit.unitId);
     return;
   }
-  const targets = GetActionTargets(gameState, gameState.selectedUnitId, actionMode);
+  const targets = GetInterfaceActionTargets(gameState.selectedUnitId, actionMode);
   if (targets.includes(tileKey)) {
     SetPreview({
       actionId: actionMode,
@@ -1341,7 +1469,7 @@ function ClickTile(tileKey) {
   }
   const tile = gameState.tiles[tileKey];
   if (gameState.selectedLayer === LayerIds.TUNNEL && !gameState.tunnels[tileKey]) {
-    const soilText = tile.soilRevealed
+    const soilText = IsSoilKnown(gameState, tileKey)
       ? `${SoilCatalog[tile.soilId].label}：${SoilCatalog[tile.soilId].risk}`
       : "土层未知；先让交通员在地面侦察。";
     ShowToast(`${tile.name}地下尚未挖通。${soilText}`);

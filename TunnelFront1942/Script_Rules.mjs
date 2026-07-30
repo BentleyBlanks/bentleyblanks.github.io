@@ -491,6 +491,13 @@ export function GetMoveTargets(state, unitId) {
   });
 }
 
+export function IsSoilKnown(state, tileKey) {
+  return Boolean(
+    state.tiles[tileKey]?.soilRevealed
+    || state.plannedCorridorKeys?.includes(tileKey),
+  );
+}
+
 export function GetDigTargets(state, unitId) {
   const unit = GetUnit(state, unitId);
   if (!UnitCanAct(unit) || unit.role !== "Digger" || unit.layer !== LayerIds.TUNNEL) {
@@ -1175,6 +1182,7 @@ function ApplyRecon(state, unit, targetKey) {
     state.plannedFastPath = [...survey.fastPath];
     state.plannedQuietPath = [...survey.quietPath];
     state.planningReconCompleted = true;
+    revealed = survey.corridorKeys.length;
   } else {
     revealed = RevealAround(state, unit.tileKey, 2);
   }
@@ -1221,7 +1229,7 @@ function ApplyRecon(state, unit, targetKey) {
     state,
     "good",
     planningRecon
-      ? `交通员完成${survey.exitName}主勘线：快掘 ${survey.fast.segments} 段/工具 ${survey.fast.tools}/噪音 ${survey.fast.noise}，静掘 ${survey.quiet.segments} 段/工具 ${survey.quiet.tools}/噪音 ${survey.quiet.noise}；最近威胁为${survey.nearestThreat?.name ?? "无"}（距出口 ${survey.nearestThreat?.distance ?? "-"} 格）。主出口接通前不能改用另一出口发车。`
+      ? `交通员完成${survey.exitName}主勘线并标明 ${revealed} 格土层：快掘 ${survey.fast.segments} 段/工具 ${survey.fast.tools}/噪音 ${survey.fast.noise}，静掘 ${survey.quiet.segments} 段/工具 ${survey.quiet.tools}/噪音 ${survey.quiet.noise}；最近威胁为${survey.nearestThreat?.name ?? "无"}（距出口 ${survey.nearestThreat?.distance ?? "-"} 格）。主出口接通前不能改用另一出口发车。`
       : repeatRecon
       ? `交通员消耗 1 点组织复查地表，排除旧痕并标出敌军下一步意图；暴露下降 5。`
       : `交通员查清附近 ${revealed} 格土层，并标出可见敌军下一步意图。`,
@@ -1485,6 +1493,234 @@ export function ApplyPlayerAction(inputState, action = {}) {
   }
   state.outcome = EvaluateMission(state);
   return { ok: true, state, events: state.log };
+}
+
+const PathActionIds = new Set([
+  ActionIds.MOVE,
+  ActionIds.DIG,
+]);
+
+function GetPathDecisionStop(beforeState, afterState, unitId, actionId, targetKey) {
+  const beforeUnit = GetUnit(beforeState, unitId);
+  const afterUnit = GetUnit(afterState, unitId);
+  if (actionId === ActionIds.DIG) {
+    const tile = beforeState.tiles[targetKey];
+    if (!IsSoilKnown(beforeState, targetKey)) {
+      return "土层尚未侦明，先停下核对实际消耗与风险";
+    }
+    const newCollapseWarning = afterState.warnings
+      .slice(beforeState.warnings.length)
+      .some((warning) => warning.kind === "Collapse" && warning.targetKey === targetKey);
+    if (afterState.tunnels[targetKey]?.cracked || newCollapseWarning) {
+      return "新挖这一段下回合将开裂，先决定立即支护还是继续冒险";
+    }
+    if (tile.hasEntrance) {
+      return "新段接通地表出口，先核对洞口风险与下一步分工";
+    }
+  }
+  if (actionId === ActionIds.MOVE) {
+    if (beforeUnit?.ambushPrepared && !afterUnit?.ambushPrepared) {
+      return "离开预设洞口会取消伏击，先重新确认后续调动";
+    }
+    if (
+      beforeUnit?.layer === LayerIds.TUNNEL
+      && beforeState.tunnels[targetKey]?.smoke > 0
+    ) {
+      return "进入烟段并承受烟害，先重新判断后续路线";
+    }
+    const enteredEnemySight = afterState.evidence
+      .slice(beforeState.evidence.length)
+      .some((evidence) => evidence.kind === "SurfaceSighting");
+    if (enteredEnemySight) {
+      return "进入敌军视线并留下新目击证据，先查看暴露与追踪变化";
+    }
+  }
+  return null;
+}
+
+function SummarizeActionPath(
+  inputState,
+  outputState,
+  unitId,
+  actionId,
+  targetKeys,
+  decisionStop,
+) {
+  const inputUnit = GetUnit(inputState, unitId);
+  const outputUnit = GetUnit(outputState, unitId);
+  return {
+    actionId,
+    unitId,
+    startKey: inputUnit.tileKey,
+    targetKey: targetKeys.at(-1),
+    targetKeys: [...targetKeys],
+    steps: targetKeys.length,
+    apCost: inputUnit.actionPoints - outputUnit.actionPoints,
+    toolsCost: inputState.tools - outputState.tools,
+    exposureDelta: outputState.exposure - inputState.exposure,
+    healthLoss: inputUnit.health - outputUnit.health,
+    evidenceAdded: outputState.evidence.slice(inputState.evidence.length).map((evidence) => ({
+      evidenceId: evidence.evidenceId,
+      kind: evidence.kind,
+      tileKey: evidence.tileKey,
+      strength: evidence.strength,
+    })),
+    warningsAdded: outputState.warnings.slice(inputState.warnings.length).map((warning) => ({
+      warningId: warning.warningId,
+      kind: warning.kind,
+      targetKey: warning.targetKey,
+      resolvesTurn: warning.resolvesTurn,
+    })),
+    decisionStop,
+  };
+}
+
+function SimulatePlayerActionPath(inputState, action = {}) {
+  const actionId = String(action.actionId ?? action.type ?? "");
+  const targetKeys = Array.isArray(action.targetKeys)
+    ? action.targetKeys.map(String)
+    : [];
+  if (!PathActionIds.has(actionId)) {
+    return {
+      ok: false,
+      state: inputState,
+      reason: "连续路径只支持同回合移动或开挖",
+    };
+  }
+  if (!targetKeys.length) {
+    return { ok: false, state: inputState, reason: "连续路径至少需要一个目标格" };
+  }
+  const inputUnit = GetUnit(inputState, action.unitId);
+  if (!UnitCanAct(inputUnit)) {
+    return { ok: false, state: inputState, reason: "单位没有行动点" };
+  }
+  const visited = new Set([inputUnit.tileKey]);
+  let nextState = inputState;
+  let decisionStop = null;
+  for (let index = 0; index < targetKeys.length; index += 1) {
+    const targetKey = targetKeys[index];
+    if (visited.has(targetKey)) {
+      return { ok: false, state: inputState, reason: "连续路径不能折返或重复经过同一格" };
+    }
+    const beforeState = nextState;
+    const result = ApplyPlayerAction(beforeState, {
+      unitId: action.unitId,
+      actionId,
+      targetKey,
+    });
+    if (!result.ok) {
+      return {
+        ok: false,
+        state: inputState,
+        reason: `第 ${index + 1} 步无法执行：${result.reason ?? "路径失效"}`,
+      };
+    }
+    nextState = result.state;
+    visited.add(targetKey);
+    decisionStop = GetPathDecisionStop(
+      beforeState,
+      nextState,
+      action.unitId,
+      actionId,
+      targetKey,
+    );
+    if (decisionStop && index < targetKeys.length - 1) {
+      return {
+        ok: false,
+        state: inputState,
+        reason: `第 ${index + 1} 步必须停下：${decisionStop}`,
+      };
+    }
+  }
+  return {
+    ok: true,
+    state: nextState,
+    events: nextState.log,
+    plan: SummarizeActionPath(
+      inputState,
+      nextState,
+      action.unitId,
+      actionId,
+      targetKeys,
+      decisionStop,
+    ),
+  };
+}
+
+export function ApplyPlayerActionPath(inputState, action = {}) {
+  return SimulatePlayerActionPath(inputState, action);
+}
+
+export function GetActionPathPlans(inputState, unitId, actionId, options = {}) {
+  if (!PathActionIds.has(actionId)) {
+    return [];
+  }
+  const unit = GetUnit(inputState, unitId);
+  if (!UnitCanAct(unit) || inputState.phase !== "Player" || inputState.outcome) {
+    return [];
+  }
+  const candidatesByTarget = new Map();
+  const frontier = [{ state: inputState, targetKeys: [], visited: new Set([unit.tileKey]) }];
+  while (frontier.length) {
+    const current = frontier.shift();
+    const targets = GetActionTargets(current.state, unitId, actionId)
+      .filter((targetKey) => !current.visited.has(targetKey))
+      .sort();
+    for (const targetKey of targets) {
+      const targetKeys = [...current.targetKeys, targetKey];
+      const simulation = SimulatePlayerActionPath(inputState, {
+        unitId,
+        actionId,
+        targetKeys,
+      });
+      if (!simulation.ok) {
+        continue;
+      }
+      const targetIsPublicForMultiStep = (
+        actionId !== ActionIds.DIG
+        || targetKeys.length === 1
+        || IsSoilKnown(inputState, targetKey)
+      );
+      if (targetIsPublicForMultiStep) {
+        const plans = candidatesByTarget.get(targetKey) ?? [];
+        plans.push(simulation.plan);
+        candidatesByTarget.set(targetKey, plans);
+      }
+      const outputUnit = GetUnit(simulation.state, unitId);
+      if (
+        outputUnit.actionPoints > 0
+        && !simulation.state.outcome
+        && !simulation.plan.decisionStop
+      ) {
+        frontier.push({
+          state: simulation.state,
+          targetKeys,
+          visited: new Set([...current.visited, targetKey]),
+        });
+      }
+    }
+  }
+  const includeAmbiguous = Boolean(options.includeAmbiguous);
+  const plans = [];
+  for (const candidates of candidatesByTarget.values()) {
+    candidates.sort((first, second) => (
+      first.steps - second.steps
+      || first.targetKeys.join("|").localeCompare(second.targetKeys.join("|"))
+    ));
+    if (includeAmbiguous) {
+      plans.push(...candidates);
+      continue;
+    }
+    const shortest = candidates.filter((candidate) => candidate.steps === candidates[0].steps);
+    if (shortest.length === 1) {
+      plans.push(shortest[0]);
+    }
+  }
+  return plans.sort((first, second) => (
+    first.steps - second.steps
+    || first.targetKey.localeCompare(second.targetKey)
+    || first.targetKeys.join("|").localeCompare(second.targetKeys.join("|"))
+  ));
 }
 
 export function CollectEnemyObservations(state) {
@@ -2932,11 +3168,14 @@ export function CreateRulesApi() {
     LayerIds,
     CreateInitialState,
     ApplyPlayerAction,
+    ApplyPlayerActionPath,
     AdvanceTurn,
     GetAvailableActions,
     GetActionTargets,
+    GetActionPathPlans,
     GetMoveTargets,
     GetDigTargets,
+    IsSoilKnown,
     GetAttackTargets,
     GetEvacuationTargets,
     GetCivilianTransitEstimate,
