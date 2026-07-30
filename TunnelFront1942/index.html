@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171a17">
+  <meta name="description" content="《地火线》是一款原创 Three.js 六角格回合制地道战策略白盒。侦察土层、规划地道、应对封锁与扫荡，掩护群众安全撤离。">
+  <title>地火线｜原创 Three.js 地道战策略白盒</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260730b">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "../taihang/vendor/three/build/three.module.mjs"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="GameShell" class="gameShell">
+    <canvas id="GameCanvas" aria-label="地面与地下双层六角格战场"></canvas>
+    <div id="LayerWatermark" class="layerWatermark" aria-hidden="true">地面态势</div>
+
+    <header id="TopBar" class="topBar">
+      <section class="missionStamp">
+        <span>冀中平原 · 1942.5</span>
+        <b>地火线</b>
+      </section>
+      <section class="turnReadout">
+        <small>回合</small>
+        <b><span id="TurnValue">1</span> / 9</b>
+        <em id="PhaseValue">我方行动</em>
+      </section>
+      <section class="sweepReadout" id="SweepReadout">
+        <small>扫荡压力</small>
+        <b id="SweepText">4 回合后开始</b>
+        <i><em id="SweepFill"></em></i>
+      </section>
+      <section class="resourceStrip" aria-label="行动资源">
+        <div><small>工具</small><b id="ToolsValue">15</b></div>
+        <div><small>组织</small><b id="OrganizationValue">6</b></div>
+        <div><small>情报</small><b id="IntelValue">0</b></div>
+        <div><small>暴露</small><b id="ExposureValue">12</b></div>
+        <div class="peopleSafety"><small>群众安全</small><b id="SafetyValue">100</b></div>
+      </section>
+      <div class="topActions">
+        <button id="HelpButton" type="button">规则</button>
+        <button id="RestartButton" type="button">重开</button>
+      </div>
+    </header>
+
+    <section class="layerToggle" aria-label="战场层级">
+      <button id="SurfaceLayerButton" class="active" data-layer="Surface" type="button">
+        <span>地面</span><small>地形 · 敌情 · 封锁</small>
+      </button>
+      <button id="TunnelLayerButton" data-layer="Tunnel" type="button">
+        <span>地下</span><small>地道 · 稳定 · 烟流</small>
+      </button>
+      <kbd>Q</kbd>
+    </section>
+
+    <aside class="objectivePanel">
+      <header><small>本关目标</small><b id="ObjectivePrimary">安全转移 0/6 人</b></header>
+      <div class="objectiveProgress"><i id="ObjectiveFill"></i></div>
+      <ul>
+        <li id="ObjectiveRecon"><i></i><span>完成至少 1 次地面侦察</span></li>
+        <li id="ObjectiveDig"><i></i><span>至少新挖 1 段地道</span></li>
+        <li id="ObjectiveSweep"><i></i><span>4 回合后扫荡</span></li>
+        <li><i></i><span>杀敌不计分；群众受难只记入代价账本</span></li>
+      </ul>
+      <section class="civilianLedger" id="CivilianLedger"></section>
+    </aside>
+
+    <aside class="inspectorPanel">
+      <header>
+        <p id="InspectorEyebrow">当前选择</p>
+        <h2 id="InspectorTitle">交通员 · 林岚</h2>
+        <span id="InspectorLayer">地面</span>
+      </header>
+      <p id="InspectorDescription" class="inspectorDescription"></p>
+      <div id="InspectorStats" class="inspectorStats"></div>
+      <div id="NetworkCard" class="networkCard"></div>
+      <section class="actionSection">
+        <small>可用命令</small>
+        <div id="ActionButtons" class="actionButtons"></div>
+      </section>
+      <button id="EndTurnButton" class="endTurnButton" type="button">
+        <span>结束本回合</span><small>敌军按箭头行动 · E</small>
+      </button>
+    </aside>
+
+    <section id="PreviewPanel" class="previewPanel" hidden>
+      <div>
+        <small id="PreviewEyebrow">行动预览</small>
+        <b id="PreviewTitle">移动到麦田</b>
+        <p id="PreviewBody">消耗 1 AP</p>
+      </div>
+      <button id="CancelPreviewButton" type="button">取消 <kbd>Esc</kbd></button>
+      <button id="ConfirmPreviewButton" class="confirmAction" type="button">确认 <kbd>Enter</kbd></button>
+    </section>
+
+    <section class="eventLog">
+      <header>
+        <b>因果日志</b>
+        <span>预警一定先于伤害性反制</span>
+      </header>
+      <ol id="EventLog"></ol>
+    </section>
+
+    <div id="MapHint" class="mapHint">
+      <span>单击选择 / 预览</span><span>拖动平移</span><span>滚轮缩放</span><span>Tab 切换单位</span>
+    </div>
+
+    <section id="TitleScreen" class="titleScreen">
+      <article class="titleCard">
+        <p>原创回合制策略白盒 · Three.js</p>
+        <h1>地火线</h1>
+        <h2>一条地道，不是一条没有风险的捷径</h2>
+        <div class="titleRule">
+          <span><b>侦察</b>看清土层与敌军意图</span>
+          <span><b>规划</b>短险北线或长稳南线</span>
+          <span><b>反制</b>假迹、陷阱、伏击与备用出口</span>
+          <span><b>撤离</b>九回合内安全转移至少六人</span>
+        </div>
+        <p class="titleCopy">1942 年五月，日军扫荡队正在向赵庄收紧。你要组织交通员、地道队、民兵与游击小组，在地面收集敌情，在地下挖出能经受封堵、灌烟与塌方的撤离网络。杀敌不能赢；群众的伤痕也不会变成奖励。</p>
+        <button id="StartButton" class="startButton" type="button">开始侦察与规划</button>
+        <button id="OpenBriefingButton" class="briefingButton" type="button">先阅读三页任务简报</button>
+        <footer>建议桌面键鼠游玩 · 支持触控 · 固定种子可重复规划</footer>
+      </article>
+    </section>
+
+    <section id="BriefingScreen" class="modalScreen" hidden>
+      <article class="briefingModal">
+        <small id="BriefingEyebrow"></small>
+        <h2 id="BriefingTitle"></h2>
+        <p id="BriefingBody"></p>
+        <div id="BriefingDots" class="briefingDots"></div>
+        <footer>
+          <button id="BriefingBackButton" type="button">上一页</button>
+          <button id="BriefingNextButton" class="primaryModalButton" type="button">下一页</button>
+        </footer>
+      </article>
+    </section>
+
+    <section id="HelpScreen" class="modalScreen" hidden>
+      <article class="helpModal">
+        <button id="CloseHelpButton" class="modalClose" type="button" aria-label="关闭规则">×</button>
+        <small>玩法规则</small>
+        <h2>地面提供情报与窗口，地下提供路线与风险</h2>
+        <div class="helpGrid">
+          <section><b>1 · 侦察</b><p>交通员在地面侦察会揭示两格内土层与敌军意图。首次侦察建立情报；之后须移动到未侦察地块，每回合可消耗 1 点组织复查一次，降低 5 点暴露并刷新意图。</p></section>
+          <section><b>2 · 挖掘</b><p>地道队进入赵庄入口后，从相邻六角格连续开挖。黏土费工具，树根层动静大，返沙层必须及时支护。</p></section>
+          <section><b>3 · 敌军证据</b><p>敌军只依据地表目击、开挖声、脚印和枪声行动，不会读取隐藏地道。工兵只有确认洞口并抵达相邻格后，才会提前一回合预告封洞或灌烟。</p></section>
+          <section><b>4 · 多种解法</b><p>可走短险北线、长稳南线；假迹能掩去真实行迹并拖住搜索组，也可在诱饵洞口布陷阱或伏击工兵。至少六人安全撤离才算胜利。</p></section>
+        </div>
+        <button id="CloseHelpConfirmButton" class="primaryModalButton" type="button">回到战场</button>
+      </article>
+    </section>
+
+    <section id="OutcomeScreen" class="outcomeScreen" hidden>
+      <article>
+        <small id="OutcomeEyebrow">行动结算</small>
+        <h2 id="OutcomeTitle"></h2>
+        <p id="OutcomeSummary"></p>
+        <div id="OutcomeRoute" class="outcomeRoute"></div>
+        <section>
+          <h3>代价账本与因果链</h3>
+          <ol id="OutcomeCauses"></ol>
+        </section>
+        <p id="OutcomeTip" class="outcomeTip"></p>
+        <footer>
+          <button id="OutcomeRestartButton" class="primaryModalButton" type="button">用同一局面重新规划</button>
+          <a href="../projects/">返回项目列表</a>
+        </footer>
+      </article>
+    </section>
+
+    <div id="Toast" class="toast" hidden role="status" aria-live="polite"></div>
+  </main>
+  <noscript>《地火线》需要启用 JavaScript 才能运行。</noscript>
+  <script type="module" src="./Script_Game.mjs?v=20260730b"></script>
+</body>
+</html>
