@@ -1059,7 +1059,7 @@ function ChooseAction(state, unit, stats, style) {
 
     // 群众发动到位（≥70）且工富余时，先把工事修起来（坚壁窖/交通壕/消息树），
     // 再继续把群众基础做满——工事是反扫荡的另一半准备。
-    if (style === "skilled" && here && here.massBase >= 70 && (state.stock.labor ?? 0) >= 40 && !here.workBuild) {
+    if (style === "skilled" && here && here.massBase >= 60 && (state.stock.labor ?? 0) >= 30 && !here.workBuild) {
       for (const workType of here.feature === "Village" ? ["Cache", "Trench", "Beacon"] : ["Beacon", "Trench"]) {
         if (Rules.CanBuildWork(state, unit.id, unit.key, workType).ok) {
           return { kind: "BuildWork", unitId: unit.id, key: unit.key, workType };
@@ -1603,21 +1603,45 @@ Test("缴获入账与战报严格等值（不许双重入账）", () => {
   );
 });
 
-Test("围一下就走不能冻结据点补给（tap-and-run）", () => {
+Test("围一下就走不能冻结据点补给（tap-and-run 走真实回合链路）", () => {
   let state = Rules.CreateInitialState({ seed: 7 });
-  const stronghold = state.strongholds.find((item) => item.type === "Blockhouse");
-  const adjacent = HexNeighborKeys(stronghold.key).find((key) => Rules.GetHex(state, key));
+  const strongholdId = state.strongholds.find((item) => item.type === "Blockhouse").id;
+  const strongholdKey = state.strongholds.find((item) => item.id === strongholdId).key;
   const unit = state.units[0];
-  unit.key = adjacent;
-  state = Combat.ResolveSiege(state, unit.id, stronghold.id, { mode: "Blockade" }).nextState;
-  const drained = state.strongholds.find((item) => item.id === stronghold.id).supply;
-  const runner = state.units.find((item) => item.id === unit.id);
-  runner.key = state.map.order.find(
-    (key) => Rules.GetHex(state, key) && HexDistanceKeys(key, stronghold.key) >= 3,
+  unit.key = HexNeighborKeys(strongholdKey).find((key) => Rules.GetHex(state, key));
+  const acted = Rules.PerformAction(state, { kind: "Siege", unitId: unit.id, strongholdId, mode: "Blockade" });
+  assert.equal(acted.report.ok, true, `围困动作未成立：${acted.report.reason ?? ""}`);
+  state = acted.nextState;
+  const drained = state.strongholds.find((item) => item.id === strongholdId).supply;
+  // 之后两回合不再围（原地歇着也算撤围），走真实 EndTurn——
+  // 曾经 EndTurn 只回抄 units/enemies，据点恢复整体死机（第三轮复核 P0）。
+  for (let step = 0; step < 2; step += 1) {
+    if (state.events.pending) state = Rules.ApplyEventChoice(state, state.events.pending, null);
+    state = Rules.EndTurn(state).nextState;
+  }
+  const target = state.strongholds.find((item) => item.id === strongholdId);
+  assert.ok(
+    target.destroyed || target.supply > drained,
+    `撤围两回合后据点补给未恢复（${drained} → ${target.supply}）——采纳块又丢字段了`,
   );
-  const recovered = Combat.TickCombatRecovery(state);
-  const after = (recovered.strongholds ?? state.strongholds).find((item) => item.id === stronghold.id).supply;
-  assert.ok(after > drained, `撤围后据点补给未恢复（${drained} → ${after}）——围困标记泄漏`);
+});
+
+Test("治疗要扣药（真实回合链路）", () => {
+  let state = Rules.CreateInitialState({ seed: 7 });
+  const unit = state.units[0];
+  unit.hp = Math.max(6, unit.maxHp - 24);
+  const hex = Rules.GetHex(state, unit.key);
+  if (hex) hex.massBase = 60;
+  state.stock.medicine = 30;
+  const before = { id: unit.id, hp: unit.hp, medicine: state.stock.medicine };
+  if (state.events.pending) state = Rules.ApplyEventChoice(state, state.events.pending, null);
+  state = Rules.EndTurn(state).nextState;
+  const after = state.units.find((item) => item.id === before.id);
+  assert.ok(after && after.hp > before.hp, "受伤部队在群众掩护下未恢复");
+  assert.ok(
+    state.stock.medicine < before.medicine,
+    `治疗没有消耗药品（${before.medicine} → ${state.stock.medicine}）——药的消费口又死了`,
+  );
 });
 
 Test("围困不是零风险：守敌会出击袭扰围困部队", () => {

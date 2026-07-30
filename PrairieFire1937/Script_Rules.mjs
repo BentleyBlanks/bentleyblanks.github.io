@@ -115,7 +115,7 @@ export const ruleConstants = Object.freeze({
   // 这是让「战线拉长有代价」成立的关键，也是防止收入无限膨胀的形状性约束。
   hexUpkeepGrain: 0.34,
   hexUpkeepLabor: 0.1,
-  cadreIncomeScale: 2.4,
+  cadreIncomeScale: 2.6,
   // 各资源的地产系数，把设计意图写进数值：
   // 粮是主粮、工次之；械主要靠缴获而不是种出来的（0.08 让种田产械
   // 低于一次像样的伏击，否则"械主要靠缴获"就是一句空话）；药在敌后永远稀缺。
@@ -1010,9 +1010,11 @@ function DriftMassBase(state) {
   const suppression = new Map();
   for (const stronghold of state.strongholds ?? []) {
     if (!stronghold || stronghold.destroyed || (stronghold.garrison ?? 0) <= 0) continue;
-    const strengthScale = Clamp01(
-      (stronghold.garrison ?? 0) / Math.max(1, stronghold.maxGarrison ?? stronghold.garrison ?? 1),
-    );
+    const strengthScale =
+      Clamp01((stronghold.garrison ?? 0) / Math.max(1, stronghold.maxGarrison ?? stronghold.garrison ?? 1)) *
+      // 恢复期敌施政重心收缩、反攻期风声鹤唳——压制场随时期衰减，
+      // 战役曲线才有"恢复期反弹"这一幕（第三轮复核 P1）。
+      (state.eraKey === "Recovery" ? 0.7 : state.eraKey === "Counter" ? 0.45 : 1);
     const radius = stronghold.type === "Blockhouse" ? 1 : 2;
     for (const coordinate of HexesInRange(ParseHexKey(stronghold.key), radius)) {
       const hexKey = HexKey(coordinate.q, coordinate.r);
@@ -2070,7 +2072,12 @@ export function EndTurn(state) {
   if (typeof Combat.TickCombatRecovery === "function") {
     try {
       const recovered = Combat.TickCombatRecovery(next);
-      if (recovered && recovered.units) {
+      if (recovered && recovered.units && recovered.map) {
+        // 整体采纳（部分字段回抄的采纳块一律禁止——事故档案）：
+        // 据点补给恢复/警报松弛/坑道回填、治疗的药品扣费都在这份状态里，
+        // 只抄 units/enemies 会让据点恢复系统整体死机（第三轮复核 P0）。
+        Object.assign(next, recovered);
+      } else if (recovered && recovered.units) {
         next.units = recovered.units;
         next.enemies = recovered.enemies ?? next.enemies;
       }
@@ -2242,6 +2249,13 @@ function RunEnemyTurn(state) {
   state.pendingForcedSweep = applied.pendingForcedSweep ?? false;
   state.alert = applied.alert ?? state.alert;
   state.exposure = applied.exposure ?? state.exposure;
+  // 扫荡结算写进 AI 侧状态的库存效应（敌进我进缴获、夺粮扣库、抽干部）、
+  // 账本逐条与"方针一次一定"的清空必须一起搬运——曾经这里丢字段，
+  // 夺粮 19~107 石从不落库存、方针 28/28 粘滞（第三轮复核 P0）。
+  state.stock = applied.stock ?? state.stock;
+  state.sweepStance = applied.sweepStance ?? null;
+  if (Array.isArray(applied.ledgerLog)) state.ledgerLog = applied.ledgerLog;
+  state.log = applied.log ?? state.log;
   if (applied.ledger) {
     // 敌方造成的代价经减灾效果折算后再入账（坚壁清野、地道、两面政权等）。
     const delta = {};
@@ -2258,17 +2272,12 @@ function RunEnemyTurn(state) {
     try {
       const sweepOutcome = Combat.ResolveSweepBattle(state, state.sweep);
       if (sweepOutcome?.nextState) {
-        const swept = sweepOutcome.nextState;
-        state.map = swept.map;
-        state.units = swept.units;
-        state.enemies = swept.enemies;
-        state.strongholds = swept.strongholds;
-        state.bases = swept.bases;
-        state.rngState = swept.rngState;
+        // 整体采纳（部分字段回抄的采纳块一律禁止——事故档案）。
+        // 账本已在战斗模块按 shelter 结算，这里不再重复入账。
+        Object.assign(state, sweepOutcome.nextState);
         state.sweep = null;
         state.sweepStance = null; // 方针一次一定，扫荡结束即清空
         const sweepReport = sweepOutcome.report ?? {};
-        if (sweepReport.ledgerDelta) AddLedger(state, sweepReport.ledgerDelta, true);
         lines.push(...(sweepReport.lines ?? []));
         for (const item of sweepReport.effects ?? []) effects.push(item);
       }

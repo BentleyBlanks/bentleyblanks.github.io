@@ -291,6 +291,20 @@ export const combatConstants = Object.freeze({
       exposureFactor: 0.1,
       captureFactor: 0.35,
     }),
+    // 没来得及定下方针：机关与部队仓促疏散，处处被动——
+    // 各维度都比四个主动方针里最差的那个再差一档（"不表态"不许是白拿的最优）。
+    Unprepared: Object.freeze({
+      name: "仓促应变",
+      ourLossFactor: 0.9,
+      theirLossFactor: 0.3,
+      civilianFactor: 0.75,
+      villageFactor: 0.7,
+      grainFactor: 0.7,
+      cadreFactor: 0.7,
+      displacedFactor: 1.15,
+      exposureFactor: 0.2,
+      captureFactor: 0.1,
+    }),
   }),
   sweepCivilianBase: 6, // 每个受扫荡村庄的平民伤亡基数（只进账本）
   sweepVillageBase: 0.9,
@@ -2105,6 +2119,7 @@ export function ResolveSiege(state, unitId, strongholdId, options = {}) {
 
   const mode = options.mode === "Blockade" ? "Blockade" : "Assault";
   const model = BuildSiegeModel(state, unit, stronghold, options);
+  const underminedLevel = Clamp(Number(stronghold.undermined) || 0, 0, 4);
   const draft = CreateDraft(state);
   const ledgerDelta = EmptyLedger();
   const captures = EmptyCaptures();
@@ -2194,14 +2209,16 @@ export function ResolveSiege(state, unitId, strongholdId, options = {}) {
   const damageVariance = 1 + (damageRoll - 0.5) * 2 * constants.damageVarianceSpread;
   const lossVariance = 1 + (lossRoll - 0.5) * 2 * constants.lossVarianceSpread;
 
-  let garrisonLoss = (victory ? model.damageOnWin : model.damageOnFail) * damageVariance;
+  // 坑道作业的兑现：药室越深，爆破的杀伤越大、破防线越宽——
+  // 普通部队"围三攻一"由此成为可行路径（第三轮复核 P1）。
+  let garrisonLoss = (victory ? model.damageOnWin : model.damageOnFail) * damageVariance * (1 + underminedLevel * 0.3);
   garrisonLoss = Math.max(0, Math.min(model.garrison, garrisonLoss));
-  let ourLoss = (victory ? model.lossOnWin : model.lossOnFail) * lossVariance;
+  let ourLoss = (victory ? model.lossOnWin : model.lossOnFail) * lossVariance * (1 - underminedLevel * 0.1);
   ourLoss = Math.min(unit.hp ?? model.unitStats.hp, Math.max(0, ourLoss));
 
   const strongholdDraft = DraftStronghold(draft, stronghold.id);
   const remainingGarrison = Math.max(0, model.garrison - garrisonLoss);
-  const captured = victory && remainingGarrison <= 0.5;
+  const captured = victory && remainingGarrison <= 0.5 + underminedLevel * 0.35;
   if (strongholdDraft) {
     strongholdDraft.garrison = Round1(remainingGarrison);
     strongholdDraft.alarm = Clamp((stronghold.alarm || 0) + 18, 0, 100);
@@ -2319,8 +2336,9 @@ export function ResolveSweepBattle(state, sweep) {
     report.valid = false;
     return { nextState: state, report };
   }
-  const stanceKey = sweep.stance || state.sweepStance || "Disperse";
-  const profile = constants.sweepStanceProfiles[stanceKey] || constants.sweepStanceProfiles.Disperse;
+  // 不定方针不是白拿最优：没表态就是仓促应变，比任何一个主动选择都差。
+  const stanceKey = sweep.stance || state.sweepStance || "Unprepared";
+  const profile = constants.sweepStanceProfiles[stanceKey] || constants.sweepStanceProfiles.Unprepared;
   const draft = CreateDraft(state);
 
   const radius = sweep.radius || constants.sweepRadius;
@@ -2800,6 +2818,9 @@ export function TickCombatRecovery(state) {
   for (const unit of units) {
     const blockadeId = unit && unit.combat && unit.combat.blockading;
     if (!blockadeId || (unit.hp ?? 0) <= 0) continue;
+    // 围困要每回合真花行动维持：本回合没执行围困（原地歇着也一样）就算撤围
+    //（Rest-park 白嫖维持曾是第三轮复核点名的漏洞）。
+    if ((unit.combat.lastActionTurn ?? -1) !== turn) continue;
     const target = strongholds.find((item) => item && item.id === blockadeId);
     if (target && HexDistanceKeys(unit.key, target.key) <= 1) blockading.add(blockadeId);
   }

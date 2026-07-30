@@ -1192,7 +1192,7 @@ function PlanConstruction(state, difficulty, doctrine, rng) {
   // 修堡预算随时期收缩：恢复期敌无力再扩网、反攻期停止一切新建——
   // 否则"敌网恢复期比开局更密"，反攻永远名不副实（第二轮评审 P1）。
   const eraKey = ResolveEraKey(state);
-  const eraBuildScale = eraKey === 'Recovery' ? 0.5 : eraKey === 'Counter' ? 0 : 1;
+  const eraBuildScale = eraKey === 'Recovery' ? 0 : eraKey === 'Counter' ? 0 : 1;
   const budget = Math.round(
     (difficulty.buildBudget + (doctrine.key === 'Cage' || doctrine.key === 'Nibble' ? 1 : 0)) * eraBuildScale,
   );
