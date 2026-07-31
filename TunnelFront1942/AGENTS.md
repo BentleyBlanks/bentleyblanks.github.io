@@ -11,7 +11,9 @@
 
 ## 〇、当前状态
 
-- R0：脚手架 + 设计种子。R-设计：七领域设计委员会评审完毕，本文档为**裁决后的规则 v2（实现基线）**。
+- R0：脚手架 + 设计种子。R-设计：七领域设计委员会评审完毕 → 规则 v2。
+- **R3：战役重构为按电影《地道战》进化线展开的五幕（A1~A5），本文档为规则 v3（实现基线）。**
+  L1/L2 已下线，仅保留为别名（`L1→A1`、`L2→A5`），供旧链接 `?level=L1` 落地。
 - 轮次与独立审查 verdict 记录见 `CHANGELOG.md`。
 
 ## 一、不可动摇的核心与题材红线（改动前必读）
@@ -25,17 +27,39 @@
 5. 文案克制、具体、档案式；不做感官刺激描写，白盒不做血腥表现。特务（平民伪装）未识破时不可被攻击。
 6. **不要用堆内容掩盖核心玩法问题**：审查未过的机制先修或删，不添新系统转移注意力。
 
-## 二、玩法规则 v2（定稿 · 实现基线）
+## 二、玩法规则 v3（定稿 · 实现基线）
 
 > 一句话：敌人在头顶搜庄，你在地下调兵——把整个村庄群变成一件武器。
 > 双时钟：敌军每回合都在**积累搜索**、抢走地面存粮（纯缩头会输）；敌军有**行动力池**，
 > 伤亡/拖延/破路会加速其撤退（主动袭扰能提前结束扫荡，但每次出手都冒暴露风险）。
 
+### 2.0 战役结构：五幕（认知递增，不是难度递增）
+
+战役按电影《地道战》的进化线展开：**地道从「各家的藏身地窖」一步步变成一件武器**。
+每一幕都由上一幕的失败推动——先吃亏、再学会。**关卡不是难度递增，是认知递增。**
+
+| 幕 | 名 | 回合 | 本幕解锁 | 这一幕要学会的 |
+|---|---|---|---|---|
+| A1 | 单口洞 | 8 | （只有藏粮/转移群众/掩土/破路） | 洞不通，人就没处去——**这一幕注定要付代价** |
+| A2 | 户户相通 | 10 | 连通挖掘、多口、伪装口、**带领群众** | 网络的价值不是长度，是出路的条数 |
+| A3 | 能打的地道 | 10 | 射击孔、翻板、伏击/野战 | **打一枪换一个地方** |
+| A4 | 毒烟与水 | 12 | 通气孔、隔断门、高低差（敌烟/水/刨口全开） | 反制来自结构，不是数值；水只往低处走 |
+| A5 | 反扫荡 | 14 | 三村相连、跨村地道网、多射击孔协同 | 把整片村庄变成一件武器 |
+
+- **`level.unlocks` 是认知递增在代码里的落点**：`{ actions[], facilities[], disguises[], civGuidance, newThisAct[] }`。
+  `LegalActions` 按 `unlocks.actions` 过滤（`Move/UseEntrance/Rest/EndTurn` 恒开放），
+  `DigFacility` 按 `unlocks.facilities` 过滤，`Disguise` 按 `unlocks.disguises` 过滤；
+  `PerformAction` 对未解锁动作直接拒绝并说明「本幕尚未开放」。**后一幕的动作集必须是前一幕的超集。**
+- 每幕另带：`lessons`（恰好三行「这一幕你要学会什么」）、`debrief`（终局复盘三段：
+  付出了什么代价 / 学到了什么 / 解锁了什么）、`unlocks.newThisAct`（新机制首次出现时的一次性提示素材）。
+- **第一幕注定要付代价**（结构性，不是失衡）：明存粮 8 担 + 平静期 1 担 > 粮窖上限 4 担；
+  群众 6 批（7 个铺位）> 两个人窖合计 4 个铺位。胜利条件放宽为「保住半数群众」，但代价簿一定不为零。
+
 ### 2.1 回合与阶段
 
 - 关卡 = `平静期（备战）→ 扫荡期（周旋）`，按关卡脚本推进（见 §2.10）。
 - 每回合：**玩家阶段**（逐单位操作，任意顺序）→ **敌军阶段**（逐纵队按决策树行动，先算完再按可见性播报）
-  → **结算**（烟蔓延→憋闷→被迫出洞→搜索暴露判定→粮食产耗→情报刷新→池扣减→撤退判定→胜负检查，顺序固定）。
+  → **结算**（烟蔓延→水漫延→憋闷与恐慌→被迫出洞→搜索暴露判定→粮食产耗→情报刷新→池扣减→撤退判定→胜负检查，顺序固定）。
 - 单位：移动力 MP + 一个「主动作」（用后该单位本回合结束）。免费动作：开关邻接隔断门（每门每回合 1 次）。
 
 ### 2.2 地图与地形（11×9 轴向矩形，平顶六角）
@@ -49,6 +73,8 @@
 | river 河沟 | ✗ | ✗ | ✗ | — | 不可通行（桥格例外）、不可挖穿 |
 | open 开阔地 | ✗ | ✗ | ✓ | 1 | — |
 
+- **高程 `hex.elev`（0 低 / 1 中 / 2 高）**：第四、五幕的地图有明确高低差。
+  **水只往同高或更低的相邻格漫**——高处的巷子淹不着。这是唯一「靠地形而非数值」的反制。
 - `road` 是格上旗标：敌纵队全路径在路上时 MP 消耗减半；`roadBroken` 后视同越野。
 - 视线：距离 ≤ 视野，树林/村庄格阻挡其后延伸。
 
@@ -65,11 +91,22 @@
   **每单位每局至多 3 次**——这是全局唯一的减法。「平静期一锹别动、扫荡期无限开挖」就此作废。
 - **入口**：地表↔地下唯一通道，上下穿越花 1 MP。隐蔽等级 conceal 1~3（受地形上限约束），暴露阈值 = conceal×3 豆。
 - **通风口 vent**：等效隐蔽 2 的次级开口，可被搜出、可被灌烟；不可通行。
-- 设施（挖在已有地道格上）：`storage 储粮洞`（藏粮上限 8）、`shelter 藏人室`（群众容量 6）、
-  `vent 通风口`、`fightpost 枪眼`（见 §2.6）、`door 隔断门`（挖在边上：关闭时阻挡烟蔓延与通行）。
-- 容量：每地道格至多 2 个单位；群众只能待在藏人室。
-- **空气与憋闷（反缩头核心）**：空气分区 = 经开放门连通的地道连通块。分区内有**未被烟熏的通风口或开放入口**
-  → 正常呼吸；否则区内每单位/群众批每回合憋闷 +1（烟中 +2）。憋闷 ≥3 → 结算时**一定上地面**（R2 P0-3）：
+- 设施（挖在已有地道格上，一格一种；**按幕解锁**）：`storage 储粮洞`、`shelter 藏人室`、
+  `vent 通气孔`、`fightpost 射击孔`（§2.6）、`trapdoor 翻板`（§2.6）、
+  `door 隔断门`（挖在边上：关闭时阻挡烟、水与通行）。
+  **储粮洞与藏人室的容量按幕给**（`level.storageCap` / `level.shelterCap`，缺省 8 / 6 铺位）。
+- **伪装口（第二幕解锁，`Disguise` 1 进度）**：把已有的口做进灶台/水井/炕洞/牲口槽。
+  暴露阈值 =（基础隐蔽 + 伪装加成）× 3；**敌盯上该口所需的豆数 = 4 + 伪装加成 × 2**。
+  | 伪装 | 隐蔽 | 群众可通行 | 带路加成 | 可做地形 |
+  |---|---|---|---|---|
+  | 灶台 stove | +1 | ✓ | 0 | 村庄 |
+  | 炕洞 kang | +1 | ✓ | 0 | 村庄 |
+  | 水井 well | +2 | **✗（口窄，群众进不去也上不来）** | 0 | 村庄/农田 |
+  | 牲口槽 trough | +0 | ✓ | **+1 批** | 村庄/农田/树林/坟地 |
+- 容量：每地道格至多 2 个单位；**群众只能经 `MoveCivs` 进藏人室**，
+  走廊（非藏人室的地道格）只能在「带路」途中临时容身，铺位 2。
+- **空气与憋闷（反缩头核心）**：空气分区 = 经开放门连通的地道连通块。分区内有**未被烟熏的通气孔或开放入口**
+  → 正常呼吸；否则区内每单位每回合憋闷 +1（烟中 +2、水中 +2）。憋闷 ≥3 → 结算时**一定上地面**：
   ①优先自本分区最近的未封入口涌出；②一个可用口都没有就**在本格正上方刨土钻出**（该地表格 +1 痕迹，
   不产生新入口）；③连正上方都不可通行才退化为每回合 -1 HP。无论地面有没有敌人都要出去；
   出洞时该格有敌 → 群众当场被捕进代价账本。出地面或分区恢复通风 → 憋闷清零。
@@ -93,7 +130,7 @@
 | 日军班 | 4 | 2 | 2 | 2 | 2 | 骨干 |
 | 伪军队 | 3 | 1 | 2 | 1 | 1（1 格内无日军班则 0） | 督战规则仅此一条 |
 | 特务 | 2 | 0 | 3 | 2 | 3 | 平民伪装：与我方单位相邻或执行搜索后现形；未现形不可被攻击 |
-| 工兵班 | 3 | 1 | 2 | 2 | 2 | 唯一能烟攻/爆破/封堵的单位（wave2/L2） |
+| 工兵班 | 3 | 1 | 2 | 2 | 2 | 唯一能烟攻/灌水/爆破的单位（A3 起出场；刨口与封堵不需要它） |
 
 ### 2.5 战斗（确定性，零随机，单一入口 ResolveAttack）
 
@@ -112,8 +149,16 @@
   数学锚点：单伏击 3 伤打不死日军班（4 HP）——残兵会回撤报信；两处不同伏点接力才能全歼。
 - **打了就钻**：本回合已攻击且位于**未暴露**入口格且剩 MP≥1 → 花 1 MP 入地，入地后本回合不能再动。
   代价链：枪声目击引来机动队 + 入口使用暴露豆 +2（见 §2.7）——连用两次同一口≈自己交出这个口。
-- **枪眼 fightpost**：地下单位在枪眼格可攻击本格/相邻地表格的敌单位（按伏击结算）；使用后该开口立即变为已知。
-- 弹药：全局池。L1 开局 6、L2 开局 10，上限 12。攻击（含伏击/枪眼）每次 1。缴获是唯一来源，
+- **射击孔 fightpost（第三幕解锁）**：地下单位在射击孔格可攻击本格/相邻地表格的敌单位（按伏击结算）；
+  开火后该格的地道口立即变为已知。
+- **打一枪换一个地方（第三幕核心手感）**：距上次从**同一个射击孔**开火 ≤1 回合再开火 →
+  该孔被「咬住」：这一枪固定只伤 1，且该格获「敌已警戒」2 回合（敌寻路 +4 绕行）。
+  隔 2 回合不打，热度自然散掉。合法动作上带 `locked: true` 明牌提示。
+  **勋记「换地方」按 `state.score.fightpostsUsed`（开过火的不同射击孔格）判定。**
+- **翻板 trapdoor（第三幕解锁）**：修在**有地道口**的地道格上。敌对这个口作业（烟/水/爆/攻入/刨/封）时
+  **踩空掉下去**：作业作废、该纵队整队 1 回合、敌行动力池 -1，翻板落下（`trapReady=false`，重修 2 进度）。
+  完好的翻板同时**阻断烟与水**通过该格。它买的是**时间**，不是安全。
+- 弹药：全局池。开局 4~10（按幕，见 `level.ammoStart`），上限 12。攻击（含伏击/射击孔）每次 1。缴获是唯一来源，
   且**收支严格为负**：日军班 +1（打死它要两枪）、伪军/工兵/特务 +0；**反击打死的敌人不缴获**
   （没主动权就没工夫捡枪，否则挨打反而能回血）。
 
@@ -159,9 +204,14 @@
   硬上限回合数到也撤。**任何池扣减不给玩家任何资源**。
 - RNG 仅三处（波次开始时抽取）：路线变体 / 入场格 ±1 抖动 / 嫌疑同分平手。波内一切严格确定。
 
-### 2.8 反地道四选一（敌邻接已知入口时，按序取首个满足项；全部**提前 1 回合电报**给玩家）
+### 2.8 反地道六选一（敌邻接被盯上的入口时，按 `level.opPriority` 取首个满足项；全部**提前 1 回合电报**）
 
-1. **烟攻**（需烟具余量>0，工兵在场）：宣布后次回合点烟：烟从该口沿开放边蔓延 1 格/回合，持续 3 回合后 2 回合消散；
+> 盯上一个口的门槛：`known` 或 `expose ≥ 4 + 伪装加成 × 2`。每幕开放哪几手写在 `level.enemyOps`：
+> A1 封堵/攻入 → A2 加刨口 → A3 加爆破 → A4/A5 加烟与水。
+> **完好的翻板先于一切作业结算：踩空一次，这一趟就白跑了。**
+
+1. **烟攻**（需烟具余量>0，工兵在场）：宣布后次回合点烟：烟从该口沿开放边蔓延，
+   **直巷子 1 格/回合，拐一个弯要多花 1 回合**（`smokeCornerDelay`），持续 3 回合后 2 回合消散；
    烟中：憋闷 +2/回合、通风口失效；关闭的隔断门阻挡蔓延。烟不直接杀伤——它把人**逼出地面**（被捕进账本）；
    无路可出才掉血。反制：隔断门分区、备用出口、提前转移。
 2. **爆破**（需工兵邻接作业 1 整回合，可被击杀打断）：摧毁该入口 + 该地下格设施；格内单位 -2 HP。
@@ -169,54 +219,78 @@
    若入口正下方格或其相邻枪眼格有我方单位驻守 → 敌 1 个班伤亡（-3 池）且中止，改标记爆破；
    若无人驻守 → 入口被毁，该格藏人室/储粮内容被捕/被夺（进账本）。**在地道里守口有真实价值。**
 4. **封堵**（兜底，任一班 1 回合，**每纵队每役至多 1 次**）：入口被填死（我方从地下重挖 2 进度可恢复）。
+5. **刨口 excavate**（第二幕起，**不需要工兵**）：任一队围住已知的口，次回合把它刨塌（入口消失）。自耗池 2。
+6. **灌水 flood**（第四幕起，需工兵 + `wave.floodCharges`，且该口所在气区存在同高或更低的格）：
+   水自该口灌入，**只往同高或更低的相邻格漫**（3 回合蔓延 + 3 回合滞留）；关闭的隔断门与完好的翻板阻断。
+   淹到的格：单位憋闷 +2、群众恐慌 +2；**被淹的储粮洞每回合泡毁 2 担进代价簿**。自耗池 3。
+   反制只有结构：把粮与人放在高处、用隔断门把低处切出去、用翻板压住低处的口。
 
 ### 2.9 经济与群众
 
 - **粮食**：村粮仓（明存）+ 地下储粮洞（敌抢不走，除非攻入得手）。平静期每村每回合 +1 明存粮。
-  **扫荡期敌到村 2 格内 → 该村明存粮每回合被搜走 `level.sweepGrainLoss` 担（L1 2 / L2 1）进代价簿**
+  **扫荡期敌到村 2 格内 → 该村明存粮每回合被搜走 `level.sweepGrainLoss` 担（各幕 1~2）进代价簿**
   （当回合已被纵队征过粮的村不重复扣）。敌在村且有明存粮 → 征粮 2/回合；**明存粮净空后改为抓丁 1 批/回合**。
   主动作「藏粮」：**单位所在村格正下方必须有地道格，且该格与还装得下的储粮洞连通、所在气区至少有一个未封的口**
   → 转移 3 粮入洞（R2 P0-4：粮不会隔空入洞）。组织度≥1 的村平静期每回合自动藏 1（同一连通性要求）。
-- **群众**：村人口以「批」计（每批≈十余人）。主动作「转移群众」：单位在村格 → 2 批进入邻接入口连通的藏人室。
-  扫荡结束敌离场后群众自动返村。群众在地面被敌捕获、在烟/无氧中伤亡 → 全部进代价账本。
+- **群众（带领百姓躲避 —— 与藏粮并列的第二条主线，第二幕起贯穿到底）**：
+  群众以「批」计，存在 `state.civs` 注册表里，分三类：
+
+  | 类 | 地道里速度 | 铺位 | 说明 |
+  |---|---|---|---|
+  | 老弱 old | 1 格/回合 | 1 | 走得最慢，最先慌 |
+  | 青壮 young | 2 格/回合 | 1 | 跟得上带路的人 |
+  | 伤员 wounded | 1 格/回合 | 2 | 只能靠人带（原 L2 的「伤员」并入本表，`state.wounded` 已删除） |
+
+  - **村口转移** `MoveCivs`（主动作）：单位在村格 → 至多 2 批经**群众可通行**的邻接口进入连通的**藏人室**。
+    可带 `kind` 指定先送哪一类。
+  - **地道里必须有单位带路才能移动** `GuideCivs`（主动作）：单位须与群众**同格**；
+    一次带的批数 = `guideCap`（联络员 3 / 民兵 2 / 游击 1）+ 该格伪装口加成（牲口槽 +1）；
+    走的格数 = min(单位 MP, **最慢一批的速度**)；单位跟着一起走。
+  - **恐慌 = 憋闷的地面版，与「憋闷被迫出洞」合并为同一套压力**（每回合结算一次）：
+    地道里的群众 恐慌 +1（扫荡期且本幕开放带路、且同格没有我方单位）、
+    +1（气区无风）、+2（烟中）、+2（水中）；
+    同格有我方单位且无烟无水有风 → 恐慌 -1（安抚，不花主动作，只要人在那儿）。
+  - **恐慌 ≥3 → 群众自行冲出地面**：走本气区最近的、**群众过得去**的未封口（水井口不算）；
+    没有口就在本格正上方刨土钻出；连正上方都不可通行才罹难。
+    **地面有敌 → 当场被抓进代价簿。**
+  - 带路占掉一个主动作 → **谁去带路、谁去挖、谁去打**成为每回合的真取舍。
+  - 扫荡结束敌离场后群众自动返村。**终局按群众保全率评定**（`civSafe / civTotal`）；
+    被抓与罹难只进代价账本，永不转化为任何收益。
+  - 第一幕 `unlocks.civGuidance = false`：三个窖互不相连，群众进去就只能待着——
+    那一幕的困境不是恐慌，是**没有出路**，所以不积恐慌。
 - **组织**：主动作「组织」+1 进度，2 进度升 1 级（上限 2）：
   1 级 = 自动藏粮 + 村 2 格内敌纵队意图箭头常显（哨网）；2 级 = 村 1 格内工地每回合 +1 进度（群众参与）。
 - **破路**：主动作，路格工地 2 进度 → 永久断路（敌减速 + 若在敌补给线上则扣池）。
 
 ### 2.10 关卡（`Data_Levels.mjs` 数据驱动；地图手工摆位，seed 只走白名单）
 
-- **L1《护粮》**（10 回合，教学）：单村（枣林庄）+ **双路轴（北大车路 + 南土路）** + 河 + **石桥（可破）**
-  + **浅滩（唯一可涉处，不可破）** + 坟地伏击位 + 树林。
-  我方：民兵×2、游击×1、联络员×1；粮 12；起始地道：村内 1 格 + 1 入口。
-  敌：T3 伪军斥候绕村侦察；**T5±2 征粮队按配比 3 档入境**；**T+1 工兵组（工兵×1，烟具 1）**——
-  L1 自此也有烟攻/爆破/攻入；池 **14、衰减 0（改扑空衰减）**、上限至 T10；征满即离场；
-  **征粮队伤亡≥2 → T+1 报复队/追剿队（seed 抽定）进场**。
-  胜利 = **终局洞存粮 ≥10** 且战斗单位 ≥1（明存粮在敌到村边后每回合被搜走 2 担，零地道流必败）。
-  勋记：①洞存粮 ≥14 ②群众/房屋零损失且无阵亡 ③敌被逼退或粮被夺 ≤4。
-- **L2《合围》**（16 回合，完整）：三村（枣林庄=区队部、柳条峪=余粮、石槽村=武库）+ 河桥 + 双路轴。
-  我方：民兵×3、游击×2、联络员×1；粮 20（柳条峪 12 + 枣林庄 8）；伤员 4 批在枣林庄（只能走地道转移）；
-  起始地道：枣林庄 3 格 2 口、石槽村 1 格 1 口、柳条峪无（首个战略抉择）。
-  敌（三阶段脚本）：渗透（T2/T4 斥候两路、T3 特务按 seed 路线）→ 合围（T6 主攻 4 班自 seed 口、
-  T7 助攻 3 班另一口、T9 工兵队走北支路，桥毁则改道；T11 机动预备队 2 班投放到我方杀伤最高轴线，各轴杀伤<2 则不出）
-  → T13 判定：占村则驻剿搜毁（每回合搜 1 格 + 烧房），未占则沿路撤退（可伏击，无报复波）。
-  池 24、**衰减 0（改扑空衰减）**、烟具 2。胜负：胜 = 撑到 T16 且存活村 ≥2 且**洞存粮 ≥8** 且伤员 ≥3 批；
-  即败 = 区队部被驻占 2 回合 / 战斗单位全灭 / 人口 <50%。
-  勋记：①**洞存粮 ≥12** ②伤员 4/4 保全**且无战斗单位阵亡** ③主干无被毁段**且群众零损失**
-  （R2：三枚各带一条「全须全尾」判据，丢粮丢人丢单位的一局不再与干干净净的一局同评）。
-- **seed 白名单**（每关由 `level.seedDraws` 声明，`BuildSchedule(level, plan)` 在 `Data_Levels.mjs` 里
-  把抽出的下标翻译成完整排班；规则脚本只负责抽签与执行）：
-  - L1：入境轴线 9 选 1 × 兵力配比 3 档 × 主力到达 T5±2 × 斥候绕向 6 选 1 × 报复队变体 2 选 1。
-  - L2：主攻口 E1/E2 × 目标村指派 4 选 1 × 主力编成 3 档 × 特务路线 4 选 1 × 南北斥候巡逻各 2 变体
-    × 五处时刻 ±1。
-  **地形与兵力预算恒定**（配比换的是构成，不是总量）。开局简报把抽中的每一项写明（情报 100% 真实，v1 无假情报）。
-- 关卡数据同时承载全部玩家侧文本：`briefing / digest / objectives / tactics / pitfalls / openingChecklist /
-  landmarks / ambushSpots / roster / counterNotes / facilityNotes / ledgerNotes / gradeNotes / phases /
-  intelTimeline / orderOfBattle / medals[].hint / defeatHints`，一律经 `DeriveView` 原样透出，
-  表现层与 CLI 不再自己编解释。
+五幕共用一张关卡数据契约与一个排程器 `BuildSchedule(level, plan)`（斥候 → 主力（轴线 × 配比 × 到达回合）
+→ 工兵 → 额外波次 → T 判定波）。**A1~A3 共用高家庄那张图**——同一个村子，一幕比一幕会打，
+这样玩家能亲身比较「同样被搜出，第一幕跑不掉，第二幕跑得掉，第三幕还能还手」。
+
+| 幕 | 图 | 我方 | 群众 | 粮 / 仓容 / 铺位 | 池 | 敌反地道 | 胜利线 | 三勋记 |
+|---|---|---|---|---|---|---|---|---|
+| A1《单口洞》8T | 高家庄，**三个互不相连的单口地窖** | 民2 游1 联1 | 6 批 | 8 / 4 / 2×2 | 12 | 封堵·攻入 | 群众保全 ≥3、战斗单位 ≥1 | 窖满(洞粮≥4)·五口(保全≥5)·周旋(逼退) |
+| A2《户户相通》10T | 同图，可挖 | 民2 游1 联1 | 6 批 | 14 / 6 / 4 | 14 | +刨口 | 保全 ≥5、洞粮 ≥8、战斗 ≥1 | 户户相通(连通块≥5)·六口(保全 6)·多口(活口≥2 且伪装≥1) |
+| A3《能打的地道》10T | 同图，起始 5 格 2 口 | 民3 游1 联1 | 6 批 | 12 / 8 / 6 | 14 | +爆破 | 保全 ≥5、洞粮 ≥8、战斗 ≥1 | 换地方(≥2 个孔开过火)·六口·逼退 |
+| A4《毒烟与水》12T | **有高低差**：西岗 2 / 村 1 / 东洼 0 | 民3 游2 联1 | 8 批 | 14 / 8 / 6 | 20 | 全开（烟·水·爆·攻入·刨·封） | 保全 ≥6、洞粮 ≥8、战斗 ≥1 | 换气(通气孔≥2 且零逼出)·一个不落(8)·高处(洞粮≥12) |
+| A5《反扫荡》14T | **三村**（高家庄=区队部 / 李庄 / 马家河）+ T12 判定 | 民3 游2 联1 | 10 批 | 24 / 8 / 6 | 26 | 全开 | 保全 ≥8、存活村 ≥2、洞粮 ≥8、战斗 ≥1 | 村村相连(3 村贯通)·一个不落(10)·逼退 |
+
+- A5 即败：区队部被驻剿纵队占满 2 回合 / 群众损失过半 / 战斗单位全灭（其余各幕只有最后一条）。
+- A1 `levyAlways: true`：搜庄队搜粮抓人一起来——地面上留着的人，敌一进村就一回合抓走一批。
+- **seed 白名单**：各幕声明 `seedDraws`（入境轴线 / 兵力配比 / 到达回合 / 斥候绕向 /（A3）报复队 /
+  （A4·A5）时刻抖动）。**地形与兵力预算恒定**，配比换的是构成不是总量；开局简报把抽中的每一项写明。
+- 关卡数据同时承载全部玩家侧文本：`lessons / debrief / unlocks.newThisAct / briefing / digest / objectives /
+  tactics / pitfalls / openingChecklist / landmarks / ambushSpots / roster / counterNotes / facilityNotes /
+  ledgerNotes / gradeNotes / phases / intelTimeline / orderOfBattle / medals[].hint / defeatHints`，
+  一律经 `DeriveView` 原样透出，表现层与 CLI 不再自己编解释。
+- 关卡注册表 `levelDefinitions = {A1..A5}`，`campaignOrder`，别名 `L1→A1`、`L2→A5`。
 
 ### 2.11 胜负评级（三勋记制）
 
 - 胜利后按勋记数定级：3 枚 = 甲、2 枚 = 乙、≤1 枚 = 丙；失败 = 丁。
+- **终局另按群众保全率评定**：`result.civSafe / result.civTotal / result.civRatio / result.civForcedOut`。
+- 终局复盘三段固定进 `result.debrief = { cost, learned, unlocked, ledger }`（取自 `level.debrief`）。
 - 结算画面：勋记逐条点亮附一句归因 + 代价账本（中性灰白、逐项列出、无任何奖励表述）。
 - `state.result.breakdown` 另存数值分（存续/保粮/保网/周旋加权 + 歼敌 min(8, floor(3·log2(1+kills)))），
   **仅供冒烟测试排序断言，不进 UI**。
@@ -235,53 +309,73 @@
 | 零地道流（不挖不藏） | 胜负只认洞存粮；明存粮在敌到村边后每回合被搜走 |
 | 平静期不动土、扫荡期猛挖 | 暴露豆全程结算：每段每设施都记豆，掩土每人每局只有 3 次 |
 | 无限伏击刷弹药 | 缴获上限 12 且净收支为负；池扣减每回合上限 5；预备队投放到杀伤最高轴线 |
+| 守着一个射击孔连打 | 同孔 1 回合内再开火只伤 1，且该格获「敌已警戒」——必须在网里换位 |
+| 把群众塞进地道就不管 | 无人同格陪着每回合恐慌 +1，满 3 自行冲出地面；地面有敌当场被抓 |
+| 把粮与人放在低处 | 灌水只往同高或更低处漫：被淹的储粮洞每回合泡毁 2 担，人恐慌 +2 |
+| 把主干挖成一条直线 | 烟在直巷子一回合一格；拐弯才让它多花一回合 |
 
 ## 三、状态契约（实现法律；可 JSON 序列化，同种子同操作序列逐字节一致）
 
 ```js
 state = {
-  meta: { level: "L1", seed: 7, turn: 1, phase: "player" },   // player|enemy|resolve|over
+  meta: { level: "A1", act: 1, seed: 7, turn: 1, phase: "player" },   // player|enemy|resolve|over
   wave: { status: "quiet",        // quiet|sweep|withdrawing|done
-          sweepTurn: 0, pool: 14, decay: 0, playerDrainThisTurn: 0,   // decay 已归零，见 §2.7 扑空衰减
-          smokeCharges: 0, hardEndTurn: 10, withdrawAnnounced: false,
-          plan: {}, schedule: [], revenge: null },   // plan=seed 抽出的下标 + 派生字段；schedule=BuildSchedule 产物
+          sweepTurn: 0, pool: 12, decay: 0, playerDrainThisTurn: 0,   // decay 归零，见 §2.7 扑空衰减
+          smokeCharges: 0, floodCharges: 0, hardEndTurn: 8, withdrawAnnounced: false,
+          plan: {}, schedule: [], revenge: null },   // plan=seed 抽出的下标 + 派生字段
   rngState: 123456,               // 只经 StepRng 推进；仅波次开始抽三类子流
-  map: { hexes: { "q,r": { terrain, road: false, roadBroken: false, bridge: false,   // bridge=桥或浅滩
+  map: { hexes: { "q,r": { terrain, elev: 1, road: false, roadBroken: false, bridge: false,
                            villageId: null, traces: 0, searched: false, attackSite: false,
-                           ambushSetTurn: 0, alertedUntil: 0 } },     // 伏击设点回合 / 「敌已警戒」到期回合
-         villages: { v1: { name, hexKeys: [], pop, popStart, grainOpen, organize, organizeProgress,
-                           hasHq: false, burnedHexes: 0, seizedTurn: 0 } } },
+                           alertedUntil: 0 } },      // elev 0/1/2：水只往同高或更低处漫
+         villages: { v1: { name, hexKeys: [], popStart, grainOpen, organize, organizeProgress,
+                           hasHq: false, burnedHexes: 0, seizedTurn: 0 } } },   // pop 已删除：见 state.civs
   tunnels: {
-    cells:     { "q,r": { facility: null,      // null|storage|shelter|vent|fightpost
-                          grain: 0, civs: 0, smoke: 0 } },   // smoke = 剩余浓度回合
+    cells:     { "q,r": { facility: null,      // null|storage|shelter|vent|fightpost|trapdoor
+                          grain: 0, smoke: 0, water: 0,      // smoke/water = 剩余回合
+                          trapReady: false,                  // 翻板是否支好（用过要重修）
+                          fightpostHeat: 0, fightpostLastTurn: 0, fightpostKnown: false } },
     edges:     { "a|b": { door: null } },      // 存在即挖通；door: null|"open"|"closed"
-    entrances: { "q,r": { conceal: 3, expose: 0, known: false, sealed: false } },
-    vents:     { "q,r": { expose: 0, known: false, smoked: false } },   // 通风口的地表开口
+    entrances: { "q,r": { conceal: 3, expose: 0, known: false, sealed: false,
+                          disguise: null } },  // null|stove|well|kang|trough（§2.3）
+    vents:     { "q,r": { expose: 0, known: false, smoked: false } },
     digs:      { siteId: { kind, at, edge?, facility?, need, progress } },
+                 // kind: segment|entrance|facility|disguise|door|roadBreak
+    smokeOps:  [ { origin, spreadLeft, lingerLeft, cells: [], front: [{key,dir}], queued: [] } ],
+    floodOps:  [ { origin, spreadLeft, lingerLeft, cells: [] } ],
   },
   units: { u1: { id, side: "ally",             // ally|enemy
                  type,                          // militia|guerrilla|runner|inf|puppet|spy|sapper
                  hp, mp, acted, layer: "surface",  // surface|under
                  pos: "q,r", stance: "normal",  // normal|hidden|ambush|exposed|stunned
-                 breath: 0, revealed: false,    // spy 用
-                 coverUses: 0,                  // 掩土已用次数（每单位每局上限 3）
-                 ambushHex: null, ambushTurn: 0, ambushStale: false,   // 伏击持续状态与「老地方」标记
+                 breath: 0, revealed: false,
+                 coverUses: 0,
+                 ambushHex: null, ambushTurn: 0, ambushStale: false,
                  columnId: null } },
+  // 群众批注册表（AGENTS §2.9）：取代旧的 village.pop / cell.civs / state.wounded
+  civs: { c1: { id, kind: "old",               // old|young|wounded
+                home: "v1",
+                loc: "village",                // village|cell|lost
+                at: "v1",                      // loc=village 时为村 id；loc=cell 时为地道格键
+                panic: 0, fate: null } },      // fate: null|"captured"|"dead"
   resources: { ammo: 6 },
   enemy: { columns: [ { id, unitIds, role,     // march|mobile|sapper|scout|spy
                         route: ["q,r"], routeIndex: 0, targetVillage,
                         caution: 0, cautionTurns: 0, regroupTurns: 0,
-                        gained: false, seals: 0,   // 本回合有无所获（扑空衰减用）/ 已填死的口数（上限 1）
-                        opInProgress: null } ], // {kind:"smoke|blast|breach|seal", at, turnsLeft}
+                        gained: false, seals: 0,
+                        opInProgress: null } ], // {kind, at, turnsLeft}
            sightings: [ { pos, turn, confidence } ],
-           pendingOps: [],                     // 已电报、次回合结算的反地道作业
+           pendingOps: [],                     // kind: smoke|flood|blast|breach|excavate|seal
            memory: { ambushedVillages: [] } },
-  wounded: { atVillage: { v1: 4 }, inCells: {}, delivered: 0 },   // 仅 L2
   ledger: { civCaptured: 0, civDead: 0, housesBurned: 0, grainSeized: 0 },  // 永不回落
-  score: { kills: { inf:0, puppet:0, spy:0, sapper:0 }, withdrewEarlyTurns: 0 },
+  score: { kills: { inf:0, puppet:0, spy:0, sapper:0 }, withdrewEarlyTurns: 0, alliesLost: 0,
+           hqOccupiedTurns: 0,
+           fightpostsUsed: [],                 // 开过火的不同射击孔格键（勋记「换地方」）
+           civForcedOut: 0, civGuidedTrips: 0 },
   log: [ { turn, kind, text, hex?, layer?, visible } ],   // visible=false 事件 UI 零泄漏
   medals: null,                    // 结算时 [bool,bool,bool]
-  result: null,                    // { won, grade: "甲|乙|丙|丁", medals, breakdown, reasons }
+  result: null,                    // { won, grade, medals, breakdown, reasons, act, actName,
+                                   //   civSafe, civTotal, civRatio, civForcedOut,
+                                   //   debrief:{cost,learned,unlocked,ledger}, nextId, nextName }
 }
 ```
 
@@ -292,9 +386,36 @@ state = {
 - 渲染/UI 不自己算规则：一切「玩家能看到什么」由 `Script_Visibility.mjs` 的 `DeriveView(state)` 给出
   （可见敌单位、虚影、意图箭头、暴露豆、痕迹、烟、可达格、合法动作、待办护栏项、电报预告）。
 
+#### 三.1 HUD 数据契约（R3 新增，渲染层按此对接；`DeriveView(state)` 顶层字段）
+
+| 字段 | 形状 | 用途 |
+|---|---|---|
+| `act` | `{ id, act, name, subtitle, lessons[3], unlocked[], nextId, nextName, maxTurns }` | **幕间剧情卡**：幕次、幕名、三行「这一幕你要学会什么」 |
+| `newUnlocks` | `[{ key, name, note }]` | **本幕新解锁的机制**（供首次出现时的一次性提示） |
+| `unlockedActions` / `unlockedFacilities` / `unlockedDisguises` | `string[]` | 按幕过滤按钮/菜单，未解锁的直接不显示 |
+| `civGuidance` | `bool` | 本幕是否有「带路 / 恐慌」这套机制 |
+| `objectiveProgress` | `[{ key, label, have, need, ok, short }]` | **常显目标条**：当前幕目标 + 还差多少 |
+| `civs` | `[{ id, kind, kindName, loc, at, home, panic, panicMax, escorted, speed, slots, fate }]` | **群众各批状态**：类型/位置/是否有人带路/恐慌值 |
+| `civSummary` | `{ total, safe, lost, ratio, inVillage, inTunnel, unescorted, panicking, forcedOut, captured, dead }` | 群众总览与保全率 |
+| `network` | `{ cells, largest, villagesLinked, liveEntrances, disguised, vents, fightpostsUsed[] }` | 地道网摘要（勋记进度） |
+| `debrief` | `{ cost, learned, unlocked, ledger } | null` | **终局复盘三段**（未结算时为 null） |
+| `result` | 见 §三 `state.result` | 另含 `civSafe/civTotal/civRatio/civForcedOut/act/actName/nextId` |
+| `allies[].guideCap` / `.escorting` / `.breathMax` | number | 该单位一次带几批 / 同格陪着几批 / 憋闷上限 |
+| `guardrails[]` | 增加 `kind:"panic"`（带 `civId`、`hex`） | 「地道里有群众无人照应」待办项 |
+| `hexBadges[key]` | 增加 `elev`、`water`、`trapReady`、`fightpost:{lastTurn,locked}`、`entrance.disguise/disguiseName`、`civs`、`civPanic`、`civEscorted` | 格上徽记 |
+| `wave.floodCharges` | number | 敌水车余量 |
+| `resources.storageCap` / `.shelterCap` | number | 本幕的仓容与铺位上限 |
+
+`Script_AsciiMap.mjs` 另导出与之配套的可打印行：`ActCardLines` / `ObjectiveProgressLines` /
+`CivLines` / `DebriefLines`（CLI 与网页共用同一措辞）。
+
 ## 四、动作协议（CLI 与 UI 共用同一 JSON）
 
 `LegalActions(state, unitId?) → [action]`；`PerformAction(state, action) → { state, events, illegal? }`
+
+> **两者都按 `level.unlocks` 过滤**：本幕没解锁的动作既不会出现在 `LegalActions` 里，
+> 直接下令也会被 `PerformAction` 拒绝并回「本幕（第 N 幕《…》）尚未开放「X」」。
+> `MoveWounded` 已删除——伤员并入群众三类之一，走 `MoveCivs` / `GuideCivs`。
 
 ```
 {type:"Move", unit, path:["q,r",...]}      {type:"UseEntrance", unit}
@@ -302,11 +423,14 @@ state = {
 {type:"DigEntrance", unit, at:"q,r"}       // 地下向上开口；重开被封口同此
 {type:"DigFacility", unit, cell:"q,r", facility:"storage|shelter|vent|fightpost"}
 {type:"DigDoor", unit, edge:"a|b"}         {type:"ToggleDoor", unit, edge}   // 免费
+{type:"Disguise", unit, at:"q,r", disguise:"stove|well|kang|trough"}   // 地面做伪装口，1 进度
+{type:"GuideCivs", unit, to:"q,r", count, path:[...]}                 // 带路：须与群众同格，主动作
 {type:"CoverTraces", unit, usesLeft}       {type:"BreakRoad", unit, bridge}
 {type:"Ambush", unit, site, stale}        // site: cover|entrance|foxhole；stale=连设两回合（伤害降为 1）
-{type:"Hide", unit}      {type:"Attack", unit, target, sameHex}   // sameHex=同格敌人（R2 起可打）
-{type:"Feint", unit}     {type:"HideGrain", unit}   {type:"MoveCivs", unit, count}
-{type:"MoveWounded", unit, count}          // L2：伤员经地道转移（在藏人室间）
+{type:"Hide", unit}      {type:"Attack", unit, target, sameHex, fightpost, locked}
+                                          // fightpost=射击孔开火；locked=同孔连开（只伤 1，明牌）
+{type:"Feint", unit}     {type:"HideGrain", unit}
+{type:"MoveCivs", unit, count, kind?}      // kind: old|young|wounded（先送哪一类）
 {type:"Organize", unit}  {type:"Collapse", unit, at:"q,r"}  {type:"Rest", unit}
 {type:"EndTurn"}
 ```
@@ -317,13 +441,13 @@ state = {
 |---|---|---|
 | `Script_Hex.mjs` | 坐标契约与确定性随机（**冻结**） | 地基 |
 | `Data_Rules.mjs` | 全部可调数值 `CFG` + 地形/单位/设施表 + 文案 | 数值平衡 |
-| `Data_Levels.mjs` | L1/L2 手工地图、波次脚本、勋记、简报、seed 白名单 | 关卡任务 |
-| `Script_State.mjs` | 建局、CloneState、序列化、选择器（连通块/空气分区/容量） | 核心玩法 |
+| `Data_Levels.mjs` | **五幕 A1~A5**：手工地图（含高程）、`unlocks` 解锁表、群众编成、波次脚本、勋记、简报、复盘、seed 白名单 | 关卡任务 |
+| `Script_State.mjs` | 建局、CloneState、序列化、选择器（连通块/空气分区/容量/**群众批**/**解锁查询**） | 核心玩法 |
 | `Script_Actions.mjs` | 合法动作枚举与结算（含 ResolveAttack 单入口） | 核心玩法 |
 | `Script_Visibility.mjs` | 视线、目击、暴露、嫌疑分、DeriveView | 核心玩法 |
 | `Script_EnemyAi.mjs` | 纵队决策树、反地道四选一、行动力池、波次脚本执行 | 敌军 AI |
 | `Script_Turn.mjs` | 回合管线与固定结算顺序、胜负勋记 | 核心玩法 |
-| `Script_Bots.mjs` | 乱打/缩头/莽撞/会玩 四 bot（纯条件直查） | 数值平衡 |
+| `Script_Bots.mjs` | 乱打/缩头/莽撞/会玩 四 bot（纯条件直查；会玩含带路职责与就地找活的挖网） | 数值平衡 |
 | `Script_PlayCli.mjs` + `Script_AsciiMap.mjs` | 审查 Agent 完整游玩接口 + 双层 ASCII | 审查接口 |
 | `Script_SmokeTest.mjs` | node 冒烟（§7.1 清单，<90s） | 质检 |
 | `Script_Balance.mjs` | 多 seed 批量模拟统计 | 数值平衡 |
@@ -360,24 +484,44 @@ state = {
 
 ### 7.1 冒烟（`node TunnelFront1942/Script_SmokeTest.mjs`，退出码即成败，<90s）
 
-- 契约：坐标、状态序列化 round-trip、CloneState 隔离、纯度扫描（核心模块无 window/document/three/Math.random/Date.now）。
+- 契约：坐标、状态序列化 round-trip、CloneState 隔离、纯度扫描（核心模块无 window/document/three/Math.random/Date.now）、
+  **五幕注册齐全 + 幕次卡完整 + 解锁集逐幕为超集**。
 - 确定性：同 seed 同动作序列 → 终局 JSON 哈希一致；存档读档续跑 = 一次跑通。
-- 模糊：乱打 bot L1/L2 各若干 seed 跑满局，零崩溃、零负资源、MP/HP 有界、账本单调不减。
-- **策略排序红线**：会玩 > 缩头 且 会玩 > 莽撞（胜负+内部分双排序）；缩头 L1 必不得甲乙（≤丙或败）；
-  莽撞 L1 必败；会玩 L1 必胜且 ≥乙。
-- 双时钟数学断言（R2 改口径）：纯躲脚本 → 敌满时长离场、明存粮被征 ≥6、**一次也逼不退**；
-  袭扰脚本 → **半数以上 seed 把敌逼退，且逼退落在 T9-T10**（取消基础衰减后收队时点不再是平滑函数，
-  池与逼退率才是双时钟本体）。
-- **R2 承重墙回归**（每条都能单独变红）：暴露豆全程结算（挖段/修设施 +1、开新口 +2）；掩土 -2 且每人 3 次；
+- 模糊：乱打 bot 五幕各一 seed 跑满局，零崩溃、零负资源、MP/HP/恐慌有界、账本单调不减、
+  **群众守恒（保全 + 被抓 + 罹难 = 总批数）**。
+- **战役可通关**：会玩 bot 在**每一幕**都有 ≥6/8 个 seed 通关。
+- **策略排序红线**：会玩 > 缩头 且 会玩 > 莽撞（胜负 + 内部分双排序，**逐幕**）；
+  缩头永远拿不到甲乙；莽撞在第二幕起必败（第一幕没有攻击动作，莽撞退化为乱走，不作断言）。
+- 双时钟：纯躲在 A1~A3 一次也逼不退**且连池都耗不动**（`pool > 0`）；
+  会玩在 A3/A4/A5 有半数以上 seed 把池打到 ≤0。
+  （第四幕起敌自带烟与水，反地道作业会自耗池——那是敌人自己花的钱，纯躲照样输。）
+- **R3 承重墙回归**（每条都能单独变红，已逐条验证先红后绿）：
+  1. `unlocks` 过滤真的生效——第一幕挖不了段、开不了口、修不了设施，直接下令也被拒；第二幕才能挖；
+  2. 地道里的群众没有单位同格就带不动（GuideCivs 是主动作，且单位跟着走）；
+  3. 带路批数上限（联络员 3 / 民兵 2 / 游击 1）与走廊铺位 2 的限制；
+  4. 无人带路 → 恐慌积累 → 满 3 冲出地面，地面有敌当场被抓；有人同格则恐慌回落；第一幕不积恐慌；
+  5. 射击孔同孔连开被锁定（伤害降为 1 + 该格获警戒 + 提示换地方），隔两回合冷却；
+  6. 水只往同高或更低处漫（高程 2 的西岗永不进水），被淹的储粮洞泡毁存粮进代价簿；
+  7. 翻板拦敌一回合 + 挡烟，用过要重修；
+  8. 烟在直巷子 1 格/回合，拐弯要多花一回合；
+  9. 伪装口抬高被搜出与被盯上的门槛；水井口群众上不去（恐慌出洞时只能就地刨土）；
+  10. **第一幕注定要付代价**：结构性断言（粮 > 仓容、铺位 < 群众需求）+ 多 bot 多 seed 实测代价簿恒不为零，
+      且复盘文案点破「洞不通，人就没处去」；
+  11. 群众保全率进终局评定，且丢光群众绝不抬高数值分；
+  12. 敌新增刨口（不用工兵）与灌水（要工兵），第一幕两者皆无。
+- **R2 承重墙回归（不许回退）**：暴露豆全程结算（挖段/修设施 +1、开新口 +2）；掩土 -2 且每人 3 次；
   憋闷 3 回合被推到地面（不掉血）；HideGrain 要求正下方连通；同格单伏击 + 打完转暴露；
-  同格连设两回合伤害降为 1 且该格获警戒（含 T1 边界不得误判）；伏击持续状态；L1 洞存粮 9 负/10 胜；
-  L1 多 seed 终局出现差异；零地道流必输；复读伏击流拿不到甲；只挖不掩土流必然引来烟攻/爆破/攻入/封堵；
+  同格连设两回合伤害降为 1 且该格获警戒（含 T1 边界）；伏击持续状态；胜负只认洞存粮（7 负 / 8 胜）；
+  多 seed 终局出现差异；零地道流必输；复读伏击流拿不到甲；只挖不掩土必然引来烟/水/爆/攻入/刨/封；
   弹药收支为负；代价簿四栏都会动；同格可攻击 / 民兵散兵坑 / 石桥可破且破后敌绕行。
 - 佯动木偶化断言：仅置信 1 噪音的脚本 → 敌纵队逐回合路径与基线完全一致。
-- 反地道覆盖：烟/爆/攻入/封堵四出口各至少可达一次；攻入遇驻守必中止且敌 -1 班；烟被关门阻断。
-- 憋闷链：无通风分区 3 回合被迫出洞先于敌行动结算；通风口被烟后分区开始积憋闷。
-- 预算比率：理想全功能网所需单位回合 / 平静期可用单位回合 ∈ [1.05, 1.5]。
+- 反地道覆盖：烟/水/爆/攻入/刨口/封堵各至少可达一次；攻入遇驻守必中止且敌 -1 班；烟被关门阻断。
+- 憋闷链：通气孔被烟后分区开始积憋闷；无风分区 3 回合被迫出洞先于敌行动结算。
+- **预算比率**：各幕「理想全功能网所需进度 / 平静期可用单位回合」∈ [1.05, 2.2]
+  （上界从 1.5 放宽到 2.2 是**设计**：后面几幕本来就不可能在平静期内备齐——
+  逼你在扫荡期一边挨搜一边动土，而动土必留声）。第一幕连挖都不开放，无从谈起。
 - 红线回归：账本项只增不减且不出现在任何加成路径；kills 超封顶后 breakdown 战果项增量为 0。
+- **HUD 数据契约**：`DeriveView` 的幕次卡 / 目标进度 / 新解锁 / 群众各批状态 / 终局复盘三段逐字段断言。
 - 页面装配：index.html 引用存在、importmap 正确、`?v=` 一致、表现层文件不被核心 import。
 
 ### 7.2 浏览器实测（表现层）
@@ -388,12 +532,12 @@ Q 切层、Tab 循环、结束回合跑敌阶段播报、截图（地上态/地�
 ### 7.3 审查 Agent 完整游玩接口（`Script_PlayCli.mjs`）
 
 ```
-node TunnelFront1942/Script_PlayCli.mjs new  --level L1 --seed 3 --save /tmp/g.json   # 开局+简报+ASCII
+node TunnelFront1942/Script_PlayCli.mjs new  --level A1 --seed 3 --save /tmp/g.json   # 幕次卡+简报+ASCII
 node TunnelFront1942/Script_PlayCli.mjs show --save /tmp/g.json [--layer surface|under|both]
 node TunnelFront1942/Script_PlayCli.mjs legal --save /tmp/g.json [--unit u1]
 node TunnelFront1942/Script_PlayCli.mjs act  --save /tmp/g.json --json '{...}'        # 执行+可见事件
 node TunnelFront1942/Script_PlayCli.mjs end  --save /tmp/g.json                       # 敌阶段+结算全播报
-node TunnelFront1942/Script_PlayCli.mjs run  --level L1 --seed 3 --bot Skilled        # bot 整局→总结
+node TunnelFront1942/Script_PlayCli.mjs run  --level A1 --seed 3 --bot Skilled        # bot 整局→总结
 ```
 
 输出必须让「只读 README 的外人」能完整游玩：每步带可见事件、双层 ASCII、资源/池/波次状态、电报预告。

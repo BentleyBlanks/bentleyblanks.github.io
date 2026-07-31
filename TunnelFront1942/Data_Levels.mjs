@@ -558,7 +558,7 @@ const a3Villages = [
 const a3 = {
   id: "A3", act: 3, name: "能打的地道", subtitle: "第三幕 · 从藏到打",
   maxTurns: 10, sweepStartTurn: 3, hardEndTurn: 10,
-  pool: 16, decay: 0, smokeCharges: 0, floodCharges: 0, ammoStart: 8, sweepGrainLoss: 2,
+  pool: 14, decay: 0, smokeCharges: 0, floodCharges: 0, ammoStart: 8, sweepGrainLoss: 2,
   storageCap: 8, shelterCap: 6,
   enemyOps: ["blast", "breach", "excavate", "seal"],
   opPriority: ["blast", "breach", "excavate", "seal"],
@@ -651,7 +651,7 @@ const a3 = {
       hint: "这一幕人窖大了（6 铺），但敌人也开始炸口了：别把人全放在一间" },
     { key: "expel", name: "逼退", text: "把敌军逼退（行动力池耗尽，提前收队）",
       anyOf: { expelled: true },
-      hint: "行动力池 16：歼日军班 -3、破路每处 -2、打退攻入 -7、敌每次作业自耗 2~4、扑空每支纵队 -1" },
+      hint: "行动力池 14：歼日军班 -3、破路每处 -2、打退攻入 -7、敌每次作业自耗 2~4、扑空每支纵队 -1" },
   ],
   defeatHints: {
     civSafeAtLeast: "群众要早带、要分散：爆破一次只毁一格，别让一间人窖装下所有人",
@@ -1126,7 +1126,7 @@ const a5 = {
     edges: [[A(2, 1), A(3, 1)], [A(2, 1), A(2, 2)], [A(2, 2), A(3, 2)]],
     entrances: AL([[2, 1], [3, 2], [3, 5], [7, 1]]),
     facilities: [[A(2, 1), "storage"], [A(2, 2), "shelter"], [A(3, 5), "shelter"], [A(3, 1), "fightpost"]],
-    disguises: [[A(2, 1), "stove"], [A(3, 5), "well"]],
+    disguises: [[A(2, 1), "stove"], [A(3, 5), "trough"]],
   },
   civBatches: [
     { kind: "old", village: "v1", count: 2 },
@@ -1142,7 +1142,7 @@ const a5 = {
     { key: A(2, 1), name: "高家庄 · 区队部", note: "即败条件绑定此处：被驻剿纵队占住 2 回合即告失利；起始粮窖与灶台口在此" },
     { key: A(3, 1), name: "高家庄 · 射击孔", note: "起始射击孔；协同开火至少还要再修两个" },
     { key: A(7, 1), name: "李庄", note: "余粮 12 担、群众 3 批；离主干 4 段——救不救它是本幕第一个抉择" },
-    { key: A(3, 5), name: "马家河", note: "地势最高、离大路最远的安全村；起始人窖与水井口在此（水井群众上不去）" },
+    { key: A(3, 5), name: "马家河", note: "地势最高、离大路最远的安全村；起始人窖与牲口槽口在此（口子大，带路一次多带 1 批）" },
     { key: A(9, 2), name: "木桥", note: "北大车路唯一跨河点，可破；破后北路须南绕" },
     { key: A(9, 4), name: "浅滩", note: "河沟唯一可涉处，破桥也拦不住这一路" },
     { key: A(5, 3), name: "中部树林", note: "南北两轴之间的掩蔽带，机动队最容易被拦在这里" },

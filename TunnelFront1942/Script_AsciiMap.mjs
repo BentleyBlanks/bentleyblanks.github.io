@@ -256,6 +256,8 @@ export function OpeningLines(state, view) {
 
 const victoryLabels = {
   surviveTurn: (v) => `撑到 T${v}`,
+  civSafeAtLeast: (v) => `群众保全 ≥${v} 批`,
+  civSafeRatioAtLeast: (v) => `群众保全率 ≥${Math.round(v * 100)}%`,
   villagesAtLeast: (v) => `存活村 ≥${v} 处`,
   grainAtLeast: (v) => `存粮 ≥${v} 担`,
   tunnelGrainAtLeast: (v) => `洞存粮 ≥${v} 担`,
@@ -620,7 +622,7 @@ export function ActionHints(state, unitId, legalActions) {
     else if (!VillageStorageEntrances(state, hex.villageId).length) {
       const anyStorage = SortedKeys(state.tunnels.cells).some((key) => state.tunnels.cells[key].facility === "storage");
       hints.push(anyStorage
-        ? `HideGrain 不可用：村 1 格内的地道口连不到还有余量的储粮洞（每洞上限 ${CFG.storageGrainCap} 担，可能是装满了）。`
+        ? `HideGrain 不可用：村 1 格内的地道口连不到还有余量的储粮洞（本幕每洞上限 ${StorageCapOf(state)} 担，多半是装满了）。`
         : "HideGrain 不可用：地下还没有储粮洞——先在地道格上 DigFacility storage。");
     }
   }

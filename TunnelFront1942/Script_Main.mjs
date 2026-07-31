@@ -208,6 +208,13 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       hexes, villages, tunnels,
       units: units.filter((unit) => (unit.hp ?? 1) > 0),
       ghosts, intents,
+      // 五幕战役新增：群众批注册表、格上徽记、幕次与目标进度（夹具模式没有，按空处理）
+      civs: view?.civs ?? [],
+      civSummary: view?.civSummary ?? null,
+      hexBadges: view?.hexBadges ?? {},
+      act: view?.act ?? null,
+      objectiveProgress: view?.objectiveProgress ?? [],
+      debrief: view?.debrief ?? null,
     };
     return session.vm;
   }
@@ -246,8 +253,12 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     const village = vm.villages?.[hex.villageId];
     if (village) {
       title = `${village.name}（${title}）`;
-      // 字段缺席时整行不显示，不把 undefined 打到面板上（引擎侧字段改名也不会漏怯）
-      if (village.pop !== undefined) lines.push({ label: "人口", value: `${village.pop} / ${village.popStart ?? "?"} 批` });
+      // 群众已改为 view.civs 批注册表（不再挂在村上）：按 home 归属统计仍留在本村的批数。
+      const homeCivs = (vm.civs ?? []).filter((civ) => civ.home === hex.villageId);
+      if (homeCivs.length) {
+        const stillHere = homeCivs.filter((civ) => civ.loc === "village").length;
+        lines.push({ label: "尚在村中", value: `${stillHere} / ${homeCivs.length} 批` });
+      }
       lines.push({ label: "明存粮", value: village.grainOpen });
       lines.push({ label: "组织度", value: village.organize });
       if (village.hasHq) notes.push("区队部所在");
@@ -271,7 +282,13 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       const facility = theme.under.facilities[cell.facility];
       if (facility) notes.push(`地下设施：${facility.name}`);
       if ((cell.grain ?? 0) > 0) lines.push({ label: "洞藏粮", value: cell.grain });
-      if ((cell.civs ?? 0) > 0) lines.push({ label: "藏蔽群众", value: `${cell.civs} 批` });
+      // 群众改由 hexBadges 给出（cell.civs 已废弃）：连带显示无人照应与恐慌，因为这是本格最要紧的信息。
+      const badge = vm.hexBadges?.[hexKey];
+      if ((badge?.civs ?? 0) > 0) {
+        lines.push({ label: "藏蔽群众", value: `${badge.civs} 批` });
+        if (badge.civEscorted === false) notes.push("无人照应——会积恐慌");
+        if ((badge.civPanic ?? 0) > 0) lines.push({ label: "恐慌", value: badge.civPanic });
+      }
       if ((cell.smoke ?? 0) > 0) lines.push({ label: "烟", value: `余 ${cell.smoke} 回合` });
     }
     for (const dig of Object.values(vm.tunnels?.digs ?? {})) {

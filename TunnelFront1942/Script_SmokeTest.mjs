@@ -142,9 +142,11 @@ Check("契约：五幕战役注册齐全，幕次卡与解锁声明完整", () =
     const card = BuildActCard(level);
     Eq(card.act, level.act);
     // 认知递增：后一幕的动作集必须是前一幕的超集
+    Ok(level.unlocks.newThisAct.length > 0, `${id} 没有声明本幕新解锁`);
     if (previousActions) {
       for (const type of previousActions) Ok(level.unlocks.actions.includes(type), `${id} 丢掉了上一幕已解锁的 ${type}`);
-      Ok(level.unlocks.actions.length > previousActions.length, `${id} 没有任何新解锁`);
+      // 第五幕不加新动作（它加的是三个村与跨村地道网），其余各幕必须有新动作
+      if (id !== "A5") Ok(level.unlocks.actions.length > previousActions.length, `${id} 没有任何新解锁动作`);
     }
     previousActions = level.unlocks.actions;
   }
@@ -318,15 +320,29 @@ Check("排序红线：缩头永远拿不到甲乙；莽撞在第二幕起必败"
   }
 });
 
-Check("双时钟：纯躲一次也逼不退；会玩能在半数以上 seed 把敌逼退（第三幕起有枪之后）", () => {
-  for (const level of acts) {
+Check("双时钟：纯躲一次也逼不退（第一至三幕）且永远赢不了；会玩能在半数以上 seed 把敌逼退", () => {
+  // 第四幕起敌人自己带烟与水，反地道作业会自耗行动力池（烟 -3 / 水 -3 / 爆 -4 / 攻入 -4）——
+  // 那是敌人自己花的钱，不是白送给玩家的；纯躲即使把敌熬走也照样输（排序红线已锁）。
+  for (const level of ["A1", "A2", "A3"]) {
     for (const state of rank[level].Turtle) {
       Ok(!state.wave.expelled, `${level}：纯躲不该把敌逼退`);
     }
   }
+  for (const level of acts) {
+    for (const state of rank[level].Turtle) {
+      Ok(!state.result.won || ["丙", "丁"].includes(state.result.grade), `${level}：纯躲评到 ${state.result.grade}`);
+    }
+  }
+  // 纯躲连池都耗不动（扑空衰减要靠「藏干净」换，缩头流留着东西给敌人搜，敌人就有事干）
+  for (const level of ["A1", "A2", "A3"]) {
+    for (const state of rank[level].Turtle) {
+      Ok(state.wave.pool > 0, `${level}：纯躲不该把敌行动力池耗到见底（实得 ${state.wave.pool}）`);
+    }
+  }
+  // 会玩要把池打到见底（打到 ≤0 即算；能不能在硬上限之前收到「收队」横幅，取决于还剩几回合）
   for (const level of ["A3", "A4", "A5"]) {
-    const expelled = rank[level].Skilled.filter((state) => state.wave.expelled).length;
-    Ok(expelled * 2 >= rankSeeds.length, `${level}：会玩只逼退 ${expelled}/${rankSeeds.length}`);
+    const drained = rank[level].Skilled.filter((state) => state.wave.expelled || state.wave.pool <= 0).length;
+    Ok(drained * 2 >= rankSeeds.length, `${level}：会玩只把池打到见底 ${drained}/${rankSeeds.length}`);
   }
 });
 
@@ -350,10 +366,16 @@ Check("R3-1：unlocks 过滤真的生效——第一幕挖不了连通段、开�
   Eq(Object.keys(state.tunnels.edges).length, 0, "第一幕的地窖不该有任何连通段");
   Eq(LargestNetworkSize(state), 1, "第一幕最大连通块应为 1 格");
   // 第二幕必须真的能挖
-  const a2 = CreateGame("A2", 1);
+  let a2 = CreateGame("A2", 1);
   PutUnder(a2, "u1", "3,0");
   Ok(LegalActions(a2, "u1").some((a) => a.type === "Dig"), "第二幕应能挖连通段");
-  Ok(LegalActions(a2, "u1").some((a) => a.type === "DigEntrance"), "第二幕应能开新口");
+  a2 = Step(a2, { type: "Dig", unit: "u1", target: "3,1" }).state;    // 挖出一个还没有口的新格
+  Ok(a2.tunnels.cells["3,1"], "第二幕应能挖出新地道格");
+  PutUnder(a2, "u2", "3,1");
+  Ok(LegalActions(a2, "u2").some((a) => a.type === "DigEntrance"), "第二幕应能在新格上开口");
+  Ok(LegalActions(a2, "u2").some((a) => a.type === "DigFacility" && a.facility === "storage"), "第二幕应能修储粮洞");
+  Ok(!LegalActions(a2, "u2").some((a) => a.type === "DigFacility" && a.facility === "fightpost"),
+    "第二幕还不该能修射击孔（那是第三幕的事）");
 });
 
 Check("R3-2：地道里的群众没有单位带路就动不了（GuideCivs 必须同格且是主动作）", () => {
@@ -402,10 +424,21 @@ Check("R3-3：带路批数有上限（联络员 3 / 民兵 2 / 游击 1），牲
   Eq(CivsInCell(after, gAction.to).length, 1, "游击班带走的批数超了");
   // 联络员一次 3 批
   let s2 = SurgeryGame("A3", 1);
+  s2.tunnels.cells["3,1"].facility = "shelter";        // 隔壁修成藏人室，铺位才装得下 3 批
   for (const id of ["c1", "c2", "c3", "c4", "c5"]) PutCiv(s2, id, "4,0");
   PutUnder(s2, runner.id, "4,0");
-  const rAction = LegalActions(s2, runner.id).find((a) => a.type === "GuideCivs");
+  const rAction = LegalActions(s2, runner.id).find((a) => a.type === "GuideCivs" && a.to === "3,1");
+  Ok(rAction, "联络员应能把群众带进隔壁藏人室");
   Eq(rAction.count, CFG.civ.guideCap.runner, "联络员一次应带 3 批");
+  const afterRunner = Step(s2, rAction).state;
+  Eq(CivsInCell(afterRunner, "3,1").length, CFG.civ.guideCap.runner, "联络员带走的批数不对");
+  Eq(CivsInCell(afterRunner, "4,0").length, 2, "剩下的批应留在原地——一次带不完就得再跑一趟");
+  // 走廊（非藏人室）铺位只有 2：带不动 3 批就是带不动
+  let s3 = SurgeryGame("A3", 1);
+  for (const id of ["c1", "c2", "c3"]) PutCiv(s3, id, "4,0");
+  PutUnder(s3, runner.id, "4,0");
+  Ok(!LegalActions(s3, runner.id).some((a) => a.type === "GuideCivs" && a.to === "3,1"),
+    "走廊只有 2 个铺位，3 批带不过去");
 });
 
 Check("R3-4：无人带路 → 恐慌积累 → 满 3 冲出地面；地面有敌当场被抓", () => {
@@ -444,7 +477,7 @@ Check("R3-5：射击孔「打一枪换一个地方」——同口连开被锁定
   let state = SurgeryGame("A3", 1);
   state.tunnels.cells["4,-1"].facility = "fightpost";        // A3 起始网里的一格改成射击孔
   PutUnder(state, "u1", "4,-1");
-  MakeColumn(state, "tShoot", ["inf", "inf"], "4,-1");        // 敌就在射击孔正上方
+  MakeColumn(state, "tShoot", ["inf", "inf"], "5,-1");        // 敌在射击孔旁边的农田（无掩护，好算伤害）
   const first = LegalActions(state, "u1").find((a) => a.type === "Attack" && a.fightpost);
   Ok(first, "射击孔应能开火");
   Ok(!first.locked, "第一枪不该被标为锁定");
@@ -534,12 +567,19 @@ Check("R3-7：翻板拦敌一回合、挡烟挡水；用过要重修", () => {
 
 Check("R3-8：烟在直巷子一回合一格，拐弯要多花一回合", () => {
   // A4 主干：3,0 → 4,-1 → 4,0 → 3,1（3,0→4,-1 与 4,-1→4,0 不同向 = 一个弯）
+  // A4 主干：3,0 →(方向1) 4,-1 →(方向5) 4,0 是一个弯；另接一条 4,-1 →(方向1) 5,-2 的直巷作对照
   let state = SurgeryGame("A4", 1);
+  state.tunnels.cells["5,-2"] = { facility: null, grain: 0, smoke: 0, water: 0, trapReady: false,
+    fightpostHeat: 0, fightpostLastTurn: 0, fightpostKnown: false };
+  state.tunnels.edges[EdgeKey("4,-1", "5,-2")] = { door: null };
   state.tunnels.smokeOps.push({ origin: "3,0", spreadLeft: 6, lingerLeft: 2, cells: ["3,0"],
     front: [{ key: "3,0", dir: -1 }], queued: [] });
   state = EndTurn(state).state;
   Ok(state.tunnels.cells["4,-1"].smoke > 0, "第一步（原点向外）应立刻蔓延");
   Eq(state.tunnels.cells["4,0"].smoke, 0, "拐弯的那一格第一回合不该到");
+  state = EndTurn(state).state;
+  Ok(state.tunnels.cells["5,-2"].smoke > 0, "直巷子应一回合走一格");
+  Eq(state.tunnels.cells["4,0"].smoke, 0, "拐弯那一格第二回合仍不该到（拐弯要多花一回合）");
   state = EndTurn(state).state;
   Ok(state.tunnels.cells["4,0"].smoke > 0, "拐弯的那一格应在多一回合后到达");
 });
@@ -703,10 +743,10 @@ Check("R2 P0-5：同格至多 1 人设伏；伏击后转暴露；连设两回合
   Ok(again && again.stale, "第二回合同格设伏应被标记为 stale");
   state = Step(state, again).state;
   Ok((state.map.hexes["1,2"].alertedUntil || 0) >= state.meta.turn, "该格应获「敌已警戒」标记");
-  MakeColumn(state, "tStale", ["inf"], "0,2");
+  MakeColumn(state, "tStale", ["inf"], "0,1", { target: "v1" });   // 让它朝村里走，必经伏点旁（起手不相邻）
   const outcome = EndTurn(state);
   const hit = outcome.events.find((event) => event.kind === "combat" && event.text.includes("伏击"));
-  Ok(hit, "伏击未触发");
+  Ok(hit, `伏击未触发：${outcome.events.map((e) => e.text).join(" / ")}`);
   Ok(hit.text.includes(`伤 ${CFG.staleAmbushDamage}`), `老地方伏击伤害应降为 ${CFG.staleAmbushDamage}：${hit.text}`);
   // 边界：T1 首次设伏不得被误判为老地方
   const fresh = CreateGame("A3", 1);
@@ -720,6 +760,8 @@ Check("R2 P0-6：胜负只认洞存粮与群众保全（第三幕：洞里 7 担
   const Finish = (tunnelGrain) => {
     let state = CreateGame("A3", 1);
     state.map.villages.v1.grainOpen = 0;
+    state.map.villages.v1.organize = 0;            // 关掉平静期自动藏粮，锁死判定口径
+    state.wave.status = "sweep";
     state.tunnels.cells["3,0"].grain = tunnelGrain;
     state.meta.turn = GetLevel("A3").maxTurns;
     state.wave.schedule = [];

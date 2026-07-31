@@ -3,7 +3,7 @@
 // 全确定性：波内零随机（三处 RNG 子流已在建局时抽定于 wave.plan / schedule / tieSalt）。
 
 import { HexNeighborKeys, HexDistanceKeys, ParseHexKey } from "./Script_Hex.mjs";
-import { CFG, unitDefinitions, TEXT } from "./Data_Rules.mjs";
+import { CFG, unitDefinitions, disguiseDefinitions, TEXT } from "./Data_Rules.mjs";
 import { GetLevel } from "./Data_Levels.mjs";
 import {
   SortedKeys, CompareIds, PushEvent, AddLedger, MakeEnemyUnit, EnemyMoveCost, EnemyPathCost, UnitsOn,
@@ -257,12 +257,21 @@ function ResolveDecisionWave(state, events) {
 
 /** R2 P0-2：盯上一个口的门槛从「已被搜出（满 9 豆）」降到「暴露豆 ≥4」，暴露高者优先。
  *  L1 的口一辈子到不了 9 豆，这正是反地道四选一从没发生过的原因。 */
+/** 盯上一个口所需的动静：基础 opTargetExpose，**伪装每级再加 2**——
+ *  灶台/炕洞（+1）要 6 豆、水井（+2）要 8 豆才招敌动手。
+ *  伪装口因此不只是更难搜出，也更晚被敌盯上；没做伪装的口门槛照旧。 */
+function OpTargetBeans(state, entrance) {
+  const bonus = entrance.disguise && disguiseDefinitions[entrance.disguise]
+    ? disguiseDefinitions[entrance.disguise].conceal * 2 : 0;
+  return CFG.opTargetExpose + bonus;
+}
+
 function TargetableEntranceNear(state, pos, range) {
   const keys = [];
   for (const key of SortedKeys(state.tunnels.entrances)) {
     const entrance = state.tunnels.entrances[key];
     if (entrance.sealed || HexDistanceKeys(pos, key) > range) continue;
-    if (entrance.known || entrance.expose >= CFG.opTargetExpose) keys.push(key);
+    if (entrance.known || entrance.expose >= OpTargetBeans(state, entrance)) keys.push(key);
   }
   keys.sort((a, b) => (state.tunnels.entrances[b].expose - state.tunnels.entrances[a].expose) || (a < b ? -1 : 1));
   return keys.length ? keys[0] : null;

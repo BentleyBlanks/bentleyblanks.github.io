@@ -11,7 +11,7 @@ import {
   SortedKeys, CompareIds, EdgeKey, EdgeEnds, TerrainOf, PushEvent, AddLedger, AddPlayerDrain,
   SpendAmmo, GainAmmo, UnitDef, CloneState, UnitsOn, AllyUnits, EnemyUnits, RemoveUnit,
   TunnelNeighbors, ReachableFacilityCells, StorageCellsUnder,
-  EntranceThreshold, CellHasRoom, IsSurfacePassable, ZoneOfCell, ZoneEntranceKeys,
+  EntranceThreshold, CellHasRoom, IsSurfacePassable, ZoneOfCell, ZoneEntranceKeys, EntranceCivPassable,
   ActionUnlocked, FacilityUnlocked, UnlockedDisguises, CivGuidanceOn, StorageCapOf,
   CivsAtVillage, CivsInCell, CivSlots, CivSpeed, CellCivRoom, EntranceGuideBonus,
 } from "./Script_State.mjs";
@@ -585,20 +585,22 @@ function CollectUnitActions(state, unit, actions) {
   actions.push({ type: "Rest", unit: id });
 }
 
-/** 群众从村口能落脚的地道格（近者优先）：先找连通的藏人室，实在没有就先挤进口下那一格。 */
+/**
+ * 群众从村口能落脚的地道格：**只有藏人室**（AGENTS §2.3「群众只能待在藏人室」）。
+ * 走廊只能在「带路」途中临时容身（每格 2 个铺位），不能从村口直接往里塞人——
+ * 藏人室的铺位不够，就是不够，这是第一幕代价的结构来源。
+ */
 function CivDropCells(state, entranceKey) {
-  const cells = ReachableFacilityCells(state, entranceKey, "shelter");
-  if (state.tunnels.cells[entranceKey] && CellCivRoom(state, entranceKey) > 0 && !cells.includes(entranceKey)) {
-    cells.push(entranceKey);
-  }
-  return cells;
+  return ReachableFacilityCells(state, entranceKey, "shelter");
 }
 
+/** 群众下得去的口：未封，且伪装物不挡人（水井口窄，群众进不去也上不来）。 */
 function NearbyShelterEntrance(state, pos) {
   const keys = [pos, ...HexNeighborKeys(pos)];
   for (const key of keys) {
     const entrance = state.tunnels.entrances[key];
-    if (entrance && !entrance.sealed && CivDropCells(state, key).length) return key;
+    if (!entrance || entrance.sealed || !EntranceCivPassable(entrance)) continue;
+    if (CivDropCells(state, key).length) return key;
   }
   return null;
 }
