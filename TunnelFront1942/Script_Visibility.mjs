@@ -3,6 +3,7 @@
 
 import { ParseHexKey, HexLine, HexKey, HexNeighborKeys, HexDistanceKeys } from "./Script_Hex.mjs";
 import { CFG, terrainDefinitions, unitDefinitions, TEXT } from "./Data_Rules.mjs";
+import { GetLevel } from "./Data_Levels.mjs";
 import {
   SortedKeys, AllyUnits, EnemyUnits, UnitDef, EntranceThreshold, VentThreshold,
   GrainTotal, PopTotal, WoundedTotal, TunnelNeighbors,
@@ -171,6 +172,22 @@ export function DeriveView(state) {
     telegraphs: [],
     guardrails: [],
     hexBadges: {},
+    // 关卡自带的固定情报：地标、伏击位、目标行、规则要点、代价簿说明、敌单位速查，均取自 Data_Levels
+    landmarks: (GetLevel(state.meta.level).landmarks || []).map((entry) => ({ ...entry })),
+    ambushSpots: (GetLevel(state.meta.level).ambushSpots || []).map((entry) => ({ ...entry })),
+    objectives: (GetLevel(state.meta.level).objectives || []).slice(),
+    phaseNote: (GetLevel(state.meta.level).phases || [])
+      .find((entry) => state.meta.turn >= entry.from && state.meta.turn <= entry.to) || null,
+    openingChecklist: (GetLevel(state.meta.level).openingChecklist || []).slice(),
+    pitfalls: (GetLevel(state.meta.level).pitfalls || []).slice(),
+    roster: (GetLevel(state.meta.level).roster || []).slice(),
+    gradeNotes: (GetLevel(state.meta.level).gradeNotes || []).slice(),
+    digest: (GetLevel(state.meta.level).digest || []).slice(),
+    ledgerNotes: (GetLevel(state.meta.level).ledgerNotes || []).slice(),
+    counterNotes: (GetLevel(state.meta.level).counterNotes || []).slice(),
+    facilityNotes: (GetLevel(state.meta.level).facilityNotes || []).slice(),
+    tactics: (GetLevel(state.meta.level).tactics || []).slice(),
+    orderOfBattle: (GetLevel(state.meta.level).orderOfBattle || []).slice(),
     result: state.result,
   };
 
@@ -211,10 +228,18 @@ export function DeriveView(state) {
   for (const op of state.enemy.pendingOps) {
     view.telegraphs.push({ kind: op.kind, hex: op.at, text: `${TEXT.telegraph[op.kind]}（${op.at}）` });
   }
+  // 波次预告：优先用关卡数据自带的档案式电报文案（写在 Data_Levels，情报 100% 真实）
   for (const wave of state.wave.schedule) {
     if (!wave.spawned && wave.kind !== "decision" && wave.turn === state.meta.turn + 1) {
-      view.telegraphs.push({ kind: "wave", hex: wave.entry, text: `内线电报：明日有敌一部（${wave.units.length}队）自 ${wave.entry || "不明方向"} 入境` });
+      view.telegraphs.push({ kind: "wave", hex: wave.entry,
+        text: wave.telegraph || `内线电报：明日有敌一部（${wave.units.length}队）自 ${wave.entry || "不明方向"} 入境` });
     }
+  }
+  // 敌情时间线：按回合投放的内线通报（与波次预告同为「已定之事」，不含推测）
+  for (const intel of GetLevel(state.meta.level).intelTimeline || []) {
+    if (intel.turn !== state.meta.turn) continue;
+    const villageName = ({ v1: "枣林庄", v2: "柳条峪", v3: "石槽村" })[state.wave.plan?.targetAssign?.main] || "枣林庄";
+    view.telegraphs.push({ kind: "intel", hex: null, text: intel.text.replace("{MAINVILLAGE}", villageName) });
   }
   if (state.wave.withdrawAnnounced && state.wave.status !== "done") {
     view.telegraphs.push({ kind: "withdraw", hex: null, text: TEXT.banner.withdraw });

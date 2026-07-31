@@ -99,12 +99,9 @@ function StepBreath(state, events) {
   }
 }
 
-/**
- * ③ 被迫出洞（先于任何敌利用；R2 P0-3 改造）：憋闷 ≥3 → **一定上地面**。
- * 优先自分区里最近的未封口涌出；一个口都没有就在**本格正上方刨土钻出**（留下痕迹）；
- * 连正上方都不可通行才退化为掉血。出洞时地面有敌：群众被捕入代价簿，单位就此暴露在敌前。
- * 这是地上-地下唯一的强耦合点——把人闷死在洞里不再是可行打法。
- */
+/** ③ 被迫出洞（R2 P0-3）：憋闷 ≥3 → **一定上地面**：先走分区里最近的未封口，没有口就在本格
+ *  正上方刨土钻出（留痕迹），连正上方都不可通行才退化为掉血。地面有敌 → 群众当场被捕入账本。
+ *  这是地上-地下唯一的强耦合点：把人闷死在洞里不再是可行打法。 */
 function ForcedExit(state, zone, fromKey) {
   const exits = ZoneExits(state, zone, fromKey);
   if (exits.length) return { key: exits[0], dug: false };
@@ -226,11 +223,8 @@ function StepExposure(state, events) {
   }
 }
 
-/**
- * ⑤ 粮食产耗：平静期每村 +1 明存粮，组织 ≥1 且脚下真通着储粮洞的村自动藏 1；
- * 扫荡期（场上有敌时）每村明存粮每回合被搜走 2 担进代价簿——明粮留在地面就是留给敌人（R2 P0-6a）。
- * 敌纵队当回合已在本村征过粮的不再重复扣。
- */
+/** ⑤ 粮食产耗：平静期每村 +1（组织 ≥1 且脚下通着储粮洞则自动藏 1）；扫荡期敌到村边则每回合
+ *  搜走 sweepGrainLoss 担进代价簿（R2 P0-6a）。当回合已被纵队征过粮的村不重复扣。 */
 function StepGrain(state, events) {
   if (state.wave.status === "quiet") {
     for (const villageId of SortedKeys(state.map.villages)) {
@@ -267,12 +261,8 @@ function StepIntel(state, events) {
   UpdateEnemyMemory(state);
 }
 
-/**
- * ⑦ 池扣减与撤退判定（R2 P0-6b）：
- * 基础衰减（L1 已归零）+ **扑空衰减**（摸到村边却一无所获的纵队每支 -1，每回合至多 -2）
- * + 我方所致（伏击/破路/逼作业/打退攻入，单回合封顶 5）。池空 → 次回合宣布收队。
- * 扑空衰减不是白送：它由「粮藏净、人藏好、口掩住」换来，是地道战本身的胜利。
- */
+/** ⑦ 池扣减与撤退（R2 P0-6b）：基础衰减（两关都已归零）+ **扑空衰减**（摸到村边却一无所获的
+ *  纵队每支 -1，每回合至多 -2）+ 我方所致（封顶 5）。扑空衰减不是白送，是藏干净换来的。 */
 function EmptyHandedColumns(state) {
   let count = 0;
   for (const column of state.enemy.columns) {
@@ -406,10 +396,7 @@ export function ComputeBreakdown(state, won) {
   return breakdown;
 }
 
-/**
- * 判据求值器（胜负线与勋记共用一张表；条件写在 Data_Levels，脚本只负责算）。
- * 每条返回 { ok, text }，text 直接进终局归因，玩家看得见「差多少」。
- */
+/** 判据求值器（胜负线与勋记共用；条件写在 Data_Levels）。每条返回 { ok, text } 进终局归因。 */
 function CheckCondition(state, key, want) {
   const table = {
     grainTotal: () => ({ ok: GrainTotal(state) >= want, text: `存粮 ${GrainTotal(state)} 担（需 ≥${want}）` }),
@@ -452,7 +439,11 @@ function Evaluate(state, events, opts) {
   } else {
     const verdict = CheckAll(state, level.victory);
     won = verdict.ok;
-    for (const row of verdict.rows) reasons.push(`${row.ok ? "✓" : "✗"} ${row.text}`);
+    const keys = Object.keys(level.victory || {}).sort();
+    verdict.rows.forEach((row, index) => {
+      const hint = !row.ok && level.defeatHints ? level.defeatHints[keys[index]] : null;
+      reasons.push(`${row.ok ? "✓" : "✗"} ${row.text}${hint ? `——${hint}` : ""}`);
+    });
   }
   let medals = (level.medals || []).map((medal) => (medal.anyOf
     ? CheckAny(state, medal.anyOf).ok && CheckAll(state, medal.need || {}).ok

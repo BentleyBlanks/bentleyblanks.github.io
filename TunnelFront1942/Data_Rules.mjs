@@ -59,7 +59,8 @@ export const CFG = Object.freeze({
   // —— 弹药（全局池，缴获是唯一来源；R2：收支严格为负） ——
   ammoMax: 12,
   ammoPerAttack: 1,
-  loot: Object.freeze({ inf: 1, puppet: 0, sapper: 1, spy: 0 }),
+  // 打死一个日军班要两枪（伏击 3 伤 × 2 打 4 HP），只缴到 1 发——每场交火都在净亏。
+  loot: Object.freeze({ inf: 1, puppet: 0, sapper: 0, spy: 0 }),
 
   // —— 战斗（确定性，零随机） ——
   ambushBonus: 1,        // 伏击 +1 伤
@@ -105,6 +106,8 @@ export const CFG = Object.freeze({
 
   // —— 反地道作业 ——
   breachMinInf: 2,          // 攻入需 ≥2 步兵班邻接且谨慎 <2
+  sealPerColumn: 1,         // 每纵队每役至多填死 1 个口（填土是整天的活，不是随手就干）
+  sapperSeekRange: 12,      // 工兵队会主动奔向暴露最高的口（它就是为这个来的）
   sealRepairProgress: 2,    // 被封/自毁入口重挖进度
   logCap: 300,
 });

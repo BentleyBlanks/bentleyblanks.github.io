@@ -149,8 +149,9 @@ function DrawWavePlan(state, level) {
   const plan = state.wave.plan;
   for (const draw of level.seedDraws || []) plan[draw.key] = PickIndex(state, draw.count);
   for (const entry of BuildSchedule(level, plan)) state.wave.schedule.push(entry);
-  if (level.revenge) {
-    state.wave.revenge = { ...level.revenge, casualties: 0, spawnedTurn: null, pending: false };
+  if (level.revengeVariants) {
+    const variant = level.revengeVariants[(plan.revenge || 0) % level.revengeVariants.length];
+    state.wave.revenge = { ...variant, watch: level.revengeWatch, casualties: 0, spawnedTurn: null, pending: false };
   }
   state.wave.tieSalt = Math.floor(NextRandom(state) * 997);            // 嫌疑同分平手子流
 }

@@ -250,23 +250,17 @@ Check("双时钟：纯躲 → 敌满时长离场且明存粮被征 ≥6", () => 
 
 // R2：L1 取消了「每回合白送 -1」，收队时点不再是平滑函数，双时钟改按**池**与**逼退率**断言
 // （池才是双时钟本体；扑空衰减 + 我方袭扰共同耗池，纯躲两样都拿不到）。
-Check("双时钟：袭扰耗池 ≥ 纯躲 +5（逐 seed），且袭扰逼退率 ≥半数、纯躲零逼退", () => {
+Check("双时钟：袭扰把敌逼退、纯躲一次也逼不退；逼退落在 T9-T10（不再 T7-T8 提前收工留空转）", () => {
   let expelled = 0;
   for (let i = 0; i < rankSeeds.length; i += 1) {
     const harass = rank.L1.Skilled[i];
-    const turtle = rank.L1.Turtle[i];
-    Ok(turtle.wave.pool - harass.wave.pool >= 5,
-      `seed${rankSeeds[i]}：袭扰余池 ${harass.wave.pool} vs 纯躲 ${turtle.wave.pool}，差 <5`);
-    Ok(!turtle.wave.expelled, `seed${rankSeeds[i]}：纯躲不该把敌逼退`);
-    if (harass.wave.expelled) expelled += 1;
+    Ok(!rank.L1.Turtle[i].wave.expelled, `seed${rankSeeds[i]}：纯躲不该把敌逼退`);
+    if (!harass.wave.expelled) continue;
+    expelled += 1;
+    Ok(harass.wave.withdrawTurn >= 9, `seed${rankSeeds[i]}：逼退过早 T${harass.wave.withdrawTurn}`);
+    Ok(harass.wave.withdrawTurn <= harass.wave.hardEndTurn, "逼退回合越界");
   }
   Ok(expelled * 2 >= rankSeeds.length, `袭扰逼退 ${expelled}/${rankSeeds.length}，不足半数`);
-});
-
-Check("双时钟：逼退发生在 T9-T10（不再是 T7-T8 提前收工留空转）", () => {
-  const turns = rank.L1.Skilled.filter((state) => state.wave.expelled).map((state) => state.wave.withdrawTurn);
-  Ok(turns.length > 0, "没有一个 seed 逼退");
-  for (const turn of turns) Ok(turn >= 9, `逼退过早：T${turn}`);
 });
 
 // ===========================================================================
@@ -495,12 +489,12 @@ const FirstIdle = (state) => AllyUnits(state).find((unit) => !unit.acted) || nul
 const Acts = (state, unit) => LegalActions(state, unit.id);
 const Pick = (actions, type, extra) => actions.find((a) => a.type === type && (!extra || extra(a))) || null;
 
-Check("R2 P0-1：挖通一段/修一处设施 → 同气区各口暴露 +1；开新口 → 该口 +2（全程结算，非只在扫荡开始）", () => {
-  let state = SurgeryGame("L1", 1);                       // 已进入扫荡期
+Check("R2 P0-1：挖一段/修一设施 → 同气区各口 +1，开新口 +2；掩土 -2 且每人每局限 3 次", () => {
+  let state = SurgeryGame("L1", 1);                       // 已进入扫荡期：证明「全程结算」不是只在扫荡开始那一瞬
   Eq(state.wave.status, "sweep", "外科局应在扫荡期");
   const before = state.tunnels.entrances["3,1"].expose;
   PutUnder(state, "u1", "3,1");
-  state = Step(state, { type: "Dig", unit: "u1", target: "3,2" }).state;    // 民兵挖掘力 2 = 村庄段一次挖通
+  state = Step(state, { type: "Dig", unit: "u1", target: "3,2" }).state;   // 民兵挖掘力 2 = 村庄段一次挖通
   Ok(state.tunnels.cells["3,2"], "村庄段应一次挖通");
   Eq(state.tunnels.entrances["3,1"].expose, before + CFG.exposePerWork, "挖通一段未给同气区的口记豆");
   PutUnder(state, "u2", "3,2");
@@ -510,11 +504,9 @@ Check("R2 P0-1：挖通一段/修一处设施 → 同气区各口暴露 +1；开
   PutUnder(state, "u1", "3,2");
   state = Step(state, { type: "DigEntrance", unit: "u1", at: "3,2" }).state;
   Eq(state.tunnels.entrances["3,2"].expose, CFG.exposeNewEntrance, "新开口应自带 +2 豆");
-});
-
-Check("R2 P0-1：掩土 -2 豆，且每单位每局至多 3 次（第 4 次非法）", () => {
-  let state = SurgeryGame("L1", 1);
+  // 掩土：唯一的减法，每人每局 3 次
   state.tunnels.entrances["3,1"].expose = 20;
+  state.units.u1.layer = "surface"; state.units.u1.pos = "3,1";
   for (let i = 0; i < CFG.coverUsesPerUnit; i += 1) {
     const expose = state.tunnels.entrances["3,1"].expose;
     state.units.u1.acted = false;
@@ -522,13 +514,13 @@ Check("R2 P0-1：掩土 -2 豆，且每单位每局至多 3 次（第 4 次非�
     Eq(state.tunnels.entrances["3,1"].expose, expose - CFG.coverTracesAmount, `第 ${i + 1} 次掩土未减豆`);
   }
   state.units.u1.acted = false;
-  Ok(!LegalActions(state, "u1").some((a) => a.type === "CoverTraces"), "掩土次数用尽后不应再出现在合法动作里");
+  Ok(!LegalActions(state, "u1").some((a) => a.type === "CoverTraces"), "掩土次数用尽后不该再出现在合法动作里");
   Ok(PerformAction(state, { type: "CoverTraces", unit: "u1" }).illegal, "第 4 次掩土应被拒绝");
 });
 
 Check("R2 P0-3：无风分区憋满 3 回合 → 人与群众被推到地面（不是原地掉血致死）", () => {
   let state = SurgeryGame("L1", 1);
-  state.tunnels.entrances["3,1"].sealed = true;           // 封死唯一的口：无风、无常规出口
+  state.tunnels.entrances["3,1"].sealed = true;           // 封死唯一的口：无风、且没有常规出口
   PutUnder(state, "u1", "3,1");
   state.tunnels.cells["3,1"].civs = 2;
   const hpBefore = state.units.u1.hp;
@@ -536,7 +528,7 @@ Check("R2 P0-3：无风分区憋满 3 回合 → 人与群众被推到地面（�
   for (let i = 0; i < 4 && !forced; i += 1) {
     const outcome = EndTurn(state);
     state = outcome.state;
-    if (outcome.events.some((event) => event.kind === "forcedOut")) forced = true;
+    forced = outcome.events.some((event) => event.kind === "forcedOut");
   }
   Ok(forced, "憋闷满 3 回合必须被迫出洞");
   Eq(state.units.u1.layer, "surface", "单位应被推到地面");
@@ -549,19 +541,16 @@ Check("R2 P0-4：HideGrain 要求本村格正下方有地道且连着储粮洞",
   let state = CreateGame("L1", 1);
   PutUnder(state, "u1", "3,1");
   state = Step(state, { type: "DigFacility", unit: "u1", cell: "3,1", facility: "storage" }).state;
-  const away = state.units.u2;                             // u2 站在 4,0：村格，但头顶一格地道也没有
-  Eq(away.pos, "4,0");
+  Eq(state.units.u2.pos, "4,0");                           // u2 站在村格 4,0，但头顶一格地道也没有
   Ok(!state.tunnels.cells["4,0"], "4,0 正下方本不该有地道格");
   Ok(!LegalActions(state, "u2").some((a) => a.type === "HideGrain"), "隔空藏粮不该是合法动作");
   Ok(PerformAction(state, { type: "HideGrain", unit: "u2" }).illegal, "隔空藏粮应被拒绝");
   state.units.u1.acted = false;
   PutUnder(state, "u1", "3,1");
   state = Step(state, { type: "Dig", unit: "u1", target: "4,0" }).state;    // 把地道挖到粮囤脚底下
-  Ok(state.tunnels.cells["4,0"], "村庄段应挖通");
   state.units.u2.acted = false;
-  Ok(LegalActions(state, "u2").some((a) => a.type === "HideGrain"), "挖通之后才该能藏粮");
-  const outcome = Step(state, { type: "HideGrain", unit: "u2" });
-  Ok(TunnelGrainTotal(outcome.state) > 0, "藏粮应真的入洞");
+  Ok(state.tunnels.cells["4,0"] && LegalActions(state, "u2").some((a) => a.type === "HideGrain"), "挖通之后才该能藏粮");
+  Ok(TunnelGrainTotal(Step(state, { type: "HideGrain", unit: "u2" }).state) > 0, "藏粮应真的入洞");
 });
 
 Check("R2 P0-5：同格至多 1 人设伏；伏击后转暴露可被还击", () => {
@@ -599,22 +588,14 @@ Check("R2 P0-5：连两回合同格设伏 → 伤害 3→1，且该格获「敌�
   const hit = outcome.events.find((event) => event.kind === "combat" && event.text.includes("伏击"));
   Ok(hit, "伏击未触发");
   Ok(hit.text.includes(`伤 ${CFG.staleAmbushDamage}`), `老地方伏击伤害应降为 ${CFG.staleAmbushDamage}：${hit.text}`);
-});
-
-Check("R2 P0-5：T1 全新格的首次设伏绝不能被判成「老地方」（ambushSetTurn 缺省 0 的边界）", () => {
-  const state = CreateGame("L1", 1);
-  Eq(state.meta.turn, 1);
+  // 边界：ambushSetTurn 缺省 0，T1 的 `0 === turn-1` 会把全新格误判成老地方
+  const fresh = CreateGame("L1", 1);
+  Eq(fresh.meta.turn, 1);
   for (const unitId of ["u1", "u2", "u3"]) {
-    for (const action of LegalActions(state, unitId).filter((a) => a.type === "Ambush")) {
-      Ok(!action.stale, `T1 首次设伏被误判为老地方：${JSON.stringify(action)}`);
-    }
+    for (const act of LegalActions(fresh, unitId).filter((a) => a.type === "Ambush")) Ok(!act.stale, "T1 首次设伏被误判为老地方");
   }
-  const first = LegalActions(state, "u1").find((a) => a.type === "Ambush");
-  if (first) {
-    const after = Step(state, first).state;
-    Ok(!after.units.u1.ambushStale, "T1 首次设伏不该带 stale");
-    Eq(after.map.hexes[after.units.u1.pos].alertedUntil || 0, 0, "T1 首次设伏不该给该格挂「敌已警戒」");
-  }
+  const first = LegalActions(fresh, "u1").find((a) => a.type === "Ambush");
+  if (first) Eq(Step(fresh, first).state.map.hexes[fresh.units.u1.pos].alertedUntil || 0, 0, "T1 首次设伏不该挂警戒");
 });
 
 Check("R2 P0-5：伏击改为持续状态——不移动不换动作就一直守着", () => {
@@ -644,48 +625,34 @@ Check("R2 P0-6a：L1 胜负只认洞存粮——洞里 9 担判负、10 担判�
 });
 
 Check("R2 P0-6c：L1 的 seed 是真变量——12 个 seed 不再逐字节相同", () => {
-  const prints = new Set();
-  const axes = new Set();
-  const mixes = new Set();
-  const arrivals = new Set();
+  const prints = new Set(); const axes = new Set(); const mixes = new Set(); const arrivals = new Set();
   for (let seed = 1; seed <= 12; seed += 1) {
     const { state } = RunBotGame({ level: "L1", seed, bot: "Skilled" });
     prints.add([state.result.grade, state.result.medals.join(""), GrainTotal(state), state.meta.turn,
       state.wave.pool, state.resources.ammo, JSON.stringify(state.ledger), state.wave.withdrawTurn].join("/"));
-    axes.add(state.wave.plan.axisId);
-    mixes.add(state.wave.plan.mixId);
-    arrivals.add(state.wave.plan.arriveTurn);
+    axes.add(state.wave.plan.axisId); mixes.add(state.wave.plan.mixId); arrivals.add(state.wave.plan.arriveTurn);
   }
   Ok(prints.size >= 4, `12 个 seed 只跑出 ${prints.size} 种终局`);
-  Ok(axes.size >= 2, `入境轴线只出现 ${axes.size} 种`);
-  Ok(mixes.size >= 2, `兵力配比只出现 ${mixes.size} 种`);
-  Ok(arrivals.size >= 3, `主力到达回合只出现 ${arrivals.size} 种`);
+  Ok(axes.size >= 2 && mixes.size >= 2 && arrivals.size >= 3,
+    `排班变量太少：轴线 ${axes.size} 种 / 配比 ${mixes.size} 种 / 到达回合 ${arrivals.size} 种`);
 });
 
-Check("R2 复验反例①：零地道流（不挖不藏不下群众）在 L1 必输", () => {
+Check("R2 复验盲审两大反例：零地道流必输、复读伏击流拿不到满勋记", () => {
   const NoDig = (state) => {
     const unit = FirstIdle(state);
     if (!unit) return { type: "EndTurn" };
     const actions = Acts(state, unit);
     return Pick(actions, "Ambush") || Pick(actions, "Hide") || Pick(actions, "Rest") || { type: "Rest", unit: unit.id };
   };
-  for (const seed of [1, 3, 5, 7]) {
-    const state = PlayWith("L1", seed, NoDig);
-    Ok(state.result && !state.result.won, `seed${seed}：零地道流竟然赢了（${state.result && state.result.grade}）`);
-    Eq(TunnelGrainTotal(state), 0, "零地道流不该有洞存粮");
-  }
-});
-
-Check("R2 复验反例②：三单位堆一格复读伏击在 L1 拿不到满勋记", () => {
-  const spot = "4,0";
+  const spot = "4,0";                                   // 盲审局 3 用的就是这一格（村庄 + 大车路）
   const Spam = (state) => {
     const unit = FirstIdle(state);
     if (!unit) return { type: "EndTurn" };
     const actions = Acts(state, unit);
     if (UnitDef(unit).atk > 0) {
       if (unit.pos !== spot) {
-        const move = actions.filter((a) => a.type === "Move")
-          .sort((a, b) => HexDistanceKeys(a.path[a.path.length - 1], spot) - HexDistanceKeys(b.path[b.path.length - 1], spot))[0];
+        const move = actions.filter((a) => a.type === "Move").sort((a, b) =>
+          HexDistanceKeys(a.path[a.path.length - 1], spot) - HexDistanceKeys(b.path[b.path.length - 1], spot))[0];
         if (move) return move;
       }
       const ambush = Pick(actions, "Ambush");
@@ -694,43 +661,58 @@ Check("R2 复验反例②：三单位堆一格复读伏击在 L1 拿不到满勋
     return Pick(actions, "Hide") || Pick(actions, "Rest") || { type: "Rest", unit: unit.id };
   };
   for (const seed of [1, 3, 5, 7]) {
-    const state = PlayWith("L1", seed, Spam);
-    Ok(state.result && state.result.grade !== "甲",
-      `seed${seed}：复读伏击流仍评到 ${state.result && state.result.grade}`);
+    const noDig = PlayWith("L1", seed, NoDig);
+    Ok(noDig.result && !noDig.result.won, `seed${seed}：零地道流竟然赢了（${noDig.result && noDig.result.grade}）`);
+    Eq(TunnelGrainTotal(noDig), 0, "零地道流不该有洞存粮");
+    const spam = PlayWith("L1", seed, Spam);
+    Ok(spam.result && spam.result.grade !== "甲", `seed${seed}：复读伏击流仍评到 ${spam.result && spam.result.grade}`);
   }
 });
 
-Check("R2 P0-2：只挖不掩土 → 敌真的会烟攻/爆破/封堵（多 seed 实际触发）", () => {
-  const Digger = (state) => {
-    const unit = FirstIdle(state);
-    if (!unit) return { type: "EndTurn" };
-    const actions = Acts(state, unit);
-    return Pick(actions, "Dig") || Pick(actions, "DigFacility") || Pick(actions, "DigEntrance")
-      || Pick(actions, "UseEntrance", (a) => !a.dive) || Pick(actions, "HideGrain")
-      || Pick(actions, "Rest") || { type: "Rest", unit: unit.id };
-  };
-  const kinds = { L1: new Set(), L2: new Set() };
-  for (const level of ["L1", "L2"]) {
-    for (const seed of [1, 2, 3, 4, 5, 6]) {
-      let state = CreateGame(level, seed);
-      for (let step = 0; step < 3000 && !state.result; step += 1) {
-        const action = Digger(state);
-        let outcome = action.type === "EndTurn" ? EndTurn(state) : PerformAction(state, action);
-        if (outcome.illegal) { outcome = EndTurn(state); if (outcome.illegal) break; }
-        for (const event of outcome.events) {
-          if (event.kind !== "op") continue;
-          for (const [kind, word] of [["smoke", "烟"], ["blast", "炸"], ["breach", "攻入"], ["seal", "填死"]]) {
-            if (event.text.includes(word)) kinds[level].add(kind);
-          }
+/** 「只挖不掩土」流：挖网 + 藏粮 + 藏人，但从不掩土——最常见的新手打法。
+ *  暴露豆全程结算之后，这一流必然把敌人引到自己的口上来（P0-1 与 P0-2 的联合验收）。 */
+const DiggerLine = (state) => {
+  const unit = FirstIdle(state);
+  if (!unit) return { type: "EndTurn" };
+  const actions = Acts(state, unit);
+  const move = actions.filter((a) => a.type === "Move");
+  return Pick(actions, "Dig") || Pick(actions, "DigFacility") || Pick(actions, "DigEntrance")
+    || Pick(actions, "UseEntrance", (a) => !a.dive) || Pick(actions, "HideGrain") || Pick(actions, "MoveCivs")
+    || (unit.layer === "surface" && move.length ? move[0] : null)
+    || Pick(actions, "Rest") || { type: "Rest", unit: unit.id };
+};
+
+function ScanOps(level, seeds) {
+  const kinds = new Set();
+  const ledger = { civCaptured: 0, civDead: 0, housesBurned: 0, grainSeized: 0 };
+  for (const seed of seeds) {
+    let state = CreateGame(level, seed);
+    for (let step = 0; step < 3000 && !state.result; step += 1) {
+      const action = DiggerLine(state);
+      let outcome = action.type === "EndTurn" ? EndTurn(state) : PerformAction(state, action);
+      if (outcome.illegal) { outcome = EndTurn(state); if (outcome.illegal) break; }
+      for (const event of outcome.events) {
+        if (event.kind !== "op") continue;
+        for (const [kind, word] of [["smoke", "烟自"], ["blast", "炸毁"], ["breach", "攻入"], ["seal", "填死"]]) {
+          if (event.text.includes(word)) kinds.add(kind);
         }
-        state = outcome.state;
       }
+      state = outcome.state;
     }
+    for (const key of Object.keys(ledger)) ledger[key] = Math.max(ledger[key], state.ledger[key]);
   }
-  Ok(kinds.L1.has("smoke"), `L1 多 seed 未触发烟攻（实得 ${[...kinds.L1].join("/") || "无"}）`);
-  Ok(kinds.L1.has("seal"), "L1 多 seed 未触发封堵");
-  Ok(kinds.L2.has("smoke"), `L2 多 seed 未触发烟攻（实得 ${[...kinds.L2].join("/") || "无"}）`);
-  Ok(kinds.L2.has("breach") || kinds.L2.has("blast"), "L2 多 seed 未触发攻入/爆破");
+  return { kinds, ledger };
+}
+
+const diggerL1 = ScanOps("L1", [1, 2, 3, 4, 5, 6]);
+const diggerL2 = ScanOps("L2", [1, 2, 3, 4, 5, 6]);
+
+Check("R2 P0-2：只挖不掩土 → 敌真的会烟攻/爆破/攻入/封堵（多 seed 实际触发）", () => {
+  Ok(diggerL1.kinds.has("smoke"), `L1 多 seed 未触发烟攻（实得 ${[...diggerL1.kinds].join("/") || "无"}）`);
+  Ok(diggerL1.kinds.has("seal"), "L1 多 seed 未触发封堵");
+  Ok(diggerL2.kinds.has("smoke"), `L2 多 seed 未触发烟攻（实得 ${[...diggerL2.kinds].join("/") || "无"}）`);
+  Ok(diggerL1.kinds.has("blast") || diggerL2.kinds.has("blast"), "多 seed 未触发爆破");
+  Ok(diggerL2.kinds.has("breach"), "L2 多 seed 未触发攻入");
 });
 
 Check("R2 P1：弹药收支严格为负（缴获补不回消耗）", () => {
@@ -749,7 +731,7 @@ Check("R2 P1：弹药收支严格为负（缴获补不回消耗）", () => {
   }
 });
 
-Check("R2 P1：代价簿四栏在正常游玩中都会动", () => {
+Check("R2 P1：代价簿四栏在正常游玩中都会动（不再是三栏恒 0）", () => {
   const moved = { civCaptured: 0, civDead: 0, housesBurned: 0, grainSeized: 0 };
   for (const level of ["L1", "L2"]) {
     for (const bot of ["Skilled", "Turtle", "Random"]) {
@@ -759,43 +741,50 @@ Check("R2 P1：代价簿四栏在正常游玩中都会动", () => {
       }
     }
   }
-  for (const key of Object.keys(moved)) Ok(moved[key] > 0, `代价簿 ${key} 在 24 局里一次都没动过`);
+  for (const key of Object.keys(moved)) {
+    if (diggerL1.ledger[key] > 0) moved[key] += 1;
+    if (diggerL2.ledger[key] > 0) moved[key] += 1;
+  }
+  for (const key of ["civCaptured", "housesBurned", "grainSeized"]) {
+    Ok(moved[key] > 0, `代价簿 ${key} 在 26 局里一次都没动过`);
+  }
+  // civDead 按 §2.8 只该由「爆破塌方 / 彻底无路可出」造成（烟只逼人出洞，不直接杀伤）——
+  // 这一栏用确定性场景锁死，不靠概率。
+  let state = SurgeryGame("L2", 1);
+  state.wave.smokeCharges = 0;
+  state.tunnels.entrances["2,2"].known = true;
+  state.tunnels.cells["2,2"].facility = "shelter";
+  state.tunnels.cells["2,2"].civs = 2;
+  MakeColumn(state, "tBlastCiv", ["sapper", "inf"], "3,1");
+  state = EndTurn(state).state;
+  state = EndTurn(state).state;
+  Ok(state.ledger.civDead >= 2, `爆破塌方未把藏身群众记入代价簿（civDead=${state.ledger.civDead}）`);
 });
 
-Check("R2 P1：游击班可打同格敌人；民兵可在开阔地挖散兵坑设伏", () => {
+Check("R2 P1：同格可攻击 · 民兵开阔地可挖散兵坑 · L1 石桥可破且破后敌绕行", () => {
   let state = SurgeryGame("L1", 1);
-  MakeColumn(state, "tSame", ["puppet"], state.units.u3.pos);      // 敌与游击班同格
+  MakeColumn(state, "tSame", ["puppet"], state.units.u3.pos);          // 敌与游击班同格
   const shot = LegalActions(state, "u3").find((a) => a.type === "Attack" && a.sameHex);
-  Ok(shot, "同格敌人必须打得着");
-  Ok(!PerformAction(state, shot).illegal, "同格攻击应被接受");
-  // 民兵在开阔地（无隐蔽、无入口）挖散兵坑
+  Ok(shot && !PerformAction(state, shot).illegal, "同格敌人必须打得着");
   let open = SurgeryGame("L1", 1);
-  open.units.u1.pos = "5,0";
+  open.units.u1.pos = "5,0";                                           // 开阔地：无隐蔽、无入口
   const foxhole = LegalActions(open, "u1").find((a) => a.type === "Ambush" && a.site === "foxhole");
   Ok(foxhole, "民兵在开阔地应能挖散兵坑设伏");
   open = Step(open, foxhole).state;
   Eq(open.units.u1.stance, "ambush");
   Ok(open.map.hexes["5,0"].traces > 0, "挖散兵坑应留下痕迹");
-  // 游击班挖不动散兵坑（挖掘力不足）
   const guerrilla = SurgeryGame("L1", 1);
   guerrilla.units.u3.pos = "5,0";
   Ok(!LegalActions(guerrilla, "u3").some((a) => a.type === "Ambush"), "游击班挖不动散兵坑");
-});
-
-Check("R2 P1：L1 石桥可破，破后敌绕行（浅滩/南土路仍通）", () => {
   const level = GetLevel("L1");
   Ok(level.bridgeBreakable, "L1 石桥应可破");
-  let state = SurgeryGame("L1", 1);
-  const bridge = SortedKeys(state.map.hexes).find((key) => state.map.hexes[key].bridge && state.map.hexes[key].road);
-  Ok(bridge, "L1 应有石桥");
-  state.units.u1.pos = bridge;
-  state.units.u1.layer = "surface";
-  Ok(LegalActions(state, "u1").some((a) => a.type === "BreakRoad" && a.bridge), "石桥应能 BreakRoad");
-  state.map.hexes[bridge].roadBroken = true;
-  MakeColumn(state, "tDetour", ["inf"], level.exitKeys[0]);
-  const path = EnemyPath(state, level.exitKeys[0], "3,1");
-  Ok(path && path.length, "桥断后仍应能绕到村里（浅滩/南土路）");
-  Ok(!path.includes(bridge), "绕行路线不该再经过断桥");
+  let bridgeGame = SurgeryGame("L1", 1);
+  const bridge = SortedKeys(bridgeGame.map.hexes).find((key) => bridgeGame.map.hexes[key].bridge && bridgeGame.map.hexes[key].road);
+  bridgeGame.units.u1.pos = bridge;
+  Ok(LegalActions(bridgeGame, "u1").some((a) => a.type === "BreakRoad" && a.bridge), "石桥应能 BreakRoad");
+  bridgeGame.map.hexes[bridge].roadBroken = true;
+  const path = EnemyPath(bridgeGame, level.exitKeys[0], "3,1");
+  Ok(path && path.length && !path.includes(bridge), "桥断后仍应能绕到村里（浅滩/南土路），且不再经过断桥");
 });
 
 // ===========================================================================

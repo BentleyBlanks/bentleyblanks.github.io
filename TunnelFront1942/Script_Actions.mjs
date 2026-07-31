@@ -42,12 +42,8 @@ export function AddTraces(state, key, amount) {
   if (hex) hex.traces = Math.min(CFG.tracesMax, hex.traces + amount);
 }
 
-/**
- * R2 P0-1 承重墙：暴露豆**全程结算**。
- * 每挖通 1 段地道 / 修成 1 处设施 → 该气区所有已开地道口（含通风口）暴露豆 +1；
- * 每开 1 个新口 → 该口 +2。掩土是唯一的减法（每人每局 3 次）。
- * 「平静期一锹别动、扫荡期无限开挖」到此为止：动土在哪个阶段都要付账。
- */
+/** R2 P0-1 承重墙：暴露豆**全程结算**——每挖通 1 段 / 修成 1 处设施 → 该气区所有开口 +1，
+ *  每开 1 个新口 → 该口 +2；掩土是唯一的减法（每人每局 3 次）。动土在哪个阶段都要付账。 */
 export function ExposeZoneWork(state, events, atKey, amount = CFG.exposePerWork) {
   const zone = ZoneOfCell(state, atKey);
   if (!zone.size) return 0;
@@ -243,7 +239,8 @@ export function ResolveAttack(state, events, attackerId, defenderId, opts = {}) 
   }
   if (attacker.hp <= 0) {
     if (attacker.side === "ally") OnAllyKilled(state, events, attacker);
-    else OnEnemyKilled(state, events, attacker, defender.side === "ally" && defender.hp > 0);
+    // 反击打死的敌人不缴获：没主动权就没工夫捡枪——否则弹药收支能靠挨打回正。
+    else OnEnemyKilled(state, events, attacker, false);
   } else if (counter > 0 && attacker.side === "enemy") {
     AddPlayerDrain(state, CFG.pool.wound);   // 我方反击致伤敌单位：击伤扣池
   }
@@ -490,6 +487,17 @@ function NearbyShelterEntrance(state, pos) {
   return null;
 }
 
+/** 转移群众/伤员为什么不行——分清「没口 / 没藏人室 / 藏人室满了」，不再一律说成「未连通」。 */
+function ShelterBlockReason(state, pos) {
+  if (![pos, ...HexNeighborKeys(pos)].some((key) => state.tunnels.entrances[key] && !state.tunnels.entrances[key].sealed)) {
+    return "本格与相邻格都没有可用地道口（口要在地下用 DigEntrance 自己开）";
+  }
+  if (!SortedKeys(state.tunnels.cells).some((key) => state.tunnels.cells[key].facility === "shelter")) {
+    return "连通的地道里还没有藏人室——先在地道格上 DigFacility shelter";
+  }
+  return `连通的藏人室都满了（每间容量 ${CFG.shelterCivCap} 批，群众与伤员合计）——再修一间或换个口`;
+}
+
 export function LegalActions(state, unitId) {
   const actions = [];
   if (state.meta.phase !== "player" || state.result) return actions;
@@ -725,12 +733,8 @@ function ApplyBreakRoad(state, events, action) {
   return WorkSite(state, events, unit, power, { kind: "roadBreak", at: unit.pos, need }, null);
 }
 
-/**
- * 设伏（R2 P0-5 改造）：
- * ① 同格至多 1 人处于伏击态；② 伏击是**持续状态**，不移动不换动作就一直守着，不必每回合重按；
- * ③ 连着两回合在同一格设伏 → 本次伏击只伤 1，且该格获「敌已警戒」2 回合（敌寻路绕行）；
- * ④ 民兵可在任何可挖地形就地挖散兵坑设伏，代价是本格 +1 痕迹。
- */
+/** 设伏（R2 P0-5）：① 同格至多 1 人；② 持续状态，不移动不换动作就一直守着；
+ *  ③ 连两回合同格 → 只伤 1 且该格获「敌已警戒」2 回合；④ 民兵可挖散兵坑设伏（+1 痕迹）。 */
 function ApplyAmbush(state, events, action) {
   const unit = AllyOf(state, action.unit);
   if (!unit) return "单位不存在或已阵亡";
@@ -861,7 +865,7 @@ function ApplyMoveCivs(state, events, action) {
   if (!village) return "须在村格转移群众";
   if (village.pop <= 0) return "村中已无未转移的群众";
   const entranceKey = NearbyShelterEntrance(state, unit.pos);
-  if (!entranceKey) return "邻接入口未连通可用藏人室";
+  if (!entranceKey) return ShelterBlockReason(state, unit.pos);
   let want = Math.min(CFG.moveCivsPerAction, village.pop, Math.max(1, Number(action.count) || CFG.moveCivsPerAction));
   let moved = 0;
   for (const cellKey of ReachableFacilityCells(state, entranceKey, "shelter")) {
@@ -876,7 +880,7 @@ function ApplyMoveCivs(state, events, action) {
     }
     if (want <= 0) break;
   }
-  if (moved <= 0) return "藏人室已满";
+  if (moved <= 0) return ShelterBlockReason(state, unit.pos);
   unit.acted = true;
   PushEvent(state, events, { kind: "civs", text: `群众 ${moved} 批转入地道`, hex: unit.pos, visible: true });
   return null;
@@ -891,7 +895,7 @@ function ApplyMoveWounded(state, events, action) {
   const villageId = hex?.villageId || null;
   if (!villageId || (state.wounded.atVillage[villageId] || 0) <= 0) return "此村没有待转移的伤员";
   const entranceKey = NearbyShelterEntrance(state, unit.pos);
-  if (!entranceKey) return "邻接入口未连通可用藏人室";
+  if (!entranceKey) return ShelterBlockReason(state, unit.pos);
   let want = Math.min(CFG.moveWoundedPerAction, state.wounded.atVillage[villageId]);
   let moved = 0;
   for (const cellKey of ReachableFacilityCells(state, entranceKey, "shelter")) {
@@ -906,7 +910,7 @@ function ApplyMoveWounded(state, events, action) {
     }
     if (want <= 0) break;
   }
-  if (moved <= 0) return "藏人室已满";
+  if (moved <= 0) return ShelterBlockReason(state, unit.pos);
   unit.acted = true;
   PushEvent(state, events, { kind: "wounded", text: `伤员 ${moved} 批经地道后送`, hex: unit.pos, visible: true });
   return null;

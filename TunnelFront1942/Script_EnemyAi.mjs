@@ -85,10 +85,7 @@ export function EnemyPath(state, fromKey, toKey) {
 // 伏击触发（敌纵队每进一格检查；未识破特务先因相邻现形，再谈可否被伏）
 // ---------------------------------------------------------------------------
 
-/**
- * 伏击触发。R2 P0-5：同格只可能有 1 个伏击手（合法性在 Ambush 动作侧就卡住了），
- * 打完立刻转「暴露」，并当场吃该纵队一次还击——伏击不再是零风险的免费伤害。
- */
+/** 伏击触发。R2 P0-5：同格只可能有 1 个伏击手；打完转「暴露」并当场吃一次还击。 */
 function TriggerAmbushes(state, events, column, hexKey) {
   const ambushers = AllyUnits(state)
     .filter((unit) => unit.stance === "ambush" && unit.layer === "surface"
@@ -159,7 +156,7 @@ function SpawnColumn(state, events, spec) {
     seizeGoal: spec.seizeGoal || 0, seized: 0,
     caution: 0, cautionTurns: 0, regroupTurns: 0, opInProgress: null,
     withdrawing: false, garrison: false, plannedPath: [], respondFresh: false,
-    incident: false, casualties: 0, burned: false, done: false, gained: false,
+    incident: false, casualties: 0, burned: false, done: false, gained: false, seals: 0,
     axis: spec.axis || null, burnCount: spec.burnCount || 0,
   };
   for (const type of spec.units) {
@@ -196,6 +193,7 @@ function SpawnDueWaves(state, events) {
       const axis = (kills.north || 0) >= (kills.south || 0) ? "north" : "south";
       const entry = axis === "north" ? level.exitKeys[0] : level.exitKeys[1];
       SpawnColumn(state, events, { ...wave, entry, exit: entry, axis,
+        waypoints: (level.reserveWays || {})[axis] || wave.waypoints,
         target: state.wave.plan.targetAssign ? state.wave.plan.targetAssign.main : null });
       continue;
     }
@@ -217,6 +215,7 @@ function SpawnDueWaves(state, events) {
 function VillageWorthGarrison(state, villageId) {
   const village = state.map.villages[villageId];
   if (!village) return false;
+  if ((GetLevel(state.meta.level).garrisonPriority || [])[0] === villageId) return true;   // 区队部永远值得占
   if (village.grainOpen > 0) return true;
   for (const hexKey of village.hexKeys) {
     if (TargetableEntranceNear(state, hexKey, 1)) return true;
@@ -254,11 +253,8 @@ function ResolveDecisionWave(state, events) {
 // 反地道四选一：宣布（提前 1 回合电报）与执行
 // ---------------------------------------------------------------------------
 
-/**
- * R2 P0-2：敌盯上一个口的门槛从「已被搜出（暴露豆满 9）」降到「暴露豆 ≥4」——
- * L1 的口一辈子到不了 9 豆，反地道四选一才会一次都没发生过。
- * 暴露豆高者优先（同分按格键），敌当然先撬最响的那个口。
- */
+/** R2 P0-2：盯上一个口的门槛从「已被搜出（满 9 豆）」降到「暴露豆 ≥4」，暴露高者优先。
+ *  L1 的口一辈子到不了 9 豆，这正是反地道四选一从没发生过的原因。 */
 function TargetableEntranceNear(state, pos, range) {
   const keys = [];
   for (const key of SortedKeys(state.tunnels.entrances)) {
@@ -280,14 +276,17 @@ function ZoneUnderVentilated(state, entranceKey) {
 function AnnounceOp(state, events, column, entranceKey) {
   const level = GetLevel(state.meta.level);
   const allowed = level.enemyOps || [];
-  let kind = null;
   const entrance = state.tunnels.entrances[entranceKey];
-  if (allowed.includes("smoke") && state.wave.smokeCharges > 0 && ColumnHasType(state, column, "sapper")
-      && ZoneUnderVentilated(state, entranceKey)) kind = "smoke";
-  else if (allowed.includes("blast") && ColumnHasType(state, column, "sapper")) kind = "blast";
-  else if (allowed.includes("breach") && CountInf(state, column) >= CFG.breachMinInf
-           && column.caution < CFG.cautionMax && !entrance.breachDenied) kind = "breach";
-  else if (allowed.includes("seal")) kind = "seal";
+  // 四选一的偏好顺序写在关卡数据里（level.opPriority），这里只判「能不能做」。
+  const able = {
+    smoke: () => state.wave.smokeCharges > 0 && ColumnHasType(state, column, "sapper")
+      && ZoneUnderVentilated(state, entranceKey),
+    blast: () => ColumnHasType(state, column, "sapper"),
+    breach: () => CountInf(state, column) >= CFG.breachMinInf && column.caution < CFG.cautionMax && !entrance.breachDenied,
+    seal: () => (column.seals || 0) < CFG.sealPerColumn,
+  };
+  const kind = (level.opPriority || ["smoke", "blast", "breach", "seal"])
+    .find((option) => allowed.includes(option) && able[option] && able[option]()) || null;
   if (!kind) return false;
   state.enemy.pendingOps.push({ kind, at: entranceKey, columnId: column.id, announcedTurn: state.meta.turn, turnsLeft: 1 });
   column.gained = true;
@@ -420,6 +419,7 @@ function ExecuteOp(state, events, op, column) {
       PushEvent(state, events, { kind: "op", text: "敌封堵中止", hex: op.at, visible: SeenBy(state, op.at) });
       return;
     }
+    column.seals = (column.seals || 0) + 1;
     entrance.sealed = true;
     PushEvent(state, events, { kind: "op", text: `${TEXT.op.seal}：入口被土石填死`, hex: op.at, visible: true });
   }
@@ -693,8 +693,14 @@ function ColumnAct(state, events, column) {
   const fired = ColumnAttackAdjacent(state, events, column);
   if (!ColumnUnits(state, column).length) return;
   const engaged = fired && ColumnUnits(state, column).length <= 2;
-  // 4) 已知入口在 1 格内 → 反地道四选一（提前 1 回合电报）
-  const knownKey = pos ? TargetableEntranceNear(state, pos, 1) : null;
+  // 3.8) 工兵队专程来对付地道口：主动奔向暴露最高的那个口（走到了就在同一回合下电报，不空耗一回合）
+  if (column.role === "sapper" && pos && !engaged) {
+    const seek = TargetableEntranceNear(state, pos, CFG.sapperSeekRange);
+    if (seek && HexDistanceKeys(pos, seek) > 1) { MoveColumn(state, events, column, seek); PlanPath(state, column, seek); }
+  }
+  // 4) 已知/已被盯上的入口在 1 格内 → 反地道四选一（提前 1 回合电报）
+  const here = ColumnPos(state, column) || pos;
+  const knownKey = here ? TargetableEntranceNear(state, here, 1) : null;
   if (knownKey && AnnounceOp(state, events, column, knownKey)) { column.plannedPath = []; TickCaution(state, column); return; }
   // 5) 在目标村：征粮 + 按嫌疑分搜索
   const village = column.targetVillage ? state.map.villages[column.targetVillage] : null;
