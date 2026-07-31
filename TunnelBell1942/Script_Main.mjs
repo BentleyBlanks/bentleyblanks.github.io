@@ -358,6 +358,12 @@ function OpenCodex(id) {
 function CloseCodex() { screens.codex.hidden = true; }
 el("CodexClose").addEventListener("click", CloseCodex);
 
+function FlashObjective() {
+  const node = el("HudObjective");
+  node.dataset.flash = "1";
+  setTimeout(() => { node.dataset.flash = "0"; }, 1400);
+}
+
 function Toast(text) {
   const node = el("HudToast");
   node.textContent = text;
@@ -465,16 +471,17 @@ function SyncHud() {
     lastObjective = objective;
   }
 
+  // 提示条：只有 key 和 label 都在才显示。
+  // 不能只靠 memo 判断显隐——半成品的 prompt（label 为空）会留下一个空徽章挂在屏幕上。
   const prompt = state.hud.prompt;
-  const key = prompt ? `${prompt.key}|${prompt.label}` : "";
+  const usable = prompt && prompt.key && prompt.label;
+  const key = usable ? `${prompt.key}|${prompt.label}` : "";
   if (key !== lastPromptKey) {
     lastPromptKey = key;
-    if (prompt) {
-      hudPrompt.hidden = false;
+    hudPrompt.hidden = !usable;
+    if (usable) {
       hudPrompt.firstElementChild.textContent = prompt.key;
       hudPrompt.lastElementChild.textContent = prompt.label;
-    } else {
-      hudPrompt.hidden = true;
     }
   }
 
@@ -501,7 +508,9 @@ function DispatchEvents(events) {
       case "panel": QueuePanels([event.id]); break;
       case "sfx": PlaySfx(event.id); break;
       case "codex": OpenCodex(event.id); break;
-      case "objective": Toast(event.text); break;
+      // 新目标不弹居中大字：左上角那行已经写着同样的话，弹一次等于把同一句话说两遍。
+      // 改成让角落那行闪一下，玩家的眼睛会跟过去。
+      case "objective": FlashObjective(); break;
       case "checkpoint": Toast("安全点"); break;
       case "spot": PlaySfx("alarm"); break;
       case "lost": PlaySfx("heartbeat"); break;

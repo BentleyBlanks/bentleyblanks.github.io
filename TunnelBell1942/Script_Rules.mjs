@@ -389,14 +389,22 @@ function PostureHeight(posture) {
   return PLAYER.standHeight;
 }
 
-/** 目标 x 能不能过去（净空够爬 + 台阶不太高 + 不出界）。 */
-function CanWalkTo(state, x, fromY) {
+/**
+ * 目标 x 能不能过去。
+ * 规则（照抄《勇敢的心》的手感）：
+ *   - 净空连爬都不够 → 是墙，谁也进不去；
+ *   - 台阶太高 → 是墙；
+ *   - 站着的人进不了"要猫腰"的矮口，必须先低头（按住 crouch 或本来就在矮处）。
+ *     进去之后姿态自动维持，绝不会被卡在几何里。
+ */
+function CanWalkTo(state, x, fromY, posture) {
   const level = state.level;
   if (x < level.bounds.x0 - 1 || x > level.bounds.x1 + 1) return false;
   const col = Column(level, x, fromY + STEP_UP, STEP_UP + FLOOR_SNAP);
   if (!col.floor) return true; // 悬空：允许走过去然后掉下去
   if (col.clearance < HEADROOM.crawlNeeds - 0.02) return false;
   if (col.floorY > fromY + STEP_UP) return false;
+  if (posture === "stand" && col.clearance < HEADROOM.standNeeds) return false;
   return true;
 }
 
@@ -489,10 +497,7 @@ export function CreateState(levelIndex = 0) {
     // 内部簿记（渲染层不需要读）
     triggersFired: {},
     triggersInside: {},
-    panelTimer: 0,
-    panelId: null,
     trail: [],
-    winTimer: 0,
   };
 
   ResetLevel(state, levelIndex);
@@ -512,10 +517,7 @@ export function ResetLevel(state, levelIndex) {
   state.events.length = 0;
   state.triggersFired = {};
   state.triggersInside = {};
-  state.panelTimer = 0;
-  state.panelId = null;
   state.trail = [];
-  state.winTimer = 0;
   state.checkpointId = null;
   state.stats.timeInLevel = 0;
 
@@ -668,14 +670,19 @@ function FindChapter(chapterId) {
   return null;
 }
 
+// 气泡不抢 phase：Rules 只负责发事件 + 排队，要不要暂停由 Main 决定
+// （Main 可以自己把 phase 置成 "panel"，Rules 会停下模拟，队列清空后自动放行）。
 function QueuePanel(state, panelId) {
   if (typeof panelId !== "string" || !panelId) return;
   if (state.story.seen[panelId]) return;
-  if (state.story.queue.indexOf(panelId) >= 0) return;
+  state.story.seen[panelId] = true;
   state.story.queue.push(panelId);
+  while (state.story.queue.length > 12) state.story.queue.shift();
+  Emit(state, { kind: "panel", id: panelId });
 }
 
-function PanelDuration(panelId) {
+/** 一条气泡建议显示多久（秒）。给 Main 的 UI 当默认停留时间用。 */
+export function PanelDuration(panelId) {
   const panels = Story && Story.PANELS ? Story.PANELS : null;
   const panel = panels ? panels[panelId] : null;
   const text = panel && typeof panel.text === "string" ? panel.text : "";
@@ -764,42 +771,24 @@ function IdleAnims(state, dt) {
 // ───────────────────────────── 漫画气泡 ─────────────────────────────
 
 function UpdatePanels(state, dt) {
-  if (state.phase === "won" || state.phase === "chapterEnd") return;
-
+  // Main 如果为了显示气泡把 phase 设成 "panel"，队列清空后自动回到 play，
+  // 保证任何情况下都不会因为气泡卡死。
   if (state.phase === "panel") {
-    state.panelTimer -= dt;
-    const canSkip = state.panelTimer <= PanelDuration(state.panelId) - 0.4;
-    if (state.input.interactPressed && canSkip) {
-      state.input.interactPressed = false;
-      state.panelTimer = 0;
-    }
-    if (state.panelTimer <= 0) {
-      if (state.panelId) state.story.seen[state.panelId] = true;
-      state.panelId = null;
-      state.phase = "play";
-    }
-    return;
-  }
-
-  if (state.phase === "play" && state.story.queue.length > 0) {
-    const id = state.story.queue.shift();
-    state.panelId = id;
-    state.panelTimer = PanelDuration(id);
-    state.phase = "panel";
-    Emit(state, { kind: "panel", id });
-    // 停下脚步，别在气泡里滑行
     state.player.vx = 0;
+    if (state.story.queue.length === 0) state.phase = "play";
   }
 }
 
-/** 让 UI 提前跳过当前气泡（Main 可选调用）。 */
+/** 消费掉队首的气泡（Main 的 UI 播完一条就调一次）。队列空了自动回到 play。 */
 export function DismissPanel(state) {
-  if (state.phase !== "panel") return false;
-  if (state.panelId) state.story.seen[state.panelId] = true;
-  state.panelId = null;
-  state.panelTimer = 0;
-  state.phase = "play";
-  return true;
+  const popped = state.story.queue.length > 0 ? state.story.queue.shift() : null;
+  if (state.phase === "panel" && state.story.queue.length === 0) state.phase = "play";
+  return popped;
+}
+
+/** 当前该显示的气泡 id（Main 可选用）。 */
+export function CurrentPanel(state) {
+  return state.story.queue.length > 0 ? state.story.queue[0] : null;
 }
 
 // ───────────────────────────── 玩家 ─────────────────────────────
@@ -910,12 +899,12 @@ function UpdateWalk(state, dt) {
   // 水平推进 + 撞墙
   if (p.vx !== 0) {
     const nextX = p.x + p.vx * dt;
-    if (CanWalkTo(state, nextX, p.y)) {
+    if (CanWalkTo(state, nextX, p.y, p.posture)) {
       p.x = nextX;
     } else {
       // 细分一次，尽量贴到墙上
       const midX = p.x + p.vx * dt * 0.35;
-      if (CanWalkTo(state, midX, p.y)) p.x = midX;
+      if (CanWalkTo(state, midX, p.y, p.posture)) p.x = midX;
       p.vx = 0;
     }
     p.x = Clamp(p.x, level.bounds.x0 + 0.3, level.bounds.x1 - 0.3);
@@ -1666,6 +1655,31 @@ export function ActiveObjective(state) {
   return "前往" + state.level.exit.label;
 }
 
+/**
+ * 这条目标算不算通关的硬条件。
+ * 只认"指得到东西"的目标——万一关卡里写了个不存在的 id，降级成不要求，
+ * 而不是把整幕锁死。atExit 本身不算条件（它就是终点）。
+ */
+function ObjectiveRequired(state, obj) {
+  const w = obj.doneWhen || {};
+  if (w.atExit) return false;
+  if (w.propUsed) return !!FindPropById(state, w.propUsed);
+  if (w.trigger) return state.level.triggers.some((t) => t.id === w.trigger);
+  if (w.npcRescued) {
+    if (w.npcRescued === "all") return state.npcs.length > 0;
+    return !!NpcById(state, w.npcRescued);
+  }
+  return false;
+}
+
+function PendingObjectives(state) {
+  const out = [];
+  for (const obj of state.level.objectives) {
+    if (ObjectiveRequired(state, obj) && !ObjectiveDone(state, obj)) out.push(obj);
+  }
+  return out;
+}
+
 function AtExit(state) {
   const p = state.player;
   const exit = state.level.exit;
@@ -1681,6 +1695,8 @@ function CheckWin(state, dt) {
   const exit = state.level.exit;
   if (!AtExit(state)) return;
   if (exit.needAllVillagers && !AllVillagersSafe(state)) return;
+  // 事还没办完就到出口不算通关（第一幕必须先敲响钟）
+  if (PendingObjectives(state).length > 0) return;
   WinLevel(state);
 }
 
@@ -1690,10 +1706,7 @@ function WinLevel(state) {
   state.player.vx = 0;
   const chapter = FindChapter(state.level.chapterId);
   if (chapter && Array.isArray(chapter.closing)) {
-    for (const id of chapter.closing) {
-      state.story.seen[id] = true;
-      Emit(state, { kind: "panel", id });
-    }
+    for (const id of chapter.closing) QueuePanel(state, id);
   }
   Emit(state, { kind: "won" });
 }
@@ -1923,7 +1936,8 @@ function MoveEnemy(state, e, targetX, speed, dt) {
   if (Math.abs(dx) < 0.05) return false;
   const dir = dx > 0 ? 1 : -1;
   const nextX = e.x + dir * speed * dt;
-  if (!CanWalkTo(state, nextX, e.y)) return false;
+  // 敌人按"猫腰"判定：能进矮通道，但爬行才过得去的洞不追
+  if (!CanWalkTo(state, nextX, e.y, "crouch")) return false;
   e.x = Clamp(nextX, state.level.bounds.x0 + 0.3, state.level.bounds.x1 - 0.3);
   e.facing = dir;
   e.stepTimer -= dt;
@@ -2409,18 +2423,23 @@ export function DebugTeleport(state, x, y) {
   return state;
 }
 
-/** 按住一组输入跑若干秒（测试用）。 */
+/**
+ * 按住一组输入跑若干秒（测试用）。
+ * 每帧先把输入清干净再套用 patch —— "按住这些键"就只按这些键，不会残留上一次的。
+ */
 export function DebugHold(state, inputPatch, seconds) {
   const dt = 1 / 60;
   const total = Num(seconds, 1);
   let t = 0;
   while (t < total - 1e-9) {
+    ClearInput(state.input);
     if (inputPatch && typeof inputPatch === "object") {
       for (const key in inputPatch) state.input[key] = inputPatch[key];
     }
     StepPlay(state, dt);
     t += dt;
   }
+  ClearInput(state.input);
   return state;
 }
 
@@ -2592,29 +2611,59 @@ function BotHatchPropFor(state, hatchId) {
   return null;
 }
 
+/**
+ * 找当前最该处理的敌人，并算清楚"他现在到底看不看得见我"。
+ * 有效视距按机器人自己保持的猫腰+潜行折扣算，所以它知道什么时候能大胆走、
+ * 什么时候得低头、什么时候必须躲。
+ */
 function BotThreat(state) {
   const p = state.player;
+  const stealth = SENSE.crouchVisibility * SENSE.sneakVisibility;
   let worst = null;
   for (const e of state.enemies) {
     if (e.dormant) continue;
-    if (e.alertness < 0.3) continue;
-    if (Math.abs(e.y - p.y) > 2.5) continue;
-    const d = Math.abs(e.x - p.x);
-    if (d > 14) continue;
-    if (!worst || e.alertness > worst.alertness) worst = e;
+    if (Math.abs(e.y - p.y) > 2.5) continue; // 不同层：土层挡着，不算威胁
+    const dist = Math.abs(e.x - p.x);
+    if (dist > 18) continue;
+    const facingMe = dist < 1.5 || Math.sign(p.x - e.x) === e.facing;
+    const effStealth = e.visionRange * stealth + 1.4;
+    const effStand = e.visionRange + 1.4;
+    const info = {
+      e,
+      dist,
+      facingMe,
+      effStealth,
+      effStand,
+      exposed: facingMe && dist < effStealth, // 猫腰潜行也会被看见
+      loud: dist < (e.hearing || 6) * NOISE.walk + 0.5, // 站着跑会被听见
+      alert: e.alertness,
+    };
+    const score = info.alert + (info.exposed ? 2 : 0) + (info.facingMe ? 0.3 : 0) - dist * 0.01;
+    if (!worst || score > worst.score) {
+      info.score = score;
+      worst = info;
+    }
   }
   return worst;
 }
 
-function BotHideSpot(state) {
+/** 找一个能躲的地方：别在敌人另一侧（跑过去等于送），限制在 14 米内。 */
+function BotHideSpot(state, threat) {
   const p = state.player;
   let best = null;
   let bestD = Infinity;
   for (const prop of state.level.props) {
     if (prop.interact !== "hide") continue;
     if (!InteractAvailable(state, prop)) continue;
-    const d = Math.abs(PropX(state, prop) - p.x);
-    if (d > 6 || Math.abs(prop.y - p.y) > 2) continue;
+    const px = PropX(state, prop);
+    const d = Math.abs(px - p.x);
+    if (d > 14 || Math.abs(prop.y - p.y) > 2) continue;
+    if (threat) {
+      const toEnemy = threat.e.x - p.x;
+      const toSpot = px - p.x;
+      // 躲点在敌人那一侧、而且比敌人还远 → 不去
+      if (Math.sign(toSpot) === Math.sign(toEnemy) && Math.abs(toSpot) > Math.abs(toEnemy) - 1.0) continue;
+    }
     if (d < bestD) {
       bestD = d;
       best = prop;
@@ -2648,13 +2697,12 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
     stuckTimer: 0,
     lastX: state.player.x,
     lastY: state.player.y,
-    unstickTimer: 0,
-    unstickDir: 1,
     hiding: false,
-    hideTimer: 0,
+    evade: false,
+    evadeTimer: 0,
+    dashing: false,
+    blockedBy: null,
     lastGoal: "",
-    lastReason: "",
-    shaftId: null,
   };
   let t = 0;
   let guard = 0;
@@ -2678,7 +2726,8 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
       " playerX=" + state.player.x.toFixed(1) +
       " playerY=" + state.player.y.toFixed(1) +
       " objective=" + ActiveObjective(state) +
-      " deaths=" + state.stats.deaths,
+      " deaths=" + state.stats.deaths +
+      (bot.blockedBy ? " blockedBy=" + bot.blockedBy : ""),
   };
 }
 
@@ -2692,7 +2741,8 @@ function BotThink(state, bot, dt) {
   }
 
   if (state.phase === "panel") {
-    input.interactPressed = true;
+    // Main 如果为了播气泡把 phase 挂起了，机器人自己翻页，别在这卡死
+    DismissPanel(state);
     return;
   }
   if (state.phase !== "play") return;
@@ -2715,48 +2765,113 @@ function BotThink(state, bot, dt) {
     return;
   }
 
-  // 威胁处理：猫腰 + 潜行；很危险就躲/退
+  // ── 潜行处置 ──
+  // 三档：他背过身且离得远 → 站起来跑（3.3 比巡逻的 1.5 快，能超车）；
+  //       他背过身但很近 → 猫腰潜行贴着过去（别让他听见）；
+  //       他正朝我这边而且我进了有效视距 → 必须脱离：能藏就藏，不能藏就退。
   const threat = BotThreat(state);
   bot.hiding = false;
+
+  if (p.hidden) {
+    const stillDanger = threat && (threat.exposed || threat.alert > 0.08 || threat.dist < 4.5);
+    if (stillDanger) {
+      bot.hiding = true;
+      return; // 继续躲着，等他走
+    }
+    input.interactPressed = true; // 风头过了，出来
+    return;
+  }
+
   if (threat) {
-    input.crouch = true;
-    input.sneak = true;
-    if (threat.alertness > 0.62) {
-      const spot = BotHideSpot(state);
+    const mustBreak = threat.exposed || (threat.facingMe && threat.alert >= SENSE.searchAt);
+    if (mustBreak) {
+      bot.evade = true;
+      bot.evadeTimer = 0.7;
+    } else if (bot.evade) {
+      bot.evadeTimer -= dt;
+      if (bot.evadeTimer <= 0 && threat.alert < 0.18) bot.evade = false;
+    }
+
+    // 已经被盯上：唯一靠谱的是切断视线（钻柴垛），其次是退出视距。全程低头缩小被看见的半径。
+    if (bot.evade) {
+      input.crouch = true;
+      input.sneak = true;
+      bot.stuckTimer = 0;
+      bot.blockedBy = threat.e.id;
+      const spot = BotHideSpot(state, threat);
       if (spot && Math.abs(PropX(state, spot) - p.x) < 1.2) {
         bot.hiding = true;
-      } else if (spot) {
-        BotWalkTo(state, bot, PropX(state, spot), input);
-        MaybePress(state, bot, goal, input);
-        return;
-      } else if (threat.alertness > 0.8) {
-        // 往反方向退一点
-        input.moveX = p.x >= threat.x ? 1 : -1;
         MaybePress(state, bot, goal, input);
         return;
       }
+      if (spot) {
+        BotWalkTo(state, bot, PropX(state, spot), input);
+        input.crouch = true;
+        input.sneak = true;
+        MaybePress(state, bot, goal, input);
+        return;
+      }
+      input.moveX = p.x >= threat.e.x ? 1 : -1;
+      return;
     }
+
+    // 还没被盯上：关键是别贴着巡逻兵走。
+    // 他一到巡逻端点就会转身，贴在 3 米内等于把脸凑上去——保持一个"他转身也看不到我"的间距。
+    const dirToGoal = Math.sign(goal.x - p.x) || p.facing;
+    const inTheWay = Math.sign(threat.e.x - p.x) === dirToGoal;
+    const safeGap = threat.effStealth + 1.2;
+    if (inTheWay && threat.dist < safeGap + 1.5) {
+      bot.blockedBy = threat.e.id;
+      bot.stuckTimer = 0; // 这是在等时机，不是卡住了
+      const spot = BotHideSpot(state, threat);
+      if (spot && Math.abs(PropX(state, spot) - p.x) < 1.2) {
+        // 钻进去等他过去
+        input.crouch = true;
+        input.sneak = true;
+        bot.hiding = true;
+        MaybePress(state, bot, goal, input);
+        return;
+      }
+      if (spot && threat.dist < safeGap) {
+        input.crouch = true;
+        input.sneak = true;
+        BotWalkTo(state, bot, PropX(state, spot), input);
+        input.crouch = true;
+        input.sneak = true;
+        MaybePress(state, bot, goal, input);
+        return;
+      }
+      if (!threat.facingMe && threat.dist > 2.2) {
+        // 他刚好转过头去：这就是窗口，站起来冲过去（站着跑 3.3，比谁都快）
+        bot.dashing = true;
+        BotWalkTo(state, bot, goal.x, input);
+        MaybePress(state, bot, goal, input);
+        return;
+      }
+      // 他正对着这边：保持距离等他转身。太近就往回挪，够远就站住。
+      input.crouch = true;
+      input.sneak = true;
+      input.moveX = threat.dist < safeGap ? -dirToGoal : 0;
+      MaybePress(state, bot, goal, input);
+      return;
+    }
+    bot.dashing = false;
+
+    // 他背对我而且不挡路：贴身才低头轻声挪，否则站起来跑（3.3 比巡逻的 1.5 快，甩得掉）
+    if (threat.dist < 3.0 || (threat.alert > 0.3 && threat.dist < 5.0)) {
+      input.crouch = true;
+      input.sneak = true;
+    }
+  } else if (bot.evade) {
+    bot.evade = false;
   }
-  if (p.hidden && !bot.hiding) {
-    input.interactPressed = true; // 没威胁就出来
-    return;
-  }
-  if (bot.hiding && !p.hidden) {
-    MaybePress(state, bot, goal, input);
-    return;
-  }
-  if (p.hidden) return;
 
   // 竖直导航
   const needVertical = Math.abs(goal.y - p.y) > 1.4;
   if (p.onShaft) {
-    const shaft = ShaftById(state, p.shaftId);
-    if (shaft) {
-      if (goal.y > p.y + 0.2) input.up = true;
-      else if (goal.y < p.y - 0.2) input.down = true;
-      else input.up = p.y < (shaft.yTop + shaft.yBottom) * 0.5 ? false : true;
-      if (!input.up && !input.down) input.up = true;
-    }
+    // 一路按到底，别在半空里改主意（改主意会在竖井里反复横跳）
+    if (goal.y > p.y) input.up = true;
+    else input.down = true;
     return;
   }
 
@@ -2808,7 +2923,11 @@ function BotWalkTo(state, bot, targetX, input) {
     input.moveX = 0;
     return;
   }
-  input.moveX = dx > 0 ? 1 : -1;
+  const dir = dx > 0 ? 1 : -1;
+  input.moveX = dir;
+  // 前方净空不够站着走 → 提前低头，否则会撞在矮口上
+  const col = Column(state.level, p.x + dir * 0.95, p.y + 0.15, FLOOR_SNAP);
+  if (col.clearance < HEADROOM.standNeeds) input.crouch = true;
 }
 
 function MaybePress(state, bot, goal, input, preferProp) {

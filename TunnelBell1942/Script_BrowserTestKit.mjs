@@ -75,7 +75,9 @@ export async function OpenGame(browser, port, viewport = { width: 1600, height: 
     if (message.type() === "error") errors.push(message.text().slice(0, 300));
   });
   await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: "load", timeout: 60000 });
-  await page.waitForFunction(() => window.TunnelBell !== undefined, { timeout: 60000 });
+  // 注意签名是 (pageFunction, arg, options)：options 必须是第三个参数，
+  // 写成第二个会被当成 arg，超时静默退回默认 30s。SwiftShader 软件光栅下不够用。
+  await page.waitForFunction(() => window.TunnelBell !== undefined, null, { timeout: 90000 });
   const bootError = await page.evaluate(() => window.TunnelBell.error);
   if (bootError) errors.push(`BOOT ${bootError.slice(0, 400)}`);
   await page.evaluate(() => window.TunnelBell.Muted(true));

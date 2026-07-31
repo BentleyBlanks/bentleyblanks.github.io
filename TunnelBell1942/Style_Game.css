@@ -280,6 +280,17 @@ body[data-cinematic="1"] .letterbox i { height: 11vh; }
   opacity: .92;
 }
 .hudObjective:empty { display: none; }
+/* 目标更新时闪一下，代替居中大字的重复播报 */
+.hudObjective[data-flash="1"] {
+  animation: objectiveFlash 1.4s ease-out;
+  border-left-color: var(--paper);
+}
+@keyframes objectiveFlash {
+  0% { opacity: 0; transform: translateX(-8px); }
+  12% { opacity: 1; transform: none; }
+  40% { color: #fff6e2; }
+  100% { opacity: .92; }
+}
 .hudRight { display: flex; align-items: center; gap: .6rem; pointer-events: auto; }
 .hudChip {
   font-size: .76rem; letter-spacing: .12em; color: var(--paper);
