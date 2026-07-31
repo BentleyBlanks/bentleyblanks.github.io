@@ -558,8 +558,12 @@ function Frame(now) {
 
 function Resize() {
   if (!render) return;
+  const width = shell.clientWidth;
+  const height = shell.clientHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  render.Resize(shell.clientWidth, shell.clientHeight, dpr);
+  render.Resize(width, height, dpr);
+  // 规则层靠这个夹紧摄像机。不告诉它真实宽高比，竖屏手机上出生点会落在画面外。
+  if (state && state.camera && height > 0) state.camera.aspect = width / height;
 }
 window.addEventListener("resize", Resize);
 window.addEventListener("orientationchange", () => setTimeout(Resize, 120));

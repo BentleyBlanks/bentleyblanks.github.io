@@ -232,6 +232,30 @@ Section("姿态与净空");
   }
 }
 
+Section("摄像机取景");
+// 竖屏手机的半宽只有横屏的三分之一。摄像机夹紧如果按 16:9 写死，
+// 关卡两端各有八米死区，玩家一进游戏就在画面外——这条按真实机型比例验。
+for (const [label, aspect] of [["竖屏 390x844", 390 / 844], ["方屏 1024x1024", 1], ["横屏 1600x900", 16 / 9]]) {
+  for (let i = 0; i < 3; i += 1) {
+    const state = Rules.CreateState(i);
+    state.camera.aspect = aspect;
+    Rules.StepPlay(state, 1 / 60);
+    Rules.DebugHold(state, {}, 0.5);
+    const halfW = state.camera.viewHeight * 0.5 * aspect;
+    const halfH = state.camera.viewHeight * 0.5;
+    const dx = Math.abs(state.player.x - state.camera.x);
+    const dy = Math.abs(state.player.y - state.camera.y);
+    Assert(dx < halfW && dy < halfH,
+      `${label} act${i + 1}: 出生点在画面内（dx ${dx.toFixed(1)}/${halfW.toFixed(1)}）`);
+
+    // 走到关卡尽头也要还在画面里
+    Rules.DebugTeleport(state, state.level.exit.x, state.level.exit.y);
+    Rules.DebugHold(state, {}, 1.2);
+    const dxEnd = Math.abs(state.player.x - state.camera.x);
+    Assert(dxEnd < halfW, `${label} act${i + 1}: 关卡尽头也在画面内（dx ${dxEnd.toFixed(1)}）`);
+  }
+}
+
 Section("确定性");
 {
   const run = () => {

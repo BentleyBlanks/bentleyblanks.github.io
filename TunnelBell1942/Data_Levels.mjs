@@ -144,6 +144,8 @@ const act1 = {
     { id: "a1_pr_haystack_y3a", x: 84, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_stove1", x: 87, y: 0, z: PLAY, kind: "stove", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_vat_y3", x: 87.5, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a1_pr_millstone_y3", x: 90, y: 0, z: PLAY, kind: "millstone", facing: 1, interact: "hide", data: { capacity: 1 }, label: "碾盘" },
+    { id: "a1_pr_cart_y3", x: 92.5, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
     { id: "a1_pr_house4", x: 90, y: 0, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
     { id: "a1_pr_wall3", x: 92, y: 0, z: PLAY, kind: "wall", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_trough_y3", x: 99, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },

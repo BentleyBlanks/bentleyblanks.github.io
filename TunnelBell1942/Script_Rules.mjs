@@ -463,7 +463,8 @@ export function CreateState(levelIndex = 0) {
       stepTimer: 0,
     },
 
-    camera: { x: 0, y: 0, viewHeight: CAMERA.viewHeight, shake: 0 },
+    // aspect = 视口宽/高，由集成层在 Resize 时写入，摄像机夹紧要用它
+    camera: { x: 0, y: 0, viewHeight: CAMERA.viewHeight, shake: 0, aspect: 16 / 9 },
     enemies: [],
     npcs: [],
     hazards: [],
@@ -2289,7 +2290,11 @@ function ClampCamera(state) {
   const b = state.level.bounds;
   const c = state.camera;
   const halfH = c.viewHeight * 0.5;
-  const halfW = c.viewHeight * 0.95; // 按 ~16:9 估的半宽，渲染层可再收
+  // 半宽必须按真实视口宽高比算。写死 16:9（viewHeight*0.95）在竖屏手机上会把
+  // 相机夹到离关卡两端 8 米开外——出生点直接落在画面外，玩家一进游戏看不见自己。
+  // aspect 由集成层在 Resize 时写入；拿不到就退回 16:9。
+  const aspect = c.aspect > 0.2 ? c.aspect : 16 / 9;
+  const halfW = halfH * aspect;
   const loX = b.x0 + halfW;
   const hiX = b.x1 - halfW;
   c.x = loX <= hiX ? Clamp(c.x, loX, hiX) : (b.x0 + b.x1) * 0.5;
