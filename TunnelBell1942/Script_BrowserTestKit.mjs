@@ -72,7 +72,15 @@ export async function OpenGame(browser, port, viewport = { width: 1600, height: 
   const errors = [];
   page.on("pageerror", (error) => errors.push(`PAGEERROR ${String(error).slice(0, 300)}`));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text().slice(0, 300));
+    if (message.type() !== "error") return;
+    const text = message.text();
+    // 本地静态服只挂了子目录，favicon 在仓库根上；线上不会 404，别让它污染错误清单。
+    if (/favicon/i.test(text) || /status of 404/.test(text)) return;
+    errors.push(text.slice(0, 300));
+  });
+  page.on("requestfailed", (request) => {
+    if (/favicon/i.test(request.url())) return;
+    errors.push(`REQFAIL ${request.url().slice(-80)}`);
   });
   await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: "load", timeout: 60000 });
   // 注意签名是 (pageFunction, arg, options)：options 必须是第三个参数，
@@ -82,4 +90,50 @@ export async function OpenGame(browser, port, viewport = { width: 1600, height: 
   if (bootError) errors.push(`BOOT ${bootError.slice(0, 400)}`);
   await page.evaluate(() => window.TunnelBell.Muted(true));
   return { page, errors };
+}
+
+/**
+ * 读画面的真实像素分布。
+ *
+ * 为什么要绕这么一圈：WebGL canvas 没开 preserveDrawingBuffer 时，
+ * 页面内 ctx.drawImage(canvas) 拿到的是全黑——用它做"是不是黑屏"的判断，
+ * 结论永远是"黑屏"，而且是假的。所以必须走 Playwright 的真实截图，
+ * 再把 PNG 塞回页面里用 2D canvas 解码采样。
+ */
+export async function SamplePixels(page, clip) {
+  const buffer = await page.screenshot(clip ? { clip } : {});
+  const dataUrl = `data:image/png;base64,${buffer.toString("base64")}`;
+  return page.evaluate(async (url) => {
+    const image = new Image();
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+      image.src = url;
+    });
+    const w = 200;
+    const h = Math.max(1, Math.round((image.height / image.width) * w));
+    const off = document.createElement("canvas");
+    off.width = w;
+    off.height = h;
+    const ctx = off.getContext("2d");
+    ctx.drawImage(image, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let min = 255;
+    let max = 0;
+    let sum = 0;
+    const tones = new Set();
+    const hues = new Set();
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const lum = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+      if (lum < min) min = lum;
+      if (lum > max) max = lum;
+      sum += lum;
+      tones.add(lum >> 3);
+      hues.add(`${r >> 5},${g >> 5},${b >> 5}`);
+    }
+    return { min, max, mean: sum / (data.length / 4), tones: tones.size, hues: hues.size };
+  }, dataUrl);
 }

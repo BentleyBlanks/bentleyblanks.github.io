@@ -60,7 +60,8 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
     (level.enemies || []).slice(0, 2).forEach((e, i) => out.push({ tag: `enemy${i}`, x: e.x - 6, y: e.y }));
     const tunnelFloors = (level.floors || []).filter((f) => f.kind === "tunnel");
     tunnelFloors.slice(0, 2).forEach((f, i) => out.push({ tag: `tunnel${i}`, x: (f.x0 + f.x1) / 2, y: f.y }));
-    out.push({ tag: "exit", x: level.exit.x - 8, y: level.exit.y });
+    // 出口只靠近、不踏进：踩上去会判胜利，弹幕终卡把后面所有机位全糊住
+    out.push({ tag: "nearExit", x: level.exit.x - (level.exit.radius + 10), y: level.exit.y });
     return out;
   });
 
@@ -68,9 +69,11 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
   for (const sample of samples) {
     n += 1;
     await page.evaluate((s) => {
+      window.TunnelBell.SkipPanels();
       window.TunnelBell.Teleport(s.x, s.y);
       // 让摄像机瞬间跟上，再跑一小段让动画/光照稳定
       window.TunnelBell.Advance(0.9, { moveX: 0 });
+      window.TunnelBell.SkipPanels();
     }, sample);
     await page.waitForTimeout(260);
     await Shot(`${11 + levelIndex * 10}_act${levelIndex + 1}_${String(n).padStart(2, "0")}_${sample.tag}`);

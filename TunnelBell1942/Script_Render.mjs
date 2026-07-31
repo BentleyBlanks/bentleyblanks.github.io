@@ -815,7 +815,10 @@ function PaintEarthStrata(geo, groundRef, frontZ, backZ) {
     // 假 AO：越往里越暗，坑道壁自然向深处沉下去
     const zt = Clamp((z - backZ) / Math.max(0.5, frontZ - backZ), 0, 1);
     const ao = 0.30 + 0.70 * (zt * zt);
-    const k = sp * ao;
+    // 整体压暗：土是"地下"的东西，站在地表时它不该跟被月光直照的墙一样亮。
+    // 靠近地表的一薄层留亮些，好让 bevel 把地平线那道边勾出来。
+    const dim = Lerp(0.80, 0.42, Clamp(depth / 3.2, 0, 1));
+    const k = sp * ao * dim;
     arr[i * 3] = r * k; arr[i * 3 + 1] = g * k; arr[i * 3 + 2] = b * k;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
@@ -1295,6 +1298,9 @@ export function CreateRenderer(canvas, options = {}) {
     alpha: false,
     stencil: false,
     powerPreference: 'high-performance',
+    // 保留绘制缓冲：截图 / 像素级健康检查要能 drawImage(canvas) 读回像素。
+    // 关掉的话画面照常显示，但任何 canvas 读回都会拿到全透明黑。
+    preserveDrawingBuffer: opts.preserveDrawingBuffer !== false,
   });
   renderer.setClearColor(0x0b1220, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1379,7 +1385,12 @@ export function CreateRenderer(canvas, options = {}) {
     glass: new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.22, depthWrite: false }),
     flame: new THREE.MeshBasicMaterial({ color: 0xffd08a, fog: false }),
     void: new THREE.MeshBasicMaterial({ color: 0x05070c }),
-    earth: new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, map: T('earth') || null }),
+    // 剖面自带一层很低的暖自发光：月光是冷的，光靠它照土层会被中和成灰，
+    // 而"地下偏赭褐橙"是硬要求。这层暖底同时保证坑道壁永远不会掉进纯黑。
+    earth: new THREE.MeshLambertMaterial({
+      color: 0xffffff, vertexColors: true, map: T('earth') || null,
+      emissive: 0x30200f, emissiveIntensity: 0.55,
+    }),
     earthBack: LambertMat(0x241a12, 'earth'),
     fore: new THREE.MeshBasicMaterial({ color: 0x05070d }),
     farSil: new THREE.MeshBasicMaterial({ color: 0x131c2c, fog: false }),
@@ -1411,6 +1422,11 @@ export function CreateRenderer(canvas, options = {}) {
   if (cfg.shadows) SetupShadow(moon);
   const lanternLight = new THREE.PointLight(0xffb066, 0, 12, 1.35);
   scene.add(lanternLight);
+  // 地表补光：只跟着玩家走的一小盏冷色补光。夜里地表没有暖光源，主角会糊在
+  // 同样暗的地面上；这盏灯把剪影从背景里拉出来（"站位清楚"是硬要求）。
+  const fillLight = new THREE.PointLight(0xa9c4e8, 0, 7.0, 1.2);
+  fillLight.visible = false;
+  scene.add(fillLight);
   const warmLights = [];
   for (let i = 0; i < QUALITY_PRESET.high.warmLights; i++) {
     const l = new THREE.PointLight(0xffb066, 0, 9, 1.4);
@@ -1578,6 +1594,10 @@ export function CreateRenderer(canvas, options = {}) {
       level = lv && typeof lv === 'object' ? lv : {};
       palette = PALETTE[level.timeOfDay] || PALETTE.night;
       levelRoot = gPlay;
+      bellRingT = -1;
+      // 开局就在地道里的幕（第 2 幕）不许先亮一下再暗下去
+      layerMix = Clamp(((typeof level.startY === 'number' ? level.startY : 0) + 3.4) / 2.8, 0, 1);
+      lastViewHeight = -1;
 
       const b = level.bounds || {};
       const bx0 = typeof b.x0 === 'number' ? b.x0 : 0;
@@ -1955,9 +1975,9 @@ export function CreateRenderer(canvas, options = {}) {
   }
   function InteractHaloR(p) {
     switch (p.kind) {
-      case 'house': case 'haystack': case 'millstone': case 'tree': return 2.6;
-      case 'bell': case 'chokepoint': case 'well': return 2.2;
-      default: return 1.7;
+      case 'house': case 'haystack': case 'millstone': case 'tree': return 1.9;
+      case 'bell': case 'chokepoint': case 'well': return 1.6;
+      default: return 1.15;
     }
   }
 
@@ -2319,7 +2339,7 @@ export function CreateRenderer(canvas, options = {}) {
     if (haloItems.length) {
       const batch = MakeQuadBatch(haloItems,
         function (it) { return { w: it.r * 2, h: it.r * 2, tilt: 0 }; },
-        function () { return { r: 1, g: 0.72, b: 0.42, a: 0 }; });
+        function () { return { r: 1, g: 0.52, b: 0.20, a: 0 }; });
       if (batch) {
         haloMesh = new THREE.Mesh(batch.geo, mats.haloAdd);
         haloMesh.renderOrder = 21; haloMesh.frustumCulled = false;
@@ -2450,12 +2470,16 @@ export function CreateRenderer(canvas, options = {}) {
     _colA.setHex(palette.ambientSurface);
     _colB.setHex(palette.ambientTunnel);
     ambient.color.copy(_colB).lerp(_colA, mix);
-    ambient.intensity = Lerp(0.55, 3.2, mix);
+    // 地下环境光刻意留一点底，够看清坑道轮廓就行；亮度主体仍然靠马灯。
+    ambient.intensity = Lerp(4.6, 3.2, mix);
 
     _colC.setHex(palette.moon);
     moon.color.copy(_colC);
     moon.intensity = Lerp(0.06, (palette.moonIntensity || 1) * 2.15, mix * mix);
-    moon.position.set(cx - 9, cy + 15, 12);
+    // z 分量压低：正对观众的剖面（法线 +Z）少吃直射月光，免得整块土被打亮、打灰
+    moon.position.set(cx - 9, cy + 15, 3);
+    // 剖面暖底：地下更强（读作赭褐橙），地表弱一点让它退到背景里
+    mats.earth.emissiveIntensity = Lerp(0.95, 0.42, mix);
     moon.target.position.set(cx, cy - 1, 0);
     moon.target.updateMatrixWorld();
     if (moon.castShadow) { moon.shadow.camera.updateProjectionMatrix(); }
@@ -2488,12 +2512,22 @@ export function CreateRenderer(canvas, options = {}) {
       lanternLight.intensity = Clamp(lr * 1.95 * flick, 0.5, 40) * Lerp(1.0, 0.5, mix);
     }
 
+    // ---- 地表补光：跟着玩家，只在地表生效 ----
+    fillLight.visible = mix > 0.06;
+    if (fillLight.visible) {
+      fillLight.position.set(px, py + 1.05, 3.2);
+      fillLight.color.copy(_colC);
+      fillLight.intensity = 5.0 * mix;
+    }
+
     // ---- 暖光池：只点亮离相机最近的几盏 ----
     UpdateWarmLights(cx, t, mix);
 
     // ---- 玩家 ----
+    // 角色比 PLAY 层道具略靠前一点点：否则站在柴垛/碾盘旁边时会被道具整个吞掉。
+    // 仍然远在剖面正面(z=2.25)和 FORE(z=5)之后，所以该被挡的地方照样被挡。
     if (playerRig && playerRig.group) {
-      playerRig.group.position.set(px, py, LAYER_Z.PLAY);
+      playerRig.group.position.set(px, py, ACTOR_Z_PLAYER);
       PoseRig(playerRig, p.anim || null, p.facing === -1 ? -1 : 1, t);
       playerRig.group.visible = !p.hidden;
     }
@@ -2708,8 +2742,8 @@ export function CreateRenderer(canvas, options = {}) {
         const gone = h.interact === 'pickup' && world.picked && world.picked[h.propId];
         if (!gone) {
           const d = Math.hypot(h.x - px, (h.y - 0.4) - py);
-          want = 0.11 * pulse;                       // 平时：极淡，不打断沉浸
-          if (d < 3.4) want = 0.11 + 0.30 * (1 - d / 3.4) * pulse;  // 走近：亮起来
+          want = 0.055 * pulse;                      // 平时：极淡，不打断沉浸
+          if (d < 3.4) want = 0.055 + 0.26 * (1 - d / 3.4) * pulse;  // 走近：亮起来
         }
       }
       h.cur += (want - h.cur) * 0.16;

@@ -390,7 +390,15 @@ function ShowChapterCard(chapterIndex, onGo) {
 function StartLevel(levelIndex) {
   screens.title.hidden = true;
   screens.end.hidden = true;
+  screens.panel.hidden = true;
+  screens.codex.hidden = true;
   el("Hud").hidden = true;
+  // 上一幕的收尾气泡如果还排在队里，它的回调会在新一幕开打之后才跑，
+  // 把上一幕的幕终卡盖到正在玩的画面上。换幕必须把叙事队列连回调一起清干净。
+  panelQueue.length = 0;
+  pendingAfterPanels = null;
+  activePanelId = null;
+  document.body.dataset.cinematic = "0";
 
   ShowChapterCard(levelIndex, () => {
     try {

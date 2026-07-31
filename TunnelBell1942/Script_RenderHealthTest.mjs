@@ -7,7 +7,7 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LaunchBrowser, OpenGame, ServeProject } from "./Script_BrowserTestKit.mjs";
+import { LaunchBrowser, OpenGame, SamplePixels, ServeProject } from "./Script_BrowserTestKit.mjs";
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const server = await ServeProject(projectRoot);
@@ -37,6 +37,10 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
 
   const probe = await page.evaluate(() => {
     const handle = window.TunnelBell.render;
+    // info.render.calls 是"上一次 render 的计数"，不是累计值。
+    // 探针如果赶在本幕第一个 rAF 之前跑，读到的就是 0——那是时序假象，不是没画。
+    // 这里主动画一帧，让计数反映真实的提交量。
+    handle.renderer.render(handle.scene, handle.camera);
     const gl = handle.renderer.getContext();
     let meshes = 0;
     let tris = 0;
@@ -68,27 +72,31 @@ for (let levelIndex = 0; levelIndex < 3; levelIndex += 1) {
   Assert(probe.calls < 400, `${tag}: draw calls 受控（${probe.calls}）`);
 
   // 像素实测：画面不能是一整块纯色（黑屏 / 只剩天空）
-  const pixelSpread = await page.evaluate(() => {
-    const canvas = document.getElementById("GameCanvas");
-    const off = document.createElement("canvas");
-    off.width = 160; off.height = 90;
-    const ctx = off.getContext("2d");
-    ctx.drawImage(canvas, 0, 0, 160, 90);
-    const data = ctx.getImageData(0, 0, 160, 90).data;
-    let min = 255; let max = 0; let sum = 0;
-    const buckets = new Set();
-    for (let i = 0; i < data.length; i += 4) {
-      const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
-      if (lum < min) min = lum;
-      if (lum > max) max = lum;
-      sum += lum;
-      buckets.add(lum >> 3);
-    }
-    return { min, max, mean: sum / (data.length / 4), tones: buckets.size };
-  });
+  const pixelSpread = await SamplePixels(page);
   Assert(pixelSpread.max - pixelSpread.min > 40, `${tag}: 画面有明暗层次（${pixelSpread.min}→${pixelSpread.max}）`);
   Assert(pixelSpread.tones >= 6, `${tag}: 色调不单一（${pixelSpread.tones} 档）`);
   Assert(pixelSpread.mean > 6, `${tag}: 不是全黑（均值 ${pixelSpread.mean.toFixed(1)}）`);
+  Assert(pixelSpread.hues >= 8, `${tag}: 有色彩层次（${pixelSpread.hues} 种色块）`);
+
+  // 角色必须在画面里看得见：玩家所在的那一竖条要比同高度的背景更有对比
+  const readable = await page.evaluate(() => {
+    const s = window.TunnelBell.state;
+    const c = window.TunnelBell.render.camera;
+    const cv = document.getElementById("GameCanvas");
+    const W = cv.clientWidth; const H = cv.clientHeight;
+    const sx = (s.player.x - (c.position.x + c.left)) / (c.right - c.left) * W;
+    const syTop = ((c.position.y + c.top) - (s.player.y + 1.9)) / (c.top - c.bottom) * H;
+    const syBot = ((c.position.y + c.top) - (s.player.y - 0.2)) / (c.top - c.bottom) * H;
+    return { sx, syTop, h: syBot - syTop, W, H };
+  });
+  if (readable.sx > 40 && readable.sx < readable.W - 40 && readable.h > 8) {
+    const onPlayer = await SamplePixels(page, {
+      x: Math.max(0, readable.sx - 26), y: Math.max(0, readable.syTop),
+      width: 52, height: Math.min(readable.h, readable.H - readable.syTop),
+    });
+    Assert(onPlayer.max - onPlayer.min > 24,
+      `${tag}: 角色所在处有对比，不是糊在背景里（${onPlayer.min}→${onPlayer.max}）`);
+  }
 
   // 玩家必须在画面里
   const onScreen = await page.evaluate(() => {

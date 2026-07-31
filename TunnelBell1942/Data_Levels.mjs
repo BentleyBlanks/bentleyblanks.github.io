@@ -100,8 +100,11 @@ const act1 = {
     // —— 一道院：发现敌人已经摸进村；矮墙教猫腰 ——
     { id: "a1_pr_corpse", x: 26, y: 0, z: PLAY, kind: "corpse", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_haystack1", x: 30, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
-    { id: "a1_pr_vat0", x: 34, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
-    { id: "a1_pr_cart0", x: 42, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
+    { id: "a1_pr_vat0", x: 79, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a1_pr_haystack1c", x: 33, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a1_pr_trough_h1", x: 38, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
+    { id: "a1_pr_cart0", x: 42.5, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
+    { id: "a1_pr_vat_y1", x: 46, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a1_pr_haystack1b", x: 48, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_wall1", x: 37, y: 0, z: PLAY, kind: "wall", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_house2", x: 44, y: 0, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
@@ -109,21 +112,28 @@ const act1 = {
 
     // —— 二道院：院门 + 柴垛 + 交叉视线 ——
     { id: "a1_pr_gate1", x: 50.6, y: 0.35, z: PLAY, kind: "gate", facing: 1, interact: "lever", data: { channel: "gateOpen", needItem: null }, label: "院门" },
-    { id: "a1_pr_vat1", x: 55, y: 0.35, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a1_pr_haystack_g1", x: 53.5, y: 0.35, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a1_pr_vat1", x: 59, y: 0.35, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a1_pr_house3", x: 60, y: 0.35, z: MID, kind: "house", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_haystack2", x: 62, y: 0.35, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_cart1", x: 67, y: 0.35, z: FORE, kind: "cart", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_wall2", x: 71, y: 0.35, z: PLAY, kind: "wall", facing: 1, interact: "none", data: null, label: null },
-    { id: "a1_pr_haystack2b", x: 70, y: 0.35, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a1_pr_haystack2b", x: 68, y: 0.35, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a1_pr_vat_y2", x: 67, y: 0.35, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a1_pr_cart_g1", x: 73.5, y: 0.35, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
+    { id: "a1_pr_haystack_y2", x: 78, y: 0.35, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a1_pr_trough_y2", x: 75.5, y: 0.35, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
     { id: "a1_pr_fence1", x: 76.5, y: 0.35, z: PLAY, kind: "fence", facing: 1, interact: "none", data: null, label: null },
 
     // —— 三道院：兵 + 军犬，长矮墙 ——
     { id: "a1_pr_trough2", x: 81, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
     { id: "a1_pr_stove1", x: 87, y: 0, z: PLAY, kind: "stove", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_vat_y3", x: 87.5, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a1_pr_house4", x: 90, y: 0, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
     { id: "a1_pr_wall3", x: 92, y: 0, z: PLAY, kind: "wall", facing: 1, interact: "none", data: null, label: null },
+    { id: "a1_pr_trough_y3", x: 99, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
     { id: "a1_pr_haystack3", x: 97, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
-    { id: "a1_pr_haystack3b", x: 91, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a1_pr_haystack3b", x: 94.5, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_vat3", x: 102, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a1_pr_fence2", x: 103, y: 0, z: FORE, kind: "fence", facing: 1, interact: "none", data: null, label: null },
 
@@ -135,6 +145,12 @@ const act1 = {
 
     // —— 追逐段终点：碾盘下的地道口（他没能进去）——
     { id: "a1_pr_haystack4", x: 122, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a1_pr_trough_h2", x: 116, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
+    { id: "a1_pr_vat_ch1", x: 114, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a1_pr_trough_ch1", x: 115.5, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
+    { id: "a1_pr_vat_ch2", x: 118, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a1_pr_cart_ch1", x: 120, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
+    { id: "a1_pr_haystack5", x: 110, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_millstone", x: 125, y: 0, z: PLAY, kind: "millstone", facing: 1, interact: "hatch", data: { hatchId: "a1_h_exit" }, label: "碾盘下的地道口" },
   ],
 
@@ -142,21 +158,21 @@ const act1 = {
     // 一道院：背对着来回巡逻，矮墙是他的盲区。patrol 不覆盖出生点 x=4。
     {
       id: "a1_e_search1", x: 43, y: 0, kind: "search", facing: -1,
-      patrol: { x0: 37, x1: 45, speed: 1.2, pauseSec: 1.4 },
-      vision: { range: 10, halfAngleDeg: 34, height: 1.6 },
+      patrol: { x0: 38, x1: 45, speed: 1.2, pauseSec: 1.8 },
+      vision: { range: 9, halfAngleDeg: 34, height: 1.6 },
       hearing: 6.0, probeAt: null,
     },
     // 二道院：两个兵交叉视线。
     {
       id: "a1_e_search2", x: 58, y: 0.35, kind: "search", facing: 1,
-      patrol: { x0: 53, x1: 66, speed: 1.35, pauseSec: 1.0 },
+      patrol: { x0: 54, x1: 66, speed: 1.35, pauseSec: 1.0 },
       vision: { range: 11, halfAngleDeg: 32, height: 1.6 },
       hearing: 6.0, probeAt: null,
     },
     {
       id: "a1_e_guard1", x: 74, y: 0.35, kind: "guard", facing: -1,
-      patrol: { x0: 73, x1: 76, speed: 1.1, pauseSec: 2.2 },
-      vision: { range: 12, halfAngleDeg: 28, height: 1.6 },
+      patrol: { x0: 71, x1: 77, speed: 1.2, pauseSec: 1.2 },
+      vision: { range: 11, halfAngleDeg: 28, height: 1.6 },
       hearing: 5.5, probeAt: null,
     },
     // 三道院：兵 + 军犬。狗的听觉 10.5，站起来走路（noise 0.42）必被听见。
@@ -517,7 +533,7 @@ const act3 = {
     { id: "a3_f_su2", x0: 88, x1: 106, y: 0.4, kind: "stone" },
     { id: "a3_f_su3", x0: 106, x1: 124, y: 0, kind: "dirt" },
     // 街道底下的短地道：绕开两个哨兵和一条狗
-    { id: "a3_f_dm", x0: 88, x1: 100, y: -4.5, kind: "tunnel" },
+    { id: "a3_f_dm", x0: 88, x1: 106, y: -4.5, kind: "tunnel" },
     // 地下：东段干线（塌方之后的那一半）
     { id: "a3_f_d3", x0: 110, x1: 148, y: -8.0, kind: "tunnel" },
     { id: "a3_f_d4", x0: 148, x1: 178, y: -8.0, kind: "tunnel" },
@@ -538,7 +554,7 @@ const act3 = {
     // 粮窖：净空 1.20，猫腰
     { x0: 24, x1: 40, y: -3.00 },
     // 街道底下的短地道：净空 1.20，猫腰
-    { x0: 88, x1: 100, y: -3.30 },
+    { x0: 88, x1: 106, y: -3.30 },
     // 东段干线
     { x0: 110, x1: 130, y: -6.22 },
     { x0: 130, x1: 138, y: -6.90 },
@@ -551,16 +567,16 @@ const act3 = {
     { id: "a3_sh_grain_a", x: 30, yTop: -4.2, yBottom: -8.0, kind: "ladder", requiresHatch: null },
     { id: "a3_sh_grain_b", x: 38, yTop: -4.2, yBottom: -8.0, kind: "dirt", requiresHatch: null },
     { id: "a3_sh_mill", x: 63, yTop: 0, yBottom: -8.0, kind: "ladder", requiresHatch: "a3_h_mill" },
-    { id: "a3_sh_m1", x: 90, yTop: 0.4, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_street1" },
-    { id: "a3_sh_m2", x: 99, yTop: 0.4, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_street2" },
+    { id: "a3_sh_m1", x: 88.5, yTop: 0.4, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_street1" },
+    { id: "a3_sh_m2", x: 104.5, yTop: 0.4, yBottom: -4.5, kind: "ladder", requiresHatch: "a3_h_street2" },
     { id: "a3_sh_kang", x: 116, yTop: 0, yBottom: -8.0, kind: "ladder", requiresHatch: "a3_h_kang" },
     { id: "a3_sh_wind", x: 175, yTop: 0, yBottom: -8.0, kind: "dirt", requiresHatch: null },
   ],
 
   hatches: [
     { id: "a3_h_mill", x: 63, shaftId: "a3_sh_mill", hidden: true, opened: false, revealBy: "a3_t_choke", label: "碾盘下的地道口", propId: "a3_pr_mill_hatch" },
-    { id: "a3_h_street1", x: 90, shaftId: "a3_sh_m1", hidden: true, opened: false, revealBy: "a3_t_street", label: "驴槽底下的口", propId: "a3_pr_trough_hatch" },
-    { id: "a3_h_street2", x: 99, shaftId: "a3_sh_m2", hidden: true, opened: false, revealBy: "a3_t_dip", label: "水缸底下的翻口", propId: "a3_pr_dip_out" },
+    { id: "a3_h_street1", x: 88.5, shaftId: "a3_sh_m1", hidden: true, opened: false, revealBy: "a3_t_street", label: "驴槽底下的口", propId: "a3_pr_trough_hatch" },
+    { id: "a3_h_street2", x: 104.5, shaftId: "a3_sh_m2", hidden: true, opened: false, revealBy: "a3_t_dip", label: "水缸底下的翻口", propId: "a3_pr_dip_out" },
     { id: "a3_h_kang", x: 116, shaftId: "a3_sh_kang", hidden: true, opened: false, revealBy: "a3_t_flood", label: "炕下的地道口", propId: "a3_pr_kang3" },
   ],
 
@@ -595,24 +611,31 @@ const act3 = {
     { id: "a3_pr_corpse_s1", x: 67, y: 0, z: PLAY, kind: "corpse", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_wall_s1", x: 70, y: 0, z: PLAY, kind: "wall", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_cart_s1", x: 72, y: 0, z: FORE, kind: "cart", facing: 1, interact: "none", data: null, label: null },
-    { id: "a3_pr_haystack_s1", x: 74, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a3_pr_haystack_s1", x: 70.5, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a3_pr_house_s1", x: 78, y: 0, z: MID, kind: "house", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_cart_g1", x: 76.5, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
+    { id: "a3_pr_haystack_g1b", x: 80, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a3_pr_vat_s1", x: 82, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a3_pr_gate_s1", x: 86.5, y: 0, z: PLAY, kind: "gate", facing: 1, interact: "lever", data: { channel: "gateOpen", needItem: null }, label: "院门" },
 
     // —— 地表 su2：街道，两个哨兵 + 一条狗。驴槽底下有口 ——
-    { id: "a3_pr_trough_hatch", x: 90, y: 0.4, z: PLAY, kind: "trough", facing: 1, interact: "hatch", data: { hatchId: "a3_h_street1" }, label: "驴槽底下的口" },
+    { id: "a3_pr_trough_hatch", x: 88.5, y: 0.4, z: PLAY, kind: "trough", facing: 1, interact: "hatch", data: { hatchId: "a3_h_street1" }, label: "驴槽底下的口" },
+    { id: "a3_pr_haystack_gate", x: 89.5, y: 0.4, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a3_pr_trough_s2", x: 93, y: 0.4, z: PLAY, kind: "trough", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_house_s2", x: 95, y: 0.4, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
-    { id: "a3_pr_haystack_s2", x: 97, y: 0.4, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
-    { id: "a3_pr_vat_s2", x: 99, y: 0.4, z: PLAY, kind: "vat", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_vat_g2", x: 94.5, y: 0.4, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a3_pr_trough_g2", x: 98, y: 0.4, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
+    { id: "a3_pr_haystack_s2", x: 100.5, y: 0.4, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a3_pr_vat_s2", x: 104.5, y: 0.4, z: PLAY, kind: "vat", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_cart_g3", x: 105, y: 0.4, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
+    { id: "a3_pr_haystack_g3", x: 102.5, y: 0.4, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a3_pr_fence_s2", x: 103, y: 0.4, z: FORE, kind: "fence", facing: 1, interact: "none", data: null, label: null },
 
     // —— 街道底下的短地道 ——
     { id: "a3_pr_beam_m1", x: 92, y: -4.5, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_vent_m1", x: 94, y: -3.30, z: PLAY, kind: "vent", facing: 1, interact: "none", data: null, label: null },
-    { id: "a3_pr_crock_m", x: 96, y: -4.5, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
-    { id: "a3_pr_dip_out", x: 99, y: -4.5, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a3_h_street2" }, label: "水缸底下的翻口" },
+    { id: "a3_pr_crock_m", x: 101, y: -4.5, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_dip_out", x: 104.5, y: -4.5, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a3_h_street2" }, label: "水缸底下的翻口" },
 
     // —— 地表 su3：水井 + 炕屋 ——
     { id: "a3_pr_sign3", x: 107, y: 0, z: PLAY, kind: "sign", facing: 1, interact: "read", data: { codexId: "codex_qiangyan" }, label: "墙根的枪眼" },
@@ -620,8 +643,11 @@ const act3 = {
     { id: "a3_pr_haystack_s3", x: 108.5, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a3_pr_well3", x: 112, y: 0, z: PLAY, kind: "well", facing: 1, interact: "lever", data: { channel: "waterDivert", needItem: null }, label: "水井辘轳" },
     { id: "a3_pr_kang3", x: 116, y: 0, z: PLAY, kind: "kang", facing: 1, interact: "hatch", data: { hatchId: "a3_h_kang" }, label: "炕下的地道口" },
-    { id: "a3_pr_vat_s3", x: 114, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a3_pr_haystack_s3b", x: 114, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a3_pr_vat_s3", x: 118, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a3_pr_house_s3", x: 118, y: 0, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
+    { id: "a3_pr_vat_s4", x: 122, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a3_pr_cart_s3", x: 123.2, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
     { id: "a3_pr_loophole_s3", x: 121, y: 0, z: PLAY, kind: "loophole", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_lamp_s3", x: 123, y: 0, z: BACK, kind: "lamp", facing: 1, interact: "none", data: null, label: null },
 
@@ -655,34 +681,34 @@ const act3 = {
     // 碾盘院：一个哨兵站桩
     {
       id: "a3_e_g1", x: 76, y: 0, kind: "guard", facing: -1,
-      patrol: { x0: 75, x1: 78, speed: 1.1, pauseSec: 2.0 },
-      vision: { range: 12, halfAngleDeg: 30, height: 1.6 },
+      patrol: { x0: 73, x1: 79, speed: 1.15, pauseSec: 1.4 },
+      vision: { range: 10, halfAngleDeg: 30, height: 1.6 },
       hearing: 5.8, probeAt: null,
     },
     // 街道：两个哨兵交叉 + 一条军犬。正经走过去几乎必被发现，
     // 正解是从 x=90 的驴槽下去、x=99 的水缸上来。
     {
-      id: "a3_e_g2", x: 91, y: 0.4, kind: "guard", facing: 1,
-      patrol: { x0: 89, x1: 94, speed: 1.15, pauseSec: 2.4 },
-      vision: { range: 13, halfAngleDeg: 28, height: 1.6 },
+      id: "a3_e_g2", x: 96, y: 0.4, kind: "guard", facing: 1,
+      patrol: { x0: 94, x1: 99, speed: 1.15, pauseSec: 1.6 },
+      vision: { range: 11, halfAngleDeg: 28, height: 1.6 },
       hearing: 6.0, probeAt: null,
     },
     {
-      id: "a3_e_g3", x: 103, y: 0.4, kind: "guard", facing: -1,
-      patrol: { x0: 101, x1: 105, speed: 1.2, pauseSec: 2.2 },
+      id: "a3_e_g3", x: 100, y: 0.4, kind: "guard", facing: -1,
+      patrol: { x0: 99, x1: 102, speed: 1.2, pauseSec: 1.4 },
       vision: { range: 13, halfAngleDeg: 28, height: 1.6 },
       hearing: 6.0, probeAt: null,
     },
     {
       id: "a3_e_dog3", x: 97, y: 0.4, kind: "dog", facing: 1,
-      patrol: { x0: 89, x1: 105, speed: 2.1, pauseSec: 0.5 },
+      patrol: { x0: 94, x1: 101, speed: 2.1, pauseSec: 0.5 },
       vision: { range: 9, halfAngleDeg: 46, height: 0.7 },
       hearing: 11.0, probeAt: null,
     },
     // 水井那条街：一个来回搜的兵。水井 x=112 和炕洞 x=116 都在他的巡逻里。
     {
       id: "a3_e_s4", x: 114, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 110, x1: 120, speed: 1.5, pauseSec: 1.0 },
+      patrol: { x0: 113, x1: 121, speed: 1.5, pauseSec: 1.0 },
       vision: { range: 12, halfAngleDeg: 34, height: 1.6 },
       hearing: 6.5, probeAt: null,
     },

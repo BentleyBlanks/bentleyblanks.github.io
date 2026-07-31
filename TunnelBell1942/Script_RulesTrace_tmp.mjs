@@ -2812,17 +2812,6 @@ function BotThreat(state) {
   return worst;
 }
 
-/** 往哪边退才不会掉下台子／退回刚爬上来的竖井。 */
-function BotRetreatDir(state, threat) {
-  const p = state.player;
-  const away = p.x >= threat.e.x ? 1 : -1;
-  const floor = FloorUnder(state.level, p.x, p.y + 0.3, 0.6);
-  if (!floor) return away;
-  const room = away > 0 ? floor.x1 - p.x : p.x - floor.x0;
-  if (room > 1.2) return away;
-  return 0; // 退无可退，就地低头别动
-}
-
 /** 脚底下就有掩体吗（站上去就能钻进去）。 */
 function BotCoverAt(state, x) {
   const p = state.player;
@@ -2936,7 +2925,7 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
     won: false,
     seconds: t,
     reason:
-      BotFailKind(bot) +
+      (bot.giveUp ? "stuck" : "timeout") +
       " goal=" + (bot.lastGoal || "?") +
       " playerX=" + state.player.x.toFixed(1) +
       " playerY=" + state.player.y.toFixed(1) +
@@ -2944,15 +2933,6 @@ export function DebugAutoPlay(state, maxSeconds = 240) {
       " deaths=" + state.stats.deaths +
       (bot.blockedBy ? " blockedBy=" + bot.blockedBy : ""),
   };
-}
-
-/** 失败原因分类，方便下次定位：卡在敌人 / 找不到路 / 目标不可达 / 几何卡死。 */
-function BotFailKind(bot) {
-  if (bot.noRoute > 3) return "no_route";
-  if (bot.giveUp && bot.failKind === "geometry") return "stuck_geometry";
-  if (bot.blockedBy) return "blocked_by_enemy";
-  if (bot.lastGoal && bot.lastGoal.indexOf("propDone:") === 0) return "goal_unreachable";
-  return "timeout";
 }
 
 function BotThink(state, bot, dt) {
@@ -2978,12 +2958,6 @@ function BotThink(state, bot, dt) {
   // 这一跳该往哪走（导航图算的，可能跟目标方向相反——比如要先绕回去下地道）
   const hop = p.onShaft ? null : NavNext(state, goal.x, goal.y);
   const localX = hop ? hop.x : goal.x;
-  if (!hop && !p.onShaft && Math.abs(goal.y - p.y) > 1.6) {
-    // 导航图连不到目标那一层：不是被敌人挡着，是真没路
-    bot.noRoute = (bot.noRoute || 0) + dt;
-  } else {
-    bot.noRoute = 0;
-  }
 
   // 卡住检测
   const moved = Math.abs(p.x - bot.lastX) + Math.abs(p.y - bot.lastY);
@@ -2996,66 +2970,22 @@ function BotThink(state, bot, dt) {
   }
   if (bot.stuckTimer > 30) {
     bot.giveUp = true;
-    bot.failKind = "geometry";
-    return;
-  }
-
-  // ── 停滞升级 ──
-  // 这个测试是要证明"关卡没有死锁"，不是证明 bot 玩得好。
-  // 同一个目标上长时间原地打转 → 一级一级加码，最后允许被抓一次
-  //（被抓只是回检查点，已开的地道口／已拉的闸／已救的人都还在）。
-  if (goal.tag !== bot.stallGoal || Math.abs(p.x - bot.stallX) > 3.5) {
-    bot.stallGoal = goal.tag;
-    bot.stallX = p.x;
-    bot.stallTimer = 0;
-    bot.desperate = 0;
-  } else {
-    bot.stallTimer = (bot.stallTimer || 0) + dt;
-  }
-  if (bot.deathMark !== state.stats.deaths) {
-    // 刚被抓过：局面已经重置，重新好好玩
-    bot.deathMark = state.stats.deaths;
-    bot.stallTimer = 0;
-    bot.desperate = 0;
-    bot.dashTo = null;
-  }
-  bot.desperate = bot.stallTimer > 26 ? 2 : bot.stallTimer > 13 ? 1 : 0;
-
-  // 二级：彻底不管敌人了，低头直接朝路线目标走，被抓就被抓
-  if (bot.desperate >= 2) {
-    bot.blockedBy = bot.blockedBy || null;
-    bot.failKind = "enemy";
-    if (p.hidden) {
-      input.interactPressed = true;
-      return;
-    }
-    input.crouch = bot.stallTimer < 34;
-    input.sneak = input.crouch;
-    BotWalkTo(state, bot, localX, input);
-    MaybePress(state, bot, goal, input);
     return;
   }
 
   // ── 潜行处置：掩体接力 ──
-  // 关卡是按"柴垛—水缸—碾盘每隔七八米一个"设计的，正确打法是从掩体跑到掩体：
-  //   离得远 → 一路猫腰潜行（猫腰视距只有站着的一半，远处根本看不见）；
-  //   进了"猫腰也会被看见"的范围 → 没窗口就钻进眼前的掩体等；
-  //   等他背过身 → 站起来全速冲下一个掩体，**冲了就冲到底**，半路他回头也不许掉头
-  //     （掉头等于在他眼皮底下多待一倍时间，这是之前卡死的真正原因）；
-  //   冲到掩体立刻再钻进去 —— 跑动会被听见，但只要藏起来他就找不到人。
+  // 这些关卡是按"柴垛—水缸—碾盘每隔七八米一个"设计的，正确打法是从掩体跑到掩体：
+  //   没窗口就钻进眼前的掩体等；等到他背过身，站起来全速冲下一个掩体，落地立刻再钻进去。
+  // 直接朝终点冲是死路：站着跑视距 12 米，冲三十米一定会被回头的岗哨逮住。
   const threat = BotThreat(state);
   bot.hiding = false;
   const dirToGoal = Math.sign(localX - p.x) || p.facing;
+  // "窗口" = 他背过身而且还没起疑
+  const windowOpen = !threat || (!threat.facingMe && threat.alert < 0.25);
 
   if (p.hidden) {
-    bot.hideTimer = (bot.hideTimer || 0) + dt;
-    const clear =
-      !threat ||
-      (threat.alert < 0.25 && (!threat.facingMe || threat.dist > threat.effStealth + 0.5));
-    // 实在等不到空窗就硬着头皮出去：宁可难看地通关，也不许无限等待
-    if (clear || bot.hideTimer > 7) {
-      input.interactPressed = true;
-      bot.hideTimer = 0;
+    if (windowOpen) {
+      input.interactPressed = true; // 风头过了，出来
       bot.commitTimer = 0;
     } else {
       bot.hiding = true;
@@ -3064,86 +2994,60 @@ function BotThink(state, bot, dt) {
     }
     return;
   }
-  bot.hideTimer = 0;
 
-  if (!threat) {
-    bot.commitTimer = 0;
-    bot.dashTo = null;
-  } else {
-    const inSight = threat.dist < threat.effStand + 2;
-    const nearVision = threat.dist < threat.effStealth + 2.5 || threat.alert > 0.2;
-    if (inSight) {
-      input.crouch = true;
-      input.sneak = true;
-    }
-
-    if (nearVision || bot.dashTo != null) {
+  if (threat) {
+    // 他管得到这一段吗（视距内，或者已经起疑）
+    const engaged = threat.dist < threat.effStand + 3 || threat.alert > 0.2;
+    if (engaged) {
       bot.blockedBy = threat.e.id;
       bot.stuckTimer = 0;
       bot.commitTimer = (bot.commitTimer || 0) + dt;
-      const windowOpen = !threat.facingMe && threat.alert < 0.25;
-      const commit = bot.commitTimer > 9 || bot.desperate > 0;
+      const here = BotCoverAt(state, p.x);
 
-      // 1) 已经在冲了：冲到底
-      if (bot.dashTo != null) {
-        if (Math.abs(bot.dashTo - p.x) < 1.15) {
-          bot.dashTo = null;
-          bot.commitTimer = 0;
-          const arrived = BotCoverAt(state, p.x);
-          if (arrived && (!windowOpen || threat.alert > 0.15)) {
-            bot.hiding = true; // 落地就钻进去
-            MaybePress(state, bot, goal, input);
-            return;
-          }
-        } else {
-          input.crouch = false;
-          input.sneak = false;
-          BotWalkTo(state, bot, bot.dashTo, input);
+      // 等太久了就硬冲一次：宁可被抓回检查点，也别在这耗到超时
+      const commit = bot.commitTimer > 14;
+
+      if (!windowOpen && !commit) {
+        if (here) {
+          // 就地钻进去
+          input.crouch = true;
+          input.sneak = true;
+          bot.hiding = true;
           MaybePress(state, bot, goal, input);
           return;
         }
-      }
-
-      // 2) 有窗口（或憋太久）→ 起跑，目标是下一个掩体
-      if (windowOpen || commit) {
-        const next = BotCoverToward(state, dirToGoal, null);
-        const dashX = next ? PropX(state, next) : localX;
-        if (Math.abs(dashX - p.x) > 1.15) bot.dashTo = dashX;
-        bot.commitTimer = 0;
-        input.crouch = false;
-        input.sneak = false;
-        BotWalkTo(state, bot, dashX, input);
-        MaybePress(state, bot, goal, input);
-        return;
-      }
-
-      // 3) 没窗口：钻眼前的掩体 → 退到后面的掩体 → 退出视距 → 低头继续挪
-      const here = BotCoverAt(state, p.x);
-      if (here) {
-        bot.hiding = true;
-        MaybePress(state, bot, goal, input);
-        return;
-      }
-      const back = BotCoverToward(state, -dirToGoal, threat);
-      if (back) {
-        input.crouch = !threat.exposed;
-        input.sneak = input.crouch;
-        BotWalkTo(state, bot, PropX(state, back), input);
-        MaybePress(state, bot, goal, input);
-        return;
-      }
-      if (threat.exposed) {
-        const dir = BotRetreatDir(state, threat);
-        if (dir !== 0) {
-          input.moveX = dir;
+        const back = BotCoverToward(state, -dirToGoal, threat);
+        if (back) {
+          input.crouch = !threat.exposed; // 已经被看见就别磨蹭，跑
+          input.sneak = input.crouch;
+          BotWalkTo(state, bot, PropX(state, back), input);
+          MaybePress(state, bot, goal, input);
           return;
         }
+        // 没掩体可退：退出他的视距
+        input.crouch = true;
+        input.sneak = true;
+        input.moveX = p.x >= threat.e.x ? 1 : -1;
+        return;
       }
-      // 退无可退：低头继续往前挪，别在原地耗着
-    } else {
-      bot.commitTimer = 0;
-      bot.dashTo = null;
+
+      // 有窗口：全速冲向下一个掩体（站着跑最快，别猫腰）
+      if (commit) bot.commitTimer = 0;
+      const next = BotCoverToward(state, dirToGoal, null);
+      const dashX = next ? PropX(state, next) : localX;
+      BotWalkTo(state, bot, dashX, input);
+      MaybePress(state, bot, goal, input);
+      return;
     }
+    bot.commitTimer = 0;
+    // 他背对我而且离得不近：贴身才低头轻声挪
+    if (threat.dist < 3.0 || (threat.alert > 0.3 && threat.dist < 5.0)) {
+      input.crouch = true;
+      input.sneak = true;
+    }
+  } else {
+    bot.commitTimer = 0;
+    bot.evade = false;
   }
 
   // 竖直导航：在竖井上就一路按到底，别在半空里改主意
@@ -3227,3 +3131,5 @@ function MaybePress(state, bot, goal, input, preferProp) {
   input.interactPressed = true;
   bot.pressCooldown[prompt.id] = 0.6;
 }
+
+export { BotThink as _BotThink, BotThreat as _BotThreat, BotGoal as _BotGoal, NavNext as _NavNext, BotCoverToward as _BotCoverToward };
