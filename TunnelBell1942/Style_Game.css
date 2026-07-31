@@ -20,6 +20,11 @@
 
 * { box-sizing: border-box; }
 
+/* hidden 属性靠的是 UA 样式表里的 display:none，任何作者写的 display 都能盖掉它。
+   本文件里 .hudPrompt 是 display:flex、.panelIcons span 是 grid——它们"隐藏"时
+   照样占位照样画，屏幕上就会留下一个空徽章。这条兜底必须排在所有布局规则前面。 */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;

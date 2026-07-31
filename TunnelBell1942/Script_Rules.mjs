@@ -1110,6 +1110,7 @@ function FinishPlayerFrame(state, dt) {
     if (p.posture === "crawl") base = NOISE.crawl;
     else if (p.posture === "crouch") base = NOISE.crouch;
     else base = state.input.sneak ? NOISE.sneak : NOISE.walk * frac;
+    if (state.input.sneak && p.posture !== "stand") base *= 0.5; // 猫腰再放轻脚步
   }
   p.noise = Clamp(Math.max(base, p.noiseSpike), 0, 1);
 
@@ -2593,6 +2594,7 @@ function BotHatchPropFor(state, hatchId) {
 
 const NAV_DANGER = 26; // 一个哨兵覆盖的路段要多付多少代价
 const NAV_HATCH = 6; // 还没开的地道口：能开，但优先走现成的路
+const NAV_HIDDEN = 10; // 还没现形的地道口：更贵，但不是死路
 
 function BuildNav(state) {
   const level = state.level;
@@ -2633,24 +2635,26 @@ function BuildNav(state) {
   }
 
   // 竖井
-  const NodeAt = (x, y) => {
-    let best = -1;
-    let bestDy = 1.2;
+  // 井口正好压在切分点上时，两边的节点都算"够得着"——
+  // 只连其中一个的话，会出现"钻了地道又被塞回原来那段危险街面"的假路线。
+  const NodesAt = (x, y) => {
+    const out = [];
     for (const n of nodes) {
       if (x < n.x0 - 0.7 || x > n.x1 + 0.7) continue;
-      const dy = Math.abs(n.y - y);
-      if (dy < bestDy) {
-        bestDy = dy;
-        best = n.id;
-      }
+      if (Math.abs(n.y - y) > 1.1) continue;
+      out.push(n.id);
     }
-    return best;
+    return out;
   };
   for (const s of level.shafts) {
-    const top = NodeAt(s.x, s.yTop);
-    const bottom = NodeAt(s.x, s.yBottom);
-    if (top < 0 || bottom < 0 || top === bottom) continue;
-    AddEdge(top, bottom, "shaft", { shaft: s, x: s.x });
+    const tops = NodesAt(s.x, s.yTop);
+    const bottoms = NodesAt(s.x, s.yBottom);
+    for (const top of tops) {
+      for (const bottom of bottoms) {
+        if (top === bottom) continue;
+        AddEdge(top, bottom, "shaft", { shaft: s, x: s.x });
+      }
+    }
   }
 
   return nodes;
@@ -2704,7 +2708,11 @@ function NavShaftUsable(state, shaft) {
   const rec = state.world.hatches[shaft.requiresHatch];
   if (!rec) return { ok: false, cost: 0 };
   if (rec.opened) return { ok: true, cost: 0 };
-  if (rec.hidden && !state.world.revealed[shaft.requiresHatch]) return { ok: false, cost: 0 };
+  // 还没现形的地道口不能算死路：关卡通常是"人走到跟前，触发区才让它现形"。
+  // 当成"贵但走得通"，否则机器人永远想不到要下地道，只会去街上跟岗哨对撞。
+  if (rec.hidden && !state.world.revealed[shaft.requiresHatch]) {
+    return { ok: true, cost: NAV_HATCH + NAV_HIDDEN };
+  }
   return { ok: true, cost: NAV_HATCH };
 }
 
@@ -2745,7 +2753,7 @@ function NavNext(state, goalX, goalY) {
 
     for (const edge of nodes[cur].edges) {
       if (done[edge.to]) continue;
-      let cost = Math.abs(edge.x - entryX[cur]) + NavDanger(state, nodes[edge.to]) * 0.5;
+      let cost = Math.abs(edge.x - entryX[cur]) + NavDanger(state, nodes[edge.to]);
       if (edge.kind === "shaft") {
         const usable = NavShaftUsable(state, edge.shaft);
         if (!usable.ok) continue;
@@ -3021,6 +3029,20 @@ function BotThink(state, bot, dt) {
   }
   bot.desperate = bot.stallTimer > 26 ? 2 : bot.stallTimer > 13 ? 1 : 0;
 
+  // 竖直导航：在竖井上就一路按到底，别在半空里改主意
+  if (p.onShaft) {
+    const shaft = ShaftById(state, p.shaftId);
+    const wantY = bot.climbTargetY !== undefined ? bot.climbTargetY : goal.y;
+    if (shaft) {
+      const mid = (shaft.yTop + shaft.yBottom) * 0.5;
+      if (wantY > p.y + 0.05) input.up = true;
+      else if (wantY < p.y - 0.05) input.down = true;
+      else if (p.y > mid) input.up = true;
+      else input.down = true;
+    } else if (wantY > p.y) input.up = true;
+    else input.down = true;
+    return;
+  }
   // 二级：彻底不管敌人了，低头直接朝路线目标走，被抓就被抓
   if (bot.desperate >= 2) {
     bot.blockedBy = bot.blockedBy || null;
@@ -3046,6 +3068,20 @@ function BotThink(state, bot, dt) {
   const threat = BotThreat(state);
   bot.hiding = false;
   const dirToGoal = Math.sign(localX - p.x) || p.facing;
+  // 井口就在眼前：钻下去比躲柴垛安全得多，别再玩掩体接力了
+  const shaftHop = !!(hop && hop.kind === "shaft");
+  const atMouth = shaftHop && Math.abs(p.x - hop.x) < 2.2;
+
+  // 顺路就把乡亲喊上（有的关卡没有 talk 道具，只能靠"呼应"）。
+  // 不这么干的话，等目标轮到"找齐乡亲"时得横穿半张图回头捡人。
+  if (!p.hidden && !p.action && !(threat && threat.dist < 12)) {
+    for (const n of state.npcs) {
+      if (n.rescued || n.follow) continue;
+      if (Math.abs(n.x - p.x) > 5.5 || Math.abs(n.y - p.y) > 2.2) continue;
+      input.callPressed = true;
+      break;
+    }
+  }
 
   if (p.hidden) {
     bot.hideTimer = (bot.hideTimer || 0) + dt;
@@ -3066,9 +3102,13 @@ function BotThink(state, bot, dt) {
   }
   bot.hideTimer = 0;
 
-  if (!threat) {
+  if (!threat || atMouth) {
     bot.commitTimer = 0;
     bot.dashTo = null;
+    if (threat) {
+      input.crouch = true;
+      input.sneak = true;
+    }
   } else {
     const inSight = threat.dist < threat.effStand + 2;
     const nearVision = threat.dist < threat.effStealth + 2.5 || threat.alert > 0.2;
@@ -3106,7 +3146,7 @@ function BotThink(state, bot, dt) {
 
       // 2) 有窗口（或憋太久）→ 起跑，目标是下一个掩体
       if (windowOpen || commit) {
-        const next = BotCoverToward(state, dirToGoal, null);
+        const next = shaftHop ? null : BotCoverToward(state, dirToGoal, null);
         const dashX = next ? PropX(state, next) : localX;
         if (Math.abs(dashX - p.x) > 1.15) bot.dashTo = dashX;
         bot.commitTimer = 0;
@@ -3146,20 +3186,6 @@ function BotThink(state, bot, dt) {
     }
   }
 
-  // 竖直导航：在竖井上就一路按到底，别在半空里改主意
-  if (p.onShaft) {
-    const shaft = ShaftById(state, p.shaftId);
-    const wantY = bot.climbTargetY !== undefined ? bot.climbTargetY : goal.y;
-    if (shaft) {
-      const mid = (shaft.yTop + shaft.yBottom) * 0.5;
-      if (wantY > p.y + 0.05) input.up = true;
-      else if (wantY < p.y - 0.05) input.down = true;
-      else if (p.y > mid) input.up = true;
-      else input.down = true;
-    } else if (wantY > p.y) input.up = true;
-    else input.down = true;
-    return;
-  }
   bot.climbTargetY = undefined;
 
   // 走地板 + 钻竖井的路线由导航图算（会为了躲岗哨主动绕地道）

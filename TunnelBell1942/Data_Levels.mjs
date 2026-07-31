@@ -689,27 +689,27 @@ const act3 = {
     // 街道：两个哨兵交叉 + 一条军犬。正经走过去几乎必被发现，
     // 正解是从 x=90 的驴槽下去、x=99 的水缸上来。
     {
-      id: "a3_e_g2", x: 96, y: 0.4, kind: "guard", facing: 1,
-      patrol: { x0: 94, x1: 99, speed: 1.15, pauseSec: 1.6 },
+      id: "a3_e_g2", x: 98, y: 0.4, kind: "guard", facing: 1,
+      patrol: { x0: 96, x1: 100, speed: 1.15, pauseSec: 1.6 },
       vision: { range: 11, halfAngleDeg: 28, height: 1.6 },
       hearing: 6.0, probeAt: null,
     },
     {
-      id: "a3_e_g3", x: 101, y: 0.4, kind: "guard", facing: -1,
-      patrol: { x0: 100, x1: 103, speed: 1.2, pauseSec: 1.4 },
-      vision: { range: 13, halfAngleDeg: 28, height: 1.6 },
+      id: "a3_e_g3", x: 102, y: 0.4, kind: "guard", facing: -1,
+      patrol: { x0: 101, x1: 104, speed: 1.2, pauseSec: 1.4 },
+      vision: { range: 9, halfAngleDeg: 28, height: 1.6 },
       hearing: 6.0, probeAt: null,
     },
     {
-      id: "a3_e_dog3", x: 96, y: 0.4, kind: "dog", facing: 1,
-      patrol: { x0: 93, x1: 99, speed: 1.5, pauseSec: 0.6 },
+      id: "a3_e_dog3", x: 93, y: 0.4, kind: "dog", facing: 1,
+      patrol: { x0: 91, x1: 95, speed: 1.5, pauseSec: 0.6 },
       vision: { range: 8, halfAngleDeg: 46, height: 0.7 },
       hearing: 9.5, probeAt: null,
     },
     // 水井那条街：一个来回搜的兵。水井 x=112 和炕洞 x=116 都在他的巡逻里。
     {
-      id: "a3_e_s4", x: 117, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 115, x1: 121, speed: 1.5, pauseSec: 1.0 },
+      id: "a3_e_s4", x: 120, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 118, x1: 123, speed: 1.5, pauseSec: 1.0 },
       vision: { range: 12, halfAngleDeg: 34, height: 1.6 },
       hearing: 6.5, probeAt: null,
     },
