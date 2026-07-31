@@ -69,6 +69,8 @@ const TURN_RATE = 26.0;
 
 /** 模块级临时姿态缓冲。PoseActor 内同步使用，绝不逃逸，因此可以全局复用。 */
 const scratch = new Float32Array(NCH);
+/** 第二块缓冲：crawl 要在「猫腰走」和「匍匐」两套姿态之间插值。 */
+const scratchB = new Float32Array(NCH);
 
 // ——————————————————————————————————————————————————————————— 数学小工具（全部零分配）
 
@@ -151,62 +153,64 @@ function AddP(out, j, x, y, z) {
 const SPECS = {
   // 高老忠：偏瘦、微驼、白羊肚手巾、长袄过膝，步子稳、摆臂小。
   laozhong: {
-    height: ADULT * 0.976, build: 0.84, limb: 0.90, headScale: 1.00,
+    height: ADULT * 0.972, build: 0.80, limb: 0.88, headScale: 1.00, waist: 0.90,
     thighRatio: 0.243, shinRatio: 0.237,
-    stoop: -0.15, cadence: 0.90, stepAmp: 0.88, armSwing: 0.72,
+    stoop: -0.20, cadence: 0.88, stepAmp: 0.86, armSwing: 0.68,
     gown: true, towel: true, beard: false,
-    col: { cloth: 0x2c3039, cloth2: 0x22262e, skin: 0x8a6a52, accent: 0xd2ccbb, metal: 0x777d86, dark: 0x171a21 },
+    col: { cloth: 0x30353f, cloth2: 0x232730, skin: 0x8a6a52, accent: 0xd2ccbb, metal: 0x777d86, dark: 0x171a21 },
   },
   // 高传宝：结实挺拔、短打、腰间别着东西，动作快、摆臂大。
   chuanbao: {
-    height: ADULT * 1.024, build: 1.08, limb: 1.06, headScale: 0.97,
-    thighRatio: 0.248, shinRatio: 0.240,
-    stoop: -0.02, cadence: 1.14, stepAmp: 1.10, armSwing: 1.15,
-    sash: true, pouch: true,
-    col: { cloth: 0x333a45, cloth2: 0x22272f, skin: 0x93715a, accent: 0x5c4830, metal: 0x8a9099, dark: 0x14171d },
+    height: ADULT * 1.035, build: 1.16, limb: 1.14, headScale: 0.94, waist: 0.94,
+    thighRatio: 0.250, shinRatio: 0.242,
+    stoop: -0.02, cadence: 1.16, stepAmp: 1.12, armSwing: 1.20,
+    yoke: true, jacket: true, sash: true, pouch: true, rolled: true,
+    col: { cloth: 0x39404d, cloth2: 0x282d37, skin: 0x93715a, bare: 0x5d4634,
+      accent: 0x5c4830, metal: 0x8a9099, dark: 0x14171d },
   },
   villager: {
-    height: ADULT * 0.988, build: 0.98, limb: 1.00, headScale: 1.00,
+    height: ADULT * 0.982, build: 0.94, limb: 0.98, headScale: 1.00, waist: 1.00,
     thighRatio: 0.245, shinRatio: 0.235,
     stoop: -0.07, cadence: 1.00, stepAmp: 0.98, armSwing: 0.95,
     cap: true,
-    col: { cloth: 0x2f333c, cloth2: 0x262a32, skin: 0x8d6e57, accent: 0x8f8574, metal: 0x777d86, dark: 0x171a20 },
+    col: { cloth: 0x31353f, cloth2: 0x24272f, skin: 0x8d6e57, accent: 0x8f8574, metal: 0x777d86, dark: 0x171a20 },
   },
   // 孩子：小、头大、腿短、动作碎（cadence 高、幅度小）。
   child: {
-    height: ADULT * 0.647, build: 0.94, limb: 0.90, headScale: 1.44,
-    thighRatio: 0.222, shinRatio: 0.212,
-    stoop: -0.04, cadence: 1.58, stepAmp: 0.76, armSwing: 1.20,
-    col: { cloth: 0x3b414d, cloth2: 0x2c313a, skin: 0x9a7860, accent: 0xa89a84, metal: 0x777d86, dark: 0x1a1e25 },
+    height: ADULT * 0.630, build: 1.10, limb: 0.96, headScale: 1.62, waist: 1.08,
+    thighRatio: 0.212, shinRatio: 0.202,
+    stoop: -0.04, cadence: 1.62, stepAmp: 0.72, armSwing: 1.28,
+    col: { cloth: 0x414957, cloth2: 0x2e333d, skin: 0x9a7860, accent: 0xa89a84, metal: 0x777d86, dark: 0x1a1e25 },
   },
   // 老人：驼得厉害、慢、拄棍。
   elder: {
-    height: ADULT * 0.929, build: 0.80, limb: 0.86, headScale: 1.03,
-    thighRatio: 0.240, shinRatio: 0.232,
-    stoop: -0.32, cadence: 0.70, stepAmp: 0.60, armSwing: 0.45,
+    height: ADULT * 0.906, build: 0.78, limb: 0.84, headScale: 1.06, waist: 0.94,
+    thighRatio: 0.232, shinRatio: 0.226,
+    stoop: -0.52, cadence: 0.66, stepAmp: 0.56, armSwing: 0.40,
     gown: true, stick: true, beard: true,
-    col: { cloth: 0x2a2e36, cloth2: 0x22262d, skin: 0x8a6d58, accent: 0xb9b3a5, metal: 0x777d86, dark: 0x171a20 },
+    col: { cloth: 0x2c313b, cloth2: 0x1f232b, skin: 0x8a6d58, accent: 0xb9b3a5, metal: 0x777d86, dark: 0x171a20 },
   },
   // 日军士兵：军帽带屁帘、背长枪、步子方正（摆臂僵、步幅平）。
   soldier: {
-    height: ADULT * 0.971, build: 1.05, limb: 1.04, headScale: 0.97,
+    height: ADULT * 0.965, build: 1.06, limb: 1.04, headScale: 0.96, waist: 1.02,
     thighRatio: 0.245, shinRatio: 0.235,
-    stoop: 0.00, cadence: 1.02, stepAmp: 1.02, armSwing: 0.80,
-    capFlap: true, rifle: true, torch: true, boots: 0.55,
-    col: { cloth: 0x39412f, cloth2: 0x2c3325, skin: 0x9c7b62, accent: 0x4b5238, metal: 0x8f959d, dark: 0x14150f },
+    stoop: 0.00, cadence: 1.02, stepAmp: 1.02, armSwing: 0.78,
+    yoke: true, capFlap: true, rifle: true, torch: true, puttee: true, boots: 0.55,
+    col: { cloth: 0x3d4531, cloth2: 0x2b3122, skin: 0x9c7b62, accent: 0x4b5238, metal: 0x8f959d, dark: 0x14150f },
   },
   // 山田：军官帽、马靴、佩刀、站得更直，走路慢而有压迫感。
   officer: {
-    height: ADULT * 1.018, build: 1.00, limb: 1.00, headScale: 0.96,
-    thighRatio: 0.246, shinRatio: 0.238,
-    stoop: 0.05, cadence: 0.76, stepAmp: 0.94, armSwing: 0.55,
-    peakCap: true, sword: true, torch: true, boots: 0.95, belt: true,
-    col: { cloth: 0x323a33, cloth2: 0x272e28, skin: 0x9c7f68, accent: 0x5a4a2a, metal: 0x9aa2ab, dark: 0x101110 },
+    height: ADULT * 1.024, build: 0.98, limb: 1.00, headScale: 0.94, waist: 0.88,
+    thighRatio: 0.248, shinRatio: 0.240,
+    stoop: 0.10, cadence: 0.74, stepAmp: 0.92, armSwing: 0.50,
+    yoke: true, peakCap: true, sword: true, torch: true, breeches: true,
+    boots: 0.95, belt: true,
+    col: { cloth: 0x363f3b, cloth2: 0x242b28, skin: 0x9c7f68, accent: 0x5a4a2a, metal: 0x9aa2ab, dark: 0x101110 },
   },
   // 军犬：四足 rig，跟人形完全不同。height 是肩高。
   dog: {
     dog: true,
-    height: ADULT * 0.412, build: 1.00, limb: 1.00, headScale: 1.00,
+    height: ADULT * 0.412, build: 1.00, limb: 1.00, headScale: 1.00, waist: 1.00,
     thighRatio: 0.43, shinRatio: 0.37,
     stoop: 0.00, cadence: 1.30, stepAmp: 1.00, armSwing: 1.00,
     col: { cloth: 0x24262c, cloth2: 0x1b1d22, skin: 0x2a2c33, accent: 0x3a3d45, metal: 0x8f959d, dark: 0x0f1013 },
@@ -270,6 +274,15 @@ function Lam(three, list, color) {
   return m;
 }
 
+/** 与 BuildHuman 保持一致的脊柱总长推导，几何缓存要用。 */
+function spineTotalOf(sp) {
+  const h = sp.height;
+  const hipY = h * 0.033 + h * sp.shinRatio + h * sp.thighRatio;
+  const headOver = h * 0.068 * sp.headScale * 1.995;
+  const t = h - hipY - headOver;
+  return t < h * 0.18 ? h * 0.18 : t;
+}
+
 function BuildHumanAssets(three, sp) {
   const list = [];
   const h = sp.height;
@@ -285,8 +298,8 @@ function BuildHumanAssets(three, sp) {
   geo.foreArm = Cap(three, list, lr * 0.80, h * 0.178);
   geo.thigh = Cap(three, list, lr * 1.28, h * sp.thighRatio);
   geo.shin = Cap(three, list, lr * 1.02, h * sp.shinRatio);
-  geo.torso = Cap(three, list, lr * 1.9, h * 0.175);
-  geo.chest = Cap(three, list, lr * 2.05, h * 0.165);
+  geo.torso = Cap(three, list, lr * 2.10, spineTotalOf(sp) * 0.70);
+  geo.chest = Cap(three, list, lr * 2.22, spineTotalOf(sp) * 0.62);
 
   const c = sp.col;
   const mat = {
@@ -296,6 +309,7 @@ function BuildHumanAssets(three, sp) {
     accent: Lam(three, list, c.accent),
     metal: Lam(three, list, c.metal),
     dark: Lam(three, list, c.dark),
+    bare: Lam(three, list, c.bare || c.skin),
   };
   return { geo: geo, mat: mat, list: list };
 }
@@ -390,23 +404,32 @@ function BuildHuman(three, kind, sp, assets) {
   const root = Joint(three, group, 0, 0, 0);
 
   // —— 骨盆 ——
+  // 侧视时躯干是一整条梯形：胯宽 → 腰收 → 胸展。用方块而不是叠胶囊，
+  // 否则剪影上是「一串珠子」，读不出人形。
   const hip = Joint(three, root, 0, hipY, 0);
-  Part(three, hip, g.box, m.cloth2, bodyW * 0.92, h * 0.085, bodyD * 1.9, 0, -h * 0.028, 0);
+  Part(three, hip, g.sphere, m.cloth, bodyW * 1.02, h * 0.135, bodyD * 2.0, 0, -h * 0.028, 0);
 
   // —— 脊柱 ——
+  // 两段胶囊「半径接近 + 大幅重叠」，侧视才是一条连续的躯干，
+  // 而不是一串珠子；差异交给外面的衣着块去做。
   const torso = Joint(three, hip, 0, 0, 0);
   const torsoMesh = new three.Mesh(g.torso, m.cloth);
-  torsoMesh.position.set(0, torsoL * 0.5, 0);
-  torsoMesh.scale.set(1.0, 1.0, 1.62);
+  torsoMesh.position.set(0, torsoL * 0.44, 0);
+  torsoMesh.scale.set(sp.waist, 1.0, 1.52);
   torsoMesh.castShadow = true;
   torso.add(torsoMesh);
 
   const chest = Joint(three, torso, 0, torsoL, 0);
   const chestMesh = new three.Mesh(g.chest, m.cloth);
-  chestMesh.position.set(0, chestL * 0.5, 0);
-  chestMesh.scale.set(1.0, 1.0, 1.72);
+  chestMesh.position.set(h * 0.004, chestL * 0.34, 0);
+  chestMesh.scale.set(1.0, 1.0, 1.62);
   chestMesh.castShadow = true;
   chest.add(chestMesh);
+  if (sp.yoke) {
+    // 宽肩：民兵队长和军人靠这一块把上身撑开
+    Part(three, chest, g.sphere, m.cloth, bodyW * 1.24, h * 0.085, shW * 2.30,
+      -h * 0.006, chestL * 0.86, 0);
+  }
 
   const neck = Joint(three, chest, 0, chestL, 0);
   Part(three, neck, g.cyl, m.skin, h * 0.038, neckL * 1.25, h * 0.038, 0, neckL * 0.4, 0);
@@ -417,47 +440,54 @@ function BuildHuman(three, kind, sp, assets) {
 
   // —— 头部标志物（全部按身体本地坐标摆放，+X 就是「前」）——
   if (sp.towel) {
-    // 白羊肚手巾：包住头顶，前额打结（结在 +X，转身后仍在脸前）。
-    Part(three, head, g.box, m.accent, headR * 1.95, headR * 1.05, headR * 1.95,
+    // 白羊肚手巾：整个头顶裹一圈浅色，脑后垂一角，额前系个结。
+    // 这是高老忠在剪影上最好认的东西，所以做得比真实比例夸张。
+    Part(three, head, g.box, m.accent, headR * 2.10, headR * 1.05, headR * 2.00,
       0, headR * 1.62, 0);
-    Part(three, head, g.box, m.accent, headR * 0.85, headR * 0.62, headR * 0.55,
-      headR * 0.98, headR * 1.85, 0);
+    Part(three, head, g.box, m.accent, headR * 0.90, headR * 0.66, headR * 0.58,
+      headR * 1.12, headR * 1.98, 0);                      // 额前的结
+    Part(three, head, g.box, m.accent, headR * 0.45, headR * 1.15, headR * 1.55,
+      -headR * 1.05, headR * 0.95, 0);                     // 脑后垂角
   }
   if (sp.cap) {
-    Part(three, head, g.box, m.accent, headR * 1.9, headR * 0.55, headR * 1.85,
-      headR * 0.1, headR * 1.75, 0);
+    Part(three, head, g.box, m.accent, headR * 1.95, headR * 0.62, headR * 1.85,
+      headR * 0.1, headR * 1.78, 0);
   }
   if (sp.capFlap) {
-    // 军帽 + 屁帘（脑后垂布）。
-    Part(three, head, g.box, m.cloth2, headR * 1.95, headR * 0.72, headR * 1.9,
+    // 军帽 + 屁帘（脑后垂布），侧视是日军士兵最硬的一个标志。
+    Part(three, head, g.box, m.cloth2, headR * 2.00, headR * 0.80, headR * 1.92,
       0, headR * 1.72, 0);
-    Part(three, head, g.box, m.cloth2, headR * 0.75, headR * 0.35, headR * 1.6,
-      headR * 1.25, headR * 1.60, 0);                      // 帽檐
-    Part(three, head, g.box, m.accent, headR * 0.28, headR * 1.05, headR * 1.9,
-      -headR * 1.05, headR * 0.95, 0);                     // 屁帘
+    Part(three, head, g.box, m.cloth2, headR * 1.05, headR * 0.30, headR * 1.62,
+      headR * 1.42, headR * 1.58, 0);                      // 前伸的帽檐
+    Part(three, head, g.box, m.accent, headR * 0.34, headR * 1.55, headR * 1.95,
+      -headR * 1.12, headR * 0.72, 0);                     // 屁帘
   }
   if (sp.peakCap) {
-    Part(three, head, g.box, m.dark, headR * 1.98, headR * 0.85, headR * 1.95,
-      0, headR * 1.78, 0);
-    Part(three, head, g.box, m.dark, headR * 1.05, headR * 0.22, headR * 1.7,
-      headR * 1.35, headR * 1.50, 0);                      // 硬帽檐
+    // 大盖帽：帽墙高、帽顶前倾出檐，硬檐往前伸出一大截。
+    Part(three, head, g.box, m.dark, headR * 2.05, headR * 0.62, headR * 2.00,
+      0, headR * 1.62, 0);                                 // 帽墙
+    Part(three, head, g.box, m.dark, headR * 2.30, headR * 0.40, headR * 2.16,
+      headR * 0.26, headR * 1.98, 0);                      // 帽顶（前出檐）
+    Part(three, head, g.box, m.dark, headR * 1.35, headR * 0.20, headR * 1.75,
+      headR * 1.75, headR * 1.44, 0);                      // 硬帽檐
   }
   if (sp.beard) {
-    Part(three, head, g.box, m.accent, headR * 0.72, headR * 1.0, headR * 0.9,
-      headR * 0.92, -headR * 0.35, 0);
+    Part(three, head, g.box, m.accent, headR * 0.95, headR * 1.35, headR * 0.95,
+      headR * 1.00, -headR * 0.52, 0);
   }
 
   // —— 手臂 ——
-  const armL = Joint(three, chest, 0, chestL * 0.86, -shW);
-  Limb(three, armL, g.upArm, m.cloth, upArmL);
+  const armL = Joint(three, chest, h * 0.012, chestL * 0.86, -shW);
+  Limb(three, armL, g.upArm, m.cloth2, upArmL);
   const forL = Joint(three, armL, 0, -upArmL, 0);
-  Limb(three, forL, g.foreArm, m.cloth, foreL + h * 0.023);   // 多出来那一截就是拳头
+  const foreMat = sp.rolled ? m.bare : m.cloth2;
+  Limb(three, forL, g.foreArm, foreMat, foreL + h * 0.023);   // 多出来那一截就是拳头
   const handL = Joint(three, forL, 0, -foreL, 0);
 
-  const armR = Joint(three, chest, 0, chestL * 0.86, shW);
-  Limb(three, armR, g.upArm, m.cloth, upArmL);
+  const armR = Joint(three, chest, h * 0.012, chestL * 0.86, shW);
+  Limb(three, armR, g.upArm, m.cloth2, upArmL);
   const forR = Joint(three, armR, 0, -upArmL, 0);
-  Limb(three, forR, g.foreArm, m.cloth, foreL + h * 0.023);
+  Limb(three, forR, g.foreArm, foreMat, foreL + h * 0.023);
   const handR = Joint(three, forR, 0, -foreL, 0);
 
   // 手不单独出网格：前臂胶囊的圆端就当拳头，省两个 draw call。
@@ -470,27 +500,41 @@ function BuildHuman(three, kind, sp, assets) {
   const shinMat = bootH > 0.6 ? m.dark : m.cloth2;
 
   const legL = Joint(three, hip, 0, 0, -hipW);
-  Limb(three, legL, g.thigh, m.cloth2, thighL);
+  const thighLm = Limb(three, legL, g.thigh, m.cloth2, thighL);
   const shinLj = Joint(three, legL, 0, -thighL, 0);
   const shinLm = Limb(three, shinLj, g.shin, shinMat, shinL);
   const footL = Joint(three, shinLj, 0, -shinL, 0);
   Part(three, footL, g.box, m.dark, h * 0.095, ankleY * 1.9, h * 0.048, h * 0.020, -ankleY * 0.55, 0);
 
   const legR = Joint(three, hip, 0, 0, hipW);
-  Limb(three, legR, g.thigh, m.cloth2, thighL);
+  const thighRm = Limb(three, legR, g.thigh, m.cloth2, thighL);
   const shinRj = Joint(three, legR, 0, -thighL, 0);
   const shinRm = Limb(three, shinRj, g.shin, shinMat, shinL);
   const footR = Joint(three, shinRj, 0, -shinL, 0);
   Part(three, footR, g.box, m.dark, h * 0.095, ankleY * 1.9, h * 0.048, h * 0.020, -ankleY * 0.55, 0);
 
   if (bootH > 0) {
-    shinLm.scale.set(1.14, 1.0, 1.14);
-    shinRm.scale.set(1.14, 1.0, 1.14);
+    shinLm.scale.set(1.16, 1.0, 1.16);
+    shinRm.scale.set(1.16, 1.0, 1.16);
+  }
+  if (sp.breeches) {
+    // 马裤：大腿外张，军官剪影最好认的一块
+    thighLm.scale.set(1.46, 1.0, 1.30);
+    thighRm.scale.set(1.46, 1.0, 1.30);
+  }
+  if (sp.puttee) {
+    // 绑腿：小腿上两道浅色缠布，把日军士兵的腿分成两段
+    Part(three, shinLj, g.box, m.accent, h * 0.052, h * 0.052, h * 0.050, 0, -shinL * 0.55, 0);
+    Part(three, shinRj, g.box, m.accent, h * 0.052, h * 0.052, h * 0.050, 0, -shinL * 0.55, 0);
   }
 
   // —— 衣着轮廓（决定剪影的关键块）——
+  if (sp.jacket) {
+    // 短打：到胯的对襟棉袄，下摆比腰略张，和长袄拉开长度差
+    Part(three, hip, g.sphere, m.cloth, bodyW * 1.34, h * 0.175, bodyD * 2.24, 0, -h * 0.052, 0);
+  }
   if (sp.sash) {
-    Part(three, hip, g.box, m.accent, bodyW * 1.02, h * 0.045, bodyD * 2.02, 0, h * 0.012, 0);
+    Part(three, hip, g.sphere, m.accent, bodyW * 1.34, h * 0.062, bodyD * 2.16, 0, h * 0.018, 0);
   }
   if (sp.belt) {
     Part(three, hip, g.box, m.dark, bodyW * 1.04, h * 0.036, bodyD * 2.04, 0, h * 0.02, 0);
@@ -514,13 +558,13 @@ function BuildHuman(three, kind, sp, assets) {
   } else if (sp.sword) {
     // 佩刀挂左胯，刀尖朝后下。
     propA = Joint(three, hip, -h * 0.03, -h * 0.02, -hipW * 1.15);
-    propA.rotation.set(0, 0, 0.62);
-    Part(three, propA, g.cyl, m.metal, h * 0.014, h * 0.40, h * 0.014, 0, -h * 0.19, 0);
-    Part(three, propA, g.box, m.dark, h * 0.028, h * 0.10, h * 0.022, 0, h * 0.03, 0);
+    propA.rotation.set(0, 0, -0.42);
+    Part(three, propA, g.cyl, m.dark, h * 0.018, h * 0.34, h * 0.018, 0, -h * 0.16, 0);
+    Part(three, propA, g.cyl, m.metal, h * 0.020, h * 0.09, h * 0.020, 0, h * 0.035, 0);
   } else if (sp.stick) {
     // 拐棍握在左手里。
     propA = Joint(three, handL, h * 0.01, -h * 0.03, 0);
-    Part(three, propA, g.cyl, m.accent, h * 0.016, h * 0.50, h * 0.016, 0, -h * 0.20, 0);
+    Part(three, propA, g.cyl, m.accent, h * 0.017, h * 0.42, h * 0.017, 0, -h * 0.165, 0);
   } else if (sp.pouch) {
     // 腰间别着的木塞/手榴弹袋——高传宝的辨识点。
     propA = Joint(three, hip, h * 0.045, -h * 0.005, hipW * 0.95);
@@ -537,10 +581,12 @@ function BuildHuman(three, kind, sp, assets) {
     lightMount.position.set(h * 0.06, 0, 0);
     propB.add(lightMount);
   } else if (sp.gown) {
-    // 长袄／棉袍：挂在骨盆下的独立关节上，盖到膝，把上腿藏掉，剪影立刻变「老乡」。
+    // 长袄／棉袍：挂在骨盆下的独立关节上，盖过膝，把上腿整个藏掉。
+    // 下摆比腰宽出一大截，侧视剪影立刻从「人柱子」变成「老乡」。
     // 用独立关节是为了让下摆能跟着大腿走，蹲下、伏地时不会插进土里。
     propB = Joint(three, hip, 0, 0, 0);
-    Part(three, propB, g.box, m.cloth, bodyW * 1.18, h * 0.29, bodyD * 2.05, 0, -h * 0.140, 0);
+    Part(three, propB, g.sphere, m.cloth, bodyW * 2.05, h * 0.325, bodyD * 2.50,
+      h * 0.006, -h * 0.132, 0);
   } else {
     propB = Joint(three, chest, 0, 0, 0);
   }
@@ -556,8 +602,8 @@ function BuildHuman(three, kind, sp, assets) {
   };
 
   // 挂件从挂点往下伸多长（佩刀 / 拐棍 / 长袄下摆防穿地要用）
-  const propDrop = sp.sword ? h * 0.40 : sp.stick ? h * 0.46 : h * 0.30;
-  const gownDrop = h * 0.288;
+  const propDrop = sp.sword ? h * 0.34 : sp.stick ? h * 0.40 : h * 0.30;
+  const gownDrop = h * 0.318;
 
   const list = [
     root, hip, torso, chest, neck, head,
@@ -570,6 +616,7 @@ function BuildHuman(three, kind, sp, assets) {
     group: group, joints: joints, jointList: list,
     thighLen: thighL, shinLen: shinL, torsoLen: torsoL, chestLen: chestL,
     upArmLen: upArmL, foreArmLen: foreL, hipY: hipY,
+    neckLen: neckL, headOver: headOver, ankleY: ankleY, armFull: upArmL + foreL,
     propDrop: propDrop, gownDrop: gownDrop,
   };
 }
@@ -682,6 +729,7 @@ function BuildDog(three, sp, assets) {
     group: group, joints: joints, jointList: list,
     thighLen: legUp, shinLen: legLow, torsoLen: 0.56 * s, chestLen: 0.26 * s,
     upArmLen: legUp, foreArmLen: legLow, hipY: backY, chestX: chestX,
+    neckLen: 0.17 * s, headOver: 0.15 * s, ankleY: 0, armFull: legUp + legLow,
   };
 }
 
@@ -738,6 +786,10 @@ export function CreateActorRig(kind, three) {
     upArmLen: built.upArmLen,
     foreArmLen: built.foreArmLen,
     hipY: built.hipY,
+    neckLen: built.neckLen,
+    headOver: built.headOver,
+    ankleY: built.ankleY,
+    armFull: built.armFull,
 
     // 姿态与混合状态（每个 rig 独立，多角色互不干扰）
     rest: rest,
@@ -748,6 +800,11 @@ export function CreateActorRig(kind, three) {
     animName: null,
     phase: 0,
     stateT: 0,
+    // 玩法层把「猫腰移动」和「匍匐」都发成 crawl（见 Script_Rules 第 1185 行），
+    // 只能靠 anim.speed 反推：猫腰姿态封顶 crouchSpeed/walkSpeed=0.53，
+    // 匍匐姿态封顶 crawlSpeed/walkSpeed=0.39，中间留死区做迟滞。
+    // lowness 1=猫腰高度 0=贴地高度，crouchIdle 沿用同一个值，两态之间才不会弹。
+    lowness: 1,
     lastTime: -1,
     yaw: 0,
     yawInit: false,
@@ -842,6 +899,31 @@ function Cadence(name, speed, sp) {
   }
 }
 
+/**
+ * 两连杆 IK。已知胯的高度 hipH 与脚踝相对胯的水平位移 dx（+X 在前），
+ * 解出大腿、小腿的 rz。结果写进 legSolve[0..1]，不分配对象。
+ * 膝盖朝前（+X），这正是蹲姿要的构型。
+ */
+const legSolve = new Float32Array(2);
+function SolveLeg(rig, hipH, dx) {
+  const A = rig.thighLen;
+  const B = rig.shinLen;
+  const dy = hipH - rig.ankleY;
+  let d = Math.sqrt(dx * dx + dy * dy);
+  const dmax = (A + B) * 0.999;
+  const dmin = Math.abs(A - B) + 1e-4;
+  if (d > dmax) d = dmax;
+  if (d < dmin) d = dmin;
+  const phi = Math.atan2(dx, dy);                       // 胯→踝 相对竖直向下的方位
+  const alpha = Math.acos(Clamp((A * A + d * d - B * B) / (2 * A * d), -1, 1));
+  const beta = Math.acos(Clamp((B * B + d * d - A * A) / (2 * B * d), -1, 1));
+  const u = phi + alpha;                                // 大腿世界角（膝朝前）
+  const v = phi - beta;                                 // 小腿世界角
+  legSolve[0] = u;
+  legSolve[1] = v - u;
+  return u;
+}
+
 /** 给定大小腿角度，算胯部要下沉多少才让脚还踩在地上。 */
 function HipDrop(rig, thighZ, shinZ) {
   return rig.thighLen * Math.cos(thighZ) + rig.shinLen * Math.cos(thighZ + shinZ) - rig.legFull;
@@ -889,6 +971,14 @@ export function PoseActor(rig, anim, facing, time) {
     at = anim.t;
   }
 
+  // —— 猫腰 / 匍匐判别：只在 crawl 帧按 anim.speed 更新，crouchIdle 沿用上一次的判断 ——
+  if (name === 'crawl') {
+    let want = rig.lowness;
+    if (speed > CROUCH_HI) want = 1;
+    else if (speed < CROUCH_LO) want = 0;
+    rig.lowness += (want - rig.lowness) * (1 - Math.exp(-5.0 * dt));
+  }
+
   // —— 步相位：按状态步频累积，换速不跳变 ——
   rig.phase += dt * Cadence(name, speed, rig.spec);
   if (rig.phase > TAU) rig.phase -= TAU * Math.floor(rig.phase / TAU);
@@ -928,6 +1018,141 @@ export function PoseActor(rig, anim, facing, time) {
 function PoseFor(out, rig, name, at, p, time, speed) {
   if (rig.isDog) PoseDog(out, rig, name, at, p, time, speed);
   else PoseHuman(out, rig, name, at, p, time, speed);
+}
+
+// —— 猫腰 / 匍匐：三套姿态构件 ——————————————————————————————————
+
+const CROUCH_HI = 0.47;      // 持续超过它 = 一定是猫腰姿态（匍匐封顶 0.394）
+const CROUCH_LO = 0.42;
+
+/** 猫腰蹲住：膝顶在前、屁股坐在后、背弓成弧、头前伸下巴压低。 */
+function PoseSquat(out, rig, time) {
+  const h = rig.height;
+  HumanBase(out, rig);
+  const wHip = 0.20, wTor = 0.52, wChe = 0.86, wNec = 1.02, wHead = 0.30;
+  const rise = rig.torsoLen * Math.cos(wTor) + rig.chestLen * Math.cos(wChe)
+    + rig.neckLen * Math.cos(wNec) + rig.headOver * Math.cos(wHead);
+  const target = PLAYER.crouchHeight * (h / ADULT) * 1.04;
+  const hipT = Clamp(target - rise, rig.ankleY + h * 0.06, rig.hipY * 0.92);
+  const back = h * 0.115;
+  SolveLeg(rig, hipT, back);
+  AddP(out, J_ROOT, -back, hipT - rig.hipY, 0);
+  SetRz(out, J_LEGL, legSolve[0] + wHip + 0.06);
+  SetRz(out, J_LEGR, legSolve[0] + wHip - 0.06);
+  SetRz(out, J_SHINL, legSolve[1]);
+  SetRz(out, J_SHINR, legSolve[1]);
+  SetRz(out, J_FOOTL, Clamp(-(legSolve[0] + legSolve[1]), -1.0, 1.50));
+  SetRz(out, J_FOOTR, Clamp(-(legSolve[0] + legSolve[1]), -1.0, 1.50));
+  SetRz(out, J_HIP, -wHip);
+  SetRz(out, J_TORSO, -(wTor - wHip));
+  SetRz(out, J_CHEST, -(wChe - wTor));
+  SetRz(out, J_NECK, -(wNec - wChe));
+  SetRz(out, J_HEAD, wNec - wHead);
+  SetR(out, J_ARML, 0.11, 0, wChe + 0.20);
+  SetR(out, J_ARMR, -0.11, 0, wChe + 0.08);
+  SetRz(out, J_FOREL, -0.46);
+  SetRz(out, J_FORER, -0.40);
+  const br = Math.sin(time * 1.35);
+  AddRz(out, J_CHEST, br * 0.030);
+  AddP(out, J_ROOT, 0, h * 0.005 * br, 0);
+  AddR(out, J_HEAD, 0, Math.sin(time * 0.62) * 0.16, 0.03 * br);
+}
+
+/** 猫腰走：蹲着迈步。头顶高度跟 PoseSquat 对齐，两态互切才不会弹。 */
+function PoseCrouchWalk(out, rig, p, speed, time) {
+  const h = rig.height;
+  const sp = rig.spec;
+  HumanBase(out, rig);
+  const wHip = 0.24, wTor = 0.74, wChe = 1.14, wNec = 1.34, wHead = 0.28;
+  const rise = rig.torsoLen * Math.cos(wTor) + rig.chestLen * Math.cos(wChe)
+    + rig.neckLen * Math.cos(wNec) + rig.headOver * Math.cos(wHead);
+  const target = PLAYER.crouchHeight * (h / ADULT) * 1.04;
+  const hipT = Clamp(target - rise, rig.ankleY + h * 0.10, rig.hipY * 0.94);
+  SolveLeg(rig, hipT, h * 0.03);
+  const th0 = legSolve[0];
+  const sh0 = legSolve[1];
+
+  const stride = sp.stepAmp * (0.55 + 0.45 * Clamp(speed / 0.53, 0, 1));
+  const sL = Swing(p, 0.70);
+  const sR = Swing(p + PI, 0.70);
+  const swing = 0.46 * stride;
+  const thL = th0 + swing * sL;
+  const thR = th0 + swing * sR;
+  const knL = sh0 - 0.34 * stride * Math.max(0, Math.cos(p));
+  const knR = sh0 - 0.34 * stride * Math.max(0, Math.cos(p + PI));
+  SetRz(out, J_LEGL, thL + wHip);
+  SetRz(out, J_LEGR, thR + wHip);
+  SetRz(out, J_SHINL, knL);
+  SetRz(out, J_SHINR, knR);
+  SetRz(out, J_FOOTL, Clamp(-(thL + knL), -1.0, 1.50));
+  SetRz(out, J_FOOTR, Clamp(-(thR + knR), -1.0, 1.50));
+
+  // 背照样是弧，只是比蹲住时压得更平一点
+  SetRz(out, J_HIP, -wHip);
+  SetRz(out, J_TORSO, -(wTor - wHip));
+  SetRz(out, J_CHEST, -(wChe - wTor));
+  SetRz(out, J_NECK, -(wNec - wChe));
+  SetRz(out, J_HEAD, wNec - wHead);
+  AddP(out, J_ROOT, 0, hipT - rig.hipY
+    + h * stride * (0.010 * Math.cos(2 * p) - 0.014 * Pulse(Math.max(0, -Math.cos(2 * p)), 3)), 0);
+  AddR(out, J_HIP, 0.05 * stride * Math.sin(p), 0.10 * stride * Math.sin(p), 0);
+  AddR(out, J_CHEST, 0, -0.14 * stride * Math.sin(p), 0);
+  AddR(out, J_HEAD, 0, 0.09 * stride * Math.sin(p - 0.9), 0);
+
+  // 手臂低位前后摆，手掠着地面过去
+  const aw = sp.armSwing * stride;
+  SetR(out, J_ARML, 0.11, 0, wChe + 0.18 - 0.42 * aw * Math.sin(p));
+  SetR(out, J_ARMR, -0.11, 0, wChe + 0.06 + 0.42 * aw * Math.sin(p));
+  SetRz(out, J_FOREL, -0.48);
+  SetRz(out, J_FORER, -0.42);
+}
+
+/** 匍匐：肘撑地的低爬，净空只有 HEADROOM.crawlNeeds。moving=0 时是趴着不动。 */
+function PoseBellyCrawl(out, rig, p, moving) {
+  const h = rig.height;
+  HumanBase(out, rig);
+  const s = Math.sin(p) * moving;
+  const c = Math.cos(p) * moving;
+  const hipT = h * 0.206;
+  const kneeR = h * 0.058;
+  const knee = -Math.acos(Clamp((hipT - kneeR) / rig.thighLen, -1, 1));
+  AddP(out, J_ROOT, h * 0.02, hipT - rig.hipY + h * 0.008 * Math.cos(2 * p) * moving, 0);
+
+  // 屁股是全身最高点，背从胯一路下坡到肩 —— 和猫腰的「竖着压扁」正好相反
+  SetRz(out, J_HIP, 0.16);
+  SetRz(out, J_TORSO, -1.62);
+  SetRz(out, J_CHEST, -0.10);
+  SetRz(out, J_NECK, 0.30);
+  SetRz(out, J_HEAD, 1.34);
+  AddR(out, J_HIP, 0.11 * s, 0.16 * s, 0);
+  AddR(out, J_CHEST, -0.07 * s, -0.20 * s, 0);
+  AddR(out, J_HEAD, 0, 0.13 * Math.sin(p - 0.8) * moving, 0);
+
+  const chestW = 0.16 - 1.62 - 0.10;
+  const armWL = 0.32 + 0.30 * s;
+  const armWR = 0.32 - 0.30 * s;
+  SetR(out, J_ARML, 0.10, 0, armWL - chestW);
+  SetR(out, J_ARMR, -0.10, 0, armWR - chestW);
+  SetRz(out, J_FOREL, (1.44 - 0.20 * Math.max(0, -c)) - armWL);
+  SetRz(out, J_FORER, (1.44 - 0.20 * Math.max(0, c)) - armWR);
+
+  const dL = 0.34 * Math.max(0, s);
+  const dR = 0.34 * Math.max(0, -s);
+  const thW_L = knee - dL;
+  const thW_R = knee - dR;
+  const shW_L = -(PI * 0.5) - 0.24 - 0.14 * Math.max(0, s);
+  const shW_R = -(PI * 0.5) - 0.24 - 0.14 * Math.max(0, -s);
+  SetRz(out, J_LEGL, thW_L - 0.16);
+  SetRz(out, J_LEGR, thW_R - 0.16);
+  SetRz(out, J_SHINL, shW_L - thW_L);
+  SetRz(out, J_SHINR, shW_R - thW_R);
+  SetRz(out, J_FOOTL, -shW_L - 0.32);
+  SetRz(out, J_FOOTR, -shW_R - 0.32);
+}
+
+/** 把 b 按权重 w 混进 a。 */
+function BlendInto(a, b, w) {
+  for (let i = 0; i < NCH; i++) a[i] = a[i] + (b[i] - a[i]) * w;
 }
 
 // ——————————————————————————————————————————————————————————— 人形姿态
@@ -979,11 +1204,11 @@ function PoseHuman(out, rig, name, at, p, time, speed) {
         AddR(out, J_HIP, 0.04, 0, 0);
       }
       if (sp.sword) {
-        // 军官背手站姿，压迫感靠这个。
-        SetR(out, J_ARML, 0.18, 0, -0.55);
-        SetR(out, J_ARMR, -0.18, 0, -0.55);
-        SetRz(out, J_FOREL, -0.95);
-        SetRz(out, J_FORER, -0.95);
+        // 军官站姿：左手按在刀柄上，右手垂着。站得最直，压迫感靠不动。
+        SetR(out, J_ARML, 0.14, 0, 0.26);
+        SetRz(out, J_FOREL, -0.62);
+        SetR(out, J_ARMR, -0.12, 0, -0.14);
+        SetRz(out, J_FORER, 0.12);
       }
       break;
     }
@@ -1100,72 +1325,22 @@ function PoseHuman(out, rig, name, at, p, time, speed) {
 
     // —————————————————————————— 猫腰静止（招牌姿态之一）
     case 'crouchIdle': {
-      // 猫腰：重心压到 PLAYER.crouchHeight 那一档，背弓成一条近乎水平的线，头前伸。
-      // 目标胯高由 PLAYER.crouchHeight 反推；kn = -2*th 让小腿与大腿对称，
-      // 踝关节正好留在胯的正下方，脚不会飘也不会陷。
-      const hipT = h * CROUCH_RATIO * 0.545;
-      const th = Math.acos(Clamp((hipT - (rig.hipY - rig.legFull)) / rig.legFull, -1, 1));
-      const kn = -2 * th;
-      AddP(out, J_ROOT, h * 0.045, HipDrop(rig, th, kn), 0);
-      SetRz(out, J_TORSO, -0.85);
-      SetRz(out, J_CHEST, -0.50);
-      SetRz(out, J_NECK, -0.10);
-      SetRz(out, J_HEAD, 1.42);
-      SetRz(out, J_LEGL, th);
-      SetRz(out, J_LEGR, th + 0.10);
-      SetRz(out, J_SHINL, kn);
-      SetRz(out, J_SHINR, kn - 0.10);
-      SetRz(out, J_FOOTL, Clamp(-(th + kn), -0.8, 0.9));
-      SetRz(out, J_FOOTR, Clamp(-(th + 0.10 + kn - 0.10), -0.8, 0.9));
-      // 手臂垂在膝前
-      SetR(out, J_ARML, 0.13, 0, 1.06);
-      SetR(out, J_ARMR, -0.13, 0, 1.00);
-      SetRz(out, J_FOREL, -0.42);
-      SetRz(out, J_FORER, -0.42);
-      // 屏息式浅呼吸
-      const br = Math.sin(time * 1.35);
-      AddRz(out, J_CHEST, br * 0.028);
-      AddP(out, J_ROOT, 0, h * 0.004 * br, 0);
-      AddR(out, J_HEAD, 0, Math.sin(time * 0.62) * 0.16, 0);
+      // 站住不动时沿用 rig.lowness：刚才在猫腰就蹲着，刚才在匍匐就趴着。
+      PoseBellyCrawl(out, rig, p, 0);
+      if (rig.lowness > 0.002) {
+        PoseSquat(scratchB, rig, time);
+        BlendInto(out, scratchB, rig.lowness);
+      }
       break;
     }
 
-    // —————————————————————————— 爬行（招牌姿态之二）
+    // —————————————————————————— 猫腰移动 / 爬行（招牌姿态之二）
     case 'crawl': {
-      // 匍匐：净空只有 HEADROOM.crawlNeeds(0.62m)，所以是肘撑地的低爬，
-      // 不是四足高跪。重心极低、背弓、手撑地、头前伸——本作的题眼姿态。
-      const s = Math.sin(p);
-      const c = Math.cos(p);
-      // 胯落到大腿能撑住的高度，膝盖正好点地。
-      const hipT = h * CRAWL_RATIO * 0.384;
-      const kneeR = h * 0.052;                     // 膝盖也有粗细，不能让轴线贴在 y=0
-      const knee = -Math.acos(Clamp((hipT - kneeR) / rig.thighLen, -1, 1));
-      AddP(out, J_ROOT, h * 0.02, hipT - rig.hipY + h * 0.008 * Math.cos(2 * p), 0);
-
-      SetRz(out, J_TORSO, -1.26);                  // 背几乎水平
-      SetRz(out, J_CHEST, -0.24);
-      SetRz(out, J_NECK, -0.06);
-      SetRz(out, J_HEAD, 1.52);                    // 头抬起来看前面
-      AddR(out, J_HIP, 0.17 * s, 0.15 * s, 0);     // 躯干左右摆
-      AddR(out, J_CHEST, -0.11 * s, -0.19 * s, 0);
-      AddR(out, J_HEAD, 0, 0.13 * Math.sin(p - 0.8), 0);
-
-      // 前肢：上臂几乎垂直撑住，小臂平摊在地上交替往前够（肘撑式匍匐）
-      SetR(out, J_ARML, 0.10, 0, 1.74 + 0.40 * s);
-      SetR(out, J_ARMR, -0.10, 0, 1.74 - 0.40 * s);
-      SetRz(out, J_FOREL, 1.30 - 0.40 * s - 0.22 * Math.max(0, -c));
-      SetRz(out, J_FORER, 1.30 + 0.40 * s - 0.22 * Math.max(0, c));
-
-      // 后肢：膝点地，小腿平摊在后面，交替往后蹬（只往后摆，膝盖才不会钻进土里）
-      const dL = 0.34 * Math.max(0, s);
-      const dR = 0.34 * Math.max(0, -s);
-      SetRz(out, J_LEGL, knee - dL);
-      SetRz(out, J_LEGR, knee - dR);
-      const flat = -(PI * 0.5 + knee) - 0.20;      // 小腿贴地，踝端略抬免得脚背穿土
-      SetRz(out, J_SHINL, flat + dL + 0.20 * Math.max(0, s));
-      SetRz(out, J_SHINR, flat + dR + 0.20 * Math.max(0, -s));
-      SetRz(out, J_FOOTL, 0.25);
-      SetRz(out, J_FOOTR, 0.25);
+      PoseBellyCrawl(out, rig, p, 1);
+      if (rig.lowness > 0.002) {
+        PoseCrouchWalk(scratchB, rig, p, speed, time);
+        BlendInto(out, scratchB, rig.lowness);
+      }
       break;
     }
 
@@ -1308,7 +1483,9 @@ function PoseHuman(out, rig, name, at, p, time, speed) {
       // 腿：入土时沉胯发力
       const th = 0.24 + 0.34 * sStab - 0.22 * sLift;
       const kn = -0.42 - 0.55 * sStab + 0.42 * sLift;
-      AddP(out, J_ROOT, 0, HipDrop(rig, th, kn), 0);
+      // 两条腿角度不同，沉胯量要取「伸得最直那条」的，否则那只脚会陷进土里
+      AddP(out, J_ROOT, 0,
+        Math.max(HipDrop(rig, th + 0.20, kn), HipDrop(rig, th - 0.20, kn * 0.8)), 0);
       AddRz(out, J_LEGL, th + 0.20);
       AddRz(out, J_LEGR, th - 0.20);
       AddRz(out, J_SHINL, kn);
@@ -1535,9 +1712,10 @@ function PoseHuman(out, rig, name, at, p, time, speed) {
   if (sp.sword) {
     // 佩刀挂在胯上：胯一低，刀鞘尖就会插进地里。按胯的实际高度把它撇平。
     const hy = rig.hipY + out[J_ROOT * CH + 4] + out[J_HIP * CH + 4] - h * 0.02;
-    const need = Math.acos(Clamp(hy / rig.propDrop, -1, 1));
+    const need = Math.acos(Clamp(hy / rig.propDrop, -1, 1)) + Math.abs(GetRz(out, J_HIP));
     const rest = rig.restRot[J_PROPA * 3 + 2];
-    if (rest < need) SetRz(out, J_PROPA, need - rest);
+    const sign = rest < 0 ? -1 : 1;
+    if (Math.abs(rest) < need) SetRz(out, J_PROPA, sign * need - rest);
   }
   if (sp.stick) {
     // 拐棍：直立行走时严格竖直拄地；其余姿态收成朝前上方，绝不插进地里。
@@ -1557,10 +1735,12 @@ function PoseHuman(out, rig, name, at, p, time, speed) {
   if (sp.gown) {
     // 长袄下摆跟着大腿走：蹲下时兜在膝前，伏地时顺着腿摊在身后。
     // 再按胯的实际高度兜底，保证下摆永远不会插进土里。
-    let a = (GetRz(out, J_LEGL) + GetRz(out, J_LEGR)) * 0.375;
+    let a = (GetRz(out, J_LEGL) + GetRz(out, J_LEGR)) * 0.26;
     const hy = rig.hipY + out[J_ROOT * CH + 4] + out[J_HIP * CH + 4];
     // + 0.22 是下摆方箱的半宽补偿：转起来最低的是角，不是中轴。
-    const need = hy < rig.gownDrop ? Math.acos(Clamp(hy / rig.gownDrop, -1, 1)) + 0.22 : 0;
+    const need = hy < rig.gownDrop
+      ? Math.acos(Clamp(hy / rig.gownDrop, -1, 1)) + 0.34 + Math.abs(GetRz(out, J_HIP))
+      : 0;
     if (a >= 0) { if (a < need) a = need; } else if (-a < need) a = -need;
     SetRz(out, J_PROPB, a);
   }
@@ -1650,7 +1830,7 @@ function PoseDog(out, rig, name, at, p, time, speed) {
     case 'sneak': {
       // 潜行：压低身子、头几乎贴地、尾巴放平。
       const amp = 0.30 + 0.30 * speed;
-      AddP(out, J_ROOT, 0, DogStance(out, rig, 0.85, -1.70), 0);
+      AddP(out, J_ROOT, 0, DogStance(out, rig, 0.85, -1.70) + h * 0.035, 0);
       DogTrot(out, rig, p, amp);
       AddRz(out, J_TORSO, 0.06);
       AddRz(out, J_NECK, -0.42);

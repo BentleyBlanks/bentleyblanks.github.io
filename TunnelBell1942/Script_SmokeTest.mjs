@@ -232,6 +232,24 @@ Section("姿态与净空");
   }
 }
 
+Section("姿态判别的隐式契约");
+// 契约的动画状态名里没有 crouchWalk：猫腰移动和匍匐爬行都发 `crawl`。
+// 动画层靠"归一化速度"把这两个姿态分开（猫腰封顶 crouchSpeed/walkSpeed，
+// 匍匐封顶 crawlSpeed/walkSpeed）。这是一条隐式耦合——两个速度一旦靠近，
+// 一米高的猫腰走和贴地爬就会糊成同一坨，而且不会有任何报错。
+{
+  const crouchFrac = PLAYER.crouchSpeed / PLAYER.walkSpeed;
+  const crawlFrac = PLAYER.crawlSpeed / PLAYER.walkSpeed;
+  Assert(crouchFrac - crawlFrac > 0.09,
+    `猫腰与匍匐的归一化速度要分得开（${crawlFrac.toFixed(3)} vs ${crouchFrac.toFixed(3)}）`);
+  Assert(PLAYER.crawlHeight < PLAYER.crouchHeight - 0.15,
+    "匍匐比猫腰明显更低（剪影要一眼分得出）");
+  Assert(PLAYER.crawlHeight >= HEADROOM.crawlNeeds,
+    "匍匐高度不低于最矮通道的净空要求");
+  Assert(PLAYER.crouchHeight <= HEADROOM.crouchNeeds,
+    "猫腰高度进得去猫腰通道");
+}
+
 Section("摄像机取景");
 // 竖屏手机的半宽只有横屏的三分之一。摄像机夹紧如果按 16:9 写死，
 // 关卡两端各有八米死区，玩家一进游戏就在画面外——这条按真实机型比例验。
