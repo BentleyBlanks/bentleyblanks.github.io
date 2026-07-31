@@ -345,6 +345,46 @@ Section("第一幕的收场");
     }
     Assert(stall.phase === "won", `敲钟后躲在${label}也躲不掉结局（等了 ${waited}s，phase=${stall.phase}）`);
   }
+
+  // 钻进柴垛屏住呼吸同样不该能把结局拖住——搜村的兵会挨个挑柴垛。
+  const hideSpots = Rules.CreateState(0).level.props.filter((p) => p.interact === "hide");
+  for (const near of [30, 53, 79, 103]) {
+    const inside = Rules.CreateState(0);
+    const b2 = inside.level.props.find((p) => p.interact === "bell");
+    Rules.DebugTeleport(inside, b2.x, 0);
+    Rules.DebugPressInteract(inside);
+    Rules.DebugHold(inside, {}, 2.0);
+    const spot = hideSpots.reduce((a, c) => (Math.abs(a.x - near) < Math.abs(c.x - near) ? a : c));
+    Rules.DebugTeleport(inside, spot.x, 0);
+    Rules.DebugPressInteract(inside);
+    Rules.DebugHold(inside, {}, 1.0);
+    let waited = 0;
+    while (waited < 90 && inside.phase !== "won") {
+      Rules.DebugHold(inside, {}, 1.0);
+      Rules.DrainEvents(inside);
+      waited += 1;
+    }
+    Assert(inside.phase === "won", `敲钟后藏进 ${spot.id} 也会被翻出来（等了 ${waited}s）`);
+  }
+}
+
+Section("藏身在警报之前仍然管用");
+// 上一节的"翻柴垛"绝不能把前半段的教学动词废掉：
+// 钟响之前，藏进掩体必须真的躲得过巡逻。
+{
+  const state = Rules.CreateState(0);
+  const spot = state.level.props
+    .filter((p) => p.interact === "hide")
+    .reduce((a, c) => (a.x < c.x ? a : c));
+  Rules.DebugTeleport(state, spot.x, 0);
+  Rules.DebugPressInteract(state);
+  Rules.DebugHold(state, {}, 1.0);
+  Assert(state.player.hidden, "能藏进掩体");
+  Rules.DebugHold(state, {}, 40);
+  Assert(state.player.hidden, "钟响之前，藏着待 40 秒不会被翻出来");
+  Assert(state.phase === "play" && !state.player.dead, "藏着不会被抓");
+  const maxAlert = state.enemies.reduce((m, e) => Math.max(m, e.alertness || 0), 0);
+  Assert(maxAlert < 0.9, `藏着时没人把警觉拉满（最高 ${maxAlert.toFixed(2)}）`);
 }
 
 Section("失败与复活");

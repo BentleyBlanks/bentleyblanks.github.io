@@ -41,6 +41,7 @@ const FORE = LAYER_Z.FORE;
 //   钟在 x112.5。三个人的视距都是 11，钟响那一刻谁也看不见他（山田从 125 只看到 114）。
 //   猫腰后山田的有效视距约 6.72 米 —— 玩家最多摸到 x≈118 就再也过不去，
 //   离那个口还差 7 米，而猫腰 1.75 m/s 追不过巡逻 1.6 m/s 的正面。
+//   钟响的同时村西门也进来一路（a1_e_chase3, 2–32），所以往回跑不是活路。
 //   老槐树（x104）往东一个藏身点都没有——有意清空的：
 //   这一段的"喘息"只能靠退出视线让警觉衰减，而不是钻进柴垛无限等，
 //   所以玩家可以反复试探、反复被顶回来，十几秒后西边合拢，谁也躲不掉。
@@ -55,14 +56,14 @@ const act1 = {
   // 玩法层看见 endKind:"captured" 就不要再把 atExit 当通关条件——
   // 钟已敲响 + 玩家被抓 → 发 { kind:"won" } 并播 a1_close。
   endKind: "captured",
-  bounds: { x0: 0, x1: 128, yTop: 8, yBottom: -6 },
+  bounds: { x0: 3, x1: 128, yTop: 8, yBottom: -6 },
   startX: 4,
   startY: 0,
   exit: { x: 125, y: 0, radius: 2.2, needAllVillagers: false, label: "碾盘下的地道口" },
   timeOfDay: "night",
 
   floors: [
-    { id: "a1_f_road", x0: 0, x1: 24, y: 0, kind: "dirt" },
+    { id: "a1_f_road", x0: 3, x1: 24, y: 0, kind: "dirt" },
     { id: "a1_f_yard1", x0: 24, x1: 50, y: 0, kind: "dirt" },
     { id: "a1_f_yard2", x0: 50, x1: 78, y: 0.35, kind: "stone" },
     { id: "a1_f_yard3", x0: 78, x1: 106, y: 0, kind: "dirt" },
@@ -160,7 +161,7 @@ const act1 = {
     { id: "a1_pr_tree", x: 112, y: 0, z: PLAY, kind: "tree", facing: 1, interact: "none", data: null, label: null },
     // 钟挂在树上，互动点是树下垂到地面的绳，所以 y = 0。
     { id: "a1_pr_bell", x: 112.5, y: 0, z: PLAY, kind: "bell", facing: 1, interact: "bell",
-      data: { rings: 3, panels: ["a1_p11", "a1_p12"], spawn: ["a1_e_chase1", "a1_e_chase2", "a1_e_blocker"], objective: "往回跑" },
+      data: { rings: 3, panels: ["a1_p11", "a1_p12"], spawn: ["a1_e_chase1", "a1_e_chase2", "a1_e_chase3", "a1_e_blocker"], objective: "往回跑" },
       label: "老槐树上的钟" },
 
     // —— 追逐段终点：碾盘下的地道口（他没能进去）——
@@ -221,6 +222,15 @@ const act1 = {
       id: "a1_e_chase2", x: 78, y: 0, kind: "search", facing: 1,
       patrol: { x0: 78, x1: 108, speed: 1.7, pauseSec: 0.3 },
       vision: { range: 11, halfAngleDeg: 36, height: 1.6 },
+      hearing: 7.0, probeAt: null,
+    },
+    // 从村西门推进来的那一路。西端 7（不能再往西，会压到出生点 x=4），东到 32；
+    // 和 search1(38–45, 视距 9 → 看到 29) 的视野接上，
+    // 往西 0–54 这一整段就没有死角了：往回跑不是活路，只是换个人抓。
+    {
+      id: "a1_e_chase3", x: 7, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 7, x1: 32, speed: 1.5, pauseSec: 1.8 },
+      vision: { range: 13, halfAngleDeg: 36, height: 1.6 },
       hearing: 7.0, probeAt: null,
     },
     // 山田：出口 x125 就在他巡逻区间里。玩家做对一切也过不去——这是叙事必然。

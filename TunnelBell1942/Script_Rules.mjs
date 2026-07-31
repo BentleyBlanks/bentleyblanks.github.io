@@ -38,6 +38,7 @@ const EVENT_CAP = 256;
 const STEP_UP = 0.55; // 能自动迈上的台阶高度，超过算墙
 const FLOOR_SNAP = 0.34; // 站立时脚下地板的吸附容差
 const SHAFT_GRAB_X = 0.6; // 竖井吸附的水平半径（契约写死 ±0.6）
+const FLUSH_OUT_REACH = 1.5; // 搜索状态的兵走到这么近，会把藏在道具里的人翻出来
 
 const LAND_STUN_SEC = 0.62; // 超过 safeFallSpeed 的硬直
 const LAND_STUMBLE_SEC = 0.16; // 普通落地的小踉跄
@@ -1112,6 +1113,30 @@ function UpdateHiding(state, dt) {
     p.hidePropId = null;
     Sfx(state, "cloth", p.x, p.y);
     p.noiseSpike = Math.max(p.noiseSpike, NOISE.crouch);
+    return;
+  }
+
+  // 搜村的兵会挨个挑柴垛。掩体挡得住"路过的一眼"，挡不住"专门来翻的人"。
+  //
+  // 分两种情形，因为"藏"在前半段是教给玩家的核心动词，不能一上来就废掉：
+  //   · 警报没拉响时，只有已经在搜索/发现状态的敌人会翻掩体——玩家藏得住，
+  //     藏是过巡逻线的正解。
+  //   · 钟一响全村被翻个底朝天，任何醒着的兵走到跟前都会把人揪出来。否则
+  //     钻进柴垛屏住呼吸就能把第一幕无限拖住，那个结局永远不来。
+  const villageBeingSwept = !!state.world.bellRung;
+  for (const enemy of state.enemies) {
+    if (enemy.dormant || enemy.kind === "dog") continue;
+    const hunting = enemy.state === "search" || enemy.state === "spotted";
+    if (!hunting && !villageBeingSwept) continue;
+    if (Math.abs(enemy.y - p.y) > 2.2) continue;
+    if (Math.abs(enemy.x - p.x) > FLUSH_OUT_REACH) continue;
+    p.hidden = false;
+    p.hidePropId = null;
+    p.noiseSpike = Math.max(p.noiseSpike, NOISE.crouch);
+    Sfx(state, "cloth", p.x, p.y);
+    Sfx(state, "shout", enemy.x, enemy.y);
+    enemy.alertness = Math.max(enemy.alertness, 0.92);
+    break;
   }
 }
 
