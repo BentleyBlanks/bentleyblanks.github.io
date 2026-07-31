@@ -64,6 +64,8 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
   const ledgerPanel = document.getElementById("ledgerPanel") ?? El("aside", "tf-ledger", uiRoot);
   ledgerPanel.replaceChildren();
   const resLine = El("div", "tf-res-line", ledgerPanel);
+  const grainBox = El("div", "tf-grain", ledgerPanel);       // 明存粮/洞存粮分账（R2）
+  const landmarkBox = El("div", "tf-landmark", ledgerPanel); // 区队部等关键地点坐标（R2）
   const ledgerTitle = El("div", "tf-ledger-title", ledgerPanel, "代价账本");
   const ledgerList = El("dl", "tf-ledger-list", ledgerPanel);
 
@@ -125,8 +127,49 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
     civCaptured: "群众被抓", civDead: "群众伤亡", housesBurned: "房屋被焚", grainSeized: "粮食被夺",
   });
 
+  /**
+   * 资源条 + 存粮分账。胜利条件按「存粮」算，所以明存（敌进村就能征走）与
+   * 洞存（敌须攻入得手才夺得走）必须分开显示，且逐村给出村名与格号。
+   */
   function SetResources(res) {
-    resLine.textContent = `弹药 ${res.ammo ?? 0} ｜ 明存粮 ${res.grainOpen ?? 0} ｜ 洞藏粮 ${res.grainHidden ?? 0}`;
+    const open = res.grainOpen ?? 0;
+    const hidden = res.grainHidden ?? 0;
+    resLine.textContent = `弹药 ${res.ammo ?? 0}/${res.ammoMax ?? 12} ｜ 存粮 ${open + hidden}`;
+    grainBox.replaceChildren();
+    const head = El("div", "tf-grain-head", grainBox);
+    El("span", "tf-grain-label", head, "明存粮（敌可征走）");
+    El("span", "tf-grain-value", head, String(open));
+    const rowCap = 5;
+    const villageRows = res.grainRows ?? [];
+    for (const row of villageRows.slice(0, rowCap)) {
+      const line = El("div", "tf-grain-row", grainBox);
+      El("span", "tf-grain-name", line, `${row.name}（${row.hexKeys?.join(" ") ?? ""}）`);
+      El("span", "tf-grain-value", line, String(row.grain ?? 0));
+    }
+    if (villageRows.length > rowCap) El("div", "tf-grain-row tf-grain-empty", grainBox, `…另有 ${villageRows.length - rowCap} 处`);
+    if (!villageRows.length) El("div", "tf-grain-row tf-grain-empty", grainBox, "各村已无明存粮");
+    const head2 = El("div", "tf-grain-head", grainBox);
+    El("span", "tf-grain-label", head2, "洞存粮（须敌攻入才丢）");
+    El("span", "tf-grain-value", head2, String(hidden));
+    const cellRows = res.cellRows ?? [];
+    for (const row of cellRows.slice(0, rowCap)) {
+      const line = El("div", "tf-grain-row", grainBox);
+      El("span", "tf-grain-name", line, `储粮洞 ${row.key}`);
+      El("span", "tf-grain-value", line, `${row.grain}/${row.cap ?? 8}`);
+    }
+    if (cellRows.length > rowCap) El("div", "tf-grain-row tf-grain-empty", grainBox, `…另有 ${cellRows.length - rowCap} 处`);
+    if (!cellRows.length) El("div", "tf-grain-row tf-grain-empty", grainBox, "尚无粮入洞");
+  }
+
+  /** 关键地点：区队部坐标常显（L2「区队部被驻占 2 回合即败」需要玩家知道它在哪）。 */
+  function SetLandmarks(rows) {
+    landmarkBox.replaceChildren();
+    if (!rows?.length) return;
+    for (const row of rows) {
+      const line = El("div", "tf-landmark-row", landmarkBox);
+      El("span", "tf-landmark-name", line, row.label);
+      El("span", "tf-landmark-hex", line, row.hexKeys?.join(" ") ?? "");
+    }
   }
 
   function SetLedger(ledger) {
@@ -334,14 +377,19 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
     El("div", "tf-result-kicker", card, "战 报 归 档");
     El("div", "tf-result-grade", card, `评定：${result.grade ?? "—"}`);
     if (result.reasons?.length) El("div", "tf-result-reason", card, result.reasons.join("；"));
+    El("div", "tf-result-medals-title", card, `勋记 ${(result.medalItems ?? []).filter((m) => m.earned).length} / 3 —— 逐枚说明`);
     const medalList = El("ul", "tf-result-medals", card);
     (result.medalItems ?? []).forEach((medal, index) => {
       const item = El("li", `tf-medal${medal.earned ? " tf-medal-lit" : ""}`, medalList);
       item.style.animationDelay = `${0.4 + index * 0.55}s`;
       El("span", "tf-medal-mark", item, medal.earned ? "●" : "○");
-      El("span", "tf-medal-name", item, medal.name);
-      El("span", "tf-medal-note", item, medal.note ?? "");
+      const body = El("div", "tf-medal-body", item);
+      const head = El("div", "tf-medal-head", body);
+      El("span", "tf-medal-name", head, medal.name);
+      El("span", "tf-medal-cond", head, medal.text ?? "");
+      El("div", "tf-medal-note", body, medal.note ?? "");
     });
+    El("div", "tf-result-medals-foot", card, "三枚全中评甲、两枚乙、一枚及以下丙；失利一律丁。歼敌不计分。");
     El("div", "tf-result-ledger-title", card, "代价账本");
     const table = El("dl", "tf-result-ledger", card);
     for (const [key, label] of Object.entries(ledgerLabels)) {
@@ -365,7 +413,7 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
   function SetFixtureBadge(on) { fixtureBadge.hidden = !on; }
 
   return {
-    SetTopBar, SetResources, SetLedger, SetSelected, SetHover,
+    SetTopBar, SetResources, SetLandmarks, SetLedger, SetSelected, SetHover,
     Toast, Banner, AppendLog, ToggleLog,
     SetEndTurn, ShowTodos, HideTodos, TodosVisible,
     MaybeHint, ClearHints,

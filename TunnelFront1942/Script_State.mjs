@@ -5,7 +5,7 @@
 
 import { HexKey, ParseHexKey, HexNeighborKeys, HexDistanceKeys, StepRng, HashString } from "./Script_Hex.mjs";
 import { CFG, terrainDefinitions, unitDefinitions } from "./Data_Rules.mjs";
-import { GetLevel, BuildBriefing } from "./Data_Levels.mjs";
+import { GetLevel, BuildBriefing, BuildSchedule } from "./Data_Levels.mjs";
 
 // ---------------------------------------------------------------------------
 // 通用小工具（其余模块共用）
@@ -88,7 +88,8 @@ function MakeAllyUnit(state, type, at) {
   const def = unitDefinitions[type];
   const id = `u${state.meta.nextUnitId += 1}`;
   state.units[id] = { id, side: "ally", type, hp: def.hp, mp: def.mp, acted: false, layer: "surface",
-    pos: at, stance: "normal", breath: 0, revealed: false, columnId: null, attacked: false, freeMove: false };
+    pos: at, stance: "normal", breath: 0, revealed: false, columnId: null, attacked: false, freeMove: false,
+    coverUses: 0, ambushHex: null, ambushTurn: 0, ambushStale: false };
   return id;
 }
 
@@ -125,7 +126,8 @@ export function CreateGame(levelId, seed) {
   for (const village of level.villages) {
     state.map.villages[village.id] = { name: village.name, hexKeys: village.hexKeys.slice(),
       pop: village.pop, popStart: village.pop, grainOpen: village.grainOpen,
-      organize: village.organize, organizeProgress: 0, hasHq: !!village.hasHq, burnedHexes: 0 };
+      organize: village.organize, organizeProgress: 0, hasHq: !!village.hasHq, burnedHexes: 0,
+      seizedTurn: 0 };
   }
   for (const ally of level.allies) MakeAllyUnit(state, ally.type, ally.at);
   for (const key of level.tunnels.cells) {
@@ -141,37 +143,12 @@ export function CreateGame(levelId, seed) {
   return state;
 }
 
-/** seed 白名单抽取：仅此处消耗 rngState（§2.7 三类子流 + 时刻抖动 + 平手盐）。 */
+/** seed 白名单抽取：仅此处消耗 rngState。抽哪几支、每支几选一由关卡的 seedDraws 声明，
+ *  「抽出来长什么样」由 Data_Levels 的 BuildSchedule 决定（规则脚本不写关卡内容）。 */
 function DrawWavePlan(state, level) {
   const plan = state.wave.plan;
-  const schedule = state.wave.schedule;
-  if (level.id === "L1") {
-    plan.scoutDir = PickIndex(state, 2);        // 斥候绕向（路线变体子流）
-  } else {
-    plan.mainEntry = level.mainEntryOptions[PickIndex(state, 2)];      // 入场口子流
-    plan.spyRoute = PickIndex(state, 3);                               // 路线变体子流
-    plan.targetAssign = level.targetAssignOptions[PickIndex(state, 2)];
-  }
-  for (const wave of level.waves) {
-    const entry = { id: wave.id, kind: wave.kind, turn: wave.turn, role: wave.role || null,
-      entry: wave.entry || null, exit: wave.exit || null, units: (wave.units || []).slice(),
-      waypoints: (wave.waypoints || []).slice(), target: wave.target || null,
-      seizeGoal: wave.seizeGoal || 0, axisKillsNeed: wave.axisKillsNeed || 0, spawned: false };
-    if (wave.jitter) entry.turn = Math.max(2, wave.turn + (PickIndex(state, 3) - 1));   // 时刻 ±1 抖动
-    if (wave.routeVariants && level.id === "L1") entry.waypoints = wave.routeVariants[plan.scoutDir].slice();
-    if (wave.id === "w2spy") {
-      const route = wave.routeVariants[plan.spyRoute];
-      entry.entry = route.entry;
-      entry.waypoints = route.waypoints.slice();
-    }
-    if (wave.id === "w2main") { entry.entry = plan.mainEntry; entry.exit = plan.mainEntry; entry.target = plan.targetAssign.main; }
-    if (wave.id === "w2support") {
-      const other = level.mainEntryOptions.find((key) => key !== plan.mainEntry);
-      entry.entry = other; entry.exit = other; entry.target = plan.targetAssign.support;
-    }
-    schedule.push(entry);
-  }
-  schedule.sort((a, b) => (a.turn - b.turn) || (a.id < b.id ? -1 : 1));
+  for (const draw of level.seedDraws || []) plan[draw.key] = PickIndex(state, draw.count);
+  for (const entry of BuildSchedule(level, plan)) state.wave.schedule.push(entry);
   if (level.revenge) {
     state.wave.revenge = { ...level.revenge, casualties: 0, spawnedTurn: null, pending: false };
   }
@@ -288,6 +265,31 @@ export function AirZones(state) {
   return zones;
 }
 
+/** 某地道格所属的空气分区（经开放门连通）。格不存在时返回空集。 */
+export function ZoneOfCell(state, key) {
+  if (!state.tunnels.cells[key]) return new Set();
+  return ConnectedCells(state, key, true);
+}
+
+/** 分区内未封的地道口键（暴露豆全程结算与被迫出洞都按此口径）。 */
+export function ZoneEntranceKeys(state, zone) {
+  const keys = [];
+  for (const key of [...zone].sort()) {
+    const entrance = state.tunnels.entrances[key];
+    if (entrance && !entrance.sealed) keys.push(key);
+  }
+  return keys;
+}
+
+/** 分区内通风口数量（敌选烟攻的额外条件：通风口数 < 地道格数 / 3）。 */
+export function ZoneVentCount(state, zone) {
+  let count = 0;
+  for (const key of zone) {
+    if (state.tunnels.cells[key]?.facility === "vent" && !state.tunnels.vents[key]?.smoked) count += 1;
+  }
+  return count;
+}
+
 /** 分区是否有可呼吸的开口：未被烟熏的通风口，或未封且无烟的开放入口。 */
 export function ZoneHasAir(state, zone) {
   for (const key of zone) {
@@ -332,27 +334,34 @@ export function ReachableFacilityCells(state, startKey, facility) {
   });
 }
 
-/** 村 1 格内、未封、已连通储粮洞的入口（藏粮用）。 */
+/**
+ * R2 P0-4：藏粮要求物理连通——本格**正下方**必须有地道格，该格所在分区里有还装得下的储粮洞，
+ * 且分区里至少有一个未封的口（否则粮根本递不下去）。返回可用的储粮洞格键（近者优先）。
+ */
+export function StorageCellsUnder(state, hexKey) {
+  const cell = state.tunnels.cells[hexKey];
+  if (!cell) return [];
+  if (!ZoneEntranceKeys(state, ZoneOfCell(state, hexKey)).length) return [];
+  return ReachableFacilityCells(state, hexKey, "storage");
+}
+
+/** 该村中「脚底下真通着储粮洞」的村格（藏粮用；AsciiMap 只取其条数做提示）。 */
 export function VillageStorageEntrances(state, villageId) {
   const village = state.map.villages[villageId];
   if (!village) return [];
-  const near = new Set();
-  for (const hexKey of village.hexKeys) {
-    near.add(hexKey);
-    for (const nb of HexNeighborKeys(hexKey)) near.add(nb);
-  }
-  const result = [];
-  for (const key of SortedKeys(state.tunnels.entrances)) {
-    const entrance = state.tunnels.entrances[key];
-    if (entrance.sealed || !near.has(key)) continue;
-    if (ReachableFacilityCells(state, key, "storage").length) result.push(key);
-  }
-  return result;
+  return village.hexKeys.filter((hexKey) => StorageCellsUnder(state, hexKey).length > 0);
 }
 
 export function GrainTotal(state) {
   let total = 0;
   for (const id of SortedKeys(state.map.villages)) total += state.map.villages[id].grainOpen;
+  for (const key of SortedKeys(state.tunnels.cells)) total += state.tunnels.cells[key].grain;
+  return total;
+}
+
+/** 洞存粮：胜负线与勋记都只认这一项（明存粮扫荡期每回合被搜走）。 */
+export function TunnelGrainTotal(state) {
+  let total = 0;
   for (const key of SortedKeys(state.tunnels.cells)) total += state.tunnels.cells[key].grain;
   return total;
 }
@@ -395,6 +404,18 @@ export function EnemyMoveCost(state, key) {
   if (!IsSurfacePassable(state, key)) return Infinity;
   if (hex.road && !hex.roadBroken) return CFG.moveCost.road;
   return CFG.moveCost.offroad;
+}
+
+/** 「敌已警戒」：同一格连着两回合设伏，敌记住了这个地方（§2.5）。 */
+export function IsHexAlerted(state, key) {
+  return (state.map.hexes[key]?.alertedUntil || 0) >= state.meta.turn;
+}
+
+/** 寻路成本 = 移动成本 + 警戒惩罚：有路可绕就绕开警戒格，绕不开还是得硬过（不是墙）。 */
+export function EnemyPathCost(state, key) {
+  const cost = EnemyMoveCost(state, key);
+  if (!Number.isFinite(cost)) return cost;
+  return cost + (IsHexAlerted(state, key) ? CFG.alertedExtraCost : 0);
 }
 
 export function VillageOfHex(state, key) {

@@ -6,8 +6,9 @@ import { HexNeighborKeys, HexDistanceKeys, ParseHexKey } from "./Script_Hex.mjs"
 import { CFG, unitDefinitions, TEXT } from "./Data_Rules.mjs";
 import { GetLevel } from "./Data_Levels.mjs";
 import {
-  SortedKeys, CompareIds, PushEvent, AddLedger, MakeEnemyUnit, EnemyMoveCost, UnitsOn,
+  SortedKeys, CompareIds, PushEvent, AddLedger, MakeEnemyUnit, EnemyMoveCost, EnemyPathCost, UnitsOn,
   AllyUnits, EnemyUnits, RemoveUnit, UnitDef, TerrainOf, EntranceThreshold, VentThreshold,
+  ZoneOfCell, ZoneVentCount,
 } from "./Script_State.mjs";
 import { CanAllySeeHex, EnemySeesUnit, FreshSightings, SuspicionScore, RecordSighting } from "./Script_Visibility.mjs";
 import { ResolveAttack, RecordExposedSightings } from "./Script_Actions.mjs";
@@ -60,7 +61,7 @@ export function EnemyPath(state, fromKey, toKey) {
     const key = open.shift();
     if (key === toKey) break;
     for (const nb of HexNeighborKeys(key)) {
-      const cost = EnemyMoveCost(state, nb);
+      const cost = EnemyPathCost(state, nb);      // 含「敌已警戒」惩罚：有路可绕就绕开伏击老地方
       if (!Number.isFinite(cost)) continue;
       const alt = dist[key] + cost;
       if (dist[nb] === undefined || alt < dist[nb] - 1e-9) {
@@ -84,6 +85,10 @@ export function EnemyPath(state, fromKey, toKey) {
 // 伏击触发（敌纵队每进一格检查；未识破特务先因相邻现形，再谈可否被伏）
 // ---------------------------------------------------------------------------
 
+/**
+ * 伏击触发。R2 P0-5：同格只可能有 1 个伏击手（合法性在 Ambush 动作侧就卡住了），
+ * 打完立刻转「暴露」，并当场吃该纵队一次还击——伏击不再是零风险的免费伤害。
+ */
 function TriggerAmbushes(state, events, column, hexKey) {
   const ambushers = AllyUnits(state)
     .filter((unit) => unit.stance === "ambush" && unit.layer === "surface"
@@ -97,7 +102,15 @@ function TriggerAmbushes(state, events, column, hexKey) {
     if (!targets.length) break;
     if (state.resources.ammo < CFG.ammoPerAttack) break;
     const outcome = ResolveAttack(state, events, ambusher.id, targets[0].id, { ambush: true });
-    if (outcome.done) fired = true;
+    if (!outcome.done) continue;
+    fired = true;
+    // 还击：伏击手已暴露，纵队里够得着又打得动的第一个班当场回敬一下
+    const shooter = ColumnUnits(state, column)
+      .filter((unit) => UnitDef(unit).atk > 0 && HexDistanceKeys(unit.pos, ambusher.pos) <= 1)
+      .sort((a, b) => CompareIds(a.id, b.id))[0];
+    if (shooter && state.units[ambusher.id] && state.units[ambusher.id].hp > 0) {
+      ResolveAttack(state, events, shooter.id, ambusher.id, { ambush: false });
+    }
   }
   return fired;
 }
@@ -146,7 +159,7 @@ function SpawnColumn(state, events, spec) {
     seizeGoal: spec.seizeGoal || 0, seized: 0,
     caution: 0, cautionTurns: 0, regroupTurns: 0, opInProgress: null,
     withdrawing: false, garrison: false, plannedPath: [], respondFresh: false,
-    incident: false, casualties: 0, burned: false, done: false,
+    incident: false, casualties: 0, burned: false, done: false, gained: false,
     axis: spec.axis || null, burnCount: spec.burnCount || 0,
   };
   for (const type of spec.units) {
@@ -206,7 +219,7 @@ function VillageWorthGarrison(state, villageId) {
   if (!village) return false;
   if (village.grainOpen > 0) return true;
   for (const hexKey of village.hexKeys) {
-    if (KnownEntranceNear(state, hexKey, 1)) return true;
+    if (TargetableEntranceNear(state, hexKey, 1)) return true;
   }
   return false;
 }
@@ -241,13 +254,27 @@ function ResolveDecisionWave(state, events) {
 // 反地道四选一：宣布（提前 1 回合电报）与执行
 // ---------------------------------------------------------------------------
 
-function KnownEntranceNear(state, pos, range) {
+/**
+ * R2 P0-2：敌盯上一个口的门槛从「已被搜出（暴露豆满 9）」降到「暴露豆 ≥4」——
+ * L1 的口一辈子到不了 9 豆，反地道四选一才会一次都没发生过。
+ * 暴露豆高者优先（同分按格键），敌当然先撬最响的那个口。
+ */
+function TargetableEntranceNear(state, pos, range) {
   const keys = [];
   for (const key of SortedKeys(state.tunnels.entrances)) {
     const entrance = state.tunnels.entrances[key];
-    if (entrance.known && !entrance.sealed && HexDistanceKeys(pos, key) <= range) keys.push(key);
+    if (entrance.sealed || HexDistanceKeys(pos, key) > range) continue;
+    if (entrance.known || entrance.expose >= CFG.opTargetExpose) keys.push(key);
   }
+  keys.sort((a, b) => (state.tunnels.entrances[b].expose - state.tunnels.entrances[a].expose) || (a < b ? -1 : 1));
   return keys.length ? keys[0] : null;
+}
+
+/** 烟攻的额外条件（R2 P0-2）：该气区通风口数 < 地道格数 / 3——通风口修得够多，敌就不烧这份柴。 */
+function ZoneUnderVentilated(state, entranceKey) {
+  const zone = ZoneOfCell(state, entranceKey);
+  if (!zone.size) return false;
+  return ZoneVentCount(state, zone) < zone.size / CFG.ventPerCellsForSmoke;
 }
 
 function AnnounceOp(state, events, column, entranceKey) {
@@ -255,13 +282,15 @@ function AnnounceOp(state, events, column, entranceKey) {
   const allowed = level.enemyOps || [];
   let kind = null;
   const entrance = state.tunnels.entrances[entranceKey];
-  if (allowed.includes("smoke") && state.wave.smokeCharges > 0 && ColumnHasType(state, column, "sapper")) kind = "smoke";
+  if (allowed.includes("smoke") && state.wave.smokeCharges > 0 && ColumnHasType(state, column, "sapper")
+      && ZoneUnderVentilated(state, entranceKey)) kind = "smoke";
   else if (allowed.includes("blast") && ColumnHasType(state, column, "sapper")) kind = "blast";
   else if (allowed.includes("breach") && CountInf(state, column) >= CFG.breachMinInf
            && column.caution < CFG.cautionMax && !entrance.breachDenied) kind = "breach";
   else if (allowed.includes("seal")) kind = "seal";
   if (!kind) return false;
   state.enemy.pendingOps.push({ kind, at: entranceKey, columnId: column.id, announcedTurn: state.meta.turn, turnsLeft: 1 });
+  column.gained = true;
   column.opInProgress = { kind, at: entranceKey, turnsLeft: 1 };
   PushEvent(state, events, { kind: "telegraph", text: TEXT.telegraph[kind], hex: entranceKey, visible: true });
   return true;
@@ -459,11 +488,13 @@ function DoSearch(state, events, column) {
   }
   if (entrance && !entrance.known && !entrance.sealed) {
     entrance.expose += power;
+    column.gained = true;
     PushEvent(state, events, { kind: "search", text: `敌在翻检此地（暴露 +${power}）`, hex: pos, visible: true });
     return true;
   }
   if (vent && !vent.known) {
     vent.expose += power;
+    column.gained = true;
     PushEvent(state, events, { kind: "search", text: `敌在翻检此地（暴露 +${power}）`, hex: pos, visible: true });
     return true;
   }
@@ -475,14 +506,26 @@ function DoSearch(state, events, column) {
   return false;
 }
 
+/** 征粮：有明存粮就抢粮；粮已净空则抓丁——把人藏进地道才躲得掉（代价簿四栏都得会动）。 */
 function DoSeize(state, events, column) {
   const village = column.targetVillage ? state.map.villages[column.targetVillage] : null;
   const pos = ColumnPos(state, column);
   if (!village || !pos) return false;
   const hex = state.map.hexes[pos];
-  if (!hex || hex.villageId !== column.targetVillage || village.grainOpen <= 0) return false;
+  if (!hex || hex.villageId !== column.targetVillage) return false;
+  if (village.grainOpen <= 0) {
+    if (village.pop <= 0) return false;
+    const grab = Math.min(CFG.levyCivsPerTurn, village.pop);
+    village.pop -= grab;
+    column.gained = true;
+    AddLedger(state, "civCaptured", grab);
+    PushEvent(state, events, { kind: "ledger", text: `村中无粮可征，敌抓丁 ${grab} 批（入代价簿）`, hex: pos, visible: true });
+    return true;
+  }
   const take = Math.min(CFG.seizePerTurn, village.grainOpen);
   village.grainOpen -= take;
+  village.seizedTurn = state.meta.turn;
+  column.gained = true;
   AddLedger(state, "grainSeized", take);
   column.seized += take;
   PushEvent(state, events, { kind: "ledger", text: `敌征走明存粮 ${take} 担（入代价簿）`, hex: pos, visible: true });
@@ -502,8 +545,16 @@ function WithdrawMove(state, events, column) {
   const pos = ColumnPos(state, column);
   if (!pos) { column.done = true; return; }
   let exit = column.exit;
-  if (!exit || !Number.isFinite(EnemyMoveCost(state, exit))) {
-    const options = level.exitKeys.slice().sort((a, b) => (HexDistanceKeys(pos, a) - HexDistanceKeys(pos, b)) || (a < b ? -1 : 1));
+  if (!exit || !Number.isFinite(EnemyMoveCost(state, exit)) || !EnemyPath(state, pos, exit)) {
+    const options = level.exitKeys.slice()
+      .filter((key) => EnemyPath(state, pos, key))
+      .sort((a, b) => (HexDistanceKeys(pos, a) - HexDistanceKeys(pos, b)) || (a < b ? -1 : 1));
+    if (!options.length) {          // 桥断路绝：残部弃辎重涉水散去（不许卡在图上拖住波次收束）
+      for (const unit of ColumnUnits(state, column)) RemoveUnit(state, unit.id);
+      column.done = true;
+      PushEvent(state, events, { kind: "enemyMove", text: "敌一部无路可退，弃辎重涉水散去", hex: pos, visible: SeenBy(state, pos) });
+      return;
+    }
     exit = options[0];
   }
   MoveColumn(state, events, column, exit);
@@ -594,6 +645,7 @@ function NextObjective(state, column) {
 
 function ColumnAct(state, events, column) {
   if (column.done || !ColumnUnits(state, column).length) return;
+  column.gained = false;      // 本回合有没有「搜出东西/抢到东西/干成一件作业」，决定扑空衰减
   column.incident = false;
   column.respondFresh = false;
   const pos = ColumnPos(state, column);
@@ -608,7 +660,7 @@ function ColumnAct(state, events, column) {
     return;
   }
   // 0.5) 驻剿（L2 T13 判定后）
-  if (column.garrison) { GarrisonAct(state, events, column); TickCaution(state, column); return; }
+  if (column.garrison) { GarrisonAct(state, events, column); column.gained = true; TickCaution(state, column); return; }
   // 0.7) 报复队烧房：一到目标村界即执行（只进账本，绝不产生任何资源）
   if (column.burnCount > 0 && column.targetVillage) {
     const target = state.map.villages[column.targetVillage];
@@ -642,7 +694,7 @@ function ColumnAct(state, events, column) {
   if (!ColumnUnits(state, column).length) return;
   const engaged = fired && ColumnUnits(state, column).length <= 2;
   // 4) 已知入口在 1 格内 → 反地道四选一（提前 1 回合电报）
-  const knownKey = pos ? KnownEntranceNear(state, pos, 1) : null;
+  const knownKey = pos ? TargetableEntranceNear(state, pos, 1) : null;
   if (knownKey && AnnounceOp(state, events, column, knownKey)) { column.plannedPath = []; TickCaution(state, column); return; }
   // 5) 在目标村：征粮 + 按嫌疑分搜索
   const village = column.targetVillage ? state.map.villages[column.targetVillage] : null;

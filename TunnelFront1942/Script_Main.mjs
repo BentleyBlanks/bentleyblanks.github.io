@@ -54,6 +54,19 @@ async function LoadEngine() {
     for (const name of ["CreateGame", "LegalActions", "PerformAction", "EndTurn", "DeriveView"]) {
       if (typeof engine[name] !== "function") return null;
     }
+    // 呈现层报表（存粮分账 / 勋记说明 / 电报措辞 / 动作不可用原因）——与 CLI 同一份实现。
+    // 可选依赖：装载失败只是少了这些说明，不拖垮整页。
+    try {
+      const reportMod = await import("./Script_AsciiMap.mjs");
+      engine.GrainReport = reportMod.GrainReport ?? null;
+      engine.MedalReport = reportMod.MedalReport ?? null;
+      engine.TelegraphText = reportMod.TelegraphText ?? null;
+      engine.ActionHints = reportMod.ActionHints ?? null;
+      engine.ObjectiveLine = reportMod.ObjectiveLine ?? null;
+    } catch {
+      engine.GrainReport = null; engine.MedalReport = null;
+      engine.TelegraphText = null; engine.ActionHints = null; engine.ObjectiveLine = null;
+    }
     return engine;
   } catch {
     return null;
@@ -272,24 +285,73 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
   // 刷新管线
   // =========================================================================
 
+  /** 存粮分账：优先用引擎侧共享报表（与 CLI 同源），缺席时按可见状态兜底汇总。 */
+  function GrainDetail() {
+    const st = session.state;
+    if (session.engine?.GrainReport) {
+      try {
+        const report = session.engine.GrainReport(st);
+        return {
+          grainOpen: report.open, grainHidden: report.hidden,
+          grainRows: report.villages.filter((v) => v.grainOpen > 0)
+            .map((v) => ({ name: v.name, hexKeys: v.hexKeys, grain: v.grainOpen })),
+          cellRows: report.cells,
+        };
+      } catch { /* 落到兜底 */ }
+    }
+    const villages = Object.entries(st.map?.villages ?? {});
+    const grainOpen = villages.reduce((sum, [, village]) => sum + (village.grainOpen ?? 0), 0);
+    const cells = Object.entries(st.tunnels?.cells ?? {}).filter(([, cell]) => (cell.grain ?? 0) > 0);
+    return {
+      grainOpen,
+      grainHidden: cells.reduce((sum, [, cell]) => sum + cell.grain, 0),
+      grainRows: villages.filter(([, v]) => (v.grainOpen ?? 0) > 0)
+        .map(([, v]) => ({ name: v.name, hexKeys: v.hexKeys ?? [], grain: v.grainOpen })),
+      cellRows: cells.map(([key, cell]) => ({ key, grain: cell.grain, cap: 8 })),
+    };
+  }
+
+  /** 关键地点：区队部与各村坐标（L2 即败条件绑定区队部，必须常显）。 */
+  function LandmarkRows() {
+    const villages = Object.values(session.state.map?.villages ?? {});
+    return villages.map((village) => ({
+      label: `${village.name}${village.hasHq ? "【区队部】" : ""}`,
+      hexKeys: village.hexKeys ?? [],
+    }));
+  }
+
+  /** 目标文案：关卡数据驱动（数值改了自动跟着改），并写明区队部格号。 */
+  function ObjectiveText() {
+    const st = session.state;
+    if (session.engine?.ObjectiveLine) {
+      try {
+        const line = session.engine.ObjectiveLine(st);
+        if (line) return line;
+      } catch { /* 落到兜底 */ }
+    }
+    const base = session.objective ?? objectiveFallback[st.meta?.level] ?? "见简报";
+    const hq = Object.values(st.map?.villages ?? {}).find((village) => village.hasHq);
+    if (!hq) return base;
+    return `${base}｜区队部：${hq.name} ${(hq.hexKeys ?? []).join(" ")}`;
+  }
+
   function RefreshHud() {
     const st = session.state;
     const view = session.view;
-    const villages = Object.values(st.map?.villages ?? {});
-    const grainOpen = villages.reduce((sum, village) => sum + (village.grainOpen ?? 0), 0);
-    const grainHidden = Object.values(st.tunnels?.cells ?? {}).reduce((sum, cell) => sum + (cell.grain ?? 0), 0);
+    const grain = GrainDetail();
     const wave = view?.wave ?? st.wave ?? {};
     ui.SetTopBar({
       turn: view?.turn ?? st.meta?.turn,
       hardEndTurn: wave.hardEndTurn,
       phase: session.busy ? "enemy" : (view?.phase ?? st.meta?.phase),
-      objective: session.objective ?? objectiveFallback[st.meta?.level] ?? null,
+      objective: ObjectiveText(),
       waveStatus: wave.status,
       sweepTurn: wave.sweepTurn,
       pool: wave.pool,
       smokeCharges: wave.smokeCharges,
     });
-    ui.SetResources({ ammo: st.resources?.ammo ?? 0, grainOpen, grainHidden });
+    ui.SetResources({ ammo: st.resources?.ammo ?? 0, ammoMax: 12, ...grain });
+    ui.SetLandmarks(LandmarkRows());
     ui.SetLedger(st.ledger);
     if (session.mode === "fixture") ui.SetEndTurn("fixture");
     else if (session.busy) ui.SetEndTurn("busy");
@@ -356,12 +418,14 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       session.hintFlags.expose = true;
       ui.MaybeHint("expose");
     }
-    // 电报预告（DeriveView.telegraphs）：每条只 toast 一次
+    // 电报预告（DeriveView.telegraphs）：每条只 toast 一次；入境预告加注「未必看得见」，
+    // 免得次回合敌军阶段一条相关事件都没有时，玩家以为电报是假的。
     for (const telegraph of session.view?.telegraphs ?? []) {
       if (!telegraph?.text || session.seenTelegraphs.has(telegraph.text)) continue;
       session.seenTelegraphs.add(telegraph.text);
-      ui.Toast(telegraph.text, { kind: "telegraph", ms: 3400 });
-      ui.AppendLog({ turn: session.state.meta?.turn, kind: "telegraph", text: telegraph.text, hex: telegraph.hex ?? undefined, visible: true });
+      const text = session.engine?.TelegraphText ? session.engine.TelegraphText(telegraph) : telegraph.text;
+      ui.Toast(text, { kind: "telegraph", ms: 4200 });
+      ui.AppendLog({ turn: session.state.meta?.turn, kind: "telegraph", text, hex: telegraph.hex ?? undefined, visible: true });
     }
   }
 
@@ -374,6 +438,13 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     try { return session.engine.LegalActions(session.state, unitId) ?? []; } catch { return []; }
   }
 
+  /** 「为什么这条不能做」的真实原因（与 CLI 同一份实现），至多取两条免得刷屏。 */
+  function ActionHintsSafe(unitId) {
+    if (!unitId || !session.engine?.ActionHints) return [];
+    try { return (session.engine.ActionHints(session.state, unitId, LegalActionsSafe(unitId)) ?? []).slice(0, 2); }
+    catch { return []; }
+  }
+
   function Perform(action) {
     if (!session.engine || session.busy) return false;
     let outcome;
@@ -382,7 +453,14 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       return false;
     }
     if (!outcome || outcome.illegal) {
-      ui.Toast("此令不可执行", { kind: "warn", ms: 1800 });
+      // 说真实原因，不说笼统话：先摆引擎给的理由，再补一条按当前状态推断的成因。
+      const reason = outcome?.illegal || "此令不可执行";
+      ui.Toast(reason, { kind: "warn", ms: 2600 });
+      ui.AppendLog({ turn: session.state.meta?.turn, kind: "warn", text: `不可执行：${reason}`, visible: true });
+      for (const hint of ActionHintsSafe(action.unit)) {
+        ui.Toast(hint, { kind: "warn", ms: 4200 });
+        ui.AppendLog({ turn: session.state.meta?.turn, kind: "warn", text: hint, visible: true });
+      }
       return false;
     }
     session.state = outcome.state ?? session.state;
@@ -512,15 +590,26 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
 
   function Sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+  /** 终局：三枚勋记逐条列出名称、条件与「为什么中/为什么没中」（以前只有一串 ●○）。 */
   function ShowResult() {
     const result = session.state.result;
-    const medalNames = session.view?.medalNames ?? result.medalNames ?? [];
     const medals = result.medals ?? session.state.medals ?? [];
-    const medalItems = medals.map((earned, index) => ({
-      earned: Boolean(earned),
-      name: medalNames[index] ?? `勋记 ${index + 1}`,
-      note: result.medalNotes?.[index] ?? "",
-    }));
+    let medalItems = null;
+    if (session.engine?.MedalReport) {
+      try {
+        medalItems = session.engine.MedalReport(session.state)
+          .map((row) => ({ earned: row.earned, name: row.name, text: row.text, note: row.note }));
+      } catch { medalItems = null; }
+    }
+    if (!medalItems) {
+      const medalNames = session.view?.medalNames ?? result.medalNames ?? [];
+      medalItems = medals.map((earned, index) => ({
+        earned: Boolean(earned),
+        name: medalNames[index] ?? `勋记 ${index + 1}`,
+        text: "",
+        note: result.medalNotes?.[index] ?? "",
+      }));
+    }
     ui.ShowResult({ grade: result.grade, reasons: result.reasons, medalItems }, session.state.ledger);
   }
 

@@ -16,9 +16,12 @@ import { CreateGame, SerializeState, DeserializeState, GetBriefing, GrainTotal, 
 import { DeriveView } from "./Script_Visibility.mjs";
 import { LegalActions, PerformAction } from "./Script_Actions.mjs";
 import { EndTurn } from "./Script_Turn.mjs";
-import { RenderAsciiMap } from "./Script_AsciiMap.mjs";
+import {
+  RenderAsciiMap, GrainLines, OpeningLines, LandmarkLines, IntentLines, ObjectiveLine,
+  UnitLines, MedalLines, TelegraphText, ActionKind, actionKindNames, ActionHints,
+} from "./Script_AsciiMap.mjs";
 import { RunBotGame, botNames } from "./Script_Bots.mjs";
-import { TEXT } from "./Data_Rules.mjs";
+import { TEXT, CFG } from "./Data_Rules.mjs";
 
 function ParseArgs(argv) {
   const args = { _: [] };
@@ -55,57 +58,87 @@ function PrintEvents(events) {
   }
 }
 
-function PrintStatus(state) {
-  const view = DeriveView(state);
-  const wave = view.wave;
-  console.log(`回合 T${view.turn}/${wave.hardEndTurn} ｜ 阶段：${view.phase} ｜ 波次：${wave.statusText}`
+function PrintStatus(state, view) {
+  const derived = view || DeriveView(state);
+  const wave = derived.wave;
+  const objective = ObjectiveLine(state);
+  if (objective) console.log(`目标：${objective}`);
+  console.log(`回合 T${derived.turn}/${wave.hardEndTurn} ｜ 阶段：${derived.phase} ｜ 波次：${wave.statusText}`
     + (wave.status !== "quiet" ? ` ｜ 敌行动力池：${wave.pool}` : "")
     + (wave.smokeCharges ? ` ｜ 敌烟具：${wave.smokeCharges}` : ""));
-  console.log(`弹药 ${view.resources.ammo}/12 ｜ 总粮 ${view.resources.grainTotal} ｜ 人口 ${view.resources.popTotal} 批`
-    + (view.resources.woundedTotal ? ` ｜ 伤员 ${view.resources.woundedTotal} 批` : ""));
-  const ledgerParts = Object.entries(view.ledger).filter(([, v]) => v > 0)
+  console.log(`弹药 ${derived.resources.ammo}/${CFG.ammoMax} ｜ 人口 ${derived.resources.popTotal} 批`
+    + (derived.resources.woundedTotal ? ` ｜ 伤员 ${derived.resources.woundedTotal} 批` : ""));
+  for (const line of GrainLines(state)) console.log(line);
+  const ledgerParts = Object.entries(derived.ledger).filter(([, v]) => v > 0)
     .map(([k, v]) => `${TEXT.ledgerNames[k]}：${v}`);
   console.log(`代价簿：${ledgerParts.length ? ledgerParts.join("；") : "（全空）"}`);
-  if (view.telegraphs.length) {
+  if (derived.telegraphs.length) {
     console.log("电报预告：");
-    for (const telegraph of view.telegraphs) console.log(`  ! ${telegraph.text}`);
+    for (const telegraph of derived.telegraphs) console.log(`  ! ${TelegraphText(telegraph)}`);
   }
-  if (view.guardrails.length) {
+  if (derived.guardrails.length) {
     console.log("待办护栏：");
-    for (const guardrail of view.guardrails) console.log(`  - ${guardrail.text}`);
+    for (const guardrail of derived.guardrails) console.log(`  - ${guardrail.text}`);
   }
-  if (view.result) {
-    console.log(`【终局】${view.result.won ? "胜" : "负"} ｜ 评定：${view.result.grade} ｜ 勋记：${view.result.medals.map((m) => (m ? "●" : "○")).join("")}`);
-    for (const reason of view.result.reasons) console.log(`  · ${reason}`);
-  }
+  if (derived.result) PrintResult(state, derived);
 }
 
-function PrintUnits(state) {
-  const view = DeriveView(state);
-  console.log("我方单位：");
-  for (const unit of view.allies) {
-    console.log(`  ${unit.id} ${unit.name} ＠${unit.pos}（${unit.layer === "under" ? "地下" : "地面"}）`
-      + ` HP${unit.hp} MP${unit.mp} ${unit.acted ? "已行动" : "未行动"} ${TEXT.stance[unit.stance] || unit.stance}`
-      + (unit.breath ? ` 憋闷${unit.breath}` : ""));
-  }
-  if (view.visibleEnemies.length) {
+/** 终局：三枚勋记逐条列出达成与否与原因（不再只丢一串 ●○ 让人猜）。 */
+function PrintResult(state, view) {
+  const result = view.result;
+  console.log("");
+  console.log(`【终局 · 战报归档】${result.won ? "胜" : "负"} ｜ 评定：${result.grade}`
+    + ` ｜ 勋记 ${result.medals.filter(Boolean).length}/3 ${result.medals.map((m) => (m ? "●" : "○")).join("")}`);
+  console.log("胜负判定：");
+  for (const reason of result.reasons) console.log(`  · ${reason}`);
+  console.log("勋记逐枚：");
+  for (const line of MedalLines(state)) console.log(line);
+  const ledgerParts = Object.keys(TEXT.ledgerNames)
+    .map((key) => `${TEXT.ledgerNames[key]} ${state.ledger[key] || 0}`);
+  console.log(`代价账本（只记损失，不折功劳）：${ledgerParts.join(" ｜ ")}`);
+}
+
+function PrintUnits(state, view) {
+  const derived = view || DeriveView(state);
+  console.log("我方单位（每单位每回合只有 1 个主动作）：");
+  for (const line of UnitLines(state, derived)) console.log(line);
+  if (derived.visibleEnemies.length) {
     console.log("可见敌单位：");
-    for (const foe of view.visibleEnemies) {
+    for (const foe of derived.visibleEnemies) {
       console.log(`  ${foe.id} ${foe.name} ＠${foe.pos}` + (foe.hp !== null && foe.hp !== undefined ? ` HP${foe.hp}` : ""));
     }
   }
-  if (view.ghosts.length) {
-    console.log("敌踪虚影（最后目击）：" + view.ghosts.map((ghost) => `${ghost.type}＠${ghost.pos}(T${ghost.turn})`).join("、"));
+  if (derived.ghosts.length) {
+    console.log("敌踪虚影（最后目击）：" + derived.ghosts.map((ghost) => `${ghost.type}＠${ghost.pos}(T${ghost.turn})`).join("、"));
   }
 }
 
 function ShowAll(state, layer) {
-  PrintStatus(state);
+  const view = DeriveView(state);
+  PrintStatus(state, view);
   console.log("");
-  console.log(RenderAsciiMap(state, { layer: layer || "both" }));
+  console.log(RenderAsciiMap(state, { layer: layer || "both", view }));
   console.log("");
-  PrintUnits(state);
+  console.log("关键地点：");
+  for (const line of LandmarkLines(state)) console.log(line);
+  console.log("地道口一览（暴露豆全程明牌）：");
+  for (const line of OpeningLines(state, view)) console.log(line);
+  const intents = IntentLines(state, view);
+  console.log("敌纵队意图（只列我方看得见的）：");
+  if (intents.length) for (const line of intents) console.log(line);
+  else console.log("  （当前没有可见的敌纵队）");
+  console.log("");
+  PrintUnits(state, view);
 }
+
+const rulesCard = [
+  "—— 三条最要命的规则（先看这个再下令）——",
+  "1. 每个单位每回合只能做 1 个「主动作」（挖/藏粮/转移群众/伏击/隐蔽/攻击/佯动/组织/掩土/破路/塌口/休整），",
+  "   用掉后该单位本回合就结束了。移动（Move）与上下地道口（UseEntrance）只花 MP，不占主动作；开关隔断门免费。",
+  "2. 动作 JSON 用轴向键 \"q,r\"；ASCII 图用偏移列/行，列号 = q，行号 y = r + floor(q/2)。",
+  "3. 地道口不是白给的：要在地下用 DigEntrance 自己开。藏人室有容量上限、储粮洞有容量上限，",
+  "   一格地道只能修一种设施，联络员挖掘力为 0（挖不了）。",
+];
 
 function CmdNew(args) {
   const level = args.level || "L1";
@@ -113,6 +146,8 @@ function CmdNew(args) {
   const state = CreateGame(level, seed);
   console.log(`—— 开局：${level} seed=${seed} ——`);
   for (const line of GetBriefing(state)) console.log(line);
+  console.log("");
+  for (const line of rulesCard) console.log(line);
   console.log("");
   ShowAll(state, args.layer);
   if (args.save) { WriteSave(args.save, state); console.log(`\n[存档] ${args.save}`); }
@@ -123,11 +158,60 @@ function CmdShow(args) {
   ShowAll(state, args.layer);
 }
 
+/** 动作按「单位 → 分类」分组打印：一次 143 条无从下手的问题在这里解决。 */
 function CmdLegal(args) {
   const state = LoadSave(args.save);
-  const actions = LegalActions(state, args.unit);
-  console.log(JSON.stringify(actions, null, 1));
-  console.log(`（共 ${actions.length} 个合法动作${args.unit ? `，单位 ${args.unit}` : ""}）`);
+  const unitId = typeof args.unit === "string" ? args.unit : null;
+  const actions = LegalActions(state, unitId || undefined);
+  if (args.json === true || args.raw === true) {
+    console.log(JSON.stringify(actions, null, 1));
+    console.log(`（共 ${actions.length} 个合法动作${unitId ? `，单位 ${unitId}` : ""}）`);
+    return;
+  }
+  const groups = new Map();
+  for (const action of actions) {
+    const owner = action.unit || "（全局）";
+    if (!groups.has(owner)) groups.set(owner, []);
+    groups.get(owner).push(action);
+  }
+  console.log("合法动作（每单位每回合只能用 1 个「主动作」；移动只花 MP，不占主动作）");
+  console.log("");
+  for (const [owner, list] of groups) {
+    const unit = state.units[owner];
+    const head = unit
+      ? `【${owner} ${unit.type} ＠${unit.pos} ${unit.layer === "under" ? "地下" : "地面"} MP${unit.mp}${unit.acted ? " · 主动作已用掉" : ""}】`
+      : `【${owner}】`;
+    console.log(`${head} 共 ${list.length} 条`);
+    for (const kind of ["main", "move", "free"]) {
+      const subset = list.filter((action) => ActionKind(action) === kind);
+      if (!subset.length) continue;
+      console.log(`  · ${actionKindNames[kind]}`);
+      if (kind === "move") {
+        // 移动条目太多：只报可达终点，完整 JSON 用 --json
+        const dests = subset.filter((action) => action.type === "Move")
+          .map((action) => action.path[action.path.length - 1]);
+        if (dests.length) console.log(`      Move 可达 ${dests.length} 格：${dests.join(" ")}`);
+        for (const action of subset.filter((action) => action.type !== "Move")) {
+          console.log(`      ${JSON.stringify(action)}`);
+        }
+      } else {
+        for (const action of subset) console.log(`      ${JSON.stringify(action)}`);
+      }
+    }
+    if (unitId) {
+      const hints = ActionHints(state, unitId, list);
+      if (hints.length) {
+        console.log("  · 为什么某些动作不在上面（按当前状态给出的原因，判定仍以本列表为准）：");
+        for (const hint of hints) console.log(`      - ${hint}`);
+      }
+    }
+    console.log("");
+  }
+  console.log(`（共 ${actions.length} 条${unitId ? `，单位 ${unitId}` : "；建议用 --unit u1 逐个单位看，或 --json 输出原始 JSON"}）`);
+  if (!unitId) {
+    console.log("用法提示：legal --save <存档> --unit u1     只看 u1 的动作（含不可用原因）");
+    console.log("          legal --save <存档> --unit u1 --json  输出可直接喂给 act --json 的原始 JSON");
+  }
 }
 
 function CmdAct(args) {
@@ -136,7 +220,17 @@ function CmdAct(args) {
   let action;
   try { action = JSON.parse(args.json); } catch (error) { Die(`动作 JSON 解析失败：${error.message}`); }
   const outcome = PerformAction(state, action);
-  if (outcome.illegal) { console.log(`[非法动作] ${outcome.illegal}`); process.exit(2); }
+  if (outcome.illegal) {
+    console.log(`[非法动作] ${outcome.illegal}`);
+    if (action.unit && state.units[action.unit]) {
+      const all = ActionHints(state, action.unit, LegalActions(state, action.unit));
+      const focused = all.filter((hint) => hint.startsWith(`${action.type} `));
+      const shown = focused.length ? focused : all.slice(0, 2);
+      for (const hint of shown) console.log(`  提示：${hint}`);
+      console.log(`  想知道 ${action.unit} 现在到底能做什么：legal --save <存档> --unit ${action.unit}`);
+    }
+    process.exit(2);
+  }
   console.log("可见事件：");
   PrintEvents(outcome.events);
   console.log("");
@@ -191,6 +285,10 @@ function CmdRun(args) {
     } : null,
   });
   if (verbose) { console.log(""); ShowAll(state); console.log(""); }
+  else if (state.result) {
+    console.log(`【终局】${state.result.won ? "胜" : "负"} ｜ 评定：${state.result.grade}`);
+    for (const line of MedalLines(state)) console.log(line);
+  }
   console.log(JSON.stringify(Summary(state, steps), null, 1));
 }
 
@@ -218,12 +316,15 @@ const args = ParseArgs(process.argv.slice(2));
 const command = args._[0];
 if (!command || !commands[command]) {
   console.log("用法：node TunnelFront1942/Script_PlayCli.mjs <new|show|legal|act|end|run|fixture> [--参数 值]");
-  console.log("  new  --level L1 --seed 3 --save /tmp/g.json");
-  console.log("  show --save /tmp/g.json [--layer surface|under|both]");
-  console.log("  legal --save /tmp/g.json [--unit u1]");
+  console.log("  new  --level L1 --seed 3 --save /tmp/g.json          开局简报 + 规则要点 + 战场报表");
+  console.log("  show --save /tmp/g.json [--layer surface|under|both] 战场报表（地图/地道口/存粮分账/敌意图）");
+  console.log("  legal --save /tmp/g.json --unit u1                   某单位合法动作（按主动作/移动/免费分组 + 不可用原因）");
+  console.log("  legal --save /tmp/g.json --unit u1 --json            原始 JSON，可直接喂给 act");
   console.log('  act  --save /tmp/g.json --json \'{"type":"Move","unit":"u1","path":["4,1"]}\'');
-  console.log("  end  --save /tmp/g.json");
-  console.log("  run  --level L1 --seed 3 --bot Skilled [--verbose]");
+  console.log("  end  --save /tmp/g.json                              敌军阶段 + 结算全播报");
+  console.log("  run  --level L1 --seed 3 --bot Skilled [--verbose]   bot 整局 → 总结 JSON");
+  console.log("");
+  for (const line of rulesCard) console.log(line);
   process.exit(command ? 1 : 0);
 }
 commands[command](args);

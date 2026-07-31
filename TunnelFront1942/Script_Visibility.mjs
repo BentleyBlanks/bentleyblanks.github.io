@@ -150,7 +150,8 @@ export function SuspicionScore(state, key) {
 function UnitBrief(unit) {
   const def = unitDefinitions[unit.type];
   return { id: unit.id, type: unit.type, name: def.name, pos: unit.pos, layer: unit.layer,
-    hp: unit.hp, mp: unit.mp, acted: unit.acted, stance: unit.stance, breath: unit.breath };
+    hp: unit.hp, mp: unit.mp, acted: unit.acted, stance: unit.stance, breath: unit.breath,
+    coverLeft: Math.max(0, CFG.coverUsesPerUnit - (unit.coverUses || 0)) };
 }
 
 export function DeriveView(state) {
@@ -219,9 +220,9 @@ export function DeriveView(state) {
     view.telegraphs.push({ kind: "withdraw", hex: null, text: TEXT.banner.withdraw });
   }
 
-  // —— 待办护栏 ——
+  // —— 待办护栏（伏击是持续状态：守着不动就是它这回合的活，不再催你重按一次） ——
   for (const unit of AllyUnits(state)) {
-    if (!unit.acted && state.meta.phase === "player") {
+    if (!unit.acted && unit.stance !== "ambush" && state.meta.phase === "player") {
       view.guardrails.push({ kind: "unmoved", unitId: unit.id, text: `${UnitDef(unit).name} ${unit.id} 尚未行动` });
     }
     if (unit.breath >= 2) {
@@ -248,6 +249,8 @@ export function DeriveView(state) {
     if (hex.traces > 0) badge.traces = hex.traces;
     if (hex.searched) badge.searched = true;
     if (hex.attackSite) badge.attackSite = true;
+    // 「敌已警戒」：同一格连着两回合设伏留下的记号，敌寻路会绕开这里（§2.5）
+    if ((hex.alertedUntil || 0) >= state.meta.turn) badge.alerted = (hex.alertedUntil - state.meta.turn) + 1;
     const entrance = state.tunnels.entrances[key];
     if (entrance) badge.entrance = { expose: entrance.expose, threshold: EntranceThreshold(entrance),
       known: entrance.known, sealed: entrance.sealed };

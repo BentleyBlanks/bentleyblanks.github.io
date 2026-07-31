@@ -245,20 +245,34 @@ function SkilledQuiet(state, unit, actions) {
       }
     }
   }
-  // 组织 → 掩土 → 隐蔽待命
+  // 掩土（暴露豆逼近敌盯上的阈值就得压一压）→ 组织 → 隐蔽待命
+  const cover = CoverIfExposed(state, unit, actions);
+  if (cover) return cover;
   const organize = FindAction(actions, "Organize");
   if (organize) return organize;
-  const hex = state.map.hexes[unit.pos];
-  if (unit.layer === "surface" && hex && hex.traces >= 3 && FindAction(actions, "CoverTraces")) {
-    return FindAction(actions, "CoverTraces");
-  }
   const hide = FindAction(actions, "Hide");
   if (hide) return hide;
   return FindAction(actions, "Rest") || { type: "Rest", unit: unit.id };
 }
 
+/** R2：掩土是全局唯一的减法且每人只有 3 次——只在本格开口逼近「敌盯上」阈值时才花。 */
+function CoverIfExposed(state, unit, actions) {
+  if (unit.layer !== "surface") return null;
+  const covering = FindAction(actions, "CoverTraces");
+  if (!covering) return null;
+  const entrance = state.tunnels.entrances[unit.pos];
+  const vent = state.tunnels.vents[unit.pos];
+  const hex = state.map.hexes[unit.pos];
+  const opening = (entrance && !entrance.known && !entrance.sealed && entrance.expose >= CFG.opTargetExpose - 1)
+    || (vent && !vent.known && vent.expose >= CFG.opTargetExpose - 1);
+  if (opening || (hex && hex.traces >= 3)) return covering;
+  return null;
+}
+
 function SkilledSweep(state, unit, actions) {
   const def = UnitDef(unit);
+  // 伏击是持续状态（R2）：已经趴好的人就守着，不再每回合重按一次
+  if (unit.stance === "ambush") return FindAction(actions, "Rest") || { type: "Rest", unit: unit.id };
   // 憋闷 ≥2：向出口转移 / 出洞
   if (unit.layer === "under" && unit.breath >= 2) {
     const exits = ActiveEntranceKeys(state).filter((key) => state.tunnels.cells[key]);
@@ -310,19 +324,21 @@ function SkilledSweep(state, unit, actions) {
     }
   }
   const near = NearestEnemyPos(state, unit.pos, false);
-  // 破路耗池：扫荡期在敌补给线上断路（每处 -2 池且逼敌减速），只在敌不近时动手
+  // 破路耗池：扫荡期只在**敌补给线**上断路（每处 -2 池且逼敌减速），在自家村里刨路没有意义
   if (unit.layer === "surface" && (CFG.digPower[unit.type] || 0) > 0
       && state.wave.roadCuts < CFG.pool.roadCutMaxPerWave) {
-    const breakHere = FindAction(actions, "BreakRoad");
-    if (breakHere && (!near || near.dist >= 2)) return breakHere;
     const level = LevelOf(state);
+    const onSupply = (level.supplyRoad || []).includes(unit.pos);
+    const breakHere = onSupply ? FindAction(actions, "BreakRoad") : null;
+    if (breakHere && (!near || near.dist >= 2)) return breakHere;
+    // 断敌补给线是最稳的耗池手段：值得为它多走两回合（含破桥——桥毁敌须绕行）
     const targets = (level.supplyRoad || []).filter((key) => {
       const hex = state.map.hexes[key];
       if (!hex || hex.roadBroken) return false;
       const foe = NearestEnemyPos(state, key, false);
-      return (!foe || foe.dist >= 3) && HexDistanceKeys(unit.pos, key) <= unit.mp;
+      return (!foe || foe.dist >= 2) && HexDistanceKeys(unit.pos, key) <= unit.mp * 2;
     }).sort((a, b) => (HexDistanceKeys(unit.pos, a) - HexDistanceKeys(unit.pos, b)) || (a < b ? -1 : 1));
-    if (targets.length && (!near || near.dist >= 3)) {
+    if (targets.length && (!near || near.dist >= 2)) {
       const move = MoveToward(state, unit, actions, targets[0]);
       if (move) return move;
     }
@@ -354,10 +370,15 @@ function SkilledSweep(state, unit, actions) {
       if (bestMove) return bestMove;
     }
   }
+  // 掩土：口快被敌盯上了就先压豆（每人 3 次，花在刀刃上）
+  const cover = CoverIfExposed(state, unit, actions);
+  if (cover && (!near || near.dist >= 2)) return cover;
   if (unit.layer === "surface" && def.atk > 0 && state.resources.ammo >= CFG.ammoPerAttack) {
-    const ambush = FindAction(actions, "Ambush");
-    if (ambush && near && near.dist <= 3) return ambush;
-    // 向坟地/树林伏击位机动（贴近敌行进方向）
+    // 设伏要趁敌**还没贴上来**：敌已相邻时它先开火，伏击白搭；也不在「老地方」重复设伏。
+    // 伏击是持续状态，早趴下不吃亏：只要场上有敌且它还没贴上来，就先把伏点占住
+    const ambush = FindAction(actions, "Ambush", (action) => !action.stale && action.site !== "foxhole");
+    if (ambush && near && near.dist >= 2) return ambush;
+    // 向坟地/树林伏击位机动：站到「敌下一步会走到我旁边」的掩蔽格上（距敌 2 格）
     if (near && near.dist <= 5 && unit.stance !== "ambush") {
       let bestHex = null;
       let bestScore = Infinity;
@@ -366,8 +387,8 @@ function SkilledSweep(state, unit, actions) {
         if (!terrain?.hide || !terrain.cover) continue;
         const toEnemy = HexDistanceKeys(key, near.pos);
         const toMe = HexDistanceKeys(key, unit.pos);
-        if (toEnemy > 2 || toMe > unit.mp) continue;
-        const score = toEnemy * 10 + toMe;
+        if (toEnemy !== 2 || toMe > unit.mp) continue;
+        const score = toMe * 10 + ((state.map.hexes[key].alertedUntil || 0) >= state.meta.turn ? 100 : 0);
         if (score < bestScore) { bestScore = score; bestHex = key; }
       }
       if (bestHex && bestHex !== unit.pos) {

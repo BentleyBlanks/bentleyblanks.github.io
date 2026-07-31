@@ -10,13 +10,13 @@ import { GetLevel } from "./Data_Levels.mjs";
 import {
   SortedKeys, CompareIds, PushEvent, AddLedger, CloneState, UnitDef, UnitsOn,
   AllyUnits, EnemyUnits, RemoveUnit, CombatUnitCount, AirZones, ZoneHasAir, ZoneExits,
-  ConnectedCells, TunnelNeighbors, GrainTotal, PopTotal, WoundedTotal,
-  EntranceThreshold, VentThreshold, EnemyNearVillage, VillageStorageEntrances,
-  ReachableFacilityCells,
+  ConnectedCells, TunnelNeighbors, GrainTotal, TunnelGrainTotal, PopTotal, WoundedTotal,
+  EntranceThreshold, VentThreshold, EnemyNearVillage, StorageCellsUnder,
+  IsSurfacePassable,
 } from "./Script_State.mjs";
 import { ExpireSightings, UpdateEnemyMemory, ExposeEntranceUse, CanAllySeeHex, RecordSighting } from "./Script_Visibility.mjs";
 import { RunEnemyPhase } from "./Script_EnemyAi.mjs";
-import { AdvanceSite, RevealAdjacentSpies, RecordExposedSightings } from "./Script_Actions.mjs";
+import { AdvanceSite, AddTraces, RevealAdjacentSpies, RecordExposedSightings } from "./Script_Actions.mjs";
 
 // ---------------------------------------------------------------------------
 // 玩家阶段收尾：组织 2 级村的免费工地进度（敌近则停）
@@ -99,7 +99,19 @@ function StepBreath(state, events) {
   }
 }
 
-/** ③ 被迫出洞（先于任何敌利用）：憋闷 ≥3 者自最近可用口涌出；出洞群众同格有敌即被捕入账本。 */
+/**
+ * ③ 被迫出洞（先于任何敌利用；R2 P0-3 改造）：憋闷 ≥3 → **一定上地面**。
+ * 优先自分区里最近的未封口涌出；一个口都没有就在**本格正上方刨土钻出**（留下痕迹）；
+ * 连正上方都不可通行才退化为掉血。出洞时地面有敌：群众被捕入代价簿，单位就此暴露在敌前。
+ * 这是地上-地下唯一的强耦合点——把人闷死在洞里不再是可行打法。
+ */
+function ForcedExit(state, zone, fromKey) {
+  const exits = ZoneExits(state, zone, fromKey);
+  if (exits.length) return { key: exits[0], dug: false };
+  if (IsSurfacePassable(state, fromKey)) return { key: fromKey, dug: true };
+  return null;
+}
+
 function StepForcedOut(state, events) {
   const zones = AirZones(state);
   const zoneOf = {};
@@ -108,19 +120,20 @@ function StepForcedOut(state, events) {
   for (const unit of AllyUnits(state)) {
     if (unit.layer !== "under" || unit.breath < CFG.breathThreshold) continue;
     const zone = zones[zoneOf[unit.pos]] || new Set([unit.pos]);
-    const exits = ZoneExits(state, zone, unit.pos);
-    if (exits.length) {
-      const exitKey = exits[0];
-      unit.pos = exitKey;
+    const out = ForcedExit(state, zone, unit.pos);
+    if (out) {
+      unit.pos = out.key;
       unit.layer = "surface";
       unit.breath = 0;
       unit.stance = "normal";
       unit.revealed = true;
-      ExposeEntranceUse(state, exitKey, null);
-      PushEvent(state, events, { kind: "forcedOut", text: `${UnitDef(unit).name}被憋出地面`, hex: exitKey, visible: true });
+      if (out.dug) AddTraces(state, out.key, CFG.tracesPerDig);
+      else ExposeEntranceUse(state, out.key, null);
+      PushEvent(state, events, { kind: "forcedOut", text: `${UnitDef(unit).name}${out.dug ? TEXT.forced.dugOut : TEXT.forced.entrance}`,
+        hex: out.key, visible: true });
     } else {
       unit.hp -= CFG.suffocateHpLoss;
-      PushEvent(state, events, { kind: "breath", text: `${UnitDef(unit).name}困于无风地道（-1）`, hex: unit.pos, layer: "under", visible: true });
+      PushEvent(state, events, { kind: "breath", text: `${UnitDef(unit).name}${TEXT.forced.trapped}（-1）`, hex: unit.pos, layer: "under", visible: true });
       if (unit.hp <= 0) {
         state.score.alliesLost += 1;
         PushEvent(state, events, { kind: "loss", text: `${UnitDef(unit).name}窒息牺牲`, hex: unit.pos, layer: "under", visible: true });
@@ -134,19 +147,20 @@ function StepForcedOut(state, events) {
     const wounded = state.wounded.inCells[key] || 0;
     if ((cell.civs <= 0 && wounded <= 0) || (cell.civBreath || 0) < CFG.breathThreshold) continue;
     const zone = zones[zoneOf[key]] || new Set([key]);
-    const exits = ZoneExits(state, zone, key);
-    if (exits.length) {
-      const exitKey = exits[0];
+    const out = ForcedExit(state, zone, key);
+    if (out) {
+      const exitKey = out.key;
       const enemyThere = UnitsOn(state, exitKey, "surface").some((unit) => unit.side === "enemy");
       const civs = cell.civs;
       cell.civs = 0;
       cell.civBreath = 0;
       if (wounded > 0) delete state.wounded.inCells[key];
-      ExposeEntranceUse(state, exitKey, null);
+      if (out.dug) AddTraces(state, exitKey, CFG.tracesPerDig);
+      else ExposeEntranceUse(state, exitKey, null);
       if (enemyThere) {
         if (civs > 0) AddLedger(state, "civCaptured", civs);
         if (wounded > 0) AddLedger(state, "civCaptured", wounded);
-        PushEvent(state, events, { kind: "ledger", text: `被烟憋出的群众 ${civs + wounded} 批当场被抓（入代价簿）`, hex: exitKey, visible: true });
+        PushEvent(state, events, { kind: "ledger", text: `憋出地面的群众 ${civs + wounded} 批当场被抓（入代价簿）`, hex: exitKey, visible: true });
       } else {
         const village = NearestVillage(state, exitKey);
         if (village) {
@@ -212,23 +226,37 @@ function StepExposure(state, events) {
   }
 }
 
-/** ⑤ 粮食产耗：平静期每村 +1 明存粮；组织 ≥1 的村自动藏 1（征粮已在敌阶段按纵队结算）。 */
+/**
+ * ⑤ 粮食产耗：平静期每村 +1 明存粮，组织 ≥1 且脚下真通着储粮洞的村自动藏 1；
+ * 扫荡期（场上有敌时）每村明存粮每回合被搜走 2 担进代价簿——明粮留在地面就是留给敌人（R2 P0-6a）。
+ * 敌纵队当回合已在本村征过粮的不再重复扣。
+ */
 function StepGrain(state, events) {
-  if (state.wave.status !== "quiet") return;
-  for (const villageId of SortedKeys(state.map.villages)) {
-    const village = state.map.villages[villageId];
-    village.grainOpen += CFG.quietGrainPerVillage;
-    if (village.organize >= 1 && village.grainOpen > 0) {
-      const entrances = VillageStorageEntrances(state, villageId);
-      for (const entranceKey of entrances) {
-        const cells = ReachableFacilityCells(state, entranceKey, "storage");
-        if (cells.length) {
-          state.tunnels.cells[cells[0]].grain += CFG.autoHidePerTurn;
-          village.grainOpen -= CFG.autoHidePerTurn;
-          break;
-        }
+  if (state.wave.status === "quiet") {
+    for (const villageId of SortedKeys(state.map.villages)) {
+      const village = state.map.villages[villageId];
+      village.grainOpen += CFG.quietGrainPerVillage;
+      if (village.organize < 1 || village.grainOpen <= 0) continue;
+      for (const hexKey of village.hexKeys) {
+        const cells = StorageCellsUnder(state, hexKey);
+        if (!cells.length) continue;
+        state.tunnels.cells[cells[0]].grain += CFG.autoHidePerTurn;
+        village.grainOpen -= CFG.autoHidePerTurn;
+        break;
       }
     }
+    return;
+  }
+  if (state.wave.status === "done" || !EnemyUnits(state).length) return;
+  for (const villageId of SortedKeys(state.map.villages)) {
+    const village = state.map.villages[villageId];
+    if (village.grainOpen <= 0 || village.seizedTurn === state.meta.turn) continue;
+    if (!EnemyNearVillage(state, villageId, CFG.sweepGrainRange)) continue;   // 敌摸到村边才搜得着
+    const take = Math.min(GetLevel(state.meta.level).sweepGrainLoss ?? CFG.sweepOpenGrainLoss, village.grainOpen);
+    village.grainOpen -= take;
+    AddLedger(state, "grainSeized", take);
+    PushEvent(state, events, { kind: "ledger", text: `${TEXT.sweepGrain}：${village.name} ${take} 担（入代价簿）`,
+      hex: village.hexKeys[0], visible: true });
   }
 }
 
@@ -239,13 +267,38 @@ function StepIntel(state, events) {
   UpdateEnemyMemory(state);
 }
 
-/** ⑦ 池扣减与撤退判定：基础衰减 + 我方所致（单回合封顶）；池空 → 次回合宣布收队。 */
+/**
+ * ⑦ 池扣减与撤退判定（R2 P0-6b）：
+ * 基础衰减（L1 已归零）+ **扑空衰减**（摸到村边却一无所获的纵队每支 -1，每回合至多 -2）
+ * + 我方所致（伏击/破路/逼作业/打退攻入，单回合封顶 5）。池空 → 次回合宣布收队。
+ * 扑空衰减不是白送：它由「粮藏净、人藏好、口掩住」换来，是地道战本身的胜利。
+ */
+function EmptyHandedColumns(state) {
+  let count = 0;
+  for (const column of state.enemy.columns) {
+    if (column.done || column.withdrawing || column.gained) continue;
+    const units = column.unitIds.map((id) => state.units[id]).filter((unit) => unit && unit.hp > 0);
+    if (!units.length) continue;
+    const atVillageEdge = SortedKeys(state.map.villages).some((villageId) => state.map.villages[villageId].hexKeys
+      .some((key) => HexDistanceKeys(units[0].pos, key) <= CFG.pool.emptyHandedRange));
+    if (atVillageEdge) count += 1;
+  }
+  return count;
+}
+
 function StepPool(state, events) {
   if (state.wave.status !== "sweep" && state.wave.status !== "withdrawing") {
     state.wave.playerDrainThisTurn = 0;
     return;
   }
-  if (state.wave.status === "sweep") state.wave.pool -= state.wave.decay;
+  if (state.wave.status === "sweep") {
+    state.wave.pool -= state.wave.decay;
+    const empty = Math.min(EmptyHandedColumns(state), CFG.pool.emptyHandedCapPerTurn) * CFG.pool.emptyHanded;
+    if (empty > 0) {
+      state.wave.pool -= empty;
+      PushEvent(state, events, { kind: "pool", text: `敌翻遍村子一无所获，锐气又挫（行动力池 -${empty}）`, visible: true });
+    }
+  }
   const drain = Math.min(state.wave.playerDrainThisTurn, CFG.pool.playerDrainCapPerTurn);
   if (drain > 0) state.wave.pool -= drain;
   state.wave.playerDrainThisTurn = 0;
@@ -353,39 +406,58 @@ export function ComputeBreakdown(state, won) {
   return breakdown;
 }
 
+/**
+ * 判据求值器（胜负线与勋记共用一张表；条件写在 Data_Levels，脚本只负责算）。
+ * 每条返回 { ok, text }，text 直接进终局归因，玩家看得见「差多少」。
+ */
+function CheckCondition(state, key, want) {
+  const table = {
+    grainTotal: () => ({ ok: GrainTotal(state) >= want, text: `存粮 ${GrainTotal(state)} 担（需 ≥${want}）` }),
+    tunnelGrain: () => ({ ok: TunnelGrainTotal(state) >= want, text: `洞存粮 ${TunnelGrainTotal(state)} 担（需 ≥${want}）` }),
+    tunnelGrainAtLeast: () => ({ ok: TunnelGrainTotal(state) >= want, text: `洞存粮 ${TunnelGrainTotal(state)} 担（需 ≥${want}）` }),
+    grainAtLeast: () => ({ ok: GrainTotal(state) >= want, text: `存粮 ${GrainTotal(state)} 担（需 ≥${want}）` }),
+    woundedAtLeast: () => ({ ok: WoundedTotal(state) >= want, text: `伤员保全 ${WoundedTotal(state)} 批（需 ≥${want}）` }),
+    wounded: () => ({ ok: WoundedTotal(state) >= want, text: `伤员保全 ${WoundedTotal(state)} 批（需 ≥${want}）` }),
+    villagesAtLeast: () => ({ ok: AliveVillages(state) >= want, text: `存活村 ${AliveVillages(state)} 处（需 ≥${want}）` }),
+    combatUnitsAtLeast: () => ({ ok: CombatUnitCount(state) >= want, text: `战斗单位 ${CombatUnitCount(state)} 支（需 ≥${want}）` }),
+    ledgerEmpty: () => ({ ok: LedgerEmpty(state) === want, text: LedgerEmpty(state) ? "代价簿全空" : "代价簿有记录" }),
+    alliesLostAtMost: () => ({ ok: (state.score.alliesLost || 0) <= want, text: `阵亡 ${state.score.alliesLost || 0} 支（需 ≤${want}）` }),
+    grainSeizedAtMost: () => ({ ok: state.ledger.grainSeized <= want, text: `粮秣被夺 ${state.ledger.grainSeized} 担（需 ≤${want}）` }),
+    civLedgerAtMost: () => ({ ok: state.ledger.civCaptured + state.ledger.civDead <= want,
+      text: `群众被抓/罹难 ${state.ledger.civCaptured + state.ledger.civDead} 批（需 ≤${want}）` }),
+    housesBurnedAtMost: () => ({ ok: state.ledger.housesBurned <= want, text: `房屋被焚 ${state.ledger.housesBurned} 处（需 ≤${want}）` }),
+    expelled: () => ({ ok: !!state.wave.expelled === want, text: state.wave.expelled ? "敌被逼退" : "敌按期收队，未被逼退" }),
+    trunkIntact: () => ({ ok: TrunkIntact(state) === want, text: TrunkIntact(state) ? "主干贯通未毁" : "主干未贯通或有段被毁" }),
+  };
+  const check = table[key];
+  return check ? check() : { ok: true, text: "" };
+}
+
+function CheckAll(state, spec) {
+  const rows = Object.keys(spec || {}).sort().map((key) => CheckCondition(state, key, spec[key]));
+  return { ok: rows.every((row) => row.ok), rows };
+}
+
+function CheckAny(state, spec) {
+  const rows = Object.keys(spec || {}).sort().map((key) => CheckCondition(state, key, spec[key]));
+  return { ok: rows.some((row) => row.ok), rows };
+}
+
 function Evaluate(state, events, opts) {
   const level = GetLevel(state.meta.level);
   let won = false;
   const reasons = [];
   if (opts.defeatReason) {
     reasons.push(opts.defeatReason);
-  } else if (state.meta.level === "L1") {
-    const grainOk = GrainTotal(state) >= level.victory.grainAtLeast;
-    const unitsOk = CombatUnitCount(state) >= level.victory.combatUnitsAtLeast;
-    won = grainOk && unitsOk;
-    reasons.push(grainOk ? `存粮 ${GrainTotal(state)} 担，未断口粮` : `存粮仅 ${GrainTotal(state)} 担，不足 ${level.victory.grainAtLeast}`);
-    reasons.push(unitsOk ? "武装骨干犹在" : "战斗单位折损殆尽");
   } else {
-    const villagesOk = AliveVillages(state) >= level.victory.villagesAtLeast;
-    const grainOk = GrainTotal(state) >= level.victory.grainAtLeast;
-    const woundedOk = WoundedTotal(state) >= level.victory.woundedAtLeast;
-    const unitsOk = CombatUnitCount(state) >= 1;
-    won = villagesOk && grainOk && woundedOk && unitsOk;
-    reasons.push(villagesOk ? `存活村 ${AliveVillages(state)} 处` : "村落焚毁过多");
-    reasons.push(grainOk ? `存粮 ${GrainTotal(state)} 担` : `存粮仅 ${GrainTotal(state)} 担`);
-    reasons.push(woundedOk ? `伤员保全 ${WoundedTotal(state)} 批` : `伤员仅存 ${WoundedTotal(state)} 批`);
+    const verdict = CheckAll(state, level.victory);
+    won = verdict.ok;
+    for (const row of verdict.rows) reasons.push(`${row.ok ? "✓" : "✗"} ${row.text}`);
   }
-  let medals;
-  if (state.meta.level === "L1") {
-    medals = [
-      GrainTotal(state) >= 10,
-      LedgerEmpty(state) && state.score.alliesLost === 0,
-      state.wave.expelled || state.ledger.grainSeized <= 2,
-    ];
-  } else {
-    medals = [GrainTotal(state) >= 15, WoundedTotal(state) >= 4, TrunkIntact(state)];
-  }
-  if (!won) medals = [false, false, false];
+  let medals = (level.medals || []).map((medal) => (medal.anyOf
+    ? CheckAny(state, medal.anyOf).ok && CheckAll(state, medal.need || {}).ok
+    : CheckAll(state, medal.need || {}).ok));
+  if (!won) medals = medals.map(() => false);
   const medalCount = medals.filter(Boolean).length;
   state.medals = medals;
   state.result = {
@@ -435,8 +507,11 @@ function StartNewTurn(state, events) {
     unit.acted = false;
     unit.attacked = false;
     unit.freeMove = false;
+    // 「暴露」只持续到我方下一次行动前；伏击是持续状态，不在这里清（只有移动/换动作/开火才解除）。
+    if (unit.stance === "exposed") unit.stance = "normal";
     if (unit.side === "ally") unit.revealed = false;
   }
+  for (const villageId of SortedKeys(state.map.villages)) state.map.villages[villageId].seizedTurn = 0;
   state.meta.phase = "player";
 }
 

@@ -795,12 +795,17 @@ export function CreateRenderer({ canvas }) {
       quads.push({ x: world.x + slot.x, y, z: world.z + slot.z, size, glyph, color: cssColor });
     };
 
-    // —— 地表徽记：优先级 暴露豆 > 痕迹 > 断路 > 部 > 搜/袭 ——（预算 3）
+    // —— 地表徽记：优先级 部 > 暴露豆 > 痕迹 > 断路 > 搜/袭 ——（预算 3）
+    // 「部」排第一：L2 的即败条件绑定区队部，这枚地标不能被别的徽记挤掉。
     for (const [key, hex] of Object.entries(vm.hexes ?? {})) {
       const y = TopY(key) + 0.1;
       const rows = [];
       const entrance = entrances[key];
       const vent = vents[key];
+      const village = vm.villages?.[hex.villageId];
+      if (village?.hasHq && village.hexKeys?.[0] === key) {
+        rows.push((slot) => PushGlyph(surfaceQuads, key, y, slot, "部", theme.badges.hq, 0.34));
+      }
       if (entrance && !entrance.sealed) {
         rows.push((slot) => PushBeadRow(surfaceQuads, key, y, slot, entrance.expose ?? 0, Math.max(1, (entrance.conceal ?? 2) * 3)));
       } else if (vent) {
@@ -808,10 +813,6 @@ export function CreateRenderer({ canvas }) {
       }
       if ((hex.traces ?? 0) > 0) rows.push((slot) => PushDotRow(surfaceQuads, key, y, slot, hex.traces));
       if (hex.roadBroken) rows.push((slot) => PushGlyph(surfaceQuads, key, y, slot, "cross", theme.surface.roadBroken));
-      const village = vm.villages?.[hex.villageId];
-      if (village?.hasHq && village.hexKeys?.[0] === key) {
-        rows.push((slot) => PushGlyph(surfaceQuads, key, y, slot, "部", theme.badges.hq, 0.34));
-      }
       if (hex.searched) rows.push((slot) => PushGlyph(surfaceQuads, key, y, slot, "搜", theme.badges.searched, 0.26));
       if (hex.attackSite) rows.push((slot) => PushGlyph(surfaceQuads, key, y, slot, "袭", theme.badges.attackSite, 0.26));
       rows.slice(0, 3).forEach((build, index) => build(badgeSlots[index]));

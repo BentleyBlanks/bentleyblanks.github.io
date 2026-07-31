@@ -82,7 +82,8 @@ body {
 
 /* ---------------- 右上：资源 + 代价账本（中性灰白） ---------------- */
 .tf-ledger, #ledgerPanel {
-  position: absolute; top: 48px; right: 12px; width: 218px;
+  position: absolute; top: 48px; right: 12px; width: 232px;
+  max-height: 300px; overflow-y: auto;
   background: var(--tf-ledger-bg, rgba(28, 30, 34, 0.92));
   border: 1px solid var(--tf-ledger-border, #4a4c50);
   padding: 8px 10px;
@@ -91,6 +92,27 @@ body {
   font-size: 12px; color: var(--tf-text, #d8d5cc); letter-spacing: 0.02em;
   padding-bottom: 6px; border-bottom: 1px solid var(--tf-line, #2a2d33); margin-bottom: 6px;
 }
+/* 存粮分账：明存（敌可征走）/ 洞存（须攻入才丢）分开列，逐村给村名与格号 */
+.tf-grain { padding-bottom: 6px; border-bottom: 1px solid var(--tf-line, #2a2d33); margin-bottom: 6px; }
+.tf-grain-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11px; letter-spacing: 0.08em; color: var(--tf-ledger-title, #b9b6ae); margin-top: 4px;
+}
+.tf-grain-head:first-child { margin-top: 0; }
+.tf-grain-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 11.5px; color: var(--tf-ledger-text, #cfcdc6); padding: 1px 0 1px 8px;
+}
+.tf-grain-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tf-grain-value { color: var(--tf-ledger-value, #e4e2da); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.tf-grain-empty { color: var(--tf-text-faint, #5f5c55); }
+/* 关键地点：区队部坐标常显 */
+.tf-landmark { padding-bottom: 6px; border-bottom: 1px solid var(--tf-line, #2a2d33); margin-bottom: 6px; }
+.tf-landmark-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 11.5px; color: var(--tf-ledger-text, #cfcdc6); padding: 1px 0;
+}
+.tf-landmark-hex { color: var(--tf-ledger-value, #e4e2da); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
 .tf-ledger-title { font-size: 11.5px; letter-spacing: 0.4em; color: var(--tf-ledger-title, #b9b6ae); margin-bottom: 4px; }
 .tf-ledger-list, .tf-result-ledger { margin: 0; }
 .tf-ledger-row { display: flex; justify-content: space-between; padding: 2px 0; }
@@ -127,7 +149,7 @@ body {
 
 /* ---------------- 日志抽屉（右） ---------------- */
 .tf-log-toggle, #logToggle {
-  position: absolute; right: 12px; top: 260px;
+  position: absolute; right: 12px; top: 360px;
   padding: 5px 10px; font-size: 12px; letter-spacing: 0.2em;
   color: var(--tf-text-dim, #8f8c84);
   background: var(--tf-panel, rgba(24, 26, 31, 0.92));
@@ -135,7 +157,7 @@ body {
 }
 .tf-log-toggle:hover { color: var(--tf-text, #d8d5cc); }
 .tf-log, #logDrawer {
-  position: absolute; right: 12px; top: 296px; bottom: 96px; width: 300px;
+  position: absolute; right: 12px; top: 396px; bottom: 96px; width: 300px;
   background: var(--tf-panel, rgba(24, 26, 31, 0.92));
   border: 1px solid var(--tf-panel-border, #3a3f47);
   display: flex; flex-direction: column;
@@ -250,7 +272,9 @@ body {
 .tf-result-kicker { text-align: center; font-size: 12px; letter-spacing: 0.6em; color: var(--tf-text-dim, #8f8c84); }
 .tf-result-grade { text-align: center; font-size: 26px; font-weight: 700; letter-spacing: 0.3em; margin: 10px 0 4px; }
 .tf-result-reason { text-align: center; font-size: 12px; color: var(--tf-text-dim, #8f8c84); margin-bottom: 12px; }
-.tf-result-medals { list-style: none; margin: 12px 0; padding: 0; border-top: 1px solid var(--tf-line, #2a2d33); }
+.tf-result-medals-title { font-size: 11.5px; letter-spacing: 0.3em; color: var(--tf-ledger-title, #b9b6ae); margin-top: 12px; }
+.tf-result-medals-foot { font-size: 11px; color: var(--tf-text-faint, #5f5c55); margin-top: -4px; }
+.tf-result-medals { list-style: none; margin: 8px 0; padding: 0; border-top: 1px solid var(--tf-line, #2a2d33); }
 .tf-medal {
   display: flex; gap: 10px; align-items: baseline; padding: 8px 2px;
   border-bottom: 1px solid var(--tf-line, #2a2d33);
@@ -259,8 +283,11 @@ body {
 .tf-medal-lit { color: var(--tf-text, #d8d5cc); opacity: 0; animation: tfMedalIn 0.6s ease forwards; }
 @keyframes tfMedalIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
 .tf-medal-mark { flex: 0 0 auto; }
+.tf-medal-body { flex: 1 1 auto; min-width: 0; }
+.tf-medal-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .tf-medal-name { flex: 0 0 auto; font-weight: 700; letter-spacing: 0.1em; }
-.tf-medal-note { font-size: 11.5px; color: var(--tf-text-dim, #8f8c84); }
+.tf-medal-cond { font-size: 11.5px; color: var(--tf-text-dim, #8f8c84); }
+.tf-medal-note { font-size: 11.5px; color: var(--tf-text-dim, #8f8c84); margin-top: 3px; line-height: 1.5; }
 .tf-result-ledger-title { font-size: 11.5px; letter-spacing: 0.4em; color: var(--tf-ledger-title, #b9b6ae); margin: 12px 0 4px; }
 .tf-result-foot { display: flex; gap: 8px; margin-top: 16px; }
 

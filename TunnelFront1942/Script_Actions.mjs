@@ -10,8 +10,8 @@ import { GetLevel } from "./Data_Levels.mjs";
 import {
   SortedKeys, CompareIds, EdgeKey, EdgeEnds, TerrainOf, PushEvent, AddLedger, AddPlayerDrain,
   SpendAmmo, GainAmmo, UnitDef, CloneState, UnitsOn, AllyUnits, EnemyUnits, RemoveUnit,
-  TunnelNeighbors, ReachableFacilityCells, VillageStorageEntrances,
-  EntranceThreshold, CellHasRoom, IsSurfacePassable,
+  TunnelNeighbors, ReachableFacilityCells, StorageCellsUnder,
+  EntranceThreshold, CellHasRoom, IsSurfacePassable, ZoneOfCell, ZoneEntranceKeys,
 } from "./Script_State.mjs";
 import {
   EnemyCanSeeHex, EnemySeesUnit, RecordSighting, ExposeEntranceUse, PreviewEntranceUseBeans,
@@ -40,6 +40,32 @@ function SurfaceBlockedByEnemy(state, key) {
 export function AddTraces(state, key, amount) {
   const hex = state.map.hexes[key];
   if (hex) hex.traces = Math.min(CFG.tracesMax, hex.traces + amount);
+}
+
+/**
+ * R2 P0-1 承重墙：暴露豆**全程结算**。
+ * 每挖通 1 段地道 / 修成 1 处设施 → 该气区所有已开地道口（含通风口）暴露豆 +1；
+ * 每开 1 个新口 → 该口 +2。掩土是唯一的减法（每人每局 3 次）。
+ * 「平静期一锹别动、扫荡期无限开挖」到此为止：动土在哪个阶段都要付账。
+ */
+export function ExposeZoneWork(state, events, atKey, amount = CFG.exposePerWork) {
+  const zone = ZoneOfCell(state, atKey);
+  if (!zone.size) return 0;
+  let touched = 0;
+  for (const key of ZoneEntranceKeys(state, zone)) {
+    const entrance = state.tunnels.entrances[key];
+    if (entrance.known) continue;
+    entrance.expose += amount;
+    touched += 1;
+  }
+  for (const key of [...zone].sort()) {
+    const vent = state.tunnels.vents[key];
+    if (vent && !vent.known) { vent.expose += amount; touched += 1; }
+  }
+  if (touched > 0) {
+    PushEvent(state, events, { kind: "expose", text: TEXT.expose.work, hex: atKey, visible: true });
+  }
+  return touched;
 }
 
 /** 特务现形判定：与我方单位相邻（任一层不论，按地表距离）即现形。 */
@@ -98,16 +124,19 @@ export function AdvanceSite(state, events, siteId, amount) {
       state.tunnels.cells[at] = { facility: null, grain: 0, civs: 0, smoke: 0, civBreath: 0, fightpostKnown: false };
     }
     PushEvent(state, events, { kind: "dig", text: "地道段贯通", hex: at, layer: "under", visible: true });
+    ExposeZoneWork(state, events, at);
   } else if (site.kind === "entrance") {
     const cap = TerrainOf(state, at)?.concealCap ?? 1;
-    state.tunnels.entrances[at] = { conceal: Math.min(3, cap), expose: 0, known: false, sealed: false };
+    state.tunnels.entrances[at] = { conceal: Math.min(3, cap), expose: CFG.exposeNewEntrance, known: false, sealed: false };
     PushEvent(state, events, { kind: "dig", text: "新开地道口", hex: at, layer: "under", visible: true });
+    PushEvent(state, events, { kind: "expose", text: TEXT.expose.newEntrance, hex: at, visible: true });
   } else if (site.kind === "facility") {
     const cell = state.tunnels.cells[at];
     if (cell) {
       cell.facility = site.facility;
       if (site.facility === "vent") state.tunnels.vents[at] = { expose: 0, known: false, smoked: false };
       PushEvent(state, events, { kind: "dig", text: `修成${({ storage: "储粮洞", shelter: "藏人室", vent: "通风口", fightpost: "枪眼" })[site.facility]}`, hex: at, layer: "under", visible: true });
+      ExposeZoneWork(state, events, at);
     }
   } else if (site.kind === "door") {
     const edge = state.tunnels.edges[site.edge];
@@ -147,7 +176,7 @@ function OnEnemyKilled(state, events, foe, allyLooterAlive) {
     if (column.axis) state.wave.axisKills[column.axis] = (state.wave.axisKills[column.axis] || 0) + 1;
   }
   const revenge = state.wave.revenge;
-  if (revenge && foe.columnId === revenge.watch) {
+  if (revenge && String(foe.columnId || "").startsWith(revenge.watch)) {
     revenge.casualties += 1;
     if (!revenge.pending && revenge.spawnedTurn === null && revenge.casualties >= revenge.casualtiesNeed) {
       revenge.pending = true;
@@ -187,11 +216,13 @@ export function ResolveAttack(state, events, attackerId, defenderId, opts = {}) 
     if (state.resources.ammo < CFG.ammoPerAttack) return { done: false, reason: "弹药不足" };
     SpendAmmo(state);
   }
-  // ②③④ 伤害与掩护
+  // ②③④ 伤害与掩护（老地方连设两回合的伏击：敌有防备，固定只伤 1）
+  const stale = ambush && !opts.fightpost && attacker.ambushStale;
   let damage = aDef.atk + (ambush ? CFG.ambushBonus : 0);
   damage = Math.max(ambush ? CFG.ambushMinDamage : 0, damage - CoverOf(state, defender));
+  if (stale) damage = CFG.staleAmbushDamage;
   defender.hp -= damage;
-  const verb = ambush ? (opts.fightpost ? "枪眼急射" : "伏击") : "接火";
+  const verb = ambush ? (opts.fightpost ? "枪眼急射" : (stale ? "伏击（敌有防备）" : "伏击")) : "接火";
   PushEvent(state, events, { kind: "combat", text: `${aDef.name}${verb}${dDef.name}：伤 ${damage}`, hex: defender.pos, visible: true });
   const killed = defender.hp <= 0;
   let counter = 0;
@@ -217,8 +248,14 @@ export function ResolveAttack(state, events, attackerId, defenderId, opts = {}) 
     AddPlayerDrain(state, CFG.pool.wound);   // 我方反击致伤敌单位：击伤扣池
   }
   // ⑧ 攻方状态解除 + 枪声目击（我方开火才留给敌人）
+  // R2 P0-5：伏击打完就藏不住了——我方伏击手强制转入「暴露」1 回合，可被敌方还击。
   if (attacker.hp > 0) {
-    attacker.stance = "normal";
+    const wasAmbush = attacker.stance === "ambush";
+    attacker.stance = wasAmbush && attacker.side === "ally" && !opts.fightpost ? "exposed" : "normal";
+    attacker.ambushStale = false;
+    if (attacker.stance === "exposed") {
+      PushEvent(state, events, { kind: "ambush", text: TEXT.ambushText.exposedAfter, hex: attacker.pos, visible: true });
+    }
     if (attacker.side === "ally") {
       attacker.revealed = true;
       const hex = state.map.hexes[attacker.pos];
@@ -286,6 +323,42 @@ function EnumMoves(state, unit) {
 // ---------------------------------------------------------------------------
 // LegalActions
 // ---------------------------------------------------------------------------
+
+/** 设伏地点是否成立：可隐蔽地形 / 地道口格 / 民兵就地挖散兵坑（可挖地形，留痕迹）。 */
+function AmbushSite(state, unit) {
+  const terrain = TerrainOf(state, unit.pos);
+  const entrance = state.tunnels.entrances[unit.pos];
+  if (terrain?.hide) return "cover";
+  if (entrance && !entrance.sealed) return "entrance";
+  if ((CFG.digPower[unit.type] || 0) >= CFG.foxholeMinDig && terrain?.diggable) return "foxhole";
+  return null;
+}
+
+/** R2 P0-5：同一格同时至多 1 个单位处于伏击态——「三个班堆一格全砸下去」不再成立。 */
+function HexAmbusherCount(state, pos, exceptId) {
+  return UnitsOn(state, pos, "surface")
+    .filter((unit) => unit.side === "ally" && unit.stance === "ambush" && unit.id !== exceptId).length;
+}
+
+/** 本格上一回合是否已经设过伏（连着两回合就是「老地方」，敌有防备）。
+ *  注意 ambushSetTurn 缺省为 0：T1 的 `0 === turn-1` 会把全新格误判成老地方，必须先要求 >0。 */
+function HexAmbushStale(state, pos) {
+  const setTurn = state.map.hexes[pos]?.ambushSetTurn || 0;
+  return setTurn > 0 && setTurn === state.meta.turn - 1;
+}
+
+/** 掩土是否还有额度与可掩之物（痕迹或未被搜出的开口暴露豆）。 */
+function CoverTarget(state, unit) {
+  if ((unit.coverUses || 0) >= CFG.coverUsesPerUnit) return null;
+  const hex = state.map.hexes[unit.pos];
+  if (!hex) return null;
+  const entrance = state.tunnels.entrances[unit.pos];
+  const vent = state.tunnels.vents[unit.pos];
+  if (hex.traces > 0) return "traces";
+  if (entrance && !entrance.known && !entrance.sealed && entrance.expose > 0) return "entrance";
+  if (vent && !vent.known && vent.expose > 0) return "vent";
+  return null;
+}
 
 function CanDive(state, unit) {
   if (!(unit.acted && unit.attacked && unit.layer === "surface" && unit.mp >= 1)) return false;
@@ -359,29 +432,31 @@ function CollectUnitActions(state, unit, actions) {
     }
   }
   if (unit.layer === "surface") {
-    if (hex && hex.traces > 0) actions.push({ type: "CoverTraces", unit: id });
+    if (CoverTarget(state, unit)) {
+      actions.push({ type: "CoverTraces", unit: id, usesLeft: CFG.coverUsesPerUnit - (unit.coverUses || 0) });
+    }
     if (hex && hex.road && !hex.roadBroken && digPower > 0
         && (!hex.bridge || GetLevel(state.meta.level).bridgeBreakable)) {
-      actions.push({ type: "BreakRoad", unit: id });
+      actions.push({ type: "BreakRoad", unit: id, bridge: !!hex.bridge });
     }
     if (def.atk > 0 && unit.stance !== "ambush" && state.resources.ammo >= CFG.ammoPerAttack
-        && (terrain?.hide || (entrance && !entrance.sealed))) {
-      actions.push({ type: "Ambush", unit: id });
+        && AmbushSite(state, unit) && HexAmbusherCount(state, unit.pos, id) < CFG.ambushPerHex) {
+      actions.push({ type: "Ambush", unit: id, site: AmbushSite(state, unit), stale: HexAmbushStale(state, unit.pos) });
     }
     if (terrain?.hide && unit.stance !== "hidden") actions.push({ type: "Hide", unit: id });
     actions.push({ type: "Feint", unit: id });
-    // 野战攻击（仅 fieldAttack 单位）
+    // 野战攻击（仅 fieldAttack 单位；同格敌人也打得着——R2 P1）
     if (def.fieldAttack && state.resources.ammo >= CFG.ammoPerAttack) {
       for (const foe of EnemyUnits(state)) {
-        if (foe.layer === "surface" && foe.revealed && HexDistanceKeys(unit.pos, foe.pos) === 1) {
-          actions.push({ type: "Attack", unit: id, target: foe.id });
+        if (foe.layer === "surface" && foe.revealed && HexDistanceKeys(unit.pos, foe.pos) <= 1) {
+          actions.push({ type: "Attack", unit: id, target: foe.id, sameHex: unit.pos === foe.pos });
         }
       }
     }
     const villageId = hex?.villageId || null;
     const village = villageId ? state.map.villages[villageId] : null;
     if (village) {
-      if (village.grainOpen > 0 && VillageStorageEntrances(state, villageId).length) {
+      if (village.grainOpen > 0 && StorageCellsUnder(state, unit.pos).length) {
         actions.push({ type: "HideGrain", unit: id });
       }
       if (village.pop > 0 && NearbyShelterEntrance(state, unit.pos)) {
@@ -452,6 +527,14 @@ export function PerformAction(inputState, action) {
   const events = [];
   const illegal = handler(state, events, action);
   if (illegal) return { state: inputState, events: [], illegal };
+  // 伏击是持续状态：只有移动、改做别的主动作、或开火/被打断才解除（Rest 与免费动作不打断）。
+  const actor = action.unit ? state.units[action.unit] : null;
+  if (actor && actor.stance === "ambush" && action.type !== "Ambush"
+      && action.type !== "Rest" && action.type !== "ToggleDoor") {
+    actor.stance = "normal";
+    actor.ambushHex = null;
+    actor.ambushStale = false;
+  }
   RevealAdjacentSpies(state, events);
   RecordExposedSightings(state);
   UpdateEnemyMemory(state);
@@ -609,16 +692,24 @@ function ApplyToggleDoor(state, events, action) {
   return null;
 }
 
+/** 掩土：本格痕迹 -2，本格未被搜出的开口暴露豆 -2。每单位每局 3 次——这是全局唯一的减法。 */
 function ApplyCoverTraces(state, events, action) {
   const unit = AllyOf(state, action.unit);
   if (!unit) return "单位不存在或已阵亡";
   if (unit.acted) return "该单位本回合已行动";
   if (unit.layer !== "surface") return "须在地面掩土";
+  if ((unit.coverUses || 0) >= CFG.coverUsesPerUnit) return TEXT.expose.coverSpent;
+  if (!CoverTarget(state, unit)) return "此格没有可掩的痕迹或暴露";
   const hex = HexOf(state, unit.pos);
-  if (!hex || hex.traces <= 0) return "此格没有挖掘痕迹";
   hex.traces = Math.max(0, hex.traces - CFG.coverTracesAmount);
+  const entrance = state.tunnels.entrances[unit.pos];
+  if (entrance && !entrance.known) entrance.expose = Math.max(0, entrance.expose - CFG.coverTracesAmount);
+  const vent = state.tunnels.vents[unit.pos];
+  if (vent && !vent.known) vent.expose = Math.max(0, vent.expose - CFG.coverTracesAmount);
+  unit.coverUses = (unit.coverUses || 0) + 1;
   unit.acted = true;
-  PushEvent(state, events, { kind: "cover", text: "掩土匿迹", hex: unit.pos, visible: true });
+  PushEvent(state, events, { kind: "cover", text: `${TEXT.expose.cover}（本人还剩 ${CFG.coverUsesPerUnit - unit.coverUses} 次）`,
+    hex: unit.pos, visible: true });
   return null;
 }
 
@@ -630,21 +721,44 @@ function ApplyBreakRoad(state, events, action) {
   const hex = HexOf(state, unit.pos);
   if (!hex || !hex.road || hex.roadBroken) return "此格没有可破的路";
   if (hex.bridge && !GetLevel(state.meta.level).bridgeBreakable) return "此桥不可破毁";
-  return WorkSite(state, events, unit, power, { kind: "roadBreak", at: unit.pos, need: CFG.dig.roadBreak }, null);
+  const need = hex.bridge ? CFG.dig.bridgeBreak : CFG.dig.roadBreak;
+  return WorkSite(state, events, unit, power, { kind: "roadBreak", at: unit.pos, need }, null);
 }
 
+/**
+ * 设伏（R2 P0-5 改造）：
+ * ① 同格至多 1 人处于伏击态；② 伏击是**持续状态**，不移动不换动作就一直守着，不必每回合重按；
+ * ③ 连着两回合在同一格设伏 → 本次伏击只伤 1，且该格获「敌已警戒」2 回合（敌寻路绕行）；
+ * ④ 民兵可在任何可挖地形就地挖散兵坑设伏，代价是本格 +1 痕迹。
+ */
 function ApplyAmbush(state, events, action) {
   const unit = AllyOf(state, action.unit);
   if (!unit) return "单位不存在或已阵亡";
   if (unit.acted) return "该单位本回合已行动";
   if (unit.layer !== "surface") return "伏击须在地面";
   if (UnitDef(unit).atk <= 0) return "该单位无法伏击";
-  const terrain = TerrainOf(state, unit.pos);
-  const entrance = state.tunnels.entrances[unit.pos];
-  if (!(terrain?.hide || (entrance && !entrance.sealed))) return "须在可隐蔽地形或入口格设伏";
+  if (state.resources.ammo < CFG.ammoPerAttack) return "弹药不足，设不了伏";
+  const site = AmbushSite(state, unit);
+  if (!site) return "须在可隐蔽地形、地道口格设伏（民兵还可就地挖散兵坑）";
+  if (HexAmbusherCount(state, unit.pos, unit.id) >= CFG.ambushPerHex) return TEXT.ambushText.occupied;
+  const hex = HexOf(state, unit.pos);
+  const stale = HexAmbushStale(state, unit.pos);
   unit.stance = "ambush";
   unit.acted = true;
+  unit.ambushHex = unit.pos;
+  unit.ambushTurn = state.meta.turn;
+  unit.ambushStale = stale;
+  hex.ambushSetTurn = state.meta.turn;
+  if (site === "foxhole") {
+    AddTraces(state, unit.pos, CFG.foxholeTrace);
+    PushEvent(state, events, { kind: "ambush", text: TEXT.ambushText.foxhole, hex: unit.pos, visible: true });
+  }
   PushEvent(state, events, { kind: "ambush", text: `${UnitDef(unit).name}设伏`, hex: unit.pos, visible: true });
+  if (stale) {
+    hex.alertedUntil = state.meta.turn + CFG.alertedTurns;
+    PushEvent(state, events, { kind: "ambush", text: TEXT.ambushText.stale, hex: unit.pos, visible: true });
+    PushEvent(state, events, { kind: "ambush", text: TEXT.ambushText.alerted, hex: unit.pos, visible: true });
+  }
   return null;
 }
 
@@ -673,7 +787,7 @@ function ApplyAttack(state, events, action) {
   let opts = null;
   if (unit.layer === "surface") {
     if (!def.fieldAttack) return "该单位不能野战攻击（仅伏击/枪眼）";
-    if (HexDistanceKeys(unit.pos, target.pos) !== 1) return "目标不相邻";
+    if (HexDistanceKeys(unit.pos, target.pos) > 1) return "目标不相邻";
     opts = { ambush: false };
   } else {
     const cell = state.tunnels.cells[unit.pos];
@@ -714,22 +828,20 @@ function ApplyHideGrain(state, events, action) {
   const village = hex?.villageId ? state.map.villages[hex.villageId] : null;
   if (!village) return "须在村格藏粮";
   if (village.grainOpen <= 0) return "村中已无明存粮";
-  const entrances = VillageStorageEntrances(state, hex.villageId);
-  if (!entrances.length) return "村一格内没有连通储粮洞的入口";
+  // R2 P0-4：粮不会隔空入洞——本村格正下方必须有地道格，且该格连着还装得下的储粮洞。
+  const cells = StorageCellsUnder(state, unit.pos);
+  if (!cells.length) return "本格正下方没有连着储粮洞的地道（先把地道挖到粮囤脚底下）";
   let moved = 0;
   let want = Math.min(CFG.hideGrainPerAction, village.grainOpen);
-  for (const entranceKey of entrances) {
-    for (const cellKey of ReachableFacilityCells(state, entranceKey, "storage")) {
-      const cell = state.tunnels.cells[cellKey];
-      const room = CFG.storageGrainCap - cell.grain;
-      const take = Math.min(room, want);
-      if (take > 0) {
-        cell.grain += take;
-        village.grainOpen -= take;
-        moved += take;
-        want -= take;
-      }
-      if (want <= 0) break;
+  for (const cellKey of cells) {
+    const cell = state.tunnels.cells[cellKey];
+    const room = CFG.storageGrainCap - cell.grain;
+    const take = Math.min(room, want);
+    if (take > 0) {
+      cell.grain += take;
+      village.grainOpen -= take;
+      moved += take;
+      want -= take;
     }
     if (want <= 0) break;
   }
