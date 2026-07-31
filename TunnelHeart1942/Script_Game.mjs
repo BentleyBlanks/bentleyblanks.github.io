@@ -57,45 +57,12 @@ function SetModal(which) {
   state.pauseOpen = which === "pause";
 }
 
-function GoalLabel(id) {
-  const map = {
-    talk_laozhong: "听取高老忠交代",
-    enter_hatch: "下地窖（开始挖）",
-    link_ab: "挖通：高家 ↔ 邻家",
-    link_bc: "挖通：邻家 ↔ 东家",
-    dig_safe_room: "挖出东侧避难窖空腔",
-    link_safe: "挖通西口 ↔ 东窖",
-    shelter_a: "护送第一户入洞",
-    shelter_b: "护送第二户入洞",
-    shelter_c: "护送第三户入洞",
-    reach_bell: "赶到村口敲钟",
-    dig_alcove: "挖出翻口厢室",
-    build_flip: "改建战斗翻口",
-    link_trap: "挖通卡口巷道",
-    expose_spy: "盘问并识破特务",
-    trap_spy: "翻口制服特务",
-    enter_spine: "进入主巷",
-    dig_shaft_a: "上挖井口竖井",
-    dig_shaft_b: "上挖墙根竖井",
-    dig_shaft_c: "上挖灶台竖井",
-    shot_a: "井口出击",
-    shot_b: "墙根出击",
-    shot_c: "灶台出击",
-    break_patrol: "打散报复巡逻",
-    dig_charge_room: "挖出炮楼根药室",
-    link_charge: "挖通进攻端 ↔ 药室",
-    plant_charge: "安放药室炸药",
-    signal_assault: "发出总攻信号",
-  };
-  return map[id] || id;
-}
-
 function SyncTitle() {
   const progress = LoadFromStorage();
   const cont = $("ContinueButton");
   if (progress && progress.unlockedActs > 1) {
     Show(cont, true);
-    cont.textContent = `继续 · 第 ${Math.min(progress.unlockedActs, CHAPTERS.length)} 幕`;
+    cont.textContent = "继续";
   } else Show(cont, false);
 }
 
@@ -103,49 +70,20 @@ function SyncPanels() {
   const chapter = CHAPTERS[state.chapterIndex];
   const list = state.phase === "panels" ? chapter.openPanels : chapter.closePanels;
   const beat = list[state.panelIndex];
-  $("PanelKicker").textContent = `第${chapter.act}幕 · ${chapter.timeLabel}`;
+  $("PanelKicker").textContent = `第 ${chapter.act} 页`;
   $("PanelTitle").textContent = chapter.title;
   $("PanelSpeaker").textContent = beat.speaker;
-  $("PanelBody").textContent = beat.text;
+  $("PanelBody").textContent = beat.body;
   $("PanelProgress").innerHTML = list
     .map((_, i) => `<i class="${i <= state.panelIndex ? "on" : ""}"></i>`)
     .join("");
-  const last = state.panelIndex >= list.length - 1;
-  $("PanelNextButton").querySelector("span").textContent = state.phase === "panels"
-    ? last ? "进入关卡" : "继续"
-    : last
-      ? state.chapterIndex >= CHAPTERS.length - 1
-        ? "终章"
-        : "下一幕"
-      : "继续";
   $("PanelCard").dataset.mood = beat.mood || "talk";
 }
 
 function SyncHud() {
-  const chapter = CHAPTERS[state.chapterIndex];
-  $("ChapterLabel").textContent = `第${chapter.act}幕`;
-  $("ChapterTime").textContent = chapter.timeLabel;
-  $("MissionTitle").textContent = chapter.title;
-  $("ObjectiveText").textContent = chapter.objective;
-  $("GoalList").innerHTML = `<strong>本幕目标</strong>${Object.entries(state.goalsDone)
-    .map(([id, done]) => `<li class="${done ? "done" : ""}">${done ? "✓" : "○"} ${GoalLabel(id)}</li>`)
-    .join("")}`;
-  $("HpRow").innerHTML = [0, 1, 2].map((i) => `<i class="${i < state.player.hp ? "" : "off"}"></i>`).join("");
-  $("LayerTag").textContent = state.player.inTunnel
-    ? `地道剖视 · 已挖 ${state.stats.cellsCarved || 0} 格`
-    : "地面层 · 纵深";
-
-  if (state.subtitle) {
-    Show($("SubtitlePanel"), true);
-    $("SubtitleSpeaker").textContent = state.subtitle.speaker;
-    $("SubtitleText").textContent = state.subtitle.text;
-  } else Show($("SubtitlePanel"), false);
-
-  if (state.interactHint) {
-    Show($("InteractionPrompt"), true);
-    $("InteractionLabel").textContent = state.interactHint;
-    $("InteractKey").textContent = state.interactHint.includes("挖掘") || state.interactHint.includes("J") ? "J" : "E";
-  } else Show($("InteractionPrompt"), false);
+  $("HeartRow").innerHTML = [0, 1, 2]
+    .map((i) => `<i class="${i < state.player.hp ? "" : "off"}"></i>`)
+    .join("");
 }
 
 function SyncPhaseUi() {
@@ -154,6 +92,8 @@ function SyncPhaseUi() {
   Show($("PanelScreen"), phase === "panels" || phase === "closePanels");
   Show($("EndingScreen"), phase === "ending");
   Show($("GameHud"), phase === "play");
+  const letter = document.querySelector(".comicLetterbox");
+  if (letter) letter.style.visibility = phase === "play" ? "visible" : "hidden";
   if (phase === "title") SyncTitle();
   if (phase === "panels" || phase === "closePanels") SyncPanels();
   if (phase === "play") SyncHud();
@@ -381,15 +321,10 @@ function DrawShaft(shaft) {
   if (!state.player.inTunnel) {
     ctx.fillStyle = "#2a1c12";
     ctx.fillRect(x - 18 * s, y - 6 * s, 36 * s, 10 * s);
-    ctx.strokeStyle = "#c9a45a";
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = 2;
     ctx.strokeRect(x - 18 * s, y - 6 * s, 36 * s, 10 * s);
-    ctx.fillStyle = "rgba(239,224,197,.8)";
-    ctx.font = `${11 * s}px IBM Plex Sans, sans-serif`;
-    ctx.fillText(shaft.label || "地道口", x - 20 * s, y - 12 * s);
-  } else {
-    ctx.fillStyle = "rgba(239,224,197,.55)";
-    ctx.font = `${11 * s}px IBM Plex Sans, sans-serif`;
-    ctx.fillText(shaft.label || "井口", x - 16 * s, WY(state.level.soil?.originY || 72) - 8);
+    DrawPictogram("hatch", x - 10 * s, y - 36 * s, 20 * s);
   }
 }
 
@@ -446,9 +381,8 @@ function DrawSoilGrid(pal) {
     ctx.fillStyle = "rgba(201,164,90,.12)";
     ctx.fillRect(x, y, w, h);
     ctx.setLineDash([]);
-    ctx.fillStyle = "rgba(239,224,197,.9)";
-    ctx.font = `600 ${11 * s}px IBM Plex Sans, sans-serif`;
-    ctx.fillText("待挖区域", x + 4, y - 6);
+    // VH: dashed zone only — shovel tick, no quest text
+    DrawPictogram("shovel", x + 8, y + 8, 14 * s);
     ctx.restore();
   }
   const dig = state.player.digTarget;
@@ -566,6 +500,186 @@ function DrawEntity(ent) {
   ctx.restore();
 }
 
+function DrawPictogram(kind, x, y, size) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = "#1a1410";
+  ctx.fillStyle = "#efe2c8";
+  ctx.lineWidth = Math.max(1.5, size * 0.08);
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeRect(0, 0, size, size);
+  ctx.strokeStyle = "#1a1410";
+  ctx.fillStyle = "#1a1410";
+  const m = size * 0.2;
+  const d = size - m * 2;
+  if (kind === "shovel") {
+    ctx.fillRect(m + d * 0.4, m, d * 0.2, d * 0.7);
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.15, m + d * 0.65);
+    ctx.lineTo(m + d * 0.85, m + d * 0.65);
+    ctx.lineTo(m + d * 0.5, m + d);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === "hatch") {
+    ctx.strokeRect(m + d * 0.25, m, d * 0.5, d);
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.35, m + d * 0.2);
+    ctx.lineTo(m + d * 0.65, m + d * 0.35);
+    ctx.lineTo(m + d * 0.35, m + d * 0.5);
+    ctx.lineTo(m + d * 0.65, m + d * 0.65);
+    ctx.lineTo(m + d * 0.35, m + d * 0.8);
+    ctx.stroke();
+  } else if (kind === "bell") {
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.2, m + d * 0.25);
+    ctx.lineTo(m + d * 0.8, m + d * 0.25);
+    ctx.lineTo(m + d * 0.85, m + d * 0.7);
+    ctx.lineTo(m + d * 0.5, m + d * 0.9);
+    ctx.lineTo(m + d * 0.15, m + d * 0.7);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === "talk") {
+    ctx.beginPath();
+    ctx.ellipse(m + d * 0.5, m + d * 0.4, d * 0.4, d * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.35, m + d * 0.65);
+    ctx.lineTo(m + d * 0.25, m + d * 0.95);
+    ctx.lineTo(m + d * 0.55, m + d * 0.7);
+    ctx.fill();
+  } else if (kind === "people") {
+    ctx.beginPath();
+    ctx.arc(m + d * 0.35, m + d * 0.3, d * 0.15, 0, Math.PI * 2);
+    ctx.arc(m + d * 0.65, m + d * 0.3, d * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(m + d * 0.2, m + d * 0.5, d * 0.25, d * 0.45);
+    ctx.fillRect(m + d * 0.55, m + d * 0.5, d * 0.25, d * 0.45);
+  } else if (kind === "flip") {
+    ctx.strokeRect(m, m + d * 0.35, d, d * 0.35);
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.2, m + d * 0.35);
+    ctx.lineTo(m + d * 0.5, m + d * 0.1);
+    ctx.lineTo(m + d * 0.8, m + d * 0.35);
+    ctx.stroke();
+  } else if (kind === "shot") {
+    ctx.fillRect(m, m + d * 0.4, d * 0.7, d * 0.2);
+    ctx.fillRect(m + d * 0.55, m + d * 0.25, d * 0.15, d * 0.5);
+  } else if (kind === "charge") {
+    ctx.beginPath();
+    ctx.arc(m + d * 0.5, m + d * 0.55, d * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(m + d * 0.45, m + d * 0.1, d * 0.1, d * 0.25);
+  } else if (kind === "warn") {
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.5, m);
+    ctx.lineTo(m + d, m + d);
+    ctx.lineTo(m, m + d);
+    ctx.closePath();
+    ctx.fillStyle = "#c9a45a";
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#1a1410";
+    ctx.fillRect(m + d * 0.45, m + d * 0.3, d * 0.1, d * 0.35);
+    ctx.fillRect(m + d * 0.45, m + d * 0.75, d * 0.1, d * 0.1);
+  } else if (kind === "check") {
+    ctx.beginPath();
+    ctx.moveTo(m + d * 0.15, m + d * 0.5);
+    ctx.lineTo(m + d * 0.4, m + d * 0.75);
+    ctx.lineTo(m + d * 0.85, m + d * 0.25);
+    ctx.lineWidth = Math.max(2, size * 0.12);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(m + d * 0.5, m + d * 0.5, d * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function DrawSpeechBubble() {
+  const b = state.bubble;
+  if (!b || !b.icons?.length) return;
+  const s = Scale();
+  const x = WX(state.player.x);
+  const y = WY(state.player.y) - (state.player.crouching ? 40 : 70) * s;
+  const iconSize = 22 * s;
+  const pad = 8 * s;
+  const gap = 4 * s;
+  const w = pad * 2 + b.icons.length * iconSize + (b.icons.length - 1) * gap;
+  const h = pad * 2 + iconSize;
+  const bx = x - w / 2;
+  const by = y - h - 12 * s;
+  ctx.save();
+  ctx.fillStyle = "#efe2c8";
+  ctx.strokeStyle = "#1a1410";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === "function") ctx.roundRect(bx, by, w, h, 4 * s);
+  else ctx.rect(bx, by, w, h);
+  ctx.fill();
+  ctx.stroke();
+  // tail
+  ctx.beginPath();
+  ctx.moveTo(x - 6 * s, by + h);
+  ctx.lineTo(x, by + h + 10 * s);
+  ctx.lineTo(x + 6 * s, by + h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  b.icons.forEach((icon, i) => {
+    DrawPictogram(icon, bx + pad + i * (iconSize + gap), by + pad, iconSize);
+  });
+  ctx.restore();
+}
+
+function DrawInteractPromptWorld() {
+  const hint = state.interactHint;
+  if (!hint) return;
+  const s = Scale();
+  const x = WX(state.player.x);
+  const y = WY(state.player.y) - 8 * s;
+  const key = hint === "dig" ? "J" : "E";
+  const icon =
+    hint === "dig"
+      ? "shovel"
+      : hint === "hatch"
+        ? "hatch"
+        : hint === "bell"
+          ? "bell"
+          : hint === "shelter"
+            ? "people"
+            : hint === "shot_port"
+              ? "shot"
+              : hint === "flip_build" || hint === "flip_trap"
+                ? "flip"
+                : hint === "charge" || hint === "signal"
+                  ? "charge"
+                  : "talk";
+  // VH floating key circle
+  ctx.save();
+  ctx.fillStyle = "#efe2c8";
+  ctx.strokeStyle = "#1a1410";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(x + 28 * s, y - 36 * s, 14 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#1a1410";
+  ctx.font = `700 ${12 * s}px IBM Plex Sans, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(key, x + 28 * s, y - 36 * s);
+  DrawPictogram(icon, x + 40 * s, y - 52 * s, 18 * s);
+  if (hint === "dig" && state.player.digging) {
+    ctx.strokeStyle = "#a6452f";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x + 28 * s, y - 36 * s, 16 * s, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.player.digProgress);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function DrawPlayer() {
   const p = state.player;
   const s = Scale();
@@ -577,7 +691,7 @@ function DrawPlayer() {
   ctx.scale(p.facing, 1);
   if (p.invuln > 0 && Math.floor(p.invuln * 18) % 2 === 0) ctx.globalAlpha = 0.4;
   ctx.lineWidth = 2.5 * s;
-  ctx.strokeStyle = "#1c1712";
+  ctx.strokeStyle = "#1a1410";
   ctx.fillStyle = "#4d6b57";
   ctx.fillRect(-13 * s, -h, 26 * s, h);
   ctx.strokeRect(-13 * s, -h, 26 * s, h);
@@ -594,12 +708,6 @@ function DrawPlayer() {
     ctx.stroke();
     ctx.fillStyle = "#6e5a3a";
     ctx.fillRect(26 * s, -10 * s, 12 * s, 10 * s);
-    // progress
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "rgba(0,0,0,.45)";
-    ctx.fillRect(-24 * s, -h - 28 * s, 48 * s, 7 * s);
-    ctx.fillStyle = "#c9a45a";
-    ctx.fillRect(-24 * s, -h - 28 * s, 48 * s * p.digProgress, 7 * s);
   }
   ctx.restore();
 }
@@ -647,7 +755,11 @@ function Render() {
 
     for (const shaft of state.level.shafts) DrawShaft(shaft);
     for (const ent of state.level.entities) DrawEntity(ent);
-    if (state.phase === "play") DrawPlayer();
+    if (state.phase === "play") {
+      DrawPlayer();
+      DrawSpeechBubble();
+      DrawInteractPromptWorld();
+    }
 
     if (!state.player.inTunnel && state.phase === "play") {
       DrawForeground(w, h, camX, pal);
@@ -666,12 +778,6 @@ function Render() {
     ctx.fillRect(0, 0, w, h);
   }
 
-  // comic letterbox for play — VH stage framing
-  if (state.phase === "play") {
-    ctx.fillStyle = "rgba(12,10,8,.55)";
-    ctx.fillRect(0, 0, w, h * 0.06);
-    ctx.fillRect(0, h * 0.94, w, h * 0.06);
-  }
 }
 
 function BindInput() {

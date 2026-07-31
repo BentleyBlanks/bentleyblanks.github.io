@@ -1,7 +1,7 @@
 /** Film beats — dig system is the spine of every underground act. */
 
 export const SAVE_KEY = "tunnelheart1942_v3";
-export const CACHE_BUST = "20260731c";
+export const CACHE_BUST = "20260731d";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -45,7 +45,7 @@ export const CHAPTERS = [
       {
         id: "p1c",
         speaker: "提示",
-        text: "下地窖后：对准软土按住 J 挖掘。S 向下挖，W 向上挖。硬砖挖不动。连通目标看左上清单。",
+        text: "下地窖后对着软土按住铁锨。蹲下往下挖，抬头往上挖。硬砖挖不动——看气泡里的记号走。",
         mood: "tip",
       },
     ],
@@ -127,7 +127,7 @@ export const CHAPTERS = [
       {
         id: "p3c",
         speaker: "提示",
-        text: "黄色虚线框是待挖厢室。挖够格数才能改建翻口；再挖通到卡口，才能翻口制敌。",
+        text: "虚线框里是要挖出的翻口厢室。挖开了，再改翻口、通到卡口。",
         mood: "tip",
       },
     ],

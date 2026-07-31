@@ -60,6 +60,8 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     cameraY: tunnel ? level.tunnelFloor - 300 : SURFACE_Y - 360,
     level,
     interactHint: "",
+    /** Valiant Hearts-style bubble: { icons: string[], mutter?: string, timer } */
+    bubble: null,
     subtitle: null,
     subtitleTimer: 0,
     winTimer: 0,
@@ -154,11 +156,48 @@ function MarkGoal(state, goalId) {
   if (!Object.prototype.hasOwnProperty.call(state.goalsDone, goalId)) return;
   if (state.goalsDone[goalId]) return;
   state.goalsDone[goalId] = true;
+  // Soft pictogram ping — never a "quest complete" banner
+  const icon = GoalIcon(goalId);
+  if (icon) SetBubble(state, [icon, "check"], "", 1.4);
+}
+
+function GoalIcon(goalId) {
+  if (goalId.startsWith("link_") || goalId.startsWith("dig_")) return "shovel";
+  if (goalId.includes("bell")) return "bell";
+  if (goalId.includes("hatch") || goalId.includes("enter") || goalId.includes("shaft")) return "hatch";
+  if (goalId.includes("shelter")) return "people";
+  if (goalId.includes("flip") || goalId.includes("trap") || goalId.includes("spy")) return "flip";
+  if (goalId.includes("shot") || goalId.includes("patrol")) return "shot";
+  if (goalId.includes("charge") || goalId.includes("signal")) return "charge";
+  if (goalId.includes("talk")) return "talk";
+  return "check";
+}
+
+function SetBubble(state, icons, mutter = "", time = 2.8) {
+  state.bubble = { icons: icons || [], mutter, timer: time };
+  state.subtitle = mutter ? { speaker: "", text: mutter } : null;
+  state.subtitleTimer = time;
 }
 
 function SetSubtitle(state, speaker, text, time = 3.0) {
-  state.subtitle = { speaker, text };
-  state.subtitleTimer = time;
+  // Keep API for existing call sites — route into VH bubble (no quest-log tone)
+  const icons = GuessIcons(speaker, text);
+  SetBubble(state, icons, text, time);
+}
+
+function GuessIcons(speaker, text) {
+  const t = `${speaker}|${text}`;
+  if (/挖|铁锨|软土|土洞|地窖/.test(t)) return ["shovel"];
+  if (/钟/.test(t)) return ["bell"];
+  if (/井|地道口|下到|回到地面/.test(t)) return ["hatch"];
+  if (/翻口/.test(t)) return ["flip"];
+  if (/特务|武工/.test(t)) return ["talk", "warn"];
+  if (/打一枪|出击/.test(t)) return ["shot"];
+  if (/药|炸药|总攻/.test(t)) return ["charge"];
+  if (/乡亲|进洞|孩子/.test(t)) return ["people"];
+  if (/发现|危险|蹲/.test(t)) return ["warn"];
+  if (/还没挖|挖到位/.test(t)) return ["shovel", "warn"];
+  return ["talk"];
 }
 
 function SyncDigGoals(state) {
@@ -201,14 +240,14 @@ function TryDig(state, dt) {
   const dig = target2 || target;
   if (!dig) {
     player.digProgress = 0;
-    state.interactHint = input.up || input.jump ? "上方不是软土 / 挖不动" : "对准软土按住 J（S下挖 W上挖）";
+    state.interactHint = "";
     return;
   }
 
   player.digging = true;
   player.digTarget = dig;
   player.digProgress = Math.min(1, player.digProgress + DIG_RATE * dt);
-  state.interactHint = `挖掘软土… ${Math.floor(player.digProgress * 100)}%`;
+  state.interactHint = "dig";
   if (player.digProgress < 1) return;
 
   if (CarveCell(level.soil, dig.c, dig.r)) {
@@ -216,7 +255,7 @@ function TryDig(state, dt) {
     state.stats.cellsCarved += 1;
     RebuildTunnelSolids(level);
     SyncDigGoals(state);
-    SetSubtitle(state, "高传宝", "再挖。", 1.0);
+    SetBubble(state, ["shovel"], "", 0.6);
   }
   player.digProgress = 0;
 }
@@ -239,7 +278,7 @@ function FinishHatch(state) {
   }
   state.player.vy = 0;
   state.player.onGround = true;
-  SetSubtitle(state, "地道口", goingDown ? "下到地窖——前面是实土，自己挖。" : "回到地面。", 2.0);
+  SetBubble(state, goingDown ? ["hatch", "shovel"] : ["hatch"], "", 1.6);
 }
 
 function GoalReady(state, ent) {
@@ -258,7 +297,7 @@ function TryInteract(state) {
     if (!Near(player, ent, ent.radius || 52)) continue;
 
     if (!GoalReady(state, ent) && ent.type !== "hatch" && ent.type !== "talk") {
-      SetSubtitle(state, "提示", "还没挖到位——先完成地道目标。", 2.2);
+      SetBubble(state, ["shovel", "warn"], "", 1.8);
       return;
     }
 
@@ -379,7 +418,14 @@ function UpdateActors(state, dt) {
   }
   if (state.subtitleTimer > 0) {
     state.subtitleTimer -= dt;
-    if (state.subtitleTimer <= 0) state.subtitle = null;
+    if (state.subtitleTimer <= 0) {
+      state.subtitle = null;
+      state.bubble = null;
+    }
+  }
+  if (state.bubble) {
+    state.bubble.timer -= dt;
+    if (state.bubble.timer <= 0) state.bubble = null;
   }
 }
 
@@ -411,14 +457,12 @@ function AllGoalsDone(state) {
 
 function RefreshHint(state) {
   if (state.player.digging) return;
-  if (!state.interactHint || state.interactHint.includes("挖掘") || state.interactHint.includes("软土")) {
-    state.interactHint = "";
-  }
+  state.interactHint = "";
   for (const ent of state.level.entities) {
     if (ent.hidden || ent.done) continue;
     if (!LayerOk(state.player, ent)) continue;
     if (Near(state.player, ent, ent.radius || 52)) {
-      state.interactHint = ent.hint || "互动";
+      state.interactHint = ent.type;
       return;
     }
   }
@@ -431,7 +475,7 @@ function RefreshHint(state) {
       !!state.input.crouch,
       !!state.input.up,
     );
-    if (dig) state.interactHint = "按住 J 挖掘软土";
+    if (dig) state.interactHint = "dig";
   }
 }
 
