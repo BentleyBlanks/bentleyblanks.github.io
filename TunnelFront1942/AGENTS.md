@@ -45,8 +45,15 @@
 - **当前回合路径**：`GetActionPathPlans` 默认只为 Move / Dig 生成无歧义的本回合连续终点；
   CLI 的 `legal` 可请求 `includeAmbiguous`，用完整 route 分别列出共享终点的明确分支；
   `ApplyPlayerActionPath` 必须逐步重放 `ApplyPlayerAction`，不跨回合、不自动结束、不自动支护或改道。
-  走廊外未知土层、返沙开裂、烟段、进入敌军视线、伏击离位与接通出口都要强制停下重新确认；
-  规划侦察须揭示两条候选走廊的逐格土层，保证已选走廊上的连续开挖真实可用。
+  返沙开裂、烟段、进入敌军视线、伏击离位、接通出口与标线外未知土层都要强制停下重新确认。
+- **主走廊身份**：规划侦察同时冻结 Fast / Quiet 的代表路径、各自全部最优格带，以及用于敌情揭示的较宽一圈；
+  只有两条最优格带进入 `IsSoilKnown`。首个独占分流格确定 Fast / Quiet；跨线或标线外施工持续标为
+  `Rerouted`，且身份单调不可被后来连通路径降回 Fast / Quiet。标线外仍可应急单挖，但合法性统一预留最坏 2 AP/工具，结算时才揭示真实土层并额外 +3 暴露。
+  Dig 的 AP 与工具成本同为 `soil.digCost`；北 Fast/Quiet 分别需 3/4 个施工回合，南线为 4/5。
+  第一条接通主出口的路径冻结为 `corridorConnectedPath` 并优先承载撤离；后补支线不得静默改写身份。
+  若冻结主线不可用但同出口仍有可行支线，预测、发车批次、在途 UI、CLI 与日志都必须显式携带
+  `usesFrozenMainline=false` / `corridorRerouted=true`。UI、CLI、终局与存档必须一致显示身份、累计施工次数、
+  实际工具、土层噪音、挖掘暴露、标线外段数和接通回合；冻结主线接通后的塌方重挖仍须逐次进入累计台账。
 - **撤离预测**：`GetCivilianTransitEstimate` 必须复用正式群众推进规则，保持纯读，并只使用玩家公开信息；
   未揭示的敌军意图不得改变出口窗口或预测。`remainingSchedule` 是“当前候选批次占用本回合发车位后”的
   剩余排班条件下界：固定当前已通路线，假设下一批前不再开路/抢通，且不计敌军、拥堵与其他新风险；
@@ -86,10 +93,14 @@
 2. 规则内核对外接口不得就地修改传入 state（`ApplyPlayerAction` / `RunEnemyPhase` / `AdvanceTurn`）。
    连续路径失败也必须原子返回原 state；禁止按路径长度汇总扣费、直接写终点或合并逐格证据。
 3. 表现层不自己算规则；玩家看不见的敌军信息不得泄漏到 UI 或日志。
+   Fast/Quiet 格带、身份与接通主线不得依赖 seed、未揭示 intent、敌军/证据数组顺序；
+   敌军规划也不得读取 `plannedRouteMode`，只能响应真实噪音、证据与公开局面。
 4. 零外部运行时依赖：无 CDN、无外部字体/图片/音频。three.js 走 `../taihang/vendor/three/`。
 5. three r152+ 颜色只转换一次：`new THREE.Color(hex)` 已 sRGB→Linear，禁止再叠 `convertSRGBToLinear()`。
 6. 改动游戏脚本后必须 bump `index.html` 里的 `?v=` 缓存参数。
-7. 命名遵守根 AGENTS.md：文件 PascalCase + `Script_`/`Data_`/`Style_` 前缀；导出函数 PascalCase、
+7. 新走廊字段（Fast/Quiet 格带、精确已勘格、身份、已挖格、冻结接通路径/回合）必须完整 round-trip；
+   旧存档只能从公开地道图、已存代表路径与净化后的初始勘线快照迁移，禁止根据当前隐藏敌情或后来变化的入口知识重算格带与身份。
+8. 命名遵守根 AGENTS.md：文件 PascalCase + `Script_`/`Data_`/`Style_` 前缀；导出函数 PascalCase、
    变量 lowerCamelCase；玩家可见文案中文。
 
 ## 五、测试与验收

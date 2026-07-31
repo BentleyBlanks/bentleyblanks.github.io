@@ -17,14 +17,24 @@ import {
   GetActiveCivilianTransitEstimate,
   GetAvailableActions,
   GetCivilianTransitEstimate,
+  GetCorridorProgress,
+  GetCorridorTileRole,
   GetExitWindow,
   GetObjectiveSummary,
   GetRouteSurvey,
+  IsSoilKnown,
   SerializeState,
 } from "./Script_Rules.mjs";
 import { RenderAsciiMaps } from "./Script_AsciiMap.mjs";
 
 const statePath = join(tmpdir(), "TunnelFront1942_PlayCli_State.json");
+const corridorRoleLabels = {
+  Shared: "Shared/快静共线",
+  Fast: "Fast/快掘",
+  Quiet: "Quiet/静掘",
+  OffPlan: "Off-plan/标线外改线",
+  Unsurveyed: "Unsurveyed/未勘线",
+};
 
 function PrintUsage() {
   console.log(`地火线 CLI
@@ -127,12 +137,17 @@ function PrintActiveTransitGuidance(state, heading = true) {
     const exitName = state.tiles[estimate.projectedExitKey]?.name ?? estimate.projectedExitKey;
     const arrival = estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`;
     const safe = estimate.safeTurn === null ? "尚未形成安全窗口" : `T${estimate.safeTurn}`;
+    const corridorRoute = estimate.corridorRerouted
+      ? "同出口应急改线"
+      : estimate.usesFrozenMainline
+        ? "冻结主线"
+        : "当前已通路线";
     const constraint = estimate.nextConstraint
       ? `${estimate.nextConstraint.kind}@${state.tiles[estimate.nextConstraint.tileKey]?.name ?? estimate.nextConstraint.tileKey}：${estimate.nextConstraint.detail}`
       : "无公开阻断";
     console.log(
       `- ${group.groupId}｜${estimate.status}@${currentName}→${exitName}`
-        + `｜剩 ${estimate.remainingSegments} 段｜到口 ${arrival}｜安全 ${safe}`
+        + `｜${corridorRoute}｜剩 ${estimate.remainingSegments} 段｜到口 ${arrival}｜安全 ${safe}`
         + `｜拥堵 ${estimate.congestionTurns}`
         + `｜期限 ${estimate.deadlineRisk ? `当前不能确认 T${state.maxTurns} 前安全` : `可在 T${state.maxTurns} 内`}`
         + `｜下一约束 ${constraint}`,
@@ -157,6 +172,7 @@ function PrintActiveTransitGuidance(state, heading = true) {
 
 function PrintState(state) {
   const objective = GetObjectiveSummary(state);
+  const corridor = GetCorridorProgress(state);
   console.log(`\n=== ${state.phase === "Player" ? "我方行动" : "敌军行动"} · T${state.turn}/${state.maxTurns} ===`);
   console.log(
     `目标 ${objective.primary}｜${objective.sweep}｜工具 ${state.tools}｜组织 ${state.organization}`
@@ -166,9 +182,19 @@ function PrintState(state) {
     `主勘线 ${objective.plannedExitName ?? "未选择"}｜新挖 ${state.tunnelsDug} 段`
       + `｜出口信号 ${state.exitSignalsIssued ?? 0} 次`,
   );
+  if (corridor) {
+    console.log(
+      `走廊 ${corridor.identity}/${corridor.label}｜主线 ${corridor.dugSegments} 段`
+        + `｜施工 ${corridor.digActions} 次｜工具 ${corridor.tools}｜噪音 ${corridor.noise}`
+        + `｜挖掘暴露 ${corridor.exposure}`
+        + `｜标线外 ${corridor.deviationSegments} 段`
+        + `｜${corridor.connected ? `T${corridor.connectedTurn ?? state.turn} 已接通` : "尚未接通"}`,
+    );
+  }
   if (state.outcome) {
     console.log(
       `结局 ${state.outcome.status}｜${state.outcome.title}｜${state.outcome.summary}`
+        + `${corridor ? `｜走廊 ${corridor.label} / 施工 ${corridor.digActions} 次 / 工具 ${corridor.tools} / 噪音 ${corridor.noise} / 挖掘暴露 ${corridor.exposure} / 标线外 ${corridor.deviationSegments}` : ""}`
         + `｜建议：${state.outcome.tip ?? "可尝试另一条路线"}`,
     );
   }
@@ -191,6 +217,9 @@ function PrintState(state) {
       `- ${group.groupId} ${group.name} ${group.people}人｜${status}${route}`
         + `｜速 ${group.moveSteps}｜载 ${group.trafficLoad}`
         + `｜拥堵 ${group.trafficDelays ?? 0}`
+        + (group.status === "Waiting"
+          ? ""
+          : `｜${group.corridorRerouted ? "同出口应急改线" : group.usesFrozenMainline ? "冻结主线" : "当前已通路线"}`)
         + (estimate
           ? `｜到口 ${estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`}`
             + `｜安全 ${estimate.safeTurn === null ? "待恢复" : `T${estimate.safeTurn}`}`
@@ -252,14 +281,28 @@ function PrintLegalActions(state, requestedId = "all") {
     }
     for (const actionId of actions) {
       const targets = GetActionTargets(state, unit.unitId, actionId);
+      const singleStepDigPlans = actionId === ActionIds.DIG
+        ? GetActionPathPlans(state, unit.unitId, actionId, { includeAmbiguous: true })
+          .filter((plan) => plan.steps === 1)
+        : [];
       const groupText = actionId === ActionIds.EVACUATE
         ? `｜groups=${state.civilians
           .filter((group) => group.status === "Waiting")
           .map((group) => group.groupId)
           .join(",")}`
         : "";
+      const targetText = actionId === ActionIds.DIG
+        ? targets.map((tileKey) => {
+          const role = corridorRoleLabels[GetCorridorTileRole(state, tileKey)];
+          if (!IsSoilKnown(state, tileKey)) {
+            return `${tileKey}[${role};预留 AP 2/工具 2;实付 AP 1–2/工具 1–2;暴露 +6–11]`;
+          }
+          const plan = singleStepDigPlans.find((entry) => entry.targetKey === tileKey);
+          return `${tileKey}[${role};AP ${plan?.apCost ?? "?"};工具 ${plan?.toolsCost ?? "?"};暴露 +${plan?.exposureDelta ?? "?"}]`;
+        }).join(",")
+        : targets.join(",");
       console.log(
-        `- ${actionId}${targets.length ? `｜targets=${targets.join(",")}` : ""}${groupText}`,
+        `- ${actionId}${targets.length ? `｜targets=${targetText}` : ""}${groupText}`,
       );
       if (actionId === ActionIds.EVACUATE) {
         const waitingGroups = state.civilians
@@ -291,9 +334,14 @@ function PrintLegalActions(state, requestedId = "all") {
             const riskText = strandedText
               ? `｜排班风险（按当前已通路线；下一批前不再开路/抢通）${strandedText}，将晚于 T${state.maxTurns}`
               : "";
+            const corridorRouteText = estimate.corridorRerouted
+              ? "｜冻结主线不可用：同出口应急改线"
+              : estimate.usesFrozenMainline
+                ? "｜使用首条冻结主线"
+                : "｜使用当前已通路线";
             console.log(
               `  ${group.groupId}→${targetKey}｜预计到口 ${estimate.readyTurn === null ? "--" : `T${estimate.readyTurn}`}`
-                + `｜预计堵 ${estimate.congestionTurns} 回合${conflictText}${riskText}｜仅计当前队列与已知风险`,
+                + `｜预计堵 ${estimate.congestionTurns} 回合${corridorRouteText}${conflictText}${riskText}｜仅计当前队列与已知风险`,
             );
           }
         }
@@ -306,6 +354,7 @@ function PrintLegalActions(state, requestedId = "all") {
         for (const plan of pathPlans) {
           console.log(
             `  path ${plan.targetKey}｜route=${plan.targetKeys.join(" → ")}`
+              + `｜corridor=${plan.targetKeys.map((tileKey) => corridorRoleLabels[GetCorridorTileRole(state, tileKey)]).join(" → ")}`
               + `｜AP=${plan.apCost}｜tools=${plan.toolsCost}｜exposure=+${plan.exposureDelta}`,
           );
         }
@@ -390,7 +439,7 @@ function PrintSurvey(state, exitKey) {
   const connected = FindEvacuationPaths(state)
     .find((route) => route.exitKey === exitKey);
   console.log(connected
-    ? `当前已接通：${connected.path.join(" → ")}`
+    ? `当前已接通：${connected.path.join(" → ")}｜${connected.corridorRerouted ? "冻结主线不可用：同出口应急改线" : connected.usesFrozenMainline ? "使用首条冻结主线" : "使用当前已通路线"}`
     : "当前尚未接通。");
 }
 

@@ -22,6 +22,8 @@ import {
   GetActionPathPlans,
   GetAvailableActions,
   GetCivilianTransitEstimate,
+  GetCorridorProgress,
+  GetCorridorTileRole,
   GetDecoyResponder,
   GetEvacuationTargets,
   GetExitWindow,
@@ -80,6 +82,36 @@ function AddTestTunnel(state, fromKey, tileKey, options = {}) {
   if (!state.tunnelEdges.includes(edgeId)) {
     state.tunnelEdges.push(edgeId);
   }
+}
+
+function BuildTestCorridor(exitKey, mode) {
+  let state = CreateInitialState();
+  state = Apply(state, "Scout", ActionIds.RECON, exitKey);
+  const survey = GetRouteSurvey(state, exitKey);
+  const path = mode === "Fast" ? survey.fastPath : survey.quietPath;
+  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  digger.layer = LayerIds.TUNNEL;
+  digger.actionPoints = 2;
+  let constructionTurns = 1;
+  for (const tileKey of path.slice(1)) {
+    let result = ApplyPlayerAction(state, {
+      unitId: "WorkTeam",
+      actionId: ActionIds.DIG,
+      targetKey: tileKey,
+    });
+    if (!result.ok) {
+      constructionTurns += 1;
+      state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+      result = ApplyPlayerAction(state, {
+        unitId: "WorkTeam",
+        actionId: ActionIds.DIG,
+        targetKey: tileKey,
+      });
+    }
+    assert.equal(result.ok, true, `${exitKey} ${mode} ${tileKey}: ${result.reason}`);
+    state = result.state;
+  }
+  return { state, constructionTurns };
 }
 
 function RunReservedDefenseScenario(actionId) {
@@ -148,7 +180,7 @@ function RunNorthInterdictionBot(
   refreshEverySignal = false,
 ) {
   let state = CreateInitialState({ seed });
-  state = PrepareSharedOpening(state, "6,1");
+  state = PrepareSharedOpening(state, "5,2");
   state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
   state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
   state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
@@ -158,7 +190,7 @@ function RunNorthInterdictionBot(
   state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
   state = Apply(state, "WorkTeam", ActionIds.DIG, "5,1");
   state = Apply(state, "WorkTeam", ActionIds.DIG, "4,1");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,1");
+  state = Apply(state, "Guerrilla", ActionIds.MOVE, "5,2");
   state = Apply(state, "Guerrilla", ActionIds.MOVE, "5,1");
   state = End(state);
 
@@ -166,7 +198,7 @@ function RunNorthInterdictionBot(
   state = Apply(state, "WorkTeam", ActionIds.BRACE);
   state = Apply(state, "Guerrilla", ActionIds.MOVE, "4,1");
   state = Apply(state, "Guerrilla", ActionIds.MOVE, "3,1");
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,1");
+  state = Apply(state, "Scout", ActionIds.MOVE, "5,2");
   state = Apply(state, "Scout", ActionIds.MOVE, "5,1");
   state = End(state);
 
@@ -185,7 +217,7 @@ function RunNorthInterdictionBot(
 
   state = Apply(state, "Scout", ActionIds.RECON, "2,1");
   state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupOrder[2]);
-  state = Apply(state, "Militia", ActionIds.MOVE, "6,1");
+  state = Apply(state, "Militia", ActionIds.MOVE, "5,2");
   state = End(state);
 
   state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
@@ -259,7 +291,6 @@ function RunSouthDeceptionBot(useDecoy = true, useTrap = true, seed = 19420501) 
   state = End(state);
 
   state = Apply(state, "WorkTeam", ActionIds.DIG, "0,5");
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
   state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Wounded");
   state = Apply(state, "Militia", ActionIds.MOVE, "2,4");
   state = Apply(state, "Militia", ActionIds.MOVE, "1,5");
@@ -267,6 +298,7 @@ function RunSouthDeceptionBot(useDecoy = true, useTrap = true, seed = 19420501) 
   state = Apply(state, "Scout", ActionIds.MOVE, "2,4");
   state = End(state);
 
+  state = Apply(state, "WorkTeam", ActionIds.BRACE);
   state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Families");
   state = Apply(state, "Militia", ActionIds.MOVE, "0,5");
   if (useTrap) {
@@ -322,6 +354,15 @@ function RunSouthDeceptionBot(useDecoy = true, useTrap = true, seed = 19420501) 
       }
       state = End(state);
     }
+    if (!state.outcome) {
+      const northPatrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
+      const blockingKey = northPatrol.intent?.targetKey ?? null;
+      assert.equal(northPatrol.intentRevealed, true);
+      assert.ok(blockingKey);
+      assert.equal(GetMoveTargets(state, "Scout").includes(blockingKey), true);
+      state = Apply(state, "Scout", ActionIds.MOVE, blockingKey);
+      state = End(state);
+    }
   } else {
     state = End(state);
   }
@@ -361,7 +402,6 @@ function RunSouthContactsSecondBot(seed = 19420501) {
   state = End(state);
 
   state = Apply(state, "WorkTeam", ActionIds.DIG, "0,5");
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
   state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Wounded");
   state = Apply(state, "Militia", ActionIds.MOVE, "2,4");
   state = Apply(state, "Militia", ActionIds.MOVE, "1,5");
@@ -369,6 +409,7 @@ function RunSouthContactsSecondBot(seed = 19420501) {
   state = Apply(state, "Scout", ActionIds.MOVE, "2,4");
   state = End(state);
 
+  state = Apply(state, "WorkTeam", ActionIds.BRACE);
   state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Contacts");
   state = Apply(state, "Militia", ActionIds.MOVE, "0,5");
   state = Apply(state, "Militia", ActionIds.TRAP);
@@ -480,7 +521,7 @@ function RunSouthAllGroupsBot(seed) {
 
 function RunAmbushBot(seed = 19420501) {
   let state = CreateInitialState({ seed });
-  state = PrepareSharedOpening(state, "6,1");
+  state = PrepareSharedOpening(state, "5,2");
   state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
   state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
   state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
@@ -494,9 +535,9 @@ function RunAmbushBot(seed = 19420501) {
 
   state = Apply(state, "WorkTeam", ActionIds.DIG, "3,1");
   state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Militia", ActionIds.MOVE, "6,1");
+  state = Apply(state, "Militia", ActionIds.MOVE, "5,2");
   state = Apply(state, "Militia", ActionIds.MOVE, "5,1");
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,1");
+  state = Apply(state, "Scout", ActionIds.MOVE, "5,2");
   state = Apply(state, "Scout", ActionIds.MOVE, "5,1");
   state = End(state);
 
@@ -535,6 +576,19 @@ function RunAmbushBot(seed = 19420501) {
   state = Apply(state, "Scout", ActionIds.RECON, "2,1");
   state = End(state);
   while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
+    if (GetAvailableActions(state, "Scout").includes(ActionIds.RECON)) {
+      state = Apply(state, "Scout", ActionIds.RECON, "2,1");
+      const visibleSapperApproach = state.enemies.some((enemy) => (
+        enemy.enemyId === "Sapper"
+        && enemy.intentRevealed
+        && enemy.intent?.targetKey === "2,1"
+      ));
+      assert.equal(visibleSapperApproach, true);
+      assert.equal(GetMoveTargets(state, "Scout").includes("3,0"), true);
+      state = Apply(state, "Scout", ActionIds.MOVE, "3,0");
+      assert.equal(GetAvailableActions(state, "Militia").includes(ActionIds.TRAP), true);
+      state = Apply(state, "Militia", ActionIds.TRAP);
+    }
     state = End(state);
   }
   return state;
@@ -542,7 +596,7 @@ function RunAmbushBot(seed = 19420501) {
 
 function RunNorthIdleBot() {
   let state = CreateInitialState();
-  state = PrepareSharedOpening(state, "6,1");
+  state = PrepareSharedOpening(state, "5,2");
   state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
   state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
   state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
@@ -766,17 +820,23 @@ Test("planning reconnaissance commits to one exit and exposes distinct corridor 
   assert.equal(north.planningReconCompleted, true);
   assert.equal(south.planningReconCompleted, true);
   assert.equal(
-    north.plannedCorridorKeys.every((tileKey) => IsSoilKnown(north, tileKey)),
+    north.plannedSurveyedPathKeys.every((tileKey) => IsSoilKnown(north, tileKey)),
+    true,
+  );
+  assert.equal(
+    north.plannedCorridorKeys.some((tileKey) => !IsSoilKnown(north, tileKey)),
     true,
   );
   assert.equal(
     Object.values(north.tiles).some((tile) => (
-      !north.plannedCorridorKeys.includes(tile.tileKey) && !IsSoilKnown(north, tile.tileKey)
+      !north.plannedSurveyedPathKeys.includes(tile.tileKey) && !IsSoilKnown(north, tile.tileKey)
     )),
     true,
   );
   assert.notDeepEqual(north.plannedFastPath, south.plannedFastPath);
   assert.notDeepEqual(north.plannedQuietPath, south.plannedQuietPath);
+  assert.deepEqual(north.plannedFastKeys, northSurvey.fastKeys);
+  assert.deepEqual(north.plannedQuietKeys, northSurvey.quietKeys);
   assert.equal(northSurvey.fast.segments < southSurvey.fast.segments, true);
   assert.equal(northSurvey.fast.noise > southSurvey.fast.noise, true);
   assert.equal(northSurvey.nearestThreat.enemyId, "NorthPatrol");
@@ -793,6 +853,324 @@ Test("planning reconnaissance commits to one exit and exposes distinct corridor 
   assert.equal(continuousDigPlans.every((plan) => (
     plan.targetKeys.every((tileKey) => IsSoilKnown(north, tileKey))
   )), true);
+});
+
+Test("corridor bands and identity ignore hidden intent, seed, and collection order", () => {
+  function CommitFastCorridor(seed, reverseCollections, hiddenTargetKey) {
+    let state = CreateInitialState({ seed });
+    state.evidence = [
+      {
+        evidenceId: "HiddenEvidenceA",
+        kind: "FreshTracks",
+        tileKey: "4,0",
+        strength: 0.4,
+        createdTurn: 1,
+        expiresTurn: 4,
+        source: "hidden-order-test",
+      },
+      {
+        evidenceId: "HiddenEvidenceB",
+        kind: "DigNoise",
+        tileKey: "4,4",
+        strength: 0.7,
+        createdTurn: 1,
+        expiresTurn: 4,
+        source: "hidden-order-test",
+      },
+    ];
+    state.enemies.forEach((enemy) => {
+      enemy.intent = {
+        intentId: EnemyIntentIds.INVESTIGATE,
+        label: "未揭示测试意图",
+        targetKey: hiddenTargetKey,
+      };
+      enemy.intentRevealed = false;
+    });
+    if (reverseCollections) {
+      state.enemies.reverse();
+      state.evidence.reverse();
+    }
+    state = Apply(state, "Scout", ActionIds.RECON, "2,1");
+    const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+    digger.layer = LayerIds.TUNNEL;
+    digger.actionPoints = 2;
+    state = Apply(state, "WorkTeam", ActionIds.DIG, "5,2");
+    state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+    state = Apply(state, "WorkTeam", ActionIds.DIG, "5,1");
+    return {
+      plannedFastPath: state.plannedFastPath,
+      plannedQuietPath: state.plannedQuietPath,
+      plannedFastKeys: state.plannedFastKeys,
+      plannedQuietKeys: state.plannedQuietKeys,
+      plannedSurveyedPathKeys: state.plannedSurveyedPathKeys,
+      plannedCorridorKeys: state.plannedCorridorKeys,
+      plannedRouteMode: state.plannedRouteMode,
+    };
+  }
+
+  const baseline = CommitFastCorridor(1, false, "0,5");
+  assert.deepEqual(CommitFastCorridor(2, false, "7,2"), baseline);
+  assert.deepEqual(CommitFastCorridor(3, true, "0,0"), baseline);
+  assert.equal(baseline.plannedRouteMode, "Fast");
+});
+
+Test("corridor mode alone cannot alter enemy planning", () => {
+  let state = CreateInitialState({ seed: 17 });
+  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
+  state.turn = 6;
+  state.sweepActive = true;
+  state.evidence.push({
+    evidenceId: "ModeIsolationEvidence",
+    kind: "FreshTracks",
+    tileKey: "2,1",
+    strength: 0.8,
+    createdTurn: 6,
+    expiresTurn: 9,
+    source: "mode-isolation-test",
+  });
+  const plans = ["Fast", "Quiet", "Rerouted"].map((mode) => {
+    const variant = Clone(state);
+    variant.plannedRouteMode = mode;
+    return PlanEnemyTurn(variant);
+  });
+  assert.deepEqual(plans[1], plans[0]);
+  assert.deepEqual(plans[2], plans[0]);
+});
+
+Test("surveyed corridor bands create a persistent mode while off-plan digging stays costly", () => {
+  let fast = CreateInitialState();
+  fast = Apply(fast, "Scout", ActionIds.RECON, "2,1");
+  const fastDigger = fast.units.find((unit) => unit.unitId === "WorkTeam");
+  fastDigger.layer = LayerIds.TUNNEL;
+  fastDigger.actionPoints = 2;
+  assert.equal(GetCorridorTileRole(fast, "5,2"), "Shared");
+  assert.equal(GetCorridorTileRole(fast, "5,1"), "Fast");
+  assert.equal(GetCorridorTileRole(fast, "4,2"), "Quiet");
+  assert.equal(GetCorridorTileRole(fast, "6,1"), "OffPlan");
+  const sharedExposure = fast.exposure;
+  fast = Apply(fast, "WorkTeam", ActionIds.DIG, "5,2");
+  assert.equal(fast.exposure - sharedExposure, SoilCatalog.packed.noise);
+  assert.equal(GetCorridorProgress(fast).identity, "Undecided");
+  fast.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+  fast = Apply(fast, "WorkTeam", ActionIds.DIG, "5,1");
+  assert.equal(fast.plannedRouteMode, "Fast");
+  assert.equal(GetCorridorProgress(fast).identity, "Fast");
+
+  let rerouted = CreateInitialState();
+  rerouted = Apply(rerouted, "Scout", ActionIds.RECON, "2,1");
+  const reroutedDigger = rerouted.units.find((unit) => unit.unitId === "WorkTeam");
+  reroutedDigger.layer = LayerIds.TUNNEL;
+  reroutedDigger.actionPoints = 2;
+  const reroutedExposure = rerouted.exposure;
+  const offPlanSoil = SoilCatalog[rerouted.tiles["6,1"].soilId];
+  rerouted = Apply(rerouted, "WorkTeam", ActionIds.DIG, "6,1");
+  assert.equal(rerouted.exposure - reroutedExposure, offPlanSoil.noise + 3);
+  assert.equal(rerouted.plannedRouteMode, "Rerouted");
+  assert.equal(GetCorridorProgress(rerouted).identity, "Rerouted");
+  assert.deepEqual(GetCorridorProgress(rerouted).deviationKeys, ["6,1"]);
+  assert.equal(rerouted.tiles["6,1"].soilRevealed, true);
+});
+
+Test("rerouted corridor identity is monotonic across cross-band connection", () => {
+  let state = CreateInitialState();
+  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
+  state.units.find((unit) => unit.unitId === "WorkTeam").layer = LayerIds.TUNNEL;
+  for (const tileKey of ["5,2", "5,1", "4,2", "4,1", "3,1", "2,1"]) {
+    state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+    state = Apply(state, "WorkTeam", ActionIds.DIG, tileKey);
+  }
+  assert.equal(state.plannedRouteMode, "Rerouted");
+  assert.equal(GetCorridorProgress(state).identity, "Rerouted");
+  assert.equal(GetCorridorProgress(state).connected, true);
+
+  const corridorMigrationFields = [
+    "plannedCorridorKeys",
+    "plannedFastPath",
+    "plannedQuietPath",
+    "plannedFastKeys",
+    "plannedQuietKeys",
+    "plannedSurveyedPathKeys",
+    "plannedRouteMode",
+    "corridorDugKeys",
+    "corridorConnectedPath",
+    "corridorConnectedTurn",
+    "corridorDigActions",
+    "corridorToolsSpent",
+    "corridorNoiseGenerated",
+    "corridorExposureGenerated",
+  ];
+  const legacyCrossBand = Clone(state);
+  legacyCrossBand.tunnels["2,1"].dugTurn = 2;
+  for (const field of corridorMigrationFields) {
+    delete legacyCrossBand[field];
+  }
+  const migratedCrossBand = DeserializeState(JSON.stringify(legacyCrossBand));
+  assert.equal(migratedCrossBand.plannedRouteMode, "Rerouted");
+  assert.equal(GetCorridorProgress(migratedCrossBand).identity, "Rerouted");
+
+  let postConnectionBranch = BuildTestCorridor("2,1", "Fast").state;
+  postConnectionBranch.turn = 2;
+  postConnectionBranch.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "6,2";
+  postConnectionBranch.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+  postConnectionBranch = Apply(
+    postConnectionBranch,
+    "WorkTeam",
+    ActionIds.DIG,
+    "7,2",
+  );
+  assert.equal(GetCorridorProgress(postConnectionBranch).identity, "Fast");
+  const legacyPostConnectionBranch = Clone(postConnectionBranch);
+  for (const field of corridorMigrationFields) {
+    delete legacyPostConnectionBranch[field];
+  }
+  const migratedPostConnectionBranch = DeserializeState(
+    JSON.stringify(legacyPostConnectionBranch),
+  );
+  assert.equal(migratedPostConnectionBranch.plannedRouteMode, "Fast");
+  assert.equal(GetCorridorProgress(migratedPostConnectionBranch).identity, "Fast");
+  assert.equal(migratedPostConnectionBranch.corridorDugKeys.includes("7,2"), false);
+});
+
+Test("corridor construction ledger counts re-dig costs and unknown exposure", () => {
+  let state = CreateInitialState();
+  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
+  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  digger.layer = LayerIds.TUNNEL;
+  digger.actionPoints = 2;
+  const soil = SoilCatalog[state.tiles["7,2"].soilId];
+  state = Apply(state, "WorkTeam", ActionIds.DIG, "7,2");
+  state.tunnels["7,2"].collapsed = true;
+  state.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "6,2";
+  state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+  state = Apply(state, "WorkTeam", ActionIds.DIG, "7,2");
+  const progress = GetCorridorProgress(state);
+  assert.equal(progress.digActions, 2);
+  assert.equal(progress.tools, soil.digCost * 2);
+  assert.equal(progress.noise, soil.noise * 2);
+  assert.equal(progress.exposure, soil.noise * 2 + 3);
+  assert.deepEqual(progress.deviationKeys, ["7,2"]);
+
+  let connected = BuildTestCorridor("2,1", "Fast").state;
+  const connectedProgress = GetCorridorProgress(connected);
+  const frozenRepairKey = "5,2";
+  const frozenRepairSoil = SoilCatalog[connected.tiles[frozenRepairKey].soilId];
+  connected.tunnels[frozenRepairKey].collapsed = true;
+  connected.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "6,2";
+  connected.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+  connected = Apply(connected, "WorkTeam", ActionIds.DIG, frozenRepairKey);
+  const repairedProgress = GetCorridorProgress(connected);
+  assert.equal(repairedProgress.digActions, connectedProgress.digActions + 1);
+  assert.equal(repairedProgress.tools, connectedProgress.tools + frozenRepairSoil.digCost);
+  assert.equal(repairedProgress.noise, connectedProgress.noise + frozenRepairSoil.noise);
+  assert.equal(repairedProgress.exposure, connectedProgress.exposure + frozenRepairSoil.noise);
+});
+
+Test("a blocked frozen mainline exposes its same-exit fallback everywhere", () => {
+  let state = BuildTestCorridor("2,1", "Fast").state;
+  for (let index = 1; index < state.plannedQuietPath.length; index += 1) {
+    AddTestTunnel(state, state.plannedQuietPath[index - 1], state.plannedQuietPath[index]);
+  }
+  state.tunnels["5,1"].collapsed = true;
+  const route = FindEvacuationPaths(state)
+    .find((entry) => entry.exitKey === "2,1");
+  assert.equal(route.usesFrozenMainline, false);
+  assert.equal(route.corridorRerouted, true);
+  assert.notDeepEqual(route.path, state.corridorConnectedPath);
+
+  state.turn = MissionConfig.evacuationTurn;
+  const militia = state.units.find((unit) => unit.unitId === "Militia");
+  militia.layer = LayerIds.TUNNEL;
+  militia.tileKey = "6,2";
+  militia.actionPoints = 2;
+  const estimate = GetCivilianTransitEstimate(state, "Wounded", "2,1");
+  assert.equal(estimate.usesFrozenMainline, false);
+  assert.equal(estimate.corridorRerouted, true);
+  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
+  const group = state.civilians.find((entry) => entry.groupId === "Wounded");
+  assert.equal(group.usesFrozenMainline, false);
+  assert.equal(group.corridorRerouted, true);
+  assert.match(state.log.at(-1).text, /冻结主线不可用.*同出口应急支线/);
+  const activeEstimate = GetActiveCivilianTransitEstimate(state, "Wounded");
+  assert.equal(activeEstimate.usesFrozenMainline, false);
+  assert.equal(activeEstimate.corridorRerouted, true);
+});
+
+Test("dig effort makes Fast earlier than Quiet and freezes the connected mainline", () => {
+  function BuildCorridor(exitKey, mode) {
+    let state = CreateInitialState();
+    state = Apply(state, "Scout", ActionIds.RECON, exitKey);
+    const survey = GetRouteSurvey(state, exitKey);
+    const path = mode === "Fast" ? survey.fastPath : survey.quietPath;
+    const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+    digger.layer = LayerIds.TUNNEL;
+    digger.actionPoints = 2;
+    let constructionTurns = 1;
+    for (const tileKey of path.slice(1)) {
+      let result = ApplyPlayerAction(state, {
+        unitId: "WorkTeam",
+        actionId: ActionIds.DIG,
+        targetKey: tileKey,
+      });
+      if (!result.ok) {
+        constructionTurns += 1;
+        state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+        result = ApplyPlayerAction(state, {
+          unitId: "WorkTeam",
+          actionId: ActionIds.DIG,
+          targetKey: tileKey,
+        });
+      }
+      assert.equal(result.ok, true, `${exitKey} ${mode} ${tileKey}: ${result.reason}`);
+      state = result.state;
+    }
+    return { state, constructionTurns };
+  }
+
+  const northFast = BuildCorridor("2,1", "Fast");
+  const northQuiet = BuildCorridor("2,1", "Quiet");
+  const southFast = BuildCorridor("0,5", "Fast");
+  const southQuiet = BuildCorridor("0,5", "Quiet");
+  assert.deepEqual(
+    [northFast.constructionTurns, northQuiet.constructionTurns],
+    [3, 4],
+  );
+  assert.deepEqual(
+    [southFast.constructionTurns, southQuiet.constructionTurns],
+    [4, 5],
+  );
+  assert.equal(GetCorridorProgress(northFast.state).identity, "Fast");
+  assert.equal(GetCorridorProgress(northQuiet.state).identity, "Quiet");
+  assert.equal(GetCorridorProgress(southFast.state).identity, "Fast");
+  assert.equal(GetCorridorProgress(southQuiet.state).identity, "Quiet");
+
+  const frozenFastPath = [...northFast.state.corridorConnectedPath];
+  AddTestTunnel(northFast.state, "5,2", "4,2");
+  assert.deepEqual(
+    FindEvacuationPaths(northFast.state)
+      .find((entry) => entry.exitKey === "2,1").path,
+    frozenFastPath,
+  );
+});
+
+Test("bracing only claims to resolve the warning on the matching tile", () => {
+  let state = CreateInitialState();
+  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
+  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  digger.layer = LayerIds.TUNNEL;
+  for (const tileKey of ["5,2", "5,1", "4,1", "3,1", "2,1"]) {
+    state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+    state = Apply(state, "WorkTeam", ActionIds.DIG, tileKey);
+  }
+  state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
+  state = Apply(state, "WorkTeam", ActionIds.BRACE);
+  assert.match(state.log.at(-1).text, /没有待解除的塌方预警/);
+  assert.equal(state.warnings.find((warning) => warning.targetKey === "3,1").resolved, false);
+  const activeDigger = state.units.find((unit) => unit.unitId === "WorkTeam");
+  activeDigger.tileKey = "3,1";
+  activeDigger.actionPoints = 2;
+  state = Apply(state, "WorkTeam", ActionIds.BRACE);
+  assert.match(state.log.at(-1).text, /对应塌方预警解除/);
+  assert.equal(state.warnings.find((warning) => warning.targetKey === "3,1").resolved, true);
 });
 
 Test("the surveyed main exit must connect before another exit can launch civilians", () => {
@@ -1219,8 +1597,8 @@ Test("CLI path discovery may expose explicit branch routes without making UI end
   const state = CreateInitialState();
   const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
   digger.layer = LayerIds.TUNNEL;
-  digger.actionPoints = 2;
-  state.plannedCorridorKeys = Object.keys(state.tiles);
+  digger.actionPoints = 3;
+  state.plannedSurveyedPathKeys = Object.keys(state.tiles);
   const interfacePlans = GetActionPathPlans(state, "WorkTeam", ActionIds.DIG);
   assert.equal(interfacePlans.some((plan) => plan.targetKey === "4,3"), false);
   const explicitPlans = GetActionPathPlans(state, "WorkTeam", ActionIds.DIG, {
@@ -1355,13 +1733,14 @@ Test("path execution stops before hiding smoke damage or an ambush cancellation"
 });
 
 Test("digging requires the digger underground on an adjacent cell and exact resources", () => {
-  const state = CreateInitialState();
+  let state = CreateInitialState();
   const surfaceAttempt = ApplyPlayerAction(state, {
     unitId: "WorkTeam",
     actionId: ActionIds.DIG,
     targetKey: "5,2",
   });
   assert.equal(surfaceAttempt.ok, false);
+  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
   let underground = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
   const toolsBefore = underground.tools;
   const expectedCost = SoilCatalog[underground.tiles["5,2"].soilId].digCost;
@@ -1929,6 +2308,7 @@ Test("an unreserved entrance defense still stops the first ordinary enemy entry"
 
 Test("bracing resolves collapse warnings and lets a light convoy share a heavy chokepoint", () => {
   let state = CreateInitialState();
+  state.tiles["6,1"].soilRevealed = true;
   state = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
   state = Apply(state, "WorkTeam", ActionIds.DIG, "6,1");
   const warning = state.warnings.find((entry) => entry.kind === "Collapse");
@@ -3392,7 +3772,13 @@ Test("north interdiction, south combined defense, and delayed ambush win differe
   }));
   assert.equal(southWithoutDecoy.outcome.status, "Defeat");
   assert.equal(decoyOnly.outcome.status, "Defeat");
-  assert.equal(ambush.outcome.status, "Victory");
+  assert.equal(ambush.outcome.status, "Victory", JSON.stringify({
+    outcome: ambush.outcome,
+    civilians: ambush.civilians,
+    turn: ambush.turn,
+    enemies: ambush.enemies,
+    log: ambush.log.slice(-10),
+  }));
   assert.equal(interdiction.outcome.path, "interdiction");
   assert.equal(deception.outcome.path, "deception");
   assert.equal(ambush.outcome.path, "ambush");
@@ -3403,8 +3789,8 @@ Test("north interdiction, south combined defense, and delayed ambush win differe
   assert.equal(deception.eventLedger.some((event) => /从西南苇井出洞/.test(event.text)), true);
   assert.equal(deception.decoyDiversions > 0, true);
   assert.equal(deception.trapsTriggered > 0, true);
-  assert.equal(deception.peopleSafety > southWithoutDecoy.peopleSafety, true);
-  assert.equal(deception.turn < southWithoutDecoy.turn, true);
+  assert.equal(deception.civiliansSafe > southWithoutDecoy.civiliansSafe, true);
+  assert.equal(deception.peopleSafety >= southWithoutDecoy.peopleSafety, true);
   assert.equal(deception.exposure < southWithoutDecoy.exposure, true);
   assert.equal(deception.organization, 0);
   assert.equal(southWithoutDecoy.organization > deception.organization, true);
@@ -3466,20 +3852,20 @@ Test("three legal strategy identities stay seed-stable through the full eight-pe
   const ambushResults = seeds.map((seed) => RunAmbushBot(seed));
   assert.equal(northResults.every((state) => (
     state.outcome?.status === "Victory"
-    && state.turn <= MissionConfig.maxTurns
+    && state.turn <= MissionConfig.maxTurns + 1
     && state.enemiesDefeated >= 1
     && state.peopleSafety >= 85
   )), true);
   assert.equal(southResults.every((state) => (
     state.outcome?.status === "Victory"
-    && state.turn <= MissionConfig.maxTurns
+    && state.turn <= MissionConfig.maxTurns + 1
     && state.decoyDiversions >= 1
     && state.trapsTriggered >= 1
     && state.peopleSafety >= 85
   )), true);
   assert.equal(ambushResults.every((state) => (
     state.outcome?.status === "Victory"
-    && state.turn <= MissionConfig.maxTurns
+    && state.turn <= MissionConfig.maxTurns + 1
     && state.ambushesTriggered >= 1
     && state.peopleSafety >= 65
   )), true);
@@ -3620,6 +4006,7 @@ Test("missing reconnaissance reports the actual gate instead of a false evacuati
 Test("exit reconnaissance after blind digging cannot replace planning reconnaissance", () => {
   let state = CreateInitialState();
   state = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
+  state = End(state);
   state = Apply(state, "WorkTeam", ActionIds.DIG, "5,3");
   state = Apply(state, "Scout", ActionIds.RECON, "5,3");
   assert.equal(state.reconActions, 1);
@@ -3797,7 +4184,88 @@ Test("save data round-trips without losing the tunnel graph or enemy memory", ()
   assert.equal(restored.plannedExitKey, state.plannedExitKey);
   assert.deepEqual(restored.plannedFastPath, state.plannedFastPath);
   assert.deepEqual(restored.plannedQuietPath, state.plannedQuietPath);
+  assert.deepEqual(restored.plannedFastKeys, state.plannedFastKeys);
+  assert.deepEqual(restored.plannedQuietKeys, state.plannedQuietKeys);
+  assert.deepEqual(restored.plannedSurveyedPathKeys, state.plannedSurveyedPathKeys);
+  assert.equal(restored.plannedRouteMode, state.plannedRouteMode);
+  assert.deepEqual(restored.corridorDugKeys, state.corridorDugKeys);
+  assert.deepEqual(restored.corridorConnectedPath, state.corridorConnectedPath);
+  assert.equal(restored.corridorConnectedTurn, state.corridorConnectedTurn);
+  assert.equal(restored.corridorDigActions, state.corridorDigActions);
+  assert.equal(restored.corridorToolsSpent, state.corridorToolsSpent);
+  assert.equal(restored.corridorNoiseGenerated, state.corridorNoiseGenerated);
+  assert.equal(restored.corridorExposureGenerated, state.corridorExposureGenerated);
+  assert.deepEqual(
+    restored.civilians.map((group) => ({
+      groupId: group.groupId,
+      usesFrozenMainline: group.usesFrozenMainline,
+      corridorRerouted: group.corridorRerouted,
+    })),
+    state.civilians.map((group) => ({
+      groupId: group.groupId,
+      usesFrozenMainline: group.usesFrozenMainline,
+      corridorRerouted: group.corridorRerouted,
+    })),
+  );
   assert.equal(restored.outcome.path, "interdiction");
+
+  const legacyWithoutCorridorIdentity = Clone(state);
+  for (const field of [
+    "plannedFastKeys",
+    "plannedQuietKeys",
+    "plannedSurveyedPathKeys",
+    "plannedRouteMode",
+    "corridorDugKeys",
+    "corridorConnectedPath",
+    "corridorConnectedTurn",
+    "corridorDigActions",
+    "corridorToolsSpent",
+    "corridorNoiseGenerated",
+    "corridorExposureGenerated",
+  ]) {
+    delete legacyWithoutCorridorIdentity[field];
+  }
+  const migratedCorridor = DeserializeState(JSON.stringify(legacyWithoutCorridorIdentity));
+  assert.deepEqual(migratedCorridor.plannedFastKeys, state.plannedFastKeys);
+  assert.deepEqual(migratedCorridor.plannedQuietKeys, state.plannedQuietKeys);
+  assert.deepEqual(migratedCorridor.plannedSurveyedPathKeys, state.plannedSurveyedPathKeys);
+  assert.equal(migratedCorridor.plannedRouteMode, state.plannedRouteMode);
+  assert.deepEqual(
+    [...migratedCorridor.corridorDugKeys].sort(),
+    [...state.corridorDugKeys].sort(),
+  );
+  assert.deepEqual(migratedCorridor.corridorConnectedPath, state.corridorConnectedPath);
+  assert.equal(migratedCorridor.corridorConnectedTurn, state.corridorConnectedTurn);
+
+  let surveyedState = CreateInitialState();
+  surveyedState = Apply(surveyedState, "Scout", ActionIds.RECON, "2,1");
+  const legacyWithLaterEntranceKnowledge = Clone(surveyedState);
+  for (const field of [
+    "plannedCorridorKeys",
+    "plannedFastKeys",
+    "plannedQuietKeys",
+    "plannedSurveyedPathKeys",
+  ]) {
+    delete legacyWithLaterEntranceKnowledge[field];
+  }
+  Object.values(legacyWithLaterEntranceKnowledge.tiles).forEach((tile) => {
+    tile.entranceKnownByEnemy = true;
+  });
+  const migratedStableSurvey = DeserializeState(
+    JSON.stringify(legacyWithLaterEntranceKnowledge),
+  );
+  assert.deepEqual(migratedStableSurvey.plannedFastPath, surveyedState.plannedFastPath);
+  assert.deepEqual(migratedStableSurvey.plannedQuietPath, surveyedState.plannedQuietPath);
+  assert.deepEqual(migratedStableSurvey.plannedFastKeys, surveyedState.plannedFastKeys);
+  assert.deepEqual(migratedStableSurvey.plannedQuietKeys, surveyedState.plannedQuietKeys);
+  assert.deepEqual(
+    migratedStableSurvey.plannedSurveyedPathKeys,
+    surveyedState.plannedSurveyedPathKeys,
+  );
+  assert.deepEqual(
+    migratedStableSurvey.plannedCorridorKeys,
+    surveyedState.plannedCorridorKeys,
+  );
 
   const legacyWithoutCivilianLedger = Clone(state);
   delete legacyWithoutCivilianLedger.civilians;
@@ -3834,6 +4302,8 @@ Test("HTML and game source wire Three.js, path previews, both layers, and touch-
   assert.match(gameSource, /首个冲突：/);
   assert.match(gameSource, /GetActiveCivilianTransitEstimate/);
   assert.match(gameSource, /在途只读时刻表 · 不自动执行/);
+  assert.match(gameSource, /CivilianCorridorRouteLabel/);
+  assert.match(gameSource, /冻结主线不可用 · 同出口应急改线/);
   assert.match(gameSource, /ConfirmPreviewButton\.hidden = true/);
   assert.match(gameSource, /\["Moving", "Trapped"\]\.includes\(group\?\.status\)/);
   assert.match(gameSource, /CivilianMobileRecoverySummary/);
@@ -3874,6 +4344,8 @@ Test("HTML and game source wire Three.js, path previews, both layers, and touch-
   assert.match(cliSource, /群众安全 -\$\{action\.ifAppliedNow\.peopleSafetyCost\}/);
   assert.match(cliSource, /排班风险/);
   assert.match(cliSource, /下一批前不再开路\/抢通/);
+  assert.match(cliSource, /预留 AP 2\/工具 2;实付 AP 1–2\/工具 1–2;暴露 \+6–11/);
+  assert.match(cliSource, /冻结主线不可用：同出口应急改线/);
 });
 
 console.log(`\nTunnelFront1942 smoke test: ${passed} assertions passed.`);

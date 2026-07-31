@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#171a17">
   <meta name="description" content="《地火线》是一款原创 Three.js 六角格回合制地道战策略白盒。侦察土层、规划地道、应对封锁与扫荡，掩护群众安全撤离。">
   <title>地火线｜原创 Three.js 地道战策略白盒</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260731d">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260731f">
   <script type="importmap">
     {
       "imports": {
@@ -63,7 +63,7 @@
       <div class="objectiveProgress"><i id="ObjectiveFill"></i></div>
       <section id="ExitWindowBoard" class="exitWindowBoard" aria-label="出口地面窗口"></section>
       <ul>
-        <li id="ObjectiveRecon"><i></i><span>首次开挖前选择北/南主出口勘线；出口另需上浮复查</span></li>
+        <li id="ObjectiveRecon"><i></i><span>首次开挖前选择主出口勘线；从分流格决定快掘或静掘</span></li>
         <li id="ObjectiveDig"><i></i><span>至少新挖 1 段地道</span></li>
         <li id="ObjectiveSweep"><i></i><span>4 回合后扫荡</span></li>
         <li><i></i><span>杀敌不计分；群众受难只记入代价账本</span></li>
@@ -148,8 +148,8 @@
         <small>玩法规则</small>
         <h2>地面提供情报与窗口，地下提供路线与风险</h2>
         <div class="helpGrid">
-          <section><b>1 · 勘线与信号</b><p>首次开挖前必须选择北枣窖或西南苇井作为主出口勘线；地图会同时投影快掘与静掘两条候选走廊，揭示其工具、噪音、返沙和最近敌情。主出口接通前不能改用另一出口发车，但接通后仍可补挖备用支线。群众到达出口下方后不会自动出洞；交通员须从该出口上浮复查，消耗 1 点组织并发出两回合安全信号。</p></section>
-          <section><b>2 · 挖掘与路径</b><p>规划侦察会标明两条候选走廊的逐格土层，地道队随后逐段开挖。移动或开挖时可选择本回合高亮的远端格，一次确认后逐格结算；路径不跨回合、不自动结束回合或支护，遇走廊外未知土层、返沙开裂、烟段、进入敌军视线或接通出口会强制停下。黏土费工具，树根层动静大，返沙层必须及时支护。</p></section>
+          <section><b>1 · 勘线与信号</b><p>首次开挖前必须选择北枣窖或西南苇井作为主出口勘线；地图会同时投影快掘与静掘的代表线和最优格带，揭示工具、施工 AP、噪音、返沙和最近敌情。从第一个分流格开挖后，主线身份与实际施工次数、工具、噪音和挖掘暴露会持续记录。主出口接通前不能改用另一出口发车；第一条接通路径会成为撤离优先主线，后补支线不会静默改写身份。若冻结主线受阻而同一出口仍有支线可走，预览和在途状态会明确标成应急改线。群众到达出口下方后不会自动出洞；交通员须从该出口上浮复查，消耗 1 点组织并发出两回合安全信号。</p></section>
+          <section><b>2 · 挖掘与路径</b><p>每段开挖同时消耗与土层工具成本相同的 AP，所以快掘比静掘早一个施工回合接通。标线外应急改线仍合法，但须预留 2 AP/工具、每次只挖一段，并按未知土层额外增加 3 暴露。移动或开挖时可选择本回合高亮的远端格，一次确认后逐格结算；路径不跨回合、不自动结束回合或支护，遇标线外未知土层、返沙开裂、烟段、进入敌军视线或接通出口会强制停下。黏土费工具，树根层动静大，返沙层必须及时支护。</p></section>
           <section><b>3 · 敌军证据</b><p>敌军只依据地表目击、开挖声、脚印和枪声行动，不会读取隐藏地道。工兵扫荡时机动 2 格；确认洞口并抵达相邻格后，仍会提前一整回合预告封洞或灌烟。</p></section>
           <section><b>4 · 调度与回答窗口</b><p>三批速度/负载分别为 1/2、2/1、3/2；生土地道容量 2，支护段容量 3，先发批次优先通行。出口显示未复查、安全、敌军监视、封洞或烟流。未知状态只让群众安全等待；假迹会让指定搜索组浪费当次行动调查错误方向，但不会继续停摆，仍须用陷阱、伏击、压制或已接通的备用出口接住后续压力。三批共八人全部安全撤离才算胜利。</p></section>
         </div>
@@ -178,6 +178,6 @@
     <div id="Toast" class="toast" hidden role="status" aria-live="polite"></div>
   </main>
   <noscript>《地火线》需要启用 JavaScript 才能运行。</noscript>
-  <script type="module" src="./Script_Game.mjs?v=20260731d"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260731f"></script>
 </body>
 </html>

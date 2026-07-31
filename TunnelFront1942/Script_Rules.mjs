@@ -188,6 +188,48 @@ function FindSurveyPath(state, exitKey, mode) {
   return path;
 }
 
+function FindSurveyDistanceMap(state, originKey, mode, reverse = false) {
+  const costs = new Map([[originKey, 0]]);
+  const open = [originKey];
+  while (open.length) {
+    open.sort((first, second) => (
+      costs.get(first) - costs.get(second)
+      || first.localeCompare(second)
+    ));
+    const currentKey = open.shift();
+    for (const neighborKey of NeighborKeys(currentKey)) {
+      if (!state.tiles[neighborKey]) {
+        continue;
+      }
+      const stepKey = reverse ? currentKey : neighborKey;
+      const nextCost = costs.get(currentKey) + SurveyStepCost(state, stepKey, mode);
+      if (nextCost >= (costs.get(neighborKey) ?? Infinity)) {
+        continue;
+      }
+      costs.set(neighborKey, nextCost);
+      open.push(neighborKey);
+    }
+  }
+  return costs;
+}
+
+function FindOptimalSurveyKeys(state, exitKey, mode) {
+  const startKey = "6,2";
+  const fromStart = FindSurveyDistanceMap(state, startKey, mode);
+  const toExit = FindSurveyDistanceMap(state, exitKey, mode, true);
+  const bestCost = fromStart.get(exitKey);
+  if (!Number.isFinite(bestCost)) {
+    return [];
+  }
+  return Object.keys(state.tiles)
+    .filter((tileKey) => (
+      fromStart.has(tileKey)
+      && toExit.has(tileKey)
+      && fromStart.get(tileKey) + toExit.get(tileKey) === bestCost
+    ))
+    .sort();
+}
+
 function SummarizeSurveyPath(state, path) {
   return path.slice(1).reduce((summary, tileKey) => {
     if (state.tunnels[tileKey]) {
@@ -215,14 +257,10 @@ export function GetRouteSurvey(state, exitKey) {
   }
   const fastPath = FindSurveyPath(state, exitKey, "Fast");
   const quietPath = FindSurveyPath(state, exitKey, "Quiet");
-  const corridorKeys = new Set([...fastPath, ...quietPath]);
-  for (const tileKey of [...corridorKeys]) {
-    for (const neighborKey of NeighborKeys(tileKey)) {
-      if (state.tiles[neighborKey]) {
-        corridorKeys.add(neighborKey);
-      }
-    }
-  }
+  const fastKeys = FindOptimalSurveyKeys(state, exitKey, "Fast");
+  const quietKeys = FindOptimalSurveyKeys(state, exitKey, "Quiet");
+  const pathKeys = [...new Set([...fastKeys, ...quietKeys])].sort();
+  const corridorKeys = BuildSurveyCorridorKeys(state, fastPath, quietPath);
   const threats = state.enemies
     .filter(IsAlive)
     .map((enemy) => ({
@@ -239,9 +277,12 @@ export function GetRouteSurvey(state, exitKey) {
     exitName: state.tiles[exitKey].name,
     fastPath,
     quietPath,
+    fastKeys,
+    quietKeys,
+    pathKeys,
     fast: SummarizeSurveyPath(state, fastPath),
     quiet: SummarizeSurveyPath(state, quietPath),
-    corridorKeys: [...corridorKeys].sort(),
+    corridorKeys,
     nearestThreat: threats[0] ?? null,
   };
 }
@@ -317,6 +358,8 @@ export function CreateInitialState(options = {}) {
       trafficDelays: 0,
       lastTrafficDelayTileKey: null,
       exitArrivalTurn: null,
+      usesFrozenMainline: null,
+      corridorRerouted: false,
     })),
     tiles,
     tunnels: {
@@ -364,6 +407,17 @@ export function CreateInitialState(options = {}) {
     plannedCorridorKeys: [],
     plannedFastPath: [],
     plannedQuietPath: [],
+    plannedFastKeys: [],
+    plannedQuietKeys: [],
+    plannedSurveyedPathKeys: [],
+    plannedRouteMode: null,
+    corridorDugKeys: [],
+    corridorConnectedPath: [],
+    corridorConnectedTurn: null,
+    corridorDigActions: 0,
+    corridorToolsSpent: 0,
+    corridorNoiseGenerated: 0,
+    corridorExposureGenerated: 0,
     lastReconTurn: 0,
     reconVisitedTiles: [],
     reconTileTurns: {},
@@ -427,6 +481,187 @@ export function FindTunnelPath(state, startKey, endKey) {
   return [];
 }
 
+function BuildSurveyCorridorKeys(state, fastPath, quietPath) {
+  const corridorKeys = new Set([...fastPath, ...quietPath]);
+  for (const tileKey of [...corridorKeys]) {
+    for (const neighborKey of NeighborKeys(tileKey)) {
+      if (state.tiles[neighborKey]) {
+        corridorKeys.add(neighborKey);
+      }
+    }
+  }
+  return [...corridorKeys].sort();
+}
+
+export function GetCorridorTileRole(state, tileKey) {
+  if (!state.planningReconCompleted || !state.plannedExitKey) {
+    return "Unsurveyed";
+  }
+  const fastKeys = state.plannedFastKeys?.length
+    ? state.plannedFastKeys
+    : state.plannedFastPath ?? [];
+  const quietKeys = state.plannedQuietKeys?.length
+    ? state.plannedQuietKeys
+    : state.plannedQuietPath ?? [];
+  const onFast = fastKeys.includes(tileKey);
+  const onQuiet = quietKeys.includes(tileKey);
+  if (onFast && onQuiet) {
+    return "Shared";
+  }
+  if (onFast) {
+    return "Fast";
+  }
+  if (onQuiet) {
+    return "Quiet";
+  }
+  return "OffPlan";
+}
+
+function ClassifyCorridorKeys(state, routeKeys, fallbackMode = null) {
+  if (["Rerouted", "Hybrid"].includes(fallbackMode)) {
+    return "Rerouted";
+  }
+  if (!routeKeys.length) {
+    return fallbackMode ?? "Undecided";
+  }
+  const roles = routeKeys.map((tileKey) => GetCorridorTileRole(state, tileKey));
+  const hasOffPlan = roles.includes("OffPlan") || roles.includes("Unsurveyed");
+  const hasFast = roles.includes("Fast");
+  const hasQuiet = roles.includes("Quiet");
+  if (hasOffPlan) {
+    return "Rerouted";
+  }
+  if (hasFast && hasQuiet) {
+    return "Rerouted";
+  }
+  if (hasFast) {
+    return "Fast";
+  }
+  if (hasQuiet) {
+    return "Quiet";
+  }
+  return fallbackMode ?? "Undecided";
+}
+
+export function GetCorridorProgress(state) {
+  if (!state.planningReconCompleted || !state.plannedExitKey) {
+    return null;
+  }
+  const liveConnectedPath = FindTunnelPath(state, "6,2", state.plannedExitKey);
+  const connectedPath = state.corridorConnectedPath?.length > 1
+    ? [...state.corridorConnectedPath]
+    : liveConnectedPath;
+  const connected = connectedPath.length > 1;
+  const trackedKeys = connected
+    ? connectedPath.slice(1)
+    : [...new Set(state.corridorDugKeys ?? [])];
+  const identity = ClassifyCorridorKeys(
+    state,
+    trackedKeys,
+    state.plannedRouteMode,
+  );
+  const dugKeys = trackedKeys.filter((tileKey) => (
+    state.tunnels[tileKey] && !state.tunnels[tileKey].isOriginal
+  ));
+  const summary = dugKeys.reduce((totals, tileKey) => {
+    const soil = SoilCatalog[state.tiles[tileKey].soilId];
+    totals.tools += soil.digCost;
+    totals.noise += soil.noise;
+    totals.unstable += soil.stability === 1 ? 1 : 0;
+    return totals;
+  }, {
+    tools: 0,
+    noise: 0,
+    unstable: 0,
+  });
+  const digActions = Number.isFinite(state.corridorDigActions)
+    ? state.corridorDigActions
+    : dugKeys.length;
+  const toolsSpent = Number.isFinite(state.corridorToolsSpent)
+    ? state.corridorToolsSpent
+    : summary.tools;
+  const noiseGenerated = Number.isFinite(state.corridorNoiseGenerated)
+    ? state.corridorNoiseGenerated
+    : summary.noise;
+  const exposureGenerated = Number.isFinite(state.corridorExposureGenerated)
+    ? state.corridorExposureGenerated
+    : summary.noise;
+  const deviationKeys = [...new Set(state.corridorDugKeys ?? [])]
+    .filter((tileKey) => GetCorridorTileRole(state, tileKey) === "OffPlan");
+  const labels = {
+    Undecided: "共线段，尚未分流",
+    Fast: "快掘主线",
+    Quiet: "静掘主线",
+    Hybrid: "混合改线",
+    Rerouted: "标线外改线",
+  };
+  return {
+    exitKey: state.plannedExitKey,
+    exitName: state.tiles[state.plannedExitKey]?.name ?? state.plannedExitKey,
+    identity,
+    label: labels[identity] ?? identity,
+    connected,
+    connectedTurn: state.corridorConnectedTurn ?? null,
+    path: connectedPath,
+    dugSegments: dugKeys.length,
+    digActions,
+    tools: toolsSpent,
+    noise: noiseGenerated,
+    exposure: exposureGenerated,
+    unstable: summary.unstable,
+    deviationSegments: deviationKeys.length,
+    deviationKeys,
+    fast: SummarizeSurveyPath(state, state.plannedFastPath ?? []),
+    quiet: SummarizeSurveyPath(state, state.plannedQuietPath ?? []),
+  };
+}
+
+function IsTunnelPathUsable(state, path) {
+  return path.length > 1 && path.every((tileKey) => (
+    state.tunnels[tileKey]
+    && !state.tunnels[tileKey].collapsed
+  ));
+}
+
+function PathsEqual(firstPath = [], secondPath = []) {
+  return firstPath.length === secondPath.length
+    && firstPath.every((tileKey, index) => tileKey === secondPath[index]);
+}
+
+function FindPreferredEvacuationRoute(state, exitKey) {
+  if (exitKey === state.plannedExitKey) {
+    if (IsTunnelPathUsable(state, state.corridorConnectedPath ?? [])) {
+      return {
+        path: [...state.corridorConnectedPath],
+        usesFrozenMainline: true,
+        corridorRerouted: false,
+      };
+    }
+    const plannedPath = state.plannedRouteMode === "Fast"
+      ? state.plannedFastPath
+      : state.plannedRouteMode === "Quiet"
+        ? state.plannedQuietPath
+        : [];
+    if (IsTunnelPathUsable(state, plannedPath ?? [])) {
+      return {
+        path: [...plannedPath],
+        usesFrozenMainline: false,
+        corridorRerouted: (state.corridorConnectedPath?.length ?? 0) > 1,
+      };
+    }
+  }
+  const path = FindTunnelPath(state, "6,2", exitKey);
+  return {
+    path,
+    usesFrozenMainline: false,
+    corridorRerouted: Boolean(
+      exitKey === state.plannedExitKey
+      && (state.corridorConnectedPath?.length ?? 0) > 1
+      && path.length > 1
+    ),
+  };
+}
+
 export function FindEvacuationPaths(state) {
   const output = [];
   for (const exitKey of evacuationExitKeys) {
@@ -434,9 +669,9 @@ export function FindEvacuationPaths(state) {
     if (!node || node.collapsed || node.sealed) {
       continue;
     }
-    const path = FindTunnelPath(state, "6,2", exitKey);
-    if (path.length > 1) {
-      output.push({ exitKey, path });
+    const route = FindPreferredEvacuationRoute(state, exitKey);
+    if (route.path.length > 1) {
+      output.push({ exitKey, ...route });
     }
   }
   return output.sort((first, second) => first.path.length - second.path.length);
@@ -492,9 +727,10 @@ export function GetMoveTargets(state, unitId) {
 }
 
 export function IsSoilKnown(state, tileKey) {
+  const plannedKeys = state.plannedSurveyedPathKeys ?? state.plannedCorridorKeys ?? [];
   return Boolean(
     state.tiles[tileKey]?.soilRevealed
-    || state.plannedCorridorKeys?.includes(tileKey),
+    || plannedKeys.includes(tileKey),
   );
 }
 
@@ -512,7 +748,9 @@ export function GetDigTargets(state, unitId) {
     if (existing && !existing.collapsed) {
       return false;
     }
-    return state.tools >= SoilCatalog[tile.soilId].digCost;
+    const actualCost = SoilCatalog[tile.soilId].digCost;
+    const requiredCost = IsSoilKnown(state, tileKey) ? actualCost : 2;
+    return state.tools >= requiredCost && unit.actionPoints >= requiredCost;
   });
 }
 
@@ -668,6 +906,8 @@ function RunCivilianTransitProjection(
     delayed: false,
     waitingForSignal: false,
     exitArrivalTurn: null,
+    usesFrozenMainline: candidateRoute.usesFrozenMainline,
+    corridorRerouted: candidateRoute.corridorRerouted,
   });
   const candidateTrace = {
     queueDelayTurns: 0,
@@ -846,6 +1086,8 @@ export function GetCivilianTransitEstimate(state, groupId, exitKey) {
     exitKey,
     projectedExitKey,
     rerouted: projection.rerouted,
+    usesFrozenMainline: route.usesFrozenMainline,
+    corridorRerouted: route.corridorRerouted,
     queueOrder,
     routeSegments,
     moveSteps,
@@ -1640,6 +1882,8 @@ export function GetActiveCivilianTransitEstimate(state, groupId) {
     exitKey: group.exitKey,
     projectedExitKey: baseline.projectedExitKey,
     rerouted: baseline.rerouted,
+    usesFrozenMainline: Boolean(group.usesFrozenMainline),
+    corridorRerouted: Boolean(group.corridorRerouted),
     remainingSegments,
     arrivalTurn: baseline.arrivalTurn,
     safeTurn: baseline.safeTurn,
@@ -1912,13 +2156,25 @@ function ApplyDig(state, unit, targetKey) {
   }
   const tile = state.tiles[targetKey];
   const soil = SoilCatalog[tile.soilId];
-  const knownSoil = tile.soilRevealed;
+  const knownSoil = IsSoilKnown(state, targetKey);
+  const trackingMainCorridor = Boolean(
+    state.planningReconCompleted
+    && state.plannedExitKey
+    && !(state.corridorConnectedPath?.length > 1)
+    && FindTunnelPath(state, "6,2", state.plannedExitKey).length === 0
+  );
+  const repairingFrozenMainline = Boolean(
+    (state.corridorConnectedPath?.length ?? 0) > 1
+    && state.corridorConnectedPath.includes(targetKey)
+    && state.tunnels[targetKey]?.collapsed
+  );
   state.tools -= soil.digCost;
-  SpendAction(unit);
+  SpendAction(unit, soil.digCost);
   const node = CreateTunnelNode(tile, {
     cracked: soil.stability === 1,
     dugTurn: state.turn,
   });
+  tile.soilRevealed = true;
   state.tunnels[targetKey] = node;
   const edgeId = [unit.tileKey, targetKey].sort().join("|");
   if (!state.tunnelEdges.includes(edgeId)) {
@@ -1927,6 +2183,30 @@ function ApplyDig(state, unit, targetKey) {
   unit.tileKey = targetKey;
   state.lastTraceTileKey = targetKey;
   state.tunnelsDug += 1;
+  if (trackingMainCorridor || repairingFrozenMainline) {
+    state.corridorDugKeys ??= [];
+    if (!state.corridorDugKeys.includes(targetKey)) {
+      state.corridorDugKeys.push(targetKey);
+    }
+    state.corridorDigActions = (state.corridorDigActions ?? 0) + 1;
+    state.corridorToolsSpent = (state.corridorToolsSpent ?? 0) + soil.digCost;
+    state.corridorNoiseGenerated = (state.corridorNoiseGenerated ?? 0) + soil.noise;
+    state.corridorExposureGenerated = (state.corridorExposureGenerated ?? 0)
+      + soil.noise
+      + (knownSoil ? 0 : 3);
+  }
+  if (trackingMainCorridor) {
+    const tileRole = GetCorridorTileRole(state, targetKey);
+    if (!state.plannedRouteMode && ["Fast", "Quiet"].includes(tileRole)) {
+      state.plannedRouteMode = tileRole;
+    } else if (
+      tileRole === "OffPlan"
+      || (state.plannedRouteMode === "Fast" && tileRole === "Quiet")
+      || (state.plannedRouteMode === "Quiet" && tileRole === "Fast")
+    ) {
+      state.plannedRouteMode = "Rerouted";
+    }
+  }
   state.exposure = Clamp(
     state.exposure + soil.noise + (knownSoil ? 0 : 3),
     0,
@@ -1952,6 +2232,24 @@ function ApplyDig(state, unit, targetKey) {
   } else {
     AddLog(state, "good", `挖通${tile.name}下方${soil.label}。`);
   }
+  if (trackingMainCorridor) {
+    const connectedPath = FindTunnelPath(state, "6,2", state.plannedExitKey);
+    if (connectedPath.length > 1) {
+      state.corridorConnectedPath = [...connectedPath];
+      state.corridorConnectedTurn = state.turn;
+      state.plannedRouteMode = ClassifyCorridorKeys(
+        state,
+        connectedPath.slice(1),
+        state.plannedRouteMode,
+      );
+      const progress = GetCorridorProgress(state);
+      AddLog(
+        state,
+        "good",
+        `${progress.exitName}主走廊接通：${progress.label}，施工 ${progress.digActions} 次 / 工具 ${progress.tools} / 噪音 ${progress.noise} / 挖掘暴露 ${progress.exposure}${progress.deviationSegments ? ` / 标线外 ${progress.deviationSegments} 段` : ""}。此主线已冻结；后续可自由补挖备用支线。`,
+      );
+    }
+  }
   for (const group of state.civilians.filter((entry) => (
     entry.status === "Trapped"
     && entry.tileKey === targetKey
@@ -1964,6 +2262,8 @@ function ApplyDig(state, unit, targetKey) {
       group.exitKey = reroute.exitKey;
       group.delayed = false;
       group.exitArrivalTurn = null;
+      group.usesFrozenMainline = false;
+      group.corridorRerouted = true;
       AddLog(state, "good", `${group.name}所在塌方段已抢通，改向${state.tiles[reroute.exitKey].name}。`);
     }
   }
@@ -2000,7 +2300,9 @@ function ApplyBrace(state, unit) {
   AddLog(
     state,
     "good",
-    `${state.tiles[unit.tileKey].name}地下已支护，塌方预警解除。`,
+    warning
+      ? `${state.tiles[unit.tileKey].name}地下已支护，对应塌方预警解除。`
+      : `${state.tiles[unit.tileKey].name}地下已支护，容量提高；此处没有待解除的塌方预警。`,
     warning?.warningId ?? null,
   );
   return { ok: true };
@@ -2027,6 +2329,17 @@ function ApplyRecon(state, unit, targetKey) {
     state.plannedCorridorKeys = [...survey.corridorKeys];
     state.plannedFastPath = [...survey.fastPath];
     state.plannedQuietPath = [...survey.quietPath];
+    state.plannedFastKeys = [...survey.fastKeys];
+    state.plannedQuietKeys = [...survey.quietKeys];
+    state.plannedSurveyedPathKeys = [...survey.pathKeys];
+    state.plannedRouteMode = null;
+    state.corridorDugKeys = [];
+    state.corridorConnectedPath = [];
+    state.corridorConnectedTurn = null;
+    state.corridorDigActions = 0;
+    state.corridorToolsSpent = 0;
+    state.corridorNoiseGenerated = 0;
+    state.corridorExposureGenerated = 0;
     state.planningReconCompleted = true;
     revealed = survey.corridorKeys.length;
   } else {
@@ -2075,7 +2388,7 @@ function ApplyRecon(state, unit, targetKey) {
     state,
     "good",
     planningRecon
-      ? `交通员完成${survey.exitName}主勘线并标明 ${revealed} 格土层：快掘 ${survey.fast.segments} 段/工具 ${survey.fast.tools}/噪音 ${survey.fast.noise}，静掘 ${survey.quiet.segments} 段/工具 ${survey.quiet.tools}/噪音 ${survey.quiet.noise}；最近威胁为${survey.nearestThreat?.name ?? "无"}（距出口 ${survey.nearestThreat?.distance ?? "-"} 格）。主出口接通前不能改用另一出口发车。`
+      ? `交通员完成${survey.exitName}主勘线并标明 ${survey.pathKeys.length} 格候选土层：快掘 ${survey.fast.segments} 段/工具 ${survey.fast.tools}/施工 ${survey.fast.tools} AP/噪音 ${survey.fast.noise}，静掘 ${survey.quiet.segments} 段/工具 ${survey.quiet.tools}/施工 ${survey.quiet.tools} AP/噪音 ${survey.quiet.noise}；从分流格开挖即形成走线身份，标线外仍可单段改线但按未知土层增加暴露。最近威胁为${survey.nearestThreat?.name ?? "无"}（距出口 ${survey.nearestThreat?.distance ?? "-"} 格）。主出口接通前不能改用另一出口发车。`
       : repeatRecon
       ? `交通员消耗 1 点组织复查地表，排除旧痕并标出敌军下一步意图；暴露下降 5。`
       : `交通员查清附近 ${revealed} 格土层，并标出可见敌军下一步意图。`,
@@ -2247,6 +2560,8 @@ function ApplyEvacuate(state, unit, exitKey, groupId = null) {
   group.trafficDelays = 0;
   group.lastTrafficDelayTileKey = null;
   group.exitArrivalTurn = null;
+  group.usesFrozenMainline = route.usesFrozenMainline;
+  group.corridorRerouted = route.corridorRerouted;
   state.civilianLaunchSerial = (state.civilianLaunchSerial ?? 1) + 1;
   state.lastEvacuationLaunchTurn = state.turn;
   state.organization -= 1;
@@ -2254,7 +2569,7 @@ function ApplyEvacuate(state, unit, exitKey, groupId = null) {
   AddLog(
     state,
     "good",
-    `${group.name}第 ${group.launchOrder} 批沿${state.tiles[exitKey].name}路线转移：每回合 ${group.moveSteps ?? 2} 段，通行负载 ${group.trafficLoad ?? 1}。`,
+    `${group.name}第 ${group.launchOrder} 批沿${state.tiles[exitKey].name}路线转移：${route.corridorRerouted ? "冻结主线不可用，显式改走同出口应急支线" : route.usesFrozenMainline ? "使用首条冻结主线" : "使用当前已通路线"}；每回合 ${group.moveSteps ?? 2} 段，通行负载 ${group.trafficLoad ?? 1}。`,
   );
   return { ok: true };
 }
@@ -3375,6 +3690,8 @@ function AdvanceCivilians(state, transitTraces = null) {
         group.exitKey = alternate.exitKey;
         group.delayed = true;
         group.exitArrivalTurn = null;
+        group.usesFrozenMainline = false;
+        group.corridorRerouted = true;
         AddLog(
           state,
           "good",
@@ -3396,6 +3713,8 @@ function AdvanceCivilians(state, transitTraces = null) {
             group.exitKey = alternate.exitKey;
             group.delayed = true;
             group.exitArrivalTurn = null;
+            group.usesFrozenMainline = false;
+            group.corridorRerouted = true;
             AddLog(
               state,
               "warning",
@@ -3441,6 +3760,8 @@ function AdvanceCivilians(state, transitTraces = null) {
           group.pathIndex = 0;
           group.exitKey = reroute.exitKey;
           group.exitArrivalTurn = null;
+          group.usesFrozenMainline = false;
+          group.corridorRerouted = true;
           AddLog(state, "warning", `${group.name}因塌方改走${state.tiles[reroute.exitKey].name}支线。`);
           continue;
         }
@@ -3918,6 +4239,7 @@ export function GetObjectiveSummary(state) {
     planningReconCompleted: Boolean(state.planningReconCompleted),
     plannedExitKey: state.plannedExitKey ?? null,
     plannedExitName: state.plannedExitKey ? state.tiles[state.plannedExitKey]?.name ?? null : null,
+    corridor: GetCorridorProgress(state),
   };
 }
 
@@ -4035,14 +4357,96 @@ export function DeserializeState(serialized) {
     })[0];
   }
   if (parsed.plannedExitKey) {
-    const survey = GetRouteSurvey(parsed, parsed.plannedExitKey);
-    parsed.plannedCorridorKeys ??= [...survey.corridorKeys];
+    const sanitizedSurveyState = CreateInitialState({ seed: parsed.seed });
+    const survey = GetRouteSurvey(sanitizedSurveyState, parsed.plannedExitKey);
     parsed.plannedFastPath ??= [...survey.fastPath];
     parsed.plannedQuietPath ??= [...survey.quietPath];
+    parsed.plannedFastKeys ??= [...survey.fastKeys];
+    parsed.plannedQuietKeys ??= [...survey.quietKeys];
+    parsed.plannedSurveyedPathKeys ??= [...new Set([
+      ...parsed.plannedFastKeys,
+      ...parsed.plannedQuietKeys,
+    ])].sort();
+    parsed.plannedCorridorKeys ??= BuildSurveyCorridorKeys(
+      parsed,
+      parsed.plannedFastPath,
+      parsed.plannedQuietPath,
+    );
+    const allDugKeys = Object.keys(parsed.tunnels ?? {})
+      .filter((tileKey) => !parsed.tunnels[tileKey].isOriginal)
+      .sort((first, second) => (
+        (parsed.tunnels[first].dugTurn ?? Number.MAX_SAFE_INTEGER)
+          - (parsed.tunnels[second].dugTurn ?? Number.MAX_SAFE_INTEGER)
+        || first.localeCompare(second)
+      ));
+    const connectedPath = FindTunnelPath(parsed, "6,2", parsed.plannedExitKey);
+    parsed.corridorConnectedPath ??= [...connectedPath];
+    parsed.corridorConnectedTurn ??= connectedPath.length > 1
+      ? Math.max(
+        1,
+        ...connectedPath.map((tileKey) => parsed.tunnels[tileKey]?.dugTurn ?? 1),
+      )
+      : null;
+    if (!Array.isArray(parsed.corridorDugKeys)) {
+      const frozenPathKeys = new Set((parsed.corridorConnectedPath ?? []).slice(1));
+      parsed.corridorDugKeys = allDugKeys.filter((tileKey) => (
+        parsed.corridorConnectedTurn === null
+        || frozenPathKeys.has(tileKey)
+        || (parsed.tunnels[tileKey].dugTurn ?? Number.MAX_SAFE_INTEGER)
+          < parsed.corridorConnectedTurn
+      ));
+    }
+    parsed.plannedRouteMode ??= ClassifyCorridorKeys(parsed, parsed.corridorDugKeys);
+    parsed.plannedRouteMode = ClassifyCorridorKeys(
+      parsed,
+      parsed.corridorConnectedPath.length > 1
+        ? parsed.corridorConnectedPath.slice(1)
+        : parsed.corridorDugKeys,
+      parsed.plannedRouteMode,
+    );
+    const migratedDigSummary = parsed.corridorDugKeys.reduce((summary, tileKey) => {
+      const soil = SoilCatalog[parsed.tiles[tileKey]?.soilId];
+      if (!soil) {
+        return summary;
+      }
+      summary.tools += soil.digCost;
+      summary.noise += soil.noise;
+      summary.exposure += soil.noise
+        + (GetCorridorTileRole(parsed, tileKey) === "OffPlan" ? 3 : 0);
+      return summary;
+    }, { tools: 0, noise: 0, exposure: 0 });
+    parsed.corridorDigActions ??= parsed.corridorDugKeys.length;
+    parsed.corridorToolsSpent ??= migratedDigSummary.tools;
+    parsed.corridorNoiseGenerated ??= migratedDigSummary.noise;
+    parsed.corridorExposureGenerated ??= migratedDigSummary.exposure;
   } else {
     parsed.plannedCorridorKeys ??= [];
     parsed.plannedFastPath ??= [];
     parsed.plannedQuietPath ??= [];
+    parsed.plannedFastKeys ??= [];
+    parsed.plannedQuietKeys ??= [];
+    parsed.plannedSurveyedPathKeys ??= [];
+    parsed.plannedRouteMode ??= null;
+    parsed.corridorDugKeys ??= [];
+    parsed.corridorConnectedPath ??= [];
+    parsed.corridorConnectedTurn ??= null;
+    parsed.corridorDigActions ??= 0;
+    parsed.corridorToolsSpent ??= 0;
+    parsed.corridorNoiseGenerated ??= 0;
+    parsed.corridorExposureGenerated ??= 0;
+  }
+  for (const group of parsed.civilians ?? []) {
+    const usesFrozenMainline = Boolean(
+      group.exitKey === parsed.plannedExitKey
+      && PathsEqual(group.path ?? [], parsed.corridorConnectedPath ?? [])
+      && (group.path?.length ?? 0) > 1
+    );
+    group.usesFrozenMainline ??= group.status === "Waiting" ? null : usesFrozenMainline;
+    group.corridorRerouted ??= Boolean(
+      group.status !== "Waiting"
+      && (group.path?.length ?? 0) > 1
+      && !usesFrozenMainline
+    );
   }
   return parsed;
 }
@@ -4090,6 +4494,8 @@ export function CreateRulesApi() {
     GetActiveCivilianTransitEstimate,
     GetReconTargets,
     GetRouteSurvey,
+    GetCorridorTileRole,
+    GetCorridorProgress,
     FindTunnelPath,
     FindEvacuationPaths,
     GetCombatPreview,

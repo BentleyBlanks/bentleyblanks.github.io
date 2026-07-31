@@ -18,6 +18,8 @@ import {
   GetAvailableActions,
   GetCombatPreview,
   GetCivilianTransitEstimate,
+  GetCorridorProgress,
+  GetCorridorTileRole,
   GetDecoyResponder,
   GetExitWindow,
   GetObjectiveSummary,
@@ -29,6 +31,13 @@ import {
 } from "./Script_Rules.mjs";
 
 const saveKey = "tunnelfront1942_campaign_v1";
+const corridorRoleLabels = {
+  Shared: "快/静共线",
+  Fast: "快掘走廊",
+  Quiet: "静掘走廊",
+  OffPlan: "标线外改线",
+  Unsurveyed: "未完成勘线",
+};
 const canvas = document.querySelector("#GameCanvas");
 const gameShell = document.querySelector("#GameShell");
 const ui = Object.fromEntries(
@@ -518,6 +527,21 @@ function AddPlanningOverlay() {
       height: 0.18,
     },
   ];
+  const bandKeys = [...new Set([
+    ...(gameState.plannedFastKeys ?? gameState.plannedFastPath ?? []),
+    ...(gameState.plannedQuietKeys ?? gameState.plannedQuietPath ?? []),
+  ])].filter((tileKey) => tileKey !== "6,2");
+  const bandColors = {
+    Fast: 0xe2ad58,
+    Quiet: 0x75bfc2,
+    Shared: 0xb8b981,
+  };
+  for (const tileKey of bandKeys) {
+    const role = GetCorridorTileRole(gameState, tileKey);
+    const marker = CreateRing(bandColors[role] ?? 0xb8b981, 0.34, 0.58);
+    marker.position.copy(WorldPosition(tileKey, 0.1));
+    tunnelDynamicGroup.add(marker);
+  }
   for (const route of routeStyles) {
     if (route.path.length < 2) {
       continue;
@@ -1001,6 +1025,16 @@ function CivilianActiveTimingText(estimate, compact = false) {
   return [arrival, safety, congestion, deadline].filter(Boolean).join(" · ");
 }
 
+function CivilianCorridorRouteLabel(routeState, compact = false) {
+  if (routeState?.corridorRerouted) {
+    return compact ? "应急改线" : "冻结主线不可用 · 同出口应急改线";
+  }
+  if (routeState?.usesFrozenMainline) {
+    return compact ? "冻结主线" : "使用首条冻结主线";
+  }
+  return compact ? "已通路线" : "使用当前已通路线";
+}
+
 function CivilianRecoverySummary(estimate) {
   if (!estimate) {
     return "";
@@ -1099,9 +1133,10 @@ function RenderHud() {
   ui.SafetyValue.style.color = gameState.peopleSafety <= 60 ? "#ef877a" : "";
   ui.ObjectivePrimary.textContent = objective.primary;
   ui.ObjectiveFill.style.width = `${Math.min(100, (gameState.civiliansSafe / MissionConfig.requiredEvacuees) * 100)}%`;
+  const corridor = objective.corridor;
   ui.ObjectiveRecon.querySelector("span").textContent = objective.planningReconCompleted
-    ? `主勘线：${objective.plannedExitName}；出口另需上浮复查`
-    : "首次开挖前选择北/南主出口勘线；出口另需上浮复查";
+    ? `主勘线：${objective.plannedExitName}｜${corridor.label}｜施工 ${corridor.digActions} 次 / 工具 ${corridor.tools} / 噪音 ${corridor.noise} / 挖掘暴露 ${corridor.exposure}${corridor.deviationSegments ? ` / 标线外 ${corridor.deviationSegments}` : ""}${corridor.connected ? `｜T${corridor.connectedTurn ?? gameState.turn} 接通` : "｜出口另需接通与上浮复查"}`
+    : "首次开挖前选择北/南主出口勘线；从分流格决定快掘或静掘";
   ui.ObjectiveRecon.classList.toggle("complete", gameState.planningReconCompleted);
   ui.ObjectiveDig.classList.toggle("complete", gameState.tunnelsDug > 0);
   ui.ObjectiveSweep.querySelector("span").textContent = objective.sweep;
@@ -1143,10 +1178,10 @@ function RenderHud() {
       <b><span class="desktopCivilianName">${group.name}</span><span class="mobileCivilianName">${CivilianShortName(group)}</span> · ${group.people}人</b>
       <span>${CivilianStatusLabel(group, activeTransitEstimates.get(group.groupId))}</span>
       <small class="desktopCivilianSummary">${group.moveSteps ?? 2} 段/回合 · 负载 ${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 已堵 ${group.trafficDelays} 回合` : ""}<br>${activeTransitEstimates.has(group.groupId)
-    ? `${CivilianActiveTimingText(activeTransitEstimates.get(group.groupId))}<br>${CivilianRecoverySummary(activeTransitEstimates.get(group.groupId))}`
+    ? `${CivilianCorridorRouteLabel(activeTransitEstimates.get(group.groupId))} · ${CivilianActiveTimingText(activeTransitEstimates.get(group.groupId))}<br>${CivilianRecoverySummary(activeTransitEstimates.get(group.groupId))}`
     : group.logisticsNote ?? "标准转移批次"}</small>
       <small class="mobileCivilianSummary">${CivilianMobileStatus(group, activeTransitEstimates.get(group.groupId))} · ${activeTransitEstimates.has(group.groupId)
-    ? `到${activeTransitEstimates.get(group.groupId).arrivalTurn === null ? "--" : `T${activeTransitEstimates.get(group.groupId).arrivalTurn}`} · ${CivilianMobileRecoverySummary(activeTransitEstimates.get(group.groupId))}${activeTransitEstimates.get(group.groupId).congestionTurns ? ` · 堵${activeTransitEstimates.get(group.groupId).congestionTurns}` : ""}${activeTransitEstimates.get(group.groupId).deadlineRisk ? " · 超期" : ""}`
+    ? `${CivilianCorridorRouteLabel(activeTransitEstimates.get(group.groupId), true)} · 到${activeTransitEstimates.get(group.groupId).arrivalTurn === null ? "--" : `T${activeTransitEstimates.get(group.groupId).arrivalTurn}`} · ${CivilianMobileRecoverySummary(activeTransitEstimates.get(group.groupId))}${activeTransitEstimates.get(group.groupId).congestionTurns ? ` · 堵${activeTransitEstimates.get(group.groupId).congestionTurns}` : ""}${activeTransitEstimates.get(group.groupId).deadlineRisk ? " · 超期" : ""}`
     : `速${group.moveSteps ?? 2} · 载${group.trafficLoad ?? 1}${group.trafficDelays ? ` · 堵${group.trafficDelays}` : ""}`}</small>
     </button>
   `).join("");
@@ -1295,6 +1330,9 @@ function BuildPreview(action) {
       const soilText = pathTiles
         .map((entry) => `${entry.name}:${SoilCatalog[entry.soilId].label}`)
         .join("、");
+      const corridorText = pathTiles
+        .map((entry) => corridorRoleLabels[GetCorridorTileRole(gameState, entry.tileKey)])
+        .join(" → ");
       const stopText = pathPlan?.decisionStop
         ? `｜抵达后强制停下：${pathPlan.decisionStop}`
         : "";
@@ -1302,8 +1340,8 @@ function BuildPreview(action) {
         eyebrow: "开挖预览",
         title: `${pathPlan?.steps > 1 ? `连续开挖 ${pathPlan.steps} 段至` : "向"}${tile.name}${pathPlan?.steps > 1 ? "" : "下方开挖"}`,
         body: known
-          ? `${pathPlan?.apCost ?? 1} AP｜工具 ${pathPlan?.toolsCost ?? soil.digCost}｜暴露 +${pathPlan?.exposureDelta ?? soil.noise}｜路线：${routeText}｜${soilText}${stopText}｜逐段留下开挖证据；本次不自动支护或结束回合`
-          : `1 AP｜工具 1–2｜暴露约 +6–11｜路线：${routeText}｜土层未知：只执行这一段，实际消耗与塌方风险须停下核对${stopText}`,
+          ? `${pathPlan?.apCost ?? soil.digCost} AP｜工具 ${pathPlan?.toolsCost ?? soil.digCost}｜暴露 +${pathPlan?.exposureDelta ?? soil.noise}｜走线：${corridorText}｜路线：${routeText}｜${soilText}${stopText}｜逐段留下开挖证据；本次不自动支护或结束回合`
+          : `预留 2 AP / 工具 2｜实际支付 1–2｜暴露约 +6–11｜走线：${corridorText}｜路线：${routeText}｜标线外土层未知：只执行这一段，并额外增加 3 暴露；实际消耗与塌方风险须停下核对${stopText}`,
       };
     }
     case ActionIds.RECON:
@@ -1312,7 +1350,7 @@ function BuildPreview(action) {
         return {
           eyebrow: "主走廊勘线预览",
           title: `以${survey.exitName}为主出口`,
-          body: `快掘：${survey.fast.segments} 段 / 工具 ${survey.fast.tools} / 噪音 ${survey.fast.noise}${survey.fast.unstable ? ` / 返沙 ${survey.fast.unstable}` : ""}；静掘：${survey.quiet.segments} 段 / 工具 ${survey.quiet.tools} / 噪音 ${survey.quiet.noise}${survey.quiet.knownEntrances ? ` / 已知旧洞 ${survey.quiet.knownEntrances}` : ""}。最近威胁：${survey.nearestThreat?.name ?? "无"}，距出口 ${survey.nearestThreat?.distance ?? "-"} 格。确认后揭示两条候选走廊；主出口接通前不能改用另一出口发车。`,
+          body: `快掘：${survey.fast.segments} 段 / 工具与施工 ${survey.fast.tools} / 噪音 ${survey.fast.noise}${survey.fast.unstable ? ` / 返沙 ${survey.fast.unstable}` : ""}；静掘：${survey.quiet.segments} 段 / 工具与施工 ${survey.quiet.tools} / 噪音 ${survey.quiet.noise}${survey.quiet.knownEntrances ? ` / 已知旧洞 ${survey.quiet.knownEntrances}` : ""}。黏土每段需 2 AP，因此静掘会晚一回合接通；从分流格开挖即形成走线身份。标线外仍可单段改线，但按未知土层额外增加 3 暴露。最近威胁：${survey.nearestThreat?.name ?? "无"}，距出口 ${survey.nearestThreat?.distance ?? "-"} 格。`,
         };
       }
       if (tile.kind === "safeExit") {
@@ -1403,6 +1441,7 @@ function BuildPreview(action) {
       const rerouteText = estimate?.rerouted
         ? `当前已知反制会让本批改走${projectedExit.name}`
         : `按${projectedExit.name}现有路线`;
+      const corridorRouteText = CivilianCorridorRouteLabel(estimate);
       const deadlineText = estimate?.deadlineSlack === null || estimate?.deadlineSlack === undefined
         ? "时限未知"
         : estimate.deadlineSlack < 0
@@ -1442,7 +1481,7 @@ function BuildPreview(action) {
           ? "群众转移预览 · 排班风险"
           : "群众转移预览",
         title: `第 ${estimate?.queueOrder ?? "?"} 批：${group?.name ?? "群众"} → ${projectedExit.name}`,
-        body: `${rerouteText} · ${readyText} · ${deadlineText}｜${queueText}｜${scheduleRiskText}｜1 AP · 组织 1 · 速 ${estimate?.moveSteps ?? "?"} · 载 ${estimate?.trafficLoad ?? "?"}｜${signalText}｜已计当前烟流、封口与已知反制；剩余排班固定当前已通路线，只给无敌军、无拥堵的条件下界，未计后续新增敌情、烟流、封口、塌方或玩家改道`,
+        body: `${corridorRouteText} · ${rerouteText} · ${readyText} · ${deadlineText}｜${queueText}｜${scheduleRiskText}｜1 AP · 组织 1 · 速 ${estimate?.moveSteps ?? "?"} · 载 ${estimate?.trafficLoad ?? "?"}｜${signalText}｜已计当前烟流、封口与已知反制；剩余排班固定当前已通路线，只给无敌军、无拥堵的条件下界，未计后续新增敌情、烟流、封口、塌方或玩家改道`,
       };
     }
     case ActionIds.CLEAR_SEAL:
@@ -1523,7 +1562,7 @@ function ShowActiveCivilianPreview(groupId) {
         : "当前无需恢复动作";
   ui.PreviewEyebrow.textContent = "在途只读时刻表 · 不自动执行";
   ui.PreviewTitle.textContent = `${group.name} · ${status} · ${currentName}→${exitName}`;
-  ui.PreviewBody.textContent = `${CivilianActiveTimingText(estimate)}｜剩余 ${estimate.remainingSegments} 段｜${constraint}｜恢复：${recovery}｜${estimate.assumptions}`;
+  ui.PreviewBody.textContent = `${CivilianCorridorRouteLabel(estimate)}｜${CivilianActiveTimingText(estimate)}｜剩余 ${estimate.remainingSegments} 段｜${constraint}｜恢复：${recovery}｜${estimate.assumptions}`;
   ui.CancelPreviewButton.innerHTML = "关闭 <kbd>Esc</kbd>";
   ui.ConfirmPreviewButton.hidden = true;
   ui.PreviewPanel.hidden = false;
@@ -1830,7 +1869,11 @@ function ShowOutcome() {
     interdiction: "地表压制开窗路线",
     none: "未形成有效转移路线",
   };
-  ui.OutcomeRoute.textContent = `本局主要策略：${pathLabels[outcome.path] ?? "混合路线"}`;
+  const corridor = GetCorridorProgress(gameState);
+  const corridorText = corridor
+    ? `${corridor.label}；${corridor.connected ? `T${corridor.connectedTurn ?? gameState.turn} 接通` : "未接通"}；施工 ${corridor.digActions} 次 / 工具 ${corridor.tools} / 噪音 ${corridor.noise} / 挖掘暴露 ${corridor.exposure}${corridor.deviationSegments ? ` / 标线外 ${corridor.deviationSegments} 段` : ""}`
+    : "未形成主走廊";
+  ui.OutcomeRoute.textContent = `本局走廊：${corridorText}｜窗口策略：${pathLabels[outcome.path] ?? "混合路线"}`;
   ui.OutcomeCauses.innerHTML = (outcome.causeChain ?? [])
     .map((event) => `<li>T${event.turn} · ${event.text}</li>`)
     .join("");
