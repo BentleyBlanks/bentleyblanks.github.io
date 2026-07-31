@@ -5,13 +5,15 @@
 // 纯逻辑模块：禁 window/document/three、禁时钟与非 StepRng 随机；对外接口一律 CloneState 后推进。
 
 import { HexNeighborKeys, HexDistanceKeys } from "./Script_Hex.mjs";
-import { CFG, terrainDefinitions, unitDefinitions, TEXT } from "./Data_Rules.mjs";
+import { CFG, terrainDefinitions, unitDefinitions, disguiseDefinitions, TEXT } from "./Data_Rules.mjs";
 import { GetLevel } from "./Data_Levels.mjs";
 import {
   SortedKeys, CompareIds, EdgeKey, EdgeEnds, TerrainOf, PushEvent, AddLedger, AddPlayerDrain,
   SpendAmmo, GainAmmo, UnitDef, CloneState, UnitsOn, AllyUnits, EnemyUnits, RemoveUnit,
   TunnelNeighbors, ReachableFacilityCells, StorageCellsUnder,
   EntranceThreshold, CellHasRoom, IsSurfacePassable, ZoneOfCell, ZoneEntranceKeys,
+  ActionUnlocked, FacilityUnlocked, UnlockedDisguises, CivGuidanceOn, StorageCapOf,
+  CivsAtVillage, CivsInCell, CivSlots, CivSpeed, CellCivRoom, EntranceGuideBonus,
 } from "./Script_State.mjs";
 import {
   EnemyCanSeeHex, EnemySeesUnit, RecordSighting, ExposeEntranceUse, PreviewEntranceUseBeans,
@@ -117,22 +119,38 @@ export function AdvanceSite(state, events, siteId, amount) {
   if (site.kind === "segment") {
     state.tunnels.edges[site.edge] = { door: null };
     if (!state.tunnels.cells[at]) {
-      state.tunnels.cells[at] = { facility: null, grain: 0, civs: 0, smoke: 0, civBreath: 0, fightpostKnown: false };
+      state.tunnels.cells[at] = { facility: null, grain: 0, smoke: 0, water: 0, trapReady: false,
+        fightpostHeat: 0, fightpostLastTurn: 0, fightpostKnown: false };
     }
     PushEvent(state, events, { kind: "dig", text: "地道段贯通", hex: at, layer: "under", visible: true });
     ExposeZoneWork(state, events, at);
   } else if (site.kind === "entrance") {
     const cap = TerrainOf(state, at)?.concealCap ?? 1;
-    state.tunnels.entrances[at] = { conceal: Math.min(3, cap), expose: CFG.exposeNewEntrance, known: false, sealed: false };
+    const previous = state.tunnels.entrances[at];
+    state.tunnels.entrances[at] = { conceal: Math.min(3, cap), expose: CFG.exposeNewEntrance,
+      known: false, sealed: false, disguise: (previous && previous.disguise) || null };
     PushEvent(state, events, { kind: "dig", text: "新开地道口", hex: at, layer: "under", visible: true });
     PushEvent(state, events, { kind: "expose", text: TEXT.expose.newEntrance, hex: at, visible: true });
   } else if (site.kind === "facility") {
     const cell = state.tunnels.cells[at];
     if (cell) {
+      const rearm = cell.facility === "trapdoor" && site.facility === "trapdoor";
       cell.facility = site.facility;
-      if (site.facility === "vent") state.tunnels.vents[at] = { expose: 0, known: false, smoked: false };
-      PushEvent(state, events, { kind: "dig", text: `修成${({ storage: "储粮洞", shelter: "藏人室", vent: "通风口", fightpost: "枪眼" })[site.facility]}`, hex: at, layer: "under", visible: true });
+      if (site.facility === "vent" && !state.tunnels.vents[at]) state.tunnels.vents[at] = { expose: 0, known: false, smoked: false };
+      if (site.facility === "trapdoor") cell.trapReady = true;
+      PushEvent(state, events, { kind: "dig",
+        text: rearm ? TEXT.trapText.rearm
+          : `修成${({ storage: "储粮洞", shelter: "藏人室", vent: "通气孔", fightpost: "射击孔", trapdoor: "翻板" })[site.facility]}`,
+        hex: at, layer: "under", visible: true });
       ExposeZoneWork(state, events, at);
+    }
+  } else if (site.kind === "disguise") {
+    const entrance = state.tunnels.entrances[at];
+    if (entrance) {
+      entrance.disguise = site.facility;
+      const def = disguiseDefinitions[site.facility];
+      PushEvent(state, events, { kind: "dig", text: `口做进了${def ? def.name : "什物"}里（${TEXT.expose.disguised}）`,
+        hex: at, visible: true });
     }
   } else if (site.kind === "door") {
     const edge = state.tunnels.edges[site.edge];
@@ -217,8 +235,12 @@ export function ResolveAttack(state, events, attackerId, defenderId, opts = {}) 
   let damage = aDef.atk + (ambush ? CFG.ambushBonus : 0);
   damage = Math.max(ambush ? CFG.ambushMinDamage : 0, damage - CoverOf(state, defender));
   if (stale) damage = CFG.staleAmbushDamage;
+  // 打一枪换一个地方：同一个射击孔隔一回合内再开火 → 火光被咬住，这一枪只伤 1。
+  if (opts.locked) damage = CFG.fightpost.lockedDamage;
   defender.hp -= damage;
-  const verb = ambush ? (opts.fightpost ? "枪眼急射" : (stale ? "伏击（敌有防备）" : "伏击")) : "接火";
+  const verb = ambush
+    ? (opts.fightpost ? (opts.locked ? "射击孔急射（已被咬住）" : "射击孔急射") : (stale ? "伏击（敌有防备）" : "伏击"))
+    : "接火";
   PushEvent(state, events, { kind: "combat", text: `${aDef.name}${verb}${dDef.name}：伤 ${damage}`, hex: defender.pos, visible: true });
   const killed = defender.hp <= 0;
   let counter = 0;
@@ -267,6 +289,12 @@ export function ResolveAttack(state, events, attackerId, defenderId, opts = {}) 
       } else if (opts.fightpost) {
         const cell = state.tunnels.cells[attacker.pos];
         if (cell) cell.fightpostKnown = true;
+        // 从射击孔开火 = 交出这个口；连着打还会被咬住（该格获警戒，敌寻路绕不开地记住它）
+        const entrance = state.tunnels.entrances[attacker.pos];
+        if (entrance && !entrance.sealed && !entrance.known) {
+          entrance.known = true;
+          PushEvent(state, events, { kind: "expose", text: TEXT.fightpostText.known, hex: attacker.pos, visible: true });
+        }
       }
     }
   }
@@ -315,6 +343,60 @@ function EnumMoves(state, unit) {
   }
   results.sort((a, b) => (a.dest < b.dest ? -1 : 1));
   return results;
+}
+
+/** 带路时一次能带几批：单位本身的额度 + 所在格伪装口的加成（牲口槽口子大，多带 1 批）。 */
+export function GuideCapacity(state, unit) {
+  const base = CFG.civ.guideCap[unit.type] || 0;
+  return base + EntranceGuideBonus(state.tunnels.entrances[unit.pos]);
+}
+
+/** 带路时实际会带走的那几批（按批号定序，取前 count 批）。 */
+export function GuidePick(state, unit, count) {
+  const here = CivsInCell(state, unit.pos).sort((a, b) => CompareIds(a.id, b.id));
+  const cap = Math.min(GuideCapacity(state, unit), here.length);
+  const want = Math.max(1, Math.min(cap, Number(count) || cap));
+  return here.slice(0, want);
+}
+
+/**
+ * 带路可达枚举：单位与群众同格 → 沿开放门的地道走，步数上限 = min(单位 MP, 最慢一批的速度)。
+ * 老弱与伤员一回合只挪一格——这就是「早动身」的全部理由。
+ */
+function EnumGuideMoves(state, unit) {
+  const results = [];
+  if (unit.mp <= 0) return results;
+  const taken = GuidePick(state, unit, 0);
+  if (!taken.length) return results;
+  const slots = taken.reduce((sum, civ) => sum + CivSlots(civ), 0);
+  const speed = Math.min(...taken.map(CivSpeed));
+  const limit = Math.min(unit.mp, speed);
+  if (limit <= 0) return results;
+  const frontier = [{ key: unit.pos, cost: 0, path: [] }];
+  const best = { [unit.pos]: 0 };
+  while (frontier.length) {
+    const node = frontier.shift();
+    if (node.cost >= limit) continue;
+    for (const nb of TunnelNeighbors(state, node.key, true)) {
+      const cost = node.cost + 1;
+      if (best[nb] !== undefined && best[nb] <= cost) continue;
+      best[nb] = cost;
+      const path = [...node.path, nb];
+      if (CellCivRoom(state, nb) >= slots && CellHasRoom(state, nb)) {
+        results.push({ dest: nb, path, count: taken.length });
+      }
+      frontier.push({ key: nb, cost, path });
+    }
+  }
+  results.sort((a, b) => (a.dest < b.dest ? -1 : 1));
+  return results;
+}
+
+/** 射击孔是否处于「被咬住」状态：距上次从这个孔开火 ≤ lockWindow 回合。 */
+export function FightpostLocked(state, key) {
+  const cell = state.tunnels.cells[key];
+  if (!cell || !cell.fightpostLastTurn) return false;
+  return state.meta.turn - cell.fightpostLastTurn <= CFG.fightpost.lockWindow;
 }
 
 // ---------------------------------------------------------------------------
@@ -417,15 +499,26 @@ function CollectUnitActions(state, unit, actions) {
       actions.push({ type: "DigEntrance", unit: id, at: unit.pos });
     }
     if (cell.facility === null) {
-      for (const facility of ["storage", "shelter", "vent", "fightpost"]) {
+      for (const facility of ["storage", "shelter", "vent", "fightpost", "trapdoor"]) {
+        if (!FacilityUnlocked(state, facility)) continue;
+        if (facility === "trapdoor" && (!entrance || entrance.sealed)) continue;   // 翻板要压在有口的格上
         actions.push({ type: "DigFacility", unit: id, cell: unit.pos, facility });
       }
+    } else if (cell.facility === "trapdoor" && !cell.trapReady && FacilityUnlocked(state, "trapdoor")) {
+      actions.push({ type: "DigFacility", unit: id, cell: unit.pos, facility: "trapdoor", rearm: true });
     }
     for (const nb of TunnelNeighbors(state, unit.pos, false)) {
       const edgeId = EdgeKey(unit.pos, nb);
       if (state.tunnels.edges[edgeId] && state.tunnels.edges[edgeId].door === null) {
         actions.push({ type: "DigDoor", unit: id, edge: edgeId });
       }
+    }
+  }
+  // 带领群众：单位与群众同格才带得动；一次带的批数看单位（联络员 3 / 民兵 2 / 游击 1），
+  // 走得多远看最慢的那一批（老弱与伤员 1 格、青壮 2 格）。带路是主动作——谁去带路，就谁不去挖。
+  if (unit.layer === "under" && cell && CivGuidanceOn(state)) {
+    for (const move of EnumGuideMoves(state, unit)) {
+      actions.push({ type: "GuideCivs", unit: id, to: move.dest, count: move.count, path: move.path });
     }
   }
   if (unit.layer === "surface") {
@@ -450,25 +543,39 @@ function CollectUnitActions(state, unit, actions) {
         }
       }
     }
+    // 伪装口：把本格的口做进灶台/水井/炕洞/牲口槽（1 进度，不留痕迹）
+    if (entrance && !entrance.sealed && !entrance.known && !entrance.disguise && digPower > 0) {
+      for (const kind of UnlockedDisguises(state)) {
+        const def2 = disguiseDefinitions[kind];
+        if (!def2 || !def2.terrains.includes(hex.terrain)) continue;
+        actions.push({ type: "Disguise", unit: id, at: unit.pos, disguise: kind });
+      }
+    }
     const villageId = hex?.villageId || null;
     const village = villageId ? state.map.villages[villageId] : null;
     if (village) {
       if (village.grainOpen > 0 && StorageCellsUnder(state, unit.pos).length) {
         actions.push({ type: "HideGrain", unit: id });
       }
-      if (village.pop > 0 && NearbyShelterEntrance(state, unit.pos)) {
-        actions.push({ type: "MoveCivs", unit: id, count: Math.min(CFG.moveCivsPerAction, village.pop) });
-      }
-      if ((state.wounded.atVillage[villageId] || 0) > 0 && NearbyShelterEntrance(state, unit.pos)) {
-        actions.push({ type: "MoveWounded", unit: id, count: Math.min(CFG.moveWoundedPerAction, state.wounded.atVillage[villageId]) });
+      const waiting = CivsAtVillage(state, villageId);
+      if (waiting.length && NearbyShelterEntrance(state, unit.pos)) {
+        const kinds = [...new Set(waiting.map((civ) => civ.kind))].sort();
+        actions.push({ type: "MoveCivs", unit: id, count: Math.min(CFG.moveCivsPerAction, waiting.length) });
+        if (kinds.length > 1) {
+          for (const kind of kinds) {
+            actions.push({ type: "MoveCivs", unit: id, kind,
+              count: Math.min(CFG.moveCivsPerAction, waiting.filter((civ) => civ.kind === kind).length) });
+          }
+        }
       }
       if (village.organize < CFG.organizeMax) actions.push({ type: "Organize", unit: id });
     }
   } else if (cell && cell.facility === "fightpost" && def.atk > 0 && state.resources.ammo >= CFG.ammoPerAttack) {
-    // 枪眼：攻击本格/相邻地表敌单位（按伏击结算）
+    // 射击孔：攻击本格/相邻地表敌单位（按伏击结算）；连着打会被锁定，所以标出 locked 让玩家看得见
+    const locked = FightpostLocked(state, unit.pos);
     for (const foe of EnemyUnits(state)) {
       if (foe.layer === "surface" && foe.revealed && HexDistanceKeys(unit.pos, foe.pos) <= 1) {
-        actions.push({ type: "Attack", unit: id, target: foe.id, fightpost: true });
+        actions.push({ type: "Attack", unit: id, target: foe.id, fightpost: true, locked, confirm: locked });
       }
     }
   }
@@ -478,16 +585,25 @@ function CollectUnitActions(state, unit, actions) {
   actions.push({ type: "Rest", unit: id });
 }
 
+/** 群众从村口能落脚的地道格（近者优先）：先找连通的藏人室，实在没有就先挤进口下那一格。 */
+function CivDropCells(state, entranceKey) {
+  const cells = ReachableFacilityCells(state, entranceKey, "shelter");
+  if (state.tunnels.cells[entranceKey] && CellCivRoom(state, entranceKey) > 0 && !cells.includes(entranceKey)) {
+    cells.push(entranceKey);
+  }
+  return cells;
+}
+
 function NearbyShelterEntrance(state, pos) {
   const keys = [pos, ...HexNeighborKeys(pos)];
   for (const key of keys) {
     const entrance = state.tunnels.entrances[key];
-    if (entrance && !entrance.sealed && ReachableFacilityCells(state, key, "shelter").length) return key;
+    if (entrance && !entrance.sealed && CivDropCells(state, key).length) return key;
   }
   return null;
 }
 
-/** 转移群众/伤员为什么不行——分清「没口 / 没藏人室 / 藏人室满了」，不再一律说成「未连通」。 */
+/** 转移群众为什么不行——分清「没口 / 没藏人室 / 铺位满了」，不再一律说成「未连通」。 */
 function ShelterBlockReason(state, pos) {
   if (![pos, ...HexNeighborKeys(pos)].some((key) => state.tunnels.entrances[key] && !state.tunnels.entrances[key].sealed)) {
     return "本格与相邻格都没有可用地道口（口要在地下用 DigEntrance 自己开）";
@@ -495,7 +611,7 @@ function ShelterBlockReason(state, pos) {
   if (!SortedKeys(state.tunnels.cells).some((key) => state.tunnels.cells[key].facility === "shelter")) {
     return "连通的地道里还没有藏人室——先在地道格上 DigFacility shelter";
   }
-  return `连通的藏人室都满了（每间容量 ${CFG.shelterCivCap} 批，群众与伤员合计）——再修一间或换个口`;
+  return "连通的藏人室铺位都满了（老弱/青壮各占 1 铺，伤员占 2 铺）——再修一间或换个口";
 }
 
 export function LegalActions(state, unitId) {
@@ -505,8 +621,10 @@ export function LegalActions(state, unitId) {
     ? [state.units[unitId]].filter((unit) => unit && unit.side === "ally" && unit.hp > 0)
     : AllyUnits(state);
   for (const unit of units) CollectUnitActions(state, unit, actions);
-  if (!unitId) actions.push({ type: "EndTurn" });
-  return actions;
+  // 认知递增在代码里的落点：本幕没解锁的动作，压根不出现在合法动作里。
+  const filtered = actions.filter((action) => ActionUnlocked(state, action.type));
+  if (!unitId) filtered.push({ type: "EndTurn" });
+  return filtered;
 }
 
 // ---------------------------------------------------------------------------
@@ -516,9 +634,10 @@ export function LegalActions(state, unitId) {
 const applyHandlers = {
   Move: ApplyMove, UseEntrance: ApplyUseEntrance, Dig: ApplyDig, DigEntrance: ApplyDigEntrance,
   DigFacility: ApplyDigFacility, DigDoor: ApplyDigDoor, ToggleDoor: ApplyToggleDoor,
+  Disguise: ApplyDisguise, GuideCivs: ApplyGuideCivs,
   CoverTraces: ApplyCoverTraces, BreakRoad: ApplyBreakRoad, Ambush: ApplyAmbush, Hide: ApplyHide,
   Attack: ApplyAttack, Feint: ApplyFeint, HideGrain: ApplyHideGrain, MoveCivs: ApplyMoveCivs,
-  MoveWounded: ApplyMoveWounded, Organize: ApplyOrganize, Collapse: ApplyCollapse, Rest: ApplyRest,
+  Organize: ApplyOrganize, Collapse: ApplyCollapse, Rest: ApplyRest,
 };
 
 export function PerformAction(inputState, action) {
@@ -531,6 +650,11 @@ export function PerformAction(inputState, action) {
   }
   const handler = applyHandlers[action.type];
   if (!handler) return { state: inputState, events: [], illegal: `未知动作类型：${action.type}` };
+  if (!ActionUnlocked(inputState, action.type)) {
+    const level = GetLevel(inputState.meta.level);
+    return { state: inputState, events: [],
+      illegal: `本幕（第${level.act}幕《${level.name}》）尚未开放「${action.type}」——这一幕要学的不是它` };
+  }
   const state = CloneState(inputState);
   const events = [];
   const illegal = handler(state, events, action);
@@ -667,10 +791,100 @@ function ApplyDigFacility(state, events, action) {
   if (unit.layer !== "under") return "须在地道内施工";
   const cell = state.tunnels.cells[unit.pos];
   if (!cell || action.cell !== unit.pos) return "只能在所在地道格修设施";
-  if (cell.facility !== null) return "此格已有设施";
-  if (!["storage", "shelter", "vent", "fightpost"].includes(action.facility)) return "设施类型不合法";
+  if (!["storage", "shelter", "vent", "fightpost", "trapdoor"].includes(action.facility)) return "设施类型不合法";
+  if (!FacilityUnlocked(state, action.facility)) return `本幕还修不了「${action.facility}」`;
+  const rearm = cell.facility === "trapdoor" && action.facility === "trapdoor" && !cell.trapReady;
+  if (cell.facility !== null && !rearm) return "此格已有设施";
+  if (action.facility === "trapdoor") {
+    const entrance = state.tunnels.entrances[unit.pos];
+    if (!entrance || entrance.sealed) return "翻板要压在有地道口的格上";
+  }
   return WorkSite(state, events, unit, power,
     { kind: "facility", at: unit.pos, facility: action.facility, need: CFG.dig.facility }, unit.pos);
+}
+
+/** 伪装口：把已有的口做进灶台/水井/炕洞/牲口槽。1 进度，不留痕迹（本来就是在遮掩）。 */
+function ApplyDisguise(state, events, action) {
+  const got = RequireDigger(state, action);
+  if (got.error) return got.error;
+  const { unit, power } = got;
+  if (unit.layer !== "surface") return "伪装口要在地面做（灶台、水井、炕洞都在屋里屋外）";
+  const at = action.at || unit.pos;
+  if (at !== unit.pos) return "只能伪装脚下这个口";
+  const entrance = state.tunnels.entrances[at];
+  if (!entrance || entrance.sealed) return "本格没有可伪装的地道口";
+  if (entrance.known) return "这个口已经被敌人记下了，再伪装也没用（塌了另开一个吧）";
+  if (entrance.disguise) return "这个口已经做过伪装了";
+  const def = disguiseDefinitions[action.disguise];
+  if (!def) return "伪装物不合法";
+  if (!UnlockedDisguises(state).includes(action.disguise)) return "本幕还不会做这种伪装口";
+  const hex = HexOf(state, at);
+  if (!def.terrains.includes(hex.terrain)) return `${def.name}只能做在${def.terrains.map((t) => terrainDefinitions[t].name).join("/")}上`;
+  return WorkSite(state, events, unit, power,
+    { kind: "disguise", at, facility: action.disguise, need: CFG.dig.disguise }, null);
+}
+
+/**
+ * 带领群众（第二幕起）：单位与群众同格，领着他们沿开放门的地道走。
+ * 一次带几批看单位（联络员 3 / 民兵 2 / 游击 1，牲口槽口 +1），走几格看最慢的那一批。
+ * 这是主动作——带路的人这一回合就挖不成、也打不了。
+ */
+function ApplyGuideCivs(state, events, action) {
+  const unit = AllyOf(state, action.unit);
+  if (!unit) return "单位不存在或已阵亡";
+  if (unit.acted) return "该单位本回合已行动";
+  if (!CivGuidanceOn(state)) return "本幕的洞不通，群众进去了就没处走——带不了路";
+  if (unit.layer !== "under" || !state.tunnels.cells[unit.pos]) return "带路须在地道里，且与群众同格";
+  const taken = GuidePick(state, unit, action.count);
+  if (!taken.length) return "本格没有等着带路的群众";
+  const to = action.to;
+  if (!to || !state.tunnels.cells[to]) return "目的地不是地道格";
+  const speed = Math.min(...taken.map(CivSpeed));
+  const limit = Math.min(unit.mp, speed);
+  if (limit <= 0) return "移动力不足（带路要跟着走）";
+  const path = Array.isArray(action.path) && action.path.length ? action.path : GuidePath(state, unit.pos, to, limit);
+  if (!path || !path.length) return `带不到那么远：最慢的一批一回合只走 ${speed} 格`;
+  if (path.length > limit) return `带不到那么远：最慢的一批一回合只走 ${speed} 格`;
+  let cursor = unit.pos;
+  for (const step of path) {
+    if (!TunnelNeighbors(state, cursor, true).includes(step)) return "地道未挖通或门已关闭";
+    cursor = step;
+  }
+  if (cursor !== to) return "路径终点与目的地不符";
+  const slots = taken.reduce((sum, civ) => sum + CivSlots(civ), 0);
+  if (CellCivRoom(state, to) < slots) return "目的地铺位不够（老弱/青壮各 1 铺，伤员 2 铺）";
+  if (!CellHasRoom(state, to) && !UnitsOn(state, to, "under").some((u) => u.id === unit.id)) return "地道格已满员";
+  unit.pos = to;
+  unit.mp -= path.length;
+  unit.acted = true;
+  for (const civ of taken) {
+    civ.at = to;
+    civ.panic = Math.max(0, civ.panic - CFG.civ.calmPerTurn);
+  }
+  state.score.civGuidedTrips += 1;
+  PushEvent(state, events, { kind: "civs",
+    text: `${UnitDef(unit).name}${TEXT.civText.guided}：${taken.length} 批（${taken.map((civ) => civ.kind === "old" ? "老弱" : civ.kind === "young" ? "青壮" : "伤员").join("、")}）→ ${to}`,
+    hex: to, layer: "under", visible: true });
+  return null;
+}
+
+/** 带路寻路：只走开放门，最短路（键序稳定）。 */
+function GuidePath(state, fromKey, toKey, limit) {
+  if (fromKey === toKey) return null;
+  const frontier = [{ key: fromKey, path: [] }];
+  const seen = new Set([fromKey]);
+  while (frontier.length) {
+    const node = frontier.shift();
+    if (node.path.length >= limit) continue;
+    for (const nb of TunnelNeighbors(state, node.key, true).sort()) {
+      if (seen.has(nb)) continue;
+      seen.add(nb);
+      const path = [...node.path, nb];
+      if (nb === toKey) return path;
+      frontier.push({ key: nb, path });
+    }
+  }
+  return null;
 }
 
 function ApplyDigDoor(state, events, action) {
@@ -795,13 +1009,27 @@ function ApplyAttack(state, events, action) {
     opts = { ambush: false };
   } else {
     const cell = state.tunnels.cells[unit.pos];
-    if (!cell || cell.facility !== "fightpost") return "地下攻击须在枪眼格";
+    if (!cell || cell.facility !== "fightpost") return "地下攻击须在射击孔格";
     if (def.atk <= 0) return "该单位无法开火";
-    if (HexDistanceKeys(unit.pos, target.pos) > 1) return "目标超出枪眼射界";
-    opts = { ambush: true, fightpost: true };
+    if (HexDistanceKeys(unit.pos, target.pos) > 1) return "目标超出射击孔射界";
+    opts = { ambush: true, fightpost: true, locked: FightpostLocked(state, unit.pos) };
   }
   const outcome = ResolveAttack(state, events, unit.id, target.id, opts);
   if (!outcome.done) return outcome.reason || "攻击未能进行";
+  if (opts.fightpost) {
+    const cell = state.tunnels.cells[unit.pos];
+    if (opts.locked) {
+      const hex = HexOf(state, unit.pos);
+      if (hex) hex.alertedUntil = state.meta.turn + CFG.fightpost.lockedTurns;
+      PushEvent(state, events, { kind: "fightpost", text: TEXT.fightpostText.locked, hex: unit.pos, visible: true });
+      PushEvent(state, events, { kind: "fightpost", text: TEXT.fightpostText.relocate, hex: unit.pos, visible: true });
+    }
+    if (cell) {
+      cell.fightpostLastTurn = state.meta.turn;
+      cell.fightpostHeat = (cell.fightpostHeat || 0) + 1;
+    }
+    if (!state.score.fightpostsUsed.includes(unit.pos)) state.score.fightpostsUsed.push(unit.pos);
+  }
   if (state.units[unit.id]) {
     unit.acted = true;
     unit.attacked = true;
@@ -839,7 +1067,7 @@ function ApplyHideGrain(state, events, action) {
   let want = Math.min(CFG.hideGrainPerAction, village.grainOpen);
   for (const cellKey of cells) {
     const cell = state.tunnels.cells[cellKey];
-    const room = CFG.storageGrainCap - cell.grain;
+    const room = StorageCapOf(state) - cell.grain;
     const take = Math.min(room, want);
     if (take > 0) {
       cell.grain += take;
@@ -855,64 +1083,38 @@ function ApplyHideGrain(state, events, action) {
   return null;
 }
 
+/** 村口转移：把地面上的群众送进邻接地道口连通的地道。可用 kind 指定先送哪一类（老弱/伤员优先是常识）。 */
 function ApplyMoveCivs(state, events, action) {
   const unit = AllyOf(state, action.unit);
   if (!unit) return "单位不存在或已阵亡";
   if (unit.acted) return "该单位本回合已行动";
   if (unit.layer !== "surface") return "须在地面组织转移";
   const hex = HexOf(state, unit.pos);
-  const village = hex?.villageId ? state.map.villages[hex.villageId] : null;
-  if (!village) return "须在村格转移群众";
-  if (village.pop <= 0) return "村中已无未转移的群众";
-  const entranceKey = NearbyShelterEntrance(state, unit.pos);
-  if (!entranceKey) return ShelterBlockReason(state, unit.pos);
-  let want = Math.min(CFG.moveCivsPerAction, village.pop, Math.max(1, Number(action.count) || CFG.moveCivsPerAction));
-  let moved = 0;
-  for (const cellKey of ReachableFacilityCells(state, entranceKey, "shelter")) {
-    const cell = state.tunnels.cells[cellKey];
-    const room = CFG.shelterCivCap - cell.civs - (state.wounded.inCells[cellKey] || 0);
-    const take = Math.min(room, want);
-    if (take > 0) {
-      cell.civs += take;
-      village.pop -= take;
-      moved += take;
-      want -= take;
-    }
-    if (want <= 0) break;
-  }
-  if (moved <= 0) return ShelterBlockReason(state, unit.pos);
-  unit.acted = true;
-  PushEvent(state, events, { kind: "civs", text: `群众 ${moved} 批转入地道`, hex: unit.pos, visible: true });
-  return null;
-}
-
-function ApplyMoveWounded(state, events, action) {
-  const unit = AllyOf(state, action.unit);
-  if (!unit) return "单位不存在或已阵亡";
-  if (unit.acted) return "该单位本回合已行动";
-  if (unit.layer !== "surface") return "须在地面组织后送";
-  const hex = HexOf(state, unit.pos);
   const villageId = hex?.villageId || null;
-  if (!villageId || (state.wounded.atVillage[villageId] || 0) <= 0) return "此村没有待转移的伤员";
+  const village = villageId ? state.map.villages[villageId] : null;
+  if (!village) return "须在村格转移群众";
+  let waiting = CivsAtVillage(state, villageId).sort((a, b) => CompareIds(a.id, b.id));
+  if (action.kind) waiting = waiting.filter((civ) => civ.kind === action.kind);
+  if (!waiting.length) return "村中已无未转移的群众（或该类群众已转移完）";
   const entranceKey = NearbyShelterEntrance(state, unit.pos);
   if (!entranceKey) return ShelterBlockReason(state, unit.pos);
-  let want = Math.min(CFG.moveWoundedPerAction, state.wounded.atVillage[villageId]);
-  let moved = 0;
-  for (const cellKey of ReachableFacilityCells(state, entranceKey, "shelter")) {
-    const cell = state.tunnels.cells[cellKey];
-    const room = CFG.shelterCivCap - cell.civs - (state.wounded.inCells[cellKey] || 0);
-    const take = Math.min(room, want);
-    if (take > 0) {
-      state.wounded.inCells[cellKey] = (state.wounded.inCells[cellKey] || 0) + take;
-      state.wounded.atVillage[villageId] -= take;
-      moved += take;
-      want -= take;
-    }
-    if (want <= 0) break;
+  const want = Math.min(CFG.moveCivsPerAction, waiting.length,
+    Math.max(1, Number(action.count) || CFG.moveCivsPerAction));
+  const queue = waiting.slice(0, want);
+  const moved = [];
+  for (const civ of queue) {
+    const slot = CivSlots(civ);
+    const target = CivDropCells(state, entranceKey).find((key) => CellCivRoom(state, key) >= slot);
+    if (!target) break;
+    civ.loc = "cell";
+    civ.at = target;
+    moved.push(civ);
   }
-  if (moved <= 0) return ShelterBlockReason(state, unit.pos);
+  if (!moved.length) return ShelterBlockReason(state, unit.pos);
   unit.acted = true;
-  PushEvent(state, events, { kind: "wounded", text: `伤员 ${moved} 批经地道后送`, hex: unit.pos, visible: true });
+  PushEvent(state, events, { kind: "civs",
+    text: `群众 ${moved.length} 批转入地道（${moved.map((civ) => civ.kind === "old" ? "老弱" : civ.kind === "young" ? "青壮" : "伤员").join("、")}）`,
+    hex: unit.pos, visible: true });
   return null;
 }
 

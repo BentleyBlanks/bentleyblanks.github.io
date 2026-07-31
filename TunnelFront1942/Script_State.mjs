@@ -1,11 +1,11 @@
 // 《地下长城 · 冀中1942》 —— 状态构造、序列化与选择器。
 // 本模块是状态契约（AGENTS.md §三）的唯一权威实现：CreateGame / CloneState /
-// SerializeState / DeserializeState + 地道连通块、空气分区、容量、可达性等选择器。
+// SerializeState / DeserializeState + 地道连通块、空气分区、容量、群众批、可达性等选择器。
 // 纯逻辑：禁 window/document/three/Math.random/Date.now；随机只经 StepRng 且仅用于建局波次抽取。
 
 import { HexKey, ParseHexKey, HexNeighborKeys, HexDistanceKeys, StepRng, HashString } from "./Script_Hex.mjs";
-import { CFG, terrainDefinitions, unitDefinitions } from "./Data_Rules.mjs";
-import { GetLevel, BuildBriefing, BuildSchedule } from "./Data_Levels.mjs";
+import { CFG, terrainDefinitions, unitDefinitions, disguiseDefinitions } from "./Data_Rules.mjs";
+import { GetLevel, BuildBriefing, BuildSchedule, BuildActCard } from "./Data_Levels.mjs";
 
 // ---------------------------------------------------------------------------
 // 通用小工具（其余模块共用）
@@ -33,6 +33,12 @@ export function EdgeEnds(edgeKey) {
 export function TerrainOf(state, key) {
   const hex = state.map.hexes[key];
   return hex ? terrainDefinitions[hex.terrain] : null;
+}
+
+/** 高程（0 低 / 1 中 / 2 高）。水只往同高或更低处漫——这是第四幕的空间信息。 */
+export function ElevOf(state, key) {
+  const hex = state.map.hexes[key];
+  return hex && Number.isFinite(hex.elev) ? hex.elev : 1;
 }
 
 /** 记事件：同时进 events 数组与 state.log（封顶截断）。visible=false 表示玩家不可见。 */
@@ -71,6 +77,48 @@ export function UnitDef(unit) {
 }
 
 // ---------------------------------------------------------------------------
+// 幕次与解锁（认知递增在代码里的落点：动作合法性据此过滤）
+// ---------------------------------------------------------------------------
+
+export function LevelOf(state) {
+  return GetLevel(state.meta.level);
+}
+
+/** 本幕是否开放某个动作类型。Move / UseEntrance / Rest / EndTurn 是永远开放的骨架动作。 */
+export function ActionUnlocked(state, type) {
+  const always = type === "Move" || type === "UseEntrance" || type === "Rest" || type === "EndTurn";
+  if (always) return true;
+  const unlocks = LevelOf(state).unlocks;
+  if (!unlocks || !unlocks.actions) return true;
+  return unlocks.actions.includes(type);
+}
+
+export function FacilityUnlocked(state, facility) {
+  const unlocks = LevelOf(state).unlocks;
+  if (!unlocks || !unlocks.facilities) return true;
+  return unlocks.facilities.includes(facility);
+}
+
+export function UnlockedDisguises(state) {
+  const unlocks = LevelOf(state).unlocks;
+  return (unlocks && unlocks.disguises) ? unlocks.disguises.slice() : [];
+}
+
+/** 本幕是否开放「带领群众」——第一幕的洞不通，群众进去了就没处走，也就谈不上恐慌。 */
+export function CivGuidanceOn(state) {
+  const unlocks = LevelOf(state).unlocks;
+  return !!(unlocks && unlocks.civGuidance);
+}
+
+export function StorageCapOf(state) {
+  return LevelOf(state).storageCap ?? CFG.storageGrainCap;
+}
+
+export function ShelterCapOf(state) {
+  return LevelOf(state).shelterCap ?? CFG.shelterCivCap;
+}
+
+// ---------------------------------------------------------------------------
 // 建局
 // ---------------------------------------------------------------------------
 
@@ -101,50 +149,79 @@ export function MakeEnemyUnit(state, type, at, columnId) {
   return id;
 }
 
-/** 建局：手工地图 + seed 白名单抽取（路线变体/入场口/目标村/时刻抖动/嫌疑平手盐）。 */
+function NewCell() {
+  return { facility: null, grain: 0, smoke: 0, water: 0, trapReady: false,
+    fightpostHeat: 0, fightpostLastTurn: 0, fightpostKnown: false };
+}
+
+/** 建局：手工地图 + seed 白名单抽取（路线变体/入场口/配比/时刻抖动/嫌疑平手盐）。 */
 export function CreateGame(levelId, seed) {
   const level = GetLevel(levelId);
   const state = {
-    meta: { level: level.id, seed: Number(seed) >>> 0, turn: 1, phase: "player", nextUnitId: 0, nextEnemyId: 0 },
+    meta: { level: level.id, act: level.act, seed: Number(seed) >>> 0, turn: 1, phase: "player",
+            nextUnitId: 0, nextEnemyId: 0, nextCivId: 0 },
     wave: { status: "quiet", sweepTurn: 0, pool: level.pool, decay: level.decay, playerDrainThisTurn: 0,
-            smokeCharges: level.smokeCharges, hardEndTurn: level.hardEndTurn, withdrawAnnounced: false,
+            smokeCharges: level.smokeCharges, floodCharges: level.floodCharges || 0,
+            hardEndTurn: level.hardEndTurn, withdrawAnnounced: false,
             sweepStartTurn: level.sweepStartTurn, expelled: false, roadCuts: 0, doneTurn: null, withdrawTurn: null,
-            garrison: false, axisKills: { north: 0, south: 0 }, schedule: [], plan: {}, tieSalt: 0 },
+            garrison: false, axisKills: { north: 0, south: 0 }, schedule: [], plan: {}, tieSalt: 0, revenge: null },
     rngState: (Number(seed) >>> 0) || 1,
     map: { hexes: JSON.parse(JSON.stringify(level.hexes)), villages: {} },
-    tunnels: { cells: {}, edges: {}, entrances: {}, vents: {}, digs: {}, smokeOps: [], nextSiteId: 0 },
+    tunnels: { cells: {}, edges: {}, entrances: {}, vents: {}, digs: {},
+               smokeOps: [], floodOps: [], nextSiteId: 0 },
     units: {},
+    civs: {},
     resources: { ammo: level.ammoStart },
     enemy: { columns: [], sightings: [], pendingOps: [], memory: { ambushedVillages: [] }, lastSeen: {} },
-    wounded: { atVillage: JSON.parse(JSON.stringify(level.wounded || {})), inCells: {}, delivered: 0 },
     ledger: { civCaptured: 0, civDead: 0, housesBurned: 0, grainSeized: 0 },
-    score: { kills: { inf: 0, puppet: 0, spy: 0, sapper: 0 }, withdrewEarlyTurns: 0, alliesLost: 0, hqOccupiedTurns: 0 },
+    score: { kills: { inf: 0, puppet: 0, spy: 0, sapper: 0 }, withdrewEarlyTurns: 0, alliesLost: 0,
+             hqOccupiedTurns: 0, fightpostsUsed: [], civForcedOut: 0, civGuidedTrips: 0 },
     log: [],
     medals: null,
     result: null,
   };
   for (const village of level.villages) {
     state.map.villages[village.id] = { name: village.name, hexKeys: village.hexKeys.slice(),
-      pop: village.pop, popStart: village.pop, grainOpen: village.grainOpen,
+      popStart: 0, grainOpen: village.grainOpen,
       organize: village.organize, organizeProgress: 0, hasHq: !!village.hasHq, burnedHexes: 0,
       seizedTurn: 0 };
   }
   for (const ally of level.allies) MakeAllyUnit(state, ally.type, ally.at);
-  for (const key of level.tunnels.cells) {
-    state.tunnels.cells[key] = { facility: null, grain: 0, civs: 0, smoke: 0, civBreath: 0, fightpostKnown: false };
-  }
+  for (const key of level.tunnels.cells) state.tunnels.cells[key] = NewCell();
   for (const [a, b] of level.tunnels.edges) state.tunnels.edges[EdgeKey(a, b)] = { door: null };
   for (const key of level.tunnels.entrances) {
     const cap = TerrainOf(state, key)?.concealCap ?? 1;
-    state.tunnels.entrances[key] = { conceal: Math.min(3, cap), expose: 0, known: false, sealed: false };
+    state.tunnels.entrances[key] = { conceal: Math.min(3, cap), expose: 0, known: false, sealed: false, disguise: null };
+  }
+  for (const [key, facility] of level.tunnels.facilities || []) {
+    const cell = state.tunnels.cells[key];
+    if (!cell) continue;
+    cell.facility = facility;
+    if (facility === "vent") state.tunnels.vents[key] = { expose: 0, known: false, smoked: false };
+    if (facility === "trapdoor") cell.trapReady = true;
+  }
+  for (const [key, disguise] of level.tunnels.disguises || []) {
+    if (state.tunnels.entrances[key] && disguiseDefinitions[disguise]) {
+      state.tunnels.entrances[key].disguise = disguise;
+    }
+  }
+  // 群众批：按关卡声明展开成独立的「批」（老弱/青壮/伤员），每批有自己的位置与恐慌值
+  for (const batch of level.civBatches || []) {
+    for (let index = 0; index < batch.count; index += 1) {
+      const id = `c${state.meta.nextCivId += 1}`;
+      state.civs[id] = { id, kind: batch.kind, home: batch.village, loc: "village", at: batch.village,
+        panic: 0, fate: null };
+      if (state.map.villages[batch.village]) state.map.villages[batch.village].popStart += 1;
+    }
   }
   DrawWavePlan(state, level);
-  PushEvent(state, null, { kind: "brief", text: `第▲区队进驻${level.villages[0].name}，${level.name}任务开始`, visible: true });
+  PushEvent(state, null, { kind: "brief",
+    text: `第${["零", "一", "二", "三", "四", "五"][level.act] || level.act}幕《${level.name}》——${level.villages[0].name}`,
+    visible: true });
   return state;
 }
 
-/** seed 白名单抽取：仅此处消耗 rngState。抽哪几支、每支几选一由关卡的 seedDraws 声明，
- *  「抽出来长什么样」由 Data_Levels 的 BuildSchedule 决定（规则脚本不写关卡内容）。 */
+/** seed 白名单抽取：仅此处消耗 rngState。 */
 function DrawWavePlan(state, level) {
   const plan = state.wave.plan;
   for (const draw of level.seedDraws || []) plan[draw.key] = PickIndex(state, draw.count);
@@ -159,6 +236,10 @@ function DrawWavePlan(state, level) {
 export function GetBriefing(state) {
   const level = GetLevel(state.meta.level);
   return BuildBriefing(level, state.wave.plan);
+}
+
+export function GetActCard(state) {
+  return BuildActCard(GetLevel(state.meta.level));
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +306,91 @@ export function RemoveUnit(state, unitId) {
 }
 
 // ---------------------------------------------------------------------------
+// 群众批选择器（AGENTS.md §2.9：以「批」计，分老弱/青壮/伤员）
+// ---------------------------------------------------------------------------
+
+export function AllCivs(state) {
+  return SortedKeys(state.civs).sort(CompareIds).map((id) => state.civs[id]);
+}
+
+/** 还在场（没被抓、没罹难）的群众批。 */
+export function LiveCivs(state) {
+  return AllCivs(state).filter((civ) => civ.loc !== "lost");
+}
+
+export function CivsAtVillage(state, villageId) {
+  return LiveCivs(state).filter((civ) => civ.loc === "village" && civ.at === villageId);
+}
+
+export function CivsInCell(state, key) {
+  return LiveCivs(state).filter((civ) => civ.loc === "cell" && civ.at === key);
+}
+
+export function CivSlots(civ) {
+  return CFG.civ.slots[civ.kind] || 1;
+}
+
+export function CivSpeed(civ) {
+  return CFG.civ.speed[civ.kind] || 1;
+}
+
+/** 某地道格的铺位上限：藏人室按关卡容量，普通巷子只能临时挤 2 个铺位。 */
+export function CellCivCap(state, key) {
+  const cell = state.tunnels.cells[key];
+  if (!cell) return 0;
+  return cell.facility === "shelter" ? ShelterCapOf(state) : CFG.corridorCivCap;
+}
+
+export function CellCivUsed(state, key) {
+  return CivsInCell(state, key).reduce((sum, civ) => sum + CivSlots(civ), 0);
+}
+
+export function CellCivRoom(state, key) {
+  return Math.max(0, CellCivCap(state, key) - CellCivUsed(state, key));
+}
+
+/** 群众保全数（终局评定的分母是 CivTotal）。 */
+export function CivSafeCount(state) {
+  return LiveCivs(state).length;
+}
+
+export function CivTotal(state) {
+  return AllCivs(state).length;
+}
+
+export function CivLostCount(state) {
+  return AllCivs(state).filter((civ) => civ.loc === "lost").length;
+}
+
+export function CivSafeRatio(state) {
+  const total = CivTotal(state);
+  return total > 0 ? CivSafeCount(state) / total : 1;
+}
+
+/** 群众批离场（被抓 / 罹难）：只写代价簿，永不产生任何收益。 */
+export function LoseCiv(state, civ, fate) {
+  civ.loc = "lost";
+  civ.at = null;
+  civ.panic = 0;
+  civ.fate = fate;
+  AddLedger(state, fate === "dead" ? "civDead" : "civCaptured", 1);
+}
+
+/** 兼容口径：人口总数（=还在场的批数）。 */
+export function PopTotal(state) {
+  return CivSafeCount(state);
+}
+
+/** 伤员批（第一幕起就存在的一类群众，速度慢、占两个铺位）。 */
+export function WoundedTotal(state) {
+  return LiveCivs(state).filter((civ) => civ.kind === "wounded").length;
+}
+
+export function VillagePop(state, villageId) {
+  return CivsAtVillage(state, villageId).length;
+}
+
+// ---------------------------------------------------------------------------
 // 地道选择器：连通块、空气分区、容量、可达性
 // ---------------------------------------------------------------------------
 
@@ -272,7 +438,7 @@ export function ZoneOfCell(state, key) {
   return ConnectedCells(state, key, true);
 }
 
-/** 分区内未封的地道口键（暴露豆全程结算与被迫出洞都按此口径）。 */
+/** 分区内未封的地道口键。 */
 export function ZoneEntranceKeys(state, zone) {
   const keys = [];
   for (const key of [...zone].sort()) {
@@ -302,15 +468,30 @@ export function ZoneHasAir(state, zone) {
   return false;
 }
 
-/** 分区内可用出口（未封入口，烟不挡逃生），按到 fromKey 的地道步数排序。 */
-export function ZoneExits(state, zone, fromKey) {
+/** 分区内可用出口（未封入口），按到 fromKey 的地道步数排序。
+ *  forCivs=true 时排除群众过不去的伪装口（水井口窄，群众上不来）。 */
+export function ZoneExits(state, zone, fromKey, forCivs) {
   const exits = [];
   for (const key of zone) {
     const entrance = state.tunnels.entrances[key];
-    if (entrance && !entrance.sealed) exits.push(key);
+    if (!entrance || entrance.sealed) continue;
+    if (forCivs && !EntranceCivPassable(entrance)) continue;
+    exits.push(key);
   }
   exits.sort((a, b) => HexDistanceKeys(fromKey, a) - HexDistanceKeys(fromKey, b) || (a < b ? -1 : 1));
   return exits;
+}
+
+export function EntranceCivPassable(entrance) {
+  if (!entrance || !entrance.disguise) return true;
+  const def = disguiseDefinitions[entrance.disguise];
+  return !def || def.civPassable !== false;
+}
+
+export function EntranceGuideBonus(entrance) {
+  if (!entrance || !entrance.disguise) return 0;
+  const def = disguiseDefinitions[entrance.disguise];
+  return def ? (def.guideBonus || 0) : 0;
 }
 
 export function CellUnitCount(state, key) {
@@ -329,14 +510,14 @@ export function ReachableFacilityCells(state, startKey, facility) {
   return zone.filter((key) => {
     const cell = state.tunnels.cells[key];
     if (cell.facility !== facility) return false;
-    if (facility === "storage") return cell.grain < CFG.storageGrainCap;
-    if (facility === "shelter") return cell.civs + (state.wounded.inCells[key] || 0) < CFG.shelterCivCap;
+    if (facility === "storage") return cell.grain < StorageCapOf(state);
+    if (facility === "shelter") return CellCivRoom(state, key) > 0;
     return true;
   });
 }
 
 /**
- * R2 P0-4：藏粮要求物理连通——本格**正下方**必须有地道格，该格所在分区里有还装得下的储粮洞，
+ * 藏粮要求物理连通：本格**正下方**必须有地道格，该格所在分区里有还装得下的储粮洞，
  * 且分区里至少有一个未封的口（否则粮根本递不下去）。返回可用的储粮洞格键（近者优先）。
  */
 export function StorageCellsUnder(state, hexKey) {
@@ -346,7 +527,7 @@ export function StorageCellsUnder(state, hexKey) {
   return ReachableFacilityCells(state, hexKey, "storage");
 }
 
-/** 该村中「脚底下真通着储粮洞」的村格（藏粮用；AsciiMap 只取其条数做提示）。 */
+/** 该村中「脚底下真通着储粮洞」的村格（藏粮用）。 */
 export function VillageStorageEntrances(state, villageId) {
   const village = state.map.villages[villageId];
   if (!village) return [];
@@ -367,22 +548,56 @@ export function TunnelGrainTotal(state) {
   return total;
 }
 
-export function PopTotal(state) {
-  let total = 0;
-  for (const id of SortedKeys(state.map.villages)) total += state.map.villages[id].pop;
-  for (const key of SortedKeys(state.tunnels.cells)) total += state.tunnels.cells[key].civs;
-  return total;
+/** 最大地道连通块的格数（第二幕勋记「户户相通」的判据，忽略门）。 */
+export function LargestNetworkSize(state) {
+  let best = 0;
+  const seen = new Set();
+  for (const key of SortedKeys(state.tunnels.cells)) {
+    if (seen.has(key)) continue;
+    const block = ConnectedCells(state, key, false);
+    for (const cell of block) seen.add(cell);
+    best = Math.max(best, block.size);
+  }
+  return best;
 }
 
-export function WoundedTotal(state) {
-  let total = state.wounded.delivered;
-  for (const id of SortedKeys(state.wounded.atVillage)) total += state.wounded.atVillage[id];
-  for (const key of SortedKeys(state.wounded.inCells)) total += state.wounded.inCells[key];
-  return total;
+/** 同一片地道网串起来的村数（第五幕勋记「村村相连」的判据）。 */
+export function VillagesLinked(state) {
+  const seen = new Set();
+  let best = 0;
+  for (const key of SortedKeys(state.tunnels.cells)) {
+    if (seen.has(key)) continue;
+    const block = ConnectedCells(state, key, false);
+    const villages = new Set();
+    for (const cell of block) {
+      seen.add(cell);
+      const villageId = state.map.hexes[cell]?.villageId;
+      if (villageId) villages.add(villageId);
+    }
+    best = Math.max(best, villages.size);
+  }
+  return best;
 }
 
+export function LiveEntranceCount(state) {
+  return SortedKeys(state.tunnels.entrances)
+    .filter((key) => !state.tunnels.entrances[key].sealed && !state.tunnels.entrances[key].known).length;
+}
+
+export function DisguisedEntranceCount(state) {
+  return SortedKeys(state.tunnels.entrances)
+    .filter((key) => !state.tunnels.entrances[key].sealed && state.tunnels.entrances[key].disguise).length;
+}
+
+export function VentCount(state) {
+  return SortedKeys(state.tunnels.vents).filter((key) => !state.tunnels.vents[key].known).length;
+}
+
+/** 暴露阈值 =（基础隐蔽 + 伪装加成）× 3。伪装口更难被搜出，这是第二幕的全部意义。 */
 export function EntranceThreshold(entrance) {
-  return entrance.conceal * CFG.exposePerConceal;
+  const bonus = entrance.disguise && disguiseDefinitions[entrance.disguise]
+    ? disguiseDefinitions[entrance.disguise].conceal : 0;
+  return (entrance.conceal + bonus) * CFG.exposePerConceal;
 }
 
 export function VentThreshold() {
@@ -407,7 +622,7 @@ export function EnemyMoveCost(state, key) {
   return CFG.moveCost.offroad;
 }
 
-/** 「敌已警戒」：同一格连着两回合设伏，敌记住了这个地方（§2.5）。 */
+/** 「敌已警戒」：同一格连着两回合设伏、或同一个射击孔连着开火，敌记住了这个地方。 */
 export function IsHexAlerted(state, key) {
   return (state.map.hexes[key]?.alertedUntil || 0) >= state.meta.turn;
 }
@@ -422,6 +637,10 @@ export function EnemyPathCost(state, key) {
 export function VillageOfHex(state, key) {
   const hex = state.map.hexes[key];
   return hex && hex.villageId ? state.map.villages[hex.villageId] : null;
+}
+
+export function VillageIdOfHex(state, key) {
+  return state.map.hexes[key]?.villageId || null;
 }
 
 /** 敌单位是否在某村 range 格内（组织免费进度停摆等用）。 */

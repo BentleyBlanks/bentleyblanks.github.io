@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // 《地下长城 · 冀中1942》 —— 审查 Agent 完整游玩接口（AGENTS.md §7.3）。
 // 子命令：
-//   new  --level L1 --seed 3 --save /tmp/g.json     开局 + 简报 + ASCII
+//   new  --level A1 --seed 3 --save /tmp/g.json     开局 + 简报 + ASCII
 //   show --save /tmp/g.json [--layer surface|under|both]
 //   legal --save /tmp/g.json [--unit u1]
 //   act  --save /tmp/g.json --json '{"type":"Move",...}'
 //   end  --save /tmp/g.json                          敌阶段 + 结算全播报
-//   run  --level L1 --seed 3 --bot Skilled           bot 整局 → 总结 JSON
-//   fixture --level L1 --seed 3 --turns 6 --out Data_FixtureState.mjs   （生成渲染夹具）
+//   run  --level A1 --seed 3 --bot Skilled           bot 整局 → 总结 JSON
+//   fixture --level A1 --seed 3 --turns 6 --out Data_FixtureState.mjs   （生成渲染夹具）
 // 仅本文件允许触碰 fs/process；引擎模块保持纯逻辑。
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -19,6 +19,7 @@ import { EndTurn } from "./Script_Turn.mjs";
 import {
   RenderAsciiMap, GrainLines, OpeningLines, LandmarkLines, IntentLines, ObjectiveLine,
   UnitLines, MedalLines, TelegraphText, ActionKind, actionKindNames, ActionHints,
+  CivLines, ActCardLines, ObjectiveProgressLines, DebriefLines,
 } from "./Script_AsciiMap.mjs";
 import { RunBotGame, botNames } from "./Script_Bots.mjs";
 import { TEXT, CFG } from "./Data_Rules.mjs";
@@ -61,14 +62,21 @@ function PrintEvents(events) {
 function PrintStatus(state, view) {
   const derived = view || DeriveView(state);
   const wave = derived.wave;
+  console.log(`【第${derived.act.act}幕《${derived.act.name}》】${derived.act.subtitle}`);
   const objective = ObjectiveLine(state);
   if (objective) console.log(`目标：${objective}`);
+  console.log("幕目标进度：");
+  for (const line of ObjectiveProgressLines(state, derived)) console.log(line);
   console.log(`回合 T${derived.turn}/${wave.hardEndTurn} ｜ 阶段：${derived.phase} ｜ 波次：${wave.statusText}`
     + (wave.status !== "quiet" ? ` ｜ 敌行动力池：${wave.pool}` : "")
-    + (wave.smokeCharges ? ` ｜ 敌烟具：${wave.smokeCharges}` : ""));
-  console.log(`弹药 ${derived.resources.ammo}/${CFG.ammoMax} ｜ 人口 ${derived.resources.popTotal} 批`
-    + (derived.resources.woundedTotal ? ` ｜ 伤员 ${derived.resources.woundedTotal} 批` : ""));
+    + (wave.smokeCharges ? ` ｜ 敌烟具：${wave.smokeCharges}` : "")
+    + (wave.floodCharges ? ` ｜ 敌水车：${wave.floodCharges}` : ""));
+  console.log(`弹药 ${derived.resources.ammo}/${CFG.ammoMax}`
+    + ` ｜ 地道网 ${derived.network.cells} 格（最大连通块 ${derived.network.largest}，串起 ${derived.network.villagesLinked} 村）`
+    + ` ｜ 未被搜出的口 ${derived.network.liveEntrances}（伪装 ${derived.network.disguised}）`
+    + ` ｜ 通气孔 ${derived.network.vents}`);
   for (const line of GrainLines(state)) console.log(line);
+  for (const line of CivLines(state, derived)) console.log(line);
   const ledgerParts = Object.entries(derived.ledger).filter(([, v]) => v > 0)
     .map(([k, v]) => `${TEXT.ledgerNames[k]}：${v}`);
   console.log(`代价簿：${ledgerParts.length ? ledgerParts.join("；") : "（全空）"}`);
@@ -96,6 +104,8 @@ function PrintResult(state, view) {
   const ledgerParts = Object.keys(TEXT.ledgerNames)
     .map((key) => `${TEXT.ledgerNames[key]} ${state.ledger[key] || 0}`);
   console.log(`代价账本（只记损失，不折功劳）：${ledgerParts.join(" ｜ ")}`);
+  console.log("");
+  for (const line of DebriefLines(state, view)) console.log(line);
 }
 
 function PrintUnits(state, view) {
@@ -141,10 +151,12 @@ const rulesCard = [
 ];
 
 function CmdNew(args) {
-  const level = args.level || "L1";
+  const level = args.level || "A1";
   const seed = Number(args.seed ?? 3);
   const state = CreateGame(level, seed);
-  console.log(`—— 开局：${level} seed=${seed} ——`);
+  console.log(`—— 开局：${state.meta.level} seed=${seed} ——`);
+  for (const line of ActCardLines(state)) console.log(line);
+  console.log("");
   for (const line of GetBriefing(state)) console.log(line);
   console.log("");
   for (const line of rulesCard) console.log(line);
@@ -250,8 +262,10 @@ function CmdEnd(args) {
 }
 
 function Summary(state, steps) {
+  const view = DeriveView(state);
   return {
     level: state.meta.level,
+    act: state.meta.act,
     seed: state.meta.seed,
     endTurn: state.meta.turn,
     steps,
@@ -260,7 +274,8 @@ function Summary(state, steps) {
     kills: state.score.kills,
     alliesLost: state.score.alliesLost,
     grainTotal: GrainTotal(state),
-    popTotal: PopTotal(state),
+    civ: view.civSummary,
+    network: view.network,
     woundedTotal: WoundedTotal(state),
     ammo: state.resources.ammo,
     pool: state.wave.pool,
@@ -270,7 +285,7 @@ function Summary(state, steps) {
 }
 
 function CmdRun(args) {
-  const level = args.level || "L1";
+  const level = args.level || "A1";
   const seed = Number(args.seed ?? 3);
   const botName = args.bot || "Skilled";
   if (!botNames.includes(botName)) Die(`未知 bot：${botName}（可选：${botNames.join("/")}）`);
@@ -293,7 +308,7 @@ function CmdRun(args) {
 }
 
 function CmdFixture(args) {
-  const level = args.level || "L1";
+  const level = args.level || "A1";
   const seed = Number(args.seed ?? 3);
   const turns = Number(args.turns ?? 6);
   const out = args.out || new URL("./Data_FixtureState.mjs", import.meta.url).pathname;
@@ -316,13 +331,13 @@ const args = ParseArgs(process.argv.slice(2));
 const command = args._[0];
 if (!command || !commands[command]) {
   console.log("用法：node TunnelFront1942/Script_PlayCli.mjs <new|show|legal|act|end|run|fixture> [--参数 值]");
-  console.log("  new  --level L1 --seed 3 --save /tmp/g.json          开局简报 + 规则要点 + 战场报表");
+  console.log("  new  --level A1 --seed 3 --save /tmp/g.json          开局简报 + 规则要点 + 战场报表");
   console.log("  show --save /tmp/g.json [--layer surface|under|both] 战场报表（地图/地道口/存粮分账/敌意图）");
   console.log("  legal --save /tmp/g.json --unit u1                   某单位合法动作（按主动作/移动/免费分组 + 不可用原因）");
   console.log("  legal --save /tmp/g.json --unit u1 --json            原始 JSON，可直接喂给 act");
   console.log('  act  --save /tmp/g.json --json \'{"type":"Move","unit":"u1","path":["4,1"]}\'');
   console.log("  end  --save /tmp/g.json                              敌军阶段 + 结算全播报");
-  console.log("  run  --level L1 --seed 3 --bot Skilled [--verbose]   bot 整局 → 总结 JSON");
+  console.log("  run  --level A1 --seed 3 --bot Skilled [--verbose]   bot 整局 → 总结 JSON");
   console.log("");
   for (const line of rulesCard) console.log(line);
   process.exit(command ? 1 : 0);

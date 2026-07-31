@@ -112,13 +112,36 @@ export const theme = Object.freeze({
   }),
 
   // ---------------------------------------------------------------- 交互高亮
+  // 可达/路径必须在麦田米色（#c2b48f）、青纱帐绿（#7a9455）、树林深绿（#49664a）、
+  // 坟地灰紫（#8d8698）、村庄土褐（#b3906d）与地下近黑（#1a1c21）上都一眼可辨——
+  // 故一律走「冷青蓝」这条地形里不存在的色相，并且每格都描粗边（不靠低透明度覆膜）。
   highlight: Object.freeze({
     selection: "#e8e4d8",        // 选中脉冲环
-    hover: "#b9b5a8",
-    reachable: "#dad4c2",        // 可达格覆膜
-    reachableOpacity: 0.28,
-    path: "#e8e4d8",             // 路径预览
+    hover: "#f4efe2",            // 悬停轮廓（提亮到近白，配 hoverWidth 带宽）
+    hoverWidth: 0.055,           // 悬停轮廓带宽（世界单位；不再用 1px LineBasicMaterial）
+
+    // 可达一档：走到该格仍有剩余 MP（还能接着走）——亮青覆膜「提亮」地形
+    reachable: "#5fdcef",
+    reachableEdge: "#aef4fd",    // 描边（青白，六边形轮廓）
+    reachableOpacity: 0.24,      // 覆膜压低靠描边立信息：地形本色仍要读得出
+    // 可达二档：走到该格正好走满 MP（本回合到此为止）——深青覆膜「压暗」地形，与一档反向
+    reachableSpent: "#123c4e",
+    reachableSpentEdge: "#59a0b8",
+    // 目标模式（挖掘等）：琥珀色另一套视觉语言，与「能走到」区分
+    target: "#c88a34",
+    targetEdge: "#f0c274",
+    edgeWidth: 0.075,            // 可达格描边带宽（世界单位）
+    edgeOpacity: 0.95,
+    edgePulse: 0.22,             // 描边呼吸幅度（0=不呼吸）
+
+    path: "#f4efe0",             // 路径预览主色（暖白管线）
     pathRisk: "#d08030",         // 风险段（橙）
+    pathRadius: 0.075,           // 路径管半径（世界单位）
+    pathArrow: "#fffaf0",        // 路径方向箭头
+    dest: "#ffe4a3",             // 目的地落点环（暖黄，与青色可达膜互补）
+    destRisk: "#e08a3c",         // 目的地落点环（该路线带风险时）
+    costText: "#f6f2e6",         // 代价牌文字
+    costBg: "rgba(17, 19, 23, 0.90)",   // 代价牌底
     focus: "#d0812f",            // 播报聚焦脉冲
   }),
 
@@ -166,6 +189,8 @@ export const theme = Object.freeze({
 export function CssVars() {
   const ui = theme.ui;
   return {
+    "--tf-reach-edge": theme.highlight.reachableEdge,
+    "--tf-path-risk": theme.highlight.pathRisk,
     "--tf-bg": ui.bg,
     "--tf-panel": ui.panel,
     "--tf-panel-border": ui.panelBorder,

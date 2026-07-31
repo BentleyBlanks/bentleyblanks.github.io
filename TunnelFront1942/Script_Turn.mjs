@@ -1,18 +1,20 @@
 // 《地下长城 · 冀中1942》 —— 回合管线（AGENTS.md §2.1/§三）：
 // EndTurn = 玩家阶段收尾 → 敌军阶段（逐纵队）→ 固定结算顺序
-// （烟蔓延→憋闷累计→被迫出洞→搜索暴露判定→粮食产耗→情报刷新→池扣减与撤退判定→胜负勋记判定）
+// （烟蔓延→水漫延→憋闷与恐慌→被迫出洞→搜索暴露判定→粮食产耗→情报刷新→池扣减与撤退判定→胜负勋记判定）
 // → 新回合开卷（波次状态机 quiet→sweep→withdrawing→done）。
-// 胜负评级三勋记制；breakdown 数值分仅供冒烟排序断言，不进 UI。
+// 胜负评级三勋记制 + 群众保全率；breakdown 数值分仅供冒烟排序断言，不进 UI。
 
-import { HexNeighborKeys, HexDistanceKeys } from "./Script_Hex.mjs";
+import { HexNeighborKeys, HexDistanceKeys, ParseHexKey, hexDirections } from "./Script_Hex.mjs";
 import { CFG, TEXT, GradeForMedals } from "./Data_Rules.mjs";
-import { GetLevel } from "./Data_Levels.mjs";
+import { GetLevel, BuildActCard } from "./Data_Levels.mjs";
 import {
   SortedKeys, CompareIds, PushEvent, AddLedger, CloneState, UnitDef, UnitsOn,
   AllyUnits, EnemyUnits, RemoveUnit, CombatUnitCount, AirZones, ZoneHasAir, ZoneExits,
   ConnectedCells, TunnelNeighbors, GrainTotal, TunnelGrainTotal, PopTotal, WoundedTotal,
-  EntranceThreshold, VentThreshold, EnemyNearVillage, StorageCellsUnder,
-  IsSurfacePassable,
+  EntranceThreshold, VentThreshold, EnemyNearVillage, StorageCellsUnder, ElevOf,
+  IsSurfacePassable, LiveCivs, CivsInCell, CivsAtVillage, CivSafeCount, CivTotal, CivSafeRatio,
+  CivLostCount, LoseCiv, CivGuidanceOn, LargestNetworkSize, VillagesLinked, LiveEntranceCount,
+  DisguisedEntranceCount, VentCount, VillageIdOfHex,
 } from "./Script_State.mjs";
 import { ExpireSightings, UpdateEnemyMemory, ExposeEntranceUse, CanAllySeeHex, RecordSighting } from "./Script_Visibility.mjs";
 import { RunEnemyPhase } from "./Script_EnemyAi.mjs";
@@ -38,29 +40,74 @@ function PlayerWrapUp(state, events) {
 }
 
 // ---------------------------------------------------------------------------
-// 结算八步（顺序固定）
+// 结算（顺序固定）
 // ---------------------------------------------------------------------------
 
-/** ① 烟蔓延：沿开放边扩 1 格/回合 ×3，再滞留 2 回合后消散；关闭的隔断门阻挡。 */
+/** 方向索引：拐弯判定用（直巷子里烟走得快，拐一个弯要多花一回合）。 */
+function DirIndex(fromKey, toKey) {
+  const a = ParseHexKey(fromKey);
+  const b = ParseHexKey(toKey);
+  const dq = b.q - a.q;
+  const dr = b.r - a.r;
+  for (let index = 0; index < hexDirections.length; index += 1) {
+    if (hexDirections[index].q === dq && hexDirections[index].r === dr) return index;
+  }
+  return -1;
+}
+
+/** 完好的翻板压着的格：烟灌不进、水漫不进（第四幕的结构性反制之一）。 */
+function TrapBlocks(state, key) {
+  const cell = state.tunnels.cells[key];
+  return !!(cell && cell.facility === "trapdoor" && cell.trapReady);
+}
+
+/**
+ * ① 烟蔓延：沿开放边扩散，**直巷子 1 格/回合，拐一个弯要多花 1 回合**；
+ * 关闭的隔断门与完好的翻板阻断。持续 3 回合后再滞留 2 回合消散。
+ */
 function StepSmoke(state, events) {
   const keep = [];
   for (const op of state.tunnels.smokeOps) {
+    op.cells = op.cells || [];
+    op.front = op.front || op.cells.map((key) => ({ key, dir: -1 }));
+    op.queued = op.queued || [];
+    const known = new Set(op.cells);
+    // 上一回合被「拐弯」拖住的支线，这一回合到位
+    const promoted = [];
+    for (const entry of op.queued) {
+      if (known.has(entry.key)) continue;
+      known.add(entry.key);
+      op.cells.push(entry.key);
+      promoted.push(entry);
+    }
+    op.queued = [];
     if (op.spreadLeft > 0) {
-      const next = new Set(op.cells);
-      for (const key of op.cells) {
-        for (const nb of TunnelNeighbors(state, key, true)) next.add(nb);
+      const nextFront = promoted.slice();
+      for (const entry of op.front) {
+        for (const nb of TunnelNeighbors(state, entry.key, true).sort()) {
+          if (known.has(nb) || TrapBlocks(state, nb)) continue;
+          const dir = DirIndex(entry.key, nb);
+          if (entry.dir < 0 || dir === entry.dir) {
+            known.add(nb);
+            op.cells.push(nb);
+            nextFront.push({ key: nb, dir });
+          } else if (!op.queued.some((q) => q.key === nb)) {
+            op.queued.push({ key: nb, dir });          // 拐弯：多花一回合
+          }
+        }
       }
-      op.cells = [...next].sort();
+      op.front = nextFront;
+      op.cells.sort();
       op.spreadLeft -= 1;
-      PushEvent(state, events, { kind: "smoke", text: "烟沿地道蔓延", hex: op.origin, layer: "under", visible: true });
+      PushEvent(state, events, { kind: "smoke", text: "烟沿地道蔓延（直巷子快，拐弯慢一回合）", hex: op.origin, layer: "under", visible: true });
     } else {
       op.lingerLeft -= 1;
+      op.front = promoted;
     }
     if (op.lingerLeft > 0 || op.spreadLeft > 0) keep.push(op);
     else PushEvent(state, events, { kind: "smoke", text: "地道里的烟散了", hex: op.origin, layer: "under", visible: true });
   }
   state.tunnels.smokeOps = keep;
-  // 统一重刷各格烟浓度与通风口熏染
   for (const key of SortedKeys(state.tunnels.cells)) state.tunnels.cells[key].smoke = 0;
   for (const op of state.tunnels.smokeOps) {
     const remain = op.spreadLeft + op.lingerLeft;
@@ -74,36 +121,116 @@ function StepSmoke(state, events) {
   }
 }
 
-/** ② 憋闷累计：无风分区内单位/群众批 +1（烟中 +2）；有风清零。 */
-function StepBreath(state, events) {
-  const zones = AirZones(state);
-  for (const zone of zones) {
-    const hasAir = ZoneHasAir(state, zone);
-    for (const key of [...zone].sort()) {
-      const cell = state.tunnels.cells[key];
-      const gain = cell.smoke > 0 ? CFG.breathGainSmoke : CFG.breathGainNoAir;
-      for (const unit of UnitsOn(state, key, "under")) {
-        unit.breath = hasAir && cell.smoke === 0 ? 0 : unit.breath + gain;
-        if (!hasAir || cell.smoke > 0) {
-          if (unit.breath === CFG.breathThreshold) {
-            PushEvent(state, events, { kind: "breath", text: `${UnitDef(unit).name}在地道中憋闷难支`, hex: key, layer: "under", visible: true });
-          }
+/**
+ * ①' 灌水：水**只往同高或更低**的相邻格漫（关闭的隔断门与完好的翻板阻断）。
+ * 高处的巷子淹不着——这是第四幕唯一真正可靠的反制，而且它是地形，不是数值。
+ */
+function StepWater(state, events) {
+  const keep = [];
+  for (const op of state.tunnels.floodOps) {
+    op.cells = op.cells || [];
+    if (op.spreadLeft > 0) {
+      const known = new Set(op.cells);
+      const added = [];
+      for (const key of op.cells) {
+        for (const nb of TunnelNeighbors(state, key, true).sort()) {
+          if (known.has(nb) || TrapBlocks(state, nb)) continue;
+          if (ElevOf(state, nb) > ElevOf(state, key)) continue;      // 水不上坡
+          known.add(nb);
+          added.push(nb);
         }
       }
-      if (cell.civs > 0 || (state.wounded.inCells[key] || 0) > 0) {
-        cell.civBreath = hasAir && cell.smoke === 0 ? 0 : (cell.civBreath || 0) + gain;
-      } else {
-        cell.civBreath = 0;
-      }
+      for (const key of added) op.cells.push(key);
+      op.cells.sort();
+      op.spreadLeft -= 1;
+      PushEvent(state, events, { kind: "water", text: TEXT.water.spread, hex: op.origin, layer: "under", visible: true });
+    } else {
+      op.lingerLeft -= 1;
+    }
+    if (op.lingerLeft > 0 || op.spreadLeft > 0) keep.push(op);
+    else PushEvent(state, events, { kind: "water", text: TEXT.water.dry, hex: op.origin, layer: "under", visible: true });
+  }
+  state.tunnels.floodOps = keep;
+  for (const key of SortedKeys(state.tunnels.cells)) state.tunnels.cells[key].water = 0;
+  for (const op of state.tunnels.floodOps) {
+    const remain = op.spreadLeft + op.lingerLeft;
+    for (const key of op.cells) {
+      const cell = state.tunnels.cells[key];
+      if (cell) cell.water = Math.max(cell.water, remain);
+    }
+  }
+  // 被淹的储粮洞泡毁存粮（只进代价簿，绝不产生任何收益）
+  for (const key of SortedKeys(state.tunnels.cells)) {
+    const cell = state.tunnels.cells[key];
+    if (cell.water > 0 && cell.grain > 0) {
+      const lost = Math.min(CFG.water.grainSpoilPerTurn, cell.grain);
+      cell.grain -= lost;
+      AddLedger(state, "grainSeized", lost);
+      PushEvent(state, events, { kind: "ledger", text: `${TEXT.water.spoil}：${lost} 担`, hex: key, layer: "under", visible: true });
     }
   }
 }
 
-/** ③ 被迫出洞（R2 P0-3）：憋闷 ≥3 → **一定上地面**：先走分区里最近的未封口，没有口就在本格
- *  正上方刨土钻出（留痕迹），连正上方都不可通行才退化为掉血。地面有敌 → 群众当场被捕入账本。
- *  这是地上-地下唯一的强耦合点：把人闷死在洞里不再是可行打法。 */
-function ForcedExit(state, zone, fromKey) {
-  const exits = ZoneExits(state, zone, fromKey);
+/** ② 憋闷（单位）与恐慌（群众批）：同一套压力，只是两种称呼。 */
+function StepPressure(state, events) {
+  const zones = AirZones(state);
+  const zoneAir = {};
+  for (const zone of zones) {
+    const hasAir = ZoneHasAir(state, zone);
+    for (const key of zone) zoneAir[key] = hasAir;
+  }
+  // 单位憋闷
+  for (const key of SortedKeys(state.tunnels.cells)) {
+    const cell = state.tunnels.cells[key];
+    const hasAir = !!zoneAir[key];
+    const gain = cell.smoke > 0 ? CFG.breathGainSmoke
+      : cell.water > 0 ? CFG.breathGainWater : CFG.breathGainNoAir;
+    for (const unit of UnitsOn(state, key, "under")) {
+      const bad = !hasAir || cell.smoke > 0 || cell.water > 0;
+      unit.breath = bad ? unit.breath + gain : 0;
+      if (bad && unit.breath === CFG.breathThreshold) {
+        PushEvent(state, events, { kind: "breath", text: `${UnitDef(unit).name}在地道中憋闷难支`, hex: key, layer: "under", visible: true });
+      }
+    }
+  }
+  // 群众恐慌（无人带路 / 无风 / 烟 / 水 —— 合并成同一个表）
+  const guidance = CivGuidanceOn(state);
+  const sweeping = state.wave.status !== "quiet";
+  for (const civ of LiveCivs(state)) {
+    if (civ.loc !== "cell") { civ.panic = 0; continue; }
+    const cell = state.tunnels.cells[civ.at];
+    if (!cell) { civ.panic = 0; continue; }
+    let gain = 0;
+    if (cell.smoke > 0) gain += CFG.civ.panicSmoke;
+    else if (cell.water > 0) gain += CFG.civ.panicWater;
+    else if (!zoneAir[civ.at]) gain += CFG.civ.panicNoAir;
+    const escorted = UnitsOn(state, civ.at, "under").some((unit) => unit.side === "ally");
+    if (!escorted && guidance && sweeping) gain += CFG.civ.panicNoGuide;
+    if (gain > 0) {
+      civ.panic += gain;
+      if (civ.panic === CFG.civ.panicThreshold) {
+        PushEvent(state, events, { kind: "panic",
+          text: `地道里的群众（${KindName(civ)}）撑不住了：${escorted ? "" : "无人照应，"}恐慌已满`,
+          hex: civ.at, layer: "under", visible: true });
+      }
+    } else if (escorted && civ.panic > 0) {
+      civ.panic = Math.max(0, civ.panic - CFG.civ.calmPerTurn);
+      PushEvent(state, events, { kind: "panic", text: TEXT.civText.calmed, hex: civ.at, layer: "under", visible: false });
+    }
+  }
+}
+
+function KindName(civ) {
+  return ({ old: "老弱", young: "青壮", wounded: "伤员" })[civ.kind] || civ.kind;
+}
+
+/**
+ * ③ 被迫出洞：憋闷 ≥3 的单位、恐慌 ≥3 的群众批**一定上地面**。
+ * 先走本分区最近的可用口（群众过不去的伪装口——比如水井——不算），没有口就在本格正上方刨土钻出，
+ * 连正上方都不可通行才退化为掉血/罹难。地面有敌 → 群众当场被捕入账本。
+ */
+function ForcedExit(state, zone, fromKey, forCivs) {
+  const exits = ZoneExits(state, zone, fromKey, forCivs);
   if (exits.length) return { key: exits[0], dug: false };
   if (IsSurfacePassable(state, fromKey)) return { key: fromKey, dug: true };
   return null;
@@ -117,7 +244,7 @@ function StepForcedOut(state, events) {
   for (const unit of AllyUnits(state)) {
     if (unit.layer !== "under" || unit.breath < CFG.breathThreshold) continue;
     const zone = zones[zoneOf[unit.pos]] || new Set([unit.pos]);
-    const out = ForcedExit(state, zone, unit.pos);
+    const out = ForcedExit(state, zone, unit.pos, false);
     if (out) {
       unit.pos = out.key;
       unit.layer = "surface";
@@ -138,71 +265,44 @@ function StepForcedOut(state, events) {
       }
     }
   }
-  // 群众批与伤员批
-  for (const key of SortedKeys(state.tunnels.cells)) {
-    const cell = state.tunnels.cells[key];
-    const wounded = state.wounded.inCells[key] || 0;
-    if ((cell.civs <= 0 && wounded <= 0) || (cell.civBreath || 0) < CFG.breathThreshold) continue;
-    const zone = zones[zoneOf[key]] || new Set([key]);
-    const out = ForcedExit(state, zone, key);
-    if (out) {
-      const exitKey = out.key;
-      const enemyThere = UnitsOn(state, exitKey, "surface").some((unit) => unit.side === "enemy");
-      const civs = cell.civs;
-      cell.civs = 0;
-      cell.civBreath = 0;
-      if (wounded > 0) delete state.wounded.inCells[key];
-      if (out.dug) AddTraces(state, exitKey, CFG.tracesPerDig);
-      else ExposeEntranceUse(state, exitKey, null);
-      if (enemyThere) {
-        if (civs > 0) AddLedger(state, "civCaptured", civs);
-        if (wounded > 0) AddLedger(state, "civCaptured", wounded);
-        PushEvent(state, events, { kind: "ledger", text: `憋出地面的群众 ${civs + wounded} 批当场被抓（入代价簿）`, hex: exitKey, visible: true });
-      } else {
-        const village = NearestVillage(state, exitKey);
-        if (village) {
-          village.pop += civs;
-          if (wounded > 0) {
-            const villageId = VillageIdOf(state, village);
-            state.wounded.atVillage[villageId] = (state.wounded.atVillage[villageId] || 0) + wounded;
-          }
-        }
-        PushEvent(state, events, { kind: "forcedOut", text: `群众 ${civs + wounded} 批被憋出地面，散回村中`, hex: exitKey, visible: true });
-      }
+  // 群众批
+  for (const civ of LiveCivs(state)) {
+    if (civ.loc !== "cell" || civ.panic < CFG.civ.panicThreshold) continue;
+    const zone = zones[zoneOf[civ.at]] || new Set([civ.at]);
+    const out = ForcedExit(state, zone, civ.at, true);
+    if (!out) {
+      LoseCiv(state, civ, "dead");
+      PushEvent(state, events, { kind: "ledger", text: `无路可出：群众（${KindName(civ)}）1 批罹难（入代价簿）`, layer: "under", visible: true });
+      continue;
+    }
+    const enemyThere = UnitsOn(state, out.key, "surface").some((unit) => unit.side === "enemy");
+    state.score.civForcedOut += 1;
+    if (out.dug) AddTraces(state, out.key, CFG.tracesPerDig);
+    else ExposeEntranceUse(state, out.key, null);
+    if (enemyThere) {
+      LoseCiv(state, civ, "captured");
+      PushEvent(state, events, { kind: "ledger", text: `${TEXT.civText.caught}：群众（${KindName(civ)}）1 批`, hex: out.key, visible: true });
     } else {
-      if (cell.civs > 0) {
-        cell.civs -= 1;
-        AddLedger(state, "civDead", 1);
-        PushEvent(state, events, { kind: "ledger", text: "无风地道中群众罹难 1 批（入代价簿）", hex: key, layer: "under", visible: true });
-      } else if (wounded > 0) {
-        state.wounded.inCells[key] = wounded - 1;
-        if (state.wounded.inCells[key] <= 0) delete state.wounded.inCells[key];
-        AddLedger(state, "civDead", 1);
-        PushEvent(state, events, { kind: "ledger", text: "无风地道中伤员罹难 1 批（入代价簿）", hex: key, layer: "under", visible: true });
-      }
+      const villageId = NearestVillageId(state, out.key);
+      civ.loc = "village";
+      civ.at = villageId;
+      civ.panic = 0;
+      PushEvent(state, events, { kind: "forcedOut", text: `${TEXT.civText.panicOut}：群众（${KindName(civ)}）1 批散回村中`, hex: out.key, visible: true });
     }
   }
   RecordExposedSightings(state);
 }
 
-function NearestVillage(state, key) {
+function NearestVillageId(state, key) {
   let best = null;
   let bestDist = Infinity;
   for (const villageId of SortedKeys(state.map.villages)) {
-    const village = state.map.villages[villageId];
-    for (const hexKey of village.hexKeys) {
+    for (const hexKey of state.map.villages[villageId].hexKeys) {
       const dist = HexDistanceKeys(hexKey, key);
-      if (dist < bestDist) { bestDist = dist; best = village; }
+      if (dist < bestDist) { bestDist = dist; best = villageId; }
     }
   }
   return best;
-}
-
-function VillageIdOf(state, village) {
-  for (const villageId of SortedKeys(state.map.villages)) {
-    if (state.map.villages[villageId] === village) return villageId;
-  }
-  return null;
 }
 
 /** ④ 搜索暴露判定：暴露豆达到阈值 → 入口/通风口转为已知（永久）。 */
@@ -218,13 +318,12 @@ function StepExposure(state, events) {
     const vent = state.tunnels.vents[key];
     if (!vent.known && vent.expose >= VentThreshold()) {
       vent.known = true;
-      PushEvent(state, events, { kind: "expose", text: "通风口被敌搜出", hex: key, visible: true });
+      PushEvent(state, events, { kind: "expose", text: "通气孔被敌搜出", hex: key, visible: true });
     }
   }
 }
 
-/** ⑤ 粮食产耗：平静期每村 +1（组织 ≥1 且脚下通着储粮洞则自动藏 1）；扫荡期敌到村边则每回合
- *  搜走 sweepGrainLoss 担进代价簿（R2 P0-6a）。当回合已被纵队征过粮的村不重复扣。 */
+/** ⑤ 粮食产耗：平静期每村 +1（组织 ≥1 且脚下通着储粮洞则自动藏 1）；扫荡期敌到村边则每回合搜走。 */
 function StepGrain(state, events) {
   if (state.wave.status === "quiet") {
     for (const villageId of SortedKeys(state.map.villages)) {
@@ -261,8 +360,7 @@ function StepIntel(state, events) {
   UpdateEnemyMemory(state);
 }
 
-/** ⑦ 池扣减与撤退（R2 P0-6b）：基础衰减（两关都已归零）+ **扑空衰减**（摸到村边却一无所获的
- *  纵队每支 -1，每回合至多 -2）+ 我方所致（封顶 5）。扑空衰减不是白送，是藏干净换来的。 */
+/** ⑦ 池扣减与撤退：扑空衰减（摸到村边却一无所获的纵队每支 -1，每回合至多 -2）+ 我方所致（封顶 5）。 */
 function EmptyHandedColumns(state) {
   let count = 0;
   for (const column of state.enemy.columns) {
@@ -297,28 +395,28 @@ function StepPool(state, events) {
 /** ⑧ 胜负勋记判定（早败 / 波次收束 / 到时终局）。 */
 function StepOutcome(state, events) {
   const level = GetLevel(state.meta.level);
-  // 早败：战斗单位全灭
   if (CombatUnitCount(state) === 0) {
     Evaluate(state, events, { defeatReason: "战斗单位全部损失" });
     return;
   }
-  if (state.meta.level === "L2") {
+  const defeat = level.defeat || {};
+  if (defeat.hqOccupiedTurns !== undefined) {
     const hq = Object.values(state.map.villages).find((village) => village.hasHq);
     const hqHexes = hq ? hq.hexKeys : [];
-    // 「驻占」= T13 判定后转入驻剿的纵队据守区队部（扫荡期路过搜粮不算占）
     const garrisonColumns = state.enemy.columns.filter((column) => column.garrison);
     const occupied = garrisonColumns.some((column) => column.unitIds.some((id) => {
       const unit = state.units[id];
       return unit && unit.hp > 0 && hqHexes.includes(unit.pos);
     }));
     state.score.hqOccupiedTurns = occupied ? state.score.hqOccupiedTurns + 1 : 0;
-    if (state.score.hqOccupiedTurns >= level.defeat.hqOccupiedTurns) {
+    if (state.score.hqOccupiedTurns >= defeat.hqOccupiedTurns) {
       Evaluate(state, events, { defeatReason: "区队部被敌驻占" });
       return;
     }
-    const popStart = Object.values(state.map.villages).reduce((sum, village) => sum + village.popStart, 0);
-    if (PopTotal(state) < popStart * level.defeat.popRatioBelow) {
-      Evaluate(state, events, { defeatReason: "人口损失过半" });
+  }
+  if (defeat.civLostRatioAbove !== undefined && CivTotal(state) > 0) {
+    if (CivLostCount(state) / CivTotal(state) > defeat.civLostRatioAbove) {
+      Evaluate(state, events, { defeatReason: "群众损失过半" });
       return;
     }
   }
@@ -333,19 +431,25 @@ function StepOutcome(state, events) {
       state.wave.doneTurn = state.meta.turn;
       state.score.withdrewEarlyTurns = Math.max(0, state.wave.hardEndTurn - state.meta.turn);
       PushEvent(state, events, { kind: "banner", text: TEXT.waveStatus.done, visible: true });
-      // 敌离场：群众自动返村
-      for (const key of SortedKeys(state.tunnels.cells)) {
-        const cell = state.tunnels.cells[key];
-        if (cell.civs > 0) {
-          const village = NearestVillage(state, key);
-          if (village) { village.pop += cell.civs; cell.civs = 0; cell.civBreath = 0; }
-        }
-      }
+      ReturnCivsHome(state);
       Evaluate(state, events, {});
       return;
     }
   }
-  if (state.meta.turn >= level.maxTurns) Evaluate(state, events, {});
+  if (state.meta.turn >= level.maxTurns) {
+    ReturnCivsHome(state);
+    Evaluate(state, events, {});
+  }
+}
+
+/** 敌离场：地道里的群众自动返村（保全率只认「没被抓、没罹难」，不认他们最后待在哪儿）。 */
+function ReturnCivsHome(state) {
+  for (const civ of LiveCivs(state)) {
+    if (civ.loc !== "cell") continue;
+    civ.loc = "village";
+    civ.at = NearestVillageId(state, civ.at) || civ.home;
+    civ.panic = 0;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -360,21 +464,6 @@ function AliveVillages(state) {
   return Object.values(state.map.villages).filter((village) => village.burnedHexes < village.hexKeys.length).length;
 }
 
-/** 主干贯通（L2 勋记③）：枣林庄任一地道格与石槽村任一地道格连通（忽略门）。 */
-function TrunkIntact(state) {
-  const v1 = state.map.villages.v1;
-  const v3 = state.map.villages.v3;
-  if (!v1 || !v3) return false;
-  const starts = v1.hexKeys.filter((key) => state.tunnels.cells[key]);
-  const goals = new Set(v3.hexKeys.filter((key) => state.tunnels.cells[key]));
-  if (!starts.length || !goals.size) return false;
-  for (const start of starts) {
-    const reach = ConnectedCells(state, start, false);
-    for (const goal of goals) if (reach.has(goal)) return true;
-  }
-  return false;
-}
-
 function LedgerEmpty(state) {
   return Object.values(state.ledger).every((value) => value === 0);
 }
@@ -385,9 +474,9 @@ export function ComputeBreakdown(state, won) {
   const entrancesIntact = SortedKeys(state.tunnels.entrances)
     .filter((key) => !state.tunnels.entrances[key].sealed).length;
   const breakdown = {
-    survive: 8 * CombatUnitCount(state) + 2 * PopTotal(state) + 2 * WoundedTotal(state),
+    survive: 8 * CombatUnitCount(state) + 4 * CivSafeCount(state),
     grain: 2 * GrainTotal(state),
-    network: Object.keys(state.tunnels.cells).length + 2 * entrancesIntact + (state.meta.level === "L2" && TrunkIntact(state) ? 4 : 0),
+    network: Object.keys(state.tunnels.cells).length + 2 * entrancesIntact + 2 * LargestNetworkSize(state),
     harass: 3 * (state.score.withdrewEarlyTurns || 0) + (state.wave.expelled ? 4 : 0),
     kills: KillsScore(totalKills),
   };
@@ -403,6 +492,11 @@ function CheckCondition(state, key, want) {
     tunnelGrain: () => ({ ok: TunnelGrainTotal(state) >= want, text: `洞存粮 ${TunnelGrainTotal(state)} 担（需 ≥${want}）` }),
     tunnelGrainAtLeast: () => ({ ok: TunnelGrainTotal(state) >= want, text: `洞存粮 ${TunnelGrainTotal(state)} 担（需 ≥${want}）` }),
     grainAtLeast: () => ({ ok: GrainTotal(state) >= want, text: `存粮 ${GrainTotal(state)} 担（需 ≥${want}）` }),
+    civSafeAtLeast: () => ({ ok: CivSafeCount(state) >= want,
+      text: `群众保全 ${CivSafeCount(state)}/${CivTotal(state)} 批（需 ≥${want}）` }),
+    civSafeRatioAtLeast: () => ({ ok: CivSafeRatio(state) >= want - 1e-9,
+      text: `群众保全率 ${(CivSafeRatio(state) * 100).toFixed(0)}%（需 ≥${(want * 100).toFixed(0)}%）` }),
+    civLostAtMost: () => ({ ok: CivLostCount(state) <= want, text: `群众损失 ${CivLostCount(state)} 批（需 ≤${want}）` }),
     woundedAtLeast: () => ({ ok: WoundedTotal(state) >= want, text: `伤员保全 ${WoundedTotal(state)} 批（需 ≥${want}）` }),
     wounded: () => ({ ok: WoundedTotal(state) >= want, text: `伤员保全 ${WoundedTotal(state)} 批（需 ≥${want}）` }),
     villagesAtLeast: () => ({ ok: AliveVillages(state) >= want, text: `存活村 ${AliveVillages(state)} 处（需 ≥${want}）` }),
@@ -414,7 +508,19 @@ function CheckCondition(state, key, want) {
       text: `群众被抓/罹难 ${state.ledger.civCaptured + state.ledger.civDead} 批（需 ≤${want}）` }),
     housesBurnedAtMost: () => ({ ok: state.ledger.housesBurned <= want, text: `房屋被焚 ${state.ledger.housesBurned} 处（需 ≤${want}）` }),
     expelled: () => ({ ok: !!state.wave.expelled === want, text: state.wave.expelled ? "敌被逼退" : "敌按期收队，未被逼退" }),
-    trunkIntact: () => ({ ok: TrunkIntact(state) === want, text: TrunkIntact(state) ? "主干贯通未毁" : "主干未贯通或有段被毁" }),
+    largestNetworkAtLeast: () => ({ ok: LargestNetworkSize(state) >= want,
+      text: `最大地道连通块 ${LargestNetworkSize(state)} 格（需 ≥${want}）` }),
+    villagesLinkedAtLeast: () => ({ ok: VillagesLinked(state) >= want,
+      text: `同一片地道网串起 ${VillagesLinked(state)} 个村（需 ≥${want}）` }),
+    liveEntrancesAtLeast: () => ({ ok: LiveEntranceCount(state) >= want,
+      text: `未被搜出的地道口 ${LiveEntranceCount(state)} 个（需 ≥${want}）` }),
+    disguisedAtLeast: () => ({ ok: DisguisedEntranceCount(state) >= want,
+      text: `伪装口 ${DisguisedEntranceCount(state)} 个（需 ≥${want}）` }),
+    ventsAtLeast: () => ({ ok: VentCount(state) >= want, text: `通气孔 ${VentCount(state)} 处（需 ≥${want}）` }),
+    fightpostsUsedAtLeast: () => ({ ok: (state.score.fightpostsUsed || []).length >= want,
+      text: `开过火的射击孔 ${(state.score.fightpostsUsed || []).length} 处（需 ≥${want}）` }),
+    forcedOutAtMost: () => ({ ok: (state.score.civForcedOut || 0) <= want,
+      text: `被逼出地面的群众 ${state.score.civForcedOut || 0} 批（需 ≤${want}）` }),
   };
   const check = table[key];
   return check ? check() : { ok: true, text: "" };
@@ -450,6 +556,7 @@ function Evaluate(state, events, opts) {
     : CheckAll(state, medal.need || {}).ok));
   if (!won) medals = medals.map(() => false);
   const medalCount = medals.filter(Boolean).length;
+  const card = BuildActCard(level);
   state.medals = medals;
   state.result = {
     won,
@@ -458,8 +565,23 @@ function Evaluate(state, events, opts) {
     breakdown: ComputeBreakdown(state, won),
     reasons,
     endTurn: state.meta.turn,
+    // 终局复盘三段（付出了什么代价 / 学到了什么 / 解锁了什么）—— HUD 直接取这三段
+    act: level.act,
+    actName: level.name,
+    civSafe: CivSafeCount(state),
+    civTotal: CivTotal(state),
+    civRatio: Number(CivSafeRatio(state).toFixed(3)),
+    civForcedOut: state.score.civForcedOut || 0,
+    debrief: {
+      cost: card.debrief.cost || "",
+      learned: card.debrief.learned || "",
+      unlocked: card.debrief.unlocked || "",
+      ledger: { ...state.ledger },
+    },
+    nextId: card.nextId,
+    nextName: card.nextName,
   };
-  PushEvent(state, events, { kind: "result", text: won ? `扫荡对抗结束，评定：${state.result.grade}` : `此役失利，评定：${state.result.grade}`, visible: true });
+  PushEvent(state, events, { kind: "result", text: won ? `第${level.act}幕《${level.name}》结束，评定：${state.result.grade}` : `第${level.act}幕《${level.name}》失利，评定：${state.result.grade}`, visible: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -498,7 +620,6 @@ function StartNewTurn(state, events) {
     unit.acted = false;
     unit.attacked = false;
     unit.freeMove = false;
-    // 「暴露」只持续到我方下一次行动前；伏击是持续状态，不在这里清（只有移动/换动作/开火才解除）。
     if (unit.stance === "exposed") unit.stance = "normal";
     if (unit.side === "ally") unit.revealed = false;
   }
@@ -521,7 +642,8 @@ export function EndTurn(inputState) {
   RunEnemyPhase(state, events);
   state.meta.phase = "resolve";
   StepSmoke(state, events);
-  StepBreath(state, events);
+  StepWater(state, events);
+  StepPressure(state, events);
   StepForcedOut(state, events);
   StepExposure(state, events);
   StepGrain(state, events);

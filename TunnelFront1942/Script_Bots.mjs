@@ -10,7 +10,8 @@ import { CreateRng, HashString, HexDistanceKeys, HexNeighborKeys } from "./Scrip
 import { CFG, unitDefinitions } from "./Data_Rules.mjs";
 import {
   CreateGame, SortedKeys, CompareIds, AllyUnits, EnemyUnits, UnitDef, TerrainOf,
-  EntranceThreshold, UnitsOn, ReachableFacilityCells,
+  EntranceThreshold, UnitsOn, ReachableFacilityCells, FacilityUnlocked, StorageCapOf, ShelterCapOf,
+  CivsInCell, LiveCivs, CivGuidanceOn,
 } from "./Script_State.mjs";
 import { GetLevel } from "./Data_Levels.mjs";
 
@@ -143,108 +144,157 @@ function ActiveEntranceKeys(state) {
 }
 
 /** 备战网待办：返回下一批工地诉求 [{ kind, workPos, action }]（按优先序）。 */
-function DigWishes(state) {
-  const wishes = [];
+/**
+ * 网还缺什么（按胜负线倒推）：容量不够就修仓、铺位不够就修室、口少于两个就再开一个、
+ * 通气孔与射击孔按解锁情况补，最后才是「把网撑大」。返回一张需求表，SkilledDig 据此就地找活干。
+ */
+function DigNeeds(state) {
   const cells = SortedKeys(state.tunnels.cells);
-  const emptyCells = cells.filter((key) => state.tunnels.cells[key].facility === null);
-  let emptyCursor = 0;
-  const TakeEmpty = () => (emptyCursor < emptyCells.length ? emptyCells[emptyCursor++] : null);
-  const SegmentWish = (preferKinds) => {
-    for (const from of cells) {
-      const neighbors = HexNeighborKeys(from)
-        .filter((nb) => {
-          const hex = state.map.hexes[nb];
-          return hex && !state.tunnels.cells[nb] && TerrainOf(state, nb)?.diggable
-            && !state.tunnels.edges[[from, nb].sort().join("|")];
-        })
-        .sort((a, b) => {
-          const ta = preferKinds.indexOf(state.map.hexes[a].terrain);
-          const tb = preferKinds.indexOf(state.map.hexes[b].terrain);
-          return (ta === -1 ? 9 : ta) - (tb === -1 ? 9 : tb) || (a < b ? -1 : 1);
-        });
-      if (neighbors.length) {
-        return { kind: "segment", workPos: from, action: (unit) => ({ type: "Dig", unit: unit.id, target: neighbors[0] }) };
-      }
-    }
-    return null;
-  };
-  const FacilityWish = (facility) => {
-    const cell = TakeEmpty();
-    if (cell) return { kind: facility, workPos: cell, action: (unit) => ({ type: "DigFacility", unit: unit.id, cell, facility }) };
-    return SegmentWish(["village", "grave", "woods", "field"]);
-  };
-  if (!HasFacility(state, "storage")) wishes.push(FacilityWish("storage"));
-  // 洞容不够装全村余粮 → 再修一个储粮洞（勋记「仓廪」的底账）
+  const level = LevelOf(state);
   const openGrain = SortedKeys(state.map.villages).reduce((sum, id) => sum + state.map.villages[id].grainOpen, 0);
   const storageRoom = cells.reduce((sum, key) => {
     const cell = state.tunnels.cells[key];
-    return sum + (cell.facility === "storage" ? CFG.storageGrainCap - cell.grain : 0);
+    return sum + (cell.facility === "storage" ? StorageCapOf(state) - cell.grain : 0);
   }, 0);
-  if (HasFacility(state, "storage") && openGrain > storageRoom) wishes.push(FacilityWish("storage"));
-  const needShelter = state.meta.level === "L2"
-    || SortedKeys(state.wounded.atVillage).some((id) => state.wounded.atVillage[id] > 0);
-  if (needShelter && !HasFacility(state, "shelter")) wishes.push(FacilityWish("shelter"));
-  if (!HasFacility(state, "vent")) wishes.push(FacilityWish("vent"));
-  // 备用口：优先坟地（经典伏击位），其次树林
-  if (ActiveEntranceKeys(state).length < 2) {
-    let placed = false;
-    for (const key of cells) {
-      const hex = state.map.hexes[key];
-      if (!state.tunnels.entrances[key] && (TerrainOf(state, key)?.concealCap ?? 0) >= 3
-          && (hex.terrain === "grave" || hex.terrain === "woods")) {
-        wishes.push({ kind: "entrance", workPos: key, action: (unit) => ({ type: "DigEntrance", unit: unit.id, at: key }) });
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) wishes.push(SegmentWish(["grave", "woods", "village"]));
-  }
-  if (!HasFacility(state, "fightpost")) wishes.push(FacilityWish("fightpost"));
-  return wishes.filter(Boolean);
+  const grainGoal = (level.victory && level.victory.tunnelGrainAtLeast) || 0;
+  const hidden = cells.reduce((sum, key) => sum + state.tunnels.cells[key].grain, 0);
+  const shelterRoom = cells.reduce((sum, key) => sum
+    + (state.tunnels.cells[key].facility === "shelter"
+      ? Math.max(0, ShelterCapOf(state) - CivsInCell(state, key).reduce((n, civ) => n + (CFG.civ.slots[civ.kind] || 1), 0))
+      : 0), 0);
+  const civsOutside = LiveCivs(state).filter((civ) => civ.loc === "village")
+    .reduce((sum, civ) => sum + (CFG.civ.slots[civ.kind] || 1), 0);
+  const fightposts = cells.filter((key) => state.tunnels.cells[key].facility === "fightpost").length;
+  const emptyCells = cells.filter((key) => state.tunnels.cells[key].facility === null).length;
+  return {
+    storage: FacilityUnlocked(state, "storage") && (storageRoom <= 0 || hidden + storageRoom < grainGoal),
+    shelter: FacilityUnlocked(state, "shelter") && shelterRoom < civsOutside,
+    vent: FacilityUnlocked(state, "vent") && !HasFacility(state, "vent"),
+    fightpost: FacilityUnlocked(state, "fightpost") && fightposts < 2,
+    trapdoor: FacilityUnlocked(state, "trapdoor") && !HasFacility(state, "trapdoor"),
+    entrance: ActiveEntranceKeys(state).length < 2,
+    emptyCells,
+  };
 }
 
-function WishBlocked(state, wish) {
-  for (const siteId of SortedKeys(state.tunnels.digs)) {
-    const site = state.tunnels.digs[siteId];
-    if ((site.workedTurn || 0) >= state.meta.turn && site.at === wish.workPos) return true;
-  }
-  return false;
+function NeedsAnything(needs) {
+  return needs.storage || needs.shelter || needs.vent || needs.fightpost || needs.trapdoor || needs.entrance;
 }
+
+/**
+ * 挖网：**就地找活**（不再指派一个走不到的工地）。
+ * 顺序 = 本格空着就按缺口修设施 → 缺口就开口 → 否则挖段把网撑开 → 实在没活干就往有活的格挪。
+ * 扫荡期也照挖：网不够就永远够不着胜负线，只是要挑敌不在近旁的时候干。
+ */
+function SkilledDig(state, unit, actions) {
+  const digPower = CFG.digPower[unit.type] || 0;
+  if (digPower <= 0) return null;
+  const needs = DigNeeds(state);
+  if (unit.layer !== "under") {
+    if (!NeedsAnything(needs)) return null;
+    const down = FindAction(actions, "UseEntrance", (action) => !action.dive);
+    if (down && state.tunnels.entrances[unit.pos] && !state.tunnels.entrances[unit.pos].sealed) return down;
+    const entranceKey = NearestEntranceKey(state, unit.pos, true);
+    if (entranceKey && entranceKey !== unit.pos) {
+      const move = MoveToward(state, unit, actions, entranceKey);
+      if (move) return move;
+    }
+    return null;
+  }
+  const cell = state.tunnels.cells[unit.pos];
+  if (!cell) return null;
+  // ① 本格空着 → 按缺口修设施（顺序即优先级）
+  if (cell.facility === null) {
+    for (const facility of ["storage", "shelter", "fightpost", "vent", "trapdoor"]) {
+      if (!needs[facility]) continue;
+      const act = FindAction(actions, "DigFacility", (a) => a.facility === facility && !a.rearm);
+      if (act) return act;
+    }
+  }
+  // ①' 翻板落下了就重新支好（它是唯一能反复用的工事）
+  const rearm = FindAction(actions, "DigFacility", (a) => a.rearm);
+  if (rearm) return rearm;
+  // ② 还缺设施而本格已占：先挪到空格上去修（移动不占主动作，比又挖一段划算）
+  const wantsFacility = needs.storage || needs.shelter || needs.vent || needs.fightpost || needs.trapdoor;
+  if (wantsFacility && needs.emptyCells > 0) {
+    const target = SortedKeys(state.tunnels.cells)
+      .find((key) => state.tunnels.cells[key].facility === null && key !== unit.pos);
+    if (target) {
+      const move = MoveToward(state, unit, actions, target);
+      if (move) return move;
+    }
+  }
+  // ③ 口不够两个 → 就地开口（本格允许才行）
+  if (needs.entrance) {
+    const dig = FindAction(actions, "DigEntrance");
+    if (dig) return dig;
+  }
+  // ④ 还缺东西但没有空格可用 → 挖段把网撑开（优先挖向村庄格：成本只要 1）
+  if (NeedsAnything(needs)) {
+    const digs = actions.filter((action) => action.type === "Dig").sort((a, b) => {
+      const ta = state.map.hexes[a.target].terrain === "village" ? 0 : 1;
+      const tb = state.map.hexes[b.target].terrain === "village" ? 0 : 1;
+      return ta - tb || (a.target < b.target ? -1 : 1);
+    });
+    if (digs.length) return digs[0];
+  }
+  return null;
+}
+
+/**
+ * 带领群众的职责（第二幕起）：
+ * ① 和群众同格且群众还在走廊里 → 带去藏人室；
+ * ② 恐慌已起 → 就地陪着（同格即安抚，不必花主动作）；
+ * ③ 别处有无人照应且快要冲出去的群众 → 往那边靠。
+ */
+function CivDuty(state, unit, actions) {
+  if (!CivGuidanceOn(state)) return null;
+  if (unit.layer === "under") {
+    const here = CivsInCell(state, unit.pos);
+    if (here.length) {
+      const cell = state.tunnels.cells[unit.pos];
+      if (cell && cell.facility !== "shelter") {
+        const guide = actions.filter((action) => action.type === "GuideCivs")
+          .sort((a, b) => {
+            const sa = state.tunnels.cells[a.to]?.facility === "shelter" ? 0 : 1;
+            const sb = state.tunnels.cells[b.to]?.facility === "shelter" ? 0 : 1;
+            return sa - sb || (a.to < b.to ? -1 : 1);
+          })[0];
+        if (guide && state.tunnels.cells[guide.to]?.facility === "shelter") return guide;
+      }
+      if (here.some((civ) => (civ.panic || 0) > 0)) {
+        return FindAction(actions, "Rest") || { type: "Rest", unit: unit.id };
+      }
+    } else {
+      // 别处有恐慌逼近满值的群众：过去陪着（移动不占主动作）
+      const needy = LiveCivs(state)
+        .filter((civ) => civ.loc === "cell" && (civ.panic || 0) >= 1
+          && !UnitsOn(state, civ.at, "under").some((u) => u.side === "ally"))
+        .sort((a, b) => (b.panic - a.panic) || (a.at < b.at ? -1 : 1))[0];
+      if (needy) {
+        const move = MoveToward(state, unit, actions, needy.at);
+        if (move) return move;
+      }
+    }
+  }
+  return null;
+}
+
 
 function SkilledQuiet(state, unit, actions) {
   const digPower = CFG.digPower[unit.type] || 0;
-  // 藏粮 → 转移群众/伤员
+  // 藏粮 → 转移群众（先送伤员与老弱：他们走得最慢）
   const hideGrain = FindAction(actions, "HideGrain");
   if (hideGrain) return hideGrain;
-  const moveWounded = FindAction(actions, "MoveWounded");
-  if (moveWounded) return moveWounded;
-  const moveCivs = FindAction(actions, "MoveCivs");
+  const moveCivs = FindAction(actions, "MoveCivs", (a) => a.kind === "wounded")
+    || FindAction(actions, "MoveCivs", (a) => a.kind === "old")
+    || FindAction(actions, "MoveCivs");
   if (moveCivs) return moveCivs;
+  const duty = CivDuty(state, unit, actions);
+  if (duty) return duty;
   // 挖网
-  if (digPower > 0) {
-    const wishes = DigWishes(state).filter((wish) => !WishBlocked(state, wish));
-    if (wishes.length) {
-      const wish = wishes[0];
-      if (unit.layer === "under") {
-        if (unit.pos === wish.workPos) {
-          const want = wish.action(unit);
-          if (FindAction(actions, want.type, (a) => JSON.stringify(a).includes(want.target || want.cell || want.at || ""))) return want;
-          const legal = FindAction(actions, want.type);
-          if (legal) return legal;
-        }
-        const move = MoveToward(state, unit, actions, wish.workPos);
-        if (move) return move;
-      } else {
-        const down = FindAction(actions, "UseEntrance", (action) => !action.dive);
-        if (down && state.tunnels.entrances[unit.pos] && !state.tunnels.entrances[unit.pos].sealed) return down;
-        const entranceKey = NearestEntranceKey(state, unit.pos, true);
-        if (entranceKey && entranceKey !== unit.pos) {
-          const move = MoveToward(state, unit, actions, entranceKey);
-          if (move) return move;
-        }
-      }
-    }
-  }
+  const digging = SkilledDig(state, unit, actions);
+  if (digging) return digging;
   // 掩土（暴露豆逼近敌盯上的阈值就得压一压）→ 组织 → 隐蔽待命
   const cover = CoverIfExposed(state, unit, actions);
   if (cover) return cover;
@@ -271,8 +321,11 @@ function CoverIfExposed(state, unit, actions) {
 
 function SkilledSweep(state, unit, actions) {
   const def = UnitDef(unit);
-  // 伏击是持续状态（R2）：已经趴好的人就守着，不再每回合重按一次
+  // 伏击是持续状态：已经趴好的人就守着，不再每回合重按一次
   if (unit.stance === "ambush") return FindAction(actions, "Rest") || { type: "Rest", unit: unit.id };
+  // 带路职责优先于一切：群众冲出地面就是纯代价簿，抢不回来
+  const duty = CivDuty(state, unit, actions);
+  if (duty) return duty;
   // 憋闷 ≥2：向出口转移 / 出洞
   if (unit.layer === "under" && unit.breath >= 2) {
     const exits = ActiveEntranceKeys(state).filter((key) => state.tunnels.cells[key]);
@@ -397,17 +450,28 @@ function SkilledSweep(state, unit, actions) {
       }
     }
   }
-  // 枪眼开火
-  const fightpostShot = FindAction(actions, "Attack", (action) => action.fightpost);
+  // 射击孔开火：打一枪换一个地方——被咬住的孔不打
+  const fightpostShot = FindAction(actions, "Attack", (action) => action.fightpost && !action.locked);
   if (fightpostShot) return fightpostShot;
-  // 扫荡期照旧藏粮（敌不在近旁时）
+  // 扫荡期照旧藏粮、转移群众（敌不在近旁时）
   if (unit.layer === "surface" && (!near || near.dist > 2)) {
     const hideGrain = FindAction(actions, "HideGrain");
     if (hideGrain) return hideGrain;
-    const moveWounded = FindAction(actions, "MoveWounded");
-    if (moveWounded) return moveWounded;
-    const moveCivs = FindAction(actions, "MoveCivs");
+    const moveCivs = FindAction(actions, "MoveCivs", (a) => a.kind === "wounded")
+      || FindAction(actions, "MoveCivs", (a) => a.kind === "old")
+      || FindAction(actions, "MoveCivs");
     if (moveCivs) return moveCivs;
+    const disguise = FindAction(actions, "Disguise", (a) => a.disguise === "stove" || a.disguise === "kang");
+    if (disguise) return disguise;
+  }
+  // 扫荡期照旧补网：胜负线认的是洞存粮与保全率，网不够就永远够不着——只挑敌不在近旁的时候干
+  if ((!near || near.dist >= 3) && unit.layer === "under") {
+    const digging = SkilledDig(state, unit, actions);
+    if (digging) return digging;
+  }
+  if ((!near || near.dist >= 4) && unit.layer === "surface" && (CFG.digPower[unit.type] || 0) > 0) {
+    const digging = SkilledDig(state, unit, actions);
+    if (digging) return digging;
   }
   // 无弹民兵 / 联络员：隐蔽或入地保存
   if (unit.layer === "surface") {

@@ -106,6 +106,16 @@ export function CreateRenderer({ canvas }) {
   const hexTile = BuildHexTileGeometry(HexCornerOffsets(hexSize * 0.92));
   const ringGeom = new THREE.TorusGeometry(0.42, 0.055, 8, 24);
   ringGeom.rotateX(Math.PI / 2);
+  // 六边形「带宽轮廓」：12 顶点 12 三角的扁平环——替代 WebGL 下恒为 1px 的 LineBasicMaterial。
+  const hexRingReach = BuildHexRingGeometry(0.93, theme.highlight.edgeWidth);
+  const hexRingHover = BuildHexRingGeometry(0.985, theme.highlight.hoverWidth);
+  const hexRingDest = BuildHexRingGeometry(0.93, theme.highlight.edgeWidth * 1.5);
+  const destRingGeom = new THREE.TorusGeometry(0.5, 0.075, 8, 30);
+  destRingGeom.rotateX(Math.PI / 2);
+  const pathArrowGeom = new THREE.ConeGeometry(theme.highlight.pathRadius * 2.4, theme.highlight.pathRadius * 4.4, 5);
+  pathArrowGeom.rotateX(Math.PI / 2);   // 锥尖指向 +Z，便于用 lookAt 摆向
+  const pathJointGeom = new THREE.SphereGeometry(theme.highlight.pathRadius * 1.05, 8, 6);
+  const costPlaneGeom = new THREE.PlaneGeometry(1, 1);
   const unitGeoms = {
     box: new THREE.BoxGeometry(0.5, 0.48, 0.5),
     cylinder: new THREE.CylinderGeometry(0.28, 0.32, 0.6, 6),
@@ -138,12 +148,18 @@ export function CreateRenderer({ canvas }) {
   const matVent = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.under.ventPole), transparent: true, depthTest: false });
   const matVentUnder = matVent.clone();
 
-  const matReach = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(theme.highlight.reachable), transparent: true,
-    opacity: theme.highlight.reachableOpacity, depthTest: false });
-  const matPath = new THREE.LineBasicMaterial({ color: new THREE.Color(theme.highlight.path), transparent: true, opacity: 0.95, depthTest: false });
-  const matPathRisk = new THREE.LineBasicMaterial({ color: new THREE.Color(theme.highlight.pathRisk), transparent: true, opacity: 0.95, depthTest: false });
-  const matHover = new THREE.LineBasicMaterial({ color: new THREE.Color(theme.highlight.hover), transparent: true, opacity: 0.9, depthTest: false });
+  // 可达覆膜 + 可达描边：两张 InstancedMesh（instanceColor 承担档位差异，避免逐格建几何体）
+  const matReachFill = new THREE.MeshBasicMaterial({
+    transparent: true, opacity: theme.highlight.reachableOpacity, depthTest: false, depthWrite: false });
+  const matReachEdge = new THREE.MeshBasicMaterial({
+    transparent: true, opacity: theme.highlight.edgeOpacity, depthTest: false, depthWrite: false });
+  const matPath = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.highlight.path), transparent: true, opacity: 0.96, depthTest: false });
+  const matPathRisk = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.highlight.pathRisk), transparent: true, opacity: 0.96, depthTest: false });
+  const matPathArrow = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.highlight.pathArrow), transparent: true, opacity: 0.98, depthTest: false });
+  const matDest = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.highlight.dest), transparent: true, opacity: 0.95, depthTest: false });
+  const matDestOutline = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.highlight.dest), transparent: true, opacity: 0.9, depthTest: false });
+  const matCost = new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, opacity: 1 });
+  const matHover = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.highlight.hover), transparent: true, opacity: 0.9, depthTest: false });
   const matSelect = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.highlight.selection), transparent: true, opacity: 0.95, depthTest: false });
   const matFocus = new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.highlight.focus), transparent: true, opacity: 0, depthTest: false });
   const matIntent = new THREE.LineDashedMaterial({
@@ -236,6 +252,27 @@ export function CreateRenderer({ canvas }) {
     const positions = [];
     for (let i = 1; i < 5; i += 1) {   // 绕序同上：(0, i+1, i) 正面朝上
       positions.push(corners[0].x, 0, corners[0].z, corners[i + 1].x, 0, corners[i + 1].z, corners[i].x, 0, corners[i].z);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  /** 六边形环带（扁平 annulus，位于 y=0 平面）：outer 为外轮廓缩放，width 为带宽（世界单位）。
+   *  WebGL 下 LineBasicMaterial.linewidth 恒为 1px，「描边」必须是真几何体才看得见。 */
+  function BuildHexRingGeometry(outerScale, width) {
+    const outer = HexCornerOffsets(hexSize * outerScale);
+    const innerScale = Math.max(0.05, outerScale - width / hexSize);
+    const inner = HexCornerOffsets(hexSize * innerScale);
+    const positions = [];
+    for (let i = 0; i < 6; i += 1) {
+      const j = (i + 1) % 6;
+      // 每条边一个四边形（外 i、外 j、内 j、内 i），绕序保证正面朝上（+Y）
+      positions.push(
+        outer[i].x, 0, outer[i].z, inner[i].x, 0, inner[i].z, outer[j].x, 0, outer[j].z,
+        outer[j].x, 0, outer[j].z, inner[i].x, 0, inner[i].z, inner[j].x, 0, inner[j].z,
+      );
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -1049,59 +1086,287 @@ export function CreateRenderer({ canvas }) {
   }
 
   // ---------------- 高亮 / 路径 / 悬停 / 选中 ----------------
+  //
+  // 可达提示（文明VI 手感）：覆膜 + 六边形描边，两档
+  //   free  = 走到该格仍有剩余 MP（亮青 + 青白粗描边）
+  //   spent = 走到该格正好走满 MP（钢青 + 蓝灰描边，明显压一档）
+  //   target= 目标模式（挖掘等）的候选格，换琥珀色另一套语言
+  // 实现：两张 InstancedMesh（覆膜/描边）一次分配、反复复用，只改 count 与 instanceColor，
+  // 不在 SetReachable 里新建几何体，更不在 Frame 里建。
 
-  let reachMesh = null;
-  let pathLines = [];
-  let hoverLine = null;
+  const reachTierColor = Object.freeze({
+    free: Object.freeze({ fill: theme.highlight.reachable, edge: theme.highlight.reachableEdge }),
+    spent: Object.freeze({ fill: theme.highlight.reachableSpent, edge: theme.highlight.reachableSpentEdge }),
+    target: Object.freeze({ fill: theme.highlight.target, edge: theme.highlight.targetEdge }),
+  });
+
+  const reach = { fill: null, edge: null, capacity: 0, count: 0, keys: [], farthest: null, layer: "surface" };
+  let overlayLayer = "surface";     // 可达/路径归属层：Frame 里据此让高亮跟随该层明暗
+  let hoverRing = null;
   let selectRing = null;
 
-  function SetReachable(keys, layer) {
-    if (reachMesh) { gOverlay.remove(reachMesh); reachMesh.dispose(); reachMesh = null; }
-    if (!keys?.length) return;
-    reachMesh = new THREE.InstancedMesh(hexTile, matReach, keys.length);
-    const matrix = new THREE.Matrix4();
-    keys.forEach((key, index) => {
-      const world = HexToWorld(ParseHexKey(key).q, ParseHexKey(key).r);
-      matrix.makeTranslation(world.x, LayerY(key, layer) + 0.02, world.z);
-      reachMesh.setMatrixAt(index, matrix);
-    });
-    reachMesh.instanceMatrix.needsUpdate = true;
-    reachMesh.renderOrder = 10;
-    gOverlay.add(reachMesh);
+  function EnsureReachCapacity(needed) {
+    if (reach.capacity >= needed && reach.fill) return;
+    const capacity = Math.max(64, needed, reach.capacity * 2);
+    for (const mesh of [reach.fill, reach.edge]) {
+      if (!mesh) continue;
+      gOverlay.remove(mesh);
+      mesh.dispose();
+    }
+    reach.fill = new THREE.InstancedMesh(hexTile, matReachFill, capacity);
+    reach.edge = new THREE.InstancedMesh(hexRingReach, matReachEdge, capacity);
+    for (const mesh of [reach.fill, reach.edge]) {
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
+      mesh.frustumCulled = false;
+      mesh.count = 0;
+      gOverlay.add(mesh);
+    }
+    reach.fill.renderOrder = 10;
+    reach.edge.renderOrder = 11;
+    reach.capacity = capacity;
   }
 
+  /** entries：`[hexKey]`（默认 free 档）或 `[{key, tier}]`。tier ∈ free|spent|target。 */
+  function SetReachable(entries, layer) {
+    const list = (entries ?? []).map((entry) => (typeof entry === "string" ? { key: entry, tier: "free" } : entry))
+      .filter((entry) => entry && entry.key);
+    reach.keys = list.map((entry) => entry.key);
+    reach.layer = layer ?? viewState.layer;
+    if (list.length) overlayLayer = reach.layer;
+    reach.farthest = list.reduce((best, entry) =>
+      ((entry.steps ?? 0) > (best?.steps ?? -1) ? entry : best), null)?.key ?? reach.keys[reach.keys.length - 1] ?? null;
+    viewState.reachable = list;
+    if (!list.length) {
+      reach.count = 0;
+      if (reach.fill) { reach.fill.count = 0; reach.edge.count = 0; }
+      return;
+    }
+    EnsureReachCapacity(list.length);
+    // 地上态：覆膜吃深度测试，站在可达格上的单位不会被青色洗掉；
+    // 地下态：必须透地画，才看得见埋在地表下的地道格。描边一律不吃深度，保证轮廓永不断。
+    matReachFill.depthTest = reach.layer !== "under";
+    const matrix = new THREE.Matrix4();
+    const color = new THREE.Color();
+    list.forEach((entry, index) => {
+      const world = HexToWorld(ParseHexKey(entry.key).q, ParseHexKey(entry.key).r);
+      const y = LayerY(entry.key, reach.layer);
+      matrix.makeTranslation(world.x, y + 0.02, world.z);
+      reach.fill.setMatrixAt(index, matrix);
+      matrix.makeTranslation(world.x, y + 0.035, world.z);
+      reach.edge.setMatrixAt(index, matrix);
+      const tier = reachTierColor[entry.tier] ?? reachTierColor.free;
+      color.set(tier.fill);
+      reach.fill.instanceColor.setXYZ(index, color.r, color.g, color.b);
+      color.set(tier.edge);
+      reach.edge.instanceColor.setXYZ(index, color.r, color.g, color.b);
+    });
+    reach.count = list.length;
+    reach.fill.count = list.length;
+    reach.edge.count = list.length;
+    reach.fill.instanceMatrix.needsUpdate = true;
+    reach.edge.instanceMatrix.needsUpdate = true;
+    reach.fill.instanceColor.needsUpdate = true;
+    reach.edge.instanceColor.needsUpdate = true;
+  }
+
+  // ---------------- 路径预览（管线 + 方向箭头 + 落点环 + 代价牌） ----------------
+  //
+  // 1px 的 THREE.Line 在 WebGL 下永远看不清 → 改 TubeGeometry 实体管线；
+  // 段中点摆箭头给方向；终点套「落点环 + 六边形轮廓」；代价用广告牌小牌子写在落点上方。
+  // 全部只在「路径变了」时重建（悬停格不变就不动），Frame 里只做脉冲，不建几何体。
+
+  const pathGroup = new THREE.Group();
+  pathGroup.renderOrder = 12;
+  gOverlay.add(pathGroup);
+  const pathTubes = [];              // [{mesh}] 动态几何，路径变更时重建
+  const pathArrows = [];             // 复用的箭头 Mesh 池
+  const pathJoints = [];             // 复用的转角球 Mesh 池
+  let destRing = null;
+  let destOutline = null;
+  let costMesh = null;
+  let pathSignature = "";
+  const pathState = { active: false, keys: [], risk: false };
+
+  function ClearPathTubes() {
+    for (const mesh of pathTubes) { pathGroup.remove(mesh); mesh.geometry.dispose(); }
+    pathTubes.length = 0;
+  }
+
+  function PathPoints(keys, layer) {
+    return keys.map((key) => {
+      const world = HexToWorld(ParseHexKey(key).q, ParseHexKey(key).r);
+      return new THREE.Vector3(world.x, LayerY(key, layer) + 0.16, world.z);
+    });
+  }
+
+  function MakeTube(points, material) {
+    if (points.length < 2) return;
+    const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.25);
+    const segments = Math.max(8, (points.length - 1) * 8);
+    const geometry = new THREE.TubeGeometry(curve, segments, theme.highlight.pathRadius, 6, false);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = 12;
+    mesh.frustumCulled = false;
+    pathGroup.add(mesh);
+    pathTubes.push(mesh);
+  }
+
+  function PoolMesh(pool, geometry, material) {
+    const existing = pool.find((mesh) => !mesh.visible);
+    if (existing) { existing.visible = true; return existing; }
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = 13;
+    mesh.frustumCulled = false;
+    pathGroup.add(mesh);
+    pool.push(mesh);
+    return mesh;
+  }
+
+  /** preview: { path:[key], layer, riskFrom, steps, mpLeft, costText } —— 数据全部由 Script_Main 从引擎取。 */
   function SetPath(preview) {
-    for (const line of pathLines) { gOverlay.remove(line); line.geometry.dispose(); }
-    pathLines = [];
-    if (!preview || !preview.path || preview.path.length < 2) return;
-    const layer = preview.layer ?? "surface";
-    const riskFrom = preview.riskFrom ?? preview.path.length;
-    const MakeLine = (keys, material) => {
-      if (keys.length < 2) return;
-      const points = keys.map((key) => {
-        const world = HexToWorld(ParseHexKey(key).q, ParseHexKey(key).r);
-        return new THREE.Vector3(world.x, LayerY(key, layer) + 0.12, world.z);
-      });
-      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material);
-      line.renderOrder = 10;
-      gOverlay.add(line);
-      pathLines.push(line);
-    };
-    MakeLine(preview.path.slice(0, riskFrom + 1), matPath);
-    MakeLine(preview.path.slice(riskFrom), matPathRisk);
+    const keys = preview?.path ?? [];
+    const layer = preview?.layer ?? "surface";
+    const riskFrom = preview?.riskFrom ?? keys.length;
+    const signature = `${keys.join(">")}|${layer}|${riskFrom}|${preview?.costText ?? ""}`;
+    if (signature === pathSignature) return;
+    pathSignature = signature;
+
+    ClearPathTubes();
+    for (const mesh of pathArrows) mesh.visible = false;
+    for (const mesh of pathJoints) mesh.visible = false;
+    if (destRing) destRing.visible = false;
+    if (destOutline) destOutline.visible = false;
+    if (costMesh) costMesh.visible = false;
+    pathState.active = false;
+    pathState.keys = [];
+    pathState.risk = false;
+    if (keys.length < 2) return;
+    overlayLayer = layer;
+
+    const points = PathPoints(keys, layer);
+    const risky = riskFrom < keys.length - 1;
+    pathState.active = true;
+    pathState.keys = keys.slice();
+    pathState.risk = risky;
+
+    // 管线：安全段 + 风险段（风险段整段变橙，AGENTS §六.4）
+    const safeCut = Math.min(points.length, riskFrom + 1);
+    MakeTube(points.slice(0, safeCut), matPath);
+    if (risky) MakeTube(points.slice(Math.max(0, riskFrom)), matPathRisk);
+
+    // 转角球：把折线接缝填圆，读起来是一条连续的绳
+    for (let i = 1; i < points.length - 1; i += 1) {
+      const joint = PoolMesh(pathJoints, pathJointGeom, i >= riskFrom ? matPathRisk : matPath);
+      joint.material = i >= riskFrom ? matPathRisk : matPath;
+      joint.position.copy(points[i]);
+    }
+    // 方向箭头：每段中点一个，指向行进方向
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const arrow = PoolMesh(pathArrows, pathArrowGeom, matPathArrow);
+      arrow.position.lerpVectors(points[i], points[i + 1], 0.55);
+      arrow.lookAt(points[i + 1]);
+    }
+
+    // 落点：六边形粗轮廓 + 环 + 代价牌
+    const destKey = keys[keys.length - 1];
+    const destWorld = HexToWorld(ParseHexKey(destKey).q, ParseHexKey(destKey).r);
+    const destY = LayerY(destKey, layer);
+    const destColor = risky ? theme.highlight.destRisk : theme.highlight.dest;
+    matDest.color.set(destColor);
+    matDestOutline.color.set(destColor);
+    if (!destRing) {
+      destRing = new THREE.Mesh(destRingGeom, matDest);
+      destRing.renderOrder = 13;
+      destRing.frustumCulled = false;
+      pathGroup.add(destRing);
+    }
+    if (!destOutline) {
+      destOutline = new THREE.Mesh(hexRingDest, matDestOutline);
+      destOutline.renderOrder = 13;
+      destOutline.frustumCulled = false;
+      pathGroup.add(destOutline);
+    }
+    destRing.position.set(destWorld.x, destY + 0.1, destWorld.z);
+    destRing.visible = true;
+    destOutline.position.set(destWorld.x, destY + 0.05, destWorld.z);
+    destOutline.visible = true;
+
+    if (preview?.costText) {
+      if (!costMesh) {
+        costMesh = new THREE.Mesh(costPlaneGeom, matCost);
+        costMesh.renderOrder = 14;
+        costMesh.frustumCulled = false;
+        costMesh.rotation.x = -cameraPitchRad;   // 固定俯角相机 → 广告牌姿态可静态求解
+        pathGroup.add(costMesh);
+      }
+      const plate = CostTexture(preview.costText, risky ? theme.highlight.destRisk : theme.highlight.dest);
+      costMesh.material.map = plate.texture;
+      costMesh.material.needsUpdate = true;
+      costMesh.userData.plate = plate;            // Frame 里按缩放档反向缩放 → 屏幕上大小恒定
+      costMesh.position.set(destWorld.x, destY + 0.78, destWorld.z + 0.06);
+      costMesh.visible = true;
+    }
+  }
+
+  // 代价牌纹理（文字集合很小：「余 N MP」这类，缓存住不重复画）
+  const costTextureCache = new Map();
+  function CostTexture(text, borderColor) {
+    const cacheKey = `${text}|${borderColor}`;
+    if (costTextureCache.has(cacheKey)) return costTextureCache.get(cacheKey);
+    const scale = 4;
+    const fontPx = 30;
+    const probe = document.createElement("canvas").getContext("2d");
+    probe.font = `700 ${fontPx}px 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif`;
+    const textWidth = Math.ceil(probe.measureText(text).width);
+    const padX = 20;
+    const cssWidth = textWidth + padX * 2;
+    const cssHeight = fontPx + 20;
+    const canvasEl = document.createElement("canvas");
+    canvasEl.width = cssWidth * scale / 2;
+    canvasEl.height = cssHeight * scale / 2;
+    const ctx = canvasEl.getContext("2d");
+    ctx.scale(scale / 2, scale / 2);
+    const radius = 7;
+    ctx.beginPath();
+    ctx.moveTo(radius, 1);
+    ctx.arcTo(cssWidth - 1, 1, cssWidth - 1, cssHeight - 1, radius);
+    ctx.arcTo(cssWidth - 1, cssHeight - 1, 1, cssHeight - 1, radius);
+    ctx.arcTo(1, cssHeight - 1, 1, 1, radius);
+    ctx.arcTo(1, 1, cssWidth - 1, 1, radius);
+    ctx.closePath();
+    ctx.fillStyle = theme.highlight.costBg;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = borderColor;
+    ctx.stroke();
+    ctx.font = `700 ${fontPx}px 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = theme.highlight.costText;
+    ctx.fillText(text, cssWidth / 2, cssHeight / 2 + 1);
+    const texture = new THREE.CanvasTexture(canvasEl);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.anisotropy = 4;
+    const worldHeight = 0.34;
+    const entry = { texture, width: worldHeight * (cssWidth / cssHeight), height: worldHeight };
+    costTextureCache.set(cacheKey, entry);
+    return entry;
   }
 
   function SetHover(key, layer) {
     viewState.hoverKey = key;
     viewState.hoverLayer = layer ?? viewState.layer;
-    if (hoverLine) { gOverlay.remove(hoverLine); hoverLine.geometry.dispose(); hoverLine = null; }
-    if (!key) return;
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position",
-      new THREE.Float32BufferAttribute(HexOutlinePositions(key, LayerY(key, viewState.hoverLayer) + 0.05, 0.94), 3));
-    hoverLine = new THREE.LineSegments(geometry, matHover);
-    hoverLine.renderOrder = 10;
-    gOverlay.add(hoverLine);
+    if (!hoverRing) {
+      hoverRing = new THREE.Mesh(hexRingHover, matHover);
+      hoverRing.renderOrder = 12;
+      hoverRing.frustumCulled = false;
+      gOverlay.add(hoverRing);
+    }
+    if (!key) { hoverRing.visible = false; return; }
+    const world = HexToWorld(ParseHexKey(key).q, ParseHexKey(key).r);
+    hoverRing.position.set(world.x, LayerY(key, viewState.hoverLayer) + 0.05, world.z);
+    hoverRing.visible = true;
   }
 
   function SetSelection(selection) {
@@ -1182,6 +1447,19 @@ export function CreateRenderer({ canvas }) {
     matBadgeSurface.opacity = Clamp(surfOp + 0.25, 0.45, 1);
     matIntent.opacity = 0.95 * Clamp(surfOp + 0.2, 0.4, 1);
     matIntentHead.opacity = matIntent.opacity;
+
+    // 高亮层跟随所属层的明暗：给地下单位画的可达/路径，在地上态就随拓扑线一起退到 15%，
+    // 不会隔着地皮泄漏一片亮青（§六.2 地上态不显示地下单位）。窥视时随之提亮。
+    const dim = overlayLayer === "under" ? Clamp01(underB) : Clamp(surfOp + 0.25, 0.35, 1);
+    const breathe = 1 - theme.highlight.edgePulse * (0.5 + 0.5 * Math.sin(performance.now() / 420));
+    matReachFill.opacity = theme.highlight.reachableOpacity * dim;
+    matReachEdge.opacity = theme.highlight.edgeOpacity * breathe * dim;
+    matPath.opacity = 0.96 * dim;
+    matPathRisk.opacity = 0.96 * dim;
+    matPathArrow.opacity = 0.98 * dim;
+    matDest.opacity = 0.95 * dim;
+    matDestOutline.opacity = 0.9 * dim;
+    matCost.opacity = dim;
 
     // 单位可见性：地上态不显示地下单位（保护隐蔽感）；窥视/地下态显示
     const showUnder = viewState.layer === "under" || viewState.peek || eff.underBrightness.value > 0.6;
@@ -1333,6 +1611,17 @@ export function CreateRenderer({ canvas }) {
       const pulse = 1 + 0.12 * Math.sin(performance.now() / 260);
       selectRing.scale.setScalar(pulse);
     }
+    // 落点环脉冲
+    if (destRing?.visible) {
+      const pulse = 1 + 0.1 * Math.sin(performance.now() / 220);
+      destRing.scale.set(pulse, 1, pulse);
+    }
+    // 代价牌：随相机距离反向缩放，三档缩放下屏幕上大小一致（不至于近处糊脸、远处看不清）
+    if (costMesh?.visible && costMesh.userData.plate) {
+      const k = camState.zoomCurrent / zoomDistances[1];
+      const plate = costMesh.userData.plate;
+      costMesh.scale.set(plate.width * k, plate.height * k, 1);
+    }
     // 聚焦脉冲
     if (viewState.focusPulse.mesh && viewState.focusPulse.t < 1) {
       viewState.focusPulse.t = Math.min(1, viewState.focusPulse.t + dt / 700);
@@ -1354,7 +1643,9 @@ export function CreateRenderer({ canvas }) {
   function Dispose() {
     ClearGroup(gSurface, mapDisposables);
     ClearGroup(gUnder, disposables);
+    ClearPathTubes();
     for (const texture of labelTextureCache.values()) texture.dispose();
+    for (const entry of costTextureCache.values()) entry.texture.dispose();
     atlas.texture.dispose();
     renderer.dispose();
   }
@@ -1367,6 +1658,14 @@ export function CreateRenderer({ canvas }) {
     PanBy, PanByPixels, ZoomStep, Frame, Resize, Dispose,
     GetLayer: () => viewState.layer,
     GetZoomIndex: () => camState.zoomIndex,
+    /** 只读自检口（验收脚本用；不参与玩法）。 */
+    DebugOverlay: () => ({
+      reachable: { count: reach.count, keys: reach.keys.slice(), farthest: reach.farthest, layer: reach.layer },
+      path: pathState.active ? pathState.keys.slice() : null,
+      pathRisk: pathState.risk,
+      hover: viewState.hoverKey,
+      selection: viewState.selection ? { ...viewState.selection } : null,
+    }),
     Stats: () => ({ fps: viewState.fps, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
     camera, scene, renderer,
   };

@@ -71,6 +71,8 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
 
   const infoPanel = document.getElementById("infoPanel") ?? El("aside", "tf-info", uiRoot);
   infoPanel.replaceChildren();
+  const movePreviewBox = El("div", "tf-move-preview", infoPanel);   // 移动预览条（悬停即时，不去抖）
+  movePreviewBox.hidden = true;
   const selBox = El("div", "tf-info-sel", infoPanel);
   const hoverBox = El("div", "tf-info-hover", infoPanel);
   selBox.innerHTML = "";
@@ -213,6 +215,24 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
 
   function SetSelected(info) {
     RenderInfo(selBox, info, "未选中单位或地格");
+  }
+
+  /** 移动预览条（悬停可达格时即时出现，不走 300ms 去抖——这是操作反馈不是资料）。
+   *  数字来自 Script_Main 从引擎动作里读到的步数与该单位的 MP，本模块不算任何规则。 */
+  function SetMovePreview(preview) {
+    if (!preview) { movePreviewBox.hidden = true; movePreviewBox.replaceChildren(); return; }
+    movePreviewBox.replaceChildren();
+    movePreviewBox.hidden = false;
+    movePreviewBox.classList.toggle("tf-move-risk", Boolean(preview.risky));
+    const head = El("div", "tf-move-head", movePreviewBox);
+    El("span", "tf-move-tag", head, `右键移动 → ${preview.dest}`);
+    const grid = El("div", "tf-move-grid", movePreviewBox);
+    El("span", "tf-move-label", grid, "路程");
+    El("span", "tf-move-value", grid, `${preview.steps} 步`);
+    El("span", "tf-move-label", grid, "行动力");
+    El("span", "tf-move-value", grid, preview.fixture ? "——" : `${preview.mp} → 余 ${preview.left}`);
+    if (preview.risky) El("div", "tf-move-note", movePreviewBox, "这条路会降低入口隐蔽：需二次右键确认");
+    else if (preview.left === 0) El("div", "tf-move-note tf-move-note-dim", movePreviewBox, "走满行动力，本回合到此为止");
   }
 
   // ---------------- toast / 横幅 ----------------
@@ -413,7 +433,7 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
   function SetFixtureBadge(on) { fixtureBadge.hidden = !on; }
 
   return {
-    SetTopBar, SetResources, SetLandmarks, SetLedger, SetSelected, SetHover,
+    SetTopBar, SetResources, SetLandmarks, SetLedger, SetSelected, SetHover, SetMovePreview,
     Toast, Banner, AppendLog, ToggleLog,
     SetEndTurn, ShowTodos, HideTodos, TodosVisible,
     MaybeHint, ClearHints,

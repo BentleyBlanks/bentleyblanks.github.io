@@ -2,11 +2,14 @@
 // 「玩家能看到什么」只由本模块回答：渲染层与 CLI 共用 DeriveView(state)，不得自算规则。
 
 import { ParseHexKey, HexLine, HexKey, HexNeighborKeys, HexDistanceKeys } from "./Script_Hex.mjs";
-import { CFG, terrainDefinitions, unitDefinitions, TEXT } from "./Data_Rules.mjs";
-import { GetLevel } from "./Data_Levels.mjs";
+import { CFG, terrainDefinitions, unitDefinitions, civKindDefinitions, disguiseDefinitions, TEXT } from "./Data_Rules.mjs";
+import { GetLevel, BuildActCard } from "./Data_Levels.mjs";
 import {
   SortedKeys, AllyUnits, EnemyUnits, UnitDef, EntranceThreshold, VentThreshold,
-  GrainTotal, PopTotal, WoundedTotal, TunnelNeighbors,
+  GrainTotal, PopTotal, WoundedTotal, TunnelNeighbors, TunnelGrainTotal, CombatUnitCount,
+  LiveCivs, AllCivs, CivsInCell, CivSafeCount, CivTotal, CivSafeRatio, CivLostCount,
+  CivSlots, CivSpeed, CivGuidanceOn, UnitsOn, ElevOf, LargestNetworkSize, VillagesLinked,
+  LiveEntranceCount, DisguisedEntranceCount, VentCount, ActionUnlocked, StorageCapOf, ShelterCapOf,
 } from "./Script_State.mjs";
 
 // ---------------------------------------------------------------------------
@@ -148,24 +151,98 @@ export function SuspicionScore(state, key) {
 // DeriveView：玩家视角模型（渲染与 CLI 唯一信息源）
 // ---------------------------------------------------------------------------
 
-function UnitBrief(unit) {
+function UnitBrief(state, unit) {
   const def = unitDefinitions[unit.type];
   return { id: unit.id, type: unit.type, name: def.name, pos: unit.pos, layer: unit.layer,
     hp: unit.hp, mp: unit.mp, acted: unit.acted, stance: unit.stance, breath: unit.breath,
+    breathMax: CFG.breathThreshold,
+    guideCap: CFG.civ.guideCap[unit.type] || 0,
+    escorting: unit.layer === "under" ? CivsInCell(state, unit.pos).length : 0,
     coverLeft: Math.max(0, CFG.coverUsesPerUnit - (unit.coverUses || 0)) };
 }
 
+/** 群众批的 HUD 视图：类型/位置/有没有人带路/恐慌值——用户明确要求的第二条主线全在这里透出。 */
+function CivBrief(state, civ) {
+  const kindDef = civKindDefinitions[civ.kind] || {};
+  const escorted = civ.loc === "cell"
+    && UnitsOn(state, civ.at, "under").some((unit) => unit.side === "ally");
+  return {
+    id: civ.id, kind: civ.kind, kindName: kindDef.name || civ.kind,
+    loc: civ.loc, at: civ.at, home: civ.home,
+    panic: civ.panic || 0, panicMax: CFG.civ.panicThreshold,
+    escorted, speed: CivSpeed(civ), slots: CivSlots(civ),
+    fate: civ.fate || null,
+  };
+}
+
+/** 幕目标进度：把 level.victory 的每一条翻成「现在多少 / 还差多少」。 */
+function ObjectiveProgress(state) {
+  const level = GetLevel(state.meta.level);
+  const readers = {
+    civSafeAtLeast: () => ({ label: "群众保全（批）", have: CivSafeCount(state) }),
+    civSafeRatioAtLeast: () => ({ label: "群众保全率", have: Number(CivSafeRatio(state).toFixed(2)) }),
+    tunnelGrainAtLeast: () => ({ label: "洞存粮（担）", have: TunnelGrainTotal(state) }),
+    grainAtLeast: () => ({ label: "存粮合计（担）", have: GrainTotal(state) }),
+    combatUnitsAtLeast: () => ({ label: "战斗单位（支）", have: CombatUnitCount(state) }),
+    villagesAtLeast: () => ({ label: "存活村（处）",
+      have: Object.values(state.map.villages).filter((v) => v.burnedHexes < v.hexKeys.length).length }),
+    woundedAtLeast: () => ({ label: "伤员保全（批）", have: WoundedTotal(state) }),
+  };
+  const rows = [];
+  for (const key of Object.keys(level.victory || {}).sort()) {
+    const reader = readers[key];
+    if (!reader) continue;
+    const { label, have } = reader();
+    const need = level.victory[key];
+    rows.push({ key, label, have, need, ok: have >= need, short: Math.max(0, Number((need - have).toFixed(2))) });
+  }
+  return rows;
+}
+
 export function DeriveView(state) {
+  const level = GetLevel(state.meta.level);
+  const card = BuildActCard(level);
+  const civs = AllCivs(state).map((civ) => CivBrief(state, civ));
   const view = {
     turn: state.meta.turn, phase: state.meta.phase, level: state.meta.level, seed: state.meta.seed,
+    // —— 幕次卡（剧情 + 三行「这一幕你要学会什么」+ 本幕新解锁）——
+    act: { id: card.id, act: card.act, name: card.name, subtitle: card.subtitle,
+           lessons: card.lessons, unlocked: card.unlocked,
+           nextId: card.nextId, nextName: card.nextName,
+           maxTurns: level.maxTurns },
+    newUnlocks: card.unlocked,
+    unlockedActions: (level.unlocks && level.unlocks.actions ? level.unlocks.actions.slice() : []),
+    unlockedFacilities: (level.unlocks && level.unlocks.facilities ? level.unlocks.facilities.slice() : []),
+    unlockedDisguises: (level.unlocks && level.unlocks.disguises ? level.unlocks.disguises.slice() : []),
+    civGuidance: CivGuidanceOn(state),
     wave: { status: state.wave.status, statusText: TEXT.waveStatus[state.wave.status],
             sweepTurn: state.wave.sweepTurn, pool: state.wave.pool,
             hardEndTurn: state.wave.hardEndTurn, withdrawAnnounced: state.wave.withdrawAnnounced,
-            smokeCharges: state.wave.smokeCharges },
+            smokeCharges: state.wave.smokeCharges, floodCharges: state.wave.floodCharges },
     resources: { ammo: state.resources.ammo, grainTotal: GrainTotal(state), popTotal: PopTotal(state),
-                 woundedTotal: WoundedTotal(state) },
+                 woundedTotal: WoundedTotal(state),
+                 storageCap: StorageCapOf(state), shelterCap: ShelterCapOf(state) },
     ledger: { ...state.ledger },
-    allies: AllyUnits(state).map(UnitBrief),
+    // —— 群众各批状态（类型/位置/是否有人带路/恐慌值）——
+    civs,
+    civSummary: {
+      total: CivTotal(state), safe: CivSafeCount(state), lost: CivLostCount(state),
+      ratio: Number(CivSafeRatio(state).toFixed(3)),
+      inVillage: civs.filter((civ) => civ.loc === "village").length,
+      inTunnel: civs.filter((civ) => civ.loc === "cell").length,
+      unescorted: civs.filter((civ) => civ.loc === "cell" && !civ.escorted).length,
+      panicking: civs.filter((civ) => civ.loc === "cell" && civ.panic >= CFG.civ.panicThreshold - 1).length,
+      forcedOut: state.score.civForcedOut || 0,
+      captured: civs.filter((civ) => civ.fate === "captured").length,
+      dead: civs.filter((civ) => civ.fate === "dead").length,
+    },
+    // —— 幕目标与进度 ——
+    objectiveProgress: ObjectiveProgress(state),
+    network: { cells: Object.keys(state.tunnels.cells).length, largest: LargestNetworkSize(state),
+               villagesLinked: VillagesLinked(state), liveEntrances: LiveEntranceCount(state),
+               disguised: DisguisedEntranceCount(state), vents: VentCount(state),
+               fightpostsUsed: (state.score.fightpostsUsed || []).slice() },
+    allies: AllyUnits(state).map((unit) => UnitBrief(state, unit)),
     visibleEnemies: [],
     ghosts: [],
     intentArrows: [],
@@ -188,6 +265,9 @@ export function DeriveView(state) {
     facilityNotes: (GetLevel(state.meta.level).facilityNotes || []).slice(),
     tactics: (GetLevel(state.meta.level).tactics || []).slice(),
     orderOfBattle: (GetLevel(state.meta.level).orderOfBattle || []).slice(),
+    lessons: (level.lessons || []).slice(),
+    // —— 终局复盘三段（代价 / 学到什么 / 解锁什么）：结算时才有值，平时给 null ——
+    debrief: state.result ? state.result.debrief : null,
     result: state.result,
   };
 
@@ -251,8 +331,16 @@ export function DeriveView(state) {
       view.guardrails.push({ kind: "unmoved", unitId: unit.id, text: `${UnitDef(unit).name} ${unit.id} 尚未行动` });
     }
     if (unit.breath >= 2) {
-      view.guardrails.push({ kind: "breath", unitId: unit.id, text: `${UnitDef(unit).name} ${unit.id} 憋闷 ${unit.breath}/3` });
+      view.guardrails.push({ kind: "breath", unitId: unit.id, text: `${UnitDef(unit).name} ${unit.id} 憋闷 ${unit.breath}/${CFG.breathThreshold}` });
     }
+  }
+  // 群众护栏：地道里恐慌逼近满值的批（没人带路是最常见的死法）
+  for (const civ of LiveCivs(state)) {
+    if (civ.loc !== "cell" || (civ.panic || 0) < CFG.civ.panicThreshold - 1) continue;
+    const escorted = UnitsOn(state, civ.at, "under").some((unit) => unit.side === "ally");
+    view.guardrails.push({ kind: "panic", civId: civ.id, hex: civ.at,
+      text: `群众 ${civ.id}（${(civKindDefinitions[civ.kind] || {}).name || civ.kind}）＠${civ.at} 恐慌 ${civ.panic}/${CFG.civ.panicThreshold}`
+        + (escorted ? "（有人照应）" : "——无人带路，再撑一回合就要往外冲") });
   }
   for (const siteId of SortedKeys(state.tunnels.digs)) {
     const site = state.tunnels.digs[siteId];
@@ -276,17 +364,28 @@ export function DeriveView(state) {
     if (hex.attackSite) badge.attackSite = true;
     // 「敌已警戒」：同一格连着两回合设伏留下的记号，敌寻路会绕开这里（§2.5）
     if ((hex.alertedUntil || 0) >= state.meta.turn) badge.alerted = (hex.alertedUntil - state.meta.turn) + 1;
+    if (ElevOf(state, key) !== 1) badge.elev = ElevOf(state, key);
     const entrance = state.tunnels.entrances[key];
     if (entrance) badge.entrance = { expose: entrance.expose, threshold: EntranceThreshold(entrance),
-      known: entrance.known, sealed: entrance.sealed };
+      known: entrance.known, sealed: entrance.sealed, disguise: entrance.disguise,
+      disguiseName: entrance.disguise ? (disguiseDefinitions[entrance.disguise] || {}).name : null };
     const vent = state.tunnels.vents[key];
     if (vent) badge.vent = { expose: vent.expose, threshold: VentThreshold(), known: vent.known, smoked: vent.smoked };
     const cell = state.tunnels.cells[key];
     if (cell) {
       if (cell.smoke > 0) badge.smoke = cell.smoke;
+      if (cell.water > 0) badge.water = cell.water;
       if (cell.facility) badge.facility = cell.facility;
+      if (cell.facility === "trapdoor") badge.trapReady = !!cell.trapReady;
+      if (cell.facility === "fightpost") badge.fightpost = { lastTurn: cell.fightpostLastTurn || 0,
+        locked: !!cell.fightpostLastTurn && state.meta.turn - cell.fightpostLastTurn <= CFG.fightpost.lockWindow };
       if (cell.grain > 0) badge.grain = cell.grain;
-      if (cell.civs > 0) badge.civs = cell.civs;
+      const here = CivsInCell(state, key);
+      if (here.length) {
+        badge.civs = here.length;
+        badge.civPanic = Math.max(...here.map((civ) => civ.panic || 0));
+        badge.civEscorted = UnitsOn(state, key, "under").some((unit) => unit.side === "ally");
+      }
       const tunnelLinks = TunnelNeighbors(state, key, false);
       if (tunnelLinks.length) badge.tunnelLinks = tunnelLinks;
     }

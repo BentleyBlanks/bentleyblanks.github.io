@@ -17,7 +17,9 @@ body {
 
 #app { position: fixed; inset: 0; }
 #worldCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
-#worldCanvas.isPanning { cursor: grabbing; }
+/* 光标反馈（对标文明VI）：能对这格下令 → 指针手型；正在拖地图 → 抓手。拖拽优先级最高。 */
+#worldCanvas.canOrder { cursor: pointer; }
+#worldCanvas.isPanning, #worldCanvas.isPanning.canOrder { cursor: grabbing; }
 
 /* UI 根层不拦截；各面板自取指针（:where 保持零特异度，防止后续覆盖事故） */
 .ui-root { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
@@ -147,6 +149,26 @@ body {
 .tf-info-label { color: var(--tf-text-dim, #8f8c84); }
 .tf-info-value { color: var(--tf-text, #d8d5cc); font-variant-numeric: tabular-nums; }
 .tf-info-note { font-size: 11.5px; color: var(--tf-warn, #c77b3f); margin-top: 3px; }
+
+/* 移动预览条：悬停可达格时即时出现（代价数字进面板，格上只放一块小牌子） */
+.tf-move-preview {
+  background: var(--tf-panel, rgba(24, 26, 31, 0.92));
+  border: 1px solid var(--tf-reach-edge, #aef4fd);
+  border-left-width: 3px;
+  padding: 6px 10px 7px;
+}
+.tf-move-preview.tf-move-risk { border-color: var(--tf-path-risk, #d08030); }
+.tf-move-head { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.tf-move-tag {
+  font-size: 11px; letter-spacing: 0.12em; color: var(--tf-reach-edge, #aef4fd);
+  font-variant-numeric: tabular-nums;
+}
+.tf-move-preview.tf-move-risk .tf-move-tag { color: var(--tf-path-risk, #d08030); }
+.tf-move-grid { display: grid; grid-template-columns: auto 1fr; gap: 1px 12px; font-size: 12px; }
+.tf-move-label { color: var(--tf-text-dim, #8f8c84); }
+.tf-move-value { color: var(--tf-text, #d8d5cc); font-variant-numeric: tabular-nums; }
+.tf-move-note { font-size: 11px; color: var(--tf-warn, #c77b3f); margin-top: 3px; }
+.tf-move-note-dim { color: var(--tf-text-faint, #5f5c55); }
 
 /* ---------------- 日志抽屉（右） ---------------- */
 .tf-log-toggle, #logToggle {

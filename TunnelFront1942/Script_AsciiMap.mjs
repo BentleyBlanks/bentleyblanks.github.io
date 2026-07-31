@@ -8,18 +8,21 @@
 //   地下 3 字/格 = [设施] [内容位：烟 > 群众/伤员 > 存粮]      [占用位：地下单位]
 // 坐标：动作用轴向键 "q,r"；本图列号 = q，行号 y = r + floor(q/2)（故 r = y - floor(q/2)）。
 
-import { CFG, terrainDefinitions, facilityDefinitions, TEXT, unitDefinitions } from "./Data_Rules.mjs";
+import { CFG, terrainDefinitions, facilityDefinitions, civKindDefinitions, disguiseDefinitions, TEXT, unitDefinitions } from "./Data_Rules.mjs";
 import { GetLevel } from "./Data_Levels.mjs";
 import { HexNeighborKeys } from "./Script_Hex.mjs";
 import {
   SortedKeys, KeyToOffset, OffsetToKey, GrainTotal, TerrainOf, UnitDef,
-  ReachableFacilityCells, VillageStorageEntrances, WoundedTotal,
+  ReachableFacilityCells, VillageStorageEntrances, WoundedTotal, CivsInCell, CivsAtVillage,
+  VillagePop, ShelterCapOf, StorageCapOf, CivSlots, LiveCivs, AllCivs, CivGuidanceOn,
+  ActionUnlocked, FacilityUnlocked, ElevOf,
 } from "./Script_State.mjs";
 import { DeriveView } from "./Script_Visibility.mjs";
 
 const allyChars = { militia: "M", guerrilla: "G", runner: "R" };
 const enemyChars = { inf: "J", puppet: "P", spy: "S", sapper: "B", civilian: "?" };
-const facilityChars = { storage: "S", shelter: "H", vent: "O", fightpost: "X" };
+const facilityChars = { storage: "S", shelter: "H", vent: "O", fightpost: "X", trapdoor: "T" };
+const civChars = { old: "o", young: "y", wounded: "w" };
 
 const cellWidth = 3;        // 每格字符数（地形/设施 + 开口/内容 + 占用）
 const gutter = " ";         // 格间隔
@@ -67,21 +70,23 @@ function SurfaceCell(state, key, marks) {
   return base + opening + occupant;
 }
 
-/** 地下格 3 字：设施位 + 内容位（烟/群众/存粮） + 占用位（地下单位）。 */
+/** 地下格 3 字：设施位 + 内容位（水/烟/群众/存粮） + 占用位（地下单位）。 */
 function UnderCell(state, key, marks) {
   const cell = state.tunnels.cells[key];
   if (!cell) return state.map.hexes[key] ? "·  " : "   ";
   const base = cell.facility ? facilityChars[cell.facility] : "o";
   let content = " ";
   if (cell.grain > 0) content = "g";
-  if (cell.civs > 0 || (marks.wounded[key] || 0) > 0) content = "c";
+  const civs = marks.civs[key] || [];
+  if (civs.length) content = civs.some((civ) => civ.panic >= CFG.civ.panicThreshold - 1) ? "!" : (civChars[civs[0].kind] || "c");
   if (cell.smoke > 0) content = "*";
+  if (cell.water > 0) content = "~";
   const occupant = marks.underUnits[key] || " ";
   return base + content + occupant;
 }
 
 function CollectMarks(state, view) {
-  const marks = { allies: {}, enemies: {}, underUnits: {}, arrows: {}, wounded: {} };
+  const marks = { allies: {}, enemies: {}, underUnits: {}, arrows: {}, civs: {} };
   for (const unit of view.allies) {
     const char = allyChars[unit.type] || "A";
     if (unit.layer === "under") {
@@ -102,7 +107,10 @@ function CollectMarks(state, view) {
       prev = hexKey;
     }
   }
-  for (const key of SortedKeys(state.wounded.inCells)) marks.wounded[key] = state.wounded.inCells[key];
+  for (const civ of LiveCivs(state)) {
+    if (civ.loc !== "cell") continue;
+    (marks.civs[civ.at] = marks.civs[civ.at] || []).push(civ);
+  }
   return marks;
 }
 
@@ -134,7 +142,7 @@ export function GrainReport(state) {
     const village = state.map.villages[id];
     villages.push({
       id, name: village.name, hexKeys: village.hexKeys.slice(),
-      grainOpen: village.grainOpen, pop: village.pop, popStart: village.popStart,
+      grainOpen: village.grainOpen, pop: VillagePop(state, id), popStart: village.popStart,
       organize: village.organize, hasHq: !!village.hasHq,
     });
     open += village.grainOpen;
@@ -144,7 +152,7 @@ export function GrainReport(state) {
   for (const key of SortedKeys(state.tunnels.cells)) {
     const cell = state.tunnels.cells[key];
     if (cell.grain > 0) {
-      cells.push({ key, grain: cell.grain, cap: CFG.storageGrainCap, facility: cell.facility });
+      cells.push({ key, grain: cell.grain, cap: StorageCapOf(state), facility: cell.facility });
       hidden += cell.grain;
     }
   }
@@ -197,12 +205,16 @@ export function OpeningReport(state, view) {
     if (!badge) continue;
     const hex = state.map.hexes[key] || {};
     const village = hex.villageId ? state.map.villages[hex.villageId] : null;
+    const cell = state.tunnels.cells[key];
     entrances.push({
       key, expose: badge.expose, threshold: badge.threshold, known: badge.known, sealed: badge.sealed,
+      disguise: badge.disguise || null, disguiseName: badge.disguiseName || null,
       terrain: TerrainOf(state, key) ? TerrainOf(state, key).name : "?",
       village: village ? village.name : null,
       allies: allyAt[key] || [],
       traces: hex.traces || 0,
+      elev: ElevOf(state, key),
+      trap: cell && cell.facility === "trapdoor" ? (cell.trapReady ? "翻板已支好" : "翻板已落下（须重修）") : null,
     });
   }
   const vents = [];
@@ -227,7 +239,9 @@ export function OpeningLines(state, view) {
     const status = entry.sealed ? "已封堵（重挖 2 进度可恢复）"
       : entry.known ? "已被搜出（永久暴露）"
       : `暴露豆 ${entry.expose}/${entry.threshold}`;
-    lines.push(`  地道口 ${entry.key}（${entry.village ? entry.village + " " : ""}${entry.terrain}）${status}`
+    lines.push(`  地道口 ${entry.key}（${entry.village ? entry.village + " " : ""}${entry.terrain}·高程${entry.elev}）${status}`
+      + `${entry.disguiseName ? ` ｜ 伪装：${entry.disguiseName}${disguiseDefinitions[entry.disguise].civPassable === false ? "（群众上不去）" : ""}` : ""}`
+      + `${entry.trap ? ` ｜ ${entry.trap}` : ""}`
       + `${entry.traces ? ` 本格痕迹 ${entry.traces}` : ""}`
       + `${entry.allies.length ? ` ｜ 我方在此：${entry.allies.join("、")}` : ""}`);
   }
@@ -279,15 +293,86 @@ export function ObjectiveLine(state) {
   return text;
 }
 
-/** 关键地点：村庄格、区队部所在（L2 的即败条件与之绑定，必须给坐标）。 */
+/** 关键地点：村庄格、区队部所在（即败条件与之绑定，必须给坐标）。 */
 export function LandmarkLines(state) {
   const lines = [];
   for (const id of SortedKeys(state.map.villages)) {
     const village = state.map.villages[id];
     lines.push(`  ${village.name}${village.hasHq ? "【区队部】" : ""} 格 ${village.hexKeys.join(" / ")}`
-      + ` ｜ 人口 ${village.pop}/${village.popStart} 批 ｜ 明存粮 ${village.grainOpen} 担 ｜ 组织度 ${village.organize}`
+      + ` ｜ 地面群众 ${VillagePop(state, id)}/${village.popStart} 批 ｜ 明存粮 ${village.grainOpen} 担 ｜ 组织度 ${village.organize}`
       + (village.burnedHexes ? ` ｜ 被焚 ${village.burnedHexes} 处` : ""));
   }
+  for (const entry of GetLevel(state.meta.level).landmarks || []) {
+    lines.push(`  ${entry.name} ${entry.key}——${entry.note}`);
+  }
+  return lines;
+}
+
+/**
+ * 群众一览（用户明确要求的第二条主线）：每一批的类型、在哪儿、有没有人带路、恐慌到几分。
+ * 这张表是「带领百姓躲避」在 CLI 上的全部界面。
+ */
+export function CivLines(state, view) {
+  const derived = view || DeriveView(state);
+  const summary = derived.civSummary;
+  const lines = [];
+  lines.push(`群众 ${summary.safe}/${summary.total} 批保全（保全率 ${(summary.ratio * 100).toFixed(0)}%）`
+    + ` ｜ 地面 ${summary.inVillage} ｜ 地道 ${summary.inTunnel} ｜ 无人带路 ${summary.unescorted}`
+    + ` ｜ 被抓 ${summary.captured} ｜ 罹难 ${summary.dead} ｜ 曾被逼出地面 ${summary.forcedOut}`);
+  if (!CivGuidanceOn(state)) {
+    lines.push("  （本幕地窖互不相连：群众进了窖就只能待着，没有「带路」这回事——恐慌也就无从谈起）");
+  }
+  for (const civ of derived.civs) {
+    if (civ.loc === "lost") {
+      lines.push(`  ${civ.id} ${civ.kindName}：已${civ.fate === "dead" ? "罹难" : "被抓"}（入代价簿）`);
+      continue;
+    }
+    const where = civ.loc === "village"
+      ? `地面 · ${(state.map.villages[civ.at] || {}).name || civ.at}`
+      : `地道 ${civ.at}`;
+    const escort = civ.loc === "cell" ? (civ.escorted ? "有人带路" : "无人带路") : "—";
+    lines.push(`  ${civ.id} ${civ.kindName}（速度 ${civ.speed} 格/回合，占 ${civ.slots} 铺）＠${where}`
+      + ` ｜ ${escort} ｜ 恐慌 ${civ.panic}/${civ.panicMax}`);
+  }
+  return lines;
+}
+
+/** 幕次卡：剧情标题 + 三行「这一幕你要学会什么」+ 本幕新解锁（HUD 与 CLI 共用同一份数据）。 */
+export function ActCardLines(state, view) {
+  const derived = view || DeriveView(state);
+  const act = derived.act;
+  const lines = [`【第${act.act}幕《${act.name}》】${act.subtitle}（共 ${act.maxTurns} 回合）`];
+  lines.push("这一幕你要学会什么：");
+  for (const lesson of act.lessons) lines.push(`  ${lesson}`);
+  if (act.unlocked.length) {
+    lines.push("本幕新解锁：");
+    for (const entry of act.unlocked) lines.push(`  · ${entry.name}——${entry.note}`);
+  }
+  return lines;
+}
+
+/** 幕目标进度条（常显目标行：当前多少、还差多少）。 */
+export function ObjectiveProgressLines(state, view) {
+  const derived = view || DeriveView(state);
+  return derived.objectiveProgress.map((row) =>
+    `  ${row.ok ? "✓" : "·"} ${row.label} ${row.have}/${row.need}${row.ok ? "" : `（还差 ${row.short}）`}`);
+}
+
+/** 终局复盘三段：付出了什么代价 / 学到了什么 / 解锁了什么。 */
+export function DebriefLines(state, view) {
+  const derived = view || DeriveView(state);
+  if (!derived.debrief) return [];
+  const result = derived.result;
+  const lines = ["【复盘】"];
+  lines.push(`  付出的代价：${derived.debrief.cost}`);
+  const ledgerParts = Object.keys(TEXT.ledgerNames)
+    .map((key) => `${TEXT.ledgerNames[key]} ${derived.debrief.ledger[key] || 0}`);
+  lines.push(`    代价簿：${ledgerParts.join(" ｜ ")}`);
+  lines.push(`    群众保全：${result.civSafe}/${result.civTotal} 批（${(result.civRatio * 100).toFixed(0)}%）`
+    + `；曾被逼出地面 ${result.civForcedOut} 批`);
+  lines.push(`  学到了什么：${derived.debrief.learned}`);
+  lines.push(`  解锁了什么：${derived.debrief.unlocked}`);
+  if (result.nextId) lines.push(`    下一幕：${result.nextId}《${result.nextName}》`);
   return lines;
 }
 
@@ -419,8 +504,8 @@ export function MedalLines(state) {
 // 动作分类与「为什么这条动作不在列表里」诊断
 // ---------------------------------------------------------------------------
 
-const mainActionTypes = new Set(["Dig", "DigEntrance", "DigFacility", "DigDoor", "CoverTraces",
-  "BreakRoad", "Ambush", "Hide", "Attack", "Feint", "HideGrain", "MoveCivs", "MoveWounded",
+const mainActionTypes = new Set(["Dig", "DigEntrance", "DigFacility", "DigDoor", "Disguise", "GuideCivs",
+  "CoverTraces", "BreakRoad", "Ambush", "Hide", "Attack", "Feint", "HideGrain", "MoveCivs",
   "Organize", "Collapse", "Rest"]);
 
 /** main=主动作（用掉即本单位本回合结束）｜move=只花 MP｜free=免费。 */
@@ -539,17 +624,40 @@ export function ActionHints(state, unitId, legalActions) {
         : "HideGrain 不可用：地下还没有储粮洞——先在地道格上 DigFacility storage。");
     }
   }
-  // 转移群众 / 伤员：区分「没有藏人室」与「藏人室满了」
-  if (!have.has("MoveCivs") || !have.has("MoveWounded")) {
-    const shelterState = ShelterDiagnosis(state, unit.pos);
-    if (!have.has("MoveCivs")) {
-      if (!village) hints.push("MoveCivs 不可用：本单位不在村庄格。");
-      else if (village.pop <= 0) hints.push(`MoveCivs 不可用：${village.name}地面上已经没有群众了。`);
-      else hints.push(`MoveCivs 不可用：${shelterState}`);
+  // 转移群众：区分「没有藏人室」与「铺位满了」
+  if (!have.has("MoveCivs")) {
+    if (!village) hints.push("MoveCivs 不可用：本单位不在村庄格。");
+    else if (VillagePop(state, hex.villageId) <= 0) hints.push(`MoveCivs 不可用：${village.name}地面上已经没有群众了。`);
+    else hints.push(`MoveCivs 不可用：${ShelterDiagnosis(state, unit.pos)}`);
+  }
+  // 带路（第二幕起）：说清楚「同格才带得动、一次带几批、走得了几格」
+  if (!have.has("GuideCivs")) {
+    if (!ActionUnlocked(state, "GuideCivs")) {
+      hints.push("GuideCivs 不可用：本幕地窖互不相连，群众进去就只能待着——「带路」要到第二幕才开放。");
+    } else if (unit.layer !== "under") {
+      hints.push("GuideCivs 不可用：带路要在地道里（先 UseEntrance 下地，走到群众那一格）。");
+    } else if (!CivsInCell(state, unit.pos).length) {
+      hints.push("GuideCivs 不可用：本格没有等着带路的群众——带路必须与群众同格。");
+    } else if (unit.mp <= 0) {
+      hints.push("GuideCivs 不可用：MP 已耗尽（带路要跟着一起走）。");
+    } else {
+      hints.push(`GuideCivs 不可用：一步之内没有装得下的地道格。${UnitDef(unit).name}一次带 ${CFG.civ.guideCap[unit.type] || 0} 批，`
+        + "最慢的一批（老弱/伤员）一回合只走 1 格。");
     }
-    if (!have.has("MoveWounded") && state.meta.level === "L2" && village
-        && (state.wounded.atVillage[hex.villageId] || 0) > 0) {
-      hints.push(`MoveWounded 不可用：${shelterState}`);
+  }
+  // 伪装口（第二幕起）
+  if (!have.has("Disguise") && ActionUnlocked(state, "Disguise")) {
+    if (unit.layer !== "surface") hints.push("Disguise 不可用：伪装口要在地面做（灶台、水井、炕洞都在屋里屋外）。");
+    else if (!entrance || entrance.sealed) hints.push("Disguise 不可用：本格没有可伪装的地道口。");
+    else if (entrance.known) hints.push("Disguise 不可用：这个口已经被敌人记下了，伪装也没用。");
+    else if (entrance.disguise) {
+      hints.push(`Disguise 不可用：这个口已经做成了「${(disguiseDefinitions[entrance.disguise] || {}).name}」。`);
+    } else if (digPower <= 0) hints.push(`Disguise 不可用：${def.name}挖掘力为 0，做不了这活。`);
+  }
+  // 本幕未解锁的动作：明说「不是你不会，是这一幕还没到」
+  for (const type of ["Dig", "DigEntrance", "DigFacility", "DigDoor", "Ambush", "Attack", "Disguise"]) {
+    if (!ActionUnlocked(state, type)) {
+      hints.push(`${type} 不可用：第${GetLevel(state.meta.level).act}幕《${GetLevel(state.meta.level).name}》还没开放这一手。`);
     }
   }
   return hints;
@@ -583,7 +691,7 @@ function ShelterDiagnosis(state, pos) {
   if (!hasEntrance) return "本格与相邻格都没有可用地道口（口要在地下用 DigEntrance 自己开）。";
   if (reachableShelter) return "藏人室尚有余量，若仍不可用请核对本单位是否已行动。";
   if (anyShelterInZone) {
-    return `连通的藏人室都满了——每间藏人室容量 ${CFG.shelterCivCap} 批（群众与伤员合计），再修一间或换个口。`;
+    return `连通的藏人室铺位都满了——每间 ${ShelterCapOf(state)} 铺（老弱/青壮各占 1 铺，伤员占 2 铺），再修一间或换个口。`;
   }
   return "连通的地道里还没有藏人室——先在地道格上 DigFacility shelter。";
 }
@@ -643,9 +751,9 @@ export function RenderAsciiMap(state, options = {}) {
   lines.push("图例 地上 第1位 地形：V村 F农田 W树林 G坟地 R河 B桥 =路 x断路 .开阔");
   lines.push("     地上 第2位 开口：0-9 该地道口当前暴露豆（攒到阈值就被搜出） ! 已被搜出 # 已封堵 o通风口 *通风口被烟 ,挖掘痕迹 _敌已搜过");
   lines.push("     地上 第3位 单位：M民兵 G游击 R联络 +我方多单位｜J日军 P伪军 B工兵 S特务 ?身份不明 &我敌同格｜> < ^ v 敌意图箭头");
-  lines.push("图例 地下 第1位 设施：o普通地道格 S储粮洞 H藏人室 O通风口 X枪眼 ·尚未挖通");
-  lines.push("     地下 第2位 内容：g存粮 c群众/伤员 *烟｜第3位 单位：M民兵 G游击 R联络 +多单位");
-  lines.push("注：暴露豆与单位分列两位，站在地道口上也看得见自己的豆；详细数字见下方「地道口一览」。");
+  lines.push("图例 地下 第1位 设施：o普通地道格 S储粮洞 H藏人室 O通气孔 X射击孔 T翻板 ·尚未挖通");
+  lines.push("     地下 第2位 内容：g存粮 o老弱 y青壮 w伤员 !群众恐慌将满 *烟 ~水｜第3位 单位：M民兵 G游击 R联络 +多单位");
+  lines.push("注：暴露豆与单位分列两位，站在地道口上也看得见自己的豆；详细数字见下方「地道口一览」与「群众一览」。");
   return lines.join("\n");
 }
 
@@ -660,6 +768,8 @@ export function UnitLines(state, view) {
       + ` HP${unit.hp} MP${unit.mp}/${def.mp ?? "?"} ${TEXT.stance[unit.stance] || unit.stance}`
       + `｜主动作：${raw.acted ? "本回合已用掉" : "尚未使用"}`
       + `｜挖掘力 ${CFG.digPower[unit.type] || 0}${def.fieldAttack ? "｜可野战攻击" : "｜不可野战攻击"}`
+      + `｜带路 ${CFG.civ.guideCap[unit.type] || 0} 批/次`
+      + (unit.layer === "under" && CivsInCell(state, unit.pos).length ? `｜同格群众 ${CivsInCell(state, unit.pos).length} 批（有人照应）` : "")
       + (unit.breath ? `｜憋闷 ${unit.breath}/${CFG.breathThreshold}` : ""));
   }
   return lines;

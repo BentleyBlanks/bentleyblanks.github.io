@@ -1,5 +1,5 @@
-// 《地下长城 · 冀中1942》 —— 全部可调数值 CFG + 地形/单位/设施定义表 + 玩家可见文案。
-// 纯数据模块：不依赖任何运行时环境。规则含义见 AGENTS.md §二（规则 v2 定稿）。
+// 《地下长城 · 冀中1942》 —— 全部可调数值 CFG + 地形/单位/设施/群众/伪装定义表 + 玩家可见文案。
+// 纯数据模块：不依赖任何运行时环境。规则含义见 AGENTS.md §二（规则 v3 · 五幕战役）。
 
 export const CFG = Object.freeze({
   // —— 挖掘（进度点；同一工地同回合只允许 1 个单位施工） ——
@@ -7,8 +7,9 @@ export const CFG = Object.freeze({
     segment: 2,          // 地道段（两地下格之间的边）
     segmentVillage: 1,   // 目标格为村庄时的段成本
     entrance: 2,         // 入口（地下向上开口；重开被封口同价）
-    facility: 2,         // 储粮洞/藏人室/通风口/枪眼
+    facility: 2,         // 储粮洞/藏人室/通风口/枪眼/翻板
     door: 1,             // 隔断门（挖在边上）
+    disguise: 1,         // 伪装口（把已有的口做进灶台/水井/炕洞/牲口槽）
     roadBreak: 2,        // 破路工地
     bridgeBreak: 4,      // 破桥工地（比土路难毁一倍：两个民兵回合）
   }),
@@ -16,14 +17,14 @@ export const CFG = Object.freeze({
   tracesPerDig: 1,       // 每次挖掘动作给地表格 +1 痕迹
   tracesMax: 6,
   coverTracesAmount: 2,  // 「掩土」：本格痕迹 -2，本格开口暴露豆 -2
-  coverUsesPerUnit: 3,   // 「掩土」每单位每局至多 3 次（R2：掩土不再免费无限）
+  coverUsesPerUnit: 3,   // 「掩土」每单位每局至多 3 次（掩土不是免费无限）
 
   // —— 入口暴露（全程结算：动土就留声，掩土是唯一的减法） ——
-  exposePerConceal: 3,   // 暴露阈值 = conceal × 3
+  exposePerConceal: 3,   // 暴露阈值 = (conceal + 伪装加成) × 3
   ventConceal: 2,        // 通风口等效隐蔽 2（阈值 6）
   exposePerWork: 1,      // 每挖通 1 段 / 修成 1 设施 → 同气区所有已开口 +1（R2 P0-1）
   exposeNewEntrance: 2,  // 每开 1 个新地道口 → 该口 +2
-  opTargetExpose: 4,     // 敌反地道四选一的盯上阈值：暴露豆 ≥4 即可作业（R2 P0-2）
+  opTargetExpose: 4,     // 敌反地道选项的盯上阈值：暴露豆 ≥4 即可作业
   useEntranceExposeSeen: 2,   // 敌视野内使用入口
   useEntranceExposeNear: 1,   // 敌 2 格内（无视野）使用入口
   useEntranceNearRange: 2,
@@ -31,35 +32,56 @@ export const CFG = Object.freeze({
 
   // —— 容量与空气 ——
   cellUnitCap: 2,        // 每地道格至多 2 个单位
-  storageGrainCap: 8,    // 储粮洞藏粮上限
-  shelterCivCap: 6,      // 藏人室容量（群众批 + 伤员批合计）
+  storageGrainCap: 8,    // 储粮洞藏粮上限（关卡可用 level.storageCap 覆写）
+  shelterCivCap: 6,      // 藏人室容量（按「铺位」计，关卡可用 level.shelterCap 覆写）
+  corridorCivCap: 2,     // 非藏人室的普通地道格：只能临时挤 2 个铺位（走廊不是家）
   breathThreshold: 3,    // 憋闷 ≥3 → 本次结算被迫出洞
   breathGainNoAir: 1,
   breathGainSmoke: 2,
-  suffocateHpLoss: 1,    // 连正上方都刨不开时每回合 -1 HP（群众批死亡进账本）
+  breathGainWater: 2,
+  suffocateHpLoss: 1,    // 连正上方都刨不开时每回合 -1 HP
   smokeSpreadTurns: 3,   // 点烟后蔓延 3 回合
   smokeLingerTurns: 2,   // 再滞留 2 回合后消散
-  ventPerCellsForSmoke: 3,   // 敌选烟攻的额外条件：该气区通风口数 < 地道格数 / 3（R2 P0-2）
+  smokeCornerDelay: 1,   // 拐弯：烟拐一个弯要多花 1 回合（直巷子最危险）
+  ventPerCellsForSmoke: 3,   // 敌选烟攻的额外条件：该气区通风口数 < 地道格数 / 3
+
+  // —— 灌水（第四幕；水往低处走，高处是活路） ——
+  water: Object.freeze({
+    spreadTurns: 3,      // 灌水后每回合向「同高或更低」的相邻格漫 1 格
+    lingerTurns: 3,      // 之后滞留 3 回合退去
+    grainSpoilPerTurn: 2,   // 被淹的储粮洞每回合泡毁 2 担（入代价簿）
+  }),
+
+  // —— 群众（以「批」计；老弱/青壮/伤员速度与铺位不同） ——
+  civ: Object.freeze({
+    panicThreshold: 3,       // 恐慌 ≥3 → 自行冲出地面
+    panicNoGuide: 1,         // 地道里没有我方单位陪同（无人带路）
+    panicNoAir: 1,           // 气区无风
+    panicSmoke: 2,           // 烟中
+    panicWater: 2,           // 水中
+    calmPerTurn: 1,          // 同格有我方单位且无烟无水有风 → 恐慌 -1
+    guideCap: Object.freeze({ runner: 3, militia: 2, guerrilla: 1 }),   // 一次带得动几批
+    speed: Object.freeze({ old: 1, young: 2, wounded: 1 }),             // 地道里一回合走几格
+    slots: Object.freeze({ old: 1, young: 1, wounded: 2 }),             // 占几个铺位
+  }),
 
   // —— 经济与群众 ——
   quietGrainPerVillage: 1,   // 平静期每村每回合 +1 明存粮
-  sweepOpenGrainLoss: 2,     // 扫荡期每村每回合明存粮被搜走 2 担（R2 P0-6a：明粮留不住）
-  sweepGrainRange: 2,        // 敌进到村 2 格内才搜得着明存粮（不在村边就搜不着）
+  sweepOpenGrainLoss: 2,     // 扫荡期每村每回合明存粮被搜走（关卡可覆写）
+  sweepGrainRange: 2,        // 敌进到村 2 格内才搜得着明存粮
   levyCivsPerTurn: 1,        // 敌在村且明存粮已尽 → 抓丁 1 批/回合（入代价簿）
   hideGrainPerAction: 3,     // 「藏粮」每次转移 3
   autoHidePerTurn: 1,        // 组织度 ≥1 的村平静期每回合自动藏 1
-  moveCivsPerAction: 2,      // 「转移群众」每次 2 批
-  moveWoundedPerAction: 2,   // 「转移伤员」每次至多 2 批
+  moveCivsPerAction: 2,      // 「转移群众」每次至多 2 批（村口 → 地道）
   seizePerTurn: 2,           // 敌征粮 2/回合
   organizeNeed: 2,           // 「组织」2 进度升 1 级
   organizeMax: 2,
   organizeFreeDigRadius: 1,  // 组织 2 级：村 1 格内工地免费 +1 进度
   organizeStopEnemyRange: 2, // 敌在村 2 格内时免费进度停止
 
-  // —— 弹药（全局池，缴获是唯一来源；R2：收支严格为负） ——
+  // —— 弹药（全局池，缴获是唯一来源；收支严格为负） ——
   ammoMax: 12,
   ammoPerAttack: 1,
-  // 打死一个日军班要两枪（伏击 3 伤 × 2 打 4 HP），只缴到 1 发——每场交火都在净亏。
   loot: Object.freeze({ inf: 1, puppet: 0, sapper: 0, spy: 0 }),
 
   // —— 战斗（确定性，零随机） ——
@@ -69,46 +91,60 @@ export const CFG = Object.freeze({
   counterPenalty: 1,     // 反伤 = max(攻 - 1 - 攻方掩护, 0)
   blastDamage: 2,        // 爆破波及格内单位 -2 HP
 
-  // —— 伏击（R2 P0-5：拆同格叠伏、拆复读） ——
+  // —— 伏击 ——
   ambushPerHex: 1,       // 同一格同时至多 1 个单位处于伏击态
   staleAmbushDamage: 1,  // 连续两回合在同一格设伏 → 第二次伏击固定 1 伤
   alertedTurns: 2,       // 该格获「敌已警戒」标记的回合数
-  alertedExtraCost: 4,   // 敌寻路对警戒格的附加成本（有路可绕就绕开）
+  alertedExtraCost: 4,   // 敌寻路对警戒格的附加成本
   foxholeTrace: 1,       // 挖散兵坑设伏：该格 +1 痕迹
-  foxholeMinDig: 2,      // 只有挖掘力 ≥2 的民兵挖得动散兵坑（这是民兵在开阔地唯一的活路）
+  foxholeMinDig: 2,      // 只有挖掘力 ≥2 的民兵挖得动散兵坑
+
+  // —— 射击孔：打一枪换一个地方（第三幕的核心手感） ——
+  fightpost: Object.freeze({
+    lockWindow: 1,       // 距上次从本孔开火 ≤1 回合再开 → 被迅速锁定
+    lockedDamage: 1,     // 被锁定的射击孔只伤 1（敌已经对着这个孔了）
+    lockedTurns: 2,      // 该格被敌记住（警戒）的回合数
+    coolTurns: 2,        // 隔 2 回合不打，热度自然散掉
+  }),
+
+  // —— 翻板（第三幕解锁；拦敌一回合、挡烟挡水） ——
+  trap: Object.freeze({
+    holdTurns: 1,        // 敌踩空 → 整队一回合
+    selfCost: 1,         // 敌白跑一趟：行动力池 -1
+  }),
 
   // —— 行动力池（波次时钟） ——
   pool: Object.freeze({
     killInf: 3, killOther: 2, wound: 1,
     roadCut: 2, roadCutMaxPerWave: 3,
     playerDrainCapPerTurn: 5,       // 我方所致扣减每回合合计上限
-    smokeSelfCost: 3, blastSelfCost: 4, breachSelfCost: 4,   // 敌反地道自耗
-    // R2：取消「每回合白送 -1」，改成**扑空衰减**——纵队摸到村边却一无所获才扣池。
-    // 粮藏净、人藏好、口掩住，敌人自己就待不住了；留着东西给他搜，他能耗到天黑。
+    smokeSelfCost: 3, blastSelfCost: 4, breachSelfCost: 4,
+    floodSelfCost: 3, excavateSelfCost: 2,
+    // 扑空衰减：摸到村边却一无所获的纵队每支 -1（每回合至多 -2）。
     emptyHanded: 1,
     emptyHandedCapPerTurn: 2,
-    emptyHandedRange: 2,            // 「摸到村边」= 距任一村格 ≤2
+    emptyHandedRange: 2,
   }),
 
   // —— 谨慎等级（0~2，按纵队） ——
   cautionMax: 2,
-  cautionCalmTurns: 3,   // 连续 3 回合无事 -1
-  cautionMpPenalty: 1,   // 1 级起移动 -1 MP
-  cautionSearchBonus: 1, // 1 级起搜索力 +1
+  cautionCalmTurns: 3,
+  cautionMpPenalty: 1,
+  cautionSearchBonus: 1,
 
   // —— 侦察与嫌疑 ——
-  sightingLife: 2,          // 置信 2 目击时效（回合）
-  mobileResponseRadius: 6,  // 机动队响应半径
+  sightingLife: 2,
+  mobileResponseRadius: 6,
   suspicion: Object.freeze({ sighting2: 2, sighting1: 1, attackSite: 2, openGrain: 1, tracesUnit: 1 }),
 
   // —— 敌纵队移动（A* 成本） ——
   moveCost: Object.freeze({ road: 0.5, offroad: 1 }),
 
   // —— 反地道作业 ——
-  breachMinInf: 2,          // 攻入需 ≥2 步兵班邻接且谨慎 <2
-  sealPerColumn: 1,         // 每纵队每役至多填死 1 个口（填土是整天的活，不是随手就干）
-  sapperSeekRange: 12,      // 工兵队会主动奔向暴露最高的口（它就是为这个来的）
-  sealRepairProgress: 2,    // 被封/自毁入口重挖进度
+  breachMinInf: 2,
+  sealPerColumn: 1,
+  sapperSeekRange: 12,
+  sealRepairProgress: 2,
   logCap: 300,
 });
 
@@ -138,8 +174,33 @@ export const facilityDefinitions = Object.freeze({
   storage:   Object.freeze({ name: "储粮洞", char: "S" }),
   shelter:   Object.freeze({ name: "藏人室", char: "H" }),
   vent:      Object.freeze({ name: "通风口", char: "O" }),
-  fightpost: Object.freeze({ name: "枪眼", char: "X" }),
+  fightpost: Object.freeze({ name: "射击孔", char: "X" }),
+  trapdoor:  Object.freeze({ name: "翻板", char: "T" }),
   door:      Object.freeze({ name: "隔断门", char: "D" }),
+});
+
+// —— 群众分类（以「批」计，每批约十余人）。速度决定带路一回合能走几格，铺位决定占多少藏人室容量。 ——
+export const civKindDefinitions = Object.freeze({
+  old:     Object.freeze({ name: "老弱", char: "o", note: "走得慢（1 格/回合），铺位 1；掉队最快、最先慌" }),
+  young:   Object.freeze({ name: "青壮", char: "y", note: "走得快（2 格/回合），铺位 1；能跟上带路的人" }),
+  wounded: Object.freeze({ name: "伤员", char: "w", note: "走得慢（1 格/回合），铺位 2；只能靠人带，不能自己跑" }),
+});
+
+/**
+ * 伪装口（第二幕解锁）：把地道口做进灶台/水井/炕洞/牲口槽。
+ * conceal = 隐蔽等级加成（暴露阈值 = (基础隐蔽 + 加成) × 3）；
+ * civPassable = 群众过不过得去（水井口窄，恐慌冲出时群众用不上它）；
+ * guideBonus = 该口带路时一次能多带几批（牲口槽口子大，赶人快）。
+ */
+export const disguiseDefinitions = Object.freeze({
+  stove:  Object.freeze({ name: "灶台", conceal: 1, terrains: ["village"], civPassable: true, guideBonus: 0,
+    note: "锅台底下的活门：最常见，隐蔽 +1，群众进出无碍" }),
+  well:   Object.freeze({ name: "水井", conceal: 2, terrains: ["village", "field"], civPassable: false, guideBonus: 0,
+    note: "井壁掏洞：隐蔽 +2 最难搜出，但井口窄——群众上不来，只走得了单位" }),
+  kang:   Object.freeze({ name: "炕洞", conceal: 1, terrains: ["village"], civPassable: true, guideBonus: 0,
+    note: "炕洞改口：隐蔽 +1，屋里屋外都不显眼" }),
+  trough: Object.freeze({ name: "牲口槽", conceal: 0, terrains: ["village", "field", "woods", "grave"], civPassable: true, guideBonus: 1,
+    note: "牲口槽底下的大口：隐蔽不加分，但口子大——从这里带路一次多带 1 批" }),
 });
 
 // —— 玩家可见文案（档案式、克制；账本永不出现奖励性表述） ——
@@ -153,30 +214,33 @@ export const TEXT = Object.freeze({
     seizedEnough: "敌征粮车装满，押运回据点",
   }),
   op: Object.freeze({
-    smoke: "烟攻", blast: "爆破", breach: "攻入", seal: "封堵",
+    smoke: "烟攻", blast: "爆破", breach: "攻入", seal: "封堵", excavate: "刨口", flood: "灌水",
   }),
   telegraph: Object.freeze({
     smoke: "敌工兵在入口旁架设风箱柴堆，次回合点烟",
     blast: "敌工兵在入口旁埋设炸药，次回合起爆",
     breach: "敌步兵在入口集结，次回合强行攻入",
     seal: "敌兵搬土石填口，次回合封死该入口",
+    excavate: "敌兵扛锹镐围住此口，次回合就要往下刨",
+    flood: "敌自河沟架起水车对着此口，次回合灌水",
   }),
   ledgerNames: Object.freeze({ civCaptured: "群众被抓（批）", civDead: "群众罹难（批）", housesBurned: "房屋被焚（处）", grainSeized: "粮食被夺（担）" }),
   grades: Object.freeze({ jia: "甲", yi: "乙", bing: "丙", ding: "丁" }),
   guardrails: Object.freeze({
     unmoved: "尚有单位未行动",
     breath: "地道内有人憋闷加重",
+    panic: "地道里有群众无人照应",
     idleSite: "有工地整回合无人施工",
     exposeSoon: "有入口即将被搜出",
     coverLeft: "掩土次数所剩无几",
   }),
-  // R2 新增玩家可见文案（暴露豆全程结算、伏击警戒、被迫出洞、明粮被搜）
   expose: Object.freeze({
     work: "动土的响动传上去了：本气区各口暴露 +1",
     newEntrance: "新口刚开，土色新鲜：该口暴露 +2",
     cover: "掩土匿迹：本格痕迹与暴露各减 2",
     coverSpent: "掩土次数已用尽（每人每役 3 次）",
     marked: "敌已盯上此口：随时可能动手",
+    disguised: "口做进了寻常什物里，不细看认不出",
   }),
   ambushText: Object.freeze({
     occupied: "本格已有人设伏，一格只容一处伏点",
@@ -185,12 +249,37 @@ export const TEXT = Object.freeze({
     exposedAfter: "打完这一下就藏不住了：转入暴露，可被还击",
     foxhole: "就地挖散兵坑设伏：无遮无拦，打完就得挨枪（本格留下痕迹）",
   }),
+  fightpostText: Object.freeze({
+    locked: "同一个孔连着打：枪口火光被咬住了，这一枪只伤 1，且此处已被记下",
+    relocate: "打一枪换一个地方——网里还有别的孔，换过去再打",
+    known: "从射击孔开火：这个口敌人记下了",
+  }),
+  trapText: Object.freeze({
+    sprung: "敌踩上翻板，人仰马翻掉了下去——这一回合他什么也干不成",
+    blockSmoke: "翻板压着口，烟灌不进来",
+    blockWater: "翻板压着口，水漫不进来",
+    rearm: "翻板重新支好",
+  }),
   forced: Object.freeze({
     entrance: "憋闷难支，自最近口涌出地面",
     dugOut: "无口可出，就地刨土钻出地面",
     trapped: "困在无风地道里，出不去也刨不开",
   }),
+  civText: Object.freeze({
+    needGuide: "地道里的群众得有人带路才走得动——派一个单位到他们那一格，用 GuideCivs 领着走",
+    panicOut: "无人照应，恐慌到了头：群众自己摸出地面",
+    caught: "冲出地面正撞上敌人：当场被抓（入代价簿）",
+    calmed: "有人在跟前守着，人心定下来了",
+    wellBlocked: "水井口太窄，群众上不去",
+    guided: "领着群众在地道里转移",
+  }),
   sweepGrain: "敌搜庄刮走明存粮",
+  water: Object.freeze({
+    spread: "水顺着地道往低处漫",
+    dry: "地道里的水退了",
+    spoil: "储粮洞进水，粮食泡毁（入代价簿）",
+    highGround: "水到不了这里——地势高",
+  }),
 });
 
 // 评级：胜利后按勋记数定级（§2.11）。

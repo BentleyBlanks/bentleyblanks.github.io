@@ -246,7 +246,8 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     const village = vm.villages?.[hex.villageId];
     if (village) {
       title = `${village.name}（${title}）`;
-      lines.push({ label: "人口", value: `${village.pop} / ${village.popStart} 批` });
+      // 字段缺席时整行不显示，不把 undefined 打到面板上（引擎侧字段改名也不会漏怯）
+      if (village.pop !== undefined) lines.push({ label: "人口", value: `${village.pop} / ${village.popStart ?? "?"} 批` });
       lines.push({ label: "明存粮", value: village.grainOpen });
       lines.push({ label: "组织度", value: village.organize });
       if (village.hasHq) notes.push("区队部所在");
@@ -370,6 +371,8 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
         renderer.SetSelection({ unitId: unit.id, hexKey: unit.pos, layer: unit.layer });
         ui.SetSelected(UnitInfo(unit));
         RefreshReachable(unit);
+        renderer.SetPath(null);           // 状态变了，旧路径立即作废；下一次悬停会重画
+        ui.SetMovePreview?.(null);
         return;
       }
     }
@@ -382,24 +385,34 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     }
     renderer.SetReachable([], renderer.GetLayer());
     renderer.SetPath(null);
+    ui.SetMovePreview?.(null);
+    SetOrderCursor(false);
   }
 
-  /** 可达/目标高亮：engine 用 LegalActions；夹具用邻格演示（fixture-only 展示）。 */
+  /** 可达/目标高亮：engine 用 LegalActions；夹具用邻格演示（fixture-only 展示）。
+   *  两档只读引擎给的两个数——`action.path.length`（引擎 BFS 的步数）与 `unit.mp`：
+   *    free  = 走到该格后还剩 MP（还能接着走）；spent = 正好走满，本回合到此为止。
+   *  引擎不提供「多回合可达」（EnumMoves 只枚举本回合 MP 内的终点），故不编造第三档。 */
   function RefreshReachable(unit) {
     if (session.targetMode === "dig") {
-      renderer.SetReachable([...session.targetChoices.keys()], unit.layer);
+      renderer.SetReachable([...session.targetChoices.keys()].map((key) => ({ key, tier: "target" })), unit.layer);
       return;
     }
     if (unit.side !== "ally" || unit.acted) { renderer.SetReachable([], unit.layer); return; }
     if (session.engine) {
-      const moves = LegalActionsSafe(unit.id).filter((action) => action.type === "Move" && action.path?.length);
-      renderer.SetReachable(moves.map((action) => action.path[action.path.length - 1]), unit.layer);
+      const moves = LegalActionsCached(unit.id).filter((action) => action.type === "Move" && action.path?.length);
+      const mp = unit.mp ?? 0;
+      renderer.SetReachable(moves.map((action) => {
+        const steps = action.path.length;
+        const left = Math.max(0, mp - steps);
+        return { key: action.path[steps - 1], tier: left > 0 ? "free" : "spent", steps, left };
+      }), unit.layer);
     } else {
       // fixture-only：演示可达渲染——同层邻格（地下限已挖通格），不是规则结果
       const neighbors = HexNeighborKeys(unit.pos).filter((key) => unit.layer === "under"
         ? Boolean(session.vm.tunnels?.cells?.[key])
         : Boolean(session.vm.hexes[key]) && session.vm.hexes[key].terrain !== "river");
-      renderer.SetReachable(neighbors, unit.layer);
+      renderer.SetReachable(neighbors.map((key) => ({ key, tier: "free", steps: 1, left: 0 })), unit.layer);
     }
   }
 
@@ -438,6 +451,16 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     try { return session.engine.LegalActions(session.state, unitId) ?? []; } catch { return []; }
   }
 
+  /** 悬停要逐帧问「这格能不能走」，每次重跑一遍 LegalActions 会顿。
+   *  按 (unitId, vm 修订号) 记忆：状态一变 revision 就自增，缓存自然失效——不缓存任何规则判断本身。 */
+  let actionCache = { key: null, list: [] };
+  function LegalActionsCached(unitId) {
+    const key = `${unitId}|${session.revision}`;
+    if (actionCache.key === key) return actionCache.list;
+    actionCache = { key, list: LegalActionsSafe(unitId) };
+    return actionCache.list;
+  }
+
   /** 「为什么这条不能做」的真实原因（与 CLI 同一份实现），至多取两条免得刷屏。 */
   function ActionHintsSafe(unitId) {
     if (!unitId || !session.engine?.ActionHints) return [];
@@ -470,7 +493,17 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     }
     SaveGame();
     RefreshAll();
+    FollowSelectedLayer();
     return true;
+  }
+
+  /** 动作把选中单位换到了另一层（上下地道口）→ 视角跟过去，别让人对着空地找自己的兵。
+   *  只在「执行动作后」跟随；Q 手动切层不受影响（那是玩家主动看另一层）。 */
+  function FollowSelectedLayer() {
+    const unit = session.vm?.units.find((candidate) => candidate.id === session.selectedUnitId);
+    if (!unit || unit.layer === renderer.GetLayer()) return;
+    renderer.SetLayer(unit.layer);
+    RefreshSelection();
   }
 
   function SaveGame() {
@@ -635,6 +668,20 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     if (unit.side === "ally") ui.MaybeHint("move");
   }
 
+  /** 左键落点解析（§六.4 单位＞地物＞地形）：格上有单位就选单位，空格才选地形。
+   *  一格叠了两个以上单位时，反复左键在它们之间**循环**（文明VI 的堆叠取用手感），
+   *  不必只靠 Tab；只有一个单位时重复点击保持选中，不会一下把自己点没了。 */
+  function SelectAt(pick) {
+    const stack = session.vm.units.filter((unit) => unit.pos === pick.hexKey && unit.layer === pick.layer);
+    if (!stack.length) { SelectHex(pick.hexKey); return; }
+    const currentIndex = stack.findIndex((unit) => unit.id === session.selectedUnitId);
+    if (currentIndex < 0) {                       // 首次点这格：优先点中的那个，否则堆顶
+      SelectUnit(pick.kind === "unit" ? pick.unitId : stack[0].id);
+      return;
+    }
+    SelectUnit(stack[(currentIndex + 1) % stack.length].id);
+  }
+
   function SelectHex(hexKey) {
     session.selectedUnitId = null;
     session.selectedHexKey = hexKey;
@@ -729,14 +776,17 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     Perform(action);
   }
 
-  // ---------------- 悬停与路径预览 ----------------
+  // ---------------- 悬停与路径预览（文明VI 手感：移到哪，路径与代价立刻跟上） ----------------
   let hoverRaf = 0;
+  const hoverPoint = { x: 0, y: 0 };
   function HandleHover(event) {
+    hoverPoint.x = event.clientX;                 // 永远用最新坐标，rAF 里再拾取（不丢帧、不滞后）
+    hoverPoint.y = event.clientY;
     if (hoverRaf) return;
     hoverRaf = requestAnimationFrame(() => {
       hoverRaf = 0;
-      const pick = renderer.PickAt(event.clientX, event.clientY, {});
-      if (!pick) { renderer.SetHover(null); ui.SetHover(null); renderer.SetPath(null); return; }
+      const pick = renderer.PickAt(hoverPoint.x, hoverPoint.y, {});
+      if (!pick) { renderer.SetHover(null); ui.SetHover(null); ClearPreview(); return; }
       renderer.SetHover(pick.hexKey, pick.layer);
       ui.SetHover(pick.kind === "unit"
         ? UnitInfo(session.vm.units.find((unit) => unit.id === pick.unitId))
@@ -745,30 +795,61 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     });
   }
 
+  function ClearPreview() {
+    renderer.SetPath(null);
+    ui.SetMovePreview?.(null);
+    SetOrderCursor(false);
+  }
+
+  /** 光标反馈（文明VI：能下令的格子光标会变）——只改 class，样式在 Style_Game.css。 */
+  function SetOrderCursor(on) {
+    canvas.classList.toggle("canOrder", Boolean(on));
+  }
+
   function PreviewPath(pick) {
     const unit = session.vm.units.find((candidate) => candidate.id === session.selectedUnitId);
-    if (!unit || unit.side !== "ally" || unit.acted || session.targetMode || pick.hexKey === unit.pos) {
+    if (!unit || unit.side !== "ally" || unit.acted) { ClearPreview(); return; }
+    if (session.targetMode === "dig") {                       // 目标模式：只提示这格是不是合法目标
+      SetOrderCursor(session.targetChoices.has(pick.hexKey));
       renderer.SetPath(null);
+      ui.SetMovePreview?.(null);
       return;
     }
+    if (pick.hexKey === unit.pos) { ClearPreview(); return; }
     if (session.engine) {
-      const action = LegalActionsSafe(unit.id).find((candidate) => candidate.type === "Move"
+      const actions = LegalActionsCached(unit.id);
+      const action = actions.find((candidate) => candidate.type === "Move"
         && candidate.path?.[candidate.path.length - 1] === pick.hexKey);
       if (action) {
+        const full = [unit.pos, ...action.path];
+        const steps = action.path.length;                     // 引擎 BFS：一步 1 MP
+        const left = Math.max(0, (unit.mp ?? 0) - steps);
+        // 风险段起点：引擎给 riskFrom 就用引擎的；只给「会降低入口隐蔽」标记就整条算风险。
+        const riskFrom = action.riskFrom ?? ((action.confirm === true || action.exposeRisk === true) ? 0 : full.length);
+        const risky = riskFrom < full.length - 1;
         renderer.SetPath({
-          path: [unit.pos, ...action.path],
+          path: full,
           layer: unit.layer,
-          riskFrom: action.riskFrom ?? ((action.confirm || action.exposeRisk) ? 0 : [unit.pos, ...action.path].length),
+          riskFrom,
+          costText: risky ? `${steps} 步 · 余 ${left} MP · 有风险` : `${steps} 步 · 余 ${left} MP`,
         });
+        ui.SetMovePreview?.({ dest: pick.hexKey, steps, left, mp: unit.mp ?? 0, risky, unitName: unit.name });
+        SetOrderCursor(true);
         return;
       }
-      renderer.SetPath(null);
+      // 不能走：若这格站着可攻击的敌人，仍给出「可下令」光标
+      const attack = pick.kind === "unit"
+        && actions.some((candidate) => candidate.type === "Attack" && candidate.target === pick.unitId);
+      ClearPreview();
+      SetOrderCursor(attack);
     } else if (HexDistanceKeys(unit.pos, pick.hexKey) <= 2 && pick.layer === unit.layer) {
       // fixture-only：直线演示路径（非规则寻路）
       const line = HexLine(ParseHexKey(unit.pos), ParseHexKey(pick.hexKey)).map((axial) => HexKey(axial.q, axial.r));
-      renderer.SetPath({ path: line, layer: unit.layer, riskFrom: line.length - 2 });
+      renderer.SetPath({ path: line, layer: unit.layer, riskFrom: line.length - 2, costText: `${line.length - 1} 步（夹具）` });
+      ui.SetMovePreview?.({ dest: pick.hexKey, steps: line.length - 1, left: 0, mp: 0, risky: true, fixture: true });
+      SetOrderCursor(true);
     } else {
-      renderer.SetPath(null);
+      ClearPreview();
     }
   }
 
@@ -780,8 +861,10 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
   // 判定顺序：按下先只记录；移动超过阈值才升级为拖拽并开始平移；未越过阈值的抬起仍按点击处理。
   const dragThresholdPixels = 5;
   const pointerState = { downX: 0, downY: 0, downButton: -1, held: false, dragging: false, pointerId: -1 };
+  let pointerInside = false;
 
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+  canvas.addEventListener("pointerenter", () => { pointerInside = true; });
 
   canvas.addEventListener("pointerdown", (event) => {
     pointerState.downX = event.clientX;
@@ -800,6 +883,8 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
         pointerState.dragging = true;
         canvas.setPointerCapture(pointerState.pointerId);
         canvas.classList.add("isPanning");
+        renderer.SetHover(null);              // 拖地图时先收起悬停/预览，松手再按新位置重算
+        ClearPreview();
       }
       if (pointerState.dragging) {
         renderer.PanByPixels(event.movementX, event.movementY);
@@ -816,6 +901,7 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       pointerState.dragging = false;
       canvas.classList.remove("isPanning");
       if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      if (pointerInside) HandleHover(event);   // 松手后按新视角重算悬停格
       return true;   // 拖拽结束不派发点击
     }
     return false;
@@ -829,23 +915,34 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     const pickLayer = crossLayer ? (renderer.GetLayer() === "surface" ? "under" : "surface") : undefined;
     const pick = renderer.PickAt(event.clientX, event.clientY, { layer: pickLayer });
     if (!pick) return;
-    if (event.button === keymap.select.button) {           // 左键：选中（单位＞地格，当前层优先）
-      if (pick.kind === "unit") SelectUnit(pick.unitId);
-      else SelectHex(pick.hexKey);
-    } else if (event.button === keymap.order.button) {     // 右键：下令
-      IssueOrder(pick);
-    }
+    if (event.button === keymap.select.button) SelectAt(pick);   // 左键：选中（单位＞地格，当前层优先）
+    else if (event.button === keymap.order.button) IssueOrder(pick);   // 右键：下令
+    // 选完/下完令立刻按当前光标位置重算预览（文明VI：不用挪鼠标就能看到新状态）
+    if (pointerInside) HandleHover(event);
   });
 
-  canvas.addEventListener("pointerleave", () => { renderer.SetHover(null); ui.SetHover(null); renderer.SetPath(null); });
+  canvas.addEventListener("pointerleave", () => {
+    pointerInside = false;
+    renderer.SetHover(null); ui.SetHover(null); ClearPreview();
+  });
 
+  // 滚轮缩放：3 档（§六.6）。鼠标一格滚 100+px、触控板一次只有几 px——
+  // 所以按「累计位移」跨档而不是「每个事件跨一档」，并把冷却压到 90ms 让连滚跟手。
   let wheelCooldown = 0;
+  let wheelAccum = 0;
+  const wheelStepPixels = 42;
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
     const now = performance.now();
     if (now < wheelCooldown) return;
-    wheelCooldown = now + 140;
-    renderer.ZoomStep(event.deltaY > 0 ? 1 : -1);
+    wheelAccum += event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;   // deltaMode 1 = 行
+    if (Math.abs(wheelAccum) < wheelStepPixels) return;
+    const direction = wheelAccum > 0 ? 1 : -1;
+    wheelAccum = 0;
+    wheelCooldown = now + 90;
+    renderer.ZoomStep(direction);
+    // 缩放补间走完后重算一次悬停：不动鼠标也能看到光标下换了格（文明VI 同样会跟着更新）
+    setTimeout(() => { if (pointerInside) HandleHover({ clientX: hoverPoint.x, clientY: hoverPoint.y }); }, 150);
   }, { passive: false });
 
   window.addEventListener("keydown", (event) => {

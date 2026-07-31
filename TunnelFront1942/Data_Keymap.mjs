@@ -7,7 +7,7 @@ export const keymap = Object.freeze({
   layerToggle: Object.freeze({ code: "KeyQ", label: "Q", group: "视图", desc: "切换地上／地下（200ms 补间）" }),
   peek: Object.freeze({ code: "Space", label: "Space（按住）", group: "视图", hold: true,
                         desc: "透视窥视另一层（只读，禁下令）；敌阶段播报时=快进" }),
-  zoomWheel: Object.freeze({ wheel: true, label: "滚轮", group: "视图", desc: "缩放（3 档）" }),
+  zoomWheel: Object.freeze({ wheel: true, label: "滚轮", group: "视图", desc: "缩放（3 档；触控板小增量会累加）" }),
   panUp: Object.freeze({ code: "KeyW", label: "W", group: "视图", desc: "平移（上）" }),
   panLeft: Object.freeze({ code: "KeyA", label: "A", group: "视图", desc: "平移（左）" }),
   panDown: Object.freeze({ code: "KeyS", label: "S", group: "视图", desc: "平移（下）" }),
@@ -16,9 +16,12 @@ export const keymap = Object.freeze({
                             desc: "平移（左／中／右键按住拖动皆可；触屏单指拖动）" }),
 
   // ---- 选取与下令 ----
-  select: Object.freeze({ button: 0, label: "左键", group: "操作", desc: "单击选中（单位＞地物＞地形，当前层优先）；按住拖动＝平移" }),
+  select: Object.freeze({ button: 0, label: "左键", group: "操作",
+                          desc: "单击选中（单位＞地物＞地形，当前层优先）；同格多个单位反复点即循环；按住拖动＝平移" }),
   order: Object.freeze({ button: 2, label: "右键", group: "操作",
                          desc: "单击移动／下令（降低入口隐蔽的操作需二次右键确认）；按住拖动＝平移" }),
+  hoverPreview: Object.freeze({ hover: true, label: "悬停", group: "操作",
+                                desc: "选中单位后停在可达格上＝实时路径预览（管线＋方向箭头＋落点环＋「几步·余几 MP」）" }),
   crossLayerPick: Object.freeze({ button: 0, alt: true, label: "Alt+点击", group: "操作", desc: "强制选取另一层" }),
   nextUnit: Object.freeze({ code: "Tab", label: "Tab", group: "操作", desc: "下一个未行动单位（自动落层跳转）" }),
   cancel: Object.freeze({ code: "Escape", label: "Esc", group: "操作",
