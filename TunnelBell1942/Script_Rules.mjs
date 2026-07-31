@@ -2233,6 +2233,8 @@ function UpdateHud(state) {
   hud.villagersTotal = state.npcs.length;
   hud.villagersSafe = state.npcs.reduce((acc, n) => acc + (n.rescued ? 1 : 0), 0);
   hud.codexCount = Object.keys(state.world.codex).length;
+  const carry = state.player.carrying;
+  hud.carryLabel = carry && ITEMS[carry] ? ITEMS[carry].label : null;
 }
 
 // ───────────────────────────── 复活 ─────────────────────────────
@@ -2419,6 +2421,15 @@ export function DebugHold(state, inputPatch, seconds) {
     StepPlay(state, dt);
     t += dt;
   }
+  return state;
+}
+
+/**
+ * 立刻走死亡/被抓流程（测试用）。
+ * 之后正常跑 1.5 秒会自动回到最近检查点：stats.deaths +1、player.dead=false、phase="play"。
+ */
+export function DebugKill(state, reason = "test") {
+  Die(state, reason);
   return state;
 }
 
