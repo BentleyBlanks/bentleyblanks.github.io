@@ -24,18 +24,27 @@ import { AdvanceSite, AddTraces, RevealAdjacentSpies, RecordExposedSightings } f
 // 玩家阶段收尾：组织 2 级村的免费工地进度（敌近则停）
 // ---------------------------------------------------------------------------
 
+/**
+ * R6 P0-3：这条规则本来就在，只是**一声不吭**——给了免费进度不播报，停了也不播报，
+ * 于是三幕独立复审都判它「未观察到 / 不生效」。规则不播报就等于不存在，现在两头都说话。
+ */
 function PlayerWrapUp(state, events) {
   for (const villageId of SortedKeys(state.map.villages)) {
     const village = state.map.villages[villageId];
     if (village.organize < 2) continue;
-    if (EnemyNearVillage(state, villageId, CFG.organizeStopEnemyRange)) continue;
-    for (const siteId of SortedKeys(state.tunnels.digs)) {
-      const site = state.tunnels.digs[siteId];
-      const near = village.hexKeys.some((key) => HexDistanceKeys(key, site.at) <= CFG.organizeFreeDigRadius);
-      if (!near) continue;
-      AdvanceSite(state, events, siteId, 1);
-      break;   // 每村每回合只帮一个工地
+    const sites = SortedKeys(state.tunnels.digs).filter((siteId) => village.hexKeys
+      .some((key) => HexDistanceKeys(key, state.tunnels.digs[siteId].at) <= CFG.organizeFreeDigRadius));
+    if (!sites.length) continue;
+    if (EnemyNearVillage(state, villageId, CFG.organizeStopEnemyRange)) {
+      PushEvent(state, events, { kind: "organize", text: `${village.name}：${TEXT.organizeFreeText.stopped}`,
+        hex: village.hexKeys[0], visible: true });
+      continue;
     }
+    const siteId = sites[0];                        // 每村每回合只帮一个工地
+    const at = state.tunnels.digs[siteId].at;
+    PushEvent(state, events, { kind: "organize", text: `${village.name}：${TEXT.organizeFreeText.given}`,
+      hex: at, layer: "under", visible: true });
+    AdvanceSite(state, events, siteId, 1);
   }
 }
 

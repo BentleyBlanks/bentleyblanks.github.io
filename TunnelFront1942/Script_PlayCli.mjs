@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // 《地下长城 · 冀中1942》 —— 审查 Agent 完整游玩接口（AGENTS.md §7.3）。
 // 子命令：
-//   new  --level A1 --seed 3 --save /tmp/g.json     开局 + 简报 + ASCII
+//   new  --level A1 --seed 3 --save /tmp/g.json [--carry default|full|<存档/继承档>]   开局 + 简报 + ASCII
+//   next --save /tmp/a1.json --save-to /tmp/a2.json [--seed 3]   带着上一幕的战果开下一幕（战役串联）
+//   carry --save /tmp/a1.json [--out /tmp/carry.json]            查看/导出一份终局存档的继承档
 //   show --save /tmp/g.json [--layer surface|under|both]
 //   legal --save /tmp/g.json [--unit u1]
 //   act  --save /tmp/g.json --json '{"type":"Move",...}'
@@ -12,7 +14,8 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import process from "node:process";
-import { CreateGame, SerializeState, DeserializeState, GetBriefing, GrainTotal, PopTotal, WoundedTotal } from "./Script_State.mjs";
+import { CreateGame, SerializeState, DeserializeState, GetBriefing, GrainTotal, PopTotal, WoundedTotal,
+  ExtractCarry } from "./Script_State.mjs";
 import { DeriveView } from "./Script_Visibility.mjs";
 import { LegalActions, PerformAction } from "./Script_Actions.mjs";
 import { EndTurn } from "./Script_Turn.mjs";
@@ -20,10 +23,11 @@ import {
   RenderAsciiMap, GrainLines, OpeningLines, LandmarkLines, IntentLines, ObjectiveLine,
   UnitLines, MedalLines, TelegraphText, ActionKind, actionKindNames, ActionHints, ActionNotes,
   CivLines, ActCardLines, ObjectiveProgressLines, DebriefLines, TunnelLinkLines,
-  TunnelLinkReport, VentSummary,
+  TunnelLinkReport, VentSummary, CarryLines, CarryReport,
+  CivDropSummary, CivShelterLines, MoveCostNote, DigNote,
 } from "./Script_AsciiMap.mjs";
 import { RunBotGame, botNames } from "./Script_Bots.mjs";
-import { campaignOrder, levelDefinitions } from "./Data_Levels.mjs";
+import { campaignOrder, levelDefinitions, BuildFullCarry, CarryWeight, NextLevelId } from "./Data_Levels.mjs";
 import { TEXT, CFG } from "./Data_Rules.mjs";
 
 /**
@@ -53,6 +57,33 @@ function ParseArgs(argv) {
     } else args._.push(argv[i]);
   }
   return args;
+}
+
+/**
+ * 每条子命令认哪些参数（R6 P0-1）。
+ * 以前任何 `--乱写` 都被**静默吞掉**——`--from <A1终局存档>` 与 `--bogusflag` 一个待遇，
+ * 于是「我明明接上了上一幕」这种误会没有任何一处会报错。现在未知参数一律报错退出。
+ */
+const commandFlags = {
+  new: ["level", "seed", "save", "layer", "carry"],
+  next: ["save", "save-to", "seed", "level", "layer", "carry"],
+  carry: ["save", "out"],
+  show: ["save", "layer"],
+  legal: ["save", "unit", "json", "raw"],
+  act: ["save", "json", "layer"],
+  end: ["save", "layer"],
+  run: ["level", "seed", "bot", "verbose", "carry", "save"],
+  fixture: ["level", "seed", "turns", "out", "write", "bot"],
+};
+
+function CheckFlags(command, args) {
+  const allowed = commandFlags[command] || [];
+  const unknown = Object.keys(args).filter((key) => key !== "_" && !allowed.includes(key));
+  if (!unknown.length) return;
+  Die(`${command} 不认识这些参数：${unknown.map((key) => `--${key}`).join(" ")}\n`
+    + `        ${command} 认的参数只有：${allowed.map((key) => `--${key}`).join(" ")}\n`
+    + "        （以前未知参数被静默忽略，于是 `--from <上一幕存档>` 看着像生效了其实什么也没做；\n"
+    + "          战役串联现在用 `next --save <上一幕存档> --save-to <新存档>`，或 `new --carry <存档>`。）");
 }
 
 function LoadSave(path) {
@@ -98,6 +129,11 @@ function PrintStatus(state, view) {
     + ` ｜ 通气孔 ${vents.have}/需 ${vents.need}`
     + (vents.unknown !== vents.have ? `（未被搜出 ${vents.unknown} 处，勋记按此计）` : "")
     + (links.doors.length ? ` ｜ 隔断门 ${links.doors.length} 道（开 ${links.doorsOpen} / 关 ${links.doorsClosed}）` : " ｜ 隔断门 0 道"));
+  // 战役串联的常显一行：这盘网是自己挣的还是系统送的，全程看得见（详版见开局横幅 / CarryLines）
+  const carryInfo = CarryReport(state);
+  console.log(`本局继承自：${carryInfo.carry ? carryInfo.label
+    : carryInfo.act > 1 ? "未记录（续承接口之前的老存档）" : `无（第${carryInfo.act}幕，本幕的战果会带进下一幕）`}`
+    + (carryInfo.carry && carryInfo.gaps.length ? ` ｜ 对照满配还欠：${carryInfo.gaps.join("；")}` : ""));
   for (const line of GrainLines(state)) console.log(line);
   for (const line of CivLines(state, derived)) console.log(line);
   const ledgerParts = Object.entries(derived.ledger).filter(([, v]) => v > 0)
@@ -175,12 +211,65 @@ const rulesCard = [
   "   一格地道只能修一种设施，联络员挖掘力为 0（挖不了）。",
 ];
 
+// ---------------------------------------------------------------------------
+// 战役串联（R6 P0-1）
+//
+// 引擎侧接口早就齐了（ExtractCarry / CreateGame(..., { carry }) / BuildFullCarry / level.carryDefault），
+// 但**没有任何一条 CLI 路径用得到它**：`new --level A3` 的盘面与你打没打过前两幕毫无关系，
+// A1 的终局复盘却写着「你这一幕挖下的东西会跟着走」。下面三件事把那句话兑现：
+//   ① `next --save <上一幕终局存档> --save-to <新存档>`：自动 ExtractCarry 并开下一幕
+//   ② `new --carry <存档|继承档 json|full|default>`：显式指定继承源
+//   ③ 开局横幅打印「继承自谁 / 继承了什么 / 欠了什么」（CarryLines，网页共用同一份）
+// ---------------------------------------------------------------------------
+
+/** 一份存档还是一份继承档？——两种都收，读错了当场报错，不再猜。 */
+function ReadCarryFile(path) {
+  let text;
+  try { text = readFileSync(path, "utf8"); } catch (error) { Die(`读不到 --carry 指定的文件 ${path}：${error.message}`); }
+  let doc;
+  try { doc = JSON.parse(text); } catch (error) { Die(`--carry 文件不是合法 JSON（${path}）：${error.message}`); }
+  if (doc && doc.meta && doc.tunnels && doc.units) {
+    const prev = DeserializeState(text);
+    if (!prev.result) {
+      console.log(`[提示] ${path} 还没打完（没有终局 result），按**当前盘面**折成继承档。`);
+    }
+    return { carry: ExtractCarry(prev), from: prev };
+  }
+  if (doc && Array.isArray(doc.cells)) return { carry: doc, from: null };
+  Die(`--carry 文件 ${path} 既不是存档（缺 meta/tunnels/units），也不是继承档（缺 cells 数组）。`);
+  return null;
+}
+
+/** `--carry` 取值：default（关卡默认继承档，缺省）｜full（满配档）｜<存档路径>｜<继承档 json 路径>。 */
+function ResolveCarry(raw, levelId) {
+  if (raw === undefined) return { carry: null, how: "default" };
+  if (raw === true) {
+    Die("--carry 要带一个值：default（关卡默认继承档）｜full（满配档）｜<上一幕存档路径>｜<继承档 json 路径>");
+  }
+  const value = String(raw);
+  if (value === "default") return { carry: null, how: "default" };
+  if (value === "full") return { carry: BuildFullCarry(levelId), how: "full" };
+  const loaded = ReadCarryFile(value);
+  return { carry: loaded.carry, how: "file", from: loaded.from, path: value };
+}
+
+function PrintCarryBanner(state, extra) {
+  console.log("");
+  for (const line of CarryLines(state)) console.log(line);
+  for (const line of extra || []) console.log(line);
+}
+
 function CmdNew(args) {
   const level = ResolveLevelId(args.level);
   const seed = Number(args.seed ?? 3);
-  const state = CreateGame(level, seed);
+  const picked = ResolveCarry(args.carry, level);
+  const state = CreateGame(level, seed, { carry: picked.carry });
   console.log(`—— 开局：${state.meta.level} seed=${seed} ——`);
   for (const line of ActCardLines(state)) console.log(line);
+  PrintCarryBanner(state, picked.how === "file" && picked.from
+    ? [`  （继承源存档：${picked.path}，${picked.from.meta.level} 打到 T${picked.from.meta.turn}`
+       + `${picked.from.result ? `，${picked.from.result.won ? "胜" : "负"}·${picked.from.result.grade}` : "，未终局"}）`]
+    : picked.how === "full" ? ["  （--carry full：满配继承档，等于「上一幕该挖的都挖到了」的对照上界）"] : []);
   console.log("");
   for (const line of GetBriefing(state)) console.log(line);
   console.log("");
@@ -188,6 +277,79 @@ function CmdNew(args) {
   console.log("");
   ShowAll(state, args.layer);
   if (args.save) { WriteSave(args.save, state); console.log(`\n[存档] ${args.save}`); }
+  else console.log("\n[提示] 没给 --save，本局没有落盘。");
+}
+
+/** 战役串联：拿上一幕的**终局存档**直接开下一幕，继承档由 ExtractCarry 自动折出。 */
+function CmdNext(args) {
+  if (!args.save) Die("next 缺少 --save <上一幕的终局存档>");
+  const prev = LoadSave(args.save);
+  const prevLevel = prev.meta.level;
+  if (!prev.result) {
+    Die(`${args.save} 还没打完（${prevLevel} 打到 T${prev.meta.turn}，没有终局 result）。\n`
+      + "        先把这一幕打到终局（end 到出战报），或用 `new --carry <这份存档>` 强行按当前盘面开下一幕。");
+  }
+  const auto = prev.result.nextId || NextLevelId(prevLevel) || null;
+  const levelId = args.level !== undefined ? ResolveLevelId(args.level) : auto;
+  if (!levelId) {
+    Die(`${prevLevel} 是最后一幕，没有下一幕了（战役顺序：${campaignOrder.join(" → ")}）。`);
+  }
+  if (args.carry !== undefined && args.carry !== true) {
+    Die("next 的继承源就是 --save 那份存档；想显式换继承源请改用 `new --level <幕> --carry <...>`。");
+  }
+  // 落盘参数先校验再动手——不能先把整块报表打完，最后才说「路径不能同名」。
+  const out = args["save-to"];
+  if (out === true) Die("--save-to 要带一个路径");
+  if (out !== undefined && out === args.save) {
+    Die("--save-to 不能和 --save 同一个文件（那会把上一幕的战报覆盖掉）");
+  }
+  const carry = ExtractCarry(prev);
+  const seed = args.seed !== undefined ? Number(args.seed) : prev.meta.seed;
+  const state = CreateGame(levelId, seed, { carry });
+  const weight = CarryWeight(carry);
+  console.log(`—— 战役串联：${prevLevel}《${levelDefinitions[prevLevel].name}》`
+    + `（${prev.result.won ? "胜" : "负"}·${prev.result.grade}，打到 T${prev.meta.turn}）`
+    + ` → ${levelId}《${levelDefinitions[levelId].name}》 seed=${seed} ——`);
+  for (const line of ActCardLines(state)) console.log(line);
+  PrintCarryBanner(state, [
+    `  （上一幕交出来的原始继承档：${weight.cells} 格 / 未封的口 ${weight.entrances} / 伪装 ${weight.disguises}`
+    + ` / 洞存粮 ${weight.tunnelGrain} 担 / 弹药 ${weight.ammo} 发；`
+    + "落地时按本幕地图过滤，洞存粮按本幕仓容一洞一洞地填，装不下的就是上一幕白藏了）",
+  ]);
+  console.log("");
+  for (const line of GetBriefing(state)) console.log(line);
+  console.log("");
+  ShowAll(state, args.layer);
+  if (out === undefined) {
+    console.log("\n[提示] 没给 --save-to，本局没有落盘。加上 --save-to <新存档路径> 才能接着打。");
+  } else {
+    WriteSave(String(out), state);
+    console.log(`\n[存档] ${out}`);
+  }
+}
+
+/** 看看一份存档折出来的继承档长什么样（也可以 --out 导出，喂给 `new --carry`）。 */
+function CmdCarry(args) {
+  const state = LoadSave(args.save);
+  const carry = ExtractCarry(state);
+  const weight = CarryWeight(carry);
+  const nextId = (state.result && state.result.nextId) || NextLevelId(state.meta.level) || null;
+  console.log(`—— ${state.meta.level}《${levelDefinitions[state.meta.level].name}》T${state.meta.turn} 折出的继承档 ——`);
+  console.log(`厚薄：地道 ${weight.cells} 格 ｜ 未封的口 ${weight.entrances} ｜ 伪装 ${weight.disguises}`
+    + ` ｜ 洞存粮 ${weight.tunnelGrain} 担 ｜ 弹药 ${weight.ammo} 发`);
+  if (nextId) {
+    const full = CarryWeight(BuildFullCarry(nextId));
+    const def = CarryWeight(levelDefinitions[nextId].carryDefault);
+    console.log(`对照下一幕 ${nextId}：默认继承档 ${def.cells} 格 / 口 ${def.entrances} / 伪装 ${def.disguises}`
+      + ` / 粮 ${def.tunnelGrain} / 弹 ${def.ammo}　｜　满配档 ${full.cells} 格 / 口 ${full.entrances}`
+      + ` / 伪装 ${full.disguises} / 弹 ${full.ammo}`);
+    console.log(`接着打：node TunnelFront1942/Script_PlayCli.mjs next --save ${args.save} --save-to <新存档>`);
+  } else {
+    console.log(`${state.meta.level} 是最后一幕，没有下一幕。`);
+  }
+  console.log(JSON.stringify(carry, null, 1));
+  if (args.out === true) Die("--out 要带一个路径");
+  if (args.out) { writeFileSync(String(args.out), JSON.stringify(carry, null, 1)); console.log(`[继承档] 已写入 ${args.out}`); }
 }
 
 function CmdShow(args) {
@@ -198,10 +360,10 @@ function CmdShow(args) {
 /** 一条动作打印成「可以直接抄进 act --json 的那一行」，必要时右边补一句人话。 */
 function ActionLine(state, action, links) {
   const json = JSON.stringify(action);
-  if (action.type === "Move") {
-    const dest = action.path[action.path.length - 1];
-    return `      ${json}   ← 到 ${dest}，${action.path.length} 步`;
-  }
+  const unit = action.unit ? state.units[action.unit] : null;
+  // R6 P0-3③：Move 以前只报「几步」，不报「到那儿还剩几 MP」——
+  // 于是「移动到村格 + UseEntrance 要 2MP 而民兵只有 2MP」这种边界只能靠撞。
+  if (action.type === "Move") return `      ${json}   ← ${MoveCostNote(state, action)}`;
   if (action.type === "ToggleDoor") {
     const segment = links.segments.find((entry) => entry.edge === action.edge);
     const now = segment && segment.door === "open" ? "开着" : "关着";
@@ -210,7 +372,24 @@ function ActionLine(state, action, links) {
       + (next === "关上" ? "（挡烟、挡水、把气区切成两半）" : "（人和烟水都过得去）");
   }
   if (action.type === "UseEntrance" && action.dive) return `      ${json}   ← 「打了就钻」：该口暴露豆 +2`;
-  if (action.type === "UseEntrance") return `      ${json}   ← 上/下地道口，花 1 MP`;
+  if (action.type === "UseEntrance") {
+    return `      ${json}   ← 上/下地道口，花 1 MP`
+      + (unit ? `（现在 ${unit.mp} MP，用后剩 ${unit.mp - 1} MP）` : "");
+  }
+  // R6 P0-3②：挖掘完人**仍在原格**——审查员为此吃了 4 次「只能向相邻格挖段／只能在所在地道格修设施」。
+  if (action.type === "Dig" || action.type === "DigEntrance"
+      || action.type === "DigFacility" || action.type === "DigDoor") {
+    return `      ${json}   ← ${DigNote(state, action)}`;
+  }
+  // R6 P0-3①：MoveCivs 以前不说人会进哪个窖——而简报要求「人分两个窖放」。
+  if (action.type === "MoveCivs" && unit) {
+    const summary = CivDropSummary(state, unit.pos, action);
+    const head = action.ground === true ? `挪 ${action.count} 批` : `转 ${action.count} 批入洞`;
+    return `      ${json}   ← ${head}${summary ? `：${summary}` : ""}`;
+  }
+  if (action.type === "GuideCivs") {
+    return `      ${json}   ← 带 ${action.count} 批走到 ${action.to}（${action.path.length} 格，单位跟着一起走）`;
+  }
   return `      ${json}`;
 }
 
@@ -260,6 +439,14 @@ function CmdLegal(args) {
       }
     }
     if (unitId) {
+      // R6 P0-3①：只要这个单位按得动 MoveCivs，就把「人会进哪个窖、各窖还剩几铺」摊开。
+      if (unit && list.some((action) => action.type === "MoveCivs")) {
+        const shelterLines = CivShelterLines(state, unit.pos, list);
+        if (shelterLines.length) {
+          console.log("  · 转移群众会把人放进哪个窖：");
+          for (const line of shelterLines) console.log(`    ${line}`);
+        }
+      }
       const notes = ActionNotes(state, unitId, list);
       if (notes.length) {
         console.log("  · 这些动作到底有什么用（速查）：");
@@ -352,11 +539,12 @@ function Summary(state, steps) {
 function CmdRun(args) {
   const level = ResolveLevelId(args.level);
   const seed = Number(args.seed ?? 3);
-  const botName = args.bot || "Skilled";
-  if (!botNames.includes(botName)) Die(`未知 bot：${botName}（可选：${botNames.join("/")}）`);
+  const botName = args.bot === undefined ? "Skilled" : String(args.bot);
+  if (!botNames.includes(botName)) Die(`未知 bot：${botName}（可选：${botNames.join(" / ")}）`);
   const verbose = !!args.verbose;
+  const picked = ResolveCarry(args.carry, level);
   const { state, steps } = RunBotGame({
-    level, seed, bot: botName,
+    level, seed, bot: botName, carry: picked.carry,
     onStep: verbose ? (st, action, events) => {
       if (action.type === "EndTurn") {
         console.log(`—— T${st.meta.turn} ——`);
@@ -370,6 +558,9 @@ function CmdRun(args) {
     for (const line of MedalLines(state)) console.log(line);
   }
   console.log(JSON.stringify(Summary(state, steps), null, 1));
+  // 落盘后就能接着 `next --save … --save-to …` 把战役串下去（bot 打完一幕，人接着打下一幕）。
+  if (args.save === true) Die("--save 要带一个路径");
+  if (args.save) { WriteSave(String(args.save), state); console.log(`[存档] ${args.save}`); }
 }
 
 /**
@@ -403,25 +594,50 @@ function CmdFixture(args) {
   console.log(`[夹具] 已写入 ${out}（T${state.meta.turn}，${Object.keys(state.units).length} 个单位）`);
 }
 
-const commands = { new: CmdNew, show: CmdShow, legal: CmdLegal, act: CmdAct, end: CmdEnd, run: CmdRun, fixture: CmdFixture };
+const commands = { new: CmdNew, next: CmdNext, carry: CmdCarry, show: CmdShow, legal: CmdLegal,
+  act: CmdAct, end: CmdEnd, run: CmdRun, fixture: CmdFixture };
 
-const args = ParseArgs(process.argv.slice(2));
-const command = args._[0];
-if (!command || !commands[command]) {
-  console.log("用法：node TunnelFront1942/Script_PlayCli.mjs <new|show|legal|act|end|run|fixture> [--参数 值]");
+function PrintUsage() {
+  console.log("用法：node TunnelFront1942/Script_PlayCli.mjs <new|next|carry|show|legal|act|end|run|fixture> [--参数 值]");
   console.log(`  关卡（--level）只有五幕：${campaignOrder.map((id) => `${id}《${levelDefinitions[id].name}》`).join("、")}`);
-  console.log("  new  --level A1 --seed 3 --save /tmp/g.json          开局简报 + 规则要点 + 战场报表");
-  console.log("  show --save /tmp/g.json [--layer surface|under|both] 战场报表（地图/地道口/地道段与门/存粮分账/敌意图）");
-  console.log("  legal --save /tmp/g.json --unit u1                   某单位合法动作（分组 + 用途速查 + 不可用原因；Move 带全 path）");
-  console.log("  legal --save /tmp/g.json --unit u1 --json            原始 JSON，可直接喂给 act");
-  console.log('  act  --save /tmp/g.json --json \'{"type":"Move","unit":"u1","path":["4,-1","4,0"]}\'');
-  console.log("  end  --save /tmp/g.json                              敌军阶段 + 结算全播报");
-  console.log("  run  --level A1 --seed 3 --bot Skilled [--verbose]   bot 整局 → 总结 JSON");
+  console.log("  未知参数一律报错退出——写错的 flag 不会再被静默吞掉。");
+  console.log("");
+  console.log("  new  --level A1 --seed 3 --save /tmp/a1.json          开局简报 + 规则要点 + 战场报表");
+  console.log("       [--carry default|full|<存档路径>|<继承档 json>]  本局的地道网从哪儿继承（缺省 default）");
+  console.log("  next --save /tmp/a1.json --save-to /tmp/a2.json [--seed 3] [--level A3]");
+  console.log("                                                       **战役串联**：拿上一幕的终局存档直接开下一幕，");
+  console.log("                                                       地道网/口/伪装/洞存粮/弹药自动带过去。");
+  console.log("  carry --save /tmp/a1.json [--out /tmp/carry.json]    看/导出这份存档折出来的继承档");
+  console.log("  show --save /tmp/a1.json [--layer surface|under|both] 战场报表（地图/地道口/地道段与门/存粮分账/敌意图）");
+  console.log("  legal --save /tmp/a1.json --unit u1                   某单位合法动作（分组 + 用途速查 + 不可用原因；");
+  console.log("                                                       Move 带全 path 与「到那儿剩几 MP」，");
+  console.log("                                                       MoveCivs 带「人落进哪个窖、各窖剩几铺」）");
+  console.log("  legal --save /tmp/a1.json --unit u1 --json            原始 JSON，可直接喂给 act");
+  console.log('  act  --save /tmp/a1.json --json \'{"type":"Move","unit":"u1","path":["4,-1","4,0"]}\'');
+  console.log("  end  --save /tmp/a1.json                             敌军阶段 + 结算全播报");
+  console.log("  run  --level A1 --seed 3 --bot Skilled [--verbose] [--carry ...] [--save /tmp/a1.json]");
+  console.log(`                                                       bot 整局 → 总结 JSON；--bot 只认：${botNames.join(" / ")}`);
   console.log("  fixture --level A1 --seed 3 --turns 6 [--out 路径] --write");
   console.log("                                                       生成渲染夹具。**会覆写 Data_FixtureState.mjs**，");
   console.log("                                                       不加 --write 只空跑并打印将要写入的目标。");
   console.log("");
+  console.log("  打完一幕接着打下一幕（战役五幕连打）：");
+  console.log("    node TunnelFront1942/Script_PlayCli.mjs new  --level A1 --seed 3 --save /tmp/a1.json");
+  console.log("    …… 打到终局 ……");
+  console.log("    node TunnelFront1942/Script_PlayCli.mjs next --save /tmp/a1.json --save-to /tmp/a2.json");
+  console.log("");
   for (const line of rulesCard) console.log(line);
+}
+
+const args = ParseArgs(process.argv.slice(2));
+const command = args._[0];
+if (!command || !commands[command]) {
+  if (command) console.error(`[错误] 未知子命令「${command}」。`);
+  PrintUsage();
   process.exit(command ? 1 : 0);
 }
+if (args._.length > 1) {
+  Die(`多余的参数：${args._.slice(1).join(" ")}（子命令只有一个，其余一律用 --参数 值）`);
+}
+CheckFlags(command, args);
 commands[command](args);

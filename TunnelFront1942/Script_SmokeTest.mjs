@@ -13,6 +13,7 @@ import {
   AddLedger, GrainTotal, TunnelGrainTotal, PopTotal, SortedKeys, EdgeKey, AllyUnits, EnemyUnits, UnitDef,
   AllCivs, LiveCivs, CivsInCell, CivsAtVillage, CivSafeCount, CivTotal, ElevOf,
   LargestNetworkSize, EntranceThreshold, ActionUnlocked, StorageCapOf, ShelterCapOf, LiveEntranceCount,
+  IsStunned, VentCount, EnemyNearVillage,
 } from "./Script_State.mjs";
 import { DeriveView, RecordSighting } from "./Script_Visibility.mjs";
 import { LegalActions, PerformAction } from "./Script_Actions.mjs";
@@ -1251,8 +1252,10 @@ Check("R5 P0-1：第一幕真的把你打疼——窖口阈值、敌占格加压
   // 8 回合内够得着：本幕窖口阈值 4，敌踩两回合就翻出来
   Ok(state.tunnels.entrances["3,0"].expose * 2 >= EntranceThreshold(state.tunnels.entrances["3,0"]),
     "踩一回合应至少攒到阈值的一半——招牌失败必须在八回合内够得着");
-  // ③ 第六日的硬脚本撬窖：人最多的那个窖被打开，窖里的人一个也跑不掉
+  // ③ 第六日的硬脚本撬窖（R6 P0-1 改判）：只够得着口子跟前的**一批**，而且**有人驻守就被打回去**。
+  //    原来是「一锅端」，于是 A/B 实测出「不用地窖比用地窖评级更高」——教什么就罚什么。
   Ok(level.scriptedBreach && level.scriptedBreach.turn === 6, "第一幕应声明第六回合的撬窖脚本");
+  Eq(level.scriptedBreachHaul, 1, "撬窖一次至多带走 1 批（R6 P0-1 的承重条，不许改回一锅端）");
   let scripted = CreateGame("A1", 1);
   while (scripted.meta.turn < level.scriptedBreach.turn - 1) scripted = EndTurn(scripted).state;
   PutCiv(scripted, "c1", "4,0");
@@ -1265,10 +1268,27 @@ Check("R5 P0-1：第一幕真的把你打疼——窖口阈值、敌占格加压
     "撬窖前一回合应有电报");
   const done = EndTurn(scripted);
   scripted = done.state;
-  Ok(done.events.some((e) => e.text.includes("一个也跑不掉")), "撬窖战报缺失");
-  Eq(scripted.ledger.civCaptured - capturedBefore >= 2, true, "人最多的那个窖里的人应全部进代价簿");
-  Ok(CivsInCell(scripted, "4,0").length === 0, "被撬的那个窖应该空了");
+  Eq(scripted.ledger.civCaptured - capturedBefore, 1, "撬窖只该带走 1 批（不是整窖）");
+  Eq(CivsInCell(scripted, "4,0").length, 1, "被撬的窖里应还剩人——「一锅端」已作废");
   Ok(CivsInCell(scripted, "2,1").length === 1, "只撬人最多的那一个窖——分开放的人还在");
+  // ③' 留守：窖口正下方有我方单位 → 与「攻入」同一套结算（弹药 -1 + 压制 1 回合 + 口永久已知），
+  //     而且**一批也带不走**。这才是「分窖 + 留守」值得做的理由。
+  let guarded = CreateGame("A1", 1);
+  while (guarded.meta.turn < level.scriptedBreach.turn - 1) guarded = EndTurn(guarded).state;
+  PutCiv(guarded, "c1", "4,0");
+  PutCiv(guarded, "c2", "4,0");
+  const guard = AllyUnits(guarded).find((unit) => unit.type === "militia");
+  guard.pos = "4,0";
+  guard.layer = "under";
+  const ammoBefore = guarded.resources.ammo;
+  guarded = EndTurn(guarded).state;                     // 电报
+  const guardedDone = EndTurn(guarded);
+  guarded = guardedDone.state;
+  Eq(CivsInCell(guarded, "4,0").length, 2, "窖里有人驻守时撬窖应被打退，窖里一批也少不了");
+  Ok(guardedDone.events.some((e) => e.text.includes("打了回去")), "打退撬窖的战报缺失");
+  Eq(ammoBefore - guarded.resources.ammo, CFG.guardAmmoCost, "打退撬窖要花 1 发弹药（与攻入同价）");
+  Ok(IsStunned(guarded, guarded.units[guard.id]), "守窖的人应被压制一回合");
+  Ok(guarded.tunnels.entrances["4,0"].known, "打退之后这个口应转为已知（永久）");
   // ④ 手感：认真打的新手保全 ≤3/6、评定丙；且第一幕不再是全作最容易的一幕
   let safeSum = 0;
   const grades = { jia: 0, bing: 0 };
@@ -1278,7 +1298,10 @@ Check("R5 P0-1：第一幕真的把你打疼——窖口阈值、敌占格加压
     if (finished.result.grade === "甲") grades.jia += 1;
     if (finished.result.grade === "丙" || finished.result.grade === "丁") grades.bing += 1;
   }
-  Ok(safeSum / 8 <= 3.5, `认真打的新手在第一幕应只保住 ≤3.5 批（实得 ${(safeSum / 8).toFixed(2)}）`);
+  // R6 P0-1 之后这条线的口径变了：撬窖只带走 1 批（而不是整窖），所以新手线会多留住一批人。
+  // 本幕的「注定要付代价」由 R3-10 的代价簿断言与「新手拿不到甲」两条锁着，不靠这一个数字。
+  Ok(safeSum / 8 <= 4.5, `认真打的新手在第一幕应只保住 ≤4.5 批（实得 ${(safeSum / 8).toFixed(2)}）`);
+  Ok(safeSum / 8 < CivTotal(CreateGame("A1", 1)), "第一幕不该出现「一批也不赔」的新手线");
   Eq(grades.jia, 0, "新手线不该在第一幕拿甲");
   const a1Jia = rank.A1.Skilled.filter((st) => st.result.grade === "甲").length;
   const laterJia = ["A2", "A3", "A4", "A5"]
@@ -1398,15 +1421,18 @@ Check("R5 P0-3：战役续承——上一幕的战果真的传得下去，跳过
         const full = RunBotGame({ level: act, seed, bot, carry: BuildFullCarry(act) }).state;
         weakLive += LiveEntranceCount(weak);
         fullLive += LiveEntranceCount(full);
-        weakCost += Object.values(weak.ledger).reduce((sum, value) => sum + value, 0);
-        fullCost += Object.values(full.ledger).reduce((sum, value) => sum + value, 0);
+        // 第二把尺子量的是**网本身**：跳过前作接手的是一张更小的网，终局也还是更小。
+        // （原来量的是代价簿总额，但那一栏被「敌占了村子多久」主导——R6 P0-4 的久占加压
+        //   让房屋被焚跟着占领时长走，与你上一幕挖了多少格无关，量不出继承的差别。）
+        weakCost += LargestNetworkSize(weak);
+        fullCost += LargestNetworkSize(full);
       }
     }
   }
   Ok(fullLive > weakLive,
     `跳过前作没有可感知代价：终局活口 默认档 ${weakLive} vs 满配档 ${fullLive}`);
-  Ok(fullCost <= weakCost,
-    `跳过前作没有可感知代价：代价簿总额 默认档 ${weakCost} vs 满配档 ${fullCost}`);
+  Ok(fullCost > weakCost,
+    `跳过前作没有可感知代价：终局最大连通块合计 默认档 ${weakCost} vs 满配档 ${fullCost}`);
 });
 
 Check("R5 P0-4：守洞不再免费——打退攻入要花子弹、人被压制一回合、口从此明摆着", () => {

@@ -53,6 +53,7 @@ async function LoadEngine() {
     const engine = {
       CreateGame: stateMod.CreateGame,
       GetBriefing: stateMod.GetBriefing ?? null,     // 可选：开局简报（含目标文案）
+      ExtractCarry: stateMod.ExtractCarry ?? null,   // 可选：把终局折成续承档（「进入下一幕」用）
       LegalActions: actionsMod.LegalActions,
       PerformAction: actionsMod.PerformAction,
       EndTurn: turnMod.EndTurn,
@@ -73,10 +74,12 @@ async function LoadEngine() {
       // R5：地道段 / 隔断门 / 空气分区与通气孔门槛——与 CLI 同一份实现，网页也得看得见
       engine.TunnelLinkReport = reportMod.TunnelLinkReport ?? null;
       engine.VentSummary = reportMod.VentSummary ?? null;
+      // R6：战役续承说明（「本局继承自谁、继承了什么、欠了什么」）——与 CLI 同一份实现
+      engine.CarryLines = reportMod.CarryLines ?? null;
     } catch {
       engine.GrainReport = null; engine.MedalReport = null;
       engine.TelegraphText = null; engine.ActionHints = null; engine.ObjectiveLine = null;
-      engine.TunnelLinkReport = null; engine.VentSummary = null;
+      engine.TunnelLinkReport = null; engine.VentSummary = null; engine.CarryLines = null;
     }
     return engine;
   } catch {
@@ -161,6 +164,7 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       OnTodoJump: (todo) => JumpTodo(todo),
       OnJumpHex: (hexKey, layer) => { renderer.FocusHex(hexKey, 300); renderer.PulseHex(hexKey, layer); },
       OnRestart: () => Restart(),
+      OnNextAct: () => NextAct(),
       OnClearSave: () => { ClearSave(); ui.Toast("存档已清除，刷新后生效", { kind: "warn" }); },
     },
   });
@@ -604,6 +608,67 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     window.location.reload();
   }
 
+  /**
+   * 进入下一幕（R6 P0-1）：**带着这一幕的战果**开局。
+   * 引擎接口早就有（ExtractCarry / CreateGame(level, seed, { carry })），但网页侧一处都没接——
+   * 终局画面只有「重新开始」，于是「你这一幕挖下的东西会跟着走」在网页上同样不成立。
+   * 这里把终局 state 折成续承档、开下一幕、落进同一个存档槽，整页无刷新继续。
+   */
+  function NextAct() {
+    const result = session.state?.result;
+    const nextId = result?.nextId ?? null;
+    if (session.mode !== "engine" || !nextId) { Restart(); return; }
+    if (typeof session.engine.ExtractCarry !== "function") {
+      ui.Toast("这份引擎没有 ExtractCarry，进不了下一幕", { kind: "warn" });
+      return;
+    }
+    let next = null;
+    try {
+      const carry = session.engine.ExtractCarry(session.state);
+      next = session.engine.CreateGame(nextId, session.state.meta.seed, { carry });
+      if (next?.state?.meta) next = next.state;
+    } catch (error) {
+      console.warn("进入下一幕失败", error);
+      next = null;
+    }
+    if (!next?.meta) { ui.Toast("下一幕开局失败，已保留本局战报", { kind: "warn" }); return; }
+    session.state = next;
+    session.selectedUnitId = null;
+    session.selectedHexKey = null;
+    session.targetMode = null;
+    session.pendingConfirm = null;
+    session.endTurnArmed = false;
+    session.seenTelegraphs = new Set();
+    if (session.engine.GetBriefing) {
+      try {
+        const briefing = session.engine.GetBriefing(next);
+        session.objective = briefing?.objective ?? briefing?.goal ?? briefing?.objectiveText ?? null;
+      } catch { session.objective = null; }
+    }
+    ui.HideResult();
+    // 上一幕的播报留在日志里只会让人以为还在打上一幕——换幕就清干净，再写这一幕的开场。
+    ui.ClearLog?.();
+    RefreshAll();
+    SaveGame();
+    const carryInfo = next.meta?.carry ?? null;
+    ui.Banner(`第${next.meta.act}幕 —— ${carryInfo?.label ?? "带着上一幕的战果开局"}`);
+    for (const line of CarryLinesSafe(next)) {
+      ui.AppendLog({ turn: next.meta.turn, kind: "info", text: line, visible: true });
+    }
+    for (const entry of (next.log ?? []).filter((item) => item.visible !== false)) ui.AppendLog(entry);
+    ui.ToggleLog(true);
+  }
+
+  /** 续承说明（与 CLI 同一份实现）；报表模块缺席时退回一行摘要。 */
+  function CarryLinesSafe(state) {
+    if (typeof session.engine?.CarryLines === "function") {
+      try { return session.engine.CarryLines(state); } catch { /* 落到兜底 */ }
+    }
+    const carry = state.meta?.carry;
+    return carry ? [`本局继承自：${carry.label}（地道 ${carry.cells} 格 · 未封的口 ${carry.entrances}`
+      + ` · 洞存粮 ${carry.tunnelGrain} 担 · 弹药 ${carry.ammo} 发）`] : [];
+  }
+
   // ---------------- 待办护栏（正源 DeriveView.guardrails；缺席用展示级兜底） ----------------
   function BuildTodos() {
     const rails = session.view?.guardrails ?? session.view?.todos;
@@ -726,7 +791,22 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
         note: result.medalNotes?.[index] ?? "",
       }));
     }
-    ui.ShowResult({ grade: result.grade, reasons: result.reasons, medalItems }, session.state.ledger);
+    // R6 P0-1：终局画面必须给得出「进入下一幕（带着这一幕的战果）」这个去处——
+    // 「你这一幕挖下的东西会跟着走」这句话在网页上原来一处都兑现不了。
+    const carry = session.engine?.ExtractCarry && result.nextId
+      ? (() => { try { return session.engine.ExtractCarry(session.state); } catch { return null; } })()
+      : null;
+    const nextAct = result.nextId ? {
+      id: result.nextId,
+      name: result.nextName ?? result.nextId,
+      // 带得走什么：一律取引擎折出的续承档，表现层不自算
+      cells: (carry?.cells ?? []).length,
+      entrances: (carry?.entrances ?? []).filter((key) => !(carry?.sealed ?? []).includes(key)).length,
+      tunnelGrain: carry?.tunnelGrain ?? 0,
+      ammo: carry?.ammo ?? 0,
+      ready: !!carry,
+    } : null;
+    ui.ShowResult({ grade: result.grade, reasons: result.reasons, medalItems, nextAct }, session.state.ledger);
   }
 
   function FixtureToast() {

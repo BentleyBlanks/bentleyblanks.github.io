@@ -11,7 +11,7 @@ import { CFG, unitDefinitions } from "./Data_Rules.mjs";
 import {
   CreateGame, SortedKeys, CompareIds, AllyUnits, EnemyUnits, UnitDef, TerrainOf,
   EntranceThreshold, UnitsOn, ReachableFacilityCells, FacilityUnlocked, StorageCapOf, ShelterCapOf,
-  CivsInCell, LiveCivs, CivGuidanceOn, StorageCellsUnder, ConnectedCells,
+  CivsInCell, LiveCivs, CivGuidanceOn, StorageCellsUnder, ConnectedCells, ActionUnlocked, ElevOf,
 } from "./Script_State.mjs";
 import { GetLevel } from "./Data_Levels.mjs";
 
@@ -180,12 +180,28 @@ function DigNeeds(state) {
   return {
     storage: FacilityUnlocked(state, "storage") && (storageRoom <= 0 || hidden + storageRoom < grainGoal),
     shelter: FacilityUnlocked(state, "shelter") && shelterRoom < civsOutside,
-    vent: FacilityUnlocked(state, "vent") && !HasFacility(state, "vent"),
+    // 通气孔按**比例**修，不是修一个就完事：敌选烟攻的条件是「该气区通风口数 < 地道格数 ÷ 3」，
+    // 而每挖大一格网，这个比例就被自己破坏一次。bot 原来只认「有没有」，于是网一撑大烟必来。
+    vent: FacilityUnlocked(state, "vent")
+      && cells.filter((key) => state.tunnels.cells[key].facility === "vent").length
+         < Math.ceil(cells.length / CFG.ventPerCellsForSmoke),
     fightpost: FacilityUnlocked(state, "fightpost") && fightposts < 2,
     trapdoor: FacilityUnlocked(state, "trapdoor") && !HasFacility(state, "trapdoor"),
-    entrance: ActiveEntranceKeys(state).length < 2,
+    // 口不够两个要开口；**铺位不够而某个藏人室的口被填死了，也要去把那个口刨开**——
+    // 「户户相通」这一课的落点就在这儿：上一幕留下的窖不是废的，把它接进网里就多四个铺位。
+    entrance: ActiveEntranceKeys(state).length < 2
+      || (shelterRoom < civsOutside && SealedShelterKeys(state).length > 0),
+    sealedShelters: SealedShelterKeys(state),
     emptyCells,
   };
+}
+
+/** 口被填死、里面却是藏人室的格：重挖 2 进度就能把它接回来用。 */
+function SealedShelterKeys(state) {
+  return SortedKeys(state.tunnels.cells).filter((key) => {
+    const entrance = state.tunnels.entrances[key];
+    return state.tunnels.cells[key].facility === "shelter" && entrance && entrance.sealed;
+  });
 }
 
 function NeedsAnything(needs) {
@@ -230,18 +246,28 @@ function SkilledDig(state, unit, actions) {
   if (wantsFacility && needs.emptyCells > 0) {
     // 只挑**自己这张网上走得到**的空格：李庄那种还没连通的孤格挪不过去，
     // 更要命的是修在那儿的储粮洞装不着高家庄的粮（藏粮认的是「村格正下方连着的洞」）。
+    // 有水车的幕（A4/A5）先挑**高处**的空格：水只往同高或更低处漫，
+    // 修在低洼里的粮窖一次灌水每回合泡毁 2 担——「粮要么修在高处，要么用门隔开」是这一幕的正解。
     const reachable = ConnectedCells(state, unit.pos, true);
-    const target = SortedKeys(state.tunnels.cells)
-      .find((key) => state.tunnels.cells[key].facility === null && key !== unit.pos && reachable.has(key));
+    const empties = SortedKeys(state.tunnels.cells)
+      .filter((key) => state.tunnels.cells[key].facility === null && key !== unit.pos && reachable.has(key));
+    if (state.wave.floodCharges > 0) empties.sort((a, b) => ElevOf(state, b) - ElevOf(state, a));
+    const target = empties[0];
     if (target) {
       const move = MoveToward(state, unit, actions, target);
       if (move) return move;
     }
   }
-  // ③ 口不够两个 → 就地开口（本格允许才行）
+  // ③ 口不够两个（或铺位不够而有窖的口被填死） → 就地开口/刨开被填死的口
   if (needs.entrance) {
     const dig = FindAction(actions, "DigEntrance");
     if (dig) return dig;
+    const reachable = ConnectedCells(state, unit.pos, true);
+    const sealed = (needs.sealedShelters || []).find((key) => key !== unit.pos && reachable.has(key));
+    if (sealed) {
+      const move = MoveToward(state, unit, actions, sealed);
+      if (move) return move;
+    }
   }
   // ④ 还缺东西但没有空格可用 → 挖段把网撑开（优先挖向村庄格：成本只要 1）
   if (NeedsAnything(needs)) {
@@ -314,6 +340,29 @@ function SurfaceToHideGrain(state, unit, actions) {
   return FindAction(actions, "UseEntrance", (action) => !action.dive);
 }
 
+/**
+ * 转移群众（R6 P0-1 之后 MoveCivs 带目的地）：先送伤员与老弱（走得最慢），
+ * 并且**分窖**——同样是进窖，挑还剩铺位最多的那一个，别把人全挤在一个窖里。
+ * 地面转移（`ground:true`）是没窖可进时的下策，bot 不用它（它会把主动作全花在挪人上）。
+ */
+function PickMoveCivs(state, actions) {
+  // 分窖还是并窖，取决于这一幕有没有「恐慌」：
+  // 第一幕（civGuidance=false）不积恐慌，人分两个窖放只有好处——第六日那一撬只够得着一个窖。
+  // 第二幕起洞里会积恐慌：同格没人陪着每回合 +1，满 3 自己冲出地面。
+  // 这时候把人摊到三四个窖里，等于让一个带路的单位照应不过来——**并窖才对**。
+  const spread = !CivGuidanceOn(state);
+  const score = (action) => (spread ? -(action.roomLeft || 0) : -(action.here || 0));
+  const drops = actions.filter((action) => action.type === "MoveCivs" && !action.ground)
+    .sort((a, b) => (score(a) - score(b)) || ((a.to || "") < (b.to || "") ? -1 : 1));
+  const byKind = (kind) => drops.find((action) => action.kind === kind);
+  const shelter = byKind("wounded") || byKind("old") || drops[0] || null;
+  if (shelter) return shelter;
+  // 窖满了（或压根没口）而敌已经摸到 2 格内：把人往村子另一头挪。
+  // 这是 R6 P0-1 新给 MoveCivs 的地面目的地——它只在这种时候才出现在合法动作里。
+  return actions.filter((action) => action.type === "MoveCivs" && action.ground)
+    .sort((a, b) => ((a.to || "") < (b.to || "") ? -1 : 1))[0] || null;
+}
+
 function SkilledQuiet(state, unit, actions) {
   const digPower = CFG.digPower[unit.type] || 0;
   // 藏粮 → 转移群众（先送伤员与老弱：他们走得最慢）
@@ -321,9 +370,7 @@ function SkilledQuiet(state, unit, actions) {
   if (hideGrain) return hideGrain;
   const surfaceForGrain = SurfaceToHideGrain(state, unit, actions);
   if (surfaceForGrain) return surfaceForGrain;
-  const moveCivs = FindAction(actions, "MoveCivs", (a) => a.kind === "wounded")
-    || FindAction(actions, "MoveCivs", (a) => a.kind === "old")
-    || FindAction(actions, "MoveCivs");
+  const moveCivs = PickMoveCivs(state, actions);
   if (moveCivs) return moveCivs;
   const duty = CivDuty(state, unit, actions);
   if (duty) return duty;
@@ -333,7 +380,9 @@ function SkilledQuiet(state, unit, actions) {
   // 掩土（暴露豆逼近敌盯上的阈值就得压一压）→ 组织 → 隐蔽待命
   const cover = CoverIfExposed(state, unit, actions);
   if (cover) return cover;
-  const organize = FindAction(actions, "Organize");
+  // 组织（R6 P1 之后要管一顿饭：明存粮 -1）。2 级的红利是「村 1 格内工地免费 +1 进度」，
+  // 本幕挖不了地道（第一幕）就没有工地可帮——那两担粮花下去一点回报也没有，不如留着藏进窖里。
+  const organize = ActionUnlocked(state, "Dig") ? FindAction(actions, "Organize") : null;
   if (organize) return organize;
   const hide = FindAction(actions, "Hide");
   if (hide) return hide;
@@ -526,17 +575,24 @@ function SkilledSweep(state, unit, actions) {
   // 射击孔开火：打一枪换一个地方——被咬住的孔不打
   const fightpostShot = FindAction(actions, "Attack", (action) => action.fightpost && !action.locked);
   if (fightpostShot) return fightpostShot;
-  // 扫荡期照旧藏粮、转移群众（敌不在近旁时）
-  if ((!near || near.dist > 2) && unit.layer === "under") {
+  // 扫荡期照旧藏粮、转移群众。R6 P0-4 把洞粮线抬到「两个满仓也不够」之后，
+  // 「敌一进 3 格就不再搬粮」等于自己放弃胜负线——**洞粮还没够就照搬**，
+  // 只是不站到敌人鼻子底下（1 格内）去搬。粮线够了才退回原来的谨慎距离。
+  const grainGoal = (LevelOf(state).victory || {}).tunnelGrainAtLeast || 0;
+  const grainShort = SortedKeys(state.tunnels.cells)
+    .reduce((sum, key) => sum + state.tunnels.cells[key].grain, 0) < grainGoal;
+  // 只有在**群众都已经安置好**的前提下才敢贴到敌人 2 格内搬粮：
+  // 人比粮要紧，这条顺序不能反（R6 P0-4 抬线之后，bot 一度为了粮把人丢在地面上）。
+  const civsWaiting = LiveCivs(state).some((civ) => civ.loc === "village");
+  const grainRange = grainShort && !civsWaiting ? 1 : 2;
+  if ((!near || near.dist > grainRange) && unit.layer === "under") {
     const up = SurfaceToHideGrain(state, unit, actions);
     if (up) return up;
   }
-  if (unit.layer === "surface" && (!near || near.dist > 2)) {
+  if (unit.layer === "surface" && (!near || near.dist > grainRange)) {
     const hideGrain = FindAction(actions, "HideGrain");
     if (hideGrain) return hideGrain;
-    const moveCivs = FindAction(actions, "MoveCivs", (a) => a.kind === "wounded")
-      || FindAction(actions, "MoveCivs", (a) => a.kind === "old")
-      || FindAction(actions, "MoveCivs");
+    const moveCivs = PickMoveCivs(state, actions);
     if (moveCivs) return moveCivs;
     const disguise = FindAction(actions, "Disguise", (a) => a.disguise === "stove" || a.disguise === "kang");
     if (disguise) return disguise;
@@ -544,7 +600,7 @@ function SkilledSweep(state, unit, actions) {
   // 扫荡期照旧补网：胜负线认的是洞存粮与保全率，网不够就永远够不着——只挑敌不在近旁的时候干
   // 地下动土：敌人看不见也够不着地下的人，只有「动静会记在暴露豆上」这一条代价。
   // 敌就贴在头顶（1 格内）时才停手；原来要 3 格才肯干活，第五幕十来个敌人一进场就再也挖不动了。
-  if ((!near || near.dist >= 3) && unit.layer === "under") {
+  if ((!near || near.dist >= 2) && unit.layer === "under") {
     const digging = SkilledDig(state, unit, actions);
     if (digging) return digging;
   }

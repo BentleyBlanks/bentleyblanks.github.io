@@ -295,6 +295,12 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
     logDrawer.hidden = force === undefined ? !logDrawer.hidden : !force;
   }
 
+  /** 清空事件日志（换幕时用：上一幕的播报留在这儿只会让人以为还在打上一幕）。 */
+  function ClearLog() {
+    logEntries.length = 0;
+    logList.replaceChildren();
+  }
+
   // ---------------- 结束回合三态 + 两段护栏 ----------------
   function SetEndTurn(state, { todoCount = 0 } = {}) {
     endTurnBtn.classList.remove("tf-end-ready", "tf-end-hold", "tf-end-busy");
@@ -431,8 +437,24 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
       El("dt", null, row, label);
       El("dd", null, row, String(ledger?.[key] ?? 0));
     }
+    // R6 P0-1：战役续承的去处。终局复盘白纸黑字写着「你这一幕挖下的东西会跟着走」，
+    // 而网页终局画面原来只有「重新开始」——这一段就是那句话的按钮。
+    const next = result.nextAct;
+    if (next) {
+      El("div", "tf-result-next-title", card, `下一幕：${next.id}《${next.name}》`);
+      El("div", "tf-result-next-note", card, next.ready
+        ? `带过去的是这一幕自己挣下的盘面：地道 ${next.cells} 格 · 未封的口 ${next.entrances} 个`
+          + ` · 洞存粮 ${next.tunnelGrain} 担 · 弹药 ${next.ammo} 发。`
+          + "（下一幕按新图过滤，洞存粮按新幕仓容一洞一洞地填；装不下的就是这一幕白藏了）"
+        : "本页引擎没有提供续承接口，进下一幕只能从默认继承档开始。");
+    }
     const foot = El("div", "tf-result-foot", card);
-    const again = El("button", "tf-menu-btn", foot, "重新开始");
+    if (next) {
+      const go = El("button", "tf-menu-btn tf-menu-btn-primary", foot, `进入下一幕 ${next.id}（带着这一幕的战果）`);
+      go.type = "button";
+      go.addEventListener("click", () => callbacks.OnNextAct?.());
+    }
+    const again = El("button", "tf-menu-btn", foot, "重新打这一幕");
     again.type = "button";
     again.addEventListener("click", () => callbacks.OnRestart?.());
     const close = El("button", "tf-menu-btn", foot, "关闭");
@@ -448,7 +470,7 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
 
   return {
     SetTopBar, SetResources, SetLandmarks, SetLedger, SetSelected, SetHover, SetMovePreview,
-    Toast, Banner, AppendLog, ToggleLog,
+    Toast, Banner, AppendLog, ToggleLog, ClearLog,
     SetEndTurn, ShowTodos, HideTodos, TodosVisible,
     MaybeHint, ClearHints,
     ShowMenu, HideMenu, MenuVisible,

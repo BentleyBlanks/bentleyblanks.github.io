@@ -84,6 +84,18 @@ export const CFG = Object.freeze({
   organizeMax: 2,
   organizeFreeDigRadius: 1,  // 组织 2 级：村 1 格内工地免费 +1 进度
   organizeStopEnemyRange: 2, // 敌在村 2 格内时免费进度停止
+  // R6 P1：组织不再是「站村格按两下白拿」。两条代价都不靠新资源：
+  // ① **时机**——敌已摸到村 `organizeStopEnemyRange` 格内就开不成会（跟 2 级红利同一个条件，
+  //    「想吃这个红利就得先把敌人挡在村外」这句话从此对动作本身也成立）；
+  // ② **痕迹**——一屋子人进进出出，村口踩出新土（本格 +1），扫荡开始时这笔账记在口的暴露豆上。
+  organizeTrace: 1,
+  // R6 P1：破路不再无声无息——刨断大车路和别的挖掘一样留下新土，人也藏不住。
+  roadBreakTrace: 1,         // 破路工地所在格痕迹 +1（与一次普通挖掘同价）
+  // R6 P0-4：全幕 2/3 之后，敌若仍占着村格 → 每村每回合烧房 1 处 + 拉走 1 批地面群众。
+  // 胜负线因此守不到最后一回合就不算数（原来第四五回合达标后整个后半局空转）。
+  occupationTollFrom: 2 / 3,
+  occupationBurnPerTurn: 1,
+  occupationLevyPerTurn: 1,
 
   // —— 弹药（全局池，缴获是唯一来源；收支严格为负） ——
   ammoMax: 12,
@@ -153,6 +165,11 @@ export const CFG = Object.freeze({
   // —— 侦察与嫌疑 ——
   sightingLife: 2,
   mobileResponseRadius: 6,
+  // R6 P0-2：佯动必须真的拉得动人。**只有真单位在敌纵队 feintPullRange 格内现身**才拉得动，
+  // 而且只拉 feintLureTurns 个敌回合、只拉最近的那一支纵队。
+  // 置信 1 的痕迹/动静仍然绝不拉动任何纵队（防木偶化红线，见 §2.6）。
+  feintPullRange: 2,
+  feintLureTurns: 1,
   suspicion: Object.freeze({ sighting2: 2, sighting1: 1, attackSite: 2, openGrain: 1, tracesUnit: 1 }),
 
   // —— 敌纵队移动（A* 成本） ——
@@ -313,7 +330,39 @@ export const TEXT = Object.freeze({
   }),
   scriptText: Object.freeze({
     breachWarn: "内线急电：敌已认准村里的窖，明日就要往下挖人",
-    breachDone: "敌撬开窖口，探灯照下去——窖里的人一个也跑不掉（全部入代价簿）",
+    // R6 P0-1：撬窖不再是「一锅端」——探灯往下照，够得着的只有挤在口子跟前的那一批。
+    breachDone: "敌撬开窖口，探灯照下去——够得着的那一批被拽了上去（入代价簿）",
+    breachGuarded: "窖口下头有人端着枪：撬窖的被打了回去（与「攻入」同一套账：弹药 -1、守的人被压制一回合、这个口从此明摆着）",
+    breachEmpty: "敌撬开窖口，里面空空如也——人早转走了",
+  }),
+  feintText: Object.freeze({
+    lured: "敌一部循着响动改了道",
+    tooFar: "离敌太远，这一嗓子没人听见——佯动只在敌纵队 2 格内才拉得动人",
+    exposed: "现身佯动：这一下把自己亮在了明处，可被当场还击",
+  }),
+  organizeText: Object.freeze({
+    tooLate: "敌已摸到村边（2 格内），乡亲不敢聚——组织工作得赶在他来之前做",
+    trace: "一屋子人进进出出，村口踩出新土（本格痕迹 +1）",
+  }),
+  roadText: Object.freeze({
+    trace: "刨路留下新土：本格痕迹 +1",
+    seen: "在村外大路上刨坑，这一回合藏不住身形（隐蔽被打破）",
+  }),
+  organizeFreeText: Object.freeze({
+    given: "组织度 2 级：乡亲来帮工，工地免费 +1 进度",
+    stopped: "敌已摸到村边（2 格内），乡亲不敢出门帮工——本回合没有免费进度",
+  }),
+  occupationText: Object.freeze({
+    burn: "敌久占不去，又点了一处房子（入代价簿）",
+    levy: "敌久占不去，挨家挨户又拉走一批人（入代价簿）",
+    warn: "敌若再占着村子不走，从今日起每回合都要烧一处房、拉一批人",
+  }),
+  civMoveText: Object.freeze({
+    toShelter: "群众转入地道",
+    onGround: "地面转移：领着乡亲挪到别的村格",
+    noRoom: "那个窖的铺位不够了——换一个窖（legal 里逐窖列着还剩几个铺）",
+    sameHex: "已经在这一格了",
+    notVillage: "只能往本村的村格上挪",
   }),
   carryText: Object.freeze({
     fromDefault: "【默认继承档】你没打前面几幕：接手的是一份别人替你挖了一半的网，账也照旧记在你名下",

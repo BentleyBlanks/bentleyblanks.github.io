@@ -191,8 +191,47 @@ export function ExtractCarry(state) {
     won: !!(state.result && state.result.won), grade: state.result ? state.result.grade : null };
 }
 
+/**
+ * 续承合并（R6 P0-2 必修）：**继承只增不减**。
+ * 落地时把上一幕的档与本幕的默认继承档取**并集**（格/段/口/伪装/设施四项），
+ * 于是「打得好 → 比默认档强」「打得差 → 至少退回默认档」，
+ * 绝不会出现「打过前作反而比跳过前作更惨」。
+ * 实测的反例（并行 CLI Agent 端到端跑出来的）：手打**输掉**的 A2（两个口都被搜出）串进 A3
+ * 得到 0 个活口，而直接开 A3 的默认档有 2 个活口——继承方向是反的。
+ * 被填死的口只在**两份档都填死**时才算填死：默认档给的那个口，不该被你上一幕的失败带走。
+ */
+function MergeCarry(base, extra) {
+  if (!extra) return base;
+  if (!base) return extra;
+  const cells = [...new Set([...(base.cells || []), ...(extra.cells || [])])];
+  const edgeKey = ([a, b]) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const edgeMap = new Map();
+  for (const edge of [...(base.edges || []), ...(extra.edges || [])]) edgeMap.set(edgeKey(edge), edge);
+  const entrances = [...new Set([...(base.entrances || []), ...(extra.entrances || [])])];
+  const baseSealed = new Set(base.sealed || []);
+  const extraSealed = new Set(extra.sealed || []);
+  const sealed = entrances.filter((key) => {
+    const inBase = (base.entrances || []).includes(key);
+    const inExtra = (extra.entrances || []).includes(key);
+    // 只有「两边都认为它被填死」才继续填死；任一边留着活口就按活口算
+    return (!inBase || baseSealed.has(key)) && (!inExtra || extraSealed.has(key));
+  });
+  const facilityMap = new Map((extra.facilities || []).map(([key, facility]) => [key, facility]));
+  for (const [key, facility] of base.facilities || []) facilityMap.set(key, facility);
+  const disguiseMap = new Map((extra.disguises || []).map(([key, kind]) => [key, kind]));
+  for (const [key, kind] of base.disguises || []) disguiseMap.set(key, kind);
+  return { ...base,
+    cells, edges: [...edgeMap.values()], entrances, sealed,
+    facilities: [...facilityMap.entries()], disguises: [...disguiseMap.entries()],
+    tunnelGrain: Math.max(Number(base.tunnelGrain) || 0, 0),
+    ammo: base.ammo };
+}
+
 /** 续承档落地到新局：只认新图上真实存在且挖得动的格，粮按本幕仓容截断。 */
-function ApplyCarry(state, level, carry) {
+function ApplyCarry(state, level, inputCarry) {
+  // 认真打过来的档先与默认档取并集（保底不低于「跳过前作」），默认档自身不必再合并。
+  const carry = inputCarry && !inputCarry.isDefault
+    ? MergeCarry(inputCarry, level.carryDefault) : inputCarry;
   const valid = (key) => {
     const hex = state.map.hexes[key];
     return !!hex && terrainDefinitions[hex.terrain].diggable;
@@ -288,7 +327,7 @@ export function CreateGame(levelId, seed, options = {}) {
   for (const village of level.villages) {
     state.map.villages[village.id] = { name: village.name, hexKeys: village.hexKeys.slice(),
       popStart: 0, grainOpen: village.grainOpen,
-      organize: village.organize, organizeProgress: 0, hasHq: !!village.hasHq, burnedHexes: 0,
+      organize: village.organize, organizeProgress: 0, hasHq: !!village.hasHq, burnedHexes: 0, occupiedStreak: 0,
       seizedTurn: 0 };
   }
   for (const ally of level.allies) MakeAllyUnit(state, ally.type, ally.at);

@@ -315,7 +315,11 @@ body {
 .tf-medal-cond { font-size: 11.5px; color: var(--tf-text-dim, #8f8c84); }
 .tf-medal-note { font-size: 11.5px; color: var(--tf-text-dim, #8f8c84); margin-top: 3px; line-height: 1.5; }
 .tf-result-ledger-title { font-size: 11.5px; letter-spacing: 0.4em; color: var(--tf-ledger-title, #b9b6ae); margin: 12px 0 4px; }
-.tf-result-foot { display: flex; gap: 8px; margin-top: 16px; }
+/* 战役续承（R6）：下一幕的去处与「带得走什么」。中性灰白，不做任何奖励表述。 */
+.tf-result-next-title { font-size: 11.5px; letter-spacing: 0.4em; color: var(--tf-ledger-title, #b9b6ae); margin: 14px 0 4px; }
+.tf-result-next-note { font-size: 11.5px; color: var(--tf-text-dim, #8f8c84); line-height: 1.6; }
+.tf-result-foot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.tf-menu-btn-primary { flex: 1 0 100%; border-color: var(--tf-warn, #c77b3f); }
 
 /* ---------------- 启动层 / 兜底 ---------------- */
 .boot {

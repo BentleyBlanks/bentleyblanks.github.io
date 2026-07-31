@@ -731,31 +731,57 @@ function KindName(civ) {
 }
 
 /**
- * 第一幕的硬脚本攻入（R5 P0-1）：到了关卡声明的那一回合，敌人认准村里最挤的那个窖撬开——
- * **窖里的人一个也跑不掉**，全部进代价簿。这是开场白写的招牌失败，必须在 8 回合内够得着。
- * 提前一回合电报；玩家能改变的是**把人分散在哪几个窖里**，不是这一下会不会来。
+ * 第一幕的硬脚本撬窖（R5 P0-1 立，R6 P0-1 改）：到了关卡声明的那一回合，
+ * 敌人认准村里**人最多**的那个窖撬开。提前一回合电报，这一下不可避免。
+ *
+ * R6 P0-1：原来它是「一锅端」——窖里的人一个不留。于是同 seed A/B 实测出了个荒唐结论：
+ * **不用地窖比用地窖评级更高**（用窖两局直接失利，不用窖零失利还拿过乙），
+ * 而简报第一条写的是「粮与人即刻转入窖中」。教什么就罚什么。现在改成：
+ * ① **最多带走 `level.scriptedBreachHaul` 批**（够得着口子跟前那一批，不是整窖）；
+ * ② **窖里有我方单位驻守 → 被打退**，走「攻入」同一套结算：
+ *    弹药 -1 + 守洞单位压制 1 回合 + 该口永久转为已知（弹药池空则守不住）。
+ * 于是「早藏、分窖、留守」三件事各自有了确定的收益，A1 的激励第一次和它的文案对上。
  */
 function ScriptedBreach(state, events) {
-  const script = GetLevel(state.meta.level).scriptedBreach;
+  const level = GetLevel(state.meta.level);
+  const script = level.scriptedBreach;
   if (!script || state.wave.scriptedBreachDone) return;
   if (state.meta.turn === script.turn - 1) {
     PushEvent(state, events, { kind: "telegraph", text: script.telegraph || TEXT.scriptText.breachWarn, visible: true });
     return;
   }
   if (state.meta.turn < script.turn) return;
-  // 人最多的那个窖（并列取格键序）——你把人分散在哪儿，决定这一下要走多少
+  // 人最多的那个窖（并列取格键序）——你把人分散在哪儿，决定这一下够得着谁
   let target = null;
   let best = -1;
   for (const key of SortedKeys(state.tunnels.cells)) {
-    const count = CivsInCell(state, key).reduce((sum, civ) => sum + 1, 0);
+    const count = CivsInCell(state, key).length;
     if (count > best) { best = count; target = key; }
   }
   state.wave.scriptedBreachDone = true;
   if (!target || best <= 0) {
-    PushEvent(state, events, { kind: "op", text: "敌撬开窖口，里面空空如也——人早转走了", visible: true });
+    PushEvent(state, events, { kind: "op", text: TEXT.scriptText.breachEmpty, visible: true });
     return;
   }
-  const caught = CivsInCell(state, target);
+  const entrance = state.tunnels.entrances[target];
+  // 留守：窖口正下方有我方单位 → 与「攻入」同一套代价链（R5 P0-4 的四项一项不少）
+  const defenders = UnitsOn(state, target, "under").filter((unit) => unit.side === "ally" && unit.hp > 0);
+  if (defenders.length && state.resources.ammo >= CFG.guardAmmoCost) {
+    for (let i = 0; i < CFG.guardAmmoCost; i += 1) SpendAmmo(state);
+    PushEvent(state, events, { kind: "combat", text: TEXT.guardText.ammo, hex: target, visible: true });
+    PushEvent(state, events, { kind: "op", text: TEXT.scriptText.breachGuarded, hex: target, visible: true });
+    for (const unit of defenders) StunUnit(state, unit, CFG.guardStunTurns);
+    PushEvent(state, events, { kind: "combat", text: TEXT.guardText.stunned, hex: target, layer: "under", visible: true });
+    if (entrance && !entrance.known) {
+      entrance.known = true;
+      PushEvent(state, events, { kind: "expose", text: TEXT.guardText.marked, hex: target, visible: true });
+    }
+    return;
+  }
+  if (defenders.length) PushEvent(state, events, { kind: "op", text: TEXT.guardText.noAmmo, hex: target, visible: true });
+  // 无人驻守（或弹药池空）：够得着的只有口子跟前的那一批
+  const haul = Math.max(1, Number(level.scriptedBreachHaul) || 1);
+  const caught = CivsInCell(state, target).sort((a, b) => CompareIds(a.id, b.id)).slice(0, haul);
   for (const civ of caught) LoseCiv(state, civ, "captured");
   const cell = state.tunnels.cells[target];
   if (cell && cell.grain > 0) {
@@ -763,11 +789,62 @@ function ScriptedBreach(state, events) {
     PushEvent(state, events, { kind: "ledger", text: `窖中存粮 ${cell.grain} 担一并被夺（入代价簿）`, hex: target, visible: true });
     cell.grain = 0;
   }
-  const entrance = state.tunnels.entrances[target];
   if (entrance) { entrance.known = true; entrance.sealed = true; }
   PushEvent(state, events, { kind: "ledger",
     text: `${script.text || TEXT.scriptText.breachDone}：群众被抓 ${caught.length} 批（入代价簿）`,
     hex: target, visible: true });
+}
+
+/**
+ * 久占加压（R6 P0-4）：全幕过了 `CFG.occupationTollFrom`（2/3）之后，敌若**还踩着村格不走**，
+ * 每村每回合烧掉一处房、拉走一批还在地面上的乡亲（老弱与伤员先遭殃）。
+ * 这一条把胜负线钉死在最后一回合——原来第四五回合把粮藏够就万事大吉，后半局只剩空按 end。
+ * 反制有两条，都是这套规则本来就有的：把人送到地下去，或者把敌人从村里赶走、引走。
+ */
+function OccupationToll(state, events) {
+  const level = GetLevel(state.meta.level);
+  const from = Math.ceil(level.maxTurns * CFG.occupationTollFrom);
+  if (state.meta.turn === from - 1) {
+    PushEvent(state, events, { kind: "telegraph", text: TEXT.occupationText.warn, visible: true });
+  }
+  if (state.meta.turn < from || state.wave.status !== "sweep") return;
+  for (const villageId of SortedKeys(state.map.villages)) {
+    const village = state.map.villages[villageId];
+    const occupied = village.hexKeys.find((key) => UnitsOn(state, key, "surface")
+      .some((unit) => unit.side === "enemy" && unit.hp > 0));
+    // 「久占」要占得住：连着两个回合还站在村格上才算——
+    // 路过一格不至于烧房抓丁，而你有整整一个回合把人挪开、或者把他赶走、引走。
+    village.occupiedStreak = occupied ? (village.occupiedStreak || 0) + 1 : 0;
+    if (!occupied || village.occupiedStreak < 2) continue;
+    for (let i = 0; i < CFG.occupationBurnPerTurn; i += 1) {
+      if (village.burnedHexes >= village.hexKeys.length) break;
+      village.burnedHexes += 1;
+      AddLedger(state, "housesBurned", 1);
+      PushEvent(state, events, { kind: "ledger", text: `${village.name}：${TEXT.occupationText.burn}`, hex: occupied, visible: true });
+    }
+    // 「挨家挨户」只搜得到**敌人正踩着的那一格**：把人挪到村子另一头仍然有用
+    //（MoveCivs 的地面目的地就是干这个的）。到了这个日子青壮也跑不掉了——
+    // 前面 LevyOccupiedHexes 放走的那一批，收队前的这几日会被逐户搜出来。
+    const order = { old: 0, wounded: 1, young: 2 };
+    const reach = village.hexKeys.filter((key) => UnitsOn(state, key, "surface")
+      .some((unit) => unit.side === "enemy" && unit.hp > 0));
+    const onGround = CivsAtVillage(state, villageId)
+      .filter((civ) => civ.hex && reach.includes(civ.hex))
+      .sort((a, b) => (order[a.kind] - order[b.kind]) || CompareIds(a.id, b.id))
+      .slice(0, CFG.occupationLevyPerTurn);
+    for (const civ of onGround) {
+      const where = civ.hex || occupied;
+      LoseCiv(state, civ, "captured");
+      PushEvent(state, events, { kind: "ledger", text: `${village.name}：${TEXT.occupationText.levy}`, hex: where, visible: true });
+    }
+    if (onGround.length) {
+      for (const column of state.enemy.columns) {
+        if (!ColumnUnits(state, column).some((unit) => village.hexKeys.includes(unit.pos))) continue;
+        column.gained = true;
+        column.hauled = true;      // 拉到了人：这支队伍此后不再算「扑空」
+      }
+    }
+  }
 }
 
 /** 征粮：进村就搬粮（抓丁已改挂群众暴露，见 LevyOccupiedHexes）。 */
@@ -950,6 +1027,20 @@ function ColumnAct(state, events, column) {
     column.opInProgress = null;   // 目标口已不在：作业作废
     state.enemy.pendingOps = state.enemy.pendingOps.filter((op) => op.columnId !== column.id);
   }
+  // 2.5) 被佯动钉住（R6 P0-2）：真单位在 2 格内现身，这一支下一回合就朝那儿去。
+  //      它排在「反地道作业」与「进村搜索征粮」之前——**这才是把敌人从群众头上引开的那一手**。
+  //      已经电报出去的在途作业（第 2 步）优先级更高，佯动撤不掉它：电报一发就作数。
+  if (column.lureAt && state.meta.turn <= (column.lureUntil || 0)) {
+    const lureAt = column.lureAt;
+    column.lureAt = null;
+    PushEvent(state, events, { kind: "enemyMove", text: `${TEXT.feintText.lured}：朝 ${lureAt} 去`, hex: pos, visible: SeenBy(state, pos) });
+    MoveColumn(state, events, column, lureAt);
+    ColumnAttackAdjacent(state, events, column);
+    PlanPath(state, column, lureAt);
+    TickCaution(state, column);
+    return;
+  }
+  column.lureAt = null;
   // 3) 机动队响应置信 2 目击
   if (column.role === "mobile" && MobileRespond(state, events, column)) { TickCaution(state, column); return; }
   // 3.5) 邻接可见我方单位 → 接火（不吞任务；两班以下的小队才会被缠住停止机动）
@@ -1029,5 +1120,6 @@ export function RunEnemyPhase(state, events) {
   const columns = state.enemy.columns.slice().sort((a, b) => (a.id < b.id ? -1 : 1));
   for (const column of columns) ColumnAct(state, events, column);
   LevyOccupiedHexes(state, events);       // 敌军阶段收尾：踩住的村格上还站着谁，就拉走谁
+  OccupationToll(state, events);          // 全幕 2/3 之后：还占着村子不走，就每回合烧一处、拉一批
   RecordExposedSightings(state);
 }

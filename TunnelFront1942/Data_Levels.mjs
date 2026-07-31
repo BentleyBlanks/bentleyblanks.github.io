@@ -442,6 +442,9 @@ const a1 = {
   ],
   // ② 到第六日，敌人已经认准村里有窖：**人最多的那个窖被撬开，窖里的人一个也跑不掉**。
   //    这一下不可避免（开场白写的就是它）；你能改变的是「把人分散在哪几个窖里」。
+  // R6 P0-1：这一下**最多带走 1 批**，而且**窖里有我方单位驻守时会被打退**
+  //（走「攻入」同一套结算：弹药 -1 + 守的人压制 1 回合 + 这个口永久转为已知）。
+  scriptedBreachHaul: 1,
   scriptedBreach: {
     turn: 6,
     telegraph: "内线急电：敌今日在村里挨家踩地听声，明日就要照着最响的那处往下挖",
@@ -1566,7 +1569,7 @@ const a4Elev = [
 
 const a4VillageHexes = AL([[3, 1], [4, 1], [3, 2], [4, 2], [3, 3]]);
 const a4Villages = [
-  { id: "v1", name: "高家庄", hexKeys: a4VillageHexes, grainOpen: 14, organize: 1, hasHq: true },
+  { id: "v1", name: "高家庄", hexKeys: a4VillageHexes, grainOpen: 18, organize: 1, hasHq: true },
 ];
 
 const a4NorthRoad = AL([[8, 2], [6, 2], [5, 2], [4, 2]]);

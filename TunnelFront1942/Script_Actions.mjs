@@ -13,7 +13,7 @@ import {
   TunnelNeighbors, ReachableFacilityCells, StorageCellsUnder,
   EntranceThreshold, CellHasRoom, IsSurfacePassable, ZoneOfCell, ZoneEntranceKeys, EntranceCivPassable,
   ActionUnlocked, FacilityUnlocked, UnlockedDisguises, CivGuidanceOn, StorageCapOf,
-  CivsAtVillage, CivsInCell, CivSlots, CivSpeed, CellCivRoom, EntranceGuideBonus, IsStunned,
+  CivsAtVillage, CivsInCell, CivSlots, CivSpeed, CellCivRoom, EntranceGuideBonus, IsStunned, EnemyNearVillage,
 } from "./Script_State.mjs";
 import {
   EnemyCanSeeHex, EnemySeesUnit, RecordSighting, ExposeEntranceUse, PreviewEntranceUseBeans,
@@ -575,18 +575,34 @@ function CollectUnitActions(state, unit, actions) {
       if (village.grainOpen > 0 && StorageCellsUnder(state, unit.pos).length) {
         actions.push({ type: "HideGrain", unit: id });
       }
+      // 转移群众（R6 P0-1）：**逐窖**列出还剩几个铺位，并允许 `to` 指定进哪一个窖。
+      // 原来窖由系统自动挑（永远挑格键最小的那个），失败提示写着「人分两个窖放」，
+      // 物理上根本做不到。`to` 也可以是本村另一个村格 —— 「把地面上剩的人往敌人还没踩到的格挪」
+      // 同样是这一个动作，不是新系统。
       const waiting = CivsAtVillage(state, villageId);
-      if (waiting.length && NearbyShelterEntrance(state, unit.pos)) {
+      if (waiting.length) {
         const kinds = [...new Set(waiting.map((civ) => civ.kind))].sort();
-        actions.push({ type: "MoveCivs", unit: id, count: Math.min(CFG.moveCivsPerAction, waiting.length) });
-        if (kinds.length > 1) {
+        const kindCount = (kind) => Math.min(CFG.moveCivsPerAction,
+          kind ? waiting.filter((civ) => civ.kind === kind).length : waiting.length);
+        const drops = ShelterDrops(state, unit.pos);
+        for (const drop of drops) {
+          actions.push({ type: "MoveCivs", unit: id, to: drop.cell, via: drop.entrance,
+            roomLeft: drop.room, here: drop.here, count: kindCount(null) });
           for (const kind of kinds) {
-            actions.push({ type: "MoveCivs", unit: id, kind,
-              count: Math.min(CFG.moveCivsPerAction, waiting.filter((civ) => civ.kind === kind).length) });
+            if (kinds.length > 1) {
+              actions.push({ type: "MoveCivs", unit: id, to: drop.cell, via: drop.entrance, kind,
+                roomLeft: drop.room, here: drop.here, count: kindCount(kind) });
+            }
           }
         }
+        for (const dest of GroundDrops(state, unit.pos, villageId, drops.length > 0)) {
+          actions.push({ type: "MoveCivs", unit: id, to: dest, ground: true, count: kindCount(null) });
+        }
       }
-      if (village.organize < CFG.organizeMax) actions.push({ type: "Organize", unit: id });
+      // 组织有窗口期：敌一摸到村边就聚不起人（R6 P1，把「站村格按两下白拿」堵掉）
+      if (village.organize < CFG.organizeMax && !EnemyNearVillage(state, villageId, CFG.organizeStopEnemyRange)) {
+        actions.push({ type: "Organize", unit: id, traceCost: CFG.organizeTrace });
+      }
     }
   } else if (cell && cell.facility === "fightpost" && def.atk > 0 && state.resources.ammo >= CFG.ammoPerAttack) {
     // 射击孔：攻击本格/相邻地表敌单位（按伏击结算）；连着打会被锁定，所以标出 locked 让玩家看得见
@@ -613,14 +629,68 @@ function CivDropCells(state, entranceKey) {
 }
 
 /** 群众下得去的口：未封，且伪装物不挡人（水井口窄，群众进不去也上不来）。 */
-function NearbyShelterEntrance(state, pos) {
+function NearbyShelterEntrance(state, pos, wantCell) {
   const keys = [pos, ...HexNeighborKeys(pos)];
   for (const key of keys) {
     const entrance = state.tunnels.entrances[key];
     if (!entrance || entrance.sealed || !EntranceCivPassable(entrance)) continue;
-    if (CivDropCells(state, key).length) return key;
+    const cells = CivDropCells(state, key);
+    if (!cells.length) continue;
+    if (!wantCell) return key;
+    if (cells.includes(wantCell)) return key;
   }
   return null;
+}
+
+/**
+ * 逐窖可投放清单（R6 P0-1）：`{ cell, entrance, room, here }`。
+ * `room` = 该藏人室**还剩几个铺位**，`here` = 里面已经有几批人——
+ * 「人分两个窖放」这条建议要成立，玩家必须先看得见这两个数。
+ */
+function ShelterDrops(state, pos) {
+  const out = [];
+  const seen = new Set();
+  for (const key of [pos, ...HexNeighborKeys(pos)]) {
+    const entrance = state.tunnels.entrances[key];
+    if (!entrance || entrance.sealed || !EntranceCivPassable(entrance)) continue;
+    for (const cell of CivDropCells(state, key)) {
+      if (seen.has(cell)) continue;
+      const room = CellCivRoom(state, cell);
+      if (room <= 0) continue;
+      seen.add(cell);
+      out.push({ cell, entrance: key, room, here: CivsInCell(state, cell).length });
+    }
+  }
+  return out.sort((a, b) => (a.cell < b.cell ? -1 : 1));
+}
+
+function NearestEnemyDistance(state, key) {
+  let best = Infinity;
+  for (const foe of EnemyUnits(state)) best = Math.min(best, HexDistanceKeys(foe.pos, key));
+  return best;
+}
+
+/**
+ * 地面转移的落点（R6 P0-1）：本村相邻、可通行、没有敌人站着，
+ * **且离最近的敌人比现在更远**的村格——失败提示里那句
+ * 「地面上剩下的人往敌人还没踩到的村格挪」原来在 A1 全部主动作里根本做不到。
+ * 它不需要新动作、新单位、新资源，只需要给 MoveCivs 一个地面目的地。
+ * 只在**这一格已经进不去窖**（铺位满了或没口）且**敌已经摸到 2 格内**时才出现：
+ * 挪人是没窖可进时的下策，不是可以每回合空按的动作。
+ */
+function GroundDrops(state, pos, villageId, hasShelterRoom) {
+  if (hasShelterRoom) return [];
+  const here = NearestEnemyDistance(state, pos);
+  if (here > CFG.useEntranceNearRange) return [];
+  const out = [];
+  for (const key of HexNeighborKeys(pos)) {
+    const hex = HexOf(state, key);
+    if (!hex || hex.villageId !== villageId) continue;
+    if (!IsSurfacePassable(state, key) || SurfaceBlockedByEnemy(state, key)) continue;
+    if (NearestEnemyDistance(state, key) <= here) continue;
+    out.push(key);
+  }
+  return out.sort();
 }
 
 /** 转移群众为什么不行——分清「没口 / 没藏人室 / 铺位满了」，不再一律说成「未连通」。 */
@@ -984,7 +1054,16 @@ function ApplyBreakRoad(state, events, action) {
   if (hex.villageId) return "村里的街不能刨：断了这一段，敌人照旧从别处进村，自家的粮车反倒过不去";
   if (hex.bridge && !GetLevel(state.meta.level).bridgeBreakable) return "此桥不可破毁";
   const need = hex.bridge ? CFG.dig.bridgeBreak : CFG.dig.roadBreak;
-  return WorkSite(state, events, unit, power, { kind: "roadBreak", at: unit.pos, need }, null);
+  // R6 P1：破路不再是「1 个主动作换敌池 -4、零暴露零痕迹」的白嫖。
+  // 刨断大车路是一队人挖半天的大工程：本格留下大片新土，人也被看见——
+  // 断路本身仍然管用，只是它把「我在这儿」写在了路面上。
+  const error = WorkSite(state, events, unit, power, { kind: "roadBreak", at: unit.pos, need }, null);
+  if (error) return error;
+  AddTraces(state, unit.pos, CFG.roadBreakTrace);
+  unit.stance = "normal";
+  unit.revealed = true;      // 在村外大路上刨坑，这一回合藏不住（敌看得见就是置信 2 目击）
+  PushEvent(state, events, { kind: "road", text: `${TEXT.roadText.trace}；${TEXT.roadText.seen}`, hex: unit.pos, visible: true });
+  return null;
 }
 
 /** 设伏（R2 P0-5）：① 同格至多 1 人；② 持续状态，不移动不换动作就一直守着；
@@ -1077,18 +1156,52 @@ function ApplyAttack(state, events, action) {
   return null;
 }
 
+/**
+ * 佯动（R6 P0-2 重做）：**真单位在敌纵队 `feintPullRange` 格内现身**，
+ * 强制**最近的那一支**纵队下一个敌回合把意图指向这一格（`column.lureAt`，`feintLureTurns` 回合）。
+ * 代价：该单位转入 `exposed`——被拉过来的那一支就是冲着他来的，邻接即挨枪。
+ * 防木偶化红线原样保留：置信 1 的痕迹/动静仍然绝不拉动任何纵队，
+ * 拉得动人的只有「真单位、真距离、真风险」这一条路。
+ */
 function ApplyFeint(state, events, action) {
   const unit = AllyOf(state, action.unit);
   if (!unit) return "单位不存在或已阵亡";
   if (unit.acted) return "该单位本回合已行动";
   if (unit.layer !== "surface") return "佯动须在地面";
-  unit.stance = "normal";
+  unit.stance = "exposed";
   unit.revealed = true;
   unit.acted = true;
   unit.freeMove = true;
   RecordSighting(state, unit.pos, 2);
   PushEvent(state, events, { kind: "feint", text: `${UnitDef(unit).name}现身佯动，引敌来看`, hex: unit.pos, visible: true });
+  PushEvent(state, events, { kind: "feint", text: TEXT.feintText.exposed, hex: unit.pos, visible: true });
+  const lured = LureNearestColumn(state, unit.pos);
+  if (lured) {
+    PushEvent(state, events, { kind: "feint", text: `${TEXT.feintText.lured}：敌一部下回合朝 ${unit.pos} 来`,
+      hex: unit.pos, visible: true });
+  } else {
+    PushEvent(state, events, { kind: "feint", text: TEXT.feintText.tooFar, hex: unit.pos, visible: true });
+  }
   return null;
+}
+
+/** 把最近的一支（未撤退、未在途作业的）敌纵队钉向 `at`，只钉 `feintLureTurns` 个敌回合。 */
+export function LureNearestColumn(state, at) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const column of state.enemy.columns) {
+    if (column.done || column.withdrawing) continue;
+    const units = Object.values(state.units)
+      .filter((unit) => unit.side === "enemy" && unit.hp > 0 && unit.columnId === column.id);
+    if (!units.length) continue;
+    const dist = Math.min(...units.map((unit) => HexDistanceKeys(unit.pos, at)));
+    if (dist > CFG.feintPullRange) continue;
+    if (dist < bestDist || (dist === bestDist && best && column.id < best.id)) { bestDist = dist; best = column; }
+  }
+  if (!best) return null;
+  best.lureAt = at;
+  best.lureUntil = state.meta.turn + CFG.feintLureTurns;
+  return best;
 }
 
 function ApplyHideGrain(state, events, action) {
@@ -1105,6 +1218,9 @@ function ApplyHideGrain(state, events, action) {
   if (!cells.length) return "本格正下方没有连着储粮洞的地道（先把地道挖到粮囤脚底下）";
   let moved = 0;
   let want = Math.min(CFG.hideGrainPerAction, village.grainOpen);
+  // 「粮分几个洞放」这句话要在动作里成立：先往**最空的那个窖**装，装平了再装下一个。
+  // 原来是按格键顺序把第一个窖灌满才动第二个——一次灌水泡的就是那一整窖。
+  cells.sort((a, b) => (state.tunnels.cells[a].grain - state.tunnels.cells[b].grain) || (a < b ? -1 : 1));
   for (const cellKey of cells) {
     const cell = state.tunnels.cells[cellKey];
     const room = StorageCapOf(state) - cell.grain;
@@ -1123,7 +1239,12 @@ function ApplyHideGrain(state, events, action) {
   return null;
 }
 
-/** 村口转移：把地面上的群众送进邻接地道口连通的地道。可用 kind 指定先送哪一类（老弱/伤员优先是常识）。 */
+/**
+ * 组织转移（R6 P0-1）：把本村格上的群众
+ * ① 送进邻接地道口连通的**指定藏人室**（`to` = 地道格键；不给则挑铺位最空的那个），或
+ * ② 挪到本村**相邻的另一个村格**（`to` = 村格键，`ground:true`）——「往敌人还没踩到的格挪」。
+ * 可用 `kind` 指定先送哪一类（老弱/伤员优先是常识）。
+ */
 function ApplyMoveCivs(state, events, action) {
   const unit = AllyOf(state, action.unit);
   if (!unit) return "单位不存在或已阵亡";
@@ -1133,30 +1254,60 @@ function ApplyMoveCivs(state, events, action) {
   const villageId = hex?.villageId || null;
   const village = villageId ? state.map.villages[villageId] : null;
   if (!village) return "须在村格转移群众";
-  let waiting = CivsAtVillage(state, villageId).sort((a, b) => CompareIds(a.id, b.id));
+  // 同格的人先走（抓丁按格判定，站在带路人脚边的那几批本来就是最急的）
+  let waiting = CivsAtVillage(state, villageId)
+    .sort((a, b) => ((a.hex === unit.pos ? 0 : 1) - (b.hex === unit.pos ? 0 : 1)) || CompareIds(a.id, b.id));
   if (action.kind) waiting = waiting.filter((civ) => civ.kind === action.kind);
   if (!waiting.length) return "村中已无未转移的群众（或该类群众已转移完）";
-  const entranceKey = NearbyShelterEntrance(state, unit.pos);
-  if (!entranceKey) return ShelterBlockReason(state, unit.pos);
   const want = Math.min(CFG.moveCivsPerAction, waiting.length,
     Math.max(1, Number(action.count) || CFG.moveCivsPerAction));
   const queue = waiting.slice(0, want);
+  const to = action.to ? String(action.to) : null;
+
+  // —— ② 地面转移：挪到本村相邻的另一个村格 ——
+  const groundTarget = to && HexOf(state, to) && HexOf(state, to).villageId === villageId
+    && HexDistanceKeys(unit.pos, to) === 1 ? to : null;
+  if (action.ground || (to && !state.tunnels.cells[to])) {
+    if (!groundTarget) return `${TEXT.civMoveText.notVillage}（to 要写本村的相邻村格键，如 "3,2"）`;
+    if (!IsSurfacePassable(state, groundTarget)) return "那一格过不去";
+    if (SurfaceBlockedByEnemy(state, groundTarget)) return "那一格上站着敌人";
+    for (const civ of queue) civ.hex = groundTarget;
+    unit.acted = true;
+    PushEvent(state, events, { kind: "civs",
+      text: `${TEXT.civMoveText.onGround}：${queue.length} 批（${queue.map(CivKindName).join("、")}）→ ${groundTarget}`,
+      hex: unit.pos, visible: true });
+    return null;
+  }
+
+  // —— ① 进窖：`to` 指定进哪一个藏人室 ——
+  const drops = ShelterDrops(state, unit.pos);
+  if (!drops.length) return ShelterBlockReason(state, unit.pos);
+  let dropCell = to;
+  if (dropCell && !drops.some((drop) => drop.cell === dropCell)) {
+    return `${TEXT.civMoveText.noRoom}（本格能送到的窖：${drops.map((d) => `${d.cell} 还剩 ${d.room} 铺`).join("；")}）`;
+  }
+  if (!dropCell) dropCell = drops.slice().sort((a, b) => (b.room - a.room) || (a.cell < b.cell ? -1 : 1))[0].cell;
+  const entranceKey = NearbyShelterEntrance(state, unit.pos, dropCell);
+  if (!entranceKey) return ShelterBlockReason(state, unit.pos);
   const moved = [];
   for (const civ of queue) {
-    const slot = CivSlots(civ);
-    const target = CivDropCells(state, entranceKey).find((key) => CellCivRoom(state, key) >= slot);
-    if (!target) break;
+    if (CellCivRoom(state, dropCell) < CivSlots(civ)) break;
     civ.loc = "cell";
-    civ.at = target;
+    civ.at = dropCell;
     civ.hex = null;          // 人进了洞就不在地面格上了——抓丁再也够不着他（R5 P0-2）
     moved.push(civ);
   }
-  if (!moved.length) return ShelterBlockReason(state, unit.pos);
+  if (!moved.length) return `${TEXT.civMoveText.noRoom}（${dropCell} 还剩 ${CellCivRoom(state, dropCell)} 铺；伤员一批占 2 铺）`;
   unit.acted = true;
   PushEvent(state, events, { kind: "civs",
-    text: `群众 ${moved.length} 批转入地道（${moved.map((civ) => civ.kind === "old" ? "老弱" : civ.kind === "young" ? "青壮" : "伤员").join("、")}）`,
+    text: `${TEXT.civMoveText.toShelter} ${moved.length} 批（${moved.map(CivKindName).join("、")}）→ ${dropCell}`
+      + `（该窖还剩 ${CellCivRoom(state, dropCell)} 铺）`,
     hex: unit.pos, visible: true });
   return null;
+}
+
+function CivKindName(civ) {
+  return ({ old: "老弱", young: "青壮", wounded: "伤员" })[civ.kind] || civ.kind;
 }
 
 function ApplyOrganize(state, events, action) {
@@ -1168,6 +1319,11 @@ function ApplyOrganize(state, events, action) {
   const village = hex?.villageId ? state.map.villages[hex.villageId] : null;
   if (!village) return "须在村格组织";
   if (village.organize >= CFG.organizeMax) return "该村组织度已到上限";
+  // R6 P1：组织不再是「站村格按两下白拿三项收益」。代价是**时机**与**痕迹**：
+  // 敌一摸到村边就开不成会（跟 2 级红利同一个条件），而开一次会就在村口留下一片新土。
+  if (EnemyNearVillage(state, hex.villageId, CFG.organizeStopEnemyRange)) return TEXT.organizeText.tooLate;
+  AddTraces(state, unit.pos, CFG.organizeTrace);
+  PushEvent(state, events, { kind: "organize", text: TEXT.organizeText.trace, hex: unit.pos, visible: true });
   village.organizeProgress += 1;
   if (village.organizeProgress >= CFG.organizeNeed) {
     village.organize += 1;

@@ -9,7 +9,7 @@
 // 坐标：动作用轴向键 "q,r"；本图列号 = q，行号 y = r + floor(q/2)（故 r = y - floor(q/2)）。
 
 import { CFG, terrainDefinitions, facilityDefinitions, civKindDefinitions, disguiseDefinitions, TEXT, unitDefinitions } from "./Data_Rules.mjs";
-import { GetLevel } from "./Data_Levels.mjs";
+import { GetLevel, BuildFullCarry, CarryWeight } from "./Data_Levels.mjs";
 import { HexNeighborKeys } from "./Script_Hex.mjs";
 import {
   SortedKeys, KeyToOffset, OffsetToKey, GrainTotal, TerrainOf, UnitDef,
@@ -19,6 +19,7 @@ import {
   EdgeKey, EdgeEnds, AirZones, ZoneVentCount, ZoneHasAir, ZoneEntranceKeys,
   LargestNetworkSize, VillagesLinked, LiveEntranceCount, DisguisedEntranceCount, VentCount,
   CivSafeCount, CivTotal, StorageCellsUnder,
+  EntranceCivPassable, CellCivCap, CellCivUsed, CellCivRoom, CompareIds,
 } from "./Script_State.mjs";
 import { DeriveView } from "./Script_Visibility.mjs";
 
@@ -541,6 +542,71 @@ export function ActCardLines(state, view) {
   return lines;
 }
 
+/**
+ * 战役续承说明（R6 P0-1）：本局的开局盘面**是从哪儿来的**，继承了什么、又欠了什么。
+ * A1 的终局复盘写着「你这一幕挖下的东西会跟着走」——这份报表就是那句话在盘面上的对账单。
+ * 只读 `state.meta.carry`（由引擎 ApplyCarry 写入）与当前盘面，再对照 `BuildFullCarry` 给差额。
+ */
+export function CarryReport(state) {
+  const level = GetLevel(state.meta.level);
+  const carry = state.meta.carry || null;
+  const cells = Object.keys(state.tunnels.cells).length;
+  const segments = Object.keys(state.tunnels.edges).length;
+  const entranceKeys = SortedKeys(state.tunnels.entrances);
+  const live = entranceKeys.filter((key) => !state.tunnels.entrances[key].sealed);
+  const sealed = entranceKeys.filter((key) => state.tunnels.entrances[key].sealed);
+  const disguised = entranceKeys.filter((key) => state.tunnels.entrances[key].disguise);
+  const facilities = {};
+  for (const key of SortedKeys(state.tunnels.cells)) {
+    const facility = state.tunnels.cells[key].facility;
+    if (facility) facilities[facility] = (facilities[facility] || 0) + 1;
+  }
+  const full = CarryWeight(BuildFullCarry(level.id));
+  const have = { cells, entrances: live.length, disguises: disguised.length };
+  const gaps = [];
+  if (have.cells < full.cells) gaps.push(`地道格 ${have.cells}／满配 ${full.cells}（少 ${full.cells - have.cells} 格）`);
+  if (have.entrances < full.entrances) gaps.push(`未封的口 ${have.entrances}／满配 ${full.entrances}（少 ${full.entrances - have.entrances} 个）`);
+  if (have.disguises < full.disguises) gaps.push(`伪装口 ${have.disguises}／满配 ${full.disguises}（少 ${full.disguises - have.disguises} 处）`);
+  return {
+    levelId: level.id, levelName: level.name, act: level.act,
+    carry, isDefault: !!(carry && carry.isDefault), source: carry ? carry.source : null,
+    label: carry ? carry.label : null, notes: carry ? (carry.notes || []).slice() : [],
+    cells, segments, live: live.slice(), sealed: sealed.slice(), disguised: disguised.slice(),
+    facilities, tunnelGrain: GrainReport(state).hidden, ammo: state.resources.ammo,
+    ammoStart: level.ammoStart, full, gaps,
+  };
+}
+
+/** 开局横幅：「本局继承自 XXX」＋继承了什么＋欠了什么（CLI 与网页共用）。 */
+export function CarryLines(state) {
+  const report = CarryReport(state);
+  const lines = ["—— 本局的开局盘面从哪儿来 ——"];
+  if (!report.carry) {
+    lines.push(report.act > 1
+      ? `  继承自：未记录（这份存档是在续承接口之前存的；盘面按 ${report.levelId} 的关卡原始地道网起）。`
+      : `  继承自：无——${report.levelId}《${report.levelName}》是第${report.act}幕，没有上一幕可继承。`);
+    lines.push("  但**你这一幕挖下的东西会跟着走**：地道网、口、伪装、洞里剩的粮与弹药都会带进下一幕。");
+    lines.push("  打完这一幕后接着打：next --save <本局存档> --save-to <下一幕存档>");
+    return lines;
+  }
+  lines.push(`  继承自：${report.label}${report.source ? `（源 ${report.source}）` : ""}`);
+  lines.push(`  继承到手的东西：地道 ${report.cells} 格 / ${report.segments} 段`
+    + ` ｜ 未封的口 ${report.live.length}（${report.live.join("、") || "无"}）`
+    + (report.sealed.length ? ` ｜ 被填死的口 ${report.sealed.length}（${report.sealed.join("、")}，地下重挖 2 进度可恢复）` : "")
+    + ` ｜ 伪装口 ${report.disguised.length}`);
+  const facilityParts = Object.keys(report.facilities)
+    .map((key) => `${(facilityDefinitions[key] || {}).name || key} ${report.facilities[key]}`);
+  lines.push(`    设施：${facilityParts.join(" ｜ ") || "（无）"}`
+    + ` ｜ 洞存粮 ${report.tunnelGrain} 担 ｜ 弹药 ${report.ammo} 发（本幕配发 ${report.ammoStart} 发）`);
+  lines.push(`  欠了什么（对照「满配继承档」＝上一幕该挖的都挖到了）：${report.gaps.length ? report.gaps.join("；") : "一样不欠（已达满配）"}`);
+  for (const note of report.notes) lines.push(`    · ${note}`);
+  if (report.isDefault) {
+    lines.push("  这是**默认继承档**：你没打前面几幕，接手的是别人替你挖了一半的网，账照旧记在你名下。");
+    lines.push("  想带着自己的战果开局：先打上一幕，再 next --save <上一幕存档> --save-to <本幕存档>。");
+  }
+  return lines;
+}
+
 /** 幕目标进度条（常显目标行：当前多少、还差多少）。 */
 export function ObjectiveProgressLines(state, view) {
   const derived = view || DeriveView(state);
@@ -926,8 +992,12 @@ export function ActionNotes(state, unitId, legalActions) {
     notes.push(`  · 到 1 级：平静期本村每回合自动藏 ${auto} 担粮进储粮洞（须村下有连通的储粮洞），`
       + `并且村 2 格内的敌纵队意图常显（哨网——不用派人去看）。`
       + `${village.organize >= 1 ? "【本村已生效】" : "【本村尚未达到】"}`);
-    notes.push(`  · 到 2 级：村 ${freeRadius} 格内每回合免费给一个工地 +1 进度（群众来帮工），`
-      + `敌进到村 ${stopRange} 格内即停。${village.organize >= 2 ? "【本村已生效】" : "【本村尚未达到】"}`);
+    // 「敌进村 N 格内即停」以前写得像「敌人会停下来」，其实停的是**这份免费进度**——
+    // 三轮复审都把它读成了敌军行为并判「未观察到」。措辞在这里说死。
+    notes.push(`  · 到 2 级：村 ${freeRadius} 格内每回合免费给一个工地 +1 进度（群众来帮工）。`
+      + `**敌一摸到村 ${stopRange} 格内，这份免费进度就停发**（乡亲不敢出门帮工）——`
+      + "停的是进度，不是敌人；敌人该进村照样进村。"
+      + `${village.organize >= 2 ? "【本村已生效】" : "【本村尚未达到】"}`);
     if (village.organize >= 1 && !village.hexKeys.some((key) => StorageCellsUnder(state, key).length)) {
       notes.push("  · 注意：本村地下还没有连通的储粮洞，1 级的「自动藏粮」现在一担也藏不进去。");
     }
@@ -948,6 +1018,184 @@ export function ActionNotes(state, unitId, legalActions) {
       + "扩网会把比例拉低——多挖两格，就得多修一个孔。");
   }
   return notes;
+}
+
+// ---------------------------------------------------------------------------
+// R6 P0-3：三处「玩家看不见、只能靠试错」的补报
+//   ① MoveCivs 不说人会进哪个窖 —— 逐窖列出剩余铺位与本次落点
+//   ② Dig 之后单位仍留在原格 —— 在挖掘条目后缀说明
+//   ③ Move 不预告剩余 MP —— 逐条算出「到这里剩几 MP」与「还够不够再下一次口」
+// 三者一律只读，且全部走引擎导出的同一批判定函数（ReachableFacilityCells / CellCivRoom /
+// CivSlots / EntranceCivPassable），表现层不自算规则。
+// ---------------------------------------------------------------------------
+
+/** 群众下得去的口（与引擎 NearbyShelterEntrance 同口径：未封 + 伪装不挡人 + 通得到还装得下的藏人室）。 */
+function CivUsableEntrances(state, pos) {
+  return [pos, ...HexNeighborKeys(pos)].filter((key) => {
+    const entrance = state.tunnels.entrances[key];
+    if (!entrance || entrance.sealed || !EntranceCivPassable(entrance)) return false;
+    return ReachableFacilityCells(state, key, "shelter").length > 0;
+  });
+}
+
+const civKindName = (kind) => (civKindDefinitions[kind] || {}).name || kind;
+
+/**
+ * 转移群众的**落点预报**（自算兜底）：这一按下去，人从哪个口下去、落进哪个窖、之后各窖还剩几铺。
+ * **优先读动作自带的字段**（引擎已给 MoveCivs 加了 `to`/`via`/`roomLeft`/`here`/`ground`），
+ * 只有动作没带这些字段时才走本函数——容错，不硬依赖任何一种形状。
+ */
+export function CivDropPlan(state, unitPos, action = null) {
+  const hex = state.map.hexes[unitPos];
+  const villageId = hex ? hex.villageId : null;
+  if (!villageId) return null;
+  const usable = CivUsableEntrances(state, unitPos);
+  if (!usable.length) return null;
+  const entranceKey = usable[0];
+  const cells = ReachableFacilityCells(state, entranceKey, "shelter");
+  const shelters = cells.map((key) => ({ key, cap: CellCivCap(state, key),
+    used: CellCivUsed(state, key), room: CellCivRoom(state, key) }));
+  let waiting = CivsAtVillage(state, villageId).slice()
+    .sort((a, b) => ((a.hex === unitPos ? 0 : 1) - (b.hex === unitPos ? 0 : 1)) || CompareIds(a.id, b.id));
+  if (action && action.kind) waiting = waiting.filter((civ) => civ.kind === action.kind);
+  const per = CFG.moveCivsPerAction;
+  const want = Math.min(per, waiting.length, Math.max(1, Number(action && action.count) || per));
+  const room = new Map(shelters.map((entry) => [entry.key, entry.room]));
+  const drops = [];
+  for (const civ of waiting.slice(0, want)) {
+    const slot = CivSlots(civ);
+    const target = cells.find((key) => (room.get(key) || 0) >= slot);
+    if (!target) { drops.push({ id: civ.id, kind: civ.kind, slot, to: null }); break; }
+    room.set(target, room.get(target) - slot);
+    drops.push({ id: civ.id, kind: civ.kind, slot, to: target });
+  }
+  return { villageId, entranceKey, usableEntrances: usable, shelters, drops,
+    roomAfter: shelters.map((entry) => ({ key: entry.key, room: room.get(entry.key) })) };
+}
+
+/**
+ * MoveCivs 单行后缀：这一按到底把人送到哪儿。
+ * 三种形状都认：`ground:true`（地面换格）｜带 `to`/`via` 的进窖｜什么都不带的老形状（自算兜底）。
+ */
+export function CivDropSummary(state, unitPos, action) {
+  if (!action) return "";
+  const kindText = action.kind ? `只送${civKindName(action.kind)}，` : "";
+  if (action.ground === true) {
+    return `${kindText}**地面转移**：把 ${action.count} 批挪到 ${action.to}——人还在地面，`
+      + "只是换一格站（躲开敌纵队踩着的那格；抓丁按格判定）";
+  }
+  if (action.to) {
+    const room = action.roomLeft !== undefined ? action.roomLeft : CellCivRoom(state, String(action.to));
+    const here = action.here !== undefined ? action.here : CivsInCell(state, String(action.to)).length;
+    return `${kindText}进 ${action.to} 窖${action.via ? `（从 ${action.via} 口下去）` : ""}`
+      + `：该窖现在住着 ${here} 批、还空 ${room} 铺`
+      + `${room < action.count ? "——铺位不够，这一按放不下全部批" : ""}`;
+  }
+  const plan = CivDropPlan(state, unitPos, action);
+  if (!plan) return "";
+  const landed = plan.drops.filter((drop) => drop.to);
+  return `${kindText}从 ${plan.entranceKey} 口下去：`
+    + `${landed.length ? landed.map((drop) => `${civKindName(drop.kind)}→${drop.to}`).join("、") : "（一批也放不下）"}`
+    + (plan.drops.length > landed.length ? "；再往后的批就装不下了" : "");
+}
+
+/**
+ * 「人到底会进哪个窖」逐窖表：每个窖住着几批、还剩几铺、从哪个口下得去；顺带列出地面换格的落点。
+ * 简报要求「人分两个窖放」，而 CLI 以前一个字也不说人会进哪个窖——这一节就是补这条。
+ * 表格**由合法动作反推**（动作里带着 `to`/`via`/`roomLeft`/`here`），
+ * 所以它与判定天然一致；动作没带这些字段时退回自算。
+ */
+export function CivShelterLines(state, unitPos, legalActions = null) {
+  const moves = (legalActions || []).filter((action) => action.type === "MoveCivs");
+  const lines = [];
+  const tunnelMoves = moves.filter((action) => action.to && action.ground !== true);
+  const groundMoves = moves.filter((action) => action.ground === true);
+  if (tunnelMoves.length) {
+    lines.push(`藏人室逐窖铺位（每间 ${ShelterCapOf(state)} 铺；老弱/青壮各占 1 铺、伤员占 2 铺）：`);
+    const seen = new Set();
+    for (const action of tunnelMoves) {
+      const cell = String(action.to);
+      if (seen.has(cell)) continue;
+      seen.add(cell);
+      const room = action.roomLeft !== undefined ? action.roomLeft : CellCivRoom(state, cell);
+      const here = action.here !== undefined ? action.here : CivsInCell(state, cell).length;
+      lines.push(`  ${cell} 藏人室：住着 ${here} 批，还空 ${room} 铺`
+        + `${action.via ? `（从 ${action.via} 口下去）` : ""}`
+        + `　→ {"type":"MoveCivs","unit":"${action.unit}","to":"${cell}"}`);
+    }
+    if (seen.size > 1) lines.push("  想「人分两个窖放」就改 to：两窖各送一批，别让一个窖被端了一锅端。");
+  } else if (moves.length) {
+    for (const line of CivShelterLinesFallback(state, unitPos)) lines.push(line);
+  }
+  if (groundMoves.length) {
+    lines.push(`地面换格（人不进洞，只挪到本村另一格）：${groundMoves.map((action) => action.to).join("、")}`
+      + `　→ {"type":"MoveCivs","unit":"${groundMoves[0].unit}","to":"${groundMoves[0].to}","ground":true}`);
+  }
+  if (lines.length) lines.push("  排队顺序：与本单位同格的批先走，其余按批号——先把敌人脚底下那几批带走。");
+  return lines;
+}
+
+/** 动作不带 `to` 时的自算兜底表（老形状：窖由系统挑）。 */
+function CivShelterLinesFallback(state, unitPos) {
+  const plan = CivDropPlan(state, unitPos, null);
+  if (!plan) return [];
+  const lines = [`藏人室铺位（本次从 ${plan.entranceKey} 口下去；每间 ${ShelterCapOf(state)} 铺，`
+    + "老弱/青壮各占 1 铺、伤员占 2 铺）："];
+  if (!plan.shelters.length) lines.push("  （这个口通不到任何还装得下的藏人室）");
+  for (const shelter of plan.shelters) {
+    lines.push(`  ${shelter.key} 藏人室 ${shelter.used}/${shelter.cap} 铺（还空 ${shelter.room} 铺）`);
+  }
+  if (plan.usableEntrances.length > 1) {
+    lines.push(`  群众下得去的口不止一个：${plan.usableEntrances.join("、")}——`
+      + "换个口下去，通到的窖就不一样（把单位挪到另一个口边上再按）。");
+  }
+  return lines;
+}
+
+/**
+ * Move 落点的 MP 预报：到这里剩几 MP，还够不够再花 1 MP 钻下（上）地道口。
+ * 「移动到村格 + UseEntrance 要 2MP 而民兵只有 2MP」这种边界，必须在下令前看得见。
+ */
+export function MoveCostNote(state, action) {
+  const unit = state.units[action.unit];
+  if (!unit || !Array.isArray(action.path) || !action.path.length) return "";
+  const dest = action.path[action.path.length - 1];
+  const left = unit.mp - action.path.length;
+  const entrance = state.tunnels.entrances[dest];
+  const usable = entrance && !entrance.sealed;
+  let tail = "";
+  if (usable && unit.layer === "surface" && !state.tunnels.cells[dest]) {
+    tail = "；这个口下面还没有地道格，下不去";
+  } else if (usable && left >= 1) {
+    tail = `；脚下有地道口，再花 1 MP 就能${unit.layer === "surface" ? "钻下去" : "上去"}（钻完剩 ${left - 1} MP）`;
+  } else if (usable && left <= 0) {
+    tail = `；脚下有地道口，但到了就没 MP 了——UseEntrance 还要 1 MP，本回合${unit.layer === "surface" ? "下不去" : "上不来"}`;
+  } else if (left <= 0) {
+    tail = "；走满了，本回合到此为止";
+  }
+  return `到 ${dest}，${action.path.length} 步，到那儿还剩 ${left} MP${tail}`;
+}
+
+/** 挖掘类动作的「人不跟着走」后缀（审查员因此吃过 4 次拒绝）。 */
+export function DigNote(state, action) {
+  const unit = state.units[action.unit];
+  const at = unit ? unit.pos : "本格";
+  if (action.type === "Dig") {
+    return `挖 ${at} ↔ ${action.target} 这一段；**挖通后你仍站在 ${at}**，人不会跟着过去，`
+      + "要过去还得下回合花 MP 走（Dig 只能挖向相邻格）";
+  }
+  if (action.type === "DigEntrance") {
+    return `在 ${action.at} 往上开口；**只能开在你所在的这一格**，开完你还在 ${at}`;
+  }
+  if (action.type === "DigFacility") {
+    const def = facilityDefinitions[action.facility];
+    return `在 ${action.cell} 修「${def ? def.name : action.facility}」${action.rearm ? "（重支翻板）" : ""}；`
+      + `**只能修在你所在的这一格**，一格一种设施，修完你还在 ${at}`;
+  }
+  if (action.type === "DigDoor") {
+    return `在 ${action.edge} 这一段上装隔断门（1 进度）；装完你还在 ${at}`;
+  }
+  return "";
 }
 
 /** 本格是否已经有别的我方单位在设伏（同格伏点唯一）。 */
