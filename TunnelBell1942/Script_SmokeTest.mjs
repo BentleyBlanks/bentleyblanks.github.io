@@ -327,6 +327,24 @@ Section("第一幕的收场");
   Rules.DebugKill(early, "caught");
   Rules.DebugHold(early, {}, 2.5);
   Assert(early.phase === "play" && !early.player.dead, "敲钟之前被抓仍然正常复活");
+
+  // 钟响之后全村都在被搜。玩家往哪个方向跑都不该能把这一幕无限拖住——
+  // 躲在关卡角落里让结局永远不来，比打不过更伤。
+  for (const [label, x] of [["最西端", 0], ["钟底下", null], ["出口上", 125], ["中段", 60]]) {
+    const stall = Rules.CreateState(0);
+    const b = stall.level.props.find((p) => p.interact === "bell");
+    Rules.DebugTeleport(stall, b.x, 0);
+    Rules.DebugPressInteract(stall);
+    Rules.DebugHold(stall, {}, 2.0);
+    if (x !== null) Rules.DebugTeleport(stall, x, 0);
+    let waited = 0;
+    while (waited < 90 && stall.phase !== "won") {
+      Rules.DebugHold(stall, {}, 1.0);
+      Rules.DrainEvents(stall);
+      waited += 1;
+    }
+    Assert(stall.phase === "won", `敲钟后躲在${label}也躲不掉结局（等了 ${waited}s，phase=${stall.phase}）`);
+  }
 }
 
 Section("失败与复活");
