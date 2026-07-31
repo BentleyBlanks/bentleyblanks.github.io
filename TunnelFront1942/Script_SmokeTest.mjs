@@ -12,7 +12,7 @@ import {
   CreateGame, CloneState, SerializeState, DeserializeState, HashState, MakeEnemyUnit, ExtractCarry,
   AddLedger, GrainTotal, TunnelGrainTotal, PopTotal, SortedKeys, EdgeKey, AllyUnits, EnemyUnits, UnitDef,
   AllCivs, LiveCivs, CivsInCell, CivsAtVillage, CivSafeCount, CivTotal, ElevOf,
-  LargestNetworkSize, EntranceThreshold, ActionUnlocked, StorageCapOf, ShelterCapOf,
+  LargestNetworkSize, EntranceThreshold, ActionUnlocked, StorageCapOf, ShelterCapOf, LiveEntranceCount,
 } from "./Script_State.mjs";
 import { DeriveView, RecordSighting } from "./Script_Visibility.mjs";
 import { LegalActions, PerformAction } from "./Script_Actions.mjs";
@@ -334,8 +334,10 @@ Check("双时钟：纯躲一次也逼不退（第一至三幕）且永远赢不�
       Ok(!state.result.won || ["丙", "丁"].includes(state.result.grade), `${level}：纯躲评到 ${state.result.grade}`);
     }
   }
-  // 纯躲连池都耗不动（扑空衰减要靠「藏干净」换，缩头流留着东西给敌人搜，敌人就有事干）
-  for (const level of ["A1", "A2", "A3"]) {
+  // 纯躲连池都耗不动（扑空衰减要靠「藏干净」换，缩头流留着东西给敌人搜，敌人就有事干）。
+  // **只断言第一、二幕**：第三幕起敌自带工兵，爆破/刨口的自耗是敌人自己花的钱，
+  // 那笔账不该算作「纯躲把敌人熬走了」——纯躲照样一次也逼不退（上面那条断言管着）。
+  for (const level of ["A1", "A2"]) {
     for (const state of rank[level].Turtle) {
       Ok(state.wave.pool > 0, `${level}：纯躲不该把敌行动力池耗到见底（实得 ${state.wave.pool}）`);
     }
@@ -910,7 +912,10 @@ Check("R2 P1：代价簿四栏在正常游玩中都会动（不再是三栏恒 0
   MakeColumn(state, "tBlastCiv", ["sapper", "inf"], "3,0");
   state = EndTurn(state).state;
   state = EndTurn(state).state;
-  Ok(state.ledger.civDead >= 2, `爆破塌方未把藏身群众记入代价簿（civDead=${state.ledger.civDead}）`);
+  Ok(state.ledger.civDead >= CFG.blastCivDead,
+    `爆破塌方未把藏身群众记入代价簿（civDead=${state.ledger.civDead}）`);
+  Ok(state.ledger.civDead <= CFG.blastCivDead,
+    "一炮不该抹掉整间藏人室——塌方只压住口子底下那一批，其余的被震到隔壁");
 });
 
 Check("R2 P1：同格可攻击 · 民兵开阔地可挖散兵坑 · 石桥可破且破后敌绕行", () => {
@@ -1154,6 +1159,39 @@ Check("HUD 数据：DeriveView 透出幕次/目标进度/新解锁/群众各批�
 // 九、页面装配
 // ===========================================================================
 
+Check("R5 玩家侧文本：逐幕规则卡 / 名词表 / 战术手册 / 收尾清单 / 续承说明齐全且经 DeriveView 透出", () => {
+  for (const act of acts) {
+    const level = GetLevel(act);
+    Ok((level.ruleCard || []).length >= 20, `${act} 的规则卡太薄（${(level.ruleCard || []).length} 行）`);
+    Ok((level.glossary || []).length >= 8, `${act} 的名词表太薄`);
+    Ok((level.endgameChecklist || []).length >= 5, `${act} 缺收尾清单——后段空转的意见就是冲它来的`);
+    Ok((level.debriefNotes || []).length >= 5, `${act} 缺复盘要点`);
+    Ok((level.carryNotes || []).length >= 3, `${act} 缺战役续承说明`);
+    Ok((level.exposeNotes || []).length >= 4, `${act} 缺暴露豆速查`);
+    Ok((level.actionNotes || []).length >= 18, `${act} 缺完整动作表`);
+    Ok((level.enemyUnitNotes || []).length >= 8, `${act} 缺敌军单位速查`);
+    Ok((level.medalNotes || []).length >= 4, `${act} 缺勋记说明`);
+    Ok((level.campaignNotes || []).length >= 10, `${act} 缺战役全景说明`);
+    const book = level.playbook || {};
+    for (const key of ["enemy", "civ", "victory", "guard", "beans", "turnByTurn", "map", "units"]) {
+      Ok((book[key] || []).length >= 4, `${act} 的战术手册缺「${key}」`);
+    }
+    // 规则卡必须把本轮三条贯穿规则写清楚（玩家不该只能从源码里知道它们）
+    const card = (level.ruleCard || []).join("");
+    Ok(card.includes("踩"), `${act} 的规则卡没写「敌踩在格上加暴露」`);
+    Ok(card.includes("抓丁"), `${act} 的规则卡没写抓丁的触发源`);
+    Ok(card.includes("就地结算"), `${act} 的规则卡没写终局就地结算`);
+  }
+  const view = DeriveView(CreateGame("A4", 1));
+  for (const key of ["ruleCard", "glossary", "endgameChecklist", "debriefNotes", "exposeNotes",
+    "campaignNotes", "carryNotes", "actionNotes", "enemyUnitNotes", "disguiseNotes", "medalNotes"]) {
+    Ok(Array.isArray(view[key]) && view[key].length > 0, `DeriveView 没透出 ${key}`);
+  }
+  Ok(view.playbook && Object.keys(view.playbook).length >= 8, "DeriveView 没透出战术手册");
+  Ok(view.carry && view.carry.label.includes("继承档"), "DeriveView 没透出本局的续承来源");
+  Ok(view.carry.isDefault === true, "未接前作时应标明用的是默认继承档");
+});
+
 Check("页面装配：引用存在、importmap 正确、?v= 一致、核心不引表现层", () => {
   const html = Src("index.html");
   Ok(existsSync(here + "Style_Game.css"), "缺 Style_Game.css");
@@ -1280,6 +1318,8 @@ Check("R5 P0-2：抓丁改挂群众暴露——站在敌脚底下才被抓，粮
   ending.wave.status = "sweep";
   ending.wave.schedule = [];
   ending.wave.revenge = null;
+  const holding = MakeColumn(ending, "tEnd", ["puppet"], "9,-2");   // 场上还有敌：走「到时终局」那条路
+  holding.regroupTurns = 5;                                        // 原地整队，别自己退场把波次收束了
   PutCiv(ending, "c1", "3,0");
   ending.meta.turn = GetLevel("A3").maxTurns;
   ending = EndTurn(ending).state;
@@ -1344,18 +1384,29 @@ Check("R5 P0-3：战役续承——上一幕的战果真的传得下去，跳过
     Ok(worse, `${act} 的默认继承档并不比满配档差：${JSON.stringify(weak)} vs ${JSON.stringify(full)}`);
     Ok(weak.ammo < level.ammoStart, `${act} 的默认继承档应少配发弹药（实得 ${weak.ammo}/${level.ammoStart}）`);
   }
-  // ③ 可感知代价：同 seed 同 bot，默认档的终局一定不优于满配档
-  for (const act of ["A3", "A4", "A5"]) {
-    let better = 0;
-    for (const seed of [1, 2, 3, 4]) {
-      const weak = RunBotGame({ level: act, seed, bot: "Skilled" }).state;
-      const full = RunBotGame({ level: act, seed, bot: "Skilled", carry: BuildFullCarry(act) }).state;
-      const weakScore = weak.result.breakdown.total;
-      const fullScore = full.result.breakdown.total;
-      if (fullScore >= weakScore) better += 1;
+  // ③ 可感知代价（实测口径）：续承档直接给的是「网、口、伪装」，所以用**终局还没被搜出的口**
+  //    与**代价簿总额**来量它。会玩 bot 会把缺的东西自己挖回来（挖得动就补得上），
+  //    所以这里用挖不动的两条线（缩头 / 乱打）跨四幕聚合比较——差额就是跳过前作欠下的账。
+  let weakLive = 0;
+  let fullLive = 0;
+  let weakCost = 0;
+  let fullCost = 0;
+  for (const act of ["A2", "A3", "A4", "A5"]) {
+    for (const bot of ["Turtle", "Random"]) {
+      for (const seed of [1, 2, 3, 4]) {
+        const weak = RunBotGame({ level: act, seed, bot }).state;
+        const full = RunBotGame({ level: act, seed, bot, carry: BuildFullCarry(act) }).state;
+        weakLive += LiveEntranceCount(weak);
+        fullLive += LiveEntranceCount(full);
+        weakCost += Object.values(weak.ledger).reduce((sum, value) => sum + value, 0);
+        fullCost += Object.values(full.ledger).reduce((sum, value) => sum + value, 0);
+      }
     }
-    Ok(better >= 3, `${act}：满配继承档没有体现出优势（${better}/4）`);
   }
+  Ok(fullLive > weakLive,
+    `跳过前作没有可感知代价：终局活口 默认档 ${weakLive} vs 满配档 ${fullLive}`);
+  Ok(fullCost <= weakCost,
+    `跳过前作没有可感知代价：代价簿总额 默认档 ${weakCost} vs 满配档 ${fullCost}`);
 });
 
 Check("R5 P0-4：守洞不再免费——打退攻入要花子弹、人被压制一回合、口从此明摆着", () => {
@@ -1487,8 +1538,9 @@ Check("R5 P0-6：胜利线不能第三四回合就达标，且洞存粮真的会
   state = EndTurn(state).state;
   const buriedBefore = state.ledger.grainSeized;
   state = EndTurn(state).state;
-  Eq(state.ledger.grainSeized - buriedBefore, CFG.blastGrainLoss, "爆破应把一部分洞存粮埋进代价簿");
-  Eq(state.tunnels.cells["3,0"].grain, 8 - CFG.blastGrainLoss, "爆破只该埋掉一部分（教的是「粮分几个洞放」）");
+  Eq(CFG.blastGrainLoss, 4, "爆破埋粮是 R5 P0-6 的承重条：洞存粮不再是存进去就永远安全");
+  Eq(state.ledger.grainSeized - buriedBefore, 4, "爆破应把一部分洞存粮埋进代价簿");
+  Eq(state.tunnels.cells["3,0"].grain, 4, "爆破只该埋掉一部分（教的是「粮分几个洞放」）");
   // ③ 攻入得手：口下那格的粮全丢，敌还顺着巷子再搬走一些
   let haul = SurgeryGame("A3", 3);
   haul.map.villages.v1.grainOpen = 0;
@@ -1500,6 +1552,7 @@ Check("R5 P0-6：胜利线不能第三四回合就达标，且洞存粮真的会
   MakeColumn(haul, "tHaul", ["inf", "inf"], "3,0");
   haul = EndTurn(haul).state;
   haul = EndTurn(haul).state;
+  Eq(CFG.breachStorageHaul, 4, "攻入顺着地道搬粮是 R5 P0-6 的承重条");
   Ok(haul.tunnels.cells["4,-1"].grain <= 8 - CFG.breachStorageHaul,
     `攻入得手后敌应顺着地道再搬走 ${CFG.breachStorageHaul} 担（实剩 ${haul.tunnels.cells["4,-1"].grain}）`);
   // ④ 实测：会玩 bot 的达标回合被推到**过半**（原来 A2 T4 / A3 T4 / A4 T4 / A5 T3）

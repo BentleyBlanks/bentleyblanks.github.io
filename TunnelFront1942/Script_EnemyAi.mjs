@@ -9,7 +9,7 @@ import {
   SortedKeys, CompareIds, PushEvent, AddLedger, MakeEnemyUnit, EnemyMoveCost, EnemyPathCost, UnitsOn,
   AllyUnits, EnemyUnits, RemoveUnit, UnitDef, TerrainOf, EntranceThreshold, VentThreshold,
   ZoneOfCell, ZoneVentCount, ElevOf, CivsInCell, CivsAtVillage, LoseCiv, CivsOnHex, StunUnit,
-  ConnectedCells, SpendAmmo,
+  ConnectedCells, SpendAmmo, TunnelNeighbors, CellCivRoom, CivSlots, PlaceCivOnHex, VillageIdOfHex,
 } from "./Script_State.mjs";
 import { CanAllySeeHex, EnemySeesUnit, FreshSightings, SuspicionScore, RecordSighting } from "./Script_Visibility.mjs";
 import { ResolveAttack, RecordExposedSightings, KillEnemyUnit } from "./Script_Actions.mjs";
@@ -411,6 +411,16 @@ function ResolveDueOps(state, events) {
   }
 }
 
+/** 一件作业**干成了**：这支队伍此后不再算「扑空」（他们确实刨出了东西）。
+ *  反过来，作业被翻板拦下、被塌口扑空、被守洞打退的队伍照旧算扑空——
+ *  「把敌人熬走」只能靠让他一无所获，不能靠把粮和人摆在那儿给他挖。 */
+function MarkOpSucceeded(column) {
+  if (!column) return;
+  column.gained = true;
+  column.hauled = true;
+  column.incident = true;
+}
+
 function ExecuteOp(state, events, op, column) {
   const entrance = state.tunnels.entrances[op.at];
   const columnPos = column ? ColumnPos(state, column) : null;
@@ -435,7 +445,7 @@ function ExecuteOp(state, events, op, column) {
     const vent = state.tunnels.vents[op.at];
     if (vent) vent.smoked = true;
     PushEvent(state, events, { kind: "op", text: `${TEXT.op.smoke}：烟自该口灌入地道`, hex: op.at, visible: true });
-    column.incident = true;
+    MarkOpSucceeded(column);
     return;
   }
   if (op.kind === "flood") {
@@ -450,7 +460,7 @@ function ExecuteOp(state, events, op, column) {
     const cell = state.tunnels.cells[op.at];
     if (cell) cell.water = CFG.water.spreadTurns + CFG.water.lingerTurns;
     PushEvent(state, events, { kind: "op", text: `${TEXT.op.flood}：水自该口灌进地道，顺着往低处走`, hex: op.at, visible: true });
-    column.incident = true;
+    MarkOpSucceeded(column);
     return;
   }
   if (op.kind === "excavate") {
@@ -461,6 +471,7 @@ function ExecuteOp(state, events, op, column) {
     state.wave.pool -= CFG.pool.excavateSelfCost;
     delete state.tunnels.entrances[op.at];
     PushEvent(state, events, { kind: "op", text: `${TEXT.op.excavate}：入口被一锹一镐刨塌`, hex: op.at, visible: true });
+    MarkOpSucceeded(column);
     return;
   }
   if (op.kind === "blast") {
@@ -492,13 +503,30 @@ function ExecuteOp(state, events, op, column) {
           RemoveUnit(state, unit.id);
         }
       }
+      // 塌方：只压住口子底下那一批，其余的被震到隔壁巷子里（挤不下就只能钻出地面）
       const trapped = CivsInCell(state, op.at);
       if (trapped.length) {
-        for (const civ of trapped) LoseCiv(state, civ, "dead");
-        PushEvent(state, events, { kind: "ledger", text: `爆破塌方：群众罹难 ${trapped.length} 批（入代价簿）`, hex: op.at, visible: true });
+        const buried = trapped.slice(0, CFG.blastCivDead);
+        for (const civ of buried) LoseCiv(state, civ, "dead");
+        PushEvent(state, events, { kind: "ledger", text: `爆破塌方：群众罹难 ${buried.length} 批（入代价簿）`, hex: op.at, visible: true });
+        for (const civ of trapped.slice(CFG.blastCivDead)) {
+          const spot = TunnelNeighbors(state, op.at, true)
+            .sort()
+            .find((key) => CellCivRoom(state, key) >= CivSlots(civ));
+          if (spot) {
+            civ.at = spot;
+            civ.panic += CFG.civ.panicSmoke;
+            PushEvent(state, events, { kind: "civs", text: "塌方把人震到隔壁巷子里，惊魂未定", hex: spot, layer: "under", visible: true });
+          } else {
+            PlaceCivOnHex(state, civ, VillageIdOfHex(state, op.at) || civ.home, op.at);
+            state.score.civForcedOut += 1;
+            PushEvent(state, events, { kind: "forcedOut", text: "巷子塌了，人只能从土里刨出来上地面", hex: op.at, visible: true });
+          }
+        }
       }
     }
     PushEvent(state, events, { kind: "op", text: `${TEXT.op.blast}：入口被炸毁`, hex: op.at, visible: true });
+    MarkOpSucceeded(column);
     return;
   }
   if (op.kind === "breach") {
@@ -557,6 +585,7 @@ function ExecuteOp(state, events, op, column) {
       cell.trapReady = false;
     }
     PushEvent(state, events, { kind: "op", text: `${TEXT.op.breach}：无人驻守，入口被毁`, hex: op.at, visible: true });
+    MarkOpSucceeded(column);
     return;
   }
   if (op.kind === "seal") {
@@ -567,6 +596,7 @@ function ExecuteOp(state, events, op, column) {
     column.seals = (column.seals || 0) + 1;
     entrance.sealed = true;
     PushEvent(state, events, { kind: "op", text: `${TEXT.op.seal}：入口被土石填死`, hex: op.at, visible: true });
+    MarkOpSucceeded(column);
   }
 }
 
@@ -927,21 +957,18 @@ function ColumnAct(state, events, column) {
   if (!ColumnUnits(state, column).length) return;
   const engaged = fired && ColumnUnits(state, column).length <= 2;
   // 3.8) 工兵队专程来对付地道口：主动奔向暴露最高的那个口（走到了就在同一回合下电报，不空耗一回合）
+  let sapperSeek = null;
   if (column.role === "sapper" && pos && !engaged) {
-    const seek = SapperSeekTarget(state, pos, CFG.sapperSeekRange);
-    if (seek) {
-      MoveColumn(state, events, column, seek);
-      PlanPath(state, column, seek);
-      // 走到口上就**踩住不走**：踩着的那一格每回合 +2 豆，够门槛了就下电报动手。
-      // 还没摸到就这一回合只管赶路——不能像原来那样再往下走一遍脚本路线，把自己带离那个口。
-      const arrived = HexDistanceKeys(ColumnPos(state, column) || pos, seek) <= 1;
-      if (!arrived) { TickCaution(state, column); return; }
-    }
+    sapperSeek = SapperSeekTarget(state, pos, CFG.sapperSeekRange);
+    if (sapperSeek) { MoveColumn(state, events, column, sapperSeek); PlanPath(state, column, sapperSeek); }
   }
   // 4) 已知/已被盯上的入口在 1 格内 → 反地道四选一（提前 1 回合电报）
   const here = ColumnPos(state, column) || pos;
   const knownKey = here ? TargetableEntranceNear(state, here, 1) : null;
   if (knownKey && AnnounceOp(state, events, column, knownKey)) { column.plannedPath = []; TickCaution(state, column); return; }
+  // 4.5) 工兵队盯上了一个口就**踩住不走**：这一格每回合 +2 豆，攒够门槛再下电报动手。
+  //      原来它摸到口跟前、发现还不够门槛，就接着往脚本路线走了——一辈子回不到这个口上。
+  if (sapperSeek) { column.plannedPath = []; TickCaution(state, column); return; }
   // 5) 在目标村：征粮 + 按嫌疑分搜索
   const village = column.targetVillage ? state.map.villages[column.targetVillage] : null;
   const nearTargetVillage = village && pos

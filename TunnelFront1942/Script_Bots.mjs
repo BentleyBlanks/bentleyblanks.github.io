@@ -11,7 +11,7 @@ import { CFG, unitDefinitions } from "./Data_Rules.mjs";
 import {
   CreateGame, SortedKeys, CompareIds, AllyUnits, EnemyUnits, UnitDef, TerrainOf,
   EntranceThreshold, UnitsOn, ReachableFacilityCells, FacilityUnlocked, StorageCapOf, ShelterCapOf,
-  CivsInCell, LiveCivs, CivGuidanceOn,
+  CivsInCell, LiveCivs, CivGuidanceOn, StorageCellsUnder, ConnectedCells,
 } from "./Script_State.mjs";
 import { GetLevel } from "./Data_Levels.mjs";
 
@@ -152,10 +152,21 @@ function DigNeeds(state) {
   const cells = SortedKeys(state.tunnels.cells);
   const level = LevelOf(state);
   const openGrain = SortedKeys(state.map.villages).reduce((sum, id) => sum + state.map.villages[id].grainOpen, 0);
-  const storageRoom = cells.reduce((sum, key) => {
-    const cell = state.tunnels.cells[key];
-    return sum + (cell.facility === "storage" ? StorageCapOf(state) - cell.grain : 0);
-  }, 0);
+  // 只算**装得进去**的仓容：储粮洞必须在「还有明存粮的村格正下方且连通」处才派得上用场。
+  // 原来把全图所有储粮洞的余量一并算进来，于是修在李庄那个孤洞上的 6 担空位
+  // 会让 bot 以为「仓容够了」，从此再也不修高家庄的第二个窖——第五幕的洞存粮就永远卡在一洞。
+  const usable = new Set();
+  let storageRoom = 0;
+  for (const villageId of SortedKeys(state.map.villages)) {
+    if (state.map.villages[villageId].grainOpen <= 0) continue;
+    for (const hexKey of state.map.villages[villageId].hexKeys) {
+      for (const key of StorageCellsUnder(state, hexKey)) {
+        if (usable.has(key)) continue;
+        usable.add(key);
+        storageRoom += StorageCapOf(state) - state.tunnels.cells[key].grain;
+      }
+    }
+  }
   const grainGoal = (level.victory && level.victory.tunnelGrainAtLeast) || 0;
   const hidden = cells.reduce((sum, key) => sum + state.tunnels.cells[key].grain, 0);
   const shelterRoom = cells.reduce((sum, key) => sum
@@ -217,8 +228,11 @@ function SkilledDig(state, unit, actions) {
   // ② 还缺设施而本格已占：先挪到空格上去修（移动不占主动作，比又挖一段划算）
   const wantsFacility = needs.storage || needs.shelter || needs.vent || needs.fightpost || needs.trapdoor;
   if (wantsFacility && needs.emptyCells > 0) {
+    // 只挑**自己这张网上走得到**的空格：李庄那种还没连通的孤格挪不过去，
+    // 更要命的是修在那儿的储粮洞装不着高家庄的粮（藏粮认的是「村格正下方连着的洞」）。
+    const reachable = ConnectedCells(state, unit.pos, true);
     const target = SortedKeys(state.tunnels.cells)
-      .find((key) => state.tunnels.cells[key].facility === null && key !== unit.pos);
+      .find((key) => state.tunnels.cells[key].facility === null && key !== unit.pos && reachable.has(key));
     if (target) {
       const move = MoveToward(state, unit, actions, target);
       if (move) return move;
@@ -281,11 +295,32 @@ function CivDuty(state, unit, actions) {
 }
 
 
+/**
+ * 修完窖就得上去装粮（R5）：地下单位脚上那一格是村格、村里还有明存粮、脚下又通着装得下的储粮洞
+ * → 先出洞。原来这个单位会一直待在地下接着挖，李庄那十二担粮永远没人往下搬。
+ */
+function SurfaceToHideGrain(state, unit, actions) {
+  if (unit.layer !== "under") return null;
+  const villageId = state.map.hexes[unit.pos]?.villageId;
+  const village = villageId ? state.map.villages[villageId] : null;
+  if (!village || village.grainOpen <= 0) return null;
+  if (!StorageCellsUnder(state, unit.pos).length) return null;
+  const enemyThere = UnitsOn(state, unit.pos, "surface").some((other) => other.side === "enemy");
+  if (enemyThere) return null;
+  // 村里地面上已经有人在装粮了就不必再上来一个——别把整队都从地道里抽空
+  const someoneUp = AllyUnits(state).some((other) => other.layer === "surface"
+    && state.map.hexes[other.pos] && state.map.hexes[other.pos].villageId === villageId);
+  if (someoneUp) return null;
+  return FindAction(actions, "UseEntrance", (action) => !action.dive);
+}
+
 function SkilledQuiet(state, unit, actions) {
   const digPower = CFG.digPower[unit.type] || 0;
   // 藏粮 → 转移群众（先送伤员与老弱：他们走得最慢）
   const hideGrain = FindAction(actions, "HideGrain");
   if (hideGrain) return hideGrain;
+  const surfaceForGrain = SurfaceToHideGrain(state, unit, actions);
+  if (surfaceForGrain) return surfaceForGrain;
   const moveCivs = FindAction(actions, "MoveCivs", (a) => a.kind === "wounded")
     || FindAction(actions, "MoveCivs", (a) => a.kind === "old")
     || FindAction(actions, "MoveCivs");
@@ -319,10 +354,48 @@ function CoverIfExposed(state, unit, actions) {
   return null;
 }
 
+/**
+ * 电报是留给你换位、带人、关门的那一回合（R5）：
+ * 敌已经对某个口下了电报，而那一格（或它脚下那一格）还压着群众 → 先把人带走。
+ * 爆破塌方压住藏身处是全作唯一会让群众**罹难**的事，提前一回合躲开是唯一的解。
+ */
+function EvacuateTelegraphed(state, unit, actions) {
+  if (!CivGuidanceOn(state)) return null;
+  const doomed = state.enemy.pendingOps.map((op) => op.at)
+    .filter((key) => CivsInCell(state, key).length > 0)
+    .sort();
+  if (!doomed.length) return null;
+  if (unit.layer === "under") {
+    if (doomed.includes(unit.pos)) {
+      const away = actions.filter((action) => action.type === "GuideCivs" && !doomed.includes(action.to))
+        .sort((a, b) => {
+          const sa = state.tunnels.cells[a.to]?.facility === "shelter" ? 0 : 1;
+          const sb = state.tunnels.cells[b.to]?.facility === "shelter" ? 0 : 1;
+          return sa - sb || (a.to < b.to ? -1 : 1);
+        })[0];
+      if (away) return away;
+      return null;
+    }
+    return MoveToward(state, unit, actions, doomed[0]);   // 一次带不完就多来一个人（联络员一次 3 批）
+  }
+  // 地面上的人也得下去帮忙：电报只给你一个回合，联络员的三批全靠这一趟
+  const entrance = state.tunnels.entrances[unit.pos];
+  if (entrance && !entrance.sealed && state.tunnels.cells[unit.pos]) {
+    const down = FindAction(actions, "UseEntrance", (action) => !action.dive);
+    if (down) return down;
+  }
+  const entranceKey = NearestEntranceKey(state, unit.pos, true);
+  if (entranceKey && entranceKey !== unit.pos) return MoveToward(state, unit, actions, entranceKey);
+  return null;
+}
+
 function SkilledSweep(state, unit, actions) {
   const def = UnitDef(unit);
   // 伏击是持续状态：已经趴好的人就守着，不再每回合重按一次
   if (unit.stance === "ambush") return FindAction(actions, "Rest") || { type: "Rest", unit: unit.id };
+  // 电报已下：先把电报点上的群众带走（爆破塌方是唯一会让群众罹难的事）
+  const evac = EvacuateTelegraphed(state, unit, actions);
+  if (evac) return evac;
   // 带路职责优先于一切：群众冲出地面就是纯代价簿，抢不回来
   const duty = CivDuty(state, unit, actions);
   if (duty) return duty;
@@ -454,6 +527,10 @@ function SkilledSweep(state, unit, actions) {
   const fightpostShot = FindAction(actions, "Attack", (action) => action.fightpost && !action.locked);
   if (fightpostShot) return fightpostShot;
   // 扫荡期照旧藏粮、转移群众（敌不在近旁时）
+  if ((!near || near.dist > 2) && unit.layer === "under") {
+    const up = SurfaceToHideGrain(state, unit, actions);
+    if (up) return up;
+  }
   if (unit.layer === "surface" && (!near || near.dist > 2)) {
     const hideGrain = FindAction(actions, "HideGrain");
     if (hideGrain) return hideGrain;
@@ -465,6 +542,8 @@ function SkilledSweep(state, unit, actions) {
     if (disguise) return disguise;
   }
   // 扫荡期照旧补网：胜负线认的是洞存粮与保全率，网不够就永远够不着——只挑敌不在近旁的时候干
+  // 地下动土：敌人看不见也够不着地下的人，只有「动静会记在暴露豆上」这一条代价。
+  // 敌就贴在头顶（1 格内）时才停手；原来要 3 格才肯干活，第五幕十来个敌人一进场就再也挖不动了。
   if ((!near || near.dist >= 3) && unit.layer === "under") {
     const digging = SkilledDig(state, unit, actions);
     if (digging) return digging;
@@ -513,12 +592,14 @@ export function CreateBot(name, seed) {
 }
 
 /**
- * 统一跑局器：options = { level, seed, bot, untilTurn?, maxSteps?, onStep? }。
+ * 统一跑局器：options = { level, seed, bot, carry?, untilTurn?, maxSteps?, onStep? }。
+ * `carry` 直通 CreateGame 的战役续承档（缺省即用本幕的默认继承档）——
+ * 冒烟据此比较「默认继承档 vs 满配继承档」，跳过前作的代价才量得出来。
  * 返回 { state, actions, steps }；actions 为完整动作序列（可用于确定性重放）。
  */
 export function RunBotGame(options) {
   const bot = CreateBot(options.bot, options.seed);
-  let state = CreateGame(options.level, options.seed);
+  let state = CreateGame(options.level, options.seed, { carry: options.carry || null });
   const actions = [];
   const maxSteps = options.maxSteps || 3000;
   let actionsThisTurn = 0;
