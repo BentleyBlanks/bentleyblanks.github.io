@@ -2334,15 +2334,27 @@ function UpdateCamera(state, dt) {
 
   const speedFrac = Clamp(Math.abs(p.vx) / PLAYER.walkSpeed, 0, 1);
   const targetX = p.x + p.facing * CAMERA.lookAheadX * speedFrac;
-  const targetY = p.y + 0.9;
+  // 摄像机抬多高分层定，因为两边要看的东西不一样：
+  // 地表要把村庄和天空放进上三分之二（+0.9 会把地平线钉在 57.8%，
+  //   剩下 42% 全是没内容的实心土，眼睛第一眼落在土上）；
+  // 地道净空只有一米七出头，抬太高上下都是土，反而要把净空放到画面中间。
+  const targetY = p.y + (p.layer === "tunnel" ? CAMERA.tunnelLift : CAMERA.surfaceLift);
 
   const dx = targetX - c.x;
   if (dx > CAMERA.deadzoneX) c.x = Approach(c.x, targetX - CAMERA.deadzoneX, CAMERA.followLerp, dt);
   else if (dx < -CAMERA.deadzoneX) c.x = Approach(c.x, targetX + CAMERA.deadzoneX, CAMERA.followLerp, dt);
 
+  // 竖直死区只在人离地时才该存在——它是用来吸收跳落和爬梯的抖动的。
+  // 站在地上还留着死区，摄像机就会停在 targetY 上下 deadzoneY 的任意位置，
+  // 取景高度变成"看你从哪边收敛过来"的随机数，构图根本定不住。
   const dy = targetY - c.y;
-  if (dy > CAMERA.deadzoneY) c.y = Approach(c.y, targetY - CAMERA.deadzoneY, CAMERA.followLerp, dt);
-  else if (dy < -CAMERA.deadzoneY) c.y = Approach(c.y, targetY + CAMERA.deadzoneY, CAMERA.followLerp, dt);
+  if (p.onGround && !p.onShaft) {
+    c.y = Approach(c.y, targetY, CAMERA.followLerp, dt);
+  } else if (dy > CAMERA.deadzoneY) {
+    c.y = Approach(c.y, targetY - CAMERA.deadzoneY, CAMERA.followLerp, dt);
+  } else if (dy < -CAMERA.deadzoneY) {
+    c.y = Approach(c.y, targetY + CAMERA.deadzoneY, CAMERA.followLerp, dt);
+  }
   if (p.onShaft) c.y = Approach(c.y, targetY, CAMERA.followLerp * 1.4, dt);
 
   const targetVH = p.layer === "tunnel" ? CAMERA.tunnelViewHeight : CAMERA.viewHeight;

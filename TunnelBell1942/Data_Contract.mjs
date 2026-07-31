@@ -76,7 +76,12 @@ export const SENSE = {
 /** 摄像机。正交，看向 -Z。 */
 export const CAMERA = {
   viewHeight: 11.5,          // 正交视口高度（米）
-  tunnelViewHeight: 9.0,     // 进地道后收紧，制造压迫感
+  // 地道净空只有 1.78 米。9.0 的视口意味着画面里只有 19.8% 是能走的空间，
+  // 上下 80% 全是实心土——收紧到 7.2 才谈得上"压迫感"而不是"埋在土里"。
+  tunnelViewHeight: 7.2,
+  // 摄像机在玩家头顶抬多少（分层，见 Script_Rules 的 targetY）
+  surfaceLift: 2.0,          // 地表：把地平线压到画面下三分之一，村庄和天空拿回上 2/3
+  tunnelLift: 0.55,          // 地道：净空居中
   followLerp: 4.6,           // 每秒的追踪强度
   deadzoneX: 1.1,
   deadzoneY: 0.9,
