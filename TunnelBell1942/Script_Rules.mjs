@@ -553,9 +553,14 @@ export function ResetLevel(state, levelIndex) {
   // codex 跨幕保留，不清空
 
   // 敌人运行时
+  // 谁是"还没登场"的敌人：触发区的 emit.spawn，以及道具 data.spawn（敲钟引来的追兵）。
+  // 登场之前必须当作完全不存在——没有视野、不产生警觉、也不挡机器人的路。
   const spawnGated = {};
   for (const t of level.triggers) {
     for (const id of t.emit.spawn) spawnGated[id] = true;
+  }
+  for (const prop of level.props) {
+    for (const id of Arr(prop.data && prop.data.spawn)) spawnGated[id] = true;
   }
   state.enemies = level.enemies.map((e) => ({
     id: e.id,
@@ -2918,7 +2923,8 @@ function BotHopSafe(state, fromX, toX, stealth) {
   const scale = stealth ? SENSE.crouchVisibility * SENSE.sneakVisibility : 1;
   const speed = stealth ? PLAYER.crouchSpeed * 0.72 : PLAYER.walkSpeed;
   const dir = toX >= fromX ? 1 : -1;
-  const hopSec = Math.abs(toX - fromX) / Math.max(0.5, speed) + 0.4;
+  const travel = Math.abs(toX - fromX) / Math.max(0.5, speed);
+  const hopSec = travel + 0.4;
   for (const e of state.enemies) {
     if (e.dormant) continue;
     if (Math.abs(e.y - p.y) > 2.5) continue;
@@ -2935,9 +2941,25 @@ function BotHopSafe(state, fromX, toX, stealth) {
     const stayBehind = aheadOfMe && (e.x - toX) * dir > 0 && e.facing === dir;
     // 他在我后面、背朝我 → 也安全。
     const behindMe = !aheadOfMe && e.facing !== dir;
-    if (!stayBehind && !behindMe) return false;
+    if (stayBehind || behindMe) continue;
+    // 被看见不等于被抓：警觉要爬满 alertRiseSec 才算数。
+    // 只放行"他完全没起疑 + 半秒就跑完"的短跳，否则连挨着的两个柴垛都过不去；
+    // 放得再宽就会连着蹭好几段，警觉累加起来照样被抓。
+    if (travel < 0.7 && e.alertness < 0.06) continue;
+    return false;
   }
   return true;
+}
+
+/** 往哪边退才不会掉下台子／退回刚爬上来的竖井。 */
+function BotRetreatDir(state, threat) {
+  const p = state.player;
+  const away = p.x >= threat.e.x ? 1 : -1;
+  const floor = FloorUnder(state.level, p.x, p.y + 0.3, 0.6);
+  if (!floor) return away;
+  const room = away > 0 ? floor.x1 - p.x : p.x - floor.x0;
+  if (room > 1.2) return away;
+  return 0; // 退无可退，就地低头别动
 }
 
 /** 脚底下就有掩体吗（站上去就能钻进去）。 */
@@ -3316,22 +3338,28 @@ function BotThink(state, bot, dt) {
         MaybePress(state, bot, goal, input);
         return;
       }
-      const back = BotCoverToward(state, -dirToGoal, threat);
-      if (back) {
-        input.crouch = !threat.exposed;
-        input.sneak = input.crouch;
-        BotWalkTo(state, bot, PropX(state, back), input);
-        MaybePress(state, bot, goal, input);
-        return;
-      }
+      // 只有真被看见了才往回退。没被看见就原地低头等——
+      // 否则会在相邻两个柴垛之间来回蹭，形成死循环，一步也前进不了。
       if (threat.exposed) {
+        const back = BotCoverToward(state, -dirToGoal, threat);
+        if (back) {
+          input.crouch = false;
+          input.sneak = false;
+          BotWalkTo(state, bot, PropX(state, back), input);
+          MaybePress(state, bot, goal, input);
+          return;
+        }
         const dir = BotRetreatDir(state, threat);
         if (dir !== 0) {
           input.moveX = dir;
           return;
         }
       }
-      // 退无可退：低头继续往前挪，别在原地耗着
+      input.crouch = true;
+      input.sneak = true;
+      input.moveX = 0; // 蹲着等时机
+      MaybePress(state, bot, goal, input);
+      return;
     } else {
       bot.commitTimer = 0;
       bot.dashTo = null;

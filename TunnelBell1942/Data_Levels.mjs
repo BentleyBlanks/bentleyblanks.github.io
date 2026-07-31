@@ -38,8 +38,9 @@ const FORE = LAYER_Z.FORE;
 //     a1_e_chase2  90–106   从西边压过来，断掉往村里退的路
 //     a1_e_chase1  103–116  贴着老槐树扫，逼他往东
 //     a1_e_blocker 117–125  山田站死碾盘那个口（出口 125 在他巡逻区间正中）
-//   钟在 x112.5。山田视距 15，猫腰后的有效视距约 8.65 米 ——
-//   玩家最多摸到 x≈116 就再也过不去，离那个口还差 9 米。
+//   钟在 x112.5。三个人的视距都是 11，钟响那一刻谁也看不见他（山田从 125 只看到 114）。
+//   猫腰后山田的有效视距约 6.72 米 —— 玩家最多摸到 x≈118 就再也过不去，
+//   离那个口还差 7 米，而猫腰 1.75 m/s 追不过巡逻 1.6 m/s 的正面。
 //   x≥113 一个藏身点都没有（有意清空），但西边 110 还留着最后一垛柴，
 //   所以他能躲一下、被逼出来、再试一次：15–25 秒的徒劳，然后被抓。
 //   敲钟后不再放检查点——这一段没有"重来"。
@@ -200,22 +201,22 @@ const act1 = {
     // —— 以下三个由 a1_pr_bell.data.spawn 唤出（敲钟那一下才有），之前应视为不存在 ——
     // 钟响之前它们不存在，所以玩家不可能"先引出追兵再回头敲钟"。
     {
-      id: "a1_e_chase1", x: 103, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 103, x1: 116, speed: 2.2, pauseSec: 0.3 },
-      vision: { range: 13, halfAngleDeg: 36, height: 1.6 },
+      id: "a1_e_chase1", x: 92, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 92, x1: 116, speed: 2.2, pauseSec: 0.3 },
+      vision: { range: 11, halfAngleDeg: 36, height: 1.6 },
       hearing: 7.5, probeAt: null,
     },
     {
-      id: "a1_e_chase2", x: 90, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 90, x1: 106, speed: 2.1, pauseSec: 0.3 },
-      vision: { range: 13, halfAngleDeg: 36, height: 1.6 },
+      id: "a1_e_chase2", x: 80, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 80, x1: 108, speed: 2.1, pauseSec: 0.3 },
+      vision: { range: 11, halfAngleDeg: 36, height: 1.6 },
       hearing: 7.0, probeAt: null,
     },
     // 山田：出口 x125 就在他巡逻区间里。玩家做对一切也过不去——这是叙事必然。
     {
       id: "a1_e_blocker", x: 125, y: 0, kind: "officer", facing: -1,
       patrol: { x0: 117, x1: 125, speed: 1.6, pauseSec: 0.9 },
-      vision: { range: 15, halfAngleDeg: 40, height: 1.65 },
+      vision: { range: 11, halfAngleDeg: 40, height: 1.65 },
       hearing: 7.5, probeAt: null,
     },
   ],
@@ -616,7 +617,7 @@ const act3 = {
     { id: "a3_pr_beam4", x: 47, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: null },
     { id: "a3_pr_choke", x: 52, y: -8.0, z: PLAY, kind: "chokepoint", facing: 1, interact: "lever", data: { channel: "gasSeal", needItem: "plug" }, label: "卡口闸" },
     { id: "a3_pr_crock4", x: 57, y: -8.0, z: PLAY, kind: "crock", facing: 1, interact: "none", data: null, label: null },
-    { id: "a3_pr_loophole_a3", x: 60, y: -8.0, z: PLAY, kind: "loophole", facing: 1, interact: "none", data: null, label: null },
+    { id: "a3_pr_loophole_a3", x: 69, y: -8.0, z: PLAY, kind: "loophole", facing: 1, interact: "none", data: null, label: "枪眼" },
     { id: "a3_pr_mill_hatch", x: 63, y: -8.0, z: PLAY, kind: "trapdoor", facing: 1, interact: "hatch", data: { hatchId: "a3_h_mill" }, label: "碾盘下的地道口" },
     { id: "a3_pr_collapse", x: 68, y: -8.0, z: PLAY, kind: "prop_beam", facing: 1, interact: "none", data: null, label: "塌方" },
 
@@ -696,7 +697,7 @@ const act3 = {
     // 碾盘院：一个哨兵站桩
     {
       id: "a3_e_g1", x: 76, y: 0, kind: "guard", facing: -1,
-      patrol: { x0: 73, x1: 79, speed: 1.15, pauseSec: 1.4 },
+      patrol: { x0: 69, x1: 79, speed: 1.15, pauseSec: 1.4 },
       vision: { range: 10, halfAngleDeg: 30, height: 1.6 },
       hearing: 5.8, probeAt: null,
     },
