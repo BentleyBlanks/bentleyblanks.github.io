@@ -129,6 +129,17 @@ Rules:
 - 页面使用独立存档键 `resistancecommand1937_campaign_v1` 与检查点键 `resistancecommand1937_checkpoint_v1`，零外部运行时依赖；地图 Canvas 只绘制态势线，全部地区与命令必须保留可键盘/触控操作的 DOM 按钮。
 - 改动后必须跑 `node TaihangDemo/ResistanceCommand1937/Script_SmokeTest.mjs`。测试锁定固定种子、计划纯函数、敌情/疏散/坚壁的真实因果、方针与生产、存档 round-trip、100 局批量模拟、终局锁定，以及“均衡组织路线 > 消极不作为、莽攻会摧毁人民安全”。
 
+## 子页面 `TunnelBell1942/`（地道战 · 钟声，Three.js 横版叙事冒险白盒）
+
+- 题材是电影《地道战》，形式参考《勇敢的心：世界大战》：正交相机的 2.5D 横版，三幕结构，象形气泡叙事，**没有攻击键**。线上地址 `https://bentleyblanks.github.io/TunnelBell1942/`。
+- 三幕：第一幕「钟声」高老忠地表潜行敲钟报信；第二幕「翻口」高传宝在地道里带乡亲转移；第三幕「转移」地表与地道来回切换，封卡口、引水反制灌烟，带六位乡亲撤出黑风口。第一幕主角不会活着离开，这是叙事支点，不许改成打赢。
+- **模块契约在 `TunnelBell1942/AGENTS.md`，改任何模块前先读它。** 文件所有权、坐标系、关卡/剧情数据格式、Rules/Render/Actor 的 API 都在那份文档里定死。
+- 分层纪律：`Data_Levels.mjs` / `Data_Story.mjs` / `Script_Rules.mjs` **不许 import three.js**（纯 Node 可跑，冒烟测试靠这一点）；`Script_Render.mjs` / `Script_Actor.mjs` **不许写 state**（只读只画）。
+- 三方依赖只有仓库内的 `TunnelBell1942/vendor/three`。美术全部程序化生成（`CanvasTexture` 现场画），音效 WebAudio 现场合成，不加载任何外部图片/音频。
+- 存档键固定 `tunnelbell1942_v1`，与 `TunnelHeart1942/`、`TunnelFront1942/` 完全隔离，不共用任何键。
+- 改动后必须跑 `node TunnelBell1942/Script_SmokeTest.mjs`（纯逻辑，含机器人三幕通关与确定性断言）。动到渲染还要跑 `node TunnelBell1942/Script_RenderHealthTest.mjs`（读 `gl.getError()`、`renderer.info` 与画面像素分布，防"看着在跑其实黑屏"）。截图用 `node TunnelBell1942/Script_Screenshot.mjs`。
+- 页面脚本或资源变更时抬 `index.html` 里的 cache-bust（`?v=…`）。
+
 ## BehindTheLines Documentation
 
 - `BehindTheLines/` is the public documentation namespace for the private BehindTheLines Godot repository. Its canonical URL is `https://bentleyblanks.github.io/BehindTheLines/`.
