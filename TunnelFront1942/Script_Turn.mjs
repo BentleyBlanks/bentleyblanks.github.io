@@ -569,7 +569,10 @@ function CheckCondition(state, key, want) {
       text: `未被搜出的地道口 ${LiveEntranceCount(state)} 个（需 ≥${want}）` }),
     disguisedAtLeast: () => ({ ok: DisguisedEntranceCount(state) >= want,
       text: `伪装口 ${DisguisedEntranceCount(state)} 个（需 ≥${want}）` }),
-    ventsAtLeast: () => ({ ok: VentCount(state) >= want, text: `通气孔 ${VentCount(state)} 处（需 ≥${want}）` }),
+    // R6 P1：这条判据一直只认**未被搜出**的孔（VentCount 就是这个口径），
+    // 但文案只写「通气孔 N 处」，于是「保全 8/8、逼出 0 批却判通气孔 1 处」看上去像 bug。把口径写进文案。
+    ventsAtLeast: () => ({ ok: VentCount(state) >= want,
+      text: `未被搜出的通气孔 ${VentCount(state)} 处（需 ≥${want}；被敌翻出来的孔不算）` }),
     fightpostsUsedAtLeast: () => ({ ok: (state.score.fightpostsUsed || []).length >= want,
       text: `开过火的射击孔 ${(state.score.fightpostsUsed || []).length} 处（需 ≥${want}）` }),
     forcedOutAtMost: () => ({ ok: (state.score.civForcedOut || 0) <= want,

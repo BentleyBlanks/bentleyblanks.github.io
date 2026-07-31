@@ -289,6 +289,18 @@ export function DeriveView(state) {
     gradeLadder: (level.gradeLadder || []).slice(),
     seedNotes: (level.seedNotes || []).slice(),
     firstTimeHere: (level.firstTimeHere || []).slice(),
+    // —— R6 新增的玩家侧长文：本轮规则速查 / 群众保全决策树 / 反地道逐手应对 / 勋记怎么拿 /
+    //    五幕开局对照 / 怎么读盘面 / 一回合按什么顺序想 / 单位分工 / 续承怎么用 / 代价簿怎么读 ——
+    r6Notes: (level.r6Notes || []).slice(),
+    civSaveNotes: (level.civSaveNotes || []).slice(),
+    enemyOpNotes: (level.enemyOpNotes || []).slice(),
+    medalStrategyNotes: (level.medalStrategyNotes || []).slice(),
+    openingByAct: (level.openingByAct || []).slice(),
+    readingTheBoard: (level.readingTheBoard || []).slice(),
+    turnOrderNotes: (level.turnOrderNotes || []).slice(),
+    unitRoleNotes: (level.unitRoleNotes || []).slice(),
+    carryStrategyNotes: (level.carryStrategyNotes || []).slice(),
+    ledgerReadingNotes: (level.ledgerReadingNotes || []).slice(),
     // 本局的续承来源（默认继承档 / 上一幕的战果）：简报要说明「这是上一幕的战果」
     carry: state.meta.carry ? { ...state.meta.carry, notes: (state.meta.carry.notes || []).slice() } : null,
     // —— 终局复盘三段（代价 / 学到什么 / 解锁什么）：结算时才有值，平时给 null ——
