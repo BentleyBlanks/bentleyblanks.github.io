@@ -1,494 +1,229 @@
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import {
-  ActionIds,
-  ApplyPlayerAction,
-  ApplyPlayerActionPath,
-  CreateInitialState,
-  DeserializeState,
-  FindEvacuationPaths,
-  GetActionTargets,
-  GetActionPathPlans,
-  GetActiveCivilianTransitEstimate,
-  GetAvailableActions,
-  GetCivilianTransitEstimate,
-  GetCorridorProgress,
-  GetCorridorTileRole,
-  GetExitWindow,
-  GetObjectiveSummary,
-  GetRouteSurvey,
-  IsSoilKnown,
-  SerializeState,
-} from "./Script_Rules.mjs";
-import { RenderAsciiMaps } from "./Script_AsciiMap.mjs";
+#!/usr/bin/env node
+// 《地下长城 · 冀中1942》 —— 审查 Agent 完整游玩接口（AGENTS.md §7.3）。
+// 子命令：
+//   new  --level L1 --seed 3 --save /tmp/g.json     开局 + 简报 + ASCII
+//   show --save /tmp/g.json [--layer surface|under|both]
+//   legal --save /tmp/g.json [--unit u1]
+//   act  --save /tmp/g.json --json '{"type":"Move",...}'
+//   end  --save /tmp/g.json                          敌阶段 + 结算全播报
+//   run  --level L1 --seed 3 --bot Skilled           bot 整局 → 总结 JSON
+//   fixture --level L1 --seed 3 --turns 6 --out Data_FixtureState.mjs   （生成渲染夹具）
+// 仅本文件允许触碰 fs/process；引擎模块保持纯逻辑。
 
-const statePath = join(tmpdir(), "TunnelFront1942_PlayCli_State.json");
-const corridorRoleLabels = {
-  Shared: "Shared/快静共线",
-  Fast: "Fast/快掘",
-  Quiet: "Quiet/静掘",
-  OffPlan: "Off-plan/标线外改线",
-  Unsurveyed: "Unsurveyed/未勘线",
-};
+import { readFileSync, writeFileSync } from "node:fs";
+import process from "node:process";
+import { CreateGame, SerializeState, DeserializeState, GetBriefing, GrainTotal, PopTotal, WoundedTotal } from "./Script_State.mjs";
+import { DeriveView } from "./Script_Visibility.mjs";
+import { LegalActions, PerformAction } from "./Script_Actions.mjs";
+import { EndTurn } from "./Script_Turn.mjs";
+import { RenderAsciiMap } from "./Script_AsciiMap.mjs";
+import { RunBotGame, botNames } from "./Script_Bots.mjs";
+import { TEXT } from "./Data_Rules.mjs";
 
-function PrintUsage() {
-  console.log(`地火线 CLI
-
-用法：
-  node TunnelFront1942/Script_PlayCli.mjs new [seed]
-  node TunnelFront1942/Script_PlayCli.mjs show
-  node TunnelFront1942/Script_PlayCli.mjs legal [unitId|all]
-  node TunnelFront1942/Script_PlayCli.mjs act <unitId> <actionId> [targetKey] [groupId]
-  node TunnelFront1942/Script_PlayCli.mjs path <unitId> <Move|Dig> <targetKey...>
-  node TunnelFront1942/Script_PlayCli.mjs end
-  node TunnelFront1942/Script_PlayCli.mjs survey <exitKey>
-
-unitId：Scout / WorkTeam / Militia / Guerrilla
-actionId：${Object.values(ActionIds).join(" / ")}
-示例：
-  node TunnelFront1942/Script_PlayCli.mjs new 7
-  node TunnelFront1942/Script_PlayCli.mjs legal Scout
-  node TunnelFront1942/Script_PlayCli.mjs act Scout Recon 2,1
-  node TunnelFront1942/Script_PlayCli.mjs path Scout Move 5,4 5,5
-  node TunnelFront1942/Script_PlayCli.mjs end`);
-}
-
-function LoadState() {
-  if (!existsSync(statePath)) {
-    throw new Error("尚无 CLI 局面；先运行 new [seed]。");
+function ParseArgs(argv) {
+  const args = { _: [] };
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i].startsWith("--")) {
+      const key = argv[i].slice(2);
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("--")) { args[key] = next; i += 1; }
+      else args[key] = true;
+    } else args._.push(argv[i]);
   }
-  return DeserializeState(readFileSync(statePath, "utf8"));
+  return args;
 }
 
-function SaveState(state) {
-  writeFileSync(statePath, SerializeState(state), "utf8");
+function LoadSave(path) {
+  if (!path) Die("缺少 --save 存档路径");
+  return DeserializeState(readFileSync(path, "utf8"));
 }
 
-function ResolveUnitId(state, requestedId) {
-  return state.units.find((unit) => (
-    unit.unitId.toLowerCase() === String(requestedId).toLowerCase()
-  ))?.unitId ?? null;
+function WriteSave(path, state) {
+  writeFileSync(path, SerializeState(state));
 }
 
-function ResolveActionId(requestedId) {
-  return Object.values(ActionIds).find((actionId) => (
-    actionId.toLowerCase() === String(requestedId).toLowerCase()
-  )) ?? null;
+function Die(message) {
+  console.error(`[错误] ${message}`);
+  process.exit(1);
 }
 
-function FormatIntent(enemy) {
-  if (!enemy.intentRevealed || !enemy.intent) {
-    return "意图未揭示";
+function PrintEvents(events) {
+  const visible = (events || []).filter((event) => event.visible !== false);
+  if (!visible.length) { console.log("（本步无可见事件）"); return; }
+  for (const event of visible) {
+    console.log(`  · T${event.turn} ${event.text}${event.hex ? `（${event.hex}${event.layer === "under" ? " 地下" : ""}）` : ""}`);
   }
-  const target = enemy.intent.targetKey ? `→${enemy.intent.targetKey}` : "";
-  return `${enemy.intent.intentId}${target}`;
 }
 
-function FormatActiveRecovery(action, state, estimate) {
-  const labels = {
-    Ambush: "行动组 Ambush/伏击",
-    Attack: "行动组 Attack/压制",
-    Brace: "WorkTeam Brace/支护",
-    ClearSeal: "WorkTeam ClearSeal/抢通",
-    Dig: "WorkTeam Dig/重挖",
-    Recon: "Scout Recon/复查",
-    Trap: "Militia Trap/陷阱",
+function PrintStatus(state) {
+  const view = DeriveView(state);
+  const wave = view.wave;
+  console.log(`回合 T${view.turn}/${wave.hardEndTurn} ｜ 阶段：${view.phase} ｜ 波次：${wave.statusText}`
+    + (wave.status !== "quiet" ? ` ｜ 敌行动力池：${wave.pool}` : "")
+    + (wave.smokeCharges ? ` ｜ 敌烟具：${wave.smokeCharges}` : ""));
+  console.log(`弹药 ${view.resources.ammo}/12 ｜ 总粮 ${view.resources.grainTotal} ｜ 人口 ${view.resources.popTotal} 批`
+    + (view.resources.woundedTotal ? ` ｜ 伤员 ${view.resources.woundedTotal} 批` : ""));
+  const ledgerParts = Object.entries(view.ledger).filter(([, v]) => v > 0)
+    .map(([k, v]) => `${TEXT.ledgerNames[k]}：${v}`);
+  console.log(`代价簿：${ledgerParts.length ? ledgerParts.join("；") : "（全空）"}`);
+  if (view.telegraphs.length) {
+    console.log("电报预告：");
+    for (const telegraph of view.telegraphs) console.log(`  ! ${telegraph.text}`);
+  }
+  if (view.guardrails.length) {
+    console.log("待办护栏：");
+    for (const guardrail of view.guardrails) console.log(`  - ${guardrail.text}`);
+  }
+  if (view.result) {
+    console.log(`【终局】${view.result.won ? "胜" : "负"} ｜ 评定：${view.result.grade} ｜ 勋记：${view.result.medals.map((m) => (m ? "●" : "○")).join("")}`);
+    for (const reason of view.result.reasons) console.log(`  · ${reason}`);
+  }
+}
+
+function PrintUnits(state) {
+  const view = DeriveView(state);
+  console.log("我方单位：");
+  for (const unit of view.allies) {
+    console.log(`  ${unit.id} ${unit.name} ＠${unit.pos}（${unit.layer === "under" ? "地下" : "地面"}）`
+      + ` HP${unit.hp} MP${unit.mp} ${unit.acted ? "已行动" : "未行动"} ${TEXT.stance[unit.stance] || unit.stance}`
+      + (unit.breath ? ` 憋闷${unit.breath}` : ""));
+  }
+  if (view.visibleEnemies.length) {
+    console.log("可见敌单位：");
+    for (const foe of view.visibleEnemies) {
+      console.log(`  ${foe.id} ${foe.name} ＠${foe.pos}` + (foe.hp !== null && foe.hp !== undefined ? ` HP${foe.hp}` : ""));
+    }
+  }
+  if (view.ghosts.length) {
+    console.log("敌踪虚影（最后目击）：" + view.ghosts.map((ghost) => `${ghost.type}＠${ghost.pos}(T${ghost.turn})`).join("、"));
+  }
+}
+
+function ShowAll(state, layer) {
+  PrintStatus(state);
+  console.log("");
+  console.log(RenderAsciiMap(state, { layer: layer || "both" }));
+  console.log("");
+  PrintUnits(state);
+}
+
+function CmdNew(args) {
+  const level = args.level || "L1";
+  const seed = Number(args.seed ?? 3);
+  const state = CreateGame(level, seed);
+  console.log(`—— 开局：${level} seed=${seed} ——`);
+  for (const line of GetBriefing(state)) console.log(line);
+  console.log("");
+  ShowAll(state, args.layer);
+  if (args.save) { WriteSave(args.save, state); console.log(`\n[存档] ${args.save}`); }
+}
+
+function CmdShow(args) {
+  const state = LoadSave(args.save);
+  ShowAll(state, args.layer);
+}
+
+function CmdLegal(args) {
+  const state = LoadSave(args.save);
+  const actions = LegalActions(state, args.unit);
+  console.log(JSON.stringify(actions, null, 1));
+  console.log(`（共 ${actions.length} 个合法动作${args.unit ? `，单位 ${args.unit}` : ""}）`);
+}
+
+function CmdAct(args) {
+  const state = LoadSave(args.save);
+  if (!args.json) Die("缺少 --json 动作");
+  let action;
+  try { action = JSON.parse(args.json); } catch (error) { Die(`动作 JSON 解析失败：${error.message}`); }
+  const outcome = PerformAction(state, action);
+  if (outcome.illegal) { console.log(`[非法动作] ${outcome.illegal}`); process.exit(2); }
+  console.log("可见事件：");
+  PrintEvents(outcome.events);
+  console.log("");
+  ShowAll(outcome.state, args.layer);
+  WriteSave(args.save, outcome.state);
+}
+
+function CmdEnd(args) {
+  const state = LoadSave(args.save);
+  const outcome = EndTurn(state);
+  if (outcome.illegal) { console.log(`[不可结束] ${outcome.illegal}`); process.exit(2); }
+  console.log("敌军阶段与结算（可见事件播报）：");
+  PrintEvents(outcome.events);
+  console.log("");
+  ShowAll(outcome.state, args.layer);
+  WriteSave(args.save, outcome.state);
+}
+
+function Summary(state, steps) {
+  return {
+    level: state.meta.level,
+    seed: state.meta.seed,
+    endTurn: state.meta.turn,
+    steps,
+    result: state.result,
+    ledger: state.ledger,
+    kills: state.score.kills,
+    alliesLost: state.score.alliesLost,
+    grainTotal: GrainTotal(state),
+    popTotal: PopTotal(state),
+    woundedTotal: WoundedTotal(state),
+    ammo: state.resources.ammo,
+    pool: state.wave.pool,
+    waveStatus: state.wave.status,
+    doneTurn: state.wave.doneTurn,
   };
-  const targetName = state.tiles[action.targetKey]?.name ?? action.targetKey;
-  const costs = [
-    `AP ${action.cost.ap}`,
-    action.cost.tools ? `工具 ${action.cost.tools}` : null,
-    action.cost.organization ? `组织 ${action.cost.organization}` : null,
-    action.cost.ammo ? `弹药 ${action.cost.ammo}` : null,
-    action.cost.exposure ? `暴露 ${action.cost.exposure > 0 ? "+" : ""}${action.cost.exposure}` : null,
-    action.ifAppliedNow.peopleSafetyCost > 0
-      ? `群众安全 -${action.ifAppliedNow.peopleSafetyCost}`
-      : null,
-  ].filter(Boolean).join("/");
-  const arrival = action.ifAppliedNow.arrivalTurn === null
-    ? "到口 --"
-    : `到口 ${estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`}→T${action.ifAppliedNow.arrivalTurn}`;
-  const safe = action.ifAppliedNow.safeTurn === null
-    ? `仍未形成安全窗口${action.ifAppliedNow.nextConstraintKind ? `，随后仍有 ${action.ifAppliedNow.nextConstraintKind}` : ""}`
-    : `安全 T${action.ifAppliedNow.safeTurn}`;
-  return `${labels[action.actionId] ?? action.actionId}@${targetName}（${costs}；${arrival}；${safe}）`;
 }
 
-function PrintActiveTransitGuidance(state, heading = true) {
-  const active = state.civilians
-    .map((group) => ({
-      group,
-      estimate: GetActiveCivilianTransitEstimate(state, group.groupId),
-    }))
-    .filter(({ estimate }) => estimate);
-  if (!active.length) {
-    return;
-  }
-  if (heading) {
-    console.log("\n在途只读时刻表（不自动执行，不预测未揭示敌情）：");
-  }
-  for (const { group, estimate } of active) {
-    const currentName = state.tiles[estimate.currentTileKey]?.name ?? estimate.currentTileKey;
-    const exitName = state.tiles[estimate.projectedExitKey]?.name ?? estimate.projectedExitKey;
-    const arrival = estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`;
-    const safe = estimate.safeTurn === null ? "尚未形成安全窗口" : `T${estimate.safeTurn}`;
-    const corridorRoute = estimate.corridorRerouted
-      ? "同出口应急改线"
-      : estimate.usesFrozenMainline
-        ? "冻结主线"
-        : "当前已通路线";
-    const constraint = estimate.nextConstraint
-      ? `${estimate.nextConstraint.kind}@${state.tiles[estimate.nextConstraint.tileKey]?.name ?? estimate.nextConstraint.tileKey}：${estimate.nextConstraint.detail}`
-      : "无公开阻断";
-    console.log(
-      `- ${group.groupId}｜${estimate.status}@${currentName}→${exitName}`
-        + `｜${corridorRoute}｜剩 ${estimate.remainingSegments} 段｜到口 ${arrival}｜安全 ${safe}`
-        + `｜拥堵 ${estimate.congestionTurns}`
-        + `｜期限 ${estimate.deadlineRisk ? `当前不能确认 T${state.maxTurns} 前安全` : `可在 T${state.maxTurns} 内`}`
-        + `｜下一约束 ${constraint}`,
-    );
-    if (estimate.recoveryActions.length) {
-      console.log(
-        `  当前合法恢复：${estimate.recoveryActions
-          .map((action) => FormatActiveRecovery(action, state, estimate))
-          .join("；")}`,
-      );
-    } else if (estimate.recoveryNeeds.length) {
-      console.log(`  当前不可执行：${estimate.recoveryNeeds.map((entry) => entry.reason).join("；")}`);
-    } else {
-      console.log(
-        estimate.recoveryState === "NoKnownRecovery"
-          ? "  当前无合法且已知有效的恢复动作"
-          : "  当前无需恢复动作",
-      );
-    }
-  }
-}
-
-function PrintState(state) {
-  const objective = GetObjectiveSummary(state);
-  const corridor = GetCorridorProgress(state);
-  console.log(`\n=== ${state.phase === "Player" ? "我方行动" : "敌军行动"} · T${state.turn}/${state.maxTurns} ===`);
-  console.log(
-    `目标 ${objective.primary}｜${objective.sweep}｜工具 ${state.tools}｜组织 ${state.organization}`
-      + `｜情报 ${state.intel}｜暴露 ${state.exposure}｜群众安全 ${state.peopleSafety}`,
-  );
-  console.log(
-    `主勘线 ${objective.plannedExitName ?? "未选择"}｜新挖 ${state.tunnelsDug} 段`
-      + `｜出口信号 ${state.exitSignalsIssued ?? 0} 次`,
-  );
-  if (corridor) {
-    console.log(
-      `走廊 ${corridor.identity}/${corridor.label}｜主线 ${corridor.dugSegments} 段`
-        + `｜施工 ${corridor.digActions} 次｜工具 ${corridor.tools}｜噪音 ${corridor.noise}`
-        + `｜挖掘暴露 ${corridor.exposure}`
-        + `｜标线外 ${corridor.deviationSegments} 段`
-        + `｜${corridor.connected ? `T${corridor.connectedTurn ?? state.turn} 已接通` : "尚未接通"}`,
-    );
-  }
-  if (state.outcome) {
-    console.log(
-      `结局 ${state.outcome.status}｜${state.outcome.title}｜${state.outcome.summary}`
-        + `${corridor ? `｜走廊 ${corridor.label} / 施工 ${corridor.digActions} 次 / 工具 ${corridor.tools} / 噪音 ${corridor.noise} / 挖掘暴露 ${corridor.exposure} / 标线外 ${corridor.deviationSegments}` : ""}`
-        + `｜建议：${state.outcome.tip ?? "可尝试另一条路线"}`,
-    );
-  }
-
-  console.log("\n单位：");
-  for (const unit of state.units) {
-    console.log(
-      `- ${unit.unitId} ${unit.shortName}｜${unit.layer}@${unit.tileKey}`
-        + `｜AP ${unit.actionPoints}/${unit.maxActionPoints}｜HP ${unit.health}/${unit.maxHealth}`
-        + `｜弹药 ${unit.ammo ?? 0}`,
-    );
-  }
-
-  console.log("\n群众：");
-  for (const group of state.civilians) {
-    const route = group.exitKey ? `→${state.tiles[group.exitKey]?.name ?? group.exitKey}` : "";
-    const estimate = GetActiveCivilianTransitEstimate(state, group.groupId);
-    const status = estimate?.status ?? group.status;
-    console.log(
-      `- ${group.groupId} ${group.name} ${group.people}人｜${status}${route}`
-        + `｜速 ${group.moveSteps}｜载 ${group.trafficLoad}`
-        + `｜拥堵 ${group.trafficDelays ?? 0}`
-        + (group.status === "Waiting"
-          ? ""
-          : `｜${group.corridorRerouted ? "同出口应急改线" : group.usesFrozenMainline ? "冻结主线" : "当前已通路线"}`)
-        + (estimate
-          ? `｜到口 ${estimate.arrivalTurn === null ? "--" : `T${estimate.arrivalTurn}`}`
-            + `｜安全 ${estimate.safeTurn === null ? "待恢复" : `T${estimate.safeTurn}`}`
-          : ""),
-    );
-  }
-  PrintActiveTransitGuidance(state);
-
-  console.log("\n敌情：");
-  for (const enemy of state.enemies.filter((entry) => entry.health > 0)) {
-    console.log(
-      `- ${enemy.enemyId} ${enemy.name}｜@${enemy.tileKey}`
-        + `｜HP ${enemy.health}/${enemy.maxHealth}｜${FormatIntent(enemy)}`,
-    );
-  }
-
-  console.log("\n出口窗口：");
-  for (const exitKey of ["2,1", "0,5"]) {
-    const windowState = GetExitWindow(state, exitKey);
-    console.log(
-      `- ${state.tiles[exitKey].name} ${exitKey}｜${windowState.status}`
-        + `｜${windowState.detail}`,
-    );
-  }
-
-  if (state.warnings.some((warning) => !warning.resolved)) {
-    console.log("\n未决预警：");
-    for (const warning of state.warnings.filter((entry) => !entry.resolved)) {
-      console.log(
-        `- ${warning.kind}@${warning.targetKey}｜T${warning.resolvesTurn} 结算`
-          + `｜${warning.text ?? ""}`,
-      );
-    }
-  }
-
-  console.log(`\n${RenderAsciiMaps(state)}`);
-  console.log("\n最近事件：");
-  for (const event of state.eventLedger.slice(-8)) {
-    console.log(`- T${event.turn} [${event.kind}] ${event.text}`);
-  }
-}
-
-function PrintLegalActions(state, requestedId = "all") {
-  const units = String(requestedId).toLowerCase() === "all"
-    ? state.units.filter((unit) => unit.health > 0)
-    : state.units.filter((unit) => (
-      unit.unitId.toLowerCase() === String(requestedId).toLowerCase()
-    ));
-  if (!units.length) {
-    throw new Error(`未知单位：${requestedId}`);
-  }
-  PrintActiveTransitGuidance(state);
-  for (const unit of units) {
-    console.log(`\n${unit.unitId} ${unit.shortName}｜${unit.layer}@${unit.tileKey}｜AP ${unit.actionPoints}`);
-    const actions = GetAvailableActions(state, unit.unitId);
-    if (!actions.length) {
-      console.log("- 无可用动作");
-      continue;
-    }
-    for (const actionId of actions) {
-      const targets = GetActionTargets(state, unit.unitId, actionId);
-      const singleStepDigPlans = actionId === ActionIds.DIG
-        ? GetActionPathPlans(state, unit.unitId, actionId, { includeAmbiguous: true })
-          .filter((plan) => plan.steps === 1)
-        : [];
-      const groupText = actionId === ActionIds.EVACUATE
-        ? `｜groups=${state.civilians
-          .filter((group) => group.status === "Waiting")
-          .map((group) => group.groupId)
-          .join(",")}`
-        : "";
-      const targetText = actionId === ActionIds.DIG
-        ? targets.map((tileKey) => {
-          const role = corridorRoleLabels[GetCorridorTileRole(state, tileKey)];
-          if (!IsSoilKnown(state, tileKey)) {
-            return `${tileKey}[${role};预留 AP 2/工具 2;实付 AP 1–2/工具 1–2;暴露 +6–11]`;
-          }
-          const plan = singleStepDigPlans.find((entry) => entry.targetKey === tileKey);
-          return `${tileKey}[${role};AP ${plan?.apCost ?? "?"};工具 ${plan?.toolsCost ?? "?"};暴露 +${plan?.exposureDelta ?? "?"}]`;
-        }).join(",")
-        : targets.join(",");
-      console.log(
-        `- ${actionId}${targets.length ? `｜targets=${targetText}` : ""}${groupText}`,
-      );
-      if (actionId === ActionIds.EVACUATE) {
-        const waitingGroups = state.civilians
-          .filter((group) => group.status === "Waiting");
-        for (const targetKey of targets) {
-          for (const group of waitingGroups) {
-            const estimate = GetCivilianTransitEstimate(
-              state,
-              group.groupId,
-              targetKey,
-            );
-            if (!estimate) {
-              continue;
-            }
-            const bottleneck = estimate.bottleneckKey
-              ? state.tiles[estimate.bottleneckKey]
-              : null;
-            const conflictText = bottleneck
-              ? `｜首堵 ${bottleneck.name} ${estimate.bottleneckUsedLoad}+${estimate.trafficLoad}/${estimate.bottleneckCapacity}`
-              : "｜首堵 无";
-            const strandedText = estimate.remainingSchedule
-              .filter((entry) => entry.deadlineSlack < 0)
-              .map((entry) => {
-                const strandedGroup = state.civilians
-                  .find((candidate) => candidate.groupId === entry.groupId);
-                return `${strandedGroup?.name ?? entry.groupId}最早 T${entry.earliestLaunchTurn} 发车、T${entry.earliestReadyTurn} 到口`;
-              })
-              .join("；");
-            const riskText = strandedText
-              ? `｜排班风险（按当前已通路线；下一批前不再开路/抢通）${strandedText}，将晚于 T${state.maxTurns}`
-              : "";
-            const corridorRouteText = estimate.corridorRerouted
-              ? "｜冻结主线不可用：同出口应急改线"
-              : estimate.usesFrozenMainline
-                ? "｜使用首条冻结主线"
-                : "｜使用当前已通路线";
-            console.log(
-              `  ${group.groupId}→${targetKey}｜预计到口 ${estimate.readyTurn === null ? "--" : `T${estimate.readyTurn}`}`
-                + `｜预计堵 ${estimate.congestionTurns} 回合${corridorRouteText}${conflictText}${riskText}｜仅计当前队列与已知风险`,
-            );
-          }
-        }
+function CmdRun(args) {
+  const level = args.level || "L1";
+  const seed = Number(args.seed ?? 3);
+  const botName = args.bot || "Skilled";
+  if (!botNames.includes(botName)) Die(`未知 bot：${botName}（可选：${botNames.join("/")}）`);
+  const verbose = !!args.verbose;
+  const { state, steps } = RunBotGame({
+    level, seed, bot: botName,
+    onStep: verbose ? (st, action, events) => {
+      if (action.type === "EndTurn") {
+        console.log(`—— T${st.meta.turn} ——`);
+        PrintEvents(events);
       }
-      if ([ActionIds.MOVE, ActionIds.DIG].includes(actionId)) {
-        const pathPlans = GetActionPathPlans(state, unit.unitId, actionId, {
-          includeAmbiguous: true,
-        })
-          .filter((entry) => entry.steps > 1);
-        for (const plan of pathPlans) {
-          console.log(
-            `  path ${plan.targetKey}｜route=${plan.targetKeys.join(" → ")}`
-              + `｜corridor=${plan.targetKeys.map((tileKey) => corridorRoleLabels[GetCorridorTileRole(state, tileKey)]).join(" → ")}`
-              + `｜AP=${plan.apCost}｜tools=${plan.toolsCost}｜exposure=+${plan.exposureDelta}`,
-          );
-        }
-        if (!pathPlans.length && targets.length) {
-          console.log(
-            actionId === ActionIds.DIG
-              ? "  path 暂无｜连续开挖只延伸规划侦察已标明且无分叉的走廊；未知土层、开裂与出口会要求逐段确认"
-              : "  path 暂无｜本回合没有无分叉的多步终点，仍可逐格移动",
-          );
-        }
-      }
-    }
-  }
-}
-
-function ApplyCliAction(state, requestedUnitId, requestedActionId, targetKey, groupId) {
-  const unitId = ResolveUnitId(state, requestedUnitId);
-  const actionId = ResolveActionId(requestedActionId);
-  if (!unitId) {
-    throw new Error(`未知单位：${requestedUnitId}`);
-  }
-  if (!actionId || actionId === ActionIds.END_TURN) {
-    throw new Error(`未知或不适用于 act 的动作：${requestedActionId}`);
-  }
-  const result = ApplyPlayerAction(state, {
-    unitId,
-    actionId,
-    targetKey,
-    groupId,
+    } : null,
   });
-  if (!result.ok) {
-    throw new Error(result.reason ?? "动作失败");
-  }
-  SaveState(result.state);
-  PrintState(result.state);
+  if (verbose) { console.log(""); ShowAll(state); console.log(""); }
+  console.log(JSON.stringify(Summary(state, steps), null, 1));
 }
 
-function ApplyCliPath(state, requestedUnitId, requestedActionId, targetKeys) {
-  const unitId = ResolveUnitId(state, requestedUnitId);
-  const actionId = ResolveActionId(requestedActionId);
-  if (!unitId) {
-    throw new Error(`未知单位：${requestedUnitId}`);
-  }
-  if (![ActionIds.MOVE, ActionIds.DIG].includes(actionId)) {
-    throw new Error("path 只支持 Move 或 Dig");
-  }
-  if (!targetKeys.length) {
-    throw new Error("path 至少需要一个按顺序排列的目标格");
-  }
-  const result = ApplyPlayerActionPath(state, {
-    unitId,
-    actionId,
-    targetKeys,
-  });
-  if (!result.ok) {
-    throw new Error(result.reason ?? "连续路径执行失败");
-  }
-  SaveState(result.state);
-  console.log(
-    `连续执行 ${result.plan.steps} 步：${result.plan.startKey} → ${result.plan.targetKeys.join(" → ")}`,
-  );
-  PrintState(result.state);
+function CmdFixture(args) {
+  const level = args.level || "L1";
+  const seed = Number(args.seed ?? 3);
+  const turns = Number(args.turns ?? 6);
+  const out = args.out || new URL("./Data_FixtureState.mjs", import.meta.url).pathname;
+  const { state } = RunBotGame({ level, seed, bot: args.bot || "Skilled", untilTurn: turns });
+  const body = [
+    "// 渲染开发用固定状态夹具（与 AGENTS.md §三 状态契约同构）。",
+    `// 由 Script_PlayCli.mjs fixture 生成：${level} seed=${seed}，Skilled bot 跑至 T${state.meta.turn} 的真实中盘状态。`,
+    "// 用途：`index.html?fixture=1` 与表现层自测在引擎缺席时渲染本状态。重新生成请再跑同命令。",
+    "",
+    `export const fixtureState = ${JSON.stringify(state, null, 1)};`,
+    "",
+  ].join("\n");
+  writeFileSync(out, body);
+  console.log(`[夹具] 已写入 ${out}（T${state.meta.turn}，${Object.keys(state.units).length} 个单位）`);
 }
 
-function EndTurn(state) {
-  const result = ApplyPlayerAction(state, {
-    unitId: null,
-    actionId: ActionIds.END_TURN,
-  });
-  if (!result.ok) {
-    throw new Error(result.reason ?? "无法结束回合");
-  }
-  SaveState(result.state);
-  PrintState(result.state);
-}
+const commands = { new: CmdNew, show: CmdShow, legal: CmdLegal, act: CmdAct, end: CmdEnd, run: CmdRun, fixture: CmdFixture };
 
-function PrintSurvey(state, exitKey) {
-  if (!["2,1", "0,5"].includes(exitKey)) {
-    throw new Error("survey 只接受 2,1（北枣窖）或 0,5（西南苇井）。");
-  }
-  console.log(JSON.stringify(GetRouteSurvey(state, exitKey), null, 2));
-  const connected = FindEvacuationPaths(state)
-    .find((route) => route.exitKey === exitKey);
-  console.log(connected
-    ? `当前已接通：${connected.path.join(" → ")}｜${connected.corridorRerouted ? "冻结主线不可用：同出口应急改线" : connected.usesFrozenMainline ? "使用首条冻结主线" : "使用当前已通路线"}`
-    : "当前尚未接通。");
+const args = ParseArgs(process.argv.slice(2));
+const command = args._[0];
+if (!command || !commands[command]) {
+  console.log("用法：node TunnelFront1942/Script_PlayCli.mjs <new|show|legal|act|end|run|fixture> [--参数 值]");
+  console.log("  new  --level L1 --seed 3 --save /tmp/g.json");
+  console.log("  show --save /tmp/g.json [--layer surface|under|both]");
+  console.log("  legal --save /tmp/g.json [--unit u1]");
+  console.log('  act  --save /tmp/g.json --json \'{"type":"Move","unit":"u1","path":["4,1"]}\'');
+  console.log("  end  --save /tmp/g.json");
+  console.log("  run  --level L1 --seed 3 --bot Skilled [--verbose]");
+  process.exit(command ? 1 : 0);
 }
-
-function Run() {
-  const [, , rawCommand = "help", ...args] = process.argv;
-  const command = rawCommand.toLowerCase();
-  if (["help", "-h", "--help"].includes(command)) {
-    PrintUsage();
-    return;
-  }
-  if (command === "new") {
-    const requestedSeed = args[0] === undefined ? 19420501 : Number(args[0]);
-    if (!Number.isInteger(requestedSeed)) {
-      throw new Error(`seed 必须是整数：${args[0]}`);
-    }
-    const state = CreateInitialState({ seed: requestedSeed });
-    SaveState(state);
-    PrintState(state);
-    return;
-  }
-
-  const state = LoadState();
-  switch (command) {
-    case "show":
-      PrintState(state);
-      break;
-    case "legal":
-      PrintLegalActions(state, args[0] ?? "all");
-      break;
-    case "act":
-      ApplyCliAction(state, args[0], args[1], args[2], args[3]);
-      break;
-    case "path":
-      ApplyCliPath(state, args[0], args[1], args.slice(2));
-      break;
-    case "end":
-      EndTurn(state);
-      break;
-    case "survey":
-      PrintSurvey(state, args[0]);
-      break;
-    default:
-      throw new Error(`未知子命令：${rawCommand}`);
-  }
-}
-
-try {
-  Run();
-} catch (error) {
-  console.error(`CLI 错误：${error.message}`);
-  process.exitCode = 1;
-}
+commands[command](args);

@@ -1,4351 +1,489 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+#!/usr/bin/env node
+// 《地下长城 · 冀中1942》 —— node 冒烟测试（AGENTS.md §7.1 清单逐条落地）。
+// 退出码即成败；彩色 PASS/FAIL 汇总；目标总时长 <90 秒。
+
+import { readFileSync, existsSync } from "node:fs";
+import process from "node:process";
+import { HexKey, ParseHexKey, HexNeighborKeys, HexDistanceKeys } from "./Script_Hex.mjs";
+import { CFG, unitDefinitions } from "./Data_Rules.mjs";
+import { GetLevel, levelDefinitions } from "./Data_Levels.mjs";
 import {
-  MissionConfig,
-  SoilCatalog,
-} from "./Data_Level.mjs";
-import {
-  ActionIds,
-  AdvanceTurn,
-  ApplyPlayerAction,
-  ApplyPlayerActionPath,
-  CollectEnemyObservations,
-  CreateInitialState,
-  CreateSurfaceSnapshot,
-  DeserializeState,
-  EnemyIntentIds,
-  EvaluateMission,
-  FindEvacuationPaths,
-  FindTunnelPath,
-  GetActiveCivilianTransitEstimate,
-  GetAttackTargets,
-  GetActionPathPlans,
-  GetAvailableActions,
-  GetCivilianTransitEstimate,
-  GetCorridorProgress,
-  GetCorridorTileRole,
-  GetDecoyResponder,
-  GetEvacuationTargets,
-  GetExitWindow,
-  GetMoveTargets,
-  GetReconTargets,
-  GetRouteSurvey,
-  HexDistance,
-  IsSoilKnown,
-  LayerIds,
-  NeighborKeys,
-  PlanEnemyTurn,
-  RunEnemyPhase,
-  SerializeState,
-  UpdateEnemyBeliefs,
-} from "./Script_Rules.mjs";
+  CreateGame, CloneState, SerializeState, DeserializeState, HashState, MakeEnemyUnit,
+  AddLedger, GrainTotal, PopTotal, SortedKeys, EdgeKey, AllyUnits, EnemyUnits, UnitDef,
+} from "./Script_State.mjs";
+import { DeriveView, RecordSighting } from "./Script_Visibility.mjs";
+import { LegalActions, PerformAction } from "./Script_Actions.mjs";
+import { EndTurn, KillsScore, ComputeBreakdown } from "./Script_Turn.mjs";
+import { RenderAsciiMap } from "./Script_AsciiMap.mjs";
+import { RunBotGame } from "./Script_Bots.mjs";
 
-let passed = 0;
+const startedAt = Date.now();
+const results = [];
+const green = (text) => `[32m${text}[0m`;
+const red = (text) => `[31m${text}[0m`;
 
-function Test(name, callback) {
-  callback();
-  passed += 1;
-  console.log(`✓ ${name}`);
-}
-
-function Clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function Apply(state, unitId, actionId, targetKey = undefined, groupId = undefined) {
-  const result = ApplyPlayerAction(state, {
-    unitId,
-    actionId,
-    targetKey,
-    groupId,
-  });
-  assert.equal(
-    result.ok,
-    true,
-    `T${state.turn} ${unitId ?? "Mission"} ${actionId} ${targetKey ?? ""}: ${result.reason ?? "failed"}`,
-  );
-  return result.state;
-}
-
-function End(state) {
-  return Apply(state, null, ActionIds.END_TURN);
-}
-
-function AddTestTunnel(state, fromKey, tileKey, options = {}) {
-  state.tunnels[tileKey] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey,
-    isOriginal: false,
-    ...options,
-  };
-  const edgeId = [fromKey, tileKey].sort().join("|");
-  if (!state.tunnelEdges.includes(edgeId)) {
-    state.tunnelEdges.push(edgeId);
+function Check(name, fn) {
+  try {
+    fn();
+    results.push({ name, pass: true });
+    console.log(`${green("PASS")} ${name}`);
+  } catch (error) {
+    results.push({ name, pass: false, message: error.message });
+    console.log(`${red("FAIL")} ${name} —— ${error.message}`);
   }
 }
 
-function BuildTestCorridor(exitKey, mode) {
-  let state = CreateInitialState();
-  state = Apply(state, "Scout", ActionIds.RECON, exitKey);
-  const survey = GetRouteSurvey(state, exitKey);
-  const path = mode === "Fast" ? survey.fastPath : survey.quietPath;
-  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  digger.actionPoints = 2;
-  let constructionTurns = 1;
-  for (const tileKey of path.slice(1)) {
-    let result = ApplyPlayerAction(state, {
-      unitId: "WorkTeam",
-      actionId: ActionIds.DIG,
-      targetKey: tileKey,
-    });
-    if (!result.ok) {
-      constructionTurns += 1;
-      state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-      result = ApplyPlayerAction(state, {
-        unitId: "WorkTeam",
-        actionId: ActionIds.DIG,
-        targetKey: tileKey,
-      });
-    }
-    assert.equal(result.ok, true, `${exitKey} ${mode} ${tileKey}: ${result.reason}`);
-    state = result.state;
-  }
-  return { state, constructionTurns };
+function Ok(cond, message) {
+  if (!cond) throw new Error(message || "断言失败");
 }
 
-function RunReservedDefenseScenario(actionId) {
-  let state = CreateInitialState();
-  state.turn = 6;
-  state.sweepActive = true;
-  state.tunnels["2,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "2,1",
-    sealed: false,
-  };
-  state.enemyMemory.confirmedEntrances = ["2,1"];
-  state.enemyMemory.knownEntranceStates = { "2,1": { sealed: false } };
-  const patrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-  state.enemies.forEach((enemy) => {
-    enemy.health = [patrol.enemyId, sapper.enemyId].includes(enemy.enemyId)
-      ? enemy.maxHealth
-      : 0;
-  });
-  patrol.tileKey = "3,1";
-  patrol.intent = {
-    intentId: EnemyIntentIds.INVESTIGATE,
-    targetKey: "2,1",
-    evidenceTarget: "2,1",
-    evidenceId: "UnrelatedPatrolMove",
-    evidenceKind: "FreshTracks",
-  };
-  sapper.inactiveUntilTurn = 0;
-  sapper.tileKey = "3,0";
-  sapper.intent = {
-    intentId: EnemyIntentIds.RESOLVE_SEAL,
-    targetKey: "2,1",
-    warningId: "ReservedSeal",
-  };
-  state.warnings = [{
-    warningId: "ReservedSeal",
-    kind: "Seal",
-    targetKey: "2,1",
-    resolvesTurn: state.turn,
-    resolved: false,
-    enemyId: sapper.enemyId,
-    text: "工兵将在本回合封堵北枣窖",
-  }];
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "2,1";
-  militia.actionPoints = 2;
-  state = Apply(state, "Militia", actionId);
-  return RunEnemyPhase(state);
+function Eq(actual, expected, message) {
+  if (actual !== expected) throw new Error(`${message || "不相等"}：实际 ${JSON.stringify(actual)}，期望 ${JSON.stringify(expected)}`);
 }
 
-function PrepareSharedOpening(state, firstDigKey) {
-  const plannedExitKey = firstDigKey === "5,3" ? "0,5" : "2,1";
-  let next = Apply(state, "Scout", ActionIds.RECON, plannedExitKey);
-  next = Apply(next, "WorkTeam", ActionIds.ENTER_TUNNEL);
-  next = Apply(next, "WorkTeam", ActionIds.DIG, firstDigKey);
-  next = Apply(next, "Militia", ActionIds.MOVE, "6,2");
-  next = Apply(next, "Militia", ActionIds.ENTER_TUNNEL);
-  return next;
+function Step(state, action) {
+  const outcome = action.type === "EndTurn" ? EndTurn(state) : PerformAction(state, action);
+  Ok(!outcome.illegal, `动作被拒：${outcome.illegal}（${JSON.stringify(action)}）`);
+  return outcome;
 }
 
-function RunNorthInterdictionBot(
-  seed = 19420501,
-  groupOrder = ["Wounded", "Families", "Contacts"],
-  refreshEverySignal = false,
-) {
-  let state = CreateInitialState({ seed });
-  state = PrepareSharedOpening(state, "5,2");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
-  state = End(state);
+const here = new URL(".", import.meta.url).pathname;
+const Src = (file) => readFileSync(here + file, "utf8");
 
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "5,1");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "4,1");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "5,2");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "5,1");
-  state = End(state);
+/** 测试用敌纵队装配（与 Script_EnemyAi 的列结构同构）。 */
+function MakeColumn(state, id, types, pos, opts = {}) {
+  const column = { id, unitIds: [], role: opts.role || "march", route: [], routeIndex: 0,
+    exit: opts.exit || null, targetVillage: opts.target || null, seizeGoal: 0, seized: 0,
+    caution: opts.caution || 0, cautionTurns: 0, regroupTurns: 0, opInProgress: null,
+    withdrawing: false, garrison: false, plannedPath: [], respondFresh: false,
+    incident: false, casualties: 0, burned: false, done: false, axis: null, burnCount: 0 };
+  for (const type of types) column.unitIds.push(MakeEnemyUnit(state, type, pos, id));
+  state.enemy.columns.push(column);
+  return column;
+}
 
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "3,1");
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "4,1");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "3,1");
-  state = Apply(state, "Scout", ActionIds.MOVE, "5,2");
-  state = Apply(state, "Scout", ActionIds.MOVE, "5,1");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "2,1");
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupOrder[0]);
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "2,1");
-  state = Apply(state, "Scout", ActionIds.MOVE, "4,1");
-  state = Apply(state, "Scout", ActionIds.MOVE, "3,1");
-  state = End(state);
-
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupOrder[1]);
-  state = Apply(state, "Scout", ActionIds.MOVE, "2,1");
-  state = Apply(state, "Scout", ActionIds.EXIT_TUNNEL);
-  state = End(state);
-
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupOrder[2]);
-  state = Apply(state, "Militia", ActionIds.MOVE, "5,2");
-  state = End(state);
-
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Militia", ActionIds.MOVE, "5,1");
-  state = Apply(state, "Militia", ActionIds.MOVE, "4,1");
-  state = Apply(state, "Guerrilla", ActionIds.EXIT_TUNNEL);
-  let attackKey = GetAttackTargets(state, "Guerrilla")[0];
-  assert.ok(attackKey, "the guerrilla must have a visible adjacent threat at the north exit");
-  state = Apply(state, "Guerrilla", ActionIds.ATTACK, attackKey);
-  state = End(state);
-  if (state.outcome) {
-    return state;
-  }
-
-  const guerrillaStep = GetMoveTargets(state, "Guerrilla")[0];
-  assert.ok(guerrillaStep, "the guerrilla must clear the exit for the signal");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, guerrillaStep);
-  state = Apply(state, "Militia", ActionIds.MOVE, "3,1");
-  state = Apply(state, "Militia", ActionIds.MOVE, "2,1");
-  state = Apply(state, "Scout", ActionIds.EXIT_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  state = End(state);
-  while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
-    if (
-      refreshEverySignal
-      && GetAvailableActions(state, "Scout").includes(ActionIds.RECON)
-    ) {
-      state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-    }
-    state = End(state);
-  }
+/** 清空脚本波次并推进到扫荡期的外科手术局（留一个远期占位波，防止波次提前收束）。 */
+function SurgeryGame(levelId, seed) {
+  let state = CreateGame(levelId, seed);
+  while (state.wave.status === "quiet") state = EndTurn(state).state;
+  state.wave.schedule = [{ id: "zzHold", kind: "march", turn: 99, role: "march", entry: null, exit: null,
+    units: [], waypoints: [], target: null, seizeGoal: 0, axisKillsNeed: 0, spawned: false }];
+  if (state.wave.revenge) state.wave.revenge.pending = false;
+  for (const foe of EnemyUnits(state)) delete state.units[foe.id];
+  state.enemy.columns = [];
   return state;
 }
 
-function RunNorthFamilyFirstBot(seed = 19420501) {
-  return RunNorthInterdictionBot(
-    seed,
-    ["Families", "Wounded", "Contacts"],
-    true,
-  );
-}
+// ===========================================================================
+// 一、契约
+// ===========================================================================
 
-function RunSouthDeceptionBot(useDecoy = true, useTrap = true, seed = 19420501) {
-  let state = CreateInitialState({ seed });
-  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  state = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "5,3");
-  if (useDecoy) {
-    state = Apply(state, "Militia", ActionIds.DECOY, "6,5");
-  }
-  state = Apply(state, "Militia", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
-  state = End(state);
-
-  state = Apply(state, "Militia", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Militia", ActionIds.MOVE, "5,3");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "4,4");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "3,4");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "2,4");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "1,5");
-  state = Apply(state, "Militia", ActionIds.MOVE, "4,4");
-  state = Apply(state, "Militia", ActionIds.MOVE, "3,4");
-  state = Apply(state, "Scout", ActionIds.MOVE, "5,3");
-  state = Apply(state, "Scout", ActionIds.MOVE, "4,4");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "0,5");
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Wounded");
-  state = Apply(state, "Militia", ActionIds.MOVE, "2,4");
-  state = Apply(state, "Militia", ActionIds.MOVE, "1,5");
-  state = Apply(state, "Scout", ActionIds.MOVE, "3,4");
-  state = Apply(state, "Scout", ActionIds.MOVE, "2,4");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Families");
-  state = Apply(state, "Militia", ActionIds.MOVE, "0,5");
-  if (useTrap) {
-    state = Apply(state, "Militia", ActionIds.TRAP);
-  }
-  state = Apply(state, "Scout", ActionIds.MOVE, "1,5");
-  state = Apply(state, "Scout", ActionIds.MOVE, "0,5");
-  state = End(state);
-
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Contacts");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "5,3");
-  state = End(state);
-
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "4,4");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "3,4");
-  state = End(state);
-
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "2,4");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "1,5");
-  let southExitResult = ApplyPlayerAction(state, {
-    unitId: "Scout",
-    actionId: ActionIds.EXIT_TUNNEL,
-  });
-  while (!southExitResult.ok && state.turn < 10) {
-    state = End(state);
-    southExitResult = ApplyPlayerAction(state, {
-      unitId: "Scout",
-      actionId: ActionIds.EXIT_TUNNEL,
-    });
-  }
-  assert.equal(southExitResult.ok, true, `the scout needs a surface window by T9: ${southExitResult.reason}`);
-  state = southExitResult.state;
-  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  state = End(state);
-  assert.equal(
-    state.exitWindows["0,5"].checkedUntilTurn,
-    state.turn,
-    JSON.stringify({ turn: state.turn, window: state.exitWindows["0,5"], log: state.log.slice(-5) }),
-  );
-
-  if (useDecoy && useTrap && !state.outcome) {
-    if (state.units.find((unit) => unit.unitId === "Militia").tileKey !== "0,5") {
-      state = Apply(state, "Militia", ActionIds.MOVE, "0,5");
-    }
-    if (!state.tunnels["0,5"].trap) {
-      state = Apply(state, "Militia", ActionIds.TRAP);
-    }
-    state = End(state);
-    if (!state.outcome) {
-      state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-      if (!state.tunnels["0,5"].trap) {
-        state = Apply(state, "Militia", ActionIds.TRAP);
-      }
-      state = End(state);
-    }
-    if (!state.outcome) {
-      const northPatrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-      const blockingKey = northPatrol.intent?.targetKey ?? null;
-      assert.equal(northPatrol.intentRevealed, true);
-      assert.ok(blockingKey);
-      assert.equal(GetMoveTargets(state, "Scout").includes(blockingKey), true);
-      state = Apply(state, "Scout", ActionIds.MOVE, blockingKey);
-      state = End(state);
-    }
-  } else {
-    state = End(state);
-  }
-
-  while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
-    state = End(state);
-  }
-  return state;
-}
-
-function RunSouthContactsSecondBot(seed = 19420501) {
-  let state = CreateInitialState({ seed });
-  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  state = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "5,3");
-  state = Apply(state, "Militia", ActionIds.DECOY, "6,5");
-  state = Apply(state, "Militia", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
-  state = End(state);
-
-  state = Apply(state, "Militia", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Militia", ActionIds.MOVE, "5,3");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "4,4");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "3,4");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "2,4");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "1,5");
-  state = Apply(state, "Militia", ActionIds.MOVE, "4,4");
-  state = Apply(state, "Militia", ActionIds.MOVE, "3,4");
-  state = Apply(state, "Scout", ActionIds.MOVE, "5,3");
-  state = Apply(state, "Scout", ActionIds.MOVE, "4,4");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "0,5");
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Wounded");
-  state = Apply(state, "Militia", ActionIds.MOVE, "2,4");
-  state = Apply(state, "Militia", ActionIds.MOVE, "1,5");
-  state = Apply(state, "Scout", ActionIds.MOVE, "3,4");
-  state = Apply(state, "Scout", ActionIds.MOVE, "2,4");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Contacts");
-  state = Apply(state, "Militia", ActionIds.MOVE, "0,5");
-  state = Apply(state, "Militia", ActionIds.TRAP);
-  state = Apply(state, "Scout", ActionIds.MOVE, "1,5");
-  state = Apply(state, "Scout", ActionIds.MOVE, "0,5");
-  state = End(state);
-
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "0,5", "Families");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "5,3");
-  state = End(state);
-
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "4,4");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "3,4");
-  state = End(state);
-
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "2,4");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "1,5");
-  state = Apply(state, "Scout", ActionIds.EXIT_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  state = End(state);
-
-  if (!state.tunnels["0,5"].trap) {
-    state = Apply(state, "Militia", ActionIds.TRAP);
-  }
-  state = End(state);
-
-  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  if (!state.tunnels["0,5"].trap) {
-    state = Apply(state, "Militia", ActionIds.TRAP);
-  }
-  state = End(state);
-
-  const northPatrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  const blockingKey = northPatrol.intent?.targetKey ?? null;
-  assert.ok(blockingKey);
-  assert.equal(GetMoveTargets(state, "Scout").includes(blockingKey), true);
-  state = Apply(state, "Scout", ActionIds.MOVE, blockingKey);
-  state = End(state);
-  while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
-    state = End(state);
-  }
-  return { state, blockingKey };
-}
-
-function RunSouthAllGroupsBot(seed) {
-  let state = CreateInitialState({ seed });
-  let pressureObserved = false;
-  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  state = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "5,3");
-  state = Apply(state, "Militia", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Militia", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "4,4");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "3,4");
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "2,4");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "1,5");
-  state = Apply(state, "Scout", ActionIds.MOVE, "5,3");
-  state = Apply(state, "Scout", ActionIds.MOVE, "4,4");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "0,5");
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "0,5", "Wounded");
-  state = Apply(state, "Scout", ActionIds.MOVE, "3,4");
-  state = Apply(state, "Scout", ActionIds.MOVE, "2,4");
-  state = End(state);
-
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "0,5", "Families");
-  state = Apply(state, "Scout", ActionIds.MOVE, "1,5");
-  state = Apply(state, "Scout", ActionIds.MOVE, "0,5");
-  state = End(state);
-
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "0,5", "Contacts");
-  state = Apply(state, "Scout", ActionIds.EXIT_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  state = End(state);
-  pressureObserved ||= ["Watched", "Sealing", "Smoking"].includes(
-    GetExitWindow(state, "0,5").status,
-  );
-
-  if (!state.outcome) {
-    state = End(state);
-    pressureObserved ||= ["Watched", "Sealing", "Smoking"].includes(
-      GetExitWindow(state, "0,5").status,
-    );
-  }
-  if (
-    !state.outcome
-    && GetAvailableActions(state, "Scout").includes(ActionIds.RECON)
-  ) {
-    state = Apply(state, "Scout", ActionIds.RECON, "0,5");
-  }
-  while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
-    pressureObserved ||= ["Watched", "Sealing", "Smoking"].includes(
-      GetExitWindow(state, "0,5").status,
-    );
-    state = End(state);
-  }
-  return { state, pressureObserved };
-}
-
-function RunAmbushBot(seed = 19420501) {
-  let state = CreateInitialState({ seed });
-  state = PrepareSharedOpening(state, "5,2");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
-  state = End(state);
-
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "5,1");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "4,1");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "3,1");
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Militia", ActionIds.MOVE, "5,2");
-  state = Apply(state, "Militia", ActionIds.MOVE, "5,1");
-  state = Apply(state, "Scout", ActionIds.MOVE, "5,2");
-  state = Apply(state, "Scout", ActionIds.MOVE, "5,1");
-  state = End(state);
-
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "2,1");
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "2,1", "Wounded");
-  state = Apply(state, "Militia", ActionIds.MOVE, "4,1");
-  state = Apply(state, "Militia", ActionIds.MOVE, "3,1");
-  state = Apply(state, "Scout", ActionIds.MOVE, "4,1");
-  state = Apply(state, "Scout", ActionIds.MOVE, "3,1");
-  state = End(state);
-
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "2,1", "Families");
-  state = Apply(state, "Militia", ActionIds.MOVE, "2,1");
-  state = Apply(state, "Militia", ActionIds.AMBUSH);
-  state = Apply(state, "Scout", ActionIds.MOVE, "2,1");
-  state = Apply(state, "Scout", ActionIds.EXIT_TUNNEL);
-  state = End(state);
-
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Guerrilla", ActionIds.EVACUATE, "2,1", "Contacts");
-  state = Apply(state, "Guerrilla", ActionIds.EXIT_TUNNEL);
-  state = End(state);
-  state = Apply(state, "Militia", ActionIds.MOVE, "3,1");
-  state = Apply(state, "Militia", ActionIds.MOVE, "2,1");
-  state = End(state);
-  if (state.outcome) {
-    return state;
-  }
-
-  state = Apply(state, "Militia", ActionIds.AMBUSH);
-  state = End(state);
-
-  state = Apply(state, "Scout", ActionIds.EXIT_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  state = End(state);
-  while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
-    if (GetAvailableActions(state, "Scout").includes(ActionIds.RECON)) {
-      state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-      const visibleSapperApproach = state.enemies.some((enemy) => (
-        enemy.enemyId === "Sapper"
-        && enemy.intentRevealed
-        && enemy.intent?.targetKey === "2,1"
-      ));
-      assert.equal(visibleSapperApproach, true);
-      assert.equal(GetMoveTargets(state, "Scout").includes("3,0"), true);
-      state = Apply(state, "Scout", ActionIds.MOVE, "3,0");
-      assert.equal(GetAvailableActions(state, "Militia").includes(ActionIds.TRAP), true);
-      state = Apply(state, "Militia", ActionIds.TRAP);
-    }
-    state = End(state);
-  }
-  return state;
-}
-
-function RunNorthIdleBot() {
-  let state = CreateInitialState();
-  state = PrepareSharedOpening(state, "5,2");
-  state = Apply(state, "Guerrilla", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Guerrilla", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,3");
-  state = End(state);
-  state = Apply(state, "Scout", ActionIds.MOVE, "6,2");
-  state = Apply(state, "Scout", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "5,1");
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "4,1");
-  state = End(state);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "3,1");
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = End(state);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "2,1");
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
-  state = End(state);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Families");
-  state = End(state);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Contacts");
-  state = End(state);
-  while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
-    state = End(state);
-  }
-  return state;
-}
-
-const northEvacuationPath = ["6,2", "6,1", "5,1", "4,1", "3,1", "2,1"];
-const southEvacuationPath = ["6,2", "5,3", "4,4", "3,4", "2,4", "1,5", "0,5"];
-
-function CreateLogisticsState(bracedExit = false) {
-  const state = CreateInitialState();
-  const nodeTemplate = Clone(state.tunnels["6,2"]);
-  state.turn = MissionConfig.evacuationTurn;
-  state.sweepActive = true;
-  state.planningReconCompleted = true;
-  state.plannedExitKey = "2,1";
-  state.tunnelsDug = northEvacuationPath.length - 1;
-  state.organization = 99;
-  state.outcome = null;
-  state.enemies.forEach((enemy) => {
-    enemy.health = 0;
-    enemy.intent = null;
-  });
-  state.tunnels = Object.fromEntries(northEvacuationPath.map((tileKey, index) => [
-    tileKey,
-    {
-      ...Clone(nodeTemplate),
-      tileKey,
-      braced: index === 0 || (bracedExit && tileKey === "2,1"),
-      cracked: false,
-      collapsed: false,
-      sealed: false,
-      smoke: 0,
-      trap: false,
-      dugTurn: 1,
-      isOriginal: index === 0,
-    },
-  ]));
-  state.exitWindows["2,1"] = {
-    exitKey: "2,1",
-    checkedTurn: state.turn,
-    checkedUntilTurn: 20,
-    signalCount: 1,
-  };
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "6,2";
-  militia.actionPoints = militia.maxActionPoints;
-  return state;
-}
-
-function CreateDualRouteLogisticsState() {
-  const state = CreateLogisticsState(false);
-  const nodeTemplate = Clone(state.tunnels["6,2"]);
-  for (const tileKey of southEvacuationPath.slice(1)) {
-    state.tunnels[tileKey] = {
-      ...Clone(nodeTemplate),
-      tileKey,
-      braced: false,
-      cracked: false,
-      collapsed: false,
-      sealed: false,
-      smoke: 0,
-      trap: false,
-      dugTurn: 1,
-      isOriginal: false,
-    };
-  }
-  state.exitWindows["0,5"] = {
-    exitKey: "0,5",
-    checkedTurn: state.turn,
-    checkedUntilTurn: 20,
-    signalCount: 1,
-  };
-  return state;
-}
-
-function CreateSouthLogisticsState() {
-  const state = CreateLogisticsState(false);
-  const nodeTemplate = Clone(state.tunnels["6,2"]);
-  state.plannedExitKey = "0,5";
-  state.tunnelsDug = southEvacuationPath.length - 1;
-  state.tunnels = Object.fromEntries(southEvacuationPath.map((tileKey, index) => [
-    tileKey,
-    {
-      ...Clone(nodeTemplate),
-      tileKey,
-      braced: index === 0,
-      cracked: false,
-      collapsed: false,
-      sealed: false,
-      smoke: 0,
-      trap: false,
-      dugTurn: 1,
-      isOriginal: index === 0,
-    },
-  ]));
-  state.exitWindows["0,5"] = {
-    exitKey: "0,5",
-    checkedTurn: state.turn,
-    checkedUntilTurn: 20,
-    signalCount: 1,
-  };
-  return state;
-}
-
-function RunCivilianOrder(groupIds, bracedExit = false) {
-  let state = CreateLogisticsState(bracedExit);
-  const timeline = [];
-  for (const groupId of groupIds) {
-    state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupId);
-    state = End(state);
-    timeline.push({ turn: state.turn - 1, safePeople: state.civiliansSafe });
-  }
-  while (!state.outcome && state.turn <= MissionConfig.maxTurns + 1) {
-    state = End(state);
-    timeline.push({ turn: state.turn - 1, safePeople: state.civiliansSafe });
-  }
-  const firstSafe = timeline.find((entry) => entry.safePeople > 0) ?? null;
-  return {
-    state,
-    timeline,
-    firstSafe,
-    delaySignature: state.civilians
-      .map((group) => `${group.groupId}:${group.trafficDelays ?? 0}`)
-      .join("|"),
-  };
-}
-
-function SafetyAfterFirstLaunch(groupId) {
-  let state = CreateLogisticsState(false);
-  const pressureEnemy = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  pressureEnemy.health = pressureEnemy.maxHealth;
-  pressureEnemy.tileKey = "5,2";
-  pressureEnemy.intent = null;
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", groupId);
-  return End(state).peopleSafety;
-}
-
-function CheapestRoute(state, goalKey) {
-  const costs = new Map([["6,2", 0]]);
-  const noise = new Map([["6,2", 0]]);
-  const open = ["6,2"];
-  while (open.length) {
-    open.sort((first, second) => costs.get(first) - costs.get(second));
-    const currentKey = open.shift();
-    if (currentKey === goalKey) {
-      break;
-    }
-    for (const neighborKey of NeighborKeys(currentKey)) {
-      const tile = state.tiles[neighborKey];
-      if (!tile) {
-        continue;
-      }
-      const nextCost = costs.get(currentKey) + SoilCatalog[tile.soilId].digCost;
-      if (nextCost < (costs.get(neighborKey) ?? Infinity)) {
-        costs.set(neighborKey, nextCost);
-        noise.set(
-          neighborKey,
-          noise.get(currentKey) + SoilCatalog[tile.soilId].noise,
-        );
-        open.push(neighborKey);
-      }
-    }
-  }
-  return {
-    distance: HexDistance("6,2", goalKey),
-    cost: costs.get(goalKey),
-    noise: noise.get(goalKey),
-  };
-}
-
-Test("mission opens with visible pressure, countdown, recon, and excavation options", () => {
-  const state = CreateInitialState();
-  assert.equal(state.turn, 1);
-  assert.equal(state.maxTurns, 11);
-  assert.equal(state.sweepTurn, 5);
-  assert.equal(state.enemies.filter((enemy) => !enemy.inactiveUntilTurn).length >= 2, true);
-  assert.equal(GetAvailableActions(state, "Scout").includes(ActionIds.RECON), true);
-  assert.equal(GetAvailableActions(state, "WorkTeam").includes(ActionIds.ENTER_TUNNEL), true);
-  assert.equal(state.planningReconCompleted, false);
-  assert.match(state.log[0].text, /第 4 回合转移信号/);
+Check("契约：六角坐标往返与邻接", () => {
+  Eq(HexKey(3, -2), "3,-2");
+  const parsed = ParseHexKey("3,-2");
+  Eq(parsed.q, 3); Eq(parsed.r, -2);
+  for (const nb of HexNeighborKeys("0,0")) Eq(HexDistanceKeys("0,0", nb), 1, "邻格距离");
+  Eq(EdgeKey("2,2", "1,2"), EdgeKey("1,2", "2,2"), "边键对称");
 });
 
-Test("planning reconnaissance commits to one exit and exposes distinct corridor tradeoffs", () => {
-  const initial = CreateInitialState();
-  assert.deepEqual(GetReconTargets(initial, "Scout").sort(), ["0,5", "2,1"]);
-  const untargeted = ApplyPlayerAction(initial, {
-    unitId: "Scout",
-    actionId: ActionIds.RECON,
-  });
-  assert.equal(untargeted.ok, false);
-  assert.match(untargeted.reason, /选择北枣窖或西南苇井/);
-
-  const north = Apply(initial, "Scout", ActionIds.RECON, "2,1");
-  const south = Apply(initial, "Scout", ActionIds.RECON, "0,5");
-  const northSurvey = GetRouteSurvey(initial, "2,1");
-  const southSurvey = GetRouteSurvey(initial, "0,5");
-  assert.equal(north.plannedExitKey, "2,1");
-  assert.equal(south.plannedExitKey, "0,5");
-  assert.equal(north.planningReconCompleted, true);
-  assert.equal(south.planningReconCompleted, true);
-  assert.equal(
-    north.plannedSurveyedPathKeys.every((tileKey) => IsSoilKnown(north, tileKey)),
-    true,
-  );
-  assert.equal(
-    north.plannedCorridorKeys.some((tileKey) => !IsSoilKnown(north, tileKey)),
-    true,
-  );
-  assert.equal(
-    Object.values(north.tiles).some((tile) => (
-      !north.plannedSurveyedPathKeys.includes(tile.tileKey) && !IsSoilKnown(north, tile.tileKey)
-    )),
-    true,
-  );
-  assert.notDeepEqual(north.plannedFastPath, south.plannedFastPath);
-  assert.notDeepEqual(north.plannedQuietPath, south.plannedQuietPath);
-  assert.deepEqual(north.plannedFastKeys, northSurvey.fastKeys);
-  assert.deepEqual(north.plannedQuietKeys, northSurvey.quietKeys);
-  assert.equal(northSurvey.fast.segments < southSurvey.fast.segments, true);
-  assert.equal(northSurvey.fast.noise > southSurvey.fast.noise, true);
-  assert.equal(northSurvey.nearestThreat.enemyId, "NorthPatrol");
-  assert.equal(southSurvey.nearestThreat.enemyId, "BridgePatrol");
-  assert.equal(north.exitSignalsIssued, 0);
-  assert.match(north.log.at(-1).text, /快掘.*静掘.*主出口接通前/);
-
-  const northDigger = north.units.find((unit) => unit.unitId === "WorkTeam");
-  northDigger.layer = LayerIds.TUNNEL;
-  northDigger.actionPoints = 2;
-  const continuousDigPlans = GetActionPathPlans(north, "WorkTeam", ActionIds.DIG)
-    .filter((plan) => plan.steps > 1);
-  assert.equal(continuousDigPlans.length > 0, true);
-  assert.equal(continuousDigPlans.every((plan) => (
-    plan.targetKeys.every((tileKey) => IsSoilKnown(north, tileKey))
-  )), true);
+Check("契约：状态序列化 round-trip", () => {
+  for (const levelId of Object.keys(levelDefinitions)) {
+    const state = CreateGame(levelId, 7);
+    const revived = DeserializeState(SerializeState(state));
+    Eq(HashState(revived), HashState(state), `${levelId} 序列化后哈希漂移`);
+  }
 });
 
-Test("corridor bands and identity ignore hidden intent, seed, and collection order", () => {
-  function CommitFastCorridor(seed, reverseCollections, hiddenTargetKey) {
-    let state = CreateInitialState({ seed });
-    state.evidence = [
-      {
-        evidenceId: "HiddenEvidenceA",
-        kind: "FreshTracks",
-        tileKey: "4,0",
-        strength: 0.4,
-        createdTurn: 1,
-        expiresTurn: 4,
-        source: "hidden-order-test",
-      },
-      {
-        evidenceId: "HiddenEvidenceB",
-        kind: "DigNoise",
-        tileKey: "4,4",
-        strength: 0.7,
-        createdTurn: 1,
-        expiresTurn: 4,
-        source: "hidden-order-test",
-      },
+Check("契约：CloneState 隔离", () => {
+  const state = CreateGame("L1", 4);
+  const hash = HashState(state);
+  const clone = CloneState(state);
+  clone.meta.turn = 99;
+  clone.map.hexes["3,1"].traces = 6;
+  clone.units.u1.hp = 0;
+  clone.ledger.civDead = 9;
+  Eq(HashState(state), hash, "改克隆不得影响原状态");
+});
+
+Check("契约：纯度扫描（核心模块无 window/document/three/伪随机/时钟）", () => {
+  const coreFiles = ["Script_Hex.mjs", "Data_Rules.mjs", "Data_Levels.mjs", "Script_State.mjs",
+    "Script_Visibility.mjs", "Script_Actions.mjs", "Script_EnemyAi.mjs", "Script_Turn.mjs",
+    "Script_Bots.mjs", "Script_AsciiMap.mjs"];
+  const banned = ["window.", "document.", "Math." + "random", "Date." + "now", 'from "three"', "from 'three'"];
+  for (const file of coreFiles) {
+    const source = Src(file)
+      .replace(/\/\*[\s\S]*?\*\//g, "")     // 去块注释
+      .replace(/\/\/[^\n]*/g, "");          // 去行注释（禁令只针对可执行代码）
+    for (const pattern of banned) {
+      Ok(!source.includes(pattern), `${file} 含违禁引用 ${pattern}`);
+    }
+  }
+});
+
+Check("契约：DeriveView 只读不写（视图不改状态）", () => {
+  let state = CreateGame("L2", 7);
+  for (let i = 0; i < 3; i += 1) state = EndTurn(state).state;
+  const hash = HashState(state);
+  DeriveView(state);
+  RenderAsciiMap(state);
+  Eq(HashState(state), hash, "DeriveView/ASCII 改动了状态");
+});
+
+Check("契约：非法动作不改状态且给出理由", () => {
+  const state = CreateGame("L1", 3);
+  const hash = HashState(state);
+  const outcome = PerformAction(state, { type: "Attack", unit: "u1", target: "不存在" });
+  Ok(outcome.illegal, "应返回 illegal");
+  Eq(HashState(state), hash, "非法动作污染了传入状态");
+  Eq(outcome.state, state, "非法动作应原样退回状态引用");
+});
+
+// ===========================================================================
+// 二、确定性
+// ===========================================================================
+
+Check("确定性：同 seed 同 bot 两次跑 → 终局哈希一致", () => {
+  const a = RunBotGame({ level: "L1", seed: 5, bot: "Skilled" });
+  const b = RunBotGame({ level: "L1", seed: 5, bot: "Skilled" });
+  Eq(HashState(a.state), HashState(b.state), "L1 Skilled 终局哈希");
+  const c = RunBotGame({ level: "L2", seed: 4, bot: "Random" });
+  const d = RunBotGame({ level: "L2", seed: 4, bot: "Random" });
+  Eq(HashState(c.state), HashState(d.state), "L2 Random 终局哈希");
+});
+
+Check("确定性：动作序列重放 + 存档读档续跑 = 一次跑通", () => {
+  const run = RunBotGame({ level: "L1", seed: 5, bot: "Skilled" });
+  let replay = CreateGame("L1", 5);
+  const half = Math.floor(run.actions.length / 2);
+  for (let i = 0; i < half; i += 1) replay = Step(replay, run.actions[i]).state;
+  let resumed = DeserializeState(SerializeState(replay));      // 中盘存档
+  for (let i = half; i < run.actions.length; i += 1) {
+    replay = Step(replay, run.actions[i]).state;
+    resumed = Step(resumed, run.actions[i]).state;
+  }
+  Eq(HashState(replay), HashState(run.state), "重放与原跑不一致");
+  Eq(HashState(resumed), HashState(run.state), "读档续跑与一次跑通不一致");
+});
+
+// ===========================================================================
+// 三、乱打模糊
+// ===========================================================================
+
+Check("模糊：乱打 bot 整局零崩溃、资源有界、账本单调", () => {
+  const cases = [["L1", 11], ["L1", 12], ["L1", 13], ["L2", 11], ["L2", 12]];
+  for (const [level, seed] of cases) {
+    let lastLedger = { civCaptured: 0, civDead: 0, housesBurned: 0, grainSeized: 0 };
+    const { state } = RunBotGame({ level, seed, bot: "Random", onStep: (st) => {
+      Ok(st.resources.ammo >= 0 && st.resources.ammo <= CFG.ammoMax, `弹药越界 ${st.resources.ammo}`);
+      for (const key of Object.keys(st.ledger)) {
+        Ok(st.ledger[key] >= lastLedger[key], `账本回落：${key}`);
+        Ok(st.ledger[key] >= 0, `账本为负：${key}`);
+      }
+      lastLedger = { ...st.ledger };
+      for (const unit of AllyUnits(st).concat(EnemyUnits(st))) {
+        Ok(unit.hp > 0 && unit.hp <= UnitDef(unit).hp, `HP 越界 ${unit.id}:${unit.hp}`);
+        Ok(unit.mp >= 0, `MP 为负 ${unit.id}`);
+        Ok(unit.breath >= 0, `憋闷为负 ${unit.id}`);
+      }
+      for (const key of SortedKeys(st.map.hexes)) {
+        Ok(st.map.hexes[key].traces <= CFG.tracesMax, `痕迹越界 ${key}`);
+      }
+      Ok(PopTotal(st) >= 0 && GrainTotal(st) >= 0, "资源为负");
+    } });
+    Ok(state.result, `${level} seed${seed} 乱打未跑到终局`);
+  }
+});
+
+// ===========================================================================
+// 四、策略排序红线 + 双时钟
+// ===========================================================================
+
+const rankSeeds = [1, 2, 3, 4, 5];
+const rank = {};
+for (const level of ["L1", "L2"]) {
+  rank[level] = {};
+  for (const bot of ["Skilled", "Turtle", "Rambo"]) {
+    rank[level][bot] = rankSeeds.map((seed) => RunBotGame({ level, seed, bot }).state);
+  }
+}
+
+Check("排序红线：莽撞 L1 必败", () => {
+  for (const state of rank.L1.Rambo) Ok(!state.result.won, `Rambo seed 应败，实得 ${state.result.grade}`);
+});
+
+Check("排序红线：缩头 L1 必不得甲乙", () => {
+  for (const state of rank.L1.Turtle) {
+    Ok(!state.result.won || ["丙", "丁"].includes(state.result.grade), `Turtle 评到 ${state.result.grade}`);
+  }
+});
+
+Check("排序红线：会玩 L1 必胜且 ≥乙", () => {
+  for (const state of rank.L1.Skilled) {
+    Ok(state.result.won, "Skilled L1 未胜");
+    Ok(["甲", "乙"].includes(state.result.grade), `Skilled 评到 ${state.result.grade}`);
+  }
+});
+
+Check("排序红线：会玩 > 缩头 且 会玩 > 莽撞（胜负 + 数值分双排序）", () => {
+  for (const level of ["L1", "L2"]) {
+    const score = (states) => [
+      states.filter((state) => state.result.won).length,
+      states.reduce((sum, state) => sum + state.result.breakdown.total, 0),
     ];
-    state.enemies.forEach((enemy) => {
-      enemy.intent = {
-        intentId: EnemyIntentIds.INVESTIGATE,
-        label: "未揭示测试意图",
-        targetKey: hiddenTargetKey,
-      };
-      enemy.intentRevealed = false;
-    });
-    if (reverseCollections) {
-      state.enemies.reverse();
-      state.evidence.reverse();
-    }
-    state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-    const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-    digger.layer = LayerIds.TUNNEL;
-    digger.actionPoints = 2;
-    state = Apply(state, "WorkTeam", ActionIds.DIG, "5,2");
-    state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-    state = Apply(state, "WorkTeam", ActionIds.DIG, "5,1");
-    return {
-      plannedFastPath: state.plannedFastPath,
-      plannedQuietPath: state.plannedQuietPath,
-      plannedFastKeys: state.plannedFastKeys,
-      plannedQuietKeys: state.plannedQuietKeys,
-      plannedSurveyedPathKeys: state.plannedSurveyedPathKeys,
-      plannedCorridorKeys: state.plannedCorridorKeys,
-      plannedRouteMode: state.plannedRouteMode,
-    };
-  }
-
-  const baseline = CommitFastCorridor(1, false, "0,5");
-  assert.deepEqual(CommitFastCorridor(2, false, "7,2"), baseline);
-  assert.deepEqual(CommitFastCorridor(3, true, "0,0"), baseline);
-  assert.equal(baseline.plannedRouteMode, "Fast");
-});
-
-Test("corridor mode alone cannot alter enemy planning", () => {
-  let state = CreateInitialState({ seed: 17 });
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  state.turn = 6;
-  state.sweepActive = true;
-  state.evidence.push({
-    evidenceId: "ModeIsolationEvidence",
-    kind: "FreshTracks",
-    tileKey: "2,1",
-    strength: 0.8,
-    createdTurn: 6,
-    expiresTurn: 9,
-    source: "mode-isolation-test",
-  });
-  const plans = ["Fast", "Quiet", "Rerouted"].map((mode) => {
-    const variant = Clone(state);
-    variant.plannedRouteMode = mode;
-    return PlanEnemyTurn(variant);
-  });
-  assert.deepEqual(plans[1], plans[0]);
-  assert.deepEqual(plans[2], plans[0]);
-});
-
-Test("surveyed corridor bands create a persistent mode while off-plan digging stays costly", () => {
-  let fast = CreateInitialState();
-  fast = Apply(fast, "Scout", ActionIds.RECON, "2,1");
-  const fastDigger = fast.units.find((unit) => unit.unitId === "WorkTeam");
-  fastDigger.layer = LayerIds.TUNNEL;
-  fastDigger.actionPoints = 2;
-  assert.equal(GetCorridorTileRole(fast, "5,2"), "Shared");
-  assert.equal(GetCorridorTileRole(fast, "5,1"), "Fast");
-  assert.equal(GetCorridorTileRole(fast, "4,2"), "Quiet");
-  assert.equal(GetCorridorTileRole(fast, "6,1"), "OffPlan");
-  const sharedExposure = fast.exposure;
-  fast = Apply(fast, "WorkTeam", ActionIds.DIG, "5,2");
-  assert.equal(fast.exposure - sharedExposure, SoilCatalog.packed.noise);
-  assert.equal(GetCorridorProgress(fast).identity, "Undecided");
-  fast.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-  fast = Apply(fast, "WorkTeam", ActionIds.DIG, "5,1");
-  assert.equal(fast.plannedRouteMode, "Fast");
-  assert.equal(GetCorridorProgress(fast).identity, "Fast");
-
-  let rerouted = CreateInitialState();
-  rerouted = Apply(rerouted, "Scout", ActionIds.RECON, "2,1");
-  const reroutedDigger = rerouted.units.find((unit) => unit.unitId === "WorkTeam");
-  reroutedDigger.layer = LayerIds.TUNNEL;
-  reroutedDigger.actionPoints = 2;
-  const reroutedExposure = rerouted.exposure;
-  const offPlanSoil = SoilCatalog[rerouted.tiles["6,1"].soilId];
-  rerouted = Apply(rerouted, "WorkTeam", ActionIds.DIG, "6,1");
-  assert.equal(rerouted.exposure - reroutedExposure, offPlanSoil.noise + 3);
-  assert.equal(rerouted.plannedRouteMode, "Rerouted");
-  assert.equal(GetCorridorProgress(rerouted).identity, "Rerouted");
-  assert.deepEqual(GetCorridorProgress(rerouted).deviationKeys, ["6,1"]);
-  assert.equal(rerouted.tiles["6,1"].soilRevealed, true);
-});
-
-Test("rerouted corridor identity is monotonic across cross-band connection", () => {
-  let state = CreateInitialState();
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  state.units.find((unit) => unit.unitId === "WorkTeam").layer = LayerIds.TUNNEL;
-  for (const tileKey of ["5,2", "5,1", "4,2", "4,1", "3,1", "2,1"]) {
-    state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-    state = Apply(state, "WorkTeam", ActionIds.DIG, tileKey);
-  }
-  assert.equal(state.plannedRouteMode, "Rerouted");
-  assert.equal(GetCorridorProgress(state).identity, "Rerouted");
-  assert.equal(GetCorridorProgress(state).connected, true);
-
-  const corridorMigrationFields = [
-    "plannedCorridorKeys",
-    "plannedFastPath",
-    "plannedQuietPath",
-    "plannedFastKeys",
-    "plannedQuietKeys",
-    "plannedSurveyedPathKeys",
-    "plannedRouteMode",
-    "corridorDugKeys",
-    "corridorConnectedPath",
-    "corridorConnectedTurn",
-    "corridorDigActions",
-    "corridorToolsSpent",
-    "corridorNoiseGenerated",
-    "corridorExposureGenerated",
-  ];
-  const legacyCrossBand = Clone(state);
-  legacyCrossBand.tunnels["2,1"].dugTurn = 2;
-  for (const field of corridorMigrationFields) {
-    delete legacyCrossBand[field];
-  }
-  const migratedCrossBand = DeserializeState(JSON.stringify(legacyCrossBand));
-  assert.equal(migratedCrossBand.plannedRouteMode, "Rerouted");
-  assert.equal(GetCorridorProgress(migratedCrossBand).identity, "Rerouted");
-
-  let postConnectionBranch = BuildTestCorridor("2,1", "Fast").state;
-  postConnectionBranch.turn = 2;
-  postConnectionBranch.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "6,2";
-  postConnectionBranch.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-  postConnectionBranch = Apply(
-    postConnectionBranch,
-    "WorkTeam",
-    ActionIds.DIG,
-    "7,2",
-  );
-  assert.equal(GetCorridorProgress(postConnectionBranch).identity, "Fast");
-  const legacyPostConnectionBranch = Clone(postConnectionBranch);
-  for (const field of corridorMigrationFields) {
-    delete legacyPostConnectionBranch[field];
-  }
-  const migratedPostConnectionBranch = DeserializeState(
-    JSON.stringify(legacyPostConnectionBranch),
-  );
-  assert.equal(migratedPostConnectionBranch.plannedRouteMode, "Fast");
-  assert.equal(GetCorridorProgress(migratedPostConnectionBranch).identity, "Fast");
-  assert.equal(migratedPostConnectionBranch.corridorDugKeys.includes("7,2"), false);
-});
-
-Test("corridor construction ledger counts re-dig costs and unknown exposure", () => {
-  let state = CreateInitialState();
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  digger.actionPoints = 2;
-  const soil = SoilCatalog[state.tiles["7,2"].soilId];
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "7,2");
-  state.tunnels["7,2"].collapsed = true;
-  state.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "6,2";
-  state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "7,2");
-  const progress = GetCorridorProgress(state);
-  assert.equal(progress.digActions, 2);
-  assert.equal(progress.tools, soil.digCost * 2);
-  assert.equal(progress.noise, soil.noise * 2);
-  assert.equal(progress.exposure, soil.noise * 2 + 3);
-  assert.deepEqual(progress.deviationKeys, ["7,2"]);
-
-  let connected = BuildTestCorridor("2,1", "Fast").state;
-  const connectedProgress = GetCorridorProgress(connected);
-  const frozenRepairKey = "5,2";
-  const frozenRepairSoil = SoilCatalog[connected.tiles[frozenRepairKey].soilId];
-  connected.tunnels[frozenRepairKey].collapsed = true;
-  connected.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "6,2";
-  connected.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-  connected = Apply(connected, "WorkTeam", ActionIds.DIG, frozenRepairKey);
-  const repairedProgress = GetCorridorProgress(connected);
-  assert.equal(repairedProgress.digActions, connectedProgress.digActions + 1);
-  assert.equal(repairedProgress.tools, connectedProgress.tools + frozenRepairSoil.digCost);
-  assert.equal(repairedProgress.noise, connectedProgress.noise + frozenRepairSoil.noise);
-  assert.equal(repairedProgress.exposure, connectedProgress.exposure + frozenRepairSoil.noise);
-});
-
-Test("a blocked frozen mainline exposes its same-exit fallback everywhere", () => {
-  let state = BuildTestCorridor("2,1", "Fast").state;
-  for (let index = 1; index < state.plannedQuietPath.length; index += 1) {
-    AddTestTunnel(state, state.plannedQuietPath[index - 1], state.plannedQuietPath[index]);
-  }
-  state.tunnels["5,1"].collapsed = true;
-  const route = FindEvacuationPaths(state)
-    .find((entry) => entry.exitKey === "2,1");
-  assert.equal(route.usesFrozenMainline, false);
-  assert.equal(route.corridorRerouted, true);
-  assert.notDeepEqual(route.path, state.corridorConnectedPath);
-
-  state.turn = MissionConfig.evacuationTurn;
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "6,2";
-  militia.actionPoints = 2;
-  const estimate = GetCivilianTransitEstimate(state, "Wounded", "2,1");
-  assert.equal(estimate.usesFrozenMainline, false);
-  assert.equal(estimate.corridorRerouted, true);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
-  const group = state.civilians.find((entry) => entry.groupId === "Wounded");
-  assert.equal(group.usesFrozenMainline, false);
-  assert.equal(group.corridorRerouted, true);
-  assert.match(state.log.at(-1).text, /冻结主线不可用.*同出口应急支线/);
-  const activeEstimate = GetActiveCivilianTransitEstimate(state, "Wounded");
-  assert.equal(activeEstimate.usesFrozenMainline, false);
-  assert.equal(activeEstimate.corridorRerouted, true);
-});
-
-Test("dig effort makes Fast earlier than Quiet and freezes the connected mainline", () => {
-  function BuildCorridor(exitKey, mode) {
-    let state = CreateInitialState();
-    state = Apply(state, "Scout", ActionIds.RECON, exitKey);
-    const survey = GetRouteSurvey(state, exitKey);
-    const path = mode === "Fast" ? survey.fastPath : survey.quietPath;
-    const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-    digger.layer = LayerIds.TUNNEL;
-    digger.actionPoints = 2;
-    let constructionTurns = 1;
-    for (const tileKey of path.slice(1)) {
-      let result = ApplyPlayerAction(state, {
-        unitId: "WorkTeam",
-        actionId: ActionIds.DIG,
-        targetKey: tileKey,
-      });
-      if (!result.ok) {
-        constructionTurns += 1;
-        state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-        result = ApplyPlayerAction(state, {
-          unitId: "WorkTeam",
-          actionId: ActionIds.DIG,
-          targetKey: tileKey,
-        });
-      }
-      assert.equal(result.ok, true, `${exitKey} ${mode} ${tileKey}: ${result.reason}`);
-      state = result.state;
-    }
-    return { state, constructionTurns };
-  }
-
-  const northFast = BuildCorridor("2,1", "Fast");
-  const northQuiet = BuildCorridor("2,1", "Quiet");
-  const southFast = BuildCorridor("0,5", "Fast");
-  const southQuiet = BuildCorridor("0,5", "Quiet");
-  assert.deepEqual(
-    [northFast.constructionTurns, northQuiet.constructionTurns],
-    [3, 4],
-  );
-  assert.deepEqual(
-    [southFast.constructionTurns, southQuiet.constructionTurns],
-    [4, 5],
-  );
-  assert.equal(GetCorridorProgress(northFast.state).identity, "Fast");
-  assert.equal(GetCorridorProgress(northQuiet.state).identity, "Quiet");
-  assert.equal(GetCorridorProgress(southFast.state).identity, "Fast");
-  assert.equal(GetCorridorProgress(southQuiet.state).identity, "Quiet");
-
-  const frozenFastPath = [...northFast.state.corridorConnectedPath];
-  AddTestTunnel(northFast.state, "5,2", "4,2");
-  assert.deepEqual(
-    FindEvacuationPaths(northFast.state)
-      .find((entry) => entry.exitKey === "2,1").path,
-    frozenFastPath,
-  );
-});
-
-Test("bracing only claims to resolve the warning on the matching tile", () => {
-  let state = CreateInitialState();
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  for (const tileKey of ["5,2", "5,1", "4,1", "3,1", "2,1"]) {
-    state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-    state = Apply(state, "WorkTeam", ActionIds.DIG, tileKey);
-  }
-  state.units.find((unit) => unit.unitId === "WorkTeam").actionPoints = 2;
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  assert.match(state.log.at(-1).text, /没有待解除的塌方预警/);
-  assert.equal(state.warnings.find((warning) => warning.targetKey === "3,1").resolved, false);
-  const activeDigger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  activeDigger.tileKey = "3,1";
-  activeDigger.actionPoints = 2;
-  state = Apply(state, "WorkTeam", ActionIds.BRACE);
-  assert.match(state.log.at(-1).text, /对应塌方预警解除/);
-  assert.equal(state.warnings.find((warning) => warning.targetKey === "3,1").resolved, true);
-});
-
-Test("the surveyed main exit must connect before another exit can launch civilians", () => {
-  let state = CreateInitialState();
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  state.turn = MissionConfig.evacuationTurn;
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "6,2";
-  militia.actionPoints = 2;
-  const nodeTemplate = Clone(state.tunnels["6,2"]);
-  for (const tileKey of ["5,3", "4,4", "3,4", "2,4", "1,5", "0,5"]) {
-    state.tunnels[tileKey] = { ...Clone(nodeTemplate), tileKey };
-  }
-  assert.deepEqual(GetEvacuationTargets(state, "Militia"), []);
-  const blockedLaunch = ApplyPlayerAction(state, {
-    unitId: "Militia",
-    actionId: ActionIds.EVACUATE,
-    targetKey: "0,5",
-    groupId: "Wounded",
-  });
-  assert.equal(blockedLaunch.ok, false);
-  assert.match(blockedLaunch.reason, /主勘线出口北枣窖尚未接通/);
-  for (const tileKey of ["6,1", "5,1", "4,1", "3,1", "2,1"]) {
-    state.tunnels[tileKey] = { ...Clone(nodeTemplate), tileKey };
-  }
-  assert.deepEqual(GetEvacuationTargets(state, "Militia").sort(), ["0,5", "2,1"]);
-});
-
-Test("intel reveals threats along the chosen corridor instead of acting as a dead resource", () => {
-  let north = CreateInitialState();
-  north = Apply(north, "Scout", ActionIds.RECON, "2,1");
-  north.enemies.forEach((enemy) => {
-    enemy.scoutedUntilTurn = 0;
-    enemy.intentRevealed = false;
-  });
-  const lowIntel = Clone(north);
-  lowIntel.intel = 0;
-  PlanEnemyTurn(lowIntel);
-  PlanEnemyTurn(north);
-  assert.equal(
-    north.enemies.find((enemy) => enemy.enemyId === "NorthPatrol").intentRevealed,
-    true,
-  );
-  assert.equal(
-    lowIntel.enemies.find((enemy) => enemy.enemyId === "NorthPatrol").intentRevealed,
-    false,
-  );
-
-  let south = CreateInitialState();
-  south = Apply(south, "Scout", ActionIds.RECON, "0,5");
-  south.enemies.forEach((enemy) => {
-    enemy.scoutedUntilTurn = 0;
-    enemy.intentRevealed = false;
-  });
-  PlanEnemyTurn(south);
-  assert.equal(
-    south.enemies.find((enemy) => enemy.enemyId === "BridgePatrol").intentRevealed,
-    true,
-  );
-  assert.equal(
-    south.enemies.find((enemy) => enemy.enemyId === "NorthPatrol").intentRevealed,
-    false,
-  );
-
-  const movedOffNorthCorridor = Clone(north);
-  const movedNorthPatrol = movedOffNorthCorridor.enemies.find((enemy) => (
-    enemy.enemyId === "NorthPatrol"
-  ));
-  movedNorthPatrol.tileKey = "0,0";
-  movedNorthPatrol.intentRevealed = false;
-  movedNorthPatrol.scoutedUntilTurn = 0;
-  PlanEnemyTurn(movedOffNorthCorridor);
-  assert.equal(movedNorthPatrol.intentRevealed, false);
-
-  const movedOntoSouthCorridor = Clone(south);
-  const movedSouthPatrol = movedOntoSouthCorridor.enemies.find((enemy) => (
-    enemy.enemyId === "NorthPatrol"
-  ));
-  movedSouthPatrol.tileKey = "1,5";
-  movedSouthPatrol.intentRevealed = false;
-  movedSouthPatrol.scoutedUntilTurn = 0;
-  PlanEnemyTurn(movedOntoSouthCorridor);
-  assert.equal(movedSouthPatrol.intentRevealed, true);
-});
-
-Test("repeat surface reconnaissance costs organization, respects cooldown, and cannot be spammed", () => {
-  let state = CreateInitialState();
-  state.reconActions = 1;
-  state.reconVisitedTiles = ["6,3"];
-  state.planningReconCompleted = true;
-  state.plannedExitKey = "2,1";
-  state.exposure = 30;
-  state = Apply(state, "Scout", ActionIds.RECON, "5,3");
-  assert.equal(state.exposure, 25);
-  assert.equal(state.reconActions, 2);
-  assert.equal(state.planningReconCompleted, true);
-  assert.equal(state.organization, MissionConfig.startingOrganization - 1);
-  assert.equal(GetAvailableActions(state, "Scout").includes(ActionIds.RECON), false);
-  const repeated = ApplyPlayerAction(state, {
-    unitId: "Scout",
-    actionId: ActionIds.RECON,
-  });
-  assert.equal(repeated.ok, false);
-  assert.equal(
-    state.enemies.some((enemy) => enemy.intentRevealed && enemy.scoutedUntilTurn >= state.turn),
-    true,
-  );
-  const scout = state.units.find((unit) => unit.unitId === "Scout");
-  scout.layer = LayerIds.TUNNEL;
-  assert.equal(GetAvailableActions(state, "Scout").includes(ActionIds.RECON), false);
-});
-
-Test("civilians wait safely below an unknown exit until the scout signals a clear window", () => {
-  let state = CreateInitialState();
-  state.enemies.forEach((enemy) => {
-    enemy.health = 0;
-  });
-  state.turn = 5;
-  state.sweepActive = true;
-  state.tunnels["2,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "2,1",
-    sealed: false,
-  };
-  const group = state.civilians[0];
-  group.status = "Moving";
-  group.path = ["6,2", "2,1"];
-  group.pathIndex = 1;
-  group.tileKey = "2,1";
-  group.exitKey = "2,1";
-  const safetyBefore = state.peopleSafety;
-  state = RunEnemyPhase(state);
-  assert.equal(state.civilians[0].waitingForSignal, true);
-  assert.equal(state.civiliansSafe, 0);
-  assert.equal(state.peopleSafety, safetyBefore);
-  assert.equal(GetExitWindow(state, "2,1").status, "Unknown");
-  const missed = Clone(state);
-  missed.turn = MissionConfig.maxTurns + 1;
-  missed.outcome = EvaluateMission(missed);
-  assert.equal(missed.outcome.failureId, "ExitWindowMissed");
-  assert.equal(missed.outcome.groupId, "Wounded");
-
-  const scout = state.units.find((unit) => unit.unitId === "Scout");
-  scout.tileKey = "2,1";
-  scout.layer = LayerIds.SURFACE;
-  scout.actionPoints = 2;
-  state.reconActions = 1;
-  state.planningReconCompleted = true;
-  state.plannedExitKey = "2,1";
-  state.lastReconTurn = 0;
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  assert.equal(GetExitWindow(state, "2,1").status, "Clear");
-  assert.equal(state.intel, 1);
-  const expiredSignal = Clone(state);
-  expiredSignal.turn = expiredSignal.exitWindows["2,1"].checkedUntilTurn + 1;
-  assert.equal(GetExitWindow(expiredSignal, "2,1").status, "Unknown");
-  state = RunEnemyPhase(state);
-  assert.equal(state.civilians[0].status, "Safe");
-  assert.equal(state.civiliansSafe, 3);
-});
-
-Test("surface control overrides a fresh clear signal at an exit", () => {
-  const state = CreateInitialState();
-  state.turn = 6;
-  state.tunnels["2,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "2,1",
-    sealed: false,
-  };
-  state.exitWindows["2,1"].checkedTurn = state.turn;
-  state.exitWindows["2,1"].checkedUntilTurn = state.turn + 1;
-  const patrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  state.enemies.forEach((enemy) => {
-    enemy.health = enemy.enemyId === patrol.enemyId ? 3 : 0;
-  });
-  patrol.inactiveUntilTurn = 0;
-  patrol.stunnedUntilTurn = 0;
-  patrol.intent = null;
-
-  patrol.tileKey = "2,1";
-  assert.equal(GetExitWindow(state, "2,1").status, "Watched");
-
-  patrol.tileKey = "2,2";
-  assert.equal(HexDistance(patrol.tileKey, "2,1"), 1);
-  assert.equal(GetExitWindow(state, "2,1").status, "Watched");
-
-  patrol.health = 0;
-  assert.equal(GetExitWindow(state, "2,1").status, "Clear");
-});
-
-Test("enemy movement cannot overlap a surface player unit", () => {
-  let state = CreateInitialState();
-  state.turn = 6;
-  state.sweepActive = true;
-  const scout = state.units.find((unit) => unit.unitId === "Scout");
-  scout.layer = LayerIds.SURFACE;
-  scout.tileKey = "2,1";
-  const patrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  state.enemies.forEach((enemy) => {
-    enemy.health = enemy.enemyId === patrol.enemyId ? 3 : 0;
-  });
-  patrol.tileKey = "3,1";
-  patrol.intent = {
-    intentId: EnemyIntentIds.INVESTIGATE,
-    targetKey: "2,1",
-    evidenceTarget: "2,1",
-    evidenceId: "OccupiedExit",
-    evidenceKind: "SurfaceSighting",
-  };
-  state = RunEnemyPhase(state);
-  assert.equal(state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol").tileKey, "3,1");
-  assert.equal(state.units.find((unit) => unit.unitId === "Scout").tileKey, "2,1");
-});
-
-Test("a new seal warning reroutes civilians in transit and still permits a T11 escape", () => {
-  let state = CreateInitialState();
-  state.turn = 7;
-  state.sweepActive = true;
-  const northPath = ["6,2", "6,1", "5,1", "4,1", "3,1", "2,1"];
-  const southPath = ["6,2", "5,3", "4,4", "3,4", "2,4", "1,5", "0,5"];
-  for (const tileKey of [...new Set([...northPath, ...southPath])]) {
-    state.tunnels[tileKey] = {
-      ...Clone(state.tunnels["6,2"]),
-      tileKey,
-      sealed: false,
-      collapsed: false,
-      braced: true,
-    };
-  }
-  const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-  state.enemies.forEach((enemy) => {
-    enemy.health = enemy.enemyId === sapper.enemyId ? 4 : 0;
-  });
-  sapper.inactiveUntilTurn = 0;
-  sapper.tileKey = "3,1";
-  sapper.intent = {
-    intentId: EnemyIntentIds.PREPARE_SEAL,
-    targetKey: "2,1",
-  };
-  const group = state.civilians[0];
-  group.status = "Moving";
-  group.path = northPath;
-  group.pathIndex = 3;
-  group.tileKey = "4,1";
-  group.exitKey = "2,1";
-  group.moveSteps = 2;
-
-  state = RunEnemyPhase(state);
-  const rerouted = state.civilians[0];
-  assert.equal(state.warnings.some((warning) => !warning.resolved && warning.kind === "Seal"), true);
-  assert.equal(rerouted.tileKey === "2,1", false);
-  assert.equal(rerouted.path[0], "4,1");
-  assert.equal(rerouted.exitKey, "0,5");
-  assert.equal(rerouted.delayed, true);
-  assert.equal(
-    state.eventLedger.some((event) => event.text.includes(state.tiles["0,5"].name)),
-    true,
-  );
-
-  sapper.health = 0;
-  sapper.intent = null;
-  while (state.turn < MissionConfig.maxTurns) {
-    state = RunEnemyPhase(state);
-  }
-  assert.equal(state.turn, MissionConfig.maxTurns);
-  assert.equal(state.civilians[0].status, "Moving");
-  state.exitWindows["0,5"].checkedTurn = state.turn;
-  state.exitWindows["0,5"].checkedUntilTurn = state.turn + 1;
-  state = RunEnemyPhase(state);
-  assert.equal(state.turn, MissionConfig.maxTurns + 1);
-  assert.equal(state.civilians[0].status, "Safe");
-  assert.equal(state.civiliansSafe, 3);
-});
-
-Test("a visible seal warning makes civilians take a connected second exit", () => {
-  let state = CreateInitialState();
-  state.turn = 7;
-  state.sweepActive = true;
-  state.enemies.forEach((enemy) => {
-    enemy.health = 0;
-  });
-  const northPath = ["6,2", "6,1", "5,1", "4,1", "3,1", "2,1"];
-  const southPath = ["6,2", "5,3", "4,4", "3,4", "2,4", "1,5", "0,5"];
-  for (const tileKey of [...new Set([...northPath, ...southPath])]) {
-    state.tunnels[tileKey] = {
-      ...Clone(state.tunnels["6,2"]),
-      tileKey,
-      sealed: false,
-      collapsed: false,
-      braced: true,
-    };
-  }
-  state.warnings = [{
-    warningId: "NorthSeal",
-    kind: "Seal",
-    targetKey: "2,1",
-    resolvesTurn: state.turn + 1,
-    resolved: false,
-    enemyId: "Sapper",
-  }];
-  state.exitWindows["0,5"].checkedTurn = state.turn;
-  state.exitWindows["0,5"].checkedUntilTurn = state.turn + 2;
-  const group = state.civilians[0];
-  group.status = "Moving";
-  group.path = northPath;
-  group.pathIndex = northPath.length - 1;
-  group.tileKey = "2,1";
-  group.exitKey = "2,1";
-  state = RunEnemyPhase(state);
-  assert.equal(state.civilians[0].status, "Moving");
-  assert.equal(state.civilians[0].exitKey, "0,5");
-  assert.equal(state.civilians[0].delayed, true);
-  assert.equal(
-    state.eventLedger.some((event) => event.text.includes(state.tiles["0,5"].name)),
-    true,
-  );
-});
-
-Test("hex helpers return six unique neighbors and symmetric distance", () => {
-  const neighbors = NeighborKeys("3,2");
-  assert.equal(neighbors.length, 6);
-  assert.equal(new Set(neighbors).size, 6);
-  assert.equal(HexDistance("6,2", "2,1"), HexDistance("2,1", "6,2"));
-});
-
-Test("north route is shorter and louder while south route is longer and steadier", () => {
-  const state = CreateInitialState();
-  const north = CheapestRoute(state, "2,1");
-  const south = CheapestRoute(state, "0,5");
-  assert.equal(north.distance < south.distance, true);
-  assert.equal(north.cost < south.cost, true);
-  assert.equal(north.noise > south.noise, true);
-});
-
-Test("current-turn move paths are pure and exactly replay authoritative steps", () => {
-  const state = CreateInitialState();
-  const untouched = Clone(state);
-  const plans = GetActionPathPlans(state, "Scout", ActionIds.MOVE);
-  assert.deepEqual(state, untouched);
-  const plan = plans.find((entry) => entry.targetKey === "5,5");
-  assert.deepEqual(plan.targetKeys, ["5,4", "5,5"]);
-  assert.equal(plan.steps, 2);
-  const batch = ApplyPlayerActionPath(state, {
-    unitId: "Scout",
-    actionId: ActionIds.MOVE,
-    targetKeys: plan.targetKeys,
-  });
-  assert.equal(batch.ok, true);
-  let manual = Apply(state, "Scout", ActionIds.MOVE, "5,4");
-  manual = Apply(manual, "Scout", ActionIds.MOVE, "5,5");
-  assert.deepEqual(batch.state, manual);
-  assert.equal(batch.state.turn, state.turn);
-  assert.equal(batch.state.phase, "Player");
-  assert.equal(SerializeState(batch.state).includes('"targetKeys"'), false);
-});
-
-Test("move paths cannot skip costly terrain, occupied cells, or a decision stop", () => {
-  let state = CreateInitialState();
-  const scout = state.units.find((unit) => unit.unitId === "Scout");
-  scout.tileKey = "1,3";
-  scout.actionPoints = 2;
-  state.enemies.forEach((enemy) => {
-    enemy.health = 0;
-  });
-  const untouched = Clone(state);
-  const costly = ApplyPlayerActionPath(state, {
-    unitId: "Scout",
-    actionId: ActionIds.MOVE,
-    targetKeys: ["1,4", "1,5"],
-  });
-  assert.equal(costly.ok, false);
-  assert.deepEqual(costly.state, untouched);
-
-  state = CreateInitialState();
-  state.enemies.find((enemy) => enemy.enemyId === "BridgePatrol").tileKey = "5,4";
-  const occupied = ApplyPlayerActionPath(state, {
-    unitId: "Scout",
-    actionId: ActionIds.MOVE,
-    targetKeys: ["5,4", "5,5"],
-  });
-  assert.equal(occupied.ok, false);
-  assert.deepEqual(occupied.state, state);
-
-  state = CreateInitialState();
-  const sighted = ApplyPlayerActionPath(state, {
-    unitId: "Scout",
-    actionId: ActionIds.MOVE,
-    targetKeys: ["4,4", "3,4"],
-  });
-  assert.equal(sighted.ok, false);
-  assert.match(sighted.reason, /敌军视线/);
-  assert.deepEqual(sighted.state, state);
-});
-
-Test("current-turn dig paths preserve every tool, noise, warning, and log mutation", () => {
-  const state = CreateInitialState();
-  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  digger.actionPoints = 2;
-  state.tiles["5,3"].soilRevealed = true;
-  state.tiles["4,4"].soilRevealed = true;
-  const plans = GetActionPathPlans(state, "WorkTeam", ActionIds.DIG);
-  const plan = plans.find((entry) => entry.targetKey === "4,4");
-  assert.deepEqual(plan.targetKeys, ["5,3", "4,4"]);
-  const batch = ApplyPlayerActionPath(state, {
-    unitId: "WorkTeam",
-    actionId: ActionIds.DIG,
-    targetKeys: plan.targetKeys,
-  });
-  assert.equal(batch.ok, true);
-  let manual = Apply(state, "WorkTeam", ActionIds.DIG, "5,3");
-  manual = Apply(manual, "WorkTeam", ActionIds.DIG, "4,4");
-  assert.deepEqual(batch.state, manual);
-  assert.equal(batch.state.tunnelsDug, state.tunnelsDug + 2);
-  assert.deepEqual(
-    batch.plan.evidenceAdded.map((evidence) => [evidence.kind, evidence.tileKey]),
-    [["DigNoise", "5,3"], ["DigNoise", "4,4"]],
-  );
-  assert.equal(batch.plan.toolsCost, 2);
-});
-
-Test("CLI path discovery may expose explicit branch routes without making UI endpoints ambiguous", () => {
-  const state = CreateInitialState();
-  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  digger.actionPoints = 3;
-  state.plannedSurveyedPathKeys = Object.keys(state.tiles);
-  const interfacePlans = GetActionPathPlans(state, "WorkTeam", ActionIds.DIG);
-  assert.equal(interfacePlans.some((plan) => plan.targetKey === "4,3"), false);
-  const explicitPlans = GetActionPathPlans(state, "WorkTeam", ActionIds.DIG, {
-    includeAmbiguous: true,
-  }).filter((plan) => plan.targetKey === "4,3");
-  assert.deepEqual(
-    explicitPlans.map((plan) => plan.targetKeys),
-    [["5,2", "4,3"], ["5,3", "4,3"]],
-  );
-  assert.equal(explicitPlans.every((plan) => ApplyPlayerActionPath(state, {
-    unitId: "WorkTeam",
-    actionId: ActionIds.DIG,
-    targetKeys: plan.targetKeys,
-  }).ok), true);
-});
-
-Test("dig paths reject unknown, unaffordable, or post-crack continuation atomically", () => {
-  let state = CreateInitialState();
-  let digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  digger.actionPoints = 2;
-  let result = ApplyPlayerActionPath(state, {
-    unitId: "WorkTeam",
-    actionId: ActionIds.DIG,
-    targetKeys: ["5,3", "4,4"],
-  });
-  assert.equal(result.ok, false);
-  assert.match(result.reason, /土层尚未侦明/);
-  assert.deepEqual(result.state, state);
-
-  state = CreateInitialState();
-  digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  digger.actionPoints = 2;
-  state.tiles["5,3"].soilRevealed = true;
-  state.tiles["4,4"].soilRevealed = true;
-  state.tools = 1;
-  result = ApplyPlayerActionPath(state, {
-    unitId: "WorkTeam",
-    actionId: ActionIds.DIG,
-    targetKeys: ["5,3", "4,4"],
-  });
-  assert.equal(result.ok, false);
-  assert.deepEqual(result.state, state);
-
-  state = CreateInitialState();
-  digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  digger.actionPoints = 3;
-  for (const tileKey of ["5,3", "5,4", "4,4"]) {
-    state.tiles[tileKey].soilRevealed = true;
-  }
-  result = ApplyPlayerActionPath(state, {
-    unitId: "WorkTeam",
-    actionId: ActionIds.DIG,
-    targetKeys: ["5,3", "5,4", "4,4"],
-  });
-  assert.equal(result.ok, false);
-  assert.match(result.reason, /新挖这一段下回合将开裂/);
-  assert.deepEqual(result.state, state);
-  const stopAtCrack = ApplyPlayerActionPath(state, {
-    unitId: "WorkTeam",
-    actionId: ActionIds.DIG,
-    targetKeys: ["5,3", "5,4"],
-  });
-  assert.equal(stopAtCrack.ok, true);
-  assert.match(stopAtCrack.plan.decisionStop, /新挖这一段下回合将开裂/);
-  assert.equal(stopAtCrack.state.warnings.some((warning) => (
-    warning.kind === "Collapse" && warning.targetKey === "5,4"
-  )), true);
-});
-
-Test("path execution stops before hiding smoke damage or an ambush cancellation", () => {
-  let state = CreateInitialState();
-  let scout = state.units.find((unit) => unit.unitId === "Scout");
-  scout.layer = LayerIds.TUNNEL;
-  scout.tileKey = "6,2";
-  scout.actionPoints = 2;
-  AddTestTunnel(state, "6,2", "5,3", { smoke: 2 });
-  AddTestTunnel(state, "5,3", "4,4");
-  let result = ApplyPlayerActionPath(state, {
-    unitId: "Scout",
-    actionId: ActionIds.MOVE,
-    targetKeys: ["5,3", "4,4"],
-  });
-  assert.equal(result.ok, false);
-  assert.match(result.reason, /烟段/);
-  assert.deepEqual(result.state, state);
-  const smokeStep = ApplyPlayerActionPath(state, {
-    unitId: "Scout",
-    actionId: ActionIds.MOVE,
-    targetKeys: ["5,3"],
-  });
-  assert.equal(smokeStep.ok, true);
-  assert.equal(smokeStep.plan.healthLoss, 1);
-
-  state.units.find((unit) => unit.unitId === "Scout").health = 1;
-  result = ApplyPlayerActionPath(state, {
-    unitId: "Scout",
-    actionId: ActionIds.MOVE,
-    targetKeys: ["5,3", "4,4"],
-  });
-  assert.equal(result.ok, false);
-  assert.match(result.reason, /烟段/);
-  assert.deepEqual(result.state, state);
-  const minimumHealthSmokeStep = ApplyPlayerActionPath(state, {
-    unitId: "Scout",
-    actionId: ActionIds.MOVE,
-    targetKeys: ["5,3"],
-  });
-  assert.equal(minimumHealthSmokeStep.ok, true);
-  assert.equal(minimumHealthSmokeStep.state.units.find((unit) => unit.unitId === "Scout").health, 1);
-  assert.match(minimumHealthSmokeStep.plan.decisionStop, /烟段/);
-
-  state = CreateInitialState();
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "6,2";
-  militia.actionPoints = 2;
-  militia.ambushPrepared = true;
-  militia.ambushTileKey = "6,2";
-  AddTestTunnel(state, "6,2", "5,3");
-  AddTestTunnel(state, "5,3", "4,4");
-  result = ApplyPlayerActionPath(state, {
-    unitId: "Militia",
-    actionId: ActionIds.MOVE,
-    targetKeys: ["5,3", "4,4"],
-  });
-  assert.equal(result.ok, false);
-  assert.match(result.reason, /取消伏击/);
-  assert.deepEqual(result.state, state);
-});
-
-Test("digging requires the digger underground on an adjacent cell and exact resources", () => {
-  let state = CreateInitialState();
-  const surfaceAttempt = ApplyPlayerAction(state, {
-    unitId: "WorkTeam",
-    actionId: ActionIds.DIG,
-    targetKey: "5,2",
-  });
-  assert.equal(surfaceAttempt.ok, false);
-  state = Apply(state, "Scout", ActionIds.RECON, "2,1");
-  let underground = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
-  const toolsBefore = underground.tools;
-  const expectedCost = SoilCatalog[underground.tiles["5,2"].soilId].digCost;
-  underground = Apply(underground, "WorkTeam", ActionIds.DIG, "5,2");
-  assert.equal(underground.tools, toolsBefore - expectedCost);
-  assert.equal(underground.tunnelsDug, 1);
-});
-
-Test("evacuation cannot launch before turn four or twice from one entrance in a turn", () => {
-  let state = CreateInitialState();
-  for (const key of ["5,3", "4,4", "3,4", "2,4", "1,5", "0,5"]) {
-    state.tunnels[key] = {
-      ...Clone(state.tunnels["6,2"]),
-      tileKey: key,
-      sealed: false,
-      isOriginal: false,
-    };
-  }
-  state.units.find((unit) => unit.unitId === "Militia").layer = LayerIds.TUNNEL;
-  state.units.find((unit) => unit.unitId === "Militia").tileKey = "6,2";
-  assert.deepEqual(FindEvacuationPaths(state).map((entry) => entry.exitKey), ["0,5"]);
-  assert.equal(GetAvailableActions(state, "Militia").includes(ActionIds.EVACUATE), false);
-  state.turn = MissionConfig.evacuationTurn;
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "0,5", "Wounded");
-  const secondLaunch = ApplyPlayerAction(state, {
-    unitId: "Militia",
-    actionId: ActionIds.EVACUATE,
-    targetKey: "0,5",
-    groupId: "Contacts",
-  });
-  assert.equal(secondLaunch.ok, false);
-});
-
-Test("sealed entrances block crossing layers but not underground horizontal movement", () => {
-  let state = CreateInitialState();
-  state.tunnels["5,2"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "5,2",
-    sealed: true,
-  };
-  const digger = state.units.find((unit) => unit.unitId === "WorkTeam");
-  digger.layer = LayerIds.TUNNEL;
-  digger.tileKey = "6,2";
-  assert.equal(GetMoveTargets(state, "WorkTeam").includes("5,2"), true);
-  state.tunnels["6,2"].sealed = true;
-  digger.layer = LayerIds.SURFACE;
-  assert.equal(GetAvailableActions(state, "WorkTeam").includes(ActionIds.ENTER_TUNNEL), false);
-});
-
-Test("one evidence token is processed once and never remotely confirms an entrance", () => {
-  const memory = {
-    suspectedEntrances: {},
-    confirmedEntrances: [],
-    knownEntranceStates: {},
-    processedEvidenceIds: [],
-    lastKnownSurfaceUnit: null,
-  };
-  const observation = {
-    evidenceId: "NoiseA",
-    kind: "DigNoise",
-    tileKey: "2,1",
-    strength: 1,
-    createdTurn: 1,
-    expiresTurn: 4,
-  };
-  const once = UpdateEnemyBeliefs(memory, [observation], 1);
-  const twice = UpdateEnemyBeliefs(once, [observation], 2);
-  assert.equal(once.suspectedEntrances["2,1"], twice.suspectedEntrances["2,1"]);
-  assert.deepEqual(twice.confirmedEntrances, []);
-});
-
-Test("enemy planning does not peek at a hidden sealed tunnel node", () => {
-  const first = CreateInitialState();
-  first.turn = 5;
-  first.sweepActive = true;
-  const sapper = first.enemies.find((enemy) => enemy.enemyId === "Sapper");
-  sapper.inactiveUntilTurn = 0;
-  sapper.tileKey = "3,1";
-  first.enemyMemory.confirmedEntrances = ["2,1"];
-  first.enemyMemory.knownEntranceStates = { "2,1": { sealed: false } };
-  first.tunnels["2,1"] = {
-    ...Clone(first.tunnels["6,2"]),
-    tileKey: "2,1",
-    sealed: false,
-  };
-  first.tiles["2,1"].entranceKnownByEnemy = true;
-  const second = Clone(first);
-  second.tunnels["2,1"].sealed = true;
-  assert.deepEqual(CreateSurfaceSnapshot(first), CreateSurfaceSnapshot(second));
-  PlanEnemyTurn(first);
-  PlanEnemyTurn(second);
-  assert.deepEqual(
-    first.enemies.find((enemy) => enemy.enemyId === "Sapper").intent,
-    second.enemies.find((enemy) => enemy.enemyId === "Sapper").intent,
-  );
-});
-
-Test("sapper follows stronger live exit evidence over a nearby weaker trace", () => {
-  function PlanWithExitEvidence(expiresTurn) {
-    const state = CreateInitialState();
-    state.turn = 8;
-    state.sweepActive = true;
-    state.evidence = [
-      {
-        evidenceId: "ActiveOriginTracks",
-        kind: "FreshTracks",
-        tileKey: "6,2",
-        strength: 0.45,
-        createdTurn: 8,
-        expiresTurn: 11,
-        source: "旧院脚印",
-      },
-      {
-        evidenceId: "ActiveExitGunfire",
-        kind: "Gunfire",
-        tileKey: "0,5",
-        strength: 1,
-        createdTurn: 8,
-        expiresTurn,
-        source: "洞口伏击",
-      },
-    ];
-    state.enemyMemory.confirmedEntrances = ["6,2", "0,5"];
-    state.enemyMemory.knownEntranceStates = {
-      "6,2": { sealed: false },
-      "0,5": { sealed: false },
-    };
-    state.units.forEach((unit) => {
-      unit.layer = LayerIds.TUNNEL;
-    });
-    state.enemies.forEach((enemy) => {
-      enemy.health = enemy.enemyId === "Sapper" ? enemy.maxHealth : 0;
-    });
-    const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-    sapper.inactiveUntilTurn = 0;
-    sapper.stunnedUntilTurn = 0;
-    sapper.tileKey = "6,2";
-    PlanEnemyTurn(state);
-    return sapper.intent;
-  }
-
-  const active = PlanWithExitEvidence(11);
-  assert.equal(active.intentId, EnemyIntentIds.INVESTIGATE);
-  assert.equal(active.evidenceTarget, "0,5");
-  assert.equal(active.evidenceKind, "ConfirmedEntrance");
-  assert.notEqual(active.targetKey, "6,2");
-
-  const expired = PlanWithExitEvidence(7);
-  assert.equal(expired.intentId, EnemyIntentIds.PREPARE_SEAL);
-  assert.equal(expired.targetKey, "6,2");
-});
-
-Test("confirmed-entrance priority respects decoy ownership and one-use consumption", () => {
-  function PlanWithDecoy({ claimedEnemyId, consumed = false }) {
-    const state = CreateInitialState();
-    state.turn = 8;
-    state.sweepActive = true;
-    state.evidence = [
-      {
-        evidenceId: "ActiveOriginTracks",
-        kind: "FreshTracks",
-        tileKey: "6,2",
-        strength: 0.45,
-        createdTurn: 8,
-        expiresTurn: 11,
-        source: "旧院脚印",
-      },
-      {
-        evidenceId: "ActiveExitDecoy",
-        kind: "Decoy",
-        tileKey: "0,5",
-        strength: 0.95,
-        createdTurn: 8,
-        expiresTurn: 12,
-        source: "民兵组",
-        claimedEnemyId,
-      },
-    ];
-    state.usedDecoyIds = consumed ? ["ActiveExitDecoy"] : [];
-    state.enemyMemory.confirmedEntrances = ["6,2", "0,5"];
-    state.enemyMemory.knownEntranceStates = {
-      "6,2": { sealed: false },
-      "0,5": { sealed: false },
-    };
-    state.units.forEach((unit) => {
-      unit.layer = LayerIds.TUNNEL;
-    });
-    state.enemies.forEach((enemy) => {
-      enemy.health = enemy.enemyId === "Sapper" ? enemy.maxHealth : 0;
-    });
-    const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-    sapper.inactiveUntilTurn = 0;
-    sapper.stunnedUntilTurn = 0;
-    sapper.tileKey = "6,2";
-    PlanEnemyTurn(state);
-    return state;
-  }
-
-  const sapperClaim = PlanWithDecoy({ claimedEnemyId: "Sapper" });
-  const sapperClaimIntent = sapperClaim.enemies.find((enemy) => (
-    enemy.enemyId === "Sapper"
-  )).intent;
-  assert.equal(sapperClaimIntent.intentId, EnemyIntentIds.INVESTIGATE);
-  assert.equal(sapperClaimIntent.evidenceTarget, "0,5");
-  assert.equal(sapperClaimIntent.evidenceId, "ActiveExitDecoy");
-  assert.equal(sapperClaimIntent.evidenceKind, "Decoy");
-
-  const diverted = RunEnemyPhase(sapperClaim);
-  assert.equal(diverted.usedDecoyIds.includes("ActiveExitDecoy"), true);
-  const nextSapperIntent = diverted.enemies.find((enemy) => (
-    enemy.enemyId === "Sapper"
-  )).intent;
-  assert.notEqual(nextSapperIntent.evidenceId, "ActiveExitDecoy");
-  assert.notEqual(nextSapperIntent.evidenceTarget, "0,5");
-
-  for (const ignoredState of [
-    PlanWithDecoy({ claimedEnemyId: "BridgePatrol" }),
-    PlanWithDecoy({ claimedEnemyId: "Sapper", consumed: true }),
-  ]) {
-    const ignored = ignoredState.enemies.find((enemy) => enemy.enemyId === "Sapper").intent;
-    assert.equal(ignored.intentId, EnemyIntentIds.PREPARE_SEAL);
-    assert.equal(ignored.targetKey, "6,2");
-  }
-});
-
-Test("sapper moves two hexes only during the active sweep and still follows public evidence", () => {
-  function PlannedDistance(sweepActive) {
-    const state = CreateInitialState();
-    state.turn = sweepActive ? 5 : 3;
-    state.sweepActive = sweepActive;
-    state.evidence = [{
-      evidenceId: "PublicNoise",
-      kind: "DigNoise",
-      tileKey: "2,1",
-      strength: 1,
-      createdTurn: state.turn,
-      expiresTurn: state.turn + 3,
-    }];
-    state.enemyMemory.confirmedEntrances = [];
-    state.enemies.forEach((enemy) => {
-      if (enemy.enemyId !== "Sapper") {
-        enemy.health = 0;
-      }
-    });
-    const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-    sapper.inactiveUntilTurn = 0;
-    sapper.tileKey = "5,0";
-    PlanEnemyTurn(state);
-    assert.equal(sapper.intent.evidenceId, "PublicNoise");
-    return HexDistance("5,0", sapper.intent.targetKey);
-  }
-  assert.equal(PlannedDistance(false), 1);
-  assert.equal(PlannedDistance(true), 2);
-});
-
-Test("seed deterministically breaks equal evidence ties without reading tunnel state", () => {
-  function EvidenceTarget(seed) {
-    const state = CreateInitialState({ seed });
-    state.turn = 5;
-    state.sweepActive = true;
-    state.evidence = ["2,1", "0,5"].map((tileKey, index) => ({
-      evidenceId: `Tie${index}`,
-      kind: "DigNoise",
-      tileKey,
-      strength: 0.8,
-      createdTurn: 5,
-      expiresTurn: 8,
-    }));
-    state.enemyMemory.confirmedEntrances = [];
-    state.enemies.forEach((enemy) => {
-      if (enemy.enemyId !== "Sapper") {
-        enemy.health = 0;
-      }
-    });
-    const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-    sapper.inactiveUntilTurn = 0;
-    sapper.tileKey = "2,3";
-    PlanEnemyTurn(state);
-    return sapper.intent.evidenceTarget;
-  }
-  assert.equal(EvidenceTarget(2), EvidenceTarget(2));
-  assert.notEqual(EvidenceTarget(2), EvidenceTarget(3));
-});
-
-Test("decoy responders are deterministic across enemy array order and match the eventual investigator", () => {
-  for (let seed = 1; seed <= 100; seed += 1) {
-    const state = CreateInitialState({ seed });
-    state.units.forEach((unit) => {
-      unit.layer = LayerIds.TUNNEL;
-    });
-    state.enemies.forEach((enemy) => {
-      enemy.inactiveUntilTurn = 0;
-      enemy.stunnedUntilTurn = 0;
-      enemy.intent = null;
-    });
-    const expected = GetDecoyResponder(state, "4,3")?.enemyId;
-    assert.ok(expected);
-    const reversed = Clone(state);
-    reversed.enemies.reverse();
-    const rotated = Clone(state);
-    rotated.enemies.push(rotated.enemies.shift());
-    assert.equal(GetDecoyResponder(reversed, "4,3")?.enemyId, expected);
-    assert.equal(GetDecoyResponder(rotated, "4,3")?.enemyId, expected);
-  }
-
-  let state = CreateInitialState({ seed: 17 });
-  const responder = GetDecoyResponder(state, "6,5");
-  assert.ok(responder);
-  state = Apply(state, "Militia", ActionIds.DECOY, "6,5");
-  const evidence = state.evidence.find((entry) => entry.kind === "Decoy");
-  assert.equal(evidence.claimedEnemyId, responder.enemyId);
-  state.enemies.reverse();
-  PlanEnemyTurn(state);
-  const investigator = state.enemies.find((enemy) => enemy.intent?.evidenceId === evidence.evidenceId);
-  assert.equal(investigator.enemyId, responder.enemyId);
-  state = RunEnemyPhase(state);
-  assert.equal(state.decoyDiversions, 1);
-  assert.equal(state.eventLedger.some((event) => event.text.includes(responder.name)), true);
-});
-
-Test("a decoy with no feasible responder is visibly allowed to expire without diversion", () => {
-  let state = CreateInitialState();
-  state.enemies.forEach((enemy) => {
-    enemy.health = 0;
-    enemy.intent = null;
-  });
-  assert.equal(GetDecoyResponder(state, "6,5"), null);
-  state = Apply(state, "Militia", ActionIds.DECOY, "6,5");
-  const evidence = state.evidence.find((entry) => entry.kind === "Decoy");
-  assert.equal(evidence.claimedEnemyId, null);
-  PlanEnemyTurn(state);
-  assert.equal(state.enemies.some((enemy) => enemy.intent?.evidenceKind === "Decoy"), false);
-  for (let index = 0; index < 5; index += 1) {
-    state = RunEnemyPhase(state);
-  }
-  assert.equal(state.decoyDiversions, 0);
-});
-
-Test("a consumed decoy cannot keep retargeting another enemy", () => {
-  const state = CreateInitialState();
-  state.turn = 5;
-  state.sweepActive = true;
-  state.evidence = [
-    {
-      evidenceId: "SpentDecoy",
-      kind: "Decoy",
-      tileKey: "4,3",
-      strength: 1,
-      createdTurn: 4,
-      expiresTurn: 8,
-    },
-    {
-      evidenceId: "FreshNoise",
-      kind: "DigNoise",
-      tileKey: "4,1",
-      strength: 0.6,
-      createdTurn: 5,
-      expiresTurn: 8,
-    },
-  ];
-  state.usedDecoyIds = ["SpentDecoy"];
-  state.enemyMemory.confirmedEntrances = [];
-  state.enemies.forEach((enemy) => {
-    if (enemy.enemyId !== "Sapper") {
-      enemy.health = 0;
-    }
-  });
-  const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-  sapper.inactiveUntilTurn = 0;
-  PlanEnemyTurn(state);
-  assert.equal(sapper.intent.evidenceId, "FreshNoise");
-});
-
-Test("a decoy spends one investigation action but cannot freeze later turns", () => {
-  let state = CreateInitialState();
-  state.units.forEach((unit) => {
-    unit.layer = LayerIds.TUNNEL;
-  });
-  state.enemies.forEach((enemy) => {
-    enemy.health = enemy.enemyId === "BridgePatrol" ? enemy.maxHealth : 0;
-  });
-  state.evidence = [{
-    evidenceId: "SingleDiversion",
-    kind: "Decoy",
-    tileKey: "6,5",
-    strength: 0.95,
-    createdTurn: state.turn,
-    expiresTurn: state.turn + 4,
-  }];
-  state.decoys = [{
-    decoyId: "DecoySingleDiversion",
-    evidenceId: "SingleDiversion",
-    tileKey: "6,5",
-    strength: 0.95,
-    createdTurn: state.turn,
-    expiresTurn: state.turn + 4,
-  }];
-  const bridgePatrol = state.enemies.find((enemy) => enemy.enemyId === "BridgePatrol");
-  PlanEnemyTurn(state);
-  assert.equal(bridgePatrol.intent.intentId, EnemyIntentIds.INVESTIGATE);
-  assert.equal(bridgePatrol.intent.evidenceKind, "Decoy");
-  const previousTileKey = bridgePatrol.tileKey;
-  state = RunEnemyPhase(state);
-  const divertedPatrol = state.enemies.find((enemy) => enemy.enemyId === "BridgePatrol");
-  assert.notEqual(divertedPatrol.tileKey, previousTileKey);
-  assert.equal(state.decoyDiversions, 1);
-  assert.equal(state.decoys.length, 0);
-  assert.equal(divertedPatrol.stunnedUntilTurn, 0);
-  assert.notEqual(divertedPatrol.intent.intentId, EnemyIntentIds.STALLED);
-});
-
-Test("sapper ignores a stale emergency cellar and can confirm the searched village entrance", () => {
-  const state = CreateInitialState();
-  state.turn = 5;
-  state.sweepActive = true;
-  state.evidence = [];
-  state.units.forEach((unit) => {
-    unit.layer = LayerIds.TUNNEL;
-  });
-  state.enemies.forEach((enemy) => {
-    if (enemy.enemyId !== "Sapper") {
-      enemy.health = 0;
-    }
-  });
-  const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-  sapper.inactiveUntilTurn = 0;
-  sapper.tileKey = "5,1";
-  PlanEnemyTurn(state);
-  assert.equal(sapper.intent.intentId, EnemyIntentIds.SEARCH);
-  assert.notEqual(sapper.intent.targetKey, "3,2");
-  const searched = RunEnemyPhase(state);
-  assert.equal(searched.enemyMemory.confirmedEntrances.includes("6,2"), true);
-  const nextIntent = searched.enemies.find((enemy) => enemy.enemyId === "Sapper").intent;
-  assert.equal(nextIntent.intentId, EnemyIntentIds.PREPARE_SEAL);
-  assert.equal(nextIntent.targetKey, "6,2");
-});
-
-Test("seal preparation telegraphs for a full turn and an entrance trap cancels resolution", () => {
-  let state = CreateInitialState();
-  state.turn = 5;
-  state.sweepActive = true;
-  state.tunnels["2,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "2,1",
-    sealed: false,
-  };
-  state.enemyMemory.confirmedEntrances = ["2,1"];
-  state.enemyMemory.knownEntranceStates = { "2,1": { sealed: false } };
-  const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-  sapper.inactiveUntilTurn = 0;
-  sapper.tileKey = "3,1";
-  PlanEnemyTurn(state);
-  assert.equal(sapper.intent.intentId, "PrepareSeal");
-  state = RunEnemyPhase(state);
-  assert.equal(state.tunnels["2,1"].sealed, false);
-  assert.equal(state.warnings.some((warning) => !warning.resolved && warning.kind === "Seal"), true);
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "2,1";
-  militia.actionPoints = 2;
-  state = Apply(state, "Militia", ActionIds.TRAP);
-  state = RunEnemyPhase(state);
-  assert.equal(state.tunnels["2,1"].sealed, false);
-  assert.equal(state.trapsTriggered, 1);
-  assert.equal(state.warnings.every((warning) => warning.resolved), true);
-});
-
-Test("warning-bound traps and ambushes cannot be stolen by an unrelated patrol", () => {
-  const trapped = RunReservedDefenseScenario(ActionIds.TRAP);
-  const ambushed = RunReservedDefenseScenario(ActionIds.AMBUSH);
-  for (const [state, counterKey] of [
-    [trapped, "trapsTriggered"],
-    [ambushed, "ambushesTriggered"],
-  ]) {
-    const patrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-    const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-    assert.equal(patrol.tileKey, "2,1");
-    assert.equal(patrol.health, patrol.maxHealth);
-    assert.equal(sapper.health, sapper.maxHealth - 2);
-    assert.equal(state.tunnels["2,1"].sealed, false);
-    assert.equal(state[counterKey], 1);
-    assert.equal(state.warnings.find((warning) => warning.warningId === "ReservedSeal").resolved, true);
-  }
-});
-
-Test("a warning-bound trap can stop that same enemy's adjacent attack without erasing the warning", () => {
-  let state = CreateInitialState();
-  state.turn = 8;
-  state.sweepActive = true;
-  state.tunnels["2,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "2,1",
-    braced: true,
-    trap: false,
-  };
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "2,1";
-  militia.actionPoints = 2;
-  state = Apply(state, "Militia", ActionIds.TRAP);
-  const sapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-  state.enemies.forEach((enemy) => {
-    enemy.health = enemy.enemyId === sapper.enemyId ? enemy.maxHealth : 0;
-    enemy.intent = null;
-  });
-  sapper.inactiveUntilTurn = 0;
-  sapper.tileKey = "3,1";
-  sapper.intent = {
-    intentId: EnemyIntentIds.PREPARE_SEAL,
-    targetKey: "2,1",
-  };
-  state = RunEnemyPhase(state);
-  const warning = state.warnings.find((entry) => !entry.resolved && entry.enemyId === "Sapper");
-  assert.ok(warning);
-  assert.equal(state.tunnels["2,1"].trapEnemyId, "Sapper");
-  const scout = state.units.find((unit) => unit.unitId === "Scout");
-  scout.layer = LayerIds.SURFACE;
-  scout.tileKey = "2,1";
-  const scoutHealth = scout.health;
-  state.enemies.find((enemy) => enemy.enemyId === "Sapper").intent = {
-    intentId: EnemyIntentIds.ATTACK,
-    targetKey: "2,1",
-    unitId: "Scout",
-  };
-  state = RunEnemyPhase(state);
-  assert.equal(state.trapsTriggered, 1);
-  assert.equal(state.units.find((unit) => unit.unitId === "Scout").health, scoutHealth);
-  assert.equal(state.warnings.find((entry) => entry.warningId === warning.warningId).resolved, false);
-  const trapEvent = state.eventLedger.find((event) => /原封洞\/灌烟预警仍待处理/.test(event.text));
-  assert.equal(trapEvent?.relatedWarningId, warning.warningId);
-});
-
-Test("an unreserved entrance defense still stops the first ordinary enemy entry", () => {
-  let state = CreateInitialState();
-  state.turn = 6;
-  state.sweepActive = true;
-  state.tunnels["2,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "2,1",
-    sealed: false,
-  };
-  const patrol = state.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  state.enemies.forEach((enemy) => {
-    enemy.health = enemy.enemyId === patrol.enemyId ? enemy.maxHealth : 0;
-  });
-  patrol.tileKey = "3,1";
-  patrol.intent = {
-    intentId: EnemyIntentIds.INVESTIGATE,
-    targetKey: "2,1",
-    evidenceTarget: "2,1",
-    evidenceId: "OrdinaryEntry",
-    evidenceKind: "FreshTracks",
-  };
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "2,1";
-  militia.actionPoints = 2;
-  state = Apply(state, "Militia", ActionIds.TRAP);
-  state = RunEnemyPhase(state);
-  assert.equal(state.trapsTriggered, 1);
-  assert.equal(state.enemies.find((enemy) => enemy.enemyId === patrol.enemyId).tileKey, "3,1");
-  assert.equal(state.enemies.find((enemy) => enemy.enemyId === patrol.enemyId).health, 1);
-  assert.equal(state.eventLedger.some((event) => /本次攻击/.test(event.text)), false);
-});
-
-Test("bracing resolves collapse warnings and lets a light convoy share a heavy chokepoint", () => {
-  let state = CreateInitialState();
-  state.tiles["6,1"].soilRevealed = true;
-  state = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "6,1");
-  const warning = state.warnings.find((entry) => entry.kind === "Collapse");
-  if (warning) {
-    state = Apply(state, "WorkTeam", ActionIds.BRACE);
-    assert.equal(state.warnings.find((entry) => entry.warningId === warning.warningId).resolved, true);
-  }
-  function RunChokepoint(braced) {
-    const convoy = CreateInitialState();
-    convoy.enemies.forEach((enemy) => {
-      enemy.health = 0;
-    });
-    convoy.tunnels["5,3"] = {
-      ...Clone(convoy.tunnels["6,2"]),
-      tileKey: "5,3",
-      braced,
-    };
-    for (const [index, group] of convoy.civilians.slice(0, 2).entries()) {
-      group.status = "Moving";
-      group.path = ["6,2", "5,3"];
-      group.pathIndex = 0;
-      group.tileKey = "6,2";
-      group.exitKey = "5,3";
-      group.launchOrder = index + 1;
-    }
-    return RunEnemyPhase(convoy);
-  }
-  const unbraced = RunChokepoint(false);
-  assert.equal(unbraced.civilians[0].tileKey, "5,3");
-  assert.equal(unbraced.civilians[1].tileKey, "6,2");
-  assert.equal(unbraced.civilians[1].delayed, true);
-  const braced = RunChokepoint(true);
-  assert.equal(braced.civilians[0].tileKey, "5,3");
-  assert.equal(braced.civilians[1].tileKey, "5,3");
-});
-
-Test("all six launch orders create distinct timing or congestion signatures with valid first-batch reasons", () => {
-  const orders = [
-    ["Wounded", "Families", "Contacts"],
-    ["Wounded", "Contacts", "Families"],
-    ["Families", "Wounded", "Contacts"],
-    ["Families", "Contacts", "Wounded"],
-    ["Contacts", "Wounded", "Families"],
-    ["Contacts", "Families", "Wounded"],
-  ];
-  const results = orders.map((order) => RunCivilianOrder(order));
-  assert.equal(results.every(({ state }) => state.outcome?.status === "Victory"), true);
-  const signatures = new Set(results.map(({ state, timeline, delaySignature }) => (
-    `${state.turn}|${delaySignature}|${timeline.map((entry) => entry.safePeople).join(",")}`
-  )));
-  assert.equal(signatures.size >= 3, true);
-
-  const woundedFirst = results[0];
-  const familiesFirst = results[2];
-  const contactsFirst = results[4];
-  const bracedWoundedFirst = RunCivilianOrder(orders[0], true);
-  assert.equal(bracedWoundedFirst.state.turn < woundedFirst.state.turn, true);
-  assert.equal(familiesFirst.firstSafe.turn < woundedFirst.firstSafe.turn, true);
-  assert.equal(contactsFirst.firstSafe.turn < familiesFirst.firstSafe.turn, true);
-  assert.equal(contactsFirst.firstSafe.safePeople, 3);
-  assert.equal(SafetyAfterFirstLaunch("Families") > SafetyAfterFirstLaunch("Contacts"), true);
-  assert.equal(SafetyAfterFirstLaunch("Families") > SafetyAfterFirstLaunch("Wounded"), true);
-
-  const estimateState = CreateLogisticsState(false);
-  assert.equal(GetCivilianTransitEstimate(estimateState, "Wounded", "2,1").readyTurn, 9);
-  assert.equal(GetCivilianTransitEstimate(estimateState, "Families", "2,1").readyTurn, 6);
-  assert.equal(GetCivilianTransitEstimate(estimateState, "Contacts", "2,1").readyTurn, 5);
-});
-
-Test("queue forecasts match real movement without solving future enemy pressure", () => {
-  function ActualReadyTurn(inputState, groupId, launchExitKey = "2,1") {
-    let state = Apply(
-      inputState,
-      "Militia",
-      ActionIds.EVACUATE,
-      launchExitKey,
-      groupId,
-    );
-    while (state.civilians.find((group) => group.groupId === groupId).status !== "Safe") {
-      const phaseTurn = state.turn;
-      state = End(state);
-      if (state.civilians.find((group) => group.groupId === groupId).status === "Safe") {
-        return { phaseTurn, state };
-      }
-      assert.equal(state.turn <= MissionConfig.maxTurns + 3, true);
-    }
-    throw new Error(`${groupId} was already safe before forecast verification`);
-  }
-
-  function ActualInjectedReadyTurn(inputState, groupId, launchExitKey) {
-    let state = Clone(inputState);
-    const route = FindEvacuationPaths(state)
-      .find((entry) => entry.exitKey === launchExitKey);
-    const group = state.civilians
-      .find((entry) => entry.groupId === groupId && entry.status === "Waiting");
-    assert.ok(route);
-    assert.ok(group);
-    group.status = "Moving";
-    group.path = [...route.path];
-    group.pathIndex = 0;
-    group.tileKey = route.path[0];
-    group.exitKey = launchExitKey;
-    group.launchTurn = state.turn;
-    group.launchOrder = state.civilianLaunchSerial;
-    group.trafficDelays = 0;
-    group.lastTrafficDelayTileKey = null;
-    group.exitArrivalTurn = null;
-    state.civilianLaunchSerial += 1;
-    while (group.status !== "Safe") {
-      const phaseTurn = state.turn;
-      state = RunEnemyPhase(state);
-      const updatedGroup = state.civilians.find((entry) => entry.groupId === groupId);
-      if (updatedGroup.status === "Safe") {
-        return { phaseTurn, state };
-      }
-      assert.equal(state.turn <= MissionConfig.maxTurns + 3, true);
-    }
-    throw new Error(`${groupId} was already safe before injected forecast verification`);
-  }
-
-  let queueState = CreateLogisticsState(false);
-  const pristineState = Clone(queueState);
-  const baseline = GetCivilianTransitEstimate(queueState, "Wounded", "2,1");
-  assert.deepEqual(queueState, pristineState);
-  assert.deepEqual(GetCivilianTransitEstimate(queueState, "Wounded", "2,1"), baseline);
-  assert.equal(baseline.queueOrder, 1);
-  assert.equal(baseline.readyTurn, 9);
-  assert.equal(baseline.soloReadyTurn, 9);
-  assert.equal(baseline.congestionTurns, 0);
-  assert.equal(baseline.etaDelayTurns, 0);
-  assert.equal(baseline.signalCoverage, "Covered");
-  assert.equal(Object.hasOwn(baseline, "projectedSafeTurn"), false);
-  assert.equal(Object.hasOwn(baseline, "earliestSafeTurn"), false);
-  assert.equal(Object.hasOwn(baseline, "idealSafeTurn"), false);
-
-  const dissipatingSmoke = CreateLogisticsState(false);
-  dissipatingSmoke.tunnels["2,1"].smoke = 2;
-  const dissipatingEstimate = GetCivilianTransitEstimate(
-    dissipatingSmoke,
-    "Wounded",
-    "2,1",
-  );
-  assert.equal(GetExitWindow(dissipatingSmoke, "2,1").status, "Smoking");
-  assert.equal(dissipatingEstimate.signalCoverage, "Covered");
-  assert.equal(dissipatingEstimate.signalStatusAtReady, "Clear");
-  assert.equal(
-    ActualReadyTurn(dissipatingSmoke, "Wounded").phaseTurn,
-    dissipatingEstimate.readyTurn,
-  );
-
-  let recoveringThreat = CreateLogisticsState(false);
-  const recoveringPatrol = recoveringThreat.enemies
-    .find((enemy) => enemy.enemyId === "NorthPatrol");
-  recoveringPatrol.health = recoveringPatrol.maxHealth;
-  recoveringPatrol.tileKey = "2,2";
-  recoveringPatrol.intent = null;
-  recoveringPatrol.inactiveUntilTurn = 99;
-  recoveringPatrol.stunnedUntilTurn = recoveringThreat.turn;
-  const recoveringEstimate = GetCivilianTransitEstimate(
-    recoveringThreat,
-    "Wounded",
-    "2,1",
-  );
-  assert.equal(GetExitWindow(recoveringThreat, "2,1").status, "Clear");
-  assert.equal(recoveringEstimate.signalCoverage, "MissingOrBlocked");
-  assert.equal(recoveringEstimate.signalStatusAtReady, "Watched");
-  recoveringThreat = Apply(
-    recoveringThreat,
-    "Militia",
-    ActionIds.EVACUATE,
-    "2,1",
-    "Wounded",
-  );
-  while (recoveringThreat.turn <= recoveringEstimate.readyTurn) {
-    recoveringThreat = End(recoveringThreat);
-  }
-  const threatenedWounded = recoveringThreat.civilians
-    .find((group) => group.groupId === "Wounded");
-  assert.equal(threatenedWounded.status, "Moving");
-  assert.equal(threatenedWounded.waitingForSignal, true);
-
-  queueState = Apply(queueState, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
-  assert.equal(GetCivilianTransitEstimate(queueState, "Wounded", "2,1"), null);
-  queueState = End(queueState);
-  const familiesEstimate = GetCivilianTransitEstimate(queueState, "Families", "2,1");
-  assert.equal(familiesEstimate.queueOrder, 2);
-  assert.equal(familiesEstimate.soloReadyTurn, 7);
-  assert.equal(familiesEstimate.readyTurn, 9);
-  assert.equal(familiesEstimate.congestionTurns, 4);
-  assert.equal(familiesEstimate.etaDelayTurns, 2);
-  assert.equal(familiesEstimate.bottleneckKey, "5,1");
-  assert.equal(familiesEstimate.bottleneckUsedLoad, 2);
-  assert.equal(familiesEstimate.trafficLoad, 1);
-  assert.equal(familiesEstimate.bottleneckCapacity, 2);
-  assert.deepEqual(familiesEstimate.conflictingGroupIds, ["Wounded"]);
-  assert.equal(familiesEstimate.firstBottleneckBraceRelief, "Helps");
-  assert.equal(ActualReadyTurn(queueState, "Families").phaseTurn, familiesEstimate.readyTurn);
-  const bracedFamilyQueue = Clone(queueState);
-  bracedFamilyQueue.tunnels["5,1"].braced = true;
-  const bracedFamiliesEstimate = GetCivilianTransitEstimate(
-    bracedFamilyQueue,
-    "Families",
-    "2,1",
-  );
-  assert.equal(bracedFamiliesEstimate.congestionTurns, 3);
-  assert.equal(bracedFamiliesEstimate.congestionTurns < familiesEstimate.congestionTurns, true);
-
-  queueState = Apply(queueState, "Militia", ActionIds.EVACUATE, "2,1", "Families");
-  queueState = End(queueState);
-  const contactsEstimate = GetCivilianTransitEstimate(queueState, "Contacts", "2,1");
-  assert.equal(contactsEstimate.queueOrder, 3);
-  assert.equal(contactsEstimate.readyTurn, 10);
-  assert.equal(contactsEstimate.congestionTurns, 4);
-  assert.equal(contactsEstimate.etaDelayTurns, 3);
-  assert.equal(contactsEstimate.bottleneckUsedLoad, 1);
-  assert.equal(contactsEstimate.trafficLoad, 2);
-  assert.equal(contactsEstimate.firstBottleneckBraceRelief, "Insufficient");
-  assert.equal(ActualReadyTurn(queueState, "Contacts").phaseTurn, contactsEstimate.readyTurn);
-
-  const bracedQueue = Clone(queueState);
-  bracedQueue.tunnels["2,1"].braced = true;
-  const bracedContacts = GetCivilianTransitEstimate(bracedQueue, "Contacts", "2,1");
-  assert.equal(bracedContacts.readyTurn, 9);
-  assert.equal(ActualReadyTurn(bracedQueue, "Contacts").phaseTurn, bracedContacts.readyTurn);
-
-  const heavyConflictState = CreateLogisticsState(false);
-  let woundedMoving = Apply(
-    heavyConflictState,
-    "Militia",
-    ActionIds.EVACUATE,
-    "2,1",
-    "Wounded",
-  );
-  woundedMoving = End(woundedMoving);
-  const contactsBehindWounded = GetCivilianTransitEstimate(
-    woundedMoving,
-    "Contacts",
-    "2,1",
-  );
-  assert.equal(contactsBehindWounded.bottleneckUsedLoad, 2);
-  assert.equal(contactsBehindWounded.trafficLoad, 2);
-  assert.equal(contactsBehindWounded.firstBottleneckBraceRelief, "Insufficient");
-
-  const expiredSignal = Clone(woundedMoving);
-  expiredSignal.exitWindows["2,1"].checkedUntilTurn = expiredSignal.turn;
-  assert.equal(
-    GetCivilianTransitEstimate(expiredSignal, "Families", "2,1").signalCoverage,
-    "ExpiresBefore",
-  );
-  const missingSignal = Clone(woundedMoving);
-  missingSignal.exitWindows["2,1"].checkedTurn = 0;
-  missingSignal.exitWindows["2,1"].checkedUntilTurn = 0;
-  missingSignal.exitWindows["2,1"].signalCount = 0;
-  assert.equal(
-    GetCivilianTransitEstimate(missingSignal, "Families", "2,1").signalCoverage,
-    "MissingOrBlocked",
-  );
-  let noSignalState = CreateLogisticsState(false);
-  noSignalState.exitWindows["2,1"].checkedTurn = 0;
-  noSignalState.exitWindows["2,1"].checkedUntilTurn = 0;
-  noSignalState.exitWindows["2,1"].signalCount = 0;
-  const noSignalEstimate = GetCivilianTransitEstimate(
-    noSignalState,
-    "Wounded",
-    "2,1",
-  );
-  noSignalState = Apply(
-    noSignalState,
-    "Militia",
-    ActionIds.EVACUATE,
-    "2,1",
-    "Wounded",
-  );
-  while (noSignalState.turn <= noSignalEstimate.readyTurn) {
-    noSignalState = End(noSignalState);
-  }
-  const waitingWounded = noSignalState.civilians.find((group) => group.groupId === "Wounded");
-  assert.equal(noSignalEstimate.readyTurn, 9);
-  assert.equal(waitingWounded.status, "Moving");
-  assert.equal(waitingWounded.waitingForSignal, true);
-  assert.equal(noSignalState.civiliansSafe, 0);
-
-  const warnedReroute = CreateDualRouteLogisticsState();
-  warnedReroute.warnings = [{
-    warningId: "ForecastSmoke",
-    kind: "Smoke",
-    targetKey: "2,1",
-    resolvesTurn: warnedReroute.turn + 1,
-    resolved: false,
-    enemyId: "Sapper",
-    text: "工兵准备向北枣窖灌烟",
-  }];
-  const warnedEstimate = GetCivilianTransitEstimate(
-    warnedReroute,
-    "Wounded",
-    "2,1",
-  );
-  const warnedActual = ActualReadyTurn(warnedReroute, "Wounded");
-  assert.equal(warnedEstimate.rerouted, true);
-  assert.equal(warnedEstimate.projectedExitKey, "0,5");
-  assert.equal(warnedEstimate.readyTurn, 10);
-  assert.equal(warnedActual.phaseTurn, warnedEstimate.readyTurn);
-  assert.equal(
-    warnedActual.state.civilians.find((group) => group.groupId === "Wounded").exitKey,
-    warnedEstimate.projectedExitKey,
-  );
-
-  let reroutingQueue = CreateDualRouteLogisticsState();
-  reroutingQueue = Apply(
-    reroutingQueue,
-    "Militia",
-    ActionIds.EVACUATE,
-    "2,1",
-    "Wounded",
-  );
-  const sealedReroute = Clone(reroutingQueue);
-  sealedReroute.tunnels["2,1"].sealed = true;
-  sealedReroute.plannedExitKey = null;
-  const sealedEstimate = GetCivilianTransitEstimate(
-    sealedReroute,
-    "Families",
-    "0,5",
-  );
-  const sealedActual = ActualInjectedReadyTurn(sealedReroute, "Families", "0,5");
-  assert.equal(sealedEstimate.readyTurn, 10);
-  assert.equal(sealedEstimate.congestionTurns, 6);
-  assert.equal(sealedActual.phaseTurn, sealedEstimate.readyTurn);
-  assert.equal(
-    sealedActual.state.civilians.find((group) => group.groupId === "Wounded").exitKey,
-    "0,5",
-  );
-
-  const smokyReroute = Clone(reroutingQueue);
-  smokyReroute.tunnels["2,1"].smoke = 2;
-  const smokyEstimate = GetCivilianTransitEstimate(
-    smokyReroute,
-    "Families",
-    "0,5",
-  );
-  const smokyActual = ActualInjectedReadyTurn(smokyReroute, "Families", "0,5");
-  assert.equal(smokyEstimate.readyTurn, 10);
-  assert.equal(smokyEstimate.congestionTurns, 6);
-  assert.equal(smokyActual.phaseTurn, smokyEstimate.readyTurn);
-  assert.equal(
-    smokyActual.state.civilians.find((group) => group.groupId === "Wounded").exitKey,
-    "0,5",
-  );
-
-  const tooLate = CreateLogisticsState(false);
-  tooLate.turn = 7;
-  const lateWounded = GetCivilianTransitEstimate(tooLate, "Wounded", "2,1");
-  assert.equal(lateWounded.readyTurn, 12);
-  assert.equal(lateWounded.deadlineSlack, -1);
-  assert.equal(lateWounded.deadlineRisk, true);
-  assert.match(lateWounded.assumptions, /未计后续新增敌情、烟流、封口、塌方或玩家改道/);
-});
-
-Test("transit forecasts ignore unrevealed enemy intentions", () => {
-  const baseline = CreateLogisticsState(false);
-  const patrol = baseline.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  patrol.health = patrol.maxHealth;
-  patrol.tileKey = "0,0";
-  patrol.inactiveUntilTurn = 0;
-  patrol.stunnedUntilTurn = 0;
-  patrol.intent = null;
-  patrol.intentRevealed = false;
-  const baselineWindow = GetExitWindow(baseline, "2,1");
-  const baselineEstimate = GetCivilianTransitEstimate(
-    baseline,
-    "Wounded",
-    "2,1",
-  );
-
-  const hiddenIntent = Clone(baseline);
-  const hiddenPatrol = hiddenIntent.enemies
-    .find((enemy) => enemy.enemyId === "NorthPatrol");
-  hiddenPatrol.intent = {
-    intentId: EnemyIntentIds.INVESTIGATE,
-    targetKey: "2,1",
-  };
-  hiddenPatrol.intentRevealed = false;
-  const hiddenWindow = GetExitWindow(hiddenIntent, "2,1");
-  const hiddenEstimate = GetCivilianTransitEstimate(
-    hiddenIntent,
-    "Wounded",
-    "2,1",
-  );
-  assert.deepEqual(
-    {
-      status: hiddenWindow.status,
-      detail: hiddenWindow.detail,
-      signalCoverage: hiddenEstimate.signalCoverage,
-      signalStatusAtReady: hiddenEstimate.signalStatusAtReady,
-      signalDetailAtReady: hiddenEstimate.signalDetailAtReady,
-    },
-    {
-      status: baselineWindow.status,
-      detail: baselineWindow.detail,
-      signalCoverage: baselineEstimate.signalCoverage,
-      signalStatusAtReady: baselineEstimate.signalStatusAtReady,
-      signalDetailAtReady: baselineEstimate.signalDetailAtReady,
-    },
-  );
-
-  const revealedIntent = Clone(hiddenIntent);
-  revealedIntent.enemies
-    .find((enemy) => enemy.enemyId === "NorthPatrol").intentRevealed = true;
-  assert.equal(GetExitWindow(revealedIntent, "2,1").status, "Watched");
-  const revealedEstimate = GetCivilianTransitEstimate(
-    revealedIntent,
-    "Wounded",
-    "2,1",
-  );
-  assert.equal(revealedEstimate.signalCoverage, "MissingOrBlocked");
-  assert.equal(revealedEstimate.signalStatusAtReady, "Watched");
-});
-
-Test("active convoy forecasts stay pure and expose legal brace timing relief", () => {
-  let state = CreateLogisticsState(false);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
-  state = End(state);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Families");
-  state = End(state);
-  state = Apply(state, "Militia", ActionIds.EVACUATE, "2,1", "Contacts");
-  const workTeam = state.units.find((unit) => unit.unitId === "WorkTeam");
-  workTeam.layer = LayerIds.TUNNEL;
-  workTeam.tileKey = "2,1";
-  workTeam.actionPoints = workTeam.maxActionPoints;
-
-  const pristine = Clone(state);
-  const estimate = GetActiveCivilianTransitEstimate(state, "Contacts");
-  assert.deepEqual(state, pristine);
-  assert.deepEqual(GetActiveCivilianTransitEstimate(state, "Contacts"), estimate);
-  assert.deepEqual(
-    GetActiveCivilianTransitEstimate(
-      DeserializeState(SerializeState(state)),
-      "Contacts",
-    ),
-    estimate,
-  );
-  assert.equal(estimate.status, "Moving");
-  assert.equal(estimate.currentTileKey, "6,2");
-  assert.equal(estimate.remainingSegments, 5);
-  assert.equal(estimate.arrivalTurn, 10);
-  assert.equal(estimate.safeTurn, 10);
-  assert.equal(estimate.congestionTurns, 4);
-  assert.equal(estimate.nextConstraint.kind, "Congestion");
-  assert.equal(estimate.nextConstraint.tileKey, "5,1");
-  const brace = estimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.BRACE
-  ));
-  assert.ok(brace);
-  assert.equal(brace.unitId, "WorkTeam");
-  assert.equal(brace.targetKey, "2,1");
-  assert.equal(brace.availableNow, true);
-  assert.equal(brace.ifAppliedNow.arrivalTurn, 9);
-  assert.equal(brace.ifAppliedNow.safeTurn, 9);
-  assert.equal(brace.ifAppliedNow.congestionTurns, 3);
-  assert.equal(brace.ifAppliedNow.turnsSaved, 1);
-
-  const braced = Apply(state, "WorkTeam", ActionIds.BRACE);
-  const bracedEstimate = GetActiveCivilianTransitEstimate(braced, "Contacts");
-  assert.equal(bracedEstimate.arrivalTurn, brace.ifAppliedNow.arrivalTurn);
-  assert.equal(bracedEstimate.safeTurn, brace.ifAppliedNow.safeTurn);
-  assert.equal(bracedEstimate.congestionTurns, brace.ifAppliedNow.congestionTurns);
-
-  const tooLate = Clone(state);
-  tooLate.turn = 11;
-  tooLate.exitWindows["2,1"].checkedUntilTurn = 30;
-  const lateEstimate = GetActiveCivilianTransitEstimate(tooLate, "Contacts");
-  assert.equal(lateEstimate.deadlineRisk, true);
-  assert.equal(lateEstimate.safeTurn > tooLate.maxTurns, true);
-  assert.equal(lateEstimate.deadlineSlack, tooLate.maxTurns - lateEstimate.safeTurn);
-  assert.equal(lateEstimate.arrivalDeadlineSlack, tooLate.maxTurns - lateEstimate.arrivalTurn);
-  assert.equal(lateEstimate.safeDeadlineSlack, lateEstimate.deadlineSlack);
-  assert.equal(lateEstimate.recoveryState, "NoKnownRecovery");
-  assert.equal(lateEstimate.recoveryActions.length, 0);
-  assert.match(lateEstimate.recoveryNeeds[0].reason, /仍不能在 T11 前安全撤出/);
-  assert.equal(Object.hasOwn(lateEstimate.recoveryNeeds[0], "ifAppliedNow"), false);
-
-  const crackedTransit = CreateLogisticsState(false);
-  crackedTransit.turn = 5;
-  const crackedWounded = crackedTransit.civilians.find((entry) => entry.groupId === "Wounded");
-  crackedWounded.status = "Moving";
-  crackedWounded.path = [...northEvacuationPath];
-  crackedWounded.pathIndex = 3;
-  crackedWounded.tileKey = "4,1";
-  crackedWounded.exitKey = "2,1";
-  crackedWounded.launchTurn = 4;
-  crackedWounded.launchOrder = 1;
-  crackedTransit.tunnels["3,1"].cracked = true;
-  crackedTransit.tunnels["3,1"].braced = false;
-  crackedTransit.tunnels["3,1"].dugTurn = 1;
-  const crackedDigger = crackedTransit.units.find((unit) => unit.unitId === "WorkTeam");
-  crackedDigger.layer = LayerIds.TUNNEL;
-  crackedDigger.tileKey = "3,1";
-  crackedDigger.actionPoints = crackedDigger.maxActionPoints;
-  const crackedEstimate = GetActiveCivilianTransitEstimate(crackedTransit, "Wounded");
-  assert.equal(crackedEstimate.nextConstraint.kind, "Collapse");
-  const preventiveBrace = crackedEstimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.BRACE
-  ));
-  assert.ok(preventiveBrace);
-  assert.equal(preventiveBrace.targetKey, "3,1");
-  assert.equal(preventiveBrace.ifAppliedNow.arrivalTurn <= crackedTransit.maxTurns, true);
-  assert.equal(preventiveBrace.ifAppliedNow.nextConstraintKind, null);
-
-  let exactStepArrival = CreateLogisticsState(false);
-  exactStepArrival.turn = 7;
-  const exactFamilies = exactStepArrival.civilians.find((entry) => entry.groupId === "Families");
-  exactFamilies.status = "Moving";
-  exactFamilies.path = [...northEvacuationPath];
-  exactFamilies.pathIndex = 3;
-  exactFamilies.tileKey = "4,1";
-  exactFamilies.exitKey = "2,1";
-  exactFamilies.launchTurn = 5;
-  exactFamilies.launchOrder = 1;
-  const beforeArrival = GetActiveCivilianTransitEstimate(exactStepArrival, "Families");
-  assert.equal(beforeArrival.arrivalTurn, 8);
-  assert.equal(beforeArrival.safeTurn, 8);
-  exactStepArrival = End(exactStepArrival);
-  assert.equal(exactStepArrival.civilians.find((entry) => entry.groupId === "Families").status, "Moving");
-  assert.equal(GetActiveCivilianTransitEstimate(exactStepArrival, "Families").status, "AtExit");
-  assert.equal(GetActiveCivilianTransitEstimate(exactStepArrival, "Families").arrivalTurn, 8);
-  assert.equal(GetActiveCivilianTransitEstimate(exactStepArrival, "Families").safeTurn, 8);
-});
-
-Test("active exit forecasts distinguish arrival from Recon and ClearSeal recovery", () => {
-  function CreateAtExitState() {
-    const state = CreateLogisticsState(false);
-    state.turn = 6;
-    const group = state.civilians.find((entry) => entry.groupId === "Contacts");
-    group.status = "Moving";
-    group.path = [...northEvacuationPath];
-    group.pathIndex = northEvacuationPath.length - 1;
-    group.tileKey = "2,1";
-    group.exitKey = "2,1";
-    group.launchTurn = 4;
-    group.launchOrder = 1;
-    group.exitArrivalTurn = 6;
-    group.waitingForSignal = true;
-    state.civilianLaunchSerial = 2;
-    return state;
-  }
-
-  let signalState = CreateAtExitState();
-  signalState.exitWindows["2,1"] = {
-    exitKey: "2,1",
-    checkedTurn: 0,
-    checkedUntilTurn: 0,
-    signalCount: 0,
-  };
-  signalState.reconActions = 1;
-  signalState.lastReconTurn = 0;
-  signalState.reconTileTurns["2,1"] = 0;
-  signalState.organization = 1;
-  const scout = signalState.units.find((unit) => unit.unitId === "Scout");
-  scout.layer = LayerIds.SURFACE;
-  scout.tileKey = "2,1";
-  scout.actionPoints = scout.maxActionPoints;
-  const signalEstimate = GetActiveCivilianTransitEstimate(signalState, "Contacts");
-  assert.equal(signalEstimate.status, "AtExit");
-  assert.equal(signalEstimate.arrivalTurn, 6);
-  assert.equal(signalEstimate.safeTurn, null);
-  assert.equal(signalEstimate.nextConstraint.kind, "Signal");
-  const recon = signalEstimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.RECON
-  ));
-  assert.ok(recon);
-  assert.equal(recon.cost.organization, 1);
-  assert.equal(recon.ifAppliedNow.safeTurn, 6);
-  signalState = Apply(signalState, "Scout", ActionIds.RECON, "2,1");
-  const signaledActual = RunEnemyPhase(signalState);
-  assert.equal(signaledActual.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
-
-  const noOrganization = CreateAtExitState();
-  noOrganization.exitWindows["2,1"].checkedUntilTurn = 0;
-  noOrganization.exitWindows["2,1"].signalCount = 0;
-  noOrganization.reconActions = 1;
-  noOrganization.organization = 0;
-  const blockedScout = noOrganization.units.find((unit) => unit.unitId === "Scout");
-  blockedScout.layer = LayerIds.SURFACE;
-  blockedScout.tileKey = "2,1";
-  blockedScout.actionPoints = blockedScout.maxActionPoints;
-  const noOrganizationEstimate = GetActiveCivilianTransitEstimate(
-    noOrganization,
-    "Contacts",
-  );
-  assert.equal(noOrganizationEstimate.recoveryActions.length, 0);
-  assert.match(
-    noOrganizationEstimate.recoveryNeeds.find((entry) => entry.actionId === ActionIds.RECON).reason,
-    /组织 1/,
-  );
-  assert.equal(Object.hasOwn(
-    noOrganizationEstimate.recoveryNeeds.find((entry) => entry.actionId === ActionIds.RECON),
-    "ifAppliedNow",
-  ), false);
-
-  let sealedState = CreateAtExitState();
-  sealedState.tunnels["2,1"].sealed = true;
-  sealedState.exitWindows["2,1"].checkedUntilTurn = 20;
-  const sealedWorkTeam = sealedState.units.find((unit) => unit.unitId === "WorkTeam");
-  sealedWorkTeam.layer = LayerIds.TUNNEL;
-  sealedWorkTeam.tileKey = "2,1";
-  sealedWorkTeam.actionPoints = sealedWorkTeam.maxActionPoints;
-  const toolsBefore = sealedState.tools;
-  const exposureBefore = sealedState.exposure;
-  const sealedEstimate = GetActiveCivilianTransitEstimate(sealedState, "Contacts");
-  assert.equal(sealedEstimate.nextConstraint.kind, "Seal");
-  const clearSeal = sealedEstimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.CLEAR_SEAL
-  ));
-  assert.ok(clearSeal);
-  assert.equal(clearSeal.cost.tools, 2);
-  assert.equal(clearSeal.cost.exposure, 10);
-  assert.equal(clearSeal.ifAppliedNow.safeTurn, 6);
-  sealedState = Apply(sealedState, "WorkTeam", ActionIds.CLEAR_SEAL);
-  assert.equal(sealedState.tools, toolsBefore - 2);
-  assert.equal(sealedState.exposure, exposureBefore + 10);
-  const clearedActual = RunEnemyPhase(sealedState);
-  assert.equal(clearedActual.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
-
-  let passiveSmoke = CreateAtExitState();
-  passiveSmoke.tunnels["2,1"].smoke = 2;
-  const passiveSmokeEstimate = GetActiveCivilianTransitEstimate(passiveSmoke, "Contacts");
-  assert.equal(passiveSmokeEstimate.nextConstraint.kind, "Smoke");
-  assert.equal(passiveSmokeEstimate.safeTurn, 7);
-  assert.equal(passiveSmokeEstimate.recoveryState, "NoRecoveryNeeded");
-  passiveSmoke = End(passiveSmoke);
-  assert.equal(passiveSmoke.civilians.find((entry) => entry.groupId === "Contacts").status, "Moving");
-  passiveSmoke = End(passiveSmoke);
-  assert.equal(passiveSmoke.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
-
-  let smokySeal = CreateAtExitState();
-  smokySeal.tunnels["2,1"].sealed = true;
-  smokySeal.tunnels["2,1"].smoke = 3;
-  const smokyWorkTeam = smokySeal.units.find((unit) => unit.unitId === "WorkTeam");
-  smokyWorkTeam.layer = LayerIds.TUNNEL;
-  smokyWorkTeam.tileKey = "2,1";
-  smokyWorkTeam.actionPoints = smokyWorkTeam.maxActionPoints;
-  const smokyClear = GetActiveCivilianTransitEstimate(smokySeal, "Contacts")
-    .recoveryActions.find((entry) => entry.actionId === ActionIds.CLEAR_SEAL);
-  assert.ok(smokyClear);
-  assert.equal(smokyClear.ifAppliedNow.safeTurn, 7);
-  smokySeal = Apply(smokySeal, "WorkTeam", ActionIds.CLEAR_SEAL);
-  smokySeal = End(smokySeal);
-  smokySeal = End(smokySeal);
-  assert.equal(smokySeal.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
-
-  let watchedState = CreateAtExitState();
-  const blockingPatrol = watchedState.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  blockingPatrol.health = 1;
-  blockingPatrol.tileKey = "2,2";
-  blockingPatrol.intent = null;
-  blockingPatrol.intentRevealed = false;
-  const guerrilla = watchedState.units.find((unit) => unit.unitId === "Guerrilla");
-  guerrilla.layer = LayerIds.SURFACE;
-  guerrilla.tileKey = "3,2";
-  guerrilla.actionPoints = guerrilla.maxActionPoints;
-  guerrilla.ammo = 1;
-  const watchedEstimate = GetActiveCivilianTransitEstimate(watchedState, "Contacts");
-  assert.equal(watchedEstimate.nextConstraint.kind, "Watched");
-  const attack = watchedEstimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.ATTACK
-  ));
-  assert.ok(attack);
-  assert.equal(attack.unitId, "Guerrilla");
-  assert.equal(attack.targetKey, "2,2");
-  assert.equal(attack.cost.ammo, 1);
-  assert.equal(attack.ifAppliedNow.safeTurn, 6);
-  watchedState = Apply(watchedState, "Guerrilla", ActionIds.ATTACK, "2,2");
-  watchedState = End(watchedState);
-  assert.equal(watchedState.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
-
-  const deadlineNoAp = CreateAtExitState();
-  deadlineNoAp.turn = deadlineNoAp.maxTurns;
-  deadlineNoAp.exitWindows["2,1"] = {
-    exitKey: "2,1",
-    checkedTurn: 0,
-    checkedUntilTurn: 0,
-    signalCount: 0,
-  };
-  deadlineNoAp.reconActions = 1;
-  deadlineNoAp.lastReconTurn = 0;
-  deadlineNoAp.reconTileTurns["2,1"] = 0;
-  deadlineNoAp.organization = 1;
-  const deadlineScout = deadlineNoAp.units.find((unit) => unit.unitId === "Scout");
-  deadlineScout.layer = LayerIds.SURFACE;
-  deadlineScout.tileKey = "2,1";
-  deadlineScout.health = deadlineScout.maxHealth;
-  deadlineScout.actionPoints = 0;
-  const deadlineEstimate = GetActiveCivilianTransitEstimate(deadlineNoAp, "Contacts");
-  assert.equal(deadlineEstimate.safeTurn, null);
-  assert.equal(deadlineEstimate.deadlineRisk, true);
-  assert.equal(deadlineEstimate.recoveryActions.length, 0);
-  assert.equal(deadlineEstimate.recoveryState, "NoKnownRecovery");
-  const deadlineReconNeed = deadlineEstimate.recoveryNeeds.find((entry) => (
-    entry.actionId === ActionIds.RECON
-  ));
-  assert.ok(deadlineReconNeed);
-  assert.equal(deadlineReconNeed.canBecomeAvailable, false);
-  assert.equal(Object.hasOwn(deadlineReconNeed, "ifAppliedNow"), false);
-
-  const tiedThreats = CreateAtExitState();
-  for (const [enemyId, tileKey] of [
-    ["NorthPatrol", "2,2"],
-    ["BridgePatrol", "3,1"],
-  ]) {
-    const enemy = tiedThreats.enemies.find((entry) => entry.enemyId === enemyId);
-    enemy.health = enemy.maxHealth;
-    enemy.defeated = false;
-    enemy.tileKey = tileKey;
-    enemy.inactiveUntilTurn = 0;
-    enemy.stunnedUntilTurn = 0;
-    enemy.intent = null;
-    enemy.intentRevealed = false;
-  }
-  for (const unit of tiedThreats.units) {
-    unit.actionPoints = 0;
-    if (Object.hasOwn(unit, "ammo")) {
-      unit.ammo = 0;
+    const skilled = score(rank[level].Skilled);
+    for (const rival of ["Turtle", "Rambo"]) {
+      const other = score(rank[level][rival]);
+      const better = skilled[0] > other[0] || (skilled[0] === other[0] && skilled[1] > other[1]);
+      Ok(better, `${level}：Skilled(胜${skilled[0]},分${skilled[1]}) 未压过 ${rival}(胜${other[0]},分${other[1]})`);
     }
   }
-  const tiedBaseline = GetActiveCivilianTransitEstimate(tiedThreats, "Contacts");
-  const tiedReversed = Clone(tiedThreats);
-  tiedReversed.enemies.reverse();
-  assert.deepEqual(
-    GetActiveCivilianTransitEstimate(tiedReversed, "Contacts"),
-    tiedBaseline,
-  );
-
-  const twoAttackers = CreateAtExitState();
-  const watched = twoAttackers.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  watched.health = 1;
-  watched.defeated = false;
-  watched.tileKey = "2,2";
-  watched.inactiveUntilTurn = 0;
-  watched.stunnedUntilTurn = 0;
-  watched.intent = null;
-  watched.intentRevealed = false;
-  const militia = twoAttackers.units.find((unit) => unit.unitId === "Militia");
-  Object.assign(militia, {
-    layer: LayerIds.SURFACE,
-    tileKey: "2,3",
-    actionPoints: 2,
-    ammo: 1,
-  });
-  const secondGuerrilla = twoAttackers.units.find((unit) => unit.unitId === "Guerrilla");
-  Object.assign(secondGuerrilla, {
-    layer: LayerIds.SURFACE,
-    tileKey: "3,2",
-    actionPoints: 2,
-    ammo: 1,
-  });
-  const attackerBaseline = GetActiveCivilianTransitEstimate(twoAttackers, "Contacts");
-  assert.deepEqual(
-    attackerBaseline.recoveryActions
-      .filter((entry) => entry.actionId === ActionIds.ATTACK)
-      .map((entry) => entry.unitId),
-    ["Guerrilla", "Militia"],
-  );
-  const attackersReversed = Clone(twoAttackers);
-  attackersReversed.units.reverse();
-  assert.deepEqual(
-    GetActiveCivilianTransitEstimate(attackersReversed, "Contacts"),
-    attackerBaseline,
-  );
-
-  let warnedSeal = CreateAtExitState();
-  const sapper = warnedSeal.enemies.find((enemy) => enemy.enemyId === "Sapper");
-  sapper.health = sapper.maxHealth;
-  sapper.inactiveUntilTurn = 0;
-  sapper.tileKey = "3,1";
-  sapper.intentRevealed = true;
-  sapper.intent = {
-    intentId: EnemyIntentIds.RESOLVE_SEAL,
-    targetKey: "2,1",
-    warningId: "ActiveForecastSeal",
-  };
-  warnedSeal.warnings = [{
-    warningId: "ActiveForecastSeal",
-    kind: "Seal",
-    targetKey: "2,1",
-    resolvesTurn: warnedSeal.turn,
-    resolved: false,
-    enemyId: sapper.enemyId,
-    text: "工兵准备封堵北枣窖",
-  }];
-  const warnedMilitia = warnedSeal.units.find((unit) => unit.unitId === "Militia");
-  warnedMilitia.layer = LayerIds.TUNNEL;
-  warnedMilitia.tileKey = "2,1";
-  warnedMilitia.actionPoints = warnedMilitia.maxActionPoints;
-  warnedMilitia.ammo = 1;
-  warnedSeal.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "6,2";
-  const warnedSealEstimate = GetActiveCivilianTransitEstimate(warnedSeal, "Contacts");
-  assert.equal(warnedSealEstimate.nextConstraint.kind, "Seal");
-  const trap = warnedSealEstimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.TRAP
-  ));
-  assert.ok(trap);
-  assert.equal(trap.unitId, "Militia");
-  assert.equal(trap.cost.tools, 1);
-  assert.equal(trap.ifAppliedNow.safeTurn, 6);
-  warnedSeal = Apply(warnedSeal, "Militia", ActionIds.TRAP);
-  warnedSeal = End(warnedSeal);
-  assert.equal(warnedSeal.warnings.find((entry) => entry.warningId === "ActiveForecastSeal").resolved, true);
-  assert.equal(warnedSeal.trapsTriggered, 1);
-  assert.equal(warnedSeal.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
-
-  function CreateDualAtExitState() {
-    const state = CreateDualRouteLogisticsState();
-    state.turn = 10;
-    const group = state.civilians.find((entry) => entry.groupId === "Contacts");
-    group.status = "Moving";
-    group.path = [...northEvacuationPath];
-    group.pathIndex = northEvacuationPath.length - 1;
-    group.tileKey = "2,1";
-    group.exitKey = "2,1";
-    group.launchTurn = 8;
-    group.launchOrder = 1;
-    group.exitArrivalTurn = 10;
-    group.waitingForSignal = true;
-    state.civilianLaunchSerial = 2;
-    state.exitWindows["2,1"].checkedUntilTurn = 20;
-    state.exitWindows["0,5"].checkedUntilTurn = 20;
-    return state;
-  }
-
-  function AddResolvingNorthSealWarning(state) {
-    const warningSapper = state.enemies.find((enemy) => enemy.enemyId === "Sapper");
-    warningSapper.health = warningSapper.maxHealth;
-    warningSapper.inactiveUntilTurn = 0;
-    warningSapper.stunnedUntilTurn = 0;
-    warningSapper.tileKey = "3,1";
-    warningSapper.intentRevealed = true;
-    warningSapper.intent = {
-      intentId: EnemyIntentIds.RESOLVE_SEAL,
-      targetKey: "2,1",
-      warningId: "RerouteSeal",
-    };
-    state.warnings = [{
-      warningId: "RerouteSeal",
-      kind: "Seal",
-      targetKey: "2,1",
-      resolvesTurn: state.turn,
-      resolved: false,
-      enemyId: warningSapper.enemyId,
-      text: "工兵准备封堵北枣窖",
-    }];
-    return state;
-  }
-
-  let trapBeforeReroute = AddResolvingNorthSealWarning(CreateDualAtExitState());
-  const rerouteMilitia = trapBeforeReroute.units.find((unit) => unit.unitId === "Militia");
-  rerouteMilitia.layer = LayerIds.TUNNEL;
-  rerouteMilitia.tileKey = "2,1";
-  rerouteMilitia.actionPoints = rerouteMilitia.maxActionPoints;
-  rerouteMilitia.ammo = 1;
-  const rerouteBaseline = GetActiveCivilianTransitEstimate(
-    trapBeforeReroute,
-    "Contacts",
-  );
-  assert.equal(rerouteBaseline.rerouted, true);
-  assert.equal(rerouteBaseline.projectedExitKey, "0,5");
-  assert.equal(rerouteBaseline.safeTurn > trapBeforeReroute.maxTurns, true);
-  const rerouteTrap = rerouteBaseline.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.TRAP
-    && entry.unitId === "Militia"
-    && entry.targetKey === "2,1"
-  ));
-  assert.ok(rerouteTrap);
-  assert.equal(rerouteTrap.ifAppliedNow.safeTurn, 10);
-  trapBeforeReroute = Apply(trapBeforeReroute, "Militia", ActionIds.TRAP);
-  trapBeforeReroute = End(trapBeforeReroute);
-  assert.equal(
-    trapBeforeReroute.civilians.find((entry) => entry.groupId === "Contacts").status,
-    "Safe",
-  );
-
-  const ambushBeforeReroute = AddResolvingNorthSealWarning(CreateDualAtExitState());
-  const rerouteGuerrilla = ambushBeforeReroute.units.find((unit) => (
-    unit.unitId === "Guerrilla"
-  ));
-  rerouteGuerrilla.layer = LayerIds.TUNNEL;
-  rerouteGuerrilla.tileKey = "2,1";
-  rerouteGuerrilla.actionPoints = rerouteGuerrilla.maxActionPoints;
-  rerouteGuerrilla.ammo = 1;
-  const rerouteAmbush = GetActiveCivilianTransitEstimate(
-    ambushBeforeReroute,
-    "Contacts",
-  ).recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.AMBUSH
-    && entry.unitId === "Guerrilla"
-    && entry.targetKey === "2,1"
-  ));
-  assert.ok(rerouteAmbush);
-  assert.equal(rerouteAmbush.ifAppliedNow.safeTurn, 10);
-  let ambushActual = Apply(ambushBeforeReroute, "Guerrilla", ActionIds.AMBUSH);
-  ambushActual = End(ambushActual);
-  assert.equal(
-    ambushActual.civilians.find((entry) => entry.groupId === "Contacts").status,
-    "Safe",
-  );
-
-  let clearBeforeReroute = CreateDualAtExitState();
-  clearBeforeReroute.tunnels["2,1"].sealed = true;
-  const rerouteWorkTeam = clearBeforeReroute.units.find((unit) => (
-    unit.unitId === "WorkTeam"
-  ));
-  rerouteWorkTeam.layer = LayerIds.TUNNEL;
-  rerouteWorkTeam.tileKey = "2,1";
-  rerouteWorkTeam.actionPoints = rerouteWorkTeam.maxActionPoints;
-  const sealedRerouteBaseline = GetActiveCivilianTransitEstimate(
-    clearBeforeReroute,
-    "Contacts",
-  );
-  assert.equal(sealedRerouteBaseline.rerouted, true);
-  assert.equal(sealedRerouteBaseline.projectedExitKey, "0,5");
-  const rerouteClear = sealedRerouteBaseline.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.CLEAR_SEAL
-    && entry.unitId === "WorkTeam"
-    && entry.targetKey === "2,1"
-  ));
-  assert.ok(rerouteClear);
-  assert.equal(rerouteClear.ifAppliedNow.safeTurn, 10);
-  clearBeforeReroute = Apply(clearBeforeReroute, "WorkTeam", ActionIds.CLEAR_SEAL);
-  clearBeforeReroute = End(clearBeforeReroute);
-  assert.equal(
-    clearBeforeReroute.civilians.find((entry) => entry.groupId === "Contacts").status,
-    "Safe",
-  );
-
-  const movingBeforeReroute = AddResolvingNorthSealWarning(
-    CreateDualRouteLogisticsState(),
-  );
-  movingBeforeReroute.turn = 6;
-  movingBeforeReroute.warnings[0].resolvesTurn = 6;
-  const movingWounded = movingBeforeReroute.civilians.find((entry) => (
-    entry.groupId === "Wounded"
-  ));
-  movingWounded.status = "Moving";
-  movingWounded.path = [...northEvacuationPath];
-  movingWounded.pathIndex = 0;
-  movingWounded.tileKey = "6,2";
-  movingWounded.exitKey = "2,1";
-  movingWounded.launchTurn = 5;
-  movingWounded.launchOrder = 1;
-  movingWounded.exitArrivalTurn = null;
-  for (const unitId of ["Militia", "Guerrilla"]) {
-    const defender = movingBeforeReroute.units.find((unit) => unit.unitId === unitId);
-    defender.layer = LayerIds.TUNNEL;
-    defender.tileKey = "2,1";
-    defender.actionPoints = defender.maxActionPoints;
-    defender.ammo = 1;
-  }
-  const movingRerouteEstimate = GetActiveCivilianTransitEstimate(
-    movingBeforeReroute,
-    "Wounded",
-  );
-  assert.equal(movingRerouteEstimate.rerouted, true);
-  assert.equal(movingRerouteEstimate.projectedExitKey, "0,5");
-  assert.equal(movingRerouteEstimate.arrivalTurn, 12);
-  assert.equal(movingRerouteEstimate.safeTurn > movingBeforeReroute.maxTurns, true);
-  for (const [actionId, unitId] of [
-    [ActionIds.TRAP, "Militia"],
-    [ActionIds.AMBUSH, "Guerrilla"],
-  ]) {
-    const defense = movingRerouteEstimate.recoveryActions.find((entry) => (
-      entry.actionId === actionId
-      && entry.unitId === unitId
-      && entry.targetKey === "2,1"
-    ));
-    assert.ok(defense, JSON.stringify({
-      actionId,
-      unitId,
-      recoveryActions: movingRerouteEstimate.recoveryActions,
-      recoveryNeeds: movingRerouteEstimate.recoveryNeeds,
-    }));
-    assert.equal(defense.ifAppliedNow.arrivalTurn, 11);
-    assert.equal(defense.ifAppliedNow.safeTurn, null);
-    assert.equal(defense.ifAppliedNow.nextConstraintKind, "Watched");
-    let defended = Apply(movingBeforeReroute, unitId, actionId);
-    defended = End(defended);
-    assert.equal(
-      defended.civilians.find((entry) => entry.groupId === "Wounded").exitKey,
-      "2,1",
-    );
-    assert.equal(
-      defended.civilians.find((entry) => entry.groupId === "Wounded").tileKey,
-      "6,1",
-    );
-    assert.equal(defended.tunnels["2,1"].sealed, false);
-    assert.equal(defended.warnings.find((warning) => warning.warningId === "RerouteSeal").resolved, true);
-  }
-
-  let smokyDefenseState = Clone(movingBeforeReroute);
-  smokyDefenseState.tunnels["6,1"].smoke = 2;
-  const smokyDefenseEstimate = GetActiveCivilianTransitEstimate(
-    smokyDefenseState,
-    "Wounded",
-  );
-  const smokyTrap = smokyDefenseEstimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.TRAP
-    && entry.unitId === "Militia"
-    && entry.targetKey === "2,1"
-  ));
-  assert.ok(smokyTrap);
-  assert.equal(smokyTrap.ifAppliedNow.peopleSafetyCost, 5);
-  const safetyBeforeSmoke = smokyDefenseState.peopleSafety;
-  smokyDefenseState = Apply(smokyDefenseState, "Militia", ActionIds.TRAP);
-  smokyDefenseState = End(smokyDefenseState);
-  assert.equal(safetyBeforeSmoke - smokyDefenseState.peopleSafety, 5);
 });
 
-Test("active trapped forecasts model occupied-node Dig but not forward-obstruction rescue", () => {
-  function CreateTrappedState(groupTileKey, collapsedTileKey) {
-    const state = CreateLogisticsState(false);
-    state.turn = 5;
-    state.peopleSafety = 88;
-    const group = state.civilians.find((entry) => entry.groupId === "Wounded");
-    group.status = "Trapped";
-    group.path = [...northEvacuationPath];
-    group.pathIndex = northEvacuationPath.indexOf(groupTileKey);
-    group.tileKey = groupTileKey;
-    group.exitKey = "2,1";
-    group.launchTurn = 4;
-    group.launchOrder = 1;
-    group.delayed = true;
-    group.exitArrivalTurn = null;
-    state.tunnels[collapsedTileKey].collapsed = true;
-    const workTeam = state.units.find((unit) => unit.unitId === "WorkTeam");
-    workTeam.layer = LayerIds.TUNNEL;
-    workTeam.tileKey = "6,2";
-    workTeam.actionPoints = workTeam.maxActionPoints;
-    return state;
+Check("双时钟：纯躲 → 敌满时长离场且明存粮被征 ≥6", () => {
+  for (const state of rank.L1.Turtle) {
+    Ok(state.ledger.grainSeized >= 6, `纯躲被征 ${state.ledger.grainSeized} < 6`);
+    const effectiveWithdraw = state.wave.withdrawTurn ?? (state.wave.hardEndTurn + 1);
+    Ok(effectiveWithdraw >= state.wave.hardEndTurn, "纯躲不应逼退敌军");
   }
-
-  let occupiedCollapse = CreateTrappedState("6,1", "6,1");
-  const pristine = Clone(occupiedCollapse);
-  const occupiedEstimate = GetActiveCivilianTransitEstimate(
-    occupiedCollapse,
-    "Wounded",
-  );
-  assert.deepEqual(occupiedCollapse, pristine);
-  assert.equal(occupiedEstimate.status, "Trapped");
-  assert.equal(occupiedEstimate.nextConstraint.kind, "Collapse");
-  assert.equal(occupiedEstimate.nextConstraint.tileKey, "6,1");
-  assert.equal(occupiedEstimate.recoveryState, "RecoverableNow");
-  const dig = occupiedEstimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.DIG
-  ));
-  assert.ok(dig);
-  assert.equal(dig.targetKey, "6,1");
-  assert.equal(dig.cost.tools, 1);
-  assert.equal(dig.cost.ap, 1);
-  assert.equal(dig.cost.exposure, 11);
-  assert.equal(dig.ifAppliedNow.status, "Moving");
-  assert.equal(dig.ifAppliedNow.safeTurn, 9);
-
-  const toolsBefore = occupiedCollapse.tools;
-  const exposureBefore = occupiedCollapse.exposure;
-  occupiedCollapse = Apply(occupiedCollapse, "WorkTeam", ActionIds.DIG, "6,1");
-  assert.equal(occupiedCollapse.tools, toolsBefore - 1);
-  assert.equal(occupiedCollapse.exposure, exposureBefore + 11);
-  assert.equal(occupiedCollapse.peopleSafety, 88);
-  assert.equal(occupiedCollapse.civilians.find((entry) => entry.groupId === "Wounded").status, "Moving");
-  assert.equal(
-    GetActiveCivilianTransitEstimate(occupiedCollapse, "Wounded").safeTurn,
-    dig.ifAppliedNow.safeTurn,
-  );
-  while (!occupiedCollapse.outcome && occupiedCollapse.turn <= dig.ifAppliedNow.safeTurn) {
-    occupiedCollapse = End(occupiedCollapse);
-  }
-  assert.equal(occupiedCollapse.civilians.find((entry) => entry.groupId === "Wounded").status, "Safe");
-  assert.equal(occupiedCollapse.peopleSafety, 88);
-
-  const needsPositioning = CreateTrappedState("6,1", "6,1");
-  needsPositioning.units.find((unit) => unit.unitId === "WorkTeam").tileKey = "4,1";
-  const positioningEstimate = GetActiveCivilianTransitEstimate(needsPositioning, "Wounded");
-  assert.equal(positioningEstimate.recoveryState, "RecoverableAfterPositioning");
-  assert.equal(positioningEstimate.recoveryActions.length, 0);
-  assert.equal(positioningEstimate.recoveryNeeds.some((entry) => Object.hasOwn(entry, "ifAppliedNow")), false);
-
-  const deadDigger = CreateTrappedState("6,1", "6,1");
-  deadDigger.units.find((unit) => unit.unitId === "WorkTeam").health = 0;
-  const deadDiggerEstimate = GetActiveCivilianTransitEstimate(deadDigger, "Wounded");
-  assert.equal(deadDiggerEstimate.recoveryState, "NoKnownRecovery");
-  assert.equal(deadDiggerEstimate.recoveryActions.length, 0);
-  assert.equal(deadDiggerEstimate.recoveryNeeds[0].canBecomeAvailable, false);
-
-  const forwardObstruction = CreateTrappedState("6,1", "5,1");
-  const forwardEstimate = GetActiveCivilianTransitEstimate(forwardObstruction, "Wounded");
-  assert.equal(forwardEstimate.recoveryState, "NoKnownRecovery");
-  assert.equal(forwardEstimate.recoveryActions.length, 0);
-  assert.equal(forwardEstimate.nextConstraint.tileKey, "5,1");
-
-  let movingObstruction = CreateLogisticsState(false);
-  movingObstruction.turn = 6;
-  const movingContacts = movingObstruction.civilians.find((entry) => entry.groupId === "Contacts");
-  movingContacts.status = "Moving";
-  movingContacts.path = [...northEvacuationPath];
-  movingContacts.pathIndex = 1;
-  movingContacts.tileKey = "6,1";
-  movingContacts.exitKey = "2,1";
-  movingContacts.launchTurn = 4;
-  movingContacts.launchOrder = 1;
-  movingObstruction.tunnels["5,1"].collapsed = true;
-  const movingDigger = movingObstruction.units.find((unit) => unit.unitId === "WorkTeam");
-  movingDigger.layer = LayerIds.TUNNEL;
-  movingDigger.tileKey = "6,1";
-  movingDigger.actionPoints = movingDigger.maxActionPoints;
-  const movingEstimate = GetActiveCivilianTransitEstimate(movingObstruction, "Contacts");
-  assert.equal(movingEstimate.nextConstraint.kind, "Collapse");
-  assert.equal(movingEstimate.nextConstraint.tileKey, "5,1");
-  assert.equal(movingEstimate.peopleSafetyCost, 8);
-  const preventiveDig = movingEstimate.recoveryActions.find((entry) => (
-    entry.actionId === ActionIds.DIG
-  ));
-  assert.ok(preventiveDig);
-  assert.equal(preventiveDig.targetKey, "5,1");
-  assert.equal(preventiveDig.ifAppliedNow.safeTurn, 7);
-
-  const collapsedBraceState = Clone(movingObstruction);
-  const collapsedBraceDigger = collapsedBraceState.units.find((unit) => (
-    unit.unitId === "WorkTeam"
-  ));
-  collapsedBraceDigger.tileKey = "5,1";
-  assert.equal(
-    GetAvailableActions(collapsedBraceState, "WorkTeam").includes(ActionIds.BRACE),
-    false,
-  );
-  const collapsedBraceResult = ApplyPlayerAction(collapsedBraceState, {
-    unitId: "WorkTeam",
-    actionId: ActionIds.BRACE,
-  });
-  assert.equal(collapsedBraceResult.ok, false);
-  assert.deepEqual(collapsedBraceResult.state, collapsedBraceState);
-
-  const unrescued = End(movingObstruction);
-  assert.equal(unrescued.peopleSafety, movingObstruction.peopleSafety - 8);
-  movingObstruction = Apply(movingObstruction, "WorkTeam", ActionIds.DIG, "5,1");
-  movingObstruction = End(movingObstruction);
-  movingObstruction = End(movingObstruction);
-  assert.equal(movingObstruction.civilians.find((entry) => entry.groupId === "Contacts").status, "Safe");
-
-  let reroute = CreateDualRouteLogisticsState();
-  reroute.turn = 6;
-  const reroutingWounded = reroute.civilians.find((entry) => entry.groupId === "Wounded");
-  reroutingWounded.status = "Moving";
-  reroutingWounded.path = [...northEvacuationPath];
-  reroutingWounded.pathIndex = 0;
-  reroutingWounded.tileKey = "6,2";
-  reroutingWounded.exitKey = "2,1";
-  reroutingWounded.launchTurn = 4;
-  reroutingWounded.launchOrder = 1;
-  reroute.tunnels["5,1"].collapsed = true;
-  const rerouteEstimate = GetActiveCivilianTransitEstimate(reroute, "Wounded");
-  assert.equal(rerouteEstimate.rerouted, true);
-  assert.equal(rerouteEstimate.projectedExitKey, "0,5");
-  assert.notEqual(rerouteEstimate.nextConstraint?.kind, "Collapse");
 });
 
-Test("active forecasts include public reroutes and smoke without hidden-intent leakage", () => {
-  let rerouting = CreateDualRouteLogisticsState();
-  rerouting = Apply(rerouting, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
-  rerouting.warnings = [{
-    warningId: "VisibleSeal",
-    kind: "Seal",
-    targetKey: "2,1",
-    resolvesTurn: rerouting.turn + 1,
-    resolved: false,
-    enemyId: "Sapper",
-    text: "工兵准备封堵北枣窖",
-  }];
-  const warned = GetActiveCivilianTransitEstimate(rerouting, "Wounded");
-  assert.equal(warned.projectedExitKey, "0,5");
-  assert.equal(warned.rerouted, true);
+Check("双时钟：袭扰 → 撤退比纯躲提前 ≥2 回合", () => {
+  for (let i = 0; i < rankSeeds.length; i += 1) {
+    const harass = rank.L1.Skilled[i].wave.withdrawTurn ?? (rank.L1.Skilled[i].wave.hardEndTurn + 1);
+    const turtle = rank.L1.Turtle[i].wave.withdrawTurn ?? (rank.L1.Turtle[i].wave.hardEndTurn + 1);
+    Ok(turtle - harass >= 2, `seed${rankSeeds[i]}：袭扰 T${harass} vs 纯躲 T${turtle}，差 <2`);
+  }
+});
 
-  const smoky = CreateLogisticsState(false);
-  let smokyMoving = Apply(smoky, "Militia", ActionIds.EVACUATE, "2,1", "Wounded");
-  smokyMoving.tunnels["6,1"].smoke = 2;
-  const smokyEstimate = GetActiveCivilianTransitEstimate(smokyMoving, "Wounded");
-  assert.equal(smokyEstimate.smokeDelayTurns > 0, true);
-  assert.equal(smokyEstimate.peopleSafetyCost > 0, true);
+// ===========================================================================
+// 五、佯动木偶化（置信 1 噪音绝不拉动纵队）
+// ===========================================================================
 
-  const publicState = Clone(rerouting);
-  publicState.warnings = [];
-  const patrol = publicState.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-  patrol.health = patrol.maxHealth;
-  patrol.tileKey = "0,0";
-  patrol.intent = null;
-  patrol.intentRevealed = false;
-  const publicEstimate = GetActiveCivilianTransitEstimate(publicState, "Wounded");
-  for (let index = 0; index < 1000; index += 1) {
-    const hidden = Clone(publicState);
-    hidden.seed = index + 100;
-    const hiddenPatrol = hidden.enemies.find((enemy) => enemy.enemyId === "NorthPatrol");
-    hiddenPatrol.intent = {
-      intentId: index % 2 ? EnemyIntentIds.PREPARE_SEAL : EnemyIntentIds.SEARCH,
-      targetKey: "2,1",
-    };
-    hiddenPatrol.intentRevealed = false;
-    if (index % 2) {
-      hidden.enemies.reverse();
+Check("佯动木偶化：仅置信 1 噪音 → 敌纵队逐回合路径与基线一致", () => {
+  const Trace = (withNoise) => {
+    let state = CreateGame("L1", 2);
+    const positionsPerTurn = [];
+    for (let i = 0; i < 8; i += 1) {
+      if (withNoise) RecordSighting(state, "0,8", 1);      // 远角落的动静：只加嫌疑
+      state = EndTurn(state).state;
+      positionsPerTurn.push(EnemyUnits(state).map((unit) => `${unit.type}@${unit.pos}`).sort().join("|"));
+      if (state.result) break;
     }
-    assert.deepEqual(
-      GetActiveCivilianTransitEstimate(hidden, "Wounded"),
-      publicEstimate,
-    );
-  }
-});
-
-Test("launch forecasts warn before an optimistic remaining schedule becomes impossible", () => {
-  let south = CreateSouthLogisticsState();
-  const t4Families = GetCivilianTransitEstimate(south, "Families", "0,5");
-  assert.equal(t4Families.remainingScheduleRisk, false);
-  assert.deepEqual(
-    t4Families.remainingSchedule.map((entry) => entry.groupId),
-    ["Wounded", "Contacts"],
-  );
-  assert.deepEqual(
-    t4Families.remainingSchedule.map((entry) => [
-      entry.earliestLaunchTurn,
-      entry.earliestReadyTurn,
-    ]),
-    [[5, 11], [6, 8]],
-  );
-
-  south = Apply(south, "Militia", ActionIds.EVACUATE, "0,5", "Families");
-  south = End(south);
-  const pristine = Clone(south);
-  const contactsSecond = GetCivilianTransitEstimate(south, "Contacts", "0,5");
-  assert.deepEqual(south, pristine);
-  assert.equal(contactsSecond.remainingScheduleRisk, true);
-  assert.match(contactsSecond.remainingScheduleAssumption, /当前已通路线/);
-  assert.match(contactsSecond.remainingScheduleAssumption, /不再开路或抢通/);
-  assert.deepEqual(contactsSecond.strandedGroupIds, ["Wounded"]);
-  assert.deepEqual(contactsSecond.remainingSchedule, [{
-    groupId: "Wounded",
-    exitKey: "0,5",
-    routeSegments: 6,
-    moveSteps: 1,
-    earliestLaunchTurn: 6,
-    earliestReadyTurn: 12,
-    deadlineSlack: -1,
-  }]);
-  assert.deepEqual(
-    GetCivilianTransitEstimate(south, "Contacts", "0,5"),
-    contactsSecond,
-  );
-
-  const woundedSecond = GetCivilianTransitEstimate(south, "Wounded", "0,5");
-  assert.equal(woundedSecond.remainingScheduleRisk, false);
-  assert.deepEqual(woundedSecond.strandedGroupIds, []);
-  assert.deepEqual(
-    woundedSecond.remainingSchedule.map((entry) => [
-      entry.groupId,
-      entry.earliestLaunchTurn,
-      entry.earliestReadyTurn,
-    ]),
-    [["Contacts", 6, 8]],
-  );
-
-  let contactsFirst = CreateSouthLogisticsState();
-  contactsFirst = Apply(
-    contactsFirst,
-    "Militia",
-    ActionIds.EVACUATE,
-    "0,5",
-    "Contacts",
-  );
-  contactsFirst = End(contactsFirst);
-  const familiesSecond = GetCivilianTransitEstimate(
-    contactsFirst,
-    "Families",
-    "0,5",
-  );
-  assert.equal(familiesSecond.remainingScheduleRisk, true);
-  assert.deepEqual(familiesSecond.strandedGroupIds, ["Wounded"]);
-
-  let north = CreateLogisticsState(false);
-  north = Apply(north, "Militia", ActionIds.EVACUATE, "2,1", "Families");
-  north = End(north);
-  for (const groupId of ["Contacts", "Wounded"]) {
-    const estimate = GetCivilianTransitEstimate(north, groupId, "2,1");
-    assert.equal(estimate.remainingScheduleRisk, false);
-    assert.deepEqual(estimate.strandedGroupIds, []);
-  }
-
-  const hiddenEnemyVariant = Clone(south);
-  hiddenEnemyVariant.enemies.forEach((enemy, index) => {
-    enemy.health = enemy.maxHealth;
-    enemy.tileKey = index % 2 ? "0,0" : "8,5";
-    enemy.intent = {
-      intentId: EnemyIntentIds.PREPARE_SEAL,
-      targetKey: "0,5",
-    };
-    enemy.intentRevealed = false;
-  });
-  const hiddenVariantEstimate = GetCivilianTransitEstimate(
-    hiddenEnemyVariant,
-    "Contacts",
-    "0,5",
-  );
-  assert.deepEqual(
-    hiddenVariantEstimate.remainingSchedule,
-    contactsSecond.remainingSchedule,
-  );
-  assert.equal(
-    hiddenVariantEstimate.remainingScheduleRisk,
-    contactsSecond.remainingScheduleRisk,
-  );
-});
-
-Test("clay slows smoke by one segment and keeps civilians beyond it moving", () => {
-  function ResolveTestSmoke(soilId) {
-    const state = CreateInitialState();
-    const tunnelKeys = ["3,2", "4,2", "5,2", "6,2", "7,1"];
-    const nodeTemplate = Clone(state.tunnels["6,2"]);
-    state.turn = 6;
-    state.outcome = null;
-    state.tunnels = Object.fromEntries(tunnelKeys.map((tileKey) => [
-      tileKey,
-      {
-        ...Clone(nodeTemplate),
-        tileKey,
-        braced: false,
-        cracked: false,
-        collapsed: false,
-        sealed: false,
-        smoke: 0,
-        isOriginal: false,
-      },
-    ]));
-    state.tunnels["3,2"].sealed = true;
-    state.tiles["4,2"].soilId = soilId;
-    const sapper = Clone(state.enemies.find((enemy) => enemy.enemyId === "Sapper"));
-    sapper.inactiveUntilTurn = 0;
-    sapper.intent = {
-      intentId: EnemyIntentIds.RESOLVE_SMOKE,
-      targetKey: "3,2",
-      warningId: "SmokeTest",
-    };
-    state.enemies = [sapper];
-    state.warnings = [{
-      warningId: "SmokeTest",
-      kind: "Smoke",
-      targetKey: "3,2",
-      resolvesTurn: state.turn,
-      resolved: false,
-      enemyId: sapper.enemyId,
-    }];
-    state.enemyMemory.confirmedEntrances = ["3,2"];
-    state.enemyMemory.knownEntranceStates = { "3,2": { sealed: true } };
-    state.civilians = [{
-      groupId: "TestGroup",
-      name: "测试群众",
-      people: 3,
-      status: "Moving",
-      tileKey: "7,1",
-      path: ["7,1", "6,2"],
-      pathIndex: 0,
-      exitKey: "6,2",
-      delayed: false,
-    }];
-    state.exitWindows["6,2"] = {
-      exitKey: "6,2",
-      checkedTurn: state.turn,
-      checkedUntilTurn: state.turn + 2,
-      signalCount: 1,
-    };
-    return RunEnemyPhase(state);
-  }
-
-  const clay = ResolveTestSmoke("clay");
-  const packed = ResolveTestSmoke("packed");
-  assert.equal(clay.tunnels["6,2"].smoke, 0);
-  assert.equal(packed.tunnels["6,2"].smoke, 2);
-  assert.equal(clay.civilians[0].status, "Safe");
-  assert.equal(packed.civilians[0].status, "Moving");
-  assert.equal(packed.civilians[0].delayed, true);
-  assert.equal(packed.peopleSafety, clay.peopleSafety - 5);
-});
-
-Test("a moving civilian group cannot skip across an unbraced cracked segment", () => {
-  let state = CreateInitialState();
-  state.turn = 3;
-  state.tunnels["4,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "4,1",
-    braced: true,
+    return positionsPerTurn.join("\n");
   };
-  state.tunnels["3,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "3,1",
-    braced: false,
-    cracked: true,
-    collapsed: false,
-    dugTurn: 1,
-  };
-  state.tunnels["2,1"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "2,1",
-    braced: true,
-  };
-  const group = state.civilians[0];
-  group.status = "Moving";
-  group.path = ["4,1", "3,1", "2,1"];
-  group.pathIndex = 0;
-  group.tileKey = "4,1";
-  group.exitKey = "2,1";
-  state = RunEnemyPhase(state);
-  assert.equal(state.tunnels["3,1"].collapsed, true);
-  assert.equal(state.civilians[0].status, "Trapped");
+  Eq(Trace(true), Trace(false), "置信 1 噪音改变了纵队路径");
 });
 
-Test("ambush ammunition is reserved at preparation and moving cancels the prepared tile", () => {
-  let state = CreateInitialState();
-  const militia = state.units.find((unit) => unit.unitId === "Militia");
-  militia.layer = LayerIds.TUNNEL;
-  militia.tileKey = "6,2";
-  militia.actionPoints = 2;
-  const ammoBefore = militia.ammo;
-  state = Apply(state, "Militia", ActionIds.AMBUSH);
-  assert.equal(state.units.find((unit) => unit.unitId === "Militia").ammo, ammoBefore - 1);
-  assert.equal(GetAvailableActions(state, "Militia").includes(ActionIds.TRAP), false);
-  state.tunnels["5,2"] = {
-    ...Clone(state.tunnels["6,2"]),
-    tileKey: "5,2",
-  };
-  state = Apply(state, "Militia", ActionIds.MOVE, "5,2");
-  assert.equal(state.units.find((unit) => unit.unitId === "Militia").ambushPrepared, false);
+// ===========================================================================
+// 六、反地道四选一（烟/爆/攻入/封堵各至少可达一次，全部先电报后执行）
+// ===========================================================================
 
-  let timed = CreateInitialState();
-  const timedMilitia = timed.units.find((unit) => unit.unitId === "Militia");
-  timedMilitia.layer = LayerIds.TUNNEL;
-  timedMilitia.tileKey = "6,2";
-  timed = Apply(timed, "Militia", ActionIds.AMBUSH);
-  timed = End(timed);
-  timed = End(timed);
-  assert.equal(timed.units.find((unit) => unit.unitId === "Militia").ambushPrepared, true);
-  timed = End(timed);
-  assert.equal(timed.units.find((unit) => unit.unitId === "Militia").ambushPrepared, false);
+Check("反地道：烟攻先电报后点烟，蔓延被关门阻断", () => {
+  let state = SurgeryGame("L2", 1);
+  state.tunnels.entrances["2,2"].known = true;
+  state.tunnels.edges[EdgeKey("2,2", "2,3")].door = "closed";      // 关门隔离 2,3
+  MakeColumn(state, "tSmoke", ["sapper", "inf"], "3,1");
+  let outcome = EndTurn(state);
+  state = outcome.state;
+  Ok(state.enemy.pendingOps.some((op) => op.kind === "smoke"), "未宣布烟攻");
+  Ok(outcome.events.some((event) => event.kind === "telegraph" && event.visible), "烟攻电报应可见");
+  const chargesBefore = state.wave.smokeCharges;
+  const poolBefore = state.wave.pool;
+  outcome = EndTurn(state);
+  state = outcome.state;
+  Eq(state.wave.smokeCharges, chargesBefore - 1, "烟具未扣");
+  Ok(state.wave.pool <= poolBefore - CFG.pool.smokeSelfCost, "烟攻未自耗行动力池");
+  Ok(state.tunnels.cells["2,2"].smoke > 0, "口下格未起烟");
+  state = EndTurn(state).state;
+  state = EndTurn(state).state;
+  Ok(state.tunnels.cells["3,2"].smoke > 0, "开放边未蔓延");
+  Eq(state.tunnels.cells["2,3"].smoke, 0, "关闭的隔断门没能挡烟");
 });
 
-Test("north interdiction, south combined defense, and delayed ambush win differently", () => {
-  const interdiction = RunNorthInterdictionBot();
-  const deception = RunSouthDeceptionBot();
-  const southWithoutDecoy = RunSouthDeceptionBot(false);
-  const decoyOnly = RunSouthDeceptionBot(true, false);
-  const ambush = RunAmbushBot();
-  assert.equal(interdiction.outcome.status, "Victory");
-  assert.equal(deception.outcome.status, "Victory", JSON.stringify({
-    outcome: deception.outcome,
-    civilians: deception.civilians,
-    turn: deception.turn,
-    organization: deception.organization,
-    exitWindow: deception.exitWindows["0,5"],
-    enemies: deception.enemies,
-    log: deception.log.slice(-8),
-  }));
-  assert.equal(southWithoutDecoy.outcome.status, "Defeat");
-  assert.equal(decoyOnly.outcome.status, "Defeat");
-  assert.equal(ambush.outcome.status, "Victory", JSON.stringify({
-    outcome: ambush.outcome,
-    civilians: ambush.civilians,
-    turn: ambush.turn,
-    enemies: ambush.enemies,
-    log: ambush.log.slice(-10),
-  }));
-  assert.equal(interdiction.outcome.path, "interdiction");
-  assert.equal(deception.outcome.path, "deception");
-  assert.equal(ambush.outcome.path, "ambush");
-  assert.equal(interdiction.exitSignalsIssued >= 1, true);
-  assert.equal(deception.exitSignalsIssued >= 2, true);
-  assert.equal(ambush.exitSignalsIssued >= 2, true);
-  assert.equal(interdiction.eventLedger.some((event) => /从北枣窖出洞/.test(event.text)), true);
-  assert.equal(deception.eventLedger.some((event) => /从西南苇井出洞/.test(event.text)), true);
-  assert.equal(deception.decoyDiversions > 0, true);
-  assert.equal(deception.trapsTriggered > 0, true);
-  assert.equal(deception.civiliansSafe > southWithoutDecoy.civiliansSafe, true);
-  assert.equal(deception.peopleSafety >= southWithoutDecoy.peopleSafety, true);
-  assert.equal(deception.exposure < southWithoutDecoy.exposure, true);
-  assert.equal(deception.organization, 0);
-  assert.equal(southWithoutDecoy.organization > deception.organization, true);
-  assert.equal(decoyOnly.trapsTriggered, 0);
-  assert.equal(decoyOnly.civiliansSafe, 0);
-  assert.match(decoyOnly.outcome.tip, /假迹已经消耗/);
-  assert.doesNotMatch(decoyOnly.outcome.tip, /先诱敌/);
-  assert.equal(ambush.ambushesTriggered > 0, true);
-  assert.notDeepEqual(
-    Object.keys(interdiction.tunnels).sort(),
-    Object.keys(deception.tunnels).sort(),
-  );
+Check("反地道：爆破毁口并波及格内单位", () => {
+  let state = SurgeryGame("L2", 1);
+  state.wave.smokeCharges = 0;                                     // 逼 AI 选爆破
+  state.tunnels.entrances["2,2"].known = true;
+  const defender = state.units.u1;                                  // 民兵下地站在口下
+  defender.layer = "under";
+  defender.pos = "2,2";
+  MakeColumn(state, "tBlast", ["sapper", "inf"], "3,1");
+  state = EndTurn(state).state;
+  Ok(state.enemy.pendingOps.some((op) => op.kind === "blast"), "未宣布爆破");
+  state = EndTurn(state).state;
+  Ok(!state.tunnels.entrances["2,2"], "爆破后入口应被摧毁");
+  Eq(state.units.u1.hp, unitDefinitions.militia.hp - CFG.blastDamage, "爆破波及伤害不对");
 });
 
-Test("a fixed opening decoy needs follow-up counterplay across mission seeds", () => {
-  const seeds = Array.from({ length: 100 }, (_, index) => index + 1);
-  const supportedDeceptionResults = seeds.map((seed) => (
-    RunSouthDeceptionBot(true, true, seed)
-  ));
-  const pureTrapResults = seeds.map((seed) => (
-    RunSouthDeceptionBot(false, true, seed)
-  ));
-  const decoyOnlyResults = seeds.map((seed) => (
-    RunSouthDeceptionBot(true, false, seed)
-  ));
-  const noCounterResults = seeds.map((seed) => (
-    RunSouthDeceptionBot(false, false, seed)
-  ));
-  assert.equal(supportedDeceptionResults.every((state) => (
-    state.outcome?.status === "Victory"
-    && state.decoyDiversions > 0
-    && state.trapsTriggered > 0
-  )), true);
-  assert.equal(pureTrapResults.some((state) => state.outcome?.status === "Defeat"), true);
-  assert.equal(pureTrapResults.some((state) => state.trapsTriggered > 0), true);
-  assert.equal(pureTrapResults.some((state, index) => (
-    state.trapsTriggered > 0
-    && (
-      state.peopleSafety > noCounterResults[index].peopleSafety
-      || state.enemies.reduce((sum, enemy) => sum + enemy.health, 0)
-        < noCounterResults[index].enemies.reduce((sum, enemy) => sum + enemy.health, 0)
-    )
-  )), true);
-  assert.equal(supportedDeceptionResults.every((state, index) => (
-    state.exposure < pureTrapResults[index].exposure
-  )), true);
-  assert.equal(decoyOnlyResults.every((state) => (
-    state.outcome?.status === "Defeat"
-    && state.civiliansSafe === 0
-    && state.trapsTriggered === 0
-  )), true);
-  assert.equal(noCounterResults.every((state) => state.trapsTriggered === 0), true);
+Check("反地道：攻入遇驻守 → 敌折一班且中止；无驻守 → 内容进账本", () => {
+  // 有驻守
+  let state = SurgeryGame("L2", 1);
+  state.wave.smokeCharges = 0;
+  state.tunnels.entrances["2,2"].known = true;
+  state.units.u1.layer = "under";
+  state.units.u1.pos = "2,2";
+  MakeColumn(state, "tBreach", ["inf", "inf"], "3,1");
+  state = EndTurn(state).state;
+  Ok(state.enemy.pendingOps.some((op) => op.kind === "breach"), "未宣布攻入");
+  const enemiesBefore = EnemyUnits(state).length;
+  state = EndTurn(state).state;
+  Eq(EnemyUnits(state).length, enemiesBefore - 1, "驻守未折敌一班");
+  Ok(state.tunnels.entrances["2,2"] && !state.tunnels.entrances["2,2"].sealed, "驻守成功后入口应保住");
+  // 无驻守
+  state = SurgeryGame("L2", 1);
+  state.wave.smokeCharges = 0;
+  state.tunnels.entrances["2,2"].known = true;
+  state.tunnels.cells["2,2"].grain = 3;
+  state.tunnels.cells["2,2"].civs = 2;
+  MakeColumn(state, "tBreach2", ["inf", "inf"], "3,1");
+  state = EndTurn(state).state;
+  state = EndTurn(state).state;
+  Ok(!state.tunnels.entrances["2,2"], "无驻守攻入应毁口");
+  Eq(state.ledger.grainSeized, 3, "洞藏粮应被夺进账本");
+  Eq(state.ledger.civCaptured, 2, "藏身群众应被捕进账本");
 });
 
-Test("three legal strategy identities stay seed-stable through the full eight-person schedule", () => {
-  const seeds = Array.from({ length: 100 }, (_, index) => index + 1);
-  const northResults = seeds.map((seed) => RunNorthInterdictionBot(seed));
-  const southResults = seeds.map((seed) => RunSouthDeceptionBot(true, true, seed));
-  const ambushResults = seeds.map((seed) => RunAmbushBot(seed));
-  assert.equal(northResults.every((state) => (
-    state.outcome?.status === "Victory"
-    && state.turn <= MissionConfig.maxTurns + 1
-    && state.enemiesDefeated >= 1
-    && state.peopleSafety >= 85
-  )), true);
-  assert.equal(southResults.every((state) => (
-    state.outcome?.status === "Victory"
-    && state.turn <= MissionConfig.maxTurns + 1
-    && state.decoyDiversions >= 1
-    && state.trapsTriggered >= 1
-    && state.peopleSafety >= 85
-  )), true);
-  assert.equal(ambushResults.every((state) => (
-    state.outcome?.status === "Victory"
-    && state.turn <= MissionConfig.maxTurns + 1
-    && state.ambushesTriggered >= 1
-    && state.peopleSafety >= 65
-  )), true);
-  assert.equal(seeds.every((_, index) => (
-    southResults[index].exposure < ambushResults[index].exposure
-    && ambushResults[index].exposure < northResults[index].exposure
-  )), true);
+Check("反地道：封堵（L1 兜底）先电报后填死", () => {
+  let state = SurgeryGame("L1", 1);
+  state.tunnels.entrances["3,1"].known = true;
+  MakeColumn(state, "tSeal", ["puppet"], "4,1");
+  state = EndTurn(state).state;
+  Ok(state.enemy.pendingOps.some((op) => op.kind === "seal"), "未宣布封堵");
+  state = EndTurn(state).state;
+  Ok(state.tunnels.entrances["3,1"].sealed, "封堵未生效");
 });
 
-Test("different launch orders survive full enemy pressure across mission seeds", () => {
-  function SignalTurns(state) {
-    return state.eventLedger
-      .filter((event) => event.text.includes("发出安全信号"))
-      .map((event) => event.turn);
+// ===========================================================================
+// 七、憋闷链
+// ===========================================================================
+
+Check("憋闷链：无风分区累计 3 → 被迫出洞先于敌利用；同格有敌则群众被捕", () => {
+  let state = SurgeryGame("L1", 1);
+  state.units.u1.layer = "under"; state.units.u1.pos = "3,1";
+  state.tunnels.cells["3,1"].civs = 2;
+  state.tunnels.smokeOps.push({ origin: "3,1", spreadLeft: 0, lingerLeft: 99, cells: ["3,1"] });
+  MakeColumn(state, "tCamp", ["inf"], "3,1");            // 敌就蹲在口上
+  let forcedTurn = null;
+  for (let i = 0; i < 4 && !forcedTurn; i += 1) {
+    const outcome = EndTurn(state);
+    state = outcome.state;
+    if (outcome.events.some((event) => event.kind === "forcedOut" || (event.kind === "ledger" && event.text.includes("被抓")))) {
+      forcedTurn = state.meta.turn;
+    }
   }
-
-  const seeds = Array.from({ length: 100 }, (_, index) => index + 1);
-  const northResults = seeds.map((seed) => RunNorthFamilyFirstBot(seed));
-  const southResults = seeds.map((seed) => RunSouthContactsSecondBot(seed));
-
-  assert.equal(northResults.every((state) => (
-    state.outcome?.status === "Victory"
-    && state.civiliansSafe === MissionConfig.totalEvacuees
-    && state.exitSignalsIssued === 3
-    && state.enemiesDefeated === 1
-    && state.peopleSafety >= 90
-    && JSON.stringify(SignalTurns(state)) === JSON.stringify([6, 8, 10])
-    && state.civilians.find((group) => group.groupId === "Families").launchTurn === 4
-    && state.civilians.find((group) => group.groupId === "Families").launchOrder === 1
-    && state.civilians.find((group) => group.groupId === "Wounded").launchTurn === 5
-    && state.civilians.find((group) => group.groupId === "Wounded").launchOrder === 2
-    && state.civilians.find((group) => group.groupId === "Contacts").launchTurn === 6
-    && state.civilians.find((group) => group.groupId === "Contacts").launchOrder === 3
-  )), true);
-  assert.equal(southResults.every(({ state, blockingKey }) => (
-    state.outcome?.status === "Victory"
-    && state.turn <= MissionConfig.maxTurns + 1
-    && state.civiliansSafe === MissionConfig.totalEvacuees
-    && state.exitSignalsIssued === 2
-    && state.decoyDiversions === 1
-    && state.trapsTriggered === 3
-    && state.enemiesDefeated === 1
-    && state.peopleSafety >= 95
-    && JSON.stringify(SignalTurns(state)) === JSON.stringify([8])
-    && state.civilians.find((group) => group.groupId === "Wounded").launchTurn === 4
-    && state.civilians.find((group) => group.groupId === "Wounded").launchOrder === 1
-    && state.civilians.find((group) => group.groupId === "Contacts").launchTurn === 5
-    && state.civilians.find((group) => group.groupId === "Contacts").launchOrder === 2
-    && state.civilians.find((group) => group.groupId === "Families").launchTurn === 6
-    && state.civilians.find((group) => group.groupId === "Families").launchOrder === 3
-    && state.units.find((unit) => unit.unitId === "Scout").tileKey === blockingKey
-  )), true, JSON.stringify({
-    outcome: southResults[0].state.outcome,
-    trapsTriggered: southResults[0].state.trapsTriggered,
-    enemiesDefeated: southResults[0].state.enemiesDefeated,
-    peopleSafety: southResults[0].state.peopleSafety,
-    blockingKey: southResults[0].blockingKey,
-    signalTurns: SignalTurns(southResults[0].state),
-  }));
+  Ok(forcedTurn !== null, "憋闷未逼人出洞");
+  Eq(state.units.u1.layer, "surface", "单位应被憋出地面");
+  Eq(state.ledger.civCaptured, 2, "口上有敌：出洞群众应被捕入账本");
+  Eq(state.tunnels.cells["3,1"].civs, 0, "群众批应已离洞");
 });
 
-Test("public south-side digging noise breaks the fixed undefended eight-person script", () => {
-  const results = Array.from({ length: 100 }, (_, index) => RunSouthAllGroupsBot(index + 1));
-  assert.equal(results.every(({ pressureObserved }) => pressureObserved), true);
-  assert.equal(results.every(({ state }) => !(
-    state.outcome?.status === "Victory"
-    && state.civiliansSafe === MissionConfig.totalEvacuees
-    && state.peopleSafety === MissionConfig.startingPeopleSafety
-  )), true);
+Check("憋闷链：通风口被烟熏后分区开始积憋闷", () => {
+  let state = SurgeryGame("L1", 1);
+  state.tunnels.entrances["3,1"].sealed = true;          // 只剩通风口
+  state.tunnels.cells["3,1"].facility = "vent";
+  state.tunnels.vents["3,1"] = { expose: 0, known: false, smoked: false };
+  state.units.u1.layer = "under"; state.units.u1.pos = "3,1";
+  state = EndTurn(state).state;
+  Eq(state.units.u1.breath, 0, "通风口完好时不应憋闷");
+  state.tunnels.smokeOps.push({ origin: "3,1", spreadLeft: 0, lingerLeft: 99, cells: ["3,1"] });
+  state = EndTurn(state).state;
+  Ok(state.units.u1.breath > 0, "通风口被熏后应开始积憋闷");
 });
 
-Test("victory requires all three groups safe and derives its person count from group status", () => {
-  const state = CreateInitialState();
-  state.turn = 6;
-  state.sweepActive = true;
-  state.planningReconCompleted = true;
-  state.reconActions = 1;
-  state.tunnelsDug = 1;
-  state.civilians[0].status = "Safe";
-  state.civilians[2].status = "Safe";
-  state.civilians[1].status = "Moving";
-  state.civiliansSafe = 6;
-  assert.equal(EvaluateMission(state), null);
+// ===========================================================================
+// 八、预算比率（理想全功能网单位回合 / 备战窗口单位回合 ∈ [1.05, 1.5]）
+// ===========================================================================
 
-  state.civilians[1].status = "Trapped";
-  assert.equal(EvaluateMission(state), null);
-
-  state.civilians[1].status = "Waiting";
-  let outcome = EvaluateMission(state);
-  assert.equal(outcome, null);
-
-  state.civilians[1].status = "Safe";
-  assert.equal(EvaluateMission(state), null);
-  state.civiliansSafe = 8;
-  outcome = EvaluateMission(state);
-  assert.equal(outcome.status, "Victory");
-  assert.equal(
-    state.civiliansSafe,
-    state.civilians
-      .filter((group) => group.status === "Safe")
-      .reduce((sum, group) => sum + group.people, 0),
-  );
-});
-
-Test("the old all-underground north script cannot coast to victory", () => {
-  const idle = RunNorthIdleBot();
-  assert.equal(idle.outcome.status, "Defeat");
-  assert.equal(["ExitWindowMissed", "EvacuationLate"].includes(idle.outcome.failureId), true);
-  assert.equal(idle.civiliansSafe, 0);
-  assert.equal(idle.exitSignalsIssued, 0);
-});
-
-Test("waiting or combat without a tunnel cannot satisfy the mission", () => {
-  let state = CreateInitialState();
-  while (!state.outcome && state.turn <= 10) {
-    state = AdvanceTurn(state);
+Check("预算比率：L1 与 L2 均落在 [1.05, 1.5]", () => {
+  const digCrew = (types) => types.reduce((sum, type) => sum + (CFG.digPower[type] || 0), 0);
+  // L1：储粮+藏人+通风+枪眼 + 村内两段 + 坟地一段 + 坟地备用口
+  const l1Need = CFG.dig.facility * 4 + CFG.dig.segmentVillage * 2 + CFG.dig.segment + CFG.dig.entrance;
+  const l1Window = (GetLevel("L1").sweepStartTurn - 1) * digCrew(["militia", "militia", "guerrilla"]);
+  const l1Ratio = l1Need / l1Window;
+  // L2：双储粮/双藏人/双通风/双枪眼 + 主干三段 + 两备用口 + 两门 + 柳条峪延伸七段
+  const l2Need = CFG.dig.facility * 8 + CFG.dig.segment * 3 + CFG.dig.entrance * 2 + CFG.dig.door * 2 + CFG.dig.segment * 7;
+  const l2MainTurn = GetLevel("L2").waves.find((wave) => wave.id === "w2main").turn;
+  const l2Window = (l2MainTurn - 1) * digCrew(["militia", "militia", "militia", "guerrilla", "guerrilla"]);
+  const l2Ratio = l2Need / l2Window;
+  for (const [name, ratio] of [["L1", l1Ratio], ["L2", l2Ratio]]) {
+    Ok(ratio >= 1.05 - 1e-9 && ratio <= 1.5 + 1e-9, `${name} 预算比率 ${ratio.toFixed(3)} 出界`);
   }
-  assert.equal(state.outcome.status, "Defeat");
-  assert.equal(state.civiliansSafe, 0);
-  assert.equal(state.tunnelsDug, 0);
-  assert.equal(state.outcome.path, "none");
 });
 
-Test("missing reconnaissance reports the actual gate instead of a false evacuation tip", () => {
-  const state = CreateInitialState();
-  state.turn = MissionConfig.maxTurns + 1;
-  state.sweepActive = true;
-  state.tunnelsDug = 4;
-  state.civiliansSafe = MissionConfig.totalEvacuees;
-  state.civilians.forEach((group) => {
-    group.status = "Safe";
-  });
-  const outcome = EvaluateMission(state);
-  assert.equal(outcome.failureId, "ReconMissing");
-  assert.match(outcome.summary, /首次开挖前没有选择主出口完成走廊勘线/);
+// ===========================================================================
+// 九、账本红线 + kills 封顶
+// ===========================================================================
+
+Check("账本红线：只增不减、拒绝负数、不进任何加成路径", () => {
+  const state = CreateGame("L1", 6);
+  AddLedger(state, "civDead", -5);
+  Eq(state.ledger.civDead, 0, "负数进账应被拒绝");
+  AddLedger(state, "civDead", 2);
+  Eq(state.ledger.civDead, 2);
+  const final = rank.L1.Skilled[0];
+  const inflated = CloneState(final);
+  for (const key of Object.keys(inflated.ledger)) inflated.ledger[key] += 5;
+  const a = ComputeBreakdown(final, true).total;
+  const b = ComputeBreakdown(inflated, true).total;
+  Ok(b <= a, "账本膨胀反而抬高了数值分——存在奖励路径");
 });
 
-Test("exit reconnaissance after blind digging cannot replace planning reconnaissance", () => {
-  let state = CreateInitialState();
-  state = Apply(state, "WorkTeam", ActionIds.ENTER_TUNNEL);
-  state = End(state);
-  state = Apply(state, "WorkTeam", ActionIds.DIG, "5,3");
-  state = Apply(state, "Scout", ActionIds.RECON, "5,3");
-  assert.equal(state.reconActions, 1);
-  assert.equal(state.planningReconCompleted, false);
-  const legacyState = Clone(state);
-  delete legacyState.planningReconCompleted;
-  const migratedState = DeserializeState(JSON.stringify(legacyState));
-  assert.equal(migratedState.planningReconCompleted, false);
-  state.turn = MissionConfig.maxTurns + 1;
-  state.sweepActive = true;
-  state.civilians.forEach((group) => {
-    group.status = "Safe";
-  });
-  state.civiliansSafe = MissionConfig.totalEvacuees;
-  const outcome = EvaluateMission(state);
-  assert.equal(outcome.failureId, "ReconMissing");
-});
-
-Test("failure advice names the real missing batch, living actor, and connected-route limits", () => {
-  const incomplete = CreateLogisticsState(false);
-  incomplete.turn = MissionConfig.maxTurns + 1;
-  incomplete.civilians[0].status = "Safe";
-  incomplete.civilians[1].status = "Safe";
-  incomplete.civilians[2].status = "Waiting";
-  incomplete.civiliansSafe = 5;
-  const incompleteOutcome = EvaluateMission(incomplete);
-  assert.equal(incompleteOutcome.failureId, "EvacuationIncomplete");
-  assert.equal(incompleteOutcome.missingPeople, 3);
-  assert.match(incompleteOutcome.tip, /还差 3 人；三批必须全部发车/);
-  assert.match(incompleteOutcome.tip, /交通站骨干/);
-
-  const missedWindow = CreateLogisticsState(false);
-  missedWindow.turn = MissionConfig.maxTurns + 1;
-  const waitingAtExit = missedWindow.civilians[0];
-  waitingAtExit.status = "Moving";
-  waitingAtExit.path = [...northEvacuationPath];
-  waitingAtExit.pathIndex = northEvacuationPath.length - 1;
-  waitingAtExit.tileKey = "2,1";
-  waitingAtExit.exitKey = "2,1";
-  waitingAtExit.waitingForSignal = true;
-  waitingAtExit.launchOrder = 1;
-  waitingAtExit.launchTurn = 4;
-  waitingAtExit.exitArrivalTurn = 11;
-  missedWindow.units.find((unit) => unit.unitId === "Scout").health = 0;
-  const deadScoutWindow = EvaluateMission(missedWindow);
-  assert.equal(deadScoutWindow.failureId, "ExitWindowMissed");
-  assert.match(deadScoutWindow.tip, /第 1 批（伤员与担架队，T4 发车，1 段\/回合）已于 T11 到达/);
-  assert.match(deadScoutWindow.tip, /交通员已阵亡，本局无法/);
-  assert.doesNotMatch(deadScoutWindow.tip, /让交通员.*(?:上浮|复查|侦察)/);
-  assert.match(deadScoutWindow.tip, /当前仅接通北枣窖，不存在可立即改走的备用出口/);
-  assert.doesNotMatch(deadScoutWindow.tip, /改走已接通/);
-
-  const aliveScoutWindow = Clone(missedWindow);
-  aliveScoutWindow.units.find((unit) => unit.unitId === "Scout").health = 3;
-  const oneExitOutcome = EvaluateMission(aliveScoutWindow);
-  assert.match(oneExitOutcome.tip, /让交通员在该批预计到达前一回合从北枣窖上浮并复查/);
-  assert.match(oneExitOutcome.tip, /不存在可立即改走的备用出口/);
-
-  const laterBatchWindow = CreateLogisticsState(false);
-  laterBatchWindow.turn = MissionConfig.maxTurns + 1;
-  laterBatchWindow.civilians[0].status = "Safe";
-  laterBatchWindow.civiliansSafe = 3;
-  const familiesAtExit = laterBatchWindow.civilians[1];
-  familiesAtExit.status = "Moving";
-  familiesAtExit.path = [...northEvacuationPath];
-  familiesAtExit.pathIndex = northEvacuationPath.length - 1;
-  familiesAtExit.tileKey = "2,1";
-  familiesAtExit.exitKey = "2,1";
-  familiesAtExit.waitingForSignal = true;
-  familiesAtExit.launchOrder = 2;
-  familiesAtExit.launchTurn = 5;
-  familiesAtExit.exitArrivalTurn = 8;
-  const laterBatchOutcome = EvaluateMission(laterBatchWindow);
-  assert.equal(laterBatchOutcome.failureId, "ExitWindowMissed");
-  assert.match(laterBatchOutcome.tip, /第 2 批（两户乡亲，T5 发车，2 段\/回合）已于 T8 到达/);
-  assert.doesNotMatch(laterBatchOutcome.tip, /首批到达前/);
-
-  const missedPlanning = CreateInitialState();
-  missedPlanning.turn = MissionConfig.maxTurns + 1;
-  missedPlanning.sweepActive = true;
-  missedPlanning.tunnelsDug = 1;
-  missedPlanning.civilians.forEach((group) => {
-    group.status = "Safe";
-  });
-  missedPlanning.civiliansSafe = MissionConfig.totalEvacuees;
-  missedPlanning.units.find((unit) => unit.unitId === "Scout").health = 0;
-  const deadScoutRecon = EvaluateMission(missedPlanning);
-  assert.equal(deadScoutRecon.failureId, "ReconMissing");
-  assert.match(deadScoutRecon.tip, /交通员已阵亡，本局无法补回/);
-  assert.doesNotMatch(deadScoutRecon.tip, /让交通员执行/);
-
-  const collapsed = CreateLogisticsState(false);
-  collapsed.turn = MissionConfig.maxTurns + 1;
-  collapsed.civilians[0].status = "Trapped";
-  collapsed.lastFailureCause = {
-    failureId: "UnbracedCollapse",
-    warningId: "CollapseTest",
-    text: "返沙层未支护，人员经过时塌方。",
-    tip: "让地道队在下回合前支护。",
-  };
-  const collapseOutcome = EvaluateMission(collapsed);
-  assert.equal(collapseOutcome.failureId, "UnbracedCollapse");
-  assert.match(collapseOutcome.summary, /返沙层未支护/);
-});
-
-Test("late evacuation advice diagnoses slow last launch, congestion, and a sealed exit", () => {
-  const slowLast = CreateLogisticsState(false);
-  slowLast.turn = MissionConfig.maxTurns + 1;
-  slowLast.civilians[1].status = "Safe";
-  slowLast.civilians[2].status = "Safe";
-  slowLast.civiliansSafe = 5;
-  const wounded = slowLast.civilians[0];
-  wounded.status = "Moving";
-  wounded.path = [...northEvacuationPath];
-  wounded.pathIndex = 3;
-  wounded.tileKey = "4,1";
-  wounded.exitKey = "2,1";
-  wounded.launchOrder = 3;
-  wounded.launchTurn = 6;
-  wounded.waitingForSignal = false;
-  const slowOutcome = EvaluateMission(slowLast);
-  assert.equal(slowOutcome.failureId, "EvacuationLate");
-  assert.match(slowOutcome.tip, /第 3 批（伤员与担架队，T6 发车，1 段\/回合）/);
-  assert.match(slowOutcome.tip, /仍距北枣窖 2 段/);
-  assert.match(slowOutcome.tip, /优先发出伤员，并支护出口咽喉/);
-  assert.doesNotMatch(slowOutcome.tip, /接通第一出口|组织第一批/);
-
-  const congested = Clone(slowLast);
-  congested.civilians[0].trafficDelays = 2;
-  congested.civilians[0].lastTrafficDelayTileKey = "5,1";
-  const congestionOutcome = EvaluateMission(congested);
-  assert.match(congestionOutcome.tip, /麦田因拥堵等待 2 回合/);
-  assert.match(congestionOutcome.tip, /重载 2 与轻载 1.*容量 3/);
-  assert.match(congestionOutcome.tip, /两支重载 2\+2 仍须错开发车/);
-
-  const sealed = Clone(slowLast);
-  sealed.civilians[0].pathIndex = northEvacuationPath.length - 1;
-  sealed.civilians[0].tileKey = "2,1";
-  sealed.tunnels["2,1"].sealed = true;
-  const sealedOutcome = EvaluateMission(sealed);
-  assert.equal(sealedOutcome.failureId, "EvacuationLate");
-  assert.match(sealedOutcome.tip, /到达北枣窖时洞口已封闭/);
-  assert.match(sealedOutcome.tip, /地道队抢通/);
-});
-
-Test("civilian harm never creates tools, organization, intel, or ammunition", () => {
-  const state = CreateInitialState();
-  const resourcesBefore = {
-    tools: state.tools,
-    organization: state.organization,
-    intel: state.intel,
-    ammo: state.units.reduce((sum, unit) => sum + (unit.ammo ?? 0), 0),
-  };
-  state.peopleSafety = 42;
-  const outcome = EvaluateMission(state);
-  assert.equal(outcome.status, "Defeat");
-  assert.deepEqual(
-    {
-      tools: state.tools,
-      organization: state.organization,
-      intel: state.intel,
-      ammo: state.units.reduce((sum, unit) => sum + (unit.ammo ?? 0), 0),
-    },
-    resourcesBefore,
-  );
-});
-
-Test("save data round-trips without losing the tunnel graph or enemy memory", () => {
-  const state = RunNorthInterdictionBot();
-  const restored = DeserializeState(SerializeState(state));
-  assert.deepEqual(restored.tunnels, state.tunnels);
-  assert.deepEqual(restored.enemyMemory, state.enemyMemory);
-  assert.deepEqual(restored.exitWindows, state.exitWindows);
-  assert.deepEqual(restored.reconTileTurns, state.reconTileTurns);
-  assert.equal(restored.plannedExitKey, state.plannedExitKey);
-  assert.deepEqual(restored.plannedFastPath, state.plannedFastPath);
-  assert.deepEqual(restored.plannedQuietPath, state.plannedQuietPath);
-  assert.deepEqual(restored.plannedFastKeys, state.plannedFastKeys);
-  assert.deepEqual(restored.plannedQuietKeys, state.plannedQuietKeys);
-  assert.deepEqual(restored.plannedSurveyedPathKeys, state.plannedSurveyedPathKeys);
-  assert.equal(restored.plannedRouteMode, state.plannedRouteMode);
-  assert.deepEqual(restored.corridorDugKeys, state.corridorDugKeys);
-  assert.deepEqual(restored.corridorConnectedPath, state.corridorConnectedPath);
-  assert.equal(restored.corridorConnectedTurn, state.corridorConnectedTurn);
-  assert.equal(restored.corridorDigActions, state.corridorDigActions);
-  assert.equal(restored.corridorToolsSpent, state.corridorToolsSpent);
-  assert.equal(restored.corridorNoiseGenerated, state.corridorNoiseGenerated);
-  assert.equal(restored.corridorExposureGenerated, state.corridorExposureGenerated);
-  assert.deepEqual(
-    restored.civilians.map((group) => ({
-      groupId: group.groupId,
-      usesFrozenMainline: group.usesFrozenMainline,
-      corridorRerouted: group.corridorRerouted,
-    })),
-    state.civilians.map((group) => ({
-      groupId: group.groupId,
-      usesFrozenMainline: group.usesFrozenMainline,
-      corridorRerouted: group.corridorRerouted,
-    })),
-  );
-  assert.equal(restored.outcome.path, "interdiction");
-
-  const legacyWithoutCorridorIdentity = Clone(state);
-  for (const field of [
-    "plannedFastKeys",
-    "plannedQuietKeys",
-    "plannedSurveyedPathKeys",
-    "plannedRouteMode",
-    "corridorDugKeys",
-    "corridorConnectedPath",
-    "corridorConnectedTurn",
-    "corridorDigActions",
-    "corridorToolsSpent",
-    "corridorNoiseGenerated",
-    "corridorExposureGenerated",
-  ]) {
-    delete legacyWithoutCorridorIdentity[field];
+Check("kills 封顶：超封顶后战果项增量为 0", () => {
+  Ok(KillsScore(0) === 0, "零战果应为 0");
+  let previous = 0;
+  for (let kills = 1; kills <= 30; kills += 1) {
+    const score = KillsScore(kills);
+    Ok(score >= previous, "战果分应单调不减");
+    Ok(score <= 8, "战果分超过封顶");
+    previous = score;
   }
-  const migratedCorridor = DeserializeState(JSON.stringify(legacyWithoutCorridorIdentity));
-  assert.deepEqual(migratedCorridor.plannedFastKeys, state.plannedFastKeys);
-  assert.deepEqual(migratedCorridor.plannedQuietKeys, state.plannedQuietKeys);
-  assert.deepEqual(migratedCorridor.plannedSurveyedPathKeys, state.plannedSurveyedPathKeys);
-  assert.equal(migratedCorridor.plannedRouteMode, state.plannedRouteMode);
-  assert.deepEqual(
-    [...migratedCorridor.corridorDugKeys].sort(),
-    [...state.corridorDugKeys].sort(),
-  );
-  assert.deepEqual(migratedCorridor.corridorConnectedPath, state.corridorConnectedPath);
-  assert.equal(migratedCorridor.corridorConnectedTurn, state.corridorConnectedTurn);
+  Eq(KillsScore(6), 8, "6 歼即应到顶");
+  Eq(KillsScore(30) - KillsScore(6), 0, "封顶后增量应为 0");
+  const base = CloneState(rank.L1.Skilled[0]);
+  base.score.kills = { inf: 6, puppet: 0, spy: 0, sapper: 0 };
+  const capped = CloneState(base);
+  capped.score.kills = { inf: 20, puppet: 5, spy: 3, sapper: 2 };
+  Eq(ComputeBreakdown(capped, true).kills, ComputeBreakdown(base, true).kills, "breakdown 战果项未封顶");
+});
 
-  let surveyedState = CreateInitialState();
-  surveyedState = Apply(surveyedState, "Scout", ActionIds.RECON, "2,1");
-  const legacyWithLaterEntranceKnowledge = Clone(surveyedState);
-  for (const field of [
-    "plannedCorridorKeys",
-    "plannedFastKeys",
-    "plannedQuietKeys",
-    "plannedSurveyedPathKeys",
-  ]) {
-    delete legacyWithLaterEntranceKnowledge[field];
+// ===========================================================================
+// 十、页面装配
+// ===========================================================================
+
+Check("页面装配：引用存在、importmap 正确、?v= 一致、核心不引表现层", () => {
+  const html = Src("index.html");
+  Ok(existsSync(here + "Style_Game.css"), "缺 Style_Game.css");
+  Ok(existsSync(here + "Script_Main.mjs"), "缺 Script_Main.mjs");
+  const versions = [...html.matchAll(/\?v=(\d+)/g)].map((match) => match[1]);
+  Ok(versions.length >= 2, "index.html 应带 ?v= 版本号");
+  Ok(new Set(versions).size === 1, `?v= 不一致：${versions.join(",")}`);
+  const importmap = html.match(/"three":\s*"([^"]+)"/);
+  Ok(importmap, "importmap 缺 three 映射");
+  Ok(existsSync(here + importmap[1].replace("./", "")), `three 模块不存在：${importmap[1]}`);
+  const addons = html.match(/"three\/addons\/":\s*"([^"]+)"/);
+  Ok(addons && existsSync(here + addons[1].replace("./", "")), "three/addons/ 路径不存在");
+  const coreFiles = ["Script_State.mjs", "Script_Visibility.mjs", "Script_Actions.mjs",
+    "Script_EnemyAi.mjs", "Script_Turn.mjs", "Script_Bots.mjs", "Script_AsciiMap.mjs",
+    "Data_Rules.mjs", "Data_Levels.mjs"];
+  const surfaces = ["Script_Renderer", "Script_Ui", "Script_Main", "Data_Theme", "Data_Keymap"];
+  for (const file of coreFiles) {
+    const source = Src(file);
+    for (const surface of surfaces) {
+      Ok(!source.includes(`./${surface}`), `${file} 引用了表现层 ${surface}`);
+    }
   }
-  Object.values(legacyWithLaterEntranceKnowledge.tiles).forEach((tile) => {
-    tile.entranceKnownByEnemy = true;
-  });
-  const migratedStableSurvey = DeserializeState(
-    JSON.stringify(legacyWithLaterEntranceKnowledge),
-  );
-  assert.deepEqual(migratedStableSurvey.plannedFastPath, surveyedState.plannedFastPath);
-  assert.deepEqual(migratedStableSurvey.plannedQuietPath, surveyedState.plannedQuietPath);
-  assert.deepEqual(migratedStableSurvey.plannedFastKeys, surveyedState.plannedFastKeys);
-  assert.deepEqual(migratedStableSurvey.plannedQuietKeys, surveyedState.plannedQuietKeys);
-  assert.deepEqual(
-    migratedStableSurvey.plannedSurveyedPathKeys,
-    surveyedState.plannedSurveyedPathKeys,
-  );
-  assert.deepEqual(
-    migratedStableSurvey.plannedCorridorKeys,
-    surveyedState.plannedCorridorKeys,
-  );
-
-  const legacyWithoutCivilianLedger = Clone(state);
-  delete legacyWithoutCivilianLedger.civilians;
-  delete legacyWithoutCivilianLedger.civilianLaunchSerial;
-  const migratedWithoutLedger = DeserializeState(JSON.stringify(legacyWithoutCivilianLedger));
-  assert.equal(migratedWithoutLedger.civilianLaunchSerial, 1);
+  const fixture = Src("Data_FixtureState.mjs");
+  Ok(fixture.includes("export const fixtureState"), "夹具导出名被改动");
 });
 
-Test("HTML and game source wire Three.js, path previews, both layers, and touch-safe input", () => {
-  const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
-  const gameSource = readFileSync(new URL("./Script_Game.mjs", import.meta.url), "utf8");
-  const cliSource = readFileSync(new URL("./Script_PlayCli.mjs", import.meta.url), "utf8");
-  const style = readFileSync(new URL("./Style_Game.css", import.meta.url), "utf8");
-  assert.match(html, /three\.module\.mjs/);
-  assert.match(html, /SurfaceLayerButton/);
-  assert.match(html, /TunnelLayerButton/);
-  assert.match(html, /PreviewPanel/);
-  assert.match(html, /ExitWindowBoard/);
-  assert.match(gameSource, /THREE\.Raycaster/);
-  assert.match(gameSource, /pointerState\.moved/);
-  assert.match(gameSource, /地表压制开窗路线/);
-  assert.match(gameSource, /信号持续本回合与下一回合/);
-  assert.match(gameSource, /主走廊勘线预览/);
-  assert.match(gameSource, /候选出口 ·/);
-  assert.match(gameSource, /plannedFastPath/);
-  assert.match(gameSource, /divergenceIndex/);
-  assert.match(gameSource, /data-exit-key/);
-  assert.match(gameSource, /exitCardActionTargets/);
-  assert.match(gameSource, /成功诱导只浪费该敌军一次调查行动/);
-  assert.match(gameSource, /预计响应：/);
-  assert.match(gameSource, /段\/回合 · 负载/);
-  assert.match(gameSource, /三批全撤 · 速度\/负载各异/);
-  assert.match(gameSource, /约 T.*进入出洞窗口/);
-  assert.match(gameSource, /首个冲突：/);
-  assert.match(gameSource, /GetActiveCivilianTransitEstimate/);
-  assert.match(gameSource, /在途只读时刻表 · 不自动执行/);
-  assert.match(gameSource, /CivilianCorridorRouteLabel/);
-  assert.match(gameSource, /冻结主线不可用 · 同出口应急改线/);
-  assert.match(gameSource, /ConfirmPreviewButton\.hidden = true/);
-  assert.match(gameSource, /\["Moving", "Trapped"\]\.includes\(group\?\.status\)/);
-  assert.match(gameSource, /CivilianMobileRecoverySummary/);
-  assert.match(gameSource, /action\.ifAppliedNow\.peopleSafetyCost/);
-  assert.match(gameSource, /群众安全 -\$\{action\.ifAppliedNow\.peopleSafetyCost\}/);
-  assert.match(gameSource, /未计后续新增敌情、烟流、封口、塌方或玩家改道/);
-  assert.match(gameSource, /按当前已通路线且下一批前不再开路\/抢通/);
-  assert.doesNotMatch(gameSource, /最乐观排班仍会/);
-  assert.doesNotMatch(gameSource, /无拥堵且信号及时最早.*安全撤出/);
-  assert.match(gameSource, /通行容量 2→3/);
-  assert.match(gameSource, /mobileCivilianSummary/);
-  assert.match(gameSource, /classList\.add\("previewOpen"\)/);
-  assert.match(gameSource, /ApplyPlayerActionPath/);
-  assert.match(gameSource, /确认执行 \$\{steps\} 步/);
-  assert.match(gameSource, /computeLineDistances/);
-  assert.match(gameSource, /data-path-target/);
-  assert.match(gameSource, /本回合连续终点 · 仍逐格结算/);
-  assert.match(gameSource, /敌军预警只在手动结束回合后结算/);
-  assert.match(gameSource, /eventLedger\.slice\(eventCountBefore\)/);
-  assert.match(gameSource, /IsSoilKnown\(gameState, tileKey\)/);
-  assert.match(gameSource, /window\.scrollTo\(0, 0\)/);
-  assert.match(gameSource, /1 AP｜预留弹药 1｜离开洞口不返还/);
-  assert.match(gameSource, /锁定当前预警工兵，其他敌军不会抢先消耗/);
-  assert.match(style, /touch-action:\s*none/);
-  assert.match(style, /min-height:\s*44px/);
-  assert.match(style, /\.exitWindowCard\.actionable/);
-  assert.match(style, /\.civilianLedger\s*\{[\s\S]*?position:\s*fixed/);
-  assert.match(style, /\.civilianEntry \.mobileCivilianSummary/);
-  assert.match(style, /grid-template-rows:\s*minmax\(0, 1fr\) 44px/);
-  assert.match(style, /\.actionButtons \.pathChoice/);
-  assert.match(cliSource, /case "path"/);
-  assert.match(cliSource, /ApplyPlayerActionPath/);
-  assert.match(cliSource, /GetCivilianTransitEstimate/);
-  assert.match(cliSource, /GetActiveCivilianTransitEstimate/);
-  assert.match(cliSource, /在途只读时刻表/);
-  assert.match(cliSource, /当前合法恢复/);
-  assert.match(cliSource, /action\.ifAppliedNow\.peopleSafetyCost/);
-  assert.match(cliSource, /群众安全 -\$\{action\.ifAppliedNow\.peopleSafetyCost\}/);
-  assert.match(cliSource, /排班风险/);
-  assert.match(cliSource, /下一批前不再开路\/抢通/);
-  assert.match(cliSource, /预留 AP 2\/工具 2;实付 AP 1–2\/工具 1–2;暴露 \+6–11/);
-  assert.match(cliSource, /冻结主线不可用：同出口应急改线/);
-});
+// ===========================================================================
+// 汇总
+// ===========================================================================
 
-console.log(`\nTunnelFront1942 smoke test: ${passed} assertions passed.`);
+const failures = results.filter((entry) => !entry.pass);
+const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+console.log("");
+console.log(`—— 冒烟汇总：${results.length - failures.length}/${results.length} 通过，用时 ${seconds}s ——`);
+for (const failure of failures) console.log(`${red("✗")} ${failure.name} —— ${failure.message}`);
+if (failures.length === 0) console.log(green("全绿。"));
+process.exit(failures.length ? 1 : 0);

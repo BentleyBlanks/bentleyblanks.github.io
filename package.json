@@ -6,6 +6,7 @@
   "scripts": {
     "test": "npm run test:qinyuan && npm run test:resistanceNetwork && npm run test:beiyue1941 && npm run test:enemyRear1941 && npm run test:taihangLetters1942 && npm run test:civilianFront1942 && npm run test:prairieFire1937 && npm run test:enemyRearCommand && npm run test:tunnelFront1942",
     "test:enemyRearCommand": "node EnemyRearCommand/Script_SmokeTest.mjs",
+    "test:tunnelFront1942": "node TunnelFront1942/Script_SmokeTest.mjs",
     "test:prairieFire1937": "node PrairieFire1937/Script_SmokeTest.mjs",
     "test:mountainEmber1941": "node MountainEmber1941/Script_SmokeTest.mjs",
     "test:prairieFire1937:browser": "node PrairieFire1937/Script_ClickSmokeTest.mjs && node PrairieFire1937/Script_RenderHealthTest.mjs",
@@ -17,8 +18,7 @@
     "test:qinyuan": "node qinyuan/smoke-test.mjs",
     "test:resistanceNetwork": "node ResistanceNetwork/SmokeTest.mjs",
     "test:beiyue1941": "node Beiyue1941/Script_StrategySmokeTest.mjs",
-    "test:taihangLetters1942": "node TaihangLetters1942/Script_SmokeTest.mjs",
-    "test:tunnelFront1942": "node TunnelFront1942/Script_SmokeTest.mjs"
+    "test:taihangLetters1942": "node TaihangLetters1942/Script_SmokeTest.mjs"
   },
   "repository": {
     "type": "git",
