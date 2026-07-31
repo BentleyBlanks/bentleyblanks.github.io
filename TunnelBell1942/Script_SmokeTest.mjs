@@ -121,6 +121,81 @@ for (const chapter of CHAPTERS) {
   Assert((chapter.closing || []).every((id) => !!PANELS[id]), `${chapter.id}: closing 引用有效`);
 }
 
+// ─────────────────────────────────────────── 叙事与关卡的接缝
+// 这一节锁的是剧情审查查出来的结构性问题。台词写得再好，挂错了位置就是空的。
+Section("叙事与关卡一致性");
+{
+  const CAST = ["栓柱", "王大娘", "四爷", "秋兰", "二嫂", "老栓"];
+  const SPEAKERS = ["高老忠", "高传宝", "林霞", "山田", ...CAST];
+
+  // 第一幕不许以"活着逃出去"收场
+  const act1 = GetLevel(0);
+  Assert(act1.endKind === "captured", "act1 标记为被抓收场，而不是到出口通关");
+
+  // 敲钟必须是追兵的因，不能靠玩家跑到某个 x 才触发
+  const bell = (act1.props || []).find((p) => p.interact === "bell");
+  if (Assert(!!bell, "act1 有钟")) {
+    const data = bell.data || {};
+    Assert((data.panels || []).length > 0, "敲钟会推剧情气泡");
+    Assert((data.spawn || []).length > 0, "敲钟会唤醒追兵");
+  }
+  const positionalChase = (act1.triggers || []).some(
+    (t) => (t.emit?.spawn || []).some((id) => /chase|blocker/.test(id)),
+  );
+  Assert(!positionalChase, "追兵不再由位置触发（因果必须挂在敲钟上）");
+
+  // 台词里的人必须真的在关卡里
+  const levelNames = new Set();
+  for (let i = 0; i < 3; i += 1) for (const npc of GetLevel(i).npcs || []) levelNames.add(npc.name);
+  const strays = [];
+  for (const [id, panel] of Object.entries(PANELS)) {
+    if (panel.speaker && !SPEAKERS.includes(panel.speaker)) strays.push(`${id}:${panel.speaker}`);
+  }
+  Assert(strays.length === 0, `台词说话人都在名单里${strays.length ? ` → ${strays.slice(0, 4).join(", ")}` : ""}`);
+  const missing = CAST.filter((name) => !levelNames.has(name));
+  Assert(missing.length === 0, `名单里的乡亲都在关卡里${missing.length ? ` → 缺 ${missing.join("、")}` : ""}`);
+
+  // "六个。都在。"这条呼应要求两幕的人数都对得上
+  Assert((GetLevel(1).npcs || []).length === 6, `act2 有六位乡亲（实际 ${(GetLevel(1).npcs || []).length}）`);
+  Assert((GetLevel(2).npcs || []).length === 6, `act3 有六位乡亲（实际 ${(GetLevel(2).npcs || []).length}）`);
+
+  // 主题转折点：枪眼头顶必须真的有巡逻兵会背对经过
+  const act3 = GetLevel(2);
+  const loopholes = (act3.props || []).filter((p) => p.kind === "loophole");
+  const covered = loopholes.some((hole) => (act3.enemies || []).some((e) => {
+    const p = e.patrol;
+    return p && hole.x >= p.x0 - 2 && hole.x <= p.x1 + 2 && e.y > hole.y + 1.5;
+  }));
+  Assert(covered, "act3 至少有一个枪眼头顶是敌人巡逻区（放弃开枪这个节拍才成立）");
+
+  // 悬空道具：每个 prop 都该有立足之地
+  for (let i = 0; i < 3; i += 1) {
+    const level = GetLevel(i);
+    const floating = (level.props || []).filter((p) => {
+      if (p.kind === "vent" || p.kind === "loophole" || p.kind === "bell" || p.kind === "lamp") return false;
+      return !(level.floors || []).some(
+        (f) => p.x >= f.x0 - 1 && p.x <= f.x1 + 1 && p.y >= f.y - 0.6 && p.y <= f.y + 3.2,
+      );
+    });
+    Assert(floating.length === 0,
+      `act${i + 1} 没有悬空道具${floating.length ? ` → ${floating.slice(0, 3).map((p) => p.id).join(", ")}` : ""}`);
+  }
+
+  // 写好的气泡不许烂在文件里没人用
+  const used = new Set();
+  for (let i = 0; i < 3; i += 1) {
+    const level = GetLevel(i);
+    for (const t of level.triggers || []) for (const id of t.emit?.panels || []) used.add(id);
+    for (const p of level.props || []) for (const id of p.data?.panels || []) used.add(id);
+  }
+  for (const chapter of CHAPTERS) {
+    for (const id of chapter.opening || []) used.add(id);
+    for (const id of chapter.closing || []) used.add(id);
+  }
+  const orphans = Object.keys(PANELS).filter((id) => !used.has(id));
+  Assert(orphans.length === 0, `没有从未被引用的气泡${orphans.length ? ` → ${orphans.join(", ")}` : ""}`);
+}
+
 // ─────────────────────────────────────────── 规则运行
 Section("规则运行");
 for (let i = 0; i < 3; i += 1) {
@@ -183,6 +258,8 @@ Section("存档往返");
 }
 
 Section("机器人通关");
+// act1 的"通关"含义和另外两幕不同：它是敲响钟之后被抓，不是走到出口。
+// 这条断言的意义是证明关卡没有死锁，不是证明 bot 玩得漂亮。
 for (let i = 0; i < 3; i += 1) {
   const state = Rules.CreateState(i);
   let result = null;
@@ -190,8 +267,12 @@ for (let i = 0; i < 3; i += 1) {
   try { result = Rules.DebugAutoPlay(state, 300); } catch (error) { threw = error; }
   if (threw) {
     Assert(false, `act${i + 1}: 机器人跑挂了 (${threw.message})`);
-  } else {
-    Assert(result && result.won, `act${i + 1}: 机器人能通关（${result ? `${result.seconds.toFixed(0)}s ${result.reason}` : "无结果"}）`);
+    continue;
+  }
+  Assert(result && result.won, `act${i + 1}: 机器人能通关（${result ? `${result.seconds.toFixed(0)}s ${result.reason}` : "无结果"}）`);
+  if (result && result.won && i === 0) {
+    Assert(state.world.bellRung || state.story.seen?.a1_p11,
+      "act1 通关的前提是钟真的敲响了");
   }
 }
 

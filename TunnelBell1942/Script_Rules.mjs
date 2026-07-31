@@ -1741,6 +1741,12 @@ function HazardWarnText(h) {
 
 function UpdateHazards(state, dt) {
   for (const h of state.hazards) {
+    // 闸门也能启动危害：拉闸引水是玩家的手段，因果必须落在玩家身上，
+    // 不能靠某个 trigger 自己走完（armAt 也允许直接写成闸门 channel）。
+    if (!h.armed) {
+      if (h.armAt && state.world.levers[h.armAt]) ArmHazard(state, h.id);
+      else if (h.kind === "water" && state.world.levers.waterDivert) ArmHazard(state, h.id);
+    }
     const sealed = h.sealedBy ? !!state.world.levers[h.sealedBy] : false;
 
     if (h.warn > 0) {
@@ -2793,14 +2799,17 @@ function BotThreat(state) {
   const p = state.player;
   const stealth = SENSE.crouchVisibility * SENSE.sneakVisibility;
   let worst = null;
+  // 空窗要对所有人成立，但只有"真能看见猫腰的人"才算数：
+  // 十几米开外正对着我的哨兵根本看不见蹲着的人，不该让机器人永远不敢动。
+  let windowBlocked = false;
   for (const e of state.enemies) {
     if (e.dormant) continue;
     if (Math.abs(e.y - p.y) > 2.5) continue; // 不同层：土层挡着，不算威胁
     const dist = Math.abs(e.x - p.x);
-    if (dist > 18) continue;
     const facingMe = dist < 1.5 || Math.sign(p.x - e.x) === e.facing;
     const effStealth = e.visionRange * stealth + 1.4;
     const effStand = e.visionRange + 1.4;
+    if (dist > effStand + 5) continue; // 站着都看不见，跟我没关系
     const info = {
       e,
       dist,
@@ -2811,24 +2820,46 @@ function BotThreat(state) {
       loud: dist < (e.hearing || 6) * NOISE.walk + 0.5, // 站着跑会被听见
       alert: e.alertness,
     };
-    const score = info.alert + (info.exposed ? 2 : 0) + (info.facingMe ? 0.3 : 0) - dist * 0.01;
+    if (facingMe && dist < effStealth + 1.0) windowBlocked = true;
+    if (e.alertness >= 0.3) windowBlocked = true;
+    // 挑"最该提防的那个"：先看有没有被盯上，再看警觉，最后才是远近。
+    // 以前只按 facingMe 加分，结果十几米外一个面朝我的哨兵会把整个决策带偏。
+    const score =
+      info.alert * 2 +
+      (info.exposed ? 3 : 0) +
+      (facingMe && dist < effStealth + 2 ? 1 : 0) +
+      (effStand + 5 - dist) * 0.05;
     if (!worst || score > worst.score) {
       info.score = score;
       worst = info;
     }
   }
+  if (worst) worst.window = !windowBlocked;
   return worst;
 }
 
-/** 往哪边退才不会掉下台子／退回刚爬上来的竖井。 */
-function BotRetreatDir(state, threat) {
+/**
+ * 从 fromX 跑到 toX 这一段，现在有人能看见吗？
+ * 掩体接力真正要回答的是这个问题，而不是笼统的"附近有没有敌人面朝我"——
+ * 十几米外一个面朝我的哨兵不该否决一次两米的短跳。
+ */
+function BotHopSafe(state, fromX, toX, stealth) {
   const p = state.player;
-  const away = p.x >= threat.e.x ? 1 : -1;
-  const floor = FloorUnder(state.level, p.x, p.y + 0.3, 0.6);
-  if (!floor) return away;
-  const room = away > 0 ? floor.x1 - p.x : p.x - floor.x0;
-  if (room > 1.2) return away;
-  return 0; // 退无可退，就地低头别动
+  const scale = stealth ? SENSE.crouchVisibility * SENSE.sneakVisibility : 1;
+  const lo = Math.min(fromX, toX) - 1.2;
+  const hi = Math.max(fromX, toX) + 1.2;
+  for (const e of state.enemies) {
+    if (e.dormant) continue;
+    if (Math.abs(e.y - p.y) > 2.5) continue;
+    if (e.alertness >= 0.3) return false; // 已经起疑了，别动
+    const eff = e.visionRange * scale + 1.4;
+    const gap = e.x < lo ? lo - e.x : e.x > hi ? e.x - hi : 0;
+    if (gap > eff) continue; // 照不到这段路
+    // 他面朝这段路吗（人在段里就是照得到）
+    const facingSeg = gap === 0 || (e.x < lo ? e.facing > 0 : e.facing < 0);
+    if (facingSeg) return false;
+  }
+  return true;
 }
 
 /** 脚底下就有掩体吗（站上去就能钻进去）。 */
@@ -2847,16 +2878,13 @@ function BotCoverAt(state, x) {
  * 沿 dir 方向的下一个掩体。掩体接力就靠它。
  * 两个讲究：
  *   - 传了 noCross 就不选"要从他身上跨过去"的（往回退的时候用）；
- *   - 尽量别选落在他巡逻段里的掩体 —— 躲在他来回踱步的范围内，
- *     等不到"他背过身"的空窗，出来就是送。实在没有别的才用。
+ *   - 巡逻段里的掩体照用不误：它常常是唯一的踏脚石，
+ *     躲进去等他走过再接力，比一口气冲二十米安全得多。
  */
-function BotCoverToward(state, dir, noCross, avoid) {
+function BotCoverToward(state, dir, noCross) {
   const p = state.player;
-  const foe = avoid || noCross;
   let best = null;
   let bestD = Infinity;
-  let fallback = null;
-  let fallbackD = Infinity;
   for (const prop of state.level.props) {
     if (prop.interact !== "hide") continue;
     if (!InteractAvailable(state, prop)) continue;
@@ -2868,25 +2896,12 @@ function BotCoverToward(state, dir, noCross, avoid) {
       const toEnemy = (noCross.e.x - p.x) * dir;
       if (toEnemy > 0 && d > toEnemy - 0.8) continue;
     }
-    let insidePatrol = false;
-    if (foe && foe.e.patrol) {
-      const lo = Math.min(foe.e.patrol.x0, foe.e.patrol.x1) - 0.5;
-      const hi = Math.max(foe.e.patrol.x0, foe.e.patrol.x1) + 0.5;
-      insidePatrol = px >= lo && px <= hi;
-    }
-    if (insidePatrol) {
-      if (d < fallbackD) {
-        fallbackD = d;
-        fallback = prop;
-      }
-      continue;
-    }
     if (d < bestD) {
       bestD = d;
       best = prop;
     }
   }
-  return best || fallback;
+  return best;
 }
 
 /** 找一个能躲的地方：别在敌人另一侧（跑过去等于送），限制在 14 米内。 */
@@ -3031,9 +3046,18 @@ function BotThink(state, bot, dt) {
   // 这个测试是要证明"关卡没有死锁"，不是证明 bot 玩得好。
   // 同一个目标上长时间原地打转 → 一级一级加码，最后允许被抓一次
   //（被抓只是回检查点，已开的地道口／已拉的闸／已救的人都还在）。
-  if (goal.tag !== bot.stallGoal || Math.abs(p.x - bot.stallX) > 3.5) {
+  // 用"离目标最近到过哪"来判定有没有进展。
+  // 之前用"位置有没有动过"，结果机器人在两个柴垛之间来回蹭六米就把计时器清零了，
+  // 于是永远升不了级，卡在原地三百秒。
+  const goalDist = Math.abs(p.x - goal.x) + Math.abs(p.y - goal.y) * 2;
+  if (goal.tag !== bot.stallGoal) {
     bot.stallGoal = goal.tag;
-    bot.stallX = p.x;
+    bot.bestDist = goalDist;
+    bot.stallTimer = 0;
+    bot.desperate = 0;
+    bot.caughtHere = 0;
+  } else if (goalDist < (bot.bestDist === undefined ? Infinity : bot.bestDist) - 3) {
+    bot.bestDist = goalDist;
     bot.stallTimer = 0;
     bot.desperate = 0;
   } else {
@@ -3045,8 +3069,18 @@ function BotThink(state, bot, dt) {
     bot.stallTimer = 0;
     bot.desperate = 0;
     bot.dashTo = null;
+    bot.caughtHere = (bot.caughtHere || 0) + 1;
   }
-  bot.desperate = bot.stallTimer > 26 ? 2 : bot.stallTimer > 13 ? 1 : 0;
+  // 兜底顺序：绕路（导航图里本来就含地道旁路）→ 猫腰掩体接力 → 等窗口 → 才轮到硬闯。
+  // 而且同一个目标最多认三次被抓，再多就说明硬闯不是解，别无限撞。
+  // 一级（不等空窗、强制掩体接力）永远开着——它不送命，只是急一点；
+  // 二级（完全无视敌人）才是会被抓的那档，同一目标认三次就停用，改回耐心打法。
+  if ((bot.caughtHere || 0) >= 3 && bot.stallTimer > 45) {
+    bot.caughtHere = 0; // 耐心打法也试过一轮了，再给三次硬闯机会
+    bot.stallTimer = 14;
+  }
+  const mayCharge = (bot.caughtHere || 0) < 3;
+  bot.desperate = bot.stallTimer > 26 && mayCharge ? 2 : bot.stallTimer > 13 ? 1 : 0;
 
   // 竖直导航：在竖井上就一路按到底，别在半空里改主意
   if (p.onShaft) {
@@ -3087,9 +3121,12 @@ function BotThink(state, bot, dt) {
   const threat = BotThreat(state);
   bot.hiding = false;
   const dirToGoal = Math.sign(localX - p.x) || p.facing;
-  // 井口就在眼前：钻下去比躲柴垛安全得多，别再玩掩体接力了
+  // 井口就在眼前：钻下去比躲柴垛安全得多，别再玩掩体接力了。
+  // 但开地道口要站着刨将近一秒，被军犬盯着刨等于送——所以还是要挑没人看的时候。
   const shaftHop = !!(hop && hop.kind === "shaft");
-  const atMouth = shaftHop && Math.abs(p.x - hop.x) < 2.2;
+  const nearMouth = shaftHop && Math.abs(p.x - hop.x) < 2.2;
+  const atMouth =
+    nearMouth && (!threat || BotHopSafe(state, p.x, hop.x, true));
 
   // 顺路就把乡亲喊上（有的关卡没有 talk 道具，只能靠"呼应"）。
   // 不这么干的话，等目标轮到"找齐乡亲"时得横穿半张图回头捡人。
@@ -3104,12 +3141,20 @@ function BotThink(state, bot, dt) {
 
   if (p.hidden) {
     bot.hideTimer = (bot.hideTimer || 0) + dt;
+    const nextCover = BotCoverToward(state, dirToGoal, null);
+    let exitTarget = nextCover ? PropX(state, nextCover) : localX;
+    if (shaftHop && Math.abs(hop.x - p.x) < Math.abs(exitTarget - p.x)) exitTarget = hop.x;
     const clear =
-      !threat ||
-      (threat.alert < 0.25 && (!threat.facingMe || threat.dist > threat.effStealth + 0.5));
+      !threat || BotHopSafe(state, p.x, exitTarget, false) || BotHopSafe(state, p.x, exitTarget, true);
     // 实在等不到空窗就硬着头皮出去：宁可难看地通关，也不许无限等待
-    if (clear || bot.hideTimer > 7) {
+    if (clear || bot.hideTimer > 18) {
       input.interactPressed = true;
+      if (!clear) {
+        // 关键：出来就直接锁定下一个掩体开冲。
+        // 否则下一帧发现"没窗口 + 脚下正好有掩体"，会立刻again钻回同一个柴垛，
+        // 计时器归零，于是永远在同一个位置进进出出——之前卡死就是卡在这。
+        if (Math.abs(exitTarget - p.x) > 1.15) bot.dashTo = exitTarget;
+      }
       bot.hideTimer = 0;
       bot.commitTimer = 0;
     } else {
@@ -3140,8 +3185,16 @@ function BotThink(state, bot, dt) {
       bot.blockedBy = threat.e.id;
       bot.stuckTimer = 0;
       bot.commitTimer = (bot.commitTimer || 0) + dt;
-      const windowOpen = !threat.facingMe && threat.alert < 0.25;
-      const commit = bot.commitTimer > 9 || bot.desperate > 0;
+      const hopTarget = (() => {
+        const next = BotCoverToward(state, dirToGoal, null);
+        let x = next ? PropX(state, next) : localX;
+        if (shaftHop && Math.abs(hop.x - p.x) < Math.abs(x - p.x)) x = hop.x;
+        return x;
+      })();
+      const safeRun = BotHopSafe(state, p.x, hopTarget, false);
+      const safeCreep = safeRun || BotHopSafe(state, p.x, hopTarget, true);
+      const windowOpen = safeCreep;
+      const commit = bot.commitTimer > 16 || bot.desperate > 0;
 
       // 1) 已经在冲了：冲到底
       if (bot.dashTo != null) {
@@ -3155,8 +3208,9 @@ function BotThink(state, bot, dt) {
             return;
           }
         } else {
-          input.crouch = false;
-          input.sneak = false;
+          const creep = !BotHopSafe(state, p.x, bot.dashTo, false) || threat.loud;
+          input.crouch = creep;
+          input.sneak = creep;
           BotWalkTo(state, bot, bot.dashTo, input);
           MaybePress(state, bot, goal, input);
           return;
@@ -3165,12 +3219,13 @@ function BotThink(state, bot, dt) {
 
       // 2) 有窗口（或憋太久）→ 起跑，目标是下一个掩体
       if (windowOpen || commit) {
-        const next = shaftHop ? null : BotCoverToward(state, dirToGoal, null, threat);
-        const dashX = next ? PropX(state, next) : localX;
+        const dashX = hopTarget;
         if (Math.abs(dashX - p.x) > 1.15) bot.dashTo = dashX;
         bot.commitTimer = 0;
-        input.crouch = false;
-        input.sneak = false;
+        // 能跑就全速站着跑；只有"跑会被看见但蹭得过去"时才猫腰
+        const creep = !safeRun || threat.loud;
+        input.crouch = creep;
+        input.sneak = creep;
         BotWalkTo(state, bot, dashX, input);
         MaybePress(state, bot, goal, input);
         return;
@@ -3183,7 +3238,7 @@ function BotThink(state, bot, dt) {
         MaybePress(state, bot, goal, input);
         return;
       }
-      const back = BotCoverToward(state, -dirToGoal, threat, threat);
+      const back = BotCoverToward(state, -dirToGoal, threat);
       if (back) {
         input.crouch = !threat.exposed;
         input.sneak = input.crouch;
