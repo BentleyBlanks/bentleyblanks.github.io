@@ -8,10 +8,11 @@ import { GetLevel } from "./Data_Levels.mjs";
 import {
   SortedKeys, CompareIds, PushEvent, AddLedger, MakeEnemyUnit, EnemyMoveCost, EnemyPathCost, UnitsOn,
   AllyUnits, EnemyUnits, RemoveUnit, UnitDef, TerrainOf, EntranceThreshold, VentThreshold,
-  ZoneOfCell, ZoneVentCount, ElevOf, CivsInCell, CivsAtVillage, LoseCiv, CivsAtVillage as CivsHome,
+  ZoneOfCell, ZoneVentCount, ElevOf, CivsInCell, CivsAtVillage, LoseCiv, CivsOnHex, StunUnit,
+  ConnectedCells, SpendAmmo,
 } from "./Script_State.mjs";
 import { CanAllySeeHex, EnemySeesUnit, FreshSightings, SuspicionScore, RecordSighting } from "./Script_Visibility.mjs";
-import { ResolveAttack, RecordExposedSightings } from "./Script_Actions.mjs";
+import { ResolveAttack, RecordExposedSightings, KillEnemyUnit } from "./Script_Actions.mjs";
 
 // ---------------------------------------------------------------------------
 // 小件
@@ -93,9 +94,11 @@ function TriggerAmbushes(state, events, column, hexKey) {
     .sort((a, b) => CompareIds(a.id, b.id));
   let fired = false;
   for (const ambusher of ambushers) {
+    // 伏击先撞上的是走在前头的步兵班——**工兵夹在队伍中间**，不会第一个挨枪。
+    // （原来一律按单位号取第一个，而工兵总是最先生成：一发伏击就能让整幕的烟与水永不出现。）
     const targets = ColumnUnits(state, column)
       .filter((unit) => unit.revealed)
-      .sort((a, b) => CompareIds(a.id, b.id));
+      .sort((a, b) => ((a.type === "sapper" ? 1 : 0) - (b.type === "sapper" ? 1 : 0)) || CompareIds(a.id, b.id));
     if (!targets.length) break;
     if (state.resources.ammo < CFG.ammoPerAttack) break;
     const outcome = ResolveAttack(state, events, ambusher.id, targets[0].id, { ambush: true });
@@ -156,7 +159,7 @@ function SpawnColumn(state, events, spec) {
     seizeGoal: spec.seizeGoal || 0, seized: 0,
     caution: 0, cautionTurns: 0, regroupTurns: 0, opInProgress: null,
     withdrawing: false, garrison: false, plannedPath: [], respondFresh: false,
-    incident: false, casualties: 0, burned: false, done: false, gained: false, seals: 0,
+    incident: false, casualties: 0, burned: false, done: false, gained: false, hauled: false, seals: 0,
     axis: spec.axis || null, burnCount: spec.burnCount || 0,
   };
   for (const type of spec.units) {
@@ -277,6 +280,26 @@ function TargetableEntranceNear(state, pos, range) {
   return keys.length ? keys[0] : null;
 }
 
+/**
+ * 工兵专程要去的那个口（R5 P0-5）：已经够得着就去够得着的那个；
+ * 一个都还不够门槛时，就**朝动静最大的那个口摸过去**（暴露豆 ≥ sapperSniffExpose 才算有动静）。
+ * 情报公平：暴露豆本来就是明牌，敌人被新土吸引过去不是读心，而且他站上去还要自己踩几回合。
+ * 原来工兵只认「已够门槛」的口，于是在正常游玩里它一辈子走不到任何一个口跟前——
+ * 这就是「A4 打满 12 回合 0 次灌水、水车 2/2 从没动过」的直接原因。
+ */
+function SapperSeekTarget(state, pos, range) {
+  const ready = TargetableEntranceNear(state, pos, range);
+  if (ready) return ready;
+  const keys = [];
+  for (const key of SortedKeys(state.tunnels.entrances)) {
+    const entrance = state.tunnels.entrances[key];
+    if (entrance.sealed || HexDistanceKeys(pos, key) > range) continue;
+    if (entrance.expose >= CFG.sapperSniffExpose) keys.push(key);
+  }
+  keys.sort((a, b) => (state.tunnels.entrances[b].expose - state.tunnels.entrances[a].expose) || (a < b ? -1 : 1));
+  return keys.length ? keys[0] : null;
+}
+
 /** 烟攻的额外条件（R2 P0-2）：该气区通风口数 < 地道格数 / 3——通风口修得够多，敌就不烧这份柴。 */
 function ZoneUnderVentilated(state, entranceKey) {
   const zone = ZoneOfCell(state, entranceKey);
@@ -295,24 +318,46 @@ function FloodUseful(state, entranceKey) {
   return false;
 }
 
+/** 工兵在不在手边：本纵队自带工兵，或有工兵班就在 1 格内跟着（R5 P0-5 放宽）。
+ *  原来只认「同一纵队里有工兵」，而工兵永远单独成队——烟与水因此在正常游玩里根本不会发生。 */
+function SapperOnHand(state, column) {
+  if (ColumnHasType(state, column, "sapper")) return true;
+  const pos = ColumnPos(state, column);
+  if (!pos) return false;
+  return EnemyUnits(state).some((unit) => unit.type === "sapper" && HexDistanceKeys(unit.pos, pos) <= 1);
+}
+
+/** 攻入的兵力门槛（R5 P0-5 放宽）：≥2 个班，其中至少 1 个日军班。 */
+function BreachManpowerOk(state, column) {
+  const squads = ColumnUnits(state, column).filter((unit) => unit.type === "inf" || unit.type === "puppet").length;
+  return CountInf(state, column) >= CFG.breachMinInf && squads >= CFG.breachMinSquads;
+}
+
 function AnnounceOp(state, events, column, entranceKey) {
   const level = GetLevel(state.meta.level);
   const allowed = level.enemyOps || [];
   const entrance = state.tunnels.entrances[entranceKey];
   // 反地道诸手的偏好顺序写在关卡数据里（level.opPriority），这里只判「能不能做」。
   const able = {
-    smoke: () => state.wave.smokeCharges > 0 && ColumnHasType(state, column, "sapper")
+    smoke: () => state.wave.smokeCharges > 0 && SapperOnHand(state, column)
       && ZoneUnderVentilated(state, entranceKey),
-    flood: () => state.wave.floodCharges > 0 && ColumnHasType(state, column, "sapper")
+    flood: () => state.wave.floodCharges > 0 && SapperOnHand(state, column)
       && FloodUseful(state, entranceKey),
-    blast: () => ColumnHasType(state, column, "sapper"),
-    breach: () => CountInf(state, column) >= CFG.breachMinInf && column.caution < CFG.cautionMax && !entrance.breachDenied,
+    blast: () => SapperOnHand(state, column),
+    breach: () => BreachManpowerOk(state, column) && column.caution < CFG.cautionMax && !entrance.breachDenied,
     excavate: () => entrance.known,          // 刨口不需要工兵：认准了的口，扛锹镐就能刨
     seal: () => (column.seals || 0) < CFG.sealPerColumn,
   };
-  const kind = (level.opPriority || ["smoke", "blast", "breach", "seal"])
-    .find((option) => allowed.includes(option) && able[option] && able[option]()) || null;
+  const order = (level.opPriority || ["smoke", "blast", "breach", "seal"])
+    .filter((option) => allowed.includes(option) && able[option] && able[option]());
+  // R5 P0-5：敌不会把同一手用到底——可做的几手里先挑**本役用得最少**的那一手。
+  // 「水是死内容」的根因就是烟永远排在水前面、又共用同一个工兵。
+  if (CFG.opRotate && order.length > 1) {
+    order.sort((a, b) => ((state.wave.opsUsed[a] || 0) - (state.wave.opsUsed[b] || 0)) || 0);
+  }
+  const kind = order.length ? order[0] : null;
   if (!kind) return false;
+  state.wave.opsUsed[kind] = (state.wave.opsUsed[kind] || 0) + 1;
   state.enemy.pendingOps.push({ kind, at: entranceKey, columnId: column.id, announcedTurn: state.meta.turn, turnsLeft: 1 });
   column.gained = true;
   column.opInProgress = { kind, at: entranceKey, turnsLeft: 1 };
@@ -338,6 +383,24 @@ function TrapIntercept(state, events, op, column) {
   return true;
 }
 
+/** 敌从破开的口顺着巷子往里搬粮：连通储粮洞按格键序掏走至多 amount 担（只进代价簿）。 */
+function HaulFromZone(state, events, atKey, amount) {
+  let want = amount;
+  const zone = [...ConnectedCells(state, atKey, false)].sort();
+  for (const key of zone) {
+    if (want <= 0) break;
+    if (key === atKey) continue;
+    const cell = state.tunnels.cells[key];
+    if (!cell || cell.grain <= 0) continue;
+    const take = Math.min(cell.grain, want);
+    cell.grain -= take;
+    want -= take;
+    AddLedger(state, "grainSeized", take);
+    PushEvent(state, events, { kind: "ledger", text: `敌顺着地道搬走储粮 ${take} 担（入代价簿）`,
+      hex: key, layer: "under", visible: true });
+  }
+}
+
 function ResolveDueOps(state, events) {
   const due = state.enemy.pendingOps.filter((op) => op.announcedTurn < state.meta.turn);
   state.enemy.pendingOps = state.enemy.pendingOps.filter((op) => op.announcedTurn >= state.meta.turn);
@@ -359,7 +422,7 @@ function ExecuteOp(state, events, op, column) {
   // 翻板先于一切作业结算：踩空一次，这一趟就白跑了
   if (TrapIntercept(state, events, op, column)) return;
   if (op.kind === "smoke") {
-    if (!column || !adjacent || !ColumnHasType(state, column, "sapper") || state.wave.smokeCharges <= 0) {
+    if (!column || !adjacent || !SapperOnHand(state, column) || state.wave.smokeCharges <= 0) {
       PushEvent(state, events, { kind: "op", text: "敌烟攻中止", hex: op.at, visible: SeenBy(state, op.at) });
       return;
     }
@@ -376,7 +439,7 @@ function ExecuteOp(state, events, op, column) {
     return;
   }
   if (op.kind === "flood") {
-    if (!column || !adjacent || !ColumnHasType(state, column, "sapper") || state.wave.floodCharges <= 0) {
+    if (!column || !adjacent || !SapperOnHand(state, column) || state.wave.floodCharges <= 0) {
       PushEvent(state, events, { kind: "op", text: "敌灌水中止", hex: op.at, visible: SeenBy(state, op.at) });
       return;
     }
@@ -401,7 +464,7 @@ function ExecuteOp(state, events, op, column) {
     return;
   }
   if (op.kind === "blast") {
-    const sapperReady = column && adjacent && ColumnHasType(state, column, "sapper");
+    const sapperReady = column && adjacent && SapperOnHand(state, column);
     if (!sapperReady) {
       PushEvent(state, events, { kind: "op", text: "敌爆破被打断", hex: op.at, visible: SeenBy(state, op.at) });
       return;
@@ -411,6 +474,15 @@ function ExecuteOp(state, events, op, column) {
     const cell = state.tunnels.cells[op.at];
     if (cell) {
       if (cell.facility === "vent") delete state.tunnels.vents[op.at];
+      // 炸塌的储粮洞里那几担粮跟着土一起埋了（R5 P0-6：洞存粮不再是存进去就永远安全）。
+      // 只埋一部分——这一条要教的是「粮分几个洞放」，不是「一炮翻盘」。
+      if (cell.grain > 0) {
+        const buried = Math.min(CFG.blastGrainLoss, cell.grain);
+        cell.grain -= buried;
+        AddLedger(state, "grainSeized", buried);
+        PushEvent(state, events, { kind: "ledger", text: `储粮洞被炸塌，${buried} 担粮埋在土里（入代价簿）`,
+          hex: op.at, layer: "under", visible: true });
+      }
       cell.facility = null;
       for (const unit of UnitsOn(state, op.at, "under")) {
         unit.hp -= CFG.blastDamage;
@@ -430,24 +502,35 @@ function ExecuteOp(state, events, op, column) {
     return;
   }
   if (op.kind === "breach") {
-    const ready = column && adjacent && CountInf(state, column) >= CFG.breachMinInf && column.caution < CFG.cautionMax;
+    const ready = column && adjacent && BreachManpowerOk(state, column) && column.caution < CFG.cautionMax;
     if (!ready) {
       PushEvent(state, events, { kind: "op", text: "敌攻入中止", hex: op.at, visible: SeenBy(state, op.at) });
       return;
     }
     state.wave.pool -= CFG.pool.breachSelfCost;
-    // 驻守判定：入口正下方格或相邻枪眼格有我方单位 → 敌 1 班伤亡且中止
-    const defended = UnitsOn(state, op.at, "under").length > 0
-      || HexNeighborKeys(op.at).some((nb) => {
-        const cell = state.tunnels.cells[nb];
-        return cell && cell.facility === "fightpost" && UnitsOn(state, nb, "under").length > 0;
-      });
-    if (defended) {
-      state.wave.pool -= CFG.pool.killInf;
+    // 驻守判定：入口正下方格或相邻枪眼格有我方单位 → 敌 1 班伤亡且中止。
+    // R5 P0-4：守洞**不再免费**——要打出去一发子弹（弹药池空就堵不住），
+    // 守洞的人被压制一回合，且这个口从此明摆在敌人眼里。它仍然是一手好棋，只是有价。
+    const defenders = UnitsOn(state, op.at, "under").slice();
+    for (const nb of HexNeighborKeys(op.at)) {
+      const cell = state.tunnels.cells[nb];
+      if (cell && cell.facility === "fightpost") defenders.push(...UnitsOn(state, nb, "under"));
+    }
+    const allyDefenders = defenders.filter((unit) => unit.side === "ally");
+    if (allyDefenders.length && state.resources.ammo < CFG.guardAmmoCost) {
+      PushEvent(state, events, { kind: "op", text: TEXT.guardText.noAmmo, hex: op.at, visible: true });
+    }
+    if (allyDefenders.length && state.resources.ammo >= CFG.guardAmmoCost) {
+      for (let i = 0; i < CFG.guardAmmoCost; i += 1) SpendAmmo(state);
+      PushEvent(state, events, { kind: "combat", text: TEXT.guardText.ammo, hex: op.at, visible: true });
       const infUnits = ColumnUnits(state, column).filter((unit) => unit.type === "inf").sort((a, b) => CompareIds(a.id, b.id));
-      if (infUnits.length) {
-        PushEvent(state, events, { kind: "op", text: "敌强攻入口，守洞火力当头：敌一个班伤亡，攻入中止", hex: op.at, visible: true });
-        RemoveUnit(state, infUnits[0].id);
+      PushEvent(state, events, { kind: "op", text: `敌强攻入口，${TEXT.guardText.repelled}`, hex: op.at, visible: true });
+      if (infUnits.length) KillEnemyUnit(state, events, infUnits[0], false);
+      for (const unit of allyDefenders) StunUnit(state, unit, CFG.guardStunTurns);
+      PushEvent(state, events, { kind: "combat", text: TEXT.guardText.stunned, hex: op.at, layer: "under", visible: true });
+      if (!entrance.known) {
+        entrance.known = true;
+        PushEvent(state, events, { kind: "expose", text: TEXT.guardText.marked, hex: op.at, visible: true });
       }
       entrance.breachDenied = true;
       column.incident = true;
@@ -467,6 +550,8 @@ function ExecuteOp(state, events, op, column) {
         PushEvent(state, events, { kind: "ledger", text: `储粮洞被夺 ${cell.grain} 担（入代价簿）`, hex: op.at, visible: true });
         cell.grain = 0;
       }
+      // R5 P0-6：口一破，敌就顺着这条巷子往里搬——连通的储粮洞也要被掏走一部分。
+      HaulFromZone(state, events, op.at, CFG.breachStorageHaul);
       if (cell.facility === "vent") delete state.tunnels.vents[op.at];
       cell.facility = null;
       cell.trapReady = false;
@@ -566,33 +651,108 @@ function DoSearch(state, events, column) {
   return false;
 }
 
-/** 征粮：有明存粮就抢粮；粮已净空则抓丁——把人藏进地道才躲得掉（代价簿四栏都得会动）。 */
+/**
+ * 抓丁（R5 P0-2 重挂触发源）：**敌军阶段结束时，站在敌纵队所占村格上的群众批被抓。**
+ * 老弱与伤员走不动，一个也跑不掉；青壮腿脚快，每两批走脱一批。
+ *
+ * 旧规则看的是「村里还有没有明存粮」，于是「什么都不做」和「全塞进地道后不管」
+ * 结果一模一样，而「疯狂藏粮」反而死人更多——反向激励。现在只看**人还站在哪儿**：
+ * 恐慌被逼出洞、村口没送走、终局还留在地面，都会在这里结账。
+ */
+function LevyOccupiedHexes(state, events) {
+  if (state.wave.status === "quiet" || state.wave.status === "done") return;
+  const occupied = new Set();
+  for (const foe of EnemyUnits(state)) {
+    const hex = state.map.hexes[foe.pos];
+    if (hex && hex.villageId) occupied.add(foe.pos);
+  }
+  for (const key of [...occupied].sort()) {
+    const here = CivsOnHex(state, key).sort((a, b) => CompareIds(a.id, b.id));
+    const grabbed = [];
+    let dodged = 0;
+    for (const civ of here) {
+      // 青壮腿脚快：**头一回**能翻墙走脱（每批一次），第二回就没跑掉——
+      // 确定性的「一半」，而且给玩家一个回合的警告去把人挪走。老弱与伤员一次也躲不掉。
+      if (civ.kind === "young" && (civ.levyMisses || 0) < CFG.levyYoungEveryN - 1) {
+        civ.levyMisses = (civ.levyMisses || 0) + 1;
+        dodged += 1;
+        continue;
+      }
+      grabbed.push(civ);
+    }
+    if (dodged > 0) {
+      PushEvent(state, events, { kind: "civs", text: `${TEXT.civText.levyYoungAway}（${dodged} 批）`, hex: key, visible: true });
+    }
+    if (!grabbed.length) continue;
+    for (const civ of grabbed) LoseCiv(state, civ, "captured");
+    for (const column of state.enemy.columns) {
+      if (!ColumnUnits(state, column).some((unit) => unit.pos === key)) continue;
+      column.gained = true;
+      column.hauled = true;      // 拉到了人：这支队伍此后不再算「扑空」
+    }
+    PushEvent(state, events, { kind: "ledger",
+      text: `${TEXT.civText.levyOnHex}：群众被抓 ${grabbed.length} 批（${grabbed.map(KindName).join("、")}）（入代价簿）`,
+      hex: key, visible: true });
+  }
+}
+
+function KindName(civ) {
+  return ({ old: "老弱", young: "青壮", wounded: "伤员" })[civ.kind] || civ.kind;
+}
+
+/**
+ * 第一幕的硬脚本攻入（R5 P0-1）：到了关卡声明的那一回合，敌人认准村里最挤的那个窖撬开——
+ * **窖里的人一个也跑不掉**，全部进代价簿。这是开场白写的招牌失败，必须在 8 回合内够得着。
+ * 提前一回合电报；玩家能改变的是**把人分散在哪几个窖里**，不是这一下会不会来。
+ */
+function ScriptedBreach(state, events) {
+  const script = GetLevel(state.meta.level).scriptedBreach;
+  if (!script || state.wave.scriptedBreachDone) return;
+  if (state.meta.turn === script.turn - 1) {
+    PushEvent(state, events, { kind: "telegraph", text: script.telegraph || TEXT.scriptText.breachWarn, visible: true });
+    return;
+  }
+  if (state.meta.turn < script.turn) return;
+  // 人最多的那个窖（并列取格键序）——你把人分散在哪儿，决定这一下要走多少
+  let target = null;
+  let best = -1;
+  for (const key of SortedKeys(state.tunnels.cells)) {
+    const count = CivsInCell(state, key).reduce((sum, civ) => sum + 1, 0);
+    if (count > best) { best = count; target = key; }
+  }
+  state.wave.scriptedBreachDone = true;
+  if (!target || best <= 0) {
+    PushEvent(state, events, { kind: "op", text: "敌撬开窖口，里面空空如也——人早转走了", visible: true });
+    return;
+  }
+  const caught = CivsInCell(state, target);
+  for (const civ of caught) LoseCiv(state, civ, "captured");
+  const cell = state.tunnels.cells[target];
+  if (cell && cell.grain > 0) {
+    AddLedger(state, "grainSeized", cell.grain);
+    PushEvent(state, events, { kind: "ledger", text: `窖中存粮 ${cell.grain} 担一并被夺（入代价簿）`, hex: target, visible: true });
+    cell.grain = 0;
+  }
+  const entrance = state.tunnels.entrances[target];
+  if (entrance) { entrance.known = true; entrance.sealed = true; }
+  PushEvent(state, events, { kind: "ledger",
+    text: `${script.text || TEXT.scriptText.breachDone}：群众被抓 ${caught.length} 批（入代价簿）`,
+    hex: target, visible: true });
+}
+
+/** 征粮：进村就搬粮（抓丁已改挂群众暴露，见 LevyOccupiedHexes）。 */
 function DoSeize(state, events, column) {
   const village = column.targetVillage ? state.map.villages[column.targetVillage] : null;
   const pos = ColumnPos(state, column);
   if (!village || !pos) return false;
   const hex = state.map.hexes[pos];
   if (!hex || hex.villageId !== column.targetVillage) return false;
-  // 抓丁：明存粮净空后必抓；关卡声明 levyAlways 的（第一幕的搜庄队）则搜粮抓人一起来。
-  const levyAlways = !!GetLevel(state.meta.level).levyAlways;
-  if (village.grainOpen <= 0 || levyAlways) {
-    const waiting = CivsAtVillage(state, column.targetVillage);
-    if (waiting.length) {
-      const grabbed = waiting.slice(0, CFG.levyCivsPerTurn);
-      for (const civ of grabbed) LoseCiv(state, civ, "captured");
-      column.gained = true;
-      PushEvent(state, events, { kind: "ledger",
-        text: `${village.grainOpen <= 0 ? "村中无粮可征，" : "搜庄"}敌抓丁 ${grabbed.length} 批（入代价簿）`,
-        hex: pos, visible: true });
-      if (village.grainOpen <= 0) return true;
-    } else if (village.grainOpen <= 0) {
-      return false;
-    }
-  }
+  if (village.grainOpen <= 0) return false;
   const take = Math.min(CFG.seizePerTurn, village.grainOpen);
   village.grainOpen -= take;
   village.seizedTurn = state.meta.turn;
   column.gained = true;
+  column.hauled = true;          // 装了粮：这支队伍此后不再算「扑空」
   AddLedger(state, "grainSeized", take);
   column.seized += take;
   PushEvent(state, events, { kind: "ledger", text: `敌征走明存粮 ${take} 担（入代价簿）`, hex: pos, visible: true });
@@ -639,18 +799,23 @@ function GarrisonAct(state, events, column) {
     : (state.map.hexes[ColumnPos(state, column)]?.villageId ? state.map.villages[state.map.hexes[ColumnPos(state, column)].villageId] : null);
   const pos = ColumnPos(state, column);
   if (!village || !pos) return;
+  // 驻剿队也搞反地道作业（R5 P0-5）：占了村不去，本来就是为了把地道挖出来。
+  // 原来一转入驻剿就只会「搜、烧、抓」，第五幕 T12 之后的一切反地道作业因此全部停摆。
+  if (column.opInProgress) {
+    const busy = state.tunnels.entrances[column.opInProgress.at];
+    if (busy && !busy.sealed) { column.plannedPath = []; return; }
+    column.opInProgress = null;
+    state.enemy.pendingOps = state.enemy.pendingOps.filter((op) => op.columnId !== column.id);
+  }
+  const garrisonTarget = TargetableEntranceNear(state, pos, 1);
+  if (garrisonTarget && AnnounceOp(state, events, column, garrisonTarget)) { column.plannedPath = []; return; }
   DoSeize(state, events, column);
   if (village.burnedHexes < village.hexKeys.length) {
     village.burnedHexes += 1;
     AddLedger(state, "housesBurned", 1);
     PushEvent(state, events, { kind: "ledger", text: `${village.name}又有房屋被焚（入代价簿）`, hex: pos, visible: true });
   }
-  const villageId = column.targetVillage || state.map.hexes[pos]?.villageId;
-  const remaining = villageId ? CivsAtVillage(state, villageId) : [];
-  if (remaining.length) {
-    LoseCiv(state, remaining[0], "captured");
-    PushEvent(state, events, { kind: "ledger", text: "驻剿抓丁：群众被抓 1 批（入代价簿）", hex: pos, visible: true });
-  }
+  // 抓丁不在这里做：驻剿队踩住哪一格，那一格的人才被拉走（统一走 LevyOccupiedHexes，R5 P0-2）
   const candidates = SearchCandidates(state, column);
   const target = PickSearchTarget(state, column, candidates);
   if (target && target !== pos) MoveColumn(state, events, column, target);
@@ -763,8 +928,15 @@ function ColumnAct(state, events, column) {
   const engaged = fired && ColumnUnits(state, column).length <= 2;
   // 3.8) 工兵队专程来对付地道口：主动奔向暴露最高的那个口（走到了就在同一回合下电报，不空耗一回合）
   if (column.role === "sapper" && pos && !engaged) {
-    const seek = TargetableEntranceNear(state, pos, CFG.sapperSeekRange);
-    if (seek && HexDistanceKeys(pos, seek) > 1) { MoveColumn(state, events, column, seek); PlanPath(state, column, seek); }
+    const seek = SapperSeekTarget(state, pos, CFG.sapperSeekRange);
+    if (seek) {
+      MoveColumn(state, events, column, seek);
+      PlanPath(state, column, seek);
+      // 走到口上就**踩住不走**：踩着的那一格每回合 +2 豆，够门槛了就下电报动手。
+      // 还没摸到就这一回合只管赶路——不能像原来那样再往下走一遍脚本路线，把自己带离那个口。
+      const arrived = HexDistanceKeys(ColumnPos(state, column) || pos, seek) <= 1;
+      if (!arrived) { TickCaution(state, column); return; }
+    }
   }
   // 4) 已知/已被盯上的入口在 1 格内 → 反地道四选一（提前 1 回合电报）
   const here = ColumnPos(state, column) || pos;
@@ -826,7 +998,9 @@ export function RunEnemyPhase(state, events) {
   }
   SpawnDueWaves(state, events);
   ResolveDueOps(state, events);
+  ScriptedBreach(state, events);          // 关卡硬脚本的那一下（第一幕的招牌失败）
   const columns = state.enemy.columns.slice().sort((a, b) => (a.id < b.id ? -1 : 1));
   for (const column of columns) ColumnAct(state, events, column);
+  LevyOccupiedHexes(state, events);       // 敌军阶段收尾：踩住的村格上还站着谁，就拉走谁
   RecordExposedSightings(state);
 }

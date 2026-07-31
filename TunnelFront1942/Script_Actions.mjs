@@ -13,7 +13,7 @@ import {
   TunnelNeighbors, ReachableFacilityCells, StorageCellsUnder,
   EntranceThreshold, CellHasRoom, IsSurfacePassable, ZoneOfCell, ZoneEntranceKeys, EntranceCivPassable,
   ActionUnlocked, FacilityUnlocked, UnlockedDisguises, CivGuidanceOn, StorageCapOf,
-  CivsAtVillage, CivsInCell, CivSlots, CivSpeed, CellCivRoom, EntranceGuideBonus,
+  CivsAtVillage, CivsInCell, CivSlots, CivSpeed, CellCivRoom, EntranceGuideBonus, IsStunned,
 } from "./Script_State.mjs";
 import {
   EnemyCanSeeHex, EnemySeesUnit, RecordSighting, ExposeEntranceUse, PreviewEntranceUseBeans,
@@ -180,7 +180,12 @@ function CoverOf(state, unit) {
   return TerrainOf(state, unit.pos)?.cover ? CFG.coverReduce : 0;
 }
 
-/** 我方击杀敌单位的全部进账：战果计数、行动力池扣减、轴线杀伤、报复队计数、缴获。 */
+/** 我方击杀敌单位的全部进账：战果计数、行动力池扣减、轴线杀伤、报复队计数、缴获。
+ *  对外导出（守洞打退攻入等「不经 ResolveAttack」的击杀也必须走这里，否则战果与池都不作数）。 */
+export function KillEnemyUnit(state, events, foe, allyLooterAlive) {
+  OnEnemyKilled(state, events, foe, allyLooterAlive);
+}
+
 function OnEnemyKilled(state, events, foe, allyLooterAlive) {
   if (Object.prototype.hasOwnProperty.call(state.score.kills, foe.type)) state.score.kills[foe.type] += 1;
   AddPlayerDrain(state, foe.type === "inf" ? CFG.pool.killInf : CFG.pool.killOther);
@@ -198,12 +203,23 @@ function OnEnemyKilled(state, events, foe, allyLooterAlive) {
       PushEvent(state, events, { kind: "telegraph", text: "内线电报：敌拟派报复队进庄", visible: true });
     }
   }
+  // 缴获（R5 必修 bug 3）：兑现「打死日军班/工兵班捡一发」的承诺，同时把「为什么没捡着」说清楚。
   if (allyLooterAlive) {
     const loot = CFG.loot[foe.type] ?? 0;
     if (loot > 0) {
+      const before = state.resources.ammo;
       GainAmmo(state, loot);
-      PushEvent(state, events, { kind: "loot", text: `缴获弹药 ${loot}`, hex: foe.pos, visible: true });
+      const got = state.resources.ammo - before;
+      PushEvent(state, events, { kind: "loot",
+        text: got > 0 ? `就地缴获弹药 ${got}（弹药池 ${state.resources.ammo}/${CFG.ammoMax}）` : "缴获了，可弹药池已满，装不下了",
+        hex: foe.pos, visible: true });
+    } else {
+      PushEvent(state, events, { kind: "loot", text: `${UnitDef(foe).name}身上没有能用的枪弹，无可缴获`,
+        hex: foe.pos, visible: false });
     }
+  } else {
+    PushEvent(state, events, { kind: "loot", text: "没主动权就没工夫捡枪：这一个不缴获",
+      hex: foe.pos, visible: false });
   }
   PushEvent(state, events, { kind: "kill", text: `${UnitDef(foe).name}被歼`, hex: foe.pos, visible: true });
   RemoveUnit(state, foe.id);
@@ -447,6 +463,7 @@ function CanDive(state, unit) {
 }
 
 function CollectUnitActions(state, unit, actions) {
+  if (IsStunned(state, unit)) return;      // 被压制：这一回合抬不起头（守洞打退攻入的代价）
   const def = UnitDef(unit);
   const id = unit.id;
   const hex = HexOf(state, unit.pos);
@@ -525,7 +542,8 @@ function CollectUnitActions(state, unit, actions) {
     if (CoverTarget(state, unit)) {
       actions.push({ type: "CoverTraces", unit: id, usesLeft: CFG.coverUsesPerUnit - (unit.coverUses || 0) });
     }
-    if (hex && hex.road && !hex.roadBroken && digPower > 0
+    // 破路只破**村外**的路：村里的街是自家的街，刨断了敌人照旧从别处进来，自己反倒运不动东西。
+    if (hex && hex.road && !hex.roadBroken && digPower > 0 && !hex.villageId
         && (!hex.bridge || GetLevel(state.meta.level).bridgeBreakable)) {
       actions.push({ type: "BreakRoad", unit: id, bridge: !!hex.bridge });
     }
@@ -642,25 +660,44 @@ const applyHandlers = {
   Organize: ApplyOrganize, Collapse: ApplyCollapse, Rest: ApplyRest,
 };
 
+/**
+ * 拒绝回执（R5 必修 bug 4）：非法动作只回**这一个动作**的理由与补救提示，
+ * 绝不附赠别的动作的「不可用」条目。表现层与 CLI 一律直接展示 `illegal` + `hints`，
+ * 不要再自行遍历全部动作类型去猜——那正是「DigEntrance 失败却看到 Ambush 不可用」的来源。
+ */
+function Refusal(state, action, reason) {
+  const hints = [];
+  const unit = action.unit ? state.units[action.unit] : null;
+  if (unit && unit.side === "ally" && unit.hp > 0) {
+    if (IsStunned(state, unit)) hints.push(`${action.type}：${UnitDef(unit).name}被压制中，这一回合抬不起头。`);
+    else if (unit.acted && !unit.freeMove) hints.push(`${action.type}：本单位的主动作已经用掉了——每单位每回合只有 1 个。`);
+    hints.push(`${action.type}：${reason}`);
+    hints.push(`要看 ${action.unit} 现在到底能做什么，用 legal --unit ${action.unit}（只列它自己的）。`);
+  } else {
+    hints.push(`${action.type}：${reason}`);
+  }
+  return { state, events: [], illegal: reason, illegalAction: action.type, hints };
+}
+
 export function PerformAction(inputState, action) {
   if (!action || typeof action.type !== "string") {
-    return { state: inputState, events: [], illegal: "动作缺失或无类型" };
+    return { state: inputState, events: [], illegal: "动作缺失或无类型", hints: [] };
   }
   if (action.type === "EndTurn") return EndTurn(inputState);
   if (inputState.meta.phase !== "player" || inputState.result) {
-    return { state: inputState, events: [], illegal: "当前不在玩家阶段" };
+    return Refusal(inputState, action, "当前不在玩家阶段");
   }
   const handler = applyHandlers[action.type];
-  if (!handler) return { state: inputState, events: [], illegal: `未知动作类型：${action.type}` };
+  if (!handler) return Refusal(inputState, action, `未知动作类型：${action.type}`);
   if (!ActionUnlocked(inputState, action.type)) {
     const level = GetLevel(inputState.meta.level);
-    return { state: inputState, events: [],
-      illegal: `本幕（第${level.act}幕《${level.name}》）尚未开放「${action.type}」——这一幕要学的不是它` };
+    return Refusal(inputState, action,
+      `本幕（第${level.act}幕《${level.name}》）尚未开放「${action.type}」——这一幕要学的不是它`);
   }
   const state = CloneState(inputState);
   const events = [];
   const illegal = handler(state, events, action);
-  if (illegal) return { state: inputState, events: [], illegal };
+  if (illegal) return Refusal(inputState, action, illegal);
   // 伏击是持续状态：只有移动、改做别的主动作、或开火/被打断才解除（Rest 与免费动作不打断）。
   const actor = action.unit ? state.units[action.unit] : null;
   if (actor && actor.stance === "ambush" && action.type !== "Ambush"
@@ -944,6 +981,7 @@ function ApplyBreakRoad(state, events, action) {
   if (unit.layer !== "surface") return "须在地面破路";
   const hex = HexOf(state, unit.pos);
   if (!hex || !hex.road || hex.roadBroken) return "此格没有可破的路";
+  if (hex.villageId) return "村里的街不能刨：断了这一段，敌人照旧从别处进村，自家的粮车反倒过不去";
   if (hex.bridge && !GetLevel(state.meta.level).bridgeBreakable) return "此桥不可破毁";
   const need = hex.bridge ? CFG.dig.bridgeBreak : CFG.dig.roadBreak;
   return WorkSite(state, events, unit, power, { kind: "roadBreak", at: unit.pos, need }, null);
@@ -1110,6 +1148,7 @@ function ApplyMoveCivs(state, events, action) {
     if (!target) break;
     civ.loc = "cell";
     civ.at = target;
+    civ.hex = null;          // 人进了洞就不在地面格上了——抓丁再也够不着他（R5 P0-2）
     moved.push(civ);
   }
   if (!moved.length) return ShelterBlockReason(state, unit.pos);

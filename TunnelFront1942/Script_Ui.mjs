@@ -52,6 +52,7 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
   const topRight = El("div", "tf-top-right", topBar);
   const topWave = El("span", "tf-top-wave", topRight, "");
   const topPool = El("span", "tf-top-pool", topRight, "");
+  const topNet = El("span", "tf-top-net", topRight, "");    // 地道网：格/段/通气孔门槛/门开关（R5）
 
   const fixtureBadge = document.getElementById("fixtureBadge") ?? El("div", "tf-fixture-badge", uiRoot);
   fixtureBadge.textContent = "夹具模式 · 仅渲染不可玩";
@@ -118,10 +119,23 @@ export function CreateUi({ uiRoot, callbacks = {} }) {
     const wave = waveText[info.waveStatus] ?? "";
     topWave.textContent = info.waveStatus === "sweep" ? `${wave} T${info.sweepTurn ?? ""}` : wave;
     if (info.pool !== undefined && info.waveStatus !== "quiet" && info.waveStatus !== "done") {
-      topPool.textContent = `敌行动力 ${info.pool}${info.smokeCharges ? ` · 烟具 ${info.smokeCharges}` : ""}`;
+      topPool.textContent = `敌行动力 ${info.pool}`
+        + (info.smokeCharges ? ` · 烟具 ${info.smokeCharges}` : "")
+        + (info.floodCharges ? ` · 水车 ${info.floodCharges}` : "");
     } else {
       topPool.textContent = "";
     }
+    // 地道网摘要：段数与「通气孔够不够」以前网页上一处都没有，只能靠玩家自己数格子。
+    const net = info.network;
+    if (!net) { topNet.textContent = ""; return; }
+    const parts = [`地道 ${net.cells} 格 / ${net.segments} 段`];
+    if (net.vents !== null && net.vents !== undefined && net.ventNeed !== null && net.ventNeed !== undefined) {
+      parts.push(`通气孔 ${net.vents}/需 ${net.ventNeed}`);
+    }
+    if (net.doorsOpen || net.doorsClosed) parts.push(`隔断门 开${net.doorsOpen}/关${net.doorsClosed}`);
+    topNet.textContent = parts.join(" ｜ ");
+    topNet.classList.toggle("tf-top-net-short",
+      net.vents !== null && net.ventNeed !== null && net.vents < net.ventNeed);
   }
 
   // ---------------- 资源 + 账本（中性灰白） ----------------

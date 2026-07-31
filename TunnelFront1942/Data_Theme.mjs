@@ -62,8 +62,8 @@ export const theme = Object.freeze({
     facilities: Object.freeze({
       storage:   Object.freeze({ color: "#b9995e", label: "储", name: "储粮洞" }),
       shelter:   Object.freeze({ color: "#7f9bb5", label: "藏", name: "藏人室" }),
-      vent:      Object.freeze({ color: "#d8d8d2", label: "风", name: "通风口" }),
-      fightpost: Object.freeze({ color: "#a05656", label: "枪", name: "枪眼" }),
+      vent:      Object.freeze({ color: "#d8d8d2", label: "风", name: "通气孔（通风口）" }),
+      fightpost: Object.freeze({ color: "#a05656", label: "枪", name: "射击孔" }),
       door:      Object.freeze({ color: "#8a7f6a", label: "门", name: "隔断门" }),
     }),
   }),

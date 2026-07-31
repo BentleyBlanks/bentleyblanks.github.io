@@ -24,6 +24,9 @@ export const CFG = Object.freeze({
   ventConceal: 2,        // 通风口等效隐蔽 2（阈值 6）
   exposePerWork: 1,      // 每挖通 1 段 / 修成 1 设施 → 同气区所有已开口 +1（R2 P0-1）
   exposeNewEntrance: 2,  // 每开 1 个新地道口 → 该口 +2
+  // R5 P0-1：**敌纵队踩在哪一格，哪一格的口就每回合 +2**——翻检是断续的，脚是一直踩着的。
+  // 这条把「敌人就站在口上，暴露豆纹丝不动」补死，也是烟/水/攻入终于会发生的根因。
+  occupiedExposePerTurn: 2,
   opTargetExpose: 4,     // 敌反地道选项的盯上阈值：暴露豆 ≥4 即可作业
   useEntranceExposeSeen: 2,   // 敌视野内使用入口
   useEntranceExposeNear: 1,   // 敌 2 格内（无视野）使用入口
@@ -66,10 +69,13 @@ export const CFG = Object.freeze({
   }),
 
   // —— 经济与群众 ——
-  quietGrainPerVillage: 1,   // 平静期每村每回合 +1 明存粮
+  quietGrainPerVillage: 1,   // 平静期每村每回合 +1 明存粮（**必须播报**，见 R5 必修 bug 1）
   sweepOpenGrainLoss: 2,     // 扫荡期每村每回合明存粮被搜走（关卡可覆写）
   sweepGrainRange: 2,        // 敌进到村 2 格内才搜得着明存粮
-  levyCivsPerTurn: 1,        // 敌在村且明存粮已尽 → 抓丁 1 批/回合（入代价簿）
+  // R5 P0-2：抓丁不再看「村里还有没有粮」，改看**人还站在哪儿**——
+  // 敌纵队占住的那一格上的群众批：老弱/伤员必抓，青壮跑得快，每两批走脱一批。
+  levyYoungEveryN: 2,        // 青壮：每 N 批抓 1 批（确定性的「一半」，不消耗 rng）
+  breachStorageHaul: 4,      // 攻入得手后，敌顺着口下去从连通储粮洞再搬走 4 担（入代价簿）
   hideGrainPerAction: 3,     // 「藏粮」每次转移 3
   autoHidePerTurn: 1,        // 组织度 ≥1 的村平静期每回合自动藏 1
   moveCivsPerAction: 2,      // 「转移群众」每次至多 2 批（村口 → 地道）
@@ -82,7 +88,13 @@ export const CFG = Object.freeze({
   // —— 弹药（全局池，缴获是唯一来源；收支严格为负） ——
   ammoMax: 12,
   ammoPerAttack: 1,
-  loot: Object.freeze({ inf: 1, puppet: 0, sapper: 0, spy: 0 }),
+  // 缴获（R5 必修 bug 3）：日军班与工兵班身上有枪有雷管，打死了能捡；伪军与特务身上没有。
+  // 收支仍严格为负：日军班 4 HP 要两枪（-2+1），工兵班 3 HP 在掩护地形也要两枪；
+  // 且**反击打死的不缴获**（没主动权就没工夫捡枪）——这三条一起把「挨打回血」堵死。
+  loot: Object.freeze({ inf: 1, puppet: 0, sapper: 1, spy: 0 }),
+  // 守洞不是免费的（R5 P0-4）：打退一次攻入要花这么多弹药，守洞的人还要被压制一回合。
+  guardAmmoCost: 1,
+  guardStunTurns: 1,
 
   // —— 战斗（确定性，零随机） ——
   ambushBonus: 1,        // 伏击 +1 伤
@@ -90,6 +102,9 @@ export const CFG = Object.freeze({
   ambushMinDamage: 1,    // 伏击伤害下限 1（普攻下限 0）
   counterPenalty: 1,     // 反伤 = max(攻 - 1 - 攻方掩护, 0)
   blastDamage: 2,        // 爆破波及格内单位 -2 HP
+  // 爆破埋掉的存粮（R5 P0-6）：只埋一部分，不是一炸就全没——
+  // 它要教的是「粮分几个洞放」，不是「一次翻盘」。
+  blastGrainLoss: 4,
 
   // —— 伏击 ——
   ambushPerHex: 1,       // 同一格同时至多 1 个单位处于伏击态
@@ -141,9 +156,17 @@ export const CFG = Object.freeze({
   moveCost: Object.freeze({ road: 0.5, offroad: 1 }),
 
   // —— 反地道作业 ——
-  breachMinInf: 2,
+  // R5 P0-5：攻入的门槛从「≥2 个日军班」放宽到「≥2 个班且其中至少 1 个日军班」——
+  // 原门槛只有「日军重」配比才够得着，攻入因此在 9 局 bot 里一次没发生过。
+  breachMinInf: 1,
+  breachMinSquads: 2,
+  // 敌不会把同一手用到底：可选作业里优先挑**本役用得最少**的那一手（平手才按 level.opPriority）。
+  // 这是「水必须真的出现」的落点——烟具与水车不再被同一个优先级永远压住。
+  opRotate: true,
   sealPerColumn: 1,
   sapperSeekRange: 12,
+  // 工兵闻着新土走：口的暴露豆到这个数，工兵就专程往那儿摸（还不够动手门槛也先踩上去）。
+  sapperSniffExpose: 2,
   sealRepairProgress: 2,
   logCap: 300,
 });
@@ -237,6 +260,7 @@ export const TEXT = Object.freeze({
   expose: Object.freeze({
     work: "动土的响动传上去了：本气区各口暴露 +1",
     newEntrance: "新口刚开，土色新鲜：该口暴露 +2",
+    occupied: "敌就踩在这个口上，来回踩、来回敲——这一格的口暴露 +2",
     cover: "掩土匿迹：本格痕迹与暴露各减 2",
     coverSpent: "掩土次数已用尽（每人每役 3 次）",
     marked: "敌已盯上此口：随时可能动手",
@@ -272,8 +296,30 @@ export const TEXT = Object.freeze({
     calmed: "有人在跟前守着，人心定下来了",
     wellBlocked: "水井口太窄，群众上不去",
     guided: "领着群众在地道里转移",
+    // R5 P0-2：抓丁挂在「人还站在敌人脚底下」，不再挂在「村里还有没有粮」。
+    levyOnHex: "敌就站在这一格上挨家挨户拉人",
+    levyYoungAway: "青壮腿脚快，趁乱翻墙走脱了",
+    stayUnderground: "扫荡还没完，人就留在洞里——地上地下不是一回事",
+  }),
+  guardText: Object.freeze({
+    repelled: "守洞火力当头：敌一个班伤亡，攻入中止",
+    ammo: "守洞这一下打出去的是子弹（弹药 -1）",
+    noAmmo: "弹药池空了：洞口只剩人，堵不住枪——敌人踩着口进来了",
+    stunned: "枪口火光把位置交了出去：守洞的人被压得抬不起头，下一回合动不了",
+    marked: "这个口从此明摆在敌人眼里（已知，永久）",
+  }),
+  scriptText: Object.freeze({
+    breachWarn: "内线急电：敌已认准村里的窖，明日就要往下挖人",
+    breachDone: "敌撬开窖口，探灯照下去——窖里的人一个也跑不掉（全部入代价簿）",
+  }),
+  carryText: Object.freeze({
+    fromDefault: "【默认继承档】你没打前面几幕：接手的是一份别人替你挖了一半的网，账也照旧记在你名下",
+    fromPrev: "【上一幕的战果】这盘地道网、这些口与这几担洞存粮，都是你上一幕自己挣下来的",
+    sealedNote: "上一幕被填死的口还堵着（地下重挖 2 进度可恢复）",
   }),
   sweepGrain: "敌搜庄刮走明存粮",
+  quietGrain: "秋粮陆续入囤：明存粮 +1",
+  quietHide: "组织有力，夜里又搬了一担进窖：洞存粮 +1",
   water: Object.freeze({
     spread: "水顺着地道往低处漫",
     dry: "地道里的水退了",

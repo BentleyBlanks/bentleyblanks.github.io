@@ -4,7 +4,7 @@
 // 绝不改状态、绝不自算敌军可见性（可见敌单位/意图箭头一律取 view.visibleEnemies / view.intentArrows）。
 //
 // 格位约定（R2 修正：暴露豆与单位不再抢同一字符位）：
-//   地上 3 字/格 = [地形] [开口位：入口暴露豆 / 通风口 / 痕迹] [占用位：我方 > 敌方 > 意图箭头]
+//   地上 3 字/格 = [地形] [开口位：入口暴露豆 / 通气孔 / 痕迹] [占用位：我方 > 敌方 > 意图箭头]
 //   地下 3 字/格 = [设施] [内容位：烟 > 群众/伤员 > 存粮]      [占用位：地下单位]
 // 坐标：动作用轴向键 "q,r"；本图列号 = q，行号 y = r + floor(q/2)（故 r = y - floor(q/2)）。
 
@@ -16,6 +16,9 @@ import {
   ReachableFacilityCells, VillageStorageEntrances, WoundedTotal, CivsInCell, CivsAtVillage,
   VillagePop, ShelterCapOf, StorageCapOf, CivSlots, LiveCivs, AllCivs, CivGuidanceOn,
   ActionUnlocked, FacilityUnlocked, ElevOf,
+  EdgeKey, EdgeEnds, AirZones, ZoneVentCount, ZoneHasAir, ZoneEntranceKeys,
+  LargestNetworkSize, VillagesLinked, LiveEntranceCount, DisguisedEntranceCount, VentCount,
+  CivSafeCount, CivTotal, StorageCellsUnder,
 } from "./Script_State.mjs";
 import { DeriveView } from "./Script_Visibility.mjs";
 
@@ -47,7 +50,7 @@ function ArrowChar(fromKey, toKey) {
   return "^";
 }
 
-/** 地上格 3 字：地形位 + 开口位（暴露豆/通风口/痕迹） + 占用位（单位/箭头）。 */
+/** 地上格 3 字：地形位 + 开口位（暴露豆/通气孔/痕迹） + 占用位（单位/箭头）。 */
 function SurfaceCell(state, key, marks) {
   const hex = state.map.hexes[key];
   if (!hex) return "   ";
@@ -192,7 +195,7 @@ export function GrainLines(state) {
   return lines;
 }
 
-/** 地道口 / 通风口 / 挖掘痕迹一览（暴露豆全程明牌，且不再被单位字母盖住）。 */
+/** 地道口 / 通气孔 / 挖掘痕迹一览（暴露豆全程明牌，且不再被单位字母盖住）。 */
 export function OpeningReport(state, view) {
   const derived = view || DeriveView(state);
   const allyAt = {};
@@ -246,10 +249,157 @@ export function OpeningLines(state, view) {
       + `${entry.allies.length ? ` ｜ 我方在此：${entry.allies.join("、")}` : ""}`);
   }
   for (const vent of report.vents) {
-    lines.push(`  通风口 ${vent.key} ${vent.known ? "已被搜出" : `暴露豆 ${vent.expose}/${vent.threshold}`}${vent.smoked ? " · 已被灌烟（失效）" : ""}`);
+    lines.push(`  通气孔 ${vent.key} ${vent.known ? "已被搜出" : `暴露豆 ${vent.expose}/${vent.threshold}`}${vent.smoked ? " · 已被灌烟（失效）" : ""}`);
   }
   if (report.traces.length) {
     lines.push("  挖掘痕迹：" + report.traces.map((entry) => `${entry.key}×${entry.traces}`).join(" "));
+  }
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
+// 地道段 / 隔断门 / 空气分区（R5 P0-1：没有这三张表，地下层就只能靠试错）
+// ---------------------------------------------------------------------------
+
+/** 「通气孔够不够」的分母：敌选烟攻的条件是「本气区通气孔数 < 地道格数 / N」。容错读取。 */
+function VentPerCells() {
+  const per = CFG.ventPerCellsForSmoke;
+  return typeof per === "number" && per > 0 ? per : 3;
+}
+
+/** 某气区要几个通气孔，敌人的烟才用不上（ventCount ≥ size/N ⇔ ≥ ceil(size/N)）。 */
+export function VentNeedFor(size) {
+  return Math.ceil(size / VentPerCells());
+}
+
+/** 段的字符：未挖通=空、有门按开/关、其余用给定的方向字符。 */
+function LinkChar(state, keyA, keyB, dirChar) {
+  const edge = state.tunnels.edges[EdgeKey(keyA, keyB)];
+  if (!edge) return " ";
+  if (edge.door === "closed") return "#";
+  if (edge.door === "open") return "D";
+  return dirChar;
+}
+
+/** 谁现在按得动这道门：门只能由邻接该段的地下我方单位免费开合（每门每回合 1 次）。 */
+function DoorOperator(state, edgeKey) {
+  const ends = EdgeEnds(edgeKey);
+  for (const id of SortedKeys(state.units)) {
+    const unit = state.units[id];
+    if (unit.side !== "ally" || unit.hp <= 0 || unit.layer !== "under") continue;
+    if (ends.includes(unit.pos)) return unit.id;
+  }
+  return null;
+}
+
+/**
+ * 空气分区一览：分区 = 经「开放门」连通的地道连通块。
+ * 通气孔按分区算——关一道门就把一个区切成两个，两边各自要够数。
+ */
+export function AirZoneReport(state) {
+  return AirZones(state).map((zone, index) => {
+    const cells = [...zone].sort();
+    const vents = ZoneVentCount(state, zone);
+    const ventKeys = cells.filter((key) => state.tunnels.cells[key].facility === "vent");
+    return {
+      index: index + 1,
+      cells,
+      size: cells.length,
+      vents,
+      ventKeys,
+      ventsKnown: ventKeys.filter((key) => (state.tunnels.vents[key] || {}).known).length,
+      ventsSmoked: ventKeys.filter((key) => (state.tunnels.vents[key] || {}).smoked).length,
+      ventNeed: VentNeedFor(cells.length),
+      hasAir: ZoneHasAir(state, zone),
+      entrances: ZoneEntranceKeys(state, zone),
+      grain: cells.reduce((sum, key) => sum + (state.tunnels.cells[key].grain || 0), 0),
+      civs: cells.reduce((sum, key) => sum + CivsInCell(state, key).length, 0),
+      elevLow: cells.length ? Math.min(...cells.map((key) => ElevOf(state, key))) : null,
+      elevHigh: cells.length ? Math.max(...cells.map((key) => ElevOf(state, key))) : null,
+    };
+  });
+}
+
+/**
+ * 通气孔总账：顶栏「通气孔 3/需 4」的数据源。
+ * have = 各气区里还在通风的孔（被烟灌死的不算）；need = 各气区门槛之和——两个数同口径才能比。
+ * 另给 unknown = 尚未被敌搜出的孔数（勋记「换气」按这个算，与通风与否是两回事）。
+ */
+export function VentSummary(state) {
+  const zones = AirZoneReport(state);
+  return {
+    have: zones.reduce((sum, zone) => sum + zone.vents, 0),
+    need: zones.reduce((sum, zone) => sum + zone.ventNeed, 0),
+    unknown: VentCount(state),
+    total: SortedKeys(state.tunnels.vents).length,
+    zones,
+    perCells: VentPerCells(),
+  };
+}
+
+/**
+ * 地道段一览：逐条列出已挖通的段（哪两格通着），并标明每道隔断门是开是关。
+ * 「地道未挖通或门已关闭」这条报错以前无处可查，这张表就是它的答案。
+ */
+export function TunnelLinkReport(state) {
+  const segments = [];
+  for (const edgeKey of SortedKeys(state.tunnels.edges)) {
+    const edge = state.tunnels.edges[edgeKey];
+    const [a, b] = EdgeEnds(edgeKey);
+    const door = edge.door || null;
+    segments.push({
+      edge: edgeKey, a, b, door,
+      blocked: door === "closed",
+      toggledThisTurn: (edge.toggledTurn || 0) >= state.meta.turn,
+      operator: door ? DoorOperator(state, edgeKey) : null,
+      elevA: ElevOf(state, a), elevB: ElevOf(state, b),
+    });
+  }
+  const doors = segments.filter((segment) => segment.door);
+  return {
+    segments,
+    doors,
+    doorsOpen: doors.filter((segment) => segment.door === "open").length,
+    doorsClosed: doors.filter((segment) => segment.door === "closed").length,
+    zones: AirZoneReport(state),
+  };
+}
+
+/** 地道段 + 隔断门 + 空气分区的可打印行（CLI 与网页共用同一措辞）。 */
+export function TunnelLinkLines(state) {
+  const report = TunnelLinkReport(state);
+  const lines = [];
+  if (!report.segments.length) {
+    lines.push("  （一条段也没有挖通——地下的每个窖各自孤立，人进去就出不来）");
+  }
+  for (const segment of report.segments) {
+    const elev = segment.elevA === segment.elevB
+      ? `高程${segment.elevA}`
+      : `高程${segment.elevA}→${segment.elevB}`;
+    if (!segment.door) {
+      lines.push(`  ${segment.a} — ${segment.b}  已挖通 · 无门（${elev}）`);
+      continue;
+    }
+    const open = segment.door === "open";
+    const order = segment.operator
+      ? `{"type":"ToggleDoor","unit":"${segment.operator}","edge":"${segment.edge}"}`
+      : `需先让一个单位下到 ${segment.a} 或 ${segment.b}`;
+    lines.push(`  ${segment.a} — ${segment.b}  隔断门【${open ? "开着" : "关着"}】`
+      + `（${elev}）→ ${open ? "现在人、烟、水都过得去；关上即挡烟挡水" : "现在人、烟、水都过不去"}`
+      + `${segment.toggledThisTurn ? " ｜ 本回合已开合过，下回合才能再动" : ` ｜ 免费开合：${order}`}`);
+  }
+  lines.push(`  （共 ${report.segments.length} 段；隔断门 ${report.doors.length} 道：开 ${report.doorsOpen} / 关 ${report.doorsClosed}。`
+    + "地图上段画在格与格之间：- | / \\ 已挖通、D 门开着、# 门关着、空白 未挖通）");
+  lines.push("空气分区（关上一道门就把网切成几间屋子；通气孔按分区算）：");
+  if (!report.zones.length) lines.push("  （地下还没有地道格）");
+  for (const zone of report.zones) {
+    lines.push(`  区${zone.index}：${zone.cells.join(" ")}（${zone.size} 格，高程 ${zone.elevLow}~${zone.elevHigh}）`
+      + ` ｜ 通气孔 ${zone.vents}/需 ${zone.ventNeed}${zone.vents >= zone.ventNeed ? "（够——敌工兵的烟对本区用不上）" : `（还差 ${zone.ventNeed - zone.vents}，敌可对本区放烟）`}`
+      + `${zone.ventsKnown ? `（其中 ${zone.ventsKnown} 处已被敌搜出——照样通风，但勋记不认）` : ""}`
+      + `${zone.ventsSmoked ? `（另有 ${zone.ventsSmoked} 处被灌了烟，已失效）` : ""}`
+      + ` ｜ 通风：${zone.hasAir ? "有" : "无（区内每人每回合憋闷 +1）"}`
+      + ` ｜ 出口 ${zone.entrances.length ? zone.entrances.join(" ") : "无（一个未封的口都没有）"}`
+      + `${zone.civs ? ` ｜ 群众 ${zone.civs} 批` : ""}${zone.grain ? ` ｜ 洞存粮 ${zone.grain} 担` : ""}`);
   }
   return lines;
 }
@@ -324,17 +474,55 @@ export function CivLines(state, view) {
   if (!CivGuidanceOn(state)) {
     lines.push("  （本幕地窖互不相连：群众进了窖就只能待着，没有「带路」这回事——恐慌也就无从谈起）");
   }
+  // 地面群众按村给真实格号，并点名哪些村格上现在踩着看得见的敌军（R5 P1：光写村名判断不了贴不贴身）。
+  const enemyAt = {};
+  for (const foe of derived.visibleEnemies || []) {
+    (enemyAt[foe.pos] = enemyAt[foe.pos] || []).push(foe.name || foe.type);
+  }
+  // 逐批的地面格号优先读 state.civs[id].hex（引擎新加的字段；缺席时退回本村格列表，不编造）
+  const CivHex = (civ) => {
+    const raw = (state.civs || {})[civ.id];
+    return raw && typeof raw.hex === "string" && raw.hex ? raw.hex : null;
+  };
+  const villageHexText = {};
+  for (const id of SortedKeys(state.map.villages)) {
+    const village = state.map.villages[id];
+    const keys = village.hexKeys || [];
+    villageHexText[id] = keys.join(" ");
+    const onGround = derived.civs.filter((civ) => civ.loc === "village" && civ.at === id);
+    if (!onGround.length) continue;
+    const spread = {};
+    for (const civ of onGround) {
+      const key = CivHex(civ);
+      if (key) spread[key] = (spread[key] || 0) + 1;
+    }
+    const placed = Object.values(spread).reduce((sum, n) => sum + n, 0);
+    const where = placed
+      ? Object.keys(spread).sort().map((key) => `${key}×${spread[key]} 批`).join("、")
+        + (placed < onGround.length ? `；另 ${onGround.length - placed} 批在村里（未落到具体格）` : "")
+      : `村格 ${keys.join(" / ")}（本批次未记具体格）`;
+    const hot = keys.filter((key) => enemyAt[key]);
+    lines.push(`  ${village.name} 地面群众 ${onGround.length} 批＠${where}`
+      + (hot.length
+        ? ` ｜ ⚠ 敌已在村格 ${hot.map((key) => `${key}（${enemyAt[key].join("、")}）`).join(" ")}`
+          + (Object.keys(spread).some((key) => enemyAt[key]) ? "——有群众正贴着敌人" : "")
+        : " ｜ 村格上暂无可见敌军"));
+  }
   for (const civ of derived.civs) {
     if (civ.loc === "lost") {
       lines.push(`  ${civ.id} ${civ.kindName}：已${civ.fate === "dead" ? "罹难" : "被抓"}（入代价簿）`);
       continue;
     }
+    const hex = CivHex(civ);
     const where = civ.loc === "village"
-      ? `地面 · ${(state.map.villages[civ.at] || {}).name || civ.at}`
+      ? `地面 ${hex || `· ${(state.map.villages[civ.at] || {}).name || civ.at}（村格 ${villageHexText[civ.at] || "?"}）`}`
+        + (hex ? ` · ${(state.map.villages[civ.at] || {}).name || civ.at}` : "")
       : `地道 ${civ.at}`;
     const escort = civ.loc === "cell" ? (civ.escorted ? "有人带路" : "无人带路") : "—";
+    const danger = civ.loc === "village" && hex && enemyAt[hex]
+      ? ` ｜ ⚠ 同格有敌：${enemyAt[hex].join("、")}` : "";
     lines.push(`  ${civ.id} ${civ.kindName}（速度 ${civ.speed} 格/回合，占 ${civ.slots} 铺）＠${where}`
-      + ` ｜ ${escort} ｜ 恐慌 ${civ.panic}/${civ.panicMax}`);
+      + ` ｜ ${escort} ｜ 恐慌 ${civ.panic}/${civ.panicMax}${danger}`);
   }
   return lines;
 }
@@ -439,6 +627,38 @@ function MedalFact(state, key, value, earned) {
       return `伤员保全 ${WoundedTotal(state)} 批（需 ≥${value}）`;
     case "trunkIntact": case "trunk":
       return `枣林庄—石槽村地道主干：${earned ? "贯通且无被毁段" : "未贯通，或有段被毁"}`;
+    // —— R5 P1：以下几条以前认不出，只能退回复述条件（「○ 换气——通气孔不少于 2 处：通气孔不少于 2 处」）——
+    case "civSafeAtLeast":
+      return `群众保全 ${CivSafeCount(state)}/${CivTotal(state)} 批（需 ≥${value}）`;
+    case "civSafeRatioAtLeast":
+      return `群众保全率 ${(CivTotal(state) ? (CivSafeCount(state) / CivTotal(state)) * 100 : 0).toFixed(0)}%`
+        + `（需 ≥${(value * 100).toFixed(0)}%）`;
+    case "civLostAtMost":
+      return `群众损失 ${CivTotal(state) - CivSafeCount(state)} 批（需 ≤${value}）`;
+    case "largestNetworkAtLeast":
+      return `最大地道连通块 ${LargestNetworkSize(state)} 格（需 ≥${value}）`;
+    case "villagesLinkedAtLeast":
+      return `同一片地道网串起 ${VillagesLinked(state)} 个村（需 ≥${value}）`;
+    case "liveEntrancesAtLeast":
+      return `未被搜出的地道口 ${LiveEntranceCount(state)} 个（需 ≥${value}）`;
+    case "disguisedAtLeast":
+      return `伪装口 ${DisguisedEntranceCount(state)} 个（需 ≥${value}）`;
+    case "ventsAtLeast":
+      return `通气孔 ${VentCount(state)} 处（需 ≥${value}）`;
+    case "fightpostsUsedAtLeast": {
+      const used = (state.score && state.score.fightpostsUsed) || [];
+      return `开过火的不同射击孔 ${used.length} 处（需 ≥${value}）${used.length ? `：${used.join(" ")}` : ""}`;
+    }
+    case "forcedOutAtMost":
+      return `被烟/水/憋闷逼出地面的群众 ${(state.score && state.score.civForcedOut) || 0} 批（需 ≤${value}）`;
+    case "combatUnitsAtLeast": {
+      const alive = SortedKeys(state.units)
+        .filter((id) => state.units[id].side === "ally" && state.units[id].hp > 0
+          && (unitDefinitions[state.units[id].type] || {}).atk > 0).length;
+      return `战斗单位 ${alive} 支（需 ≥${value}）`;
+    }
+    case "surviveTurn":
+      return `打到 T${state.meta.turn}（需撑到 T${value}）`;
     default:
       return null;
   }
@@ -656,6 +876,24 @@ export function ActionHints(state, unitId, legalActions) {
       hints.push(`Disguise 不可用：这个口已经做成了「${(disguiseDefinitions[entrance.disguise] || {}).name}」。`);
     } else if (digPower <= 0) hints.push(`Disguise 不可用：${def.name}挖掘力为 0，做不了这活。`);
   }
+  // 组织（组织度的作用见 ActionNotes；这里只说为什么按不了）
+  if (!have.has("Organize") && ActionUnlocked(state, "Organize")) {
+    if (!village) hints.push("Organize 不可用：组织要在村庄格上做（本单位不在任何村格）。");
+    else if (village.organize >= (CFG.organizeMax ?? 2)) {
+      hints.push(`Organize 不可用：${village.name}组织度已到上限 ${CFG.organizeMax ?? 2}`
+        + "（1 级=平静期自动藏粮+哨网；2 级=村 1 格内工地每回合免费 +1 进度）。");
+    }
+  }
+  // 隔断门（第四幕起）：门是免费动作，但要人在门边的地道里，且每门每回合只动一次
+  if (!have.has("ToggleDoor") && ActionUnlocked(state, "ToggleDoor")) {
+    const doors = TunnelLinkReport(state).doors;
+    if (!doors.length) hints.push("ToggleDoor 不可用：全网一道隔断门都还没装（先在段上 DigDoor，1 进度）。");
+    else if (unit.layer !== "under") hints.push("ToggleDoor 不可用：门要在地道里开合（先 UseEntrance 下地，走到门边那一格）。");
+    else if (!doors.some((segment) => EdgeEnds(segment.edge).includes(unit.pos))) {
+      hints.push(`ToggleDoor 不可用：${unit.pos} 不邻接任何隔断门——现有的门在 `
+        + `${doors.map((segment) => segment.edge).join("、")}。`);
+    } else hints.push("ToggleDoor 不可用：邻接的门本回合已经开合过了（每门每回合只动一次）。");
+  }
   // 本幕未解锁的动作：明说「不是你不会，是这一幕还没到」
   for (const type of ["Dig", "DigEntrance", "DigFacility", "DigDoor", "Ambush", "Attack", "Disguise"]) {
     if (!ActionUnlocked(state, type)) {
@@ -663,6 +901,53 @@ export function ActionHints(state, unitId, legalActions) {
     }
   }
   return hints;
+}
+
+/**
+ * 「这些动作到底有什么用」速查（R5 P0-3：组织度以前全作没有一处解释）。
+ * 只讲已解锁、且与该单位当前处境有关的那几条，避免变成第二份说明书。
+ */
+export function ActionNotes(state, unitId, legalActions) {
+  const unit = state.units[unitId];
+  if (!unit || unit.side !== "ally" || unit.hp <= 0) return [];
+  const have = new Set((legalActions || []).map((action) => action.type));
+  const notes = [];
+  const hex = state.map.hexes[unit.pos];
+  const village = hex && hex.villageId ? state.map.villages[hex.villageId] : null;
+
+  if (village && ActionUnlocked(state, "Organize")) {
+    const max = CFG.organizeMax ?? 2;
+    const need = CFG.organizeNeed ?? 2;
+    const freeRadius = CFG.organizeFreeDigRadius ?? 1;
+    const stopRange = CFG.organizeStopEnemyRange ?? 2;
+    const auto = CFG.autoHidePerTurn ?? 1;
+    notes.push(`Organize（组织）＝把村子发动起来：${village.name}现在 ${village.organize}/${max} 级`
+      + `（进度 ${village.organizeProgress || 0}/${need}，每按一次 +1 进度，占掉整个主动作）。`);
+    notes.push(`  · 到 1 级：平静期本村每回合自动藏 ${auto} 担粮进储粮洞（须村下有连通的储粮洞），`
+      + `并且村 2 格内的敌纵队意图常显（哨网——不用派人去看）。`
+      + `${village.organize >= 1 ? "【本村已生效】" : "【本村尚未达到】"}`);
+    notes.push(`  · 到 2 级：村 ${freeRadius} 格内每回合免费给一个工地 +1 进度（群众来帮工），`
+      + `敌进到村 ${stopRange} 格内即停。${village.organize >= 2 ? "【本村已生效】" : "【本村尚未达到】"}`);
+    if (village.organize >= 1 && !village.hexKeys.some((key) => StorageCellsUnder(state, key).length)) {
+      notes.push("  · 注意：本村地下还没有连通的储粮洞，1 级的「自动藏粮」现在一担也藏不进去。");
+    }
+  }
+  if (have.has("ToggleDoor")) {
+    const report = TunnelLinkReport(state);
+    const mine = report.doors.filter((segment) => EdgeEnds(segment.edge).includes(unit.pos));
+    for (const segment of mine) {
+      notes.push(`ToggleDoor ${segment.edge}：这道门现在【${segment.door === "open" ? "开着" : "关着"}】，`
+        + `按下去会变成【${segment.door === "open" ? "关着" : "开着"}】。`
+        + "关上＝挡烟、挡水、把气区切成两半（两边各自要够通气孔）；开着＝人和烟水都过得去。");
+    }
+  }
+  const vents = VentSummary(state);
+  if (FacilityUnlocked(state, "vent") && vents.zones.length) {
+    notes.push(`通气孔：全网 ${vents.have} 个／按分区合计需 ${vents.need} 个`
+      + `（每个气区要 ≥ 该区地道格数 ÷ ${vents.perCells}，凑不够敌工兵就能对那个区放烟）。`
+      + "扩网会把比例拉低——多挖两格，就得多修一个孔。");
+  }
+  return notes;
 }
 
 /** 本格是否已经有别的我方单位在设伏（同格伏点唯一）。 */
@@ -734,28 +1019,55 @@ export function RenderAsciiMap(state, options = {}) {
     lines.push(rLine);
   }
 
+  // 段（格与格之间通没通）画在格间：同行的段占格后的间隔位，上下与斜向的段占「段行」。
+  // 只有真的挖通过段才插段行——第一幕三个窖互不相连，插了也全是空白。
+  const showLinks = layer !== "surface" && Object.keys(state.tunnels.edges).length > 0;
+  const Parity = (x) => ((x % 2) + 2) % 2;
+
   for (let y = minY; y <= maxY; y += 1) {
-    const surfaceRow = [];
-    const underRow = [];
+    let surfaceRow = "";
+    let underRow = "";
     for (let x = minX; x <= maxX; x += 1) {
       const key = OffsetToKey(x, y);
-      surfaceRow.push(SurfaceCell(state, key, marks) + gutter);
-      underRow.push(UnderCell(state, key, marks) + gutter);
+      surfaceRow += SurfaceCell(state, key, marks) + gutter;
+      underRow += UnderCell(state, key, marks);
+      // 同一行的右邻永远是六角邻居（q 奇偶皆然），所以间隔位天然就是那条段的位置
+      underRow += x < maxX ? LinkChar(state, key, OffsetToKey(x + 1, y), "-") : gutter;
     }
     const label = Pad(`y${String(y).padStart(2)}`, labelWidth);
-    if (layer === "surface") lines.push(label + surfaceRow.join(""));
-    else if (layer === "under") lines.push(label + underRow.join(""));
-    else lines.push(Pad(label + surfaceRow.join(""), blockWidth + 2) + label + underRow.join(""));
+    if (layer === "surface") lines.push(label + surfaceRow);
+    else if (layer === "under") lines.push(label + underRow);
+    else lines.push(Pad(label + surfaceRow, blockWidth + 2) + label + underRow);
+
+    if (!showLinks || y >= maxY) continue;
+    let underLink = "";
+    for (let x = minX; x <= maxX; x += 1) {
+      const key = OffsetToKey(x, y);
+      underLink += `${LinkChar(state, key, OffsetToKey(x, y + 1), "|")}  `;   // 正上下的段（对齐设施位）
+      if (x >= maxX) { underLink += gutter; continue; }
+      // 跨列的第二条段：列号为偶数时是 ╱（左下↔右上），为奇数时是 ╲（左上↔右下）
+      const slash = Parity(x) === 0;
+      const from = slash ? OffsetToKey(x, y + 1) : OffsetToKey(x, y);
+      const to = slash ? OffsetToKey(x + 1, y) : OffsetToKey(x + 1, y + 1);
+      underLink += LinkChar(state, from, to, slash ? "/" : "\\");
+    }
+    const blank = Pad("", labelWidth);
+    if (layer === "under") lines.push(blank + underLink);
+    else lines.push(Pad("", blockWidth + 2) + blank + underLink);
   }
 
   lines.push("");
   for (const help of AxialHelpLines(state)) lines.push(help);
   lines.push("图例 地上 第1位 地形：V村 F农田 W树林 G坟地 R河 B桥 =路 x断路 .开阔");
-  lines.push("     地上 第2位 开口：0-9 该地道口当前暴露豆（攒到阈值就被搜出） ! 已被搜出 # 已封堵 o通风口 *通风口被烟 ,挖掘痕迹 _敌已搜过");
+  lines.push("     地上 第2位 开口：0-9 该地道口当前暴露豆（攒到阈值就被搜出） ! 已被搜出 # 已封堵 o通气孔 *通气孔被烟 ,挖掘痕迹 _敌已搜过");
   lines.push("     地上 第3位 单位：M民兵 G游击 R联络 +我方多单位｜J日军 P伪军 B工兵 S特务 ?身份不明 &我敌同格｜> < ^ v 敌意图箭头");
   lines.push("图例 地下 第1位 设施：o普通地道格 S储粮洞 H藏人室 O通气孔 X射击孔 T翻板 ·尚未挖通");
   lines.push("     地下 第2位 内容：g存粮 o老弱 y青壮 w伤员 !群众恐慌将满 *烟 ~水｜第3位 单位：M民兵 G游击 R联络 +多单位");
-  lines.push("注：暴露豆与单位分列两位，站在地道口上也看得见自己的豆；详细数字见下方「地道口一览」与「群众一览」。");
+  if (showLinks) {
+    lines.push("     地下 格与格之间＝段：- 横向 | 纵向 / \\ 斜向（都表示已挖通，人/烟/水过得去）");
+    lines.push("                        D 这段上有隔断门·现在开着（通） ｜ # 隔断门·现在关着（人、烟、水都不通）｜ 空白＝未挖通");
+  }
+  lines.push("注：暴露豆与单位分列两位，站在地道口上也看得见自己的豆；详细数字见下方「地道口一览」「地道段一览」与「群众一览」。");
   return lines.join("\n");
 }
 

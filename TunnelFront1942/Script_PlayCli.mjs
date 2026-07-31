@@ -7,7 +7,7 @@
 //   act  --save /tmp/g.json --json '{"type":"Move",...}'
 //   end  --save /tmp/g.json                          敌阶段 + 结算全播报
 //   run  --level A1 --seed 3 --bot Skilled           bot 整局 → 总结 JSON
-//   fixture --level A1 --seed 3 --turns 6 --out Data_FixtureState.mjs   （生成渲染夹具）
+//   fixture --level A1 --seed 3 --turns 6 --write [--out 路径]           （生成渲染夹具，会覆写文件）
 // 仅本文件允许触碰 fs/process；引擎模块保持纯逻辑。
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -18,11 +18,29 @@ import { LegalActions, PerformAction } from "./Script_Actions.mjs";
 import { EndTurn } from "./Script_Turn.mjs";
 import {
   RenderAsciiMap, GrainLines, OpeningLines, LandmarkLines, IntentLines, ObjectiveLine,
-  UnitLines, MedalLines, TelegraphText, ActionKind, actionKindNames, ActionHints,
-  CivLines, ActCardLines, ObjectiveProgressLines, DebriefLines,
+  UnitLines, MedalLines, TelegraphText, ActionKind, actionKindNames, ActionHints, ActionNotes,
+  CivLines, ActCardLines, ObjectiveProgressLines, DebriefLines, TunnelLinkLines,
+  TunnelLinkReport, VentSummary,
 } from "./Script_AsciiMap.mjs";
 import { RunBotGame, botNames } from "./Script_Bots.mjs";
+import { campaignOrder, levelDefinitions } from "./Data_Levels.mjs";
 import { TEXT, CFG } from "./Data_Rules.mjs";
+
+/**
+ * 关卡 ID 校验：以前 `--level L1` 会静默回落到 A1（别名表里还留着 L1→A1、L2→A5），
+ * 于是照着旧 README 打的人一路以为自己在打 L1。现在未知/停用的 ID 一律报错退出。
+ */
+function ResolveLevelId(raw) {
+  const id = raw === undefined || raw === true ? "A1" : String(raw);
+  if (campaignOrder.includes(id) && levelDefinitions[id]) return id;
+  const names = campaignOrder.map((key) => `${key}《${levelDefinitions[key].name}》`).join("、");
+  if (id === "L1" || id === "L2") {
+    Die(`关卡 ID「${id}」已停用：本作是五幕战役 ${names}。`
+      + `（旧 L1 相当于 ${id === "L1" ? "A1《单口洞》" : "A5《反扫荡》"}，但请直接写新 ID，别再用别名。）`);
+  }
+  Die(`未知关卡「${id}」。可用关卡：${names}`);
+  return id;
+}
 
 function ParseArgs(argv) {
   const args = { _: [] };
@@ -71,10 +89,15 @@ function PrintStatus(state, view) {
     + (wave.status !== "quiet" ? ` ｜ 敌行动力池：${wave.pool}` : "")
     + (wave.smokeCharges ? ` ｜ 敌烟具：${wave.smokeCharges}` : "")
     + (wave.floodCharges ? ` ｜ 敌水车：${wave.floodCharges}` : ""));
+  // 通气孔「需要几个」以前一处都没写（只显示「通气孔 3」），玩家无从知道自己扩网把比例扩坏了。
+  const vents = VentSummary(state);
+  const links = TunnelLinkReport(state);
   console.log(`弹药 ${derived.resources.ammo}/${CFG.ammoMax}`
-    + ` ｜ 地道网 ${derived.network.cells} 格（最大连通块 ${derived.network.largest}，串起 ${derived.network.villagesLinked} 村）`
+    + ` ｜ 地道网 ${derived.network.cells} 格 / ${links.segments.length} 段（最大连通块 ${derived.network.largest}，串起 ${derived.network.villagesLinked} 村）`
     + ` ｜ 未被搜出的口 ${derived.network.liveEntrances}（伪装 ${derived.network.disguised}）`
-    + ` ｜ 通气孔 ${derived.network.vents}`);
+    + ` ｜ 通气孔 ${vents.have}/需 ${vents.need}`
+    + (vents.unknown !== vents.have ? `（未被搜出 ${vents.unknown} 处，勋记按此计）` : "")
+    + (links.doors.length ? ` ｜ 隔断门 ${links.doors.length} 道（开 ${links.doorsOpen} / 关 ${links.doorsClosed}）` : " ｜ 隔断门 0 道"));
   for (const line of GrainLines(state)) console.log(line);
   for (const line of CivLines(state, derived)) console.log(line);
   const ledgerParts = Object.entries(derived.ledger).filter(([, v]) => v > 0)
@@ -133,6 +156,8 @@ function ShowAll(state, layer) {
   for (const line of LandmarkLines(state)) console.log(line);
   console.log("地道口一览（暴露豆全程明牌）：");
   for (const line of OpeningLines(state, view)) console.log(line);
+  console.log("地道段一览（哪两格通着、哪道门开着——「地道未挖通或门已关闭」的答案都在这里）：");
+  for (const line of TunnelLinkLines(state)) console.log(line);
   const intents = IntentLines(state, view);
   console.log("敌纵队意图（只列我方看得见的）：");
   if (intents.length) for (const line of intents) console.log(line);
@@ -151,7 +176,7 @@ const rulesCard = [
 ];
 
 function CmdNew(args) {
-  const level = args.level || "A1";
+  const level = ResolveLevelId(args.level);
   const seed = Number(args.seed ?? 3);
   const state = CreateGame(level, seed);
   console.log(`—— 开局：${state.meta.level} seed=${seed} ——`);
@@ -170,6 +195,25 @@ function CmdShow(args) {
   ShowAll(state, args.layer);
 }
 
+/** 一条动作打印成「可以直接抄进 act --json 的那一行」，必要时右边补一句人话。 */
+function ActionLine(state, action, links) {
+  const json = JSON.stringify(action);
+  if (action.type === "Move") {
+    const dest = action.path[action.path.length - 1];
+    return `      ${json}   ← 到 ${dest}，${action.path.length} 步`;
+  }
+  if (action.type === "ToggleDoor") {
+    const segment = links.segments.find((entry) => entry.edge === action.edge);
+    const now = segment && segment.door === "open" ? "开着" : "关着";
+    const next = now === "开着" ? "关上" : "打开";
+    return `      ${json}   ← 这道门现在【${now}】，按下去就是【${next}】`
+      + (next === "关上" ? "（挡烟、挡水、把气区切成两半）" : "（人和烟水都过得去）");
+  }
+  if (action.type === "UseEntrance" && action.dive) return `      ${json}   ← 「打了就钻」：该口暴露豆 +2`;
+  if (action.type === "UseEntrance") return `      ${json}   ← 上/下地道口，花 1 MP`;
+  return `      ${json}`;
+}
+
 /** 动作按「单位 → 分类」分组打印：一次 143 条无从下手的问题在这里解决。 */
 function CmdLegal(args) {
   const state = LoadSave(args.save);
@@ -180,6 +224,7 @@ function CmdLegal(args) {
     console.log(`（共 ${actions.length} 个合法动作${unitId ? `，单位 ${unitId}` : ""}）`);
     return;
   }
+  const links = TunnelLinkReport(state);
   const groups = new Map();
   for (const action of actions) {
     const owner = action.unit || "（全局）";
@@ -187,6 +232,7 @@ function CmdLegal(args) {
     groups.get(owner).push(action);
   }
   console.log("合法动作（每单位每回合只能用 1 个「主动作」；移动只花 MP，不占主动作）");
+  console.log("下面每一行的 JSON 都是完整的，可以整段抄进 act --json —— Move 也带全 path。");
   console.log("");
   for (const [owner, list] of groups) {
     const unit = state.units[owner];
@@ -199,18 +245,26 @@ function CmdLegal(args) {
       if (!subset.length) continue;
       console.log(`  · ${actionKindNames[kind]}`);
       if (kind === "move") {
-        // 移动条目太多：只报可达终点，完整 JSON 用 --json
-        const dests = subset.filter((action) => action.type === "Move")
-          .map((action) => action.path[action.path.length - 1]);
-        if (dests.length) console.log(`      Move 可达 ${dests.length} 格：${dests.join(" ")}`);
+        // R5 P0-1：Move 以前只报终点，act 却要求精确 path——两边对不上，地下层就只能靠试错。
+        // 现在与 GuideCivs 一致，逐条吐完整路径。
+        const moves = subset.filter((action) => action.type === "Move");
+        if (moves.length) {
+          console.log(`      （Move 共 ${moves.length} 条，每条都写全了 path，直接复制即可）`);
+          for (const action of moves) console.log(ActionLine(state, action, links));
+        }
         for (const action of subset.filter((action) => action.type !== "Move")) {
-          console.log(`      ${JSON.stringify(action)}`);
+          console.log(ActionLine(state, action, links));
         }
       } else {
-        for (const action of subset) console.log(`      ${JSON.stringify(action)}`);
+        for (const action of subset) console.log(ActionLine(state, action, links));
       }
     }
     if (unitId) {
+      const notes = ActionNotes(state, unitId, list);
+      if (notes.length) {
+        console.log("  · 这些动作到底有什么用（速查）：");
+        for (const note of notes) console.log(`      ${note}`);
+      }
       const hints = ActionHints(state, unitId, list);
       if (hints.length) {
         console.log("  · 为什么某些动作不在上面（按当前状态给出的原因，判定仍以本列表为准）：");
@@ -221,7 +275,7 @@ function CmdLegal(args) {
   }
   console.log(`（共 ${actions.length} 条${unitId ? `，单位 ${unitId}` : "；建议用 --unit u1 逐个单位看，或 --json 输出原始 JSON"}）`);
   if (!unitId) {
-    console.log("用法提示：legal --save <存档> --unit u1     只看 u1 的动作（含不可用原因）");
+    console.log("用法提示：legal --save <存档> --unit u1     只看 u1 的动作（含用途速查与不可用原因）");
     console.log("          legal --save <存档> --unit u1 --json  输出可直接喂给 act --json 的原始 JSON");
   }
 }
@@ -233,13 +287,24 @@ function CmdAct(args) {
   try { action = JSON.parse(args.json); } catch (error) { Die(`动作 JSON 解析失败：${error.message}`); }
   const outcome = PerformAction(state, action);
   if (outcome.illegal) {
-    console.log(`[非法动作] ${outcome.illegal}`);
+    console.log(`[非法动作] ${outcome.illegal}`
+      + (outcome.illegalAction && outcome.illegalAction !== action.type ? `（被拒的是 ${outcome.illegalAction}）` : ""));
     if (action.unit && state.units[action.unit]) {
-      const all = ActionHints(state, action.unit, LegalActions(state, action.unit));
-      const focused = all.filter((hint) => hint.startsWith(`${action.type} `));
-      const shown = focused.length ? focused : all.slice(0, 2);
-      for (const hint of shown) console.log(`  提示：${hint}`);
-      console.log(`  想知道 ${action.unit} 现在到底能做什么：legal --save <存档> --unit ${action.unit}`);
+      // 引擎给的补救提示优先（它知道到底是哪一条判定拦下的）；缺席时自己按动作类型筛。
+      // 以前没有对口提示就退回 all.slice(0,2)，于是 DigEntrance 失败还附赠
+      // 「Ambush 不可用」「Attack 不可用」，纯属噪音。
+      let hints = Array.isArray(outcome.hints) ? outcome.hints.filter(Boolean) : [];
+      if (!hints.length) {
+        const all = ActionHints(state, action.unit, LegalActions(state, action.unit));
+        const family = { Dig: "挖掘类", DigEntrance: "挖掘类", DigFacility: "挖掘类" };
+        hints = all.filter((hint) => hint.startsWith(`${action.type} `)
+          || (family[action.type] && hint.startsWith(family[action.type])));
+      }
+      for (const hint of hints) console.log(`  提示：${hint}`);
+      if (!hints.length) console.log("  提示：本次失败的原因就是上面那一行；本单位的其它动作不受影响。");
+      if (!hints.some((hint) => hint.includes("legal"))) {
+        console.log(`  想知道 ${action.unit} 现在到底能做什么：legal --save <存档> --unit ${action.unit}`);
+      }
     }
     process.exit(2);
   }
@@ -285,7 +350,7 @@ function Summary(state, steps) {
 }
 
 function CmdRun(args) {
-  const level = args.level || "A1";
+  const level = ResolveLevelId(args.level);
   const seed = Number(args.seed ?? 3);
   const botName = args.bot || "Skilled";
   if (!botNames.includes(botName)) Die(`未知 bot：${botName}（可选：${botNames.join("/")}）`);
@@ -307,11 +372,24 @@ function CmdRun(args) {
   console.log(JSON.stringify(Summary(state, steps), null, 1));
 }
 
+/**
+ * 渲染夹具生成器。**会覆写仓库里的 Data_FixtureState.mjs**，所以默认只做空跑并把要写的目标打出来，
+ * 真要落盘必须显式加 --write（R5 P1：以前它一声不吭地改仓库文件，还不在用法行与 README 里）。
+ */
 function CmdFixture(args) {
-  const level = args.level || "A1";
+  const level = ResolveLevelId(args.level);
   const seed = Number(args.seed ?? 3);
   const turns = Number(args.turns ?? 6);
-  const out = args.out || new URL("./Data_FixtureState.mjs", import.meta.url).pathname;
+  const out = typeof args.out === "string" ? args.out : new URL("./Data_FixtureState.mjs", import.meta.url).pathname;
+  if (args.write !== true && args.write !== "true") {
+    console.log("[夹具·空跑] 本命令会**覆写**下面这个仓库文件，因此默认不写盘：");
+    console.log(`  目标文件：${out}`);
+    console.log(`  将写入：${level} seed=${seed}，${args.bot || "Skilled"} bot 跑至 T${turns} 的状态`);
+    console.log("  确认无误再加 --write 真正落盘：");
+    console.log(`    node TunnelFront1942/Script_PlayCli.mjs fixture --level ${level} --seed ${seed} --turns ${turns} --write`);
+    console.log("  （想写到别处就再加 --out <路径>，仓库文件即可保持不动）");
+    return;
+  }
   const { state } = RunBotGame({ level, seed, bot: args.bot || "Skilled", untilTurn: turns });
   const body = [
     "// 渲染开发用固定状态夹具（与 AGENTS.md §三 状态契约同构）。",
@@ -331,13 +409,17 @@ const args = ParseArgs(process.argv.slice(2));
 const command = args._[0];
 if (!command || !commands[command]) {
   console.log("用法：node TunnelFront1942/Script_PlayCli.mjs <new|show|legal|act|end|run|fixture> [--参数 值]");
+  console.log(`  关卡（--level）只有五幕：${campaignOrder.map((id) => `${id}《${levelDefinitions[id].name}》`).join("、")}`);
   console.log("  new  --level A1 --seed 3 --save /tmp/g.json          开局简报 + 规则要点 + 战场报表");
-  console.log("  show --save /tmp/g.json [--layer surface|under|both] 战场报表（地图/地道口/存粮分账/敌意图）");
-  console.log("  legal --save /tmp/g.json --unit u1                   某单位合法动作（按主动作/移动/免费分组 + 不可用原因）");
+  console.log("  show --save /tmp/g.json [--layer surface|under|both] 战场报表（地图/地道口/地道段与门/存粮分账/敌意图）");
+  console.log("  legal --save /tmp/g.json --unit u1                   某单位合法动作（分组 + 用途速查 + 不可用原因；Move 带全 path）");
   console.log("  legal --save /tmp/g.json --unit u1 --json            原始 JSON，可直接喂给 act");
-  console.log('  act  --save /tmp/g.json --json \'{"type":"Move","unit":"u1","path":["4,1"]}\'');
+  console.log('  act  --save /tmp/g.json --json \'{"type":"Move","unit":"u1","path":["4,-1","4,0"]}\'');
   console.log("  end  --save /tmp/g.json                              敌军阶段 + 结算全播报");
   console.log("  run  --level A1 --seed 3 --bot Skilled [--verbose]   bot 整局 → 总结 JSON");
+  console.log("  fixture --level A1 --seed 3 --turns 6 [--out 路径] --write");
+  console.log("                                                       生成渲染夹具。**会覆写 Data_FixtureState.mjs**，");
+  console.log("                                                       不加 --write 只空跑并打印将要写入的目标。");
   console.log("");
   for (const line of rulesCard) console.log(line);
   process.exit(command ? 1 : 0);

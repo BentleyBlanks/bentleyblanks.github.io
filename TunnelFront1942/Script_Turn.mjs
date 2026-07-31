@@ -14,7 +14,7 @@ import {
   EntranceThreshold, VentThreshold, EnemyNearVillage, StorageCellsUnder, ElevOf,
   IsSurfacePassable, LiveCivs, CivsInCell, CivsAtVillage, CivSafeCount, CivTotal, CivSafeRatio,
   CivLostCount, LoseCiv, CivGuidanceOn, LargestNetworkSize, VillagesLinked, LiveEntranceCount,
-  DisguisedEntranceCount, VentCount, VillageIdOfHex,
+  DisguisedEntranceCount, VentCount, VillageIdOfHex, PlaceCivOnHex, IsStunned, StorageCapOf,
 } from "./Script_State.mjs";
 import { ExpireSightings, UpdateEnemyMemory, ExposeEntranceUse, CanAllySeeHex, RecordSighting } from "./Script_Visibility.mjs";
 import { RunEnemyPhase } from "./Script_EnemyAi.mjs";
@@ -283,14 +283,30 @@ function StepForcedOut(state, events) {
       LoseCiv(state, civ, "captured");
       PushEvent(state, events, { kind: "ledger", text: `${TEXT.civText.caught}：群众（${KindName(civ)}）1 批`, hex: out.key, visible: true });
     } else {
+      // R5 P0-2：冲出地面的人**落在一个具体的格上**（带格号），不再一句「散回村中」把地上地下抹平。
+      // 口外没有敌人时，他们四散躲进村里离敌最远的那一格——但人已经在地面上了：
+      // 下一个敌军阶段敌纵队踩到哪一格，那一格的人就被拉走。
       const villageId = NearestVillageId(state, out.key);
-      civ.loc = "village";
-      civ.at = villageId;
-      civ.panic = 0;
-      PushEvent(state, events, { kind: "forcedOut", text: `${TEXT.civText.panicOut}：群众（${KindName(civ)}）1 批散回村中`, hex: out.key, visible: true });
+      const landing = ScatterHex(state, villageId, out.key);
+      PlaceCivOnHex(state, civ, villageId, landing);
+      PushEvent(state, events, { kind: "forcedOut",
+        text: `${TEXT.civText.panicOut}：群众（${KindName(civ)}）1 批钻出 ${out.key}，躲进 ${landing} 的房子里`,
+        hex: out.key, visible: true });
     }
   }
   RecordExposedSightings(state);
+}
+
+/** 钻出地面后往哪儿躲：本村里**离敌最远**的那一格（并列取格键序）；没有村格就还站在原地。 */
+function ScatterHex(state, villageId, fromKey) {
+  const village = villageId ? state.map.villages[villageId] : null;
+  if (!village || !village.hexKeys.length) return fromKey;
+  const foes = EnemyUnits(state);
+  const Score = (key) => (foes.length
+    ? Math.min(...foes.map((unit) => HexDistanceKeys(unit.pos, key)))
+    : 99);
+  return village.hexKeys.slice()
+    .sort((a, b) => (Score(b) - Score(a)) || (a < b ? -1 : 1))[0];
 }
 
 function NearestVillageId(state, key) {
@@ -305,8 +321,32 @@ function NearestVillageId(state, key) {
   return best;
 }
 
-/** ④ 搜索暴露判定：暴露豆达到阈值 → 入口/通风口转为已知（永久）。 */
+/**
+ * ④ 搜索暴露判定。先结算「敌就踩在口上」的持续加压（R5 P0-1）：
+ * 翻检是断续的（要选中这一格才 +搜索力），脚却是一直踩着的——
+ * 敌纵队占住哪一格，那一格未被搜出的口与通气孔每回合 +2。
+ * 这一条同时是「烟/水/攻入在正常游玩里根本不发生」的根因修复：豆子终于攒得上去。
+ */
+function StepOccupiedPressure(state, events) {
+  if (state.wave.status === "quiet" || state.wave.status === "done") return;
+  const occupied = new Set(EnemyUnits(state).map((unit) => unit.pos));
+  for (const key of [...occupied].sort()) {
+    let touched = false;
+    const entrance = state.tunnels.entrances[key];
+    if (entrance && !entrance.known && !entrance.sealed) {
+      entrance.expose += CFG.occupiedExposePerTurn;
+      touched = true;
+    }
+    const vent = state.tunnels.vents[key];
+    if (vent && !vent.known) { vent.expose += CFG.occupiedExposePerTurn; touched = true; }
+    if (touched) {
+      PushEvent(state, events, { kind: "expose", text: TEXT.expose.occupied, hex: key, visible: true });
+    }
+  }
+}
+
 function StepExposure(state, events) {
+  StepOccupiedPressure(state, events);
   for (const key of SortedKeys(state.tunnels.entrances)) {
     const entrance = state.tunnels.entrances[key];
     if (!entrance.known && !entrance.sealed && entrance.expose >= EntranceThreshold(entrance)) {
@@ -326,15 +366,24 @@ function StepExposure(state, events) {
 /** ⑤ 粮食产耗：平静期每村 +1（组织 ≥1 且脚下通着储粮洞则自动藏 1）；扫荡期敌到村边则每回合搜走。 */
 function StepGrain(state, events) {
   if (state.wave.status === "quiet") {
+    // R5 必修 bug 1：平静期的产出与自动藏粮**必须播报**——原来这两笔都是静默的，
+    // 零操作对照能看见合计从 14 变 16 却查不到任何一条事件。
     for (const villageId of SortedKeys(state.map.villages)) {
       const village = state.map.villages[villageId];
       village.grainOpen += CFG.quietGrainPerVillage;
+      PushEvent(state, events, { kind: "grain", text: `${TEXT.quietGrain}（${village.name} 现有明存粮 ${village.grainOpen} 担）`,
+        hex: village.hexKeys[0], visible: true });
       if (village.organize < 1 || village.grainOpen <= 0) continue;
       for (const hexKey of village.hexKeys) {
         const cells = StorageCellsUnder(state, hexKey);
         if (!cells.length) continue;
-        state.tunnels.cells[cells[0]].grain += CFG.autoHidePerTurn;
-        village.grainOpen -= CFG.autoHidePerTurn;
+        const room = StorageCapOf(state) - state.tunnels.cells[cells[0]].grain;
+        const take = Math.min(CFG.autoHidePerTurn, room, village.grainOpen);
+        if (take <= 0) break;
+        state.tunnels.cells[cells[0]].grain += take;
+        village.grainOpen -= take;
+        PushEvent(state, events, { kind: "grain", text: `${TEXT.quietHide}（${village.name}，${cells[0]}）`,
+          hex: hexKey, layer: "under", visible: true });
         break;
       }
     }
@@ -364,7 +413,10 @@ function StepIntel(state, events) {
 function EmptyHandedColumns(state) {
   let count = 0;
   for (const column of state.enemy.columns) {
-    if (column.done || column.withdrawing || column.gained) continue;
+    // 已经装了车的队伍不算「扑空」：他们手里有东西可押运，锐气挫不着（R5）。
+    // 这条把因果重新拧紧——**把粮和人留给敌人搜，就别指望把他熬走**；
+    // 扑空衰减只能靠「粮藏净、人藏好、口掩住」去换。
+    if (column.done || column.withdrawing || column.gained || column.hauled) continue;
     const units = column.unitIds.map((id) => state.units[id]).filter((unit) => unit && unit.hp > 0);
     if (!units.length) continue;
     const atVillageEdge = SortedKeys(state.map.villages).some((villageId) => state.map.villages[villageId].hexKeys
@@ -431,26 +483,18 @@ function StepOutcome(state, events) {
       state.wave.doneTurn = state.meta.turn;
       state.score.withdrewEarlyTurns = Math.max(0, state.wave.hardEndTurn - state.meta.turn);
       PushEvent(state, events, { kind: "banner", text: TEXT.waveStatus.done, visible: true });
-      ReturnCivsHome(state);
       Evaluate(state, events, {});
       return;
     }
   }
   if (state.meta.turn >= level.maxTurns) {
-    ReturnCivsHome(state);
     Evaluate(state, events, {});
   }
 }
 
-/** 敌离场：地道里的群众自动返村（保全率只认「没被抓、没罹难」，不认他们最后待在哪儿）。 */
-function ReturnCivsHome(state) {
-  for (const civ of LiveCivs(state)) {
-    if (civ.loc !== "cell") continue;
-    civ.loc = "village";
-    civ.at = NearestVillageId(state, civ.at) || civ.home;
-    civ.panic = 0;
-  }
-}
+// R5 P0-2：终局**不再**把幸存群众一律传回地面。人在洞里就算在洞里，在地面就算在地面——
+// 原来的 ReturnCivsHome 把「谁下去了、谁还站在敌人脚底下」这个区别在结算那一刻全抹平了，
+// 于是「什么都不做」与「全塞进地道」两条线的终局一模一样。就地结算，账才对得上。
 
 // ---------------------------------------------------------------------------
 // 胜负、勋记与数值分
@@ -621,6 +665,16 @@ function StartNewTurn(state, events) {
     unit.attacked = false;
     unit.freeMove = false;
     if (unit.stance === "exposed") unit.stance = "normal";
+    // 压制（R5 P0-4）：守洞打退攻入的人，这一回合动不了；到期自动恢复。
+    if (IsStunned(state, unit)) {
+      unit.acted = true;
+      unit.mp = 0;
+      unit.stance = "stunned";
+      PushEvent(state, events, { kind: "combat", text: `${UnitDef(unit).name}仍被压制，本回合动不了`,
+        hex: unit.pos, layer: unit.layer, visible: unit.side === "ally" });
+    } else if (unit.stance === "stunned") {
+      unit.stance = "normal";
+    }
     if (unit.side === "ally") unit.revealed = false;
   }
   for (const villageId of SortedKeys(state.map.villages)) state.map.villages[villageId].seizedTurn = 0;

@@ -4,7 +4,7 @@
 // 纯逻辑：禁 window/document/three/Math.random/Date.now；随机只经 StepRng 且仅用于建局波次抽取。
 
 import { HexKey, ParseHexKey, HexNeighborKeys, HexDistanceKeys, StepRng, HashString } from "./Script_Hex.mjs";
-import { CFG, terrainDefinitions, unitDefinitions, disguiseDefinitions } from "./Data_Rules.mjs";
+import { CFG, TEXT, terrainDefinitions, unitDefinitions, disguiseDefinitions } from "./Data_Rules.mjs";
 import { GetLevel, BuildBriefing, BuildSchedule, BuildActCard } from "./Data_Levels.mjs";
 
 // ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ function MakeAllyUnit(state, type, at) {
   const id = `u${state.meta.nextUnitId += 1}`;
   state.units[id] = { id, side: "ally", type, hp: def.hp, mp: def.mp, acted: false, layer: "surface",
     pos: at, stance: "normal", breath: 0, revealed: false, columnId: null, attacked: false, freeMove: false,
-    coverUses: 0, ambushHex: null, ambushTurn: 0, ambushStale: false };
+    coverUses: 0, ambushHex: null, ambushTurn: 0, ambushStale: false, stunnedUntil: 0 };
   return id;
 }
 
@@ -154,8 +154,110 @@ function NewCell() {
     fightpostHeat: 0, fightpostLastTurn: 0, fightpostKnown: false };
 }
 
-/** 建局：手工地图 + seed 白名单抽取（路线变体/入场口/配比/时刻抖动/嫌疑平手盐）。 */
-export function CreateGame(levelId, seed) {
+// ---------------------------------------------------------------------------
+// 战役续承（R5 P0-3）：A2 起的开局盘面由「上一幕的终局地道网/口/伪装/存粮/弹药」派生。
+//
+//   ExtractCarry(终局 state) → 续承档（可 JSON 序列化，写进存档或 --carry 文件）
+//   CreateGame(levelId, seed, { carry }) → 用续承档开局
+//   不给续承档时，用关卡自带的**默认继承档** `level.carryDefault`（明确标注、且一定比认真打过差）
+//
+// 「跳过前几幕要付可感知的代价」就落在这里：默认档少格、少口、没伪装、洞里没粮、弹药也少。
+// ---------------------------------------------------------------------------
+
+/** 把一局终局状态压成续承档。只带走「你自己挖出来的东西」，不带走战果与账本。 */
+export function ExtractCarry(state) {
+  const cells = [];
+  const facilities = [];
+  let grain = 0;
+  for (const key of SortedKeys(state.tunnels.cells)) {
+    const cell = state.tunnels.cells[key];
+    cells.push(key);
+    if (cell.facility && cell.facility !== "trapdoor") facilities.push([key, cell.facility]);
+    grain += cell.grain;
+  }
+  const edges = SortedKeys(state.tunnels.edges).map((edgeKey) => EdgeEnds(edgeKey));
+  const entrances = [];
+  const disguises = [];
+  const sealed = [];
+  for (const key of SortedKeys(state.tunnels.entrances)) {
+    const entrance = state.tunnels.entrances[key];
+    entrances.push(key);
+    if (entrance.sealed) sealed.push(key);
+    if (entrance.disguise) disguises.push([key, entrance.disguise]);
+  }
+  return { source: state.meta.level, act: state.meta.act, isDefault: false,
+    cells, edges, entrances, sealed, facilities, disguises,
+    tunnelGrain: grain, ammo: state.resources.ammo,
+    won: !!(state.result && state.result.won), grade: state.result ? state.result.grade : null };
+}
+
+/** 续承档落地到新局：只认新图上真实存在且挖得动的格，粮按本幕仓容截断。 */
+function ApplyCarry(state, level, carry) {
+  const valid = (key) => {
+    const hex = state.map.hexes[key];
+    return !!hex && terrainDefinitions[hex.terrain].diggable;
+  };
+  for (const key of (carry.cells || []).filter(valid)) {
+    if (!state.tunnels.cells[key]) state.tunnels.cells[key] = NewCell();
+  }
+  for (const [a, b] of carry.edges || []) {
+    if (!valid(a) || !valid(b) || !state.tunnels.cells[a] || !state.tunnels.cells[b]) continue;
+    state.tunnels.edges[EdgeKey(a, b)] = { door: null };
+  }
+  const sealedSet = new Set(carry.sealed || []);
+  for (const key of (carry.entrances || []).filter(valid)) {
+    if (!state.tunnels.cells[key]) continue;
+    const cap = TerrainOf(state, key)?.concealCap ?? 1;
+    if ((cap ?? 0) <= 0) continue;
+    state.tunnels.entrances[key] = { conceal: Math.min(3, cap), expose: 0, known: false,
+      sealed: sealedSet.has(key), disguise: null };
+  }
+  for (const [key, facility] of carry.facilities || []) {
+    const cell = state.tunnels.cells[key];
+    if (!cell) continue;
+    cell.facility = facility;
+    if (facility === "vent") state.tunnels.vents[key] = { expose: 0, known: false, smoked: false };
+    if (facility === "trapdoor") cell.trapReady = true;
+  }
+  for (const [key, disguise] of carry.disguises || []) {
+    if (state.tunnels.entrances[key] && disguiseDefinitions[disguise]) {
+      state.tunnels.entrances[key].disguise = disguise;
+    }
+  }
+  // 洞存粮：按本幕仓容一洞一洞地填（装不下的就是上一幕白藏了——网不够大，粮也留不住）
+  let grain = Math.max(0, Number(carry.tunnelGrain) || 0);
+  for (const key of SortedKeys(state.tunnels.cells)) {
+    if (grain <= 0) break;
+    const cell = state.tunnels.cells[key];
+    if (cell.facility !== "storage") continue;
+    const take = Math.min(StorageCapOf(state), grain);
+    cell.grain += take;
+    grain -= take;
+  }
+  // 弹药：本幕照例配发 level.ammoStart；上一幕省下的比这多就按省下的算（认真打永远不吃亏）。
+  // **默认继承档例外**：它自带一个明确写死的、比配发数更低的数字——那就是「跳过前作」的账。
+  if (Number.isFinite(carry.ammo)) {
+    state.resources.ammo = carry.isDefault
+      ? Math.max(0, Math.min(CFG.ammoMax, carry.ammo))
+      : Math.max(level.ammoStart, Math.min(CFG.ammoMax, carry.ammo));
+  }
+  state.meta.carry = {
+    source: carry.source || (carry.isDefault ? "default" : null),
+    isDefault: !!carry.isDefault,
+    label: carry.label || (carry.isDefault ? TEXT.carryText.fromDefault : TEXT.carryText.fromPrev),
+    notes: (carry.notes || []).slice(),
+    tunnelGrain: Math.max(0, Number(carry.tunnelGrain) || 0),
+    ammo: Number.isFinite(carry.ammo) ? carry.ammo : level.ammoStart,
+    cells: Object.keys(state.tunnels.cells).length,
+    entrances: SortedKeys(state.tunnels.entrances).filter((key) => !state.tunnels.entrances[key].sealed).length,
+    sealed: SortedKeys(state.tunnels.entrances).filter((key) => state.tunnels.entrances[key].sealed).length,
+    disguised: SortedKeys(state.tunnels.entrances).filter((key) => state.tunnels.entrances[key].disguise).length,
+  };
+}
+
+/** 建局：手工地图 + seed 白名单抽取（路线变体/入场口/配比/时刻抖动/嫌疑平手盐）。
+ *  options.carry：战役续承档（缺省用 level.carryDefault，再缺省才用 level.tunnels）。 */
+export function CreateGame(levelId, seed, options = {}) {
   const level = GetLevel(levelId);
   const state = {
     meta: { level: level.id, act: level.act, seed: Number(seed) >>> 0, turn: 1, phase: "player",
@@ -164,7 +266,10 @@ export function CreateGame(levelId, seed) {
             smokeCharges: level.smokeCharges, floodCharges: level.floodCharges || 0,
             hardEndTurn: level.hardEndTurn, withdrawAnnounced: false,
             sweepStartTurn: level.sweepStartTurn, expelled: false, roadCuts: 0, doneTurn: null, withdrawTurn: null,
-            garrison: false, axisKills: { north: 0, south: 0 }, schedule: [], plan: {}, tieSalt: 0, revenge: null },
+            garrison: false, axisKills: { north: 0, south: 0 }, schedule: [], plan: {}, tieSalt: 0, revenge: null,
+            // 本役各手反地道作业已用次数：敌据此轮着来，不把同一手用到底（R5 P0-5）
+            opsUsed: { smoke: 0, flood: 0, blast: 0, breach: 0, excavate: 0, seal: 0 },
+            scriptedBreachDone: false },
     rngState: (Number(seed) >>> 0) || 1,
     map: { hexes: JSON.parse(JSON.stringify(level.hexes)), villages: {} },
     tunnels: { cells: {}, edges: {}, entrances: {}, vents: {}, digs: {},
@@ -187,31 +292,45 @@ export function CreateGame(levelId, seed) {
       seizedTurn: 0 };
   }
   for (const ally of level.allies) MakeAllyUnit(state, ally.type, ally.at);
-  for (const key of level.tunnels.cells) state.tunnels.cells[key] = NewCell();
-  for (const [a, b] of level.tunnels.edges) state.tunnels.edges[EdgeKey(a, b)] = { door: null };
-  for (const key of level.tunnels.entrances) {
-    const cap = TerrainOf(state, key)?.concealCap ?? 1;
-    state.tunnels.entrances[key] = { conceal: Math.min(3, cap), expose: 0, known: false, sealed: false, disguise: null };
-  }
-  for (const [key, facility] of level.tunnels.facilities || []) {
-    const cell = state.tunnels.cells[key];
-    if (!cell) continue;
-    cell.facility = facility;
-    if (facility === "vent") state.tunnels.vents[key] = { expose: 0, known: false, smoked: false };
-    if (facility === "trapdoor") cell.trapReady = true;
-  }
-  for (const [key, disguise] of level.tunnels.disguises || []) {
-    if (state.tunnels.entrances[key] && disguiseDefinitions[disguise]) {
-      state.tunnels.entrances[key].disguise = disguise;
+  // 战役续承（R5 P0-3）：优先用调用方给的续承档 → 关卡的默认继承档 → 关卡原始 tunnels。
+  const carry = options.carry || level.carryDefault || null;
+  if (carry) {
+    ApplyCarry(state, level, carry);
+  } else {
+    for (const key of level.tunnels.cells) state.tunnels.cells[key] = NewCell();
+    for (const [a, b] of level.tunnels.edges) state.tunnels.edges[EdgeKey(a, b)] = { door: null };
+    for (const key of level.tunnels.entrances) {
+      const cap = TerrainOf(state, key)?.concealCap ?? 1;
+      state.tunnels.entrances[key] = { conceal: Math.min(3, cap), expose: 0, known: false, sealed: false, disguise: null };
+    }
+    for (const [key, facility] of level.tunnels.facilities || []) {
+      const cell = state.tunnels.cells[key];
+      if (!cell) continue;
+      cell.facility = facility;
+      if (facility === "vent") state.tunnels.vents[key] = { expose: 0, known: false, smoked: false };
+      if (facility === "trapdoor") cell.trapReady = true;
+    }
+    for (const [key, disguise] of level.tunnels.disguises || []) {
+      if (state.tunnels.entrances[key] && disguiseDefinitions[disguise]) {
+        state.tunnels.entrances[key].disguise = disguise;
+      }
     }
   }
-  // 群众批：按关卡声明展开成独立的「批」（老弱/青壮/伤员），每批有自己的位置与恐慌值
+  // 逐口暴露阈值覆写（第一幕：祖辈挖的土口摆在明处，4 豆就翻出来）
+  for (const [key, threshold] of level.entranceThresholds || []) {
+    if (state.tunnels.entrances[key]) state.tunnels.entrances[key].threshold = threshold;
+  }
+  // 群众批：按关卡声明展开成独立的「批」（老弱/青壮/伤员），每批有自己的位置与恐慌值。
+  // R5 P0-2：地面上的群众也有**格号**——敌纵队踩上哪一格，那一格的人就被拉走。
   for (const batch of level.civBatches || []) {
+    const village = state.map.villages[batch.village];
+    const homeHexes = village ? village.hexKeys : [];
     for (let index = 0; index < batch.count; index += 1) {
       const id = `c${state.meta.nextCivId += 1}`;
+      const hex = homeHexes.length ? homeHexes[state.meta.nextCivId % homeHexes.length] : null;
       state.civs[id] = { id, kind: batch.kind, home: batch.village, loc: "village", at: batch.village,
-        panic: 0, fate: null };
-      if (state.map.villages[batch.village]) state.map.villages[batch.village].popStart += 1;
+        hex, panic: 0, fate: null };
+      if (village) village.popStart += 1;
     }
   }
   DrawWavePlan(state, level);
@@ -326,6 +445,21 @@ export function CivsInCell(state, key) {
   return LiveCivs(state).filter((civ) => civ.loc === "cell" && civ.at === key);
 }
 
+/** 还站在**地面某一格**上的群众批（R5 P0-2：抓丁挂在这里，不再挂在「村里还有没有粮」）。 */
+export function CivsOnHex(state, key) {
+  return LiveCivs(state).filter((civ) => civ.loc === "village" && civ.hex === key);
+}
+
+/** 把一批群众安置到某个村格上（村口没送走、被逼出洞、扫荡结束都走这里，保证 hex 恒有值）。 */
+export function PlaceCivOnHex(state, civ, villageId, hexKey) {
+  const village = state.map.villages[villageId] || null;
+  civ.loc = "village";
+  civ.at = villageId;
+  civ.hex = hexKey && state.map.hexes[hexKey] ? hexKey
+    : (village && village.hexKeys.length ? village.hexKeys[0] : null);
+  civ.panic = 0;
+}
+
 export function CivSlots(civ) {
   return CFG.civ.slots[civ.kind] || 1;
 }
@@ -371,6 +505,7 @@ export function CivSafeRatio(state) {
 export function LoseCiv(state, civ, fate) {
   civ.loc = "lost";
   civ.at = null;
+  civ.hex = null;
   civ.panic = 0;
   civ.fate = fate;
   AddLedger(state, fate === "dead" ? "civDead" : "civCaptured", 1);
@@ -494,6 +629,16 @@ export function EntranceGuideBonus(entrance) {
   return def ? (def.guideBonus || 0) : 0;
 }
 
+/** 压制（R5 P0-4）：守洞打退攻入的那个单位，下一回合抬不起头——`stunnedUntil` 到期前不能行动。 */
+export function StunUnit(state, unit, turns) {
+  unit.stunnedUntil = Math.max(unit.stunnedUntil || 0, state.meta.turn + (turns || 1));
+  unit.stance = "stunned";
+}
+
+export function IsStunned(state, unit) {
+  return (unit.stunnedUntil || 0) >= state.meta.turn;
+}
+
 export function CellUnitCount(state, key) {
   return UnitsOn(state, key, "under").length;
 }
@@ -593,10 +738,17 @@ export function VentCount(state) {
   return SortedKeys(state.tunnels.vents).filter((key) => !state.tunnels.vents[key].known).length;
 }
 
-/** 暴露阈值 =（基础隐蔽 + 伪装加成）× 3。伪装口更难被搜出，这是第二幕的全部意义。 */
+/**
+ * 暴露阈值 =（基础隐蔽 + 伪装加成）× 3。伪装口更难被搜出，这是第二幕的全部意义。
+ * **关卡可逐口覆写**（`level.entranceThresholds`，R5 P0-1）：第一幕祖辈挖的窖是明摆着的土口，
+ * 村里的窖 4 豆、青纱帐那个 3 豆就被翻出来——招牌失败必须在 8 回合内够得着。
+ */
 export function EntranceThreshold(entrance) {
   const bonus = entrance.disguise && disguiseDefinitions[entrance.disguise]
     ? disguiseDefinitions[entrance.disguise].conceal : 0;
+  if (Number.isFinite(entrance.threshold)) {
+    return entrance.threshold + bonus * CFG.exposePerConceal;
+  }
   return (entrance.conceal + bonus) * CFG.exposePerConceal;
 }
 

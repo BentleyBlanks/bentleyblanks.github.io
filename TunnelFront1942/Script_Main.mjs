@@ -20,11 +20,18 @@ import { HexKey, ParseHexKey, HexNeighborKeys, HexLine, HexDistanceKeys } from "
 
 const saveStorageKey = "tunnelfront1942_v1";
 
-/** 关卡目标兜底文案（正式来源是引擎 DeriveView / 关卡简报；此处仅缺席时垫底）。 */
+/**
+ * 关卡目标兜底文案（正式来源是引擎 DeriveView / 关卡简报，此处仅缺席时垫底）。
+ * 五幕战役 A1~A5；旧 ID L1/L2 只在引擎里留作别名，不再作为默认值。
+ */
 const objectiveFallback = Object.freeze({
-  L1: "护粮：终局存粮 ≥8，战斗单位 ≥1",
-  L2: "合围：撑至 T16，存活村 ≥2，粮 ≥10，伤员 ≥3 批",
+  A1: "单口洞（8 回合）：群众保全 ≥3 批、战斗单位 ≥1",
+  A2: "户户相通（10 回合）：群众保全 ≥5 批、洞存粮 ≥10 担、战斗单位 ≥1",
+  A3: "能打的地道（10 回合）：群众保全 ≥5 批、洞存粮 ≥10 担、战斗单位 ≥1",
+  A4: "毒烟与水（12 回合）：群众保全 ≥6 批、洞存粮 ≥12 担、战斗单位 ≥1",
+  A5: "反扫荡（14 回合）：群众保全 ≥8 批、存活村 ≥2、洞存粮 ≥10 担、战斗单位 ≥1",
 });
+const defaultLevelId = "A1";
 
 const terrainNames = Object.freeze({
   village: "村庄", field: "农田（青纱帐）", woods: "树林", grave: "坟地", river: "河沟", open: "开阔地",
@@ -63,9 +70,13 @@ async function LoadEngine() {
       engine.TelegraphText = reportMod.TelegraphText ?? null;
       engine.ActionHints = reportMod.ActionHints ?? null;
       engine.ObjectiveLine = reportMod.ObjectiveLine ?? null;
+      // R5：地道段 / 隔断门 / 空气分区与通气孔门槛——与 CLI 同一份实现，网页也得看得见
+      engine.TunnelLinkReport = reportMod.TunnelLinkReport ?? null;
+      engine.VentSummary = reportMod.VentSummary ?? null;
     } catch {
       engine.GrainReport = null; engine.MedalReport = null;
       engine.TelegraphText = null; engine.ActionHints = null; engine.ObjectiveLine = null;
+      engine.TunnelLinkReport = null; engine.VentSummary = null;
     }
     return engine;
   } catch {
@@ -98,10 +109,10 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     }
     if (!state) {
       // 引擎签名：CreateGame(levelId, seed)（Script_State 实际接口）；容忍对象参数/包装返回的变体
-      state = engine.CreateGame(levelParam ?? "L1", Number(seedParam ?? 3));
+      state = engine.CreateGame(levelParam ?? defaultLevelId, Number(seedParam ?? 3));
       if (state?.state?.meta) state = state.state;
       if (!state?.meta) {
-        state = engine.CreateGame({ level: levelParam ?? "L1", seed: Number(seedParam ?? 3) });
+        state = engine.CreateGame({ level: levelParam ?? defaultLevelId, seed: Number(seedParam ?? 3) });
         if (state?.state?.meta) state = state.state;
       }
       if (!state?.meta) throw new Error("CreateGame 未返回合法 state");
@@ -243,6 +254,15 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     };
   }
 
+  /** 该格所属的空气分区摘要（引擎缺席时返回 null，面板就少这一行，不编造）。 */
+  function ZoneOfHex(hexKey) {
+    if (!session.engine?.VentSummary) return null;
+    try {
+      const zones = session.engine.VentSummary(session.state).zones ?? [];
+      return zones.find((zone) => zone.cells.includes(hexKey)) ?? null;
+    } catch { return null; }
+  }
+
   function HexInfo(hexKey, layer) {
     const vm = session.vm;
     const hex = vm.hexes[hexKey];
@@ -276,7 +296,7 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       if (entrance.sealed) notes.push("入口已封闭");
     }
     const vent = vm.tunnels?.vents?.[hexKey];
-    if (vent) lines.push({ label: "通风口暴露", value: `${vent.expose} / 6${vent.smoked ? "（被烟熏）" : ""}` });
+    if (vent) lines.push({ label: "通气孔暴露", value: `${vent.expose} / 6${vent.smoked ? "（被烟熏）" : ""}` });
     const cell = vm.tunnels?.cells?.[hexKey];
     if (cell && (layer === "under" || entrance || session.peek)) {
       const facility = theme.under.facilities[cell.facility];
@@ -290,6 +310,24 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
         if ((badge.civPanic ?? 0) > 0) lines.push({ label: "恐慌", value: badge.civPanic });
       }
       if ((cell.smoke ?? 0) > 0) lines.push({ label: "烟", value: `余 ${cell.smoke} 回合` });
+      if ((cell.water ?? 0) > 0) lines.push({ label: "水", value: `余 ${cell.water} 回合` });
+      // R5 P0-1：本格通到哪几格、每道隔断门是开是关——以前地图与面板一处都没有
+      const linkRows = [];
+      for (const [edgeKey, edge] of Object.entries(vm.tunnels?.edges ?? {})) {
+        const ends = edgeKey.split("|");
+        if (!ends.includes(hexKey)) continue;
+        const other = ends[0] === hexKey ? ends[1] : ends[0];
+        linkRows.push(edge?.door
+          ? `${other}（隔断门·${edge.door === "open" ? "开着" : "关着，不通"}）`
+          : `${other}（通）`);
+      }
+      lines.push({ label: "通向", value: linkRows.length ? linkRows.join("、") : "无（本格还没挖通任何一段）" });
+      const zone = ZoneOfHex(hexKey);
+      if (zone) {
+        lines.push({ label: "所在气区", value: `${zone.size} 格 ｜ 通气孔 ${zone.vents}/需 ${zone.ventNeed}` });
+        if (zone.vents < zone.ventNeed) notes.push("本气区通气孔不够（＜格数÷3）——敌工兵可以对这一区放烟");
+        if (!zone.hasAir) notes.push("本气区没有能呼吸的口：区内每人每回合憋闷 +1");
+      }
     }
     for (const dig of Object.values(vm.tunnels?.digs ?? {})) {
       if (dig.at === hexKey || dig.edge?.includes(hexKey)) {
@@ -353,6 +391,28 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     return `${base}｜区队部：${hq.name} ${(hq.hexKeys ?? []).join(" ")}`;
   }
 
+  /** 地道网摘要：格/段/通气孔门槛/门的开关——顶栏常显（R5 P0-1，与 CLI 同一份口径）。 */
+  function NetworkDetail() {
+    const st = session.state;
+    const summary = {
+      cells: Object.keys(st.tunnels?.cells ?? {}).length,
+      segments: Object.keys(st.tunnels?.edges ?? {}).length,
+      vents: null, ventNeed: null, doorsOpen: 0, doorsClosed: 0,
+    };
+    for (const edge of Object.values(st.tunnels?.edges ?? {})) {
+      if (edge?.door === "open") summary.doorsOpen += 1;
+      else if (edge?.door === "closed") summary.doorsClosed += 1;
+    }
+    if (session.engine?.VentSummary) {
+      try {
+        const vents = session.engine.VentSummary(st);
+        summary.vents = vents.have;
+        summary.ventNeed = vents.need;
+      } catch { /* 缺席就只少这一项 */ }
+    }
+    return summary;
+  }
+
   function RefreshHud() {
     const st = session.state;
     const view = session.view;
@@ -367,6 +427,8 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       sweepTurn: wave.sweepTurn,
       pool: wave.pool,
       smokeCharges: wave.smokeCharges,
+      floodCharges: wave.floodCharges,
+      network: NetworkDetail(),
     });
     ui.SetResources({ ammo: st.resources?.ammo ?? 0, ammoMax: 12, ...grain });
     ui.SetLandmarks(LandmarkRows());
@@ -497,7 +559,11 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       const reason = outcome?.illegal || "此令不可执行";
       ui.Toast(reason, { kind: "warn", ms: 2600 });
       ui.AppendLog({ turn: session.state.meta?.turn, kind: "warn", text: `不可执行：${reason}`, visible: true });
-      for (const hint of ActionHintsSafe(action.unit)) {
+      // 引擎自带的补救提示只针对被拒的那一条动作；缺席时才退回按当前状态推断（后者可能夹带别的动作）
+      const refusalHints = Array.isArray(outcome?.hints) && outcome.hints.length
+        ? outcome.hints.slice(0, 2)
+        : ActionHintsSafe(action.unit);
+      for (const hint of refusalHints) {
         ui.Toast(hint, { kind: "warn", ms: 4200 });
         ui.AppendLog({ turn: session.state.meta?.turn, kind: "warn", text: hint, visible: true });
       }

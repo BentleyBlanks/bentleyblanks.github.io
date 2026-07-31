@@ -44,6 +44,9 @@ body {
 .tf-top-right { display: flex; align-items: baseline; gap: 12px; white-space: nowrap; }
 .tf-top-wave { color: var(--tf-warn, #c77b3f); font-weight: 600; }
 .tf-top-pool { color: var(--tf-text-dim, #8f8c84); font-size: 12px; }
+/* 地道网摘要（格/段/通气孔门槛/门开关）：通气孔不够时转告警色 —— 颜色仍取 Data_Theme 打到 :root 的变量 */
+.tf-top-net { color: var(--tf-text-dim, #8f8c84); font-size: 12px; }
+.tf-top-net-short { color: var(--tf-warn, #c77b3f); }
 
 /* ---------------- 夹具模式标注 ---------------- */
 .tf-fixture-badge, #fixtureBadge {

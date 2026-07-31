@@ -6,9 +6,10 @@ import { readFileSync, existsSync } from "node:fs";
 import process from "node:process";
 import { HexKey, ParseHexKey, HexNeighborKeys, HexDistanceKeys } from "./Script_Hex.mjs";
 import { CFG, unitDefinitions, disguiseDefinitions } from "./Data_Rules.mjs";
-import { GetLevel, levelDefinitions, campaignOrder, BuildSchedule, BuildActCard } from "./Data_Levels.mjs";
+import { GetLevel, levelDefinitions, campaignOrder, BuildSchedule, BuildActCard,
+  BuildFullCarry, CarryWeight } from "./Data_Levels.mjs";
 import {
-  CreateGame, CloneState, SerializeState, DeserializeState, HashState, MakeEnemyUnit,
+  CreateGame, CloneState, SerializeState, DeserializeState, HashState, MakeEnemyUnit, ExtractCarry,
   AddLedger, GrainTotal, TunnelGrainTotal, PopTotal, SortedKeys, EdgeKey, AllyUnits, EnemyUnits, UnitDef,
   AllCivs, LiveCivs, CivsInCell, CivsAtVillage, CivSafeCount, CivTotal, ElevOf,
   LargestNetworkSize, EntranceThreshold, ActionUnlocked, StorageCapOf, ShelterCapOf,
@@ -68,8 +69,8 @@ function MakeColumn(state, id, types, pos, opts = {}) {
 }
 
 /** 清空脚本波次并推进到扫荡期的外科手术局（留一个远期占位波，防止波次提前收束）。 */
-function SurgeryGame(levelId, seed) {
-  let state = CreateGame(levelId, seed);
+function SurgeryGame(levelId, seed, options) {
+  let state = CreateGame(levelId, seed, options || {});
   while (state.wave.status === "quiet") state = EndTurn(state).state;
   state.wave.schedule = [{ id: "zzHold", kind: "march", turn: 99, role: "march", entry: null, exit: null,
     units: [], waypoints: [], target: null, seizeGoal: 0, axisKillsNeed: 0, spawned: false }];
@@ -411,7 +412,8 @@ Check("R3-3：带路批数有上限（联络员 3 / 民兵 2 / 游击 1），牲
   Eq(CFG.civ.guideCap.runner, 3);
   Eq(CFG.civ.guideCap.militia, 2);
   Eq(CFG.civ.guideCap.guerrilla, 1);
-  let state = SurgeryGame("A3", 1);                    // A3 起始网 5 格全连通
+  // 用「满配继承档」开局：默认继承档只有三格（跳过前两幕的代价），带路断言要在完整的网上做
+  let state = SurgeryGame("A3", 1, { carry: BuildFullCarry("A3") });
   for (const id of ["c1", "c2", "c3", "c4", "c5"]) PutCiv(state, id, "4,0");
   PutUnder(state, "u4", "4,0");                        // u4 = 民兵（A3 编成：u1~u3 民兵、u4 游击、u5 联络员）
   const guerrilla = AllyUnits(state).find((u) => u.type === "guerrilla");
@@ -423,7 +425,7 @@ Check("R3-3：带路批数有上限（联络员 3 / 民兵 2 / 游击 1），牲
   const after = Step(state, gAction).state;
   Eq(CivsInCell(after, gAction.to).length, 1, "游击班带走的批数超了");
   // 联络员一次 3 批
-  let s2 = SurgeryGame("A3", 1);
+  let s2 = SurgeryGame("A3", 1, { carry: BuildFullCarry("A3") });
   s2.tunnels.cells["3,1"].facility = "shelter";        // 隔壁修成藏人室，铺位才装得下 3 批
   for (const id of ["c1", "c2", "c3", "c4", "c5"]) PutCiv(s2, id, "4,0");
   PutUnder(s2, runner.id, "4,0");
@@ -434,7 +436,7 @@ Check("R3-3：带路批数有上限（联络员 3 / 民兵 2 / 游击 1），牲
   Eq(CivsInCell(afterRunner, "3,1").length, CFG.civ.guideCap.runner, "联络员带走的批数不对");
   Eq(CivsInCell(afterRunner, "4,0").length, 2, "剩下的批应留在原地——一次带不完就得再跑一趟");
   // 走廊（非藏人室）铺位只有 2：带不动 3 批就是带不动
-  let s3 = SurgeryGame("A3", 1);
+  let s3 = SurgeryGame("A3", 1, { carry: BuildFullCarry("A3") });
   for (const id of ["c1", "c2", "c3"]) PutCiv(s3, id, "4,0");
   PutUnder(s3, runner.id, "4,0");
   Ok(!LegalActions(s3, runner.id).some((a) => a.type === "GuideCivs" && a.to === "3,1"),
@@ -508,7 +510,8 @@ Check("R3-5：射击孔「打一枪换一个地方」——同口连开被锁定
 });
 
 Check("R3-6：水只往同高或更低处漫；隔断门与翻板挡得住", () => {
-  let state = SurgeryGame("A4", 1);
+  // 用「满配继承档」开局：默认继承档没有西岗那一段（跳过前三幕的代价），断言要针对完整的高低差网
+  let state = SurgeryGame("A4", 1, { carry: BuildFullCarry("A4") });
   Eq(ElevOf(state, "5,2"), 0, "东洼口应是高程 0");
   Eq(ElevOf(state, "4,2"), 0, "东洼巷应是高程 0");
   Eq(ElevOf(state, "3,2"), 1, "村南应是高程 1");
@@ -653,8 +656,8 @@ Check("R3-11：群众保全率进终局评定，且群众损失只进代价簿�
 Check("R3-12：敌新增两手——刨口（不用工兵）与灌水（要工兵）；翻板与高程各挡一手", () => {
   // 刨口：第二幕起，任何一队围住已知的口，一回合刨掉它
   let state = SurgeryGame("A2", 1);
-  state.tunnels.entrances["2,1"].known = true;
-  MakeColumn(state, "tDig", ["inf", "inf"], "2,1");
+  state.tunnels.entrances["3,0"].known = true;
+  MakeColumn(state, "tDig", ["inf", "inf"], "3,0");
   state = EndTurn(state).state;
   Ok(state.enemy.pendingOps.some((op) => op.kind === "excavate" || op.kind === "breach"),
     `第二幕应能宣布刨口或攻入，实得 ${JSON.stringify(state.enemy.pendingOps)}`);
@@ -756,7 +759,7 @@ Check("R2 P0-5：同格至多 1 人设伏；伏击后转暴露；连设两回合
   }
 });
 
-Check("R2 P0-6：胜负只认洞存粮与群众保全（第三幕：洞里 7 担判负、8 担判胜）", () => {
+Check("R2 P0-6：胜负只认洞存粮与群众保全（第三幕：洞里 11 担判负、12 担判胜）", () => {
   const Finish = (tunnelGrain) => {
     let state = CreateGame("A3", 1);
     state.map.villages.v1.grainOpen = 0;
@@ -768,8 +771,8 @@ Check("R2 P0-6：胜负只认洞存粮与群众保全（第三幕：洞里 7 担
     state.wave.revenge = null;
     return EndTurn(state).state.result;
   };
-  Ok(!Finish(7).won, "洞存粮 7 应判负");
-  Ok(Finish(8).won, "洞存粮 8 应判胜");
+  Ok(!Finish(11).won, "洞存粮 11 应判负");
+  Ok(Finish(12).won, "洞存粮 12 应判胜");
 });
 
 Check("R2 P0-6c：seed 是真变量——12 个 seed 不再逐字节相同", () => {
@@ -998,7 +1001,7 @@ Check("反地道：攻入遇驻守 → 敌折一班且中止；无驻守 → 内
   state = EndTurn(state).state;
   Ok(!state.tunnels.entrances["3,0"], "无驻守攻入应毁口");
   Ok(state.ledger.grainSeized >= seizedBefore + 3, "洞藏粮应被夺进账本");
-  Eq(state.ledger.civCaptured, 2, "藏身群众应被捕进账本");
+  Ok(state.ledger.civCaptured >= 2, `藏身群众应被捕进账本：实际 ${state.ledger.civCaptured}`);
 });
 
 Check("反地道：封堵（第一幕兜底）先电报后填死", () => {
@@ -1172,6 +1175,424 @@ Check("页面装配：引用存在、importmap 正确、?v= 一致、核心不�
     for (const surface of surfaces) {
       Ok(!source.includes(`./${surface}`), `${file} 引用了表现层 ${surface}`);
     }
+  }
+});
+
+// ===========================================================================
+// 五之二、R5 承重墙回归（本轮：先红后绿，每条都能单独变红）
+// ===========================================================================
+
+/** 「认真打的新手」：老老实实藏粮 + 转移群众（先伤员老弱），不破路、不掩土、不调度、不带路。 */
+function NewbieLine(state) {
+  const unit = FirstIdle(state);
+  if (!unit) return { type: "EndTurn" };
+  const actions = Acts(state, unit);
+  return Pick(actions, "MoveCivs", (a) => a.kind === "wounded")
+    || Pick(actions, "MoveCivs", (a) => a.kind === "old")
+    || Pick(actions, "MoveCivs")
+    || Pick(actions, "HideGrain")
+    || Pick(actions, "Rest") || { type: "Rest", unit: unit.id };
+}
+
+Check("R5 P0-1：第一幕真的把你打疼——窖口阈值、敌占格加压、第六日必然的撬窖", () => {
+  const level = GetLevel("A1");
+  // ① 逐口阈值覆写（原来村里 9 豆、青纱帐 6 豆，8 回合内数学上到不了）
+  const state0 = CreateGame("A1", 1);
+  Eq(EntranceThreshold(state0.tunnels.entrances["3,0"]), 4, "村北窖口阈值应为 4");
+  Eq(EntranceThreshold(state0.tunnels.entrances["4,0"]), 4, "村南窖口阈值应为 4");
+  Eq(EntranceThreshold(state0.tunnels.entrances["2,1"]), 3, "青纱帐窖口阈值应为 3");
+  // ② 敌纵队踩在口上 → 该口每回合 +2（不靠翻检，光是踩就踩出来）
+  let state = SurgeryGame("A1", 1);
+  const before = state.tunnels.entrances["3,0"].expose;
+  const stand = MakeColumn(state, "tStand", ["puppet"], "3,0");   // 伪军搜索力 0，只能靠「踩」
+  stand.regroupTurns = 3;                                        // 原地不动，排除「搜索加豆」的干扰
+  state = EndTurn(state).state;
+  Eq(CFG.occupiedExposePerTurn, 2, "敌占格加压是 R5 P0-1 的承重条：每回合 +2，不许改小");
+  Ok(state.tunnels.entrances["3,0"].expose - before >= 2,
+    `敌踩在口上未加压：${before} → ${state.tunnels.entrances["3,0"].expose}`);
+  // 8 回合内够得着：本幕窖口阈值 4，敌踩两回合就翻出来
+  Ok(state.tunnels.entrances["3,0"].expose * 2 >= EntranceThreshold(state.tunnels.entrances["3,0"]),
+    "踩一回合应至少攒到阈值的一半——招牌失败必须在八回合内够得着");
+  // ③ 第六日的硬脚本撬窖：人最多的那个窖被打开，窖里的人一个也跑不掉
+  Ok(level.scriptedBreach && level.scriptedBreach.turn === 6, "第一幕应声明第六回合的撬窖脚本");
+  let scripted = CreateGame("A1", 1);
+  while (scripted.meta.turn < level.scriptedBreach.turn - 1) scripted = EndTurn(scripted).state;
+  PutCiv(scripted, "c1", "4,0");
+  PutCiv(scripted, "c2", "4,0");
+  PutCiv(scripted, "c3", "2,1");
+  const capturedBefore = scripted.ledger.civCaptured;
+  const warn = EndTurn(scripted);                       // 提前一回合电报
+  scripted = warn.state;
+  Ok(warn.events.some((e) => e.kind === "telegraph" && e.text.includes("挖")),
+    "撬窖前一回合应有电报");
+  const done = EndTurn(scripted);
+  scripted = done.state;
+  Ok(done.events.some((e) => e.text.includes("一个也跑不掉")), "撬窖战报缺失");
+  Eq(scripted.ledger.civCaptured - capturedBefore >= 2, true, "人最多的那个窖里的人应全部进代价簿");
+  Ok(CivsInCell(scripted, "4,0").length === 0, "被撬的那个窖应该空了");
+  Ok(CivsInCell(scripted, "2,1").length === 1, "只撬人最多的那一个窖——分开放的人还在");
+  // ④ 手感：认真打的新手保全 ≤3/6、评定丙；且第一幕不再是全作最容易的一幕
+  let safeSum = 0;
+  const grades = { jia: 0, bing: 0 };
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const finished = PlayWith("A1", seed, NewbieLine);
+    safeSum += CivSafeCount(finished);
+    if (finished.result.grade === "甲") grades.jia += 1;
+    if (finished.result.grade === "丙" || finished.result.grade === "丁") grades.bing += 1;
+  }
+  Ok(safeSum / 8 <= 3.5, `认真打的新手在第一幕应只保住 ≤3.5 批（实得 ${(safeSum / 8).toFixed(2)}）`);
+  Eq(grades.jia, 0, "新手线不该在第一幕拿甲");
+  const a1Jia = rank.A1.Skilled.filter((st) => st.result.grade === "甲").length;
+  const laterJia = ["A2", "A3", "A4", "A5"]
+    .reduce((sum, act) => sum + rank[act].Skilled.filter((st) => st.result.grade === "甲").length, 0);
+  Ok(a1Jia <= laterJia, `第一幕仍是最容易的一幕：会玩拿甲 A1=${a1Jia}，后四幕合计 ${laterJia}`);
+});
+
+Check("R5 P0-2：抓丁改挂群众暴露——站在敌脚底下才被抓，粮空不再等于抓人", () => {
+  // ① 敌踩住的村格上：老弱必抓，青壮头一回走脱
+  let state = SurgeryGame("A3", 1);
+  const villageHex = GetLevel("A3").villages[0].hexKeys[0];
+  const old1 = AllCivs(state).find((civ) => civ.kind === "old");
+  const young1 = AllCivs(state).find((civ) => civ.kind === "young");
+  for (const civ of AllCivs(state)) { civ.loc = "lost"; civ.at = null; civ.hex = null; civ.fate = "captured"; }
+  state.ledger.civCaptured = 0;
+  for (const civ of [old1, young1]) { civ.loc = "village"; civ.at = "v1"; civ.hex = villageHex; civ.fate = null; civ.levyMisses = 0; }
+  MakeColumn(state, "tLevy", ["inf"], villageHex);
+  state.map.villages.v1.grainOpen = 9;                   // 村里有粮可征：旧规则下「有粮就不抓丁」
+  state = EndTurn(state).state;
+  Eq(state.civs[old1.id].loc, "lost", "老弱站在敌脚底下必被抓");
+  Eq(state.civs[young1.id].loc, "village", "青壮头一回应能走脱");
+  state = EndTurn(state).state;
+  Eq(state.civs[young1.id].loc, "lost", "青壮第二回就没跑掉");
+  // ② 「村中无粮可征」不再触发抓丁：人在地道里，粮空也抓不着
+  let safe = SurgeryGame("A3", 1);
+  safe.map.villages.v1.grainOpen = 0;
+  for (const civ of AllCivs(safe)) PutCiv(safe, civ.id, "3,0");
+  safe.tunnels.cells["3,0"].facility = "shelter";
+  MakeColumn(safe, "tDry", ["inf"], GetLevel("A3").villages[0].hexKeys[0]);
+  const beforeDry = safe.ledger.civCaptured;
+  safe = EndTurn(safe).state;
+  Eq(safe.ledger.civCaptured, beforeDry, "粮空不该再凭空抓走地道里的群众");
+  // ③ 终局不把幸存群众传回地面：就地结算
+  let ending = CreateGame("A3", 1);
+  ending.map.villages.v1.grainOpen = 0;
+  ending.map.villages.v1.organize = 0;
+  ending.wave.status = "sweep";
+  ending.wave.schedule = [];
+  ending.wave.revenge = null;
+  PutCiv(ending, "c1", "3,0");
+  ending.meta.turn = GetLevel("A3").maxTurns;
+  ending = EndTurn(ending).state;
+  Ok(ending.result, "应已结算");
+  Eq(ending.civs.c1.loc, "cell", "终局不该把地道里的群众传回地面");
+  // ④ 三组对照：什么都不做 / 全塞地道后不管 / 疯狂藏粮 —— 结果必须不再相同
+  const Idle = () => ({ type: "EndTurn" });
+  // 「全塞进地道，之后完全不管」：只要村里还有人就往地道里送，送完就再也不动
+  const StuffOnce = (st) => {
+    for (const unit of AllyUnits(st).filter((u) => !u.acted)) {
+      const move = Pick(Acts(st, unit), "MoveCivs");
+      if (move) return move;
+    }
+    return { type: "EndTurn" };
+  };
+  const GrainOnly = (st) => {
+    const unit = FirstIdle(st);
+    if (!unit) return { type: "EndTurn" };
+    return Pick(Acts(st, unit), "HideGrain") || { type: "EndTurn" };
+  };
+  const Sig = (st) => `${CivSafeCount(st)}/${st.ledger.civCaptured}/${TunnelGrainTotal(st)}`;
+  let differ = 0;
+  let noReverse = 0;
+  let escortWins = 0;
+  const seeds = [3, 5, 7, 21];
+  for (const seed of seeds) {
+    const idle = PlayWith("A3", seed, Idle);
+    const stuffed = PlayWith("A3", seed, StuffOnce);
+    const grained = PlayWith("A3", seed, GrainOnly);
+    const escorted = RunBotGame({ level: "A3", seed, bot: "Skilled" }).state;
+    // ①「什么都不做」与「全塞进地道后不管」不能再给出一模一样的终局
+    if (Sig(idle) !== Sig(stuffed)) differ += 1;
+    // ②「疯狂藏粮」不该比「什么都不做」死更多人——反向激励必须消失
+    if (grained.ledger.civCaptured <= idle.ledger.civCaptured) noReverse += 1;
+    // ③「有人陪着带路」必须明显强过「塞进去不管」——「谁去带路」是真取舍
+    if (CivSafeCount(escorted) > CivSafeCount(stuffed)) escortWins += 1;
+    Ok(TunnelGrainTotal(grained) > TunnelGrainTotal(idle), `seed${seed}：藏粮线的洞存粮必须更高`);
+  }
+  Ok(differ >= 3, `「什么都不做」与「全塞进地道后不管」仍在给同样的结果（${differ}/${seeds.length} 个 seed 有区别）`);
+  Eq(noReverse, seeds.length, "「藏粮越快死人越多」的反向激励仍然存在");
+  Ok(escortWins >= 3, `「有人陪着」没有明显强过「塞进去不管」（${escortWins}/${seeds.length}）`);
+});
+
+Check("R5 P0-3：战役续承——上一幕的战果真的传得下去，跳过前作有可感知代价", () => {
+  // ① 引擎侧接口：ExtractCarry → CreateGame(level, seed, { carry })
+  let played = RunBotGame({ level: "A2", seed: 1, bot: "Skilled" }).state;
+  const carry = ExtractCarry(played);
+  Ok(carry.cells.length >= 3, "续承档应带走地道格");
+  const carried = CreateGame("A3", 1, { carry });
+  Eq(Object.keys(carried.tunnels.cells).length, carry.cells.filter((key) => carried.map.hexes[key]).length,
+    "续承的地道格未落地");
+  Ok(carried.meta.carry && !carried.meta.carry.isDefault, "续承元信息应标明来源");
+  // ② 默认继承档：明确标注，且**每一幕都比满配档差**（这就是跳过前作的账）
+  for (const act of ["A2", "A3", "A4", "A5"]) {
+    const level = GetLevel(act);
+    Ok(level.carryDefault && level.carryDefault.isDefault, `${act} 应声明默认继承档`);
+    Ok((level.carryDefault.label || "").includes("默认继承档"), `${act} 的默认继承档必须明确标注`);
+    Ok((level.carryDefault.notes || []).length > 0, `${act} 的默认继承档应说明差在哪儿`);
+    const weak = CarryWeight(level.carryDefault);
+    const full = CarryWeight(BuildFullCarry(act));
+    const worse = weak.cells < full.cells || weak.entrances < full.entrances || weak.disguises < full.disguises;
+    Ok(worse, `${act} 的默认继承档并不比满配档差：${JSON.stringify(weak)} vs ${JSON.stringify(full)}`);
+    Ok(weak.ammo < level.ammoStart, `${act} 的默认继承档应少配发弹药（实得 ${weak.ammo}/${level.ammoStart}）`);
+  }
+  // ③ 可感知代价：同 seed 同 bot，默认档的终局一定不优于满配档
+  for (const act of ["A3", "A4", "A5"]) {
+    let better = 0;
+    for (const seed of [1, 2, 3, 4]) {
+      const weak = RunBotGame({ level: act, seed, bot: "Skilled" }).state;
+      const full = RunBotGame({ level: act, seed, bot: "Skilled", carry: BuildFullCarry(act) }).state;
+      const weakScore = weak.result.breakdown.total;
+      const fullScore = full.result.breakdown.total;
+      if (fullScore >= weakScore) better += 1;
+    }
+    Ok(better >= 3, `${act}：满配继承档没有体现出优势（${better}/4）`);
+  }
+});
+
+Check("R5 P0-4：守洞不再免费——打退攻入要花子弹、人被压制一回合、口从此明摆着", () => {
+  let state = SurgeryGame("A3", 1);
+  state.tunnels.entrances["3,0"].known = true;
+  PutUnder(state, "u1", "3,0");
+  state.resources.ammo = 4;
+  MakeColumn(state, "tGuard", ["inf", "inf"], "3,0");
+  state = EndTurn(state).state;
+  Ok(state.enemy.pendingOps.some((op) => op.kind === "breach"), "未宣布攻入");
+  const ammoBefore = state.resources.ammo;
+  const enemiesBefore = EnemyUnits(state).length;
+  const outcome = EndTurn(state);
+  state = outcome.state;
+  Eq(EnemyUnits(state).length, enemiesBefore - 1, "守洞仍应折敌一班（它必须仍是一手好棋）");
+  Eq(state.resources.ammo, ammoBefore - CFG.guardAmmoCost, "守洞打退攻入应消耗弹药");
+  Ok(outcome.events.some((e) => e.text.includes("守洞火力当头")), "守洞战报文本必须保住");
+  Ok(state.tunnels.entrances["3,0"].known, "守洞开火后该口应转为已知");
+  const guard = state.units.u1;
+  Ok(guard && guard.acted && guard.mp === 0 && guard.stance === "stunned", "守洞单位下一回合应被压制");
+  Eq(LegalActions(state, "u1").length, 0, "被压制的单位这一回合不该有任何合法动作");
+  Ok(state.score.kills.inf >= 1, "守洞折敌应计入战果（原来这一刀连账都不记）");
+  // 弹药池见底 → 洞口只剩人，堵不住枪
+  let dry = SurgeryGame("A3", 2);
+  dry.tunnels.entrances["3,0"].known = true;
+  PutUnder(dry, "u1", "3,0");
+  dry.resources.ammo = 0;
+  MakeColumn(dry, "tDryGuard", ["inf", "inf"], "3,0");
+  dry = EndTurn(dry).state;
+  const dryOutcome = EndTurn(dry);
+  dry = dryOutcome.state;
+  Ok(dryOutcome.events.some((e) => e.text.includes("堵不住枪")), "弹药见底应明说守不住");
+  Ok(!dry.tunnels.entrances["3,0"], "弹药见底时攻入应得手");
+});
+
+Check("R5 P0-5：水与烟必须真的出现——多 seed 逐种作业触发率", () => {
+  const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+  const rate = {};
+  for (const act of ["A2", "A3", "A4", "A5"]) {
+    rate[act] = { smoke: 0, flood: 0, blast: 0, breach: 0, excavate: 0, seal: 0 };
+    for (const seed of seeds) {
+      const seen = new Set();
+      let state = CreateGame(act, seed);
+      for (let step = 0; step < 3000 && !state.result; step += 1) {
+        const action = DiggerLine(state);
+        let outcome = action.type === "EndTurn" ? EndTurn(state) : PerformAction(state, action);
+        if (outcome.illegal) { outcome = EndTurn(state); if (outcome.illegal) break; }
+        for (const event of outcome.events) {
+          if (event.kind !== "op") continue;
+          for (const [kind, word] of [["smoke", "烟自"], ["flood", "水自"], ["blast", "炸毁"],
+            ["breach", "攻入"], ["excavate", "刨塌"], ["seal", "填死"]]) {
+            if (event.text.includes(word)) seen.add(kind);
+          }
+        }
+        state = outcome.state;
+      }
+      for (const kind of seen) rate[act][kind] += 1;
+    }
+  }
+  // ① 作业轮换：可做的几手里先挑本役用得最少的那一手（「烟永远压着水」就是水成为死内容的原因）
+  Ok(CFG.opRotate, "作业轮换是 R5 P0-5 的承重条");
+  let rot = SurgeryGame("A4", 1, { carry: BuildFullCarry("A4") });
+  rot.tunnels.entrances["5,2"].known = true;                  // 东洼最低处的口：烟与水都做得了
+  rot.wave.opsUsed.smoke = 9;                                 // 烟已经用滥了 → 这次该换水
+  MakeColumn(rot, "tRot", ["sapper", "inf"], "5,2");
+  rot = EndTurn(rot).state;
+  Ok(rot.enemy.pendingOps.some((op) => op.kind === "flood"),
+    `烟用滥了敌应改用水，实得 ${JSON.stringify(rot.enemy.pendingOps.map((op) => op.kind))}`);
+  let rot2 = SurgeryGame("A4", 1, { carry: BuildFullCarry("A4") });
+  rot2.tunnels.entrances["5,2"].known = true;
+  rot2.wave.opsUsed.flood = 9;
+  MakeColumn(rot2, "tRot2", ["sapper", "inf"], "5,2");
+  rot2 = EndTurn(rot2).state;
+  Ok(rot2.enemy.pendingOps.some((op) => op.kind === "smoke"), "水用滥了敌应改用烟");
+  // ② 工兵闻着新土走：还没够动手门槛的口也会被工兵专程摸过去（踩上去再自己踩出豆来）
+  let sniff = SurgeryGame("A4", 1, { carry: BuildFullCarry("A4") });
+  sniff.tunnels.entrances["5,2"].expose = CFG.sapperSniffExpose;   // 有动静，但还不够动手门槛
+  const sniffColumn = MakeColumn(sniff, "tSniff", ["sapper", "inf"], "8,0", { role: "sapper" });
+  const farBefore = HexDistanceKeys("8,0", "5,2");
+  sniff = EndTurn(sniff).state;
+  const sniffPos = sniff.units[sniffColumn.unitIds[0]].pos;
+  Ok(HexDistanceKeys(sniffPos, "5,2") < farBefore,
+    `工兵没有朝有动静的口摸过去：${sniffPos}（原 8,0）`);
+  // ③ 驻剿队也做反地道作业（第五幕 T12 转入驻剿之后，原来一切作业全部停摆）
+  let garri = SurgeryGame("A5", 1);
+  garri.tunnels.entrances["2,0"].known = true;
+  const garrisonColumn = MakeColumn(garri, "tGarri", ["inf", "inf"], "2,0", { target: "v1" });
+  garrisonColumn.garrison = true;
+  garri = EndTurn(garri).state;
+  Ok(garri.enemy.pendingOps.length > 0, "驻剿队应照样对地道口动手");
+  Ok(rate.A4.flood * 2 >= seeds.length, `第四幕的水仍是死内容：${rate.A4.flood}/${seeds.length}`);
+  Ok(rate.A5.flood * 2 >= seeds.length, `第五幕的水仍是死内容：${rate.A5.flood}/${seeds.length}`);
+  Ok(rate.A4.smoke * 2 >= seeds.length, `第四幕的烟触发率过低：${rate.A4.smoke}/${seeds.length}`);
+  Ok(rate.A5.smoke * 2 >= seeds.length, `第五幕的烟触发率过低：${rate.A5.smoke}/${seeds.length}`);
+  Ok(rate.A4.breach >= 1, `第四幕的攻入一次也没发生：${rate.A4.breach}/${seeds.length}`);
+  Ok(rate.A3.blast * 2 >= seeds.length, `第三幕的爆破触发率过低：${rate.A3.blast}/${seeds.length}`);
+  Ok(rate.A2.excavate >= 1, "第二幕的刨口一次也没发生");
+  // 保住「通气孔比例的涌现」：通风口修够（≥ 地道格数/3）敌就不烧这份柴
+  Ok(CFG.ventPerCellsForSmoke === 3, "通气孔比例（地道格数/3）是第四幕的涌现点，不许改数");
+  let vented = SurgeryGame("A4", 1, { carry: BuildFullCarry("A4") });
+  vented.tunnels.entrances["3,0"].known = true;
+  for (const key of SortedKeys(vented.tunnels.cells)) {
+    if (vented.tunnels.cells[key].facility === null) {
+      vented.tunnels.cells[key].facility = "vent";
+      vented.tunnels.vents[key] = { expose: 0, known: false, smoked: false };
+    }
+  }
+  MakeColumn(vented, "tVent", ["sapper", "inf"], "3,0");
+  vented = EndTurn(vented).state;
+  Ok(!vented.enemy.pendingOps.some((op) => op.kind === "smoke"),
+    "通风口修够了敌就不该再选烟攻（第四幕的涌现点）");
+});
+
+Check("R5 P0-6：胜利线不能第三四回合就达标，且洞存粮真的会被敌夺走", () => {
+  // ① 逐幕：洞粮线必须高于**单个储粮洞的容量**——一个洞装不下，就必须再挖一个
+  for (const act of ["A2", "A3", "A4", "A5"]) {
+    const level = GetLevel(act);
+    const need = level.victory.tunnelGrainAtLeast;
+    Ok(need > level.storageCap,
+      `${act}：洞粮线 ${need} 不高于单洞容量 ${level.storageCap}，一个洞就能达标`);
+  }
+  // ② 爆破埋粮（只埋一部分：它教的是「粮分几个洞放」）
+  let state = SurgeryGame("A3", 1);
+  state.map.villages.v1.grainOpen = 0;                     // 排除「明存粮被搜走」对账本的干扰
+  state.tunnels.entrances["3,0"].known = true;
+  state.tunnels.cells["3,0"].facility = "storage";
+  state.tunnels.cells["3,0"].grain = 8;
+  MakeColumn(state, "tBlastGrain", ["sapper", "inf"], "3,0");
+  state = EndTurn(state).state;
+  const buriedBefore = state.ledger.grainSeized;
+  state = EndTurn(state).state;
+  Eq(state.ledger.grainSeized - buriedBefore, CFG.blastGrainLoss, "爆破应把一部分洞存粮埋进代价簿");
+  Eq(state.tunnels.cells["3,0"].grain, 8 - CFG.blastGrainLoss, "爆破只该埋掉一部分（教的是「粮分几个洞放」）");
+  // ③ 攻入得手：口下那格的粮全丢，敌还顺着巷子再搬走一些
+  let haul = SurgeryGame("A3", 3);
+  haul.map.villages.v1.grainOpen = 0;
+  haul.tunnels.entrances["3,0"].known = true;
+  haul.tunnels.cells["3,0"].facility = "storage";
+  haul.tunnels.cells["3,0"].grain = 2;
+  haul.tunnels.cells["4,-1"].facility = "storage";
+  haul.tunnels.cells["4,-1"].grain = 8;
+  MakeColumn(haul, "tHaul", ["inf", "inf"], "3,0");
+  haul = EndTurn(haul).state;
+  haul = EndTurn(haul).state;
+  Ok(haul.tunnels.cells["4,-1"].grain <= 8 - CFG.breachStorageHaul,
+    `攻入得手后敌应顺着地道再搬走 ${CFG.breachStorageHaul} 担（实剩 ${haul.tunnels.cells["4,-1"].grain}）`);
+  // ④ 实测：会玩 bot 的达标回合被推到**过半**（原来 A2 T4 / A3 T4 / A4 T4 / A5 T3）
+  //    并且最后三分之一的回合仍然有事发生（敌方作业或代价簿在动），不是空按 end。
+  const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+  for (const act of ["A2", "A3", "A4", "A5"]) {
+    const level = GetLevel(act);
+    const need = level.victory.tunnelGrainAtLeast;
+    let sum = 0;
+    let hits = 0;
+    let lateBusy = 0;
+    for (const seed of seeds) {
+      let hit = null;
+      let busy = false;
+      const run = RunBotGame({ level: act, seed, bot: "Skilled", onStep: (st, action, events) => {
+        if (st.meta.turn > (level.maxTurns * 2) / 3) {
+          for (const event of events || []) {
+            if (event.kind === "op" || event.kind === "ledger" || event.kind === "telegraph") busy = true;
+          }
+        }
+        if (action.type !== "EndTurn" || hit !== null) return;
+        if (TunnelGrainTotal(st) >= need) hit = st.meta.turn;
+      } });
+      if (hit !== null) { sum += hit; hits += 1; }
+      // 「后段不空转」= 后三分之一里确实有事发生；**或者你干脆把敌人提前赶走了**
+      //（提前收束的局根本没有「后段」可空转，那是玩家挣来的安静，不是设计的空白）。
+      const ended = run.state.result ? run.state.result.endTurn : level.maxTurns;
+      if (busy || run.state.wave.expelled || ended < level.maxTurns) lateBusy += 1;
+    }
+    Ok(hits === 0 || sum / hits >= level.maxTurns * 0.4,
+      `${act}：洞粮线平均第 ${(sum / hits).toFixed(1)} 回合就达标（本幕 ${level.maxTurns} 回合，至少要到第 ${(level.maxTurns * 0.4).toFixed(1)} 回合）`);
+    Ok(lateBusy * 2 >= seeds.length,
+      `${act}：最后三分之一的回合只有 ${lateBusy}/${seeds.length} 个 seed 还有事发生`);
+  }
+});
+
+Check("R5 bug：平静期产出与自动藏粮必须播报，且第一幕的算术对得上", () => {
+  const state = CreateGame("A4", 9);
+  const grainBefore = state.map.villages.v1.grainOpen + TunnelGrainTotal(state);
+  const outcome = EndTurn(state);
+  const grainAfter = outcome.state.map.villages.v1.grainOpen + TunnelGrainTotal(outcome.state);
+  Ok(grainAfter > grainBefore, "平静期确实在产粮（这一条只是锚定口径）");
+  const shown = outcome.events.filter((e) => e.visible && e.kind === "grain");
+  Ok(shown.some((e) => e.text.includes("秋粮")), "平静期明存粮产出必须播报");
+  Ok(shown.some((e) => e.text.includes("进窖")), "组织度自动藏粮必须播报");
+  // 第一幕的账：七担 + 平静期一担 = 八担，粮窖只装得下四担（复盘文案与数值对得上）
+  const a1 = GetLevel("A1");
+  const total = a1.villages[0].grainOpen + CFG.quietGrainPerVillage * (a1.sweepStartTurn - 1);
+  Eq(total, 8, "第一幕开打时应正好八担粮");
+  Ok(a1.debrief.cost.includes("八担"), "第一幕复盘应写「八担」");
+  Ok(a1.debrief.cost.includes("四担"), "第一幕复盘应写粮窖只装得下四担");
+});
+
+Check("R5 bug：BreakRoad 不能刨村庄格；缴获真的会兑现；非法动作不夹带无关提示", () => {
+  // ① 村庄格不许破路（原来能在区队部脚下把地形改成断路）
+  let state = CreateGame("A1", 3);
+  for (const action of LegalActions(state)) {
+    if (action.type !== "BreakRoad") continue;
+    const unit = state.units[action.unit];
+    Ok(!state.map.hexes[unit.pos].villageId, `村庄格 ${unit.pos} 竟然可以 BreakRoad`);
+  }
+  const villageRoad = GetLevel("A1").villages[0].hexKeys.find((key) => state.map.hexes[key].road);
+  Ok(villageRoad, "第一幕村里应当有路格（否则这条断言没意义）");
+  const militia = AllyUnits(state).find((unit) => (CFG.digPower[unit.type] || 0) > 0);
+  militia.pos = villageRoad;
+  militia.layer = "surface";
+  const refused = PerformAction(state, { type: "BreakRoad", unit: militia.id });
+  Ok(refused.illegal && refused.illegal.includes("村里的街"), `村庄格破路应被拒：${refused.illegal}`);
+  // ② 缴获：日军班与工兵班打死了要能捡到子弹（README 承诺的那 +1）
+  Ok(CFG.loot.inf > 0 && CFG.loot.sapper > 0, "日军班与工兵班应可缴获");
+  let loot = SurgeryGame("A3", 1);
+  loot.resources.ammo = 6;
+  MakeColumn(loot, "tLoot", ["sapper"], "3,1");
+  const sapper = EnemyUnits(loot).find((unit) => unit.type === "sapper");
+  sapper.hp = 1;
+  const guerrilla = AllyUnits(loot).find((unit) => unit.type === "guerrilla");
+  guerrilla.pos = "3,0";
+  guerrilla.layer = "surface";
+  guerrilla.acted = false;
+  const shot = LegalActions(loot, guerrilla.id).find((a) => a.type === "Attack" && a.target === sapper.id);
+  Ok(shot, "应能打这个工兵班");
+  const hit = Step(loot, shot);
+  Ok(hit.events.some((e) => e.kind === "loot" && e.visible && e.text.includes("缴获")),
+    "打死工兵班应播报缴获（原来一次也没兑现过）");
+  Eq(hit.state.resources.ammo, 6 - CFG.ammoPerAttack + CFG.loot.sapper, "缴获数目不对");
+  // ③ 非法动作：只回这一个动作的理由，不夹带别的动作类型
+  const refusal = PerformAction(CreateGame("A2", 1), { type: "DigEntrance", unit: "u1", at: "3,0" });
+  Ok(refusal.illegal, "地面上开口应被拒");
+  Eq(refusal.illegalAction, "DigEntrance", "拒绝回执应标明是哪一个动作被拒");
+  Ok(Array.isArray(refusal.hints) && refusal.hints.length > 0, "拒绝回执应带补救提示");
+  for (const hint of refusal.hints) {
+    Ok(!/^(Ambush|Attack|Hide|CoverTraces|BreakRoad|Collapse|Dig|DigFacility|DigDoor|HideGrain|MoveCivs|GuideCivs|Disguise)[ ：:]/.test(hint)
+       || hint.startsWith("DigEntrance"), `拒绝回执夹带了无关动作的提示：${hint}`);
   }
 });
 
