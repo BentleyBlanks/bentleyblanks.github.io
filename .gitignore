@@ -18,3 +18,7 @@ tmp/
 
 # Local Civilization VI reference audio; do not publish or redistribute.
 /taihang/assets/audio/local-civ6/
+
+# TunnelBell1942 调试临时文件（agent 跑 trace 用，不进仓库）
+TunnelBell1942/*_tmp.mjs
+Screens_TunnelBell/

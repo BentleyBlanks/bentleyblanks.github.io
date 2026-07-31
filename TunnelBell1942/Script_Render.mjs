@@ -54,6 +54,11 @@ const EARTH_FRONT_Z = 2.25;
 /** 地道背墙 z。 */
 const EARTH_BACK_Z = -6.6;
 
+/** 角色 z：略微靠前，避免被同在 PLAY 层的道具吞掉；仍在剖面正面之后。 */
+const ACTOR_Z_PLAYER = 0.55;
+const ACTOR_Z_ENEMY = 0.40;
+const ACTOR_Z_NPC = 0.25;
+
 const QUALITY_PRESET = {
   low: {
     texSize: 64, cyl: 6, lathe: 8, ico: 0, bevelSeg: 1, extrudeDepth: 5.0,
@@ -2242,7 +2247,7 @@ export function CreateRenderer(canvas, options = {}) {
           }
           TrackMat(m);
           const q = new THREE.Mesh(TrackGeo(GQuad(1, 1, 0.5, 0.5, 0)), m);
-          q.position.z = 0.35 + k * 0.55;
+          q.position.z = 0.95 + k * 0.5;   // 必须在角色之前，毒烟要能把人罩住
           q.renderOrder = 14 + k;
           view.group.add(q);
           view.layers.push(q);
@@ -2545,7 +2550,7 @@ export function CreateRenderer(canvas, options = {}) {
       if (rig && rig.group) {
         rig.group.visible = near;
         if (near) {
-          rig.group.position.set(ex, ey, LAYER_Z.PLAY);
+          rig.group.position.set(ex, ey, ACTOR_Z_ENEMY);
           PoseRig(rig, e.anim || null, e.facing === -1 ? -1 : 1, t);
         }
       }
@@ -2578,7 +2583,7 @@ export function CreateRenderer(canvas, options = {}) {
       const near = Math.abs(nx - cx) < halfW;
       rig.group.visible = near && !nn.rescued;
       if (near) {
-        rig.group.position.set(nx, typeof nn.y === 'number' ? nn.y : 0, LAYER_Z.PLAY - 0.35);
+        rig.group.position.set(nx, typeof nn.y === 'number' ? nn.y : 0, ACTOR_Z_NPC);
         PoseRig(rig, nn.anim || null, nn.facing === -1 ? -1 : 1, t);
       }
     }
