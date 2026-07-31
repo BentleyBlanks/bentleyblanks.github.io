@@ -32,6 +32,16 @@ export const keymap = Object.freeze({
   ambush: Object.freeze({ code: "KeyV", label: "V", group: "动作", desc: "伏击" }),
   feint: Object.freeze({ code: "KeyF", label: "F", group: "动作", desc: "佯动" }),
   hide: Object.freeze({ code: "KeyG", label: "G", group: "动作", desc: "隐蔽" }),
+  hideGrain: Object.freeze({ code: "KeyH", label: "H", group: "动作", desc: "藏粮（站在村格，把明存粮转进脚下已连通的储粮洞）" }),
+  moveCivs: Object.freeze({ code: "KeyM", label: "M", group: "动作", desc: "转移群众（选目标：送进邻接地道口的藏人室，或挪到地面安全格）" }),
+  guideCivs: Object.freeze({ code: "KeyP", label: "P", group: "动作", desc: "带路（选目标：带着同格群众一起在地道里走）" }),
+  disguise: Object.freeze({ code: "KeyI", label: "I", group: "动作", desc: "伪装入口（灶台/水井/炕洞/牲口槽）" }),
+  organize: Object.freeze({ code: "KeyO", label: "O", group: "动作", desc: "组织（升本村组织度，占主动作）" }),
+  coverTraces: Object.freeze({ code: "KeyC", label: "C", group: "动作", desc: "掩土（本格痕迹与暴露豆各 -2，每人每役限 3 次）" }),
+  breakRoad: Object.freeze({ code: "KeyK", label: "K", group: "动作", desc: "破路（刨毁脚下大车路/南土路/石桥）" }),
+  collapse: Object.freeze({ code: "KeyX", label: "X", group: "动作", desc: "自毁封口（塌毁脚下地道口，断敌利用；需二次确认）" }),
+  toggleDoor: Object.freeze({ code: "KeyT", label: "T", group: "动作", desc: "开关隔断门（免费，不占主动作，每门每回合 1 次）" }),
+  rest: Object.freeze({ code: "KeyN", label: "N", group: "动作", desc: "休整（明确不做别的，结束这一手）" }),
 
   // ---- 回合与信息 ----
   endTurn: Object.freeze({ code: "Enter", label: "Enter", group: "回合", desc: "结束回合（两段式护栏）" }),

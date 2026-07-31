@@ -135,7 +135,7 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     revision: 0,
     selectedUnitId: null,
     selectedHexKey: null,
-    targetMode: null,           // null | "dig"
+    targetMode: null,           // null | "dig" | "civs" | "guide"（三者共用 targetChoices 的格键→动作映射）
     targetChoices: new Map(),   // hexKey -> action
     pendingConfirm: null,       // { action, hexKey, expiresAt }
     peek: false,
@@ -477,7 +477,7 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
    *    free  = 走到该格后还剩 MP（还能接着走）；spent = 正好走满，本回合到此为止。
    *  引擎不提供「多回合可达」（EnumMoves 只枚举本回合 MP 内的终点），故不编造第三档。 */
   function RefreshReachable(unit) {
-    if (session.targetMode === "dig") {
+    if (session.targetMode) {
       renderer.SetReachable([...session.targetChoices.keys()].map((key) => ({ key, tier: "target" })), unit.layer);
       return;
     }
@@ -873,16 +873,33 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     renderer.FocusHex(next.pos, 250);
   }
 
-  /** 右键下令（engine）：Move / UseEntrance；降低入口隐蔽的操作需二次确认（全游戏唯一）。 */
+  /** 二次确认：仅限引擎标记「降低入口隐蔽 / 不可逆」的操作（confirm / exposeRisk）。
+   *  三处共用同一份逻辑：右键下令、目标模式选点、键盘直触发单动作（自毁封口就走这条）。 */
+  function PerformWithConfirm(action) {
+    const needsConfirm = action.confirm === true || action.exposeRisk === true;
+    if (needsConfirm) {
+      const pending = session.pendingConfirm;
+      const same = pending && JSON.stringify(pending.action) === JSON.stringify(action);
+      if (!same || performance.now() > pending.expiresAt) {
+        session.pendingConfirm = { action, expiresAt: performance.now() + 4000 };
+        ui.Toast("这一下不可逆（或会降低入口隐蔽）：再确认一次", { kind: "warn", ms: 2600 });
+        return;
+      }
+      session.pendingConfirm = null;
+    }
+    Perform(action);
+  }
+
+  /** 右键下令（engine）：Move / UseEntrance / Attack，以及目标模式（挖掘/转移群众/带路）选点。 */
   function IssueOrder(pick) {
     const unit = session.vm.units.find((candidate) => candidate.id === session.selectedUnitId);
     if (!unit || unit.side !== "ally") return;
     if (session.peek) { ui.Toast("窥视中：松开 Space 后再下令", { kind: "warn", ms: 1600 }); return; }
     if (session.mode === "fixture") { FixtureToast(); return; }
-    if (session.targetMode === "dig") {
-      const digAction = session.targetChoices.get(pick.hexKey);
-      if (digAction) { CancelTargetMode(); Perform(digAction); }
-      else ui.Toast("不是可挖目标", { kind: "warn", ms: 1500 });
+    if (session.targetMode) {
+      const targetAction = session.targetChoices.get(pick.hexKey);
+      if (targetAction) { CancelTargetMode(); PerformWithConfirm(targetAction); }
+      else ui.Toast("不是可选目标", { kind: "warn", ms: 1500 });
       return;
     }
     const actions = LegalActionsSafe(unit.id);
@@ -897,46 +914,58 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
       }
     }
     if (!action) { ui.Toast("此处无可执行的命令", { kind: "warn", ms: 1500 }); return; }
-    // 二次确认：仅限引擎标记「降低入口隐蔽」的操作（confirm / exposeRisk）
-    const needsConfirm = action.confirm === true || action.exposeRisk === true;
-    if (needsConfirm) {
-      const pending = session.pendingConfirm;
-      const same = pending && JSON.stringify(pending.action) === JSON.stringify(action);
-      if (!same || performance.now() > pending.expiresAt) {
-        session.pendingConfirm = { action, expiresAt: performance.now() + 4000 };
-        ui.Toast("该操作会降低入口隐蔽：再次右键确认", { kind: "warn", ms: 2600 });
-        return;
-      }
-      session.pendingConfirm = null;
-    }
-    Perform(action);
+    PerformWithConfirm(action);
   }
 
-  function EnterDigMode() {
+  /** 通用「选目标格」模式：挖掘 / 转移群众 / 带路都是同一套壳——枚举候选动作、
+   *  按格键去重存进 targetChoices，右键点格时 IssueOrder 直接查表执行。
+   *  同一格若有多个候选（例如 MoveCivs 的 全部/只送老弱/只送伤员/只送青壮 四种变体），
+   *  优先保留「不限人群」的那个通用变体，其余细分变体留给 CLI，不在网页上做二级选择器。 */
+  function EnterTargetMode(mode, types, promptText, hintKey) {
     const unit = session.vm.units.find((candidate) => candidate.id === session.selectedUnitId);
     if (!unit || unit.side !== "ally") return;
     if (session.mode === "fixture") { FixtureToast(); return; }
-    const digActions = LegalActionsSafe(unit.id)
-      .filter((action) => ["Dig", "DigEntrance", "DigFacility", "DigDoor"].includes(action.type));
-    if (!digActions.length) { ui.Toast("此处无可挖掘目标", { kind: "warn", ms: 1600 }); return; }
-    session.targetMode = "dig";
+    const candidates = LegalActionsSafe(unit.id).filter((action) => types.includes(action.type));
+    if (!candidates.length) { ui.Toast("此处无可执行目标", { kind: "warn", ms: 1600 }); return; }
+    session.targetMode = mode;
     session.targetChoices.clear();
-    for (const action of digActions) {
-      const key = action.target ?? action.at ?? action.cell ?? unit.pos;
-      if (!session.targetChoices.has(key)) session.targetChoices.set(key, action);
+    for (const action of candidates) {
+      const key = action.target ?? action.at ?? action.cell ?? action.to ?? unit.pos;
+      const existing = session.targetChoices.get(key);
+      if (!existing || (existing.kind && !action.kind)) session.targetChoices.set(key, action);
     }
-    ui.MaybeHint("tunnelCost");
-    ui.Toast("选择挖掘目标（右键下达，Esc 取消）", { kind: "info", ms: 2200 });
+    if (hintKey) ui.MaybeHint(hintKey);
+    ui.Toast(promptText, { kind: "info", ms: 2200 });
     RefreshSelection();
   }
 
+  function EnterDigMode() {
+    EnterTargetMode("dig", ["Dig", "DigEntrance", "DigFacility", "DigDoor"],
+      "选择挖掘目标（右键下达，Esc 取消）", "tunnelCost");
+  }
+
+  function EnterMoveCivsMode() {
+    EnterTargetMode("civs", ["MoveCivs"], "选择群众去哪（藏人室或地面安全格，右键下达，Esc 取消）");
+  }
+
+  function EnterGuideCivsMode() {
+    EnterTargetMode("guide", ["GuideCivs"], "选择带路终点（同格群众跟着一起走，右键下达，Esc 取消）");
+  }
+
+  /** 「一按就做」的单一/自身目标动作：藏粮、组织、掩土、破路、休整、自毁封口（需二次确认走 PerformWithConfirm）、
+   *  伪装（多种变体取第一种）、开关隔断门（可能邻接多道门，取第一道并告知还有几道）。
+   *  候选不止一个时提示「已选第一种」——网页不做二级选择器，要精细挑选去 CLI。 */
   function DoStanceAction(type) {
     const unit = session.vm.units.find((candidate) => candidate.id === session.selectedUnitId);
     if (!unit || unit.side !== "ally") return;
     if (session.mode === "fixture") { FixtureToast(); return; }
-    const action = LegalActionsSafe(unit.id).find((candidate) => candidate.type === type);
-    if (!action) { ui.Toast("当前不可执行该动作", { kind: "warn", ms: 1500 }); return; }
-    Perform(action);
+    const candidates = LegalActionsSafe(unit.id).filter((candidate) => candidate.type === type);
+    if (!candidates.length) { ui.Toast("当前不可执行该动作", { kind: "warn", ms: 1500 }); return; }
+    const action = candidates[0];
+    if (candidates.length > 1) {
+      ui.Toast(`有 ${candidates.length} 种可选，先执行第一种；其余细分见 CLI`, { kind: "info", ms: 2200 });
+    }
+    PerformWithConfirm(action);
   }
 
   // ---------------- 悬停与路径预览（文明VI 手感：移到哪，路径与代价立刻跟上） ----------------
@@ -972,7 +1001,7 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
   function PreviewPath(pick) {
     const unit = session.vm.units.find((candidate) => candidate.id === session.selectedUnitId);
     if (!unit || unit.side !== "ally" || unit.acted) { ClearPreview(); return; }
-    if (session.targetMode === "dig") {                       // 目标模式：只提示这格是不是合法目标
+    if (session.targetMode) {                                 // 目标模式：只提示这格是不是合法目标
       SetOrderCursor(session.targetChoices.has(pick.hexKey));
       renderer.SetPath(null);
       ui.SetMovePreview?.(null);
@@ -1136,6 +1165,16 @@ export async function StartGame({ canvas, uiRoot, OnProgress = () => {} } = {}) 
     if (KeyMatches(keymap.ambush, event)) { DoStanceAction("Ambush"); return; }
     if (KeyMatches(keymap.feint, event)) { DoStanceAction("Feint"); return; }
     if (KeyMatches(keymap.hide, event)) { DoStanceAction("Hide"); return; }
+    if (KeyMatches(keymap.hideGrain, event)) { DoStanceAction("HideGrain"); return; }
+    if (KeyMatches(keymap.moveCivs, event)) { EnterMoveCivsMode(); return; }
+    if (KeyMatches(keymap.guideCivs, event)) { EnterGuideCivsMode(); return; }
+    if (KeyMatches(keymap.disguise, event)) { DoStanceAction("Disguise"); return; }
+    if (KeyMatches(keymap.organize, event)) { DoStanceAction("Organize"); return; }
+    if (KeyMatches(keymap.coverTraces, event)) { DoStanceAction("CoverTraces"); return; }
+    if (KeyMatches(keymap.breakRoad, event)) { DoStanceAction("BreakRoad"); return; }
+    if (KeyMatches(keymap.collapse, event)) { DoStanceAction("Collapse"); return; }
+    if (KeyMatches(keymap.toggleDoor, event)) { DoStanceAction("ToggleDoor"); return; }
+    if (KeyMatches(keymap.rest, event)) { DoStanceAction("Rest"); return; }
     if (KeyMatches(keymap.panUp, event)) session.panKeys.up = true;
     if (KeyMatches(keymap.panDown, event)) session.panKeys.down = true;
     if (KeyMatches(keymap.panLeft, event)) session.panKeys.left = true;
