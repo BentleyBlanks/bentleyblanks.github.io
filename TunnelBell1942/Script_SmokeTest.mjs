@@ -276,6 +276,35 @@ for (let i = 0; i < 3; i += 1) {
   }
 }
 
+Section("第一幕的收场");
+// 这一幕的情感支点：钟响了，人没下来。
+// 玩家不能靠"跑得快"改写它，但在敲钟之前也不能被随便弄死。
+{
+  const atExit = Rules.CreateState(0);
+  Rules.DebugTeleport(atExit, atExit.level.exit.x, atExit.level.exit.y);
+  Rules.DebugHold(atExit, {}, 1.5);
+  Assert(atExit.phase === "play", "没敲钟就站到出口上，不算通关");
+
+  const rung = Rules.CreateState(0);
+  const bell = rung.level.props.find((p) => p.interact === "bell");
+  const beforeChase = rung.enemies.filter((e) => !e.dormant).length;
+  Rules.DebugTeleport(rung, bell.x, 0);
+  Rules.DebugPressInteract(rung);
+  Rules.DebugHold(rung, {}, 2.5);
+  Assert(rung.world.bellRung, "钟能被敲响");
+  Assert(rung.enemies.filter((e) => !e.dormant).length > beforeChase, "敲钟之后才有追兵");
+
+  Rules.DebugKill(rung, "caught");
+  Rules.DebugHold(rung, {}, 3.0);
+  Assert(rung.phase === "won", "敲钟之后被抓 = 本幕收场，不是复活");
+  Assert(rung.stats.deaths === 0, "这次被抓不计入死亡（它是结局，不是失误）");
+
+  const early = Rules.CreateState(0);
+  Rules.DebugKill(early, "caught");
+  Rules.DebugHold(early, {}, 2.5);
+  Assert(early.phase === "play" && !early.player.dead, "敲钟之前被抓仍然正常复活");
+}
+
 Section("失败与复活");
 {
   const state = Rules.CreateState(0);
