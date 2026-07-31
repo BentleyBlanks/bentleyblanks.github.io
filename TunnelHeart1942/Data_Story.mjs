@@ -1,87 +1,68 @@
-/** @typedef {{ id: string, title: string, body: string }} StoryBeat */
-/** @typedef {{ id: string, title: string, body: string }} HistoryCard */
+/** Film-faithful beats for 地道战, told in Valiant Hearts chapter cadence. */
 
-export const SAVE_KEY = "tunnelheart1942_v1";
-export const CACHE_BUST = "20260731a";
+export const SAVE_KEY = "tunnelheart1942_v2";
+export const CACHE_BUST = "20260731b";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
-  subtitle: "横版叙事解谜 · 致敬《勇敢的心：世界大战》形式",
-  tagline: "在冀中平原，用铁锨、钟声与地道，把乡亲护到明天。",
+  subtitle: "白盒 · 横版叙事解谜（Valiant Hearts 形式）",
+  tagline: "铁锨、钟声、翻口与黑风口——按电影五幕走完高家庄。",
   yearLabel: "一九四二年 · 冀中高家庄",
 };
 
-/** @type {HistoryCard[]} */
-export const HISTORY_CARDS = [
-  {
-    id: "card_tunnel_origin",
-    title: "地道从地窖长出来",
-    body: "冀中平原少山少林，群众先把地窖、土洞打通，再逐步改造成能藏、能走、能打的战斗地道。",
-  },
-  {
-    id: "card_bell",
-    title: "村口大钟",
-    body: "钟声是最响的警报。电影里高老忠拼死敲钟，换来乡亲入洞的时间——本关把这一幕写成不可改写的史实节拍。",
-  },
-  {
-    id: "card_flip",
-    title: "翻口与迷惑洞",
-    body: "战斗地道设翻口、卡口与迷惑岔道，专克毒气、灌水与搜查，也能让敌人“高，实在是高”。",
-  },
-  {
-    id: "card_heifengkou",
-    title: "黑风口据点",
-    body: "拔据点不是炫技歼敌，而是把封锁网撕开一口，让村落地道连成野外进攻网。",
-  },
-];
-
 /**
- * Five acts mirror the film arc:
- * dig → raid/sacrifice → rebuild combat tunnels → ambush → take the blockhouse.
- * @type {Array<{
+ * @typedef {{ id: string, speaker: string, text: string, mood?: string }} Panel
+ * @typedef {{
  *   id: string,
  *   act: number,
  *   title: string,
  *   timeLabel: string,
- *   portrait: string,
- *   bg: string,
- *   layer: "village"|"tunnel"|"blockhouse",
- *   briefing: StoryBeat[],
- *   outro: StoryBeat[],
+ *   cast: string,
  *   objective: string,
  *   goals: string[],
- *   historyCardId: string,
- * }>}
+ *   openPanels: Panel[],
+ *   closePanels: Panel[],
+ *   night?: boolean,
+ *   startTunnel?: boolean,
+ * }} Chapter
  */
+
+/** @type {Chapter[]} */
 export const CHAPTERS = [
   {
     id: "act1_connect",
     act: 1,
     title: "土洞相连",
     timeLabel: "一九四二年 · 春",
-    portrait: "Texture_PortraitChuanbao.png",
-    bg: "Texture_BgVillage.jpg",
-    layer: "village",
-    objective: "把三家地窖挖通，让乡亲能互通躲藏。",
-    goals: ["dig_links", "talk_laozhong", "open_hatch"],
-    historyCardId: "card_tunnel_origin",
-    briefing: [
+    cast: "高传宝",
+    objective: "听高老忠交代，下地道挖通两处土塞，让三家地窖通气。",
+    goals: ["talk_laozhong", "enter_hatch", "dig_west", "dig_east"],
+    openPanels: [
       {
-        id: "b1a",
-        title: "平原没有山",
-        body: "高家庄在冀中平地上。鬼子一来，藏无可藏。高老忠把几家的土洞指给传宝看——“先挖通，再谈打。”",
+        id: "p1a",
+        speaker: "旁白",
+        text: "冀中平原，一马平川。鬼子的炮楼看得见庄稼，庄稼却藏不住人。",
+        mood: "wide",
       },
       {
-        id: "b1b",
-        title: "铁锨就是武器",
-        body: "你是民兵队长高传宝。左右移动，走近松土按住挖掘，把地窖连成地道。空格跳跃，靠近物件按互动。",
+        id: "p1b",
+        speaker: "高老忠",
+        text: "传宝，别先想着打。先把几家土洞挖通——人能藏，才谈得上活。",
+        mood: "talk",
+      },
+      {
+        id: "p1c",
+        speaker: "提示",
+        text: "←→ 移动　空格跳　E 互动　按住 J 挖掘。地道口按 E 下井，土塞要挖开，不是跳过去。",
+        mood: "tip",
       },
     ],
-    outro: [
+    closePanels: [
       {
-        id: "o1",
-        title: "洞通了",
-        body: "三家地道口对上了气。林霞说：能藏还不够，夜里要有人守钟。",
+        id: "p1z",
+        speaker: "林霞",
+        text: "气通了。可只能藏、不能打——夜里要是来抄，钟谁敲？",
+        mood: "talk",
       },
     ],
   },
@@ -90,29 +71,48 @@ export const CHAPTERS = [
     act: 2,
     title: "钟声",
     timeLabel: "一九四二年 · 夜袭",
-    portrait: "Texture_PortraitLaozhong.png",
-    bg: "Texture_BgVillage.jpg",
-    layer: "village",
-    objective: "护送乡亲入洞，并赶到村口大槐树下敲响警钟。",
-    goals: ["shelter_villagers", "ring_bell", "survive_raid"],
-    historyCardId: "card_bell",
-    briefing: [
+    cast: "高传宝",
+    night: true,
+    objective: "把三户乡亲送进地道，再冲到村口大槐树下——钟，必须响。",
+    goals: ["shelter_a", "shelter_b", "shelter_c", "reach_bell"],
+    openPanels: [
       {
-        id: "b2a",
-        title: "黑风口的靴子",
-        body: "夜色里据点灯火一闪。高老忠听见狗叫，低声吩咐：快把人往洞里送——钟，我来敲。",
+        id: "p2a",
+        speaker: "旁白",
+        text: "黑风口据点的灯火一闪。狗叫先于枪声。",
+        mood: "wide",
       },
       {
-        id: "b2b",
-        title: "先救人",
-        body: "带乡亲到地道口互动入洞。随后冲向村口大钟。钟声一响，这一幕便按史实落下。",
+        id: "p2b",
+        speaker: "高老忠",
+        text: "快送人进洞！钟——我去敲。你们记住：人比地道金贵。",
+        mood: "talk",
+      },
+      {
+        id: "p2c",
+        speaker: "高传宝",
+        text: "爹——",
+        mood: "talk",
+      },
+      {
+        id: "p2d",
+        speaker: "高老忠",
+        text: "少说话。去！",
+        mood: "talk",
       },
     ],
-    outro: [
+    closePanels: [
       {
-        id: "o2",
-        title: "钟还在响",
-        body: "高老忠拉响了最后一颗手榴弹。地道被破坏了，可乡亲还在。传宝握紧铁锨：只藏不够，要能打。",
+        id: "p2z1",
+        speaker: "旁白",
+        text: "钟声裂开夜色。高老忠拉响了最后一颗手榴弹。",
+        mood: "wide",
+      },
+      {
+        id: "p2z2",
+        speaker: "高传宝",
+        text: "地道被搅烂了……可人还在。只藏不够——要能打。",
+        mood: "talk",
       },
     ],
   },
@@ -121,29 +121,36 @@ export const CHAPTERS = [
     act: 3,
     title: "能藏能打",
     timeLabel: "一九四三年 · 初夏",
-    portrait: "Texture_PortraitLinxia.png",
-    bg: "Texture_BgTunnel.jpg",
-    layer: "tunnel",
-    objective: "改建翻口，识破冒充武工队的特务并在翻口处将其制服。",
+    cast: "高传宝",
+    startTunnel: true,
+    objective: "在地道里修好翻口，盘问可疑来客，引他们到翻口下将其制服。",
     goals: ["build_flip", "expose_spy", "trap_spy"],
-    historyCardId: "card_flip",
-    briefing: [
+    openPanels: [
       {
-        id: "b3a",
-        title: "论持久战摊在炕桌上",
-        body: "林霞与传宝总结教训：地道要有翻口、射击孔和迷惑岔道。敌人灌水放火，也别想一网打尽。",
+        id: "p3a",
+        speaker: "林霞",
+        text: "《论持久战》摊在炕桌上。教训写得很清楚：要有翻口、射击孔、迷惑岔道。",
+        mood: "talk",
       },
       {
-        id: "b3b",
-        title: "来客不对劲",
-        body: "两个“武工队员”口音发飘、路线发熟。先修好翻口，再引他们走到卡口下方。",
+        id: "p3b",
+        speaker: "高传宝",
+        text: "灌水、放火、搜洞——都得防。先把翻口改起来。",
+        mood: "talk",
+      },
+      {
+        id: "p3c",
+        speaker: "旁白",
+        text: "庄外来了两个“武工队员”。口音飘，路线熟——不对劲。",
+        mood: "wide",
       },
     ],
-    outro: [
+    closePanels: [
       {
-        id: "o3",
-        title: "高，实在是高",
-        body: "翻口一落，特务束手。山田的报复不会远——下一次，要让他在地道口摸不着北。",
+        id: "p3z",
+        speaker: "民兵",
+        text: "翻口一落——高，实在是高。山田不会善罢甘休。",
+        mood: "talk",
       },
     ],
   },
@@ -152,29 +159,29 @@ export const CHAPTERS = [
     act: 4,
     title: "神出鬼没",
     timeLabel: "一九四三年 · 夏",
-    portrait: "Texture_PortraitChuanbao.png",
-    bg: "Texture_BgVillage.jpg",
-    layer: "village",
-    objective: "从多个地道口出击，打乱山田的报复队形并保全群众。",
-    goals: ["exit_shots", "break_patrol", "keep_safe"],
-    historyCardId: "card_flip",
-    briefing: [
+    cast: "高传宝",
+    objective: "从三处出击口轮流开火，打散山田的报复队，别在同一口子恋战。",
+    goals: ["shot_a", "shot_b", "shot_c", "break_patrol"],
+    openPanels: [
       {
-        id: "b4a",
-        title: "打一枪换一个地方",
-        body: "山田纠集兵力进村。民兵从井口、灶台、墙根钻出开火，再缩回地道——让敌人打的是空气。",
+        id: "p4a",
+        speaker: "旁白",
+        text: "山田纠集兵力进村。民兵却像从井口、灶台、墙根里冒出来。",
+        mood: "wide",
       },
       {
-        id: "b4b",
-        title: "口子就是阵地",
-        body: "走到发光的出击口按互动开火，再换到下一处。别在同一个口子恋战。",
+        id: "p4b",
+        speaker: "高传宝",
+        text: "打一枪，换一个地方！让他们打空气。",
+        mood: "talk",
       },
     ],
-    outro: [
+    closePanels: [
       {
-        id: "o4",
-        title: "气焰压下去了",
-        body: "报复落了空。地道开始往野外延伸——下一目标：黑风口。",
+        id: "p4z",
+        speaker: "林霞",
+        text: "气焰压下去了。下一步：地道出村，咬住黑风口。",
+        mood: "talk",
       },
     ],
   },
@@ -183,38 +190,41 @@ export const CHAPTERS = [
     act: 5,
     title: "黑风口",
     timeLabel: "反攻前夜",
-    portrait: "Texture_PortraitChuanbao.png",
-    bg: "Texture_BgBlockhouse.jpg",
-    layer: "blockhouse",
-    objective: "地道挖到炮楼下，与八路军协同拔掉黑风口据点。",
+    cast: "高传宝",
+    startTunnel: true,
+    objective: "在地道里挖开炮楼根的土塞，安放炸药，再上地表发出总攻信号。",
     goals: ["dig_under", "plant_charge", "signal_assault"],
-    historyCardId: "card_heifengkou",
-    briefing: [
+    openPanels: [
       {
-        id: "b5a",
-        title: "围点打援",
-        body: "区长赵平原定下协同：民兵地道先咬住炮楼根基，主力与游击队再合围。",
+        id: "p5a",
+        speaker: "赵平原",
+        text: "围点打援。民兵地道先咬住炮楼根基，主力与游击队再合围。",
+        mood: "talk",
       },
       {
-        id: "b5b",
-        title: "最后一锨",
-        body: "在松土段挖通至药室，安放炸药，爬上信号点鸣枪。胜利的钟声，要响遍冀中。",
+        id: "p5b",
+        speaker: "高传宝",
+        text: "明白。挖到药室，安好，我亲自上去鸣枪。",
+        mood: "talk",
       },
     ],
-    outro: [
+    closePanels: [
       {
-        id: "o5",
-        title: "钟声再起",
-        body: "黑风口塌了。高家庄的地道从村里通到野外——不是为了炫技，是为了人还能回家。",
+        id: "p5z1",
+        speaker: "旁白",
+        text: "黑风口塌了。胜利的钟声，从村口传到野外。",
+        mood: "wide",
+      },
+      {
+        id: "p5z2",
+        speaker: "高传宝",
+        text: "地道不是为了炫技。是为了人，还能回家。",
+        mood: "talk",
       },
     ],
   },
 ];
 
 export function FindChapter(chapterId) {
-  return CHAPTERS.find((chapter) => chapter.id === chapterId) || CHAPTERS[0];
-}
-
-export function FindHistoryCard(cardId) {
-  return HISTORY_CARDS.find((card) => card.id === cardId) || HISTORY_CARDS[0];
+  return CHAPTERS.find((c) => c.id === chapterId) || CHAPTERS[0];
 }

@@ -1,56 +1,24 @@
-import { CHAPTERS, CACHE_BUST, FindHistoryCard } from "./Data_Story.mjs";
+import { CHAPTERS, CACHE_BUST } from "./Data_Story.mjs";
 import {
-  AdvanceBriefing,
-  AdvanceOutro,
+  AdvancePanels,
   CreateCampaignState,
   CreateInputState,
   LoadFromStorage,
+  PLAYER_H,
   RestartChapter,
   SaveToStorage,
   StepPlay,
 } from "./Script_Rules.mjs";
+import { SURFACE_Y, TUNNEL_CEIL, TUNNEL_FLOOR, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
-
 const canvas = $("GameCanvas");
 const ctx = canvas.getContext("2d");
-
-const images = {};
-const IMAGE_LIST = [
-  "Texture_TitleBackground.jpg",
-  "Texture_BgVillage.jpg",
-  "Texture_BgTunnel.jpg",
-  "Texture_BgBlockhouse.jpg",
-  "Texture_PortraitChuanbao.png",
-  "Texture_PortraitLaozhong.png",
-  "Texture_PortraitLinxia.png",
-  "Texture_SocialPreview.jpg",
-];
 
 let state = CreateCampaignState(0);
 let lastTs = 0;
 let audioCtx = null;
-
-function AssetUrl(name) {
-  return `./${name}?v=${CACHE_BUST}`;
-}
-
-function LoadImages() {
-  return Promise.all(
-    IMAGE_LIST.map(
-      (name) =>
-        new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            images[name] = img;
-            resolve();
-          };
-          img.onerror = () => resolve();
-          img.src = AssetUrl(name);
-        }),
-    ),
-  );
-}
+let prevGoalSig = "";
 
 function EnsureAudio() {
   if (audioCtx) return audioCtx;
@@ -60,7 +28,7 @@ function EnsureAudio() {
   return audioCtx;
 }
 
-function Beep(freq = 440, dur = 0.08, type = "square", gain = 0.03) {
+function Beep(freq = 440, dur = 0.07, type = "square", gain = 0.03) {
   const ac = EnsureAudio();
   if (!ac) return;
   const o = ac.createOscillator();
@@ -76,22 +44,40 @@ function Beep(freq = 440, dur = 0.08, type = "square", gain = 0.03) {
 }
 
 function Show(el, on) {
-  if (!el) return;
-  el.hidden = !on;
+  if (el) el.hidden = !on;
 }
 
 function SetModal(which) {
-  const layer = $("ModalLayer");
-  const map = {
-    help: $("HelpModal"),
-    history: $("HistoryModal"),
-    pause: $("PauseModal"),
-    fail: $("FailModal"),
-  };
-  const any = !!which;
-  Show(layer, any);
-  for (const [key, el] of Object.entries(map)) Show(el, which === key);
+  Show($("ModalLayer"), !!which);
+  Show($("HelpModal"), which === "help");
+  Show($("HistoryModal"), which === "history");
+  Show($("PauseModal"), which === "pause");
+  Show($("FailModal"), which === "fail");
   state.pauseOpen = which === "pause";
+}
+
+function GoalLabel(id) {
+  const map = {
+    talk_laozhong: "听取高老忠交代",
+    enter_hatch: "从地窖口下地道",
+    dig_west: "挖开西口土塞",
+    dig_east: "挖开东口土塞",
+    shelter_a: "护送第一户入洞",
+    shelter_b: "护送第二户入洞",
+    shelter_c: "护送第三户入洞",
+    reach_bell: "赶到村口敲钟",
+    build_flip: "改建战斗翻口",
+    expose_spy: "盘问并识破特务",
+    trap_spy: "翻口制服特务",
+    shot_a: "井口出击",
+    shot_b: "墙根出击",
+    shot_c: "灶台出击",
+    break_patrol: "打散报复巡逻",
+    dig_under: "挖开炮楼根土塞",
+    plant_charge: "安放药室炸药",
+    signal_assault: "发出总攻信号",
+  };
+  return map[id] || id;
 }
 
 function SyncTitle() {
@@ -99,58 +85,30 @@ function SyncTitle() {
   const cont = $("ContinueButton");
   if (progress && progress.unlockedActs > 1) {
     Show(cont, true);
-    cont.textContent = `继续 · 第 ${Math.min(progress.unlockedActs, CHAPTERS.length)} 幕附近`;
-  } else {
-    Show(cont, false);
-  }
+    cont.textContent = `继续 · 第 ${Math.min(progress.unlockedActs, CHAPTERS.length)} 幕`;
+  } else Show(cont, false);
 }
 
-function SyncBriefing() {
+function SyncPanels() {
   const chapter = CHAPTERS[state.chapterIndex];
-  const beat = chapter.briefing[state.briefingIndex];
-  $("BriefingKicker").textContent = `第${chapter.act}幕 · ${chapter.timeLabel}`;
-  $("BriefingTitle").textContent = beat.title;
-  $("BriefingBody").textContent = beat.body;
-  $("BriefingPortrait").src = AssetUrl(chapter.portrait);
-  $("BriefingPortrait").alt = chapter.title;
-  const prog = $("BriefingProgress");
-  prog.innerHTML = chapter.briefing.map((_, i) => `<i class="${i <= state.briefingIndex ? "on" : ""}"></i>`).join("");
-}
-
-function SyncOutro() {
-  const chapter = CHAPTERS[state.chapterIndex];
-  const beat = chapter.outro[state.outroIndex];
-  $("OutroKicker").textContent = `第${chapter.act}幕 · 幕终`;
-  $("OutroTitle").textContent = beat.title;
-  $("OutroBody").textContent = beat.body;
-  $("OutroPortrait").src = AssetUrl(chapter.portrait);
-  const prog = $("OutroProgress");
-  prog.innerHTML = chapter.outro.map((_, i) => `<i class="${i <= state.outroIndex ? "on" : ""}"></i>`).join("");
-  $("OutroNextButton").querySelector("span").textContent =
-    state.chapterIndex >= CHAPTERS.length - 1 && state.outroIndex >= chapter.outro.length - 1
-      ? "终章"
-      : "下一幕";
-}
-
-function GoalLabel(id) {
-  const labels = {
-    dig_links: "挖通地窖连线",
-    talk_laozhong: "听取高老忠吩咐",
-    open_hatch: "进入地道口",
-    shelter_villagers: "护送乡亲入洞",
-    ring_bell: "敲响村口警钟",
-    survive_raid: "撑过夜袭这一拍",
-    build_flip: "改建战斗翻口",
-    expose_spy: "识破冒充特务",
-    trap_spy: "用翻口制服特务",
-    exit_shots: "从三处出击口开火",
-    break_patrol: "打乱报复巡逻",
-    keep_safe: "保全群众撤离窗口",
-    dig_under: "挖到炮楼根基",
-    plant_charge: "安放药室炸药",
-    signal_assault: "发出总攻信号",
-  };
-  return labels[id] || id;
+  const list = state.phase === "panels" ? chapter.openPanels : chapter.closePanels;
+  const beat = list[state.panelIndex];
+  $("PanelKicker").textContent = `第${chapter.act}幕 · ${chapter.timeLabel}`;
+  $("PanelTitle").textContent = chapter.title;
+  $("PanelSpeaker").textContent = beat.speaker;
+  $("PanelBody").textContent = beat.text;
+  $("PanelProgress").innerHTML = list
+    .map((_, i) => `<i class="${i <= state.panelIndex ? "on" : ""}"></i>`)
+    .join("");
+  const last = state.panelIndex >= list.length - 1;
+  $("PanelNextButton").querySelector("span").textContent = state.phase === "panels"
+    ? last ? "进入关卡" : "继续"
+    : last
+      ? state.chapterIndex >= CHAPTERS.length - 1
+        ? "终章"
+        : "下一幕"
+      : "继续";
+  $("PanelCard").dataset.mood = beat.mood || "talk";
 }
 
 function SyncHud() {
@@ -159,49 +117,41 @@ function SyncHud() {
   $("ChapterTime").textContent = chapter.timeLabel;
   $("MissionTitle").textContent = chapter.title;
   $("ObjectiveText").textContent = chapter.objective;
-  const list = $("GoalList");
-  list.innerHTML = `<strong>本幕目标</strong>${Object.entries(state.goalsDone)
+  $("GoalList").innerHTML = `<strong>本幕目标</strong>${Object.entries(state.goalsDone)
     .map(([id, done]) => `<li class="${done ? "done" : ""}">${done ? "✓" : "○"} ${GoalLabel(id)}</li>`)
     .join("")}`;
-
-  const hp = $("HpRow");
-  hp.innerHTML = [0, 1, 2].map((i) => `<i class="${i < state.player.hp ? "" : "off"}"></i>`).join("");
+  $("HpRow").innerHTML = [0, 1, 2].map((i) => `<i class="${i < state.player.hp ? "" : "off"}"></i>`).join("");
+  $("LayerTag").textContent = state.player.inTunnel ? "地道层 · 剖视" : "地面层 · 纵深";
 
   if (state.subtitle) {
     Show($("SubtitlePanel"), true);
     $("SubtitleSpeaker").textContent = state.subtitle.speaker;
     $("SubtitleText").textContent = state.subtitle.text;
-  } else {
-    Show($("SubtitlePanel"), false);
-  }
+  } else Show($("SubtitlePanel"), false);
 
   if (state.interactHint) {
     Show($("InteractionPrompt"), true);
     $("InteractionLabel").textContent = state.interactHint;
-    $("InteractKey").textContent = state.interactHint.includes("挖掘") ? "J" : "E";
-  } else {
-    Show($("InteractionPrompt"), false);
-  }
+    $("InteractKey").textContent = state.interactHint.includes("挖掘") || state.interactHint.includes("J") ? "J" : "E";
+  } else Show($("InteractionPrompt"), false);
 }
 
 function SyncPhaseUi() {
   const phase = state.phase;
   Show($("TitleScreen"), phase === "title");
-  Show($("BriefingScreen"), phase === "briefing");
-  Show($("OutroScreen"), phase === "outro");
+  Show($("PanelScreen"), phase === "panels" || phase === "closePanels");
   Show($("EndingScreen"), phase === "ending");
   Show($("GameHud"), phase === "play");
-  if (phase === "briefing") SyncBriefing();
-  if (phase === "outro") SyncOutro();
-  if (phase === "play") SyncHud();
   if (phase === "title") SyncTitle();
+  if (phase === "panels" || phase === "closePanels") SyncPanels();
+  if (phase === "play") SyncHud();
   if (state.failed) SetModal("fail");
 }
 
 function BeginFrom(chapterIndex) {
   state = CreateCampaignState(chapterIndex, LoadFromStorage());
-  state.phase = "briefing";
-  state.briefingIndex = 0;
+  state.phase = "panels";
+  state.panelIndex = 0;
   SaveToStorage(state);
   SetModal(null);
   SyncPhaseUi();
@@ -210,344 +160,506 @@ function BeginFrom(chapterIndex) {
 
 function Resize() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const w = canvas.clientWidth || window.innerWidth;
-  const h = canvas.clientHeight || window.innerHeight;
+  const w = canvas.clientWidth || innerWidth;
+  const h = canvas.clientHeight || innerHeight;
   canvas.width = Math.floor(w * dpr);
   canvas.height = Math.floor(h * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function DrawSky(w, h, chapter) {
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  if (chapter.layer === "tunnel") {
-    g.addColorStop(0, "#2a2118");
-    g.addColorStop(1, "#15110d");
-  } else if (chapter.layer === "blockhouse") {
-    g.addColorStop(0, "#1b2430");
-    g.addColorStop(1, "#3a2a22");
-  } else if (chapter.id === "act2_bell") {
-    g.addColorStop(0, "#1a2230");
-    g.addColorStop(1, "#3a2f28");
-  } else {
-    g.addColorStop(0, "#9eb4b8");
-    g.addColorStop(0.55, "#d7c3a0");
-    g.addColorStop(1, "#8a6b48");
-  }
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
+/** Map world → screen with camera; +y is down; SURFACE_Y(0) is ground top. */
+function Scale() {
+  return (canvas.clientHeight || innerHeight) / VIEW_H;
+}
+function WX(x) {
+  return (x - state.cameraX) * Scale();
+}
+function WY(y) {
+  return (y - state.cameraY) * Scale();
 }
 
-function DrawBackground(w, h, chapter, camX) {
-  const key =
-    chapter.layer === "tunnel"
-      ? "Texture_BgTunnel.jpg"
-      : chapter.layer === "blockhouse"
-        ? "Texture_BgBlockhouse.jpg"
-        : "Texture_BgVillage.jpg";
-  const img = images[key];
-  if (!img) return;
-  const parallax = camX * 0.35;
-  const scale = Math.max(w / img.width, h / img.height) * 1.05;
-  const iw = img.width * scale;
-  const ih = img.height * scale;
-  ctx.globalAlpha = state.player.inTunnel && chapter.layer !== "tunnel" ? 0.25 : 0.55;
-  ctx.drawImage(img, -parallax % iw, h - ih, iw, ih);
-  ctx.drawImage(img, -parallax % iw + iw - 1, h - ih, iw, ih);
+// ─── Valiant Hearts-style layered depth ─────────────────────────
+function DrawSky(w, h, pal) {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, pal.skyTop);
+  g.addColorStop(0.55, pal.skyBot);
+  g.addColorStop(1, pal.earth);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  // soft sun / moon
+  ctx.globalAlpha = pal.night ? 0.35 : 0.5;
+  ctx.fillStyle = pal.night ? "#d9e2f0" : "#f0d9a0";
+  ctx.beginPath();
+  ctx.arc(w * 0.78, h * 0.18, pal.night ? 22 : 34, 0, Math.PI * 2);
+  ctx.fill();
   ctx.globalAlpha = 1;
 }
 
-function WorldToScreen(x, y, camX, groundY, viewH) {
-  const scale = viewH / 900;
-  return {
-    x: (x - camX) * scale,
-    y: (y - 120) * scale,
-    scale,
-  };
+function DrawParallaxHills(w, h, camX, pal, factor, yBase, amp, color) {
+  const scale = Scale();
+  const scroll = camX * factor;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  for (let i = 0; i <= w + 40; i += 20) {
+    const wx = i + scroll;
+    const n =
+      Math.sin(wx * 0.0031) * amp +
+      Math.sin(wx * 0.007) * amp * 0.45 +
+      Math.sin(wx * 0.013) * amp * 0.2;
+    const y = yBase + n * scale;
+    ctx.lineTo(i, y);
+  }
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
 }
 
-function DrawDecor(level, camX, viewH, inTunnel) {
-  for (const d of level.decor) {
-    if (d.kind === "tunnel" && !inTunnel) continue;
-    if (d.kind !== "tunnel" && inTunnel && d.kind !== "blockhouse") continue;
-    const p = WorldToScreen(d.x, d.y, camX, level.surfaceFloor, viewH);
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.scale(p.scale, p.scale);
-    ctx.lineWidth = 3;
+function DrawFarVillage(w, h, camX, pal) {
+  const scale = Scale();
+  const scroll = camX * 0.42;
+  const baseY = h * 0.58;
+  ctx.fillStyle = pal.night ? "#243028" : "#5a6a4e";
+  for (let i = -2; i < 18; i++) {
+    const x = ((i * 140 - scroll) % (w + 200)) - 40;
+    const bw = 28 + ((i * 17) % 22);
+    const bh = 36 + ((i * 13) % 40);
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(x, baseY - bh * scale, bw * scale, bh * scale);
+    // roof triangle
+    ctx.beginPath();
+    ctx.moveTo(x - 4 * scale, baseY - bh * scale);
+    ctx.lineTo(x + bw * 0.5 * scale, baseY - (bh + 16) * scale);
+    ctx.lineTo(x + (bw + 4) * scale, baseY - bh * scale);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function DrawFieldBands(w, h, camX, pal) {
+  DrawParallaxHills(w, h, camX, pal, 0.12, h * 0.5, 18, pal.haze);
+  DrawParallaxHills(w, h, camX, pal, 0.28, h * 0.56, 14, pal.field);
+  DrawFarVillage(w, h, camX, pal);
+  DrawParallaxHills(w, h, camX, pal, 0.55, h * 0.64, 10, pal.earth);
+}
+
+function DrawForeground(w, h, camX, pal) {
+  const scale = Scale();
+  const scroll = camX * 1.35;
+  ctx.strokeStyle = pal.night ? "rgba(180,200,160,.25)" : "rgba(40,50,30,.35)";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 40; i++) {
+    const x = ((i * 55 - scroll) % (w + 60)) - 20;
+    const hgt = (18 + (i % 5) * 6) * scale;
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.moveTo(x, h * 0.92);
+    ctx.quadraticCurveTo(x + 4, h * 0.92 - hgt * 0.5, x - 2, h * 0.92 - hgt);
+    ctx.stroke();
+  }
+  // fence posts
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = "#3a2a1c";
+  for (let i = 0; i < 12; i++) {
+    const x = ((i * 160 - scroll * 0.9) % (w + 80)) - 30;
+    ctx.fillRect(x, h * 0.78, 4 * scale, h * 0.14);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function DrawSoilCutaway(w, h, camX, pal) {
+  // Cross-section depth bands — the VH digging-scene feel
+  const bands = [
+    { y0: 0.0, y1: 0.22, c: pal.skyTop, a: 0.35 },
+    { y0: 0.18, y1: 0.38, c: pal.earth, a: 0.55 },
+    { y0: 0.34, y1: 0.55, c: pal.soilLight, a: 0.85 },
+    { y0: 0.5, y1: 0.72, c: pal.soilMid, a: 1 },
+    { y0: 0.68, y1: 1, c: pal.soilDeep, a: 1 },
+  ];
+  for (const b of bands) {
+    ctx.globalAlpha = b.a;
+    ctx.fillStyle = b.c;
+    ctx.fillRect(0, h * b.y0, w, h * (b.y1 - b.y0));
+  }
+  ctx.globalAlpha = 1;
+
+  // tiny surface silhouettes along the cut line
+  const cutY = h * 0.34;
+  ctx.fillStyle = "rgba(30,40,28,.55)";
+  const scroll = camX * 0.5;
+  for (let i = 0; i < 14; i++) {
+    const x = ((i * 120 - scroll) % (w + 100)) - 20;
+    ctx.fillRect(x, cutY - 28, 22, 28);
+  }
+  ctx.strokeStyle = "rgba(20,14,10,.5)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, cutY);
+  ctx.lineTo(w, cutY);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(239,224,197,.55)";
+  ctx.font = "600 12px IBM Plex Sans, sans-serif";
+  ctx.fillText("地面剖线", 16, cutY - 8);
+}
+
+function DrawProp(prop, pal) {
+  const s = Scale();
+  const x = WX(prop.x);
+  const y = WY(SURFACE_Y);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineWidth = 2.5 * s;
+  ctx.strokeStyle = "#1c1712";
+  if (prop.kind === "house") {
+    const bw = 90 * s;
+    const bh = 70 * s;
+    ctx.fillStyle = prop.variant ? "#b8956a" : "#c4a27a";
+    ctx.fillRect(-bw / 2, -bh, bw, bh);
+    ctx.strokeRect(-bw / 2, -bh, bw, bh);
+    ctx.fillStyle = "#6e2a1c";
+    ctx.beginPath();
+    ctx.moveTo(-bw / 2 - 6 * s, -bh);
+    ctx.lineTo(0, -bh - 28 * s);
+    ctx.lineTo(bw / 2 + 6 * s, -bh);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#3a2418";
+    ctx.fillRect(-10 * s, -36 * s, 20 * s, 36 * s);
+  } else if (prop.kind === "tree") {
+    ctx.fillStyle = "#5c4030";
+    ctx.fillRect(-5 * s, -90 * s, 10 * s, 90 * s);
+    ctx.fillStyle = "#4f6344";
+    ctx.beginPath();
+    ctx.arc(0, -100 * s, 36 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  } else if (prop.kind === "well") {
+    ctx.fillStyle = "#7a7264";
+    ctx.fillRect(-16 * s, -18 * s, 32 * s, 18 * s);
+    ctx.strokeRect(-16 * s, -18 * s, 32 * s, 18 * s);
+  } else if (prop.kind === "bell") {
+    ctx.fillStyle = "#c9a45a";
+    ctx.beginPath();
+    ctx.moveTo(-14 * s, -100 * s);
+    ctx.lineTo(14 * s, -100 * s);
+    ctx.lineTo(18 * s, -58 * s);
+    ctx.lineTo(0, -46 * s);
+    ctx.lineTo(-18 * s, -58 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (prop.kind === "blockhouse") {
+    ctx.fillStyle = "#5a5852";
+    ctx.fillRect(-70 * s, -150 * s, 140 * s, 150 * s);
+    ctx.fillStyle = "#3e3c38";
+    ctx.fillRect(-45 * s, -200 * s, 90 * s, 50 * s);
+    ctx.strokeRect(-70 * s, -150 * s, 140 * s, 150 * s);
+    ctx.strokeRect(-45 * s, -200 * s, 90 * s, 50 * s);
+  }
+  ctx.restore();
+}
+
+function DrawShaft(shaft) {
+  const s = Scale();
+  const x = WX(shaft.x);
+  if (state.player.inTunnel) {
+    const top = WY(SURFACE_Y);
+    const bot = WY(TUNNEL_FLOOR);
+    ctx.fillStyle = "rgba(20,14,10,.55)";
+    ctx.fillRect(x - 14 * s, top, 28 * s, bot - top);
+    ctx.strokeStyle = "#c9a45a";
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(x - 14 * s, top, 28 * s, bot - top);
+    ctx.setLineDash([]);
+  } else {
+    const y = WY(SURFACE_Y);
+    ctx.fillStyle = "#2a1c12";
+    ctx.fillRect(x - 18 * s, y - 6 * s, 36 * s, 10 * s);
+    ctx.strokeStyle = "#c9a45a";
+    ctx.strokeRect(x - 18 * s, y - 6 * s, 36 * s, 10 * s);
+    ctx.fillStyle = "rgba(239,224,197,.8)";
+    ctx.font = `${11 * s}px IBM Plex Sans, sans-serif`;
+    ctx.fillText(shaft.label || "地道口", x - 20 * s, y - 12 * s);
+  }
+}
+
+function DrawSolids() {
+  const s = Scale();
+  const solids = state.player.inTunnel ? state.level.tunnelSolids : state.level.surfaceSolids;
+  for (const solid of solids) {
+    if (solid.id === "sg" || solid.id === "tg" || solid.id === "tc") continue;
+    const x = WX(solid.x);
+    const y = WY(solid.y); // solid.y is top face
+    ctx.fillStyle = solid.digOnly ? "#6a4a32" : "#7a7264";
     ctx.strokeStyle = "#1c1712";
-    if (d.kind === "house") {
-      ctx.fillStyle = "#c4a27a";
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, y, solid.w * s, solid.h * s);
+    ctx.strokeRect(x, y, solid.w * s, solid.h * s);
+    if (solid.digOnly) {
+      ctx.strokeStyle = "#c9a45a";
       ctx.beginPath();
-      ctx.moveTo(-50, 0);
-      ctx.lineTo(-50, -70);
-      ctx.lineTo(0, -105);
-      ctx.lineTo(50, -70);
-      ctx.lineTo(50, 0);
-      ctx.closePath();
-      ctx.fill();
+      for (let i = 8; i < solid.w; i += 12) {
+        ctx.moveTo(x + i * s, y + 6 * s);
+        ctx.lineTo(x + (i - 8) * s, y + solid.h * s - 6 * s);
+      }
       ctx.stroke();
-      ctx.fillStyle = "#6e2a1c";
-      ctx.fillRect(-12, -40, 24, 40);
-      ctx.strokeRect(-12, -40, 24, 40);
-    } else if (d.kind === "tree") {
-      ctx.fillStyle = "#5c4030";
-      ctx.fillRect(-6, -90, 12, 90);
-      ctx.fillStyle = "#5f6f4e";
-      ctx.beginPath();
-      ctx.arc(0, -110, 40, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    } else if (d.kind === "bell") {
-      ctx.fillStyle = "#c9a45a";
-      ctx.beginPath();
-      ctx.moveTo(-16, -100);
-      ctx.lineTo(16, -100);
-      ctx.lineTo(22, -60);
-      ctx.lineTo(0, -48);
-      ctx.lineTo(-22, -60);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    } else if (d.kind === "well") {
-      ctx.fillStyle = "#7a7264";
-      ctx.fillRect(-18, -20, 36, 20);
-      ctx.strokeRect(-18, -20, 36, 20);
-    } else if (d.kind === "blockhouse") {
-      ctx.fillStyle = "#5a5852";
-      ctx.fillRect(-60, -140, 120, 140);
-      ctx.fillStyle = "#3e3c38";
-      ctx.fillRect(-40, -190, 80, 50);
-      ctx.strokeRect(-60, -140, 120, 140);
-      ctx.strokeRect(-40, -190, 80, 50);
-      ctx.fillStyle = "#1c1712";
-      ctx.fillRect(-12, -40, 24, 40);
+      ctx.fillStyle = "rgba(239,224,197,.9)";
+      ctx.font = `600 ${12 * s}px IBM Plex Sans, sans-serif`;
+      ctx.fillText("土塞 · 挖开（不能跳过）", x + 4 * s, y - 8 * s);
     }
+  }
+}
+
+function DrawTunnelCorridor(w, h) {
+  // Hollow the play corridor so depth bands read as surrounding earth
+  const s = Scale();
+  const top = WY(TUNNEL_CEIL);
+  const bot = WY(TUNNEL_FLOOR);
+  const left = WX(state.cameraX - 20);
+  const width = (VIEW_W + 40) * s;
+  ctx.fillStyle = "#2a2118";
+  ctx.globalAlpha = 0.92;
+  ctx.fillRect(left, top, width, bot - top);
+  ctx.globalAlpha = 1;
+  // floor plank tone
+  ctx.fillStyle = "#3a2a1c";
+  ctx.fillRect(left, bot - 6 * s, width, 10 * s);
+  // ceiling beams
+  ctx.strokeStyle = "rgba(90,70,45,.7)";
+  ctx.lineWidth = 3 * s;
+  for (let x = state.cameraX; x < state.cameraX + VIEW_W; x += 80) {
+    const sx = WX(x);
+    ctx.beginPath();
+    ctx.moveTo(sx, top);
+    ctx.lineTo(sx, top + 16 * s);
+    ctx.stroke();
+  }
+}
+
+function DrawDigSpots() {
+  const s = Scale();
+  const layer = state.player.inTunnel ? "tunnel" : "surface";
+  for (const dig of state.level.digSpots) {
+    if (dig.done || dig.layer !== layer) continue;
+    const x = WX(dig.x);
+    const y = WY(dig.y);
+    ctx.save();
+    ctx.strokeStyle = "#c9a45a";
+    ctx.fillStyle = "rgba(201,164,90,.2)";
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 2;
+    ctx.fillRect(x - 22 * s, y - 50 * s, 44 * s, 50 * s);
+    ctx.strokeRect(x - 22 * s, y - 50 * s, 44 * s, 50 * s);
+    ctx.setLineDash([]);
     ctx.restore();
   }
 }
 
-function DrawSolids(solids, camX, viewH, color) {
-  for (const s of solids) {
-    const p = WorldToScreen(s.x, s.y, camX, 0, viewH);
-    ctx.fillStyle = color;
-    ctx.strokeStyle = "#1c1712";
-    ctx.lineWidth = 2;
-    ctx.fillRect(p.x, p.y, s.w * p.scale, s.h * p.scale);
-    ctx.strokeRect(p.x, p.y, s.w * p.scale, s.h * p.scale);
-  }
-}
-
-function DrawEntity(ent, camX, viewH) {
+function DrawEntity(ent) {
   if (ent.hidden) return;
-  const p = WorldToScreen(ent.x, ent.y, camX, 0, viewH);
+  if (ent.layer === "tunnel" && !state.player.inTunnel) return;
+  if (ent.layer === "surface" && state.player.inTunnel && ent.type !== "spy") return;
+
+  const s = Scale();
+  const x = WX(ent.x);
+  const y = WY(ent.y);
   ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(p.scale, p.scale);
-  ctx.lineWidth = 3;
+  ctx.translate(x, y);
+  ctx.lineWidth = 2.5 * s;
   ctx.strokeStyle = "#1c1712";
 
   const glow = () => {
     ctx.fillStyle = "rgba(201,164,90,.35)";
     ctx.beginPath();
-    ctx.arc((ent.w || 20) / 2, -10, 22, 0, Math.PI * 2);
+    ctx.arc(0, -24 * s, 20 * s, 0, Math.PI * 2);
     ctx.fill();
   };
 
-  if (ent.type === "talk" || ent.type === "spy_talk") {
-    glow();
-    ctx.fillStyle = ent.type === "spy_talk" ? "#6b7058" : "#4a5d4a";
-    ctx.fillRect(0, -46, 28, 46);
-    ctx.strokeRect(0, -46, 28, 46);
+  if (ent.type === "talk" || ent.type === "spy_talk" || ent.type === "shelter") {
+    if (!ent.done) glow();
+    ctx.fillStyle = ent.type === "spy_talk" ? "#6b7058" : ent.type === "shelter" ? "#c4a27a" : "#4a5d4a";
+    if (ent.done && ent.type === "shelter") ctx.globalAlpha = 0.35;
+    ctx.fillRect(-13 * s, -48 * s, 26 * s, 48 * s);
+    ctx.strokeRect(-13 * s, -48 * s, 26 * s, 48 * s);
     ctx.fillStyle = "#e7d0b0";
     ctx.beginPath();
-    ctx.arc(14, -56, 10, 0, Math.PI * 2);
+    ctx.arc(0, -56 * s, 9 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-  } else if (ent.type === "shelter") {
-    if (!ent.done) glow();
-    ctx.fillStyle = ent.done ? "rgba(90,90,90,.4)" : "#c4a27a";
-    ctx.fillRect(0, -40, 26, 40);
-    ctx.strokeRect(0, -40, 26, 40);
   } else if (ent.type === "hatch") {
     glow();
-    ctx.fillStyle = "#5c4030";
-    ctx.fillRect(0, -8, 36, 10);
-    ctx.strokeRect(0, -8, 36, 10);
+    ctx.fillStyle = "#2a1c12";
+    ctx.fillRect(-20 * s, -8 * s, 40 * s, 10 * s);
+    ctx.strokeStyle = "#c9a45a";
+    ctx.strokeRect(-20 * s, -8 * s, 40 * s, 10 * s);
   } else if (ent.type === "bell") {
     glow();
     ctx.fillStyle = ent.ringing ? "#f0c27a" : "#c9a45a";
     ctx.beginPath();
-    ctx.moveTo(4, -90);
-    ctx.lineTo(36, -90);
-    ctx.lineTo(40, -50);
-    ctx.lineTo(20, -38);
-    ctx.lineTo(0, -50);
+    ctx.moveTo(-14 * s, -96 * s);
+    ctx.lineTo(14 * s, -96 * s);
+    ctx.lineTo(18 * s, -54 * s);
+    ctx.lineTo(0, -42 * s);
+    ctx.lineTo(-18 * s, -54 * s);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
   } else if (ent.type === "flip_build" || ent.type === "flip_trap" || ent.type === "charge" || ent.type === "signal") {
     if (!ent.done) glow();
     ctx.fillStyle = ent.done ? "#7a7264" : "#a6452f";
-    ctx.fillRect(0, -28, 40, 28);
-    ctx.strokeRect(0, -28, 40, 28);
+    ctx.fillRect(-20 * s, -28 * s, 40 * s, 28 * s);
+    ctx.strokeRect(-20 * s, -28 * s, 40 * s, 28 * s);
   } else if (ent.type === "shot_port") {
-    if (!ent.cooled) glow();
+    if (!ent.used) glow();
     ctx.fillStyle = "#2f5d4a";
-    ctx.fillRect(0, -24, 34, 24);
-    ctx.strokeRect(0, -24, 34, 24);
-  } else if (ent.type === "history") {
-    if (!ent.done) glow();
-    ctx.fillStyle = "#efe0c5";
-    ctx.fillRect(0, -28, 24, 28);
-    ctx.strokeRect(0, -28, 24, 28);
-    ctx.fillStyle = "#a6452f";
-    ctx.fillRect(4, -20, 16, 3);
+    ctx.fillRect(-17 * s, -26 * s, 34 * s, 26 * s);
+    ctx.strokeRect(-17 * s, -26 * s, 34 * s, 26 * s);
   } else if (ent.type === "spy") {
     ctx.fillStyle = ent.trapped ? "#444" : "#5a4030";
-    ctx.fillRect(0, -46, 28, 46);
-    ctx.strokeRect(0, -46, 28, 46);
+    ctx.fillRect(-13 * s, -48 * s, 26 * s, 48 * s);
+    ctx.strokeRect(-13 * s, -48 * s, 26 * s, 48 * s);
     ctx.fillStyle = "#e7d0b0";
     ctx.beginPath();
-    ctx.arc(14, -56, 10, 0, Math.PI * 2);
+    ctx.arc(0, -56 * s, 9 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     if (ent.exposed && !ent.trapped) {
       ctx.fillStyle = "#a6452f";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText("!", 10, -70);
+      ctx.font = `bold ${16 * s}px sans-serif`;
+      ctx.fillText("!", -4 * s, -70 * s);
     }
   } else if (ent.type === "patrol") {
-    if (ent.broken) {
-      ctx.globalAlpha = 0.35;
-    }
+    if (ent.broken) ctx.globalAlpha = 0.3;
     ctx.fillStyle = "#3e4638";
-    ctx.fillRect(0, -46, 28, 46);
-    ctx.strokeRect(0, -46, 28, 46);
+    ctx.fillRect(-13 * s, -48 * s, 26 * s, 48 * s);
+    ctx.strokeRect(-13 * s, -48 * s, 26 * s, 48 * s);
     ctx.fillStyle = "#c9b89a";
     ctx.beginPath();
-    ctx.arc(14, -56, 10, 0, Math.PI * 2);
+    ctx.arc(0, -56 * s, 9 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = "rgba(155,47,47,.25)";
+    ctx.fillStyle = "rgba(155,47,47,.22)";
     ctx.beginPath();
-    ctx.moveTo(14, -20);
-    ctx.lineTo(90, -60);
-    ctx.lineTo(90, 20);
+    ctx.moveTo(0, -20 * s);
+    ctx.lineTo(80 * s, -50 * s);
+    ctx.lineTo(80 * s, 10 * s);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
 }
 
-function DrawDigSpots(level, camX, viewH, inTunnel) {
-  for (const dig of level.digSpots) {
-    if (dig.done || dig.tunnel !== inTunnel) continue;
-    const p = WorldToScreen(dig.x, dig.y, camX, 0, viewH);
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.scale(p.scale, p.scale);
-    ctx.strokeStyle = "#c9a45a";
-    ctx.lineWidth = 3;
-    ctx.setLineDash([6, 4]);
-    ctx.strokeRect(-20, -40, 40, 40);
-    ctx.setLineDash([]);
-    ctx.fillStyle = "rgba(201,164,90,.25)";
-    ctx.fillRect(-20, -40, 40, 40);
-    ctx.restore();
-  }
-}
-
-function DrawPlayer(player, camX, viewH) {
-  const h = player.crouching ? 34 : 46;
-  const p = WorldToScreen(player.x, player.y, camX, 0, viewH);
+function DrawPlayer() {
+  const p = state.player;
+  const s = Scale();
+  const x = WX(p.x);
+  const y = WY(p.y);
+  const h = (p.crouching ? PLAYER_H * 0.7 : PLAYER_H) * s;
   ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(p.scale * player.facing, p.scale);
-  if (player.invuln > 0 && Math.floor(player.invuln * 20) % 2 === 0) ctx.globalAlpha = 0.4;
-  ctx.lineWidth = 3;
+  ctx.translate(x, y);
+  ctx.scale(p.facing, 1);
+  if (p.invuln > 0 && Math.floor(p.invuln * 18) % 2 === 0) ctx.globalAlpha = 0.4;
+  ctx.lineWidth = 2.5 * s;
   ctx.strokeStyle = "#1c1712";
   ctx.fillStyle = "#4d6b57";
-  ctx.fillRect(-14, -h, 28, h);
-  ctx.strokeRect(-14, -h, 28, h);
+  ctx.fillRect(-13 * s, -h, 26 * s, h);
+  ctx.strokeRect(-13 * s, -h, 26 * s, h);
   ctx.fillStyle = "#e7d0b0";
   ctx.beginPath();
-  ctx.arc(0, -h - 10, 10, 0, Math.PI * 2);
+  ctx.arc(0, -h - 9 * s, 9 * s, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  if (player.digging) {
+  if (p.digging) {
     ctx.strokeStyle = "#8b6a45";
     ctx.beginPath();
-    ctx.moveTo(14, -20);
-    ctx.lineTo(34, -8);
+    ctx.moveTo(12 * s, -20 * s);
+    ctx.lineTo(30 * s, -6 * s);
     ctx.stroke();
     ctx.fillStyle = "#6e5a3a";
-    ctx.fillRect(30, -12, 12, 10);
+    ctx.fillRect(26 * s, -10 * s, 12 * s, 10 * s);
+    // progress
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.fillRect(-24 * s, -h - 28 * s, 48 * s, 7 * s);
+    ctx.fillStyle = "#c9a45a";
+    ctx.fillRect(-24 * s, -h - 28 * s, 48 * s * p.digProgress, 7 * s);
   }
   ctx.restore();
 }
 
-function DrawInkOutline() {
-  // subtle vignette already in CSS; add comic panel corners
+function DrawGroundStrip(w, h, pal) {
+  // Play-depth ground plane shadow under feet — anchors the stage
+  const y = WY(SURFACE_Y);
+  const g = ctx.createLinearGradient(0, y - 10, 0, h);
+  g.addColorStop(0, pal.night ? "rgba(30,28,24,.0)" : "rgba(80,60,40,.0)");
+  g.addColorStop(0.05, pal.night ? "#2a3228" : "#7a6248");
+  g.addColorStop(1, pal.night ? "#1a1814" : "#4a3828");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y, w, h - y + 4);
+  ctx.strokeStyle = "rgba(28,23,18,.45)";
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.lineTo(w, y);
+  ctx.stroke();
 }
 
 function Render() {
-  const w = canvas.clientWidth || window.innerWidth;
-  const h = canvas.clientHeight || window.innerHeight;
-  const chapter = CHAPTERS[state.chapterIndex];
-  DrawSky(w, h, chapter);
+  const w = canvas.clientWidth || innerWidth;
+  const h = canvas.clientHeight || innerHeight;
+  const pal = state.level.palette;
+  const camX = state.cameraX;
 
-  if (state.phase === "play" || state.phase === "outro" || state.phase === "briefing") {
-    const camX = state.cameraX || 0;
-    DrawBackground(w, h, chapter, camX);
-    if (state.phase === "play") {
-      const level = state.level;
-      const inTunnel = state.player.inTunnel;
-      DrawDecor(level, camX, h, inTunnel);
-      DrawSolids(inTunnel ? level.tunnelSolids : level.surfaceSolids, camX, h, inTunnel ? "#6a5138" : "#8a6b48");
-      DrawDigSpots(level, camX, h, inTunnel);
-      for (const ent of level.entities) {
-        if (ent.requiresTunnel != null && !!inTunnel !== !!ent.requiresTunnel) {
-          if (ent.type === "patrol" || ent.type === "spy") {
-            // still draw surface actors when underground faintly? skip
-          } else if (ent.type !== "patrol" && ent.type !== "spy") {
-            continue;
-          }
-        }
-        if ((ent.type === "patrol" || ent.type === "spy" || ent.type === "spy_talk" || ent.type === "shelter" || ent.type === "bell" || ent.type === "shot_port" || ent.type === "signal") && inTunnel) {
-          if (ent.type !== "flip_trap" && ent.type !== "flip_build" && ent.type !== "charge" && ent.type !== "history") {
-            // hide most surface props while underground
-            if (!(ent.type === "spy" && ent.exposed)) continue;
-          }
-        }
-        if ((ent.type === "flip_build" || ent.type === "flip_trap" || ent.type === "charge") && !inTunnel) continue;
-        DrawEntity(ent, camX, h);
-      }
-      // always draw hatch on both layers
-      for (const ent of level.entities) {
-        if (ent.type === "hatch") DrawEntity(ent, camX, h);
-      }
-      DrawPlayer(state.player, camX, h);
-
-      // dig progress bar
-      if (state.player.digging) {
-        const p = WorldToScreen(state.player.x, state.player.y - 70, camX, 0, h);
-        ctx.fillStyle = "rgba(0,0,0,.45)";
-        ctx.fillRect(p.x - 30, p.y, 60, 8);
-        ctx.fillStyle = "#c9a45a";
-        ctx.fillRect(p.x - 30, p.y, 60 * state.player.digProgress, 8);
-      }
-
-      // layer label
-      ctx.fillStyle = "rgba(239,224,197,.85)";
-      ctx.strokeStyle = "#1c1712";
-      ctx.lineWidth = 2;
-      const label = inTunnel ? "地道层" : "地面层";
-      ctx.font = "600 14px IBM Plex Sans, sans-serif";
-      ctx.fillText(label, 16, h - 24);
-    }
+  if (state.player.inTunnel && state.phase === "play") {
+    DrawSoilCutaway(w, h, camX, pal);
+    DrawTunnelCorridor(w, h);
+  } else {
+    DrawSky(w, h, pal);
+    DrawFieldBands(w, h, camX, pal);
+    DrawGroundStrip(w, h, pal);
   }
 
-  DrawInkOutline();
+  if (state.phase === "play" || state.phase === "panels" || state.phase === "closePanels") {
+    if (!state.player.inTunnel) {
+      for (const prop of state.level.props) DrawProp(prop, pal);
+    } else {
+      // blockhouse / houses as faint silhouettes above cut line when underground
+      ctx.globalAlpha = 0.25;
+      for (const prop of state.level.props) DrawProp(prop, pal);
+      ctx.globalAlpha = 1;
+    }
+
+    for (const shaft of state.level.shafts) DrawShaft(shaft);
+    DrawSolids();
+    DrawDigSpots();
+    for (const ent of state.level.entities) DrawEntity(ent);
+    if (state.phase === "play") DrawPlayer();
+
+    if (!state.player.inTunnel && state.phase === "play") {
+      DrawForeground(w, h, camX, pal);
+    }
+  } else if (state.phase === "title" || state.phase === "ending") {
+    DrawSky(w, h, pal);
+    DrawFieldBands(w, h, camX * 0.2, pal);
+    DrawGroundStrip(w, h, pal);
+    DrawForeground(w, h, camX * 0.2, pal);
+  }
+
+  // hatch transition veil
+  if (state.transition > 0) {
+    const a = state.transition < 0.5 ? state.transition * 2 : (1 - state.transition) * 2;
+    ctx.fillStyle = `rgba(10,8,6,${Math.min(1, a)})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // comic letterbox for play — VH stage framing
+  if (state.phase === "play") {
+    ctx.fillStyle = "rgba(12,10,8,.55)";
+    ctx.fillRect(0, 0, w, h * 0.06);
+    ctx.fillRect(0, h * 0.94, w, h * 0.06);
+  }
 }
 
 function BindInput() {
@@ -559,30 +671,31 @@ function BindInput() {
     if (["arrowdown", "s"].includes(k)) input.crouch = down;
     if (["j", "shift"].includes(k)) input.dig = down;
     if (down && [" ", "w", "arrowup"].includes(k)) {
+      if (state.phase === "panels" || state.phase === "closePanels") {
+        state = AdvancePanels(state);
+        SaveToStorage(state);
+        SyncPhaseUi();
+        Beep(480, 0.05);
+        e.preventDefault();
+        return;
+      }
       input.jump = true;
       input.jumpPressed = true;
       e.preventDefault();
     }
     if (!down && [" ", "w", "arrowup"].includes(k)) input.jump = false;
     if (down && (k === "e" || k === "f" || k === "enter")) {
-      input.interactPressed = true;
-      if (state.phase === "briefing") {
-        state = AdvanceBriefing(state);
+      if (state.phase === "panels" || state.phase === "closePanels") {
+        state = AdvancePanels(state);
         SaveToStorage(state);
         SyncPhaseUi();
         Beep(480, 0.05);
-      } else if (state.phase === "outro") {
-        state = AdvanceOutro(state);
-        SaveToStorage(state);
-        SyncPhaseUi();
-        Beep(500, 0.05);
+        return;
       }
+      input.interactPressed = true;
     }
-    if (down && k === "escape") {
-      if (state.phase === "play") {
-        if (state.pauseOpen) SetModal(null);
-        else SetModal("pause");
-      }
+    if (down && k === "escape" && state.phase === "play") {
+      SetModal(state.pauseOpen ? null : "pause");
     }
   };
   window.addEventListener("keydown", (e) => setKey(e, true));
@@ -600,9 +713,7 @@ function BindInput() {
         state.input.jump = down;
         if (down) state.input.jumpPressed = true;
       }
-      if (kind === "interact" && down) {
-        state.input.interactPressed = true;
-      }
+      if (kind === "interact" && down) state.input.interactPressed = true;
     };
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
@@ -623,8 +734,7 @@ function BindUi() {
   $("ContinueButton").addEventListener("click", () => {
     EnsureAudio();
     const progress = LoadFromStorage();
-    const idx = Math.max(0, Math.min(CHAPTERS.length - 1, (progress?.unlockedActs || 1) - 1));
-    BeginFrom(idx);
+    BeginFrom(Math.max(0, Math.min(CHAPTERS.length - 1, (progress?.unlockedActs || 1) - 1)));
   });
   $("OpenHelpButton").addEventListener("click", () => SetModal("help"));
   $("CloseHelpButton").addEventListener("click", () => SetModal(null));
@@ -649,15 +759,9 @@ function BindUi() {
     SetModal(null);
     SyncPhaseUi();
   });
-  $("BriefingNextButton").addEventListener("click", () => {
+  $("PanelNextButton").addEventListener("click", () => {
     EnsureAudio();
-    state = AdvanceBriefing(state);
-    SaveToStorage(state);
-    SyncPhaseUi();
-  });
-  $("OutroNextButton").addEventListener("click", () => {
-    EnsureAudio();
-    state = AdvanceOutro(state);
+    state = AdvancePanels(state);
     SaveToStorage(state);
     SyncPhaseUi();
   });
@@ -668,36 +772,32 @@ function BindUi() {
   });
 }
 
-let prevGoalSig = "";
-let prevSubtitle = "";
-
 function Frame(ts) {
   const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
   lastTs = ts;
 
   if (state.phase === "play" && !state.pauseOpen && !state.failed) {
-    const beforeFail = state.failed;
     StepPlay(state, dt);
-    if (state.failed && !beforeFail) {
+    if (state.failed) {
       Beep(120, 0.2, "sawtooth", 0.04);
       SetModal("fail");
     }
     const sig = JSON.stringify(state.goalsDone);
     if (sig !== prevGoalSig) {
       prevGoalSig = sig;
-      Beep(660, 0.07, "triangle", 0.035);
+      Beep(660, 0.07, "triangle", 0.03);
       SaveToStorage(state);
     }
     if (state.completed) {
       SaveToStorage(state);
       SyncPhaseUi();
       Beep(784, 0.12, "triangle", 0.04);
-    }
-    if (state.subtitle?.text !== prevSubtitle) {
-      prevSubtitle = state.subtitle?.text || "";
-      if (state.subtitle) Beep(392, 0.04, "sine", 0.02);
-    }
-    SyncHud();
+    } else SyncHud();
+  }
+
+  // slow drift on title
+  if (state.phase === "title" || state.phase === "ending") {
+    state.cameraX += dt * 12;
   }
 
   Render();
@@ -705,14 +805,12 @@ function Frame(ts) {
 }
 
 async function Main() {
-  await LoadImages();
   Resize();
   window.addEventListener("resize", Resize);
   BindInput();
   BindUi();
   SyncPhaseUi();
-  // warm history card lookup so bundlers keep export
-  FindHistoryCard("card_tunnel_origin");
+  document.title = `地道战 · 高家庄｜白盒 ${CACHE_BUST}`;
   requestAnimationFrame(Frame);
 }
 

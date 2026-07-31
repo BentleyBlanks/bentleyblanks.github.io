@@ -1,14 +1,12 @@
-import { CHAPTERS, HISTORY_CARDS, SAVE_KEY } from "./Data_Story.mjs";
-import { BuildLevel } from "./Script_World.mjs";
+import { CHAPTERS, SAVE_KEY } from "./Data_Story.mjs";
+import { BuildLevel, TUNNEL_CEIL, TUNNEL_FLOOR } from "./Script_World.mjs";
 import {
-  AdvanceBriefing,
-  AdvanceOutro,
+  AdvancePanels,
   CreateCampaignState,
   DebugCompleteGoal,
   GoalsRemaining,
+  JumpApexHeight,
   LoadProgress,
-  PlayerAabb,
-  RectsOverlap,
   SerializeProgress,
   StepPlay,
 } from "./Script_Rules.mjs";
@@ -18,165 +16,172 @@ function Assert(cond, msg) {
   if (!cond) {
     failed += 1;
     console.error("FAIL:", msg);
-  } else {
-    console.log("ok:", msg);
-  }
+  } else console.log("ok:", msg);
 }
 
-function SimulateDig(state, digId, seconds = 3) {
-  const dig = state.level.digSpots.find((d) => d.id === digId);
-  Assert(!!dig, `dig spot ${digId} exists`);
+function Play(state) {
   state.phase = "play";
-  state.player.x = dig.x;
-  state.player.y = dig.tunnel ? state.level.tunnelFloor : state.level.surfaceFloor;
-  state.player.inTunnel = !!dig.tunnel;
+  return state;
+}
+
+function DigAt(state, digId) {
+  const dig = state.level.digSpots.find((d) => d.id === digId);
+  Assert(!!dig, `dig ${digId} exists`);
+  // Stand beside the seal (not inside it)
+  state.player.inTunnel = dig.layer === "tunnel";
+  state.player.y = dig.layer === "tunnel" ? state.level.tunnelFloor : state.level.surfaceY;
+  state.player.x = dig.x - 50;
   state.player.onGround = true;
   state.input.dig = true;
-  for (let i = 0; i < 90; i++) StepPlay(state, 1 / 30);
-  Assert(dig.done, `${digId} dug after hold`);
+  for (let i = 0; i < 120; i++) StepPlay(state, 1 / 30);
+  Assert(dig.done, `${digId} completed by adjacent dig`);
+  if (dig.clears) {
+    Assert(!state.level.tunnelSolids.some((s) => s.id === dig.clears), `${dig.clears} removed`);
+  }
 }
 
-function SimulateInteract(state, entId) {
+function Interact(state, entId, opts = {}) {
   const ent = state.level.entities.find((e) => e.id === entId);
-  Assert(!!ent, `entity ${entId} exists`);
-  state.phase = "play";
-  state.player.x = ent.x + (ent.w || 0) / 2;
-  state.player.y = ent.requiresTunnel ? state.level.tunnelFloor : state.level.surfaceFloor;
-  if (ent.requiresTunnel != null) state.player.inTunnel = !!ent.requiresTunnel;
-  if (ent.type === "hatch") {
-    // hatch works from either layer; keep current unless specified
-  }
+  Assert(!!ent, `entity ${entId}`);
+  if (opts.tunnel != null) state.player.inTunnel = !!opts.tunnel;
+  state.player.y = state.player.inTunnel ? state.level.tunnelFloor : state.level.surfaceY;
+  state.player.x = ent.x;
   state.player.onGround = true;
   state.input.interactPressed = true;
   StepPlay(state, 1 / 30);
 }
 
-function TestAct1Flow() {
-  const state = CreateCampaignState(0);
-  state.phase = "play";
-  SimulateInteract(state, "npc_laozhong");
-  Assert(state.goalsDone.talk_laozhong, "act1 talk goal");
-  SimulateInteract(state, "hatch1");
-  Assert(state.goalsDone.open_hatch, "act1 hatch goal");
-  Assert(state.player.inTunnel, "entered tunnel");
-  SimulateDig(state, "dig1");
-  Assert(state.goalsDone.dig_links, "act1 dig goal");
+function TestJumpVsSealContract() {
+  const apex = JumpApexHeight();
+  const sealH = TUNNEL_FLOOR - TUNNEL_CEIL;
+  Assert(apex > 36, `jump clears short rubble (${apex.toFixed(1)}px)`);
+  Assert(sealH > apex + 10, `tunnel seals taller than jump (${sealH} > ${apex.toFixed(1)}) — dig only`);
 }
 
-function TestAct2Bell() {
-  const state = CreateCampaignState(1);
-  state.phase = "play";
-  for (const id of ["v1", "v2", "v3"]) SimulateInteract(state, id);
-  Assert(state.goalsDone.shelter_villagers, "villagers sheltered");
-  SimulateInteract(state, "bell");
-  Assert(state.goalsDone.ring_bell && state.goalsDone.survive_raid, "bell sacrifice beat");
-}
-
-function TestAct3Flip() {
-  const state = CreateCampaignState(2);
-  state.phase = "play";
-  SimulateInteract(state, "flip_build");
-  Assert(state.goalsDone.build_flip, "flip built");
-  // go surface to expose spy
-  state.player.inTunnel = false;
-  state.player.y = state.level.surfaceFloor;
-  SimulateInteract(state, "spy_talk");
-  Assert(state.goalsDone.expose_spy, "spy exposed");
-  const spy = state.level.entities.find((e) => e.id === "spy");
-  const trap = state.level.entities.find((e) => e.id === "flip_trap");
-  spy.x = trap.x;
-  state.player.inTunnel = true;
-  state.player.y = state.level.tunnelFloor;
-  SimulateInteract(state, "flip_trap");
-  Assert(state.goalsDone.trap_spy && spy.trapped, "spy trapped by flip");
-}
-
-function TestAct4Ambush() {
-  const state = CreateCampaignState(3);
-  state.phase = "play";
-  for (const id of ["port1", "port2", "port3"]) {
-    const port = state.level.entities.find((e) => e.id === id);
-    port.cooled = false;
-    SimulateInteract(state, id);
-  }
-  Assert(state.goalsDone.exit_shots, "three ports used");
-  Assert(state.goalsDone.break_patrol, "patrol broken");
-  Assert(state.goalsDone.keep_safe, "keep safe marked");
-}
-
-function TestAct5Finale() {
-  const state = CreateCampaignState(4);
-  state.phase = "play";
-  SimulateDig(state, "under1");
-  Assert(state.goalsDone.dig_under, "dug under blockhouse");
-  SimulateInteract(state, "charge");
-  Assert(state.goalsDone.plant_charge, "charge planted");
-  state.player.inTunnel = false;
-  state.player.y = state.level.surfaceFloor;
-  // crouch to avoid patrol while signaling
-  state.input.crouch = true;
-  SimulateInteract(state, "signal");
-  Assert(state.goalsDone.signal_assault, "assault signaled");
-}
-
-function TestPhysicsAndSave() {
-  const state = CreateCampaignState(0);
-  state.phase = "play";
+function TestAct1() {
+  const state = Play(CreateCampaignState(0));
+  Interact(state, "npc_laozhong");
+  Assert(state.goalsDone.talk_laozhong, "talk");
+  Interact(state, "hatch1");
+  // hatch starts transition — step until flipped
+  for (let i = 0; i < 60; i++) StepPlay(state, 1 / 30);
+  Assert(state.player.inTunnel, "hatch entered tunnel");
+  Assert(state.goalsDone.enter_hatch, "enter hatch goal");
+  DigAt(state, "dig_west");
+  Assert(state.goalsDone.dig_west, "west dig");
+  // walk through former west seal before campaign completes
+  state.input.dig = false;
+  state.player.x = 620 - 40;
+  state.player.vx = 0;
   state.input.right = true;
   const x0 = state.player.x;
   for (let i = 0; i < 30; i++) StepPlay(state, 1 / 30);
-  Assert(state.player.x > x0, "player moves right");
-  const aabb = PlayerAabb(state.player);
-  Assert(aabb.w > 0 && aabb.h > 0, "player aabb");
-  Assert(RectsOverlap(aabb, { x: aabb.x + 1, y: aabb.y + 1, w: 10, h: 10 }), "overlap helper");
-
-  const blob = SerializeProgress(state);
-  const loaded = LoadProgress(blob);
-  Assert(loaded.chapterIndex === 0, "save roundtrip chapter");
-  Assert(SAVE_KEY.startsWith("tunnelheart"), "save key namespaced");
+  Assert(state.player.x > x0 + 20, "can walk through cleared seal");
+  state.input.right = false;
+  DigAt(state, "dig_east");
+  Assert(state.goalsDone.dig_east, "east dig");
 }
 
-function TestBriefingOutroChain() {
-  let state = CreateCampaignState(0);
-  state.phase = "briefing";
-  while (state.phase === "briefing") state = AdvanceBriefing(state);
-  Assert(state.phase === "play", "briefing enters play");
-  for (const g of Object.keys(state.goalsDone)) DebugCompleteGoal(state, g);
-  Assert(GoalsRemaining(state).length === 0, "debug goals clear");
-  state.phase = "outro";
-  state.outroIndex = 0;
-  state = AdvanceOutro(state);
-  // act1 has one outro beat
-  Assert(state.phase === "briefing" || state.chapterIndex === 1, "outro advances campaign");
-}
-
-function TestLevelsExist() {
-  Assert(CHAPTERS.length === 5, "five film acts");
-  Assert(HISTORY_CARDS.length >= 4, "history cards");
-  for (const ch of CHAPTERS) {
-    const level = BuildLevel(ch.id);
-    Assert(level.width > 1000, `${ch.id} wide level`);
-    Assert(level.spawn && level.surfaceFloor > 0, `${ch.id} spawn`);
-    for (const goal of ch.goals) {
-      Assert(typeof goal === "string", `${ch.id} goal string`);
-    }
+function TestCannotJumpSeal() {
+  const state = Play(CreateCampaignState(0));
+  state.player.inTunnel = true;
+  state.player.y = TUNNEL_FLOOR;
+  state.player.x = 620 - 60;
+  state.player.onGround = true;
+  // sprint into seal and spam jump
+  state.input.right = true;
+  for (let i = 0; i < 45; i++) {
+    state.input.jumpPressed = true;
+    StepPlay(state, 1 / 30);
   }
+  Assert(state.player.x < 620 - 10, "jump does not clear uncleared seal");
+}
+
+function TestAct2Bell() {
+  const state = Play(CreateCampaignState(1));
+  for (const id of ["v1", "v2", "v3"]) Interact(state, id);
+  Assert(state.goalsDone.shelter_a && state.goalsDone.shelter_b && state.goalsDone.shelter_c, "shelters");
+  // crouch past patrol
+  state.input.crouch = true;
+  Interact(state, "bell");
+  Assert(state.goalsDone.reach_bell, "bell");
+}
+
+function TestAct3() {
+  const state = Play(CreateCampaignState(2));
+  Interact(state, "flip_build", { tunnel: true });
+  Assert(state.goalsDone.build_flip, "flip");
+  Interact(state, "hatch3", { tunnel: true });
+  for (let i = 0; i < 60; i++) StepPlay(state, 1 / 30);
+  Assert(!state.player.inTunnel, "up to surface");
+  Interact(state, "spy_talk", { tunnel: false });
+  Assert(state.goalsDone.expose_spy, "expose");
+  const spy = state.level.entities.find((e) => e.id === "spy");
+  const trap = state.level.entities.find((e) => e.id === "flip_trap");
+  spy.x = trap.x;
+  // dig mid seal so path clear, then trap
+  DigAt(state, "dig_mid");
+  Interact(state, "flip_trap", { tunnel: true });
+  Assert(state.goalsDone.trap_spy && spy.trapped, "trap spy");
+}
+
+function TestAct4() {
+  const state = Play(CreateCampaignState(3));
+  for (const id of ["port1", "port2", "port3"]) {
+    const p = state.level.entities.find((e) => e.id === id);
+    p.used = false;
+    Interact(state, id, { tunnel: false });
+  }
+  Assert(state.goalsDone.shot_a && state.goalsDone.shot_b && state.goalsDone.shot_c, "shots");
+  Assert(state.goalsDone.break_patrol, "patrol broken");
+}
+
+function TestAct5() {
+  const state = Play(CreateCampaignState(4));
+  DigAt(state, "dig_under");
+  Assert(state.goalsDone.dig_under, "under");
+  Interact(state, "charge", { tunnel: true });
+  Assert(state.goalsDone.plant_charge, "charge");
+  Interact(state, "hatch5", { tunnel: true });
+  for (let i = 0; i < 60; i++) StepPlay(state, 1 / 30);
+  state.input.crouch = true;
+  Interact(state, "signal", { tunnel: false });
+  Assert(state.goalsDone.signal_assault, "signal");
+}
+
+function TestStoryAndSave() {
+  Assert(CHAPTERS.length === 5, "five acts");
+  Assert(CHAPTERS.every((c) => c.openPanels.length >= 2 && c.closePanels.length >= 1), "panels");
+  for (const c of CHAPTERS) {
+    const level = BuildLevel(c.id);
+    Assert(level.width > 2000, `${c.id} wide`);
+    Assert(level.palette && level.props, `${c.id} parallax palette/props`);
+  }
+  let state = CreateCampaignState(0);
+  state.phase = "panels";
+  while (state.phase === "panels") state = AdvancePanels(state);
+  Assert(state.phase === "play", "panels -> play");
+  for (const g of Object.keys(state.goalsDone)) DebugCompleteGoal(state, g);
+  Assert(GoalsRemaining(state).length === 0, "goals clear");
+  const blob = SerializeProgress(state);
+  Assert(LoadProgress(blob).chapterIndex === 0, "save");
+  Assert(SAVE_KEY.endsWith("_v2"), "new save key");
 }
 
 function Main() {
-  TestLevelsExist();
-  TestPhysicsAndSave();
-  TestAct1Flow();
+  TestJumpVsSealContract();
+  TestStoryAndSave();
+  TestAct1();
+  TestCannotJumpSeal();
   TestAct2Bell();
-  TestAct3Flip();
-  TestAct4Ambush();
-  TestAct5Finale();
-  TestBriefingOutroChain();
+  TestAct3();
+  TestAct4();
+  TestAct5();
   if (failed) {
-    console.error(`\n${failed} assertion(s) failed`);
+    console.error(`\n${failed} failed`);
     process.exit(1);
   }
-  console.log("\nAll TunnelHeart1942 smoke tests passed.");
+  console.log("\nTunnelHeart1942 whitebox smoke OK");
 }
 
 Main();

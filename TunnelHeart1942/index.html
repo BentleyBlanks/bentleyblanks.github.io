@@ -4,94 +4,74 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#120f0c">
-  <meta name="description" content="《地道战·高家庄》——以电影《地道战》剧情为骨架、以《勇敢的心：世界大战》横版叙事解谜形式呈现的冀中地道战互动故事。">
-  <meta property="og:title" content="地道战 · 高家庄">
-  <meta property="og:description" content="铁锨、钟声与地道。用勇敢的心式横版叙事，走过高家庄的五幕地道战。">
+  <meta name="description" content="《地道战·高家庄》白盒：以电影《地道战》五幕为骨架，用 Valiant Hearts 式横版叙事解谜与分层景深呈现冀中地道战。零外部贴图，程序化绘制。">
+  <meta property="og:title" content="地道战 · 高家庄（白盒）">
+  <meta property="og:description" content="铁锨、钟声、翻口与黑风口。分层景深横版叙事解谜白盒。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
-  <meta property="og:image" content="https://bentleyblanks.github.io/TunnelHeart1942/Texture_SocialPreview.jpg">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://bentleyblanks.github.io/TunnelHeart1942/Texture_SocialPreview.jpg">
-  <title>地道战 · 高家庄｜横版叙事解谜</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260731a">
+  <title>地道战 · 高家庄｜白盒横版叙事解谜</title>
+  <link rel="stylesheet" href="./Style_Game.css?v=20260731b">
 </head>
 <body>
-  <main id="GameShell" class="gameShell" aria-label="地道战高家庄游戏">
-    <canvas id="GameCanvas" class="gameCanvas" tabindex="0" aria-label="高家庄横版场景。方向键移动，空格跳跃，E互动，按住J或Shift挖掘。"></canvas>
-    <div class="comicGrade" aria-hidden="true"></div>
+  <main id="GameShell" class="gameShell" aria-label="地道战高家庄白盒">
+    <canvas id="GameCanvas" class="gameCanvas" tabindex="0" aria-label="高家庄横版白盒场景。方向键移动，空格跳跃，E互动，按住J挖掘土塞。"></canvas>
+    <div class="stageVignette" aria-hidden="true"></div>
 
     <section id="TitleScreen" class="screen titleScreen">
-      <a class="projectMark" href="../" aria-label="返回网站首页"><b>高家庄档案</b><span>VALIANT HEARTS FORM · TUNNEL WARFARE</span></a>
+      <a class="projectMark" href="../" aria-label="返回网站首页"><b>高家庄白盒</b><span>VALIANT HEARTS FORM · NO EXTERNAL ART</span></a>
       <button id="OpenHelpButton" class="quietButton" type="button">操作说明</button>
       <div class="titleLayout">
         <article class="titleCopy">
-          <p class="eyebrow"><i></i> 一九四二年 · 冀中平原</p>
+          <p class="eyebrow"><i></i> 一九四二年 · 冀中平原 · 程序化分层景深</p>
           <h1>地道战<br><em>高家庄</em></h1>
-          <p class="titleLead">按电影《地道战》的五幕骨架，用《勇敢的心：世界大战》式横版叙事解谜：挖通地窖、敲响警钟、改建翻口、神出鬼没，直到拔掉黑风口。</p>
+          <p class="titleLead">按电影五幕走：挖通土洞、夜袭敲钟、改建翻口、神出鬼没、拔掉黑风口。玩法形式对齐《勇敢的心：世界大战》——叙事面板、横版关卡、地道剖视，不是平台跳跃闯关。</p>
           <div class="titleActions">
-            <button id="BeginButton" class="primaryButton" type="button"><span>开始第一幕</span><small>约 20–30 分钟 · 自动存档</small></button>
+            <button id="BeginButton" class="primaryButton" type="button"><span>开始第一幕</span><small>约 20 分钟 · 自动存档</small></button>
             <button id="ContinueButton" class="secondaryButton" type="button" hidden>继续检查点</button>
             <button id="OpenHistoryButton" class="secondaryButton" type="button">史实与创作边界</button>
           </div>
-          <p class="technicalNote">2D 横版 · 挖掘 / 互动 / 轻量潜行出击 · 键鼠与触屏 · 漫画水彩风素材</p>
+          <p class="technicalNote">白盒零贴图 · 远景/中景/前景视差 · 地道土壤剖视 · 土塞只能挖不能跳 · 键鼠与触屏</p>
         </article>
         <aside class="fieldNote" aria-label="五幕提纲">
           <div class="notePin" aria-hidden="true"></div>
-          <p>高家庄作战笔记</p>
+          <p>电影骨架</p>
           <ol>
-            <li><span>土洞相连</span><b>挖通</b><small>铁锨先于枪</small></li>
-            <li><span>钟声</span><b>救人</b><small>高老忠敲钟</small></li>
+            <li><span>土洞相连</span><b>挖通</b><small>土塞 · 非跳跃</small></li>
+            <li><span>钟声</span><b>夜袭</b><small>高老忠敲钟</small></li>
             <li><span>能藏能打</span><b>翻口</b><small>识破特务</small></li>
-            <li><span>神出鬼没</span><b>换位</b><small>打一枪换一处</small></li>
-            <li><span>黑风口</span><b>拔点</b><small>地道攻炮楼</small></li>
+            <li><span>神出鬼没</span><b>换位</b><small>三口出击</small></li>
+            <li><span>黑风口</span><b>拔点</b><small>药室总攻</small></li>
           </ol>
           <blockquote>“先通三家。通了，人就有地方藏。”</blockquote>
-          <footer>党支部书记 · 高老忠</footer>
+          <footer>高老忠 · 党支部书记</footer>
         </aside>
       </div>
       <footer class="titleFooter">
-        <span>剧情骨架取自电影《地道战》 · 玩法形式致敬 Valiant Hearts · 人物地点为作品化呈现</span>
-        <span>侵略责任明确 · 不以歼敌数为唯一评价</span>
+        <span>剧情骨架取自电影《地道战》 · 形式致敬 Valiant Hearts · 白盒程序化绘制</span>
+        <span>土塞不可跳过 · 地道口按 E 切换层</span>
       </footer>
     </section>
 
-    <section id="BriefingScreen" class="screen storyScreen" hidden aria-live="polite">
-      <article class="storyCard">
-        <img id="BriefingPortrait" alt="当前幕角色画像" width="160" height="214">
-        <div class="storyCopy">
-          <p id="BriefingKicker" class="kicker">第一幕</p>
-          <h2 id="BriefingTitle">土洞相连</h2>
-          <p id="BriefingBody">……</p>
-          <div id="BriefingProgress" class="storyProgress" aria-hidden="true"></div>
-          <button id="BriefingNextButton" class="primaryButton" type="button"><span>继续</span><small>空格 / 点击</small></button>
+    <section id="PanelScreen" class="screen panelScreen" hidden aria-live="polite">
+      <article id="PanelCard" class="panelCard" data-mood="talk">
+        <div class="panelCopy">
+          <p id="PanelKicker" class="kicker">第一幕</p>
+          <h2 id="PanelTitle">土洞相连</h2>
+          <p id="PanelSpeaker" class="speaker">高老忠</p>
+          <p id="PanelBody" class="body">……</p>
+          <div id="PanelProgress" class="storyProgress" aria-hidden="true"></div>
+          <button id="PanelNextButton" class="primaryButton" type="button"><span>继续</span><small>空格 / 点击</small></button>
         </div>
       </article>
     </section>
 
-    <section id="OutroScreen" class="screen storyScreen" hidden aria-live="polite">
-      <article class="storyCard">
-        <img id="OutroPortrait" alt="幕间角色画像" width="160" height="214">
-        <div class="storyCopy">
-          <p id="OutroKicker" class="kicker">幕终</p>
-          <h2 id="OutroTitle">……</h2>
-          <p id="OutroBody">……</p>
-          <div id="OutroProgress" class="storyProgress" aria-hidden="true"></div>
-          <button id="OutroNextButton" class="primaryButton" type="button"><span>下一幕</span><small>空格 / 点击</small></button>
-        </div>
-      </article>
-    </section>
-
-    <section id="EndingScreen" class="screen storyScreen endingScreen" hidden>
-      <article class="storyCard">
-        <div class="portraits" aria-hidden="true">
-          <img src="./Texture_PortraitChuanbao.png?v=20260731a" alt="">
-          <img src="./Texture_PortraitLaozhong.png?v=20260731a" alt="">
-          <img src="./Texture_PortraitLinxia.png?v=20260731a" alt="">
-        </div>
-        <div class="storyCopy">
+    <section id="EndingScreen" class="screen panelScreen endingScreen" hidden>
+      <article class="panelCard">
+        <div class="panelCopy">
           <p class="kicker">终章</p>
           <h2>钟声再起</h2>
-          <p id="EndingBody">黑风口塌了。高家庄的地道从村里通到野外——不是为了炫技，是为了人还能回家。</p>
+          <p class="speaker">旁白</p>
+          <p class="body">黑风口塌了。高家庄的地道从村里通到野外——不是为了炫技，是为了人还能回家。</p>
           <div class="modalActions">
             <button id="ReplayButton" class="primaryButton" type="button"><span>再走一遍</span></button>
             <button id="EndingHomeButton" class="secondaryButton" type="button">返回标题</button>
@@ -107,11 +87,14 @@
           <h2 id="MissionTitle">土洞相连</h2>
           <div class="objectiveRow">
             <i aria-hidden="true"></i>
-            <div><small>当前任务</small><b id="ObjectiveText">把三家地窖挖通</b></div>
+            <div><small>当前任务</small><b id="ObjectiveText">……</b></div>
           </div>
         </section>
-        <div class="hpRow" id="HpRow" aria-label="体力"></div>
-        <button id="PauseButton" class="pauseButton" type="button" aria-label="暂停">Ⅱ</button>
+        <div class="hudRight">
+          <span id="LayerTag" class="layerTag">地面层 · 纵深</span>
+          <div class="hpRow" id="HpRow" aria-label="体力"></div>
+          <button id="PauseButton" class="pauseButton" type="button" aria-label="暂停">Ⅱ</button>
+        </div>
       </header>
 
       <ul id="GoalList" class="goalList" aria-label="本幕目标"></ul>
@@ -142,25 +125,25 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作说明</h2>
-        <p><b>键盘：</b>A/D 或 ←/→ 移动 · W/空格/↑ 跳跃 · S/↓ 蹲下 · E/F 互动 · J 或 Shift 按住挖掘 · Esc 暂停</p>
-        <p><b>触屏：</b>左下方向，右下挖/蹲/跳/用。</p>
-        <p>地道口可进出地下层。出击口开火后会自动换位——别在同一个口子恋战。</p>
+        <p><b>移动</b> A/D 或 ←/→　<b>跳</b> 空格/W　<b>蹲</b> S　<b>互动</b> E/F　<b>挖掘</b> 按住 J 或 Shift　Esc 暂停</p>
+        <p><b>地道口</b> 走到发光井口按 E，黑场切换地面/地道剖视层——不是跳进洞。</p>
+        <p><b>土塞</b> 地道里画着斜线的土墙只能挖开，跳不过去。短沙袋可以跳。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>明白了</span></button>
         </div>
       </article>
       <article id="HistoryModal" class="modalCard" hidden>
         <h2>史实与创作边界</h2>
-        <p>本页剧情骨架取自 1965 年电影《地道战》：高家庄挖地道、高老忠敲钟牺牲、改建战斗地道、识破特务、神出鬼没打击报复、协同拔除黑风口。</p>
-        <p>玩法形式致敬育碧《勇敢的心：世界大战》（Valiant Hearts）：横版关卡、叙事卡片、环境解谜与轻度动作，而非写实射击。</p>
-        <p>高家庄为作品中的复合村落；不猎奇展示苦难，平民受难只进入叙事代价，不以歼敌数作为唯一胜利条件。</p>
+        <p>剧情骨架取自 1965 年电影《地道战》：挖通土洞、高老忠敲钟牺牲、改建战斗地道、识破特务、神出鬼没、协同拔除黑风口。</p>
+        <p>玩法形式致敬《勇敢的心：世界大战》：叙事面板、横版关卡、分层景深与地道剖视；本页为白盒，零外部贴图，全部程序化绘制。</p>
+        <p>不以歼敌数为唯一胜利条件；平民受难只进入叙事代价。</p>
         <div class="modalActions">
           <button id="CloseHistoryButton" class="primaryButton" type="button"><span>关闭</span></button>
         </div>
       </article>
       <article id="PauseModal" class="modalCard" hidden>
         <h2>暂停</h2>
-        <p id="PauseSummary">当前进度已自动保存。</p>
+        <p>当前进度已自动保存。</p>
         <div class="modalActions">
           <button id="ResumeButton" class="primaryButton" type="button"><span>继续</span></button>
           <button id="RestartChapterButton" class="secondaryButton" type="button">重来本幕</button>
@@ -169,15 +152,14 @@
       </article>
       <article id="FailModal" class="modalCard" hidden>
         <h2>被发现了</h2>
-        <p>巡逻封住了去路。钻地道、蹲下隐蔽，或换一个出击口再试。</p>
+        <p>蹲下隐蔽，或回到地道口切层再试。</p>
         <div class="modalActions">
           <button id="FailRetryButton" class="primaryButton" type="button"><span>重试本幕</span></button>
         </div>
       </article>
     </div>
   </main>
-
-  <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260731a"></script>
+  <h1 class="visuallyHidden">地道战 · 高家庄（白盒）</h1>
+  <script type="module" src="./Script_Game.mjs?v=20260731b"></script>
 </body>
 </html>
