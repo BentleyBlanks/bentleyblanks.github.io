@@ -77,7 +77,7 @@ const act1 = {
     // 二道院的草棚：地板 y=0.35，净空 1.40。
     { x0: 68, x1: 74, y: 1.75 },
     // 三道院的长矮墙：军犬段全程猫腰。净空 1.30。
-    { x0: 84, x1: 100, y: 1.30 },
+    { x0: 84, x1: 96, y: 1.30 },
     // 出口下的地道存根：净空 1.35。
     { x0: 121, x1: 128, y: -3.15 },
   ],
@@ -151,6 +151,7 @@ const act1 = {
     { id: "a1_pr_trough_y3", x: 99, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
     { id: "a1_pr_haystack3", x: 97, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_haystack3b", x: 94.5, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
+    { id: "a1_pr_cart_y3b", x: 101.3, y: 0, z: PLAY, kind: "cart", facing: 1, interact: "hide", data: { capacity: 1 }, label: "马车" },
     { id: "a1_pr_vat3", x: 103.5, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a1_pr_fence2", x: 103, y: 0, z: FORE, kind: "fence", facing: 1, interact: "none", data: null, label: null },
 
@@ -188,18 +189,25 @@ const act1 = {
       vision: { range: 11, halfAngleDeg: 28, height: 1.6 },
       hearing: 5.5, probeAt: null,
     },
-    // 三道院：兵 + 军犬。狗的听觉 10.5，站起来走路（noise 0.42）必被听见。
+    // 三道院（军犬段）——这几个数字是量出来的，别随手改：
+    //   矮墙净空 1.30 只盖到 x=96。墙根这一截强制猫腰（1.75 m/s），
+    //     搜索兵 1.45 m/s 追不上，所以贴着墙一垛一垛挪就能过去。
+    //   军犬搜索时跑 2.9 m/s，猫腰的人绝对跑不掉，所以它的巡逻线 [98,103]
+    //     放在矮墙外头：出了墙玩家能自己选——站起来冲（快但有声），还是继续猫腰（慢但安静）。
+    //     "军犬教的是自己选安静"，不是"被按在地上跑不动"。
+    //   两条巡逻线之间留了 7 米无人区（91→98），窗口不用对齐；
+    //     掩体 92.5 / 94.5 是这段的落脚点，99 / 101.3 / 103.5 连着盖住军犬整条线。
     {
-      id: "a1_e_search3", x: 90, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 86, x1: 93, speed: 1.45, pauseSec: 0.9 },
+      id: "a1_e_search3", x: 88, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 86, x1: 91, speed: 1.45, pauseSec: 0.9 },
       vision: { range: 11, halfAngleDeg: 34, height: 1.6 },
       hearing: 6.5, probeAt: null,
     },
     {
-      id: "a1_e_dog1", x: 98, y: 0, kind: "dog", facing: -1,
-      patrol: { x0: 95, x1: 102, speed: 2.0, pauseSec: 0.6 },
+      id: "a1_e_dog1", x: 100, y: 0, kind: "dog", facing: -1,
+      patrol: { x0: 98, x1: 103, speed: 1.8, pauseSec: 0.6 },
       vision: { range: 8, halfAngleDeg: 44, height: 0.7 },
-      hearing: 10.5, probeAt: null,
+      hearing: 9.5, probeAt: null,
     },
     // —— 以下三个由 a1_pr_bell.data.spawn 唤出（敲钟那一下才有），之前应视为不存在 ——
     // 钟响之前它们不存在，所以玩家不可能"先引出追兵再回头敲钟"。
