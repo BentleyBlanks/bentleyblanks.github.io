@@ -527,6 +527,7 @@ export function ResetLevel(state, levelIndex) {
   state.triggersFired = {};
   state.triggersInside = {};
   state.trail = [];
+  state.winArmed = false;
   state.navNodes = null; // 换关卡了，机器人的导航图作废
   state.checkpointId = null;
   state.stats.timeInLevel = 0;
@@ -1655,7 +1656,13 @@ function FireTrigger(state, t) {
 
   if (emit.checkpoint) SetCheckpointNear(state, (t.x0 + t.x1) * 0.5, state.player.y, t.id);
 
-  if (emit.win) WinLevel(state);
+  if (emit.win) {
+    // 触发区说"到这就算通关"，但关卡自己写了 needAllVillagers。
+    // AGENTS.md 第 0 节：第三幕结尾必须是一次完整的转移（全员抵达出口）。
+    // 所以 win 只是"到地方了"，人没带齐就先记下来，等人齐了再收尾。
+    state.winArmed = true;
+    CheckWin(state, 0);
+  }
 }
 
 function SetCheckpointNear(state, x, y, fallbackId) {
@@ -1751,7 +1758,7 @@ function CheckWin(state, dt) {
   // 以"被抓"收场的一幕，走到出口不算通关
   if (state.level.endKind === "captured") return;
   const exit = state.level.exit;
-  if (!AtExit(state)) return;
+  if (!AtExit(state) && !state.winArmed) return;
   if (exit.needAllVillagers && !AllVillagersSafe(state)) return;
   // 事还没办完就到出口不算通关（第一幕必须先敲响钟）
   if (PendingObjectives(state).length > 0) return;
@@ -2918,13 +2925,62 @@ function BotThreat(state) {
  * 掩体接力真正要回答的是这个问题，而不是笼统的"附近有没有敌人面朝我"——
  * 十几米外一个面朝我的哨兵不该否决一次两米的短跳。
  */
+/**
+ * 预测这一跳会被看见多少秒（把敌人的巡逻往前推演，逐段累加）。
+ * "被看见"不等于"被抓"——警觉要爬满 SENSE.alertRiseSec 才算数，
+ * 所以真正该问的是"总曝光时间够不够他抓住我"，而不是"有没有一瞬间被看见"。
+ */
+function BotHopExposure(state, fromX, toX, stealth) {
+  const p = state.player;
+  const scale = stealth ? SENSE.crouchVisibility * SENSE.sneakVisibility : 1;
+  const speed = stealth ? PLAYER.crouchSpeed * 0.72 : PLAYER.walkSpeed;
+  const travel = Math.abs(toX - fromX) / Math.max(0.5, speed);
+  const steps = 8;
+  const step = travel / steps;
+  let worst = 0;
+  for (const e of state.enemies) {
+    if (e.dormant) continue;
+    if (Math.abs(e.y - p.y) > 2.5) continue;
+    const eff = e.visionRange * scale + 1.4;
+    const lo = e.patrol ? Math.min(e.patrol.x0, e.patrol.x1) : e.x;
+    const hi = e.patrol ? Math.max(e.patrol.x0, e.patrol.x1) : e.x;
+    const sp = e.patrol ? e.patrol.speed : 0;
+    let acc = e.alertness * SENSE.alertRiseSec; // 已经涨上去的警觉先算进去
+    for (let i = 0; i <= steps; i++) {
+      const t = i * step;
+      const px = fromX + (toX - fromX) * (i / steps);
+      let ex = e.x;
+      let face = e.facing;
+      if (sp > 0 && hi > lo) {
+        // 把巡逻往前推：撞到端点就折返
+        let x = e.x + face * sp * t;
+        let guard = 0;
+        while ((x < lo || x > hi) && guard++ < 8) {
+          if (x < lo) {
+            x = lo + (lo - x);
+            face = 1;
+          } else {
+            x = hi - (x - hi);
+            face = -1;
+          }
+        }
+        ex = x;
+      }
+      const d = Math.abs(px - ex);
+      const facingP = d < 1.5 || Math.sign(px - ex) === face;
+      if (facingP && d < eff) acc += step;
+    }
+    if (acc > worst) worst = acc;
+  }
+  return worst;
+}
+
 function BotHopSafe(state, fromX, toX, stealth) {
   const p = state.player;
   const scale = stealth ? SENSE.crouchVisibility * SENSE.sneakVisibility : 1;
   const speed = stealth ? PLAYER.crouchSpeed * 0.72 : PLAYER.walkSpeed;
   const dir = toX >= fromX ? 1 : -1;
-  const travel = Math.abs(toX - fromX) / Math.max(0.5, speed);
-  const hopSec = travel + 0.4;
+  const hopSec = Math.abs(toX - fromX) / Math.max(0.5, speed) + 0.4;
   for (const e of state.enemies) {
     if (e.dormant) continue;
     if (Math.abs(e.y - p.y) > 2.5) continue;
@@ -2941,12 +2997,10 @@ function BotHopSafe(state, fromX, toX, stealth) {
     const stayBehind = aheadOfMe && (e.x - toX) * dir > 0 && e.facing === dir;
     // 他在我后面、背朝我 → 也安全。
     const behindMe = !aheadOfMe && e.facing !== dir;
-    if (stayBehind || behindMe) continue;
-    // 被看见不等于被抓：警觉要爬满 alertRiseSec 才算数。
-    // 只放行"他完全没起疑 + 半秒就跑完"的短跳，否则连挨着的两个柴垛都过不去；
-    // 放得再宽就会连着蹭好几段，警觉累加起来照样被抓。
-    if (travel < 0.7 && e.alertness < 0.06) continue;
-    return false;
+    if (!stayBehind && !behindMe) {
+      // 严格判据不过，就看看实际会被盯多久——够短就还是走得掉
+      return BotHopExposure(state, fromX, toX, stealth) < SENSE.alertRiseSec * 0.6;
+    }
   }
   return true;
 }
@@ -2965,13 +3019,19 @@ function BotRetreatDir(state, threat) {
 /** 脚底下就有掩体吗（站上去就能钻进去）。 */
 function BotCoverAt(state, x) {
   const p = state.player;
+  let best = null;
+  let bestD = 1.25;
   for (const prop of state.level.props) {
     if (prop.interact !== "hide") continue;
     if (!InteractAvailable(state, prop)) continue;
     if (Math.abs(prop.y - p.y) > 1.4) continue;
-    if (Math.abs(PropX(state, prop) - x) < 1.25) return prop;
+    const d = Math.abs(PropX(state, prop) - x);
+    if (d < bestD) {
+      bestD = d;
+      best = prop;
+    }
   }
-  return null;
+  return best;
 }
 
 /**
@@ -3136,7 +3196,9 @@ function BotThink(state, bot, dt) {
   } else {
     bot.stuckTimer += dt;
   }
-  if (bot.stuckTimer > 30) {
+  // 只有"真的一动不动"才认定几何卡死。在敌人跟前蹲着等时机不算卡死——
+  // 提前弃权等于白扔掉后面两百秒的尝试机会。
+  if (bot.stuckTimer > 75) {
     bot.giveUp = true;
     bot.failKind = "geometry";
     return;
@@ -3200,6 +3262,7 @@ function BotThink(state, bot, dt) {
   if (bot.desperate >= 2) {
     bot.blockedBy = bot.blockedBy || null;
     bot.failKind = "enemy";
+    bot.stuckTimer = 0; // 这是在硬闯，不是卡住
     if (p.hidden) {
       input.interactPressed = true;
       return;
@@ -3247,13 +3310,13 @@ function BotThink(state, bot, dt) {
     const clear =
       !threat || BotHopSafe(state, p.x, exitTarget, false) || BotHopSafe(state, p.x, exitTarget, true);
     // 实在等不到空窗就硬着头皮出去：宁可难看地通关，也不许无限等待
-    if (clear || bot.hideTimer > 18) {
+    if (clear || bot.hideTimer > 20) {
       input.interactPressed = true;
       if (!clear) {
         // 关键：出来就直接锁定下一个掩体开冲。
         // 否则下一帧发现"没窗口 + 脚下正好有掩体"，会立刻again钻回同一个柴垛，
         // 计时器归零，于是永远在同一个位置进进出出——之前卡死就是卡在这。
-        if (Math.abs(exitTarget - p.x) > 1.15) bot.dashTo = exitTarget;
+        if (Math.abs(exitTarget - p.x) > 0.8) bot.dashTo = exitTarget;
       }
       bot.hideTimer = 0;
       bot.commitTimer = 0;
@@ -3298,7 +3361,7 @@ function BotThink(state, bot, dt) {
 
       // 1) 已经在冲了：冲到底
       if (bot.dashTo != null) {
-        if (Math.abs(bot.dashTo - p.x) < 1.15) {
+        if (Math.abs(bot.dashTo - p.x) < 0.8) {
           bot.dashTo = null;
           bot.commitTimer = 0;
           const arrived = BotCoverAt(state, p.x);
@@ -3320,7 +3383,7 @@ function BotThink(state, bot, dt) {
       // 2) 有窗口（或憋太久）→ 起跑，目标是下一个掩体
       if (windowOpen || commit) {
         const dashX = hopTarget;
-        if (Math.abs(dashX - p.x) > 1.15) bot.dashTo = dashX;
+        if (Math.abs(dashX - p.x) > 0.8) bot.dashTo = dashX;
         bot.commitTimer = 0;
         // 能跑就全速站着跑；只有"跑会被看见但蹭得过去"时才猫腰
         const creep = !safeRun || threat.loud;

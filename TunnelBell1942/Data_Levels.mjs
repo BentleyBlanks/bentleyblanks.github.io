@@ -41,8 +41,9 @@ const FORE = LAYER_Z.FORE;
 //   钟在 x112.5。三个人的视距都是 11，钟响那一刻谁也看不见他（山田从 125 只看到 114）。
 //   猫腰后山田的有效视距约 6.72 米 —— 玩家最多摸到 x≈118 就再也过不去，
 //   离那个口还差 7 米，而猫腰 1.75 m/s 追不过巡逻 1.6 m/s 的正面。
-//   x≥113 一个藏身点都没有（有意清空），但西边 110 还留着最后一垛柴，
-//   所以他能躲一下、被逼出来、再试一次：15–25 秒的徒劳，然后被抓。
+//   老槐树（x104）往东一个藏身点都没有——有意清空的：
+//   这一段的"喘息"只能靠退出视线让警觉衰减，而不是钻进柴垛无限等，
+//   所以玩家可以反复试探、反复被顶回来，十几秒后西边合拢，谁也躲不掉。
 //   敲钟后不再放检查点——这一段没有"重来"。
 // ===========================================================================
 const act1 = {
@@ -140,6 +141,7 @@ const act1 = {
 
     // —— 三道院：兵 + 军犬，长矮墙 ——
     { id: "a1_pr_trough2", x: 81, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
+    { id: "a1_pr_haystack_y3a", x: 84, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_stove1", x: 87, y: 0, z: PLAY, kind: "stove", facing: 1, interact: "none", data: null, label: null },
     { id: "a1_pr_vat_y3", x: 87.5, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a1_pr_house4", x: 90, y: 0, z: MID, kind: "house", facing: -1, interact: "none", data: null, label: null },
@@ -147,7 +149,7 @@ const act1 = {
     { id: "a1_pr_trough_y3", x: 99, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
     { id: "a1_pr_haystack3", x: 97, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_haystack3b", x: 94.5, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
-    { id: "a1_pr_vat3", x: 102, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
+    { id: "a1_pr_vat3", x: 103.5, y: 0, z: PLAY, kind: "vat", facing: 1, interact: "hide", data: { capacity: 1 }, label: "水缸" },
     { id: "a1_pr_fence2", x: 103, y: 0, z: FORE, kind: "fence", facing: 1, interact: "none", data: null, label: null },
 
     // —— 老槐树：钟 ——
@@ -160,7 +162,6 @@ const act1 = {
 
     // —— 追逐段终点：碾盘下的地道口（他没能进去）——
     { id: "a1_pr_trough_h2", x: 116, y: 0, z: PLAY, kind: "trough", facing: 1, interact: "hide", data: { capacity: 1 }, label: "驴槽" },
-    { id: "a1_pr_haystack5", x: 110, y: 0, z: PLAY, kind: "haystack", facing: 1, interact: "hide", data: { capacity: 1 }, label: "柴垛" },
     { id: "a1_pr_millstone", x: 125, y: 0, z: PLAY, kind: "millstone", facing: 1, interact: "hatch", data: { hatchId: "a1_h_exit" }, label: "碾盘下的地道口" },
   ],
 
@@ -187,34 +188,34 @@ const act1 = {
     },
     // 三道院：兵 + 军犬。狗的听觉 10.5，站起来走路（noise 0.42）必被听见。
     {
-      id: "a1_e_search3", x: 92, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 88, x1: 98, speed: 1.45, pauseSec: 0.9 },
+      id: "a1_e_search3", x: 90, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 86, x1: 93, speed: 1.45, pauseSec: 0.9 },
       vision: { range: 11, halfAngleDeg: 34, height: 1.6 },
       hearing: 6.5, probeAt: null,
     },
     {
       id: "a1_e_dog1", x: 98, y: 0, kind: "dog", facing: -1,
-      patrol: { x0: 90, x1: 101, speed: 2.0, pauseSec: 0.6 },
+      patrol: { x0: 95, x1: 102, speed: 2.0, pauseSec: 0.6 },
       vision: { range: 8, halfAngleDeg: 44, height: 0.7 },
       hearing: 10.5, probeAt: null,
     },
     // —— 以下三个由 a1_pr_bell.data.spawn 唤出（敲钟那一下才有），之前应视为不存在 ——
     // 钟响之前它们不存在，所以玩家不可能"先引出追兵再回头敲钟"。
     {
-      id: "a1_e_chase1", x: 92, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 92, x1: 116, speed: 2.2, pauseSec: 0.3 },
+      id: "a1_e_chase1", x: 85, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 85, x1: 116, speed: 1.8, pauseSec: 0.3 },
       vision: { range: 11, halfAngleDeg: 36, height: 1.6 },
       hearing: 7.5, probeAt: null,
     },
     {
-      id: "a1_e_chase2", x: 80, y: 0, kind: "search", facing: 1,
-      patrol: { x0: 80, x1: 108, speed: 2.1, pauseSec: 0.3 },
+      id: "a1_e_chase2", x: 78, y: 0, kind: "search", facing: 1,
+      patrol: { x0: 78, x1: 108, speed: 1.7, pauseSec: 0.3 },
       vision: { range: 11, halfAngleDeg: 36, height: 1.6 },
       hearing: 7.0, probeAt: null,
     },
     // 山田：出口 x125 就在他巡逻区间里。玩家做对一切也过不去——这是叙事必然。
     {
-      id: "a1_e_blocker", x: 125, y: 0, kind: "officer", facing: -1,
+      id: "a1_e_blocker", x: 125, y: 0, kind: "officer", facing: 1,
       patrol: { x0: 117, x1: 125, speed: 1.6, pauseSec: 0.9 },
       vision: { range: 11, halfAngleDeg: 40, height: 1.65 },
       hearing: 7.5, probeAt: null,
