@@ -6,25 +6,37 @@ import {
   SetCell,
   AIR,
 } from "./Script_Dig.mjs";
+import {
+  CanDigWith,
+  CanPlant,
+  CanThrow,
+  ITEM_CHARGE,
+  ITEM_GRENADE,
+  ITEM_NONE,
+  ITEM_SHOVEL,
+  PickupEntity,
+} from "./Script_Items.mjs";
 import { BuildLevel, EvalDigGoals, SURFACE_Y, VIEW_W } from "./Script_World.mjs";
 
 export const PLAYER_W = 26;
 export const PLAYER_H = 48;
 export const GRAVITY = 1850;
 export const MOVE_SPEED = 220;
-export const JUMP_VEL = 680;
 export const DIG_RATE = 0.85;
+export const THROW_SPEED = 420;
 
 export function CreateInputState() {
   return {
     left: false,
     right: false,
     up: false,
-    jump: false,
-    jumpPressed: false,
     dig: false,
     interact: false,
     interactPressed: false,
+    use: false,
+    usePressed: false,
+    drop: false,
+    dropPressed: false,
     crouch: false,
   };
 }
@@ -52,10 +64,13 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
       digging: false,
       digProgress: 0,
       digTarget: null,
+      /** Valiant Hearts: one carried item at a time — not a backpack. */
+      held: ITEM_NONE,
       hp: 3,
       invuln: 0,
       inTunnel: tunnel,
     },
+    projectiles: [],
     cameraX: Math.max(0, level.spawn.x - VIEW_W * 0.35),
     cameraY: tunnel ? level.tunnelFloor - 300 : SURFACE_Y - 360,
     level,
@@ -70,7 +85,7 @@ export function CreateCampaignState(chapterIndex = 0, progress = null) {
     pauseOpen: false,
     transition: 0,
     input: CreateInputState(),
-    stats: { digs: 0, interactions: 0, shots: 0, cellsCarved: 0 },
+    stats: { digs: 0, interactions: 0, shots: 0, cellsCarved: 0, pickups: 0 },
   };
 }
 
@@ -96,11 +111,7 @@ function ResolvePhysics(state, dt) {
   const speed = player.crouching ? MOVE_SPEED * 0.55 : MOVE_SPEED;
   player.vx = move * speed;
   if (move) player.facing = move;
-
-  if (input.jumpPressed && player.onGround && !player.crouching && !input.dig) {
-    player.vy = -JUMP_VEL;
-    player.onGround = false;
-  }
+  // No Mario jump — Valiant Hearts traversal is walk / crawl / dig / hatch.
 
   player.vy += GRAVITY * dt;
 
@@ -142,6 +153,10 @@ function Near(player, ent, radius = 48) {
   const ex = ent.x + (ent.w || 28) / 2;
   const r = ent.radius || radius;
   if (ent.type === "hatch" || ent.layer === "both") return Math.abs(player.x - ex) < r;
+  // Tunnel props sit on a dig floor that can jitter under gravity — match on X.
+  if (ent.tunnelAnchored || ent.type === "plant_zone" || ent.kind === "pickup") {
+    return Math.abs(player.x - ex) < r;
+  }
   return Math.hypot(player.x - ex, player.y - ent.y) < r;
 }
 
@@ -222,22 +237,23 @@ function TryDig(state, dt) {
     player.digProgress = 0;
     return;
   }
+  if (!CanDigWith(player.held)) {
+    player.digProgress = 0;
+    state.interactHint = "need_shovel";
+    if (!state._digNeedWarned) {
+      state._digNeedWarned = true;
+      SetBubble(state, ["shovel", "warn"], "先捡起铁锹", 1.6);
+    }
+    return;
+  }
+  state._digNeedWarned = false;
 
-  const target = PickDigTarget(
-    level.soil,
-    player.x,
-    player.y,
-    player.facing,
-    !!input.crouch,
-    !!input.up || (!!input.jump && !player.onGround) || (!!input.jump && !!input.dig),
-  );
-  // Prefer explicit up while holding dig on ground
-  const target2 =
-    target ||
-    (input.up || (input.jump && input.dig)
-      ? PickDigTarget(level.soil, player.x, player.y, player.facing, false, true)
-      : null);
-  const dig = target2 || target;
+  const digUp = !!input.up;
+  const digDown = !!input.crouch;
+  let dig = PickDigTarget(level.soil, player.x, player.y, player.facing, digDown, digUp);
+  if (!dig && digUp) {
+    dig = PickDigTarget(level.soil, player.x, player.y, player.facing, false, true);
+  }
   if (!dig) {
     player.digProgress = 0;
     state.interactHint = "";
@@ -258,6 +274,108 @@ function TryDig(state, dt) {
     SetBubble(state, ["shovel"], "", 0.6);
   }
   player.digProgress = 0;
+}
+
+function MakeDroppedPickup(player, itemId, side = 1) {
+  const p = PickupEntity(player.x + player.facing * 28 * side, player.inTunnel ? player.y : SURFACE_Y, itemId);
+  p.layer = player.inTunnel ? "tunnel" : "surface";
+  return p;
+}
+
+function DropHeld(state) {
+  const { player, level } = state;
+  if (!player.held) return;
+  const itemId = player.held;
+  player.held = ITEM_NONE;
+  level.entities.push(MakeDroppedPickup(player, itemId, 1));
+  SetBubble(state, [itemId === ITEM_SHOVEL ? "shovel" : itemId === ITEM_CHARGE ? "charge" : "warn"], "放下", 1.0);
+}
+
+function TryPickupOrInteract(state) {
+  const { player, level, input } = state;
+  if (!input.interactPressed || state.transition > 0) return false;
+
+  // Prefer world pickups — one-item carry, swap if hands full
+  for (const ent of level.entities) {
+    if (ent.kind !== "pickup" || ent.taken) continue;
+    if (!LayerOk(player, ent)) continue;
+    if (!Near(player, ent, 46)) continue;
+    const previous = player.held;
+    player.held = ent.itemId;
+    ent.taken = true;
+    ent.hidden = true;
+    state.stats.pickups += 1;
+    if (previous) {
+      level.entities.push(MakeDroppedPickup(player, previous, -1));
+    }
+    const icon = ent.itemId === ITEM_SHOVEL ? "shovel" : ent.itemId === ITEM_CHARGE ? "charge" : "warn";
+    SetBubble(state, [icon], "", 1.2);
+    return true;
+  }
+  return false;
+}
+
+function TryUseItem(state) {
+  const { player, level, input } = state;
+  if (!input.usePressed || state.transition > 0) return;
+
+  if (CanThrow(player.held)) {
+    state.projectiles.push({
+      kind: "grenade",
+      x: player.x + player.facing * 20,
+      y: player.y - 28,
+      vx: player.facing * THROW_SPEED,
+      vy: -220,
+      life: 1.4,
+    });
+    player.held = ITEM_NONE;
+    SetBubble(state, ["warn"], "", 0.8);
+    return;
+  }
+
+  if (CanPlant(player.held)) {
+    for (const ent of level.entities) {
+      if (ent.type !== "plant_zone" || ent.done) continue;
+      if (!LayerOk(player, ent)) continue;
+      if (!Near(player, ent, ent.radius || 56)) continue;
+      if (!GoalReady(state, ent)) {
+        SetBubble(state, ["shovel", "warn"], "", 1.6);
+        return;
+      }
+      ent.done = true;
+      player.held = ITEM_NONE;
+      if (ent.goal) MarkGoal(state, ent.goal);
+      SetSubtitle(state, "高传宝", "药室安好。回地面发信号！", 2.8);
+      return;
+    }
+    SetBubble(state, ["charge", "warn"], "到药室再安放", 1.6);
+  }
+}
+
+function UpdateProjectiles(state, dt) {
+  const next = [];
+  for (const p of state.projectiles || []) {
+    p.vy += GRAVITY * 0.55 * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0) {
+      // Soft impact: break a hostile patrol if close on surface
+      for (const ent of state.level.entities) {
+        if (ent.type !== "patrol" || ent.broken) continue;
+        if (Math.hypot(ent.x - p.x, (ent.y || 0) - p.y) < 70) {
+          ent.hits = (ent.hits || 0) + 2;
+          if (ent.hits >= 3) {
+            ent.broken = true;
+            MarkGoal(state, "break_patrol");
+          }
+        }
+      }
+      continue;
+    }
+    next.push(p);
+  }
+  state.projectiles = next;
 }
 
 function BeginHatchTransition(state, goingDown, ent) {
@@ -289,9 +407,14 @@ function GoalReady(state, ent) {
 function TryInteract(state) {
   const { player, level, input } = state;
   if (!input.interactPressed || state.transition > 0) return;
+  if (TryPickupOrInteract(state)) {
+    state.stats.interactions += 1;
+    return;
+  }
   state.stats.interactions += 1;
 
   for (const ent of level.entities) {
+    if (ent.kind === "pickup") continue;
     if (ent.hidden || ent.done) continue;
     if (!LayerOk(player, ent)) continue;
     if (!Near(player, ent, ent.radius || 52)) continue;
@@ -380,15 +503,20 @@ function TryInteract(state) {
       return;
     }
 
-    if (ent.type === "charge" || ent.type === "signal") {
+    if (ent.type === "plant_zone") {
+      if (!CanPlant(player.held)) {
+        SetBubble(state, ["charge", "warn"], "先拿着炸药包", 1.6);
+        return;
+      }
+      // Planting is F / use — nudge player
+      SetBubble(state, ["charge"], "按 F 安放", 1.4);
+      return;
+    }
+
+    if (ent.type === "signal") {
       ent.done = true;
       if (ent.goal) MarkGoal(state, ent.goal);
-      SetSubtitle(
-        state,
-        ent.type === "charge" ? "高传宝" : "赵平原",
-        ent.type === "charge" ? "药室安好。回地面发信号！" : "总攻——黑风口！",
-        2.8,
-      );
+      SetSubtitle(state, "赵平原", "总攻——黑风口！", 2.8);
       return;
     }
   }
@@ -409,7 +537,7 @@ function UpdateActors(state, dt) {
         if (Math.abs(player.x - ent.x) < 38 && Math.abs(player.y - ent.y) < 40) {
           player.hp -= 1;
           player.invuln = 1.25;
-          player.vy = -300;
+          player.vx = Math.sign(player.x - ent.x || 1) * 180;
           SetSubtitle(state, "危险", "被发现了——蹲下或钻地道。", 2.2);
           if (player.hp <= 0) state.failed = true;
         }
@@ -459,6 +587,16 @@ function RefreshHint(state) {
   if (state.player.digging) return;
   state.interactHint = "";
   for (const ent of state.level.entities) {
+    if (ent.kind === "pickup" && !ent.taken && !ent.hidden) {
+      if (!LayerOk(state.player, ent)) continue;
+      if (Near(state.player, ent, 46)) {
+        state.interactHint = "pickup";
+        return;
+      }
+    }
+  }
+  for (const ent of state.level.entities) {
+    if (ent.kind === "pickup") continue;
     if (ent.hidden || ent.done) continue;
     if (!LayerOk(state.player, ent)) continue;
     if (Near(state.player, ent, ent.radius || 52)) {
@@ -467,6 +605,18 @@ function RefreshHint(state) {
     }
   }
   if (state.player.inTunnel && state.level.soil) {
+    if (!CanDigWith(state.player.held)) {
+      const softNear = PickDigTarget(
+        state.level.soil,
+        state.player.x,
+        state.player.y,
+        state.player.facing,
+        !!state.input.crouch,
+        !!state.input.up,
+      );
+      if (softNear) state.interactHint = "need_shovel";
+      return;
+    }
     const dig = PickDigTarget(
       state.level.soil,
       state.player.x,
@@ -484,12 +634,17 @@ export function StepPlay(state, dt) {
   const clamped = Math.min(0.033, Math.max(0, dt));
 
   UpdateTransition(state, clamped);
+  // Use / pick / talk before physics — standing in a fresh chamber can get
+  // X-shoved by unresolved soil solids for a frame.
+  if (state.input.dropPressed) DropHeld(state);
+  TryUseItem(state);
+  TryInteract(state);
   ResolvePhysics(state, clamped);
   TryDig(state, clamped);
-  TryInteract(state);
   SyncDigGoals(state);
   RefreshHint(state);
   UpdateActors(state, clamped);
+  UpdateProjectiles(state, clamped);
   UpdateCamera(state, clamped);
 
   if (AllGoalsDone(state) && !state.completed) {
@@ -502,8 +657,9 @@ export function StepPlay(state, dt) {
     }
   } else state.winTimer = 0;
 
-  state.input.jumpPressed = false;
   state.input.interactPressed = false;
+  state.input.usePressed = false;
+  state.input.dropPressed = false;
   return state;
 }
 
@@ -535,7 +691,13 @@ export function RestartChapter(state) {
 }
 
 export function SerializeProgress(state) {
-  return { v: 3, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
+  return { v: 4, chapterIndex: state.chapterIndex, unlockedActs: state.unlockedActs };
+}
+
+/** Test helper: put shovel in hand. */
+export function DebugHold(state, itemId = ITEM_SHOVEL) {
+  state.player.held = itemId;
+  return state;
 }
 
 export function LoadProgress(raw) {

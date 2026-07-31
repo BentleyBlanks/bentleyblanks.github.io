@@ -10,6 +10,7 @@ import {
   StepPlay,
 } from "./Script_Rules.mjs";
 import { AIR, HARD, SOFT, CellWorldRect } from "./Script_Dig.mjs";
+import { ITEM_CHARGE, ITEM_GRENADE, ITEM_META, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { SURFACE_Y, VIEW_H, VIEW_W } from "./Script_World.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -73,7 +74,7 @@ function SyncPanels() {
   $("PanelKicker").textContent = `第 ${chapter.act} 页`;
   $("PanelTitle").textContent = chapter.title;
   $("PanelSpeaker").textContent = beat.speaker;
-  $("PanelBody").textContent = beat.body;
+  $("PanelBody").textContent = beat.text || beat.body || "";
   $("PanelProgress").innerHTML = list
     .map((_, i) => `<i class="${i <= state.panelIndex ? "on" : ""}"></i>`)
     .join("");
@@ -84,6 +85,15 @@ function SyncHud() {
   $("HeartRow").innerHTML = [0, 1, 2]
     .map((i) => `<i class="${i < state.player.hp ? "" : "off"}"></i>`)
     .join("");
+  const slot = $("HeldSlot");
+  if (!slot) return;
+  const held = state.player.held;
+  const meta = held ? ITEM_META[held] : null;
+  slot.dataset.empty = held ? "0" : "1";
+  slot.innerHTML = meta
+    ? `<b style="--item:${meta.color}"></b><span>${meta.label}</span><em>${meta.tip}</em>`
+    : `<b></b><span>空手</span><em>走近地上的道具按 E 捡起（一次只拿一件）</em>`;
+  if (meta) slot.querySelector("b").dataset.item = held;
 }
 
 function SyncPhaseUi() {
@@ -426,6 +436,21 @@ function DrawEntity(ent) {
     ctx.fill();
   };
 
+  if (ent.kind === "pickup") {
+    if (ent.taken) {
+      ctx.restore();
+      return;
+    }
+    glow();
+    const bob = Math.sin((performance.now() || 0) * 0.006) * 3 * s;
+    ctx.translate(0, -18 * s + bob);
+    const icon =
+      ent.itemId === ITEM_SHOVEL ? "shovel" : ent.itemId === ITEM_CHARGE ? "charge" : ent.itemId === ITEM_GRENADE ? "warn" : "talk";
+    DrawPictogram(icon, -12 * s, -12 * s, 24 * s);
+    ctx.restore();
+    return;
+  }
+
   if (ent.type === "talk" || ent.type === "spy_talk" || ent.type === "shelter") {
     if (!ent.done) glow();
     ctx.fillStyle = ent.type === "spy_talk" ? "#6b7058" : ent.type === "shelter" ? "#c4a27a" : "#4a5d4a";
@@ -455,11 +480,14 @@ function DrawEntity(ent) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-  } else if (ent.type === "flip_build" || ent.type === "flip_trap" || ent.type === "charge" || ent.type === "signal") {
+  } else if (ent.type === "flip_build" || ent.type === "flip_trap" || ent.type === "plant_zone" || ent.type === "signal") {
     if (!ent.done) glow();
-    ctx.fillStyle = ent.done ? "#7a7264" : "#a6452f";
+    ctx.fillStyle = ent.done ? "#7a7264" : ent.type === "plant_zone" ? "#5a3a28" : "#a6452f";
     ctx.fillRect(-20 * s, -28 * s, 40 * s, 28 * s);
     ctx.strokeRect(-20 * s, -28 * s, 40 * s, 28 * s);
+    if (ent.type === "plant_zone" && !ent.done) {
+      DrawPictogram("charge", -10 * s, -48 * s, 20 * s);
+    }
   } else if (ent.type === "shot_port") {
     if (!ent.used) glow();
     ctx.fillStyle = "#2f5d4a";
@@ -638,9 +666,10 @@ function DrawInteractPromptWorld() {
   const s = Scale();
   const x = WX(state.player.x);
   const y = WY(state.player.y) - 8 * s;
-  const key = hint === "dig" ? "J" : "E";
+  const key =
+    hint === "dig" ? "J" : hint === "plant_zone" && state.player.held === ITEM_CHARGE ? "F" : hint === "need_shovel" ? "E" : "E";
   const icon =
-    hint === "dig"
+    hint === "dig" || hint === "need_shovel" || hint === "pickup"
       ? "shovel"
       : hint === "hatch"
         ? "hatch"
@@ -652,7 +681,7 @@ function DrawInteractPromptWorld() {
               ? "shot"
               : hint === "flip_build" || hint === "flip_trap"
                 ? "flip"
-                : hint === "charge" || hint === "signal"
+                : hint === "plant_zone" || hint === "signal"
                   ? "charge"
                   : "talk";
   // VH floating key circle
@@ -670,6 +699,9 @@ function DrawInteractPromptWorld() {
   ctx.textBaseline = "middle";
   ctx.fillText(key, x + 28 * s, y - 36 * s);
   DrawPictogram(icon, x + 40 * s, y - 52 * s, 18 * s);
+  if (hint === "need_shovel") {
+    DrawPictogram("warn", x + 58 * s, y - 52 * s, 14 * s);
+  }
   if (hint === "dig" && state.player.digging) {
     ctx.strokeStyle = "#a6452f";
     ctx.lineWidth = 3;
@@ -700,16 +732,43 @@ function DrawPlayer() {
   ctx.arc(0, -h - 9 * s, 9 * s, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  if (p.digging) {
+  // Always show carried tool in hand (VH one-item carry)
+  if (p.held === ITEM_SHOVEL || p.digging) {
     ctx.strokeStyle = "#8b6a45";
+    ctx.lineWidth = 3 * s;
     ctx.beginPath();
-    ctx.moveTo(12 * s, -20 * s);
-    ctx.lineTo(30 * s, -6 * s);
+    ctx.moveTo(10 * s, -22 * s);
+    ctx.lineTo(p.digging ? 32 * s : 26 * s, p.digging ? -4 * s : -10 * s);
     ctx.stroke();
     ctx.fillStyle = "#6e5a3a";
-    ctx.fillRect(26 * s, -10 * s, 12 * s, 10 * s);
+    ctx.fillRect((p.digging ? 28 : 22) * s, (p.digging ? -8 : -14) * s, 12 * s, 10 * s);
+  } else if (p.held === ITEM_CHARGE) {
+    ctx.fillStyle = "#4a3a2a";
+    ctx.fillRect(10 * s, -28 * s, 16 * s, 14 * s);
+    ctx.strokeRect(10 * s, -28 * s, 16 * s, 14 * s);
+  } else if (p.held === ITEM_GRENADE) {
+    ctx.fillStyle = "#5a6a3a";
+    ctx.beginPath();
+    ctx.arc(16 * s, -22 * s, 7 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
+}
+
+function DrawProjectiles() {
+  const s = Scale();
+  for (const p of state.projectiles || []) {
+    ctx.save();
+    ctx.fillStyle = "#5a6a3a";
+    ctx.strokeStyle = "#1a1410";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(WX(p.x), WY(p.y), 6 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function DrawGroundStrip(w, h, pal) {
@@ -756,6 +815,7 @@ function Render() {
     for (const shaft of state.level.shafts) DrawShaft(shaft);
     for (const ent of state.level.entities) DrawEntity(ent);
     if (state.phase === "play") {
+      DrawProjectiles();
       DrawPlayer();
       DrawSpeechBubble();
       DrawInteractPromptWorld();
@@ -788,8 +848,11 @@ function BindInput() {
     if (["arrowright", "d"].includes(k)) input.right = down;
     if (["arrowdown", "s"].includes(k)) input.crouch = down;
     if (["j", "shift"].includes(k)) input.dig = down;
-    if (["w", "arrowup"].includes(k)) input.up = down;
-    if (down && [" ", "w", "arrowup"].includes(k)) {
+    if (["w", "arrowup"].includes(k)) {
+      input.up = down;
+      if (down) e.preventDefault();
+    }
+    if (down && (k === " " || k === "enter")) {
       if (state.phase === "panels" || state.phase === "closePanels") {
         state = AdvancePanels(state);
         SaveToStorage(state);
@@ -798,12 +861,11 @@ function BindInput() {
         e.preventDefault();
         return;
       }
-      input.jump = true;
-      input.jumpPressed = true;
+      // Space = interact (pick up / talk / hatch) — not jump
+      input.interactPressed = true;
       e.preventDefault();
     }
-    if (!down && [" ", "w", "arrowup"].includes(k)) input.jump = false;
-    if (down && (k === "e" || k === "f" || k === "enter")) {
+    if (down && k === "e") {
       if (state.phase === "panels" || state.phase === "closePanels") {
         state = AdvancePanels(state);
         SaveToStorage(state);
@@ -812,6 +874,13 @@ function BindInput() {
         return;
       }
       input.interactPressed = true;
+    }
+    if (down && k === "f") {
+      input.usePressed = true;
+      e.preventDefault();
+    }
+    if (down && k === "q") {
+      input.dropPressed = true;
     }
     if (down && k === "escape" && state.phase === "play") {
       SetModal(state.pauseOpen ? null : "pause");
@@ -828,11 +897,9 @@ function BindInput() {
       if (kind === "right") state.input.right = down;
       if (kind === "crouch") state.input.crouch = down;
       if (kind === "dig") state.input.dig = down;
-      if (kind === "jump") {
-        state.input.jump = down;
-        if (down) state.input.jumpPressed = true;
-      }
+      if (kind === "up") state.input.up = down;
       if (kind === "interact" && down) state.input.interactPressed = true;
+      if (kind === "use" && down) state.input.usePressed = true;
     };
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
@@ -897,6 +964,7 @@ function Frame(ts) {
 
   if (state.phase === "play" && !state.pauseOpen && !state.failed) {
     StepPlay(state, dt);
+    SyncHud();
     if (state.failed) {
       Beep(120, 0.2, "sawtooth", 0.04);
       SetModal("fail");

@@ -1,7 +1,7 @@
 /** Film beats — dig system is the spine of every underground act. */
 
-export const SAVE_KEY = "tunnelheart1942_v3";
-export const CACHE_BUST = "20260731d";
+export const SAVE_KEY = "tunnelheart1942_v4";
+export const CACHE_BUST = "20260731e";
 
 export const GAME_META = {
   title: "地道战 · 高家庄",
@@ -45,7 +45,7 @@ export const CHAPTERS = [
       {
         id: "p1c",
         speaker: "提示",
-        text: "下地窖后对着软土按住铁锨。蹲下往下挖，抬头往上挖。硬砖挖不动——看气泡里的记号走。",
+        text: "地上只有一件道具可捡——铁锹。E 捡起，手上拿着才能挖。没有超级玛丽式跳跃：走路、蹲、挖、进出井口。",
         mood: "tip",
       },
     ],

@@ -11,6 +11,13 @@ import {
   CountAirInRect,
   RebuildTunnelSolids,
 } from "./Script_Dig.mjs";
+import { ITEM_CHARGE, ITEM_GRENADE, ITEM_SHOVEL, PickupEntity } from "./Script_Items.mjs";
+
+function PlacePickup(x, y, itemId, layer = "both") {
+  const p = PickupEntity(x, y, itemId);
+  p.layer = layer;
+  return p;
+}
 
 export const SURFACE_Y = 0;
 export const VIEW_W = 960;
@@ -116,10 +123,11 @@ function BuildAct1() {
       y: SURFACE_Y,
       layer: "surface",
       speaker: "高老忠",
-      line: "三家各有个土洞，互不相通。你下去，一锨一锨挖穿——通了才算地道。",
+      line: "铁锹在井边。捡起来再下洞——空手挖不动土。",
       hint: "与高老忠交谈",
       goal: "talk_laozhong",
     }),
+    PlacePickup(180, SURFACE_Y, ITEM_SHOVEL, "surface"),
     Ent({
       id: "hatch1",
       type: "hatch",
@@ -128,7 +136,7 @@ function BuildAct1() {
       layer: "both",
       w: 40,
       h: 18,
-      hint: "按 E 下地窖（下面全是土，要自己挖）",
+      hint: "按 E 下地窖（先捡铁锹）",
       goal: "enter_hatch",
       tunnelX: a.x,
       tunnelY: a.y + 10,
@@ -185,6 +193,7 @@ function BuildAct2() {
     { x: CellCenter(soil, east.c + 1, east.r).x, label: "东窖（待挖）" },
   ];
   level.entities = [
+    PlacePickup(w.x - 50, SURFACE_Y, ITEM_SHOVEL, "surface"),
     Ent({
       id: "hatch2a",
       type: "hatch",
@@ -303,6 +312,7 @@ function BuildAct3() {
   level.shafts = [{ x: startPt.x, label: "灶台口" }];
   const trapX = CellCenter(soil, 30, 3).x;
   level.entities = [
+    PlacePickup(startPt.x - 36, startPt.y + 16, ITEM_SHOVEL, "tunnel"),
     Ent({
       id: "flip_build",
       type: "flip_build",
@@ -411,6 +421,8 @@ function BuildAct4() {
     { x: portX(42), label: "灶台（上挖）" },
   ];
   level.entities = [
+    PlacePickup(s.x - 40, SURFACE_Y, ITEM_SHOVEL, "surface"),
+    PlacePickup(s.x + 70, SURFACE_Y, ITEM_GRENADE, "surface"),
     Ent({
       id: "h4",
       type: "hatch",
@@ -513,18 +525,21 @@ function BuildAct5() {
     { x: chargePt.x, label: "炮楼根（待挖）" },
   ];
   level.entities = [
+    PlacePickup(s.x + 40, s.y + 16, ITEM_SHOVEL, "tunnel"),
+    PlacePickup(s.x - 40, s.y + 16, ITEM_CHARGE, "tunnel"),
     Ent({
-      id: "charge",
-      type: "charge",
+      id: "plant_zone",
+      type: "plant_zone",
       x: chargePt.x,
       y: chargePt.y + 16,
       layer: "tunnel",
       w: 40,
       h: 28,
-      hint: "挖通药室后按 E 安放炸药",
+      hint: "挖通后空手拿炸药包过来，按 F 安放",
       goal: "plant_charge",
       requiresGoal: "link_charge",
       tunnelAnchored: true,
+      radius: 56,
     }),
     Ent({
       id: "hatch5",

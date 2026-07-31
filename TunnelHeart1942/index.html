@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bentleyblanks.github.io/TunnelHeart1942/">
   <title>地道战 · 高家庄</title>
-  <link rel="stylesheet" href="./Style_Game.css?v=20260731d">
+  <link rel="stylesheet" href="./Style_Game.css?v=20260731e">
 </head>
 <body>
   <main id="GameShell" class="gameShell" aria-label="地道战高家庄">
@@ -74,11 +74,14 @@
       </article>
     </section>
 
-    <!-- Valiant Hearts: almost no HUD — pause, hearts, bubbles live on canvas -->
+    <!-- Valiant Hearts: hearts + one held-item slot (not a backpack) -->
     <section id="GameHud" class="gameHud" hidden>
       <div class="vhChrome">
         <div id="HeartRow" class="heartRow" aria-label="体力"></div>
         <button id="PauseButton" class="pauseButton" type="button" aria-label="暂停">Ⅱ</button>
+      </div>
+      <div id="HeldSlot" class="heldSlot" data-empty="1" aria-label="手持道具">
+        <b></b><span>空手</span><em>走近地上的道具按 E 捡起</em>
       </div>
 
       <div class="touchPad" aria-label="触屏操作">
@@ -88,9 +91,10 @@
         </div>
         <div class="cluster">
           <button type="button" class="wide" data-touch="dig" aria-label="挖掘">⛏</button>
-          <button type="button" data-touch="crouch" aria-label="蹲下">↓</button>
-          <button type="button" data-touch="jump" aria-label="跳跃">↑</button>
-          <button type="button" data-touch="interact" aria-label="互动">●</button>
+          <button type="button" data-touch="crouch" aria-label="蹲/下挖">↓</button>
+          <button type="button" data-touch="up" aria-label="上挖">↑</button>
+          <button type="button" data-touch="interact" aria-label="捡/互动">E</button>
+          <button type="button" data-touch="use" aria-label="使用道具">F</button>
         </div>
       </div>
     </section>
@@ -98,16 +102,16 @@
     <div id="ModalLayer" class="modalLayer" hidden>
       <article id="HelpModal" class="modalCard" hidden>
         <h2>操作</h2>
-        <p>A/D 移动 · 空格跳 · S 蹲/下挖 · W 上挖 · 按住 J 挖软土 · E 靠近互动 · Esc 暂停</p>
-        <p>没有任务栏。听人说话、看气泡里的记号：铁锨、井口、钟、翻口。</p>
+        <p>A/D 走 · S 蹲/下挖 · W 上挖 · 按住 J 挖（须手持铁锹）· E/空格 捡物或互动 · F 使用手中道具 · Q 放下 · Esc 暂停</p>
+        <p>没有跳跃，也没有背包。地上一次只能捡一件拿在手里——左下角就是你手里那件。</p>
         <div class="modalActions">
           <button id="CloseHelpButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
       </article>
       <article id="HistoryModal" class="modalCard" hidden>
         <h2>说明</h2>
-        <p>剧情骨架取自电影《地道战》。界面与叙事形式对齐《勇敢的心：世界大战》：漫画页、气泡记号、极简操作，不挂任务清单。</p>
-        <p>白盒零贴图。地道由土壤格网挖出。</p>
+        <p>剧情骨架取自电影《地道战》。形式对齐《勇敢的心：世界大战》：漫画页、气泡记号、单手持物、极简界面。</p>
+        <p>白盒零贴图。地道由土壤格网挖出；铁锹在地上，捡起来才能挖。</p>
         <div class="modalActions">
           <button id="CloseHistoryButton" class="primaryButton" type="button"><span>好</span></button>
         </div>
@@ -131,6 +135,6 @@
     </div>
   </main>
   <h1 class="visuallyHidden">地道战 · 高家庄</h1>
-  <script type="module" src="./Script_Game.mjs?v=20260731d"></script>
+  <script type="module" src="./Script_Game.mjs?v=20260731e"></script>
 </body>
 </html>

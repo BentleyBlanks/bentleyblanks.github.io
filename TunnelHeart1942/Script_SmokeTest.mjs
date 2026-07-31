@@ -1,9 +1,11 @@
 import { CHAPTERS, SAVE_KEY } from "./Data_Story.mjs";
-import { AIR, GetCell, SOFT } from "./Script_Dig.mjs";
+import { AIR, GetCell, RebuildTunnelSolids, SOFT } from "./Script_Dig.mjs";
+import { ITEM_CHARGE, ITEM_SHOVEL } from "./Script_Items.mjs";
 import { AirConnected, BuildLevel, EvalDigGoals } from "./Script_World.mjs";
 import {
   CreateCampaignState,
   DebugCarvePath,
+  DebugHold,
   GoalsRemaining,
   LoadProgress,
   SerializeProgress,
@@ -57,7 +59,6 @@ function TestCarveConnectsAct1() {
   const state = Play(0);
   HatchDown(state, "hatch1");
   Assert(state.goalsDone.enter_hatch, "enter");
-  // Carve A(5,3) -> B(23,3) -> C(41,4) through soft
   DebugCarvePath(state, 5, 3, 23, 3);
   Assert(state.goalsDone.link_ab, "link_ab after carve");
   DebugCarvePath(state, 23, 3, 41, 4);
@@ -68,19 +69,47 @@ function TestCarveConnectsAct1() {
   );
 }
 
-function TestDigCellByCell() {
+function TestNoJump() {
+  const state = Play(0);
+  state.player.onGround = true;
+  state.player.vy = 0;
+  const y0 = state.player.y;
+  state.input.up = true;
+  for (let i = 0; i < 20; i++) StepPlay(state, 1 / 30);
+  Assert(state.player.y >= y0 - 2, "W/up does not launch into the air");
+  Assert(!Object.prototype.hasOwnProperty.call(state.input, "jumpPressed"), "input has no jumpPressed");
+}
+
+function TestPickupShovelRequired() {
+  const state = Play(0);
+  const shovel = state.level.entities.find((e) => e.kind === "pickup" && e.itemId === ITEM_SHOVEL);
+  Assert(!!shovel, "act1 has shovel on ground");
+  Assert(state.player.held == null, "starts empty-handed");
+  state.player.x = shovel.x;
+  state.player.y = shovel.y;
+  state.input.interactPressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.player.held === ITEM_SHOVEL, "E picks up shovel");
+  Assert(shovel.taken, "pickup consumed");
+}
+
+function TestDigNeedsShovel() {
   const state = Play(0);
   HatchDown(state, "hatch1");
-  // Stand at right edge of cellar A, face the soft wall
   const hatch = state.level.entities.find((e) => e.id === "hatch1");
   state.player.x = hatch.tunnelX + 80;
   state.player.y = hatch.tunnelY;
   state.player.facing = 1;
   state.player.onGround = true;
+  state.player.held = null;
   const before = state.stats.cellsCarved;
   state.input.dig = true;
   for (let i = 0; i < 100; i++) StepPlay(state, 1 / 30);
-  Assert(state.stats.cellsCarved > before, "held dig carves soft cell at wall");
+  Assert(state.stats.cellsCarved === before, "cannot dig empty-handed");
+  DebugHold(state, ITEM_SHOVEL);
+  state.input.dig = true;
+  for (let i = 0; i < 100; i++) StepPlay(state, 1 / 30);
+  Assert(state.stats.cellsCarved > before, "shovel dig carves soft cell");
 }
 
 function TestAct2MustDigBeforeShelter() {
@@ -92,9 +121,7 @@ function TestAct2MustDigBeforeShelter() {
   state.input.interactPressed = true;
   StepPlay(state, 1 / 30);
   Assert(!state.goalsDone.shelter_a, "cannot shelter before dig link");
-  // Dig east chamber + path
   DebugCarvePath(state, 6, 3, 29, 3);
-  // Fill zone air
   for (let r = 2; r < 5; r++) {
     for (let c = 28; c < 32; c++) {
       state.level.soil.cells[r][c] = AIR;
@@ -106,17 +133,40 @@ function TestAct2MustDigBeforeShelter() {
   Assert(state.goalsDone.link_safe || EvalDigGoals(state.level).link_safe, "safe linked");
 }
 
-function TestAct5Maze() {
+function TestAct5PlantNeedsCharge() {
   const state = Play(4);
   Assert(state.player.inTunnel, "act5 starts underground");
-  const links = EvalDigGoals(state.level);
-  Assert(!links.link_charge, "charge not linked at start");
+  const chargePick = state.level.entities.find((e) => e.kind === "pickup" && e.itemId === ITEM_CHARGE);
+  const zone = state.level.entities.find((e) => e.type === "plant_zone");
+  Assert(!!chargePick && !!zone, "charge pickup + plant zone");
   DebugCarvePath(state, 4, 4, 49, 4);
   for (let r = 3; r < 5; r++) {
     for (let c = 48; c < 51; c++) state.level.soil.cells[r][c] = AIR;
   }
+  RebuildTunnelSolids(state.level);
   StepPlay(state, 1 / 30);
   Assert(state.goalsDone.link_charge || EvalDigGoals(state.level).link_charge, "charge linked after carve");
+
+  state.player.x = zone.x;
+  state.player.y = zone.y;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.player.onGround = true;
+  state.player.held = null;
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(!state.goalsDone.plant_charge, "cannot plant without charge in hand");
+
+  state.player.x = zone.x;
+  state.player.y = zone.y;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.player.onGround = true;
+  state.player.held = ITEM_CHARGE;
+  state.input.usePressed = true;
+  StepPlay(state, 1 / 30);
+  Assert(state.goalsDone.plant_charge, "F plants charge at zone");
+  Assert(state.player.held == null, "hands empty after plant");
 }
 
 function TestChaptersHaveSoil() {
@@ -125,8 +175,12 @@ function TestChaptersHaveSoil() {
     const level = BuildLevel(ch.id);
     Assert(!!level.soil, `${ch.id} soil`);
     Assert((level.digLinks?.length || 0) + (level.digZones?.length || 0) > 0, `${ch.id} dig objectives`);
+    Assert(
+      level.entities.some((e) => e.kind === "pickup" && e.itemId === ITEM_SHOVEL),
+      `${ch.id} has shovel pickup`,
+    );
   }
-  Assert(SAVE_KEY.endsWith("_v3"), "save v3");
+  Assert(SAVE_KEY.endsWith("_v4"), "save v4");
   const blob = SerializeProgress(Play(0));
   Assert(LoadProgress(blob).chapterIndex === 0, "save");
 }
@@ -135,16 +189,18 @@ function Main() {
   TestChaptersHaveSoil();
   TestSoilNotGifted();
   TestCarveConnectsAct1();
-  TestDigCellByCell();
+  TestNoJump();
+  TestPickupShovelRequired();
+  TestDigNeedsShovel();
   TestAct2MustDigBeforeShelter();
-  TestAct5Maze();
+  TestAct5PlantNeedsCharge();
   const leftover = GoalsRemaining(Play(0));
   Assert(leftover.length === 4, "act1 starts with 4 open goals");
   if (failed) {
     console.error(`\n${failed} failed`);
     process.exit(1);
   }
-  console.log("\nTunnelHeart1942 dig-system smoke OK");
+  console.log("\nTunnelHeart1942 item-carry smoke OK");
 }
 
 Main();

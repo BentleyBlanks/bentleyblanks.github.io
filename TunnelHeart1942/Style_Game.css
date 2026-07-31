@@ -184,6 +184,47 @@ button { font: inherit; cursor: pointer; }
   box-shadow: 3px 3px 0 rgba(0,0,0,.3); font-weight: 700;
 }
 
+/* Valiant Hearts one-item carry — single slot, not inventory */
+.heldSlot {
+  position: absolute; left: 14px; top: 7%;
+  display: grid; grid-template-columns: 44px 1fr; grid-template-rows: auto auto;
+  column-gap: 10px; align-items: center;
+  max-width: min(280px, 46vw);
+  pointer-events: none;
+  background: rgba(239, 226, 200, .92);
+  border: 2.5px solid var(--ink);
+  box-shadow: 3px 3px 0 rgba(0,0,0,.28);
+  padding: 8px 10px;
+}
+.heldSlot b {
+  grid-row: 1 / span 2;
+  width: 44px; height: 44px;
+  border: 2px solid var(--ink);
+  background:
+    linear-gradient(135deg, rgba(0,0,0,.06), transparent),
+    var(--item, #c9b89a);
+  position: relative;
+}
+.heldSlot[data-empty="1"] b { background: repeating-linear-gradient(45deg, #d8c9a8, #d8c9a8 4px, #cbb996 4px, #cbb996 8px); }
+.heldSlot b[data-item="shovel"]::after {
+  content: ""; position: absolute; inset: 10px 18px 8px 18px;
+  background: #3a2a18; box-shadow: -6px 14px 0 -2px #6e5a3a, 6px 14px 0 -2px #6e5a3a;
+}
+.heldSlot b[data-item="charge"]::after {
+  content: ""; position: absolute; left: 12px; right: 12px; top: 14px; bottom: 10px;
+  background: #2a2018; border: 2px solid #1a1410;
+}
+.heldSlot b[data-item="grenade"]::after {
+  content: ""; position: absolute; left: 14px; right: 14px; top: 12px; bottom: 12px;
+  border-radius: 50%; background: #4a5a30; border: 2px solid #1a1410;
+}
+.heldSlot span {
+  font-family: var(--display); font-size: 1.15rem; line-height: 1.1; color: var(--ink);
+}
+.heldSlot em {
+  font-style: normal; font-size: .72rem; color: rgba(26,20,16,.72); line-height: 1.35;
+}
+
 .touchPad {
   position: absolute; left: 12px; right: 12px; bottom: 7%;
   display: none; justify-content: space-between; gap: 12px; pointer-events: none;
